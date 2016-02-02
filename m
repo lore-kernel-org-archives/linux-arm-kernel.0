@@ -1,75 +1,114 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Tue, 2 Feb 2016 07:52:39 +0100
-Subject: [PATCH v3 2/2] clk: sunxi: Refactor A31 PLL6 so that it can be
- reused
-In-Reply-To: <20160201201754.GI4652@lukather>
-References: <1454008958-12655-1-git-send-email-maxime.ripard@free-electrons.com>
- <1454008958-12655-2-git-send-email-maxime.ripard@free-electrons.com>
- <20160130185714.7abcf1de9ef8108c2f48c7fe@free.fr>
- <20160201201754.GI4652@lukather>
-Message-ID: <20160202075239.e4318e9dced1eeed29c593f6@free.fr>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 2 Feb 2016 14:53:07 +0800
+Subject: [PATCH 1/4] ARM: dts: imx53: add ethernet PHY supply regulator
+In-Reply-To: <1453295362-18798-2-git-send-email-LW@KARO-electronics.de>
+References: <1453295362-18798-1-git-send-email-LW@KARO-electronics.de>
+ <1453295362-18798-2-git-send-email-LW@KARO-electronics.de>
+Message-ID: <20160202065306.GH8307@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 1 Feb 2016 21:17:54 +0100
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-
-> > Also, for the H3 PLL periph1 (aka PLL8), why didn't you create a
-> > 'pll8x2' clock with 'pll8' as a divider?
+On Wed, Jan 20, 2016 at 02:09:19PM +0100, Lothar Wa?mann wrote:
+> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+> ---
+>  arch/arm/boot/dts/imx53-tx53.dtsi | 40 ++++++++++++++++++++++++++++++---------
+>  1 file changed, 31 insertions(+), 9 deletions(-)
 > 
-> No one seems to use it. We can always add it later in a separate
-> patch when someone will.
-
-Well, then, I don't understand. The pll periph/peripheral/periph0,
-aka PLL6 works well for many SoCs and there is no need to change
-its DT definition.
-
-In the patch header, you wrote:
-
-> Remove the fixed dividers from the PLL6 driver to be able to have a
-> reusable driver that can be used across several SoCs that share the same
-> controller, but don't have the same set of dividers for this clock, and to
-> also be reused multiple times in the same SoC, since we're droping the
-> clock name.
-
-then, for the H3, you do
-(the comment should be "until pll8 can be reused"),
-
-> -		/* dummy clock until pll6 can be reused */
-> -		pll8: pll8_clk {
-> +		pll8: clk at 01c20044 {
->  			#clock-cells = <0>;
-> -			compatible = "fixed-clock";
-> -			clock-frequency = <1>;
-> +			compatible = "allwinner,sun6i-a31-pll6-clk";
-> +			reg = <0x01c20044 0x4>;
-> +			clocks = <&osc24M>;
->  			clock-output-names = "pll8";
+> diff --git a/arch/arm/boot/dts/imx53-tx53.dtsi b/arch/arm/boot/dts/imx53-tx53.dtsi
+> index d3e50b2..8f08389 100644
+> --- a/arch/arm/boot/dts/imx53-tx53.dtsi
+> +++ b/arch/arm/boot/dts/imx53-tx53.dtsi
+> @@ -87,9 +87,20 @@
+>  			regulator-max-microvolt = <3300000>;
 >  		};
+>  
+> -		reg_can_xcvr: regulator at 2 {
+> +		reg_3v3_etn: regulator at 2 {
 
-that is, you add the PLL8, don't you?
+Why cannot this be added as regulator at 5 to avoid changing every node?
 
-And, further, you change the MMC clocks:
+>  			compatible = "regulator-fixed";
+>  			reg = <2>;
+> +			regulator-name = "ETN 3V3";
+> +			regulator-min-microvolt = <3300000>;
+> +			regulator-max-microvolt = <3300000>;
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&pinctrl_etn_phy>;
+> +			gpio = <&gpio3 20 GPIO_ACTIVE_HIGH>;
+> +		};
+> +
+> +		reg_can_xcvr: regulator at 3 {
+> +			compatible = "regulator-fixed";
+> +			reg = <3>;
+>  			regulator-name = "CAN XCVR";
+>  			regulator-min-microvolt = <3300000>;
+>  			regulator-max-microvolt = <3300000>;
+> @@ -98,9 +109,9 @@
+>  			gpio = <&gpio4 21 GPIO_ACTIVE_HIGH>;
+>  		};
+>  
+> -		reg_usbh1_vbus: regulator at 3 {
+> +		reg_usbh1_vbus: regulator at 4 {
+>  			compatible = "regulator-fixed";
+> -			reg = <3>;
+> +			reg = <4>;
+>  			regulator-name = "usbh1_vbus";
+>  			regulator-min-microvolt = <5000000>;
+>  			regulator-max-microvolt = <5000000>;
+> @@ -110,9 +121,9 @@
+>  			enable-active-high;
+>  		};
+>  
+> -		reg_usbotg_vbus: regulator at 4 {
+> +		reg_usbotg_vbus: regulator at 5 {
+>  			compatible = "regulator-fixed";
+> -			reg = <4>;
+> +			reg = <5>;
+>  			regulator-name = "usbotg_vbus";
+>  			regulator-min-microvolt = <5000000>;
+>  			regulator-max-microvolt = <5000000>;
+> @@ -204,13 +215,20 @@
+>  	phy-mode = "rmii";
+>  	phy-reset-gpios = <&gpio7 6 GPIO_ACTIVE_HIGH>;
+>  	phy-handle = <&phy0>;
+> +	phy-supply = <&reg_3v3_etn>;
+>  	mac-address = [000000000000]; /* placeholder; will be overwritten by bootloader */
+>  	status = "okay";
+>  
+> -	phy0: ethernet-phy at 0 {
+> -		interrupt-parent = <&gpio2>;
+> -		interrupts = <4>;
+> -		device_type = "ethernet-phy";
+> +	mdio {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		phy0: ethernet-phy at 0 {
+> +			compatible = "ethernet-phy-id0007.c0f1", "ethernet-phy-ieee802.3-c22";
+> +			reg = <0>;
+> +			interrupt-parent = <&gpio2>;
+> +			interrupts = <4>;
+> +		};
 
-> @@ -243,7 +243,7 @@
->  			#clock-cells = <1>;
->  			compatible = "allwinner,sun4i-a10-mmc-clk";
->  			reg = <0x01c20088 0x4>;
-> -			clocks = <&osc24M>, <&pll6 0>, <&pll8>;
-> +			clocks = <&osc24M>, <&pll6>, <&pll8>;
->  			clock-output-names = "mmc0",
->  					     "mmc0_output",
->  					     "mmc0_sample";
+This should be a separate change.
 
-where the PLL8 is already used.
+Shawn
 
-So, how can you say
-
-> No one seems to use it. We can always add it later in a separate
-> patch when someone will.
-
-?
-
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+>  	};
+>  };
+>  
+> @@ -309,6 +327,10 @@
+>  			fsl,pins = <MX53_PAD_DISP0_DAT0__GPIO4_21 0xe0>; /* Flexcan XCVR enable */
+>  		};
+>  
+> +		pinctrl_etn_phy: etn-phygrp {
+> +			fsl,pins = <MX53_PAD_EIM_D20__GPIO3_20 0xe0>; /* ETN PHY Power enable */
+> +		};
+> +
+>  		pinctrl_ds1339: ds1339grp {
+>  			fsl,pins = <MX53_PAD_DI0_PIN4__GPIO4_20 0xe0>;
+>  		};
+> -- 
+> 2.1.4
+> 
+> 
