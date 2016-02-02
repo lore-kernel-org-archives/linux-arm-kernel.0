@@ -1,136 +1,79 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue,  2 Feb 2016 11:39:59 +0000
-Subject: [PATCH v2 10/10] ARM: dts: introduce MPS2 AN399/AN400
-In-Reply-To: <1454413199-26573-1-git-send-email-vladimir.murzin@arm.com>
-References: <1454413199-26573-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1454413199-26573-11-git-send-email-vladimir.murzin@arm.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Tue, 02 Feb 2016 12:41:40 +0100
+Subject: [PATCH v10 4/8] mfd: fsl imx25 Touchscreen ADC driver
+In-Reply-To: <20160111065441.GW3331@x1>
+References: <1450101234-2191-1-git-send-email-mpa@pengutronix.de>
+ <1450101234-2191-5-git-send-email-mpa@pengutronix.de>
+ <20160111065441.GW3331@x1>
+Message-ID: <6151166.y0HMDdqtvF@adelgunde>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Application Notes 399 and 400 shares the same memory map and
-features. Both are shipped with Cortex-M7 and have the same  peripheral
-as AN385/AN386, but with different location of PSRAM and Ethernet
-controller.
+Hi,
 
-Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
----
- arch/arm/boot/dts/Makefile       |    4 +-
- arch/arm/boot/dts/mps2-an399.dts |   92 ++++++++++++++++++++++++++++++++++++++
- 2 files changed, 95 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/mps2-an399.dts
+On Monday, January 11, 2016 06:54:41 AM Lee Jones wrote:
+> On Mon, 14 Dec 2015, Markus Pargmann wrote:
+> 
+> > This is the core driver for imx25 touchscreen/adc driver. The module
+> > has one shared ADC and two different conversion queues which use the
+> > ADC. The two queues are identical. Both can be used for general purpose
+> > ADC but one is meant to be used for touchscreens.
+> > 
+> > This driver is the core which manages the central components and
+> > registers of the TSC/ADC unit. It manages the IRQs and forwards them to
+> > the correct components.
+> > 
+> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> > Signed-off-by: Denis Carikli <denis@eukrea.com>
+> > 
+> > [ensure correct ADC clock depending on the IPG clock]
+> > Signed-off-by: Juergen Borleis <jbe@pengutronix.de>
+> > Acked-by: Jonathan Cameron <jic23@kernel.org>
+> > ---
+> > 
+> > Notes:
+> >     Changes in v7:
+> >      - Cleanup bit defines in header files to be more readable
+> >      - Fix irq check to return with an error for irq <= 0
+> >      - Add COMPILE_TEST in Kconfig file
+> >     
+> >     Changes in v5:
+> >      - Remove ifdef CONFIG_OF as this driver is only for DT usage
+> >      - Remove module owner
+> >      - Add Kconfig dependencies ARCH_MX25 and OF
+> > 
+> >  drivers/mfd/Kconfig             |   9 ++
+> >  drivers/mfd/Makefile            |   2 +
+> >  drivers/mfd/fsl-imx25-tsadc.c   | 203 ++++++++++++++++++++++++++++++++++++++++
+> >  include/linux/mfd/imx25-tsadc.h | 140 +++++++++++++++++++++++++++
+> >  4 files changed, 354 insertions(+)
+> >  create mode 100644 drivers/mfd/fsl-imx25-tsadc.c
+> >  create mode 100644 include/linux/mfd/imx25-tsadc.h
+> 
+> For my own reference:
+>   Acked-by: Lee Jones <lee.jones@linaro.org>
+> 
+> I will apply this and sent out pull-requests to the relevant
+> maintainers once -rc1 is out.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 96418d2..ad5622b 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -245,7 +245,9 @@ dtb-$(CONFIG_ARCH_MMP) += \
- dtb-$(CONFIG_MACH_MESON8B) += \
- 	meson8b-mxq.dtb \
- 	meson8b-odroidc1.dtb
--dtb-$(CONFIG_ARCH_MPS2) += mps2-an385.dtb
-+dtb-$(CONFIG_ARCH_MPS2) += \
-+	mps2-an385.dtb \
-+	mps2-an399.dtb
- dtb-$(CONFIG_ARCH_MOXART) += \
- 	moxart-uc7112lx.dtb
- dtb-$(CONFIG_SOC_IMX1) += \
-diff --git a/arch/arm/boot/dts/mps2-an399.dts b/arch/arm/boot/dts/mps2-an399.dts
-new file mode 100644
-index 0000000..e591d75
---- /dev/null
-+++ b/arch/arm/boot/dts/mps2-an399.dts
-@@ -0,0 +1,92 @@
-+/*
-+ * Copyright (C) 2015 ARM Limited
-+ *
-+ * Author: Vladimir Murzin <vladimir.murzin@arm.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+
-+#include "mps2.dtsi"
-+
-+/ {
-+	model = "ARM MPS2 Application Note 399/400";
-+	compatible = "arm,mps2";
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	chosen {
-+		bootargs = "rdinit=/sbin/init earlycon";
-+		stdout-path = "serial0:9600n8";
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x60000000 0x1000000>;
-+	};
-+
-+
-+	ethernet at a0000000 {
-+		compatible = "smsc,lan9220", "smsc,lan9115";
-+		reg = <0xa0000000 0x10000>;
-+		interrupts = <13>;
-+		interrupt-parent = <&nvic>;
-+		smsc,irq-active-high;
-+	};
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
-+
-+
-+&timer0 {
-+	status = "okay";
-+};
-+
-+&timer1 {
-+	status = "okay";
-+};
-+
-+&wdt {
-+	status = "okay";
-+};
+Thanks. Do you mean just this patch or the whole series?
+
+Shall I resend the whole series to fix the commit title of the first
+patch?
+
+Best Regards,
+
+Markus
+
 -- 
-1.7.9.5
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160202/7ec6e01c/attachment.sig>
