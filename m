@@ -1,22 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 02 Feb 2016 09:32:05 +0100
-Subject: [PATCH 1/4] ARM: dts: ls1021a: add PCIe dts node
-In-Reply-To: <1454401807-28751-1-git-send-email-Minghuan.Lian@nxp.com>
-References: <1454401807-28751-1-git-send-email-Minghuan.Lian@nxp.com>
-Message-ID: <1640613.2DY3gpScUX@wuerfel>
+From: clabbe.montjoie@gmail.com (LABBE Corentin)
+Date: Tue, 2 Feb 2016 09:42:54 +0100
+Subject: [linux-sunxi] [PATCH 02/11] crypto: sunxi-ss: prevent
+ compilation on 64-bit
+In-Reply-To: <1454348370-3816-3-git-send-email-andre.przywara@arm.com>
+References: <1454348370-3816-1-git-send-email-andre.przywara@arm.com>
+ <1454348370-3816-3-git-send-email-andre.przywara@arm.com>
+Message-ID: <20160202084254.GA22621@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 02 February 2016 16:30:07 Minghuan Lian wrote:
-> LS1021a contains two PCIe controllers. The patch adds their node to
-> dts file.
+On Mon, Feb 01, 2016 at 05:39:21PM +0000, Andre Przywara wrote:
+> The driver for the sunxi-ss crypto engine is not entirely 64-bit safe,
+> compilation on arm64 spits some warnings.
+> The proper fix was deemed to involved [1], so since 64-bit SoCs won't
+> have this IP block we just disable this driver for 64-bit.
 > 
-> Signed-off-by: Minghuan Lian <Minghuan.Lian@nxp.com>
+> [1]: http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/399988.html
+>      (and the reply)
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+
+Acked-by: Corentin LABBE <clabbe.montjoie@gmail.com>
+
 > ---
->  arch/arm/boot/dts/ls1021a.dtsi | 44 ++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 44 insertions(+)
+>  drivers/crypto/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-
-Looks ok to me, please submit to the ARM imx maintainers for merging.
-
-	Arnd
+> diff --git a/drivers/crypto/Kconfig b/drivers/crypto/Kconfig
+> index 07d4942..737200f 100644
+> --- a/drivers/crypto/Kconfig
+> +++ b/drivers/crypto/Kconfig
+> @@ -487,7 +487,7 @@ config CRYPTO_DEV_IMGTEC_HASH
+>  
+>  config CRYPTO_DEV_SUN4I_SS
+>  	tristate "Support for Allwinner Security System cryptographic accelerator"
+> -	depends on ARCH_SUNXI
+> +	depends on ARCH_SUNXI && !64BIT
+>  	select CRYPTO_MD5
+>  	select CRYPTO_SHA1
+>  	select CRYPTO_AES
+> -- 
+> 2.6.4
+> 
+> -- 
