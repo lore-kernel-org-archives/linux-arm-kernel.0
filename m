@@ -1,71 +1,80 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue,  2 Feb 2016 18:27:37 +0800
-Subject: [PATCH 04/11] regulator: axp20x: Remove voltage readout support for
- switch regulators
+Date: Tue,  2 Feb 2016 18:27:35 +0800
+Subject: [PATCH 02/11] mfd: axp20x: Add bindings for AXP809 PMIC
 In-Reply-To: <1454408864-24112-1-git-send-email-wens@csie.org>
 References: <1454408864-24112-1-git-send-email-wens@csie.org>
-Message-ID: <1454408864-24112-5-git-send-email-wens@csie.org>
+Message-ID: <1454408864-24112-3-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switch-type regulators, such as DC1SW on AXP22X, are a secondary output
-from DCDC1. They are just an on/off switch, and the driver should not
-try to read its voltage directly from the DCDC1 control registers.
+This patch adds the basic and regulator bindings for the X-Powers AXP809
+PMIC.
 
-Instead, the core will pass down the voltage from the regulator supply
-chain.
+Also update the DC-DC converter operating frequency for AXP22X/AXP80X.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/regulator/axp20x-regulator.c | 14 +++-----------
- 1 file changed, 3 insertions(+), 11 deletions(-)
+ Documentation/devicetree/bindings/mfd/axp20x.txt | 31 ++++++++++++++++++++++--
+ 1 file changed, 29 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
-index e86d1fc2d80b..f31d238e85e8 100644
---- a/drivers/regulator/axp20x-regulator.c
-+++ b/drivers/regulator/axp20x-regulator.c
-@@ -78,8 +78,7 @@
- 		.ops		= &axp20x_ops,					\
- 	}
+diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
+index fd39fa54571b..d20b1034e967 100644
+--- a/Documentation/devicetree/bindings/mfd/axp20x.txt
++++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
+@@ -6,10 +6,11 @@ axp202 (X-Powers)
+ axp209 (X-Powers)
+ axp221 (X-Powers)
+ axp223 (X-Powers)
++axp809 (X-Powers)
  
--#define AXP_DESC_SW(_family, _id, _match, _supply, _min, _max, _step, _vreg,	\
--		    _vmask, _ereg, _emask) 					\
-+#define AXP_DESC_SW(_family, _id, _match, _supply, _ereg, _emask)		\
- 	[_family##_##_id] = {							\
- 		.name		= #_id,						\
- 		.supply_name	= (_supply),					\
-@@ -87,12 +86,7 @@
- 		.regulators_node = of_match_ptr("regulators"),			\
- 		.type		= REGULATOR_VOLTAGE,				\
- 		.id		= _family##_##_id,				\
--		.n_voltages	= (((_max) - (_min)) / (_step) + 1),		\
- 		.owner		= THIS_MODULE,					\
--		.min_uV		= (_min) * 1000,				\
--		.uV_step	= (_step) * 1000,				\
--		.vsel_reg	= (_vreg),					\
--		.vsel_mask	= (_vmask),					\
- 		.enable_reg	= (_ereg),					\
- 		.enable_mask	= (_emask),					\
- 		.ops		= &axp20x_ops_sw,				\
-@@ -160,8 +154,6 @@ static struct regulator_ops axp20x_ops = {
- };
+ Required properties:
+ - compatible: "x-powers,axp152", "x-powers,axp202", "x-powers,axp209",
+-	      "x-powers,axp221", "x-powers,axp223"
++	      "x-powers,axp221", "x-powers,axp223", "x-powers,axp809"
+ - reg: The I2C slave address or RSB hardware address for the AXP chip
+ - interrupt-parent: The parent interrupt controller
+ - interrupts: SoC NMI / GPIO interrupt connected to the PMIC's IRQ pin
+@@ -18,7 +19,9 @@ Required properties:
  
- static struct regulator_ops axp20x_ops_sw = {
--	.get_voltage_sel	= regulator_get_voltage_sel_regmap,
--	.list_voltage		= regulator_list_voltage_linear,
- 	.enable			= regulator_enable_regmap,
- 	.disable		= regulator_disable_regmap,
- 	.is_enabled		= regulator_is_enabled_regmap,
-@@ -196,8 +188,8 @@ static const struct regulator_desc axp22x_regulators[] = {
- 	AXP_DESC(AXP22X, DCDC5, "dcdc5", "vin5", 1000, 2550, 50,
- 		 AXP22X_DCDC5_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL1, BIT(5)),
- 	/* secondary switchable output of DCDC1 */
--	AXP_DESC_SW(AXP22X, DC1SW, "dc1sw", NULL, 1600, 3400, 100,
--		    AXP22X_DCDC1_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL2, BIT(7)),
-+	AXP_DESC_SW(AXP22X, DC1SW, "dc1sw", NULL, AXP22X_PWR_OUT_CTRL2,
-+		    BIT(7)),
- 	/* LDO regulator internally chained to DCDC5 */
- 	AXP_DESC(AXP22X, DC5LDO, "dc5ldo", NULL, 700, 1400, 100,
- 		 AXP22X_DC5LDO_V_OUT, 0x7, AXP22X_PWR_OUT_CTRL1, BIT(0)),
+ Optional properties:
+ - x-powers,dcdc-freq: defines the work frequency of DC-DC in KHz
+-		      (range: 750-1875). Default: 1.5MHz
++		      AXP152/20X: range:  750-1875, Default: 1.5 MHz
++		      AXP22X/80X: range: 1800-4050, Default: 3   MHz
++
+ - <input>-supply: a phandle to the regulator supply node. May be omitted if
+ 		  inputs are unregulated, such as using the IPSOUT output
+ 		  from the PMIC.
+@@ -77,6 +80,30 @@ LDO_IO0		: LDO		: ips-supply		: GPIO 0
+ LDO_IO1		: LDO		: ips-supply		: GPIO 1
+ RTC_LDO		: LDO		: ips-supply		: always on
+ 
++AXP809 regulators, type, and corresponding input supply names:
++
++Regulator	  Type		  Supply Name		  Notes
++---------	  ----		  -----------		  -----
++DCDC1		: DC-DC buck	: vin1-supply
++DCDC2		: DC-DC buck	: vin2-supply
++DCDC3		: DC-DC	buck	: vin3-supply
++DCDC4		: DC-DC	buck	: vin4-supply
++DCDC5		: DC-DC	buck	: vin5-supply
++DC1SW		: On/Off Switch	:			: DCDC1 secondary output
++DC5LDO		: LDO		:			: input from DCDC5
++ALDO1		: LDO		: aldoin-supply		: shared supply
++ALDO2		: LDO		: aldoin-supply		: shared supply
++ALDO3		: LDO		: aldoin-supply		: shared supply
++DLDO1		: LDO		: dldoin-supply		: shared supply
++DLDO2		: LDO		: dldoin-supply		: shared supply
++ELDO1		: LDO		: eldoin-supply		: shared supply
++ELDO2		: LDO		: eldoin-supply		: shared supply
++ELDO3		: LDO		: eldoin-supply		: shared supply
++LDO_IO0		: LDO		: ips-supply		: GPIO 0
++LDO_IO1		: LDO		: ips-supply		: GPIO 1
++RTC_LDO		: LDO		: ips-supply		: always on
++SW		: On/Off Switch : swin-supply
++
+ Example:
+ 
+ axp209: pmic at 34 {
 -- 
 2.7.0
