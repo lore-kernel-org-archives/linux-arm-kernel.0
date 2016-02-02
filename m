@@ -1,49 +1,33 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 2 Feb 2016 10:05:56 -0800
-Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
- v4.5-rc1
-In-Reply-To: <20160202164910.GV19432@atomide.com>
-References: <CAPDyKFqQb+jtTpZbq6EvbfAk28yVkgdtiOswngNH_BjCWBDxFg@mail.gmail.com>
- <Pine.LNX.4.44L0.1602021112320.1653-100000@iolanthe.rowland.org>
- <20160202164910.GV19432@atomide.com>
-Message-ID: <20160202180555.GW19432@atomide.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Tue, 2 Feb 2016 18:05:49 +0000
+Subject: [PATCH 08/11] clk: sunxi: improve error reporting for the mux
+ clock
+In-Reply-To: <20160202180227.GC4652@lukather>
+References: <1454348370-3816-1-git-send-email-andre.przywara@arm.com>
+ <1454348370-3816-9-git-send-email-andre.przywara@arm.com>
+ <20160202180227.GC4652@lukather>
+Message-ID: <56B0EFFD.8070900@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [160202 08:50]:
-> * Alan Stern <stern@rowland.harvard.edu> [160202 08:17]:
+Salut,
+
+On 02/02/16 18:02, Maxime Ripard wrote:
+> On Mon, Feb 01, 2016 at 05:39:27PM +0000, Andre Przywara wrote:
+>> clk_register_mux returns a pointer wrapped error value in case of
+>> failure, so a simple NULL check is not sufficient to catch errors.
+>> Fix that and elaborate on the failure reason on the way. The whole
+>> function does not return any error value, so silently failing may
+>> leave users scratching their heads because the kernel does not
+>> provide any clues on what's wrong.
+>>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 > 
-> > ?  pm_runtime_put_sync() _already_ does not respect the autosuspend 
-> > mode.  If you want to respect it, you have to call 
-> > pm_runtime_put_sync_autosuspend() instead.
+> Applied, thanks.
 > 
-> I think you found the real bug there. So the right fix is to
-> call pm_runtime_put_sync_autosuspend() at the end of failed
-> probe in omap_hsmmc. Let me give that a try here.
+> Any chance you do that for the other functions? :)
 
-Nope that's not it but getting closer.
+Sure, that was actually a test balloon ;-)
 
-The following seems to make things behave for me. Now the
-question is.. Does it have some undesired side effects?
-
-> Can we add some warning to pm_runtime_put_sync() about that?
-
-Probably no need for that, I misunderstood the meaning of
-pm_runtime_put_sync_autosuspend().
-
-Regards,
-
-Tony
-
-8< --------------
---- a/drivers/base/power/runtime.c
-+++ b/drivers/base/power/runtime.c
-@@ -435,7 +435,7 @@ static int rpm_suspend(struct device *dev, int rpmflags)
- 		goto out;
- 
- 	/* If the autosuspend_delay time hasn't expired yet, reschedule. */
--	if ((rpmflags & RPM_AUTO)
-+	if (((rpmflags & (RPM_ASYNC | RPM_AUTO)) == ((RPM_ASYNC | RPM_AUTO)))
- 	    && dev->power.runtime_status != RPM_SUSPENDING) {
- 		unsigned long expires = pm_runtime_autosuspend_expiration(dev);
- 
+Cheers,
+Andre
