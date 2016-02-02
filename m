@@ -1,69 +1,62 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 2 Feb 2016 08:35:36 -0800
-Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
- v4.5-rc1
-In-Reply-To: <CAPDyKFras1o13WBZzaZ_Snnj5TBQQFWKr=PtCjUvwe+yGPQn9w@mail.gmail.com>
-References: <20160201232833.GR19432@atomide.com>
- <Pine.LNX.4.44L0.1602011844540.2869-100000@netrider.rowland.org>
- <20160202030533.GT19432@atomide.com>
- <CAPDyKFqQb+jtTpZbq6EvbfAk28yVkgdtiOswngNH_BjCWBDxFg@mail.gmail.com>
- <CAPDyKFras1o13WBZzaZ_Snnj5TBQQFWKr=PtCjUvwe+yGPQn9w@mail.gmail.com>
-Message-ID: <20160202163536.GU19432@atomide.com>
+From: acme@kernel.org (Arnaldo Carvalho de Melo)
+Date: Tue, 2 Feb 2016 13:41:29 -0300
+Subject: [PATCH V8 23/23] perf tools: adding coresight etm PMU record
+ capabilities
+In-Reply-To: <CANLsYkysvVKoaxKJu9TYLAGJaZj9=9gMN+O6NpcDLztJNrgy+w@mail.gmail.com>
+References: <1452807977-8069-1-git-send-email-mathieu.poirier@linaro.org>
+ <1452807977-8069-24-git-send-email-mathieu.poirier@linaro.org>
+ <CANLsYkyBCFyu3Q-3jet-6rNfa3vGzWWQ3_m+PNf4Z+n6OxsscA@mail.gmail.com>
+ <20160125211048.GE22501@kernel.org> <56AB4027.2070208@intel.com>
+ <CANLsYkyFSjLmT_i7ANE2VL21Y+Nud13SvjOd1akV-e9hQcTcHA@mail.gmail.com>
+ <20160129211208.GB32225@kernel.org>
+ <CANLsYkxwtqHyoQ7+Z4a+qJfTV_ZWc72_mJh12FHxVEhNYKsgjw@mail.gmail.com>
+ <CANLsYkysvVKoaxKJu9TYLAGJaZj9=9gMN+O6NpcDLztJNrgy+w@mail.gmail.com>
+Message-ID: <20160202164129.GE32488@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-* Ulf Hansson <ulf.hansson@linaro.org> [160202 02:43]:
+Em Tue, Feb 02, 2016 at 09:20:51AM -0700, Mathieu Poirier escreveu:
+> [...]
 > 
-> For the omap_hsmmc and likely also other omap drivers, which needs more
-> than one attempt to ->probe() (returning -EPROBE_DEFER), this commit
-> causes a regression at the PM domain level (omap hwmod).
+> >>> >
+> >>> > Looks OK, apart from adding linux/coresight-pmu.h to the manifest, but I
+> >>> > mentioned that on another patch.
+> >>> >
+> >>> > However there is no decoder, which begs the question, is there anything you
+> >>> > can actually do with the perf.data file?  Might be a bit confusing for users
+> >>> > if they can capture traces but not use perf tools on the resulting perf.data
+> >>> > file?
+> >>>
+> >>> We are working on a decoding library in parallel to this work.
+> >>
+> >> Would be nice to be able to get both in the same patch kit, no? So that
+> >> one can both record and process the traces, verifying it all works.
+> >
+> > We are still a few weeks away from being in a position where the
+> > community can start playing with the decoding library.  I can hold off
+> > on the "perf tools" patches when I queue the kernel side of the work
+> > for 4.6 but since you and Adrian have already reviewed the work it
+> > would be nice to have that part included as well.
+> >
+> > We've been playing with the perf.data files for a couple of months now
+> > and things look at the right place.  This isn't surprising since we
+> > are using the same framework as X86.
+> >
+> > I think the generation of the perf.data file should be coupled with
+> > the submission of the kernel driver but would also respect a diverging
+> > point of view.  Simply let me know what you prefer and I will adjust
+> > V9 accordingly.
 > 
-> The reason is that the drivers don't put back the device into low power
-> state while bailing out in ->probe to return -EPROBE_DEFER. This leads to
-> that pm_runtime_reinit() in driver core, is re-initializing the runtime PM
-> status from RPM_ACTIVE to RPM_SUSPENDED.
+> Arnaldo,
+> 
+> I'm preparing V9 at this time - what's your view on the above?
 
-Yup, that's the bug here. It seems that we never call the runtime_suspend
-callback at the end of a first failed device driver probe if the driver
-has set pm_runtime_use_autosuspend. Only rpm_idle runtime_idle callback
-gets called. So the device stays on.
+I'd say go with something we can test, i.e. if we generate a perf.data
+file we can't then process to figure out if what was inserted is right,
+how can we decide if it is ok?
 
-This does not happen if pm_runtime_dont_use_autosuspend() is added to
-the end of the device driver probe before pm_runtime_put_sync().
+Otherwise please describe how you test it, preferably by having this in
+the commit log, i.e. if you decide that using plain 'perf report -D' is
+enough, state that and show the output, etc.
 
-> The next ->probe() attempt then triggers the ->runtime_resume() callback
-> to be invoked, which means this happens two times in a row. At the PM
-> domain level (omap hwmod) this is being treated as an error and thus the
-> runtime PM status of the device isn't correctly synchronized with the
-> runtime PM core.
-
-That's a valid error though, let's not remove it. The reason why we
-call runtime_resume() twice is because runtime_suspend callback never
-gets called like I explain above.
-
-> In the end, ->probe() anyway succeeds (as the driver don't checks the
-> error code from the runtime PM APIs), but results in that the PM domain
-> always stays powered on. This because of the runtime PM core believes the
-> device is RPM_SUSPENDED.
-
-FYI, the following allows runtime_suspend callback to get called at the
-end of a failed driver probe so the hardware state matches the PM runtime
-state. Need to debug more.
-
-Regards,
-
-Tony
-
-8< ------------
---- a/drivers/mmc/host/omap_hsmmc.c
-+++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -2232,6 +2232,7 @@ err_irq:
- 		dma_release_channel(host->tx_chan);
- 	if (host->rx_chan)
- 		dma_release_channel(host->rx_chan);
-+	pm_runtime_dont_use_autosuspend(host->dev);
- 	pm_runtime_put_sync(host->dev);
- 	pm_runtime_disable(host->dev);
- 	if (host->dbclk)
+- Arnaldo
