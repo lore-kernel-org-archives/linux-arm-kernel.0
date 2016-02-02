@@ -1,45 +1,40 @@
-From: ryabinin.a.a@gmail.com (Andrey Ryabinin)
-Date: Tue, 2 Feb 2016 19:02:49 +0300
-Subject: [PATCH v6] kernel: add kcov code coverage
-In-Reply-To: <1453726850-49137-1-git-send-email-dvyukov@google.com>
-References: <1453726850-49137-1-git-send-email-dvyukov@google.com>
-Message-ID: <CAPAsAGz6vVGfAPSimwqkneUmzMmrwX_WxdCoQ1xg3UyNn4+-eQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 02 Feb 2016 17:04:56 +0100
+Subject: [PATCH 04/11] arm64: Introduce Allwinner SoC config option
+In-Reply-To: <56B0CBA8.3020804@arm.com>
+References: <1454348370-3816-1-git-send-email-andre.przywara@arm.com>
+ <56B0C95B.4040500@gmail.com> <56B0CBA8.3020804@arm.com>
+Message-ID: <6587581.Opm4UCG8SA@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-01-25 16:00 GMT+03:00 Dmitry Vyukov <dvyukov@google.com>:
+On Tuesday 02 February 2016 15:30:48 Andre Przywara wrote:
+> Hi,
+> 
+> On 02/02/16 15:20, Matthias Brugger wrote:
+> > 
+> > 
+> > On 01/02/16 18:39, Andre Przywara wrote:
+> >> To prepare for the Allwinner A64 SoC support, introduce a config
+> >> option to allow compiling Allwinner (aka. sunxi) specific drivers
+> >> for the arm64 architecture as well.
+> >> This patch just defines the ARCH_SUNXI symbol to allow Allwinner
+> >> specific drivers to be selected during kernel configuration.
+> >> Since the MMC driver is quite essential for Linux to be useful, select
+> >> it by default.
+> >>
+> > 
+> > This mostly depends on the board you have. The rootfs could be on the
+> > flash, on nfs or even on a usb stick.
+> 
+> Yeah, could be. It's just that all boards I know of so far have either
+> SD card or eMMC.
+> Maybe it's better put in defconfig.
 
-> diff --git a/lib/Kconfig.debug b/lib/Kconfig.debug
-> index ecb9e75..cde6bd1 100644
-> --- a/lib/Kconfig.debug
-> +++ b/lib/Kconfig.debug
-> @@ -678,6 +678,26 @@ config DEBUG_STACKOVERFLOW
->
->           If in doubt, say "N".
->
-> +config ARCH_HAS_KCOV
-> +       bool
-> +       help
-> +         KCOV does not have any arch-specific code, but currently it is enabled
-> +         only for x86_64. KCOV requires testing on other archs, and most likely
-> +         disabling of instrumentation for some early boot code.
-> +
-> +config KCOV
-> +       bool "Code coverage for fuzzing"
-> +       depends on ARCH_HAS_KCOV
+Yes, definitely. The current patch also causes a Kconfig warning when
+a user disables CONFIG_MMC, as that a dependency for MMC_SUNXI.
 
-I think we should select DEBUG_FS here, since this useless without it.
-Also you placed this into 'Memory Debugging' submenu which seems wrong.
+There are tons of other options that users need to select to have
+a usable system, no need to treat this one special.
 
-> +       help
-> +         KCOV exposes kernel code coverage information in a form suitable
-> +         for coverage-guided fuzzing (randomized testing).
-> +
-> +         If RANDOMIZE_BASE is enabled, PC values will not be stable across
-> +         different machines and across reboots. If you need stable PC values,
-> +         disable RANDOMIZE_BASE.
-> +
-> +         For more details, see Documentation/kcov.txt.
-> +
->  source "lib/Kconfig.kmemcheck"
->
+	Arnd
