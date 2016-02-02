@@ -1,146 +1,302 @@
-From: fcooper@ti.com (Franklin S Cooper Jr)
-Date: Tue,  2 Feb 2016 17:25:16 -0600
-Subject: [PATCH 2/3] ARM: dts: keystone: Add Initial DT support for TI K2G SoC
- family
-In-Reply-To: <1454455517-7360-1-git-send-email-fcooper@ti.com>
-References: <1454455517-7360-1-git-send-email-fcooper@ti.com>
-Message-ID: <1454455517-7360-3-git-send-email-fcooper@ti.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 2 Feb 2016 17:34:17 -0600
+Subject: [PATCH v10 3/8] dt, numa: adding numa dt binding implementation.
+In-Reply-To: <1454407763-1017-4-git-send-email-gkulkarni@caviumnetworks.com>
+References: <1454407763-1017-1-git-send-email-gkulkarni@caviumnetworks.com>
+ <1454407763-1017-4-git-send-email-gkulkarni@caviumnetworks.com>
+Message-ID: <20160202233417.GA4739@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vitaly Andrianov <vitalya@ti.com>
+On Tue, Feb 02, 2016 at 03:39:18PM +0530, Ganapatrao Kulkarni wrote:
+> dt node parsing for numa topology is done using device property
+> numa-node-id and device node distance-map.
+> 
+> Reviewed-by: Robert Richter <rrichter@cavium.com>
+> Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
+> ---
+>  drivers/of/Kconfig   |  11 +++
+>  drivers/of/Makefile  |   1 +
+>  drivers/of/of_numa.c | 207 +++++++++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/of.h   |   4 +
+>  4 files changed, 223 insertions(+)
+>  create mode 100644 drivers/of/of_numa.c
+> 
+> diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
+> index e2a4841..8f9cc3a 100644
+> --- a/drivers/of/Kconfig
+> +++ b/drivers/of/Kconfig
+> @@ -112,4 +112,15 @@ config OF_OVERLAY
+>  	  While this option is selected automatically when needed, you can
+>  	  enable it manually to improve device tree unit test coverage.
+>  
+> +config OF_NUMA
+> +	bool "Device Tree NUMA support"
 
-K2G is the newest addition of TI's Keystone 2 product family. It is a
-single core Cortex A15 and a C66x DSP.
+Does this need to be user visible?
 
-K2G supports standard peripherals such as SPI, UART, MMC and USB 2.0.
+> +	depends on NUMA
+> +	depends on OF
+> +	depends on ARM64
 
-Includes two dual-core Programmable Real-time Unit and Industrial
-Communication Subsystems (PRU-ICSS).
+drop this (and make sure it compiles on other arches). It will fail 
+because you also have a dependency on FDT.
 
-The technical reference manual for K2G can be found here:
-http://www.ti.com/lit/ug/spruhy8/spruhy8.pdf
+> +	default y
+> +	help
+> +	  Enable Device Tree NUMA support.
+> +	  This enables the numa mapping of cpu, memory, io and
+> +	  inter node distances using dt bindings.
+> +
+>  endif # OF
+> diff --git a/drivers/of/Makefile b/drivers/of/Makefile
+> index 156c072..bee3fa9 100644
+> --- a/drivers/of/Makefile
+> +++ b/drivers/of/Makefile
+> @@ -14,5 +14,6 @@ obj-$(CONFIG_OF_MTD)	+= of_mtd.o
+>  obj-$(CONFIG_OF_RESERVED_MEM) += of_reserved_mem.o
+>  obj-$(CONFIG_OF_RESOLVE)  += resolver.o
+>  obj-$(CONFIG_OF_OVERLAY) += overlay.o
+> +obj-$(CONFIG_OF_NUMA) += of_numa.o
+>  
+>  obj-$(CONFIG_OF_UNITTEST) += unittest-data/
+> diff --git a/drivers/of/of_numa.c b/drivers/of/of_numa.c
+> new file mode 100644
+> index 0000000..1142cdb
+> --- /dev/null
+> +++ b/drivers/of/of_numa.c
+> @@ -0,0 +1,207 @@
+> +/*
+> + * OF NUMA Parsing support.
+> + *
+> + * Copyright (C) 2015 Cavium Inc.
+> + * Author: Ganapatrao Kulkarni <gkulkarni@cavium.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/of.h>
+> +#include <linux/of_fdt.h>
 
-This device is targeted for a variety of applications which include, but
-are not limited to:
+Surely you need some numa related includes.
 
-Home audio
-Professional audio
-Industrial Programmable Logic Control
+> +
+> +/* define default numa node to 0 */
+> +#define DEFAULT_NODE 0
+> +
+> +/* Returns nid in the range [0..MAX_NUMNODES-1],
+> + * or NUMA_NO_NODE if no valid numa-node-id entry found
+> + * or DEFAULT_NODE if no numa-node-id entry exists
+> + */
+> +static int of_numa_prop_to_nid(const __be32 *of_numa_prop, int length)
+> +{
+> +	int nid;
+> +
+> +	if (!of_numa_prop)
+> +		return DEFAULT_NODE;
+> +
+> +	if (length != sizeof(*of_numa_prop)) {
+> +		pr_warn("NUMA: Invalid of_numa_prop length %d found.\n",
+> +				length);
+> +		return NUMA_NO_NODE;
+> +	}
+> +
+> +	nid = of_read_number(of_numa_prop, 1);
+> +	if (nid >= MAX_NUMNODES) {
+> +		pr_warn("NUMA: Invalid numa node %d found.\n", nid);
+> +		return NUMA_NO_NODE;
+> +	}
+> +
+> +	return nid;
+> +}
+> +
+> +static int __init early_init_of_node_to_nid(unsigned long node)
+> +{
+> +	int length;
+> +	const __be32 *of_numa_prop;
+> +
+> +	of_numa_prop = of_get_flat_dt_prop(node, "numa-node-id", &length);
+> +
+> +	return of_numa_prop_to_nid(of_numa_prop, length);
+> +}
+> +
+> +/*
+> + * Even though we connect cpus to numa domains later in SMP
+> + * init, we need to know the node ids now for all cpus.
+> +*/
+> +static int __init early_init_parse_cpu_node(unsigned long node)
+> +{
+> +	int nid;
+> +	const char *type = of_get_flat_dt_prop(node, "device_type", NULL);
+> +
+> +	if (type == NULL)
+> +		return 0;
+> +
+> +	if (strcmp(type, "cpu") != 0)
+> +		return 0;
+> +
+> +	nid = early_init_of_node_to_nid(node);
+> +	if (nid == NUMA_NO_NODE)
+> +		return -EINVAL;
+> +
+> +	node_set(nid, numa_nodes_parsed);
+> +	return 0;
+> +}
+> +
+> +static int __init early_init_parse_memory_node(unsigned long node)
+> +{
+> +	const __be32 *reg, *endp;
+> +	int length;
+> +	int nid;
+> +	const char *type = of_get_flat_dt_prop(node, "device_type", NULL);
+> +
+> +	if (type == NULL)
+> +		return 0;
+> +
+> +	if (strcmp(type, "memory") != 0)
+> +		return 0;
+> +
+> +	nid = early_init_of_node_to_nid(node);
+> +	if (nid == NUMA_NO_NODE)
+> +		return -EINVAL;
+> +
+> +	reg = of_get_flat_dt_prop(node, "reg", &length);
+> +	endp = reg + (length / sizeof(__be32));
+> +
+> +	while ((endp - reg) >= (dt_root_addr_cells + dt_root_size_cells)) {
+> +		u64 base, size;
+> +
+> +		base = dt_mem_next_cell(dt_root_addr_cells, &reg);
+> +		size = dt_mem_next_cell(dt_root_size_cells, &reg);
+> +		pr_debug("NUMA:  base = %llx , node = %u\n",
+> +				base, nid);
+> +
 
-The peripheral nodes that have been included in this patch have been
-tested during bring-up. Since all peripherals will not necessarily be
-used on all boards, disable all peripherals by default. This allow
-the board dts to selectively choose which peripherals it wants to
-enable.
+We already have code to parse memory nodes. Can the NUMA part be 
+combined somehow.
 
-This SoC now uses the next generation of power management architecture
-with the PM functionality located in a microcontroller embedded in the SOC.
+> +		if (numa_add_memblk(nid, base, size) < 0)
+> +			return -EINVAL;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int __init early_init_parse_distance_map_v1(unsigned long node,
+> +		const char *uname)
+> +{
+> +	const __be32 *prop_dist_matrix;
+> +	int length = 0, i, matrix_count;
+> +	int nr_size_cells = OF_ROOT_NODE_SIZE_CELLS_DEFAULT;
+> +
+> +	pr_info("NUMA: parsing numa-distance-map-v1\n");
+> +
+> +	prop_dist_matrix =
+> +		of_get_flat_dt_prop(node, "distance-matrix", &length);
+> +
+> +	if (!length) {
+> +		pr_err("NUMA: failed to parse distance-matrix\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	matrix_count = ((length / sizeof(__be32)) / (3 * nr_size_cells));
+> +
+> +	if ((matrix_count * sizeof(__be32) * 3 * nr_size_cells) !=  length) {
+> +		pr_warn("NUMA: invalid distance-matrix length %d\n", length);
+> +		return -EINVAL;
+> +	}
+> +
+> +	for (i = 0; i < matrix_count; i++) {
+> +		u32 nodea, nodeb, distance;
+> +
+> +		nodea = dt_mem_next_cell(nr_size_cells, &prop_dist_matrix);
+> +		nodeb = dt_mem_next_cell(nr_size_cells, &prop_dist_matrix);
+> +		distance = dt_mem_next_cell(nr_size_cells, &prop_dist_matrix);
+> +		numa_set_distance(nodea, nodeb, distance);
+> +		pr_debug("NUMA:  distance[node%d -> node%d] = %d\n",
+> +				nodea, nodeb, distance);
+> +
+> +		/* Set default distance of node B->A same as A->B */
+> +		if (nodeb > nodea)
+> +			numa_set_distance(nodeb, nodea, distance);
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int __init early_init_parse_distance_map(unsigned long node,
+> +		const char *uname)
+> +{
+> +	if (strcmp(uname, "distance-map") != 0)
+> +		return 0;
+> +
+> +	if (of_flat_dt_is_compatible(node, "numa-distance-map-v1"))
+> +		return early_init_parse_distance_map_v1(node, uname);
+> +
+> +	pr_err("NUMA: invalid distance-map device node\n");
+> +	return -EINVAL;
+> +}
+> +
+> +static int __init early_init_of_scan_numa_map(unsigned long node, const char *uname,
+> +				     int depth, void *data)
+> +{
+> +	int ret;
+> +
+> +	ret = early_init_parse_cpu_node(node);
+> +	if (ret)
+> +		return ret;
+> +
+> +	ret = early_init_parse_memory_node(node);
+> +	if (ret)
+> +		return ret;
+> +
+> +	return early_init_parse_distance_map(node, uname);
+> +}
+> +
+> +int of_node_to_nid(struct device_node *device)
+> +{
+> +	const __be32 *of_numa_prop;
+> +	int length;
+> +
+> +	of_numa_prop = of_get_property(device, "numa-node-id", &length);
+> +	if (of_numa_prop)
+> +		return of_numa_prop_to_nid(of_numa_prop, length);
+> +
+> +	return NUMA_NO_NODE;
+> +}
+> +
+> +/* DT node mapping is done already early_init_of_scan_memory */
+> +int __init of_numa_init(void)
+> +{
+> +	return of_scan_flat_dt(early_init_of_scan_numa_map, NULL);
+> +}
+> diff --git a/include/linux/of.h b/include/linux/of.h
+> index dd10626..23e5bad 100644
+> --- a/include/linux/of.h
+> +++ b/include/linux/of.h
+> @@ -685,6 +685,10 @@ static inline int of_node_to_nid(struct device_node *device)
+>  }
+>  #endif
+>  
+> +#ifdef CONFIG_OF_NUMA
+> +extern int __init of_numa_init(void);
+> +#endif
 
-Support for this new PM architecture along with other peripherals will be
-added in future patches.
+You don't need an ifdef here unless you need an empty function.
 
-Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
-Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
----
- arch/arm/boot/dts/k2g.dtsi | 89 ++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 89 insertions(+)
- create mode 100644 arch/arm/boot/dts/k2g.dtsi
+Can this be called internally by the DT code when it does the all 
+the other flat scanning instead of adding another call from arch code to 
+DT code. Ideally, the arch code would call DT code once and it would do 
+all the parsing it needs to.
 
-diff --git a/arch/arm/boot/dts/k2g.dtsi b/arch/arm/boot/dts/k2g.dtsi
-new file mode 100644
-index 0000000..7ff2796
---- /dev/null
-+++ b/arch/arm/boot/dts/k2g.dtsi
-@@ -0,0 +1,89 @@
-+/*
-+ * Device Tree Source for K2G SOC
-+ *
-+ * Copyright (C) 2016 Texas Instruments Incorporated - http://www.ti.com/
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include "skeleton.dtsi"
-+
-+/ {
-+	compatible = "ti,k2g","ti,keystone";
-+	model = "Texas Instruments K2G SoC";
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+	interrupt-parent = <&gic>;
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			compatible = "arm,cortex-a15";
-+			device_type = "cpu";
-+			reg = <0>;
-+		};
-+	};
-+
-+	gic: interrupt-controller at 02561000 {
-+		compatible = "arm,cortex-a15-gic";
-+		#interrupt-cells = <3>;
-+		interrupt-controller;
-+		reg = <0x0 0x02561000 0x0 0x1000>,
-+		      <0x0 0x02562000 0x0 0x2000>,
-+		      <0x0 0x02564000 0x0 0x1000>,
-+		      <0x0 0x02566000 0x0 0x2000>;
-+		interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) |
-+				IRQ_TYPE_LEVEL_HIGH)>;
-+	};
-+
-+	timer {
-+		compatible = "arm,armv7-timer";
-+		interrupts =
-+			<GIC_PPI 13
-+				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+			<GIC_PPI 14
-+				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+			<GIC_PPI 11
-+				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+			<GIC_PPI 10
-+				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
-+	};
-+
-+	pmu {
-+		compatible = "arm,cortex-a15-pmu";
-+		interrupts = <GIC_SPI 4 IRQ_TYPE_EDGE_RISING>;
-+	};
-+
-+	soc {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "ti,keystone","simple-bus";
-+		ranges = <0x0 0x0 0x0 0xc0000000>;
-+		dma-ranges = <0x80000000 0x8 0x00000000 0x80000000>;
-+
-+		uart0: serial at 02530c00 {
-+			compatible = "ns16550a";
-+			current-speed = <115200>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			reg = <0x02530c00 0x100>;
-+			interrupts = <GIC_SPI 164 IRQ_TYPE_EDGE_RISING>;
-+			clock-frequency = <200000000>;
-+			status = "disabled";
-+		};
-+	};
-+};
--- 
-2.7.0
+Rob
