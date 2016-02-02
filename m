@@ -1,169 +1,167 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue,  2 Feb 2016 18:27:40 +0800
-Subject: [PATCH 07/11] ARM: dts: sunxi: Add dtsi file for AXP809 PMIC
+Date: Tue,  2 Feb 2016 18:27:42 +0800
+Subject: [PATCH 09/11] ARM: dts: sun9i: cubieboard4: Add AXP809 PMIC device
+ node and regulators
 In-Reply-To: <1454408864-24112-1-git-send-email-wens@csie.org>
 References: <1454408864-24112-1-git-send-email-wens@csie.org>
-Message-ID: <1454408864-24112-8-git-send-email-wens@csie.org>
+Message-ID: <1454408864-24112-10-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AXP809 PMIC is used with the Allwinner A80 SoC, along with
-an AXP806 PMIC as a slave.
-
-This patch adds a dtsi file for all the common bindings and default
-values unrelated to board design. Currently this is just listing all
-the regulator nodes. The regulators are initialized based on their
-device node names.
+The AXP809 PMIC is the primary PMIC. It provides various supply voltages
+for the SoC and other peripherals. The PMIC's interrupt line is connected
+to NMI pin of the SoC.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/axp809.dtsi | 138 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 138 insertions(+)
- create mode 100644 arch/arm/boot/dts/axp809.dtsi
+ arch/arm/boot/dts/sun9i-a80-cubieboard4.dts | 121 +++++++++++++++++++++++++++-
+ 1 file changed, 119 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/axp809.dtsi b/arch/arm/boot/dts/axp809.dtsi
-new file mode 100644
-index 000000000000..17769923f9c3
---- /dev/null
-+++ b/arch/arm/boot/dts/axp809.dtsi
-@@ -0,0 +1,138 @@
-+/*
-+ * Copyright 2015 Chen-Yu Tsai
-+ *
-+ * Chen-Yu Tsai <wens@csie.org>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
+diff --git a/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts b/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
+index eb2ccd0a3bd5..4d56dc69713c 100644
+--- a/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
++++ b/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
+@@ -98,7 +98,7 @@
+ &mmc0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc0_pins>, <&mmc0_cd_pin_cubieboard4>;
+-	vmmc-supply = <&reg_vcc3v0>;
++	vmmc-supply = <&reg_dcdc1>;
+ 	bus-width = <4>;
+ 	cd-gpios = <&pio 7 18 GPIO_ACTIVE_HIGH>; /* PH18 */
+ 	cd-inverted;
+@@ -108,7 +108,7 @@
+ &mmc2 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc2_8bit_pins>;
+-	vmmc-supply = <&reg_vcc3v0>;
++	vmmc-supply = <&reg_dcdc1>;
+ 	bus-width = <8>;
+ 	non-removable;
+ 	cap-mmc-hw-reset;
+@@ -126,6 +126,123 @@
+ 
+ &r_rsb {
+ 	status = "okay";
 +
-+/*
-+ * AXP809 Integrated Power Management Chip
-+ */
-+
-+&axp809 {
-+	compatible = "x-powers,axp809";
-+	interrupt-controller;
-+	#interrupt-cells = <1>;
-+
-+	regulators {
-+		/* Default work frequency for buck regulators */
-+		x-powers,dcdc-freq = <3000>;
-+
-+		reg_dcdc1: dcdc1 {
-+			regulator-name = "dcdc1";
-+		};
-+
-+		reg_dcdc2: dcdc2 {
-+			regulator-name = "dcdc2";
-+		};
-+
-+		reg_dcdc3: dcdc3 {
-+			regulator-name = "dcdc3";
-+		};
-+
-+		reg_dcdc4: dcdc4 {
-+			regulator-name = "dcdc4";
-+		};
-+
-+		reg_dcdc5: dcdc5 {
-+			regulator-name = "dcdc5";
-+		};
-+
-+		reg_dc1sw: dc1sw {
-+			regulator-name = "dc1sw";
-+		};
-+
-+		reg_dc5ldo: dc5ldo {
-+			regulator-name = "dc5ldo";
-+		};
-+
-+		reg_aldo1: aldo1 {
-+			regulator-name = "aldo1";
-+		};
-+
-+		reg_aldo2: aldo2 {
-+			regulator-name = "aldo2";
-+		};
-+
-+		reg_aldo3: aldo3 {
-+			regulator-name = "aldo3";
-+		};
-+
-+		reg_dldo1: dldo1 {
-+			regulator-name = "dldo1";
-+		};
-+
-+		reg_dldo2: dldo2 {
-+			regulator-name = "dldo2";
-+		};
-+
-+		reg_eldo1: eldo1 {
-+			regulator-name = "eldo1";
-+		};
-+
-+		reg_eldo2: eldo2 {
-+			regulator-name = "eldo2";
-+		};
-+
-+		reg_eldo3: eldo3 {
-+			regulator-name = "eldo3";
-+		};
-+
-+		reg_ldo_io0: ldo_io0 {
-+			regulator-name = "ldo_io0";
-+		};
-+
-+		reg_ldo_io1: ldo_io1 {
-+			regulator-name = "ldo_io1";
-+		};
-+
-+		reg_rtc_ldo: rtc_ldo {
-+			/* RTC_LDO is a fixed, always-on regulator */
-+			regulator-always-on;
-+			regulator-min-microvolt = <1800000>;
-+			regulator-max-microvolt = <1800000>;
-+			regulator-name = "rtc_ldo";
-+		};
-+
-+		reg_sw: sw {
-+			regulator-name = "sw";
-+		};
++	axp809: pmic at 3a3 {
++		reg = <0x3a3>;
++		interrupt-parent = <&nmi_intc>;
++		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
 +	};
 +};
++
++#include "axp809.dtsi"
++
++&reg_aldo1 {
++	/* TODO: This should be handled by the USB PHY driver */
++	regulator-always-on;
++	regulator-min-microvolt = <3000000>;
++	regulator-max-microvolt = <3000000>;
++	regulator-name = "vcc33-usbh";
++};
++
++&reg_aldo2 {
++	regulator-min-microvolt = <1800000>;
++	regulator-max-microvolt = <1800000>;
++	regulator-name = "vcc-pb-io-cam";
++};
++
++&reg_dc5ldo {
++	regulator-always-on;
++	regulator-min-microvolt = <800000>;
++	regulator-max-microvolt = <1100000>;
++	regulator-name = "vdd-cpus-09-usbh";
++};
++
++&reg_dcdc1 {
++	regulator-always-on;
++	regulator-min-microvolt = <3000000>;
++	regulator-max-microvolt = <3000000>;
++	regulator-name = "vcc-3v";
++};
++
++&reg_dcdc2 {
++	regulator-min-microvolt = <800000>;
++	regulator-max-microvolt = <1100000>;
++	regulator-name = "vdd-gpu";
++};
++
++&reg_dcdc3 {
++	regulator-always-on;
++	regulator-min-microvolt = <800000>;
++	regulator-max-microvolt = <1100000>;
++	regulator-name = "vdd-cpua";
++};
++
++&reg_dcdc4 {
++	regulator-always-on;
++	regulator-min-microvolt = <800000>;
++	regulator-max-microvolt = <1100000>;
++	regulator-name = "vdd-sys-usb0-hdmi";
++};
++
++&reg_dcdc5 {
++	regulator-always-on;
++	regulator-min-microvolt = <1425000>;
++	regulator-max-microvolt = <1575000>;
++	regulator-name = "vcc-dram";
++};
++
++&reg_dldo1 {
++	/*
++	 * The WiFi chip supports a wide range (3.0 ~ 4.8V) of voltages,
++	 * and so does this regulator (3.0 ~ 4.2V), but Allwinner SDK
++	 * always sets it to 3.3V.
++	 */
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-wifi";
++};
++
++&reg_dldo2 {
++	regulator-always-on;
++	regulator-min-microvolt = <3000000>;
++	regulator-max-microvolt = <3000000>;
++	regulator-name = "vcc-pl";
++};
++
++&reg_eldo1 {
++	regulator-min-microvolt = <1200000>;
++	regulator-max-microvolt = <1200000>;
++	regulator-name = "vcc-dvdd-cam";
++};
++
++&reg_eldo2 {
++	regulator-min-microvolt = <1800000>;
++	regulator-max-microvolt = <1800000>;
++	regulator-name = "vcc-pe";
++};
++
++&reg_eldo3 {
++	regulator-always-on;
++	regulator-min-microvolt = <3000000>;
++	regulator-max-microvolt = <3000000>;
++	regulator-name = "vcc-pm-codec-io1";
++};
++
++&reg_ldo_io0 {
++	regulator-always-on;
++	regulator-min-microvolt = <3000000>;
++	regulator-max-microvolt = <3000000>;
++	regulator-name = "vcc-pg";
++};
++
++&reg_ldo_io1 {
++	regulator-min-microvolt = <2500000>;
++	regulator-max-microvolt = <2500000>;
++	regulator-name = "vcc-pa-gmac-2v5";
++};
++
++&reg_rtc_ldo {
++	regulator-name = "vcc-rtc-vdd1v8-io";
+ };
+ 
+ &uart0 {
 -- 
 2.7.0
