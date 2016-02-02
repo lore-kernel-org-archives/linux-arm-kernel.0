@@ -1,47 +1,26 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 2 Feb 2016 17:26:13 +0000
-Subject: [PATCH v2 2/2] drm: sunxi: Add a basic DRM driver for Allwinner
- DE2
-In-Reply-To: <20160202181949.d59e84a040a980abcdd69d32@free.fr>
-References: <cover.1452876522.git.moinejf@free.fr>
- <4c40052b27f74df1342e631cb0f9ed5993861a54.1452876522.git.moinejf@free.fr>
- <569F6C1E.8000006@arm.com> <20160202181949.d59e84a040a980abcdd69d32@free.fr>
-Message-ID: <56B0E6B5.5040708@arm.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Tue, 2 Feb 2016 18:31:41 +0100
+Subject: [PATCH] recordmcount: arm: Implement make_nop
+In-Reply-To: <20160201194432.GK4848@codeaurora.org>
+References: <1454116686-30190-1-git-send-email-sboyd@codeaurora.org>
+ <20160130184005.GA29607@debian>
+ <20160201194432.GK4848@codeaurora.org>
+Message-ID: <20160202173141.GB9044@debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 02/02/16 17:19, Jean-Francois Moine wrote:
-> On Wed, 20 Jan 2016 11:14:38 +0000
-> Andre Przywara <andre.przywara@arm.com> wrote:
+On Mon, Feb 01, 2016 at 11:44:32AM -0800, Stephen Boyd wrote:
+> On 01/30, Rabin Vincent wrote:
+> > For __gnu_mcount_nc, wouldn't it be better to replace both the push {lr}
+> > and the bl with nop instructions, instead of keeping a (useless) push +
+> > pop sequence?
 > 
->> I haven't looked at it in detail yet, I just tried to compile it for
->> ARM64 to prepare for a test on the Allwinner A64.
->>
->> So just two things I spotted below:
-> 
-> Hi Andr?,
-> 
-> I fixed them in the v3 patch request.
+> Agreed. I was trying to do a 1-to-1 copy of the ftrace code on
+> ARM.  I was wondering the same thing in that code path while
+> doing this though. Can't we replace both instructions instead of
+> one instruction when we're patching in nops at runtime?
 
-Thanks for that.
+As Steven pointed out the last time this came up, we can't do it safely
+at runtime:
 
-> Have you succeeded to get video on the A64?
-
-No, but I haven't tried yet. I am tempted to give it a go, though. I
-guess this "headless Linux" term has scared some backers, who had more
-associations with Sleepy Hollow than with a serial terminal ;-)
-
-Can you sketch (or point me to) what I need to do? Just a
-simple-framebuffer DT node?
-I take it that the driver does not depend on any kind of U-Boot
-initialisation, but instead takes care of this itself?
-
-And would this pave the way for fbturbo also?
-
-Please excuse my probably silly questions, I am more of a headless
-horseman ;-)
-
-Cheers,
-Andre.
+https://marc.info/?l=linux-arm-kernel&m=132517584531389&w=2
