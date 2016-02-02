@@ -1,116 +1,104 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 2 Feb 2016 11:00:46 +0100
-Subject: [PATCH 05/11] drivers: pinctrl: add driver for Allwinner A64 SoC
-In-Reply-To: <56AFE0EC.8080207@arm.com>
-References: <1454348370-3816-1-git-send-email-andre.przywara@arm.com>
- <1454348370-3816-6-git-send-email-andre.przywara@arm.com>
- <20160201182754.GA14737@excalibur.cnev.de>
- <56AFE0EC.8080207@arm.com>
-Message-ID: <20160202100046.GM4652@lukather>
+From: andy.yan@rock-chips.com (Andy Yan)
+Date: Tue,  2 Feb 2016 17:59:11 +0800
+Subject: [PATCH v3 1/4] dt-bindings: power: reset: add document for
+ reboot-mode driver
+In-Reply-To: <1454406981-4692-1-git-send-email-andy.yan@rock-chips.com>
+References: <1454406981-4692-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <1454407151-4751-1-git-send-email-andy.yan@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andre,
+add device tree bindings document for reboot-mode driver
 
-On Mon, Feb 01, 2016 at 10:49:16PM +0000, Andr? Przywara wrote:
-> On 01/02/16 18:27, Karsten Merker wrote:
-> 
-> Hi Karsten,
-> 
-> thank you very much for your feedback!
-> 
-> > On Mon, Feb 01, 2016 at 05:39:24PM +0000, Andre Przywara wrote:
-> >> Based on the Allwinner A64 user manual and on the previous sunxi
-> >> pinctrl drivers this introduces the pin multiplex assignments for
-> >> the ARMv8 Allwinner A64 SoC.
-> >> Port A is apparently used for the fixed function DRAM controller, so
-> >> the ports start at B here (the manual mentions "n from 1 to 7", so
-> >> not starting at 0).
-> >>
-> >> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> >> ---
-> >>  .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   |   1 +
-> >>  arch/arm64/Kconfig.platforms                       |   1 +
-> >>  drivers/pinctrl/sunxi/Kconfig                      |   4 +
-> >>  drivers/pinctrl/sunxi/Makefile                     |   1 +
-> >>  drivers/pinctrl/sunxi/pinctrl-a64.c                | 606 +++++++++++++++++++++
-> >>  5 files changed, 613 insertions(+)
-> >>  create mode 100644 drivers/pinctrl/sunxi/pinctrl-a64.c
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-> >> index 9213b27..9050002 100644
-> >> --- a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-> >> +++ b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-> >> @@ -21,6 +21,7 @@ Required properties:
-> >>    "allwinner,sun9i-a80-r-pinctrl"
-> >>    "allwinner,sun8i-a83t-pinctrl"
-> >>    "allwinner,sun8i-h3-pinctrl"
-> >> +  "allwinner,a64-pinctrl"
-> > 
-> > Hello,
-> > 
-> > on all other Allwinner SoCs we use the SoC family as part of the
-> > compatible, as well as in the names of the Kconfig options. To
-> > keep things consistent, I would like to propose doing the same on
-> > Arm64, i.e. using allwinner,sun50i-a64-pinctrl instead of
-> > allwinner,a64-pinctrl.
-> 
-> Yes, I have been told this already. However I don't like this idea so
-> much, for the following reasons:
-> a) It is mostly redundant. The actual SoC (marketing) name is unique,
-> there is no sun6i-a20 or sun7i-a23.
+Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
 
-At the same time, the family name is mostly valid too.
+---
 
-We do share some DTSI across some SoCs already by their family name
-(sun5i.dtsi for the A10s/A13/R8, sun8i-a23-a33.dtsi for the A23 and
-A33, etc.)
+Changes in v3:
+- descirbe all reboot mode as properity instead of subnode
 
-> b) It is not even helpful. If I got Maxime correctly, then the newer
-> sunxi generation numbers depend on the ARM _cores_ used in the SoC,
-> which is frankly the least interesting part from a Linux support
-> perspective. I would see some sense if it would reflect the generation
-> of IP blocks used, but so it is even more confusing to see that
-> sun7i-a20 and sun8i-a23 are related, but sun8i-h3 is a completely
-> different beast. The Allwinner marketing name tells you that, but the
-> sunxi one does not.
+Changes in v2: None
+Changes in v1: None
 
-The opposite can be said too.
+ .../bindings/power/reset/reboot-mode.txt           | 26 ++++++++++++++++
+ .../bindings/power/reset/syscon-reboot-mode.txt    | 36 ++++++++++++++++++++++
+ 2 files changed, 62 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/power/reset/reboot-mode.txt
+ create mode 100644 Documentation/devicetree/bindings/power/reset/syscon-reboot-mode.txt
 
-The A31 is quite different from the A33, while the A83 is much closer
-to the H3 than it is to the A80. Their marketing scheme is messy. In
-all aspects. We have a scheme that worked, I'd really like to stick
-with it.
-
-> c) It is very confusing for people not dealing with it everyday. Just
-> because I own a BananaPi I know that the A20 is sun7i, but I am totally
-> lost when it comes to all the other names. And even now it took me about
-> a minute to find the appropriate Wiki page which explains part of that
-> story.
-> d) Most importantly ;-): It kills TAB completion, unless you know the
-> sunxi number, which is mostly not true as pointed out in c)
-
-Both of these are true, but are about the DT filenames, and not the
-compatibles. I'd agree with you on this one now that we have
-per-vendor subfolders in boot/dts, but it was not the case before, and
-I'm pretty sure that to anyone that is not aware of the Allwinner SoCs
-names, having an A<number>.dtsi in arch/arm/boot/dts, it would be
-about a Cortex-A<number>, and definitely not an SoC from some random
-vendor.
-
-So, droping it in the filenames, why not. But I'd really like to keep
-the same compatible scheme.
-
-Maxime
-
+diff --git a/Documentation/devicetree/bindings/power/reset/reboot-mode.txt b/Documentation/devicetree/bindings/power/reset/reboot-mode.txt
+new file mode 100644
+index 0000000..517080f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/power/reset/reboot-mode.txt
+@@ -0,0 +1,26 @@
++Generic reboot mode core map driver
++
++This driver get reboot mode arguments and call the write
++interface to stores the magic value in special register
++or ram . Then the bootloader can read it and take different
++action according the argument stored.
++
++All mode properties are vendor specific, it is a indication to tell
++the bootloder what to do when the system reboot, and should be named
++as mode-xxx = <magic> (xxx is mode name).
++
++- mode-normal: Normal reboot mode, system reboot with command "reboot".
++- mode-recovery: Android Recovery mode, it is a mode to format the device or update a new image.
++- mode-fastboot: Android fastboot mode, it's a mode to  re-flash partitions on the device.
++- mode-loader: A bootloader mode, it's a mode used to download image on Rockchip platform,
++	       usually used in development.
++- mode-maskrom: It's a mode to download bootloader on Rockchip platform.
++
++Example:
++	reboot-mode {
++		mode-normal = <BOOT_NORMAL>;
++		mode-recovery = <BOOT_RECOVERY>;
++		mode-fastboot = <BOOT_FASTBOOT>;
++		mode-loader = <BOOT_LOADER>;
++		mode-maskrom = <BOOT_MASKROM>;
++	}
+diff --git a/Documentation/devicetree/bindings/power/reset/syscon-reboot-mode.txt b/Documentation/devicetree/bindings/power/reset/syscon-reboot-mode.txt
+new file mode 100644
+index 0000000..923c82b
+--- /dev/null
++++ b/Documentation/devicetree/bindings/power/reset/syscon-reboot-mode.txt
+@@ -0,0 +1,36 @@
++SYSCON reboot mode driver
++
++This driver get reboot mode magic value form reboot-mode driver
++and stores it in a SYSCON mapped register. Then the bootloader
++can read it and take different action according to the magic
++value stored.
++
++This DT node should be represented as a sub-node of a "syscon", "simple-mfd"
++node.
++
++Required properties:
++- compatible: should be "syscon-reboot-mode"
++- offset: offset in the register map for the storage register (in bytes)
++
++Optional properity:
++- mask: the mask bits of the mode magic value, default set to 0xffffffff if missing.
++
++The rest of the properties should follow the generic reboot-mode discription
++found in reboot-mode.txt
++
++Example:
++	pmu: pmu at 20004000 {
++		compatible = "rockchip,rk3066-pmu", "syscon", "simple-mfd";
++		reg = <0x20004000 0x100>;
++
++		reboot-mode {
++			compatible = "syscon-reboot-mode";
++			offset = <0x40>;
++			mode-normal = <BOOT_NORMAL>;
++			mode-recovery = <BOOT_RECOVERY>;
++			mode-fastboot = <BOOT_FASTBOOT>;
++			mode-loader = <BOOT_LOADER>;
++			mode-maskrom = <BOOT_MASKROM>;
++
++		};
++	};
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160202/c857ab32/attachment.sig>
+1.9.1
