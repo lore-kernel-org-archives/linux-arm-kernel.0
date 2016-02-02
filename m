@@ -1,261 +1,282 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 2 Feb 2016 14:16:54 +0000
-Subject: [PATCH 3/5] clk: sunxi: convert current clocks registration to
- CLK_OF_DECLARE
-In-Reply-To: <1454402834-6385-4-git-send-email-maxime.ripard@free-electrons.com>
-References: <1454402834-6385-1-git-send-email-maxime.ripard@free-electrons.com>
- <1454402834-6385-4-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <56B0BA56.10500@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 2 Feb 2016 14:24:16 +0000
+Subject: [PATCH v2 19/21] arm64: KVM: Move most of the fault decoding to C
+In-Reply-To: <20160201152122.GY1478@cbox>
+References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
+ <1453737235-16522-20-git-send-email-marc.zyngier@arm.com>
+ <20160201152122.GY1478@cbox>
+Message-ID: <56B0BC10.40309@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
-
-On 02/02/16 08:47, Maxime Ripard wrote:
-> The current clock registration and protection code has a few drawbacks, the
-> two main ones being that we create a lot of orphans clock in the
-> registration phase, which will be troublesome when we will start being less
-> relaxed about them.
+On 01/02/16 15:21, Christoffer Dall wrote:
+> On Mon, Jan 25, 2016 at 03:53:53PM +0000, Marc Zyngier wrote:
+>> The fault decoding process (including computing the IPA in the case
+>> of a permission fault) would be much better done in C code, as we
+>> have a reasonable infrastructure to deal with the VHE/non-VHE
+>> differences.
+>>
+>> Let's move the whole thing to C, including the workaround for
+>> erratum 834220, and just patch the odd ESR_EL2 access remaining
+>> in hyp-entry.S.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm64/kernel/asm-offsets.c |  3 --
+>>  arch/arm64/kvm/hyp/hyp-entry.S  | 69 +++--------------------------------------
+>>  arch/arm64/kvm/hyp/switch.c     | 54 ++++++++++++++++++++++++++++++++
+>>  3 files changed, 59 insertions(+), 67 deletions(-)
+>>
+>> diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+>> index fffa4ac6..b0ab4e9 100644
+>> --- a/arch/arm64/kernel/asm-offsets.c
+>> +++ b/arch/arm64/kernel/asm-offsets.c
+>> @@ -110,9 +110,6 @@ int main(void)
+>>    DEFINE(CPU_USER_PT_REGS,	offsetof(struct kvm_regs, regs));
+>>    DEFINE(CPU_FP_REGS,		offsetof(struct kvm_regs, fp_regs));
+>>    DEFINE(VCPU_FPEXC32_EL2,	offsetof(struct kvm_vcpu, arch.ctxt.sys_regs[FPEXC32_EL2]));
+>> -  DEFINE(VCPU_ESR_EL2,		offsetof(struct kvm_vcpu, arch.fault.esr_el2));
+>> -  DEFINE(VCPU_FAR_EL2,		offsetof(struct kvm_vcpu, arch.fault.far_el2));
+>> -  DEFINE(VCPU_HPFAR_EL2,	offsetof(struct kvm_vcpu, arch.fault.hpfar_el2));
+>>    DEFINE(VCPU_HOST_CONTEXT,	offsetof(struct kvm_vcpu, arch.host_cpu_context));
+>>  #endif
+>>  #ifdef CONFIG_CPU_PM
+>> diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
+>> index 9e0683f..213de52 100644
+>> --- a/arch/arm64/kvm/hyp/hyp-entry.S
+>> +++ b/arch/arm64/kvm/hyp/hyp-entry.S
+>> @@ -19,7 +19,6 @@
+>>  
+>>  #include <asm/alternative.h>
+>>  #include <asm/assembler.h>
+>> -#include <asm/asm-offsets.h>
+>>  #include <asm/cpufeature.h>
+>>  #include <asm/kvm_arm.h>
+>>  #include <asm/kvm_asm.h>
+>> @@ -67,7 +66,11 @@ ENDPROC(__vhe_hyp_call)
+>>  el1_sync:				// Guest trapped into EL2
+>>  	save_x0_to_x3
+>>  
+>> +alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
+>>  	mrs	x1, esr_el2
+>> +alternative_else
+>> +	mrs	x1, esr_el1
+>> +alternative_endif
 > 
-> The protection code also relies on clkdev, which we don't really use but
-> for this particular case.
+> I suppose this is not technically part of what the patch description
+> says it does, but ok...
+
+That's what the "... and just patch the odd ESR_EL2 access remaining in
+hyp-entry.S." meant. Would you prefer this as a separate patch?
+
 > 
-> Fix both at the same time by moving everyone to the CLK_OF_DECLARE that
-> will probe our clock tree in the right and thus avoid orphans, and by
-> protecting directly the clock returned by our registration function.
-
-I very much appreciate this cleanup and like the idea. Any chance we can
-have this rather quickly, so that I can rebase the A64 support series on it?
-
-One issue below, though:
-
-...
-
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/clk/sunxi/clk-sunxi.c | 150 +++++++++++++++++++++++++++++++++++++-----
->  1 file changed, 133 insertions(+), 17 deletions(-)
+>>  	lsr	x2, x1, #ESR_ELx_EC_SHIFT
+>>  
+>>  	cmp	x2, #ESR_ELx_EC_HVC64
+>> @@ -103,72 +106,10 @@ el1_trap:
+>>  	cmp	x2, #ESR_ELx_EC_FP_ASIMD
+>>  	b.eq	__fpsimd_guest_restore
+>>  
+>> -	cmp	x2, #ESR_ELx_EC_DABT_LOW
+>> -	mov	x0, #ESR_ELx_EC_IABT_LOW
+>> -	ccmp	x2, x0, #4, ne
+>> -	b.ne	1f		// Not an abort we care about
+>> -
+>> -	/* This is an abort. Check for permission fault */
+>> -alternative_if_not ARM64_WORKAROUND_834220
+>> -	and	x2, x1, #ESR_ELx_FSC_TYPE
+>> -	cmp	x2, #FSC_PERM
+>> -	b.ne	1f		// Not a permission fault
+>> -alternative_else
+>> -	nop			// Use the permission fault path to
+>> -	nop			// check for a valid S1 translation,
+>> -	nop			// regardless of the ESR value.
+>> -alternative_endif
+>> -
+>> -	/*
+>> -	 * Check for Stage-1 page table walk, which is guaranteed
+>> -	 * to give a valid HPFAR_EL2.
+>> -	 */
+>> -	tbnz	x1, #7, 1f	// S1PTW is set
+>> -
+>> -	/* Preserve PAR_EL1 */
+>> -	mrs	x3, par_el1
+>> -	stp	x3, xzr, [sp, #-16]!
+>> -
+>> -	/*
+>> -	 * Permission fault, HPFAR_EL2 is invalid.
+>> -	 * Resolve the IPA the hard way using the guest VA.
+>> -	 * Stage-1 translation already validated the memory access rights.
+>> -	 * As such, we can use the EL1 translation regime, and don't have
+>> -	 * to distinguish between EL0 and EL1 access.
+>> -	 */
+>> -	mrs	x2, far_el2
+>> -	at	s1e1r, x2
+>> -	isb
+>> -
+>> -	/* Read result */
+>> -	mrs	x3, par_el1
+>> -	ldp	x0, xzr, [sp], #16	// Restore PAR_EL1 from the stack
+>> -	msr	par_el1, x0
+>> -	tbnz	x3, #0, 3f		// Bail out if we failed the translation
+>> -	ubfx	x3, x3, #12, #36	// Extract IPA
+>> -	lsl	x3, x3, #4		// and present it like HPFAR
+>> -	b	2f
+>> -
+>> -1:	mrs	x3, hpfar_el2
+>> -	mrs	x2, far_el2
+>> -
+>> -2:	mrs	x0, tpidr_el2
+>> -	str	w1, [x0, #VCPU_ESR_EL2]
+>> -	str	x2, [x0, #VCPU_FAR_EL2]
+>> -	str	x3, [x0, #VCPU_HPFAR_EL2]
+>> -
+>> +	mrs	x0, tpidr_el2
+>>  	mov	x1, #ARM_EXCEPTION_TRAP
+>>  	b	__guest_exit
+>>  
+>> -	/*
+>> -	 * Translation failed. Just return to the guest and
+>> -	 * let it fault again. Another CPU is probably playing
+>> -	 * behind our back.
+>> -	 */
+>> -3:	restore_x0_to_x3
+>> -
+>> -	eret
+>> -
+>>  el1_irq:
+>>  	save_x0_to_x3
+>>  	mrs	x0, tpidr_el2
+>> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+>> index 0cadb7f..df2cce9 100644
+>> --- a/arch/arm64/kvm/hyp/switch.c
+>> +++ b/arch/arm64/kvm/hyp/switch.c
+>> @@ -15,6 +15,7 @@
+>>   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>>   */
+>>  
+>> +#include <linux/types.h>
+>>  #include <asm/kvm_asm.h>
+>>  
+>>  #include "hyp.h"
+>> @@ -150,6 +151,55 @@ static void __hyp_text __vgic_restore_state(struct kvm_vcpu *vcpu)
+>>  	__vgic_call_restore_state()(vcpu);
+>>  }
+>>  
+>> +static hyp_alternate_value(__check_arm_834220,
+>> +			   false, true,
+>> +			   ARM64_WORKAROUND_834220);
+>> +
+>> +static bool __hyp_text __populate_fault_info(struct kvm_vcpu *vcpu)
+>> +{
+>> +	u64 esr = read_sysreg_el2(esr);
+>> +	u8 ec = esr >> ESR_ELx_EC_SHIFT;
+>> +	u64 hpfar, far;
+>> +
+>> +	vcpu->arch.fault.esr_el2 = esr;
+>> +
+>> +	if (ec != ESR_ELx_EC_DABT_LOW && ec != ESR_ELx_EC_IABT_LOW)
+>> +		return true;
+>> +
+>> +	far = read_sysreg_el2(far);
+>> +
+>> +	if (!(esr & ESR_ELx_S1PTW) &&
+>> +	    (__check_arm_834220() || (esr & ESR_ELx_FSC_TYPE) == FSC_PERM)) {
 > 
-> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-> index a3d706f5b21c..da6c1bc763d1 100644
-> --- a/drivers/clk/sunxi/clk-sunxi.c
-> +++ b/drivers/clk/sunxi/clk-sunxi.c
-> @@ -585,6 +585,41 @@ static struct clk * __init sunxi_factors_clk_setup(struct device_node *node,
->  	return sunxi_factors_register(node, data, &clk_lock, reg);
->  }
->  
-> +static void __init sun4i_pll1_clk_setup(struct device_node *node)
-> +{
-> +	sunxi_factors_clk_setup(node, &sun4i_pll1_data);
-> +}
-> +CLK_OF_DECLARE(sun4i_pll1, "allwinner,sun4i-a10-pll1-clk",
-> +	       sun4i_pll1_clk_setup);
-> +
-> +static void __init sun6i_pll1_clk_setup(struct device_node *node)
-> +{
-> +	sunxi_factors_clk_setup(node, &sun6i_a31_pll1_data);
-> +}
-> +CLK_OF_DECLARE(sun6i_pll1, "allwinner,sun6i-a31-pll1-clk",
-> +	       sun6i_pll1_clk_setup);
-> +
-> +static void __init sun8i_pll1_clk_setup(struct device_node *node)
-> +{
-> +	sunxi_factors_clk_setup(node, &sun8i_a23_pll1_data);
-> +}
-> +CLK_OF_DECLARE(sun8i_pll1, "allwinner,sun8i-a23-pll1-clk",
-> +	       sun8i_pll1_clk_setup);
-> +
-> +static void __init sun7i_pll4_clk_setup(struct device_node *node)
-> +{
-> +	sunxi_factors_clk_setup(node, &sun7i_a20_pll4_data);
-> +}
-> +CLK_OF_DECLARE(sun7i_pll4, "allwinner,sun7i-a20-pll4-clk",
-> +	       sun7i_pll4_clk_setup);
-> +
-> +static void __init sun5i_ahb_clk_setup(struct device_node *node)
-> +{
-> +	sunxi_factors_clk_setup(node, &sun5i_a13_ahb_data);
-> +}
-> +CLK_OF_DECLARE(sun5i_ahb, "allwinner,sun5i-a13-ahb-clk",
-> +	       sun5i_ahb_clk_setup);
-> +
->  static void __init sun6i_ahb1_clk_setup(struct device_node *node)
->  {
->  	sunxi_factors_clk_setup(node, &sun6i_ahb1_data);
-> @@ -592,6 +627,20 @@ static void __init sun6i_ahb1_clk_setup(struct device_node *node)
->  CLK_OF_DECLARE(sun6i_a31_ahb1, "allwinner,sun6i-a31-ahb1-clk",
->  	       sun6i_ahb1_clk_setup);
->  
-> +static void __init sun4i_apb1_clk_setup(struct device_node *node)
-> +{
-> +	sunxi_factors_clk_setup(node, &sun4i_apb1_data);
-> +}
-> +CLK_OF_DECLARE(sun4i_apb1, "allwinner,sun4i-a10-apb1-clk",
-> +	       sun4i_apb1_clk_setup);
-> +
-> +static void __init sun7i_out_clk_setup(struct device_node *node)
-> +{
-> +	sunxi_factors_clk_setup(node, &sun7i_a20_out_data);
-> +}
-> +CLK_OF_DECLARE(sun7i_out, "allwinner,sun7i-a20-out-clk",
-> +	       sun7i_out_clk_setup);
-> +
->  
->  /**
->   * sunxi_mux_clk_setup() - Setup function for muxes
-> @@ -642,6 +691,34 @@ static struct clk * __init sunxi_mux_clk_setup(struct device_node *node,
->  	return clk;
->  }
->  
-> +static void __init sun4i_cpu_clk_setup(struct device_node *node)
-> +{
-> +	struct clk *clk;
-> +
-> +	clk = sunxi_mux_clk_setup(node, &sun4i_cpu_mux_data);
-> +	if (!clk)
-> +		return;
-> +
-> +	/* Protect CPU clock */
-> +	__clk_get(clk);
-> +	clk_prepare_enable(clk);
-> +}
-> +CLK_OF_DECLARE(sun4i_cpu, "allwinner,sun4i-a10-cpu-clk",
-> +	       sun4i_cpu_clk_setup);
-> +
-> +static void __init sun6i_ahb1_mux_clk_setup(struct device_node *node)
-> +{
-> +	sunxi_mux_clk_setup(node, &sun6i_a31_ahb1_mux_data);
-> +}
-> +CLK_OF_DECLARE(sun6i_ahb1_mux, "allwinner,sun6i-a31-ahb1-mux-clk",
-> +	       sun6i_ahb1_mux_clk_setup);
-> +
-> +static void __init sun8i_ahb2_clk_setup(struct device_node *node)
-> +{
-> +	sunxi_mux_clk_setup(node, &sun8i_h3_ahb2_mux_data);
-> +}
-> +CLK_OF_DECLARE(sun8i_ahb2, "allwinner,sun8i-a31-ahb2-clk",
-> +	       sun8i_ahb2_clk_setup);
-
-I don't find this clock in my tree (which is mripard/sunxi/for-next).
-Instead I only have "allwinner,sun8i-h3-ahb2-clk", as mentioned below.
-But as you remove this clock below from the old code and instead
-instantiate this new clock here, this looks somehow wrong to me. Can you
-confirm this or am I utterly confused?
-
-Apart from that I checked each and every clock mentioned in this patch
-and can confirm that the transformation is correct. So if you fix this,
-I can send a Reviewed-by.
-
-Cheers,
-Andre.
-
->  
->  
->  /**
-> @@ -723,6 +800,34 @@ static void __init sunxi_divider_clk_setup(struct device_node *node,
->  	}
->  }
->  
-> +static void __init sun4i_ahb_clk_setup(struct device_node *node)
-> +{
-> +	sunxi_divider_clk_setup(node, &sun4i_ahb_data);
-> +}
-> +CLK_OF_DECLARE(sun4i_ahb, "allwinner,sun4i-a10-ahb-clk",
-> +	       sun4i_ahb_clk_setup);
-> +
-> +static void __init sun4i_apb0_clk_setup(struct device_node *node)
-> +{
-> +	sunxi_divider_clk_setup(node, &sun4i_apb0_data);
-> +}
-> +CLK_OF_DECLARE(sun4i_apb0, "allwinner,sun4i-a10-apb0-clk",
-> +	       sun4i_apb0_clk_setup);
-> +
-> +static void __init sun4i_axi_clk_setup(struct device_node *node)
-> +{
-> +	sunxi_divider_clk_setup(node, &sun4i_axi_data);
-> +}
-> +CLK_OF_DECLARE(sun4i_axi, "allwinner,sun4i-a10-axi-clk",
-> +	       sun4i_axi_clk_setup);
-> +
-> +static void __init sun8i_axi_clk_setup(struct device_node *node)
-> +{
-> +	sunxi_divider_clk_setup(node, &sun8i_a23_axi_data);
-> +}
-> +CLK_OF_DECLARE(sun8i_axi, "allwinner,sun8i-a23-axi-clk",
-> +	       sun8i_axi_clk_setup);
-> +
->  
->  /**
->   * sunxi_gates_clk_setup() - Setup function for leaf gates on clocks
-> @@ -934,42 +1039,53 @@ free_clkdata:
->  	return NULL;
->  }
->  
-> +static void __init sun4i_pll5_clk_setup(struct device_node *node)
-> +{
-> +	struct clk **clks;
-> +
-> +	clks = sunxi_divs_clk_setup(node, &pll5_divs_data);
-> +	if (!clks)
-> +		return;
-> +
-> +	/* Protect PLL5_DDR */
-> +	__clk_get(clks[0]);
-> +	clk_prepare_enable(clks[0]);
-> +}
-> +CLK_OF_DECLARE(sun4i_pll5, "allwinner,sun4i-a10-pll5-clk",
-> +	       sun4i_pll5_clk_setup);
-> +
-> +static void __init sun4i_pll6_clk_setup(struct device_node *node)
-> +{
-> +	sunxi_divs_clk_setup(node, &pll6_divs_data);
-> +}
-> +CLK_OF_DECLARE(sun4i_pll6, "allwinner,sun4i-a10-pll6-clk",
-> +	       sun4i_pll6_clk_setup);
-> +
-> +static void __init sun6i_pll6_clk_setup(struct device_node *node)
-> +{
-> +	sunxi_divs_clk_setup(node, &sun6i_a31_pll6_divs_data);
-> +}
-> +CLK_OF_DECLARE(sun6i_pll6, "allwinner,sun6i-a31-pll6-clk",
-> +	       sun6i_pll6_clk_setup);
->  
->  
->  /* Matches for factors clocks */
->  static const struct of_device_id clk_factors_match[] __initconst = {
-> -	{.compatible = "allwinner,sun4i-a10-pll1-clk", .data = &sun4i_pll1_data,},
-> -	{.compatible = "allwinner,sun6i-a31-pll1-clk", .data = &sun6i_a31_pll1_data,},
-> -	{.compatible = "allwinner,sun8i-a23-pll1-clk", .data = &sun8i_a23_pll1_data,},
-> -	{.compatible = "allwinner,sun7i-a20-pll4-clk", .data = &sun7i_a20_pll4_data,},
-> -	{.compatible = "allwinner,sun5i-a13-ahb-clk", .data = &sun5i_a13_ahb_data,},
-> -	{.compatible = "allwinner,sun4i-a10-apb1-clk", .data = &sun4i_apb1_data,},
-> -	{.compatible = "allwinner,sun7i-a20-out-clk", .data = &sun7i_a20_out_data,},
->  	{}
->  };
->  
->  /* Matches for divider clocks */
->  static const struct of_device_id clk_div_match[] __initconst = {
-> -	{.compatible = "allwinner,sun4i-a10-axi-clk", .data = &sun4i_axi_data,},
-> -	{.compatible = "allwinner,sun8i-a23-axi-clk", .data = &sun8i_a23_axi_data,},
-> -	{.compatible = "allwinner,sun4i-a10-ahb-clk", .data = &sun4i_ahb_data,},
-> -	{.compatible = "allwinner,sun4i-a10-apb0-clk", .data = &sun4i_apb0_data,},
->  	{}
->  };
->  
->  /* Matches for divided outputs */
->  static const struct of_device_id clk_divs_match[] __initconst = {
-> -	{.compatible = "allwinner,sun4i-a10-pll5-clk", .data = &pll5_divs_data,},
-> -	{.compatible = "allwinner,sun4i-a10-pll6-clk", .data = &pll6_divs_data,},
-> -	{.compatible = "allwinner,sun6i-a31-pll6-clk", .data = &sun6i_a31_pll6_divs_data,},
->  	{}
->  };
->  
->  /* Matches for mux clocks */
->  static const struct of_device_id clk_mux_match[] __initconst = {
-> -	{.compatible = "allwinner,sun4i-a10-cpu-clk", .data = &sun4i_cpu_mux_data,},
-> -	{.compatible = "allwinner,sun6i-a31-ahb1-mux-clk", .data = &sun6i_a31_ahb1_mux_data,},
-> -	{.compatible = "allwinner,sun8i-h3-ahb2-clk", .data = &sun8i_h3_ahb2_mux_data,},
->  	{}
->  };
->  
+> this is really hard to read.  How do you feel about putting the below
+> block into its own function and changing to something like this:
 > 
+> /*
+>  * The HPFAR can be invalid if the stage 2 fault did not happen during a
+>  * stage 1 page table walk (the ESR_EL2.S1PTW bit is clear) and one of
+>  * the two following cases are true:
+>  *   1. The fault was due to a permission fault
+>  *   2. The processor carries errata 834220
+>  *
+>  * Therefore, for all non S1PTW faults where we either have a permission
+>  * fault or the errata workaround is enabled, we resolve the IPA using
+>  * the AT instruction.
+>  */
+> if (!(esr & ESR_ELx_S1PTW) &&
+>     (__check_arm_834220() || (esr & ESR_ELx_FSC_TYPE) == FSC_PERM)) {
+>     	if (!__translate_far_to_ipa(&hpfar))
+> 		return false; /* Translation failed, back to guest */
+> } else {
+> 	hpfar = read_sysreg(hpfar_el2);
+> }
+> 
+> not sure if it helps that much, perhaps it's just complicated by nature.
+> 
+>> +		u64 par, tmp;
+>> +
+>> +		/*
+>> +		 * Permission fault, HPFAR_EL2 is invalid. Resolve the
+>> +		 * IPA the hard way using the guest VA.
+>> +		 * Stage-1 translation already validated the memory
+>> +		 * access rights. As such, we can use the EL1
+>> +		 * translation regime, and don't have to distinguish
+>> +		 * between EL0 and EL1 access.
+>> +		 */
+>> +		par = read_sysreg(par_el1);
+> 
+> in any cas I think we also need the comment about preserving par_el1
+> here, which is only something we do because we may return early, IIUC.
+
+Not only. At that point, we still haven't saved the vcpu sysregs, so we
+most save/restore it in order to save it later for good. Not the fastest
+thing, but I guess that everything sucks so much when we take a page
+fault that it really doesn't matter.
+
+> 
+>> +		asm volatile("at s1e1r, %0" : : "r" (far));
+>> +		isb();
+>> +
+>> +		tmp = read_sysreg(par_el1);
+>> +		write_sysreg(par, par_el1);
+>> +
+>> +		if (unlikely(tmp & 1))
+>> +			return false; /* Translation failed, back to guest */
+>> +
+> 
+> nit: add comment /* Convert PAR to HPFAR format */
+> 
+>> +		hpfar = ((tmp >> 12) & ((1UL << 36) - 1)) << 4;
+>> +	} else {
+>> +		hpfar = read_sysreg(hpfar_el2);
+>> +	}
+>> +
+>> +	vcpu->arch.fault.far_el2 = far;
+>> +	vcpu->arch.fault.hpfar_el2 = hpfar;
+>> +	return true;
+>> +}
+>> +
+>>  static int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
+>>  {
+>>  	struct kvm_cpu_context *host_ctxt;
+>> @@ -181,9 +231,13 @@ static int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
+>>  	__debug_restore_state(vcpu, kern_hyp_va(vcpu->arch.debug_ptr), guest_ctxt);
+>>  
+>>  	/* Jump in the fire! */
+>> +again:
+>>  	exit_code = __guest_enter(vcpu, host_ctxt);
+>>  	/* And we're baaack! */
+>>  
+>> +	if (exit_code == ARM_EXCEPTION_TRAP && !__populate_fault_info(vcpu))
+>> +		goto again;
+>> +
+>>  	fp_enabled = __fpsimd_enabled();
+>>  
+>>  	__sysreg_save_guest_state(guest_ctxt);
+>> -- 
+>> 2.1.4
+>>
+> The good news are that I couldn't find any bugs in the code.
+
+Right. So I've applied most of your comments directly, because they
+definitely made sense. let's see how it looks on round 3.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
