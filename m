@@ -1,39 +1,25 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 1 Feb 2016 16:52:37 -0800
-Subject: [PATCH] ARM: dts: cros-ec-keyboard: Add LOCK key to keyboard
- matrix
-In-Reply-To: <2283417.UbYyfQa1E3@diego>
-References: <1454121504-12683-1-git-send-email-djkurtz@chromium.org>
- <2283417.UbYyfQa1E3@diego>
-Message-ID: <CAOesGMj496KKjoQ801WGbv1Z-63PnTz=24Gz8f3fBnuMSrfU3w@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 1 Feb 2016 17:09:39 -0800
+Subject: [PATCH v2] clk: move the common clock's to_clk_*(_hw) macros to
+ clk-provider.h
+In-Reply-To: <704f6d5aa50acc4723f6756c217a865641d927fe.1452267334.git.geliangtang@163.com>
+References: <568F9960.9040209@gmail.com>
+ <704f6d5aa50acc4723f6756c217a865641d927fe.1452267334.git.geliangtang@163.com>
+Message-ID: <20160202010939.GF4848@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 1, 2016 at 9:16 AM, Heiko St?bner <heiko@sntech.de> wrote:
-> Hi Daniel,
->
-> Am Samstag, 30. Januar 2016, 10:38:24 schrieb Daniel Kurtz:
->> From: James Chao <james_chao@asus.com>
->>
->> The LOCK key is at KSO9/KSI3 for Chromebook Flip and other devices
->> that use the Chrome OS EC keyboard matrix.
->>
->> Signed-off-by: James Chao <james_chao@asus.com>
->> Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
->> Signed-off-by: YH Huang <yh.huang@mediatek.com>
->
-> that should probably be a
->         Reviewed-by: YH Huang <yh.huang@mediatek.com>
-> As I don't see any actual patch handling step by him/her.
->
-> Also, you might've included Olof as the keeper of all things ChromeOS when
-> sending.
->
-> @Olof: this seems to be pretty Veyron-specific for the moment, so I'm inclined
-> to pick that up. Please holler if you disagree and want to pick it up yourself
-> ;-)
+On 01/08, Geliang Tang wrote:
+> to_clk_*(_hw) macros have been repeatedly defined in many places.
+> This patch moves all the to_clk_*(_hw) definitions in the common
+> clock framework to public header clk-provider.h, and drop the local
+> definitions.
+> 
+> Signed-off-by: Geliang Tang <geliangtang@163.com>
+> ---
 
-Go ahead, we can take it as a fix for 4.5 at this time if you want.
+Applied to clk-next
 
-
--Olof
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
