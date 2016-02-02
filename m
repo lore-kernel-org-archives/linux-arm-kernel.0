@@ -1,61 +1,55 @@
-From: andy.yan@rock-chips.com (Andy Yan)
-Date: Tue,  2 Feb 2016 18:13:19 +0800
-Subject: [PATCH v3 4/4] ARM64: dts: rockchip: add syscon-reboot-mode DT node
-In-Reply-To: <1454406981-4692-1-git-send-email-andy.yan@rock-chips.com>
-References: <1454406981-4692-1-git-send-email-andy.yan@rock-chips.com>
-Message-ID: <1454407999-5476-1-git-send-email-andy.yan@rock-chips.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 2 Feb 2016 10:19:45 +0000
+Subject: [PATCH] arm64: move back to generic
+ memblock_enforce_memory_limit()
+In-Reply-To: <1454351417-23732-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <20160201180256.GJ15514@e104818-lin.cambridge.arm.com>
+ <1454351417-23732-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160202101945.GA22042@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add syscon-reboot-mode driver DT node for rk3368 platform
+On Mon, Feb 01, 2016 at 07:30:17PM +0100, Ard Biesheuvel wrote:
+>  void __init arm64_memblock_init(void)
+>  {
+>  	const s64 linear_region_size = -(s64)PAGE_OFFSET;
+> @@ -215,24 +180,14 @@ void __init arm64_memblock_init(void)
+>  	if (memblock_end_of_DRAM() > linear_region_size)
+>  		memblock_remove(0, memblock_end_of_DRAM() - linear_region_size);
+>  
+> +	/*
+> +	 * Apply the memory limit if it was set. Since the kernel may be loaded
+> +	 * high up in memory, add back the kernel region that must be accessible
+> +	 * via the linear mapping.
+> +	 */
+>  	if (memory_limit != (phys_addr_t)ULLONG_MAX) {
+> -		u64 kbase = round_down(__pa(_text), MIN_KIMG_ALIGN);
+> -		u64 kend = PAGE_ALIGN(__pa(_end));
+> -		u64 const sz_4g = 0x100000000UL;
+> -
+> -		/*
+> -		 * Clip memory in order of preference:
+> -		 * - above the kernel and above 4 GB
+> -		 * - between 4 GB and the start of the kernel (if the kernel
+> -		 *   is loaded high in memory)
+> -		 * - between the kernel and 4 GB (if the kernel is loaded
+> -		 *   low in memory)
+> -		 * - below 4 GB
+> -		 */
+> -		clip_mem_range(max(sz_4g, kend), ULLONG_MAX);
+> -		clip_mem_range(sz_4g, kbase);
+> -		clip_mem_range(kend, sz_4g);
+> -		clip_mem_range(0, min(kbase, sz_4g));
+> +		memblock_enforce_memory_limit(memory_limit);
+> +		memblock_add(__pa(__init_begin), (u64)(_end - __init_begin));
 
-Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+Thanks, it looks much simpler now. However, loading the kernel 1GB
+higher with mem=1G fails somewhere during the KVM hyp initialisation. It
+works if I change the last line below to:
 
----
+	memblock_add(__pa(_text), (u64)(_end - _text));
 
-Changes in v3:
-- descirbe all reboot mode as property instead of subnode
+I can fold the change in.
 
-Changes in v2:
-- make this node as a subnode of pmugrf
-
-Changes in v1: None
-
- arch/arm64/boot/dts/rockchip/rk3368.dtsi | 14 +++++++++++++-
- 1 file changed, 13 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm64/boot/dts/rockchip/rk3368.dtsi b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
-index 122777b..5213713 100644
---- a/arch/arm64/boot/dts/rockchip/rk3368.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
-@@ -45,6 +45,7 @@
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/pinctrl/rockchip.h>
-+#include <dt-bindings/soc/rockchip_boot-mode.h>
- #include <dt-bindings/thermal/thermal.h>
- 
- / {
-@@ -554,8 +555,19 @@
- 	};
- 
- 	pmugrf: syscon at ff738000 {
--		compatible = "rockchip,rk3368-pmugrf", "syscon";
-+		compatible = "rockchip,rk3368-pmugrf", "syscon", "simple-mfd";
- 		reg = <0x0 0xff738000 0x0 0x1000>;
-+
-+		reboot-mode {
-+			compatible = "syscon-reboot-mode";
-+			offset = <0x200>;
-+			mode-normal = <BOOT_NORMAL>;
-+			mode-recovery = <BOOT_RECOVERY>;
-+			mode-fastboot = <BOOT_FASTBOOT>;
-+			mode-loader = <BOOT_LOADER>;
-+			mode-maskrom = <BOOT_MASKROM>;
-+
-+		};
- 	};
- 
- 	cru: clock-controller at ff760000 {
 -- 
-1.9.1
+Catalin
