@@ -1,101 +1,67 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 2 Feb 2016 11:42:51 +0100
-Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
- v4.5-rc1
-In-Reply-To: <CAPDyKFqQb+jtTpZbq6EvbfAk28yVkgdtiOswngNH_BjCWBDxFg@mail.gmail.com>
-References: <20160201232833.GR19432@atomide.com>
- <Pine.LNX.4.44L0.1602011844540.2869-100000@netrider.rowland.org>
- <20160202030533.GT19432@atomide.com>
- <CAPDyKFqQb+jtTpZbq6EvbfAk28yVkgdtiOswngNH_BjCWBDxFg@mail.gmail.com>
-Message-ID: <CAPDyKFras1o13WBZzaZ_Snnj5TBQQFWKr=PtCjUvwe+yGPQn9w@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 2 Feb 2016 10:44:38 +0000
+Subject: [PATCH] arm64: move back to generic
+ memblock_enforce_memory_limit()
+In-Reply-To: <CAKv+Gu_2JmVGpE4zvgkrX5W1nFeMLgO8C8tCLmZ9cPGrR=7Tiw@mail.gmail.com>
+References: <20160201180256.GJ15514@e104818-lin.cambridge.arm.com>
+ <1454351417-23732-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20160202101945.GA22042@localhost.localdomain>
+ <CAKv+Gu_2JmVGpE4zvgkrX5W1nFeMLgO8C8tCLmZ9cPGrR=7Tiw@mail.gmail.com>
+Message-ID: <20160202104438.GB22042@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->
-> Instead of the suggested approaches, I think the regression should be
-> fixed at the PM domain level (omap hwmod). I have attached a patch
-> below, please give it try as it's untested.
+On Tue, Feb 02, 2016 at 11:28:41AM +0100, Ard Biesheuvel wrote:
+> On 2 February 2016 at 11:19, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Mon, Feb 01, 2016 at 07:30:17PM +0100, Ard Biesheuvel wrote:
+> >>  void __init arm64_memblock_init(void)
+> >>  {
+> >>       const s64 linear_region_size = -(s64)PAGE_OFFSET;
+> >> @@ -215,24 +180,14 @@ void __init arm64_memblock_init(void)
+> >>       if (memblock_end_of_DRAM() > linear_region_size)
+> >>               memblock_remove(0, memblock_end_of_DRAM() - linear_region_size);
+> >>
+> >> +     /*
+> >> +      * Apply the memory limit if it was set. Since the kernel may be loaded
+> >> +      * high up in memory, add back the kernel region that must be accessible
+> >> +      * via the linear mapping.
+> >> +      */
+> >>       if (memory_limit != (phys_addr_t)ULLONG_MAX) {
+> >> -             u64 kbase = round_down(__pa(_text), MIN_KIMG_ALIGN);
+> >> -             u64 kend = PAGE_ALIGN(__pa(_end));
+> >> -             u64 const sz_4g = 0x100000000UL;
+> >> -
+> >> -             /*
+> >> -              * Clip memory in order of preference:
+> >> -              * - above the kernel and above 4 GB
+> >> -              * - between 4 GB and the start of the kernel (if the kernel
+> >> -              *   is loaded high in memory)
+> >> -              * - between the kernel and 4 GB (if the kernel is loaded
+> >> -              *   low in memory)
+> >> -              * - below 4 GB
+> >> -              */
+> >> -             clip_mem_range(max(sz_4g, kend), ULLONG_MAX);
+> >> -             clip_mem_range(sz_4g, kbase);
+> >> -             clip_mem_range(kend, sz_4g);
+> >> -             clip_mem_range(0, min(kbase, sz_4g));
+> >> +             memblock_enforce_memory_limit(memory_limit);
+> >> +             memblock_add(__pa(__init_begin), (u64)(_end - __init_begin));
+> >
+> > Thanks, it looks much simpler now. However, loading the kernel 1GB
+> > higher with mem=1G fails somewhere during the KVM hyp initialisation. It
+> > works if I change the last line below to:
+> >
+> >         memblock_add(__pa(_text), (u64)(_end - _text));
+> 
+> OK, that should work as well.
+> 
+> I suppose the fact that mem= loses some of its accuracy is not an
+> issue? If you need it to be exact, you should simply not load your
+> kernel outside your mem= range ...
 
-Realized that version 1 would actually *only* make the PM domain code
-to deal with pre-enabled devices. It would still invoke the driver's
-->runtime_resume() callbacks (via pm_generic_runtime_resume())  for
-these scenarios.
+I'm not worried about accuracy. We could avoid freeing the init mem if
+the kernel is outside the memory_limit range but I don't really think
+it's worth.
 
-That's not what we want. So I moved the checks to the actual
-->runtime_resume() callback in the PM domain, instead of in the
-omap_device_enable() function. A version 2 is attached. Please give it
-at try.
-
-[...]
-
-From: Ulf Hansson <ulf.hansson@linaro.org>
-Date: Tue, 2 Feb 2016 10:05:39 +0100
-Subject: [PATCH V2] ARM: OMAP2+: omap-device: Allow devices to be pre-enabled
-
-Commit 5de85b9d57ab ("PM / runtime: Re-init runtime PM states at probe
-error and driver unbind") may re-initialize the runtime PM status of the
-device to RPM_SUSPENDED at driver probe failures.
-
-For the omap_hsmmc and likely also other omap drivers, which needs more
-than one attempt to ->probe() (returning -EPROBE_DEFER), this commit
-causes a regression at the PM domain level (omap hwmod).
-
-The reason is that the drivers don't put back the device into low power
-state while bailing out in ->probe to return -EPROBE_DEFER. This leads to
-that pm_runtime_reinit() in driver core, is re-initializing the runtime PM
-status from RPM_ACTIVE to RPM_SUSPENDED.
-
-The next ->probe() attempt then triggers the ->runtime_resume() callback
-to be invoked, which means this happens two times in a row. At the PM
-domain level (omap hwmod) this is being treated as an error and thus the
-runtime PM status of the device isn't correctly synchronized with the
-runtime PM core.
-
-In the end, ->probe() anyway succeeds (as the driver don't checks the
-error code from the runtime PM APIs), but results in that the PM domain
-always stays powered on. This because of the runtime PM core believes the
-device is RPM_SUSPENDED.
-
-Fix this regression by allowing devices to be pre-enabled when the PM
-domain's (omap hwmod) ->runtime_resume() callback is requested to enable
-the device. In such cases, return zero to synchronize the runtime PM
-status with the runtime PM core.
-
-Fixes: 5de85b9d57ab ("PM / runtime: Re-init runtime PM states at probe
-error and driver unbind")
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
-
-Changes in v2:
-        -Prevent a driver's ->runtime_resume() callbacks from being invoked for
-        a pre-enabled device.
-
----
- arch/arm/mach-omap2/omap_device.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
-
-diff --git a/arch/arm/mach-omap2/omap_device.c
-b/arch/arm/mach-omap2/omap_device.c
-index 0437537..1ad390b 100644
---- a/arch/arm/mach-omap2/omap_device.c
-+++ b/arch/arm/mach-omap2/omap_device.c
-@@ -599,8 +599,17 @@ static int _od_runtime_suspend(struct device *dev)
- static int _od_runtime_resume(struct device *dev)
- {
-        struct platform_device *pdev = to_platform_device(dev);
-+       struct omap_device *od = to_omap_device(pdev);
-        int ret;
-
-+       /*
-+        * From the PM domain perspective the device may already be enabled.
-+        * In such case, let's return zero to synchronize the state with the
-+        * runtime PM core.
-+       */
-+       if (od->_state == OMAP_DEVICE_STATE_ENABLED)
-+               return 0;
-+
-        ret = omap_device_enable(pdev);
-        if (ret)
-                return ret;
 -- 
-1.9.1
+Catalin
