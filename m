@@ -1,77 +1,31 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 2 Feb 2016 17:04:02 +0000
-Subject: [PATCH 3/5] clk: sunxi: convert current clocks registration to
- CLK_OF_DECLARE
-In-Reply-To: <20160202170037.GZ4652@lukather>
-References: <1454402834-6385-1-git-send-email-maxime.ripard@free-electrons.com>
- <1454402834-6385-4-git-send-email-maxime.ripard@free-electrons.com>
- <56B0BA56.10500@arm.com> <20160202170037.GZ4652@lukather>
-Message-ID: <56B0E182.9000207@arm.com>
+From: Chris.Brandt@renesas.com (Chris Brandt)
+Date: Tue, 2 Feb 2016 17:05:07 +0000
+Subject: [PATCH v4] ARM: xip: Use correct symbol for end of ROM marker
+In-Reply-To: <alpine.LFD.2.20.1602011522070.32766@knanqh.ubzr>
+References: <1447697140-4099-1-git-send-email-chris.brandt@renesas.com>
+ <1454349165-12249-1-git-send-email-chris.brandt@renesas.com>
+ <alpine.LFD.2.20.1602011404420.32766@knanqh.ubzr>
+ <SG2PR06MB0572F0EE79C00A530FA9CF398ADE0@SG2PR06MB0572.apcprd06.prod.outlook.com>
+ <alpine.LFD.2.20.1602011522070.32766@knanqh.ubzr>
+Message-ID: <HKXPR06MB0565EEA0ED5BB19E5CFC992B8ADF0@HKXPR06MB0565.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, 1 Feb 2016, Nicolas Pitre wrote:
+> The __data_loc symbol doesn't convey much to say with regards to XIP 
+> mapping.  It would be better to dedicate another symbol with a 
+> proper name instead.  Something like xiprom_start and xiprom_end perhaps.
+> This way, someone looking at the linker script won't be fooled by a 
+> hidden meaning tied to _etext or __data_loc.
 
-On 02/02/16 17:00, Maxime Ripard wrote:
-> Hi,
-> 
-> On Tue, Feb 02, 2016 at 02:16:54PM +0000, Andre Przywara wrote:
->> Hi Maxime,
->>
->> On 02/02/16 08:47, Maxime Ripard wrote:
->>> The current clock registration and protection code has a few drawbacks, the
->>> two main ones being that we create a lot of orphans clock in the
->>> registration phase, which will be troublesome when we will start being less
->>> relaxed about them.
->>>
->>> The protection code also relies on clkdev, which we don't really use but
->>> for this particular case.
->>>
->>> Fix both at the same time by moving everyone to the CLK_OF_DECLARE that
->>> will probe our clock tree in the right and thus avoid orphans, and by
->>> protecting directly the clock returned by our registration function.
->>
->> I very much appreciate this cleanup and like the idea. Any chance we can
->> have this rather quickly, so that I can rebase the A64 support series on it?
-> 
-> I actually count on that :)
+In keeping with the convention that's already in the vmlinux.lds, I'm going to go with "_xiprom" and "_exiprom"
 
-Great!
 
-> I wasn't really happy about your allwinner,sunxi compatible,
+> > Or, should we keep piling more stuff in vmlinux.lds.S?
+>
+> I still think the split linker file is the way to go.
 
-Me neither, honestly, but I didn't dare to touch clk-sunxi.c even more ;-)
+So...since I didn't hear any clapping and cheering, first I'd like to fix what I know is broken and get that in. Then go back to the splitting linker script idea.
 
-> so I just
-> gave you an easier way out ;)
 
-Appreciated!
-
-> 
->>> +static void __init sun8i_ahb2_clk_setup(struct device_node *node)
->>> +{
->>> +	sunxi_mux_clk_setup(node, &sun8i_h3_ahb2_mux_data);
->>> +}
->>> +CLK_OF_DECLARE(sun8i_ahb2, "allwinner,sun8i-a31-ahb2-clk",
->>> +	       sun8i_ahb2_clk_setup);
->>
->> I don't find this clock in my tree (which is mripard/sunxi/for-next).
->> Instead I only have "allwinner,sun8i-h3-ahb2-clk", as mentioned below.
->> But as you remove this clock below from the old code and instead
->> instantiate this new clock here, this looks somehow wrong to me. Can you
->> confirm this or am I utterly confused?
-> 
-> Damn, you're right, it's just a silly copy-paste issue, I'll fix it.
-
-I am sure you left it in to see if somebody actually checks it ;-)
-
-Merci!
-Andre
-
->> Apart from that I checked each and every clock mentioned in this patch
->> and can confirm that the transformation is correct. So if you fix this,
->> I can send a Reviewed-by.
-> 
-> Thanks,
-> Maxime
-> 
+Chris
