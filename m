@@ -1,52 +1,53 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 2 Feb 2016 16:48:18 +0000
-Subject: [PATCH] arm64: asm: Explicitly include linux/personality.h in
- asm/page.h
-In-Reply-To: <20160128144610.GA2380@ulmo>
-References: <1453983508-20410-1-git-send-email-broonie@kernel.org>
- <20160128124417.GE6078@sirena.org.uk>
- <20160128141425.GA20099@e104818-lin.cambridge.arm.com>
- <20160128144610.GA2380@ulmo>
-Message-ID: <20160202164817.GM10166@arm.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Tue, 2 Feb 2016 16:33:43 +0100
+Subject: [PATCH v3 0/2] Add a DRM display driver to the Allwinner H3
+Message-ID: <cover.1454427223.git.moinejf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 28, 2016 at 03:46:10PM +0100, Thierry Reding wrote:
-> On Thu, Jan 28, 2016 at 02:14:26PM +0000, Catalin Marinas wrote:
-> > On Thu, Jan 28, 2016 at 12:44:17PM +0000, Mark Brown wrote:
-> > > On Thu, Jan 28, 2016 at 12:18:28PM +0000, Mark Brown wrote:
-> > > > asm/page.h uses READ_IMPLIES_EXEC from linux/personality.h but does not
-> > > > explicitly include it causing build failures in -next where whatever was
-> > > > causing it to be implicitly included has changed to remove that
-> > > > inclusion.  Add an explicit inclusion to fix this.
-> > > 
-> > > Argh, sorry - this causes problems further down the line with linking
-> > > vdso.lds due to enums getting into the linker script and upsetting the
-> > > linker (there are several compile errors today so it was masked).
-> > 
-> > You can move the include further down after the #ifndef __ASSEMBLY__
-> 
-> Indeed, here's what I've been using to successfully complete ARM64 test
-> builds:
-> 
-> --- >8 ---
-> diff --git a/arch/arm64/include/asm/page.h b/arch/arm64/include/asm/page.h
-> index 9b2f5a9d019d..ae615b9d9a55 100644
-> --- a/arch/arm64/include/asm/page.h
-> +++ b/arch/arm64/include/asm/page.h
-> @@ -39,6 +39,7 @@
->  
->  #ifndef __ASSEMBLY__
->  
-> +#include <linux/personality.h> /* for READ_IMPLIES_EXEC */
->  #include <asm/pgtable-types.h>
->  
->  extern void __cpu_clear_user_page(void *p, unsigned long user);
+The proposed DRM driver works on a Orange PI 2 with a kernel 4.5.0-rc1
+and some H3 patches found in Hans de Goede's GIT repository.
 
-I see this has ended up in linux-next, but I'm not sure whether or not
-it's actually queued someplace for 4.6. Any ideas?
+As there is no documentation about the HDMI of the H3,
+the associated encoder/connector driver has not been included
+in this patch series.
+For test purpose, it may be built as a out-of-tree driver
+from the tarball:
+	http://moinejf.free.fr/opi2/h3-hdmi.tar.gz
+and the DT files:
+	http://moinejf.free.fr/opi2/sun8i-h3.dtsi
+	http://moinejf.free.fr/opi2/sun8i-h3-orangepi-plus.dts
 
-If not, I can take it (or some derivative) through arm64 as a fix for
--rc3.
+Jean-Francois Moine (2):
+  clk: sunxi: Add sun6i/8i video support
+  drm: sunxi: Add a basic DRM driver for Allwinner DE2
 
-Will
+ Documentation/devicetree/bindings/clock/sunxi.txt  |   2 +
+ .../devicetree/bindings/display/sunxi.txt          |  81 ++++
+ drivers/clk/sunxi/clk-sun6i-display.c              | 106 +++++
+ drivers/clk/sunxi/clk-sun6i-pll3.c                 | 174 +++++++
+ drivers/gpu/drm/Kconfig                            |   2 +
+ drivers/gpu/drm/Makefile                           |   1 +
+ drivers/gpu/drm/sunxi/Kconfig                      |  20 +
+ drivers/gpu/drm/sunxi/Makefile                     |   7 +
+ drivers/gpu/drm/sunxi/de2_crtc.c                   | 421 +++++++++++++++++
+ drivers/gpu/drm/sunxi/de2_crtc.h                   |  61 +++
+ drivers/gpu/drm/sunxi/de2_de.c                     | 505 +++++++++++++++++++++
+ drivers/gpu/drm/sunxi/de2_drm.h                    |  40 ++
+ drivers/gpu/drm/sunxi/de2_drv.c                    | 377 +++++++++++++++
+ drivers/gpu/drm/sunxi/de2_plane.c                  |  91 ++++
+ 14 files changed, 1888 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/sunxi.txt
+ create mode 100644 drivers/clk/sunxi/clk-sun6i-display.c
+ create mode 100644 drivers/clk/sunxi/clk-sun6i-pll3.c
+ create mode 100644 drivers/gpu/drm/sunxi/Kconfig
+ create mode 100644 drivers/gpu/drm/sunxi/Makefile
+ create mode 100644 drivers/gpu/drm/sunxi/de2_crtc.c
+ create mode 100644 drivers/gpu/drm/sunxi/de2_crtc.h
+ create mode 100644 drivers/gpu/drm/sunxi/de2_de.c
+ create mode 100644 drivers/gpu/drm/sunxi/de2_drm.h
+ create mode 100644 drivers/gpu/drm/sunxi/de2_drv.c
+ create mode 100644 drivers/gpu/drm/sunxi/de2_plane.c
+
+-- 
+2.7.0
