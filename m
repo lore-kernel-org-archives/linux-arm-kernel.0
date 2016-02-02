@@ -1,75 +1,105 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Tue, 2 Feb 2016 23:41:56 +0300
-Subject: [PATCH 1/5] all: s390: move wrapper infrastructure to generic
- headers
-In-Reply-To: <20160202195434.GA3397@osiris>
-References: <1453741047-5498-1-git-send-email-ynorov@caviumnetworks.com>
- <1453741047-5498-2-git-send-email-ynorov@caviumnetworks.com>
- <20160128121618.GB5418@osiris> <20160128163109.GA8529@yury-N73SV>
- <20160201114251.GB973@yury-N73SV> <20160202073913.GB3990@osiris>
- <20160202154331.GA3003@yury-N73SV> <20160202160826.GF3990@osiris>
- <20160202195434.GA3397@osiris>
-Message-ID: <20160202204156.GA27290@yury-N73SV>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 2 Feb 2016 21:47:20 +0100
+Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
+ v4.5-rc1
+In-Reply-To: <20160202163536.GU19432@atomide.com>
+References: <20160201232833.GR19432@atomide.com>
+ <Pine.LNX.4.44L0.1602011844540.2869-100000@netrider.rowland.org>
+ <20160202030533.GT19432@atomide.com>
+ <CAPDyKFqQb+jtTpZbq6EvbfAk28yVkgdtiOswngNH_BjCWBDxFg@mail.gmail.com>
+ <CAPDyKFras1o13WBZzaZ_Snnj5TBQQFWKr=PtCjUvwe+yGPQn9w@mail.gmail.com>
+ <20160202163536.GU19432@atomide.com>
+Message-ID: <CAPDyKFosQjkHDVSvy67+hstjjFseXQP5WYXrJE19GgVFYJ099w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 02, 2016 at 08:54:34PM +0100, Heiko Carstens wrote:
-> Hi Yury,
-> 
-> On Tue, Feb 02, 2016 at 05:08:26PM +0100, Heiko Carstens wrote:
-> > See e.g. 485d52768685 ("sys_personality: change sys_personality() to accept
-> > "unsigned int" instead of u_long") would have been a candidate which could
-> > silently break architectures which need compat wrappers.
-> 
-> Ok, this example is of course wrong. But now I can claim that also somebody
-> who should know better makes these mistakes.. :)
-> 
+On 2 February 2016 at 17:35, Tony Lindgren <tony@atomide.com> wrote:
+> Hi,
+>
+> * Ulf Hansson <ulf.hansson@linaro.org> [160202 02:43]:
+>>
+>> For the omap_hsmmc and likely also other omap drivers, which needs more
+>> than one attempt to ->probe() (returning -EPROBE_DEFER), this commit
+>> causes a regression at the PM domain level (omap hwmod).
+>>
+>> The reason is that the drivers don't put back the device into low power
+>> state while bailing out in ->probe to return -EPROBE_DEFER. This leads to
+>> that pm_runtime_reinit() in driver core, is re-initializing the runtime PM
+>> status from RPM_ACTIVE to RPM_SUSPENDED.
+>
+> Yup, that's the bug here. It seems that we never call the runtime_suspend
+> callback at the end of a first failed device driver probe if the driver
+> has set pm_runtime_use_autosuspend. Only rpm_idle runtime_idle callback
+> gets called. So the device stays on.
+>
+> This does not happen if pm_runtime_dont_use_autosuspend() is added to
+> the end of the device driver probe before pm_runtime_put_sync().
 
-Yep, this is a bad example. :) Moreover, this patch is coming from year 2010,
-and it shows how stable the syscall ABI is.
+Thanks! It then confirms the second option I proposed.
 
-> > > I don't know much about s390 specifics. Maybe because of that I do not
-> > > understand completely your worries. I'm OK with both 1st and 2nd
-> > > version, but I'd choose 2nd one because it allows inlines, and we
-> > > don't need the compat_wrapper.c.
-> > 
-> > It would be only nicer if we can guarentee correctness all the time. That
-> > being said I'm about to revert my own commit :)
-> > 
-> > So if you want to go without compat_wrapper.c then we should have a
-> > solution which will do the right thing all the time without that a system
-> > call author has to know about the sign and zero extension issue some
-> > architectures face. It _will_ go wrong.
-> 
-> So I think I can summarize my point to: if you can enforce correctness, why
-> shouldn't you do it if the performance impact is only a single instruction.
+>
+>> The next ->probe() attempt then triggers the ->runtime_resume() callback
+>> to be invoked, which means this happens two times in a row. At the PM
+>> domain level (omap hwmod) this is being treated as an error and thus the
+>> runtime PM status of the device isn't correctly synchronized with the
+>> runtime PM core.
+>
+> That's a valid error though, let's not remove it. The reason why we
+> call runtime_resume() twice is because runtime_suspend callback never
+> gets called like I explain above.
 
-For aarch64 it's 5 instructions. But what's more important (if ever),
-another wrapper takes another i-cache line...
-        <compat_SyS_ftruncate>:
-        stp     x29, x30, [sp,#-16]!
-        mov     x29, sp
-        bl      d40 <do_sys_ftruncate.constprop.3>
-        ldp     x29, x30, [sp],#16
-        ret
+This isn't an error, it's just a hickup in the synchronization of the
+runtime PM status.
 
-> 
-> However I'll try to write an addon patch to your patch series. Maybe we can
-> still get rid of compat_wrapper.c in a way which makes both of us happy.
-> Also.. the idea with the alias names for compat wrappers does seem to have
-> the disadvantage that it will pollute /proc/kallsyms for example.
-> 
-> Anyway, I'm not sure if I will be able to come up with something this week
-> though.
+Very similar what happens at the first probe, when the driver core has
+initialized the runtime PM status to RPM_SUSPENDED at the device
+registration.
 
-Great, I'm looking forward...
+To me, it's the responsible of the PM domain to *help* with the
+synchronization, not prevent it as it currently does.
 
-My point is. Syscall ABI is so stable and so important that too much
-people are involved in development and testing of it. So automatic
-checks are almost useless, as all bugs will be found during
-development and review. I think, community is able to pay enough
-attention to review a couple of such patches per decade.
-But I'm OK with some automatic checker, if it will be :
- - not too complicated, as complex code makes bugs by itself;
- - not too expensive;
- - not too ugly (my one is definitely ugly).
+>
+>> In the end, ->probe() anyway succeeds (as the driver don't checks the
+>> error code from the runtime PM APIs), but results in that the PM domain
+>> always stays powered on. This because of the runtime PM core believes the
+>> device is RPM_SUSPENDED.
+>
+> FYI, the following allows runtime_suspend callback to get called at the
+> end of a failed driver probe so the hardware state matches the PM runtime
+> state. Need to debug more.
+>
+> Regards,
+>
+> Tony
+>
+> 8< ------------
+> --- a/drivers/mmc/host/omap_hsmmc.c
+> +++ b/drivers/mmc/host/omap_hsmmc.c
+> @@ -2232,6 +2232,7 @@ err_irq:
+>                 dma_release_channel(host->tx_chan);
+>         if (host->rx_chan)
+>                 dma_release_channel(host->rx_chan);
+> +       pm_runtime_dont_use_autosuspend(host->dev);
+
+It's good know this works, although do you intend to fix this sequence
+for all omap drivers/devices that's part of the hwmod PM domain?
+
+I haven't checked the number of drivers this would affect, but I
+imagine there could be quite many with similar behaviour and thus may
+suffer from the same issue.
+
+Of course the regression is only noticed for those returning
+-EPROBE_DEFER, which might not be that many, but it seems fragile to
+rely on this when going forward. All related drivers then needs to be
+fixed.
+
+>         pm_runtime_put_sync(host->dev);
+>         pm_runtime_disable(host->dev);
+>         if (host->dbclk)
+
+Could you please test my version 2 of the patch I attached earlier. I
+still believe it's the best way to solve the regression, if it works
+of course. :-)
+
+Kind regards
+Uffe
