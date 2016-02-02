@@ -1,49 +1,42 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 2 Feb 2016 15:26:37 -0600
-Subject: [PATCH 05/10] Documentation: dt: Tidy up the Marvell related files
-In-Reply-To: <1454436468-4241-6-git-send-email-gregory.clement@free-electrons.com>
-References: <1454436468-4241-1-git-send-email-gregory.clement@free-electrons.com>
- <1454436468-4241-6-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20160202212637.GA24562@rob-hp-laptop>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 02 Feb 2016 22:34:22 +0100
+Subject: [PATCH] ARM: mx25: Add basic suspend/resume support
+In-Reply-To: <1454447886-4045-1-git-send-email-festevam@gmail.com>
+References: <1454447886-4045-1-git-send-email-festevam@gmail.com>
+Message-ID: <4987443.OL55qNe4Wb@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 02, 2016 at 07:07:43PM +0100, Gregory CLEMENT wrote:
-> Over the last releases we have added more and more Marvell related binding
-> directly in the arm directory. It's time to have our proper directory
-> inside it, and move all the files in it.
+On Tuesday 02 February 2016 19:18:06 Fabio Estevam wrote:
+> +#ifdef CONFIG_PM
+> +static int imx25_suspend_enter(suspend_state_t state)
+> +{
+> +       switch (state) {
+> +       case PM_SUSPEND_MEM:
+> +               cpu_do_idle();
+> +               break;
+> +       default:
+> +               return -EINVAL;
+> +       }
+> +
+> +       return 0;
+> +}
+> +#else
+> +static inline int imx25_suspend_enter(suspend_state_t state)
+> +{
+> +       return 0;
+> +}
+> +#endif
 > 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  .../devicetree/bindings/arm/{ => marvell}/armada-370-xp-pmsu.txt          | 0
->  Documentation/devicetree/bindings/arm/{ => marvell}/armada-370-xp.txt     | 0
->  Documentation/devicetree/bindings/arm/{ => marvell}/armada-375.txt        | 0
->  .../devicetree/bindings/arm/{ => marvell}/armada-380-mpcore-soc-ctrl.txt  | 0
->  Documentation/devicetree/bindings/arm/{ => marvell}/armada-38x.txt        | 0
->  Documentation/devicetree/bindings/arm/{ => marvell}/armada-39x.txt        | 0
->  Documentation/devicetree/bindings/arm/{ => marvell}/armada-cpu-reset.txt  | 0
->  Documentation/devicetree/bindings/arm/{ => marvell}/coherency-fabric.txt  | 0
->  Documentation/devicetree/bindings/arm/{ => marvell}/kirkwood.txt          | 0
->  Documentation/devicetree/bindings/arm/{ => marvell}/marvell,berlin.txt    | 0
->  Documentation/devicetree/bindings/arm/{ => marvell}/marvell,dove.txt      | 0
->  Documentation/devicetree/bindings/arm/{ => marvell}/marvell,kirkwood.txt  | 0
->  Documentation/devicetree/bindings/arm/{ => marvell}/mvebu-cpu-config.txt  | 0
->  .../devicetree/bindings/arm/{ => marvell}/mvebu-system-controller.txt     | 0
->  14 files changed, 0 insertions(+), 0 deletions(-)
->  rename Documentation/devicetree/bindings/arm/{ => marvell}/armada-370-xp-pmsu.txt (100%)
->  rename Documentation/devicetree/bindings/arm/{ => marvell}/armada-370-xp.txt (100%)
->  rename Documentation/devicetree/bindings/arm/{ => marvell}/armada-375.txt (100%)
->  rename Documentation/devicetree/bindings/arm/{ => marvell}/armada-380-mpcore-soc-ctrl.txt (100%)
->  rename Documentation/devicetree/bindings/arm/{ => marvell}/armada-38x.txt (100%)
->  rename Documentation/devicetree/bindings/arm/{ => marvell}/armada-39x.txt (100%)
->  rename Documentation/devicetree/bindings/arm/{ => marvell}/armada-cpu-reset.txt (100%)
->  rename Documentation/devicetree/bindings/arm/{ => marvell}/coherency-fabric.txt (100%)
->  rename Documentation/devicetree/bindings/arm/{ => marvell}/kirkwood.txt (100%)
->  rename Documentation/devicetree/bindings/arm/{ => marvell}/marvell,berlin.txt (100%)
->  rename Documentation/devicetree/bindings/arm/{ => marvell}/marvell,dove.txt (100%)
->  rename Documentation/devicetree/bindings/arm/{ => marvell}/marvell,kirkwood.txt (100%)
->  rename Documentation/devicetree/bindings/arm/{ => marvell}/mvebu-cpu-config.txt (100%)
->  rename Documentation/devicetree/bindings/arm/{ => marvell}/mvebu-system-controller.txt (100%)
 
-Acked-by: Rob Herring <robh@kernel.org>
+Better remove the #ifdef by doing
+
+void __init imx25_pm_init(void)
+{
+	if (IS_ENABLED(CONFIG_PM))
+		suspend_set_ops(&imx25_suspend_ops);
+}
+
+or put the IS_ENABLED() check inside of imx25_suspend_enter().
+
+	Arnd
