@@ -1,70 +1,24 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Tue, 02 Feb 2016 10:46:29 -0800
-Subject: MTK mt8173-evb: mainline unstable, and big-endian boot failures
-In-Reply-To: <1454379462.27798.11.camel@mtksdaap41> (Fan Chen's message of
- "Tue, 2 Feb 2016 10:17:42 +0800")
-References: <CAOi56cVDbkAJEDWy3+DV63a=UuD7nqpUu8X7e-OjtWM-4dj_-w@mail.gmail.com>
- <7hsi1ilczm.fsf@baylibre.com>
- <CAF-23O3ps0Wt_UCmJbArpc5iJJryJKA0k_2qAyNb7op8O=UnAg@mail.gmail.com>
- <1453964180.26397.8.camel@mtksdaap41> <7hy4b8gc7q.fsf@baylibre.com>
- <1454309376.11974.3.camel@mtksdaap41> <7hh9hrgbbh.fsf@baylibre.com>
- <1454379462.27798.11.camel@mtksdaap41>
-Message-ID: <7h37tbdk6y.fsf@baylibre.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 2 Feb 2016 10:47:34 -0800
+Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
+ v4.5-rc1
+In-Reply-To: <20160202180555.GW19432@atomide.com>
+References: <CAPDyKFqQb+jtTpZbq6EvbfAk28yVkgdtiOswngNH_BjCWBDxFg@mail.gmail.com>
+ <Pine.LNX.4.44L0.1602021112320.1653-100000@iolanthe.rowland.org>
+ <20160202164910.GV19432@atomide.com>
+ <20160202180555.GW19432@atomide.com>
+Message-ID: <20160202184733.GX19432@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fan,
+* Tony Lindgren <tony@atomide.com> [160202 10:07]:
+> 
+> The following seems to make things behave for me. Now the
+> question is.. Does it have some undesired side effects?
 
-Fan Chen <fan.chen@mediatek.com> writes:
+The side effect is that it breaks PM runtime for devices
+during runtime..
 
-> I just checked that the problem cannot be reproduced (tested 100 times
-> with your script) after flashing new firmware which we uploaded to
-> github[0] yesterday.
+Regards,
 
-Great news!
-
-> This latest firmware got many fixes and also supports cluster idle, so
-> we prefer testing with this new one Would you please test in your
-> side? Thanks for your great help!!
-
-I tested the latest firmware and it's booted 20+ times in a row without
-failure, which is better than it ever did in the past, so it seems to
-have fixed the idle problem.
-
-I will keep an eye on the failures in kernelci.org and let you know if I
-notice any other failures.
-
-Thanks again for the updated firmware!
-
-Speaking of updated firmware, is there any chance to make the default
-version of the firmware significantly less noisy.  There is a TON of
-output from the firmware before fastboot starts which makes the logs for
-this board very noisy (same complaint on the mt8135.)
-
-Kevin
-
->
->
-> Best regards,
-> Fan
->
-> On Mon, 2016-02-01 at 17:17 -0800, Kevin Hilman wrote:
->> Hi Eddie,
->> 
->> Eddie Huang <eddie.huang@mediatek.com> writes:
->> 
->> [...]
->> 
->> > Thanks your patience to provide detail steps, we can reproduce this
->> > problem now. It seems something wrong in ATF, we still investigate how
->> > to fix it. We will provide you new ATF firmware once we have solution
->> 
->> Great, I'm glad you can reproduce it.  I was starting to worry it was
->> only my hardware with the problem.
->> 
->> Please let me know if there are firmware updates you'd like me to test
->> and I'll be happy to.
->> 
->> Thanks,
->> 
->> Kevin
+Tony
