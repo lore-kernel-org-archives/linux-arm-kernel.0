@@ -1,76 +1,85 @@
-From: heiko.carstens@de.ibm.com (Heiko Carstens)
-Date: Tue, 2 Feb 2016 17:08:26 +0100
-Subject: [PATCH 1/5] all: s390: move wrapper infrastructure to generic
- headers
-In-Reply-To: <20160202154331.GA3003@yury-N73SV>
-References: <1453741047-5498-1-git-send-email-ynorov@caviumnetworks.com>
- <1453741047-5498-2-git-send-email-ynorov@caviumnetworks.com>
- <20160128121618.GB5418@osiris> <20160128163109.GA8529@yury-N73SV>
- <20160201114251.GB973@yury-N73SV> <20160202073913.GB3990@osiris>
- <20160202154331.GA3003@yury-N73SV>
-Message-ID: <20160202160826.GF3990@osiris>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Tue, 2 Feb 2016 11:15:55 -0500 (EST)
+Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
+ v4.5-rc1
+In-Reply-To: <CAPDyKFqQb+jtTpZbq6EvbfAk28yVkgdtiOswngNH_BjCWBDxFg@mail.gmail.com>
+Message-ID: <Pine.LNX.4.44L0.1602021112320.1653-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 02, 2016 at 06:43:31PM +0300, Yury Norov wrote:
-> > Well, I'd like to have some proof by the compiler or linker that nothing
-> > went wrong. Which seems hard if only selected system call defines will be
-> > converted to the new defines.
-> > 
-> > How can you tell that nothing has been forgotten?
-> > 
-> > Also, what happens if the prototype of a system call get's changed shortly
-> > after it was merged. We might miss such changes and have bugs.
-> > 
+On Tue, 2 Feb 2016, Ulf Hansson wrote:
+
+> On 2 February 2016 at 04:05, Tony Lindgren <tony@atomide.com> wrote:
+> > Hi,
+> >
+> > * Alan Stern <stern@rowland.harvard.edu> [160201 15:50]:
+> >>
+> >> You get here only if runtime PM is disabled, right?  So the rpm_idle
+> >> call won't do anything -- "disabled" means don't make any callbacks.
+> >
+> > Hmm sorry yes I'm confused again. Yeah it looks like calling rpm_idle
+> > just has a side effect that makes a difference here.
+> >
+> >> Tony, exactly what are you trying to do here?  Do you want this to
+> >> invoke a runtime-PM callback in the subsystem, power domain, or driver?
+> >> (Is there even a driver bound to the device when this function runs?)
+> >
+> > I guess I need to add more printks to figure out what's going on here.
+> > But yeah, I'm not seeing the callback happening at the interconnect
+> > level so hardware and PM runtime states won't match on the following
+> > probe after -EPROBE_DEFER.
+> >
+> >> The function's name suggests that it merely resets the data stored in
+> >> dev->power without actually touching the hardware.  Is that what you
+> >> really want?
+> >
+> > I guess you mean pm_runtime_set_suspended() above? I'm seeing a state
+> > where we now set pm_runtime_set_suspended() between failed device
+> > probes and the device is still active in hardware.
+> >
+> > The patch below also helps with the problem and leaves out the
+> > rpm_suspend() call from loop so it might give more hints.
+> >
+> > The difference here from what Rafael suggested earlier is calling
+> > __pm_runtime_use_autosuspend() and then not calling
+> > pm_runtime_set_suspended().
+> >
+> > However, it seems the below patch keeps hardware active in the
+> > autoidle case though, so chances are there is more that needs to
+> > be done here. Anyways, I'll try to debug it more tomorrow.
+> >
 > 
-> As for now, there's no such proof, and everything is OK. Syscall ABI
-> is extremely conservative, and Greg KH, and other people spent a lot
-> of efforts to keep it that way. This is the only reason for me to not
-> worry much about it. Modification of syscall ABI is virtually
-> impossible now, because it breaks binary compatibility. Even addition
-> of new syscall is very difficult procedure.
-> (Documentation/adding-syscalls.txt begins with section "System Call
-> Alternatives".)
+> Your observations is correct. The hardware will be kept active
+> in-between the probe attempts (and thus also if probing fails).
+> Although, that's not a regression as that's the behaviour you get from
+> runtime PM, when drivers are implemented like omap_hsmmc.
 
-Well... during the years a lot of system calls have been added. And we've
-also seen last-minute changes or reverts. So I don't share your optimistic
-view here :)
+Perhaps this is what we should do.  If probing gets deferred a few 
+times, doing runtime suspends and resumes in between will be a waste of 
+time.
 
-See e.g. 485d52768685 ("sys_personality: change sys_personality() to accept
-"unsigned int" instead of u_long") would have been a candidate which could
-silently break architectures which need compat wrappers.
+> Instead of the suggested approaches, I think the regression should be
+> fixed at the PM domain level (omap hwmod). I have attached a patch
+> below, please give it try as it's untested.
+> 
+> To solve the other problem (allowing devices to become inactive
+> in-between at probe failures), I see two options (not treated as
+> regressions).
+> 1)
+> Change the behaviour of pm_runtime_put_sync(), to *not* respect the
+> autosuspend mode.
+> I think I prefer this option, as it seems like autosuspend should be
+> respected only via the asynchronous runtime PM APIs.
 
-> We can invent some protection, but it will cost us in complexity and/or
-> runtime delays. Because syscall ABI is so stable, I think it's OK to
-> review wrappers carefully once, and they will be fine for long time.
+?  pm_runtime_put_sync() _already_ does not respect the autosuspend 
+mode.  If you want to respect it, you have to call 
+pm_runtime_put_sync_autosuspend() instead.
 
-Here I don't agree with you. These interfaces are so important that I'd
-like to have a waterproof method that these don't break.  If this involves
-a couple of superfluous instructions then that's what I'm willing to pay
-for it.
+> 2)
+> Change the failing drivers, to before calling pm_runtime_put_sync()
+> also invoke pm_runtime_dont_use_autosusend(). Or other similar
+> approach.
 
-> > Before doing that I think you should actually revert this patch: my commit
-> > 7681df456f97 ("s390/compat: remove superfluous compat wrappers") probably
-> > wasn't a very bright idea :)
-> This patch is OK for me. pid_t, uid_t, gid_t, unsigned and signed int
-> types are all 32-bit both on LP64 and ILP32. Normally, compiler should
-> care about top halves... Did I miss something?
+Given the above, this seems unnecessary.
 
-The patch was correct when writing it, but e.g. a patch like named above
-would introduce a possible bug which would go in unnoticed.
-The only thing we save is a _single_ unconditional branch here. I'd say
-that's well worth it if you get a (hopefully) always bug free sign and zero
-extension infrastructure in return.
-
-> I don't know much about s390 specifics. Maybe because of that I do not
-> understand completely your worries. I'm OK with both 1st and 2nd
-> version, but I'd choose 2nd one because it allows inlines, and we
-> don't need the compat_wrapper.c.
-
-It would be only nicer if we can guarentee correctness all the time. That
-being said I'm about to revert my own commit :)
-
-So if you want to go without compat_wrapper.c then we should have a
-solution which will do the right thing all the time without that a system
-call author has to know about the sign and zero extension issue some
-architectures face. It _will_ go wrong.
+Alan Stern
