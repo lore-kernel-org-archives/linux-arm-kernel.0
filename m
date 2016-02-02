@@ -1,99 +1,101 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue, 2 Feb 2016 14:18:15 +0900
-Subject: [PATCH 18/19] arm64: kdump: update a kernel doc
-In-Reply-To: <20160122111331.GA23620@leverpostej>
-References: <20160119122848.GA2904@dhcp-128-65.nay.redhat.com>
- <20160119125114.GH25024@leverpostej>
- <20160119134553.GA2986@dhcp-128-65.nay.redhat.com>
- <20160119140139.GC26545@leverpostej>
- <20160120024946.GA2999@dhcp-128-65.nay.redhat.com>
- <569F2439.9000604@linaro.org> <20160120114929.GB25829@leverpostej>
- <56A08076.8060302@linaro.org> <20160121120210.GD2581@leverpostej>
- <56A1CAD2.70403@linaro.org> <20160122111331.GA23620@leverpostej>
-Message-ID: <56B03C17.5090606@linaro.org>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 2 Feb 2016 13:33:04 +0800
+Subject: [PATCH v2 2/2] arm/mach-imx: enable big endian mode
+In-Reply-To: <1453913976-30619-3-git-send-email-johannes@sipsolutions.net>
+References: <1453913976-30619-1-git-send-email-johannes@sipsolutions.net>
+ <1453913976-30619-3-git-send-email-johannes@sipsolutions.net>
+Message-ID: <20160202053304.GA8307@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark,
+On Wed, Jan 27, 2016 at 05:59:36PM +0100, Johannes Berg wrote:
+> Enable ARM big-endian mode on mach-imx. This requires adding some
+> byte swapping in the debug functions (which otherwise hang forever)
+> and of course the secondary core bringup.
+> 
+> Tested (on top of 4.4) on i.MX6 HummingBoard quad-core (IMX6Q).
+> 
+> The patch is pretty much as suggested by Arnd Bergmann, thanks!
+> 
+> Signed-off-by: Johannes Berg <johannes@sipsolutions.net>
 
-On 01/22/2016 08:13 PM, Mark Rutland wrote:
-> On Fri, Jan 22, 2016 at 03:23:14PM +0900, AKASHI Takahiro wrote:
->> On 01/21/2016 09:02 PM, Mark Rutland wrote:
->>> On Thu, Jan 21, 2016 at 03:53:42PM +0900, AKASHI Takahiro wrote:
->>>> On 01/20/2016 08:49 PM, Mark Rutland wrote:
->>>>> On Wed, Jan 20, 2016 at 03:07:53PM +0900, AKASHI Takahiro wrote:
->>>>>> On 01/20/2016 11:49 AM, Dave Young wrote:
->>>>>>> Firmware do not know kernel endianniess, kernel should respect firmware
->>>>>>> maps and adapt to it, it sounds like a generic issue not specfic to kexec.
->>>>>>
->>>>>> On arm64, a kernel image header has a bit field to specify the image's endianness.
->>>>>> Anyway, our current implementation replies on a user-supplied dtb to start BE kernel.
->>>>>
->>>>> The firmware should _never_ care about the kernel's endianness. The
->>>>> bootlaoder or first kernel shouldn't care about the next kernel's
->>>>> endianness apart from in exceptional circumstances. The DTB for a LE
->>>>> kernel should look identical to that passed to a BE kernel.
->>>>
->>>> Please note that I didn't say anything different from your last two statements.
->>>> The current arm64 kexec implementation doesn't do anything specific to BE,
->>>> but as far as BE kernel doesn't support UEFI, users are responsible for
->>>> providing a proper dtb.
->>>
->>> I'm just confused as to what you mean by a "proper dtb" in that case.
->>>
->>> If you just mean one with memory nodes hacked in, then that would
->>> currently be a way to make that work, yes.
->>
->> One of useful cases that I have in my mind is kdump.
->> We may want to use a small sub-set of dtb, especially devices, to
->> make the reboot more reliable. Device drivers are likely to be vulnerable
->> at crash.
->
-> I don't think that we can reliably have userspace carve out devices from
-> the DTB or from ACPI tables in order to achieve that. That's going to
-> end up complex and/or incomplete. We also can't do this in the
-> kexec_load_file / Secure Boot case.
->
-> That's not to say we cannot try, as it's possible when using kexec_load.
-> However, it's only going to be possible on a subset of systems, and it
-> would probably make sense to reserve this approach to those cases we
-> cannot work around by other means (e.g. whitelisting "safe" devices in
-> the kdump kernel, forcing explicit resets, etc).
->
->>> It seems like the better option is to fix the BE kernel to support a
->>> UEFI memory map, as that solves other issues.
->>
->> Why did Ard throw away his patch?
->
-> In the absence of kexec it wasn't necessary, it only supported a subset
-> of the runtime services (and no other features like DMI IIRC), and it
-> looked like it would be painful to debug (if something went wrong while
-> a CPU was in LE mode, we couldn't even panic()).
->
-> Given BE kernels on UEFI were never supported until that point, there
-> wasn't a compelling reason to support that case.
->
-> Even if we support the UEFI memory map, I don't think it's worth the
-> effort to support runtime services, ACPI, and related code that's only
-> ever been tested on LE. So realistically this would only work on systems
-> using UEFI && DT rather than UEFI && ACPI.
->
->> So, are you now suggesting that we put both "elfcorehdr=" and
->> "usable-memory=" under /chosen in dtb?
->
-> Yes.
->
->> That's fair enough.  (as far as nobody cares about incompatibility
->> with other archs.)
->
-> Glad to hear! :)
+We conventionally use "ARM: imx: ..." as the subject for IMX platform
+patches.
 
-I'm preparing for a new version based on our discussions.
-Do you think that UEFI memory map support on BE kernel is a prerequisite
-for accepting my kdump?
+> ---
+>  arch/arm/include/debug/imx.S | 3 +++
+>  arch/arm/mach-imx/Kconfig    | 1 +
+>  arch/arm/mach-imx/headsmp.S  | 2 ++
+>  3 files changed, 6 insertions(+)
+> 
+> diff --git a/arch/arm/include/debug/imx.S b/arch/arm/include/debug/imx.S
+> index 619d8cc1ac12..92c44760d656 100644
+> --- a/arch/arm/include/debug/imx.S
+> +++ b/arch/arm/include/debug/imx.S
+> @@ -11,6 +11,7 @@
+>   *
+>   */
+>  
+> +#include <asm/assembler.h>
+>  #include "imx-uart.h"
+>  
+>  /*
+> @@ -34,6 +35,7 @@
+>  		.endm
+>  
+>  		.macro	senduart,rd,rx
+> +		ARM_BE8(rev \rd, \rd)
+>  		str	\rd, [\rx, #0x40]	@ TXDATA
+>  		.endm
+>  
+> @@ -42,6 +44,7 @@
+>  
+>  		.macro	busyuart,rd,rx
+>  1002:		ldr	\rd, [\rx, #0x98]	@ SR2
+> +		ARM_BE8(rev \rd, \rd)
+>  		tst	\rd, #1 << 3		@ TXDC
+>  		beq	1002b			@ wait until transmit done
+>  		.endm
+> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> index 15df34fbdf44..607e0fedbf1c 100644
+> --- a/arch/arm/mach-imx/Kconfig
+> +++ b/arch/arm/mach-imx/Kconfig
+> @@ -9,6 +9,7 @@ menuconfig ARCH_MXC
+>  	select PM_OPP if PM
+>  	select SOC_BUS
+>  	select SRAM
+> +	select ARCH_SUPPORTS_BIG_ENDIAN
 
--Takahiro AKASHI
+It should be added in alphabetical order.
 
-> Thanks,
-> Mark.
->
+I fixed these two minor things and applied both patches.
+
+Shawn
+
+>  	help
+>  	  Support for Freescale MXC/iMX-based family of processors
+>  
+> diff --git a/arch/arm/mach-imx/headsmp.S b/arch/arm/mach-imx/headsmp.S
+> index b5e976816b63..6c28d28b3c64 100644
+> --- a/arch/arm/mach-imx/headsmp.S
+> +++ b/arch/arm/mach-imx/headsmp.S
+> @@ -12,6 +12,7 @@
+>  
+>  #include <linux/linkage.h>
+>  #include <linux/init.h>
+> +#include <asm/assembler.h>
+>  
+>  diag_reg_offset:
+>  	.word	g_diag_reg - .
+> @@ -25,6 +26,7 @@ diag_reg_offset:
+>  	.endm
+>  
+>  ENTRY(v7_secondary_startup)
+> +ARM_BE8(setend be)			@ go BE8 if entered LE
+>  	set_diag_reg
+>  	b	secondary_startup
+>  ENDPROC(v7_secondary_startup)
+> -- 
+> 2.6.2
+> 
+> 
