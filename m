@@ -1,95 +1,215 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue,  2 Feb 2016 14:14:01 -0700
-Subject: [PATCH 7/7] coresight: implementing 'cpu_id()' API
-In-Reply-To: <1454447641-29153-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1454447641-29153-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1454447641-29153-8-git-send-email-mathieu.poirier@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 2 Feb 2016 22:17:43 +0100
+Subject: [PATCH v3 2/2] ASOC: sunxi: Add support for the SPDIF block
+In-Reply-To: <1454424594-25208-3-git-send-email-codekipper@gmail.com>
+References: <1454424594-25208-1-git-send-email-codekipper@gmail.com>
+ <1454424594-25208-3-git-send-email-codekipper@gmail.com>
+Message-ID: <20160202211743.GD4652@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Other than plainly parsing the device tree there is no way to
-know which CPU a tracer is affined to.  As such adding an
-interface to lookup the CPU field enclosed in the etm_drvdata
-structure that was initialised at boot time.
+Hi,
 
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
----
- drivers/hwtracing/coresight/coresight-etm3x.c | 8 ++++++++
- drivers/hwtracing/coresight/coresight-etm4x.c | 8 ++++++++
- include/linux/coresight.h                     | 3 +++
- 3 files changed, 19 insertions(+)
+It looks mostly good on my side, a few comments though.
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
-index 5981fcc69960..aae80e14508d 100644
---- a/drivers/hwtracing/coresight/coresight-etm3x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm3x.c
-@@ -315,6 +315,13 @@ static void etm_enable_hw(void *info)
- 	dev_dbg(drvdata->dev, "cpu: %d enable smp call done\n", drvdata->cpu);
- }
- 
-+static int etm_cpu_id(struct coresight_device *csdev)
-+{
-+	struct etm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-+
-+	return drvdata->cpu;
-+}
-+
- static int etm_trace_id(struct coresight_device *csdev)
- {
- 	struct etm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-@@ -421,6 +428,7 @@ static void etm_disable(struct coresight_device *csdev)
- }
- 
- static const struct coresight_ops_source etm_source_ops = {
-+	.cpu_id		= etm_cpu_id,
- 	.trace_id	= etm_trace_id,
- 	.enable		= etm_enable,
- 	.disable	= etm_disable,
-diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-index 0edc10b44004..d6a92c6d3a66 100644
---- a/drivers/hwtracing/coresight/coresight-etm4x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-@@ -63,6 +63,13 @@ static bool etm4_arch_supported(u8 arch)
- 	return true;
- }
- 
-+static int etm4_cpu_id(struct coresight_device *csdev)
-+{
-+	struct etmv4_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-+
-+	return drvdata->cpu;
-+}
-+
- static int etm4_trace_id(struct coresight_device *csdev)
- {
- 	struct etmv4_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-@@ -262,6 +269,7 @@ static void etm4_disable(struct coresight_device *csdev)
- }
- 
- static const struct coresight_ops_source etm4_source_ops = {
-+	.cpu_id		= etm4_cpu_id,
- 	.trace_id	= etm4_trace_id,
- 	.enable		= etm4_enable,
- 	.disable	= etm4_disable,
-diff --git a/include/linux/coresight.h b/include/linux/coresight.h
-index a7cabfa23b55..bf62b265bf52 100644
---- a/include/linux/coresight.h
-+++ b/include/linux/coresight.h
-@@ -205,12 +205,15 @@ struct coresight_ops_link {
- /**
-  * struct coresight_ops_source - basic operations for a source
-  * Operations available for sources.
-+ * @cpu_id:	returns the value of the CPU number this component
-+ *		is associated to.
-  * @trace_id:	returns the value of the component's trace ID as known
- 		to the HW.
-  * @enable:	enables tracing for a source.
-  * @disable:	disables tracing for a source.
-  */
- struct coresight_ops_source {
-+	int (*cpu_id)(struct coresight_device *csdev);
- 	int (*trace_id)(struct coresight_device *csdev);
- 	int (*enable)(struct coresight_device *csdev);
- 	void (*disable)(struct coresight_device *csdev);
+On Tue, Feb 02, 2016 at 03:49:54PM +0100, codekipper at gmail.com wrote:
+> +#ifdef CONFIG_PM
+> +static int sun4i_spdif_runtime_suspend(struct device *dev)
+> +{
+> +	struct sun4i_spdif_dev *host  = dev_get_drvdata(dev);
+> +
+> +	clk_disable_unprepare(host->spdif_clk);
+> +
+> +	return 0;
+> +}
+> +
+> +static int sun4i_spdif_runtime_resume(struct device *dev)
+> +{
+> +	struct sun4i_spdif_dev *host  = dev_get_drvdata(dev);
+> +
+> +	clk_prepare_enable(host->spdif_clk);
+> +
+> +	return 0;
+> +}
+> +#endif /* CONFIG_PM */
+
+You can also shut down the bus clock here. That will reset the device,
+so you'll have to reinit it in your resume, but since you won't be
+suspended while you play something, and that you set up most of your
+controller any way when you start streaming, it shouldn't be a big
+deal.
+
+> +
+> +static int sun4i_spdif_probe(struct platform_device *pdev)
+> +{
+> +	struct device_node *np = pdev->dev.of_node;
+> +	struct sun4i_spdif_dev *host;
+> +	struct resource *res;
+> +	int ret;
+> +	void __iomem *base;
+> +
+> +	dev_dbg(&pdev->dev, "Entered %s\n", __func__);
+> +
+> +	if (!np)
+> +		return -ENODEV;
+
+You won't probe without DT.
+
+> +
+> +	if (!of_match_device(sun4i_spdif_of_match, &pdev->dev)) {
+> +		dev_err(&pdev->dev, "No matched devices found.\n");
+> +		return -EINVAL;
+> +	}
+
+And you won't probe if the compatibles don't match.
+
+> +	host = devm_kzalloc(&pdev->dev, sizeof(*host), GFP_KERNEL);
+> +	if (!host)
+> +		return -ENOMEM;
+> +
+> +	host->pdev = pdev;
+> +
+> +	/* Initialize this copy of the CPU DAI driver structure */
+> +	memcpy(&host->cpu_dai_drv, &sun4i_spdif_dai, sizeof(sun4i_spdif_dai));
+> +	host->cpu_dai_drv.name = dev_name(&pdev->dev);
+> +
+> +	/* Get the addresses */
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	base = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(base))
+> +		return PTR_ERR(base);
+> +
+> +	host->regmap = devm_regmap_init_mmio(&pdev->dev, base,
+> +						&sun4i_spdif_regmap_config);
+> +
+> +	/* Clocks */
+> +	host->apb_clk = devm_clk_get(&pdev->dev, "apb");
+> +	if (IS_ERR(host->apb_clk)) {
+> +		dev_err(&pdev->dev, "failed to get a apb clock.\n");
+> +		return PTR_ERR(host->apb_clk);
+> +	}
+> +
+> +	ret = clk_prepare_enable(host->apb_clk);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "try to enable apb_spdif_clk failed\n");
+> +		return ret;
+> +	}
+> +
+> +	host->spdif_clk = devm_clk_get(&pdev->dev, "spdif");
+> +	if (IS_ERR(host->spdif_clk)) {
+> +		dev_err(&pdev->dev, "failed to get a spdif clock.\n");
+> +		goto exit_clkdisable_apb_clk;
+> +	}
+> +
+> +	host->playback_supported = false;
+> +	host->capture_supported = false;
+> +
+> +	if (of_property_read_bool(np, "spdif-out"))
+> +		host->playback_supported = true;
+> +
+> +	if (!host->playback_supported) {
+> +		dev_err(&pdev->dev, "no enabled S/PDIF DAI link\n");
+> +		goto exit_clkdisable_clk;
+> +	}
+> +
+> +	host->dma_params_tx.addr = res->start + SUN4I_SPDIF_TXFIFO;
+> +	host->dma_params_tx.maxburst = 4;
+> +	host->dma_params_tx.addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
+> +	host->dma_params_rx.addr = res->start + SUN4I_SPDIF_RXFIFO;
+> +	host->dma_params_rx.maxburst = 4;
+> +	host->dma_params_rx.addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
+> +
+> +	platform_set_drvdata(pdev, host);
+> +
+> +	ret = devm_snd_soc_register_component(&pdev->dev,
+> +				&sun4i_spdif_component, &sun4i_spdif_dai, 1);
+> +	if (ret)
+> +		goto exit_clkdisable_clk;
+> +
+> +	pm_runtime_enable(&pdev->dev);
+> +
+> +	ret = devm_snd_dmaengine_pcm_register(&pdev->dev, NULL, 0);
+> +	if (ret)
+> +		goto exit_clkdisable_clk;
+> +	return 0;
+> +
+> +exit_clkdisable_clk:
+> +	clk_disable_unprepare(host->spdif_clk);
+
+You disabled a clock that you didn't enable.
+
+> +exit_clkdisable_apb_clk:
+> +	clk_disable_unprepare(host->apb_clk);
+> +	return ret;
+> +}
+> +
+> +static int sun4i_spdif_remove(struct platform_device *pdev)
+> +{
+> +	struct sun4i_spdif_dev *host = dev_get_drvdata(&pdev->dev);
+> +
+> +	snd_soc_unregister_platform(&pdev->dev);
+> +	snd_soc_unregister_component(&pdev->dev);
+> +
+> +	pm_runtime_disable(&pdev->dev);
+> +
+> +	if (!IS_ERR(host->spdif_clk)) {
+
+Probe will fail on this condition. If probe failed, remove won't be
+called.
+
+> +		clk_disable_unprepare(host->spdif_clk);
+
+And here as well.
+
+> +		clk_disable_unprepare(host->apb_clk);
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct dev_pm_ops sun4i_spdif_pm = {
+> +	SET_RUNTIME_PM_OPS(sun4i_spdif_runtime_suspend,
+> +			   sun4i_spdif_runtime_resume, NULL)
+> +};
+> +
+> +static struct platform_driver sun4i_spdif_driver = {
+> +	.driver		= {
+> +		.name	= "sun4i-spdif",
+> +		.owner	= THIS_MODULE,
+
+This is not needed.
+
+> +		.of_match_table = of_match_ptr(sun4i_spdif_of_match),
+> +		.pm	= &sun4i_spdif_pm,
+
+IIRC, the pm field is not defined if PM is not set.
+
+Have you tested your driver without PM?
+
+> +	},
+> +	.probe		= sun4i_spdif_probe,
+> +	.remove		= sun4i_spdif_remove,
+> +};
+> +
+> +module_platform_driver(sun4i_spdif_driver);
+> +
+> +MODULE_AUTHOR("Marcus Cooper <codekipper@gmail.com>");
+> +MODULE_AUTHOR("Andrea Venturi <be17068@iperbole.bo.it>");
+> +MODULE_DESCRIPTION("Allwinner sun4i SPDIF SoC Interface");
+> +MODULE_LICENSE("GPL");
+> +MODULE_ALIAS("platform:sun4i-spdif");
+
+Thanks!
+Maxime
+
 -- 
-2.1.4
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160202/a3f0df25/attachment-0001.sig>
