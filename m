@@ -1,55 +1,49 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 2 Feb 2016 15:24:54 -0600
-Subject: [PATCH 06/10] devicetree: bindings: add DT binding for the
- Marvell Armada 3700 SoC family
-In-Reply-To: <1454436468-4241-7-git-send-email-gregory.clement@free-electrons.com>
+Date: Tue, 2 Feb 2016 15:26:37 -0600
+Subject: [PATCH 05/10] Documentation: dt: Tidy up the Marvell related files
+In-Reply-To: <1454436468-4241-6-git-send-email-gregory.clement@free-electrons.com>
 References: <1454436468-4241-1-git-send-email-gregory.clement@free-electrons.com>
- <1454436468-4241-7-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20160202212454.GA21678@rob-hp-laptop>
+ <1454436468-4241-6-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20160202212637.GA24562@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 02, 2016 at 07:07:44PM +0100, Gregory CLEMENT wrote:
-> The Marvell Armada 3700 is a family of ARMv8 CA53 SoCs. This commit
-> introduces the Device Tree binding that documents the top-level
-> compatible strings for Armada 3700 based platforms.
+On Tue, Feb 02, 2016 at 07:07:43PM +0100, Gregory CLEMENT wrote:
+> Over the last releases we have added more and more Marvell related binding
+> directly in the arm directory. It's time to have our proper directory
+> inside it, and move all the files in it.
 > 
 > Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 > ---
->  .../devicetree/bindings/arm/marvell/armada-37xx.txt     | 17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt b/Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt
-> new file mode 100644
-> index 000000000000..5db9f1a90da2
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt
-> @@ -0,0 +1,17 @@
-> +Marvell Armada 37xx Platforms Device Tree Bindings
-> +--------------------------------------------------
-> +
-> +Boards using a SoC of the Marvell Armada 37xx family must carry the
-> +following root node property:
-> +
-> + - compatible: must contain "marvell,armada3700"
+>  .../devicetree/bindings/arm/{ => marvell}/armada-370-xp-pmsu.txt          | 0
+>  Documentation/devicetree/bindings/arm/{ => marvell}/armada-370-xp.txt     | 0
+>  Documentation/devicetree/bindings/arm/{ => marvell}/armada-375.txt        | 0
+>  .../devicetree/bindings/arm/{ => marvell}/armada-380-mpcore-soc-ctrl.txt  | 0
+>  Documentation/devicetree/bindings/arm/{ => marvell}/armada-38x.txt        | 0
+>  Documentation/devicetree/bindings/arm/{ => marvell}/armada-39x.txt        | 0
+>  Documentation/devicetree/bindings/arm/{ => marvell}/armada-cpu-reset.txt  | 0
+>  Documentation/devicetree/bindings/arm/{ => marvell}/coherency-fabric.txt  | 0
+>  Documentation/devicetree/bindings/arm/{ => marvell}/kirkwood.txt          | 0
+>  Documentation/devicetree/bindings/arm/{ => marvell}/marvell,berlin.txt    | 0
+>  Documentation/devicetree/bindings/arm/{ => marvell}/marvell,dove.txt      | 0
+>  Documentation/devicetree/bindings/arm/{ => marvell}/marvell,kirkwood.txt  | 0
+>  Documentation/devicetree/bindings/arm/{ => marvell}/mvebu-cpu-config.txt  | 0
+>  .../devicetree/bindings/arm/{ => marvell}/mvebu-system-controller.txt     | 0
+>  14 files changed, 0 insertions(+), 0 deletions(-)
+>  rename Documentation/devicetree/bindings/arm/{ => marvell}/armada-370-xp-pmsu.txt (100%)
+>  rename Documentation/devicetree/bindings/arm/{ => marvell}/armada-370-xp.txt (100%)
+>  rename Documentation/devicetree/bindings/arm/{ => marvell}/armada-375.txt (100%)
+>  rename Documentation/devicetree/bindings/arm/{ => marvell}/armada-380-mpcore-soc-ctrl.txt (100%)
+>  rename Documentation/devicetree/bindings/arm/{ => marvell}/armada-38x.txt (100%)
+>  rename Documentation/devicetree/bindings/arm/{ => marvell}/armada-39x.txt (100%)
+>  rename Documentation/devicetree/bindings/arm/{ => marvell}/armada-cpu-reset.txt (100%)
+>  rename Documentation/devicetree/bindings/arm/{ => marvell}/coherency-fabric.txt (100%)
+>  rename Documentation/devicetree/bindings/arm/{ => marvell}/kirkwood.txt (100%)
+>  rename Documentation/devicetree/bindings/arm/{ => marvell}/marvell,berlin.txt (100%)
+>  rename Documentation/devicetree/bindings/arm/{ => marvell}/marvell,dove.txt (100%)
+>  rename Documentation/devicetree/bindings/arm/{ => marvell}/marvell,kirkwood.txt (100%)
+>  rename Documentation/devicetree/bindings/arm/{ => marvell}/mvebu-cpu-config.txt (100%)
+>  rename Documentation/devicetree/bindings/arm/{ => marvell}/mvebu-system-controller.txt (100%)
 
-Is 3700 an actual chip? If not, please drop this. 
-
-> +
-> +In addition, depending on whether the Armada 3710 or Armada 3720 SoCs
-> +are being used, the following root node property must be added:
-> +
-> + - compatible: must contain either "marvell,armada3710" or
-> +   "marvell,armada3720"
-> +
-> +Example:
-> +
-> +compatible = "marvell,armada-3720-db", "marvell,armada3720", "marvell,armada3700";
-> -- 
-> 2.5.0
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Acked-by: Rob Herring <robh@kernel.org>
