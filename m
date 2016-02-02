@@ -1,90 +1,26 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 2 Feb 2016 16:27:06 +0200
-Subject: [PATCH 1/2] ARM: OMAP1: DMA: Provide dma_slave_map to omap-dma
-In-Reply-To: <1454423227-31830-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1454423227-31830-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1454423227-31830-2-git-send-email-peter.ujfalusi@ti.com>
+Date: Tue, 2 Feb 2016 16:27:05 +0200
+Subject: [PATCH 0/2] ARM: OMAP1/OMAP2+: Add dma_slave_map to board files
+Message-ID: <1454423227-31830-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP1 can not boot in DT mode and to be able to clean up the driver
-regarding to the dmaengine API use (switching to the new API) the
-device/slave -> filter mapping needs to be provided to the omap-dma driver.
+Hi,
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+The following series adds the dma_slave map to the sDMA (omap-dma) driver. The
+dma_slave_map is needed later when we convert drivers to use the new dmaengine
+API for requesting slave channels.
+
+Regards,
+Peter
 ---
- arch/arm/mach-omap1/dma.c | 45 +++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 45 insertions(+)
+Peter Ujfalusi (2):
+  ARM: OMAP1: DMA: Provide dma_slave_map to omap-dma
+  ARM: OMAP2+: DMA: Provide dma_slave_map to omap-dma for legacy boot
 
-diff --git a/arch/arm/mach-omap1/dma.c b/arch/arm/mach-omap1/dma.c
-index 7b02ed218a42..f6ba589cd312 100644
---- a/arch/arm/mach-omap1/dma.c
-+++ b/arch/arm/mach-omap1/dma.c
-@@ -25,6 +25,7 @@
- #include <linux/device.h>
- #include <linux/io.h>
- #include <linux/dma-mapping.h>
-+#include <linux/dmaengine.h>
- #include <linux/omap-dma.h>
- #include <mach/tc.h>
- 
-@@ -265,6 +266,42 @@ static const struct platform_device_info omap_dma_dev_info = {
- 	.num_res = 1,
- };
- 
-+/* OMAP730, OMAP850 */
-+static const struct dma_slave_map omap7xx_sdma_map[] = {
-+	{ "omap-mcbsp.1", "tx", SDMA_FILTER_PARAM(8) },
-+	{ "omap-mcbsp.1", "rx", SDMA_FILTER_PARAM(9) },
-+	{ "omap-mcbsp.2", "tx", SDMA_FILTER_PARAM(10) },
-+	{ "omap-mcbsp.2", "rx", SDMA_FILTER_PARAM(11) },
-+	{ "mmci-omap.0", "tx", SDMA_FILTER_PARAM(21) },
-+	{ "mmci-omap.0", "rx", SDMA_FILTER_PARAM(22) },
-+	{ "omap_udc", "rx0", SDMA_FILTER_PARAM(26) },
-+	{ "omap_udc", "rx1", SDMA_FILTER_PARAM(27) },
-+	{ "omap_udc", "rx2", SDMA_FILTER_PARAM(28) },
-+	{ "omap_udc", "tx0", SDMA_FILTER_PARAM(29) },
-+	{ "omap_udc", "tx1", SDMA_FILTER_PARAM(30) },
-+	{ "omap_udc", "tx2", SDMA_FILTER_PARAM(31) },
-+};
-+
-+/* OMAP1510, OMAP1610*/
-+static const struct dma_slave_map omap1xxx_sdma_map[] = {
-+	{ "omap-mcbsp.1", "tx", SDMA_FILTER_PARAM(8) },
-+	{ "omap-mcbsp.1", "rx", SDMA_FILTER_PARAM(9) },
-+	{ "omap-mcbsp.3", "tx", SDMA_FILTER_PARAM(10) },
-+	{ "omap-mcbsp.3", "rx", SDMA_FILTER_PARAM(11) },
-+	{ "omap-mcbsp.2", "tx", SDMA_FILTER_PARAM(16) },
-+	{ "omap-mcbsp.2", "rx", SDMA_FILTER_PARAM(17) },
-+	{ "mmci-omap.0", "tx", SDMA_FILTER_PARAM(21) },
-+	{ "mmci-omap.0", "rx", SDMA_FILTER_PARAM(22) },
-+	{ "omap_udc", "rx0", SDMA_FILTER_PARAM(26) },
-+	{ "omap_udc", "rx1", SDMA_FILTER_PARAM(27) },
-+	{ "omap_udc", "rx2", SDMA_FILTER_PARAM(28) },
-+	{ "omap_udc", "tx0", SDMA_FILTER_PARAM(29) },
-+	{ "omap_udc", "tx1", SDMA_FILTER_PARAM(30) },
-+	{ "omap_udc", "tx2", SDMA_FILTER_PARAM(31) },
-+	{ "mmci-omap.1", "tx", SDMA_FILTER_PARAM(54) },
-+	{ "mmci-omap.1", "rx", SDMA_FILTER_PARAM(55) },
-+};
-+
- static struct omap_system_dma_plat_info dma_plat_info __initdata = {
- 	.reg_map	= reg_map,
- 	.channel_stride	= 0x40,
-@@ -342,6 +379,14 @@ static int __init omap1_system_dma_init(void)
- 	p.dma_attr = d;
- 	p.errata = configure_dma_errata();
- 
-+	if (cpu_is_omap7xx()) {
-+		p.slave_map = omap7xx_sdma_map;
-+		p.slavecnt = ARRAY_SIZE(omap7xx_sdma_map);
-+	} else {
-+		p.slave_map = omap1xxx_sdma_map;
-+		p.slavecnt = ARRAY_SIZE(omap1xxx_sdma_map);
-+	}
-+
- 	ret = platform_device_add_data(pdev, &p, sizeof(p));
- 	if (ret) {
- 		dev_err(&pdev->dev, "%s: Unable to add resources for %s%d\n",
+ arch/arm/mach-omap1/dma.c |  45 ++++++++++++++++++
+ arch/arm/mach-omap2/dma.c | 117 ++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 162 insertions(+)
+
 -- 
 2.7.0
