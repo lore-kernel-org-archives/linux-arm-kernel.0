@@ -1,40 +1,31 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 2 Feb 2016 19:39:13 +0000
-Subject: [PATCH V4 2/2] regulator: mt6323: Add support for MT6323 regulator
-In-Reply-To: <1454069479.10861.30.camel@mtksdaap41>
-References: <1453896059-44589-1-git-send-email-blogic@openwrt.org>
- <1453896059-44589-2-git-send-email-blogic@openwrt.org>
- <20160127144105.GQ6042@sirena.org.uk>
- <56AA5A5C.9080402@openwrt.org>
- <20160128231306.GD4130@sirena.org.uk>
- <1454061134.10861.14.camel@mtksdaap41>
- <20160129112717.GP4130@sirena.org.uk>
- <1454069479.10861.30.camel@mtksdaap41>
-Message-ID: <20160202193913.GY4455@sirena.org.uk>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 2 Feb 2016 11:47:13 -0800
+Subject: [PATCH] clk: vt8500: don't return possibly uninitialized data
+In-Reply-To: <2210116.QsPesySkh0@wuerfel>
+References: <4790407.6zgSQCdsSB@wuerfel> <20160202011545.GG4848@codeaurora.org>
+ <2210116.QsPesySkh0@wuerfel>
+Message-ID: <20160202194713.GN4848@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 29, 2016 at 08:11:19PM +0800, menghui lin wrote:
-> On Fri, 2016-01-29 at 12:27 +0100, Mark Brown wrote:
+On 02/02, Arnd Bergmann wrote:
+> On Monday 01 February 2016 17:15:45 Stephen Boyd wrote:
+> 
+> I see what you mean now. I checked different gcc versions, and with my patch I get
+> the warnings for 4.6 through 4.9, but not for 5.x.
+> 
+> In general, I tried to only address warnings I still see with newer gcc version,
+> as they are better about false positives. Do you think it's ok to take the
+> patch as is then? Otherwise we probably have to add fake initializations which
+> would shut up the warnings but not help with the code quality.
+> 
 
-> > None of this is answering my question - I know what the current API is,
-> > describing it doesn't tell me about actual users or how they are able to
-> > sensibly use the interface.  Bear in mind that the definitions of the
-> > various modes are all relative and what one device thinks is high usage
-> > may be low usage for another device.
+Sure. I was hoping something could be done to restructure the
+code to make it easier for the compiler to figure out the
+variables would be initialized. But you're the one who's sending
+the patch to silence them so if you're satisfied I'm not going to
+spend too much time on this.
 
-> Assuming valid_modes_mask and initial_mode are specified, a possible
-> way to modify regulator_set_mode() is to allow mode change only if the
-> regulator is controlled exclusively by a certain consumer or the
-> requested mode provides stronger power capability than current mode.
-> Here I assume that power capability fast > normal > idle > standby.
-
-...and I also note that the above *still* doesn't answer my questions
-above.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160202/89866e4e/attachment.sig>
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
