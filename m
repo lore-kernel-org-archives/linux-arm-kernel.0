@@ -1,80 +1,146 @@
-From: joshc@ni.com (Josh Cartwright)
-Date: Tue, 2 Feb 2016 20:30:49 -0600
-Subject: [PATCH 2/2] ARM: zynq: address L2 cache data corruption
-In-Reply-To: <cover.1454465714.git.joshc@ni.com>
-References: <cover.1454465714.git.joshc@ni.com>
-Message-ID: <9d2012ea9f91ff27f7289fcb9208c10791e4d3a0.1454465714.git.joshc@ni.com>
+From: majun258@huawei.com (majun (F))
+Date: Wed, 3 Feb 2016 10:31:52 +0800
+Subject: [RFC PATCH] irq/mbigen:Fix the problem of IO remap for duplicated
+ physical address in mbigen driver
+In-Reply-To: <20160202114340.GA28839@leverpostej>
+References: <1454327094-7848-1-git-send-email-majun258@huawei.com>
+ <20160201115717.GD674@leverpostej> <56AF585E.6050005@huawei.com>
+ <20160201132557.GG674@leverpostej> <56B08431.3000200@huawei.com>
+ <20160202114340.GA28839@leverpostej>
+Message-ID: <56B16698.6050509@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Zynq has a bug where the L2 cache will return invalid data in some
-circumstances unless the L2C_RAM register is set to 0x00020202 before the first
-enabling of the L2 cache.
 
-The Xilinx-recommended solution to this problem is to ensure that early one of
-the earlier bootstages correctly initialize L2C_RAM, however, this issue wasn't
-discovered and fixed until after their EDK/SDK 14.4 release.  For systems built
-prior to that, and which lack field-upgradable bootloaders, this issue still
-exists and silent data corruption can be seen in the wild.
 
-Fix these systems by ensuring L2C_RAM is properly initialized at the
-earliest convenient moment prior to the L2 being brought up, which is
-when the SLCR is first mapped.
+? 2016/2/2 19:43, Mark Rutland ??:
+> On Tue, Feb 02, 2016 at 06:25:53PM +0800, majun (F) wrote:
+>> Hi Mark:
+>>
+>> ? 2016/2/1 21:25, Mark Rutland ??:
+>>> On Mon, Feb 01, 2016 at 09:06:38PM +0800, majun (F) wrote:
+>>>>
+>>>>
+>>>> ? 2016/2/1 19:57, Mark Rutland ??:
+>>>>> On Mon, Feb 01, 2016 at 07:44:54PM +0800, MaJun wrote:
+>>>>>> From: Ma Jun <majun258@huawei.com>
+>>>>>>
+>>>>>> For mbigen module, there is a special case that more than one mbigen 
+>>>>>> device nodes use the same reg definition in DTS when these devices
+>>>>>> exist in the same mbigen hardware module. 
+>>>>>>
+>>>>>> mbigen_dev1:intc_dev1 {
+>>>>>> 	...
+>>>>>> 	reg = <0x0 0xc0080000 0x0 0x10000>;
+>>>>>> 	...
+>>>>>> };
+>>>>>>
+>>>>>> mbigen_dev2:intc_dev2 {
+>>>>>> 	...
+>>>>>> 	reg = <0x0 0xc0080000 0x0 0x10000>;
+>>>>>> 	...
+>>>>>> };
+>>>>>
+>>>>> This doesn't sound right. If they exist in the same place, and have the
+>>>>> same reg, they _are_ the same device.
+>>>>>
+>>>>> You'll need to explain this better.
+>>>>>
+>>>>
+>>>> For a mbigen hardware module which connecte with several devices,
+>>>> because these devices has different device ID,
+>>>> I need to define a device node for each device in DTS file.
+>>>>
+>>>> 	mbigen
+>>>> 	|
+>>>> ------------------
+>>>> | 	| 	|
+>>>> dev1 	dev2 	dev3
+>>>>
+>>>> Because of register layout,the registers related with these devices
+>>>> are put together, I can't split them clearly.
+>>>> So, I only make these devices which connect with
+>>>> same mbigen hardware module usethe same address.
+>>>
+>>> This sounds like we've either mis-described the mbigen in the binding,
+>>> or we're mis-describing the relationship with the devices.
+>>>
+>>
+>> Sorry, I didn't express myself clearly.
+>>
+>> For example, a mbigen hardware module can support several peripheral devices
+>> with different device ID.
+>>
+>> |-----------------------|-
+>> |	mbigen		|
+>> |-----------------------|-
+>>  |       |        |
+>> dev1    dev2     dev3
+>>
+>> To simplify the mbigen drvier,
+>> I didn't use the whole mbigen module as a mbgien device, but use
+>> the register collections(vector, trigger type,status etc.) corresponding
+>> to a peripheral device as a mbigen device.
+>> So, mbigen device is a logical conception or logical device.
+> 
+>>From the above, it sounds like the DT representation is not an accurate
+> representation of the hardware. We should describe the _whole_ mbigen,
+> not portions thereof. Trying to describe it piecemeal leads to problems
+> like this one.
+> 
+> I don't understand the rationale for describing the mbigen as separate
+> nodes. Above you mention that we "need to define a device node for each
+> device", but I don't see why that's necessary. Why do you believe we
+> need an mbigen node per client device?
+> 
+> As far as I can tell, we should be able to map an arbitrary
+> interrupt-specifier to a particular MSI (complete with device id) within
+> the mbigen driver. We just need to define the full set of MSIs the
+> mbigen owns.
+> 
 
-The Zynq bug is described in more detail by Xilinx AR# 54190 as quoted
-below.
+mbigen device is a interrupt controller, it is also a ITS device for ITS module.
+So, we need to register the each mbigen device to ITS with a unique ID.
+Based on the current MSI/ITS driver, I can't register whole mbigen module which
+contains several mbigen devices at one time. Because they have different device ID.
 
-Xilinx AR# 54190
-http://www.xilinx.com/support/answers/54190.htm
-Captured on 2014-09-24 14:43 -0500
+I don't know whether this explanation is clear or not.
+I think Marc can explain this well.
 
-  = Description =
-  For proper L2 cache operation, the user code must program the
-  slcr.L2C_RAM register (address 0xF800_0A1C) to the value of
-  0x0002_0202 before enabling the L2 cache. The reset value
-  (0x0001_0101) might cause, very infrequently, the L2 cache to return
-  invalid data.
+Marc, would you please help me explain this?  or, do you have any opinion about this ?
 
-  = Solution =
-  It is up to the user code (FSBL or other user code) to set the
-  slcr.L2C_RAM register to the value 0x0002_0202 before enabling the L2
-  cache.
+>> Now, a mbigen hardware module contains several logical mbigen device.
+>>
+>> -------------------------------
+>> |mgn_dev1  mgn_dev2  mgn_dev3 |
+>> |-----------------------------|
+>>    |          |        |
+>> dev1	    dev2      dev3
+>>
+>> So,mgn_dev1, mgn_dev2 and mgn_dev3 exist in same mbigen hardware module,
+>> and,they use the same reg address region,that is adress of mbigen hardware module.
+>>
+>> For this case, I think the question is can we map an reg address
+>> region more than one time?
+> 
+> As above, I think we've mis-described the hardware. Rather than making
+> things simpler, this has resulted in problems like this one.
+> 
+> We should not map a reg region more than once. Even if it's technically
+> possible to do so, I do not believe that would be the right solution
+> here. Implicitly sharing resources (e.g. portions of the mbigen control
+> registers) is inevitably going to lead to more problems later on.
 
-  Note: The L2 cache is disabled after reset and is not enabled by the
-  BootROM.
+Because we only need to write 1 into corresponding bit of status
+register to clear interrupt status during runtime,I think we don't
+need to worry about this.
 
-  Note: The slcr.l2C_RAM register was previously reserved. It is added
-  in the Zynq-7000 AP SoC Technical Reference Manual (TRM) v1.5 as
-  "Reserved".
+Thanks!
+Ma Jun
 
-Thanks to Jaeden Amero for initial debugging and triage efforts.
 
-Signed-off-by: Josh Cartwright <joshc@ni.com>
----
- arch/arm/mach-zynq/slcr.c | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/arch/arm/mach-zynq/slcr.c b/arch/arm/mach-zynq/slcr.c
-index 26320eb..f0292a3 100644
---- a/arch/arm/mach-zynq/slcr.c
-+++ b/arch/arm/mach-zynq/slcr.c
-@@ -28,6 +28,7 @@
- #define SLCR_A9_CPU_RST_CTRL_OFFSET	0x244 /* CPU Software Reset Control */
- #define SLCR_REBOOT_STATUS_OFFSET	0x258 /* PS Reboot Status */
- #define SLCR_PSS_IDCODE			0x530 /* PS IDCODE */
-+#define SLCR_L2C_RAM			0xA1C /* L2C_RAM in AR#54190 */
- 
- #define SLCR_UNLOCK_MAGIC		0xDF0D
- #define SLCR_A9_CPU_CLKSTOP		0x10
-@@ -227,6 +228,9 @@ int __init zynq_early_slcr_init(void)
- 	/* unlock the SLCR so that registers can be changed */
- 	zynq_slcr_unlock();
- 
-+	/* See AR#54190 design advisory */
-+	regmap_update_bits(zynq_slcr_regmap, SLCR_L2C_RAM, 0x70707, 0x20202);
-+
- 	register_restart_handler(&zynq_slcr_restart_nb);
- 
- 	pr_info("%s mapped to %p\n", np->name, zynq_slcr_base);
--- 
-2.7.0
+> 
+> Mark.
+> 
+> .
+> 
