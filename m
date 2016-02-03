@@ -1,114 +1,56 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 3 Feb 2016 14:47:17 -0600
-Subject: [PATCH v6 1/4] dt-bindings: mailbox: Document Hi6220 mailbox
- driver
-In-Reply-To: <1454407782-24674-2-git-send-email-leo.yan@linaro.org>
-References: <1454407782-24674-1-git-send-email-leo.yan@linaro.org>
- <1454407782-24674-2-git-send-email-leo.yan@linaro.org>
-Message-ID: <20160203204717.GA1713@rob-hp-laptop>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 3 Feb 2016 21:47:30 +0100
+Subject: [PATCH v2 17/26] drm: sun4i: Add DT bindings documentation
+In-Reply-To: <CAL_JsqLLvK0L+PaOxesgr9u_3hb6EWbb9w2-yw80D8sUqiohTA@mail.gmail.com>
+References: <1452785109-6172-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1452785109-6172-18-git-send-email-maxime.ripard@free-electrons.com>
+ <20160115031515.GA19797@rob-hp-laptop>
+ <20160203195919.GB3327@lukather>
+ <CAL_JsqLLvK0L+PaOxesgr9u_3hb6EWbb9w2-yw80D8sUqiohTA@mail.gmail.com>
+Message-ID: <20160203204730.GH3327@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 02, 2016 at 06:09:39PM +0800, Leo Yan wrote:
-> Document DT binding for Hisilicon Hi6220 mailbox driver.
+On Wed, Feb 03, 2016 at 02:19:31PM -0600, Rob Herring wrote:
+> >> > +Required properties:
+> >> > +  - compatible: value must be one of:
+> >> > +    * allwinner,sun5i-a13-display-engine
+> >> > +  - allwinner,pipelines: list of phandle to the entry points of the
+> >> > +    pipelines (either to the frontend or backend)
+> >> > +
+> >> > +Example:
+> >> > +
+> >> > +panel: panel {
+> >> > +   compatible = "olimex,lcd-olinuxino-43-ts";
+> >>
+> >> This should either be a child of what it is attached to or use of-graph.
+> >
+> > You had a similar discussion with Thierry last time I sent it, and it
+> > seemed to settle on keeping that property:
+> >
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/382115.html
+> >
+> > Has that changed?
 > 
-> Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> ---
->  .../bindings/mailbox/hisilicon,hi6220-mailbox.txt  | 74 ++++++++++++++++++++++
->  1 file changed, 74 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mailbox/hisilicon,hi6220-mailbox.txt
+> No, I still disagree. We already have 2 ways to describe panels: as a
+> child node of its controller or with of-graph. We don't need a 3rd way
+> even if it is simple. The problem with of-graph today is too much of
+> the parsing is left to the individual drivers. We need to fix that and
+> make it be handled by common code.
 
-One nit, otherwise:
+Ok. I'm guessing from your answer you prefer of-graph over a child
+node ?
 
-Acked-by: Rob Herring <robh@kernel.org>
+Maxime
 
-> 
-> diff --git a/Documentation/devicetree/bindings/mailbox/hisilicon,hi6220-mailbox.txt b/Documentation/devicetree/bindings/mailbox/hisilicon,hi6220-mailbox.txt
-> new file mode 100644
-> index 0000000..8508c8a
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mailbox/hisilicon,hi6220-mailbox.txt
-> @@ -0,0 +1,74 @@
-> +Hisilicon Hi6220 Mailbox Driver
-> +===============================
-> +
-> +Hisilicon Hi6220 mailbox supports up to 32 channels. Each channel
-> +is unidirectional with a maximum message size of 8 words. I/O is
-> +performed using register access (there is no DMA) and the cell
-> +raises an interrupt when messages are received.
-> +
-> +Mailbox Device Node:
-> +====================
-> +
-> +Required properties:
-> +--------------------
-> +- compatible:		Shall be "hisilicon,hi6220-mbox"
-> +- reg:			Contains the mailbox register address range (base
-> +			address and length); the first item is for IPC
-> +			registers, the second item is shared buffer for
-> +			slots.
-> +- #mbox-cells:		Common mailbox binding property to identify the number
-> +			of cells required for the mailbox specifier. Must be 3.
-> +			<&phandle slot_id dst_irq ack_irq>
-> +			  phandle: Label name of mailbox controller
-> +			  slot_id: Slot id used either for TX or RX
-> +			  dst_irq: IRQ identifier index number which used by MCU
-> +			  ack_irq: IRQ identifier index number with generating a
-> +			           TX/RX interrupt to application processor,
-> +				   mailbox driver uses it to acknowledge interrupt
-> +- interrupts:		Contains the interrupt information for the mailbox
-> +			device. The format is dependent on which interrupt
-> +			controller the SoCs use.
-> +
-> +Optional Properties:
-> +--------------------
-> +- hi6220,mbox-tx-noirq: Property of MCU firmware's feature, so mailbox driver
-> +			use this flag to ask MCU to enable "automatic idle
-> +			flag" mode or IRQ generated mode to acknowledge a TX
-> +			completion.
-> +
-> +Example:
-> +--------
-> +
-> +	mailbox: mailbox at F7510000 {
-
-use lowercase for hex
-
-> +		compatible = "hisilicon,hi6220-mbox";
-> +		reg = <0x0 0xF7510000 0x0 0x1000>, /* IPC_S */
-> +		      <0x0 0x06DFF800 0x0 0x0800>; /* Mailbox */
-
-and here too.
-
-> +		interrupt-parent = <&gic>;
-> +		interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
-> +		#mbox-cells = <3>;
-> +	};
-> +
-> +
-> +Mailbox client
-> +===============
-> +
-> +Required properties:
-> +--------------------
-> +- compatible:		Many (See the client docs).
-> +- mboxes:		Standard property to specify a Mailbox (See ./mailbox.txt)
-> +			Cells must match 'mbox-cells' (See Mailbox Device Node above).
-> +
-> +Optional Properties:
-> +--------------------
-> +- mbox-names:		Name given to channels seen in the 'mboxes' property.
-> +
-> +Example:
-> +--------
-> +
-> +	stub_clock: stub_clock {
-> +		compatible = "hisilicon,hi6220-stub-clk";
-> +		hisilicon,hi6220-clk-sram = <&sram>;
-> +		#clock-cells = <1>;
-> +		mbox-names = "mbox-tx", "mbox-rx";
-> +		mboxes = <&mailbox 1 0 11>, <&mailbox 0 1 10>;
-> +	};
-> -- 
-> 1.9.1
-> 
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160203/d38c1394/attachment.sig>
