@@ -1,88 +1,77 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 03 Feb 2016 17:43:59 +0100
-Subject: [PATCH 01/10] serial: mvebu-uart: initial support for Armada-3700
- serial port
-In-Reply-To: <CAPv3WKfGX2dVDu2zWG4gdEMf0vO-X+NMerh9PzNDjzLBDSQcUA@mail.gmail.com>
- (Marcin Wojtas's message of "Wed, 3 Feb 2016 09:05:55 +0100")
-References: <1454436468-4241-1-git-send-email-gregory.clement@free-electrons.com>
- <1454436468-4241-2-git-send-email-gregory.clement@free-electrons.com>
- <CAPv3WKfGX2dVDu2zWG4gdEMf0vO-X+NMerh9PzNDjzLBDSQcUA@mail.gmail.com>
-Message-ID: <87io254ucw.fsf@free-electrons.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 3 Feb 2016 16:46:32 +0000
+Subject: [PATCH v4 4/7] arm64: Handle early CPU boot failures
+In-Reply-To: <20160203125735.GA26487@MBP.local>
+References: <1453745225-27736-1-git-send-email-suzuki.poulose@arm.com>
+ <1453745225-27736-5-git-send-email-suzuki.poulose@arm.com>
+ <20160203125735.GA26487@MBP.local>
+Message-ID: <20160203164632.GC1234@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marcin,
- 
- On mer., f?vr. 03 2016, Marcin Wojtas <mw@semihalf.com> wrote:
+On Wed, Feb 03, 2016 at 12:57:38PM +0000, Catalin Marinas wrote:
+> Hi Suzuki,
+> 
+> On Mon, Jan 25, 2016 at 06:07:02PM +0000, Suzuki K. Poulose wrote:
+> > + * update_early_cpu_boot_status tmp, status
+> > + *  - Corrupts tmp, x0, x1
+> > + *  - Writes 'status' to __early_cpu_boot_status and makes sure
+> > + *    it is committed to memory.
+> > + */
+> > +
+> > +	.macro	update_early_cpu_boot_status tmp, status
+> > +	mov	\tmp, lr
+> > +	adrp	x0, __early_cpu_boot_status
+> > +	add	x0, x0, #:lo12:__early_cpu_boot_status
+> 
+> Nitpick: you could use the adr_l macro.
+> 
+> > +	mov	x1, #\status
+> > +	str	x1, [x0]
+> > +	add	x1, x0, 4
+> > +	bl	__inval_cache_range
+> > +	mov	lr, \tmp
+> > +	.endm
+> 
+> If the CPU that's currently booting has the MMU off, what's the point of
+> invalidating the cache here?
 
-> Hi Gregory
->
->> +
->> +static int mvebu_uart_startup(struct uart_port *port)
->> +{
->> +       int ret;
->> +
->> +       writel(CTRL_TXFIFO_RST | CTRL_RXFIFO_RST,
->> +              port->membase + UART_CTRL);
->> +       udelay(1);
->> +       writel(CTRL_RX_INT, port->membase + UART_CTRL);
->> +
->> +       ret = request_irq(port->irq, mvebu_uart_isr, port->irqflags, "serial",
->> +                         port);
->> +       if (ret) {
->> +               dev_err(port->dev, "failed to request irq\n");
->> +               return ret;
->> +       }
->> +
->> +       return 0;
->> +}
->> +
->
->> +static int mvebu_uart_probe(struct platform_device *pdev)
->> +{
->> +       struct resource *reg = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> +       struct resource *irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
->> +       struct uart_port *port;
->> +       struct mvebu_uart_data *data;
->> +       int ret;
->> +
->> +       if (!reg || !irq) {
->> +               dev_err(&pdev->dev, "no registers/irq defined\n");
->> +               return -EINVAL;
->> +       }
->> +
->> +       port = &mvebu_uart_ports[0];
->> +
->> +       spin_lock_init(&port->lock);
->> +
->> +       port->dev        = &pdev->dev;
->> +       port->type       = PORT_MVEBU;
->> +       port->ops        = &mvebu_uart_ops;
->> +       port->regshift   = 0;
->> +
->> +       port->fifosize   = 32;
->> +       port->iotype     = UPIO_MEM32;
->> +       port->flags      = UPF_FIXED_PORT;
->> +       port->line       = 0; /* single port: force line number to  0 */
->> +
->> +       port->irq        = irq->start;
->> +       port->irqflags   = 0;
->
-> Please use port->irqflags = IRQF_SHARED;
-> As ubuntu opens multiple consoles A3700 can't boot to it (only to
-> buildroot with single console).
+To invalidate stale lines for this address, held in any caches prior to
+the PoC. I'm assuming that __early_cpu_boot_status is sufficiently
+padded to the CWG.
 
-But this irq is not shared, this looks like a hack hidding the real
-issue.
+Cache maintenance works when SCTLR_ELx.M == 0, though barriers are
+required prior to cache maintenance as non-cacheable accesses do not
+hazard by VA.
 
-Gregory
+The MMU being off has no effect on the cache maintenance itself.
 
->
-> Best regards,
-> Marcin
+> The operation may not even be broadcast to the other CPU. So you
+> actually need the invalidation before reading the status on the
+> primary CPU.
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+We require that CPUs are coherent when they enter the kernel, so any
+cache maintenance operation _must_ affect all coherent caches (i.e. it
+must be broadcast and must affect all coherent caches prior to the PoC
+in this case).
+
+> > +
+> > +ENTRY(__early_cpu_boot_status)
+> > +	.long 	0
+> > +END(__early_cpu_boot_status)
+> 
+> I think we should just do like __boot_cpu_mode and place it in the
+> .data..cacheline_aligned section.
+
+I think we should add a separate __writeback_aligned annotation for
+stuff like this, even if it falls in .data..cacheline_aligned for now.
+
+Otherwise, agreed.
+
+> You can always use the safe clean+invalidate before reading the value
+> so that we don't care much about the write-back granule.
+
+To get correct data out we need to pad to the CQG regardless of whether
+the reader or the writer perform the maintenance.
+
+Mark.
