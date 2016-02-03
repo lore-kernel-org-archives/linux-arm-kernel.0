@@ -1,48 +1,46 @@
-From: nathan@nathanrossi.com (Nathan Rossi)
-Date: Wed,  3 Feb 2016 22:41:05 +1000
-Subject: [PATCH] ARM: dts: zynq: Enable USB and USB PHY for ZYBO
-Message-ID: <1454503265-20605-1-git-send-email-nathan@nathanrossi.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 3 Feb 2016 13:50:47 +0100
+Subject: [PATCH 00/10] KVM PCIe/MSI passthrough on ARM/ARM64
+In-Reply-To: <20160201140351.GE6828@arm.com>
+References: <1453813968-2024-1-git-send-email-eric.auger@linaro.org>
+ <1454017899.23148.0.camel@redhat.com> <56AB78B1.2030202@linaro.org>
+ <1454096004.9301.1.camel@redhat.com> <56ABD8E0.6080409@linaro.org>
+ <20160201140351.GE6828@arm.com>
+Message-ID: <20160203125047.GB13974@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Setup the USB controller and configure it to operate in host mode.
-Additionally add the USB phy node for the ZYBO, including reset gpio
-which is connected to a external MIO pin.
+On Mon, Feb 01, 2016 at 02:03:51PM +0000, Will Deacon wrote:
+> On Fri, Jan 29, 2016 at 10:25:52PM +0100, Eric Auger wrote:
+> > On 01/29/2016 08:33 PM, Alex Williamson wrote:
+> > >>> We know that x86 handles MSI vectors specially, so there is some
+> > >>> hardware that helps the situation.  It's not just that x86 has a fixed
+> > >>> range for MSI, it's how it manages that range when interrupt remapping
+> > >>> hardware is enabled.  A device table indexed by source-ID references a
+> > >>> per device table indexed by data from the MSI write itself.  So we get
+> > >>> much, much finer granularity,
+> > >> About the granularity, I think ARM GICv3 now provides a similar
+> > >> capability with GICv3 ITS (interrupt translation service). Along with
+> > >> the MSI MSG write transaction, the device outputs a DeviceID conveyed on
+> > >> the bus. This DeviceID (~ your source-ID) enables to index a device
+> > >> table. The entry in the device table points to a DeviceId interrupt
+> > >> translation table indexed by the EventID found in the msi msg. So the
+> > >> entry in the interrupt translation table eventually gives you the
+> > >> eventual interrupt ID targeted by the MSI MSG.
+> > >> This translation capability if not available in GICv2M though, ie. the
+> > >> one I am currently using.
+> > >>  
+> > >> Those tables currently are built by the ITS irqchip (irq-gic-v3-its.c)
+> 
+> That's right. GICv3/ITS disambiguates the interrupt source using the
+> DeviceID, which for PCI is derived from the Requester ID of the endpoint.
+> GICv2m is less flexible and requires a separate physical frame per guest
+> to achieve isolation.
+> 
+We should still support MSI passthrough with a single MSI frame host
+system though, right?
 
-Signed-off-by: Nathan Rossi <nathan@nathanrossi.com>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Michal Simek <michal.simek@xilinx.com>
-Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
----
- arch/arm/boot/dts/zynq-zybo.dts | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+(Users should just be aware that guests are not fully protected against
+misbehaving hardware in that case).
 
-diff --git a/arch/arm/boot/dts/zynq-zybo.dts b/arch/arm/boot/dts/zynq-zybo.dts
-index 16c9cac..8f085b3 100644
---- a/arch/arm/boot/dts/zynq-zybo.dts
-+++ b/arch/arm/boot/dts/zynq-zybo.dts
-@@ -33,6 +33,11 @@
- 		stdout-path = "serial0:115200n8";
- 	};
- 
-+	usb_phy0: phy0 {
-+		#phy-cells = <0>;
-+		compatible = "usb-nop-xceiv";
-+		reset-gpios = <&gpio0 46 1>;
-+	};
- };
- 
- &clkc {
-@@ -56,3 +61,9 @@
- &uart1 {
- 	status = "okay";
- };
-+
-+&usb0 {
-+	status = "okay";
-+	dr_mode = "host";
-+	usb-phy = <&usb_phy0>;
-+};
--- 
-2.7.0
+-Christoffer
