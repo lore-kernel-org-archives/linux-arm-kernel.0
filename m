@@ -1,96 +1,121 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Wed, 3 Feb 2016 10:53:31 +0100
-Subject: [PATCH 3/3] kallsyms: remove --page-offset command line option
-In-Reply-To: <CAKv+Gu8vzvX-6=+SgPwm2CUy_1Qpt-GHvzv=brQTs50i2Z=v9w@mail.gmail.com>
-References: <1454419174-21290-1-git-send-email-ard.biesheuvel@linaro.org>
- <1454419174-21290-4-git-send-email-ard.biesheuvel@linaro.org>
- <20160203000504.GY10826@n2100.arm.linux.org.uk>
- <CAKv+Gu8vzvX-6=+SgPwm2CUy_1Qpt-GHvzv=brQTs50i2Z=v9w@mail.gmail.com>
-Message-ID: <CALszF6B5B7=KxDLXZktpF-FYxW4fHCrQ_Xp1fyN513aBUmee_A@mail.gmail.com>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Wed, 3 Feb 2016 11:02:01 +0100
+Subject: [GIT PULL 00/16] perf/core improvements and fixes
+In-Reply-To: <1454102273-16431-1-git-send-email-acme@kernel.org>
+References: <1454102273-16431-1-git-send-email-acme@kernel.org>
+Message-ID: <20160203100201.GC17305@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-02-03 9:16 GMT+01:00 Ard Biesheuvel <ard.biesheuvel@linaro.org>:
-> (+ Uwe, Maxime)
->
-> Complete thread here:
-> http://thread.gmane.org/gmane.linux.ports.arm.kernel/474400
->
-> On 3 February 2016 at 01:05, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
->> On Tue, Feb 02, 2016 at 02:19:34PM +0100, Ard Biesheuvel wrote:
->>> The --page-offset command line option was only used for ARM, to filter
->>> symbol addresses below CONFIG_PAGE_OFFSET. This is no longer needed, so
->>> remove the functionality altogether.
->>
->> From what I remember, this option has nothing to do with MMU-ful ARM,
->> but noMMU ARM, where the .text segment can be significantly different
->> from the .data segment.
->>
->> I think you need to talk to noMMU people about this patch.
->>
->
-> We have
->
-> commit f6537f2f0eba4eba3354e48dbe3047db6d8b6254
-> Author: Ming Lei <tom.leiming@gmail.com>
-> Date:   Sat Nov 2 09:11:33 2013 +1030
->
->     scripts/kallsyms: filter symbols not in kernel address space
->
->     This patch uses CONFIG_PAGE_OFFSET to filter symbols which
->     are not in kernel address space because these symbols are
->     generally for generating code purpose and can't be run at
->     kernel mode, so we needn't keep them in /proc/kallsyms.
->
->     For example, on ARM there are some symbols which may be
->     linked in relocatable code section, then perf can't parse
->     symbols any more from /proc/kallsyms, this patch fixes the
->     problem (introduced b9b32bf70f2fb710b07c94e13afbc729afe221da)
->
-> which introduces the --page-offset option to kallsyms, in response to
-> your patch that moves .vectors and .stubs to VMA 0x0. Then we have
->
-> commit 7122c3e9154b5d9a7422f68f02d8acf050fad2b0
-> Author: Ming Lei <tom.leiming@gmail.com>
-> Date:   Tue Dec 10 16:46:29 2013 +1030
->
->     scripts/link-vmlinux.sh: only filter kernel symbols for arm
->
->     Actually CONFIG_PAGE_OFFSET isn't same with PAGE_OFFSET, so
->     it isn't easy to figue out PAGE_OFFSET defined in header
->     file from scripts.
->
->     Because CONFIG_PAGE_OFFSET may not be defined in some ARCHs(
->     64bit ARCH), or defined as bogus value in !MMU case, so
->     this patch only applys the filter on ARM when CONFIG_PAGE_OFFSET
->     is defined as the original problem is only on ARM.
->
-> which restricts the use of --page-offset to CONFIG_ARM, and
->
-> commit cc8475305203ddfd117b81e2e732194b67d8f310
-> Author: Maxime Coquelin <mcoquelin.stm32@gmail.com>
-> Date:   Thu May 21 19:17:44 2015 +0800
->
->     scripts: link-vmlinux: Don't pass page offset to kallsyms if XIP Kernel
->
->     When Kernel is executed in place from ROM, the symbol addresses can be
->     lower than the page offset.
->
-> which restricts the use of --page-offset to CONFIG_ARM && !CONFIG_XIP_KERNEL
->
-> So it looks like the Dec 10 patch fixes some fallout related to !MMU
-> that was caused by the Nov 2 patch, but the original patch has nothing
-> to do with !MMU. Furthermore, 3 out of 4 !MMU configs we have in the
-> tree (efm32, stm32 and vf610m4) are also XIP kernel, for which
-> --page-offset isn't even used to begin with after Maxime's patch.
-> Hopefully Uwe and/or Maxime can confirm, but removing the PAGE_OFFSET
-> lower limit should not affect those platforms at all afaict,
-> especially since, after patch 1/3, there are no symbols left to filter
-> below that limit in the first place.
 
-I agree with you, removing the PAGE_OFFSET lower limit should not
-affect our platforms.
+* Arnaldo Carvalho de Melo <acme@kernel.org> wrote:
 
-Regards,
-Maxime
+> Hi Ingo,
+> 
+> 	This is on top of the previously submitted perf-core-for-mingo tag,
+> please consider applying,
+> 
+> - Arnaldo
+> 
+> The following changes since commit 5ac76283b32b116c58e362e99542182ddcfc8262:
+> 
+>   perf cpumap: Auto initialize cpu__max_{node,cpu} (2016-01-26 16:08:36 -0300)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/acme/linux.git tags/perf-core-for-mingo-2
+> 
+> for you to fetch changes up to 814568db641f6587c1e98a3a85f214cb6a30fe10:
+> 
+>   perf build: Align the names of the build tests: (2016-01-29 17:51:04 -0300)
+> 
+> ----------------------------------------------------------------
+> New features:
+> 
+> - Port 'perf kvm stat' to PowerPC (Hemant Kumar)
+> 
+> Infrastructure:
+> 
+> - Use the 'feature-dump' target to do the feature checks just once and then
+>   add code to reuse that in the tests/make makefile, speeding up the
+>   'make -C tools/perf build-test' target (Wang Nan)
+> 
+> - Reduce the number of tests the 'build-test' target do to those that don't
+>   pollute the source tree (Arnaldo Carvalho de Melo)
+> 
+> - Improve the output of the build tests a bit by aligning the name of the
+>   tests, more can be done to filter out uninteresting info in the output
+>   (Arnaldo Carvalho de Melo)
+> 
+> - Add perf_evlist pointer to *info_priv_size(), more prep work for
+>   supporting the coresight architecture (Mathieu Poirier)
+> 
+> - Improve the 'perf test bp_signal' test (Wang Nan)
+> 
+> - Check environment before starting the BPF 'perf test', so that we can just
+>   'Skip' older kernels instead of 'FAIL'ing them (Wang Nan)
+> 
+> - Fix cpumode of synthesized buildid event (Wang Nan)
+> 
+> Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
+> 
+> ----------------------------------------------------------------
+> Arnaldo Carvalho de Melo (2):
+>       perf tools: Speed up build-tests by reducing the number of builds tested
+>       perf build: Align the names of the build tests:
+> 
+> Hemant Kumar (4):
+>       perf kvm/{x86,s390}: Remove dependency on uapi/kvm_perf.h
+>       perf kvm/{x86,s390}: Remove const from kvm_events_tp
+>       perf kvm/powerpc: Port perf kvm stat to powerpc
+>       perf kvm/powerpc: Add support for HCALL reasons
+> 
+> Jiri Olsa (1):
+>       perf build: Fix feature-dump checks, we need to test all features
+> 
+> Mathieu Poirier (1):
+>       perf auxtrace: Add perf_evlist pointer to *info_priv_size()
+> 
+> Wang Nan (8):
+>       tools build: Check basic headers for test-compile feature checker
+>       perf build: Remove all condition feature check {C,LD}FLAGS
+>       perf build: Use feature dump file for build-test
+>       perf buildid: Fix cpumode of buildid event
+>       perf test: Check environment before start real BPF test
+>       perf test: Improve bp_signal
+>       perf tools: Move timestamp creation to util
+>       perf record: Use OPT_BOOLEAN_SET for buildid cache related options
+> 
+>  tools/build/Makefile.feature                   |   8 ++
+>  tools/build/feature/test-compile.c             |   2 +
+>  tools/perf/Makefile                            |  11 +-
+>  tools/perf/arch/powerpc/Makefile               |   2 +
+>  tools/perf/arch/powerpc/util/Build             |   1 +
+>  tools/perf/arch/powerpc/util/book3s_hcalls.h   | 123 ++++++++++++++++++
+>  tools/perf/arch/powerpc/util/book3s_hv_exits.h |  33 +++++
+>  tools/perf/arch/powerpc/util/kvm-stat.c        | 170 +++++++++++++++++++++++++
+>  tools/perf/arch/s390/util/kvm-stat.c           |  10 +-
+>  tools/perf/arch/x86/util/intel-bts.c           |   4 +-
+>  tools/perf/arch/x86/util/intel-pt.c            |   4 +-
+>  tools/perf/arch/x86/util/kvm-stat.c            |  16 ++-
+>  tools/perf/builtin-buildid-cache.c             |  14 +-
+>  tools/perf/builtin-kvm.c                       |  38 ++++--
+>  tools/perf/builtin-record.c                    |  12 +-
+>  tools/perf/config/Makefile                     | 101 +++++++--------
+>  tools/perf/tests/bp_signal.c                   | 140 ++++++++++++++++----
+>  tools/perf/tests/bpf.c                         |  37 ++++++
+>  tools/perf/tests/make                          |  39 +++++-
+>  tools/perf/util/auxtrace.c                     |   7 +-
+>  tools/perf/util/auxtrace.h                     |   6 +-
+>  tools/perf/util/build-id.c                     |   6 +-
+>  tools/perf/util/kvm-stat.h                     |   8 +-
+>  tools/perf/util/util.c                         |  17 +++
+>  tools/perf/util/util.h                         |   1 +
+>  25 files changed, 688 insertions(+), 122 deletions(-)
+>  create mode 100644 tools/perf/arch/powerpc/util/book3s_hcalls.h
+>  create mode 100644 tools/perf/arch/powerpc/util/book3s_hv_exits.h
+>  create mode 100644 tools/perf/arch/powerpc/util/kvm-stat.c
+
+Pulled, thanks a lot Arnaldo!
+
+	Ingo
