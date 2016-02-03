@@ -1,102 +1,90 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  3 Feb 2016 18:00:15 +0000
-Subject: [PATCH v3 22/23] arm64: VHE: Add support for running Linux in EL2 mode
-In-Reply-To: <1454522416-6874-1-git-send-email-marc.zyngier@arm.com>
-References: <1454522416-6874-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1454522416-6874-23-git-send-email-marc.zyngier@arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 3 Feb 2016 19:02:32 +0100
+Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
+ v4.5-rc1
+In-Reply-To: <20160203162705.GG19432@atomide.com>
+References: <20160201232833.GR19432@atomide.com>
+ <Pine.LNX.4.44L0.1602011844540.2869-100000@netrider.rowland.org>
+ <20160202030533.GT19432@atomide.com>
+ <CAPDyKFqQb+jtTpZbq6EvbfAk28yVkgdtiOswngNH_BjCWBDxFg@mail.gmail.com>
+ <CAPDyKFras1o13WBZzaZ_Snnj5TBQQFWKr=PtCjUvwe+yGPQn9w@mail.gmail.com>
+ <20160202163536.GU19432@atomide.com>
+ <CAPDyKFosQjkHDVSvy67+hstjjFseXQP5WYXrJE19GgVFYJ099w@mail.gmail.com>
+ <20160202234145.GC19432@atomide.com>
+ <CAPDyKFqLi8xOUeoxUTAmif5QrOjVpV_2CDLv4hjO_C9iOnv+5Q@mail.gmail.com>
+ <20160203162705.GG19432@atomide.com>
+Message-ID: <CAPDyKFrsbW+vOoKBDvkNbJa=aUZE1EcikCqrAuO4cv+TkW-FnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With ARMv8.1 VHE, the architecture is able to (almost) transparently
-run the kernel at EL2, despite being written for EL1.
+On 3 February 2016 at 17:27, Tony Lindgren <tony@atomide.com> wrote:
+>
+>> >> To me, it's the responsible of the PM domain to *help* with the
+>> >> synchronization, not prevent it as it currently does.
+>> >
+>> > The problem is that the hardware state gets out of sync with
+>> > PM runtime. And that's going to be a pain to debug later on.
+>>
+>> I don't see the problem, but of course you know omap for better than I do.
+>
+> Well there's also the long term maintenance aspect at least I
+> need to consider.
+>
+>> So if you are concerned about this, perhaps adding a dev_dbg print
+>> when the omap hwmod's ->runtime_suspend() callback returns zero could
+>> be a way forward?
+>
+> If we downgrade it to a debug statement or a warning, we'll soon end
+> up with even more driver specific warnings than we already have.
+> And I don't want to be chasing people around to fix their drivers
+> for eavery new driver that gets submitted.
+>
+> Also, without this error I would not even originally have noticed we
+> have a problem :) So I suggest the following:
 
-This patch takes care of the "almost" part, mostly preventing the kernel
-from dropping from EL2 to EL1, and setting up the HYP configuration.
+Well, I am actually not removing that existing warning in the
+omap_device_enable(), as it's being called from other places as well.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/Kconfig       | 13 +++++++++++++
- arch/arm64/kernel/head.S | 28 +++++++++++++++++++++++++++-
- 2 files changed, 40 insertions(+), 1 deletion(-)
+It's just the runtime PM path that's being changed.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 8cc6228..cf118d9 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -750,6 +750,19 @@ config ARM64_LSE_ATOMICS
- 	  not support these instructions and requires the kernel to be
- 	  built with binutils >= 2.25.
- 
-+config ARM64_VHE
-+	bool "Enable support for Virtualization Host Extensions (VHE)"
-+	default y
-+	help
-+	  Virtualization Host Extensions (VHE) allow the kernel to run
-+	  directly at EL2 (instead of EL1) on processors that support
-+	  it. This leads to better performance for KVM, as they reduce
-+	  the cost of the world switch.
-+
-+	  Selecting this option allows the VHE feature to be detected
-+	  at runtime, and does not affect processors that do not
-+	  implement this feature.
-+
- endmenu
- 
- endmenu
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 917d981..6f2f377 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -30,6 +30,7 @@
- #include <asm/cache.h>
- #include <asm/cputype.h>
- #include <asm/kernel-pgtable.h>
-+#include <asm/kvm_arm.h>
- #include <asm/memory.h>
- #include <asm/pgtable-hwdef.h>
- #include <asm/pgtable.h>
-@@ -464,9 +465,27 @@ CPU_LE(	bic	x0, x0, #(3 << 24)	)	// Clear the EE and E0E bits for EL1
- 	isb
- 	ret
- 
-+2:
-+#ifdef CONFIG_ARM64_VHE
-+	/*
-+	 * Check for VHE being present. For the rest of the EL2 setup,
-+	 * x2 being non-zero indicates that we do have VHE, and that the
-+	 * kernel is intended to run@EL2.
-+	 */
-+	mrs	x2, id_aa64mmfr1_el1
-+	ubfx	x2, x2, #8, #4
-+#else
-+	mov	x2, xzr
-+#endif
-+
- 	/* Hyp configuration. */
--2:	mov	x0, #(1 << 31)			// 64-bit EL1
-+	mov	x0, #HCR_RW			// 64-bit EL1
-+	cbz	x2, set_hcr
-+	orr	x0, x0, #HCR_TGE		// Enable Host Extensions
-+	orr	x0, x0, #HCR_E2H
-+set_hcr:
- 	msr	hcr_el2, x0
-+	isb
- 
- 	/* Generic timers. */
- 	mrs	x0, cnthctl_el2
-@@ -526,6 +545,13 @@ CPU_LE(	movk	x0, #0x30d0, lsl #16	)	// Clear EE and E0E on LE systems
- 	/* Stage-2 translation */
- 	msr	vttbr_el2, xzr
- 
-+	cbz	x2, install_el2_stub
-+
-+	mov	w20, #BOOT_CPU_MODE_EL2		// This CPU booted in EL2
-+	isb
-+	ret
-+
-+install_el2_stub:
- 	/* Hypervisor stub */
- 	adrp	x0, __hyp_stub_vectors
- 	add	x0, x0, #:lo12:__hyp_stub_vectors
--- 
-2.1.4
+>
+> 1. I'll do a series of patches to fix up the handful of omap
+>    specific drivers with pm_runtime_use_autosuspend() that depend
+>    on omap_device
+>
+> 2. I'll also do a patch to improve the omap_device error message
+>    so new drivers are easy to fix. Something like:
+>
+>   "%() called from invalid state %d, use pm_runtime_put_sync_suspend()?"
+>
+> Does that sounds OK to you?
+
+Sure.
+
+>
+> Regards,
+>
+> Tony
+
+One more thing though. I just realized that you have yet another issue
+to consider going for the approach fixing *only* drivers.
+
+Let me summarize it here:
+
+If userspace has prevented runtime PM (pm_runtime_forbid()) when a
+driver becomes unbound, the driver will not be able to suspend the
+device by using any of the pm_runtime_suspend() APIs, as the usage
+count is isn't zero.
+
+As pm_runtime_reinit() is invoked as part of the driver unbind
+sequence, the runtime PM status goes out of sync. A following driver
+rebind will then trigger the warning when the PM domain's
+->runtime_resume() callback gets invoked. Again, forever preventing
+the device from being runtime suspended.
+
+How do you intend to solve this case?
+I guess there are two options, pick up the patch I posted for omap
+hwmod or make use of pm_runtime_force_suspend() in the driver.
+
+Kind regards
+Uffe
