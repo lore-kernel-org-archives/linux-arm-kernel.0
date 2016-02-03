@@ -1,87 +1,75 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Wed, 3 Feb 2016 02:33:11 +0000
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 03 Feb 2016 11:45:56 +0900
 Subject: [PATCH v4 1/2] regulator: act8945a: add regulator driver for
  ACT8945A
-In-Reply-To: <CABxcv=nJsWEv9KW-5iPpUnyN8ZVpx6CV07gBRaLNWqd644YOqQ@mail.gmail.com>
+In-Reply-To: <B256D81BAE5131468A838E5D7A243641D64026A0@penmbx01>
 References: <1453863463-30515-1-git-send-email-wenyou.yang@atmel.com>
  <1453863463-30515-2-git-send-email-wenyou.yang@atmel.com>
  <20160129001603.GM4130@sirena.org.uk>
  <B256D81BAE5131468A838E5D7A243641D63FBF8B@penmbx01>
- <20160129113518.GQ4130@sirena.org.uk>
- <CABxcv=kNKmgRytxB5ppawrAvC-GDRhV4T_UUGvpHgKp9+BsUmQ@mail.gmail.com>
- <B256D81BAE5131468A838E5D7A243641D63FE2C7@penmbx01>
- <CABxcv=nJsWEv9KW-5iPpUnyN8ZVpx6CV07gBRaLNWqd644YOqQ@mail.gmail.com>
-Message-ID: <B256D81BAE5131468A838E5D7A243641D64026CB@penmbx01>
+ <20160129113518.GQ4130@sirena.org.uk> <87wpqn3t72.fsf@dell.be.48ers.dk>
+ <B256D81BAE5131468A838E5D7A243641D64026A0@penmbx01>
+Message-ID: <56B169E4.9030801@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Javier Martinez Canillas [mailto:javier at dowhile0.org]
-> Sent: 2016?2?1? 21:15
-> To: Yang, Wenyou <Wenyou.Yang@atmel.com>
-> Cc: Mark Brown <broonie@kernel.org>; Liam Girdwood <lgirdwood@gmail.com>;
-> Rob Herring <robh+dt@kernel.org>; Pawel Moll <pawel.moll@arm.com>; Ian
-> Campbell <ijc+devicetree@hellion.org.uk>; Kumar Gala <galak@codeaurora.org>;
-> Krzysztof Kozlowski <k.kozlowski@samsung.com>; Lee Jones
-> <lee.jones@linaro.org>; Peter Korsgaard <jacmet@gmail.com>; Ferre, Nicolas
-> <Nicolas.FERRE@atmel.com>; linux-arm-kernel at lists.infradead.org; linux-
-> kernel at vger.kernel.org; devicetree at vger.kernel.org
-> Subject: Re: [PATCH v4 1/2] regulator: act8945a: add regulator driver for
-> ACT8945A
+On 03.02.2016 11:29, Yang, Wenyou wrote:
+> Hi Peter,
 > 
-> Hello Wenyou,
+>> -----Original Message-----
+>> From: Peter Korsgaard [mailto:jacmet at gmail.com] On Behalf Of Peter Korsgaard
+>> Sent: 2016?2?3? 1:42
+>> To: Mark Brown <broonie@kernel.org>
+>> Cc: Yang, Wenyou <Wenyou.Yang@atmel.com>; Liam Girdwood
+>> <lgirdwood@gmail.com>; Rob Herring <robh+dt@kernel.org>; Pawel Moll
+>> <pawel.moll@arm.com>; Ian Campbell <ijc+devicetree@hellion.org.uk>; Kumar
+>> Gala <galak@codeaurora.org>; Krzysztof Kozlowski
+>> <k.kozlowski@samsung.com>; Javier Martinez Canillas <javier@dowhile0.org>;
+>> Lee Jones <lee.jones@linaro.org>; Peter Korsgaard <jacmet@gmail.com>; Ferre,
+>> Nicolas <Nicolas.FERRE@atmel.com>; linux-arm-kernel at lists.infradead.org;
+>> linux-kernel at vger.kernel.org; devicetree at vger.kernel.org
+>> Subject: Re: [PATCH v4 1/2] regulator: act8945a: add regulator driver for
+>> ACT8945A
+>>
+>>>>>>> "Mark" == Mark Brown <broonie@kernel.org> writes:
+>>
+>>  > On Fri, Jan 29, 2016 at 01:20:08AM +0000, Yang, Wenyou wrote:
+>>  >> > > +static const struct of_device_id act8945a_pmic_of_match[] = {
+>>  >> > > +	{ .compatible = "active-semi,act8945a-regulator" },
+>>  >> > > +	{ },
+>>  >> > > +};
+>>  >> > > +MODULE_DEVICE_TABLE(of, act8945a_pmic_of_match);
+>>
+>>  >> > This seems mostly OK but why do we have a compatible string here -
+>> shouldn't  >> > the MFD be able to instantiate the regulator function without
+>> needing this?
+>>
+>>  >> Because I got feedback from Javier for the act8945a-charger patches of this
+>> MFD series,  >> He said missing the OF match table will cause the module
+>> autoloading broken.
+>>
+>>  >> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/398113.html
+>>
+>>  >> What do you think about it?
+>>
+>>  > If then device is not being loaded from the DT (and it shouldn't be, the  > device
+>> looks like it should be instantiated directly by the MFD as it  > can't exist
+>> separately to that MFD) an OF table will do nothing.
+>>
+>> To add to the confusion, the regulator part of the chip is actually identical to
+>> act8865, so it could use the existing regulator driver / compatible, except that it
+>> binds to the platform bus instead of i2c.
 > 
-> [snip]
+> Thank you for your opinion.
 > 
-> >> >
-> >> > If then device is not being loaded from the DT (and it shouldn't
-> >> > be, the device looks like it should be instantiated directly by the
-> >> > MFD as it can't exist separately to that MFD) an OF table will do nothing.
-> >>
-> >> Then he should remove the .of_compatible from the MFD cell definition.
-> >
-> > I tried it,
-> >
-> > But if removed this .of_compatible, and reserved the OF table.
-> 
-> What we said is that you should remove both the mfd cell .of_compatible field and
-> the OF table. Of course removing one but leaving the other is not correct.
-> 
-> > the &pdev->dev->of_node is NULL, the driver fails to get the
-> > configuration value from DT,
-> >
-> 
-> I see, you mean that you are not able to lookup the "active-semi,vsel-high"
-> property.
-> 
-> > It seems the OF table still doesn't work. Where is wrong?
-> >
-> 
-> I think the problem is with your DT binding. You have a PMIC dev node with
-> compatible "active-semi,act8945a" that has a child node with compatible "active-
-> semi,act8945a-regulator" which in turn has the "regulators" node.
-> 
-> I believe what Mark says is that there shouldn't be a compatible and node for the
-> regulators IC since is part of the PMIC. IOW, you can't have it as a standalone
-> node in the DTS.
-> 
-> > Could you help give some suggestion?
-> >
-> 
-> I would just remove the "active-semi,act8945a-regulator" node and make "active-
-> semi,vsel-high" a property of the "active-semi,act8945a" node.
-> That way you can remove the mfd cell .of_compatible and OF table in the
-> regulator driver and read the "active-semi,vsel-high" using the platform device's
-> parent of_node.
-> 
-> But it's better if you wait for Mark's opinions before re-spining your patches.
+> But I think It is better to make it a separate driver, the driver is simpler. 
 
-Hi Mark, what is your opinions?
+Do I understand correctly that you are creating a new device driver for
+the same logical device (regulator block)?
 
-> 
-> Best regards,
-> Javier
+By duplicating the code you are not making kernel simpler. Maybe your
+new driver will be simple but still this adds a NEW driver instead of
+re-using existing code.
 
-
-Best Regards,
-Wenyou Yang
+Best regards,
+Krzysztof
