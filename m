@@ -1,38 +1,39 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 3 Feb 2016 00:31:58 +0000
-Subject: [PATCH] ARM: vmlinux.lds: assert that ROM and RAM don't overlap
- when XIP_KERNEL=y
-In-Reply-To: <1454346154-12931-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1454346154-12931-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160203003158.GZ10826@n2100.arm.linux.org.uk>
+Date: Wed, 3 Feb 2016 00:41:54 +0000
+Subject: [PATCH] video: ARM CLCD: runtime check for Versatile
+In-Reply-To: <25978729.oSoMp4ZgxA@wuerfel>
+References: <1454446059-30526-1-git-send-email-linus.walleij@linaro.org>
+ <25978729.oSoMp4ZgxA@wuerfel>
+Message-ID: <20160203004154.GA10826@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 01, 2016 at 06:02:34PM +0100, Ard Biesheuvel wrote:
-> When building an XIP kernel, the linker produces two disjoint VMA regions,
-> where the first is mapped onto ROM and the second onto RAM. For this reason,
-> the linker output pointer '.' is updated halfway through the linker script,
-> and set to a value that corresponds with the start of the RAM region.
+On Tue, Feb 02, 2016 at 10:10:49PM +0100, Arnd Bergmann wrote:
+> On Tuesday 02 February 2016 21:47:39 Linus Walleij wrote:
+> >         } else {
+> > -#ifdef CONFIG_ARCH_VERSATILE
+> > -               fb->off_ienb = CLCD_PL111_IENB;
+> > -               fb->off_cntl = CLCD_PL111_CNTL;
+> > -#else
+> > -               fb->off_ienb = CLCD_PL110_IENB;
+> > -               fb->off_cntl = CLCD_PL110_CNTL;
+> > -#endif
+> > +               if (of_machine_is_compatible("arm,versatile-ab") ||
+> > +                   of_machine_is_compatible("arm,versatile-pb")) {
+> > +                       fb->off_ienb = CLCD_PL111_IENB;
+> > +                       fb->off_cntl = CLCD_PL111_CNTL;
+> > +               } else {
+> > +                       fb->off_ienb = CLCD_PL110_IENB;
+> > +                       fb->off_cntl = CLCD_PL110_CNTL;
+> > +               }
+> >         }
+> > 
 > 
-> However, in some cases, the ROM region exceeds the expected size, and the
-> assignment of the output pointer results in a decrement rather than an
-> increment, causing the virtual addresses of the .data region to clash with
-> the .text region. Such a kernel cannot boot normally, but it also confuses
-> the hell out of kallsyms, since .data symbols may appear inside the
-> [_stext, _etext] or [_sinittext, _einittext] intervals in the first pass,
-> but not in the second (or vice versa), resulting in inconsistent kallsyms
-> data.
-> 
-> So let's make sure that the output pointer only advances, and never jumps
-> back into the ROM region.
+> Could that be done based on the AMBA device ID instead?
 
-The long term goal is to move the XIP stuff out of this file, so
-I think it's better to avoid touching this until the split has
-happened.
-
-I'd _much_ rather see the split happen first, and then fixes
-applied, rather than trying to fix the existing unmaintainable
-mess.
+Unfortunately not.  It's a mistake made on one Versatile board
+which reverses the registers.  There's nothing to distinguish it
+in the primecell itself.
 
 -- 
 RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
