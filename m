@@ -1,70 +1,73 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Wed, 3 Feb 2016 09:05:55 +0100
-Subject: [PATCH 01/10] serial: mvebu-uart: initial support for Armada-3700
- serial port
-In-Reply-To: <1454436468-4241-2-git-send-email-gregory.clement@free-electrons.com>
-References: <1454436468-4241-1-git-send-email-gregory.clement@free-electrons.com>
- <1454436468-4241-2-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <CAPv3WKfGX2dVDu2zWG4gdEMf0vO-X+NMerh9PzNDjzLBDSQcUA@mail.gmail.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 3 Feb 2016 16:01:43 +0800
+Subject: [PATCH v2 net 6/6] net: mvneta: Fix race condition during stopping
+In-Reply-To: <1454332067-16378-7-git-send-email-gregory.clement@free-electrons.com>
+References: <1454332067-16378-1-git-send-email-gregory.clement@free-electrons.com>
+ <1454332067-16378-7-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20160203160143.59225a51@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory
+On Mon, 1 Feb 2016 14:07:47 +0100 Gregory CLEMENT wrote:
 
-> +
-> +static int mvebu_uart_startup(struct uart_port *port)
-> +{
-> +       int ret;
-> +
-> +       writel(CTRL_TXFIFO_RST | CTRL_RXFIFO_RST,
-> +              port->membase + UART_CTRL);
-> +       udelay(1);
-> +       writel(CTRL_RX_INT, port->membase + UART_CTRL);
-> +
-> +       ret = request_irq(port->irq, mvebu_uart_isr, port->irqflags, "serial",
-> +                         port);
-> +       if (ret) {
-> +               dev_err(port->dev, "failed to request irq\n");
-> +               return ret;
-> +       }
-> +
-> +       return 0;
-> +}
-> +
+> When stopping the port, the CPU notifier are still there whereas the
+> mvneta_stop_dev function calls mvneta_percpu_disable() on each CPUs.
+> It was possible to have a new CPU coming at this point which could be
+> racy.
+> 
+> This patch adds a flag preventing executing the code notifier for a new CPU
+> when the port is stopping.
+> 
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  drivers/net/ethernet/marvell/mvneta.c | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
+> 
+> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+> index 4d40d2fde7ca..2f53975aa6ec 100644
+> --- a/drivers/net/ethernet/marvell/mvneta.c
+> +++ b/drivers/net/ethernet/marvell/mvneta.c
+> @@ -374,6 +374,7 @@ struct mvneta_port {
+>  	 * ensuring that the configuration remains coherent.
+>  	 */
+>  	spinlock_t lock;
+> +	bool is_stopping;
+>  
+>  	/* Core clock */
+>  	struct clk *clk;
+> @@ -2916,6 +2917,11 @@ static int mvneta_percpu_notifier(struct notifier_block *nfb,
+>  	switch (action) {
+>  	case CPU_ONLINE:
+>  	case CPU_ONLINE_FROZEN:
+> +		/* Configuring the driver for a new CPU while the
+> +		 * driver is stopping is racy, so just avoid it.
+> +		 */
+> +		if (pp->is_stopping)
+> +			break;
 
-> +static int mvebu_uart_probe(struct platform_device *pdev)
-> +{
-> +       struct resource *reg = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +       struct resource *irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-> +       struct uart_port *port;
-> +       struct mvebu_uart_data *data;
-> +       int ret;
-> +
-> +       if (!reg || !irq) {
-> +               dev_err(&pdev->dev, "no registers/irq defined\n");
-> +               return -EINVAL;
-> +       }
-> +
-> +       port = &mvebu_uart_ports[0];
-> +
-> +       spin_lock_init(&port->lock);
-> +
-> +       port->dev        = &pdev->dev;
-> +       port->type       = PORT_MVEBU;
-> +       port->ops        = &mvebu_uart_ops;
-> +       port->regshift   = 0;
-> +
-> +       port->fifosize   = 32;
-> +       port->iotype     = UPIO_MEM32;
-> +       port->flags      = UPF_FIXED_PORT;
-> +       port->line       = 0; /* single port: force line number to  0 */
-> +
-> +       port->irq        = irq->start;
-> +       port->irqflags   = 0;
+I still see race. What about another cpu set is_stopping at this point?
 
-Please use port->irqflags = IRQF_SHARED;
-As ubuntu opens multiple consoles A3700 can't boot to it (only to
-buildroot with single console).
+Thanks
 
-Best regards,
-Marcin
+
+>  		netif_tx_stop_all_queues(pp->dev);
+>  
+>  		/* We have to synchronise on tha napi of each CPU
+> @@ -3054,9 +3060,17 @@ static int mvneta_stop(struct net_device *dev)
+>  {
+>  	struct mvneta_port *pp = netdev_priv(dev);
+>  
+> +	/* Inform that we are stopping so we don't want to setup the
+> +	 * driver for new CPUs in the notifiers
+> +	 */
+> +	pp->is_stopping = true;
+>  	mvneta_stop_dev(pp);
+>  	mvneta_mdio_remove(pp);
+>  	unregister_cpu_notifier(&pp->cpu_notifier);
+> +	/* Now that the notifier are unregistered, we can clear the
+> +	 * flag
+> +	 */
+> +	pp->is_stopping = false;
+>  	on_each_cpu(mvneta_percpu_disable, pp, true);
+>  	free_percpu_irq(dev->irq, pp->ports);
+>  	mvneta_cleanup_rxqs(pp);
