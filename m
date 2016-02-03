@@ -1,55 +1,71 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 3 Feb 2016 10:23:42 +0800
-Subject: [PATCH] clk: gpio: Make into a platform driver
-In-Reply-To: <1454462520-20787-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <201602031053.Tb6b0qXh%fengguang.wu@intel.com>
+From: Wenyou.Yang@atmel.com (Yang, Wenyou)
+Date: Wed, 3 Feb 2016 02:29:12 +0000
+Subject: [PATCH v4 1/2] regulator: act8945a: add regulator driver for
+ ACT8945A
+In-Reply-To: <87wpqn3t72.fsf@dell.be.48ers.dk>
+References: <1453863463-30515-1-git-send-email-wenyou.yang@atmel.com>
+ <1453863463-30515-2-git-send-email-wenyou.yang@atmel.com>
+ <20160129001603.GM4130@sirena.org.uk>
+ <B256D81BAE5131468A838E5D7A243641D63FBF8B@penmbx01>
+ <20160129113518.GQ4130@sirena.org.uk> <87wpqn3t72.fsf@dell.be.48ers.dk>
+Message-ID: <B256D81BAE5131468A838E5D7A243641D64026A0@penmbx01>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Hi Peter,
 
-[auto build test ERROR on clk/clk-next]
-[also build test ERROR on v4.5-rc2 next-20160202]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+> -----Original Message-----
+> From: Peter Korsgaard [mailto:jacmet at gmail.com] On Behalf Of Peter Korsgaard
+> Sent: 2016?2?3? 1:42
+> To: Mark Brown <broonie@kernel.org>
+> Cc: Yang, Wenyou <Wenyou.Yang@atmel.com>; Liam Girdwood
+> <lgirdwood@gmail.com>; Rob Herring <robh+dt@kernel.org>; Pawel Moll
+> <pawel.moll@arm.com>; Ian Campbell <ijc+devicetree@hellion.org.uk>; Kumar
+> Gala <galak@codeaurora.org>; Krzysztof Kozlowski
+> <k.kozlowski@samsung.com>; Javier Martinez Canillas <javier@dowhile0.org>;
+> Lee Jones <lee.jones@linaro.org>; Peter Korsgaard <jacmet@gmail.com>; Ferre,
+> Nicolas <Nicolas.FERRE@atmel.com>; linux-arm-kernel at lists.infradead.org;
+> linux-kernel at vger.kernel.org; devicetree at vger.kernel.org
+> Subject: Re: [PATCH v4 1/2] regulator: act8945a: add regulator driver for
+> ACT8945A
+> 
+> >>>>> "Mark" == Mark Brown <broonie@kernel.org> writes:
+> 
+>  > On Fri, Jan 29, 2016 at 01:20:08AM +0000, Yang, Wenyou wrote:
+>  >> > > +static const struct of_device_id act8945a_pmic_of_match[] = {
+>  >> > > +	{ .compatible = "active-semi,act8945a-regulator" },
+>  >> > > +	{ },
+>  >> > > +};
+>  >> > > +MODULE_DEVICE_TABLE(of, act8945a_pmic_of_match);
+> 
+>  >> > This seems mostly OK but why do we have a compatible string here -
+> shouldn't  >> > the MFD be able to instantiate the regulator function without
+> needing this?
+> 
+>  >> Because I got feedback from Javier for the act8945a-charger patches of this
+> MFD series,  >> He said missing the OF match table will cause the module
+> autoloading broken.
+> 
+>  >> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/398113.html
+> 
+>  >> What do you think about it?
+> 
+>  > If then device is not being loaded from the DT (and it shouldn't be, the  > device
+> looks like it should be instantiated directly by the MFD as it  > can't exist
+> separately to that MFD) an OF table will do nothing.
+> 
+> To add to the confusion, the regulator part of the chip is actually identical to
+> act8865, so it could use the existing regulator driver / compatible, except that it
+> binds to the platform bus instead of i2c.
 
-url:    https://github.com/0day-ci/linux/commits/Stephen-Boyd/clk-gpio-Make-into-a-platform-driver/20160203-092337
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
-config: mips-maltaaprp_defconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=mips 
+Thank you for your opinion.
 
-All error/warnings (new ones prefixed by >>):
+But I think It is better to make it a separate driver, the driver is simpler. 
 
->> drivers/clk/clk-gpio.c:263:1: warning: data definition has no type or storage class
-    MODULE_DEVICE_TABLE(of, gpio_clk_match_table);
-    ^
->> drivers/clk/clk-gpio.c:263:1: error: type defaults to 'int' in declaration of 'MODULE_DEVICE_TABLE' [-Werror=implicit-int]
->> drivers/clk/clk-gpio.c:263:1: warning: parameter names (without types) in function declaration
-   cc1: some warnings being treated as errors
+> 
+> --
+> Bye, Peter Korsgaard
 
-vim +263 drivers/clk/clk-gpio.c
 
-   257	
-   258	static const struct of_device_id gpio_clk_match_table[] = {
-   259		{ .compatible = "gpio-mux-clock" },
-   260		{ .compatible = "gpio-gate-clock" },
-   261		{ }
-   262	};
- > 263	MODULE_DEVICE_TABLE(of, gpio_clk_match_table);
-   264	
-   265	static struct platform_driver gpio_clk_driver = {
-   266		.probe		= gpio_clk_driver_probe,
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 13851 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160203/719b8853/attachment-0001.obj>
+Best Regards,
+Wenyou Yang
