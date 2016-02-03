@@ -1,47 +1,72 @@
 From: jglauber@cavium.com (Jan Glauber)
-Date: Wed,  3 Feb 2016 18:11:58 +0100
-Subject: [PATCH v3 3/5] arm64: dts: Add Cavium ThunderX specific PMU
+Date: Wed,  3 Feb 2016 18:11:59 +0100
+Subject: [PATCH v3 4/5] arm64/perf: Enable PMCR long cycle counter bit
 In-Reply-To: <cover.1454516082.git.jglauber@cavium.com>
 References: <cover.1454516082.git.jglauber@cavium.com>
-Message-ID: <d02a118085866aefb8607bacecf4c7eb4019c921.1454516082.git.jglauber@cavium.com>
+Message-ID: <de7340e1843f7823384551db64b12eadde7eded7.1454516082.git.jglauber@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a compatible string for the Cavium ThunderX PMU.
+With the long cycle counter bit (LC) disabled the cycle counter is not
+working on ThunderX SOC (ThunderX only implements Aarch64).
+Also, according to documentation LC == 0 is deprecated.
+
+To keep the code simple the patch does not introduce 64 bit wide counter
+functions. Instead writing the cycle counter always sets the upper
+32 bits so overflow interrupts are generated as before.
+
+Original patch from Andrew Pinksi <Andrew.Pinksi@caviumnetworks.com>
 
 Signed-off-by: Jan Glauber <jglauber@cavium.com>
 ---
- Documentation/devicetree/bindings/arm/pmu.txt | 1 +
- arch/arm64/boot/dts/cavium/thunder-88xx.dtsi  | 5 +++++
- 2 files changed, 6 insertions(+)
+ arch/arm64/kernel/perf_event.c | 21 ++++++++++++++++-----
+ 1 file changed, 16 insertions(+), 5 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/pmu.txt b/Documentation/devicetree/bindings/arm/pmu.txt
-index 5651883..d3999a1 100644
---- a/Documentation/devicetree/bindings/arm/pmu.txt
-+++ b/Documentation/devicetree/bindings/arm/pmu.txt
-@@ -25,6 +25,7 @@ Required properties:
- 	"qcom,scorpion-pmu"
- 	"qcom,scorpion-mp-pmu"
- 	"qcom,krait-pmu"
-+	"cavium,thunder-pmu"
- - interrupts : 1 combined interrupt or 1 per core. If the interrupt is a per-cpu
-                interrupt (PPI) then 1 interrupt should be specified.
- 
-diff --git a/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi b/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
-index 9cb7cf9..2eb9b22 100644
---- a/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
-+++ b/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
-@@ -360,6 +360,11 @@
- 		             <1 10 0xff01>;
- 	};
- 
-+	pmu {
-+		compatible = "cavium,thunder-pmu", "arm,armv8-pmuv3";
-+		interrupts = <1 7 4>;
-+	};
+diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+index c038e4e..5e4275e 100644
+--- a/arch/arm64/kernel/perf_event.c
++++ b/arch/arm64/kernel/perf_event.c
+@@ -405,6 +405,7 @@ static const struct attribute_group *armv8_pmuv3_attr_groups[] = {
+ #define ARMV8_PMCR_D		(1 << 3) /* CCNT counts every 64th cpu cycle */
+ #define ARMV8_PMCR_X		(1 << 4) /* Export to ETM */
+ #define ARMV8_PMCR_DP		(1 << 5) /* Disable CCNT if non-invasive debug*/
++#define ARMV8_PMCR_LC		(1 << 6) /* Overflow on 64 bit cycle counter */
+ #define	ARMV8_PMCR_N_SHIFT	11	 /* Number of counters supported */
+ #define	ARMV8_PMCR_N_MASK	0x1f
+ #define	ARMV8_PMCR_MASK		0x3f	 /* Mask for writable bits */
+@@ -494,9 +495,16 @@ static inline void armv8pmu_write_counter(struct perf_event *event, u32 value)
+ 	if (!armv8pmu_counter_valid(cpu_pmu, idx))
+ 		pr_err("CPU%u writing wrong counter %d\n",
+ 			smp_processor_id(), idx);
+-	else if (idx == ARMV8_IDX_CYCLE_COUNTER)
+-		asm volatile("msr pmccntr_el0, %0" :: "r" (value));
+-	else if (armv8pmu_select_counter(idx) == idx)
++	else if (idx == ARMV8_IDX_CYCLE_COUNTER) {
++		/*
++		 * Set the upper 32bits as this is a 64bit counter but we only
++		 * count using the lower 32bits and we want an interrupt when
++		 * it overflows.
++		 */
++		u64 value64 = 0xffffffff00000000ULL | value;
 +
- 	soc {
- 		compatible = "simple-bus";
- 		#address-cells = <2>;
++		asm volatile("msr pmccntr_el0, %0" :: "r" (value64));
++	} else if (armv8pmu_select_counter(idx) == idx)
+ 		asm volatile("msr pmxevcntr_el0, %0" :: "r" (value));
+ }
+ 
+@@ -768,8 +776,11 @@ static void armv8pmu_reset(void *info)
+ 		armv8pmu_disable_intens(idx);
+ 	}
+ 
+-	/* Initialize & Reset PMNC: C and P bits. */
+-	armv8pmu_pmcr_write(ARMV8_PMCR_P | ARMV8_PMCR_C);
++	/*
++	 * Initialize & Reset PMNC. Request overflow on 64 bit but
++	 * cheat in armv8pmu_write_counter().
++	 */
++	armv8pmu_pmcr_write(ARMV8_PMCR_P | ARMV8_PMCR_C | ARMV8_PMCR_LC);
+ }
+ 
+ static int armv8_pmuv3_map_event(struct perf_event *event)
 -- 
 1.9.1
