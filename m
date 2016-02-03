@@ -1,42 +1,49 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 3 Feb 2016 21:30:35 +0100
-Subject: [PATCH 0/3] kallsyms: remove special handling for CONFIG_ARM
-In-Reply-To: <alpine.LFD.2.20.1602031522090.17825@knanqh.ubzr>
-References: <1454419174-21290-1-git-send-email-ard.biesheuvel@linaro.org>
- <HKXPR06MB0565A2CFF95AD7C000F43E6A8ADF0@HKXPR06MB0565.apcprd06.prod.outlook.com>
- <CAKv+Gu9VvskQ34w0niS+6AtF9hNcycfYDt_3Kp4T+WK8Vxf_dA@mail.gmail.com>
- <HKXPR06MB05656F902E0E1FBBDBD713DC8AD00@HKXPR06MB0565.apcprd06.prod.outlook.com>
- <CAKv+Gu8ZTHAqviveLMizRKPfeXwb6kcXi4cVQNYVYuPcVMgMeQ@mail.gmail.com>
- <20160203200107.GD10826@n2100.arm.linux.org.uk>
- <CAKv+Gu_MyPvDnnQ0hScqW6XR77h0MD6LxEb_q2Z-mS0AQw3djA@mail.gmail.com>
- <alpine.LFD.2.20.1602031522090.17825@knanqh.ubzr>
-Message-ID: <CAKv+Gu_50f+yqs20a6j_QyCg3NcSfe5cD00fWXebLXBFhV_eGg@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 3 Feb 2016 21:31:20 +0100
+Subject: [PATCH v2 10/26] ARM: sun5i: a13: Add display and TCON clocks
+In-Reply-To: <CAGb2v67fqMUQsG-+zVxfgE3UzY7uyomBkwxgNHeXbqA1pwM8pA@mail.gmail.com>
+References: <1452785109-6172-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1452785109-6172-11-git-send-email-maxime.ripard@free-electrons.com>
+ <CAGb2v67fqMUQsG-+zVxfgE3UzY7uyomBkwxgNHeXbqA1pwM8pA@mail.gmail.com>
+Message-ID: <20160203203120.GF3327@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 February 2016 at 21:23, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> On Wed, 3 Feb 2016, Ard Biesheuvel wrote:
->
->> On 3 February 2016 at 21:01, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > On Wed, Feb 03, 2016 at 02:41:29PM +0100, Ard Biesheuvel wrote:
->> >> > bf353edc T __stubs_start
->> >>
->> >> This is a global symbol
->> >>
->> >> > bf353edc T _etext
->> >> > bf353ee0 t __stubs_start
->> >>
->> >> This is a local symbol
->> >
->> > Stop this madness.  This gets you an immediate NAK on the patch set.
->> >
->>
->> What madness? This does not change at all with my patches, these
->> duplicates already exist in the current code.
->
-> That doesn't make it any better, and was cause for issue as Chris
-> demonstrated.  Can we get rid of that duplication please?
->
+Hi,
 
-4/4 in my v2 removes the redundant symbols.
+On Sun, Jan 17, 2016 at 01:06:07AM +0800, Chen-Yu Tsai wrote:
+> > +                       compatible = "allwinner,sun4i-a10-tcon-ch0-clk";
+> > +                       reg = <0x01c20118 0x4>;
+> > +                       clocks = <&pll3>, <&pll7>, <&pll3x2>, <&pll7x2>;
+> > +                       clock-output-names = "tcon-ch0-sclk";
+> > +               };
+> > +
+> > +               tcon_ch1_clk: clk at 01c2012c {
+> > +                       #clock-cells = <0>;
+> > +                       compatible = "allwinner,sun4i-a10-tcon-ch1-clk";
+> > +                       reg = <0x01c2012c 0x4>;
+> > +                       clocks = <&pll3>, <&pll7>, <&pll3x2>, <&pll7x2>;
+> > +                       clock-output-names = "tcon-ch1-sclk";
+> > +               };
+> 
+> I suggest moving these to sun5i.dtsi, as they are shared amongst them.
+
+Eventually, yes, but I don't have an a10s board handy, and I couldn't
+test the clocks that needs to be taken by simplefb.
+
+Once properly tested, they can definitely be moved to sun5i.dtsi.
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160203/73dab241/attachment.sig>
