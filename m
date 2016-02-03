@@ -1,53 +1,111 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 3 Feb 2016 13:10:58 +0000
-Subject: [PATCH 00/10] KVM PCIe/MSI passthrough on ARM/ARM64
-In-Reply-To: <20160203125047.GB13974@cbox>
-References: <1453813968-2024-1-git-send-email-eric.auger@linaro.org>
- <1454017899.23148.0.camel@redhat.com> <56AB78B1.2030202@linaro.org>
- <1454096004.9301.1.camel@redhat.com> <56ABD8E0.6080409@linaro.org>
- <20160201140351.GE6828@arm.com> <20160203125047.GB13974@cbox>
-Message-ID: <20160203131057.GA20217@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 03 Feb 2016 14:21:48 +0100
+Subject: [PATCH] [RFC] ARM: modify pgd_t definition for
+ TRANSPARENT_HUGEPAGE_PUD
+Message-ID: <1773775.QWf7OyDGPh@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 03, 2016 at 01:50:47PM +0100, Christoffer Dall wrote:
-> On Mon, Feb 01, 2016 at 02:03:51PM +0000, Will Deacon wrote:
-> > On Fri, Jan 29, 2016 at 10:25:52PM +0100, Eric Auger wrote:
-> > > On 01/29/2016 08:33 PM, Alex Williamson wrote:
-> > > >>> We know that x86 handles MSI vectors specially, so there is some
-> > > >>> hardware that helps the situation.  It's not just that x86 has a fixed
-> > > >>> range for MSI, it's how it manages that range when interrupt remapping
-> > > >>> hardware is enabled.  A device table indexed by source-ID references a
-> > > >>> per device table indexed by data from the MSI write itself.  So we get
-> > > >>> much, much finer granularity,
-> > > >> About the granularity, I think ARM GICv3 now provides a similar
-> > > >> capability with GICv3 ITS (interrupt translation service). Along with
-> > > >> the MSI MSG write transaction, the device outputs a DeviceID conveyed on
-> > > >> the bus. This DeviceID (~ your source-ID) enables to index a device
-> > > >> table. The entry in the device table points to a DeviceId interrupt
-> > > >> translation table indexed by the EventID found in the msi msg. So the
-> > > >> entry in the interrupt translation table eventually gives you the
-> > > >> eventual interrupt ID targeted by the MSI MSG.
-> > > >> This translation capability if not available in GICv2M though, ie. the
-> > > >> one I am currently using.
-> > > >>  
-> > > >> Those tables currently are built by the ITS irqchip (irq-gic-v3-its.c)
-> > 
-> > That's right. GICv3/ITS disambiguates the interrupt source using the
-> > DeviceID, which for PCI is derived from the Requester ID of the endpoint.
-> > GICv2m is less flexible and requires a separate physical frame per guest
-> > to achieve isolation.
-> > 
-> We should still support MSI passthrough with a single MSI frame host
-> system though, right?
+I ran into build errors on ARM after Willy's newly added generic
+TRANSPARENT_HUGEPAGE_PUD support. We don't support this feature
+on ARM at all, but the patch causes a build error anyway:
 
-I think we should treat the frame as an exclusive resource and assign it
-to a single VM.
+In file included from ../kernel/memremap.c:17:0:
+../include/linux/pfn_t.h:108:7: error: 'pud_mkdevmap' declared as function returning an array
+ pud_t pud_mkdevmap(pud_t pud);
 
-> (Users should just be aware that guests are not fully protected against
-> misbehaving hardware in that case).
+We don't use a PUD on ARM, so pud_t is defined as pmd_t, which
+in turn is defined as
 
-Is it confined to misbehaving hardware? What if a malicious/buggy guest
-configures its device to DMA all over the doorbell?
+typedef unsigned long pgd_t[2];
 
-Will
+on NOMMU and on 2-level MMU configurations. There is an (unused)
+other definition using a struct around the array, which happens to
+work fine here.
+
+There is a comment in the file about the fact the other version
+is "easier on the compiler", and I've traced that version back
+to linux-2.1.80 when ARM support was first merged back in 1998.
+
+It's probably a safe assumption that this is no longer necessary:
+The same logic existed in asm-i386 at the time but was removed
+a year later in 2.3.23pre3. The STRICT_MM_TYPECHECKS logic
+also ended up getting copied into these files:
+
+arch/alpha/include/asm/page.h
+arch/arc/include/asm/page.h
+arch/arm/include/asm/pgtable-3level-types.h
+arch/arm64/include/asm/pgtable-types.h
+arch/ia64/include/asm/page.h
+arch/parisc/include/asm/page.h
+arch/powerpc/include/asm/page.h
+arch/sparc/include/asm/page_32.h
+arch/sparc/include/asm/page_64.h
+arch/tile/include/asm/page.h
+arch/unicore32/include/asm/page.h
+
+We should probably remove it everywhere, but for the moment,
+this minimal patch gets things to compile on linux-next.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: a27da20ed50e ("mm: add support for PUD-sized transparent hugepages")
+
+diff --git a/arch/arm/include/asm/page-nommu.h b/arch/arm/include/asm/page-nommu.h
+index d1b162a18dcb..3db1ca22fecb 100644
+--- a/arch/arm/include/asm/page-nommu.h
++++ b/arch/arm/include/asm/page-nommu.h
+@@ -31,12 +31,12 @@
+  */
+ typedef unsigned long pte_t;
+ typedef unsigned long pmd_t;
+-typedef unsigned long pgd_t[2];
++typedef struct { unsigned long pgd[2]; } pgd_t;
+ typedef unsigned long pgprot_t;
+ 
+ #define pte_val(x)      (x)
+ #define pmd_val(x)      (x)
+-#define pgd_val(x)	((x)[0])
++#define pgd_val(x)	((x).pgd[0])
+ #define pgprot_val(x)   (x)
+ 
+ #define __pte(x)        (x)
+diff --git a/arch/arm/include/asm/pgtable-2level-types.h b/arch/arm/include/asm/pgtable-2level-types.h
+index 66cb5b0e89c5..9b9815d5ebd6 100644
+--- a/arch/arm/include/asm/pgtable-2level-types.h
++++ b/arch/arm/include/asm/pgtable-2level-types.h
+@@ -24,6 +24,9 @@
+ typedef u32 pteval_t;
+ typedef u32 pmdval_t;
+ 
++typedef struct { pmdval_t pgd[2]; } pgd_t;
++#define pgd_val(x)	((x).pgd[0])
++
+ #undef STRICT_MM_TYPECHECKS
+ 
+ #ifdef STRICT_MM_TYPECHECKS
+@@ -32,12 +35,10 @@ typedef u32 pmdval_t;
+  */
+ typedef struct { pteval_t pte; } pte_t;
+ typedef struct { pmdval_t pmd; } pmd_t;
+-typedef struct { pmdval_t pgd[2]; } pgd_t;
+ typedef struct { pteval_t pgprot; } pgprot_t;
+ 
+ #define pte_val(x)      ((x).pte)
+ #define pmd_val(x)      ((x).pmd)
+-#define pgd_val(x)	((x).pgd[0])
+ #define pgprot_val(x)   ((x).pgprot)
+ 
+ #define __pte(x)        ((pte_t) { (x) } )
+@@ -50,12 +51,10 @@ typedef struct { pteval_t pgprot; } pgprot_t;
+  */
+ typedef pteval_t pte_t;
+ typedef pmdval_t pmd_t;
+-typedef pmdval_t pgd_t[2];
+ typedef pteval_t pgprot_t;
+ 
+ #define pte_val(x)      (x)
+ #define pmd_val(x)      (x)
+-#define pgd_val(x)	((x)[0])
+ #define pgprot_val(x)   (x)
+ 
+ #define __pte(x)        (x)
