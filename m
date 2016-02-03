@@ -1,93 +1,117 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 3 Feb 2016 10:32:07 -0600
-Subject: [PATCH V2 5/5] Microblaze: Modifying microblaze PCI subsytem to
- support  generic Xilinx  AXI PCIe Host Bridge IP driver
-In-Reply-To: <1452620173-4905-6-git-send-email-bharatku@xilinx.com>
-References: <1452620173-4905-1-git-send-email-bharatku@xilinx.com>
- <1452620173-4905-6-git-send-email-bharatku@xilinx.com>
-Message-ID: <20160203163207.GC32546@localhost>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 03 Feb 2016 17:32:41 +0100
+Subject: [PATCH 01/10] serial: mvebu-uart: initial support for Armada-3700
+ serial port
+In-Reply-To: <20160202182842.GD29778@leverpostej> (Mark Rutland's message of
+ "Tue, 2 Feb 2016 18:28:42 +0000")
+References: <1454436468-4241-1-git-send-email-gregory.clement@free-electrons.com>
+ <1454436468-4241-2-git-send-email-gregory.clement@free-electrons.com>
+ <20160202182842.GD29778@leverpostej>
+Message-ID: <87r3gt4uvq.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc Ben, pcibios_get_phb_of_node() question]
+Hi Mark,
+ 
+ On mar., f?vr. 02 2016, Mark Rutland <mark.rutland@arm.com> wrote:
 
-On Tue, Jan 12, 2016 at 11:06:13PM +0530, Bharat Kumar Gogada wrote:
-> This patch does required modifications to microblaze PCI subsystem, to
-> work with generic driver (drivers/pci/host/pcie-xilinx.c) on Microblaze
-> and Zynq.
-> 
-> Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
-> Signed-off-by: Ravi Kiran Gummaluri <rgummal@xilinx.com>
->...
+> On Tue, Feb 02, 2016 at 07:07:39PM +0100, Gregory CLEMENT wrote:
+>> From: Wilson Ding <dingwei@marvell.com>
+>> 
+>> Armada-3700's uart is a simple serial port, which doesn't
+>> support. Configuring the modem control lines. The uart port has a 32
+>> bytes Tx FIFO and a 64 bytes Rx FIFO
+>> 
+>> The uart driver implements the uart core operations. It also support the
+>> system (early) console based on Armada-3700's serial port.
+>> 
+>> Known Issue:
+>> 
+>> The uart driver currently doesn't support clock programming, which means
+>> the baud-rate stays with the default value configured by the bootloader
+>> at boot time
+>
+> To ensure that the bootloader and kernel match, it's best to place the
+> rate in the stdout-path property (as in
+> Documentation/devicetree/bindings/chosen.txt).
+>
+> Presumably that is what you want?
 
->  resource_size_t pcibios_align_resource(void *data, const struct resource *res,
->  				resource_size_t size, resource_size_t align)
->  {
-> -	struct pci_dev *dev = data;
->  	resource_size_t start = res->start;
->  
-> -	if (res->flags & IORESOURCE_IO) {
-> -		if (skip_isa_ioresource_align(dev))
-> -			return start;
-> -		if (start & 0x300)
-> -			start = (start + 0x3ff) & ~0x3ff;
-> -	}
-> -
->  	return start;
+It is done in patch 7.
 
-"return res->start;" is sufficient; no need for a temporary variable.
+>
+> Is it difficutl to add clock programming?
 
->  }
->  EXPORT_SYMBOL(pcibios_align_resource);
->  
-> +int pcibios_add_device(struct pci_dev *dev)
-> +{
-> +	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL(pcibios_add_device);
-> +
->  /*
->   * Reparent resource children of pr that conflict with res
->   * under res, and make res replace those children.
-> @@ -1335,9 +1308,21 @@ static void pcibios_setup_phb_resources(struct pci_controller *hose,
->  
->  struct device_node *pcibios_get_phb_of_node(struct pci_bus *bus)
->  {
-> -	struct pci_controller *hose = bus->sysdata;
-> +	struct device_node *np;
-> +
-> +	for_each_node_by_type(np, "pci") {
-> +		const void *prop;
-> +		unsigned int bus_min;
-> +
-> +		prop = of_get_property(np, "bus-range", NULL);
-> +		if (!prop)
-> +			continue;
-> +		bus_min = be32_to_cpup(prop);
-> +		if (bus->number == bus_min)
-> +			return np;
-> +	}
->  
-> -	return of_node_get(hose->dn);
-> +	return NULL;
+Currently there is no clock tree support before adding it I would like
+to be able to test it.
 
-Hmmm.  The old microblaze code ("return of_node_get(hose->dn);") is
-basically the same as the mips and powerpc versions.  The new code is
-basically the same as the x86 version.
+Thanks,
 
-I like the generic weak version in drivers/pci/of.c because it doesn't
-use any arch-specific data, and it looks like if we just set the
-struct device.of_node members correctly, everything should Just Work.
+Gregory
 
-But Ben added both the generic and the x86 versions the same day, so
-there must be some complication:
+>
+>> 
+>> [gregory.clement at free-electrons.com: Rewrite many part which are too long
+>> to enumerate]
+>> 
+>> Signed-off-by: Wilson Ding <dingwei@marvell.com>
+>> Signed-off-by: Nadav Haklai <nadavh@marvell.com>
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> ---
+>>  .../devicetree/bindings/tty/serial/mvebu-uart.txt  |  13 +
+>>  Documentation/kernel-parameters.txt                |   6 +
+>>  drivers/tty/serial/Kconfig                         |  22 +
+>>  drivers/tty/serial/Makefile                        |   1 +
+>>  drivers/tty/serial/mvebu-uart.c                    | 649 +++++++++++++++++++++
+>>  include/uapi/linux/serial_core.h                   |   3 +
+>>  6 files changed, 694 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/tty/serial/mvebu-uart.txt
+>>  create mode 100644 drivers/tty/serial/mvebu-uart.c
+>> 
+>> diff --git a/Documentation/devicetree/bindings/tty/serial/mvebu-uart.txt b/Documentation/devicetree/bindings/tty/serial/mvebu-uart.txt
+>> new file mode 100644
+>> index 000000000000..6087defd9f93
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/tty/serial/mvebu-uart.txt
+>> @@ -0,0 +1,13 @@
+>> +* Marvell UART : Non standard UART used in some of Marvell EBU SoCs (e.g., Armada-3700)
+>> +
+>> +Required properties:
+>> +- compatible: "marvell,armada-3700-uart"
+>> +- reg: offset and length of the register set for the device.
+>> +- interrupts: device interrupt
+>> +
+>> +Example:
+>> +	serial at 12000 {
+>> +		compatible = "marvell,armada-3700-uart";
+>> +		reg = <0x12000 0x400>;
+>> +		interrupts = <43>;
+>> +	};
+>
+> There are no external clock inputs?
+>
+>> diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
+>> index 87d40a72f6a1..198f6bd56e84 100644
+>> --- a/Documentation/kernel-parameters.txt
+>> +++ b/Documentation/kernel-parameters.txt
+>> @@ -1058,6 +1058,12 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
+>>  			A valid base address must be provided, and the serial
+>>  			port must already be setup and configured.
+>>  
+>> +		mvebu_uart,<addr>
+>> +			Start an early, polled-mode console on an some mvebu
+>> +			SoC (as the Armada-3700) serial port at the specified
+>> +			address. The serial port must already be setup and
+>> +			configured. Options are not yet supported.
+>> +
+>
+> Does the the mvebu UART vary between platforms at all?
+>
+> Thanks,
+> Mark.
 
-  98d9f30c820d ("pci/of: Match PCI devices to OF nodes dynamically")
-  3d5fe5a65af9 ("x86/devicetree: Use generic PCI <-> OF matching")
-
-So I guess my question is, why do we need a microblaze-specific
-version at all?
-
-Bjorn
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
