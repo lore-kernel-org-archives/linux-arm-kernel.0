@@ -1,72 +1,25 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Wed, 3 Feb 2016 11:29:29 +0800
-Subject: [PATCH v8 2/2] drm/bridge: Add I2C based driver for ps8640 bridge
-In-Reply-To: <1454300012-32552-2-git-send-email-jitao.shi@mediatek.com>
-References: <1454300012-32552-1-git-send-email-jitao.shi@mediatek.com>
- <1454300012-32552-2-git-send-email-jitao.shi@mediatek.com>
-Message-ID: <CAGS+omAhExDg1H96nFY1EEKwTPVsnS6vNnxJCPYL4QwMt+hAcw@mail.gmail.com>
+From: Chris.Brandt@renesas.com (Chris Brandt)
+Date: Wed, 3 Feb 2016 03:54:59 +0000
+Subject: [PATCH] ARM: vmlinux.lds: assert that ROM and RAM don't overlap
+ when XIP_KERNEL=y
+In-Reply-To: <CA+ZsKJ5hCSY39D5UBpie5u7XmrJfb0xXBA11hc3z2t8_niKw9g@mail.gmail.com>
+References: <1454346154-12931-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20160203003158.GZ10826@n2100.arm.linux.org.uk>
+ <CA+ZsKJ5hCSY39D5UBpie5u7XmrJfb0xXBA11hc3z2t8_niKw9g@mail.gmail.com>
+Message-ID: <HKXPR06MB0565FC1048E3851BA9A58B108AD00@HKXPR06MB0565.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jitao,
-
-One more comment, inline...
-
-On Mon, Feb 1, 2016 at 12:13 PM, Jitao Shi <jitao.shi@mediatek.com> wrote:
-> This patch adds drm_bridge driver for parade DSI to eDP bridge chip.
+> > The long term goal is to move the XIP stuff out of this file, so I 
+> > think it's better to avoid touching this until the split has happened.
+> >
+> > I'd _much_ rather see the split happen first, and then fixes applied, 
+> > rather than trying to fix the existing unmaintainable mess.
 >
-> Signed-off-by: Jitao Shi <jitao.shi@mediatek.com>
+> Is that split being actively worked on?  If so by whom?
 
-[snip]
+I submitted "[PATCH v2] ARM: xip: Move XIP linking to a separate file" back in November which seemed pretty straight forward.
 
-> +static int ps8640_probe(struct i2c_client *client,
-> +                       const struct i2c_device_id *id)
-> +{
-> +       struct device *dev = &client->dev;
-> +       struct ps8640 *ps_bridge;
-> +       struct device_node *np = dev->of_node;
-> +       struct device_node *port, *out_ep;
-> +       struct device_node *panel_node = NULL;
-> +       int i, ret;
-> +
-> +       ps_bridge = devm_kzalloc(dev, sizeof(*ps_bridge), GFP_KERNEL);
-> +       ps_bridge->dsi = devm_kzalloc(dev, sizeof(struct mipi_dsi_device),
-> +                                     GFP_KERNEL);
-> +       if (!ps_bridge) {
-> +               ret = -ENOMEM;
-> +               goto exit;
-> +       }
-> +       /* port at 1 is ps8640 output port */
-> +       port = of_graph_get_port_by_id(np, 1);
-> +       if (port) {
-> +               out_ep = of_get_child_by_name(port, "endpoint");
-> +               of_node_put(port);
-> +               if (out_ep) {
-> +                       panel_node = of_graph_get_remote_port_parent(out_ep);
-> +                       of_node_put(out_ep);
-> +               }
-> +       }
-> +       if (panel_node) {
-> +               ps_bridge->panel = of_drm_find_panel(panel_node);
-> +               of_node_put(panel_node);
-> +               if (!ps_bridge->panel) {
-> +                       ret = -EPROBE_DEFER;
-> +                       goto exit;
-> +               }
-> +       }
-> +
-> +       ps_bridge->pwr_3v3_supply = devm_regulator_get(dev, "vdd33");
-> +       if (IS_ERR(ps_bridge->pwr_3v3_supply)) {
-> +               ret = PTR_ERR(ps_bridge->pwr_3v3_supply);
-> +               dev_err(dev, "cannot get vdd33 supply: %d\n", ret);
-> +               goto exit;
-> +       }
-> +
-> +       ps_bridge->pwr_1v2_supply = devm_regulator_get(dev, "vdd12");
+Although, it didn't make it too far (other than Nicolas acking it)
 
-Since we have two regulators, and they must always be enabled &
-disabled together, we can just use the 'bulk regulator' APIs:
-
-  devm_regulator_bulk_get()
-  regulator_bulk_enable()
-  regulator_bulk_disable()
+Chris
