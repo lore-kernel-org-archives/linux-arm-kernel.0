@@ -1,85 +1,90 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Tue, 02 Feb 2016 16:42:20 -0800
-Subject: [PATCH v4 00/13] arm64: kernel: Add support for
- hibernate/suspend-to-disk
-In-Reply-To: <56AF1D07.3000604@arm.com> (James Morse's message of "Mon, 01 Feb
- 2016 08:53:27 +0000")
-References: <1453977766-20907-1-git-send-email-james.morse@arm.com>
- <7hvb6chv5e.fsf@baylibre.com> <56AF1D07.3000604@arm.com>
-Message-ID: <7hmvrid3pv.fsf@baylibre.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Tue, 02 Feb 2016 17:00:23 -0800
+Subject: [PATCH v2 0/4] ARM: dts: vf610: relicense the device trees under
+ GPLv2/X11
+In-Reply-To: <1449525076-23569-1-git-send-email-stefan@agner.ch>
+References: <1449525076-23569-1-git-send-email-stefan@agner.ch>
+Message-ID: <5311c9f5234f774dc34118a564f48a4c@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-James Morse <james.morse@arm.com> writes:
+Hi Shawn,
 
-> On 29/01/16 22:34, Kevin Hilman wrote:
->> James Morse <james.morse@arm.com> writes:
->> I'd like to help in testing this so I'm just curious which platforms
->> you've been testing this on.  I'm assuming a Juno (r2?), anything else?
->
-> That would be great - thanks!
->
-> I've done most of the testing on a Juno r1, but also gave it a spin on a
-> stray Seattle.
+For patches 1, 2 and 4 I think we have enough Acks to consider it safe
+to change the license.
 
-OK, I'm using a very recently arrived Juno R2, and I did get it
-working.  I have a few other arm64 boards around that ar part of
-kernelci.org and will try those as well.
+For Patch 3, the Cosmic board, I can not get an Ack nor a Nack from Matt
+Porter, unfortunately... But IMHO it should not hold us back from
+merging the rest, what do you think?
 
->> Are you testing the resume from cold boot, or just from kexec?
->
-> From cold boot. I haven't tried with kexec, but I doubt that's a use-case anyone
-> wants as you would resume immediately. (might be interesting for testing though)
->
->
->> For cold boot on Juno, I'm assuming there would be some
->> booloader/firmware changes needed to find and boot from the hibernation
->> image?
->
-> Not at all! Your firmware only needs to support some mechanism to
-> turning CPUs off.
->
-> If you add 'resume=/dev/sda2' (or wherever your swap partition is located), the
-> kernel will check this partition for the hibernate-image signature, if found, it
-> will resume from that partition. Otherwise booting is as normal. (there is one
-> hoop to jump through to ensure your rootfs hasn't been mounted before the kernel
-> starts resume, as you could corrupt it - an initramfs in the kernel is the best
-> fix for this).
->
-> No firmware changes needed.
->
->> Is that being worked on?  If not Juno, are you aware of any
->> other platforms that could be tested with resume from cold boot?
->
-> Any arm64 platform with persistent storage should work. I've been using a swap
-> partition on a usb drive.
+--
+Stefan
 
->> Not knowing the answers to the above, I tested your branch using arm64
->> defconfig + CONFIG_HIBERNATION=y on my Juno and noticed that it didn't
->> stay suspended (full suspend log below) so I'm looking for
->> ideas/recommenations on how to test this.
->
-> That trace looks quite normal, (one of mine below[0] for comparison). Any
-> failure would have happened after the point you stopped ... did you have a swap
-> partition 'on'?
-
-I think I must have not setup swap correctly since after testing again
-it's working fine.  Maybe I forgot the 'swapon'?  In any case, being a
-little more careful, testing again and things are working fine on Juno.
-
-I'm also using swap on USB storage for now.
-
-> 'syscore' will freeze all processes and stop all devices, then create a
-> copy of the minimum amount of memory it needs to save. Then it starts
-> all the devices again, as it needs to write this image out to swap. This is what
-> you are seeing.
->
-> Once it has done this it calls poweroff or reboot.
-
-Yeah, I wasn't seeing the call to poweroff, but most likely because it
-was failing to fully write the image due to my missing/incorrect swap
-setup.
-
-Thanks for the help,
-
-Kevin
+On 2015-12-07 13:51, Stefan Agner wrote:
+> I collected the Acks I received so far and removed them from the list
+> below. Several Freescale addresses are no longer valid (the once
+> starting with --)... I would interprete the Ack from Yuan Yao as an
+> Ack from Freescale.
+> 
+> Matt, you introduced the vf610-cosmic.dts board, is it possible to
+> get an ack for this too? I think you did not receive v1 of this patch
+> due to an old email address, sorry about that.
+> 
+> vf???.dtsi:
+>   --Chao Fu <B44548@freescale.com>
+>   Cosmin Stoica <cosminstefan.stoica@freescale.com>
+>   Frank Li <Frank.Li@freescale.com>
+>   --Fugang Duan <B38611@freescale.com>
+>   --Huang Shijie <b32955@freescale.com>
+>   --Jingchang Lu <jingchang.lu@freescale.com>
+>   --Xiubo Li <Li.Xiubo@freescale.com>
+> 
+> vf610-colibri:
+>   <all done>
+> 
+> vf610-cosmic:
+>   Matt Porter <mporter@kernel.crashing.org>
+> 
+> vf610-twr:
+>   --Chao Fu <B44548@freescale.com>
+>   Cosmin Stoica <cosminstefan.stoica@freescale.com>
+>   --Fugang Duan <B38611@freescale.com>
+>   --Jingchang Lu <b35083@freescale.com>
+>   --Xiubo Li <Li.Xiubo@freescale.com>
+> 
+> CC: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
+> CC: Bill Pringlemeir <bpringle@sympatico.ca>
+> --CC: Chao Fu <B44548@freescale.com>
+> CC: Cory Tusar <cory.tusar@pid1solutions.com>
+> CC: Cosmin Stoica <cosminstefan.stoica@freescale.com>
+> CC: Frank Li <Frank.Li@freescale.com>
+> --CC: Fugang Duan <B38611@freescale.com>
+> --CC: Huang Shijie <b32955@freescale.com>
+> --CC: Jingchang Lu <jingchang.lu@freescale.com>
+> CC: Lucas Stach <l.stach@pengutronix.de>
+> CC: Matt Porter <mporter@kernel.crashing.org>
+> CC: Olof Johansson <olof@lixom.net>
+> CC: Sanchayan Maity <maitysanchayan@gmail.com>
+> CC: Shawn Guo <shawnguo@kernel.org>
+> CC: Stephen Warren <swarren@wwwdotorg.org>
+> --CC: Xiubo Li <Li.Xiubo@freescale.com>
+> CC: Yuan Yao <yao.yuan@freescale.com>
+> 
+> Stefan Agner (4):
+>   ARM: dts: vf610: relicense vf???.dtsi under GPLv2/X11
+>   ARM: dts: vf610-colibri: relicense vf*colibri* under GPLv2/X11
+>   ARM: dts: vf610-cosmic: relicense vf610-cosmic.dts under GPLv2/X11
+>   ARM: dts: vf610-twr: relicense vf610-twr.dts under GPLv2/X11
+> 
+>  arch/arm/boot/dts/vf-colibri-eval-v3.dtsi   | 40 ++++++++++++++++++++++++---
+>  arch/arm/boot/dts/vf-colibri.dtsi           | 40 ++++++++++++++++++++++++---
+>  arch/arm/boot/dts/vf500-colibri-eval-v3.dts | 40 ++++++++++++++++++++++++---
+>  arch/arm/boot/dts/vf500-colibri.dtsi        | 40 ++++++++++++++++++++++++---
+>  arch/arm/boot/dts/vf500.dtsi                | 40 ++++++++++++++++++++++++---
+>  arch/arm/boot/dts/vf610-colibri-eval-v3.dts | 42 +++++++++++++++++++++++++----
+>  arch/arm/boot/dts/vf610-colibri.dtsi        | 40 ++++++++++++++++++++++++---
+>  arch/arm/boot/dts/vf610-cosmic.dts          | 40 ++++++++++++++++++++++++---
+>  arch/arm/boot/dts/vf610-twr.dts             | 40 ++++++++++++++++++++++++---
+>  arch/arm/boot/dts/vf610.dtsi                | 40 ++++++++++++++++++++++++---
+>  arch/arm/boot/dts/vfxxx.dtsi                | 40 ++++++++++++++++++++++++---
+>  11 files changed, 397 insertions(+), 45 deletions(-)
