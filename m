@@ -1,187 +1,80 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 3 Feb 2016 09:59:20 -0600
-Subject: [PATCH V2 5/5] Microblaze: Modifying microblaze PCI subsytem to
- support  generic Xilinx  AXI PCIe Host Bridge IP driver
-In-Reply-To: <8520D5D51A55D047800579B0941471982587F02E@XAP-PVEXMBX01.xlnx.xilinx.com>
-References: <1452620173-4905-1-git-send-email-bharatku@xilinx.com>
- <1452620173-4905-6-git-send-email-bharatku@xilinx.com>
- <8520D5D51A55D047800579B0941471982587F02E@XAP-PVEXMBX01.xlnx.xilinx.com>
-Message-ID: <20160203155920.GB32546@localhost>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 03 Feb 2016 16:58:46 +0100
+Subject: [PATCH 01/10] serial: mvebu-uart: initial support for Armada-3700
+ serial port
+In-Reply-To: <20160202181935.19b4ab7e@lxorguk.ukuu.org.uk> (One Thousand
+ Gnomes's message of "Tue, 2 Feb 2016 18:19:35 +0000")
+References: <1454436468-4241-1-git-send-email-gregory.clement@free-electrons.com>
+ <1454436468-4241-2-git-send-email-gregory.clement@free-electrons.com>
+ <20160202181935.19b4ab7e@lxorguk.ukuu.org.uk>
+Message-ID: <87vb654wg9.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bharat,
+Hi,
+ 
+ On mar., f?vr. 02 2016, One Thousand Gnomes <gnomes@lxorguk.ukuu.org.uk> wrote:
 
-On Wed, Feb 03, 2016 at 03:40:21PM +0000, Bharat Kumar Gogada wrote:
-> Ping
+>> +static void mvebu_uart_set_termios(struct uart_port *port,
+>> +				   struct ktermios *termios,
+>> +				   struct ktermios *old)
+>> +{
+>> +	unsigned long flags;
+>> +	unsigned int baud;
+>> +
+>> +	spin_lock_irqsave(&port->lock, flags);
+>> +
+>> +	port->read_status_mask = STAT_RX_RDY | STAT_OVR_ERR |
+>> +		STAT_TX_RDY | STAT_TX_FIFO_FUL;
+>> +
+>> +	if (termios->c_iflag & INPCK)
+>> +		port->read_status_mask |= STAT_FRM_ERR | STAT_PAR_ERR;
+>> +
+>> +	port->ignore_status_mask = 0;
+>> +	if (termios->c_iflag & IGNPAR)
+>> +		port->ignore_status_mask |=
+>> +			STAT_FRM_ERR | STAT_PAR_ERR | STAT_OVR_ERR;
+>> +
+>> +	if ((termios->c_cflag & CREAD) == 0)
+>> +		port->ignore_status_mask |= STAT_RX_RDY | STAT_BRK_ERR;
+>
+> If you don't support parity or charactive size then you should be forcing
+> those bits in the tty->termios so that the caller sees what settings they
+> get. tty_termios_copy_hw is close to what you need except that you can
+> support IGNPAR.
 
-You said you were going to do another revision, so I'm waiting for r3.
+OK thanks for the pointer.
 
-> > This patch does required modifications to microblaze PCI subsystem, to
-> > work with generic driver (drivers/pci/host/pcie-xilinx.c) on Microblaze
-> > and Zynq.
-> > 
-> > Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
-> > Signed-off-by: Ravi Kiran Gummaluri <rgummal@xilinx.com>
-> > ---
-> > Changes:
-> > Modified pcibios_fixup_bus in pci-common.c, as per generic architecuture.
-> > Modified pcibios_align_resource in pci-common.c, as per generic
-> > architecuture.
-> > Modified pcibios_get_phb_of_node function in pci-common.c, to remove
-> > dependency on struct pci_controller.
-> > Removed pci_domain_nr in pci-common.c, instead using generic code.
-> > Added pcibios_add_device in pci-common.c, as per generic architecuture.
-> > Adding Kernel configuration in arch/microblaze as required for generic PCI
-> > domains.
-> > Added kernel configuration for driver to support Microblaze.
-> > ---
-> >  arch/microblaze/Kconfig          |  3 ++
-> >  arch/microblaze/pci/pci-common.c | 61 +++++++++++++++--------------------
-> > -----
-> >  drivers/pci/host/Kconfig         |  2 +-
-> >  3 files changed, 27 insertions(+), 39 deletions(-)
-> > 
-> > diff --git a/arch/microblaze/Kconfig b/arch/microblaze/Kconfig
-> > index 0bce820..c3702b9 100644
-> > --- a/arch/microblaze/Kconfig
-> > +++ b/arch/microblaze/Kconfig
-> > @@ -271,6 +271,9 @@ config PCI
-> >  config PCI_DOMAINS
-> >  	def_bool PCI
-> > 
-> > +config PCI_DOMAINS_GENERIC
-> > +	def_bool PCI_DOMAINS
-> > +
-> >  config PCI_SYSCALL
-> >  	def_bool PCI
-> > 
-> > diff --git a/arch/microblaze/pci/pci-common.c b/arch/microblaze/pci/pci-
-> > common.c
-> > index ae838ed..bc72856 100644
-> > --- a/arch/microblaze/pci/pci-common.c
-> > +++ b/arch/microblaze/pci/pci-common.c
-> > @@ -123,17 +123,6 @@ unsigned long pci_address_to_pio(phys_addr_t
-> > address)
-> >  }
-> >  EXPORT_SYMBOL_GPL(pci_address_to_pio);
-> > 
-> > -/*
-> > - * Return the domain number for this bus.
-> > - */
-> > -int pci_domain_nr(struct pci_bus *bus)
-> > -{
-> > -	struct pci_controller *hose = pci_bus_to_host(bus);
-> > -
-> > -	return hose->global_number;
-> > -}
-> > -EXPORT_SYMBOL(pci_domain_nr);
-> > -
-> >  /* This routine is meant to be used early during boot, when the
-> >   * PCI bus numbers have not yet been assigned, and you need to
-> >   * issue PCI config cycles to an OF device.
-> > @@ -863,26 +852,10 @@ void pcibios_setup_bus_devices(struct pci_bus
-> > *bus)
-> > 
-> >  void pcibios_fixup_bus(struct pci_bus *bus)
-> >  {
-> > -	/* When called from the generic PCI probe, read PCI<->PCI bridge
-> > -	 * bases. This is -not- called when generating the PCI tree from
-> > -	 * the OF device-tree.
-> > -	 */
-> > -	if (bus->self != NULL)
-> > -		pci_read_bridge_bases(bus);
-> > -
-> > -	/* Now fixup the bus bus */
-> > -	pcibios_setup_bus_self(bus);
-> > -
-> > -	/* Now fixup devices on that bus */
-> > -	pcibios_setup_bus_devices(bus);
-> > +	/* nothing to do */
-> >  }
-> >  EXPORT_SYMBOL(pcibios_fixup_bus);
-> > 
-> > -static int skip_isa_ioresource_align(struct pci_dev *dev)
-> > -{
-> > -	return 0;
-> > -}
-> > -
-> >  /*
-> >   * We need to avoid collisions with `mirrored' VGA ports
-> >   * and other strange ISA hardware, so we always want the
-> > @@ -899,20 +872,20 @@ static int skip_isa_ioresource_align(struct pci_dev
-> > *dev)
-> >  resource_size_t pcibios_align_resource(void *data, const struct resource
-> > *res,
-> >  				resource_size_t size, resource_size_t align)
-> >  {
-> > -	struct pci_dev *dev = data;
-> >  	resource_size_t start = res->start;
-> > 
-> > -	if (res->flags & IORESOURCE_IO) {
-> > -		if (skip_isa_ioresource_align(dev))
-> > -			return start;
-> > -		if (start & 0x300)
-> > -			start = (start + 0x3ff) & ~0x3ff;
-> > -	}
-> > -
-> >  	return start;
-> >  }
-> >  EXPORT_SYMBOL(pcibios_align_resource);
-> > 
-> > +int pcibios_add_device(struct pci_dev *dev)
-> > +{
-> > +	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
-> > +
-> > +	return 0;
-> > +}
-> > +EXPORT_SYMBOL(pcibios_add_device);
-> > +
-> >  /*
-> >   * Reparent resource children of pr that conflict with res
-> >   * under res, and make res replace those children.
-> > @@ -1335,9 +1308,21 @@ static void pcibios_setup_phb_resources(struct
-> > pci_controller *hose,
-> > 
-> >  struct device_node *pcibios_get_phb_of_node(struct pci_bus *bus)
-> >  {
-> > -	struct pci_controller *hose = bus->sysdata;
-> > +	struct device_node *np;
-> > +
-> > +	for_each_node_by_type(np, "pci") {
-> > +		const void *prop;
-> > +		unsigned int bus_min;
-> > +
-> > +		prop = of_get_property(np, "bus-range", NULL);
-> > +		if (!prop)
-> > +			continue;
-> > +		bus_min = be32_to_cpup(prop);
-> > +		if (bus->number == bus_min)
-> > +			return np;
-> > +	}
-> > 
-> > -	return of_node_get(hose->dn);
-> > +	return NULL;
-> >  }
-> > 
-> >  static void pcibios_scan_phb(struct pci_controller *hose)
-> > diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-> > index d5e58ba..7c56c2e 100644
-> > --- a/drivers/pci/host/Kconfig
-> > +++ b/drivers/pci/host/Kconfig
-> > @@ -79,7 +79,7 @@ config PCI_KEYSTONE
-> > 
-> >  config PCIE_XILINX
-> >  	bool "Xilinx AXI PCIe host bridge support"
-> > -	depends on ARCH_ZYNQ
-> > +	depends on ARCH_ZYNQ || MICROBLAZE
-> >  	help
-> >  	  Say 'Y' here if you want kernel to support the Xilinx AXI PCIe
-> >  	  Host Bridge driver.
-> > --
-> > 2.1.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+> You also want to provide the actual baud rate chosen (see how 8250.c does
+> it using tty_termios_encode_baud_rate().
+>
+>
+>> +static struct uart_driver mvebu_uart_driver = {
+>> +	.owner			= THIS_MODULE,
+>> +	.driver_name		= "serial",
+>> +	.dev_name		= "ttyS",
+>> +	.major			= TTY_MAJOR,
+>> +	.minor			= 64,
+>
+> NAK
+>
+> TTY_MAJOR 64+ is the 8250 driver and ttyS is the 8250 driver name. You
+> should be using a dynamic major (0) for all new drivers and you need to
+> pick a different and unused ttyXXX format name.
+
+I missed this one, I will remove .major and .minor and use our own
+ttyXX.
+
+Thanks,
+
+Gregory
+
+>
+> Alan
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
