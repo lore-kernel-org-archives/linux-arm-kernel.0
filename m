@@ -1,37 +1,31 @@
-From: k@japko.eu (Krzysztof Adamski)
-Date: Wed, 3 Feb 2016 08:57:14 +0100
-Subject: [PATCH v2] pinctrl: sunxi: H3 requires irq_read_needs_mux
-Message-ID: <20160203075713.GA23312@box2.japko.eu>
+From: heiko.carstens@de.ibm.com (Heiko Carstens)
+Date: Wed, 3 Feb 2016 09:01:59 +0100
+Subject: [PATCH 1/5] all: s390: move wrapper infrastructure to generic
+ headers
+In-Reply-To: <20160202204156.GA27290@yury-N73SV>
+References: <1453741047-5498-1-git-send-email-ynorov@caviumnetworks.com>
+ <1453741047-5498-2-git-send-email-ynorov@caviumnetworks.com>
+ <20160128121618.GB5418@osiris> <20160128163109.GA8529@yury-N73SV>
+ <20160201114251.GB973@yury-N73SV> <20160202073913.GB3990@osiris>
+ <20160202154331.GA3003@yury-N73SV> <20160202160826.GF3990@osiris>
+ <20160202195434.GA3397@osiris> <20160202204156.GA27290@yury-N73SV>
+Message-ID: <20160203080159.GA3369@osiris>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It seems that on H3, just like on A10, when GPIOs are configured as
-external interrupt data registers does not contain their value.  When
-value is read, GPIO function must be temporary switched to input for
-reads.
+On Tue, Feb 02, 2016 at 11:41:56PM +0300, Yury Norov wrote:
+> On Tue, Feb 02, 2016 at 08:54:34PM +0100, Heiko Carstens wrote:
+> > So I think I can summarize my point to: if you can enforce correctness, why
+> > shouldn't you do it if the performance impact is only a single instruction.
+> 
+> For aarch64 it's 5 instructions. But what's more important (if ever),
+> another wrapper takes another i-cache line...
+>         <compat_SyS_ftruncate>:
+>         stp     x29, x30, [sp,#-16]!
+>         mov     x29, sp
+>         bl      d40 <do_sys_ftruncate.constprop.3>
+>         ldp     x29, x30, [sp],#16
+>         ret
 
-Signed-off-by: Krzysztof Adamski <k@japko.eu>
----
-
-Changes compared to v1:
-- None, but the patch was sent with wrong "From:", if you want to apply 
-  it, please apply this one. Sorry for confusion.
-
-
- drivers/pinctrl/sunxi/pinctrl-sun8i-h3.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/pinctrl/sunxi/pinctrl-sun8i-h3.c b/drivers/pinctrl/sunxi/pinctrl-sun8i-h3.c
-index 77d4cf0..11760bb 100644
---- a/drivers/pinctrl/sunxi/pinctrl-sun8i-h3.c
-+++ b/drivers/pinctrl/sunxi/pinctrl-sun8i-h3.c
-@@ -492,6 +492,7 @@ static const struct sunxi_pinctrl_desc sun8i_h3_pinctrl_data = {
- 	.pins = sun8i_h3_pins,
- 	.npins = ARRAY_SIZE(sun8i_h3_pins),
- 	.irq_banks = 2,
-+	.irq_read_needs_mux = true
- };
- 
- static int sun8i_h3_pinctrl_probe(struct platform_device *pdev)
--- 
-2.4.2
+Why does gcc allocate a stackframe here? Don't you have tail call
+optimization?
