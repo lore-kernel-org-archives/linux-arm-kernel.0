@@ -1,69 +1,403 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed,  3 Feb 2016 11:39:12 -0700
-Subject: [PATCH V9 14/18] coresight: etb10: moving to local atomic operations
-In-Reply-To: <1454524756-10628-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1454524756-10628-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1454524756-10628-15-git-send-email-mathieu.poirier@linaro.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed,  3 Feb 2016 19:41:26 +0100
+Subject: [PATCH v2 09/12] arm64: dts: add the Marvell Armada 3700 family and a
+ development board
+In-Reply-To: <1454524889-9207-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1454524889-9207-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1454524889-9207-10-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Moving to use local atomic operations to take advantage of the
-lockless implementation, something that will come handy when
-the ETB is accessed from the Perf subsystem. Also changing the
-name of the variable to something more meaningful.
+Add initial dtsi files to support Marvell Armada 3700 SoC with Cortex-A53
+CPUs. There are two members in this family: the Armada 3710 (Single CPU)
+and the Armada 3720 (Dual CPUs).
 
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+It also adds a dts file for the Marvell Armada 3720 DB board.
+
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/hwtracing/coresight/coresight-etb10.c | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
+ arch/arm64/boot/dts/marvell/Makefile           |   4 +
+ arch/arm64/boot/dts/marvell/armada-371x.dtsi   |  53 ++++++++++
+ arch/arm64/boot/dts/marvell/armada-3720-db.dts |  86 ++++++++++++++++
+ arch/arm64/boot/dts/marvell/armada-372x.dtsi   |  63 ++++++++++++
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi   | 131 +++++++++++++++++++++++++
+ 5 files changed, 337 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/marvell/armada-371x.dtsi
+ create mode 100644 arch/arm64/boot/dts/marvell/armada-3720-db.dts
+ create mode 100644 arch/arm64/boot/dts/marvell/armada-372x.dtsi
+ create mode 100644 arch/arm64/boot/dts/marvell/armada-37xx.dtsi
 
-diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
-index 917562ecf82a..162c9ccc8c33 100644
---- a/drivers/hwtracing/coresight/coresight-etb10.c
-+++ b/drivers/hwtracing/coresight/coresight-etb10.c
-@@ -10,6 +10,7 @@
-  * GNU General Public License for more details.
-  */
+diff --git a/arch/arm64/boot/dts/marvell/Makefile b/arch/arm64/boot/dts/marvell/Makefile
+index 348f4db4f313..2114af8d312d 100644
+--- a/arch/arm64/boot/dts/marvell/Makefile
++++ b/arch/arm64/boot/dts/marvell/Makefile
+@@ -1,6 +1,10 @@
++# Berlin SoC Family
+ dtb-$(CONFIG_ARCH_BERLIN) += berlin4ct-dmp.dtb
+ dtb-$(CONFIG_ARCH_BERLIN) += berlin4ct-stb.dtb
  
-+#include <asm/local.h>
- #include <linux/kernel.h>
- #include <linux/module.h>
- #include <linux/init.h>
-@@ -71,7 +72,7 @@
-  * @csdev:	component vitals needed by the framework.
-  * @miscdev:	specifics to handle "/dev/xyz.etb" entry.
-  * @spinlock:	only one at a time pls.
-- * @in_use:	synchronise user space access to etb buffer.
-+ * @reading:	synchronise user space access to etb buffer.
-  * @buf:	area of memory where ETB buffer content gets sent.
-  * @buffer_depth: size of @buf.
-  * @enable:	this ETB is being used.
-@@ -84,7 +85,7 @@ struct etb_drvdata {
- 	struct coresight_device	*csdev;
- 	struct miscdevice	miscdev;
- 	spinlock_t		spinlock;
--	atomic_t		in_use;
-+	local_t			reading;
- 	u8			*buf;
- 	u32			buffer_depth;
- 	bool			enable;
-@@ -277,7 +278,7 @@ static int etb_open(struct inode *inode, struct file *file)
- 	struct etb_drvdata *drvdata = container_of(file->private_data,
- 						   struct etb_drvdata, miscdev);
- 
--	if (atomic_cmpxchg(&drvdata->in_use, 0, 1))
-+	if (local_cmpxchg(&drvdata->reading, 0, 1))
- 		return -EBUSY;
- 
- 	dev_dbg(drvdata->dev, "%s: successfully opened\n", __func__);
-@@ -313,7 +314,7 @@ static int etb_release(struct inode *inode, struct file *file)
- {
- 	struct etb_drvdata *drvdata = container_of(file->private_data,
- 						   struct etb_drvdata, miscdev);
--	atomic_set(&drvdata->in_use, 0);
-+	local_set(&drvdata->reading, 0);
- 
- 	dev_dbg(drvdata->dev, "%s: released\n", __func__);
- 	return 0;
++# Mvebu SoC Family
++dtb-$(CONFIG_ARCH_MVEBU) += armada-3720-db.dtb
++
+ always		:= $(dtb-y)
+ subdir-y	:= $(dts-dirs)
+ clean-files	:= *.dtb
+diff --git a/arch/arm64/boot/dts/marvell/armada-371x.dtsi b/arch/arm64/boot/dts/marvell/armada-371x.dtsi
+new file mode 100644
+index 000000000000..c9e5325b8ac3
+--- /dev/null
++++ b/arch/arm64/boot/dts/marvell/armada-371x.dtsi
+@@ -0,0 +1,53 @@
++/*
++ * Device Tree Include file for Marvell Armada 371x family of SoCs
++ * (also named 88F3710)
++ *
++ * Copyright (C) 2016 Marvell
++ *
++ * Gregory CLEMENT <gregory.clement@free-electrons.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++#include "armada-37xx.dtsi"
++
++/ {
++	model = "Marvell Armada 3710 SoC";
++	compatible = "marvell,armada3710", "marvell,armada3700";
++};
+diff --git a/arch/arm64/boot/dts/marvell/armada-3720-db.dts b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
+new file mode 100644
+index 000000000000..359050154511
+--- /dev/null
++++ b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
+@@ -0,0 +1,86 @@
++/*
++ * Device Tree file for Marvell Armada 3720 development board
++ * (DB-88F3720-DDR3)
++ * Copyright (C) 2016 Marvell
++ *
++ * Gregory CLEMENT <gregory.clement@free-electrons.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++
++#include "armada-372x.dtsi"
++
++/ {
++	model = "Marvell Armada 3720 Development Board DB-88F3720-DDR3";
++	compatible = "marvell,armada-3720-db", "marvell,armada3720", "marvell,armada3710";
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0x00000000 0x00000000 0x00000000 0x20000000>;
++	};
++
++	soc {
++		internal-regs {
++			/*
++			* Exported on the micro USB connector CON32
++			* through an FTDI
++			*/
++			uart0: serial at 12000 {
++				status = "okay";
++			};
++
++			/* CON31 */
++			usb3 at 58000 {
++				status = "okay";
++			};
++
++			/* CON3 */
++			sata at e0000 {
++			       status = "okay";
++			};
++		};
++	};
++};
++
+diff --git a/arch/arm64/boot/dts/marvell/armada-372x.dtsi b/arch/arm64/boot/dts/marvell/armada-372x.dtsi
+new file mode 100644
+index 000000000000..f292a00ce97c
+--- /dev/null
++++ b/arch/arm64/boot/dts/marvell/armada-372x.dtsi
+@@ -0,0 +1,63 @@
++/*
++ * Device Tree Include file for Marvell Armada 372x family of SoCs
++ * (also named 88F3720)
++ *
++ * Copyright (C) 2016 Marvell
++ *
++ * Gregory CLEMENT <gregory.clement@free-electrons.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++#include "armada-37xx.dtsi"
++
++/ {
++	model = "Marvell Armada 3720 SoC";
++	compatible = "marvell,armada3720", "marvell,armada3710";
++
++	cpus {
++		cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53","arm,armv8";
++			reg = <0x1>;
++			enable-method = "psci";
++		};
++	};
++
++};
+diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+new file mode 100644
+index 000000000000..ba9df7ff2a72
+--- /dev/null
++++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+@@ -0,0 +1,131 @@
++/*
++ * Device Tree Include file for Marvell Armada 37xx family of SoCs.
++ *
++ * Copyright (C) 2016 Marvell
++ *
++ * Gregory CLEMENT <gregory.clement@free-electrons.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++
++/ {
++	model = "Marvell Armada 37xx SoC";
++	compatible = "marvell,armada3700";
++	interrupt-parent = <&gic>;
++	#address-cells = <2>;
++	#size-cells = <2>;
++
++	aliases {
++		serial0 = &uart0;
++	};
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53", "arm,armv8";
++			reg = <0>;
++			enable-method = "psci";
++		};
++	};
++
++	psci {
++		compatible = "arm,psci-0.2";
++		method = "smc";
++	};
++
++	timer {
++		compatible = "arm,armv8-timer";
++		interrupts = <GIC_PPI 13
++			(GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>,
++			     <GIC_PPI 14
++			(GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>,
++			     <GIC_PPI 11
++			(GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>,
++			     <GIC_PPI 10
++			(GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
++	};
++
++	soc {
++		compatible = "simple-bus";
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++
++		internal-regs {
++			#address-cells = <1>;
++			#size-cells = <1>;
++			compatible = "simple-bus";
++			/* 32M internal register @ 0xd000_0000 */
++			ranges = <0x0 0x0 0xd0000000 0x2000000>;
++
++			uart0: serial at 12000 {
++				compatible = "marvell,armada-3700-uart";
++				reg = <0x12000 0x400>;
++				interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
++				status = "disabled";
++			};
++
++			usb3 at 58000 {
++				compatible = "generic-xhci";
++				reg = <0x58000 0x4000>;
++				interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
++				status = "disabled";
++			};
++
++			sata at e0000 {
++				compatible = "marvell,armada-3700-ahci";
++				reg = <0xe0000 0x2000>;
++				interrupts = <GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>;
++				status = "disabled";
++			};
++
++			gic: interrupt-controller at 1d00000 {
++				compatible = "arm,gic-v3";
++				#interrupt-cells = <3>;
++				interrupt-controller;
++				reg = <0x1d00000 0x10000>, /* GICD */
++				      <0x1d40000 0x40000>; /* GICR */
++			};
++		};
++	};
++};
 -- 
-2.1.4
+2.5.0
