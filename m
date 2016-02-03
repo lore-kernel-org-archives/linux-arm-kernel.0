@@ -1,99 +1,186 @@
-From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
-Date: Wed, 3 Feb 2016 13:03:19 -0300
-Subject: [PATCH 1/2] clocksource/drivers/lpc32xx: Support periodic mode
-In-Reply-To: <CAGhQ9VxtqkW4PLrpQWsyZu9bgB_98mmO=WZ7gvaeN_DWQ5M3rg@mail.gmail.com>
-References: <1454136379-7517-1-git-send-email-ezequiel@vanguardiasur.com.ar>
- <CAGhQ9VxO7Rsus8Js_oZDBxWzEHuUHnRyoVTVmawbtXmK7tNMcw@mail.gmail.com>
- <CAAEAJfAVTJm-PzhjkRmkdNG39sH7eHyEXaSX4q0=TCQ0468Heg@mail.gmail.com>
- <CAAEAJfD8LUV=t97RN3U4uqgzCLP89AQtHqBccKGd6-EskP9DOQ@mail.gmail.com>
- <CAGhQ9VxtqkW4PLrpQWsyZu9bgB_98mmO=WZ7gvaeN_DWQ5M3rg@mail.gmail.com>
-Message-ID: <CAAEAJfBO5jARMZyu62ccRWjA_A69qfBfHBcWncYbqOdPkYqSMQ@mail.gmail.com>
+From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
+Date: Wed, 3 Feb 2016 16:08:58 +0000
+Subject: [PATCH V2 5/5] Microblaze: Modifying microblaze PCI subsytem to
+ support  generic Xilinx  AXI PCIe Host Bridge IP driver
+In-Reply-To: <20160203155920.GB32546@localhost>
+References: <1452620173-4905-1-git-send-email-bharatku@xilinx.com>
+ <1452620173-4905-6-git-send-email-bharatku@xilinx.com>
+ <8520D5D51A55D047800579B0941471982587F02E@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <20160203155920.GB32546@localhost>
+Message-ID: <8520D5D51A55D047800579B0941471982587F05F@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joachim,
+> You said you were going to do another revision, so I'm waiting for r3.
+Hi Bjorn, 
+Do you have any comments on this patch (5/5), I will address other patches comments along with this patch, if any, in v3.
 
-(Ccing Vladimir)
-
-On 1 February 2016 at 18:55, Joachim  Eastwood <manabian@gmail.com> wrote:
-> On 1 February 2016 at 16:09, Ezequiel Garcia
-> <ezequiel@vanguardiasur.com.ar> wrote:
->> On 31 January 2016 at 17:07, Ezequiel Garcia
->> <ezequiel@vanguardiasur.com.ar> wrote:
->>> On 30 January 2016 at 16:39, Joachim  Eastwood <manabian@gmail.com> wrote:
->>>> Hi Ezequiel,
->>>>
->>>> On 30 January 2016 at 07:46, Ezequiel Garcia
->>>> <ezequiel@vanguardiasur.com.ar> wrote:
->>>>> This commit adds the support for periodic mode. This is done by not
->>>>> setting the MR0S (Stop on TnMR0) bit on MCR, thus allowing
->>>>> interrupts to be periodically generated on MR0 matches.
->>>>>
->>>>> In order to do this, move the initial configuration that is specific to
->>>>> the one shot mode to clock_event_device.set_state_oneshot.
->>>>>
->> [...]
->>>
->>>>
->>>> I will look more closely at the new timer setup later.
->>>>
->>>> btw, didn't I look through a version of this you sent me privately
->>>> quite some time ago?
->>>> I think I had a comment about using TIMER_PR instead of TIMER_MR0
->>>> then. Unsure if that is still valid, though.
->>>>
->>>
->>> Ah, right. It was ages ago, and forgot your previous review. Sorry about that.
->>> Using TIMER_PR looks less invasive so I'll send a v2 using it instead.
->>
->> Actually, using the prescale counter and MR0 = 1 resulted in exactly
->> half the number of interrupts that I expected (HZ / 2). Using this
->> patch, with PR=0 and MR0=ticks_per_jiggies, I can see HZ no. of
->> interrupts per sec.
->>
->> Why did you choose to use the prescale in your oneshot implementation?
->
-> The clockevent code was copied from arch/arm/mach-lpc32xx/timer.c so
-> it's really old code.
-> I think it is a strange way to use the timer, but the logic still
-> seems good to me.
->
->> Did you test or measure the timer expire using the PR and MR0 = 1?
->
-> I really can't remember. I do remember going through the timer setup
-> and it seemed like a valid, albeit slightly strange, way to use the
-> timer.
->
->> To be honest, I'm still trying to make some sense out of my results.
->
-> I'll see if can find the time to do some more testing over here as well.
->
-
-I wrote a small test driver to toggle a GPIO on a timer event.
-One-shot usage of the timers results in the same measurements
-with either implementation.
-
-In other words, when triggering a one-shot timer (MCR_MR0S is set),
-I get the same results using the prescale counter (PR=ticks, MR0=1)
-or the timer counter (PR=0, MR0=ticks).
-
-Here's the branch in case you want to play with it:
-http://git.infradead.org/users/ezequielg/linux/shortlog/refs/heads/misc_timer_test
-
-My logic analyzer is quite crappy, but it was clear that one-shot timers
-expired correctly at the configured time, with either implementation.
-
-However, when configuring the timer in periodic mode (MCR_MR0S
-is cleared), the result is always ~twice the programmed value
-(as if it takes two TC cycles to complete one event).
-
-Hence, it seems the prescale counter is not suitable for periodic mode.
-
-How about we change the current oneshot implementation
-to not use the prescale counter at all, and so when the periodic
-mode is introduced it'll be consistent with oneshot?
-
-(Tested on LPC4350 Hitex Devkit, no idea how this works on LPC32xx)
--- 
-Ezequiel Garc?a, VanguardiaSur
-www.vanguardiasur.com.ar
+Bharat
+> 
+> > > This patch does required modifications to microblaze PCI subsystem,
+> > > to work with generic driver (drivers/pci/host/pcie-xilinx.c) on
+> > > Microblaze and Zynq.
+> > >
+> > > Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
+> > > Signed-off-by: Ravi Kiran Gummaluri <rgummal@xilinx.com>
+> > > ---
+> > > Changes:
+> > > Modified pcibios_fixup_bus in pci-common.c, as per generic
+> architecuture.
+> > > Modified pcibios_align_resource in pci-common.c, as per generic
+> > > architecuture.
+> > > Modified pcibios_get_phb_of_node function in pci-common.c, to
+> remove
+> > > dependency on struct pci_controller.
+> > > Removed pci_domain_nr in pci-common.c, instead using generic code.
+> > > Added pcibios_add_device in pci-common.c, as per generic
+> architecuture.
+> > > Adding Kernel configuration in arch/microblaze as required for
+> > > generic PCI domains.
+> > > Added kernel configuration for driver to support Microblaze.
+> > > ---
+> > >  arch/microblaze/Kconfig          |  3 ++
+> > >  arch/microblaze/pci/pci-common.c | 61
+> > > +++++++++++++++--------------------
+> > > -----
+> > >  drivers/pci/host/Kconfig         |  2 +-
+> > >  3 files changed, 27 insertions(+), 39 deletions(-)
+> > >
+> > > diff --git a/arch/microblaze/Kconfig b/arch/microblaze/Kconfig index
+> > > 0bce820..c3702b9 100644
+> > > --- a/arch/microblaze/Kconfig
+> > > +++ b/arch/microblaze/Kconfig
+> > > @@ -271,6 +271,9 @@ config PCI
+> > >  config PCI_DOMAINS
+> > >  	def_bool PCI
+> > >
+> > > +config PCI_DOMAINS_GENERIC
+> > > +	def_bool PCI_DOMAINS
+> > > +
+> > >  config PCI_SYSCALL
+> > >  	def_bool PCI
+> > >
+> > > diff --git a/arch/microblaze/pci/pci-common.c
+> > > b/arch/microblaze/pci/pci- common.c index ae838ed..bc72856 100644
+> > > --- a/arch/microblaze/pci/pci-common.c
+> > > +++ b/arch/microblaze/pci/pci-common.c
+> > > @@ -123,17 +123,6 @@ unsigned long pci_address_to_pio(phys_addr_t
+> > > address)
+> > >  }
+> > >  EXPORT_SYMBOL_GPL(pci_address_to_pio);
+> > >
+> > > -/*
+> > > - * Return the domain number for this bus.
+> > > - */
+> > > -int pci_domain_nr(struct pci_bus *bus) -{
+> > > -	struct pci_controller *hose = pci_bus_to_host(bus);
+> > > -
+> > > -	return hose->global_number;
+> > > -}
+> > > -EXPORT_SYMBOL(pci_domain_nr);
+> > > -
+> > >  /* This routine is meant to be used early during boot, when the
+> > >   * PCI bus numbers have not yet been assigned, and you need to
+> > >   * issue PCI config cycles to an OF device.
+> > > @@ -863,26 +852,10 @@ void pcibios_setup_bus_devices(struct pci_bus
+> > > *bus)
+> > >
+> > >  void pcibios_fixup_bus(struct pci_bus *bus)  {
+> > > -	/* When called from the generic PCI probe, read PCI<->PCI bridge
+> > > -	 * bases. This is -not- called when generating the PCI tree from
+> > > -	 * the OF device-tree.
+> > > -	 */
+> > > -	if (bus->self != NULL)
+> > > -		pci_read_bridge_bases(bus);
+> > > -
+> > > -	/* Now fixup the bus bus */
+> > > -	pcibios_setup_bus_self(bus);
+> > > -
+> > > -	/* Now fixup devices on that bus */
+> > > -	pcibios_setup_bus_devices(bus);
+> > > +	/* nothing to do */
+> > >  }
+> > >  EXPORT_SYMBOL(pcibios_fixup_bus);
+> > >
+> > > -static int skip_isa_ioresource_align(struct pci_dev *dev) -{
+> > > -	return 0;
+> > > -}
+> > > -
+> > >  /*
+> > >   * We need to avoid collisions with `mirrored' VGA ports
+> > >   * and other strange ISA hardware, so we always want the @@ -899,20
+> > > +872,20 @@ static int skip_isa_ioresource_align(struct pci_dev
+> > > *dev)
+> > >  resource_size_t pcibios_align_resource(void *data, const struct
+> > > resource *res,
+> > >  				resource_size_t size, resource_size_t align)  {
+> > > -	struct pci_dev *dev = data;
+> > >  	resource_size_t start = res->start;
+> > >
+> > > -	if (res->flags & IORESOURCE_IO) {
+> > > -		if (skip_isa_ioresource_align(dev))
+> > > -			return start;
+> > > -		if (start & 0x300)
+> > > -			start = (start + 0x3ff) & ~0x3ff;
+> > > -	}
+> > > -
+> > >  	return start;
+> > >  }
+> > >  EXPORT_SYMBOL(pcibios_align_resource);
+> > >
+> > > +int pcibios_add_device(struct pci_dev *dev) {
+> > > +	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
+> > > +
+> > > +	return 0;
+> > > +}
+> > > +EXPORT_SYMBOL(pcibios_add_device);
+> > > +
+> > >  /*
+> > >   * Reparent resource children of pr that conflict with res
+> > >   * under res, and make res replace those children.
+> > > @@ -1335,9 +1308,21 @@ static void
+> > > pcibios_setup_phb_resources(struct
+> > > pci_controller *hose,
+> > >
+> > >  struct device_node *pcibios_get_phb_of_node(struct pci_bus *bus)  {
+> > > -	struct pci_controller *hose = bus->sysdata;
+> > > +	struct device_node *np;
+> > > +
+> > > +	for_each_node_by_type(np, "pci") {
+> > > +		const void *prop;
+> > > +		unsigned int bus_min;
+> > > +
+> > > +		prop = of_get_property(np, "bus-range", NULL);
+> > > +		if (!prop)
+> > > +			continue;
+> > > +		bus_min = be32_to_cpup(prop);
+> > > +		if (bus->number == bus_min)
+> > > +			return np;
+> > > +	}
+> > >
+> > > -	return of_node_get(hose->dn);
+> > > +	return NULL;
+> > >  }
+> > >
+> > >  static void pcibios_scan_phb(struct pci_controller *hose) diff
+> > > --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig index
+> > > d5e58ba..7c56c2e 100644
+> > > --- a/drivers/pci/host/Kconfig
+> > > +++ b/drivers/pci/host/Kconfig
+> > > @@ -79,7 +79,7 @@ config PCI_KEYSTONE
+> > >
+> > >  config PCIE_XILINX
+> > >  	bool "Xilinx AXI PCIe host bridge support"
+> > > -	depends on ARCH_ZYNQ
+> > > +	depends on ARCH_ZYNQ || MICROBLAZE
+> > >  	help
+> > >  	  Say 'Y' here if you want kernel to support the Xilinx AXI PCIe
+> > >  	  Host Bridge driver.
+> > > --
+> > > 2.1.1
+> >
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-pci"
+> > in the body of a message to majordomo at vger.kernel.org More
+> majordomo
+> > info at  http://vger.kernel.org/majordomo-info.html
