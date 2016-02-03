@@ -1,35 +1,89 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed,  3 Feb 2016 11:39:07 -0700
-Subject: [PATCH V9 09/18] coresight: etm3x: set progbit to stop trace
- collection
+Date: Wed,  3 Feb 2016 11:39:09 -0700
+Subject: [PATCH V9 11/18] coresight: etm3x: consolidating initial config
 In-Reply-To: <1454524756-10628-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1454524756-10628-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1454524756-10628-10-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1454524756-10628-12-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no need to use the event enable's "always false" event to
-stop trace collection.  For that purpose setting the programming bit
-(ETMCR:10) is enough.
+There is really no point in having two functions to take care
+of doing the initial tracer configuration.  As such moving
+everything to 'etm_set_default()'.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-etm3x.c | 3 ---
- 1 file changed, 3 deletions(-)
+ drivers/hwtracing/coresight/coresight-etm3x.c | 37 ++++++++++-----------------
+ 1 file changed, 14 insertions(+), 23 deletions(-)
 
 diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
-index e16501b41ed8..447459969cb5 100644
+index 92139674bea4..34a69583ccbc 100644
 --- a/drivers/hwtracing/coresight/coresight-etm3x.c
 +++ b/drivers/hwtracing/coresight/coresight-etm3x.c
-@@ -398,9 +398,6 @@ static void etm_disable_hw(void *info)
- 	CS_UNLOCK(drvdata->base);
- 	etm_set_prog(drvdata);
+@@ -41,7 +41,6 @@ module_param_named(boot_enable, boot_enable, int, S_IRUGO);
+ /* The number of ETM/PTM currently registered */
+ static int etm_count;
+ static struct etm_drvdata *etmdrvdata[NR_CPUS];
+-static void etm_init_default_data(struct etm_config *config);
  
--	/* Program trace enable to low by using always false event */
--	etm_writel(drvdata, ETM_HARD_WIRE_RES_A | ETM_EVENT_NOT_A, ETMTEEVR);
+ /*
+  * Memory mapped writes to clear os lock are not supported on some processors
+@@ -194,6 +193,19 @@ void etm_set_default(struct etm_config *config)
+ 	if (WARN_ON_ONCE(!config))
+ 		return;
+ 
++	/*
++	 * Taken verbatim from the TRM:
++	 *
++	 * To trace all memory:
++	 *  set bit [24] in register 0x009, the ETMTECR1, to 1
++	 *  set all other bits in register 0x009, the ETMTECR1, to 0
++	 *  set all bits in register 0x007, the ETMTECR2, to 0
++	 *  set register 0x008, the ETMTEEVR, to 0x6F (TRUE).
++	 */
++	config->enable_ctrl1 = BIT(24);
++	config->enable_ctrl2 = 0x0;
++	config->enable_event = ETM_HARD_WIRE_RES_A;
++
+ 	config->trigger_event = ETM_DEFAULT_EVENT_VAL;
+ 	config->enable_event = ETM_HARD_WIRE_RES_A;
+ 
+@@ -577,27 +589,6 @@ static void etm_init_arch_data(void *info)
+ 	CS_LOCK(drvdata->base);
+ }
+ 
+-static void etm_init_default_data(struct etm_config *config)
+-{
+-	if (WARN_ON_ONCE(!config))
+-		return;
 -
- 	/* Read back sequencer and counters for post trace analysis */
- 	config->seq_curr_state = (etm_readl(drvdata, ETMSQR) & ETM_SQR_MASK);
+-	etm_set_default(config);
+-
+-	/*
+-	 * Taken verbatim from the TRM:
+-	 *
+-	 * To trace all memory:
+-	 *  set bit [24] in register 0x009, the ETMTECR1, to 1
+-	 *  set all other bits in register 0x009, the ETMTECR1, to 0
+-	 *  set all bits in register 0x007, the ETMTECR2, to 0
+-	 *  set register 0x008, the ETMTEEVR, to 0x6F (TRUE).
+-	 */
+-	config->enable_ctrl1 = BIT(24);
+-	config->enable_ctrl2 = 0x0;
+-	config->enable_event = ETM_HARD_WIRE_RES_A;
+-}
+-
+ static void etm_init_trace_id(struct etm_drvdata *drvdata)
+ {
+ 	/*
+@@ -674,7 +665,7 @@ static int etm_probe(struct amba_device *adev, const struct amba_id *id)
+ 	}
  
+ 	etm_init_trace_id(drvdata);
+-	etm_init_default_data(&drvdata->config);
++	etm_set_default(&drvdata->config);
+ 
+ 	desc->type = CORESIGHT_DEV_TYPE_SOURCE;
+ 	desc->subtype.source_subtype = CORESIGHT_DEV_SUBTYPE_SOURCE_PROC;
 -- 
 2.1.4
