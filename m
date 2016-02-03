@@ -1,86 +1,35 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed,  3 Feb 2016 11:39:08 -0700
-Subject: [PATCH V9 10/18] coresight: etm3x: changing default trace
- configuration
+Date: Wed,  3 Feb 2016 11:39:07 -0700
+Subject: [PATCH V9 09/18] coresight: etm3x: set progbit to stop trace
+ collection
 In-Reply-To: <1454524756-10628-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1454524756-10628-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1454524756-10628-11-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1454524756-10628-10-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changing default configuration to include the entire address
-range rather than just the kernel.  That way traces are more
-inclusive and it is easier to narrow down if needed.
+There is no need to use the event enable's "always false" event to
+stop trace collection.  For that purpose setting the programming bit
+(ETMCR:10) is enough.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-etm.h   |  2 ++
- drivers/hwtracing/coresight/coresight-etm3x.c | 29 ++++++++++++---------------
- 2 files changed, 15 insertions(+), 16 deletions(-)
+ drivers/hwtracing/coresight/coresight-etm3x.c | 3 ---
+ 1 file changed, 3 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm.h b/drivers/hwtracing/coresight/coresight-etm.h
-index 5b29d5540fe5..44585d4adb26 100644
---- a/drivers/hwtracing/coresight/coresight-etm.h
-+++ b/drivers/hwtracing/coresight/coresight-etm.h
-@@ -146,6 +146,7 @@
-  * @startstop_ctrl: setting for register ETMTSSCR.
-  * @enable_event: setting for register ETMTEEVR.
-  * @enable_ctrl1: setting for register ETMTECR1.
-+ * @enable_ctrl2: setting for register ETMTECR2.
-  * @fifofull_level: setting for register ETMFFLR.
-  * @addr_idx:	index for the address comparator selection.
-  * @addr_val:	value for address comparator register.
-@@ -179,6 +180,7 @@ struct etm_config {
- 	u32				startstop_ctrl;
- 	u32				enable_event;
- 	u32				enable_ctrl1;
-+	u32				enable_ctrl2;
- 	u32				fifofull_level;
- 	u8				addr_idx;
- 	u32				addr_val[ETM_MAX_ADDR_CMP];
 diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
-index 447459969cb5..92139674bea4 100644
+index e16501b41ed8..447459969cb5 100644
 --- a/drivers/hwtracing/coresight/coresight-etm3x.c
 +++ b/drivers/hwtracing/coresight/coresight-etm3x.c
-@@ -579,26 +579,23 @@ static void etm_init_arch_data(void *info)
+@@ -398,9 +398,6 @@ static void etm_disable_hw(void *info)
+ 	CS_UNLOCK(drvdata->base);
+ 	etm_set_prog(drvdata);
  
- static void etm_init_default_data(struct etm_config *config)
- {
--	u32 flags = (1 << 0 | /* instruction execute*/
--		     3 << 3 | /* ARM instruction */
--		     0 << 5 | /* No data value comparison */
--		     0 << 7 | /* No exact mach */
--		     0 << 8 | /* Ignore context ID */
--		     0 << 10); /* Security ignored */
+-	/* Program trace enable to low by using always false event */
+-	etm_writel(drvdata, ETM_HARD_WIRE_RES_A | ETM_EVENT_NOT_A, ETMTEEVR);
 -
- 	if (WARN_ON_ONCE(!config))
- 		return;
+ 	/* Read back sequencer and counters for post trace analysis */
+ 	config->seq_curr_state = (etm_readl(drvdata, ETMSQR) & ETM_SQR_MASK);
  
--	config->ctrl = (ETMCR_CYC_ACC | ETMCR_TIMESTAMP_EN);
--	config->enable_ctrl1 = ETMTECR1_ADDR_COMP_1;
--	config->addr_val[0] = (u32) _stext;
--	config->addr_val[1] = (u32) _etext;
--	config->addr_acctype[0] = flags;
--	config->addr_acctype[1] = flags;
--	config->addr_type[0] = ETM_ADDR_TYPE_RANGE;
--	config->addr_type[1] = ETM_ADDR_TYPE_RANGE;
--
- 	etm_set_default(config);
-+
-+	/*
-+	 * Taken verbatim from the TRM:
-+	 *
-+	 * To trace all memory:
-+	 *  set bit [24] in register 0x009, the ETMTECR1, to 1
-+	 *  set all other bits in register 0x009, the ETMTECR1, to 0
-+	 *  set all bits in register 0x007, the ETMTECR2, to 0
-+	 *  set register 0x008, the ETMTEEVR, to 0x6F (TRUE).
-+	 */
-+	config->enable_ctrl1 = BIT(24);
-+	config->enable_ctrl2 = 0x0;
-+	config->enable_event = ETM_HARD_WIRE_RES_A;
- }
- 
- static void etm_init_trace_id(struct etm_drvdata *drvdata)
 -- 
 2.1.4
