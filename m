@@ -1,28 +1,23 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 3 Feb 2016 00:03:51 +0000
-Subject: [PATCH 1/3] ARM: move .vectors and .stubs sections back into the
- kernel VMA
-In-Reply-To: <1454419174-21290-2-git-send-email-ard.biesheuvel@linaro.org>
+Date: Wed, 3 Feb 2016 00:05:06 +0000
+Subject: [PATCH 3/3] kallsyms: remove --page-offset command line option
+In-Reply-To: <1454419174-21290-4-git-send-email-ard.biesheuvel@linaro.org>
 References: <1454419174-21290-1-git-send-email-ard.biesheuvel@linaro.org>
- <1454419174-21290-2-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160203000351.GX10826@n2100.arm.linux.org.uk>
+ <1454419174-21290-4-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160203000504.GY10826@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 02, 2016 at 02:19:32PM +0100, Ard Biesheuvel wrote:
-> The sections themselves are emitted 4 KB apart, as required:
->   ...
->   [16] .stubs       PROGBITS   c0c35000 a35000 0002c0 00  AX  0   0 32
->   [17] .vectors     PROGBITS   c0c34000 a44000 000020 00  AX  0   0  2
->   ...
+On Tue, Feb 02, 2016 at 02:19:34PM +0100, Ard Biesheuvel wrote:
+> The --page-offset command line option was only used for ARM, to filter
+> symbol addresses below CONFIG_PAGE_OFFSET. This is no longer needed, so
+> remove the functionality altogether.
 
-... which means we end up wasting most of a page for absolutely no
-purpose what so ever.  Sorry, I'm really not happy about this
-gratuitous wastage.
+>From what I remember, this option has nothing to do with MMU-ful ARM,
+but noMMU ARM, where the .text segment can be significantly different
+from the .data segment.
 
-We changed to the existing solution to get rid of the VMA offset
-to make the code easier to read, but if we're going to get rid of
-that improvement, just revert the change.  (Check the kernel history.)
+I think you need to talk to noMMU people about this patch.
 
 -- 
 RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
