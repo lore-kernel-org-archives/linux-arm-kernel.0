@@ -1,39 +1,88 @@
 From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Wed,  3 Feb 2016 12:04:37 +0100
-Subject: [PATCH v5 1/9] ARM: Kconfig: Introduce MACH_STM32F429 flag
-In-Reply-To: <1454497485-464-1-git-send-email-mcoquelin.stm32@gmail.com>
-References: <1454497485-464-1-git-send-email-mcoquelin.stm32@gmail.com>
-Message-ID: <1454497485-464-2-git-send-email-mcoquelin.stm32@gmail.com>
+Date: Wed,  3 Feb 2016 12:04:36 +0100
+Subject: [PATCH v5 0/9] Add STM32 pinctrl/GPIO driver
+Message-ID: <1454497485-464-1-git-send-email-mcoquelin.stm32@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces the MACH_STM32F429 to make possible to only select
-STM32F429 pinctrl driver.
+Hi Linus,
 
-By default, all the MACH_STM32Fxxx flags will be set with STM32 defconfig.
+This is the fifth round of STM32 pinctrl series, which is rebased on top of
+v4.5-rc1 and removes no more needed dependency between DT and driver.
 
-Acked-by: Patrice Chotard <patrice.chotard@st.com>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
----
- arch/arm/Kconfig | 5 +++++
- 1 file changed, 5 insertions(+)
+Also, it fixes the Makefile so that it is really built when COMPILE_TEST is
+set and not ARCH_STM32.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 4f799e5..ca16120 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -883,6 +883,11 @@ config ARCH_STM32
- 	help
- 	  Support for STMicroelectronics STM32 processors.
- 
-+config MACH_STM32F429
-+	bool "STMicrolectronics STM32F429"
-+	depends on ARCH_STM32
-+	default y
-+
- # Definitions to make life easier
- config ARCH_ACORN
- 	bool
+The STM32 family has 16 pins per GPIO bank, and the number of bank varies
+depending on the model.
+
+Pins can be multiplexed either in GPIO mode, alternate function (up to 15
+functions per pin) or analog (for ADC/DAC).
+
+Changes since v4:
+-----------------
+ - Rebase on v4.5-rc1
+ - Fix compilation breakage due to gpio_chip struct .dev field renaming
+ - Move the macros from includes/dt-bindings to STM32 pinctrl driver directory
+to avoid uneeded dependency between DT and driver.
+ - Fix Makefile so that driver is built with COMPILE_TEST set
+
+Changes since v3:
+-----------------
+ - Rebase on v4.4
+ - Fix error paths in stm32_pctrl_dt_subnode_to_map() (Patrice)
+ - Remove useless stm32_pctrl_find_function_by_pin function (Patrice)
+
+Changes since v2:
+-----------------
+ - Rebase on v4.4-rc1
+ - Declare leds also for Eval board
+ - Set green led as heartbeat
+ - Collect some acks
+
+Changes since v1:
+-----------------
+ - Add GPIO LEDs support in DT and defconfig
+ - Changes pinmux DT bindings from macros to raw values (Daniel)
+ - Improve DT bindings documentation (Daniel)
+ - Fix some commit fixup and rebase issues.
+
+Kind regards,
+Maxime
+
+Maxime Coquelin (9):
+  ARM: Kconfig: Introduce MACH_STM32F429 flag
+  Documentation: dt-bindings: Document STM32 pinctrl driver DT bindings
+  includes: dt-bindings: Add STM32F429 pinctrl DT bindings
+  pinctrl: Add STM32 MCUs support
+  ARM: mach-stm32: Select pinctrl
+  ARM: dts: Add pinctrl node to STM32F429
+  ARM: dts: Add USART1 pin config to STM32F429 boards
+  ARM: dts: Add leds support to STM32F429 boards
+  ARM: config: Enable GPIO Led driver in stm32_defconfig
+
+ .../bindings/pinctrl/st,stm32-pinctrl.txt          |  126 ++
+ arch/arm/Kconfig                                   |    6 +
+ arch/arm/boot/dts/stm32429i-eval.dts               |   19 +
+ arch/arm/boot/dts/stm32f429-disco.dts              |   13 +
+ arch/arm/boot/dts/stm32f429.dtsi                   |  110 ++
+ arch/arm/configs/stm32_defconfig                   |    1 +
+ drivers/pinctrl/Kconfig                            |    1 +
+ drivers/pinctrl/Makefile                           |    1 +
+ drivers/pinctrl/stm32/Kconfig                      |   16 +
+ drivers/pinctrl/stm32/Makefile                     |    5 +
+ drivers/pinctrl/stm32/pinctrl-stm32.c              |  832 ++++++++++
+ drivers/pinctrl/stm32/pinctrl-stm32.h              |   51 +
+ drivers/pinctrl/stm32/pinctrl-stm32f429.c          | 1598 ++++++++++++++++++++
+ include/dt-bindings/pinctrl/stm32f429-pinfunc.h    | 1239 +++++++++++++++
+ 14 files changed, 4018 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
+ create mode 100644 drivers/pinctrl/stm32/Kconfig
+ create mode 100644 drivers/pinctrl/stm32/Makefile
+ create mode 100644 drivers/pinctrl/stm32/pinctrl-stm32.c
+ create mode 100644 drivers/pinctrl/stm32/pinctrl-stm32.h
+ create mode 100644 drivers/pinctrl/stm32/pinctrl-stm32f429.c
+ create mode 100644 include/dt-bindings/pinctrl/stm32f429-pinfunc.h
+
 -- 
 1.9.1
