@@ -1,55 +1,32 @@
-From: julian.calaby@gmail.com (Julian Calaby)
-Date: Wed, 3 Feb 2016 11:19:52 +1100
-Subject: [linux-sunxi] [PATCH 01/11] MAINTAINERS: Add entry for X-Powers
- AXP family PMIC drivers
-In-Reply-To: <1454408864-24112-2-git-send-email-wens@csie.org>
-References: <1454408864-24112-1-git-send-email-wens@csie.org>
- <1454408864-24112-2-git-send-email-wens@csie.org>
-Message-ID: <CAGRGNgVxan9RCsLFW9hHWcdW+Rd_SgVG95H-yQg213g-YeE6Ug@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 2 Feb 2016 19:20:58 -0500 (EST)
+Subject: [PATCH 1/3] ARM: move .vectors and .stubs sections back into
+ the kernel VMA
+In-Reply-To: <20160203000351.GX10826@n2100.arm.linux.org.uk>
+References: <1454419174-21290-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1454419174-21290-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20160203000351.GX10826@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.20.1602021918050.32766@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chen-Yu,
+On Wed, 3 Feb 2016, Russell King - ARM Linux wrote:
 
-On Tue, Feb 2, 2016 at 9:27 PM, Chen-Yu Tsai <wens@csie.org> wrote:
-> Add an entry for X-Powers AXP family PMIC drivers and list myself
-> as maintainer.
->
-> Cc: Carlo Caione <carlo@caione.org>
-> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Cc: Ramakrishna Pallala <ramakrishna.pallala@intel.com>
-> Cc: Todd Brandt <todd.e.brandt@linux.intel.com>
-> Cc: Jacob Pan <jacob.jun.pan@linux.intel.com>
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  MAINTAINERS | 6 ++++++
->  1 file changed, 6 insertions(+)
->
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index f678c37107f5..7ea4e54f566a 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -11941,6 +11941,12 @@ F:     include/linux/workqueue.h
->  F:     kernel/workqueue.c
->  F:     Documentation/workqueue.txt
->
-> +X-POWERS MULTIFUNCTION PMIC DEVICE DRIVERS
-> +M:     Chen-Yu Tsai <wens@csie.org>
-> +L:     linux-kernel at vger.kernel.org
-> +S:     Maintained
-> +N:     axp[128]
+> On Tue, Feb 02, 2016 at 02:19:32PM +0100, Ard Biesheuvel wrote:
+> > The sections themselves are emitted 4 KB apart, as required:
+> >   ...
+> >   [16] .stubs       PROGBITS   c0c35000 a35000 0002c0 00  AX  0   0 32
+> >   [17] .vectors     PROGBITS   c0c34000 a44000 000020 00  AX  0   0  2
+> >   ...
+> 
+> ... which means we end up wasting most of a page for absolutely no
+> purpose what so ever.  Sorry, I'm really not happy about this
+> gratuitous wastage.
 
-Should you list the files maintained and this list also?
+In practice this shouldn't make much of a difference given zImage is 
+compressed and large zero filled areas compress very well.
 
-> +
->  X.25 NETWORK LAYER
->  M:     Andrew Hendry <andrew.hendry@gmail.com>
->  L:     linux-x25 at vger.kernel.org
+But this is not nice for XIP though.
 
-Thanks,
 
--- 
-Julian Calaby
-
-Email: julian.calaby at gmail.com
-Profile: http://www.google.com/profiles/julian.calaby/
+Nicolas
