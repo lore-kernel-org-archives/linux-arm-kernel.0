@@ -1,75 +1,78 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 03 Feb 2016 17:56:56 +0100
-Subject: [PATCH 01/10] serial: mvebu-uart: initial support for Armada-3700
- serial port
-In-Reply-To: <20160202182842.GD29778@leverpostej> (Mark Rutland's message of
- "Tue, 2 Feb 2016 18:28:42 +0000")
-References: <1454436468-4241-1-git-send-email-gregory.clement@free-electrons.com>
- <1454436468-4241-2-git-send-email-gregory.clement@free-electrons.com>
- <20160202182842.GD29778@leverpostej>
-Message-ID: <87egct4trb.fsf@free-electrons.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Wed,  3 Feb 2016 16:56:51 +0000
+Subject: [PATCH] KVM: arm/arm64: fix reference to uninitialised VGIC
+Message-ID: <1454518611-15694-1-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Commit 4b4b4512da2a ("arm/arm64: KVM: Rework the arch timer to use
+level-triggered semantics") brought the virtual architected timer
+closer to the VGIC. There is one occasion were we don't properly
+check for the VGIC actually having been initialized before, but
+instead go on to check the active state of some IRQ number.
+If userland hasn't instantiated a virtual GIC, we end up with a
+kernel NULL pointer dereference:
+=========
+Unable to handle kernel NULL pointer dereference at virtual address 00000000
+pgd = ffffffc9745c5000
+[00000000] *pgd=00000009f631e003, *pud=00000009f631e003, *pmd=0000000000000000
+Internal error: Oops: 96000006 [#2] PREEMPT SMP
+Modules linked in:
+CPU: 0 PID: 2144 Comm: kvm_simplest-ar Tainted: G      D 4.5.0-rc2+ #1300
+Hardware name: ARM Juno development board (r1) (DT)
+task: ffffffc976da8000 ti: ffffffc976e28000 task.ti: ffffffc976e28000
+PC is at vgic_bitmap_get_irq_val+0x78/0x90
+LR is at kvm_vgic_map_is_active+0xac/0xc8
+pc : [<ffffffc0000b7e28>] lr : [<ffffffc0000b972c>] pstate: 20000145
+....
+=========
+
+Fix this by bailing out early of kvm_timer_flush_hwstate() if we don't
+have a VGIC at all.
+
+Reported-by: Cosmin Gorgovan <cosmin@linux-geek.org>
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Cc: <stable@vger.kernel.org> # 4.4.x
+---
+ virt/kvm/arm/arch_timer.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 69bca18..ea60646 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -143,7 +143,7 @@ static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level)
+  * Check if there was a change in the timer state (should we raise or lower
+  * the line level to the GIC).
+  */
+-static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
++static int kvm_timer_update_state(struct kvm_vcpu *vcpu)
+ {
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
  
- On mar., f?vr. 02 2016, Mark Rutland <mark.rutland@arm.com> wrote:
-
->> diff --git a/Documentation/devicetree/bindings/tty/serial/mvebu-uart.txt b/Documentation/devicetree/bindings/tty/serial/mvebu-uart.txt
->> new file mode 100644
->> index 000000000000..6087defd9f93
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/tty/serial/mvebu-uart.txt
->> @@ -0,0 +1,13 @@
->> +* Marvell UART : Non standard UART used in some of Marvell EBU SoCs (e.g., Armada-3700)
->> +
->> +Required properties:
->> +- compatible: "marvell,armada-3700-uart"
->> +- reg: offset and length of the register set for the device.
->> +- interrupts: device interrupt
->> +
->> +Example:
->> +	serial at 12000 {
->> +		compatible = "marvell,armada-3700-uart";
->> +		reg = <0x12000 0x400>;
->> +		interrupts = <43>;
->> +	};
->
-> There are no external clock inputs?
-
-Right, even if we don't use it in the driver we should ad it in the
-binding because there is an external clock input.
-
->
->> diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
->> index 87d40a72f6a1..198f6bd56e84 100644
->> --- a/Documentation/kernel-parameters.txt
->> +++ b/Documentation/kernel-parameters.txt
->> @@ -1058,6 +1058,12 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
->>  			A valid base address must be provided, and the serial
->>  			port must already be setup and configured.
->>  
->> +		mvebu_uart,<addr>
->> +			Start an early, polled-mode console on an some mvebu
->> +			SoC (as the Armada-3700) serial port at the specified
->> +			address. The serial port must already be setup and
->> +			configured. Options are not yet supported.
->> +
->
-> Does the the mvebu UART vary between platforms at all?
-
-I am not sure to undersatnd your question.
-
-If you asked about the UART used on the other mvebu SoCs then my answer
-is: on all the other mvebu SoC until now third party IPs were used. This
-one is the first one dedicated to an mevbu SoC and currently only used
-on Armada 3700 but I don't know what are the plan for the future mvebu
-SoCs.
-
-Gregory
-
+@@ -154,10 +154,12 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
+ 	 * until we call this function from kvm_timer_flush_hwstate.
+ 	 */
+ 	if (!vgic_initialized(vcpu->kvm))
+-	    return;
++		return -ENODEV;
+ 
+ 	if (kvm_timer_should_fire(vcpu) != timer->irq.level)
+ 		kvm_timer_update_irq(vcpu, !timer->irq.level);
++
++	return 0;
+ }
+ 
+ /*
+@@ -218,7 +220,8 @@ void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
+ 	bool phys_active;
+ 	int ret;
+ 
+-	kvm_timer_update_state(vcpu);
++	if (kvm_timer_update_state(vcpu))
++		return;
+ 
+ 	/*
+ 	* If we enter the guest with the virtual input level to the VGIC
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.6.4
