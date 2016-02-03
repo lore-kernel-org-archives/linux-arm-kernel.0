@@ -1,36 +1,37 @@
-From: mranostay@gmail.com (Matt Ranostay)
-Date: Tue, 2 Feb 2016 23:55:58 -0800
-Subject: [PATCH] iio: chemical: select IRQ_WORK for ATLAS ph sensor
-In-Reply-To: <5127664.OXcBoKUPQO@wuerfel>
-References: <5127664.OXcBoKUPQO@wuerfel>
-Message-ID: <CAKzfze8b7Q4ZHyXW=wq4K2ETFoMrfERpTci2dSAzSgCCrWpnzg@mail.gmail.com>
+From: k@japko.eu (Krzysztof Adamski)
+Date: Wed, 3 Feb 2016 08:57:14 +0100
+Subject: [PATCH v2] pinctrl: sunxi: H3 requires irq_read_needs_mux
+Message-ID: <20160203075713.GA23312@box2.japko.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reviewed-by: Matt Ranostay <mranostay@gmail.com>
+It seems that on H3, just like on A10, when GPIOs are configured as
+external interrupt data registers does not contain their value.  When
+value is read, GPIO function must be temporary switched to input for
+reads.
 
-On Tue, Feb 2, 2016 at 6:36 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> The newly added atlas-ph-sensor driver uses irq_work_queue, which
-> may not always be enabled:
->
-> ERROR: "irq_work_queue" [drivers/iio/chemical/atlas-ph-sensor.ko] undefined!
->
-> This adds a 'select' statement to Kconfig to ensure it's there
-> when we need it.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 27dec00ecf2d ("iio: chemical: add Atlas pH-SM sensor support")
->
-> diff --git a/drivers/iio/chemical/Kconfig b/drivers/iio/chemical/Kconfig
-> index ce7cd1370f74..f73290f84c90 100644
-> --- a/drivers/iio/chemical/Kconfig
-> +++ b/drivers/iio/chemical/Kconfig
-> @@ -10,6 +10,7 @@ config ATLAS_PH_SENSOR
->         select REGMAP_I2C
->         select IIO_BUFFER
->         select IIO_TRIGGERED_BUFFER
-> +       select IRQ_WORK
->         help
->          Say Y here to build I2C interface support for the Atlas
->          Scientific OEM pH-SM sensor.
->
+Signed-off-by: Krzysztof Adamski <k@japko.eu>
+---
+
+Changes compared to v1:
+- None, but the patch was sent with wrong "From:", if you want to apply 
+  it, please apply this one. Sorry for confusion.
+
+
+ drivers/pinctrl/sunxi/pinctrl-sun8i-h3.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sun8i-h3.c b/drivers/pinctrl/sunxi/pinctrl-sun8i-h3.c
+index 77d4cf0..11760bb 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sun8i-h3.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sun8i-h3.c
+@@ -492,6 +492,7 @@ static const struct sunxi_pinctrl_desc sun8i_h3_pinctrl_data = {
+ 	.pins = sun8i_h3_pins,
+ 	.npins = ARRAY_SIZE(sun8i_h3_pins),
+ 	.irq_banks = 2,
++	.irq_read_needs_mux = true
+ };
+ 
+ static int sun8i_h3_pinctrl_probe(struct platform_device *pdev)
+-- 
+2.4.2
