@@ -1,176 +1,99 @@
-From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
-Date: Wed, 3 Feb 2016 15:40:21 +0000
-Subject: [PATCH V2 5/5] Microblaze: Modifying microblaze PCI subsytem to
- support  generic Xilinx  AXI PCIe Host Bridge IP driver
-In-Reply-To: <1452620173-4905-6-git-send-email-bharatku@xilinx.com>
-References: <1452620173-4905-1-git-send-email-bharatku@xilinx.com>
- <1452620173-4905-6-git-send-email-bharatku@xilinx.com>
-Message-ID: <8520D5D51A55D047800579B0941471982587F02E@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: vitalya@ti.com (Vitaly Andrianov)
+Date: Wed, 3 Feb 2016 10:43:23 -0500
+Subject: [PATCH 1/2] ARM: make virt_to_idmap() return unsigned long
+In-Reply-To: <56B20B2E.7060408@ti.com>
+References: <E1aO8F2-00074N-E8@rmk-PC.arm.linux.org.uk>
+ <56A84748.3040108@oracle.com> <20160201152015.GU10826@n2100.arm.linux.org.uk>
+ <56AF8F54.7030805@ti.com> <56AF917F.9030505@oracle.com>
+ <56B14546.4070808@oracle.com> <56B20B2E.7060408@ti.com>
+Message-ID: <56B2201B.7020205@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping
- 
-> This patch does required modifications to microblaze PCI subsystem, to
-> work with generic driver (drivers/pci/host/pcie-xilinx.c) on Microblaze
-> and Zynq.
-> 
-> Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
-> Signed-off-by: Ravi Kiran Gummaluri <rgummal@xilinx.com>
-> ---
-> Changes:
-> Modified pcibios_fixup_bus in pci-common.c, as per generic architecuture.
-> Modified pcibios_align_resource in pci-common.c, as per generic
-> architecuture.
-> Modified pcibios_get_phb_of_node function in pci-common.c, to remove
-> dependency on struct pci_controller.
-> Removed pci_domain_nr in pci-common.c, instead using generic code.
-> Added pcibios_add_device in pci-common.c, as per generic architecuture.
-> Adding Kernel configuration in arch/microblaze as required for generic PCI
-> domains.
-> Added kernel configuration for driver to support Microblaze.
-> ---
->  arch/microblaze/Kconfig          |  3 ++
->  arch/microblaze/pci/pci-common.c | 61 +++++++++++++++--------------------
-> -----
->  drivers/pci/host/Kconfig         |  2 +-
->  3 files changed, 27 insertions(+), 39 deletions(-)
-> 
-> diff --git a/arch/microblaze/Kconfig b/arch/microblaze/Kconfig
-> index 0bce820..c3702b9 100644
-> --- a/arch/microblaze/Kconfig
-> +++ b/arch/microblaze/Kconfig
-> @@ -271,6 +271,9 @@ config PCI
->  config PCI_DOMAINS
->  	def_bool PCI
-> 
-> +config PCI_DOMAINS_GENERIC
-> +	def_bool PCI_DOMAINS
-> +
->  config PCI_SYSCALL
->  	def_bool PCI
-> 
-> diff --git a/arch/microblaze/pci/pci-common.c b/arch/microblaze/pci/pci-
-> common.c
-> index ae838ed..bc72856 100644
-> --- a/arch/microblaze/pci/pci-common.c
-> +++ b/arch/microblaze/pci/pci-common.c
-> @@ -123,17 +123,6 @@ unsigned long pci_address_to_pio(phys_addr_t
-> address)
->  }
->  EXPORT_SYMBOL_GPL(pci_address_to_pio);
-> 
-> -/*
-> - * Return the domain number for this bus.
-> - */
-> -int pci_domain_nr(struct pci_bus *bus)
-> -{
-> -	struct pci_controller *hose = pci_bus_to_host(bus);
-> -
-> -	return hose->global_number;
-> -}
-> -EXPORT_SYMBOL(pci_domain_nr);
-> -
->  /* This routine is meant to be used early during boot, when the
->   * PCI bus numbers have not yet been assigned, and you need to
->   * issue PCI config cycles to an OF device.
-> @@ -863,26 +852,10 @@ void pcibios_setup_bus_devices(struct pci_bus
-> *bus)
-> 
->  void pcibios_fixup_bus(struct pci_bus *bus)
->  {
-> -	/* When called from the generic PCI probe, read PCI<->PCI bridge
-> -	 * bases. This is -not- called when generating the PCI tree from
-> -	 * the OF device-tree.
-> -	 */
-> -	if (bus->self != NULL)
-> -		pci_read_bridge_bases(bus);
-> -
-> -	/* Now fixup the bus bus */
-> -	pcibios_setup_bus_self(bus);
-> -
-> -	/* Now fixup devices on that bus */
-> -	pcibios_setup_bus_devices(bus);
-> +	/* nothing to do */
->  }
->  EXPORT_SYMBOL(pcibios_fixup_bus);
-> 
-> -static int skip_isa_ioresource_align(struct pci_dev *dev)
-> -{
-> -	return 0;
-> -}
-> -
->  /*
->   * We need to avoid collisions with `mirrored' VGA ports
->   * and other strange ISA hardware, so we always want the
-> @@ -899,20 +872,20 @@ static int skip_isa_ioresource_align(struct pci_dev
-> *dev)
->  resource_size_t pcibios_align_resource(void *data, const struct resource
-> *res,
->  				resource_size_t size, resource_size_t align)
->  {
-> -	struct pci_dev *dev = data;
->  	resource_size_t start = res->start;
-> 
-> -	if (res->flags & IORESOURCE_IO) {
-> -		if (skip_isa_ioresource_align(dev))
-> -			return start;
-> -		if (start & 0x300)
-> -			start = (start + 0x3ff) & ~0x3ff;
-> -	}
-> -
->  	return start;
->  }
->  EXPORT_SYMBOL(pcibios_align_resource);
-> 
-> +int pcibios_add_device(struct pci_dev *dev)
-> +{
-> +	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL(pcibios_add_device);
-> +
->  /*
->   * Reparent resource children of pr that conflict with res
->   * under res, and make res replace those children.
-> @@ -1335,9 +1308,21 @@ static void pcibios_setup_phb_resources(struct
-> pci_controller *hose,
-> 
->  struct device_node *pcibios_get_phb_of_node(struct pci_bus *bus)
->  {
-> -	struct pci_controller *hose = bus->sysdata;
-> +	struct device_node *np;
-> +
-> +	for_each_node_by_type(np, "pci") {
-> +		const void *prop;
-> +		unsigned int bus_min;
-> +
-> +		prop = of_get_property(np, "bus-range", NULL);
-> +		if (!prop)
-> +			continue;
-> +		bus_min = be32_to_cpup(prop);
-> +		if (bus->number == bus_min)
-> +			return np;
-> +	}
-> 
-> -	return of_node_get(hose->dn);
-> +	return NULL;
->  }
-> 
->  static void pcibios_scan_phb(struct pci_controller *hose)
-> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-> index d5e58ba..7c56c2e 100644
-> --- a/drivers/pci/host/Kconfig
-> +++ b/drivers/pci/host/Kconfig
-> @@ -79,7 +79,7 @@ config PCI_KEYSTONE
-> 
->  config PCIE_XILINX
->  	bool "Xilinx AXI PCIe host bridge support"
-> -	depends on ARCH_ZYNQ
-> +	depends on ARCH_ZYNQ || MICROBLAZE
->  	help
->  	  Say 'Y' here if you want kernel to support the Xilinx AXI PCIe
->  	  Host Bridge driver.
-> --
-> 2.1.1
+
+
+On 02/03/2016 09:14 AM, Grygorii Strashko wrote:
+> On 02/03/2016 02:09 AM, santosh shilimkar wrote:
+>> Vitaly,
+>>
+>> On 2/1/2016 9:10 AM, santosh shilimkar wrote:
+>>> On 2/1/2016 9:01 AM, Vitaly Andrianov wrote:
+>>>>
+>>>>
+>>>> On 02/01/2016 10:20 AM, Russell King - ARM Linux wrote:
+>>>>> On Tue, Jan 26, 2016 at 08:27:52PM -0800, santosh.shilimkar at oracle.com
+>>>>> wrote:
+>>>>>> On 1/26/16 10:21 AM, Russell King wrote:
+>>>>>>> Make virt_to_idmap() return an unsigned long rather than phys_addr_t.
+>>>>>>>
+>>>>>>> Returning phys_addr_t here makes no sense, because the definition of
+>>>>>>> virt_to_idmap() is that it shall return a physical address which maps
+>>>>>>> identically with the virtual address.  Since virtual addresses are
+>>>>>>> limited to 32-bit, identity mapped physical addresses are as well.
+>>>>>>>
+>>>>>>> Almost all users already had an implicit narrowing cast to unsigned
+>>>>>>> long
+>>>>>>> so let's make this official and part of this interface.
+>>>>>>>
+>>>>>>> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+>>>>>>> ---
+>>>>>> Looks correct to me.
+>>>>>>
+>>>>>> Vitaly,
+>>>>>> Could you please try out this patch and see everything continue to
+>>>>>> work ?
+>>>>>
+>>>>> I haven't heard anything yet...  Vitaly?
+>>>>>
+>>>> Russel, Santosh,
+>>>>
+>>>> I'm not working with the latest kernel, but with the stable v4.1.y. So I
+>>>> couldn't apply the patch to it. I checked out 4.5.0-rc1 and applied the
+>>>> patch to it. Tried to boot and it crashed. I'm not sure either because
+>>>> of the patch or because of the network driver.
+>>>>
+>>> Thanks for checking.
+>>>
+>>>> Here is the log:
+>>>>
+>>> Based on the log, I think the patch seems to work fine since the boot
+>>> reached upto rootfs. The crash seems to be coming from mostky NetCP
+>>> related compents.
+>>>
+>> The NETCP crash you saw could be the same one others stumbled as
+>> mentioned in below thread. You can try the fix and see if the
+>> crash goes away.
+>>
+>> http://marc.info/?l=linux-netdev&m=145445399232540&w=2
+>
+> 100%. I came up with absolutely similar fix.
+>
+>
+> Regarding, kexec:
+> - it seems can't be tested on ks2 out of the box, because there is unmet dependency in kconfig
+>   config KEXEC
+>          bool "Kexec system call (EXPERIMENTAL)"
+> -       depends on (!SMP || PM_SLEEP_SMP)
+>          depends on !CPU_V7M
+>          select KEXEC_CORE
+>          help
+>
+> - any way, i've hacked kernel as above;
+> - downloaded and built kexec-tools
+> git://git.kernel.org/pub/scm/linux/kernel/git/geoff/kexec-tools.git
+> - tried to run it using different combination of parameters, but always
+> with below result:
+> # kexec -l /boot/zImage
+> kexec version: 15.12.22.16.38-g6503cb3
+> Could not find a free area of memory of 0x3b2ca0 bytes...
+> Cannot load /boot/zImage
+>
+> I'm doing something wrong, but don't know what yet :(
+> - these patches were not applied, I'd like to see kexec not working first
+>
+>
+I'm not sure about that particular issue, but when I worked on KS2 kexec 
+I had to patch kexec-tools to support KS2 LPAE memory.
+
+Regards,
+Vitaly
