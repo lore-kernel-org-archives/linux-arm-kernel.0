@@ -1,148 +1,59 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed,  3 Feb 2016 11:39:10 -0700
-Subject: [PATCH V9 12/18] coresight: etm3x: implementing user/kernel mode
- tracing
-In-Reply-To: <1454524756-10628-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1454524756-10628-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1454524756-10628-13-git-send-email-mathieu.poirier@linaro.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed,  3 Feb 2016 19:41:21 +0100
+Subject: [PATCH v2 04/12] ata: ahci_mvebu: add support for Armada 3700 variant
+In-Reply-To: <1454524889-9207-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1454524889-9207-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1454524889-9207-5-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding new mode to limit tracing to kernel or user space.
+From: Lior Amsalem <alior@marvell.com>
 
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+The main difference in the new Armada 3700 is that no address
+decoding needs to take place in the driver probe.
+
+[gregory.clement at free-electrons.com: reformulate the commit log]
+
+Signed-off-by: Lior Amsalem <alior@marvell.com>
+Reviewed-by: Nadav Haklai <nadavh@marvell.com>
+Tested-by: Nadav Haklai <nadavh@marvell.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/hwtracing/coresight/coresight-etm.h        |  6 ++-
- .../hwtracing/coresight/coresight-etm3x-sysfs.c    |  4 ++
- drivers/hwtracing/coresight/coresight-etm3x.c      | 63 ++++++++++++++++++++++
- drivers/hwtracing/coresight/coresight-priv.h       |  3 ++
- 4 files changed, 75 insertions(+), 1 deletion(-)
+ drivers/ata/ahci_mvebu.c | 14 +++++++++-----
+ 1 file changed, 9 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm.h b/drivers/hwtracing/coresight/coresight-etm.h
-index 44585d4adb26..51597cb2c08a 100644
---- a/drivers/hwtracing/coresight/coresight-etm.h
-+++ b/drivers/hwtracing/coresight/coresight-etm.h
-@@ -110,7 +110,10 @@
- #define ETM_MODE_STALL		BIT(2)
- #define ETM_MODE_TIMESTAMP	BIT(3)
- #define ETM_MODE_CTXID		BIT(4)
--#define ETM_MODE_ALL		0x1f
-+#define ETM_MODE_ALL		(ETM_MODE_EXCLUDE | ETM_MODE_CYCACC | \
-+				 ETM_MODE_STALL | ETM_MODE_TIMESTAMP | \
-+				 ETM_MODE_CTXID | ETM_MODE_EXCL_KERN | \
-+				 ETM_MODE_EXCL_USER)
+diff --git a/drivers/ata/ahci_mvebu.c b/drivers/ata/ahci_mvebu.c
+index f7a7fa81740e..de7128d81e9c 100644
+--- a/drivers/ata/ahci_mvebu.c
++++ b/drivers/ata/ahci_mvebu.c
+@@ -112,12 +112,15 @@ static int ahci_mvebu_probe(struct platform_device *pdev)
+ 	if (rc)
+ 		return rc;
  
- #define ETM_SQR_MASK		0x3
- #define ETM_TRACEID_MASK	0x3f
-@@ -296,5 +299,6 @@ static inline unsigned int etm_readl(struct etm_drvdata *drvdata, u32 off)
- extern const struct attribute_group *coresight_etm_groups[];
- int etm_get_trace_id(struct etm_drvdata *drvdata);
- void etm_set_default(struct etm_config *config);
-+void etm_config_trace_mode(struct etm_config *config);
- struct etm_config *get_etm_config(struct etm_drvdata *drvdata);
- #endif
-diff --git a/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c b/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
-index 387c79fd9d5e..cbb4046c1070 100644
---- a/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
-+++ b/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
-@@ -162,6 +162,10 @@ static ssize_t mode_store(struct device *dev,
- 		config->ctrl |= ETMCR_CTXID_SIZE;
- 	else
- 		config->ctrl &= ~ETMCR_CTXID_SIZE;
-+
-+	if (config->mode & (ETM_MODE_EXCL_KERN | ETM_MODE_EXCL_USER))
-+		etm_config_trace_mode(config);
-+
- 	spin_unlock(&drvdata->spinlock);
+-	dram = mv_mbus_dram_info();
+-	if (!dram)
+-		return -ENODEV;
++	if (of_device_is_compatible(pdev->dev.of_node,
++				    "marvell,armada-380-ahci")) {
++		dram = mv_mbus_dram_info();
++		if (!dram)
++			return -ENODEV;
  
- 	return size;
-diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
-index 34a69583ccbc..c82d545e68ef 100644
---- a/drivers/hwtracing/coresight/coresight-etm3x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm3x.c
-@@ -234,6 +234,69 @@ void etm_set_default(struct etm_config *config)
- 	config->ctxid_mask = 0x0;
- }
- 
-+void etm_config_trace_mode(struct etm_config *config)
-+{
-+	u32 flags, mode;
-+
-+	mode = config->mode;
-+
-+	mode &= (ETM_MODE_EXCL_KERN | ETM_MODE_EXCL_USER);
-+
-+	/* excluding kernel AND user space doesn't make sense */
-+	if (mode == (ETM_MODE_EXCL_KERN | ETM_MODE_EXCL_USER))
-+		return;
-+
-+	/* nothing to do if neither flags are set */
-+	if (!(mode & ETM_MODE_EXCL_KERN) && !(mode & ETM_MODE_EXCL_USER))
-+		return;
-+
-+	flags = (1 << 0 |	/* instruction execute */
-+		 3 << 3 |	/* ARM instruction */
-+		 0 << 5 |	/* No data value comparison */
-+		 0 << 7 |	/* No exact mach */
-+		 0 << 8);	/* Ignore context ID */
-+
-+	/* No need to worry about single address comparators. */
-+	config->enable_ctrl2 = 0x0;
-+
-+	/* Bit 0 is address range comparator 1 */
-+	config->enable_ctrl1 = ETMTECR1_ADDR_COMP_1;
-+
-+	/*
-+	 * On ETMv3.5:
-+	 * ETMACTRn[13,11] == Non-secure state comparison control
-+	 * ETMACTRn[12,10] == Secure state comparison control
-+	 *
-+	 * b00 == Match in all modes in this state
-+	 * b01 == Do not match in any more in this state
-+	 * b10 == Match in all modes excepts user mode in this state
-+	 * b11 == Match only in user mode in this state
-+	 */
-+
-+	/* Tracing in secure mode is not supported at this time */
-+	flags |= (0 << 12 | 1 << 10);
-+
-+	if (mode & ETM_MODE_EXCL_USER) {
-+		/* exclude user, match all modes except user mode */
-+		flags |= (1 << 13 | 0 << 11);
-+	} else {
-+		/* exclude kernel, match only in user mode */
-+		flags |= (1 << 13 | 1 << 11);
+-	ahci_mvebu_mbus_config(hpriv, dram);
+-	ahci_mvebu_regret_option(hpriv);
++		ahci_mvebu_mbus_config(hpriv, dram);
++		ahci_mvebu_regret_option(hpriv);
 +	}
-+
-+	/*
-+	 * The ETMEEVR register is already set to "hard wire A".  As such
-+	 * all there is to do is setup an address comparator that spans
-+	 * the entire address range and configure the state and mode bits.
-+	 */
-+	config->addr_val[0] = (u32) 0x0;
-+	config->addr_val[1] = (u32) ~0x0;
-+	config->addr_acctype[0] = flags;
-+	config->addr_acctype[1] = flags;
-+	config->addr_type[0] = ETM_ADDR_TYPE_RANGE;
-+	config->addr_type[1] = ETM_ADDR_TYPE_RANGE;
-+}
-+
- static void etm_enable_hw(void *info)
- {
- 	int i;
-diff --git a/drivers/hwtracing/coresight/coresight-priv.h b/drivers/hwtracing/coresight/coresight-priv.h
-index ed116b303e87..932f34a84d96 100644
---- a/drivers/hwtracing/coresight/coresight-priv.h
-+++ b/drivers/hwtracing/coresight/coresight-priv.h
-@@ -34,6 +34,9 @@
- #define TIMEOUT_US		100
- #define BMVAL(val, lsb, msb)	((val & GENMASK(msb, lsb)) >> lsb)
  
-+#define ETM_MODE_EXCL_KERN	BIT(30)
-+#define ETM_MODE_EXCL_USER	BIT(31)
-+
- enum cs_mode {
- 	CS_MODE_DISABLED,
- 	CS_MODE_SYSFS,
+ 	rc = ahci_platform_init_host(pdev, hpriv, &ahci_mvebu_port_info,
+ 				     &ahci_platform_sht);
+@@ -133,6 +136,7 @@ disable_resources:
+ 
+ static const struct of_device_id ahci_mvebu_of_match[] = {
+ 	{ .compatible = "marvell,armada-380-ahci", },
++	{ .compatible = "marvell,armada-3700-ahci", },
+ 	{ },
+ };
+ MODULE_DEVICE_TABLE(of, ahci_mvebu_of_match);
 -- 
-2.1.4
+2.5.0
