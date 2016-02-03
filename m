@@ -1,47 +1,40 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 3 Feb 2016 14:23:00 -0600
-Subject: [PATCH v2 08/12] devicetree: bindings: add DT binding for the
- Marvell Armada 3700 SoC family
-In-Reply-To: <1454524889-9207-9-git-send-email-gregory.clement@free-electrons.com>
-References: <1454524889-9207-1-git-send-email-gregory.clement@free-electrons.com>
- <1454524889-9207-9-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <CAL_JsqJ8tY-XNo7LcP82LB5ywK_41fQzDqcyFOca2MXhu+Gw2A@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 3 Feb 2016 15:23:52 -0500 (EST)
+Subject: [PATCH 0/3] kallsyms: remove special handling for CONFIG_ARM
+In-Reply-To: <CAKv+Gu_MyPvDnnQ0hScqW6XR77h0MD6LxEb_q2Z-mS0AQw3djA@mail.gmail.com>
+References: <1454419174-21290-1-git-send-email-ard.biesheuvel@linaro.org>
+ <HKXPR06MB0565A2CFF95AD7C000F43E6A8ADF0@HKXPR06MB0565.apcprd06.prod.outlook.com>
+ <CAKv+Gu9VvskQ34w0niS+6AtF9hNcycfYDt_3Kp4T+WK8Vxf_dA@mail.gmail.com>
+ <HKXPR06MB05656F902E0E1FBBDBD713DC8AD00@HKXPR06MB0565.apcprd06.prod.outlook.com>
+ <CAKv+Gu8ZTHAqviveLMizRKPfeXwb6kcXi4cVQNYVYuPcVMgMeQ@mail.gmail.com>
+ <20160203200107.GD10826@n2100.arm.linux.org.uk>
+ <CAKv+Gu_MyPvDnnQ0hScqW6XR77h0MD6LxEb_q2Z-mS0AQw3djA@mail.gmail.com>
+Message-ID: <alpine.LFD.2.20.1602031522090.17825@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 3, 2016 at 12:41 PM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
-> The Marvell Armada 3700 is a family of ARMv8 CA53 SoCs. This commit
-> introduces the Device Tree binding that documents the top-level
-> compatible strings for Armada 3700 based platforms.
->
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  .../devicetree/bindings/arm/marvell/armada-37xx.txt      | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt
->
-> diff --git a/Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt b/Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt
-> new file mode 100644
-> index 000000000000..17e90e8b5f76
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt
-> @@ -0,0 +1,16 @@
-> +Marvell Armada 37xx Platforms Device Tree Bindings
-> +--------------------------------------------------
-> +
-> +Boards using a SoC of the Marvell Armada 37xx family must carry the
-> +following root node property:
-> +
-> + - compatible: must contain "marvell,armada3710"
-> +
-> +In addition, boards using the Marvell Armada 3720 SoC shall have the
-> +following property before the previous one:
-> +
-> + - compatible: must contain "marvell,armada3720"
-> +
-> +Example:
-> +
-> +compatible = "marvell,armada-3720-db", "marvell,armada3710", "marvell,armada3720";
+On Wed, 3 Feb 2016, Ard Biesheuvel wrote:
 
-The order is wrong?
+> On 3 February 2016 at 21:01, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Wed, Feb 03, 2016 at 02:41:29PM +0100, Ard Biesheuvel wrote:
+> >> > bf353edc T __stubs_start
+> >>
+> >> This is a global symbol
+> >>
+> >> > bf353edc T _etext
+> >> > bf353ee0 t __stubs_start
+> >>
+> >> This is a local symbol
+> >
+> > Stop this madness.  This gets you an immediate NAK on the patch set.
+> >
+> 
+> What madness? This does not change at all with my patches, these
+> duplicates already exist in the current code.
+
+That doesn't make it any better, and was cause for issue as Chris 
+demonstrated.  Can we get rid of that duplication please?
+
+
+Nicolas
