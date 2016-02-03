@@ -1,116 +1,208 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 3 Feb 2016 11:16:03 +0000
-Subject: [RFC PATCH] irq/mbigen:Fix the problem of IO remap for
- duplicated physical address in mbigen driver
-In-Reply-To: <56B16698.6050509@huawei.com>
-References: <1454327094-7848-1-git-send-email-majun258@huawei.com>
- <20160201115717.GD674@leverpostej> <56AF585E.6050005@huawei.com>
- <20160201132557.GG674@leverpostej> <56B08431.3000200@huawei.com>
- <20160202114340.GA28839@leverpostej> <56B16698.6050509@huawei.com>
-Message-ID: <20160203111602.GA1234@leverpostej>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Wed, 3 Feb 2016 12:16:53 +0100
+Subject: [PATCH linux-next v2 01/14] mtd: spi-nor: remove
+ micron_quad_enable()
+In-Reply-To: <A765B125120D1346A63912DDE6D8B6310BF57A75@NTXXIAMBX02.xacn.micron.com>
+References: <A765B125120D1346A63912DDE6D8B6310BF57A75@NTXXIAMBX02.xacn.micron.com>
+Message-ID: <56B1E1A5.9060902@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 03, 2016 at 10:31:52AM +0800, majun (F) wrote:
+Le 20/01/2016 06:13, Bean Huo ??? (beanhuo) a ?crit :
+>> Message-ID:
+>> 	<6177f7317fe11922e1d1b6dc4548afbaf0ccebdd.1452268345.git.cyrille.
+>> pitchen at atmel.com>
+>>
+>> Content-Type: text/plain
+>>
+>> This patch remove the micron_quad_enable() function which force the Quad
+>> SPI mode. However, once this mode is enabled, the Micron memory expect
+>> ALL
+>> commands to use the SPI 4-4-4 protocol. Hence a failure does occur when
+>> calling spi_nor_wait_till_ready() right after the update of the Enhanced
+>> Volatile Configuration Register (EVCR) in the micron_quad_enable() as
+>> the SPI controller driver is not aware about the protocol change.
+>> Since there is almost no performance increase using Fast Read 4-4-4
+>> commands instead of Fast Read 1-1-4 commands, we rather keep on using
+>> the
+>> Extended SPI mode than enabling the Quad SPI mode.
+>>
+>> Let's take the example of the pretty standard use of 8 dummy cycles during
+>> Fast Read operations on 64KB erase sectors:
+>>
+>> Fast Read 1-1-4 requires 8 cycles for the command, then 24 cycles for the
+>> 3byte address followed by 8 dummy clock cycles and finally 65536*2 cycles
+>> for the read data; so 131112 clock cycles.
+>>
+>> On the other hand the Fast Read 4-4-4 would require 2 cycles for the
+>> command, then 6 cycles for the 3byte address followed by 8 dummy clock
+>> cycles and finally 65536*2 cycles for the read data. So 131088 clock
+>> cycles. The theorical bandwidth increase is 0.0%.
+>>
+>> Now using Fast Read operations on 512byte pages:
+>> Fast Read 1-1-4 needs 8+24+8+(512*2) = 1064 clock cycles whereas Fast
+>> Read 4-4-4 would requires 2+6+8+(512*2) = 1040 clock cycles. Hence the
+>> theorical bandwidth increase is 2.3%.
+>> Consecutive reads for non sequential pages is not a relevant use case so
+>> The Quad SPI mode is not worth it.
+>>
+>> mtd_speedtest seems to confirm these figures.
+>>
+>> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+>> Fixes: 548cd3ab54da ("mtd: spi-nor: Add quad I/O support for Micron SPI
+>> NOR")
+>> ---
+>>  drivers/mtd/spi-nor/spi-nor.c | 46 +------------------------------------------
+>>  1 file changed, 1 insertion(+), 45 deletions(-)
+>>
+>> diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
+>> index ed0c19c558b5..3028c06547c1 100644
+>> --- a/drivers/mtd/spi-nor/spi-nor.c
+>> +++ b/drivers/mtd/spi-nor/spi-nor.c
+>> @@ -1100,45 +1100,6 @@ static int spansion_quad_enable(struct spi_nor
+>> *nor)
+>>  	return 0;
+>>  }
+>>
+>> -static int micron_quad_enable(struct spi_nor *nor)
+>> -{
+>> -	int ret;
+>> -	u8 val;
+>> -
+>> -	ret = nor->read_reg(nor, SPINOR_OP_RD_EVCR, &val, 1);
+>> -	if (ret < 0) {
+>> -		dev_err(nor->dev, "error %d reading EVCR\n", ret);
+>> -		return ret;
+>> -	}
+>> -
+>> -	write_enable(nor);
+>> -
+>> -	/* set EVCR, enable quad I/O */
+>> -	nor->cmd_buf[0] = val & ~EVCR_QUAD_EN_MICRON;
+>> -	ret = nor->write_reg(nor, SPINOR_OP_WD_EVCR, nor->cmd_buf, 1);
+>> -	if (ret < 0) {
+>> -		dev_err(nor->dev, "error while writing EVCR register\n");
+>> -		return ret;
+>> -	}
+>> -
+>> -	ret = spi_nor_wait_till_ready(nor);
+>> -	if (ret)
+>> -		return ret;
+>> -
+>> -	/* read EVCR and check it */
+>> -	ret = nor->read_reg(nor, SPINOR_OP_RD_EVCR, &val, 1);
+>> -	if (ret < 0) {
+>> -		dev_err(nor->dev, "error %d reading EVCR\n", ret);
+>> -		return ret;
+>> -	}
+>> -	if (val & EVCR_QUAD_EN_MICRON) {
+>> -		dev_err(nor->dev, "Micron EVCR Quad bit not clear\n");
+>> -		return -EINVAL;
+>> -	}
+>> -
+>> -	return 0;
+>> -}
+>> -
+>>  static int set_quad_mode(struct spi_nor *nor, const struct flash_info *info)
+>>  {
+>>  	int status;
+>> @@ -1152,12 +1113,7 @@ static int set_quad_mode(struct spi_nor *nor,
+>> const struct flash_info *info)
+>>  		}
+>>  		return status;
+>>  	case SNOR_MFR_MICRON:
+>> -		status = micron_quad_enable(nor);
+>> -		if (status) {
+>> -			dev_err(nor->dev, "Micron quad-read not enabled\n");
+>> -			return -EINVAL;
+>> -		}
+>> -		return status;
+>> +		return 0;
+>>  	default:
+>>  		status = spansion_quad_enable(nor);
+>>  		if (status) {
+>> --
+>> 1.8.2.2
+>>
+>>
+>>
+>>
 > 
+> Hi, Cyrlle
+> Micron_quad_enable() function is just for how to enable Micron spi nor Quad mode,
+> does not force to use SPI nor quad mode. if does not need SPI NOR quad mode,
+> why spi-nor.c need set_quad_mode(), according to your patch, this function also need to
+> be removed?
+> Another question, if there is user want to enable SPI nor quad mode, how to do?
 > 
-> ? 2016/2/2 19:43, Mark Rutland ??:
-> > On Tue, Feb 02, 2016 at 06:25:53PM +0800, majun (F) wrote:
-> >> To simplify the mbigen drvier,
-> >> I didn't use the whole mbigen module as a mbgien device, but use
-> >> the register collections(vector, trigger type,status etc.) corresponding
-> >> to a peripheral device as a mbigen device.
-> >> So, mbigen device is a logical conception or logical device.
-> > 
-> >>From the above, it sounds like the DT representation is not an accurate
-> > representation of the hardware. We should describe the _whole_ mbigen,
-> > not portions thereof. Trying to describe it piecemeal leads to problems
-> > like this one.
-> > 
-> > I don't understand the rationale for describing the mbigen as separate
-> > nodes. Above you mention that we "need to define a device node for each
-> > device", but I don't see why that's necessary. Why do you believe we
-> > need an mbigen node per client device?
-> > 
-> > As far as I can tell, we should be able to map an arbitrary
-> > interrupt-specifier to a particular MSI (complete with device id) within
-> > the mbigen driver. We just need to define the full set of MSIs the
-> > mbigen owns.
-> > 
-> 
-> mbigen device is a interrupt controller, it is also a ITS device for ITS module.
-> So, we need to register the each mbigen device to ITS with a unique ID.
-> Based on the current MSI/ITS driver, I can't register whole mbigen module which
-> contains several mbigen devices at one time. Because they have different device ID.
 
-I don't follow.
+Hi Bean,
 
-You can describe this by having a top-level mbigen node featuring a reg,
-with a sub-node for each mbigen module with an appropriate msi-parent,
-e.g.
+the set_quad_mode() function should not been removed from spi-nor.c as it is
+needed for both Macronix and Spansion memories.
+Indeed, what macronix_quad_enable() and spansion_quad_enable() do is to change
+a dedicated bit in some status/configuration register to enable Quad SPI
+operations. More precisely, this disables some features such as the Write
+Protection (Spansion & Macronix) or the Reset (Macronix) / Hold (Spansion) so
+the associated pins can be reassigned to IO2 and IO3 data lines... and that's
+all!
+What I mean is that once set_quad_mode() has been called, Macronix and Spansion
+memories still reply to commands such as Read Status Register in protocol
+SPI 1-1-1. Of course, they now also support Fast Read 1-1-4 (0x6b) or 1-4-4
+(0xeb).
+For Macronix memories, setting the Quad Enable bit in its Status Register is
+NOT the same as entering its QPI mode. In QPI mode, ALL commands are expected
+to use the SPI 4-4-4 protocol: this mode is not used by spi-nor.c
 
-mbigen {
-	reg = < ... ... >;
+Then going back to the Micron case, micron_quad_enable() makes the memory
+enter its Quad mode where ALL commands must use the SPI 4-4-4 protocol. So
+it is definitely not the same thing as what either macronix_quad_enable() or
+spansion_quad_enable() do.
 
-	#interrupt-cells = <2>;
+Also the current code of micron_quad_enable() is broken:
 
-	#address-cells = <1>; /* module index */
+[...]
+Here, the memory still expects the SPI 1-1-1 to be used by write_reg() or
+read_reg().
 
-	module at 0 {
-		reg = <0>;
-		msi-parent = <&its 0>;
-	};
+	/* set EVCR, enable quad I/O */
+	nor->cmd_buf[0] = val & ~EVCR_QUAD_EN_MICRON;
+	ret = nor->write_reg(nor, SPINOR_OP_WD_EVCR, nor->cmd_buf, 1);
+	if (ret < 0) {
+		dev_err(nor->dev, "error while writing EVCR register\n");
+		return ret;
+	}
 
-	module at 1 {
-		reg = <1>;
-		reg = <&its 1>;
-	};
-};
+However, once the Quad Enable bit has been cleared into the Enhanced Volatile
+Configuration Register, all commands must use the SPI 4-4-4 protocol.
+Especially, the later call of spi_nor_wait_till_ready(), which calls read_reg()
+to read the Status Register, will fail because the QSPI controller has to mean
+to know about the protocol switch hence keeps on sending the Read Status
+Register command with the wrong SPI 1-1-1 protocol.
+This is the issue I faced when using a Micron memory with the Atmel QSPI
+controller embedded in a sama5d2 SoC. Also for the same reason, users of the
+m25p80 driver won't be able to use Micron memories for QSPI operations too.
+
+	ret = spi_nor_wait_till_ready(nor);
+	if (ret)
+		return ret;
+[...]
+
+So in its current state, micron_quad_enable() prevents us from using Micron
+memories for Quad SPI operations. Some code is missing to make it work.
 
 
-That clearly does not require the reg to be duplicated, and encodes the
-information you want. The infrastructure for handling that might not
-exist yet, but that is a Linux issue that we can fix.
 
-Marc, thoughts?
+As I said in the patch description, using the SPI 4-4-4 protocol is not
+relevant for MTD usage. It would be worth for XIP operations but this is not the
+purpose of the spi-nor driver.
+Also, the series of patches still support the Micron Quad SPI mode: the spi-nor
+driver no longer enables this mode itself but it still can adapt itself whether
+the Quad SPI mode had already been enabled by a previous bootloader or at
+reset. This is the purpose of the patch focusing on Read JEDEC ID commands:
+it is used to probe the current state of the memory and use the SPI 4-4-4 if
+needed.
 
-I take it all interrupts within a module share the same device id?
+Best regards,
 
-> I don't know whether this explanation is clear or not.
-> I think Marc can explain this well.
-> 
-> Marc, would you please help me explain this?  or, do you have any opinion about this ?
-> 
-> >> Now, a mbigen hardware module contains several logical mbigen device.
-> >>
-> >> -------------------------------
-> >> |mgn_dev1  mgn_dev2  mgn_dev3 |
-> >> |-----------------------------|
-> >>    |          |        |
-> >> dev1	    dev2      dev3
-> >>
-> >> So,mgn_dev1, mgn_dev2 and mgn_dev3 exist in same mbigen hardware module,
-> >> and,they use the same reg address region,that is adress of mbigen hardware module.
-> >>
-> >> For this case, I think the question is can we map an reg address
-> >> region more than one time?
-> > 
-> > As above, I think we've mis-described the hardware. Rather than making
-> > things simpler, this has resulted in problems like this one.
-> > 
-> > We should not map a reg region more than once. Even if it's technically
-> > possible to do so, I do not believe that would be the right solution
-> > here. Implicitly sharing resources (e.g. portions of the mbigen control
-> > registers) is inevitably going to lead to more problems later on.
-> 
-> Because we only need to write 1 into corresponding bit of status
-> register to clear interrupt status during runtime,I think we don't
-> need to worry about this.
-
-That might be currently true, but I doubt that will remain true in
-future. Presumably there are other control registers in the mbigen which
-are shared between modules.
-
-I think we do need to worry about this.
-
-Mark.
+Cyrille
