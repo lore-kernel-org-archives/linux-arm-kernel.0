@@ -1,77 +1,91 @@
-From: zhang.chunyan@linaro.org (Chunyan Zhang)
-Date: Wed,  3 Feb 2016 16:15:36 +0800
-Subject: [PATCH V2 5/6] coresight-stm: Bindings for System Trace Macrocell
-In-Reply-To: <1454487337-30184-1-git-send-email-zhang.chunyan@linaro.org>
-References: <1454487337-30184-1-git-send-email-zhang.chunyan@linaro.org>
-Message-ID: <1454487337-30184-6-git-send-email-zhang.chunyan@linaro.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 3 Feb 2016 09:16:51 +0100
+Subject: [PATCH 3/3] kallsyms: remove --page-offset command line option
+In-Reply-To: <20160203000504.GY10826@n2100.arm.linux.org.uk>
+References: <1454419174-21290-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1454419174-21290-4-git-send-email-ard.biesheuvel@linaro.org>
+ <20160203000504.GY10826@n2100.arm.linux.org.uk>
+Message-ID: <CAKv+Gu8vzvX-6=+SgPwm2CUy_1Qpt-GHvzv=brQTs50i2Z=v9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mathieu Poirier <mathieu.poirier@linaro.org>
+(+ Uwe, Maxime)
 
-The System Trace Macrocell (STM) is an IP block falling under the
-CoreSight umbrella.  It's main purpose it so expose stimulus channels
-to any system component for the purpose of information logging.
+Complete thread here:
+http://thread.gmane.org/gmane.linux.ports.arm.kernel/474400
 
-Bindings for this IP block adds a couple of items to the current
-mandatory definition for CoreSight components.
+On 3 February 2016 at 01:05, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Feb 02, 2016 at 02:19:34PM +0100, Ard Biesheuvel wrote:
+>> The --page-offset command line option was only used for ARM, to filter
+>> symbol addresses below CONFIG_PAGE_OFFSET. This is no longer needed, so
+>> remove the functionality altogether.
+>
+> From what I remember, this option has nothing to do with MMU-ful ARM,
+> but noMMU ARM, where the .text segment can be significantly different
+> from the .data segment.
+>
+> I think you need to talk to noMMU people about this patch.
+>
 
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-Acked-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
----
- .../devicetree/bindings/arm/coresight.txt          | 28 ++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+We have
 
-diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
-index 62938eb..93147c0c 100644
---- a/Documentation/devicetree/bindings/arm/coresight.txt
-+++ b/Documentation/devicetree/bindings/arm/coresight.txt
-@@ -19,6 +19,7 @@ its hardware characteristcs.
- 		- "arm,coresight-etm3x", "arm,primecell";
- 		- "arm,coresight-etm4x", "arm,primecell";
- 		- "qcom,coresight-replicator1x", "arm,primecell";
-+		- "arm,coresight-stm", "arm,primecell"; [1]
- 
- 	* reg: physical base address and length of the register
- 	  set(s) of the component.
-@@ -36,6 +37,14 @@ its hardware characteristcs.
- 	  layout using the generic DT graph presentation found in
- 	  "bindings/graph.txt".
- 
-+* Additional required properties for System Trace Macrocells (STM):
-+	* reg: along with the physical base address and length of the register
-+	  set as described above, another entry is required to describe the
-+	  mapping of the extended stimulus port area.
-+
-+	* reg-names: the only acceptable values are "stm-base" and
-+	  "stm-stimulus-base", each corresponding to the areas defined in "reg".
-+
- * Required properties for devices that don't show up on the AMBA bus, such as
-   non-configurable replicators:
- 
-@@ -202,3 +211,22 @@ Example:
- 			};
- 		};
- 	};
-+
-+4. STM
-+	stm at 20100000 {
-+		compatible = "arm,coresight-stm", "arm,primecell";
-+		reg = <0 0x20100000 0 0x1000>,
-+		      <0 0x28000000 0 0x180000>;
-+		reg-names = "stm-base", "stm-stimulus-base";
-+
-+		clocks = <&soc_smc50mhz>;
-+		clock-names = "apb_pclk";
-+		port {
-+			stm_out_port: endpoint {
-+				remote-endpoint = <&main_funnel_in_port2>;
-+			};
-+		};
-+	};
-+
-+[1]. There is currently two version of STM: STM32 and STM500.  Both
-+have the same HW interface and as such don't need an explicit binding name.
--- 
-1.9.1
+commit f6537f2f0eba4eba3354e48dbe3047db6d8b6254
+Author: Ming Lei <tom.leiming@gmail.com>
+Date:   Sat Nov 2 09:11:33 2013 +1030
+
+    scripts/kallsyms: filter symbols not in kernel address space
+
+    This patch uses CONFIG_PAGE_OFFSET to filter symbols which
+    are not in kernel address space because these symbols are
+    generally for generating code purpose and can't be run at
+    kernel mode, so we needn't keep them in /proc/kallsyms.
+
+    For example, on ARM there are some symbols which may be
+    linked in relocatable code section, then perf can't parse
+    symbols any more from /proc/kallsyms, this patch fixes the
+    problem (introduced b9b32bf70f2fb710b07c94e13afbc729afe221da)
+
+which introduces the --page-offset option to kallsyms, in response to
+your patch that moves .vectors and .stubs to VMA 0x0. Then we have
+
+commit 7122c3e9154b5d9a7422f68f02d8acf050fad2b0
+Author: Ming Lei <tom.leiming@gmail.com>
+Date:   Tue Dec 10 16:46:29 2013 +1030
+
+    scripts/link-vmlinux.sh: only filter kernel symbols for arm
+
+    Actually CONFIG_PAGE_OFFSET isn't same with PAGE_OFFSET, so
+    it isn't easy to figue out PAGE_OFFSET defined in header
+    file from scripts.
+
+    Because CONFIG_PAGE_OFFSET may not be defined in some ARCHs(
+    64bit ARCH), or defined as bogus value in !MMU case, so
+    this patch only applys the filter on ARM when CONFIG_PAGE_OFFSET
+    is defined as the original problem is only on ARM.
+
+which restricts the use of --page-offset to CONFIG_ARM, and
+
+commit cc8475305203ddfd117b81e2e732194b67d8f310
+Author: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+Date:   Thu May 21 19:17:44 2015 +0800
+
+    scripts: link-vmlinux: Don't pass page offset to kallsyms if XIP Kernel
+
+    When Kernel is executed in place from ROM, the symbol addresses can be
+    lower than the page offset.
+
+which restricts the use of --page-offset to CONFIG_ARM && !CONFIG_XIP_KERNEL
+
+So it looks like the Dec 10 patch fixes some fallout related to !MMU
+that was caused by the Nov 2 patch, but the original patch has nothing
+to do with !MMU. Furthermore, 3 out of 4 !MMU configs we have in the
+tree (efm32, stm32 and vf610m4) are also XIP kernel, for which
+--page-offset isn't even used to begin with after Maxime's patch.
+Hopefully Uwe and/or Maxime can confirm, but removing the PAGE_OFFSET
+lower limit should not affect those platforms at all afaict,
+especially since, after patch 1/3, there are no symbols left to filter
+below that limit in the first place.
+
+Thanks,
+Ard.
