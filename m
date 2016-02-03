@@ -1,36 +1,33 @@
-From: friesendrywall@gmail.com (Erik Friesen)
-Date: Wed, 3 Feb 2016 10:11:39 -0500
-Subject: SGTL5000 misc
-In-Reply-To: <CAOMZO5C4QUHnJr=pisnYWCYZ0zUt+7HO846aPQui0zcLyX0N-Q@mail.gmail.com>
-References: <CAEuupiuhPR48Upo=8f0zV8cxf0Vefgx3qA+vC+QDWAOV4n-e3Q@mail.gmail.com>
- <CAOMZO5BPNc1ncz6J8yhcBYywCVuTxKYMYhiNUt_Jq3LZsKdi+A@mail.gmail.com>
- <CAEuupiszxAj7JkJu-5ozqgEnTWkz9FQEpxN8dmEN+KtaV-76ww@mail.gmail.com>
- <CAOMZO5DhrzdVyTVPB3FNquV4rDQ8a0MQrsJMosVsUQN63hj1Ww@mail.gmail.com>
- <CAEuupiuoB7nMSc8Fbyort1rJd=ZhYc0zfJNkd=ckUYk1qd8Z7Q@mail.gmail.com>
- <CAOMZO5C4QUHnJr=pisnYWCYZ0zUt+7HO846aPQui0zcLyX0N-Q@mail.gmail.com>
-Message-ID: <CAEuupivdftoopCOX3f7KRbV9poKdjdD3s9hfcbgB2TYjHmrjvw@mail.gmail.com>
+From: matt@codeblueprint.co.uk (Matt Fleming)
+Date: Wed, 3 Feb 2016 15:19:27 +0000
+Subject: [PATCH 1/3] arm64: efistub: drop __init annotation from
+ handle_kernel_image()
+In-Reply-To: <CAKv+Gu_rvLMFF9ssdY4GCWpdcOwaXVsaCvBTYG30NS0zw5xBWw@mail.gmail.com>
+References: <1453979254-25374-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1453979254-25374-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20160128225809.GF2571@codeblueprint.co.uk>
+ <CAKv+Gu9sE4oJrFmSK8sEjTrU8A7k53Hj1S1pTyCqyA5Gsba2Kw@mail.gmail.com>
+ <20160129160006.GD2611@codeblueprint.co.uk>
+ <CAKv+Gu96tdf8ZrGHDi_YKacsRF_b336Nu4Anh61j4u3Lg18BHg@mail.gmail.com>
+ <20160202110821.GB2642@codeblueprint.co.uk>
+ <CAKv+Gu_rvLMFF9ssdY4GCWpdcOwaXVsaCvBTYG30NS0zw5xBWw@mail.gmail.com>
+Message-ID: <20160203151927.GJ2597@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no difference in code that I can tell between the two.  I am
-not asking to have this fixed, rather just some ideas on how I can
-implement this. If alsa-devel list is the preferred asking place, I'll
-go there.
+On Tue, 02 Feb, at 12:09:41PM, Ard Biesheuvel wrote:
+> On 2 February 2016 at 12:08, Matt Fleming <matt@codeblueprint.co.uk> wrote:
+> >
+> > What about,
+> >
+> > #define __init __compiletime_error("__init not supported in EFI boot stub")
+> >
+> 
+> That only works for invocations, i.e., it needs to be used in header
+> files, and will trigger the error if a call to the function remains
+> after optimization. We want it at function definition time instead.
 
-The riotboard used kernel 4.3.0-rc2-00019-gbcee19f with the same results.
+Good point.
 
-On Wed, Feb 3, 2016 at 9:51 AM, Fabio Estevam <festevam@gmail.com> wrote:
-> On Wed, Feb 3, 2016 at 12:46 PM, Erik Friesen <friesendrywall@gmail.com> wrote:
->> It appears sgtl5000.c is patched the same in my kernel as the commit mentioned.
->>
->> The problem the way I see it, is that there is no mechanism to deal
->> with a reboot on the codec itself.
->
-> There is no reset line nor reset command on the sgtl5000.
->
->> This alsa stuff has too many layers.  At least coming from a non os
->> embedded angle it seems that way.
->
-> I would suggest you to try 4.4.1 and if you still see an issue with
-> the codec, then report it back to the alsa-devel at alsa-project.org
-> list.
+OK, how about we just do the #undef, call it good, and I add the task
+of printing some helpful error message to my growing TODO list?
