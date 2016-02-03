@@ -1,74 +1,66 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 03 Feb 2016 09:02:44 +0100
-Subject: [PATCH 06/10] devicetree: bindings: add DT binding for the
- Marvell Armada 3700 SoC family
-In-Reply-To: <20160202212454.GA21678@rob-hp-laptop> (Rob Herring's message of
- "Tue, 2 Feb 2016 15:24:54 -0600")
-References: <1454436468-4241-1-git-send-email-gregory.clement@free-electrons.com>
- <1454436468-4241-7-git-send-email-gregory.clement@free-electrons.com>
- <20160202212454.GA21678@rob-hp-laptop>
-Message-ID: <87fuxa5ihn.fsf@free-electrons.com>
+From: hs.liao@mediatek.com (Horng-Shyang Liao)
+Date: Wed, 3 Feb 2016 16:04:03 +0800
+Subject: FW: [RFC 3/3] CMDQ: Mediatek CMDQ driver
+In-Reply-To: <CAGS+omABD93f3X0pfiFgaxa9Lob2txkJfUUomUvs+hiRkxSuHw@mail.gmail.com>
+References: <8A0FDEEF9DBBD140A3857422D81DA20F867B19FD@mtkmbs01n1>
+ <1454479333.11967.12.camel@mtksdaap41>
+ <CAGS+omABD93f3X0pfiFgaxa9Lob2txkJfUUomUvs+hiRkxSuHw@mail.gmail.com>
+Message-ID: <1454486643.29722.2.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
- 
- On mar., f?vr. 02 2016, Rob Herring <robh@kernel.org> wrote:
+On Wed, 2016-02-03 at 14:40 +0800, Daniel Kurtz wrote:
+> > Hi Dan,
+> >
+> > Thanks for your comment.
+> > This solution looks good to me.
+> > I will change it as your suggestion.
+> >
+> > But, I have a question about 'mask out the provided *device virtual*
+> > address'.
+> > Are lower 16-bits (or 24-bits for JUMP op) of device virtual address the
+> > same as device physical address?
+> 
+> I'm not sure.  But I doubt it we can rely on this.
+> My guess would be that the ioremap only preserves the lower 12 bits
+> (4k page size).
+> 
+> > If not, we still need to pass in physical address into CMDQ driver.
+> 
+> Or, instead of the iommu/slot approach, we can just provide a
+> registration function for the gce driver.
+> Each gce consumer could then have a simple gce node, with no slot/address:
+> 
+>   mediatek,gce = <&gce>;
+> 
+> Then on probe, the gce consumer could pass in its (struct device *) to
+> gce_register_device().  gce_register_device() could then access the
+> device's of_node to extract its physical address range, and look up
+> its physical address in its table of per-soc of
+> "device_address:gce_subsys_address" entries.  If the physical address
+> is in a valid subsys ranges, the gce_register_device would cache the
+> subsys address, and an offset in a (struct gce_consumer).
+> gce_register_device() could then add this struct to a struct list_head
+> of gce_consumers, and finally return a pointer to it back to the
+> caller.
+> 
+> Later, the gce consumer could pass in ths (struct gce_consumer *) when
+> make gce calls, along with the *offset* (not the physical address or
+> virtual address) for the register that it wishes to access.  Then the
+> gce driver can simply use the gce_consumer->subsys entry to create a
+> gce address from the passed in offset.
+> 
+> This will keep the binding very simple, and would remove the need to
+> convert from device virtual to physical addresses by the gce consumer,
+> but require a little more per-gce-consumer setup.
+> 
+> -Dan
 
-> On Tue, Feb 02, 2016 at 07:07:44PM +0100, Gregory CLEMENT wrote:
->> The Marvell Armada 3700 is a family of ARMv8 CA53 SoCs. This commit
->> introduces the Device Tree binding that documents the top-level
->> compatible strings for Armada 3700 based platforms.
->> 
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->> ---
->>  .../devicetree/bindings/arm/marvell/armada-37xx.txt     | 17 +++++++++++++++++
->>  1 file changed, 17 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt
->> 
->> diff --git a/Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt b/Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt
->> new file mode 100644
->> index 000000000000..5db9f1a90da2
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt
->> @@ -0,0 +1,17 @@
->> +Marvell Armada 37xx Platforms Device Tree Bindings
->> +--------------------------------------------------
->> +
->> +Boards using a SoC of the Marvell Armada 37xx family must carry the
->> +following root node property:
->> +
->> + - compatible: must contain "marvell,armada3700"
->
-> Is 3700 an actual chip? If not, please drop this.
+Hi Dan,
 
-As for I know, it is not an actual chip, so I will remove it.
+This solution is better.
+I will use it.
+Thanks for your suggestion.
 
 Thanks,
-
-Gregory
-
->
->> +
->> +In addition, depending on whether the Armada 3710 or Armada 3720 SoCs
->> +are being used, the following root node property must be added:
->> +
->> + - compatible: must contain either "marvell,armada3710" or
->> +   "marvell,armada3720"
->> +
->> +Example:
->> +
->> +compatible = "marvell,armada-3720-db", "marvell,armada3720", "marvell,armada3700";
->> -- 
->> 2.5.0
->> 
->> --
->> To unsubscribe from this list: send the line "unsubscribe devicetree" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+HS Liao
