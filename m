@@ -1,78 +1,67 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 3 Feb 2016 18:20:54 +0000
-Subject: [PATCH] dt-bindings: arm, gic-v3: require that reserved cells are
- always 0
-In-Reply-To: <1454522458-29643-1-git-send-email-will.deacon@arm.com>
-References: <1454522458-29643-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20160203182054.GH1234@leverpostej>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Thu, 4 Feb 2016 02:37:14 +0800
+Subject: [PATCH v10 5/5] Watchdog: ARM SBSA Generic Watchdog half timeout
+ panic support
+In-Reply-To: <56B24642.8090105@codeaurora.org>
+References: <1454519923-25230-1-git-send-email-fu.wei@linaro.org>
+ <1454519923-25230-6-git-send-email-fu.wei@linaro.org>
+ <56B23883.7000501@codeaurora.org>
+ <CADyBb7sxPg-QUjTbeHFtYkctKc_g7D8O=+jqbXN+DCCoCEnFqA@mail.gmail.com>
+ <56B23E99.1030604@codeaurora.org>
+ <CADyBb7s4opxfPFuX=1-qEE6uhsaMXgofAJPbHUQHrng2AUwqNA@mail.gmail.com>
+ <56B2423B.1020109@codeaurora.org>
+ <CADyBb7uULCn97ea19zH8dB4QX1QA8=AXL94d6gXgFxXM8haBNA@mail.gmail.com>
+ <56B24642.8090105@codeaurora.org>
+Message-ID: <CADyBb7s_QeU=pYqN9G+5WMtx-L+=QC6uZR6N6ZWPOixnkHzPjw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 03, 2016 at 06:00:58PM +0000, Will Deacon wrote:
-> The arm,gic-v3 binding was written with good intentions and doesn't
-> enforce interrupt-cells to be 3, therefore making it easy to extend
-> the irq description in future if necessary:
-> 
->   > Cells 4 and beyond are reserved for future use.
-> 
-> Unfortunately, this sentence is immediately followed up with:
-> 
->   > When the 1st cell has a value of 0 or 1, cells 4 and beyond act as
->   > padding, and may be ignored. It is recommended that padding cells
->   > have a value of 0.
+On 4 February 2016 at 02:26, Timur Tabi <timur@codeaurora.org> wrote:
+> Fu Wei wrote:
+>>
+>> Actually,
+>> the SBSA watchdog driver should support only  half-timeout for panic
+>> the user cannot configure the length of "panic time",  He can only
+>> enable it, and it is automatically set to 1/2 timeout.
+>>
+>> we don't need pre-timeout here.
+>>
+>> Hope I understand you correctly:-)  sorry for your confusion
+>>
+>>> >
+>>> >So when pre-timeout occurs, the interrupt handler calls panic() or
+>>> > whatever
+>>> >it's supposed to do.
+>>
+>> Actually,
+>> So when 1/2 timeout occurs, the interrupt handler calls panic() or
+>> whatever it's supposed to do.
+>>
+>
+> I understand all that.  What I'm saying is that, in the future, when
+> pre-timeout support is added to the watchdog layer, I think it makes sense
+> to modify this driver to use pre-timeout support.
 
-The initial intention of this was to allow for new, longer entries which
-were identified by a new value in cell 1.
+As you know I have made the pre-timeout support patch, If people like
+it, i am happy to go on upstream it separately.
 
-Regardless, I agree that it should be a requirement that padding cells
-must be zero.
+If we want to use pre-timeout here, user only can use get_pretimeout
+and disable panic by setting pretimeout to 0
+but user can not really set pretimeout, because "pre-timeout  ==
+timeout / 2 (always)".
+if user want to change pretimeout, he/she has to set_time instead.
 
-> Consequently, any extensions to the PPI or SPI interrupt specifiers must
-> be able to work with random crap from legacy DTs, effectively
-> necessitating a new interrupt type in the first cell. Sigh.
 
-I'm not sure that's true if we allocate a new value for the 1st cell for
-"extended" PPI or SPI interrupt-sepcficiers (which presumably add
-restrictions). That would also allow old kernels to safely skip such
-interrupts rather than mis-parsing them.
 
-> This patch fixes the text so that additional, reserved cells are
-> required to be zero. This looks like a reasonable thing to require and
-> is already satisifed by the .dts files in-tree.
-> 
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-This patch itself makes sense, so FWIW:
+-- 
+Best regards,
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Any proposed extention to the binding requires its own discussion.
-
-Thanks,
-Mark.
-
-> ---
->  .../devicetree/bindings/interrupt-controller/arm,gic-v3.txt          | 5 ++---
->  1 file changed, 2 insertions(+), 3 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.txt b/Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.txt
-> index 7803e77d85cb..007a5b46256a 100644
-> --- a/Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.txt
-> +++ b/Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.txt
-> @@ -24,9 +24,8 @@ Main node required properties:
->  		1 = edge triggered
->  		4 = level triggered
->  
-> -  Cells 4 and beyond are reserved for future use. When the 1st cell
-> -  has a value of 0 or 1, cells 4 and beyond act as padding, and may be
-> -  ignored. It is recommended that padding cells have a value of 0.
-> +  Cells 4 and beyond are reserved for future use and must have a value
-> +  of 0 if present.
->  
->  - reg : Specifies base physical address(s) and size of the GIC
->    registers, in the following order:
-> -- 
-> 2.1.4
-> 
+Fu Wei
+Software Engineer
+Red Hat Software (Beijing) Co.,Ltd.Shanghai Branch
+Ph: +86 21 61221326(direct)
+Ph: +86 186 2020 4684 (mobile)
+Room 1512, Regus One Corporate Avenue,Level 15,
+One Corporate Avenue,222 Hubin Road,Huangpu District,
+Shanghai,China 200021
