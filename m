@@ -1,78 +1,73 @@
-From: pi-cheng.chen@linaro.org (Pi-Cheng Chen)
-Date: Wed, 3 Feb 2016 09:46:25 +0800
-Subject: [PATCH v2 3/3] ARM64: dts: mt8173: Add CPU OPP, clock and
- regulator supply properties
-In-Reply-To: <56B0B894.9040706@gmail.com>
-References: <1451197318-12418-1-git-send-email-pi-cheng.chen@linaro.org>
- <1451197318-12418-4-git-send-email-pi-cheng.chen@linaro.org>
- <20151228031340.GD3598@ubuntu> <3310024.mO5K6yH9vU@wuerfel>
- <20160105102455.GA30120@ubuntu> <56B08DA4.8070207@gmail.com>
- <56B0B894.9040706@gmail.com>
-Message-ID: <CALx668UB+o_RYUWSR86nUL7YpiK9fWPzZeOSaOmYTGtdnRKx=Q@mail.gmail.com>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Wed, 3 Feb 2016 10:07:50 +0800
+Subject: [PATCH v3 4/4] ARM64: dts: rockchip: add syscon-reboot-mode DT
+ node
+In-Reply-To: <1454407999-5476-1-git-send-email-andy.yan@rock-chips.com>
+References: <1454406981-4692-1-git-send-email-andy.yan@rock-chips.com>
+ <1454407999-5476-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <56B160F6.20308@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 2, 2016 at 10:09 PM, Matthias Brugger
-<matthias.bgg@gmail.com> wrote:
+On 2016/2/2 18:13, Andy Yan wrote:
+> Add syscon-reboot-mode driver DT node for rk3368 platform
 >
+> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
 >
-> On 02/02/16 12:06, Matthias Brugger wrote:
->>
->>
->>
->> On 05/01/16 11:24, Viresh Kumar wrote:
->>>
->>> On 05-01-16, 11:21, Arnd Bergmann wrote:
->>>>
->>>> On Monday 28 December 2015 08:43:40 Viresh Kumar wrote:
->>>>>
->>>>> On 27-12-15, 14:21, Pi-Cheng Chen wrote:
->>>>>>
->>>>>> Add operating-points-v2, clock, and regulator supply properties
->>>>>> required by mt8173-cpufreq driver to enable it.
->>>>>>
->>>>>> Signed-off-by: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
->>>>>> ---
->>>>>> This patch is based on the patch[1] that adds underlying clock MUX for
->>>>>> MT8173 which is needed by mt8173-cpufreq driver but not yet picked.
->>>>>>
->>>>>> [1] http://article.gmane.org/gmane.linux.kernel.clk/325
->>>>>> ---
->>>>>>   arch/arm64/boot/dts/mediatek/mt8173-evb.dts | 18 ++++++
->>>>>>   arch/arm64/boot/dts/mediatek/mt8173.dtsi    | 90
->>>>>> +++++++++++++++++++++++++++++
->>>>>>   2 files changed, 108 insertions(+)
->>>>>
->>>>>
->>>>> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
->>>>>
->>>>
->>>> This patch is now in linux-next through Rafael's pm tree, and it
->>>> breaks the
->>>> arm64 build:
->>>>
->>>>          arm64-defconfig
->>>> Error: ../arch/arm64/boot/dts/mediatek/mt8173.dtsi:132.24-25 syntax
->>>> error
->>>>
->>>>
->>>> Please revert.
->>>>
->>>> In the future, please send all dts changes through the proper maintainer
->>>> channels (-> Mattias -> arm-soc), and make sure they actually build.
->>>
->>>
->>> Rafael has already reverted that, AFAIK, after Mark Brown reported the
->>> build issue.
->>>
->>
->> Applied to v4.5-next/dts
->>
->
-> I oversaw that this needs a clock patch, which is not yet mainlined.
-> I deleted this patch from my tree.
 
-I should mention that explicitly.
-Sorry for the inconvenience.
+Work fine with my rk3368-sheep board :)
 
-Pi-Cheng
+Tested-by: Shawn Lin <shawn.lin@rock-chips.com>
+
+> ---
+>
+> Changes in v3:
+> - descirbe all reboot mode as property instead of subnode
+>
+> Changes in v2:
+> - make this node as a subnode of pmugrf
+>
+> Changes in v1: None
+>
+>   arch/arm64/boot/dts/rockchip/rk3368.dtsi | 14 +++++++++++++-
+>   1 file changed, 13 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3368.dtsi b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+> index 122777b..5213713 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+> +++ b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+> @@ -45,6 +45,7 @@
+>   #include <dt-bindings/interrupt-controller/irq.h>
+>   #include <dt-bindings/interrupt-controller/arm-gic.h>
+>   #include <dt-bindings/pinctrl/rockchip.h>
+> +#include <dt-bindings/soc/rockchip_boot-mode.h>
+>   #include <dt-bindings/thermal/thermal.h>
+>
+>   / {
+> @@ -554,8 +555,19 @@
+>   	};
+>
+>   	pmugrf: syscon at ff738000 {
+> -		compatible = "rockchip,rk3368-pmugrf", "syscon";
+> +		compatible = "rockchip,rk3368-pmugrf", "syscon", "simple-mfd";
+>   		reg = <0x0 0xff738000 0x0 0x1000>;
+> +
+> +		reboot-mode {
+> +			compatible = "syscon-reboot-mode";
+> +			offset = <0x200>;
+> +			mode-normal = <BOOT_NORMAL>;
+> +			mode-recovery = <BOOT_RECOVERY>;
+> +			mode-fastboot = <BOOT_FASTBOOT>;
+> +			mode-loader = <BOOT_LOADER>;
+> +			mode-maskrom = <BOOT_MASKROM>;
+> +
+> +		};
+>   	};
+>
+>   	cru: clock-controller at ff760000 {
+>
+
+
+-- 
+Best Regards
+Shawn Lin
