@@ -1,32 +1,40 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 2 Feb 2016 19:20:58 -0500 (EST)
-Subject: [PATCH 1/3] ARM: move .vectors and .stubs sections back into
- the kernel VMA
-In-Reply-To: <20160203000351.GX10826@n2100.arm.linux.org.uk>
-References: <1454419174-21290-1-git-send-email-ard.biesheuvel@linaro.org>
- <1454419174-21290-2-git-send-email-ard.biesheuvel@linaro.org>
- <20160203000351.GX10826@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.20.1602021918050.32766@knanqh.ubzr>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 3 Feb 2016 00:31:58 +0000
+Subject: [PATCH] ARM: vmlinux.lds: assert that ROM and RAM don't overlap
+ when XIP_KERNEL=y
+In-Reply-To: <1454346154-12931-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1454346154-12931-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160203003158.GZ10826@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 3 Feb 2016, Russell King - ARM Linux wrote:
-
-> On Tue, Feb 02, 2016 at 02:19:32PM +0100, Ard Biesheuvel wrote:
-> > The sections themselves are emitted 4 KB apart, as required:
-> >   ...
-> >   [16] .stubs       PROGBITS   c0c35000 a35000 0002c0 00  AX  0   0 32
-> >   [17] .vectors     PROGBITS   c0c34000 a44000 000020 00  AX  0   0  2
-> >   ...
+On Mon, Feb 01, 2016 at 06:02:34PM +0100, Ard Biesheuvel wrote:
+> When building an XIP kernel, the linker produces two disjoint VMA regions,
+> where the first is mapped onto ROM and the second onto RAM. For this reason,
+> the linker output pointer '.' is updated halfway through the linker script,
+> and set to a value that corresponds with the start of the RAM region.
 > 
-> ... which means we end up wasting most of a page for absolutely no
-> purpose what so ever.  Sorry, I'm really not happy about this
-> gratuitous wastage.
+> However, in some cases, the ROM region exceeds the expected size, and the
+> assignment of the output pointer results in a decrement rather than an
+> increment, causing the virtual addresses of the .data region to clash with
+> the .text region. Such a kernel cannot boot normally, but it also confuses
+> the hell out of kallsyms, since .data symbols may appear inside the
+> [_stext, _etext] or [_sinittext, _einittext] intervals in the first pass,
+> but not in the second (or vice versa), resulting in inconsistent kallsyms
+> data.
+> 
+> So let's make sure that the output pointer only advances, and never jumps
+> back into the ROM region.
 
-In practice this shouldn't make much of a difference given zImage is 
-compressed and large zero filled areas compress very well.
+The long term goal is to move the XIP stuff out of this file, so
+I think it's better to avoid touching this until the split has
+happened.
 
-But this is not nice for XIP though.
+I'd _much_ rather see the split happen first, and then fixes
+applied, rather than trying to fix the existing unmaintainable
+mess.
 
-
-Nicolas
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
