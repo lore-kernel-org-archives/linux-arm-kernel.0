@@ -1,120 +1,104 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed,  3 Feb 2016 20:04:57 +0100
-Subject: [PATCH v2 4/4] ARM: use single definition for vectors-to-stubs
- section offset
-In-Reply-To: <1454526297-5269-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1454526297-5269-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1454526297-5269-5-git-send-email-ard.biesheuvel@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 3 Feb 2016 20:07:46 +0100
+Subject: [PATCH v3 2/2] clk: sunxi: Refactor A31 PLL6 so that it can be
+ reused
+In-Reply-To: <20160202075239.e4318e9dced1eeed29c593f6@free.fr>
+References: <1454008958-12655-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1454008958-12655-2-git-send-email-maxime.ripard@free-electrons.com>
+ <20160130185714.7abcf1de9ef8108c2f48c7fe@free.fr>
+ <20160201201754.GI4652@lukather>
+ <20160202075239.e4318e9dced1eeed29c593f6@free.fr>
+Message-ID: <20160203190746.GJ4652@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This replaces a couple of unannotated uses of the constant 0x1000 with
-a single definition in the linker script, and updates the referring
-code to use it.
+On Tue, Feb 02, 2016 at 07:52:39AM +0100, Jean-Francois Moine wrote:
+> On Mon, 1 Feb 2016 21:17:54 +0100
+> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+> 
+> > > Also, for the H3 PLL periph1 (aka PLL8), why didn't you create a
+> > > 'pll8x2' clock with 'pll8' as a divider?
+> > 
+> > No one seems to use it. We can always add it later in a separate
+> > patch when someone will.
+> 
+> Well, then, I don't understand. The pll periph/peripheral/periph0,
+> aka PLL6 works well for many SoCs and there is no need to change
+> its DT definition.
+> 
+> In the patch header, you wrote:
+> 
+> > Remove the fixed dividers from the PLL6 driver to be able to have a
+> > reusable driver that can be used across several SoCs that share the same
+> > controller, but don't have the same set of dividers for this clock, and to
+> > also be reused multiple times in the same SoC, since we're droping the
+> > clock name.
+> 
+> then, for the H3, you do
+> (the comment should be "until pll8 can be reused"),
 
-Note that this involves explicitly emitting a relocation against the
-literal in .stubs containing the address of vector_swi(), since the
-assembler refuses to do so.
+No. The comment is right. Even though pll8 was just another instance
+of pll6, the pll6 driver couldn't be reused because the clock name was
+hardcoded in the driver, and you couldn't register two clocks with the
+same name.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm/kernel/entry-armv.S  | 17 +++++++++++++----
- arch/arm/kernel/traps.c       |  4 +++-
- arch/arm/kernel/vmlinux.lds.S |  9 ++++++++-
- 3 files changed, 24 insertions(+), 6 deletions(-)
+This was done because this driver has several outputs, the main PLL
+output, plus all the various dividers it might have in the various
+SoCs.
 
-diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-index 8575ff42c0d4..c19d3b82edb8 100644
---- a/arch/arm/kernel/entry-armv.S
-+++ b/arch/arm/kernel/entry-armv.S
-@@ -1064,8 +1064,7 @@ ENDPROC(vector_\name)
- 	.endm
- 
- 	.section .stubs, "ax", %progbits
--__stubs_start:
--	@ This must be the first word
-+.Lvector_swi:
- 	.word	vector_swi
- 
- vector_rst:
-@@ -1205,16 +1204,26 @@ vector_addrexcptn:
- 	.globl	vector_fiq
- 
- 	.section .vectors, "ax", %progbits
--.L__vectors_start:
- 	W(b)	vector_rst
- 	W(b)	vector_und
--	W(ldr)	pc, .L__vectors_start + 0x1000
-+0:	W(ldr)	pc, .				@ vector_swi
- 	W(b)	vector_pabt
- 	W(b)	vector_dabt
- 	W(b)	vector_addrexcptn
- 	W(b)	vector_irq
- 	W(b)	vector_fiq
- 
-+	/*
-+	 * The assembler refuses to emit the correct relocation for the
-+	 * cross-section reference to .Lvector_swi inside the ldr instruction
-+	 * above, so we have to emit it manually. Note that the addend cannot
-+	 * be set by the .reloc directive, and the initial offset recorded in
-+	 * the instruction should compensate for the PC bias of the execution
-+	 * mode, hence the use of '.' as the label.
-+	 */
-+ ARM(	.reloc	0b, R_ARM_LDR_PC_G0, .Lvector_swi	)
-+ THUMB(	.reloc	0b, R_ARM_THM_PC12, .Lvector_swi	)
-+
- 	.data
- 
- 	.globl	cr_alignment
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index bc698383e822..d90a5b2c02a3 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -792,6 +792,8 @@ void __init early_trap_init(void *vectors_base)
- {
- #ifndef CONFIG_CPU_V7M
- 	unsigned long vectors = (unsigned long)vectors_base;
-+	extern char __stubs_offset[];
-+	unsigned long stubs = vectors + (unsigned long)&__stubs_offset;
- 	extern char __stubs_start[], __stubs_end[];
- 	extern char __vectors_start[], __vectors_end[];
- 	unsigned i;
-@@ -813,7 +815,7 @@ void __init early_trap_init(void *vectors_base)
- 	 * are visible to the instruction stream.
- 	 */
- 	memcpy((void *)vectors, __vectors_start, __vectors_end - __vectors_start);
--	memcpy((void *)vectors + 0x1000, __stubs_start, __stubs_end - __stubs_start);
-+	memcpy((void *)stubs, __stubs_start, __stubs_end - __stubs_start);
- 
- 	kuser_init(vectors_base);
- 
-diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-index 9f96a54c7d90..8f270c8e9153 100644
---- a/arch/arm/kernel/vmlinux.lds.S
-+++ b/arch/arm/kernel/vmlinux.lds.S
-@@ -163,7 +163,14 @@ SECTIONS
- 	/*
- 	 * The vectors and stubs are relocatable code, and the
- 	 * only thing that matters is their relative offsets
-+	 * The .stubs section is virtually placed exactly 4 KB after
-+	 * the .vectors section, so that it is in reach for indirect
-+	 * jumps from the vector table ('ldr pc, <label>', where the
-+	 * label itself is inside the .stubs section) but can still
-+	 * be mapped with different permissions.
- 	 */
-+	__stubs_offset = 0x1000;
-+
- 	.stubs : {
- 		__stubs_start = .;
- 		*(.stubs)
-@@ -171,7 +178,7 @@ SECTIONS
- 	}
- 
- 	__vectors_start = .;
--	.vectors ADDR(.stubs) - 0x1000 : AT(__vectors_start) {
-+	.vectors ADDR(.stubs) - __stubs_offset : AT(__vectors_start) {
- 		*(.vectors)
- 	}
- 	. = __vectors_start + SIZEOF(.vectors);
+So, no. It was not working fine on "many" SoCs. And this is exactly
+what this patch fixes.
+
+> > -		/* dummy clock until pll6 can be reused */
+> > -		pll8: pll8_clk {
+> > +		pll8: clk at 01c20044 {
+> >  			#clock-cells = <0>;
+> > -			compatible = "fixed-clock";
+> > -			clock-frequency = <1>;
+> > +			compatible = "allwinner,sun6i-a31-pll6-clk";
+> > +			reg = <0x01c20044 0x4>;
+> > +			clocks = <&osc24M>;
+> >  			clock-output-names = "pll8";
+> >  		};
+> 
+> that is, you add the PLL8, don't you?
+
+I guess it's just a matter of interpretation, but no, I'm just
+removing the placeholder that was there.
+
+> 
+> And, further, you change the MMC clocks:
+> 
+> > @@ -243,7 +243,7 @@
+> >  			#clock-cells = <1>;
+> >  			compatible = "allwinner,sun4i-a10-mmc-clk";
+> >  			reg = <0x01c20088 0x4>;
+> > -			clocks = <&osc24M>, <&pll6 0>, <&pll8>;
+> > +			clocks = <&osc24M>, <&pll6>, <&pll8>;
+> >  			clock-output-names = "mmc0",
+> >  					     "mmc0_output",
+> >  					     "mmc0_sample";
+> 
+> where the PLL8 is already used.
+> 
+> So, how can you say
+> 
+> > No one seems to use it. We can always add it later in a separate
+> > patch when someone will.
+
+Because I was replying to a request from you asking about
+pll8x2. The code you quote is about pll8...
+
+Maxime
+
 -- 
-2.5.0
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160203/d4be01d1/attachment.sig>
