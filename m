@@ -1,547 +1,150 @@
-From: stillcompiling@gmail.com (Joshua Clayton)
-Date: Wed,  3 Feb 2016 09:37:45 -0800
-Subject: [PATCH v3] ARM: dts: Add dts for Uniwest evi
-In-Reply-To: <1454491459.3415.6.camel@pengutronix.de>
-References: <1454491459.3415.6.camel@pengutronix.de>
-Message-ID: <1454521065-14241-1-git-send-email-stillcompiling@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 3 Feb 2016 17:45:47 +0000
+Subject: [PATCH v2 21/21] arm64: Panic when VHE and non VHE CPUs coexist
+In-Reply-To: <20160203084913.GA13974@cbox>
+References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
+ <1453737235-16522-22-git-send-email-marc.zyngier@arm.com>
+ <20160201153605.GA1478@cbox> <56B0CBF4.9030507@arm.com>
+ <20160203084913.GA13974@cbox>
+Message-ID: <56B23CCB.4000009@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Uniwest evi is a portable electrical eddy current non-destructive
-testing device.
+On 03/02/16 08:49, Christoffer Dall wrote:
+> On Tue, Feb 02, 2016 at 03:32:04PM +0000, Marc Zyngier wrote:
+>> On 01/02/16 15:36, Christoffer Dall wrote:
+>>> On Mon, Jan 25, 2016 at 03:53:55PM +0000, Marc Zyngier wrote:
+>>>> Having both VHE and non-VHE capable CPUs in the same system
+>>>> is likely to be a recipe for disaster.
+>>>>
+>>>> If the boot CPU has VHE, but a secondary is not, we won't be
+>>>> able to downgrade and run the kernel at EL1. Add CPU hotplug
+>>>> to the mix, and this produces a terrifying mess.
+>>>>
+>>>> Let's solve the problem once and for all. If you mix VHE and
+>>>> non-VHE CPUs in the same system, you deserve to loose, and this
+>>>> patch makes sure you don't get a chance.
+>>>>
+>>>> This is implemented by storing the kernel execution level in
+>>>> a global variable. Secondaries will park themselves in a
+>>>> WFI loop if they observe a mismatch. Also, the primary CPU
+>>>> will detect that the secondary CPU has died on a mismatched
+>>>> execution level. Panic will follow.
+>>>>
+>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>> ---
+>>>>  arch/arm64/include/asm/virt.h | 17 +++++++++++++++++
+>>>>  arch/arm64/kernel/head.S      | 19 +++++++++++++++++++
+>>>>  arch/arm64/kernel/smp.c       |  3 +++
+>>>>  3 files changed, 39 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
+>>>> index 9f22dd6..f81a345 100644
+>>>> --- a/arch/arm64/include/asm/virt.h
+>>>> +++ b/arch/arm64/include/asm/virt.h
+>>>> @@ -36,6 +36,11 @@
+>>>>   */
+>>>>  extern u32 __boot_cpu_mode[2];
+>>>>  
+>>>> +/*
+>>>> + * __run_cpu_mode records the mode the boot CPU uses for the kernel.
+>>>> + */
+>>>> +extern u32 __run_cpu_mode[2];
+>>>> +
+>>>>  void __hyp_set_vectors(phys_addr_t phys_vector_base);
+>>>>  phys_addr_t __hyp_get_vectors(void);
+>>>>  
+>>>> @@ -60,6 +65,18 @@ static inline bool is_kernel_in_hyp_mode(void)
+>>>>  	return el == CurrentEL_EL2;
+>>>>  }
+>>>>  
+>>>> +static inline bool is_kernel_mode_mismatched(void)
+>>>> +{
+>>>> +	/*
+>>>> +	 * A mismatched CPU will have written its own CurrentEL in
+>>>> +	 * __run_cpu_mode[1] (initially set to zero) after failing to
+>>>> +	 * match the value in __run_cpu_mode[0]. Thus, a non-zero
+>>>> +	 * value in __run_cpu_mode[1] is enough to detect the
+>>>> +	 * pathological case.
+>>>> +	 */
+>>>> +	return !!ACCESS_ONCE(__run_cpu_mode[1]);
+>>>> +}
+>>>> +
+>>>>  /* The section containing the hypervisor text */
+>>>>  extern char __hyp_text_start[];
+>>>>  extern char __hyp_text_end[];
+>>>> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+>>>> index 2a7134c..bc44cf8 100644
+>>>> --- a/arch/arm64/kernel/head.S
+>>>> +++ b/arch/arm64/kernel/head.S
+>>>> @@ -577,7 +577,23 @@ ENTRY(set_cpu_boot_mode_flag)
+>>>>  1:	str	w20, [x1]			// This CPU has booted in EL1
+>>>>  	dmb	sy
+>>>>  	dc	ivac, x1			// Invalidate potentially stale cache line
+>>>> +	adr_l	x1, __run_cpu_mode
+>>>> +	ldr	w0, [x1]
+>>>> +	mrs	x20, CurrentEL
+>>>> +	cbz	x0, skip_el_check
+>>>> +	cmp	x0, x20
+>>>> +	bne	mismatched_el
+>>>
+>>> can't you do a ret here instead of writing the same value and flushing
+>>> caches etc.?
+>>
+>> Yes, good point.
+>>
+>>>
+>>>> +skip_el_check:			// Only the first CPU gets to set the rule
+>>>> +	str	w20, [x1]
+>>>> +	dmb	sy
+>>>> +	dc	ivac, x1	// Invalidate potentially stale cache line
+>>>>  	ret
+>>>> +mismatched_el:
+>>>> +	str	w20, [x1, #4]
+>>>> +	dmb	sy
+>>>> +	dc	ivac, x1	// Invalidate potentially stale cache line
+>>>> +1:	wfi
+>>>
+>>> I'm no expert on SMP bringup, but doesn't this prevent the CPU from
+>>> signaling completion and thus you'll never actually reach the checking
+>>> code in __cpu_up?
+>>
+>> Indeed, and that's the whole point. The primary CPU will notice that the
+>> secondary CPU has failed to boot (timeout), and will find the reason in
+>> __run_cpu_mode.
+>>
+> That wasn't exactly my point.  If I understand correctly and __cpu_up is
+> the primary CPU executing a function to bring up a secondary core, then
+> it will wait for the cpu_running completion which should be signalled by
+> the secondary core, but because the secondary core never makes any
+> progress it will timeout the wait for completion and you will see that
+> error "..failed to come online" instead of the "incompatible execution
+> level".
 
-Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
----
+It will actually do both. Here's an example on the model configured for
+such a braindead case:
 
-Changes since v2:
-- removed fsl,data-mapping and fsl,data-width from lvds0 per Phillip Zabel
-- removed MX6QDL_PAD_GPIO_19__GPIO4_IO05 from hoggrp. This pin is
-  used in a not yet upstreamed input driver.
+CPU4: failed to come online
+Kernel panic - not syncing: CPU4: incompatible execution level
+CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.5.0-rc2+ #5459
+Hardware name: FVP Base (DT)
+Call trace:
+[<ffffffc0000899e0>] dump_backtrace+0x0/0x180
+[<ffffffc000089b74>] show_stack+0x14/0x20
+[<ffffffc000333b08>] dump_stack+0x90/0xc8
+[<ffffffc00014d424>] panic+0x10c/0x250
+[<ffffffc00008ef24>] __cpu_up+0xfc/0x100
+[<ffffffc0000b7a9c>] _cpu_up+0x154/0x188
+[<ffffffc0000b7b54>] cpu_up+0x84/0xa8
+[<ffffffc0009e9d00>] smp_init+0xbc/0xc0
+[<ffffffc0009dca10>] kernel_init_freeable+0x94/0x1ec
+[<ffffffc000712f90>] kernel_init+0x10/0xe0
+[<ffffffc000085cd0>] ret_from_fork+0x10/0x40
 
- arch/arm/boot/dts/Makefile      |   1 +
- arch/arm/boot/dts/imx6q-evi.dts | 502 ++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 503 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6q-evi.dts
+Am I missing something *really* obvious?
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index c4f42a78..4a4ef29 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -326,6 +326,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
- 	imx6q-cubox-i.dtb \
- 	imx6q-dfi-fs700-m60.dtb \
- 	imx6q-dmo-edmqmx6.dtb \
-+	imx6q-evi.dtb \
- 	imx6q-gk802.dtb \
- 	imx6q-gw51xx.dtb \
- 	imx6q-gw52xx.dtb \
-diff --git a/arch/arm/boot/dts/imx6q-evi.dts b/arch/arm/boot/dts/imx6q-evi.dts
-new file mode 100644
-index 0000000..4fa5601
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6q-evi.dts
-@@ -0,0 +1,502 @@
-+/*
-+ * Copyright 2016 United Western Technologies.
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ *
-+ */
-+
-+/dts-v1/;
-+#include "imx6q.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/interrupt-controller/irq.h>
-+
-+/ {
-+	model = "Uniwest Evi";
-+	compatible = "uniwest,imx6q-evi", "fsl,imx6q";
-+
-+	memory {
-+		reg = <0x10000000 0x40000000>;
-+	};
-+
-+	reg_usbh1_vbus: regulator-usbhubreset {
-+		compatible = "regulator-fixed";
-+		regulator-name = "usbh1_vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		enable-active-high;
-+		startup-delay-us = <2>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_usbh1_hubreset>;
-+		gpio = <&gpio7 12 GPIO_ACTIVE_HIGH>;
-+	};
-+
-+	reg_usb_otg_vbus: regulator-usbotgvbus {
-+		compatible = "regulator-fixed";
-+		regulator-name = "usb_otg_vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_usbotgvbus>;
-+		gpio = <&gpio4 15 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+		regulator-always-on;
-+	};
-+
-+	panel {
-+		compatible = "sharp,lq101k1ly04";
-+
-+		port {
-+			panel_in: endpoint {
-+				remote-endpoint = <&lvds0_out>;
-+			};
-+		};
-+	};
-+};
-+
-+&ecspi1 {
-+	fsl,spi-num-chipselects = <1>;
-+	cs-gpios = <&gpio4 10 GPIO_ACTIVE_LOW>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_ecspi1 &pinctrl_ecspi1cs>;
-+	status = "okay";
-+};
-+
-+&ecspi3 {
-+	fsl,spi-num-chipselects = <3>;
-+	cs-gpios = <&gpio4 24 GPIO_ACTIVE_LOW>,
-+		<&gpio4 25 GPIO_ACTIVE_LOW>,
-+		<&gpio4 26 GPIO_ACTIVE_LOW>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_ecspi3 &pinctrl_ecspi3cs>;
-+	status = "okay";
-+};
-+
-+&ecspi5 {
-+	fsl,spi-num-chipselects = <4>;
-+	cs-gpios = <&gpio1 14 GPIO_ACTIVE_LOW>,
-+		<&gpio1 13 GPIO_ACTIVE_LOW>,
-+		<&gpio1 12 GPIO_ACTIVE_LOW>,
-+		<&gpio2 9 GPIO_ACTIVE_HIGH>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_ecspi5 &pinctrl_ecspi5cs>;
-+	status = "okay";
-+
-+	eeprom: m95m02 at 1 {
-+		compatible = "st,m95m02", "atmel,at25";
-+		size = <262144>;
-+		pagesize = <256>;
-+		address-width = <24>;
-+		spi-max-frequency = <5000000>;
-+		reg = <1>;
-+	};
-+
-+	pb_rtc: rtc at 3 {
-+		compatible = "nxp,rtc-pcf2123";
-+		spi-max-frequency = <2450000>;
-+		spi-cs-high;
-+		reg = <3>;
-+	};
-+};
-+
-+&fec {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_enet>;
-+	phy-mode = "rgmii";
-+	phy-reset-gpios = <&gpio1 25 0>;
-+	status = "okay";
-+};
-+
-+&gpmi {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_gpminand>;
-+	status = "okay";
-+};
-+
-+&i2c2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c2>;
-+	clock-frequency = <100000>;
-+	status = "okay";
-+};
-+
-+&i2c3 {
-+	pinctrl-names = "default", "gpio";
-+	pinctrl-0 = <&pinctrl_i2c3>;
-+	pinctrl-1 = <&pinctrl_i2c3_gpio>;
-+	clock-frequency = <100000>;
-+	scl-gpios = <&gpio1 5 GPIO_ACTIVE_HIGH>;
-+	sda-gpios = <&gpio7 11 GPIO_ACTIVE_HIGH>;
-+	status = "okay";
-+
-+	battery: sbs-battery at b {
-+		compatible = "sbs,sbs-battery";
-+		reg = <0x0b>;
-+		sbs,poll-retry-count = <100>;
-+		sbs,i2c-retry-count = <100>;
-+	};
-+};
-+
-+&ldb {
-+	status = "okay";
-+
-+	lvds0: lvds-channel at 0 {
-+		status = "okay";
-+
-+		port at 4 {
-+			reg = <4>;
-+			lvds0_out: endpoint {
-+				remote-endpoint = <&panel_in>;
-+			};
-+		};
-+	};
-+};
-+
-+&ssi1 {
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart1>;
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart2>;
-+	status = "okay";
-+};
-+
-+&usbh1 {
-+	vbus-supply = <&reg_usbh1_vbus>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usbh1>;
-+	dr_mode = "host";
-+	disable-over-current;
-+	status = "okay";
-+};
-+
-+&usbotg {
-+	vbus-supply = <&reg_usb_otg_vbus>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usbotg>;
-+	disable-over-current;
-+	dr_mode = "otg";
-+	status = "okay";
-+};
-+
-+&usdhc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc1>;
-+	non-removable;
-+	status = "okay";
-+};
-+
-+&weim {
-+	#address-cells = <2>;
-+	#size-cells = <1>;
-+	ranges = <0 0 0x08000000 0x08000000>;
-+	fsl,weim-cs-gpr = <&gpr>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_weimfpga &pinctrl_weimcs>;
-+	status = "okay";
-+};
-+
-+&iomuxc {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_hog>;
-+
-+	pinctrl_hog: hoggrp {
-+		fsl,pins = <
-+			/* pwr mcu alert irq */
-+			MX6QDL_PAD_SD4_DAT2__GPIO2_IO10 0x1b0b0
-+			/* remainder ???? */
-+			MX6QDL_PAD_CSI0_MCLK__GPIO5_IO19 0x1b0b0
-+		>;
-+	};
-+
-+	pinctrl_ecspi1: ecspi1grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_KEY_COL1__ECSPI1_MISO 0x100b1
-+			MX6QDL_PAD_KEY_ROW0__ECSPI1_MOSI 0x100b1
-+			MX6QDL_PAD_KEY_COL0__ECSPI1_SCLK 0x100b1
-+		>;
-+	};
-+
-+	pinctrl_ecspi1cs: ecspi1csgrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_KEY_COL2__GPIO4_IO10 0x1b0b0
-+		>;
-+	};
-+
-+	pinctrl_ecspi3: ecspi3grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_DISP0_DAT0__ECSPI3_SCLK 0x10068
-+			MX6QDL_PAD_DISP0_DAT1__ECSPI3_MOSI 0x10068
-+			MX6QDL_PAD_DISP0_DAT2__ECSPI3_MISO 0x1f068
-+		>;
-+	};
-+
-+	pinctrl_ecspi3cs: ecspi3csgrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_DISP0_DAT3__GPIO4_IO24 0x1b0b0
-+			MX6QDL_PAD_DISP0_DAT4__GPIO4_IO25 0x1b0b0
-+			MX6QDL_PAD_DISP0_DAT5__GPIO4_IO26 0x1b0b0
-+			MX6QDL_PAD_DISP0_DAT6__GPIO4_IO27 0x1b0b0
-+		>;
-+	};
-+
-+	pinctrl_ecspi5: ecspi5grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_SD2_CLK__ECSPI5_SCLK 0x100b1
-+			MX6QDL_PAD_SD2_CMD__ECSPI5_MOSI 0x100b1
-+			MX6QDL_PAD_SD2_DAT0__ECSPI5_MISO 0x100b1
-+		>;
-+	};
-+
-+	pinctrl_ecspi5cs: ecspi5csgrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_SD2_DAT1__GPIO1_IO14 0x1b0b0
-+			MX6QDL_PAD_SD2_DAT2__GPIO1_IO13 0x1b0b0
-+			MX6QDL_PAD_SD2_DAT3__GPIO1_IO12 0x1b0b0
-+			MX6QDL_PAD_SD4_DAT1__GPIO2_IO09 0x1b0b0
-+		>;
-+	};
-+
-+	pinctrl_enet: enetgrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_ENET_MDIO__ENET_MDIO 0x1b0b0
-+			MX6QDL_PAD_ENET_MDC__ENET_MDC 0x1b0b0
-+			MX6QDL_PAD_RGMII_TXC__RGMII_TXC 0x1b0b0
-+			MX6QDL_PAD_RGMII_TD0__RGMII_TD0 0x1b0b0
-+			MX6QDL_PAD_RGMII_TD1__RGMII_TD1 0x1b0b0
-+			MX6QDL_PAD_RGMII_TD2__RGMII_TD2 0x1b0b0
-+			MX6QDL_PAD_RGMII_TD3__RGMII_TD3 0x1b0b0
-+			MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL 0x1b0b0
-+			MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK 0x1b0b0
-+			MX6QDL_PAD_RGMII_RXC__RGMII_RXC 0x1b0b0
-+			MX6QDL_PAD_RGMII_RD0__RGMII_RD0 0x1b0b0
-+			MX6QDL_PAD_RGMII_RD1__RGMII_RD1 0x1b0b0
-+			MX6QDL_PAD_RGMII_RD2__RGMII_RD2 0x1b0b0
-+			MX6QDL_PAD_RGMII_RD3__RGMII_RD3 0x1b0b0
-+			MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL 0x1b0b0
-+			MX6QDL_PAD_ENET_TX_EN__ENET_TX_EN 0x4001b0a8
-+			MX6QDL_PAD_ENET_CRS_DV__GPIO1_IO25 0x1b0b0
-+		>;
-+	};
-+
-+	pinctrl_gpminand: gpminandgrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_NANDF_CLE__NAND_CLE 0xb0b1
-+			MX6QDL_PAD_NANDF_ALE__NAND_ALE 0xb0b1
-+			MX6QDL_PAD_NANDF_WP_B__NAND_WP_B 0xb0b1
-+			MX6QDL_PAD_NANDF_RB0__NAND_READY_B 0xb000
-+			MX6QDL_PAD_NANDF_CS0__NAND_CE0_B 0xb0b1
-+			MX6QDL_PAD_NANDF_CS1__NAND_CE1_B 0xb0b1
-+			MX6QDL_PAD_SD4_CMD__NAND_RE_B 0xb0b1
-+			MX6QDL_PAD_SD4_CLK__NAND_WE_B 0xb0b1
-+			MX6QDL_PAD_NANDF_D0__NAND_DATA00 0xb0b1
-+			MX6QDL_PAD_NANDF_D1__NAND_DATA01 0xb0b1
-+			MX6QDL_PAD_NANDF_D2__NAND_DATA02 0xb0b1
-+			MX6QDL_PAD_NANDF_D3__NAND_DATA03 0xb0b1
-+			MX6QDL_PAD_NANDF_D4__NAND_DATA04 0xb0b1
-+			MX6QDL_PAD_NANDF_D5__NAND_DATA05 0xb0b1
-+			MX6QDL_PAD_NANDF_D6__NAND_DATA06 0xb0b1
-+			MX6QDL_PAD_NANDF_D7__NAND_DATA07 0xb0b1
-+			MX6QDL_PAD_SD4_DAT0__NAND_DQS 0x00b1
-+		>;
-+	};
-+
-+	pinctrl_i2c2: i2c2grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_KEY_ROW3__I2C2_SDA 0x4001b8b1
-+			MX6QDL_PAD_KEY_COL3__I2C2_SCL 0x4001b8b1
-+		>;
-+	};
-+
-+	pinctrl_i2c3: i2c3grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_GPIO_5__I2C3_SCL 0x4001b8b1
-+			MX6QDL_PAD_GPIO_16__I2C3_SDA 0x4001b8b1
-+		>;
-+	};
-+
-+	pinctrl_i2c3_gpio: i2c3gpiogrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_GPIO_5__GPIO1_IO05 0x4001b8b1
-+			MX6QDL_PAD_GPIO_16__GPIO7_IO11 0x4001b8b1
-+		>;
-+	};
-+
-+	pinctrl_weimcs: weimcsgrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_EIM_CS0__EIM_CS0_B 0xb0b1
-+			MX6QDL_PAD_EIM_CS1__EIM_CS1_B 0xb0b1
-+		>;
-+	};
-+
-+	pinctrl_weimfpga: weimfpgagrp {
-+		fsl,pins = <
-+			/* weim misc */
-+			MX6QDL_PAD_EIM_OE__EIM_OE_B 0xb0b1
-+			MX6QDL_PAD_EIM_RW__EIM_RW 0xb0b1
-+			MX6QDL_PAD_EIM_WAIT__EIM_WAIT_B 0xb060
-+			MX6QDL_PAD_EIM_BCLK__EIM_BCLK 0xb0b1
-+			MX6QDL_PAD_EIM_LBA__EIM_LBA_B 0xb0b1
-+			MX6QDL_PAD_EIM_EB0__EIM_EB0_B 0xb0b1
-+			MX6QDL_PAD_EIM_EB1__EIM_EB1_B 0xb0b1
-+			MX6QDL_PAD_EIM_EB2__EIM_EB2_B 0xb0b1
-+			MX6QDL_PAD_EIM_EB3__EIM_EB3_B 0xb0b1
-+			/* weim data */
-+			MX6QDL_PAD_CSI0_DATA_EN__EIM_DATA00 0x1b0b0
-+			MX6QDL_PAD_CSI0_VSYNC__EIM_DATA01 0x1b0b0
-+			MX6QDL_PAD_CSI0_DAT4__EIM_DATA02 0x1b0b0
-+			MX6QDL_PAD_CSI0_DAT5__EIM_DATA03 0x1b0b0
-+			MX6QDL_PAD_CSI0_DAT6__EIM_DATA04 0x1b0b0
-+			MX6QDL_PAD_CSI0_DAT7__EIM_DATA05 0x1b0b0
-+			MX6QDL_PAD_CSI0_DAT8__EIM_DATA06 0x1b0b0
-+			MX6QDL_PAD_CSI0_DAT9__EIM_DATA07 0x1b0b0
-+			MX6QDL_PAD_CSI0_DAT12__EIM_DATA08 0x1b0b0
-+			MX6QDL_PAD_CSI0_DAT13__EIM_DATA09 0x1b0b0
-+			MX6QDL_PAD_CSI0_DAT14__EIM_DATA10 0x1b0b0
-+			MX6QDL_PAD_CSI0_DAT15__EIM_DATA11 0x1b0b0
-+			MX6QDL_PAD_CSI0_DAT16__EIM_DATA12 0x1b0b0
-+			MX6QDL_PAD_CSI0_DAT17__EIM_DATA13 0x1b0b0
-+			MX6QDL_PAD_CSI0_DAT18__EIM_DATA14 0x1b0b0
-+			MX6QDL_PAD_CSI0_DAT19__EIM_DATA15 0x1b0b0
-+			MX6QDL_PAD_EIM_D16__EIM_DATA16 0x1b0b0
-+			MX6QDL_PAD_EIM_D17__EIM_DATA17 0x1b0b0
-+			MX6QDL_PAD_EIM_D18__EIM_DATA18 0x1b0b0
-+			MX6QDL_PAD_EIM_D19__EIM_DATA19 0x1b0b0
-+			MX6QDL_PAD_EIM_D20__EIM_DATA20 0x1b0b0
-+			MX6QDL_PAD_EIM_D21__EIM_DATA21 0x1b0b0
-+			MX6QDL_PAD_EIM_D22__EIM_DATA22 0x1b0b0
-+			MX6QDL_PAD_EIM_D23__EIM_DATA23 0x1b0b0
-+			MX6QDL_PAD_EIM_D24__EIM_DATA24 0x1b0b0
-+			MX6QDL_PAD_EIM_D25__EIM_DATA25 0x1b0b0
-+			MX6QDL_PAD_EIM_D26__EIM_DATA26 0x1b0b0
-+			MX6QDL_PAD_EIM_D27__EIM_DATA27 0x1b0b0
-+			MX6QDL_PAD_EIM_D28__EIM_DATA28 0x1b0b0
-+			MX6QDL_PAD_EIM_D29__EIM_DATA29 0x1b0b0
-+			MX6QDL_PAD_EIM_D30__EIM_DATA30 0x1b0b0
-+			MX6QDL_PAD_EIM_D31__EIM_DATA31 0x1b0b0
-+			/* weim address */
-+			MX6QDL_PAD_EIM_A25__EIM_ADDR25 0xb0b1
-+			MX6QDL_PAD_EIM_A24__EIM_ADDR24 0xb0b1
-+			MX6QDL_PAD_EIM_A23__EIM_ADDR23 0xb0b1
-+			MX6QDL_PAD_EIM_A22__EIM_ADDR22 0xb0b1
-+			MX6QDL_PAD_EIM_A21__EIM_ADDR21 0xb0b1
-+			MX6QDL_PAD_EIM_A20__EIM_ADDR20 0xb0b1
-+			MX6QDL_PAD_EIM_A19__EIM_ADDR19 0xb0b1
-+			MX6QDL_PAD_EIM_A18__EIM_ADDR18 0xb0b1
-+			MX6QDL_PAD_EIM_A17__EIM_ADDR17 0xb0b1
-+			MX6QDL_PAD_EIM_A16__EIM_ADDR16 0xb0b1
-+			MX6QDL_PAD_EIM_DA15__EIM_AD15 0xb0b1
-+			MX6QDL_PAD_EIM_DA14__EIM_AD14 0xb0b1
-+			MX6QDL_PAD_EIM_DA13__EIM_AD13 0xb0b1
-+			MX6QDL_PAD_EIM_DA12__EIM_AD12 0xb0b1
-+			MX6QDL_PAD_EIM_DA11__EIM_AD11 0xb0b1
-+			MX6QDL_PAD_EIM_DA10__EIM_AD10 0xb0b1
-+			MX6QDL_PAD_EIM_DA9__EIM_AD09 0xb0b1
-+			MX6QDL_PAD_EIM_DA8__EIM_AD08 0xb0b1
-+			MX6QDL_PAD_EIM_DA7__EIM_AD07 0xb0b1
-+			MX6QDL_PAD_EIM_DA6__EIM_AD06 0xb0b1
-+			MX6QDL_PAD_EIM_DA5__EIM_AD05 0xb0b1
-+			MX6QDL_PAD_EIM_DA4__EIM_AD04 0xb0b1
-+			MX6QDL_PAD_EIM_DA3__EIM_AD03 0xb0b1
-+			MX6QDL_PAD_EIM_DA2__EIM_AD02 0xb0b1
-+			MX6QDL_PAD_EIM_DA1__EIM_AD01 0xb0b1
-+			MX6QDL_PAD_EIM_DA0__EIM_AD00 0xb0b1
-+		>;
-+	};
-+
-+	pinctrl_uart1: uart1grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_CSI0_DAT10__UART1_TX_DATA 0x1b0b1
-+			MX6QDL_PAD_CSI0_DAT11__UART1_RX_DATA 0x1b0b1
-+		>;
-+	};
-+
-+	pinctrl_uart2: uart2grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_SD3_DAT5__UART2_TX_DATA 0x1b0b1
-+			MX6QDL_PAD_SD3_DAT4__UART2_RX_DATA 0x1b0b1
-+			MX6QDL_PAD_SD3_CLK__UART2_RTS_B 0x1b0b1
-+			MX6QDL_PAD_SD3_CMD__UART2_CTS_B 0x1b0b1
-+		>;
-+	};
-+
-+	pinctrl_usbh1: usbh1grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_GPIO_3__USB_H1_OC 0x1b0b0
-+			/* usbh1_b OC */
-+			MX6QDL_PAD_GPIO_0__GPIO1_IO00 0x1b0b0
-+		>;
-+	};
-+
-+	pinctrl_usbh1_hubreset: usbh1hubresetgrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_GPIO_17__GPIO7_IO12 0x1b0b0
-+		>;
-+	};
-+
-+	pinctrl_usbotg: usbotggrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_GPIO_1__USB_OTG_ID 0x17059
-+			MX6QDL_PAD_KEY_COL4__USB_OTG_OC 0x1b0b0
-+		>;
-+	};
-+
-+	pinctrl_usbotgvbus: usbotgvbusgrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_KEY_ROW4__GPIO4_IO15 0x000b0
-+		>;
-+	};
-+
-+	pinctrl_usdhc1: usdhc1grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_SD1_CMD__SD1_CMD 0x17059
-+			MX6QDL_PAD_SD1_CLK__SD1_CLK 0x10059
-+			MX6QDL_PAD_SD1_DAT0__SD1_DATA0 0x17059
-+			MX6QDL_PAD_SD1_DAT1__SD1_DATA1 0x17059
-+			MX6QDL_PAD_SD1_DAT2__SD1_DATA2 0x17059
-+			MX6QDL_PAD_SD1_DAT3__SD1_DATA3 0x17059
-+		>;
-+	};
-+};
+Thanks,
+
+	M.
 -- 
-2.5.0
+Jazz is not dead. It just smells funny...
