@@ -1,56 +1,70 @@
-From: fan.chen@mediatek.com (Fan Chen)
-Date: Wed, 3 Feb 2016 09:38:18 +0800
-Subject: MTK mt8173-evb: mainline unstable, and big-endian boot failures
-In-Reply-To: <7h37tbdk6y.fsf@baylibre.com>
-References: <CAOi56cVDbkAJEDWy3+DV63a=UuD7nqpUu8X7e-OjtWM-4dj_-w@mail.gmail.com>
- <7hsi1ilczm.fsf@baylibre.com>
- <CAF-23O3ps0Wt_UCmJbArpc5iJJryJKA0k_2qAyNb7op8O=UnAg@mail.gmail.com>
- <1453964180.26397.8.camel@mtksdaap41> <7hy4b8gc7q.fsf@baylibre.com>
- <1454309376.11974.3.camel@mtksdaap41> <7hh9hrgbbh.fsf@baylibre.com>
- <1454379462.27798.11.camel@mtksdaap41> <7h37tbdk6y.fsf@baylibre.com>
-Message-ID: <1454463498.27798.24.camel@mtksdaap41>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue,  2 Feb 2016 17:42:13 -0800
+Subject: [PATCH] clk: Deprecate CLK_IS_ROOT
+Message-ID: <1454463733-25281-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+We don't use CLK_IS_ROOT but in a few places in the common clk
+framework core. Let's replace those checks with a check for the
+number of parents a clk has instead of the flag, freeing up one
+flag for something else. We don't remove the flag yet so that
+things keep building, but we'll remove it once all drivers have
+removed their flag usage.
 
-On Tue, 2016-02-02 at 10:46 -0800, Kevin Hilman wrote:
-> Hi Fan,
-> 
-> Fan Chen <fan.chen@mediatek.com> writes:
-> 
-> > I just checked that the problem cannot be reproduced (tested 100 times
-> > with your script) after flashing new firmware which we uploaded to
-> > github[0] yesterday.
-> 
-> Great news!
-> 
-> > This latest firmware got many fixes and also supports cluster idle, so
-> > we prefer testing with this new one Would you please test in your
-> > side? Thanks for your great help!!
-> 
-> I tested the latest firmware and it's booted 20+ times in a row without
-> failure, which is better than it ever did in the past, so it seems to
-> have fixed the idle problem.
-> 
-> I will keep an eye on the failures in kernelci.org and let you know if I
-> notice any other failures.
-> 
-> Thanks again for the updated firmware!
-> 
-Thanks to keep notice us failures as well.
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
 
-> Speaking of updated firmware, is there any chance to make the default
-> version of the firmware significantly less noisy.  There is a TON of
-> output from the firmware before fastboot starts which makes the logs for
-> this board very noisy (same complaint on the mt8135.)
-> 
-I will discuss with Eddie if it's possible to release a version with
-light logs, but I'm afraid the answer could be given after our Chinese
-New Year vacation. :P
+A bunch of patches to remove CLK_IS_ROOT are coming...
+
+ drivers/clk/clk.c            | 6 +++---
+ include/linux/clk-provider.h | 2 +-
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index bb01ed6cc63e..cd8382c83f48 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -385,7 +385,7 @@ static unsigned long clk_core_get_rate_nolock(struct clk_core *core)
  
-
-> Kevin
-> 
-
-Fan
+ 	ret = core->rate;
+ 
+-	if (core->flags & CLK_IS_ROOT)
++	if (!core->num_parents)
+ 		goto out;
+ 
+ 	if (!core->parent)
+@@ -2351,7 +2351,7 @@ static int __clk_core_init(struct clk_core *core)
+ 	/*
+ 	 * Populate core->parent if parent has already been __clk_init'd.  If
+ 	 * parent has not yet been __clk_init'd then place clk in the orphan
+-	 * list.  If clk has set the CLK_IS_ROOT flag then place it in the root
++	 * list.  If clk doesn't have any parents then place it in the root
+ 	 * clk list.
+ 	 *
+ 	 * Every time a new clk is clk_init'd then we walk the list of orphan
+@@ -2362,7 +2362,7 @@ static int __clk_core_init(struct clk_core *core)
+ 		hlist_add_head(&core->child_node,
+ 				&core->parent->children);
+ 		core->orphan = core->parent->orphan;
+-	} else if (core->flags & CLK_IS_ROOT) {
++	} else if (!core->num_parents) {
+ 		hlist_add_head(&core->child_node, &clk_root_list);
+ 		core->orphan = false;
+ 	} else {
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index fabe5bedbba6..9c3a18c1a984 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -25,7 +25,7 @@
+ #define CLK_SET_PARENT_GATE	BIT(1) /* must be gated across re-parent */
+ #define CLK_SET_RATE_PARENT	BIT(2) /* propagate rate change up one level */
+ #define CLK_IGNORE_UNUSED	BIT(3) /* do not gate even if unused */
+-#define CLK_IS_ROOT		BIT(4) /* root clk, has no parent */
++#define CLK_IS_ROOT		BIT(4) /* Deprecated: Don't use */
+ #define CLK_IS_BASIC		BIT(5) /* Basic clk, can't do a to_clk_foo() */
+ #define CLK_GET_RATE_NOCACHE	BIT(6) /* do not use the cached clk rate */
+ #define CLK_SET_RATE_NO_REPARENT BIT(7) /* don't re-parent on rate change */
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
