@@ -1,62 +1,176 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 3 Feb 2016 16:36:06 +0100
-Subject: [PATCH 00/10] KVM PCIe/MSI passthrough on ARM/ARM64
-In-Reply-To: <20160203131057.GA20217@arm.com>
-References: <1453813968-2024-1-git-send-email-eric.auger@linaro.org>
- <1454017899.23148.0.camel@redhat.com> <56AB78B1.2030202@linaro.org>
- <1454096004.9301.1.camel@redhat.com> <56ABD8E0.6080409@linaro.org>
- <20160201140351.GE6828@arm.com> <20160203125047.GB13974@cbox>
- <20160203131057.GA20217@arm.com>
-Message-ID: <20160203153606.GC13974@cbox>
+From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
+Date: Wed, 3 Feb 2016 15:40:21 +0000
+Subject: [PATCH V2 5/5] Microblaze: Modifying microblaze PCI subsytem to
+ support  generic Xilinx  AXI PCIe Host Bridge IP driver
+In-Reply-To: <1452620173-4905-6-git-send-email-bharatku@xilinx.com>
+References: <1452620173-4905-1-git-send-email-bharatku@xilinx.com>
+ <1452620173-4905-6-git-send-email-bharatku@xilinx.com>
+Message-ID: <8520D5D51A55D047800579B0941471982587F02E@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 03, 2016 at 01:10:58PM +0000, Will Deacon wrote:
-> On Wed, Feb 03, 2016 at 01:50:47PM +0100, Christoffer Dall wrote:
-> > On Mon, Feb 01, 2016 at 02:03:51PM +0000, Will Deacon wrote:
-> > > On Fri, Jan 29, 2016 at 10:25:52PM +0100, Eric Auger wrote:
-> > > > On 01/29/2016 08:33 PM, Alex Williamson wrote:
-> > > > >>> We know that x86 handles MSI vectors specially, so there is some
-> > > > >>> hardware that helps the situation.  It's not just that x86 has a fixed
-> > > > >>> range for MSI, it's how it manages that range when interrupt remapping
-> > > > >>> hardware is enabled.  A device table indexed by source-ID references a
-> > > > >>> per device table indexed by data from the MSI write itself.  So we get
-> > > > >>> much, much finer granularity,
-> > > > >> About the granularity, I think ARM GICv3 now provides a similar
-> > > > >> capability with GICv3 ITS (interrupt translation service). Along with
-> > > > >> the MSI MSG write transaction, the device outputs a DeviceID conveyed on
-> > > > >> the bus. This DeviceID (~ your source-ID) enables to index a device
-> > > > >> table. The entry in the device table points to a DeviceId interrupt
-> > > > >> translation table indexed by the EventID found in the msi msg. So the
-> > > > >> entry in the interrupt translation table eventually gives you the
-> > > > >> eventual interrupt ID targeted by the MSI MSG.
-> > > > >> This translation capability if not available in GICv2M though, ie. the
-> > > > >> one I am currently using.
-> > > > >>  
-> > > > >> Those tables currently are built by the ITS irqchip (irq-gic-v3-its.c)
-> > > 
-> > > That's right. GICv3/ITS disambiguates the interrupt source using the
-> > > DeviceID, which for PCI is derived from the Requester ID of the endpoint.
-> > > GICv2m is less flexible and requires a separate physical frame per guest
-> > > to achieve isolation.
-> > > 
-> > We should still support MSI passthrough with a single MSI frame host
-> > system though, right?
+Ping
+ 
+> This patch does required modifications to microblaze PCI subsystem, to
+> work with generic driver (drivers/pci/host/pcie-xilinx.c) on Microblaze
+> and Zynq.
 > 
-> I think we should treat the frame as an exclusive resource and assign it
-> to a single VM.
-
-so on a single frame GICv2m system, either your host or a single VM gets
-to do MSIs...
-
+> Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
+> Signed-off-by: Ravi Kiran Gummaluri <rgummal@xilinx.com>
+> ---
+> Changes:
+> Modified pcibios_fixup_bus in pci-common.c, as per generic architecuture.
+> Modified pcibios_align_resource in pci-common.c, as per generic
+> architecuture.
+> Modified pcibios_get_phb_of_node function in pci-common.c, to remove
+> dependency on struct pci_controller.
+> Removed pci_domain_nr in pci-common.c, instead using generic code.
+> Added pcibios_add_device in pci-common.c, as per generic architecuture.
+> Adding Kernel configuration in arch/microblaze as required for generic PCI
+> domains.
+> Added kernel configuration for driver to support Microblaze.
+> ---
+>  arch/microblaze/Kconfig          |  3 ++
+>  arch/microblaze/pci/pci-common.c | 61 +++++++++++++++--------------------
+> -----
+>  drivers/pci/host/Kconfig         |  2 +-
+>  3 files changed, 27 insertions(+), 39 deletions(-)
 > 
-> > (Users should just be aware that guests are not fully protected against
-> > misbehaving hardware in that case).
+> diff --git a/arch/microblaze/Kconfig b/arch/microblaze/Kconfig
+> index 0bce820..c3702b9 100644
+> --- a/arch/microblaze/Kconfig
+> +++ b/arch/microblaze/Kconfig
+> @@ -271,6 +271,9 @@ config PCI
+>  config PCI_DOMAINS
+>  	def_bool PCI
 > 
-> Is it confined to misbehaving hardware? What if a malicious/buggy guest
-> configures its device to DMA all over the doorbell?
+> +config PCI_DOMAINS_GENERIC
+> +	def_bool PCI_DOMAINS
+> +
+>  config PCI_SYSCALL
+>  	def_bool PCI
 > 
-I guess not, I suppose we can't trap any configuration access and
-mediate that for any device.  Bummer.
-
--Christoffer
+> diff --git a/arch/microblaze/pci/pci-common.c b/arch/microblaze/pci/pci-
+> common.c
+> index ae838ed..bc72856 100644
+> --- a/arch/microblaze/pci/pci-common.c
+> +++ b/arch/microblaze/pci/pci-common.c
+> @@ -123,17 +123,6 @@ unsigned long pci_address_to_pio(phys_addr_t
+> address)
+>  }
+>  EXPORT_SYMBOL_GPL(pci_address_to_pio);
+> 
+> -/*
+> - * Return the domain number for this bus.
+> - */
+> -int pci_domain_nr(struct pci_bus *bus)
+> -{
+> -	struct pci_controller *hose = pci_bus_to_host(bus);
+> -
+> -	return hose->global_number;
+> -}
+> -EXPORT_SYMBOL(pci_domain_nr);
+> -
+>  /* This routine is meant to be used early during boot, when the
+>   * PCI bus numbers have not yet been assigned, and you need to
+>   * issue PCI config cycles to an OF device.
+> @@ -863,26 +852,10 @@ void pcibios_setup_bus_devices(struct pci_bus
+> *bus)
+> 
+>  void pcibios_fixup_bus(struct pci_bus *bus)
+>  {
+> -	/* When called from the generic PCI probe, read PCI<->PCI bridge
+> -	 * bases. This is -not- called when generating the PCI tree from
+> -	 * the OF device-tree.
+> -	 */
+> -	if (bus->self != NULL)
+> -		pci_read_bridge_bases(bus);
+> -
+> -	/* Now fixup the bus bus */
+> -	pcibios_setup_bus_self(bus);
+> -
+> -	/* Now fixup devices on that bus */
+> -	pcibios_setup_bus_devices(bus);
+> +	/* nothing to do */
+>  }
+>  EXPORT_SYMBOL(pcibios_fixup_bus);
+> 
+> -static int skip_isa_ioresource_align(struct pci_dev *dev)
+> -{
+> -	return 0;
+> -}
+> -
+>  /*
+>   * We need to avoid collisions with `mirrored' VGA ports
+>   * and other strange ISA hardware, so we always want the
+> @@ -899,20 +872,20 @@ static int skip_isa_ioresource_align(struct pci_dev
+> *dev)
+>  resource_size_t pcibios_align_resource(void *data, const struct resource
+> *res,
+>  				resource_size_t size, resource_size_t align)
+>  {
+> -	struct pci_dev *dev = data;
+>  	resource_size_t start = res->start;
+> 
+> -	if (res->flags & IORESOURCE_IO) {
+> -		if (skip_isa_ioresource_align(dev))
+> -			return start;
+> -		if (start & 0x300)
+> -			start = (start + 0x3ff) & ~0x3ff;
+> -	}
+> -
+>  	return start;
+>  }
+>  EXPORT_SYMBOL(pcibios_align_resource);
+> 
+> +int pcibios_add_device(struct pci_dev *dev)
+> +{
+> +	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL(pcibios_add_device);
+> +
+>  /*
+>   * Reparent resource children of pr that conflict with res
+>   * under res, and make res replace those children.
+> @@ -1335,9 +1308,21 @@ static void pcibios_setup_phb_resources(struct
+> pci_controller *hose,
+> 
+>  struct device_node *pcibios_get_phb_of_node(struct pci_bus *bus)
+>  {
+> -	struct pci_controller *hose = bus->sysdata;
+> +	struct device_node *np;
+> +
+> +	for_each_node_by_type(np, "pci") {
+> +		const void *prop;
+> +		unsigned int bus_min;
+> +
+> +		prop = of_get_property(np, "bus-range", NULL);
+> +		if (!prop)
+> +			continue;
+> +		bus_min = be32_to_cpup(prop);
+> +		if (bus->number == bus_min)
+> +			return np;
+> +	}
+> 
+> -	return of_node_get(hose->dn);
+> +	return NULL;
+>  }
+> 
+>  static void pcibios_scan_phb(struct pci_controller *hose)
+> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+> index d5e58ba..7c56c2e 100644
+> --- a/drivers/pci/host/Kconfig
+> +++ b/drivers/pci/host/Kconfig
+> @@ -79,7 +79,7 @@ config PCI_KEYSTONE
+> 
+>  config PCIE_XILINX
+>  	bool "Xilinx AXI PCIe host bridge support"
+> -	depends on ARCH_ZYNQ
+> +	depends on ARCH_ZYNQ || MICROBLAZE
+>  	help
+>  	  Say 'Y' here if you want kernel to support the Xilinx AXI PCIe
+>  	  Host Bridge driver.
+> --
+> 2.1.1
