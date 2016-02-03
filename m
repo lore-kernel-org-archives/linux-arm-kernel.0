@@ -1,48 +1,55 @@
-From: minghuan.lian@nxp.com (Minghuan Lian)
-Date: Wed, 3 Feb 2016 02:11:06 +0000
-Subject: [PATCH 1/4] ARM: dts: ls1021a: add PCIe dts node
-In-Reply-To: <6117401.iajrHOL4Mn@wuerfel>
-References: <1454401807-28751-1-git-send-email-Minghuan.Lian@nxp.com>
- <VI1PR04MB1615DCF54369ED2E01234E64E8DF0@VI1PR04MB1615.eurprd04.prod.outlook.com>
- <6117401.iajrHOL4Mn@wuerfel>
-Message-ID: <VI1PR04MB16159CDCE9C134363846F4CAE8D00@VI1PR04MB1615.eurprd04.prod.outlook.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 3 Feb 2016 10:23:42 +0800
+Subject: [PATCH] clk: gpio: Make into a platform driver
+In-Reply-To: <1454462520-20787-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <201602031053.Tb6b0qXh%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi Stephen,
 
-I am sorry.
-Other patches are for MSI test, and not need to be summited.
-There is only one patch, should be [1/1] not [1/4].  I forgot to remove "1/4" :(
-Should I re-summit to fix it?
+[auto build test ERROR on clk/clk-next]
+[also build test ERROR on v4.5-rc2 next-20160202]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 
-Thanks,
-Minghuan
+url:    https://github.com/0day-ci/linux/commits/Stephen-Boyd/clk-gpio-Make-into-a-platform-driver/20160203-092337
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
+config: mips-maltaaprp_defconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=mips 
 
+All error/warnings (new ones prefixed by >>):
 
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: Tuesday, February 02, 2016 5:32 PM
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: Minghuan Lian <minghuan.lian@nxp.com>; linux-pci at vger.kernel.org;
-> Shawn Guo <shawnguo@kernel.org>; Sascha Hauer <kernel@pengutronix.de>;
-> Roy Zang <roy.zang@nxp.com>; Stuart Yoder <stuart.yoder@nxp.com>;
-> Yang-Leo Li <leoyang.li@nxp.com>; Bjorn Helgaas <bhelgaas@google.com>;
-> Mingkai Hu <mingkai.hu@nxp.com>
-> Subject: Re: [PATCH 1/4] ARM: dts: ls1021a: add PCIe dts node
-> 
-> On Tuesday 02 February 2016 08:48:36 Minghuan Lian wrote:
-> > Hi Shawn,
-> >
-> > Could you please help to review the patch?  Thank you very much.
-> > There is only one patch not a set of patch, please ignore [1/4]
-> >
-> > Arnd has given a ack.
-> 
-> For some reason, I did not get the other three patches though, I was going to
-> look at them, but I can't tell if this was a series of patches doing PCI support, or
-> patches doing other dts changes.
-> 
-> If you have additional patches for the PCI driver, let's review it all together first.
-> 
-> 	Arnd
+>> drivers/clk/clk-gpio.c:263:1: warning: data definition has no type or storage class
+    MODULE_DEVICE_TABLE(of, gpio_clk_match_table);
+    ^
+>> drivers/clk/clk-gpio.c:263:1: error: type defaults to 'int' in declaration of 'MODULE_DEVICE_TABLE' [-Werror=implicit-int]
+>> drivers/clk/clk-gpio.c:263:1: warning: parameter names (without types) in function declaration
+   cc1: some warnings being treated as errors
+
+vim +263 drivers/clk/clk-gpio.c
+
+   257	
+   258	static const struct of_device_id gpio_clk_match_table[] = {
+   259		{ .compatible = "gpio-mux-clock" },
+   260		{ .compatible = "gpio-gate-clock" },
+   261		{ }
+   262	};
+ > 263	MODULE_DEVICE_TABLE(of, gpio_clk_match_table);
+   264	
+   265	static struct platform_driver gpio_clk_driver = {
+   266		.probe		= gpio_clk_driver_probe,
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 13851 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160203/719b8853/attachment-0001.obj>
