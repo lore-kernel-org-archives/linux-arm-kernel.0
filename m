@@ -1,59 +1,44 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed,  3 Feb 2016 11:39:00 -0700
-Subject: [PATCH V9 02/18] coresight: add API to get sink from path
-In-Reply-To: <1454524756-10628-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1454524756-10628-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1454524756-10628-3-git-send-email-mathieu.poirier@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 3 Feb 2016 20:29:13 +0100
+Subject: [PATCH 5/5] clk: sunxi: Remove clk_register_clkdev calls
+In-Reply-To: <20160202112604.447baec98bf89a79542fd240@free.fr>
+References: <1454402834-6385-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1454402834-6385-6-git-send-email-maxime.ripard@free-electrons.com>
+ <20160202112604.447baec98bf89a79542fd240@free.fr>
+Message-ID: <20160203192913.GA3327@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add an API allowing external code to quickly get a handle on the
-sink within a path.  The sink is always last, but adding an API allows
-to keep the path's node structure private and remove redundant checks.
+On Tue, Feb 02, 2016 at 11:26:04AM +0100, Jean-Francois Moine wrote:
+> On Tue,  2 Feb 2016 09:47:14 +0100
+> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+> 
+> > diff --git a/drivers/clk/sunxi/clk-mod0.c b/drivers/clk/sunxi/clk-mod0.c
+> > index 578bff0dd251..b38d71cec74c 100644
+> > --- a/drivers/clk/sunxi/clk-mod0.c
+> > +++ b/drivers/clk/sunxi/clk-mod0.c
+> > @@ -15,6 +15,7 @@
+> >   */
+> >  
+> >  #include <linux/clk.h>
+> > +#include <linux/clkdev.h>
+> 
+> Why?
 
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
----
- drivers/hwtracing/coresight/coresight-priv.h |  1 +
- drivers/hwtracing/coresight/coresight.c      | 15 +++++++++++++++
- 2 files changed, 16 insertions(+)
+Because this driver uses __clk_get, that it was previously included in
+clk-factors.h and is not anymore, and that otherwise it won't compile,
+obviously.
 
-diff --git a/drivers/hwtracing/coresight/coresight-priv.h b/drivers/hwtracing/coresight/coresight-priv.h
-index 7b193a34d709..14f245a2018d 100644
---- a/drivers/hwtracing/coresight/coresight-priv.h
-+++ b/drivers/hwtracing/coresight/coresight-priv.h
-@@ -54,6 +54,7 @@ static inline void CS_UNLOCK(void __iomem *addr)
- 
- void coresight_disable_path(struct list_head *path);
- int coresight_enable_path(struct list_head *path);
-+struct coresight_device *coresight_get_sink(struct list_head *path);
- struct list_head *coresight_build_path(struct coresight_device *csdev);
- void coresight_release_path(struct list_head *path);
- 
-diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
-index f26589effb70..2ed48545df26 100644
---- a/drivers/hwtracing/coresight/coresight.c
-+++ b/drivers/hwtracing/coresight/coresight.c
-@@ -321,6 +321,21 @@ err:
- 	goto out;
- }
- 
-+struct coresight_device *coresight_get_sink(struct list_head *path)
-+{
-+	struct coresight_device *csdev;
-+
-+	if (!path)
-+		return NULL;
-+
-+	csdev = list_last_entry(path, struct coresight_node, link)->csdev;
-+	if (csdev->type != CORESIGHT_DEV_TYPE_SINK &&
-+	    csdev->type != CORESIGHT_DEV_TYPE_LINKSINK)
-+		return NULL;
-+
-+	return csdev;
-+}
-+
- /**
-  * _coresight_build_path - recursively build a path from a @csdev to a sink.
-  * @csdev:	The device to start from.
+Maxime
+
 -- 
-2.1.4
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160203/bfdb411e/attachment.sig>
