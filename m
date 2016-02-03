@@ -1,58 +1,176 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 3 Feb 2016 09:22:22 -0800
-Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
- v4.5-rc1
-In-Reply-To: <CAJZ5v0hdDdFDiieDnsjummg6F+nV7fi=gFa=oFweyP7-ApsHrQ@mail.gmail.com>
-References: <20160202210345.GZ19432@atomide.com>
- <Pine.LNX.4.44L0.1602021626540.1653-100000@iolanthe.rowland.org>
- <20160202234626.GD19432@atomide.com>
- <CAJZ5v0hdDdFDiieDnsjummg6F+nV7fi=gFa=oFweyP7-ApsHrQ@mail.gmail.com>
-Message-ID: <20160203172222.GL19432@atomide.com>
+From: fu.wei@linaro.org (fu.wei at linaro.org)
+Date: Thu,  4 Feb 2016 01:18:43 +0800
+Subject: [PATCH v10 5/5] Watchdog: ARM SBSA Generic Watchdog half timeout
+ panic support
+In-Reply-To: <1454519923-25230-1-git-send-email-fu.wei@linaro.org>
+References: <1454519923-25230-1-git-send-email-fu.wei@linaro.org>
+Message-ID: <1454519923-25230-6-git-send-email-fu.wei@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Rafael J. Wysocki <rafael@kernel.org> [160203 09:19]:
-> On Wed, Feb 3, 2016 at 12:46 AM, Tony Lindgren <tony@atomide.com> wrote:
-> > * Alan Stern <stern@rowland.harvard.edu> [160202 13:46]:
-> >> On Tue, 2 Feb 2016, Tony Lindgren wrote:
-> >>
-> >> > > Also, what is autosuspend_delay set to for your device?  And is
-> >> > > runtime_auto set?
-> >> >
-> >> > It's 100 at that point, see the commented snippet below from
-> >> > omap_hsmmc_probe():
-> >> >
-> >> >     pm_runtime_enable(host->dev);
-> >> >     pm_runtime_get_sync(host->dev);
-> >> >     pm_runtime_set_autosuspend_delay(host->dev, MMC_AUTOSUSPEND_DELAY);
-> >> >     /* NOTE: pm_runtime_dont_use_autosuspend(host->dev) needed here? */
-> >> >     pm_runtime_use_autosuspend(host->dev);
-> >> >     ...
-> >> >     /* gets -EPROBE_DEFER */
-> >> > err_irq:
-> >> >     ...
-> >> >     pm_runtime_put_sync(host->dev);
-> >>
-> >> You could try changing this to pm_runtime_put_sync_suspend().  But
-> >> putting pm_runtime_dont_use_autosuspend() before the put_sync seems
-> >> like a perfectly reasonable thing to do, especially if you feel you
-> >> should reverse all the changes you made at the start.
-> 
-> FWIW, I'd call pm_runtime_dont_use_autosuspend() before put_sync().
-> 
-> After all, the driver doesn't want to use autosuspend going forward,
-> so stating that explicitly looks like the right thing to do.
+From: Fu Wei <fu.wei@linaro.org>
 
-Yeah agreed. FYI, this is what I typed up here into a commit message:
+This patch registers the WS0 interrupt routine to trigger panic,
+when the watchdog reachs the first stage (the half timeout).
+This function can help administrator to backup the system context
+info by panic console output or kdump (if supported), once system
+goes wrong (doesn't feed the watchdog in the half timeout).
 
-1. For sections of code that needs the device disabled, use
-   pm_runtime_put_sync_suspend() if pm_runtime_set_autosuspend() has
-   been set.
+User also can skip panic by setting panic_enabled (module parameter) as 0
 
-2. For driver exit code, use pm_runtime_dont_use_autosuspend() before
-   pm_runtime_put_sync() if pm_runtime_use_autosuspend() has been
-   set.
+Signed-off-by: Fu Wei <fu.wei@linaro.org>
+---
+ Documentation/watchdog/watchdog-parameters.txt |  1 +
+ drivers/watchdog/Kconfig                       | 10 +++++
+ drivers/watchdog/sbsa_gwdt.c                   | 54 +++++++++++++++++++++++---
+ 3 files changed, 60 insertions(+), 5 deletions(-)
 
-Regards,
-
-Tony
+diff --git a/Documentation/watchdog/watchdog-parameters.txt b/Documentation/watchdog/watchdog-parameters.txt
+index 300eb4d..31641e2 100644
+--- a/Documentation/watchdog/watchdog-parameters.txt
++++ b/Documentation/watchdog/watchdog-parameters.txt
+@@ -286,6 +286,7 @@ nowayout: Watchdog cannot be stopped once started
+ -------------------------------------------------
+ sbsa_gwdt:
+ timeout: Watchdog timeout in seconds. (default 20s)
++panic_enabled: Enable panic at half timeout. (default=true)
+ nowayout: Watchdog cannot be stopped once started
+ 	(default=kernel config parameter)
+ -------------------------------------------------
+diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+index 4ab1b05..42adfdf 100644
+--- a/drivers/watchdog/Kconfig
++++ b/drivers/watchdog/Kconfig
+@@ -218,6 +218,16 @@ config ARM_SBSA_WATCHDOG
+ 	  To compile this driver as module, choose M here: The module
+ 	  will be called sbsa_gwdt.
+ 
++config ARM_SBSA_WATCHDOG_PANIC
++	bool "ARM SBSA Generic Watchdog triggers panic at the half timeout"
++	depends on ARM_SBSA_WATCHDOG
++	help
++	  ARM SBSA Generic Watchdog will trigger panic in the first signal
++	  (WS0) interrupt routine when the half timeout is reached.
++	  This function can help administrator to backup the system context
++	  info by panic console output or kdump (if supported).
++	  But user can skip panic by setting moduleparam panic_enabled as 0.
++
+ config ASM9260_WATCHDOG
+ 	tristate "Alphascale ASM9260 watchdog"
+ 	depends on MACH_ASM9260
+diff --git a/drivers/watchdog/sbsa_gwdt.c b/drivers/watchdog/sbsa_gwdt.c
+index 5a2dba3..d18cf37 100644
+--- a/drivers/watchdog/sbsa_gwdt.c
++++ b/drivers/watchdog/sbsa_gwdt.c
+@@ -16,18 +16,22 @@
+  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  * GNU General Public License for more details.
+  *
+- * This SBSA Generic watchdog driver is a single stage timeout version.
++ * This SBSA Generic watchdog driver is a two stages version.
+  * Since this watchdog timer has two stages, and each stage is determined
+  * by WOR. So the timeout is (WOR * 2).
+- * When first timeout is reached, WS0 is triggered, the interrupt
+- * triggered by WS0 will be ignored, then the second watch period starts;
+- * when second timeout is reached, then WS1 is triggered, system reset.
++ * When the first stage(the half timeout) is reached, WS0 interrupt is
++ * triggered, at this moment the second watch period starts;
++ * In the WS0 interrupt routine, panic will be triggered for saving the
++ * system context.
++ * If the system is getting into trouble and cannot be reset by panic or
++ * restart properly by the kdump kernel(if supported), then the second
++ * stage (the timeout) will be reached, system will be reset by WS1.
+  *
+  * More details about the hardware specification of this device:
+  * ARM DEN0029B - Server Base System Architecture (SBSA)
+  *
+  * SBSA GWDT: |--------WOR-------WS0--------WOR-------WS1
+- *            |----------------timeout----------------reset
++ *            |--half_timeout--(panic)--half_timeout--reset
+  *
+  */
+ 
+@@ -84,6 +88,13 @@ MODULE_PARM_DESC(timeout,
+ 		 "Watchdog timeout in seconds. (>=0, default="
+ 		 __MODULE_STRING(DEFAULT_TIMEOUT) ")");
+ 
++#ifdef CONFIG_ARM_SBSA_WATCHDOG_PANIC
++static bool panic_enabled = true;
++module_param(panic_enabled, bool, 0);
++MODULE_PARM_DESC(panic_enabled,
++		 "enable panic at half timeout. (default=true)");
++#endif
++
+ static bool nowayout = WATCHDOG_NOWAYOUT;
+ module_param(nowayout, bool, S_IRUGO);
+ MODULE_PARM_DESC(nowayout,
+@@ -159,6 +170,16 @@ static int sbsa_gwdt_stop(struct watchdog_device *wdd)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_ARM_SBSA_WATCHDOG_PANIC
++static irqreturn_t sbsa_gwdt_interrupt(int irq, void *dev_id)
++{
++	if (panic_enabled)
++		panic("SBSA Watchdog half timeout");
++
++	return IRQ_HANDLED;
++}
++#endif
++
+ static struct watchdog_info sbsa_gwdt_info = {
+ 	.identity	= "SBSA Generic Watchdog",
+ 	.options	= WDIOF_SETTIMEOUT |
+@@ -186,6 +207,9 @@ static int sbsa_gwdt_probe(struct platform_device *pdev)
+ 	struct resource *res;
+ 	u32 status;
+ 	int ret;
++#ifdef CONFIG_ARM_SBSA_WATCHDOG_PANIC
++	int irq;
++#endif
+ 
+ 	gwdt = devm_kzalloc(dev, sizeof(*gwdt), GFP_KERNEL);
+ 	if (!gwdt)
+@@ -202,6 +226,14 @@ static int sbsa_gwdt_probe(struct platform_device *pdev)
+ 	if (IS_ERR(rf_base))
+ 		return PTR_ERR(rf_base);
+ 
++#ifdef CONFIG_ARM_SBSA_WATCHDOG_PANIC
++	irq = platform_get_irq(pdev, 0);
++	if (irq < 0) {
++		dev_err(dev, "unable to get ws0 interrupt.\n");
++		return irq;
++	}
++#endif
++
+ 	/*
+ 	 * Get the frequency of system counter from the cp15 interface of ARM
+ 	 * Generic timer. We don't need to check it, because if it returns "0",
+@@ -228,6 +260,14 @@ static int sbsa_gwdt_probe(struct platform_device *pdev)
+ 		dev_warn(dev, "System reset by WDT.\n");
+ 		wdd->bootstatus |= WDIOF_CARDRESET;
+ 	}
++#ifdef CONFIG_ARM_SBSA_WATCHDOG_PANIC
++	ret = devm_request_irq(dev, irq, sbsa_gwdt_interrupt, 0,
++			       pdev->name, gwdt);
++	if (ret) {
++		dev_err(dev, "unable to request IRQ %d\n", irq);
++		return ret;
++	}
++#endif
+ 
+ 	ret = watchdog_register_device(wdd);
+ 	if (ret)
+@@ -242,6 +282,10 @@ static int sbsa_gwdt_probe(struct platform_device *pdev)
+ 
+ 	dev_info(dev, "Initialized with %ds timeout @ %u Hz%s\n", wdd->timeout,
+ 		 gwdt->clk, status & SBSA_GWDT_WCS_EN ? " [enabled]" : "");
++#ifdef CONFIG_ARM_SBSA_WATCHDOG_PANIC
++	dev_info(dev, "Half timeout panic %s.\n",
++		 panic_enabled ? "enabled" : "disabled");
++#endif
+ 
+ 	return 0;
+ }
+-- 
+2.5.0
