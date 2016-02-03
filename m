@@ -1,31 +1,48 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 3 Feb 2016 07:40:52 +0530
-Subject: Plain DFS (no voltage scaling)
-In-Reply-To: <56B11B67.3090600@free.fr>
-References: <56B11B67.3090600@free.fr>
-Message-ID: <20160203021052.GK31828@vireshk>
+From: minghuan.lian@nxp.com (Minghuan Lian)
+Date: Wed, 3 Feb 2016 02:11:06 +0000
+Subject: [PATCH 1/4] ARM: dts: ls1021a: add PCIe dts node
+In-Reply-To: <6117401.iajrHOL4Mn@wuerfel>
+References: <1454401807-28751-1-git-send-email-Minghuan.Lian@nxp.com>
+ <VI1PR04MB1615DCF54369ED2E01234E64E8DF0@VI1PR04MB1615.eurprd04.prod.outlook.com>
+ <6117401.iajrHOL4Mn@wuerfel>
+Message-ID: <VI1PR04MB16159CDCE9C134363846F4CAE8D00@VI1PR04MB1615.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02-02-16, 22:11, Mason wrote:
-> Hello,
-> 
-> I plan to enable the on-demand governor on the tango platform:
-> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/boot/dts/tango4-smp8758.dtsi
-> 
-> I found the cpufreq-dt binding doc:
-> 
-> https://www.kernel.org/doc/Documentation/devicetree/bindings/cpufreq/cpufreq-dt.txt
-> https://www.kernel.org/doc/Documentation/devicetree/bindings/opp/opp.txt
-> 
-> Something is not clear to me:
-> 
-> If my platform cannot scale the voltage, what information
-> should I put in the voltage part of the DT?
+Hi Arnd,
 
-Wouldn't matter if there is no regulator. i.e. you should keep 0, but
-even if they have something non-zero, core code will ignore it. But
-yeah, it makes sense to keep it zero.
+I am sorry.
+Other patches are for MSI test, and not need to be summited.
+There is only one patch, should be [1/1] not [1/4].  I forgot to remove "1/4" :(
+Should I re-summit to fix it?
 
--- 
-viresh
+Thanks,
+Minghuan
+
+
+> -----Original Message-----
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: Tuesday, February 02, 2016 5:32 PM
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: Minghuan Lian <minghuan.lian@nxp.com>; linux-pci at vger.kernel.org;
+> Shawn Guo <shawnguo@kernel.org>; Sascha Hauer <kernel@pengutronix.de>;
+> Roy Zang <roy.zang@nxp.com>; Stuart Yoder <stuart.yoder@nxp.com>;
+> Yang-Leo Li <leoyang.li@nxp.com>; Bjorn Helgaas <bhelgaas@google.com>;
+> Mingkai Hu <mingkai.hu@nxp.com>
+> Subject: Re: [PATCH 1/4] ARM: dts: ls1021a: add PCIe dts node
+> 
+> On Tuesday 02 February 2016 08:48:36 Minghuan Lian wrote:
+> > Hi Shawn,
+> >
+> > Could you please help to review the patch?  Thank you very much.
+> > There is only one patch not a set of patch, please ignore [1/4]
+> >
+> > Arnd has given a ack.
+> 
+> For some reason, I did not get the other three patches though, I was going to
+> look at them, but I can't tell if this was a series of patches doing PCI support, or
+> patches doing other dts changes.
+> 
+> If you have additional patches for the PCI driver, let's review it all together first.
+> 
+> 	Arnd
