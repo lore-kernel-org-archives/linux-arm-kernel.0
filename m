@@ -1,75 +1,40 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 03 Feb 2016 11:45:56 +0900
-Subject: [PATCH v4 1/2] regulator: act8945a: add regulator driver for
- ACT8945A
-In-Reply-To: <B256D81BAE5131468A838E5D7A243641D64026A0@penmbx01>
-References: <1453863463-30515-1-git-send-email-wenyou.yang@atmel.com>
- <1453863463-30515-2-git-send-email-wenyou.yang@atmel.com>
- <20160129001603.GM4130@sirena.org.uk>
- <B256D81BAE5131468A838E5D7A243641D63FBF8B@penmbx01>
- <20160129113518.GQ4130@sirena.org.uk> <87wpqn3t72.fsf@dell.be.48ers.dk>
- <B256D81BAE5131468A838E5D7A243641D64026A0@penmbx01>
-Message-ID: <56B169E4.9030801@samsung.com>
+From: jaredeh@gmail.com (Jared Hulbert)
+Date: Tue, 2 Feb 2016 19:06:06 -0800
+Subject: [PATCH] ARM: vmlinux.lds: assert that ROM and RAM don't overlap
+ when XIP_KERNEL=y
+In-Reply-To: <20160203003158.GZ10826@n2100.arm.linux.org.uk>
+References: <1454346154-12931-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20160203003158.GZ10826@n2100.arm.linux.org.uk>
+Message-ID: <CA+ZsKJ5hCSY39D5UBpie5u7XmrJfb0xXBA11hc3z2t8_niKw9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03.02.2016 11:29, Yang, Wenyou wrote:
-> Hi Peter,
-> 
->> -----Original Message-----
->> From: Peter Korsgaard [mailto:jacmet at gmail.com] On Behalf Of Peter Korsgaard
->> Sent: 2016?2?3? 1:42
->> To: Mark Brown <broonie@kernel.org>
->> Cc: Yang, Wenyou <Wenyou.Yang@atmel.com>; Liam Girdwood
->> <lgirdwood@gmail.com>; Rob Herring <robh+dt@kernel.org>; Pawel Moll
->> <pawel.moll@arm.com>; Ian Campbell <ijc+devicetree@hellion.org.uk>; Kumar
->> Gala <galak@codeaurora.org>; Krzysztof Kozlowski
->> <k.kozlowski@samsung.com>; Javier Martinez Canillas <javier@dowhile0.org>;
->> Lee Jones <lee.jones@linaro.org>; Peter Korsgaard <jacmet@gmail.com>; Ferre,
->> Nicolas <Nicolas.FERRE@atmel.com>; linux-arm-kernel at lists.infradead.org;
->> linux-kernel at vger.kernel.org; devicetree at vger.kernel.org
->> Subject: Re: [PATCH v4 1/2] regulator: act8945a: add regulator driver for
->> ACT8945A
+On Tue, Feb 2, 2016 at 4:31 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Feb 01, 2016 at 06:02:34PM +0100, Ard Biesheuvel wrote:
+>> When building an XIP kernel, the linker produces two disjoint VMA regions,
+>> where the first is mapped onto ROM and the second onto RAM. For this reason,
+>> the linker output pointer '.' is updated halfway through the linker script,
+>> and set to a value that corresponds with the start of the RAM region.
 >>
->>>>>>> "Mark" == Mark Brown <broonie@kernel.org> writes:
+>> However, in some cases, the ROM region exceeds the expected size, and the
+>> assignment of the output pointer results in a decrement rather than an
+>> increment, causing the virtual addresses of the .data region to clash with
+>> the .text region. Such a kernel cannot boot normally, but it also confuses
+>> the hell out of kallsyms, since .data symbols may appear inside the
+>> [_stext, _etext] or [_sinittext, _einittext] intervals in the first pass,
+>> but not in the second (or vice versa), resulting in inconsistent kallsyms
+>> data.
 >>
->>  > On Fri, Jan 29, 2016 at 01:20:08AM +0000, Yang, Wenyou wrote:
->>  >> > > +static const struct of_device_id act8945a_pmic_of_match[] = {
->>  >> > > +	{ .compatible = "active-semi,act8945a-regulator" },
->>  >> > > +	{ },
->>  >> > > +};
->>  >> > > +MODULE_DEVICE_TABLE(of, act8945a_pmic_of_match);
->>
->>  >> > This seems mostly OK but why do we have a compatible string here -
->> shouldn't  >> > the MFD be able to instantiate the regulator function without
->> needing this?
->>
->>  >> Because I got feedback from Javier for the act8945a-charger patches of this
->> MFD series,  >> He said missing the OF match table will cause the module
->> autoloading broken.
->>
->>  >> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/398113.html
->>
->>  >> What do you think about it?
->>
->>  > If then device is not being loaded from the DT (and it shouldn't be, the  > device
->> looks like it should be instantiated directly by the MFD as it  > can't exist
->> separately to that MFD) an OF table will do nothing.
->>
->> To add to the confusion, the regulator part of the chip is actually identical to
->> act8865, so it could use the existing regulator driver / compatible, except that it
->> binds to the platform bus instead of i2c.
-> 
-> Thank you for your opinion.
-> 
-> But I think It is better to make it a separate driver, the driver is simpler. 
+>> So let's make sure that the output pointer only advances, and never jumps
+>> back into the ROM region.
+>
+> The long term goal is to move the XIP stuff out of this file, so
+> I think it's better to avoid touching this until the split has
+> happened.
+>
+> I'd _much_ rather see the split happen first, and then fixes
+> applied, rather than trying to fix the existing unmaintainable
+> mess.
 
-Do I understand correctly that you are creating a new device driver for
-the same logical device (regulator block)?
-
-By duplicating the code you are not making kernel simpler. Maybe your
-new driver will be simple but still this adds a NEW driver instead of
-re-using existing code.
-
-Best regards,
-Krzysztof
+Is that split being actively worked on?  If so by whom?
