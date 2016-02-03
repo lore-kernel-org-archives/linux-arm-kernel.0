@@ -1,46 +1,75 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 3 Feb 2016 17:33:54 +0000
-Subject: [PATCH] KVM: arm/arm64: fix reference to uninitialised VGIC
-In-Reply-To: <1454518611-15694-1-git-send-email-andre.przywara@arm.com>
-References: <1454518611-15694-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <56B23A02.7070804@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 3 Feb 2016 17:34:49 +0000
+Subject: [PATCH v4 4/7] arm64: Handle early CPU boot failures
+In-Reply-To: <20160203164632.GC1234@leverpostej>
+References: <1453745225-27736-1-git-send-email-suzuki.poulose@arm.com>
+ <1453745225-27736-5-git-send-email-suzuki.poulose@arm.com>
+ <20160203125735.GA26487@MBP.local>
+ <20160203164632.GC1234@leverpostej>
+Message-ID: <20160203173448.GD26487@MBP.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/02/16 16:56, Andre Przywara wrote:
-> Commit 4b4b4512da2a ("arm/arm64: KVM: Rework the arch timer to use
-> level-triggered semantics") brought the virtual architected timer
-> closer to the VGIC. There is one occasion were we don't properly
-> check for the VGIC actually having been initialized before, but
-> instead go on to check the active state of some IRQ number.
-> If userland hasn't instantiated a virtual GIC, we end up with a
-> kernel NULL pointer dereference:
-> =========
-> Unable to handle kernel NULL pointer dereference at virtual address 00000000
-> pgd = ffffffc9745c5000
-> [00000000] *pgd=00000009f631e003, *pud=00000009f631e003, *pmd=0000000000000000
-> Internal error: Oops: 96000006 [#2] PREEMPT SMP
-> Modules linked in:
-> CPU: 0 PID: 2144 Comm: kvm_simplest-ar Tainted: G      D 4.5.0-rc2+ #1300
-> Hardware name: ARM Juno development board (r1) (DT)
-> task: ffffffc976da8000 ti: ffffffc976e28000 task.ti: ffffffc976e28000
-> PC is at vgic_bitmap_get_irq_val+0x78/0x90
-> LR is at kvm_vgic_map_is_active+0xac/0xc8
-> pc : [<ffffffc0000b7e28>] lr : [<ffffffc0000b972c>] pstate: 20000145
-> ....
-> =========
+On Wed, Feb 03, 2016 at 04:46:32PM +0000, Mark Rutland wrote:
+> On Wed, Feb 03, 2016 at 12:57:38PM +0000, Catalin Marinas wrote:
+> > On Mon, Jan 25, 2016 at 06:07:02PM +0000, Suzuki K. Poulose wrote:
+> > > + * update_early_cpu_boot_status tmp, status
+> > > + *  - Corrupts tmp, x0, x1
+> > > + *  - Writes 'status' to __early_cpu_boot_status and makes sure
+> > > + *    it is committed to memory.
+> > > + */
+> > > +
+> > > +	.macro	update_early_cpu_boot_status tmp, status
+> > > +	mov	\tmp, lr
+> > > +	adrp	x0, __early_cpu_boot_status
+> > > +	add	x0, x0, #:lo12:__early_cpu_boot_status
+> > 
+> > Nitpick: you could use the adr_l macro.
+> > 
+> > > +	mov	x1, #\status
+> > > +	str	x1, [x0]
+> > > +	add	x1, x0, 4
+> > > +	bl	__inval_cache_range
+> > > +	mov	lr, \tmp
+> > > +	.endm
+> > 
+> > If the CPU that's currently booting has the MMU off, what's the point of
+> > invalidating the cache here?
 > 
-> Fix this by bailing out early of kvm_timer_flush_hwstate() if we don't
-> have a VGIC at all.
+> To invalidate stale lines for this address, held in any caches prior to
+> the PoC. I'm assuming that __early_cpu_boot_status is sufficiently
+> padded to the CWG.
+
+I would have rather invalidated it before writing the [x0], if that's
+what it's aimed at.
+
+> Cache maintenance works when SCTLR_ELx.M == 0, though barriers are
+> required prior to cache maintenance as non-cacheable accesses do not
+> hazard by VA.
 > 
-> Reported-by: Cosmin Gorgovan <cosmin@linux-geek.org>
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> Cc: <stable@vger.kernel.org> # 4.4.x
+> The MMU being off has no effect on the cache maintenance itself.
 
-Nice catch, thanks.
+I know, but whether it has an effect on other CPUs is a different
+question (it probably has). Anyway, I would rather do the invalidation
+on the CPU that actually reads this status.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> > The operation may not even be broadcast to the other CPU. So you
+> > actually need the invalidation before reading the status on the
+> > primary CPU.
+> 
+> We require that CPUs are coherent when they enter the kernel, so any
+> cache maintenance operation _must_ affect all coherent caches (i.e. it
+> must be broadcast and must affect all coherent caches prior to the PoC
+> in this case).
 
-	M.
+In general, if you perform cache maintenance on a non-shareable mapping,
+I don't think it would be broadcast. But in this case, the MMU is off,
+data accesses default to Device_nGnRnE and considered outer shareable,
+so it may actually work. Is this stated anywhere in the ARM ARM?
+
+But see my point above about invalidating on the secondary CPU before
+writing the location and invalidating again on the primary CPU before
+reading it.
+
 -- 
-Jazz is not dead. It just smells funny...
+Catalin
