@@ -1,37 +1,36 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 3 Feb 2016 13:43:32 +0000
-Subject: [PATCH] arm64: Allow vmalloc regions to be set with set_memory_*
-In-Reply-To: <56AC2462.20506@huawei.com>
-References: <CAKv+Gu_A1C9hXgqrYDekoy1YHaRXi_mUF-kYx-TqsOBkWMVjmQ@mail.gmail.com>
- <CAKv+Gu-73QKAsFQCa=yO5+=DihLXp_AKYyY6QRTVM4nuDH=-8g@mail.gmail.com>
- <20160118115640.GK21067@leverpostej> <56A97328.9070003@huawei.com>
- <20160128105138.GE17123@leverpostej> <56A9FFBD.8030303@huawei.com>
- <20160128142746.GL17123@leverpostej> <56AABEA4.3010301@huawei.com>
- <20160129110252.GB17038@leverpostej> <56AC2462.20506@huawei.com>
-Message-ID: <20160203134332.GB1234@leverpostej>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 3 Feb 2016 14:06:33 +0000
+Subject: [PATCH 4/4] arm64: Rename cpuid_feature field extract routines
+In-Reply-To: <1453805896-4397-5-git-send-email-suzuki.poulose@arm.com>
+References: <1453805896-4397-1-git-send-email-suzuki.poulose@arm.com>
+ <1453805896-4397-5-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20160203140632.GB16727@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 30, 2016 at 10:48:02AM +0800, Xishi Qiu wrote:
- Hi Mark,
+On Tue, Jan 26, 2016 at 10:58:16AM +0000, Suzuki K. Poulose wrote:
+> Now that we have a clear understanding of the sign of a feature,
+> rename the routines to reflect the sign, so that it is not misused.
+> The cpuid_feature_extract_field() now accepts a 'sign' parameter.
 > 
-> Thanks for your reply. Maybe I didn't express it clearly, sorry for it.
-> 
-> The abstract process is the following:
-> 1. do not create a large block, use 4kb for all of the memory(regardless of performance).
-> setup_arch->paging_init()->map_mem()->__map_memblock()->create_mapping()
-> 2. alloc a page and get the the linear mapping address.
-> 3. modify judgment condition of the function set_memory_ro(), so it could handle the linear mapping range.
-> 4. use set_memory_ro() to change the prot flag of the page which we get in step 2.
-> 
-> Is it safe?
+> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+[...]
+> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+> index 7364339..2ac4a22 100644
+> --- a/arch/arm64/include/asm/kvm_mmu.h
+> +++ b/arch/arm64/include/asm/kvm_mmu.h
+> @@ -307,7 +307,7 @@ static inline unsigned int kvm_get_vmid_bits(void)
+>  {
+>  	int reg = read_system_reg(SYS_ID_AA64MMFR1_EL1);
+>  
+> -	return (cpuid_feature_extract_field(reg, ID_AA64MMFR1_VMIDBITS_SHIFT) == 2) ? 16 : 8;
+> +	return (cpuid_feature_extract_unsigned_field(reg, ID_AA64MMFR1_VMIDBITS_SHIFT) == 2) ? 16 : 8;
+>  }
 
-This will be free from the problems associated with splitting/fusing
-sections.
+Since this is touch a KVM file, it would be good to have an ack from
+Marc or Christoffer.
 
-My concern was with what exactly this "special memory" was and how it
-was being used. It sounds like either some infrstructure is missing, or
-you are using the wrong abstractions.
+Thanks.
 
-Thanks,
-Mark.
+-- 
+Catalin
