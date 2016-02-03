@@ -1,61 +1,23 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Wed, 3 Feb 2016 18:27:16 +0100
-Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
- v4.5-rc1
-In-Reply-To: <20160203172222.GL19432@atomide.com>
-References: <20160202210345.GZ19432@atomide.com>
- <Pine.LNX.4.44L0.1602021626540.1653-100000@iolanthe.rowland.org>
- <20160202234626.GD19432@atomide.com>
- <CAJZ5v0hdDdFDiieDnsjummg6F+nV7fi=gFa=oFweyP7-ApsHrQ@mail.gmail.com>
- <20160203172222.GL19432@atomide.com>
-Message-ID: <CAJZ5v0j_mgtuk-eGYJTV=hNBjQR0-Rhk8ocQUyEVObYnx314pg@mail.gmail.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Wed, 3 Feb 2016 11:27:31 -0600
+Subject: [PATCH v10 5/5] Watchdog: ARM SBSA Generic Watchdog half timeout
+ panic support
+In-Reply-To: <1454519923-25230-6-git-send-email-fu.wei@linaro.org>
+References: <1454519923-25230-1-git-send-email-fu.wei@linaro.org>
+ <1454519923-25230-6-git-send-email-fu.wei@linaro.org>
+Message-ID: <56B23883.7000501@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 3, 2016 at 6:22 PM, Tony Lindgren <tony@atomide.com> wrote:
-> * Rafael J. Wysocki <rafael@kernel.org> [160203 09:19]:
->> On Wed, Feb 3, 2016 at 12:46 AM, Tony Lindgren <tony@atomide.com> wrote:
->> > * Alan Stern <stern@rowland.harvard.edu> [160202 13:46]:
->> >> On Tue, 2 Feb 2016, Tony Lindgren wrote:
->> >>
->> >> > > Also, what is autosuspend_delay set to for your device?  And is
->> >> > > runtime_auto set?
->> >> >
->> >> > It's 100 at that point, see the commented snippet below from
->> >> > omap_hsmmc_probe():
->> >> >
->> >> >     pm_runtime_enable(host->dev);
->> >> >     pm_runtime_get_sync(host->dev);
->> >> >     pm_runtime_set_autosuspend_delay(host->dev, MMC_AUTOSUSPEND_DELAY);
->> >> >     /* NOTE: pm_runtime_dont_use_autosuspend(host->dev) needed here? */
->> >> >     pm_runtime_use_autosuspend(host->dev);
->> >> >     ...
->> >> >     /* gets -EPROBE_DEFER */
->> >> > err_irq:
->> >> >     ...
->> >> >     pm_runtime_put_sync(host->dev);
->> >>
->> >> You could try changing this to pm_runtime_put_sync_suspend().  But
->> >> putting pm_runtime_dont_use_autosuspend() before the put_sync seems
->> >> like a perfectly reasonable thing to do, especially if you feel you
->> >> should reverse all the changes you made at the start.
->>
->> FWIW, I'd call pm_runtime_dont_use_autosuspend() before put_sync().
->>
->> After all, the driver doesn't want to use autosuspend going forward,
->> so stating that explicitly looks like the right thing to do.
->
-> Yeah agreed. FYI, this is what I typed up here into a commit message:
->
-> 1. For sections of code that needs the device disabled, use
->    pm_runtime_put_sync_suspend() if pm_runtime_set_autosuspend() has
->    been set.
->
-> 2. For driver exit code, use pm_runtime_dont_use_autosuspend() before
->    pm_runtime_put_sync() if pm_runtime_use_autosuspend() has been
->    set.
+fu.wei at linaro.org wrote:
+> +#ifdef CONFIG_ARM_SBSA_WATCHDOG_PANIC
+> +static bool panic_enabled = true;
 
-Sounds reasonable to me.
+I think this should default to 'false', because IMHO, this seems like an 
+odd feature.  I'm not crazy about the fact that there's a Kconfig option 
+for it either, but I'm not going to NACK this patch.
 
-Thanks,
-Rafael
+I personally would prefer to drop this patch, and just wait for 
+full-blown pre-timeout support.  It feels like a debugging feature that 
+doesn't really belong upstream.  But like I said, it's just my opinion, 
+and I won't complain if I'm outvoted.
