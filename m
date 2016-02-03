@@ -1,45 +1,73 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 3 Feb 2016 09:42:30 +0100
-Subject: [RFC PATCH 0/3] arm64 initrd mapping/relocation
-In-Reply-To: <56B1222D.3000604@redhat.com>
-References: <1454435802-7604-1-git-send-email-ard.biesheuvel@linaro.org>
- <56B1222D.3000604@redhat.com>
-Message-ID: <CAKv+Gu_K69O4c-500mxxYd=2Se+S=+fjXHkqdLdZ0QUtC4Lbbw@mail.gmail.com>
+From: jitao.shi@mediatek.com (Jitao Shi)
+Date: Wed, 3 Feb 2016 16:48:07 +0800
+Subject: [PATCH v9 1/2] Documentation: bridge: Add documentation for ps8640 DT
+ properties
+Message-ID: <1454489288-31951-1-git-send-email-jitao.shi@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 February 2016 at 22:39, Mark Langsdorf <mlangsdo@redhat.com> wrote:
-> On 02/02/2016 11:56 AM, Ard Biesheuvel wrote:
->>
->> After discussing in linux-efi with Mark, and on #armlinux with Will, this
->> is
->> a proposal for dealing with initrd memory that is potentially not covered
->> by
->> the linear region.
->>
->> Note that this will look slightly differently when some of the KASLR work
->> gets
->> merged, but this should only affect the way we deal with the initrd if it
->> sits
->> outside of the linear region.
->>
->> Mostly intended for discussion, not tested at all.
->>
->> Ard Biesheuvel (3):
->>    memblock: add routine to clear the MEMBLOCK_NOMAP flag for a region
->>    arm64: add the initrd region to the linear mapping explicitly
->>    arm64: remove the now unneeded relocate_initrd()
->
->
-> I discovered the original problem on AMD Seattle and these patches
-> fixed it for me.
->
-> Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
->
+Add documentation for DT properties supported by
+ps8640 DSI-eDP converter.
 
-Thanks Mark.
+Signed-off-by: Jitao Shi <jitao.shi@mediatek.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+Changes since v8:
+ - No change
+---
+ .../devicetree/bindings/display/bridge/ps8640.txt  |   43 ++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/bridge/ps8640.txt
 
-I will let Will confirm when and how these patches will be merged.
-
+diff --git a/Documentation/devicetree/bindings/display/bridge/ps8640.txt b/Documentation/devicetree/bindings/display/bridge/ps8640.txt
+new file mode 100644
+index 0000000..a3e0971
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/bridge/ps8640.txt
+@@ -0,0 +1,43 @@
++ps8640-bridge bindings
++
++Required properties:
++	- compatible: "parade,ps8640"
++	- reg: first page address of the bridge.
++	- sleep-gpios: OF device-tree gpio specification for PD_ pin.
++	- reset-gpios: OF device-tree gpio specification for reset pin.
++	- mode-sel-gpios: OF device-tree gpio specification for mode-sel pin.
++	- vdd12-supply: OF device-tree regulator specification for 1.2V power.
++	- vdd33-supply: OF device-tree regulator specification for 3.3V power.
++	- ports: The device node can contain video interface port nodes per
++		 the video-interfaces bind[1]. For port at 0,set the reg = <0> as
++		 ps8640 dsi in and port at 1,set the reg = <1> as ps8640 eDP out.
++
++[1]: Documentation/devicetree/bindings/media/video-interfaces.txt
++
++Example:
++	edp-bridge at 18 {
++		compatible = "parade,ps8640";
++		reg = <0x18>;
++		sleep-gpios = <&pio 116 GPIO_ACTIVE_HIGH>;
++		reset-gpios = <&pio 115 GPIO_ACTIVE_HIGH>;
++		mode-sel-gpios = <&pio 92 GPIO_ACTIVE_HIGH>;
++		vdd12-supply = <&ps8640_fixed_1v2>;
++		vdd33-supply = <&mt6397_vgp2_reg>;
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			port at 0 {
++				reg = <0>;
++				ps8640_in: endpoint {
++					remote-endpoint = <&dsi0_out>;
++				};
++			};
++			port at 1 {
++				reg = <1>;
++				ps8640_out: endpoint {
++					remote-endpoint = <&panel_in>;
++				};
++			};
++		};
++	};
 -- 
-Ard.
+1.7.9.5
