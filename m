@@ -1,40 +1,174 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 3 Feb 2016 15:23:52 -0500 (EST)
-Subject: [PATCH 0/3] kallsyms: remove special handling for CONFIG_ARM
-In-Reply-To: <CAKv+Gu_MyPvDnnQ0hScqW6XR77h0MD6LxEb_q2Z-mS0AQw3djA@mail.gmail.com>
-References: <1454419174-21290-1-git-send-email-ard.biesheuvel@linaro.org>
- <HKXPR06MB0565A2CFF95AD7C000F43E6A8ADF0@HKXPR06MB0565.apcprd06.prod.outlook.com>
- <CAKv+Gu9VvskQ34w0niS+6AtF9hNcycfYDt_3Kp4T+WK8Vxf_dA@mail.gmail.com>
- <HKXPR06MB05656F902E0E1FBBDBD713DC8AD00@HKXPR06MB0565.apcprd06.prod.outlook.com>
- <CAKv+Gu8ZTHAqviveLMizRKPfeXwb6kcXi4cVQNYVYuPcVMgMeQ@mail.gmail.com>
- <20160203200107.GD10826@n2100.arm.linux.org.uk>
- <CAKv+Gu_MyPvDnnQ0hScqW6XR77h0MD6LxEb_q2Z-mS0AQw3djA@mail.gmail.com>
-Message-ID: <alpine.LFD.2.20.1602031522090.17825@knanqh.ubzr>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 3 Feb 2016 21:27:58 +0100
+Subject: [PATCH v2 06/26] clk: sunxi: Add PLL3 clock
+In-Reply-To: <CAGb2v64pj5Ga4-QaF7RpExUSyYntyMU2dQ87TPsm5WbNeAXMOQ@mail.gmail.com>
+References: <1452785109-6172-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1452785109-6172-7-git-send-email-maxime.ripard@free-electrons.com>
+ <CAGb2v64pj5Ga4-QaF7RpExUSyYntyMU2dQ87TPsm5WbNeAXMOQ@mail.gmail.com>
+Message-ID: <20160203202758.GD3327@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 3 Feb 2016, Ard Biesheuvel wrote:
-
-> On 3 February 2016 at 21:01, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Wed, Feb 03, 2016 at 02:41:29PM +0100, Ard Biesheuvel wrote:
-> >> > bf353edc T __stubs_start
-> >>
-> >> This is a global symbol
-> >>
-> >> > bf353edc T _etext
-> >> > bf353ee0 t __stubs_start
-> >>
-> >> This is a local symbol
-> >
-> > Stop this madness.  This gets you an immediate NAK on the patch set.
-> >
+On Sun, Jan 17, 2016 at 12:05:06AM +0800, Chen-Yu Tsai wrote:
+> Hi,
 > 
-> What madness? This does not change at all with my patches, these
-> duplicates already exist in the current code.
+> On Thu, Jan 14, 2016 at 11:24 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > The A10 SoCs and relatives have a PLL controller to drive the PLL3 and
+> > PLL7, clocked from a 3MHz oscillator, that drives the display related
+> > clocks (GPU, display engine, TCON, etc.)
+> >
+> > Add a driver for it.
+> >
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
+> >  drivers/clk/sunxi/Makefile                        |  1 +
+> >  drivers/clk/sunxi/clk-sun4i-pll3.c                | 90 +++++++++++++++++++++++
+> >  3 files changed, 92 insertions(+)
+> >  create mode 100644 drivers/clk/sunxi/clk-sun4i-pll3.c
+> >
+> > diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+> > index 5360554a7d3f..bb9fb78dcff8 100644
+> > --- a/Documentation/devicetree/bindings/clock/sunxi.txt
+> > +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+> > @@ -10,6 +10,7 @@ Required properties:
+> >         "allwinner,sun4i-a10-pll1-clk" - for the main PLL clock and PLL4
+> >         "allwinner,sun6i-a31-pll1-clk" - for the main PLL clock on A31
+> >         "allwinner,sun8i-a23-pll1-clk" - for the main PLL clock on A23
+> > +       "allwinner,sun4i-a10-pll3-clk" - for the video PLL clock on A10
+> >         "allwinner,sun9i-a80-pll4-clk" - for the peripheral PLLs on A80
+> >         "allwinner,sun4i-a10-pll5-clk" - for the PLL5 clock
+> >         "allwinner,sun4i-a10-pll6-clk" - for the PLL6 clock
+> > diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
+> > index a991cd8ca509..40c32ffd912c 100644
+> > --- a/drivers/clk/sunxi/Makefile
+> > +++ b/drivers/clk/sunxi/Makefile
+> > @@ -11,6 +11,7 @@ obj-y += clk-a20-gmac.o
+> >  obj-y += clk-mod0.o
+> >  obj-y += clk-simple-gates.o
+> >  obj-y += clk-sun4i-display.o
+> > +obj-y += clk-sun4i-pll3.o
+> >  obj-y += clk-sun8i-mbus.o
+> >  obj-y += clk-sun9i-core.o
+> >  obj-y += clk-sun9i-mmc.o
+> > diff --git a/drivers/clk/sunxi/clk-sun4i-pll3.c b/drivers/clk/sunxi/clk-sun4i-pll3.c
+> > new file mode 100644
+> > index 000000000000..6c9c2210b6b2
+> > --- /dev/null
+> > +++ b/drivers/clk/sunxi/clk-sun4i-pll3.c
+> > @@ -0,0 +1,90 @@
+> > +/*
+> > + * Copyright 2015 Maxime Ripard
+> > + *
+> > + * Maxime Ripard <maxime.ripard@free-electrons.com>
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License as published by
+> > + * the Free Software Foundation; either version 2 of the License, or
+> > + * (at your option) any later version.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> > + */
+> > +
+> > +#include <linux/clk-provider.h>
+> > +#include <linux/of.h>
+> > +#include <linux/of_address.h>
+> > +#include <linux/slab.h>
+> > +#include <linux/spinlock.h>
+> > +
+> > +#define SUN4I_A10_PLL3_GATE_BIT        31
+> > +#define SUN4I_A10_PLL3_DIV_WIDTH       7
+> > +#define SUN4I_A10_PLL3_DIV_SHIFT       0
+> > +
+> > +static DEFINE_SPINLOCK(sun4i_a10_pll3_lock);
+> > +
+> > +static void __init sun4i_a10_pll3_setup(struct device_node *node)
+> > +{
+> > +       const char *clk_name = node->name, *parent;
+> > +       struct clk_multiplier *mult;
+> > +       struct clk_gate *gate;
+> > +       void __iomem *reg;
+> > +       struct clk *clk;
+> > +       int ret;
+> > +
+> > +       of_property_read_string(node, "clock-output-names", &clk_name);
+> > +       parent = of_clk_get_parent_name(node, 0);
+> > +
+> > +       reg = of_io_request_and_map(node, 0, of_node_full_name(node));
+> > +       if (IS_ERR(reg)) {
+> > +               pr_err("%s: Could not map the clock registers\n", clk_name);
+> > +               return;
+> > +       }
+> > +
+> > +       gate = kzalloc(sizeof(*gate), GFP_KERNEL);
+> > +       if (!gate)
+> > +               return;
+> > +
+> > +       gate->reg = reg;
+> > +       gate->bit_idx = SUN4I_A10_PLL3_GATE_BIT;
+> > +       gate->lock = &sun4i_a10_pll3_lock;
+> > +
+> > +       mult = kzalloc(sizeof(*mult), GFP_KERNEL);
+> > +       if (!mult)
+> > +               goto err_free_gate;
+> > +
+> > +       mult->reg = reg;
+> > +       mult->shift = SUN4I_A10_PLL3_DIV_SHIFT;
+> > +       mult->width = SUN4I_A10_PLL3_DIV_WIDTH;
+> > +       mult->lock = &sun4i_a10_pll3_lock;
+> > +
+> > +       clk = clk_register_composite(NULL, clk_name,
+> > +                                    &parent, 1,
+> > +                                    NULL, NULL,
+> > +                                    &mult->hw, &clk_multiplier_ops,
+> > +                                    &gate->hw, &clk_gate_ops,
+> > +                                    0);
+> > +       if (IS_ERR(clk)) {
+> > +               pr_err("%s: Couldn't register the clock\n", clk_name);
+> > +               goto err_free_mult;
+> > +       }
+> > +
+> > +       ret = of_clk_add_provider(node, of_clk_src_simple_get, clk);
+> > +       if (WARN_ON(ret))
+> 
+> Any particular reason for WARN_ON instead of pr_err like above?
 
-That doesn't make it any better, and was cause for issue as Chris 
-demonstrated.  Can we get rid of that duplication please?
+I guess not, I'll change that.
 
+> 
+> > +               goto err_clk_unregister;
+> > +
+> > +       return;
+> > +
+> > +err_clk_unregister:
+> > +       clk_unregister_composite(clk);
+> > +err_free_mult:
+> > +       kfree(mult);
+> > +err_free_gate:
+> > +       kfree(gate);
+> 
+> Clean up after of_io_request_and_map(), otherwise
 
-Nicolas
+Ack
+
+> 
+> Acked-by: Chen-Yu Tsai <wens@csie.org>
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160203/c7f23515/attachment.sig>
