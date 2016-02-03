@@ -1,90 +1,150 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 3 Feb 2016 19:02:32 +0100
-Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
- v4.5-rc1
-In-Reply-To: <20160203162705.GG19432@atomide.com>
-References: <20160201232833.GR19432@atomide.com>
- <Pine.LNX.4.44L0.1602011844540.2869-100000@netrider.rowland.org>
- <20160202030533.GT19432@atomide.com>
- <CAPDyKFqQb+jtTpZbq6EvbfAk28yVkgdtiOswngNH_BjCWBDxFg@mail.gmail.com>
- <CAPDyKFras1o13WBZzaZ_Snnj5TBQQFWKr=PtCjUvwe+yGPQn9w@mail.gmail.com>
- <20160202163536.GU19432@atomide.com>
- <CAPDyKFosQjkHDVSvy67+hstjjFseXQP5WYXrJE19GgVFYJ099w@mail.gmail.com>
- <20160202234145.GC19432@atomide.com>
- <CAPDyKFqLi8xOUeoxUTAmif5QrOjVpV_2CDLv4hjO_C9iOnv+5Q@mail.gmail.com>
- <20160203162705.GG19432@atomide.com>
-Message-ID: <CAPDyKFrsbW+vOoKBDvkNbJa=aUZE1EcikCqrAuO4cv+TkW-FnA@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed,  3 Feb 2016 18:00:08 +0000
+Subject: [PATCH v3 15/23] arm64: KVM: VHE: Implement VHE
+ activate/deactivate_traps
+In-Reply-To: <1454522416-6874-1-git-send-email-marc.zyngier@arm.com>
+References: <1454522416-6874-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1454522416-6874-16-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 February 2016 at 17:27, Tony Lindgren <tony@atomide.com> wrote:
->
->> >> To me, it's the responsible of the PM domain to *help* with the
->> >> synchronization, not prevent it as it currently does.
->> >
->> > The problem is that the hardware state gets out of sync with
->> > PM runtime. And that's going to be a pain to debug later on.
->>
->> I don't see the problem, but of course you know omap for better than I do.
->
-> Well there's also the long term maintenance aspect at least I
-> need to consider.
->
->> So if you are concerned about this, perhaps adding a dev_dbg print
->> when the omap hwmod's ->runtime_suspend() callback returns zero could
->> be a way forward?
->
-> If we downgrade it to a debug statement or a warning, we'll soon end
-> up with even more driver specific warnings than we already have.
-> And I don't want to be chasing people around to fix their drivers
-> for eavery new driver that gets submitted.
->
-> Also, without this error I would not even originally have noticed we
-> have a problem :) So I suggest the following:
+Running the kernel in HYP mode requires the HCR_E2H bit to be set
+at all times, and the HCR_TGE bit to be set when running as a host
+(and cleared when running as a guest). At the same time, the vector
+ must be set to the current role of the kernel (either host or
+hypervisor), and a couple of system registers differ between VHE
+and non-VHE.
 
-Well, I am actually not removing that existing warning in the
-omap_device_enable(), as it's being called from other places as well.
+We implement these by using another set of alternate functions
+that get dynamically patched.
 
-It's just the runtime PM path that's being changed.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/include/asm/kvm_arm.h     |  3 ++-
+ arch/arm64/include/asm/kvm_emulate.h |  3 +++
+ arch/arm64/kvm/hyp/switch.c          | 47 +++++++++++++++++++++++++++++++++---
+ 3 files changed, 49 insertions(+), 4 deletions(-)
 
->
-> 1. I'll do a series of patches to fix up the handful of omap
->    specific drivers with pm_runtime_use_autosuspend() that depend
->    on omap_device
->
-> 2. I'll also do a patch to improve the omap_device error message
->    so new drivers are easy to fix. Something like:
->
->   "%() called from invalid state %d, use pm_runtime_put_sync_suspend()?"
->
-> Does that sounds OK to you?
-
-Sure.
-
->
-> Regards,
->
-> Tony
-
-One more thing though. I just realized that you have yet another issue
-to consider going for the approach fixing *only* drivers.
-
-Let me summarize it here:
-
-If userspace has prevented runtime PM (pm_runtime_forbid()) when a
-driver becomes unbound, the driver will not be able to suspend the
-device by using any of the pm_runtime_suspend() APIs, as the usage
-count is isn't zero.
-
-As pm_runtime_reinit() is invoked as part of the driver unbind
-sequence, the runtime PM status goes out of sync. A following driver
-rebind will then trigger the warning when the PM domain's
-->runtime_resume() callback gets invoked. Again, forever preventing
-the device from being runtime suspended.
-
-How do you intend to solve this case?
-I guess there are two options, pick up the patch I posted for omap
-hwmod or make use of pm_runtime_force_suspend() in the driver.
-
-Kind regards
-Uffe
+diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+index 498335e..100cbec 100644
+--- a/arch/arm64/include/asm/kvm_arm.h
++++ b/arch/arm64/include/asm/kvm_arm.h
+@@ -23,6 +23,7 @@
+ #include <asm/types.h>
+ 
+ /* Hyp Configuration Register (HCR) bits */
++#define HCR_E2H		(UL(1) << 34)
+ #define HCR_ID		(UL(1) << 33)
+ #define HCR_CD		(UL(1) << 32)
+ #define HCR_RW_SHIFT	31
+@@ -81,7 +82,7 @@
+ 			 HCR_AMO | HCR_SWIO | HCR_TIDCP | HCR_RW)
+ #define HCR_VIRT_EXCP_MASK (HCR_VA | HCR_VI | HCR_VF)
+ #define HCR_INT_OVERRIDE   (HCR_FMO | HCR_IMO)
+-
++#define HCR_HOST_VHE_FLAGS (HCR_RW | HCR_TGE | HCR_E2H)
+ 
+ /* Hyp System Control Register (SCTLR_EL2) bits */
+ #define SCTLR_EL2_EE	(1 << 25)
+diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+index 3066328..5ae0c69 100644
+--- a/arch/arm64/include/asm/kvm_emulate.h
++++ b/arch/arm64/include/asm/kvm_emulate.h
+@@ -29,6 +29,7 @@
+ #include <asm/kvm_mmio.h>
+ #include <asm/ptrace.h>
+ #include <asm/cputype.h>
++#include <asm/virt.h>
+ 
+ unsigned long *vcpu_reg32(const struct kvm_vcpu *vcpu, u8 reg_num);
+ unsigned long *vcpu_spsr32(const struct kvm_vcpu *vcpu);
+@@ -43,6 +44,8 @@ void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr);
+ static inline void vcpu_reset_hcr(struct kvm_vcpu *vcpu)
+ {
+ 	vcpu->arch.hcr_el2 = HCR_GUEST_FLAGS;
++	if (is_kernel_in_hyp_mode())
++		vcpu->arch.hcr_el2 |= HCR_E2H;
+ 	if (test_bit(KVM_ARM_VCPU_EL1_32BIT, vcpu->arch.features))
+ 		vcpu->arch.hcr_el2 &= ~HCR_RW;
+ }
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index 0db161e..686ca35 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -15,6 +15,8 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ 
++#include <asm/kvm_asm.h>
++
+ #include "hyp.h"
+ 
+ static bool __hyp_text __fpsimd_enabled_nvhe(void)
+@@ -36,6 +38,27 @@ bool __hyp_text __fpsimd_enabled(void)
+ 	return __fpsimd_is_enabled()();
+ }
+ 
++static void __hyp_text __activate_traps_vhe(void)
++{
++	u64 val;
++
++	val = read_sysreg(cpacr_el1);
++	val |= CPACR_EL1_TTA;
++	val &= ~CPACR_EL1_FPEN;
++	write_sysreg(val, cpacr_el1);
++
++	write_sysreg(__kvm_hyp_vector, vbar_el1);
++}
++
++static void __hyp_text __activate_traps_nvhe(void)
++{
++	write_sysreg(CPTR_EL2_TTA | CPTR_EL2_TFP, cptr_el2);
++}
++
++static hyp_alternate_select(__activate_traps_arch,
++			    __activate_traps_nvhe, __activate_traps_vhe,
++			    ARM64_HAS_VIRT_HOST_EXTN);
++
+ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
+ {
+ 	u64 val;
+@@ -55,16 +78,34 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
+ 	write_sysreg(val, hcr_el2);
+ 	/* Trap on AArch32 cp15 c15 accesses (EL1 or EL0) */
+ 	write_sysreg(1 << 15, hstr_el2);
+-	write_sysreg(CPTR_EL2_TTA | CPTR_EL2_TFP, cptr_el2);
+ 	write_sysreg(vcpu->arch.mdcr_el2, mdcr_el2);
++	__activate_traps_arch()();
+ }
+ 
+-static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
++static void __hyp_text __deactivate_traps_vhe(void)
++{
++	extern char vectors[];	/* kernel exception vectors */
++
++	write_sysreg(HCR_HOST_VHE_FLAGS, hcr_el2);
++	write_sysreg(CPACR_EL1_FPEN, cpacr_el1);
++	write_sysreg(vectors, vbar_el1);
++}
++
++static void __hyp_text __deactivate_traps_nvhe(void)
+ {
+ 	write_sysreg(HCR_RW, hcr_el2);
++	write_sysreg(0, cptr_el2);
++}
++
++static hyp_alternate_select(__deactivate_traps_arch,
++			    __deactivate_traps_nvhe, __deactivate_traps_vhe,
++			    ARM64_HAS_VIRT_HOST_EXTN);
++
++static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
++{
++	__deactivate_traps_arch()();
+ 	write_sysreg(0, hstr_el2);
+ 	write_sysreg(read_sysreg(mdcr_el2) & MDCR_EL2_HPMN_MASK, mdcr_el2);
+-	write_sysreg(0, cptr_el2);
+ }
+ 
+ static void __hyp_text __activate_vm(struct kvm_vcpu *vcpu)
+-- 
+2.1.4
