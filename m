@@ -1,32 +1,55 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 3 Feb 2016 13:36:18 +0100
-Subject: [PATCH v2 3/5] pinctrl: sunxi: Add H3 R_PIO controller support
-In-Reply-To: <1454448113-18810-4-git-send-email-k@japko.eu>
-References: <1454448113-18810-1-git-send-email-k@japko.eu>
- <1454448113-18810-4-git-send-email-k@japko.eu>
-Message-ID: <20160203123618.GH4652@lukather>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Wed, 3 Feb 2016 12:38:57 +0000
+Subject: [PATCH v1 3/5] arm64: kernel: Add support for User Access Override
+In-Reply-To: <1454432611-21333-4-git-send-email-james.morse@arm.com>
+References: <1454432611-21333-1-git-send-email-james.morse@arm.com>
+ <1454432611-21333-4-git-send-email-james.morse@arm.com>
+Message-ID: <56B1F4E1.4050603@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 02, 2016 at 10:21:51PM +0100, Krzysztof Adamski wrote:
-> H3 has additional PIO controller similar to what we can find on A23.
-> It's a 12 pin port, described in H3 Datasheet rev 1.1, pages 345-350.
-> 
-> Signed-off-by: Krzysztof Adamski <k@japko.eu>
+On 02/02/16 17:03, James Morse wrote:
+> 'User Access Override' is a new ARMv8.2 feature which allows the
+> unprivileged load and store instructions to be overridden to behave in
+> the normal way.
+>
+> This patch converts {get,put}_user() and friends to use ldtr*/sttr*
+> instructions - so that they can only access EL0 memory, then enables
+> UAO when fs==KERNEL_DS so that these functions can access kernel memory.
+>
+> This allows user space's read/write permissions to be checked against the
+> page tables, instead of testing addr<USER_DS, then using the kernel's
+> read/write permissions.
+>
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> +
+> +#ifdef CONFIG_ARM64_UAO
+> +/*
+> + * Kernel threads have fs=KERNEL_DS by default, and don't need to call
+> + * set_fs(), devtmpfs in particular relies on this behaviour.
+> + * We need to enable the feature at runtime (instead of adding it to
+> + * PSR_MODE_EL1h) as the feature may not be implemented by the cpu.
+> + */
+> +void cpu_enable_uao(void *__unused)
+> +{
+> +	asm(SET_PSTATE_UAO(1));
+> +}
+> +#endif /* CONFIG_ARM64_UAO */
 
-Thanks!
-Maxime
+Could this be moved to arch/arm64/mm/fault.c, just like cpu_enable_pan() ?
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160203/79ba258a/attachment.sig>
+> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+> index 92ddac1e8ca2..5ce2656b04df 100644
+> --- a/arch/arm64/mm/fault.c
+> +++ b/arch/arm64/mm/fault.c
+> @@ -192,6 +192,14 @@ out:
+>   	return fault;
+>   }
+>
+> +static inline int permission_fault(unsigned int esr)
+> +{
+> +	unsigned int ec       = (esr & ESR_ELx_EC_MASK)>>ESR_ELx_EC_SHIFT;
+
+nit: space before and after >> ?
+
+Suzuki
