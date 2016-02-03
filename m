@@ -1,48 +1,24 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 3 Feb 2016 15:26:57 +0100
-Subject: [RFC PATCH 0/3] arm64 initrd mapping/relocation
-In-Reply-To: <1454509367.4108.3.camel@redhat.com>
-References: <1454435802-7604-1-git-send-email-ard.biesheuvel@linaro.org>
- <20160202180622.GP10166@arm.com>
- <1454509367.4108.3.camel@redhat.com>
-Message-ID: <CAKv+Gu__xLKxwAXXf=C3VxpLizjP3oADYyk0bQzQT1G-gTxFqQ@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 3 Feb 2016 22:28:35 +0800
+Subject: [PATCH v2 0/4] ARM: dts: vf610: relicense the device trees under
+ GPLv2/X11
+In-Reply-To: <5311c9f5234f774dc34118a564f48a4c@agner.ch>
+References: <1449525076-23569-1-git-send-email-stefan@agner.ch>
+ <5311c9f5234f774dc34118a564f48a4c@agner.ch>
+Message-ID: <20160203142835.GP8307@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 February 2016 at 15:22, Mark Salter <msalter@redhat.com> wrote:
-> On Tue, 2016-02-02 at 18:06 +0000, Will Deacon wrote:
->> On Tue, Feb 02, 2016 at 06:56:39PM +0100, Ard Biesheuvel wrote:
->> > After discussing in linux-efi with Mark, and on #armlinux with Will, this is
->> > a proposal for dealing with initrd memory that is potentially not covered by
->> > the linear region.
->> >
->> > Note that this will look slightly differently when some of the KASLR work gets
->> > merged, but this should only affect the way we deal with the initrd if it sits
->> > outside of the linear region.
->> >
->> > Mostly intended for discussion, not tested at all.
->>
->> Thanks Ard, this looks like a much better approach to me. Mark -- does
->> the general idea work for you too?
->>
->> Will
->
-> Yeah, much simpler. I like it in concept but am I missing something or is it
-> adding memory to the system beyond the mem= limit?
+On Tue, Feb 02, 2016 at 05:00:23PM -0800, Stefan Agner wrote:
+> Hi Shawn,
+> 
+> For patches 1, 2 and 4 I think we have enough Acks to consider it safe
+> to change the license.
+> 
+> For Patch 3, the Cosmic board, I can not get an Ack nor a Nack from Matt
+> Porter, unfortunately... But IMHO it should not hold us back from
+> merging the rest, what do you think?
 
-Indeed. I think it is reasonable to require that if you pass both mem=
-and initrd= *and* you need your memory limit to be honored strictly,
-it is up to you to ensure that the initrd does not live in the memory
-you are throwing away.
+Yes.  Applied patches 1, 2 and 4.
 
-> But even that may not be
-> a big deal. And I need to look at the KASLR work and understand the issues
-> with it and mem= if any. I'm traveling right now and can't really try it out
-> until tomorrow...
->
-
-No worries. My estimation is that Will is not going to take this as a
-fix anyway, so we have plenty of time to test and/or discuss
-
-Thanks,
-Ard.
+Shawn
