@@ -1,80 +1,101 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 3 Feb 2016 08:37:49 -0800
-Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
- v4.5-rc1
-In-Reply-To: <Pine.LNX.4.44L0.1602031026460.2041-100000@iolanthe.rowland.org>
-References: <20160202234626.GD19432@atomide.com>
- <Pine.LNX.4.44L0.1602031026460.2041-100000@iolanthe.rowland.org>
-Message-ID: <20160203163749.GI19432@atomide.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 3 Feb 2016 10:38:05 -0600
+Subject: [PATCH V2 5/5] Microblaze: Modifying microblaze PCI subsytem to
+ support  generic Xilinx  AXI PCIe Host Bridge IP driver
+In-Reply-To: <20160203163207.GC32546@localhost>
+References: <1452620173-4905-1-git-send-email-bharatku@xilinx.com>
+ <1452620173-4905-6-git-send-email-bharatku@xilinx.com>
+ <20160203163207.GC32546@localhost>
+Message-ID: <20160203163805.GA6112@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Alan Stern <stern@rowland.harvard.edu> [160203 07:49]:
-> On Tue, 2 Feb 2016, Tony Lindgren wrote:
+[+cc Ben for real this time]
+
+On Wed, Feb 03, 2016 at 10:32:07AM -0600, Bjorn Helgaas wrote:
+> [+cc Ben, pcibios_get_phb_of_node() question]
 > 
-> > * Alan Stern <stern@rowland.harvard.edu> [160202 13:46]:
-> > > On Tue, 2 Feb 2016, Tony Lindgren wrote:
-> > > 
-> > > > > Also, what is autosuspend_delay set to for your device?  And is 
-> > > > > runtime_auto set?
-> > > > 
-> > > > It's 100 at that point, see the commented snippet below from
-> > > > omap_hsmmc_probe():
-> > > > 
-> > > > 	pm_runtime_enable(host->dev);
-> > > > 	pm_runtime_get_sync(host->dev);
-> > > > 	pm_runtime_set_autosuspend_delay(host->dev, MMC_AUTOSUSPEND_DELAY);
-> > > > 	/* NOTE: pm_runtime_dont_use_autosuspend(host->dev) needed here? */
-> > > > 	pm_runtime_use_autosuspend(host->dev);
-> > > > 	...
-> > > > 	/* gets -EPROBE_DEFER */
-> > > > err_irq:
-> > > > 	...
-> > > > 	pm_runtime_put_sync(host->dev);
-> > > 
-> > > You could try changing this to pm_runtime_put_sync_suspend().  But
-> > > putting pm_runtime_dont_use_autosuspend() before the put_sync seems
-> > > like a perfectly reasonable thing to do, especially if you feel you
-> > > should reverse all the changes you made at the start.
+> On Tue, Jan 12, 2016 at 11:06:13PM +0530, Bharat Kumar Gogada wrote:
+> > This patch does required modifications to microblaze PCI subsystem, to
+> > work with generic driver (drivers/pci/host/pcie-xilinx.c) on Microblaze
+> > and Zynq.
 > > 
-> > They both seem to fix the problem.
+> > Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
+> > Signed-off-by: Ravi Kiran Gummaluri <rgummal@xilinx.com>
+> >...
 > 
-> So you could use either one.  In my opinion, the 
-> pm_runtime_dont_use_autosuspend() solution is a little cleaner.
+> >  resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+> >  				resource_size_t size, resource_size_t align)
+> >  {
+> > -	struct pci_dev *dev = data;
+> >  	resource_size_t start = res->start;
+> >  
+> > -	if (res->flags & IORESOURCE_IO) {
+> > -		if (skip_isa_ioresource_align(dev))
+> > -			return start;
+> > -		if (start & 0x300)
+> > -			start = (start + 0x3ff) & ~0x3ff;
+> > -	}
+> > -
+> >  	return start;
 > 
-> > > The reinit function gets called too late to do what you want -- namely, 
-> > > put the hardware in a low-power state.
-> > 
-> > Right, the problem is the lack of suspend on the first probe. But
-> > for having autosuspend timeout long enough for the next probe
-> > would mean that we can't reset the PM runtime state in between.
+> "return res->start;" is sufficient; no need for a temporary variable.
 > 
-> That's one way to look at it.  But in principle you don't need to
-> suspend the device after an unsuccessful probe.  You can just leave it
-> at high power.  If this causes problems for a second probe, it's the 
-> second probe's own fault for assuming the actual state matches the PM 
-> status.
-
-Yes. And I can improve the warning for omap_device so the authors
-for new drivers can easily fix the issue.
-
-> > > pm_runtime_put_sync() is supposed to follow the driver's wishes.  It
-> > > invokes the driver's runtime_idle callback if there is one, and the
-> > > callback routine can start a suspend or an autosuspend.  If there is no
-> > > callback, it will use whatever autosuspend setting the driver has set
-> > > up.  If you want to override the autosuspend setting, use
-> > > pm_runtime_put_sync_suspend() instead.
-> > 
-> > Yes.. That works too. I guess the thing to consider is if we should
-> > make pm_runtime_put_sync() always sync along the lines of a patch
-> > I posted earlier today. That could avoid quite a bit of confusion
-> > as already seen in this thread :)
+> >  }
+> >  EXPORT_SYMBOL(pcibios_align_resource);
+> >  
+> > +int pcibios_add_device(struct pci_dev *dev)
+> > +{
+> > +	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
+> > +
+> > +	return 0;
+> > +}
+> > +EXPORT_SYMBOL(pcibios_add_device);
+> > +
+> >  /*
+> >   * Reparent resource children of pr that conflict with res
+> >   * under res, and make res replace those children.
+> > @@ -1335,9 +1308,21 @@ static void pcibios_setup_phb_resources(struct pci_controller *hose,
+> >  
+> >  struct device_node *pcibios_get_phb_of_node(struct pci_bus *bus)
+> >  {
+> > -	struct pci_controller *hose = bus->sysdata;
+> > +	struct device_node *np;
+> > +
+> > +	for_each_node_by_type(np, "pci") {
+> > +		const void *prop;
+> > +		unsigned int bus_min;
+> > +
+> > +		prop = of_get_property(np, "bus-range", NULL);
+> > +		if (!prop)
+> > +			continue;
+> > +		bus_min = be32_to_cpup(prop);
+> > +		if (bus->number == bus_min)
+> > +			return np;
+> > +	}
+> >  
+> > -	return of_node_get(hose->dn);
+> > +	return NULL;
 > 
-> As Rafael pointed out, pm_runtime_put_sync() has well-documented 
-> behavior.  It shouldn't be changed.  I don't see how changing the 
-> behavior would reduce anybody's confusion.  At least, anybody who reads 
-> the documentation carefully.
-
-Right :)
-
-Tony
+> Hmmm.  The old microblaze code ("return of_node_get(hose->dn);") is
+> basically the same as the mips and powerpc versions.  The new code is
+> basically the same as the x86 version.
+> 
+> I like the generic weak version in drivers/pci/of.c because it doesn't
+> use any arch-specific data, and it looks like if we just set the
+> struct device.of_node members correctly, everything should Just Work.
+> 
+> But Ben added both the generic and the x86 versions the same day, so
+> there must be some complication:
+> 
+>   98d9f30c820d ("pci/of: Match PCI devices to OF nodes dynamically")
+>   3d5fe5a65af9 ("x86/devicetree: Use generic PCI <-> OF matching")
+> 
+> So I guess my question is, why do we need a microblaze-specific
+> version at all?
+> 
+> Bjorn
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
