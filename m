@@ -1,53 +1,102 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed,  3 Feb 2016 18:00:58 +0000
-Subject: [PATCH] dt-bindings: arm,
- gic-v3: require that reserved cells are always 0
-Message-ID: <1454522458-29643-1-git-send-email-will.deacon@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed,  3 Feb 2016 18:00:15 +0000
+Subject: [PATCH v3 22/23] arm64: VHE: Add support for running Linux in EL2 mode
+In-Reply-To: <1454522416-6874-1-git-send-email-marc.zyngier@arm.com>
+References: <1454522416-6874-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1454522416-6874-23-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The arm,gic-v3 binding was written with good intentions and doesn't
-enforce interrupt-cells to be 3, therefore making it easy to extend
-the irq description in future if necessary:
+With ARMv8.1 VHE, the architecture is able to (almost) transparently
+run the kernel at EL2, despite being written for EL1.
 
-  > Cells 4 and beyond are reserved for future use.
+This patch takes care of the "almost" part, mostly preventing the kernel
+from dropping from EL2 to EL1, and setting up the HYP configuration.
 
-Unfortunately, this sentence is immediately followed up with:
-
-  > When the 1st cell has a value of 0 or 1, cells 4 and beyond act as
-  > padding, and may be ignored. It is recommended that padding cells
-  > have a value of 0.
-
-Consequently, any extensions to the PPI or SPI interrupt specifiers must
-be able to work with random crap from legacy DTs, effectively
-necessitating a new interrupt type in the first cell. Sigh.
-
-This patch fixes the text so that additional, reserved cells are
-required to be zero. This looks like a reasonable thing to require and
-is already satisifed by the .dts files in-tree.
-
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- .../devicetree/bindings/interrupt-controller/arm,gic-v3.txt          | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+ arch/arm64/Kconfig       | 13 +++++++++++++
+ arch/arm64/kernel/head.S | 28 +++++++++++++++++++++++++++-
+ 2 files changed, 40 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.txt b/Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.txt
-index 7803e77d85cb..007a5b46256a 100644
---- a/Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.txt
-+++ b/Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.txt
-@@ -24,9 +24,8 @@ Main node required properties:
- 		1 = edge triggered
- 		4 = level triggered
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 8cc6228..cf118d9 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -750,6 +750,19 @@ config ARM64_LSE_ATOMICS
+ 	  not support these instructions and requires the kernel to be
+ 	  built with binutils >= 2.25.
  
--  Cells 4 and beyond are reserved for future use. When the 1st cell
--  has a value of 0 or 1, cells 4 and beyond act as padding, and may be
--  ignored. It is recommended that padding cells have a value of 0.
-+  Cells 4 and beyond are reserved for future use and must have a value
-+  of 0 if present.
++config ARM64_VHE
++	bool "Enable support for Virtualization Host Extensions (VHE)"
++	default y
++	help
++	  Virtualization Host Extensions (VHE) allow the kernel to run
++	  directly at EL2 (instead of EL1) on processors that support
++	  it. This leads to better performance for KVM, as they reduce
++	  the cost of the world switch.
++
++	  Selecting this option allows the VHE feature to be detected
++	  at runtime, and does not affect processors that do not
++	  implement this feature.
++
+ endmenu
  
- - reg : Specifies base physical address(s) and size of the GIC
-   registers, in the following order:
+ endmenu
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 917d981..6f2f377 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -30,6 +30,7 @@
+ #include <asm/cache.h>
+ #include <asm/cputype.h>
+ #include <asm/kernel-pgtable.h>
++#include <asm/kvm_arm.h>
+ #include <asm/memory.h>
+ #include <asm/pgtable-hwdef.h>
+ #include <asm/pgtable.h>
+@@ -464,9 +465,27 @@ CPU_LE(	bic	x0, x0, #(3 << 24)	)	// Clear the EE and E0E bits for EL1
+ 	isb
+ 	ret
+ 
++2:
++#ifdef CONFIG_ARM64_VHE
++	/*
++	 * Check for VHE being present. For the rest of the EL2 setup,
++	 * x2 being non-zero indicates that we do have VHE, and that the
++	 * kernel is intended to run@EL2.
++	 */
++	mrs	x2, id_aa64mmfr1_el1
++	ubfx	x2, x2, #8, #4
++#else
++	mov	x2, xzr
++#endif
++
+ 	/* Hyp configuration. */
+-2:	mov	x0, #(1 << 31)			// 64-bit EL1
++	mov	x0, #HCR_RW			// 64-bit EL1
++	cbz	x2, set_hcr
++	orr	x0, x0, #HCR_TGE		// Enable Host Extensions
++	orr	x0, x0, #HCR_E2H
++set_hcr:
+ 	msr	hcr_el2, x0
++	isb
+ 
+ 	/* Generic timers. */
+ 	mrs	x0, cnthctl_el2
+@@ -526,6 +545,13 @@ CPU_LE(	movk	x0, #0x30d0, lsl #16	)	// Clear EE and E0E on LE systems
+ 	/* Stage-2 translation */
+ 	msr	vttbr_el2, xzr
+ 
++	cbz	x2, install_el2_stub
++
++	mov	w20, #BOOT_CPU_MODE_EL2		// This CPU booted in EL2
++	isb
++	ret
++
++install_el2_stub:
+ 	/* Hypervisor stub */
+ 	adrp	x0, __hyp_stub_vectors
+ 	add	x0, x0, #:lo12:__hyp_stub_vectors
 -- 
 2.1.4
