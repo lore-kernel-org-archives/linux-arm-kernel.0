@@ -1,30 +1,68 @@
-From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
-Date: Wed, 3 Feb 2016 23:26:23 +0000
-Subject: [PATCH v4 1/2] ARM: dts: imx6: Add support for Toradex Apalis
- iMX6Q/D SoM
-In-Reply-To: <20160201132916.GF10671@tiger>
-References: <1453675703-31594-1-git-send-email-marcel.ziswiler@toradex.com>
- <1453675703-31594-2-git-send-email-marcel.ziswiler@toradex.com>
- <20160201132916.GF10671@tiger>
-Message-ID: <1454541981.11389.17.camel@toradex.com>
+From: k@japko.eu (Krzysztof Adamski)
+Date: Thu,  4 Feb 2016 00:33:47 +0100
+Subject: [PATCH v3 2/5] dts: sun8i-h3: Add APB0 related clocks and resets
+In-Reply-To: <1454542430-16572-1-git-send-email-k@japko.eu>
+References: <1454542430-16572-1-git-send-email-k@japko.eu>
+Message-ID: <1454542430-16572-3-git-send-email-k@japko.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2016-02-01 at 21:29 +0800, Shawn Guo wrote:
+APB0 is bearly mentioned in H3 User Manual and it is only setup in the
+Allwinners kernel dump for CIR. I have verified experimentally that the
+gate for R_PIO exists and works, though. There are probably other gates
+there but I don't know their order right now and I don't have access to
+their peripherals on my board to test them.
 
-[snip]
+After some experiments and reviewing how this is organized on other
+sunxi SoCs, I couldn't actually find any way to disable clocks for R_PIO
+and they are working properly without doing anything so I assume they
+are connected straight to the 24Mhz oscillator for now.
 
-> > +		stmpe_touchscreen {
-> 
-> Shouldn't the node name be generic as just touchscreen???Or at least,
-> hyphen instead of underscore should be used in node name.
+Signed-off-by: Krzysztof Adamski <k@japko.eu>
+---
+ arch/arm/boot/dts/sun8i-h3.dtsi | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-This one is actually as per binding document example:
-
-Documentation/devicetree/bindings/input/touchscreen/stmpe.txt:
-
-Example:
-
-????????stmpe_touchscreen {
-
-[snip]
+diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+index 1524130e..bb37f52 100644
+--- a/arch/arm/boot/dts/sun8i-h3.dtsi
++++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+@@ -276,6 +276,24 @@
+ 			clocks = <&osc24M>, <&pll6 1>, <&pll5>;
+ 			clock-output-names = "mbus";
+ 		};
++
++		apb0: apb0_clk {
++			compatible = "fixed-factor-clock";
++			#clock-cells = <0>;
++			clock-div = <1>;
++			clock-mult = <1>;
++			clocks = <&osc24M>;
++			clock-output-names = "apb0";
++		};
++
++		apb0_gates: clk at 01f01428 {
++			compatible = "allwinner,sun8i-h3-apb0-gates-clk";
++			reg = <0x01f01428 0x4>;
++			#clock-cells = <1>;
++			clocks = <&apb0>;
++			clock-indices = <0>, <1>;
++			clock-output-names = "apb0_pio", "apb0_ir";
++		};
+ 	};
+ 
+ 	soc {
+@@ -493,5 +511,11 @@
+ 			interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>,
+ 				     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
+ 		};
++
++		apb0_reset: reset at 01f014b0 {
++			reg = <0x01f014b0 0x4>;
++			compatible = "allwinner,sun6i-a31-clock-reset";
++			#reset-cells = <1>;
++		};
+ 	};
+ };
+-- 
+2.1.4
