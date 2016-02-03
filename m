@@ -1,111 +1,131 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 03 Feb 2016 14:21:48 +0100
-Subject: [PATCH] [RFC] ARM: modify pgd_t definition for
- TRANSPARENT_HUGEPAGE_PUD
-Message-ID: <1773775.QWf7OyDGPh@wuerfel>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Wed, 3 Feb 2016 14:26:45 +0100
+Subject: [PATCH v3 00/14] mtd: spi-nor: add driver for Atmel QSPI controller
+Message-ID: <cover.1454505161.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I ran into build errors on ARM after Willy's newly added generic
-TRANSPARENT_HUGEPAGE_PUD support. We don't support this feature
-on ARM at all, but the patch causes a build error anyway:
+Hi all,
 
-In file included from ../kernel/memremap.c:17:0:
-../include/linux/pfn_t.h:108:7: error: 'pud_mkdevmap' declared as function returning an array
- pud_t pud_mkdevmap(pud_t pud);
+This series of patches adds support to the Atmel QSPI controller available
+on sama5d2 SoCs. It was tested on a sama5d2 xplained ultra board with  
+Micron n25q128a13, Spansion s25fl512 and Macronix mx25l51245g QSPI
+memories and a at25df321a SPI memory.
 
-We don't use a PUD on ARM, so pud_t is defined as pmd_t, which
-in turn is defined as
+The SPI protocol to be used by .read_reg(), .write_reg(), .read(), .write()
+and .erase() hooks should be read by these hooks from new *_proto fields in
+the struct spi_nor, the same way as the .read(), .write() and .erase()
+hooks already get the op code value from dedicated *_opcode fields in the
+very same struct spi_nor.
+Doing so, there is no need to modify the current prototypes of all these
+hooks.
 
-typedef unsigned long pgd_t[2];
+Also, if some implementation is not interrested in supporting Dual or Quad
+SPI protocols, it can simply ignore the value of the new  *_proto fields,
+thus assuming the SPI 1-1-1 protocol is always used. Such an
+implementation would work exactly as it did before introducing the *_proto
+fields hence no regression should happen.
+Indeed SPI protocols other than SPI 1-1-1 are used only if the caller of
+spi_nor_scan() sets the value of the 'mode' argument to either
+SPI_NOR_DUAL or SPI_NOR_QUAD.
 
-on NOMMU and on 2-level MMU configurations. There is an (unused)
-other definition using a struct around the array, which happens to
-work fine here.
 
-There is a comment in the file about the fact the other version
-is "easier on the compiler", and I've traced that version back
-to linux-2.1.80 when ARM support was first merged back in 1998.
+This series was based and tested on linux-next
 
-It's probably a safe assumption that this is no longer necessary:
-The same logic existed in asm-i386 at the time but was removed
-a year later in 2.3.23pre3. The STRICT_MM_TYPECHECKS logic
-also ended up getting copied into these files:
+1 - Atmel QSPI controller + Micron n25q128a13 (atmel-quadspi.c driver)
 
-arch/alpha/include/asm/page.h
-arch/arc/include/asm/page.h
-arch/arm/include/asm/pgtable-3level-types.h
-arch/arm64/include/asm/pgtable-types.h
-arch/ia64/include/asm/page.h
-arch/parisc/include/asm/page.h
-arch/powerpc/include/asm/page.h
-arch/sparc/include/asm/page_32.h
-arch/sparc/include/asm/page_64.h
-arch/tile/include/asm/page.h
-arch/unicore32/include/asm/page.h
+SPI 1-1-1: This mode was tested replacing SPI_NOR_QUAD by SPI_NOR_FAST as
+           argument to spi_nor_scan() called from atmel_qspi_probe().
 
-We should probably remove it everywhere, but for the moment,
-this minimal patch gets things to compile on linux-next.
+SPI 1-1-4: Bootloaders (at91bootstrap/uboot) don't enable the Quad SPI
+           mode of the Micron memory. When probed from Linux, the memory
+           uses its Extended SPI mode and replies to the regular Read ID
+           (0x9f) command.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: a27da20ed50e ("mm: add support for PUD-sized transparent hugepages")
+SPI 4-4-4: The romcode enabled the Quad SPI mode the of Micron memory
+           before loading the at91bootstrap. When probed from Linux, the
+           memory uses its Quad SPI mode and no longer replies to the
+           regular Read ID (0x9f) command but instead to the Read ID
+           Multiple I/O (0xaf) command. The memory expects ALL commands
+           to use the SPI 4-4-4 protocol.
 
-diff --git a/arch/arm/include/asm/page-nommu.h b/arch/arm/include/asm/page-nommu.h
-index d1b162a18dcb..3db1ca22fecb 100644
---- a/arch/arm/include/asm/page-nommu.h
-+++ b/arch/arm/include/asm/page-nommu.h
-@@ -31,12 +31,12 @@
-  */
- typedef unsigned long pte_t;
- typedef unsigned long pmd_t;
--typedef unsigned long pgd_t[2];
-+typedef struct { unsigned long pgd[2]; } pgd_t;
- typedef unsigned long pgprot_t;
- 
- #define pte_val(x)      (x)
- #define pmd_val(x)      (x)
--#define pgd_val(x)	((x)[0])
-+#define pgd_val(x)	((x).pgd[0])
- #define pgprot_val(x)   (x)
- 
- #define __pte(x)        (x)
-diff --git a/arch/arm/include/asm/pgtable-2level-types.h b/arch/arm/include/asm/pgtable-2level-types.h
-index 66cb5b0e89c5..9b9815d5ebd6 100644
---- a/arch/arm/include/asm/pgtable-2level-types.h
-+++ b/arch/arm/include/asm/pgtable-2level-types.h
-@@ -24,6 +24,9 @@
- typedef u32 pteval_t;
- typedef u32 pmdval_t;
- 
-+typedef struct { pmdval_t pgd[2]; } pgd_t;
-+#define pgd_val(x)	((x).pgd[0])
-+
- #undef STRICT_MM_TYPECHECKS
- 
- #ifdef STRICT_MM_TYPECHECKS
-@@ -32,12 +35,10 @@ typedef u32 pmdval_t;
-  */
- typedef struct { pteval_t pte; } pte_t;
- typedef struct { pmdval_t pmd; } pmd_t;
--typedef struct { pmdval_t pgd[2]; } pgd_t;
- typedef struct { pteval_t pgprot; } pgprot_t;
- 
- #define pte_val(x)      ((x).pte)
- #define pmd_val(x)      ((x).pmd)
--#define pgd_val(x)	((x).pgd[0])
- #define pgprot_val(x)   ((x).pgprot)
- 
- #define __pte(x)        ((pte_t) { (x) } )
-@@ -50,12 +51,10 @@ typedef struct { pteval_t pgprot; } pgprot_t;
-  */
- typedef pteval_t pte_t;
- typedef pmdval_t pmd_t;
--typedef pmdval_t pgd_t[2];
- typedef pteval_t pgprot_t;
- 
- #define pte_val(x)      (x)
- #define pmd_val(x)      (x)
--#define pgd_val(x)	((x)[0])
- #define pgprot_val(x)   (x)
- 
- #define __pte(x)        (x)
+2 - Atmel QSPI controller + Macronix mx25l51245g (atmel-quadspi.c driver)
+
+SPI 1-1-4: the number of dummy cycles is set to 8 so drivers such as the
+           m25p80 one can work properly.
+
+3 - Atmel QSPI controller + Spansion s25fl512 (atmel-quadspi.c driver)
+
+SPI 1-1-4: default settings. Early developpements on a FPGA board.
+
+4 - Atmel SPI contoller + at25df321a (m25p80.c driver)
+
+SPI 1-1-1: tested with the m25p80 driver for non regression purpose.
+
+
+Winbond memories were NOT tested since I don't have any sample yet. The
+patches were written only based on the manufacturers' datasheets.
+
+
+Best regards,
+
+Cyrille
+
+
+ChangeLog:
+
+v2 > v3:
+- no longer check patterns such as FFFFFF or 000000 to detect a Read Jedec
+  ID failure: always look the read ID up in the spi_nor_ids[] table (patch 2).
+- fix patch 10 to configure the number of dummy cycles on Macronix memories:
+  these memories use op code 0x15 to read their Configuration Register. Op
+  code 0x35 is used to enter Macronix QPI mode, which was not intented.
+- add "Acked-by Nicolas Ferre <nicolas.ferre@atmel.com>" to patch 14:
+  driver for Atmel QSPI controller.
+
+v1 -> v2:
+- I've totally reworked the whole series. Especially I have split the
+  former patch 2 to ease the code review. The Single/Dual/Quad SPI mode
+  support fixes are now done by manufacturer.
+- fix support and probing of Winbond memories.
+- m25p80: compute the number of dummy bytes from both the number of dummy
+  clock cycles and the number of I/O lines used to send them.
+- fix Kconfig dependencies for the Atmel QSPI controller driver (it should
+  fix the kbuild test robot warnings).
+- add more comments.
+
+Cyrille Pitchen (14):
+  mtd: spi-nor: remove micron_quad_enable()
+  mtd: spi-nor: properly detect the memory when it boots in Quad or Dual
+    mode
+  mtd: spi-nor: select op codes and SPI NOR protocols by manufacturer
+  mtd: spi-nor: fix support of Macronix memories
+  mtd: spi-nor: fix support of Winbond memories
+  mtd: spi-nor: fix support of Micron memories
+  mtd: spi-nor: fix support of Spansion memories
+  mtd: spi-nor: configure the number of dummy clock cycles by
+    manufacturer
+  mtd: spi-nor: configure the number of dummy clock cycles on Micron
+    memories
+  mtd: spi-nor: configure the number of dummy clock cycles on Macronix
+    memories
+  mtd: spi-nor: configure the number of dummy clock cycles on Spansion
+    memories
+  mtd: m25p80: add support of dual and quad spi protocols to all
+    commands
+  Documentation: atmel-quadspi: add binding file for Atmel QSPI driver
+  mtd: atmel-quadspi: add driver for Atmel QSPI controller
+
+ .../devicetree/bindings/mtd/atmel-quadspi.txt      |  32 +
+ drivers/mtd/devices/m25p80.c                       | 192 ++++-
+ drivers/mtd/spi-nor/Kconfig                        |   9 +
+ drivers/mtd/spi-nor/Makefile                       |   1 +
+ drivers/mtd/spi-nor/atmel-quadspi.c                | 877 ++++++++++++++++++++
+ drivers/mtd/spi-nor/spi-nor.c                      | 921 +++++++++++++++++++--
+ include/linux/mtd/spi-nor.h                        |  74 +-
+ 7 files changed, 1971 insertions(+), 135 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mtd/atmel-quadspi.txt
+ create mode 100644 drivers/mtd/spi-nor/atmel-quadspi.c
+
+-- 
+1.8.2.2
