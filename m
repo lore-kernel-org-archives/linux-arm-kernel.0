@@ -1,80 +1,83 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 3 Feb 2016 12:17:24 +0100
-Subject: [PATCH] dmaengine: use phys_addr_t for slave configuration
-In-Reply-To: <20151215172649.GK1854@localhost>
-References: <1366967214-20776-1-git-send-email-linus.walleij@linaro.org>
- <CAMuHMdUTzTBT8DyRb5WN048U5DbVsFnhJB0c5tjHBnA4rfetJg@mail.gmail.com>
- <20150710081411.GF836@localhost>
- <CAMuHMdV8a1W1MyJPanUNBzaiNsL96JYzetBVSiZoC3=eKXzo1Q@mail.gmail.com>
- <20151215172649.GK1854@localhost>
-Message-ID: <CAMuHMdXe8i2JbhOP2sWkVkqHEeBnW4AfVBbRaoZW=Kg0s_9m3g@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 3 Feb 2016 11:21:12 +0000
+Subject: [PATCH v3] ARM64: kernel: implement ACPI parking protocol
+In-Reply-To: <20160202182657.GC15706@e104818-lin.cambridge.arm.com>
+References: <1453806638-23167-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <20160202182657.GC15706@e104818-lin.cambridge.arm.com>
+Message-ID: <20160203112112.GA18387@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+On Tue, Feb 02, 2016 at 06:26:58PM +0000, Catalin Marinas wrote:
+> On Tue, Jan 26, 2016 at 11:10:38AM +0000, Lorenzo Pieralisi wrote:
+> > The SBBR and ACPI specifications allow ACPI based systems that do not
+> > implement PSCI (eg systems with no EL3) to boot through the ACPI parking
+> > protocol specification[1].
+> > 
+> > This patch implements the ACPI parking protocol CPU operations, and adds
+> > code that eases parsing the parking protocol data structures to the
+> > ARM64 SMP initializion carried out at the same time as cpus enumeration.
+> > 
+> > To wake-up the CPUs from the parked state, this patch implements a
+> > wakeup IPI for ARM64 (ie arch_send_wakeup_ipi_mask()) that mirrors the
+> > ARM one, so that a specific IPI is sent for wake-up purpose in order
+> > to distinguish it from other IPI sources.
+> > 
+> > Given the current ACPI MADT parsing API, the patch implements a glue
+> > layer that helps passing MADT GICC data structure from SMP initialization
+> > code to the parking protocol implementation somewhat overriding the CPU
+> > operations interfaces. This to avoid creating a completely trasparent
+> > DT/ACPI CPU operations layer that would require creating opaque
+> > structure handling for CPUs data (DT represents CPU through DT nodes, ACPI
+> > through static MADT table entries), which seems overkill given that ACPI
+> > on ARM64 mandates only two booting protocols (PSCI and parking protocol),
+> > so there is no need for further protocol additions.
+> > 
+> > Based on the original work by Mark Salter <msalter@redhat.com>
+> > 
+> > [1] https://acpica.org/sites/acpica/files/MP%20Startup%20for%20ARM%20platforms.docx
+> > 
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Cc: Hanjun Guo <hanjun.guo@linaro.org>
+> > Cc: Loc Ho <lho@apm.com>
+> > Cc: Sudeep Holla <sudeep.holla@arm.com>
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Mark Rutland <mark.rutland@arm.com>
+> > Cc: Mark Salter <msalter@redhat.com>
+> > Cc: Al Stone <ahs3@redhat.com>
+> 
+> Applied, with a minor addition just to warn people from not using it in
+> other configurations (#ifdef still needed otherwise the
+> acpi_parking_protocol_valid symbol is not available; but I prefer uglier
+> code than people starting to use this IPI in their firmware):
 
-On Tue, Dec 15, 2015 at 6:26 PM, Vinod Koul <vinod.koul@intel.com> wrote:
-> On Tue, Dec 15, 2015 at 11:48:24AM +0100, Geert Uytterhoeven wrote:
->> On Fri, Jul 10, 2015 at 10:14 AM, Vinod Koul <vinod.koul@intel.com> wrote:
->> > On Wed, Jul 08, 2015 at 12:12:52PM +0200, Geert Uytterhoeven wrote:
->> >> On Fri, Apr 26, 2013 at 11:06 AM, Linus Walleij
+It makes sense, we could include asm/acpi.h in smp.c (which is not
+included by linux/acpi.h if !CONFIG_ACPI) to pull in the symbol and
+remove the ifdef if you think it is cleaner.
 
-(yes, 2013)
+Thanks !
+Lorenzo
 
->> >> <linus.walleij@linaro.org> wrote:
->> >> > The documentation already says these are physical addresses, and
->> >> > we have concluded that any translation into the DMA address space
->> >> > needs to reside in the dmaengine driver, so change the type of
->> >> > the passed arguments.
->> >> >
->> >> > Cc: Arnd Bergmann <arnd@arndb.de>
->> >> > Cc: Lee Jones <lee.jones@linaro.org>
->> >> > Cc: Vinod Koul <vinod.koul@intel.com>
->> >> > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->> >>
->> >> What's the status of this one, which has been acked by Lee and Arnd?
->> > Looks to have slipped thru. I will redo it
->>
->> Ping?
->
-> I should be able to do this in next few days...
-
-Ping?
-
-This is a dependency for adding iommu support to the rcar-dmac driver, cfr.
-"[PATCH v2 0/5] dmaengine: rcar-dmac: add iommu support for slave transfers".
-http://www.spinics.net/lists/linux-renesas-soc/msg00066.html
-https://www.mail-archive.com/linux-renesas-soc at vger.kernel.org/msg00108.html
-
-Thank you for applying!
-
->> >> > ---
->> >> >  include/linux/dmaengine.h | 4 ++--
->> >> >  1 file changed, 2 insertions(+), 2 deletions(-)
->> >> >
->> >> > diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
->> >> > index 91ac8da..681df5f9 100644
->> >> > --- a/include/linux/dmaengine.h
->> >> > +++ b/include/linux/dmaengine.h
->> >> > @@ -361,8 +361,8 @@ enum dma_slave_buswidth {
->> >> >   */
->> >> >  struct dma_slave_config {
->> >> >         enum dma_transfer_direction direction;
->> >> > -       dma_addr_t src_addr;
->> >> > -       dma_addr_t dst_addr;
->> >> > +       phys_addr_t src_addr;
->> >> > +       phys_addr_t dst_addr;
->> >> >         enum dma_slave_buswidth src_addr_width;
->> >> >         enum dma_slave_buswidth dst_addr_width;
->> >> >         u32 src_maxburst;
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> 
+> --- a/arch/arm64/kernel/smp.c
+> +++ b/arch/arm64/kernel/smp.c
+> @@ -767,6 +767,12 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
+>                 break;
+>  #endif
+> +
+> +#ifdef CONFIG_ARM64_ACPI_PARKING_PROTOCOL
+>         case IPI_WAKEUP:
+> +               WARN_ONCE(!acpi_parking_protocol_valid(cpu),
+> +                         "CPU%u: Wake-up IPI outside the ACPI parking protocol\n",
+> +                         cpu);
+>                 break;
+> +#endif
+>  
+>         default:
+> 
+> Thanks.
+> 
+> -- 
+> Catalin
+> 
