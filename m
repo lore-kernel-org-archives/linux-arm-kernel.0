@@ -1,55 +1,36 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Wed, 3 Feb 2016 14:40:47 +0800
-Subject: FW: [RFC 3/3] CMDQ: Mediatek CMDQ driver
-In-Reply-To: <1454479333.11967.12.camel@mtksdaap41>
-References: <8A0FDEEF9DBBD140A3857422D81DA20F867B19FD@mtkmbs01n1>
- <1454479333.11967.12.camel@mtksdaap41>
-Message-ID: <CAGS+omABD93f3X0pfiFgaxa9Lob2txkJfUUomUvs+hiRkxSuHw@mail.gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Tue, 2 Feb 2016 22:44:23 -0800
+Subject: MTK mt8173-evb: mainline unstable, and big-endian boot failures
+In-Reply-To: <1454463498.27798.24.camel@mtksdaap41>
+References: <CAOi56cVDbkAJEDWy3+DV63a=UuD7nqpUu8X7e-OjtWM-4dj_-w@mail.gmail.com>
+ <7hsi1ilczm.fsf@baylibre.com>
+ <CAF-23O3ps0Wt_UCmJbArpc5iJJryJKA0k_2qAyNb7op8O=UnAg@mail.gmail.com>
+ <1453964180.26397.8.camel@mtksdaap41> <7hy4b8gc7q.fsf@baylibre.com>
+ <1454309376.11974.3.camel@mtksdaap41> <7hh9hrgbbh.fsf@baylibre.com>
+ <1454379462.27798.11.camel@mtksdaap41>
+ <7h37tbdk6y.fsf@baylibre.com>
+ <1454463498.27798.24.camel@mtksdaap41>
+Message-ID: <CAOi56cUjbdRwd8qw+UFJGG_F0-a8yx12Uo0Ta_XF_wEZf8OgpQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Hi Dan,
->
-> Thanks for your comment.
-> This solution looks good to me.
-> I will change it as your suggestion.
->
-> But, I have a question about 'mask out the provided *device virtual*
-> address'.
-> Are lower 16-bits (or 24-bits for JUMP op) of device virtual address the
-> same as device physical address?
+Hi Fan,
 
-I'm not sure.  But I doubt it we can rely on this.
-My guess would be that the ioremap only preserves the lower 12 bits
-(4k page size).
+On Tue, Feb 2, 2016 at 5:38 PM, Fan Chen <fan.chen@mediatek.com> wrote:
 
-> If not, we still need to pass in physical address into CMDQ driver.
+>> Speaking of updated firmware, is there any chance to make the default
+>> version of the firmware significantly less noisy.  There is a TON of
+>> output from the firmware before fastboot starts which makes the logs for
+>> this board very noisy (same complaint on the mt8135.)
+>>
+> I will discuss with Eddie if it's possible to release a version with
+> light logs, but I'm afraid the answer could be given after our Chinese
+> New Year vacation. :P
 
-Or, instead of the iommu/slot approach, we can just provide a
-registration function for the gce driver.
-Each gce consumer could then have a simple gce node, with no slot/address:
+Thank you, it's not a big rush on that feature request, but it will be
+helpful whenever you can get to it.  Thanks for looking into it.  I
+hope you enjoy your  vacation.
 
-  mediatek,gce = <&gce>;
+Gu?ni?n h?o  :)
 
-Then on probe, the gce consumer could pass in its (struct device *) to
-gce_register_device().  gce_register_device() could then access the
-device's of_node to extract its physical address range, and look up
-its physical address in its table of per-soc of
-"device_address:gce_subsys_address" entries.  If the physical address
-is in a valid subsys ranges, the gce_register_device would cache the
-subsys address, and an offset in a (struct gce_consumer).
-gce_register_device() could then add this struct to a struct list_head
-of gce_consumers, and finally return a pointer to it back to the
-caller.
-
-Later, the gce consumer could pass in ths (struct gce_consumer *) when
-make gce calls, along with the *offset* (not the physical address or
-virtual address) for the register that it wishes to access.  Then the
-gce driver can simply use the gce_consumer->subsys entry to create a
-gce address from the passed in offset.
-
-This will keep the binding very simple, and would remove the need to
-convert from device virtual to physical addresses by the gce consumer,
-but require a little more per-gce-consumer setup.
-
--Dan
+Kevin
