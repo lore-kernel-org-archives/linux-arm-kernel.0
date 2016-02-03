@@ -1,31 +1,47 @@
-From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
-Date: Wed, 3 Feb 2016 11:03:06 -0600
-Subject: [PATCH] ARM: multi_v7_defconfig: enable DW_WATCHDOG
-Message-ID: <1454518986-25953-1-git-send-email-dinguyen@opensource.altera.com>
+From: jglauber@cavium.com (Jan Glauber)
+Date: Wed,  3 Feb 2016 18:11:55 +0100
+Subject: [PATCH v3 0/5] Cavium ThunderX PMU support
+Message-ID: <cover.1454516082.git.jglauber@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <dinguyen@opensource.altera.com>
+Hi,
 
-The watchdog timer on the SoCFPGA platform is the Synopsys Designware watchdog.
-Enable CONFIG_DW_WATCHDOG for the driver to get built.
+I'm reposting the whole series just in case my previous attempt to
+repost only the broken patch was confusing. Patches are based on
+4.5-rc2.
 
-Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
----
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+Patches 1-3 add support for ThunderX specific PMU events.
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 69d6a6d..24ceac2 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -426,6 +426,7 @@ CONFIG_SUNXI_WATCHDOG=y
- CONFIG_IMX2_WDT=y
- CONFIG_TEGRA_WATCHDOG=m
- CONFIG_MESON_WATCHDOG=y
-+CONFIG_DW_WATCHDOG=y
- CONFIG_DIGICOLOR_WATCHDOG=y
- CONFIG_MFD_AS3711=y
- CONFIG_MFD_AS3722=y
+Patch 4 changes the cycle counter to overflow on 64 bit but tries to minimize
+code changes. Without this change perf does not work at all on ThunderX.
+
+Patch 5 extends the event mask according to ARMv8.1 and also affects arm32.
+
+Changes to v2:
+- fixed arm compile errors
+
+Changes to v1:
+- renamed thunderx dt pmu binding to thunder
+
+--Jan
+
+Jan Glauber (5):
+  arm64/perf: Rename Cortex A57 events
+  arm64/perf: Add Cavium ThunderX PMU support
+  arm64: dts: Add Cavium ThunderX specific PMU
+  arm64/perf: Enable PMCR long cycle counter bit
+  arm64/perf: Extend event mask for ARMv8.1
+
+ Documentation/devicetree/bindings/arm/pmu.txt |   1 +
+ arch/arm/kernel/perf_event_v6.c               |   6 +-
+ arch/arm/kernel/perf_event_v7.c               |  29 ++++--
+ arch/arm/kernel/perf_event_xscale.c           |   4 +-
+ arch/arm64/boot/dts/cavium/thunder-88xx.dtsi  |   5 +
+ arch/arm64/kernel/perf_event.c                | 145 ++++++++++++++++++++------
+ drivers/perf/arm_pmu.c                        |   5 +-
+ include/linux/perf/arm_pmu.h                  |   4 +-
+ 8 files changed, 151 insertions(+), 48 deletions(-)
+
 -- 
-2.6.2
+1.9.1
