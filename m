@@ -1,77 +1,86 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 3 Feb 2016 16:46:32 +0000
-Subject: [PATCH v4 4/7] arm64: Handle early CPU boot failures
-In-Reply-To: <20160203125735.GA26487@MBP.local>
-References: <1453745225-27736-1-git-send-email-suzuki.poulose@arm.com>
- <1453745225-27736-5-git-send-email-suzuki.poulose@arm.com>
- <20160203125735.GA26487@MBP.local>
-Message-ID: <20160203164632.GC1234@leverpostej>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 3 Feb 2016 08:49:40 -0800
+Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
+ v4.5-rc1
+In-Reply-To: <CAJZ5v0if-OCynmN1qzBaWLHOEEHN6kJe1LCbJ=eOwUj6=iZDaw@mail.gmail.com>
+References: <CAPDyKFqQb+jtTpZbq6EvbfAk28yVkgdtiOswngNH_BjCWBDxFg@mail.gmail.com>
+ <Pine.LNX.4.44L0.1602021112320.1653-100000@iolanthe.rowland.org>
+ <CAPDyKFokWcLSCAh_TX-j-df_M1hN8Qw1gbQt--SyWccGCPiN5Q@mail.gmail.com>
+ <20160202213916.GA19432@atomide.com>
+ <CAJZ5v0if-OCynmN1qzBaWLHOEEHN6kJe1LCbJ=eOwUj6=iZDaw@mail.gmail.com>
+Message-ID: <20160203164940.GJ19432@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 03, 2016 at 12:57:38PM +0000, Catalin Marinas wrote:
-> Hi Suzuki,
-> 
-> On Mon, Jan 25, 2016 at 06:07:02PM +0000, Suzuki K. Poulose wrote:
-> > + * update_early_cpu_boot_status tmp, status
-> > + *  - Corrupts tmp, x0, x1
-> > + *  - Writes 'status' to __early_cpu_boot_status and makes sure
-> > + *    it is committed to memory.
-> > + */
+* Rafael J. Wysocki <rafael@kernel.org> [160203 05:04]:
+> On Tue, Feb 2, 2016 at 10:39 PM, Tony Lindgren <tony@atomide.com> wrote:
+> > * Ulf Hansson <ulf.hansson@linaro.org> [160202 12:25]:
+> >> >
+> >> > ?  pm_runtime_put_sync() _already_ does not respect the autosuspend
+> >> > mode.  If you want to respect it, you have to call
+> >> > pm_runtime_put_sync_autosuspend() instead.
+> >>
+> >> Then there's a bug in the runtime PM core.
+> >>
+> >> From Tony's regression report and from mine own local runtime PM test
+> >> driver, I can see that the device doesn't get RPM_SUSPENDED (the
+> >> ->runtime_suspend() callback isn't called), even when the usage count
+> >> is zero - when pm_runtime_put_sync() is called.
+> > ...
+> >> Okay, so you are saying that the pm_runtime_put_sync() should idle the
+> >> device even if autosuspend is in use. That seems reasonable, I will
+> >> look into this problem.
+> >
+> > The patch below fixes pm_runtime_put_sync() to not respect the
+> > autosuspend mode to match what Alan is saying above. Seems to also
+> > fixes the $subject issue for me. And seems to behave for PM runtime
+> > for other devices during runtime too based on light testing here.
+> >
+> > Regards,
+> >
+> > Tony
+> >
+> > 8< ---------------
+> > --- a/drivers/base/power/runtime.c
+> > +++ b/drivers/base/power/runtime.c
+> > @@ -353,7 +353,9 @@ static int rpm_idle(struct device *dev, int rpmflags)
+> >
+> >   out:
+> >         trace_rpm_return_int(dev, _THIS_IP_, retval);
+> > -       return retval ? retval : rpm_suspend(dev, rpmflags | RPM_AUTO);
+> > +       if (!(rpmflags & RPM_IGNORE_AUTO))
+> > +               rpmflags |= RPM_AUTO;
+> > +       return retval ? retval : rpm_suspend(dev, rpmflags);
+> >  }
+> >
+> >  /**
+> > --- a/include/linux/pm_runtime.h
+> > +++ b/include/linux/pm_runtime.h
+> > @@ -23,6 +23,8 @@
+> >                                             usage_count */
+> >  #define RPM_AUTO               0x08    /* Use autosuspend_delay */
+> >
+> > +#define RPM_IGNORE_AUTO                0x10    /* Ignore autosuspend */
 > > +
-> > +	.macro	update_early_cpu_boot_status tmp, status
-> > +	mov	\tmp, lr
-> > +	adrp	x0, __early_cpu_boot_status
-> > +	add	x0, x0, #:lo12:__early_cpu_boot_status
+> >  #ifdef CONFIG_PM
+> >  extern struct workqueue_struct *pm_wq;
+> >
+> > @@ -241,7 +243,7 @@ static inline int pm_runtime_put_autosuspend(struct device *dev)
+> >
+> >  static inline int pm_runtime_put_sync(struct device *dev)
+> >  {
+> > -       return __pm_runtime_idle(dev, RPM_GET_PUT);
+> > +       return __pm_runtime_idle(dev, RPM_GET_PUT | RPM_IGNORE_AUTO);
+> >  }
+> >
+> >  static inline int pm_runtime_put_sync_suspend(struct device *dev)
 > 
-> Nitpick: you could use the adr_l macro.
+> This changes a well-documented behavior that someone may be relying on.
 > 
-> > +	mov	x1, #\status
-> > +	str	x1, [x0]
-> > +	add	x1, x0, 4
-> > +	bl	__inval_cache_range
-> > +	mov	lr, \tmp
-> > +	.endm
-> 
-> If the CPU that's currently booting has the MMU off, what's the point of
-> invalidating the cache here?
+> Not the safest thing to do I have to say.
 
-To invalidate stale lines for this address, held in any caches prior to
-the PoC. I'm assuming that __early_cpu_boot_status is sufficiently
-padded to the CWG.
+Yup fine with me.
 
-Cache maintenance works when SCTLR_ELx.M == 0, though barriers are
-required prior to cache maintenance as non-cacheable accesses do not
-hazard by VA.
+Regards,
 
-The MMU being off has no effect on the cache maintenance itself.
-
-> The operation may not even be broadcast to the other CPU. So you
-> actually need the invalidation before reading the status on the
-> primary CPU.
-
-We require that CPUs are coherent when they enter the kernel, so any
-cache maintenance operation _must_ affect all coherent caches (i.e. it
-must be broadcast and must affect all coherent caches prior to the PoC
-in this case).
-
-> > +
-> > +ENTRY(__early_cpu_boot_status)
-> > +	.long 	0
-> > +END(__early_cpu_boot_status)
-> 
-> I think we should just do like __boot_cpu_mode and place it in the
-> .data..cacheline_aligned section.
-
-I think we should add a separate __writeback_aligned annotation for
-stuff like this, even if it falls in .data..cacheline_aligned for now.
-
-Otherwise, agreed.
-
-> You can always use the safe clean+invalidate before reading the value
-> so that we don't care much about the write-back granule.
-
-To get correct data out we need to pad to the CQG regardless of whether
-the reader or the writer perform the maintenance.
-
-Mark.
+Tony
