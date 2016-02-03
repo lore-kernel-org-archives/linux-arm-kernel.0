@@ -1,39 +1,46 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 3 Feb 2016 16:21:07 +0100
-Subject: [PATCH 1/3] arm64: efistub: drop __init annotation from
- handle_kernel_image()
-In-Reply-To: <20160203151927.GJ2597@codeblueprint.co.uk>
-References: <1453979254-25374-1-git-send-email-ard.biesheuvel@linaro.org>
- <1453979254-25374-2-git-send-email-ard.biesheuvel@linaro.org>
- <20160128225809.GF2571@codeblueprint.co.uk>
- <CAKv+Gu9sE4oJrFmSK8sEjTrU8A7k53Hj1S1pTyCqyA5Gsba2Kw@mail.gmail.com>
- <20160129160006.GD2611@codeblueprint.co.uk>
- <CAKv+Gu96tdf8ZrGHDi_YKacsRF_b336Nu4Anh61j4u3Lg18BHg@mail.gmail.com>
- <20160202110821.GB2642@codeblueprint.co.uk>
- <CAKv+Gu_rvLMFF9ssdY4GCWpdcOwaXVsaCvBTYG30NS0zw5xBWw@mail.gmail.com>
- <20160203151927.GJ2597@codeblueprint.co.uk>
-Message-ID: <CAKv+Gu8A7YmwFVgHn0QEsBzr-oFpMY_5PBuqx8o+WrcogGMRng@mail.gmail.com>
+From: peppe.cavallaro@st.com (Giuseppe CAVALLARO)
+Date: Wed, 3 Feb 2016 16:21:39 +0100
+Subject: [PATCH 0/4]  Add Ethernet support on STM32F429
+In-Reply-To: <1454511275-9791-1-git-send-email-alexandre.torgue@gmail.com>
+References: <1454511275-9791-1-git-send-email-alexandre.torgue@gmail.com>
+Message-ID: <56B21B03.507@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 February 2016 at 16:19, Matt Fleming <matt@codeblueprint.co.uk> wrote:
-> On Tue, 02 Feb, at 12:09:41PM, Ard Biesheuvel wrote:
->> On 2 February 2016 at 12:08, Matt Fleming <matt@codeblueprint.co.uk> wrote:
->> >
->> > What about,
->> >
->> > #define __init __compiletime_error("__init not supported in EFI boot stub")
->> >
->>
->> That only works for invocations, i.e., it needs to be used in header
->> files, and will trigger the error if a call to the function remains
->> after optimization. We want it at function definition time instead.
->
-> Good point.
->
-> OK, how about we just do the #undef, call it good, and I add the task
-> of printing some helpful error message to my growing TODO list?
+Hello Alex
 
-I take it you didn't like my #pragma then? :-)
+On 2/3/2016 3:54 PM, Alexandre TORGUE wrote:
+> STM32F429 Chip embeds a Synopsys 3.50a MAC IP.
+> This series:
+> 	-enhance current stmmac driver to control it (code already available) and
+> 	 adds basic glue for STM32F429 chip.
+> 	-Enable basic Net config in kernel.
+>
+> Note that DT patches are not present because STM32 pinctrl code is not
+> yet avalaible.
 
-In any case, I don't care deeply about this, so just #undef'ing it is fine by me
+patches look ok for me
+
+Acked-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
+
+>
+> Regards
+>
+> Alexandre
+>
+> Alexandre TORGUE (4):
+>    net: ethernet: dwmac: add Ethernet glue logic for stm32 chip
+>    Documentation: Bindings: Add STM32 DWMAC glue
+>    net: ethernet: stmmac: add support of Synopsys 3.50a MAC IP
+>    ARM: STM32: Enable Ethernet in stm32_defconfig
+>
+>   .../devicetree/bindings/net/stm32-dwmac.txt        |  41 +++++
+>   arch/arm/configs/stm32_defconfig                   |   9 ++
+>   drivers/net/ethernet/stmicro/stmmac/Kconfig        |  12 ++
+>   drivers/net/ethernet/stmicro/stmmac/Makefile       |   1 +
+>   drivers/net/ethernet/stmicro/stmmac/dwmac-stm32.c  | 177 +++++++++++++++++++++
+>   .../net/ethernet/stmicro/stmmac/stmmac_platform.c  |   1 +
+>   6 files changed, 241 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/net/stm32-dwmac.txt
+>   create mode 100644 drivers/net/ethernet/stmicro/stmmac/dwmac-stm32.c
+>
