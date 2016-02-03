@@ -1,206 +1,142 @@
 From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Wed, 3 Feb 2016 14:26:48 +0100
-Subject: [PATCH v3 03/14] mtd: spi-nor: select op codes and SPI NOR protocols
- by manufacturer
+Date: Wed, 3 Feb 2016 14:26:49 +0100
+Subject: [PATCH v3 04/14] mtd: spi-nor: fix support of Macronix memories
 In-Reply-To: <cover.1454505161.git.cyrille.pitchen@atmel.com>
 References: <cover.1454505161.git.cyrille.pitchen@atmel.com>
-Message-ID: <79c8e53fc1c59adc753586905db66e4b86077ae7.1454505161.git.cyrille.pitchen@atmel.com>
+Message-ID: <25b58be3ffa0ab68cb19248d78086685583eb4ab.1454505161.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a transitional patch to prepare the split by Manufacturer of the
-support of Single/Dual/Quad SPI modes.
+This patch fixes the support of Macronix memories. Especially we avoid
+updating the Status Register when not needed as the Quad Enable (QE) bit
+is a non-volatile bit.
 
-Indeed every QSPI NOR manufacturer (Spansion, Micron, Macronix, Winbond)
-supports Dual or Quad SPI modes on its way. Especially the Fast Read op
-code and the SPI NOR protocols to use are not quite the same depending on
-the manufacturer.
-
-For instance Quad commands can use either the SPI 1-1-4, 1-4-4 or 4-4-4
-protocol.
-
-This is why this patch will be completed by fixes for each manufacturer.
+Also we add comments to explain why we use some Fast Read op codes rather
+than others.
 
 Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
 ---
- drivers/mtd/spi-nor/spi-nor.c | 110 ++++++++++++++++++++++++++++++++----------
- include/linux/mtd/spi-nor.h   |  12 +++--
- 2 files changed, 92 insertions(+), 30 deletions(-)
+ drivers/mtd/spi-nor/spi-nor.c | 81 ++++++++++++++++++++++++++++++++++++++-----
+ 1 file changed, 72 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
-index cff2665cea66..e6438d63246d 100644
+index e6438d63246d..2b2572e58a91 100644
 --- a/drivers/mtd/spi-nor/spi-nor.c
 +++ b/drivers/mtd/spi-nor/spi-nor.c
-@@ -1153,17 +1153,61 @@ static int set_quad_mode(struct spi_nor *nor, const struct flash_info *info)
- 			dev_err(nor->dev, "Macronix quad-read not enabled\n");
- 			return -EINVAL;
- 		}
--		return status;
-+		/* Check whether Macronix QPI mode is enabled. */
-+		if (nor->read_proto != SNOR_PROTO_4_4_4)
-+			nor->read_proto = SNOR_PROTO_1_1_4;
-+		break;
+@@ -1088,6 +1088,11 @@ static int macronix_quad_enable(struct spi_nor *nor)
+ 	val = read_sr(nor);
+ 	if (val < 0)
+ 		return val;
 +
- 	case SNOR_MFR_MICRON:
--		return 0;
--	default:
-+		/* Check whether Micron Quad mode is enabled. */
-+		if (nor->read_proto != SNOR_PROTO_4_4_4)
-+			nor->read_proto = SNOR_PROTO_1_1_4;
-+		break;
++	if (likely(val & SR_QUAD_EN_MX))
++		return 0;
++	dev_warn(nor->dev, "Macronix Quad mode disabled, enable it\n");
 +
-+	case SNOR_MFR_SPANSION:
- 		status = spansion_quad_enable(nor);
- 		if (status) {
- 			dev_err(nor->dev, "Spansion quad-read not enabled\n");
- 			return -EINVAL;
- 		}
--		return status;
-+		nor->read_proto = SNOR_PROTO_1_1_4;
-+		break;
+ 	write_enable(nor);
+ 
+ 	write_sr(nor, val | SR_QUAD_EN_MX);
+@@ -1142,21 +1147,73 @@ static int spansion_quad_enable(struct spi_nor *nor)
+ 	return 0;
+ }
+ 
++static int macronix_set_quad_mode(struct spi_nor *nor)
++{
++	int status;
 +
-+	default:
-+		return -EINVAL;
- 	}
++	/* Check whether the QPI mode is enabled. */
++	if (nor->read_proto == SNOR_PROTO_4_4_4) {
++		/*
++		 * Since the QPI mode is enabled, the Quad Enabled (QE)
++		 * non-volatile bit is already set.
++		 * However in QPI mode, only the Fast Read 1-4-4 (0xeb)
++		 * op code is supported.
++		 * WARNING: we should take care about the performance
++		 * enhance toggling bits P0-P7 written during the
++		 * dummy/mode cycles to avoid entering the continuous
++		 * read (performance enhance) mode by mistake!
++		 */
++		nor->read_opcode = SPINOR_OP_READ_1_4_4;
++		return 0;
++	}
 +
++	/*
++	 * The QPI mode is disabled but we still need to set the QE bit:
++	 * this disables the reset and write protect features and
++	 * frees the associated pins so they can be used as the 3rd
++	 * and 4th I/O lines required by Quad SPI commands.
++	 * Also we'd rather use the Fast Read 1-1-4 (0x6b) op code than
++	 * the Fast Read 1-4-4 (0xeb) op code so we don't care about
++	 * entering the continuous read mode by mistake if some
++	 * performance enhance toggling bits P0-P7 were written during
++	 * dummy/mode cycles.
++	 */
++	status = macronix_quad_enable(nor);
++	if (status) {
++		dev_err(nor->dev, "Macronix quad-read not enabled\n");
++		return status;
++	}
++	nor->read_proto = SNOR_PROTO_1_1_4;
 +	nor->read_opcode = SPINOR_OP_READ_1_1_4;
 +	return 0;
 +}
 +
-+static int set_dual_mode(struct spi_nor *nor, const struct flash_info *info)
++/*
++ * For both Macronix Dual and Single modes, we don't care about the value of
++ * the Quad Enabled (QE) bit since the memory still replies to Dual or Single
++ * SPI commands.
++ */
++
++static int macronix_set_dual_mode(struct spi_nor *nor)
 +{
-+	switch (JEDEC_MFR(info)) {
-+	case SNOR_MFR_MICRON:
-+		/* Check whether Micron Dual mode is enabled. */
-+		if (nor->read_proto != SNOR_PROTO_2_2_2)
-+			nor->read_proto = SNOR_PROTO_1_1_2;
-+		break;
-+
-+	default:
-+		nor->read_proto = SNOR_PROTO_1_1_2;
-+		break;
-+	}
-+
++	nor->read_proto = SNOR_PROTO_1_1_2;
 +	nor->read_opcode = SPINOR_OP_READ_1_1_2;
 +	return 0;
 +}
 +
-+static int set_single_mode(struct spi_nor *nor, const struct flash_info *info)
++static int macronix_set_single_mode(struct spi_nor *nor)
 +{
-+	switch (JEDEC_MFR(info)) {
-+	default:
-+		nor->read_proto = SNOR_PROTO_1_1_1;
-+		break;
-+	}
-+
++	nor->read_proto = SNOR_PROTO_1_1_1;
 +	return 0;
- }
- 
- static int spi_nor_check(struct spi_nor *nor)
-@@ -1311,7 +1355,30 @@ int spi_nor_scan(struct spi_nor *nor, const char *name, enum read_mode mode)
- 	if (info->flags & SPI_NOR_NO_FR)
- 		nor->flash_read = SPI_NOR_NORMAL;
- 
--	/* Quad/Dual-read mode takes precedence over fast/normal */
-+	/* Default commands */
-+	if (nor->flash_read == SPI_NOR_NORMAL)
-+		nor->read_opcode = SPINOR_OP_READ;
-+	else
-+		nor->read_opcode = SPINOR_OP_READ_FAST;
++}
 +
-+	nor->program_opcode = SPINOR_OP_PP;
+ static int set_quad_mode(struct spi_nor *nor, const struct flash_info *info)
+ {
+ 	int status;
+ 
+ 	switch (JEDEC_MFR(info)) {
+ 	case SNOR_MFR_MACRONIX:
+-		status = macronix_quad_enable(nor);
+-		if (status) {
+-			dev_err(nor->dev, "Macronix quad-read not enabled\n");
+-			return -EINVAL;
+-		}
+-		/* Check whether Macronix QPI mode is enabled. */
+-		if (nor->read_proto != SNOR_PROTO_4_4_4)
+-			nor->read_proto = SNOR_PROTO_1_1_4;
+-		break;
++		return macronix_set_quad_mode(nor);
+ 
+ 	case SNOR_MFR_MICRON:
+ 		/* Check whether Micron Quad mode is enabled. */
+@@ -1184,6 +1241,9 @@ static int set_quad_mode(struct spi_nor *nor, const struct flash_info *info)
+ static int set_dual_mode(struct spi_nor *nor, const struct flash_info *info)
+ {
+ 	switch (JEDEC_MFR(info)) {
++	case SNOR_MFR_MACRONIX:
++		return macronix_set_dual_mode(nor);
 +
-+	/*
-+	 * Quad/Dual-read mode takes precedence over fast/normal.
-+	 *
-+	 * Manufacturer specific modes are discovered when reading the JEDEC ID
-+	 * and are reported by the nor->read_proto value:
-+	 *  - SNOR_PROTO_4_4_4 is either:
-+	 *    + Micron Quad mode enabled
-+	 *    + Macronix/Winbond QPI mode enabled
-+	 *  - SNOR_PROTO_2_2_2 is either:
-+	 *    + Micron Dual mode enabled
-+	 *
-+	 * The opcodes and the protocols are updated depending on the
-+	 * manufacturer.
-+	 * The read opcode and protocol should be updated by the relevant
-+	 * function when entering Quad or Dual mode.
-+	 */
- 	if (mode == SPI_NOR_QUAD && info->flags & SPI_NOR_QUAD_READ) {
- 		ret = set_quad_mode(nor, info);
- 		if (ret) {
-@@ -1320,30 +1387,21 @@ int spi_nor_scan(struct spi_nor *nor, const char *name, enum read_mode mode)
- 		}
- 		nor->flash_read = SPI_NOR_QUAD;
- 	} else if (mode == SPI_NOR_DUAL && info->flags & SPI_NOR_DUAL_READ) {
-+		ret = set_dual_mode(nor, info);
-+		if (ret) {
-+			dev_err(dev, "dual mode not supported\n");
-+			return ret;
-+		}
- 		nor->flash_read = SPI_NOR_DUAL;
-+	} else if (info->flags & (SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ)) {
-+		/* We may need to leave a Quad or Dual mode */
-+		ret = set_single_mode(nor, info);
-+		if (ret) {
-+			dev_err(dev, "failed to switch back to single mode\n");
-+			return ret;
-+		}
- 	}
- 
--	/* Default commands */
--	switch (nor->flash_read) {
--	case SPI_NOR_QUAD:
--		nor->read_opcode = SPINOR_OP_READ_1_1_4;
--		break;
--	case SPI_NOR_DUAL:
--		nor->read_opcode = SPINOR_OP_READ_1_1_2;
--		break;
--	case SPI_NOR_FAST:
--		nor->read_opcode = SPINOR_OP_READ_FAST;
--		break;
--	case SPI_NOR_NORMAL:
--		nor->read_opcode = SPINOR_OP_READ;
--		break;
--	default:
--		dev_err(dev, "No Read opcode defined\n");
--		return -EINVAL;
--	}
--
--	nor->program_opcode = SPINOR_OP_PP;
--
- 	if (info->addr_width)
- 		nor->addr_width = info->addr_width;
- 	else if (mtd->size > 0x1000000) {
-diff --git a/include/linux/mtd/spi-nor.h b/include/linux/mtd/spi-nor.h
-index 53932c87bcf2..89e3228ec1d0 100644
---- a/include/linux/mtd/spi-nor.h
-+++ b/include/linux/mtd/spi-nor.h
-@@ -42,8 +42,10 @@
- #define SPINOR_OP_WRSR		0x01	/* Write status register 1 byte */
- #define SPINOR_OP_READ		0x03	/* Read data bytes (low frequency) */
- #define SPINOR_OP_READ_FAST	0x0b	/* Read data bytes (high frequency) */
--#define SPINOR_OP_READ_1_1_2	0x3b	/* Read data bytes (Dual SPI) */
--#define SPINOR_OP_READ_1_1_4	0x6b	/* Read data bytes (Quad SPI) */
-+#define SPINOR_OP_READ_1_1_2	0x3b	/* Read data bytes (Dual Output SPI) */
-+#define SPINOR_OP_READ_1_2_2	0xbb	/* Read data bytes (Dual I/O SPI) */
-+#define SPINOR_OP_READ_1_1_4	0x6b	/* Read data bytes (Quad Output SPI) */
-+#define SPINOR_OP_READ_1_4_4	0xeb	/* Read data bytes (Quad I/O SPI) */
- #define SPINOR_OP_PP		0x02	/* Page program (up to 256 bytes) */
- #define SPINOR_OP_BE_4K		0x20	/* Erase 4KiB block */
- #define SPINOR_OP_BE_4K_PMC	0xd7	/* Erase 4KiB block on PMC chips */
-@@ -57,8 +59,10 @@
- /* 4-byte address opcodes - used on Spansion and some Macronix flashes. */
- #define SPINOR_OP_READ4		0x13	/* Read data bytes (low frequency) */
- #define SPINOR_OP_READ4_FAST	0x0c	/* Read data bytes (high frequency) */
--#define SPINOR_OP_READ4_1_1_2	0x3c	/* Read data bytes (Dual SPI) */
--#define SPINOR_OP_READ4_1_1_4	0x6c	/* Read data bytes (Quad SPI) */
-+#define SPINOR_OP_READ4_1_1_2	0x3c	/* Read data bytes (Dual Output SPI) */
-+#define SPINOR_OP_READ4_1_2_2	0xbc	/* Read data bytes (Dual I/O SPI) */
-+#define SPINOR_OP_READ4_1_1_4	0x6c	/* Read data bytes (Quad Output SPI) */
-+#define SPINOR_OP_READ4_1_4_4	0xec	/* Read data bytes (Quad I/O SPI) */
- #define SPINOR_OP_PP_4B		0x12	/* Page program (up to 256 bytes) */
- #define SPINOR_OP_SE_4B		0xdc	/* Sector erase (usually 64KiB) */
- 
+ 	case SNOR_MFR_MICRON:
+ 		/* Check whether Micron Dual mode is enabled. */
+ 		if (nor->read_proto != SNOR_PROTO_2_2_2)
+@@ -1202,6 +1262,9 @@ static int set_dual_mode(struct spi_nor *nor, const struct flash_info *info)
+ static int set_single_mode(struct spi_nor *nor, const struct flash_info *info)
+ {
+ 	switch (JEDEC_MFR(info)) {
++	case SNOR_MFR_MACRONIX:
++		return macronix_set_single_mode(nor);
++
+ 	default:
+ 		nor->read_proto = SNOR_PROTO_1_1_1;
+ 		break;
 -- 
 1.8.2.2
