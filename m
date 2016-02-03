@@ -1,110 +1,102 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  3 Feb 2016 18:00:00 +0000
-Subject: [PATCH v3 07/23] arm64: KVM: VHE: Patch out use of HVC
+Date: Wed,  3 Feb 2016 18:00:01 +0000
+Subject: [PATCH v3 08/23] arm64: KVM: VHE: Patch out kern_hyp_va
 In-Reply-To: <1454522416-6874-1-git-send-email-marc.zyngier@arm.com>
 References: <1454522416-6874-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1454522416-6874-8-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1454522416-6874-9-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With VHE, the host never issues an HVC instruction to get into the
-KVM code, as we can simply branch there.
+The kern_hyp_va macro is pretty meaninless with VHE, as there is
+only one mapping - the kernel one.
 
-Use runtime code patching to simplify things a bit.
+In order to keep the code readable and efficient, use runtime
+patching to replace the 'and' instruction used to compute the VA
+with a 'nop'.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/hyp.S           |  7 +++++++
- arch/arm64/kvm/hyp/hyp-entry.S | 40 +++++++++++++++++++++++++++++++---------
- 2 files changed, 38 insertions(+), 9 deletions(-)
+ arch/arm64/include/asm/kvm_mmu.h | 12 +++++++++++-
+ arch/arm64/kvm/hyp/hyp.h         | 25 ++++++++++++++++++++++---
+ 2 files changed, 33 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-index 0ccdcbb..0689a74 100644
---- a/arch/arm64/kvm/hyp.S
-+++ b/arch/arm64/kvm/hyp.S
-@@ -17,7 +17,9 @@
- 
- #include <linux/linkage.h>
- 
-+#include <asm/alternative.h>
- #include <asm/assembler.h>
-+#include <asm/cpufeature.h>
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 7364339..9a9318a 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -23,13 +23,16 @@
+ #include <asm/cpufeature.h>
  
  /*
-  * u64 kvm_call_hyp(void *hypfn, ...);
-@@ -38,6 +40,11 @@
-  * arch/arm64/kernel/hyp_stub.S.
+- * As we only have the TTBR0_EL2 register, we cannot express
++ * As ARMv8.0 only has the TTBR0_EL2 register, we cannot express
+  * "negative" addresses. This makes it impossible to directly share
+  * mappings with the kernel.
+  *
+  * Instead, give the HYP mode its own VA region at a fixed offset from
+  * the kernel by just masking the top bits (which are all ones for a
+  * kernel address).
++ *
++ * ARMv8.1 (using VHE) does have a TTBR1_EL2, and doesn't use these
++ * macros (the entire kernel runs at EL2).
   */
- ENTRY(kvm_call_hyp)
+ #define HYP_PAGE_OFFSET_SHIFT	VA_BITS
+ #define HYP_PAGE_OFFSET_MASK	((UL(1) << HYP_PAGE_OFFSET_SHIFT) - 1)
+@@ -56,12 +59,19 @@
+ 
+ #ifdef __ASSEMBLY__
+ 
++#include <asm/alternative.h>
++#include <asm/cpufeature.h>
++
+ /*
+  * Convert a kernel VA into a HYP VA.
+  * reg: VA to be converted.
+  */
+ .macro kern_hyp_va	reg
 +alternative_if_not ARM64_HAS_VIRT_HOST_EXTN	
- 	hvc	#0
- 	ret
+ 	and	\reg, \reg, #HYP_PAGE_OFFSET_MASK
 +alternative_else
-+	b	__vhe_hyp_call
 +	nop
 +alternative_endif
- ENDPROC(kvm_call_hyp)
-diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
-index 93e8d983..1bdeee7 100644
---- a/arch/arm64/kvm/hyp/hyp-entry.S
-+++ b/arch/arm64/kvm/hyp/hyp-entry.S
-@@ -38,6 +38,34 @@
- 	ldp	x0, x1, [sp], #16
  .endm
  
-+.macro do_el2_call
-+	/*
-+	 * Shuffle the parameters before calling the function
-+	 * pointed to in x0. Assumes parameters in x[1,2,3].
-+	 */
-+	sub	sp, sp, #16
-+	str	lr, [sp]
-+	mov	lr, x0
-+	mov	x0, x1
-+	mov	x1, x2
-+	mov	x2, x3
-+	blr	lr
-+	ldr	lr, [sp]
-+	add	sp, sp, #16
-+.endm
+ #else
+diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
+index fb27517..fc502f3 100644
+--- a/arch/arm64/kvm/hyp/hyp.h
++++ b/arch/arm64/kvm/hyp/hyp.h
+@@ -25,9 +25,28 @@
+ 
+ #define __hyp_text __section(.hyp.text) notrace
+ 
+-#define kern_hyp_va(v) (typeof(v))((unsigned long)(v) & HYP_PAGE_OFFSET_MASK)
+-#define hyp_kern_va(v) (typeof(v))((unsigned long)(v) - HYP_PAGE_OFFSET \
+-						      + PAGE_OFFSET)
++static inline unsigned long __kern_hyp_va(unsigned long v)
++{
++	asm volatile(ALTERNATIVE("and %0, %0, %1",
++				 "nop",
++				 ARM64_HAS_VIRT_HOST_EXTN)
++		     : "+r" (v) : "i" (HYP_PAGE_OFFSET_MASK));
++	return v;
++}
 +
-+ENTRY(__vhe_hyp_call)
-+	do_el2_call
-+	/*
-+	 * We used to rely on having an exception return to get
-+	 * an implicit isb. In the E2H case, we don't have it anymore.
-+	 * rather than changing all the leaf functions, just do it here
-+	 * before returning to the rest of the kernel.
-+	 */
-+	isb
-+	ret
-+ENDPROC(__vhe_hyp_call)
-+	
- el1_sync:				// Guest trapped into EL2
- 	save_x0_to_x3
++#define kern_hyp_va(v) (typeof(v))(__kern_hyp_va((unsigned long)(v)))
++
++static inline unsigned long __hyp_kern_va(unsigned long v)
++{
++	u64 offset = PAGE_OFFSET - HYP_PAGE_OFFSET;
++	asm volatile(ALTERNATIVE("add %0, %0, %1",
++				 "nop",
++				 ARM64_HAS_VIRT_HOST_EXTN)
++		     : "+r" (v) : "r" (offset));
++	return v;
++}
++
++#define hyp_kern_va(v) (typeof(v))(__hyp_kern_va((unsigned long)(v)))
  
-@@ -58,19 +86,13 @@ el1_sync:				// Guest trapped into EL2
- 	mrs	x0, vbar_el2
- 	b	2f
- 
--1:	stp	lr, xzr, [sp, #-16]!
--
-+1:
- 	/*
--	 * Compute the function address in EL2, and shuffle the parameters.
-+	 * Perform the EL2 call
- 	 */
- 	kern_hyp_va	x0
--	mov	lr, x0
--	mov	x0, x1
--	mov	x1, x2
--	mov	x2, x3
--	blr	lr
-+	do_el2_call
- 
--	ldp	lr, xzr, [sp], #16
- 2:	eret
- 
- el1_trap:
+ /**
+  * hyp_alternate_select - Generates patchable code sequences that are
 -- 
 2.1.4
