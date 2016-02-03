@@ -1,54 +1,69 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 3 Feb 2016 21:44:28 +0530
-Subject: Plain DFS (no voltage scaling)
-In-Reply-To: <56B21E2E.1070606@free.fr>
-References: <56B11B67.3090600@free.fr> <20160203021052.GK31828@vireshk>
- <56B21E2E.1070606@free.fr>
-Message-ID: <20160203161428.GJ3469@vireshk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 3 Feb 2016 16:18:36 +0000
+Subject: [PATCH v3] ARM64: kernel: implement ACPI parking protocol
+In-Reply-To: <20160203112112.GA18387@red-moon>
+References: <1453806638-23167-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <20160202182657.GC15706@e104818-lin.cambridge.arm.com>
+ <20160203112112.GA18387@red-moon>
+Message-ID: <20160203161834.GB26487@MBP.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03-02-16, 16:35, Mason wrote:
-> On 03/02/2016 03:10, Viresh Kumar wrote:
-> > On 02-02-16, 22:11, Mason wrote:
-> >> Hello,
-> >>
-> >> I plan to enable the on-demand governor on the tango platform:
-> >> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/boot/dts/tango4-smp8758.dtsi
-> >>
-> >> I found the cpufreq-dt binding doc:
-> >>
-> >> https://www.kernel.org/doc/Documentation/devicetree/bindings/cpufreq/cpufreq-dt.txt
-> >> https://www.kernel.org/doc/Documentation/devicetree/bindings/opp/opp.txt
-> >>
-> >> Something is not clear to me:
-> >>
-> >> If my platform cannot scale the voltage, what information
-> >> should I put in the voltage part of the DT?
+On Wed, Feb 03, 2016 at 11:21:12AM +0000, Lorenzo Pieralisi wrote:
+> On Tue, Feb 02, 2016 at 06:26:58PM +0000, Catalin Marinas wrote:
+> > On Tue, Jan 26, 2016 at 11:10:38AM +0000, Lorenzo Pieralisi wrote:
+> > > The SBBR and ACPI specifications allow ACPI based systems that do not
+> > > implement PSCI (eg systems with no EL3) to boot through the ACPI parking
+> > > protocol specification[1].
+> > > 
+> > > This patch implements the ACPI parking protocol CPU operations, and adds
+> > > code that eases parsing the parking protocol data structures to the
+> > > ARM64 SMP initializion carried out at the same time as cpus enumeration.
+> > > 
+> > > To wake-up the CPUs from the parked state, this patch implements a
+> > > wakeup IPI for ARM64 (ie arch_send_wakeup_ipi_mask()) that mirrors the
+> > > ARM one, so that a specific IPI is sent for wake-up purpose in order
+> > > to distinguish it from other IPI sources.
+> > > 
+> > > Given the current ACPI MADT parsing API, the patch implements a glue
+> > > layer that helps passing MADT GICC data structure from SMP initialization
+> > > code to the parking protocol implementation somewhat overriding the CPU
+> > > operations interfaces. This to avoid creating a completely trasparent
+> > > DT/ACPI CPU operations layer that would require creating opaque
+> > > structure handling for CPUs data (DT represents CPU through DT nodes, ACPI
+> > > through static MADT table entries), which seems overkill given that ACPI
+> > > on ARM64 mandates only two booting protocols (PSCI and parking protocol),
+> > > so there is no need for further protocol additions.
+> > > 
+> > > Based on the original work by Mark Salter <msalter@redhat.com>
+> > > 
+> > > [1] https://acpica.org/sites/acpica/files/MP%20Startup%20for%20ARM%20platforms.docx
+> > > 
+> > > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > > Cc: Will Deacon <will.deacon@arm.com>
+> > > Cc: Hanjun Guo <hanjun.guo@linaro.org>
+> > > Cc: Loc Ho <lho@apm.com>
+> > > Cc: Sudeep Holla <sudeep.holla@arm.com>
+> > > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > > Cc: Mark Rutland <mark.rutland@arm.com>
+> > > Cc: Mark Salter <msalter@redhat.com>
+> > > Cc: Al Stone <ahs3@redhat.com>
 > > 
-> > Wouldn't matter if there is no regulator. i.e. you should keep 0, but
-> > even if they have something non-zero, core code will ignore it. But
-> > yeah, it makes sense to keep it zero.
+> > Applied, with a minor addition just to warn people from not using it in
+> > other configurations (#ifdef still needed otherwise the
+> > acpi_parking_protocol_valid symbol is not available; but I prefer uglier
+> > code than people starting to use this IPI in their firmware):
 > 
-> Hmmm, I am missing something obvious.
-> 
-> My config contains:
-> 
-> CONFIG_CPU_FREQ=y
-> CONFIG_CPU_FREQ_GOV_COMMON=y
-> CONFIG_CPU_FREQ_STAT=y
-> CONFIG_CPU_FREQ_STAT_DETAILS=y
-> CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE=y
-> CONFIG_CPU_FREQ_GOV_PERFORMANCE=y
-> CONFIG_CPU_FREQ_GOV_ONDEMAND=y
-> CONFIG_CPUFREQ_DT=y
-> 
-> Yet, neither dt_cpufreq_probe() nor cpufreq_init() are being called.
-> 
-> Could someone please point to my mistake?
+> It makes sense, we could include asm/acpi.h in smp.c (which is not
+> included by linux/acpi.h if !CONFIG_ACPI) to pull in the symbol and
+> remove the ifdef if you think it is cleaner.
 
-You need to create a platform device to get cpufreq-dt driver probed.
-Check other users..
+I don't think it's worth.
+
+BTW, the acpi_parking_protocol_valid() definition has an __init
+annotation while the declaration does not. I removed the __init
+altogether since I get a section mismatch warning when being called from
+handle_IPI.
 
 -- 
-viresh
+Catalin
