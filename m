@@ -1,77 +1,93 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 3 Feb 2016 08:27:06 -0800
-Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
- v4.5-rc1
-In-Reply-To: <CAPDyKFqLi8xOUeoxUTAmif5QrOjVpV_2CDLv4hjO_C9iOnv+5Q@mail.gmail.com>
-References: <20160201232833.GR19432@atomide.com>
- <Pine.LNX.4.44L0.1602011844540.2869-100000@netrider.rowland.org>
- <20160202030533.GT19432@atomide.com>
- <CAPDyKFqQb+jtTpZbq6EvbfAk28yVkgdtiOswngNH_BjCWBDxFg@mail.gmail.com>
- <CAPDyKFras1o13WBZzaZ_Snnj5TBQQFWKr=PtCjUvwe+yGPQn9w@mail.gmail.com>
- <20160202163536.GU19432@atomide.com>
- <CAPDyKFosQjkHDVSvy67+hstjjFseXQP5WYXrJE19GgVFYJ099w@mail.gmail.com>
- <20160202234145.GC19432@atomide.com>
- <CAPDyKFqLi8xOUeoxUTAmif5QrOjVpV_2CDLv4hjO_C9iOnv+5Q@mail.gmail.com>
-Message-ID: <20160203162705.GG19432@atomide.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 3 Feb 2016 10:32:07 -0600
+Subject: [PATCH V2 5/5] Microblaze: Modifying microblaze PCI subsytem to
+ support  generic Xilinx  AXI PCIe Host Bridge IP driver
+In-Reply-To: <1452620173-4905-6-git-send-email-bharatku@xilinx.com>
+References: <1452620173-4905-1-git-send-email-bharatku@xilinx.com>
+ <1452620173-4905-6-git-send-email-bharatku@xilinx.com>
+Message-ID: <20160203163207.GC32546@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ulf Hansson <ulf.hansson@linaro.org> [160203 02:24]:
-> On 3 February 2016 at 00:41, Tony Lindgren <tony@atomide.com> wrote:
->
-> > Well we actually pretty much have devices in that state to start
-> > with.
+[+cc Ben, pcibios_get_phb_of_node() question]
+
+On Tue, Jan 12, 2016 at 11:06:13PM +0530, Bharat Kumar Gogada wrote:
+> This patch does required modifications to microblaze PCI subsystem, to
+> work with generic driver (drivers/pci/host/pcie-xilinx.c) on Microblaze
+> and Zynq.
 > 
-> That's not true, not even for omap.
-> 
-> There are definitely devices which HW state is reflected by RPM_ACTIVE
-> at boot. It's the responsible of the subsystem/driver (including PM
-> domains) to make sure the runtime PM status is updated accordingly, to
-> reflect the real HW state.
-> 
-> For omap hwmod, at device registration in omap_device_build_from_dt()
-> it may actually invoke pm_runtime_set_active() if the device is
-> enabled. To my understanding, that's done to synchronize the real HW
-> state with the runtime PM status, right?
+> Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
+> Signed-off-by: Ravi Kiran Gummaluri <rgummal@xilinx.com>
+>...
 
-Sure we do have cases where the bootloader state needs to be
-preserved for some devices. Like GPIO pin state to power memory on
-some devices! :)
+>  resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+>  				resource_size_t size, resource_size_t align)
+>  {
+> -	struct pci_dev *dev = data;
+>  	resource_size_t start = res->start;
+>  
+> -	if (res->flags & IORESOURCE_IO) {
+> -		if (skip_isa_ioresource_align(dev))
+> -			return start;
+> -		if (start & 0x300)
+> -			start = (start + 0x3ff) & ~0x3ff;
+> -	}
+> -
+>  	return start;
 
-> >> To me, it's the responsible of the PM domain to *help* with the
-> >> synchronization, not prevent it as it currently does.
-> >
-> > The problem is that the hardware state gets out of sync with
-> > PM runtime. And that's going to be a pain to debug later on.
-> 
-> I don't see the problem, but of course you know omap for better than I do.
+"return res->start;" is sufficient; no need for a temporary variable.
 
-Well there's also the long term maintenance aspect at least I
-need to consider.
+>  }
+>  EXPORT_SYMBOL(pcibios_align_resource);
+>  
+> +int pcibios_add_device(struct pci_dev *dev)
+> +{
+> +	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL(pcibios_add_device);
+> +
+>  /*
+>   * Reparent resource children of pr that conflict with res
+>   * under res, and make res replace those children.
+> @@ -1335,9 +1308,21 @@ static void pcibios_setup_phb_resources(struct pci_controller *hose,
+>  
+>  struct device_node *pcibios_get_phb_of_node(struct pci_bus *bus)
+>  {
+> -	struct pci_controller *hose = bus->sysdata;
+> +	struct device_node *np;
+> +
+> +	for_each_node_by_type(np, "pci") {
+> +		const void *prop;
+> +		unsigned int bus_min;
+> +
+> +		prop = of_get_property(np, "bus-range", NULL);
+> +		if (!prop)
+> +			continue;
+> +		bus_min = be32_to_cpup(prop);
+> +		if (bus->number == bus_min)
+> +			return np;
+> +	}
+>  
+> -	return of_node_get(hose->dn);
+> +	return NULL;
 
-> So if you are concerned about this, perhaps adding a dev_dbg print
-> when the omap hwmod's ->runtime_suspend() callback returns zero could
-> be a way forward?
+Hmmm.  The old microblaze code ("return of_node_get(hose->dn);") is
+basically the same as the mips and powerpc versions.  The new code is
+basically the same as the x86 version.
 
-If we downgrade it to a debug statement or a warning, we'll soon end
-up with even more driver specific warnings than we already have.
-And I don't want to be chasing people around to fix their drivers
-for eavery new driver that gets submitted.
+I like the generic weak version in drivers/pci/of.c because it doesn't
+use any arch-specific data, and it looks like if we just set the
+struct device.of_node members correctly, everything should Just Work.
 
-Also, without this error I would not even originally have noticed we
-have a problem :) So I suggest the following:
+But Ben added both the generic and the x86 versions the same day, so
+there must be some complication:
 
-1. I'll do a series of patches to fix up the handful of omap
-   specific drivers with pm_runtime_use_autosuspend() that depend
-   on omap_device
+  98d9f30c820d ("pci/of: Match PCI devices to OF nodes dynamically")
+  3d5fe5a65af9 ("x86/devicetree: Use generic PCI <-> OF matching")
 
-2. I'll also do a patch to improve the omap_device error message
-   so new drivers are easy to fix. Something like:
+So I guess my question is, why do we need a microblaze-specific
+version at all?
 
-  "%() called from invalid state %d, use pm_runtime_put_sync_suspend()?"
-
-Does that sounds OK to you?
-
-Regards,
-
-Tony
+Bjorn
