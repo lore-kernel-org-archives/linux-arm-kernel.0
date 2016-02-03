@@ -1,55 +1,36 @@
-From: slash.tmp@free.fr (Mason)
-Date: Wed, 3 Feb 2016 16:07:53 +0100
-Subject: Plain DFS (no voltage scaling)
-In-Reply-To: <56B11B67.3090600@free.fr>
-References: <56B11B67.3090600@free.fr>
-Message-ID: <56B217C9.1050405@free.fr>
+From: friesendrywall@gmail.com (Erik Friesen)
+Date: Wed, 3 Feb 2016 10:11:39 -0500
+Subject: SGTL5000 misc
+In-Reply-To: <CAOMZO5C4QUHnJr=pisnYWCYZ0zUt+7HO846aPQui0zcLyX0N-Q@mail.gmail.com>
+References: <CAEuupiuhPR48Upo=8f0zV8cxf0Vefgx3qA+vC+QDWAOV4n-e3Q@mail.gmail.com>
+ <CAOMZO5BPNc1ncz6J8yhcBYywCVuTxKYMYhiNUt_Jq3LZsKdi+A@mail.gmail.com>
+ <CAEuupiszxAj7JkJu-5ozqgEnTWkz9FQEpxN8dmEN+KtaV-76ww@mail.gmail.com>
+ <CAOMZO5DhrzdVyTVPB3FNquV4rDQ8a0MQrsJMosVsUQN63hj1Ww@mail.gmail.com>
+ <CAEuupiuoB7nMSc8Fbyort1rJd=ZhYc0zfJNkd=ckUYk1qd8Z7Q@mail.gmail.com>
+ <CAOMZO5C4QUHnJr=pisnYWCYZ0zUt+7HO846aPQui0zcLyX0N-Q@mail.gmail.com>
+Message-ID: <CAEuupivdftoopCOX3f7KRbV9poKdjdD3s9hfcbgB2TYjHmrjvw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/02/2016 22:11, Mason wrote:
+There is no difference in code that I can tell between the two.  I am
+not asking to have this fixed, rather just some ideas on how I can
+implement this. If alsa-devel list is the preferred asking place, I'll
+go there.
 
-> I plan to enable the on-demand governor on the tango platform:
-> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/boot/dts/tango4-smp8758.dtsi
-> 
-> I found the cpufreq-dt binding doc:
-> 
-> https://www.kernel.org/doc/Documentation/devicetree/bindings/cpufreq/cpufreq-dt.txt
-> https://www.kernel.org/doc/Documentation/devicetree/bindings/opp/opp.txt
-> 
-> Something is not clear to me:
-> 
-> If my platform cannot scale the voltage, what information
-> should I put in the voltage part of the DT?
+The riotboard used kernel 4.3.0-rc2-00019-gbcee19f with the same results.
 
-Someone pointed out that tweaking the frequency without tweaking
-the voltage might be counter-productive.
-
-I measured the power consumption of the entire board (at the power outlet)
-for 3 CPU frequencies (all other things being equal, I hope).
-
-idle @ 111 MHz = 4.6 W
-idle @ 333 MHz = 4.6 W
-idle @ 999 MHz = 4.6 W
-
-load @ 111 MHz = 5.0 W
-load @ 333 MHz = 5.7 W
-load @ 999 MHz = 7.7 W
-
-When idle, the kernel calls WFI, which "turns off" most of the CPU
-(clock gating?) such that the actual frequency does not matter.
-
-At full load (I use cpuburn to jog as many FUs simultaneously as
-possible) it looks like each additional MHz requires ~3 mW.
-
-So it would appear that an on-demand governor might not help to
-save power.
-
-But I have another use-case in mind: CPU throttling on over-heating.
-There's a temperature sensor in the CPU, and I'd like to say:
-"if temperature exceeds a user-set threshold, don't run at the max
-frequency until the temperature becomes reasonable".
-
-And I think that requires cpufreq?
-
-Regards.
+On Wed, Feb 3, 2016 at 9:51 AM, Fabio Estevam <festevam@gmail.com> wrote:
+> On Wed, Feb 3, 2016 at 12:46 PM, Erik Friesen <friesendrywall@gmail.com> wrote:
+>> It appears sgtl5000.c is patched the same in my kernel as the commit mentioned.
+>>
+>> The problem the way I see it, is that there is no mechanism to deal
+>> with a reboot on the codec itself.
+>
+> There is no reset line nor reset command on the sgtl5000.
+>
+>> This alsa stuff has too many layers.  At least coming from a non os
+>> embedded angle it seems that way.
+>
+> I would suggest you to try 4.4.1 and if you still see an issue with
+> the codec, then report it back to the alsa-devel at alsa-project.org
+> list.
