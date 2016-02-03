@@ -1,121 +1,28 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Wed, 3 Feb 2016 11:02:01 +0100
-Subject: [GIT PULL 00/16] perf/core improvements and fixes
-In-Reply-To: <1454102273-16431-1-git-send-email-acme@kernel.org>
-References: <1454102273-16431-1-git-send-email-acme@kernel.org>
-Message-ID: <20160203100201.GC17305@gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 3 Feb 2016 18:05:22 +0800
+Subject: [PATCH V2 2/6] stm class: adds a loop to extract the first valid
+ STM device name
+In-Reply-To: <1454487337-30184-3-git-send-email-zhang.chunyan@linaro.org>
+Message-ID: <201602031758.BtqxFNRd%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Chunyan,
 
-* Arnaldo Carvalho de Melo <acme@kernel.org> wrote:
+[auto build test WARNING on robh/for-next]
+[also build test WARNING on v4.5-rc2 next-20160203]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 
-> Hi Ingo,
-> 
-> 	This is on top of the previously submitted perf-core-for-mingo tag,
-> please consider applying,
-> 
-> - Arnaldo
-> 
-> The following changes since commit 5ac76283b32b116c58e362e99542182ddcfc8262:
-> 
->   perf cpumap: Auto initialize cpu__max_{node,cpu} (2016-01-26 16:08:36 -0300)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/acme/linux.git tags/perf-core-for-mingo-2
-> 
-> for you to fetch changes up to 814568db641f6587c1e98a3a85f214cb6a30fe10:
-> 
->   perf build: Align the names of the build tests: (2016-01-29 17:51:04 -0300)
-> 
-> ----------------------------------------------------------------
-> New features:
-> 
-> - Port 'perf kvm stat' to PowerPC (Hemant Kumar)
-> 
-> Infrastructure:
-> 
-> - Use the 'feature-dump' target to do the feature checks just once and then
->   add code to reuse that in the tests/make makefile, speeding up the
->   'make -C tools/perf build-test' target (Wang Nan)
-> 
-> - Reduce the number of tests the 'build-test' target do to those that don't
->   pollute the source tree (Arnaldo Carvalho de Melo)
-> 
-> - Improve the output of the build tests a bit by aligning the name of the
->   tests, more can be done to filter out uninteresting info in the output
->   (Arnaldo Carvalho de Melo)
-> 
-> - Add perf_evlist pointer to *info_priv_size(), more prep work for
->   supporting the coresight architecture (Mathieu Poirier)
-> 
-> - Improve the 'perf test bp_signal' test (Wang Nan)
-> 
-> - Check environment before starting the BPF 'perf test', so that we can just
->   'Skip' older kernels instead of 'FAIL'ing them (Wang Nan)
-> 
-> - Fix cpumode of synthesized buildid event (Wang Nan)
-> 
-> Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
-> 
-> ----------------------------------------------------------------
-> Arnaldo Carvalho de Melo (2):
->       perf tools: Speed up build-tests by reducing the number of builds tested
->       perf build: Align the names of the build tests:
-> 
-> Hemant Kumar (4):
->       perf kvm/{x86,s390}: Remove dependency on uapi/kvm_perf.h
->       perf kvm/{x86,s390}: Remove const from kvm_events_tp
->       perf kvm/powerpc: Port perf kvm stat to powerpc
->       perf kvm/powerpc: Add support for HCALL reasons
-> 
-> Jiri Olsa (1):
->       perf build: Fix feature-dump checks, we need to test all features
-> 
-> Mathieu Poirier (1):
->       perf auxtrace: Add perf_evlist pointer to *info_priv_size()
-> 
-> Wang Nan (8):
->       tools build: Check basic headers for test-compile feature checker
->       perf build: Remove all condition feature check {C,LD}FLAGS
->       perf build: Use feature dump file for build-test
->       perf buildid: Fix cpumode of buildid event
->       perf test: Check environment before start real BPF test
->       perf test: Improve bp_signal
->       perf tools: Move timestamp creation to util
->       perf record: Use OPT_BOOLEAN_SET for buildid cache related options
-> 
->  tools/build/Makefile.feature                   |   8 ++
->  tools/build/feature/test-compile.c             |   2 +
->  tools/perf/Makefile                            |  11 +-
->  tools/perf/arch/powerpc/Makefile               |   2 +
->  tools/perf/arch/powerpc/util/Build             |   1 +
->  tools/perf/arch/powerpc/util/book3s_hcalls.h   | 123 ++++++++++++++++++
->  tools/perf/arch/powerpc/util/book3s_hv_exits.h |  33 +++++
->  tools/perf/arch/powerpc/util/kvm-stat.c        | 170 +++++++++++++++++++++++++
->  tools/perf/arch/s390/util/kvm-stat.c           |  10 +-
->  tools/perf/arch/x86/util/intel-bts.c           |   4 +-
->  tools/perf/arch/x86/util/intel-pt.c            |   4 +-
->  tools/perf/arch/x86/util/kvm-stat.c            |  16 ++-
->  tools/perf/builtin-buildid-cache.c             |  14 +-
->  tools/perf/builtin-kvm.c                       |  38 ++++--
->  tools/perf/builtin-record.c                    |  12 +-
->  tools/perf/config/Makefile                     | 101 +++++++--------
->  tools/perf/tests/bp_signal.c                   | 140 ++++++++++++++++----
->  tools/perf/tests/bpf.c                         |  37 ++++++
->  tools/perf/tests/make                          |  39 +++++-
->  tools/perf/util/auxtrace.c                     |   7 +-
->  tools/perf/util/auxtrace.h                     |   6 +-
->  tools/perf/util/build-id.c                     |   6 +-
->  tools/perf/util/kvm-stat.h                     |   8 +-
->  tools/perf/util/util.c                         |  17 +++
->  tools/perf/util/util.h                         |   1 +
->  25 files changed, 688 insertions(+), 122 deletions(-)
->  create mode 100644 tools/perf/arch/powerpc/util/book3s_hcalls.h
->  create mode 100644 tools/perf/arch/powerpc/util/book3s_hv_exits.h
->  create mode 100644 tools/perf/arch/powerpc/util/kvm-stat.c
+url:    https://github.com/0day-ci/linux/commits/Chunyan-Zhang/Introduce-CoreSight-STM-support/20160203-161836
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux for-next
 
-Pulled, thanks a lot Arnaldo!
 
-	Ingo
+coccinelle warnings: (new ones prefixed by >>)
+
+>> drivers/hwtracing/stm/policy.c:341:2-3: Unneeded semicolon
+
+Please review and possibly fold the followup patch.
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
