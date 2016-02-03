@@ -1,31 +1,60 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 3 Feb 2016 08:36:04 -0800
-Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
- v4.5-rc1
-In-Reply-To: <CAJZ5v0jbOJc2m=cBrvAuMUHvY8_AQPdJEyt1w-dPikU5expeLA@mail.gmail.com>
-References: <20160202210345.GZ19432@atomide.com>
- <Pine.LNX.4.44L0.1602021626540.1653-100000@iolanthe.rowland.org>
- <20160202234626.GD19432@atomide.com>
- <CAJZ5v0jbOJc2m=cBrvAuMUHvY8_AQPdJEyt1w-dPikU5expeLA@mail.gmail.com>
-Message-ID: <20160203163604.GH19432@atomide.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 03 Feb 2016 17:36:01 +0100
+Subject: [PATCH 01/10] serial: mvebu-uart: initial support for Armada-3700
+ serial port
+In-Reply-To: <5687888.WDl8xbENFR@wuerfel> (Arnd Bergmann's message of "Tue, 02
+ Feb 2016 22:07:17 +0100")
+References: <1454436468-4241-1-git-send-email-gregory.clement@free-electrons.com>
+ <1454436468-4241-2-git-send-email-gregory.clement@free-electrons.com>
+ <5687888.WDl8xbENFR@wuerfel>
+Message-ID: <87mvrh4uq6.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Rafael J. Wysocki <rafael@kernel.org> [160203 05:07]:
-> On Wed, Feb 3, 2016 at 12:46 AM, Tony Lindgren <tony@atomide.com> wrote:
-> >
-> > Yes.. That works too. I guess the thing to consider is if we should
-> > make pm_runtime_put_sync() always sync along the lines of a patch
-> > I posted earlier today. That could avoid quite a bit of confusion
-> > as already seen in this thread :)
-> 
-> No, we shouldn't.
-> 
-> As I said, the current behavior is actually well documented (in
-> kerneldoc comments and elsewhere).
+Hi Arnd,
+ 
+ On mar., f?vr. 02 2016, Arnd Bergmann <arnd@arndb.de> wrote:
 
-OK. I'll do a series of fixes to the drivers using omap_device.
+> On Tuesday 02 February 2016 19:07:39 Gregory CLEMENT wrote:
+>
+>> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+>> index 39721ec4f415..b291f934d51b 100644
+>> --- a/drivers/tty/serial/Kconfig
+>> +++ b/drivers/tty/serial/Kconfig
+>> @@ -1606,6 +1606,28 @@ config SERIAL_STM32_CONSOLE
+>>  	depends on SERIAL_STM32=y
+>>  	select SERIAL_CORE_CONSOLE
+>>  
+>> +config SERIAL_MVEBU_UART
+>> +	bool "Marvell EBU serial port support"
+>
+> Could this be a loadable module?
 
-Regards,
+I don't see any reason to not being able to use it as a module. But I
+didn't test it because currently te serial port is the only way ro
+cimmunicate with the board.
 
-Tony
+>
+>> +config SERIAL_MVEBU_CONSOLE
+>> +	bool "Console on Marvell EBU serial port"
+>> +	depends on SERIAL_MVEBU_UART
+>
+> If yes, this would become 
+>
+> 	depends on SERIAL_MVEBU_UART=y
+
+OK, let's try to enable it.
+
+Thanks,
+
+Gregory
+
+>
+> 	Arnd
+>
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
