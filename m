@@ -1,134 +1,81 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 3 Feb 2016 12:57:38 +0000
-Subject: [PATCH v4 4/7] arm64: Handle early CPU boot failures
-In-Reply-To: <1453745225-27736-5-git-send-email-suzuki.poulose@arm.com>
-References: <1453745225-27736-1-git-send-email-suzuki.poulose@arm.com>
- <1453745225-27736-5-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20160203125735.GA26487@MBP.local>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Wed, 3 Feb 2016 14:03:49 +0100
+Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
+ v4.5-rc1
+In-Reply-To: <20160202213916.GA19432@atomide.com>
+References: <CAPDyKFqQb+jtTpZbq6EvbfAk28yVkgdtiOswngNH_BjCWBDxFg@mail.gmail.com>
+ <Pine.LNX.4.44L0.1602021112320.1653-100000@iolanthe.rowland.org>
+ <CAPDyKFokWcLSCAh_TX-j-df_M1hN8Qw1gbQt--SyWccGCPiN5Q@mail.gmail.com>
+ <20160202213916.GA19432@atomide.com>
+Message-ID: <CAJZ5v0if-OCynmN1qzBaWLHOEEHN6kJe1LCbJ=eOwUj6=iZDaw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suzuki,
-
-On Mon, Jan 25, 2016 at 06:07:02PM +0000, Suzuki K. Poulose wrote:
-> +/* Values for secondary_data.status */
-> +
-> +#define CPU_MMU_OFF		-1
-> +#define CPU_BOOT_SUCCESS	0
-> +/* The cpu invoked ops->cpu_die, synchronise it with cpu_kill */
-> +#define CPU_KILL_ME		1
-> +/* The cpu couldn't die gracefully and is looping in the kernel */
-> +#define CPU_STUCK_IN_KERNEL	2
-> +/* Fatal system error detected by secondary CPU, crash the system */
-> +#define CPU_PANIC_KERNEL	3
-
-Please add braces around these numbers, just in case (I added them
-locally).
-
->  /*
-> + * The booting CPU updates the failed status, with MMU turned off,
-> + * below which lies in head.txt to make sure it doesn't share the same writeback
-> + * granule. So that we can invalidate it properly.
-
-I can't really parse this (it looks like punctuation in the wrong place;
-also "share the same..." with what?).
-
-> + *
-> + * update_early_cpu_boot_status tmp, status
-> + *  - Corrupts tmp, x0, x1
-> + *  - Writes 'status' to __early_cpu_boot_status and makes sure
-> + *    it is committed to memory.
-> + */
-> +
-> +	.macro	update_early_cpu_boot_status tmp, status
-> +	mov	\tmp, lr
-> +	adrp	x0, __early_cpu_boot_status
-> +	add	x0, x0, #:lo12:__early_cpu_boot_status
-
-Nitpick: you could use the adr_l macro.
-
-> +	mov	x1, #\status
-> +	str	x1, [x0]
-> +	add	x1, x0, 4
-> +	bl	__inval_cache_range
-> +	mov	lr, \tmp
-> +	.endm
-
-If the CPU that's currently booting has the MMU off, what's the point of
-invalidating the cache here? The operation may not even be broadcast to
-the other CPU. So you actually need the invalidation before reading the
-status on the primary CPU.
-
-> +
-> +ENTRY(__early_cpu_boot_status)
-> +	.long 	0
-> +END(__early_cpu_boot_status)
-
-I think we should just do like __boot_cpu_mode and place it in the
-.data..cacheline_aligned section. You can always use the safe
-clean+invalidate before reading the value so that we don't care much
-about the write-back granule.
-
-> @@ -89,12 +101,14 @@ static DECLARE_COMPLETION(cpu_running);
->  int __cpu_up(unsigned int cpu, struct task_struct *idle)
->  {
->  	int ret;
-> +	int status;
->  
->  	/*
->  	 * We need to tell the secondary core where to find its stack and the
->  	 * page tables.
->  	 */
->  	secondary_data.stack = task_stack_page(idle) + THREAD_START_SP;
-> +	update_cpu_boot_status(CPU_MMU_OFF);
->  	__flush_dcache_area(&secondary_data, sizeof(secondary_data));
->  
->  	/*
-> @@ -117,7 +131,35 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
->  		pr_err("CPU%u: failed to boot: %d\n", cpu, ret);
->  	}
->  
-> +	/* Make sure the update to status is visible */
-> +	smp_rmb();
-
-Which status? In relation to what?
-
->  	secondary_data.stack = NULL;
-> +	status = READ_ONCE(secondary_data.status);
-> +	if (ret && status) {
-> +
-> +		if (status == CPU_MMU_OFF)
-> +			status = READ_ONCE(__early_cpu_boot_status);
-
-You need cache maintenance before reading this.
-
-> +
-> +		switch (status) {
-> +		default:
-> +			pr_err("CPU%u: failed in unknown state : 0x%x\n",
-> +					cpu, status);
-> +			break;
-> +		case CPU_KILL_ME:
-> +			if (!op_cpu_kill(cpu)) {
-> +				pr_crit("CPU%u: died during early boot\n", cpu);
-> +				break;
-> +			}
-> +			/* Fall through */
-> +			pr_crit("CPU%u: may not have shut down cleanly\n", cpu);
-> +		case CPU_STUCK_IN_KERNEL:
-> +			pr_crit("CPU%u: is stuck in kernel\n", cpu);
-> +			cpus_stuck_in_kernel++;
-> +			break;
-> +		case CPU_PANIC_KERNEL:
-> +			panic("CPU%u detected unsupported configuration\n", cpu);
-> +		}
-> +	}
->  
->  	return ret;
+On Tue, Feb 2, 2016 at 10:39 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Ulf Hansson <ulf.hansson@linaro.org> [160202 12:25]:
+>> >
+>> > ?  pm_runtime_put_sync() _already_ does not respect the autosuspend
+>> > mode.  If you want to respect it, you have to call
+>> > pm_runtime_put_sync_autosuspend() instead.
+>>
+>> Then there's a bug in the runtime PM core.
+>>
+>> From Tony's regression report and from mine own local runtime PM test
+>> driver, I can see that the device doesn't get RPM_SUSPENDED (the
+>> ->runtime_suspend() callback isn't called), even when the usage count
+>> is zero - when pm_runtime_put_sync() is called.
+> ...
+>> Okay, so you are saying that the pm_runtime_put_sync() should idle the
+>> device even if autosuspend is in use. That seems reasonable, I will
+>> look into this problem.
+>
+> The patch below fixes pm_runtime_put_sync() to not respect the
+> autosuspend mode to match what Alan is saying above. Seems to also
+> fixes the $subject issue for me. And seems to behave for PM runtime
+> for other devices during runtime too based on light testing here.
+>
+> Regards,
+>
+> Tony
+>
+> 8< ---------------
+> --- a/drivers/base/power/runtime.c
+> +++ b/drivers/base/power/runtime.c
+> @@ -353,7 +353,9 @@ static int rpm_idle(struct device *dev, int rpmflags)
+>
+>   out:
+>         trace_rpm_return_int(dev, _THIS_IP_, retval);
+> -       return retval ? retval : rpm_suspend(dev, rpmflags | RPM_AUTO);
+> +       if (!(rpmflags & RPM_IGNORE_AUTO))
+> +               rpmflags |= RPM_AUTO;
+> +       return retval ? retval : rpm_suspend(dev, rpmflags);
 >  }
+>
+>  /**
+> --- a/include/linux/pm_runtime.h
+> +++ b/include/linux/pm_runtime.h
+> @@ -23,6 +23,8 @@
+>                                             usage_count */
+>  #define RPM_AUTO               0x08    /* Use autosuspend_delay */
+>
+> +#define RPM_IGNORE_AUTO                0x10    /* Ignore autosuspend */
+> +
+>  #ifdef CONFIG_PM
+>  extern struct workqueue_struct *pm_wq;
+>
+> @@ -241,7 +243,7 @@ static inline int pm_runtime_put_autosuspend(struct device *dev)
+>
+>  static inline int pm_runtime_put_sync(struct device *dev)
+>  {
+> -       return __pm_runtime_idle(dev, RPM_GET_PUT);
+> +       return __pm_runtime_idle(dev, RPM_GET_PUT | RPM_IGNORE_AUTO);
+>  }
+>
+>  static inline int pm_runtime_put_sync_suspend(struct device *dev)
 
-BTW, you can send a fix-up on top of this series with corrections, I can
-fold them in.
+This changes a well-documented behavior that someone may be relying on.
 
--- 
-Catalin
+Not the safest thing to do I have to say.
+
+Thanks,
+Rafael
