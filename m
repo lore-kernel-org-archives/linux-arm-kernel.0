@@ -1,89 +1,129 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 3 Feb 2016 09:48:31 -0600
-Subject: [PATCH V5 10/14] Documentation: DT: bindings: Add power domain
- info for NVIDIA PMC
-In-Reply-To: <56B1DE40.7080403@nvidia.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed, 3 Feb 2016 08:58:58 -0700
+Subject: [PATCH V5 05/14] soc: tegra: pmc: Wait for powergate state to
+ change
+In-Reply-To: <56B1C647.4060504@nvidia.com>
 References: <1453998832-27383-1-git-send-email-jonathanh@nvidia.com>
- <1453998832-27383-11-git-send-email-jonathanh@nvidia.com>
- <20160129160625.GA21918@rob-hp-laptop>
- <56B1DE40.7080403@nvidia.com>
-Message-ID: <CAL_JsqLcoKW2znNNvM=sYLmZ6O6ZWqn7+aXspkXoONw6-O1ygg@mail.gmail.com>
+ <1453998832-27383-6-git-send-email-jonathanh@nvidia.com>
+ <CANLsYkycbEo+wyMX8RJ9H-S5kDTjQR4nnDZc5gvf2kShOZAv9w@mail.gmail.com>
+ <56AF613A.1000909@nvidia.com> <56B1C647.4060504@nvidia.com>
+Message-ID: <CANLsYkyPj+ExhBFffokvtMcZ-OWocMc0Hx3_nfVgRu=uUVvJfg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 3, 2016 at 5:02 AM, Jon Hunter <jonathanh@nvidia.com> wrote:
+On 3 February 2016 at 02:20, Jon Hunter <jonathanh@nvidia.com> wrote:
 >
-> On 29/01/16 16:06, Rob Herring wrote:
->> On Thu, Jan 28, 2016 at 04:33:48PM +0000, Jon Hunter wrote:
->>> Add power-domain binding documentation for the NVIDIA PMC driver in
->>> order to support generic power-domains.
->>>
->>> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
->>> ---
->>>  .../bindings/arm/tegra/nvidia,tegra20-pmc.txt      | 55 ++++++++++++++++++++++
->>>  1 file changed, 55 insertions(+)
->>>
->>> diff --git a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
->>> index 53aa5496c5cf..3c77373aa826 100644
->>> --- a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
->>> +++ b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
->>> @@ -1,5 +1,7 @@
->>>  NVIDIA Tegra Power Management Controller (PMC)
->>>
->>> +== Power Management Controller Node ==
->>> +
->>>  The PMC block interacts with an external Power Management Unit. The PMC
->>>  mostly controls the entry and exit of the system from different sleep
->>>  modes. It provides power-gating controllers for SoC and CPU power-islands.
->>> @@ -70,6 +72,10 @@ Optional properties for hardware-triggered thermal reset (inside 'i2c-thermtrip'
->>>                       Defaults to 0. Valid values are described in section 12.5.2
->>>                       "Pinmux Support" of the Tegra4 Technical Reference Manual.
->>>
->>> +Optional nodes:
->>> +- powergates : This node contains a hierarchy of power domain nodes, which
->>> +           should match the powergates on the Tegra SoC.
->>> +
->>>  Example:
->>>
->>>  / SoC dts including file
->>> @@ -115,3 +121,52 @@ pmc at 7000f400 {
->>>      };
->>>      ...
->>>  };
->>> +
->>> +
->>> +== PM Domain Nodes ==
->>> +
->>> +Each of the PM domain nodes represents a power-domain on the Tegra SoC
->>> +that can be power-gated by the PMC and should be named appropriately.
->>> +
->>> +Required properties:
->>> +  - clocks: Must contain an entry for each clock required by the PMC for
->>> +    controlling a power-gate. See ../clocks/clock-bindings.txt for details.
->>> +  - resets: Must contain an entry for each reset required by the PMC for
->>> +    controlling a power-gate. See ../reset/reset.txt for details.
->>> +  - nvidia,powergate: Integer cell that contains an identifier for the PMC
->>> +    power-gate that is associated with the power-domain. Please refer to
->>> +    the Tegra TRM for more details.
+> On 01/02/16 13:44, Jon Hunter wrote:
 >>
->> Why not make this value be the power-domain cell for consumers and the
->> pmc be the phandle.
+>> On 29/01/16 16:58, Mathieu Poirier wrote:
+>>> On 28 January 2016 at 09:33, Jon Hunter <jonathanh@nvidia.com> wrote:
+>>>> Currently, the function tegra_powergate_set() simply sets the desired
+>>>> powergate state but does not wait for the state to change. In most cases
+>>>> we should wait for the state to change before proceeding. Currently, there
+>>>> is a case for tegra114 and tegra124 devices where we do not wait when
+>>>> starting the secondary CPU as this is not necessary. However, this is only
+>>>> done at boot time and so waiting here will only have a small impact on
+>>>> boot time. Therefore, update tegra_powergate_set() to wait when setting
+>>>> the powergate.
+>>>>
+>>>> By adding this feature, we can also eliminate the polling loop from
+>>>> tegra30_boot_secondary().
+>>>>
+>>>> A function has been added for checking the status of the powergate and
+>>>> so update the tegra_powergate_is_powered() to use this macro as well.
+>>>>
+>>>> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+>>>> ---
+>>>>  arch/arm/mach-tegra/platsmp.c | 16 +++-------------
+>>>>  drivers/soc/tegra/pmc.c       |  9 ++++++++-
+>>>>  2 files changed, 11 insertions(+), 14 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
+>>>> index f3f61dbbda97..75620ae73913 100644
+>>>> --- a/arch/arm/mach-tegra/platsmp.c
+>>>> +++ b/arch/arm/mach-tegra/platsmp.c
+>>>> @@ -108,19 +108,9 @@ static int tegra30_boot_secondary(unsigned int cpu, struct task_struct *idle)
+>>>>          * be un-gated by un-toggling the power gate register
+>>>>          * manually.
+>>>>          */
+>>>> -       if (!tegra_pmc_cpu_is_powered(cpu)) {
+>>>> -               ret = tegra_pmc_cpu_power_on(cpu);
+>>>> -               if (ret)
+>>>> -                       return ret;
+>>>> -
+>>>> -               /* Wait for the power to come up. */
+>>>> -               timeout = jiffies + msecs_to_jiffies(100);
+>>>> -               while (!tegra_pmc_cpu_is_powered(cpu)) {
+>>>> -                       if (time_after(jiffies, timeout))
+>>>> -                               return -ETIMEDOUT;
+>>>> -                       udelay(10);
+>>>> -               }
+>>>> -       }
+>>>> +       ret = tegra_pmc_cpu_power_on(cpu);
+>>>> +       if (ret)
+>>>> +               return ret;
+>>>>
+>>>>  remove_clamps:
+>>>>         /* CPU partition is powered. Enable the CPU clock. */
+>>>> diff --git a/drivers/soc/tegra/pmc.c b/drivers/soc/tegra/pmc.c
+>>>> index 99cb2fdd29e1..35ee60fd17be 100644
+>>>> --- a/drivers/soc/tegra/pmc.c
+>>>> +++ b/drivers/soc/tegra/pmc.c
+>>>> @@ -28,6 +28,7 @@
+>>>>  #include <linux/export.h>
+>>>>  #include <linux/init.h>
+>>>>  #include <linux/io.h>
+>>>> +#include <linux/iopoll.h>
+>>>>  #include <linux/of.h>
+>>>>  #include <linux/of_address.h>
+>>>>  #include <linux/platform_device.h>
+>>>> @@ -186,6 +187,9 @@ static inline bool tegra_powergate_state(int id)
+>>>>   */
+>>>>  static int tegra_powergate_set(unsigned int id, bool new_state)
+>>>>  {
+>>>> +       bool status;
+>>>> +       int err;
+>>>> +
+>>>>         mutex_lock(&pmc->powergates_lock);
+>>>>
+>>>>         if (tegra_powergate_state(id) == new_state) {
+>>>> @@ -195,9 +199,12 @@ static int tegra_powergate_set(unsigned int id, bool new_state)
+>>>>
+>>>>         tegra_pmc_writel(PWRGATE_TOGGLE_START | id, PWRGATE_TOGGLE);
+>>>>
+>>>> +       err = readx_poll_timeout(tegra_powergate_state, id, status,
+>>>> +                                status == new_state, 10, 100000);
+>>>> +
+>>>
+>>> I understand (and agree) with the goal of this patch but I wonder (and
+>>> I don't know much about the system/context) if holding a mutex while
+>>> sleeping won't incur adverse effect on other parts of the system that
+>>> weren't use to see this wait.  One way to fix this might be to use
+>>> "mutex_trylock()" and let callers retry as they see fit if an
+>>> operation is already in progress.
+>>
+>> I could unlock the mutex after writing the TOGGLE_START register. I
+>> don't believe that we need to waiting for a powergate to change before
+>> writing again.
 >
-> Is there anything wrong with using a label for the consumers? Seems
-> simpler, if you can just say ...
+> I was not thinking clearly here, the whole reason for the locking is to
+> protect the base address as we swap it during the probe.
 >
->         adma: adma at 702e2000 {
->                 ...
->                 power-domains = <&pd_audio>;
->                 ...
->         };
+> In general, I prefer to keep it the way we have it in this patch. By
+> using mutex_trylock() would mean that now clients would have to handle
+> retrying if they cannot get the lock and make it more complex.
 
-Only that is a bit unusual. It would only really matter if we had some
-common parsing that we wanted to share. I'd look at other examples and
-try to align. If there's no clear pattern, then it is fine.
+Yes, the complexity is indeed pushed to the caller but that way we
+know exactly what is going on.  Another way to implement this without
+any locks at all would be through RCUs.  I'll let Stephen and Thierry
+make the call here.
 
->> Then use reg property for the subnodes. That avoids a custom property.
+Thanks,
+Mahtieu
+
+> Powergates should not be turned on and off that frequently and so
+> hopefully a delay here should be tolerable. For CPUs, this should only
+> be used on cold boot and not during CPU hotplug events.
 >
-> That is fine with me.
->
+> Cheers
 > Jon
