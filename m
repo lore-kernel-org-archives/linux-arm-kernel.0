@@ -1,39 +1,50 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Wed, 3 Feb 2016 15:45:24 +0000
-Subject: [PATCH v1 2/5] arm64: add ARMv8.2 id_aa64mmfr2 boiler plate
-In-Reply-To: <56B21D34.8060106@arm.com>
-References: <1454432611-21333-1-git-send-email-james.morse@arm.com>
- <1454432611-21333-3-git-send-email-james.morse@arm.com>
- <56B1EEC5.9020506@arm.com> <56B21D34.8060106@arm.com>
-Message-ID: <56B22094.7020408@arm.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Wed, 3 Feb 2016 10:45:34 -0500 (EST)
+Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
+ v4.5-rc1
+In-Reply-To: <CAPDyKFpNRc3Nf9ofXhZrfBa54vXMxWboDScCrYFrZy97m8Y5gg@mail.gmail.com>
+Message-ID: <Pine.LNX.4.44L0.1602031034360.2041-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/02/16 15:31, James Morse wrote:
-> Hi Suzuki,
+On Wed, 3 Feb 2016, Ulf Hansson wrote:
 
+> > Let me summarize my understanding of this thread so far.
+> >
+> > It looks like the omap3 code initializes hardware in ->probe() and
+> > then it may return -EPROBE_DEFER due to some unmet dependencies.  In
+> > that case the hardware is not reset to the previous state and the
+> > runtime PM framework is left in the state that corresponds to the
+> > current hardware state.  Before we had pm_runtime_reinit(), everything
+> > worked as expected on the second ->probe() call, because things were
+> > in sync then.
+> 
+> Correct!
+> 
+> Before pm_runtime_reinit(), the failing probe case (-EPROBE_DEFER)
+> worked fine because the HW state and the runtime PM status was in
+> sync. The device was powered and the runtime PM status was RPM_ACTIVE.
+> 
+> >
+> > The introduction of pm_runtime_reinit() changed the situation and now
+> > effectively the hardware is required to be reset to the initial state
+> > if -EPROBE_DEFER is to be returned too.
+> 
+> Not correct. The hardware doesn't need a reset as it stays powered
+> after a failed probe.
+> 
+> Instead, only the runtime PM status needs to be synchronized with the
+> HW state the next probe attempt.
 
->>>
->>> +static struct arm64_ftr_bits ftr_id_aa64mmfr2[] = {
->>> +    ARM64_FTR_END,
->>
->> It will be good to see all the defined fields in id_aa64mmfr2 added here in
->> this patch. You could also move the definition of UA0 field from the next patch
->> to here.
->
-> Okay, what are the rules for unsupported features?
->
-> UAO support isn't added until a later patch, I assumed it was best to add the
-> definition as part of that patch.
+In other words, the probe routine assumes the actual state is the same
+as the PM status.  This may have been true before pm_runtime_reinit()
+came along, but it's not true now.
 
-The table up there is also used for SANITY checks. So even if Linux doesn't use
-the fields directly, the sanity checks could run on the fields and report issues which
-might be problematic for the normal operation (if at all any).
+> In other words, when the PM domain's ->runtime_resume() callbacks gets
+> called due to a pm_runtime_get_sync() in the second probe attempt, it
+> may find that the HW is already powered and can return zero instead of
+> resetting it.
 
-Also since you are adding the information about the new register to the table,
-its good to have the fields defined along with this patch to make the UAO patch
-a bit more cleaner, which would make use of it eventually.
+What's wrong with going ahead and resetting the hardware anyway?
 
-
-Cheers
-Suzuki
+Alan Stern
