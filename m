@@ -1,36 +1,67 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Tue, 2 Feb 2016 22:44:23 -0800
-Subject: MTK mt8173-evb: mainline unstable, and big-endian boot failures
-In-Reply-To: <1454463498.27798.24.camel@mtksdaap41>
-References: <CAOi56cVDbkAJEDWy3+DV63a=UuD7nqpUu8X7e-OjtWM-4dj_-w@mail.gmail.com>
- <7hsi1ilczm.fsf@baylibre.com>
- <CAF-23O3ps0Wt_UCmJbArpc5iJJryJKA0k_2qAyNb7op8O=UnAg@mail.gmail.com>
- <1453964180.26397.8.camel@mtksdaap41> <7hy4b8gc7q.fsf@baylibre.com>
- <1454309376.11974.3.camel@mtksdaap41> <7hh9hrgbbh.fsf@baylibre.com>
- <1454379462.27798.11.camel@mtksdaap41>
- <7h37tbdk6y.fsf@baylibre.com>
- <1454463498.27798.24.camel@mtksdaap41>
-Message-ID: <CAOi56cUjbdRwd8qw+UFJGG_F0-a8yx12Uo0Ta_XF_wEZf8OgpQ@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 3 Feb 2016 14:49:49 +0800
+Subject: [linux-sunxi] [PATCH 01/11] MAINTAINERS: Add entry for X-Powers
+ AXP family PMIC drivers
+In-Reply-To: <1454462910.7291.53.camel@perches.com>
+References: <1454408864-24112-1-git-send-email-wens@csie.org>
+ <1454408864-24112-2-git-send-email-wens@csie.org>
+ <CAGRGNgVxan9RCsLFW9hHWcdW+Rd_SgVG95H-yQg213g-YeE6Ug@mail.gmail.com>
+ <1454462910.7291.53.camel@perches.com>
+Message-ID: <CAGb2v64JfVdSN7VfgDdi2b0ZRKfJsHim=RiGmuvk853LFprF9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fan,
-
-On Tue, Feb 2, 2016 at 5:38 PM, Fan Chen <fan.chen@mediatek.com> wrote:
-
->> Speaking of updated firmware, is there any chance to make the default
->> version of the firmware significantly less noisy.  There is a TON of
->> output from the firmware before fastboot starts which makes the logs for
->> this board very noisy (same complaint on the mt8135.)
+On Wed, Feb 3, 2016 at 9:28 AM, Joe Perches <joe@perches.com> wrote:
+> On Wed, 2016-02-03 at 11:19 +1100, Julian Calaby wrote:
+>> On Tue, Feb 2, 2016 at 9:27 PM, Chen-Yu Tsai <wens@csie.org> wrote:
+>> > Add an entry for X-Powers AXP family PMIC drivers and list myself
+>> > as maintainer.
+> []
+>> > diff --git a/MAINTAINERS b/MAINTAINERS
+> []
+>> > @@ -11941,6 +11941,12 @@ F:     include/linux/workqueue.h
+>> >  F:     kernel/workqueue.c
+>> >  F:     Documentation/workqueue.txt
+>> >
+>> > +X-POWERS MULTIFUNCTION PMIC DEVICE DRIVERS
+>> > +M:     Chen-Yu Tsai <wens@csie.org>
+>> > +L:     linux-kernel at vger.kernel.org
+>> > +S:     Maintained
+>> > +N:     axp[128]
 >>
-> I will discuss with Eddie if it's possible to release a version with
-> light logs, but I'm afraid the answer could be given after our Chinese
-> New Year vacation. :P
+>> Should you list the files maintained and this list also?
+>
+> This "N:" pattern is kind of a wildcard.
+>
+> The difference between F: and N: is that git history
+> is also used by default for files that match.
+>
+> There are no files in -next today that match "*axp8*"
+> Dunno if this patchset added any.
 
-Thank you, it's not a big rush on that feature request, but it will be
-helpful whenever you can get to it.  Thanks for looking into it.  I
-hope you enjoy your  vacation.
+This set adds a "axp809.dtsi". A subsequent set will add "axp806.dtsi".
 
-Gu?ni?n h?o  :)
+> This matches:
+>
+>     $ git ls-files | grep "axp[128]"
+>     Documentation/devicetree/bindings/mfd/axp20x.txt
+>     Documentation/devicetree/bindings/power_supply/axp20x_usb_power.txt
+>     arch/arm/boot/dts/axp152.dtsi
+>     arch/arm/boot/dts/axp209.dtsi
+>     arch/arm/boot/dts/axp22x.dtsi
+>     drivers/extcon/extcon-axp288.c
+>     drivers/iio/adc/axp288_adc.c
+>     drivers/input/misc/axp20x-pek.c
+>     drivers/mfd/axp20x.c
+>     drivers/power/axp20x_usb_power.c
+>     drivers/power/axp288_charger.c
+>     drivers/power/axp288_fuel_gauge.c
+>     drivers/regulator/axp20x-regulator.c
+>     include/linux/mfd/axp20x.h
+>
+> Are all these files appropriate?
+>
 
-Kevin
+Yes.
+
+ChenYu
