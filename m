@@ -1,45 +1,39 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Wed, 3 Feb 2016 23:22:36 +0100
-Subject: [PATCH v2 03/12] serial: mvebu-uart: initial support for
- Armada-3700 serial port
-In-Reply-To: <20160203230224.5ea52f65@free-electrons.com>
-References: <1454524889-9207-1-git-send-email-gregory.clement@free-electrons.com>
- <1454524889-9207-4-git-send-email-gregory.clement@free-electrons.com>
- <CAPv3WKdh8D8GYMabALQQW-Z7L+=XhkZw2cXdYpcQ8tF0Rjckag@mail.gmail.com>
- <20160203230224.5ea52f65@free-electrons.com>
-Message-ID: <CAPv3WKe6=705iEtsuo0cUtugofiFa_Zt9xydRsgOV+mZ18H-3Q@mail.gmail.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Wed, 3 Feb 2016 14:30:09 -0800
+Subject: [PATCH] mm/debug-pagealloc: add missing debug_pagealloc_enabled
+In-Reply-To: <1454537757-3760706-1-git-send-email-arnd@arndb.de>
+References: <1454537757-3760706-1-git-send-email-arnd@arndb.de>
+Message-ID: <56B27F71.2000700@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'm sorry, indeed, I was the one to overlook - there was a lot going
-on in a thread and I missed it.
+On 02/03/2016 02:15 PM, Arnd Bergmann wrote:
+> The change to move the pagealloc logic broke the slab allocator
+> check when it's disabled at compile time:
+>
+> mm/slab.c: In function 'is_debug_pagealloc_cache':
+> mm/slab.c:1608:29: error: implicit declaration of function 'debug_pagealloc_enabled' [-Werror=implicit-function-declaration]
+>
+> This adds an inline helper to get it to work again.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 0a244aea1a61 ("mm/slab: clean up DEBUG_PAGEALLOC processing code")
+> ---
+>   include/linux/mm.h | 1 +
+>   1 file changed, 1 insertion(+)
+>
+> diff --git a/include/linux/mm.h b/include/linux/mm.h
+> index 5d86eb2e8584..90d600ce56ad 100644
+> --- a/include/linux/mm.h
+> +++ b/include/linux/mm.h
+> @@ -2242,6 +2242,7 @@ kernel_map_pages(struct page *page, int numpages, int enable)
+>   extern bool kernel_page_present(struct page *page);
+>   #endif /* CONFIG_HIBERNATION */
+>   #else
+> +static inline bool debug_pagealloc_enabled(void) { return 0; }
+>   static inline void
+>   kernel_map_pages(struct page *page, int numpages, int enable) {}
+>   #ifdef CONFIG_HIBERNATION
+>
 
-Ofer, as you found out that IRQF_SHARED help booting ubuntu - do you
-think it's a hack or fix?
-
-Best regards,
-Marcin
-
-2016-02-03 23:02 GMT+01:00 Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com>:
-> Dear Marcin Wojtas,
->
-> On Wed, 3 Feb 2016 22:41:15 +0100, Marcin Wojtas wrote:
->> Hi Gregory,
->>
->> > +       port->irq        = irq->start;
->> > +       port->irqflags   = 0;
->>
->> Same request as for v1, which you must have overlooked:
->> port->irqflags = IRQF_SHARED;
->
-> Gregory didn't overlook this comment you made on v1, he even replied to
-> it. Please check Gregory's reply to your review.
->
-> Best regards,
->
-> Thomas
-> --
-> Thomas Petazzoni, CTO, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+I believe this should be fixed with http://article.gmane.org/gmane.linux.kernel.mm/145655
