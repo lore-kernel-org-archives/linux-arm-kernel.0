@@ -1,35 +1,20 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed,  3 Feb 2016 23:15:05 +0100
-Subject: [PATCH] mm/debug-pagealloc: add missing debug_pagealloc_enabled
-Message-ID: <1454537757-3760706-1-git-send-email-arnd@arndb.de>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 3 Feb 2016 20:20:39 -0200
+Subject: SGTL5000 misc
+In-Reply-To: <CAEuupit8pVdnehkZkZPmq1QBHaS0sUG4NFuVFX37dKHn18j7DQ@mail.gmail.com>
+References: <CAEuupiuhPR48Upo=8f0zV8cxf0Vefgx3qA+vC+QDWAOV4n-e3Q@mail.gmail.com>
+ <CAOMZO5BPNc1ncz6J8yhcBYywCVuTxKYMYhiNUt_Jq3LZsKdi+A@mail.gmail.com>
+ <CAEuupiszxAj7JkJu-5ozqgEnTWkz9FQEpxN8dmEN+KtaV-76ww@mail.gmail.com>
+ <CAOMZO5DhrzdVyTVPB3FNquV4rDQ8a0MQrsJMosVsUQN63hj1Ww@mail.gmail.com>
+ <CAEuupiuoB7nMSc8Fbyort1rJd=ZhYc0zfJNkd=ckUYk1qd8Z7Q@mail.gmail.com>
+ <CAOMZO5C4QUHnJr=pisnYWCYZ0zUt+7HO846aPQui0zcLyX0N-Q@mail.gmail.com>
+ <CAEuupivdftoopCOX3f7KRbV9poKdjdD3s9hfcbgB2TYjHmrjvw@mail.gmail.com>
+ <CAEuupit8pVdnehkZkZPmq1QBHaS0sUG4NFuVFX37dKHn18j7DQ@mail.gmail.com>
+Message-ID: <CAOMZO5BxFRzi3qJAK=xDGger_MK9GZhuM00ugo836PHK_zJKjQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The change to move the pagealloc logic broke the slab allocator
-check when it's disabled at compile time:
+On Wed, Feb 3, 2016 at 8:05 PM, Erik Friesen <friesendrywall@gmail.com> wrote:
+> Anyway, I think something like this should be added to sgtl5000.c
 
-mm/slab.c: In function 'is_debug_pagealloc_cache':
-mm/slab.c:1608:29: error: implicit declaration of function 'debug_pagealloc_enabled' [-Werror=implicit-function-declaration]
-
-This adds an inline helper to get it to work again.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 0a244aea1a61 ("mm/slab: clean up DEBUG_PAGEALLOC processing code")
----
- include/linux/mm.h | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/include/linux/mm.h b/include/linux/mm.h
-index 5d86eb2e8584..90d600ce56ad 100644
---- a/include/linux/mm.h
-+++ b/include/linux/mm.h
-@@ -2242,6 +2242,7 @@ kernel_map_pages(struct page *page, int numpages, int enable)
- extern bool kernel_page_present(struct page *page);
- #endif /* CONFIG_HIBERNATION */
- #else
-+static inline bool debug_pagealloc_enabled(void) { return 0; }
- static inline void
- kernel_map_pages(struct page *page, int numpages, int enable) {}
- #ifdef CONFIG_HIBERNATION
--- 
-2.7.0
+Yes, please send a formal patch for it.
