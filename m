@@ -1,83 +1,144 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 3 Feb 2016 11:21:12 +0000
-Subject: [PATCH v3] ARM64: kernel: implement ACPI parking protocol
-In-Reply-To: <20160202182657.GC15706@e104818-lin.cambridge.arm.com>
-References: <1453806638-23167-1-git-send-email-lorenzo.pieralisi@arm.com>
- <20160202182657.GC15706@e104818-lin.cambridge.arm.com>
-Message-ID: <20160203112112.GA18387@red-moon>
+From: paul.burton@imgtec.com (Paul Burton)
+Date: Wed, 3 Feb 2016 11:30:34 +0000
+Subject: [PATCH v2 04/15] PCI: xilinx: Keep references to both IRQ domains
+In-Reply-To: <1454499045-5020-1-git-send-email-paul.burton@imgtec.com>
+References: <1454499045-5020-1-git-send-email-paul.burton@imgtec.com>
+Message-ID: <1454499045-5020-5-git-send-email-paul.burton@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 02, 2016 at 06:26:58PM +0000, Catalin Marinas wrote:
-> On Tue, Jan 26, 2016 at 11:10:38AM +0000, Lorenzo Pieralisi wrote:
-> > The SBBR and ACPI specifications allow ACPI based systems that do not
-> > implement PSCI (eg systems with no EL3) to boot through the ACPI parking
-> > protocol specification[1].
-> > 
-> > This patch implements the ACPI parking protocol CPU operations, and adds
-> > code that eases parsing the parking protocol data structures to the
-> > ARM64 SMP initializion carried out at the same time as cpus enumeration.
-> > 
-> > To wake-up the CPUs from the parked state, this patch implements a
-> > wakeup IPI for ARM64 (ie arch_send_wakeup_ipi_mask()) that mirrors the
-> > ARM one, so that a specific IPI is sent for wake-up purpose in order
-> > to distinguish it from other IPI sources.
-> > 
-> > Given the current ACPI MADT parsing API, the patch implements a glue
-> > layer that helps passing MADT GICC data structure from SMP initialization
-> > code to the parking protocol implementation somewhat overriding the CPU
-> > operations interfaces. This to avoid creating a completely trasparent
-> > DT/ACPI CPU operations layer that would require creating opaque
-> > structure handling for CPUs data (DT represents CPU through DT nodes, ACPI
-> > through static MADT table entries), which seems overkill given that ACPI
-> > on ARM64 mandates only two booting protocols (PSCI and parking protocol),
-> > so there is no need for further protocol additions.
-> > 
-> > Based on the original work by Mark Salter <msalter@redhat.com>
-> > 
-> > [1] https://acpica.org/sites/acpica/files/MP%20Startup%20for%20ARM%20platforms.docx
-> > 
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Cc: Hanjun Guo <hanjun.guo@linaro.org>
-> > Cc: Loc Ho <lho@apm.com>
-> > Cc: Sudeep Holla <sudeep.holla@arm.com>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Mark Rutland <mark.rutland@arm.com>
-> > Cc: Mark Salter <msalter@redhat.com>
-> > Cc: Al Stone <ahs3@redhat.com>
-> 
-> Applied, with a minor addition just to warn people from not using it in
-> other configurations (#ifdef still needed otherwise the
-> acpi_parking_protocol_valid symbol is not available; but I prefer uglier
-> code than people starting to use this IPI in their firmware):
+pcie-xilinx creates 2 IRQ domains when built with MSI support: one for
+MSI interrupts & one for legacy INTx interrupts. However, it only kept a
+reference to the MSI IRQ domain. This means that any INTx interrupts
+that may occur would be mapped using the wrong domain, and that only the
+MSI IRQ domain would be removed along with the driver. Track both IRQ
+domains & clean up both as appropriate.
 
-It makes sense, we could include asm/acpi.h in smp.c (which is not
-included by linux/acpi.h if !CONFIG_ACPI) to pull in the symbol and
-remove the ifdef if you think it is cleaner.
+Signed-off-by: Paul Burton <paul.burton@imgtec.com>
+Fixes: 8961def56845 ("PCI: xilinx: Add Xilinx AXI PCIe Host Bridge IP driver")
 
-Thanks !
-Lorenzo
+---
 
-> 
-> --- a/arch/arm64/kernel/smp.c
-> +++ b/arch/arm64/kernel/smp.c
-> @@ -767,6 +767,12 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
->                 break;
->  #endif
-> +
-> +#ifdef CONFIG_ARM64_ACPI_PARKING_PROTOCOL
->         case IPI_WAKEUP:
-> +               WARN_ONCE(!acpi_parking_protocol_valid(cpu),
-> +                         "CPU%u: Wake-up IPI outside the ACPI parking protocol\n",
-> +                         cpu);
->                 break;
-> +#endif
->  
->         default:
-> 
-> Thanks.
-> 
-> -- 
-> Catalin
-> 
+Changes in v2:
+- Add Fixes tag.
+
+ drivers/pci/host/pcie-xilinx.c | 58 ++++++++++++++++++++----------------------
+ 1 file changed, 28 insertions(+), 30 deletions(-)
+
+diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
+index 4cfa463..1490bd1 100644
+--- a/drivers/pci/host/pcie-xilinx.c
++++ b/drivers/pci/host/pcie-xilinx.c
+@@ -105,6 +105,7 @@
+  * @root_busno: Root Bus number
+  * @dev: Device pointer
+  * @irq_domain: IRQ domain pointer
++ * @msi_irq_domain: MSI IRQ domain pointer
+  * @bus_range: Bus range
+  * @resources: Bus Resources
+  */
+@@ -115,6 +116,7 @@ struct xilinx_pcie_port {
+ 	u8 root_busno;
+ 	struct device *dev;
+ 	struct irq_domain *irq_domain;
++	struct irq_domain *msi_irq_domain;
+ 	struct resource bus_range;
+ 	struct list_head resources;
+ };
+@@ -291,7 +293,7 @@ static int xilinx_pcie_msi_setup_irq(struct msi_controller *chip,
+ 	if (hwirq < 0)
+ 		return hwirq;
+ 
+-	irq = irq_create_mapping(port->irq_domain, hwirq);
++	irq = irq_create_mapping(port->msi_irq_domain, hwirq);
+ 	if (!irq)
+ 		return -EINVAL;
+ 
+@@ -517,31 +519,21 @@ static irqreturn_t xilinx_pcie_intr_handler(int irq, void *data)
+ 
+ /**
+  * xilinx_pcie_free_irq_domain - Free IRQ domain
+- * @port: PCIe port information
++ * @domain: the IRQ domain to free
++ * @nr: the number of IRQs in the domain
+  */
+-static void xilinx_pcie_free_irq_domain(struct xilinx_pcie_port *port)
++static void xilinx_pcie_free_irq_domain(struct irq_domain *domain, int nr)
+ {
+ 	int i;
+-	u32 irq, num_irqs;
+-
+-	/* Free IRQ Domain */
+-	if (IS_ENABLED(CONFIG_PCI_MSI)) {
+-
+-		free_pages(port->msi_pages, 0);
+-
+-		num_irqs = XILINX_NUM_MSI_IRQS;
+-	} else {
+-		/* INTx */
+-		num_irqs = 4;
+-	}
++	u32 irq;
+ 
+-	for (i = 0; i < num_irqs; i++) {
+-		irq = irq_find_mapping(port->irq_domain, i);
++	for (i = 0; i < nr; i++) {
++		irq = irq_find_mapping(domain, i);
+ 		if (irq > 0)
+ 			irq_dispose_mapping(irq);
+ 	}
+ 
+-	irq_domain_remove(port->irq_domain);
++	irq_domain_remove(domain);
+ }
+ 
+ /**
+@@ -571,20 +563,20 @@ static int xilinx_pcie_init_irq_domain(struct xilinx_pcie_port *port)
+ 		return PTR_ERR(port->irq_domain);
+ 	}
+ 
+-	/* Setup MSI */
+-	if (IS_ENABLED(CONFIG_PCI_MSI)) {
+-		port->irq_domain = irq_domain_add_linear(node,
+-							 XILINX_NUM_MSI_IRQS,
+-							 &msi_domain_ops,
+-							 &xilinx_pcie_msi_chip);
+-		if (!port->irq_domain) {
+-			dev_err(dev, "Failed to get a MSI IRQ domain\n");
+-			return PTR_ERR(port->irq_domain);
+-		}
++	if (!IS_ENABLED(CONFIG_PCI_MSI))
++		return 0;
+ 
+-		xilinx_pcie_enable_msi(port);
++	/* Setup MSI */
++	port->msi_irq_domain = irq_domain_add_linear(node,
++						     XILINX_NUM_MSI_IRQS,
++						     &msi_domain_ops,
++						     &xilinx_pcie_msi_chip);
++	if (!port->msi_irq_domain) {
++		dev_err(dev, "Failed to get a MSI IRQ domain\n");
++		return PTR_ERR(port->msi_irq_domain);
+ 	}
+ 
++	xilinx_pcie_enable_msi(port);
+ 	return 0;
+ }
+ 
+@@ -869,7 +861,13 @@ static int xilinx_pcie_remove(struct platform_device *pdev)
+ {
+ 	struct xilinx_pcie_port *port = platform_get_drvdata(pdev);
+ 
+-	xilinx_pcie_free_irq_domain(port);
++	xilinx_pcie_free_irq_domain(port->irq_domain, 4);
++
++	if (config_enabled(CONFIG_MSI)) {
++		free_pages(port->msi_pages, 0);
++		xilinx_pcie_free_irq_domain(port->msi_irq_domain,
++					    XILINX_NUM_MSI_IRQS);
++	}
+ 
+ 	return 0;
+ }
+-- 
+2.7.0
