@@ -1,31 +1,32 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 3 Feb 2016 21:02:30 +0100
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 3 Feb 2016 21:14:15 +0100
 Subject: [PATCH 0/3] kallsyms: remove special handling for CONFIG_ARM
-In-Reply-To: <20160203200107.GD10826@n2100.arm.linux.org.uk>
+In-Reply-To: <1454419174-21290-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1454419174-21290-1-git-send-email-ard.biesheuvel@linaro.org>
- <HKXPR06MB0565A2CFF95AD7C000F43E6A8ADF0@HKXPR06MB0565.apcprd06.prod.outlook.com>
- <CAKv+Gu9VvskQ34w0niS+6AtF9hNcycfYDt_3Kp4T+WK8Vxf_dA@mail.gmail.com>
- <HKXPR06MB05656F902E0E1FBBDBD713DC8AD00@HKXPR06MB0565.apcprd06.prod.outlook.com>
- <CAKv+Gu8ZTHAqviveLMizRKPfeXwb6kcXi4cVQNYVYuPcVMgMeQ@mail.gmail.com>
- <20160203200107.GD10826@n2100.arm.linux.org.uk>
-Message-ID: <CAKv+Gu_MyPvDnnQ0hScqW6XR77h0MD6LxEb_q2Z-mS0AQw3djA@mail.gmail.com>
+Message-ID: <CACRpkdZ+uDTM+LZPyvkZiFSzxUipP_6ArzoN_JAJbqVw6+=u7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 February 2016 at 21:01, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Feb 03, 2016 at 02:41:29PM +0100, Ard Biesheuvel wrote:
->> > bf353edc T __stubs_start
->>
->> This is a global symbol
->>
->> > bf353edc T _etext
->> > bf353ee0 t __stubs_start
->>
->> This is a local symbol
->
-> Stop this madness.  This gets you an immediate NAK on the patch set.
->
+On Tue, Feb 2, 2016 at 2:19 PM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
 
-What madness? This does not change at all with my patches, these
-duplicates already exist in the current code.
+> a) CONFIG_HAVE_TCM creates a virtual region that is too far away for the
+>    relative kallsyms code to reach it;
+
+We have discussed the TCM before in context of SRAM and other
+embedded on-chip RAMs.
+
+There was some consensus that the statically allocated area for TCM is
+not really scaleable, especially not for multiplatform kernels, which will
+try to compile the sum total of all platforms' code tagged for TCM into this
+memory which is bound to overflow if people start to take advantage
+of it. It would be better to have just the machine-relevant code loaded
+into TCM at boot. People have also shown interest in deploying
+SRAM/TCM applications from userspace (for hard processing
+kernels etc).
+
+The best would be to advance that work and thus get rid of the
+static TCM linkage I think?
+
+Yours,
+Linus Walleij
