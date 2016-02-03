@@ -1,33 +1,20 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 3 Feb 2016 09:25:02 +0000
-Subject: [PATCH 0/5] Clean up warnings (part 2, asm/pci-bridge.h)
-In-Reply-To: <20160202193026.9258.7573.stgit@bhelgaas-glaptop2.roam.corp.google.com>
-References: <20160202193026.9258.7573.stgit@bhelgaas-glaptop2.roam.corp.google.com>
-Message-ID: <20160203092502.GA11376@arm.com>
+From: biao.huang@mediatek.com (Biao Huang)
+Date: Wed, 3 Feb 2016 09:24:44 +0800
+Subject: [PATCH 0/2] pinctrl: mediatek: Add direction control and
+ gpio_request_enable Support
+Message-ID: <1454462686-770-1-git-send-email-biao.huang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 02, 2016 at 01:38:26PM -0600, Bjorn Helgaas wrote:
-> We've had some non-arch-specific stuff (pci_has_flag() and associated
-> definitions like PCI_PROBE_ONLY) in asm/pci-bridge.h.  This leads to
-> warnings like:
-> 
->   drivers/pci/host/pcie-designware.c:562:20: error: 'PCI_PROBE_ONLY' undeclared (first use in this function)
->   drivers/pci/host/pcie-designware.c:562:7: error: implicit declaration of function 'pci_has_flag' [-Werror=implicit-function-declaration]
-> 
-> because arches don't consistently supply asm/pci-bridge.h, and several
-> drivers include it when they shouldn't.
-> 
-> This series moves the generic stuff to linux/pci.h, so it's the same for
-> everybody, and removes the now-empty asm-generic/pci-bridge.h.
-> 
-> There still a few arches that provide asm/pci-bridge.h (microblaze,
-> powerpc, and xtensa), but now they contain truly arch-dependent things like
-> struct pci_controller definitions, and they're only included by
-> arch-specific files.
+1. Set direction to input when do input-enable/disable and input-schmitt-enable/disable properties.
+2. Add gpio_request_enable support to set pin to gpio function.
 
-For the arm64 bits:
+Biao Huang (2):
+  pinctrl: mediatek: fix direction control issue
+  pinctrl: mediatek: Add gpio_request_enable support
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+ drivers/pinctrl/mediatek/pinctrl-mtk-common.c |   38 +++++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
 
-Will
+-- 
+1.7.9.5
