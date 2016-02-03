@@ -1,38 +1,50 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Wed, 3 Feb 2016 12:26:10 -0600
-Subject: [PATCH v10 5/5] Watchdog: ARM SBSA Generic Watchdog half timeout
- panic support
-In-Reply-To: <CADyBb7uULCn97ea19zH8dB4QX1QA8=AXL94d6gXgFxXM8haBNA@mail.gmail.com>
-References: <1454519923-25230-1-git-send-email-fu.wei@linaro.org>
- <1454519923-25230-6-git-send-email-fu.wei@linaro.org>
- <56B23883.7000501@codeaurora.org>
- <CADyBb7sxPg-QUjTbeHFtYkctKc_g7D8O=+jqbXN+DCCoCEnFqA@mail.gmail.com>
- <56B23E99.1030604@codeaurora.org>
- <CADyBb7s4opxfPFuX=1-qEE6uhsaMXgofAJPbHUQHrng2AUwqNA@mail.gmail.com>
- <56B2423B.1020109@codeaurora.org>
- <CADyBb7uULCn97ea19zH8dB4QX1QA8=AXL94d6gXgFxXM8haBNA@mail.gmail.com>
-Message-ID: <56B24642.8090105@codeaurora.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 3 Feb 2016 10:28:28 -0800
+Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
+ v4.5-rc1
+In-Reply-To: <CAPDyKFrsbW+vOoKBDvkNbJa=aUZE1EcikCqrAuO4cv+TkW-FnA@mail.gmail.com>
+References: <Pine.LNX.4.44L0.1602011844540.2869-100000@netrider.rowland.org>
+ <20160202030533.GT19432@atomide.com>
+ <CAPDyKFqQb+jtTpZbq6EvbfAk28yVkgdtiOswngNH_BjCWBDxFg@mail.gmail.com>
+ <CAPDyKFras1o13WBZzaZ_Snnj5TBQQFWKr=PtCjUvwe+yGPQn9w@mail.gmail.com>
+ <20160202163536.GU19432@atomide.com>
+ <CAPDyKFosQjkHDVSvy67+hstjjFseXQP5WYXrJE19GgVFYJ099w@mail.gmail.com>
+ <20160202234145.GC19432@atomide.com>
+ <CAPDyKFqLi8xOUeoxUTAmif5QrOjVpV_2CDLv4hjO_C9iOnv+5Q@mail.gmail.com>
+ <20160203162705.GG19432@atomide.com>
+ <CAPDyKFrsbW+vOoKBDvkNbJa=aUZE1EcikCqrAuO4cv+TkW-FnA@mail.gmail.com>
+Message-ID: <20160203182828.GM19432@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fu Wei wrote:
-> Actually,
-> the SBSA watchdog driver should support only  half-timeout for panic
-> the user cannot configure the length of "panic time",  He can only
-> enable it, and it is automatically set to 1/2 timeout.
->
-> we don't need pre-timeout here.
->
-> Hope I understand you correctly:-)  sorry for your confusion
->
->> >
->> >So when pre-timeout occurs, the interrupt handler calls panic() or whatever
->> >it's supposed to do.
-> Actually,
-> So when 1/2 timeout occurs, the interrupt handler calls panic() or
-> whatever it's supposed to do.
->
+* Ulf Hansson <ulf.hansson@linaro.org> [160203 10:03]:
+> 
+> One more thing though. I just realized that you have yet another issue
+> to consider going for the approach fixing *only* drivers.
+> 
+> Let me summarize it here:
+> 
+> If userspace has prevented runtime PM (pm_runtime_forbid()) when a
+> driver becomes unbound, the driver will not be able to suspend the
+> device by using any of the pm_runtime_suspend() APIs, as the usage
+> count is isn't zero.
+> 
+> As pm_runtime_reinit() is invoked as part of the driver unbind
+> sequence, the runtime PM status goes out of sync. A following driver
+> rebind will then trigger the warning when the PM domain's
+> ->runtime_resume() callback gets invoked. Again, forever preventing
+> the device from being runtime suspended.
 
-I understand all that.  What I'm saying is that, in the future, when 
-pre-timeout support is added to the watchdog layer, I think it makes 
-sense to modify this driver to use pre-timeout support.
+Hmm yeah that's a good point.
+
+> How do you intend to solve this case?
+> I guess there are two options, pick up the patch I posted for omap
+> hwmod or make use of pm_runtime_force_suspend() in the driver.
+
+My gut feeling right now is we should just have
+BUS_NOTIFY_UNBIND_DRIVER shut down the device on the interconnect
+automatically as it's unused after the driver has unloaded :)
+
+Regards,
+
+Tony
