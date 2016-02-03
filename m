@@ -1,47 +1,74 @@
 From: jglauber@cavium.com (Jan Glauber)
-Date: Wed,  3 Feb 2016 18:11:55 +0100
-Subject: [PATCH v3 0/5] Cavium ThunderX PMU support
-Message-ID: <cover.1454516082.git.jglauber@cavium.com>
+Date: Wed,  3 Feb 2016 18:11:56 +0100
+Subject: [PATCH v3 1/5] arm64/perf: Rename Cortex A57 events
+In-Reply-To: <cover.1454516082.git.jglauber@cavium.com>
+References: <cover.1454516082.git.jglauber@cavium.com>
+Message-ID: <e0ecaaaffb64cc0b2ecfd8852f718a3f1d642b5c.1454516082.git.jglauber@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The implemented Cortex A57 events are not A57 specific.
+They are recommended by ARM and can be found on other
+ARMv8 SOCs like Cavium ThunderX too. Therefore move
+these events to the common PMUv3 table.
 
-I'm reposting the whole series just in case my previous attempt to
-repost only the broken patch was confusing. Patches are based on
-4.5-rc2.
+Signed-off-by: Jan Glauber <jglauber@cavium.com>
+---
+ arch/arm64/kernel/perf_event.c | 28 ++++++++++++++--------------
+ 1 file changed, 14 insertions(+), 14 deletions(-)
 
-Patches 1-3 add support for ThunderX specific PMU events.
-
-Patch 4 changes the cycle counter to overflow on 64 bit but tries to minimize
-code changes. Without this change perf does not work at all on ThunderX.
-
-Patch 5 extends the event mask according to ARMv8.1 and also affects arm32.
-
-Changes to v2:
-- fixed arm compile errors
-
-Changes to v1:
-- renamed thunderx dt pmu binding to thunder
-
---Jan
-
-Jan Glauber (5):
-  arm64/perf: Rename Cortex A57 events
-  arm64/perf: Add Cavium ThunderX PMU support
-  arm64: dts: Add Cavium ThunderX specific PMU
-  arm64/perf: Enable PMCR long cycle counter bit
-  arm64/perf: Extend event mask for ARMv8.1
-
- Documentation/devicetree/bindings/arm/pmu.txt |   1 +
- arch/arm/kernel/perf_event_v6.c               |   6 +-
- arch/arm/kernel/perf_event_v7.c               |  29 ++++--
- arch/arm/kernel/perf_event_xscale.c           |   4 +-
- arch/arm64/boot/dts/cavium/thunder-88xx.dtsi  |   5 +
- arch/arm64/kernel/perf_event.c                | 145 ++++++++++++++++++++------
- drivers/perf/arm_pmu.c                        |   5 +-
- include/linux/perf/arm_pmu.h                  |   4 +-
- 8 files changed, 151 insertions(+), 48 deletions(-)
-
+diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+index f7ab14c..32fe656 100644
+--- a/arch/arm64/kernel/perf_event.c
++++ b/arch/arm64/kernel/perf_event.c
+@@ -87,17 +87,17 @@
+ #define ARMV8_PMUV3_PERFCTR_L2D_TLB				0x2F
+ #define ARMV8_PMUV3_PERFCTR_L21_TLB				0x30
+ 
++/* Recommended events. */
++#define ARMV8_PMUV3_PERFCTR_L1_DCACHE_ACCESS_LD			0x40
++#define ARMV8_PMUV3_PERFCTR_L1_DCACHE_ACCESS_ST			0x41
++#define ARMV8_PMUV3_PERFCTR_L1_DCACHE_REFILL_LD			0x42
++#define ARMV8_PMUV3_PERFCTR_L1_DCACHE_REFILL_ST			0x43
++#define ARMV8_PMUV3_PERFCTR_DTLB_REFILL_LD			0x4C
++#define ARMV8_PMUV3_PERFCTR_DTLB_REFILL_ST			0x4D
++
+ /* ARMv8 Cortex-A53 specific event types. */
+ #define ARMV8_A53_PERFCTR_PREFETCH_LINEFILL			0xC2
+ 
+-/* ARMv8 Cortex-A57 and Cortex-A72 specific event types. */
+-#define ARMV8_A57_PERFCTR_L1_DCACHE_ACCESS_LD			0x40
+-#define ARMV8_A57_PERFCTR_L1_DCACHE_ACCESS_ST			0x41
+-#define ARMV8_A57_PERFCTR_L1_DCACHE_REFILL_LD			0x42
+-#define ARMV8_A57_PERFCTR_L1_DCACHE_REFILL_ST			0x43
+-#define ARMV8_A57_PERFCTR_DTLB_REFILL_LD			0x4c
+-#define ARMV8_A57_PERFCTR_DTLB_REFILL_ST			0x4d
+-
+ /* PMUv3 HW events mapping. */
+ static const unsigned armv8_pmuv3_perf_map[PERF_COUNT_HW_MAX] = {
+ 	PERF_MAP_ALL_UNSUPPORTED,
+@@ -174,16 +174,16 @@ static const unsigned armv8_a57_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
+ 					      [PERF_COUNT_HW_CACHE_RESULT_MAX] = {
+ 	PERF_CACHE_MAP_ALL_UNSUPPORTED,
+ 
+-	[C(L1D)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_A57_PERFCTR_L1_DCACHE_ACCESS_LD,
+-	[C(L1D)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_A57_PERFCTR_L1_DCACHE_REFILL_LD,
+-	[C(L1D)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV8_A57_PERFCTR_L1_DCACHE_ACCESS_ST,
+-	[C(L1D)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV8_A57_PERFCTR_L1_DCACHE_REFILL_ST,
++	[C(L1D)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L1_DCACHE_ACCESS_LD,
++	[C(L1D)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L1_DCACHE_REFILL_LD,
++	[C(L1D)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L1_DCACHE_ACCESS_ST,
++	[C(L1D)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L1_DCACHE_REFILL_ST,
+ 
+ 	[C(L1I)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L1_ICACHE_ACCESS,
+ 	[C(L1I)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L1_ICACHE_REFILL,
+ 
+-	[C(DTLB)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_A57_PERFCTR_DTLB_REFILL_LD,
+-	[C(DTLB)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV8_A57_PERFCTR_DTLB_REFILL_ST,
++	[C(DTLB)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_DTLB_REFILL_LD,
++	[C(DTLB)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_DTLB_REFILL_ST,
+ 
+ 	[C(ITLB)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_ITLB_REFILL,
+ 
 -- 
 1.9.1
