@@ -1,48 +1,63 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Wed, 3 Feb 2016 13:18:18 +0100
-Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
- v4.5-rc1
-In-Reply-To: <CAPDyKFqSVZffQ7WNZqn9qSRibsCgG2rY26z_97agL+LhQRVGcg@mail.gmail.com>
-References: <20160201232833.GR19432@atomide.com>
- <Pine.LNX.4.44L0.1602011844540.2869-100000@netrider.rowland.org>
- <20160202030533.GT19432@atomide.com>
- <CAPDyKFqQb+jtTpZbq6EvbfAk28yVkgdtiOswngNH_BjCWBDxFg@mail.gmail.com>
- <CAPDyKFras1o13WBZzaZ_Snnj5TBQQFWKr=PtCjUvwe+yGPQn9w@mail.gmail.com>
- <20160202163536.GU19432@atomide.com>
- <CAPDyKFosQjkHDVSvy67+hstjjFseXQP5WYXrJE19GgVFYJ099w@mail.gmail.com>
- <20160202234145.GC19432@atomide.com>
- <CAPDyKFqLi8xOUeoxUTAmif5QrOjVpV_2CDLv4hjO_C9iOnv+5Q@mail.gmail.com>
- <CAPDyKFqSVZffQ7WNZqn9qSRibsCgG2rY26z_97agL+LhQRVGcg@mail.gmail.com>
-Message-ID: <CAJZ5v0iSu9_uNLZstKsC1mHi3A3GRxQc=WPU6Xa7BSiaNChNCA@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 3 Feb 2016 12:29:52 +0000
+Subject: [PATCH V4 2/2] regulator: mt6323: Add support for MT6323 regulator
+In-Reply-To: <1454477942.31375.32.camel@mtksdaap41>
+References: <1453896059-44589-1-git-send-email-blogic@openwrt.org>
+ <1453896059-44589-2-git-send-email-blogic@openwrt.org>
+ <20160127144105.GQ6042@sirena.org.uk>
+ <56AA5A5C.9080402@openwrt.org>
+ <20160128231306.GD4130@sirena.org.uk>
+ <1454061134.10861.14.camel@mtksdaap41>
+ <20160129112717.GP4130@sirena.org.uk>
+ <1454069479.10861.30.camel@mtksdaap41>
+ <20160202193839.GX4455@sirena.org.uk>
+ <1454477942.31375.32.camel@mtksdaap41>
+Message-ID: <20160203122952.GF4455@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 3, 2016 at 11:25 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->>
->> I don't see the problem, but of course you know omap for better than I do.
->>
->> So if you are concerned about this, perhaps adding a dev_dbg print
->> when the omap hwmod's ->runtime_suspend() callback returns zero could
->
-> /s/runtime_suspend/runtime_resume
+On Wed, Feb 03, 2016 at 01:39:02PM +0800, menghui lin wrote:
+> On Tue, 2016-02-02 at 19:38 +0000, Mark Brown wrote:
 
-OK
+> > How does the driver know if it needs to change the mode (ie, how can it
+> > tell if the current mode is inadequate) and surely if we can only change
+> > in one direction this isn't terribly useful?
 
-Let me summarize my understanding of this thread so far.
+> I think the datasheet of buck/ldo could provide information about power
+> capability of each mode. The driver should adjust regulator mode per its
+> device's power requirement.
 
-It looks like the omap3 code initializes hardware in ->probe() and
-then it may return -EPROBE_DEFER due to some unmet dependencies.  In
-that case the hardware is not reset to the previous state and the
-runtime PM framework is left in the state that corresponds to the
-current hardware state.  Before we had pm_runtime_reinit(), everything
-worked as expected on the second ->probe() call, because things were
-in sync then.
+That's of no help for a consumer driver which doesn't know what
+regulator is supplying it.
 
-The introduction of pm_runtime_reinit() changed the situation and now
-effectively the hardware is required to be reset to the initial state
-if -EPROBE_DEFER is to be returned too.
+> case 1:
 
-Is that correct?
+> We have a USB typeC micro-controller, which has two modes - standby and
+> normal. It requires 1.8V and 3.3V to operate (both powers are always
+> on). The device stays in standby mode when there is no cable in. When
+> cable in, we got an interrupt and change device into normal mode.
 
-Thanks,
-Rafael
+> The standby mode power consumption is quite small, so we would like the
+> change mode of regulator into STANDBY to save more power. And we change
+> into NORMAL when we receive cable-in interrupt.
+
+This seems like something that we ought to be doing via runtime PM
+anyway which should be going through the suspend mode bindings, though
+that would need some plumbing in.
+
+> case 2:
+
+> About buck regulator for CPU, it usually provides PWM mode, PWM/PFM Auto
+> mode, PFM mode. I think it could map to FAST, NORMAL, IDLE mode
+> respectively. Most of time we would use just normal mode. However, we
+> would change regulator into PWM mode time to time to test buck output
+> performance on the tested board.
+
+That's a test use that doesn't seem a good fit for upstream at all.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160203/fa4e9220/attachment-0001.sig>
