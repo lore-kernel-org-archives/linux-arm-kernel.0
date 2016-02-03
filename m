@@ -1,138 +1,122 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Wed,  3 Feb 2016 12:12:47 +0800
-Subject: [PATCH 8/8] ARM: dts: rockchip: add the thermal main info found on
- rk3228
-In-Reply-To: <1454472767-5767-1-git-send-email-wxt@rock-chips.com>
-References: <1454472767-5767-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1454472767-5767-9-git-send-email-wxt@rock-chips.com>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Wed, 3 Feb 2016 13:22:48 +0800
+Subject: [PATCH v4 1/4] soc: mediatek: Refine scpsys to support multiple
+ platform
+In-Reply-To: <56B0889A.1010305@gmail.com>
+References: <1453270097-53853-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1453270097-53853-2-git-send-email-jamesjj.liao@mediatek.com>
+ <56ADF556.6070402@gmail.com> <1454396212.2847.15.camel@mtksdaap41>
+ <56B0889A.1010305@gmail.com>
+Message-ID: <1454476968.2847.59.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the thermal needed main information for rk3228 SoCS.
+Hi Matthias,
 
-Basically has the following content:
+On Tue, 2016-02-02 at 11:44 +0100, Matthias Brugger wrote:
+> On 02/02/16 07:56, James Liao wrote:
+> > On Sun, 2016-01-31 at 12:51 +0100, Matthias Brugger wrote:
+> >> >On 20/01/16 07:08, James Liao wrote:
+> >>> > >Refine scpsys driver common code to support multiple SoC / platform.
+> >>> > >
+> >>> > >Signed-off-by: James Liao<jamesjj.liao@mediatek.com>
+> >>> > >---
+> >>> > >   drivers/soc/mediatek/mtk-scpsys.c | 418 ++++++++++++++++++++------------------
+> >>> > >   drivers/soc/mediatek/mtk-scpsys.h |  55 +++++
+> >>> > >   2 files changed, 270 insertions(+), 203 deletions(-)
+> >>> > >   create mode 100644 drivers/soc/mediatek/mtk-scpsys.h
+> >> >
+> >> >In general this approach looks fine to me, comments below.
+> >> >
+> >>> > >
+> >>> > >diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
+> >>> > >index 0221387..339adfc 100644
+> >>> > >--- a/drivers/soc/mediatek/mtk-scpsys.c
+> >>> > >+++ b/drivers/soc/mediatek/mtk-scpsys.c
+> >>> > >@@ -11,29 +11,17 @@
+> >>> > >    * GNU General Public License for more details.
+> >>> > >    */
+> >>> > >   #include <linux/clk.h>
+> >>> > >-#include <linux/delay.h>
+> >>> > >+#include <linux/init.h>
+> >>> > >   #include <linux/io.h>
+> >>> > >-#include <linux/kernel.h>
+> >>> > >   #include <linux/mfd/syscon.h>
+> >> >
+> >> >When at it, do we need this include?
+> > syscon_regmap_lookup_by_phandle() is declared in this head file.
+> >
+> >>> > >-#include <linux/init.h>
+> >>> > >   #include <linux/of_device.h>
+> >>> > >   #include <linux/platform_device.h>
+> >>> > >   #include <linux/pm_domain.h>
+> >>> > >-#include <linux/regmap.h>
+> >>> > >-#include <linux/soc/mediatek/infracfg.h>
+> >>> > >   #include <linux/regulator/consumer.h>
+> >>> > >-#include <dt-bindings/power/mt8173-power.h>
+> >>> > >+#include <linux/soc/mediatek/infracfg.h>
+> >>> > >+
+> >>> > >+#include "mtk-scpsys.h"
+> >>> > >
+> >>> > >-#define SPM_VDE_PWR_CON			0x0210
+> >>> > >-#define SPM_MFG_PWR_CON			0x0214
+> >>> > >-#define SPM_VEN_PWR_CON			0x0230
+> >>> > >-#define SPM_ISP_PWR_CON			0x0238
+> >>> > >-#define SPM_DIS_PWR_CON			0x023c
+> >>> > >-#define SPM_VEN2_PWR_CON		0x0298
+> >>> > >-#define SPM_AUDIO_PWR_CON		0x029c
+> >>> > >-#define SPM_MFG_2D_PWR_CON		0x02c0
+> >>> > >-#define SPM_MFG_ASYNC_PWR_CON		0x02c4
+> >>> > >-#define SPM_USB_PWR_CON			0x02cc
+> >> >
+> >> >I would prefer to keep this defines and declare SoC specific ones where
+> >> >necessary. It makes the code more readable.
+> > Some register address may be reused by other modules among SoCs, so it's
+> > not easy to maintain the defines when we implement multiple SoC drivers
+> > in the same file. For example, offset 0x0298 is VEN2_PWR_CON on MT8173,
+> > but it is MJC_PWR_CON on other chips.
+> >
+> 
+> So that sounds as if 0x0298 offset is MT8173 specific.
+> I checked [VDE, MFG, VEN, IFR, ISP, DIS, DPY]_PWR_CON on mt8173, mt8135 
+> and mt6589 and they all have the same offset. So it doesn't seem as if 
+> the offset randomly changes for every SoC.
+> 
+> > Furthermore, these register offsets are only used in scp_domain_data[],
+> > and each element has its own power domain name. So I think it's enough
+> > to know which power domain are using these registers and status bits.
+> >
+> 
+> Yes that's true, but it will make it easier for another person to 
+> understand the driver, especially if he want's to implement the driver 
+> for a new SoC.
 
-1) TSADC controller:
-Add the needed attributes for rk3036 TSADC controller.
+There are two kinds of conflicts may happen:
 
-Especially for the TSHUT, in some cases if we are unable to shut it down
-in orderly fashion (says: kernel is stuck holding a lock or similar), then
-hardware TSHUT will reset it.
-If the temperature is over 95C over a period of time the thermal shutdown
-of the tsadc is invoked with can either reset the entire chip via the CRU,
-or notify the PMIC via a GPIO. This should be set in the specific board.
+1. Different modules use the same register address.
+2. Different register addresses are used by the same module (on
+different IC).
 
-2) Thermal zones:
-Add the needed device mode for thermal generic framework.
-Detail in Documentation/devicetree/bindings/thermal/thermal.txt.
+Type 1. for example:
 
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+	#define SPM_BDP_PWR_CON			0x029c /* 2701 */
+	#define SPM_AUDIO_PWR_CON		0x029c /* 8173 */
 
----
+We can resolve this conflict easily, such as define these two register
+name to the same register address.
 
- arch/arm/boot/dts/rk3228.dtsi | 69 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 69 insertions(+)
+Type 2. for example:
 
-diff --git a/arch/arm/boot/dts/rk3228.dtsi b/arch/arm/boot/dts/rk3228.dtsi
-index 119ff12..afce7fd 100644
---- a/arch/arm/boot/dts/rk3228.dtsi
-+++ b/arch/arm/boot/dts/rk3228.dtsi
-@@ -43,6 +43,7 @@
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/pinctrl/rockchip.h>
- #include <dt-bindings/clock/rk3228-cru.h>
-+#include <dt-bindings/thermal/thermal.h>
- #include "skeleton.dtsi"
- 
- / {
-@@ -69,6 +70,7 @@
- 				/* KHz    uV */
- 				 816000 1000000
- 			>;
-+			#cooling-cells = <2>; /* min followed by max */
- 			clock-latency = <40000>;
- 			clocks = <&cru ARMCLK>;
- 		};
-@@ -247,6 +249,63 @@
- 		assigned-clock-rates = <594000000>;
- 	};
- 
-+	thermal-zones {
-+		cpu_thermal: cpu-thermal {
-+			polling-delay-passive = <100>; /* milliseconds */
-+			polling-delay = <5000>; /* milliseconds */
-+
-+			thermal-sensors = <&tsadc 0>;
-+
-+			trips {
-+				cpu_alert0: cpu_alert0 {
-+					temperature = <70000>; /* millicelsius */
-+					hysteresis = <2000>; /* millicelsius */
-+					type = "passive";
-+				};
-+				cpu_alert1: cpu_alert1 {
-+					temperature = <75000>; /* millicelsius */
-+					hysteresis = <2000>; /* millicelsius */
-+					type = "passive";
-+				};
-+				cpu_crit: cpu_crit {
-+					temperature = <90000>; /* millicelsius */
-+					hysteresis = <2000>; /* millicelsius */
-+					type = "critical";
-+				};
-+			};
-+
-+			cooling-maps {
-+				map0 {
-+					trip = <&cpu_alert0>;
-+					cooling-device =
-+						<&cpu0 THERMAL_NO_LIMIT 6>;
-+				};
-+				map1 {
-+					trip = <&cpu_alert1>;
-+					cooling-device =
-+						<&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-+				};
-+			};
-+		};
-+	};
-+
-+	tsadc: tsadc at 11150000 {
-+		compatible = "rockchip,rk3228-tsadc";
-+		reg = <0x11150000 0x100>;
-+		interrupts = <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cru SCLK_TSADC>, <&cru PCLK_TSADC>;
-+		clock-names = "tsadc", "apb_pclk";
-+		resets = <&cru SRST_TSADC>;
-+		reset-names = "tsadc-apb";
-+		pinctrl-names = "init", "default", "sleep";
-+		pinctrl-0 = <&otp_gpio>;
-+		pinctrl-1 = <&otp_out>;
-+		pinctrl-2 = <&otp_gpio>;
-+		#thermal-sensor-cells = <0>;
-+		rockchip,hw-tshut-temp = <95000>;
-+		status = "disabled";
-+	};
-+
- 	emmc: dwmmc at 30020000 {
- 		compatible = "rockchip,rk3288-dw-mshc";
- 		reg = <0x30020000 0x4000>;
-@@ -394,6 +453,16 @@
- 			};
- 		};
- 
-+		tsadc {
-+			otp_gpio: otp-gpio {
-+				rockchip,pins = <0 24 RK_FUNC_GPIO &pcfg_pull_none>;
-+			};
-+
-+			otp_out: otp-out {
-+				rockchip,pins = <0 24 RK_FUNC_1 &pcfg_pull_none>;
-+			};
-+		};
-+
- 		uart0 {
- 			uart0_xfer: uart0-xfer {
- 				rockchip,pins = <2 26 RK_FUNC_1 &pcfg_pull_none>,
--- 
-1.9.1
+	#define SPM_VDE_PWR_CON			0x0300 /* 6755 */
+	#define SPM_VDE_PWR_CON			0x0210 /* 8173 */
+
+We can not reuse the register defines in this case. We may need to name
+the registers with its IC name, such as MT8173_SPM_VDE_PWR_CON and
+MT6755_VDE_PWR_CON. But it will increase the maintain effort. That's why
+I prefer to remove register defines if we implement multiple SoC's
+scpsys in a single file.
+
+
+Best regards,
+
+James
