@@ -1,37 +1,35 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed,  3 Feb 2016 23:05:50 +0100
-Subject: [PATCH] kernel/locking/lockdep.c: mark chainhashentry as
- __maybe_unused
-Message-ID: <1454537158-3759624-1-git-send-email-arnd@arndb.de>
+Date: Wed,  3 Feb 2016 23:15:05 +0100
+Subject: [PATCH] mm/debug-pagealloc: add missing debug_pagealloc_enabled
+Message-ID: <1454537757-3760706-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The newly added chainhashentry() function is only use when
-CONFIG_PROVE_LOCKING is enabled, otherwise we get a warning about it.
+The change to move the pagealloc logic broke the slab allocator
+check when it's disabled at compile time:
 
-kernel/locking/lockdep.c:318:26: error: 'chainhashentry' defined but not used [-Werror=unused-function]
+mm/slab.c: In function 'is_debug_pagealloc_cache':
+mm/slab.c:1608:29: error: implicit declaration of function 'debug_pagealloc_enabled' [-Werror=implicit-function-declaration]
 
-We could add another #ifdef or add __maybe_unused to avoid the warning,
-this patch picks the second option.
+This adds an inline helper to get it to work again.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: a33a23c7def8 ("kernel/locking/lockdep.c: make lockdep initialize itself on demand")
+Fixes: 0a244aea1a61 ("mm/slab: clean up DEBUG_PAGEALLOC processing code")
 ---
- kernel/locking/lockdep.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ include/linux/mm.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/kernel/locking/lockdep.c b/kernel/locking/lockdep.c
-index 9269b1a74260..0d3c08d23946 100644
---- a/kernel/locking/lockdep.c
-+++ b/kernel/locking/lockdep.c
-@@ -315,7 +315,7 @@ static inline struct list_head *classhashentry(struct lockdep_subclass_key *key)
- 
- static struct list_head __chainhash_table[CHAINHASH_SIZE];
- 
--static struct list_head *chainhashentry(unsigned long chain)
-+static __maybe_unused struct list_head * chainhashentry(unsigned long chain)
- {
- 	if (unlikely(!lockdep_initialized))
- 		lockdep_init();
+diff --git a/include/linux/mm.h b/include/linux/mm.h
+index 5d86eb2e8584..90d600ce56ad 100644
+--- a/include/linux/mm.h
++++ b/include/linux/mm.h
+@@ -2242,6 +2242,7 @@ kernel_map_pages(struct page *page, int numpages, int enable)
+ extern bool kernel_page_present(struct page *page);
+ #endif /* CONFIG_HIBERNATION */
+ #else
++static inline bool debug_pagealloc_enabled(void) { return 0; }
+ static inline void
+ kernel_map_pages(struct page *page, int numpages, int enable) {}
+ #ifdef CONFIG_HIBERNATION
 -- 
 2.7.0
