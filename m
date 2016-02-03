@@ -1,100 +1,63 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed,  3 Feb 2016 11:39:02 -0700
-Subject: [PATCH V9 04/18] coresight: etm3x: moving etm_readl/writel to header
- file
+Date: Wed,  3 Feb 2016 11:39:04 -0700
+Subject: [PATCH V9 06/18] coresight: etm3x: unlocking tracers in default arch
+ init
 In-Reply-To: <1454524756-10628-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1454524756-10628-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1454524756-10628-5-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1454524756-10628-7-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Moving functions etm_readl/writel to file "coresight-etm.h"
-so that the main ETM3x driver can be split in more than one
-file.
+Calling function 'smp_call_function_single()' to unlock a
+tracer and calling it again right after to perform the
+default initialisation doesn't make sense.
+
+Moving 'etm_os_unlock()' just before making the default
+initialisation results in the same outcome while saving
+one call to 'smp_call_function_single()'.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-etm.h   | 29 +++++++++++++++++++++++++++
- drivers/hwtracing/coresight/coresight-etm3x.c | 29 ---------------------------
- 2 files changed, 29 insertions(+), 29 deletions(-)
+ drivers/hwtracing/coresight/coresight-etm3x.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm.h b/drivers/hwtracing/coresight/coresight-etm.h
-index b4481eb29304..34f7db881fa7 100644
---- a/drivers/hwtracing/coresight/coresight-etm.h
-+++ b/drivers/hwtracing/coresight/coresight-etm.h
-@@ -251,4 +251,33 @@ enum etm_addr_type {
- 	ETM_ADDR_TYPE_START,
- 	ETM_ADDR_TYPE_STOP,
- };
-+
-+static inline void etm_writel(struct etm_drvdata *drvdata,
-+			      u32 val, u32 off)
-+{
-+	if (drvdata->use_cp14) {
-+		if (etm_writel_cp14(off, val)) {
-+			dev_err(drvdata->dev,
-+				"invalid CP14 access to ETM reg: %#x", off);
-+		}
-+	} else {
-+		writel_relaxed(val, drvdata->base + off);
-+	}
-+}
-+
-+static inline unsigned int etm_readl(struct etm_drvdata *drvdata, u32 off)
-+{
-+	u32 val;
-+
-+	if (drvdata->use_cp14) {
-+		if (etm_readl_cp14(off, &val)) {
-+			dev_err(drvdata->dev,
-+				"invalid CP14 access to ETM reg: %#x", off);
-+		}
-+	} else {
-+		val = readl_relaxed(drvdata->base + off);
-+	}
-+
-+	return val;
-+}
- #endif
 diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
-index fe6791e0c66c..d53440e9af6f 100644
+index 6ea35b350958..f2c74bb56993 100644
 --- a/drivers/hwtracing/coresight/coresight-etm3x.c
 +++ b/drivers/hwtracing/coresight/coresight-etm3x.c
-@@ -42,35 +42,6 @@ module_param_named(boot_enable, boot_enable, int, S_IRUGO);
- static int etm_count;
- static struct etm_drvdata *etmdrvdata[NR_CPUS];
- 
--static inline void etm_writel(struct etm_drvdata *drvdata,
--			      u32 val, u32 off)
--{
--	if (drvdata->use_cp14) {
--		if (etm_writel_cp14(off, val)) {
--			dev_err(drvdata->dev,
--				"invalid CP14 access to ETM reg: %#x", off);
--		}
--	} else {
--		writel_relaxed(val, drvdata->base + off);
--	}
--}
--
--static inline unsigned int etm_readl(struct etm_drvdata *drvdata, u32 off)
--{
--	u32 val;
--
--	if (drvdata->use_cp14) {
--		if (etm_readl_cp14(off, &val)) {
--			dev_err(drvdata->dev,
--				"invalid CP14 access to ETM reg: %#x", off);
--		}
--	} else {
--		val = readl_relaxed(drvdata->base + off);
--	}
--
--	return val;
--}
--
- /*
-  * Memory mapped writes to clear os lock are not supported on some processors
+@@ -47,11 +47,11 @@ static struct etm_drvdata *etmdrvdata[NR_CPUS];
   * and OS lock must be unlocked before any memory mapped access on such
+  * processors, otherwise memory mapped reads/writes will be invalid.
+  */
+-static void etm_os_unlock(void *info)
++static void etm_os_unlock(struct etm_drvdata *drvdata)
+ {
+-	struct etm_drvdata *drvdata = (struct etm_drvdata *)info;
+ 	/* Writing any value to ETMOSLAR unlocks the trace registers */
+ 	etm_writel(drvdata, 0x0, ETMOSLAR);
++	drvdata->os_unlock = true;
+ 	isb();
+ }
+ 
+@@ -483,6 +483,9 @@ static void etm_init_arch_data(void *info)
+ 	u32 etmccr;
+ 	struct etm_drvdata *drvdata = info;
+ 
++	/* Make sure all registers are accessible */
++	etm_os_unlock(drvdata);
++
+ 	CS_UNLOCK(drvdata->base);
+ 
+ 	/* First dummy read */
+@@ -607,9 +610,6 @@ static int etm_probe(struct amba_device *adev, const struct amba_id *id)
+ 	get_online_cpus();
+ 	etmdrvdata[drvdata->cpu] = drvdata;
+ 
+-	if (!smp_call_function_single(drvdata->cpu, etm_os_unlock, drvdata, 1))
+-		drvdata->os_unlock = true;
+-
+ 	if (smp_call_function_single(drvdata->cpu,
+ 				     etm_init_arch_data,  drvdata, 1))
+ 		dev_err(dev, "ETM arch init failed\n");
 -- 
 2.1.4
