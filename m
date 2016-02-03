@@ -1,64 +1,38 @@
-From: slash.tmp@free.fr (Mason)
-Date: Wed, 3 Feb 2016 19:25:56 +0100
-Subject: Plain DFS (no voltage scaling)
-In-Reply-To: <20160203161428.GJ3469@vireshk>
-References: <56B11B67.3090600@free.fr> <20160203021052.GK31828@vireshk>
- <56B21E2E.1070606@free.fr> <20160203161428.GJ3469@vireshk>
-Message-ID: <56B24634.6060001@free.fr>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Wed, 3 Feb 2016 12:26:10 -0600
+Subject: [PATCH v10 5/5] Watchdog: ARM SBSA Generic Watchdog half timeout
+ panic support
+In-Reply-To: <CADyBb7uULCn97ea19zH8dB4QX1QA8=AXL94d6gXgFxXM8haBNA@mail.gmail.com>
+References: <1454519923-25230-1-git-send-email-fu.wei@linaro.org>
+ <1454519923-25230-6-git-send-email-fu.wei@linaro.org>
+ <56B23883.7000501@codeaurora.org>
+ <CADyBb7sxPg-QUjTbeHFtYkctKc_g7D8O=+jqbXN+DCCoCEnFqA@mail.gmail.com>
+ <56B23E99.1030604@codeaurora.org>
+ <CADyBb7s4opxfPFuX=1-qEE6uhsaMXgofAJPbHUQHrng2AUwqNA@mail.gmail.com>
+ <56B2423B.1020109@codeaurora.org>
+ <CADyBb7uULCn97ea19zH8dB4QX1QA8=AXL94d6gXgFxXM8haBNA@mail.gmail.com>
+Message-ID: <56B24642.8090105@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/02/2016 17:14, Viresh Kumar wrote:
-> On 03-02-16, 16:35, Mason wrote:
->> On 03/02/2016 03:10, Viresh Kumar wrote:
->>> On 02-02-16, 22:11, Mason wrote:
->>>> Hello,
->>>>
->>>> I plan to enable the on-demand governor on the tango platform:
->>>> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/boot/dts/tango4-smp8758.dtsi
->>>>
->>>> I found the cpufreq-dt binding doc:
->>>>
->>>> https://www.kernel.org/doc/Documentation/devicetree/bindings/cpufreq/cpufreq-dt.txt
->>>> https://www.kernel.org/doc/Documentation/devicetree/bindings/opp/opp.txt
->>>>
->>>> Something is not clear to me:
->>>>
->>>> If my platform cannot scale the voltage, what information
->>>> should I put in the voltage part of the DT?
->>>
->>> Wouldn't matter if there is no regulator. i.e. you should keep 0, but
->>> even if they have something non-zero, core code will ignore it. But
->>> yeah, it makes sense to keep it zero.
->>
->> Hmmm, I am missing something obvious.
->>
->> My config contains:
->>
->> CONFIG_CPU_FREQ=y
->> CONFIG_CPU_FREQ_GOV_COMMON=y
->> CONFIG_CPU_FREQ_STAT=y
->> CONFIG_CPU_FREQ_STAT_DETAILS=y
->> CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE=y
->> CONFIG_CPU_FREQ_GOV_PERFORMANCE=y
->> CONFIG_CPU_FREQ_GOV_ONDEMAND=y
->> CONFIG_CPUFREQ_DT=y
->>
->> Yet, neither dt_cpufreq_probe() nor cpufreq_init() are being called.
->>
->> Could someone please point to my mistake?
-> 
-> You need to create a platform device to get cpufreq-dt driver probed.
-> Check other users..
+Fu Wei wrote:
+> Actually,
+> the SBSA watchdog driver should support only  half-timeout for panic
+> the user cannot configure the length of "panic time",  He can only
+> enable it, and it is automatically set to 1/2 timeout.
+>
+> we don't need pre-timeout here.
+>
+> Hope I understand you correctly:-)  sorry for your confusion
+>
+>> >
+>> >So when pre-timeout occurs, the interrupt handler calls panic() or whatever
+>> >it's supposed to do.
+> Actually,
+> So when 1/2 timeout occurs, the interrupt handler calls panic() or
+> whatever it's supposed to do.
+>
 
-The sunxi guys pointed me in the right direction.
-
-http://lxr.free-electrons.com/source/arch/arm/mach-sunxi/sunxi.c#L20
-
-Why isn't there a compatible string like other drivers?
-
-Such as
-  compatible = "cpufreq-dt"
-which would enable cpufreq on the platform?
-
-Regards.
+I understand all that.  What I'm saying is that, in the future, when 
+pre-timeout support is added to the watchdog layer, I think it makes 
+sense to modify this driver to use pre-timeout support.
