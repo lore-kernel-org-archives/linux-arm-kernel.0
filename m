@@ -1,279 +1,151 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed,  3 Feb 2016 11:39:01 -0700
-Subject: [PATCH V9 03/18] coresight: moving PM runtime operations to core
- framework
-In-Reply-To: <1454524756-10628-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1454524756-10628-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1454524756-10628-4-git-send-email-mathieu.poirier@linaro.org>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 3 Feb 2016 20:12:54 +0100
+Subject: [PATCH v2 21/21] arm64: Panic when VHE and non VHE CPUs coexist
+In-Reply-To: <56B23CCB.4000009@arm.com>
+References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
+ <1453737235-16522-22-git-send-email-marc.zyngier@arm.com>
+ <20160201153605.GA1478@cbox> <56B0CBF4.9030507@arm.com>
+ <20160203084913.GA13974@cbox> <56B23CCB.4000009@arm.com>
+Message-ID: <20160203191254.GD13974@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Moving PM runtime operations in Coresight devices enable() and
-disable() API to the framework core when a path is setup.  That
-way the runtime core doesn't have to be involved everytime a
-path is enabled.  It also avoids calling runtime PM operations
-in IRQ context.
+On Wed, Feb 03, 2016 at 05:45:47PM +0000, Marc Zyngier wrote:
+> On 03/02/16 08:49, Christoffer Dall wrote:
+> > On Tue, Feb 02, 2016 at 03:32:04PM +0000, Marc Zyngier wrote:
+> >> On 01/02/16 15:36, Christoffer Dall wrote:
+> >>> On Mon, Jan 25, 2016 at 03:53:55PM +0000, Marc Zyngier wrote:
+> >>>> Having both VHE and non-VHE capable CPUs in the same system
+> >>>> is likely to be a recipe for disaster.
+> >>>>
+> >>>> If the boot CPU has VHE, but a secondary is not, we won't be
+> >>>> able to downgrade and run the kernel at EL1. Add CPU hotplug
+> >>>> to the mix, and this produces a terrifying mess.
+> >>>>
+> >>>> Let's solve the problem once and for all. If you mix VHE and
+> >>>> non-VHE CPUs in the same system, you deserve to loose, and this
+> >>>> patch makes sure you don't get a chance.
+> >>>>
+> >>>> This is implemented by storing the kernel execution level in
+> >>>> a global variable. Secondaries will park themselves in a
+> >>>> WFI loop if they observe a mismatch. Also, the primary CPU
+> >>>> will detect that the secondary CPU has died on a mismatched
+> >>>> execution level. Panic will follow.
+> >>>>
+> >>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> >>>> ---
+> >>>>  arch/arm64/include/asm/virt.h | 17 +++++++++++++++++
+> >>>>  arch/arm64/kernel/head.S      | 19 +++++++++++++++++++
+> >>>>  arch/arm64/kernel/smp.c       |  3 +++
+> >>>>  3 files changed, 39 insertions(+)
+> >>>>
+> >>>> diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
+> >>>> index 9f22dd6..f81a345 100644
+> >>>> --- a/arch/arm64/include/asm/virt.h
+> >>>> +++ b/arch/arm64/include/asm/virt.h
+> >>>> @@ -36,6 +36,11 @@
+> >>>>   */
+> >>>>  extern u32 __boot_cpu_mode[2];
+> >>>>  
+> >>>> +/*
+> >>>> + * __run_cpu_mode records the mode the boot CPU uses for the kernel.
+> >>>> + */
+> >>>> +extern u32 __run_cpu_mode[2];
+> >>>> +
+> >>>>  void __hyp_set_vectors(phys_addr_t phys_vector_base);
+> >>>>  phys_addr_t __hyp_get_vectors(void);
+> >>>>  
+> >>>> @@ -60,6 +65,18 @@ static inline bool is_kernel_in_hyp_mode(void)
+> >>>>  	return el == CurrentEL_EL2;
+> >>>>  }
+> >>>>  
+> >>>> +static inline bool is_kernel_mode_mismatched(void)
+> >>>> +{
+> >>>> +	/*
+> >>>> +	 * A mismatched CPU will have written its own CurrentEL in
+> >>>> +	 * __run_cpu_mode[1] (initially set to zero) after failing to
+> >>>> +	 * match the value in __run_cpu_mode[0]. Thus, a non-zero
+> >>>> +	 * value in __run_cpu_mode[1] is enough to detect the
+> >>>> +	 * pathological case.
+> >>>> +	 */
+> >>>> +	return !!ACCESS_ONCE(__run_cpu_mode[1]);
+> >>>> +}
+> >>>> +
+> >>>>  /* The section containing the hypervisor text */
+> >>>>  extern char __hyp_text_start[];
+> >>>>  extern char __hyp_text_end[];
+> >>>> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> >>>> index 2a7134c..bc44cf8 100644
+> >>>> --- a/arch/arm64/kernel/head.S
+> >>>> +++ b/arch/arm64/kernel/head.S
+> >>>> @@ -577,7 +577,23 @@ ENTRY(set_cpu_boot_mode_flag)
+> >>>>  1:	str	w20, [x1]			// This CPU has booted in EL1
+> >>>>  	dmb	sy
+> >>>>  	dc	ivac, x1			// Invalidate potentially stale cache line
+> >>>> +	adr_l	x1, __run_cpu_mode
+> >>>> +	ldr	w0, [x1]
+> >>>> +	mrs	x20, CurrentEL
+> >>>> +	cbz	x0, skip_el_check
+> >>>> +	cmp	x0, x20
+> >>>> +	bne	mismatched_el
+> >>>
+> >>> can't you do a ret here instead of writing the same value and flushing
+> >>> caches etc.?
+> >>
+> >> Yes, good point.
+> >>
+> >>>
+> >>>> +skip_el_check:			// Only the first CPU gets to set the rule
+> >>>> +	str	w20, [x1]
+> >>>> +	dmb	sy
+> >>>> +	dc	ivac, x1	// Invalidate potentially stale cache line
+> >>>>  	ret
+> >>>> +mismatched_el:
+> >>>> +	str	w20, [x1, #4]
+> >>>> +	dmb	sy
+> >>>> +	dc	ivac, x1	// Invalidate potentially stale cache line
+> >>>> +1:	wfi
+> >>>
+> >>> I'm no expert on SMP bringup, but doesn't this prevent the CPU from
+> >>> signaling completion and thus you'll never actually reach the checking
+> >>> code in __cpu_up?
+> >>
+> >> Indeed, and that's the whole point. The primary CPU will notice that the
+> >> secondary CPU has failed to boot (timeout), and will find the reason in
+> >> __run_cpu_mode.
+> >>
+> > That wasn't exactly my point.  If I understand correctly and __cpu_up is
+> > the primary CPU executing a function to bring up a secondary core, then
+> > it will wait for the cpu_running completion which should be signalled by
+> > the secondary core, but because the secondary core never makes any
+> > progress it will timeout the wait for completion and you will see that
+> > error "..failed to come online" instead of the "incompatible execution
+> > level".
+> 
+> It will actually do both. Here's an example on the model configured for
+> such a braindead case:
+> 
+> CPU4: failed to come online
+> Kernel panic - not syncing: CPU4: incompatible execution level
+> CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.5.0-rc2+ #5459
+> Hardware name: FVP Base (DT)
+> Call trace:
+> [<ffffffc0000899e0>] dump_backtrace+0x0/0x180
+> [<ffffffc000089b74>] show_stack+0x14/0x20
+> [<ffffffc000333b08>] dump_stack+0x90/0xc8
+> [<ffffffc00014d424>] panic+0x10c/0x250
+> [<ffffffc00008ef24>] __cpu_up+0xfc/0x100
+> [<ffffffc0000b7a9c>] _cpu_up+0x154/0x188
+> [<ffffffc0000b7b54>] cpu_up+0x84/0xa8
+> [<ffffffc0009e9d00>] smp_init+0xbc/0xc0
+> [<ffffffc0009dca10>] kernel_init_freeable+0x94/0x1ec
+> [<ffffffc000712f90>] kernel_init+0x10/0xe0
+> [<ffffffc000085cd0>] ret_from_fork+0x10/0x40
+> 
+> Am I missing something *really* obvious?
+> 
+No, I was, it says "ret = -EIO;" not "return -EIO"...
 
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/hwtracing/coresight/coresight-etb10.c           | 4 ----
- drivers/hwtracing/coresight/coresight-etm3x.c           | 3 ---
- drivers/hwtracing/coresight/coresight-etm4x.c           | 6 ------
- drivers/hwtracing/coresight/coresight-funnel.c          | 2 --
- drivers/hwtracing/coresight/coresight-replicator-qcom.c | 4 ----
- drivers/hwtracing/coresight/coresight-replicator.c      | 2 --
- drivers/hwtracing/coresight/coresight-tmc.c             | 5 -----
- drivers/hwtracing/coresight/coresight-tpiu.c            | 2 --
- drivers/hwtracing/coresight/coresight.c                 | 9 ++++++++-
- 9 files changed, 8 insertions(+), 29 deletions(-)
+sorry.
 
-diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
-index 92969dae739d..917562ecf82a 100644
---- a/drivers/hwtracing/coresight/coresight-etb10.c
-+++ b/drivers/hwtracing/coresight/coresight-etb10.c
-@@ -137,8 +137,6 @@ static int etb_enable(struct coresight_device *csdev)
- 	struct etb_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
- 	unsigned long flags;
- 
--	pm_runtime_get_sync(drvdata->dev);
--
- 	spin_lock_irqsave(&drvdata->spinlock, flags);
- 	etb_enable_hw(drvdata);
- 	drvdata->enable = true;
-@@ -247,8 +245,6 @@ static void etb_disable(struct coresight_device *csdev)
- 	drvdata->enable = false;
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- 
--	pm_runtime_put(drvdata->dev);
--
- 	dev_info(drvdata->dev, "ETB disabled\n");
- }
- 
-diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
-index aae80e14508d..fe6791e0c66c 100644
---- a/drivers/hwtracing/coresight/coresight-etm3x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm3x.c
-@@ -349,7 +349,6 @@ static int etm_enable(struct coresight_device *csdev)
- 	struct etm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
- 	int ret;
- 
--	pm_runtime_get_sync(csdev->dev.parent);
- 	spin_lock(&drvdata->spinlock);
- 
- 	/*
-@@ -373,7 +372,6 @@ static int etm_enable(struct coresight_device *csdev)
- 	return 0;
- err:
- 	spin_unlock(&drvdata->spinlock);
--	pm_runtime_put(csdev->dev.parent);
- 	return ret;
- }
- 
-@@ -422,7 +420,6 @@ static void etm_disable(struct coresight_device *csdev)
- 
- 	spin_unlock(&drvdata->spinlock);
- 	put_online_cpus();
--	pm_runtime_put(csdev->dev.parent);
- 
- 	dev_info(drvdata->dev, "ETM tracing disabled\n");
- }
-diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-index d6a92c6d3a66..c2f518fbc9a8 100644
---- a/drivers/hwtracing/coresight/coresight-etm4x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-@@ -79,7 +79,6 @@ static int etm4_trace_id(struct coresight_device *csdev)
- 	if (!drvdata->enable)
- 		return drvdata->trcid;
- 
--	pm_runtime_get_sync(drvdata->dev);
- 	spin_lock_irqsave(&drvdata->spinlock, flags);
- 
- 	CS_UNLOCK(drvdata->base);
-@@ -88,7 +87,6 @@ static int etm4_trace_id(struct coresight_device *csdev)
- 	CS_LOCK(drvdata->base);
- 
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
--	pm_runtime_put(drvdata->dev);
- 
- 	return trace_id;
- }
-@@ -194,7 +192,6 @@ static int etm4_enable(struct coresight_device *csdev)
- 	struct etmv4_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
- 	int ret;
- 
--	pm_runtime_get_sync(drvdata->dev);
- 	spin_lock(&drvdata->spinlock);
- 
- 	/*
-@@ -214,7 +211,6 @@ static int etm4_enable(struct coresight_device *csdev)
- 	return 0;
- err:
- 	spin_unlock(&drvdata->spinlock);
--	pm_runtime_put(drvdata->dev);
- 	return ret;
- }
- 
-@@ -263,8 +259,6 @@ static void etm4_disable(struct coresight_device *csdev)
- 	spin_unlock(&drvdata->spinlock);
- 	put_online_cpus();
- 
--	pm_runtime_put(drvdata->dev);
--
- 	dev_info(drvdata->dev, "ETM tracing disabled\n");
- }
- 
-diff --git a/drivers/hwtracing/coresight/coresight-funnel.c b/drivers/hwtracing/coresight/coresight-funnel.c
-index 25e8ea140a09..fb2c679fbc44 100644
---- a/drivers/hwtracing/coresight/coresight-funnel.c
-+++ b/drivers/hwtracing/coresight/coresight-funnel.c
-@@ -69,7 +69,6 @@ static int funnel_enable(struct coresight_device *csdev, int inport,
- {
- 	struct funnel_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
- 
--	pm_runtime_get_sync(drvdata->dev);
- 	funnel_enable_hw(drvdata, inport);
- 
- 	dev_info(drvdata->dev, "FUNNEL inport %d enabled\n", inport);
-@@ -95,7 +94,6 @@ static void funnel_disable(struct coresight_device *csdev, int inport,
- 	struct funnel_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
- 
- 	funnel_disable_hw(drvdata, inport);
--	pm_runtime_put(drvdata->dev);
- 
- 	dev_info(drvdata->dev, "FUNNEL inport %d disabled\n", inport);
- }
-diff --git a/drivers/hwtracing/coresight/coresight-replicator-qcom.c b/drivers/hwtracing/coresight/coresight-replicator-qcom.c
-index 444815179460..286f90b50989 100644
---- a/drivers/hwtracing/coresight/coresight-replicator-qcom.c
-+++ b/drivers/hwtracing/coresight/coresight-replicator-qcom.c
-@@ -48,8 +48,6 @@ static int replicator_enable(struct coresight_device *csdev, int inport,
- {
- 	struct replicator_state *drvdata = dev_get_drvdata(csdev->dev.parent);
- 
--	pm_runtime_get_sync(drvdata->dev);
--
- 	CS_UNLOCK(drvdata->base);
- 
- 	/*
-@@ -86,8 +84,6 @@ static void replicator_disable(struct coresight_device *csdev, int inport,
- 
- 	CS_LOCK(drvdata->base);
- 
--	pm_runtime_put(drvdata->dev);
--
- 	dev_info(drvdata->dev, "REPLICATOR disabled\n");
- }
- 
-diff --git a/drivers/hwtracing/coresight/coresight-replicator.c b/drivers/hwtracing/coresight/coresight-replicator.c
-index b77d700a3f0e..0ce98903992c 100644
---- a/drivers/hwtracing/coresight/coresight-replicator.c
-+++ b/drivers/hwtracing/coresight/coresight-replicator.c
-@@ -41,7 +41,6 @@ static int replicator_enable(struct coresight_device *csdev, int inport,
- {
- 	struct replicator_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
- 
--	pm_runtime_get_sync(drvdata->dev);
- 	dev_info(drvdata->dev, "REPLICATOR enabled\n");
- 	return 0;
- }
-@@ -51,7 +50,6 @@ static void replicator_disable(struct coresight_device *csdev, int inport,
- {
- 	struct replicator_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
- 
--	pm_runtime_put(drvdata->dev);
- 	dev_info(drvdata->dev, "REPLICATOR disabled\n");
- }
- 
-diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-index c4fa70ed14ce..b526396d80b6 100644
---- a/drivers/hwtracing/coresight/coresight-tmc.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc.c
-@@ -242,12 +242,9 @@ static int tmc_enable(struct tmc_drvdata *drvdata, enum tmc_mode mode)
- {
- 	unsigned long flags;
- 
--	pm_runtime_get_sync(drvdata->dev);
--
- 	spin_lock_irqsave(&drvdata->spinlock, flags);
- 	if (drvdata->reading) {
- 		spin_unlock_irqrestore(&drvdata->spinlock, flags);
--		pm_runtime_put(drvdata->dev);
- 		return -EBUSY;
- 	}
- 
-@@ -381,8 +378,6 @@ out:
- 	drvdata->enable = false;
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- 
--	pm_runtime_put(drvdata->dev);
--
- 	dev_info(drvdata->dev, "TMC disabled\n");
- }
- 
-diff --git a/drivers/hwtracing/coresight/coresight-tpiu.c b/drivers/hwtracing/coresight/coresight-tpiu.c
-index ca50e73d9df7..0d8fce651ff7 100644
---- a/drivers/hwtracing/coresight/coresight-tpiu.c
-+++ b/drivers/hwtracing/coresight/coresight-tpiu.c
-@@ -74,7 +74,6 @@ static int tpiu_enable(struct coresight_device *csdev)
- {
- 	struct tpiu_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
- 
--	pm_runtime_get_sync(csdev->dev.parent);
- 	tpiu_enable_hw(drvdata);
- 
- 	dev_info(drvdata->dev, "TPIU enabled\n");
-@@ -98,7 +97,6 @@ static void tpiu_disable(struct coresight_device *csdev)
- 	struct tpiu_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
- 
- 	tpiu_disable_hw(drvdata);
--	pm_runtime_put(csdev->dev.parent);
- 
- 	dev_info(drvdata->dev, "TPIU disabled\n");
- }
-diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
-index 2ed48545df26..6b44928c1076 100644
---- a/drivers/hwtracing/coresight/coresight.c
-+++ b/drivers/hwtracing/coresight/coresight.c
-@@ -24,6 +24,7 @@
- #include <linux/coresight.h>
- #include <linux/of_platform.h>
- #include <linux/delay.h>
-+#include <linux/pm_runtime.h>
- 
- #include "coresight-priv.h"
- 
-@@ -376,7 +377,8 @@ out:
- 	/*
- 	 * A path from this element to a sink has been found.  The elements
- 	 * leading to the sink are already enqueued, all that is left to do
--	 * is add a node for this element.
-+	 * is tell the PM runtime core we need this element and add a node
-+	 * for it.
- 	 */
- 	node = kzalloc(sizeof(struct coresight_node), GFP_KERNEL);
- 	if (!node)
-@@ -384,6 +386,7 @@ out:
- 
- 	node->csdev = csdev;
- 	list_add(&node->link, path);
-+	pm_runtime_get_sync(csdev->dev.parent);
- 
- 	return 0;
- }
-@@ -415,9 +418,13 @@ struct list_head *coresight_build_path(struct coresight_device *csdev)
-  */
- void coresight_release_path(struct list_head *path)
- {
-+	struct coresight_device *csdev;
- 	struct coresight_node *nd, *next;
- 
- 	list_for_each_entry_safe(nd, next, path, link) {
-+		csdev = nd->csdev;
-+
-+		pm_runtime_put_sync(csdev->dev.parent);
- 		list_del(&nd->link);
- 		kfree(nd);
- 	}
--- 
-2.1.4
+-Christoffer
