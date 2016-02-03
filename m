@@ -1,61 +1,116 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 03 Feb 2016 12:13:40 +0100
-Subject: [PATCH 03/10] arm64: add Armada 3700 architecture entry
-In-Reply-To: <4284367.sAeqrVzAbo@wuerfel> (Arnd Bergmann's message of "Wed, 03
- Feb 2016 10:11:18 +0100")
-References: <1454436468-4241-1-git-send-email-gregory.clement@free-electrons.com>
- <20160203142451.41381ff6@xhacker> <87k2mm5itx.fsf@free-electrons.com>
- <4284367.sAeqrVzAbo@wuerfel>
-Message-ID: <8737ta59nf.fsf@free-electrons.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 3 Feb 2016 11:16:03 +0000
+Subject: [RFC PATCH] irq/mbigen:Fix the problem of IO remap for
+ duplicated physical address in mbigen driver
+In-Reply-To: <56B16698.6050509@huawei.com>
+References: <1454327094-7848-1-git-send-email-majun258@huawei.com>
+ <20160201115717.GD674@leverpostej> <56AF585E.6050005@huawei.com>
+ <20160201132557.GG674@leverpostej> <56B08431.3000200@huawei.com>
+ <20160202114340.GA28839@leverpostej> <56B16698.6050509@huawei.com>
+Message-ID: <20160203111602.GA1234@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
- 
- On mer., f?vr. 03 2016, Arnd Bergmann <arnd@arndb.de> wrote:
+On Wed, Feb 03, 2016 at 10:31:52AM +0800, majun (F) wrote:
+> 
+> 
+> ? 2016/2/2 19:43, Mark Rutland ??:
+> > On Tue, Feb 02, 2016 at 06:25:53PM +0800, majun (F) wrote:
+> >> To simplify the mbigen drvier,
+> >> I didn't use the whole mbigen module as a mbgien device, but use
+> >> the register collections(vector, trigger type,status etc.) corresponding
+> >> to a peripheral device as a mbigen device.
+> >> So, mbigen device is a logical conception or logical device.
+> > 
+> >>From the above, it sounds like the DT representation is not an accurate
+> > representation of the hardware. We should describe the _whole_ mbigen,
+> > not portions thereof. Trying to describe it piecemeal leads to problems
+> > like this one.
+> > 
+> > I don't understand the rationale for describing the mbigen as separate
+> > nodes. Above you mention that we "need to define a device node for each
+> > device", but I don't see why that's necessary. Why do you believe we
+> > need an mbigen node per client device?
+> > 
+> > As far as I can tell, we should be able to map an arbitrary
+> > interrupt-specifier to a particular MSI (complete with device id) within
+> > the mbigen driver. We just need to define the full set of MSIs the
+> > mbigen owns.
+> > 
+> 
+> mbigen device is a interrupt controller, it is also a ITS device for ITS module.
+> So, we need to register the each mbigen device to ITS with a unique ID.
+> Based on the current MSI/ITS driver, I can't register whole mbigen module which
+> contains several mbigen devices at one time. Because they have different device ID.
 
-> On Wednesday 03 February 2016 08:55:22 Gregory CLEMENT wrote:
->> >> 
->> >> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
->> >> index 21074f674bde..7da341f7b90d 100644
->> >> --- a/arch/arm64/Kconfig.platforms
->> >> +++ b/arch/arm64/Kconfig.platforms
->> >> @@ -1,5 +1,11 @@
->> >>  menu "Platform selection"
->> >>  
->> >> +config ARCH_ARMADA_3700
->> >
->> > Would it be better to use ARCH_MVEBU? IMHO, there will be more ARMv8 SoCs
->> > from our EBU, do we plan to add one CONFIG_ARMADA_yyzz for each SoC?
->> 
->> Not for each SoC but for each family, yes. As we did for the other mvebu
->> SoC families.
->> 
->
-> We tend to use a little more general config strings for arm64 than we have
-> for arm32. I think just using ARCH_MVEBU is fine here, no need to list
-> the 3700 series separately.
+I don't follow.
 
-OK, for the arm32 mvebu SoC, the CONFIG_ARMADA_ were barely used, and
-CONFIG_ARCH_MVEBU is mostly use as a "depends on" and do not force
-anything.
+You can describe this by having a top-level mbigen node featuring a reg,
+with a sub-node for each mbigen module with an appropriate msi-parent,
+e.g.
 
-The only annoying point was with the irqchip, but thanks to the last
-series sent by Thomas irq-armada-370-xp.c won't be inconditionnaly built
-if CONFIG_ARCH_MVEBU is selected.
+mbigen {
+	reg = < ... ... >;
 
-So OK I will use CONFIG_ARCH_MVEBU.
+	#interrupt-cells = <2>;
 
-Thanks,
+	#address-cells = <1>; /* module index */
 
-Gregory
+	module at 0 {
+		reg = <0>;
+		msi-parent = <&its 0>;
+	};
+
+	module at 1 {
+		reg = <1>;
+		reg = <&its 1>;
+	};
+};
 
 
+That clearly does not require the reg to be duplicated, and encodes the
+information you want. The infrastructure for handling that might not
+exist yet, but that is a Linux issue that we can fix.
 
-> 	Arnd
+Marc, thoughts?
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+I take it all interrupts within a module share the same device id?
+
+> I don't know whether this explanation is clear or not.
+> I think Marc can explain this well.
+> 
+> Marc, would you please help me explain this?  or, do you have any opinion about this ?
+> 
+> >> Now, a mbigen hardware module contains several logical mbigen device.
+> >>
+> >> -------------------------------
+> >> |mgn_dev1  mgn_dev2  mgn_dev3 |
+> >> |-----------------------------|
+> >>    |          |        |
+> >> dev1	    dev2      dev3
+> >>
+> >> So,mgn_dev1, mgn_dev2 and mgn_dev3 exist in same mbigen hardware module,
+> >> and,they use the same reg address region,that is adress of mbigen hardware module.
+> >>
+> >> For this case, I think the question is can we map an reg address
+> >> region more than one time?
+> > 
+> > As above, I think we've mis-described the hardware. Rather than making
+> > things simpler, this has resulted in problems like this one.
+> > 
+> > We should not map a reg region more than once. Even if it's technically
+> > possible to do so, I do not believe that would be the right solution
+> > here. Implicitly sharing resources (e.g. portions of the mbigen control
+> > registers) is inevitably going to lead to more problems later on.
+> 
+> Because we only need to write 1 into corresponding bit of status
+> register to clear interrupt status during runtime,I think we don't
+> need to worry about this.
+
+That might be currently true, but I doubt that will remain true in
+future. Presumably there are other control registers in the mbigen which
+are shared between modules.
+
+I think we do need to worry about this.
+
+Mark.
