@@ -1,121 +1,138 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  3 Feb 2016 18:00:02 +0000
-Subject: [PATCH v3 09/23] arm64: KVM: VHE: Introduce unified system register
+Date: Wed,  3 Feb 2016 18:00:05 +0000
+Subject: [PATCH v3 12/23] arm64: KVM: VHE: Use unified system register
  accessors
 In-Reply-To: <1454522416-6874-1-git-send-email-marc.zyngier@arm.com>
 References: <1454522416-6874-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1454522416-6874-10-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1454522416-6874-13-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-VHE brings its own bag of new system registers, or rather system
-register accessors, as it define new ways to access both guest
-and host system registers. For example, from the host:
+Use the recently introduced unified system register accessors for
+those sysregs that behave differently depending on VHE being in
+use or not.
 
-- The host TCR_EL2 register is accessed using the TCR_EL1 accessor
-- The guest TCR_EL1 register is accessed using the TCR_EL12 accessor
-
-Obviously, this is confusing. A way to somehow reduce the complexity
-of writing code for both ARMv8 and ARMv8.1 is to use a set of unified
-accessors that will generate the right sysreg, depending on the mode
-the CPU is running in. For example:
-
-- read_sysreg_el1(tcr) will use TCR_EL1 on ARMv8, and TCR_EL12 on
-  ARMv8.1 with VHE.
-- read_sysreg_el2(tcr) will use TCR_EL2 on ARMv8, and TCR_EL1 on
-  ARMv8.1 with VHE.
-
-We end up with three sets of accessors ({read,write}_sysreg_el[012])
-that can be directly used from C code. We take this opportunity to
-also add the definition for the new VHE sysregs.
-
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/hyp/hyp.h | 72 ++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 72 insertions(+)
+ arch/arm64/kvm/hyp/sysreg-sr.c | 84 +++++++++++++++++++++---------------------
+ 1 file changed, 42 insertions(+), 42 deletions(-)
 
-diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
-index fc502f3..744c919 100644
---- a/arch/arm64/kvm/hyp/hyp.h
-+++ b/arch/arm64/kvm/hyp/hyp.h
-@@ -48,6 +48,78 @@ static inline unsigned long __hyp_kern_va(unsigned long v)
+diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
+index 61bad17..7d7d757 100644
+--- a/arch/arm64/kvm/hyp/sysreg-sr.c
++++ b/arch/arm64/kvm/hyp/sysreg-sr.c
+@@ -37,34 +37,34 @@ static void __hyp_text __sysreg_save_common_state(struct kvm_cpu_context *ctxt)
+ 	ctxt->sys_regs[TPIDRRO_EL0]	= read_sysreg(tpidrro_el0);
+ 	ctxt->sys_regs[TPIDR_EL1]	= read_sysreg(tpidr_el1);
+ 	ctxt->gp_regs.regs.sp		= read_sysreg(sp_el0);
+-	ctxt->gp_regs.regs.pc		= read_sysreg(elr_el2);
+-	ctxt->gp_regs.regs.pstate	= read_sysreg(spsr_el2);
++	ctxt->gp_regs.regs.pc		= read_sysreg_el2(elr);
++	ctxt->gp_regs.regs.pstate	= read_sysreg_el2(spsr);
+ }
  
- #define hyp_kern_va(v) (typeof(v))(__hyp_kern_va((unsigned long)(v)))
+ static void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
+ {
+ 	ctxt->sys_regs[MPIDR_EL1]	= read_sysreg(vmpidr_el2);
+ 	ctxt->sys_regs[CSSELR_EL1]	= read_sysreg(csselr_el1);
+-	ctxt->sys_regs[SCTLR_EL1]	= read_sysreg(sctlr_el1);
+-	ctxt->sys_regs[CPACR_EL1]	= read_sysreg(cpacr_el1);
+-	ctxt->sys_regs[TTBR0_EL1]	= read_sysreg(ttbr0_el1);
+-	ctxt->sys_regs[TTBR1_EL1]	= read_sysreg(ttbr1_el1);
+-	ctxt->sys_regs[TCR_EL1]		= read_sysreg(tcr_el1);
+-	ctxt->sys_regs[ESR_EL1]		= read_sysreg(esr_el1);
+-	ctxt->sys_regs[AFSR0_EL1]	= read_sysreg(afsr0_el1);
+-	ctxt->sys_regs[AFSR1_EL1]	= read_sysreg(afsr1_el1);
+-	ctxt->sys_regs[FAR_EL1]		= read_sysreg(far_el1);
+-	ctxt->sys_regs[MAIR_EL1]	= read_sysreg(mair_el1);
+-	ctxt->sys_regs[VBAR_EL1]	= read_sysreg(vbar_el1);
+-	ctxt->sys_regs[CONTEXTIDR_EL1]	= read_sysreg(contextidr_el1);
+-	ctxt->sys_regs[AMAIR_EL1]	= read_sysreg(amair_el1);
+-	ctxt->sys_regs[CNTKCTL_EL1]	= read_sysreg(cntkctl_el1);
++	ctxt->sys_regs[SCTLR_EL1]	= read_sysreg_el1(sctlr);
++	ctxt->sys_regs[CPACR_EL1]	= read_sysreg_el1(cpacr);
++	ctxt->sys_regs[TTBR0_EL1]	= read_sysreg_el1(ttbr0);
++	ctxt->sys_regs[TTBR1_EL1]	= read_sysreg_el1(ttbr1);
++	ctxt->sys_regs[TCR_EL1]		= read_sysreg_el1(tcr);
++	ctxt->sys_regs[ESR_EL1]		= read_sysreg_el1(esr);
++	ctxt->sys_regs[AFSR0_EL1]	= read_sysreg_el1(afsr0);
++	ctxt->sys_regs[AFSR1_EL1]	= read_sysreg_el1(afsr1);
++	ctxt->sys_regs[FAR_EL1]		= read_sysreg_el1(far);
++	ctxt->sys_regs[MAIR_EL1]	= read_sysreg_el1(mair);
++	ctxt->sys_regs[VBAR_EL1]	= read_sysreg_el1(vbar);
++	ctxt->sys_regs[CONTEXTIDR_EL1]	= read_sysreg_el1(contextidr);
++	ctxt->sys_regs[AMAIR_EL1]	= read_sysreg_el1(amair);
++	ctxt->sys_regs[CNTKCTL_EL1]	= read_sysreg_el1(cntkctl);
+ 	ctxt->sys_regs[PAR_EL1]		= read_sysreg(par_el1);
+ 	ctxt->sys_regs[MDSCR_EL1]	= read_sysreg(mdscr_el1);
  
-+#define read_sysreg_elx(r,nvh,vh)					\
-+	({								\
-+		u64 reg;						\
-+		asm volatile(ALTERNATIVE("mrs %0, " __stringify(r##nvh),\
-+					 "mrs_s %0, " __stringify(r##vh),\
-+					 ARM64_HAS_VIRT_HOST_EXTN)	\
-+			     : "=r" (reg));				\
-+		reg;							\
-+	})
+ 	ctxt->gp_regs.sp_el1		= read_sysreg(sp_el1);
+-	ctxt->gp_regs.elr_el1		= read_sysreg(elr_el1);
+-	ctxt->gp_regs.spsr[KVM_SPSR_EL1]= read_sysreg(spsr_el1);
++	ctxt->gp_regs.elr_el1		= read_sysreg_el1(elr);
++	ctxt->gp_regs.spsr[KVM_SPSR_EL1]= read_sysreg_el1(spsr);
+ }
+ 
+ void __hyp_text __sysreg_save_host_state(struct kvm_cpu_context *ctxt)
+@@ -86,34 +86,34 @@ static void __hyp_text __sysreg_restore_common_state(struct kvm_cpu_context *ctx
+ 	write_sysreg(ctxt->sys_regs[TPIDRRO_EL0], tpidrro_el0);
+ 	write_sysreg(ctxt->sys_regs[TPIDR_EL1],	  tpidr_el1);
+ 	write_sysreg(ctxt->gp_regs.regs.sp,	  sp_el0);
+-	write_sysreg(ctxt->gp_regs.regs.pc,	  elr_el2);
+-	write_sysreg(ctxt->gp_regs.regs.pstate,	  spsr_el2);
++	write_sysreg_el2(ctxt->gp_regs.regs.pc,	  elr);
++	write_sysreg_el2(ctxt->gp_regs.regs.pstate, spsr);
+ }
+ 
+ static void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
+ {
+-	write_sysreg(ctxt->sys_regs[MPIDR_EL1],	  vmpidr_el2);
+-	write_sysreg(ctxt->sys_regs[CSSELR_EL1],  csselr_el1);
+-	write_sysreg(ctxt->sys_regs[SCTLR_EL1],	  sctlr_el1);
+-	write_sysreg(ctxt->sys_regs[CPACR_EL1],	  cpacr_el1);
+-	write_sysreg(ctxt->sys_regs[TTBR0_EL1],	  ttbr0_el1);
+-	write_sysreg(ctxt->sys_regs[TTBR1_EL1],	  ttbr1_el1);
+-	write_sysreg(ctxt->sys_regs[TCR_EL1],	  tcr_el1);
+-	write_sysreg(ctxt->sys_regs[ESR_EL1],	  esr_el1);
+-	write_sysreg(ctxt->sys_regs[AFSR0_EL1],	  afsr0_el1);
+-	write_sysreg(ctxt->sys_regs[AFSR1_EL1],	  afsr1_el1);
+-	write_sysreg(ctxt->sys_regs[FAR_EL1],	  far_el1);
+-	write_sysreg(ctxt->sys_regs[MAIR_EL1],	  mair_el1);
+-	write_sysreg(ctxt->sys_regs[VBAR_EL1],	  vbar_el1);
+-	write_sysreg(ctxt->sys_regs[CONTEXTIDR_EL1], contextidr_el1);
+-	write_sysreg(ctxt->sys_regs[AMAIR_EL1],	  amair_el1);
+-	write_sysreg(ctxt->sys_regs[CNTKCTL_EL1], cntkctl_el1);
+-	write_sysreg(ctxt->sys_regs[PAR_EL1],	  par_el1);
+-	write_sysreg(ctxt->sys_regs[MDSCR_EL1],	  mdscr_el1);
+-
+-	write_sysreg(ctxt->gp_regs.sp_el1,	sp_el1);
+-	write_sysreg(ctxt->gp_regs.elr_el1,	elr_el1);
+-	write_sysreg(ctxt->gp_regs.spsr[KVM_SPSR_EL1], spsr_el1);
++	write_sysreg(ctxt->sys_regs[MPIDR_EL1],		vmpidr_el2);
++	write_sysreg(ctxt->sys_regs[CSSELR_EL1],	csselr_el1);
++	write_sysreg_el1(ctxt->sys_regs[SCTLR_EL1],	sctlr);
++	write_sysreg_el1(ctxt->sys_regs[CPACR_EL1],	cpacr);
++	write_sysreg_el1(ctxt->sys_regs[TTBR0_EL1],	ttbr0);
++	write_sysreg_el1(ctxt->sys_regs[TTBR1_EL1],	ttbr1);
++	write_sysreg_el1(ctxt->sys_regs[TCR_EL1],	tcr);
++	write_sysreg_el1(ctxt->sys_regs[ESR_EL1],	esr);
++	write_sysreg_el1(ctxt->sys_regs[AFSR0_EL1],	afsr0);
++	write_sysreg_el1(ctxt->sys_regs[AFSR1_EL1],	afsr1);
++	write_sysreg_el1(ctxt->sys_regs[FAR_EL1],	far);
++	write_sysreg_el1(ctxt->sys_regs[MAIR_EL1],	mair);
++	write_sysreg_el1(ctxt->sys_regs[VBAR_EL1],	vbar);
++	write_sysreg_el1(ctxt->sys_regs[CONTEXTIDR_EL1],contextidr);
++	write_sysreg_el1(ctxt->sys_regs[AMAIR_EL1],	amair);
++	write_sysreg_el1(ctxt->sys_regs[CNTKCTL_EL1], 	cntkctl);
++	write_sysreg(ctxt->sys_regs[PAR_EL1],		par_el1);
++	write_sysreg(ctxt->sys_regs[MDSCR_EL1],		mdscr_el1);
 +
-+#define write_sysreg_elx(v,r,nvh,vh)					\
-+	do {								\
-+		u64 __val = (u64)(v);					\
-+		asm volatile(ALTERNATIVE("msr " __stringify(r##nvh) ", %x0",\
-+					 "msr_s " __stringify(r##vh) ", %x0",\
-+					 ARM64_HAS_VIRT_HOST_EXTN)	\
-+					 : : "rZ" (__val));		\
-+	} while (0)
-+
-+/*
-+ * Unified accessors for registers that have a different encoding
-+ * between VHE and non-VHE. They must be specified without their "ELx"
-+ * encoding.
-+ */
-+#define read_sysreg_el2(r)						\
-+	({								\
-+		u64 reg;						\
-+		asm volatile(ALTERNATIVE("mrs %0, " __stringify(r##_EL2),\
-+					 "mrs %0, " __stringify(r##_EL1),\
-+					 ARM64_HAS_VIRT_HOST_EXTN)	\
-+			     : "=r" (reg));				\
-+		reg;							\
-+	})
-+
-+#define write_sysreg_el2(v,r)						\
-+	do {								\
-+		u64 __val = (u64)(v);					\
-+		asm volatile(ALTERNATIVE("msr " __stringify(r##_EL2) ", %x0",\
-+					 "msr " __stringify(r##_EL1) ", %x0",\
-+					 ARM64_HAS_VIRT_HOST_EXTN)	\
-+					 : : "rZ" (__val));		\
-+	} while (0)
-+
-+#define read_sysreg_el0(r)	read_sysreg_elx(r, _EL0, _EL02)
-+#define write_sysreg_el0(v,r)	write_sysreg_elx(v, r, _EL0, _EL02)
-+#define read_sysreg_el1(r)	read_sysreg_elx(r, _EL1, _EL12)
-+#define write_sysreg_el1(v,r)	write_sysreg_elx(v, r, _EL1, _EL12)
-+
-+/* The VHE specific system registers and their encoding */
-+#define sctlr_EL12              sys_reg(3, 5, 1, 0, 0)
-+#define cpacr_EL12              sys_reg(3, 5, 1, 0, 2)
-+#define ttbr0_EL12              sys_reg(3, 5, 2, 0, 0)
-+#define ttbr1_EL12              sys_reg(3, 5, 2, 0, 1)
-+#define tcr_EL12                sys_reg(3, 5, 2, 0, 2)
-+#define afsr0_EL12              sys_reg(3, 5, 5, 1, 0)
-+#define afsr1_EL12              sys_reg(3, 5, 5, 1, 1)
-+#define esr_EL12                sys_reg(3, 5, 5, 2, 0)
-+#define far_EL12                sys_reg(3, 5, 6, 0, 0)
-+#define mair_EL12               sys_reg(3, 5, 10, 2, 0)
-+#define amair_EL12              sys_reg(3, 5, 10, 3, 0)
-+#define vbar_EL12               sys_reg(3, 5, 12, 0, 0)
-+#define contextidr_EL12         sys_reg(3, 5, 13, 0, 1)
-+#define cntkctl_EL12            sys_reg(3, 5, 14, 1, 0)
-+#define cntp_tval_EL02          sys_reg(3, 5, 14, 2, 0)
-+#define cntp_ctl_EL02           sys_reg(3, 5, 14, 2, 1)
-+#define cntp_cval_EL02          sys_reg(3, 5, 14, 2, 2)
-+#define cntv_tval_EL02          sys_reg(3, 5, 14, 3, 0)
-+#define cntv_ctl_EL02           sys_reg(3, 5, 14, 3, 1)
-+#define cntv_cval_EL02          sys_reg(3, 5, 14, 3, 2)
-+#define spsr_EL12               sys_reg(3, 5, 4, 0, 0)
-+#define elr_EL12                sys_reg(3, 5, 4, 0, 1)
-+
- /**
-  * hyp_alternate_select - Generates patchable code sequences that are
-  * used to switch between two implementations of a function, depending
++	write_sysreg(ctxt->gp_regs.sp_el1,		sp_el1);
++	write_sysreg_el1(ctxt->gp_regs.elr_el1,		elr);
++	write_sysreg_el1(ctxt->gp_regs.spsr[KVM_SPSR_EL1],spsr);
+ }
+ 
+ void __hyp_text __sysreg_restore_host_state(struct kvm_cpu_context *ctxt)
 -- 
 2.1.4
