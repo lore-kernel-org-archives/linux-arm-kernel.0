@@ -1,48 +1,62 @@
-From: slash.tmp@free.fr (Mason)
-Date: Wed, 3 Feb 2016 16:35:10 +0100
-Subject: Plain DFS (no voltage scaling)
-In-Reply-To: <20160203021052.GK31828@vireshk>
-References: <56B11B67.3090600@free.fr> <20160203021052.GK31828@vireshk>
-Message-ID: <56B21E2E.1070606@free.fr>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 3 Feb 2016 16:36:06 +0100
+Subject: [PATCH 00/10] KVM PCIe/MSI passthrough on ARM/ARM64
+In-Reply-To: <20160203131057.GA20217@arm.com>
+References: <1453813968-2024-1-git-send-email-eric.auger@linaro.org>
+ <1454017899.23148.0.camel@redhat.com> <56AB78B1.2030202@linaro.org>
+ <1454096004.9301.1.camel@redhat.com> <56ABD8E0.6080409@linaro.org>
+ <20160201140351.GE6828@arm.com> <20160203125047.GB13974@cbox>
+ <20160203131057.GA20217@arm.com>
+Message-ID: <20160203153606.GC13974@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/02/2016 03:10, Viresh Kumar wrote:
-> On 02-02-16, 22:11, Mason wrote:
->> Hello,
->>
->> I plan to enable the on-demand governor on the tango platform:
->> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/boot/dts/tango4-smp8758.dtsi
->>
->> I found the cpufreq-dt binding doc:
->>
->> https://www.kernel.org/doc/Documentation/devicetree/bindings/cpufreq/cpufreq-dt.txt
->> https://www.kernel.org/doc/Documentation/devicetree/bindings/opp/opp.txt
->>
->> Something is not clear to me:
->>
->> If my platform cannot scale the voltage, what information
->> should I put in the voltage part of the DT?
+On Wed, Feb 03, 2016 at 01:10:58PM +0000, Will Deacon wrote:
+> On Wed, Feb 03, 2016 at 01:50:47PM +0100, Christoffer Dall wrote:
+> > On Mon, Feb 01, 2016 at 02:03:51PM +0000, Will Deacon wrote:
+> > > On Fri, Jan 29, 2016 at 10:25:52PM +0100, Eric Auger wrote:
+> > > > On 01/29/2016 08:33 PM, Alex Williamson wrote:
+> > > > >>> We know that x86 handles MSI vectors specially, so there is some
+> > > > >>> hardware that helps the situation.  It's not just that x86 has a fixed
+> > > > >>> range for MSI, it's how it manages that range when interrupt remapping
+> > > > >>> hardware is enabled.  A device table indexed by source-ID references a
+> > > > >>> per device table indexed by data from the MSI write itself.  So we get
+> > > > >>> much, much finer granularity,
+> > > > >> About the granularity, I think ARM GICv3 now provides a similar
+> > > > >> capability with GICv3 ITS (interrupt translation service). Along with
+> > > > >> the MSI MSG write transaction, the device outputs a DeviceID conveyed on
+> > > > >> the bus. This DeviceID (~ your source-ID) enables to index a device
+> > > > >> table. The entry in the device table points to a DeviceId interrupt
+> > > > >> translation table indexed by the EventID found in the msi msg. So the
+> > > > >> entry in the interrupt translation table eventually gives you the
+> > > > >> eventual interrupt ID targeted by the MSI MSG.
+> > > > >> This translation capability if not available in GICv2M though, ie. the
+> > > > >> one I am currently using.
+> > > > >>  
+> > > > >> Those tables currently are built by the ITS irqchip (irq-gic-v3-its.c)
+> > > 
+> > > That's right. GICv3/ITS disambiguates the interrupt source using the
+> > > DeviceID, which for PCI is derived from the Requester ID of the endpoint.
+> > > GICv2m is less flexible and requires a separate physical frame per guest
+> > > to achieve isolation.
+> > > 
+> > We should still support MSI passthrough with a single MSI frame host
+> > system though, right?
 > 
-> Wouldn't matter if there is no regulator. i.e. you should keep 0, but
-> even if they have something non-zero, core code will ignore it. But
-> yeah, it makes sense to keep it zero.
+> I think we should treat the frame as an exclusive resource and assign it
+> to a single VM.
 
-Hmmm, I am missing something obvious.
+so on a single frame GICv2m system, either your host or a single VM gets
+to do MSIs...
 
-My config contains:
+> 
+> > (Users should just be aware that guests are not fully protected against
+> > misbehaving hardware in that case).
+> 
+> Is it confined to misbehaving hardware? What if a malicious/buggy guest
+> configures its device to DMA all over the doorbell?
+> 
+I guess not, I suppose we can't trap any configuration access and
+mediate that for any device.  Bummer.
 
-CONFIG_CPU_FREQ=y
-CONFIG_CPU_FREQ_GOV_COMMON=y
-CONFIG_CPU_FREQ_STAT=y
-CONFIG_CPU_FREQ_STAT_DETAILS=y
-CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE=y
-CONFIG_CPU_FREQ_GOV_PERFORMANCE=y
-CONFIG_CPU_FREQ_GOV_ONDEMAND=y
-CONFIG_CPUFREQ_DT=y
-
-Yet, neither dt_cpufreq_probe() nor cpufreq_init() are being called.
-
-Could someone please point to my mistake?
-
-Regards.
+-Christoffer
