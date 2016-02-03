@@ -1,69 +1,100 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 3 Feb 2016 16:18:36 +0000
-Subject: [PATCH v3] ARM64: kernel: implement ACPI parking protocol
-In-Reply-To: <20160203112112.GA18387@red-moon>
-References: <1453806638-23167-1-git-send-email-lorenzo.pieralisi@arm.com>
- <20160202182657.GC15706@e104818-lin.cambridge.arm.com>
- <20160203112112.GA18387@red-moon>
-Message-ID: <20160203161834.GB26487@MBP.local>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 3 Feb 2016 17:24:55 +0100
+Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
+ v4.5-rc1
+In-Reply-To: <20160203160951.GF19432@atomide.com>
+References: <CAPDyKFpNRc3Nf9ofXhZrfBa54vXMxWboDScCrYFrZy97m8Y5gg@mail.gmail.com>
+ <Pine.LNX.4.44L0.1602031034360.2041-100000@iolanthe.rowland.org>
+ <20160203160951.GF19432@atomide.com>
+Message-ID: <CAPDyKFoNY8xP11n6mFVicYwdy49sB4=H0fTm53754HukFX4HBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 03, 2016 at 11:21:12AM +0000, Lorenzo Pieralisi wrote:
-> On Tue, Feb 02, 2016 at 06:26:58PM +0000, Catalin Marinas wrote:
-> > On Tue, Jan 26, 2016 at 11:10:38AM +0000, Lorenzo Pieralisi wrote:
-> > > The SBBR and ACPI specifications allow ACPI based systems that do not
-> > > implement PSCI (eg systems with no EL3) to boot through the ACPI parking
-> > > protocol specification[1].
-> > > 
-> > > This patch implements the ACPI parking protocol CPU operations, and adds
-> > > code that eases parsing the parking protocol data structures to the
-> > > ARM64 SMP initializion carried out at the same time as cpus enumeration.
-> > > 
-> > > To wake-up the CPUs from the parked state, this patch implements a
-> > > wakeup IPI for ARM64 (ie arch_send_wakeup_ipi_mask()) that mirrors the
-> > > ARM one, so that a specific IPI is sent for wake-up purpose in order
-> > > to distinguish it from other IPI sources.
-> > > 
-> > > Given the current ACPI MADT parsing API, the patch implements a glue
-> > > layer that helps passing MADT GICC data structure from SMP initialization
-> > > code to the parking protocol implementation somewhat overriding the CPU
-> > > operations interfaces. This to avoid creating a completely trasparent
-> > > DT/ACPI CPU operations layer that would require creating opaque
-> > > structure handling for CPUs data (DT represents CPU through DT nodes, ACPI
-> > > through static MADT table entries), which seems overkill given that ACPI
-> > > on ARM64 mandates only two booting protocols (PSCI and parking protocol),
-> > > so there is no need for further protocol additions.
-> > > 
-> > > Based on the original work by Mark Salter <msalter@redhat.com>
-> > > 
-> > > [1] https://acpica.org/sites/acpica/files/MP%20Startup%20for%20ARM%20platforms.docx
-> > > 
-> > > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > > Cc: Will Deacon <will.deacon@arm.com>
-> > > Cc: Hanjun Guo <hanjun.guo@linaro.org>
-> > > Cc: Loc Ho <lho@apm.com>
-> > > Cc: Sudeep Holla <sudeep.holla@arm.com>
-> > > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > > Cc: Mark Rutland <mark.rutland@arm.com>
-> > > Cc: Mark Salter <msalter@redhat.com>
-> > > Cc: Al Stone <ahs3@redhat.com>
-> > 
-> > Applied, with a minor addition just to warn people from not using it in
-> > other configurations (#ifdef still needed otherwise the
-> > acpi_parking_protocol_valid symbol is not available; but I prefer uglier
-> > code than people starting to use this IPI in their firmware):
-> 
-> It makes sense, we could include asm/acpi.h in smp.c (which is not
-> included by linux/acpi.h if !CONFIG_ACPI) to pull in the symbol and
-> remove the ifdef if you think it is cleaner.
+On 3 February 2016 at 17:09, Tony Lindgren <tony@atomide.com> wrote:
+> * Alan Stern <stern@rowland.harvard.edu> [160203 07:46]:
+>> On Wed, 3 Feb 2016, Ulf Hansson wrote:
+>>
+>> > > Let me summarize my understanding of this thread so far.
+>> > >
+>> > > It looks like the omap3 code initializes hardware in ->probe() and
+>> > > then it may return -EPROBE_DEFER due to some unmet dependencies.  In
+>> > > that case the hardware is not reset to the previous state and the
+>> > > runtime PM framework is left in the state that corresponds to the
+>> > > current hardware state.  Before we had pm_runtime_reinit(), everything
+>> > > worked as expected on the second ->probe() call, because things were
+>> > > in sync then.
+>> >
+>> > Correct!
+>
+> Well not quite correct. After failed probe PM runtime is set to reset
+> state while hardware is still enabled.
 
-I don't think it's worth.
+Yes, but that's *after* pm_runtime_reinit() was added.
 
-BTW, the acpi_parking_protocol_valid() definition has an __init
-annotation while the declaration does not. I removed the __init
-altogether since I get a section mismatch warning when being called from
-handle_IPI.
+I think Rafael was thinking about how it worked *before*.
 
--- 
-Catalin
+>
+>> > Before pm_runtime_reinit(), the failing probe case (-EPROBE_DEFER)
+>> > worked fine because the HW state and the runtime PM status was in
+>> > sync. The device was powered and the runtime PM status was RPM_ACTIVE.
+>> >
+>> > >
+>> > > The introduction of pm_runtime_reinit() changed the situation and now
+>> > > effectively the hardware is required to be reset to the initial state
+>> > > if -EPROBE_DEFER is to be returned too.
+>> >
+>> > Not correct. The hardware doesn't need a reset as it stays powered
+>> > after a failed probe.
+>
+> It is really best to disable the hardware after a failed probe
+> like we do with pm_runtime_put_sync_(suspend)() and pm_runtime_disable().
+>
+> This is because there may never be another probe attempt and we want
+> to have unclaimed devices shut off (or idled) for PM.
+
+I totally agree!
+
+>
+>> > Instead, only the runtime PM status needs to be synchronized with the
+>> > HW state the next probe attempt.
+>>
+>> In other words, the probe routine assumes the actual state is the same
+>> as the PM status.  This may have been true before pm_runtime_reinit()
+>> came along, but it's not true now.
+>>
+>> > In other words, when the PM domain's ->runtime_resume() callbacks gets
+>> > called due to a pm_runtime_get_sync() in the second probe attempt, it
+>> > may find that the HW is already powered and can return zero instead of
+>> > resetting it.
+>
+> Certainly that should at least produce a warning in the hardware
+> specific implementation. It's a state mismatch between PM runtime
+> and the hardware specific implementation.
+>
+> And as discussed, the problem does not exist as long as we understand
+> that we need to use pm_runtime_put_sync_suspend() if the driver has
+> set pm_runtime_use_autoidle(). Or else use the combination of
+> pm_runtime_dont_use_autoidle() and pm_runtime_put_sync().
+
+Okay, so I understand that you decided to not pick up the omap hwmod
+patch I posted.
+
+If you want some further help in fixing the omap drivers, please just
+tell me I am at your service. :-)
+
+Also, we must not forget to also update their runtime PM calls in
+their ->remove() callbacks, as those seems to suffer from the same
+problem as in the -EPROBE_DEFER case.
+
+>
+>> What's wrong with going ahead and resetting the hardware anyway?
+>
+> Nothing, unless a state needs to be maintained for things like GPIO
+> pins power memory :)
+>
+> Regards,
+>
+> Tony
+
+Kind regards
+Uffe
