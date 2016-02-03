@@ -1,85 +1,83 @@
 From: jonathanh@nvidia.com (Jon Hunter)
-Date: Wed, 3 Feb 2016 10:51:40 +0000
-Subject: [PATCH V5 08/14] PM / Domains: Add function to remove a pm-domain
-In-Reply-To: <CAPDyKFqJLdoee4a9819XukXTmYyd3pue452K_zbiV6XhfA=fTw@mail.gmail.com>
+Date: Wed, 3 Feb 2016 11:02:24 +0000
+Subject: [PATCH V5 10/14] Documentation: DT: bindings: Add power domain
+ info for NVIDIA PMC
+In-Reply-To: <20160129160625.GA21918@rob-hp-laptop>
 References: <1453998832-27383-1-git-send-email-jonathanh@nvidia.com>
- <1453998832-27383-9-git-send-email-jonathanh@nvidia.com>
- <CAPDyKFqJLdoee4a9819XukXTmYyd3pue452K_zbiV6XhfA=fTw@mail.gmail.com>
-Message-ID: <56B1DBBC.5020509@nvidia.com>
+ <1453998832-27383-11-git-send-email-jonathanh@nvidia.com>
+ <20160129160625.GA21918@rob-hp-laptop>
+Message-ID: <56B1DE40.7080403@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On 02/02/16 15:35, Ulf Hansson wrote:
-> On 28 January 2016 at 17:33, Jon Hunter <jonathanh@nvidia.com> wrote:
->> The genpd framework allows users to add power-domains via the
->> pm_genpd_init() function, however, there is no corresponding function
->> to remove a power-domain. For most devices this may be fine as the power
->> domains are never removed, however, for devices that wish to populate
->> the power-domains from within a driver, having the ability to remove a
->> power domain if the probing of the device fails or the driver is unloaded
->> is necessary. Therefore, add a function to remove a power-domain. Please
->> note that the power domain can only be removed if there are no devices
->> using the power-domain and it is not linked to another domain.
+On 29/01/16 16:06, Rob Herring wrote:
+> On Thu, Jan 28, 2016 at 04:33:48PM +0000, Jon Hunter wrote:
+>> Add power-domain binding documentation for the NVIDIA PMC driver in
+>> order to support generic power-domains.
 >>
 >> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
 >> ---
->>  drivers/base/power/domain.c | 26 ++++++++++++++++++++++++++
->>  include/linux/pm_domain.h   |  5 +++++
->>  2 files changed, 31 insertions(+)
+>>  .../bindings/arm/tegra/nvidia,tegra20-pmc.txt      | 55 ++++++++++++++++++++++
+>>  1 file changed, 55 insertions(+)
 >>
->> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
->> index 45e3641b427d..b4120121bcac 100644
->> --- a/drivers/base/power/domain.c
->> +++ b/drivers/base/power/domain.c
->> @@ -1529,6 +1529,32 @@ void pm_genpd_init(struct generic_pm_domain *genpd,
->>  }
->>  EXPORT_SYMBOL_GPL(pm_genpd_init);
->>
->> +/**
->> + * pm_genpd_remove - Remove a generic I/O PM domain object.
->> + * @genpd: PM domain object to remove.
->> + */
->> +int pm_genpd_remove(struct generic_pm_domain *genpd)
->> +{
->> +       if (IS_ERR_OR_NULL(genpd))
->> +               return -EINVAL;
+>> diff --git a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
+>> index 53aa5496c5cf..3c77373aa826 100644
+>> --- a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
+>> +++ b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
+>> @@ -1,5 +1,7 @@
+>>  NVIDIA Tegra Power Management Controller (PMC)
+>>  
+>> +== Power Management Controller Node ==
 >> +
->> +       mutex_lock(&genpd->lock);
-> 
-> pm_genpd_summary_show() first locks the gpd_list_lock, then the genpd lock.
-> 
-> Please preserve that order here as well, to prevent potential deadlocks.
-
-Ok, yes good point.
-
+>>  The PMC block interacts with an external Power Management Unit. The PMC
+>>  mostly controls the entry and exit of the system from different sleep
+>>  modes. It provides power-gating controllers for SoC and CPU power-islands.
+>> @@ -70,6 +72,10 @@ Optional properties for hardware-triggered thermal reset (inside 'i2c-thermtrip'
+>>                       Defaults to 0. Valid values are described in section 12.5.2
+>>                       "Pinmux Support" of the Tegra4 Technical Reference Manual.
+>>  
+>> +Optional nodes:
+>> +- powergates : This node contains a hierarchy of power domain nodes, which
+>> +	       should match the powergates on the Tegra SoC.
 >> +
->> +       if (!list_empty(&genpd->master_links)
->> +           || !list_empty(&genpd->slave_links) || genpd->device_count) {
->> +               mutex_unlock(&genpd->lock);
->> +               return -EBUSY;
->> +       }
+>>  Example:
+>>  
+>>  / SoC dts including file
+>> @@ -115,3 +121,52 @@ pmc at 7000f400 {
+>>  	};
+>>  	...
+>>  };
 >> +
->> +       mutex_lock_nested(&gpd_list_lock, SINGLE_DEPTH_NESTING);
+>> +
+>> +== PM Domain Nodes ==
+>> +
+>> +Each of the PM domain nodes represents a power-domain on the Tegra SoC
+>> +that can be power-gated by the PMC and should be named appropriately.
+>> +
+>> +Required properties:
+>> +  - clocks: Must contain an entry for each clock required by the PMC for
+>> +    controlling a power-gate. See ../clocks/clock-bindings.txt for details.
+>> +  - resets: Must contain an entry for each reset required by the PMC for
+>> +    controlling a power-gate. See ../reset/reset.txt for details.
+>> +  - nvidia,powergate: Integer cell that contains an identifier for the PMC
+>> +    power-gate that is associated with the power-domain. Please refer to
+>> +    the Tegra TRM for more details.
 > 
-> Why the nesting, can this really cause lockdep warnings?
+> Why not make this value be the power-domain cell for consumers and the 
+> pmc be the phandle.
 
-Hmmm, yes I don't believe that is needed here as it should be a
-different class. Will fix.
+Is there anything wrong with using a label for the consumers? Seems
+simpler, if you can just say ...
 
->> +       list_del(&genpd->gpd_list_node);
->> +       mutex_unlock(&gpd_list_lock);
->> +       mutex_unlock(&genpd->lock);
-> 
-> Before returning, you need to make sure there isn't a scheduled work
-> for powering off the genpd.
-> That might happen for example happen via genpd_poweroff_unused().
-> 
-> Otherwise, the caller of pm_genpd_remove() might free the memory while
-> the genpd struct is still in use...
-> 
-> I assume a cancel_delayed_work_sync() should do the trick here.
+	adma: adma at 702e2000 {
+		...
+		power-domains = <&pd_audio>;
+		...
+	};
 
-Good point. I will address that too.
+> Then use reg property for the subnodes. That avoids a custom property.
+
+That is fine with me.
 
 Jon
