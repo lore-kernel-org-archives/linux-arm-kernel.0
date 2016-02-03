@@ -1,48 +1,37 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 3 Feb 2016 19:31:50 +0000
-Subject: [PATCH v4 4/7] arm64: Handle early CPU boot failures
-In-Reply-To: <20160203181250.GE26487@MBP.local>
-References: <1453745225-27736-1-git-send-email-suzuki.poulose@arm.com>
- <1453745225-27736-5-git-send-email-suzuki.poulose@arm.com>
- <20160203125735.GA26487@MBP.local>
- <20160203164632.GC1234@leverpostej>
- <20160203173448.GD26487@MBP.local>
- <20160203175351.GG1234@leverpostej>
- <20160203181250.GE26487@MBP.local>
-Message-ID: <20160203193149.GJ1234@leverpostej>
+From: tchalamarla@caviumnetworks.com (tchalamarla at caviumnetworks.com)
+Date: Wed, 3 Feb 2016 11:43:08 -0800
+Subject: [PATCH] irqchip-gicv3: wait for ack from redistributer after read_iar
+Message-ID: <1454528588-32721-1-git-send-email-tchalamarla@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 03, 2016 at 06:12:52PM +0000, Catalin Marinas wrote:
-> On Wed, Feb 03, 2016 at 05:53:51PM +0000, Mark Rutland wrote:
-> > On Wed, Feb 03, 2016 at 05:34:49PM +0000, Catalin Marinas wrote:
-> > > In general, if you perform cache maintenance on a non-shareable mapping,
-> > > I don't think it would be broadcast. But in this case, the MMU is off,
-> > > data accesses default to Device_nGnRnE and considered outer shareable,
-> > > so it may actually work. Is this stated anywhere in the ARM ARM?
-> > 
-> > In ARM DDI 0487A.h, D4.2.8 "The effects of disabling a stage of address
-> > translation" we state:
-> > 
-> > 	Cache maintenance instructions act on the target cache
-> > 	regardless of whether any stages of address translation are
-> > 	disabled, and regardless of the values of the memory attributes.
-> > 	However, if a stage of address translation is disabled, they use
-> > 	the flat address mapping for that translation stage.
-> 
-> But does "target cache" include other CPUs in the system?
+From: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
 
-It appears so. There's a more complete description (with a table) on
-page D3-1718, "Effects of instructions that operate by VA to the Point
-of Coherency", where it's explicitly stated:
+Systems with high number of cores and sufficiently loaded,
+there exists a small window where it is possible for re-distributor
+to illegally merge two LPI and cuases missing interrupts.
 
-	For Device memory and Normal memory that is Inner Non-cacheable,
-	Outer Non-cacheable, these instructions must affect the caches
-	of all PEs in the Outer Shareable shareability domain of the PE
-	on which the instruction is operating.
+Solution is, wait for ack from the redistributor after read_iar.
+A "dsb sy" after IAR read ensures there is no illegal merge windows.
 
-In other cases, per the table, the maintenance may be limited to a
-smaller set of caches.
+giv3 spec version 32 also warns this, see section 4.4.13
 
-Thanks,
-Mark.
+Signed-off-by: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
+---
+ arch/arm64/include/asm/arch_gicv3.h | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
+index 2731d3b..8ec88e5 100644
+--- a/arch/arm64/include/asm/arch_gicv3.h
++++ b/arch/arm64/include/asm/arch_gicv3.h
+@@ -103,6 +103,7 @@ static inline u64 gic_read_iar_common(void)
+ 	u64 irqstat;
+ 
+ 	asm volatile("mrs_s %0, " __stringify(ICC_IAR1_EL1) : "=r" (irqstat));
++	dsb(sy);
+ 	return irqstat;
+ }
+ 
+-- 
+2.1.0
