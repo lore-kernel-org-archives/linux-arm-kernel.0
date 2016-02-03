@@ -1,57 +1,69 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed,  3 Feb 2016 19:41:29 +0100
-Subject: [PATCH v2 12/12] arm64: defconfig: enable Armada 3700 related config
-In-Reply-To: <1454524889-9207-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1454524889-9207-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1454524889-9207-13-git-send-email-gregory.clement@free-electrons.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed,  3 Feb 2016 11:39:12 -0700
+Subject: [PATCH V9 14/18] coresight: etb10: moving to local atomic operations
+In-Reply-To: <1454524756-10628-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1454524756-10628-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1454524756-10628-15-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables the configuration for the Armada 3700 family and for
-the related driver it uses.
+Moving to use local atomic operations to take advantage of the
+lockless implementation, something that will come handy when
+the ETB is accessed from the Perf subsystem. Also changing the
+name of the variable to something more meaningful.
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- arch/arm64/configs/defconfig | 5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/hwtracing/coresight/coresight-etb10.c | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 18ca9fb9e65f..7ca2f0247ec5 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -31,6 +31,7 @@ CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
- # CONFIG_BLK_DEV_BSG is not set
- # CONFIG_IOSCHED_DEADLINE is not set
-+CONFIG_ARCH_MVEBU=y
- CONFIG_ARCH_BCM_IPROC=y
- CONFIG_ARCH_BERLIN=y
- CONFIG_ARCH_EXYNOS7=y
-@@ -93,6 +94,7 @@ CONFIG_ATA=y
- CONFIG_SATA_AHCI=y
- CONFIG_SATA_AHCI_PLATFORM=y
- CONFIG_AHCI_CEVA=y
-+CONFIG_AHCI_MVEBU=y
- CONFIG_AHCI_XGENE=y
- CONFIG_SATA_RCAR=y
- CONFIG_PATA_PLATFORM=y
-@@ -132,6 +134,7 @@ CONFIG_SERIAL_MSM_CONSOLE=y
- CONFIG_SERIAL_OF_PLATFORM=y
- CONFIG_SERIAL_XILINX_PS_UART=y
- CONFIG_SERIAL_XILINX_PS_UART_CONSOLE=y
-+CONFIG_SERIAL_MVEBU_UART=y
- CONFIG_VIRTIO_CONSOLE=y
- # CONFIG_HW_RANDOM is not set
- CONFIG_I2C=y
-@@ -162,6 +165,8 @@ CONFIG_SND_SOC=y
- CONFIG_SND_SOC_RCAR=y
- CONFIG_SND_SOC_AK4613=y
- CONFIG_USB=y
-+CONFIG_USB_XHCI_HCD=y
-+CONFIG_USB_XHCI_PLATFORM=y
- CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_EHCI_HCD_PLATFORM=y
- CONFIG_USB_OHCI_HCD=y
+diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
+index 917562ecf82a..162c9ccc8c33 100644
+--- a/drivers/hwtracing/coresight/coresight-etb10.c
++++ b/drivers/hwtracing/coresight/coresight-etb10.c
+@@ -10,6 +10,7 @@
+  * GNU General Public License for more details.
+  */
+ 
++#include <asm/local.h>
+ #include <linux/kernel.h>
+ #include <linux/module.h>
+ #include <linux/init.h>
+@@ -71,7 +72,7 @@
+  * @csdev:	component vitals needed by the framework.
+  * @miscdev:	specifics to handle "/dev/xyz.etb" entry.
+  * @spinlock:	only one at a time pls.
+- * @in_use:	synchronise user space access to etb buffer.
++ * @reading:	synchronise user space access to etb buffer.
+  * @buf:	area of memory where ETB buffer content gets sent.
+  * @buffer_depth: size of @buf.
+  * @enable:	this ETB is being used.
+@@ -84,7 +85,7 @@ struct etb_drvdata {
+ 	struct coresight_device	*csdev;
+ 	struct miscdevice	miscdev;
+ 	spinlock_t		spinlock;
+-	atomic_t		in_use;
++	local_t			reading;
+ 	u8			*buf;
+ 	u32			buffer_depth;
+ 	bool			enable;
+@@ -277,7 +278,7 @@ static int etb_open(struct inode *inode, struct file *file)
+ 	struct etb_drvdata *drvdata = container_of(file->private_data,
+ 						   struct etb_drvdata, miscdev);
+ 
+-	if (atomic_cmpxchg(&drvdata->in_use, 0, 1))
++	if (local_cmpxchg(&drvdata->reading, 0, 1))
+ 		return -EBUSY;
+ 
+ 	dev_dbg(drvdata->dev, "%s: successfully opened\n", __func__);
+@@ -313,7 +314,7 @@ static int etb_release(struct inode *inode, struct file *file)
+ {
+ 	struct etb_drvdata *drvdata = container_of(file->private_data,
+ 						   struct etb_drvdata, miscdev);
+-	atomic_set(&drvdata->in_use, 0);
++	local_set(&drvdata->reading, 0);
+ 
+ 	dev_dbg(drvdata->dev, "%s: released\n", __func__);
+ 	return 0;
 -- 
-2.5.0
+2.1.4
