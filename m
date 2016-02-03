@@ -1,80 +1,99 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 03 Feb 2016 16:58:46 +0100
-Subject: [PATCH 01/10] serial: mvebu-uart: initial support for Armada-3700
- serial port
-In-Reply-To: <20160202181935.19b4ab7e@lxorguk.ukuu.org.uk> (One Thousand
- Gnomes's message of "Tue, 2 Feb 2016 18:19:35 +0000")
-References: <1454436468-4241-1-git-send-email-gregory.clement@free-electrons.com>
- <1454436468-4241-2-git-send-email-gregory.clement@free-electrons.com>
- <20160202181935.19b4ab7e@lxorguk.ukuu.org.uk>
-Message-ID: <87vb654wg9.fsf@free-electrons.com>
+From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
+Date: Wed, 3 Feb 2016 13:03:19 -0300
+Subject: [PATCH 1/2] clocksource/drivers/lpc32xx: Support periodic mode
+In-Reply-To: <CAGhQ9VxtqkW4PLrpQWsyZu9bgB_98mmO=WZ7gvaeN_DWQ5M3rg@mail.gmail.com>
+References: <1454136379-7517-1-git-send-email-ezequiel@vanguardiasur.com.ar>
+ <CAGhQ9VxO7Rsus8Js_oZDBxWzEHuUHnRyoVTVmawbtXmK7tNMcw@mail.gmail.com>
+ <CAAEAJfAVTJm-PzhjkRmkdNG39sH7eHyEXaSX4q0=TCQ0468Heg@mail.gmail.com>
+ <CAAEAJfD8LUV=t97RN3U4uqgzCLP89AQtHqBccKGd6-EskP9DOQ@mail.gmail.com>
+ <CAGhQ9VxtqkW4PLrpQWsyZu9bgB_98mmO=WZ7gvaeN_DWQ5M3rg@mail.gmail.com>
+Message-ID: <CAAEAJfBO5jARMZyu62ccRWjA_A69qfBfHBcWncYbqOdPkYqSMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
- 
- On mar., f?vr. 02 2016, One Thousand Gnomes <gnomes@lxorguk.ukuu.org.uk> wrote:
+Hi Joachim,
 
->> +static void mvebu_uart_set_termios(struct uart_port *port,
->> +				   struct ktermios *termios,
->> +				   struct ktermios *old)
->> +{
->> +	unsigned long flags;
->> +	unsigned int baud;
->> +
->> +	spin_lock_irqsave(&port->lock, flags);
->> +
->> +	port->read_status_mask = STAT_RX_RDY | STAT_OVR_ERR |
->> +		STAT_TX_RDY | STAT_TX_FIFO_FUL;
->> +
->> +	if (termios->c_iflag & INPCK)
->> +		port->read_status_mask |= STAT_FRM_ERR | STAT_PAR_ERR;
->> +
->> +	port->ignore_status_mask = 0;
->> +	if (termios->c_iflag & IGNPAR)
->> +		port->ignore_status_mask |=
->> +			STAT_FRM_ERR | STAT_PAR_ERR | STAT_OVR_ERR;
->> +
->> +	if ((termios->c_cflag & CREAD) == 0)
->> +		port->ignore_status_mask |= STAT_RX_RDY | STAT_BRK_ERR;
+(Ccing Vladimir)
+
+On 1 February 2016 at 18:55, Joachim  Eastwood <manabian@gmail.com> wrote:
+> On 1 February 2016 at 16:09, Ezequiel Garcia
+> <ezequiel@vanguardiasur.com.ar> wrote:
+>> On 31 January 2016 at 17:07, Ezequiel Garcia
+>> <ezequiel@vanguardiasur.com.ar> wrote:
+>>> On 30 January 2016 at 16:39, Joachim  Eastwood <manabian@gmail.com> wrote:
+>>>> Hi Ezequiel,
+>>>>
+>>>> On 30 January 2016 at 07:46, Ezequiel Garcia
+>>>> <ezequiel@vanguardiasur.com.ar> wrote:
+>>>>> This commit adds the support for periodic mode. This is done by not
+>>>>> setting the MR0S (Stop on TnMR0) bit on MCR, thus allowing
+>>>>> interrupts to be periodically generated on MR0 matches.
+>>>>>
+>>>>> In order to do this, move the initial configuration that is specific to
+>>>>> the one shot mode to clock_event_device.set_state_oneshot.
+>>>>>
+>> [...]
+>>>
+>>>>
+>>>> I will look more closely at the new timer setup later.
+>>>>
+>>>> btw, didn't I look through a version of this you sent me privately
+>>>> quite some time ago?
+>>>> I think I had a comment about using TIMER_PR instead of TIMER_MR0
+>>>> then. Unsure if that is still valid, though.
+>>>>
+>>>
+>>> Ah, right. It was ages ago, and forgot your previous review. Sorry about that.
+>>> Using TIMER_PR looks less invasive so I'll send a v2 using it instead.
+>>
+>> Actually, using the prescale counter and MR0 = 1 resulted in exactly
+>> half the number of interrupts that I expected (HZ / 2). Using this
+>> patch, with PR=0 and MR0=ticks_per_jiggies, I can see HZ no. of
+>> interrupts per sec.
+>>
+>> Why did you choose to use the prescale in your oneshot implementation?
 >
-> If you don't support parity or charactive size then you should be forcing
-> those bits in the tty->termios so that the caller sees what settings they
-> get. tty_termios_copy_hw is close to what you need except that you can
-> support IGNPAR.
-
-OK thanks for the pointer.
-
+> The clockevent code was copied from arch/arm/mach-lpc32xx/timer.c so
+> it's really old code.
+> I think it is a strange way to use the timer, but the logic still
+> seems good to me.
 >
-> You also want to provide the actual baud rate chosen (see how 8250.c does
-> it using tty_termios_encode_baud_rate().
+>> Did you test or measure the timer expire using the PR and MR0 = 1?
 >
+> I really can't remember. I do remember going through the timer setup
+> and it seemed like a valid, albeit slightly strange, way to use the
+> timer.
 >
->> +static struct uart_driver mvebu_uart_driver = {
->> +	.owner			= THIS_MODULE,
->> +	.driver_name		= "serial",
->> +	.dev_name		= "ttyS",
->> +	.major			= TTY_MAJOR,
->> +	.minor			= 64,
+>> To be honest, I'm still trying to make some sense out of my results.
 >
-> NAK
+> I'll see if can find the time to do some more testing over here as well.
 >
-> TTY_MAJOR 64+ is the 8250 driver and ttyS is the 8250 driver name. You
-> should be using a dynamic major (0) for all new drivers and you need to
-> pick a different and unused ttyXXX format name.
 
-I missed this one, I will remove .major and .minor and use our own
-ttyXX.
+I wrote a small test driver to toggle a GPIO on a timer event.
+One-shot usage of the timers results in the same measurements
+with either implementation.
 
-Thanks,
+In other words, when triggering a one-shot timer (MCR_MR0S is set),
+I get the same results using the prescale counter (PR=ticks, MR0=1)
+or the timer counter (PR=0, MR0=ticks).
 
-Gregory
+Here's the branch in case you want to play with it:
+http://git.infradead.org/users/ezequielg/linux/shortlog/refs/heads/misc_timer_test
 
->
-> Alan
+My logic analyzer is quite crappy, but it was clear that one-shot timers
+expired correctly at the configured time, with either implementation.
 
+However, when configuring the timer in periodic mode (MCR_MR0S
+is cleared), the result is always ~twice the programmed value
+(as if it takes two TC cycles to complete one event).
+
+Hence, it seems the prescale counter is not suitable for periodic mode.
+
+How about we change the current oneshot implementation
+to not use the prescale counter at all, and so when the periodic
+mode is introduced it'll be consistent with oneshot?
+
+(Tested on LPC4350 Hitex Devkit, no idea how this works on LPC32xx)
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Ezequiel Garc?a, VanguardiaSur
+www.vanguardiasur.com.ar
