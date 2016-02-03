@@ -1,318 +1,143 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  3 Feb 2016 17:59:59 +0000
-Subject: [PATCH v3 06/23] arm64: KVM: Skip HYP setup when already running in
- HYP
+Date: Wed,  3 Feb 2016 18:00:03 +0000
+Subject: [PATCH v3 10/23] arm64: KVM: VHE: Differenciate host/guest sysreg
+ save/restore
 In-Reply-To: <1454522416-6874-1-git-send-email-marc.zyngier@arm.com>
 References: <1454522416-6874-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1454522416-6874-7-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1454522416-6874-11-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the kernel running at EL2, there is no point trying to
-configure page tables for HYP, as the kernel is already mapped.
+With ARMv8, host and guest share the same system register file,
+making the save/restore procedure completely symetrical.
+With VHE, host and guest now have different requirements, as they
+use different sysregs.
 
-Take this opportunity to refactor the whole init a bit, allowing
-the various parts of the hypervisor bringup to be split across
-multiple functions.
+In order to prepare for this, add split sysreg save/restore functions
+for both host and guest. No functional changes yet.
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kvm/arm.c | 173 +++++++++++++++++++++++++++++++++++------------------
- arch/arm/kvm/mmu.c |   7 +++
- 2 files changed, 121 insertions(+), 59 deletions(-)
+ arch/arm64/kvm/hyp/hyp.h       |  6 ++++--
+ arch/arm64/kvm/hyp/switch.c    | 10 +++++-----
+ arch/arm64/kvm/hyp/sysreg-sr.c | 24 ++++++++++++++++++++++--
+ 3 files changed, 31 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 6b76e01..58f89e3 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -967,6 +967,11 @@ long kvm_arch_vm_ioctl(struct file *filp,
- 	}
- }
+diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
+index 744c919..5dfa883 100644
+--- a/arch/arm64/kvm/hyp/hyp.h
++++ b/arch/arm64/kvm/hyp/hyp.h
+@@ -153,8 +153,10 @@ void __vgic_v3_restore_state(struct kvm_vcpu *vcpu);
+ void __timer_save_state(struct kvm_vcpu *vcpu);
+ void __timer_restore_state(struct kvm_vcpu *vcpu);
  
-+static void cpu_init_stage2(void *dummy)
-+{
-+	__cpu_init_stage2();
-+}
-+
- static void cpu_init_hyp_mode(void *dummy)
- {
- 	phys_addr_t boot_pgd_ptr;
-@@ -1036,6 +1041,82 @@ static inline void hyp_cpu_pm_init(void)
- }
- #endif
+-void __sysreg_save_state(struct kvm_cpu_context *ctxt);
+-void __sysreg_restore_state(struct kvm_cpu_context *ctxt);
++void __sysreg_save_host_state(struct kvm_cpu_context *ctxt);
++void __sysreg_restore_host_state(struct kvm_cpu_context *ctxt);
++void __sysreg_save_guest_state(struct kvm_cpu_context *ctxt);
++void __sysreg_restore_guest_state(struct kvm_cpu_context *ctxt);
+ void __sysreg32_save_state(struct kvm_vcpu *vcpu);
+ void __sysreg32_restore_state(struct kvm_vcpu *vcpu);
  
-+static void teardown_common_resources(void)
-+{
-+	free_percpu(kvm_host_cpu_state);
-+}
-+
-+static int init_common_resources(void)
-+{
-+	kvm_host_cpu_state = alloc_percpu(kvm_cpu_context_t);
-+	if (!kvm_host_cpu_state) {
-+		kvm_err("Cannot allocate host CPU state\n");
-+		return -ENOMEM;
-+	}
-+
-+	return 0;
-+}
-+
-+static int init_subsystems(void)
-+{
-+	int err;
-+
-+	/*
-+	 * Init HYP view of VGIC
-+	 */
-+	err = kvm_vgic_hyp_init();
-+	switch (err) {
-+	case 0:
-+		vgic_present = true;
-+		break;
-+	case -ENODEV:
-+	case -ENXIO:
-+		vgic_present = false;
-+		break;
-+	default:
-+		return err;
-+	}
-+
-+	/*
-+	 * Init HYP architected timer support
-+	 */
-+	err = kvm_timer_hyp_init();
-+	if (err)
-+		return err;
-+
-+	kvm_perf_init();
-+	kvm_coproc_table_init();
-+
-+	return 0;
-+}
-+
-+static void teardown_hyp_mode(void)
-+{
-+	int cpu;
-+
-+	if (is_kernel_in_hyp_mode())
-+		return;
-+
-+	free_hyp_pgds();
-+	for_each_possible_cpu(cpu)
-+		free_page(per_cpu(kvm_arm_hyp_stack_page, cpu));
-+}
-+
-+static int init_vhe_mode(void)
-+{
-+	/*
-+	 * Execute the init code on each CPU.
-+	 */
-+	on_each_cpu(cpu_init_stage2, NULL, 1);
-+
-+	/* set size of VMID supported by CPU */
-+	kvm_vmid_bits = kvm_get_vmid_bits();
-+	kvm_info("%d-bit VMID\n", kvm_vmid_bits);
-+
-+	kvm_info("VHE mode initialized successfully\n");
-+	return 0;
-+}
-+
- /**
-  * Inits Hyp-mode on all online CPUs
-  */
-@@ -1066,7 +1147,7 @@ static int init_hyp_mode(void)
- 		stack_page = __get_free_page(GFP_KERNEL);
- 		if (!stack_page) {
- 			err = -ENOMEM;
--			goto out_free_stack_pages;
-+			goto out_err;
- 		}
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index ca8f5a5..9071dee 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -98,7 +98,7 @@ static int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
+ 	host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
+ 	guest_ctxt = &vcpu->arch.ctxt;
  
- 		per_cpu(kvm_arm_hyp_stack_page, cpu) = stack_page;
-@@ -1078,13 +1159,13 @@ static int init_hyp_mode(void)
- 	err = create_hyp_mappings(__kvm_hyp_code_start, __kvm_hyp_code_end);
- 	if (err) {
- 		kvm_err("Cannot map world-switch code\n");
--		goto out_free_mappings;
-+		goto out_err;
- 	}
+-	__sysreg_save_state(host_ctxt);
++	__sysreg_save_host_state(host_ctxt);
+ 	__debug_cond_save_host_state(vcpu);
  
- 	err = create_hyp_mappings(__start_rodata, __end_rodata);
- 	if (err) {
- 		kvm_err("Cannot map rodata section\n");
--		goto out_free_mappings;
-+		goto out_err;
- 	}
- 
- 	/*
-@@ -1096,20 +1177,10 @@ static int init_hyp_mode(void)
- 
- 		if (err) {
- 			kvm_err("Cannot map hyp stack\n");
--			goto out_free_mappings;
-+			goto out_err;
- 		}
- 	}
- 
--	/*
--	 * Map the host CPU structures
--	 */
--	kvm_host_cpu_state = alloc_percpu(kvm_cpu_context_t);
--	if (!kvm_host_cpu_state) {
--		err = -ENOMEM;
--		kvm_err("Cannot allocate host CPU state\n");
--		goto out_free_mappings;
--	}
--
- 	for_each_possible_cpu(cpu) {
- 		kvm_cpu_context_t *cpu_ctxt;
- 
-@@ -1118,7 +1189,7 @@ static int init_hyp_mode(void)
- 
- 		if (err) {
- 			kvm_err("Cannot map host CPU state: %d\n", err);
--			goto out_free_context;
-+			goto out_err;
- 		}
- 	}
- 
-@@ -1127,34 +1198,22 @@ static int init_hyp_mode(void)
+ 	__activate_traps(vcpu);
+@@ -112,7 +112,7 @@ static int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
+ 	 * to Cortex-A57 erratum #852523.
  	 */
- 	on_each_cpu(cpu_init_hyp_mode, NULL, 1);
+ 	__sysreg32_restore_state(vcpu);
+-	__sysreg_restore_state(guest_ctxt);
++	__sysreg_restore_guest_state(guest_ctxt);
+ 	__debug_restore_state(vcpu, kern_hyp_va(vcpu->arch.debug_ptr), guest_ctxt);
  
--	/*
--	 * Init HYP view of VGIC
--	 */
--	err = kvm_vgic_hyp_init();
--	switch (err) {
--	case 0:
--		vgic_present = true;
--		break;
--	case -ENODEV:
--	case -ENXIO:
--		vgic_present = false;
--		break;
--	default:
--		goto out_free_context;
--	}
--
--	/*
--	 * Init HYP architected timer support
--	 */
--	err = kvm_timer_hyp_init();
--	if (err)
--		goto out_free_context;
--
- #ifndef CONFIG_HOTPLUG_CPU
- 	free_boot_hyp_pgd();
- #endif
+ 	/* Jump in the fire! */
+@@ -121,7 +121,7 @@ static int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
  
--	kvm_perf_init();
-+	cpu_notifier_register_begin();
-+
-+	err = __register_cpu_notifier(&hyp_init_cpu_nb);
-+
-+	cpu_notifier_register_done();
-+
-+	if (err) {
-+		kvm_err("Cannot register HYP init CPU notifier (%d)\n", err);
-+		goto out_err;
-+	}
-+
-+	hyp_cpu_pm_init();
+ 	fp_enabled = __fpsimd_enabled();
  
- 	/* set size of VMID supported by CPU */
- 	kvm_vmid_bits = kvm_get_vmid_bits();
-@@ -1163,14 +1222,9 @@ static int init_hyp_mode(void)
- 	kvm_info("Hyp mode initialized successfully\n");
+-	__sysreg_save_state(guest_ctxt);
++	__sysreg_save_guest_state(guest_ctxt);
+ 	__sysreg32_save_state(vcpu);
+ 	__timer_save_state(vcpu);
+ 	__vgic_save_state(vcpu);
+@@ -129,7 +129,7 @@ static int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
+ 	__deactivate_traps(vcpu);
+ 	__deactivate_vm(vcpu);
  
- 	return 0;
--out_free_context:
--	free_percpu(kvm_host_cpu_state);
--out_free_mappings:
--	free_hyp_pgds();
--out_free_stack_pages:
--	for_each_possible_cpu(cpu)
--		free_page(per_cpu(kvm_arm_hyp_stack_page, cpu));
-+
- out_err:
-+	teardown_hyp_mode();
- 	kvm_err("error initializing Hyp mode: %d\n", err);
- 	return err;
- }
-@@ -1214,26 +1268,27 @@ int kvm_arch_init(void *opaque)
- 		}
+-	__sysreg_restore_state(host_ctxt);
++	__sysreg_restore_host_state(host_ctxt);
+ 
+ 	if (fp_enabled) {
+ 		__fpsimd_save_state(&guest_ctxt->gp_regs.fp_regs);
+@@ -161,7 +161,7 @@ void __hyp_text __noreturn __hyp_panic(void)
+ 		host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
+ 		__deactivate_traps(vcpu);
+ 		__deactivate_vm(vcpu);
+-		__sysreg_restore_state(host_ctxt);
++		__sysreg_restore_host_state(host_ctxt);
  	}
  
--	cpu_notifier_register_begin();
--
--	err = init_hyp_mode();
-+	err = init_common_resources();
- 	if (err)
--		goto out_err;
-+		return err;
+ 	/* Call panic for real */
+diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
+index 42563098..bd5b543 100644
+--- a/arch/arm64/kvm/hyp/sysreg-sr.c
++++ b/arch/arm64/kvm/hyp/sysreg-sr.c
+@@ -24,7 +24,7 @@
+ #include "hyp.h"
  
--	err = __register_cpu_notifier(&hyp_init_cpu_nb);
--	if (err) {
--		kvm_err("Cannot register HYP init CPU notifier (%d)\n", err);
-+	if (is_kernel_in_hyp_mode())
-+		err = init_vhe_mode();
-+	else
-+		err = init_hyp_mode();
-+	if (err)
- 		goto out_err;
--	}
--
--	cpu_notifier_register_done();
- 
--	hyp_cpu_pm_init();
-+	err = init_subsystems();
-+	if (err)
-+		goto out_hyp;
- 
--	kvm_coproc_table_init();
- 	return 0;
-+
-+out_hyp:
-+	teardown_hyp_mode();
- out_err:
--	cpu_notifier_register_done();
-+	teardown_common_resources();
- 	return err;
+ /* ctxt is already in the HYP VA space */
+-void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
++static void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
+ {
+ 	ctxt->sys_regs[MPIDR_EL1]	= read_sysreg(vmpidr_el2);
+ 	ctxt->sys_regs[CSSELR_EL1]	= read_sysreg(csselr_el1);
+@@ -57,7 +57,17 @@ void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
+ 	ctxt->gp_regs.spsr[KVM_SPSR_EL1]= read_sysreg(spsr_el1);
  }
  
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index aba61fd..920d0c3 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -28,6 +28,7 @@
- #include <asm/kvm_mmio.h>
- #include <asm/kvm_asm.h>
- #include <asm/kvm_emulate.h>
-+#include <asm/virt.h>
- 
- #include "trace.h"
- 
-@@ -598,6 +599,9 @@ int create_hyp_mappings(void *from, void *to)
- 	unsigned long start = KERN_TO_HYP((unsigned long)from);
- 	unsigned long end = KERN_TO_HYP((unsigned long)to);
- 
-+	if (is_kernel_in_hyp_mode())
-+		return 0;
+-void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
++void __hyp_text __sysreg_save_host_state(struct kvm_cpu_context *ctxt)
++{
++	__sysreg_save_state(ctxt);
++}
 +
- 	start = start & PAGE_MASK;
- 	end = PAGE_ALIGN(end);
- 
-@@ -630,6 +634,9 @@ int create_hyp_io_mappings(void *from, void *to, phys_addr_t phys_addr)
- 	unsigned long start = KERN_TO_HYP((unsigned long)from);
- 	unsigned long end = KERN_TO_HYP((unsigned long)to);
- 
-+	if (is_kernel_in_hyp_mode())
-+		return 0;
++void __hyp_text __sysreg_save_guest_state(struct kvm_cpu_context *ctxt)
++{
++	__sysreg_save_state(ctxt);
++}
 +
- 	/* Check for a valid kernel IO mapping */
- 	if (!is_vmalloc_addr(from) || !is_vmalloc_addr(to - 1))
- 		return -EINVAL;
++static void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
+ {
+ 	write_sysreg(ctxt->sys_regs[MPIDR_EL1],	  vmpidr_el2);
+ 	write_sysreg(ctxt->sys_regs[CSSELR_EL1],  csselr_el1);
+@@ -90,6 +100,16 @@ void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
+ 	write_sysreg(ctxt->gp_regs.spsr[KVM_SPSR_EL1], spsr_el1);
+ }
+ 
++void __hyp_text __sysreg_restore_host_state(struct kvm_cpu_context *ctxt)
++{
++	__sysreg_restore_state(ctxt);
++}
++
++void __hyp_text __sysreg_restore_guest_state(struct kvm_cpu_context *ctxt)
++{
++	__sysreg_restore_state(ctxt);
++}
++
+ void __hyp_text __sysreg32_save_state(struct kvm_vcpu *vcpu)
+ {
+ 	u64 *spsr, *sysreg;
 -- 
 2.1.4
