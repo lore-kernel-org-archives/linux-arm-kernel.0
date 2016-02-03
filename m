@@ -1,126 +1,69 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 3 Feb 2016 15:14:54 +0100
-Subject: [PATCH 4/4] pwm: omap-dmtimer: add dev_dbg() message for
- effective period and duty cycle
-In-Reply-To: <20160202184443.1e1b0bf5.drivshin.allworx@gmail.com>
-References: <1454128014-22866-1-git-send-email-drivshin.allworx@gmail.com>
- <1454128014-22866-5-git-send-email-drivshin.allworx@gmail.com>
- <CAA3gFWvSsctXtds6_SEtYY1yUdWJDR1XjznGS6qjdrGW5Dbw=A@mail.gmail.com>
- <20160201132228.2634b72e.drivshin.allworx@gmail.com>
- <20160201185952.GN19432@atomide.com> <20160202162330.GA4918@ulmo>
- <20160202184443.1e1b0bf5.drivshin.allworx@gmail.com>
-Message-ID: <20160203141454.GC9650@ulmo>
+From: Chris.Brandt@renesas.com (Chris Brandt)
+Date: Wed, 3 Feb 2016 14:15:16 +0000
+Subject: [PATCH 0/3] kallsyms: remove special handling for CONFIG_ARM
+In-Reply-To: <CAKv+Gu8ZTHAqviveLMizRKPfeXwb6kcXi4cVQNYVYuPcVMgMeQ@mail.gmail.com>
+References: <1454419174-21290-1-git-send-email-ard.biesheuvel@linaro.org>
+ <HKXPR06MB0565A2CFF95AD7C000F43E6A8ADF0@HKXPR06MB0565.apcprd06.prod.outlook.com>
+ <CAKv+Gu9VvskQ34w0niS+6AtF9hNcycfYDt_3Kp4T+WK8Vxf_dA@mail.gmail.com>
+ <HKXPR06MB05656F902E0E1FBBDBD713DC8AD00@HKXPR06MB0565.apcprd06.prod.outlook.com>
+ <CAKv+Gu8ZTHAqviveLMizRKPfeXwb6kcXi4cVQNYVYuPcVMgMeQ@mail.gmail.com>
+Message-ID: <HKXPR06MB056516B5DC41AB61AA39D8B28AD00@HKXPR06MB0565.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 02, 2016 at 06:44:43PM -0500, David Rivshin (Allworx) wrote:
-> On Tue, 2 Feb 2016 17:23:30 +0100
-> Thierry Reding <thierry.reding@gmail.com> wrote:
-> 
-> > On Mon, Feb 01, 2016 at 10:59:52AM -0800, Tony Lindgren wrote:
-> > > Hi,
-> > > 
-> > > * David Rivshin (Allworx) <drivshin.allworx@gmail.com> [160201
-> > > 10:23]:  
-> > > > On Sat, 30 Jan 2016 15:51:06 +0100
-> > > > Neil Armstrong <narmstrong@baylibre.com> wrote:
-> > > >   
-> > > > > 2016-01-30 5:26 GMT+01:00 David Rivshin (Allworx)
-> > > > > <drivshin.allworx@gmail.com>:  
-> > > > > > From: David Rivshin <drivshin@allworx.com>
-> > > > > >
-> > > > > > After going through the math and constraints checking to
-> > > > > > compute load and match values, it is helpful to know what the
-> > > > > > resultant period and duty cycle are.
-> > > > > >
-> > > > > > Signed-off-by: David Rivshin <drivshin@allworx.com>
-> > > > > > ---
-> > > > > >
-> > > > > > I found this helpful while testing the other changes, so I
-> > > > > > included it in case it may be of use to someone in the
-> > > > > > future. I would have no issues with dropping this if it's not
-> > > > > > considered worthwhile.    
-> > > > > 
-> > > > > It's useful, but converting it as a sysfs attribute would be
-> > > > > great !  
-> > > > 
-> > > > Hrm, yes that is an interesting thought. I imagine that many PWM 
-> > > > devices have similar constraints, so perhaps that would be best 
-> > > > handled generically in the pwm core? Maybe as new optional
-> > > > get_*() ops, a modification to the config() op to add output
-> > > > params, or just updating new fields in the struct pwm directly?  
-> > > 
-> > > Yeah for /sys entry it should be Linux generic. The other option
-> > > is to use debugfs for driver specific things.  
-> > 
-> > Let's go with debugfs for this one. This is used for diagnostic
-> 
-> I had looked at using the dbg_show() op to add some additional data. 
-> One thing that discouraged me from going down that path was that 
-> it replaced the call to pwm_dbg_show() for that chip. I wouldn't 
-> want to loose the existing output, as it is useful, but also didn't
-> like the thought of duplicating the logic/formatting. I think some 
-> way to have both the standard output and add extra output somewhere
-> (e.g. same line, line after each pwm_device, block after all 
-> pwm_devices on the chip) would make that path more attractive.
-> 
-> Or were you thinking of a separate (per-chip) debugfs file for this 
-> type of information? 
+On 2 Feb 2016, Chris Brandt wrote 
+> > And when a printed out the destination, I get:
+> >
+> >    Stubs at c09ff000 :00000000 BF006F20 EF9F0000 EA000064 etc...
+> >
+> > Notice the first entry is 0....that's not right...and we know it's using that
+> > first __stubs_start symbol.
+> >
+>
+> The first quantity after __stubs_start should be the address of vector_swi. Can
+>  you check if the second value coincides with that?
 
-Yes, generally I'd prefer a separate, chip-specific debugfs file for
-extra information. To be honest I'm not entirely sure of the usefulness
-of the pwm_dbg_show() or letting drivers override it. But that's
-slightly off-topic. However...
+Yes, it does.
 
-> > purposes and not typically needed when configuring a PWM. While other
-> > drivers may compute similar hardware-specific values, there's nothing
-> > generic to them. The period and duty cycle are the generic input
-> > values and those are already exposed via sysfs.
-> 
-> Just to clarify, what I was thinking of as generic was the concept
-> that "period/duty I asked for" and "period/duty I got" may be
-> different, sometimes to a substantial degree. I could imagine 
-> userspace wanting to know the latter, which is what I think Neil 
-> was suggesting.
-> 
-> For the sake of an example, the input clock for a dmtimer is sometimes
-> (often?) 32768Hz, which means that the real period and duty_cycle output
-> are limited to being a multiple of ~61035.2ns (16384Hz). So an attempt 
-> to set a period of 100000ns (10KHz) would result in either 61035.2ns, or 
-> 122070.4ns (8192Hz), depending on the implementation of the driver (and 
-> patch 2 changes behavior from the former to the latter). You can also 
-> have cases where you desired a 33% duty cycle, but got a 25% duty cycle 
-> instead.
-> 
-> In a quick look, I see substantially similar calculations (i.e. 
-> clk_rate*period_ns/10^9) in most of the other pwm drivers, which makes 
-> sense for any that are programmed in terms of some input clock. This 
-> type of calculation almost guarantees that requested and actual period/
-> duty_cycle are going to be different to some degree. Some drivers look 
-> like they have even more complicated behavior, apparently due to other 
-> hardware constraints. For instance, fsl-ftm (among others) looks to be 
-> using a power-of-2 prescaler to fit the period_cycles into a 16bit field.
-> 
-> Of course if the input clock rate for these types of devices is 
-> sufficiently high (enough that the desired period is many input clock 
-> cycles), then the difference between "desired" and "actual" is probably 
-> small enough that noone cares. I'm not sure how common it is that
->   a) there is a substantial difference, and
->   b) userspace cares about it, and
->   c) userspace didn't carefully select an achievable value already
-> If noone has brought it up before, then I'd guess the answer is "not very".
+bf006f20 T vector_swi
 
-... I think perhaps a better way yet would be to have drivers update the
-period and duty cycle to the actual values. That way there won't be a
-delta between what's really being programmed to hardware and what shows
-up in sysfs. It would also give users a chance to check if what's been
-programmed is within an acceptable range or not.
+Which is why it booted once I modified the start address.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160203/874a22d4/attachment-0001.sig>
+
+> This is caused by the fact that __stubs_start is not aligned correctly on XIP.
+>
+> Could you try this, please?
+>
+> diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S index 7160658fd5d4..a5b8e7b80d17 100644
+> --- a/arch/arm/kernel/vmlinux.lds.S
+> +++ b/arch/arm/kernel/vmlinux.lds.S
+> @@ -164,8 +164,8 @@ SECTIONS
+>          * The vectors and stubs are relocatable code, and the
+>          * only thing that matters is their relative offsets
+>          */
+> -       __stubs_start = .;
+>         .stubs : {
+> +               __stubs_start = .;
+>                 *(.stubs)
+>         }
+>         __stubs_end = .;
+
+
+Yup, that fixed it!
+
+bf353edc T _etext
+bf353ee0 t __stubs_start
+bf353ee0 T __stubs_start
+bf353ee4 t vector_rst
+bf353f00 t vector_irq
+
+and my new print out:
+
+     Stubs at c09ff000 :BF006F20 EF9F0000 EA000064 E320F000 etc...
+
+
+Now that it is working on my XIP system, I will say that I'm also happy to see that extra junk in kallsyms.c and link-vmlinux.sh be removed. Those things also caused me some issues when I first started trying to get the XIP_KERNEL stuff back working.
+
+
+
+Chris
