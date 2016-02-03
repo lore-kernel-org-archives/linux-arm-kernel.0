@@ -1,105 +1,43 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed,  3 Feb 2016 19:41:24 +0100
-Subject: [PATCH v2 07/12] Documentation: dt: Tidy up the Marvell related files
-In-Reply-To: <1454524889-9207-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1454524889-9207-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1454524889-9207-8-git-send-email-gregory.clement@free-electrons.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 3 Feb 2016 18:40:18 +0000
+Subject: [PATCH] dt-bindings: arm, gic-v3: require that reserved cells are
+ always 0
+In-Reply-To: <20160203182054.GH1234@leverpostej>
+References: <1454522458-29643-1-git-send-email-will.deacon@arm.com>
+ <20160203182054.GH1234@leverpostej>
+Message-ID: <20160203184017.GA15852@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Over the last releases we have added more and more Marvell related binding
-directly in the arm directory. It's time to have our proper directory
-inside it, and move all the files in it.
+On Wed, Feb 03, 2016 at 06:20:54PM +0000, Mark Rutland wrote:
+> On Wed, Feb 03, 2016 at 06:00:58PM +0000, Will Deacon wrote:
+> > Consequently, any extensions to the PPI or SPI interrupt specifiers must
+> > be able to work with random crap from legacy DTs, effectively
+> > necessitating a new interrupt type in the first cell. Sigh.
+> 
+> I'm not sure that's true if we allocate a new value for the 1st cell for
+> "extended" PPI or SPI interrupt-sepcficiers (which presumably add
+> restrictions). That would also allow old kernels to safely skip such
+> interrupts rather than mis-parsing them.
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
- .../devicetree/bindings/arm/{ => marvell}/armada-370-xp-pmsu.txt          | 0
- Documentation/devicetree/bindings/arm/{ => marvell}/armada-370-xp.txt     | 0
- Documentation/devicetree/bindings/arm/{ => marvell}/armada-375.txt        | 0
- .../devicetree/bindings/arm/{ => marvell}/armada-380-mpcore-soc-ctrl.txt  | 0
- Documentation/devicetree/bindings/arm/{ => marvell}/armada-38x.txt        | 0
- Documentation/devicetree/bindings/arm/{ => marvell}/armada-39x.txt        | 0
- Documentation/devicetree/bindings/arm/{ => marvell}/armada-cpu-reset.txt  | 0
- Documentation/devicetree/bindings/arm/{ => marvell}/coherency-fabric.txt  | 0
- Documentation/devicetree/bindings/arm/{ => marvell}/kirkwood.txt          | 0
- Documentation/devicetree/bindings/arm/{ => marvell}/marvell,berlin.txt    | 0
- Documentation/devicetree/bindings/arm/{ => marvell}/marvell,dove.txt      | 0
- Documentation/devicetree/bindings/arm/{ => marvell}/marvell,kirkwood.txt  | 0
- Documentation/devicetree/bindings/arm/{ => marvell}/mvebu-cpu-config.txt  | 0
- .../devicetree/bindings/arm/{ => marvell}/mvebu-system-controller.txt     | 0
- 14 files changed, 0 insertions(+), 0 deletions(-)
- rename Documentation/devicetree/bindings/arm/{ => marvell}/armada-370-xp-pmsu.txt (100%)
- rename Documentation/devicetree/bindings/arm/{ => marvell}/armada-370-xp.txt (100%)
- rename Documentation/devicetree/bindings/arm/{ => marvell}/armada-375.txt (100%)
- rename Documentation/devicetree/bindings/arm/{ => marvell}/armada-380-mpcore-soc-ctrl.txt (100%)
- rename Documentation/devicetree/bindings/arm/{ => marvell}/armada-38x.txt (100%)
- rename Documentation/devicetree/bindings/arm/{ => marvell}/armada-39x.txt (100%)
- rename Documentation/devicetree/bindings/arm/{ => marvell}/armada-cpu-reset.txt (100%)
- rename Documentation/devicetree/bindings/arm/{ => marvell}/coherency-fabric.txt (100%)
- rename Documentation/devicetree/bindings/arm/{ => marvell}/kirkwood.txt (100%)
- rename Documentation/devicetree/bindings/arm/{ => marvell}/marvell,berlin.txt (100%)
- rename Documentation/devicetree/bindings/arm/{ => marvell}/marvell,dove.txt (100%)
- rename Documentation/devicetree/bindings/arm/{ => marvell}/marvell,kirkwood.txt (100%)
- rename Documentation/devicetree/bindings/arm/{ => marvell}/mvebu-cpu-config.txt (100%)
- rename Documentation/devicetree/bindings/arm/{ => marvell}/mvebu-system-controller.txt (100%)
+Right, that's what I said :)
 
-diff --git a/Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt b/Documentation/devicetree/bindings/arm/marvell/armada-370-xp-pmsu.txt
-similarity index 100%
-rename from Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt
-rename to Documentation/devicetree/bindings/arm/marvell/armada-370-xp-pmsu.txt
-diff --git a/Documentation/devicetree/bindings/arm/armada-370-xp.txt b/Documentation/devicetree/bindings/arm/marvell/armada-370-xp.txt
-similarity index 100%
-rename from Documentation/devicetree/bindings/arm/armada-370-xp.txt
-rename to Documentation/devicetree/bindings/arm/marvell/armada-370-xp.txt
-diff --git a/Documentation/devicetree/bindings/arm/armada-375.txt b/Documentation/devicetree/bindings/arm/marvell/armada-375.txt
-similarity index 100%
-rename from Documentation/devicetree/bindings/arm/armada-375.txt
-rename to Documentation/devicetree/bindings/arm/marvell/armada-375.txt
-diff --git a/Documentation/devicetree/bindings/arm/armada-380-mpcore-soc-ctrl.txt b/Documentation/devicetree/bindings/arm/marvell/armada-380-mpcore-soc-ctrl.txt
-similarity index 100%
-rename from Documentation/devicetree/bindings/arm/armada-380-mpcore-soc-ctrl.txt
-rename to Documentation/devicetree/bindings/arm/marvell/armada-380-mpcore-soc-ctrl.txt
-diff --git a/Documentation/devicetree/bindings/arm/armada-38x.txt b/Documentation/devicetree/bindings/arm/marvell/armada-38x.txt
-similarity index 100%
-rename from Documentation/devicetree/bindings/arm/armada-38x.txt
-rename to Documentation/devicetree/bindings/arm/marvell/armada-38x.txt
-diff --git a/Documentation/devicetree/bindings/arm/armada-39x.txt b/Documentation/devicetree/bindings/arm/marvell/armada-39x.txt
-similarity index 100%
-rename from Documentation/devicetree/bindings/arm/armada-39x.txt
-rename to Documentation/devicetree/bindings/arm/marvell/armada-39x.txt
-diff --git a/Documentation/devicetree/bindings/arm/armada-cpu-reset.txt b/Documentation/devicetree/bindings/arm/marvell/armada-cpu-reset.txt
-similarity index 100%
-rename from Documentation/devicetree/bindings/arm/armada-cpu-reset.txt
-rename to Documentation/devicetree/bindings/arm/marvell/armada-cpu-reset.txt
-diff --git a/Documentation/devicetree/bindings/arm/coherency-fabric.txt b/Documentation/devicetree/bindings/arm/marvell/coherency-fabric.txt
-similarity index 100%
-rename from Documentation/devicetree/bindings/arm/coherency-fabric.txt
-rename to Documentation/devicetree/bindings/arm/marvell/coherency-fabric.txt
-diff --git a/Documentation/devicetree/bindings/arm/kirkwood.txt b/Documentation/devicetree/bindings/arm/marvell/kirkwood.txt
-similarity index 100%
-rename from Documentation/devicetree/bindings/arm/kirkwood.txt
-rename to Documentation/devicetree/bindings/arm/marvell/kirkwood.txt
-diff --git a/Documentation/devicetree/bindings/arm/marvell,berlin.txt b/Documentation/devicetree/bindings/arm/marvell/marvell,berlin.txt
-similarity index 100%
-rename from Documentation/devicetree/bindings/arm/marvell,berlin.txt
-rename to Documentation/devicetree/bindings/arm/marvell/marvell,berlin.txt
-diff --git a/Documentation/devicetree/bindings/arm/marvell,dove.txt b/Documentation/devicetree/bindings/arm/marvell/marvell,dove.txt
-similarity index 100%
-rename from Documentation/devicetree/bindings/arm/marvell,dove.txt
-rename to Documentation/devicetree/bindings/arm/marvell/marvell,dove.txt
-diff --git a/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt b/Documentation/devicetree/bindings/arm/marvell/marvell,kirkwood.txt
-similarity index 100%
-rename from Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
-rename to Documentation/devicetree/bindings/arm/marvell/marvell,kirkwood.txt
-diff --git a/Documentation/devicetree/bindings/arm/mvebu-cpu-config.txt b/Documentation/devicetree/bindings/arm/marvell/mvebu-cpu-config.txt
-similarity index 100%
-rename from Documentation/devicetree/bindings/arm/mvebu-cpu-config.txt
-rename to Documentation/devicetree/bindings/arm/marvell/mvebu-cpu-config.txt
-diff --git a/Documentation/devicetree/bindings/arm/mvebu-system-controller.txt b/Documentation/devicetree/bindings/arm/marvell/mvebu-system-controller.txt
-similarity index 100%
-rename from Documentation/devicetree/bindings/arm/mvebu-system-controller.txt
-rename to Documentation/devicetree/bindings/arm/marvell/mvebu-system-controller.txt
--- 
-2.5.0
+> > This patch fixes the text so that additional, reserved cells are
+> > required to be zero. This looks like a reasonable thing to require and
+> > is already satisifed by the .dts files in-tree.
+> > 
+> > Cc: Mark Rutland <mark.rutland@arm.com>
+> > Cc: Marc Zyngier <marc.zyngier@arm.com>
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> 
+> This patch itself makes sense, so FWIW:
+> 
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> 
+> Any proposed extention to the binding requires its own discussion.
+
+Yup.
+
+Marc -- can you queue this please?
+
+Will
