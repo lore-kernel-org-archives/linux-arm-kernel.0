@@ -1,119 +1,87 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Wed, 3 Feb 2016 09:20:07 +0000
-Subject: [PATCH V5 05/14] soc: tegra: pmc: Wait for powergate state to
- change
-In-Reply-To: <56AF613A.1000909@nvidia.com>
-References: <1453998832-27383-1-git-send-email-jonathanh@nvidia.com>
- <1453998832-27383-6-git-send-email-jonathanh@nvidia.com>
- <CANLsYkycbEo+wyMX8RJ9H-S5kDTjQR4nnDZc5gvf2kShOZAv9w@mail.gmail.com>
- <56AF613A.1000909@nvidia.com>
-Message-ID: <56B1C647.4060504@nvidia.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 03 Feb 2016 10:24:19 +0100
+Subject: [PATCH v2] ARM: dts: Add dts for Uniwest evi
+In-Reply-To: <1454451202-1687-1-git-send-email-stillcompiling@gmail.com>
+References: <patches/evidts/35215>
+ <1454451202-1687-1-git-send-email-stillcompiling@gmail.com>
+Message-ID: <1454491459.3415.6.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Joshua,
 
-On 01/02/16 13:44, Jon Hunter wrote:
+Am Dienstag, den 02.02.2016, 14:13 -0800 schrieb Joshua Clayton:
+> Uniwest evi is a portable electrical eddy current non-destructive
+> testing device.
 > 
-> On 29/01/16 16:58, Mathieu Poirier wrote:
->> On 28 January 2016 at 09:33, Jon Hunter <jonathanh@nvidia.com> wrote:
->>> Currently, the function tegra_powergate_set() simply sets the desired
->>> powergate state but does not wait for the state to change. In most cases
->>> we should wait for the state to change before proceeding. Currently, there
->>> is a case for tegra114 and tegra124 devices where we do not wait when
->>> starting the secondary CPU as this is not necessary. However, this is only
->>> done at boot time and so waiting here will only have a small impact on
->>> boot time. Therefore, update tegra_powergate_set() to wait when setting
->>> the powergate.
->>>
->>> By adding this feature, we can also eliminate the polling loop from
->>> tegra30_boot_secondary().
->>>
->>> A function has been added for checking the status of the powergate and
->>> so update the tegra_powergate_is_powered() to use this macro as well.
->>>
->>> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
->>> ---
->>>  arch/arm/mach-tegra/platsmp.c | 16 +++-------------
->>>  drivers/soc/tegra/pmc.c       |  9 ++++++++-
->>>  2 files changed, 11 insertions(+), 14 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
->>> index f3f61dbbda97..75620ae73913 100644
->>> --- a/arch/arm/mach-tegra/platsmp.c
->>> +++ b/arch/arm/mach-tegra/platsmp.c
->>> @@ -108,19 +108,9 @@ static int tegra30_boot_secondary(unsigned int cpu, struct task_struct *idle)
->>>          * be un-gated by un-toggling the power gate register
->>>          * manually.
->>>          */
->>> -       if (!tegra_pmc_cpu_is_powered(cpu)) {
->>> -               ret = tegra_pmc_cpu_power_on(cpu);
->>> -               if (ret)
->>> -                       return ret;
->>> -
->>> -               /* Wait for the power to come up. */
->>> -               timeout = jiffies + msecs_to_jiffies(100);
->>> -               while (!tegra_pmc_cpu_is_powered(cpu)) {
->>> -                       if (time_after(jiffies, timeout))
->>> -                               return -ETIMEDOUT;
->>> -                       udelay(10);
->>> -               }
->>> -       }
->>> +       ret = tegra_pmc_cpu_power_on(cpu);
->>> +       if (ret)
->>> +               return ret;
->>>
->>>  remove_clamps:
->>>         /* CPU partition is powered. Enable the CPU clock. */
->>> diff --git a/drivers/soc/tegra/pmc.c b/drivers/soc/tegra/pmc.c
->>> index 99cb2fdd29e1..35ee60fd17be 100644
->>> --- a/drivers/soc/tegra/pmc.c
->>> +++ b/drivers/soc/tegra/pmc.c
->>> @@ -28,6 +28,7 @@
->>>  #include <linux/export.h>
->>>  #include <linux/init.h>
->>>  #include <linux/io.h>
->>> +#include <linux/iopoll.h>
->>>  #include <linux/of.h>
->>>  #include <linux/of_address.h>
->>>  #include <linux/platform_device.h>
->>> @@ -186,6 +187,9 @@ static inline bool tegra_powergate_state(int id)
->>>   */
->>>  static int tegra_powergate_set(unsigned int id, bool new_state)
->>>  {
->>> +       bool status;
->>> +       int err;
->>> +
->>>         mutex_lock(&pmc->powergates_lock);
->>>
->>>         if (tegra_powergate_state(id) == new_state) {
->>> @@ -195,9 +199,12 @@ static int tegra_powergate_set(unsigned int id, bool new_state)
->>>
->>>         tegra_pmc_writel(PWRGATE_TOGGLE_START | id, PWRGATE_TOGGLE);
->>>
->>> +       err = readx_poll_timeout(tegra_powergate_state, id, status,
->>> +                                status == new_state, 10, 100000);
->>> +
->>
->> I understand (and agree) with the goal of this patch but I wonder (and
->> I don't know much about the system/context) if holding a mutex while
->> sleeping won't incur adverse effect on other parts of the system that
->> weren't use to see this wait.  One way to fix this might be to use
->> "mutex_trylock()" and let callers retry as they see fit if an
->> operation is already in progress.
+> Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
+> ---
+>  arch/arm/boot/dts/Makefile      |   1 +
+>  arch/arm/boot/dts/imx6q-evi.dts | 506 ++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 507 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/imx6q-evi.dts
 > 
-> I could unlock the mutex after writing the TOGGLE_START register. I
-> don't believe that we need to waiting for a powergate to change before
-> writing again.
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index c4f42a78..4a4ef29 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -326,6 +326,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+>  	imx6q-cubox-i.dtb \
+>  	imx6q-dfi-fs700-m60.dtb \
+>  	imx6q-dmo-edmqmx6.dtb \
+> +	imx6q-evi.dtb \
+>  	imx6q-gk802.dtb \
+>  	imx6q-gw51xx.dtb \
+>  	imx6q-gw52xx.dtb \
+> diff --git a/arch/arm/boot/dts/imx6q-evi.dts b/arch/arm/boot/dts/imx6q-evi.dts
+> new file mode 100644
+> index 0000000..10f566e
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx6q-evi.dts
+> @@ -0,0 +1,506 @@
+[...]
+> +/dts-v1/;
+> +#include "imx6q.dtsi"
+> +#include <dt-bindings/gpio/gpio.h>
+> +#include <dt-bindings/interrupt-controller/irq.h>
+> +
+> +/ {
+> +	model = "Uniwest Evi";
+> +	compatible = "uniwest,imx6q-evi", "fsl,imx6q";
+[...]
+> +	panel {
+> +		compatible = "sharp,lq101k1ly04";
+> +
+> +		port {
+> +			panel_in: endpoint {
+> +				remote-endpoint = <&lvds0_out>;
+> +			};
+> +		};
+> +	};
+> +};
+[...]
+> +&ldb {
+> +	status = "okay";
+> +
+> +	lvds0: lvds-channel at 0 {
+> +		fsl,data-mapping = "jeida";
+> +		fsl,data-width = <24>;
 
-I was not thinking clearly here, the whole reason for the locking is to
-protect the base address as we swap it during the probe.
+The "sharp,lq101k1ly04" panel compatible already specifies the bus
+format (it is set to MEDIA_BUS_FMT_RGB888_1X7X4_JEIDA in the
+simple-panel entry), these two properties can be removed.
 
-In general, I prefer to keep it the way we have it in this patch. By
-using mutex_trylock() would mean that now clients would have to handle
-retrying if they cannot get the lock and make it more complex.
-Powergates should not be turned on and off that frequently and so
-hopefully a delay here should be tolerable. For CPUs, this should only
-be used on cold boot and not during CPU hotplug events.
+> +		status = "okay";
+> +
+> +		port at 4 {
+> +			reg = <4>;
+> +			lvds0_out: endpoint {
+> +				remote-endpoint = <&panel_in>;
+> +			};
+> +		};
+> +	};
+> +};
+[...]
 
-Cheers
-Jon
+regards
+Philipp
