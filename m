@@ -1,150 +1,90 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  3 Feb 2016 18:00:08 +0000
-Subject: [PATCH v3 15/23] arm64: KVM: VHE: Implement VHE
- activate/deactivate_traps
-In-Reply-To: <1454522416-6874-1-git-send-email-marc.zyngier@arm.com>
-References: <1454522416-6874-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1454522416-6874-16-git-send-email-marc.zyngier@arm.com>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Thu, 4 Feb 2016 02:06:02 +0800
+Subject: [PATCH v10 5/5] Watchdog: ARM SBSA Generic Watchdog half timeout
+ panic support
+In-Reply-To: <56B23E99.1030604@codeaurora.org>
+References: <1454519923-25230-1-git-send-email-fu.wei@linaro.org>
+ <1454519923-25230-6-git-send-email-fu.wei@linaro.org>
+ <56B23883.7000501@codeaurora.org>
+ <CADyBb7sxPg-QUjTbeHFtYkctKc_g7D8O=+jqbXN+DCCoCEnFqA@mail.gmail.com>
+ <56B23E99.1030604@codeaurora.org>
+Message-ID: <CADyBb7s4opxfPFuX=1-qEE6uhsaMXgofAJPbHUQHrng2AUwqNA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Running the kernel in HYP mode requires the HCR_E2H bit to be set
-at all times, and the HCR_TGE bit to be set when running as a host
-(and cleared when running as a guest). At the same time, the vector
- must be set to the current role of the kernel (either host or
-hypervisor), and a couple of system registers differ between VHE
-and non-VHE.
+Hi Timur
 
-We implement these by using another set of alternate functions
-that get dynamically patched.
+On 4 February 2016 at 01:53, Timur Tabi <timur@codeaurora.org> wrote:
+> Fu Wei wrote:
+>>
+>> sorry, are you saying : using pre-timeout instead of this half timeout?
+>>
+>> But even we have pre-timeout support, pre-timeout  == timeout / 2, it
+>> can not be configured without touch timeout.
+>>
+>> if you want pre-timeout  != timeout / 2, we have to modify WCV in the
+>> interrupt routine.
+>>   (because of the explicit watchdog refresh  mechanism)
+>>
+>> Could you let me know why we need pre-timeout  here ??:-)
+>
+>
+> What I meant was that if we had full-blown pre-timeout support in the
+> watchdog layer, then you could use that to implement the
+> panic-on-half-timeout feature.
+>
+> When pre-timeout is implemented, will you modify the interrupt handler to
+> use it?
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/include/asm/kvm_arm.h     |  3 ++-
- arch/arm64/include/asm/kvm_emulate.h |  3 +++
- arch/arm64/kvm/hyp/switch.c          | 47 +++++++++++++++++++++++++++++++++---
- 3 files changed, 49 insertions(+), 4 deletions(-)
+Sorry I am little confused.
 
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index 498335e..100cbec 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -23,6 +23,7 @@
- #include <asm/types.h>
- 
- /* Hyp Configuration Register (HCR) bits */
-+#define HCR_E2H		(UL(1) << 34)
- #define HCR_ID		(UL(1) << 33)
- #define HCR_CD		(UL(1) << 32)
- #define HCR_RW_SHIFT	31
-@@ -81,7 +82,7 @@
- 			 HCR_AMO | HCR_SWIO | HCR_TIDCP | HCR_RW)
- #define HCR_VIRT_EXCP_MASK (HCR_VA | HCR_VI | HCR_VF)
- #define HCR_INT_OVERRIDE   (HCR_FMO | HCR_IMO)
--
-+#define HCR_HOST_VHE_FLAGS (HCR_RW | HCR_TGE | HCR_E2H)
- 
- /* Hyp System Control Register (SCTLR_EL2) bits */
- #define SCTLR_EL2_EE	(1 << 25)
-diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-index 3066328..5ae0c69 100644
---- a/arch/arm64/include/asm/kvm_emulate.h
-+++ b/arch/arm64/include/asm/kvm_emulate.h
-@@ -29,6 +29,7 @@
- #include <asm/kvm_mmio.h>
- #include <asm/ptrace.h>
- #include <asm/cputype.h>
-+#include <asm/virt.h>
- 
- unsigned long *vcpu_reg32(const struct kvm_vcpu *vcpu, u8 reg_num);
- unsigned long *vcpu_spsr32(const struct kvm_vcpu *vcpu);
-@@ -43,6 +44,8 @@ void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr);
- static inline void vcpu_reset_hcr(struct kvm_vcpu *vcpu)
- {
- 	vcpu->arch.hcr_el2 = HCR_GUEST_FLAGS;
-+	if (is_kernel_in_hyp_mode())
-+		vcpu->arch.hcr_el2 |= HCR_E2H;
- 	if (test_bit(KVM_ARM_VCPU_EL1_32BIT, vcpu->arch.features))
- 		vcpu->arch.hcr_el2 &= ~HCR_RW;
- }
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 0db161e..686ca35 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -15,6 +15,8 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
-+#include <asm/kvm_asm.h>
-+
- #include "hyp.h"
- 
- static bool __hyp_text __fpsimd_enabled_nvhe(void)
-@@ -36,6 +38,27 @@ bool __hyp_text __fpsimd_enabled(void)
- 	return __fpsimd_is_enabled()();
- }
- 
-+static void __hyp_text __activate_traps_vhe(void)
-+{
-+	u64 val;
-+
-+	val = read_sysreg(cpacr_el1);
-+	val |= CPACR_EL1_TTA;
-+	val &= ~CPACR_EL1_FPEN;
-+	write_sysreg(val, cpacr_el1);
-+
-+	write_sysreg(__kvm_hyp_vector, vbar_el1);
-+}
-+
-+static void __hyp_text __activate_traps_nvhe(void)
-+{
-+	write_sysreg(CPTR_EL2_TTA | CPTR_EL2_TFP, cptr_el2);
-+}
-+
-+static hyp_alternate_select(__activate_traps_arch,
-+			    __activate_traps_nvhe, __activate_traps_vhe,
-+			    ARM64_HAS_VIRT_HOST_EXTN);
-+
- static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
- {
- 	u64 val;
-@@ -55,16 +78,34 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
- 	write_sysreg(val, hcr_el2);
- 	/* Trap on AArch32 cp15 c15 accesses (EL1 or EL0) */
- 	write_sysreg(1 << 15, hstr_el2);
--	write_sysreg(CPTR_EL2_TTA | CPTR_EL2_TFP, cptr_el2);
- 	write_sysreg(vcpu->arch.mdcr_el2, mdcr_el2);
-+	__activate_traps_arch()();
- }
- 
--static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
-+static void __hyp_text __deactivate_traps_vhe(void)
-+{
-+	extern char vectors[];	/* kernel exception vectors */
-+
-+	write_sysreg(HCR_HOST_VHE_FLAGS, hcr_el2);
-+	write_sysreg(CPACR_EL1_FPEN, cpacr_el1);
-+	write_sysreg(vectors, vbar_el1);
-+}
-+
-+static void __hyp_text __deactivate_traps_nvhe(void)
- {
- 	write_sysreg(HCR_RW, hcr_el2);
-+	write_sysreg(0, cptr_el2);
-+}
-+
-+static hyp_alternate_select(__deactivate_traps_arch,
-+			    __deactivate_traps_nvhe, __deactivate_traps_vhe,
-+			    ARM64_HAS_VIRT_HOST_EXTN);
-+
-+static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
-+{
-+	__deactivate_traps_arch()();
- 	write_sysreg(0, hstr_el2);
- 	write_sysreg(read_sysreg(mdcr_el2) & MDCR_EL2_HPMN_MASK, mdcr_el2);
--	write_sysreg(0, cptr_el2);
- }
- 
- static void __hyp_text __activate_vm(struct kvm_vcpu *vcpu)
+Actually I am taking your suggestion to avoid touching WCV in
+interrupt routine.
+So even we have pre-timeout support , it is useless for this
+panic-on-half-timeout feature,
+because pre-timeout  == timeout / 2 (always).
+
+So maybe I misunderstand your suggestion,
+could you let me know : why we want pre-timeout here?
+
+
+>
+>>> >belong upstream.  But like I said, it's just my opinion, and I won't
+>>> >complain if I'm outvoted.
+>>
+>>   I think this debugging feature is the  purpose of the two-stage
+>> watchdog, if I understand correctly
+>
+>
+> Hmmm... that make sense.  I think maybe you should drop the Kconfig option,
+> and just have "static bool panic_enabled = false;"  Also, then do this:
+>
+> if (panic_enabled) {
+>         ret = devm_request_irq(dev, irq, sbsa_gwdt_interrupt, 0,
+>                                pdev->name, gwdt);
+>         if (ret) {
+>                 dev_err(dev, "unable to request IRQ %d\n", irq);
+>                 return ret;
+>         }
+> }
+
+yes, agree
+
+>
+> That way, the interrupt handler is never registered if the command-line
+> parameter is not specified.
+>
+
+
+
 -- 
-2.1.4
+Best regards,
+
+Fu Wei
+Software Engineer
+Red Hat Software (Beijing) Co.,Ltd.Shanghai Branch
+Ph: +86 21 61221326(direct)
+Ph: +86 186 2020 4684 (mobile)
+Room 1512, Regus One Corporate Avenue,Level 15,
+One Corporate Avenue,222 Hubin Road,Huangpu District,
+Shanghai,China 200021
