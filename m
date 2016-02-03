@@ -1,118 +1,53 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Wed, 3 Feb 2016 14:06:13 +0100
-Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
- v4.5-rc1
-In-Reply-To: <20160202234626.GD19432@atomide.com>
-References: <20160202210345.GZ19432@atomide.com>
- <Pine.LNX.4.44L0.1602021626540.1653-100000@iolanthe.rowland.org>
- <20160202234626.GD19432@atomide.com>
-Message-ID: <CAJZ5v0jbOJc2m=cBrvAuMUHvY8_AQPdJEyt1w-dPikU5expeLA@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 3 Feb 2016 13:10:58 +0000
+Subject: [PATCH 00/10] KVM PCIe/MSI passthrough on ARM/ARM64
+In-Reply-To: <20160203125047.GB13974@cbox>
+References: <1453813968-2024-1-git-send-email-eric.auger@linaro.org>
+ <1454017899.23148.0.camel@redhat.com> <56AB78B1.2030202@linaro.org>
+ <1454096004.9301.1.camel@redhat.com> <56ABD8E0.6080409@linaro.org>
+ <20160201140351.GE6828@arm.com> <20160203125047.GB13974@cbox>
+Message-ID: <20160203131057.GA20217@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 3, 2016 at 12:46 AM, Tony Lindgren <tony@atomide.com> wrote:
-> * Alan Stern <stern@rowland.harvard.edu> [160202 13:46]:
->> On Tue, 2 Feb 2016, Tony Lindgren wrote:
->>
->> > > Also, what is autosuspend_delay set to for your device?  And is
->> > > runtime_auto set?
->> >
->> > It's 100 at that point, see the commented snippet below from
->> > omap_hsmmc_probe():
->> >
->> >     pm_runtime_enable(host->dev);
->> >     pm_runtime_get_sync(host->dev);
->> >     pm_runtime_set_autosuspend_delay(host->dev, MMC_AUTOSUSPEND_DELAY);
->> >     /* NOTE: pm_runtime_dont_use_autosuspend(host->dev) needed here? */
->> >     pm_runtime_use_autosuspend(host->dev);
->> >     ...
->> >     /* gets -EPROBE_DEFER */
->> > err_irq:
->> >     ...
->> >     pm_runtime_put_sync(host->dev);
->>
->> You could try changing this to pm_runtime_put_sync_suspend().  But
->> putting pm_runtime_dont_use_autosuspend() before the put_sync seems
->> like a perfectly reasonable thing to do, especially if you feel you
->> should reverse all the changes you made at the start.
->
-> They both seem to fix the problem.
->
->> >         pm_runtime_disable(host->dev);
->> >     /* NOTE: suspend callback never gets called unless
->> >      * pm_runtime_dont_use_autosuspend() is called
->> >      * before pm_runtime_put_sync() above.
->> >      */
->> >      ...
->> >
->> > > > > Does pm_runtime_use_autosuspend() get called by the probe routine?  If
->> > > > > it does, then perhaps you can get what you want by having the probe
->> > > > > routine call pm_runtime_dont_use_autosuspend() whenever it's about to
->> > > > > return an error -- particularly -EDEFER.
->> > > >
->> > > > Yes so far that's the only fix that seems to work like I posted
->> > > > earlier. But is that the right fix though?
->> > >
->> > > No, not really.  Ideally you would leave autosuspend turned on.  The
->> > > delay would be long enough to that after -EDEFER, another probe would
->> > > start before the delay expired.  But shortly after the last probe
->> > > attempt, the delay would expire and the device would then be put in low
->> > > power.
->> >
->> > But then what about the new reinit function? To me it seems that
->> > we should not attempt to maintain a state from the earlier failed
->> > probe. Or are you thinking we just skip the reinit if autosuspend
->> > is set?
->>
->> The reinit function gets called too late to do what you want -- namely,
->> put the hardware in a low-power state.
->
-> Right, the problem is the lack of suspend on the first probe. But
-> for having autosuspend timeout long enough for the next probe
-> would mean that we can't reset the PM runtime state in between.
->
->> That _is_ what you want, isn't it?  The alternative is to leave
->> dev->power.rpm_status set to RPM_ACTIVE, to match the hardware's actual
->> state.
->
-> As far as I can tell things work just fine if the failed probe
-> suspend the device at the end of the failed probe.
->
->> Given that the reinit function is supposed to restore the initial
->> settings, it probably ought to call pm_runtime_dont_use_autosuspend().
->> But that won't be enough to fix your problem.
->>
->> > > > If we wanted to have some generic fix, it seems we would have to pass
->> > > > a new flag in pm_runtime_put_sync() to ignore any autosuspend
->> > > > configuration. But I don't know if that's what we want to or should
->> > > > do though?
->> > >
->> > > I don't think so.
->> >
->> > So should we just establish a policy that pm_runtime_use_autosuspend()
->> > needs to be paired with pm_runtime_dont_use_autosuspend() for
->> > pm_runtime_put_sync() to work?
->>
->> Your understanding is slightly wrong.  pm_runtime_put_sync() _does_
->> work -- that is, it does what it's supposed to do.  The difficulty is
->> that what it's supposed to do doesn't match what you think.
->>
->> pm_runtime_put_sync() is supposed to follow the driver's wishes.  It
->> invokes the driver's runtime_idle callback if there is one, and the
->> callback routine can start a suspend or an autosuspend.  If there is no
->> callback, it will use whatever autosuspend setting the driver has set
->> up.  If you want to override the autosuspend setting, use
->> pm_runtime_put_sync_suspend() instead.
->
-> Yes.. That works too. I guess the thing to consider is if we should
-> make pm_runtime_put_sync() always sync along the lines of a patch
-> I posted earlier today. That could avoid quite a bit of confusion
-> as already seen in this thread :)
+On Wed, Feb 03, 2016 at 01:50:47PM +0100, Christoffer Dall wrote:
+> On Mon, Feb 01, 2016 at 02:03:51PM +0000, Will Deacon wrote:
+> > On Fri, Jan 29, 2016 at 10:25:52PM +0100, Eric Auger wrote:
+> > > On 01/29/2016 08:33 PM, Alex Williamson wrote:
+> > > >>> We know that x86 handles MSI vectors specially, so there is some
+> > > >>> hardware that helps the situation.  It's not just that x86 has a fixed
+> > > >>> range for MSI, it's how it manages that range when interrupt remapping
+> > > >>> hardware is enabled.  A device table indexed by source-ID references a
+> > > >>> per device table indexed by data from the MSI write itself.  So we get
+> > > >>> much, much finer granularity,
+> > > >> About the granularity, I think ARM GICv3 now provides a similar
+> > > >> capability with GICv3 ITS (interrupt translation service). Along with
+> > > >> the MSI MSG write transaction, the device outputs a DeviceID conveyed on
+> > > >> the bus. This DeviceID (~ your source-ID) enables to index a device
+> > > >> table. The entry in the device table points to a DeviceId interrupt
+> > > >> translation table indexed by the EventID found in the msi msg. So the
+> > > >> entry in the interrupt translation table eventually gives you the
+> > > >> eventual interrupt ID targeted by the MSI MSG.
+> > > >> This translation capability if not available in GICv2M though, ie. the
+> > > >> one I am currently using.
+> > > >>  
+> > > >> Those tables currently are built by the ITS irqchip (irq-gic-v3-its.c)
+> > 
+> > That's right. GICv3/ITS disambiguates the interrupt source using the
+> > DeviceID, which for PCI is derived from the Requester ID of the endpoint.
+> > GICv2m is less flexible and requires a separate physical frame per guest
+> > to achieve isolation.
+> > 
+> We should still support MSI passthrough with a single MSI frame host
+> system though, right?
 
-No, we shouldn't.
+I think we should treat the frame as an exclusive resource and assign it
+to a single VM.
 
-As I said, the current behavior is actually well documented (in
-kerneldoc comments and elsewhere).
+> (Users should just be aware that guests are not fully protected against
+> misbehaving hardware in that case).
 
-Thanks,
-Rafael
+Is it confined to misbehaving hardware? What if a malicious/buggy guest
+configures its device to DMA all over the doorbell?
+
+Will
