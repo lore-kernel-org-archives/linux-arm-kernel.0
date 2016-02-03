@@ -1,263 +1,40 @@
 From: wxt@rock-chips.com (Caesar Wang)
-Date: Wed,  3 Feb 2016 12:12:45 +0800
-Subject: [PATCH 6/8] thermal: rockchip: fix the tsadc sequence output on
- rk3228/rk3399
+Date: Wed,  3 Feb 2016 12:12:46 +0800
+Subject: [PATCH 7/8] ARM: dts: rockchip: enable the tsadc for rk3228 evb
 In-Reply-To: <1454472767-5767-1-git-send-email-wxt@rock-chips.com>
 References: <1454472767-5767-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1454472767-5767-7-git-send-email-wxt@rock-chips.com>
+Message-ID: <1454472767-5767-8-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the TRM says, add the tsadc_q_sel to control the temperature-code
-sequence since the rk3228/rk3399 need set this bit (1024 - tsadc_q)
-as output.
+This patch enables the tsadc for rk3228 evb board.
 
-Fixes: commit
-b0d7033 "thermal: rockchip: Support the RK3399 SoCs in thermal driver"
-7b02a5e "thermal: rockchip: Support the RK3228 SoCs in thermal driver"
+The rk3228 evb board uses the CRU to reset the chip since it hasn't the
+PMIC to connect it, and TSHUT is low active on evb board.
 
-Reported-by: Elaine Zhang <zhangqing@rock-chips.com>
 Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 ---
 
- drivers/thermal/rockchip_thermal.c | 176 +++++++++++++++++++++----------------
- 1 file changed, 102 insertions(+), 74 deletions(-)
+ arch/arm/boot/dts/rk3228-evb.dts | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
-index 9cdef62..233a564 100644
---- a/drivers/thermal/rockchip_thermal.c
-+++ b/drivers/thermal/rockchip_thermal.c
-@@ -155,6 +155,13 @@ struct rockchip_thermal_data {
- #define TSADCV2_AUTO_EN				BIT(0)
- #define TSADCV2_AUTO_SRC_EN(chn)		BIT(4 + (chn))
- #define TSADCV2_AUTO_TSHUT_POLARITY_HIGH	BIT(8)
-+/**
-+ * TSADCV1_AUTO_Q_SEL_EN:
-+ * whether select (1024 - tsadc_q) as output
-+ * 1'b0:use tsadc_q as output(temperature-code is rising sequence)
-+ * 1'b1:use(1024 - tsadc_q) as output (temperature-code is falling sequence)
-+ */
-+#define TSADCV3_AUTO_Q_SEL_EN			BIT(1)
- 
- #define TSADCV2_INT_SRC_EN(chn)			BIT(chn)
- #define TSADCV2_SHUT_2GPIO_SRC_EN(chn)		BIT(4 + (chn))
-@@ -184,41 +191,42 @@ struct tsadc_table {
-  * Code to Temperature mapping should be updated based on sillcon results.
-  */
- static const struct tsadc_table rk3228_code_table[] = {
--	{TSADCV3_DATA_MASK, -40000},
--	{436, -40000},
--	{431, -35000},
--	{426, -30000},
--	{421, -25000},
--	{416, -20000},
--	{411, -15000},
--	{406, -10000},
--	{401, -5000},
--	{395, 0},
--	{390, 5000},
--	{385, 10000},
--	{380, 15000},
--	{375, 20000},
--	{370, 25000},
--	{364, 30000},
--	{359, 35000},
--	{354, 40000},
--	{349, 45000},
--	{343, 50000},
--	{338, 55000},
--	{333, 60000},
--	{328, 65000},
--	{322, 70000},
--	{317, 75000},
--	{312, 80000},
--	{307, 85000},
--	{301, 90000},
--	{296, 95000},
--	{291, 100000},
--	{286, 105000},
--	{280, 110000},
--	{275, 115000},
--	{270, 120000},
--	{264, 125000},
-+	{0, -40000},
-+	{588, -40000},
-+	{593, -35000},
-+	{598, -30000},
-+	{603, -25000},
-+	{608, -20000},
-+	{613, -15000},
-+	{618, -10000},
-+	{623, -5000},
-+	{629, 0},
-+	{634, 5000},
-+	{639, 10000},
-+	{644, 15000},
-+	{649, 20000},
-+	{654, 25000},
-+	{660, 30000},
-+	{665, 35000},
-+	{670, 40000},
-+	{675, 45000},
-+	{681, 50000},
-+	{686, 55000},
-+	{691, 60000},
-+	{696, 65000},
-+	{702, 70000},
-+	{707, 75000},
-+	{712, 80000},
-+	{717, 85000},
-+	{723, 90000},
-+	{728, 95000},
-+	{733, 100000},
-+	{738, 105000},
-+	{744, 110000},
-+	{749, 115000},
-+	{754, 120000},
-+	{760, 125000},
-+	{TSADCV2_DATA_MASK, 125000},
+diff --git a/arch/arm/boot/dts/rk3228-evb.dts b/arch/arm/boot/dts/rk3228-evb.dts
+index e3898b8..c75cc41 100644
+--- a/arch/arm/boot/dts/rk3228-evb.dts
++++ b/arch/arm/boot/dts/rk3228-evb.dts
+@@ -61,6 +61,13 @@
+ 	status = "okay";
  };
  
- static const struct tsadc_table rk3288_code_table[] = {
-@@ -299,41 +307,42 @@ static const struct tsadc_table rk3368_code_table[] = {
- };
- 
- static const struct tsadc_table rk3399_code_table[] = {
--	{TSADCV3_DATA_MASK, -40000},
--	{431, -40000},
--	{426, -35000},
--	{421, -30000},
--	{415, -25000},
--	{410, -20000},
--	{405, -15000},
--	{399, -10000},
--	{394, -5000},
--	{389, 0},
--	{383, 5000},
--	{378, 10000},
--	{373, 15000},
--	{367, 20000},
--	{362, 25000},
--	{357, 30000},
--	{351, 35000},
--	{346, 40000},
--	{340, 45000},
--	{335, 50000},
--	{330, 55000},
--	{324, 60000},
--	{319, 65000},
--	{313, 70000},
--	{308, 75000},
--	{302, 80000},
--	{297, 85000},
--	{291, 90000},
--	{286, 95000},
--	{281, 100000},
--	{275, 105000},
--	{270, 110000},
--	{264, 115000},
--	{259, 120000},
--	{253, 125000},
-+	{0, -40000},
-+	{593, -40000},
-+	{598, -35000},
-+	{603, -30000},
-+	{609, -25000},
-+	{614, -20000},
-+	{619, -15000},
-+	{625, -10000},
-+	{630, -5000},
-+	{635, 0},
-+	{641, 5000},
-+	{646, 10000},
-+	{651, 15000},
-+	{657, 20000},
-+	{662, 25000},
-+	{667, 30000},
-+	{673, 35000},
-+	{678, 40000},
-+	{684, 45000},
-+	{689, 50000},
-+	{694, 55000},
-+	{700, 60000},
-+	{705, 65000},
-+	{711, 70000},
-+	{716, 75000},
-+	{722, 80000},
-+	{727, 85000},
-+	{733, 90000},
-+	{738, 95000},
-+	{743, 100000},
-+	{749, 105000},
-+	{754, 110000},
-+	{760, 115000},
-+	{765, 120000},
-+	{771, 125000},
-+	{TSADCV3_DATA_MASK, 125000},
- };
- 
- static u32 rk_tsadcv2_temp_to_code(struct chip_tsadc_table table,
-@@ -488,6 +497,25 @@ static void rk_tsadcv2_control(void __iomem *regs, bool enable)
- 	writel_relaxed(val, regs + TSADCV2_AUTO_CON);
- }
- 
-+/**
-+ * @rk_tsadcv3_control:
-+ * TSADC controller works at auto mode, and some SoCs need set the tsadc_q_sel
-+ * bit on TSADCV2_AUTO_CON[1]. The (1024 - tsadc_q) as output adc value if
-+ * setting this bit to enable.
-+ */
-+static void rk_tsadcv3_control(void __iomem *regs, bool enable)
-+{
-+	u32 val;
++&tsadc {
++	status = "okay";
 +
-+	val = readl_relaxed(regs + TSADCV2_AUTO_CON);
-+	if (enable)
-+		val |= TSADCV2_AUTO_EN | TSADCV3_AUTO_Q_SEL_EN;
-+	else
-+		val &= ~TSADCV2_AUTO_EN;
++	rockchip,hw-tshut-mode = <0>; /* tshut mode 0:CRU 1:GPIO */
++	rockchip,hw-tshut-polarity = <1>; /* tshut polarity 0:LOW 1:HIGH */
++};
 +
-+	writel_relaxed(val, regs + TSADCV2_AUTO_CON);
-+}
-+
- static int rk_tsadcv2_get_temp(struct chip_tsadc_table table,
- 			       int chn, void __iomem *regs, int *temp)
- {
-@@ -538,7 +566,7 @@ static const struct rockchip_tsadc_chip rk3228_tsadc_data = {
- 
- 	.initialize = rk_tsadcv2_initialize,
- 	.irq_ack = rk_tsadcv3_irq_ack,
--	.control = rk_tsadcv2_control,
-+	.control = rk_tsadcv3_control,
- 	.get_temp = rk_tsadcv2_get_temp,
- 	.set_tshut_temp = rk_tsadcv2_tshut_temp,
- 	.set_tshut_mode = rk_tsadcv2_tshut_mode,
-@@ -547,7 +575,7 @@ static const struct rockchip_tsadc_chip rk3228_tsadc_data = {
- 		.id = rk3228_code_table,
- 		.length = ARRAY_SIZE(rk3228_code_table),
- 		.data_mask = TSADCV3_DATA_MASK,
--		.mode = ADC_DECREMENT,
-+		.mode = ADC_INCREMENT,
- 	},
+ &uart2 {
+ 	status = "okay";
  };
- 
-@@ -610,7 +638,7 @@ static const struct rockchip_tsadc_chip rk3399_tsadc_data = {
- 
- 	.initialize = rk_tsadcv2_initialize,
- 	.irq_ack = rk_tsadcv3_irq_ack,
--	.control = rk_tsadcv2_control,
-+	.control = rk_tsadcv3_control,
- 	.get_temp = rk_tsadcv2_get_temp,
- 	.set_tshut_temp = rk_tsadcv2_tshut_temp,
- 	.set_tshut_mode = rk_tsadcv2_tshut_mode,
-@@ -619,7 +647,7 @@ static const struct rockchip_tsadc_chip rk3399_tsadc_data = {
- 		.id = rk3399_code_table,
- 		.length = ARRAY_SIZE(rk3399_code_table),
- 		.data_mask = TSADCV3_DATA_MASK,
--		.mode = ADC_DECREMENT,
-+		.mode = ADC_INCREMENT,
- 	},
- };
- 
 -- 
 1.9.1
