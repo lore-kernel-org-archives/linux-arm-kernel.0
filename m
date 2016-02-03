@@ -1,39 +1,31 @@
 From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Wed, 3 Feb 2016 12:12:53 +0000
-Subject: [PATCH v1 2/5] arm64: add ARMv8.2 id_aa64mmfr2 boiler plate
-In-Reply-To: <1454432611-21333-3-git-send-email-james.morse@arm.com>
+Date: Wed, 3 Feb 2016 12:16:29 +0000
+Subject: [PATCH v1 4/5] arm64: cpufeature: Test 'matches' pointer to find
+ the end of the list
+In-Reply-To: <1454432611-21333-5-git-send-email-james.morse@arm.com>
 References: <1454432611-21333-1-git-send-email-james.morse@arm.com>
- <1454432611-21333-3-git-send-email-james.morse@arm.com>
-Message-ID: <56B1EEC5.9020506@arm.com>
+ <1454432611-21333-5-git-send-email-james.morse@arm.com>
+Message-ID: <56B1EF9D.9060803@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 02/02/16 17:03, James Morse wrote:
-> ARMv8.2 adds a new feature register id_aa64mmfr2. This patch adds the
-> cpu feature boiler plate used by the actual features in later patches.
+> CPU feature code uses the desc field as a test to find the end of the list,
+> this means every entry must have a description. This generates noise for
+> entries in the list that aren't really features, but combinations of them.
+> e.g.
+>> CPU features: detected feature: Privileged Access Never
+>> CPU features: detected feature: PAN and not UAO
 >
-> Signed-off-by: James Morse <james.morse@arm.com>
-
-
->   #define SYS_CNTFRQ_EL0			sys_reg(3, 3, 14, 0, 0)
->   #define SYS_CTR_EL0			sys_reg(3, 3, 0, 0, 1)
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index a84febc40db2..a4f665f95f9f 100644
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -123,6 +123,10 @@ static struct arm64_ftr_bits ftr_id_aa64mmfr1[] = {
->   	ARM64_FTR_END,
->   };
+> These combination features are needed for corner cases with alternatives,
+> where cpu features interact.
 >
-> +static struct arm64_ftr_bits ftr_id_aa64mmfr2[] = {
-> +	ARM64_FTR_END,
+> Change all walkers of the arm64_features[] and arm64_hwcaps[] lists to test
+> 'matches' not 'desc', and only print 'desc' if it is non-NULL.
 
-It will be good to see all the defined fields in id_aa64mmfr2 added here in
-this patch. You could also move the definition of UA0 field from the next patch
-to here.
+Makes sense.
 
-Otherwise looks good.
+Reviewed-by : Suzuki K Poulose <suzuki.poulose@arm.com>
 
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-
+Cheers
 Suzuki
