@@ -1,67 +1,65 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 3 Feb 2016 14:49:49 +0800
-Subject: [linux-sunxi] [PATCH 01/11] MAINTAINERS: Add entry for X-Powers
- AXP family PMIC drivers
-In-Reply-To: <1454462910.7291.53.camel@perches.com>
-References: <1454408864-24112-1-git-send-email-wens@csie.org>
- <1454408864-24112-2-git-send-email-wens@csie.org>
- <CAGRGNgVxan9RCsLFW9hHWcdW+Rd_SgVG95H-yQg213g-YeE6Ug@mail.gmail.com>
- <1454462910.7291.53.camel@perches.com>
-Message-ID: <CAGb2v64JfVdSN7VfgDdi2b0ZRKfJsHim=RiGmuvk853LFprF9Q@mail.gmail.com>
+Date: Wed, 3 Feb 2016 15:02:03 +0800
+Subject: [PATCH v2 5/5] pinctrl: sunxi: Use pin number when calling
+ sunxi_pmx_set
+In-Reply-To: <1454448113-18810-6-git-send-email-k@japko.eu>
+References: <1454448113-18810-1-git-send-email-k@japko.eu>
+ <1454448113-18810-6-git-send-email-k@japko.eu>
+Message-ID: <CAGb2v66+cmHv-NBHCnYcZ_K42qxM=5+kvhazHSy2AykL8cF8tw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 3, 2016 at 9:28 AM, Joe Perches <joe@perches.com> wrote:
-> On Wed, 2016-02-03 at 11:19 +1100, Julian Calaby wrote:
->> On Tue, Feb 2, 2016 at 9:27 PM, Chen-Yu Tsai <wens@csie.org> wrote:
->> > Add an entry for X-Powers AXP family PMIC drivers and list myself
->> > as maintainer.
-> []
->> > diff --git a/MAINTAINERS b/MAINTAINERS
-> []
->> > @@ -11941,6 +11941,12 @@ F:     include/linux/workqueue.h
->> >  F:     kernel/workqueue.c
->> >  F:     Documentation/workqueue.txt
->> >
->> > +X-POWERS MULTIFUNCTION PMIC DEVICE DRIVERS
->> > +M:     Chen-Yu Tsai <wens@csie.org>
->> > +L:     linux-kernel at vger.kernel.org
->> > +S:     Maintained
->> > +N:     axp[128]
->>
->> Should you list the files maintained and this list also?
->
-> This "N:" pattern is kind of a wildcard.
->
-> The difference between F: and N: is that git history
-> is also used by default for files that match.
->
-> There are no files in -next today that match "*axp8*"
-> Dunno if this patchset added any.
+Hi,
 
-This set adds a "axp809.dtsi". A subsequent set will add "axp806.dtsi".
+On Wed, Feb 3, 2016 at 5:21 AM, Krzysztof Adamski <k@japko.eu> wrote:
+> sunxi_pmx_set accepts pin number and then calculates offset by
+> subtracting pin_base from it. sunxi_pinctrl_gpio_get, on the other hand,
+> gets offset so we have to convert it to pin number so we won't get
+> negative value in sunxi_pmx_set.
+>
+> This was only used on A10 so far, where there is only one GPIO chip with
+> pin_base set to 0 so it didn't matter. However H3 also requires this
+> workaround but have two pinmux sections, triggering problem for PL port.
+>
+> Signed-off-by: Krzysztof Adamski <k@japko.eu>
+> ---
+>  drivers/pinctrl/sunxi/pinctrl-sunxi.c | 9 ++++++---
+>  1 file changed, 6 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+> index 7a2465f..9e5bac9 100644
+> --- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+> +++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+> @@ -460,14 +460,17 @@ static int sunxi_pinctrl_gpio_get(struct gpio_chip *chip, unsigned offset)
+>         u32 set_mux = pctl->desc->irq_read_needs_mux &&
+>                         test_bit(FLAG_USED_AS_IRQ, &chip->desc[offset].flags);
+>         u32 val;
+> +       u32 pin;
+>
+> -       if (set_mux)
+> -               sunxi_pmx_set(pctl->pctl_dev, offset, SUN4I_FUNC_INPUT);
+> +       if (set_mux) {
+> +               pin = offset + pctl->desc->pin_base;
 
-> This matches:
->
->     $ git ls-files | grep "axp[128]"
->     Documentation/devicetree/bindings/mfd/axp20x.txt
->     Documentation/devicetree/bindings/power_supply/axp20x_usb_power.txt
->     arch/arm/boot/dts/axp152.dtsi
->     arch/arm/boot/dts/axp209.dtsi
->     arch/arm/boot/dts/axp22x.dtsi
->     drivers/extcon/extcon-axp288.c
->     drivers/iio/adc/axp288_adc.c
->     drivers/input/misc/axp20x-pek.c
->     drivers/mfd/axp20x.c
->     drivers/power/axp20x_usb_power.c
->     drivers/power/axp288_charger.c
->     drivers/power/axp288_fuel_gauge.c
->     drivers/regulator/axp20x-regulator.c
->     include/linux/mfd/axp20x.h
->
-> Are all these files appropriate?
->
+You can use chip->base directly. It's value is set to pin_base in the
+init function.
+You could also move this out of the if block, and not add the braces.
 
-Yes.
+Otherwise this looks good.
 
 ChenYu
+
+> +               sunxi_pmx_set(pctl->pctl_dev, pin, SUN4I_FUNC_INPUT);
+> +       }
+>
+>         val = (readl(pctl->membase + reg) >> index) & DATA_PINS_MASK;
+>
+>         if (set_mux)
+> -               sunxi_pmx_set(pctl->pctl_dev, offset, SUN4I_FUNC_IRQ);
+> +               sunxi_pmx_set(pctl->pctl_dev, pin, SUN4I_FUNC_IRQ);
+>
+>         return !!val;
+>  }
+> --
+> 2.1.4
+>
