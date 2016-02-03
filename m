@@ -1,62 +1,55 @@
-From: santosh.shilimkar@oracle.com (santosh shilimkar)
-Date: Tue, 2 Feb 2016 16:09:42 -0800
-Subject: [PATCH 1/2] ARM: make virt_to_idmap() return unsigned long
-In-Reply-To: <56AF917F.9030505@oracle.com>
-References: <E1aO8F2-00074N-E8@rmk-PC.arm.linux.org.uk>
- <56A84748.3040108@oracle.com> <20160201152015.GU10826@n2100.arm.linux.org.uk>
- <56AF8F54.7030805@ti.com> <56AF917F.9030505@oracle.com>
-Message-ID: <56B14546.4070808@oracle.com>
+From: julian.calaby@gmail.com (Julian Calaby)
+Date: Wed, 3 Feb 2016 11:19:52 +1100
+Subject: [linux-sunxi] [PATCH 01/11] MAINTAINERS: Add entry for X-Powers
+ AXP family PMIC drivers
+In-Reply-To: <1454408864-24112-2-git-send-email-wens@csie.org>
+References: <1454408864-24112-1-git-send-email-wens@csie.org>
+ <1454408864-24112-2-git-send-email-wens@csie.org>
+Message-ID: <CAGRGNgVxan9RCsLFW9hHWcdW+Rd_SgVG95H-yQg213g-YeE6Ug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vitaly,
+Hi Chen-Yu,
 
-On 2/1/2016 9:10 AM, santosh shilimkar wrote:
-> On 2/1/2016 9:01 AM, Vitaly Andrianov wrote:
->>
->>
->> On 02/01/2016 10:20 AM, Russell King - ARM Linux wrote:
->>> On Tue, Jan 26, 2016 at 08:27:52PM -0800, santosh.shilimkar at oracle.com
->>> wrote:
->>>> On 1/26/16 10:21 AM, Russell King wrote:
->>>>> Make virt_to_idmap() return an unsigned long rather than phys_addr_t.
->>>>>
->>>>> Returning phys_addr_t here makes no sense, because the definition of
->>>>> virt_to_idmap() is that it shall return a physical address which maps
->>>>> identically with the virtual address.  Since virtual addresses are
->>>>> limited to 32-bit, identity mapped physical addresses are as well.
->>>>>
->>>>> Almost all users already had an implicit narrowing cast to unsigned
->>>>> long
->>>>> so let's make this official and part of this interface.
->>>>>
->>>>> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
->>>>> ---
->>>> Looks correct to me.
->>>>
->>>> Vitaly,
->>>> Could you please try out this patch and see everything continue to
->>>> work ?
->>>
->>> I haven't heard anything yet...  Vitaly?
->>>
->> Russel, Santosh,
->>
->> I'm not working with the latest kernel, but with the stable v4.1.y. So I
->> couldn't apply the patch to it. I checked out 4.5.0-rc1 and applied the
->> patch to it. Tried to boot and it crashed. I'm not sure either because
->> of the patch or because of the network driver.
->>
-> Thanks for checking.
+On Tue, Feb 2, 2016 at 9:27 PM, Chen-Yu Tsai <wens@csie.org> wrote:
+> Add an entry for X-Powers AXP family PMIC drivers and list myself
+> as maintainer.
 >
->> Here is the log:
->>
-> Based on the log, I think the patch seems to work fine since the boot
-> reached upto rootfs. The crash seems to be coming from mostky NetCP
-> related compents.
+> Cc: Carlo Caione <carlo@caione.org>
+> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Cc: Ramakrishna Pallala <ramakrishna.pallala@intel.com>
+> Cc: Todd Brandt <todd.e.brandt@linux.intel.com>
+> Cc: Jacob Pan <jacob.jun.pan@linux.intel.com>
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  MAINTAINERS | 6 ++++++
+>  1 file changed, 6 insertions(+)
 >
-The NETCP crash you saw could be the same one others stumbled as
-mentioned in below thread. You can try the fix and see if the
-crash goes away.
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index f678c37107f5..7ea4e54f566a 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -11941,6 +11941,12 @@ F:     include/linux/workqueue.h
+>  F:     kernel/workqueue.c
+>  F:     Documentation/workqueue.txt
+>
+> +X-POWERS MULTIFUNCTION PMIC DEVICE DRIVERS
+> +M:     Chen-Yu Tsai <wens@csie.org>
+> +L:     linux-kernel at vger.kernel.org
+> +S:     Maintained
+> +N:     axp[128]
 
-http://marc.info/?l=linux-netdev&m=145445399232540&w=2
+Should you list the files maintained and this list also?
+
+> +
+>  X.25 NETWORK LAYER
+>  M:     Andrew Hendry <andrew.hendry@gmail.com>
+>  L:     linux-x25 at vger.kernel.org
+
+Thanks,
+
+-- 
+Julian Calaby
+
+Email: julian.calaby at gmail.com
+Profile: http://www.google.com/profiles/julian.calaby/
