@@ -1,26 +1,31 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Wed, 3 Feb 2016 11:58:57 -0600
-Subject: [PATCH v10 4/5] Watchdog: introduce ARM SBSA watchdog driver
-In-Reply-To: <CADyBb7tteV7VF9oxMaq5NprVdS2UBKobupxoyfSp+jQwp5wmQA@mail.gmail.com>
-References: <1454519923-25230-1-git-send-email-fu.wei@linaro.org>
- <1454519923-25230-5-git-send-email-fu.wei@linaro.org>
- <56B23D61.2050001@codeaurora.org>
- <CADyBb7tteV7VF9oxMaq5NprVdS2UBKobupxoyfSp+jQwp5wmQA@mail.gmail.com>
-Message-ID: <56B23FE1.2010207@codeaurora.org>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Wed,  3 Feb 2016 18:00:01 +0000
+Subject: [PATCH] aarch64: Enable i2c chardev in defconfig
+Message-ID: <1454522401-3729-1-git-send-email-grant.likely@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fu Wei wrote:
-> I have posted  GTDT support separately :https://lkml.org/lkml/2016/2/1/660
->
-> devicetree driver and GTDT driver both export sbsa gwdt info to
-> "platform resource".
->
-> this driver get hardware info from platform resource.
+The I2C character device is commonly used, and should be enabled by
+default. Add it to the defconfig.
 
-I must be missing something.  How does the driver probe?  It only has an 
-entry for device tree:
+Signed-off-by: Grant Likely <grant.likely@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-+		.of_match_table = sbsa_gwdt_of_match,
-
-Doesn't there need to be an ACPI match table to probe on an ACPI system?
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index d63b6e3797b6..3c26e587a264 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -147,6 +147,7 @@ CONFIG_SERIAL_XILINX_PS_UART=y
+ CONFIG_SERIAL_XILINX_PS_UART_CONSOLE=y
+ CONFIG_VIRTIO_CONSOLE=y
+ # CONFIG_HW_RANDOM is not set
++CONFIG_I2C_CHARDEV=y
+ CONFIG_I2C_DESIGNWARE_PLATFORM=y
+ CONFIG_I2C_QUP=y
+ CONFIG_SPI=y
+-- 
+2.5.0
