@@ -1,7 +1,7 @@
 From: zhang.chunyan@linaro.org (Chunyan Zhang)
-Date: Wed,  3 Feb 2016 16:10:24 +0800
+Date: Wed,  3 Feb 2016 16:15:31 +0800
 Subject: [PATCH V2 0/6] Introduce CoreSight STM support
-Message-ID: <1454487030-30053-1-git-send-email-zhang.chunyan@linaro.org>
+Message-ID: <1454487337-30184-1-git-send-email-zhang.chunyan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,7 +14,7 @@ Changes from v1:
    avoid the kbuild test robot error for the time being.  This
    modification will be removed when merging the code in which the
    coresight_simple_func() has been moved to the header file.
-
+ - Calculate the channel number according to the channel memory space size.
 
 Thanks,
 Chunyan
