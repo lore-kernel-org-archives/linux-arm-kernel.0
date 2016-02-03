@@ -1,126 +1,133 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 3 Feb 2016 09:49:13 +0100
-Subject: [PATCH v2 21/21] arm64: Panic when VHE and non VHE CPUs coexist
-In-Reply-To: <56B0CBF4.9030507@arm.com>
-References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
- <1453737235-16522-22-git-send-email-marc.zyngier@arm.com>
- <20160201153605.GA1478@cbox> <56B0CBF4.9030507@arm.com>
-Message-ID: <20160203084913.GA13974@cbox>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Wed, 3 Feb 2016 10:00:15 +0100
+Subject: [PATCH v4 1/4] soc: mediatek: Refine scpsys to support multiple
+ platform
+In-Reply-To: <1454476968.2847.59.camel@mtksdaap41>
+References: <1453270097-53853-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1453270097-53853-2-git-send-email-jamesjj.liao@mediatek.com>
+ <56ADF556.6070402@gmail.com> <1454396212.2847.15.camel@mtksdaap41>
+ <56B0889A.1010305@gmail.com> <1454476968.2847.59.camel@mtksdaap41>
+Message-ID: <56B1C19F.9070300@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 02, 2016 at 03:32:04PM +0000, Marc Zyngier wrote:
-> On 01/02/16 15:36, Christoffer Dall wrote:
-> > On Mon, Jan 25, 2016 at 03:53:55PM +0000, Marc Zyngier wrote:
-> >> Having both VHE and non-VHE capable CPUs in the same system
-> >> is likely to be a recipe for disaster.
-> >>
-> >> If the boot CPU has VHE, but a secondary is not, we won't be
-> >> able to downgrade and run the kernel at EL1. Add CPU hotplug
-> >> to the mix, and this produces a terrifying mess.
-> >>
-> >> Let's solve the problem once and for all. If you mix VHE and
-> >> non-VHE CPUs in the same system, you deserve to loose, and this
-> >> patch makes sure you don't get a chance.
-> >>
-> >> This is implemented by storing the kernel execution level in
-> >> a global variable. Secondaries will park themselves in a
-> >> WFI loop if they observe a mismatch. Also, the primary CPU
-> >> will detect that the secondary CPU has died on a mismatched
-> >> execution level. Panic will follow.
-> >>
-> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> >> ---
-> >>  arch/arm64/include/asm/virt.h | 17 +++++++++++++++++
-> >>  arch/arm64/kernel/head.S      | 19 +++++++++++++++++++
-> >>  arch/arm64/kernel/smp.c       |  3 +++
-> >>  3 files changed, 39 insertions(+)
-> >>
-> >> diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
-> >> index 9f22dd6..f81a345 100644
-> >> --- a/arch/arm64/include/asm/virt.h
-> >> +++ b/arch/arm64/include/asm/virt.h
-> >> @@ -36,6 +36,11 @@
-> >>   */
-> >>  extern u32 __boot_cpu_mode[2];
-> >>  
-> >> +/*
-> >> + * __run_cpu_mode records the mode the boot CPU uses for the kernel.
-> >> + */
-> >> +extern u32 __run_cpu_mode[2];
-> >> +
-> >>  void __hyp_set_vectors(phys_addr_t phys_vector_base);
-> >>  phys_addr_t __hyp_get_vectors(void);
-> >>  
-> >> @@ -60,6 +65,18 @@ static inline bool is_kernel_in_hyp_mode(void)
-> >>  	return el == CurrentEL_EL2;
-> >>  }
-> >>  
-> >> +static inline bool is_kernel_mode_mismatched(void)
-> >> +{
-> >> +	/*
-> >> +	 * A mismatched CPU will have written its own CurrentEL in
-> >> +	 * __run_cpu_mode[1] (initially set to zero) after failing to
-> >> +	 * match the value in __run_cpu_mode[0]. Thus, a non-zero
-> >> +	 * value in __run_cpu_mode[1] is enough to detect the
-> >> +	 * pathological case.
-> >> +	 */
-> >> +	return !!ACCESS_ONCE(__run_cpu_mode[1]);
-> >> +}
-> >> +
-> >>  /* The section containing the hypervisor text */
-> >>  extern char __hyp_text_start[];
-> >>  extern char __hyp_text_end[];
-> >> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> >> index 2a7134c..bc44cf8 100644
-> >> --- a/arch/arm64/kernel/head.S
-> >> +++ b/arch/arm64/kernel/head.S
-> >> @@ -577,7 +577,23 @@ ENTRY(set_cpu_boot_mode_flag)
-> >>  1:	str	w20, [x1]			// This CPU has booted in EL1
-> >>  	dmb	sy
-> >>  	dc	ivac, x1			// Invalidate potentially stale cache line
-> >> +	adr_l	x1, __run_cpu_mode
-> >> +	ldr	w0, [x1]
-> >> +	mrs	x20, CurrentEL
-> >> +	cbz	x0, skip_el_check
-> >> +	cmp	x0, x20
-> >> +	bne	mismatched_el
-> > 
-> > can't you do a ret here instead of writing the same value and flushing
-> > caches etc.?
-> 
-> Yes, good point.
-> 
-> > 
-> >> +skip_el_check:			// Only the first CPU gets to set the rule
-> >> +	str	w20, [x1]
-> >> +	dmb	sy
-> >> +	dc	ivac, x1	// Invalidate potentially stale cache line
-> >>  	ret
-> >> +mismatched_el:
-> >> +	str	w20, [x1, #4]
-> >> +	dmb	sy
-> >> +	dc	ivac, x1	// Invalidate potentially stale cache line
-> >> +1:	wfi
-> > 
-> > I'm no expert on SMP bringup, but doesn't this prevent the CPU from
-> > signaling completion and thus you'll never actually reach the checking
-> > code in __cpu_up?
-> 
-> Indeed, and that's the whole point. The primary CPU will notice that the
-> secondary CPU has failed to boot (timeout), and will find the reason in
-> __run_cpu_mode.
-> 
-That wasn't exactly my point.  If I understand correctly and __cpu_up is
-the primary CPU executing a function to bring up a secondary core, then
-it will wait for the cpu_running completion which should be signalled by
-the secondary core, but because the secondary core never makes any
-progress it will timeout the wait for completion and you will see that
-error "..failed to come online" instead of the "incompatible execution
-level".
 
-(This is based on my reading of the code as the completion is signalled
-in secondary_start_kernl which happens after this stuff above in
-head.S).
 
--Christoffer
+On 03/02/16 06:22, James Liao wrote:
+> Hi Matthias,
+>
+> On Tue, 2016-02-02 at 11:44 +0100, Matthias Brugger wrote:
+>> On 02/02/16 07:56, James Liao wrote:
+>>> On Sun, 2016-01-31 at 12:51 +0100, Matthias Brugger wrote:
+>>>>> On 20/01/16 07:08, James Liao wrote:
+>>>>>>> Refine scpsys driver common code to support multiple SoC / platform.
+>>>>>>>
+>>>>>>> Signed-off-by: James Liao<jamesjj.liao@mediatek.com>
+>>>>>>> ---
+>>>>>>>    drivers/soc/mediatek/mtk-scpsys.c | 418 ++++++++++++++++++++------------------
+>>>>>>>    drivers/soc/mediatek/mtk-scpsys.h |  55 +++++
+>>>>>>>    2 files changed, 270 insertions(+), 203 deletions(-)
+>>>>>>>    create mode 100644 drivers/soc/mediatek/mtk-scpsys.h
+>>>>>
+>>>>> In general this approach looks fine to me, comments below.
+>>>>>
+>>>>>>>
+>>>>>>> diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
+>>>>>>> index 0221387..339adfc 100644
+>>>>>>> --- a/drivers/soc/mediatek/mtk-scpsys.c
+>>>>>>> +++ b/drivers/soc/mediatek/mtk-scpsys.c
+>>>>>>> @@ -11,29 +11,17 @@
+>>>>>>>     * GNU General Public License for more details.
+>>>>>>>     */
+>>>>>>>    #include <linux/clk.h>
+>>>>>>> -#include <linux/delay.h>
+>>>>>>> +#include <linux/init.h>
+>>>>>>>    #include <linux/io.h>
+>>>>>>> -#include <linux/kernel.h>
+>>>>>>>    #include <linux/mfd/syscon.h>
+>>>>>
+>>>>> When at it, do we need this include?
+>>> syscon_regmap_lookup_by_phandle() is declared in this head file.
+>>>
+>>>>>>> -#include <linux/init.h>
+>>>>>>>    #include <linux/of_device.h>
+>>>>>>>    #include <linux/platform_device.h>
+>>>>>>>    #include <linux/pm_domain.h>
+>>>>>>> -#include <linux/regmap.h>
+>>>>>>> -#include <linux/soc/mediatek/infracfg.h>
+>>>>>>>    #include <linux/regulator/consumer.h>
+>>>>>>> -#include <dt-bindings/power/mt8173-power.h>
+>>>>>>> +#include <linux/soc/mediatek/infracfg.h>
+>>>>>>> +
+>>>>>>> +#include "mtk-scpsys.h"
+>>>>>>>
+>>>>>>> -#define SPM_VDE_PWR_CON			0x0210
+>>>>>>> -#define SPM_MFG_PWR_CON			0x0214
+>>>>>>> -#define SPM_VEN_PWR_CON			0x0230
+>>>>>>> -#define SPM_ISP_PWR_CON			0x0238
+>>>>>>> -#define SPM_DIS_PWR_CON			0x023c
+>>>>>>> -#define SPM_VEN2_PWR_CON		0x0298
+>>>>>>> -#define SPM_AUDIO_PWR_CON		0x029c
+>>>>>>> -#define SPM_MFG_2D_PWR_CON		0x02c0
+>>>>>>> -#define SPM_MFG_ASYNC_PWR_CON		0x02c4
+>>>>>>> -#define SPM_USB_PWR_CON			0x02cc
+>>>>>
+>>>>> I would prefer to keep this defines and declare SoC specific ones where
+>>>>> necessary. It makes the code more readable.
+>>> Some register address may be reused by other modules among SoCs, so it's
+>>> not easy to maintain the defines when we implement multiple SoC drivers
+>>> in the same file. For example, offset 0x0298 is VEN2_PWR_CON on MT8173,
+>>> but it is MJC_PWR_CON on other chips.
+>>>
+>>
+>> So that sounds as if 0x0298 offset is MT8173 specific.
+>> I checked [VDE, MFG, VEN, IFR, ISP, DIS, DPY]_PWR_CON on mt8173, mt8135
+>> and mt6589 and they all have the same offset. So it doesn't seem as if
+>> the offset randomly changes for every SoC.
+>>
+>>> Furthermore, these register offsets are only used in scp_domain_data[],
+>>> and each element has its own power domain name. So I think it's enough
+>>> to know which power domain are using these registers and status bits.
+>>>
+>>
+>> Yes that's true, but it will make it easier for another person to
+>> understand the driver, especially if he want's to implement the driver
+>> for a new SoC.
+>
+> There are two kinds of conflicts may happen:
+>
+> 1. Different modules use the same register address.
+> 2. Different register addresses are used by the same module (on
+> different IC).
+>
+> Type 1. for example:
+>
+> 	#define SPM_BDP_PWR_CON			0x029c /* 2701 */
+> 	#define SPM_AUDIO_PWR_CON		0x029c /* 8173 */
+>
+> We can resolve this conflict easily, such as define these two register
+> name to the same register address.
+>
+> Type 2. for example:
+>
+> 	#define SPM_VDE_PWR_CON			0x0300 /* 6755 */
+> 	#define SPM_VDE_PWR_CON			0x0210 /* 8173 */
+>
+> We can not reuse the register defines in this case. We may need to name
+> the registers with its IC name, such as MT8173_SPM_VDE_PWR_CON and
+> MT6755_VDE_PWR_CON. But it will increase the maintain effort. That's why
+> I prefer to remove register defines if we implement multiple SoC's
+> scpsys in a single file.
+>
+>
+
+Well type 2 for me is no problem at all. As stated in my last mail, 
+mt6755 would get the SoC name in the define (as a postfix preferably).
+I don't think that this will make a lot of pain regarding maintaining 
+it. Even less if we have the defines in alphabetic order.
+
+I we see in the future that this converts to a mess, we always can get 
+rid of the defines quite easily.
+
+Regards,
+Matthias
