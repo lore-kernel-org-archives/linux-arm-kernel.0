@@ -1,296 +1,67 @@
-From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Wed, 3 Feb 2016 14:26:57 +0100
-Subject: [PATCH v3 12/14] mtd: m25p80: add support of dual and quad spi
- protocols to all commands
-In-Reply-To: <cover.1454505161.git.cyrille.pitchen@atmel.com>
-References: <cover.1454505161.git.cyrille.pitchen@atmel.com>
-Message-ID: <8c1d521b6ec8bd60c8d5c8911c0df56a6857109d.1454505161.git.cyrille.pitchen@atmel.com>
+From: Chris.Brandt@renesas.com (Chris Brandt)
+Date: Wed, 3 Feb 2016 13:33:13 +0000
+Subject: [PATCH 0/3] kallsyms: remove special handling for CONFIG_ARM
+References: <1454419174-21290-1-git-send-email-ard.biesheuvel@linaro.org>
+ <HKXPR06MB0565A2CFF95AD7C000F43E6A8ADF0@HKXPR06MB0565.apcprd06.prod.outlook.com>
+ <CAKv+Gu9VvskQ34w0niS+6AtF9hNcycfYDt_3Kp4T+WK8Vxf_dA@mail.gmail.com>
+Message-ID: <HKXPR06MB05656F902E0E1FBBDBD713DC8AD00@HKXPR06MB0565.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Before this patch, m25p80_read() supported few SPI protocols:
-- regular SPI 1-1-1
-- SPI Dual Output 1-1-2
-- SPI Quad Output 1-1-4
-On the other hand, all other m25p80_*() hooks only supported SPI 1-1-1.
+On 2 Feb 2016, Chris Brandt wrote:
+> I then applied the 3 patches and tried again and this time it booted
+> up....almost.
+> It looks like it makes it all the way up to when it is going to mount
+> my rootfs, but then dies.
 
-However once their Quad mode enabled, Micron and Macronix spi-nor memories
-expect all commands to use the SPI 4-4-4 protocol.
 
-Also, once their Dual mode enabled, Micron spi-nor memories expect all
-commands to use the SPI-2-2-2 protocol.
+I did some debugging, and here's why I'm crashing.
 
-So this patch adds support to all currently existing SPI protocols to
-cover as many protocols as possible.
 
-Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
----
- drivers/mtd/devices/m25p80.c | 192 ++++++++++++++++++++++++++++++++++---------
- 1 file changed, 151 insertions(+), 41 deletions(-)
+If you look at my System.map file, you'll see that I've got 2 "__stubs_start" symbols.
 
-diff --git a/drivers/mtd/devices/m25p80.c b/drivers/mtd/devices/m25p80.c
-index c9c3b7fa3051..a57c7d0e3f39 100644
---- a/drivers/mtd/devices/m25p80.c
-+++ b/drivers/mtd/devices/m25p80.c
-@@ -27,22 +27,64 @@
- #include <linux/spi/flash.h>
- #include <linux/mtd/spi-nor.h>
- 
--#define	MAX_CMD_SIZE		6
-+#define	MAX_CMD_SIZE		16
- struct m25p {
- 	struct spi_device	*spi;
- 	struct spi_nor		spi_nor;
- 	u8			command[MAX_CMD_SIZE];
- };
- 
-+static inline int m25p80_proto2nbits(enum spi_nor_protocol proto,
-+				     unsigned *code_nbits,
-+				     unsigned *addr_nbits,
-+				     unsigned *data_nbits)
-+{
-+	if (code_nbits)
-+		*code_nbits = SNOR_PROTO_CMD_FROM_PROTO(proto);
-+	if (addr_nbits)
-+		*addr_nbits = SNOR_PROTO_ADDR_FROM_PROTO(proto);
-+	if (data_nbits)
-+		*data_nbits = SNOR_PROTO_DATA_FROM_PROTO(proto);
-+
-+	return 0;
-+}
-+
- static int m25p80_read_reg(struct spi_nor *nor, u8 code, u8 *val, int len)
- {
- 	struct m25p *flash = nor->priv;
- 	struct spi_device *spi = flash->spi;
-+	unsigned code_nbits, data_nbits;
-+	struct spi_transfer xfers[2];
- 	int ret;
- 
--	ret = spi_write_then_read(spi, &code, 1, val, len);
-+	/* Check the total length of command op code and data. */
-+	if (len + 1 > MAX_CMD_SIZE)
-+		return -EINVAL;
-+
-+	/* Get transfer protocols (addr_nbits is not relevant here). */
-+	ret = m25p80_proto2nbits(nor->reg_proto,
-+				 &code_nbits, NULL, &data_nbits);
-+	if (ret < 0)
-+		return ret;
-+
-+	/* Set up transfers. */
-+	memset(xfers, 0, sizeof(xfers));
-+
-+	flash->command[0] = code;
-+	xfers[0].len = 1;
-+	xfers[0].tx_buf = flash->command;
-+	xfers[0].tx_nbits = code_nbits;
-+
-+	xfers[1].len = len;
-+	xfers[1].rx_buf = &flash->command[1];
-+	xfers[1].rx_nbits = data_nbits;
-+
-+	/* Process command. */
-+	ret = spi_sync_transfer(spi, xfers, 2);
- 	if (ret < 0)
- 		dev_err(&spi->dev, "error %d reading %x\n", ret, code);
-+	else
-+		memcpy(val, &flash->command[1], len);
- 
- 	return ret;
- }
-@@ -65,12 +107,42 @@ static int m25p80_write_reg(struct spi_nor *nor, u8 opcode, u8 *buf, int len)
- {
- 	struct m25p *flash = nor->priv;
- 	struct spi_device *spi = flash->spi;
-+	unsigned code_nbits, data_nbits, num_xfers = 1;
-+	struct spi_transfer xfers[2];
-+	int ret;
-+
-+	/* Check the total length of command op code and data. */
-+	if (buf && (len + 1 > MAX_CMD_SIZE))
-+		return -EINVAL;
-+
-+	/* Get transfer protocols (addr_nbits is not relevant here). */
-+	ret = m25p80_proto2nbits(nor->reg_proto,
-+				 &code_nbits, NULL, &data_nbits);
-+	if (ret < 0)
-+		return ret;
-+
-+	/* Set up transfer(s). */
-+	memset(xfers, 0, sizeof(xfers));
- 
- 	flash->command[0] = opcode;
--	if (buf)
-+	xfers[0].len = 1;
-+	xfers[0].tx_buf = flash->command;
-+	xfers[0].tx_nbits = code_nbits;
-+
-+	if (buf) {
- 		memcpy(&flash->command[1], buf, len);
-+		if (data_nbits == code_nbits) {
-+			xfers[0].len += len;
-+		} else {
-+			xfers[1].len = len;
-+			xfers[1].tx_buf = &flash->command[1];
-+			xfers[1].tx_nbits = data_nbits;
-+			num_xfers++;
-+		}
-+	}
- 
--	return spi_write(spi, flash->command, len + 1);
-+	/* Process command. */
-+	return spi_sync_transfer(spi, xfers, num_xfers);
- }
- 
- static void m25p80_write(struct spi_nor *nor, loff_t to, size_t len,
-@@ -78,43 +150,54 @@ static void m25p80_write(struct spi_nor *nor, loff_t to, size_t len,
- {
- 	struct m25p *flash = nor->priv;
- 	struct spi_device *spi = flash->spi;
--	struct spi_transfer t[2] = {};
-+	unsigned code_nbits, addr_nbits, data_nbits, num_xfers = 1;
-+	struct spi_transfer xfers[3];
- 	struct spi_message m;
--	int cmd_sz = m25p_cmdsz(nor);
--
--	spi_message_init(&m);
-+	int ret, cmd_sz = m25p_cmdsz(nor);
- 
- 	if (nor->program_opcode == SPINOR_OP_AAI_WP && nor->sst_write_second)
- 		cmd_sz = 1;
- 
--	flash->command[0] = nor->program_opcode;
--	m25p_addr2cmd(nor, to, flash->command);
-+	/* Get transfer protocols. */
-+	ret = m25p80_proto2nbits(nor->write_proto,
-+				 &code_nbits, &addr_nbits, &data_nbits);
-+	if (ret < 0) {
-+		*retlen = 0;
-+		return;
-+	}
- 
--	t[0].tx_buf = flash->command;
--	t[0].len = cmd_sz;
--	spi_message_add_tail(&t[0], &m);
-+	/* Set up transfers. */
-+	memset(xfers, 0, sizeof(xfers));
-+
-+	flash->command[0] = nor->program_opcode;
-+	xfers[0].len = 1;
-+	xfers[0].tx_buf = flash->command;
-+	xfers[0].tx_nbits = code_nbits;
-+
-+	if (cmd_sz > 1) {
-+		m25p_addr2cmd(nor, to, flash->command);
-+		if (addr_nbits == code_nbits) {
-+			xfers[0].len += nor->addr_width;
-+		} else {
-+			xfers[1].len = nor->addr_width;
-+			xfers[1].tx_buf = &flash->command[1];
-+			xfers[1].tx_nbits = addr_nbits;
-+			num_xfers++;
-+		}
-+	}
- 
--	t[1].tx_buf = buf;
--	t[1].len = len;
--	spi_message_add_tail(&t[1], &m);
-+	xfers[num_xfers].len = len;
-+	xfers[num_xfers].tx_buf = buf;
-+	xfers[num_xfers].tx_nbits = data_nbits;
-+	num_xfers++;
- 
-+	/* Process command. */
-+	spi_message_init_with_transfers(&m, xfers, num_xfers);
- 	spi_sync(spi, &m);
- 
- 	*retlen += m.actual_length - cmd_sz;
- }
- 
--static inline unsigned int m25p80_rx_nbits(struct spi_nor *nor)
--{
--	switch (nor->flash_read) {
--	case SPI_NOR_DUAL:
--		return 2;
--	case SPI_NOR_QUAD:
--		return 4;
--	default:
--		return 0;
--	}
--}
--
- /*
-  * Read an address range from the nor chip.  The address range
-  * may be any size provided it is within the physical boundaries.
-@@ -124,28 +207,55 @@ static int m25p80_read(struct spi_nor *nor, loff_t from, size_t len,
- {
- 	struct m25p *flash = nor->priv;
- 	struct spi_device *spi = flash->spi;
--	struct spi_transfer t[2];
--	struct spi_message m;
-+	unsigned code_nbits, addr_nbits, data_nbits, num_xfers = 1;
- 	unsigned int dummy = nor->read_dummy;
-+	struct spi_transfer xfers[3];
-+	struct spi_message m;
-+	int ret;
-+
-+	/* Get transfer protocols. */
-+	ret = m25p80_proto2nbits(nor->read_proto,
-+				 &code_nbits, &addr_nbits, &data_nbits);
-+	if (ret < 0) {
-+		*retlen = 0;
-+		return ret;
-+	}
- 
- 	/* convert the dummy cycles to the number of bytes */
--	dummy /= 8;
-+	dummy = (dummy * addr_nbits) / 8;
- 
--	spi_message_init(&m);
--	memset(t, 0, (sizeof t));
-+	/* Set up transfers. */
-+	memset(xfers, 0, sizeof(xfers));
- 
- 	flash->command[0] = nor->read_opcode;
--	m25p_addr2cmd(nor, from, flash->command);
-+	xfers[0].len = 1;
-+	xfers[0].tx_buf = flash->command;
-+	xfers[0].tx_nbits = code_nbits;
- 
--	t[0].tx_buf = flash->command;
--	t[0].len = m25p_cmdsz(nor) + dummy;
--	spi_message_add_tail(&t[0], &m);
-+	m25p_addr2cmd(nor, from, flash->command);
-+	/*
-+	 * Clear all dummy/mode cycle bits to avoid sending some manufacturer
-+	 * specific pattern, which might make the memory enter its Continuous
-+	 * Read mode by mistake.
-+	 */
-+	memset(flash->command + 1 + nor->addr_width, 0, dummy);
-+
-+	if (addr_nbits == code_nbits) {
-+		xfers[0].len += nor->addr_width + dummy;
-+	} else {
-+		xfers[1].len = nor->addr_width + dummy;
-+		xfers[1].tx_buf = &flash->command[1];
-+		xfers[1].tx_nbits = addr_nbits;
-+		num_xfers++;
-+	}
- 
--	t[1].rx_buf = buf;
--	t[1].rx_nbits = m25p80_rx_nbits(nor);
--	t[1].len = len;
--	spi_message_add_tail(&t[1], &m);
-+	xfers[num_xfers].len = len;
-+	xfers[num_xfers].rx_buf = buf;
-+	xfers[num_xfers].rx_nbits = data_nbits;
-+	num_xfers++;
- 
-+	/* Process command. */
-+	spi_message_init_with_transfers(&m, xfers, num_xfers);
- 	spi_sync(spi, &m);
- 
- 	*retlen = m.actual_length - m25p_cmdsz(nor) - dummy;
--- 
-1.8.2.2
+One at 0x bf353edc, the other at 0x bf353ee0.
+
+bf353edc T __stubs_start
+bf353edc T _etext
+bf353ee0 t __stubs_start
+bf353ee4 t vector_rst
+bf353f00 t vector_irq
+bf353f80 t vector_dabt
+bf354000 t vector_pabt
+bf354080 t vector_und
+bf354100 t vector_addrexcptn
+bf354120 T vector_fiq
+bf3541a0 T __stubs_end
+bf3541a0 T __vectors_start
+bf3541c0 t __mmap_switched
+bf3541c0 T __vectors_end
+
+
+So, when you get to early_trap_init(), it grabs the first __stubs_start for the memcpy:
+
+	memcpy((void *)vectors + 0x1000, __stubs_start, __stubs_end - __stubs_start);
+
+
+And when a printed out the destination, I get:
+
+   Stubs at c09ff000 :00000000 BF006F20 EF9F0000 EA000064 etc...
+
+Notice the first entry is 0....that's not right...and we know it's using that first __stubs_start symbol.
+
+
+So, I hacked the code and put an offset of 4 like this:
+
+	memcpy((void *)vectors + 0x1000, __stubs_start+4, __stubs_end - (__stubs_start+4));
+
+
+And sure enough it booted fine.
+
+
+So, why are there 2 __stubs_start symbols???
+I haven't figured that one out yet.
+
+And, I'm assuming you guys don't have 2 __stubs_start symbols either, correct?
+
+
+Chris
