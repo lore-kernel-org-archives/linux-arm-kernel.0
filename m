@@ -1,47 +1,72 @@
 From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Wed, 3 Feb 2016 14:26:55 +0100
-Subject: [PATCH v3 10/14] mtd: spi-nor: configure the number of dummy clock
- cycles on Macronix memories
+Date: Wed, 3 Feb 2016 14:26:56 +0100
+Subject: [PATCH v3 11/14] mtd: spi-nor: configure the number of dummy clock
+ cycles on Spansion memories
 In-Reply-To: <cover.1454505161.git.cyrille.pitchen@atmel.com>
 References: <cover.1454505161.git.cyrille.pitchen@atmel.com>
-Message-ID: <fe3d12a04383048a54dd2ffe927f854142fa8db7.1454505161.git.cyrille.pitchen@atmel.com>
+Message-ID: <90dbc93adb34c4bbb7d6ea752f9f7a00219944d6.1454505161.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The spi-nor framework currently expects all Fast Read operations to use 8
-dummy clock cycles. Especially some drivers like m25p80 can only support
-multiple of 8 dummy clock cycles.
+On Spansion memories, the number of dummy clock cycles to be used during
+Fast Read commands is configured through the 2bit latency code (LC). These
+bits are non-volatile inside the Configuration Register.
 
-On Macronix memories, the number of dummy clock cycles to be used by Fast
-Read commands can be safely set to 8 by updating the DC0 and DC1 volatile
-bits inside the Configuration Register.
+To avoid breaking the configuration expected at reset by some bootloaders,
+we'd rather read the latency code and set the nor->read_dummy value
+accordingly than update those non-volatile bits.
 
-According to the mx66l1g45g datasheet from Macronix, using 8 dummy clock
-cycles should be enough to set the SPI bus clock frequency up to:
-- 133 MHz for Fast Read 1-1-1, 1-1-2, 1-1-4 and 1-2-2 commands in Single
-  Transfer Rate (STR)
-- 104 MHz for Fast Read 1-4-4 (or 4-4-4 in QPI mode) commands (STR)
+Since the Quad Enable non-volatile bit can be read at the same time from
+the Control Register, we now check its value to avoid some calls of the
+spansion_quad_enable() function when they are not needed.
 
 Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
 ---
- drivers/mtd/spi-nor/spi-nor.c | 155 +++++++++++++++++++++++++++++++++++++++---
- include/linux/mtd/spi-nor.h   |   3 +
- 2 files changed, 150 insertions(+), 8 deletions(-)
+ drivers/mtd/spi-nor/spi-nor.c | 159 ++++++++++++++++++++++++++++++++++++------
+ 1 file changed, 137 insertions(+), 22 deletions(-)
 
 diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
-index 2b1a26588ae6..c560fbbb8479 100644
+index c560fbbb8479..356db141dcb2 100644
 --- a/drivers/mtd/spi-nor/spi-nor.c
 +++ b/drivers/mtd/spi-nor/spi-nor.c
-@@ -1163,6 +1163,136 @@ static int winbond_quad_enable(struct spi_nor *nor)
- 	return 0;
+@@ -1668,47 +1668,162 @@ static int micron_set_single_mode(struct spi_nor *nor)
+ 	return micron_set_dummy_cycles(nor, read_dummy);
  }
  
-+static int macronix_dummy2code(u8 read_opcode, u8 read_dummy, u8 *dc)
+-static int spansion_set_quad_mode(struct spi_nor *nor)
++static inline int spansion_get_config(struct spi_nor *nor,
++				      bool *quad_enabled,
++				      u8 *latency_code)
+ {
+-	int status;
++	int cr;
+ 
+-	status = spansion_quad_enable(nor);
+-	if (status) {
+-		dev_err(nor->dev, "Spansion quad-read not enabled\n");
++	cr = read_cr(nor);
++	if (cr < 0) {
++		dev_err(nor->dev,
++			"error while reading the configuration register\n");
++		return cr;
++	}
++
++	if (quad_enabled)
++		*quad_enabled = !!(cr & CR_QUAD_EN_SPAN);
++
++	if (latency_code)
++		*latency_code = (u8)((cr & GENMASK(7, 6)) >> 6);
++
++	return 0;
++}
++
++static int spansion_set_dummy_cycles(struct spi_nor *nor, u8 latency_code)
 +{
-+	switch (read_opcode) {
++	/* SDR dummy cycles */
++	switch (nor->read_opcode) {
 +	case SPINOR_OP_READ:
 +	case SPINOR_OP_READ4:
-+		*dc = 0;
++		nor->read_dummy = 0;
 +		break;
 +
 +	case SPINOR_OP_READ_FAST:
@@ -50,206 +75,144 @@ index 2b1a26588ae6..c560fbbb8479 100644
 +	case SPINOR_OP_READ4_FAST:
 +	case SPINOR_OP_READ4_1_1_2:
 +	case SPINOR_OP_READ4_1_1_4:
-+		switch (read_dummy) {
-+		case 6:
-+			*dc = 1;
-+			break;
-+		case 8:
-+			*dc = 0;
-+			break;
-+		case 10:
-+			*dc = 3;
-+			break;
-+		default:
-+			return -EINVAL;
-+		}
++		nor->read_dummy = (latency_code == 3) ? 0 : 8;
 +		break;
 +
 +	case SPINOR_OP_READ_1_2_2:
 +	case SPINOR_OP_READ4_1_2_2:
-+		switch (read_dummy) {
-+		case 4:
-+			*dc = 0;
-+			break;
-+		case 6:
-+			*dc = 1;
-+			break;
-+		case 8:
-+			*dc = 2;
-+			break;
-+		case 10:
-+			*dc = 3;
++		switch (latency_code) {
 +		default:
-+			return -EINVAL;
++		case 0:
++		case 3:
++			nor->read_dummy = 4;
++			break;
++		case 1:
++			nor->read_dummy = 5;
++			break;
++		case 2:
++			nor->read_dummy = 6;
++			break;
 +		}
 +		break;
++
 +
 +	case SPINOR_OP_READ_1_4_4:
 +	case SPINOR_OP_READ4_1_4_4:
-+		switch (read_dummy) {
-+		case 4:
-+			*dc = 1;
-+			break;
-+		case 6:
-+			*dc = 0;
-+			break;
-+		case 8:
-+			*dc = 2;
-+			break;
-+		case 10:
-+			*dc = 3;
++		switch (latency_code) {
 +		default:
-+			return -EINVAL;
++		case 0:
++		case 1:
++			nor->read_dummy = 4;
++			break;
++		case 2:
++			nor->read_dummy = 5;
++			break;
++		case 3:
++			nor->read_dummy = 1;
++			break;
 +		}
-+		break;
 +
 +	default:
-+		return -EINVAL;
-+	}
+ 		return -EINVAL;
+ 	}
 +
 +	return 0;
 +}
 +
-+static int macronix_set_dummy_cycles(struct spi_nor *nor, u8 read_dummy)
++static int spansion_set_quad_mode(struct spi_nor *nor)
 +{
-+	int ret, sr, mask, val;
-+	u16 sr_cr;
-+	u8 dc, cr;
++	bool quad_enabled;
++	u8 latency_code;
++	int ret;
 +
-+	/* Convert the number of dummy cycles into Macronix DC volatile bits */
-+	ret = macronix_dummy2code(nor->read_opcode, read_dummy, &dc);
++	/*
++	 * The QUAD bit of Configuration Register must be set (CR Bit1=1) for
++	 * using any Quad SPI command.
++	 */
++	ret = spansion_get_config(nor, &quad_enabled, &latency_code);
 +	if (ret)
 +		return ret;
 +
-+	mask = GENMASK(7, 6);
-+	val = (dc << 6) & mask;
-+
-+	ret = nor->read_reg(nor, SPINOR_OP_RDCR_MX, &cr, 1);
-+	if (ret < 0) {
-+		dev_err(nor->dev, "error while reading the config register\n");
-+		return ret;
++	/* The Quad mode should be enabled ... */
++	if (!quad_enabled) {
++		/* ... if not try to enable it. */
++		dev_warn(nor->dev, "Spansion Quad mode disabled, enable it\n");
++		ret = spansion_quad_enable(nor);
++		if (ret)
++			return ret;
 +	}
 +
-+	if ((cr & mask) == val) {
-+		nor->read_dummy = read_dummy;
-+		return 0;
-+	}
-+
-+	sr = read_sr(nor);
-+	if (sr < 0) {
-+		dev_err(nor->dev, "error while reading the status register\n");
-+		return sr;
-+	}
-+
-+	cr = (cr & ~mask) | val;
-+	sr_cr = (sr & 0xff) | ((cr & 0xff) << 8);
-+	write_enable(nor);
-+	ret = write_sr_cr(nor, sr_cr);
-+	if (ret) {
-+		dev_err(nor->dev,
-+			"error while writing the SR and CR registers\n");
-+		return ret;
-+	}
-+
-+	ret = spi_nor_wait_till_ready(nor);
-+	if (ret)
-+		return ret;
-+
-+	ret = nor->read_reg(nor, SPINOR_OP_RDCR_MX, &cr, 1);
-+	if (ret < 0 || (cr & mask) != val) {
-+		dev_err(nor->dev, "Macronix Dummy Cycle bits not updated\n");
-+		return -EINVAL;
-+	}
-+
-+	/* Save the number of dummy cycles to use with Fast Read commands */
-+	nor->read_dummy = read_dummy;
-+	return 0;
-+}
-+
- static int macronix_set_quad_mode(struct spi_nor *nor)
- {
- 	int status;
-@@ -1180,8 +1310,7 @@ static int macronix_set_quad_mode(struct spi_nor *nor)
- 		 * read (performance enhance) mode by mistake!
- 		 */
- 		nor->read_opcode = SPINOR_OP_READ_1_4_4;
--		nor->read_dummy = 8;
--		return 0;
-+		return macronix_set_dummy_cycles(nor, 8);
- 	}
- 
- 	/*
-@@ -1194,6 +1323,9 @@ static int macronix_set_quad_mode(struct spi_nor *nor)
- 	 * entering the continuous read mode by mistake if some
- 	 * performance enhance toggling bits P0-P7 were written during
- 	 * dummy/mode cycles.
-+	 *
-+	 * Use the Fast Read Quad Output 1-1-4 (0x6b) command with 8 dummy
-+	 * cycles (up to 133MHz for STR and 66MHz for DTR).
- 	 */
- 	status = macronix_quad_enable(nor);
- 	if (status) {
-@@ -1202,8 +1334,7 @@ static int macronix_set_quad_mode(struct spi_nor *nor)
- 	}
++	/*
++	 * Don't use the Fast Read Quad I/O (0xeb / 0xec) commands as their
++	 * number of dummy cycles can not be set to a multiple of 8: some SPI
++	 * controllers, especially those relying on the m25p80 driver, expect
++	 * the number of dummy cycles to be a multiple of 8.
++	 * Also when using a Fast Read Quad I/O command, the memory checks the
++	 * value of the first mode/dummy cycles to decice whether it enters or
++	 * leaves the Countinuous Read mode. We should never enter the
++	 * Countinuous Read mode as the spi-nor framework doesn't support it.
++	 * For all these reason, we'd rather use the Fast Read Quad Output
++	 * 1-1-4 (0x6b / 0x6c) commands instead.
++	 */
  	nor->read_proto = SNOR_PROTO_1_1_4;
  	nor->read_opcode = SPINOR_OP_READ_1_1_4;
 -	nor->read_dummy = 8;
 -	return 0;
-+	return macronix_set_dummy_cycles(nor, 8);
++	return spansion_set_dummy_cycles(nor, latency_code);
  }
  
- /*
-@@ -1214,16 +1345,25 @@ static int macronix_set_quad_mode(struct spi_nor *nor)
- 
- static int macronix_set_dual_mode(struct spi_nor *nor)
+ static int spansion_set_dual_mode(struct spi_nor *nor)
  {
++	u8 latency_code;
++	int ret;
++
++	/* We don't care about the quad mode status */
++	ret = spansion_get_config(nor, NULL, &latency_code);
++	if (ret)
++		return ret;
++
 +	/*
-+	 * Use the Fast Read Dual Output 1-1-2 (0x3b) command with 8 dummy
-+	 * cycles (up to 133MHz for STR and 66MHz for DTR).
++	 * Don't use the Fast Read Dual I/O (0xbb / 0xbc) commands as their
++	 * number of dummy cycles can not bet set to a multiple of 8: some SPI
++	 * controllers, especially those relying on the m25p80 driver, expect
++	 * the number of dummy cycles to be a multiple of 8.
++	 * For this reason, w'd rather use the Fast Read Dual Output 1-1-2
++	 * (0x3b / 0x3c) commands instead.
 +	 */
  	nor->read_proto = SNOR_PROTO_1_1_2;
  	nor->read_opcode = SPINOR_OP_READ_1_1_2;
 -	nor->read_dummy = 8;
 -	return 0;
-+	return macronix_set_dummy_cycles(nor, 8);
++	return spansion_set_dummy_cycles(nor, latency_code);
  }
  
- static int macronix_set_single_mode(struct spi_nor *nor)
+ static int spansion_set_single_mode(struct spi_nor *nor)
  {
- 	u8 read_dummy;
+-	u8 read_dummy;
+-
+-	switch (nor->read_opcode) {
+-	case SPINOR_OP_READ:
+-	case SPINOR_OP_READ4:
+-		read_dummy = 0;
+-		break;
++	u8 latency_code;
++	int ret;
  
-+	/*
-+	 * Configure 8 dummy cycles for Fast Read 1-1-1 (0x0b) command (up to
-+	 * 133MHz for STR and 66MHz for DTR). The Read 1-1-1 (0x03) command
-+	 * expects no dummy cycle.
-+	 * read_opcode should not be overridden here!
-+	 */
- 	switch (nor->read_opcode) {
- 	case SPINOR_OP_READ:
- 	case SPINOR_OP_READ4:
-@@ -1236,8 +1376,7 @@ static int macronix_set_single_mode(struct spi_nor *nor)
- 	}
+-	default:
+-		read_dummy = 8;
+-		break;
+-	}
++	/* We don't care about the quad mode status */
++	ret = spansion_get_config(nor, NULL, &latency_code);
++	if (ret)
++		return ret;
  
  	nor->read_proto = SNOR_PROTO_1_1_1;
 -	nor->read_dummy = read_dummy;
 -	return 0;
-+	return macronix_set_dummy_cycles(nor, read_dummy);
++	return spansion_set_dummy_cycles(nor, latency_code);
  }
  
- static int winbond_set_quad_mode(struct spi_nor *nor)
-diff --git a/include/linux/mtd/spi-nor.h b/include/linux/mtd/spi-nor.h
-index 2dc0f8b429ca..8e0f43cecaca 100644
---- a/include/linux/mtd/spi-nor.h
-+++ b/include/linux/mtd/spi-nor.h
-@@ -75,6 +75,9 @@
- #define SPINOR_OP_EN4B		0xb7	/* Enter 4-byte mode */
- #define SPINOR_OP_EX4B		0xe9	/* Exit 4-byte mode */
- 
-+/* Used for Macronix flashes only. */
-+#define SPINOR_OP_RDCR_MX	0x15	/* Read configuration register */
-+
- /* Used for Winbond flashes only. */
- #define SPINOR_OP_RDSR2_WINB	0x35	/* Read status register 2 */
- #define SPINOR_OP_WRSR2_WINB	0x31	/* Write status register 2 */
+ static int set_quad_mode(struct spi_nor *nor, const struct flash_info *info)
 -- 
 1.8.2.2
