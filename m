@@ -1,122 +1,65 @@
-From: jamesjj.liao@mediatek.com (James Liao)
-Date: Wed, 3 Feb 2016 13:22:48 +0800
-Subject: [PATCH v4 1/4] soc: mediatek: Refine scpsys to support multiple
- platform
-In-Reply-To: <56B0889A.1010305@gmail.com>
-References: <1453270097-53853-1-git-send-email-jamesjj.liao@mediatek.com>
- <1453270097-53853-2-git-send-email-jamesjj.liao@mediatek.com>
- <56ADF556.6070402@gmail.com> <1454396212.2847.15.camel@mtksdaap41>
- <56B0889A.1010305@gmail.com>
-Message-ID: <1454476968.2847.59.camel@mtksdaap41>
+From: menghui.lin@mediatek.com (menghui lin)
+Date: Wed, 3 Feb 2016 13:39:02 +0800
+Subject: [PATCH V4 2/2] regulator: mt6323: Add support for MT6323 regulator
+In-Reply-To: <20160202193839.GX4455@sirena.org.uk>
+References: <1453896059-44589-1-git-send-email-blogic@openwrt.org>
+ <1453896059-44589-2-git-send-email-blogic@openwrt.org>
+ <20160127144105.GQ6042@sirena.org.uk> <56AA5A5C.9080402@openwrt.org>
+ <20160128231306.GD4130@sirena.org.uk>
+ <1454061134.10861.14.camel@mtksdaap41>
+ <20160129112717.GP4130@sirena.org.uk>
+ <1454069479.10861.30.camel@mtksdaap41>
+ <20160202193839.GX4455@sirena.org.uk>
+Message-ID: <1454477942.31375.32.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matthias,
-
-On Tue, 2016-02-02 at 11:44 +0100, Matthias Brugger wrote:
-> On 02/02/16 07:56, James Liao wrote:
-> > On Sun, 2016-01-31 at 12:51 +0100, Matthias Brugger wrote:
-> >> >On 20/01/16 07:08, James Liao wrote:
-> >>> > >Refine scpsys driver common code to support multiple SoC / platform.
-> >>> > >
-> >>> > >Signed-off-by: James Liao<jamesjj.liao@mediatek.com>
-> >>> > >---
-> >>> > >   drivers/soc/mediatek/mtk-scpsys.c | 418 ++++++++++++++++++++------------------
-> >>> > >   drivers/soc/mediatek/mtk-scpsys.h |  55 +++++
-> >>> > >   2 files changed, 270 insertions(+), 203 deletions(-)
-> >>> > >   create mode 100644 drivers/soc/mediatek/mtk-scpsys.h
-> >> >
-> >> >In general this approach looks fine to me, comments below.
-> >> >
-> >>> > >
-> >>> > >diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
-> >>> > >index 0221387..339adfc 100644
-> >>> > >--- a/drivers/soc/mediatek/mtk-scpsys.c
-> >>> > >+++ b/drivers/soc/mediatek/mtk-scpsys.c
-> >>> > >@@ -11,29 +11,17 @@
-> >>> > >    * GNU General Public License for more details.
-> >>> > >    */
-> >>> > >   #include <linux/clk.h>
-> >>> > >-#include <linux/delay.h>
-> >>> > >+#include <linux/init.h>
-> >>> > >   #include <linux/io.h>
-> >>> > >-#include <linux/kernel.h>
-> >>> > >   #include <linux/mfd/syscon.h>
-> >> >
-> >> >When at it, do we need this include?
-> > syscon_regmap_lookup_by_phandle() is declared in this head file.
-> >
-> >>> > >-#include <linux/init.h>
-> >>> > >   #include <linux/of_device.h>
-> >>> > >   #include <linux/platform_device.h>
-> >>> > >   #include <linux/pm_domain.h>
-> >>> > >-#include <linux/regmap.h>
-> >>> > >-#include <linux/soc/mediatek/infracfg.h>
-> >>> > >   #include <linux/regulator/consumer.h>
-> >>> > >-#include <dt-bindings/power/mt8173-power.h>
-> >>> > >+#include <linux/soc/mediatek/infracfg.h>
-> >>> > >+
-> >>> > >+#include "mtk-scpsys.h"
-> >>> > >
-> >>> > >-#define SPM_VDE_PWR_CON			0x0210
-> >>> > >-#define SPM_MFG_PWR_CON			0x0214
-> >>> > >-#define SPM_VEN_PWR_CON			0x0230
-> >>> > >-#define SPM_ISP_PWR_CON			0x0238
-> >>> > >-#define SPM_DIS_PWR_CON			0x023c
-> >>> > >-#define SPM_VEN2_PWR_CON		0x0298
-> >>> > >-#define SPM_AUDIO_PWR_CON		0x029c
-> >>> > >-#define SPM_MFG_2D_PWR_CON		0x02c0
-> >>> > >-#define SPM_MFG_ASYNC_PWR_CON		0x02c4
-> >>> > >-#define SPM_USB_PWR_CON			0x02cc
-> >> >
-> >> >I would prefer to keep this defines and declare SoC specific ones where
-> >> >necessary. It makes the code more readable.
-> > Some register address may be reused by other modules among SoCs, so it's
-> > not easy to maintain the defines when we implement multiple SoC drivers
-> > in the same file. For example, offset 0x0298 is VEN2_PWR_CON on MT8173,
-> > but it is MJC_PWR_CON on other chips.
-> >
+On Tue, 2016-02-02 at 19:38 +0000, Mark Brown wrote:
+> On Fri, Jan 29, 2016 at 08:11:19PM +0800, menghui lin wrote:
+> > On Fri, 2016-01-29 at 12:27 +0100, Mark Brown wrote:
 > 
-> So that sounds as if 0x0298 offset is MT8173 specific.
-> I checked [VDE, MFG, VEN, IFR, ISP, DIS, DPY]_PWR_CON on mt8173, mt8135 
-> and mt6589 and they all have the same offset. So it doesn't seem as if 
-> the offset randomly changes for every SoC.
+> > > None of this is answering my question - I know what the current API is,
+> > > describing it doesn't tell me about actual users or how they are able to
+> > > sensibly use the interface.  Bear in mind that the definitions of the
+> > > various modes are all relative and what one device thinks is high usage
+> > > may be low usage for another device.
 > 
-> > Furthermore, these register offsets are only used in scp_domain_data[],
-> > and each element has its own power domain name. So I think it's enough
-> > to know which power domain are using these registers and status bits.
-> >
+> > Assuming valid_modes_mask and initial_mode are specified, a possible
+> > way to modify regulator_set_mode() is to allow mode change only if the
+> > regulator is controlled exclusively by a certain consumer or the
+> > requested mode provides stronger power capability than current mode.
+> > Here I assume that power capability fast > normal > idle > standby.
 > 
-> Yes that's true, but it will make it easier for another person to 
-> understand the driver, especially if he want's to implement the driver 
-> for a new SoC.
+> How does the driver know if it needs to change the mode (ie, how can it
+> tell if the current mode is inadequate) and surely if we can only change
+> in one direction this isn't terribly useful?
 
-There are two kinds of conflicts may happen:
+Hi Mark,
 
-1. Different modules use the same register address.
-2. Different register addresses are used by the same module (on
-different IC).
+I think the datasheet of buck/ldo could provide information about power
+capability of each mode. The driver should adjust regulator mode per its
+device's power requirement.
 
-Type 1. for example:
+Below are some actual scenarios we have now. I provide them for your
+reference. If unfortunately below cases are not the actual users you
+ask, please kindly let me know more about your suggestion.
+Thank you. :)
 
-	#define SPM_BDP_PWR_CON			0x029c /* 2701 */
-	#define SPM_AUDIO_PWR_CON		0x029c /* 8173 */
+case 1:
 
-We can resolve this conflict easily, such as define these two register
-name to the same register address.
+We have a USB typeC micro-controller, which has two modes - standby and
+normal. It requires 1.8V and 3.3V to operate (both powers are always
+on). The device stays in standby mode when there is no cable in. When
+cable in, we got an interrupt and change device into normal mode.
 
-Type 2. for example:
+The standby mode power consumption is quite small, so we would like the
+change mode of regulator into STANDBY to save more power. And we change
+into NORMAL when we receive cable-in interrupt.
 
-	#define SPM_VDE_PWR_CON			0x0300 /* 6755 */
-	#define SPM_VDE_PWR_CON			0x0210 /* 8173 */
+case 2:
 
-We can not reuse the register defines in this case. We may need to name
-the registers with its IC name, such as MT8173_SPM_VDE_PWR_CON and
-MT6755_VDE_PWR_CON. But it will increase the maintain effort. That's why
-I prefer to remove register defines if we implement multiple SoC's
-scpsys in a single file.
-
-
-Best regards,
-
-James
+About buck regulator for CPU, it usually provides PWM mode, PWM/PFM Auto
+mode, PFM mode. I think it could map to FAST, NORMAL, IDLE mode
+respectively. Most of time we would use just normal mode. However, we
+would change regulator into PWM mode time to time to test buck output
+performance on the tested board.
