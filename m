@@ -1,60 +1,80 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 03 Feb 2016 17:36:01 +0100
-Subject: [PATCH 01/10] serial: mvebu-uart: initial support for Armada-3700
- serial port
-In-Reply-To: <5687888.WDl8xbENFR@wuerfel> (Arnd Bergmann's message of "Tue, 02
- Feb 2016 22:07:17 +0100")
-References: <1454436468-4241-1-git-send-email-gregory.clement@free-electrons.com>
- <1454436468-4241-2-git-send-email-gregory.clement@free-electrons.com>
- <5687888.WDl8xbENFR@wuerfel>
-Message-ID: <87mvrh4uq6.fsf@free-electrons.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 3 Feb 2016 08:37:49 -0800
+Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
+ v4.5-rc1
+In-Reply-To: <Pine.LNX.4.44L0.1602031026460.2041-100000@iolanthe.rowland.org>
+References: <20160202234626.GD19432@atomide.com>
+ <Pine.LNX.4.44L0.1602031026460.2041-100000@iolanthe.rowland.org>
+Message-ID: <20160203163749.GI19432@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
- 
- On mar., f?vr. 02 2016, Arnd Bergmann <arnd@arndb.de> wrote:
+* Alan Stern <stern@rowland.harvard.edu> [160203 07:49]:
+> On Tue, 2 Feb 2016, Tony Lindgren wrote:
+> 
+> > * Alan Stern <stern@rowland.harvard.edu> [160202 13:46]:
+> > > On Tue, 2 Feb 2016, Tony Lindgren wrote:
+> > > 
+> > > > > Also, what is autosuspend_delay set to for your device?  And is 
+> > > > > runtime_auto set?
+> > > > 
+> > > > It's 100 at that point, see the commented snippet below from
+> > > > omap_hsmmc_probe():
+> > > > 
+> > > > 	pm_runtime_enable(host->dev);
+> > > > 	pm_runtime_get_sync(host->dev);
+> > > > 	pm_runtime_set_autosuspend_delay(host->dev, MMC_AUTOSUSPEND_DELAY);
+> > > > 	/* NOTE: pm_runtime_dont_use_autosuspend(host->dev) needed here? */
+> > > > 	pm_runtime_use_autosuspend(host->dev);
+> > > > 	...
+> > > > 	/* gets -EPROBE_DEFER */
+> > > > err_irq:
+> > > > 	...
+> > > > 	pm_runtime_put_sync(host->dev);
+> > > 
+> > > You could try changing this to pm_runtime_put_sync_suspend().  But
+> > > putting pm_runtime_dont_use_autosuspend() before the put_sync seems
+> > > like a perfectly reasonable thing to do, especially if you feel you
+> > > should reverse all the changes you made at the start.
+> > 
+> > They both seem to fix the problem.
+> 
+> So you could use either one.  In my opinion, the 
+> pm_runtime_dont_use_autosuspend() solution is a little cleaner.
+> 
+> > > The reinit function gets called too late to do what you want -- namely, 
+> > > put the hardware in a low-power state.
+> > 
+> > Right, the problem is the lack of suspend on the first probe. But
+> > for having autosuspend timeout long enough for the next probe
+> > would mean that we can't reset the PM runtime state in between.
+> 
+> That's one way to look at it.  But in principle you don't need to
+> suspend the device after an unsuccessful probe.  You can just leave it
+> at high power.  If this causes problems for a second probe, it's the 
+> second probe's own fault for assuming the actual state matches the PM 
+> status.
 
-> On Tuesday 02 February 2016 19:07:39 Gregory CLEMENT wrote:
->
->> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
->> index 39721ec4f415..b291f934d51b 100644
->> --- a/drivers/tty/serial/Kconfig
->> +++ b/drivers/tty/serial/Kconfig
->> @@ -1606,6 +1606,28 @@ config SERIAL_STM32_CONSOLE
->>  	depends on SERIAL_STM32=y
->>  	select SERIAL_CORE_CONSOLE
->>  
->> +config SERIAL_MVEBU_UART
->> +	bool "Marvell EBU serial port support"
->
-> Could this be a loadable module?
+Yes. And I can improve the warning for omap_device so the authors
+for new drivers can easily fix the issue.
 
-I don't see any reason to not being able to use it as a module. But I
-didn't test it because currently te serial port is the only way ro
-cimmunicate with the board.
+> > > pm_runtime_put_sync() is supposed to follow the driver's wishes.  It
+> > > invokes the driver's runtime_idle callback if there is one, and the
+> > > callback routine can start a suspend or an autosuspend.  If there is no
+> > > callback, it will use whatever autosuspend setting the driver has set
+> > > up.  If you want to override the autosuspend setting, use
+> > > pm_runtime_put_sync_suspend() instead.
+> > 
+> > Yes.. That works too. I guess the thing to consider is if we should
+> > make pm_runtime_put_sync() always sync along the lines of a patch
+> > I posted earlier today. That could avoid quite a bit of confusion
+> > as already seen in this thread :)
+> 
+> As Rafael pointed out, pm_runtime_put_sync() has well-documented 
+> behavior.  It shouldn't be changed.  I don't see how changing the 
+> behavior would reduce anybody's confusion.  At least, anybody who reads 
+> the documentation carefully.
 
->
->> +config SERIAL_MVEBU_CONSOLE
->> +	bool "Console on Marvell EBU serial port"
->> +	depends on SERIAL_MVEBU_UART
->
-> If yes, this would become 
->
-> 	depends on SERIAL_MVEBU_UART=y
+Right :)
 
-OK, let's try to enable it.
-
-Thanks,
-
-Gregory
-
->
-> 	Arnd
->
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Tony
