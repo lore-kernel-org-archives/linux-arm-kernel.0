@@ -1,49 +1,114 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 3 Feb 2016 21:41:21 +0100
-Subject: [PATCH 0/3] kallsyms: remove special handling for CONFIG_ARM
-In-Reply-To: <CAKv+Gu_50f+yqs20a6j_QyCg3NcSfe5cD00fWXebLXBFhV_eGg@mail.gmail.com>
-References: <1454419174-21290-1-git-send-email-ard.biesheuvel@linaro.org>
- <HKXPR06MB0565A2CFF95AD7C000F43E6A8ADF0@HKXPR06MB0565.apcprd06.prod.outlook.com>
- <CAKv+Gu9VvskQ34w0niS+6AtF9hNcycfYDt_3Kp4T+WK8Vxf_dA@mail.gmail.com>
- <HKXPR06MB05656F902E0E1FBBDBD713DC8AD00@HKXPR06MB0565.apcprd06.prod.outlook.com>
- <CAKv+Gu8ZTHAqviveLMizRKPfeXwb6kcXi4cVQNYVYuPcVMgMeQ@mail.gmail.com>
- <20160203200107.GD10826@n2100.arm.linux.org.uk>
- <CAKv+Gu_MyPvDnnQ0hScqW6XR77h0MD6LxEb_q2Z-mS0AQw3djA@mail.gmail.com>
- <alpine.LFD.2.20.1602031522090.17825@knanqh.ubzr>
- <CAKv+Gu_50f+yqs20a6j_QyCg3NcSfe5cD00fWXebLXBFhV_eGg@mail.gmail.com>
-Message-ID: <CAKv+Gu_p9QaK31h5K0t=ZQ1HYRgbjH3tsZ8hG5fZ=-vJCiKSaA@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 3 Feb 2016 14:47:17 -0600
+Subject: [PATCH v6 1/4] dt-bindings: mailbox: Document Hi6220 mailbox
+ driver
+In-Reply-To: <1454407782-24674-2-git-send-email-leo.yan@linaro.org>
+References: <1454407782-24674-1-git-send-email-leo.yan@linaro.org>
+ <1454407782-24674-2-git-send-email-leo.yan@linaro.org>
+Message-ID: <20160203204717.GA1713@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 February 2016 at 21:30, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 3 February 2016 at 21:23, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
->> On Wed, 3 Feb 2016, Ard Biesheuvel wrote:
->>
->>> On 3 February 2016 at 21:01, Russell King - ARM Linux
->>> <linux@arm.linux.org.uk> wrote:
->>> > On Wed, Feb 03, 2016 at 02:41:29PM +0100, Ard Biesheuvel wrote:
->>> >> > bf353edc T __stubs_start
->>> >>
->>> >> This is a global symbol
->>> >>
->>> >> > bf353edc T _etext
->>> >> > bf353ee0 t __stubs_start
->>> >>
->>> >> This is a local symbol
->>> >
->>> > Stop this madness.  This gets you an immediate NAK on the patch set.
->>> >
->>>
->>> What madness? This does not change at all with my patches, these
->>> duplicates already exist in the current code.
->>
->> That doesn't make it any better, and was cause for issue as Chris
->> demonstrated.  Can we get rid of that duplication please?
->>
->
-> 4/4 in my v2 removes the redundant symbols.
+On Tue, Feb 02, 2016 at 06:09:39PM +0800, Leo Yan wrote:
+> Document DT binding for Hisilicon Hi6220 mailbox driver.
+> 
+> Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> ---
+>  .../bindings/mailbox/hisilicon,hi6220-mailbox.txt  | 74 ++++++++++++++++++++++
+>  1 file changed, 74 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mailbox/hisilicon,hi6220-mailbox.txt
 
-... actually, that only removes the redundant __stub_start, and the
-redundant __vectors_start is already removed in patch #1. Patch #4
-(v2) may be shot down for other reasons, in that case I can simply
-move the removal of __stubs_start to patch #1 instead.
+One nit, otherwise:
+
+Acked-by: Rob Herring <robh@kernel.org>
+
+> 
+> diff --git a/Documentation/devicetree/bindings/mailbox/hisilicon,hi6220-mailbox.txt b/Documentation/devicetree/bindings/mailbox/hisilicon,hi6220-mailbox.txt
+> new file mode 100644
+> index 0000000..8508c8a
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mailbox/hisilicon,hi6220-mailbox.txt
+> @@ -0,0 +1,74 @@
+> +Hisilicon Hi6220 Mailbox Driver
+> +===============================
+> +
+> +Hisilicon Hi6220 mailbox supports up to 32 channels. Each channel
+> +is unidirectional with a maximum message size of 8 words. I/O is
+> +performed using register access (there is no DMA) and the cell
+> +raises an interrupt when messages are received.
+> +
+> +Mailbox Device Node:
+> +====================
+> +
+> +Required properties:
+> +--------------------
+> +- compatible:		Shall be "hisilicon,hi6220-mbox"
+> +- reg:			Contains the mailbox register address range (base
+> +			address and length); the first item is for IPC
+> +			registers, the second item is shared buffer for
+> +			slots.
+> +- #mbox-cells:		Common mailbox binding property to identify the number
+> +			of cells required for the mailbox specifier. Must be 3.
+> +			<&phandle slot_id dst_irq ack_irq>
+> +			  phandle: Label name of mailbox controller
+> +			  slot_id: Slot id used either for TX or RX
+> +			  dst_irq: IRQ identifier index number which used by MCU
+> +			  ack_irq: IRQ identifier index number with generating a
+> +			           TX/RX interrupt to application processor,
+> +				   mailbox driver uses it to acknowledge interrupt
+> +- interrupts:		Contains the interrupt information for the mailbox
+> +			device. The format is dependent on which interrupt
+> +			controller the SoCs use.
+> +
+> +Optional Properties:
+> +--------------------
+> +- hi6220,mbox-tx-noirq: Property of MCU firmware's feature, so mailbox driver
+> +			use this flag to ask MCU to enable "automatic idle
+> +			flag" mode or IRQ generated mode to acknowledge a TX
+> +			completion.
+> +
+> +Example:
+> +--------
+> +
+> +	mailbox: mailbox at F7510000 {
+
+use lowercase for hex
+
+> +		compatible = "hisilicon,hi6220-mbox";
+> +		reg = <0x0 0xF7510000 0x0 0x1000>, /* IPC_S */
+> +		      <0x0 0x06DFF800 0x0 0x0800>; /* Mailbox */
+
+and here too.
+
+> +		interrupt-parent = <&gic>;
+> +		interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
+> +		#mbox-cells = <3>;
+> +	};
+> +
+> +
+> +Mailbox client
+> +===============
+> +
+> +Required properties:
+> +--------------------
+> +- compatible:		Many (See the client docs).
+> +- mboxes:		Standard property to specify a Mailbox (See ./mailbox.txt)
+> +			Cells must match 'mbox-cells' (See Mailbox Device Node above).
+> +
+> +Optional Properties:
+> +--------------------
+> +- mbox-names:		Name given to channels seen in the 'mboxes' property.
+> +
+> +Example:
+> +--------
+> +
+> +	stub_clock: stub_clock {
+> +		compatible = "hisilicon,hi6220-stub-clk";
+> +		hisilicon,hi6220-clk-sram = <&sram>;
+> +		#clock-cells = <1>;
+> +		mbox-names = "mbox-tx", "mbox-rx";
+> +		mboxes = <&mailbox 1 0 11>, <&mailbox 0 1 10>;
+> +	};
+> -- 
+> 1.9.1
+> 
