@@ -1,71 +1,71 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Thu, 4 Feb 2016 02:18:38 +0800
-Subject: [PATCH v10 5/5] Watchdog: ARM SBSA Generic Watchdog half timeout
- panic support
-In-Reply-To: <56B2423B.1020109@codeaurora.org>
-References: <1454519923-25230-1-git-send-email-fu.wei@linaro.org>
- <1454519923-25230-6-git-send-email-fu.wei@linaro.org>
- <56B23883.7000501@codeaurora.org>
- <CADyBb7sxPg-QUjTbeHFtYkctKc_g7D8O=+jqbXN+DCCoCEnFqA@mail.gmail.com>
- <56B23E99.1030604@codeaurora.org>
- <CADyBb7s4opxfPFuX=1-qEE6uhsaMXgofAJPbHUQHrng2AUwqNA@mail.gmail.com>
- <56B2423B.1020109@codeaurora.org>
-Message-ID: <CADyBb7uULCn97ea19zH8dB4QX1QA8=AXL94d6gXgFxXM8haBNA@mail.gmail.com>
+From: slash.tmp@free.fr (Mason)
+Date: Wed, 3 Feb 2016 19:19:12 +0100
+Subject: Plain DFS (no voltage scaling)
+In-Reply-To: <20160203161331.GI3469@vireshk>
+References: <56B11B67.3090600@free.fr> <56B217C9.1050405@free.fr>
+ <20160203161331.GI3469@vireshk>
+Message-ID: <56B244A0.60309@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 February 2016 at 02:08, Timur Tabi <timur@codeaurora.org> wrote:
-> Fu Wei wrote:
+On 03/02/2016 17:13, Viresh Kumar wrote:
+> On 03-02-16, 16:07, Mason wrote:
+>> On 02/02/2016 22:11, Mason wrote:
 >>
->> Actually I am taking your suggestion to avoid touching WCV in
->> interrupt routine.
->> So even we have pre-timeout support , it is useless for this
->> panic-on-half-timeout feature,
->> because pre-timeout  == timeout / 2 (always).
+>>> I plan to enable the on-demand governor on the tango platform:
+>>> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/boot/dts/tango4-smp8758.dtsi
+>>>
+>>> I found the cpufreq-dt binding doc:
+>>>
+>>> https://www.kernel.org/doc/Documentation/devicetree/bindings/cpufreq/cpufreq-dt.txt
+>>> https://www.kernel.org/doc/Documentation/devicetree/bindings/opp/opp.txt
+>>>
+>>> Something is not clear to me:
+>>>
+>>> If my platform cannot scale the voltage, what information
+>>> should I put in the voltage part of the DT?
 >>
->> So maybe I misunderstand your suggestion,
->> could you let me know : why we want pre-timeout here?
->
->
-> Maybe I'm confused.
->
-> For pre-timeout, I think the SBSA watchdog driver should support only
-> half-timeout.  That is, the user cannot configure the length of the
-> pre-timeout with this driver.  He can only enable it, and it is
-> automatically set to 1/2 timeout.
+>> Someone pointed out that tweaking the frequency without tweaking
+>> the voltage might be counter-productive.
+>>
+>> I measured the power consumption of the entire board (at the power outlet)
+>> for 3 CPU frequencies (all other things being equal, I hope).
+>>
+>> idle @ 111 MHz = 4.6 W
+>> idle @ 333 MHz = 4.6 W
+>> idle @ 999 MHz = 4.6 W
+>>
+>> load @ 111 MHz = 5.0 W
+>> load @ 333 MHz = 5.7 W
+>> load @ 999 MHz = 7.7 W
+>>
+>> When idle, the kernel calls WFI, which "turns off" most of the CPU
+>> (clock gating?) such that the actual frequency does not matter.
+>>
+>> At full load (I use cpuburn to jog as many FUs simultaneously as
+>> possible) it looks like each additional MHz requires ~3 mW.
+>>
+>> So it would appear that an on-demand governor might not help to
+>> save power.
+> 
+> Why do you say so ?
 
-Actually,
-the SBSA watchdog driver should support only  half-timeout for panic
-the user cannot configure the length of "panic time",  He can only
-enable it, and it is automatically set to 1/2 timeout.
+Here's my (possibly incorrect) reasoning:
 
-we don't need pre-timeout here.
+If the CPU is idle, kernel calls WFI and frequency apparently
+doesn't matter.
 
-Hope I understand you correctly :-) sorry for your confusion
+If the CPU has work to do, the on-demand governor will bump the
+frequency to the max (I think).
 
->
-> So when pre-timeout occurs, the interrupt handler calls panic() or whatever
-> it's supposed to do.
+I don't think the CPU spends a lot of time in the intermediate
+frequencies (neither max nor min).
 
-Actually,
-So when 1/2 timeout occurs, the interrupt handler calls panic() or
-whatever it's supposed to do.
+But maybe my logic is flawed?
 
->
-> So "pre-timeout  == timeout / 2 (always)" is exactly what we want.
+Also, some users (of our older kernel) reported problems were
+they considered the on-demand governor was "too slow" to ramp
+the frequency up. (But I don't know if they'd played with the
+configuration knobs.)
 
-our patchset is doing this way.
-
-
-
--- 
-Best regards,
-
-Fu Wei
-Software Engineer
-Red Hat Software (Beijing) Co.,Ltd.Shanghai Branch
-Ph: +86 21 61221326(direct)
-Ph: +86 186 2020 4684 (mobile)
-Room 1512, Regus One Corporate Avenue,Level 15,
-One Corporate Avenue,222 Hubin Road,Huangpu District,
-Shanghai,China 200021
+Regards.
