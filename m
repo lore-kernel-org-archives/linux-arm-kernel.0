@@ -1,146 +1,87 @@
-From: majun258@huawei.com (majun (F))
-Date: Wed, 3 Feb 2016 10:31:52 +0800
-Subject: [RFC PATCH] irq/mbigen:Fix the problem of IO remap for duplicated
- physical address in mbigen driver
-In-Reply-To: <20160202114340.GA28839@leverpostej>
-References: <1454327094-7848-1-git-send-email-majun258@huawei.com>
- <20160201115717.GD674@leverpostej> <56AF585E.6050005@huawei.com>
- <20160201132557.GG674@leverpostej> <56B08431.3000200@huawei.com>
- <20160202114340.GA28839@leverpostej>
-Message-ID: <56B16698.6050509@huawei.com>
+From: Wenyou.Yang@atmel.com (Yang, Wenyou)
+Date: Wed, 3 Feb 2016 02:33:11 +0000
+Subject: [PATCH v4 1/2] regulator: act8945a: add regulator driver for
+ ACT8945A
+In-Reply-To: <CABxcv=nJsWEv9KW-5iPpUnyN8ZVpx6CV07gBRaLNWqd644YOqQ@mail.gmail.com>
+References: <1453863463-30515-1-git-send-email-wenyou.yang@atmel.com>
+ <1453863463-30515-2-git-send-email-wenyou.yang@atmel.com>
+ <20160129001603.GM4130@sirena.org.uk>
+ <B256D81BAE5131468A838E5D7A243641D63FBF8B@penmbx01>
+ <20160129113518.GQ4130@sirena.org.uk>
+ <CABxcv=kNKmgRytxB5ppawrAvC-GDRhV4T_UUGvpHgKp9+BsUmQ@mail.gmail.com>
+ <B256D81BAE5131468A838E5D7A243641D63FE2C7@penmbx01>
+ <CABxcv=nJsWEv9KW-5iPpUnyN8ZVpx6CV07gBRaLNWqd644YOqQ@mail.gmail.com>
+Message-ID: <B256D81BAE5131468A838E5D7A243641D64026CB@penmbx01>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-? 2016/2/2 19:43, Mark Rutland ??:
-> On Tue, Feb 02, 2016 at 06:25:53PM +0800, majun (F) wrote:
->> Hi Mark:
->>
->> ? 2016/2/1 21:25, Mark Rutland ??:
->>> On Mon, Feb 01, 2016 at 09:06:38PM +0800, majun (F) wrote:
->>>>
->>>>
->>>> ? 2016/2/1 19:57, Mark Rutland ??:
->>>>> On Mon, Feb 01, 2016 at 07:44:54PM +0800, MaJun wrote:
->>>>>> From: Ma Jun <majun258@huawei.com>
->>>>>>
->>>>>> For mbigen module, there is a special case that more than one mbigen 
->>>>>> device nodes use the same reg definition in DTS when these devices
->>>>>> exist in the same mbigen hardware module. 
->>>>>>
->>>>>> mbigen_dev1:intc_dev1 {
->>>>>> 	...
->>>>>> 	reg = <0x0 0xc0080000 0x0 0x10000>;
->>>>>> 	...
->>>>>> };
->>>>>>
->>>>>> mbigen_dev2:intc_dev2 {
->>>>>> 	...
->>>>>> 	reg = <0x0 0xc0080000 0x0 0x10000>;
->>>>>> 	...
->>>>>> };
->>>>>
->>>>> This doesn't sound right. If they exist in the same place, and have the
->>>>> same reg, they _are_ the same device.
->>>>>
->>>>> You'll need to explain this better.
->>>>>
->>>>
->>>> For a mbigen hardware module which connecte with several devices,
->>>> because these devices has different device ID,
->>>> I need to define a device node for each device in DTS file.
->>>>
->>>> 	mbigen
->>>> 	|
->>>> ------------------
->>>> | 	| 	|
->>>> dev1 	dev2 	dev3
->>>>
->>>> Because of register layout,the registers related with these devices
->>>> are put together, I can't split them clearly.
->>>> So, I only make these devices which connect with
->>>> same mbigen hardware module usethe same address.
->>>
->>> This sounds like we've either mis-described the mbigen in the binding,
->>> or we're mis-describing the relationship with the devices.
->>>
->>
->> Sorry, I didn't express myself clearly.
->>
->> For example, a mbigen hardware module can support several peripheral devices
->> with different device ID.
->>
->> |-----------------------|-
->> |	mbigen		|
->> |-----------------------|-
->>  |       |        |
->> dev1    dev2     dev3
->>
->> To simplify the mbigen drvier,
->> I didn't use the whole mbigen module as a mbgien device, but use
->> the register collections(vector, trigger type,status etc.) corresponding
->> to a peripheral device as a mbigen device.
->> So, mbigen device is a logical conception or logical device.
+> -----Original Message-----
+> From: Javier Martinez Canillas [mailto:javier at dowhile0.org]
+> Sent: 2016?2?1? 21:15
+> To: Yang, Wenyou <Wenyou.Yang@atmel.com>
+> Cc: Mark Brown <broonie@kernel.org>; Liam Girdwood <lgirdwood@gmail.com>;
+> Rob Herring <robh+dt@kernel.org>; Pawel Moll <pawel.moll@arm.com>; Ian
+> Campbell <ijc+devicetree@hellion.org.uk>; Kumar Gala <galak@codeaurora.org>;
+> Krzysztof Kozlowski <k.kozlowski@samsung.com>; Lee Jones
+> <lee.jones@linaro.org>; Peter Korsgaard <jacmet@gmail.com>; Ferre, Nicolas
+> <Nicolas.FERRE@atmel.com>; linux-arm-kernel at lists.infradead.org; linux-
+> kernel at vger.kernel.org; devicetree at vger.kernel.org
+> Subject: Re: [PATCH v4 1/2] regulator: act8945a: add regulator driver for
+> ACT8945A
 > 
->>From the above, it sounds like the DT representation is not an accurate
-> representation of the hardware. We should describe the _whole_ mbigen,
-> not portions thereof. Trying to describe it piecemeal leads to problems
-> like this one.
+> Hello Wenyou,
 > 
-> I don't understand the rationale for describing the mbigen as separate
-> nodes. Above you mention that we "need to define a device node for each
-> device", but I don't see why that's necessary. Why do you believe we
-> need an mbigen node per client device?
+> [snip]
 > 
-> As far as I can tell, we should be able to map an arbitrary
-> interrupt-specifier to a particular MSI (complete with device id) within
-> the mbigen driver. We just need to define the full set of MSIs the
-> mbigen owns.
+> >> >
+> >> > If then device is not being loaded from the DT (and it shouldn't
+> >> > be, the device looks like it should be instantiated directly by the
+> >> > MFD as it can't exist separately to that MFD) an OF table will do nothing.
+> >>
+> >> Then he should remove the .of_compatible from the MFD cell definition.
+> >
+> > I tried it,
+> >
+> > But if removed this .of_compatible, and reserved the OF table.
 > 
-
-mbigen device is a interrupt controller, it is also a ITS device for ITS module.
-So, we need to register the each mbigen device to ITS with a unique ID.
-Based on the current MSI/ITS driver, I can't register whole mbigen module which
-contains several mbigen devices at one time. Because they have different device ID.
-
-I don't know whether this explanation is clear or not.
-I think Marc can explain this well.
-
-Marc, would you please help me explain this?  or, do you have any opinion about this ?
-
->> Now, a mbigen hardware module contains several logical mbigen device.
->>
->> -------------------------------
->> |mgn_dev1  mgn_dev2  mgn_dev3 |
->> |-----------------------------|
->>    |          |        |
->> dev1	    dev2      dev3
->>
->> So,mgn_dev1, mgn_dev2 and mgn_dev3 exist in same mbigen hardware module,
->> and,they use the same reg address region,that is adress of mbigen hardware module.
->>
->> For this case, I think the question is can we map an reg address
->> region more than one time?
+> What we said is that you should remove both the mfd cell .of_compatible field and
+> the OF table. Of course removing one but leaving the other is not correct.
 > 
-> As above, I think we've mis-described the hardware. Rather than making
-> things simpler, this has resulted in problems like this one.
+> > the &pdev->dev->of_node is NULL, the driver fails to get the
+> > configuration value from DT,
+> >
 > 
-> We should not map a reg region more than once. Even if it's technically
-> possible to do so, I do not believe that would be the right solution
-> here. Implicitly sharing resources (e.g. portions of the mbigen control
-> registers) is inevitably going to lead to more problems later on.
+> I see, you mean that you are not able to lookup the "active-semi,vsel-high"
+> property.
+> 
+> > It seems the OF table still doesn't work. Where is wrong?
+> >
+> 
+> I think the problem is with your DT binding. You have a PMIC dev node with
+> compatible "active-semi,act8945a" that has a child node with compatible "active-
+> semi,act8945a-regulator" which in turn has the "regulators" node.
+> 
+> I believe what Mark says is that there shouldn't be a compatible and node for the
+> regulators IC since is part of the PMIC. IOW, you can't have it as a standalone
+> node in the DTS.
+> 
+> > Could you help give some suggestion?
+> >
+> 
+> I would just remove the "active-semi,act8945a-regulator" node and make "active-
+> semi,vsel-high" a property of the "active-semi,act8945a" node.
+> That way you can remove the mfd cell .of_compatible and OF table in the
+> regulator driver and read the "active-semi,vsel-high" using the platform device's
+> parent of_node.
+> 
+> But it's better if you wait for Mark's opinions before re-spining your patches.
 
-Because we only need to write 1 into corresponding bit of status
-register to clear interrupt status during runtime,I think we don't
-need to worry about this.
-
-Thanks!
-Ma Jun
-
+Hi Mark, what is your opinions?
 
 > 
-> Mark.
-> 
-> .
-> 
+> Best regards,
+> Javier
+
+
+Best Regards,
+Wenyou Yang
