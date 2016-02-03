@@ -1,60 +1,69 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 03 Feb 2016 08:55:22 +0100
-Subject: [PATCH 03/10] arm64: add Armada 3700 architecture entry
-In-Reply-To: <20160203142451.41381ff6@xhacker> (Jisheng Zhang's message of
- "Wed, 3 Feb 2016 14:24:51 +0800")
-References: <1454436468-4241-1-git-send-email-gregory.clement@free-electrons.com>
- <1454436468-4241-4-git-send-email-gregory.clement@free-electrons.com>
- <20160203142451.41381ff6@xhacker>
-Message-ID: <87k2mm5itx.fsf@free-electrons.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 3 Feb 2016 08:56:35 +0100
+Subject: [PATCH 1/3] ARM: move .vectors and .stubs sections back into the
+ kernel VMA
+In-Reply-To: <20160203000351.GX10826@n2100.arm.linux.org.uk>
+References: <1454419174-21290-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1454419174-21290-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20160203000351.GX10826@n2100.arm.linux.org.uk>
+Message-ID: <CAKv+Gu_kYWczCazqgRC3y-n7s3WRTDhJXLO1RM1FE-6h1BhSUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jisheng,
- 
- On mer., f?vr. 03 2016, Jisheng Zhang <jszhang@marvell.com> wrote:
-
-> On Tue, 2 Feb 2016 19:07:41 +0100 Gregory CLEMENT wrote:
+On 3 February 2016 at 01:03, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Feb 02, 2016 at 02:19:32PM +0100, Ard Biesheuvel wrote:
+>> The sections themselves are emitted 4 KB apart, as required:
+>>   ...
+>>   [16] .stubs       PROGBITS   c0c35000 a35000 0002c0 00  AX  0   0 32
+>>   [17] .vectors     PROGBITS   c0c34000 a44000 000020 00  AX  0   0  2
+>>   ...
 >
->> The Armada 3700 is an mvebu ARM64 SoC using one or two Cortex-A53 cores
->> depending of the variant.
->> 
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->> Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->> ---
->>  arch/arm64/Kconfig.platforms | 6 ++++++
->>  1 file changed, 6 insertions(+)
->> 
->> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
->> index 21074f674bde..7da341f7b90d 100644
->> --- a/arch/arm64/Kconfig.platforms
->> +++ b/arch/arm64/Kconfig.platforms
->> @@ -1,5 +1,11 @@
->>  menu "Platform selection"
->>  
->> +config ARCH_ARMADA_3700
+> ... which means we end up wasting most of a page for absolutely no
+> purpose what so ever.  Sorry, I'm really not happy about this
+> gratuitous wastage.
 >
-> Would it be better to use ARCH_MVEBU? IMHO, there will be more ARMv8 SoCs
-> from our EBU, do we plan to add one CONFIG_ARMADA_yyzz for each SoC?
 
-Not for each SoC but for each family, yes. As we did for the other mvebu
-SoC families.
+No, we don't. Here's some more context:
 
-Gregory
+Before:
+  [14] .ARM.unwind_tab   PROGBITS        c0c2ef98 a2ef98 005088 00   A  0   0  4
+  [15] .notes            NOTE            c0c34020 a34020 000024 00  AX  0   0  4
+  [16] .vectors          PROGBITS        00000000 a40000 000020 00  AX  0   0  2
+  [17] .stubs            PROGBITS        00001000 a41000 0002c0 00  AX  0   0 32
+  [18] .init.text        PROGBITS        c0c352e0 a452e0 06b1b8 00  AX  0   0 32
 
+After
+  [14] .ARM.unwind_tab   PROGBITS        c0c2ef98 a2ef98 005088 00   A  0   0  4
+  [15] .notes            NOTE            c0c34020 a34020 000024 00  AX  0   0  4
+  [16] .stubs            PROGBITS        c0c35000 a35000 0002c0 00  AX  0   0 32
+  [17] .vectors          PROGBITS        c0c34000 a44000 000020 00  AX  0   0  2
+  [18] .init.text        PROGBITS        c0c352e0 a452e0 06b1b8 00  AX  0   0 32
+
+As you can see, the LMA footprint has not increased, only .stubs and
+.vectors have been reordered. The apparent rounding after the .notes
+section occurs in both cases, and is due to the fact that __init_begin
+is rounded to page size, and has nothing to do with the VMAs chosen
+for the .stubs and .vectors section.
+
+> We changed to the existing solution to get rid of the VMA offset
+> to make the code easier to read, but if we're going to get rid of
+> that improvement, just revert the change.  (Check the kernel history.)
 >
->> +	bool "Armada 3700 SoC Family"
->> +	help
->> +	  This enables support for Armada 3700 SoC Family. It is is an
->> +	  ARMv8 based chipset belonging to the mvebu family.
->> +
->>  config ARCH_BCM_IPROC
->>  	bool "Broadcom iProc SoC Family"
->>  	help
->
+
+I think that change was an improvement. It makes the code itself more
+readable, but also results in correct references in the object files
+rather than opaque expressions, i.e.,
+
+  c0c34000 <.vectors>:
+  c0c34000:       f001 b800       b.w     c0c35004 <vector_rst>
+  c0c34004:       f001 b8cc       b.w     c0c351a0 <vector_und>
+  c0c34008:       f8df fff4       ldr.w   pc, [pc, #4084] ; c0c35000
+  c0c3400c:       f001 b888       b.w     c0c35120 <vector_pabt>
+  c0c34010:       f001 b846       b.w     c0c350a0 <vector_dabt>
+  c0c34014:       f001 b904       b.w     c0c35220 <vector_addrexcptn>
+  c0c34018:       f001 b802       b.w     c0c35020 <vector_irq>
+  c0c3401c:       f001 b910       b.w     c0c35240 <vector_fiq>
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Ard.
