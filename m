@@ -1,27 +1,48 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Wed, 3 Feb 2016 13:17:15 +0100
-Subject: [PATCH v4] mmc: meson: Add driver for the SD/MMC host found on
- Amlogic MesonX SoCs
-In-Reply-To: <1448988109-32630-1-git-send-email-carlo@caione.org>
-References: <1448988109-32630-1-git-send-email-carlo@caione.org>
-Message-ID: <56B1EFCB.1020508@i2se.com>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Wed, 3 Feb 2016 13:18:18 +0100
+Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
+ v4.5-rc1
+In-Reply-To: <CAPDyKFqSVZffQ7WNZqn9qSRibsCgG2rY26z_97agL+LhQRVGcg@mail.gmail.com>
+References: <20160201232833.GR19432@atomide.com>
+ <Pine.LNX.4.44L0.1602011844540.2869-100000@netrider.rowland.org>
+ <20160202030533.GT19432@atomide.com>
+ <CAPDyKFqQb+jtTpZbq6EvbfAk28yVkgdtiOswngNH_BjCWBDxFg@mail.gmail.com>
+ <CAPDyKFras1o13WBZzaZ_Snnj5TBQQFWKr=PtCjUvwe+yGPQn9w@mail.gmail.com>
+ <20160202163536.GU19432@atomide.com>
+ <CAPDyKFosQjkHDVSvy67+hstjjFseXQP5WYXrJE19GgVFYJ099w@mail.gmail.com>
+ <20160202234145.GC19432@atomide.com>
+ <CAPDyKFqLi8xOUeoxUTAmif5QrOjVpV_2CDLv4hjO_C9iOnv+5Q@mail.gmail.com>
+ <CAPDyKFqSVZffQ7WNZqn9qSRibsCgG2rY26z_97agL+LhQRVGcg@mail.gmail.com>
+Message-ID: <CAJZ5v0iSu9_uNLZstKsC1mHi3A3GRxQc=WPU6Xa7BSiaNChNCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Carlo,
-
-Am 01.12.2015 um 17:41 schrieb Carlo Caione:
-> From: Carlo Caione <carlo@endlessm.com>
+On Wed, Feb 3, 2016 at 11:25 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>>
+>> I don't see the problem, but of course you know omap for better than I do.
+>>
+>> So if you are concerned about this, perhaps adding a dev_dbg print
+>> when the omap hwmod's ->runtime_suspend() callback returns zero could
 >
-> Add a driver for the SD/MMC host found on the Amlogic MesonX SoCs. This
-> is an MMC controller which provides an interface between the application
-> processor and various memory cards. It supports the SD specification
-> v2.0 and the eMMC specification v4.41.
->
-> This patch adds also the binding documentation.
+> /s/runtime_suspend/runtime_resume
 
-according to Documentation/devicetree/bindings/submitting-patches.txt
+OK
 
-the binding should be a separate patch in a series.
+Let me summarize my understanding of this thread so far.
 
-Stefan
+It looks like the omap3 code initializes hardware in ->probe() and
+then it may return -EPROBE_DEFER due to some unmet dependencies.  In
+that case the hardware is not reset to the previous state and the
+runtime PM framework is left in the state that corresponds to the
+current hardware state.  Before we had pm_runtime_reinit(), everything
+worked as expected on the second ->probe() call, because things were
+in sync then.
+
+The introduction of pm_runtime_reinit() changed the situation and now
+effectively the hardware is required to be reset to the initial state
+if -EPROBE_DEFER is to be returned too.
+
+Is that correct?
+
+Thanks,
+Rafael
