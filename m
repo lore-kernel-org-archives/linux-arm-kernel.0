@@ -1,66 +1,60 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 3 Feb 2016 19:59:06 +0000
-Subject: [PATCH 1/2] ARM: make virt_to_idmap() return unsigned long
-In-Reply-To: <56B2201B.7020205@ti.com>
-References: <E1aO8F2-00074N-E8@rmk-PC.arm.linux.org.uk>
- <56A84748.3040108@oracle.com>
- <20160201152015.GU10826@n2100.arm.linux.org.uk>
- <56AF8F54.7030805@ti.com> <56AF917F.9030505@oracle.com>
- <56B14546.4070808@oracle.com> <56B20B2E.7060408@ti.com>
- <56B2201B.7020205@ti.com>
-Message-ID: <20160203195905.GC10826@n2100.arm.linux.org.uk>
+From: Chris.Brandt@renesas.com (Chris Brandt)
+Date: Wed, 3 Feb 2016 20:00:50 +0000
+Subject: [PATCH v2 0/4] kallsyms: remove special handling for CONFIG_ARM
+In-Reply-To: <1454526297-5269-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1454526297-5269-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <HKXPR06MB056557F78EB9F04F271019C68AD00@HKXPR06MB0565.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 03, 2016 at 10:43:23AM -0500, Vitaly Andrianov wrote:
-> >100%. I came up with absolutely similar fix.
-> >
-> >
-> >Regarding, kexec:
-> >- it seems can't be tested on ks2 out of the box, because there is unmet dependency in kconfig
-> >  config KEXEC
-> >         bool "Kexec system call (EXPERIMENTAL)"
-> >-       depends on (!SMP || PM_SLEEP_SMP)
-> >         depends on !CPU_V7M
-> >         select KEXEC_CORE
-> >         help
-> >
-> >- any way, i've hacked kernel as above;
-> >- downloaded and built kexec-tools
-> >git://git.kernel.org/pub/scm/linux/kernel/git/geoff/kexec-tools.git
-> >- tried to run it using different combination of parameters, but always
-> >with below result:
-> ># kexec -l /boot/zImage
-> >kexec version: 15.12.22.16.38-g6503cb3
-> >Could not find a free area of memory of 0x3b2ca0 bytes...
-> >Cannot load /boot/zImage
-> >
-> >I'm doing something wrong, but don't know what yet :(
-> >- these patches were not applied, I'd like to see kexec not working first
-> >
-> >
-> I'm not sure about that particular issue, but when I worked on KS2 kexec I
-> had to patch kexec-tools to support KS2 LPAE memory.
+On 3 Feb 2016, Ard Biesheuvel wrote:
 
-This was specifically for Vitaly to test, as he has patches to work
-around most of the KS2 issues with kexec (although I have a KS2, I
-don't have everything that's necessary to get a working kexec in
-place.)
+> This series applies on top of today's -next, and addresses an issue
+> with the new kallsyms code that is queued there, that enables base
+> relative kallsyms tables for all architectures (except IA-64)
+>
+> Two issues have surfaced on ARM with the new kallsyms code:
+> a) CONFIG_HAVE_TCM creates a virtual region that is too far away for the
+>    relative kallsyms code to reach it;
+> b) CONFIG_XIP_KERNEL=y kernel symbols are not filtered against PAGE_OFFSET,
+>   as is the case for kernels that execute from RAM, resulting in symbols
+>   that are out of range.
+>
+> Since the way kallsyms deals with XIP kernels on ARM leaves some room for
+>  improvement regardless of the base relative changes, this series proposes
+>  a fix that allows the special case to be removed from the kallsyms
+>  handling entirely.
+>
+> Changes since v1:
+> - new patch #4 (optional, RFC)
+> - added Nico's ack to #1 - #3
+> - use PROVIDE() for vector_fiq_offset since vector_fiq itself is not
+>  always
+>   defined
+> - put __stubs_start/_end inside the section definition so that the
+>  value of the
+>   start symbol equals the start of the section after alignment
+>  (fixes an issue
+>   on XIP spotted by Chris)
+> 
+> Patch #1 moves the .stubs and .vectors section back into the kernel
+> VMA, while preserving the guaranteed virtual offset of 4 KB. This
+> results in all symbols that kallsyms sees to be in a reasonable interval.
+> 
+> Patch #2 removes the special case for CONFIG_ARM && !CONFIG_XIP_KERNEL
+> in the invocation of scripts/kallsyms
+> 
+> Patch #3 removes the now unused --page-offset command line argument
+> handling from scripts/kallsyms.c
+> 
+> Patch #4 is included as an RFC, it removes the magic constant 0x1000
+> which is the offset between the start of the .vectors section and the
+> start of the .stubs section.
 
-What I do want to know is whether this patch makes Vitaly's kexec
-patch smaller, and most importantly, what's left to deal with - in
-other words, I'd like to see the kernel patch for what's remaining.
 
-Alternatively, if I can have both the kernel and userland patches
-so I can get a working kexec setup here, that may be a better way
-forward.
+For patches 1,2,3:
 
-Either way, I think I'm going to push these patches out into
-linux-next very soon, because I believe that they're the correct
-approach to solving some of the issues found in Vitaly's original
-patch, unless someone discovers that they're broken in some manner.
+Tested with ARCH_R7S72100 with CONFIG_XIP_KERNEL=y
 
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+
+Acked-by: Chris Brandt <chris.brandt@renesas.com>
