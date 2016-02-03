@@ -1,68 +1,52 @@
 From: k@japko.eu (Krzysztof Adamski)
-Date: Thu,  4 Feb 2016 00:33:47 +0100
-Subject: [PATCH v3 2/5] dts: sun8i-h3: Add APB0 related clocks and resets
-In-Reply-To: <1454542430-16572-1-git-send-email-k@japko.eu>
-References: <1454542430-16572-1-git-send-email-k@japko.eu>
-Message-ID: <1454542430-16572-3-git-send-email-k@japko.eu>
+Date: Thu,  4 Feb 2016 00:33:45 +0100
+Subject: [PATCH v3 0/5] pinctrl: sunxi: Add H3 R_PIO controller support 
+Message-ID: <1454542430-16572-1-git-send-email-k@japko.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-APB0 is bearly mentioned in H3 User Manual and it is only setup in the
-Allwinners kernel dump for CIR. I have verified experimentally that the
-gate for R_PIO exists and works, though. There are probably other gates
-there but I don't know their order right now and I don't have access to
-their peripherals on my board to test them.
+This patch series is extension of my original single patch with the same
+subject. It adds support for R_PIO so that GPIO port L can be used in H3
+based devices. It was tested on OrangePi PC where PL is connected amount
+others to an onboard led, a switch, an IR receiver and some VCC
+controllers.
 
-After some experiments and reviewing how this is organized on other
-sunxi SoCs, I couldn't actually find any way to disable clocks for R_PIO
-and they are working properly without doing anything so I assume they
-are connected straight to the 24Mhz oscillator for now.
+Patchset is based on next-20160129.
 
-Signed-off-by: Krzysztof Adamski <k@japko.eu>
----
- arch/arm/boot/dts/sun8i-h3.dtsi | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+--- 
 
-diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-index 1524130e..bb37f52 100644
---- a/arch/arm/boot/dts/sun8i-h3.dtsi
-+++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-@@ -276,6 +276,24 @@
- 			clocks = <&osc24M>, <&pll6 1>, <&pll5>;
- 			clock-output-names = "mbus";
- 		};
-+
-+		apb0: apb0_clk {
-+			compatible = "fixed-factor-clock";
-+			#clock-cells = <0>;
-+			clock-div = <1>;
-+			clock-mult = <1>;
-+			clocks = <&osc24M>;
-+			clock-output-names = "apb0";
-+		};
-+
-+		apb0_gates: clk at 01f01428 {
-+			compatible = "allwinner,sun8i-h3-apb0-gates-clk";
-+			reg = <0x01f01428 0x4>;
-+			#clock-cells = <1>;
-+			clocks = <&apb0>;
-+			clock-indices = <0>, <1>;
-+			clock-output-names = "apb0_pio", "apb0_ir";
-+		};
- 	};
- 
- 	soc {
-@@ -493,5 +511,11 @@
- 			interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>,
- 				     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
- 		};
-+
-+		apb0_reset: reset at 01f014b0 {
-+			reg = <0x01f014b0 0x4>;
-+			compatible = "allwinner,sun6i-a31-clock-reset";
-+			#reset-cells = <1>;
-+		};
- 	};
- };
+Changes since v2:
+- fixed apb0 parrent clocks list
+- moved binding documentation change to the proper patch
+- simplified sunxi_pinctrl_gpio_get according to ChenYu suggestions
+- fixed ordering in sunxi binding documentation
+
+Changes since v1:
+- splited patch to two separate - dtsi and c files
+- added APB0 clocks a parent for R_PIO
+- added fix in sunxi_pinctrl_gpio_get for getting pin value when in irq
+  mode and on 2nd pinctrl
+- fixed a "pwn" > "pwm" typo
+- fixed order in allwinner,sunxi-pinctrl.txt
+
+
+Krzysztof Adamski (5):
+  clk: sunxi: Add apb0 gates for H3
+  dts: sun8i-h3: Add APB0 related clocks and resets
+  pinctrl: sunxi: Add H3 R_PIO controller support
+  ARM: dts: sun8i-h3: Add R_PIO controller node to the dtsi
+  pinctrl: sunxi: Use pin number when calling sunxi_pmx_set
+
+ Documentation/devicetree/bindings/clock/sunxi.txt  |   1 +
+ .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   |   1 +
+ arch/arm/boot/dts/sun8i-h3.dtsi                    |  36 +++++++
+ drivers/clk/sunxi/clk-simple-gates.c               |   2 +
+ drivers/pinctrl/sunxi/Kconfig                      |   4 +
+ drivers/pinctrl/sunxi/Makefile                     |   1 +
+ drivers/pinctrl/sunxi/pinctrl-sun8i-h3-r.c         | 106 +++++++++++++++++++++
+ drivers/pinctrl/sunxi/pinctrl-sunxi.c              |   5 +-
+ 8 files changed, 154 insertions(+), 2 deletions(-)
+ create mode 100644 drivers/pinctrl/sunxi/pinctrl-sun8i-h3-r.c
+
 -- 
 2.1.4
