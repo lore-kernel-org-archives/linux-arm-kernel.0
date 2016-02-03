@@ -1,58 +1,88 @@
-From: sam@ravnborg.org (Sam Ravnborg)
-Date: Wed, 3 Feb 2016 17:39:46 +0100
-Subject: [PATCH] [RFC] ARM: modify pgd_t definition for
- TRANSPARENT_HUGEPAGE_PUD
-In-Reply-To: <1773775.QWf7OyDGPh@wuerfel>
-References: <1773775.QWf7OyDGPh@wuerfel>
-Message-ID: <20160203163946.GA20360@ravnborg.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 03 Feb 2016 17:43:59 +0100
+Subject: [PATCH 01/10] serial: mvebu-uart: initial support for Armada-3700
+ serial port
+In-Reply-To: <CAPv3WKfGX2dVDu2zWG4gdEMf0vO-X+NMerh9PzNDjzLBDSQcUA@mail.gmail.com>
+ (Marcin Wojtas's message of "Wed, 3 Feb 2016 09:05:55 +0100")
+References: <1454436468-4241-1-git-send-email-gregory.clement@free-electrons.com>
+ <1454436468-4241-2-git-send-email-gregory.clement@free-electrons.com>
+ <CAPv3WKfGX2dVDu2zWG4gdEMf0vO-X+NMerh9PzNDjzLBDSQcUA@mail.gmail.com>
+Message-ID: <87io254ucw.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 03, 2016 at 02:21:48PM +0100, Arnd Bergmann wrote:
-> I ran into build errors on ARM after Willy's newly added generic
-> TRANSPARENT_HUGEPAGE_PUD support. We don't support this feature
-> on ARM at all, but the patch causes a build error anyway:
-> 
-> In file included from ../kernel/memremap.c:17:0:
-> ../include/linux/pfn_t.h:108:7: error: 'pud_mkdevmap' declared as function returning an array
->  pud_t pud_mkdevmap(pud_t pud);
-> 
-> We don't use a PUD on ARM, so pud_t is defined as pmd_t, which
-> in turn is defined as
-> 
-> typedef unsigned long pgd_t[2];
-> 
-> on NOMMU and on 2-level MMU configurations. There is an (unused)
-> other definition using a struct around the array, which happens to
-> work fine here.
-> 
-> There is a comment in the file about the fact the other version
-> is "easier on the compiler", and I've traced that version back
-> to linux-2.1.80 when ARM support was first merged back in 1998.
-> 
-> It's probably a safe assumption that this is no longer necessary:
-> The same logic existed in asm-i386 at the time but was removed
-> a year later in 2.3.23pre3. The STRICT_MM_TYPECHECKS logic
-> also ended up getting copied into these files:
-> 
-> arch/alpha/include/asm/page.h
-> arch/arc/include/asm/page.h
-> arch/arm/include/asm/pgtable-3level-types.h
-> arch/arm64/include/asm/pgtable-types.h
-> arch/ia64/include/asm/page.h
-> arch/parisc/include/asm/page.h
-> arch/powerpc/include/asm/page.h
-> arch/sparc/include/asm/page_32.h
-> arch/sparc/include/asm/page_64.h
+Hi Marcin,
+ 
+ On mer., f?vr. 03 2016, Marcin Wojtas <mw@semihalf.com> wrote:
 
-For the sparc32 case we use the simpler variants.
-According to the comment this is due to limitation in
-the way we pass arguments in the sparc32 ABI.
-But I have not tried to compare a kernel for sparc32 with
-and without the use of structs.
+> Hi Gregory
+>
+>> +
+>> +static int mvebu_uart_startup(struct uart_port *port)
+>> +{
+>> +       int ret;
+>> +
+>> +       writel(CTRL_TXFIFO_RST | CTRL_RXFIFO_RST,
+>> +              port->membase + UART_CTRL);
+>> +       udelay(1);
+>> +       writel(CTRL_RX_INT, port->membase + UART_CTRL);
+>> +
+>> +       ret = request_irq(port->irq, mvebu_uart_isr, port->irqflags, "serial",
+>> +                         port);
+>> +       if (ret) {
+>> +               dev_err(port->dev, "failed to request irq\n");
+>> +               return ret;
+>> +       }
+>> +
+>> +       return 0;
+>> +}
+>> +
+>
+>> +static int mvebu_uart_probe(struct platform_device *pdev)
+>> +{
+>> +       struct resource *reg = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +       struct resource *irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+>> +       struct uart_port *port;
+>> +       struct mvebu_uart_data *data;
+>> +       int ret;
+>> +
+>> +       if (!reg || !irq) {
+>> +               dev_err(&pdev->dev, "no registers/irq defined\n");
+>> +               return -EINVAL;
+>> +       }
+>> +
+>> +       port = &mvebu_uart_ports[0];
+>> +
+>> +       spin_lock_init(&port->lock);
+>> +
+>> +       port->dev        = &pdev->dev;
+>> +       port->type       = PORT_MVEBU;
+>> +       port->ops        = &mvebu_uart_ops;
+>> +       port->regshift   = 0;
+>> +
+>> +       port->fifosize   = 32;
+>> +       port->iotype     = UPIO_MEM32;
+>> +       port->flags      = UPF_FIXED_PORT;
+>> +       port->line       = 0; /* single port: force line number to  0 */
+>> +
+>> +       port->irq        = irq->start;
+>> +       port->irqflags   = 0;
+>
+> Please use port->irqflags = IRQF_SHARED;
+> As ubuntu opens multiple consoles A3700 can't boot to it (only to
+> buildroot with single console).
 
-For sparc64 we use the stricter types (structs).
-I did not check other architectures - but just wanted to
-tell that the right choice may be architecture dependent.
+But this irq is not shared, this looks like a hack hidding the real
+issue.
 
-	Sam
+Gregory
+
+>
+> Best regards,
+> Marcin
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
