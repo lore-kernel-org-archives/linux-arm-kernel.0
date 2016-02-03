@@ -1,73 +1,77 @@
-From: julian.calaby@gmail.com (Julian Calaby)
-Date: Wed, 3 Feb 2016 12:30:36 +1100
-Subject: [linux-sunxi] [PATCH 01/11] MAINTAINERS: Add entry for X-Powers
- AXP family PMIC drivers
-In-Reply-To: <1454462910.7291.53.camel@perches.com>
-References: <1454408864-24112-1-git-send-email-wens@csie.org>
- <1454408864-24112-2-git-send-email-wens@csie.org>
- <CAGRGNgVxan9RCsLFW9hHWcdW+Rd_SgVG95H-yQg213g-YeE6Ug@mail.gmail.com>
- <1454462910.7291.53.camel@perches.com>
-Message-ID: <CAGRGNgXf-dvWWmyRMjgbVdnprg+fzDhbMeX7-6nZ-+LQ1J+ghA@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 03 Feb 2016 10:33:33 +0900
+Subject: [PATCH RESEND RFC] mach:-s3c64xx:Output trace information with
+ WARN_ON if calls for setting up gpio board configuration fail in
+ s3c64xx_i2s_cfg_gpio
+In-Reply-To: <1454424992-14619-1-git-send-email-xerofoify@gmail.com>
+References: <1454424992-14619-1-git-send-email-xerofoify@gmail.com>
+Message-ID: <56B158ED.8090109@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joe,
+On 02.02.2016 23:56, Nicholas Krause wrote:
+> This fixes the function s3c64xx_i2c_cfg_gpio to log output to the
+> kernel log buff with WARN_ON if any of the calls to either
+> s3c_gpio_cfgpin_range or s3c_gpio_cfgpin fail as we cannot exit
+> from s3c64xx_i2s_cfg_gpio if any of these calls fail due to
+> other intended function work being required to complete. Further more
+> if a failure occurs allow the other users/devolopers of this driver
+> to properly check the kernel log buffers for a kernel trace for
+> when these calls failing to execute successfully arise.
 
-On Wed, Feb 3, 2016 at 12:28 PM, Joe Perches <joe@perches.com> wrote:
-> On Wed, 2016-02-03 at 11:19 +1100, Julian Calaby wrote:
->> On Tue, Feb 2, 2016 at 9:27 PM, Chen-Yu Tsai <wens@csie.org> wrote:
->> > Add an entry for X-Powers AXP family PMIC drivers and list myself
->> > as maintainer.
-> []
->> > diff --git a/MAINTAINERS b/MAINTAINERS
-> []
->> > @@ -11941,6 +11941,12 @@ F:     include/linux/workqueue.h
->> >  F:     kernel/workqueue.c
->> >  F:     Documentation/workqueue.txt
->> >
->> > +X-POWERS MULTIFUNCTION PMIC DEVICE DRIVERS
->> > +M:     Chen-Yu Tsai <wens@csie.org>
->> > +L:     linux-kernel at vger.kernel.org
->> > +S:     Maintained
->> > +N:     axp[128]
->>
->> Should you list the files maintained and this list also?
->
-> This "N:" pattern is kind of a wildcard.
->
-> The difference between F: and N: is that git history
-> is also used by default for files that match.
->
-> There are no files in -next today that match "*axp8*"
-> Dunno if this patchset added any.
->
-> This matches:
->
->     $ git ls-files | grep "axp[128]"
->     Documentation/devicetree/bindings/mfd/axp20x.txt
->     Documentation/devicetree/bindings/power_supply/axp20x_usb_power.txt
->     arch/arm/boot/dts/axp152.dtsi
->     arch/arm/boot/dts/axp209.dtsi
->     arch/arm/boot/dts/axp22x.dtsi
->     drivers/extcon/extcon-axp288.c
->     drivers/iio/adc/axp288_adc.c
->     drivers/input/misc/axp20x-pek.c
->     drivers/mfd/axp20x.c
->     drivers/power/axp20x_usb_power.c
->     drivers/power/axp288_charger.c
->     drivers/power/axp288_fuel_gauge.c
->     drivers/regulator/axp20x-regulator.c
->     include/linux/mfd/axp20x.h
->
-> Are all these files appropriate?
->
+Quite complicated sentences, very difficult to understand. The commit
+message should describe the logic behind the change (e.g. answer to
+why?) and user-visible impact in a brief and understandable way.
 
-I didn't know about the "N:" tag, and consequently I retract my comment.
+Commit subject does not match subsystem and it is over complicated on
+its own. It is also too long. Your editor should point this already (70
+chars at most).
 
-Thanks,
+Anyway I don't feel the patch is needed and description fails to
+convince me. Knowing your history, you did not encounter any errors here
+but instead you are just spreading random "fixes" which compile or not...
 
--- 
-Julian Calaby
+Since this was not tested:
+If it ain't broken, don't fix it.
 
-Email: julian.calaby at gmail.com
-Profile: http://www.google.com/profiles/julian.calaby/
+Best regards,
+Krzysztof
+
+> 
+> Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
+> ---
+> v3:Fix more wording issues and uncaught build failure with
+> previous build test
+> v2:Fix Patch Wording as it was clearly confusing and incorrect
+>  arch/arm/mach-s3c64xx/dev-audio.c | 10 +++++-----
+>  1 file changed, 5 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s3c64xx/dev-audio.c b/arch/arm/mach-s3c64xx/dev-audio.c
+> index ff780a8..796ac75 100644
+> --- a/arch/arm/mach-s3c64xx/dev-audio.c
+> +++ b/arch/arm/mach-s3c64xx/dev-audio.c
+> @@ -36,10 +36,10 @@ static int s3c64xx_i2s_cfg_gpio(struct platform_device *pdev)
+>  		base = S3C64XX_GPE(0);
+>  		break;
+>  	case 2:
+> -		s3c_gpio_cfgpin(S3C64XX_GPC(4), S3C_GPIO_SFN(5));
+> -		s3c_gpio_cfgpin(S3C64XX_GPC(5), S3C_GPIO_SFN(5));
+> -		s3c_gpio_cfgpin(S3C64XX_GPC(7), S3C_GPIO_SFN(5));
+> -		s3c_gpio_cfgpin_range(S3C64XX_GPH(6), 4, S3C_GPIO_SFN(5));
+> +		WARN_ON(s3c_gpio_cfgpin(S3C64XX_GPC(4), S3C_GPIO_SFN(5)));
+> +		WARN_ON(s3c_gpio_cfgpin(S3C64XX_GPC(5), S3C_GPIO_SFN(5)));
+> +		WARN_ON(s3c_gpio_cfgpin(S3C64XX_GPC(7), S3C_GPIO_SFN(5)));
+> +		WARN_ON(s3c_gpio_cfgpin_range(S3C64XX_GPH(6), 4, S3C_GPIO_SFN(5)));
+>  		return 0;
+>  	default:
+>  		printk(KERN_DEBUG "Invalid I2S Controller number: %d\n",
+> @@ -47,7 +47,7 @@ static int s3c64xx_i2s_cfg_gpio(struct platform_device *pdev)
+>  		return -EINVAL;
+>  	}
+>  
+> -	s3c_gpio_cfgpin_range(base, 5, S3C_GPIO_SFN(3));
+> +	WARN_ON(s3c_gpio_cfgpin_range(base, 5, S3C_GPIO_SFN(3)));
+>  
+>  	return 0;
+>  }
+> 
