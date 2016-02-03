@@ -1,61 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 03 Feb 2016 21:36:38 +0100
-Subject: [PATCH] [RFC] ARM: modify pgd_t definition for
- TRANSPARENT_HUGEPAGE_PUD
-In-Reply-To: <20160203163946.GA20360@ravnborg.org>
-References: <1773775.QWf7OyDGPh@wuerfel> <20160203163946.GA20360@ravnborg.org>
-Message-ID: <15001627.5KATBhJaXU@wuerfel>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 3 Feb 2016 21:38:25 +0100
+Subject: [PATCH v2 08/12] devicetree: bindings: add DT binding for the
+ Marvell Armada 3700 SoC family
+In-Reply-To: <1454524889-9207-9-git-send-email-gregory.clement@free-electrons.com>
+References: <1454524889-9207-1-git-send-email-gregory.clement@free-electrons.com>
+ <1454524889-9207-9-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20160203213825.4fa6a0ef@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 03 February 2016 17:39:46 Sam Ravnborg wrote:
-> On Wed, Feb 03, 2016 at 02:21:48PM +0100, Arnd Bergmann wrote:
-> > arch/alpha/include/asm/page.h
-> > arch/arc/include/asm/page.h
-> > arch/arm/include/asm/pgtable-3level-types.h
-> > arch/arm64/include/asm/pgtable-types.h
-> > arch/ia64/include/asm/page.h
-> > arch/parisc/include/asm/page.h
-> > arch/powerpc/include/asm/page.h
-> > arch/sparc/include/asm/page_32.h
-> > arch/sparc/include/asm/page_64.h
+Hello,
+
+On Wed,  3 Feb 2016 19:41:25 +0100, Gregory CLEMENT wrote:
+> The Marvell Armada 3700 is a family of ARMv8 CA53 SoCs. This commit
+> introduces the Device Tree binding that documents the top-level
+> compatible strings for Armada 3700 based platforms.
 > 
-> For the sparc32 case we use the simpler variants.
-> According to the comment this is due to limitation in
-> the way we pass arguments in the sparc32 ABI.
-> But I have not tried to compare a kernel for sparc32 with
-> and without the use of structs.
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  .../devicetree/bindings/arm/marvell/armada-37xx.txt      | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt
 > 
-> For sparc64 we use the stricter types (structs).
-> I did not check other architectures - but just wanted to
-> tell that the right choice may be architecture dependent.
-> 
+> diff --git a/Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt b/Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt
+> new file mode 100644
+> index 000000000000..17e90e8b5f76
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt
+> @@ -0,0 +1,16 @@
+> +Marvell Armada 37xx Platforms Device Tree Bindings
+> +--------------------------------------------------
+> +
+> +Boards using a SoC of the Marvell Armada 37xx family must carry the
+> +following root node property:
+> +
+> + - compatible: must contain "marvell,armada3710"
 
-I see. I was assuming that they all (wrongly) default to the simple
-definitions.
+Are we sure at this point that the 3720 is a strict super-set of the
+3710 ?
 
-It seems we have these categories:
+If that's not the case, then it would be somewhat weird for a platform
+using the 3720 platform to carry the marvell,armada3710 compatible
+string, no?
 
-* both defined, but using strict:
-arch/alpha/include/asm/page.h:#define STRICT_MM_TYPECHECKS
-arch/sparc/include/asm/page_64.h:#define STRICT_MM_TYPECHECKS
-arch/ia64/include/asm/page.h:#  define STRICT_MM_TYPECHECKS
-arch/parisc/include/asm/page.h:#define STRICT_MM_TYPECHECKS
-
-* both defined, but using non-strict:
-arch/arc/include/asm/page.h:#undef STRICT_MM_TYPECHECKS
-arch/arm/include/asm/pgtable-2level-types.h:#undef STRICT_MM_TYPECHECKS
-arch/arm/include/asm/pgtable-3level-types.h:#undef STRICT_MM_TYPECHECKS
-arch/arm64/include/asm/pgtable-types.h:#undef STRICT_MM_TYPECHECKS
-arch/sparc/include/asm/page_32.h:/* #define STRICT_MM_TYPECHECKS */
-arch/unicore32/include/asm/page.h:#undef STRICT_MM_TYPECHECKS
-
-* Kconfig option:
-arch/powerpc/Kconfig.debug:config STRICT_MM_TYPECHECKS
-			 	default n
-
-* only strict defined:
-everything else
-
-
-	Arnd
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
