@@ -1,28 +1,76 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 03 Feb 2016 20:15:47 +0100
-Subject: [PATCH 0/7] USB changes for rare warnings
-In-Reply-To: <87oabxpsr8.fsf@ti.com> (Felipe Balbi's message of "Wed, 03 Feb
- 2016 20:12:59 +0200")
-References: <1453997722-3489596-1-git-send-email-arnd@arndb.de>
- <87oabxpsr8.fsf@ti.com>
-Message-ID: <87lh7161wc.fsf@belgarion.home>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed,  3 Feb 2016 11:39:16 -0700
+Subject: [PATCH V9 18/18] coresight: introducing a global trace ID function
+In-Reply-To: <1454524756-10628-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1454524756-10628-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1454524756-10628-19-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Felipe Balbi <balbi@kernel.org> writes:
+TraceID values have to be unique for all tracers and
+consistent between drivers and user space.  As such
+introducing a central function to be used whenever a
+traceID value is required.
 
-> Hi Arnd,
->
->>  arch/arm/mach-ixp4xx/include/mach/ixp4xx-regs.h | 198 ---------
->>  arch/arm/mach-pxa/include/mach/pxa25x-udc.h     | 163 --------
->
-> for arch/arm I need Acked-by from relevant folks.
-You already have mine for arch/arm/mach-pxa/include/mach/pxa25x-udc.h I think,
-or did my mailer betray me again ...
+The patch also account for data traceIDs, which are usually
+I(N) + 1.
 
-I cannot speak for ixp4xx though.
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+---
+ drivers/hwtracing/coresight/coresight-etm3x.c |  7 ++-----
+ include/linux/coresight-pmu.h                 | 12 ++++++++++++
+ 2 files changed, 14 insertions(+), 5 deletions(-)
 
-Cheers.
-
+diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
+index 77b37413803f..0ba1a3981373 100644
+--- a/drivers/hwtracing/coresight/coresight-etm3x.c
++++ b/drivers/hwtracing/coresight/coresight-etm3x.c
+@@ -27,6 +27,7 @@
+ #include <linux/cpu.h>
+ #include <linux/of.h>
+ #include <linux/coresight.h>
++#include <linux/coresight-pmu.h>
+ #include <linux/amba/bus.h>
+ #include <linux/seq_file.h>
+ #include <linux/uaccess.h>
+@@ -740,11 +741,7 @@ static void etm_init_arch_data(void *info)
+ 
+ static void etm_init_trace_id(struct etm_drvdata *drvdata)
+ {
+-	/*
+-	 * A trace ID of value 0 is invalid, so let's start at some
+-	 * random value that fits in 7 bits and go from there.
+-	 */
+-	drvdata->traceid = 0x10 + drvdata->cpu;
++	drvdata->traceid = coresight_get_trace_id(drvdata->cpu);
+ }
+ 
+ static int etm_probe(struct amba_device *adev, const struct amba_id *id)
+diff --git a/include/linux/coresight-pmu.h b/include/linux/coresight-pmu.h
+index 6c5386b23b10..7d410260661b 100644
+--- a/include/linux/coresight-pmu.h
++++ b/include/linux/coresight-pmu.h
+@@ -19,9 +19,21 @@
+ #define _LINUX_CORESIGHT_PMU_H
+ 
+ #define CORESIGHT_ETM_PMU_NAME "cs_etm"
++#define CORESIGHT_ETM_PMU_SEED  0x10
+ 
+ /* ETMv3.5/PTM's ETMCR config bit */
+ #define ETM_OPT_CYCACC  12
+ #define ETM_OPT_TS      28
+ 
++static inline int coresight_get_trace_id(int cpu)
++{
++	/*
++	 * A trace ID of value 0 is invalid, so let's start at some
++	 * random value that fits in 7 bits and go from there.  Since
++	 * the common convention is to have data trace IDs be I(N) + 1,
++	 * set instruction trace IDs as a function of the CPU number.
++	 */
++	return (CORESIGHT_ETM_PMU_SEED + (cpu * 2));
++}
++
+ #endif
 -- 
-Robert
+2.1.4
