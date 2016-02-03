@@ -1,87 +1,33 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 03 Feb 2016 10:24:19 +0100
-Subject: [PATCH v2] ARM: dts: Add dts for Uniwest evi
-In-Reply-To: <1454451202-1687-1-git-send-email-stillcompiling@gmail.com>
-References: <patches/evidts/35215>
- <1454451202-1687-1-git-send-email-stillcompiling@gmail.com>
-Message-ID: <1454491459.3415.6.camel@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 3 Feb 2016 09:25:02 +0000
+Subject: [PATCH 0/5] Clean up warnings (part 2, asm/pci-bridge.h)
+In-Reply-To: <20160202193026.9258.7573.stgit@bhelgaas-glaptop2.roam.corp.google.com>
+References: <20160202193026.9258.7573.stgit@bhelgaas-glaptop2.roam.corp.google.com>
+Message-ID: <20160203092502.GA11376@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joshua,
-
-Am Dienstag, den 02.02.2016, 14:13 -0800 schrieb Joshua Clayton:
-> Uniwest evi is a portable electrical eddy current non-destructive
-> testing device.
+On Tue, Feb 02, 2016 at 01:38:26PM -0600, Bjorn Helgaas wrote:
+> We've had some non-arch-specific stuff (pci_has_flag() and associated
+> definitions like PCI_PROBE_ONLY) in asm/pci-bridge.h.  This leads to
+> warnings like:
 > 
-> Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
-> ---
->  arch/arm/boot/dts/Makefile      |   1 +
->  arch/arm/boot/dts/imx6q-evi.dts | 506 ++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 507 insertions(+)
->  create mode 100644 arch/arm/boot/dts/imx6q-evi.dts
+>   drivers/pci/host/pcie-designware.c:562:20: error: 'PCI_PROBE_ONLY' undeclared (first use in this function)
+>   drivers/pci/host/pcie-designware.c:562:7: error: implicit declaration of function 'pci_has_flag' [-Werror=implicit-function-declaration]
 > 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index c4f42a78..4a4ef29 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -326,6 +326,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
->  	imx6q-cubox-i.dtb \
->  	imx6q-dfi-fs700-m60.dtb \
->  	imx6q-dmo-edmqmx6.dtb \
-> +	imx6q-evi.dtb \
->  	imx6q-gk802.dtb \
->  	imx6q-gw51xx.dtb \
->  	imx6q-gw52xx.dtb \
-> diff --git a/arch/arm/boot/dts/imx6q-evi.dts b/arch/arm/boot/dts/imx6q-evi.dts
-> new file mode 100644
-> index 0000000..10f566e
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx6q-evi.dts
-> @@ -0,0 +1,506 @@
-[...]
-> +/dts-v1/;
-> +#include "imx6q.dtsi"
-> +#include <dt-bindings/gpio/gpio.h>
-> +#include <dt-bindings/interrupt-controller/irq.h>
-> +
-> +/ {
-> +	model = "Uniwest Evi";
-> +	compatible = "uniwest,imx6q-evi", "fsl,imx6q";
-[...]
-> +	panel {
-> +		compatible = "sharp,lq101k1ly04";
-> +
-> +		port {
-> +			panel_in: endpoint {
-> +				remote-endpoint = <&lvds0_out>;
-> +			};
-> +		};
-> +	};
-> +};
-[...]
-> +&ldb {
-> +	status = "okay";
-> +
-> +	lvds0: lvds-channel at 0 {
-> +		fsl,data-mapping = "jeida";
-> +		fsl,data-width = <24>;
+> because arches don't consistently supply asm/pci-bridge.h, and several
+> drivers include it when they shouldn't.
+> 
+> This series moves the generic stuff to linux/pci.h, so it's the same for
+> everybody, and removes the now-empty asm-generic/pci-bridge.h.
+> 
+> There still a few arches that provide asm/pci-bridge.h (microblaze,
+> powerpc, and xtensa), but now they contain truly arch-dependent things like
+> struct pci_controller definitions, and they're only included by
+> arch-specific files.
 
-The "sharp,lq101k1ly04" panel compatible already specifies the bus
-format (it is set to MEDIA_BUS_FMT_RGB888_1X7X4_JEIDA in the
-simple-panel entry), these two properties can be removed.
+For the arm64 bits:
 
-> +		status = "okay";
-> +
-> +		port at 4 {
-> +			reg = <4>;
-> +			lvds0_out: endpoint {
-> +				remote-endpoint = <&panel_in>;
-> +			};
-> +		};
-> +	};
-> +};
-[...]
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-regards
-Philipp
+Will
