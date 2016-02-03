@@ -1,70 +1,78 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue,  2 Feb 2016 17:42:13 -0800
-Subject: [PATCH] clk: Deprecate CLK_IS_ROOT
-Message-ID: <1454463733-25281-1-git-send-email-sboyd@codeaurora.org>
+From: pi-cheng.chen@linaro.org (Pi-Cheng Chen)
+Date: Wed, 3 Feb 2016 09:46:25 +0800
+Subject: [PATCH v2 3/3] ARM64: dts: mt8173: Add CPU OPP, clock and
+ regulator supply properties
+In-Reply-To: <56B0B894.9040706@gmail.com>
+References: <1451197318-12418-1-git-send-email-pi-cheng.chen@linaro.org>
+ <1451197318-12418-4-git-send-email-pi-cheng.chen@linaro.org>
+ <20151228031340.GD3598@ubuntu> <3310024.mO5K6yH9vU@wuerfel>
+ <20160105102455.GA30120@ubuntu> <56B08DA4.8070207@gmail.com>
+ <56B0B894.9040706@gmail.com>
+Message-ID: <CALx668UB+o_RYUWSR86nUL7YpiK9fWPzZeOSaOmYTGtdnRKx=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We don't use CLK_IS_ROOT but in a few places in the common clk
-framework core. Let's replace those checks with a check for the
-number of parents a clk has instead of the flag, freeing up one
-flag for something else. We don't remove the flag yet so that
-things keep building, but we'll remove it once all drivers have
-removed their flag usage.
+On Tue, Feb 2, 2016 at 10:09 PM, Matthias Brugger
+<matthias.bgg@gmail.com> wrote:
+>
+>
+> On 02/02/16 12:06, Matthias Brugger wrote:
+>>
+>>
+>>
+>> On 05/01/16 11:24, Viresh Kumar wrote:
+>>>
+>>> On 05-01-16, 11:21, Arnd Bergmann wrote:
+>>>>
+>>>> On Monday 28 December 2015 08:43:40 Viresh Kumar wrote:
+>>>>>
+>>>>> On 27-12-15, 14:21, Pi-Cheng Chen wrote:
+>>>>>>
+>>>>>> Add operating-points-v2, clock, and regulator supply properties
+>>>>>> required by mt8173-cpufreq driver to enable it.
+>>>>>>
+>>>>>> Signed-off-by: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
+>>>>>> ---
+>>>>>> This patch is based on the patch[1] that adds underlying clock MUX for
+>>>>>> MT8173 which is needed by mt8173-cpufreq driver but not yet picked.
+>>>>>>
+>>>>>> [1] http://article.gmane.org/gmane.linux.kernel.clk/325
+>>>>>> ---
+>>>>>>   arch/arm64/boot/dts/mediatek/mt8173-evb.dts | 18 ++++++
+>>>>>>   arch/arm64/boot/dts/mediatek/mt8173.dtsi    | 90
+>>>>>> +++++++++++++++++++++++++++++
+>>>>>>   2 files changed, 108 insertions(+)
+>>>>>
+>>>>>
+>>>>> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+>>>>>
+>>>>
+>>>> This patch is now in linux-next through Rafael's pm tree, and it
+>>>> breaks the
+>>>> arm64 build:
+>>>>
+>>>>          arm64-defconfig
+>>>> Error: ../arch/arm64/boot/dts/mediatek/mt8173.dtsi:132.24-25 syntax
+>>>> error
+>>>>
+>>>>
+>>>> Please revert.
+>>>>
+>>>> In the future, please send all dts changes through the proper maintainer
+>>>> channels (-> Mattias -> arm-soc), and make sure they actually build.
+>>>
+>>>
+>>> Rafael has already reverted that, AFAIK, after Mark Brown reported the
+>>> build issue.
+>>>
+>>
+>> Applied to v4.5-next/dts
+>>
+>
+> I oversaw that this needs a clock patch, which is not yet mainlined.
+> I deleted this patch from my tree.
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
+I should mention that explicitly.
+Sorry for the inconvenience.
 
-A bunch of patches to remove CLK_IS_ROOT are coming...
-
- drivers/clk/clk.c            | 6 +++---
- include/linux/clk-provider.h | 2 +-
- 2 files changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index bb01ed6cc63e..cd8382c83f48 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -385,7 +385,7 @@ static unsigned long clk_core_get_rate_nolock(struct clk_core *core)
- 
- 	ret = core->rate;
- 
--	if (core->flags & CLK_IS_ROOT)
-+	if (!core->num_parents)
- 		goto out;
- 
- 	if (!core->parent)
-@@ -2351,7 +2351,7 @@ static int __clk_core_init(struct clk_core *core)
- 	/*
- 	 * Populate core->parent if parent has already been __clk_init'd.  If
- 	 * parent has not yet been __clk_init'd then place clk in the orphan
--	 * list.  If clk has set the CLK_IS_ROOT flag then place it in the root
-+	 * list.  If clk doesn't have any parents then place it in the root
- 	 * clk list.
- 	 *
- 	 * Every time a new clk is clk_init'd then we walk the list of orphan
-@@ -2362,7 +2362,7 @@ static int __clk_core_init(struct clk_core *core)
- 		hlist_add_head(&core->child_node,
- 				&core->parent->children);
- 		core->orphan = core->parent->orphan;
--	} else if (core->flags & CLK_IS_ROOT) {
-+	} else if (!core->num_parents) {
- 		hlist_add_head(&core->child_node, &clk_root_list);
- 		core->orphan = false;
- 	} else {
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index fabe5bedbba6..9c3a18c1a984 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -25,7 +25,7 @@
- #define CLK_SET_PARENT_GATE	BIT(1) /* must be gated across re-parent */
- #define CLK_SET_RATE_PARENT	BIT(2) /* propagate rate change up one level */
- #define CLK_IGNORE_UNUSED	BIT(3) /* do not gate even if unused */
--#define CLK_IS_ROOT		BIT(4) /* root clk, has no parent */
-+#define CLK_IS_ROOT		BIT(4) /* Deprecated: Don't use */
- #define CLK_IS_BASIC		BIT(5) /* Basic clk, can't do a to_clk_foo() */
- #define CLK_GET_RATE_NOCACHE	BIT(6) /* do not use the cached clk rate */
- #define CLK_SET_RATE_NO_REPARENT BIT(7) /* don't re-parent on rate change */
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Pi-Cheng
