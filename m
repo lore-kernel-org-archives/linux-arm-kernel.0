@@ -1,34 +1,78 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 3 Feb 2016 13:32:47 -0500
-Subject: [PATCH V13 08/10] dma: qcom_hidma: read the channel id from HW
-In-Reply-To: <20160201151455.GA10961@rob-hp-laptop>
-References: <1454106914-15857-1-git-send-email-okaya@codeaurora.org>
- <1454106914-15857-9-git-send-email-okaya@codeaurora.org>
- <20160201151455.GA10961@rob-hp-laptop>
-Message-ID: <56B247CF.5060408@codeaurora.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 3 Feb 2016 18:20:54 +0000
+Subject: [PATCH] dt-bindings: arm, gic-v3: require that reserved cells are
+ always 0
+In-Reply-To: <1454522458-29643-1-git-send-email-will.deacon@arm.com>
+References: <1454522458-29643-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20160203182054.GH1234@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/1/2016 10:14 AM, Rob Herring wrote:
-> On Fri, Jan 29, 2016 at 05:35:11PM -0500, Sinan Kaya wrote:
->> Removing the flexibility to choose the event channel as there is no real
->> use case right now. We have been using the values in ACPI that match the HW
->> defaults. OS is reading the event-channel from the HW register now.
->>
->> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
->> ---
->>  .../devicetree/bindings/dma/qcom_hidma_mgmt.txt    |  3 --
->>  drivers/dma/qcom/hidma.c                           | 39 +---------------------
->>  2 files changed, 1 insertion(+), 41 deletions(-)
+On Wed, Feb 03, 2016 at 06:00:58PM +0000, Will Deacon wrote:
+> The arm,gic-v3 binding was written with good intentions and doesn't
+> enforce interrupt-cells to be 3, therefore making it easy to extend
+> the irq description in future if necessary:
 > 
-> Acked-by: Rob Herring <robh@kernel.org>
+>   > Cells 4 and beyond are reserved for future use.
 > 
+> Unfortunately, this sentence is immediately followed up with:
+> 
+>   > When the 1st cell has a value of 0 or 1, cells 4 and beyond act as
+>   > padding, and may be ignored. It is recommended that padding cells
+>   > have a value of 0.
 
+The initial intention of this was to allow for new, longer entries which
+were identified by a new value in cell 1.
 
-Thanks Rob,
-I'll merge this patch to the existing documentation and code on the next rev.
+Regardless, I agree that it should be a requirement that padding cells
+must be zero.
 
--- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+> Consequently, any extensions to the PPI or SPI interrupt specifiers must
+> be able to work with random crap from legacy DTs, effectively
+> necessitating a new interrupt type in the first cell. Sigh.
+
+I'm not sure that's true if we allocate a new value for the 1st cell for
+"extended" PPI or SPI interrupt-sepcficiers (which presumably add
+restrictions). That would also allow old kernels to safely skip such
+interrupts rather than mis-parsing them.
+
+> This patch fixes the text so that additional, reserved cells are
+> required to be zero. This looks like a reasonable thing to require and
+> is already satisifed by the .dts files in-tree.
+> 
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+
+This patch itself makes sense, so FWIW:
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Any proposed extention to the binding requires its own discussion.
+
+Thanks,
+Mark.
+
+> ---
+>  .../devicetree/bindings/interrupt-controller/arm,gic-v3.txt          | 5 ++---
+>  1 file changed, 2 insertions(+), 3 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.txt b/Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.txt
+> index 7803e77d85cb..007a5b46256a 100644
+> --- a/Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.txt
+> +++ b/Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.txt
+> @@ -24,9 +24,8 @@ Main node required properties:
+>  		1 = edge triggered
+>  		4 = level triggered
+>  
+> -  Cells 4 and beyond are reserved for future use. When the 1st cell
+> -  has a value of 0 or 1, cells 4 and beyond act as padding, and may be
+> -  ignored. It is recommended that padding cells have a value of 0.
+> +  Cells 4 and beyond are reserved for future use and must have a value
+> +  of 0 if present.
+>  
+>  - reg : Specifies base physical address(s) and size of the GIC
+>    registers, in the following order:
+> -- 
+> 2.1.4
+> 
