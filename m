@@ -1,38 +1,60 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 04 Feb 2016 18:01:51 +0100
-Subject: [RFC PATCH 0/4] Add ACPI support for HiSilicon PCIe Host
- Controllers
-In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E1EC9EF4B@lhreml503-mbs>
-References: <1454585860-60709-1-git-send-email-gabriele.paoloni@huawei.com>
- <76564455.dlc1WHiVY2@wuerfel>
- <EE11001F9E5DDD47B7634E2F8A612F2E1EC9EF4B@lhreml503-mbs>
-Message-ID: <1930535.mkCdtpUWq7@wuerfel>
+From: dirk.behme@gmail.com (Dirk Behme)
+Date: Thu,  4 Feb 2016 18:06:10 +0100
+Subject: [PATCH v3] drivers/perf: arm_pmu: make info messages more verbose
+Message-ID: <1454605570-4725-1-git-send-email-dirk.behme@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 04 February 2016 16:44:12 Gabriele Paoloni wrote:
-> Effectively the ACPI version of the HiSilicon driver does not rely on
-> Designware as much as the DT version (that calls dw_pcie_host_init());
-> however in order to do what you suggest I'd need to copy and paste and
-> modify dw_pcie_rd_conf and dw_pcie_wr_conf.
-> Also I'd need to declare duplicate version of the functions in
-> pcie-hisi-common.c (if I do not want to split the object across
-> different paths "drivers/pci/host" and "drivers/acpi/")
-> 
-> Now I can do it but I thought it was more correct to pass &dw_pcie_ops
-> as input pointer in DECLARE_ACPI_MCFG_FIXUP(); this is also because maybe in
-> future other Designware based controllers may need to support ACPI and it
-> would be easier for them to reuse their DT based driver functions
-> 
-> Honestly I am a bit confused...
-> 
+From: Dirk Behme <dirk.behme@de.bosch.com>
 
-I don't think you can use the dw_pcie_ops as-is anyway, as they in
-turn rely on the device driver structure, and you also don't need
-those as they seem to be written for the generic case of a 32-bit
-architecture that does not have enough space to map the entire
-config space into MMIO. Just set up all those mapping registers from
-the firmware and pass the config space base address as you'd normally
-do on ACPI.
+On a big.LITTLE system e.g. with Cortex A57 and A53 in case not all cores
+are online at PMU probe time we might get
 
-	Arnd
+hw perfevents: failed to probe PMU!
+hw perfevents: failed to register PMU devices!
+
+making it unclear which cores failed, here.
+
+Add the device tree full name which failed and the error value resulting
+in a more verbose and helpful message like
+
+hw perfevents: /soc/pmu_a53: failed to probe PMU! Error -6
+hw perfevents: /soc/pmu_a53: failed to register PMU devices! Error -6
+
+Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
+---
+Changes in v3: Rebase against Will's perf/updates (8d1a0ae72)
+
+Changes in v2: Use the full node name from DT instead of pmu->name, as if
+we fail to find anything in the match table, that'll be NULL. Additionally,
+add the error value to get an idea why it failed.
+
+ drivers/perf/arm_pmu.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+index eb5bee0..ca63a45 100644
+--- a/drivers/perf/arm_pmu.c
++++ b/drivers/perf/arm_pmu.c
+@@ -907,7 +907,8 @@ int arm_pmu_device_probe(struct platform_device *pdev,
+ 	}
+ 
+ 	if (ret) {
+-		pr_info("failed to probe PMU!\n");
++		pr_info("%s: failed to probe PMU! Error %i\n",
++			node->full_name, ret);
+ 		goto out_free;
+ 	}
+ 
+@@ -927,7 +928,8 @@ int arm_pmu_device_probe(struct platform_device *pdev,
+ out_destroy:
+ 	cpu_pmu_destroy(pmu);
+ out_free:
+-	pr_info("failed to register PMU devices!\n");
++	pr_info("%s: failed to register PMU devices! Error %i\n",
++		node->full_name, ret);
+ 	kfree(pmu);
+ 	return ret;
+ }
+-- 
+2.7.0
