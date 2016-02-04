@@ -1,38 +1,66 @@
-From: vishnupatekar0510@gmail.com (Vishnu Patekar)
-Date: Thu, 4 Feb 2016 16:51:06 +0800
-Subject: [PATCH 06/14] ARM: dts: sun8i-a83t: Correct low speed oscillator
- clocks
-In-Reply-To: <20160202131947.GS4652@lukather>
-References: <1454203266-4450-1-git-send-email-vishnupatekar0510@gmail.com>
- <1454203266-4450-7-git-send-email-vishnupatekar0510@gmail.com>
- <20160202131947.GS4652@lukather>
-Message-ID: <CAEzqOZvcy58T_uxvymGxuQXh_Goj3yHmgkmL4VL+x2_bycMgNg@mail.gmail.com>
+From: zhang.chunyan@linaro.org (Chunyan Zhang)
+Date: Thu,  4 Feb 2016 16:56:19 +0800
+Subject: [PATCH V2 2/6] stm class: adds a loop to extract the first valid STM
+ device name
+In-Reply-To: <1454487337-30184-3-git-send-email-zhang.chunyan@linaro.org>
+References: <1454487337-30184-3-git-send-email-zhang.chunyan@linaro.org>
+Message-ID: <1454576179-27224-1-git-send-email-zhang.chunyan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Maxime,
+The node name of STM master management policy is a concatenation of an
+STM device name to which this policy applies and following an arbitrary
+string, these two strings are concatenated with a dot.
 
+This patch adds a loop for extracting the STM device name when an
+arbitrary number of dot(s) are found in this STM device name.
 
-On Tue, Feb 2, 2016 at 9:19 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Sun, Jan 31, 2016 at 09:20:58AM +0800, Vishnu Patekar wrote:
->> From: Chen-Yu Tsai <wens@csie.org>
->>
->> The A83T does not have a 32.768 kHz low speed oscillator, either as
->> an external crystal or input. It has a 16 MHz RC-based (inaccurate)
->> internal oscillator, which is then divided by 512 for a clock close
->> to 32 kHz.
->>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->
-> You should have your SoB here.
->
-> Is it ok to add it?
-Yes, please add.
->
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
+---
+ drivers/hwtracing/stm/policy.c | 27 ++++++++++++++++-----------
+ 1 file changed, 16 insertions(+), 11 deletions(-)
+
+diff --git a/drivers/hwtracing/stm/policy.c b/drivers/hwtracing/stm/policy.c
+index 11ab6d0..691686e 100644
+--- a/drivers/hwtracing/stm/policy.c
++++ b/drivers/hwtracing/stm/policy.c
+@@ -321,21 +321,26 @@ stp_policies_make(struct config_group *group, const char *name)
+ 	/*
+ 	 * node must look like <device_name>.<policy_name>, where
+ 	 * <device_name> is the name of an existing stm device and
+-	 * <policy_name> is an arbitrary string
++	 * <policy_name> is an arbitrary string, when an arbitrary
++	 * number of dot(s) are found in the <device_name>, the
++	 * first matched STM device name would be extracted.
+ 	 */
+-	p = strchr(devname, '.');
+-	if (!p) {
+-		kfree(devname);
+-		return ERR_PTR(-EINVAL);
+-	}
++	for (p = devname; ; p++) {
++		p = strchr(p, '.');
++		if (!p) {
++			kfree(devname);
++			return ERR_PTR(-EINVAL);
++		}
+ 
+-	*p++ = '\0';
++		*p = '\0';
+ 
+-	stm = stm_find_device(devname);
+-	kfree(devname);
++		stm = stm_find_device(devname);
++		if (stm)
++			break;
++		*p = '.';
++	}
+ 
+-	if (!stm)
+-		return ERR_PTR(-ENODEV);
++	kfree(devname);
+ 
+ 	mutex_lock(&stm->policy_mutex);
+ 	if (stm->policy) {
+-- 
+1.9.1
