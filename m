@@ -1,49 +1,33 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 4 Feb 2016 20:26:41 +0100
-Subject: [PATCH v3 00/23] arm64: Virtualization Host Extension support
-In-Reply-To: <1454522416-6874-1-git-send-email-marc.zyngier@arm.com>
-References: <1454522416-6874-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20160204192641.GJ13974@cbox>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Thu, 4 Feb 2016 20:30:37 +0100
+Subject: [PATCH v2] clk: shmobile: r8a7795: Add SD divider support
+In-Reply-To: <1454135639-4102-1-git-send-email-dirk.behme@gmail.com>
+References: <1454135639-4102-1-git-send-email-dirk.behme@gmail.com>
+Message-ID: <20160204193036.GA1958@tetsubishi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 03, 2016 at 05:59:53PM +0000, Marc Zyngier wrote:
-> ARMv8.1 comes with the "Virtualization Host Extension" (VHE for
-> short), which enables simpler support of Type-2 hypervisors.
+On Sat, Jan 30, 2016 at 07:33:59AM +0100, Dirk Behme wrote:
+> This patch adds SD[0..3] clock divider support for R-Car Gen3 SoC.
 > 
-> This extension allows the kernel to directly run at EL2, and
-> significantly reduces the number of system registers shared between
-> host and guest, reducing the overhead of virtualization.
-> 
-> In order to have the same kernel binary running on all versions of the
-> architecture, this series makes heavy use of runtime code patching.
-> 
-> The first 22 patches massage the KVM code to deal with VHE and enable
-> Linux to run at EL2. The last patch catches an ugly case when VHE
-> capable CPUs are paired with some of their less capable siblings. This
-> should never happen, but hey...
-> 
-> I have deliberately left out some of the more "advanced"
-> optimizations, as they are likely to distract the reviewer from the
-> core infrastructure, which is what I care about at the moment.
-> 
-> Note: GDB is currently busted on VHE systems, as it checks for version
->       6 on the debug architecture, while VHE is version 7. The
->       binutils people are on the case.
-> 
-> This has been tested on the FVP_Base_SLV-V8-A model, and based on
-> v4.5-rc2. I've put a branch out on:
-> 
-> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/vhe
-> 
+> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+> Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
 
-You can have my reviewed-by on all patches that I didn't already review
-or ack explicitly.
+Tested-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
-Only exception is the debug stuff where I didn't manage to page in the
-context, so hopefully familiar with that code can have a look.
-
-Then this is ready to be queued.
+Since we don't have UHS support currently, changing the clock is not
+really exercised; but the code looks good and if it needs fixing, we can
+do it incrementally IMO. What is currently needed works fine on my
+Salvator-X for the exposed SD interfaces.
 
 Thanks,
--Christoffer
+
+   Wolfram
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160204/45685662/attachment.sig>
