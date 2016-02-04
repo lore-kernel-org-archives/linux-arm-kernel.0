@@ -1,101 +1,62 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 4 Feb 2016 16:49:39 +0100
-Subject: [PATCH] ARM: nomadik: fix up SD/MMC DT settings
-In-Reply-To: <1454332737-631-1-git-send-email-linus.walleij@linaro.org>
-References: <1454332737-631-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <CAPDyKFo2S1Urn8eqdaztWU_ZSpYwPi7-N1m5PgGZH2aSD3PTPg@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu,  4 Feb 2016 16:50:23 +0100
+Subject: [PATCH v2 0/7] ARM/efi minor fixes + stub pre-boot compat checks
+Message-ID: <1454601030-9093-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 February 2016 at 14:18, Linus Walleij <linus.walleij@linaro.org> wrote:
-> The DTSI file for the Nomadik does not properly specify how the
-> PL180 levelshifter is connected: the Nomadik actually needs all
-> the five st,sig-dir-* flags set to properly control all lines out.
->
-> Further this board supports full power cycling of the card, and
-> since this variant has no hardware clock gating, it needs a
-> ridiculously low frequency setting to keep up with the ever
-> overflowing FIFO.
->
-> The pin configuration set-up is a bit of a mystery, because of
-> course these pins are a mix of inputs and outputs. However the
-> reference implementation sets all pins to "output" with
-> unspecified initial value, so let's do that here as well.
->
-> Cc: stable at vger.kernel.org
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+I merged two EFI/ARM related series, whose v1's I sent out last week:
 
-Looks good to me!
+Changes since v1:
+- added various tags from various people
+- new patch #3 to undefine __init
 
-Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+@Matt: are you happy with all of this going through the arm64 tree? I don't
+think it clashes with anything else we've got queued up for v4.6 in tip/efi/core
 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ARM SoC folks: this fixes the non-working SD/MMC card on the
-> Nomadik please apply this directly for fixes if Ulf is OK with
-> it.
-> ---
->  arch/arm/boot/dts/ste-nomadik-stn8815.dtsi | 37 ++++++++++++++++--------------
->  1 file changed, 20 insertions(+), 17 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-> index 50c256f0fd98..b1707f6217bf 100644
-> --- a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-> +++ b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-> @@ -128,22 +128,14 @@
->                         };
->                         mmcsd_default_mode: mmcsd_default {
->                                 mmcsd_default_cfg1 {
-> -                                       /* MCCLK */
-> -                                       pins = "GPIO8_B10";
-> -                                       ste,output = <0>;
-> -                               };
-> -                               mmcsd_default_cfg2 {
-> -                                       /* MCCMDDIR, MCDAT0DIR, MCDAT31DIR, MCDATDIR2 */
-> -                                       pins = "GPIO10_C11", "GPIO15_A12",
-> -                                       "GPIO16_C13", "GPIO23_D15";
-> -                                       ste,output = <1>;
-> -                               };
-> -                               mmcsd_default_cfg3 {
-> -                                       /* MCCMD, MCDAT3-0, MCMSFBCLK */
-> -                                       pins = "GPIO9_A10", "GPIO11_B11",
-> -                                       "GPIO12_A11", "GPIO13_C12",
-> -                                       "GPIO14_B12", "GPIO24_C15";
-> -                                       ste,input = <1>;
-> +                                       /*
-> +                                        * MCCLK, MCCMDDIR, MCDAT0DIR, MCDAT31DIR, MCDATDIR2
-> +                                        * MCCMD, MCDAT3-0, MCMSFBCLK
-> +                                        */
-> +                                       pins = "GPIO8_B10", "GPIO9_A10", "GPIO10_C11", "GPIO11_B11",
-> +                                              "GPIO12_A11", "GPIO13_C12", "GPIO14_B12", "GPIO15_A12",
-> +                                              "GPIO16_C13", "GPIO23_D15", "GPIO24_C15";
-> +                                       ste,output = <2>;
->                                 };
->                         };
->                 };
-> @@ -803,10 +795,21 @@
->                         clock-names = "mclk", "apb_pclk";
->                         interrupt-parent = <&vica>;
->                         interrupts = <22>;
-> -                       max-frequency = <48000000>;
-> +                       max-frequency = <400000>;
->                         bus-width = <4>;
->                         cap-mmc-highspeed;
->                         cap-sd-highspeed;
-> +                       full-pwr-cycle;
-> +                       /*
-> +                        * The STw4811 circuit used with the Nomadik strictly
-> +                        * requires that all of these signal direction pins be
-> +                        * routed and used for its 4-bit levelshifter.
-> +                        */
-> +                       st,sig-dir-dat0;
-> +                       st,sig-dir-dat2;
-> +                       st,sig-dir-dat31;
-> +                       st,sig-dir-cmd;
-> +                       st,sig-pin-fbclk;
->                         pinctrl-names = "default";
->                         pinctrl-0 = <&mmcsd_default_mux>, <&mmcsd_default_mode>;
->                         vmmc-supply = <&vmmc_regulator>;
-> --
-> 2.4.3
->
+Series 1: arm efi minor fixes
+http://thread.gmane.org/gmane.linux.ports.arm.kernel/473027
+This fixes two minor issues with the handling of .init data in the stub (#1, #2)
+
+Patch #3 is a new patch that un-#defines __init in efistub.h, to catch its
+inadvertent use in the UEFI stub
+
+Patch #4 replaces some instances of early_memremap() with early_memremap_ro()
+where the region in question is only accessed in r/o mode.
+
+Series 2: UEFI stub pre-boot compat checks
+http://thread.gmane.org/gmane.linux.ports.arm.kernel/473189
+
+As discussed earlier today [1], and last year [2], it makes sense for the
+UEFI stub to perform some basic checks on the hardware for missing features
+that would prevent the kernel from booting to a state where it can even
+complain about this.
+
+So implements this for ARM, to check on LPAE builds whether the CPU supports
+it (patch #5), and for arm64, to check whether the build time granule is
+implemented by the CPU (patch #6). Patch #7 wires it up into the shared init
+code.
+
+[1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/472880
+[2] http://thread.gmane.org/gmane.linux.ports.arm.kernel/447370
+
+Ard Biesheuvel (7):
+  arm64: efistub: drop __init annotation from handle_kernel_image()
+  arm64: vmlinux.lds.S: handle .init.rodata.xxx and .init.bss sections
+  efi: efistub: prevent __init annotations from being used
+  efi: arm-init: use read-only early mappings
+  ARM: efistub: check for LPAE support before booting a LPAE kernel
+  arm64: efistub: check for h/w support before booting a >4 KB granule
+    kernel
+  ARM/arm64: efistub: perform hardware compatibility check
+
+ arch/arm64/kernel/vmlinux.lds.S           |  1 +
+ drivers/firmware/efi/arm-init.c           | 14 ++++----
+ drivers/firmware/efi/libstub/arm-stub.c   |  4 +++
+ drivers/firmware/efi/libstub/arm32-stub.c | 17 ++++++++++
+ drivers/firmware/efi/libstub/arm64-stub.c | 34 ++++++++++++++++----
+ drivers/firmware/efi/libstub/efistub.h    | 12 +++++++
+ 6 files changed, 68 insertions(+), 14 deletions(-)
+
+-- 
+2.5.0
