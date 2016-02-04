@@ -1,50 +1,131 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  4 Feb 2016 15:29:44 +0100
-Subject: [GIT PULL] Renesas ARM64 Based SoC DT Updates for v4.6
-Message-ID: <cover.1454595726.git.horms+renesas@verge.net.au>
+Date: Thu,  4 Feb 2016 15:29:38 +0100
+Subject: [PATCH 1/8] arm64: dts: r8a7795: Complete SYS-DMAC nodes
+In-Reply-To: <cover.1454595726.git.horms+renesas@verge.net.au>
+References: <cover.1454595726.git.horms+renesas@verge.net.au>
+Message-ID: <e2102cea9bced786a07ae5c244eff6e5e03376e3.1454595726.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Please consider these Renesas ARM64 based SoC DT updates for v4.6.
+Complete the dma-controller nodes for SYS-DMAC 0 to 2.
 
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 93 ++++++++++++++++++++++++++++++--
+ 1 file changed, 90 insertions(+), 3 deletions(-)
 
-The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
-
-  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-dt-for-v4.6
-
-for you to fetch changes up to a3fc85e27b7e3c29b30909929bc64737a19fd251:
-
-  arm64: dts: salvator-x: Enable SCIF_CLK frequency and pins (2016-02-03 10:04:33 +0100)
-
-----------------------------------------------------------------
-Renesas ARM64 Based SoC DT Updates for v4.6
-
-* Use SCIF fallback compatibility strings
-* Add Baud Rate Generator (BRG) support for (H)SCIF
-* Enable SCIF_CLK frequency and pins
-* Enable USB 3.0 host
-* Add Add USB-DMAC device nodes
-* Complete SYS-DMAC device nodes
-
-----------------------------------------------------------------
-Geert Uytterhoeven (5):
-      arm64: dts: r8a7795: Complete SYS-DMAC nodes
-      arm64: dts: r8a7795: Add SCIF fallback compatibility strings
-      arm64: dts: r8a7795: Rename the serial port clock to fck
-      arm64: dts: r8a7795: Add BRG support for (H)SCIF
-      arm64: dts: salvator-x: Enable SCIF_CLK frequency and pins
-
-Yoshihiro Shimoda (3):
-      arm64: dts: r8a7795: Add USB3.0 host device nodes
-      arm64: dts: salvator-x: enable usb3.0 host channel 0
-      arm64: dts: r8a7795: Add USB-DMAC device nodes
-
- arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts |  16 ++
- arch/arm64/boot/dts/renesas/r8a7795.dtsi           | 249 ++++++++++++++++++---
- 2 files changed, 229 insertions(+), 36 deletions(-)
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index bb353cde1253..221a8f5d24af 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -333,15 +333,102 @@
+ 		};
+ 
+ 		dmac0: dma-controller at e6700000 {
+-			/* Empty node for now */
++			compatible = "renesas,dmac-r8a7795",
++				     "renesas,rcar-dmac";
++			reg = <0 0xe6700000 0 0x10000>;
++			interrupts = <GIC_SPI 199 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 200 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 201 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 202 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 203 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 204 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 205 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 206 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 207 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 208 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 209 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 210 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 211 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 212 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 213 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 214 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 215 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "error",
++					"ch0", "ch1", "ch2", "ch3",
++					"ch4", "ch5", "ch6", "ch7",
++					"ch8", "ch9", "ch10", "ch11",
++					"ch12", "ch13", "ch14", "ch15";
++			clocks = <&cpg CPG_MOD 219>;
++			clock-names = "fck";
++			power-domains = <&cpg>;
++			#dma-cells = <1>;
++			dma-channels = <16>;
+ 		};
+ 
+ 		dmac1: dma-controller at e7300000 {
+-			/* Empty node for now */
++			compatible = "renesas,dmac-r8a7795",
++				     "renesas,rcar-dmac";
++			reg = <0 0xe7300000 0 0x10000>;
++			interrupts = <GIC_SPI 220 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 216 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 217 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 218 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 219 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 308 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 309 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 310 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 311 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 312 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 313 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 314 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 315 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 316 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 317 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 318 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 319 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "error",
++					"ch0", "ch1", "ch2", "ch3",
++					"ch4", "ch5", "ch6", "ch7",
++					"ch8", "ch9", "ch10", "ch11",
++					"ch12", "ch13", "ch14", "ch15";
++			clocks = <&cpg CPG_MOD 218>;
++			clock-names = "fck";
++			power-domains = <&cpg>;
++			#dma-cells = <1>;
++			dma-channels = <16>;
+ 		};
+ 
+ 		dmac2: dma-controller at e7310000 {
+-			/* Empty node for now */
++			compatible = "renesas,dmac-r8a7795",
++				     "renesas,rcar-dmac";
++			reg = <0 0xe7310000 0 0x10000>;
++			interrupts = <GIC_SPI 416 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 417 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 418 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 419 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 420 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 421 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 422 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 423 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 424 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 425 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 426 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 427 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 428 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 429 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 430 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 431 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 397 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "error",
++					"ch0", "ch1", "ch2", "ch3",
++					"ch4", "ch5", "ch6", "ch7",
++					"ch8", "ch9", "ch10", "ch11",
++					"ch12", "ch13", "ch14", "ch15";
++			clocks = <&cpg CPG_MOD 217>;
++			clock-names = "fck";
++			power-domains = <&cpg>;
++			#dma-cells = <1>;
++			dma-channels = <16>;
+ 		};
+ 
+ 		avb: ethernet at e6800000 {
+-- 
+2.7.0.rc3.207.g0ac5344
