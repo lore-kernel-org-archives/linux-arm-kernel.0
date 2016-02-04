@@ -1,65 +1,38 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu,  4 Feb 2016 09:31:45 +0100
-Subject: [PATCH] ARM: remove duplicate definitions of __vectors_start and
- __stubs_start
-Message-ID: <1454574705-15109-1-git-send-email-ard.biesheuvel@linaro.org>
+From: vishnupatekar0510@gmail.com (Vishnu Patekar)
+Date: Thu, 4 Feb 2016 16:51:06 +0800
+Subject: [PATCH 06/14] ARM: dts: sun8i-a83t: Correct low speed oscillator
+ clocks
+In-Reply-To: <20160202131947.GS4652@lukather>
+References: <1454203266-4450-1-git-send-email-vishnupatekar0510@gmail.com>
+ <1454203266-4450-7-git-send-email-vishnupatekar0510@gmail.com>
+ <20160202131947.GS4652@lukather>
+Message-ID: <CAEzqOZvcy58T_uxvymGxuQXh_Goj3yHmgkmL4VL+x2_bycMgNg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit b9b32bf70f2f ("ARM: use linker magic for vectors and vector stubs")
-introduced new global definitions of __vectors_start and __stubs_start,
-and changed the existing ones to have internal linkage only. However, these
-symbols are still visible to kallsyms, and due to the way the .vectors and
-.stubs sections are emitted at the base of the VMA space, these duplicate
-definitions have conflicting values.
+Hello Maxime,
 
-  $ nm -n vmlinux |grep -E __vectors\|__stubs
-  00000000 t __vectors_start
-  00001000 t __stubs_start
-  c0e77000 T __vectors_start
-  c0e77020 T __stubs_start
 
-This is completely harmless by itself, since the wrong values are local
-symbols that cannot be referenced by other object files directly. However,
-since these symbols are also listed in the kallsyms symbol table in some
-cases (i.e., CONFIG_KALLSYMS_ALL=y and CONFIG_XIP_KERNEL=y), having these
-conflicting values can be confusing. So either remove them, or make them
-strictly local.
-
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
-
-This is a separate fix for the duplicate symbols based on v4.5-rc2,
-so that it can be applied separately if desired. In that case, I will
-rebase my kallsyms series onto this patch.
-
- arch/arm/kernel/entry-armv.S | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-index 3ce377f7251f..788e40c1254f 100644
---- a/arch/arm/kernel/entry-armv.S
-+++ b/arch/arm/kernel/entry-armv.S
-@@ -1064,7 +1064,6 @@ ENDPROC(vector_\name)
- 	.endm
- 
- 	.section .stubs, "ax", %progbits
--__stubs_start:
- 	@ This must be the first word
- 	.word	vector_swi
- 
-@@ -1206,10 +1205,10 @@ vector_addrexcptn:
- 	.equ	vector_fiq_offset, vector_fiq
- 
- 	.section .vectors, "ax", %progbits
--__vectors_start:
-+.L__vectors_start:
- 	W(b)	vector_rst
- 	W(b)	vector_und
--	W(ldr)	pc, __vectors_start + 0x1000
-+	W(ldr)	pc, .L__vectors_start + 0x1000
- 	W(b)	vector_pabt
- 	W(b)	vector_dabt
- 	W(b)	vector_addrexcptn
--- 
-2.5.0
+On Tue, Feb 2, 2016 at 9:19 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Sun, Jan 31, 2016 at 09:20:58AM +0800, Vishnu Patekar wrote:
+>> From: Chen-Yu Tsai <wens@csie.org>
+>>
+>> The A83T does not have a 32.768 kHz low speed oscillator, either as
+>> an external crystal or input. It has a 16 MHz RC-based (inaccurate)
+>> internal oscillator, which is then divided by 512 for a clock close
+>> to 32 kHz.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>
+> You should have your SoB here.
+>
+> Is it ok to add it?
+Yes, please add.
+>
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
