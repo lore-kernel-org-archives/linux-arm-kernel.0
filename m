@@ -1,93 +1,214 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu,  4 Feb 2016 11:06:51 +0100
-Subject: [PATCH v2 28/51] mtd: nand: cafe: switch to mtd_ooblayout_ops
+Date: Thu,  4 Feb 2016 11:06:44 +0100
+Subject: [PATCH v2 21/51] mtd: nand: implement the default mtd_ooblayout_ops
 In-Reply-To: <1454580434-32078-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1454580434-32078-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1454580434-32078-29-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1454580434-32078-22-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implementing the mtd_ooblayout_ops interface is the new way of exposing
-ECC/OOB layout to MTD users.
+Replace the default nand_ecclayout definitions for large and small page
+devices with the equivalent mtd_ooblayout_ops.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/mtd/nand/cafe_nand.c | 45 ++++++++++++++++++++++++++++++++------------
- 1 file changed, 33 insertions(+), 12 deletions(-)
+ drivers/mtd/nand/nand_base.c | 147 ++++++++++++++++++++++++++++---------------
+ include/linux/mtd/nand.h     |   3 +
+ 2 files changed, 99 insertions(+), 51 deletions(-)
 
-diff --git a/drivers/mtd/nand/cafe_nand.c b/drivers/mtd/nand/cafe_nand.c
-index aa1a616..0935b7c 100644
---- a/drivers/mtd/nand/cafe_nand.c
-+++ b/drivers/mtd/nand/cafe_nand.c
-@@ -459,10 +459,38 @@ static int cafe_nand_read_page(struct mtd_info *mtd, struct nand_chip *chip,
- 	return max_bitflips;
- }
+diff --git a/drivers/mtd/nand/nand_base.c b/drivers/mtd/nand/nand_base.c
+index a01b472..e4dc62b 100644
+--- a/drivers/mtd/nand/nand_base.c
++++ b/drivers/mtd/nand/nand_base.c
+@@ -48,50 +48,6 @@
+ #include <linux/mtd/partitions.h>
+ #include <linux/of_mtd.h>
  
--static struct nand_ecclayout cafe_oobinfo_2048 = {
--	.eccbytes = 14,
--	.eccpos = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13},
--	.oobfree = {{14, 50}}
-+static int cafe_ooblayout_ecc(struct mtd_info *mtd, int section,
-+			      struct mtd_oob_region *oobregion)
-+{
-+	struct nand_chip *chip = mtd_to_nand(mtd);
-+
-+	if (section)
-+		return -ERANGE;
-+
-+	oobregion->offset = 0;
-+	oobregion->length = chip->ecc.steps * chip->ecc.bytes;
-+
-+	return 0;
-+}
-+
-+static int cafe_ooblayout_free(struct mtd_info *mtd, int section,
-+			       struct mtd_oob_region *oobregion)
-+{
-+	struct nand_chip *chip = mtd_to_nand(mtd);
-+	int eccbytes = chip->ecc.steps * chip->ecc.bytes;
-+
-+	if (section)
-+		return -ERANGE;
-+
-+	oobregion->offset = eccbytes;
-+	oobregion->length = mtd->oobsize - eccbytes;
-+
-+	return 0;
-+}
-+
-+static const struct mtd_ooblayout_ops cafe_ooblayout_ops = {
-+	.ecc = cafe_ooblayout_ecc,
-+	.free = cafe_ooblayout_free,
- };
- 
- /* Ick. The BBT code really ought to be able to work this bit out
-@@ -494,12 +522,6 @@ static struct nand_bbt_descr cafe_bbt_mirror_descr_2048 = {
- 	.pattern = cafe_mirror_pattern_2048
- };
- 
--static struct nand_ecclayout cafe_oobinfo_512 = {
--	.eccbytes = 14,
--	.eccpos = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13},
--	.oobfree = {{14, 2}}
+-/* Define default oob placement schemes for large and small page devices */
+-static struct nand_ecclayout nand_oob_8 = {
+-	.eccbytes = 3,
+-	.eccpos = {0, 1, 2},
+-	.oobfree = {
+-		{.offset = 3,
+-		 .length = 2},
+-		{.offset = 6,
+-		 .length = 2} }
 -};
 -
- static struct nand_bbt_descr cafe_bbt_main_descr_512 = {
- 	.options = NAND_BBT_LASTBLOCK | NAND_BBT_CREATE | NAND_BBT_WRITE
- 		| NAND_BBT_2BIT | NAND_BBT_VERSION,
-@@ -743,12 +765,11 @@ static int cafe_nand_probe(struct pci_dev *pdev,
- 		cafe->ctl2 |= 1<<29; /* 2KiB page size */
+-static struct nand_ecclayout nand_oob_16 = {
+-	.eccbytes = 6,
+-	.eccpos = {0, 1, 2, 3, 6, 7},
+-	.oobfree = {
+-		{.offset = 8,
+-		 . length = 8} }
+-};
+-
+-static struct nand_ecclayout nand_oob_64 = {
+-	.eccbytes = 24,
+-	.eccpos = {
+-		   40, 41, 42, 43, 44, 45, 46, 47,
+-		   48, 49, 50, 51, 52, 53, 54, 55,
+-		   56, 57, 58, 59, 60, 61, 62, 63},
+-	.oobfree = {
+-		{.offset = 2,
+-		 .length = 38} }
+-};
+-
+-static struct nand_ecclayout nand_oob_128 = {
+-	.eccbytes = 48,
+-	.eccpos = {
+-		   80, 81, 82, 83, 84, 85, 86, 87,
+-		   88, 89, 90, 91, 92, 93, 94, 95,
+-		   96, 97, 98, 99, 100, 101, 102, 103,
+-		   104, 105, 106, 107, 108, 109, 110, 111,
+-		   112, 113, 114, 115, 116, 117, 118, 119,
+-		   120, 121, 122, 123, 124, 125, 126, 127},
+-	.oobfree = {
+-		{.offset = 2,
+-		 .length = 78} }
+-};
+-
+ static int nand_get_device(struct mtd_info *mtd, int new_state);
  
- 	/* Set up ECC according to the type of chip we found */
-+	mtd_set_ooblayout(mtd, &cafe_ooblayout_ops);
- 	if (mtd->writesize == 2048) {
--		cafe->nand.ecc.layout = &cafe_oobinfo_2048;
- 		cafe->nand.bbt_td = &cafe_bbt_main_descr_2048;
- 		cafe->nand.bbt_md = &cafe_bbt_mirror_descr_2048;
- 	} else if (mtd->writesize == 512) {
--		cafe->nand.ecc.layout = &cafe_oobinfo_512;
- 		cafe->nand.bbt_td = &cafe_bbt_main_descr_512;
- 		cafe->nand.bbt_md = &cafe_bbt_mirror_descr_512;
- 	} else {
+ static int nand_do_write_oob(struct mtd_info *mtd, loff_t to,
+@@ -103,6 +59,92 @@ static int nand_do_write_oob(struct mtd_info *mtd, loff_t to,
+  */
+ DEFINE_LED_TRIGGER(nand_led_trigger);
+ 
++/* Define default oob placement schemes for large and small page devices */
++static int nand_ooblayout_ecc_sp(struct mtd_info *mtd, int section,
++				 struct mtd_oob_region *oobregion)
++{
++	struct nand_chip *chip = mtd_to_nand(mtd);
++	struct nand_ecc_ctrl *ecc = &chip->ecc;
++
++	if (section > 1)
++		return -ERANGE;
++
++	if (!section) {
++		oobregion->offset = 0;
++		oobregion->length = 4;
++	} else {
++		oobregion->offset = 6;
++		oobregion->length = (ecc->bytes * ecc->steps) - 4;
++	}
++
++	return 0;
++}
++
++static int nand_ooblayout_free_sp(struct mtd_info *mtd, int section,
++				  struct mtd_oob_region *oobregion)
++{
++	if (section > 1)
++		return -ERANGE;
++
++	if (mtd->oobsize == 16) {
++		if (section)
++			return -ERANGE;
++
++		oobregion->length = 8;
++		oobregion->offset = 8;
++	} else {
++		oobregion->length = 2;
++		if (!section)
++			oobregion->offset = 3;
++		else
++			oobregion->offset = 6;
++	}
++
++	return 0;
++}
++
++const struct mtd_ooblayout_ops nand_ooblayout_sp_ops = {
++	.ecc = nand_ooblayout_ecc_sp,
++	.free = nand_ooblayout_free_sp,
++};
++EXPORT_SYMBOL_GPL(nand_ooblayout_sp_ops);
++
++static int nand_ooblayout_ecc_lp(struct mtd_info *mtd, int section,
++				 struct mtd_oob_region *oobregion)
++{
++	struct nand_chip *chip = mtd_to_nand(mtd);
++	struct nand_ecc_ctrl *ecc = &chip->ecc;
++
++	if (section)
++		return -ERANGE;
++
++	oobregion->length = ecc->bytes * ecc->steps;
++	oobregion->offset = mtd->oobsize - oobregion->length;
++
++	return 0;
++}
++
++static int nand_ooblayout_free_lp(struct mtd_info *mtd, int section,
++				  struct mtd_oob_region *oobregion)
++{
++	struct nand_chip *chip = mtd_to_nand(mtd);
++	struct nand_ecc_ctrl *ecc = &chip->ecc;
++
++	if (section)
++		return -ERANGE;
++
++	oobregion->length = mtd->oobsize - (ecc->bytes * ecc->steps) - 2;
++	oobregion->offset = 2;
++
++	return 0;
++}
++
++const struct mtd_ooblayout_ops nand_ooblayout_lp_ops = {
++	.ecc = nand_ooblayout_ecc_lp,
++	.free = nand_ooblayout_free_lp,
++};
++EXPORT_SYMBOL_GPL(nand_ooblayout_lp_ops);
++
+ static int check_offs_len(struct mtd_info *mtd,
+ 					loff_t ofs, uint64_t len)
+ {
+@@ -4119,21 +4161,24 @@ int nand_scan_tail(struct mtd_info *mtd)
+ 	chip->oob_poi = chip->buffers->databuf + mtd->writesize;
+ 
+ 	/*
++	 * Set the provided ECC layout. If ecc->layout is NULL, the MTD core
++	 * will just leave mtd->ooblayout to NULL, if it's not NULL, it will
++	 * set ->ooblayout to the default ecclayout wrapper.
++	 */
++	mtd_set_ecclayout(mtd, ecc->layout);
++
++	/*
+ 	 * If no default placement scheme is given, select an appropriate one.
+ 	 */
+-	if (!ecc->layout && (ecc->mode != NAND_ECC_SOFT_BCH)) {
++	if (!mtd->ooblayout && (ecc->mode != NAND_ECC_SOFT_BCH)) {
+ 		switch (mtd->oobsize) {
+ 		case 8:
+-			ecc->layout = &nand_oob_8;
+-			break;
+ 		case 16:
+-			ecc->layout = &nand_oob_16;
++			mtd_set_ooblayout(mtd, &nand_ooblayout_sp_ops);
+ 			break;
+ 		case 64:
+-			ecc->layout = &nand_oob_64;
+-			break;
+ 		case 128:
+-			ecc->layout = &nand_oob_128;
++			mtd_set_ooblayout(mtd, &nand_ooblayout_lp_ops);
+ 			break;
+ 		default:
+ 			pr_warn("No oob scheme defined for oobsize %d\n",
+diff --git a/include/linux/mtd/nand.h b/include/linux/mtd/nand.h
+index 7604f4b..82a005a 100644
+--- a/include/linux/mtd/nand.h
++++ b/include/linux/mtd/nand.h
+@@ -740,6 +740,9 @@ struct nand_chip {
+ 	void *priv;
+ };
+ 
++extern const struct mtd_ooblayout_ops nand_ooblayout_sp_ops;
++extern const struct mtd_ooblayout_ops nand_ooblayout_lp_ops;
++
+ static inline void nand_set_flash_node(struct nand_chip *chip,
+ 				       struct device_node *np)
+ {
 -- 
 2.1.4
