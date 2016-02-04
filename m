@@ -1,161 +1,84 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  4 Feb 2016 15:29:34 +0100
-Subject: [PATCH 40/70] ARM: dts: emev2: use GIC_* defines
+Date: Thu,  4 Feb 2016 15:29:36 +0100
+Subject: [PATCH 42/70] ARM: dts: r8a7779: Add SCIF fallback compatibility
+ strings
 In-Reply-To: <cover.1454595846.git.horms+renesas@verge.net.au>
 References: <cover.1454595846.git.horms+renesas@verge.net.au>
-Message-ID: <d8c76241e05f6e124a22ab36032f98d99733bc90.1454595846.git.horms+renesas@verge.net.au>
+Message-ID: <2add0b94bb9db2ba387108461e432de339eb2608.1454595846.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use GIC_* defines for GIC interrupt cells in emev2 device tree.
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/emev2.dtsi | 39 ++++++++++++++++++++-------------------
- 1 file changed, 20 insertions(+), 19 deletions(-)
+ arch/arm/boot/dts/r8a7779.dtsi | 18 ++++++++++++------
+ 1 file changed, 12 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/emev2.dtsi b/arch/arm/boot/dts/emev2.dtsi
-index 57795da616cb..bcce6f50c93d 100644
---- a/arch/arm/boot/dts/emev2.dtsi
-+++ b/arch/arm/boot/dts/emev2.dtsi
-@@ -9,6 +9,7 @@
-  */
- 
- #include "skeleton.dtsi"
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- 
- / {
-@@ -53,8 +54,8 @@
- 
- 	pmu {
- 		compatible = "arm,cortex-a9-pmu";
--		interrupts = <0 120 IRQ_TYPE_LEVEL_HIGH>,
--			     <0 121 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>;
+diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
+index 93f3fdf95e31..1671839f55a6 100644
+--- a/arch/arm/boot/dts/r8a7779.dtsi
++++ b/arch/arm/boot/dts/r8a7779.dtsi
+@@ -211,7 +211,8 @@
  	};
  
- 	clocks at e0110000 {
-@@ -158,7 +159,7 @@
- 	timer at e0180000 {
- 		compatible = "renesas,em-sti";
- 		reg = <0xe0180000 0x54>;
--		interrupts = <0 125 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 125 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&sti_sclk>;
- 		clock-names = "sclk";
+ 	scif0: serial at ffe40000 {
+-		compatible = "renesas,scif-r8a7779", "renesas,scif";
++		compatible = "renesas,scif-r8a7779", "renesas,rcar-gen1-scif",
++			     "renesas,scif";
+ 		reg = <0xffe40000 0x100>;
+ 		interrupts = <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp0_clks R8A7779_CLK_SCIF0>;
+@@ -221,7 +222,8 @@
  	};
-@@ -166,7 +167,7 @@
- 	uart0: serial at e1020000 {
- 		compatible = "renesas,em-uart";
- 		reg = <0xe1020000 0x38>;
--		interrupts = <0 8 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&usia_u0_sclk>;
- 		clock-names = "sclk";
+ 
+ 	scif1: serial at ffe41000 {
+-		compatible = "renesas,scif-r8a7779", "renesas,scif";
++		compatible = "renesas,scif-r8a7779", "renesas,rcar-gen1-scif",
++			     "renesas,scif";
+ 		reg = <0xffe41000 0x100>;
+ 		interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp0_clks R8A7779_CLK_SCIF1>;
+@@ -231,7 +233,8 @@
  	};
-@@ -174,7 +175,7 @@
- 	uart1: serial at e1030000 {
- 		compatible = "renesas,em-uart";
- 		reg = <0xe1030000 0x38>;
--		interrupts = <0 9 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&usib_u1_sclk>;
- 		clock-names = "sclk";
+ 
+ 	scif2: serial at ffe42000 {
+-		compatible = "renesas,scif-r8a7779", "renesas,scif";
++		compatible = "renesas,scif-r8a7779", "renesas,rcar-gen1-scif",
++			     "renesas,scif";
+ 		reg = <0xffe42000 0x100>;
+ 		interrupts = <GIC_SPI 90 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp0_clks R8A7779_CLK_SCIF2>;
+@@ -241,7 +244,8 @@
  	};
-@@ -182,7 +183,7 @@
- 	uart2: serial at e1040000 {
- 		compatible = "renesas,em-uart";
- 		reg = <0xe1040000 0x38>;
--		interrupts = <0 10 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&usib_u2_sclk>;
- 		clock-names = "sclk";
+ 
+ 	scif3: serial at ffe43000 {
+-		compatible = "renesas,scif-r8a7779", "renesas,scif";
++		compatible = "renesas,scif-r8a7779", "renesas,rcar-gen1-scif",
++			     "renesas,scif";
+ 		reg = <0xffe43000 0x100>;
+ 		interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp0_clks R8A7779_CLK_SCIF3>;
+@@ -251,7 +255,8 @@
  	};
-@@ -190,7 +191,7 @@
- 	uart3: serial at e1050000 {
- 		compatible = "renesas,em-uart";
- 		reg = <0xe1050000 0x38>;
--		interrupts = <0 11 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&usib_u3_sclk>;
- 		clock-names = "sclk";
+ 
+ 	scif4: serial at ffe44000 {
+-		compatible = "renesas,scif-r8a7779", "renesas,scif";
++		compatible = "renesas,scif-r8a7779", "renesas,rcar-gen1-scif",
++			     "renesas,scif";
+ 		reg = <0xffe44000 0x100>;
+ 		interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp0_clks R8A7779_CLK_SCIF4>;
+@@ -261,7 +266,8 @@
  	};
-@@ -203,8 +204,8 @@
- 	gpio0: gpio at e0050000 {
- 		compatible = "renesas,em-gio";
- 		reg = <0xe0050000 0x2c>, <0xe0050040 0x20>;
--		interrupts = <0 67 IRQ_TYPE_LEVEL_HIGH>,
--			     <0 68 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>;
- 		gpio-controller;
- 		gpio-ranges = <&pfc 0 0 32>;
- 		#gpio-cells = <2>;
-@@ -215,8 +216,8 @@
- 	gpio1: gpio at e0050080 {
- 		compatible = "renesas,em-gio";
- 		reg = <0xe0050080 0x2c>, <0xe00500c0 0x20>;
--		interrupts = <0 69 IRQ_TYPE_LEVEL_HIGH>,
--			     <0 70 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH>;
- 		gpio-controller;
- 		gpio-ranges = <&pfc 0 32 32>;
- 		#gpio-cells = <2>;
-@@ -227,8 +228,8 @@
- 	gpio2: gpio at e0050100 {
- 		compatible = "renesas,em-gio";
- 		reg = <0xe0050100 0x2c>, <0xe0050140 0x20>;
--		interrupts = <0 71 IRQ_TYPE_LEVEL_HIGH>,
--			     <0 72 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
- 		gpio-controller;
- 		gpio-ranges = <&pfc 0 64 32>;
- 		#gpio-cells = <2>;
-@@ -239,8 +240,8 @@
- 	gpio3: gpio at e0050180 {
- 		compatible = "renesas,em-gio";
- 		reg = <0xe0050180 0x2c>, <0xe00501c0 0x20>;
--		interrupts = <0 73 IRQ_TYPE_LEVEL_HIGH>,
--			     <0 74 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>;
- 		gpio-controller;
- 		gpio-ranges = <&pfc 0 96 32>;
- 		#gpio-cells = <2>;
-@@ -251,8 +252,8 @@
- 	gpio4: gpio at e0050200 {
- 		compatible = "renesas,em-gio";
- 		reg = <0xe0050200 0x2c>, <0xe0050240 0x20>;
--		interrupts = <0 75 IRQ_TYPE_LEVEL_HIGH>,
--			     <0 76 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>;
- 		gpio-controller;
- 		gpio-ranges = <&pfc 0 128 31>;
- 		#gpio-cells = <2>;
-@@ -266,7 +267,7 @@
- 		#size-cells = <0>;
- 		compatible = "renesas,iic-emev2";
- 		reg = <0xe0070000 0x28>;
--		interrupts = <0 32 IRQ_TYPE_EDGE_RISING>;
-+		interrupts = <GIC_SPI 32 IRQ_TYPE_EDGE_RISING>;
- 		clocks = <&iic0_sclk>;
- 		clock-names = "sclk";
- 		status = "disabled";
-@@ -277,7 +278,7 @@
- 		#size-cells = <0>;
- 		compatible = "renesas,iic-emev2";
- 		reg = <0xe10a0000 0x28>;
--		interrupts = <0 33 IRQ_TYPE_EDGE_RISING>;
-+		interrupts = <GIC_SPI 33 IRQ_TYPE_EDGE_RISING>;
- 		clocks = <&iic1_sclk>;
- 		clock-names = "sclk";
- 		status = "disabled";
+ 
+ 	scif5: serial at ffe45000 {
+-		compatible = "renesas,scif-r8a7779", "renesas,scif";
++		compatible = "renesas,scif-r8a7779", "renesas,rcar-gen1-scif",
++			     "renesas,scif";
+ 		reg = <0xffe45000 0x100>;
+ 		interrupts = <GIC_SPI 93 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp0_clks R8A7779_CLK_SCIF5>;
 -- 
 2.7.0.rc3.207.g0ac5344
