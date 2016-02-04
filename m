@@ -1,35 +1,36 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Thu, 4 Feb 2016 13:18:42 -0800
-Subject: [PATCH v2 2/3] Input: rotary-encoder - move configuration data
- to driver data
-In-Reply-To: <20160203093527.GD13664@pengutronix.de>
-References: <1454408678-6011-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1454408678-6011-3-git-send-email-u.kleine-koenig@pengutronix.de>
- <56B09CAB.5020600@zonque.org>
- <20160203093527.GD13664@pengutronix.de>
-Message-ID: <20160204211842.GA40137@dtor-ws>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 4 Feb 2016 13:24:04 -0800
+Subject: [PATCH] ARM: nomadik: fix up SD/MMC DT settings
+In-Reply-To: <1454332737-631-1-git-send-email-linus.walleij@linaro.org>
+References: <1454332737-631-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20160204212404.GA10600@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 03, 2016 at 10:35:27AM +0100, Uwe Kleine-K?nig wrote:
-> Hello,
+On Mon, Feb 01, 2016 at 02:18:57PM +0100, Linus Walleij wrote:
+> The DTSI file for the Nomadik does not properly specify how the
+> PL180 levelshifter is connected: the Nomadik actually needs all
+> the five st,sig-dir-* flags set to properly control all lines out.
 > 
-> On Tue, Feb 02, 2016 at 01:10:19PM +0100, Daniel Mack wrote:
-> > On 02/02/2016 11:24 AM, Uwe Kleine-K?nig wrote:
-> > > This is a preparation for the next patche. There is no change in
-> > > behaviour intended.
-> > 
-> > This one looks good to me, but it clashes with Dmitry's latest patch
-> > sets (which I haven't found the time to test yet, sorry!).
+> Further this board supports full power cycling of the card, and
+> since this variant has no hardware clock gating, it needs a
+> ridiculously low frequency setting to keep up with the ever
+> overflowing FIFO.
 > 
-> There is nothing in next-20160203, so I assume Dmitry either fixes this
-> up when applying my patches or tells me when I should rebase.
+> The pin configuration set-up is a bit of a mystery, because of
+> course these pins are a mix of inputs and outputs. However the
+> reference implementation sets all pins to "output" with
+> unspecified initial value, so let's do that here as well.
+> 
+> Cc: stable at vger.kernel.org
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ARM SoC folks: this fixes the non-working SD/MMC card on the
+> Nomadik please apply this directly for fixes if Ulf is OK with
+> it.
 
-Please take a look at my rotary-encoder branch. I am waiting to merge it
-into next until I can get some testers. If you have raumfild device that
-would be awesome.
+Thanks, applied.
 
-Thanks.
 
--- 
-Dmitry
+-Olof
