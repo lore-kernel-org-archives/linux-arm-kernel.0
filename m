@@ -1,136 +1,46 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  4 Feb 2016 11:00:28 +0000
-Subject: [PATCH v2 11/28] ARM: KVM: Add vgic v2 save/restore
+Date: Thu,  4 Feb 2016 11:00:24 +0000
+Subject: [PATCH v2 07/28] ARM: KVM: Add system register accessor macros
 In-Reply-To: <1454583645-10144-1-git-send-email-marc.zyngier@arm.com>
 References: <1454583645-10144-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1454583645-10144-12-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1454583645-10144-8-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch shouldn't exist, as we should be able to reuse the
-arm64 version for free. I'll get there eventually, but in the
-meantime I need an interrupt controller.
+In order to move system register (CP15, mostly) access to C code,
+add a few macros to facilitate this, and minimize the difference
+between 32 and 64bit CP15 registers.
+
+This will get heavily used in the following patches.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kvm/hyp/Makefile     |  1 +
- arch/arm/kvm/hyp/hyp.h        |  3 ++
- arch/arm/kvm/hyp/vgic-v2-sr.c | 84 +++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 88 insertions(+)
- create mode 100644 arch/arm/kvm/hyp/vgic-v2-sr.c
+ arch/arm/kvm/hyp/hyp.h | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-diff --git a/arch/arm/kvm/hyp/Makefile b/arch/arm/kvm/hyp/Makefile
-index 9241ae8..d8acbb6 100644
---- a/arch/arm/kvm/hyp/Makefile
-+++ b/arch/arm/kvm/hyp/Makefile
-@@ -5,3 +5,4 @@
- obj-$(CONFIG_KVM_ARM_HOST) += tlb.o
- obj-$(CONFIG_KVM_ARM_HOST) += cp15-sr.o
- obj-$(CONFIG_KVM_ARM_HOST) += timer-sr.o
-+obj-$(CONFIG_KVM_ARM_HOST) += vgic-v2-sr.o
 diff --git a/arch/arm/kvm/hyp/hyp.h b/arch/arm/kvm/hyp/hyp.h
-index 4924418..7eb1c21 100644
+index c723870..727089f 100644
 --- a/arch/arm/kvm/hyp/hyp.h
 +++ b/arch/arm/kvm/hyp/hyp.h
-@@ -80,6 +80,9 @@
- void __timer_save_state(struct kvm_vcpu *vcpu);
- void __timer_restore_state(struct kvm_vcpu *vcpu);
+@@ -27,4 +27,19 @@
+ #define kern_hyp_va(v) (v)
+ #define hyp_kern_va(v) (v)
  
-+void __vgic_v2_save_state(struct kvm_vcpu *vcpu);
-+void __vgic_v2_restore_state(struct kvm_vcpu *vcpu);
++#define __ACCESS_CP15(CRn, Op1, CRm, Op2)	\
++	"mrc", "mcr", __stringify(p15, Op1, %0, CRn, CRm, Op2), u32
++#define __ACCESS_CP15_64(Op1, CRm)		\
++	"mrrc", "mcrr", __stringify(p15, Op1, %Q0, %R0, CRm), u64
 +
- void __sysreg_save_state(struct kvm_cpu_context *ctxt);
- void __sysreg_restore_state(struct kvm_cpu_context *ctxt);
- 
-diff --git a/arch/arm/kvm/hyp/vgic-v2-sr.c b/arch/arm/kvm/hyp/vgic-v2-sr.c
-new file mode 100644
-index 0000000..e717612
---- /dev/null
-+++ b/arch/arm/kvm/hyp/vgic-v2-sr.c
-@@ -0,0 +1,84 @@
-+/*
-+ * Copyright (C) 2012-2015 - ARM Ltd
-+ * Author: Marc Zyngier <marc.zyngier@arm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
++#define __write_sysreg(v, r, w, c, t)	asm volatile(w " " c : : "r" ((t)(v)))
++#define write_sysreg(v, ...)		__write_sysreg(v, __VA_ARGS__)
 +
-+#include <linux/compiler.h>
-+#include <linux/irqchip/arm-gic.h>
-+#include <linux/kvm_host.h>
++#define __read_sysreg(r, w, c, t) ({				\
++	t __val;						\
++	asm volatile(r " " c : "=r" (__val));			\
++	__val;							\
++})
++#define read_sysreg(...)		__read_sysreg(__VA_ARGS__)
 +
-+#include <asm/kvm_mmu.h>
-+
-+#include "hyp.h"
-+
-+/* vcpu is already in the HYP VA space */
-+void __hyp_text __vgic_v2_save_state(struct kvm_vcpu *vcpu)
-+{
-+	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
-+	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
-+	struct vgic_dist *vgic = &kvm->arch.vgic;
-+	void __iomem *base = kern_hyp_va(vgic->vctrl_base);
-+	u32 eisr0, eisr1, elrsr0, elrsr1;
-+	int i, nr_lr;
-+
-+	if (!base)
-+		return;
-+
-+	nr_lr = vcpu->arch.vgic_cpu.nr_lr;
-+	cpu_if->vgic_vmcr = readl_relaxed(base + GICH_VMCR);
-+	cpu_if->vgic_misr = readl_relaxed(base + GICH_MISR);
-+	eisr0  = readl_relaxed(base + GICH_EISR0);
-+	elrsr0 = readl_relaxed(base + GICH_ELRSR0);
-+	if (unlikely(nr_lr > 32)) {
-+		eisr1  = readl_relaxed(base + GICH_EISR1);
-+		elrsr1 = readl_relaxed(base + GICH_ELRSR1);
-+	} else {
-+		eisr1 = elrsr1 = 0;
-+	}
-+#ifdef CONFIG_CPU_BIG_ENDIAN
-+	cpu_if->vgic_eisr  = ((u64)eisr0 << 32) | eisr1;
-+	cpu_if->vgic_elrsr = ((u64)elrsr0 << 32) | elrsr1;
-+#else
-+	cpu_if->vgic_eisr  = ((u64)eisr1 << 32) | eisr0;
-+	cpu_if->vgic_elrsr = ((u64)elrsr1 << 32) | elrsr0;
-+#endif
-+	cpu_if->vgic_apr    = readl_relaxed(base + GICH_APR);
-+
-+	writel_relaxed(0, base + GICH_HCR);
-+
-+	for (i = 0; i < nr_lr; i++)
-+		cpu_if->vgic_lr[i] = readl_relaxed(base + GICH_LR0 + (i * 4));
-+}
-+
-+/* vcpu is already in the HYP VA space */
-+void __hyp_text __vgic_v2_restore_state(struct kvm_vcpu *vcpu)
-+{
-+	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
-+	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
-+	struct vgic_dist *vgic = &kvm->arch.vgic;
-+	void __iomem *base = kern_hyp_va(vgic->vctrl_base);
-+	int i, nr_lr;
-+
-+	if (!base)
-+		return;
-+
-+	writel_relaxed(cpu_if->vgic_hcr, base + GICH_HCR);
-+	writel_relaxed(cpu_if->vgic_vmcr, base + GICH_VMCR);
-+	writel_relaxed(cpu_if->vgic_apr, base + GICH_APR);
-+
-+	nr_lr = vcpu->arch.vgic_cpu.nr_lr;
-+	for (i = 0; i < nr_lr; i++)
-+		writel_relaxed(cpu_if->vgic_lr[i], base + GICH_LR0 + (i * 4));
-+}
+ #endif /* __ARM_KVM_HYP_H__ */
 -- 
 2.1.4
