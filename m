@@ -1,41 +1,68 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  4 Feb 2016 11:00:30 +0000
-Subject: [PATCH v2 13/28] ARM: KVM: Add banked registers save/restore
+Date: Thu,  4 Feb 2016 11:00:25 +0000
+Subject: [PATCH v2 08/28] ARM: KVM: Add TLB invalidation code
 In-Reply-To: <1454583645-10144-1-git-send-email-marc.zyngier@arm.com>
 References: <1454583645-10144-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1454583645-10144-14-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1454583645-10144-9-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Banked registers are one of the many perks of the 32bit architecture,
-and the world switch needs to cope with it.
-
-This requires some "special" accessors, as these are not accessed
-using a standard coprocessor instruction.
+Convert the TLB invalidation code to C, hooking it into the
+build system whilst we're at it.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kvm/hyp/Makefile    |  1 +
- arch/arm/kvm/hyp/banked-sr.c | 77 ++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/kvm/hyp/hyp.h       | 11 +++++++
- 3 files changed, 89 insertions(+)
- create mode 100644 arch/arm/kvm/hyp/banked-sr.c
+ arch/arm/kvm/Makefile     |  1 +
+ arch/arm/kvm/hyp/Makefile |  5 ++++
+ arch/arm/kvm/hyp/hyp.h    |  5 ++++
+ arch/arm/kvm/hyp/tlb.c    | 71 +++++++++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 82 insertions(+)
+ create mode 100644 arch/arm/kvm/hyp/Makefile
+ create mode 100644 arch/arm/kvm/hyp/tlb.c
 
+diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
+index c5eef02c..eb1bf43 100644
+--- a/arch/arm/kvm/Makefile
++++ b/arch/arm/kvm/Makefile
+@@ -17,6 +17,7 @@ AFLAGS_interrupts.o := -Wa,-march=armv7-a$(plus_virt)
+ KVM := ../../../virt/kvm
+ kvm-arm-y = $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o $(KVM)/vfio.o
+ 
++obj-$(CONFIG_KVM_ARM_HOST) += hyp/
+ obj-y += kvm-arm.o init.o interrupts.o
+ obj-y += arm.o handle_exit.o guest.o mmu.o emulate.o reset.o
+ obj-y += coproc.o coproc_a15.o coproc_a7.o mmio.o psci.o perf.o
 diff --git a/arch/arm/kvm/hyp/Makefile b/arch/arm/kvm/hyp/Makefile
-index 5a45f4c..173bd1d 100644
---- a/arch/arm/kvm/hyp/Makefile
-+++ b/arch/arm/kvm/hyp/Makefile
-@@ -7,3 +7,4 @@ obj-$(CONFIG_KVM_ARM_HOST) += cp15-sr.o
- obj-$(CONFIG_KVM_ARM_HOST) += timer-sr.o
- obj-$(CONFIG_KVM_ARM_HOST) += vgic-v2-sr.o
- obj-$(CONFIG_KVM_ARM_HOST) += vfp.o
-+obj-$(CONFIG_KVM_ARM_HOST) += banked-sr.o
-diff --git a/arch/arm/kvm/hyp/banked-sr.c b/arch/arm/kvm/hyp/banked-sr.c
 new file mode 100644
-index 0000000..d02dc80
+index 0000000..36c760d
 --- /dev/null
-+++ b/arch/arm/kvm/hyp/banked-sr.c
-@@ -0,0 +1,77 @@
++++ b/arch/arm/kvm/hyp/Makefile
+@@ -0,0 +1,5 @@
++#
++# Makefile for Kernel-based Virtual Machine module, HYP part
++#
++
++obj-$(CONFIG_KVM_ARM_HOST) += tlb.o
+diff --git a/arch/arm/kvm/hyp/hyp.h b/arch/arm/kvm/hyp/hyp.h
+index 727089f..5808bbd 100644
+--- a/arch/arm/kvm/hyp/hyp.h
++++ b/arch/arm/kvm/hyp/hyp.h
+@@ -42,4 +42,9 @@
+ })
+ #define read_sysreg(...)		__read_sysreg(__VA_ARGS__)
+ 
++#define VTTBR		__ACCESS_CP15_64(6, c2)
++#define ICIALLUIS	__ACCESS_CP15(c7, 0, c1, 0)
++#define TLBIALLIS	__ACCESS_CP15(c8, 0, c3, 0)
++#define TLBIALLNSNHIS	__ACCESS_CP15(c8, 4, c3, 4)
++
+ #endif /* __ARM_KVM_HYP_H__ */
+diff --git a/arch/arm/kvm/hyp/tlb.c b/arch/arm/kvm/hyp/tlb.c
+new file mode 100644
+index 0000000..993fe89
+--- /dev/null
++++ b/arch/arm/kvm/hyp/tlb.c
+@@ -0,0 +1,71 @@
 +/*
 + * Original code:
 + * Copyright (C) 2012 - Virtual Open Systems and Columbia University
@@ -58,87 +85,54 @@ index 0000000..d02dc80
 +
 +#include "hyp.h"
 +
-+__asm__(".arch_extension     virt");
-+
-+void __hyp_text __banked_save_state(struct kvm_cpu_context *ctxt)
++/**
++ * Flush per-VMID TLBs
++ *
++ * __kvm_tlb_flush_vmid(struct kvm *kvm);
++ *
++ * We rely on the hardware to broadcast the TLB invalidation to all CPUs
++ * inside the inner-shareable domain (which is the case for all v7
++ * implementations).  If we come across a non-IS SMP implementation, we'll
++ * have to use an IPI based mechanism. Until then, we stick to the simple
++ * hardware assisted version.
++ *
++ * As v7 does not support flushing per IPA, just nuke the whole TLB
++ * instead, ignoring the ipa value.
++ */
++static void __hyp_text __tlb_flush_vmid(struct kvm *kvm)
 +{
-+	ctxt->gp_regs.usr_regs.ARM_sp	= read_special(SP_usr);
-+	ctxt->gp_regs.usr_regs.ARM_pc	= read_special(ELR_hyp);
-+	ctxt->gp_regs.usr_regs.ARM_cpsr	= read_special(SPSR);
-+	ctxt->gp_regs.KVM_ARM_SVC_sp	= read_special(SP_svc);
-+	ctxt->gp_regs.KVM_ARM_SVC_lr	= read_special(LR_svc);
-+	ctxt->gp_regs.KVM_ARM_SVC_spsr	= read_special(SPSR_svc);
-+	ctxt->gp_regs.KVM_ARM_ABT_sp	= read_special(SP_abt);
-+	ctxt->gp_regs.KVM_ARM_ABT_lr	= read_special(LR_abt);
-+	ctxt->gp_regs.KVM_ARM_ABT_spsr	= read_special(SPSR_abt);
-+	ctxt->gp_regs.KVM_ARM_UND_sp	= read_special(SP_und);
-+	ctxt->gp_regs.KVM_ARM_UND_lr	= read_special(LR_und);
-+	ctxt->gp_regs.KVM_ARM_UND_spsr	= read_special(SPSR_und);
-+	ctxt->gp_regs.KVM_ARM_IRQ_sp	= read_special(SP_irq);
-+	ctxt->gp_regs.KVM_ARM_IRQ_lr	= read_special(LR_irq);
-+	ctxt->gp_regs.KVM_ARM_IRQ_spsr	= read_special(SPSR_irq);
-+	ctxt->gp_regs.KVM_ARM_FIQ_r8	= read_special(R8_fiq);
-+	ctxt->gp_regs.KVM_ARM_FIQ_r9	= read_special(R9_fiq);
-+	ctxt->gp_regs.KVM_ARM_FIQ_r10	= read_special(R10_fiq);
-+	ctxt->gp_regs.KVM_ARM_FIQ_fp	= read_special(R11_fiq);
-+	ctxt->gp_regs.KVM_ARM_FIQ_ip	= read_special(R12_fiq);
-+	ctxt->gp_regs.KVM_ARM_FIQ_sp	= read_special(SP_fiq);
-+	ctxt->gp_regs.KVM_ARM_FIQ_lr	= read_special(LR_fiq);
-+	ctxt->gp_regs.KVM_ARM_FIQ_spsr	= read_special(SPSR_fiq);
++	dsb(ishst);
++
++	/* Switch to requested VMID */
++	kvm = kern_hyp_va(kvm);
++	write_sysreg(kvm->arch.vttbr, VTTBR);
++	isb();
++
++	write_sysreg(0, TLBIALLIS);
++	dsb(ish);
++	isb();
++
++	write_sysreg(0, VTTBR);
 +}
 +
-+void __hyp_text __banked_restore_state(struct kvm_cpu_context *ctxt)
++__alias(__tlb_flush_vmid) void __weak __kvm_tlb_flush_vmid(struct kvm *kvm);
++
++static void __hyp_text __tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
 +{
-+	write_special(ctxt->gp_regs.usr_regs.ARM_sp,	SP_usr);
-+	write_special(ctxt->gp_regs.usr_regs.ARM_pc,	ELR_hyp);
-+	write_special(ctxt->gp_regs.usr_regs.ARM_cpsr,	SPSR_cxsf);
-+	write_special(ctxt->gp_regs.KVM_ARM_SVC_sp,	SP_svc);
-+	write_special(ctxt->gp_regs.KVM_ARM_SVC_lr,	LR_svc);
-+	write_special(ctxt->gp_regs.KVM_ARM_SVC_spsr,	SPSR_svc);
-+	write_special(ctxt->gp_regs.KVM_ARM_ABT_sp,	SP_abt);
-+	write_special(ctxt->gp_regs.KVM_ARM_ABT_lr,	LR_abt);
-+	write_special(ctxt->gp_regs.KVM_ARM_ABT_spsr,	SPSR_abt);
-+	write_special(ctxt->gp_regs.KVM_ARM_UND_sp,	SP_und);
-+	write_special(ctxt->gp_regs.KVM_ARM_UND_lr,	LR_und);
-+	write_special(ctxt->gp_regs.KVM_ARM_UND_spsr,	SPSR_und);
-+	write_special(ctxt->gp_regs.KVM_ARM_IRQ_sp,	SP_irq);
-+	write_special(ctxt->gp_regs.KVM_ARM_IRQ_lr,	LR_irq);
-+	write_special(ctxt->gp_regs.KVM_ARM_IRQ_spsr,	SPSR_irq);
-+	write_special(ctxt->gp_regs.KVM_ARM_FIQ_r8,	R8_fiq);
-+	write_special(ctxt->gp_regs.KVM_ARM_FIQ_r9,	R9_fiq);
-+	write_special(ctxt->gp_regs.KVM_ARM_FIQ_r10,	R10_fiq);
-+	write_special(ctxt->gp_regs.KVM_ARM_FIQ_fp,	R11_fiq);
-+	write_special(ctxt->gp_regs.KVM_ARM_FIQ_ip,	R12_fiq);
-+	write_special(ctxt->gp_regs.KVM_ARM_FIQ_sp,	SP_fiq);
-+	write_special(ctxt->gp_regs.KVM_ARM_FIQ_lr,	LR_fiq);
-+	write_special(ctxt->gp_regs.KVM_ARM_FIQ_spsr,	SPSR_fiq);
++	__tlb_flush_vmid(kvm);
 +}
-diff --git a/arch/arm/kvm/hyp/hyp.h b/arch/arm/kvm/hyp/hyp.h
-index dce0f73..278eb1f 100644
---- a/arch/arm/kvm/hyp/hyp.h
-+++ b/arch/arm/kvm/hyp/hyp.h
-@@ -45,6 +45,14 @@
- })
- #define read_sysreg(...)		__read_sysreg(__VA_ARGS__)
- 
-+#define write_special(v, r)					\
-+	asm volatile("msr " __stringify(r) ", %0" : : "r" (v))
-+#define read_special(r) ({					\
-+	u32 __val;						\
-+	asm volatile("mrs %0, " __stringify(r) : "=r" (__val));	\
-+	__val;							\
-+})
 +
- #define TTBR0		__ACCESS_CP15_64(0, c2)
- #define TTBR1		__ACCESS_CP15_64(1, c2)
- #define VTTBR		__ACCESS_CP15_64(6, c2)
-@@ -99,4 +107,7 @@ static inline bool __vfp_enabled(void)
- 	return !(read_sysreg(HCPTR) & (HCPTR_TCP(11) | HCPTR_TCP(10)));
- }
- 
-+void __hyp_text __banked_save_state(struct kvm_cpu_context *ctxt);
-+void __hyp_text __banked_restore_state(struct kvm_cpu_context *ctxt);
++__alias(__tlb_flush_vmid_ipa) void __weak __kvm_tlb_flush_vmid_ipa(struct kvm *kvm,
++							    phys_addr_t ipa);
 +
- #endif /* __ARM_KVM_HYP_H__ */
++static void __hyp_text __tlb_flush_vm_context(void)
++{
++	dsb(ishst);
++	write_sysreg(0, TLBIALLNSNHIS);
++	write_sysreg(0, ICIALLUIS);
++	dsb(ish);
++}
++
++__alias(__tlb_flush_vm_context) void __weak __kvm_flush_vm_context(void);
 -- 
 2.1.4
