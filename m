@@ -1,82 +1,54 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Thu, 04 Feb 2016 15:16:10 +0100
-Subject: [RFT PATCH] arm: omap1_defconfig: convert to use libata PATA
- drivers
-In-Reply-To: <20150817063454.GF4215@atomide.com>
-References: <1439571876-13758-1-git-send-email-b.zolnierkie@samsung.com>
- <1439571876-13758-16-git-send-email-b.zolnierkie@samsung.com>
- <20150817063454.GF4215@atomide.com>
-Message-ID: <6359194.rjne3vOG9H@amdc1976>
+From: k.debski@samsung.com (Kamil Debski)
+Date: Thu, 04 Feb 2016 15:23:02 +0100
+Subject: [PATCH 3/4] [media] s5p-mfc: don't close instance after free
+ OUTPUT buffers
+In-Reply-To: <1454180017-29071-4-git-send-email-ayaka@soulik.info>
+References: <1454180017-29071-1-git-send-email-ayaka@soulik.info>
+ <1454180017-29071-4-git-send-email-ayaka@soulik.info>
+Message-ID: <003501d15f57$8f1904b0$ad4b0e10$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
 Hi,
 
-On Sunday, August 16, 2015 11:34:55 PM Tony Lindgren wrote:
-> * Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com> [150814 10:10]:
-> > IDE subsystem has been deprecated since 2009 and the majority
-> > (if not all) of Linux distributions have switched to use
-> > libata for ATA support exclusively.  However there are still
-> > some users (mostly old or/and embedded non-x86 systems) that
-> > have not converted from using IDE subsystem to libata PATA
-> > drivers.  This doesn't seem to be good thing in the long-term
-> > for Linux as while there is less and less PATA systems left
-> > in use:
-> > 
-> > * testing efforts are divided between two subsystems
-> > 
-> > * having duplicate drivers for same hardware confuses users
-> > 
-> > This patch converts omap1_defconfig to use libata PATA
-> > drivers.
-> > 
-> > Cc: Tony Lindgren <tony@atomide.com>
-> > Cc: linux-omap at vger.kernel.org
-> > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> > ---
-> > Build tested only.
-> > If you have affected hardware please test.  Thank you.
+> From: ayaka [mailto:ayaka at soulik.info]
+> Sent: Saturday, January 30, 2016 7:54 PM
+>
+> Free buffers in OUTPUT is quite normal to detect the driver's buffer
+capacity,
+> it doesn't mean the application want to close that mfc instance.
 > 
-> All my omap1 devices are in a rack using NFSroot or MMC so
-> I can't test this. Seems like a good idea to me thoug, and does
-> not cause merge conflicts. So if you want to queue this via
-> along with other PATA related patches, please feel free to
-> add:
+> Signed-off-by: ayaka <ayaka@soulik.info>
+> ---
+>  drivers/media/platform/s5p-mfc/s5p_mfc_dec.c | 1 -
+>  1 file changed, 1 deletion(-)
 > 
-> Acked-by: Tony Lindgren <tony@atomide.com>
+> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> index aebe4fd..609b17b 100644
+> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> @@ -474,7 +474,6 @@ static int reqbufs_output(struct s5p_mfc_dev *dev,
+> struct s5p_mfc_ctx *ctx,
+>  		ret = vb2_reqbufs(&ctx->vq_src, reqbufs);
+>  		if (ret)
+>  			goto out;
+> -		s5p_mfc_close_mfc_inst(dev, ctx);
+>  		ctx->src_bufs_cnt = 0;
+>  		ctx->output_state = QUEUE_FREE;
+>  	} else if (ctx->output_state == QUEUE_FREE) {
 
-Thank you.
+What exactly do you mean by "detecting buffer capacity"  ? Is it the max
+number of buffer
+that can be allocated?
 
-Arnd/Olof, could you please merge this patch?
+Anyway, if the instance is not closed, then in a consecutive call to reqbufs
+(with cound != 0)
+the instance will be opened for a second time. So either the instance has to
+be closed, or
+it should be opened in another place.
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
+Best wishes,
+-- 
+Kamil Debski
 Samsung R&D Institute Poland
-Samsung Electronics
-
-> >  arch/arm/configs/omap1_defconfig | 4 ++--
-> >  1 file changed, 2 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/arch/arm/configs/omap1_defconfig b/arch/arm/configs/omap1_defconfig
-> > index 0c8a787..6ffc984 100644
-> > --- a/arch/arm/configs/omap1_defconfig
-> > +++ b/arch/arm/configs/omap1_defconfig
-> > @@ -96,14 +96,14 @@ CONFIG_BLK_DEV_LOOP=y
-> >  CONFIG_BLK_DEV_RAM=y
-> >  CONFIG_BLK_DEV_RAM_COUNT=2
-> >  CONFIG_BLK_DEV_RAM_SIZE=8192
-> > -CONFIG_IDE=m
-> > -CONFIG_BLK_DEV_IDECS=m
-> >  CONFIG_SCSI=y
-> >  # CONFIG_SCSI_PROC_FS is not set
-> >  CONFIG_BLK_DEV_SD=y
-> >  CONFIG_CHR_DEV_ST=y
-> >  CONFIG_BLK_DEV_SR=y
-> >  CONFIG_CHR_DEV_SG=y
-> > +CONFIG_ATA=m
-> > +CONFIG_PATA_PCMCIA=m
-> >  CONFIG_NETDEVICES=y
-> >  CONFIG_TUN=y
-> >  CONFIG_PHYLIB=y
