@@ -1,134 +1,60 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 04 Feb 2016 11:44:50 +0100
-Subject: [PATCH v4 1/1] USB: core: let USB device know device node
-In-Reply-To: <1453706679-18948-1-git-send-email-peter.chen@freescale.com>
-References: <1453706679-18948-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1454582690.3356.18.camel@pengutronix.de>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 4 Feb 2016 11:34:16 +0100
+Subject: [PATCH v4] mmc: meson: Add driver for the SD/MMC host found on
+ Amlogic MesonX SoCs
+In-Reply-To: <CAOQ7t2aF=wzYHF8LXK5WVMJ=mEDHzfvbL=iRvorq+FZshL0q0g@mail.gmail.com>
+References: <1448988109-32630-1-git-send-email-carlo@caione.org>
+ <CAPDyKFp=buvJ8Li3XC8XSUAUO7BsE+U6vEQH2xTrgcHAkdG8bQ@mail.gmail.com>
+ <CAOQ7t2aJAPWd3Xmvu7n0EWL-KC8ZriM3KryfsYEh556uXhuR+g@mail.gmail.com>
+ <CAPDyKFpcsKihuOiF5=RwoWrF0Jf7hRsXVSU5uV8qZf1mUsa-iQ@mail.gmail.com>
+ <CAOQ7t2afXxStCsj=M-FX7eMep1gLt4jkyXDiLas_SQ1UwHc0=Q@mail.gmail.com>
+ <CAPDyKFpX+_fHvv_bJUKZmSufKKnuONC582E7u3b20a+Rbbggng@mail.gmail.com>
+ <CAOQ7t2aS0yRDhM3+8wW5xrycG371uthDJy6U_oDAZip4jHRiRA@mail.gmail.com>
+ <CAPDyKFo=LdzFsELZJKXj_CDcNYj96J4Q9-KqS63041d3BVUEDQ@mail.gmail.com>
+ <CAOQ7t2aF=wzYHF8LXK5WVMJ=mEDHzfvbL=iRvorq+FZshL0q0g@mail.gmail.com>
+Message-ID: <CAPDyKFqpgEtAvK9HesdA5tLuj7htUmo5ZrvbDC0wCzHB3=_-xQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+On 4 February 2016 at 10:12, Carlo Caione <carlo@caione.org> wrote:
+> On Wed, Feb 3, 2016 at 11:46 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>> On 2 February 2016 at 22:54, Carlo Caione <carlo@caione.org> wrote:
+>
+> [cut]
+>
+>> Huh, another broken MMC controller. :-)
+>
+> Oh, actually I found in the datasheet a couple of undocumented
+> registers (also not used in the original Amlogic SDK code) that seems
+> to have something to do with timeout (hard to say without proper
+> documentation but they are called "Timeout counter for preload setting
+> and present status" and "Timeout Counter Interrupt Enable for ARC/ARM"
+> so I guess I'm on the right track here).
+> I briefly tried yesterday to enable this timeout interrupt with a
+> dummy value in the counter register (I have no idea how get this value
+> from the clocking) and it seems working (the counter value is
+> decremented when reading the register upon command completion).
 
-Am Montag, den 25.01.2016, 15:24 +0800 schrieb Peter Chen:
-> Although most of USB devices are hot-plug's, there are still some devices
-> are hard wired on the board, eg, for HSIC and SSIC interface USB devices.
-> If these kinds of USB devices are multiple functions, and they can supply
-> other interfaces like i2c, gpios for other devices, we may need to
-> describe these at device tree.
-> 
-> In this commit, it uses "reg" in dts as physical port number to match
-> the phyiscal port number decided by USB core, if they are the same,
-> then the device node is for the device we are creating for USB core.
-> 
-> Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> ---
-> Changes for v4:
-> - The range of "reg" should be 1-31, changing device node address
->   style as in lower case hexadecimal with leading zeroes suppressed
->   [binding doc, usb-device.txt]
-> - Improve the example at binding doc, it describes node from the top
->   (the controller)
-> - Delete the struct of_node * within struct usb_device
-> - Using usb_hcd_find_raw_port_number to get raw port number under root
->   hub port
-> 
-> Changes for v3:
-> - typo: s/descirbe/describe/
-> 
-> Changes for v2:
-> - Fix build error reported by kbuild robot, lack of "static" for
->   inline usb_of_get_child_node
-> - Fix typo, "devcie_node" -> "device_node"
-> - Add kernel-doc for of_node at struct usb_device
-> 
-> Changes from RFC:
-> - Fix the error address for binding doc, and add compatible for binding doc
-> - Change get child node API from "usb_of_find_node" to
->   "usb_of_get_child_node"
-> - Delete unecessary header files
-> - One typo
-> 
->  .../devicetree/bindings/usb/usb-device.txt         | 25 ++++++++++++
->  drivers/usb/core/Makefile                          |  2 +-
->  drivers/usb/core/of.c                              | 47 ++++++++++++++++++++++
->  drivers/usb/core/usb.c                             | 14 ++++++-
->  include/linux/usb/of.h                             |  7 ++++
->  5 files changed, 92 insertions(+), 3 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/usb/usb-device.txt
->  create mode 100644 drivers/usb/core/of.c
-> 
-> diff --git a/Documentation/devicetree/bindings/usb/usb-device.txt b/Documentation/devicetree/bindings/usb/usb-device.txt
-> new file mode 100644
-> index 0000000..c702885
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/usb/usb-device.txt
-> @@ -0,0 +1,25 @@
-> +Generic USB Device Properties
-> +
-> +Usually, we only use device tree for hard wired USB device.
-> +The reference binding doc is from:
-> +http://www.firmware.org/1275/bindings/usb/usb-1_0.ps
-> +
-> +Required properties:
-> +- compatible: usbVID,PID
+Let's hope this works, as this will for sure be a better solution.
 
-The reference recommendation states that for single-configuration USB
-devices the compatible should contain all of the applicable strings from
-the list starting with 2) "usbVID,PID.REV" and ending with 11)
-"usb,device". Are we going to ignore this?
+>
+>> In some cases there are no data in the request, it's just a command
+>> being sent. So to deal with this issue, you will have to adjust the
+>> timer depending on the request we send to the controller.
+>
+> I see that the CMD13 used to poll the card has no data so in that case
+> should we use a fixed / dummy value to use as timeout counter?
+> I'm kind of confused here since the MMC drivers I'm looking at use the
+> hardware timeout register only when the data->timeout_ns is actually
+> present.
 
-The document also states that "the textual representation of VID, PID
-[...] shall be in lower case hexadecimal with leading zeroes
-suppressed". This should be documented here.
+That's a different timeout value. It's elated to *each* block data
+transfer and not the entire request. So it provides information to the
+controller about what delays it shall accept during a block being
+written/read.
 
-> +- reg: the port number which this device is connecting to, the range
-> +  is 1-31.
-> +
-> +
-> +Example:
-> +
-> +&usb1 {
-> +	status = "okay";
-> +
-> +	#address-cells = <1>;
-> +	#size-cells = <0>;
-> +
-> +	hub: genesys at 1 {
+More details is found in the electrical descriptions of the interface
+in the eMMC/SD spec.
 
-There are node names specified for hubs and mass storage devices:
-"hub", "storage", "cdrom", "tape", "solid-state", and "device" for
-everything else. Should we follow this recommendation?
-
-> +		compatible = "usb05e3,0608";
-> +		reg = <0x1>;
-> +	};
-
-I'd have written this node as:
-
-	hub: hub at 1 {
-		compatible = "usb5e3,608", "usb5e3,class9",
-			     "usb,class9", "usb,device";
-		reg = <1>;
-	};
-
-As another example, I'd like to introduce the USB WLAN Adapter soldered
-onto the imx6q-gk802 board to its power enable GPIO via the device tree:
-
-/* Internal USB port (USBH1) */
-&usbh1 {
-	#address-cells = <1>;
-	#size-cells = <0>;
-	status = "okay";
-
-	/* RTL8192CU 802.11n WLAN Adapter */
-	device at 1 {
-		compatible = "usbbda,8176.200", "usbbda,8176",
-			     "usb,device";
-		reg = <1>;
-
-		enable-gpios = <&gpio2 0 GPIO_ACTIVE_LOW>;
-	};
-};
-
-regards
-Philipp
+Kind regards
+Uffe
