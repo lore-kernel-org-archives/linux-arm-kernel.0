@@ -1,17 +1,17 @@
 From: paul.burton@imgtec.com (Paul Burton)
-Date: Thu, 4 Feb 2016 16:10:11 +0000
-Subject: [PATCH v3 4/6] PCI: xilinx: Clear interrupt FIFO during probe
+Date: Thu, 4 Feb 2016 16:10:12 +0000
+Subject: [PATCH v3 5/6] PCI: xilinx: Fix INTX irq dispatch
 In-Reply-To: <1454602213-967-1-git-send-email-paul.burton@imgtec.com>
 References: <1454602213-967-1-git-send-email-paul.burton@imgtec.com>
-Message-ID: <1454602213-967-5-git-send-email-paul.burton@imgtec.com>
+Message-ID: <1454602213-967-6-git-send-email-paul.burton@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-xilinx_pcie_init_port clears the pending interrupts in the interrupt
-decode register, but does not clear the interrupt FIFO. This would lead
-to spurious interrupts if any were present in the FIFO at probe time.
-Clear the interrupt FIFO prior to the interrupt decode register in order
-to start with a clean slate as expected.
+The IRQ domain for INTX interrupts has 4 entries, numbered 0 to 3. This
+matches what the hardware reports from the interrupt FIFO exactly, but
+xilinx_pcie_intr_handler was adding 1 to that value to convert to the
+range 1 to 4. Stop adding 1, such that all of INTA through to INTD fall
+within the range of the IRQ domain.
 
 Signed-off-by: Paul Burton <paul.burton@imgtec.com>
 Fixes: 8961def56845 ("PCI: xilinx: Add Xilinx AXI PCIe Host Bridge IP driver")
@@ -24,39 +24,23 @@ Changes in v3:
 Changes in v2:
 - Add Fixes tag.
 
- drivers/pci/host/pcie-xilinx.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ drivers/pci/host/pcie-xilinx.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
-index 1eb74a2..6c5a503 100644
+index 6c5a503..8013e83 100644
 --- a/drivers/pci/host/pcie-xilinx.c
 +++ b/drivers/pci/host/pcie-xilinx.c
-@@ -568,6 +568,8 @@ static int xilinx_pcie_init_irq_domain(struct xilinx_pcie_port *port)
-  */
- static void xilinx_pcie_init_port(struct xilinx_pcie_port *port)
- {
-+	u32 val;
-+
- 	if (xilinx_pcie_link_is_up(port))
- 		dev_info(port->dev, "PCIe Link is UP\n");
- 	else
-@@ -577,6 +579,17 @@ static void xilinx_pcie_init_port(struct xilinx_pcie_port *port)
- 	pcie_write(port, ~XILINX_PCIE_IDR_ALL_MASK,
- 		   XILINX_PCIE_REG_IMR);
+@@ -451,8 +451,8 @@ static irqreturn_t xilinx_pcie_intr_handler(int irq, void *data)
+ 			irq = pcie_read(port, XILINX_PCIE_REG_RPIFR2) &
+ 				XILINX_PCIE_RPIFR2_MSG_DATA;
+ 		} else {
+-			val = ((val & XILINX_PCIE_RPIFR1_INTR_MASK) >>
+-				XILINX_PCIE_RPIFR1_INTR_SHIFT) + 1;
++			val = (val & XILINX_PCIE_RPIFR1_INTR_MASK) >>
++				XILINX_PCIE_RPIFR1_INTR_SHIFT;
+ 			irq = irq_find_mapping(port->irq_domain, val);
+ 		}
  
-+	/* Clear interrupt FIFO */
-+	while (1) {
-+		val = pcie_read(port, XILINX_PCIE_REG_RPIFR1);
-+
-+		if (!(val & XILINX_PCIE_RPIFR1_INTR_VALID))
-+			break;
-+
-+		pcie_write(port, XILINX_PCIE_RPIFR1_ALL_MASK,
-+			   XILINX_PCIE_REG_RPIFR1);
-+	}
-+
- 	/* Clear pending interrupts */
- 	pcie_write(port, pcie_read(port, XILINX_PCIE_REG_IDR) &
- 			 XILINX_PCIE_IMR_ALL_MASK,
 -- 
 2.7.0
