@@ -1,54 +1,62 @@
-From: k.debski@samsung.com (Kamil Debski)
-Date: Thu, 04 Feb 2016 15:23:02 +0100
-Subject: [PATCH 3/4] [media] s5p-mfc: don't close instance after free
- OUTPUT buffers
-In-Reply-To: <1454180017-29071-4-git-send-email-ayaka@soulik.info>
-References: <1454180017-29071-1-git-send-email-ayaka@soulik.info>
- <1454180017-29071-4-git-send-email-ayaka@soulik.info>
-Message-ID: <003501d15f57$8f1904b0$ad4b0e10$@samsung.com>
+From: Chris.Brandt@renesas.com (Chris Brandt)
+Date: Thu, 4 Feb 2016 14:25:57 +0000
+Subject: [PATCH] ARM: remove duplicate definitions of __vectors_start and
+ __stubs_start
+In-Reply-To: <1454574705-15109-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1454574705-15109-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <HKXPR06MB0565A610565403E9E5E9546C8AD10@HKXPR06MB0565.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 4 Feb 2016, Ard Biesheuvel wrote:
 
-> From: ayaka [mailto:ayaka at soulik.info]
-> Sent: Saturday, January 30, 2016 7:54 PM
+> This is completely harmless by itself, since the wrong values are local
+> symbols that cannot be referenced by other object files directly. However,
+> since these symbols are also listed in the kallsyms symbol table in some
+> cases (i.e., CONFIG_KALLSYMS_ALL=y and CONFIG_XIP_KERNEL=y), having these
+> conflicting values can be confusing. So either remove them, or make them
+> strictly local.
 >
-> Free buffers in OUTPUT is quite normal to detect the driver's buffer
-capacity,
-> it doesn't mean the application want to close that mfc instance.
-> 
-> Signed-off-by: ayaka <ayaka@soulik.info>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 > ---
->  drivers/media/platform/s5p-mfc/s5p_mfc_dec.c | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-> b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-> index aebe4fd..609b17b 100644
-> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-> @@ -474,7 +474,6 @@ static int reqbufs_output(struct s5p_mfc_dev *dev,
-> struct s5p_mfc_ctx *ctx,
->  		ret = vb2_reqbufs(&ctx->vq_src, reqbufs);
->  		if (ret)
->  			goto out;
-> -		s5p_mfc_close_mfc_inst(dev, ctx);
->  		ctx->src_bufs_cnt = 0;
->  		ctx->output_state = QUEUE_FREE;
->  	} else if (ctx->output_state == QUEUE_FREE) {
+>
+> This is a separate fix for the duplicate symbols based on v4.5-rc2,
+> so that it can be applied separately if desired. In that case, I will
+> rebase my kallsyms series onto this patch.
+>
+>  arch/arm/kernel/entry-armv.S | 5 ++---
+>  1 file changed, 2 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+> index 3ce377f7251f..788e40c1254f 100644
+> --- a/arch/arm/kernel/entry-armv.S
+> +++ b/arch/arm/kernel/entry-armv.S
+> @@ -1064,7 +1064,6 @@ ENDPROC(vector_\name)
+>  	.endm
+>  
+>  	.section .stubs, "ax", %progbits
+> -__stubs_start:
+>  	@ This must be the first word
+>  	.word	vector_swi
+>  
+> @@ -1206,10 +1205,10 @@ vector_addrexcptn:
+>  	.equ	vector_fiq_offset, vector_fiq
+>  
+>  	.section .vectors, "ax", %progbits
+> -__vectors_start:
+> +.L__vectors_start:
+>  	W(b)	vector_rst
+>  	W(b)	vector_und
+> -	W(ldr)	pc, __vectors_start + 0x1000
+> +	W(ldr)	pc, .L__vectors_start + 0x1000
+>  	W(b)	vector_pabt
+>  	W(b)	vector_dabt
+>  	W(b)	vector_addrexcptn
 
-What exactly do you mean by "detecting buffer capacity"  ? Is it the max
-number of buffer
-that can be allocated?
 
-Anyway, if the instance is not closed, then in a consecutive call to reqbufs
-(with cound != 0)
-the instance will be opened for a second time. So either the instance has to
-be closed, or
-it should be opened in another place.
+Tested with ARCH_R7S72100 with CONFIG_XIP_KERNEL=y and CONFIG_XIP_KERNEL=n
 
-Best wishes,
--- 
-Kamil Debski
-Samsung R&D Institute Poland
+Duplicate symbols are gone, and boots fine (given the other patches from "[PATCH 0/3] kallsyms: remove special handling for CONFIG_ARM" for the CONFIG_XIP_KERNEL=y case) 
+
+
+Acked-by: Chris Brandt <chris.brandt@renesas.com>
