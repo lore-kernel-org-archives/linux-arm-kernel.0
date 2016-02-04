@@ -1,45 +1,163 @@
-From: alim.akhtar@samsung.com (Alim Akhtar)
-Date: Thu, 04 Feb 2016 09:32:14 +0530
-Subject: [PATCH v2] arm64: defconfig: Enable samsung MFD and related
- configs
-In-Reply-To: <20151106163743.GA7637@e104818-lin.cambridge.arm.com>
-References: <1446787654-18306-1-git-send-email-alim.akhtar@samsung.com>
- <CAJKOXPeWerSTi2QedEwyHRVN4xA0vWM2CSOvb5v9SWUmOSPe7Q@mail.gmail.com>
- <20151106163743.GA7637@e104818-lin.cambridge.arm.com>
-Message-ID: <56B2CD46.6070607@samsung.com>
+From: vishnupatekar0510@gmail.com (Vishnu Patekar)
+Date: Thu, 4 Feb 2016 12:25:14 +0800
+Subject: [PATCH 14/14] ARM: dts: sun8i: Add A83T based Sinovoip Bpi-M3
+ Board
+In-Reply-To: <CAGb2v65BwAcT8920WXt7dBjNx4zjycw2Ea+sNZrm0aM_3JA8pA@mail.gmail.com>
+References: <1454203266-4450-1-git-send-email-vishnupatekar0510@gmail.com>
+ <1454203266-4450-15-git-send-email-vishnupatekar0510@gmail.com>
+ <CAGb2v65BwAcT8920WXt7dBjNx4zjycw2Ea+sNZrm0aM_3JA8pA@mail.gmail.com>
+Message-ID: <CAEzqOZtwyk2oChsSvfxWwqc=bKn3dT0eLDzcgAXi--N0W=cMuA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello Wens,
 
 
-On 11/06/2015 10:07 PM, Catalin Marinas wrote:
-> On Fri, Nov 06, 2015 at 02:47:12PM +0900, Krzysztof Kozlowski wrote:
->> 2015-11-06 14:27 GMT+09:00 Alim Akhtar <alim.akhtar@samsung.com>:
->>> Exynos7 based espresso board uses S2MPS15, a multifunction device.
->>> This patch enables S2MPS1X regulator, pmic-clk and rtc drivers utilized by
->>> the same.
->>>
->>> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
->>> ---
->>> Changes since v1:
->>> * updated the comment message to describe which platfrom uses it.
->>> * enable COMMON_CLK_S2MPS11 which is needed to enable pmic-clk block.
->>>
->>>   arch/arm64/configs/defconfig |    4 ++++
->>>   1 file changed, 4 insertions(+)
->>
->> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>
->> Catalin,
->>
->> Are you usually taking such arm64 defconfig changes or should they go
->> through arm-soc?
+
+On Tue, Feb 2, 2016 at 3:37 PM, Chen-Yu Tsai <wens@csie.org> wrote:
 >
-> Usually arm-soc but I don't mind either way.
+> On Sun, Jan 31, 2016 at 9:21 AM, Vishnu Patekar
+> <vishnupatekar0510@gmail.com> wrote:
+> > This patch adds support for Sinovoip BPI-M3 A83T based board.
+> >
+> > It has 2G LPDDR3, UART, ethernet, USB, HDMI, USB Sata, MIPI DSI,
+> > mic, AP6212 Wifi, etc on it.
+> > It is paired with AXP813 PMIC which is almost same as AXP818.
+> >
+> > Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
+> > ---
+> >  arch/arm/boot/dts/Makefile                       |  1 +
+> >  arch/arm/boot/dts/sun8i-a83t-sinovoip-bpi-m3.dts | 88 ++++++++++++++++++++++++
+> >  2 files changed, 89 insertions(+)
+> >  create mode 100644 arch/arm/boot/dts/sun8i-a83t-sinovoip-bpi-m3.dts
+> >
+> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> > index 58e461a..c0dd016 100644
+> > --- a/arch/arm/boot/dts/Makefile
+> > +++ b/arch/arm/boot/dts/Makefile
+> > @@ -694,6 +694,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
+> >         sun8i-a33-sinlinx-sina33.dtb \
+> >         sun8i-a83t-allwinner-h8homlet-v2.dtb \
+> >         sun8i-a83t-cubietruck-plus.dtb \
+> > +       sun8i-a83t-sinovoip-bpi-m3.dtb \
+> >         sun8i-h3-orangepi-plus.dtb
+> >  dtb-$(CONFIG_MACH_SUN9I) += \
+> >         sun9i-a80-optimus.dtb \
+> > diff --git a/arch/arm/boot/dts/sun8i-a83t-sinovoip-bpi-m3.dts b/arch/arm/boot/dts/sun8i-a83t-sinovoip-bpi-m3.dts
+> > new file mode 100644
+> > index 0000000..fecc7dc
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/sun8i-a83t-sinovoip-bpi-m3.dts
+> > @@ -0,0 +1,88 @@
+> > +/*
+> > + * Copyright 2015 Vishnu Patekar
 >
-Looks like this patch is not merged...because of this 4.5-rc1 on 
-exynos7-esspreso does not boot to user space.
-Do I need to resend this patch?
+> 2016?
+>
+> > + * Vishnu Patekar <vishnupatekar0510@gmail.com>
+> > + *
+> > + * This file is dual-licensed: you can use it either under the terms
+> > + * of the GPL or the X11 license, at your option. Note that this dual
+> > + * licensing only applies to this file, and not this project as a
+> > + * whole.
+> > + *
+> > + *  a) This file is free software; you can redistribute it and/or
+> > + *     modify it under the terms of the GNU General Public License as
+> > + *     published by the Free Software Foundation; either version 2 of the
+> > + *     License, or (at your option) any later version.
+> > + *
+> > + *     This file is distributed in the hope that it will be useful,
+> > + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + *     GNU General Public License for more details.
+> > + *
+> > + * Or, alternatively,
+> > + *
+> > + *  b) Permission is hereby granted, free of charge, to any person
+> > + *     obtaining a copy of this software and associated documentation
+> > + *     files (the "Software"), to deal in the Software without
+> > + *     restriction, including without limitation the rights to use,
+> > + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> > + *     sell copies of the Software, and to permit persons to whom the
+> > + *     Software is furnished to do so, subject to the following
+> > + *     conditions:
+> > + *
+> > + *     The above copyright notice and this permission notice shall be
+> > + *     included in all copies or substantial portions of the Software.
+> > + *
+> > + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> > + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> > + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> > + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> > + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> > + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> > + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> > + *     OTHER DEALINGS IN THE SOFTWARE.
+> > + */
+> > +
+> > +/dts-v1/;
+> > +#include "sun8i-a83t.dtsi"
+> > +#include "sunxi-common-regulators.dtsi"
+> > +
+> > +/ {
+> > +       model = "Sinovoip BananaPi M3 v1.2";
+> > +       compatible = "sinovoip,bpi-m3", "allwinner,sun8i-a83t";
+> > +
+> > +       aliases {
+> > +               serial0 = &uart0;
+> > +       };
+> > +
+> > +       chosen {
+> > +               stdout-path = "serial0:115200n8";
+> > +       };
+> > +};
+> > +
+> > +&pio {
+> > +       mmc0_cd_pin_bpi_m3: mmc0_cd_pin at 0 {
+> > +               allwinner,pins = "PF6";
+> > +               allwinner,function = "gpio_in";
+> > +               allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> > +               allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+> > +       };
+>
+> Maybe we should just put this in the .dtsi and call it
+> "mmc0_cd_pin_reference_design"?
+>
+> We have something similar for sun4i-a10.
+Yes, I'll modify it.
+>
+> > +};
+> > +
+> > +&mmc0 {
+> > +       pinctrl-names = "default";
+> > +       pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_bpi_m3>;
+> > +       vmmc-supply = <&reg_vcc3v0>;
+> > +       cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>; /* PF6 */
+> > +       bus-width = <4>;
+> > +       cd-inverted;
+> > +       status = "okay";
+> > +};
+> > +
+> > +&uart0 {
+> > +       pinctrl-names = "default";
+> > +       pinctrl-0 = <&uart0_pins_b>;
+> > +       status = "okay";
+> > +};
+> > +
+> > +&r_rsb {
+>
+> This goes before uart0.
+Okie.
+>
+> > +       status = "okay";
+> > +};
+>
+> What about eMMC?
+I've not yet tried the emmc.
+>
+>
+> Thanks!
+> ChenYu
 
 Regards,
-Alim
+Vishnu
