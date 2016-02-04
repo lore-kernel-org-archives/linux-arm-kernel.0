@@ -1,42 +1,115 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 4 Feb 2016 06:41:35 -0800
-Subject: [PATCH v10 5/5] Watchdog: ARM SBSA Generic Watchdog half timeout
- panic support
-In-Reply-To: <56B35698.4020100@codeaurora.org>
-References: <1454519923-25230-1-git-send-email-fu.wei@linaro.org>
- <1454519923-25230-6-git-send-email-fu.wei@linaro.org>
- <56B23883.7000501@codeaurora.org>
- <CADyBb7sxPg-QUjTbeHFtYkctKc_g7D8O=+jqbXN+DCCoCEnFqA@mail.gmail.com>
- <56B23E99.1030604@codeaurora.org>
- <CADyBb7s4opxfPFuX=1-qEE6uhsaMXgofAJPbHUQHrng2AUwqNA@mail.gmail.com>
- <56B2423B.1020109@codeaurora.org>
- <CADyBb7uULCn97ea19zH8dB4QX1QA8=AXL94d6gXgFxXM8haBNA@mail.gmail.com>
- <56B24642.8090105@codeaurora.org>
- <CADyBb7s_QeU=pYqN9G+5WMtx-L+=QC6uZR6N6ZWPOixnkHzPjw@mail.gmail.com>
- <56B24AB5.3070001@codeaurora.org>
- <CADyBb7usPpY=YLjecXce63zY5e1tniPLmNsVY=8CJHJsCqBgQw@mail.gmail.com>
- <56B2DEE4.7060901@roeck-us.net> <56B35698.4020100@codeaurora.org>
-Message-ID: <56B3631F.6090304@roeck-us.net>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu,  4 Feb 2016 15:29:19 +0100
+Subject: [PATCH 25/70] ARM: dts: r8a7793: add R-Car sound support to device
+ tree
+In-Reply-To: <cover.1454595846.git.horms+renesas@verge.net.au>
+References: <cover.1454595846.git.horms+renesas@verge.net.au>
+Message-ID: <951431e08636858bafabb7654c3aae0eac18d950.1454595846.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/04/2016 05:48 AM, Timur Tabi wrote:
-> Guenter Roeck wrote:
->> Also, if panic is enabled, the timeout needs to be adjusted accordingly
->> (to only panic after the entire timeout period has expired, not after
->> half of it). We can not panic the system after timeout / 2.
->
-> It's a debugging feature, not an actual watchdog timeout panic.  That's why it's disabled by default.
->
+Instantiate R-Car sound node in r8a7793 device tree.
+This only supports PIO transfers.
 
-"* When the first stage(the half timeout) is reached, WS0 interrupt is
-  * triggered, at this moment the second watch period starts;
-  * In the WS0 interrupt routine, panic will be triggered for saving the
-  * system context.
-  * If the system is getting into trouble and cannot be reset by panic or
-  * restart properly by the kdump kernel(if supported), then the second
-  * stage (the timeout) will be reached, system will be reset by WS1."
+Based on similar work for the r8a7791 by Kuninori Morimoto.
 
-That doesn't sound like debugging to me.
+Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/r8a7793.dtsi | 83 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 83 insertions(+)
 
-Guenter
+diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
+index 6aabba6ef92c..8b1ec47754ac 100644
+--- a/arch/arm/boot/dts/r8a7793.dtsi
++++ b/arch/arm/boot/dts/r8a7793.dtsi
+@@ -1101,4 +1101,87 @@
+ 		#iommu-cells = <1>;
+ 		status = "disabled";
+ 	};
++
++	rcar_sound: sound at ec500000 {
++		/*
++		 * #sound-dai-cells is required
++		 *
++		 * Single DAI : #sound-dai-cells = <0>;         <&rcar_sound>;
++		 * Multi  DAI : #sound-dai-cells = <1>;         <&rcar_sound N>;
++		 */
++		compatible =  "renesas,rcar_sound-r8a7793", "renesas,rcar_sound-gen2";
++		reg =	<0 0xec500000 0 0x1000>, /* SCU */
++			<0 0xec5a0000 0 0x100>,  /* ADG */
++			<0 0xec540000 0 0x1000>, /* SSIU */
++			<0 0xec541000 0 0x280>;  /* SSI */
++		reg-names = "scu", "adg", "ssiu", "ssi";
++
++		clocks = <&mstp10_clks R8A7793_CLK_SSI_ALL>,
++			<&mstp10_clks R8A7793_CLK_SSI9>, <&mstp10_clks R8A7793_CLK_SSI8>,
++			<&mstp10_clks R8A7793_CLK_SSI7>, <&mstp10_clks R8A7793_CLK_SSI6>,
++			<&mstp10_clks R8A7793_CLK_SSI5>, <&mstp10_clks R8A7793_CLK_SSI4>,
++			<&mstp10_clks R8A7793_CLK_SSI3>, <&mstp10_clks R8A7793_CLK_SSI2>,
++			<&mstp10_clks R8A7793_CLK_SSI1>, <&mstp10_clks R8A7793_CLK_SSI0>,
++			<&mstp10_clks R8A7793_CLK_SCU_SRC9>, <&mstp10_clks R8A7793_CLK_SCU_SRC8>,
++			<&mstp10_clks R8A7793_CLK_SCU_SRC7>, <&mstp10_clks R8A7793_CLK_SCU_SRC6>,
++			<&mstp10_clks R8A7793_CLK_SCU_SRC5>, <&mstp10_clks R8A7793_CLK_SCU_SRC4>,
++			<&mstp10_clks R8A7793_CLK_SCU_SRC3>, <&mstp10_clks R8A7793_CLK_SCU_SRC2>,
++			<&mstp10_clks R8A7793_CLK_SCU_SRC1>, <&mstp10_clks R8A7793_CLK_SCU_SRC0>,
++			<&audio_clk_a>, <&audio_clk_b>, <&audio_clk_c>, <&m2_clk>;
++		clock-names = "ssi-all",
++				"ssi.9", "ssi.8", "ssi.7", "ssi.6", "ssi.5",
++				"ssi.4", "ssi.3", "ssi.2", "ssi.1", "ssi.0",
++				"src.9", "src.8", "src.7", "src.6", "src.5",
++				"src.4", "src.3", "src.2", "src.1", "src.0",
++				"clk_a", "clk_b", "clk_c", "clk_i";
++		power-domains = <&cpg_clocks>;
++
++		status = "disabled";
++
++		rcar_sound,src {
++			src0: src at 0 { };
++			src1: src at 1 { };
++			src2: src at 2 { };
++			src3: src at 3 { };
++			src4: src at 4 { };
++			src5: src at 5 { };
++			src6: src at 6 { };
++			src7: src at 7 { };
++			src8: src at 8 { };
++			src9: src at 9 { };
++		};
++
++		rcar_sound,ssi {
++			ssi0: ssi at 0 {
++				interrupts = <GIC_SPI 370 IRQ_TYPE_LEVEL_HIGH>;
++			};
++			ssi1: ssi at 1 {
++				 interrupts = <GIC_SPI 371 IRQ_TYPE_LEVEL_HIGH>;
++			};
++			ssi2: ssi at 2 {
++				interrupts = <GIC_SPI 372 IRQ_TYPE_LEVEL_HIGH>;
++			};
++			ssi3: ssi at 3 {
++				interrupts = <GIC_SPI 373 IRQ_TYPE_LEVEL_HIGH>;
++			};
++			ssi4: ssi at 4 {
++				interrupts = <GIC_SPI 374 IRQ_TYPE_LEVEL_HIGH>;
++			};
++			ssi5: ssi at 5 {
++				interrupts = <GIC_SPI 375 IRQ_TYPE_LEVEL_HIGH>;
++			};
++			ssi6: ssi at 6 {
++				interrupts = <GIC_SPI 376 IRQ_TYPE_LEVEL_HIGH>;
++			};
++			ssi7: ssi at 7 {
++				interrupts = <GIC_SPI 377 IRQ_TYPE_LEVEL_HIGH>;
++			};
++			ssi8: ssi at 8 {
++				interrupts = <GIC_SPI 378 IRQ_TYPE_LEVEL_HIGH>;
++			};
++			ssi9: ssi at 9 {
++				interrupts = <GIC_SPI 379 IRQ_TYPE_LEVEL_HIGH>;
++			};
++		};
++	};
+ };
+-- 
+2.7.0.rc3.207.g0ac5344
