@@ -1,65 +1,39 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu,  4 Feb 2016 22:09:23 +0100
-Subject: [PATCH v3 net 1/7] net: mvneta: Fix for_each_present_cpu usage
+Date: Thu,  4 Feb 2016 22:09:26 +0100
+Subject: [PATCH v3 net 4/7] net: mvneta: Remove unused code
 In-Reply-To: <1454620169-8156-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1454620169-8156-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1454620169-8156-2-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1454620169-8156-5-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch convert the for_each_present in on_each_cpu, instead of
-applying on the present cpus it will be applied only on the online cpus.
-This fix a bug reported on
-http://thread.gmane.org/gmane.linux.ports.arm.kernel/468173.
+Since the commit 2dcf75e2793c ("net: mvneta: Associate RX queues with
+each CPU") all the percpu irq are used and disabled at initialization, so
+there is no point to disable them first.
 
-Using the macro on_each_cpu (instead of a for_each_* loop) also ensures
-that all the calls will be done all at once.
-
-Fixes: f86428854480 ("net: mvneta: Statically assign queues to CPUs")
-Reported-by: Stefan Roese <stefan.roese@gmail.com>
-Suggested-by: Jisheng Zhang <jszhang@marvell.com>
-Suggested-by: Russell King <rmk+kernel@arm.linux.org.uk>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/net/ethernet/marvell/mvneta.c | 8 +++-----
- 1 file changed, 3 insertions(+), 5 deletions(-)
+ drivers/net/ethernet/marvell/mvneta.c | 8 --------
+ 1 file changed, 8 deletions(-)
 
 diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-index 662c2ee268c7..90ff5c7e19ea 100644
+index f496f9716569..74f8158df2b0 100644
 --- a/drivers/net/ethernet/marvell/mvneta.c
 +++ b/drivers/net/ethernet/marvell/mvneta.c
-@@ -2564,7 +2564,7 @@ static void mvneta_start_dev(struct mvneta_port *pp)
- 	mvneta_port_enable(pp);
+@@ -3014,14 +3014,6 @@ static int mvneta_open(struct net_device *dev)
+ 		goto err_cleanup_txqs;
+ 	}
  
- 	/* Enable polling on the port */
--	for_each_present_cpu(cpu) {
-+	for_each_online_cpu(cpu) {
- 		struct mvneta_pcpu_port *port = per_cpu_ptr(pp->ports, cpu);
- 
- 		napi_enable(&port->napi);
-@@ -2589,7 +2589,7 @@ static void mvneta_stop_dev(struct mvneta_port *pp)
- 
- 	phy_stop(pp->phy_dev);
- 
--	for_each_present_cpu(cpu) {
-+	for_each_online_cpu(cpu) {
- 		struct mvneta_pcpu_port *port = per_cpu_ptr(pp->ports, cpu);
- 
- 		napi_disable(&port->napi);
-@@ -3057,13 +3057,11 @@ err_cleanup_rxqs:
- static int mvneta_stop(struct net_device *dev)
- {
- 	struct mvneta_port *pp = netdev_priv(dev);
--	int cpu;
- 
- 	mvneta_stop_dev(pp);
- 	mvneta_mdio_remove(pp);
- 	unregister_cpu_notifier(&pp->cpu_notifier);
--	for_each_present_cpu(cpu)
--		smp_call_function_single(cpu, mvneta_percpu_disable, pp, true);
-+	on_each_cpu(mvneta_percpu_disable, pp, true);
- 	free_percpu_irq(dev->irq, pp->ports);
- 	mvneta_cleanup_rxqs(pp);
- 	mvneta_cleanup_txqs(pp);
+-	/* Even though the documentation says that request_percpu_irq
+-	 * doesn't enable the interrupts automatically, it actually
+-	 * does so on the local CPU.
+-	 *
+-	 * Make sure it's disabled.
+-	 */
+-	mvneta_percpu_disable(pp);
+-
+ 	/* Enable per-CPU interrupt on all the CPU to handle our RX
+ 	 * queue interrupts
+ 	 */
 -- 
 2.5.0
