@@ -1,39 +1,68 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu,  4 Feb 2016 22:09:26 +0100
-Subject: [PATCH v3 net 4/7] net: mvneta: Remove unused code
+Date: Thu,  4 Feb 2016 22:09:24 +0100
+Subject: [PATCH v3 net 2/7] net: mvneta: Fix the CPU choice in
+ mvneta_percpu_elect
 In-Reply-To: <1454620169-8156-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1454620169-8156-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1454620169-8156-5-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1454620169-8156-3-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the commit 2dcf75e2793c ("net: mvneta: Associate RX queues with
-each CPU") all the percpu irq are used and disabled at initialization, so
-there is no point to disable them first.
+When passing to the management of multiple RX queue, the
+mvneta_percpu_elect function was broken. The use of the modulo can lead
+to elect the wrong cpu. For example with rxq_def=2, if the CPU 2 goes
+offline and then online, we ended with the third RX queue activated in
+the same time on CPU 0 and CPU2, which lead to a kernel crash.
 
+With this fix, we don't try to get "the closer" CPU if the default CPU is
+gone, now we just use CPU 0 which always be there. Thanks to this, the
+code becomes more readable, easier to maintain and more predicable.
+
+Cc: stable at vger.kernel.org
+Fixes: 2dcf75e2793c ("net: mvneta: Associate RX queues with each CPU")
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/net/ethernet/marvell/mvneta.c | 8 --------
- 1 file changed, 8 deletions(-)
+ drivers/net/ethernet/marvell/mvneta.c | 13 +++++++++----
+ 1 file changed, 9 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-index f496f9716569..74f8158df2b0 100644
+index 90ff5c7e19ea..4c2d12423750 100644
 --- a/drivers/net/ethernet/marvell/mvneta.c
 +++ b/drivers/net/ethernet/marvell/mvneta.c
-@@ -3014,14 +3014,6 @@ static int mvneta_open(struct net_device *dev)
- 		goto err_cleanup_txqs;
- 	}
+@@ -2849,9 +2849,14 @@ static void mvneta_percpu_disable(void *arg)
  
--	/* Even though the documentation says that request_percpu_irq
--	 * doesn't enable the interrupts automatically, it actually
--	 * does so on the local CPU.
--	 *
--	 * Make sure it's disabled.
--	 */
--	mvneta_percpu_disable(pp);
--
- 	/* Enable per-CPU interrupt on all the CPU to handle our RX
- 	 * queue interrupts
- 	 */
+ static void mvneta_percpu_elect(struct mvneta_port *pp)
+ {
+-	int online_cpu_idx, max_cpu, cpu, i = 0;
++	int elected_cpu = 0, max_cpu, cpu, i = 0;
++
++	/* Use the cpu associated to the rxq when it is online, in all
++	 * the other cases, use the cpu 0 which can't be offline.
++	 */
++	if (cpu_online(pp->rxq_def))
++		elected_cpu = pp->rxq_def;
+ 
+-	online_cpu_idx = pp->rxq_def % num_online_cpus();
+ 	max_cpu = num_present_cpus();
+ 
+ 	for_each_online_cpu(cpu) {
+@@ -2862,7 +2867,7 @@ static void mvneta_percpu_elect(struct mvneta_port *pp)
+ 			if ((rxq % max_cpu) == cpu)
+ 				rxq_map |= MVNETA_CPU_RXQ_ACCESS(rxq);
+ 
+-		if (i == online_cpu_idx)
++		if (cpu == elected_cpu)
+ 			/* Map the default receive queue queue to the
+ 			 * elected CPU
+ 			 */
+@@ -2873,7 +2878,7 @@ static void mvneta_percpu_elect(struct mvneta_port *pp)
+ 		 * the CPU bound to the default RX queue
+ 		 */
+ 		if (txq_number == 1)
+-			txq_map = (i == online_cpu_idx) ?
++			txq_map = (cpu == elected_cpu) ?
+ 				MVNETA_CPU_TXQ_ACCESS(1) : 0;
+ 		else
+ 			txq_map = mvreg_read(pp, MVNETA_CPU_MAP(cpu)) &
 -- 
 2.5.0
