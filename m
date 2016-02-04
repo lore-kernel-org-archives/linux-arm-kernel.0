@@ -1,30 +1,20 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 4 Feb 2016 20:25:17 +0100
-Subject: [PATCH v3 23/23] arm64: Panic when VHE and non VHE CPUs coexist
-In-Reply-To: <1454522416-6874-24-git-send-email-marc.zyngier@arm.com>
+Date: Thu, 4 Feb 2016 20:25:25 +0100
+Subject: [PATCH v3 22/23] arm64: VHE: Add support for running Linux in
+ EL2 mode
+In-Reply-To: <1454522416-6874-23-git-send-email-marc.zyngier@arm.com>
 References: <1454522416-6874-1-git-send-email-marc.zyngier@arm.com>
- <1454522416-6874-24-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20160204192517.GH13974@cbox>
+ <1454522416-6874-23-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20160204192525.GI13974@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 03, 2016 at 06:00:16PM +0000, Marc Zyngier wrote:
-> Having both VHE and non-VHE capable CPUs in the same system
-> is likely to be a recipe for disaster.
+On Wed, Feb 03, 2016 at 06:00:15PM +0000, Marc Zyngier wrote:
+> With ARMv8.1 VHE, the architecture is able to (almost) transparently
+> run the kernel at EL2, despite being written for EL1.
 > 
-> If the boot CPU has VHE, but a secondary is not, we won't be
-> able to downgrade and run the kernel at EL1. Add CPU hotplug
-> to the mix, and this produces a terrifying mess.
-> 
-> Let's solve the problem once and for all. If you mix VHE and
-> non-VHE CPUs in the same system, you deserve to loose, and this
-> patch makes sure you don't get a chance.
-> 
-> This is implemented by storing the kernel execution level in
-> a global variable. Secondaries will park themselves in a
-> WFI loop if they observe a mismatch. Also, the primary CPU
-> will detect that the secondary CPU has died on a mismatched
-> execution level. Panic will follow.
+> This patch takes care of the "almost" part, mostly preventing the kernel
+> from dropping from EL2 to EL1, and setting up the HYP configuration.
 > 
 > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
