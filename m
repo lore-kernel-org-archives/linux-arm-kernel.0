@@ -1,95 +1,73 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu,  4 Feb 2016 15:04:16 +0100
-Subject: [PATCH 07/11] Documentation/DT: add Versatile display bindings
+Date: Thu,  4 Feb 2016 15:04:19 +0100
+Subject: [PATCH 10/11] ARM: PB1176: define a standard VGA panel
 In-Reply-To: <1454594660-7532-1-git-send-email-linus.walleij@linaro.org>
 References: <1454594660-7532-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1454594660-7532-8-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1454594660-7532-11-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds bindings for the LCD displays that can be found connected
-to the ARM Versatile reference design, interface boards IB1 and
-IB2.
+This defines the CLCD block in the PB1176 and adds a standard
+640x480 VGA panel to the device tree.
 
 Cc: Pawel Moll <pawel.moll@arm.com>
 Cc: Rob Herring <robh@kernel.org>
 Cc: Russell King <linux@arm.linux.org.uk>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- .../devicetree/bindings/display/panel/epson,l2f50113t00.txt        | 7 +++++++
- .../devicetree/bindings/display/panel/sanyo,alr252rgt.txt          | 7 +++++++
- .../devicetree/bindings/display/panel/sanyo,tm38qv67a02a.txt       | 7 +++++++
- .../devicetree/bindings/display/panel/sharp,lq084v1dg21.txt        | 7 +++++++
- Documentation/devicetree/bindings/vendor-prefixes.txt              | 1 +
- 5 files changed, 29 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/display/panel/epson,l2f50113t00.txt
- create mode 100644 Documentation/devicetree/bindings/display/panel/sanyo,alr252rgt.txt
- create mode 100644 Documentation/devicetree/bindings/display/panel/sanyo,tm38qv67a02a.txt
- create mode 100644 Documentation/devicetree/bindings/display/panel/sharp,lq084v1dg21.txt
+ arch/arm/boot/dts/arm-realview-pb1176.dts | 40 +++++++++++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/display/panel/epson,l2f50113t00.txt b/Documentation/devicetree/bindings/display/panel/epson,l2f50113t00.txt
-new file mode 100644
-index 000000000000..58eca804dbe8
---- /dev/null
-+++ b/Documentation/devicetree/bindings/display/panel/epson,l2f50113t00.txt
-@@ -0,0 +1,7 @@
-+Epson Mobile display
+diff --git a/arch/arm/boot/dts/arm-realview-pb1176.dts b/arch/arm/boot/dts/arm-realview-pb1176.dts
+index d012ecf25127..af10d888545b 100644
+--- a/arch/arm/boot/dts/arm-realview-pb1176.dts
++++ b/arch/arm/boot/dts/arm-realview-pb1176.dts
+@@ -362,6 +362,46 @@
+ 			clocks = <&uartclk>, <&pclk>;
+ 			clock-names = "uartclk", "apb_pclk";
+ 		};
 +
-+Required properties:
-+- compatible: should be "epson,l2f50113t00"
++		clcd at 10112000 {
++			compatible = "arm,pl111", "arm,primecell";
++			reg = <0x10112000 0x1000>;
++			interrupt-parent = <&intc_dc1176>;
++			interrupt-names = "combined";
++			interrupts = <0 47 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&oscclk0>, <&pclk>;
++			clock-names = "clcdclk", "apb_pclk";
 +
-+This binding is compatible with the panel-dpi binding, which is specified
-+in panel-dpi.txt in this directory.
-diff --git a/Documentation/devicetree/bindings/display/panel/sanyo,alr252rgt.txt b/Documentation/devicetree/bindings/display/panel/sanyo,alr252rgt.txt
-new file mode 100644
-index 000000000000..d24562b34cd0
---- /dev/null
-+++ b/Documentation/devicetree/bindings/display/panel/sanyo,alr252rgt.txt
-@@ -0,0 +1,7 @@
-+Sanyo Electric Co. 2.5" panel
++			port {
++				clcd_pads: endpoint {
++					remote-endpoint = <&clcd_panel>;
++					arm,pl11x,tft-r0g0b0-pads = <0 8 16>;
++				};
++			};
 +
-+Required properties:
-+- compatible: should be "sanyo,alr252rgt"
++			panel {
++				compatible = "panel-dpi";
 +
-+This binding is compatible with the panel-dpi binding, which is specified
-+in panel-dpi.txt in this directory.
-diff --git a/Documentation/devicetree/bindings/display/panel/sanyo,tm38qv67a02a.txt b/Documentation/devicetree/bindings/display/panel/sanyo,tm38qv67a02a.txt
-new file mode 100644
-index 000000000000..c1582012d52e
---- /dev/null
-+++ b/Documentation/devicetree/bindings/display/panel/sanyo,tm38qv67a02a.txt
-@@ -0,0 +1,7 @@
-+Sanyo Electric Co. 3.8" panel
++				port {
++					clcd_panel: endpoint {
++						remote-endpoint = <&clcd_pads>;
++					};
++				};
 +
-+Required properties:
-+- compatible: should be "sanyo,tm38qv67a02a"
-+
-+This binding is compatible with the panel-dpi binding, which is specified
-+in panel-dpi.txt in this directory.
-diff --git a/Documentation/devicetree/bindings/display/panel/sharp,lq084v1dg21.txt b/Documentation/devicetree/bindings/display/panel/sharp,lq084v1dg21.txt
-new file mode 100644
-index 000000000000..8318c2422740
---- /dev/null
-+++ b/Documentation/devicetree/bindings/display/panel/sharp,lq084v1dg21.txt
-@@ -0,0 +1,7 @@
-+Sharp 8.4" VGA color TFT
-+
-+Required properties:
-+- compatible: should be "sharp,lq084v1dg21"
-+
-+This binding is compatible with the panel-dpi binding, which is specified
-+in panel-dpi.txt in this directory.
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 72e2c5a2b327..da5d8bf13818 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -198,6 +198,7 @@ ricoh	Ricoh Co. Ltd.
- rockchip	Fuzhou Rockchip Electronics Co., Ltd
- samsung	Samsung Semiconductor
- sandisk	Sandisk Corporation
-+sanyo	Sanyo Electric Co., Ltd.
- sbs	Smart Battery System
- schindler	Schindler
- seagate	Seagate Technology PLC
++				/* Standard 640x480 VGA timings */
++				panel-timing {
++					clock-frequency = <25175000>;
++					hactive = <640>;
++					hback-porch = <48>;
++					hfront-porch = <16>;
++					hsync-len = <96>;
++					vactive = <480>;
++					vback-porch = <33>;
++					vfront-porch = <10>;
++					vsync-len = <2>;
++				};
++			};
++		};
+ 	};
+ 
+ 	/* These peripherals are inside the FPGA rather than the DevChip */
 -- 
 2.4.3
