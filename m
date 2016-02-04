@@ -1,41 +1,75 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 4 Feb 2016 11:33:45 +0000
-Subject: [PATCH v2] drivers/perf: arm_pmu: make info messages more verbose
-In-Reply-To: <1454579928-20231-1-git-send-email-dirk.behme@de.bosch.com>
-References: <1454579928-20231-1-git-send-email-dirk.behme@de.bosch.com>
-Message-ID: <20160204113343.GC17257@arm.com>
+From: tiffany.lin@mediatek.com (Tiffany Lin)
+Date: Thu, 4 Feb 2016 19:35:03 +0800
+Subject: [PATCH v4 8/8] arm64: dts: mediatek: Add Video Encoder for MT8173
+In-Reply-To: <1454585703-42428-8-git-send-email-tiffany.lin@mediatek.com>
+References: <1454585703-42428-1-git-send-email-tiffany.lin@mediatek.com>
+ <1454585703-42428-2-git-send-email-tiffany.lin@mediatek.com>
+ <1454585703-42428-3-git-send-email-tiffany.lin@mediatek.com>
+ <1454585703-42428-4-git-send-email-tiffany.lin@mediatek.com>
+ <1454585703-42428-5-git-send-email-tiffany.lin@mediatek.com>
+ <1454585703-42428-6-git-send-email-tiffany.lin@mediatek.com>
+ <1454585703-42428-7-git-send-email-tiffany.lin@mediatek.com>
+ <1454585703-42428-8-git-send-email-tiffany.lin@mediatek.com>
+Message-ID: <1454585703-42428-9-git-send-email-tiffany.lin@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 04, 2016 at 10:58:48AM +0100, Dirk Behme wrote:
-> On a big.LITTLE system e.g. with Cortex A57 and A53 in case not all cores
-> are online at PMU probe time we might get
-> 
-> hw perfevents: failed to probe PMU!
-> hw perfevents: failed to register PMU devices!
-> 
-> making it unclear which cores failed, here.
-> 
-> Add the device tree full name which failed and the error value resulting
-> in a more verbose and helpful message like
-> 
-> hw perfevents: /soc/pmu_a53: failed to probe PMU! Error -6
-> hw perfevents: /soc/pmu_a53: failed to register PMU devices! Error -6
-> 
-> Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
-> ---
-> Changes in v2: Use the full node name from DT instead of pmu->name, as if
-> we fail to find anything in the match table, that'll be NULL. Additionally,
-> add the error value to get an idea why it failed.
-> 
->  drivers/perf/arm_pmu.c | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
+Add video encoder node for MT8173
 
-This looks fine to me, but please can you rebase on top of my perf/updates
-branch [1] so that I can queue it?
+Signed-off-by: Tiffany Lin <tiffany.lin@mediatek.com>
+---
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi |   39 ++++++++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
 
-Cheers,
-
-Will
-
-[1] https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/log/?h=perf/updates
+diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+index 5b0b38a..f61669d 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+@@ -1150,6 +1150,45 @@
+ 			clock-names = "apb", "smi";
+ 		};
+ 
++		vcodec_enc: vcodec at 18002000 {
++			compatible = "mediatek,mt8173-vcodec-enc";
++			reg = <0 0x18002000 0 0x1000>,	/* VENC_SYS */
++			      <0 0x19002000 0 0x1000>;	/* VENC_LT_SYS */
++			interrupts = <GIC_SPI 198 IRQ_TYPE_LEVEL_LOW>,
++				     <GIC_SPI 202 IRQ_TYPE_LEVEL_LOW>;
++			mediatek,larb = <&larb3>,
++					<&larb5>;
++			iommus = <&iommu M4U_PORT_VENC_RCPU>,
++				 <&iommu M4U_PORT_VENC_REC>,
++				 <&iommu M4U_PORT_VENC_BSDMA>,
++				 <&iommu M4U_PORT_VENC_SV_COMV>,
++				 <&iommu M4U_PORT_VENC_RD_COMV>,
++				 <&iommu M4U_PORT_VENC_CUR_LUMA>,
++				 <&iommu M4U_PORT_VENC_CUR_CHROMA>,
++				 <&iommu M4U_PORT_VENC_REF_LUMA>,
++				 <&iommu M4U_PORT_VENC_REF_CHROMA>,
++				 <&iommu M4U_PORT_VENC_NBM_RDMA>,
++				 <&iommu M4U_PORT_VENC_NBM_WDMA>,
++				 <&iommu M4U_PORT_VENC_RCPU_SET2>,
++				 <&iommu M4U_PORT_VENC_REC_FRM_SET2>,
++				 <&iommu M4U_PORT_VENC_BSDMA_SET2>,
++				 <&iommu M4U_PORT_VENC_SV_COMA_SET2>,
++				 <&iommu M4U_PORT_VENC_RD_COMA_SET2>,
++				 <&iommu M4U_PORT_VENC_CUR_LUMA_SET2>,
++				 <&iommu M4U_PORT_VENC_CUR_CHROMA_SET2>,
++				 <&iommu M4U_PORT_VENC_REF_LUMA_SET2>,
++				 <&iommu M4U_PORT_VENC_REC_CHROMA_SET2>;
++			mediatek,vpu = <&vpu>;
++			clocks = <&topckgen CLK_TOP_VENCPLL_D2>,
++				 <&topckgen CLK_TOP_VENC_SEL>,
++				 <&topckgen CLK_TOP_UNIVPLL1_D2>,
++				 <&topckgen CLK_TOP_VENC_LT_SEL>;
++			clock-names = "vencpll_d2",
++				      "venc_sel",
++				      "univpll1_d2",
++				      "venc_lt_sel";
++		};
++
+ 		vencltsys: clock-controller at 19000000 {
+ 			compatible = "mediatek,mt8173-vencltsys", "syscon";
+ 			reg = <0 0x19000000 0 0x1000>;
+-- 
+1.7.9.5
