@@ -1,62 +1,46 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu,  4 Feb 2016 16:50:23 +0100
-Subject: [PATCH v2 0/7] ARM/efi minor fixes + stub pre-boot compat checks
-Message-ID: <1454601030-9093-1-git-send-email-ard.biesheuvel@linaro.org>
+Date: Thu,  4 Feb 2016 16:50:26 +0100
+Subject: [PATCH v2 3/7] efi: efistub: prevent __init annotations from being
+ used
+In-Reply-To: <1454601030-9093-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1454601030-9093-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1454601030-9093-4-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I merged two EFI/ARM related series, whose v1's I sent out last week:
+__init annotations should not be used in the EFI stub, since the code is
+either included in the decompressor (x86, ARM) where they have no effect,
+or the whole stub is __init annotated at the section level (arm64), by
+renaming the sections, in which case the __init annotations will be
+redundant, and will result in section names like .init.init.text, and our
+linker script does not expect that. So un-#define __init so that its
+inadvertent use will force a build error.
 
-Changes since v1:
-- added various tags from various people
-- new patch #3 to undefine __init
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ drivers/firmware/efi/libstub/efistub.h | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-@Matt: are you happy with all of this going through the arm64 tree? I don't
-think it clashes with anything else we've got queued up for v4.6 in tip/efi/core
-
-Series 1: arm efi minor fixes
-http://thread.gmane.org/gmane.linux.ports.arm.kernel/473027
-This fixes two minor issues with the handling of .init data in the stub (#1, #2)
-
-Patch #3 is a new patch that un-#defines __init in efistub.h, to catch its
-inadvertent use in the UEFI stub
-
-Patch #4 replaces some instances of early_memremap() with early_memremap_ro()
-where the region in question is only accessed in r/o mode.
-
-Series 2: UEFI stub pre-boot compat checks
-http://thread.gmane.org/gmane.linux.ports.arm.kernel/473189
-
-As discussed earlier today [1], and last year [2], it makes sense for the
-UEFI stub to perform some basic checks on the hardware for missing features
-that would prevent the kernel from booting to a state where it can even
-complain about this.
-
-So implements this for ARM, to check on LPAE builds whether the CPU supports
-it (patch #5), and for arm64, to check whether the build time granule is
-implemented by the CPU (patch #6). Patch #7 wires it up into the shared init
-code.
-
-[1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/472880
-[2] http://thread.gmane.org/gmane.linux.ports.arm.kernel/447370
-
-Ard Biesheuvel (7):
-  arm64: efistub: drop __init annotation from handle_kernel_image()
-  arm64: vmlinux.lds.S: handle .init.rodata.xxx and .init.bss sections
-  efi: efistub: prevent __init annotations from being used
-  efi: arm-init: use read-only early mappings
-  ARM: efistub: check for LPAE support before booting a LPAE kernel
-  arm64: efistub: check for h/w support before booting a >4 KB granule
-    kernel
-  ARM/arm64: efistub: perform hardware compatibility check
-
- arch/arm64/kernel/vmlinux.lds.S           |  1 +
- drivers/firmware/efi/arm-init.c           | 14 ++++----
- drivers/firmware/efi/libstub/arm-stub.c   |  4 +++
- drivers/firmware/efi/libstub/arm32-stub.c | 17 ++++++++++
- drivers/firmware/efi/libstub/arm64-stub.c | 34 ++++++++++++++++----
- drivers/firmware/efi/libstub/efistub.h    | 12 +++++++
- 6 files changed, 68 insertions(+), 14 deletions(-)
-
+diff --git a/drivers/firmware/efi/libstub/efistub.h b/drivers/firmware/efi/libstub/efistub.h
+index 6b6548fda089..275f395c886d 100644
+--- a/drivers/firmware/efi/libstub/efistub.h
++++ b/drivers/firmware/efi/libstub/efistub.h
+@@ -5,6 +5,16 @@
+ /* error code which can't be mistaken for valid address */
+ #define EFI_ERROR	(~0UL)
+ 
++/*
++ * __init annotations should not be used in the EFI stub, since the code is
++ * either included in the decompressor (x86, ARM) where they have no effect,
++ * or the whole stub is __init annotated at the section level (arm64), by
++ * renaming the sections, in which case the __init annotation will be
++ * redundant, and will result in section names like .init.init.text, and our
++ * linker script does not expect that.
++ */
++#undef __init
++
+ void efi_char16_printk(efi_system_table_t *, efi_char16_t *);
+ 
+ efi_status_t efi_open_volume(efi_system_table_t *sys_table_arg, void *__image,
 -- 
 2.5.0
