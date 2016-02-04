@@ -1,109 +1,32 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  4 Feb 2016 11:00:36 +0000
-Subject: [PATCH v2 19/28] ARM: KVM: Add panic handling code
-In-Reply-To: <1454583645-10144-1-git-send-email-marc.zyngier@arm.com>
-References: <1454583645-10144-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1454583645-10144-20-git-send-email-marc.zyngier@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 4 Feb 2016 11:02:03 +0000
+Subject: [PATCH v3 00/12] pwm: add support for atomic update
+In-Reply-To: <CAD=FV=U_x1cxx6RrHuVgVV8GbOwm9DXXJcyiArbbQySUOaxrvQ@mail.gmail.com>
+References: <1442828009-6241-1-git-send-email-boris.brezillon@free-electrons.com>
+ <2341981.a79ioYM9Es@diego> <20151110173416.GB21727@ulmo>
+ <CAD=FV=WL3jYEgVe-m6QcAyQwfJgdX4J5OtKisKwyoKOrTSpEQA@mail.gmail.com>
+ <20160125170855.GA10182@ulmo>
+ <CAD=FV=Xvxeqo3imUmjukC5iYk3EZkrJ04G7C1B-w4xyr-r6-2Q@mail.gmail.com>
+ <20160203145337.GD9650@ulmo>
+ <CAD=FV=U_x1cxx6RrHuVgVV8GbOwm9DXXJcyiArbbQySUOaxrvQ@mail.gmail.com>
+Message-ID: <20160204110203.GL4455@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of spinning forever, let's "properly" handle any unexpected
-exception ("properly" meaning "print a spat on the console and die").
+On Wed, Feb 03, 2016 at 11:04:20AM -0800, Doug Anderson wrote:
 
-This has proved useful quite a few times...
+> Sure.  ...but you agree that somehow you need a new API call for this,
+> right?  Somehow the PWM regulator needs to be able to say that it
+> wants the hardware state, not the initial state as specified in the
+> device tree.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/kvm/hyp/hyp-entry.S | 28 +++++++++++++++++++++-------
- arch/arm/kvm/hyp/switch.c    | 38 ++++++++++++++++++++++++++++++++++++++
- 2 files changed, 59 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm/kvm/hyp/hyp-entry.S b/arch/arm/kvm/hyp/hyp-entry.S
-index 44bc11f..ca412ad 100644
---- a/arch/arm/kvm/hyp/hyp-entry.S
-+++ b/arch/arm/kvm/hyp/hyp-entry.S
-@@ -75,15 +75,29 @@ __kvm_hyp_vector:
- 
- .macro invalid_vector label, cause
- 	.align
--\label:	b	.
-+\label:	mov	r0, #\cause
-+	b	__hyp_panic
- .endm
- 
--	invalid_vector	hyp_reset
--	invalid_vector	hyp_undef
--	invalid_vector	hyp_svc
--	invalid_vector	hyp_pabt
--	invalid_vector	hyp_dabt
--	invalid_vector	hyp_fiq
-+	invalid_vector	hyp_reset	ARM_EXCEPTION_RESET
-+	invalid_vector	hyp_undef	ARM_EXCEPTION_UNDEFINED
-+	invalid_vector	hyp_svc		ARM_EXCEPTION_SOFTWARE
-+	invalid_vector	hyp_pabt	ARM_EXCEPTION_PREF_ABORT
-+	invalid_vector	hyp_dabt	ARM_EXCEPTION_DATA_ABORT
-+	invalid_vector	hyp_fiq		ARM_EXCEPTION_FIQ
-+
-+ENTRY(__hyp_do_panic)
-+	mrs	lr, cpsr
-+	bic	lr, lr, #MODE_MASK
-+	orr	lr, lr, #SVC_MODE
-+THUMB(	orr	lr, lr, #PSR_T_BIT	)
-+	msr	spsr_cxsf, lr
-+	ldr	lr, =panic
-+	msr	ELR_hyp, lr
-+	ldr	lr, =kvm_call_hyp
-+	clrex
-+	eret
-+ENDPROC(__hyp_do_panic)
- 
- hyp_hvc:
- 	/*
-diff --git a/arch/arm/kvm/hyp/switch.c b/arch/arm/kvm/hyp/switch.c
-index 8bfd729..67f3944 100644
---- a/arch/arm/kvm/hyp/switch.c
-+++ b/arch/arm/kvm/hyp/switch.c
-@@ -188,3 +188,41 @@ again:
- }
- 
- __alias(__guest_run) int __weak __kvm_vcpu_run(struct kvm_vcpu *vcpu);
-+
-+static const char * const __hyp_panic_string[] = {
-+	[ARM_EXCEPTION_RESET]      = "\nHYP panic: RST?? PC:%08x CPSR:%08x",
-+	[ARM_EXCEPTION_UNDEFINED]  = "\nHYP panic: UNDEF PC:%08x CPSR:%08x",
-+	[ARM_EXCEPTION_SOFTWARE]   = "\nHYP panic: SVC?? PC:%08x CPSR:%08x",
-+	[ARM_EXCEPTION_PREF_ABORT] = "\nHYP panic: PABRT PC:%08x CPSR:%08x",
-+	[ARM_EXCEPTION_DATA_ABORT] = "\nHYP panic: DABRT PC:%08x ADDR:%08x",
-+	[ARM_EXCEPTION_IRQ]        = "\nHYP panic: IRQ?? PC:%08x CPSR:%08x",
-+	[ARM_EXCEPTION_FIQ]        = "\nHYP panic: FIQ?? PC:%08x CPSR:%08x",
-+	[ARM_EXCEPTION_HVC]        = "\nHYP panic: HVC?? PC:%08x CPSR:%08x",
-+};
-+
-+void __hyp_text __noreturn __hyp_panic(int cause)
-+{
-+	u32 elr = read_special(ELR_hyp);
-+	u32 val;
-+
-+	if (cause == ARM_EXCEPTION_DATA_ABORT)
-+		val = read_sysreg(HDFAR);
-+	else
-+		val = read_special(SPSR);
-+
-+	if (read_sysreg(VTTBR)) {
-+		struct kvm_vcpu *vcpu;
-+		struct kvm_cpu_context *host_ctxt;
-+
-+		vcpu = (struct kvm_vcpu *)read_sysreg(HTPIDR);
-+		host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
-+		__deactivate_traps(vcpu);
-+		__deactivate_vm(vcpu);
-+		__sysreg_restore_state(host_ctxt);
-+	}
-+
-+	/* Call panic for real */
-+	__hyp_do_panic(__hyp_panic_string[cause], elr, val);
-+
-+	unreachable();
-+}
--- 
-2.1.4
+Wouldn't the most direct way to do that be to just not specify anything
+in the DT?  If there *is* something in DT but we ignore it that's a bit
+weird.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160204/3d4f608e/attachment-0001.sig>
