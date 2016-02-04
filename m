@@ -1,61 +1,50 @@
-From: k@japko.eu (Krzysztof Adamski)
-Date: Thu, 4 Feb 2016 21:56:02 +0100
-Subject: [PATCH v3 1/5] clk: sunxi: Add apb0 gates for H3
-In-Reply-To: <20160204154752.4df7808be3364a98c496c030@free.fr>
-References: <1454542430-16572-1-git-send-email-k@japko.eu>
- <1454542430-16572-2-git-send-email-k@japko.eu>
- <20160204154752.4df7808be3364a98c496c030@free.fr>
-Message-ID: <20160204205602.GC12071@box2.japko.eu>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu,  4 Feb 2016 22:09:22 +0100
+Subject: [PATCH v3 net 0/7] mvneta fixes for SMP
+Message-ID: <1454620169-8156-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 04, 2016 at 03:47:52PM +0100, Jean-Francois Moine wrote:
->On Thu,  4 Feb 2016 00:33:46 +0100
->Krzysztof Adamski <k@japko.eu> wrote:
->
->> This patch adds support for APB0 in H3. It seems to be compatible with
->> earlier SOCs. apb0 gates controls R_ block peripherals (R_PIO, R_IR,
->> etc).
->>
->> Signed-off-by: Krzysztof Adamski <k@japko.eu>
->> ---
->>  Documentation/devicetree/bindings/clock/sunxi.txt | 1 +
->>  drivers/clk/sunxi/clk-simple-gates.c              | 2 ++
->>  2 files changed, 3 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
->> index e59f57b..751c8b9f0 100644
->> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
->> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
->> @@ -45,6 +45,7 @@ Required properties:
->>  	"allwinner,sun6i-a31-apb0-gates-clk" - for the APB0 gates on A31
->>  	"allwinner,sun7i-a20-apb0-gates-clk" - for the APB0 gates on A20
->>  	"allwinner,sun8i-a23-apb0-gates-clk" - for the APB0 gates on A23
->> +	"allwinner,sun8i-h3-apb0-gates-clk" - for the APB0 gates on H3
->>  	"allwinner,sun9i-a80-apb0-gates-clk" - for the APB0 gates on A80
->>  	"allwinner,sun4i-a10-apb1-clk" - for the APB1 clock
->>  	"allwinner,sun9i-a80-apb1-clk" - for the APB1 bus clock on A80
->> diff --git a/drivers/clk/sunxi/clk-simple-gates.c b/drivers/clk/sunxi/clk-simple-gates.c
->> index f4da52b..6753c87 100644
->> --- a/drivers/clk/sunxi/clk-simple-gates.c
->> +++ b/drivers/clk/sunxi/clk-simple-gates.c
->> @@ -130,6 +130,8 @@ CLK_OF_DECLARE(sun8i_a23_apb2, "allwinner,sun8i-a23-apb2-gates-clk",
->>  	       sunxi_simple_gates_init);
->>  CLK_OF_DECLARE(sun8i_a33_ahb1, "allwinner,sun8i-a33-ahb1-gates-clk",
->>  	       sunxi_simple_gates_init);
->> +CLK_OF_DECLARE(sun8i_h3_apb0, "allwinner,sun8i-h3-apb0-gates-clk",
->> +	       sunxi_simple_gates_init);
->>  CLK_OF_DECLARE(sun9i_a80_ahb0, "allwinner,sun9i-a80-ahb0-gates-clk",
->>  	       sunxi_simple_gates_init);
->>  CLK_OF_DECLARE(sun9i_a80_ahb1, "allwinner,sun9i-a80-ahb1-gates-clk",
->
->It seems that the other compatible strings are there for historical
->reasons. Why do you need a new one with such a specific name?
->
->It would have been more sensible to add a generic compatible string as
->"allwinner,apb-gates", letting the removal of the other strings for a
->later patch...
+Hi,
 
-Seems like a good idea but is it possible to remove those binding in 
-separate patch? I mean, wouldn't that, in theory, break ABI? Are such 
-patches accepted?
+Following this bug report:
+http://thread.gmane.org/gmane.linux.ports.arm.kernel/468173 and the
+suggestions from Russell King, I reviewed all the code involving
+multi-CPU. It ended with this series of patches which should improve
+the stability of the driver.
+
+During my test I found another bug which is fixed by new patch (the
+second one of this new version of the series)
+
+The two first patches fix real bugs, the others fix potential issues
+in the driver.
+
+Thanks,
+
+Gregory
+
+Changelog:
+
+v1 -> v2
+Fix spinlock comment. Pointed by David Miller
+
+v2 -> v3
+ - Fix typos and mistake in the comments. Pointed by Sergei Shtylyov
+ - Add a new patch fixing the CPU choice in mvneta_percpu_elect
+ - Use lock in last patch to prevent remaining race condition. Pointed
+   by Jisheng
+
+Gregory CLEMENT (7):
+  net: mvneta: Fix for_each_present_cpu usage
+  net: mvneta: Fix the CPU choice in mvneta_percpu_elect
+  net: mvneta: Use on_each_cpu when possible
+  net: mvneta: Remove unused code
+  net: mvneta: Modify the queue related fields from each cpu
+  net: mvneta: The mvneta_percpu_elect function should be atomic
+  net: mvneta: Fix race condition during stopping
+
+ drivers/net/ethernet/marvell/mvneta.c | 184 +++++++++++++++++++---------------
+ 1 file changed, 101 insertions(+), 83 deletions(-)
+
+-- 
+2.5.0
