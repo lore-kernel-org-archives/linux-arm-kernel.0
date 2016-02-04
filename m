@@ -1,138 +1,161 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  4 Feb 2016 11:00:25 +0000
-Subject: [PATCH v2 08/28] ARM: KVM: Add TLB invalidation code
+Date: Thu,  4 Feb 2016 11:00:20 +0000
+Subject: [PATCH v2 03/28] ARM: KVM: Move VFP registers to a CPU context
+ structure
 In-Reply-To: <1454583645-10144-1-git-send-email-marc.zyngier@arm.com>
 References: <1454583645-10144-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1454583645-10144-9-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1454583645-10144-4-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert the TLB invalidation code to C, hooking it into the
-build system whilst we're at it.
+In order to turn the WS code into something that looks a bit
+more like the arm64 version, move the VFP registers into a
+CPU context container for both the host and the guest.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kvm/Makefile     |  1 +
- arch/arm/kvm/hyp/Makefile |  5 ++++
- arch/arm/kvm/hyp/hyp.h    |  5 ++++
- arch/arm/kvm/hyp/tlb.c    | 71 +++++++++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 82 insertions(+)
- create mode 100644 arch/arm/kvm/hyp/Makefile
- create mode 100644 arch/arm/kvm/hyp/tlb.c
+ arch/arm/include/asm/kvm_host.h | 11 +++++++----
+ arch/arm/kernel/asm-offsets.c   |  5 +++--
+ arch/arm/kvm/coproc.c           | 20 ++++++++++----------
+ arch/arm/kvm/interrupts.S       | 10 ++++++----
+ 4 files changed, 26 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
-index c5eef02c..eb1bf43 100644
---- a/arch/arm/kvm/Makefile
-+++ b/arch/arm/kvm/Makefile
-@@ -17,6 +17,7 @@ AFLAGS_interrupts.o := -Wa,-march=armv7-a$(plus_virt)
- KVM := ../../../virt/kvm
- kvm-arm-y = $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o $(KVM)/vfio.o
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index f1e86f1..b64ac8e 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -88,9 +88,15 @@ struct kvm_vcpu_fault_info {
+ 	u32 hyp_pc;		/* PC when exception was taken from Hyp mode */
+ };
  
-+obj-$(CONFIG_KVM_ARM_HOST) += hyp/
- obj-y += kvm-arm.o init.o interrupts.o
- obj-y += arm.o handle_exit.o guest.o mmu.o emulate.o reset.o
- obj-y += coproc.o coproc_a15.o coproc_a7.o mmio.o psci.o perf.o
-diff --git a/arch/arm/kvm/hyp/Makefile b/arch/arm/kvm/hyp/Makefile
-new file mode 100644
-index 0000000..36c760d
---- /dev/null
-+++ b/arch/arm/kvm/hyp/Makefile
-@@ -0,0 +1,5 @@
-+#
-+# Makefile for Kernel-based Virtual Machine module, HYP part
-+#
+-typedef struct vfp_hard_struct kvm_cpu_context_t;
++struct kvm_cpu_context {
++	struct vfp_hard_struct vfp;
++};
 +
-+obj-$(CONFIG_KVM_ARM_HOST) += tlb.o
-diff --git a/arch/arm/kvm/hyp/hyp.h b/arch/arm/kvm/hyp/hyp.h
-index 727089f..5808bbd 100644
---- a/arch/arm/kvm/hyp/hyp.h
-+++ b/arch/arm/kvm/hyp/hyp.h
-@@ -42,4 +42,9 @@
- })
- #define read_sysreg(...)		__read_sysreg(__VA_ARGS__)
++typedef struct kvm_cpu_context kvm_cpu_context_t;
  
-+#define VTTBR		__ACCESS_CP15_64(6, c2)
-+#define ICIALLUIS	__ACCESS_CP15(c7, 0, c1, 0)
-+#define TLBIALLIS	__ACCESS_CP15(c8, 0, c3, 0)
-+#define TLBIALLNSNHIS	__ACCESS_CP15(c8, 4, c3, 4)
+ struct kvm_vcpu_arch {
++	struct kvm_cpu_context ctxt;
 +
- #endif /* __ARM_KVM_HYP_H__ */
-diff --git a/arch/arm/kvm/hyp/tlb.c b/arch/arm/kvm/hyp/tlb.c
-new file mode 100644
-index 0000000..993fe89
---- /dev/null
-+++ b/arch/arm/kvm/hyp/tlb.c
-@@ -0,0 +1,71 @@
-+/*
-+ * Original code:
-+ * Copyright (C) 2012 - Virtual Open Systems and Columbia University
-+ * Author: Christoffer Dall <c.dall@virtualopensystems.com>
-+ *
-+ * Mostly rewritten in C by Marc Zyngier <marc.zyngier@arm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include "hyp.h"
-+
-+/**
-+ * Flush per-VMID TLBs
-+ *
-+ * __kvm_tlb_flush_vmid(struct kvm *kvm);
-+ *
-+ * We rely on the hardware to broadcast the TLB invalidation to all CPUs
-+ * inside the inner-shareable domain (which is the case for all v7
-+ * implementations).  If we come across a non-IS SMP implementation, we'll
-+ * have to use an IPI based mechanism. Until then, we stick to the simple
-+ * hardware assisted version.
-+ *
-+ * As v7 does not support flushing per IPA, just nuke the whole TLB
-+ * instead, ignoring the ipa value.
-+ */
-+static void __hyp_text __tlb_flush_vmid(struct kvm *kvm)
-+{
-+	dsb(ishst);
-+
-+	/* Switch to requested VMID */
-+	kvm = kern_hyp_va(kvm);
-+	write_sysreg(kvm->arch.vttbr, VTTBR);
-+	isb();
-+
-+	write_sysreg(0, TLBIALLIS);
-+	dsb(ish);
-+	isb();
-+
-+	write_sysreg(0, VTTBR);
-+}
-+
-+__alias(__tlb_flush_vmid) void __weak __kvm_tlb_flush_vmid(struct kvm *kvm);
-+
-+static void __hyp_text __tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
-+{
-+	__tlb_flush_vmid(kvm);
-+}
-+
-+__alias(__tlb_flush_vmid_ipa) void __weak __kvm_tlb_flush_vmid_ipa(struct kvm *kvm,
-+							    phys_addr_t ipa);
-+
-+static void __hyp_text __tlb_flush_vm_context(void)
-+{
-+	dsb(ishst);
-+	write_sysreg(0, TLBIALLNSNHIS);
-+	write_sysreg(0, ICIALLUIS);
-+	dsb(ish);
-+}
-+
-+__alias(__tlb_flush_vm_context) void __weak __kvm_flush_vm_context(void);
+ 	struct kvm_regs regs;
+ 
+ 	int target; /* Processor target */
+@@ -111,9 +117,6 @@ struct kvm_vcpu_arch {
+ 	/* Exception Information */
+ 	struct kvm_vcpu_fault_info fault;
+ 
+-	/* Floating point registers (VFP and Advanced SIMD/NEON) */
+-	struct vfp_hard_struct vfp_guest;
+-
+ 	/* Host FP context */
+ 	kvm_cpu_context_t *host_cpu_context;
+ 
+diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
+index 871b826..346bfca 100644
+--- a/arch/arm/kernel/asm-offsets.c
++++ b/arch/arm/kernel/asm-offsets.c
+@@ -173,8 +173,9 @@ int main(void)
+   DEFINE(VCPU_KVM,		offsetof(struct kvm_vcpu, kvm));
+   DEFINE(VCPU_MIDR,		offsetof(struct kvm_vcpu, arch.midr));
+   DEFINE(VCPU_CP15,		offsetof(struct kvm_vcpu, arch.cp15));
+-  DEFINE(VCPU_VFP_GUEST,	offsetof(struct kvm_vcpu, arch.vfp_guest));
+-  DEFINE(VCPU_VFP_HOST,		offsetof(struct kvm_vcpu, arch.host_cpu_context));
++  DEFINE(VCPU_GUEST_CTXT,	offsetof(struct kvm_vcpu, arch.ctxt));
++  DEFINE(VCPU_HOST_CTXT,	offsetof(struct kvm_vcpu, arch.host_cpu_context));
++  DEFINE(CPU_CTXT_VFP,		offsetof(struct kvm_cpu_context, vfp));
+   DEFINE(VCPU_REGS,		offsetof(struct kvm_vcpu, arch.regs));
+   DEFINE(VCPU_USR_REGS,		offsetof(struct kvm_vcpu, arch.regs.usr_regs));
+   DEFINE(VCPU_SVC_REGS,		offsetof(struct kvm_vcpu, arch.regs.svc_regs));
+diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
+index f3d88dc..1a643f3 100644
+--- a/arch/arm/kvm/coproc.c
++++ b/arch/arm/kvm/coproc.c
+@@ -901,7 +901,7 @@ static int vfp_get_reg(const struct kvm_vcpu *vcpu, u64 id, void __user *uaddr)
+ 	if (vfpid < num_fp_regs()) {
+ 		if (KVM_REG_SIZE(id) != 8)
+ 			return -ENOENT;
+-		return reg_to_user(uaddr, &vcpu->arch.vfp_guest.fpregs[vfpid],
++		return reg_to_user(uaddr, &vcpu->arch.ctxt.vfp.fpregs[vfpid],
+ 				   id);
+ 	}
+ 
+@@ -911,13 +911,13 @@ static int vfp_get_reg(const struct kvm_vcpu *vcpu, u64 id, void __user *uaddr)
+ 
+ 	switch (vfpid) {
+ 	case KVM_REG_ARM_VFP_FPEXC:
+-		return reg_to_user(uaddr, &vcpu->arch.vfp_guest.fpexc, id);
++		return reg_to_user(uaddr, &vcpu->arch.ctxt.vfp.fpexc, id);
+ 	case KVM_REG_ARM_VFP_FPSCR:
+-		return reg_to_user(uaddr, &vcpu->arch.vfp_guest.fpscr, id);
++		return reg_to_user(uaddr, &vcpu->arch.ctxt.vfp.fpscr, id);
+ 	case KVM_REG_ARM_VFP_FPINST:
+-		return reg_to_user(uaddr, &vcpu->arch.vfp_guest.fpinst, id);
++		return reg_to_user(uaddr, &vcpu->arch.ctxt.vfp.fpinst, id);
+ 	case KVM_REG_ARM_VFP_FPINST2:
+-		return reg_to_user(uaddr, &vcpu->arch.vfp_guest.fpinst2, id);
++		return reg_to_user(uaddr, &vcpu->arch.ctxt.vfp.fpinst2, id);
+ 	case KVM_REG_ARM_VFP_MVFR0:
+ 		val = fmrx(MVFR0);
+ 		return reg_to_user(uaddr, &val, id);
+@@ -945,7 +945,7 @@ static int vfp_set_reg(struct kvm_vcpu *vcpu, u64 id, const void __user *uaddr)
+ 	if (vfpid < num_fp_regs()) {
+ 		if (KVM_REG_SIZE(id) != 8)
+ 			return -ENOENT;
+-		return reg_from_user(&vcpu->arch.vfp_guest.fpregs[vfpid],
++		return reg_from_user(&vcpu->arch.ctxt.vfp.fpregs[vfpid],
+ 				     uaddr, id);
+ 	}
+ 
+@@ -955,13 +955,13 @@ static int vfp_set_reg(struct kvm_vcpu *vcpu, u64 id, const void __user *uaddr)
+ 
+ 	switch (vfpid) {
+ 	case KVM_REG_ARM_VFP_FPEXC:
+-		return reg_from_user(&vcpu->arch.vfp_guest.fpexc, uaddr, id);
++		return reg_from_user(&vcpu->arch.ctxt.vfp.fpexc, uaddr, id);
+ 	case KVM_REG_ARM_VFP_FPSCR:
+-		return reg_from_user(&vcpu->arch.vfp_guest.fpscr, uaddr, id);
++		return reg_from_user(&vcpu->arch.ctxt.vfp.fpscr, uaddr, id);
+ 	case KVM_REG_ARM_VFP_FPINST:
+-		return reg_from_user(&vcpu->arch.vfp_guest.fpinst, uaddr, id);
++		return reg_from_user(&vcpu->arch.ctxt.vfp.fpinst, uaddr, id);
+ 	case KVM_REG_ARM_VFP_FPINST2:
+-		return reg_from_user(&vcpu->arch.vfp_guest.fpinst2, uaddr, id);
++		return reg_from_user(&vcpu->arch.ctxt.vfp.fpinst2, uaddr, id);
+ 	/* These are invariant. */
+ 	case KVM_REG_ARM_VFP_MVFR0:
+ 		if (reg_from_user(&val, uaddr, id))
+diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
+index 9d9cb71..7bfb289 100644
+--- a/arch/arm/kvm/interrupts.S
++++ b/arch/arm/kvm/interrupts.S
+@@ -172,10 +172,11 @@ __kvm_vcpu_return:
+ 
+ #ifdef CONFIG_VFPv3
+ 	@ Switch VFP/NEON hardware state to the host's
+-	add	r7, vcpu, #VCPU_VFP_GUEST
++	add	r7, vcpu, #(VCPU_GUEST_CTXT + CPU_CTXT_VFP)
+ 	store_vfp_state r7
+-	add	r7, vcpu, #VCPU_VFP_HOST
++	add	r7, vcpu, #VCPU_HOST_CTXT
+ 	ldr	r7, [r7]
++	add	r7, r7, #CPU_CTXT_VFP
+ 	restore_vfp_state r7
+ 
+ after_vfp_restore:
+@@ -482,10 +483,11 @@ switch_to_guest_vfp:
+ 	set_hcptr vmtrap, (HCPTR_TCP(10) | HCPTR_TCP(11))
+ 
+ 	@ Switch VFP/NEON hardware state to the guest's
+-	add	r7, r0, #VCPU_VFP_HOST
++	add	r7, r0, #VCPU_HOST_CTXT
+ 	ldr	r7, [r7]
++	add	r7, r7, #CPU_CTXT_VFP
+ 	store_vfp_state r7
+-	add	r7, r0, #VCPU_VFP_GUEST
++	add	r7, r0, #(VCPU_GUEST_CTXT + CPU_CTXT_VFP)
+ 	restore_vfp_state r7
+ 
+ 	pop	{r3-r7}
 -- 
 2.1.4
