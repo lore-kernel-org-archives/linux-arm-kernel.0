@@ -1,46 +1,34 @@
-From: bcrl@kvack.org (Benjamin LaHaise)
-Date: Thu, 4 Feb 2016 08:41:42 -0500
-Subject: linux-next: build failure after merge of the aio tree
-In-Reply-To: <20160204131959.6695c7bf@canb.auug.org.au>
-References: <20160112164034.0fe945a7@canb.auug.org.au>
- <20160112163835.GD347@kvack.org> <20160127134024.0fababf6@canb.auug.org.au>
- <20160129113056.GP10826@n2100.arm.linux.org.uk>
- <CAMuHMdUy-cqeN8COO4rdpY-mOH+6gth40wB31-edkj8CO5PFCw@mail.gmail.com>
- <20160204131959.6695c7bf@canb.auug.org.au>
-Message-ID: <20160204134142.GA16315@kvack.org>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Thu, 4 Feb 2016 07:48:08 -0600
+Subject: [PATCH v10 5/5] Watchdog: ARM SBSA Generic Watchdog half timeout
+ panic support
+In-Reply-To: <56B2DEE4.7060901@roeck-us.net>
+References: <1454519923-25230-1-git-send-email-fu.wei@linaro.org>
+ <1454519923-25230-6-git-send-email-fu.wei@linaro.org>
+ <56B23883.7000501@codeaurora.org>
+ <CADyBb7sxPg-QUjTbeHFtYkctKc_g7D8O=+jqbXN+DCCoCEnFqA@mail.gmail.com>
+ <56B23E99.1030604@codeaurora.org>
+ <CADyBb7s4opxfPFuX=1-qEE6uhsaMXgofAJPbHUQHrng2AUwqNA@mail.gmail.com>
+ <56B2423B.1020109@codeaurora.org>
+ <CADyBb7uULCn97ea19zH8dB4QX1QA8=AXL94d6gXgFxXM8haBNA@mail.gmail.com>
+ <56B24642.8090105@codeaurora.org>
+ <CADyBb7s_QeU=pYqN9G+5WMtx-L+=QC6uZR6N6ZWPOixnkHzPjw@mail.gmail.com>
+ <56B24AB5.3070001@codeaurora.org>
+ <CADyBb7usPpY=YLjecXce63zY5e1tniPLmNsVY=8CJHJsCqBgQw@mail.gmail.com>
+ <56B2DEE4.7060901@roeck-us.net>
+Message-ID: <56B35698.4020100@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 04, 2016 at 01:19:59PM +1100, Stephen Rothwell wrote:
-> Hi Benjamin,
-> 
-> On Fri, 29 Jan 2016 13:03:39 +0100 Geert Uytterhoeven <geert@linux-m68k.org> wrote:
-> >
-> > On Fri, Jan 29, 2016 at 12:30 PM, Russell King - ARM Linux
-> > <linux@arm.linux.org.uk> wrote:
-> > >> Background: new aio code is adding __get_user() calls referencing 64
-> > >> bit quantities (__u64 and __s64).  
-> > >
-> > > There's lots more architectures which do not support 64-bit get_user()
-> > > _or_ __get_user(): avr32, blackfin, metag for example, and m68k which
-> > > has this interesting thing "/* case 8: disabled because gcc-4.1 has a
-> > > broken typeof \" in its *get_user() implementation.  
-> > 
-> > And if you enable it again, you get lots of "warning: cast to pointer from
-> > integer of different size", like you mentioned.
-> 
-> Any thoughts?  I am still using the version of tha aio tree from
-> next-20160111.
+Guenter Roeck wrote:
+> Also, if panic is enabled, the timeout needs to be adjusted accordingly
+> (to only panic after the entire timeout period has expired, not after
+> half of it). We can not panic the system after timeout / 2.
 
-I am still convinced that this is an architecture issue.  Given that 64 bit 
-values work in the *get_user implementations on other architectures, I see 
-no reason there should need to be a workaround for this in common code.
-
-		-ben
-
-> -- 
-> Cheers,
-> Stephen Rothwell
+It's a debugging feature, not an actual watchdog timeout panic.  That's 
+why it's disabled by default.
 
 -- 
-"Thought is the essence of where you are now."
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the
+Code Aurora Forum, hosted by The Linux Foundation.
