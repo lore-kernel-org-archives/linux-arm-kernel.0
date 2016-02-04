@@ -1,60 +1,58 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Thu, 4 Feb 2016 14:41:29 -0800
-Subject: [RFC PATCH] ARM: clocksource: make ARM_GLOBAL_TIMER selectable
-In-Reply-To: <1454610017-25499-1-git-send-email-grygorii.strashko@ti.com>
-References: <1454610017-25499-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <20160204224128.GG4215@xsjsorenbubuntu>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 4 Feb 2016 23:56:55 +0100
+Subject: [rtc-linux] Re: [PATCH v4 00/10] rtc: max77686: Extend driver
+ and add max77802 support
+In-Reply-To: <56ADF9D4.2050208@samsung.com>
+References: <1453865806-4661-1-git-send-email-javier@osg.samsung.com>
+ <20160131120525.GM20165@piout.net> <56ADF9D4.2050208@samsung.com>
+Message-ID: <20160204225655.GE4782@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2016-02-04 at 20:20:17 +0200, Grygorii Strashko wrote:
-> This patch intended to fix following cases: 
-> - SoC-A has ARM GT, defines DT node for ARM GT and selects ARM_GLOBAL_TIMER
-> statically in Kconfig file. SoC-B has ARM GT and defines DT node for ARM GT,
-> but do not selects ARM_GLOBAL_TIMER statically in Kconfig file. In case of
-> multiplatform build ARM GT will be implicitly enabled for SoC-B.
+On 31/01/2016 at 21:11:00 +0900, Krzysztof Kozlowski wrote :
+> W dniu 31.01.2016 o 21:05, Alexandre Belloni pisze:
+> > Hi,
+> > 
+> > On 27/01/2016 at 00:36:36 -0300, Javier Martinez Canillas wrote :
+> >> Hello,
+> >>
+> >> On a recent disussion [0] with Krzysztof Kozlowski and Laxman Dewangan,
+> >> we came to the conclusion that the max77686 and max77802 RTC are almost
+> >> the same with only a few differences so there shouldn't be two separate
+> >> drivers and is better to extend max77686 driver and delete rtc-max77802.
+> >>
+> >> By making the driver more generic, other RTC IP blocks from Maxim PMICs
+> >> could be supported as well like the max77620.
+> >>
+> >> This is a v4 of a series that do this, that address issues pointed out
+> >> in the latest version. The v1, v2 and v3 can be found at [1], [2], [3].
+> >>
+> >> I've tested this patch-set on an Exynos5800 Peach Pi Chromebook that has
+> >> a max77802 PMIC and the RTC was working correctly. Krzysztof Kozlowski
+> >> tested v3 on an max77686 but this version only has cosmetic changes so
+> >> it should not cause any functionality changes.
+> >>
+> >> [0]: http://www.spinics.net/lists/devicetree/msg110348.html
+> >> [1]: https://lwn.net/Articles/672568/
+> >> [2]: https://lkml.org/lkml/2016/1/25/767
+> >> [3]: https://lkml.org/lkml/2016/1/26/787
+> >>
+> > 
+> > I've applied patches 1 to 8 and I'll discussed with Arnd and Olof about
+> > what I should do with the defconfig changes.
 > 
-> - There is no way to disable ARM GT without modifying Kconfig file,
-> once ARM_GLOBAL_TIMER is selected statically in Kconfig file.
+> To avoid conflicts they could go through samsung-soc tree. I could pick
+> them if you provide me a tag with rest of patchset (dependencies).
 > 
-> Hence, fix above case by defining both HAVE_ARM_GLOBAL_TIMER and
-> ARM_GLOBAL_TIMER as recommended by 'Adding common features and make
-> the usage configurable' section in kconfig-language.txt. All places in
-> ARM folder where ARM_GLOBAL_TIMER was used now replaced on
-> HAVE_ARM_GLOBAL_TIMER.
+> Would that be okay for you?
 > 
-> Cc: Florian Fainelli <f.fainelli@gmail.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Wei Xu <xuwei5@hisilicon.com>
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Srinivas Kandagatla <srinivas.kandagatla@gmail.com>
-> Cc: Maxime Coquelin <maxime.coquelin@st.com>
-> Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
-> Cc: Liviu Dudau <liviu.dudau@arm.com>
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Jun Nie <jun.nie@linaro.org>
-> Cc: Michal Simek <michal.simek@xilinx.com>
-> Cc: "S?ren Brinkmann" <soren.brinkmann@xilinx.com>
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> 
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> ---
-[...]
-> diff --git a/arch/arm/mach-zynq/Kconfig b/arch/arm/mach-zynq/Kconfig
-> index fd0aeeb..3165720 100644
-> --- a/arch/arm/mach-zynq/Kconfig
-> +++ b/arch/arm/mach-zynq/Kconfig
-> @@ -5,7 +5,7 @@ config ARCH_ZYNQ
->  	select ARCH_SUPPORTS_BIG_ENDIAN
->  	select ARM_AMBA
->  	select ARM_GIC
-> -	select ARM_GLOBAL_TIMER if !CPU_FREQ
-> +	select HAVE_ARM_GLOBAL_TIMER if !CPU_FREQ
 
-We actually have this issue, as we don't want to use GT when CPU_FREQ is
-enabled. But with this change the 'if !CPU_FREQ' becomes obsolete.
+Let's do that, I've prepared a tag, rtc-max77686-4.6 with all the
+max77686 material collected until now.  If I need to rebase rtc-next,
+I'll rebase on top of that.
 
-Acked-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
 
-	S?ren
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
