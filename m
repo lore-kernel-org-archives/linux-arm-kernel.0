@@ -1,34 +1,80 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Thu, 4 Feb 2016 07:48:08 -0600
-Subject: [PATCH v10 5/5] Watchdog: ARM SBSA Generic Watchdog half timeout
- panic support
-In-Reply-To: <56B2DEE4.7060901@roeck-us.net>
-References: <1454519923-25230-1-git-send-email-fu.wei@linaro.org>
- <1454519923-25230-6-git-send-email-fu.wei@linaro.org>
- <56B23883.7000501@codeaurora.org>
- <CADyBb7sxPg-QUjTbeHFtYkctKc_g7D8O=+jqbXN+DCCoCEnFqA@mail.gmail.com>
- <56B23E99.1030604@codeaurora.org>
- <CADyBb7s4opxfPFuX=1-qEE6uhsaMXgofAJPbHUQHrng2AUwqNA@mail.gmail.com>
- <56B2423B.1020109@codeaurora.org>
- <CADyBb7uULCn97ea19zH8dB4QX1QA8=AXL94d6gXgFxXM8haBNA@mail.gmail.com>
- <56B24642.8090105@codeaurora.org>
- <CADyBb7s_QeU=pYqN9G+5WMtx-L+=QC6uZR6N6ZWPOixnkHzPjw@mail.gmail.com>
- <56B24AB5.3070001@codeaurora.org>
- <CADyBb7usPpY=YLjecXce63zY5e1tniPLmNsVY=8CJHJsCqBgQw@mail.gmail.com>
- <56B2DEE4.7060901@roeck-us.net>
-Message-ID: <56B35698.4020100@codeaurora.org>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 4 Feb 2016 14:48:58 +0100
+Subject: [PATCH v3 4/5] pinctrl: mediatek: Add Pinctrl/GPIO/EINT driver
+ for mt2701
+In-Reply-To: <1451290066.11129.4.camel@mtksdaap41>
+References: <1451286546-5920-1-git-send-email-biao.huang@mediatek.com>
+ <1451286546-5920-5-git-send-email-biao.huang@mediatek.com>
+ <1451290066.11129.4.camel@mtksdaap41>
+Message-ID: <56B356CA.1010200@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Guenter Roeck wrote:
-> Also, if panic is enabled, the timeout needs to be adjusted accordingly
-> (to only panic after the entire timeout period has expired, not after
-> half of it). We can not panic the system after timeout / 2.
 
-It's a debugging feature, not an actual watchdog timeout panic.  That's 
-why it's disabled by default.
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the
-Code Aurora Forum, hosted by The Linux Foundation.
+On 28/12/15 09:07, Yingjoe Chen wrote:
+> On Mon, 2015-12-28 at 15:09 +0800, Biao Huang wrote:
+>> Add mt2701 support using mediatek common pinctrl driver.
+>> MT2701 have some special pins need an extra setting register
+>> than other ICs, so adding this support to common code.
+>>
+>> Signed-off-by: Biao Huang <biao.huang@mediatek.com>
+>> Acked-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+> <...>
+>> +
+>> +static struct platform_driver mtk_pinctrl_driver = {
+>> +	.probe = mt2701_pinctrl_probe,
+>> +	.driver = {
+>> +		.name = "mediatek-mt2701-pinctrl",
+>> +		.owner = THIS_MODULE,
+>> +		.of_match_table = mt2701_pctrl_match,
+>> +	},
+>> +};
+>> +
+>> +static int __init mtk_pinctrl_init(void)
+>> +{
+>> +	return platform_driver_register(&mtk_pinctrl_driver);
+>> +}
+>> +
+>> +arch_initcall(mtk_pinctrl_init);
+>
+>
+> As discussed in
+> http://lists.infradead.org/pipermail/linux-mediatek/2015-December/003350.html
+> we should use subsys_initcall() instead.
+>
+>
+>> diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+>> index f307f1d..76279f0 100644
+>> --- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+>> +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+> <...>
+>> @@ -347,6 +352,7 @@ static int mtk_pconf_parse_conf(struct pinctrl_dev *pctldev,
+>>   		ret = mtk_pconf_set_pull_select(pctl, pin, true, false, arg);
+>>   		break;
+>>   	case PIN_CONFIG_INPUT_ENABLE:
+>> +		mtk_pmx_gpio_set_direction(pctldev, NULL, pin, true);
+>>   		ret = mtk_pconf_set_ies_smt(pctl, pin, arg, param);
+>>   		break;
+>>   	case PIN_CONFIG_OUTPUT:
+>> @@ -354,6 +360,7 @@ static int mtk_pconf_parse_conf(struct pinctrl_dev *pctldev,
+>>   		ret = mtk_pmx_gpio_set_direction(pctldev, NULL, pin, false);
+>>   		break;
+>>   	case PIN_CONFIG_INPUT_SCHMITT_ENABLE:
+>> +		mtk_pmx_gpio_set_direction(pctldev, NULL, pin, true);
+>>   		ret = mtk_pconf_set_ies_smt(pctl, pin, arg, param);
+>>   		break;
+>>   	case PIN_CONFIG_DRIVE_STRENGTH:
+>
+> This change is not directly related to adding mt2710 support and change
+> behavior for all MTK pinctrl drivers, please create a separate patch for
+> this.
+>
+
+Hi Biao,
+
+This patch didn't make it into v4.5-rc1. Are you thinking of sending a 
+new version addressing the comments from Yingjoe?
+
+Regards,
+Matthias
