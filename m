@@ -1,74 +1,61 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 4 Feb 2016 14:37:55 -0600
-Subject: [PATCH] PCI: designware: comment the condition of programming
- ATU in host init
-In-Reply-To: <1452147158-2526-1-git-send-email-jszhang@marvell.com>
-References: <1452147158-2526-1-git-send-email-jszhang@marvell.com>
-Message-ID: <20160204203755.GB7031@localhost>
+From: k@japko.eu (Krzysztof Adamski)
+Date: Thu, 4 Feb 2016 21:56:02 +0100
+Subject: [PATCH v3 1/5] clk: sunxi: Add apb0 gates for H3
+In-Reply-To: <20160204154752.4df7808be3364a98c496c030@free.fr>
+References: <1454542430-16572-1-git-send-email-k@japko.eu>
+ <1454542430-16572-2-git-send-email-k@japko.eu>
+ <20160204154752.4df7808be3364a98c496c030@free.fr>
+Message-ID: <20160204205602.GC12071@box2.japko.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 07, 2016 at 02:12:38PM +0800, Jisheng Zhang wrote:
-> Some platforms don't support ATU, e.g pci-keystone.c, these platforms
-> use their own address translation component rather than ATU, and they
-> provide the rd_other_conf and wr_other_conf to programming the
-> translation component then do the required access, so we ignore the ATU
-> programming for these platforms. Add the comment to explain the reason.
-> 
-> As Bjorn pointed out,
-> 
->   "these definitions:
-> 
->   #define PCIE_ATU_TYPE_MEM
->   #define PCIE_ATU_TYPE_IO
->   #define PCIE_ATU_TYPE_CFG0
->   #define PCIE_ATU_TYPE_CFG1
-> 
->   and these uses:
-> 
->   - In dw_pcie_host_init(), set PCIE_ATU_TYPE_MEM for unit 1
->     (but only if rd_other_conf is not overridden)
-> 
->   - In dw_pcie_rd_other_conf() and dw_pcie_wr_other_conf(),
->     set PCIE_ATU_TYPE_CFG0 before config access to own bus;
->     set PCIE_ATU_TYPE_CFG1 before config access to other bus;
->     set PCIE_ATU_TYPE_IO after completion
-> 
->    Why is that initialization related to rd_other_conf?  Shouldn't that
->    be set up always?  A comment here would be nice..."
-> 
-> To be honest, I can't answer this question immediately until I read the
-> code carefully again. So indeed, the comment is really necessary.
-> 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+On Thu, Feb 04, 2016 at 03:47:52PM +0100, Jean-Francois Moine wrote:
+>On Thu,  4 Feb 2016 00:33:46 +0100
+>Krzysztof Adamski <k@japko.eu> wrote:
+>
+>> This patch adds support for APB0 in H3. It seems to be compatible with
+>> earlier SOCs. apb0 gates controls R_ block peripherals (R_PIO, R_IR,
+>> etc).
+>>
+>> Signed-off-by: Krzysztof Adamski <k@japko.eu>
+>> ---
+>>  Documentation/devicetree/bindings/clock/sunxi.txt | 1 +
+>>  drivers/clk/sunxi/clk-simple-gates.c              | 2 ++
+>>  2 files changed, 3 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+>> index e59f57b..751c8b9f0 100644
+>> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
+>> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+>> @@ -45,6 +45,7 @@ Required properties:
+>>  	"allwinner,sun6i-a31-apb0-gates-clk" - for the APB0 gates on A31
+>>  	"allwinner,sun7i-a20-apb0-gates-clk" - for the APB0 gates on A20
+>>  	"allwinner,sun8i-a23-apb0-gates-clk" - for the APB0 gates on A23
+>> +	"allwinner,sun8i-h3-apb0-gates-clk" - for the APB0 gates on H3
+>>  	"allwinner,sun9i-a80-apb0-gates-clk" - for the APB0 gates on A80
+>>  	"allwinner,sun4i-a10-apb1-clk" - for the APB1 clock
+>>  	"allwinner,sun9i-a80-apb1-clk" - for the APB1 bus clock on A80
+>> diff --git a/drivers/clk/sunxi/clk-simple-gates.c b/drivers/clk/sunxi/clk-simple-gates.c
+>> index f4da52b..6753c87 100644
+>> --- a/drivers/clk/sunxi/clk-simple-gates.c
+>> +++ b/drivers/clk/sunxi/clk-simple-gates.c
+>> @@ -130,6 +130,8 @@ CLK_OF_DECLARE(sun8i_a23_apb2, "allwinner,sun8i-a23-apb2-gates-clk",
+>>  	       sunxi_simple_gates_init);
+>>  CLK_OF_DECLARE(sun8i_a33_ahb1, "allwinner,sun8i-a33-ahb1-gates-clk",
+>>  	       sunxi_simple_gates_init);
+>> +CLK_OF_DECLARE(sun8i_h3_apb0, "allwinner,sun8i-h3-apb0-gates-clk",
+>> +	       sunxi_simple_gates_init);
+>>  CLK_OF_DECLARE(sun9i_a80_ahb0, "allwinner,sun9i-a80-ahb0-gates-clk",
+>>  	       sunxi_simple_gates_init);
+>>  CLK_OF_DECLARE(sun9i_a80_ahb1, "allwinner,sun9i-a80-ahb1-gates-clk",
+>
+>It seems that the other compatible strings are there for historical
+>reasons. Why do you need a new one with such a specific name?
+>
+>It would have been more sensible to add a generic compatible string as
+>"allwinner,apb-gates", letting the removal of the other strings for a
+>later patch...
 
-Applied to pci/host-designware for v4.6, thanks, Jisheng!
-
-> ---
->  drivers/pci/host/pcie-designware.c | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-> index 02a7452..b795b20 100644
-> --- a/drivers/pci/host/pcie-designware.c
-> +++ b/drivers/pci/host/pcie-designware.c
-> @@ -517,6 +517,12 @@ int dw_pcie_host_init(struct pcie_port *pp)
->  	if (pp->ops->host_init)
->  		pp->ops->host_init(pp);
->  
-> +	/*
-> +	 * If the platform provides ->rd_other_conf, it means the platform
-> +	 * doesn't support ATU, it uses its own address translation component
-> +	 * rather than ATU, so we should ignore ATU programming for this
-> +	 * kind of platform.
-> +	 */
->  	if (!pp->ops->rd_other_conf)
->  		dw_pcie_prog_outbound_atu(pp, PCIE_ATU_REGION_INDEX1,
->  					  PCIE_ATU_TYPE_MEM, pp->mem_base,
-> -- 
-> 2.7.0.rc3
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Seems like a good idea but is it possible to remove those binding in 
+separate patch? I mean, wouldn't that, in theory, break ABI? Are such 
+patches accepted?
