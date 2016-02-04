@@ -1,101 +1,41 @@
-From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
-Date: Thu, 4 Feb 2016 05:49:20 +0000
-Subject: [PATCH V2 5/5] Microblaze: Modifying microblaze PCI subsytem to
- support  generic Xilinx  AXI PCIe Host Bridge IP driver
-In-Reply-To: <20160203163805.GA6112@localhost>
-References: <1452620173-4905-1-git-send-email-bharatku@xilinx.com>
- <1452620173-4905-6-git-send-email-bharatku@xilinx.com>
- <20160203163207.GC32546@localhost> <20160203163805.GA6112@localhost>
-Message-ID: <8520D5D51A55D047800579B0941471982587F199@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: vishnupatekar0510@gmail.com (Vishnu Patekar)
+Date: Thu, 4 Feb 2016 14:06:45 +0800
+Subject: [PATCH 04/14] clk: sunxi: add ahb1 clock for A83T
+In-Reply-To: <20160202131725.GQ4652@lukather>
+References: <1454203266-4450-1-git-send-email-vishnupatekar0510@gmail.com>
+ <1454203266-4450-5-git-send-email-vishnupatekar0510@gmail.com>
+ <20160202131725.GQ4652@lukather>
+Message-ID: <CAEzqOZuBz2jexvZvvtkvjbE8UtzUMKL9nT5JJ9JcvMPmzEKTcQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Subject: Re: [PATCH V2 5/5] Microblaze: Modifying microblaze PCI subsytem
-> to support generic Xilinx AXI PCIe Host Bridge IP driver
-> 
-> [+cc Ben for real this time]
-> 
-> On Wed, Feb 03, 2016 at 10:32:07AM -0600, Bjorn Helgaas wrote:
-> > [+cc Ben, pcibios_get_phb_of_node() question]
-> >
-> > On Tue, Jan 12, 2016 at 11:06:13PM +0530, Bharat Kumar Gogada wrote:
-> > > This patch does required modifications to microblaze PCI subsystem,
-> > > to work with generic driver (drivers/pci/host/pcie-xilinx.c) on
-> > > Microblaze and Zynq.
-> > >
-> > > Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
-> > > Signed-off-by: Ravi Kiran Gummaluri <rgummal@xilinx.com> ...
-> >
-> > >  resource_size_t pcibios_align_resource(void *data, const struct resource
-> *res,
-> > >  				resource_size_t size, resource_size_t align)  {
-> > > -	struct pci_dev *dev = data;
-> > >  	resource_size_t start = res->start;
-> > >
-> > > -	if (res->flags & IORESOURCE_IO) {
-> > > -		if (skip_isa_ioresource_align(dev))
-> > > -			return start;
-> > > -		if (start & 0x300)
-> > > -			start = (start + 0x3ff) & ~0x3ff;
-> > > -	}
-> > > -
-> > >  	return start;
-> >
-> > "return res->start;" is sufficient; no need for a temporary variable.
-> >
-Agreed will address in next patch.
-> > >  }
-> > >  EXPORT_SYMBOL(pcibios_align_resource);
-> > >
-> > > +int pcibios_add_device(struct pci_dev *dev) {
-> > > +	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
-> > > +
-> > > +	return 0;
-> > > +}
-> > > +EXPORT_SYMBOL(pcibios_add_device);
-> > > +
-> > >  /*
-> > >   * Reparent resource children of pr that conflict with res
-> > >   * under res, and make res replace those children.
-> > > @@ -1335,9 +1308,21 @@ static void
-> > > pcibios_setup_phb_resources(struct pci_controller *hose,
-> > >
-> > >  struct device_node *pcibios_get_phb_of_node(struct pci_bus *bus)  {
-> > > -	struct pci_controller *hose = bus->sysdata;
-> > > +	struct device_node *np;
-> > > +
-> > > +	for_each_node_by_type(np, "pci") {
-> > > +		const void *prop;
-> > > +		unsigned int bus_min;
-> > > +
-> > > +		prop = of_get_property(np, "bus-range", NULL);
-> > > +		if (!prop)
-> > > +			continue;
-> > > +		bus_min = be32_to_cpup(prop);
-> > > +		if (bus->number == bus_min)
-> > > +			return np;
-> > > +	}
-> > >
-> > > -	return of_node_get(hose->dn);
-> > > +	return NULL;
-> >
-> > Hmmm.  The old microblaze code ("return of_node_get(hose->dn);") is
-> > basically the same as the mips and powerpc versions.  The new code is
-> > basically the same as the x86 version.
-> >
-> > I like the generic weak version in drivers/pci/of.c because it doesn't
-> > use any arch-specific data, and it looks like if we just set the
-> > struct device.of_node members correctly, everything should Just Work.
-> >
-> > But Ben added both the generic and the x86 versions the same day, so
-> > there must be some complication:
-> >
-> >   98d9f30c820d ("pci/of: Match PCI devices to OF nodes dynamically")
-> >   3d5fe5a65af9 ("x86/devicetree: Use generic PCI <-> OF matching")
-> >
-> > So I guess my question is, why do we need a microblaze-specific
-> > version at all?
-> >
-I did not notice the weak version in /pci/of.c, I have tested with weak version also and it is working.  We might not need this microblaze specific version, but will wait for ben's reply.  
+Hello Maxime,
 
-Bharat
+
+On Tue, Feb 2, 2016 at 9:17 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi,
+>
+> On Sun, Jan 31, 2016 at 09:20:56AM +0800, Vishnu Patekar wrote:
+>> AHB1 on A83T is similar to ahb1 on A31, except parents are different.
+>> clock index 0b1x is PLL6.
+>>
+>> Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
+>
+> If the clock is the same but the parents are different, then we don't
+> need to duplicate all the logic. Simply add the number of parents to
+> mux_data, and you're all set.
+
+Problem here is: parent 0b10 for A31 ahb1 is AXI, 0b11 is pll6/pre_div.
+0b10 and 0b11 is pll6/pre_div.
+So, just adding number of parents to mux_data will not solve problem.
+
+Regards,
+Vishnu
+>
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
