@@ -1,128 +1,128 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  4 Feb 2016 11:00:39 +0000
-Subject: [PATCH v2 22/28] ARM: KVM: Switch to C-based stage2 init
+Date: Thu,  4 Feb 2016 11:00:41 +0000
+Subject: [PATCH v2 24/28] ARM: KVM: Turn CP15 defines to an enum
 In-Reply-To: <1454583645-10144-1-git-send-email-marc.zyngier@arm.com>
 References: <1454583645-10144-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1454583645-10144-23-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1454583645-10144-25-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Just like on arm64, having the CP15 registers expressed as a set
+of #defines has been very conflict-prone. Let's turn it into an
+enum, which should make it more manageable.
+
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_asm.h  |  2 ++
- arch/arm/include/asm/kvm_host.h |  1 +
- arch/arm/kvm/hyp/Makefile       |  1 +
- arch/arm/kvm/hyp/hyp.h          |  2 ++
- arch/arm/kvm/hyp/s2-setup.c     | 34 ++++++++++++++++++++++++++++++++++
- arch/arm/kvm/init.S             |  8 --------
- 6 files changed, 40 insertions(+), 8 deletions(-)
- create mode 100644 arch/arm/kvm/hyp/s2-setup.c
+ arch/arm/include/asm/kvm_asm.h  | 33 ---------------------------------
+ arch/arm/include/asm/kvm_host.h | 39 +++++++++++++++++++++++++++++++++++++++
+ arch/arm/kvm/guest.c            |  1 -
+ 3 files changed, 39 insertions(+), 34 deletions(-)
 
 diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
-index 4841225..3283a2f 100644
+index 3283a2f..083825f 100644
 --- a/arch/arm/include/asm/kvm_asm.h
 +++ b/arch/arm/include/asm/kvm_asm.h
-@@ -98,6 +98,8 @@ extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
- extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
+@@ -21,39 +21,6 @@
  
- extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
-+
-+extern void __init_stage2_translation(void);
- #endif
+ #include <asm/virt.h>
  
- #endif /* __ARM_KVM_ASM_H__ */
+-/* 0 is reserved as an invalid value. */
+-#define c0_MPIDR	1	/* MultiProcessor ID Register */
+-#define c0_CSSELR	2	/* Cache Size Selection Register */
+-#define c1_SCTLR	3	/* System Control Register */
+-#define c1_ACTLR	4	/* Auxiliary Control Register */
+-#define c1_CPACR	5	/* Coprocessor Access Control */
+-#define c2_TTBR0	6	/* Translation Table Base Register 0 */
+-#define c2_TTBR0_high	7	/* TTBR0 top 32 bits */
+-#define c2_TTBR1	8	/* Translation Table Base Register 1 */
+-#define c2_TTBR1_high	9	/* TTBR1 top 32 bits */
+-#define c2_TTBCR	10	/* Translation Table Base Control R. */
+-#define c3_DACR		11	/* Domain Access Control Register */
+-#define c5_DFSR		12	/* Data Fault Status Register */
+-#define c5_IFSR		13	/* Instruction Fault Status Register */
+-#define c5_ADFSR	14	/* Auxilary Data Fault Status R */
+-#define c5_AIFSR	15	/* Auxilary Instrunction Fault Status R */
+-#define c6_DFAR		16	/* Data Fault Address Register */
+-#define c6_IFAR		17	/* Instruction Fault Address Register */
+-#define c7_PAR		18	/* Physical Address Register */
+-#define c7_PAR_high	19	/* PAR top 32 bits */
+-#define c9_L2CTLR	20	/* Cortex A15/A7 L2 Control Register */
+-#define c10_PRRR	21	/* Primary Region Remap Register */
+-#define c10_NMRR	22	/* Normal Memory Remap Register */
+-#define c12_VBAR	23	/* Vector Base Address Register */
+-#define c13_CID		24	/* Context ID Register */
+-#define c13_TID_URW	25	/* Thread ID, User R/W */
+-#define c13_TID_URO	26	/* Thread ID, User R/O */
+-#define c13_TID_PRIV	27	/* Thread ID, Privileged */
+-#define c14_CNTKCTL	28	/* Timer Control Register (PL1) */
+-#define c10_AMAIR0	29	/* Auxilary Memory Attribute Indirection Reg0 */
+-#define c10_AMAIR1	30	/* Auxilary Memory Attribute Indirection Reg1 */
+-#define NR_CP15_REGS	31	/* Number of regs (incl. invalid) */
+-
+ #define ARM_EXCEPTION_RESET	  0
+ #define ARM_EXCEPTION_UNDEFINED   1
+ #define ARM_EXCEPTION_SOFTWARE    2
 diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index c62d717..0fe41aa 100644
+index 0fe41aa..daf6a71 100644
 --- a/arch/arm/include/asm/kvm_host.h
 +++ b/arch/arm/include/asm/kvm_host.h
-@@ -224,6 +224,7 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
+@@ -88,6 +88,45 @@ struct kvm_vcpu_fault_info {
+ 	u32 hyp_pc;		/* PC when exception was taken from Hyp mode */
+ };
  
- static inline void __cpu_init_stage2(void)
- {
-+	kvm_call_hyp(__init_stage2_translation);
- }
- 
- static inline int kvm_arch_dev_ioctl_check_extension(long ext)
-diff --git a/arch/arm/kvm/hyp/Makefile b/arch/arm/kvm/hyp/Makefile
-index a7d3a7e..7152369 100644
---- a/arch/arm/kvm/hyp/Makefile
-+++ b/arch/arm/kvm/hyp/Makefile
-@@ -11,3 +11,4 @@ obj-$(CONFIG_KVM_ARM_HOST) += banked-sr.o
- obj-$(CONFIG_KVM_ARM_HOST) += entry.o
- obj-$(CONFIG_KVM_ARM_HOST) += hyp-entry.o
- obj-$(CONFIG_KVM_ARM_HOST) += switch.o
-+obj-$(CONFIG_KVM_ARM_HOST) += s2-setup.o
-diff --git a/arch/arm/kvm/hyp/hyp.h b/arch/arm/kvm/hyp/hyp.h
-index 8bbd2a7..73bf9e3 100644
---- a/arch/arm/kvm/hyp/hyp.h
-+++ b/arch/arm/kvm/hyp/hyp.h
-@@ -71,6 +71,8 @@
- #define HCPTR		__ACCESS_CP15(c1, 4, c1, 2)
- #define HSTR		__ACCESS_CP15(c1, 4, c1, 3)
- #define TTBCR		__ACCESS_CP15(c2, 0, c0, 2)
-+#define HTCR		__ACCESS_CP15(c2, 4, c0, 2)
-+#define VTCR		__ACCESS_CP15(c2, 4, c1, 2)
- #define DACR		__ACCESS_CP15(c3, 0, c0, 0)
- #define DFSR		__ACCESS_CP15(c5, 0, c0, 0)
- #define IFSR		__ACCESS_CP15(c5, 0, c0, 1)
-diff --git a/arch/arm/kvm/hyp/s2-setup.c b/arch/arm/kvm/hyp/s2-setup.c
-new file mode 100644
-index 0000000..f5f49c5
---- /dev/null
-+++ b/arch/arm/kvm/hyp/s2-setup.c
-@@ -0,0 +1,34 @@
 +/*
-+ * Copyright (C) 2016 - ARM Ltd
-+ * Author: Marc Zyngier <marc.zyngier@arm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ * 0 is reserved as an invalid value.
++ * Order should be kept in sync with the save/restore code.
 + */
++enum vcpu_sysreg {
++	__INVALID_SYSREG__,
++	c0_MPIDR,		/* MultiProcessor ID Register */
++	c0_CSSELR,		/* Cache Size Selection Register */
++	c1_SCTLR,		/* System Control Register */
++	c1_ACTLR,		/* Auxiliary Control Register */
++	c1_CPACR,		/* Coprocessor Access Control */
++	c2_TTBR0,		/* Translation Table Base Register 0 */
++	c2_TTBR0_high,		/* TTBR0 top 32 bits */
++	c2_TTBR1,		/* Translation Table Base Register 1 */
++	c2_TTBR1_high,		/* TTBR1 top 32 bits */
++	c2_TTBCR,		/* Translation Table Base Control R. */
++	c3_DACR,		/* Domain Access Control Register */
++	c5_DFSR,		/* Data Fault Status Register */
++	c5_IFSR,		/* Instruction Fault Status Register */
++	c5_ADFSR,		/* Auxilary Data Fault Status R */
++	c5_AIFSR,		/* Auxilary Instrunction Fault Status R */
++	c6_DFAR,		/* Data Fault Address Register */
++	c6_IFAR,		/* Instruction Fault Address Register */
++	c7_PAR,			/* Physical Address Register */
++	c7_PAR_high,		/* PAR top 32 bits */
++	c9_L2CTLR,		/* Cortex A15/A7 L2 Control Register */
++	c10_PRRR,		/* Primary Region Remap Register */
++	c10_NMRR,		/* Normal Memory Remap Register */
++	c12_VBAR,		/* Vector Base Address Register */
++	c13_CID,		/* Context ID Register */
++	c13_TID_URW,		/* Thread ID, User R/W */
++	c13_TID_URO,		/* Thread ID, User R/O */
++	c13_TID_PRIV,		/* Thread ID, Privileged */
++	c14_CNTKCTL,		/* Timer Control Register (PL1) */
++	c10_AMAIR0,		/* Auxilary Memory Attribute Indirection Reg0 */
++	c10_AMAIR1,		/* Auxilary Memory Attribute Indirection Reg1 */
++	NR_CP15_REGS		/* Number of regs (incl. invalid) */
++};
 +
-+#include <linux/types.h>
-+#include <asm/kvm_arm.h>
-+#include <asm/kvm_asm.h>
-+
-+#include "hyp.h"
-+
-+void __hyp_text __init_stage2_translation(void)
-+{
-+	u64 val;
-+
-+	val = read_sysreg(VTCR) & ~VTCR_MASK;
-+
-+	val |= read_sysreg(HTCR) & VTCR_HTCR_SH;
-+	val |= KVM_VTCR_SL0 | KVM_VTCR_T0SZ | KVM_VTCR_S;
-+
-+	write_sysreg(val, VTCR);
-+}
-diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
-index 3988e72..1f9ae17 100644
---- a/arch/arm/kvm/init.S
-+++ b/arch/arm/kvm/init.S
-@@ -84,14 +84,6 @@ __do_hyp_init:
- 	orr	r0, r0, r1
- 	mcr	p15, 4, r0, c2, c0, 2	@ HTCR
+ struct kvm_cpu_context {
+ 	struct kvm_regs	gp_regs;
+ 	struct vfp_hard_struct vfp;
+diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
+index 86e26fb..12cbb68 100644
+--- a/arch/arm/kvm/guest.c
++++ b/arch/arm/kvm/guest.c
+@@ -25,7 +25,6 @@
+ #include <asm/cputype.h>
+ #include <asm/uaccess.h>
+ #include <asm/kvm.h>
+-#include <asm/kvm_asm.h>
+ #include <asm/kvm_emulate.h>
+ #include <asm/kvm_coproc.h>
  
--	mrc	p15, 4, r1, c2, c1, 2	@ VTCR
--	ldr	r2, =VTCR_MASK
--	bic	r1, r1, r2
--	bic	r0, r0, #(~VTCR_HTCR_SH)	@ clear non-reusable HTCR bits
--	orr	r1, r0, r1
--	orr	r1, r1, #(KVM_VTCR_SL0 | KVM_VTCR_T0SZ | KVM_VTCR_S)
--	mcr	p15, 4, r1, c2, c1, 2	@ VTCR
--
- 	@ Use the same memory attributes for hyp. accesses as the kernel
- 	@ (copy MAIRx ro HMAIRx).
- 	mrc	p15, 0, r0, c10, c2, 0
 -- 
 2.1.4
