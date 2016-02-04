@@ -1,204 +1,110 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  4 Feb 2016 15:29:39 +0100
-Subject: [PATCH 45/70] ARM: dts: r8a7793: Add SCIF fallback compatibility
- strings
-In-Reply-To: <cover.1454595846.git.horms+renesas@verge.net.au>
-References: <cover.1454595846.git.horms+renesas@verge.net.au>
-Message-ID: <02e010e8338c99eb0a8e89a072ca3f7e670aca64.1454595846.git.horms+renesas@verge.net.au>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Thu, 4 Feb 2016 08:51:48 -0600
+Subject: [PATCH V2 5/5] Microblaze: Modifying microblaze PCI subsytem to
+ support  generic Xilinx  AXI PCIe Host Bridge IP driver
+In-Reply-To: <8520D5D51A55D047800579B0941471982587F199@XAP-PVEXMBX01.xlnx.xilinx.com>
+References: <1452620173-4905-1-git-send-email-bharatku@xilinx.com>
+ <1452620173-4905-6-git-send-email-bharatku@xilinx.com>
+ <20160203163207.GC32546@localhost>
+ <20160203163805.GA6112@localhost>
+ <8520D5D51A55D047800579B0941471982587F199@XAP-PVEXMBX01.xlnx.xilinx.com>
+Message-ID: <20160204145148.GA26361@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+On Thu, Feb 04, 2016 at 05:49:20AM +0000, Bharat Kumar Gogada wrote:
+> > Subject: Re: [PATCH V2 5/5] Microblaze: Modifying microblaze PCI subsytem
+> > to support generic Xilinx AXI PCIe Host Bridge IP driver
+> > 
+> > [+cc Ben for real this time]
+> > 
+> > On Wed, Feb 03, 2016 at 10:32:07AM -0600, Bjorn Helgaas wrote:
+> > > [+cc Ben, pcibios_get_phb_of_node() question]
+> > >
+> > > On Tue, Jan 12, 2016 at 11:06:13PM +0530, Bharat Kumar Gogada wrote:
+> > > > This patch does required modifications to microblaze PCI subsystem,
+> > > > to work with generic driver (drivers/pci/host/pcie-xilinx.c) on
+> > > > Microblaze and Zynq.
+> > > >
+> > > > Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
+> > > > Signed-off-by: Ravi Kiran Gummaluri <rgummal@xilinx.com> ...
+> > >
+> > > >  resource_size_t pcibios_align_resource(void *data, const struct resource
+> > *res,
+> > > >  				resource_size_t size, resource_size_t align)  {
+> > > > -	struct pci_dev *dev = data;
+> > > >  	resource_size_t start = res->start;
+> > > >
+> > > > -	if (res->flags & IORESOURCE_IO) {
+> > > > -		if (skip_isa_ioresource_align(dev))
+> > > > -			return start;
+> > > > -		if (start & 0x300)
+> > > > -			start = (start + 0x3ff) & ~0x3ff;
+> > > > -	}
+> > > > -
+> > > >  	return start;
+> > >
+> > > "return res->start;" is sufficient; no need for a temporary variable.
+> > >
+> Agreed will address in next patch.
+> > > >  }
+> > > >  EXPORT_SYMBOL(pcibios_align_resource);
+> > > >
+> > > > +int pcibios_add_device(struct pci_dev *dev) {
+> > > > +	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
+> > > > +
+> > > > +	return 0;
+> > > > +}
+> > > > +EXPORT_SYMBOL(pcibios_add_device);
+> > > > +
+> > > >  /*
+> > > >   * Reparent resource children of pr that conflict with res
+> > > >   * under res, and make res replace those children.
+> > > > @@ -1335,9 +1308,21 @@ static void
+> > > > pcibios_setup_phb_resources(struct pci_controller *hose,
+> > > >
+> > > >  struct device_node *pcibios_get_phb_of_node(struct pci_bus *bus)  {
+> > > > -	struct pci_controller *hose = bus->sysdata;
+> > > > +	struct device_node *np;
+> > > > +
+> > > > +	for_each_node_by_type(np, "pci") {
+> > > > +		const void *prop;
+> > > > +		unsigned int bus_min;
+> > > > +
+> > > > +		prop = of_get_property(np, "bus-range", NULL);
+> > > > +		if (!prop)
+> > > > +			continue;
+> > > > +		bus_min = be32_to_cpup(prop);
+> > > > +		if (bus->number == bus_min)
+> > > > +			return np;
+> > > > +	}
+> > > >
+> > > > -	return of_node_get(hose->dn);
+> > > > +	return NULL;
+> > >
+> > > Hmmm.  The old microblaze code ("return of_node_get(hose->dn);") is
+> > > basically the same as the mips and powerpc versions.  The new code is
+> > > basically the same as the x86 version.
+> > >
+> > > I like the generic weak version in drivers/pci/of.c because it doesn't
+> > > use any arch-specific data, and it looks like if we just set the
+> > > struct device.of_node members correctly, everything should Just Work.
+> > >
+> > > But Ben added both the generic and the x86 versions the same day, so
+> > > there must be some complication:
+> > >
+> > >   98d9f30c820d ("pci/of: Match PCI devices to OF nodes dynamically")
+> > >   3d5fe5a65af9 ("x86/devicetree: Use generic PCI <-> OF matching")
+> > >
+> > > So I guess my question is, why do we need a microblaze-specific
+> > > version at all?
+> > >
+> I did not notice the weak version in /pci/of.c, I have tested with
+> weak version also and it is working.  We might not need this
+> microblaze specific version, but will wait for ben's reply.  
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7793.dtsi | 54 ++++++++++++++++++++++++++++--------------
- 1 file changed, 36 insertions(+), 18 deletions(-)
+If the generic version works, and you don't need the microblaze-
+specific version, just remove it and we'll get this wrapped up.  No
+need to wait for Ben.
 
-diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
-index 6817f14314e2..b49f9271ceb3 100644
---- a/arch/arm/boot/dts/r8a7793.dtsi
-+++ b/arch/arm/boot/dts/r8a7793.dtsi
-@@ -479,7 +479,8 @@
- 	};
- 
- 	scifa0: serial at e6c40000 {
--		compatible = "renesas,scifa-r8a7793", "renesas,scifa";
-+		compatible = "renesas,scifa-r8a7793",
-+			     "renesas,rcar-gen2-scifa", "renesas,scifa";
- 		reg = <0 0xe6c40000 0 64>;
- 		interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp2_clks R8A7793_CLK_SCIFA0>;
-@@ -491,7 +492,8 @@
- 	};
- 
- 	scifa1: serial at e6c50000 {
--		compatible = "renesas,scifa-r8a7793", "renesas,scifa";
-+		compatible = "renesas,scifa-r8a7793",
-+			     "renesas,rcar-gen2-scifa", "renesas,scifa";
- 		reg = <0 0xe6c50000 0 64>;
- 		interrupts = <GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp2_clks R8A7793_CLK_SCIFA1>;
-@@ -503,7 +505,8 @@
- 	};
- 
- 	scifa2: serial at e6c60000 {
--		compatible = "renesas,scifa-r8a7793", "renesas,scifa";
-+		compatible = "renesas,scifa-r8a7793",
-+			     "renesas,rcar-gen2-scifa", "renesas,scifa";
- 		reg = <0 0xe6c60000 0 64>;
- 		interrupts = <GIC_SPI 151 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp2_clks R8A7793_CLK_SCIFA2>;
-@@ -515,7 +518,8 @@
- 	};
- 
- 	scifa3: serial at e6c70000 {
--		compatible = "renesas,scifa-r8a7793", "renesas,scifa";
-+		compatible = "renesas,scifa-r8a7793",
-+			     "renesas,rcar-gen2-scifa", "renesas,scifa";
- 		reg = <0 0xe6c70000 0 64>;
- 		interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp11_clks R8A7793_CLK_SCIFA3>;
-@@ -527,7 +531,8 @@
- 	};
- 
- 	scifa4: serial at e6c78000 {
--		compatible = "renesas,scifa-r8a7793", "renesas,scifa";
-+		compatible = "renesas,scifa-r8a7793",
-+			     "renesas,rcar-gen2-scifa", "renesas,scifa";
- 		reg = <0 0xe6c78000 0 64>;
- 		interrupts = <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp11_clks R8A7793_CLK_SCIFA4>;
-@@ -539,7 +544,8 @@
- 	};
- 
- 	scifa5: serial at e6c80000 {
--		compatible = "renesas,scifa-r8a7793", "renesas,scifa";
-+		compatible = "renesas,scifa-r8a7793",
-+			     "renesas,rcar-gen2-scifa", "renesas,scifa";
- 		reg = <0 0xe6c80000 0 64>;
- 		interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp11_clks R8A7793_CLK_SCIFA5>;
-@@ -551,7 +557,8 @@
- 	};
- 
- 	scifb0: serial at e6c20000 {
--		compatible = "renesas,scifb-r8a7793", "renesas,scifb";
-+		compatible = "renesas,scifb-r8a7793",
-+			     "renesas,rcar-gen2-scifb", "renesas,scifb";
- 		reg = <0 0xe6c20000 0 64>;
- 		interrupts = <GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp2_clks R8A7793_CLK_SCIFB0>;
-@@ -563,7 +570,8 @@
- 	};
- 
- 	scifb1: serial at e6c30000 {
--		compatible = "renesas,scifb-r8a7793", "renesas,scifb";
-+		compatible = "renesas,scifb-r8a7793",
-+			     "renesas,rcar-gen2-scifb", "renesas,scifb";
- 		reg = <0 0xe6c30000 0 64>;
- 		interrupts = <GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp2_clks R8A7793_CLK_SCIFB1>;
-@@ -575,7 +583,8 @@
- 	};
- 
- 	scifb2: serial at e6ce0000 {
--		compatible = "renesas,scifb-r8a7793", "renesas,scifb";
-+		compatible = "renesas,scifb-r8a7793",
-+			     "renesas,rcar-gen2-scifb", "renesas,scifb";
- 		reg = <0 0xe6ce0000 0 64>;
- 		interrupts = <GIC_SPI 150 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp2_clks R8A7793_CLK_SCIFB2>;
-@@ -587,7 +596,8 @@
- 	};
- 
- 	scif0: serial at e6e60000 {
--		compatible = "renesas,scif-r8a7793", "renesas,scif";
-+		compatible = "renesas,scif-r8a7793", "renesas,rcar-gen2-scif",
-+			     "renesas,scif";
- 		reg = <0 0xe6e60000 0 64>;
- 		interrupts = <GIC_SPI 152 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp7_clks R8A7793_CLK_SCIF0>;
-@@ -599,7 +609,8 @@
- 	};
- 
- 	scif1: serial at e6e68000 {
--		compatible = "renesas,scif-r8a7793", "renesas,scif";
-+		compatible = "renesas,scif-r8a7793", "renesas,rcar-gen2-scif",
-+			     "renesas,scif";
- 		reg = <0 0xe6e68000 0 64>;
- 		interrupts = <GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp7_clks R8A7793_CLK_SCIF1>;
-@@ -611,7 +622,8 @@
- 	};
- 
- 	scif2: serial at e6e58000 {
--		compatible = "renesas,scif-r8a7793", "renesas,scif";
-+		compatible = "renesas,scif-r8a7793", "renesas,rcar-gen2-scif",
-+			     "renesas,scif";
- 		reg = <0 0xe6e58000 0 64>;
- 		interrupts = <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp7_clks R8A7793_CLK_SCIF2>;
-@@ -623,7 +635,8 @@
- 	};
- 
- 	scif3: serial at e6ea8000 {
--		compatible = "renesas,scif-r8a7793", "renesas,scif";
-+		compatible = "renesas,scif-r8a7793", "renesas,rcar-gen2-scif",
-+			     "renesas,scif";
- 		reg = <0 0xe6ea8000 0 64>;
- 		interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp7_clks R8A7793_CLK_SCIF3>;
-@@ -635,7 +648,8 @@
- 	};
- 
- 	scif4: serial at e6ee0000 {
--		compatible = "renesas,scif-r8a7793", "renesas,scif";
-+		compatible = "renesas,scif-r8a7793", "renesas,rcar-gen2-scif",
-+			     "renesas,scif";
- 		reg = <0 0xe6ee0000 0 64>;
- 		interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp7_clks R8A7793_CLK_SCIF4>;
-@@ -647,7 +661,8 @@
- 	};
- 
- 	scif5: serial at e6ee8000 {
--		compatible = "renesas,scif-r8a7793", "renesas,scif";
-+		compatible = "renesas,scif-r8a7793", "renesas,rcar-gen2-scif",
-+			     "renesas,scif";
- 		reg = <0 0xe6ee8000 0 64>;
- 		interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp7_clks R8A7793_CLK_SCIF5>;
-@@ -659,7 +674,8 @@
- 	};
- 
- 	hscif0: serial at e62c0000 {
--		compatible = "renesas,hscif-r8a7793", "renesas,hscif";
-+		compatible = "renesas,hscif-r8a7793",
-+			     "renesas,rcar-gen2-hscif", "renesas,hscif";
- 		reg = <0 0xe62c0000 0 96>;
- 		interrupts = <GIC_SPI 154 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp7_clks R8A7793_CLK_HSCIF0>;
-@@ -671,7 +687,8 @@
- 	};
- 
- 	hscif1: serial at e62c8000 {
--		compatible = "renesas,hscif-r8a7793", "renesas,hscif";
-+		compatible = "renesas,hscif-r8a7793",
-+			     "renesas,rcar-gen2-hscif", "renesas,hscif";
- 		reg = <0 0xe62c8000 0 96>;
- 		interrupts = <GIC_SPI 155 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp7_clks R8A7793_CLK_HSCIF1>;
-@@ -683,7 +700,8 @@
- 	};
- 
- 	hscif2: serial at e62d0000 {
--		compatible = "renesas,hscif-r8a7793", "renesas,hscif";
-+		compatible = "renesas,hscif-r8a7793",
-+			     "renesas,rcar-gen2-hscif", "renesas,hscif";
- 		reg = <0 0xe62d0000 0 96>;
- 		interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp7_clks R8A7793_CLK_HSCIF2>;
--- 
-2.7.0.rc3.207.g0ac5344
+Bjorn
