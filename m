@@ -1,81 +1,28 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 4 Feb 2016 22:11:55 +0100
-Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
- v4.5-rc1
-In-Reply-To: <Pine.LNX.4.44L0.1602041059070.1515-100000@iolanthe.rowland.org>
-References: <CAPDyKFr3jqh5bDFOuKLgomhQ2P9+yN5Ps8E0CH8r-oOjvBuswg@mail.gmail.com>
- <Pine.LNX.4.44L0.1602041059070.1515-100000@iolanthe.rowland.org>
-Message-ID: <CAPDyKFpRnmn+h_VH3jtC3u-BOf7-00nbzD30omaxaaZOOAK8Gg@mail.gmail.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Thu,  4 Feb 2016 13:14:28 -0800
+Subject: [PATCH] irqchip: bcm2836: Drop extra memory barrier in SMP boot.
+Message-ID: <1454620468-31303-1-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 February 2016 at 17:04, Alan Stern <stern@rowland.harvard.edu> wrote:
-> On Thu, 4 Feb 2016, Ulf Hansson wrote:
->
->> Just wanted to add yet some new findings while I was looking into this
->> regression.
->>
->> So, the reason why pm_runtime_put_sync() doesn't idle the device in
->> these cases, is because autosuspend is respected and for some reason
->> the autosuspend timer hasn't expired.
->
-> No doubt the autosuspend delay is longer than the time it takes for a
-> probe to fail.
->
->> I was wondering *why* the timer isn't considered as expired, because
->> the driver don't call pm_runtime_mark_last_busy() in the failing probe
->> case...
->>
->> Then I realized the following commit was merged a few releases ago,
->> which makes the runtime PM core to invoke pm_runtime_mark_last_busy()
->> for us.
->>
->> commit 56f487c78015936097474fd89b2ccb229d500d0f
->> Author: Tony Lindgren <tony@atomide.com>
->> Date:   Wed May 13 16:36:32 2015 -0700
->> PM / Runtime: Update last_busy in rpm_resume
->>
->> So, this commit actually causes the devices to stay active after a
->> failed probe attempt.
->>
->> I think it's a good idea to revert this change, but what to you think?
->
-> I disagree.  The whole idea of autosuspend is to prevent the device's
-> power state from bouncing up and down too rapidly.  This implies that
-> whenever the device gets resumed, we should wait at least the minimum
-> autosuspend delay before allowing the next autosuspend.
+The writel() immediately after this has a barrier, anyway.
 
-I am really not questioning the autosuspend feature at all, it's a
-really great feature!
+Signed-off-by: Eric Anholt <eric@anholt.net>
+---
+ drivers/irqchip/irq-bcm2836.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-Now, I question the minor benefit we actually gain from having the
-runtime PM core to update the mark in rpm_resume().
-
-To me, the best decision when to update the mark is know by the
-driver/subsystem for the device and not the core.
-
-In most cases the mark will be updated after a request has been
-completed, which leads to one unnecessary update at rpm_resume().
-
-In this path (the resume), you really want to keep latencies to a
-minimum and for sure not do unnecessary things.
-
->
-> Perhaps you think that it's silly to behave that way in this case,
-> because the device wasn't accessed at all during the time it was at
-> full power.  That's a valid objection, but the proper solution is not
-> to revert the 56f487c78015 commit.  Rather, change the driver to avoid
-> doing a pm_runtime_resume_sync until you _know_ that the device will be
-> accessed soon.
-
-That's not always going to work.
-
-Sometimes you need to access the device when trying to probe. Failing
-later in probe, shows just *one* case where it doesn't make sense to
-update the last busy mark. I suspect there may be other cases as well.
-
-Of course one can always use runtime PM APIs which overrides the
-autosuspend mode, so it's not a big deal.
-
-Kind regards
-Uffe
+diff --git a/drivers/irqchip/irq-bcm2836.c b/drivers/irqchip/irq-bcm2836.c
+index 963065a..b6e950d 100644
+--- a/drivers/irqchip/irq-bcm2836.c
++++ b/drivers/irqchip/irq-bcm2836.c
+@@ -229,7 +229,6 @@ int __init bcm2836_smp_boot_secondary(unsigned int cpu,
+ 	unsigned long secondary_startup_phys =
+ 		(unsigned long)virt_to_phys((void *)secondary_startup);
+ 
+-	dsb();
+ 	writel(secondary_startup_phys,
+ 	       intc.base + LOCAL_MAILBOX3_SET0 + 16 * cpu);
+ 
+-- 
+2.7.0
