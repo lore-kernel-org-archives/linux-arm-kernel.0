@@ -1,36 +1,64 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Thu, 4 Feb 2016 13:19:59 +1100
-Subject: linux-next: build failure after merge of the aio tree
-In-Reply-To: <CAMuHMdUy-cqeN8COO4rdpY-mOH+6gth40wB31-edkj8CO5PFCw@mail.gmail.com>
-References: <20160112164034.0fe945a7@canb.auug.org.au>
- <20160112163835.GD347@kvack.org>
- <20160127134024.0fababf6@canb.auug.org.au>
- <20160129113056.GP10826@n2100.arm.linux.org.uk>
- <CAMuHMdUy-cqeN8COO4rdpY-mOH+6gth40wB31-edkj8CO5PFCw@mail.gmail.com>
-Message-ID: <20160204131959.6695c7bf@canb.auug.org.au>
+From: menghui.lin@mediatek.com (menghui lin)
+Date: Thu, 4 Feb 2016 10:42:43 +0800
+Subject: [PATCH V4 2/2] regulator: mt6323: Add support for MT6323 regulator
+In-Reply-To: <20160203122952.GF4455@sirena.org.uk>
+References: <1453896059-44589-1-git-send-email-blogic@openwrt.org>
+ <1453896059-44589-2-git-send-email-blogic@openwrt.org>
+ <20160127144105.GQ6042@sirena.org.uk> <56AA5A5C.9080402@openwrt.org>
+ <20160128231306.GD4130@sirena.org.uk>
+ <1454061134.10861.14.camel@mtksdaap41>
+ <20160129112717.GP4130@sirena.org.uk>
+ <1454069479.10861.30.camel@mtksdaap41>
+ <20160202193839.GX4455@sirena.org.uk>
+ <1454477942.31375.32.camel@mtksdaap41>
+ <20160203122952.GF4455@sirena.org.uk>
+Message-ID: <1454553763.24913.8.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benjamin,
-
-On Fri, 29 Jan 2016 13:03:39 +0100 Geert Uytterhoeven <geert@linux-m68k.org> wrote:
->
-> On Fri, Jan 29, 2016 at 12:30 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> >> Background: new aio code is adding __get_user() calls referencing 64
-> >> bit quantities (__u64 and __s64).  
-> >
-> > There's lots more architectures which do not support 64-bit get_user()
-> > _or_ __get_user(): avr32, blackfin, metag for example, and m68k which
-> > has this interesting thing "/* case 8: disabled because gcc-4.1 has a
-> > broken typeof \" in its *get_user() implementation.  
+On Wed, 2016-02-03 at 12:29 +0000, Mark Brown wrote:
+> On Wed, Feb 03, 2016 at 01:39:02PM +0800, menghui lin wrote:
+> > On Tue, 2016-02-02 at 19:38 +0000, Mark Brown wrote:
 > 
-> And if you enable it again, you get lots of "warning: cast to pointer from
-> integer of different size", like you mentioned.
+> > > How does the driver know if it needs to change the mode (ie, how can it
+> > > tell if the current mode is inadequate) and surely if we can only change
+> > > in one direction this isn't terribly useful?
+> 
+> > I think the datasheet of buck/ldo could provide information about power
+> > capability of each mode. The driver should adjust regulator mode per its
+> > device's power requirement.
+> 
+> That's of no help for a consumer driver which doesn't know what
+> regulator is supplying it.
+> 
+> > case 1:
+> 
+> > We have a USB typeC micro-controller, which has two modes - standby and
+> > normal. It requires 1.8V and 3.3V to operate (both powers are always
+> > on). The device stays in standby mode when there is no cable in. When
+> > cable in, we got an interrupt and change device into normal mode.
+> 
+> > The standby mode power consumption is quite small, so we would like the
+> > change mode of regulator into STANDBY to save more power. And we change
+> > into NORMAL when we receive cable-in interrupt.
+> 
+> This seems like something that we ought to be doing via runtime PM
+> anyway which should be going through the suspend mode bindings, though
+> that would need some plumbing in.
+> 
+> > case 2:
+> 
+> > About buck regulator for CPU, it usually provides PWM mode, PWM/PFM Auto
+> > mode, PFM mode. I think it could map to FAST, NORMAL, IDLE mode
+> > respectively. Most of time we would use just normal mode. However, we
+> > would change regulator into PWM mode time to time to test buck output
+> > performance on the tested board.
+> 
+> That's a test use that doesn't seem a good fit for upstream at all.
 
-Any thoughts?  I am still using the version of tha aio tree from
-next-20160111.
+Hi Mark,
 
--- 
-Cheers,
-Stephen Rothwell
+Thanks for your response.
+It seems more work is required for dynamic mode switch.
+For MT6323 regulator patch, we would remove mode-switch related code for
+now to provide basic regulator support first.
