@@ -1,22 +1,44 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 4 Feb 2016 15:13:04 +0000
-Subject: [PATCH v5sub2 1/8] arm64: add support for module PLTs
-In-Reply-To: <1454332178-4414-2-git-send-email-ard.biesheuvel@linaro.org>
-References: <1454332178-4414-1-git-send-email-ard.biesheuvel@linaro.org>
- <1454332178-4414-2-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160204151303.GB6076@e104818-lin.cambridge.arm.com>
+From: ryabinin.a.a@gmail.com (Andrey Ryabinin)
+Date: Thu, 4 Feb 2016 18:19:14 +0300
+Subject: [PATCH v6] kernel: add kcov code coverage
+In-Reply-To: <CACT4Y+YygZitF6508qNX9885+nWu7iY9YVqdtE0bCA2+soTp_Q@mail.gmail.com>
+References: <1453726850-49137-1-git-send-email-dvyukov@google.com>
+ <CAPAsAGz6vVGfAPSimwqkneUmzMmrwX_WxdCoQ1xg3UyNn4+-eQ@mail.gmail.com>
+ <CACT4Y+YygZitF6508qNX9885+nWu7iY9YVqdtE0bCA2+soTp_Q@mail.gmail.com>
+Message-ID: <CAPAsAGx+6tfwbo32EGu6H9Mb6S1WXLvQOYzBrhhc=q=N7sFYgw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 01, 2016 at 02:09:31PM +0100, Ard Biesheuvel wrote:
-> This adds support for emitting PLTs at module load time for relative
-> branches that are out of range. This is a prerequisite for KASLR, which
-> may place the kernel and the modules anywhere in the vmalloc area,
-> making it more likely that branch target offsets exceed the maximum
-> range of +/- 128 MB.
+2016-02-04 18:07 GMT+03:00 Dmitry Vyukov <dvyukov@google.com>:
+> On Tue, Feb 2, 2016 at 5:02 PM, Andrey Ryabinin <ryabinin.a.a@gmail.com> wrote:
+>> 2016-01-25 16:00 GMT+03:00 Dmitry Vyukov <dvyukov@google.com>:
+>>
+>>> diff --git a/lib/Kconfig.debug b/lib/Kconfig.debug
+>>> index ecb9e75..cde6bd1 100644
+>>> --- a/lib/Kconfig.debug
+>>> +++ b/lib/Kconfig.debug
+>>> @@ -678,6 +678,26 @@ config DEBUG_STACKOVERFLOW
+>>>
+>>>           If in doubt, say "N".
+>>>
+>>> +config ARCH_HAS_KCOV
+>>> +       bool
+>>> +       help
+>>> +         KCOV does not have any arch-specific code, but currently it is enabled
+>>> +         only for x86_64. KCOV requires testing on other archs, and most likely
+>>> +         disabling of instrumentation for some early boot code.
+>>> +
+>>> +config KCOV
+>>> +       bool "Code coverage for fuzzing"
+>>> +       depends on ARCH_HAS_KCOV
+>>
+>> I think we should select DEBUG_FS here, since this useless without it.
+>
+> Done in v7
+>
+>> Also you placed this into 'Memory Debugging' submenu which seems wrong.
+>
+> Any better suggestions?
+>
 
-Any downside to trying to keep the kernel+modules coupled together so
-that we avoid the PLT?
-
--- 
-Catalin
+Just 'Kernel hacking'
