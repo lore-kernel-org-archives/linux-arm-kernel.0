@@ -1,44 +1,155 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 4 Feb 2016 17:51:51 +0100
-Subject: [PATCH 05/11] drivers: pinctrl: add driver for Allwinner A64 SoC
-In-Reply-To: <56B0DF26.10203@arm.com>
-References: <1454348370-3816-1-git-send-email-andre.przywara@arm.com>
- <1454348370-3816-6-git-send-email-andre.przywara@arm.com>
- <20160201182754.GA14737@excalibur.cnev.de>
- <56AFE0EC.8080207@arm.com> <20160202100046.GM4652@lukather>
- <56B0DF26.10203@arm.com>
-Message-ID: <20160204165151.GK4270@lukather>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 4 Feb 2016 20:15:09 +0100
+Subject: [PATCH v3 11/23] arm64: KVM: VHE: Split save/restore of
+ registers shared between guest and host
+In-Reply-To: <1454522416-6874-12-git-send-email-marc.zyngier@arm.com>
+References: <1454522416-6874-1-git-send-email-marc.zyngier@arm.com>
+ <1454522416-6874-12-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20160204191509.GE13974@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andre,
-
-On Tue, Feb 02, 2016 at 04:53:58PM +0000, Andre Przywara wrote:
-> > So, droping it in the filenames, why not. But I'd really like to keep
-> > the same compatible scheme.
+On Wed, Feb 03, 2016 at 06:00:04PM +0000, Marc Zyngier wrote:
+> A handful of system registers are still shared between host and guest,
+> even while using VHE (tpidr*_el[01] and actlr_el1).
 > 
-> And I still don't get this: in the DT compatible scheme we always have a
-> vendor prefix, so allwinner,a64 is surely not a mysterious ARM Ltd. core
-> or a new Apple SoC. Instead it is the A64 from Allwinner, full stop. So
-> why should we add an arbitrary and confusing sun50i naming to it (when
-> it actually should be more like "sun8i-a64").
+> Also, some of the vcpu state (sp_el0, PC and PSTATE) must be
+> save/restored on entry/exit, as they are used on the host as well.
+> 
+> In order to facilitate the introduction of a VHE-specific sysreg
+> save/restore, make move the access to these registers to their
+> own save/restore functions.
+> 
+> No functionnal change.
 
-I don't decide on their marketing names. And I know you want to start
-anew with the arm64 SoCs, but the truth is, you don't. Most of the
-compatibles in the DTSI are from earlier SoCs, and we have to keep
-that legacy and remain consistent with it. With all the good and bad
-things a legacy imply.
+uber nit: s/functionnal/functional/
 
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160204/a8aca967/attachment.sig>
+> 
+> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/kvm/hyp/sysreg-sr.c | 48 +++++++++++++++++++++++++++++-------------
+>  1 file changed, 33 insertions(+), 15 deletions(-)
+> 
+> diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
+> index bd5b543..61bad17 100644
+> --- a/arch/arm64/kvm/hyp/sysreg-sr.c
+> +++ b/arch/arm64/kvm/hyp/sysreg-sr.c
+> @@ -23,13 +23,29 @@
+>  
+>  #include "hyp.h"
+>  
+> -/* ctxt is already in the HYP VA space */
+> +/*
+> + * Non-VHE: Both host and guest must save everything.
+> + *
+> + * VHE: Host must save tpidr*_el[01], actlr_el1, sp0, pc, pstate, and
+> + * guest must save everything.
+> + */
+> +
+> +static void __hyp_text __sysreg_save_common_state(struct kvm_cpu_context *ctxt)
+> +{
+> +	ctxt->sys_regs[ACTLR_EL1]	= read_sysreg(actlr_el1);
+> +	ctxt->sys_regs[TPIDR_EL0]	= read_sysreg(tpidr_el0);
+> +	ctxt->sys_regs[TPIDRRO_EL0]	= read_sysreg(tpidrro_el0);
+> +	ctxt->sys_regs[TPIDR_EL1]	= read_sysreg(tpidr_el1);
+> +	ctxt->gp_regs.regs.sp		= read_sysreg(sp_el0);
+> +	ctxt->gp_regs.regs.pc		= read_sysreg(elr_el2);
+> +	ctxt->gp_regs.regs.pstate	= read_sysreg(spsr_el2);
+> +}
+> +
+>  static void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
+>  {
+>  	ctxt->sys_regs[MPIDR_EL1]	= read_sysreg(vmpidr_el2);
+>  	ctxt->sys_regs[CSSELR_EL1]	= read_sysreg(csselr_el1);
+>  	ctxt->sys_regs[SCTLR_EL1]	= read_sysreg(sctlr_el1);
+> -	ctxt->sys_regs[ACTLR_EL1]	= read_sysreg(actlr_el1);
+>  	ctxt->sys_regs[CPACR_EL1]	= read_sysreg(cpacr_el1);
+>  	ctxt->sys_regs[TTBR0_EL1]	= read_sysreg(ttbr0_el1);
+>  	ctxt->sys_regs[TTBR1_EL1]	= read_sysreg(ttbr1_el1);
+> @@ -41,17 +57,11 @@ static void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
+>  	ctxt->sys_regs[MAIR_EL1]	= read_sysreg(mair_el1);
+>  	ctxt->sys_regs[VBAR_EL1]	= read_sysreg(vbar_el1);
+>  	ctxt->sys_regs[CONTEXTIDR_EL1]	= read_sysreg(contextidr_el1);
+> -	ctxt->sys_regs[TPIDR_EL0]	= read_sysreg(tpidr_el0);
+> -	ctxt->sys_regs[TPIDRRO_EL0]	= read_sysreg(tpidrro_el0);
+> -	ctxt->sys_regs[TPIDR_EL1]	= read_sysreg(tpidr_el1);
+>  	ctxt->sys_regs[AMAIR_EL1]	= read_sysreg(amair_el1);
+>  	ctxt->sys_regs[CNTKCTL_EL1]	= read_sysreg(cntkctl_el1);
+>  	ctxt->sys_regs[PAR_EL1]		= read_sysreg(par_el1);
+>  	ctxt->sys_regs[MDSCR_EL1]	= read_sysreg(mdscr_el1);
+>  
+> -	ctxt->gp_regs.regs.sp		= read_sysreg(sp_el0);
+> -	ctxt->gp_regs.regs.pc		= read_sysreg(elr_el2);
+> -	ctxt->gp_regs.regs.pstate	= read_sysreg(spsr_el2);
+>  	ctxt->gp_regs.sp_el1		= read_sysreg(sp_el1);
+>  	ctxt->gp_regs.elr_el1		= read_sysreg(elr_el1);
+>  	ctxt->gp_regs.spsr[KVM_SPSR_EL1]= read_sysreg(spsr_el1);
+> @@ -60,11 +70,24 @@ static void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
+>  void __hyp_text __sysreg_save_host_state(struct kvm_cpu_context *ctxt)
+>  {
+>  	__sysreg_save_state(ctxt);
+> +	__sysreg_save_common_state(ctxt);
+>  }
+>  
+>  void __hyp_text __sysreg_save_guest_state(struct kvm_cpu_context *ctxt)
+>  {
+>  	__sysreg_save_state(ctxt);
+> +	__sysreg_save_common_state(ctxt);
+> +}
+> +
+> +static void __hyp_text __sysreg_restore_common_state(struct kvm_cpu_context *ctxt)
+> +{
+> +	write_sysreg(ctxt->sys_regs[ACTLR_EL1],	  actlr_el1);
+> +	write_sysreg(ctxt->sys_regs[TPIDR_EL0],	  tpidr_el0);
+> +	write_sysreg(ctxt->sys_regs[TPIDRRO_EL0], tpidrro_el0);
+> +	write_sysreg(ctxt->sys_regs[TPIDR_EL1],	  tpidr_el1);
+> +	write_sysreg(ctxt->gp_regs.regs.sp,	  sp_el0);
+> +	write_sysreg(ctxt->gp_regs.regs.pc,	  elr_el2);
+> +	write_sysreg(ctxt->gp_regs.regs.pstate,	  spsr_el2);
+>  }
+>  
+>  static void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
+> @@ -72,7 +95,6 @@ static void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
+>  	write_sysreg(ctxt->sys_regs[MPIDR_EL1],	  vmpidr_el2);
+>  	write_sysreg(ctxt->sys_regs[CSSELR_EL1],  csselr_el1);
+>  	write_sysreg(ctxt->sys_regs[SCTLR_EL1],	  sctlr_el1);
+> -	write_sysreg(ctxt->sys_regs[ACTLR_EL1],	  actlr_el1);
+>  	write_sysreg(ctxt->sys_regs[CPACR_EL1],	  cpacr_el1);
+>  	write_sysreg(ctxt->sys_regs[TTBR0_EL1],	  ttbr0_el1);
+>  	write_sysreg(ctxt->sys_regs[TTBR1_EL1],	  ttbr1_el1);
+> @@ -84,17 +106,11 @@ static void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
+>  	write_sysreg(ctxt->sys_regs[MAIR_EL1],	  mair_el1);
+>  	write_sysreg(ctxt->sys_regs[VBAR_EL1],	  vbar_el1);
+>  	write_sysreg(ctxt->sys_regs[CONTEXTIDR_EL1], contextidr_el1);
+> -	write_sysreg(ctxt->sys_regs[TPIDR_EL0],	  tpidr_el0);
+> -	write_sysreg(ctxt->sys_regs[TPIDRRO_EL0], tpidrro_el0);
+> -	write_sysreg(ctxt->sys_regs[TPIDR_EL1],	  tpidr_el1);
+>  	write_sysreg(ctxt->sys_regs[AMAIR_EL1],	  amair_el1);
+>  	write_sysreg(ctxt->sys_regs[CNTKCTL_EL1], cntkctl_el1);
+>  	write_sysreg(ctxt->sys_regs[PAR_EL1],	  par_el1);
+>  	write_sysreg(ctxt->sys_regs[MDSCR_EL1],	  mdscr_el1);
+>  
+> -	write_sysreg(ctxt->gp_regs.regs.sp,	sp_el0);
+> -	write_sysreg(ctxt->gp_regs.regs.pc,	elr_el2);
+> -	write_sysreg(ctxt->gp_regs.regs.pstate,	spsr_el2);
+>  	write_sysreg(ctxt->gp_regs.sp_el1,	sp_el1);
+>  	write_sysreg(ctxt->gp_regs.elr_el1,	elr_el1);
+>  	write_sysreg(ctxt->gp_regs.spsr[KVM_SPSR_EL1], spsr_el1);
+> @@ -103,11 +119,13 @@ static void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
+>  void __hyp_text __sysreg_restore_host_state(struct kvm_cpu_context *ctxt)
+>  {
+>  	__sysreg_restore_state(ctxt);
+> +	__sysreg_restore_common_state(ctxt);
+>  }
+>  
+>  void __hyp_text __sysreg_restore_guest_state(struct kvm_cpu_context *ctxt)
+>  {
+>  	__sysreg_restore_state(ctxt);
+> +	__sysreg_restore_common_state(ctxt);
+>  }
+>  
+>  void __hyp_text __sysreg32_save_state(struct kvm_vcpu *vcpu)
+> -- 
+> 2.1.4
+> 
