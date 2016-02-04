@@ -1,43 +1,58 @@
-From: hongzhou.yang@mediatek.com (Hongzhou Yang)
-Date: Wed, 3 Feb 2016 19:03:35 -0800
-Subject: [PATCH 1/2] pinctrl: mediatek: fix direction control issue
-In-Reply-To: <1454462686-770-2-git-send-email-biao.huang@mediatek.com>
-References: <1454462686-770-1-git-send-email-biao.huang@mediatek.com>
- <1454462686-770-2-git-send-email-biao.huang@mediatek.com>
-Message-ID: <1454555015.4618.10.camel@mussux00>
+From: oferh@marvell.com (Ofer Heifetz)
+Date: Thu, 4 Feb 2016 03:22:04 +0000
+Subject: [PATCH v2 03/12] serial: mvebu-uart: initial support for
+ Armada-3700 serial port
+In-Reply-To: <CAPv3WKe6=705iEtsuo0cUtugofiFa_Zt9xydRsgOV+mZ18H-3Q@mail.gmail.com>
+References: <1454524889-9207-1-git-send-email-gregory.clement@free-electrons.com>
+ <1454524889-9207-4-git-send-email-gregory.clement@free-electrons.com>
+ <CAPv3WKdh8D8GYMabALQQW-Z7L+=XhkZw2cXdYpcQ8tF0Rjckag@mail.gmail.com>
+ <20160203230224.5ea52f65@free-electrons.com>
+ <CAPv3WKe6=705iEtsuo0cUtugofiFa_Zt9xydRsgOV+mZ18H-3Q@mail.gmail.com>
+Message-ID: <d18a261fae544e27b12a56bebf4a7006@IL-EXCH01.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2016-02-03 at 09:24 +0800, Biao Huang wrote:
-> Since input-enable/disable and input-schmitt-enable/disable are
-> workable when gpio direction is input, so add direction setting
-> when do input-enable/disable and input-schmitt-enable/disable
-> properties.
-> 
-> Signed-off-by: Biao Huang <biao.huang@mediatek.com>
-> ---
->  drivers/pinctrl/mediatek/pinctrl-mtk-common.c |    2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> index 8cac73d..6eb01c9 100644
-> --- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> @@ -352,6 +352,7 @@ static int mtk_pconf_parse_conf(struct pinctrl_dev *pctldev,
->  		ret = mtk_pconf_set_pull_select(pctl, pin, true, false, arg);
->  		break;
->  	case PIN_CONFIG_INPUT_ENABLE:
-> +		mtk_pmx_gpio_set_direction(pctldev, NULL, pin, true);
->  		ret = mtk_pconf_set_ies_smt(pctl, pin, arg, param);
+Hi Marcin,
 
-Hi Linus,
+I think it is a partial fix since once QA started to use this patch and found that /proc/interrupts prints serial interrupt string multiple times which is clobbering the print.
 
->From pinctrl-bindings.txt, 'input-enable' property defined as following:
-input-enable        - enable input on pin (no effect on output)
+/Ofer
 
-Since input enable and input direction are two different settings on our
-SOC, could you tell me the exact meaning of this property? Input enable
-only? Or set input direction at the same time?
 
-Thanks,
-Hongzhou
+-----Original Message-----
+From: Marcin Wojtas [mailto:mw at semihalf.com] 
+Sent: Thursday, February 04, 2016 12:23 AM
+To: Thomas Petazzoni; Ofer Heifetz
+Cc: Gregory CLEMENT; Jason Cooper; Andrew Lunn; Sebastian Hesselbarth; arm at kernel.org; Catalin Marinas; Will Deacon; Jonathan Corbet; Mark Rutland; devicetree at vger.kernel.org; linux-ide at vger.kernel.org; Greg Kroah-Hartman; Omri Itach; linux-kernel at vger.kernel.org; Nadav Haklai; Hans de Goede; Lior Amsalem; linux-serial at vger.kernel.org; Jiri Slaby; Tejun Heo; Wilson Ding; linux-arm-kernel at lists.infradead.org
+Subject: Re: [PATCH v2 03/12] serial: mvebu-uart: initial support for Armada-3700 serial port
+
+I'm sorry, indeed, I was the one to overlook - there was a lot going on in a thread and I missed it.
+
+Ofer, as you found out that IRQF_SHARED help booting ubuntu - do you think it's a hack or fix?
+
+Best regards,
+Marcin
+
+2016-02-03 23:02 GMT+01:00 Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com>:
+> Dear Marcin Wojtas,
+>
+> On Wed, 3 Feb 2016 22:41:15 +0100, Marcin Wojtas wrote:
+>> Hi Gregory,
+>>
+>> > +       port->irq        = irq->start;
+>> > +       port->irqflags   = 0;
+>>
+>> Same request as for v1, which you must have overlooked:
+>> port->irqflags = IRQF_SHARED;
+>
+> Gregory didn't overlook this comment you made on v1, he even replied 
+> to it. Please check Gregory's reply to your review.
+>
+> Best regards,
+>
+> Thomas
+> --
+> Thomas Petazzoni, CTO, Free Electrons
+> Embedded Linux, Kernel and Android engineering 
+> http://free-electrons.com
