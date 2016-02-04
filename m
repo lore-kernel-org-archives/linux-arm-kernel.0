@@ -1,66 +1,79 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  4 Feb 2016 11:00:42 +0000
-Subject: [PATCH v2 25/28] ARM: KVM: Cleanup asm-offsets.c
-In-Reply-To: <1454583645-10144-1-git-send-email-marc.zyngier@arm.com>
-References: <1454583645-10144-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1454583645-10144-26-git-send-email-marc.zyngier@arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 4 Feb 2016 11:38:35 +0100
+Subject: [PATCH v4 00/13] mmc: use sdhci_pltfm_init for private allocation
+ and clean up
+In-Reply-To: <1453803353-6266-1-git-send-email-jszhang@marvell.com>
+References: <1453803353-6266-1-git-send-email-jszhang@marvell.com>
+Message-ID: <CAPDyKFpFSTYsAUCG9nFnnzmVsA3zm4hAPO8+6REArt9BJtn+0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since we don't have much assembler left, most of the KVM stuff
-in asm-offsets.c is now superfluous. Let's get rid of it.
++ Adrian
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/kernel/asm-offsets.c | 30 ------------------------------
- 1 file changed, 30 deletions(-)
+On 26 January 2016 at 11:15, Jisheng Zhang <jszhang@marvell.com> wrote:
+> These patches are to complete the TODOs in Commit 0e748234293f ("mmc:
+> sdhci: Add size for caller in init+register"), I.E:
+>
+> - todo: migrate clients to using allocation this way
+> - todo: remove priv variable once migration is complete
+>
+> Since v3:
+>  - based on v4.5-rc1
+>  - add Ludovic's ack for sdhci-of-at91 changes
+>  - fix use-after-free in some drivers: some host drivers still needs to
+>    access sdhci_pltfm_host->private after sdhci_pltfm_unregister(), but
+>    the private should be already freed by sdhci_pltfm_unregister.
+>  - add patch5 to fix one clk bug in sdhci_arasan_remove(). IMHO, It's
+>    better to add this patch to fixes rather than waiting for next merge
+>    window
+>
+> Since v2:
+>  - based on mmc next tree and remove all priv usage introduced in newly
+>    commits in this tree
+>  - don't break two lines if sdhci_pltfm_init() call could be put into
+>    one line. Thank Ludovic Desroches.
+>
+> Since v1:
+>  - add new patch03 to factorise sdhci_msm_pdata outisde of sdhci_msm_host.
+>    This is to fix drivers/mmc/host/sdhci-msm.c:440:32: warning: 'msm_host'
+>    is used uninitialized in this function [-Wuninitialized]
+>  - Add Arnd's Ack for all patches except patch3 which is new in v2
+>
+>
+> Jisheng Zhang (13):
+>   mmc: sdhci-bcm2835: use sdhci_pltfm_init for private allocation
+>   mmc: sdhci-esdhc-imx: use sdhci_pltfm_init for private allocation
+>   mmc: sdhci-msm: factorise sdhci_msm_pdata outisde of sdhci_msm_host
+>   mmc: sdhci-msm: use sdhci_pltfm_init for private allocation
+>   mmc: sdhci-of-arasan: fix clk issue in sdhci_arasan_remove()
+>   mmc: sdhci-of-arasan: use sdhci_pltfm_init for private allocation
+>   mmc: sdhci-of-at91: use sdhci_pltfm_init for private allocation
+>   mmc: sdhci-of-esdhc: use sdhci_pltfm_init for private allocation
+>   mmc: sdhci-pxav3: use sdhci_pltfm_init for private allocation
+>   mmc: sdhci-st: use sdhci_pltfm_init for private allocation
+>   mmc: sdhci-tegra: use sdhci_pltfm_init for private allocation
+>   mmc: sdhci-pxav2: remove unnecessary assignment of pltfm_host->priv
+>   mmc: sdhci-pltfm: remove priv variable from sdhci_pltfm_host
+>
+>  drivers/mmc/host/sdhci-bcm2835.c   | 14 +++----------
+>  drivers/mmc/host/sdhci-esdhc-imx.c | 38 ++++++++++++++++--------------------
+>  drivers/mmc/host/sdhci-msm.c       | 25 +++++++++++-------------
+>  drivers/mmc/host/sdhci-of-arasan.c | 33 +++++++++++++++----------------
+>  drivers/mmc/host/sdhci-of-at91.c   | 33 ++++++++++++++-----------------
+>  drivers/mmc/host/sdhci-of-esdhc.c  | 19 +++++++++---------
+>  drivers/mmc/host/sdhci-pltfm.h     |  1 -
+>  drivers/mmc/host/sdhci-pxav2.c     |  1 -
+>  drivers/mmc/host/sdhci-pxav3.c     | 20 ++++++++-----------
+>  drivers/mmc/host/sdhci-st.c        | 40 +++++++++++++++++++-------------------
+>  drivers/mmc/host/sdhci-tegra.c     | 21 +++++++-------------
+>  11 files changed, 106 insertions(+), 139 deletions(-)
+>
+> --
+> 2.7.0
+>
 
-diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
-index 2f3e0b0..1f24c32 100644
---- a/arch/arm/kernel/asm-offsets.c
-+++ b/arch/arm/kernel/asm-offsets.c
-@@ -170,42 +170,12 @@ int main(void)
-   DEFINE(CACHE_WRITEBACK_GRANULE, __CACHE_WRITEBACK_GRANULE);
-   BLANK();
- #ifdef CONFIG_KVM_ARM_HOST
--  DEFINE(VCPU_KVM,		offsetof(struct kvm_vcpu, kvm));
--  DEFINE(VCPU_MIDR,		offsetof(struct kvm_vcpu, arch.midr));
-   DEFINE(VCPU_GUEST_CTXT,	offsetof(struct kvm_vcpu, arch.ctxt));
-   DEFINE(VCPU_HOST_CTXT,	offsetof(struct kvm_vcpu, arch.host_cpu_context));
-   DEFINE(CPU_CTXT_VFP,		offsetof(struct kvm_cpu_context, vfp));
--  DEFINE(CPU_CTXT_CP15,		offsetof(struct kvm_cpu_context, cp15));
-   DEFINE(CPU_CTXT_GP_REGS,	offsetof(struct kvm_cpu_context, gp_regs));
-   DEFINE(GP_REGS_USR,		offsetof(struct kvm_regs, usr_regs));
--  DEFINE(GP_REGS_SVC,		offsetof(struct kvm_regs, svc_regs));
--  DEFINE(GP_REGS_ABT,		offsetof(struct kvm_regs, abt_regs));
--  DEFINE(GP_REGS_UND,		offsetof(struct kvm_regs, und_regs));
--  DEFINE(GP_REGS_IRQ,		offsetof(struct kvm_regs, irq_regs));
--  DEFINE(GP_REGS_FIQ,		offsetof(struct kvm_regs, fiq_regs));
--  DEFINE(GP_REGS_PC,		offsetof(struct kvm_regs, usr_regs.ARM_pc));
--  DEFINE(GP_REGS_CPSR,		offsetof(struct kvm_regs, usr_regs.ARM_cpsr));
--  DEFINE(VCPU_HCR,		offsetof(struct kvm_vcpu, arch.hcr));
--  DEFINE(VCPU_IRQ_LINES,	offsetof(struct kvm_vcpu, arch.irq_lines));
--  DEFINE(VCPU_HSR,		offsetof(struct kvm_vcpu, arch.fault.hsr));
--  DEFINE(VCPU_HxFAR,		offsetof(struct kvm_vcpu, arch.fault.hxfar));
--  DEFINE(VCPU_HPFAR,		offsetof(struct kvm_vcpu, arch.fault.hpfar));
-   DEFINE(VCPU_HYP_PC,		offsetof(struct kvm_vcpu, arch.fault.hyp_pc));
--  DEFINE(VCPU_VGIC_CPU,		offsetof(struct kvm_vcpu, arch.vgic_cpu));
--  DEFINE(VGIC_V2_CPU_HCR,	offsetof(struct vgic_cpu, vgic_v2.vgic_hcr));
--  DEFINE(VGIC_V2_CPU_VMCR,	offsetof(struct vgic_cpu, vgic_v2.vgic_vmcr));
--  DEFINE(VGIC_V2_CPU_MISR,	offsetof(struct vgic_cpu, vgic_v2.vgic_misr));
--  DEFINE(VGIC_V2_CPU_EISR,	offsetof(struct vgic_cpu, vgic_v2.vgic_eisr));
--  DEFINE(VGIC_V2_CPU_ELRSR,	offsetof(struct vgic_cpu, vgic_v2.vgic_elrsr));
--  DEFINE(VGIC_V2_CPU_APR,	offsetof(struct vgic_cpu, vgic_v2.vgic_apr));
--  DEFINE(VGIC_V2_CPU_LR,	offsetof(struct vgic_cpu, vgic_v2.vgic_lr));
--  DEFINE(VGIC_CPU_NR_LR,	offsetof(struct vgic_cpu, nr_lr));
--  DEFINE(VCPU_TIMER_CNTV_CTL,	offsetof(struct kvm_vcpu, arch.timer_cpu.cntv_ctl));
--  DEFINE(VCPU_TIMER_CNTV_CVAL,	offsetof(struct kvm_vcpu, arch.timer_cpu.cntv_cval));
--  DEFINE(KVM_TIMER_CNTVOFF,	offsetof(struct kvm, arch.timer.cntvoff));
--  DEFINE(KVM_TIMER_ENABLED,	offsetof(struct kvm, arch.timer.enabled));
--  DEFINE(KVM_VGIC_VCTRL,	offsetof(struct kvm, arch.vgic.vctrl_base));
--  DEFINE(KVM_VTTBR,		offsetof(struct kvm, arch.vttbr));
- #endif
-   BLANK();
- #ifdef CONFIG_VDSO
--- 
-2.1.4
+To avoid confusions. I don't intend to pick up any further sdhci
+patches, unless they are acked by Adrian Hunter.
+
+Kind regards
+Uffe
