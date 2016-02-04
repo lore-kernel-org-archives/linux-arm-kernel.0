@@ -1,69 +1,38 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu,  4 Feb 2016 18:52:42 +0100
-Subject: [GIT PULL] clk: tegra: Fixes for v4.5-rc3
-Message-ID: <1454608362-8954-1-git-send-email-thierry.reding@gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 4 Feb 2016 12:04:14 -0600
+Subject: [PATCH v3 1/8] dt-bindings: Add a binding for Mediatek Video
+ Processor
+In-Reply-To: <1454586583.7571.3.camel@mtksdaap41>
+References: <1451902316-55931-1-git-send-email-tiffany.lin@mediatek.com>
+ <1451902316-55931-2-git-send-email-tiffany.lin@mediatek.com>
+ <20160104141506.GA22801@rob-hp-laptop> <1454586583.7571.3.camel@mtksdaap41>
+Message-ID: <CAL_JsqJqQ+QRgg6HGQeGk0=rBEwQq7i-ZfoDahZwXLuvMC-=_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <treding@nvidia.com>
+On Thu, Feb 4, 2016 at 5:49 AM, tiffany lin <tiffany.lin@mediatek.com> wrote:
+> Hi Rob,
+>
+>
+>
+>
+> On Mon, 2016-01-04 at 22:15 +0800, Rob Herring wrote:
+>> On Mon, Jan 04, 2016 at 06:11:49PM +0800, Tiffany Lin wrote:
+>> > From: Andrew-CT Chen <andrew-ct.chen@mediatek.com>
+>> >
+>> > Add a DT binding documentation of Video Processor Unit for the
+>> > MT8173 SoC from Mediatek.
+>> >
+>> > Signed-off-by: Andrew-CT Chen <andrew-ct.chen@mediatek.com>
+>> > Signed-off-by: Tiffany Lin <tiffany.lin@mediatek.com>
+>>
+>> Please add acks when sending new versions as I already acked the last
+>> version.
+>>
+> Since we remove iommu attach and add 4GB support for VPU.
+> We send the new device tree and binding document.
+> We do not add Acked-by in v4 patches.
 
-Hi Mike, Stephen,
+Okay, then you should explain that in the patch.
 
-The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
-
-  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.5-clk-fixes
-
-for you to fetch changes up to 5a1d5eff3ede4de4482015a9999336051054283f:
-
-  clk: tegra: super: Fix sparse warnings for functions not declared as static (2016-02-02 15:49:34 +0100)
-
-Thanks,
-Thierry
-
-----------------------------------------------------------------
-clk: tegra: Fixes for v4.5-rc3
-
-This set contains a bunch of miscellaneous fixes that have accumulated
-over the past couple of weeks, primarily for the Tegra210 support added
-in v4.5-rc1.
-
-----------------------------------------------------------------
-Amitoj Kaur Chawla (1):
-      clk: tegra: Add missing of_node_put()
-
-Andrew Bresticker (1):
-      clk: tegra: pll: Fix potential sleeping-while-atomic
-
-Jon Hunter (7):
-      clk: tegra: Add the APB2APE audio clock on Tegra210
-      clk: tegra: Fix clock sources for Tegra210 EMC
-      clk: tegra: Fix warning caused by pll_u failing to lock
-      clk: tegra: Use definition for pll_u override bit
-      clk: tegra: Fix sparse warning for pll_m
-      clk: tegra: Fix sparse warnings for functions not declared as static
-      clk: tegra: super: Fix sparse warnings for functions not declared as static
-
-Mark Kuo (2):
-      clk: tegra: Do not disable PLLE when under hardware control
-      clk: tegra: Fix PLLE SS coefficients
-
-Rhyland Klein (6):
-      clk: tegra: Fix divider on VI_I2C
-      clk: tegra: Remove improper flags for lock_enable
-      clk: tegra: Fix naming of MISC registers
-      clk: tegra: Fix the misnaming of nvenc from msenc
-      clk: tegra: Fix pllx dyn step calculation
-      clk: tegra: Fix typos around clearing PLLE bits during enable
-
- drivers/clk/tegra/clk-emc.c              |   6 +-
- drivers/clk/tegra/clk-id.h               |   1 +
- drivers/clk/tegra/clk-pll.c              |  50 +++++++-----
- drivers/clk/tegra/clk-tegra-periph.c     |   5 +-
- drivers/clk/tegra/clk-tegra-super-gen4.c |   6 +-
- drivers/clk/tegra/clk-tegra210.c         | 132 ++++++++++++++-----------------
- include/dt-bindings/clock/tegra210-car.h |   2 +-
- 7 files changed, 104 insertions(+), 98 deletions(-)
+Rob
