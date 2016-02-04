@@ -1,103 +1,104 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Thu,  4 Feb 2016 18:28:52 +0100
-Subject: [PATCH V4 14/23] x86,
- ia64: Include acpi_pci_{add|remove}_bus to the default
- pcibios_{add|remove}_bus implementation.
+Date: Thu,  4 Feb 2016 18:28:53 +0100
+Subject: [PATCH V4 15/23] acpi,
+ mcfg: Implement two calls that might be used to inject/remove MCFG
+ region.
 In-Reply-To: <1454606941-9523-1-git-send-email-tn@semihalf.com>
 References: <1454606941-9523-1-git-send-email-tn@semihalf.com>
-Message-ID: <1454606941-9523-15-git-send-email-tn@semihalf.com>
+Message-ID: <1454606941-9523-16-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-x86 and ia64 are the only arches that implement pcibios_{add|remove}_bus hooks
-and implement them in the same way. Moreover ARM64 is going to do the same.
-So it seems that acpi_pci_{add|remove}_bus is generic enough to be default
-option for pcibios_{add|remove}_bus hooks. Also, it is always safe to run
-acpi_pci_{add|remove}_bus as they have empty stubs for !ACPI case and
-return if ACPI has been switched off in run time.
-
-After all we can remove x86 and ia64 pcibios_{add|remove}_bus
-implementation.
+Lets abstract two calls which allow to inject and remove MCFG regions
+which may come from DSDT table. These calls will be used for x86 and ARM64
+PCI host bridge driver in the later patches.
 
 Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Tested-by: Duc Dang <dhdang@apm.com>
 Tested-by: Dongdong Liu <liudongdong3@huawei.com>
 Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
 Tested-by: Graeme Gregory <graeme.gregory@linaro.org>
 Tested-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- arch/ia64/pci/pci.c   | 10 ----------
- arch/x86/pci/common.c | 10 ----------
- drivers/pci/probe.c   |  3 +++
- 3 files changed, 3 insertions(+), 20 deletions(-)
+ drivers/acpi/mcfg.c      | 38 ++++++++++++++++++++++++++++++++++++++
+ include/linux/pci-acpi.h |  9 +++++++++
+ 2 files changed, 47 insertions(+)
 
-diff --git a/arch/ia64/pci/pci.c b/arch/ia64/pci/pci.c
-index 978d6af..be4c9ef 100644
---- a/arch/ia64/pci/pci.c
-+++ b/arch/ia64/pci/pci.c
-@@ -358,16 +358,6 @@ void pcibios_fixup_bus(struct pci_bus *b)
- 	platform_pci_fixup_bus(b);
- }
- 
--void pcibios_add_bus(struct pci_bus *bus)
--{
--	acpi_pci_add_bus(bus);
--}
--
--void pcibios_remove_bus(struct pci_bus *bus)
--{
--	acpi_pci_remove_bus(bus);
--}
--
- void pcibios_set_master (struct pci_dev *dev)
- {
- 	/* No special bus mastering setup handling */
-diff --git a/arch/x86/pci/common.c b/arch/x86/pci/common.c
-index 2879efc..5aa25f1 100644
---- a/arch/x86/pci/common.c
-+++ b/arch/x86/pci/common.c
-@@ -171,16 +171,6 @@ void pcibios_fixup_bus(struct pci_bus *b)
- 		pcibios_fixup_device_resources(dev);
- }
- 
--void pcibios_add_bus(struct pci_bus *bus)
--{
--	acpi_pci_add_bus(bus);
--}
--
--void pcibios_remove_bus(struct pci_bus *bus)
--{
--	acpi_pci_remove_bus(bus);
--}
--
- /*
-  * Only use DMI information to set this if nothing was passed
-  * on the kernel command line (which was parsed earlier).
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index 81dd3a2..ef22a22 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -12,6 +12,7 @@
- #include <linux/slab.h>
- #include <linux/module.h>
- #include <linux/cpumask.h>
-+#include <linux/pci-acpi.h>
- #include <linux/pci-aspm.h>
- #include <linux/aer.h>
+diff --git a/drivers/acpi/mcfg.c b/drivers/acpi/mcfg.c
+index 3e1e7be..dca4c4e 100644
+--- a/drivers/acpi/mcfg.c
++++ b/drivers/acpi/mcfg.c
+@@ -10,6 +10,7 @@
  #include <linux/acpi.h>
-@@ -2060,10 +2061,12 @@ int __weak pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
+ #include <linux/ecam.h>
+ #include <linux/pci.h>
++#include <linux/pci-acpi.h>
  
- void __weak pcibios_add_bus(struct pci_bus *bus)
- {
-+	acpi_pci_add_bus(bus);
+ #define	PREFIX	"MCFG: "
+ 
+@@ -77,6 +78,43 @@ int __init acpi_parse_mcfg(struct acpi_table_header *header)
+ 	return 0;
  }
  
- void __weak pcibios_remove_bus(struct pci_bus *bus)
++int pci_mmcfg_setup_map(struct acpi_pci_root_info *ci)
++{
++	struct pci_mmcfg_region *cfg;
++	struct acpi_pci_root *root;
++	int seg, start, end, err;
++
++	root = ci->root;
++	seg = root->segment;
++	start = root->secondary.start;
++	end = root->secondary.end;
++
++	cfg = pci_mmconfig_lookup(seg, start);
++	if (cfg)
++		return 0;
++
++	cfg = pci_mmconfig_alloc(seg, start, end, root->mcfg_addr);
++	if (!cfg)
++		return -ENOMEM;
++
++	err = pci_mmconfig_inject(cfg);
++	return err;
++}
++
++void pci_mmcfg_teardown_map(struct acpi_pci_root_info *ci)
++{
++	struct acpi_pci_root *root = ci->root;
++	struct pci_mmcfg_region *cfg;
++
++	cfg = pci_mmconfig_lookup(root->segment, root->secondary.start);
++	if (!cfg)
++		return;
++
++	if (cfg->hot_added)
++		pci_mmconfig_delete(root->segment, root->secondary.start,
++				    root->secondary.end);
++}
++
+ int __init __weak acpi_mcfg_check_entry(struct acpi_table_mcfg *mcfg,
+ 					struct acpi_mcfg_allocation *cfg)
  {
-+	acpi_pci_remove_bus(bus);
- }
+diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
+index a72e22d..65b91f3 100644
+--- a/include/linux/pci-acpi.h
++++ b/include/linux/pci-acpi.h
+@@ -80,6 +80,15 @@ extern struct pci_bus *acpi_pci_root_create(struct acpi_pci_root *root,
+ void acpi_pci_add_bus(struct pci_bus *bus);
+ void acpi_pci_remove_bus(struct pci_bus *bus);
  
- struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
++#ifdef	CONFIG_PCI_MMCONFIG
++int pci_mmcfg_setup_map(struct acpi_pci_root_info *ci);
++void pci_mmcfg_teardown_map(struct acpi_pci_root_info *ci);
++#else
++static inline int pci_mmcfg_setup_map(struct acpi_pci_root_info *ci)
++{ return 0; }
++static inline void pci_mmcfg_teardown_map(struct acpi_pci_root_info *ci) { }
++#endif
++
+ #ifdef	CONFIG_ACPI_PCI_SLOT
+ void acpi_pci_slot_init(void);
+ void acpi_pci_slot_enumerate(struct pci_bus *bus);
 -- 
 1.9.1
