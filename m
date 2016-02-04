@@ -1,513 +1,534 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu,  4 Feb 2016 15:04:17 +0100
-Subject: [PATCH 08/11] video: ARM CLCD: add special panel hook for Versatiles
+Date: Thu,  4 Feb 2016 15:04:20 +0100
+Subject: [PATCH 11/11] ARM: versatile: move CLCD configuration to device tree
 In-Reply-To: <1454594660-7532-1-git-send-email-linus.walleij@linaro.org>
 References: <1454594660-7532-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1454594660-7532-9-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1454594660-7532-12-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a special panel init hook for the ARM reference designs
-Integrator (IM-PD1), Versatile and RealView, so we can configure
-a DPI panel from device tree and have it working without
-boardfiles for these machines.
+This moves the versatile CLCD configuration to the device tree by:
 
-Basically this is the same code as from the board files, just
-moved over to look up the syscon DT node and manipulate the
-special CLCD register from their regmap.
+- Deleting the board file set-up of CLCD displays and quirks,
+  instead relying on the driver to handle this. The driver will
+  attempt to auto-detect (like the board file did) and match to
+  a corresponding panel in the device tree.
 
-Tested on RealView PB11MPcore.
+- Defining all auto-detectable panels in the device tree for the
+  versatile-ab, defaulting the first one to VGA. The right
+  panel will be selected at panel initialization, and should
+  just work for the IB1 daughterboard panels, like EPSON.
+
+- Creating a special superset DTS file for the IB2 daughterboard
+  (phone form-factor) equipped Versatile, overriding the default VGA
+  display with the Sanyo 2.5" portrait display definitions, so that
+  the IB2-equipped Versatile can be used with this. This follows
+  the pattern of how we define the Versatile PB as a superset of
+  Versatile AB.
+
+Tested on Versatile AB with just VGA with the default device tree,
+and with the IB2 daughterboard with the custom IB2 device tree.
+Tested to shunt in XVGA by modifying the device tree and this works
+too. Also tested on QEMU for Versatile in both VGA and Sanyo 2.5"
+mode. I don't have the IB1 daughterboard and its add-on displays,
+but it should work as long as the detection mechanism and device
+tree parameters are sound.
 
 Cc: Pawel Moll <pawel.moll@arm.com>
 Cc: Rob Herring <robh@kernel.org>
 Cc: Russell King <linux@arm.linux.org.uk>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/video/fbdev/Kconfig               |   2 +
- drivers/video/fbdev/amba-clcd-versatile.c | 406 ++++++++++++++++++++++++++++++
- drivers/video/fbdev/amba-clcd-versatile.h |  17 ++
- drivers/video/fbdev/amba-clcd.c           |   4 +-
- 4 files changed, 428 insertions(+), 1 deletion(-)
- create mode 100644 drivers/video/fbdev/amba-clcd-versatile.h
+ arch/arm/boot/dts/Makefile             |   1 +
+ arch/arm/boot/dts/versatile-ab-ib2.dts |  20 ++++
+ arch/arm/boot/dts/versatile-ab.dts     | 203 ++++++++++++++++++++++++++++++++-
+ arch/arm/mach-versatile/versatile_dt.c | 162 --------------------------
+ 4 files changed, 220 insertions(+), 166 deletions(-)
+ create mode 100644 arch/arm/boot/dts/versatile-ab-ib2.dts
 
-diff --git a/drivers/video/fbdev/Kconfig b/drivers/video/fbdev/Kconfig
-index 6dcd91237551..a3fdc4cd1837 100644
---- a/drivers/video/fbdev/Kconfig
-+++ b/drivers/video/fbdev/Kconfig
-@@ -307,6 +307,8 @@ config PLAT_VERSATILE_CLCD
- 	def_bool ARCH_VERSATILE || ARCH_REALVIEW || ARCH_VEXPRESS || ARCH_INTEGRATOR
- 	depends on ARM
- 	depends on FB_ARMCLCD && FB=y
-+	select REGMAP
-+	select MFD_SYSCON
- 
- config FB_ACORN
- 	bool "Acorn VIDC support"
-diff --git a/drivers/video/fbdev/amba-clcd-versatile.c b/drivers/video/fbdev/amba-clcd-versatile.c
-index 7a8afcd4573e..5d125f77215d 100644
---- a/drivers/video/fbdev/amba-clcd-versatile.c
-+++ b/drivers/video/fbdev/amba-clcd-versatile.c
-@@ -3,6 +3,12 @@
- #include <linux/amba/bus.h>
- #include <linux/amba/clcd.h>
- #include <linux/platform_data/video-clcd-versatile.h>
-+#include <linux/of.h>
-+#include <linux/of_graph.h>
-+#include <linux/regmap.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/bitops.h>
-+#include "amba-clcd-versatile.h"
- 
- static struct clcd_panel vga = {
- 	.mode		= {
-@@ -180,3 +186,403 @@ void versatile_clcd_remove_dma(struct clcd_fb *fb)
- 	dma_free_writecombine(&fb->dev->dev, fb->fb.fix.smem_len,
- 			      fb->fb.screen_base, fb->fb.fix.smem_start);
- }
-+
-+#ifdef CONFIG_OF
-+
-+static struct regmap *versatile_syscon_map;
-+static struct regmap *versatile_ib2_map;
-+
-+/*
-+ * We detect the different syscon types from the compatible strings.
-+ */
-+enum versatile_clcd {
-+	INTEGRATOR_CLCD_CM,
-+	VERSATILE_CLCD,
-+	REALVIEW_CLCD_EB,
-+	REALVIEW_CLCD_PB1176,
-+	REALVIEW_CLCD_PB11MP,
-+	REALVIEW_CLCD_PBA8,
-+	REALVIEW_CLCD_PBX,
-+};
-+
-+static const struct of_device_id versatile_clcd_of_match[] = {
-+	{
-+		.compatible = "arm,core-module-integrator",
-+		.data = (void *)INTEGRATOR_CLCD_CM,
-+	},
-+	{
-+		.compatible = "arm,versatile-sysreg",
-+		.data = (void *)VERSATILE_CLCD,
-+	},
-+	{
-+		.compatible = "arm,realview-eb-syscon",
-+		.data = (void *)REALVIEW_CLCD_EB,
-+	},
-+	{
-+		.compatible = "arm,realview-pb1176-syscon",
-+		.data = (void *)REALVIEW_CLCD_PB1176,
-+	},
-+	{
-+		.compatible = "arm,realview-pb11mp-syscon",
-+		.data = (void *)REALVIEW_CLCD_PB11MP,
-+	},
-+	{
-+		.compatible = "arm,realview-pba8-syscon",
-+		.data = (void *)REALVIEW_CLCD_PBA8,
-+	},
-+	{
-+		.compatible = "arm,realview-pbx-syscon",
-+		.data = (void *)REALVIEW_CLCD_PBX,
-+	},
-+	{},
-+};
-+
-+/*
-+ * Core module CLCD control on the Integrator/CP, bits
-+ * 8 thru 19 of the CM_CONTROL register controls a bunch
-+ * of CLCD settings.
-+ */
-+#define INTEGRATOR_HDR_CTRL_OFFSET	0x0C
-+#define INTEGRATOR_CLCD_LCDBIASEN	BIT(8)
-+#define INTEGRATOR_CLCD_LCDBIASUP	BIT(9)
-+#define INTEGRATOR_CLCD_LCDBIASDN	BIT(10)
-+/* Bits 11,12,13 controls the LCD type */
-+#define INTEGRATOR_CLCD_LCDMUX_MASK	(BIT(11)|BIT(12)|BIT(13))
-+#define INTEGRATOR_CLCD_LCDMUX_LCD24	BIT(11)
-+#define INTEGRATOR_CLCD_LCDMUX_VGA565	BIT(12)
-+#define INTEGRATOR_CLCD_LCDMUX_SHARP	(BIT(11)|BIT(12))
-+#define INTEGRATOR_CLCD_LCDMUX_VGA555	BIT(13)
-+#define INTEGRATOR_CLCD_LCDMUX_VGA24	(BIT(11)|BIT(12)|BIT(13))
-+#define INTEGRATOR_CLCD_LCD0_EN		BIT(14)
-+#define INTEGRATOR_CLCD_LCD1_EN		BIT(15)
-+/* R/L flip on Sharp */
-+#define INTEGRATOR_CLCD_LCD_STATIC1	BIT(16)
-+/* U/D flip on Sharp */
-+#define INTEGRATOR_CLCD_LCD_STATIC2	BIT(17)
-+/* No connection on Sharp */
-+#define INTEGRATOR_CLCD_LCD_STATIC	BIT(18)
-+/* 0 = 24bit VGA, 1 = 18bit VGA */
-+#define INTEGRATOR_CLCD_LCD_N24BITEN	BIT(19)
-+
-+#define INTEGRATOR_CLCD_MASK		(INTEGRATOR_CLCD_LCDMUX_MASK | \
-+					 INTEGRATOR_CLCD_LCD0_EN | \
-+					 INTEGRATOR_CLCD_LCD1_EN | \
-+					 INTEGRATOR_CLCD_LCD_STATIC1 | \
-+					 INTEGRATOR_CLCD_LCD_STATIC2 | \
-+					 INTEGRATOR_CLCD_LCD_STATIC | \
-+					 INTEGRATOR_CLCD_LCD_N24BITEN)
-+
-+static void integrator_clcd_enable(struct clcd_fb *fb)
-+{
-+	struct fb_var_screeninfo *var = &fb->fb.var;
-+	u32 val;
-+
-+	dev_info(&fb->dev->dev, "enable Integrator CLCD connectors\n");
-+
-+	val = INTEGRATOR_CLCD_LCD_STATIC1 | INTEGRATOR_CLCD_LCD_STATIC2 |
-+		INTEGRATOR_CLCD_LCD0_EN | INTEGRATOR_CLCD_LCD1_EN;
-+	if (var->bits_per_pixel <= 8 ||
-+	    (var->bits_per_pixel == 16 && var->green.length == 5))
-+		/* Pseudocolor, RGB555, BGR555 */
-+		val |= INTEGRATOR_CLCD_LCDMUX_VGA555;
-+	else if (fb->fb.var.bits_per_pixel <= 16)
-+		/* truecolor RGB565 */
-+		val |= INTEGRATOR_CLCD_LCDMUX_VGA565;
-+	else
-+		val = 0; /* no idea for this, don't trust the docs */
-+
-+	regmap_update_bits(versatile_syscon_map,
-+			   INTEGRATOR_HDR_CTRL_OFFSET,
-+			   0,
-+			   INTEGRATOR_CLCD_MASK);
-+}
-+
-+/*
-+ * This configuration register in the Versatile and RealView
-+ * family is uniformly present but appears more and more
-+ * unutilized starting with the RealView series.
-+ */
-+#define SYS_CLCD			0x50
-+#define SYS_CLCD_MODE_MASK		(BIT(0)|BIT(1))
-+#define SYS_CLCD_MODE_888		0
-+#define SYS_CLCD_MODE_5551		BIT(0)
-+#define SYS_CLCD_MODE_565_R_LSB		BIT(1)
-+#define SYS_CLCD_MODE_565_B_LSB		(BIT(0)|BIT(1))
-+#define SYS_CLCD_CONNECTOR_MASK		(BIT(2)|BIT(3)|BIT(4)|BIT(5))
-+#define SYS_CLCD_NLCDIOON		BIT(2)
-+#define SYS_CLCD_VDDPOSSWITCH		BIT(3)
-+#define SYS_CLCD_PWR3V5SWITCH		BIT(4)
-+#define SYS_CLCD_VDDNEGSWITCH		BIT(5)
-+#define SYS_CLCD_TSNSS			BIT(6) /* touchscreen enable */
-+#define SYS_CLCD_SSPEXP			BIT(7) /* SSP expansion enable */
-+
-+/* The Versatile can detect the connected panel type */
-+#define SYS_CLCD_CLCDID_MASK		(BIT(8)|BIT(9)|BIT(10)|BIT(11)|BIT(12))
-+#define SYS_CLCD_ID_SANYO_3_8		(0x00 << 8)
-+#define SYS_CLCD_ID_SHARP_8_4		(0x01 << 8)
-+#define SYS_CLCD_ID_EPSON_2_2		(0x02 << 8)
-+#define SYS_CLCD_ID_SANYO_2_5		(0x07 << 8)
-+#define SYS_CLCD_ID_VGA			(0x1f << 8)
-+
-+#define SYS_CLCD_TSNDAV			BIT(13) /* data ready from TS */
-+
-+/* IB2 control register for the Versatile daughterboard */
-+#define IB2_CTRL			0x00
-+#define IB2_CTRL_LCD_SD			BIT(1) /* 1 = shut down LCD */
-+#define IB2_CTRL_LCD_BL_ON		BIT(0)
-+#define IB2_CTRL_LCD_MASK		(BIT(0)|BIT(1))
-+
-+static void versatile_clcd_disable(struct clcd_fb *fb)
-+{
-+	dev_info(&fb->dev->dev, "disable Versatile CLCD connectors\n");
-+	regmap_update_bits(versatile_syscon_map,
-+			   SYS_CLCD,
-+			   SYS_CLCD_CONNECTOR_MASK,
-+			   0);
-+
-+	/* If we're on an IB2 daughterboard, turn off display */
-+	if (versatile_ib2_map) {
-+		dev_info(&fb->dev->dev, "disable IB2 display\n");
-+		regmap_update_bits(versatile_ib2_map,
-+				   IB2_CTRL,
-+				   IB2_CTRL_LCD_MASK,
-+				   IB2_CTRL_LCD_SD);
-+	}
-+}
-+
-+static void versatile_clcd_enable(struct clcd_fb *fb)
-+{
-+	struct fb_var_screeninfo *var = &fb->fb.var;
-+	u32 val = 0;
-+
-+	dev_info(&fb->dev->dev, "enable Versatile CLCD connectors\n");
-+	switch (var->green.length) {
-+	case 5:
-+		val |= SYS_CLCD_MODE_5551;
-+		break;
-+	case 6:
-+		if (var->red.offset == 0)
-+			val |= SYS_CLCD_MODE_565_R_LSB;
-+		else
-+			val |= SYS_CLCD_MODE_565_B_LSB;
-+		break;
-+	case 8:
-+		val |= SYS_CLCD_MODE_888;
-+		break;
-+	}
-+
-+	/* Set up the MUX */
-+	regmap_update_bits(versatile_syscon_map,
-+			   SYS_CLCD,
-+			   SYS_CLCD_MODE_MASK,
-+			   val);
-+
-+	/* Then enable the display */
-+	regmap_update_bits(versatile_syscon_map,
-+			   SYS_CLCD,
-+			   SYS_CLCD_CONNECTOR_MASK,
-+			   SYS_CLCD_NLCDIOON | SYS_CLCD_PWR3V5SWITCH);
-+
-+	/* If we're on an IB2 daughterboard, turn on display */
-+	if (versatile_ib2_map) {
-+		dev_info(&fb->dev->dev, "enable IB2 display\n");
-+		regmap_update_bits(versatile_ib2_map,
-+				   IB2_CTRL,
-+				   IB2_CTRL_LCD_MASK,
-+				   IB2_CTRL_LCD_BL_ON);
-+	}
-+}
-+
-+static void versatile_clcd_decode(struct clcd_fb *fb, struct clcd_regs *regs)
-+{
-+	clcdfb_decode(fb, regs);
-+
-+	/* Always clear BGR for RGB565: we do the routing externally */
-+	if (fb->fb.var.green.length == 6)
-+		regs->cntl &= ~CNTL_BGR;
-+}
-+
-+static void realview_clcd_disable(struct clcd_fb *fb)
-+{
-+	dev_info(&fb->dev->dev, "disable RealView CLCD connectors\n");
-+	regmap_update_bits(versatile_syscon_map,
-+			   SYS_CLCD,
-+			   SYS_CLCD_CONNECTOR_MASK,
-+			   0);
-+}
-+
-+static void realview_clcd_enable(struct clcd_fb *fb)
-+{
-+	dev_info(&fb->dev->dev, "enable RealView CLCD connectors\n");
-+	regmap_update_bits(versatile_syscon_map,
-+			   SYS_CLCD,
-+			   SYS_CLCD_CONNECTOR_MASK,
-+			   SYS_CLCD_NLCDIOON | SYS_CLCD_PWR3V5SWITCH);
-+}
-+
-+struct versatile_panel {
-+	u32 id;
-+	char *compatible;
-+	bool ib2;
-+};
-+
-+static const struct versatile_panel versatile_panels[] = {
-+	{
-+		.id = SYS_CLCD_ID_VGA,
-+		.compatible = "VGA",
-+	},
-+	{
-+		.id = SYS_CLCD_ID_SANYO_3_8,
-+		.compatible = "sanyo,tm38qv67a02a",
-+	},
-+	{
-+		.id = SYS_CLCD_ID_SHARP_8_4,
-+		.compatible = "sharp,lq084v1dg21",
-+	},
-+	{
-+		.id = SYS_CLCD_ID_EPSON_2_2,
-+		.compatible = "epson,l2f50113t00",
-+	},
-+	{
-+		.id = SYS_CLCD_ID_SANYO_2_5,
-+		.compatible = "sanyo,alr252rgt",
-+		.ib2 = true,
-+	},
-+};
-+
-+static void versatile_panel_probe(struct device *dev,
-+				  struct device_node **endpoint)
-+{
-+	struct versatile_panel const *vpanel = NULL;
-+	struct device_node *ep = NULL;
-+	struct device_node *panel = NULL;
-+	u32 val;
-+	int ret;
-+	int i;
-+
-+	/*
-+	 * The Versatile CLCD has a panel auto-detection mechanism.
-+	 * We use this and look for the compatible panel in the
-+	 * device tree.
-+	 */
-+	ret = regmap_read(versatile_syscon_map, SYS_CLCD, &val);
-+	if (ret) {
-+		dev_err(dev, "cannot read CLCD syscon register\n");
-+		return;
-+	}
-+	val &= SYS_CLCD_CLCDID_MASK;
-+	dev_info(dev, "SYS_CLCD=%08x\n", val);
-+
-+	/* First find corresponding panel information */
-+	for (i = 0; i < ARRAY_SIZE(versatile_panels); i++) {
-+		vpanel = &versatile_panels[i];
-+
-+		if (val == vpanel->id) {
-+			dev_err(dev, "autodetected panel \"%s\"\n",
-+				vpanel->compatible);
-+			break;
-+		}
-+	}
-+	if (i == ARRAY_SIZE(versatile_panels)) {
-+		dev_err(dev, "could not auto-detect panel\n");
-+		return;
-+	}
-+
-+	/* Then look for a compatible endpoint/panel */
-+	for_each_endpoint_of_node(dev->of_node, ep) {
-+		panel = of_graph_get_remote_port_parent(ep);
-+		if (!panel) {
-+			dev_err(dev, "could not locate remote port for panel\n");
-+			return;
-+		}
-+
-+		if (of_device_is_compatible(panel, vpanel->compatible))
-+			break;
-+	}
-+	if (ep == NULL) {
-+		dev_err(dev, "could not find a panel compatible with \"%s\"\n",
-+			vpanel->compatible);
-+		return;
-+	}
-+
-+
-+	/*
-+	 * If we have a Sanyo 2.5" port
-+	 * that we're running on an IB2 and proceed to look for the
-+	 * IB2 syscon regmap.
-+	 */
-+	if (!vpanel->ib2) {
-+		/* Tell the driver to use this panel */
-+		*endpoint = ep;
-+		return;
-+	}
-+
-+	versatile_ib2_map = syscon_regmap_lookup_by_compatible(
-+		"arm,versatile-ib2-syscon");
-+	if (IS_ERR(versatile_ib2_map)) {
-+		dev_err(dev, "could not locate IB2 control register\n");
-+		versatile_ib2_map = NULL;
-+		return;
-+	}
-+	*endpoint = ep;
-+}
-+
-+int versatile_clcd_init_panel(struct clcd_fb *fb,
-+			      struct device_node **endpoint)
-+{
-+	const struct of_device_id *clcd_id;
-+	enum versatile_clcd versatile_clcd_type;
-+	struct device_node *np;
-+	struct regmap *map;
-+	struct device *dev = &fb->dev->dev;
-+
-+	np = of_find_matching_node_and_match(NULL, versatile_clcd_of_match,
-+					     &clcd_id);
-+	if (!np) {
-+		dev_err(dev, "no Versatile syscon node\n");
-+		return -ENODEV;
-+	}
-+	versatile_clcd_type = (enum versatile_clcd)clcd_id->data;
-+
-+	map = syscon_node_to_regmap(np);
-+	if (!map) {
-+		dev_err(dev, "no Versatile syscon regmap\n");
-+		return -ENODEV;
-+	}
-+
-+	switch (versatile_clcd_type) {
-+	case INTEGRATOR_CLCD_CM:
-+		versatile_syscon_map = map;
-+		fb->board->enable = integrator_clcd_enable;
-+		/* Override the caps, we have only these */
-+		fb->board->caps = CLCD_CAP_5551 | CLCD_CAP_RGB565 |
-+			CLCD_CAP_888;
-+		dev_info(dev, "set up callbacks for Integrator PL110\n");
-+		break;
-+	case VERSATILE_CLCD:
-+		versatile_syscon_map = map;
-+		fb->board->enable = versatile_clcd_enable;
-+		fb->board->disable = versatile_clcd_disable;
-+		fb->board->decode = versatile_clcd_decode;
-+		versatile_panel_probe(dev, endpoint);
-+		dev_info(dev, "set up callbacks for Versatile\n");
-+		break;
-+	case REALVIEW_CLCD_EB:
-+	case REALVIEW_CLCD_PB1176:
-+	case REALVIEW_CLCD_PB11MP:
-+	case REALVIEW_CLCD_PBA8:
-+	case REALVIEW_CLCD_PBX:
-+		versatile_syscon_map = map;
-+		fb->board->enable = realview_clcd_enable;
-+		fb->board->disable = realview_clcd_disable;
-+		dev_info(dev, "set up callbacks for RealView PL111\n");
-+		break;
-+	default:
-+		dev_info(dev, "unknown Versatile system controller\n");
-+		break;
-+	}
-+
-+	return 0;
-+}
-+
-+#endif
-diff --git a/drivers/video/fbdev/amba-clcd-versatile.h b/drivers/video/fbdev/amba-clcd-versatile.h
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index a4a6d70e8b26..76baaa51080c 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -743,6 +743,7 @@ dtb-$(CONFIG_ARCH_UNIPHIER) += \
+ 	uniphier-proxstream2-vodka.dtb
+ dtb-$(CONFIG_ARCH_VERSATILE) += \
+ 	versatile-ab.dtb \
++	versatile-ab-ib2.dtb \
+ 	versatile-pb.dtb
+ dtb-$(CONFIG_ARCH_VEXPRESS) += \
+ 	vexpress-v2p-ca5s.dtb \
+diff --git a/arch/arm/boot/dts/versatile-ab-ib2.dts b/arch/arm/boot/dts/versatile-ab-ib2.dts
 new file mode 100644
-index 000000000000..dc44557a2466
+index 000000000000..4b98b5382922
 --- /dev/null
-+++ b/drivers/video/fbdev/amba-clcd-versatile.h
-@@ -0,0 +1,17 @@
-+/*
-+ * Special local versatile callbacks
-+ */
-+#include <linux/of.h>
-+#include <linux/amba/bus.h>
-+#include <linux/platform_data/video-clcd-versatile.h>
++++ b/arch/arm/boot/dts/versatile-ab-ib2.dts
+@@ -0,0 +1,20 @@
++#include <versatile-ab.dts>
 +
-+#if defined(CONFIG_PLAT_VERSATILE_CLCD) && defined(CONFIG_OF)
-+int versatile_clcd_init_panel(struct clcd_fb *fb,
-+			      struct device_node **endpoint);
-+#else
-+static inline int versatile_clcd_init_panel(struct clcd_fb *fb,
-+				struct device_node **endpoint)
-+{
-+	return 0;
-+}
-+#endif
-diff --git a/drivers/video/fbdev/amba-clcd.c b/drivers/video/fbdev/amba-clcd.c
-index 53c5ec31168d..e1897cb657f5 100644
---- a/drivers/video/fbdev/amba-clcd.c
-+++ b/drivers/video/fbdev/amba-clcd.c
-@@ -38,6 +38,7 @@
- #include <asm/sizes.h>
++/ {
++	model = "ARM Versatile AB + IB2 board";
++
++	/* Special IB2 control register */
++	ib2_syscon at 27000000 {
++		compatible = "arm,versatile-ib2-syscon", "syscon", "simple-mfd";
++		reg = <0x27000000 0x4>;
++
++		led at 00.4 {
++			compatible = "register-bit-led";
++			offset = <0x00>;
++			mask = <0x10>;
++			label = "versatile-ib2:0";
++			linux,default-trigger = "heartbeat";
++			default-state = "on";
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/versatile-ab.dts b/arch/arm/boot/dts/versatile-ab.dts
+index 6fd7efbead34..836511cf8046 100644
+--- a/arch/arm/boot/dts/versatile-ab.dts
++++ b/arch/arm/boot/dts/versatile-ab.dts
+@@ -29,6 +29,147 @@
+ 		clock-frequency = <24000000>;
+ 	};
  
- #include "amba-clcd-nomadik.h"
-+#include "amba-clcd-versatile.h"
++	vga_panel {
++		compatible = "VGA", "panel-dpi";
++		port {
++			clcd_vga_panel: endpoint {
++				remote-endpoint = <&clcd_vga_pads>;
++			};
++		};
++
++		/* Standard 640x480 VGA timings */
++		panel-timing {
++			clock-frequency = <25175000>;
++			pixelclk-active = <0>;
++			hactive = <640>;
++			hback-porch = <48>;
++			hfront-porch = <16>;
++			hsync-len = <96>;
++			vactive = <480>;
++			vback-porch = <33>;
++			vfront-porch = <10>;
++			vsync-len = <2>;
++		};
++	};
++
++	xvga_panel {
++		compatible = "XVGA", "panel-dpi";
++		port {
++			clcd_xvga_panel: endpoint {
++				remote-endpoint = <&clcd_xvga_pads>;
++			};
++		};
++
++		/* Standard 1024x768 XVGA timings */
++		panel-timing {
++			clock-frequency = <63500127>;
++			pixelclk-active = <0>;
++			hactive = <1024>;
++			hback-porch = <152>;
++			hfront-porch = <48>;
++			hsync-len = <104>;
++			vactive = <768>;
++			vback-porch = <23>;
++			vfront-porch = <3>;
++			vsync-len = <4>;
++		};
++	};
++
++	sanyo38_panel {
++		compatible = "sanyo,tm38qv67a02a", "panel-dpi";
++		port {
++			clcd_sanyo38_panel: endpoint {
++				remote-endpoint = <&clcd_sanyo38_pads>;
++			};
++		};
++
++		panel-timing {
++			clock-frequency = <10000000>;
++			pixelclk-active = <1>;
++			hactive = <320>;
++			hback-porch = <6>;
++			hfront-porch = <6>;
++			hsync-len = <6>;
++			vactive = <240>;
++			vback-porch = <6>;
++			vfront-porch = <6>;
++			vsync-len = <0>;
++		};
++	};
++
++	sharp84_panel {
++		compatible = "sharp,lq084v1dg21", "panel-dpi";
++		port {
++			clcd_sharp84_panel: endpoint {
++				remote-endpoint = <&clcd_sharp84_pads>;
++			};
++		};
++
++		/* Standard 640x480 VGA timings */
++		panel-timing {
++			clock-frequency = <25175000>;
++			pixelclk-active = <0>;
++			hactive = <640>;
++			hback-porch = <48>;
++			hfront-porch = <16>;
++			hsync-len = <96>;
++			vactive = <480>;
++			vback-porch = <33>;
++			vfront-porch = <10>;
++			vsync-len = <2>;
++		};
++	};
++
++	/*
++	 * The IB2 has a Sanyo ALR252RGT QVGA panel mounted.
++	 */
++	sanyo25_panel {
++		compatible = "sanyo,alr252rgt", "panel-dpi";
++		port {
++			clcd_sanyo25_panel: endpoint {
++				remote-endpoint = <&clcd_sanyo25_pads>;
++			};
++		};
++
++		panel-timing {
++			clock-frequency = <5440000>;
++			pixelclk-active = <0>;
++			hsync-active = <0>;
++			vsync-active = <0>;
++			de-active = <1>;
++			hactive = <240>;
++			hback-porch = <20>;
++			hfront-porch = <10>;
++			hsync-len = <10>;
++			vactive = <320>;
++			vback-porch = <2>;
++			vfront-porch = <2>;
++			vsync-len = <2>;
++		};
++	};
++
++	epson_panel {
++		compatible = "epson,l2f50113t00", "panel-dpi";
++		port {
++			clcd_epson_panel: endpoint {
++				remote-endpoint = <&clcd_epson_pads>;
++			};
++		};
++
++		panel-timing {
++			clock-frequency = <16000000>;
++			pixelclk-active = <0>;
++			hactive = <176>;
++			hback-porch = <3>;
++			hfront-porch = <2>;
++			hsync-len = <3>;
++			vactive = <220>;
++			vback-porch = <1>;
++			vfront-porch = <0>;
++			vsync-len = <2>;
++		};
++	};
++
+ 	core-module at 10000000 {
+ 		compatible = "arm,core-module-versatile", "syscon", "simple-mfd";
+ 		reg = <0x10000000 0x200>;
+@@ -93,10 +234,20 @@
+ 			default-state = "off";
+ 		};
  
- #define to_clcd(info)	container_of(info, struct clcd_fb, fb)
+-		/* OSC1 on AB, OSC4 on PB */
+-		osc1: cm_aux_osc at 24M {
++		oscclk0: osc0 at 0c {
++			compatible = "arm,syscon-icst307";
+ 			#clock-cells = <0>;
+-			compatible = "arm,versatile-cm-auxosc";
++			lock-offset = <0x20>;
++			vco-offset = <0x0C>;
++			clocks = <&xtal24mhz>;
++		};
++
++		/* This is called OSC1 on AB, OSC4 on PB, call it OSC4 here */
++		oscclk4: osc4 at 1c {
++			compatible = "arm,syscon-icst307";
++			#clock-cells = <0>;
++			lock-offset = <0x20>;
++			vco-offset = <0x1C>;
+ 			clocks = <&xtal24mhz>;
+ 		};
  
-@@ -1042,7 +1043,8 @@ static int clcdfb_remove(struct amba_device *dev)
- }
+@@ -227,8 +378,52 @@
+ 			compatible = "arm,pl110", "arm,primecell";
+ 			reg = <0x10120000 0x1000>;
+ 			interrupts = <16>;
+-			clocks = <&osc1>, <&pclk>;
++			clocks = <&oscclk4>, <&pclk>;
+ 			clock-names = "clcd", "apb_pclk";
++			/* 16bpp @ 25.175MHz = 50350000 bytes per second */
++			max-memory-bandwidth = <50350000>;
++
++			port {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				/*
++				 * The CLCD connects to either of these panels.
++				 * at run-time, board-specific code will
++				 * detect and select the right one. If no
++				 * panel is detected, the first one (VGA)
++				 * will be used by default.
++				 */
++				clcd_vga_pads: endpoint at 0 {
++					reg = <0>;
++					remote-endpoint = <&clcd_vga_panel>;
++					arm,pl11x,tft-r0g0b0-pads = <1 7 13>;
++				};
++				clcd_xvga_pads: endpoint at 1 {
++					reg = <1>;
++					remote-endpoint = <&clcd_xvga_panel>;
++					arm,pl11x,tft-r0g0b0-pads = <1 7 13>;
++				};
++				clcd_sanyo38_pads: endpoint at 2 {
++					reg = <2>;
++					remote-endpoint = <&clcd_sanyo38_panel>;
++					arm,pl11x,tft-r0g0b0-pads = <0 8 16>;
++				};
++				clcd_sharp84_pads: endpoint at 3 {
++					reg = <3>;
++					remote-endpoint = <&clcd_sharp84_panel>;
++					arm,pl11x,tft-r0g0b0-pads = <0 8 16>;
++				};
++				clcd_sanyo25_pads: endpoint at 4 {
++					reg = <4>;
++					remote-endpoint = <&clcd_sanyo25_panel>;
++					arm,pl11x,tft-r0g0b0-pads = <0 8 16>;
++				};
++				clcd_epson_pads: endpoint at 5 {
++					reg = <5>;
++					remote-endpoint = <&clcd_epson_panel>;
++					arm,pl11x,tft-r0g0b0-pads = <0 8 16>;
++				};
++			};
+ 		};
  
- static struct clcd_vendor_data vendor_arm = {
--	/* No special business */
-+	/* Sets up the versatile board displays */
-+	.init_panel = versatile_clcd_init_panel,
+ 		sctl at 101e0000 {
+diff --git a/arch/arm/mach-versatile/versatile_dt.c b/arch/arm/mach-versatile/versatile_dt.c
+index c44871851255..ebe27945fea5 100644
+--- a/arch/arm/mach-versatile/versatile_dt.c
++++ b/arch/arm/mach-versatile/versatile_dt.c
+@@ -29,8 +29,6 @@
+ #include <linux/of_platform.h>
+ #include <linux/slab.h>
+ #include <linux/amba/bus.h>
+-#include <linux/amba/clcd.h>
+-#include <linux/platform_data/video-clcd-versatile.h>
+ #include <linux/amba/mmci.h>
+ #include <linux/mtd/physmap.h>
+ #include <asm/mach-types.h>
+@@ -57,7 +55,6 @@
+ #define VERSATILE_SYS_PCICTL_OFFSET           0x44
+ #define VERSATILE_SYS_MCI_OFFSET              0x48
+ #define VERSATILE_SYS_FLASH_OFFSET            0x4C
+-#define VERSATILE_SYS_CLCD_OFFSET             0x50
+ 
+ /*
+  * VERSATILE_SYS_FLASH
+@@ -69,10 +66,7 @@
+  */
+ #define VERSATILE_MMCI0_BASE           0x10005000	/* MMC interface */
+ #define VERSATILE_MMCI1_BASE           0x1000B000	/* MMC Interface */
+-#define VERSATILE_CLCD_BASE            0x10120000	/* CLCD */
+ #define VERSATILE_SCTL_BASE            0x101E0000	/* System controller */
+-#define VERSATILE_IB2_BASE             0x24000000	/* IB2 module */
+-#define VERSATILE_IB2_CTL_BASE		(VERSATILE_IB2_BASE + 0x03000000)
+ 
+ /*
+  * System controller bit assignment
+@@ -86,7 +80,6 @@
+ #define VERSATILE_TIMER4_EnSel	21
+ 
+ static void __iomem *versatile_sys_base;
+-static void __iomem *versatile_ib2_ctrl;
+ 
+ static void versatile_flash_set_vpp(struct platform_device *pdev, int on)
+ {
+@@ -149,158 +142,6 @@ static struct mmci_platform_data mmc1_plat_data = {
  };
  
- static struct clcd_vendor_data vendor_nomadik = {
+ /*
+- * CLCD support.
+- */
+-#define SYS_CLCD_MODE_MASK	(3 << 0)
+-#define SYS_CLCD_MODE_888	(0 << 0)
+-#define SYS_CLCD_MODE_5551	(1 << 0)
+-#define SYS_CLCD_MODE_565_RLSB	(2 << 0)
+-#define SYS_CLCD_MODE_565_BLSB	(3 << 0)
+-#define SYS_CLCD_NLCDIOON	(1 << 2)
+-#define SYS_CLCD_VDDPOSSWITCH	(1 << 3)
+-#define SYS_CLCD_PWR3V5SWITCH	(1 << 4)
+-#define SYS_CLCD_ID_MASK	(0x1f << 8)
+-#define SYS_CLCD_ID_SANYO_3_8	(0x00 << 8)
+-#define SYS_CLCD_ID_UNKNOWN_8_4	(0x01 << 8)
+-#define SYS_CLCD_ID_EPSON_2_2	(0x02 << 8)
+-#define SYS_CLCD_ID_SANYO_2_5	(0x07 << 8)
+-#define SYS_CLCD_ID_VGA		(0x1f << 8)
+-
+-static bool is_sanyo_2_5_lcd;
+-
+-/*
+- * Disable all display connectors on the interface module.
+- */
+-static void versatile_clcd_disable(struct clcd_fb *fb)
+-{
+-	void __iomem *sys_clcd = versatile_sys_base + VERSATILE_SYS_CLCD_OFFSET;
+-	u32 val;
+-
+-	val = readl(sys_clcd);
+-	val &= ~SYS_CLCD_NLCDIOON | SYS_CLCD_PWR3V5SWITCH;
+-	writel(val, sys_clcd);
+-
+-	/*
+-	 * If the LCD is Sanyo 2x5 in on the IB2 board, turn the back-light off
+-	 */
+-	if (of_machine_is_compatible("arm,versatile-ab") && is_sanyo_2_5_lcd) {
+-		unsigned long ctrl;
+-
+-		ctrl = readl(versatile_ib2_ctrl);
+-		ctrl &= ~0x01;
+-		writel(ctrl, versatile_ib2_ctrl);
+-	}
+-}
+-
+-/*
+- * Enable the relevant connector on the interface module.
+- */
+-static void versatile_clcd_enable(struct clcd_fb *fb)
+-{
+-	struct fb_var_screeninfo *var = &fb->fb.var;
+-	void __iomem *sys_clcd = versatile_sys_base + VERSATILE_SYS_CLCD_OFFSET;
+-	u32 val;
+-
+-	val = readl(sys_clcd);
+-	val &= ~SYS_CLCD_MODE_MASK;
+-
+-	switch (var->green.length) {
+-	case 5:
+-		val |= SYS_CLCD_MODE_5551;
+-		break;
+-	case 6:
+-		if (var->red.offset == 0)
+-			val |= SYS_CLCD_MODE_565_RLSB;
+-		else
+-			val |= SYS_CLCD_MODE_565_BLSB;
+-		break;
+-	case 8:
+-		val |= SYS_CLCD_MODE_888;
+-		break;
+-	}
+-
+-	/*
+-	 * Set the MUX
+-	 */
+-	writel(val, sys_clcd);
+-
+-	/*
+-	 * And now enable the PSUs
+-	 */
+-	val |= SYS_CLCD_NLCDIOON | SYS_CLCD_PWR3V5SWITCH;
+-	writel(val, sys_clcd);
+-
+-	/*
+-	 * If the LCD is Sanyo 2x5 in on the IB2 board, turn the back-light on
+-	 */
+-	if (of_machine_is_compatible("arm,versatile-ab") && is_sanyo_2_5_lcd) {
+-		unsigned long ctrl;
+-
+-		ctrl = readl(versatile_ib2_ctrl);
+-		ctrl |= 0x01;
+-		writel(ctrl, versatile_ib2_ctrl);
+-	}
+-}
+-
+-/*
+- * Detect which LCD panel is connected, and return the appropriate
+- * clcd_panel structure.  Note: we do not have any information on
+- * the required timings for the 8.4in panel, so we presently assume
+- * VGA timings.
+- */
+-static int versatile_clcd_setup(struct clcd_fb *fb)
+-{
+-	void __iomem *sys_clcd = versatile_sys_base + VERSATILE_SYS_CLCD_OFFSET;
+-	const char *panel_name;
+-	u32 val;
+-
+-	is_sanyo_2_5_lcd = false;
+-
+-	val = readl(sys_clcd) & SYS_CLCD_ID_MASK;
+-	if (val == SYS_CLCD_ID_SANYO_3_8)
+-		panel_name = "Sanyo TM38QV67A02A";
+-	else if (val == SYS_CLCD_ID_SANYO_2_5) {
+-		panel_name = "Sanyo QVGA Portrait";
+-		is_sanyo_2_5_lcd = true;
+-	} else if (val == SYS_CLCD_ID_EPSON_2_2)
+-		panel_name = "Epson L2F50113T00";
+-	else if (val == SYS_CLCD_ID_VGA)
+-		panel_name = "VGA";
+-	else {
+-		printk(KERN_ERR "CLCD: unknown LCD panel ID 0x%08x, using VGA\n",
+-			val);
+-		panel_name = "VGA";
+-	}
+-
+-	fb->panel = versatile_clcd_get_panel(panel_name);
+-	if (!fb->panel)
+-		return -EINVAL;
+-
+-	return versatile_clcd_setup_dma(fb, SZ_1M);
+-}
+-
+-static void versatile_clcd_decode(struct clcd_fb *fb, struct clcd_regs *regs)
+-{
+-	clcdfb_decode(fb, regs);
+-
+-	/* Always clear BGR for RGB565: we do the routing externally */
+-	if (fb->fb.var.green.length == 6)
+-		regs->cntl &= ~CNTL_BGR;
+-}
+-
+-static struct clcd_board clcd_plat_data = {
+-	.name		= "Versatile",
+-	.caps		= CLCD_CAP_5551 | CLCD_CAP_565 | CLCD_CAP_888,
+-	.check		= clcdfb_check,
+-	.decode		= versatile_clcd_decode,
+-	.disable	= versatile_clcd_disable,
+-	.enable		= versatile_clcd_enable,
+-	.setup		= versatile_clcd_setup,
+-	.mmap		= versatile_clcd_mmap_dma,
+-	.remove		= versatile_clcd_remove_dma,
+-};
+-
+-/*
+  * Lookup table for attaching a specific name and platform_data pointer to
+  * devices as they get created by of_platform_populate().  Ideally this table
+  * would not exist, but the current clock implementation depends on some devices
+@@ -309,7 +150,6 @@ static struct clcd_board clcd_plat_data = {
+ struct of_dev_auxdata versatile_auxdata_lookup[] __initdata = {
+ 	OF_DEV_AUXDATA("arm,primecell", VERSATILE_MMCI0_BASE, "fpga:05", &mmc0_plat_data),
+ 	OF_DEV_AUXDATA("arm,primecell", VERSATILE_MMCI1_BASE, "fpga:0b", &mmc1_plat_data),
+-	OF_DEV_AUXDATA("arm,primecell", VERSATILE_CLCD_BASE, "dev:20", &clcd_plat_data),
+ 	{}
+ };
+ 
+@@ -400,8 +240,6 @@ static void __init versatile_dt_init(void)
+ 		versatile_sys_base = of_iomap(np, 0);
+ 	WARN_ON(!versatile_sys_base);
+ 
+-	versatile_ib2_ctrl = ioremap(VERSATILE_IB2_CTL_BASE, SZ_4K);
+-
+ 	versatile_dt_pci_init();
+ 
+ 	platform_device_register(&versatile_flash_device);
 -- 
 2.4.3
