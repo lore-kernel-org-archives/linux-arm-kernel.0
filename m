@@ -1,62 +1,48 @@
-From: Chris.Brandt@renesas.com (Chris Brandt)
-Date: Thu, 4 Feb 2016 14:25:57 +0000
-Subject: [PATCH] ARM: remove duplicate definitions of __vectors_start and
- __stubs_start
-In-Reply-To: <1454574705-15109-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1454574705-15109-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <HKXPR06MB0565A610565403E9E5E9546C8AD10@HKXPR06MB0565.apcprd06.prod.outlook.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu,  4 Feb 2016 15:29:34 +0100
+Subject: [GIT PULL] Renesas ARM Based SoC Cleanup for v4.6
+Message-ID: <cover.1454595116.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 Feb 2016, Ard Biesheuvel wrote:
+Hi Olof, Hi Kevin, Hi Arnd,
 
-> This is completely harmless by itself, since the wrong values are local
-> symbols that cannot be referenced by other object files directly. However,
-> since these symbols are also listed in the kallsyms symbol table in some
-> cases (i.e., CONFIG_KALLSYMS_ALL=y and CONFIG_XIP_KERNEL=y), having these
-> conflicting values can be confusing. So either remove them, or make them
-> strictly local.
->
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->
-> This is a separate fix for the duplicate symbols based on v4.5-rc2,
-> so that it can be applied separately if desired. In that case, I will
-> rebase my kallsyms series onto this patch.
->
->  arch/arm/kernel/entry-armv.S | 5 ++---
->  1 file changed, 2 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-> index 3ce377f7251f..788e40c1254f 100644
-> --- a/arch/arm/kernel/entry-armv.S
-> +++ b/arch/arm/kernel/entry-armv.S
-> @@ -1064,7 +1064,6 @@ ENDPROC(vector_\name)
->  	.endm
->  
->  	.section .stubs, "ax", %progbits
-> -__stubs_start:
->  	@ This must be the first word
->  	.word	vector_swi
->  
-> @@ -1206,10 +1205,10 @@ vector_addrexcptn:
->  	.equ	vector_fiq_offset, vector_fiq
->  
->  	.section .vectors, "ax", %progbits
-> -__vectors_start:
-> +.L__vectors_start:
->  	W(b)	vector_rst
->  	W(b)	vector_und
-> -	W(ldr)	pc, __vectors_start + 0x1000
-> +	W(ldr)	pc, .L__vectors_start + 0x1000
->  	W(b)	vector_pabt
->  	W(b)	vector_dabt
->  	W(b)	vector_addrexcptn
+Please consider these Renesas ARM based SoC cleanup for v4.6.
+
+These are all minor cleanups from Geert.
 
 
-Tested with ARCH_R7S72100 with CONFIG_XIP_KERNEL=y and CONFIG_XIP_KERNEL=n
+The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
 
-Duplicate symbols are gone, and boots fine (given the other patches from "[PATCH 0/3] kallsyms: remove special handling for CONFIG_ARM" for the CONFIG_XIP_KERNEL=y case) 
+  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
 
+are available in the git repository at:
 
-Acked-by: Chris Brandt <chris.brandt@renesas.com>
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-cleanup-for-v4.6
+
+for you to fetch changes up to 2c7bdcfd8912ce47d8360017265713c5a110b9ed:
+
+  ARM: shmobile: r8a7779: Remove remainings of removed SCU boot setup code (2016-02-02 15:06:30 +0100)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC Cleanup for v4.6
+
+* Remove remnants of removed SCU boot setup code for r8a7779
+* Correct s/MIPDR/MPIDR/ typo
+* Add includes providing forward declarations
+* Make rcar_gen2_dma_contiguous static
+
+----------------------------------------------------------------
+Geert Uytterhoeven (4):
+      ARM: shmobile: rcar-gen2: Make rcar_gen2_dma_contiguous static
+      ARM: shmobile: Add includes providing forward declarations
+      ARM: shmobile: Typo s/MIPDR/MPIDR/
+      ARM: shmobile: r8a7779: Remove remainings of removed SCU boot setup code
+
+ arch/arm/mach-shmobile/cpufreq.c         | 2 ++
+ arch/arm/mach-shmobile/headsmp-scu.S     | 2 +-
+ arch/arm/mach-shmobile/setup-rcar-gen2.c | 7 ++++---
+ arch/arm/mach-shmobile/smp-r8a7779.c     | 2 --
+ arch/arm/mach-shmobile/suspend.c         | 2 ++
+ arch/arm/mach-shmobile/timer.c           | 2 ++
+ 6 files changed, 11 insertions(+), 6 deletions(-)
