@@ -1,128 +1,78 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  4 Feb 2016 11:00:41 +0000
-Subject: [PATCH v2 24/28] ARM: KVM: Turn CP15 defines to an enum
+Date: Thu,  4 Feb 2016 11:00:43 +0000
+Subject: [PATCH v2 26/28] ARM: KVM: Remove unused hyp_pc field
 In-Reply-To: <1454583645-10144-1-git-send-email-marc.zyngier@arm.com>
 References: <1454583645-10144-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1454583645-10144-25-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1454583645-10144-27-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just like on arm64, having the CP15 registers expressed as a set
-of #defines has been very conflict-prone. Let's turn it into an
-enum, which should make it more manageable.
+This field was never populated, and the panic code already
+does something similar. Delete the related code.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_asm.h  | 33 ---------------------------------
- arch/arm/include/asm/kvm_host.h | 39 +++++++++++++++++++++++++++++++++++++++
- arch/arm/kvm/guest.c            |  1 -
- 3 files changed, 39 insertions(+), 34 deletions(-)
+ arch/arm/include/asm/kvm_emulate.h | 5 -----
+ arch/arm/include/asm/kvm_host.h    | 1 -
+ arch/arm/kernel/asm-offsets.c      | 1 -
+ arch/arm/kvm/handle_exit.c         | 5 -----
+ 4 files changed, 12 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
-index 3283a2f..083825f 100644
---- a/arch/arm/include/asm/kvm_asm.h
-+++ b/arch/arm/include/asm/kvm_asm.h
-@@ -21,39 +21,6 @@
+diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
+index f710616..8a8c6de 100644
+--- a/arch/arm/include/asm/kvm_emulate.h
++++ b/arch/arm/include/asm/kvm_emulate.h
+@@ -108,11 +108,6 @@ static inline phys_addr_t kvm_vcpu_get_fault_ipa(struct kvm_vcpu *vcpu)
+ 	return ((phys_addr_t)vcpu->arch.fault.hpfar & HPFAR_MASK) << 8;
+ }
  
- #include <asm/virt.h>
- 
--/* 0 is reserved as an invalid value. */
--#define c0_MPIDR	1	/* MultiProcessor ID Register */
--#define c0_CSSELR	2	/* Cache Size Selection Register */
--#define c1_SCTLR	3	/* System Control Register */
--#define c1_ACTLR	4	/* Auxiliary Control Register */
--#define c1_CPACR	5	/* Coprocessor Access Control */
--#define c2_TTBR0	6	/* Translation Table Base Register 0 */
--#define c2_TTBR0_high	7	/* TTBR0 top 32 bits */
--#define c2_TTBR1	8	/* Translation Table Base Register 1 */
--#define c2_TTBR1_high	9	/* TTBR1 top 32 bits */
--#define c2_TTBCR	10	/* Translation Table Base Control R. */
--#define c3_DACR		11	/* Domain Access Control Register */
--#define c5_DFSR		12	/* Data Fault Status Register */
--#define c5_IFSR		13	/* Instruction Fault Status Register */
--#define c5_ADFSR	14	/* Auxilary Data Fault Status R */
--#define c5_AIFSR	15	/* Auxilary Instrunction Fault Status R */
--#define c6_DFAR		16	/* Data Fault Address Register */
--#define c6_IFAR		17	/* Instruction Fault Address Register */
--#define c7_PAR		18	/* Physical Address Register */
--#define c7_PAR_high	19	/* PAR top 32 bits */
--#define c9_L2CTLR	20	/* Cortex A15/A7 L2 Control Register */
--#define c10_PRRR	21	/* Primary Region Remap Register */
--#define c10_NMRR	22	/* Normal Memory Remap Register */
--#define c12_VBAR	23	/* Vector Base Address Register */
--#define c13_CID		24	/* Context ID Register */
--#define c13_TID_URW	25	/* Thread ID, User R/W */
--#define c13_TID_URO	26	/* Thread ID, User R/O */
--#define c13_TID_PRIV	27	/* Thread ID, Privileged */
--#define c14_CNTKCTL	28	/* Timer Control Register (PL1) */
--#define c10_AMAIR0	29	/* Auxilary Memory Attribute Indirection Reg0 */
--#define c10_AMAIR1	30	/* Auxilary Memory Attribute Indirection Reg1 */
--#define NR_CP15_REGS	31	/* Number of regs (incl. invalid) */
+-static inline unsigned long kvm_vcpu_get_hyp_pc(struct kvm_vcpu *vcpu)
+-{
+-	return vcpu->arch.fault.hyp_pc;
+-}
 -
- #define ARM_EXCEPTION_RESET	  0
- #define ARM_EXCEPTION_UNDEFINED   1
- #define ARM_EXCEPTION_SOFTWARE    2
+ static inline bool kvm_vcpu_dabt_isvalid(struct kvm_vcpu *vcpu)
+ {
+ 	return kvm_vcpu_get_hsr(vcpu) & HSR_ISV;
 diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 0fe41aa..daf6a71 100644
+index daf6a71..19e9aba 100644
 --- a/arch/arm/include/asm/kvm_host.h
 +++ b/arch/arm/include/asm/kvm_host.h
-@@ -88,6 +88,45 @@ struct kvm_vcpu_fault_info {
- 	u32 hyp_pc;		/* PC when exception was taken from Hyp mode */
+@@ -85,7 +85,6 @@ struct kvm_vcpu_fault_info {
+ 	u32 hsr;		/* Hyp Syndrome Register */
+ 	u32 hxfar;		/* Hyp Data/Inst. Fault Address Register */
+ 	u32 hpfar;		/* Hyp IPA Fault Address Register */
+-	u32 hyp_pc;		/* PC when exception was taken from Hyp mode */
  };
  
-+/*
-+ * 0 is reserved as an invalid value.
-+ * Order should be kept in sync with the save/restore code.
-+ */
-+enum vcpu_sysreg {
-+	__INVALID_SYSREG__,
-+	c0_MPIDR,		/* MultiProcessor ID Register */
-+	c0_CSSELR,		/* Cache Size Selection Register */
-+	c1_SCTLR,		/* System Control Register */
-+	c1_ACTLR,		/* Auxiliary Control Register */
-+	c1_CPACR,		/* Coprocessor Access Control */
-+	c2_TTBR0,		/* Translation Table Base Register 0 */
-+	c2_TTBR0_high,		/* TTBR0 top 32 bits */
-+	c2_TTBR1,		/* Translation Table Base Register 1 */
-+	c2_TTBR1_high,		/* TTBR1 top 32 bits */
-+	c2_TTBCR,		/* Translation Table Base Control R. */
-+	c3_DACR,		/* Domain Access Control Register */
-+	c5_DFSR,		/* Data Fault Status Register */
-+	c5_IFSR,		/* Instruction Fault Status Register */
-+	c5_ADFSR,		/* Auxilary Data Fault Status R */
-+	c5_AIFSR,		/* Auxilary Instrunction Fault Status R */
-+	c6_DFAR,		/* Data Fault Address Register */
-+	c6_IFAR,		/* Instruction Fault Address Register */
-+	c7_PAR,			/* Physical Address Register */
-+	c7_PAR_high,		/* PAR top 32 bits */
-+	c9_L2CTLR,		/* Cortex A15/A7 L2 Control Register */
-+	c10_PRRR,		/* Primary Region Remap Register */
-+	c10_NMRR,		/* Normal Memory Remap Register */
-+	c12_VBAR,		/* Vector Base Address Register */
-+	c13_CID,		/* Context ID Register */
-+	c13_TID_URW,		/* Thread ID, User R/W */
-+	c13_TID_URO,		/* Thread ID, User R/O */
-+	c13_TID_PRIV,		/* Thread ID, Privileged */
-+	c14_CNTKCTL,		/* Timer Control Register (PL1) */
-+	c10_AMAIR0,		/* Auxilary Memory Attribute Indirection Reg0 */
-+	c10_AMAIR1,		/* Auxilary Memory Attribute Indirection Reg1 */
-+	NR_CP15_REGS		/* Number of regs (incl. invalid) */
-+};
-+
- struct kvm_cpu_context {
- 	struct kvm_regs	gp_regs;
- 	struct vfp_hard_struct vfp;
-diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
-index 86e26fb..12cbb68 100644
---- a/arch/arm/kvm/guest.c
-+++ b/arch/arm/kvm/guest.c
-@@ -25,7 +25,6 @@
- #include <asm/cputype.h>
- #include <asm/uaccess.h>
- #include <asm/kvm.h>
--#include <asm/kvm_asm.h>
- #include <asm/kvm_emulate.h>
- #include <asm/kvm_coproc.h>
- 
+ /*
+diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
+index 1f24c32..27d0581 100644
+--- a/arch/arm/kernel/asm-offsets.c
++++ b/arch/arm/kernel/asm-offsets.c
+@@ -175,7 +175,6 @@ int main(void)
+   DEFINE(CPU_CTXT_VFP,		offsetof(struct kvm_cpu_context, vfp));
+   DEFINE(CPU_CTXT_GP_REGS,	offsetof(struct kvm_cpu_context, gp_regs));
+   DEFINE(GP_REGS_USR,		offsetof(struct kvm_regs, usr_regs));
+-  DEFINE(VCPU_HYP_PC,		offsetof(struct kvm_vcpu, arch.fault.hyp_pc));
+ #endif
+   BLANK();
+ #ifdef CONFIG_VDSO
+diff --git a/arch/arm/kvm/handle_exit.c b/arch/arm/kvm/handle_exit.c
+index 3ede90d..5377d753 100644
+--- a/arch/arm/kvm/handle_exit.c
++++ b/arch/arm/kvm/handle_exit.c
+@@ -147,11 +147,6 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 	switch (exception_index) {
+ 	case ARM_EXCEPTION_IRQ:
+ 		return 1;
+-	case ARM_EXCEPTION_UNDEFINED:
+-		kvm_err("Undefined exception in Hyp mode at: %#08lx\n",
+-			kvm_vcpu_get_hyp_pc(vcpu));
+-		BUG();
+-		panic("KVM: Hypervisor undefined exception!\n");
+ 	case ARM_EXCEPTION_DATA_ABORT:
+ 	case ARM_EXCEPTION_PREF_ABORT:
+ 	case ARM_EXCEPTION_HVC:
 -- 
 2.1.4
