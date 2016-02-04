@@ -1,62 +1,60 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Thu,  4 Feb 2016 18:29:00 +0100
-Subject: [PATCH V4 22/23] arm64, pci,
- acpi: Assign legacy IRQs once device is enable.
+Date: Thu,  4 Feb 2016 18:29:01 +0100
+Subject: [PATCH V4 23/23] arm64, pci,
+ acpi: Start using ACPI based PCI host bridge driver for ARM64.
 In-Reply-To: <1454606941-9523-1-git-send-email-tn@semihalf.com>
 References: <1454606941-9523-1-git-send-email-tn@semihalf.com>
-Message-ID: <1454606941-9523-23-git-send-email-tn@semihalf.com>
+Message-ID: <1454606941-9523-24-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the last step before enabling generic ACPI PCI host controller
-for ARM64. We need to take care of legacy IRQ mapping for non-MSI(X)
-PCI devices. pcibios_enable_device() boot order is not sensitive to
-ACPI device enumeration, so it is the best place to assign device's IRQs.
-
-NOTE: *This is going to be temporary solution*. There is ongoing work
-which aims for cleaning legacy IRQ allocation, see [1].
-We can consider this patch as the necessary evil which will be removed
-once [1] series hits mailnline in the near future.
-
-1. http://comments.gmane.org/gmane.linux.kernel.pci/46461
+Lets get rid of empty PCI init stub, related ACPI header and
+go with full-blown PCI host bridge driver.
 
 Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+CC: Arnd Bergmann <arnd@arndb.de>
+CC: Catalin Marinas <catalin.marinas@arm.com>
+CC: Liviu Dudau <Liviu.Dudau@arm.com>
+CC: Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
+CC: Will Deacon <will.deacon@arm.com>
+Tested-by: Duc Dang <dhdang@apm.com>
+Tested-by: Dongdong Liu <liudongdong3@huawei.com>
+Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
+Tested-by: Graeme Gregory <graeme.gregory@linaro.org>
+Tested-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- arch/arm64/kernel/pci.c | 14 ++++++++++++--
- 1 file changed, 12 insertions(+), 2 deletions(-)
+ arch/arm64/Kconfig      | 1 +
+ arch/arm64/kernel/pci.c | 9 ---------
+ 2 files changed, 1 insertion(+), 9 deletions(-)
 
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 4f45ea4..567523b 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -2,6 +2,7 @@ config ARM64
+ 	def_bool y
+ 	select ACPI_CCA_REQUIRED if ACPI
+ 	select ACPI_GENERIC_GSI if ACPI
++	select ACPI_PCI_HOST_GENERIC if ACPI
+ 	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
+ 	select ARCH_HAS_DEVMEM_IS_ALLOWED
+ 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
 diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-index 023b983..d1a701f 100644
+index d1a701f..0b53262 100644
 --- a/arch/arm64/kernel/pci.c
 +++ b/arch/arm64/kernel/pci.c
-@@ -39,16 +39,26 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+@@ -70,12 +70,3 @@ int pcibios_add_device(struct pci_dev *dev)
+ 
+ 	return 0;
  }
- 
- /**
-- * pcibios_enable_device - Enable I/O and memory.
-+ * pcibios_enable_device - Enable I/O, memory and legacy IRQs for ACPI.
-  * @dev: PCI device to be enabled
-  * @mask: bitmask of BARs to enable
-  */
- int pcibios_enable_device(struct pci_dev *dev, int mask)
- {
-+	int ret;
-+
- 	if (pci_has_flag(PCI_PROBE_ONLY))
- 		return 0;
- 
--	return pci_enable_resources(dev, mask);
-+	ret = pci_enable_resources(dev, mask);
-+	if (ret < 0)
-+		return ret;
-+
-+#ifdef CONFIG_ACPI
-+	if (!pci_dev_msi_enabled(dev))
-+		return acpi_pci_irq_enable(dev);
-+#endif
-+	return 0;
- }
- 
- /*
+-
+-#ifdef CONFIG_ACPI
+-/* Root bridge scanning */
+-struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+-{
+-	/* TODO: Should be revisited when implementing PCI on ACPI */
+-	return NULL;
+-}
+-#endif
 -- 
 1.9.1
