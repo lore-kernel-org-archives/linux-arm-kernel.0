@@ -1,135 +1,69 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Thu, 04 Feb 2016 19:30:43 +0200
-Subject: [PATCH V2 2/6] stm class: adds a loop to extract the first valid
- STM device name
-In-Reply-To: <1454576179-27224-1-git-send-email-zhang.chunyan@linaro.org>
-References: <1454487337-30184-3-git-send-email-zhang.chunyan@linaro.org>
- <1454576179-27224-1-git-send-email-zhang.chunyan@linaro.org>
-Message-ID: <871t8se62k.fsf@ashishki-desk.ger.corp.intel.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu,  4 Feb 2016 18:52:42 +0100
+Subject: [GIT PULL] clk: tegra: Fixes for v4.5-rc3
+Message-ID: <1454608362-8954-1-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chunyan Zhang <zhang.chunyan@linaro.org> writes:
+From: Thierry Reding <treding@nvidia.com>
 
-I few comments below:
+Hi Mike, Stephen,
 
-> The node name of STM master management policy is a concatenation of an
-> STM device name to which this policy applies and following an arbitrary
-> string, these two strings are concatenated with a dot.
+The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
 
-This is true.
+  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
 
-> This patch adds a loop for extracting the STM device name when an
-> arbitrary number of dot(s) are found in this STM device name.
+are available in the git repository at:
 
-It's not very easy to tell what's going on here from this
-description. The reader be left curious as to why an arbitrary number of
-dots is a reason to run a loop. When in doubt, try to imagine as if
-you're seeing this patch for the first time and ask yourself, does the
-message give a clear explanation of what's going on in it.
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.5-clk-fixes
 
-> Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
-> ---
->  drivers/hwtracing/stm/policy.c | 27 ++++++++++++++++-----------
->  1 file changed, 16 insertions(+), 11 deletions(-)
->
-> diff --git a/drivers/hwtracing/stm/policy.c b/drivers/hwtracing/stm/policy.c
-> index 11ab6d0..691686e 100644
-> --- a/drivers/hwtracing/stm/policy.c
-> +++ b/drivers/hwtracing/stm/policy.c
-> @@ -321,21 +321,26 @@ stp_policies_make(struct config_group *group, const char *name)
->  	/*
->  	 * node must look like <device_name>.<policy_name>, where
->  	 * <device_name> is the name of an existing stm device and
-> -	 * <policy_name> is an arbitrary string
-> +	 * <policy_name> is an arbitrary string, when an arbitrary
-> +	 * number of dot(s) are found in the <device_name>, the
-> +	 * first matched STM device name would be extracted.
->  	 */
+for you to fetch changes up to 5a1d5eff3ede4de4482015a9999336051054283f:
 
-This leaves room for a number of suspicious situations. What if both
-"xyz" and "xyz.0" are stm devices, how would you create a policy for the
-latter, for example?
+  clk: tegra: super: Fix sparse warnings for functions not declared as static (2016-02-02 15:49:34 +0100)
 
-The rules should be such that you can tell exactly what the intended stm
-device is from a policy directory name, otherwise it's just asking for
-trouble.
+Thanks,
+Thierry
 
-> -	p = strchr(devname, '.');
-> -	if (!p) {
-> -		kfree(devname);
-> -		return ERR_PTR(-EINVAL);
-> -	}
-> +	for (p = devname; ; p++) {
-> +		p = strchr(p, '.');
-> +		if (!p) {
-> +			kfree(devname);
-> +			return ERR_PTR(-EINVAL);
-> +		}
->  
-> -	*p++ = '\0';
-> +		*p = '\0';
->  
-> -	stm = stm_find_device(devname);
-> -	kfree(devname);
-> +		stm = stm_find_device(devname);
-> +		if (stm)
-> +			break;
-> +		*p = '.';
-> +	}
->  
-> -	if (!stm)
-> -		return ERR_PTR(-ENODEV);
-> +	kfree(devname);
+----------------------------------------------------------------
+clk: tegra: Fixes for v4.5-rc3
 
-In the existing code there is a clear distinction between -ENODEV, which
-is to say "we didn't find the device" and -EINVAL, "directory name
-breaks rules/is badly formatted". After the change, it's all -EINVAL,
-which also becomes "we tried everything, sorry".
+This set contains a bunch of miscellaneous fixes that have accumulated
+over the past couple of weeks, primarily for the Tegra210 support added
+in v4.5-rc1.
 
-So, having said all that, does the following patch solve your problem:
+----------------------------------------------------------------
+Amitoj Kaur Chawla (1):
+      clk: tegra: Add missing of_node_put()
 
->From 870dc5fefa5623c39552511d31e0fa0da984d581 Mon Sep 17 00:00:00 2001
-From: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-Date: Thu, 4 Feb 2016 18:56:34 +0200
-Subject: [PATCH] stm class: Support devices with multiple instances
+Andrew Bresticker (1):
+      clk: tegra: pll: Fix potential sleeping-while-atomic
 
-By convention, the name of the stm policy directory in configfs consists of
-the device name to which it applies and the actual policy name, separated
-by a dot. Now, some devices already have dots in their names that separate
-name of the actual device from its instance identifier. Such devices will
-result in two (or more, who can tell) dots in the policy directory name.
+Jon Hunter (7):
+      clk: tegra: Add the APB2APE audio clock on Tegra210
+      clk: tegra: Fix clock sources for Tegra210 EMC
+      clk: tegra: Fix warning caused by pll_u failing to lock
+      clk: tegra: Use definition for pll_u override bit
+      clk: tegra: Fix sparse warning for pll_m
+      clk: tegra: Fix sparse warnings for functions not declared as static
+      clk: tegra: super: Fix sparse warnings for functions not declared as static
 
-Existing policy code, however, will treat the first dot as the one that
-separates device name from policy name, therefore failing the above case.
+Mark Kuo (2):
+      clk: tegra: Do not disable PLLE when under hardware control
+      clk: tegra: Fix PLLE SS coefficients
 
-This patch makes the last dot in the directory name be the separator, thus
-prohibiting dots from being used in policy names.
+Rhyland Klein (6):
+      clk: tegra: Fix divider on VI_I2C
+      clk: tegra: Remove improper flags for lock_enable
+      clk: tegra: Fix naming of MISC registers
+      clk: tegra: Fix the misnaming of nvenc from msenc
+      clk: tegra: Fix pllx dyn step calculation
+      clk: tegra: Fix typos around clearing PLLE bits during enable
 
-Suggested-by: Chunyan Zhang <zhang.chunyan@linaro.org>
-Signed-off-by: Alexander Shishkin <alexander.shishkin@linux.intel.com>
----
- drivers/hwtracing/stm/policy.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/hwtracing/stm/policy.c b/drivers/hwtracing/stm/policy.c
-index 94d3abfb73..1db189657b 100644
---- a/drivers/hwtracing/stm/policy.c
-+++ b/drivers/hwtracing/stm/policy.c
-@@ -332,10 +332,11 @@ stp_policies_make(struct config_group *group, const char *name)
- 
- 	/*
- 	 * node must look like <device_name>.<policy_name>, where
--	 * <device_name> is the name of an existing stm device and
--	 * <policy_name> is an arbitrary string
-+	 * <device_name> is the name of an existing stm device; may
-+	 *               contain dots;
-+	 * <policy_name> is an arbitrary string; may not contain dots
- 	 */
--	p = strchr(devname, '.');
-+	p = strrchr(devname, '.');
- 	if (!p) {
- 		kfree(devname);
- 		return ERR_PTR(-EINVAL);
--- 
-2.7.0
+ drivers/clk/tegra/clk-emc.c              |   6 +-
+ drivers/clk/tegra/clk-id.h               |   1 +
+ drivers/clk/tegra/clk-pll.c              |  50 +++++++-----
+ drivers/clk/tegra/clk-tegra-periph.c     |   5 +-
+ drivers/clk/tegra/clk-tegra-super-gen4.c |   6 +-
+ drivers/clk/tegra/clk-tegra210.c         | 132 ++++++++++++++-----------------
+ include/dt-bindings/clock/tegra210-car.h |   2 +-
+ 7 files changed, 104 insertions(+), 98 deletions(-)
