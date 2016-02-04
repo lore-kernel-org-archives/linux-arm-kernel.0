@@ -1,60 +1,77 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  4 Feb 2016 11:00:32 +0000
-Subject: [PATCH v2 15/28] ARM: KVM: Add VFP lazy save/restore handler
+Date: Thu,  4 Feb 2016 11:00:37 +0000
+Subject: [PATCH v2 20/28] ARM: KVM: Change kvm_call_hyp return type to
+ unsigned long
 In-Reply-To: <1454583645-10144-1-git-send-email-marc.zyngier@arm.com>
 References: <1454583645-10144-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1454583645-10144-16-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1454583645-10144-21-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Similar to the arm64 version, add the code that deals with VFP traps,
-re-enabling VFP, save/restoring the registers and resuming the guest.
+Having u64 as the kvm_call_hyp return type is problematic, as
+it forces all kind of tricks for the return values from HYP
+to be promoted to 64bit (LE has the LSB in r0, and BE has them
+in r1).
+
+Since the only user of the return value is perfectly happy with
+a 32bit value, let's make kvm_call_hyp return an unsigned long,
+which is 32bit on ARM.
+
+This solves yet another headache.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kvm/hyp/entry.S | 31 +++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+ arch/arm/include/asm/kvm_host.h |  2 +-
+ arch/arm/kvm/interrupts.S       | 10 ++--------
+ 2 files changed, 3 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/kvm/hyp/entry.S b/arch/arm/kvm/hyp/entry.S
-index 32f79b0..21c2388 100644
---- a/arch/arm/kvm/hyp/entry.S
-+++ b/arch/arm/kvm/hyp/entry.S
-@@ -66,5 +66,36 @@ ENTRY(__guest_exit)
- 	bx	lr
- ENDPROC(__guest_exit)
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 02932ba..c62d717 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -165,7 +165,7 @@ unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu);
+ int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *indices);
+ int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
+ int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
+-u64 kvm_call_hyp(void *hypfn, ...);
++unsigned long kvm_call_hyp(void *hypfn, ...);
+ void force_vm_exit(const cpumask_t *mask);
  
-+/*
-+ * If VFPv3 support is not available, then we will not switch the VFP
-+ * registers; however cp10 and cp11 accesses will still trap and fallback
-+ * to the regular coprocessor emulation code, which currently will
-+ * inject an undefined exception to the guest.
-+ */
-+#ifdef CONFIG_VFPv3
-+ENTRY(__vfp_guest_restore)
-+	push	{r3, r4, lr}
-+
-+	@ NEON/VFP used.  Turn on VFP access.
-+	mrc	p15, 4, r1, c1, c1, 2		@ HCPTR
-+	bic	r1, r1, #(HCPTR_TCP(10) | HCPTR_TCP(11))
-+	mcr	p15, 4, r1, c1, c1, 2		@ HCPTR
-+	isb
-+
-+	@ Switch VFP/NEON hardware state to the guest's
-+	mov	r4, r0
-+	ldr	r0, [r0, #VCPU_HOST_CTXT]
-+	add	r0, r0, #CPU_CTXT_VFP
-+	bl	__vfp_save_state
-+	add	r0, r4, #(VCPU_GUEST_CTXT + CPU_CTXT_VFP)
-+	bl	__vfp_restore_state
-+
-+	pop	{r3, r4, lr}
-+	pop	{r0, r1, r2}
-+	clrex
-+	eret
-+ENDPROC(__vfp_guest_restore)
-+#endif
-+
- 	.popsection
+ #define KVM_ARCH_WANT_MMU_NOTIFIER
+diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
+index 7bfb289..01eb169 100644
+--- a/arch/arm/kvm/interrupts.S
++++ b/arch/arm/kvm/interrupts.S
+@@ -207,20 +207,14 @@ after_vfp_restore:
  
+ 	restore_host_regs
+ 	clrex				@ Clear exclusive monitor
+-#ifndef CONFIG_CPU_ENDIAN_BE8
+ 	mov	r0, r1			@ Return the return code
+-	mov	r1, #0			@ Clear upper bits in return value
+-#else
+-	@ r1 already has return code
+-	mov	r0, #0			@ Clear upper bits in return value
+-#endif /* CONFIG_CPU_ENDIAN_BE8 */
+ 	bx	lr			@ return to IOCTL
+ 
+ /********************************************************************
+  *  Call function in Hyp mode
+  *
+  *
+- * u64 kvm_call_hyp(void *hypfn, ...);
++ * unsigned long kvm_call_hyp(void *hypfn, ...);
+  *
+  * This is not really a variadic function in the classic C-way and care must
+  * be taken when calling this to ensure parameters are passed in registers
+@@ -231,7 +225,7 @@ after_vfp_restore:
+  * passed as r0, r1, and r2 (a maximum of 3 arguments in addition to the
+  * function pointer can be passed).  The function being called must be mapped
+  * in Hyp mode (see init_hyp_mode in arch/arm/kvm/arm.c).  Return values are
+- * passed in r0 and r1.
++ * passed in r0 (strictly 32bit).
+  *
+  * A function pointer with a value of 0xffffffff has a special meaning,
+  * and is used to implement __hyp_get_vectors in the same way as in
 -- 
 2.1.4
