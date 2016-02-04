@@ -1,68 +1,82 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  4 Feb 2016 15:29:45 +0100
-Subject: [PATCH 8/8] arm64: dts: salvator-x: Enable SCIF_CLK frequency and pins
-In-Reply-To: <cover.1454595726.git.horms+renesas@verge.net.au>
-References: <cover.1454595726.git.horms+renesas@verge.net.au>
-Message-ID: <a3fc85e27b7e3c29b30909929bc64737a19fd251.1454595726.git.horms+renesas@verge.net.au>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 4 Feb 2016 14:39:07 +0000
+Subject: linux-next: build failure after merge of the aio tree
+In-Reply-To: <20160204143204.GC16315@kvack.org>
+References: <20160112163835.GD347@kvack.org>
+ <20160127134024.0fababf6@canb.auug.org.au>
+ <20160129113056.GP10826@n2100.arm.linux.org.uk>
+ <CAMuHMdUy-cqeN8COO4rdpY-mOH+6gth40wB31-edkj8CO5PFCw@mail.gmail.com>
+ <20160204131959.6695c7bf@canb.auug.org.au>
+ <20160204134142.GA16315@kvack.org>
+ <20160204135056.GE10826@n2100.arm.linux.org.uk>
+ <20160204140822.GB16315@kvack.org>
+ <20160204141253.GF10826@n2100.arm.linux.org.uk>
+ <20160204143204.GC16315@kvack.org>
+Message-ID: <20160204143907.GG10826@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+On Thu, Feb 04, 2016 at 09:32:04AM -0500, Benjamin LaHaise wrote:
+> On Thu, Feb 04, 2016 at 02:12:53PM +0000, Russell King - ARM Linux wrote:
+> > Hence, __get_user() on x86-32 with a 64-bit quantity results in
+> > __get_user_bad() being called, which is an undefined function.
+> > Only if you build with x86-64 support enabled (iow, CONFIG_X86_32 not
+> > defined) then you get the 64-bit __get_user() support.
+> > 
+> > Given this, I fail to see how x86-32 can possibly work.
+> 
+> You're right; mea culpa.  It compiles without warning on x86-32, but it 
+> does not link.  I still think this is broken archtecture stupidity since 
+> put_user() works for 64 bit data types.
 
-Add and enable the external crystal for the SCIF_CLK and its pinctrl, to
-be used by the Baud Rate Generator for External Clock (BRG) on (H)SCIF.
+Indeed, and you'll find that several other architectures besides ARM and
+x86-32 have exactly the same problem - as I listed in my message from a
+few days ago.
 
-This increases the range and accuracy of supported baud rates:
-  - SCIF:
-      - Supports now 50, 230400, 460800, 500000, and 921600 bps,
-      - Perfect match for standard 50-460800, and 9216000 bps.
-  - HSCIF:
-      - Supports now 50, 75, and 110 bps,
-      - Perfect match for standard 50-460800, and 9216000 bps.
+Okay, so now I get to set you a challenge, since you're the one wanting
+64-bit __get_user(): try implementing it on x86-32 :)
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Reviewed-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+Also in my previous message from a few days ago I provided a set of
+functions which test out the implementation.  Here they are... again.
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-index 9af1e3fdc468..31ace9c1f79d 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-@@ -93,6 +93,9 @@
- };
- 
- &pfc {
-+	pinctrl-0 = <&scif_clk_pins>;
-+	pinctrl-names = "default";
-+
- 	scif1_pins: scif1 {
- 		renesas,groups = "scif1_data_a", "scif1_ctrl";
- 		renesas,function = "scif1";
-@@ -101,6 +104,10 @@
- 		renesas,groups = "scif2_data_a";
- 		renesas,function = "scif2";
- 	};
-+	scif_clk_pins: scif_clk {
-+		renesas,groups = "scif_clk_a";
-+		renesas,function = "scif_clk";
-+	};
- 
- 	i2c2_pins: i2c2 {
- 		renesas,groups = "i2c2_a";
-@@ -138,6 +145,11 @@
- 	status = "okay";
- };
- 
-+&scif_clk {
-+	clock-frequency = <14745600>;
-+	status = "okay";
-+};
-+
- &i2c2 {
- 	pinctrl-0 = <&i2c2_pins>;
- 	pinctrl-names = "default";
+All these should not produce any warnings, and should produce correct
+code - especially the narrowing/widening tests:
+
+int test_8(unsigned char *v, unsigned char *p)
+{ return __get_user(*v, p); }
+int test_8_constp(unsigned char *v, const unsigned char *p)
+{ return __get_user(*v, p); }
+int test_8_volatilep(unsigned char *v, volatile unsigned char *p)
+{ return __get_user(*v, p); }
+int test_16(unsigned short *v, unsigned short *p)
+{ return __get_user(*v, p); }
+int test_16_constp(unsigned short *v, const unsigned short *p)
+{ return __get_user(*v, p); }
+int test_32(unsigned int *v, unsigned int *p)
+{ return __get_user(*v, p); }
+int test_32_constp(unsigned int *v, const unsigned int *p)
+{ return __get_user(*v, p); }
+int test_64(unsigned long long *v, unsigned long long *p)
+{ return __get_user(*v, p); }
+int test_64_constp(unsigned long long *v, const unsigned long long *p)
+{ return __get_user(*v, p); }
+int test_ptr(unsigned int **v, unsigned int **p)
+{ return __get_user(*v, p); }
+int test_const(unsigned int *v, const unsigned int *p)
+{ return __get_user(*v, p); }
+int test_64_narrow(unsigned long *v, unsigned long long *p)
+{ return __get_user(*v, p); }
+int test_32_wide(unsigned long long *v, unsigned long *p)
+{ return __get_user(*v, p); }
+
+However, this one should warn:
+
+int test_wrong(char **v, const char **p)
+{ return __get_user(*v, p); }
+
+Good luck (I think you'll need lots of it to get a working solution)! :)
+
 -- 
-2.7.0.rc3.207.g0ac5344
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
