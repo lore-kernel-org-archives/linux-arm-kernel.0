@@ -1,53 +1,47 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 4 Feb 2016 18:49:22 +0000
-Subject: [GIT PULL] arm64: fixes for -rc3
-Message-ID: <20160204184922.GC21422@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 4 Feb 2016 17:44:38 +0100
+Subject: [PATCH 10/11] ARM: dts: sun9i: a80-optimus: Disable dummy
+ regulators vcc3v0, vcc3v3, vcc5v0
+In-Reply-To: <CAGb2v66xjgsoVEBocUfDk6DDx4QcH-4pP94v+4FHLTJ=rii09Q@mail.gmail.com>
+References: <1454408864-24112-1-git-send-email-wens@csie.org>
+ <1454408864-24112-11-git-send-email-wens@csie.org>
+ <20160202162136.GX4652@lukather>
+ <CAGb2v66xjgsoVEBocUfDk6DDx4QcH-4pP94v+4FHLTJ=rii09Q@mail.gmail.com>
+Message-ID: <20160204164438.GJ4270@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Wed, Feb 03, 2016 at 12:41:37AM +0800, Chen-Yu Tsai wrote:
+> On Wed, Feb 3, 2016 at 12:21 AM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > Hi,
+> >
+> > On Tue, Feb 02, 2016 at 06:27:43PM +0800, Chen-Yu Tsai wrote:
+> >> These 3 regulators are provided in sunxi-common-regulators.dtsi.
+> >> 3.0V/3.3V and 5.0V are commonly used voltages in Allwinner devices.
+> >> These dummy regulators provide a stand-in when bindings that require
+> >> one, but the real regulator is not supported yet.
+> >>
+> >> Since these are no longer needed, we can disable them.
+> >>
+> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> >
+> > Why not remove the include entirely then?
+> 
+> reg_vbus* are still used. Or should we move them as well?
 
-Please pull these arm64 fixes for -rc3. Nothing particularly interesting
-here, but all important fixes nonetheless. Details in the tag.
+I think so yeah. It's totally fine to disable per-boards regulators.
 
-Cheers,
+Maxime
 
-Will
-
---->8
-
-The following changes since commit 36f90b0a2ddd60823fe193a85e60ff1906c2a9b3:
-
-  Linux 4.5-rc2 (2016-01-31 18:12:16 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-fixes
-
-for you to fetch changes up to 3e275c64a973ba1554ef87f76c9f0f5b5221ab14:
-
-  arm64: asm: Explicitly include linux/personality.h in asm/page.h (2016-02-03 19:22:02 +0000)
-
-----------------------------------------------------------------
-arm64 fixes:
-
-- Add missing PAN toggling in the futex code
-
-- Fix missing #include that briefly caused issues in -next
-
-- Allow changing of vmalloc permissions with set_memory_* (used by bpf)
-
-----------------------------------------------------------------
-Ard Biesheuvel (1):
-      arm64: allow vmalloc regions to be set with set_memory_*
-
-James Morse (1):
-      arm64: futex.h: Add missing PAN toggling
-
-Mark Brown (1):
-      arm64: asm: Explicitly include linux/personality.h in asm/page.h
-
- arch/arm64/include/asm/futex.h |  2 ++
- arch/arm64/include/asm/page.h  |  1 +
- arch/arm64/mm/pageattr.c       | 23 +++++++++++++++++++----
- 3 files changed, 22 insertions(+), 4 deletions(-)
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160204/87bf6d46/attachment-0001.sig>
