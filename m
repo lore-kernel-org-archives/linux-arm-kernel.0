@@ -1,75 +1,22 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Thu, 4 Feb 2016 15:11:18 +0000
-Subject: [RFC PATCH 0/4] Add ACPI support for HiSilicon PCIe Host
- Controllers
-In-Reply-To: <2387127.DMZaDnZvEW@wuerfel>
-References: <1454585860-60709-1-git-send-email-gabriele.paoloni@huawei.com>
- <2387127.DMZaDnZvEW@wuerfel>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1EC9EC12@lhreml503-mbs>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 4 Feb 2016 15:13:04 +0000
+Subject: [PATCH v5sub2 1/8] arm64: add support for module PLTs
+In-Reply-To: <1454332178-4414-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1454332178-4414-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1454332178-4414-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160204151303.GB6076@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd
+On Mon, Feb 01, 2016 at 02:09:31PM +0100, Ard Biesheuvel wrote:
+> This adds support for emitting PLTs at module load time for relative
+> branches that are out of range. This is a prerequisite for KASLR, which
+> may place the kernel and the modules anywhere in the vmalloc area,
+> making it more likely that branch target offsets exceed the maximum
+> range of +/- 128 MB.
 
-Thanks for looking at this
+Any downside to trying to keep the kernel+modules coupled together so
+that we avoid the PLT?
 
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: 04 February 2016 13:12
-> To: Gabriele Paoloni
-> Cc: Guohanjun (Hanjun Guo); Wangzhou (B); liudongdong (C); Linuxarm;
-> qiujiang; bhelgaas at google.com; Lorenzo.Pieralisi at arm.com;
-> tn at semihalf.com; zhangjukuo; xuwei (O); Liguozhu (Kenneth); linux-
-> pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
-> acpi at vger.kernel.org; linux-kernel at vger.kernel.org; jcm at redhat.com
-> Subject: Re: [RFC PATCH 0/4] Add ACPI support for HiSilicon PCIe Host
-> Controllers
-> 
-> On Thursday 04 February 2016 19:37:36 Gabriele Paoloni wrote:
-> > From: gabriele paoloni <gabriele.paoloni@huawei.com>
-> >
-> > This patchset adds ACPI support for the HiSilicon Hip05/Hip06 SoC
-> PCIe controllers
-> > The four patches respectively:
-> >         - rework PCie Designware to be used for ACPI PCI Host
-> controllers
-> >         - re-architect the current HiSilicon driver to make it
-> scalable to the
-> >           new ACPI quirks
-> >         - rework the current HiSilicon driver to make it ECAM
-> compliant
-> >         - adds the HiSilicon ACPI specific quirks.
-> >
-> >    This patchset  is based on
-> >    https://github.com/semihalf-nowicki-tomasz/linux.git
-> >    branch pci-acpi-v3 + Hip06 support applied on top:
-> >    https://patchwork.ozlabs.org/patch/549198/
-> >
-> 
-> ACPI has its own PCI support, and should not need drivers for host
-> bridges. I don't think we can really mix the two things, as ACPI
-> needs to have access to things like PCI config space way before
-> we are probing normal device drivers.
-> 
-> Please put this in drivers/acpi/pci*.c.
-
-I can put pcie-hisi-acpi.c under drivers/acpi/
-
-However if you look at the driver it is made up of three parts:
-pcie-hisi.c --> the DT based driver
-pcie-hisi-acpi.c --> the ACPI based hook and ACPI specific init callback
-pcie-hisi-common.c --> common functions shared between DT and ACPI versions 
-                       of the driver
-
-Now I think that moving pcie-hisi-acpi.c under drivers/acpi/
-would make it hard to read as you need to jump across directories
-and it seems a bit unnatural...
-
-However it is not a big issue to me...
-
-Cheers
-
-Gab
-
-> 
-> 	Arnd
+-- 
+Catalin
