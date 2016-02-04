@@ -1,44 +1,74 @@
-From: ryabinin.a.a@gmail.com (Andrey Ryabinin)
-Date: Thu, 4 Feb 2016 18:19:14 +0300
-Subject: [PATCH v6] kernel: add kcov code coverage
-In-Reply-To: <CACT4Y+YygZitF6508qNX9885+nWu7iY9YVqdtE0bCA2+soTp_Q@mail.gmail.com>
-References: <1453726850-49137-1-git-send-email-dvyukov@google.com>
- <CAPAsAGz6vVGfAPSimwqkneUmzMmrwX_WxdCoQ1xg3UyNn4+-eQ@mail.gmail.com>
- <CACT4Y+YygZitF6508qNX9885+nWu7iY9YVqdtE0bCA2+soTp_Q@mail.gmail.com>
-Message-ID: <CAPAsAGx+6tfwbo32EGu6H9Mb6S1WXLvQOYzBrhhc=q=N7sFYgw@mail.gmail.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Thu,  4 Feb 2016 23:24:56 +0800
+Subject: [PATCH v7 0/4] mailbox: hisilicon: add Hi6220 mailbox driver
+Message-ID: <1454599500-15600-1-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-02-04 18:07 GMT+03:00 Dmitry Vyukov <dvyukov@google.com>:
-> On Tue, Feb 2, 2016 at 5:02 PM, Andrey Ryabinin <ryabinin.a.a@gmail.com> wrote:
->> 2016-01-25 16:00 GMT+03:00 Dmitry Vyukov <dvyukov@google.com>:
->>
->>> diff --git a/lib/Kconfig.debug b/lib/Kconfig.debug
->>> index ecb9e75..cde6bd1 100644
->>> --- a/lib/Kconfig.debug
->>> +++ b/lib/Kconfig.debug
->>> @@ -678,6 +678,26 @@ config DEBUG_STACKOVERFLOW
->>>
->>>           If in doubt, say "N".
->>>
->>> +config ARCH_HAS_KCOV
->>> +       bool
->>> +       help
->>> +         KCOV does not have any arch-specific code, but currently it is enabled
->>> +         only for x86_64. KCOV requires testing on other archs, and most likely
->>> +         disabling of instrumentation for some early boot code.
->>> +
->>> +config KCOV
->>> +       bool "Code coverage for fuzzing"
->>> +       depends on ARCH_HAS_KCOV
->>
->> I think we should select DEBUG_FS here, since this useless without it.
->
-> Done in v7
->
->> Also you placed this into 'Memory Debugging' submenu which seems wrong.
->
-> Any better suggestions?
->
+Hi6220 mailbox supports up to 32 channels. Each channel is unidirectional
+with a maximum message size of 8 words. I/O is performed using register
+access (there is no DMA) and the cell raises an interrupt when messages
+are received.
 
-Just 'Kernel hacking'
+This patch series is to implement Hi6220 mailbox driver. It registers
+two channels into framework for communication with MCU, one is tx channel
+and another is rx channel. Now mailbox driver is used to send message to
+MCU to control dynamic voltage and frequency scaling for CPU, GPU and DDR.
+
+Changes from v6:
+* Fix to use lowercase for hexadecimal value in DT binding document
+
+Changes from v5:
+* Refine to use mailbox three specifiers for client driver, so add xlate
+  callback function in mailbox driver to support these specifiers
+* Refine document for property "hi6220,mbox-tx-noirq"
+
+Changes from v4:
+* According to Jassi's suggestion, using DT binding to register channels
+* Change to use operating-points-v2 to register operating points
+
+Changes from v3:
+* The patch series for enabling idle state for Hi6220 has reserved memory
+  regions, so this series will not include it anymore
+* Refined mailbox driver according to Jassi's suggestion;
+  Removed kfifo from mailbox driver;
+  Removed spinlock for ipc registers accessing, due every channel has its
+  own dedicated bit in ipc register and readl/writel will introduce memory
+  barrier, so don't need spinlock to protect ipc registers accessing
+* After mailbox driver is ready, can use patch 4 to enable CPU's OPPs and
+  stub clock driver; finally can enable CPUFreq driver for CPU frequency
+  scaling
+
+Changes from v2:
+* Get rid of unused memory regions from memory node in DT, and don't use
+  reserved-memory node according to Mark and Leif's suggestion; Haojian also
+  has updated UEFI for efi memory info
+
+Changes from v1:
+* Correct lock usage for SMP scenario
+
+Changes from RFC:
+* According to Jassi's review, totally remove the abstract common driver
+  layer and only commit driver dedicated for Hi6220
+* According to Paul Bolle's review, fix typo issue for Kconfig and remove
+  unnecessary dependency with OF and fix minor for mailbox driver
+* Refine a little for dts nodes
+
+
+Leo Yan (4):
+  dt-bindings: mailbox: Document Hi6220 mailbox driver
+  mailbox: Hi6220: add mailbox driver
+  arm64: dts: add mailbox node for Hi6220
+  arm64: dts: add Hi6220's stub clock node
+
+ .../bindings/mailbox/hisilicon,hi6220-mailbox.txt  |  74 ++++
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi          |  64 ++++
+ drivers/mailbox/Kconfig                            |   8 +
+ drivers/mailbox/Makefile                           |   2 +
+ drivers/mailbox/hi6220-mailbox.c                   | 395 +++++++++++++++++++++
+ 5 files changed, 543 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/hisilicon,hi6220-mailbox.txt
+ create mode 100644 drivers/mailbox/hi6220-mailbox.c
+
+-- 
+1.9.1
