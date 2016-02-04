@@ -1,68 +1,78 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu,  4 Feb 2016 22:09:24 +0100
-Subject: [PATCH v3 net 2/7] net: mvneta: Fix the CPU choice in
- mvneta_percpu_elect
+Date: Thu,  4 Feb 2016 22:09:25 +0100
+Subject: [PATCH v3 net 3/7] net: mvneta: Use on_each_cpu when possible
 In-Reply-To: <1454620169-8156-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1454620169-8156-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1454620169-8156-3-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1454620169-8156-4-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When passing to the management of multiple RX queue, the
-mvneta_percpu_elect function was broken. The use of the modulo can lead
-to elect the wrong cpu. For example with rxq_def=2, if the CPU 2 goes
-offline and then online, we ended with the third RX queue activated in
-the same time on CPU 0 and CPU2, which lead to a kernel crash.
+Instead of using a for_each_* loop in which we just call the
+smp_call_function_single macro, it is more simple to directly use the
+on_each_cpu macro. Moreover, this macro ensures that the calls will be
+done all at once.
 
-With this fix, we don't try to get "the closer" CPU if the default CPU is
-gone, now we just use CPU 0 which always be there. Thanks to this, the
-code becomes more readable, easier to maintain and more predicable.
-
-Cc: stable at vger.kernel.org
-Fixes: 2dcf75e2793c ("net: mvneta: Associate RX queues with each CPU")
+Suggested-by: Russell King <rmk+kernel@arm.linux.org.uk>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/net/ethernet/marvell/mvneta.c | 13 +++++++++----
- 1 file changed, 9 insertions(+), 4 deletions(-)
+ drivers/net/ethernet/marvell/mvneta.c | 17 ++++++-----------
+ 1 file changed, 6 insertions(+), 11 deletions(-)
 
 diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-index 90ff5c7e19ea..4c2d12423750 100644
+index 4c2d12423750..f496f9716569 100644
 --- a/drivers/net/ethernet/marvell/mvneta.c
 +++ b/drivers/net/ethernet/marvell/mvneta.c
-@@ -2849,9 +2849,14 @@ static void mvneta_percpu_disable(void *arg)
+@@ -2555,7 +2555,7 @@ static void mvneta_percpu_mask_interrupt(void *arg)
  
- static void mvneta_percpu_elect(struct mvneta_port *pp)
+ static void mvneta_start_dev(struct mvneta_port *pp)
  {
--	int online_cpu_idx, max_cpu, cpu, i = 0;
-+	int elected_cpu = 0, max_cpu, cpu, i = 0;
+-	unsigned int cpu;
++	int cpu;
+ 
+ 	mvneta_max_rx_size_set(pp, pp->pkt_size);
+ 	mvneta_txq_max_tx_size_set(pp, pp->pkt_size);
+@@ -2571,9 +2571,8 @@ static void mvneta_start_dev(struct mvneta_port *pp)
+ 	}
+ 
+ 	/* Unmask interrupts. It has to be done from each CPU */
+-	for_each_online_cpu(cpu)
+-		smp_call_function_single(cpu, mvneta_percpu_unmask_interrupt,
+-					 pp, true);
++	on_each_cpu(mvneta_percpu_unmask_interrupt, pp, true);
 +
-+	/* Use the cpu associated to the rxq when it is online, in all
-+	 * the other cases, use the cpu 0 which can't be offline.
-+	 */
-+	if (cpu_online(pp->rxq_def))
-+		elected_cpu = pp->rxq_def;
+ 	mvreg_write(pp, MVNETA_INTR_MISC_MASK,
+ 		    MVNETA_CAUSE_PHY_STATUS_CHANGE |
+ 		    MVNETA_CAUSE_LINK_CHANGE |
+@@ -2993,7 +2992,7 @@ static int mvneta_percpu_notifier(struct notifier_block *nfb,
+ static int mvneta_open(struct net_device *dev)
+ {
+ 	struct mvneta_port *pp = netdev_priv(dev);
+-	int ret, cpu;
++	int ret;
  
--	online_cpu_idx = pp->rxq_def % num_online_cpus();
- 	max_cpu = num_present_cpus();
+ 	pp->pkt_size = MVNETA_RX_PKT_SIZE(pp->dev->mtu);
+ 	pp->frag_size = SKB_DATA_ALIGN(MVNETA_RX_BUF_SIZE(pp->pkt_size)) +
+@@ -3026,9 +3025,7 @@ static int mvneta_open(struct net_device *dev)
+ 	/* Enable per-CPU interrupt on all the CPU to handle our RX
+ 	 * queue interrupts
+ 	 */
+-	for_each_online_cpu(cpu)
+-		smp_call_function_single(cpu, mvneta_percpu_enable,
+-					 pp, true);
++	on_each_cpu(mvneta_percpu_enable, pp, true);
  
+ 
+ 	/* Register a CPU notifier to handle the case where our CPU
+@@ -3315,9 +3312,7 @@ static int  mvneta_config_rss(struct mvneta_port *pp)
+ 
+ 	netif_tx_stop_all_queues(pp->dev);
+ 
+-	for_each_online_cpu(cpu)
+-		smp_call_function_single(cpu, mvneta_percpu_mask_interrupt,
+-					 pp, true);
++	on_each_cpu(mvneta_percpu_mask_interrupt, pp, true);
+ 
+ 	/* We have to synchronise on the napi of each CPU */
  	for_each_online_cpu(cpu) {
-@@ -2862,7 +2867,7 @@ static void mvneta_percpu_elect(struct mvneta_port *pp)
- 			if ((rxq % max_cpu) == cpu)
- 				rxq_map |= MVNETA_CPU_RXQ_ACCESS(rxq);
- 
--		if (i == online_cpu_idx)
-+		if (cpu == elected_cpu)
- 			/* Map the default receive queue queue to the
- 			 * elected CPU
- 			 */
-@@ -2873,7 +2878,7 @@ static void mvneta_percpu_elect(struct mvneta_port *pp)
- 		 * the CPU bound to the default RX queue
- 		 */
- 		if (txq_number == 1)
--			txq_map = (i == online_cpu_idx) ?
-+			txq_map = (cpu == elected_cpu) ?
- 				MVNETA_CPU_TXQ_ACCESS(1) : 0;
- 		else
- 			txq_map = mvreg_read(pp, MVNETA_CPU_MAP(cpu)) &
 -- 
 2.5.0
