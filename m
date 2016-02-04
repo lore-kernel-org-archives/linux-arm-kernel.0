@@ -1,52 +1,50 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 3 Feb 2016 21:17:24 -0800
-Subject: [PATCH v10 5/5] Watchdog: ARM SBSA Generic Watchdog half timeout
- panic support
-In-Reply-To: <CADyBb7usPpY=YLjecXce63zY5e1tniPLmNsVY=8CJHJsCqBgQw@mail.gmail.com>
-References: <1454519923-25230-1-git-send-email-fu.wei@linaro.org>
- <1454519923-25230-6-git-send-email-fu.wei@linaro.org>
- <56B23883.7000501@codeaurora.org>
- <CADyBb7sxPg-QUjTbeHFtYkctKc_g7D8O=+jqbXN+DCCoCEnFqA@mail.gmail.com>
- <56B23E99.1030604@codeaurora.org>
- <CADyBb7s4opxfPFuX=1-qEE6uhsaMXgofAJPbHUQHrng2AUwqNA@mail.gmail.com>
- <56B2423B.1020109@codeaurora.org>
- <CADyBb7uULCn97ea19zH8dB4QX1QA8=AXL94d6gXgFxXM8haBNA@mail.gmail.com>
- <56B24642.8090105@codeaurora.org>
- <CADyBb7s_QeU=pYqN9G+5WMtx-L+=QC6uZR6N6ZWPOixnkHzPjw@mail.gmail.com>
- <56B24AB5.3070001@codeaurora.org>
- <CADyBb7usPpY=YLjecXce63zY5e1tniPLmNsVY=8CJHJsCqBgQw@mail.gmail.com>
-Message-ID: <56B2DEE4.7060901@roeck-us.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 3 Feb 2016 21:35:18 -0800
+Subject: N900 sleep mode (in 4.5-rc0, if that matters)
+In-Reply-To: <20160201221111.GP19432@atomide.com>
+References: <20160123121022.GB12497@amd> <20160125163332.GT19432@atomide.com>
+ <20160126140010.GA29723@amd> <20160126172527.GY3500@atomide.com>
+ <20160130200244.GA30429@amd> <20160130201452.GC30429@amd>
+ <20160130221509.GA28644@amd> <20160201181316.GM19432@atomide.com>
+ <20160201211736.GA11283@amd> <20160201221111.GP19432@atomide.com>
+Message-ID: <20160204053518.GP19432@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/03/2016 03:00 PM, Fu Wei wrote:
-> On 4 February 2016 at 02:45, Timur Tabi <timur@codeaurora.org> wrote:
->> Fu Wei wrote:
->>>
->>> As you know I have made the pre-timeout support patch, If people like
->>> it, i am happy to go on upstream it separately.
->>>
->>> If we want to use pre-timeout here, user only can use get_pretimeout
->>> and disable panic by setting pretimeout to 0
->>> but user can not really set pretimeout, because "pre-timeout  ==
->>> timeout / 2 (always)".
->>> if user want to change pretimeout, he/she has to set_time instead.
->>
->>
->> Ok, I think patches 4 and 5 should be combined, and I think the Kconfig
->> entry should be removed and just use panic_enabled.
+* Tony Lindgren <tony@atomide.com> [160201 14:12]:
+> * Pavel Machek <pavel@ucw.cz> [160201 13:18]:
+> > 
+> > No, sorry, that was with 4.4. As you hit "PM regression with commit
+> > 5de85b9d57ab PM runtime re-init in v4.5-rc1", I thought I'd avoid
+> > v4.5-rc. 
+> 
+> OK
+> 
+> > (I assume I have to insmod and rmmod, right? Because powersave is not
+> > entered if I simply compile-out usb).
+> 
+> Depending on what the bootloader does and probably also if
+> USB was used during the booting.. So yeah you may need to modprobe
+> and then rmmod.
+> 
+> > Would you have commit ids for those rmmod fixes? It might be good to
+> > push them into stable, and I should try again with them applied...
+> 
+> 055555fc459 ("usb: musb: core: Fix handling of the phy notifications")
+> 03e43528ab68 ("usb: musb: Fix unbalanced pm_runtime_enable")
 
-Agreed.
->
-> NP, will update this patchset like that ,  thanks :-)
->
+Oh and looks like these two phy-twl4030-phy fixes never got
+merged from thread "[PATCH 0/2] Two phy-twl4030-usb fixes for
+unloading the module":
 
-Also, if panic is enabled, the timeout needs to be adjusted accordingly
-(to only panic after the entire timeout period has expired, not after
-half of it). We can not panic the system after timeout / 2.
+phy: twl4030-usb: Relase usb phy on unload
+phy: twl4030-usb: Fix unbalanced pm_runtime_enable on module reload
 
-I am not too happy with the parameter name (panic_enabled). How about
-"action", to match machzwd ?
+I'll resend those. But without those again deeper idle states
+are blocked.. And it could be that n900 needs similar additional
+patches for it's USB PHY as I've tested things so far only with
+phy-twl4030-usb PHY based systems.
 
-Thanks,
-Guenter
+Regards,
+
+Tony
