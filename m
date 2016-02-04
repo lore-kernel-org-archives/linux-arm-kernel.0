@@ -1,50 +1,80 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 3 Feb 2016 21:35:18 -0800
-Subject: N900 sleep mode (in 4.5-rc0, if that matters)
-In-Reply-To: <20160201221111.GP19432@atomide.com>
-References: <20160123121022.GB12497@amd> <20160125163332.GT19432@atomide.com>
- <20160126140010.GA29723@amd> <20160126172527.GY3500@atomide.com>
- <20160130200244.GA30429@amd> <20160130201452.GC30429@amd>
- <20160130221509.GA28644@amd> <20160201181316.GM19432@atomide.com>
- <20160201211736.GA11283@amd> <20160201221111.GP19432@atomide.com>
-Message-ID: <20160204053518.GP19432@atomide.com>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Wed, 03 Feb 2016 21:48:03 -0800
+Subject: [PATCH] clk: Deprecate CLK_IS_ROOT
+In-Reply-To: <1454463733-25281-1-git-send-email-sboyd@codeaurora.org>
+References: <1454463733-25281-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20160204054803.32018.95106@quark.deferred.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [160201 14:12]:
-> * Pavel Machek <pavel@ucw.cz> [160201 13:18]:
-> > 
-> > No, sorry, that was with 4.4. As you hit "PM regression with commit
-> > 5de85b9d57ab PM runtime re-init in v4.5-rc1", I thought I'd avoid
-> > v4.5-rc. 
+Quoting Stephen Boyd (2016-02-02 17:42:13)
+> We don't use CLK_IS_ROOT but in a few places in the common clk
+> framework core. Let's replace those checks with a check for the
+> number of parents a clk has instead of the flag, freeing up one
+> flag for something else. We don't remove the flag yet so that
+> things keep building, but we'll remove it once all drivers have
+> removed their flag usage.
 > 
-> OK
-> 
-> > (I assume I have to insmod and rmmod, right? Because powersave is not
-> > entered if I simply compile-out usb).
-> 
-> Depending on what the bootloader does and probably also if
-> USB was used during the booting.. So yeah you may need to modprobe
-> and then rmmod.
-> 
-> > Would you have commit ids for those rmmod fixes? It might be good to
-> > push them into stable, and I should try again with them applied...
-> 
-> 055555fc459 ("usb: musb: core: Fix handling of the phy notifications")
-> 03e43528ab68 ("usb: musb: Fix unbalanced pm_runtime_enable")
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-Oh and looks like these two phy-twl4030-phy fixes never got
-merged from thread "[PATCH 0/2] Two phy-twl4030-usb fixes for
-unloading the module":
-
-phy: twl4030-usb: Relase usb phy on unload
-phy: twl4030-usb: Fix unbalanced pm_runtime_enable on module reload
-
-I'll resend those. But without those again deeper idle states
-are blocked.. And it could be that n900 needs similar additional
-patches for it's USB PHY as I've tested things so far only with
-phy-twl4030-usb PHY based systems.
+Looks good to me.
 
 Regards,
+Mike
 
-Tony
+> ---
+> 
+> A bunch of patches to remove CLK_IS_ROOT are coming...
+> 
+>  drivers/clk/clk.c            | 6 +++---
+>  include/linux/clk-provider.h | 2 +-
+>  2 files changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index bb01ed6cc63e..cd8382c83f48 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -385,7 +385,7 @@ static unsigned long clk_core_get_rate_nolock(struct clk_core *core)
+>  
+>         ret = core->rate;
+>  
+> -       if (core->flags & CLK_IS_ROOT)
+> +       if (!core->num_parents)
+>                 goto out;
+>  
+>         if (!core->parent)
+> @@ -2351,7 +2351,7 @@ static int __clk_core_init(struct clk_core *core)
+>         /*
+>          * Populate core->parent if parent has already been __clk_init'd.  If
+>          * parent has not yet been __clk_init'd then place clk in the orphan
+> -        * list.  If clk has set the CLK_IS_ROOT flag then place it in the root
+> +        * list.  If clk doesn't have any parents then place it in the root
+>          * clk list.
+>          *
+>          * Every time a new clk is clk_init'd then we walk the list of orphan
+> @@ -2362,7 +2362,7 @@ static int __clk_core_init(struct clk_core *core)
+>                 hlist_add_head(&core->child_node,
+>                                 &core->parent->children);
+>                 core->orphan = core->parent->orphan;
+> -       } else if (core->flags & CLK_IS_ROOT) {
+> +       } else if (!core->num_parents) {
+>                 hlist_add_head(&core->child_node, &clk_root_list);
+>                 core->orphan = false;
+>         } else {
+> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> index fabe5bedbba6..9c3a18c1a984 100644
+> --- a/include/linux/clk-provider.h
+> +++ b/include/linux/clk-provider.h
+> @@ -25,7 +25,7 @@
+>  #define CLK_SET_PARENT_GATE    BIT(1) /* must be gated across re-parent */
+>  #define CLK_SET_RATE_PARENT    BIT(2) /* propagate rate change up one level */
+>  #define CLK_IGNORE_UNUSED      BIT(3) /* do not gate even if unused */
+> -#define CLK_IS_ROOT            BIT(4) /* root clk, has no parent */
+> +#define CLK_IS_ROOT            BIT(4) /* Deprecated: Don't use */
+>  #define CLK_IS_BASIC           BIT(5) /* Basic clk, can't do a to_clk_foo() */
+>  #define CLK_GET_RATE_NOCACHE   BIT(6) /* do not use the cached clk rate */
+>  #define CLK_SET_RATE_NO_REPARENT BIT(7) /* don't re-parent on rate change */
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> a Linux Foundation Collaborative Project
+> 
