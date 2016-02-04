@@ -1,9 +1,9 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu,  4 Feb 2016 11:06:59 +0100
-Subject: [PATCH v2 36/51] mtd: nand: gpmi: switch to mtd_ooblayout_ops
+Date: Thu,  4 Feb 2016 11:06:51 +0100
+Subject: [PATCH v2 28/51] mtd: nand: cafe: switch to mtd_ooblayout_ops
 In-Reply-To: <1454580434-32078-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1454580434-32078-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1454580434-32078-37-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1454580434-32078-29-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,99 +12,82 @@ ECC/OOB layout to MTD users.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/mtd/nand/gpmi-nand/gpmi-nand.c | 52 ++++++++++++++++++++++++++--------
- 1 file changed, 40 insertions(+), 12 deletions(-)
+ drivers/mtd/nand/cafe_nand.c | 45 ++++++++++++++++++++++++++++++++------------
+ 1 file changed, 33 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-index 3a29b65..316b5ac 100644
---- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-@@ -47,10 +47,44 @@ static struct nand_bbt_descr gpmi_bbt_descr = {
-  * We may change the layout if we can get the ECC info from the datasheet,
-  * else we will use all the (page + OOB).
-  */
--static struct nand_ecclayout gpmi_hw_ecclayout = {
--	.eccbytes = 0,
--	.eccpos = { 0, },
--	.oobfree = { {.offset = 0, .length = 0} }
-+static int gpmi_ooblayout_ecc(struct mtd_info *mtd, int section,
+diff --git a/drivers/mtd/nand/cafe_nand.c b/drivers/mtd/nand/cafe_nand.c
+index aa1a616..0935b7c 100644
+--- a/drivers/mtd/nand/cafe_nand.c
++++ b/drivers/mtd/nand/cafe_nand.c
+@@ -459,10 +459,38 @@ static int cafe_nand_read_page(struct mtd_info *mtd, struct nand_chip *chip,
+ 	return max_bitflips;
+ }
+ 
+-static struct nand_ecclayout cafe_oobinfo_2048 = {
+-	.eccbytes = 14,
+-	.eccpos = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13},
+-	.oobfree = {{14, 50}}
++static int cafe_ooblayout_ecc(struct mtd_info *mtd, int section,
 +			      struct mtd_oob_region *oobregion)
 +{
 +	struct nand_chip *chip = mtd_to_nand(mtd);
-+	struct gpmi_nand_data *this = nand_get_controller_data(chip);
-+	struct bch_geometry *geo = &this->bch_geometry;
 +
 +	if (section)
 +		return -ERANGE;
 +
 +	oobregion->offset = 0;
-+	oobregion->length = geo->page_size - mtd->writesize;
++	oobregion->length = chip->ecc.steps * chip->ecc.bytes;
 +
 +	return 0;
 +}
 +
-+static int gpmi_ooblayout_free(struct mtd_info *mtd, int section,
++static int cafe_ooblayout_free(struct mtd_info *mtd, int section,
 +			       struct mtd_oob_region *oobregion)
 +{
 +	struct nand_chip *chip = mtd_to_nand(mtd);
-+	struct gpmi_nand_data *this = nand_get_controller_data(chip);
-+	struct bch_geometry *geo = &this->bch_geometry;
++	int eccbytes = chip->ecc.steps * chip->ecc.bytes;
 +
 +	if (section)
 +		return -ERANGE;
 +
-+	/* The available oob size we have. */
-+	if (geo->page_size < mtd->writesize + mtd->oobsize) {
-+		oobregion->offset = geo->page_size - mtd->writesize;
-+		oobregion->length = mtd->oobsize - oobregion->offset;
-+	}
++	oobregion->offset = eccbytes;
++	oobregion->length = mtd->oobsize - eccbytes;
 +
 +	return 0;
 +}
 +
-+static const struct mtd_ooblayout_ops gpmi_ooblayout_ops = {
-+	.ecc = gpmi_ooblayout_ecc,
-+	.free = gpmi_ooblayout_free,
++static const struct mtd_ooblayout_ops cafe_ooblayout_ops = {
++	.ecc = cafe_ooblayout_ecc,
++	.free = cafe_ooblayout_free,
  };
  
- static const struct gpmi_devdata gpmi_devdata_imx23 = {
-@@ -141,7 +175,6 @@ static int set_geometry_by_ecc_info(struct gpmi_nand_data *this)
- 	struct bch_geometry *geo = &this->bch_geometry;
- 	struct nand_chip *chip = &this->nand;
- 	struct mtd_info *mtd = nand_to_mtd(chip);
--	struct nand_oobfree *of = gpmi_hw_ecclayout.oobfree;
- 	unsigned int block_mark_bit_offset;
+ /* Ick. The BBT code really ought to be able to work this bit out
+@@ -494,12 +522,6 @@ static struct nand_bbt_descr cafe_bbt_mirror_descr_2048 = {
+ 	.pattern = cafe_mirror_pattern_2048
+ };
  
- 	if (!(chip->ecc_strength_ds > 0 && chip->ecc_step_ds > 0))
-@@ -229,12 +262,6 @@ static int set_geometry_by_ecc_info(struct gpmi_nand_data *this)
- 	geo->page_size = mtd->writesize + geo->metadata_size +
- 		(geo->gf_len * geo->ecc_strength * geo->ecc_chunk_count) / 8;
- 
--	/* The available oob size we have. */
--	if (geo->page_size < mtd->writesize + mtd->oobsize) {
--		of->offset = geo->page_size - mtd->writesize;
--		of->length = mtd->oobsize - of->offset;
--	}
+-static struct nand_ecclayout cafe_oobinfo_512 = {
+-	.eccbytes = 14,
+-	.eccpos = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13},
+-	.oobfree = {{14, 2}}
+-};
 -
- 	geo->payload_size = mtd->writesize;
+ static struct nand_bbt_descr cafe_bbt_main_descr_512 = {
+ 	.options = NAND_BBT_LASTBLOCK | NAND_BBT_CREATE | NAND_BBT_WRITE
+ 		| NAND_BBT_2BIT | NAND_BBT_VERSION,
+@@ -743,12 +765,11 @@ static int cafe_nand_probe(struct pci_dev *pdev,
+ 		cafe->ctl2 |= 1<<29; /* 2KiB page size */
  
- 	geo->auxiliary_status_offset = ALIGN(geo->metadata_size, 4);
-@@ -1841,6 +1868,7 @@ static void gpmi_nand_exit(struct gpmi_nand_data *this)
- static int gpmi_init_last(struct gpmi_nand_data *this)
- {
- 	struct nand_chip *chip = &this->nand;
-+	struct mtd_info *mtd = nand_to_mtd(chip);
- 	struct nand_ecc_ctrl *ecc = &chip->ecc;
- 	struct bch_geometry *bch_geo = &this->bch_geometry;
- 	int ret;
-@@ -1862,7 +1890,7 @@ static int gpmi_init_last(struct gpmi_nand_data *this)
- 	ecc->mode	= NAND_ECC_HW;
- 	ecc->size	= bch_geo->ecc_chunk_size;
- 	ecc->strength	= bch_geo->ecc_strength;
--	ecc->layout	= &gpmi_hw_ecclayout;
-+	mtd_set_ooblayout(mtd, &gpmi_ooblayout_ops);
- 
- 	/*
- 	 * We only enable the subpage read when:
+ 	/* Set up ECC according to the type of chip we found */
++	mtd_set_ooblayout(mtd, &cafe_ooblayout_ops);
+ 	if (mtd->writesize == 2048) {
+-		cafe->nand.ecc.layout = &cafe_oobinfo_2048;
+ 		cafe->nand.bbt_td = &cafe_bbt_main_descr_2048;
+ 		cafe->nand.bbt_md = &cafe_bbt_mirror_descr_2048;
+ 	} else if (mtd->writesize == 512) {
+-		cafe->nand.ecc.layout = &cafe_oobinfo_512;
+ 		cafe->nand.bbt_td = &cafe_bbt_main_descr_512;
+ 		cafe->nand.bbt_md = &cafe_bbt_mirror_descr_512;
+ 	} else {
 -- 
 2.1.4
