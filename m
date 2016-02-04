@@ -1,38 +1,70 @@
-From: tiffany.lin@mediatek.com (tiffany lin)
-Date: Thu, 4 Feb 2016 19:49:43 +0800
-Subject: [PATCH v3 1/8] dt-bindings: Add a binding for Mediatek Video
- Processor
-In-Reply-To: <20160104141506.GA22801@rob-hp-laptop>
-References: <1451902316-55931-1-git-send-email-tiffany.lin@mediatek.com>
- <1451902316-55931-2-git-send-email-tiffany.lin@mediatek.com>
- <20160104141506.GA22801@rob-hp-laptop>
-Message-ID: <1454586583.7571.3.camel@mtksdaap41>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Thu, 4 Feb 2016 13:53:16 +0200
+Subject: [PATCH 1/2] ARM: make virt_to_idmap() return unsigned long
+In-Reply-To: <20160203195905.GC10826@n2100.arm.linux.org.uk>
+References: <E1aO8F2-00074N-E8@rmk-PC.arm.linux.org.uk>
+ <56A84748.3040108@oracle.com> <20160201152015.GU10826@n2100.arm.linux.org.uk>
+ <56AF8F54.7030805@ti.com> <56AF917F.9030505@oracle.com>
+ <56B14546.4070808@oracle.com> <56B20B2E.7060408@ti.com>
+ <56B2201B.7020205@ti.com> <20160203195905.GC10826@n2100.arm.linux.org.uk>
+Message-ID: <56B33BAC.6020303@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
-
-
-
-
-On Mon, 2016-01-04 at 22:15 +0800, Rob Herring wrote:
-> On Mon, Jan 04, 2016 at 06:11:49PM +0800, Tiffany Lin wrote:
-> > From: Andrew-CT Chen <andrew-ct.chen@mediatek.com>
-> > 
-> > Add a DT binding documentation of Video Processor Unit for the
-> > MT8173 SoC from Mediatek.
-> > 
-> > Signed-off-by: Andrew-CT Chen <andrew-ct.chen@mediatek.com>
-> > Signed-off-by: Tiffany Lin <tiffany.lin@mediatek.com>
+On 02/03/2016 09:59 PM, Russell King - ARM Linux wrote:
+> On Wed, Feb 03, 2016 at 10:43:23AM -0500, Vitaly Andrianov wrote:
+>>> 100%. I came up with absolutely similar fix.
+>>>
+>>>
+>>> Regarding, kexec:
+>>> - it seems can't be tested on ks2 out of the box, because there is unmet dependency in kconfig
+>>>   config KEXEC
+>>>          bool "Kexec system call (EXPERIMENTAL)"
+>>> -       depends on (!SMP || PM_SLEEP_SMP)
+>>>          depends on !CPU_V7M
+>>>          select KEXEC_CORE
+>>>          help
+>>>
+>>> - any way, i've hacked kernel as above;
+>>> - downloaded and built kexec-tools
+>>> git://git.kernel.org/pub/scm/linux/kernel/git/geoff/kexec-tools.git
+>>> - tried to run it using different combination of parameters, but always
+>>> with below result:
+>>> # kexec -l /boot/zImage
+>>> kexec version: 15.12.22.16.38-g6503cb3
+>>> Could not find a free area of memory of 0x3b2ca0 bytes...
+>>> Cannot load /boot/zImage
+>>>
+>>> I'm doing something wrong, but don't know what yet :(
+>>> - these patches were not applied, I'd like to see kexec not working first
+>>>
+>>>
+>> I'm not sure about that particular issue, but when I worked on KS2 kexec I
+>> had to patch kexec-tools to support KS2 LPAE memory.
 > 
-> Please add acks when sending new versions as I already acked the last 
-> version.
+> This was specifically for Vitaly to test, as he has patches to work
+> around most of the KS2 issues with kexec (although I have a KS2, I
+> don't have everything that's necessary to get a working kexec in
+> place.)
 > 
-Since we remove iommu attach and add 4GB support for VPU.
-We send the new device tree and binding document.
-We do not add Acked-by in v4 patches.
+> What I do want to know is whether this patch makes Vitaly's kexec
+> patch smaller, and most importantly, what's left to deal with - in
+> other words, I'd like to see the kernel patch for what's remaining.
+> 
+> Alternatively, if I can have both the kernel and userland patches
+> so I can get a working kexec setup here, that may be a better way
+> forward.
+> 
+> Either way, I think I'm going to push these patches out into
+> linux-next very soon, because I believe that they're the correct
+> approach to solving some of the issues found in Vitaly's original
+> patch, unless someone discovers that they're broken in some manner.
+> 
 
-> Acked-by: Rob Herring <robh@kernel.org>
+This patch boot/reboot tested on k2hk-evm (LPAE=y), ping works (with netcp regression fixed)
+Tested-by: Grygorii Strashko <grygorii.strashko@ti.com>
 
-best regards,
-Tiffany
+
+-- 
+regards,
+-grygorii
