@@ -1,66 +1,47 @@
-From: zhang.chunyan@linaro.org (Chunyan Zhang)
-Date: Thu,  4 Feb 2016 16:56:19 +0800
-Subject: [PATCH V2 2/6] stm class: adds a loop to extract the first valid STM
- device name
-In-Reply-To: <1454487337-30184-3-git-send-email-zhang.chunyan@linaro.org>
-References: <1454487337-30184-3-git-send-email-zhang.chunyan@linaro.org>
-Message-ID: <1454576179-27224-1-git-send-email-zhang.chunyan@linaro.org>
+From: carlo@caione.org (Carlo Caione)
+Date: Thu, 4 Feb 2016 10:12:05 +0100
+Subject: [PATCH v4] mmc: meson: Add driver for the SD/MMC host found on
+ Amlogic MesonX SoCs
+In-Reply-To: <CAPDyKFo=LdzFsELZJKXj_CDcNYj96J4Q9-KqS63041d3BVUEDQ@mail.gmail.com>
+References: <1448988109-32630-1-git-send-email-carlo@caione.org>
+ <CAPDyKFp=buvJ8Li3XC8XSUAUO7BsE+U6vEQH2xTrgcHAkdG8bQ@mail.gmail.com>
+ <CAOQ7t2aJAPWd3Xmvu7n0EWL-KC8ZriM3KryfsYEh556uXhuR+g@mail.gmail.com>
+ <CAPDyKFpcsKihuOiF5=RwoWrF0Jf7hRsXVSU5uV8qZf1mUsa-iQ@mail.gmail.com>
+ <CAOQ7t2afXxStCsj=M-FX7eMep1gLt4jkyXDiLas_SQ1UwHc0=Q@mail.gmail.com>
+ <CAPDyKFpX+_fHvv_bJUKZmSufKKnuONC582E7u3b20a+Rbbggng@mail.gmail.com>
+ <CAOQ7t2aS0yRDhM3+8wW5xrycG371uthDJy6U_oDAZip4jHRiRA@mail.gmail.com>
+ <CAPDyKFo=LdzFsELZJKXj_CDcNYj96J4Q9-KqS63041d3BVUEDQ@mail.gmail.com>
+Message-ID: <CAOQ7t2aF=wzYHF8LXK5WVMJ=mEDHzfvbL=iRvorq+FZshL0q0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The node name of STM master management policy is a concatenation of an
-STM device name to which this policy applies and following an arbitrary
-string, these two strings are concatenated with a dot.
+On Wed, Feb 3, 2016 at 11:46 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On 2 February 2016 at 22:54, Carlo Caione <carlo@caione.org> wrote:
 
-This patch adds a loop for extracting the STM device name when an
-arbitrary number of dot(s) are found in this STM device name.
+[cut]
 
-Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
----
- drivers/hwtracing/stm/policy.c | 27 ++++++++++++++++-----------
- 1 file changed, 16 insertions(+), 11 deletions(-)
+> Huh, another broken MMC controller. :-)
 
-diff --git a/drivers/hwtracing/stm/policy.c b/drivers/hwtracing/stm/policy.c
-index 11ab6d0..691686e 100644
---- a/drivers/hwtracing/stm/policy.c
-+++ b/drivers/hwtracing/stm/policy.c
-@@ -321,21 +321,26 @@ stp_policies_make(struct config_group *group, const char *name)
- 	/*
- 	 * node must look like <device_name>.<policy_name>, where
- 	 * <device_name> is the name of an existing stm device and
--	 * <policy_name> is an arbitrary string
-+	 * <policy_name> is an arbitrary string, when an arbitrary
-+	 * number of dot(s) are found in the <device_name>, the
-+	 * first matched STM device name would be extracted.
- 	 */
--	p = strchr(devname, '.');
--	if (!p) {
--		kfree(devname);
--		return ERR_PTR(-EINVAL);
--	}
-+	for (p = devname; ; p++) {
-+		p = strchr(p, '.');
-+		if (!p) {
-+			kfree(devname);
-+			return ERR_PTR(-EINVAL);
-+		}
- 
--	*p++ = '\0';
-+		*p = '\0';
- 
--	stm = stm_find_device(devname);
--	kfree(devname);
-+		stm = stm_find_device(devname);
-+		if (stm)
-+			break;
-+		*p = '.';
-+	}
- 
--	if (!stm)
--		return ERR_PTR(-ENODEV);
-+	kfree(devname);
- 
- 	mutex_lock(&stm->policy_mutex);
- 	if (stm->policy) {
+Oh, actually I found in the datasheet a couple of undocumented
+registers (also not used in the original Amlogic SDK code) that seems
+to have something to do with timeout (hard to say without proper
+documentation but they are called "Timeout counter for preload setting
+and present status" and "Timeout Counter Interrupt Enable for ARC/ARM"
+so I guess I'm on the right track here).
+I briefly tried yesterday to enable this timeout interrupt with a
+dummy value in the counter register (I have no idea how get this value
+from the clocking) and it seems working (the counter value is
+decremented when reading the register upon command completion).
+
+> In some cases there are no data in the request, it's just a command
+> being sent. So to deal with this issue, you will have to adjust the
+> timer depending on the request we send to the controller.
+
+I see that the CMD13 used to poll the card has no data so in that case
+should we use a fixed / dummy value to use as timeout counter?
+I'm kind of confused here since the MMC drivers I'm looking at use the
+hardware timeout register only when the data->timeout_ns is actually
+present.
+
 -- 
-1.9.1
+Carlo Caione
