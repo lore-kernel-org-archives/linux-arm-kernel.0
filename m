@@ -1,9 +1,9 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  4 Feb 2016 15:30:01 +0100
-Subject: [PATCH 67/70] ARM: dts: lager: Enable SCIF_CLK frequency and pins
+Date: Thu,  4 Feb 2016 15:30:02 +0100
+Subject: [PATCH 68/70] ARM: dts: marzen: Enable SCIF_CLK frequency and pins
 In-Reply-To: <cover.1454595846.git.horms+renesas@verge.net.au>
 References: <cover.1454595846.git.horms+renesas@verge.net.au>
-Message-ID: <c538d4ca3722cb0640d3f67724128ac635f3d785.1454595846.git.horms+renesas@verge.net.au>
+Message-ID: <4603bc2b08134ad2257b1d968c9293bcc07a8bb9.1454595846.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,14 +17,14 @@ This increases the range and accuracy of supported baud rates.
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7790-lager.dts | 13 +++++++++++++
+ arch/arm/boot/dts/r8a7779-marzen.dts | 13 +++++++++++++
  1 file changed, 13 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
-index 052dcee4790d..cdc0414f5f07 100644
---- a/arch/arm/boot/dts/r8a7790-lager.dts
-+++ b/arch/arm/boot/dts/r8a7790-lager.dts
-@@ -291,6 +291,9 @@
+diff --git a/arch/arm/boot/dts/r8a7779-marzen.dts b/arch/arm/boot/dts/r8a7779-marzen.dts
+index fe396c8d58db..e111d35d02ae 100644
+--- a/arch/arm/boot/dts/r8a7779-marzen.dts
++++ b/arch/arm/boot/dts/r8a7779-marzen.dts
+@@ -165,6 +165,9 @@
  };
  
  &pfc {
@@ -32,21 +32,21 @@ index 052dcee4790d..cdc0414f5f07 100644
 +	pinctrl-names = "default";
 +
  	du_pins: du {
- 		renesas,groups = "du_rgb666", "du_sync_1", "du_clk_out_0";
- 		renesas,function = "du";
-@@ -301,6 +304,11 @@
- 		renesas,function = "scif0";
+ 		du0 {
+ 			renesas,groups = "du0_rgb888", "du0_sync_1", "du0_clk_out_0";
+@@ -176,6 +179,11 @@
+ 		};
  	};
  
 +	scif_clk_pins: scif_clk {
-+		renesas,groups = "scif_clk";
++		renesas,groups = "scif_clk_b";
 +		renesas,function = "scif_clk";
 +	};
 +
- 	ether_pins: ether {
- 		renesas,groups = "eth_link", "eth_mdio", "eth_rmii";
- 		renesas,function = "eth";
-@@ -485,6 +493,11 @@
+ 	ethernet_pins: ethernet {
+ 		intc {
+ 			renesas,groups = "intc_irq1_b";
+@@ -222,6 +230,11 @@
  	status = "okay";
  };
  
@@ -55,8 +55,8 @@ index 052dcee4790d..cdc0414f5f07 100644
 +	status = "okay";
 +};
 +
- &msiof1 {
- 	pinctrl-0 = <&msiof1_pins>;
+ &sdhi0 {
+ 	pinctrl-0 = <&sdhi0_pins>;
  	pinctrl-names = "default";
 -- 
 2.7.0.rc3.207.g0ac5344
