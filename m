@@ -1,80 +1,128 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 4 Feb 2016 09:32:03 +0000
-Subject: [PATCH] irqchip-gicv3: wait for ack from redistributer after
- read_iar
-In-Reply-To: <1454528588-32721-1-git-send-email-tchalamarla@caviumnetworks.com>
-References: <1454528588-32721-1-git-send-email-tchalamarla@caviumnetworks.com>
-Message-ID: <56B31A93.5050608@arm.com>
+From: morten.rasmussen@arm.com (Morten Rasmussen)
+Date: Thu, 4 Feb 2016 09:36:00 +0000
+Subject: [PATCH v3 2/6] drivers/cpufreq: implement
+ init_cpu_capacity_default()
+In-Reply-To: <CAKfTPtDGk5BC25WqHdhDYDOBgUsuidAMhrXS=eDi6wJPZjfrwA@mail.gmail.com>
+References: <1454500799-18451-1-git-send-email-juri.lelli@arm.com>
+ <1454500799-18451-3-git-send-email-juri.lelli@arm.com>
+ <CAKfTPtDGk5BC25WqHdhDYDOBgUsuidAMhrXS=eDi6wJPZjfrwA@mail.gmail.com>
+Message-ID: <20160204093559.GA14099@e105550-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tirumalesh,
-
-On 03/02/16 19:43, tchalamarla at caviumnetworks.com wrote:
-> From: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
+On Wed, Feb 03, 2016 at 10:04:37PM +0100, Vincent Guittot wrote:
+> On 3 February 2016 at 12:59, Juri Lelli <juri.lelli@arm.com> wrote:
+> > To get default values for CPUs capacity we profile a simple (bogus)
+> > integer benchmark on such CPUs; then we normalize results to 1024
+> > (highest capacity in the system).
+> >
+> > Architectures that want this during boot have to define a weak function
+> > (arch_wants_init_cpu_capacity) to return true.
+> >
+> > Also, kernel has to boot with init_cpu_capacity parameter if profiling
+> > is needed, as it can be expensive and might add ~1 sec to boot time.
+> >
+> > Cc: Russell King <linux@arm.linux.org.uk>
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+> > Cc: Viresh Kumar <viresh.kumar@linaro.org>
+> > Cc: Vincent Guittot <vincent.guittot@linaro.org>
+> > Cc: Sudeep Holla <sudeep.holla@arm.com>
+> > Cc: Mark Rutland <mark.rutland@arm.com>
+> > Signed-off-by: Juri Lelli <juri.lelli@arm.com>
+> > ---
+> >  Changes since v1:
+> >  - add kernel command line parameter to enable profiling
+> >  - add define for max trials
+> >
+> >  Documentation/kernel-parameters.txt |   4 +
+> >  arch/arm/kernel/topology.c          |   2 +-
+> >  arch/arm64/kernel/topology.c        |  12 +++
+> >  drivers/cpufreq/Makefile            |   2 +-
+> >  drivers/cpufreq/cpufreq.c           |   1 +
+> >  drivers/cpufreq/cpufreq_capacity.c  | 174 ++++++++++++++++++++++++++++++++++++
+> >  include/linux/cpufreq.h             |   2 +
+> >  7 files changed, 195 insertions(+), 2 deletions(-)
+> >  create mode 100644 drivers/cpufreq/cpufreq_capacity.c
+> >
+> > diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
+> > index 87d40a7..fad2b89 100644
+> > --- a/Documentation/kernel-parameters.txt
+> > +++ b/Documentation/kernel-parameters.txt
+> > @@ -1570,6 +1570,10 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
+> >
+> >         initrd=         [BOOT] Specify the location of the initial ramdisk
+> >
+> > +       init_cpu_capacity
+> > +                       [KNL,ARM] Enables dynamic CPUs capacity benchmarking
+> > +                       at boot.
+> > +
+> >         inport.irq=     [HW] Inport (ATI XL and Microsoft) busmouse driver
+> >                         Format: <irq>
+> >
+> > diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
+> > index ec279d1..c9c87a5 100644
+> > --- a/arch/arm/kernel/topology.c
+> > +++ b/arch/arm/kernel/topology.c
+> > @@ -47,7 +47,7 @@ unsigned long arch_scale_cpu_capacity(struct sched_domain *sd, int cpu)
+> >         return per_cpu(cpu_scale, cpu);
+> >  }
+> >
+> > -static void set_capacity_scale(unsigned int cpu, unsigned long capacity)
+> > +void set_capacity_scale(unsigned int cpu, unsigned long capacity)
+> >  {
+> >         per_cpu(cpu_scale, cpu) = capacity;
+> >  }
+> > diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+> > index 694f6de..3b75d63 100644
+> > --- a/arch/arm64/kernel/topology.c
+> > +++ b/arch/arm64/kernel/topology.c
+> > @@ -23,6 +23,18 @@
+> >  #include <asm/cputype.h>
+> >  #include <asm/topology.h>
+> >
+> > +static DEFINE_PER_CPU(unsigned long, cpu_scale) = SCHED_CAPACITY_SCALE;
+> > +
+> > +unsigned long arm_arch_scale_cpu_capacity(struct sched_domain *sd, int cpu)
+> > +{
+> > +       return per_cpu(cpu_scale, cpu);
+> > +}
+> > +
+> > +void set_capacity_scale(unsigned int cpu, unsigned long capacity)
+> > +{
+> > +       per_cpu(cpu_scale, cpu) = capacity;
+> > +}
+> > +
+> >  static int __init get_cpu_for_node(struct device_node *node)
+> >  {
+> >         struct device_node *cpu_node;
+> > diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
+> > index 9e63fb1..c4025fd 100644
+> > --- a/drivers/cpufreq/Makefile
+> > +++ b/drivers/cpufreq/Makefile
+> > @@ -1,5 +1,5 @@
+> >  # CPUfreq core
+> > -obj-$(CONFIG_CPU_FREQ)                 += cpufreq.o freq_table.o
+> > +obj-$(CONFIG_CPU_FREQ)                 += cpufreq.o freq_table.o cpufreq_capacity.o
 > 
-> Systems with high number of cores and sufficiently loaded,
-> there exists a small window where it is possible for re-distributor
-> to illegally merge two LPI and cuases missing interrupts.
+> Do you really want to have the calibration of capacity dependent of
+> cpufreq ? It means that we can't use it without a cpufreq driver.
+> IMHO, this creates a unnecessary dependency. I understand that you
+> must ensure that core runs at max fequency if a driver is present but
+> you should be able to calibrate the capacity if cpufreq is not
+> available but you have different capacity because micro architecture
 
-s/cuases/causes/
+We could remove the dependency on cpufreq, but it would make things more
+complicated for systems which do have frequency scaling as we would have
+to either:
 
-It has nothing to do with the number of cores or the load, but
-everything to do with the latency between the CPU interface and the
-redistributor, and how quickly the redistributor gets notified that the
-interrupt is not pending anymore.
+1) Run the calibration again once cpufreq has been initialized.
 
-> 
-> Solution is, wait for ack from the redistributor after read_iar.
-> A "dsb sy" after IAR read ensures there is no illegal merge windows.
+2) Know the frequency of all cpus at calibration time so we can
+determine the correct micro-archicture difference. This option would
+however mean that we have to provide a frequency scaling factor even for
+systems that don't have cpufreq.
 
-You don't "wait for the ack". You actually *push* the ack (as in
-Interrupt Acknowledgement Register) towards the redistributor.
-
-The fact that the DSB generates an ACK message from the redistributor is
-an HW implementation detail is not universally relevant. Please stay at
-the architecture level, and avoid implementation details.
-
-> 
-> giv3 spec version 32 also warns this, see section 4.4.13
-
-What is the point of pointing to an engineering specification that is
-unavailable to almost anyone (hint: it has the word "Confidential" on
-each and every page)?
-
-A much better reference would be a quote from the publicly available GIC
-Architecture Specification (ARM IHI 0069B). Something like:
-
-4.1.1 Physical CPU Interface:
-"The effects of reading ICC_IAR0_EL1 and ICC_IAR1_EL1 on the state of a
-returned INTID are not guaranteed to be visible until after the
-execution of a DSB."
-
-> 
-> Signed-off-by: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
-> ---
->  arch/arm64/include/asm/arch_gicv3.h | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
-> index 2731d3b..8ec88e5 100644
-> --- a/arch/arm64/include/asm/arch_gicv3.h
-> +++ b/arch/arm64/include/asm/arch_gicv3.h
-> @@ -103,6 +103,7 @@ static inline u64 gic_read_iar_common(void)
->  	u64 irqstat;
->  
->  	asm volatile("mrs_s %0, " __stringify(ICC_IAR1_EL1) : "=r" (irqstat));
-> +	dsb(sy);
->  	return irqstat;
->  }
->  
-> 
-
-Other than that, I'm fine with this. Please repost with an amended
-commit message and subject.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+3) Find a way to do the calibration anyway if cpufreq doesn't
+initialize. I'm not sure how that would work though.
