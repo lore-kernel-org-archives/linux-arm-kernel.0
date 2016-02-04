@@ -1,70 +1,59 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Thu, 4 Feb 2016 13:53:16 +0200
-Subject: [PATCH 1/2] ARM: make virt_to_idmap() return unsigned long
-In-Reply-To: <20160203195905.GC10826@n2100.arm.linux.org.uk>
-References: <E1aO8F2-00074N-E8@rmk-PC.arm.linux.org.uk>
- <56A84748.3040108@oracle.com> <20160201152015.GU10826@n2100.arm.linux.org.uk>
- <56AF8F54.7030805@ti.com> <56AF917F.9030505@oracle.com>
- <56B14546.4070808@oracle.com> <56B20B2E.7060408@ti.com>
- <56B2201B.7020205@ti.com> <20160203195905.GC10826@n2100.arm.linux.org.uk>
-Message-ID: <56B33BAC.6020303@ti.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Thu, 4 Feb 2016 13:03:07 +0100
+Subject: [PATCH v3 2/6] drivers/cpufreq: implement
+ init_cpu_capacity_default()
+In-Reply-To: <20160204093559.GA14099@e105550-lin.cambridge.arm.com>
+References: <1454500799-18451-1-git-send-email-juri.lelli@arm.com>
+ <1454500799-18451-3-git-send-email-juri.lelli@arm.com>
+ <CAKfTPtDGk5BC25WqHdhDYDOBgUsuidAMhrXS=eDi6wJPZjfrwA@mail.gmail.com>
+ <20160204093559.GA14099@e105550-lin.cambridge.arm.com>
+Message-ID: <CAKfTPtB4G3bP5N0hU6zWXJTddO34x3RnyGpp-4_otc8O=Wq2hw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/03/2016 09:59 PM, Russell King - ARM Linux wrote:
-> On Wed, Feb 03, 2016 at 10:43:23AM -0500, Vitaly Andrianov wrote:
->>> 100%. I came up with absolutely similar fix.
->>>
->>>
->>> Regarding, kexec:
->>> - it seems can't be tested on ks2 out of the box, because there is unmet dependency in kconfig
->>>   config KEXEC
->>>          bool "Kexec system call (EXPERIMENTAL)"
->>> -       depends on (!SMP || PM_SLEEP_SMP)
->>>          depends on !CPU_V7M
->>>          select KEXEC_CORE
->>>          help
->>>
->>> - any way, i've hacked kernel as above;
->>> - downloaded and built kexec-tools
->>> git://git.kernel.org/pub/scm/linux/kernel/git/geoff/kexec-tools.git
->>> - tried to run it using different combination of parameters, but always
->>> with below result:
->>> # kexec -l /boot/zImage
->>> kexec version: 15.12.22.16.38-g6503cb3
->>> Could not find a free area of memory of 0x3b2ca0 bytes...
->>> Cannot load /boot/zImage
->>>
->>> I'm doing something wrong, but don't know what yet :(
->>> - these patches were not applied, I'd like to see kexec not working first
->>>
->>>
->> I'm not sure about that particular issue, but when I worked on KS2 kexec I
->> had to patch kexec-tools to support KS2 LPAE memory.
-> 
-> This was specifically for Vitaly to test, as he has patches to work
-> around most of the KS2 issues with kexec (although I have a KS2, I
-> don't have everything that's necessary to get a working kexec in
-> place.)
-> 
-> What I do want to know is whether this patch makes Vitaly's kexec
-> patch smaller, and most importantly, what's left to deal with - in
-> other words, I'd like to see the kernel patch for what's remaining.
-> 
-> Alternatively, if I can have both the kernel and userland patches
-> so I can get a working kexec setup here, that may be a better way
-> forward.
-> 
-> Either way, I think I'm going to push these patches out into
-> linux-next very soon, because I believe that they're the correct
-> approach to solving some of the issues found in Vitaly's original
-> patch, unless someone discovers that they're broken in some manner.
-> 
+On 4 February 2016 at 10:36, Morten Rasmussen <morten.rasmussen@arm.com> wrote:
+> On Wed, Feb 03, 2016 at 10:04:37PM +0100, Vincent Guittot wrote:
+>> On 3 February 2016 at 12:59, Juri Lelli <juri.lelli@arm.com> wrote:
 
-This patch boot/reboot tested on k2hk-evm (LPAE=y), ping works (with netcp regression fixed)
-Tested-by: Grygorii Strashko <grygorii.strashko@ti.com>
+[snip]
 
+>> > diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
+>> > index 9e63fb1..c4025fd 100644
+>> > --- a/drivers/cpufreq/Makefile
+>> > +++ b/drivers/cpufreq/Makefile
+>> > @@ -1,5 +1,5 @@
+>> >  # CPUfreq core
+>> > -obj-$(CONFIG_CPU_FREQ)                 += cpufreq.o freq_table.o
+>> > +obj-$(CONFIG_CPU_FREQ)                 += cpufreq.o freq_table.o cpufreq_capacity.o
+>>
+>> Do you really want to have the calibration of capacity dependent of
+>> cpufreq ? It means that we can't use it without a cpufreq driver.
+>> IMHO, this creates a unnecessary dependency. I understand that you
+>> must ensure that core runs at max fequency if a driver is present but
+>> you should be able to calibrate the capacity if cpufreq is not
+>> available but you have different capacity because micro architecture
+>
+> We could remove the dependency on cpufreq, but it would make things more
+> complicated for systems which do have frequency scaling as we would have
+> to either:
+>
+> 1) Run the calibration again once cpufreq has been initialized.
 
--- 
-regards,
--grygorii
+or wait and let time for a driver to initialize and trig the
+calibration. If calibration has not been done at the end of the boot,
+you can force a calibration. If the cpufeq driver is a module and is
+loaded far later for any good or bad reason, we will have to run the
+calibration once again but at least the capacity will reflect he
+current capacity of the CPUs.
+I'm mainly worried that the compilation of the calibration is
+dependent of CONFIG_CPU_FREQ not that cpufreq can trig the calibration
+sequence
+
+>
+> 2) Know the frequency of all cpus at calibration time so we can
+> determine the correct micro-archicture difference. This option would
+> however mean that we have to provide a frequency scaling factor even for
+> systems that don't have cpufreq.
+>
+> 3) Find a way to do the calibration anyway if cpufreq doesn't
+> initialize. I'm not sure how that would work though.
