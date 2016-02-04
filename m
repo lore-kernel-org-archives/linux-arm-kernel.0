@@ -1,102 +1,50 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu,  4 Feb 2016 11:06:53 +0100
-Subject: [PATCH v2 30/51] mtd: nand: denali: switch to mtd_ooblayout_ops
+Date: Thu,  4 Feb 2016 11:06:33 +0100
+Subject: [PATCH v2 10/51] mtd: nand: gpmi: use mtd_ooblayout_xxx() helpers
+ where appropriate
 In-Reply-To: <1454580434-32078-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1454580434-32078-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1454580434-32078-31-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1454580434-32078-11-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implementing the mtd_ooblayout_ops interface is the new way of exposing
-ECC/OOB layout to MTD users.
+The mtd_ooblayout_xxx() helper functions have been added to avoid direct
+accesses to the ecclayout field, and thus ease for future reworks.
+Use these helpers in all places where the oobfree[] and eccpos[] arrays
+where directly accessed.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/mtd/nand/denali.c | 51 +++++++++++++++++++++++++++++++++--------------
- 1 file changed, 36 insertions(+), 15 deletions(-)
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.c | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/mtd/nand/denali.c b/drivers/mtd/nand/denali.c
-index 30bf5f6..b832375 100644
---- a/drivers/mtd/nand/denali.c
-+++ b/drivers/mtd/nand/denali.c
-@@ -1374,13 +1374,42 @@ static void denali_hw_init(struct denali_nand_info *denali)
-  * correction
-  */
- #define ECC_8BITS	14
--static struct nand_ecclayout nand_8bit_oob = {
--	.eccbytes = 14,
--};
--
- #define ECC_15BITS	26
--static struct nand_ecclayout nand_15bit_oob = {
--	.eccbytes = 26,
-+
-+static int denali_ooblayout_ecc(struct mtd_info *mtd, int section,
-+				struct mtd_oob_region *oobregion)
-+{
-+	struct denali_nand_info *denali = mtd_to_denali(mtd);
-+	struct nand_chip *chip = mtd_to_nand(mtd);
-+
-+	if (section)
-+		return -ERANGE;
-+
-+	oobregion->offset = denali->bbtskipbytes;
-+	oobregion->length = chip->ecc.bytes * chip->ecc.steps;
-+
-+	return 0;
-+}
-+
-+static int denali_ooblayout_free(struct mtd_info *mtd, int section,
-+				 struct mtd_oob_region *oobregion)
-+{
-+	struct denali_nand_info *denali = mtd_to_denali(mtd);
-+	struct nand_chip *chip = mtd_to_nand(mtd);
-+	int eccbytes = chip->ecc.bytes * chip->ecc.steps;
-+
-+	if (section)
-+		return -ERANGE;
-+
-+	oobregion->offset = eccbytes + denali->bbtskipbytes;
-+	oobregion->length = mtd->oobsize - oobregion->offset;
-+
-+	return 0;
-+}
-+
-+static const struct mtd_ooblayout_ops denali_ooblayout_ops = {
-+	.ecc = denali_ooblayout_ecc,
-+	.free = denali_ooblayout_free,
- };
+diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+index 8122c69..3a29b65 100644
+--- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
++++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+@@ -1327,18 +1327,19 @@ static int gpmi_ecc_read_oob(struct mtd_info *mtd, struct nand_chip *chip,
+ static int
+ gpmi_ecc_write_oob(struct mtd_info *mtd, struct nand_chip *chip, int page)
+ {
+-	struct nand_oobfree *of = mtd->ecclayout->oobfree;
++	struct mtd_oob_region of = { };
+ 	int status = 0;
  
- static uint8_t bbt_pattern[] = {'B', 'b', 't', '0' };
-@@ -1561,7 +1590,6 @@ int denali_init(struct denali_nand_info *denali)
- 			ECC_SECTOR_SIZE)))) {
- 		/* if MLC OOB size is large enough, use 15bit ECC*/
- 		denali->nand.ecc.strength = 15;
--		denali->nand.ecc.layout = &nand_15bit_oob;
- 		denali->nand.ecc.bytes = ECC_15BITS;
- 		iowrite32(15, denali->flash_reg + ECC_CORRECTION);
- 	} else if (mtd->oobsize < (denali->bbtskipbytes +
-@@ -1571,20 +1599,13 @@ int denali_init(struct denali_nand_info *denali)
- 		goto failed_req_irq;
- 	} else {
- 		denali->nand.ecc.strength = 8;
--		denali->nand.ecc.layout = &nand_8bit_oob;
- 		denali->nand.ecc.bytes = ECC_8BITS;
- 		iowrite32(8, denali->flash_reg + ECC_CORRECTION);
- 	}
+ 	/* Do we have available oob area? */
+-	if (!of->length)
++	mtd_ooblayout_free(mtd, 0, &of);
++	if (!of.length)
+ 		return -EPERM;
  
-+	mtd_set_ooblayout(mtd, &denali_ooblayout_ops);
- 	denali->nand.ecc.bytes *= denali->devnum;
- 	denali->nand.ecc.strength *= denali->devnum;
--	denali->nand.ecc.layout->eccbytes *=
--		mtd->writesize / ECC_SECTOR_SIZE;
--	denali->nand.ecc.layout->oobfree[0].offset =
--		denali->bbtskipbytes + denali->nand.ecc.layout->eccbytes;
--	denali->nand.ecc.layout->oobfree[0].length =
--		mtd->oobsize - denali->nand.ecc.layout->eccbytes -
--		denali->bbtskipbytes;
+ 	if (!nand_is_slc(chip))
+ 		return -EPERM;
  
- 	/*
- 	 * Let driver know the total blocks number and how many blocks
+-	chip->cmdfunc(mtd, NAND_CMD_SEQIN, mtd->writesize + of->offset, page);
+-	chip->write_buf(mtd, chip->oob_poi + of->offset, of->length);
++	chip->cmdfunc(mtd, NAND_CMD_SEQIN, mtd->writesize + of.offset, page);
++	chip->write_buf(mtd, chip->oob_poi + of.offset, of.length);
+ 	chip->cmdfunc(mtd, NAND_CMD_PAGEPROG, -1, -1);
+ 
+ 	status = chip->waitfunc(mtd, chip);
 -- 
 2.1.4
