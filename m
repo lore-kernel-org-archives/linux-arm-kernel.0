@@ -1,9 +1,9 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu,  4 Feb 2016 11:06:49 +0100
-Subject: [PATCH v2 26/51] mtd: nand: bf5xx: switch to mtd_ooblayout_ops
+Date: Thu,  4 Feb 2016 11:06:59 +0100
+Subject: [PATCH v2 36/51] mtd: nand: gpmi: switch to mtd_ooblayout_ops
 In-Reply-To: <1454580434-32078-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1454580434-32078-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1454580434-32078-27-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1454580434-32078-37-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,77 +12,99 @@ ECC/OOB layout to MTD users.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/mtd/nand/bf5xx_nand.c | 51 ++++++++++++++++++++++++-------------------
- 1 file changed, 28 insertions(+), 23 deletions(-)
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.c | 52 ++++++++++++++++++++++++++--------
+ 1 file changed, 40 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/mtd/nand/bf5xx_nand.c b/drivers/mtd/nand/bf5xx_nand.c
-index 7f6b30e..b38f414 100644
---- a/drivers/mtd/nand/bf5xx_nand.c
-+++ b/drivers/mtd/nand/bf5xx_nand.c
-@@ -109,28 +109,33 @@ static const unsigned short bfin_nfc_pin_req[] =
- 	 0};
- 
- #ifdef CONFIG_MTD_NAND_BF5XX_BOOTROM_ECC
--static struct nand_ecclayout bootrom_ecclayout = {
--	.eccbytes = 24,
--	.eccpos = {
--		0x8 * 0, 0x8 * 0 + 1, 0x8 * 0 + 2,
--		0x8 * 1, 0x8 * 1 + 1, 0x8 * 1 + 2,
--		0x8 * 2, 0x8 * 2 + 1, 0x8 * 2 + 2,
--		0x8 * 3, 0x8 * 3 + 1, 0x8 * 3 + 2,
--		0x8 * 4, 0x8 * 4 + 1, 0x8 * 4 + 2,
--		0x8 * 5, 0x8 * 5 + 1, 0x8 * 5 + 2,
--		0x8 * 6, 0x8 * 6 + 1, 0x8 * 6 + 2,
--		0x8 * 7, 0x8 * 7 + 1, 0x8 * 7 + 2
--	},
--	.oobfree = {
--		{ 0x8 * 0 + 3, 5 },
--		{ 0x8 * 1 + 3, 5 },
--		{ 0x8 * 2 + 3, 5 },
--		{ 0x8 * 3 + 3, 5 },
--		{ 0x8 * 4 + 3, 5 },
--		{ 0x8 * 5 + 3, 5 },
--		{ 0x8 * 6 + 3, 5 },
--		{ 0x8 * 7 + 3, 5 },
--	}
-+static int bootrom_ooblayout_ecc(struct mtd_info *mtd, int section,
-+				 struct mtd_oob_region *oobregion)
+diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+index 3a29b65..316b5ac 100644
+--- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
++++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+@@ -47,10 +47,44 @@ static struct nand_bbt_descr gpmi_bbt_descr = {
+  * We may change the layout if we can get the ECC info from the datasheet,
+  * else we will use all the (page + OOB).
+  */
+-static struct nand_ecclayout gpmi_hw_ecclayout = {
+-	.eccbytes = 0,
+-	.eccpos = { 0, },
+-	.oobfree = { {.offset = 0, .length = 0} }
++static int gpmi_ooblayout_ecc(struct mtd_info *mtd, int section,
++			      struct mtd_oob_region *oobregion)
 +{
-+	if (section > 7)
++	struct nand_chip *chip = mtd_to_nand(mtd);
++	struct gpmi_nand_data *this = nand_get_controller_data(chip);
++	struct bch_geometry *geo = &this->bch_geometry;
++
++	if (section)
 +		return -ERANGE;
 +
-+	oobregion->offset = section * 8;
-+	oobregion->length = 3;
++	oobregion->offset = 0;
++	oobregion->length = geo->page_size - mtd->writesize;
 +
 +	return 0;
 +}
 +
-+static int bootrom_ooblayout_free(struct mtd_info *mtd, int section,
-+				  struct mtd_oob_region *oobregion)
++static int gpmi_ooblayout_free(struct mtd_info *mtd, int section,
++			       struct mtd_oob_region *oobregion)
 +{
-+	if (section > 7)
++	struct nand_chip *chip = mtd_to_nand(mtd);
++	struct gpmi_nand_data *this = nand_get_controller_data(chip);
++	struct bch_geometry *geo = &this->bch_geometry;
++
++	if (section)
 +		return -ERANGE;
 +
-+	oobregion->offset = (section * 8) + 3;
-+	oobregion->length = 5;
++	/* The available oob size we have. */
++	if (geo->page_size < mtd->writesize + mtd->oobsize) {
++		oobregion->offset = geo->page_size - mtd->writesize;
++		oobregion->length = mtd->oobsize - oobregion->offset;
++	}
 +
 +	return 0;
 +}
 +
-+static const struct mtd_ooblayout_ops bootrom_ooblayout_ops = {
-+	.ecc = bootrom_ooblayout_ecc,
-+	.free = bootrom_ooblayout_free,
++static const struct mtd_ooblayout_ops gpmi_ooblayout_ops = {
++	.ecc = gpmi_ooblayout_ecc,
++	.free = gpmi_ooblayout_free,
  };
- #endif
  
-@@ -800,7 +805,7 @@ static int bf5xx_nand_probe(struct platform_device *pdev)
- 	/* setup hardware ECC data struct */
- 	if (hardware_ecc) {
- #ifdef CONFIG_MTD_NAND_BF5XX_BOOTROM_ECC
--		chip->ecc.layout = &bootrom_ecclayout;
-+		mtd_set_ooblayout(mtd, &bootrom_ooblayout_ops);
- #endif
- 		chip->read_buf      = bf5xx_nand_dma_read_buf;
- 		chip->write_buf     = bf5xx_nand_dma_write_buf;
+ static const struct gpmi_devdata gpmi_devdata_imx23 = {
+@@ -141,7 +175,6 @@ static int set_geometry_by_ecc_info(struct gpmi_nand_data *this)
+ 	struct bch_geometry *geo = &this->bch_geometry;
+ 	struct nand_chip *chip = &this->nand;
+ 	struct mtd_info *mtd = nand_to_mtd(chip);
+-	struct nand_oobfree *of = gpmi_hw_ecclayout.oobfree;
+ 	unsigned int block_mark_bit_offset;
+ 
+ 	if (!(chip->ecc_strength_ds > 0 && chip->ecc_step_ds > 0))
+@@ -229,12 +262,6 @@ static int set_geometry_by_ecc_info(struct gpmi_nand_data *this)
+ 	geo->page_size = mtd->writesize + geo->metadata_size +
+ 		(geo->gf_len * geo->ecc_strength * geo->ecc_chunk_count) / 8;
+ 
+-	/* The available oob size we have. */
+-	if (geo->page_size < mtd->writesize + mtd->oobsize) {
+-		of->offset = geo->page_size - mtd->writesize;
+-		of->length = mtd->oobsize - of->offset;
+-	}
+-
+ 	geo->payload_size = mtd->writesize;
+ 
+ 	geo->auxiliary_status_offset = ALIGN(geo->metadata_size, 4);
+@@ -1841,6 +1868,7 @@ static void gpmi_nand_exit(struct gpmi_nand_data *this)
+ static int gpmi_init_last(struct gpmi_nand_data *this)
+ {
+ 	struct nand_chip *chip = &this->nand;
++	struct mtd_info *mtd = nand_to_mtd(chip);
+ 	struct nand_ecc_ctrl *ecc = &chip->ecc;
+ 	struct bch_geometry *bch_geo = &this->bch_geometry;
+ 	int ret;
+@@ -1862,7 +1890,7 @@ static int gpmi_init_last(struct gpmi_nand_data *this)
+ 	ecc->mode	= NAND_ECC_HW;
+ 	ecc->size	= bch_geo->ecc_chunk_size;
+ 	ecc->strength	= bch_geo->ecc_strength;
+-	ecc->layout	= &gpmi_hw_ecclayout;
++	mtd_set_ooblayout(mtd, &gpmi_ooblayout_ops);
+ 
+ 	/*
+ 	 * We only enable the subpage read when:
 -- 
 2.1.4
