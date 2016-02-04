@@ -1,43 +1,40 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 4 Feb 2016 23:34:28 +0100
-Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
- v4.5-rc1
-In-Reply-To: <Pine.LNX.4.44L0.1602041702550.1515-100000@iolanthe.rowland.org>
-References: <CAPDyKFpRnmn+h_VH3jtC3u-BOf7-00nbzD30omaxaaZOOAK8Gg@mail.gmail.com>
- <Pine.LNX.4.44L0.1602041702550.1515-100000@iolanthe.rowland.org>
-Message-ID: <CAPDyKFrMZYdeun67FBXdWL16DBOuO16qqOxRsks3QBJhNB8SoQ@mail.gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Thu, 4 Feb 2016 16:37:11 -0600
+Subject: [PATCH] PCI: layerscape: add ls2085a compatible
+In-Reply-To: <56A906F4.3050809@linaro.org>
+References: <1453915925-19198-1-git-send-email-yang.shi@linaro.org>
+ <56A906F4.3050809@linaro.org>
+Message-ID: <20160204223711.GE7031@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 February 2016 at 23:09, Alan Stern <stern@rowland.harvard.edu> wrote:
-> On Thu, 4 Feb 2016, Ulf Hansson wrote:
->
->> I am really not questioning the autosuspend feature at all, it's a
->> really great feature!
->>
->> Now, I question the minor benefit we actually gain from having the
->> runtime PM core to update the mark in rpm_resume().
->
-> As Tony pointed out, it prevents some devices from going to sleep right
-> away.
+On Wed, Jan 27, 2016 at 10:05:40AM -0800, Shi, Yang wrote:
+> Correct FSL folks email address to nxp.com, sorry for the inconvenience.
 
-Because their drivers don't care to update the last busy mark!?
+Do we need some MAINTAINERS updates in addition to the ack for this patch?
+I see a bunch of @freescale.com addresses in MAINTAINERS.
 
->
->> To me, the best decision when to update the mark is know by the
->> driver/subsystem for the device and not the core.
->>
->> In most cases the mark will be updated after a request has been
->> completed, which leads to one unnecessary update at rpm_resume().
->
-> Sure, but that update is a simple assignment statement.  It's about as
-> cheap as you can get, short of doing nothing at all.
-
-Valid point. I rest my case. :-)
-
-Thanks for the discussion.
-
-[...]
-
-Kind regards
-Uffe
+> On 1/27/2016 9:32 AM, Yang Shi wrote:
+> >The layerscape PCI host driver needs recognize ls2085a compatible when using
+> >firmware with ls2085a compatible property, otherwise the PCI bus won't be
+> >detected even though ls2085a compatible is included by the dts.
+> >
+> >Signed-off-by: Yang Shi <yang.shi@linaro.org>
+> >---
+> >  drivers/pci/host/pci-layerscape.c | 1 +
+> >  1 file changed, 1 insertion(+)
+> >
+> >diff --git a/drivers/pci/host/pci-layerscape.c b/drivers/pci/host/pci-layerscape.c
+> >index 3923bed..c40d8b2 100644
+> >--- a/drivers/pci/host/pci-layerscape.c
+> >+++ b/drivers/pci/host/pci-layerscape.c
+> >@@ -203,6 +203,7 @@ static const struct of_device_id ls_pcie_of_match[] = {
+> >  	{ .compatible = "fsl,ls1021a-pcie", .data = &ls1021_drvdata },
+> >  	{ .compatible = "fsl,ls1043a-pcie", .data = &ls1043_drvdata },
+> >  	{ .compatible = "fsl,ls2080a-pcie", .data = &ls2080_drvdata },
+> >+	{ .compatible = "fsl,ls2085a-pcie", .data = &ls2080_drvdata },
+> >  	{ },
+> >  };
+> >  MODULE_DEVICE_TABLE(of, ls_pcie_of_match);
+> >
+> 
