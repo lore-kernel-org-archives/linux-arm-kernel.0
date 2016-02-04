@@ -1,54 +1,42 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu,  4 Feb 2016 16:50:28 +0100
-Subject: [PATCH v2 5/7] ARM: efistub: check for LPAE support before booting a
- LPAE kernel
+Date: Thu,  4 Feb 2016 16:50:25 +0100
+Subject: [PATCH v2 2/7] arm64: vmlinux.lds.S: handle .init.rodata.xxx and
+ .init.bss sections
 In-Reply-To: <1454601030-9093-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1454601030-9093-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1454601030-9093-6-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1454601030-9093-3-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A kernel built with support for LPAE cannot boot to a state where it
-can inform the user about it if it fails due to missing LPAE support
-in the hardware.
+The EFI stub is typically built into the decompressor (x86, ARM) so none
+of its symbols are annotated as __init. However, on arm64, the stub is
+linked into the kernel proper, and the code is __init annotated at the
+section level by prepending all names of SHF_ALLOC sections with '.init'.
 
-If we happen to be booting via UEFI, we can fail gracefully so check
-for LPAE support in the hardware on CONFIG_ARM_LPAE builds before
-entering the kernel proper.
+This results in section names like .init.rodata.str1.8 (for string literals)
+and .init.bss (which is tiny), both of which can be moved into the .init.data
+output section.
 
-Reviewed-by: Jeremy Linton <jeremy.linton@arm.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Tested-by: Mark Rutland <mark.rutland@arm.com>
+Reviewed-by: Matt Fleming <matt@codeblueprint.co.uk>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- drivers/firmware/efi/libstub/arm32-stub.c | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ arch/arm64/kernel/vmlinux.lds.S | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/firmware/efi/libstub/arm32-stub.c b/drivers/firmware/efi/libstub/arm32-stub.c
-index 495ebd657e38..6f42be4d0084 100644
---- a/drivers/firmware/efi/libstub/arm32-stub.c
-+++ b/drivers/firmware/efi/libstub/arm32-stub.c
-@@ -9,6 +9,23 @@
- #include <linux/efi.h>
- #include <asm/efi.h>
- 
-+efi_status_t check_platform_features(efi_system_table_t *sys_table_arg)
-+{
-+	int block;
-+
-+	/* non-LPAE kernels can run anywhere */
-+	if (!IS_ENABLED(CONFIG_ARM_LPAE))
-+		return EFI_SUCCESS;
-+
-+	/* LPAE kernels need compatible hardware */
-+	block = cpuid_feature_extract(CPUID_EXT_MMFR0, 0);
-+	if (block < 5) {
-+		pr_efi_err(sys_table_arg, "This LPAE kernel is not supported by your CPU\n");
-+		return EFI_UNSUPPORTED;
-+	}
-+	return EFI_SUCCESS;
-+}
-+
- efi_status_t handle_kernel_image(efi_system_table_t *sys_table,
- 				 unsigned long *image_addr,
- 				 unsigned long *image_size,
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index e3928f578891..cbf4db440e9c 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -134,6 +134,7 @@ SECTIONS
+ 		CON_INITCALL
+ 		SECURITY_INITCALL
+ 		INIT_RAM_FS
++		*(.init.rodata.* .init.bss)	/* from the EFI stub */
+ 	}
+ 	.exit.data : {
+ 		ARM_EXIT_KEEP(EXIT_DATA)
 -- 
 2.5.0
