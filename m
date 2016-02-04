@@ -1,36 +1,29 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 4 Feb 2016 13:24:04 -0800
-Subject: [PATCH] ARM: nomadik: fix up SD/MMC DT settings
-In-Reply-To: <1454332737-631-1-git-send-email-linus.walleij@linaro.org>
-References: <1454332737-631-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20160204212404.GA10600@localhost>
+Date: Thu, 4 Feb 2016 13:25:31 -0800
+Subject: [PATCH] ARM: multi_v7_defconfig: enable DW_WATCHDOG
+In-Reply-To: <7htwlpb8j2.fsf@baylibre.com>
+References: <1454518986-25953-1-git-send-email-dinguyen@opensource.altera.com>
+ <7htwlpb8j2.fsf@baylibre.com>
+Message-ID: <20160204212531.GA10933@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 01, 2016 at 02:18:57PM +0100, Linus Walleij wrote:
-> The DTSI file for the Nomadik does not properly specify how the
-> PL180 levelshifter is connected: the Nomadik actually needs all
-> the five st,sig-dir-* flags set to properly control all lines out.
+On Wed, Feb 03, 2016 at 04:53:37PM -0800, Kevin Hilman wrote:
+> <dinguyen@opensource.altera.com> writes:
 > 
-> Further this board supports full power cycling of the card, and
-> since this variant has no hardware clock gating, it needs a
-> ridiculously low frequency setting to keep up with the ever
-> overflowing FIFO.
+> > From: Dinh Nguyen <dinguyen@opensource.altera.com>
+> >
+> > The watchdog timer on the SoCFPGA platform is the Synopsys Designware watchdog.
+> > Enable CONFIG_DW_WATCHDOG for the driver to get built.
+> >
+> > Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
 > 
-> The pin configuration set-up is a bit of a mystery, because of
-> course these pins are a mix of inputs and outputs. However the
-> reference implementation sets all pins to "output" with
-> unspecified initial value, so let's do that here as well.
+> Tested-by: Kevin Hilman <khilman@baylibre.com>
 > 
-> Cc: stable at vger.kernel.org
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ARM SoC folks: this fixes the non-working SD/MMC card on the
-> Nomadik please apply this directly for fixes if Ulf is OK with
-> it.
+> I confirm that this fixes the boot problems I was seeing on my socfpga
+> board.
 
-Thanks, applied.
+Thanks, applied to fixes.
 
 
 -Olof
