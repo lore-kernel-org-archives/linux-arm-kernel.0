@@ -1,29 +1,64 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 4 Feb 2016 13:25:31 -0800
-Subject: [PATCH] ARM: multi_v7_defconfig: enable DW_WATCHDOG
-In-Reply-To: <7htwlpb8j2.fsf@baylibre.com>
-References: <1454518986-25953-1-git-send-email-dinguyen@opensource.altera.com>
- <7htwlpb8j2.fsf@baylibre.com>
-Message-ID: <20160204212531.GA10933@localhost>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 4 Feb 2016 17:09:43 -0500 (EST)
+Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
+ v4.5-rc1
+In-Reply-To: <CAPDyKFpRnmn+h_VH3jtC3u-BOf7-00nbzD30omaxaaZOOAK8Gg@mail.gmail.com>
+Message-ID: <Pine.LNX.4.44L0.1602041702550.1515-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 03, 2016 at 04:53:37PM -0800, Kevin Hilman wrote:
-> <dinguyen@opensource.altera.com> writes:
+On Thu, 4 Feb 2016, Ulf Hansson wrote:
+
+> I am really not questioning the autosuspend feature at all, it's a
+> really great feature!
 > 
-> > From: Dinh Nguyen <dinguyen@opensource.altera.com>
+> Now, I question the minor benefit we actually gain from having the
+> runtime PM core to update the mark in rpm_resume().
+
+As Tony pointed out, it prevents some devices from going to sleep right 
+away.
+
+> To me, the best decision when to update the mark is know by the
+> driver/subsystem for the device and not the core.
+> 
+> In most cases the mark will be updated after a request has been
+> completed, which leads to one unnecessary update at rpm_resume().
+
+Sure, but that update is a simple assignment statement.  It's about as 
+cheap as you can get, short of doing nothing at all.
+
+> In this path (the resume), you really want to keep latencies to a
+> minimum and for sure not do unnecessary things.
+> 
 > >
-> > The watchdog timer on the SoCFPGA platform is the Synopsys Designware watchdog.
-> > Enable CONFIG_DW_WATCHDOG for the driver to get built.
-> >
-> > Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
+> > Perhaps you think that it's silly to behave that way in this case,
+> > because the device wasn't accessed at all during the time it was at
+> > full power.  That's a valid objection, but the proper solution is not
+> > to revert the 56f487c78015 commit.  Rather, change the driver to avoid
+> > doing a pm_runtime_resume_sync until you _know_ that the device will be
+> > accessed soon.
 > 
-> Tested-by: Kevin Hilman <khilman@baylibre.com>
+> That's not always going to work.
 > 
-> I confirm that this fixes the boot problems I was seeing on my socfpga
-> board.
+> Sometimes you need to access the device when trying to probe. Failing
+> later in probe, shows just *one* case where it doesn't make sense to
+> update the last busy mark. I suspect there may be other cases as well.
 
-Thanks, applied to fixes.
+I don't follow your reasoning.  If you don't update the last_busy mark 
+then the probe fails, the device goes to sleep immediately, and then 
+wakes up again a fraction of a second later for another probe attempt 
+(if the error was -EDEFER).  Thus you get an unnecessary suspend 
+followed by an unnecessary resume.
 
+If the error was something other than -EDEFER and there will be no more 
+probes, then yes -- the device remains at full power for longer than 
+necessary.  But how often does that happen?  In general, people have 
+drivers that _do_ work with their devices.
 
--Olof
+> Of course one can always use runtime PM APIs which overrides the
+> autosuspend mode, so it's not a big deal.
+
+Or turn autosuspend off completely when you know you're not going to
+want it any more.  True.
+
+Alan Stern
