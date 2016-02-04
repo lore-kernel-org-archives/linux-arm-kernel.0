@@ -1,33 +1,39 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 4 Feb 2016 20:30:37 +0100
-Subject: [PATCH v2] clk: shmobile: r8a7795: Add SD divider support
-In-Reply-To: <1454135639-4102-1-git-send-email-dirk.behme@gmail.com>
-References: <1454135639-4102-1-git-send-email-dirk.behme@gmail.com>
-Message-ID: <20160204193036.GA1958@tetsubishi>
+From: labbott@fedoraproject.org (Laura Abbott)
+Date: Thu,  4 Feb 2016 11:43:37 -0800
+Subject: [PATCHv3 3/3] arm64: ptdump: Indicate whether memory should be
+ faulting
+In-Reply-To: <1454615017-24672-1-git-send-email-labbott@fedoraproject.org>
+References: <1454615017-24672-1-git-send-email-labbott@fedoraproject.org>
+Message-ID: <1454615017-24672-4-git-send-email-labbott@fedoraproject.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 30, 2016 at 07:33:59AM +0100, Dirk Behme wrote:
-> This patch adds SD[0..3] clock divider support for R-Car Gen3 SoC.
-> 
-> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
 
-Tested-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+With CONFIG_DEBUG_PAGEALLOC, pages do not have the valid bit
+set when free in the buddy allocator. Add an indiciation to
+the page table dumping code that the valid bit is not set,
+'F' for fault, to make this easier to understand.
 
-Since we don't have UHS support currently, changing the clock is not
-really exercised; but the code looks good and if it needs fixing, we can
-do it incrementally IMO. What is currently needed works fine on my
-Salvator-X for the exposed SD interfaces.
+Signed-off-by: Laura Abbott <labbott@fedoraproject.org>
+---
+ arch/arm64/mm/dump.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-Thanks,
-
-   Wolfram
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160204/45685662/attachment.sig>
+diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
+index 5a22a11..f381ac9 100644
+--- a/arch/arm64/mm/dump.c
++++ b/arch/arm64/mm/dump.c
+@@ -90,6 +90,11 @@ struct prot_bits {
+ 
+ static const struct prot_bits pte_bits[] = {
+ 	{
++		.mask	= PTE_VALID,
++		.val	= PTE_VALID,
++		.set	= " ",
++		.clear	= "F",
++	}, {
+ 		.mask	= PTE_USER,
+ 		.val	= PTE_USER,
+ 		.set	= "USR",
+-- 
+2.5.0
