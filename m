@@ -1,42 +1,80 @@
-From: tchalamarla@caviumnetworks.com (tchalamarla at caviumnetworks.com)
-Date: Thu, 4 Feb 2016 10:45:25 -0800
-Subject: [PATCH] irqchip-gicv3: Make sure read from ICC_IAR1_EL1 is visible on
- redestributor
-Message-ID: <1454611525-18032-1-git-send-email-tchalamarla@caviumnetworks.com>
+From: bcrl@kvack.org (Benjamin LaHaise)
+Date: Thu, 4 Feb 2016 13:48:25 -0500
+Subject: linux-next: build failure after merge of the aio tree
+In-Reply-To: <20160204161741.GH10826@n2100.arm.linux.org.uk>
+References: <CAMuHMdUy-cqeN8COO4rdpY-mOH+6gth40wB31-edkj8CO5PFCw@mail.gmail.com>
+ <20160204131959.6695c7bf@canb.auug.org.au> <20160204134142.GA16315@kvack.org>
+ <20160204135056.GE10826@n2100.arm.linux.org.uk>
+ <20160204140822.GB16315@kvack.org>
+ <20160204141253.GF10826@n2100.arm.linux.org.uk>
+ <20160204143204.GC16315@kvack.org>
+ <20160204143907.GG10826@n2100.arm.linux.org.uk>
+ <20160204160101.GD16315@kvack.org>
+ <20160204161741.GH10826@n2100.arm.linux.org.uk>
+Message-ID: <20160204184825.GG16315@kvack.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
+On Thu, Feb 04, 2016 at 04:17:42PM +0000, Russell King - ARM Linux wrote:
+> __gu_val will be 32-bit, even when you're wanting a 64-bit quantity.
+> That's where the fun and games start...
 
-ARM GIC specification mention the need for dsb after ICC_IAR1_EL1 read.
+Okay, I figured out how to do it: instead of using a 64 bit unsigned long 
+long for __gu_val, use an array of 2 unsigned longs.  See the patch below 
+which I verified boots, passes your tests and doesn't truncate 64 bit 
+values.  Comments?  A simple test module to verify things is located at 
+http://www.kvack.org/~bcrl/test_module2.c .
 
-4.1.1 Physical CPU Interface:
-"The effects of reading ICC_IAR0_EL1 and ICC_IAR1_EL1 on the state of a
-returned INTID are not guaranteed to be visible until after the
-execution of a DSB."
-
-The effect of not having this is, missing interrupts.
-this patch address the problem by adding a dsb .
-
-changes form V1:
-	- modified subject line and commit message.
-
-Signed-off-by: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
----
- arch/arm64/include/asm/arch_gicv3.h | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
-index 2731d3b..8ec88e5 100644
---- a/arch/arm64/include/asm/arch_gicv3.h
-+++ b/arch/arm64/include/asm/arch_gicv3.h
-@@ -103,6 +103,7 @@ static inline u64 gic_read_iar_common(void)
- 	u64 irqstat;
- 
- 	asm volatile("mrs_s %0, " __stringify(ICC_IAR1_EL1) : "=r" (irqstat));
-+	dsb(sy);
- 	return irqstat;
- }
- 
+		-ben
 -- 
-2.1.0
+"Thought is the essence of where you are now."
+
+
+diff --git a/arch/x86/include/asm/uaccess.h b/arch/x86/include/asm/uaccess.h
+index 09b1b0a..53244ae 100644
+--- a/arch/x86/include/asm/uaccess.h
++++ b/arch/x86/include/asm/uaccess.h
+@@ -326,7 +326,22 @@ do {									\
+ } while (0)
+ 
+ #ifdef CONFIG_X86_32
+-#define __get_user_asm_u64(x, ptr, retval, errret)	(x) = __get_user_bad()
++#define __get_user_asm_u64(x, addr, err, errret)			\
++	asm volatile(ASM_STAC "\n"					\
++		     "1:	movl %2,%%eax\n"			\
++		     "2:	movl %3,%%edx\n"			\
++		     "3: " ASM_CLAC "\n"				\
++		     ".section .fixup,\"ax\"\n"				\
++		     "4:	mov %4,%0\n"				\
++		     "	xorl %%eax,%%eax\n"				\
++		     "	xorl %%edx,%%edx\n"				\
++		     "	jmp 3b\n"					\
++		     ".previous\n"					\
++		     _ASM_EXTABLE(1b, 4b)				\
++		     _ASM_EXTABLE(2b, 4b)				\
++		     : "=r" (err), "=A"(x)				\
++		     : "m" (__m(addr)), "m" __m(((u32 *)addr) + 1), "i" (errret), "0" (err))
++
+ #define __get_user_asm_ex_u64(x, ptr)			(x) = __get_user_bad()
+ #else
+ #define __get_user_asm_u64(x, ptr, retval, errret) \
+@@ -407,9 +422,16 @@ do {									\
+ #define __get_user_nocheck(x, ptr, size)				\
+ ({									\
+ 	int __gu_err;							\
+-	unsigned long __gu_val;						\
+-	__get_user_size(__gu_val, (ptr), (size), __gu_err, -EFAULT);	\
+-	(x) = (__force __typeof__(*(ptr)))__gu_val;			\
++	if (size == 8) {						\
++		unsigned long __gu_val[2];				\
++		__gu_err = 0;						\
++		__get_user_asm_u64(__gu_val, ptr, __gu_err, -EFAULT);	\
++		(x) = *(__force __typeof__((ptr)))__gu_val;		\
++	} else {							\
++		unsigned long __gu_val;					\
++		__get_user_size(__gu_val, (ptr), (size), __gu_err, -EFAULT); \
++		(x) = (__force __typeof__(*(ptr)))__gu_val;		\
++	}								\
+ 	__builtin_expect(__gu_err, 0);					\
+ })
+ 
