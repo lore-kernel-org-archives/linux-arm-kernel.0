@@ -1,65 +1,53 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Thu, 4 Feb 2016 17:06:40 +0000
-Subject: [RFC PATCH 0/4] Add ACPI support for HiSilicon PCIe Host
- Controllers
-In-Reply-To: <1930535.mkCdtpUWq7@wuerfel>
-References: <1454585860-60709-1-git-send-email-gabriele.paoloni@huawei.com>
- <76564455.dlc1WHiVY2@wuerfel>
- <EE11001F9E5DDD47B7634E2F8A612F2E1EC9EF4B@lhreml503-mbs>
- <1930535.mkCdtpUWq7@wuerfel>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1EC9F055@lhreml503-mbs>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 4 Feb 2016 09:20:25 -0800
+Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
+ v4.5-rc1
+In-Reply-To: <Pine.LNX.4.44L0.1602041059070.1515-100000@iolanthe.rowland.org>
+References: <CAPDyKFr3jqh5bDFOuKLgomhQ2P9+yN5Ps8E0CH8r-oOjvBuswg@mail.gmail.com>
+ <Pine.LNX.4.44L0.1602041059070.1515-100000@iolanthe.rowland.org>
+Message-ID: <20160204172025.GQ19432@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: 04 February 2016 17:02
-> To: Gabriele Paoloni
-> Cc: Guohanjun (Hanjun Guo); Wangzhou (B); liudongdong (C); Linuxarm;
-> qiujiang; bhelgaas at google.com; Lorenzo.Pieralisi at arm.com;
-> tn at semihalf.com; zhangjukuo; xuwei (O); Liguozhu (Kenneth); linux-
-> pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
-> acpi at vger.kernel.org; linux-kernel at vger.kernel.org; jcm at redhat.com
-> Subject: Re: [RFC PATCH 0/4] Add ACPI support for HiSilicon PCIe Host
-> Controllers
+* Alan Stern <stern@rowland.harvard.edu> [160204 08:05]:
+> On Thu, 4 Feb 2016, Ulf Hansson wrote:
 > 
-> On Thursday 04 February 2016 16:44:12 Gabriele Paoloni wrote:
-> > Effectively the ACPI version of the HiSilicon driver does not rely on
-> > Designware as much as the DT version (that calls
-> dw_pcie_host_init());
-> > however in order to do what you suggest I'd need to copy and paste
-> and
-> > modify dw_pcie_rd_conf and dw_pcie_wr_conf.
-> > Also I'd need to declare duplicate version of the functions in
-> > pcie-hisi-common.c (if I do not want to split the object across
-> > different paths "drivers/pci/host" and "drivers/acpi/")
-> >
-> > Now I can do it but I thought it was more correct to pass
-> &dw_pcie_ops
-> > as input pointer in DECLARE_ACPI_MCFG_FIXUP(); this is also because
-> maybe in
-> > future other Designware based controllers may need to support ACPI
-> and it
-> > would be easier for them to reuse their DT based driver functions
-> >
-> > Honestly I am a bit confused...
-> >
+> > Just wanted to add yet some new findings while I was looking into this
+> > regression.
+> > 
+> > So, the reason why pm_runtime_put_sync() doesn't idle the device in
+> > these cases, is because autosuspend is respected and for some reason
+> > the autosuspend timer hasn't expired.
 > 
-> I don't think you can use the dw_pcie_ops as-is anyway, as they in
-> turn rely on the device driver structure, and you also don't need
-> those as they seem to be written for the generic case of a 32-bit
-> architecture that does not have enough space to map the entire
-> config space into MMIO. Just set up all those mapping registers from
-> the firmware and pass the config space base address as you'd normally
-> do on ACPI.
-
-Ok thanks, I'll wait a bit to see if there is any comment on this
-from other people, if not I'll rework the ACPI driver as you suggest
-and remove any dependency on Designware.
-
-Cheers
-
-Gab
-
+> No doubt the autosuspend delay is longer than the time it takes for a 
+> probe to fail.
 > 
-> 	Arnd
+> > I was wondering *why* the timer isn't considered as expired, because
+> > the driver don't call pm_runtime_mark_last_busy() in the failing probe
+> > case...
+> > 
+> > Then I realized the following commit was merged a few releases ago,
+> > which makes the runtime PM core to invoke pm_runtime_mark_last_busy()
+> > for us.
+> > 
+> > commit 56f487c78015936097474fd89b2ccb229d500d0f
+> > Author: Tony Lindgren <tony@atomide.com>
+> > Date:   Wed May 13 16:36:32 2015 -0700
+> > PM / Runtime: Update last_busy in rpm_resume
+> > 
+> > So, this commit actually causes the devices to stay active after a
+> > failed probe attempt.
+> > 
+> > I think it's a good idea to revert this change, but what to you think?
+> 
+> I disagree.  The whole idea of autosuspend is to prevent the device's
+> power state from bouncing up and down too rapidly.  This implies that 
+> whenever the device gets resumed, we should wait at least the minimum 
+> autosuspend delay before allowing the next autosuspend.
+
+Yeah let's not revert 56f487c78015. Without that we have devices
+falling right back to sleep.
+
+Regards,
+
+Tony
