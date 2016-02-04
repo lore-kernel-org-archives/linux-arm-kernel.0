@@ -1,9 +1,9 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu,  4 Feb 2016 11:06:48 +0100
-Subject: [PATCH v2 25/51] mtd: nand: atmel: switch to mtd_ooblayout_ops
+Date: Thu,  4 Feb 2016 11:06:46 +0100
+Subject: [PATCH v2 23/51] mtd: nand: sharpsl: switch to mtd_ooblayout_ops
 In-Reply-To: <1454580434-32078-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1454580434-32078-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1454580434-32078-26-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1454580434-32078-24-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,167 +12,119 @@ ECC/OOB layout to MTD users.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/mtd/nand/atmel_nand.c | 84 ++++++++++++++++++++-----------------------
- 1 file changed, 38 insertions(+), 46 deletions(-)
+ arch/arm/mach-pxa/spitz.c   | 55 ++++++++++++++++++++++++++++++++++++---------
+ drivers/mtd/nand/sharpsl.c  |  2 +-
+ include/linux/mtd/sharpsl.h |  2 +-
+ 3 files changed, 47 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
-index 9dde308..dddb219 100644
---- a/drivers/mtd/nand/atmel_nand.c
-+++ b/drivers/mtd/nand/atmel_nand.c
-@@ -67,30 +67,44 @@ struct atmel_nand_caps {
- 	bool pmecc_correct_erase_page;
+diff --git a/arch/arm/mach-pxa/spitz.c b/arch/arm/mach-pxa/spitz.c
+index 825f903..9050a1b 100644
+--- a/arch/arm/mach-pxa/spitz.c
++++ b/arch/arm/mach-pxa/spitz.c
+@@ -763,14 +763,49 @@ static struct nand_bbt_descr spitz_nand_bbt = {
+ 	.pattern	= scan_ff_pattern
  };
  
--/* oob layout for large page size
-+/*
-+ * oob layout for large page size
-  * bad block info is on bytes 0 and 1
-  * the bytes have to be consecutives to avoid
-  * several NAND_CMD_RNDOUT during read
-- */
--static struct nand_ecclayout atmel_oobinfo_large = {
--	.eccbytes = 4,
--	.eccpos = {60, 61, 62, 63},
--	.oobfree = {
--		{2, 58}
+-static struct nand_ecclayout akita_oobinfo = {
+-	.oobfree	= { {0x08, 0x09} },
+-	.eccbytes	= 24,
+-	.eccpos		= {
+-			0x05, 0x01, 0x02, 0x03, 0x06, 0x07, 0x15, 0x11,
+-			0x12, 0x13, 0x16, 0x17, 0x25, 0x21, 0x22, 0x23,
+-			0x26, 0x27, 0x35, 0x31, 0x32, 0x33, 0x36, 0x37,
 -	},
--};
--
--/* oob layout for small page size
-+ *
-+ * oob layout for small page size
-  * bad block info is on bytes 4 and 5
-  * the bytes have to be consecutives to avoid
-  * several NAND_CMD_RNDOUT during read
-  */
--static struct nand_ecclayout atmel_oobinfo_small = {
--	.eccbytes = 4,
--	.eccpos = {0, 1, 2, 3},
--	.oobfree = {
--		{6, 10}
--	},
-+static int atmel_ooblayout_ecc_sp(struct mtd_info *mtd, int section,
-+				  struct mtd_oob_region *oobregion)
++static int akita_ooblayout_ecc(struct mtd_info *mtd, int section,
++			       struct mtd_oob_region *oobregion)
 +{
-+	if (section)
++	if (section > 12)
 +		return -ERANGE;
 +
-+	oobregion->length = 4;
-+	oobregion->offset = 0;
++	switch (section % 3) {
++	case 0:
++		oobregion->offset = 5;
++		oobregion->length = 1;
++		break;
++
++	case 1:
++		oobregion->offset = 1;
++		oobregion->length = 3;
++		break;
++
++	case 2:
++		oobregion->offset = 6;
++		oobregion->length = 2;
++		break;
++	}
++
++	oobregion->offset += (section / 3) * 0x10;
 +
 +	return 0;
 +}
 +
-+static int atmel_ooblayout_free_sp(struct mtd_info *mtd, int section,
-+				   struct mtd_oob_region *oobregion)
++static int akita_ooblayout_free(struct mtd_info *mtd, int section,
++				struct mtd_oob_region *oobregion)
 +{
 +	if (section)
 +		return -ERANGE;
 +
-+	oobregion->offset = 6;
-+	oobregion->length = mtd->oobsize - oobregion->offset;
++	oobfree->offset = 8;
++	oobfree->length = 9;
 +
 +	return 0;
 +}
 +
-+static const struct mtd_ooblayout_ops atmel_ooblayout_sp_ops = {
-+	.ecc = atmel_ooblayout_ecc_sp,
-+	.free = atmel_ooblayout_free_sp,
++static const struct mtd_ooblayout_ops akita_ooblayout_ops = {
++	.eccpos = akita_ooblayout_ecc,
++	.oobfree = akita_ooblayout_free,
  };
  
- struct atmel_nfc {
-@@ -156,8 +170,6 @@ struct atmel_nand_host {
- 	int			*pmecc_delta;
+ static struct sharpsl_nand_platform_data spitz_nand_pdata = {
+@@ -804,11 +839,11 @@ static void __init spitz_nand_init(void)
+ 	} else if (machine_is_akita()) {
+ 		spitz_nand_partitions[1].size = 58 * 1024 * 1024;
+ 		spitz_nand_bbt.len = 1;
+-		spitz_nand_pdata.ecc_layout = &akita_oobinfo;
++		spitz_nand_pdata.ecc_layout = &akita_ooblayout_ops;
+ 	} else if (machine_is_borzoi()) {
+ 		spitz_nand_partitions[1].size = 32 * 1024 * 1024;
+ 		spitz_nand_bbt.len = 1;
+-		spitz_nand_pdata.ecc_layout = &akita_oobinfo;
++		spitz_nand_pdata.ecc_layout = &akita_ooblayout_ops;
+ 	}
+ 
+ 	platform_device_register(&spitz_nand_device);
+diff --git a/drivers/mtd/nand/sharpsl.c b/drivers/mtd/nand/sharpsl.c
+index b7d1b55..064ca17 100644
+--- a/drivers/mtd/nand/sharpsl.c
++++ b/drivers/mtd/nand/sharpsl.c
+@@ -148,6 +148,7 @@ static int sharpsl_nand_probe(struct platform_device *pdev)
+ 	/* Link the private data with the MTD structure */
+ 	mtd = nand_to_mtd(this);
+ 	mtd->dev.parent = &pdev->dev;
++	mtd_set_ooblayout(mtd, data->ecc_layout);
+ 
+ 	platform_set_drvdata(pdev, sharpsl);
+ 
+@@ -170,7 +171,6 @@ static int sharpsl_nand_probe(struct platform_device *pdev)
+ 	this->ecc.bytes = 3;
+ 	this->ecc.strength = 1;
+ 	this->badblock_pattern = data->badblock_pattern;
+-	this->ecc.layout = data->ecc_layout;
+ 	this->ecc.hwctl = sharpsl_nand_enable_hwecc;
+ 	this->ecc.calculate = sharpsl_nand_calculate_ecc;
+ 	this->ecc.correct = nand_correct_data;
+diff --git a/include/linux/mtd/sharpsl.h b/include/linux/mtd/sharpsl.h
+index 25f4d2a..65e91d0 100644
+--- a/include/linux/mtd/sharpsl.h
++++ b/include/linux/mtd/sharpsl.h
+@@ -14,7 +14,7 @@
+ 
+ struct sharpsl_nand_platform_data {
+ 	struct nand_bbt_descr	*badblock_pattern;
+-	struct nand_ecclayout	*ecc_layout;
++	const struct mtd_ooblayout_ops *ecc_layout;
+ 	struct mtd_partition	*partitions;
+ 	unsigned int		nr_partitions;
  };
- 
--static struct nand_ecclayout atmel_pmecc_oobinfo;
--
- /*
-  * Enable NAND.
-  */
-@@ -475,22 +487,6 @@ static int pmecc_get_ecc_bytes(int cap, int sector_size)
- 	return (m * cap + 7) / 8;
- }
- 
--static void pmecc_config_ecc_layout(struct nand_ecclayout *layout,
--				    int oobsize, int ecc_len)
--{
--	int i;
--
--	layout->eccbytes = ecc_len;
--
--	/* ECC will occupy the last ecc_len bytes continuously */
--	for (i = 0; i < ecc_len; i++)
--		layout->eccpos[i] = oobsize - ecc_len + i;
--
--	layout->oobfree[0].offset = PMECC_OOB_RESERVED_BYTES;
--	layout->oobfree[0].length =
--		oobsize - ecc_len - layout->oobfree[0].offset;
--}
--
- static void __iomem *pmecc_get_alpha_to(struct atmel_nand_host *host)
- {
- 	int table_size;
-@@ -1002,8 +998,8 @@ static void atmel_pmecc_core_init(struct mtd_info *mtd)
- {
- 	struct nand_chip *nand_chip = mtd_to_nand(mtd);
- 	struct atmel_nand_host *host = nand_get_controller_data(nand_chip);
-+	int eccbytes = mtd_ooblayout_count_eccbytes(mtd);
- 	uint32_t val = 0;
--	struct nand_ecclayout *ecc_layout;
- 	struct mtd_oob_region oobregion;
- 
- 	pmecc_writel(host->ecc, CTRL, PMECC_CTRL_RST);
-@@ -1051,12 +1047,11 @@ static void atmel_pmecc_core_init(struct mtd_info *mtd)
- 		| PMECC_CFG_AUTO_DISABLE);
- 	pmecc_writel(host->ecc, CFG, val);
- 
--	ecc_layout = nand_chip->ecc.layout;
- 	pmecc_writel(host->ecc, SAREA, mtd->oobsize - 1);
- 	mtd_ooblayout_ecc(mtd, 0, &oobregion);
- 	pmecc_writel(host->ecc, SADDR, oobregion.offset);
- 	pmecc_writel(host->ecc, EADDR,
--		     oobregion.offset + ecc_layout->eccbytes - 1);
-+		     oobregion.offset + eccbytes - 1);
- 	/* See datasheet about PMECC Clock Control Register */
- 	pmecc_writel(host->ecc, CLK, 2);
- 	pmecc_writel(host->ecc, IDR, 0xff);
-@@ -1271,11 +1266,8 @@ static int atmel_pmecc_nand_init_params(struct platform_device *pdev,
- 			err_no = -EINVAL;
- 			goto err;
- 		}
--		pmecc_config_ecc_layout(&atmel_pmecc_oobinfo,
--					mtd->oobsize,
--					nand_chip->ecc.total);
- 
--		nand_chip->ecc.layout = &atmel_pmecc_oobinfo;
-+		mtd_set_ooblayout(mtd, &nand_ooblayout_lp_ops);
- 		break;
- 	default:
- 		dev_warn(host->dev,
-@@ -1617,19 +1609,19 @@ static int atmel_hw_nand_init_params(struct platform_device *pdev,
- 	/* set ECC page size and oob layout */
- 	switch (mtd->writesize) {
- 	case 512:
--		nand_chip->ecc.layout = &atmel_oobinfo_small;
-+		mtd_set_ooblayout(mtd, &atmel_ooblayout_sp_ops);
- 		ecc_writel(host->ecc, MR, ATMEL_ECC_PAGESIZE_528);
- 		break;
- 	case 1024:
--		nand_chip->ecc.layout = &atmel_oobinfo_large;
-+		mtd_set_ooblayout(mtd, &nand_ooblayout_lp_ops);
- 		ecc_writel(host->ecc, MR, ATMEL_ECC_PAGESIZE_1056);
- 		break;
- 	case 2048:
--		nand_chip->ecc.layout = &atmel_oobinfo_large;
-+		mtd_set_ooblayout(mtd, &nand_ooblayout_lp_ops);
- 		ecc_writel(host->ecc, MR, ATMEL_ECC_PAGESIZE_2112);
- 		break;
- 	case 4096:
--		nand_chip->ecc.layout = &atmel_oobinfo_large;
-+		mtd_set_ooblayout(mtd, &nand_ooblayout_lp_ops);
- 		ecc_writel(host->ecc, MR, ATMEL_ECC_PAGESIZE_4224);
- 		break;
- 	default:
 -- 
 2.1.4
