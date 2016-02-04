@@ -1,41 +1,33 @@
-From: vishnupatekar0510@gmail.com (Vishnu Patekar)
-Date: Thu, 4 Feb 2016 14:06:45 +0800
-Subject: [PATCH 04/14] clk: sunxi: add ahb1 clock for A83T
-In-Reply-To: <20160202131725.GQ4652@lukather>
-References: <1454203266-4450-1-git-send-email-vishnupatekar0510@gmail.com>
- <1454203266-4450-5-git-send-email-vishnupatekar0510@gmail.com>
- <20160202131725.GQ4652@lukather>
-Message-ID: <CAEzqOZuBz2jexvZvvtkvjbE8UtzUMKL9nT5JJ9JcvMPmzEKTcQ@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 4 Feb 2016 12:01:31 +0530
+Subject: [PATCH] ARM: DRA7: hwmod: Fix OCP2SCP sysconfig
+Message-ID: <1454567491-30499-1-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Maxime,
+OCP2SCP doesn't support smart idle wakeup according to
+DRA72x_SR1.0_NDA_TRM_vL and DRA75x_DRA74x_SR1.1_NDA_TRM_vW.
+Remove SIDLE_SMART_WKUP from the list of supported SIDLE modes
+in hwmod data.
 
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c |    3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-On Tue, Feb 2, 2016 at 9:17 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
->
-> On Sun, Jan 31, 2016 at 09:20:56AM +0800, Vishnu Patekar wrote:
->> AHB1 on A83T is similar to ahb1 on A31, except parents are different.
->> clock index 0b1x is PLL6.
->>
->> Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
->
-> If the clock is the same but the parents are different, then we don't
-> need to duplicate all the logic. Simply add the number of parents to
-> mux_data, and you're all set.
-
-Problem here is: parent 0b10 for A31 ahb1 is AXI, 0b11 is pll6/pre_div.
-0b10 and 0b11 is pll6/pre_div.
-So, just adding number of parents to mux_data will not solve problem.
-
-Regards,
-Vishnu
->
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+index 848356e..84c2699 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+@@ -1482,8 +1482,7 @@ static struct omap_hwmod_class_sysconfig dra7xx_ocp2scp_sysc = {
+ 	.syss_offs	= 0x0014,
+ 	.sysc_flags	= (SYSC_HAS_AUTOIDLE | SYSC_HAS_SIDLEMODE |
+ 			   SYSC_HAS_SOFTRESET | SYSS_HAS_RESET_STATUS),
+-	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
+-			   SIDLE_SMART_WKUP),
++	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
+ 	.sysc_fields	= &omap_hwmod_sysc_type1,
+ };
+ 
+-- 
+1.7.9.5
