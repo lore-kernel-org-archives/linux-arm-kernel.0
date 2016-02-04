@@ -1,135 +1,139 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  4 Feb 2016 15:29:24 +0100
-Subject: [PATCH 30/70] ARM: dts: gose: Enable sound PIO support in device tree
-In-Reply-To: <cover.1454595846.git.horms+renesas@verge.net.au>
-References: <cover.1454595846.git.horms+renesas@verge.net.au>
-Message-ID: <f8905ce841deb22b43c6cc1f2ef47638e61bbec6.1454595846.git.horms+renesas@verge.net.au>
+Date: Thu,  4 Feb 2016 15:29:42 +0100
+Subject: [PATCH 5/8] arm64: dts: r8a7795: Add SCIF fallback compatibility
+ strings
+In-Reply-To: <cover.1454595726.git.horms+renesas@verge.net.au>
+References: <cover.1454595726.git.horms+renesas@verge.net.au>
+Message-ID: <653f502d779e9ef90daa32443d0c60ebf67d5da9.1454595726.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable sound PIO support in the r8a7793/gose device tree.
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Based on similar work for the r8a7791/koelsch by Kuninori Morimoto.
-
-Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7793-gose.dts | 77 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 77 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 38 +++++++++++++++++++++++---------
+ 1 file changed, 27 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
-index 0b4cc8d99390..395ea63746ac 100644
---- a/arch/arm/boot/dts/r8a7793-gose.dts
-+++ b/arch/arm/boot/dts/r8a7793-gose.dts
-@@ -8,6 +8,17 @@
-  * kind, whether express or implied.
-  */
- 
-+/*
-+ * SSI-AK4643
-+ *
-+ * SW1: 1: AK4643
-+ *      2: CN22
-+ *      3: ADV7511
-+ *
-+ * This command is required when Playback/Capture
-+ *
-+ *	amixer set "LINEOUT Mixer DACL" on
-+ */
- /dts-v1/;
- #include "r8a7793.dtsi"
- #include <dt-bindings/gpio/gpio.h>
-@@ -130,6 +141,30 @@
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index 95967b72db35..013df449fc30 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -474,7 +474,9 @@
  		};
- 	};
  
-+	audio_clock: clock {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <11289600>;
-+		clock-output-names = "audio_clock";
-+	};
-+
-+	rsnd_ak4643: sound {
-+		compatible = "simple-audio-card";
-+
-+		simple-audio-card,format = "left_j";
-+		simple-audio-card,bitclock-master = <&sndcodec>;
-+		simple-audio-card,frame-master = <&sndcodec>;
-+
-+		sndcpu: simple-audio-card,cpu {
-+			sound-dai = <&rcar_sound>;
-+		};
-+
-+		sndcodec: simple-audio-card,codec {
-+			sound-dai = <&ak4643>;
-+			clocks = <&audio_clock>;
-+		};
-+	};
-+
- 	hdmi-out {
- 		compatible = "hdmi-connector";
- 		type = "a";
-@@ -218,6 +253,16 @@
- 		renesas,groups = "qspi_ctrl", "qspi_data4";
- 		renesas,function = "qspi";
- 	};
-+
-+	sound_pins: sound {
-+		renesas,groups = "ssi0129_ctrl", "ssi0_data", "ssi1_data";
-+		renesas,function = "ssi";
-+	};
-+
-+	sound_clk_pins: sound_clk {
-+		renesas,groups = "audio_clk_a";
-+		renesas,function = "audio_clk";
-+	};
- };
+ 		hscif0: serial at e6540000 {
+-			compatible = "renesas,hscif-r8a7795", "renesas,hscif";
++			compatible = "renesas,hscif-r8a7795",
++				     "renesas,rcar-gen3-hscif",
++				     "renesas,hscif";
+ 			reg = <0 0xe6540000 0 96>;
+ 			interrupts = <GIC_SPI 154 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 520>;
+@@ -486,7 +488,9 @@
+ 		};
  
- &ether {
-@@ -300,6 +345,12 @@
- 	status = "okay";
- 	clock-frequency = <100000>;
+ 		hscif1: serial at e6550000 {
+-			compatible = "renesas,hscif-r8a7795", "renesas,hscif";
++			compatible = "renesas,hscif-r8a7795",
++				     "renesas,rcar-gen3-hscif",
++				     "renesas,hscif";
+ 			reg = <0 0xe6550000 0 96>;
+ 			interrupts = <GIC_SPI 155 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 519>;
+@@ -498,7 +502,9 @@
+ 		};
  
-+	ak4643: codec at 12 {
-+		compatible = "asahi-kasei,ak4643";
-+		#sound-dai-cells = <0>;
-+		reg = <0x12>;
-+	};
-+
- 	hdmi at 39 {
- 		compatible = "adi,adv7511w";
- 		reg = <0x39>;
-@@ -338,3 +389,29 @@
- 		pagesize = <16>;
- 	};
- };
-+
-+&rcar_sound {
-+	pinctrl-0 = <&sound_pins &sound_clk_pins>;
-+	pinctrl-names = "default";
-+
-+	/* Single DAI */
-+	#sound-dai-cells = <0>;
-+
-+	status = "okay";
-+
-+	rcar_sound,dai {
-+		dai0 {
-+			playback = <&ssi0>;
-+			capture  = <&ssi1>;
-+		};
-+	};
-+};
-+
-+&ssi0 {
-+	pio-transfer;
-+};
-+
-+&ssi1 {
-+	pio-transfer;
-+	shared-pin;
-+};
+ 		hscif2: serial at e6560000 {
+-			compatible = "renesas,hscif-r8a7795", "renesas,hscif";
++			compatible = "renesas,hscif-r8a7795",
++				     "renesas,rcar-gen3-hscif",
++				     "renesas,hscif";
+ 			reg = <0 0xe6560000 0 96>;
+ 			interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 518>;
+@@ -510,7 +516,9 @@
+ 		};
+ 
+ 		hscif3: serial at e66a0000 {
+-			compatible = "renesas,hscif-r8a7795", "renesas,hscif";
++			compatible = "renesas,hscif-r8a7795",
++				     "renesas,rcar-gen3-hscif",
++				     "renesas,hscif";
+ 			reg = <0 0xe66a0000 0 96>;
+ 			interrupts = <GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 517>;
+@@ -522,7 +530,9 @@
+ 		};
+ 
+ 		hscif4: serial at e66b0000 {
+-			compatible = "renesas,hscif-r8a7795", "renesas,hscif";
++			compatible = "renesas,hscif-r8a7795",
++				     "renesas,rcar-gen3-hscif",
++				     "renesas,hscif";
+ 			reg = <0 0xe66b0000 0 96>;
+ 			interrupts = <GIC_SPI 146 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 516>;
+@@ -534,7 +544,8 @@
+ 		};
+ 
+ 		scif0: serial at e6e60000 {
+-			compatible = "renesas,scif-r8a7795", "renesas,scif";
++			compatible = "renesas,scif-r8a7795",
++				     "renesas,rcar-gen3-scif", "renesas,scif";
+ 			reg = <0 0xe6e60000 0 64>;
+ 			interrupts = <GIC_SPI 152 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 207>;
+@@ -546,7 +557,8 @@
+ 		};
+ 
+ 		scif1: serial at e6e68000 {
+-			compatible = "renesas,scif-r8a7795", "renesas,scif";
++			compatible = "renesas,scif-r8a7795",
++				     "renesas,rcar-gen3-scif", "renesas,scif";
+ 			reg = <0 0xe6e68000 0 64>;
+ 			interrupts = <GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 206>;
+@@ -558,7 +570,8 @@
+ 		};
+ 
+ 		scif2: serial at e6e88000 {
+-			compatible = "renesas,scif-r8a7795", "renesas,scif";
++			compatible = "renesas,scif-r8a7795",
++				     "renesas,rcar-gen3-scif", "renesas,scif";
+ 			reg = <0 0xe6e88000 0 64>;
+ 			interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 310>;
+@@ -570,7 +583,8 @@
+ 		};
+ 
+ 		scif3: serial at e6c50000 {
+-			compatible = "renesas,scif-r8a7795", "renesas,scif";
++			compatible = "renesas,scif-r8a7795",
++				     "renesas,rcar-gen3-scif", "renesas,scif";
+ 			reg = <0 0xe6c50000 0 64>;
+ 			interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 204>;
+@@ -582,7 +596,8 @@
+ 		};
+ 
+ 		scif4: serial at e6c40000 {
+-			compatible = "renesas,scif-r8a7795", "renesas,scif";
++			compatible = "renesas,scif-r8a7795",
++				     "renesas,rcar-gen3-scif", "renesas,scif";
+ 			reg = <0 0xe6c40000 0 64>;
+ 			interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 203>;
+@@ -594,7 +609,8 @@
+ 		};
+ 
+ 		scif5: serial at e6f30000 {
+-			compatible = "renesas,scif-r8a7795", "renesas,scif";
++			compatible = "renesas,scif-r8a7795",
++				     "renesas,rcar-gen3-scif", "renesas,scif";
+ 			reg = <0 0xe6f30000 0 64>;
+ 			interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 202>;
 -- 
 2.7.0.rc3.207.g0ac5344
