@@ -1,92 +1,71 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu,  4 Feb 2016 11:07:12 +0100
-Subject: [PATCH v2 49/51] staging: mt29f_spinand: switch to mtd_ooblayout_ops
-In-Reply-To: <1454580434-32078-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1454580434-32078-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1454580434-32078-50-git-send-email-boris.brezillon@free-electrons.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 4 Feb 2016 11:20:03 +0100
+Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
+ v4.5-rc1
+In-Reply-To: <CAJZ5v0hdDdFDiieDnsjummg6F+nV7fi=gFa=oFweyP7-ApsHrQ@mail.gmail.com>
+References: <20160202210345.GZ19432@atomide.com>
+ <Pine.LNX.4.44L0.1602021626540.1653-100000@iolanthe.rowland.org>
+ <20160202234626.GD19432@atomide.com>
+ <CAJZ5v0hdDdFDiieDnsjummg6F+nV7fi=gFa=oFweyP7-ApsHrQ@mail.gmail.com>
+Message-ID: <CAPDyKFr3jqh5bDFOuKLgomhQ2P9+yN5Ps8E0CH8r-oOjvBuswg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace the nand_ecclayout definition by the equivalent mtd_ooblayout_ops
-definition.
+On 3 February 2016 at 18:18, Rafael J. Wysocki <rafael@kernel.org> wrote:
+> On Wed, Feb 3, 2016 at 12:46 AM, Tony Lindgren <tony@atomide.com> wrote:
+>> * Alan Stern <stern@rowland.harvard.edu> [160202 13:46]:
+>>> On Tue, 2 Feb 2016, Tony Lindgren wrote:
+>>>
+>>> > > Also, what is autosuspend_delay set to for your device?  And is
+>>> > > runtime_auto set?
+>>> >
+>>> > It's 100 at that point, see the commented snippet below from
+>>> > omap_hsmmc_probe():
+>>> >
+>>> >     pm_runtime_enable(host->dev);
+>>> >     pm_runtime_get_sync(host->dev);
+>>> >     pm_runtime_set_autosuspend_delay(host->dev, MMC_AUTOSUSPEND_DELAY);
+>>> >     /* NOTE: pm_runtime_dont_use_autosuspend(host->dev) needed here? */
+>>> >     pm_runtime_use_autosuspend(host->dev);
+>>> >     ...
+>>> >     /* gets -EPROBE_DEFER */
+>>> > err_irq:
+>>> >     ...
+>>> >     pm_runtime_put_sync(host->dev);
+>>>
+>>> You could try changing this to pm_runtime_put_sync_suspend().  But
+>>> putting pm_runtime_dont_use_autosuspend() before the put_sync seems
+>>> like a perfectly reasonable thing to do, especially if you feel you
+>>> should reverse all the changes you made at the start.
+>
+> FWIW, I'd call pm_runtime_dont_use_autosuspend() before put_sync().
+>
+> After all, the driver doesn't want to use autosuspend going forward,
+> so stating that explicitly looks like the right thing to do.
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
----
- drivers/staging/mt29f_spinand/mt29f_spinand.c | 48 +++++++++++++++++----------
- 1 file changed, 30 insertions(+), 18 deletions(-)
+Just wanted to add yet some new findings while I was looking into this
+regression.
 
-diff --git a/drivers/staging/mt29f_spinand/mt29f_spinand.c b/drivers/staging/mt29f_spinand/mt29f_spinand.c
-index 6728376..04b711759 100644
---- a/drivers/staging/mt29f_spinand/mt29f_spinand.c
-+++ b/drivers/staging/mt29f_spinand/mt29f_spinand.c
-@@ -42,23 +42,33 @@ static inline struct spinand_state *mtd_to_state(struct mtd_info *mtd)
- static int enable_hw_ecc;
- static int enable_read_hw_ecc;
- 
--static struct nand_ecclayout spinand_oob_64 = {
--	.eccbytes = 24,
--	.eccpos = {
--		1, 2, 3, 4, 5, 6,
--		17, 18, 19, 20, 21, 22,
--		33, 34, 35, 36, 37, 38,
--		49, 50, 51, 52, 53, 54, },
--	.oobfree = {
--		{.offset = 8,
--			.length = 8},
--		{.offset = 24,
--			.length = 8},
--		{.offset = 40,
--			.length = 8},
--		{.offset = 56,
--			.length = 8},
--	}
-+static int spinand_ooblayout_64_ecc(struct mtd_info *mtd, int section,
-+				    struct mtd_oob_region *oobregion)
-+{
-+	if (section > 3)
-+		return -ERANGE;
-+
-+	oobregion->offset = (section * 16) + 1;
-+	oobregion->length = 6;
-+
-+	return 0;
-+}
-+
-+static int spinand_ooblayout_64_free(struct mtd_info *mtd, int section,
-+				     struct mtd_oob_region *oobregion)
-+{
-+	if (section > 3)
-+		return -ERANGE;
-+
-+	oobregion->offset = (section * 16) + 8;
-+	oobregion->length = 8;
-+
-+	return 0;
-+}
-+
-+const struct mtd_ooblayout_ops spinand_oob_64_ops = {
-+	.ecc = spinand_ooblayout_64_ecc,
-+	.free = spinand_ooblayout_64_free,
- };
- #endif
- 
-@@ -883,7 +893,6 @@ static int spinand_probe(struct spi_device *spi_nand)
- 
- 	chip->ecc.strength = 1;
- 	chip->ecc.total	= chip->ecc.steps * chip->ecc.bytes;
--	chip->ecc.layout = &spinand_oob_64;
- 	chip->ecc.read_page = spinand_read_page_hwecc;
- 	chip->ecc.write_page = spinand_write_page_hwecc;
- #else
-@@ -908,6 +917,9 @@ static int spinand_probe(struct spi_device *spi_nand)
- 
- 	mtd->dev.parent = &spi_nand->dev;
- 	mtd->oobsize = 64;
-+#ifdef CONFIG_MTD_SPINAND_ONDIEECC
-+	mtd_set_ooblayout(mtd, &spinand_oob_64_ops);
-+#endif
- 
- 	if (nand_scan(mtd, 1))
- 		return -ENXIO;
--- 
-2.1.4
+So, the reason why pm_runtime_put_sync() doesn't idle the device in
+these cases, is because autosuspend is respected and for some reason
+the autosuspend timer hasn't expired.
+I was wondering *why* the timer isn't considered as expired, because
+the driver don't call pm_runtime_mark_last_busy() in the failing probe
+case...
+
+Then I realized the following commit was merged a few releases ago,
+which makes the runtime PM core to invoke pm_runtime_mark_last_busy()
+for us.
+
+commit 56f487c78015936097474fd89b2ccb229d500d0f
+Author: Tony Lindgren <tony@atomide.com>
+Date:   Wed May 13 16:36:32 2015 -0700
+PM / Runtime: Update last_busy in rpm_resume
+
+So, this commit actually causes the devices to stay active after a
+failed probe attempt.
+
+I think it's a good idea to revert this change, but what to you think?
+
+Kind regards
+Uffe
