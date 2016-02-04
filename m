@@ -1,43 +1,35 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 4 Feb 2016 12:15:00 +0530
-Subject: [PATCH] ARM: DRA7: hwmod: Fix OCP2SCP sysconfig
-In-Reply-To: <1454567491-30499-1-git-send-email-kishon@ti.com>
-References: <1454567491-30499-1-git-send-email-kishon@ti.com>
-Message-ID: <56B2F36C.1070406@ti.com>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Thu, 4 Feb 2016 14:54:03 +0800
+Subject: [PATCH v6] i2c: mt8173: add 4GB mode support in i2c driver.
+In-Reply-To: <1454347143-31461-1-git-send-email-liguo.zhang@mediatek.com>
+References: <1454347143-31461-1-git-send-email-liguo.zhang@mediatek.com>
+Message-ID: <1454568843.15541.1.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thursday 04 February 2016 12:01 PM, Kishon Vijay Abraham I wrote:
-> OCP2SCP doesn't support smart idle wakeup according to
-> DRA72x_SR1.0_NDA_TRM_vL and DRA75x_DRA74x_SR1.1_NDA_TRM_vW.
-
-Ignore this patch. I'll re-send the patch with a public TRM link.
-
-Thanks
-Kishon
-
-> Remove SIDLE_SMART_WKUP from the list of supported SIDLE modes
-> in hwmod data.
+On Tue, 2016-02-02 at 01:19 +0800, Liguo Zhang wrote:
+> If 4GB mode is enable, we should add 4gb mode support in i2c driver.
+> Set 4GB mode register to support 4GB mode.
 > 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> Signed-off-by: Liguo Zhang <liguo.zhang@mediatek.com>
 > ---
->  arch/arm/mach-omap2/omap_hwmod_7xx_data.c |    3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-> index 848356e..84c2699 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-> @@ -1482,8 +1482,7 @@ static struct omap_hwmod_class_sysconfig dra7xx_ocp2scp_sysc = {
->  	.syss_offs	= 0x0014,
->  	.sysc_flags	= (SYSC_HAS_AUTOIDLE | SYSC_HAS_SIDLEMODE |
->  			   SYSC_HAS_SOFTRESET | SYSS_HAS_RESET_STATUS),
-> -	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
-> -			   SIDLE_SMART_WKUP),
-> +	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
->  	.sysc_fields	= &omap_hwmod_sysc_type1,
->  };
->  
-> 
+> change in v6:
+> Remove unnecessary init for reg_4g_mode.
+> change in v5:
+> Use BIT_ULL() to fix kernel building warning.
+> change in v4:
+> Use BIT_ULL() to fix kernel building warning.
+> change in v3:
+> Only inline the computation of reg_4g_mode in mtk_i2c_set_4g_mode().
+> change in v2:
+> Define a static inline function mtk_i2c_set_4g_mode() for support 4g mode.
+> ---
+>  drivers/i2c/busses/i2c-mt65xx.c | 42 +++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 42 insertions(+)
+
+
+Looks good to me, Thanks.
+
+Reviewed-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+
+Joe.C
