@@ -1,192 +1,114 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  4 Feb 2016 15:29:44 +0100
-Subject: [PATCH 7/8] arm64: dts: r8a7795: Add BRG support for (H)SCIF
-In-Reply-To: <cover.1454595726.git.horms+renesas@verge.net.au>
-References: <cover.1454595726.git.horms+renesas@verge.net.au>
-Message-ID: <3da41e4cf65a322937db48ce0d55c6f6a68032b0.1454595726.git.horms+renesas@verge.net.au>
+Date: Thu,  4 Feb 2016 15:28:55 +0100
+Subject: [PATCH 01/70] ARM: dts: gose: Add GPIO keys to DT
+In-Reply-To: <cover.1454595846.git.horms+renesas@verge.net.au>
+References: <cover.1454595846.git.horms+renesas@verge.net.au>
+Message-ID: <d7d5974b156e2ef7436483de00ccada5987c9d31.1454595846.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+Instantiate the GPIO keys in the gose device tree.
 
-Add the device node for the external SCIF_CLK.
-The presence of the SCIF_CLK crystal and its clock frequency depend on
-the actual board.
+Based on similar work for the koelsch board by Laurent Pinchart.
 
-Add the two optional clock sources (S3D1 and SCIF_CLK for the internal
-resp. external clock) for the Baud Rate Generator for External Clock
-(BRG) to all SCIF and HSCIF device nodes.
-
-This increases the range and accuracy of supported baud rates on
-(H)SCIF.
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Tested-by: Magnus Damm <damm+renesas@opensource.se>
 ---
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 74 ++++++++++++++++++++++----------
- 1 file changed, 52 insertions(+), 22 deletions(-)
+ arch/arm/boot/dts/r8a7793-gose.dts | 82 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 82 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index ddeec7d7b6eb..9634e3a4858e 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -99,6 +99,14 @@
- 		clock-frequency = <0>;
+diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
+index baa59fe84298..ccbc1c66cc6c 100644
+--- a/arch/arm/boot/dts/r8a7793-gose.dts
++++ b/arch/arm/boot/dts/r8a7793-gose.dts
+@@ -31,6 +31,88 @@
+ 		device_type = "memory";
+ 		reg = <0 0x40000000 0 0x40000000>;
  	};
- 
-+	/* External SCIF clock - to be overridden by boards that provide it */
-+	scif_clk: scif {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+		status = "disabled";
-+	};
 +
- 	soc {
- 		compatible = "simple-bus";
- 		interrupt-parent = <&gic>;
-@@ -479,8 +487,10 @@
- 				     "renesas,hscif";
- 			reg = <0 0xe6540000 0 96>;
- 			interrupts = <GIC_SPI 154 IRQ_TYPE_LEVEL_HIGH>;
--			clocks = <&cpg CPG_MOD 520>;
--			clock-names = "fck";
-+			clocks = <&cpg CPG_MOD 520>,
-+				 <&cpg CPG_CORE R8A7795_CLK_S3D1>,
-+				 <&scif_clk>;
-+			clock-names = "fck", "brg_int", "scif_clk";
- 			dmas = <&dmac1 0x31>, <&dmac1 0x30>;
- 			dma-names = "tx", "rx";
- 			power-domains = <&cpg>;
-@@ -493,8 +503,10 @@
- 				     "renesas,hscif";
- 			reg = <0 0xe6550000 0 96>;
- 			interrupts = <GIC_SPI 155 IRQ_TYPE_LEVEL_HIGH>;
--			clocks = <&cpg CPG_MOD 519>;
--			clock-names = "fck";
-+			clocks = <&cpg CPG_MOD 519>,
-+				 <&cpg CPG_CORE R8A7795_CLK_S3D1>,
-+				 <&scif_clk>;
-+			clock-names = "fck", "brg_int", "scif_clk";
- 			dmas = <&dmac1 0x33>, <&dmac1 0x32>;
- 			dma-names = "tx", "rx";
- 			power-domains = <&cpg>;
-@@ -507,8 +519,10 @@
- 				     "renesas,hscif";
- 			reg = <0 0xe6560000 0 96>;
- 			interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>;
--			clocks = <&cpg CPG_MOD 518>;
--			clock-names = "fck";
-+			clocks = <&cpg CPG_MOD 518>,
-+				 <&cpg CPG_CORE R8A7795_CLK_S3D1>,
-+				 <&scif_clk>;
-+			clock-names = "fck", "brg_int", "scif_clk";
- 			dmas = <&dmac1 0x35>, <&dmac1 0x34>;
- 			dma-names = "tx", "rx";
- 			power-domains = <&cpg>;
-@@ -521,8 +535,10 @@
- 				     "renesas,hscif";
- 			reg = <0 0xe66a0000 0 96>;
- 			interrupts = <GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>;
--			clocks = <&cpg CPG_MOD 517>;
--			clock-names = "fck";
-+			clocks = <&cpg CPG_MOD 517>,
-+				 <&cpg CPG_CORE R8A7795_CLK_S3D1>,
-+				 <&scif_clk>;
-+			clock-names = "fck", "brg_int", "scif_clk";
- 			dmas = <&dmac0 0x37>, <&dmac0 0x36>;
- 			dma-names = "tx", "rx";
- 			power-domains = <&cpg>;
-@@ -535,8 +551,10 @@
- 				     "renesas,hscif";
- 			reg = <0 0xe66b0000 0 96>;
- 			interrupts = <GIC_SPI 146 IRQ_TYPE_LEVEL_HIGH>;
--			clocks = <&cpg CPG_MOD 516>;
--			clock-names = "fck";
-+			clocks = <&cpg CPG_MOD 516>,
-+				 <&cpg CPG_CORE R8A7795_CLK_S3D1>,
-+				 <&scif_clk>;
-+			clock-names = "fck", "brg_int", "scif_clk";
- 			dmas = <&dmac0 0x39>, <&dmac0 0x38>;
- 			dma-names = "tx", "rx";
- 			power-domains = <&cpg>;
-@@ -548,8 +566,10 @@
- 				     "renesas,rcar-gen3-scif", "renesas,scif";
- 			reg = <0 0xe6e60000 0 64>;
- 			interrupts = <GIC_SPI 152 IRQ_TYPE_LEVEL_HIGH>;
--			clocks = <&cpg CPG_MOD 207>;
--			clock-names = "fck";
-+			clocks = <&cpg CPG_MOD 207>,
-+				 <&cpg CPG_CORE R8A7795_CLK_S3D1>,
-+				 <&scif_clk>;
-+			clock-names = "fck", "brg_int", "scif_clk";
- 			dmas = <&dmac1 0x51>, <&dmac1 0x50>;
- 			dma-names = "tx", "rx";
- 			power-domains = <&cpg>;
-@@ -561,8 +581,10 @@
- 				     "renesas,rcar-gen3-scif", "renesas,scif";
- 			reg = <0 0xe6e68000 0 64>;
- 			interrupts = <GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>;
--			clocks = <&cpg CPG_MOD 206>;
--			clock-names = "fck";
-+			clocks = <&cpg CPG_MOD 206>,
-+				 <&cpg CPG_CORE R8A7795_CLK_S3D1>,
-+				 <&scif_clk>;
-+			clock-names = "fck", "brg_int", "scif_clk";
- 			dmas = <&dmac1 0x53>, <&dmac1 0x52>;
- 			dma-names = "tx", "rx";
- 			power-domains = <&cpg>;
-@@ -574,8 +596,10 @@
- 				     "renesas,rcar-gen3-scif", "renesas,scif";
- 			reg = <0 0xe6e88000 0 64>;
- 			interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>;
--			clocks = <&cpg CPG_MOD 310>;
--			clock-names = "fck";
-+			clocks = <&cpg CPG_MOD 310>,
-+				 <&cpg CPG_CORE R8A7795_CLK_S3D1>,
-+				 <&scif_clk>;
-+			clock-names = "fck", "brg_int", "scif_clk";
- 			dmas = <&dmac1 0x13>, <&dmac1 0x12>;
- 			dma-names = "tx", "rx";
- 			power-domains = <&cpg>;
-@@ -587,8 +611,10 @@
- 				     "renesas,rcar-gen3-scif", "renesas,scif";
- 			reg = <0 0xe6c50000 0 64>;
- 			interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
--			clocks = <&cpg CPG_MOD 204>;
--			clock-names = "fck";
-+			clocks = <&cpg CPG_MOD 204>,
-+				 <&cpg CPG_CORE R8A7795_CLK_S3D1>,
-+				 <&scif_clk>;
-+			clock-names = "fck", "brg_int", "scif_clk";
- 			dmas = <&dmac0 0x57>, <&dmac0 0x56>;
- 			dma-names = "tx", "rx";
- 			power-domains = <&cpg>;
-@@ -600,8 +626,10 @@
- 				     "renesas,rcar-gen3-scif", "renesas,scif";
- 			reg = <0 0xe6c40000 0 64>;
- 			interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
--			clocks = <&cpg CPG_MOD 203>;
--			clock-names = "fck";
-+			clocks = <&cpg CPG_MOD 203>,
-+				 <&cpg CPG_CORE R8A7795_CLK_S3D1>,
-+				 <&scif_clk>;
-+			clock-names = "fck", "brg_int", "scif_clk";
- 			dmas = <&dmac0 0x59>, <&dmac0 0x58>;
- 			dma-names = "tx", "rx";
- 			power-domains = <&cpg>;
-@@ -613,8 +641,10 @@
- 				     "renesas,rcar-gen3-scif", "renesas,scif";
- 			reg = <0 0xe6f30000 0 64>;
- 			interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
--			clocks = <&cpg CPG_MOD 202>;
--			clock-names = "fck";
-+			clocks = <&cpg CPG_MOD 202>,
-+				 <&cpg CPG_CORE R8A7795_CLK_S3D1>,
-+				 <&scif_clk>;
-+			clock-names = "fck", "brg_int", "scif_clk";
- 			dmas = <&dmac1 0x5b>, <&dmac1 0x5a>;
- 			dma-names = "tx", "rx";
- 			power-domains = <&cpg>;
++	gpio-keys {
++		compatible = "gpio-keys";
++
++		key-1 {
++		        gpios = <&gpio5 0 GPIO_ACTIVE_LOW>;
++		        linux,code = <KEY_1>;
++		        label = "SW2-1";
++		        gpio-key,wakeup;
++		        debounce-interval = <20>;
++		};
++		key-2 {
++		        gpios = <&gpio5 1 GPIO_ACTIVE_LOW>;
++		        linux,code = <KEY_2>;
++		        label = "SW2-2";
++		        gpio-key,wakeup;
++		        debounce-interval = <20>;
++		};
++		key-3 {
++		        gpios = <&gpio5 2 GPIO_ACTIVE_LOW>;
++		        linux,code = <KEY_3>;
++		        label = "SW2-3";
++		        gpio-key,wakeup;
++		        debounce-interval = <20>;
++		};
++		key-4 {
++		        gpios = <&gpio5 3 GPIO_ACTIVE_LOW>;
++		        linux,code = <KEY_4>;
++		        label = "SW2-4";
++		        gpio-key,wakeup;
++		        debounce-interval = <20>;
++		};
++		key-a {
++		        gpios = <&gpio7 0 GPIO_ACTIVE_LOW>;
++		        linux,code = <KEY_A>;
++		        label = "SW30";
++		        gpio-key,wakeup;
++		        debounce-interval = <20>;
++		};
++		key-b {
++		        gpios = <&gpio7 1 GPIO_ACTIVE_LOW>;
++		        linux,code = <KEY_B>;
++		        label = "SW31";
++		        gpio-key,wakeup;
++		        debounce-interval = <20>;
++		};
++		key-c {
++		        gpios = <&gpio7 2 GPIO_ACTIVE_LOW>;
++		        linux,code = <KEY_C>;
++		        label = "SW32";
++		        gpio-key,wakeup;
++		        debounce-interval = <20>;
++		};
++		key-d {
++		        gpios = <&gpio7 3 GPIO_ACTIVE_LOW>;
++		        linux,code = <KEY_D>;
++		        label = "SW33";
++		        gpio-key,wakeup;
++		        debounce-interval = <20>;
++		};
++		key-e {
++		        gpios = <&gpio7 4 GPIO_ACTIVE_LOW>;
++		        linux,code = <KEY_E>;
++		        label = "SW34";
++		        gpio-key,wakeup;
++		        debounce-interval = <20>;
++		};
++		key-f {
++		        gpios = <&gpio7 5 GPIO_ACTIVE_LOW>;
++		        linux,code = <KEY_F>;
++		        label = "SW35";
++		        gpio-key,wakeup;
++		        debounce-interval = <20>;
++		};
++		key-g {
++		        gpios = <&gpio7 6 GPIO_ACTIVE_LOW>;
++		        linux,code = <KEY_G>;
++		        label = "SW36";
++		        gpio-key,wakeup;
++		        debounce-interval = <20>;
++		};
++	};
+ };
+ 
+ &extal_clk {
 -- 
 2.7.0.rc3.207.g0ac5344
