@@ -1,42 +1,95 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu,  4 Feb 2016 15:04:15 +0100
-Subject: [PATCH 06/11] Documentation/DT: add blurb for IB2 syscon to Versatile
+Date: Thu,  4 Feb 2016 15:04:16 +0100
+Subject: [PATCH 07/11] Documentation/DT: add Versatile display bindings
 In-Reply-To: <1454594660-7532-1-git-send-email-linus.walleij@linaro.org>
 References: <1454594660-7532-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1454594660-7532-7-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1454594660-7532-8-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM Versatile has an optional daughterboard, if this is
-mounted, we need to be able to access its system controller.
-Put in a documentation blurb for this.
+This adds bindings for the LCD displays that can be found connected
+to the ARM Versatile reference design, interface boards IB1 and
+IB2.
 
 Cc: Pawel Moll <pawel.moll@arm.com>
 Cc: Rob Herring <robh@kernel.org>
 Cc: Russell King <linux@arm.linux.org.uk>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- Documentation/devicetree/bindings/arm/arm-boards | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ .../devicetree/bindings/display/panel/epson,l2f50113t00.txt        | 7 +++++++
+ .../devicetree/bindings/display/panel/sanyo,alr252rgt.txt          | 7 +++++++
+ .../devicetree/bindings/display/panel/sanyo,tm38qv67a02a.txt       | 7 +++++++
+ .../devicetree/bindings/display/panel/sharp,lq084v1dg21.txt        | 7 +++++++
+ Documentation/devicetree/bindings/vendor-prefixes.txt              | 1 +
+ 5 files changed, 29 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/panel/epson,l2f50113t00.txt
+ create mode 100644 Documentation/devicetree/bindings/display/panel/sanyo,alr252rgt.txt
+ create mode 100644 Documentation/devicetree/bindings/display/panel/sanyo,tm38qv67a02a.txt
+ create mode 100644 Documentation/devicetree/bindings/display/panel/sharp,lq084v1dg21.txt
 
-diff --git a/Documentation/devicetree/bindings/arm/arm-boards b/Documentation/devicetree/bindings/arm/arm-boards
-index 1a709970e7f7..2daeabc519de 100644
---- a/Documentation/devicetree/bindings/arm/arm-boards
-+++ b/Documentation/devicetree/bindings/arm/arm-boards
-@@ -93,6 +93,14 @@ Required nodes:
-   a core-module with regs and the compatible strings
-   "arm,core-module-versatile", "syscon"
- 
-+Optional nodes:
+diff --git a/Documentation/devicetree/bindings/display/panel/epson,l2f50113t00.txt b/Documentation/devicetree/bindings/display/panel/epson,l2f50113t00.txt
+new file mode 100644
+index 000000000000..58eca804dbe8
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/panel/epson,l2f50113t00.txt
+@@ -0,0 +1,7 @@
++Epson Mobile display
 +
-+- arm,versatile-ib2-syscon : if the Versatile has an IB2 interface
-+  board mounted, this has a separate system controller that is
-+  defined in this node.
-+  Required properties:
-+  compatible = "arm,versatile-ib2-syscon", "syscon"
++Required properties:
++- compatible: should be "epson,l2f50113t00"
 +
- ARM RealView Boards
- -------------------
- The RealView boards cover tailored evaluation boards that are used to explore
++This binding is compatible with the panel-dpi binding, which is specified
++in panel-dpi.txt in this directory.
+diff --git a/Documentation/devicetree/bindings/display/panel/sanyo,alr252rgt.txt b/Documentation/devicetree/bindings/display/panel/sanyo,alr252rgt.txt
+new file mode 100644
+index 000000000000..d24562b34cd0
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/panel/sanyo,alr252rgt.txt
+@@ -0,0 +1,7 @@
++Sanyo Electric Co. 2.5" panel
++
++Required properties:
++- compatible: should be "sanyo,alr252rgt"
++
++This binding is compatible with the panel-dpi binding, which is specified
++in panel-dpi.txt in this directory.
+diff --git a/Documentation/devicetree/bindings/display/panel/sanyo,tm38qv67a02a.txt b/Documentation/devicetree/bindings/display/panel/sanyo,tm38qv67a02a.txt
+new file mode 100644
+index 000000000000..c1582012d52e
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/panel/sanyo,tm38qv67a02a.txt
+@@ -0,0 +1,7 @@
++Sanyo Electric Co. 3.8" panel
++
++Required properties:
++- compatible: should be "sanyo,tm38qv67a02a"
++
++This binding is compatible with the panel-dpi binding, which is specified
++in panel-dpi.txt in this directory.
+diff --git a/Documentation/devicetree/bindings/display/panel/sharp,lq084v1dg21.txt b/Documentation/devicetree/bindings/display/panel/sharp,lq084v1dg21.txt
+new file mode 100644
+index 000000000000..8318c2422740
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/panel/sharp,lq084v1dg21.txt
+@@ -0,0 +1,7 @@
++Sharp 8.4" VGA color TFT
++
++Required properties:
++- compatible: should be "sharp,lq084v1dg21"
++
++This binding is compatible with the panel-dpi binding, which is specified
++in panel-dpi.txt in this directory.
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 72e2c5a2b327..da5d8bf13818 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -198,6 +198,7 @@ ricoh	Ricoh Co. Ltd.
+ rockchip	Fuzhou Rockchip Electronics Co., Ltd
+ samsung	Samsung Semiconductor
+ sandisk	Sandisk Corporation
++sanyo	Sanyo Electric Co., Ltd.
+ sbs	Smart Battery System
+ schindler	Schindler
+ seagate	Seagate Technology PLC
 -- 
 2.4.3
