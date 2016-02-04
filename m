@@ -1,47 +1,59 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  4 Feb 2016 15:29:30 +0100
-Subject: [PATCH 36/70] ARM: shmobile: r8a7740: Migrate to generic l2c OF
- initialization
-In-Reply-To: <cover.1454595846.git.horms+renesas@verge.net.au>
-References: <cover.1454595846.git.horms+renesas@verge.net.au>
-Message-ID: <540977ae9746e60cb95bc3d7d6769fd59b6b2cfc.1454595846.git.horms+renesas@verge.net.au>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Thu, 4 Feb 2016 15:47:52 +0100
+Subject: [PATCH v3 1/5] clk: sunxi: Add apb0 gates for H3
+In-Reply-To: <1454542430-16572-2-git-send-email-k@japko.eu>
+References: <1454542430-16572-1-git-send-email-k@japko.eu>
+ <1454542430-16572-2-git-send-email-k@japko.eu>
+Message-ID: <20160204154752.4df7808be3364a98c496c030@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+On Thu,  4 Feb 2016 00:33:46 +0100
+Krzysztof Adamski <k@japko.eu> wrote:
 
-Migrate the generic r8a7740 platform from calling l2x0_of_init() to the
-generic l2c OF initialization.
+> This patch adds support for APB0 in H3. It seems to be compatible with
+> earlier SOCs. apb0 gates controls R_ block peripherals (R_PIO, R_IR,
+> etc).
+> 
+> Signed-off-by: Krzysztof Adamski <k@japko.eu>
+> ---
+>  Documentation/devicetree/bindings/clock/sunxi.txt | 1 +
+>  drivers/clk/sunxi/clk-simple-gates.c              | 2 ++
+>  2 files changed, 3 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+> index e59f57b..751c8b9f0 100644
+> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
+> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+> @@ -45,6 +45,7 @@ Required properties:
+>  	"allwinner,sun6i-a31-apb0-gates-clk" - for the APB0 gates on A31
+>  	"allwinner,sun7i-a20-apb0-gates-clk" - for the APB0 gates on A20
+>  	"allwinner,sun8i-a23-apb0-gates-clk" - for the APB0 gates on A23
+> +	"allwinner,sun8i-h3-apb0-gates-clk" - for the APB0 gates on H3
+>  	"allwinner,sun9i-a80-apb0-gates-clk" - for the APB0 gates on A80
+>  	"allwinner,sun4i-a10-apb1-clk" - for the APB1 clock
+>  	"allwinner,sun9i-a80-apb1-clk" - for the APB1 bus clock on A80
+> diff --git a/drivers/clk/sunxi/clk-simple-gates.c b/drivers/clk/sunxi/clk-simple-gates.c
+> index f4da52b..6753c87 100644
+> --- a/drivers/clk/sunxi/clk-simple-gates.c
+> +++ b/drivers/clk/sunxi/clk-simple-gates.c
+> @@ -130,6 +130,8 @@ CLK_OF_DECLARE(sun8i_a23_apb2, "allwinner,sun8i-a23-apb2-gates-clk",
+>  	       sunxi_simple_gates_init);
+>  CLK_OF_DECLARE(sun8i_a33_ahb1, "allwinner,sun8i-a33-ahb1-gates-clk",
+>  	       sunxi_simple_gates_init);
+> +CLK_OF_DECLARE(sun8i_h3_apb0, "allwinner,sun8i-h3-apb0-gates-clk",
+> +	       sunxi_simple_gates_init);
+>  CLK_OF_DECLARE(sun9i_a80_ahb0, "allwinner,sun9i-a80-ahb0-gates-clk",
+>  	       sunxi_simple_gates_init);
+>  CLK_OF_DECLARE(sun9i_a80_ahb1, "allwinner,sun9i-a80-ahb1-gates-clk",
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/setup-r8a7740.c | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+It seems that the other compatible strings are there for historical
+reasons. Why do you need a new one with such a specific name?
 
-diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
-index 0c8f80c5b04d..7b16c12e3f81 100644
---- a/arch/arm/mach-shmobile/setup-r8a7740.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7740.c
-@@ -110,10 +110,6 @@ static void __init r8a7740_generic_init(void)
- {
- 	r8a7740_meram_workaround();
- 
--#ifdef CONFIG_CACHE_L2X0
--	/* Shared attribute override enable, 32K*8way */
--	l2x0_init(IOMEM(0xf0002000), 0x00400000, 0xc20f0fff);
--#endif
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
- 
-@@ -123,6 +119,8 @@ static const char *const r8a7740_boards_compat_dt[] __initconst = {
- };
- 
- DT_MACHINE_START(R8A7740_DT, "Generic R8A7740 (Flattened Device Tree)")
-+	.l2c_aux_val	= 0,
-+	.l2c_aux_mask	= ~0,
- 	.map_io		= r8a7740_map_io,
- 	.init_early	= shmobile_init_delay,
- 	.init_irq	= r8a7740_init_irq_of,
+It would have been more sensible to add a generic compatible string as
+"allwinner,apb-gates", letting the removal of the other strings for a
+later patch...
+
 -- 
-2.7.0.rc3.207.g0ac5344
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
