@@ -1,25 +1,33 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Thu, 4 Feb 2016 15:39:50 -0800
-Subject: [RFC PATCH] ARM: clocksource: make ARM_GLOBAL_TIMER selectable
-In-Reply-To: <CAAtXAHcV-9gXcZOX8dzUOBZUwj9M=O4MAsMCJNQYAP+os-D7Tg@mail.gmail.com>
-References: <1454610017-25499-1-git-send-email-grygorii.strashko@ti.com>
- <20160204224128.GG4215@xsjsorenbubuntu>
- <CAAtXAHcV-9gXcZOX8dzUOBZUwj9M=O4MAsMCJNQYAP+os-D7Tg@mail.gmail.com>
-Message-ID: <20160204233950.GH4215@xsjsorenbubuntu>
+From: akshay.bhat@timesys.com (Akshay Bhat)
+Date: Thu, 4 Feb 2016 18:41:07 -0500
+Subject: [PATCH v7 3/7] ARM: dts: imx: Add Advantech BA-16 Qseven module
+In-Reply-To: <20160203144051.GQ8307@tiger>
+References: <1454109558-22800-1-git-send-email-akshay.bhat@timesys.com>
+ <1454109558-22800-4-git-send-email-akshay.bhat@timesys.com>
+ <20160203144051.GQ8307@tiger>
+Message-ID: <56B3E193.8090603@timesys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2016-02-04 at 15:14:47 -0800, Moritz Fischer wrote:
-> Hi Soeren,
-> 
-> On Thu, Feb 4, 2016 at 2:41 PM, S?ren Brinkmann
-> <soren.brinkmann@xilinx.com> wrote:
-> 
-> > But with this change the 'if !CPU_FREQ' becomes obsolete.
-> I'm confused, could you explain that statement? You don't want people
-> accidentally running with GT when CPU_FREQ is on, right?
 
-Correct. But with this Kconfig rework you can just deselect it in
-Kconfig. The generic HAVE_GT could always be selected.
 
-	S?ren
+On 02/03/2016 09:40 AM, Shawn Guo wrote:
+> On Fri, Jan 29, 2016 at 06:19:14PM -0500, Akshay Bhat wrote:
+>> +&ssi1 {
+>> +	fsl,mode = "i2s-master";
+>
+> In Documentation/devicetree/bindings/sound/fsl,ssi.txt, I do not see
+> 'i2s-master' as a valid value for fsl,mode property.
+>
+> Shawn
+>
+Will fix this in the next rev (was copied over from an older kernel).
+
+Is there a tool to find such errors (to help catch these errors before 
+submitting it)?
+
+Thanks,
+Akshay
+
+>> +	status = "okay";
+>> +};
