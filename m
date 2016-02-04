@@ -1,122 +1,68 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Thu,  4 Feb 2016 18:28:51 +0100
-Subject: [PATCH V4 13/23] pci,
- acpi: Provide generic way to assign bus domain number.
+Date: Thu,  4 Feb 2016 18:28:54 +0100
+Subject: [PATCH V4 16/23] x86, acpi,
+ pci: Use equivalent function from mcfg.c driver.
 In-Reply-To: <1454606941-9523-1-git-send-email-tn@semihalf.com>
 References: <1454606941-9523-1-git-send-email-tn@semihalf.com>
-Message-ID: <1454606941-9523-14-git-send-email-tn@semihalf.com>
+Message-ID: <1454606941-9523-17-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we now have valid PCI host bridge device reference we can
-introduce code that is going to find its bus domain number using
-ACPI _SEG method.
-
-Note that _SEG method is optional, therefore _SEG absence means
-that all PCI buses belong to domain 0.
-
-While at it, for the sake of code clarity we put ACPI and DT domain
-assign methods into the corresponding helpers.
+Since mcfg.c driver provides the same function lets use it and remove
+code duplication.
 
 Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-Reviewed-by: Liviu Dudau <Liviu.Dudau@arm.com>
-Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-Tested-by: Jeremy Linton <jeremy.linton@arm.com>
 Tested-by: Duc Dang <dhdang@apm.com>
 Tested-by: Dongdong Liu <liudongdong3@huawei.com>
 Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
 Tested-by: Graeme Gregory <graeme.gregory@linaro.org>
 Tested-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/acpi/pci_root.c  | 18 ++++++++++++++++++
- drivers/pci/pci.c        | 11 +++++++++--
- include/linux/pci-acpi.h |  2 ++
- 3 files changed, 29 insertions(+), 2 deletions(-)
+ arch/x86/pci/acpi.c | 20 +-------------------
+ 1 file changed, 1 insertion(+), 19 deletions(-)
 
-diff --git a/drivers/acpi/pci_root.c b/drivers/acpi/pci_root.c
-index a65c8c2..cc2c73a 100644
---- a/drivers/acpi/pci_root.c
-+++ b/drivers/acpi/pci_root.c
-@@ -419,6 +419,24 @@ out:
- }
- EXPORT_SYMBOL(acpi_pci_osc_control_set);
+diff --git a/arch/x86/pci/acpi.c b/arch/x86/pci/acpi.c
+index d5086d1..b4e72b5 100644
+--- a/arch/x86/pci/acpi.c
++++ b/arch/x86/pci/acpi.c
+@@ -201,29 +201,11 @@ static int setup_mcfg_map(struct acpi_pci_root_info *ci)
  
-+int acpi_pci_bus_domain_nr(struct device *parent)
-+{
-+	struct acpi_device *acpi_dev = to_acpi_device(parent);
-+	unsigned long long segment = 0;
-+	acpi_status status;
-+
-+	/*
-+	 * If _SEG method does not exist, following ACPI spec (6.5.6)
-+	 * all PCI buses belong to domain 0.
-+	 */
-+	status = acpi_evaluate_integer(acpi_dev->handle, METHOD_NAME__SEG, NULL,
-+				       &segment);
-+	if (ACPI_FAILURE(status) && status != AE_NOT_FOUND)
-+		dev_err(&acpi_dev->dev, "can't evaluate _SEG\n");
-+
-+	return segment;
-+}
-+
- static void negotiate_os_control(struct acpi_pci_root *root, int *no_aspm)
+ 	return 0;
+ }
+-
+-static void teardown_mcfg_map(struct acpi_pci_root_info *ci)
+-{
+-	struct acpi_pci_root *root = ci->root;
+-	struct pci_mmcfg_region *cfg;
+-
+-	cfg = pci_mmconfig_lookup(root->segment, root->secondary.start);
+-	if (!cfg)
+-		return;
+-
+-	if (cfg->hot_added)
+-		pci_mmconfig_delete(root->segment, root->secondary.start,
+-				    root->secondary.end);
+-}
+ #else
+ static int setup_mcfg_map(struct acpi_pci_root_info *ci)
  {
- 	u32 support, control, requested;
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index 602eb42..d6c768e 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -19,6 +19,7 @@
- #include <linux/spinlock.h>
- #include <linux/string.h>
- #include <linux/log2.h>
-+#include <linux/pci-acpi.h>
- #include <linux/pci-aspm.h>
- #include <linux/pm_wakeup.h>
- #include <linux/interrupt.h>
-@@ -4769,7 +4770,7 @@ int pci_get_new_domain_nr(void)
+ 	return 0;
  }
- 
- #ifdef CONFIG_PCI_DOMAINS_GENERIC
--void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
-+static int of_pci_bus_domain_nr(struct device *parent)
- {
- 	static int use_dt_domains = -1;
- 	int domain = of_get_pci_domain_nr(parent->of_node);
-@@ -4811,7 +4812,13 @@ void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
- 		domain = -1;
- 	}
- 
--	bus->domain_nr = domain;
-+	return domain;
-+}
-+
-+void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
-+{
-+	bus->domain_nr = acpi_disabled ? of_pci_bus_domain_nr(parent) :
-+					 acpi_pci_bus_domain_nr(parent);
- }
+-
+-static void teardown_mcfg_map(struct acpi_pci_root_info *ci)
+-{
+-}
  #endif
- #endif
-diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
-index 89ab057..a72e22d 100644
---- a/include/linux/pci-acpi.h
-+++ b/include/linux/pci-acpi.h
-@@ -22,6 +22,7 @@ static inline acpi_status pci_acpi_remove_pm_notifier(struct acpi_device *dev)
+ 
+ static int pci_acpi_root_get_node(struct acpi_pci_root *root)
+@@ -251,7 +233,7 @@ static int pci_acpi_root_init_info(struct acpi_pci_root_info *ci)
+ 
+ static void pci_acpi_root_release_info(struct acpi_pci_root_info *ci)
  {
- 	return acpi_remove_pm_notifier(dev);
+-	teardown_mcfg_map(ci);
++	pci_mmcfg_teardown_map(ci);
+ 	kfree(container_of(ci, struct pci_root_info, common));
  }
-+extern int acpi_pci_bus_domain_nr(struct device *parent);
- extern phys_addr_t acpi_pci_root_get_mcfg_addr(acpi_handle handle);
  
- static inline acpi_handle acpi_find_root_bridge_handle(struct pci_dev *pdev)
-@@ -109,6 +110,7 @@ extern const u8 pci_acpi_dsm_uuid[];
- #else	/* CONFIG_ACPI */
- static inline void acpi_pci_add_bus(struct pci_bus *bus) { }
- static inline void acpi_pci_remove_bus(struct pci_bus *bus) { }
-+static inline int acpi_pci_bus_domain_nr(struct device *parent) { return -1; }
- #endif	/* CONFIG_ACPI */
- 
- #ifdef CONFIG_ACPI_APEI
 -- 
 1.9.1
