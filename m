@@ -1,44 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 04 Feb 2016 17:07:17 +0100
-Subject: [RFC PATCH 0/4] Add ACPI support for HiSilicon PCIe Host
- Controllers
-In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E1EC9EC12@lhreml503-mbs>
-References: <1454585860-60709-1-git-send-email-gabriele.paoloni@huawei.com>
- <2387127.DMZaDnZvEW@wuerfel>
- <EE11001F9E5DDD47B7634E2F8A612F2E1EC9EC12@lhreml503-mbs>
-Message-ID: <76564455.dlc1WHiVY2@wuerfel>
+From: paul.burton@imgtec.com (Paul Burton)
+Date: Thu, 4 Feb 2016 16:10:07 +0000
+Subject: [PATCH v3 0/6] Xilinx AXI PCIe Host Bridge driver fixes
+Message-ID: <1454602213-967-1-git-send-email-paul.burton@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 04 February 2016 15:11:18 Gabriele Paoloni wrote:
-> > 
-> > ACPI has its own PCI support, and should not need drivers for host
-> > bridges. I don't think we can really mix the two things, as ACPI
-> > needs to have access to things like PCI config space way before
-> > we are probing normal device drivers.
-> > 
-> > Please put this in drivers/acpi/pci*.c.
-> 
-> I can put pcie-hisi-acpi.c under drivers/acpi/
-> 
-> However if you look at the driver it is made up of three parts:
-> pcie-hisi.c --> the DT based driver
-> pcie-hisi-acpi.c --> the ACPI based hook and ACPI specific init callback
-> pcie-hisi-common.c --> common functions shared between DT and ACPI versions 
->                        of the driver
-> 
-> Now I think that moving pcie-hisi-acpi.c under drivers/acpi/
-> would make it hard to read as you need to jump across directories
-> and it seems a bit unnatural...
-> 
-> However it is not a big issue to me...
+This series fixes a number of issues found using the Xilinx AXI PCIe
+Host Bridge IP on the Imagination Technologies MIPS Boston development
+board. It has been split out of the larger Boston board support series
+at Michal's request.
 
-That's not really what I meant though: the pcie-hisi driver uses the
-pcie-designware.c library, most of which makes no sense in an environment
-where you have ACPI, e.g. link training, custom MSI support, initial
-register setup, platform driver hooks, etc.
+Applies atop v4.5-rc2.
 
-You should add a very minimal set of hacks for the parts in this driver
-that diverge from a standard SBSA compliant PCIe host that ACPI expects.
+Paul Burton (6):
+  PCI: xilinx: Keep references to both IRQ domains
+  PCI: xilinx: Unify INTx & MSI interrupt FIFO decode
+  PCI: xilinx: Always clear interrupt decode register
+  PCI: xilinx: Clear interrupt FIFO during probe
+  PCI: xilinx: Fix INTX irq dispatch
+  PCI: xilinx: Allow build on MIPS platforms
 
-	Arnd
+ drivers/pci/host/Kconfig       |   2 +-
+ drivers/pci/host/pcie-xilinx.c | 125 +++++++++++++++++++----------------------
+ 2 files changed, 60 insertions(+), 67 deletions(-)
+
+-- 
+2.7.0
