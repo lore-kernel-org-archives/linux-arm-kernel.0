@@ -1,202 +1,144 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  4 Feb 2016 11:00:22 +0000
-Subject: [PATCH v2 05/28] ARM: KVM: Move GP registers into the CPU context
- structure
+Date: Thu,  4 Feb 2016 11:00:30 +0000
+Subject: [PATCH v2 13/28] ARM: KVM: Add banked registers save/restore
 In-Reply-To: <1454583645-10144-1-git-send-email-marc.zyngier@arm.com>
 References: <1454583645-10144-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1454583645-10144-6-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1454583645-10144-14-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Continuing our rework of the CPU context, we now move the GP
-registers into the CPU context structure.
+Banked registers are one of the many perks of the 32bit architecture,
+and the world switch needs to cope with it.
+
+This requires some "special" accessors, as these are not accessed
+using a standard coprocessor instruction.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_emulate.h |  8 ++++----
- arch/arm/include/asm/kvm_host.h    |  3 +--
- arch/arm/kernel/asm-offsets.c      | 18 +++++++++---------
- arch/arm/kvm/emulate.c             | 12 ++++++------
- arch/arm/kvm/guest.c               |  4 ++--
- arch/arm/kvm/interrupts_head.S     | 11 +++++++++++
- arch/arm/kvm/reset.c               |  2 +-
- 7 files changed, 34 insertions(+), 24 deletions(-)
+ arch/arm/kvm/hyp/Makefile    |  1 +
+ arch/arm/kvm/hyp/banked-sr.c | 77 ++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/kvm/hyp/hyp.h       | 11 +++++++
+ 3 files changed, 89 insertions(+)
+ create mode 100644 arch/arm/kvm/hyp/banked-sr.c
 
-diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
-index 32bb52a..f710616 100644
---- a/arch/arm/include/asm/kvm_emulate.h
-+++ b/arch/arm/include/asm/kvm_emulate.h
-@@ -68,12 +68,12 @@ static inline bool vcpu_mode_is_32bit(struct kvm_vcpu *vcpu)
- 
- static inline unsigned long *vcpu_pc(struct kvm_vcpu *vcpu)
- {
--	return &vcpu->arch.regs.usr_regs.ARM_pc;
-+	return &vcpu->arch.ctxt.gp_regs.usr_regs.ARM_pc;
- }
- 
- static inline unsigned long *vcpu_cpsr(struct kvm_vcpu *vcpu)
- {
--	return &vcpu->arch.regs.usr_regs.ARM_cpsr;
-+	return &vcpu->arch.ctxt.gp_regs.usr_regs.ARM_cpsr;
- }
- 
- static inline void vcpu_set_thumb(struct kvm_vcpu *vcpu)
-@@ -83,13 +83,13 @@ static inline void vcpu_set_thumb(struct kvm_vcpu *vcpu)
- 
- static inline bool mode_has_spsr(struct kvm_vcpu *vcpu)
- {
--	unsigned long cpsr_mode = vcpu->arch.regs.usr_regs.ARM_cpsr & MODE_MASK;
-+	unsigned long cpsr_mode = vcpu->arch.ctxt.gp_regs.usr_regs.ARM_cpsr & MODE_MASK;
- 	return (cpsr_mode > USR_MODE && cpsr_mode < SYSTEM_MODE);
- }
- 
- static inline bool vcpu_mode_priv(struct kvm_vcpu *vcpu)
- {
--	unsigned long cpsr_mode = vcpu->arch.regs.usr_regs.ARM_cpsr & MODE_MASK;
-+	unsigned long cpsr_mode = vcpu->arch.ctxt.gp_regs.usr_regs.ARM_cpsr & MODE_MASK;
- 	return cpsr_mode > USR_MODE;;
- }
- 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 4203701..02932ba 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -89,6 +89,7 @@ struct kvm_vcpu_fault_info {
- };
- 
- struct kvm_cpu_context {
-+	struct kvm_regs	gp_regs;
- 	struct vfp_hard_struct vfp;
- 	u32 cp15[NR_CP15_REGS];
- };
-@@ -98,8 +99,6 @@ typedef struct kvm_cpu_context kvm_cpu_context_t;
- struct kvm_vcpu_arch {
- 	struct kvm_cpu_context ctxt;
- 
--	struct kvm_regs regs;
--
- 	int target; /* Processor target */
- 	DECLARE_BITMAP(features, KVM_VCPU_MAX_FEATURES);
- 
-diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
-index 43f8b01..2f3e0b0 100644
---- a/arch/arm/kernel/asm-offsets.c
-+++ b/arch/arm/kernel/asm-offsets.c
-@@ -176,15 +176,15 @@ int main(void)
-   DEFINE(VCPU_HOST_CTXT,	offsetof(struct kvm_vcpu, arch.host_cpu_context));
-   DEFINE(CPU_CTXT_VFP,		offsetof(struct kvm_cpu_context, vfp));
-   DEFINE(CPU_CTXT_CP15,		offsetof(struct kvm_cpu_context, cp15));
--  DEFINE(VCPU_REGS,		offsetof(struct kvm_vcpu, arch.regs));
--  DEFINE(VCPU_USR_REGS,		offsetof(struct kvm_vcpu, arch.regs.usr_regs));
--  DEFINE(VCPU_SVC_REGS,		offsetof(struct kvm_vcpu, arch.regs.svc_regs));
--  DEFINE(VCPU_ABT_REGS,		offsetof(struct kvm_vcpu, arch.regs.abt_regs));
--  DEFINE(VCPU_UND_REGS,		offsetof(struct kvm_vcpu, arch.regs.und_regs));
--  DEFINE(VCPU_IRQ_REGS,		offsetof(struct kvm_vcpu, arch.regs.irq_regs));
--  DEFINE(VCPU_FIQ_REGS,		offsetof(struct kvm_vcpu, arch.regs.fiq_regs));
--  DEFINE(VCPU_PC,		offsetof(struct kvm_vcpu, arch.regs.usr_regs.ARM_pc));
--  DEFINE(VCPU_CPSR,		offsetof(struct kvm_vcpu, arch.regs.usr_regs.ARM_cpsr));
-+  DEFINE(CPU_CTXT_GP_REGS,	offsetof(struct kvm_cpu_context, gp_regs));
-+  DEFINE(GP_REGS_USR,		offsetof(struct kvm_regs, usr_regs));
-+  DEFINE(GP_REGS_SVC,		offsetof(struct kvm_regs, svc_regs));
-+  DEFINE(GP_REGS_ABT,		offsetof(struct kvm_regs, abt_regs));
-+  DEFINE(GP_REGS_UND,		offsetof(struct kvm_regs, und_regs));
-+  DEFINE(GP_REGS_IRQ,		offsetof(struct kvm_regs, irq_regs));
-+  DEFINE(GP_REGS_FIQ,		offsetof(struct kvm_regs, fiq_regs));
-+  DEFINE(GP_REGS_PC,		offsetof(struct kvm_regs, usr_regs.ARM_pc));
-+  DEFINE(GP_REGS_CPSR,		offsetof(struct kvm_regs, usr_regs.ARM_cpsr));
-   DEFINE(VCPU_HCR,		offsetof(struct kvm_vcpu, arch.hcr));
-   DEFINE(VCPU_IRQ_LINES,	offsetof(struct kvm_vcpu, arch.irq_lines));
-   DEFINE(VCPU_HSR,		offsetof(struct kvm_vcpu, arch.fault.hsr));
-diff --git a/arch/arm/kvm/emulate.c b/arch/arm/kvm/emulate.c
-index ee161b1..a494def 100644
---- a/arch/arm/kvm/emulate.c
-+++ b/arch/arm/kvm/emulate.c
-@@ -112,7 +112,7 @@ static const unsigned long vcpu_reg_offsets[VCPU_NR_MODES][15] = {
-  */
- unsigned long *vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num)
- {
--	unsigned long *reg_array = (unsigned long *)&vcpu->arch.regs;
-+	unsigned long *reg_array = (unsigned long *)&vcpu->arch.ctxt.gp_regs;
- 	unsigned long mode = *vcpu_cpsr(vcpu) & MODE_MASK;
- 
- 	switch (mode) {
-@@ -147,15 +147,15 @@ unsigned long *vcpu_spsr(struct kvm_vcpu *vcpu)
- 	unsigned long mode = *vcpu_cpsr(vcpu) & MODE_MASK;
- 	switch (mode) {
- 	case SVC_MODE:
--		return &vcpu->arch.regs.KVM_ARM_SVC_spsr;
-+		return &vcpu->arch.ctxt.gp_regs.KVM_ARM_SVC_spsr;
- 	case ABT_MODE:
--		return &vcpu->arch.regs.KVM_ARM_ABT_spsr;
-+		return &vcpu->arch.ctxt.gp_regs.KVM_ARM_ABT_spsr;
- 	case UND_MODE:
--		return &vcpu->arch.regs.KVM_ARM_UND_spsr;
-+		return &vcpu->arch.ctxt.gp_regs.KVM_ARM_UND_spsr;
- 	case IRQ_MODE:
--		return &vcpu->arch.regs.KVM_ARM_IRQ_spsr;
-+		return &vcpu->arch.ctxt.gp_regs.KVM_ARM_IRQ_spsr;
- 	case FIQ_MODE:
--		return &vcpu->arch.regs.KVM_ARM_FIQ_spsr;
-+		return &vcpu->arch.ctxt.gp_regs.KVM_ARM_FIQ_spsr;
- 	default:
- 		BUG();
- 	}
-diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
-index 5fa69d7..86e26fb 100644
---- a/arch/arm/kvm/guest.c
-+++ b/arch/arm/kvm/guest.c
-@@ -55,7 +55,7 @@ static u64 core_reg_offset_from_id(u64 id)
- static int get_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
- {
- 	u32 __user *uaddr = (u32 __user *)(long)reg->addr;
--	struct kvm_regs *regs = &vcpu->arch.regs;
-+	struct kvm_regs *regs = &vcpu->arch.ctxt.gp_regs;
- 	u64 off;
- 
- 	if (KVM_REG_SIZE(reg->id) != 4)
-@@ -72,7 +72,7 @@ static int get_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
- static int set_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
- {
- 	u32 __user *uaddr = (u32 __user *)(long)reg->addr;
--	struct kvm_regs *regs = &vcpu->arch.regs;
-+	struct kvm_regs *regs = &vcpu->arch.ctxt.gp_regs;
- 	u64 off, val;
- 
- 	if (KVM_REG_SIZE(reg->id) != 4)
-diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
-index b9d9531..e0943cb8 100644
---- a/arch/arm/kvm/interrupts_head.S
-+++ b/arch/arm/kvm/interrupts_head.S
-@@ -1,6 +1,17 @@
- #include <linux/irqchip/arm-gic.h>
- #include <asm/assembler.h>
- 
-+/* Compat macro, until we get rid of this file entierely */
-+#define VCPU_GP_REGS		(VCPU_GUEST_CTXT + CPU_CTXT_GP_REGS)
-+#define VCPU_USR_REGS		(VCPU_GP_REGS + GP_REGS_USR)
-+#define VCPU_SVC_REGS		(VCPU_GP_REGS + GP_REGS_SVC)
-+#define VCPU_ABT_REGS		(VCPU_GP_REGS + GP_REGS_ABT)
-+#define VCPU_UND_REGS		(VCPU_GP_REGS + GP_REGS_UND)
-+#define VCPU_IRQ_REGS		(VCPU_GP_REGS + GP_REGS_IRQ)
-+#define VCPU_FIQ_REGS		(VCPU_GP_REGS + GP_REGS_FIQ)
-+#define VCPU_PC			(VCPU_GP_REGS + GP_REGS_PC)
-+#define VCPU_CPSR		(VCPU_GP_REGS + GP_REGS_CPSR)
+diff --git a/arch/arm/kvm/hyp/Makefile b/arch/arm/kvm/hyp/Makefile
+index 5a45f4c..173bd1d 100644
+--- a/arch/arm/kvm/hyp/Makefile
++++ b/arch/arm/kvm/hyp/Makefile
+@@ -7,3 +7,4 @@ obj-$(CONFIG_KVM_ARM_HOST) += cp15-sr.o
+ obj-$(CONFIG_KVM_ARM_HOST) += timer-sr.o
+ obj-$(CONFIG_KVM_ARM_HOST) += vgic-v2-sr.o
+ obj-$(CONFIG_KVM_ARM_HOST) += vfp.o
++obj-$(CONFIG_KVM_ARM_HOST) += banked-sr.o
+diff --git a/arch/arm/kvm/hyp/banked-sr.c b/arch/arm/kvm/hyp/banked-sr.c
+new file mode 100644
+index 0000000..d02dc80
+--- /dev/null
++++ b/arch/arm/kvm/hyp/banked-sr.c
+@@ -0,0 +1,77 @@
++/*
++ * Original code:
++ * Copyright (C) 2012 - Virtual Open Systems and Columbia University
++ * Author: Christoffer Dall <c.dall@virtualopensystems.com>
++ *
++ * Mostly rewritten in C by Marc Zyngier <marc.zyngier@arm.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
 +
- #define VCPU_USR_REG(_reg_nr)	(VCPU_USR_REGS + (_reg_nr * 4))
- #define VCPU_USR_SP		(VCPU_USR_REG(13))
- #define VCPU_USR_LR		(VCPU_USR_REG(14))
-diff --git a/arch/arm/kvm/reset.c b/arch/arm/kvm/reset.c
-index eeb85858..0048b5a 100644
---- a/arch/arm/kvm/reset.c
-+++ b/arch/arm/kvm/reset.c
-@@ -71,7 +71,7 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
- 	}
++#include "hyp.h"
++
++__asm__(".arch_extension     virt");
++
++void __hyp_text __banked_save_state(struct kvm_cpu_context *ctxt)
++{
++	ctxt->gp_regs.usr_regs.ARM_sp	= read_special(SP_usr);
++	ctxt->gp_regs.usr_regs.ARM_pc	= read_special(ELR_hyp);
++	ctxt->gp_regs.usr_regs.ARM_cpsr	= read_special(SPSR);
++	ctxt->gp_regs.KVM_ARM_SVC_sp	= read_special(SP_svc);
++	ctxt->gp_regs.KVM_ARM_SVC_lr	= read_special(LR_svc);
++	ctxt->gp_regs.KVM_ARM_SVC_spsr	= read_special(SPSR_svc);
++	ctxt->gp_regs.KVM_ARM_ABT_sp	= read_special(SP_abt);
++	ctxt->gp_regs.KVM_ARM_ABT_lr	= read_special(LR_abt);
++	ctxt->gp_regs.KVM_ARM_ABT_spsr	= read_special(SPSR_abt);
++	ctxt->gp_regs.KVM_ARM_UND_sp	= read_special(SP_und);
++	ctxt->gp_regs.KVM_ARM_UND_lr	= read_special(LR_und);
++	ctxt->gp_regs.KVM_ARM_UND_spsr	= read_special(SPSR_und);
++	ctxt->gp_regs.KVM_ARM_IRQ_sp	= read_special(SP_irq);
++	ctxt->gp_regs.KVM_ARM_IRQ_lr	= read_special(LR_irq);
++	ctxt->gp_regs.KVM_ARM_IRQ_spsr	= read_special(SPSR_irq);
++	ctxt->gp_regs.KVM_ARM_FIQ_r8	= read_special(R8_fiq);
++	ctxt->gp_regs.KVM_ARM_FIQ_r9	= read_special(R9_fiq);
++	ctxt->gp_regs.KVM_ARM_FIQ_r10	= read_special(R10_fiq);
++	ctxt->gp_regs.KVM_ARM_FIQ_fp	= read_special(R11_fiq);
++	ctxt->gp_regs.KVM_ARM_FIQ_ip	= read_special(R12_fiq);
++	ctxt->gp_regs.KVM_ARM_FIQ_sp	= read_special(SP_fiq);
++	ctxt->gp_regs.KVM_ARM_FIQ_lr	= read_special(LR_fiq);
++	ctxt->gp_regs.KVM_ARM_FIQ_spsr	= read_special(SPSR_fiq);
++}
++
++void __hyp_text __banked_restore_state(struct kvm_cpu_context *ctxt)
++{
++	write_special(ctxt->gp_regs.usr_regs.ARM_sp,	SP_usr);
++	write_special(ctxt->gp_regs.usr_regs.ARM_pc,	ELR_hyp);
++	write_special(ctxt->gp_regs.usr_regs.ARM_cpsr,	SPSR_cxsf);
++	write_special(ctxt->gp_regs.KVM_ARM_SVC_sp,	SP_svc);
++	write_special(ctxt->gp_regs.KVM_ARM_SVC_lr,	LR_svc);
++	write_special(ctxt->gp_regs.KVM_ARM_SVC_spsr,	SPSR_svc);
++	write_special(ctxt->gp_regs.KVM_ARM_ABT_sp,	SP_abt);
++	write_special(ctxt->gp_regs.KVM_ARM_ABT_lr,	LR_abt);
++	write_special(ctxt->gp_regs.KVM_ARM_ABT_spsr,	SPSR_abt);
++	write_special(ctxt->gp_regs.KVM_ARM_UND_sp,	SP_und);
++	write_special(ctxt->gp_regs.KVM_ARM_UND_lr,	LR_und);
++	write_special(ctxt->gp_regs.KVM_ARM_UND_spsr,	SPSR_und);
++	write_special(ctxt->gp_regs.KVM_ARM_IRQ_sp,	SP_irq);
++	write_special(ctxt->gp_regs.KVM_ARM_IRQ_lr,	LR_irq);
++	write_special(ctxt->gp_regs.KVM_ARM_IRQ_spsr,	SPSR_irq);
++	write_special(ctxt->gp_regs.KVM_ARM_FIQ_r8,	R8_fiq);
++	write_special(ctxt->gp_regs.KVM_ARM_FIQ_r9,	R9_fiq);
++	write_special(ctxt->gp_regs.KVM_ARM_FIQ_r10,	R10_fiq);
++	write_special(ctxt->gp_regs.KVM_ARM_FIQ_fp,	R11_fiq);
++	write_special(ctxt->gp_regs.KVM_ARM_FIQ_ip,	R12_fiq);
++	write_special(ctxt->gp_regs.KVM_ARM_FIQ_sp,	SP_fiq);
++	write_special(ctxt->gp_regs.KVM_ARM_FIQ_lr,	LR_fiq);
++	write_special(ctxt->gp_regs.KVM_ARM_FIQ_spsr,	SPSR_fiq);
++}
+diff --git a/arch/arm/kvm/hyp/hyp.h b/arch/arm/kvm/hyp/hyp.h
+index dce0f73..278eb1f 100644
+--- a/arch/arm/kvm/hyp/hyp.h
++++ b/arch/arm/kvm/hyp/hyp.h
+@@ -45,6 +45,14 @@
+ })
+ #define read_sysreg(...)		__read_sysreg(__VA_ARGS__)
  
- 	/* Reset core registers */
--	memcpy(&vcpu->arch.regs, reset_regs, sizeof(vcpu->arch.regs));
-+	memcpy(&vcpu->arch.ctxt.gp_regs, reset_regs, sizeof(vcpu->arch.ctxt.gp_regs));
++#define write_special(v, r)					\
++	asm volatile("msr " __stringify(r) ", %0" : : "r" (v))
++#define read_special(r) ({					\
++	u32 __val;						\
++	asm volatile("mrs %0, " __stringify(r) : "=r" (__val));	\
++	__val;							\
++})
++
+ #define TTBR0		__ACCESS_CP15_64(0, c2)
+ #define TTBR1		__ACCESS_CP15_64(1, c2)
+ #define VTTBR		__ACCESS_CP15_64(6, c2)
+@@ -99,4 +107,7 @@ static inline bool __vfp_enabled(void)
+ 	return !(read_sysreg(HCPTR) & (HCPTR_TCP(11) | HCPTR_TCP(10)));
+ }
  
- 	/* Reset CP15 registers */
- 	kvm_reset_coprocs(vcpu);
++void __hyp_text __banked_save_state(struct kvm_cpu_context *ctxt);
++void __hyp_text __banked_restore_state(struct kvm_cpu_context *ctxt);
++
+ #endif /* __ARM_KVM_HYP_H__ */
 -- 
 2.1.4
