@@ -1,52 +1,44 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 4 Feb 2016 11:04:50 -0500 (EST)
-Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
- v4.5-rc1
-In-Reply-To: <CAPDyKFr3jqh5bDFOuKLgomhQ2P9+yN5Ps8E0CH8r-oOjvBuswg@mail.gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1602041059070.1515-100000@iolanthe.rowland.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 04 Feb 2016 17:07:17 +0100
+Subject: [RFC PATCH 0/4] Add ACPI support for HiSilicon PCIe Host
+ Controllers
+In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E1EC9EC12@lhreml503-mbs>
+References: <1454585860-60709-1-git-send-email-gabriele.paoloni@huawei.com>
+ <2387127.DMZaDnZvEW@wuerfel>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1EC9EC12@lhreml503-mbs>
+Message-ID: <76564455.dlc1WHiVY2@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 4 Feb 2016, Ulf Hansson wrote:
-
-> Just wanted to add yet some new findings while I was looking into this
-> regression.
+On Thursday 04 February 2016 15:11:18 Gabriele Paoloni wrote:
+> > 
+> > ACPI has its own PCI support, and should not need drivers for host
+> > bridges. I don't think we can really mix the two things, as ACPI
+> > needs to have access to things like PCI config space way before
+> > we are probing normal device drivers.
+> > 
+> > Please put this in drivers/acpi/pci*.c.
 > 
-> So, the reason why pm_runtime_put_sync() doesn't idle the device in
-> these cases, is because autosuspend is respected and for some reason
-> the autosuspend timer hasn't expired.
-
-No doubt the autosuspend delay is longer than the time it takes for a 
-probe to fail.
-
-> I was wondering *why* the timer isn't considered as expired, because
-> the driver don't call pm_runtime_mark_last_busy() in the failing probe
-> case...
+> I can put pcie-hisi-acpi.c under drivers/acpi/
 > 
-> Then I realized the following commit was merged a few releases ago,
-> which makes the runtime PM core to invoke pm_runtime_mark_last_busy()
-> for us.
+> However if you look at the driver it is made up of three parts:
+> pcie-hisi.c --> the DT based driver
+> pcie-hisi-acpi.c --> the ACPI based hook and ACPI specific init callback
+> pcie-hisi-common.c --> common functions shared between DT and ACPI versions 
+>                        of the driver
 > 
-> commit 56f487c78015936097474fd89b2ccb229d500d0f
-> Author: Tony Lindgren <tony@atomide.com>
-> Date:   Wed May 13 16:36:32 2015 -0700
-> PM / Runtime: Update last_busy in rpm_resume
+> Now I think that moving pcie-hisi-acpi.c under drivers/acpi/
+> would make it hard to read as you need to jump across directories
+> and it seems a bit unnatural...
 > 
-> So, this commit actually causes the devices to stay active after a
-> failed probe attempt.
-> 
-> I think it's a good idea to revert this change, but what to you think?
+> However it is not a big issue to me...
 
-I disagree.  The whole idea of autosuspend is to prevent the device's
-power state from bouncing up and down too rapidly.  This implies that 
-whenever the device gets resumed, we should wait at least the minimum 
-autosuspend delay before allowing the next autosuspend.
+That's not really what I meant though: the pcie-hisi driver uses the
+pcie-designware.c library, most of which makes no sense in an environment
+where you have ACPI, e.g. link training, custom MSI support, initial
+register setup, platform driver hooks, etc.
 
-Perhaps you think that it's silly to behave that way in this case,
-because the device wasn't accessed at all during the time it was at
-full power.  That's a valid objection, but the proper solution is not
-to revert the 56f487c78015 commit.  Rather, change the driver to avoid
-doing a pm_runtime_resume_sync until you _know_ that the device will be
-accessed soon.
+You should add a very minimal set of hacks for the parts in this driver
+that diverge from a standard SBSA compliant PCIe host that ACPI expects.
 
-Alan Stern
+	Arnd
