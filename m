@@ -1,126 +1,83 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  4 Feb 2016 15:29:43 +0100
-Subject: [PATCH 6/8] arm64: dts: r8a7795: Rename the serial port clock to fck
-In-Reply-To: <cover.1454595726.git.horms+renesas@verge.net.au>
-References: <cover.1454595726.git.horms+renesas@verge.net.au>
-Message-ID: <69e359ca8811582cf7433f3fa894a7d6cbba4905.1454595726.git.horms+renesas@verge.net.au>
+Date: Thu,  4 Feb 2016 15:28:59 +0100
+Subject: [PATCH 05/70] ARM: dts: alt: Add QSPI device to DT
+In-Reply-To: <cover.1454595846.git.horms+renesas@verge.net.au>
+References: <cover.1454595846.git.horms+renesas@verge.net.au>
+Message-ID: <6b78e6ae688b09aa75376537bcfa990c9d4eff07.1454595846.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+Enable the QSPI controller in the alt device tree.
 
-The clock is really the device functional clock, not the interface
-clock. Rename it.
+Based similar work for the silk board by by Vladimir Barinov and
+Sergei Shtylyov.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 22 +++++++++++-----------
- 1 file changed, 11 insertions(+), 11 deletions(-)
+ arch/arm/boot/dts/r8a7794-alt.dts | 46 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 46 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index 013df449fc30..ddeec7d7b6eb 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -480,7 +480,7 @@
- 			reg = <0 0xe6540000 0 96>;
- 			interrupts = <GIC_SPI 154 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 520>;
--			clock-names = "sci_ick";
-+			clock-names = "fck";
- 			dmas = <&dmac1 0x31>, <&dmac1 0x30>;
- 			dma-names = "tx", "rx";
- 			power-domains = <&cpg>;
-@@ -494,7 +494,7 @@
- 			reg = <0 0xe6550000 0 96>;
- 			interrupts = <GIC_SPI 155 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 519>;
--			clock-names = "sci_ick";
-+			clock-names = "fck";
- 			dmas = <&dmac1 0x33>, <&dmac1 0x32>;
- 			dma-names = "tx", "rx";
- 			power-domains = <&cpg>;
-@@ -508,7 +508,7 @@
- 			reg = <0 0xe6560000 0 96>;
- 			interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 518>;
--			clock-names = "sci_ick";
-+			clock-names = "fck";
- 			dmas = <&dmac1 0x35>, <&dmac1 0x34>;
- 			dma-names = "tx", "rx";
- 			power-domains = <&cpg>;
-@@ -522,7 +522,7 @@
- 			reg = <0 0xe66a0000 0 96>;
- 			interrupts = <GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 517>;
--			clock-names = "sci_ick";
-+			clock-names = "fck";
- 			dmas = <&dmac0 0x37>, <&dmac0 0x36>;
- 			dma-names = "tx", "rx";
- 			power-domains = <&cpg>;
-@@ -536,7 +536,7 @@
- 			reg = <0 0xe66b0000 0 96>;
- 			interrupts = <GIC_SPI 146 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 516>;
--			clock-names = "sci_ick";
-+			clock-names = "fck";
- 			dmas = <&dmac0 0x39>, <&dmac0 0x38>;
- 			dma-names = "tx", "rx";
- 			power-domains = <&cpg>;
-@@ -549,7 +549,7 @@
- 			reg = <0 0xe6e60000 0 64>;
- 			interrupts = <GIC_SPI 152 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 207>;
--			clock-names = "sci_ick";
-+			clock-names = "fck";
- 			dmas = <&dmac1 0x51>, <&dmac1 0x50>;
- 			dma-names = "tx", "rx";
- 			power-domains = <&cpg>;
-@@ -562,7 +562,7 @@
- 			reg = <0 0xe6e68000 0 64>;
- 			interrupts = <GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 206>;
--			clock-names = "sci_ick";
-+			clock-names = "fck";
- 			dmas = <&dmac1 0x53>, <&dmac1 0x52>;
- 			dma-names = "tx", "rx";
- 			power-domains = <&cpg>;
-@@ -575,7 +575,7 @@
- 			reg = <0 0xe6e88000 0 64>;
- 			interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 310>;
--			clock-names = "sci_ick";
-+			clock-names = "fck";
- 			dmas = <&dmac1 0x13>, <&dmac1 0x12>;
- 			dma-names = "tx", "rx";
- 			power-domains = <&cpg>;
-@@ -588,7 +588,7 @@
- 			reg = <0 0xe6c50000 0 64>;
- 			interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 204>;
--			clock-names = "sci_ick";
-+			clock-names = "fck";
- 			dmas = <&dmac0 0x57>, <&dmac0 0x56>;
- 			dma-names = "tx", "rx";
- 			power-domains = <&cpg>;
-@@ -601,7 +601,7 @@
- 			reg = <0 0xe6c40000 0 64>;
- 			interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 203>;
--			clock-names = "sci_ick";
-+			clock-names = "fck";
- 			dmas = <&dmac0 0x59>, <&dmac0 0x58>;
- 			dma-names = "tx", "rx";
- 			power-domains = <&cpg>;
-@@ -614,7 +614,7 @@
- 			reg = <0 0xe6f30000 0 64>;
- 			interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 202>;
--			clock-names = "sci_ick";
-+			clock-names = "fck";
- 			dmas = <&dmac1 0x5b>, <&dmac1 0x5a>;
- 			dma-names = "tx", "rx";
- 			power-domains = <&cpg>;
+diff --git a/arch/arm/boot/dts/r8a7794-alt.dts b/arch/arm/boot/dts/r8a7794-alt.dts
+index 2394e4883786..773f304d1142 100644
+--- a/arch/arm/boot/dts/r8a7794-alt.dts
++++ b/arch/arm/boot/dts/r8a7794-alt.dts
+@@ -138,6 +138,13 @@
+ 	status = "okay";
+ };
+ 
++&pfc {
++	qspi_pins: spi0 {
++		renesas,groups = "qspi_ctrl", "qspi_data4";
++		renesas,function = "qspi";
++	};
++};
++
+ &ether {
+ 	pinctrl-0 = <&ether_pins &phy1_pins>;
+ 	pinctrl-names = "default";
+@@ -197,3 +204,42 @@
+ 
+ 	status = "okay";
+ };
++
++&qspi {
++	pinctrl-0 = <&qspi_pins>;
++	pinctrl-names = "default";
++
++	status = "okay";
++
++	flash at 0 {
++		compatible = "spansion,s25fl512s", "jedec,spi-nor";
++		reg = <0>;
++		spi-max-frequency = <30000000>;
++		spi-tx-bus-width = <4>;
++		spi-rx-bus-width = <4>;
++		spi-cpol;
++		spi-cpha;
++		m25p,fast-read;
++
++		partitions {
++			compatible = "fixed-partitions";
++			#address-cells = <1>;
++			#size-cells = <1>;
++
++			partition at 0 {
++				label = "loader";
++				reg = <0x00000000 0x00040000>;
++				read-only;
++			};
++			partition at 40000 {
++				label = "system";
++				reg = <0x00040000 0x00040000>;
++				read-only;
++			};
++			partition at 80000 {
++				label = "user";
++				reg = <0x00080000 0x03f80000>;
++			};
++		};
++	};
++};
 -- 
 2.7.0.rc3.207.g0ac5344
