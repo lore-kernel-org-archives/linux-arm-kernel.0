@@ -1,35 +1,20 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Thu,  4 Feb 2016 18:28:44 +0100
-Subject: [PATCH V4 06/23] XEN / PCI: Remove the dependence on arch x86 when
- PCI_MMCONFIG=y
+Date: Thu,  4 Feb 2016 18:28:45 +0100
+Subject: [PATCH V4 07/23] pci, acpi,
+ mcfg: Provide default RAW ACPI PCI config space accessors.
 In-Reply-To: <1454606941-9523-1-git-send-email-tn@semihalf.com>
 References: <1454606941-9523-1-git-send-email-tn@semihalf.com>
-Message-ID: <1454606941-9523-7-git-send-email-tn@semihalf.com>
+Message-ID: <1454606941-9523-8-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In drivers/xen/pci.c, there are arch x86 dependent codes when
-CONFIG_PCI_MMCONFIG is enabled, since CONFIG_PCI_MMCONFIG
-depends on ACPI, so this will prevent XEN PCI running on other
-architectures using ACPI with PCI_MMCONFIG enabled (such as ARM64).
+Lets keep RAW ACPI PCI config space accessors empty by default,
+since we are note sure if they are necessary accross all archs.
+Once we sort this out, we can provide generic version or let
+architectures to overwrite, like now x86.
 
-Fortunatly, it can be sloved in a simple way. In drivers/xen/pci.c,
-the only x86 dependent code is if ((pci_probe & PCI_PROBE_MMCONF) == 0),
-and it's defined in asm/pci_x86.h, the code means that
-if the PCI resource is not probed in PCI_PROBE_MMCONF way, just
-ingnore the xen mcfg init. Actually this is duplicate, because
-if PCI resource is not probed in PCI_PROBE_MMCONF way, the
-pci_mmconfig_list will be empty, and the if (list_empty())
-after it will do the same job.
-
-So just remove the arch related code and the head file, this
-will be no functional change for x86, and also makes xen/pci.c
-usable for other architectures.
-
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-CC: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-CC: Boris Ostrovsky <boris.ostrovsky@oracle.com>
-Cc: Stefano Stabellini <Stefano.Stabellini@eu.citrix.com>
+Suggested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
 Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 Tested-by: Jeremy Linton <jeremy.linton@arm.com>
 Tested-by: Duc Dang <dhdang@apm.com>
@@ -37,35 +22,44 @@ Tested-by: Dongdong Liu <liudongdong3@huawei.com>
 Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
 Tested-by: Graeme Gregory <graeme.gregory@linaro.org>
 Tested-by: Sinan Kaya <okaya@codeaurora.org>
-Reviewed-by: Boris Ostrovsky <boris.ostrovsky@oracle.com>
-Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 ---
- drivers/xen/pci.c | 6 ------
- 1 file changed, 6 deletions(-)
+ drivers/acpi/mcfg.c | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-diff --git a/drivers/xen/pci.c b/drivers/xen/pci.c
-index 6785ebb..9a8dbe3 100644
---- a/drivers/xen/pci.c
-+++ b/drivers/xen/pci.c
-@@ -28,9 +28,6 @@
- #include <asm/xen/hypervisor.h>
- #include <asm/xen/hypercall.h>
- #include "../pci/pci.h"
--#ifdef CONFIG_PCI_MMCONFIG
--#include <asm/pci_x86.h>
--#endif
+diff --git a/drivers/acpi/mcfg.c b/drivers/acpi/mcfg.c
+index 745b83e..3e1e7be 100644
+--- a/drivers/acpi/mcfg.c
++++ b/drivers/acpi/mcfg.c
+@@ -9,9 +9,30 @@
  
- static bool __read_mostly pci_seg_supported = true;
+ #include <linux/acpi.h>
+ #include <linux/ecam.h>
++#include <linux/pci.h>
  
-@@ -222,9 +219,6 @@ static int __init xen_mcfg_late(void)
- 	if (!xen_initial_domain())
- 		return 0;
+ #define	PREFIX	"MCFG: "
  
--	if ((pci_probe & PCI_PROBE_MMCONF) == 0)
--		return 0;
--
- 	if (list_empty(&pci_mmcfg_list))
- 		return 0;
- 
++/*
++ * raw_pci_read/write - raw ACPI PCI config space accessors.
++ *
++ * By defauly (__weak) these accessors are empty and should be overwritten
++ * by architectures which support operations on ACPI PCI_Config regions,
++ * see osl.c file.
++ */
++
++int __weak raw_pci_read(unsigned int domain, unsigned int bus,
++			unsigned int devfn, int reg, int len, u32 *val)
++{
++	return PCIBIOS_DEVICE_NOT_FOUND;
++}
++
++int __weak raw_pci_write(unsigned int domain, unsigned int bus,
++			 unsigned int devfn, int reg, int len, u32 val)
++{
++	return PCIBIOS_DEVICE_NOT_FOUND;
++}
++
+ int __init acpi_parse_mcfg(struct acpi_table_header *header)
+ {
+ 	struct acpi_table_mcfg *mcfg;
 -- 
 1.9.1
