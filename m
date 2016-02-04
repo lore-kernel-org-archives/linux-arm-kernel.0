@@ -1,53 +1,67 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 4 Feb 2016 09:20:25 -0800
-Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
- v4.5-rc1
-In-Reply-To: <Pine.LNX.4.44L0.1602041059070.1515-100000@iolanthe.rowland.org>
-References: <CAPDyKFr3jqh5bDFOuKLgomhQ2P9+yN5Ps8E0CH8r-oOjvBuswg@mail.gmail.com>
- <Pine.LNX.4.44L0.1602041059070.1515-100000@iolanthe.rowland.org>
-Message-ID: <20160204172025.GQ19432@atomide.com>
+From: romain.izard.pro@gmail.com (Romain Izard)
+Date: Thu,  4 Feb 2016 18:21:33 +0100
+Subject: [PATCH v1] clocksource: atmel-pit: register as a sched_clock
+Message-ID: <1454606493-15094-1-git-send-email-romain.izard.pro@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Alan Stern <stern@rowland.harvard.edu> [160204 08:05]:
-> On Thu, 4 Feb 2016, Ulf Hansson wrote:
-> 
-> > Just wanted to add yet some new findings while I was looking into this
-> > regression.
-> > 
-> > So, the reason why pm_runtime_put_sync() doesn't idle the device in
-> > these cases, is because autosuspend is respected and for some reason
-> > the autosuspend timer hasn't expired.
-> 
-> No doubt the autosuspend delay is longer than the time it takes for a 
-> probe to fail.
-> 
-> > I was wondering *why* the timer isn't considered as expired, because
-> > the driver don't call pm_runtime_mark_last_busy() in the failing probe
-> > case...
-> > 
-> > Then I realized the following commit was merged a few releases ago,
-> > which makes the runtime PM core to invoke pm_runtime_mark_last_busy()
-> > for us.
-> > 
-> > commit 56f487c78015936097474fd89b2ccb229d500d0f
-> > Author: Tony Lindgren <tony@atomide.com>
-> > Date:   Wed May 13 16:36:32 2015 -0700
-> > PM / Runtime: Update last_busy in rpm_resume
-> > 
-> > So, this commit actually causes the devices to stay active after a
-> > failed probe attempt.
-> > 
-> > I think it's a good idea to revert this change, but what to you think?
-> 
-> I disagree.  The whole idea of autosuspend is to prevent the device's
-> power state from bouncing up and down too rapidly.  This implies that 
-> whenever the device gets resumed, we should wait at least the minimum 
-> autosuspend delay before allowing the next autosuspend.
+Register the counter of the Periodic Interval Timer as a possible source
+for sched_clock. This provides a better precision than the jiffies-based
+default.
 
-Yeah let's not revert 56f487c78015. Without that we have devices
-falling right back to sleep.
+Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
+---
 
-Regards,
+To reduce overhead and cache consumption, sched_clock_register does not
+take a void* argument, as it is the case when using interrupt handlers.
+As a result, the signature of the function used to read the counter is
+u64 (*) (void). It is thus necessary to use a static variable inside the
+driver to keep a reference to the clocksource. It is a common pattern in
+other existing clocksource drivers.
 
-Tony
+All existing Atmel SoCs that rely on the PIT only have a single instance
+of the controller, and future SoCs should remain this way as additional
+timers are provided in 'Timer Counter' controllers. Additional code
+handling the case of multiple PIT instances would thus be dead code.
+
+ drivers/clocksource/timer-atmel-pit.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/drivers/clocksource/timer-atmel-pit.c b/drivers/clocksource/timer-atmel-pit.c
+index d911c5dca8f1..744e1afc4b69 100644
+--- a/drivers/clocksource/timer-atmel-pit.c
++++ b/drivers/clocksource/timer-atmel-pit.c
+@@ -21,6 +21,7 @@
+ #include <linux/of_address.h>
+ #include <linux/of_irq.h>
+ #include <linux/slab.h>
++#include <linux/sched_clock.h>
+ 
+ #define AT91_PIT_MR		0x00			/* Mode Register */
+ #define AT91_PIT_PITIEN			BIT(25)			/* Timer Interrupt Enable */
+@@ -174,6 +175,13 @@ static irqreturn_t at91sam926x_pit_interrupt(int irq, void *dev_id)
+ 	return IRQ_NONE;
+ }
+ 
++static struct clocksource *pit_sched_clock;
++
++static u64 pit_sched_clock_read(void)
++{
++	return read_pit_clk(pit_sched_clock);
++}
++
+ /*
+  * Set up both clocksource and clockevent support.
+  */
+@@ -206,6 +214,9 @@ static void __init at91sam926x_pit_common_init(struct pit_data *data)
+ 	data->clksrc.flags = CLOCK_SOURCE_IS_CONTINUOUS;
+ 	clocksource_register_hz(&data->clksrc, pit_rate);
+ 
++	pit_sched_clock = &data->clksrc;
++	sched_clock_register(pit_sched_clock_read, bits, pit_rate);
++
+ 	/* Set up irq handler */
+ 	ret = request_irq(data->irq, at91sam926x_pit_interrupt,
+ 			  IRQF_SHARED | IRQF_TIMER | IRQF_IRQPOLL,
+-- 
+2.5.0
