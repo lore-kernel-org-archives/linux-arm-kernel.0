@@ -1,51 +1,59 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu,  4 Feb 2016 16:50:24 +0100
-Subject: [PATCH v2 1/7] arm64: efistub: drop __init annotation from
- handle_kernel_image()
-In-Reply-To: <1454601030-9093-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1454601030-9093-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1454601030-9093-2-git-send-email-ard.biesheuvel@linaro.org>
+From: bcrl@kvack.org (Benjamin LaHaise)
+Date: Thu, 4 Feb 2016 11:01:01 -0500
+Subject: linux-next: build failure after merge of the aio tree
+In-Reply-To: <20160204143907.GG10826@n2100.arm.linux.org.uk>
+References: <20160127134024.0fababf6@canb.auug.org.au>
+ <20160129113056.GP10826@n2100.arm.linux.org.uk>
+ <CAMuHMdUy-cqeN8COO4rdpY-mOH+6gth40wB31-edkj8CO5PFCw@mail.gmail.com>
+ <20160204131959.6695c7bf@canb.auug.org.au> <20160204134142.GA16315@kvack.org>
+ <20160204135056.GE10826@n2100.arm.linux.org.uk>
+ <20160204140822.GB16315@kvack.org>
+ <20160204141253.GF10826@n2100.arm.linux.org.uk>
+ <20160204143204.GC16315@kvack.org>
+ <20160204143907.GG10826@n2100.arm.linux.org.uk>
+Message-ID: <20160204160101.GD16315@kvack.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After moving arm64-stub.c to libstub/, all of its sections are emitted
-as .init.xxx sections automatically, and the __init annotation of
-handle_kernel_image() causes it to end up in .init.init.text, which is
-not recognized as an __init section by the linker scripts. So drop the
-annotation.
+On Thu, Feb 04, 2016 at 02:39:07PM +0000, Russell King - ARM Linux wrote:
+> However, this one should warn:
+> 
+> int test_wrong(char **v, const char **p)
+> { return __get_user(*v, p); }
+> 
+> Good luck (I think you'll need lots of it to get a working solution)! :)
 
-Acked-by: Will Deacon <will.deacon@arm.com>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-Tested-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- drivers/firmware/efi/libstub/arm64-stub.c | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+This works with your test cases on x86-32.  Note that it's only compile + 
+link tested at present.
 
-diff --git a/drivers/firmware/efi/libstub/arm64-stub.c b/drivers/firmware/efi/libstub/arm64-stub.c
-index 78dfbd34b6bf..9e0342745e4f 100644
---- a/drivers/firmware/efi/libstub/arm64-stub.c
-+++ b/drivers/firmware/efi/libstub/arm64-stub.c
-@@ -13,13 +13,13 @@
- #include <asm/efi.h>
- #include <asm/sections.h>
- 
--efi_status_t __init handle_kernel_image(efi_system_table_t *sys_table_arg,
--					unsigned long *image_addr,
--					unsigned long *image_size,
--					unsigned long *reserve_addr,
--					unsigned long *reserve_size,
--					unsigned long dram_base,
--					efi_loaded_image_t *image)
-+efi_status_t handle_kernel_image(efi_system_table_t *sys_table_arg,
-+				 unsigned long *image_addr,
-+				 unsigned long *image_size,
-+				 unsigned long *reserve_addr,
-+				 unsigned long *reserve_size,
-+				 unsigned long dram_base,
-+				 efi_loaded_image_t *image)
- {
- 	efi_status_t status;
- 	unsigned long kernel_size, kernel_memsize = 0;
+		-ben
 -- 
-2.5.0
+"Thought is the essence of where you are now."
+
+diff --git a/arch/x86/include/asm/uaccess.h b/arch/x86/include/asm/uaccess.h
+index 09b1b0a..d8834c2 100644
+--- a/arch/x86/include/asm/uaccess.h
++++ b/arch/x86/include/asm/uaccess.h
+@@ -326,7 +326,21 @@ do {									\
+ } while (0)
+ 
+ #ifdef CONFIG_X86_32
+-#define __get_user_asm_u64(x, ptr, retval, errret)	(x) = __get_user_bad()
++#define __get_user_asm_u64(x, addr, err, errret)			\
++	asm volatile(ASM_STAC "\n"					\
++		     "1:	movl %2,%%eax\n"			\
++		     "		movl %3,%%edx\n"			\
++		     "2: " ASM_CLAC "\n"				\
++		     ".section .fixup,\"ax\"\n"				\
++		     "3:	mov %4,%0\n"				\
++		     "	xorl %%eax,%%eax\n"				\
++		     "	xorl %%edx,%%edx\n"				\
++		     "	jmp 2b\n"					\
++		     ".previous\n"					\
++		     _ASM_EXTABLE(1b, 3b)				\
++		     : "=r" (err), "=A"(x)				\
++		     : "m" (__m(addr)), "m" __m(((u32 *)addr) + 1), "i" (errret), "0" (err))
++
+ #define __get_user_asm_ex_u64(x, ptr)			(x) = __get_user_bad()
+ #else
+ #define __get_user_asm_u64(x, ptr, retval, errret) \
