@@ -1,104 +1,65 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Thu,  4 Feb 2016 18:28:48 +0100
-Subject: [PATCH V4 10/23] x86,
- pci: Cleanup platform specific MCFG data by using ECAM hot_added flag.
+Date: Thu,  4 Feb 2016 18:28:49 +0100
+Subject: [PATCH V4 11/23] pci,
+ acpi: Move ACPI host bridge device companion assignment to core code.
 In-Reply-To: <1454606941-9523-1-git-send-email-tn@semihalf.com>
 References: <1454606941-9523-1-git-send-email-tn@semihalf.com>
-Message-ID: <1454606941-9523-11-git-send-email-tn@semihalf.com>
+Message-ID: <1454606941-9523-12-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Because of two facts:
-1. MCFG region has hot_added flag
-2. struct acpi_pci_root has topology info (domain, bus number)
-we can get rid of arch specific mcfg data from x86 struct pci_root_info.
+Currently we have two platforms (x86 & ia64) capable of PCI ACPI host
+bridge initialization. They both use sysdata to pass down parent
+device reference and both rely on NULL parent in pci_create_root_bus()
+to validate sysdata content.
 
+It looks hacky and prevents us from getting some firmware specific
+info for PCI host controller e.g. PCI bus domain number.
+However, we overcome that blocker by passing down parent
+device via pci_create_root_bus parameter (as the ACPI device type)
+and using ACPI_COMPANION_SET in core code for ACPI boot method.
+ACPI_COMPANION_SET is safe to run for all cases DT, ACPI and DT&ACPI.
+
+Suggested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 Tested-by: Duc Dang <dhdang@apm.com>
 Tested-by: Dongdong Liu <liudongdong3@huawei.com>
 Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
 Tested-by: Graeme Gregory <graeme.gregory@linaro.org>
 Tested-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- arch/x86/pci/acpi.c | 36 ++++++++++++++----------------------
- 1 file changed, 14 insertions(+), 22 deletions(-)
+ drivers/acpi/pci_root.c | 5 ++++-
+ drivers/pci/probe.c     | 2 ++
+ 2 files changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/arch/x86/pci/acpi.c b/arch/x86/pci/acpi.c
-index a997d7c..8e89921 100644
---- a/arch/x86/pci/acpi.c
-+++ b/arch/x86/pci/acpi.c
-@@ -12,11 +12,6 @@
- struct pci_root_info {
- 	struct acpi_pci_root_info common;
- 	struct pci_sysdata sd;
--#ifdef	CONFIG_PCI_MMCONFIG
--	bool mcfg_added;
--	u8 start_bus;
--	u8 end_bus;
--#endif
- };
+diff --git a/drivers/acpi/pci_root.c b/drivers/acpi/pci_root.c
+index ae3fe4e..a65c8c2 100644
+--- a/drivers/acpi/pci_root.c
++++ b/drivers/acpi/pci_root.c
+@@ -846,7 +846,10 @@ struct pci_bus *acpi_pci_root_create(struct acpi_pci_root *root,
  
- static bool pci_use_crs = true;
-@@ -180,16 +175,13 @@ static int check_segment(u16 seg, struct device *dev, char *estr)
- 
- static int setup_mcfg_map(struct acpi_pci_root_info *ci)
- {
--	int result, seg;
--	struct pci_root_info *info;
-+	int result, seg, start, end;
- 	struct acpi_pci_root *root = ci->root;
- 	struct device *dev = &ci->bridge->dev;
- 
--	info = container_of(ci, struct pci_root_info, common);
--	info->start_bus = (u8)root->secondary.start;
--	info->end_bus = (u8)root->secondary.end;
--	info->mcfg_added = false;
--	seg = info->sd.domain;
-+	seg = root->segment;
-+	start = root->secondary.start;
-+	end = root->secondary.end;
- 
- 	/* return success if MMCFG is not in use */
- 	if (raw_pci_ext_ops && raw_pci_ext_ops != &pci_mmcfg)
-@@ -198,13 +190,11 @@ static int setup_mcfg_map(struct acpi_pci_root_info *ci)
- 	if (!(pci_probe & PCI_PROBE_MMCONF))
- 		return check_segment(seg, dev, "MMCONFIG is disabled,");
- 
--	result = pci_mmconfig_insert(dev, seg, info->start_bus, info->end_bus,
--				     root->mcfg_addr);
-+	result = pci_mmconfig_insert(dev, seg, start, end, root->mcfg_addr);
- 	if (result == 0) {
- 		/* enable MMCFG if it hasn't been enabled yet */
- 		if (raw_pci_ext_ops == NULL)
- 			raw_pci_ext_ops = &pci_mmcfg;
--		info->mcfg_added = true;
- 	} else if (result != -EEXIST)
- 		return check_segment(seg, dev,
- 			 "fail to add MMCONFIG information,");
-@@ -214,14 +204,16 @@ static int setup_mcfg_map(struct acpi_pci_root_info *ci)
- 
- static void teardown_mcfg_map(struct acpi_pci_root_info *ci)
- {
--	struct pci_root_info *info;
-+	struct acpi_pci_root *root = ci->root;
-+	struct pci_mmcfg_region *cfg;
- 
--	info = container_of(ci, struct pci_root_info, common);
--	if (info->mcfg_added) {
--		pci_mmconfig_delete(info->sd.domain,
--				    info->start_bus, info->end_bus);
--		info->mcfg_added = false;
--	}
-+	cfg = pci_mmconfig_lookup(root->segment, root->secondary.start);
-+	if (!cfg)
-+		return;
+ 	pci_acpi_root_add_resources(info);
+ 	pci_add_resource(&info->resources, &root->secondary);
+-	bus = pci_create_root_bus(NULL, busnum, ops->pci_ops,
 +
-+	if (cfg->hot_added)
-+		pci_mmconfig_delete(root->segment, root->secondary.start,
-+				    root->secondary.end);
- }
- #else
- static int setup_mcfg_map(struct acpi_pci_root_info *ci)
++	/* Root bridge device needs to be sure of parent ACPI type */
++	ACPI_COMPANION_SET(&device->dev, device);
++	bus = pci_create_root_bus(&device->dev, busnum, ops->pci_ops,
+ 				  sysdata, &info->resources);
+ 	if (!bus)
+ 		goto out_release_info;
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index 6d7ab9b..81dd3a2 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -2100,6 +2100,8 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
+ 	bridge->dev.parent = parent;
+ 	bridge->dev.release = pci_release_host_bridge_dev;
+ 	dev_set_name(&bridge->dev, "pci%04x:%02x", pci_domain_nr(b), bus);
++	ACPI_COMPANION_SET(&bridge->dev,
++			   parent ? to_acpi_device_node(parent->fwnode) : NULL);
+ 	error = pcibios_root_bridge_prepare(bridge);
+ 	if (error) {
+ 		kfree(bridge);
 -- 
 1.9.1
