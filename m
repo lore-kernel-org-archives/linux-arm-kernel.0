@@ -1,35 +1,29 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Thu, 4 Feb 2016 14:54:03 +0800
-Subject: [PATCH v6] i2c: mt8173: add 4GB mode support in i2c driver.
-In-Reply-To: <1454347143-31461-1-git-send-email-liguo.zhang@mediatek.com>
-References: <1454347143-31461-1-git-send-email-liguo.zhang@mediatek.com>
-Message-ID: <1454568843.15541.1.camel@mtksdaap41>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Thu, 04 Feb 2016 10:36:10 +0300
+Subject: [PATCH] KVM: arm/arm64: fix reference to uninitialised VGIC
+In-Reply-To: <56B23A02.7070804@arm.com>
+References: <1454518611-15694-1-git-send-email-andre.przywara@arm.com>
+ <56B23A02.7070804@arm.com>
+Message-ID: <009701d15f1e$b8398510$28ac8f30$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2016-02-02 at 01:19 +0800, Liguo Zhang wrote:
-> If 4GB mode is enable, we should add 4gb mode support in i2c driver.
-> Set 4GB mode register to support 4GB mode.
+ Hello!
+
+> > Fix this by bailing out early of kvm_timer_flush_hwstate() if we don't
+> > have a VGIC at all.
+> >
+> > Reported-by: Cosmin Gorgovan <cosmin@linux-geek.org>
+> > Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> > Cc: <stable@vger.kernel.org> # 4.4.x
 > 
-> Signed-off-by: Liguo Zhang <liguo.zhang@mediatek.com>
-> ---
-> change in v6:
-> Remove unnecessary init for reg_4g_mode.
-> change in v5:
-> Use BIT_ULL() to fix kernel building warning.
-> change in v4:
-> Use BIT_ULL() to fix kernel building warning.
-> change in v3:
-> Only inline the computation of reg_4g_mode in mtk_i2c_set_4g_mode().
-> change in v2:
-> Define a static inline function mtk_i2c_set_4g_mode() for support 4g mode.
-> ---
->  drivers/i2c/busses/i2c-mt65xx.c | 42 +++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 42 insertions(+)
+> Nice catch, thanks.
+
+ Can you check this: http://www.spinics.net/lists/kvm/msg124540.html ? It also should fix this issue. Just omit the very first hunk
+from it, if you don't want to apply the whole set.
 
 
-Looks good to me, Thanks.
-
-Reviewed-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
-
-Joe.C
+Kind regards,
+Pavel Fedin
+Senior Engineer
+Samsung Electronics Research center Russia
