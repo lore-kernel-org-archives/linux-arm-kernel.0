@@ -1,59 +1,52 @@
-From: bcrl@kvack.org (Benjamin LaHaise)
-Date: Thu, 4 Feb 2016 11:01:01 -0500
-Subject: linux-next: build failure after merge of the aio tree
-In-Reply-To: <20160204143907.GG10826@n2100.arm.linux.org.uk>
-References: <20160127134024.0fababf6@canb.auug.org.au>
- <20160129113056.GP10826@n2100.arm.linux.org.uk>
- <CAMuHMdUy-cqeN8COO4rdpY-mOH+6gth40wB31-edkj8CO5PFCw@mail.gmail.com>
- <20160204131959.6695c7bf@canb.auug.org.au> <20160204134142.GA16315@kvack.org>
- <20160204135056.GE10826@n2100.arm.linux.org.uk>
- <20160204140822.GB16315@kvack.org>
- <20160204141253.GF10826@n2100.arm.linux.org.uk>
- <20160204143204.GC16315@kvack.org>
- <20160204143907.GG10826@n2100.arm.linux.org.uk>
-Message-ID: <20160204160101.GD16315@kvack.org>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 4 Feb 2016 11:04:50 -0500 (EST)
+Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
+ v4.5-rc1
+In-Reply-To: <CAPDyKFr3jqh5bDFOuKLgomhQ2P9+yN5Ps8E0CH8r-oOjvBuswg@mail.gmail.com>
+Message-ID: <Pine.LNX.4.44L0.1602041059070.1515-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 04, 2016 at 02:39:07PM +0000, Russell King - ARM Linux wrote:
-> However, this one should warn:
+On Thu, 4 Feb 2016, Ulf Hansson wrote:
+
+> Just wanted to add yet some new findings while I was looking into this
+> regression.
 > 
-> int test_wrong(char **v, const char **p)
-> { return __get_user(*v, p); }
+> So, the reason why pm_runtime_put_sync() doesn't idle the device in
+> these cases, is because autosuspend is respected and for some reason
+> the autosuspend timer hasn't expired.
+
+No doubt the autosuspend delay is longer than the time it takes for a 
+probe to fail.
+
+> I was wondering *why* the timer isn't considered as expired, because
+> the driver don't call pm_runtime_mark_last_busy() in the failing probe
+> case...
 > 
-> Good luck (I think you'll need lots of it to get a working solution)! :)
+> Then I realized the following commit was merged a few releases ago,
+> which makes the runtime PM core to invoke pm_runtime_mark_last_busy()
+> for us.
+> 
+> commit 56f487c78015936097474fd89b2ccb229d500d0f
+> Author: Tony Lindgren <tony@atomide.com>
+> Date:   Wed May 13 16:36:32 2015 -0700
+> PM / Runtime: Update last_busy in rpm_resume
+> 
+> So, this commit actually causes the devices to stay active after a
+> failed probe attempt.
+> 
+> I think it's a good idea to revert this change, but what to you think?
 
-This works with your test cases on x86-32.  Note that it's only compile + 
-link tested at present.
+I disagree.  The whole idea of autosuspend is to prevent the device's
+power state from bouncing up and down too rapidly.  This implies that 
+whenever the device gets resumed, we should wait at least the minimum 
+autosuspend delay before allowing the next autosuspend.
 
-		-ben
--- 
-"Thought is the essence of where you are now."
+Perhaps you think that it's silly to behave that way in this case,
+because the device wasn't accessed at all during the time it was at
+full power.  That's a valid objection, but the proper solution is not
+to revert the 56f487c78015 commit.  Rather, change the driver to avoid
+doing a pm_runtime_resume_sync until you _know_ that the device will be
+accessed soon.
 
-diff --git a/arch/x86/include/asm/uaccess.h b/arch/x86/include/asm/uaccess.h
-index 09b1b0a..d8834c2 100644
---- a/arch/x86/include/asm/uaccess.h
-+++ b/arch/x86/include/asm/uaccess.h
-@@ -326,7 +326,21 @@ do {									\
- } while (0)
- 
- #ifdef CONFIG_X86_32
--#define __get_user_asm_u64(x, ptr, retval, errret)	(x) = __get_user_bad()
-+#define __get_user_asm_u64(x, addr, err, errret)			\
-+	asm volatile(ASM_STAC "\n"					\
-+		     "1:	movl %2,%%eax\n"			\
-+		     "		movl %3,%%edx\n"			\
-+		     "2: " ASM_CLAC "\n"				\
-+		     ".section .fixup,\"ax\"\n"				\
-+		     "3:	mov %4,%0\n"				\
-+		     "	xorl %%eax,%%eax\n"				\
-+		     "	xorl %%edx,%%edx\n"				\
-+		     "	jmp 2b\n"					\
-+		     ".previous\n"					\
-+		     _ASM_EXTABLE(1b, 3b)				\
-+		     : "=r" (err), "=A"(x)				\
-+		     : "m" (__m(addr)), "m" __m(((u32 *)addr) + 1), "i" (errret), "0" (err))
-+
- #define __get_user_asm_ex_u64(x, ptr)			(x) = __get_user_bad()
- #else
- #define __get_user_asm_u64(x, ptr, retval, errret) \
+Alan Stern
