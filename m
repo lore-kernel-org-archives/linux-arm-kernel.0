@@ -1,46 +1,25 @@
-From: paul.burton@imgtec.com (Paul Burton)
-Date: Thu, 4 Feb 2016 16:10:12 +0000
-Subject: [PATCH v3 5/6] PCI: xilinx: Fix INTX irq dispatch
-In-Reply-To: <1454602213-967-1-git-send-email-paul.burton@imgtec.com>
-References: <1454602213-967-1-git-send-email-paul.burton@imgtec.com>
-Message-ID: <1454602213-967-6-git-send-email-paul.burton@imgtec.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 4 Feb 2016 16:13:01 +0000
+Subject: [PATCH v2 0/7] ARM/efi minor fixes + stub pre-boot compat checks
+In-Reply-To: <1454601030-9093-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1454601030-9093-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160204161300.GC17587@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IRQ domain for INTX interrupts has 4 entries, numbered 0 to 3. This
-matches what the hardware reports from the interrupt FIFO exactly, but
-xilinx_pcie_intr_handler was adding 1 to that value to convert to the
-range 1 to 4. Stop adding 1, such that all of INTA through to INTD fall
-within the range of the IRQ domain.
+On Thu, Feb 04, 2016 at 04:50:23PM +0100, Ard Biesheuvel wrote:
+> Ard Biesheuvel (7):
+>   arm64: efistub: drop __init annotation from handle_kernel_image()
+>   arm64: vmlinux.lds.S: handle .init.rodata.xxx and .init.bss sections
+>   efi: efistub: prevent __init annotations from being used
+>   efi: arm-init: use read-only early mappings
+>   ARM: efistub: check for LPAE support before booting a LPAE kernel
+>   arm64: efistub: check for h/w support before booting a >4 KB granule
+>     kernel
+>   ARM/arm64: efistub: perform hardware compatibility check
 
-Signed-off-by: Paul Burton <paul.burton@imgtec.com>
-Fixes: 8961def56845 ("PCI: xilinx: Add Xilinx AXI PCIe Host Bridge IP driver")
+This all looks good to be, so FWIW, for the series:
 
----
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-Changes in v3:
-- Split out from Boston patchset.
-
-Changes in v2:
-- Add Fixes tag.
-
- drivers/pci/host/pcie-xilinx.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
-index 6c5a503..8013e83 100644
---- a/drivers/pci/host/pcie-xilinx.c
-+++ b/drivers/pci/host/pcie-xilinx.c
-@@ -451,8 +451,8 @@ static irqreturn_t xilinx_pcie_intr_handler(int irq, void *data)
- 			irq = pcie_read(port, XILINX_PCIE_REG_RPIFR2) &
- 				XILINX_PCIE_RPIFR2_MSG_DATA;
- 		} else {
--			val = ((val & XILINX_PCIE_RPIFR1_INTR_MASK) >>
--				XILINX_PCIE_RPIFR1_INTR_SHIFT) + 1;
-+			val = (val & XILINX_PCIE_RPIFR1_INTR_MASK) >>
-+				XILINX_PCIE_RPIFR1_INTR_SHIFT;
- 			irq = irq_find_mapping(port->irq_domain, val);
- 		}
- 
--- 
-2.7.0
+Mark.
