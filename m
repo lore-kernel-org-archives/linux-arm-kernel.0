@@ -1,59 +1,58 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Thu, 4 Feb 2016 13:03:07 +0100
-Subject: [PATCH v3 2/6] drivers/cpufreq: implement
- init_cpu_capacity_default()
-In-Reply-To: <20160204093559.GA14099@e105550-lin.cambridge.arm.com>
-References: <1454500799-18451-1-git-send-email-juri.lelli@arm.com>
- <1454500799-18451-3-git-send-email-juri.lelli@arm.com>
- <CAKfTPtDGk5BC25WqHdhDYDOBgUsuidAMhrXS=eDi6wJPZjfrwA@mail.gmail.com>
- <20160204093559.GA14099@e105550-lin.cambridge.arm.com>
-Message-ID: <CAKfTPtB4G3bP5N0hU6zWXJTddO34x3RnyGpp-4_otc8O=Wq2hw@mail.gmail.com>
+From: dledford@redhat.com (Doug Ledford)
+Date: Thu, 4 Feb 2016 07:15:05 -0500
+Subject: [PATCH] staging: amso1100: fix format string for 64-bit phys_addr
+In-Reply-To: <2307631.X1DYNXxKPZ@wuerfel>
+References: <2307631.X1DYNXxKPZ@wuerfel>
+Message-ID: <56B340C9.2060303@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 February 2016 at 10:36, Morten Rasmussen <morten.rasmussen@arm.com> wrote:
-> On Wed, Feb 03, 2016 at 10:04:37PM +0100, Vincent Guittot wrote:
->> On 3 February 2016 at 12:59, Juri Lelli <juri.lelli@arm.com> wrote:
+On 02/01/2016 11:34 AM, Arnd Bergmann wrote:
+> The amso1100 driver prints a phys_addr_t by casting it to a pointer,
+> which causes a warning when phys_addr_t is 64-bit and pointers
+> are 32-bit:
+> 
+> drivers/staging/rdma/amso1100/c2.c: In function 'c2_rx_error':
+> drivers/staging/rdma/amso1100/c2.c:430:4: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+> 
+> This changes the format string to print the address as a 64-bit
+> number all the time to avoids the warnings. Ideally we would use
+> the %pap format string for phys_addr_t, but that doesn't work
+> here easily as it requires passing a pointer to the address.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+> Found on ARM randconfig testing. This must have been there forever but is
+> rather hard to trigger even with randconfig builds.
+> 
+> diff --git a/drivers/staging/rdma/amso1100/c2.c b/drivers/staging/rdma/amso1100/c2.c
+> index b46ebd1ae15a..170a42a60552 100644
+> --- a/drivers/staging/rdma/amso1100/c2.c
+> +++ b/drivers/staging/rdma/amso1100/c2.c
+> @@ -426,8 +426,8 @@ static void c2_rx_error(struct c2_port *c2_port, struct c2_element *elem)
+>  		pr_debug("    index : %Zu\n",
+>  			elem - c2_port->rx_ring.start);
+>  		pr_debug("    len   : %u\n", rx_desc->len);
+> -		pr_debug("  rxp_hdr : %p [PA %p]\n", rxp_hdr,
+> -			(void *) __pa((unsigned long) rxp_hdr));
+> +		pr_debug("  rxp_hdr : %p [PA %016llx\n", rxp_hdr,
+> +			(u64)__pa((unsigned long) rxp_hdr));
+>  		pr_debug("    flags : 0x%x\n", rxp_hdr->flags);
+>  		pr_debug("    status: 0x%x\n", rxp_hdr->status);
+>  		pr_debug("    len   : %u\n", rxp_hdr->len);
+> 
 
-[snip]
+I've sent off a deletion of this file to Linus already, sorry.
 
->> > diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
->> > index 9e63fb1..c4025fd 100644
->> > --- a/drivers/cpufreq/Makefile
->> > +++ b/drivers/cpufreq/Makefile
->> > @@ -1,5 +1,5 @@
->> >  # CPUfreq core
->> > -obj-$(CONFIG_CPU_FREQ)                 += cpufreq.o freq_table.o
->> > +obj-$(CONFIG_CPU_FREQ)                 += cpufreq.o freq_table.o cpufreq_capacity.o
->>
->> Do you really want to have the calibration of capacity dependent of
->> cpufreq ? It means that we can't use it without a cpufreq driver.
->> IMHO, this creates a unnecessary dependency. I understand that you
->> must ensure that core runs at max fequency if a driver is present but
->> you should be able to calibrate the capacity if cpufreq is not
->> available but you have different capacity because micro architecture
->
-> We could remove the dependency on cpufreq, but it would make things more
-> complicated for systems which do have frequency scaling as we would have
-> to either:
->
-> 1) Run the calibration again once cpufreq has been initialized.
+-- 
+Doug Ledford <dledford@redhat.com>
+              GPG KeyID: 0E572FDD
 
-or wait and let time for a driver to initialize and trig the
-calibration. If calibration has not been done at the end of the boot,
-you can force a calibration. If the cpufeq driver is a module and is
-loaded far later for any good or bad reason, we will have to run the
-calibration once again but at least the capacity will reflect he
-current capacity of the CPUs.
-I'm mainly worried that the compilation of the calibration is
-dependent of CONFIG_CPU_FREQ not that cpufreq can trig the calibration
-sequence
 
->
-> 2) Know the frequency of all cpus at calibration time so we can
-> determine the correct micro-archicture difference. This option would
-> however mean that we have to provide a frequency scaling factor even for
-> systems that don't have cpufreq.
->
-> 3) Find a way to do the calibration anyway if cpufreq doesn't
-> initialize. I'm not sure how that would work though.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 884 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160204/f4c4bc6a/attachment.sig>
