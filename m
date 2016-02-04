@@ -1,80 +1,47 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 4 Feb 2016 14:48:58 +0100
-Subject: [PATCH v3 4/5] pinctrl: mediatek: Add Pinctrl/GPIO/EINT driver
- for mt2701
-In-Reply-To: <1451290066.11129.4.camel@mtksdaap41>
-References: <1451286546-5920-1-git-send-email-biao.huang@mediatek.com>
- <1451286546-5920-5-git-send-email-biao.huang@mediatek.com>
- <1451290066.11129.4.camel@mtksdaap41>
-Message-ID: <56B356CA.1010200@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 4 Feb 2016 13:50:56 +0000
+Subject: linux-next: build failure after merge of the aio tree
+In-Reply-To: <20160204134142.GA16315@kvack.org>
+References: <20160112164034.0fe945a7@canb.auug.org.au>
+ <20160112163835.GD347@kvack.org>
+ <20160127134024.0fababf6@canb.auug.org.au>
+ <20160129113056.GP10826@n2100.arm.linux.org.uk>
+ <CAMuHMdUy-cqeN8COO4rdpY-mOH+6gth40wB31-edkj8CO5PFCw@mail.gmail.com>
+ <20160204131959.6695c7bf@canb.auug.org.au>
+ <20160204134142.GA16315@kvack.org>
+Message-ID: <20160204135056.GE10826@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Feb 04, 2016 at 08:41:42AM -0500, Benjamin LaHaise wrote:
+> On Thu, Feb 04, 2016 at 01:19:59PM +1100, Stephen Rothwell wrote:
+> > Hi Benjamin,
+> > 
+> > On Fri, 29 Jan 2016 13:03:39 +0100 Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+> > >
+> > > On Fri, Jan 29, 2016 at 12:30 PM, Russell King - ARM Linux
+> > > <linux@arm.linux.org.uk> wrote:
+> > > >> Background: new aio code is adding __get_user() calls referencing 64
+> > > >> bit quantities (__u64 and __s64).  
+> > > >
+> > > > There's lots more architectures which do not support 64-bit get_user()
+> > > > _or_ __get_user(): avr32, blackfin, metag for example, and m68k which
+> > > > has this interesting thing "/* case 8: disabled because gcc-4.1 has a
+> > > > broken typeof \" in its *get_user() implementation.  
+> > > 
+> > > And if you enable it again, you get lots of "warning: cast to pointer from
+> > > integer of different size", like you mentioned.
+> > 
+> > Any thoughts?  I am still using the version of tha aio tree from
+> > next-20160111.
+> 
+> I am still convinced that this is an architecture issue.  Given that 64 bit 
+> values work in the *get_user implementations on other architectures, I see 
+> no reason there should need to be a workaround for this in common code.
 
+So you're happy to break x86-32 then...
 
-On 28/12/15 09:07, Yingjoe Chen wrote:
-> On Mon, 2015-12-28 at 15:09 +0800, Biao Huang wrote:
->> Add mt2701 support using mediatek common pinctrl driver.
->> MT2701 have some special pins need an extra setting register
->> than other ICs, so adding this support to common code.
->>
->> Signed-off-by: Biao Huang <biao.huang@mediatek.com>
->> Acked-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
-> <...>
->> +
->> +static struct platform_driver mtk_pinctrl_driver = {
->> +	.probe = mt2701_pinctrl_probe,
->> +	.driver = {
->> +		.name = "mediatek-mt2701-pinctrl",
->> +		.owner = THIS_MODULE,
->> +		.of_match_table = mt2701_pctrl_match,
->> +	},
->> +};
->> +
->> +static int __init mtk_pinctrl_init(void)
->> +{
->> +	return platform_driver_register(&mtk_pinctrl_driver);
->> +}
->> +
->> +arch_initcall(mtk_pinctrl_init);
->
->
-> As discussed in
-> http://lists.infradead.org/pipermail/linux-mediatek/2015-December/003350.html
-> we should use subsys_initcall() instead.
->
->
->> diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
->> index f307f1d..76279f0 100644
->> --- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
->> +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> <...>
->> @@ -347,6 +352,7 @@ static int mtk_pconf_parse_conf(struct pinctrl_dev *pctldev,
->>   		ret = mtk_pconf_set_pull_select(pctl, pin, true, false, arg);
->>   		break;
->>   	case PIN_CONFIG_INPUT_ENABLE:
->> +		mtk_pmx_gpio_set_direction(pctldev, NULL, pin, true);
->>   		ret = mtk_pconf_set_ies_smt(pctl, pin, arg, param);
->>   		break;
->>   	case PIN_CONFIG_OUTPUT:
->> @@ -354,6 +360,7 @@ static int mtk_pconf_parse_conf(struct pinctrl_dev *pctldev,
->>   		ret = mtk_pmx_gpio_set_direction(pctldev, NULL, pin, false);
->>   		break;
->>   	case PIN_CONFIG_INPUT_SCHMITT_ENABLE:
->> +		mtk_pmx_gpio_set_direction(pctldev, NULL, pin, true);
->>   		ret = mtk_pconf_set_ies_smt(pctl, pin, arg, param);
->>   		break;
->>   	case PIN_CONFIG_DRIVE_STRENGTH:
->
-> This change is not directly related to adding mt2710 support and change
-> behavior for all MTK pinctrl drivers, please create a separate patch for
-> this.
->
-
-Hi Biao,
-
-This patch didn't make it into v4.5-rc1. Are you thinking of sending a 
-new version addressing the comments from Yingjoe?
-
-Regards,
-Matthias
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
