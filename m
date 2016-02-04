@@ -1,58 +1,88 @@
-From: oferh@marvell.com (Ofer Heifetz)
-Date: Thu, 4 Feb 2016 03:22:04 +0000
-Subject: [PATCH v2 03/12] serial: mvebu-uart: initial support for
- Armada-3700 serial port
-In-Reply-To: <CAPv3WKe6=705iEtsuo0cUtugofiFa_Zt9xydRsgOV+mZ18H-3Q@mail.gmail.com>
-References: <1454524889-9207-1-git-send-email-gregory.clement@free-electrons.com>
- <1454524889-9207-4-git-send-email-gregory.clement@free-electrons.com>
- <CAPv3WKdh8D8GYMabALQQW-Z7L+=XhkZw2cXdYpcQ8tF0Rjckag@mail.gmail.com>
- <20160203230224.5ea52f65@free-electrons.com>
- <CAPv3WKe6=705iEtsuo0cUtugofiFa_Zt9xydRsgOV+mZ18H-3Q@mail.gmail.com>
-Message-ID: <d18a261fae544e27b12a56bebf4a7006@IL-EXCH01.marvell.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 4 Feb 2016 08:53:07 +0530
+Subject: Plain DFS (no voltage scaling)
+In-Reply-To: <56B244A0.60309@free.fr>
+References: <56B11B67.3090600@free.fr> <56B217C9.1050405@free.fr>
+ <20160203161331.GI3469@vireshk> <56B244A0.60309@free.fr>
+Message-ID: <20160204032307.GP3469@vireshk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marcin,
+On 03-02-16, 19:19, Mason wrote:
+> On 03/02/2016 17:13, Viresh Kumar wrote:
+> > On 03-02-16, 16:07, Mason wrote:
+> >> On 02/02/2016 22:11, Mason wrote:
+> >>
+> >>> I plan to enable the on-demand governor on the tango platform:
+> >>> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/boot/dts/tango4-smp8758.dtsi
+> >>>
+> >>> I found the cpufreq-dt binding doc:
+> >>>
+> >>> https://www.kernel.org/doc/Documentation/devicetree/bindings/cpufreq/cpufreq-dt.txt
+> >>> https://www.kernel.org/doc/Documentation/devicetree/bindings/opp/opp.txt
+> >>>
+> >>> Something is not clear to me:
+> >>>
+> >>> If my platform cannot scale the voltage, what information
+> >>> should I put in the voltage part of the DT?
+> >>
+> >> Someone pointed out that tweaking the frequency without tweaking
+> >> the voltage might be counter-productive.
+> >>
+> >> I measured the power consumption of the entire board (at the power outlet)
+> >> for 3 CPU frequencies (all other things being equal, I hope).
+> >>
+> >> idle @ 111 MHz = 4.6 W
+> >> idle @ 333 MHz = 4.6 W
+> >> idle @ 999 MHz = 4.6 W
+> >>
+> >> load @ 111 MHz = 5.0 W
+> >> load @ 333 MHz = 5.7 W
+> >> load @ 999 MHz = 7.7 W
+> >>
+> >> When idle, the kernel calls WFI, which "turns off" most of the CPU
+> >> (clock gating?) such that the actual frequency does not matter.
+> >>
+> >> At full load (I use cpuburn to jog as many FUs simultaneously as
+> >> possible) it looks like each additional MHz requires ~3 mW.
+> >>
+> >> So it would appear that an on-demand governor might not help to
+> >> save power.
 
-I think it is a partial fix since once QA started to use this patch and found that /proc/interrupts prints serial interrupt string multiple times which is clobbering the print.
+IOW, what's so special about how on-demand will behave in your case ?
+If it doesn't work properly, then that's the same for everybody, isn't
+it ?
 
-/Ofer
+> > Why do you say so ?
+> 
+> Here's my (possibly incorrect) reasoning:
+> 
+> If the CPU is idle, kernel calls WFI and frequency apparently
+> doesn't matter.
 
+Right.
 
------Original Message-----
-From: Marcin Wojtas [mailto:mw at semihalf.com] 
-Sent: Thursday, February 04, 2016 12:23 AM
-To: Thomas Petazzoni; Ofer Heifetz
-Cc: Gregory CLEMENT; Jason Cooper; Andrew Lunn; Sebastian Hesselbarth; arm at kernel.org; Catalin Marinas; Will Deacon; Jonathan Corbet; Mark Rutland; devicetree at vger.kernel.org; linux-ide at vger.kernel.org; Greg Kroah-Hartman; Omri Itach; linux-kernel at vger.kernel.org; Nadav Haklai; Hans de Goede; Lior Amsalem; linux-serial at vger.kernel.org; Jiri Slaby; Tejun Heo; Wilson Ding; linux-arm-kernel at lists.infradead.org
-Subject: Re: [PATCH v2 03/12] serial: mvebu-uart: initial support for Armada-3700 serial port
+> If the CPU has work to do, the on-demand governor will bump the
+> frequency to the max (I think).
 
-I'm sorry, indeed, I was the one to overlook - there was a lot going on in a thread and I missed it.
+Not always, but it will choose the best frequency based on the load.
 
-Ofer, as you found out that IRQF_SHARED help booting ubuntu - do you think it's a hack or fix?
+> I don't think the CPU spends a lot of time in the intermediate
+> frequencies (neither max nor min).
 
-Best regards,
-Marcin
+It does, it was fixed somewhere in v3.* .
 
-2016-02-03 23:02 GMT+01:00 Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com>:
-> Dear Marcin Wojtas,
->
-> On Wed, 3 Feb 2016 22:41:15 +0100, Marcin Wojtas wrote:
->> Hi Gregory,
->>
->> > +       port->irq        = irq->start;
->> > +       port->irqflags   = 0;
->>
->> Same request as for v1, which you must have overlooked:
->> port->irqflags = IRQF_SHARED;
->
-> Gregory didn't overlook this comment you made on v1, he even replied 
-> to it. Please check Gregory's reply to your review.
->
-> Best regards,
->
-> Thomas
-> --
-> Thomas Petazzoni, CTO, Free Electrons
-> Embedded Linux, Kernel and Android engineering 
-> http://free-electrons.com
+> But maybe my logic is flawed?
+
+Yes.
+
+> Also, some users (of our older kernel) reported problems were
+> they considered the on-demand governor was "too slow" to ramp
+> the frequency up. (But I don't know if they'd played with the
+> configuration knobs.)
+
+Shouldn't be the case anymore, or maybe those guys are more in favor
+of the interactive governor :)
+
+-- 
+viresh
