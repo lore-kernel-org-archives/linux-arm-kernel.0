@@ -1,39 +1,75 @@
-From: dvyukov@google.com (Dmitry Vyukov)
-Date: Thu, 4 Feb 2016 16:07:38 +0100
-Subject: [PATCH v6] kernel: add kcov code coverage
-In-Reply-To: <56B0E530.8090908@suse.cz>
-References: <1453726850-49137-1-git-send-email-dvyukov@google.com>
- <56B0E530.8090908@suse.cz>
-Message-ID: <CACT4Y+aKhnpwCpycay1fZuGeCSUgn1CqL8hN3PoFZPdQQsfCNg@mail.gmail.com>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Thu, 4 Feb 2016 15:11:18 +0000
+Subject: [RFC PATCH 0/4] Add ACPI support for HiSilicon PCIe Host
+ Controllers
+In-Reply-To: <2387127.DMZaDnZvEW@wuerfel>
+References: <1454585860-60709-1-git-send-email-gabriele.paoloni@huawei.com>
+ <2387127.DMZaDnZvEW@wuerfel>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1EC9EC12@lhreml503-mbs>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 2, 2016 at 6:19 PM, Jiri Slaby <jslaby@suse.cz> wrote:
-> On 01/25/2016, 02:00 PM, Dmitry Vyukov wrote:
->> --- a/scripts/Makefile.lib
->> +++ b/scripts/Makefile.lib
->> @@ -136,6 +136,12 @@ _c_flags += $(if $(patsubst n%,, \
->>               $(CFLAGS_UBSAN))
->>  endif
->>
->> +ifeq ($(CONFIG_KCOV),y)
->> +_c_flags += $(if $(patsubst n%,, \
->> +     $(KCOV_INSTRUMENT_$(basetarget).o)$(KCOV_INSTRUMENT)y), \
->> +     $(CFLAGS_KCOV))
->
-> Now that KCOV does not inherit KASAN's "n"s, I see link errors in efi
-> lib with EFI_STUB:
-> drivers/firmware/efi/libstub/lib.a(efi-stub-helper.o): In function
-> `efi_printk':
-> efi-stub-helper.c:(.text+0x13): undefined reference to
-> `__sanitizer_cov_trace_pc'
-> efi-stub-helper.c:(.text+0x31): undefined reference to
-> `__sanitizer_cov_trace_pc'
-> ...
->
-> I fixed it by adding "KCOV_INSTRUMENT := n" to
->   drivers/firmware/efi/libstub/Makefile
+Hi Arnd
 
+Thanks for looking at this
 
-Done in v7
-Thanks for testing!
+> -----Original Message-----
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: 04 February 2016 13:12
+> To: Gabriele Paoloni
+> Cc: Guohanjun (Hanjun Guo); Wangzhou (B); liudongdong (C); Linuxarm;
+> qiujiang; bhelgaas at google.com; Lorenzo.Pieralisi at arm.com;
+> tn at semihalf.com; zhangjukuo; xuwei (O); Liguozhu (Kenneth); linux-
+> pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
+> acpi at vger.kernel.org; linux-kernel at vger.kernel.org; jcm at redhat.com
+> Subject: Re: [RFC PATCH 0/4] Add ACPI support for HiSilicon PCIe Host
+> Controllers
+> 
+> On Thursday 04 February 2016 19:37:36 Gabriele Paoloni wrote:
+> > From: gabriele paoloni <gabriele.paoloni@huawei.com>
+> >
+> > This patchset adds ACPI support for the HiSilicon Hip05/Hip06 SoC
+> PCIe controllers
+> > The four patches respectively:
+> >         - rework PCie Designware to be used for ACPI PCI Host
+> controllers
+> >         - re-architect the current HiSilicon driver to make it
+> scalable to the
+> >           new ACPI quirks
+> >         - rework the current HiSilicon driver to make it ECAM
+> compliant
+> >         - adds the HiSilicon ACPI specific quirks.
+> >
+> >    This patchset  is based on
+> >    https://github.com/semihalf-nowicki-tomasz/linux.git
+> >    branch pci-acpi-v3 + Hip06 support applied on top:
+> >    https://patchwork.ozlabs.org/patch/549198/
+> >
+> 
+> ACPI has its own PCI support, and should not need drivers for host
+> bridges. I don't think we can really mix the two things, as ACPI
+> needs to have access to things like PCI config space way before
+> we are probing normal device drivers.
+> 
+> Please put this in drivers/acpi/pci*.c.
+
+I can put pcie-hisi-acpi.c under drivers/acpi/
+
+However if you look at the driver it is made up of three parts:
+pcie-hisi.c --> the DT based driver
+pcie-hisi-acpi.c --> the ACPI based hook and ACPI specific init callback
+pcie-hisi-common.c --> common functions shared between DT and ACPI versions 
+                       of the driver
+
+Now I think that moving pcie-hisi-acpi.c under drivers/acpi/
+would make it hard to read as you need to jump across directories
+and it seems a bit unnatural...
+
+However it is not a big issue to me...
+
+Cheers
+
+Gab
+
+> 
+> 	Arnd
