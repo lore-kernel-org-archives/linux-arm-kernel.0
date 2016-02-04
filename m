@@ -1,74 +1,100 @@
 From: leo.yan@linaro.org (Leo Yan)
-Date: Thu,  4 Feb 2016 23:24:56 +0800
-Subject: [PATCH v7 0/4] mailbox: hisilicon: add Hi6220 mailbox driver
-Message-ID: <1454599500-15600-1-git-send-email-leo.yan@linaro.org>
+Date: Thu,  4 Feb 2016 23:24:57 +0800
+Subject: [PATCH v7 1/4] dt-bindings: mailbox: Document Hi6220 mailbox driver
+In-Reply-To: <1454599500-15600-1-git-send-email-leo.yan@linaro.org>
+References: <1454599500-15600-1-git-send-email-leo.yan@linaro.org>
+Message-ID: <1454599500-15600-2-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi6220 mailbox supports up to 32 channels. Each channel is unidirectional
-with a maximum message size of 8 words. I/O is performed using register
-access (there is no DMA) and the cell raises an interrupt when messages
-are received.
+Document DT binding for Hisilicon Hi6220 mailbox driver.
 
-This patch series is to implement Hi6220 mailbox driver. It registers
-two channels into framework for communication with MCU, one is tx channel
-and another is rx channel. Now mailbox driver is used to send message to
-MCU to control dynamic voltage and frequency scaling for CPU, GPU and DDR.
-
-Changes from v6:
-* Fix to use lowercase for hexadecimal value in DT binding document
-
-Changes from v5:
-* Refine to use mailbox three specifiers for client driver, so add xlate
-  callback function in mailbox driver to support these specifiers
-* Refine document for property "hi6220,mbox-tx-noirq"
-
-Changes from v4:
-* According to Jassi's suggestion, using DT binding to register channels
-* Change to use operating-points-v2 to register operating points
-
-Changes from v3:
-* The patch series for enabling idle state for Hi6220 has reserved memory
-  regions, so this series will not include it anymore
-* Refined mailbox driver according to Jassi's suggestion;
-  Removed kfifo from mailbox driver;
-  Removed spinlock for ipc registers accessing, due every channel has its
-  own dedicated bit in ipc register and readl/writel will introduce memory
-  barrier, so don't need spinlock to protect ipc registers accessing
-* After mailbox driver is ready, can use patch 4 to enable CPU's OPPs and
-  stub clock driver; finally can enable CPUFreq driver for CPU frequency
-  scaling
-
-Changes from v2:
-* Get rid of unused memory regions from memory node in DT, and don't use
-  reserved-memory node according to Mark and Leif's suggestion; Haojian also
-  has updated UEFI for efi memory info
-
-Changes from v1:
-* Correct lock usage for SMP scenario
-
-Changes from RFC:
-* According to Jassi's review, totally remove the abstract common driver
-  layer and only commit driver dedicated for Hi6220
-* According to Paul Bolle's review, fix typo issue for Kconfig and remove
-  unnecessary dependency with OF and fix minor for mailbox driver
-* Refine a little for dts nodes
-
-
-Leo Yan (4):
-  dt-bindings: mailbox: Document Hi6220 mailbox driver
-  mailbox: Hi6220: add mailbox driver
-  arm64: dts: add mailbox node for Hi6220
-  arm64: dts: add Hi6220's stub clock node
-
- .../bindings/mailbox/hisilicon,hi6220-mailbox.txt  |  74 ++++
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi          |  64 ++++
- drivers/mailbox/Kconfig                            |   8 +
- drivers/mailbox/Makefile                           |   2 +
- drivers/mailbox/hi6220-mailbox.c                   | 395 +++++++++++++++++++++
- 5 files changed, 543 insertions(+)
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Leo Yan <leo.yan@linaro.org>
+---
+ .../bindings/mailbox/hisilicon,hi6220-mailbox.txt  | 74 ++++++++++++++++++++++
+ 1 file changed, 74 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/mailbox/hisilicon,hi6220-mailbox.txt
- create mode 100644 drivers/mailbox/hi6220-mailbox.c
 
+diff --git a/Documentation/devicetree/bindings/mailbox/hisilicon,hi6220-mailbox.txt b/Documentation/devicetree/bindings/mailbox/hisilicon,hi6220-mailbox.txt
+new file mode 100644
+index 0000000..044b17f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mailbox/hisilicon,hi6220-mailbox.txt
+@@ -0,0 +1,74 @@
++Hisilicon Hi6220 Mailbox Driver
++===============================
++
++Hisilicon Hi6220 mailbox supports up to 32 channels. Each channel
++is unidirectional with a maximum message size of 8 words. I/O is
++performed using register access (there is no DMA) and the cell
++raises an interrupt when messages are received.
++
++Mailbox Device Node:
++====================
++
++Required properties:
++--------------------
++- compatible:		Shall be "hisilicon,hi6220-mbox"
++- reg:			Contains the mailbox register address range (base
++			address and length); the first item is for IPC
++			registers, the second item is shared buffer for
++			slots.
++- #mbox-cells:		Common mailbox binding property to identify the number
++			of cells required for the mailbox specifier. Must be 3.
++			<&phandle slot_id dst_irq ack_irq>
++			  phandle: Label name of mailbox controller
++			  slot_id: Slot id used either for TX or RX
++			  dst_irq: IRQ identifier index number which used by MCU
++			  ack_irq: IRQ identifier index number with generating a
++			           TX/RX interrupt to application processor,
++				   mailbox driver uses it to acknowledge interrupt
++- interrupts:		Contains the interrupt information for the mailbox
++			device. The format is dependent on which interrupt
++			controller the SoCs use.
++
++Optional Properties:
++--------------------
++- hi6220,mbox-tx-noirq: Property of MCU firmware's feature, so mailbox driver
++			use this flag to ask MCU to enable "automatic idle
++			flag" mode or IRQ generated mode to acknowledge a TX
++			completion.
++
++Example:
++--------
++
++	mailbox: mailbox at f7510000 {
++		compatible = "hisilicon,hi6220-mbox";
++		reg = <0x0 0xf7510000 0x0 0x1000>, /* IPC_S */
++		      <0x0 0x06dff800 0x0 0x0800>; /* Mailbox */
++		interrupt-parent = <&gic>;
++		interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
++		#mbox-cells = <3>;
++	};
++
++
++Mailbox client
++===============
++
++Required properties:
++--------------------
++- compatible:		Many (See the client docs).
++- mboxes:		Standard property to specify a Mailbox (See ./mailbox.txt)
++			Cells must match 'mbox-cells' (See Mailbox Device Node above).
++
++Optional Properties:
++--------------------
++- mbox-names:		Name given to channels seen in the 'mboxes' property.
++
++Example:
++--------
++
++	stub_clock: stub_clock {
++		compatible = "hisilicon,hi6220-stub-clk";
++		hisilicon,hi6220-clk-sram = <&sram>;
++		#clock-cells = <1>;
++		mbox-names = "mbox-tx", "mbox-rx";
++		mboxes = <&mailbox 1 0 11>, <&mailbox 0 1 10>;
++	};
 -- 
 1.9.1
