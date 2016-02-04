@@ -1,25 +1,23 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 4 Feb 2016 13:08:17 +0100
-Subject: [PATCH 2/5] clk: sunxi: Make clocks setup functions take const
- pointer
-In-Reply-To: <1454402834-6385-3-git-send-email-maxime.ripard@free-electrons.com>
-References: <1454402834-6385-1-git-send-email-maxime.ripard@free-electrons.com>
- <1454402834-6385-3-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20160204120817.GE4270@lukather>
+Date: Thu, 4 Feb 2016 13:05:07 +0100
+Subject: [PATCH v4] clk: sunxi: Refactor A31 PLL6 so that it can be reused
+In-Reply-To: <1454358000-13594-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1454358000-13594-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20160204120507.GC4270@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 02, 2016 at 09:47:11AM +0100, Maxime Ripard wrote:
-> All the data structure that we pass to the clocks setup functions are
-> declared const, while our setup functions expects a regular pointer. This
-> was hidden by the fact that we cast a void * pointer back to these
-> structures, which made it go unnoticed.
+On Mon, Feb 01, 2016 at 09:20:00PM +0100, Maxime Ripard wrote:
+> Remove the fixed dividers from the PLL6 driver to be able to have a
+> reusable driver that can be used across several SoCs that share the same
+> controller, but don't have the same set of dividers for this clock, and to
+> also be reused multiple times in the same SoC, since we're droping the
+> clock name.
 > 
-> Fix the functions prototype.
-> 
+> Acked-by: Chen-Yu Tsai <wens@csie.org>
 > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Applied with Andre and Chen-Yu Acked-by's
+Applied.
 
 Maxime
 
@@ -33,4 +31,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160204/b27f5495/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160204/92ce1654/attachment.sig>
