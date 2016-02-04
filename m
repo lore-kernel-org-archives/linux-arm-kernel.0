@@ -1,157 +1,53 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Thu,  4 Feb 2016 23:25:00 +0800
-Subject: [PATCH v7 4/4] arm64: dts: add Hi6220's stub clock node
-In-Reply-To: <1454599500-15600-1-git-send-email-leo.yan@linaro.org>
-References: <1454599500-15600-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <1454599500-15600-5-git-send-email-leo.yan@linaro.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 4 Feb 2016 16:31:59 +0100
+Subject: [PATCH v5sub2 1/8] arm64: add support for module PLTs
+In-Reply-To: <20160204151303.GB6076@e104818-lin.cambridge.arm.com>
+References: <1454332178-4414-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1454332178-4414-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20160204151303.GB6076@e104818-lin.cambridge.arm.com>
+Message-ID: <CAKv+Gu9n=bmsZ=UOBiLWzaG2JSsbdC8k1mB7yFbH0czrbXS-1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable SRAM node and stub clock node for Hi6220, which uses mailbox
-channel 1 for CPU's frequency change.
+On 4 February 2016 at 16:13, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Mon, Feb 01, 2016 at 02:09:31PM +0100, Ard Biesheuvel wrote:
+>> This adds support for emitting PLTs at module load time for relative
+>> branches that are out of range. This is a prerequisite for KASLR, which
+>> may place the kernel and the modules anywhere in the vmalloc area,
+>> making it more likely that branch target offsets exceed the maximum
+>> range of +/- 128 MB.
+>
+> Any downside to trying to keep the kernel+modules coupled together so
+> that we avoid the PLT?
+>
 
-Furthermore, add the CPU clock phandle in CPU's node and using
-operating-points-v2 to register operating points. So can be used by
-cpufreq-dt driver.
+First of all, note that it is unlikely that the PLTs are ever required
+in practice, considering that either
+a) the kernel is loaded at the default location right at the base of
+the vmalloc range, and in this case, the module space is reserved for
+modules only, or
+b) the kernel is loaded at some random offset in the 240+ GB vmalloc
+space, and it is unlikely that all VMA space around the kernel happens
+to be given out to non-randomized vmalloc/ioremap allocations
 
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
----
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 56 +++++++++++++++++++++++++++++++
- 1 file changed, 56 insertions(+)
+So while this patch was a requirement at first (since in the first
+version of the series, the modules always remained below the vmalloc
+area so they would always be out of range when KASLR was enabled), in
+the current series, it is simply a last resort (although still
+required) to make sure that modules can be loaded far away from the
+kernel in the unlikely event that all VMA space in close proximity is
+given to another user.
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-index 23c79e1..f588be9 100644
---- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-@@ -81,6 +81,11 @@
- 			device_type = "cpu";
- 			reg = <0x0 0x0>;
- 			enable-method = "psci";
-+			clocks = <&stub_clock 0>;
-+			operating-points-v2 = <&cpu_opp_table>;
-+			cooling-min-level = <4>;
-+			cooling-max-level = <0>;
-+			#cooling-cells = <2>; /* min followed by max */
- 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
- 		};
- 
-@@ -89,6 +94,7 @@
- 			device_type = "cpu";
- 			reg = <0x0 0x1>;
- 			enable-method = "psci";
-+			operating-points-v2 = <&cpu_opp_table>;
- 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
- 		};
- 
-@@ -97,6 +103,7 @@
- 			device_type = "cpu";
- 			reg = <0x0 0x2>;
- 			enable-method = "psci";
-+			operating-points-v2 = <&cpu_opp_table>;
- 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
- 		};
- 
-@@ -105,6 +112,7 @@
- 			device_type = "cpu";
- 			reg = <0x0 0x3>;
- 			enable-method = "psci";
-+			operating-points-v2 = <&cpu_opp_table>;
- 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
- 		};
- 
-@@ -113,6 +121,7 @@
- 			device_type = "cpu";
- 			reg = <0x0 0x100>;
- 			enable-method = "psci";
-+			operating-points-v2 = <&cpu_opp_table>;
- 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
- 		};
- 
-@@ -121,6 +130,7 @@
- 			device_type = "cpu";
- 			reg = <0x0 0x101>;
- 			enable-method = "psci";
-+			operating-points-v2 = <&cpu_opp_table>;
- 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
- 		};
- 
-@@ -129,6 +139,7 @@
- 			device_type = "cpu";
- 			reg = <0x0 0x102>;
- 			enable-method = "psci";
-+			operating-points-v2 = <&cpu_opp_table>;
- 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
- 		};
- 
-@@ -137,10 +148,42 @@
- 			device_type = "cpu";
- 			reg = <0x0 0x103>;
- 			enable-method = "psci";
-+			operating-points-v2 = <&cpu_opp_table>;
- 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
- 		};
- 	};
- 
-+	cpu_opp_table: cpu_opp_table {
-+		compatible = "operating-points-v2";
-+		opp-shared;
-+
-+		opp00 {
-+			opp-hz = /bits/ 64 <208000000>;
-+			opp-microvolt = <1040000>;
-+			clock-latency-ns = <500000>;
-+		};
-+		opp01 {
-+			opp-hz = /bits/ 64 <432000000>;
-+			opp-microvolt = <1040000>;
-+			clock-latency-ns = <500000>;
-+		};
-+		opp02 {
-+			opp-hz = /bits/ 64 <729000000>;
-+			opp-microvolt = <1090000>;
-+			clock-latency-ns = <500000>;
-+		};
-+		opp03 {
-+			opp-hz = /bits/ 64 <960000000>;
-+			opp-microvolt = <1180000>;
-+			clock-latency-ns = <500000>;
-+		};
-+		opp04 {
-+			opp-hz = /bits/ 64 <1200000000>;
-+			opp-microvolt = <1330000>;
-+			clock-latency-ns = <500000>;
-+		};
-+	};
-+
- 	gic: interrupt-controller at f6801000 {
- 		compatible = "arm,gic-400";
- 		reg = <0x0 0xf6801000 0 0x1000>, /* GICD */
-@@ -168,6 +211,11 @@
- 		#size-cells = <2>;
- 		ranges;
- 
-+		sram: sram at fff80000 {
-+			compatible = "hisilicon,hi6220-sramctrl", "syscon";
-+			reg = <0x0 0xfff80000 0x0 0x12000>;
-+		};
-+
- 		ao_ctrl: ao_ctrl at f7800000 {
- 			compatible = "hisilicon,hi6220-aoctrl", "syscon";
- 			reg = <0x0 0xf7800000 0x0 0x2000>;
-@@ -193,6 +241,14 @@
- 			#clock-cells = <1>;
- 		};
- 
-+		stub_clock: stub_clock {
-+			compatible = "hisilicon,hi6220-stub-clk";
-+			hisilicon,hi6220-clk-sram = <&sram>;
-+			#clock-cells = <1>;
-+			mbox-names = "mbox-tx";
-+			mboxes = <&mailbox 1 0 11>;
-+		};
-+
- 		uart0: uart at f8015000 {	/* console */
- 			compatible = "arm,pl011", "arm,primecell";
- 			reg = <0x0 0xf8015000 0x0 0x1000>;
+Reserving a dedicated module region around the kernel while it is
+loaded at a random offset is not straight forward, since it affects
+all other users of the vmalloc area. So generic vmalloc/vmap/ioremap
+code would need to be updated to disregard the area around the kernel,
+since simply reserving the VMA area for the modules would make it
+inaccessible to module_alloc() as well (unless we reserve the whole
+region and manage the module allocations separately)
+
+So the bottom line is that it may be possible, but it is unlikely to
+be worth the effort imo
+
 -- 
-1.9.1
+Ard.
