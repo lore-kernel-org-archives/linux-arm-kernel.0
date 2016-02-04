@@ -1,133 +1,77 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  4 Feb 2016 11:00:18 +0000
-Subject: [PATCH v2 01/28] ARM: KVM: Move the  HYP code to its own section
+Date: Thu,  4 Feb 2016 11:00:40 +0000
+Subject: [PATCH v2 23/28] ARM: KVM: Remove __weak attributes
 In-Reply-To: <1454583645-10144-1-git-send-email-marc.zyngier@arm.com>
 References: <1454583645-10144-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1454583645-10144-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1454583645-10144-24-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to be able to spread the HYP code into multiple compilation
-units, adopt a layout similar to that of arm64:
-- the HYP text is emited in its own section (.hyp.text)
-- two linker generated symbols are use to identify the boundaries
-  of that section
-
-No functionnal change.
+Now that the old code is long gone, we can remove all the weak
+attributes, as there is only one version of the code.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_asm.h |  6 ++++--
- arch/arm/include/asm/virt.h    |  4 ++++
- arch/arm/kernel/vmlinux.lds.S  |  6 ++++++
- arch/arm/kvm/interrupts.S      | 13 +++++--------
- 4 files changed, 19 insertions(+), 10 deletions(-)
+ arch/arm/kvm/hyp/hyp-entry.S | 4 +---
+ arch/arm/kvm/hyp/switch.c    | 2 +-
+ arch/arm/kvm/hyp/tlb.c       | 6 +++---
+ 3 files changed, 5 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
-index 194c91b..fa2fd25 100644
---- a/arch/arm/include/asm/kvm_asm.h
-+++ b/arch/arm/include/asm/kvm_asm.h
-@@ -19,6 +19,8 @@
- #ifndef __ARM_KVM_ASM_H__
- #define __ARM_KVM_ASM_H__
+diff --git a/arch/arm/kvm/hyp/hyp-entry.S b/arch/arm/kvm/hyp/hyp-entry.S
+index ca412ad..e2a45b8 100644
+--- a/arch/arm/kvm/hyp/hyp-entry.S
++++ b/arch/arm/kvm/hyp/hyp-entry.S
+@@ -58,10 +58,8 @@
+  */
  
-+#include <asm/virt.h>
-+
- /* 0 is reserved as an invalid value. */
- #define c0_MPIDR	1	/* MultiProcessor ID Register */
- #define c0_CSSELR	2	/* Cache Size Selection Register */
-@@ -91,8 +93,8 @@ extern char __kvm_hyp_exit_end[];
- 
- extern char __kvm_hyp_vector[];
- 
--extern char __kvm_hyp_code_start[];
--extern char __kvm_hyp_code_end[];
-+#define	__kvm_hyp_code_start	__hyp_text_start
-+#define __kvm_hyp_code_end	__hyp_text_end
- 
- extern void __kvm_flush_vm_context(void);
- extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
-diff --git a/arch/arm/include/asm/virt.h b/arch/arm/include/asm/virt.h
-index 4371f45..5fdbfea 100644
---- a/arch/arm/include/asm/virt.h
-+++ b/arch/arm/include/asm/virt.h
-@@ -74,6 +74,10 @@ static inline bool is_hyp_mode_mismatched(void)
- {
- 	return !!(__boot_cpu_mode & BOOT_CPU_MODE_MISMATCH);
- }
-+
-+/* The section containing the hypervisor text */
-+extern char __hyp_text_start[];
-+extern char __hyp_text_end[];
- #endif
- 
- #endif /* __ASSEMBLY__ */
-diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-index 8b60fde..b4139cb 100644
---- a/arch/arm/kernel/vmlinux.lds.S
-+++ b/arch/arm/kernel/vmlinux.lds.S
-@@ -18,6 +18,11 @@
- 	*(.proc.info.init)						\
- 	VMLINUX_SYMBOL(__proc_info_end) = .;
- 
-+#define HYPERVISOR_TEXT							\
-+	VMLINUX_SYMBOL(__hyp_text_start) = .;				\
-+	*(.hyp.text)							\
-+	VMLINUX_SYMBOL(__hyp_text_end) = .;
-+
- #define IDMAP_TEXT							\
- 	ALIGN_FUNCTION();						\
- 	VMLINUX_SYMBOL(__idmap_text_start) = .;				\
-@@ -108,6 +113,7 @@ SECTIONS
- 			TEXT_TEXT
- 			SCHED_TEXT
- 			LOCK_TEXT
-+			HYPERVISOR_TEXT
- 			KPROBES_TEXT
- 			*(.gnu.warning)
- 			*(.glue_7)
-diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
-index 900ef6d..9d9cb71 100644
---- a/arch/arm/kvm/interrupts.S
-+++ b/arch/arm/kvm/interrupts.S
-@@ -28,9 +28,7 @@
- #include "interrupts_head.S"
- 
- 	.text
--
--__kvm_hyp_code_start:
--	.globl __kvm_hyp_code_start
-+	.pushsection	.hyp.text, "ax"
- 
- /********************************************************************
-  * Flush per-VMID TLBs
-@@ -314,8 +312,6 @@ THUMB(	orr	r2, r2, #PSR_T_BIT	)
- 	eret
- .endm
- 
--	.text
--
  	.align 5
+-__hyp_vector:
+-	.global	__hyp_vector
  __kvm_hyp_vector:
- 	.globl __kvm_hyp_vector
-@@ -511,10 +507,9 @@ hyp_fiq:
+-	.weak __kvm_hyp_vector
++	.global __kvm_hyp_vector
  
- 	.ltorg
+ 	@ Hyp-mode exception vector
+ 	W(b)	hyp_reset
+diff --git a/arch/arm/kvm/hyp/switch.c b/arch/arm/kvm/hyp/switch.c
+index 67f3944..7325ad3 100644
+--- a/arch/arm/kvm/hyp/switch.c
++++ b/arch/arm/kvm/hyp/switch.c
+@@ -187,7 +187,7 @@ again:
+ 	return exit_code;
+ }
  
--__kvm_hyp_code_end:
--	.globl	__kvm_hyp_code_end
-+	.popsection
+-__alias(__guest_run) int __weak __kvm_vcpu_run(struct kvm_vcpu *vcpu);
++__alias(__guest_run) int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
  
--	.section ".rodata"
-+	.pushsection ".rodata"
+ static const char * const __hyp_panic_string[] = {
+ 	[ARM_EXCEPTION_RESET]      = "\nHYP panic: RST?? PC:%08x CPSR:%08x",
+diff --git a/arch/arm/kvm/hyp/tlb.c b/arch/arm/kvm/hyp/tlb.c
+index 993fe89..3854e31 100644
+--- a/arch/arm/kvm/hyp/tlb.c
++++ b/arch/arm/kvm/hyp/tlb.c
+@@ -50,14 +50,14 @@ static void __hyp_text __tlb_flush_vmid(struct kvm *kvm)
+ 	write_sysreg(0, VTTBR);
+ }
  
- und_die_str:
- 	.ascii	"unexpected undefined exception in Hyp mode at: %#08x\n"
-@@ -524,3 +519,5 @@ dabt_die_str:
- 	.ascii	"unexpected data abort in Hyp mode at: %#08x\n"
- svc_die_str:
- 	.ascii	"unexpected HVC/SVC trap in Hyp mode at: %#08x\n"
-+
-+	.popsection
+-__alias(__tlb_flush_vmid) void __weak __kvm_tlb_flush_vmid(struct kvm *kvm);
++__alias(__tlb_flush_vmid) void __kvm_tlb_flush_vmid(struct kvm *kvm);
+ 
+ static void __hyp_text __tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+ {
+ 	__tlb_flush_vmid(kvm);
+ }
+ 
+-__alias(__tlb_flush_vmid_ipa) void __weak __kvm_tlb_flush_vmid_ipa(struct kvm *kvm,
++__alias(__tlb_flush_vmid_ipa) void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm,
+ 							    phys_addr_t ipa);
+ 
+ static void __hyp_text __tlb_flush_vm_context(void)
+@@ -68,4 +68,4 @@ static void __hyp_text __tlb_flush_vm_context(void)
+ 	dsb(ish);
+ }
+ 
+-__alias(__tlb_flush_vm_context) void __weak __kvm_flush_vm_context(void);
++__alias(__tlb_flush_vm_context) void __kvm_flush_vm_context(void);
 -- 
 2.1.4
