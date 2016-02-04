@@ -1,34 +1,50 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  4 Feb 2016 15:29:34 +0100
-Subject: [PATCH 3/4] ARM: shmobile: Typo s/MIPDR/MPIDR/
-In-Reply-To: <cover.1454595116.git.horms+renesas@verge.net.au>
-References: <cover.1454595116.git.horms+renesas@verge.net.au>
-Message-ID: <e24f317c859f2d904d1eb87cbb503c309e6dead7.1454595116.git.horms+renesas@verge.net.au>
+Date: Thu,  4 Feb 2016 15:29:44 +0100
+Subject: [GIT PULL] Renesas ARM64 Based SoC DT Updates for v4.6
+Message-ID: <cover.1454595726.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-The ARM Multiprocessor Affinity Register is called "MPIDR".
+Please consider these Renesas ARM64 based SoC DT updates for v4.6.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/headsmp-scu.S | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/headsmp-scu.S b/arch/arm/mach-shmobile/headsmp-scu.S
-index fa5248c52399..c0008a5aa4ca 100644
---- a/arch/arm/mach-shmobile/headsmp-scu.S
-+++ b/arch/arm/mach-shmobile/headsmp-scu.S
-@@ -27,7 +27,7 @@
-  */
- ENTRY(shmobile_boot_scu)
- 					@ r0 = SCU base address
--	mrc     p15, 0, r1, c0, c0, 5	@ read MIPDR
-+	mrc     p15, 0, r1, c0, c0, 5	@ read MPIDR
- 	and	r1, r1, #3		@ mask out cpu ID
- 	lsl	r1, r1, #3		@ we will shift by cpu_id * 8 bits
- 	ldr	r2, [r0, #8]		@ SCU Power Status Register
--- 
-2.7.0.rc3.207.g0ac5344
+The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
+
+  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-dt-for-v4.6
+
+for you to fetch changes up to a3fc85e27b7e3c29b30909929bc64737a19fd251:
+
+  arm64: dts: salvator-x: Enable SCIF_CLK frequency and pins (2016-02-03 10:04:33 +0100)
+
+----------------------------------------------------------------
+Renesas ARM64 Based SoC DT Updates for v4.6
+
+* Use SCIF fallback compatibility strings
+* Add Baud Rate Generator (BRG) support for (H)SCIF
+* Enable SCIF_CLK frequency and pins
+* Enable USB 3.0 host
+* Add Add USB-DMAC device nodes
+* Complete SYS-DMAC device nodes
+
+----------------------------------------------------------------
+Geert Uytterhoeven (5):
+      arm64: dts: r8a7795: Complete SYS-DMAC nodes
+      arm64: dts: r8a7795: Add SCIF fallback compatibility strings
+      arm64: dts: r8a7795: Rename the serial port clock to fck
+      arm64: dts: r8a7795: Add BRG support for (H)SCIF
+      arm64: dts: salvator-x: Enable SCIF_CLK frequency and pins
+
+Yoshihiro Shimoda (3):
+      arm64: dts: r8a7795: Add USB3.0 host device nodes
+      arm64: dts: salvator-x: enable usb3.0 host channel 0
+      arm64: dts: r8a7795: Add USB-DMAC device nodes
+
+ arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts |  16 ++
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi           | 249 ++++++++++++++++++---
+ 2 files changed, 229 insertions(+), 36 deletions(-)
