@@ -1,47 +1,80 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Thu, 4 Feb 2016 10:12:05 +0100
-Subject: [PATCH v4] mmc: meson: Add driver for the SD/MMC host found on
- Amlogic MesonX SoCs
-In-Reply-To: <CAPDyKFo=LdzFsELZJKXj_CDcNYj96J4Q9-KqS63041d3BVUEDQ@mail.gmail.com>
-References: <1448988109-32630-1-git-send-email-carlo@caione.org>
- <CAPDyKFp=buvJ8Li3XC8XSUAUO7BsE+U6vEQH2xTrgcHAkdG8bQ@mail.gmail.com>
- <CAOQ7t2aJAPWd3Xmvu7n0EWL-KC8ZriM3KryfsYEh556uXhuR+g@mail.gmail.com>
- <CAPDyKFpcsKihuOiF5=RwoWrF0Jf7hRsXVSU5uV8qZf1mUsa-iQ@mail.gmail.com>
- <CAOQ7t2afXxStCsj=M-FX7eMep1gLt4jkyXDiLas_SQ1UwHc0=Q@mail.gmail.com>
- <CAPDyKFpX+_fHvv_bJUKZmSufKKnuONC582E7u3b20a+Rbbggng@mail.gmail.com>
- <CAOQ7t2aS0yRDhM3+8wW5xrycG371uthDJy6U_oDAZip4jHRiRA@mail.gmail.com>
- <CAPDyKFo=LdzFsELZJKXj_CDcNYj96J4Q9-KqS63041d3BVUEDQ@mail.gmail.com>
-Message-ID: <CAOQ7t2aF=wzYHF8LXK5WVMJ=mEDHzfvbL=iRvorq+FZshL0q0g@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 4 Feb 2016 09:32:03 +0000
+Subject: [PATCH] irqchip-gicv3: wait for ack from redistributer after
+ read_iar
+In-Reply-To: <1454528588-32721-1-git-send-email-tchalamarla@caviumnetworks.com>
+References: <1454528588-32721-1-git-send-email-tchalamarla@caviumnetworks.com>
+Message-ID: <56B31A93.5050608@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 3, 2016 at 11:46 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> On 2 February 2016 at 22:54, Carlo Caione <carlo@caione.org> wrote:
+Tirumalesh,
 
-[cut]
+On 03/02/16 19:43, tchalamarla at caviumnetworks.com wrote:
+> From: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
+> 
+> Systems with high number of cores and sufficiently loaded,
+> there exists a small window where it is possible for re-distributor
+> to illegally merge two LPI and cuases missing interrupts.
 
-> Huh, another broken MMC controller. :-)
+s/cuases/causes/
 
-Oh, actually I found in the datasheet a couple of undocumented
-registers (also not used in the original Amlogic SDK code) that seems
-to have something to do with timeout (hard to say without proper
-documentation but they are called "Timeout counter for preload setting
-and present status" and "Timeout Counter Interrupt Enable for ARC/ARM"
-so I guess I'm on the right track here).
-I briefly tried yesterday to enable this timeout interrupt with a
-dummy value in the counter register (I have no idea how get this value
-from the clocking) and it seems working (the counter value is
-decremented when reading the register upon command completion).
+It has nothing to do with the number of cores or the load, but
+everything to do with the latency between the CPU interface and the
+redistributor, and how quickly the redistributor gets notified that the
+interrupt is not pending anymore.
 
-> In some cases there are no data in the request, it's just a command
-> being sent. So to deal with this issue, you will have to adjust the
-> timer depending on the request we send to the controller.
+> 
+> Solution is, wait for ack from the redistributor after read_iar.
+> A "dsb sy" after IAR read ensures there is no illegal merge windows.
 
-I see that the CMD13 used to poll the card has no data so in that case
-should we use a fixed / dummy value to use as timeout counter?
-I'm kind of confused here since the MMC drivers I'm looking at use the
-hardware timeout register only when the data->timeout_ns is actually
-present.
+You don't "wait for the ack". You actually *push* the ack (as in
+Interrupt Acknowledgement Register) towards the redistributor.
 
+The fact that the DSB generates an ACK message from the redistributor is
+an HW implementation detail is not universally relevant. Please stay at
+the architecture level, and avoid implementation details.
+
+> 
+> giv3 spec version 32 also warns this, see section 4.4.13
+
+What is the point of pointing to an engineering specification that is
+unavailable to almost anyone (hint: it has the word "Confidential" on
+each and every page)?
+
+A much better reference would be a quote from the publicly available GIC
+Architecture Specification (ARM IHI 0069B). Something like:
+
+4.1.1 Physical CPU Interface:
+"The effects of reading ICC_IAR0_EL1 and ICC_IAR1_EL1 on the state of a
+returned INTID are not guaranteed to be visible until after the
+execution of a DSB."
+
+> 
+> Signed-off-by: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
+> ---
+>  arch/arm64/include/asm/arch_gicv3.h | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
+> index 2731d3b..8ec88e5 100644
+> --- a/arch/arm64/include/asm/arch_gicv3.h
+> +++ b/arch/arm64/include/asm/arch_gicv3.h
+> @@ -103,6 +103,7 @@ static inline u64 gic_read_iar_common(void)
+>  	u64 irqstat;
+>  
+>  	asm volatile("mrs_s %0, " __stringify(ICC_IAR1_EL1) : "=r" (irqstat));
+> +	dsb(sy);
+>  	return irqstat;
+>  }
+>  
+> 
+
+Other than that, I'm fine with this. Please repost with an amended
+commit message and subject.
+
+Thanks,
+
+	M.
 -- 
-Carlo Caione
+Jazz is not dead. It just smells funny...
