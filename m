@@ -1,40 +1,60 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 4 Feb 2016 16:37:11 -0600
-Subject: [PATCH] PCI: layerscape: add ls2085a compatible
-In-Reply-To: <56A906F4.3050809@linaro.org>
-References: <1453915925-19198-1-git-send-email-yang.shi@linaro.org>
- <56A906F4.3050809@linaro.org>
-Message-ID: <20160204223711.GE7031@localhost>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Thu, 4 Feb 2016 14:41:29 -0800
+Subject: [RFC PATCH] ARM: clocksource: make ARM_GLOBAL_TIMER selectable
+In-Reply-To: <1454610017-25499-1-git-send-email-grygorii.strashko@ti.com>
+References: <1454610017-25499-1-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <20160204224128.GG4215@xsjsorenbubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 27, 2016 at 10:05:40AM -0800, Shi, Yang wrote:
-> Correct FSL folks email address to nxp.com, sorry for the inconvenience.
-
-Do we need some MAINTAINERS updates in addition to the ack for this patch?
-I see a bunch of @freescale.com addresses in MAINTAINERS.
-
-> On 1/27/2016 9:32 AM, Yang Shi wrote:
-> >The layerscape PCI host driver needs recognize ls2085a compatible when using
-> >firmware with ls2085a compatible property, otherwise the PCI bus won't be
-> >detected even though ls2085a compatible is included by the dts.
-> >
-> >Signed-off-by: Yang Shi <yang.shi@linaro.org>
-> >---
-> >  drivers/pci/host/pci-layerscape.c | 1 +
-> >  1 file changed, 1 insertion(+)
-> >
-> >diff --git a/drivers/pci/host/pci-layerscape.c b/drivers/pci/host/pci-layerscape.c
-> >index 3923bed..c40d8b2 100644
-> >--- a/drivers/pci/host/pci-layerscape.c
-> >+++ b/drivers/pci/host/pci-layerscape.c
-> >@@ -203,6 +203,7 @@ static const struct of_device_id ls_pcie_of_match[] = {
-> >  	{ .compatible = "fsl,ls1021a-pcie", .data = &ls1021_drvdata },
-> >  	{ .compatible = "fsl,ls1043a-pcie", .data = &ls1043_drvdata },
-> >  	{ .compatible = "fsl,ls2080a-pcie", .data = &ls2080_drvdata },
-> >+	{ .compatible = "fsl,ls2085a-pcie", .data = &ls2080_drvdata },
-> >  	{ },
-> >  };
-> >  MODULE_DEVICE_TABLE(of, ls_pcie_of_match);
-> >
+On Thu, 2016-02-04 at 20:20:17 +0200, Grygorii Strashko wrote:
+> This patch intended to fix following cases: 
+> - SoC-A has ARM GT, defines DT node for ARM GT and selects ARM_GLOBAL_TIMER
+> statically in Kconfig file. SoC-B has ARM GT and defines DT node for ARM GT,
+> but do not selects ARM_GLOBAL_TIMER statically in Kconfig file. In case of
+> multiplatform build ARM GT will be implicitly enabled for SoC-B.
 > 
+> - There is no way to disable ARM GT without modifying Kconfig file,
+> once ARM_GLOBAL_TIMER is selected statically in Kconfig file.
+> 
+> Hence, fix above case by defining both HAVE_ARM_GLOBAL_TIMER and
+> ARM_GLOBAL_TIMER as recommended by 'Adding common features and make
+> the usage configurable' section in kconfig-language.txt. All places in
+> ARM folder where ARM_GLOBAL_TIMER was used now replaced on
+> HAVE_ARM_GLOBAL_TIMER.
+> 
+> Cc: Florian Fainelli <f.fainelli@gmail.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Wei Xu <xuwei5@hisilicon.com>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Srinivas Kandagatla <srinivas.kandagatla@gmail.com>
+> Cc: Maxime Coquelin <maxime.coquelin@st.com>
+> Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
+> Cc: Liviu Dudau <liviu.dudau@arm.com>
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: Jun Nie <jun.nie@linaro.org>
+> Cc: Michal Simek <michal.simek@xilinx.com>
+> Cc: "S?ren Brinkmann" <soren.brinkmann@xilinx.com>
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> 
+> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> ---
+[...]
+> diff --git a/arch/arm/mach-zynq/Kconfig b/arch/arm/mach-zynq/Kconfig
+> index fd0aeeb..3165720 100644
+> --- a/arch/arm/mach-zynq/Kconfig
+> +++ b/arch/arm/mach-zynq/Kconfig
+> @@ -5,7 +5,7 @@ config ARCH_ZYNQ
+>  	select ARCH_SUPPORTS_BIG_ENDIAN
+>  	select ARM_AMBA
+>  	select ARM_GIC
+> -	select ARM_GLOBAL_TIMER if !CPU_FREQ
+> +	select HAVE_ARM_GLOBAL_TIMER if !CPU_FREQ
+
+We actually have this issue, as we don't want to use GT when CPU_FREQ is
+enabled. But with this change the 'if !CPU_FREQ' becomes obsolete.
+
+Acked-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+
+	S?ren
