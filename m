@@ -1,190 +1,81 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu,  4 Feb 2016 22:09:27 +0100
-Subject: [PATCH v3 net 5/7] net: mvneta: Modify the queue related fields from
- each cpu
-In-Reply-To: <1454620169-8156-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1454620169-8156-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1454620169-8156-6-git-send-email-gregory.clement@free-electrons.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 4 Feb 2016 22:11:55 +0100
+Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
+ v4.5-rc1
+In-Reply-To: <Pine.LNX.4.44L0.1602041059070.1515-100000@iolanthe.rowland.org>
+References: <CAPDyKFr3jqh5bDFOuKLgomhQ2P9+yN5Ps8E0CH8r-oOjvBuswg@mail.gmail.com>
+ <Pine.LNX.4.44L0.1602041059070.1515-100000@iolanthe.rowland.org>
+Message-ID: <CAPDyKFpRnmn+h_VH3jtC3u-BOf7-00nbzD30omaxaaZOOAK8Gg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the MVNETA_INTR_* registers, the queues related fields are per cpu,
-according to the datasheet (comment in [] are added by me):
-"In a multi-CPU system, bits of RX[or TX] queues for which the access by
-the reading[or writing] CPU is disabled are read as 0, and cannot be
-cleared[or written]."
+On 4 February 2016 at 17:04, Alan Stern <stern@rowland.harvard.edu> wrote:
+> On Thu, 4 Feb 2016, Ulf Hansson wrote:
+>
+>> Just wanted to add yet some new findings while I was looking into this
+>> regression.
+>>
+>> So, the reason why pm_runtime_put_sync() doesn't idle the device in
+>> these cases, is because autosuspend is respected and for some reason
+>> the autosuspend timer hasn't expired.
+>
+> No doubt the autosuspend delay is longer than the time it takes for a
+> probe to fail.
+>
+>> I was wondering *why* the timer isn't considered as expired, because
+>> the driver don't call pm_runtime_mark_last_busy() in the failing probe
+>> case...
+>>
+>> Then I realized the following commit was merged a few releases ago,
+>> which makes the runtime PM core to invoke pm_runtime_mark_last_busy()
+>> for us.
+>>
+>> commit 56f487c78015936097474fd89b2ccb229d500d0f
+>> Author: Tony Lindgren <tony@atomide.com>
+>> Date:   Wed May 13 16:36:32 2015 -0700
+>> PM / Runtime: Update last_busy in rpm_resume
+>>
+>> So, this commit actually causes the devices to stay active after a
+>> failed probe attempt.
+>>
+>> I think it's a good idea to revert this change, but what to you think?
+>
+> I disagree.  The whole idea of autosuspend is to prevent the device's
+> power state from bouncing up and down too rapidly.  This implies that
+> whenever the device gets resumed, we should wait at least the minimum
+> autosuspend delay before allowing the next autosuspend.
 
-That means that each time we want to manipulate these bits we had to do
-it on each cpu and not only on the current cpu.
+I am really not questioning the autosuspend feature at all, it's a
+really great feature!
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- drivers/net/ethernet/marvell/mvneta.c | 100 ++++++++++++++++------------------
- 1 file changed, 46 insertions(+), 54 deletions(-)
+Now, I question the minor benefit we actually gain from having the
+runtime PM core to update the mark in rpm_resume().
 
-diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-index 74f8158df2b0..2d0e8a605ca9 100644
---- a/drivers/net/ethernet/marvell/mvneta.c
-+++ b/drivers/net/ethernet/marvell/mvneta.c
-@@ -1038,6 +1038,43 @@ static void mvneta_set_autoneg(struct mvneta_port *pp, int enable)
- 	}
- }
- 
-+static void mvneta_percpu_unmask_interrupt(void *arg)
-+{
-+	struct mvneta_port *pp = arg;
-+
-+	/* All the queue are unmasked, but actually only the ones
-+	 * mapped to this CPU will be unmasked
-+	 */
-+	mvreg_write(pp, MVNETA_INTR_NEW_MASK,
-+		    MVNETA_RX_INTR_MASK_ALL |
-+		    MVNETA_TX_INTR_MASK_ALL |
-+		    MVNETA_MISCINTR_INTR_MASK);
-+}
-+
-+static void mvneta_percpu_mask_interrupt(void *arg)
-+{
-+	struct mvneta_port *pp = arg;
-+
-+	/* All the queue are masked, but actually only the ones
-+	 * mapped to this CPU will be masked
-+	 */
-+	mvreg_write(pp, MVNETA_INTR_NEW_MASK, 0);
-+	mvreg_write(pp, MVNETA_INTR_OLD_MASK, 0);
-+	mvreg_write(pp, MVNETA_INTR_MISC_MASK, 0);
-+}
-+
-+static void mvneta_percpu_clear_intr_cause(void *arg)
-+{
-+	struct mvneta_port *pp = arg;
-+
-+	/* All the queue are cleared, but actually only the ones
-+	 * mapped to this CPU will be cleared
-+	 */
-+	mvreg_write(pp, MVNETA_INTR_NEW_CAUSE, 0);
-+	mvreg_write(pp, MVNETA_INTR_MISC_CAUSE, 0);
-+	mvreg_write(pp, MVNETA_INTR_OLD_CAUSE, 0);
-+}
-+
- /* This method sets defaults to the NETA port:
-  *	Clears interrupt Cause and Mask registers.
-  *	Clears all MAC tables.
-@@ -1055,14 +1092,10 @@ static void mvneta_defaults_set(struct mvneta_port *pp)
- 	int max_cpu = num_present_cpus();
- 
- 	/* Clear all Cause registers */
--	mvreg_write(pp, MVNETA_INTR_NEW_CAUSE, 0);
--	mvreg_write(pp, MVNETA_INTR_OLD_CAUSE, 0);
--	mvreg_write(pp, MVNETA_INTR_MISC_CAUSE, 0);
-+	on_each_cpu(mvneta_percpu_clear_intr_cause, pp, true);
- 
- 	/* Mask all interrupts */
--	mvreg_write(pp, MVNETA_INTR_NEW_MASK, 0);
--	mvreg_write(pp, MVNETA_INTR_OLD_MASK, 0);
--	mvreg_write(pp, MVNETA_INTR_MISC_MASK, 0);
-+	on_each_cpu(mvneta_percpu_mask_interrupt, pp, true);
- 	mvreg_write(pp, MVNETA_INTR_ENABLE, 0);
- 
- 	/* Enable MBUS Retry bit16 */
-@@ -2528,31 +2561,6 @@ static int mvneta_setup_txqs(struct mvneta_port *pp)
- 	return 0;
- }
- 
--static void mvneta_percpu_unmask_interrupt(void *arg)
--{
--	struct mvneta_port *pp = arg;
--
--	/* All the queue are unmasked, but actually only the ones
--	 * maped to this CPU will be unmasked
--	 */
--	mvreg_write(pp, MVNETA_INTR_NEW_MASK,
--		    MVNETA_RX_INTR_MASK_ALL |
--		    MVNETA_TX_INTR_MASK_ALL |
--		    MVNETA_MISCINTR_INTR_MASK);
--}
--
--static void mvneta_percpu_mask_interrupt(void *arg)
--{
--	struct mvneta_port *pp = arg;
--
--	/* All the queue are masked, but actually only the ones
--	 * maped to this CPU will be masked
--	 */
--	mvreg_write(pp, MVNETA_INTR_NEW_MASK, 0);
--	mvreg_write(pp, MVNETA_INTR_OLD_MASK, 0);
--	mvreg_write(pp, MVNETA_INTR_MISC_MASK, 0);
--}
--
- static void mvneta_start_dev(struct mvneta_port *pp)
- {
- 	int cpu;
-@@ -2603,13 +2611,10 @@ static void mvneta_stop_dev(struct mvneta_port *pp)
- 	mvneta_port_disable(pp);
- 
- 	/* Clear all ethernet port interrupts */
--	mvreg_write(pp, MVNETA_INTR_MISC_CAUSE, 0);
--	mvreg_write(pp, MVNETA_INTR_OLD_CAUSE, 0);
-+	on_each_cpu(mvneta_percpu_clear_intr_cause, pp, true);
- 
- 	/* Mask all ethernet port interrupts */
--	mvreg_write(pp, MVNETA_INTR_NEW_MASK, 0);
--	mvreg_write(pp, MVNETA_INTR_OLD_MASK, 0);
--	mvreg_write(pp, MVNETA_INTR_MISC_MASK, 0);
-+	on_each_cpu(mvneta_percpu_mask_interrupt, pp, true);
- 
- 	mvneta_tx_reset(pp);
- 	mvneta_rx_reset(pp);
-@@ -2921,9 +2926,7 @@ static int mvneta_percpu_notifier(struct notifier_block *nfb,
- 		}
- 
- 		/* Mask all ethernet port interrupts */
--		mvreg_write(pp, MVNETA_INTR_NEW_MASK, 0);
--		mvreg_write(pp, MVNETA_INTR_OLD_MASK, 0);
--		mvreg_write(pp, MVNETA_INTR_MISC_MASK, 0);
-+		on_each_cpu(mvneta_percpu_mask_interrupt, pp, true);
- 		napi_enable(&port->napi);
- 
- 
-@@ -2938,14 +2941,8 @@ static int mvneta_percpu_notifier(struct notifier_block *nfb,
- 		 */
- 		mvneta_percpu_elect(pp);
- 
--		/* Unmask all ethernet port interrupts, as this
--		 * notifier is called for each CPU then the CPU to
--		 * Queue mapping is applied
--		 */
--		mvreg_write(pp, MVNETA_INTR_NEW_MASK,
--			MVNETA_RX_INTR_MASK(rxq_number) |
--			MVNETA_TX_INTR_MASK(txq_number) |
--			MVNETA_MISCINTR_INTR_MASK);
-+		/* Unmask all ethernet port interrupts */
-+		on_each_cpu(mvneta_percpu_unmask_interrupt, pp, true);
- 		mvreg_write(pp, MVNETA_INTR_MISC_MASK,
- 			MVNETA_CAUSE_PHY_STATUS_CHANGE |
- 			MVNETA_CAUSE_LINK_CHANGE |
-@@ -2956,9 +2953,7 @@ static int mvneta_percpu_notifier(struct notifier_block *nfb,
- 	case CPU_DOWN_PREPARE_FROZEN:
- 		netif_tx_stop_all_queues(pp->dev);
- 		/* Mask all ethernet port interrupts */
--		mvreg_write(pp, MVNETA_INTR_NEW_MASK, 0);
--		mvreg_write(pp, MVNETA_INTR_OLD_MASK, 0);
--		mvreg_write(pp, MVNETA_INTR_MISC_MASK, 0);
-+		on_each_cpu(mvneta_percpu_mask_interrupt, pp, true);
- 
- 		napi_synchronize(&port->napi);
- 		napi_disable(&port->napi);
-@@ -2974,10 +2969,7 @@ static int mvneta_percpu_notifier(struct notifier_block *nfb,
- 		/* Check if a new CPU must be elected now this on is down */
- 		mvneta_percpu_elect(pp);
- 		/* Unmask all ethernet port interrupts */
--		mvreg_write(pp, MVNETA_INTR_NEW_MASK,
--			MVNETA_RX_INTR_MASK(rxq_number) |
--			MVNETA_TX_INTR_MASK(txq_number) |
--			MVNETA_MISCINTR_INTR_MASK);
-+		on_each_cpu(mvneta_percpu_unmask_interrupt, pp, true);
- 		mvreg_write(pp, MVNETA_INTR_MISC_MASK,
- 			MVNETA_CAUSE_PHY_STATUS_CHANGE |
- 			MVNETA_CAUSE_LINK_CHANGE |
--- 
-2.5.0
+To me, the best decision when to update the mark is know by the
+driver/subsystem for the device and not the core.
+
+In most cases the mark will be updated after a request has been
+completed, which leads to one unnecessary update at rpm_resume().
+
+In this path (the resume), you really want to keep latencies to a
+minimum and for sure not do unnecessary things.
+
+>
+> Perhaps you think that it's silly to behave that way in this case,
+> because the device wasn't accessed at all during the time it was at
+> full power.  That's a valid objection, but the proper solution is not
+> to revert the 56f487c78015 commit.  Rather, change the driver to avoid
+> doing a pm_runtime_resume_sync until you _know_ that the device will be
+> accessed soon.
+
+That's not always going to work.
+
+Sometimes you need to access the device when trying to probe. Failing
+later in probe, shows just *one* case where it doesn't make sense to
+update the last busy mark. I suspect there may be other cases as well.
+
+Of course one can always use runtime PM APIs which overrides the
+autosuspend mode, so it's not a big deal.
+
+Kind regards
+Uffe
