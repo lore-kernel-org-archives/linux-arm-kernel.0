@@ -1,233 +1,36 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Thu, 4 Feb 2016 09:59:28 +0800
-Subject: [PATCH v4 1/1] USB: core: let USB device know device node
-In-Reply-To: <1453706679-18948-1-git-send-email-peter.chen@freescale.com>
-References: <1453706679-18948-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <20160204015928.GA11158@shlinux2>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Thu, 4 Feb 2016 13:19:59 +1100
+Subject: linux-next: build failure after merge of the aio tree
+In-Reply-To: <CAMuHMdUy-cqeN8COO4rdpY-mOH+6gth40wB31-edkj8CO5PFCw@mail.gmail.com>
+References: <20160112164034.0fe945a7@canb.auug.org.au>
+ <20160112163835.GD347@kvack.org>
+ <20160127134024.0fababf6@canb.auug.org.au>
+ <20160129113056.GP10826@n2100.arm.linux.org.uk>
+ <CAMuHMdUy-cqeN8COO4rdpY-mOH+6gth40wB31-edkj8CO5PFCw@mail.gmail.com>
+Message-ID: <20160204131959.6695c7bf@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 25, 2016 at 03:24:39PM +0800, Peter Chen wrote:
-> Although most of USB devices are hot-plug's, there are still some devices
-> are hard wired on the board, eg, for HSIC and SSIC interface USB devices.
-> If these kinds of USB devices are multiple functions, and they can supply
-> other interfaces like i2c, gpios for other devices, we may need to
-> describe these at device tree.
-> 
-> In this commit, it uses "reg" in dts as physical port number to match
-> the phyiscal port number decided by USB core, if they are the same,
-> then the device node is for the device we are creating for USB core.
-> 
-> Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> ---
-> Changes for v4:
-> - The range of "reg" should be 1-31, changing device node address
->   style as in lower case hexadecimal with leading zeroes suppressed
->   [binding doc, usb-device.txt]
-> - Improve the example at binding doc, it describes node from the top
->   (the controller)
-> - Delete the struct of_node * within struct usb_device
-> - Using usb_hcd_find_raw_port_number to get raw port number under root
->   hub port
-> 
+Hi Benjamin,
 
-Hi Alan, Arnd, and others, would you please give Ack for it if you
-are OK with this patch? I am not sure if Greg will queue it or not
-if no one Acks it, thanks.
+On Fri, 29 Jan 2016 13:03:39 +0100 Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+>
+> On Fri, Jan 29, 2016 at 12:30 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> >> Background: new aio code is adding __get_user() calls referencing 64
+> >> bit quantities (__u64 and __s64).  
+> >
+> > There's lots more architectures which do not support 64-bit get_user()
+> > _or_ __get_user(): avr32, blackfin, metag for example, and m68k which
+> > has this interesting thing "/* case 8: disabled because gcc-4.1 has a
+> > broken typeof \" in its *get_user() implementation.  
+> 
+> And if you enable it again, you get lots of "warning: cast to pointer from
+> integer of different size", like you mentioned.
 
-Peter
-
-> Changes for v3:
-> - typo: s/descirbe/describe/
-> 
-> Changes for v2:
-> - Fix build error reported by kbuild robot, lack of "static" for
->   inline usb_of_get_child_node
-> - Fix typo, "devcie_node" -> "device_node"
-> - Add kernel-doc for of_node at struct usb_device
-> 
-> Changes from RFC:
-> - Fix the error address for binding doc, and add compatible for binding doc
-> - Change get child node API from "usb_of_find_node" to
->   "usb_of_get_child_node"
-> - Delete unecessary header files
-> - One typo
-> 
->  .../devicetree/bindings/usb/usb-device.txt         | 25 ++++++++++++
->  drivers/usb/core/Makefile                          |  2 +-
->  drivers/usb/core/of.c                              | 47 ++++++++++++++++++++++
->  drivers/usb/core/usb.c                             | 14 ++++++-
->  include/linux/usb/of.h                             |  7 ++++
->  5 files changed, 92 insertions(+), 3 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/usb/usb-device.txt
->  create mode 100644 drivers/usb/core/of.c
-> 
-> diff --git a/Documentation/devicetree/bindings/usb/usb-device.txt b/Documentation/devicetree/bindings/usb/usb-device.txt
-> new file mode 100644
-> index 0000000..c702885
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/usb/usb-device.txt
-> @@ -0,0 +1,25 @@
-> +Generic USB Device Properties
-> +
-> +Usually, we only use device tree for hard wired USB device.
-> +The reference binding doc is from:
-> +http://www.firmware.org/1275/bindings/usb/usb-1_0.ps
-> +
-> +Required properties:
-> +- compatible: usbVID,PID
-> +- reg: the port number which this device is connecting to, the range
-> +  is 1-31.
-> +
-> +
-> +Example:
-> +
-> +&usb1 {
-> +	status = "okay";
-> +
-> +	#address-cells = <1>;
-> +	#size-cells = <0>;
-> +
-> +	hub: genesys at 1 {
-> +		compatible = "usb05e3,0608";
-> +		reg = <0x1>;
-> +	};
-> +}
-> diff --git a/drivers/usb/core/Makefile b/drivers/usb/core/Makefile
-> index 2f6f932..9780877 100644
-> --- a/drivers/usb/core/Makefile
-> +++ b/drivers/usb/core/Makefile
-> @@ -5,7 +5,7 @@
->  usbcore-y := usb.o hub.o hcd.o urb.o message.o driver.o
->  usbcore-y += config.o file.o buffer.o sysfs.o endpoint.o
->  usbcore-y += devio.o notify.o generic.o quirks.o devices.o
-> -usbcore-y += port.o
-> +usbcore-y += port.o of.o
->  
->  usbcore-$(CONFIG_PCI)		+= hcd-pci.o
->  usbcore-$(CONFIG_ACPI)		+= usb-acpi.o
-> diff --git a/drivers/usb/core/of.c b/drivers/usb/core/of.c
-> new file mode 100644
-> index 0000000..2289700
-> --- /dev/null
-> +++ b/drivers/usb/core/of.c
-> @@ -0,0 +1,47 @@
-> +/*
-> + * of.c		The helpers for hcd device tree support
-> + *
-> + * Copyright (C) 2016 Freescale Semiconductor, Inc.
-> + * Author: Peter Chen <peter.chen@freescale.com>
-> + *
-> + * This program is free software: you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2  of
-> + * the License as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#include <linux/of.h>
-> +
-> +/**
-> + * usb_of_get_child_node - Find the device node match port number
-> + * @parent: the parent device node
-> + * @portnum: the port number which device is connecting
-> + *
-> + * Find the node from device tree according to its port number.
-> + *
-> + * Return: On success, a pointer to the device node, %NULL on failure.
-> + */
-> +struct device_node *usb_of_get_child_node(struct device_node *parent,
-> +					int portnum)
-> +{
-> +	struct device_node *node;
-> +	u32 port;
-> +
-> +	for_each_child_of_node(parent, node) {
-> +		if (!of_property_read_u32(node, "reg", &port)) {
-> +			if (port == portnum)
-> +				return node;
-> +		}
-> +	}
-> +
-> +	return NULL;
-> +}
-> +EXPORT_SYMBOL_GPL(usb_of_get_child_node);
-> +
-> diff --git a/drivers/usb/core/usb.c b/drivers/usb/core/usb.c
-> index ebb29ca..25d9770 100644
-> --- a/drivers/usb/core/usb.c
-> +++ b/drivers/usb/core/usb.c
-> @@ -36,6 +36,7 @@
->  #include <linux/mutex.h>
->  #include <linux/workqueue.h>
->  #include <linux/debugfs.h>
-> +#include <linux/usb/of.h>
->  
->  #include <asm/io.h>
->  #include <linux/scatterlist.h>
-> @@ -508,11 +509,20 @@ struct usb_device *usb_alloc_dev(struct usb_device *parent,
->  	dev->connect_time = jiffies;
->  	dev->active_duration = -jiffies;
->  #endif
-> -	if (root_hub)	/* Root hub always ok [and always wired] */
-> +	if (root_hub) {	/* Root hub always ok [and always wired] */
->  		dev->authorized = 1;
-> -	else {
-> +		dev->dev.of_node = bus->controller->of_node;
-> +	} else {
->  		dev->authorized = !!HCD_DEV_AUTHORIZED(usb_hcd);
->  		dev->wusb = usb_bus_is_wusb(bus) ? 1 : 0;
-> +
-> +		if (dev->dev.parent->parent == bus->controller)
-> +			/* device under root hub's port */
-> +			port1 = usb_hcd_find_raw_port_number(usb_hcd,
-> +				port1);
-> +
-> +		dev->dev.of_node = usb_of_get_child_node(parent->dev.of_node,
-> +				port1);
->  	}
->  	return dev;
->  }
-> diff --git a/include/linux/usb/of.h b/include/linux/usb/of.h
-> index 974bce9..de3237f 100644
-> --- a/include/linux/usb/of.h
-> +++ b/include/linux/usb/of.h
-> @@ -16,6 +16,8 @@ enum usb_dr_mode of_usb_get_dr_mode_by_phy(struct device_node *phy_np);
->  bool of_usb_host_tpl_support(struct device_node *np);
->  int of_usb_update_otg_caps(struct device_node *np,
->  			struct usb_otg_caps *otg_caps);
-> +struct device_node *usb_of_get_child_node(struct device_node *parent,
-> +			int portnum);
->  #else
->  static inline enum usb_dr_mode
->  of_usb_get_dr_mode_by_phy(struct device_node *phy_np)
-> @@ -31,6 +33,11 @@ static inline int of_usb_update_otg_caps(struct device_node *np,
->  {
->  	return 0;
->  }
-> +static inline struct device_node *usb_of_get_child_node
-> +		(struct device_node *parent, int portnum)
-> +{
-> +	return NULL;
-> +}
->  #endif
->  
->  #if IS_ENABLED(CONFIG_OF) && IS_ENABLED(CONFIG_USB_SUPPORT)
-> -- 
-> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Any thoughts?  I am still using the version of tha aio tree from
+next-20160111.
 
 -- 
-
-Best Regards,
-Peter Chen
+Cheers,
+Stephen Rothwell
