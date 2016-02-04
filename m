@@ -1,36 +1,33 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 4 Feb 2016 17:44:38 +0100
-Subject: [PATCH 10/11] ARM: dts: sun9i: a80-optimus: Disable dummy
- regulators vcc3v0, vcc3v3, vcc5v0
-In-Reply-To: <CAGb2v66xjgsoVEBocUfDk6DDx4QcH-4pP94v+4FHLTJ=rii09Q@mail.gmail.com>
-References: <1454408864-24112-1-git-send-email-wens@csie.org>
- <1454408864-24112-11-git-send-email-wens@csie.org>
- <20160202162136.GX4652@lukather>
- <CAGb2v66xjgsoVEBocUfDk6DDx4QcH-4pP94v+4FHLTJ=rii09Q@mail.gmail.com>
-Message-ID: <20160204164438.GJ4270@lukather>
+Date: Thu, 4 Feb 2016 17:51:51 +0100
+Subject: [PATCH 05/11] drivers: pinctrl: add driver for Allwinner A64 SoC
+In-Reply-To: <56B0DF26.10203@arm.com>
+References: <1454348370-3816-1-git-send-email-andre.przywara@arm.com>
+ <1454348370-3816-6-git-send-email-andre.przywara@arm.com>
+ <20160201182754.GA14737@excalibur.cnev.de>
+ <56AFE0EC.8080207@arm.com> <20160202100046.GM4652@lukather>
+ <56B0DF26.10203@arm.com>
+Message-ID: <20160204165151.GK4270@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 03, 2016 at 12:41:37AM +0800, Chen-Yu Tsai wrote:
-> On Wed, Feb 3, 2016 at 12:21 AM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > Hi,
-> >
-> > On Tue, Feb 02, 2016 at 06:27:43PM +0800, Chen-Yu Tsai wrote:
-> >> These 3 regulators are provided in sunxi-common-regulators.dtsi.
-> >> 3.0V/3.3V and 5.0V are commonly used voltages in Allwinner devices.
-> >> These dummy regulators provide a stand-in when bindings that require
-> >> one, but the real regulator is not supported yet.
-> >>
-> >> Since these are no longer needed, we can disable them.
-> >>
-> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> >
-> > Why not remove the include entirely then?
-> 
-> reg_vbus* are still used. Or should we move them as well?
+Hi Andre,
 
-I think so yeah. It's totally fine to disable per-boards regulators.
+On Tue, Feb 02, 2016 at 04:53:58PM +0000, Andre Przywara wrote:
+> > So, droping it in the filenames, why not. But I'd really like to keep
+> > the same compatible scheme.
+> 
+> And I still don't get this: in the DT compatible scheme we always have a
+> vendor prefix, so allwinner,a64 is surely not a mysterious ARM Ltd. core
+> or a new Apple SoC. Instead it is the A64 from Allwinner, full stop. So
+> why should we add an arbitrary and confusing sun50i naming to it (when
+> it actually should be more like "sun8i-a64").
+
+I don't decide on their marketing names. And I know you want to start
+anew with the arm64 SoCs, but the truth is, you don't. Most of the
+compatibles in the DTSI are from earlier SoCs, and we have to keep
+that legacy and remain consistent with it. With all the good and bad
+things a legacy imply.
 
 Maxime
 
@@ -44,4 +41,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160204/87bf6d46/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160204/a8aca967/attachment.sig>
