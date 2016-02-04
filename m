@@ -1,77 +1,66 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  4 Feb 2016 11:00:40 +0000
-Subject: [PATCH v2 23/28] ARM: KVM: Remove __weak attributes
+Date: Thu,  4 Feb 2016 11:00:42 +0000
+Subject: [PATCH v2 25/28] ARM: KVM: Cleanup asm-offsets.c
 In-Reply-To: <1454583645-10144-1-git-send-email-marc.zyngier@arm.com>
 References: <1454583645-10144-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1454583645-10144-24-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1454583645-10144-26-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the old code is long gone, we can remove all the weak
-attributes, as there is only one version of the code.
+Since we don't have much assembler left, most of the KVM stuff
+in asm-offsets.c is now superfluous. Let's get rid of it.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kvm/hyp/hyp-entry.S | 4 +---
- arch/arm/kvm/hyp/switch.c    | 2 +-
- arch/arm/kvm/hyp/tlb.c       | 6 +++---
- 3 files changed, 5 insertions(+), 7 deletions(-)
+ arch/arm/kernel/asm-offsets.c | 30 ------------------------------
+ 1 file changed, 30 deletions(-)
 
-diff --git a/arch/arm/kvm/hyp/hyp-entry.S b/arch/arm/kvm/hyp/hyp-entry.S
-index ca412ad..e2a45b8 100644
---- a/arch/arm/kvm/hyp/hyp-entry.S
-+++ b/arch/arm/kvm/hyp/hyp-entry.S
-@@ -58,10 +58,8 @@
-  */
- 
- 	.align 5
--__hyp_vector:
--	.global	__hyp_vector
- __kvm_hyp_vector:
--	.weak __kvm_hyp_vector
-+	.global __kvm_hyp_vector
- 
- 	@ Hyp-mode exception vector
- 	W(b)	hyp_reset
-diff --git a/arch/arm/kvm/hyp/switch.c b/arch/arm/kvm/hyp/switch.c
-index 67f3944..7325ad3 100644
---- a/arch/arm/kvm/hyp/switch.c
-+++ b/arch/arm/kvm/hyp/switch.c
-@@ -187,7 +187,7 @@ again:
- 	return exit_code;
- }
- 
--__alias(__guest_run) int __weak __kvm_vcpu_run(struct kvm_vcpu *vcpu);
-+__alias(__guest_run) int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
- 
- static const char * const __hyp_panic_string[] = {
- 	[ARM_EXCEPTION_RESET]      = "\nHYP panic: RST?? PC:%08x CPSR:%08x",
-diff --git a/arch/arm/kvm/hyp/tlb.c b/arch/arm/kvm/hyp/tlb.c
-index 993fe89..3854e31 100644
---- a/arch/arm/kvm/hyp/tlb.c
-+++ b/arch/arm/kvm/hyp/tlb.c
-@@ -50,14 +50,14 @@ static void __hyp_text __tlb_flush_vmid(struct kvm *kvm)
- 	write_sysreg(0, VTTBR);
- }
- 
--__alias(__tlb_flush_vmid) void __weak __kvm_tlb_flush_vmid(struct kvm *kvm);
-+__alias(__tlb_flush_vmid) void __kvm_tlb_flush_vmid(struct kvm *kvm);
- 
- static void __hyp_text __tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
- {
- 	__tlb_flush_vmid(kvm);
- }
- 
--__alias(__tlb_flush_vmid_ipa) void __weak __kvm_tlb_flush_vmid_ipa(struct kvm *kvm,
-+__alias(__tlb_flush_vmid_ipa) void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm,
- 							    phys_addr_t ipa);
- 
- static void __hyp_text __tlb_flush_vm_context(void)
-@@ -68,4 +68,4 @@ static void __hyp_text __tlb_flush_vm_context(void)
- 	dsb(ish);
- }
- 
--__alias(__tlb_flush_vm_context) void __weak __kvm_flush_vm_context(void);
-+__alias(__tlb_flush_vm_context) void __kvm_flush_vm_context(void);
+diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
+index 2f3e0b0..1f24c32 100644
+--- a/arch/arm/kernel/asm-offsets.c
++++ b/arch/arm/kernel/asm-offsets.c
+@@ -170,42 +170,12 @@ int main(void)
+   DEFINE(CACHE_WRITEBACK_GRANULE, __CACHE_WRITEBACK_GRANULE);
+   BLANK();
+ #ifdef CONFIG_KVM_ARM_HOST
+-  DEFINE(VCPU_KVM,		offsetof(struct kvm_vcpu, kvm));
+-  DEFINE(VCPU_MIDR,		offsetof(struct kvm_vcpu, arch.midr));
+   DEFINE(VCPU_GUEST_CTXT,	offsetof(struct kvm_vcpu, arch.ctxt));
+   DEFINE(VCPU_HOST_CTXT,	offsetof(struct kvm_vcpu, arch.host_cpu_context));
+   DEFINE(CPU_CTXT_VFP,		offsetof(struct kvm_cpu_context, vfp));
+-  DEFINE(CPU_CTXT_CP15,		offsetof(struct kvm_cpu_context, cp15));
+   DEFINE(CPU_CTXT_GP_REGS,	offsetof(struct kvm_cpu_context, gp_regs));
+   DEFINE(GP_REGS_USR,		offsetof(struct kvm_regs, usr_regs));
+-  DEFINE(GP_REGS_SVC,		offsetof(struct kvm_regs, svc_regs));
+-  DEFINE(GP_REGS_ABT,		offsetof(struct kvm_regs, abt_regs));
+-  DEFINE(GP_REGS_UND,		offsetof(struct kvm_regs, und_regs));
+-  DEFINE(GP_REGS_IRQ,		offsetof(struct kvm_regs, irq_regs));
+-  DEFINE(GP_REGS_FIQ,		offsetof(struct kvm_regs, fiq_regs));
+-  DEFINE(GP_REGS_PC,		offsetof(struct kvm_regs, usr_regs.ARM_pc));
+-  DEFINE(GP_REGS_CPSR,		offsetof(struct kvm_regs, usr_regs.ARM_cpsr));
+-  DEFINE(VCPU_HCR,		offsetof(struct kvm_vcpu, arch.hcr));
+-  DEFINE(VCPU_IRQ_LINES,	offsetof(struct kvm_vcpu, arch.irq_lines));
+-  DEFINE(VCPU_HSR,		offsetof(struct kvm_vcpu, arch.fault.hsr));
+-  DEFINE(VCPU_HxFAR,		offsetof(struct kvm_vcpu, arch.fault.hxfar));
+-  DEFINE(VCPU_HPFAR,		offsetof(struct kvm_vcpu, arch.fault.hpfar));
+   DEFINE(VCPU_HYP_PC,		offsetof(struct kvm_vcpu, arch.fault.hyp_pc));
+-  DEFINE(VCPU_VGIC_CPU,		offsetof(struct kvm_vcpu, arch.vgic_cpu));
+-  DEFINE(VGIC_V2_CPU_HCR,	offsetof(struct vgic_cpu, vgic_v2.vgic_hcr));
+-  DEFINE(VGIC_V2_CPU_VMCR,	offsetof(struct vgic_cpu, vgic_v2.vgic_vmcr));
+-  DEFINE(VGIC_V2_CPU_MISR,	offsetof(struct vgic_cpu, vgic_v2.vgic_misr));
+-  DEFINE(VGIC_V2_CPU_EISR,	offsetof(struct vgic_cpu, vgic_v2.vgic_eisr));
+-  DEFINE(VGIC_V2_CPU_ELRSR,	offsetof(struct vgic_cpu, vgic_v2.vgic_elrsr));
+-  DEFINE(VGIC_V2_CPU_APR,	offsetof(struct vgic_cpu, vgic_v2.vgic_apr));
+-  DEFINE(VGIC_V2_CPU_LR,	offsetof(struct vgic_cpu, vgic_v2.vgic_lr));
+-  DEFINE(VGIC_CPU_NR_LR,	offsetof(struct vgic_cpu, nr_lr));
+-  DEFINE(VCPU_TIMER_CNTV_CTL,	offsetof(struct kvm_vcpu, arch.timer_cpu.cntv_ctl));
+-  DEFINE(VCPU_TIMER_CNTV_CVAL,	offsetof(struct kvm_vcpu, arch.timer_cpu.cntv_cval));
+-  DEFINE(KVM_TIMER_CNTVOFF,	offsetof(struct kvm, arch.timer.cntvoff));
+-  DEFINE(KVM_TIMER_ENABLED,	offsetof(struct kvm, arch.timer.enabled));
+-  DEFINE(KVM_VGIC_VCTRL,	offsetof(struct kvm, arch.vgic.vctrl_base));
+-  DEFINE(KVM_VTTBR,		offsetof(struct kvm, arch.vttbr));
+ #endif
+   BLANK();
+ #ifdef CONFIG_VDSO
 -- 
 2.1.4
