@@ -1,88 +1,26 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 4 Feb 2016 08:53:07 +0530
+Date: Thu, 4 Feb 2016 08:53:53 +0530
 Subject: Plain DFS (no voltage scaling)
-In-Reply-To: <56B244A0.60309@free.fr>
-References: <56B11B67.3090600@free.fr> <56B217C9.1050405@free.fr>
- <20160203161331.GI3469@vireshk> <56B244A0.60309@free.fr>
-Message-ID: <20160204032307.GP3469@vireshk>
+In-Reply-To: <56B24634.6060001@free.fr>
+References: <56B11B67.3090600@free.fr> <20160203021052.GK31828@vireshk>
+ <56B21E2E.1070606@free.fr> <20160203161428.GJ3469@vireshk>
+ <56B24634.6060001@free.fr>
+Message-ID: <20160204032353.GQ3469@vireshk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03-02-16, 19:19, Mason wrote:
-> On 03/02/2016 17:13, Viresh Kumar wrote:
-> > On 03-02-16, 16:07, Mason wrote:
-> >> On 02/02/2016 22:11, Mason wrote:
-> >>
-> >>> I plan to enable the on-demand governor on the tango platform:
-> >>> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/boot/dts/tango4-smp8758.dtsi
-> >>>
-> >>> I found the cpufreq-dt binding doc:
-> >>>
-> >>> https://www.kernel.org/doc/Documentation/devicetree/bindings/cpufreq/cpufreq-dt.txt
-> >>> https://www.kernel.org/doc/Documentation/devicetree/bindings/opp/opp.txt
-> >>>
-> >>> Something is not clear to me:
-> >>>
-> >>> If my platform cannot scale the voltage, what information
-> >>> should I put in the voltage part of the DT?
-> >>
-> >> Someone pointed out that tweaking the frequency without tweaking
-> >> the voltage might be counter-productive.
-> >>
-> >> I measured the power consumption of the entire board (at the power outlet)
-> >> for 3 CPU frequencies (all other things being equal, I hope).
-> >>
-> >> idle @ 111 MHz = 4.6 W
-> >> idle @ 333 MHz = 4.6 W
-> >> idle @ 999 MHz = 4.6 W
-> >>
-> >> load @ 111 MHz = 5.0 W
-> >> load @ 333 MHz = 5.7 W
-> >> load @ 999 MHz = 7.7 W
-> >>
-> >> When idle, the kernel calls WFI, which "turns off" most of the CPU
-> >> (clock gating?) such that the actual frequency does not matter.
-> >>
-> >> At full load (I use cpuburn to jog as many FUs simultaneously as
-> >> possible) it looks like each additional MHz requires ~3 mW.
-> >>
-> >> So it would appear that an on-demand governor might not help to
-> >> save power.
-
-IOW, what's so special about how on-demand will behave in your case ?
-If it doesn't work properly, then that's the same for everybody, isn't
-it ?
-
-> > Why do you say so ?
+On 03-02-16, 19:25, Mason wrote:
+> The sunxi guys pointed me in the right direction.
 > 
-> Here's my (possibly incorrect) reasoning:
+> http://lxr.free-electrons.com/source/arch/arm/mach-sunxi/sunxi.c#L20
 > 
-> If the CPU is idle, kernel calls WFI and frequency apparently
-> doesn't matter.
+> Why isn't there a compatible string like other drivers?
+> 
+> Such as
+>   compatible = "cpufreq-dt"
+> which would enable cpufreq on the platform?
 
-Right.
-
-> If the CPU has work to do, the on-demand governor will bump the
-> frequency to the max (I think).
-
-Not always, but it will choose the best frequency based on the load.
-
-> I don't think the CPU spends a lot of time in the intermediate
-> frequencies (neither max nor min).
-
-It does, it was fixed somewhere in v3.* .
-
-> But maybe my logic is flawed?
-
-Yes.
-
-> Also, some users (of our older kernel) reported problems were
-> they considered the on-demand governor was "too slow" to ramp
-> the frequency up. (But I don't know if they'd played with the
-> configuration knobs.)
-
-Shouldn't be the case anymore, or maybe those guys are more in favor
-of the interactive governor :)
+Because DT can't have nodes for virtual devices :(
 
 -- 
 viresh
