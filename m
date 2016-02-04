@@ -1,78 +1,78 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu,  4 Feb 2016 22:09:25 +0100
-Subject: [PATCH v3 net 3/7] net: mvneta: Use on_each_cpu when possible
+Date: Thu,  4 Feb 2016 22:09:28 +0100
+Subject: [PATCH v3 net 6/7] net: mvneta: The mvneta_percpu_elect function
+ should be atomic
 In-Reply-To: <1454620169-8156-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1454620169-8156-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1454620169-8156-4-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1454620169-8156-7-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of using a for_each_* loop in which we just call the
-smp_call_function_single macro, it is more simple to directly use the
-on_each_cpu macro. Moreover, this macro ensures that the calls will be
-done all at once.
+Electing a CPU must be done in an atomic way: it should be done after or
+before the removal/insertion of a CPU and this function is not reentrant.
 
-Suggested-by: Russell King <rmk+kernel@arm.linux.org.uk>
+During the loop of mvneta_percpu_elect we associates the queues to the
+CPUs, if there is a topology change during this loop, then the mapping
+between the CPUs and the queues could be wrong. During this loop the
+interrupt mask is also updating for each CPUs, It should not be changed
+in the same time by other part of the driver.
+
+This patch adds spinlock to create the needed critical sections.
+
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/net/ethernet/marvell/mvneta.c | 17 ++++++-----------
- 1 file changed, 6 insertions(+), 11 deletions(-)
+ drivers/net/ethernet/marvell/mvneta.c | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
 diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-index 4c2d12423750..f496f9716569 100644
+index 2d0e8a605ca9..b12a745a0e4c 100644
 --- a/drivers/net/ethernet/marvell/mvneta.c
 +++ b/drivers/net/ethernet/marvell/mvneta.c
-@@ -2555,7 +2555,7 @@ static void mvneta_percpu_mask_interrupt(void *arg)
+@@ -370,6 +370,10 @@ struct mvneta_port {
+ 	struct net_device *dev;
+ 	struct notifier_block cpu_notifier;
+ 	int rxq_def;
++	/* Protect the access to the percpu interrupt registers,
++	 * ensuring that the configuration remains coherent.
++	 */
++	spinlock_t lock;
  
- static void mvneta_start_dev(struct mvneta_port *pp)
+ 	/* Core clock */
+ 	struct clk *clk;
+@@ -2855,6 +2859,12 @@ static void mvneta_percpu_elect(struct mvneta_port *pp)
  {
--	unsigned int cpu;
-+	int cpu;
+ 	int elected_cpu = 0, max_cpu, cpu, i = 0;
  
- 	mvneta_max_rx_size_set(pp, pp->pkt_size);
- 	mvneta_txq_max_tx_size_set(pp, pp->pkt_size);
-@@ -2571,9 +2571,8 @@ static void mvneta_start_dev(struct mvneta_port *pp)
- 	}
- 
- 	/* Unmask interrupts. It has to be done from each CPU */
--	for_each_online_cpu(cpu)
--		smp_call_function_single(cpu, mvneta_percpu_unmask_interrupt,
--					 pp, true);
-+	on_each_cpu(mvneta_percpu_unmask_interrupt, pp, true);
++	/* Electing a CPU must be done in an atomic way: it should be
++	 * done after or before the removal/insertion of a CPU and
++	 * this function is not reentrant.
++	 */
++	spin_lock(&pp->lock);
 +
- 	mvreg_write(pp, MVNETA_INTR_MISC_MASK,
- 		    MVNETA_CAUSE_PHY_STATUS_CHANGE |
- 		    MVNETA_CAUSE_LINK_CHANGE |
-@@ -2993,7 +2992,7 @@ static int mvneta_percpu_notifier(struct notifier_block *nfb,
- static int mvneta_open(struct net_device *dev)
- {
- 	struct mvneta_port *pp = netdev_priv(dev);
--	int ret, cpu;
-+	int ret;
- 
- 	pp->pkt_size = MVNETA_RX_PKT_SIZE(pp->dev->mtu);
- 	pp->frag_size = SKB_DATA_ALIGN(MVNETA_RX_BUF_SIZE(pp->pkt_size)) +
-@@ -3026,9 +3025,7 @@ static int mvneta_open(struct net_device *dev)
- 	/* Enable per-CPU interrupt on all the CPU to handle our RX
- 	 * queue interrupts
+ 	/* Use the cpu associated to the rxq when it is online, in all
+ 	 * the other cases, use the cpu 0 which can't be offline.
  	 */
--	for_each_online_cpu(cpu)
--		smp_call_function_single(cpu, mvneta_percpu_enable,
--					 pp, true);
-+	on_each_cpu(mvneta_percpu_enable, pp, true);
+@@ -2898,6 +2908,7 @@ static void mvneta_percpu_elect(struct mvneta_port *pp)
+ 		i++;
  
+ 	}
++	spin_unlock(&pp->lock);
+ };
  
- 	/* Register a CPU notifier to handle the case where our CPU
-@@ -3315,9 +3312,7 @@ static int  mvneta_config_rss(struct mvneta_port *pp)
+ static int mvneta_percpu_notifier(struct notifier_block *nfb,
+@@ -2952,8 +2963,13 @@ static int mvneta_percpu_notifier(struct notifier_block *nfb,
+ 	case CPU_DOWN_PREPARE:
+ 	case CPU_DOWN_PREPARE_FROZEN:
+ 		netif_tx_stop_all_queues(pp->dev);
++		/* Thanks to this lock we are sure that any pending
++		 * cpu election is done
++		 */
++		spin_lock(&pp->lock);
+ 		/* Mask all ethernet port interrupts */
+ 		on_each_cpu(mvneta_percpu_mask_interrupt, pp, true);
++		spin_unlock(&pp->lock);
  
- 	netif_tx_stop_all_queues(pp->dev);
- 
--	for_each_online_cpu(cpu)
--		smp_call_function_single(cpu, mvneta_percpu_mask_interrupt,
--					 pp, true);
-+	on_each_cpu(mvneta_percpu_mask_interrupt, pp, true);
- 
- 	/* We have to synchronise on the napi of each CPU */
- 	for_each_online_cpu(cpu) {
+ 		napi_synchronize(&port->napi);
+ 		napi_disable(&port->napi);
 -- 
 2.5.0
