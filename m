@@ -1,32 +1,35 @@
-From: k@japko.eu (Krzysztof Adamski)
-Date: Thu, 4 Feb 2016 00:44:04 +0100
-Subject: [PATCH v2 2/5] dts: sun8i-h3: Add APB0 related clocks and resets
-In-Reply-To: <20160203222117.GA12071@box2.japko.eu>
-References: <1454448113-18810-1-git-send-email-k@japko.eu>
- <1454448113-18810-3-git-send-email-k@japko.eu>
- <20160203123534.GG4652@lukather>
- <20160203222117.GA12071@box2.japko.eu>
-Message-ID: <20160203234403.GB12071@box2.japko.eu>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 4 Feb 2016 08:28:53 +0800
+Subject: [PATCH 1/4] net: ethernet: dwmac: add Ethernet glue logic for
+ stm32 chip
+In-Reply-To: <1454511275-9791-2-git-send-email-alexandre.torgue@gmail.com>
+Message-ID: <201602040842.LxCCQ6Q3%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 03, 2016 at 11:21:17PM +0100, Krzysztof Adamski wrote:
->On Wed, Feb 03, 2016 at 01:35:34PM +0100, Maxime Ripard wrote:
->>Hi,
->>
->>I'm not sure what you mean there. The fixed factor clocks only take a
->>single parent, and you provided two.
->
->True, I that's actually some stupid leftover. As mentioned in the 
->commit message I didn't really know how the clock tree looks like here 
->so I wanted to just pretend it's connectet to osc24M. After some 
->experiments I think that 0x01f0140c register does not exist on H3 and 
->I was finally (hopefully) able to understand how this clock is set up 
->in Allwinner's code. So I changed the clock to factors clock with 
->possible osc32k and osc24M parrents. Will send it in v3.
+Hi Alexandre,
 
-I've changed my mind about using factors clock. The clock I was thinking 
-about is only setup for CIR peripheral and I have no information on how 
-r_pio is clocked other than the fact it works by default so I assume 
-it's clocked from 24M oscillator. New patchset send, let me know what 
-you think.
+[auto build test WARNING on net/master]
+[also build test WARNING on v4.5-rc2 next-20160203]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+
+url:    https://github.com/0day-ci/linux/commits/Alexandre-TORGUE/Add-Ethernet-support-on-STM32F429/20160203-225940
+config: um-allyesconfig (attached as .config)
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=um 
+
+All warnings (new ones prefixed by >>):
+
+warning: (ST_IRQCHIP && HIP04_ETH && STMMAC_PLATFORM && DWMAC_IPQ806X && DWMAC_LPC18XX && DWMAC_ROCKCHIP && DWMAC_SOCFPGA && DWMAC_STI && DWMAC_STM32 && TI_CPSW && PINCTRL_ROCKCHIP && PINCTRL_DOVE && POWER_RESET_KEYSTONE && POWER_RESET_SYSCON && POWER_RESET_SYSCON_POWEROFF && S3C2410_WATCHDOG && VIDEO_OMAP3 && VIDEO_S5P_FIMC && USB_XHCI_MTK && RTC_DRV_AT91SAM9 && LPC18XX_DMAMUX && VIDEO_OMAP4 && HWSPINLOCK_QCOM && ATMEL_ST && QCOM_GSBI && PHY_HI6220_USB) selects MFD_SYSCON which has unmet direct dependencies (HAS_IOMEM)
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 17523 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160204/cb3c4c9a/attachment-0001.obj>
