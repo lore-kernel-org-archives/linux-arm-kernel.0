@@ -1,64 +1,43 @@
-From: menghui.lin@mediatek.com (menghui lin)
-Date: Thu, 4 Feb 2016 10:42:43 +0800
-Subject: [PATCH V4 2/2] regulator: mt6323: Add support for MT6323 regulator
-In-Reply-To: <20160203122952.GF4455@sirena.org.uk>
-References: <1453896059-44589-1-git-send-email-blogic@openwrt.org>
- <1453896059-44589-2-git-send-email-blogic@openwrt.org>
- <20160127144105.GQ6042@sirena.org.uk> <56AA5A5C.9080402@openwrt.org>
- <20160128231306.GD4130@sirena.org.uk>
- <1454061134.10861.14.camel@mtksdaap41>
- <20160129112717.GP4130@sirena.org.uk>
- <1454069479.10861.30.camel@mtksdaap41>
- <20160202193839.GX4455@sirena.org.uk>
- <1454477942.31375.32.camel@mtksdaap41>
- <20160203122952.GF4455@sirena.org.uk>
-Message-ID: <1454553763.24913.8.camel@mtksdaap41>
+From: hongzhou.yang@mediatek.com (Hongzhou Yang)
+Date: Wed, 3 Feb 2016 19:03:35 -0800
+Subject: [PATCH 1/2] pinctrl: mediatek: fix direction control issue
+In-Reply-To: <1454462686-770-2-git-send-email-biao.huang@mediatek.com>
+References: <1454462686-770-1-git-send-email-biao.huang@mediatek.com>
+ <1454462686-770-2-git-send-email-biao.huang@mediatek.com>
+Message-ID: <1454555015.4618.10.camel@mussux00>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2016-02-03 at 12:29 +0000, Mark Brown wrote:
-> On Wed, Feb 03, 2016 at 01:39:02PM +0800, menghui lin wrote:
-> > On Tue, 2016-02-02 at 19:38 +0000, Mark Brown wrote:
+On Wed, 2016-02-03 at 09:24 +0800, Biao Huang wrote:
+> Since input-enable/disable and input-schmitt-enable/disable are
+> workable when gpio direction is input, so add direction setting
+> when do input-enable/disable and input-schmitt-enable/disable
+> properties.
 > 
-> > > How does the driver know if it needs to change the mode (ie, how can it
-> > > tell if the current mode is inadequate) and surely if we can only change
-> > > in one direction this isn't terribly useful?
+> Signed-off-by: Biao Huang <biao.huang@mediatek.com>
+> ---
+>  drivers/pinctrl/mediatek/pinctrl-mtk-common.c |    2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> > I think the datasheet of buck/ldo could provide information about power
-> > capability of each mode. The driver should adjust regulator mode per its
-> > device's power requirement.
-> 
-> That's of no help for a consumer driver which doesn't know what
-> regulator is supplying it.
-> 
-> > case 1:
-> 
-> > We have a USB typeC micro-controller, which has two modes - standby and
-> > normal. It requires 1.8V and 3.3V to operate (both powers are always
-> > on). The device stays in standby mode when there is no cable in. When
-> > cable in, we got an interrupt and change device into normal mode.
-> 
-> > The standby mode power consumption is quite small, so we would like the
-> > change mode of regulator into STANDBY to save more power. And we change
-> > into NORMAL when we receive cable-in interrupt.
-> 
-> This seems like something that we ought to be doing via runtime PM
-> anyway which should be going through the suspend mode bindings, though
-> that would need some plumbing in.
-> 
-> > case 2:
-> 
-> > About buck regulator for CPU, it usually provides PWM mode, PWM/PFM Auto
-> > mode, PFM mode. I think it could map to FAST, NORMAL, IDLE mode
-> > respectively. Most of time we would use just normal mode. However, we
-> > would change regulator into PWM mode time to time to test buck output
-> > performance on the tested board.
-> 
-> That's a test use that doesn't seem a good fit for upstream at all.
+> diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+> index 8cac73d..6eb01c9 100644
+> --- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+> +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+> @@ -352,6 +352,7 @@ static int mtk_pconf_parse_conf(struct pinctrl_dev *pctldev,
+>  		ret = mtk_pconf_set_pull_select(pctl, pin, true, false, arg);
+>  		break;
+>  	case PIN_CONFIG_INPUT_ENABLE:
+> +		mtk_pmx_gpio_set_direction(pctldev, NULL, pin, true);
+>  		ret = mtk_pconf_set_ies_smt(pctl, pin, arg, param);
 
-Hi Mark,
+Hi Linus,
 
-Thanks for your response.
-It seems more work is required for dynamic mode switch.
-For MT6323 regulator patch, we would remove mode-switch related code for
-now to provide basic regulator support first.
+>From pinctrl-bindings.txt, 'input-enable' property defined as following:
+input-enable        - enable input on pin (no effect on output)
+
+Since input enable and input direction are two different settings on our
+SOC, could you tell me the exact meaning of this property? Input enable
+only? Or set input direction at the same time?
+
+Thanks,
+Hongzhou
