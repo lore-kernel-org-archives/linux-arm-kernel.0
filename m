@@ -1,50 +1,65 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu,  4 Feb 2016 22:09:22 +0100
-Subject: [PATCH v3 net 0/7] mvneta fixes for SMP
-Message-ID: <1454620169-8156-1-git-send-email-gregory.clement@free-electrons.com>
+Date: Thu,  4 Feb 2016 22:09:23 +0100
+Subject: [PATCH v3 net 1/7] net: mvneta: Fix for_each_present_cpu usage
+In-Reply-To: <1454620169-8156-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1454620169-8156-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1454620169-8156-2-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch convert the for_each_present in on_each_cpu, instead of
+applying on the present cpus it will be applied only on the online cpus.
+This fix a bug reported on
+http://thread.gmane.org/gmane.linux.ports.arm.kernel/468173.
 
-Following this bug report:
-http://thread.gmane.org/gmane.linux.ports.arm.kernel/468173 and the
-suggestions from Russell King, I reviewed all the code involving
-multi-CPU. It ended with this series of patches which should improve
-the stability of the driver.
+Using the macro on_each_cpu (instead of a for_each_* loop) also ensures
+that all the calls will be done all at once.
 
-During my test I found another bug which is fixed by new patch (the
-second one of this new version of the series)
+Fixes: f86428854480 ("net: mvneta: Statically assign queues to CPUs")
+Reported-by: Stefan Roese <stefan.roese@gmail.com>
+Suggested-by: Jisheng Zhang <jszhang@marvell.com>
+Suggested-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ drivers/net/ethernet/marvell/mvneta.c | 8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
 
-The two first patches fix real bugs, the others fix potential issues
-in the driver.
-
-Thanks,
-
-Gregory
-
-Changelog:
-
-v1 -> v2
-Fix spinlock comment. Pointed by David Miller
-
-v2 -> v3
- - Fix typos and mistake in the comments. Pointed by Sergei Shtylyov
- - Add a new patch fixing the CPU choice in mvneta_percpu_elect
- - Use lock in last patch to prevent remaining race condition. Pointed
-   by Jisheng
-
-Gregory CLEMENT (7):
-  net: mvneta: Fix for_each_present_cpu usage
-  net: mvneta: Fix the CPU choice in mvneta_percpu_elect
-  net: mvneta: Use on_each_cpu when possible
-  net: mvneta: Remove unused code
-  net: mvneta: Modify the queue related fields from each cpu
-  net: mvneta: The mvneta_percpu_elect function should be atomic
-  net: mvneta: Fix race condition during stopping
-
- drivers/net/ethernet/marvell/mvneta.c | 184 +++++++++++++++++++---------------
- 1 file changed, 101 insertions(+), 83 deletions(-)
-
+diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+index 662c2ee268c7..90ff5c7e19ea 100644
+--- a/drivers/net/ethernet/marvell/mvneta.c
++++ b/drivers/net/ethernet/marvell/mvneta.c
+@@ -2564,7 +2564,7 @@ static void mvneta_start_dev(struct mvneta_port *pp)
+ 	mvneta_port_enable(pp);
+ 
+ 	/* Enable polling on the port */
+-	for_each_present_cpu(cpu) {
++	for_each_online_cpu(cpu) {
+ 		struct mvneta_pcpu_port *port = per_cpu_ptr(pp->ports, cpu);
+ 
+ 		napi_enable(&port->napi);
+@@ -2589,7 +2589,7 @@ static void mvneta_stop_dev(struct mvneta_port *pp)
+ 
+ 	phy_stop(pp->phy_dev);
+ 
+-	for_each_present_cpu(cpu) {
++	for_each_online_cpu(cpu) {
+ 		struct mvneta_pcpu_port *port = per_cpu_ptr(pp->ports, cpu);
+ 
+ 		napi_disable(&port->napi);
+@@ -3057,13 +3057,11 @@ err_cleanup_rxqs:
+ static int mvneta_stop(struct net_device *dev)
+ {
+ 	struct mvneta_port *pp = netdev_priv(dev);
+-	int cpu;
+ 
+ 	mvneta_stop_dev(pp);
+ 	mvneta_mdio_remove(pp);
+ 	unregister_cpu_notifier(&pp->cpu_notifier);
+-	for_each_present_cpu(cpu)
+-		smp_call_function_single(cpu, mvneta_percpu_disable, pp, true);
++	on_each_cpu(mvneta_percpu_disable, pp, true);
+ 	free_percpu_irq(dev->irq, pp->ports);
+ 	mvneta_cleanup_rxqs(pp);
+ 	mvneta_cleanup_txqs(pp);
 -- 
 2.5.0
