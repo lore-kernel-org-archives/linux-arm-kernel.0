@@ -1,40 +1,75 @@
-From: bcrl@kvack.org (Benjamin LaHaise)
-Date: Thu, 4 Feb 2016 11:47:18 -0500
-Subject: linux-next: build failure after merge of the aio tree
-In-Reply-To: <20160204161741.GH10826@n2100.arm.linux.org.uk>
-References: <CAMuHMdUy-cqeN8COO4rdpY-mOH+6gth40wB31-edkj8CO5PFCw@mail.gmail.com>
- <20160204131959.6695c7bf@canb.auug.org.au> <20160204134142.GA16315@kvack.org>
- <20160204135056.GE10826@n2100.arm.linux.org.uk>
- <20160204140822.GB16315@kvack.org>
- <20160204141253.GF10826@n2100.arm.linux.org.uk>
- <20160204143204.GC16315@kvack.org>
- <20160204143907.GG10826@n2100.arm.linux.org.uk>
- <20160204160101.GD16315@kvack.org>
- <20160204161741.GH10826@n2100.arm.linux.org.uk>
-Message-ID: <20160204164718.GF16315@kvack.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 4 Feb 2016 11:49:34 -0500 (EST)
+Subject: [PATCH] ARM: remove duplicate definitions of __vectors_start
+ and __stubs_start
+In-Reply-To: <1454574705-15109-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1454574705-15109-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <alpine.LFD.2.20.1602041148050.17825@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 04, 2016 at 04:17:42PM +0000, Russell King - ARM Linux wrote:
-> That's the easy bit!
-> 
-> The problem you're going to run into is here:
-> 
-> #define __get_user_nocheck(x, ptr, size)                                \
-> ({                                                                      \
->         int __gu_err;                                                   \
->         unsigned long __gu_val;                                         \
->         __uaccess_begin();                                              \
->         __get_user_size(__gu_val, (ptr), (size), __gu_err, -EFAULT);    \
->         __uaccess_end();                                                \
->         (x) = (__force __typeof__(*(ptr)))__gu_val;                     \
-> 
-> __gu_val will be 32-bit, even when you're wanting a 64-bit quantity.
-> That's where the fun and games start...
+On Thu, 4 Feb 2016, Ard Biesheuvel wrote:
 
-You're right -- it's quite non-trivial.  How evil would it be to make a 
-separate __get_user64() macro?
+> Commit b9b32bf70f2f ("ARM: use linker magic for vectors and vector stubs")
+> introduced new global definitions of __vectors_start and __stubs_start,
+> and changed the existing ones to have internal linkage only. However, these
+> symbols are still visible to kallsyms, and due to the way the .vectors and
+> .stubs sections are emitted at the base of the VMA space, these duplicate
+> definitions have conflicting values.
+> 
+>   $ nm -n vmlinux |grep -E __vectors\|__stubs
+>   00000000 t __vectors_start
+>   00001000 t __stubs_start
+>   c0e77000 T __vectors_start
+>   c0e77020 T __stubs_start
+> 
+> This is completely harmless by itself, since the wrong values are local
+> symbols that cannot be referenced by other object files directly. However,
+> since these symbols are also listed in the kallsyms symbol table in some
+> cases (i.e., CONFIG_KALLSYMS_ALL=y and CONFIG_XIP_KERNEL=y), having these
+> conflicting values can be confusing. So either remove them, or make them
+> strictly local.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-		-ben
--- 
-"Thought is the essence of where you are now."
+Acked-by: Nicolas Pitre <nico@linaro.org>
+
+
+> ---
+> 
+> This is a separate fix for the duplicate symbols based on v4.5-rc2,
+> so that it can be applied separately if desired. In that case, I will
+> rebase my kallsyms series onto this patch.
+> 
+>  arch/arm/kernel/entry-armv.S | 5 ++---
+>  1 file changed, 2 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+> index 3ce377f7251f..788e40c1254f 100644
+> --- a/arch/arm/kernel/entry-armv.S
+> +++ b/arch/arm/kernel/entry-armv.S
+> @@ -1064,7 +1064,6 @@ ENDPROC(vector_\name)
+>  	.endm
+>  
+>  	.section .stubs, "ax", %progbits
+> -__stubs_start:
+>  	@ This must be the first word
+>  	.word	vector_swi
+>  
+> @@ -1206,10 +1205,10 @@ vector_addrexcptn:
+>  	.equ	vector_fiq_offset, vector_fiq
+>  
+>  	.section .vectors, "ax", %progbits
+> -__vectors_start:
+> +.L__vectors_start:
+>  	W(b)	vector_rst
+>  	W(b)	vector_und
+> -	W(ldr)	pc, __vectors_start + 0x1000
+> +	W(ldr)	pc, .L__vectors_start + 0x1000
+>  	W(b)	vector_pabt
+>  	W(b)	vector_dabt
+>  	W(b)	vector_addrexcptn
+> -- 
+> 2.5.0
+> 
+> 
