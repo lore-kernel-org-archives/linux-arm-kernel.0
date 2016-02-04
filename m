@@ -1,78 +1,60 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  4 Feb 2016 11:00:43 +0000
-Subject: [PATCH v2 26/28] ARM: KVM: Remove unused hyp_pc field
+Date: Thu,  4 Feb 2016 11:00:32 +0000
+Subject: [PATCH v2 15/28] ARM: KVM: Add VFP lazy save/restore handler
 In-Reply-To: <1454583645-10144-1-git-send-email-marc.zyngier@arm.com>
 References: <1454583645-10144-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1454583645-10144-27-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1454583645-10144-16-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This field was never populated, and the panic code already
-does something similar. Delete the related code.
+Similar to the arm64 version, add the code that deals with VFP traps,
+re-enabling VFP, save/restoring the registers and resuming the guest.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_emulate.h | 5 -----
- arch/arm/include/asm/kvm_host.h    | 1 -
- arch/arm/kernel/asm-offsets.c      | 1 -
- arch/arm/kvm/handle_exit.c         | 5 -----
- 4 files changed, 12 deletions(-)
+ arch/arm/kvm/hyp/entry.S | 31 +++++++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
 
-diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
-index f710616..8a8c6de 100644
---- a/arch/arm/include/asm/kvm_emulate.h
-+++ b/arch/arm/include/asm/kvm_emulate.h
-@@ -108,11 +108,6 @@ static inline phys_addr_t kvm_vcpu_get_fault_ipa(struct kvm_vcpu *vcpu)
- 	return ((phys_addr_t)vcpu->arch.fault.hpfar & HPFAR_MASK) << 8;
- }
+diff --git a/arch/arm/kvm/hyp/entry.S b/arch/arm/kvm/hyp/entry.S
+index 32f79b0..21c2388 100644
+--- a/arch/arm/kvm/hyp/entry.S
++++ b/arch/arm/kvm/hyp/entry.S
+@@ -66,5 +66,36 @@ ENTRY(__guest_exit)
+ 	bx	lr
+ ENDPROC(__guest_exit)
  
--static inline unsigned long kvm_vcpu_get_hyp_pc(struct kvm_vcpu *vcpu)
--{
--	return vcpu->arch.fault.hyp_pc;
--}
--
- static inline bool kvm_vcpu_dabt_isvalid(struct kvm_vcpu *vcpu)
- {
- 	return kvm_vcpu_get_hsr(vcpu) & HSR_ISV;
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index daf6a71..19e9aba 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -85,7 +85,6 @@ struct kvm_vcpu_fault_info {
- 	u32 hsr;		/* Hyp Syndrome Register */
- 	u32 hxfar;		/* Hyp Data/Inst. Fault Address Register */
- 	u32 hpfar;		/* Hyp IPA Fault Address Register */
--	u32 hyp_pc;		/* PC when exception was taken from Hyp mode */
- };
++/*
++ * If VFPv3 support is not available, then we will not switch the VFP
++ * registers; however cp10 and cp11 accesses will still trap and fallback
++ * to the regular coprocessor emulation code, which currently will
++ * inject an undefined exception to the guest.
++ */
++#ifdef CONFIG_VFPv3
++ENTRY(__vfp_guest_restore)
++	push	{r3, r4, lr}
++
++	@ NEON/VFP used.  Turn on VFP access.
++	mrc	p15, 4, r1, c1, c1, 2		@ HCPTR
++	bic	r1, r1, #(HCPTR_TCP(10) | HCPTR_TCP(11))
++	mcr	p15, 4, r1, c1, c1, 2		@ HCPTR
++	isb
++
++	@ Switch VFP/NEON hardware state to the guest's
++	mov	r4, r0
++	ldr	r0, [r0, #VCPU_HOST_CTXT]
++	add	r0, r0, #CPU_CTXT_VFP
++	bl	__vfp_save_state
++	add	r0, r4, #(VCPU_GUEST_CTXT + CPU_CTXT_VFP)
++	bl	__vfp_restore_state
++
++	pop	{r3, r4, lr}
++	pop	{r0, r1, r2}
++	clrex
++	eret
++ENDPROC(__vfp_guest_restore)
++#endif
++
+ 	.popsection
  
- /*
-diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
-index 1f24c32..27d0581 100644
---- a/arch/arm/kernel/asm-offsets.c
-+++ b/arch/arm/kernel/asm-offsets.c
-@@ -175,7 +175,6 @@ int main(void)
-   DEFINE(CPU_CTXT_VFP,		offsetof(struct kvm_cpu_context, vfp));
-   DEFINE(CPU_CTXT_GP_REGS,	offsetof(struct kvm_cpu_context, gp_regs));
-   DEFINE(GP_REGS_USR,		offsetof(struct kvm_regs, usr_regs));
--  DEFINE(VCPU_HYP_PC,		offsetof(struct kvm_vcpu, arch.fault.hyp_pc));
- #endif
-   BLANK();
- #ifdef CONFIG_VDSO
-diff --git a/arch/arm/kvm/handle_exit.c b/arch/arm/kvm/handle_exit.c
-index 3ede90d..5377d753 100644
---- a/arch/arm/kvm/handle_exit.c
-+++ b/arch/arm/kvm/handle_exit.c
-@@ -147,11 +147,6 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 	switch (exception_index) {
- 	case ARM_EXCEPTION_IRQ:
- 		return 1;
--	case ARM_EXCEPTION_UNDEFINED:
--		kvm_err("Undefined exception in Hyp mode at: %#08lx\n",
--			kvm_vcpu_get_hyp_pc(vcpu));
--		BUG();
--		panic("KVM: Hypervisor undefined exception!\n");
- 	case ARM_EXCEPTION_DATA_ABORT:
- 	case ARM_EXCEPTION_PREF_ABORT:
- 	case ARM_EXCEPTION_HVC:
 -- 
 2.1.4
