@@ -1,249 +1,168 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Thu,  4 Feb 2016 18:28:43 +0100
-Subject: [PATCH V4 05/23] x86, pci,
- ecam: mmconfig_64.c becomes default implementation for ECAM driver.
+Date: Thu,  4 Feb 2016 18:28:50 +0100
+Subject: [PATCH V4 12/23] x86, ia64,
+ pci: Remove ACPI companion device from platform specific data.
 In-Reply-To: <1454606941-9523-1-git-send-email-tn@semihalf.com>
 References: <1454606941-9523-1-git-send-email-tn@semihalf.com>
-Message-ID: <1454606941-9523-6-git-send-email-tn@semihalf.com>
+Message-ID: <1454606941-9523-13-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mmconfig_64.c functions responsible for ECAM regions mapping
-are generic enough to use them for other architectures, GENERIC_ECAM_MAP
-should be selected in that case (like 64bit x86). Some hosts may need
-arch-specific mapping logic, thus they are obligated to provide own
-implementation and resign GENERIC_ECAM_MAP feature (like 32bit x86 does).
-
-Note, we leaved x86-specific PCI config accessors in the corresponding files.
+Since PCI core code is setting ACPI companion device for us now,
+platform specific ACPI companion device setting turns out to be dead now.
+Therefore we can get rid of it, including related companion reference
+from PCI sysdata structure.
 
 Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-Tested-by: Jeremy Linton <jeremy.linton@arm.com>
 Tested-by: Duc Dang <dhdang@apm.com>
 Tested-by: Dongdong Liu <liudongdong3@huawei.com>
 Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
 Tested-by: Graeme Gregory <graeme.gregory@linaro.org>
 Tested-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- arch/x86/Kconfig               |  1 +
- arch/x86/include/asm/pci_x86.h |  4 ---
- arch/x86/pci/mmconfig_64.c     | 55 ---------------------------------------
- drivers/acpi/mcfg.c            |  2 --
- drivers/pci/Kconfig            |  3 +++
- drivers/pci/ecam.c             | 59 +++++++++++++++++++++++++++++++++++++++++-
- include/linux/ecam.h           |  6 +++++
- 7 files changed, 68 insertions(+), 62 deletions(-)
+ arch/ia64/hp/common/sba_iommu.c    |  2 +-
+ arch/ia64/include/asm/pci.h        |  1 -
+ arch/ia64/pci/pci.c                | 16 ----------------
+ arch/ia64/sn/kernel/io_acpi_init.c |  4 ++--
+ arch/x86/include/asm/pci.h         |  3 ---
+ arch/x86/pci/acpi.c                | 17 -----------------
+ 6 files changed, 3 insertions(+), 40 deletions(-)
 
-diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-index a74acce..15674b9 100644
---- a/arch/x86/Kconfig
-+++ b/arch/x86/Kconfig
-@@ -65,6 +65,7 @@ config X86
- 	select GENERIC_CMOS_UPDATE
- 	select GENERIC_CPU_AUTOPROBE
- 	select GENERIC_EARLY_IOREMAP
-+	select GENERIC_ECAM_MAP			if X86_64
- 	select GENERIC_FIND_FIRST_BIT
- 	select GENERIC_IOMAP
- 	select GENERIC_IRQ_PROBE
-diff --git a/arch/x86/include/asm/pci_x86.h b/arch/x86/include/asm/pci_x86.h
-index 26e7dd4..6e14518 100644
---- a/arch/x86/include/asm/pci_x86.h
-+++ b/arch/x86/include/asm/pci_x86.h
-@@ -122,10 +122,6 @@ extern int pci_legacy_init(void);
- extern void pcibios_fixup_irqs(void);
+diff --git a/arch/ia64/hp/common/sba_iommu.c b/arch/ia64/hp/common/sba_iommu.c
+index a6d6190..78e4444 100644
+--- a/arch/ia64/hp/common/sba_iommu.c
++++ b/arch/ia64/hp/common/sba_iommu.c
+@@ -1981,7 +1981,7 @@ sba_connect_bus(struct pci_bus *bus)
+ 	if (PCI_CONTROLLER(bus)->iommu)
+ 		return;
  
- /* pci-mmconfig.c */
--extern int __init pci_mmcfg_arch_init(void);
--extern void __init pci_mmcfg_arch_free(void);
--extern int pci_mmcfg_arch_map(struct pci_mmcfg_region *cfg);
--extern void pci_mmcfg_arch_unmap(struct pci_mmcfg_region *cfg);
- extern int pci_mmconfig_insert(struct device *dev, u16 seg, u8 start, u8 end,
- 			       phys_addr_t addr);
+-	handle = acpi_device_handle(PCI_CONTROLLER(bus)->companion);
++	handle = acpi_device_handle(ACPI_COMPANION(bus->bridge));
+ 	if (!handle)
+ 		return;
  
-diff --git a/arch/x86/pci/mmconfig_64.c b/arch/x86/pci/mmconfig_64.c
-index d0c48eb..fd356cc 100644
---- a/arch/x86/pci/mmconfig_64.c
-+++ b/arch/x86/pci/mmconfig_64.c
-@@ -90,58 +90,3 @@ int pci_mmcfg_write(unsigned int seg, unsigned int bus,
+diff --git a/arch/ia64/include/asm/pci.h b/arch/ia64/include/asm/pci.h
+index 07039d1..5050748 100644
+--- a/arch/ia64/include/asm/pci.h
++++ b/arch/ia64/include/asm/pci.h
+@@ -65,7 +65,6 @@ extern int pci_mmap_legacy_page_range(struct pci_bus *bus,
+ #define pci_legacy_write platform_pci_legacy_write
  
- 	return 0;
+ struct pci_controller {
+-	struct acpi_device *companion;
+ 	void *iommu;
+ 	int segment;
+ 	int node;		/* nearest node with memory or NUMA_NO_NODE for global allocation */
+diff --git a/arch/ia64/pci/pci.c b/arch/ia64/pci/pci.c
+index 8f6ac2f..978d6af 100644
+--- a/arch/ia64/pci/pci.c
++++ b/arch/ia64/pci/pci.c
+@@ -301,28 +301,12 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+ 	}
+ 
+ 	info->controller.segment = root->segment;
+-	info->controller.companion = device;
+ 	info->controller.node = acpi_get_node(device->handle);
+ 	INIT_LIST_HEAD(&info->io_resources);
+ 	return acpi_pci_root_create(root, &pci_acpi_root_ops,
+ 				    &info->common, &info->controller);
  }
--
--static void __iomem *mcfg_ioremap(struct pci_mmcfg_region *cfg)
+ 
+-int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
 -{
--	void __iomem *addr;
--	u64 start, size;
--	int num_buses;
--
--	start = cfg->address + PCI_MMCFG_BUS_OFFSET(cfg->start_bus);
--	num_buses = cfg->end_bus - cfg->start_bus + 1;
--	size = PCI_MMCFG_BUS_OFFSET(num_buses);
--	addr = ioremap_nocache(start, size);
--	if (addr)
--		addr -= PCI_MMCFG_BUS_OFFSET(cfg->start_bus);
--	return addr;
--}
--
--int __init pci_mmcfg_arch_init(void)
--{
--	struct pci_mmcfg_region *cfg;
--
--	list_for_each_entry(cfg, &pci_mmcfg_list, list)
--		if (pci_mmcfg_arch_map(cfg)) {
--			pci_mmcfg_arch_free();
--			return 0;
--		}
--
--	return 1;
--}
--
--void __init pci_mmcfg_arch_free(void)
--{
--	struct pci_mmcfg_region *cfg;
--
--	list_for_each_entry(cfg, &pci_mmcfg_list, list)
--		pci_mmcfg_arch_unmap(cfg);
--}
--
--int pci_mmcfg_arch_map(struct pci_mmcfg_region *cfg)
--{
--	cfg->virt = mcfg_ioremap(cfg);
--	if (!cfg->virt) {
--		pr_err(PREFIX "can't map MMCONFIG at %pR\n", &cfg->res);
--		return -ENOMEM;
+-	/*
+-	 * We pass NULL as parent to pci_create_root_bus(), so if it is not NULL
+-	 * here, pci_create_root_bus() has been called by someone else and
+-	 * sysdata is likely to be different from what we expect.  Let it go in
+-	 * that case.
+-	 */
+-	if (!bridge->dev.parent) {
+-		struct pci_controller *controller = bridge->bus->sysdata;
+-		ACPI_COMPANION_SET(&bridge->dev, controller->companion);
 -	}
--
 -	return 0;
 -}
 -
--void pci_mmcfg_arch_unmap(struct pci_mmcfg_region *cfg)
--{
--	if (cfg && cfg->virt) {
--		iounmap(cfg->virt + PCI_MMCFG_BUS_OFFSET(cfg->start_bus));
--		cfg->virt = NULL;
--	}
--}
-diff --git a/drivers/acpi/mcfg.c b/drivers/acpi/mcfg.c
-index fad9917..745b83e 100644
---- a/drivers/acpi/mcfg.c
-+++ b/drivers/acpi/mcfg.c
-@@ -10,8 +10,6 @@
- #include <linux/acpi.h>
- #include <linux/ecam.h>
- 
--#include <asm/pci_x86.h> /* Temp hack before refactoring arch-specific calls */
--
- #define	PREFIX	"MCFG: "
- 
- int __init acpi_parse_mcfg(struct acpi_table_header *header)
-diff --git a/drivers/pci/Kconfig b/drivers/pci/Kconfig
-index 9950248..dd26f39 100644
---- a/drivers/pci/Kconfig
-+++ b/drivers/pci/Kconfig
-@@ -33,6 +33,9 @@ config PCI_ECAM
- config HAVE_PCI_ECAM
- 	bool
- 
-+config GENERIC_ECAM_MAP
-+	bool
-+
- config PCI_DEBUG
- 	bool "PCI Debugging"
- 	depends on PCI && DEBUG_KERNEL
-diff --git a/drivers/pci/ecam.c b/drivers/pci/ecam.c
-index d221dba..7bc75af 100644
---- a/drivers/pci/ecam.c
-+++ b/drivers/pci/ecam.c
-@@ -16,7 +16,6 @@
- #include <linux/ecam.h>
- 
- #include <asm/io.h>
--#include <asm/pci_x86.h> /* Temp hack before refactoring arch-specific calls */
- 
- #define PREFIX "PCI: "
- 
-@@ -24,6 +23,64 @@ static DEFINE_MUTEX(pci_mmcfg_lock);
- 
- LIST_HEAD(pci_mmcfg_list);
- 
-+#ifdef CONFIG_GENERIC_ECAM_MAP
-+
-+static void __iomem *mcfg_ioremap(struct pci_mmcfg_region *cfg)
-+{
-+	void __iomem *addr;
-+	u64 start, size;
-+	int num_buses;
-+
-+	start = cfg->address + PCI_MMCFG_BUS_OFFSET(cfg->start_bus);
-+	num_buses = cfg->end_bus - cfg->start_bus + 1;
-+	size = PCI_MMCFG_BUS_OFFSET(num_buses);
-+	addr = ioremap_nocache(start, size);
-+	if (addr)
-+		addr -= PCI_MMCFG_BUS_OFFSET(cfg->start_bus);
-+	return addr;
-+}
-+
-+int __init pci_mmcfg_arch_init(void)
-+{
-+	struct pci_mmcfg_region *cfg;
-+
-+	list_for_each_entry(cfg, &pci_mmcfg_list, list)
-+		if (pci_mmcfg_arch_map(cfg)) {
-+			pci_mmcfg_arch_free();
-+			return 0;
-+		}
-+
-+	return 1;
-+}
-+
-+void __init pci_mmcfg_arch_free(void)
-+{
-+	struct pci_mmcfg_region *cfg;
-+
-+	list_for_each_entry(cfg, &pci_mmcfg_list, list)
-+		pci_mmcfg_arch_unmap(cfg);
-+}
-+
-+int pci_mmcfg_arch_map(struct pci_mmcfg_region *cfg)
-+{
-+	cfg->virt = mcfg_ioremap(cfg);
-+	if (!cfg->virt) {
-+		pr_err(PREFIX "can't map MMCONFIG at %pR\n", &cfg->res);
-+		return -ENOMEM;
-+	}
-+
-+	return 0;
-+}
-+
-+void pci_mmcfg_arch_unmap(struct pci_mmcfg_region *cfg)
-+{
-+	if (cfg && cfg->virt) {
-+		iounmap(cfg->virt + PCI_MMCFG_BUS_OFFSET(cfg->start_bus));
-+		cfg->virt = NULL;
-+	}
-+}
-+#endif /* CONFIG_GENERIC_ECAM_MAP */
-+
- static void __init pci_mmconfig_remove(struct pci_mmcfg_region *cfg)
+ void pcibios_fixup_device_resources(struct pci_dev *dev)
  {
- 	if (cfg->res.parent)
-diff --git a/include/linux/ecam.h b/include/linux/ecam.h
-index dec3b52..813acd1 100644
---- a/include/linux/ecam.h
-+++ b/include/linux/ecam.h
-@@ -29,6 +29,12 @@ void list_add_sorted(struct pci_mmcfg_region *new);
- void free_all_mmcfg(void);
- int pci_mmconfig_delete(u16 seg, u8 start, u8 end);
+ 	int idx;
+diff --git a/arch/ia64/sn/kernel/io_acpi_init.c b/arch/ia64/sn/kernel/io_acpi_init.c
+index 0640739..bcfddc2 100644
+--- a/arch/ia64/sn/kernel/io_acpi_init.c
++++ b/arch/ia64/sn/kernel/io_acpi_init.c
+@@ -132,7 +132,7 @@ sn_get_bussoft_ptr(struct pci_bus *bus)
+ 	struct acpi_resource_vendor_typed *vendor;
  
-+/* Arch specific calls */
-+int pci_mmcfg_arch_init(void);
-+void pci_mmcfg_arch_free(void);
-+int pci_mmcfg_arch_map(struct pci_mmcfg_region *cfg);
-+void pci_mmcfg_arch_unmap(struct pci_mmcfg_region *cfg);
-+
- extern struct list_head pci_mmcfg_list;
  
- #define PCI_MMCFG_BUS_OFFSET(bus)      ((bus) << 20)
+-	handle = acpi_device_handle(PCI_CONTROLLER(bus)->companion);
++	handle = acpi_device_handle(ACPI_COMPANION(bus->bridge));
+ 	status = acpi_get_vendor_resource(handle, METHOD_NAME__CRS,
+ 					  &sn_uuid, &buffer);
+ 	if (ACPI_FAILURE(status)) {
+@@ -360,7 +360,7 @@ sn_acpi_get_pcidev_info(struct pci_dev *dev, struct pcidev_info **pcidev_info,
+ 	acpi_status status;
+ 	struct acpi_buffer name_buffer = { ACPI_ALLOCATE_BUFFER, NULL };
+ 
+-	rootbus_handle = acpi_device_handle(PCI_CONTROLLER(dev)->companion);
++	rootbus_handle = acpi_device_handle(ACPI_COMPANION(dev->bus->bridge));
+         status = acpi_evaluate_integer(rootbus_handle, METHOD_NAME__SEG, NULL,
+                                        &segment);
+         if (ACPI_SUCCESS(status)) {
+diff --git a/arch/x86/include/asm/pci.h b/arch/x86/include/asm/pci.h
+index 4625943..a98c022 100644
+--- a/arch/x86/include/asm/pci.h
++++ b/arch/x86/include/asm/pci.h
+@@ -14,9 +14,6 @@
+ struct pci_sysdata {
+ 	int		domain;		/* PCI domain */
+ 	int		node;		/* NUMA node */
+-#ifdef CONFIG_ACPI
+-	struct acpi_device *companion;	/* ACPI companion device */
+-#endif
+ #ifdef CONFIG_X86_64
+ 	void		*iommu;		/* IOMMU private data */
+ #endif
+diff --git a/arch/x86/pci/acpi.c b/arch/x86/pci/acpi.c
+index 8e89921..d5086d1 100644
+--- a/arch/x86/pci/acpi.c
++++ b/arch/x86/pci/acpi.c
+@@ -341,7 +341,6 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+ 		struct pci_sysdata sd = {
+ 			.domain = domain,
+ 			.node = node,
+-			.companion = root->device
+ 		};
+ 
+ 		memcpy(bus->sysdata, &sd, sizeof(sd));
+@@ -356,7 +355,6 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+ 		else {
+ 			info->sd.domain = domain;
+ 			info->sd.node = node;
+-			info->sd.companion = root->device;
+ 			bus = acpi_pci_root_create(root, &acpi_pci_root_ops,
+ 						   &info->common, &info->sd);
+ 		}
+@@ -374,21 +372,6 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+ 	return bus;
+ }
+ 
+-int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
+-{
+-	/*
+-	 * We pass NULL as parent to pci_create_root_bus(), so if it is not NULL
+-	 * here, pci_create_root_bus() has been called by someone else and
+-	 * sysdata is likely to be different from what we expect.  Let it go in
+-	 * that case.
+-	 */
+-	if (!bridge->dev.parent) {
+-		struct pci_sysdata *sd = bridge->bus->sysdata;
+-		ACPI_COMPANION_SET(&bridge->dev, sd->companion);
+-	}
+-	return 0;
+-}
+-
+ int __init pci_acpi_init(void)
+ {
+ 	struct pci_dev *dev = NULL;
 -- 
 1.9.1
