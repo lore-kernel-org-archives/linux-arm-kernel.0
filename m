@@ -1,228 +1,73 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri,  5 Feb 2016 14:58:50 +0000
-Subject: [PATCH v2 5/5] arm64: kernel: Don't toggle PAN on systems with UAO
-In-Reply-To: <1454684330-892-1-git-send-email-james.morse@arm.com>
-References: <1454684330-892-1-git-send-email-james.morse@arm.com>
-Message-ID: <1454684330-892-6-git-send-email-james.morse@arm.com>
+From: fijam@archlinux.us (JM)
+Date: Fri, 5 Feb 2016 16:00:49 +0100
+Subject: marvell_cesa fails to register on kirkwood (88F6282)
+In-Reply-To: <20160205112907.796afb05@bbrezillon>
+References: <CAKzmTe0mvZD5UwqM47uXbM7Z7oAJpE4g4BVMba1hkzqNu+Zbgw@mail.gmail.com>
+ <20160205090246.GE32272@lunn.ch> <20160205112907.796afb05@bbrezillon>
+Message-ID: <CAKzmTe20fT8BcRaDaf2gz92KMAK0kEUkaD-kPq_cPF1WKBdroA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If a CPU supports both Privileged Access Never (PAN) and User Access
-Override (UAO), we don't need to disable/re-enable PAN round all
-copy_to_user() like calls.
+On Fri, Feb 5, 2016 at 11:29 AM, Boris Brezillon
+<boris.brezillon@free-electrons.com> wrote:
+> Jan, Andrew
+>
+> On Fri, 5 Feb 2016 10:02:46 +0100
+> Andrew Lunn <andrew@lunn.ch> wrote:
+>
+>> On Fri, Feb 05, 2016 at 06:01:18AM +0100, JM wrote:
+>> > Hi,
+>> >
+>> > I am testing marvell_cesa on a kirkwood device (QNAP TS-212p, Marvell
+>> > Kirkwood 88F6282, dts: http://pastebin.com/Gk95KFHf ).
+>> > As of kernel 4.4 (4.4.0-trunk-kirkwood #1 Debian 4.4-1~exp1) it fails
+>> > in the following way:
+>> >
+>> > modprobe marvell_cesa allhwsupport=1
+>> > dmesg | tail -n 1
+>> > [ 1057.855091] marvell-cesa: probe of f1030000.crypto failed with error -12
+>> >
+>> > or:
+>> >
+>> > modprobe marvell_cesa
+>> > dmesg | tail -n 1
+>> > [ 9178.399357] marvell-cesa: probe of f1030000.crypto failed with error -524
+>> >
+>> > With kernel 4.3 it would fail with error -22 on that hardware. There
+>> > are scattered reports from other users experiencing the same issue
+>> > (1,2,3)
+>> >
+>> > I wonder if this is a result of an invalid definition of the
+>> > crypto-sram in the dts of this SoC, or perhaps some other problem
+>> > (PEBKAC included).
+>>
+>> Hi Jan
+>>
+>> Do you have SRAM enabled in your kernel configuration. The
+>> mvebu_v5_defconfig does not have it, which is a bug really.
+>
+> Hm, the CRYPTO_DEV_MARVELL_CESA option selects the SRAM one [1].
+> Anyway, I also think this error is related to the SRAM (not sure why the
+> driver is not able to get the SRAM though).
+>
+> Best Regards,
+>
+> Boris
+>
+> [1]http://lxr.free-electrons.com/source/drivers/crypto/Kconfig#L168
+>
+>
+> --
+> Boris Brezillon, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
 
-UAO alternatives cause these calls to use the 'unprivileged' load/store
-instructions, which are overridden to be the privileged kind when
-fs==KERNEL_DS.
+Hi,
 
-This patch changes the copy_to_user() calls to have their PAN toggling
-depend on a new composite 'feature' ARM64_ALT_PAN_NOT_UAO.
+Thanks for getting back to me. Indeed, CONFIG_SRAM is enabled, I put
+the complete .config here: http://pastebin.com/40eKMJqE
 
-If both features are detected, PAN will be enabled, but the copy_to_user()
-alternatives will not be applied. This means PAN will be enabled all the
-time for these functions. If only PAN is detected, the toggling will be
-enabled as normal.
+If there is anything I can do to help squish this bug, please let me know.
 
-This will save the time taken to disable/re-enable PAN, and allow us to
-catch copy_to_user() accesses that occur with fs==KERNEL_DS.
-
-Futex and swp-emulation code continue to hang their PAN toggling code on
-ARM64_HAS_PAN.
-
-Signed-off-by: James Morse <james.morse@arm.com>
----
- arch/arm64/include/asm/cpufeature.h |  3 ++-
- arch/arm64/include/asm/uaccess.h    |  8 ++++----
- arch/arm64/kernel/cpufeature.c      | 16 ++++++++++++++++
- arch/arm64/lib/clear_user.S         |  4 ++--
- arch/arm64/lib/copy_from_user.S     |  4 ++--
- arch/arm64/lib/copy_in_user.S       |  4 ++--
- arch/arm64/lib/copy_to_user.S       |  4 ++--
- arch/arm64/mm/fault.c               |  3 +++
- 8 files changed, 33 insertions(+), 13 deletions(-)
-
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index 349e8203d16e..7ae0d90a21ed 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -31,8 +31,9 @@
- #define ARM64_WORKAROUND_CAVIUM_23154		6
- #define ARM64_WORKAROUND_834220			7
- #define ARM64_HAS_UAO				8
-+#define ARM64_ALT_PAN_NOT_UAO			9
- 
--#define ARM64_NCAPS				9
-+#define ARM64_NCAPS				10
- 
- #ifndef __ASSEMBLY__
- 
-diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-index f973bdce8410..16ba0d5c9740 100644
---- a/arch/arm64/include/asm/uaccess.h
-+++ b/arch/arm64/include/asm/uaccess.h
-@@ -145,7 +145,7 @@ static inline void set_fs(mm_segment_t fs)
- do {									\
- 	unsigned long __gu_val;						\
- 	__chk_user_ptr(ptr);						\
--	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(0), ARM64_HAS_PAN,	\
-+	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(0), ARM64_ALT_PAN_NOT_UAO,\
- 			CONFIG_ARM64_PAN));				\
- 	switch (sizeof(*(ptr))) {					\
- 	case 1:								\
-@@ -168,7 +168,7 @@ do {									\
- 		BUILD_BUG();						\
- 	}								\
- 	(x) = (__force __typeof__(*(ptr)))__gu_val;			\
--	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(1), ARM64_HAS_PAN,	\
-+	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(1), ARM64_ALT_PAN_NOT_UAO,\
- 			CONFIG_ARM64_PAN));				\
- } while (0)
- 
-@@ -217,7 +217,7 @@ do {									\
- do {									\
- 	__typeof__(*(ptr)) __pu_val = (x);				\
- 	__chk_user_ptr(ptr);						\
--	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(0), ARM64_HAS_PAN,	\
-+	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(0), ARM64_ALT_PAN_NOT_UAO,\
- 			CONFIG_ARM64_PAN));				\
- 	switch (sizeof(*(ptr))) {					\
- 	case 1:								\
-@@ -239,7 +239,7 @@ do {									\
- 	default:							\
- 		BUILD_BUG();						\
- 	}								\
--	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(1), ARM64_HAS_PAN,	\
-+	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(1), ARM64_ALT_PAN_NOT_UAO,\
- 			CONFIG_ARM64_PAN));				\
- } while (0)
- 
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index c717c3d78f5e..7ac60350eb08 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -67,6 +67,10 @@ DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
- 		.width = 0,				\
- 	}
- 
-+/* meta feature for alternatives */
-+static bool __maybe_unused
-+cpufeature_pan_not_uao(const struct arm64_cpu_capabilities *entry);
-+
- static struct arm64_ftr_bits ftr_id_aa64isar0[] = {
- 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 32, 32, 0),
- 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64ISAR0_RDM_SHIFT, 4, 0),
-@@ -671,6 +675,12 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
- 		.enable = cpu_enable_uao,
- 	},
- #endif /* CONFIG_ARM64_UAO */
-+#ifdef CONFIG_ARM64_PAN
-+	{
-+		.capability = ARM64_ALT_PAN_NOT_UAO,
-+		.matches = cpufeature_pan_not_uao,
-+	},
-+#endif /* CONFIG_ARM64_PAN */
- 	{},
- };
- 
-@@ -949,3 +959,9 @@ void __init setup_cpu_features(void)
- 		pr_warn("L1_CACHE_BYTES smaller than the Cache Writeback Granule (%d < %d)\n",
- 			L1_CACHE_BYTES, cls);
- }
-+
-+static bool __maybe_unused
-+cpufeature_pan_not_uao(const struct arm64_cpu_capabilities *entry)
-+{
-+	return (cpus_have_cap(ARM64_HAS_PAN) && !cpus_have_cap(ARM64_HAS_UAO));
-+}
-diff --git a/arch/arm64/lib/clear_user.S b/arch/arm64/lib/clear_user.S
-index 3f950b677c07..5d1cad3ce6d6 100644
---- a/arch/arm64/lib/clear_user.S
-+++ b/arch/arm64/lib/clear_user.S
-@@ -33,7 +33,7 @@
-  * Alignment fixed up by hardware.
-  */
- ENTRY(__clear_user)
--ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(0)), ARM64_HAS_PAN, \
-+ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(0)), ARM64_ALT_PAN_NOT_UAO, \
- 	    CONFIG_ARM64_PAN)
- 	mov	x2, x1			// save the size for fixup return
- 	subs	x1, x1, #8
-@@ -54,7 +54,7 @@ uao_user_alternative 9f, strh, sttrh, wzr, x0, 2
- 	b.mi	5f
- uao_user_alternative 9f, strb, sttrb, wzr, x0, 0
- 5:	mov	x0, #0
--ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(1)), ARM64_HAS_PAN, \
-+ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(1)), ARM64_ALT_PAN_NOT_UAO, \
- 	    CONFIG_ARM64_PAN)
- 	ret
- ENDPROC(__clear_user)
-diff --git a/arch/arm64/lib/copy_from_user.S b/arch/arm64/lib/copy_from_user.S
-index 1d982d64f1a7..17e8306dca29 100644
---- a/arch/arm64/lib/copy_from_user.S
-+++ b/arch/arm64/lib/copy_from_user.S
-@@ -67,11 +67,11 @@
- 
- end	.req	x5
- ENTRY(__copy_from_user)
--ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(0)), ARM64_HAS_PAN, \
-+ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(0)), ARM64_ALT_PAN_NOT_UAO, \
- 	    CONFIG_ARM64_PAN)
- 	add	end, x0, x2
- #include "copy_template.S"
--ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(1)), ARM64_HAS_PAN, \
-+ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(1)), ARM64_ALT_PAN_NOT_UAO, \
- 	    CONFIG_ARM64_PAN)
- 	mov	x0, #0				// Nothing to copy
- 	ret
-diff --git a/arch/arm64/lib/copy_in_user.S b/arch/arm64/lib/copy_in_user.S
-index feaad1520dc1..f7292dd08c84 100644
---- a/arch/arm64/lib/copy_in_user.S
-+++ b/arch/arm64/lib/copy_in_user.S
-@@ -68,11 +68,11 @@
- 
- end	.req	x5
- ENTRY(__copy_in_user)
--ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(0)), ARM64_HAS_PAN, \
-+ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(0)), ARM64_ALT_PAN_NOT_UAO, \
- 	    CONFIG_ARM64_PAN)
- 	add	end, x0, x2
- #include "copy_template.S"
--ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(1)), ARM64_HAS_PAN, \
-+ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(1)), ARM64_ALT_PAN_NOT_UAO, \
- 	    CONFIG_ARM64_PAN)
- 	mov	x0, #0
- 	ret
-diff --git a/arch/arm64/lib/copy_to_user.S b/arch/arm64/lib/copy_to_user.S
-index 2dae2cd2c481..21faae60f988 100644
---- a/arch/arm64/lib/copy_to_user.S
-+++ b/arch/arm64/lib/copy_to_user.S
-@@ -66,11 +66,11 @@
- 
- end	.req	x5
- ENTRY(__copy_to_user)
--ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(0)), ARM64_HAS_PAN, \
-+ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(0)), ARM64_ALT_PAN_NOT_UAO, \
- 	    CONFIG_ARM64_PAN)
- 	add	end, x0, x2
- #include "copy_template.S"
--ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(1)), ARM64_HAS_PAN, \
-+ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(1)), ARM64_ALT_PAN_NOT_UAO, \
- 	    CONFIG_ARM64_PAN)
- 	mov	x0, #0
- 	ret
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 820d47353cf0..d0762a729d01 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -234,6 +234,9 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
- 	}
- 
- 	if (permission_fault(esr) && (addr < USER_DS)) {
-+		if (get_thread_info(regs->sp)->addr_limit == KERNEL_DS)
-+			panic("Accessing user space memory with fs=KERNEL_DS");
-+
- 		if (!search_exception_tables(regs->pc))
- 			panic("Accessing user space memory outside uaccess.h routines");
- 	}
--- 
-2.6.2
+Best regards,
+Jan
