@@ -1,90 +1,161 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 5 Feb 2016 13:49:27 -0600
-Subject: [PATCH v4 2/2] pci, pci-thunder-pem: Add PCIe host driver for
- ThunderX processors.
-In-Reply-To: <56B4D812.7080106@caviumnetworks.com>
-References: <1453844781-24380-1-git-send-email-ddaney.cavm@gmail.com>
- <1453844781-24380-3-git-send-email-ddaney.cavm@gmail.com>
- <20160205000452.GI7031@localhost>
- <56B3ECAD.4050605@caviumnetworks.com>
- <20160205031042.GA31722@localhost>
- <56B4D812.7080106@caviumnetworks.com>
-Message-ID: <20160205194927.GA6581@localhost>
+From: drivshin.allworx@gmail.com (David Rivshin (Allworx))
+Date: Fri, 5 Feb 2016 14:51:46 -0500
+Subject: [PATCH 4/4] pwm: omap-dmtimer: add dev_dbg() message for
+ effective period and duty cycle
+In-Reply-To: <20160203141454.GC9650@ulmo>
+References: <1454128014-22866-1-git-send-email-drivshin.allworx@gmail.com>
+ <1454128014-22866-5-git-send-email-drivshin.allworx@gmail.com>
+ <CAA3gFWvSsctXtds6_SEtYY1yUdWJDR1XjznGS6qjdrGW5Dbw=A@mail.gmail.com>
+ <20160201132228.2634b72e.drivshin.allworx@gmail.com>
+ <20160201185952.GN19432@atomide.com> <20160202162330.GA4918@ulmo>
+ <20160202184443.1e1b0bf5.drivshin.allworx@gmail.com>
+ <20160203141454.GC9650@ulmo>
+Message-ID: <20160205145146.34ec4eb9.drivshin.allworx@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 05, 2016 at 09:12:50AM -0800, David Daney wrote:
-> On 02/04/2016 07:10 PM, Bjorn Helgaas wrote:
-> >On Thu, Feb 04, 2016 at 04:28:29PM -0800, David Daney wrote:
-> >>On 02/04/2016 04:04 PM, Bjorn Helgaas wrote:
-> >>>On Tue, Jan 26, 2016 at 01:46:21PM -0800, David Daney wrote:
-> >>>>From: David Daney <david.daney@cavium.com>
-> >>>>
-> >>>>Some Cavium ThunderX processors require quirky access methods for the
-> >>>>config space of the PCIe bridge.  Add a driver to provide these config
-> >>>>space accessor functions.  The pci-host-common code is used to
-> >>>>configure the PCI machinery.
-> >>>>
-> >>>>Signed-off-by: David Daney <david.daney@cavium.com>
-> >>>>Acked-by: Rob Herring <robh@kernel.org>
-> >>>>Acked-by: Arnd Bergmann <arnd@arndb.de>
-> >>>>---
-> >>>>  .../devicetree/bindings/pci/pci-thunder-pem.txt    |  43 ++++
-> >>>>  MAINTAINERS                                        |   8 +
-> >>>>  drivers/pci/host/Kconfig                           |   7 +
-> >>>>  drivers/pci/host/Makefile                          |   1 +
-> >>>>  drivers/pci/host/pci-thunder-pem.c                 | 283 +++++++++++++++++++++
-> >>>
-> >>>What's the significance of the "pem" part of the name?  I'm wondering
-> >>>if we can shorten the filenames and function names by dropping it and
-> >>>referring to this simply as "thunder" or "thunderx".
-> ...
+On Wed, 3 Feb 2016 15:14:54 +0100
+Thierry Reding <thierry.reding@gmail.com> wrote:
 
-> >>Since PEM and ECAM are terminology used in the hardware manuals that
-> >>have specific meanings relative to the Thunder SoC family, I think
-> >>it is not too inconvenient to carry them over into the file names.
-> >
-> >As long as PEM and ECAM are really two distinct root complexes that
-> >are unrelated, I guess this is OK.
+> On Tue, Feb 02, 2016 at 06:44:43PM -0500, David Rivshin (Allworx)
+> wrote:
+> > On Tue, 2 Feb 2016 17:23:30 +0100
+> > Thierry Reding <thierry.reding@gmail.com> wrote:
+> >   
+> > > On Mon, Feb 01, 2016 at 10:59:52AM -0800, Tony Lindgren wrote:  
+> > > > Hi,
+> > > > 
+> > > > * David Rivshin (Allworx) <drivshin.allworx@gmail.com> [160201
+> > > > 10:23]:    
+> > > > > On Sat, 30 Jan 2016 15:51:06 +0100
+> > > > > Neil Armstrong <narmstrong@baylibre.com> wrote:
+> > > > >     
+> > > > > > 2016-01-30 5:26 GMT+01:00 David Rivshin (Allworx)
+> > > > > > <drivshin.allworx@gmail.com>:    
+> > > > > > > From: David Rivshin <drivshin@allworx.com>
+> > > > > > >
+> > > > > > > After going through the math and constraints checking to
+> > > > > > > compute load and match values, it is helpful to know what
+> > > > > > > the resultant period and duty cycle are.
+> > > > > > >
+> > > > > > > Signed-off-by: David Rivshin <drivshin@allworx.com>
+> > > > > > > ---
+> > > > > > >
+> > > > > > > I found this helpful while testing the other changes, so I
+> > > > > > > included it in case it may be of use to someone in the
+> > > > > > > future. I would have no issues with dropping this if it's
+> > > > > > > not considered worthwhile.      
+> > > > > > 
+> > > > > > It's useful, but converting it as a sysfs attribute would be
+> > > > > > great !    
+> > > > > 
+> > > > > Hrm, yes that is an interesting thought. I imagine that many
+> > > > > PWM devices have similar constraints, so perhaps that would
+> > > > > be best handled generically in the pwm core? Maybe as new
+> > > > > optional get_*() ops, a modification to the config() op to
+> > > > > add output params, or just updating new fields in the struct
+> > > > > pwm directly?    
+> > > > 
+> > > > Yeah for /sys entry it should be Linux generic. The other option
+> > > > is to use debugfs for driver specific things.    
+> > > 
+> > > Let's go with debugfs for this one. This is used for diagnostic  
+> > 
+> > I had looked at using the dbg_show() op to add some additional
+> > data. One thing that discouraged me from going down that path was
+> > that it replaced the call to pwm_dbg_show() for that chip. I
+> > wouldn't want to loose the existing output, as it is useful, but
+> > also didn't like the thought of duplicating the logic/formatting. I
+> > think some way to have both the standard output and add extra
+> > output somewhere (e.g. same line, line after each pwm_device, block
+> > after all pwm_devices on the chip) would make that path more
+> > attractive.
+> > 
+> > Or were you thinking of a separate (per-chip) debugfs file for this 
+> > type of information?   
 > 
-> They are, see above.
+> Yes, generally I'd prefer a separate, chip-specific debugfs file for
 
-OK, I'm convinced.
+Makes sense.
 
-> >>>>+		/*
-> >>>>+		 * 32-bit accesses only.  If the write is for a size
-> >>>>+		 * smaller than 32-bits, we must first read the 32-bit
-> >>>>+		 * value and merge in the desired bits and then write
-> >>>>+		 * the whole 32-bits back out.
-> >>>>+		 */
-> >>>
-> >>>Ugh.  Another device that only supports 32-bit writes.  I guess this
-> >>>only affects this single device, and maybe you "know" that it has no
-> >>>registers where RW1C bits may be corrupted.  Although I suppose this
-> >>>device has the standard status registers (Status at 0x06, Secondary
-> >>>Status at 0x1e, Device Status in PCIe capability, etc.), which do
-> >>>contain RW1C bits.
-> ...
+> extra information. To be honest I'm not entirely sure of the
+> usefulness of the pwm_dbg_show() or letting drivers override it. But
 
-> I will add a WARN_ONCE or similar. and send a new patch set.
+I did notice that no (in-tree) drivers were currently using 
+pwm_dbg_show()...
+
+> that's slightly off-topic. However...
 > 
-> FWIW, I think I have been able to get the message through to the
-> hardware architects that building root complexes that are not
-> exposed as PCI standard ECAMs makes things very difficult.  This was
-> the original intention, but turned out not to be possible when we
-> looked more closely at the hardware implementation.  I am optimistic
-> that subsequent generations of Thunder will be much improved in this
-> area.
+> > > purposes and not typically needed when configuring a PWM. While
+> > > other drivers may compute similar hardware-specific values,
+> > > there's nothing generic to them. The period and duty cycle are
+> > > the generic input values and those are already exposed via
+> > > sysfs.  
+> > 
+> > Just to clarify, what I was thinking of as generic was the concept
+> > that "period/duty I asked for" and "period/duty I got" may be
+> > different, sometimes to a substantial degree. I could imagine 
+> > userspace wanting to know the latter, which is what I think Neil 
+> > was suggesting.
+> > 
+> > For the sake of an example, the input clock for a dmtimer is
+> > sometimes (often?) 32768Hz, which means that the real period and
+> > duty_cycle output are limited to being a multiple of ~61035.2ns
+> > (16384Hz). So an attempt to set a period of 100000ns (10KHz) would
+> > result in either 61035.2ns, or 122070.4ns (8192Hz), depending on
+> > the implementation of the driver (and patch 2 changes behavior from
+> > the former to the latter). You can also have cases where you
+> > desired a 33% duty cycle, but got a 25% duty cycle instead.
+> > 
+> > In a quick look, I see substantially similar calculations (i.e. 
+> > clk_rate*period_ns/10^9) in most of the other pwm drivers, which
+> > makes sense for any that are programmed in terms of some input
+> > clock. This type of calculation almost guarantees that requested
+> > and actual period/ duty_cycle are going to be different to some
+> > degree. Some drivers look like they have even more complicated
+> > behavior, apparently due to other hardware constraints. For
+> > instance, fsl-ftm (among others) looks to be using a power-of-2
+> > prescaler to fit the period_cycles into a 16bit field.
+> > 
+> > Of course if the input clock rate for these types of devices is 
+> > sufficiently high (enough that the desired period is many input
+> > clock cycles), then the difference between "desired" and "actual"
+> > is probably small enough that noone cares. I'm not sure how common
+> > it is that
+> >   a) there is a substantial difference, and
+> >   b) userspace cares about it, and
+> >   c) userspace didn't carefully select an achievable value already
+> > If noone has brought it up before, then I'd guess the answer is
+> > "not very".  
+> 
+> ... I think perhaps a better way yet would be to have drivers update
+> the period and duty cycle to the actual values. That way there won't
+> be a delta between what's really being programmed to hardware and
+> what shows up in sysfs. It would also give users a chance to check if
+> what's been programmed is within an acceptable range or not.
 
-Great!  Since there's apparently only one ThunderX device (devfn == 0
-on the root bus) that has this problem, and you know exactly what that
-device is and where all its RW1C bits are, you *could* fix this in the
-*_config_write() functions by clearing any RW1C bits before the
-"modify/write" part of any read/modify/write cycle.
+>From a userspace ABI point of view, I was unsure whether it was 
+considered OK for a R/W sysfs attribute of this nature to read back 
+differently than it was set. To follow the previous example:
+	# echo 100000 > period
+	# cat period
+        122070
+I didn't find any obvious precedents for that. Would it potentially 
+confuse userspace? Is the answer different for new drivers vs 
+existing ones? The obvious alternative would be a separate file (e.g. 
+"actual_period", or somesuch name), which avoids those questions, but 
+I can see how that could be considered less clean. I don't have any 
+preference either way.
 
-BTW, minor nit, when you repost these, can you reorder the
-map_bus/read/write functions in that order so they match the order
-they're declared in struct pci_ops?  I think both pem and ecam
-versions could benefit from this.
+If just updating the existing period/duty_cycle files with the
+actual values is the way to go, then there is a second question:
+should the struct pwm_device track both requested and actual 
+values in separate fields for kernel-internal users? Or should
+the existing period/duty_cycle fields just be modified to hold
+the actual values?
 
-Bjorn
+Either way, I think any changes along these lines would probably be 
+cleaner ontop of the atomic update work (assuming some form of that 
+gets merged). And since it would also be outside the scope of this 
+patchset, you may still want to consider the simple debug message 
+in this patch as at least an interim state.
