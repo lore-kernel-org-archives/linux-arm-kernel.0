@@ -1,149 +1,463 @@
-From: zhang.chunyan@linaro.org (Chunyan Zhang)
-Date: Fri, 5 Feb 2016 11:18:41 +0800
-Subject: [PATCH V2 2/6] stm class: adds a loop to extract the first valid
- STM device name
-In-Reply-To: <871t8se62k.fsf@ashishki-desk.ger.corp.intel.com>
-References: <1454487337-30184-3-git-send-email-zhang.chunyan@linaro.org>
- <1454576179-27224-1-git-send-email-zhang.chunyan@linaro.org>
- <871t8se62k.fsf@ashishki-desk.ger.corp.intel.com>
-Message-ID: <CAG2=9p_JACdQrrwqUaU6uqY9JzsO_xHjz7W0MXBP6Ss5B-AExA@mail.gmail.com>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Fri, 5 Feb 2016 11:05:49 +0800
+Subject: [PATCH v4 14/17] XEN: EFI: Move x86 specific codes to architecture
+ directory
+In-Reply-To: <1454641552-12576-1-git-send-email-zhaoshenglong@huawei.com>
+References: <1454641552-12576-1-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1454641552-12576-15-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 5, 2016 at 1:30 AM, Alexander Shishkin
-<alexander.shishkin@linux.intel.com> wrote:
-> Chunyan Zhang <zhang.chunyan@linaro.org> writes:
->
-> I few comments below:
->
->> The node name of STM master management policy is a concatenation of an
->> STM device name to which this policy applies and following an arbitrary
->> string, these two strings are concatenated with a dot.
->
-> This is true.
->
->> This patch adds a loop for extracting the STM device name when an
->> arbitrary number of dot(s) are found in this STM device name.
->
-> It's not very easy to tell what's going on here from this
-> description. The reader be left curious as to why an arbitrary number of
-> dots is a reason to run a loop. When in doubt, try to imagine as if
-> you're seeing this patch for the first time and ask yourself, does the
-> message give a clear explanation of what's going on in it.
->
->> Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
->> ---
->>  drivers/hwtracing/stm/policy.c | 27 ++++++++++++++++-----------
->>  1 file changed, 16 insertions(+), 11 deletions(-)
->>
->> diff --git a/drivers/hwtracing/stm/policy.c b/drivers/hwtracing/stm/policy.c
->> index 11ab6d0..691686e 100644
->> --- a/drivers/hwtracing/stm/policy.c
->> +++ b/drivers/hwtracing/stm/policy.c
->> @@ -321,21 +321,26 @@ stp_policies_make(struct config_group *group, const char *name)
->>       /*
->>        * node must look like <device_name>.<policy_name>, where
->>        * <device_name> is the name of an existing stm device and
->> -      * <policy_name> is an arbitrary string
->> +      * <policy_name> is an arbitrary string, when an arbitrary
->> +      * number of dot(s) are found in the <device_name>, the
->> +      * first matched STM device name would be extracted.
->>        */
->
-> This leaves room for a number of suspicious situations. What if both
-> "xyz" and "xyz.0" are stm devices, how would you create a policy for the
-> latter, for example?
->
-> The rules should be such that you can tell exactly what the intended stm
-> device is from a policy directory name, otherwise it's just asking for
-> trouble.
->
->> -     p = strchr(devname, '.');
->> -     if (!p) {
->> -             kfree(devname);
->> -             return ERR_PTR(-EINVAL);
->> -     }
->> +     for (p = devname; ; p++) {
->> +             p = strchr(p, '.');
->> +             if (!p) {
->> +                     kfree(devname);
->> +                     return ERR_PTR(-EINVAL);
->> +             }
->>
->> -     *p++ = '\0';
->> +             *p = '\0';
->>
->> -     stm = stm_find_device(devname);
->> -     kfree(devname);
->> +             stm = stm_find_device(devname);
->> +             if (stm)
->> +                     break;
->> +             *p = '.';
->> +     }
->>
->> -     if (!stm)
->> -             return ERR_PTR(-ENODEV);
->> +     kfree(devname);
->
-> In the existing code there is a clear distinction between -ENODEV, which
-> is to say "we didn't find the device" and -EINVAL, "directory name
-> breaks rules/is badly formatted". After the change, it's all -EINVAL,
-> which also becomes "we tried everything, sorry".
->
-> So, having said all that, does the following patch solve your problem:
+From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Yes, I originally modified as well like your following patch, but at
-that moment, I didn't get your agreement that the policy name (i.e. an
-arbitrary string) cannot contain dots, so I had to consider the case.
-Whatever, there isn't a panacea.  I'm very good with your patch.  Many
-thanks for your review and providing the patch.
+Move x86 specific codes to architecture directory and export those EFI
+runtime service functions. This will be useful for initializing runtime
+service on ARM later.
 
+Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+---
+ arch/x86/xen/efi.c    | 112 ++++++++++++++++++++++++++++++++
+ drivers/xen/efi.c     | 174 ++++++++++----------------------------------------
+ include/xen/xen-ops.h |  30 ++++++---
+ 3 files changed, 168 insertions(+), 148 deletions(-)
 
-Chunyan
-
->
-> From 870dc5fefa5623c39552511d31e0fa0da984d581 Mon Sep 17 00:00:00 2001
-> From: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-> Date: Thu, 4 Feb 2016 18:56:34 +0200
-> Subject: [PATCH] stm class: Support devices with multiple instances
->
-> By convention, the name of the stm policy directory in configfs consists of
-> the device name to which it applies and the actual policy name, separated
-> by a dot. Now, some devices already have dots in their names that separate
-> name of the actual device from its instance identifier. Such devices will
-> result in two (or more, who can tell) dots in the policy directory name.
->
-> Existing policy code, however, will treat the first dot as the one that
-> separates device name from policy name, therefore failing the above case.
->
-> This patch makes the last dot in the directory name be the separator, thus
-> prohibiting dots from being used in policy names.
->
-> Suggested-by: Chunyan Zhang <zhang.chunyan@linaro.org>
-> Signed-off-by: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-> ---
->  drivers/hwtracing/stm/policy.c | 7 ++++---
->  1 file changed, 4 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/hwtracing/stm/policy.c b/drivers/hwtracing/stm/policy.c
-> index 94d3abfb73..1db189657b 100644
-> --- a/drivers/hwtracing/stm/policy.c
-> +++ b/drivers/hwtracing/stm/policy.c
-> @@ -332,10 +332,11 @@ stp_policies_make(struct config_group *group, const char *name)
->
->         /*
->          * node must look like <device_name>.<policy_name>, where
-> -        * <device_name> is the name of an existing stm device and
-> -        * <policy_name> is an arbitrary string
-> +        * <device_name> is the name of an existing stm device; may
-> +        *               contain dots;
-> +        * <policy_name> is an arbitrary string; may not contain dots
->          */
-> -       p = strchr(devname, '.');
-> +       p = strrchr(devname, '.');
->         if (!p) {
->                 kfree(devname);
->                 return ERR_PTR(-EINVAL);
-> --
-> 2.7.0
->
+diff --git a/arch/x86/xen/efi.c b/arch/x86/xen/efi.c
+index be14cc3..86527f1 100644
+--- a/arch/x86/xen/efi.c
++++ b/arch/x86/xen/efi.c
+@@ -20,10 +20,122 @@
+ #include <linux/init.h>
+ #include <linux/string.h>
+ 
++#include <xen/xen.h>
+ #include <xen/xen-ops.h>
++#include <xen/interface/platform.h>
+ 
+ #include <asm/page.h>
+ #include <asm/setup.h>
++#include <asm/xen/hypercall.h>
++
++static efi_char16_t vendor[100] __initdata;
++
++static efi_system_table_t efi_systab_xen __initdata = {
++	.hdr = {
++		.signature	= EFI_SYSTEM_TABLE_SIGNATURE,
++		.revision	= 0, /* Initialized later. */
++		.headersize	= 0, /* Ignored by Linux Kernel. */
++		.crc32		= 0, /* Ignored by Linux Kernel. */
++		.reserved	= 0
++	},
++	.fw_vendor	= EFI_INVALID_TABLE_ADDR, /* Initialized later. */
++	.fw_revision	= 0,			  /* Initialized later. */
++	.con_in_handle	= EFI_INVALID_TABLE_ADDR, /* Not used under Xen. */
++	.con_in		= EFI_INVALID_TABLE_ADDR, /* Not used under Xen. */
++	.con_out_handle	= EFI_INVALID_TABLE_ADDR, /* Not used under Xen. */
++	.con_out	= EFI_INVALID_TABLE_ADDR, /* Not used under Xen. */
++	.stderr_handle	= EFI_INVALID_TABLE_ADDR, /* Not used under Xen. */
++	.stderr		= EFI_INVALID_TABLE_ADDR, /* Not used under Xen. */
++	.runtime	= (efi_runtime_services_t *)EFI_INVALID_TABLE_ADDR,
++						  /* Not used under Xen. */
++	.boottime	= (efi_boot_services_t *)EFI_INVALID_TABLE_ADDR,
++						  /* Not used under Xen. */
++	.nr_tables	= 0,			  /* Initialized later. */
++	.tables		= EFI_INVALID_TABLE_ADDR  /* Initialized later. */
++};
++
++static const struct efi efi_xen __initconst = {
++	.systab                   = NULL, /* Initialized later. */
++	.runtime_version	  = 0,    /* Initialized later. */
++	.mps                      = EFI_INVALID_TABLE_ADDR,
++	.acpi                     = EFI_INVALID_TABLE_ADDR,
++	.acpi20                   = EFI_INVALID_TABLE_ADDR,
++	.smbios                   = EFI_INVALID_TABLE_ADDR,
++	.smbios3                  = EFI_INVALID_TABLE_ADDR,
++	.sal_systab               = EFI_INVALID_TABLE_ADDR,
++	.boot_info                = EFI_INVALID_TABLE_ADDR,
++	.hcdp                     = EFI_INVALID_TABLE_ADDR,
++	.uga                      = EFI_INVALID_TABLE_ADDR,
++	.uv_systab                = EFI_INVALID_TABLE_ADDR,
++	.fw_vendor                = EFI_INVALID_TABLE_ADDR,
++	.runtime                  = EFI_INVALID_TABLE_ADDR,
++	.config_table             = EFI_INVALID_TABLE_ADDR,
++	.get_time                 = xen_efi_get_time,
++	.set_time                 = xen_efi_set_time,
++	.get_wakeup_time          = xen_efi_get_wakeup_time,
++	.set_wakeup_time          = xen_efi_set_wakeup_time,
++	.get_variable             = xen_efi_get_variable,
++	.get_next_variable        = xen_efi_get_next_variable,
++	.set_variable             = xen_efi_set_variable,
++	.query_variable_info      = xen_efi_query_variable_info,
++	.update_capsule           = xen_efi_update_capsule,
++	.query_capsule_caps       = xen_efi_query_capsule_caps,
++	.get_next_high_mono_count = xen_efi_get_next_high_mono_count,
++	.reset_system             = NULL, /* Functionality provided by Xen. */
++	.set_virtual_address_map  = NULL, /* Not used under Xen. */
++	.memmap                   = NULL, /* Not used under Xen. */
++	.flags			  = 0     /* Initialized later. */
++};
++
++static efi_system_table_t __init *xen_efi_probe(void)
++{
++	struct xen_platform_op op = {
++		.cmd = XENPF_firmware_info,
++		.u.firmware_info = {
++			.type = XEN_FW_EFI_INFO,
++			.index = XEN_FW_EFI_CONFIG_TABLE
++		}
++	};
++	union xenpf_efi_info *info = &op.u.firmware_info.u.efi_info;
++
++	if (!xen_initial_domain() || HYPERVISOR_platform_op(&op) < 0)
++		return NULL;
++
++	/* Here we know that Xen runs on EFI platform. */
++
++	efi = efi_xen;
++
++	efi_systab_xen.tables = info->cfg.addr;
++	efi_systab_xen.nr_tables = info->cfg.nent;
++
++	op.cmd = XENPF_firmware_info;
++	op.u.firmware_info.type = XEN_FW_EFI_INFO;
++	op.u.firmware_info.index = XEN_FW_EFI_VENDOR;
++	info->vendor.bufsz = sizeof(vendor);
++	set_xen_guest_handle(info->vendor.name, vendor);
++
++	if (HYPERVISOR_platform_op(&op) == 0) {
++		efi_systab_xen.fw_vendor = __pa_symbol(vendor);
++		efi_systab_xen.fw_revision = info->vendor.revision;
++	} else
++		efi_systab_xen.fw_vendor = __pa_symbol(L"UNKNOWN");
++
++	op.cmd = XENPF_firmware_info;
++	op.u.firmware_info.type = XEN_FW_EFI_INFO;
++	op.u.firmware_info.index = XEN_FW_EFI_VERSION;
++
++	if (HYPERVISOR_platform_op(&op) == 0)
++		efi_systab_xen.hdr.revision = info->version;
++
++	op.cmd = XENPF_firmware_info;
++	op.u.firmware_info.type = XEN_FW_EFI_INFO;
++	op.u.firmware_info.index = XEN_FW_EFI_RT_VERSION;
++
++	if (HYPERVISOR_platform_op(&op) == 0)
++		efi.runtime_version = info->version;
++
++	return &efi_systab_xen;
++}
+ 
+ void __init xen_efi_init(void)
+ {
+diff --git a/drivers/xen/efi.c b/drivers/xen/efi.c
+index be7e56a..22f71ff 100644
+--- a/drivers/xen/efi.c
++++ b/drivers/xen/efi.c
+@@ -38,7 +38,7 @@
+ 
+ #define efi_data(op)	(op.u.efi_runtime_call)
+ 
+-static efi_status_t xen_efi_get_time(efi_time_t *tm, efi_time_cap_t *tc)
++efi_status_t xen_efi_get_time(efi_time_t *tm, efi_time_cap_t *tc)
+ {
+ 	struct xen_platform_op op = INIT_EFI_OP(get_time);
+ 
+@@ -59,8 +59,9 @@ static efi_status_t xen_efi_get_time(efi_time_t *tm, efi_time_cap_t *tc)
+ 
+ 	return efi_data(op).status;
+ }
++EXPORT_SYMBOL_GPL(xen_efi_get_time);
+ 
+-static efi_status_t xen_efi_set_time(efi_time_t *tm)
++efi_status_t xen_efi_set_time(efi_time_t *tm)
+ {
+ 	struct xen_platform_op op = INIT_EFI_OP(set_time);
+ 
+@@ -72,10 +73,10 @@ static efi_status_t xen_efi_set_time(efi_time_t *tm)
+ 
+ 	return efi_data(op).status;
+ }
++EXPORT_SYMBOL_GPL(xen_efi_set_time);
+ 
+-static efi_status_t xen_efi_get_wakeup_time(efi_bool_t *enabled,
+-					    efi_bool_t *pending,
+-					    efi_time_t *tm)
++efi_status_t xen_efi_get_wakeup_time(efi_bool_t *enabled, efi_bool_t *pending,
++				     efi_time_t *tm)
+ {
+ 	struct xen_platform_op op = INIT_EFI_OP(get_wakeup_time);
+ 
+@@ -95,8 +96,9 @@ static efi_status_t xen_efi_get_wakeup_time(efi_bool_t *enabled,
+ 
+ 	return efi_data(op).status;
+ }
++EXPORT_SYMBOL_GPL(xen_efi_get_wakeup_time);
+ 
+-static efi_status_t xen_efi_set_wakeup_time(efi_bool_t enabled, efi_time_t *tm)
++efi_status_t xen_efi_set_wakeup_time(efi_bool_t enabled, efi_time_t *tm)
+ {
+ 	struct xen_platform_op op = INIT_EFI_OP(set_wakeup_time);
+ 
+@@ -113,12 +115,11 @@ static efi_status_t xen_efi_set_wakeup_time(efi_bool_t enabled, efi_time_t *tm)
+ 
+ 	return efi_data(op).status;
+ }
++EXPORT_SYMBOL_GPL(xen_efi_set_wakeup_time);
+ 
+-static efi_status_t xen_efi_get_variable(efi_char16_t *name,
+-					 efi_guid_t *vendor,
+-					 u32 *attr,
+-					 unsigned long *data_size,
+-					 void *data)
++efi_status_t xen_efi_get_variable(efi_char16_t *name, efi_guid_t *vendor,
++				  u32 *attr, unsigned long *data_size,
++				  void *data)
+ {
+ 	struct xen_platform_op op = INIT_EFI_OP(get_variable);
+ 
+@@ -138,10 +139,11 @@ static efi_status_t xen_efi_get_variable(efi_char16_t *name,
+ 
+ 	return efi_data(op).status;
+ }
++EXPORT_SYMBOL_GPL(xen_efi_get_variable);
+ 
+-static efi_status_t xen_efi_get_next_variable(unsigned long *name_size,
+-					      efi_char16_t *name,
+-					      efi_guid_t *vendor)
++efi_status_t xen_efi_get_next_variable(unsigned long *name_size,
++				       efi_char16_t *name,
++				       efi_guid_t *vendor)
+ {
+ 	struct xen_platform_op op = INIT_EFI_OP(get_next_variable_name);
+ 
+@@ -161,12 +163,11 @@ static efi_status_t xen_efi_get_next_variable(unsigned long *name_size,
+ 
+ 	return efi_data(op).status;
+ }
++EXPORT_SYMBOL_GPL(xen_efi_get_next_variable);
+ 
+-static efi_status_t xen_efi_set_variable(efi_char16_t *name,
+-					 efi_guid_t *vendor,
+-					 u32 attr,
+-					 unsigned long data_size,
+-					 void *data)
++efi_status_t xen_efi_set_variable(efi_char16_t *name, efi_guid_t *vendor,
++				 u32 attr, unsigned long data_size,
++				 void *data)
+ {
+ 	struct xen_platform_op op = INIT_EFI_OP(set_variable);
+ 
+@@ -183,11 +184,11 @@ static efi_status_t xen_efi_set_variable(efi_char16_t *name,
+ 
+ 	return efi_data(op).status;
+ }
++EXPORT_SYMBOL_GPL(xen_efi_set_variable);
+ 
+-static efi_status_t xen_efi_query_variable_info(u32 attr,
+-						u64 *storage_space,
+-						u64 *remaining_space,
+-						u64 *max_variable_size)
++efi_status_t xen_efi_query_variable_info(u32 attr, u64 *storage_space,
++					 u64 *remaining_space,
++					 u64 *max_variable_size)
+ {
+ 	struct xen_platform_op op = INIT_EFI_OP(query_variable_info);
+ 
+@@ -205,8 +206,9 @@ static efi_status_t xen_efi_query_variable_info(u32 attr,
+ 
+ 	return efi_data(op).status;
+ }
++EXPORT_SYMBOL_GPL(xen_efi_query_variable_info);
+ 
+-static efi_status_t xen_efi_get_next_high_mono_count(u32 *count)
++efi_status_t xen_efi_get_next_high_mono_count(u32 *count)
+ {
+ 	struct xen_platform_op op = INIT_EFI_OP(get_next_high_monotonic_count);
+ 
+@@ -217,10 +219,10 @@ static efi_status_t xen_efi_get_next_high_mono_count(u32 *count)
+ 
+ 	return efi_data(op).status;
+ }
++EXPORT_SYMBOL_GPL(xen_efi_get_next_high_mono_count);
+ 
+-static efi_status_t xen_efi_update_capsule(efi_capsule_header_t **capsules,
+-					   unsigned long count,
+-					   unsigned long sg_list)
++efi_status_t xen_efi_update_capsule(efi_capsule_header_t **capsules,
++				    unsigned long count, unsigned long sg_list)
+ {
+ 	struct xen_platform_op op = INIT_EFI_OP(update_capsule);
+ 
+@@ -237,11 +239,11 @@ static efi_status_t xen_efi_update_capsule(efi_capsule_header_t **capsules,
+ 
+ 	return efi_data(op).status;
+ }
++EXPORT_SYMBOL_GPL(xen_efi_update_capsule);
+ 
+-static efi_status_t xen_efi_query_capsule_caps(efi_capsule_header_t **capsules,
+-					       unsigned long count,
+-					       u64 *max_size,
+-					       int *reset_type)
++efi_status_t xen_efi_query_capsule_caps(efi_capsule_header_t **capsules,
++					unsigned long count, u64 *max_size,
++					int *reset_type)
+ {
+ 	struct xen_platform_op op = INIT_EFI_OP(query_capsule_capabilities);
+ 
+@@ -260,112 +262,4 @@ static efi_status_t xen_efi_query_capsule_caps(efi_capsule_header_t **capsules,
+ 
+ 	return efi_data(op).status;
+ }
+-
+-static efi_char16_t vendor[100] __initdata;
+-
+-static efi_system_table_t efi_systab_xen __initdata = {
+-	.hdr = {
+-		.signature	= EFI_SYSTEM_TABLE_SIGNATURE,
+-		.revision	= 0, /* Initialized later. */
+-		.headersize	= 0, /* Ignored by Linux Kernel. */
+-		.crc32		= 0, /* Ignored by Linux Kernel. */
+-		.reserved	= 0
+-	},
+-	.fw_vendor	= EFI_INVALID_TABLE_ADDR, /* Initialized later. */
+-	.fw_revision	= 0,			  /* Initialized later. */
+-	.con_in_handle	= EFI_INVALID_TABLE_ADDR, /* Not used under Xen. */
+-	.con_in		= EFI_INVALID_TABLE_ADDR, /* Not used under Xen. */
+-	.con_out_handle	= EFI_INVALID_TABLE_ADDR, /* Not used under Xen. */
+-	.con_out	= EFI_INVALID_TABLE_ADDR, /* Not used under Xen. */
+-	.stderr_handle	= EFI_INVALID_TABLE_ADDR, /* Not used under Xen. */
+-	.stderr		= EFI_INVALID_TABLE_ADDR, /* Not used under Xen. */
+-	.runtime	= (efi_runtime_services_t *)EFI_INVALID_TABLE_ADDR,
+-						  /* Not used under Xen. */
+-	.boottime	= (efi_boot_services_t *)EFI_INVALID_TABLE_ADDR,
+-						  /* Not used under Xen. */
+-	.nr_tables	= 0,			  /* Initialized later. */
+-	.tables		= EFI_INVALID_TABLE_ADDR  /* Initialized later. */
+-};
+-
+-static const struct efi efi_xen __initconst = {
+-	.systab                   = NULL, /* Initialized later. */
+-	.runtime_version	  = 0,    /* Initialized later. */
+-	.mps                      = EFI_INVALID_TABLE_ADDR,
+-	.acpi                     = EFI_INVALID_TABLE_ADDR,
+-	.acpi20                   = EFI_INVALID_TABLE_ADDR,
+-	.smbios                   = EFI_INVALID_TABLE_ADDR,
+-	.smbios3                  = EFI_INVALID_TABLE_ADDR,
+-	.sal_systab               = EFI_INVALID_TABLE_ADDR,
+-	.boot_info                = EFI_INVALID_TABLE_ADDR,
+-	.hcdp                     = EFI_INVALID_TABLE_ADDR,
+-	.uga                      = EFI_INVALID_TABLE_ADDR,
+-	.uv_systab                = EFI_INVALID_TABLE_ADDR,
+-	.fw_vendor                = EFI_INVALID_TABLE_ADDR,
+-	.runtime                  = EFI_INVALID_TABLE_ADDR,
+-	.config_table             = EFI_INVALID_TABLE_ADDR,
+-	.get_time                 = xen_efi_get_time,
+-	.set_time                 = xen_efi_set_time,
+-	.get_wakeup_time          = xen_efi_get_wakeup_time,
+-	.set_wakeup_time          = xen_efi_set_wakeup_time,
+-	.get_variable             = xen_efi_get_variable,
+-	.get_next_variable        = xen_efi_get_next_variable,
+-	.set_variable             = xen_efi_set_variable,
+-	.query_variable_info      = xen_efi_query_variable_info,
+-	.update_capsule           = xen_efi_update_capsule,
+-	.query_capsule_caps       = xen_efi_query_capsule_caps,
+-	.get_next_high_mono_count = xen_efi_get_next_high_mono_count,
+-	.reset_system             = NULL, /* Functionality provided by Xen. */
+-	.set_virtual_address_map  = NULL, /* Not used under Xen. */
+-	.memmap                   = NULL, /* Not used under Xen. */
+-	.flags			  = 0     /* Initialized later. */
+-};
+-
+-efi_system_table_t __init *xen_efi_probe(void)
+-{
+-	struct xen_platform_op op = {
+-		.cmd = XENPF_firmware_info,
+-		.u.firmware_info = {
+-			.type = XEN_FW_EFI_INFO,
+-			.index = XEN_FW_EFI_CONFIG_TABLE
+-		}
+-	};
+-	union xenpf_efi_info *info = &op.u.firmware_info.u.efi_info;
+-
+-	if (!xen_initial_domain() || HYPERVISOR_platform_op(&op) < 0)
+-		return NULL;
+-
+-	/* Here we know that Xen runs on EFI platform. */
+-
+-	efi = efi_xen;
+-
+-	efi_systab_xen.tables = info->cfg.addr;
+-	efi_systab_xen.nr_tables = info->cfg.nent;
+-
+-	op.cmd = XENPF_firmware_info;
+-	op.u.firmware_info.type = XEN_FW_EFI_INFO;
+-	op.u.firmware_info.index = XEN_FW_EFI_VENDOR;
+-	info->vendor.bufsz = sizeof(vendor);
+-	set_xen_guest_handle(info->vendor.name, vendor);
+-
+-	if (HYPERVISOR_platform_op(&op) == 0) {
+-		efi_systab_xen.fw_vendor = __pa_symbol(vendor);
+-		efi_systab_xen.fw_revision = info->vendor.revision;
+-	} else
+-		efi_systab_xen.fw_vendor = __pa_symbol(L"UNKNOWN");
+-
+-	op.cmd = XENPF_firmware_info;
+-	op.u.firmware_info.type = XEN_FW_EFI_INFO;
+-	op.u.firmware_info.index = XEN_FW_EFI_VERSION;
+-
+-	if (HYPERVISOR_platform_op(&op) == 0)
+-		efi_systab_xen.hdr.revision = info->version;
+-
+-	op.cmd = XENPF_firmware_info;
+-	op.u.firmware_info.type = XEN_FW_EFI_INFO;
+-	op.u.firmware_info.index = XEN_FW_EFI_RT_VERSION;
+-
+-	if (HYPERVISOR_platform_op(&op) == 0)
+-		efi.runtime_version = info->version;
+-
+-	return &efi_systab_xen;
+-}
++EXPORT_SYMBOL_GPL(xen_efi_query_capsule_caps);
+diff --git a/include/xen/xen-ops.h b/include/xen/xen-ops.h
+index 072be1c..3491582 100644
+--- a/include/xen/xen-ops.h
++++ b/include/xen/xen-ops.h
+@@ -90,14 +90,28 @@ int xen_xlate_map_ballooned_pages(xen_pfn_t **pfns, void **vaddr,
+ 
+ bool xen_running_on_version_or_later(unsigned int major, unsigned int minor);
+ 
+-#ifdef CONFIG_XEN_EFI
+-extern efi_system_table_t *xen_efi_probe(void);
+-#else
+-static inline efi_system_table_t __init *xen_efi_probe(void)
+-{
+-	return NULL;
+-}
+-#endif
++efi_status_t xen_efi_get_time(efi_time_t *tm, efi_time_cap_t *tc);
++efi_status_t xen_efi_set_time(efi_time_t *tm);
++efi_status_t xen_efi_get_wakeup_time(efi_bool_t *enabled, efi_bool_t *pending,
++				     efi_time_t *tm);
++efi_status_t xen_efi_set_wakeup_time(efi_bool_t enabled, efi_time_t *tm);
++efi_status_t xen_efi_get_variable(efi_char16_t *name, efi_guid_t *vendor,
++				  u32 *attr, unsigned long *data_size,
++				  void *data);
++efi_status_t xen_efi_get_next_variable(unsigned long *name_size,
++				       efi_char16_t *name, efi_guid_t *vendor);
++efi_status_t xen_efi_set_variable(efi_char16_t *name, efi_guid_t *vendor,
++				  u32 attr, unsigned long data_size,
++				  void *data);
++efi_status_t xen_efi_query_variable_info(u32 attr, u64 *storage_space,
++					 u64 *remaining_space,
++					 u64 *max_variable_size);
++efi_status_t xen_efi_get_next_high_mono_count(u32 *count);
++efi_status_t xen_efi_update_capsule(efi_capsule_header_t **capsules,
++				    unsigned long count, unsigned long sg_list);
++efi_status_t xen_efi_query_capsule_caps(efi_capsule_header_t **capsules,
++					unsigned long count, u64 *max_size,
++					int *reset_type);
+ 
+ #ifdef CONFIG_PREEMPT
+ 
+-- 
+2.0.4
