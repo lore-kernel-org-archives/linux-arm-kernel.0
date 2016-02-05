@@ -1,88 +1,133 @@
 From: ddaney.cavm@gmail.com (David Daney)
-Date: Fri,  5 Feb 2016 15:41:13 -0800
-Subject: [PATCH v5 1/3] PCI: generic: Refactor code to enable reuse by other
- drivers.
+Date: Fri,  5 Feb 2016 15:41:14 -0800
+Subject: [PATCH v5 2/3] pci,
+ pci-thunder-pem: Add PCIe host driver for ThunderX processors.
 In-Reply-To: <1454715675-17512-1-git-send-email-ddaney.cavm@gmail.com>
 References: <1454715675-17512-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <1454715675-17512-2-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <1454715675-17512-3-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: David Daney <david.daney@cavium.com>
 
-No change in functionality.
-
-Move structure definitions into a separate header file.  Move common
-code to new file with Kconfig machinery to build it.  Split probe
-function in to two parts:
-
-   - a small driver specific probe function (gen_pci_probe)
-
-   - a common probe that can be used by other drivers
-     (pci_host_common_probe)
+The root complexes used to access off-chip PCIe devices (called PEM
+units in the hardware manuals) on some Cavium ThunderX processors
+require quirky access methods for the config space of the PCIe bridge.
+Add a driver to provide these config space accessor functions.  The
+pci-host-common code is used to configure the PCI machinery.
 
 Signed-off-by: David Daney <david.daney@cavium.com>
+Acked-by: Rob Herring <robh@kernel.org>
 Acked-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Will Deacon <will.deacon@arm.com>
 ---
- MAINTAINERS                         |   1 +
- drivers/pci/host/Kconfig            |   4 +
- drivers/pci/host/Makefile           |   1 +
- drivers/pci/host/pci-host-common.c  | 194 ++++++++++++++++++++++++++++++++++++
- drivers/pci/host/pci-host-common.h  |  47 +++++++++
- drivers/pci/host/pci-host-generic.c | 181 +--------------------------------
- 6 files changed, 251 insertions(+), 177 deletions(-)
- create mode 100644 drivers/pci/host/pci-host-common.c
- create mode 100644 drivers/pci/host/pci-host-common.h
+ .../devicetree/bindings/pci/pci-thunder-pem.txt    |  43 +++
+ MAINTAINERS                                        |   8 +
+ drivers/pci/host/Kconfig                           |   7 +
+ drivers/pci/host/Makefile                          |   1 +
+ drivers/pci/host/pci-thunder-pem.c                 | 332 +++++++++++++++++++++
+ 5 files changed, 391 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pci/pci-thunder-pem.txt
+ create mode 100644 drivers/pci/host/pci-thunder-pem.c
 
+diff --git a/Documentation/devicetree/bindings/pci/pci-thunder-pem.txt b/Documentation/devicetree/bindings/pci/pci-thunder-pem.txt
+new file mode 100644
+index 0000000..f131fae
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pci/pci-thunder-pem.txt
+@@ -0,0 +1,43 @@
++* ThunderX PEM PCIe host controller
++
++Firmware-initialized PCI host controller found on some Cavium
++ThunderX processors.
++
++The properties and their meanings are identical to those described in
++host-generic-pci.txt except as listed below.
++
++Properties of the host controller node that differ from
++host-generic-pci.txt:
++
++- compatible     : Must be "cavium,pci-host-thunder-pem"
++
++- reg            : Two entries: First the configuration space for down
++                   stream devices base address and size, as accessed
++                   from the parent bus. Second, the register bank of
++                   the PEM device PCIe bridge.
++
++Example:
++
++    pci at 87e0,c2000000 {
++	compatible = "cavium,pci-host-thunder-pem";
++	device_type = "pci";
++	msi-parent = <&its>;
++	msi-map = <0 &its 0x10000 0x10000>;
++	bus-range = <0x8f 0xc7>;
++	#size-cells = <2>;
++	#address-cells = <3>;
++
++	reg = <0x8880 0x8f000000 0x0 0x39000000>,  /* Configuration space */
++	      <0x87e0 0xc2000000 0x0 0x00010000>; /* PEM space */
++	ranges = <0x01000000 0x00 0x00020000 0x88b0 0x00020000 0x00 0x00010000>, /* I/O */
++		 <0x03000000 0x00 0x10000000 0x8890 0x10000000 0x0f 0xf0000000>, /* mem64 */
++		 <0x43000000 0x10 0x00000000 0x88a0 0x00000000 0x10 0x00000000>, /* mem64-pref */
++		 <0x03000000 0x87e0 0xc2f00000 0x87e0 0xc2000000 0x00 0x00100000>; /* mem64 PEM BAR4 */
++
++	#interrupt-cells = <1>;
++	interrupt-map-mask = <0 0 0 7>;
++	interrupt-map = <0 0 0 1 &gic0 0 0 0 24 4>, /* INTA */
++			<0 0 0 2 &gic0 0 0 0 25 4>, /* INTB */
++			<0 0 0 3 &gic0 0 0 0 26 4>, /* INTC */
++			<0 0 0 4 &gic0 0 0 0 27 4>; /* INTD */
++    };
 diff --git a/MAINTAINERS b/MAINTAINERS
-index a9010d9..9287929 100644
+index 9287929..ff5c367 100644
 --- a/MAINTAINERS
 +++ b/MAINTAINERS
-@@ -8367,6 +8367,7 @@ L:	linux-pci at vger.kernel.org
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- F:	Documentation/devicetree/bindings/pci/host-generic-pci.txt
-+F:	drivers/pci/host/pci-host-common.c
- F:	drivers/pci/host/pci-host-generic.c
+@@ -8413,6 +8413,14 @@ L:     linux-arm-msm at vger.kernel.org
+ S:     Maintained
+ F:     drivers/pci/host/*qcom*
  
- PCI DRIVER FOR INTEL VOLUME MANAGEMENT DEVICE (VMD)
++PCIE DRIVER FOR CAVIUM THUNDERX
++M:	David Daney <david.daney@cavium.com>
++L:	linux-pci at vger.kernel.org
++L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
++S:	Supported
++F:	Documentation/devicetree/bindings/pci/pci-thunder-*
++F:	drivers/pci/host/pci-thunder-*
++
+ PCMCIA SUBSYSTEM
+ P:	Linux PCMCIA Team
+ L:	linux-pcmcia at lists.infradead.org
 diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-index 75a6054..65709b4 100644
+index 65709b4..184df22 100644
 --- a/drivers/pci/host/Kconfig
 +++ b/drivers/pci/host/Kconfig
-@@ -53,9 +53,13 @@ config PCI_RCAR_GEN2_PCIE
- 	help
- 	  Say Y here if you want PCIe controller support on R-Car Gen2 SoCs.
+@@ -195,4 +195,11 @@ config PCIE_QCOM
+ 	  PCIe controller uses the Designware core plus Qualcomm-specific
+ 	  hardware wrappers.
  
-+config PCI_HOST_COMMON
-+	bool
-+
- config PCI_HOST_GENERIC
- 	bool "Generic PCI host controller"
- 	depends on (ARM || ARM64) && OF
++config PCI_HOST_THUNDER_PEM
++	bool "Cavium Thunder PCIe controller to off-chip devices"
++	depends on OF && ARM64
 +	select PCI_HOST_COMMON
- 	help
- 	  Say Y here if you want to support a simple generic PCI host
- 	  controller, such as the one emulated by kvmtool.
++	help
++	  Say Y here if you want PCIe support for CN88XX Cavium Thunder SoCs.
++
+ endmenu
 diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile
-index 7b2f20c..3b24af8 100644
+index 3b24af8..8903172 100644
 --- a/drivers/pci/host/Makefile
 +++ b/drivers/pci/host/Makefile
-@@ -6,6 +6,7 @@ obj-$(CONFIG_PCI_MVEBU) += pci-mvebu.o
- obj-$(CONFIG_PCI_TEGRA) += pci-tegra.o
- obj-$(CONFIG_PCI_RCAR_GEN2) += pci-rcar-gen2.o
- obj-$(CONFIG_PCI_RCAR_GEN2_PCIE) += pcie-rcar.o
-+obj-$(CONFIG_PCI_HOST_COMMON) += pci-host-common.o
- obj-$(CONFIG_PCI_HOST_GENERIC) += pci-host-generic.o
- obj-$(CONFIG_PCIE_SPEAR13XX) += pcie-spear13xx.o
- obj-$(CONFIG_PCI_KEYSTONE) += pci-keystone-dw.o pci-keystone.o
-diff --git a/drivers/pci/host/pci-host-common.c b/drivers/pci/host/pci-host-common.c
+@@ -23,3 +23,4 @@ obj-$(CONFIG_PCIE_ALTERA) += pcie-altera.o
+ obj-$(CONFIG_PCIE_ALTERA_MSI) += pcie-altera-msi.o
+ obj-$(CONFIG_PCI_HISI) += pcie-hisi.o
+ obj-$(CONFIG_PCIE_QCOM) += pcie-qcom.o
++obj-$(CONFIG_PCI_HOST_THUNDER_PEM) += pci-thunder-pem.o
+diff --git a/drivers/pci/host/pci-thunder-pem.c b/drivers/pci/host/pci-thunder-pem.c
 new file mode 100644
-index 0000000..e9f850f
+index 0000000..e3a6554
 --- /dev/null
-+++ b/drivers/pci/host/pci-host-common.c
-@@ -0,0 +1,194 @@
++++ b/drivers/pci/host/pci-thunder-pem.c
+@@ -0,0 +1,332 @@
 +/*
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
@@ -96,9 +141,8 @@ index 0000000..e9f850f
 + * You should have received a copy of the GNU General Public License
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + *
-+ * Copyright (C) 2014 ARM Limited
++ * Copyright (C) 2015 - 2016 Cavium, Inc.
 + *
-+ * Author: Will Deacon <will.deacon@arm.com>
 + */
 +
 +#include <linux/kernel.h>
@@ -109,435 +153,312 @@ index 0000000..e9f850f
 +
 +#include "pci-host-common.h"
 +
-+static void gen_pci_release_of_pci_ranges(struct gen_pci *pci)
++#define PEM_CFG_WR 0x28
++#define PEM_CFG_RD 0x30
++
++struct thunder_pem_pci {
++	struct gen_pci	gen_pci;
++	u32		ea_entry[3];
++	void __iomem	*pem_reg_base;
++};
++
++static void __iomem *thunder_pem_map_bus(struct pci_bus *bus,
++					 unsigned int devfn, int where)
 +{
-+	pci_free_resource_list(&pci->resources);
++	struct gen_pci *pci = bus->sysdata;
++	resource_size_t idx = bus->number - pci->cfg.bus_range->start;
++
++	return pci->cfg.win[idx] + ((devfn << 16) | where);
 +}
 +
-+static int gen_pci_parse_request_of_pci_ranges(struct gen_pci *pci)
++static int thunder_pem_config_read(struct pci_bus *bus, unsigned int devfn,
++				   int where, int size, u32 *val)
 +{
-+	int err, res_valid = 0;
-+	struct device *dev = pci->host.dev.parent;
-+	struct device_node *np = dev->of_node;
-+	resource_size_t iobase;
-+	struct resource_entry *win;
++	int r;
++	struct thunder_pem_pci *pem_pci;
++	struct gen_pci *pci = bus->sysdata;
 +
-+	err = of_pci_get_host_bridge_resources(np, 0, 0xff, &pci->resources,
-+					       &iobase);
-+	if (err)
-+		return err;
++	pem_pci = container_of(pci, struct thunder_pem_pci, gen_pci);
 +
-+	resource_list_for_each_entry(win, &pci->resources) {
-+		struct resource *parent, *res = win->res;
++	/*
++	 * The first device on the bus in the PEM PCIe bridge.
++	 * Special case its config access.
++	 */
++	if (bus->number == pci->cfg.bus_range->start) {
++		u64 read_val;
 +
-+		switch (resource_type(res)) {
-+		case IORESOURCE_IO:
-+			parent = &ioport_resource;
-+			err = pci_remap_iospace(res, iobase);
-+			if (err) {
-+				dev_warn(dev, "error %d: failed to map resource %pR\n",
-+					 err, res);
-+				continue;
-+			}
-+			break;
-+		case IORESOURCE_MEM:
-+			parent = &iomem_resource;
-+			res_valid |= !(res->flags & IORESOURCE_PREFETCH);
-+			break;
-+		case IORESOURCE_BUS:
-+			pci->cfg.bus_range = res;
-+		default:
-+			continue;
++		if (devfn != 0 || where >= 2048) {
++			*val = ~0;
++			return PCIBIOS_DEVICE_NOT_FOUND;
 +		}
 +
-+		err = devm_request_resource(dev, parent, res);
-+		if (err)
-+			goto out_release_res;
++		/*
++		 * 32-bit accesses only.  Write the address to the low
++		 * order bits of PEM_CFG_RD, then trigger the read by
++		 * reading back.  The config data lands in the upper
++		 * 32-bits of PEM_CFG_RD.
++		 */
++		read_val = where & ~3ull;
++		writeq(read_val, pem_pci->pem_reg_base + PEM_CFG_RD);
++		read_val = readq(pem_pci->pem_reg_base + PEM_CFG_RD);
++		read_val >>= 32;
++
++		/*
++		 * The config space contains some garbage, fix it up.
++		 * Also synthesize an EA capability for the BAR used
++		 * by MSI-X.
++		 */
++		switch (where & ~3u) {
++		case 0x40:
++			read_val &= 0xffff00ff;
++			read_val |= 0x00007000; /* Skip MSI CAP */
++			break;
++		case 0x70: /* Express Cap */
++			/* PME interrupt on vector 2*/
++			read_val |= (2u << 25);
++			break;
++		case 0xb0: /* MSI-X Cap */
++			/* TableSize=4, Next Cap is EA */
++			read_val &= 0xc00000ff;
++			read_val |= 0x0003bc00;
++			break;
++		case 0xb4:
++			/* Table offset=0, BIR=0 */
++			read_val = 0x00000000;
++			break;
++		case 0xb8:
++			/* BPA offset=0xf0000, BIR=0 */
++			read_val = 0x000f0000;
++			break;
++		case 0xbc:
++			/* EA, 1 entry, no next Cap */
++			read_val = 0x00010014;
++			break;
++		case 0xc0:
++			/* DW2 for type-1 */
++			read_val = 0x00000000;
++			break;
++		case 0xc4:
++			/* Entry BEI=0, PP=0x00, SP=0xff, ES=3 */
++			read_val = 0x80ff0003;
++			break;
++		case 0xc8:
++			read_val = pem_pci->ea_entry[0];
++			break;
++		case 0xcc:
++			read_val = pem_pci->ea_entry[1];
++			break;
++		case 0xd0:
++			read_val = pem_pci->ea_entry[2];
++			break;
++		default:
++			break;
++		}
++		read_val >>= (8 * (where & 3));
++		switch (size) {
++		case 1:
++			read_val &= 0xff;
++			break;
++		case 2:
++			read_val &= 0xffff;
++			break;
++		default:
++			break;
++		}
++		*val = read_val;
++		return PCIBIOS_SUCCESSFUL;
 +	}
++	if (bus->number < pci->cfg.bus_range->start ||
++	    bus->number > pci->cfg.bus_range->end)
++		return PCIBIOS_DEVICE_NOT_FOUND;
 +
-+	if (!res_valid) {
-+		dev_err(dev, "non-prefetchable memory resource required\n");
-+		err = -EINVAL;
-+		goto out_release_res;
-+	}
-+
-+	return 0;
-+
-+out_release_res:
-+	gen_pci_release_of_pci_ranges(pci);
-+	return err;
++	r = pci_generic_config_read(bus, devfn, where, size, val);
++	return r;
 +}
 +
-+static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
++static int thunder_pem_config_write(struct pci_bus *bus, unsigned int devfn,
++				    int where, int size, u32 val)
 +{
-+	int err;
-+	u8 bus_max;
-+	resource_size_t busn;
-+	struct resource *bus_range;
-+	struct device *dev = pci->host.dev.parent;
-+	struct device_node *np = dev->of_node;
-+	u32 sz = 1 << pci->cfg.ops->bus_shift;
++	struct gen_pci *pci = bus->sysdata;
++	struct thunder_pem_pci *pem_pci;
 +
-+	err = of_address_to_resource(np, 0, &pci->cfg.res);
-+	if (err) {
-+		dev_err(dev, "missing \"reg\" property\n");
-+		return err;
++	pem_pci = container_of(pci, struct thunder_pem_pci, gen_pci);
++
++	/*
++	 * The first device on the bus in the PEM PCIe bridge.
++	 * Special case its config access.
++	 */
++	if (bus->number == pci->cfg.bus_range->start) {
++		u64 write_val, read_val;
++		u32 mask = 0;
++
++		if (devfn != 0 || where >= 2048)
++			return PCIBIOS_DEVICE_NOT_FOUND;
++
++		/*
++		 * 32-bit accesses only.  If the write is for a size
++		 * smaller than 32-bits, we must first read the 32-bit
++		 * value and merge in the desired bits and then write
++		 * the whole 32-bits back out.
++		 */
++		switch (size) {
++		case 1:
++			read_val = where & ~3ull;
++			writeq(read_val, pem_pci->pem_reg_base + PEM_CFG_RD);
++			read_val = readq(pem_pci->pem_reg_base + PEM_CFG_RD);
++			read_val >>= 32;
++			mask = ~(0xff << (8 * (where & 3)));
++			read_val &= mask;
++			val = (val & 0xff) << (8 * (where & 3));
++			val |= (u32)read_val;
++			break;
++		case 2:
++			read_val = where & ~3ull;
++			writeq(read_val, pem_pci->pem_reg_base + PEM_CFG_RD);
++			read_val = readq(pem_pci->pem_reg_base + PEM_CFG_RD);
++			read_val >>= 32;
++			mask = ~(0xffff << (8 * (where & 3)));
++			read_val &= mask;
++			val = (val & 0xffff) << (8 * (where & 3));
++			val |= (u32)read_val;
++			break;
++		default:
++			break;
++
++		}
++
++		if (mask) {
++			/*
++			 * By expanding the write width to 32 bits, we
++			 * may inadvertently hit some W1C bits that
++			 * were not intended to be written.  Mask
++			 * these out.
++			 *
++			 * Some of the w1c_bits below also include
++			 * read-only or non-writable reserved bits,
++			 * this makes the code simpler and is OK as
++			 * the bits are not affected by writing zeros
++			 * to them.
++			 */
++			u32 w1c_bits = 0;
++
++			switch (where & 3) {
++			case 0x04: /* Command/Status */
++			case 0x1c: /* Base and I/O Limit/Secondary Status */
++				w1c_bits = 0xff000000;
++				break;
++			case 0x44: /* Power Management Control and Status */
++				w1c_bits = 0xfffffe00;
++				break;
++			case 0x78: /* Device Control/Device Status */
++			case 0x80: /* Link Control/Link Status */
++			case 0x88: /* Slot Control/Slot Status */
++			case 0x90: /* Root Status */
++			case 0xa0: /* Link Control 2 Registers/Link Status 2 */
++				w1c_bits = 0xffff0000;
++				break;
++			case 0x104: /* Uncorrectable Error Status */
++			case 0x110: /* Correctable Error Status */
++			case 0x130: /* Error Status */
++			case 0x160: /* Link Control 4 */
++				w1c_bits = 0xffffffff;
++				break;
++			default:
++				break;
++
++			}
++			if (w1c_bits) {
++				mask &= w1c_bits;
++				val &= ~mask;
++			}
++		}
++
++		/*
++		 * Low order bits are the config address, the high
++		 * order 32 bits are the data to be written.
++		 */
++		write_val = where & ~3ull;
++		write_val |= (((u64)val) << 32);
++		writeq(write_val, pem_pci->pem_reg_base + PEM_CFG_WR);
++		return PCIBIOS_SUCCESSFUL;
 +	}
-+
-+	/* Limit the bus-range to fit within reg */
-+	bus_max = pci->cfg.bus_range->start +
-+		  (resource_size(&pci->cfg.res) >> pci->cfg.ops->bus_shift) - 1;
-+	pci->cfg.bus_range->end = min_t(resource_size_t,
-+					pci->cfg.bus_range->end, bus_max);
-+
-+	pci->cfg.win = devm_kcalloc(dev, resource_size(pci->cfg.bus_range),
-+				    sizeof(*pci->cfg.win), GFP_KERNEL);
-+	if (!pci->cfg.win)
-+		return -ENOMEM;
-+
-+	/* Map our Configuration Space windows */
-+	if (!devm_request_mem_region(dev, pci->cfg.res.start,
-+				     resource_size(&pci->cfg.res),
-+				     "Configuration Space"))
-+		return -ENOMEM;
-+
-+	bus_range = pci->cfg.bus_range;
-+	for (busn = bus_range->start; busn <= bus_range->end; ++busn) {
-+		u32 idx = busn - bus_range->start;
-+
-+		pci->cfg.win[idx] = devm_ioremap(dev,
-+						 pci->cfg.res.start + idx * sz,
-+						 sz);
-+		if (!pci->cfg.win[idx])
-+			return -ENOMEM;
-+	}
-+
-+	return 0;
++	if (bus->number < pci->cfg.bus_range->start ||
++	    bus->number > pci->cfg.bus_range->end)
++		return PCIBIOS_DEVICE_NOT_FOUND;
++	return pci_generic_config_write(bus, devfn, where, size, val);
 +}
 +
-+int pci_host_common_probe(struct platform_device *pdev,
-+			  struct gen_pci *pci)
++static struct gen_pci_cfg_bus_ops thunder_pem_bus_ops = {
++	.bus_shift	= 24,
++	.ops		= {
++		.map_bus	= thunder_pem_map_bus,
++		.read		= thunder_pem_config_read,
++		.write		= thunder_pem_config_write,
++	}
++};
++
++static const struct of_device_id thunder_pem_of_match[] = {
++	{ .compatible = "cavium,pci-host-thunder-pem",
++	  .data = &thunder_pem_bus_ops },
++
++	{ },
++};
++MODULE_DEVICE_TABLE(of, thunder_pem_of_match);
++
++static int thunder_pem_probe(struct platform_device *pdev)
 +{
-+	int err;
-+	const char *type;
 +	struct device *dev = &pdev->dev;
-+	struct device_node *np = dev->of_node;
-+	struct pci_bus *bus, *child;
++	const struct of_device_id *of_id;
++	resource_size_t bar4_start;
++	struct resource *res_pem;
++	struct thunder_pem_pci *pem_pci;
 +
-+	type = of_get_property(np, "device_type", NULL);
-+	if (!type || strcmp(type, "pci")) {
-+		dev_err(dev, "invalid \"device_type\" %s\n", type);
++	pem_pci = devm_kzalloc(dev, sizeof(*pem_pci), GFP_KERNEL);
++	if (!pem_pci)
++		return -ENOMEM;
++
++	of_id = of_match_node(thunder_pem_of_match, dev->of_node);
++	pem_pci->gen_pci.cfg.ops = (struct gen_pci_cfg_bus_ops *)of_id->data;
++
++	/*
++	 * The second register range is the PEM bridge to the PCIe
++	 * bus.  It has a different config access method than those
++	 * devices behind the bridge.
++	 */
++	res_pem = platform_get_resource(pdev, IORESOURCE_MEM, 1);
++	if (!res_pem) {
++		dev_err(dev, "missing \"reg[1]\"property\n");
 +		return -EINVAL;
 +	}
 +
-+	of_pci_check_probe_only();
++	pem_pci->pem_reg_base = devm_ioremap(dev, res_pem->start, 0x10000);
++	if (!pem_pci->pem_reg_base)
++		return -ENOMEM;
 +
-+	pci->host.dev.parent = dev;
-+	INIT_LIST_HEAD(&pci->host.windows);
-+	INIT_LIST_HEAD(&pci->resources);
++	/*
++	 * The MSI-X BAR for the PEM and AER interrupts is located at
++	 * a fixed offset from the PEM register base.  Generate a
++	 * fragment of the synthesized Enhanced Allocation capability
++	 * structure here for the BAR.
++	 */
++	bar4_start = res_pem->start + 0xf00000;
++	pem_pci->ea_entry[0] = (u32)bar4_start | 2;
++	pem_pci->ea_entry[1] = (u32)(res_pem->end - bar4_start) & ~3u;
++	pem_pci->ea_entry[2] = (u32)(bar4_start >> 32);
 +
-+	/* Parse our PCI ranges and request their resources */
-+	err = gen_pci_parse_request_of_pci_ranges(pci);
-+	if (err)
-+		return err;
-+
-+	/* Parse and map our Configuration Space windows */
-+	err = gen_pci_parse_map_cfg_windows(pci);
-+	if (err) {
-+		gen_pci_release_of_pci_ranges(pci);
-+		return err;
-+	}
-+
-+	/* Do not reassign resources if probe only */
-+	if (!pci_has_flag(PCI_PROBE_ONLY))
-+		pci_add_flags(PCI_REASSIGN_ALL_RSRC | PCI_REASSIGN_ALL_BUS);
-+
-+
-+	bus = pci_scan_root_bus(dev, pci->cfg.bus_range->start,
-+				&pci->cfg.ops->ops, pci, &pci->resources);
-+	if (!bus) {
-+		dev_err(dev, "Scanning rootbus failed");
-+		return -ENODEV;
-+	}
-+
-+	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
-+
-+	if (!pci_has_flag(PCI_PROBE_ONLY)) {
-+		pci_bus_size_bridges(bus);
-+		pci_bus_assign_resources(bus);
-+
-+		list_for_each_entry(child, &bus->children, node)
-+			pcie_bus_configure_settings(child);
-+	}
-+
-+	pci_bus_add_devices(bus);
-+	return 0;
++	return pci_host_common_probe(pdev, &pem_pci->gen_pci);
 +}
 +
-+MODULE_DESCRIPTION("Generic PCI host driver common code");
-+MODULE_AUTHOR("Will Deacon <will.deacon@arm.com>");
++static struct platform_driver thunder_pem_driver = {
++	.driver = {
++		.name = KBUILD_MODNAME,
++		.of_match_table = thunder_pem_of_match,
++	},
++	.probe = thunder_pem_probe,
++};
++module_platform_driver(thunder_pem_driver);
++
++MODULE_DESCRIPTION("Thunder PEM PCIe host driver");
 +MODULE_LICENSE("GPL v2");
-diff --git a/drivers/pci/host/pci-host-common.h b/drivers/pci/host/pci-host-common.h
-new file mode 100644
-index 0000000..09f3fa0
---- /dev/null
-+++ b/drivers/pci/host/pci-host-common.h
-@@ -0,0 +1,47 @@
-+/*
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ *
-+ * Copyright (C) 2014 ARM Limited
-+ *
-+ * Author: Will Deacon <will.deacon@arm.com>
-+ */
-+
-+#ifndef _PCI_HOST_COMMON_H
-+#define _PCI_HOST_COMMON_H
-+
-+#include <linux/kernel.h>
-+#include <linux/platform_device.h>
-+
-+struct gen_pci_cfg_bus_ops {
-+	u32 bus_shift;
-+	struct pci_ops ops;
-+};
-+
-+struct gen_pci_cfg_windows {
-+	struct resource				res;
-+	struct resource				*bus_range;
-+	void __iomem				**win;
-+
-+	struct gen_pci_cfg_bus_ops		*ops;
-+};
-+
-+struct gen_pci {
-+	struct pci_host_bridge			host;
-+	struct gen_pci_cfg_windows		cfg;
-+	struct list_head			resources;
-+};
-+
-+int pci_host_common_probe(struct platform_device *pdev,
-+			  struct gen_pci *pci);
-+
-+#endif /* _PCI_HOST_COMMON_H */
-diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
-index 1652bc7..e8aa78f 100644
---- a/drivers/pci/host/pci-host-generic.c
-+++ b/drivers/pci/host/pci-host-generic.c
-@@ -25,24 +25,7 @@
- #include <linux/of_pci.h>
- #include <linux/platform_device.h>
- 
--struct gen_pci_cfg_bus_ops {
--	u32 bus_shift;
--	struct pci_ops ops;
--};
--
--struct gen_pci_cfg_windows {
--	struct resource				res;
--	struct resource				*bus_range;
--	void __iomem				**win;
--
--	struct gen_pci_cfg_bus_ops		*ops;
--};
--
--struct gen_pci {
--	struct pci_host_bridge			host;
--	struct gen_pci_cfg_windows		cfg;
--	struct list_head			resources;
--};
-+#include "pci-host-common.h"
- 
- static void __iomem *gen_pci_map_cfg_bus_cam(struct pci_bus *bus,
- 					     unsigned int devfn,
-@@ -93,175 +76,19 @@ static const struct of_device_id gen_pci_of_match[] = {
- };
- MODULE_DEVICE_TABLE(of, gen_pci_of_match);
- 
--static void gen_pci_release_of_pci_ranges(struct gen_pci *pci)
--{
--	pci_free_resource_list(&pci->resources);
--}
--
--static int gen_pci_parse_request_of_pci_ranges(struct gen_pci *pci)
--{
--	int err, res_valid = 0;
--	struct device *dev = pci->host.dev.parent;
--	struct device_node *np = dev->of_node;
--	resource_size_t iobase;
--	struct resource_entry *win;
--
--	err = of_pci_get_host_bridge_resources(np, 0, 0xff, &pci->resources,
--					       &iobase);
--	if (err)
--		return err;
--
--	resource_list_for_each_entry(win, &pci->resources) {
--		struct resource *parent, *res = win->res;
--
--		switch (resource_type(res)) {
--		case IORESOURCE_IO:
--			parent = &ioport_resource;
--			err = pci_remap_iospace(res, iobase);
--			if (err) {
--				dev_warn(dev, "error %d: failed to map resource %pR\n",
--					 err, res);
--				continue;
--			}
--			break;
--		case IORESOURCE_MEM:
--			parent = &iomem_resource;
--			res_valid |= !(res->flags & IORESOURCE_PREFETCH);
--			break;
--		case IORESOURCE_BUS:
--			pci->cfg.bus_range = res;
--		default:
--			continue;
--		}
--
--		err = devm_request_resource(dev, parent, res);
--		if (err)
--			goto out_release_res;
--	}
--
--	if (!res_valid) {
--		dev_err(dev, "non-prefetchable memory resource required\n");
--		err = -EINVAL;
--		goto out_release_res;
--	}
--
--	return 0;
--
--out_release_res:
--	gen_pci_release_of_pci_ranges(pci);
--	return err;
--}
--
--static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
--{
--	int err;
--	u8 bus_max;
--	resource_size_t busn;
--	struct resource *bus_range;
--	struct device *dev = pci->host.dev.parent;
--	struct device_node *np = dev->of_node;
--	u32 sz = 1 << pci->cfg.ops->bus_shift;
--
--	err = of_address_to_resource(np, 0, &pci->cfg.res);
--	if (err) {
--		dev_err(dev, "missing \"reg\" property\n");
--		return err;
--	}
--
--	/* Limit the bus-range to fit within reg */
--	bus_max = pci->cfg.bus_range->start +
--		  (resource_size(&pci->cfg.res) >> pci->cfg.ops->bus_shift) - 1;
--	pci->cfg.bus_range->end = min_t(resource_size_t,
--					pci->cfg.bus_range->end, bus_max);
--
--	pci->cfg.win = devm_kcalloc(dev, resource_size(pci->cfg.bus_range),
--				    sizeof(*pci->cfg.win), GFP_KERNEL);
--	if (!pci->cfg.win)
--		return -ENOMEM;
--
--	/* Map our Configuration Space windows */
--	if (!devm_request_mem_region(dev, pci->cfg.res.start,
--				     resource_size(&pci->cfg.res),
--				     "Configuration Space"))
--		return -ENOMEM;
--
--	bus_range = pci->cfg.bus_range;
--	for (busn = bus_range->start; busn <= bus_range->end; ++busn) {
--		u32 idx = busn - bus_range->start;
--
--		pci->cfg.win[idx] = devm_ioremap(dev,
--						 pci->cfg.res.start + idx * sz,
--						 sz);
--		if (!pci->cfg.win[idx])
--			return -ENOMEM;
--	}
--
--	return 0;
--}
--
- static int gen_pci_probe(struct platform_device *pdev)
- {
--	int err;
--	const char *type;
--	const struct of_device_id *of_id;
- 	struct device *dev = &pdev->dev;
--	struct device_node *np = dev->of_node;
-+	const struct of_device_id *of_id;
- 	struct gen_pci *pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
--	struct pci_bus *bus, *child;
- 
- 	if (!pci)
- 		return -ENOMEM;
- 
--	type = of_get_property(np, "device_type", NULL);
--	if (!type || strcmp(type, "pci")) {
--		dev_err(dev, "invalid \"device_type\" %s\n", type);
--		return -EINVAL;
--	}
--
--	of_pci_check_probe_only();
--
--	of_id = of_match_node(gen_pci_of_match, np);
-+	of_id = of_match_node(gen_pci_of_match, dev->of_node);
- 	pci->cfg.ops = (struct gen_pci_cfg_bus_ops *)of_id->data;
--	pci->host.dev.parent = dev;
--	INIT_LIST_HEAD(&pci->host.windows);
--	INIT_LIST_HEAD(&pci->resources);
--
--	/* Parse our PCI ranges and request their resources */
--	err = gen_pci_parse_request_of_pci_ranges(pci);
--	if (err)
--		return err;
--
--	/* Parse and map our Configuration Space windows */
--	err = gen_pci_parse_map_cfg_windows(pci);
--	if (err) {
--		gen_pci_release_of_pci_ranges(pci);
--		return err;
--	}
--
--	/* Do not reassign resources if probe only */
--	if (!pci_has_flag(PCI_PROBE_ONLY))
--		pci_add_flags(PCI_REASSIGN_ALL_RSRC | PCI_REASSIGN_ALL_BUS);
--
--
--	bus = pci_scan_root_bus(dev, pci->cfg.bus_range->start,
--				&pci->cfg.ops->ops, pci, &pci->resources);
--	if (!bus) {
--		dev_err(dev, "Scanning rootbus failed");
--		return -ENODEV;
--	}
--
--	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
--
--	if (!pci_has_flag(PCI_PROBE_ONLY)) {
--		pci_bus_size_bridges(bus);
--		pci_bus_assign_resources(bus);
--
--		list_for_each_entry(child, &bus->children, node)
--			pcie_bus_configure_settings(child);
--	}
- 
--	pci_bus_add_devices(bus);
--	return 0;
-+	return pci_host_common_probe(pdev, pci);
- }
- 
- static struct platform_driver gen_pci_driver = {
 -- 
 1.8.3.1
