@@ -1,83 +1,64 @@
-From: juri.lelli@arm.com (Juri Lelli)
-Date: Fri, 5 Feb 2016 17:49:44 +0000
-Subject: [PATCH v3 6/6] arm64: add sysfs cpu_capacity attribute
-In-Reply-To: <56B4D98F.3090103@arm.com>
-References: <1454500799-18451-1-git-send-email-juri.lelli@arm.com>
- <1454500799-18451-7-git-send-email-juri.lelli@arm.com>
- <56B4D98F.3090103@arm.com>
-Message-ID: <20160205174944.GG11415@e106622-lin>
+From: apinski@caviumnetworks.com (Andrew Pinski)
+Date: Fri, 5 Feb 2016 09:53:48 -0800
+Subject: [PATCH 0/4] copy_page improvements
+In-Reply-To: <1454417186-21828-1-git-send-email-will.deacon@arm.com>
+References: <1454417186-21828-1-git-send-email-will.deacon@arm.com>
+Message-ID: <56B4E1AC.6030301@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 2/2/2016 4:46 AM, Will Deacon wrote:
+> Hi all,
+>
+> This patch series aims to improve our copy_page implementation on both
+> CPUs with and without hardware prefetchers. It is inspired by a previous
+> patch series from Andrew, and one of the patches is lifted directly from
+> there:
+>
+>    http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/399132.html
+>
+> Changes from that series:
+>
+>    * Applies on top of mainline
+>    * Inverted the capability to the more generic ARM64_HAS_NO_HW_PREFETCH
+>    * Re-jigged the MIDR detection to try to keep it simple
+>
+> I've left copy_template alone for now, since the template really deals
+> with 64 bytes per iteration, which would need changing.
 
-On 05/02/16 17:19, Dietmar Eggemann wrote:
-> Hi Juri,
-> 
-> On 03/02/16 11:59, Juri Lelli wrote:
-> > Add a sysfs cpu_capacity attribute with which it is possible to read and
-> > write (thus over-writing default values) CPUs capacity. This might be
-> > useful in situation where there is no way to get proper default values
-> > at boot time.
-> > 
-> > The new attribute shows up as:
-> > 
-> >  /sys/devices/system/cpu/cpu*/cpu_capacity
-> > 
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Cc: Mark Brown <broonie@linaro.org>
-> > Cc: Sudeep Holla <sudeep.holla@arm.com>
-> > Signed-off-by: Juri Lelli <juri.lelli@arm.com>
-> > ---
-> >  arch/arm64/kernel/topology.c | 68 ++++++++++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 68 insertions(+)
-> > 
-> > diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-> > index f2513a6..f05cc07 100644
-> > --- a/arch/arm64/kernel/topology.c
-> > +++ b/arch/arm64/kernel/topology.c
-> > @@ -40,6 +40,74 @@ bool arch_wants_init_cpu_capacity(void)
-> >  	return true;
-> >  }
-> >  
-> > +#ifdef CONFIG_PROC_SYSCTL
-> > +#include <asm/cpu.h>
-> > +#include <linux/string.h>
-> > +static ssize_t show_cpu_capacity(struct device *dev,
-> > +				 struct device_attribute *attr,
-> > +				 char *buf)
-> > +{
-> > +	struct cpu *cpu = container_of(dev, struct cpu, dev);
-> > +	ssize_t rc;
-> > +	int cpunum = cpu->dev.id;
-> > +	unsigned long capacity = arch_scale_cpu_capacity(NULL, cpunum);
-> 
-> Gives me an implicit declaration of function ?arch_scale_cpu_capacity?
-> error [without the commit fbc899610e1a ("arm64: Update
-> arch_scale_cpu_capacity() to reflect change to define") on your
-> git://linux-arm.org/linux-jl.git upstream/default_caps_v3 branch].
-> 
-> Why don't you just return cpu_scale
-> 
-> @@ -49,10 +49,8 @@ static ssize_t show_cpu_capacity(struct device *dev,
->  {
->         struct cpu *cpu = container_of(dev, struct cpu, dev);
->         ssize_t rc;
-> -       int cpunum = cpu->dev.id;
-> -       unsigned long capacity = arch_scale_cpu_capacity(NULL, cpunum);
-> 
-> -       rc = sprintf(buf, "%lu\n", capacity);
-> +       rc = sprintf(buf, "%lu\n", per_cpu(cpu_scale, cpu->dev.id));
-> 
->         return rc;
->  }
-> 
-> to get rid of this dependency?
-> 
+Right, I had looked at doing that also for newlib/glibc but the code is 
+too complex.
+>
+> Andrew -- it would be helpful if you could take this for a spin on
+> ThunderX to make sure it didn't screw anything up.
 
-Right! I'll fix this in the next version.
+Yes it works and I get the needed prefetch in copy_page.
+
+Tested-by: Andrew Pinski  <apinski@cavium.com>
 
 Thanks,
+Andrew
 
-- Juri
+>
+> Cheers,
+>
+> Will
+>
+> --->8
+>
+> Andrew Pinski (1):
+>    arm64: lib: patch in prfm for copy_page if requested
+>
+> Will Deacon (3):
+>    arm64: prefetch: don't provide spin_lock_prefetch with LSE
+>    arm64: prefetch: add alternative pattern for CPUs without a prefetcher
+>    arm64: lib: improve copy_page to deal with 128 bytes at a time
+>
+>   arch/arm64/include/asm/cpufeature.h |  3 +-
+>   arch/arm64/include/asm/cputype.h    | 17 +++++++++-
+>   arch/arm64/include/asm/processor.h  |  7 +++--
+>   arch/arm64/kernel/cpu_errata.c      | 18 ++---------
+>   arch/arm64/kernel/cpufeature.c      | 17 ++++++++++
+>   arch/arm64/lib/copy_page.S          | 63 ++++++++++++++++++++++++++++++++-----
+>   6 files changed, 98 insertions(+), 27 deletions(-)
+>
