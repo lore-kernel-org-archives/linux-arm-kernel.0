@@ -1,101 +1,61 @@
-From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Fri, 5 Feb 2016 13:45:13 +0100
-Subject: [PATCH 2/2] crypto: atmel-sha - remove calls of clk_prepare() from
- atomic contexts
-In-Reply-To: <cover.1454675769.git.cyrille.pitchen@atmel.com>
-References: <cover.1454675769.git.cyrille.pitchen@atmel.com>
-Message-ID: <6b343599db251a8f00820939e01c5e35cc359686.1454675769.git.cyrille.pitchen@atmel.com>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Fri, 05 Feb 2016 14:52:10 +0200
+Subject: [PATCH V2 3/6] stm class: provision for statically assigned
+ masterIDs
+In-Reply-To: <1454487337-30184-4-git-send-email-zhang.chunyan@linaro.org>
+References: <1454487337-30184-1-git-send-email-zhang.chunyan@linaro.org>
+ <1454487337-30184-4-git-send-email-zhang.chunyan@linaro.org>
+Message-ID: <87mvrf5ngl.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-clk_prepare()/clk_unprepare() must not be called within atomic context.
+Chunyan Zhang <zhang.chunyan@linaro.org> writes:
 
-This patch calls clk_prepare() once for all from atmel_sha_probe() and
-clk_unprepare() from atmel_sha_remove().
+> From: Mathieu Poirier <mathieu.poirier@linaro.org>
+>
+> Some architecture like ARM assign masterIDs statically at the HW design
+> phase, making masterID manipulation in the generic STM core irrelevant.
+>
+> This patch adds a new 'mstatic' flag to struct stm_data that tells the
+> core that this specific STM device doesn't need explicit masterID
+> management.
 
-Then calls of clk_prepare_enable()/clk_disable_unprepare() were replaced
-by calls of clk_enable()/clk_disable().
+So why do we need this patch? If your STM only has master 42 allocated
+for software sources, simply set sw_start = 42, sw_end = 42 and you're
+good to go, software will have exactly one channel to choose from. See
+also the comment from <linux/stm.h>:
 
-Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
-Reported-by: Matthias Mayr <matthias.mayr@student.kit.edu>
----
- drivers/crypto/atmel-sha.c | 18 +++++++++++++-----
- 1 file changed, 13 insertions(+), 5 deletions(-)
+ * @sw_start:           first STP master available to software
+ * @sw_end:             last STP master available to software
 
-diff --git a/drivers/crypto/atmel-sha.c b/drivers/crypto/atmel-sha.c
-index b827c99b17c1..f8407dc7dd38 100644
---- a/drivers/crypto/atmel-sha.c
-+++ b/drivers/crypto/atmel-sha.c
-@@ -846,7 +846,7 @@ static void atmel_sha_finish_req(struct ahash_request *req, int err)
- 	dd->flags &= ~(SHA_FLAGS_BUSY | SHA_FLAGS_FINAL | SHA_FLAGS_CPU |
- 			SHA_FLAGS_DMA_READY | SHA_FLAGS_OUTPUT_READY);
- 
--	clk_disable_unprepare(dd->iclk);
-+	clk_disable(dd->iclk);
- 
- 	if (req->base.complete)
- 		req->base.complete(&req->base, err);
-@@ -859,7 +859,7 @@ static int atmel_sha_hw_init(struct atmel_sha_dev *dd)
- {
- 	int err;
- 
--	err = clk_prepare_enable(dd->iclk);
-+	err = clk_enable(dd->iclk);
- 	if (err)
- 		return err;
- 
-@@ -886,7 +886,7 @@ static void atmel_sha_hw_version_init(struct atmel_sha_dev *dd)
- 	dev_info(dd->dev,
- 			"version: 0x%x\n", dd->hw_version);
- 
--	clk_disable_unprepare(dd->iclk);
-+	clk_disable(dd->iclk);
- }
- 
- static int atmel_sha_handle_queue(struct atmel_sha_dev *dd,
-@@ -1536,6 +1536,10 @@ static int atmel_sha_probe(struct platform_device *pdev)
- 		goto res_err;
- 	}
- 
-+	err = clk_prepare(sha_dd->iclk);
-+	if (err)
-+		goto res_err;
-+
- 	atmel_sha_hw_version_init(sha_dd);
- 
- 	atmel_sha_get_cap(sha_dd);
-@@ -1547,12 +1551,12 @@ static int atmel_sha_probe(struct platform_device *pdev)
- 			if (IS_ERR(pdata)) {
- 				dev_err(&pdev->dev, "platform data not available\n");
- 				err = PTR_ERR(pdata);
--				goto res_err;
-+				goto iclk_unprepare;
- 			}
- 		}
- 		if (!pdata->dma_slave) {
- 			err = -ENXIO;
--			goto res_err;
-+			goto iclk_unprepare;
- 		}
- 		err = atmel_sha_dma_init(sha_dd, pdata);
- 		if (err)
-@@ -1583,6 +1587,8 @@ err_algs:
- 	if (sha_dd->caps.has_dma)
- 		atmel_sha_dma_cleanup(sha_dd);
- err_sha_dma:
-+iclk_unprepare:
-+	clk_unprepare(sha_dd->iclk);
- res_err:
- 	tasklet_kill(&sha_dd->queue_task);
- 	tasklet_kill(&sha_dd->done_task);
-@@ -1611,6 +1617,8 @@ static int atmel_sha_remove(struct platform_device *pdev)
- 	if (sha_dd->caps.has_dma)
- 		atmel_sha_dma_cleanup(sha_dd);
- 
-+	clk_unprepare(sha_dd->iclk);
-+
- 	return 0;
- }
- 
--- 
-1.8.2.2
+particularly the "available to software" part. Any other kinds of
+masters the STM class code doesn't care about (yet).
+
+> In the core sw_start/end of masterID are set to '1',
+> i.e there is only one masterID to deal with.
+
+This is also a completely arbitrary and unnecessary requirement. Again,
+you can set both to 42 and it will still work.
+
+> Also this patch depends on [1], so that the number of masterID
+> is '1' too.
+>
+> Finally the lower and upper bound for masterIDs as presented
+> in ($SYSFS)/class/stm/XYZ.stm/masters and
+> ($SYSFS)/../stp-policy/XYZ.stm.my_policy/some_device/masters
+> are set to '-1'.  That way users can't confuse them with
+> architecture where masterID management is required (where any
+> other value would be valid).
+
+Why is this a good idea? Having the actual master there will allow
+software to know what it is and also tell the decoding side what it is
+(assuming you have more than one source in the STP stream, it might not
+be easy to figure out, unless you know it in advance).
+
+I don't see how one master statically assigned to software sources is
+different from two masters or 32 masters. And I don't see any benefit of
+hiding the master id from userspace. Am I missing something?
+
+Regards,
+--
+Alex
