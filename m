@@ -1,146 +1,36 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 5 Feb 2016 21:49:26 +0100
-Subject: [PATCH 3/3] ARM: dts: orion5x: add device tree for buffalo
- linkstation ls-gl
-In-Reply-To: <1454689998-9579-4-git-send-email-rogershimizu@gmail.com>
-References: <1454689998-9579-1-git-send-email-rogershimizu@gmail.com>
- <1454689998-9579-4-git-send-email-rogershimizu@gmail.com>
-Message-ID: <20160205204926.GD8063@lunn.ch>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Fri, 05 Feb 2016 22:04:44 +0100
+Subject: marvell_cesa fails to register on kirkwood (88F6282)
+In-Reply-To: <8760y2vqje.fsf@natisbad.org> (Arnaud Ebalard's message of "Fri,
+ 05 Feb 2016 21:41:09 +0100")
+References: <CAKzmTe0mvZD5UwqM47uXbM7Z7oAJpE4g4BVMba1hkzqNu+Zbgw@mail.gmail.com>
+ <20160205090246.GE32272@lunn.ch> <20160205112907.796afb05@bbrezillon>
+ <CAKzmTe20fT8BcRaDaf2gz92KMAK0kEUkaD-kPq_cPF1WKBdroA@mail.gmail.com>
+ <87vb632maf.fsf@free-electrons.com>
+ <CAKzmTe1AqNQwjcsAULotd010NXuk1AYjj5p6UoqT_Zu=BCHdcw@mail.gmail.com>
+ <87mvrf2l6p.fsf@free-electrons.com>
+ <87io232kat.fsf@free-electrons.com> <8760y2vqje.fsf@natisbad.org>
+Message-ID: <87twlmdg2b.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 06, 2016 at 01:33:18AM +0900, Roger Shimizu wrote:
-> Add dts file to support Buffalo Linkstation LS-GL
-> (a.k.a Buffalo Linkstation Pro/Live), which is marvell orion5x based
-> 3.5" HDD NAS.
-> 
-> Product info:
->   - (JPN) http://buffalo.jp/products/catalog/item/l/ls-gl/
->   - (ENG) http://www.buffalotech.com/products/network-storage/linkstation/linkstation-pro
-> 
-> This device tree is based on the board file:
->   arch/arm/mach-orion5x/kurobox_pro-setup.c
-> However, that board file also support Kurobox Pro, which is not supported by
-> device tree yet. So the board file is not removed.
-> 
-> Signed-off-by: Roger Shimizu <rogershimizu@gmail.com>
+Hi,
 
-Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+> I'll try and do the same now w/ CESA support compiled as module to see
+> what I get. I'll keep you posted.
 
-Thanks
-	Andrew
+root at mood:~# insmod /tmp/marvell-cesa.ko 
+[  573.897977] marvell-cesa f1030000.crypto: CESA device successfully registered
 
-> ---
->  arch/arm/boot/dts/Makefile                     |  1 +
->  arch/arm/boot/dts/orion5x-linkstation-lsgl.dts | 87 ++++++++++++++++++++++++++
->  2 files changed, 88 insertions(+)
->  create mode 100644 arch/arm/boot/dts/orion5x-linkstation-lsgl.dts
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 68625754f398..15a52c1be78a 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -496,6 +496,7 @@ dtb-$(CONFIG_SOC_DRA7XX) += \
->  dtb-$(CONFIG_ARCH_ORION5X) += \
->  	orion5x-lacie-d2-network.dtb \
->  	orion5x-lacie-ethernet-disk-mini-v2.dtb \
-> +	orion5x-linkstation-lsgl.dtb \
->  	orion5x-linkstation-lswtgl.dtb \
->  	orion5x-lswsgl.dtb \
->  	orion5x-maxtor-shared-storage-2.dtb \
-> diff --git a/arch/arm/boot/dts/orion5x-linkstation-lsgl.dts b/arch/arm/boot/dts/orion5x-linkstation-lsgl.dts
-> new file mode 100644
-> index 000000000000..1cf644bfd7ea
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/orion5x-linkstation-lsgl.dts
-> @@ -0,0 +1,87 @@
-> +/*
-> + * Device Tree file for Buffalo Linkstation LS-GL
-> + *       (also known as Buffalo Linkstation Pro/Live)
-> + *
-> + * Copyright (C) 2016
-> + * Roger Shimizu <rogershimizu@gmail.com>
-> + *
-> + * Based on the board file arch/arm/mach-orion5x/kurobox_pro-setup.c
-> + * Copyright (C) Ronen Shitrit <rshitrit@marvell.com>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "orion5x-linkstation.dtsi"
-> +#include <dt-bindings/gpio/gpio.h>
-> +
-> +/ {
-> +	model = "Buffalo Linkstation Pro/Live";
-> +	compatible = "buffalo,lsgl", "marvell,orion5x-88f5182", "marvell,orion5x";
-> +
-> +	memory { /* 128 MB */
-> +		device_type = "memory";
-> +		reg = <0x00000000 0x8000000>;
-> +	};
-> +};
-> +
-> +&pinctrl {
-> +	pmx_power_hdd: pmx-power-hdd {
-> +		marvell,pins = "mpp1";
-> +		marvell,function = "gpio";
-> +	};
-> +
-> +	pmx_power_usb: pmx-power-usb {
-> +		marvell,pins = "mpp9";
-> +		marvell,function = "gpio";
-> +	};
-> +};
-> +
-> +&hdd_power {
-> +	gpios = <&gpio0 1 GPIO_ACTIVE_HIGH>;
-> +};
-> +
-> +&usb_power {
-> +	gpios = <&gpio0 9 GPIO_ACTIVE_HIGH>;
-> +};
-> +
-> +&ehci1 {
-> +	status = "okay";
-> +};
-> -- 
-> 2.1.4
-> 
+root at mood:~# uname -a
+Linux mood 4.4.0.duov2 #2 Fri Feb 5 21:42:49 CET 2016 armv5tel GNU/Linux
+
+root at mood:~# zcat /proc/config.gz | grep -i CESA
+# CONFIG_CRYPTO_DEV_MV_CESA is not set
+CONFIG_CRYPTO_DEV_MARVELL_CESA=m
+
+Cheers,
+
+a+
+
+ps: my config is temporarily at http://natisbad.org/config-duov2-cesa
