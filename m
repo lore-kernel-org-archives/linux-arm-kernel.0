@@ -1,60 +1,47 @@
 From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Fri, 05 Feb 2016 14:52:10 +0200
-Subject: [PATCH V2 3/6] stm class: provision for statically assigned
- masterIDs
-In-Reply-To: <1454487337-30184-4-git-send-email-zhang.chunyan@linaro.org>
+Date: Fri, 05 Feb 2016 14:55:31 +0200
+Subject: [PATCH V2 1/6] stm class: Add ioctl get_options interface
+In-Reply-To: <1454487337-30184-2-git-send-email-zhang.chunyan@linaro.org>
 References: <1454487337-30184-1-git-send-email-zhang.chunyan@linaro.org>
- <1454487337-30184-4-git-send-email-zhang.chunyan@linaro.org>
-Message-ID: <87mvrf5ngl.fsf@ashishki-desk.ger.corp.intel.com>
+ <1454487337-30184-2-git-send-email-zhang.chunyan@linaro.org>
+Message-ID: <87k2mj5nb0.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Chunyan Zhang <zhang.chunyan@linaro.org> writes:
 
-> From: Mathieu Poirier <mathieu.poirier@linaro.org>
+> There is already an interface of set_options, but no get_options yet.
+> Before setting any options, one would may want to see the current
+> status of that option by means of get_options interface. This
+> interface has been used in CoreSight STM driver.
 >
-> Some architecture like ARM assign masterIDs statically at the HW design
-> phase, making masterID manipulation in the generic STM core irrelevant.
+> Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
+> ---
+>  drivers/hwtracing/stm/core.c | 11 +++++++++++
+>  include/linux/stm.h          |  3 +++
+>  include/uapi/linux/stm.h     |  1 +
+>  3 files changed, 15 insertions(+)
 >
-> This patch adds a new 'mstatic' flag to struct stm_data that tells the
-> core that this specific STM device doesn't need explicit masterID
-> management.
+> diff --git a/drivers/hwtracing/stm/core.c b/drivers/hwtracing/stm/core.c
+> index b6445d9..86bb4e3 100644
+> --- a/drivers/hwtracing/stm/core.c
+> +++ b/drivers/hwtracing/stm/core.c
+> @@ -571,6 +571,17 @@ stm_char_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+>  						    options);
+>  
+>  		break;
+> +
+> +	case STP_GET_OPTIONS:
+> +		if (stm_data->get_options)
+> +			err = stm_data->get_options(stm_data,
+> +						    stmf->output.master,
+> +						    stmf->output.channel,
+> +						    stmf->output.nr_chans,
+> +						    &options);
+> +
+> +		return copy_to_user((void __user *)arg, &options, sizeof(u64));
 
-So why do we need this patch? If your STM only has master 42 allocated
-for software sources, simply set sw_start = 42, sw_end = 42 and you're
-good to go, software will have exactly one channel to choose from. See
-also the comment from <linux/stm.h>:
-
- * @sw_start:           first STP master available to software
- * @sw_end:             last STP master available to software
-
-particularly the "available to software" part. Any other kinds of
-masters the STM class code doesn't care about (yet).
-
-> In the core sw_start/end of masterID are set to '1',
-> i.e there is only one masterID to deal with.
-
-This is also a completely arbitrary and unnecessary requirement. Again,
-you can set both to 42 and it will still work.
-
-> Also this patch depends on [1], so that the number of masterID
-> is '1' too.
->
-> Finally the lower and upper bound for masterIDs as presented
-> in ($SYSFS)/class/stm/XYZ.stm/masters and
-> ($SYSFS)/../stp-policy/XYZ.stm.my_policy/some_device/masters
-> are set to '-1'.  That way users can't confuse them with
-> architecture where masterID management is required (where any
-> other value would be valid).
-
-Why is this a good idea? Having the actual master there will allow
-software to know what it is and also tell the decoding side what it is
-(assuming you have more than one source in the STP stream, it might not
-be easy to figure out, unless you know it in advance).
-
-I don't see how one master statically assigned to software sources is
-different from two masters or 32 masters. And I don't see any benefit of
-hiding the master id from userspace. Am I missing something?
+The return value of copy_to_user() is not what you assume it is.
 
 Regards,
 --
