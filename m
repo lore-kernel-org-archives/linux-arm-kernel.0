@@ -1,43 +1,73 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Fri, 5 Feb 2016 11:41:22 -0500
-Subject: [PATCH v3 1/3] libahci: Implement the capability to override the
- generic ahci interrupt handler.
-In-Reply-To: <1454620826-22554-2-git-send-email-stripathi@apm.com>
-References: <1454620826-22554-1-git-send-email-stripathi@apm.com>
- <1454620826-22554-2-git-send-email-stripathi@apm.com>
-Message-ID: <20160205164122.GB4401@htj.duckdns.org>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Fri, 05 Feb 2016 18:43:19 +0200
+Subject: Common/typical fractional divider HW API
+In-Reply-To: <56B4CDEF.3080606@free.fr>
+References: <56B4B67D.2080707@free.fr>
+ <1454684758.31169.77.camel@linux.intel.com> <56B4C775.50808@free.fr>
+ <1454688729.31169.87.camel@linux.intel.com> <56B4CDEF.3080606@free.fr>
+Message-ID: <1454690599.31169.103.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Fri, Feb 05, 2016 at 02:50:24AM +0530, suman Tripathi wrote:
-...
-> @@ -2504,15 +2505,28 @@ int ahci_host_activate(struct ata_host *host, struct scsi_host_template *sht)
->  	struct ahci_host_priv *hpriv = host->private_data;
->  	int irq = hpriv->irq;
->  	int rc;
-> +	irqreturn_t (*ahci_irq_handler)(int irq, void *dev_instance);
+On Fri, 2016-02-05 at 17:29 +0100, Mason wrote:
+> On 05/02/2016 17:12, Andy Shevchenko wrote:
 > 
-> +	ahci_irq_handler = hpriv->ahci_irq_intr;
-> +
-> +	if (hpriv->flags & (AHCI_HFLAG_MULTI_MSI | AHCI_HFLAG_MULTI_MSIX)) {
-> +		if (!ahci_irq_handler)
-> +			rc = ahci_host_activate_multi_irqs(host, sht);
-> +		else
-> +			dev_warn(host->dev, "both AHCI_HFLAG_MULTI_MSI flag set \
-> +				 and custom irq handler implemented\n");
-> +
-> +	} else {
-> +		if (!ahci_irq_handler) {
-> +			ahci_irq_handler = (hpriv->flags & AHCI_HFLAG_EDGE_IRQ ?
-> +			 		    ahci_single_edge_irq_intr :
-> +					    ahci_single_level_irq_intr);
-> +		}
-> +	}
+> > On Fri, 2016-02-05 at 17:01 +0100, Mason wrote:
+> > 
+> > > So, do you agree that
+> > > 
+> > > ? DIV = 2^I * (1 + F/256)
+> > > 
+> > > gives a more useful DIV distribution than
+> > > 
+> > > ? DIV = I + F/16
+> > 
+> > If you can change hardware why not to use any existing approach
+> > which
+> > suits better to your device?
+> 
+> Sorry, I don't understand the question.
+> 
 
-I wrote this before but can't we do this in save_initial_config the
-same way ->start_engine override is handled?
+There are plenty of implementations of the divider. You might consider
+to use one than inventing new one:
+
+https://xkcd.com/927/
+
+> In this part of my message, I was trying to argue that one HW API
+> "2^I * (1 + F/256)" seemed better than another one "I + F/16" on
+> any hardware.
+
+I disagree in a part 2^I.
+
+> 
+> > I don't remember any existing, though I didn't check much, divider
+> > register which takes something like that.
+> 
+> IIUC, you are saying that you've never seen hardware use the
+> "2^I * (1 + F/256)" formula, is that correct?
+
+Yep, though it doesn't mean there is no such.
+
+> I'm not sure how to parse that. I'm using the divider driver
+> > > for a CPU clock, to do D(V)FS in cpufreq.
+> > 
+> > If you are using custom stuff for custom hardware, I hope it's
+> > okay.
+> > But if we are talking about generic solutions (like clk-fractional-
+> > divider), I would suggest to consider existing users / hardware.
+> 
+> Are you saying that I could use the clk-fractional-divider with
+> hardware that computes "I + F/16" ?
+
+No.
+
+> Maybe the clk-fractional-divider could be made more generic by having
+> the register update part done in a call-back function?
+
+Why do you need to touch that module at all if your hardware doesn't
+suit it?
 
 -- 
-tejun
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
