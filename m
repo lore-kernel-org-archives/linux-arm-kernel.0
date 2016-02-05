@@ -1,66 +1,84 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Fri, 5 Feb 2016 11:05:43 +0800
-Subject: [PATCH v4 08/17] Xen: public/hvm: sync changes of
- HVM_PARAM_CALLBACK_VIA ABI from Xen
+Date: Fri, 5 Feb 2016 11:05:45 +0800
+Subject: [PATCH v4 10/17] arm/xen: Get event-channel irq through HVM_PARAM
+ when booting with ACPI
 In-Reply-To: <1454641552-12576-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1454641552-12576-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1454641552-12576-9-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1454641552-12576-11-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Sync the changes of HVM_PARAM_CALLBACK_VIA ABI introduced by
-Xen commit <ca5c54b6ff05> (public/hvm: export the HVM_PARAM_CALLBACK_VIA
-ABI in the API).
+When booting with ACPI, it could get the event-channel irq through
+HVM_PARAM_CALLBACK_IRQ.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 ---
- include/xen/interface/hvm/params.h | 27 +++++++++++++++++++++------
- 1 file changed, 21 insertions(+), 6 deletions(-)
+ arch/arm/xen/enlighten.c | 36 +++++++++++++++++++++++++++++++++++-
+ 1 file changed, 35 insertions(+), 1 deletion(-)
 
-diff --git a/include/xen/interface/hvm/params.h b/include/xen/interface/hvm/params.h
-index a6c7991..70ad208 100644
---- a/include/xen/interface/hvm/params.h
-+++ b/include/xen/interface/hvm/params.h
-@@ -27,16 +27,31 @@
-  * Parameter space for HVMOP_{set,get}_param.
-  */
+diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+index d94f726..807a93e 100644
+--- a/arch/arm/xen/enlighten.c
++++ b/arch/arm/xen/enlighten.c
+@@ -30,6 +30,7 @@
+ #include <linux/time64.h>
+ #include <linux/timekeeping.h>
+ #include <linux/timekeeper_internal.h>
++#include <linux/acpi.h>
  
-+#define HVM_PARAM_CALLBACK_IRQ 0
- /*
-  * How should CPU0 event-channel notifications be delivered?
-- * val[63:56] == 0: val[55:0] is a delivery GSI (Global System Interrupt).
-- * val[63:56] == 1: val[55:0] is a delivery PCI INTx line, as follows:
-- *                  Domain = val[47:32], Bus  = val[31:16],
-- *                  DevFn  = val[15: 8], IntX = val[ 1: 0]
-- * val[63:56] == 2: val[7:0] is a vector number.
-+ *
-  * If val == 0 then CPU0 event-channel notifications are not delivered.
-+ * If val != 0, val[63:56] encodes the type, as follows:
-+ */
-+
-+#define HVM_PARAM_CALLBACK_TYPE_GSI      0
-+/*
-+ * val[55:0] is a delivery GSI.  GSI 0 cannot be used, as it aliases val == 0,
-+ * and disables all notifications.
-+ */
-+
-+#define HVM_PARAM_CALLBACK_TYPE_PCI_INTX 1
-+/*
-+ * val[55:0] is a delivery PCI INTx line:
-+ * Domain = val[47:32], Bus = val[31:16] DevFn = val[15:8], IntX = val[1:0]
-+ */
-+
-+#define HVM_PARAM_CALLBACK_TYPE_VECTOR   2
-+/*
-+ * val[7:0] is a vector number.  Check for XENFEAT_hvm_callback_vector to know
-+ * if this delivery method is available.
-  */
--#define HVM_PARAM_CALLBACK_IRQ 0
+ #include <linux/mm.h>
  
- #define HVM_PARAM_STORE_PFN    1
- #define HVM_PARAM_STORE_EVTCHN 2
+@@ -278,6 +279,35 @@ void __init xen_early_init(void)
+ 		add_preferred_console("hvc", 0, NULL);
+ }
+ 
++static void __init xen_acpi_guest_init(void)
++{
++#ifdef CONFIG_ACPI
++	struct xen_hvm_param a;
++	int interrupt, trigger, polarity;
++
++	a.domid = DOMID_SELF;
++	a.index = HVM_PARAM_CALLBACK_IRQ;
++	xen_events_irq = 0;
++
++	if (!HYPERVISOR_hvm_op(HVMOP_get_param, &a)) {
++		if ((a.value >> 56) == HVM_PARAM_CALLBACK_TYPE_EVENT) {
++			interrupt = a.value & 0xff;
++			trigger = ((a.value >> 8) & 0x1) ? ACPI_EDGE_SENSITIVE
++							 : ACPI_LEVEL_SENSITIVE;
++			polarity = ((a.value >> 8) & 0x2) ? ACPI_ACTIVE_LOW
++							  : ACPI_ACTIVE_HIGH;
++			xen_events_irq = acpi_register_gsi(NULL, interrupt,
++							   trigger, polarity);
++		}
++	}
++#endif
++}
++
++static void __init xen_dt_guest_init(void)
++{
++	xen_events_irq = irq_of_parse_and_map(xen_node, 0);
++}
++
+ static int __init xen_guest_init(void)
+ {
+ 	struct xen_add_to_physmap xatp;
+@@ -286,7 +316,11 @@ static int __init xen_guest_init(void)
+ 	if (!xen_domain())
+ 		return 0;
+ 
+-	xen_events_irq = irq_of_parse_and_map(xen_node, 0);
++	if (!acpi_disabled)
++		xen_acpi_guest_init();
++	else
++		xen_dt_guest_init();
++
+ 	if (!xen_events_irq) {
+ 		pr_err("Xen event channel interrupt not found\n");
+ 		return -ENODEV;
 -- 
 2.0.4
