@@ -1,54 +1,88 @@
-From: stripathi@apm.com (Suman Tripathi)
-Date: Fri, 5 Feb 2016 10:06:35 -0800
-Subject: [PATCH v3 1/3] libahci: Implement the capability to override the
- generic ahci interrupt handler.
-In-Reply-To: <20160205164122.GB4401@htj.duckdns.org>
-References: <1454620826-22554-1-git-send-email-stripathi@apm.com>
- <1454620826-22554-2-git-send-email-stripathi@apm.com>
- <20160205164122.GB4401@htj.duckdns.org>
-Message-ID: <CAOHikRDeuyjT_OOBhivZiqVKFgHJAvEXsdcTtqYvjV6PSW+ZLA@mail.gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Fri, 5 Feb 2016 11:08:14 -0700
+Subject: [PATCH V2 3/6] stm class: provision for statically assigned
+ masterIDs
+In-Reply-To: <87mvrf5ngl.fsf@ashishki-desk.ger.corp.intel.com>
+References: <1454487337-30184-1-git-send-email-zhang.chunyan@linaro.org>
+ <1454487337-30184-4-git-send-email-zhang.chunyan@linaro.org>
+ <87mvrf5ngl.fsf@ashishki-desk.ger.corp.intel.com>
+Message-ID: <CANLsYky2twQ98u241YyHD=atYRp1N56YVHUQNY2E2Ljsq0cseA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 5, 2016 at 8:41 AM, Tejun Heo <tj@kernel.org> wrote:
-> Hello,
+On 5 February 2016 at 05:52, Alexander Shishkin
+<alexander.shishkin@linux.intel.com> wrote:
+> Chunyan Zhang <zhang.chunyan@linaro.org> writes:
 >
-> On Fri, Feb 05, 2016 at 02:50:24AM +0530, suman Tripathi wrote:
-> ...
->> @@ -2504,15 +2505,28 @@ int ahci_host_activate(struct ata_host *host, struct scsi_host_template *sht)
->>       struct ahci_host_priv *hpriv = host->private_data;
->>       int irq = hpriv->irq;
->>       int rc;
->> +     irqreturn_t (*ahci_irq_handler)(int irq, void *dev_instance);
+>> From: Mathieu Poirier <mathieu.poirier@linaro.org>
 >>
->> +     ahci_irq_handler = hpriv->ahci_irq_intr;
->> +
->> +     if (hpriv->flags & (AHCI_HFLAG_MULTI_MSI | AHCI_HFLAG_MULTI_MSIX)) {
->> +             if (!ahci_irq_handler)
->> +                     rc = ahci_host_activate_multi_irqs(host, sht);
->> +             else
->> +                     dev_warn(host->dev, "both AHCI_HFLAG_MULTI_MSI flag set \
->> +                              and custom irq handler implemented\n");
->> +
->> +     } else {
->> +             if (!ahci_irq_handler) {
->> +                     ahci_irq_handler = (hpriv->flags & AHCI_HFLAG_EDGE_IRQ ?
->> +                                         ahci_single_edge_irq_intr :
->> +                                         ahci_single_level_irq_intr);
->> +             }
->> +     }
+>> Some architecture like ARM assign masterIDs statically at the HW design
+>> phase, making masterID manipulation in the generic STM core irrelevant.
+>>
+>> This patch adds a new 'mstatic' flag to struct stm_data that tells the
+>> core that this specific STM device doesn't need explicit masterID
+>> management.
 >
-> I wrote this before but can't we do this in save_initial_config the
-> same way ->start_engine override is handled?
+> So why do we need this patch? If your STM only has master 42 allocated
+> for software sources, simply set sw_start = 42, sw_end = 42 and you're
+> good to go, software will have exactly one channel to choose from. See
+> also the comment from <linux/stm.h>:
 
-Sorry missed that out.
+On ARM each source, i.e entity capable of accessing STM channels, has
+a different master ID set in HW.  We can't assume the IDs are
+contiguous and from a SW point of view there is no way to probe the
+values.
+
 >
-> --
-> tejun
+>  * @sw_start:           first STP master available to software
+>  * @sw_end:             last STP master available to software
+>
+> particularly the "available to software" part. Any other kinds of
+> masters the STM class code doesn't care about (yet).
+>
+>> In the core sw_start/end of masterID are set to '1',
+>> i.e there is only one masterID to deal with.
+>
+> This is also a completely arbitrary and unnecessary requirement. Again,
+> you can set both to 42 and it will still work.
 
+True - any value will do. The important thing to remember is that on
+ARM, there is only one masterID channel (from an STM core point of
+view).  But we could also proceed differently, see below for more
+details.
 
+>
+>> Also this patch depends on [1], so that the number of masterID
+>> is '1' too.
+>>
+>> Finally the lower and upper bound for masterIDs as presented
+>> in ($SYSFS)/class/stm/XYZ.stm/masters and
+>> ($SYSFS)/../stp-policy/XYZ.stm.my_policy/some_device/masters
+>> are set to '-1'.  That way users can't confuse them with
+>> architecture where masterID management is required (where any
+>> other value would be valid).
+>
+> Why is this a good idea? Having the actual master there will allow
+> software to know what it is and also tell the decoding side what it is
+> (assuming you have more than one source in the STP stream, it might not
+> be easy to figure out, unless you know it in advance).
 
--- 
+In the ARM world masterIDs are irrelevant so why bother with them?
+Writing a '-1' simply highlight this reality.
+
+Another way of approaching the problem would be to change sw_start/end
+to a bitfield that represent the valid masterIDs but in my opinion, it
+is a lot of code churn for information that isn't used outside of the
+decoder.
+
 Thanks,
-with regards,
-Suman Tripathi
+Mathieu
+
+>
+> I don't see how one master statically assigned to software sources is
+> different from two masters or 32 masters. And I don't see any benefit of
+> hiding the master id from userspace. Am I missing something?
+>
+> Regards,
+> --
+> Alex
