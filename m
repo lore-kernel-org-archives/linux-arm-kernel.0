@@ -1,310 +1,654 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 5 Feb 2016 10:04:01 +0000
-Subject: [PATCH 11/11] arm64: dts: add Pine64 support
-In-Reply-To: <20160205090337.GB1139@lukather>
-References: <1454348370-3816-1-git-send-email-andre.przywara@arm.com>
- <1454348370-3816-12-git-send-email-andre.przywara@arm.com>
- <20160205090337.GB1139@lukather>
-Message-ID: <56B47391.1040709@arm.com>
+From: codekipper@gmail.com (Code Kipper)
+Date: Fri, 5 Feb 2016 11:23:48 +0100
+Subject: [PATCH v4 2/2] ASoC: sunxi: Add support for the SPDIF block
+In-Reply-To: <20160205092739.GE1139@lukather>
+References: <1454584162-32449-1-git-send-email-codekipper@gmail.com>
+ <1454584162-32449-3-git-send-email-codekipper@gmail.com>
+ <20160205092739.GE1139@lukather>
+Message-ID: <CAEKpxBkNY4zHwv6s4POtT8B+-b7tROWzvys3L+AzG25RGLQM=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 05/02/16 09:03, Maxime Ripard wrote:
+On 5 February 2016 at 10:27, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
 > Hi,
-> 
-> On Mon, Feb 01, 2016 at 05:39:30PM +0000, Andre Przywara wrote:
->> The Pine64 is a cost-efficient development board based on the
->> Allwinner A64 SoC.
->> There are three models: the basic version with Fast Ethernet and
->> 512 MB of DRAM (Pine64) and two Pine64+ versions, which both
->> feature Gigabit Ethernet and additional connectors for touchscreens
->> and a camera. Or as my son put it: "Those are smaller and these are
->> missing." ;-)
->> The two Pine64+ models just differ in the amount of DRAM
->> (1GB vs. 2GB). Since U-Boot will figure out the right size for us and
->> patches the DT accordingly we just need to provide one DT for the
->> Pine64+.
+>
+> On Thu, Feb 04, 2016 at 12:09:22PM +0100, codekipper at gmail.com wrote:
+>> From: Marcus Cooper <codekipper@gmail.com>
 >>
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> The sun4i, sun5i and sun7i SoC families have an SPDIF
+>> block which is capable of playback and capture.
+>>
+>> This patch enables the playback of this block for
+>> the sun4i families.
+>>
+>> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
 >> ---
->>  .../devicetree/bindings/vendor-prefixes.txt        |  1 +
->>  arch/arm64/boot/dts/Makefile                       |  1 +
->>  arch/arm64/boot/dts/allwinner/Makefile             |  5 ++
->>  arch/arm64/boot/dts/allwinner/pine64.dts           | 58 +++++++++++++++++
->>  arch/arm64/boot/dts/allwinner/pine64_common.dtsi   | 76 ++++++++++++++++++++++
->>  arch/arm64/boot/dts/allwinner/pine64_plus.dts      | 59 +++++++++++++++++
->>  6 files changed, 200 insertions(+)
->>  create mode 100644 arch/arm64/boot/dts/allwinner/Makefile
->>  create mode 100644 arch/arm64/boot/dts/allwinner/pine64.dts
->>  create mode 100644 arch/arm64/boot/dts/allwinner/pine64_common.dtsi
->>  create mode 100644 arch/arm64/boot/dts/allwinner/pine64_plus.dts
+>>  sound/soc/sunxi/Kconfig       |   8 +
+>>  sound/soc/sunxi/Makefile      |   1 +
+>>  sound/soc/sunxi/sun4i-spdif.c | 561 ++++++++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 570 insertions(+)
+>>  create mode 100644 sound/soc/sunxi/sun4i-spdif.c
 >>
->> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
->> index 72e2c5a..0c22fa9 100644
->> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
->> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
->> @@ -175,6 +175,7 @@ parade	Parade Technologies Inc.
->>  pericom	Pericom Technology Inc.
->>  phytec	PHYTEC Messtechnik GmbH
->>  picochip	Picochip Ltd
->> +pine64	Pine64
->>  plathome	Plat'Home Co., Ltd.
->>  plda	PLDA
->>  pixcir  PIXCIR MICROELECTRONICS Co., Ltd
-> 
-> Please make a separate patch for this one.
-> 
->> diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
->> index f832b8a..3b7428a 100644
->> --- a/arch/arm64/boot/dts/Makefile
->> +++ b/arch/arm64/boot/dts/Makefile
->> @@ -1,3 +1,4 @@
->> +dts-dirs += allwinner
-> 
-> Could you also add a patch to add this path to MAINTAINERS too?
-> 
->>  dts-dirs += altera
->>  dts-dirs += amd
->>  dts-dirs += apm
->> diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
+>> diff --git a/sound/soc/sunxi/Kconfig b/sound/soc/sunxi/Kconfig
+>> index 84c72ec..6af7224 100644
+>> --- a/sound/soc/sunxi/Kconfig
+>> +++ b/sound/soc/sunxi/Kconfig
+>> @@ -8,4 +8,12 @@ config SND_SUN4I_CODEC
+>>         Select Y or M to add support for the Codec embedded in the Allwinner
+>>         A10 and affiliated SoCs.
+>>
+>> +config SND_SUN4I_SPDIF
+>> +        tristate "Allwinner A10 SPDIF Support"
+>> +     depends on OF
+>
+> The indentation looks off.
+ACK
+>
+>> +        select SND_SOC_GENERIC_DMAENGINE_PCM
+>> +        select REGMAP_MMIO
+>> +        help
+>> +          Say Y or M to add support for the S/PDIF audio block in the Allwinner
+>> +       A10 and affiliated SoCs.
+>
+> Here as well.
+ACK
+>
+>>  endmenu
+>> diff --git a/sound/soc/sunxi/Makefile b/sound/soc/sunxi/Makefile
+>> index ea8a08c..8f5e889 100644
+>> --- a/sound/soc/sunxi/Makefile
+>> +++ b/sound/soc/sunxi/Makefile
+>> @@ -1,2 +1,3 @@
+>>  obj-$(CONFIG_SND_SUN4I_CODEC) += sun4i-codec.o
+>>
+>> +obj-$(CONFIG_SND_SUN4I_SPDIF) += sun4i-spdif.o
+>> diff --git a/sound/soc/sunxi/sun4i-spdif.c b/sound/soc/sunxi/sun4i-spdif.c
 >> new file mode 100644
->> index 0000000..65f4e24
+>> index 0000000..bb32344
 >> --- /dev/null
->> +++ b/arch/arm64/boot/dts/allwinner/Makefile
->> @@ -0,0 +1,5 @@
->> +dtb-$(CONFIG_ARCH_SUNXI) += pine64_plus.dtb pine64.dtb
->> +
->> +always		:= $(dtb-y)
->> +subdir-y	:= $(dts-dirs)
->> +clean-files	:= *.dtb
->> diff --git a/arch/arm64/boot/dts/allwinner/pine64.dts b/arch/arm64/boot/dts/allwinner/pine64.dts
->> new file mode 100644
->> index 0000000..ebea5dd
->> --- /dev/null
->> +++ b/arch/arm64/boot/dts/allwinner/pine64.dts
->> @@ -0,0 +1,58 @@
+>> +++ b/sound/soc/sunxi/sun4i-spdif.c
+>> @@ -0,0 +1,561 @@
 >> +/*
->> + * Copyright (c) 2016 ARM Ltd.
+>> + * ALSA SoC SPDIF Audio Layer
 >> + *
->> + * This file is dual-licensed: you can use it either under the terms
->> + * of the GPL or the X11 license, at your option. Note that this dual
->> + * licensing only applies to this file, and not this project as a
->> + * whole.
+>> + * Copyright 2015 Andrea Venturi <be17068@iperbole.bo.it>
+>> + * Copyright 2015 Marcus Cooper <codekipper@gmail.com>
 >> + *
->> + *  a) This library is free software; you can redistribute it and/or
->> + *     modify it under the terms of the GNU General Public License as
->> + *     published by the Free Software Foundation; either version 2 of the
->> + *     License, or (at your option) any later version.
+>> + * Based on the Allwinner SDK driver, released under the GPL.
 >> + *
->> + *     This library is distributed in the hope that it will be useful,
->> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + *     GNU General Public License for more details.
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License as published by
+>> + * the Free Software Foundation; either version 2 of the License, or
+>> + * (at your option) any later version.
 >> + *
->> + * Or, alternatively,
->> + *
->> + *  b) Permission is hereby granted, free of charge, to any person
->> + *     obtaining a copy of this software and associated documentation
->> + *     files (the "Software"), to deal in the Software without
->> + *     restriction, including without limitation the rights to use,
->> + *     copy, modify, merge, publish, distribute, sublicense, and/or
->> + *     sell copies of the Software, and to permit persons to whom the
->> + *     Software is furnished to do so, subject to the following
->> + *     conditions:
->> + *
->> + *     The above copyright notice and this permission notice shall be
->> + *     included in all copies or substantial portions of the Software.
->> + *
->> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
->> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
->> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
->> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
->> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
->> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
->> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
->> + *     OTHER DEALINGS IN THE SOFTWARE.
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
 >> + */
 >> +
->> +/dts-v1/;
+>> +#include <linux/clk.h>
+>> +#include <linux/delay.h>
+>> +#include <linux/device.h>
+>> +#include <linux/kernel.h>
+>> +#include <linux/init.h>
+>> +#include <linux/regmap.h>
+>> +#include <linux/of_address.h>
+>> +#include <linux/of_device.h>
+>> +#include <linux/ioport.h>
+>> +#include <linux/module.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/pm_runtime.h>
+>> +#include <sound/dmaengine_pcm.h>
+>> +#include <sound/pcm_params.h>
+>> +#include <sound/soc.h>
 >> +
->> +#include "pine64_common.dtsi"
+>> +#define      SUN4I_SPDIF_CTL         (0x00)
+>> +     #define SUN4I_SPDIF_CTL_MCLKDIV(v)              ((v) << 4) /* v even */
+>> +     #define SUN4I_SPDIF_CTL_MCLKOUTEN               BIT(2)
+>> +     #define SUN4I_SPDIF_CTL_GEN                     BIT(1)
+>> +     #define SUN4I_SPDIF_CTL_RESET                   BIT(0)
 >> +
->> +/ {
->> +	model = "Pine64";
->> +	compatible = "pine64,pine64", "allwinner,a64", "allwinner,sunxi";
+>> +#define SUN4I_SPDIF_TXCFG    (0x04)
+>> +     #define SUN4I_SPDIF_TXCFG_SINGLEMOD             BIT(31)
+>> +     #define SUN4I_SPDIF_TXCFG_ASS                   BIT(17)
+>> +     #define SUN4I_SPDIF_TXCFG_NONAUDIO              BIT(16)
+>> +     #define SUN4I_SPDIF_TXCFG_TXRATIO(v)            ((v) << 4)
+>> +     #define SUN4I_SPDIF_TXCFG_TXRATIO_MASK          GENMASK(8, 4)
+>> +     #define SUN4I_SPDIF_TXCFG_FMTRVD                GENMASK(3, 2)
+>> +     #define SUN4I_SPDIF_TXCFG_FMT16BIT              (0 << 2)
+>> +     #define SUN4I_SPDIF_TXCFG_FMT20BIT              (1 << 2)
+>> +     #define SUN4I_SPDIF_TXCFG_FMT24BIT              (2 << 2)
+>> +     #define SUN4I_SPDIF_TXCFG_CHSTMODE              BIT(1)
+>> +     #define SUN4I_SPDIF_TXCFG_TXEN                  BIT(0)
 >> +
->> +	chosen {
->> +		stdout-path = "serial0:115200n8";
->> +	};
+>> +#define SUN4I_SPDIF_RXCFG    (0x08)
+>> +     #define SUN4I_SPDIF_RXCFG_LOCKFLAG              BIT(4)
+>> +     #define SUN4I_SPDIF_RXCFG_CHSTSRC               BIT(3)
+>> +     #define SUN4I_SPDIF_RXCFG_CHSTCP                BIT(1)
+>> +     #define SUN4I_SPDIF_RXCFG_RXEN                  BIT(0)
 >> +
->> +	memory {
->> +		reg = <0x40000000 0x20000000>;
->> +	};
->> +};
->> diff --git a/arch/arm64/boot/dts/allwinner/pine64_common.dtsi b/arch/arm64/boot/dts/allwinner/pine64_common.dtsi
->> new file mode 100644
->> index 0000000..d968d76
->> --- /dev/null
->> +++ b/arch/arm64/boot/dts/allwinner/pine64_common.dtsi
->> @@ -0,0 +1,76 @@
+>> +#define SUN4I_SPDIF_TXFIFO   (0x0C)
+>> +
+>> +#define SUN4I_SPDIF_RXFIFO   (0x10)
+>> +
+>> +#define SUN4I_SPDIF_FCTL     (0x14)
+>> +     #define SUN4I_SPDIF_FCTL_FIFOSRC                BIT(31)
+>> +     #define SUN4I_SPDIF_FCTL_FTX                    BIT(17)
+>> +     #define SUN4I_SPDIF_FCTL_FRX                    BIT(16)
+>> +     #define SUN4I_SPDIF_FCTL_TXTL(v)                ((v) << 8)
+>> +     #define SUN4I_SPDIF_FCTL_TXTL_MASK              GENMASK(12, 8)
+>> +     #define SUN4I_SPDIF_FCTL_RXTL(v)                ((v) << 3)
+>> +     #define SUN4I_SPDIF_FCTL_RXTL_MASK              GENMASK(7, 3)
+>> +     #define SUN4I_SPDIF_FCTL_TXIM                   BIT(2)
+>> +     #define SUN4I_SPDIF_FCTL_RXOM(v)                ((v) << 0)
+>> +     #define SUN4I_SPDIF_FCTL_RXOM_MASK              GENMASK(1, 0)
+>> +
+>> +#define SUN4I_SPDIF_FSTA     (0x18)
+>> +     #define SUN4I_SPDIF_FSTA_TXE                    BIT(14)
+>> +     #define SUN4I_SPDIF_FSTA_TXECNTSHT              (8)
+>> +     #define SUN4I_SPDIF_FSTA_RXA                    BIT(6)
+>> +     #define SUN4I_SPDIF_FSTA_RXACNTSHT              (0)
+>> +
+>> +#define SUN4I_SPDIF_INT              (0x1C)
+>> +     #define SUN4I_SPDIF_INT_RXLOCKEN                BIT(18)
+>> +     #define SUN4I_SPDIF_INT_RXUNLOCKEN              BIT(17)
+>> +     #define SUN4I_SPDIF_INT_RXPARERREN              BIT(16)
+>> +     #define SUN4I_SPDIF_INT_TXDRQEN                 BIT(7)
+>> +     #define SUN4I_SPDIF_INT_TXUIEN                  BIT(6)
+>> +     #define SUN4I_SPDIF_INT_TXOIEN                  BIT(5)
+>> +     #define SUN4I_SPDIF_INT_TXEIEN                  BIT(4)
+>> +     #define SUN4I_SPDIF_INT_RXDRQEN                 BIT(2)
+>> +     #define SUN4I_SPDIF_INT_RXOIEN                  BIT(1)
+>> +     #define SUN4I_SPDIF_INT_RXAIEN                  BIT(0)
+>> +
+>> +#define SUN4I_SPDIF_ISTA     (0x20)
+>> +     #define SUN4I_SPDIF_ISTA_RXLOCKSTA              BIT(18)
+>> +     #define SUN4I_SPDIF_ISTA_RXUNLOCKSTA            BIT(17)
+>> +     #define SUN4I_SPDIF_ISTA_RXPARERRSTA            BIT(16)
+>> +     #define SUN4I_SPDIF_ISTA_TXUSTA                 BIT(6)
+>> +     #define SUN4I_SPDIF_ISTA_TXOSTA                 BIT(5)
+>> +     #define SUN4I_SPDIF_ISTA_TXESTA                 BIT(4)
+>> +     #define SUN4I_SPDIF_ISTA_RXOSTA                 BIT(1)
+>> +     #define SUN4I_SPDIF_ISTA_RXASTA                 BIT(0)
+>> +
+>> +#define SUN4I_SPDIF_TXCNT    (0x24)
+>> +
+>> +#define SUN4I_SPDIF_RXCNT    (0x28)
+>> +
+>> +#define SUN4I_SPDIF_TXCHSTA0 (0x2C)
+>> +     #define SUN4I_SPDIF_TXCHSTA0_CLK(v)             ((v) << 28)
+>> +     #define SUN4I_SPDIF_TXCHSTA0_SAMFREQ(v)         ((v) << 24)
+>> +     #define SUN4I_SPDIF_TXCHSTA0_SAMFREQ_MASK       GENMASK(27, 24)
+>> +     #define SUN4I_SPDIF_TXCHSTA0_CHNUM(v)           ((v) << 20)
+>> +     #define SUN4I_SPDIF_TXCHSTA0_CHNUM_MASK         GENMASK(23, 20)
+>> +     #define SUN4I_SPDIF_TXCHSTA0_SRCNUM(v)          ((v) << 16)
+>> +     #define SUN4I_SPDIF_TXCHSTA0_CATACOD(v)         ((v) << 8)
+>> +     #define SUN4I_SPDIF_TXCHSTA0_MODE(v)            ((v) << 6)
+>> +     #define SUN4I_SPDIF_TXCHSTA0_EMPHASIS(v)        ((v) << 3)
+>> +     #define SUN4I_SPDIF_TXCHSTA0_CP                 BIT(2)
+>> +     #define SUN4I_SPDIF_TXCHSTA0_AUDIO              BIT(1)
+>> +     #define SUN4I_SPDIF_TXCHSTA0_PRO                BIT(0)
+>> +
+>> +#define SUN4I_SPDIF_TXCHSTA1 (0x30)
+>> +     #define SUN4I_SPDIF_TXCHSTA1_CGMSA(v)           ((v) << 8)
+>> +     #define SUN4I_SPDIF_TXCHSTA1_ORISAMFREQ(v)      ((v) << 4)
+>> +     #define SUN4I_SPDIF_TXCHSTA1_ORISAMFREQ_MASK    GENMASK(7, 4)
+>> +     #define SUN4I_SPDIF_TXCHSTA1_SAMWORDLEN(v)      ((v) << 1)
+>> +     #define SUN4I_SPDIF_TXCHSTA1_MAXWORDLEN         BIT(0)
+>> +
+>> +#define SUN4I_SPDIF_RXCHSTA0 (0x34)
+>> +     #define SUN4I_SPDIF_RXCHSTA0_CLK(v)             ((v) << 28)
+>> +     #define SUN4I_SPDIF_RXCHSTA0_SAMFREQ(v)         ((v) << 24)
+>> +     #define SUN4I_SPDIF_RXCHSTA0_CHNUM(v)           ((v) << 20)
+>> +     #define SUN4I_SPDIF_RXCHSTA0_SRCNUM(v)          ((v) << 16)
+>> +     #define SUN4I_SPDIF_RXCHSTA0_CATACOD(v)         ((v) << 8)
+>> +     #define SUN4I_SPDIF_RXCHSTA0_MODE(v)            ((v) << 6)
+>> +     #define SUN4I_SPDIF_RXCHSTA0_EMPHASIS(v)        ((v) << 3)
+>> +     #define SUN4I_SPDIF_RXCHSTA0_CP                 BIT(2)
+>> +     #define SUN4I_SPDIF_RXCHSTA0_AUDIO              BIT(1)
+>> +     #define SUN4I_SPDIF_RXCHSTA0_PRO                BIT(0)
+>> +
+>> +#define SUN4I_SPDIF_RXCHSTA1 (0x38)
+>> +     #define SUN4I_SPDIF_RXCHSTA1_CGMSA(v)           ((v) << 8)
+>> +     #define SUN4I_SPDIF_RXCHSTA1_ORISAMFREQ(v)      ((v) << 4)
+>> +     #define SUN4I_SPDIF_RXCHSTA1_SAMWORDLEN(v)      ((v) << 1)
+>> +     #define SUN4I_SPDIF_RXCHSTA1_MAXWORDLEN         BIT(0)
+>> +
+>> +/* Defines for Sampling Frequency */
+>> +#define SUN4I_SPDIF_SAMFREQ_44_1KHZ          0x0
+>> +#define SUN4I_SPDIF_SAMFREQ_NOT_INDICATED    0x1
+>> +#define SUN4I_SPDIF_SAMFREQ_48KHZ            0x2
+>> +#define SUN4I_SPDIF_SAMFREQ_32KHZ            0x3
+>> +#define SUN4I_SPDIF_SAMFREQ_22_05KHZ         0x4
+>> +#define SUN4I_SPDIF_SAMFREQ_24KHZ            0x6
+>> +#define SUN4I_SPDIF_SAMFREQ_88_2KHZ          0x8
+>> +#define SUN4I_SPDIF_SAMFREQ_76_8KHZ          0x9
+>> +#define SUN4I_SPDIF_SAMFREQ_96KHZ            0xa
+>> +#define SUN4I_SPDIF_SAMFREQ_176_4KHZ         0xc
+>> +#define SUN4I_SPDIF_SAMFREQ_192KHZ           0xe
+>> +
 >> +/*
->> + * Copyright (c) 2016 ARM Ltd.
->> + *
->> + * This file is dual-licensed: you can use it either under the terms
->> + * of the GPL or the X11 license, at your option. Note that this dual
->> + * licensing only applies to this file, and not this project as a
->> + * whole.
->> + *
->> + *  a) This library is free software; you can redistribute it and/or
->> + *     modify it under the terms of the GNU General Public License as
->> + *     published by the Free Software Foundation; either version 2 of the
->> + *     License, or (at your option) any later version.
->> + *
->> + *     This library is distributed in the hope that it will be useful,
->> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + *     GNU General Public License for more details.
->> + *
->> + * Or, alternatively,
->> + *
->> + *  b) Permission is hereby granted, free of charge, to any person
->> + *     obtaining a copy of this software and associated documentation
->> + *     files (the "Software"), to deal in the Software without
->> + *     restriction, including without limitation the rights to use,
->> + *     copy, modify, merge, publish, distribute, sublicense, and/or
->> + *     sell copies of the Software, and to permit persons to whom the
->> + *     Software is furnished to do so, subject to the following
->> + *     conditions:
->> + *
->> + *     The above copyright notice and this permission notice shall be
->> + *     included in all copies or substantial portions of the Software.
->> + *
->> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
->> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
->> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
->> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
->> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
->> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
->> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
->> + *     OTHER DEALINGS IN THE SOFTWARE.
+>> + * Original sampling frequency can be represented by inverting the value of the
+>> + * sampling frequency.
 >> + */
+>> +#define ORIGINAL(v) ((~v) & 0xf)
+>
+> You're not using that macro anywhere.
+Removed ACK
+>
 >> +
->> +#include "a64.dtsi"
->> +
->> +&mmc0 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&mmc0_pins>, <&mmc0_default_cd_pin>;
->> +	vmmc-supply = <&reg_vcc3v3>;
->> +	cd-gpios = <&pio 5 6 0>;
->> +	cd-inverted;
->> +	status = "okay";
+>> +struct sun4i_spdif_dev {
+>> +     struct platform_device *pdev;
+>> +     struct clk *spdif_clk;
+>> +     struct clk *apb_clk;
+>> +     struct snd_soc_dai_driver cpu_dai_drv;
+>> +     struct regmap *regmap;
+>> +     struct snd_dmaengine_dai_dma_data dma_params_tx;
 >> +};
 >> +
->> +&uart0 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&uart0_pins_a>;
->> +	status = "okay";
+>> +static void sun4i_spdif_configure(struct sun4i_spdif_dev *host)
+>> +{
+>> +     /* soft reset SPDIF */
+>> +     regmap_write(host->regmap, SUN4I_SPDIF_CTL, SUN4I_SPDIF_CTL_RESET);
+>> +
+>> +     /* flush TX FIFO */
+>> +     regmap_update_bits(host->regmap, SUN4I_SPDIF_FCTL,
+>> +                        SUN4I_SPDIF_FCTL_FTX, SUN4I_SPDIF_FCTL_FTX);
+>> +
+>> +     /* clear TX counter */
+>> +     regmap_write(host->regmap, SUN4I_SPDIF_TXCNT, 0);
+>> +}
+>> +
+>> +static void sun4i_snd_txctrl_on(struct snd_pcm_substream *substream,
+>> +                             struct sun4i_spdif_dev *host)
+>> +{
+>> +     if (substream->runtime->channels == 1)
+>> +             regmap_update_bits(host->regmap, SUN4I_SPDIF_TXCFG,
+>> +                                SUN4I_SPDIF_TXCFG_SINGLEMOD,
+>> +                                SUN4I_SPDIF_TXCFG_SINGLEMOD);
+>> +
+>> +     /* SPDIF TX ENABLE */
+>> +     regmap_update_bits(host->regmap, SUN4I_SPDIF_TXCFG,
+>> +                        SUN4I_SPDIF_TXCFG_TXEN, SUN4I_SPDIF_TXCFG_TXEN);
+>> +
+>> +     /* DRQ ENABLE */
+>> +     regmap_update_bits(host->regmap, SUN4I_SPDIF_INT,
+>> +                        SUN4I_SPDIF_INT_TXDRQEN, SUN4I_SPDIF_INT_TXDRQEN);
+>> +
+>> +     /* Global enable */
+>> +     regmap_update_bits(host->regmap, SUN4I_SPDIF_CTL,
+>> +                        SUN4I_SPDIF_CTL_GEN, SUN4I_SPDIF_CTL_GEN);
+>> +}
+>> +
+>> +static void sun4i_snd_txctrl_off(struct snd_pcm_substream *substream,
+>> +                              struct sun4i_spdif_dev *host)
+>> +{
+>> +     /* SPDIF TX DISABLE */
+>> +     regmap_update_bits(host->regmap, SUN4I_SPDIF_TXCFG,
+>> +                        SUN4I_SPDIF_TXCFG_TXEN, 0);
+>> +
+>> +     /* DRQ DISABLE */
+>> +     regmap_update_bits(host->regmap, SUN4I_SPDIF_INT,
+>> +                        SUN4I_SPDIF_INT_TXDRQEN, 0);
+>> +
+>> +     /* Global disable */
+>> +     regmap_update_bits(host->regmap, SUN4I_SPDIF_CTL,
+>> +                        SUN4I_SPDIF_CTL_GEN, 0);
+>> +}
+>> +
+>> +static int sun4i_spdif_startup(struct snd_pcm_substream *substream,
+>> +                            struct snd_soc_dai *cpu_dai)
+>> +{
+>> +     struct snd_soc_pcm_runtime *rtd = substream->private_data;
+>> +     struct sun4i_spdif_dev *host = snd_soc_dai_get_drvdata(rtd->cpu_dai);
+>> +
+>> +     if (substream->stream != SNDRV_PCM_STREAM_PLAYBACK)
+>> +             return -EINVAL;
+>> +
+>> +     sun4i_spdif_configure(host);
+>> +
+>> +     return 0;
+>> +}
+>> +
+>> +static int sun4i_spdif_hw_params(struct snd_pcm_substream *substream,
+>> +                              struct snd_pcm_hw_params *params,
+>> +                              struct snd_soc_dai *cpu_dai)
+>> +{
+>> +     int ret = 0;
+>> +     int fmt;
+>> +     unsigned long rate = params_rate(params);
+>> +     u32 mclk_div = 0;
+>> +     unsigned int mclk = 0;
+>> +     u32 reg_val;
+>> +     struct sun4i_spdif_dev *host = snd_soc_dai_get_drvdata(cpu_dai);
+>> +     struct platform_device *pdev = host->pdev;
+>> +
+>> +     /* Add the PCM and raw data select interface */
+>> +     switch (params_channels(params)) {
+>> +     case 1: /* PCM mode */
+>> +     case 2:
+>> +             fmt = 0;
+>> +             break;
+>> +     case 4: /* raw data mode */
+>> +             fmt = SUN4I_SPDIF_TXCFG_NONAUDIO;
+>> +             break;
+>> +     default:
+>> +             return -EINVAL;
+>> +     }
+>> +
+>> +     switch (params_format(params)) {
+>> +     case SNDRV_PCM_FORMAT_S16_LE:
+>> +             fmt |= SUN4I_SPDIF_TXCFG_FMT16BIT;
+>> +             break;
+>> +     case SNDRV_PCM_FORMAT_S20_3LE:
+>> +             fmt |= SUN4I_SPDIF_TXCFG_FMT20BIT;
+>> +             break;
+>> +     case SNDRV_PCM_FORMAT_S24_LE:
+>> +             fmt |= SUN4I_SPDIF_TXCFG_FMT24BIT;
+>> +             break;
+>> +     default:
+>> +             return -EINVAL;
+>> +     }
+>> +
+>> +     switch (rate) {
+>> +     case 22050:
+>> +     case 44100:
+>> +     case 88200:
+>> +     case 176400:
+>> +             mclk = 22579200;
+>> +             break;
+>> +     case 24000:
+>> +     case 32000:
+>> +     case 48000:
+>> +     case 96000:
+>> +     case 192000:
+>> +             mclk = 24576000;
+>> +             break;
+>> +     default:
+>> +             return -EINVAL;
+>> +     }
+>> +
+>> +     ret = clk_set_rate(host->spdif_clk, mclk);
+>> +     if (ret < 0) {
+>> +             dev_err(&pdev->dev,
+>> +                     "Setting SPDIF clock rate for %d Hz failed!\n", mclk);
+>> +             return ret;
+>> +     }
+>> +
+>> +     regmap_update_bits(host->regmap, SUN4I_SPDIF_FCTL,
+>> +                        SUN4I_SPDIF_FCTL_TXIM, SUN4I_SPDIF_FCTL_TXIM);
+>> +
+>> +     switch (rate) {
+>> +     case 22050:
+>> +     case 24000:
+>> +             mclk_div = 8;
+>> +             break;
+>> +     case 32000:
+>> +             mclk_div = 6;
+>> +             break;
+>> +     case 44100:
+>> +     case 48000:
+>> +             mclk_div = 4;
+>> +             break;
+>> +     case 88200:
+>> +     case 96000:
+>> +             mclk_div = 2;
+>> +             break;
+>> +     case 176400:
+>> +     case 192000:
+>> +             mclk_div = 1;
+>> +             break;
+>> +     default:
+>> +             return -EINVAL;
+>> +     }
+>> +
+>> +     reg_val = 0;
+>> +     reg_val |= SUN4I_SPDIF_TXCFG_ASS;
+>> +     reg_val |= fmt; /* set non audio and bit depth */
+>> +     reg_val |= SUN4I_SPDIF_TXCFG_CHSTMODE;
+>> +     reg_val |= SUN4I_SPDIF_TXCFG_TXRATIO(mclk_div - 1);
+>> +     regmap_write(host->regmap, SUN4I_SPDIF_TXCFG, reg_val);
+>> +
+>> +     return 0;
+>> +}
+>> +
+>> +static int sun4i_spdif_trigger(struct snd_pcm_substream *substream, int cmd,
+>> +                            struct snd_soc_dai *dai)
+>> +{
+>> +     int ret = 0;
+>> +     struct sun4i_spdif_dev *host = snd_soc_dai_get_drvdata(dai);
+>> +
+>> +     if (substream->stream != SNDRV_PCM_STREAM_PLAYBACK)
+>> +             return -EINVAL;
+>> +
+>> +     switch (cmd) {
+>> +     case SNDRV_PCM_TRIGGER_START:
+>> +     case SNDRV_PCM_TRIGGER_RESUME:
+>> +     case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
+>> +             sun4i_snd_txctrl_on(substream, host);
+>> +             break;
+>> +
+>> +     case SNDRV_PCM_TRIGGER_STOP:
+>> +     case SNDRV_PCM_TRIGGER_SUSPEND:
+>> +     case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
+>> +             sun4i_snd_txctrl_off(substream, host);
+>> +             break;
+>> +
+>> +     default:
+>> +             ret = -EINVAL;
+>> +             break;
+>> +     }
+>> +     return ret;
+>> +}
+>> +
+>> +static int sun4i_spdif_soc_dai_probe(struct snd_soc_dai *dai)
+>> +{
+>> +     struct sun4i_spdif_dev *host = snd_soc_dai_get_drvdata(dai);
+>> +
+>> +     snd_soc_dai_init_dma_data(dai, &host->dma_params_tx, NULL);
+>> +     return 0;
+>> +}
+>> +
+>> +static const struct snd_soc_dai_ops sun4i_spdif_dai_ops = {
+>> +     .startup        = sun4i_spdif_startup,
+>> +     .trigger        = sun4i_spdif_trigger,
+>> +     .hw_params      = sun4i_spdif_hw_params,
 >> +};
 >> +
->> +&uart2 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&uart2_pins>;
->> +	status = "okay";
+>> +static const struct regmap_config sun4i_spdif_regmap_config = {
+>> +     .reg_bits = 32,
+>> +     .reg_stride = 4,
+>> +     .val_bits = 32,
+>> +     .max_register = SUN4I_SPDIF_RXCHSTA1,
 >> +};
 >> +
->> +&uart3 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&uart3_pins_a>;
->> +	status = "okay";
+>> +#define SUN4I_RATES  SNDRV_PCM_RATE_8000_192000
+>> +
+>> +#define SUN4I_FORMATS        (SNDRV_PCM_FORMAT_S16_LE | \
+>> +                             SNDRV_PCM_FORMAT_S20_3LE | \
+>> +                             SNDRV_PCM_FORMAT_S24_LE)
+>> +
+>> +static struct snd_soc_dai_driver sun4i_spdif_dai = {
+>> +     .playback = {
+>> +             .channels_min = 1,
+>> +             .channels_max = 2,
+>> +             .rates = SUN4I_RATES,
+>> +             .formats = SUN4I_FORMATS,
+>> +     },
+>> +     .probe = sun4i_spdif_soc_dai_probe,
+>> +     .ops = &sun4i_spdif_dai_ops,
+>> +     .name = "spdif",
 >> +};
 >> +
->> +&uart4 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&uart4_pins>;
->> +	status = "okay";
+>> +static const struct snd_soc_dapm_widget dit_widgets[] = {
+>> +     SND_SOC_DAPM_OUTPUT("spdif-out"),
 >> +};
-> 
-> Our policy for boards with "open" pin headers the user can plug
-> anything he wants is that unless the pin is explicitly dedicated to
-> that usage, we simply leave them aside so that we don't enforce
-> anything.
-
-Makes sense, I just wonder what a user is expected to do if she wants to
-use the serial ports?
-Hack the DT?
-Use U-Boot to create those nodes on the fly?
-Use overlays?
-Directly setup serial ports from userland? (thinking of this bloody
-mechanism x86 (used to?) have)
-
-Anyway, thanks for the comments, all make sense and I will fix them.
-
-Cheers,
-Andre.
-
-> From the quick look at the schematics, I guess only the UART0 on the
-> 10-pin expansion header is elligible.
-> 
->> diff --git a/arch/arm64/boot/dts/allwinner/pine64_plus.dts b/arch/arm64/boot/dts/allwinner/pine64_plus.dts
->> new file mode 100644
->> index 0000000..344752e
->> --- /dev/null
->> +++ b/arch/arm64/boot/dts/allwinner/pine64_plus.dts
->> @@ -0,0 +1,59 @@
->> +/*
->> + * Copyright (c) 2016 ARM Ltd.
->> + *
->> + * This file is dual-licensed: you can use it either under the terms
->> + * of the GPL or the X11 license, at your option. Note that this dual
->> + * licensing only applies to this file, and not this project as a
->> + * whole.
->> + *
->> + *  a) This library is free software; you can redistribute it and/or
->> + *     modify it under the terms of the GNU General Public License as
->> + *     published by the Free Software Foundation; either version 2 of the
->> + *     License, or (at your option) any later version.
->> + *
->> + *     This library is distributed in the hope that it will be useful,
->> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + *     GNU General Public License for more details.
->> + *
->> + * Or, alternatively,
->> + *
->> + *  b) Permission is hereby granted, free of charge, to any person
->> + *     obtaining a copy of this software and associated documentation
->> + *     files (the "Software"), to deal in the Software without
->> + *     restriction, including without limitation the rights to use,
->> + *     copy, modify, merge, publish, distribute, sublicense, and/or
->> + *     sell copies of the Software, and to permit persons to whom the
->> + *     Software is furnished to do so, subject to the following
->> + *     conditions:
->> + *
->> + *     The above copyright notice and this permission notice shall be
->> + *     included in all copies or substantial portions of the Software.
->> + *
->> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
->> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
->> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
->> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
->> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
->> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
->> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
->> + *     OTHER DEALINGS IN THE SOFTWARE.
->> + */
 >> +
->> +/dts-v1/;
+>> +static const struct snd_soc_dapm_route dit_routes[] = {
+>> +     { "spdif-out", NULL, "Playback" },
+>> +};
 >> +
->> +#include "pine64_common.dtsi"
+>> +static const struct of_device_id sun4i_spdif_of_match[] = {
+>> +     { .compatible = "allwinner,sun4i-a10-spdif", },
+>> +     { /* sentinel */ }
+>> +};
+>> +MODULE_DEVICE_TABLE(of, sun4i_spdif_of_match);
 >> +
->> +/ {
->> +	model = "Pine64+";
->> +	compatible = "pine64,pine64_plus", "allwinner,a64", "allwinner,sunxi";
-> 
-> The usual separator in the compatibles is a dash and not an underscore.
-> 
+>> +static const struct snd_soc_component_driver sun4i_spdif_component = {
+>> +     .name           = "sun4i-spdif",
+>> +};
+>> +
+>> +static int sun4i_spdif_runtime_suspend(struct device *dev)
+>> +{
+>> +     struct sun4i_spdif_dev *host  = dev_get_drvdata(dev);
+>> +
+>> +     clk_disable_unprepare(host->spdif_clk);
+>> +     clk_disable_unprepare(host->apb_clk);
+>> +
+>> +     return 0;
+>> +}
+>> +
+>> +static int sun4i_spdif_runtime_resume(struct device *dev)
+>> +{
+>> +     struct sun4i_spdif_dev *host  = dev_get_drvdata(dev);
+>> +
+>> +     clk_prepare_enable(host->spdif_clk);
+>> +     clk_prepare_enable(host->apb_clk);
+>> +
+>> +     return 0;
+>> +}
+>> +
+>> +static int sun4i_spdif_probe(struct platform_device *pdev)
+>> +{
+>> +     struct sun4i_spdif_dev *host;
+>> +     struct resource *res;
+>> +     int ret;
+>> +     void __iomem *base;
+>> +
+>> +     dev_dbg(&pdev->dev, "Entered %s\n", __func__);
+>> +
+>> +     host = devm_kzalloc(&pdev->dev, sizeof(*host), GFP_KERNEL);
+>> +     if (!host)
+>> +             return -ENOMEM;
+>> +
+>> +     host->pdev = pdev;
+>> +
+>> +     /* Initialize this copy of the CPU DAI driver structure */
+>> +     memcpy(&host->cpu_dai_drv, &sun4i_spdif_dai, sizeof(sun4i_spdif_dai));
+>> +     host->cpu_dai_drv.name = dev_name(&pdev->dev);
+>> +
+>> +     /* Get the addresses */
+>> +     res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +     base = devm_ioremap_resource(&pdev->dev, res);
+>> +     if (IS_ERR(base))
+>> +             return PTR_ERR(base);
+>> +
+>> +     host->regmap = devm_regmap_init_mmio(&pdev->dev, base,
+>> +                                             &sun4i_spdif_regmap_config);
+>> +
+>> +     /* Clocks */
+>> +     host->apb_clk = devm_clk_get(&pdev->dev, "apb");
+>> +     if (IS_ERR(host->apb_clk)) {
+>> +             dev_err(&pdev->dev, "failed to get a apb clock.\n");
+>> +             return PTR_ERR(host->apb_clk);
+>> +     }
+>> +
+>> +     ret = clk_prepare_enable(host->apb_clk);
+>> +     if (ret) {
+>> +             dev_err(&pdev->dev, "try to enable apb_spdif_clk failed\n");
+>> +             return ret;
+>> +     }
+>
+> You don't need to enable it anymore.
+Removed ACK
+>
+>> +
+>> +     host->spdif_clk = devm_clk_get(&pdev->dev, "spdif");
+>> +     if (IS_ERR(host->spdif_clk)) {
+>> +             dev_err(&pdev->dev, "failed to get a spdif clock.\n");
+>> +             goto err_disable_apb_clk;
+>> +     }
+>> +
+>> +     host->dma_params_tx.addr = res->start + SUN4I_SPDIF_TXFIFO;
+>> +     host->dma_params_tx.maxburst = 4;
+>> +     host->dma_params_tx.addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
+>> +
+>> +     platform_set_drvdata(pdev, host);
+>> +
+>> +     ret = devm_snd_soc_register_component(&pdev->dev,
+>> +                             &sun4i_spdif_component, &sun4i_spdif_dai, 1);
+>> +     if (ret)
+>> +             goto err_disable_apb_clk;
+>> +
+>> +     pm_runtime_enable(&pdev->dev);
+>> +     if (!pm_runtime_enabled(&pdev->dev)) {
+>> +             ret = sun4i_spdif_runtime_resume(&pdev->dev);
+>> +             if (ret)
+>> +                     goto err_unregister;
+>> +     }
+>> +
+>> +     ret = devm_snd_dmaengine_pcm_register(&pdev->dev, NULL, 0);
+>> +     if (ret)
+>> +             goto err_suspend;
+>> +     return 0;
+>> +err_suspend:
+>> +     if (!pm_runtime_status_suspended(&pdev->dev))
+>> +             sun4i_spdif_runtime_suspend(&pdev->dev);
+>> +err_unregister:
+>> +     pm_runtime_disable(&pdev->dev);
+>> +     snd_soc_unregister_component(&pdev->dev);
+>> +err_disable_apb_clk:
+>> +     clk_disable_unprepare(host->apb_clk);
+>> +     return ret;
+>> +}
+>> +
+>> +static int sun4i_spdif_remove(struct platform_device *pdev)
+>> +{
+>> +     pm_runtime_disable(&pdev->dev);
+>> +     if (!pm_runtime_status_suspended(&pdev->dev))
+>> +             sun4i_spdif_runtime_suspend(&pdev->dev);
+>> +
+>> +     snd_soc_unregister_platform(&pdev->dev);
+>> +     snd_soc_unregister_component(&pdev->dev);
+>> +
+>> +     return 0;
+>> +}
+>> +
+>> +static const struct dev_pm_ops sun4i_spdif_pm = {
+>> +     SET_RUNTIME_PM_OPS(sun4i_spdif_runtime_suspend,
+>> +                        sun4i_spdif_runtime_resume, NULL)
+>> +};
+>> +
+>> +static struct platform_driver sun4i_spdif_driver = {
+>> +     .driver         = {
+>> +             .name   = "sun4i-spdif",
+>> +             .of_match_table = of_match_ptr(sun4i_spdif_of_match),
+>> +             .pm     = &sun4i_spdif_pm,
+>> +     },
+>> +     .probe          = sun4i_spdif_probe,
+>> +     .remove         = sun4i_spdif_remove,
+>> +};
+>> +
+>> +module_platform_driver(sun4i_spdif_driver);
+>> +
+>> +MODULE_AUTHOR("Marcus Cooper <codekipper@gmail.com>");
+>> +MODULE_AUTHOR("Andrea Venturi <be17068@iperbole.bo.it>");
+>> +MODULE_DESCRIPTION("Allwinner sun4i SPDIF SoC Interface");
+>> +MODULE_LICENSE("GPL");
+>> +MODULE_ALIAS("platform:sun4i-spdif");
+>> --
+>> 2.7.0
+>>
+>
 > Thanks!
 > Maxime
-> 
+Thanks for the review...I'll leave it a day or so before sending v5.
+BR,
+CK
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
