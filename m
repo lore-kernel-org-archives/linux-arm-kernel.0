@@ -1,52 +1,35 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 5 Feb 2016 15:34:54 +0000
-Subject: [PATCH v2] clocksource/arm_arch_timer: Enable and verify MMIO
- access
-In-Reply-To: <56B4C072.3040409@linaro.org>
-References: <71bf617f4083b116b2aeab24f13fc5fed99a816f.1454327031.git.robin.murphy@arm.com>
- <20160201195816.GL4848@codeaurora.org> <56B4BFC8.6050201@arm.com>
- <56B4C072.3040409@linaro.org>
-Message-ID: <56B4C11E.1040702@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 05 Feb 2016 16:40:54 +0100
+Subject: [PATCH v2 0/5] arm64: kernel: Add support for User Access Override
+In-Reply-To: <1454684330-892-1-git-send-email-james.morse@arm.com>
+References: <1454684330-892-1-git-send-email-james.morse@arm.com>
+Message-ID: <13475776.5b1DTHhHh9@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/02/16 15:32, Daniel Lezcano wrote:
-> On 02/05/2016 04:29 PM, Robin Murphy wrote:
->> On 01/02/16 19:58, Stephen Boyd wrote:
->>> On 02/01, Robin Murphy wrote:
->>>> So far, we have been blindly assuming that having access to a
->>>> memory-mapped timer frame implies that the individual elements of that
->>>> frame frame are already enabled. Whilst it's the firmware's job to give
->>>> us non-secure access to frames in the first place, we should not rely
->>>> on implementations always being generous enough to also configure
->>>> CNTACR
->>>> for those non-secure frames (e.g. [1]).
->>>>
->>>> Explicitly enable feature-level access per-frame, and verify that the
->>>> access we want is really implemented before trying to make use of it.
->>>>
->>>> [1]:https://github.com/ARM-software/tf-issues/issues/170
->>>>
->>>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->>>> ---
->>>
->>> Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
->>> Tested-by: Stephen Boyd <sboyd@codeaurora.org>
->>
->> Great, thanks!
->>
->> Daniel, am I right in hoping this is something you'll pick up, or should
->> I be resending it to arm-soc?
->
-> I will be reviewing timers patches next week. I will take care of this one.
+On Friday 05 February 2016 14:58:45 James Morse wrote:
+> This series adds support for User Access Override (UAO; part of the ARMv8.2
+> Extensions[0]). When enabled, this causes the get_user() accessors to use
+> the unprivileged load/store instructions. When addr_limit is set to
+> KERNEL_DS, we set the override bit allowing privileged access.
+> 
+> Because the unprivileged instructions don't trip PAN, the last patch changes
+> which 'alternative' values are swapped in, allowing PAN to be left enabled
+> during get_user() and friends.
+> 
+> This series can be retrieved from:
+> git://linux-arm.org/linux-jm.git -b uao/v2
+> 
 
-Cool, thanks for the confirmation.
+Looks very nice. I have no complaints about the implementations, but two questions:
 
-Robin.
+* There was recently some work in reducing the number of set_fs() calls in
+  the compat_ioctl, which further reduces the attack surface. Should we try to
+  continue that effort in other syscalls?
 
->
-> Thanks
->    -- Daniel
->
->
->
+* Do we expect to handle this using live patching indefinitely? I can imagine
+  that at some point in the future, ARMv8.2+ systems will be the vast majority,
+  so it might be nice to support enabling it unconditionally (same for any
+  of the alternative bits really). Is there a long-term strategy?
+
+	Arnd
