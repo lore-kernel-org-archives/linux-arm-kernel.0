@@ -1,137 +1,108 @@
-From: rogershimizu@gmail.com (Roger Shimizu)
-Date: Sat,  6 Feb 2016 01:33:18 +0900
-Subject: [PATCH 3/3] ARM: dts: orion5x: add device tree for buffalo
- linkstation ls-gl
-In-Reply-To: <1454689998-9579-1-git-send-email-rogershimizu@gmail.com>
-References: <1454689998-9579-1-git-send-email-rogershimizu@gmail.com>
-Message-ID: <1454689998-9579-4-git-send-email-rogershimizu@gmail.com>
+From: Mike.Leach@arm.com (Mike Leach)
+Date: Fri, 5 Feb 2016 16:31:32 +0000
+Subject: [PATCH V2 3/6] stm class: provision for statically assigned
+ masterIDs
+In-Reply-To: <87mvrf5ngl.fsf@ashishki-desk.ger.corp.intel.com>
+References: <1454487337-30184-1-git-send-email-zhang.chunyan@linaro.org>
+ <1454487337-30184-4-git-send-email-zhang.chunyan@linaro.org>
+ <87mvrf5ngl.fsf@ashishki-desk.ger.corp.intel.com>
+Message-ID: <DB3PR08MB0041B8843C61FCEB049B2BB58CD20@DB3PR08MB0041.eurprd08.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add dts file to support Buffalo Linkstation LS-GL
-(a.k.a Buffalo Linkstation Pro/Live), which is marvell orion5x based
-3.5" HDD NAS.
+Hi,
 
-Product info:
-  - (JPN) http://buffalo.jp/products/catalog/item/l/ls-gl/
-  - (ENG) http://www.buffalotech.com/products/network-storage/linkstation/linkstation-pro
+I think a quick clarification of the ARM hardware STM architecture may be of value here.
 
-This device tree is based on the board file:
-  arch/arm/mach-orion5x/kurobox_pro-setup.c
-However, that board file also support Kurobox Pro, which is not supported by
-device tree yet. So the board file is not removed.
+The ARM hardware STM, when implemented as recommend in a hardware design, the master IDs are not under driver control, but have a hardwire association with source devices in the system. The master IDs are hardwired to individual cores and core security states, and there could be other IDs associated with hardware trace sources requiring output via the hardware STM. (an example of this is the ARM Juno development board).
 
-Signed-off-by: Roger Shimizu <rogershimizu@gmail.com>
----
- arch/arm/boot/dts/Makefile                     |  1 +
- arch/arm/boot/dts/orion5x-linkstation-lsgl.dts | 87 ++++++++++++++++++++++++++
- 2 files changed, 88 insertions(+)
- create mode 100644 arch/arm/boot/dts/orion5x-linkstation-lsgl.dts
+Therefore in multi-core systems many masters may be associated with a single software STM stream. A user-space application running on Core 1, may have a master ID of 0x11 in the STPv2 trace stream, but if this application is context switched and later continues running on Core 2, then master ID could change to 0x21.  Masters identify a hardware source in this scheme, the precise values used will be implementation dependent.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 68625754f398..15a52c1be78a 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -496,6 +496,7 @@ dtb-$(CONFIG_SOC_DRA7XX) += \
- dtb-$(CONFIG_ARCH_ORION5X) += \
- 	orion5x-lacie-d2-network.dtb \
- 	orion5x-lacie-ethernet-disk-mini-v2.dtb \
-+	orion5x-linkstation-lsgl.dtb \
- 	orion5x-linkstation-lswtgl.dtb \
- 	orion5x-lswsgl.dtb \
- 	orion5x-maxtor-shared-storage-2.dtb \
-diff --git a/arch/arm/boot/dts/orion5x-linkstation-lsgl.dts b/arch/arm/boot/dts/orion5x-linkstation-lsgl.dts
-new file mode 100644
-index 000000000000..1cf644bfd7ea
---- /dev/null
-+++ b/arch/arm/boot/dts/orion5x-linkstation-lsgl.dts
-@@ -0,0 +1,87 @@
-+/*
-+ * Device Tree file for Buffalo Linkstation LS-GL
-+ *       (also known as Buffalo Linkstation Pro/Live)
-+ *
-+ * Copyright (C) 2016
-+ * Roger Shimizu <rogershimizu@gmail.com>
-+ *
-+ * Based on the board file arch/arm/mach-orion5x/kurobox_pro-setup.c
-+ * Copyright (C) Ronen Shitrit <rshitrit@marvell.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+
-+#include "orion5x-linkstation.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
-+
-+/ {
-+	model = "Buffalo Linkstation Pro/Live";
-+	compatible = "buffalo,lsgl", "marvell,orion5x-88f5182", "marvell,orion5x";
-+
-+	memory { /* 128 MB */
-+		device_type = "memory";
-+		reg = <0x00000000 0x8000000>;
-+	};
-+};
-+
-+&pinctrl {
-+	pmx_power_hdd: pmx-power-hdd {
-+		marvell,pins = "mpp1";
-+		marvell,function = "gpio";
-+	};
-+
-+	pmx_power_usb: pmx-power-usb {
-+		marvell,pins = "mpp9";
-+		marvell,function = "gpio";
-+	};
-+};
-+
-+&hdd_power {
-+	gpios = <&gpio0 1 GPIO_ACTIVE_HIGH>;
-+};
-+
-+&usb_power {
-+	gpios = <&gpio0 9 GPIO_ACTIVE_HIGH>;
-+};
-+
-+&ehci1 {
-+	status = "okay";
-+};
--- 
-2.1.4
+So the number of masters "available to the software" depends on your interpretation of the phrase.
+If you mean "master IDs on which software trace will appear" then that will be many - it depends on which core is running the application. However as described above, this is not predictable by any decoder, and the master set used may not be contiguous.
+If you mean "master IDs selectable/allocated by the driver" then that will be 0 - the driver has no control, and possibly no knowledge of which master is associated with the current execution context. (this is of course system dependent - it may well be possible to have some configuration database associating cores with hardware IDs, but this will be implementation and board support dependant).
+
+Therefore, there is a requirement to tell both the user-space STM client and decoder that not only is master ID management not needed - it is in fact not possible and the key to identify the software source for a given STM packet is the channel alone. In addition we have a nominal single Master ID "available to the software", to satisfy the requirements of the generic ST module API.
+
+So on Juno for example, while we do have 128 masters, each with 65536 channels, the master allocation is not visible to system software - each core sees a single master with 65536 channels. Therefore differentiation between software sources in the STM trace is by channel number allocations only.
+
+Best Regards
+
+Mike.
+
+----------------------------------------------------------------
+Mike Leach                           +44 (0)1254 893911 (Direct)
+Principal Engineer                   +44 (0)1254 893900 (Main)
+Arm Blackburn Design Centre          +44 (0)1254 893901 (Fax)
+Belthorn House
+Walker Rd                            mailto:mike.leach at arm.com
+Guide
+Blackburn
+BB1 2QE
+----------------------------------------------------------------
+
+
+> -----Original Message-----
+> From: Alexander Shishkin [mailto:alexander.shishkin at linux.intel.com]
+> Sent: 05 February 2016 12:52
+> To: Chunyan Zhang; mathieu.poirier at linaro.org
+> Cc: robh at kernel.org; broonie at kernel.org; pratikp at codeaurora.org;
+> nicolas.guion at st.com; corbet at lwn.net; Mark Rutland; Mike Leach;
+> tor at ti.com; Al Grant; zhang.lyra at gmail.com; linux-kernel at vger.kernel.org;
+> linux-arm-kernel at lists.infradead.org; linux-api at vger.kernel.org; linux-
+> doc at vger.kernel.org
+> Subject: Re: [PATCH V2 3/6] stm class: provision for statically assigned
+> masterIDs
+>
+> Chunyan Zhang <zhang.chunyan@linaro.org> writes:
+>
+> > From: Mathieu Poirier <mathieu.poirier@linaro.org>
+> >
+> > Some architecture like ARM assign masterIDs statically at the HW design
+> > phase, making masterID manipulation in the generic STM core irrelevant.
+> >
+> > This patch adds a new 'mstatic' flag to struct stm_data that tells the
+> > core that this specific STM device doesn't need explicit masterID
+> > management.
+>
+> So why do we need this patch? If your STM only has master 42 allocated
+> for software sources, simply set sw_start = 42, sw_end = 42 and you're
+> good to go, software will have exactly one channel to choose from. See
+> also the comment from <linux/stm.h>:
+>
+>  * @sw_start:           first STP master available to software
+>  * @sw_end:             last STP master available to software
+>
+> particularly the "available to software" part. Any other kinds of
+> masters the STM class code doesn't care about (yet).
+>
+> > In the core sw_start/end of masterID are set to '1',
+> > i.e there is only one masterID to deal with.
+>
+> This is also a completely arbitrary and unnecessary requirement. Again,
+> you can set both to 42 and it will still work.
+>
+> > Also this patch depends on [1], so that the number of masterID
+> > is '1' too.
+> >
+> > Finally the lower and upper bound for masterIDs as presented
+> > in ($SYSFS)/class/stm/XYZ.stm/masters and
+> > ($SYSFS)/../stp-policy/XYZ.stm.my_policy/some_device/masters
+> > are set to '-1'.  That way users can't confuse them with
+> > architecture where masterID management is required (where any
+> > other value would be valid).
+>
+> Why is this a good idea? Having the actual master there will allow
+> software to know what it is and also tell the decoding side what it is
+> (assuming you have more than one source in the STP stream, it might not
+> be easy to figure out, unless you know it in advance).
+>
+> I don't see how one master statically assigned to software sources is
+> different from two masters or 32 masters. And I don't see any benefit of
+> hiding the master id from userspace. Am I missing something?
+>
+> Regards,
+> --
+> Alex
+
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
