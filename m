@@ -1,61 +1,121 @@
-From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
-Date: Fri,  5 Feb 2016 20:15:02 +0200
-Subject: [PATCH] ARM: RX51: Set system_rev from ATAGS
-In-Reply-To: <3663322.UyrB2OmX6o@wuerfel>
-References: <3663322.UyrB2OmX6o@wuerfel>
-Message-ID: <1454696102-2214-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Fri, 5 Feb 2016 11:17:00 -0700
+Subject: ARM PCI/MSI KVM passthrough with GICv2M
+In-Reply-To: <56B4DC97.60904@linaro.org>
+References: <1453813968-2024-1-git-send-email-eric.auger@linaro.org>
+ <1454017899.23148.0.camel@redhat.com> <56AB78B1.2030202@linaro.org>
+ <1454096004.9301.1.camel@redhat.com> <56ABD8E0.6080409@linaro.org>
+ <20160201140351.GE6828@arm.com> <20160203125047.GB13974@cbox>
+ <20160203131057.GA20217@arm.com> <20160203153606.GC13974@cbox>
+ <56B4DC97.60904@linaro.org>
+Message-ID: <20160205111700.726ac061@t450s.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com>
----
- arch/arm/mach-omap2/board-generic.c | 22 +++++++++++++++++++++-
- 1 file changed, 21 insertions(+), 1 deletion(-)
+On Fri, 5 Feb 2016 18:32:07 +0100
+Eric Auger <eric.auger@linaro.org> wrote:
 
-diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-index 8098272..b91fabe 100644
---- a/arch/arm/mach-omap2/board-generic.c
-+++ b/arch/arm/mach-omap2/board-generic.c
-@@ -18,6 +18,7 @@
- 
- #include <asm/setup.h>
- #include <asm/mach/arch.h>
-+#include <asm/system_info.h>
- 
- #include "common.h"
- 
-@@ -77,12 +78,31 @@ static const char *const n900_boards_compat[] __initconst = {
- 	NULL,
- };
- 
-+/* Set system_rev from atags */
-+static void __init rx51_system_rev(const struct tag *tags)
-+{
-+	const struct tag *tag;
-+
-+	if (tags->hdr.tag != ATAG_CORE)
-+		return;
-+
-+	for_each_tag(tag, tags) {
-+		if (tag->hdr.tag == ATAG_REVISION) {
-+			system_rev = tag->u.revision.rev;
-+			break;
-+		}
-+	}
-+}
-+
- /* Legacy userspace on Nokia N900 needs ATAGS exported in /proc/atags,
-  * save them while the data is still not overwritten
-  */
- static void __init rx51_reserve(void)
- {
--	save_atags((const struct tag *)(PAGE_OFFSET + 0x100));
-+	const struct tag *tags = (const struct tag *)(PAGE_OFFSET + 0x100);
-+
-+	save_atags(tags);
-+	rx51_system_rev(tags);
- 	omap_reserve();
- }
- 
--- 
-1.9.1
+> Hi Alex,
+> 
+> I tried to sketch a proposal for guaranteeing the IRQ integrity when
+> doing ARM PCI/MSI passthrough with ARM GICv2M msi-controller. This is
+> based on extended VFIO group viability control, as detailed below.
+> 
+> As opposed to ARM GICv3 ITS, this MSI controller does *not* support IRQ
+> remapping. It can expose 1 or more 4kB MSI frame. Each frame contains a
+> single register where the msi data is written.
+> 
+> I would be grateful to you if you could tell me whether it makes any sense.
+> 
+> Thanks in advance
+> 
+> Best Regards
+> 
+> Eric
+> 
+> 
+> 1) GICv2m with a single 4kB single frame
+>    all devices having this msi-controller as msi-parent share this
+>    single MSI frame. Those devices can work on behalf of the host
+>    or work on behalf of 1 or more guests (KVM assigned devices). We
+>    must make sure either the host only or 1 single VM can access to the
+>    single frame to guarantee interrupt integrity: a device assigned
+>    to 1 VM should not be able to trigger MSI targeted to the host
+>    or another VM.
+> 
+>    I would propose to extend the VFIO notion of group viability.
+>    Currently a VFIO group is viable if:
+>    all devices belonging to the same group are bound to a VFIO driver
+>    or unbound.
+> 
+>    Let's imagine we extend the viability check as follows:
+> 
+>    0) keep the current viable check: all the devices belonging to
+>       the group must be vfio bound or unbound.
+>    1) retrieve the MSI parent of the device and list all the
+>       other devices using that MSI controller as MSI-parent (does not
+>       look straightforward):
+>    2) they must be VFIO driver bound or unbound as well (meaning
+>       they are not used by the host). If not, reject device attachment
+>    - in case they are VFIO bound (a VFIO group is set):
+>      x if all VFIO containers are the same as the one of the device's
+>        we try to attach, that's OK. This means the other devices
+>        use different IOMMU mappings, eventually will target the
+>        MSI frame but they all work for the same user space client/VM.
+>      x 1 or more devices has a different container than the device
+>        under attachment:
+>        It works on behalf of a different user space client/VM,
+>        we can't attach the new device. I think there is a case however
+>        where severals containers can be opened by a single QEMU.
+> 
+> Of course the dynamic aspects, ie a new device showing up or an unbind
+> event bring significant complexity.
+> 
+> 2) GICv2M with multiple 4kB frames
+>    Each msi-frame is enumerated as msi-controller. The device tree
+>    statically defines which device is attached to each msi frame.
+>    In case devices are assigned we cannot change this attachment
+>    anyway since there might be physical contraints behind.
+>    So devices likely to be assigned to guests should be linked to a
+>    different MSI frame than devices that are not.
+> 
+>    I think extended viability concept can be used as well.
+> 
+>    This model still is not ideal: in case we have a SR-IOV device
+>    plugged onto an host bridge attached to a single MSI parent you won't
+>    be able anyway to have 1 Virtual Function working for host and 1 VF
+>    working for a guest. Only Interrupt translation (ITS) will bring that
+>    feature.
+> 
+> 3) GICv3 ITS
+>    This one supports interrupt translation service ~ Intel
+>    IRQ remapping.
+>    This means a single frame can be used by all devices. A deviceID is
+>    used exclusively by the host or a guest. I assume the ITS driver
+>    allocates/populates deviceid interrupt translation table featuring
+>    separate LPI spaces ie by construction different ITT cannot feature
+>    same LPIs. So no need to do the extended viability test.
+> 
+>    The MSI controller should have a property telling whether
+>    it supports interrupt translation. This kind of property currently
+>    exists on IOMMU side for INTEL remapping.
+> 
+
+Hi Eric,
+
+Would anyone be terribly upset if we simply assume the worst case
+scenario on GICv2m/M, have the IOMMU not claim IOMMU_CAP_INTR_REMAP, and
+require the user to opt-in via the allow_unsafe_interrupts on the
+vfio_iommu_type1 module?  That would make it very compatible with what
+we already do on x86, where it really is all or nothing.  My assumption
+is that GICv2 would be phased out in favor of GICv3, so there's always
+a hardware upgrade path to having more complete isolation, but the
+return on investment for figuring out whether a given device really has
+this sort of isolation seems pretty low.  Often users already have some
+degree of trust in the VMs they use for device assignment anyway.  An
+especially prudent user can still look at the hardware specs for their
+specific system to understand whether any devices are fully isolated
+and only make use of those for device assignment.  Does that seem like
+a reasonable alternative?  Thanks,
+
+Alex
