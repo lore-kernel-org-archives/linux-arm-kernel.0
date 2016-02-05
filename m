@@ -1,40 +1,52 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 5 Feb 2016 15:32:58 +0000
-Subject: [PATCH v2 1/2] regulator: Add coupled regulator
-In-Reply-To: <20160205143328.GD31506@lukather>
-References: <1452605842-9317-1-git-send-email-maxime.ripard@free-electrons.com>
- <1452605842-9317-2-git-send-email-maxime.ripard@free-electrons.com>
- <20160112143100.GA14628@rob-hp-laptop>
- <20160115085734.GG4581@lukather>
- <20160117000434.GB7774@rob-hp-laptop>
- <20160118162538.GH6588@sirena.org.uk>
- <20160121154649.GE3997@lukather>
- <20160121162802.GL6588@sirena.org.uk>
- <20160205143328.GD31506@lukather>
-Message-ID: <20160205153258.GW4455@sirena.org.uk>
+From: shameerali.kolothum.thodi@huawei.com (Shameerali Kolothum Thodi)
+Date: Fri, 5 Feb 2016 15:33:55 +0000
+Subject: [QUESTION ]ARM64 external L3 cache support in topology info
+In-Reply-To: <56B4B1FA.5030309@arm.com>
+References: <5FC3163CFD30C246ABAA99954A238FA8172E13A4@lhreml504-mbs>
+ <56B4B1FA.5030309@arm.com>
+Message-ID: <5FC3163CFD30C246ABAA99954A238FA8172E1638@lhreml504-mbs>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 05, 2016 at 03:33:28PM +0100, Maxime Ripard wrote:
-> On Thu, Jan 21, 2016 at 04:28:02PM +0000, Mark Brown wrote:
-> > On Thu, Jan 21, 2016 at 04:46:49PM +0100, Maxime Ripard wrote:
 
-> > > Anyway, I'm fine with both approaches, just let me know what you
-> > > prefer.
 
-> > Without seeing an implementation of the lists it's hard to say.
+> -----Original Message-----
+> From: Sudeep Holla [mailto:sudeep.holla at arm.com]
+> Sent: Friday, February 05, 2016 2:30 PM
+> To: Shameerali Kolothum Thodi; linux-arm-kernel at lists.infradead.org
+> Cc: Sudeep Holla
+> Subject: Re: [QUESTION ]ARM64 external L3 cache support in topology
+> info
+> 
+> [..]
+> 
+> >
+> > In our case, the L3 cache seems to be intelligent enough and doesn't
+> > require any additional maintenance ops. So there is no cache-
+> controller
+> > code for this. I am just wondering what's the best way to add this L3
+> > cache info to the topology. Overriding the CLIDR register, if there
+> is
+> > a next-level-cache entry in the dts and then retrieve the cache
+> geometry
+> > either from dts or from cache specific registers( but this will be
+> > implementation specific) ? Or am I missing something here?
+> >
+> 
+> Recent discussion on this [1] made it clear that we need to support
+> overriding cache properties using DT for some designs. I will consider
+> this "transparent" external/system level cache when I look into moving
+> PPC DT code in generic cacheinfo. I am not sure if it's OK to support
+> mixed information source for a platform(all internal caches via CLIDR
+> and external ones via DT), but we can pick up discussion once we I have
+> the patch.
 
-> Just to make sure we're on the same page: you want to keep the
-> regulator, but instead of giving the parent through vinX-supplies
-> properties, you want to have a single *-supply property, with a list
-> of regulators, right?
+Ok. Will wait for that then. Thanks.
 
-Either that or an explicit regulator describing the merge.  Rob wants
-the list I think but I really don't care.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160205/d5a0c1d4/attachment.sig>
+> --
+> Regards,
+> Sudeep
+> 
+> [1]
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-
+> October/381758.html
