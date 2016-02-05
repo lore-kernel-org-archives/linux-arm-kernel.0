@@ -1,48 +1,79 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 5 Feb 2016 11:48:54 +0100
-Subject: [PATCH] PCI: generic: map config window in one go
-In-Reply-To: <4090946.AhejVJy7MO@wuerfel>
-References: <1454077035-23872-1-git-send-email-ard.biesheuvel@linaro.org>
- <20160129142831.GF4541@arm.com>
- <CAKv+Gu_V83bUktPX0EiHd6qCDT2y0NEx=4n-uVv=P2MF9AZbMQ@mail.gmail.com>
- <4090946.AhejVJy7MO@wuerfel>
-Message-ID: <CAKv+Gu8oZADs_FRN=p7_Nz0wXJVWVmzVNsxtzscyp7_cFAreAQ@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 5 Feb 2016 12:11:52 +0100
+Subject: [PATCH v3 1/5] clk: sunxi: Add apb0 gates for H3
+In-Reply-To: <20160204154752.4df7808be3364a98c496c030@free.fr>
+References: <1454542430-16572-1-git-send-email-k@japko.eu>
+ <1454542430-16572-2-git-send-email-k@japko.eu>
+ <20160204154752.4df7808be3364a98c496c030@free.fr>
+Message-ID: <20160205111152.GA31506@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 January 2016 at 15:52, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 29 January 2016 15:32:01 Ard Biesheuvel wrote:
->> On 29 January 2016 at 15:28, Will Deacon <will.deacon@arm.com> wrote:
->> > Hi Ard,
->> >
->> > On Fri, Jan 29, 2016 at 03:17:15PM +0100, Ard Biesheuvel wrote:
->> >> Instead of iterating over the PCI config window and performing individual
->> >> ioremap() calls on all the adjacent slices, perform a single ioremap() to
->> >> map the entire region, and divvy it up later. This not only prevents
->> >> leaving some of it mapped if we fail half way through, it also ensures that
->> >> archs that support huge-vmap can use section mappings to perform the
->> >> mapping.
->> >>
->> >> On my Seattle A0 box, this transforms 128 separate 1 MB mappings that are
->> >> mapped down to 4 KB pages into a single 128 MB mapping using 2 MB sections,
->> >> saving 512 KB worth of page tables.
->> >>
->> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> >> ---
->> >
->> > The code was written this way in response to feedback during driver review
->> > that we couldn't necessarily grab that much contiguous vmalloc space on
->> > 32-bit ARM. Unless that's changed, we probably want to to predicate this
->> > change on having a 64-bit arch.
->> >
->>
->> Ah right. How about testing for the ARCH_HAVE_HUGE_VMAP Kconfig symbol
->> explicitly?
->>
->
-> Testing for 64BIT should be sufficient.
->
+Hi,
 
-Does it make sense to spin a v2 for this patch? Given the discussion
-we had regarding allocating only the config regions for busses that
-are populated, perhaps there is a better approach here?
+On Thu, Feb 04, 2016 at 03:47:52PM +0100, Jean-Francois Moine wrote:
+> On Thu,  4 Feb 2016 00:33:46 +0100
+> Krzysztof Adamski <k@japko.eu> wrote:
+> 
+> > This patch adds support for APB0 in H3. It seems to be compatible with
+> > earlier SOCs. apb0 gates controls R_ block peripherals (R_PIO, R_IR,
+> > etc).
+> > 
+> > Signed-off-by: Krzysztof Adamski <k@japko.eu>
+> > ---
+> >  Documentation/devicetree/bindings/clock/sunxi.txt | 1 +
+> >  drivers/clk/sunxi/clk-simple-gates.c              | 2 ++
+> >  2 files changed, 3 insertions(+)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+> > index e59f57b..751c8b9f0 100644
+> > --- a/Documentation/devicetree/bindings/clock/sunxi.txt
+> > +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+> > @@ -45,6 +45,7 @@ Required properties:
+> >  	"allwinner,sun6i-a31-apb0-gates-clk" - for the APB0 gates on A31
+> >  	"allwinner,sun7i-a20-apb0-gates-clk" - for the APB0 gates on A20
+> >  	"allwinner,sun8i-a23-apb0-gates-clk" - for the APB0 gates on A23
+> > +	"allwinner,sun8i-h3-apb0-gates-clk" - for the APB0 gates on H3
+> >  	"allwinner,sun9i-a80-apb0-gates-clk" - for the APB0 gates on A80
+> >  	"allwinner,sun4i-a10-apb1-clk" - for the APB1 clock
+> >  	"allwinner,sun9i-a80-apb1-clk" - for the APB1 bus clock on A80
+> > diff --git a/drivers/clk/sunxi/clk-simple-gates.c b/drivers/clk/sunxi/clk-simple-gates.c
+> > index f4da52b..6753c87 100644
+> > --- a/drivers/clk/sunxi/clk-simple-gates.c
+> > +++ b/drivers/clk/sunxi/clk-simple-gates.c
+> > @@ -130,6 +130,8 @@ CLK_OF_DECLARE(sun8i_a23_apb2, "allwinner,sun8i-a23-apb2-gates-clk",
+> >  	       sunxi_simple_gates_init);
+> >  CLK_OF_DECLARE(sun8i_a33_ahb1, "allwinner,sun8i-a33-ahb1-gates-clk",
+> >  	       sunxi_simple_gates_init);
+> > +CLK_OF_DECLARE(sun8i_h3_apb0, "allwinner,sun8i-h3-apb0-gates-clk",
+> > +	       sunxi_simple_gates_init);
+> >  CLK_OF_DECLARE(sun9i_a80_ahb0, "allwinner,sun9i-a80-ahb0-gates-clk",
+> >  	       sunxi_simple_gates_init);
+> >  CLK_OF_DECLARE(sun9i_a80_ahb1, "allwinner,sun9i-a80-ahb1-gates-clk",
+> 
+> It seems that the other compatible strings are there for historical
+> reasons. Why do you need a new one with such a specific name?
+> 
+> It would have been more sensible to add a generic compatible string as
+> "allwinner,apb-gates", letting the removal of the other strings for a
+> later patch...
+
+Yeah, it's a good idea, and it's probably time that we move to that.
+
+However, I'd like to keep per-soc and per-clocks compatibles in the
+DT, in case we need to protect a clock in the future. That doesn't
+prevent to have two compatibles thoughe, the specific and the generic.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160205/accd1c27/attachment.sig>
