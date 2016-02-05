@@ -1,49 +1,53 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 5 Feb 2016 18:50:29 +0530
-Subject: [PATCH 4/4] ARM: davinci: make I2C support optional
-In-Reply-To: <1454358962-640598-5-git-send-email-arnd@arndb.de>
-References: <1454358962-640598-1-git-send-email-arnd@arndb.de>
- <1454358962-640598-5-git-send-email-arnd@arndb.de>
-Message-ID: <56B4A19D.4060307@ti.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 5 Feb 2016 14:33:18 +0100
+Subject: [PATCH v10 5/5] Watchdog: ARM SBSA Generic Watchdog half
+ timeout panic support
+In-Reply-To: <56B49EC7.4050306@codeaurora.org>
+References: <1454519923-25230-1-git-send-email-fu.wei@linaro.org>
+ <1454519923-25230-6-git-send-email-fu.wei@linaro.org>
+ <56B23883.7000501@codeaurora.org>
+ <CADyBb7sxPg-QUjTbeHFtYkctKc_g7D8O=+jqbXN+DCCoCEnFqA@mail.gmail.com>
+ <56B23E99.1030604@codeaurora.org>
+ <CADyBb7s4opxfPFuX=1-qEE6uhsaMXgofAJPbHUQHrng2AUwqNA@mail.gmail.com>
+ <56B2423B.1020109@codeaurora.org>
+ <CADyBb7uULCn97ea19zH8dB4QX1QA8=AXL94d6gXgFxXM8haBNA@mail.gmail.com>
+ <56B24642.8090105@codeaurora.org>
+ <CADyBb7s_QeU=pYqN9G+5WMtx-L+=QC6uZR6N6ZWPOixnkHzPjw@mail.gmail.com>
+ <56B24AB5.3070001@codeaurora.org>
+ <CADyBb7usPpY=YLjecXce63zY5e1tniPLmNsVY=8CJHJsCqBgQw@mail.gmail.com>
+ <56B2DEE4.7060901@roeck-us.net>
+ <CADyBb7unAHEOMfruWS82RkHK6uwPAWCxUx9jqzSkiHU4LHDSeA@mail.gmail.com>
+ <20160205140259.72a33699@free-electrons.com>
+ <56B49EC7.4050306@codeaurora.org>
+Message-ID: <20160205143318.2de2815c@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 02 February 2016 02:05 AM, Arnd Bergmann wrote:
-> The davinci platform has tried to get support for the EEPROM right,
-> but failed to get a clean build so far. At the moment, we get
-> a warning whenever CONFIG_SYSFS is disabled, as that is needed by
-> EEPROM_AT24:
-> 
-> warning: (MACH_DAVINCI_EVM && MACH_SFFSDR && MACH_DAVINCI_DM6467_EVM && MACH_DAVINCI_DM365_EVM && MACH_DAVINCI_DA830_EVM && MACH_MITYOMAPL138 && MACH_MINI2440) selects EEPROM_AT24 which has unmet direct dependencies (I2C && SYSFS)
-> 
-> Kevin Hilman initially added the 'select' to ensure that EEPROM_AT24
-> is always enabled in machines that really want it for normal operation
-> (i.e. for reading the MAC address). This broke when I2C was disabled,
-> and Russell King followed up with another patch to select that as
-> well.
-> 
-> I now see that the SYSFS dependency is still missing, which leaves
-> us with three options:
-> 
-> a) add 'select SYSFS' in addition to the others
-> b) change AT24_EEPPROM to work without sysfs (should be possible)
-> c) remove all those selects again and get the files to build when
->    I2C is disabled.
-> 
-> I would really hate to do a) because adding select statements that
-> hardwire user-selectable symbols is generally a bad idea. I first
-> tried b) but then ended up redoing the patch from scratch to approach
-> c), so we can also remove the other selects.
-> 
-> I checked that CONFIG_I2C is still enabled with davinci_all_defconfig,
-> so that does not have to change.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 45b146d746ea ("ARM: Davinci: Fix I2C build errors")
-> Fixes: 22ca466847ad ("davinci: kconfig: select at24 eeprom for selected boards")
+Hello,
 
-This looks good to me. The #ifdefs in the middle of davinci_evm_init()
-are an eyesore, but getting rid of the selects is a big plus.
+On Fri, 5 Feb 2016 07:08:23 -0600, Timur Tabi wrote:
 
-Thanks,
-Sekhar
+> > I'm quite certainly missing something completely obvious here, but how
+> > can you get the WS1 interrupt*after*  raising a panic? Aren't all
+> > interrupts disabled and the system fully halted once you get a panic(),
+> > especially when raised from an interrupt handler? If that's the case,
+> > how can the system continue to do things, such as receiving the WS1
+> > interrupt and resetting ?
+> 
+> Typically, WS1 is not an interrupt.  Instead, it's a hard system-level 
+> reset.
+
+Ah, right, true. I missed that aspect because on my HW, triggering a
+system-level reset on WS1 is optional. I can actually get an interrupt
+on both WS0 and WS1, and no reset at all.
+
+But a normal configuration indeed involves having the WS1 event
+configured in HW to be a system-level reset.
+
+So, OK, it makes sense. Thanks for the clarification!
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
