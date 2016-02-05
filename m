@@ -1,26 +1,48 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 5 Feb 2016 17:45:12 +0800
-Subject: [PATCH v3 5/5] pinctrl: sunxi: Use pin number when calling
- sunxi_pmx_set
-In-Reply-To: <1454542430-16572-6-git-send-email-k@japko.eu>
-References: <1454542430-16572-1-git-send-email-k@japko.eu>
- <1454542430-16572-6-git-send-email-k@japko.eu>
-Message-ID: <CAGb2v67Wd_ZSJEdKm7b6dRzqAzGO3i61c1akVH+62xYnRF8Sfw@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 5 Feb 2016 09:47:40 +0000
+Subject: [PATCH v7 5/5] PCI: ACPI: Add a generic ACPI based host controller
+In-Reply-To: <CAKc_7PXYtFt1MQE-UGO0O5vvQ+xFKa2b5=F8wXB=EN-JUJVzZw@mail.gmail.com>
+References: <1454058340-7904-1-git-send-email-jchandra@broadcom.com>
+ <1454058340-7904-6-git-send-email-jchandra@broadcom.com>
+ <20160205001907.GJ7031@localhost>
+ <CAKc_7PXYtFt1MQE-UGO0O5vvQ+xFKa2b5=F8wXB=EN-JUJVzZw@mail.gmail.com>
+Message-ID: <20160205094740.GA31547@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 4, 2016 at 7:33 AM, Krzysztof Adamski <k@japko.eu> wrote:
-> sunxi_pmx_set accepts pin number and then calculates offset by
-> subtracting pin_base from it. sunxi_pinctrl_gpio_get, on the other hand,
-> gets offset so we have to convert it to pin number so we won't get
-> negative value in sunxi_pmx_set.
->
-> This was only used on A10 so far, where there is only one GPIO chip with
-> pin_base set to 0 so it didn't matter. However H3 also requires this
-> workaround but have two pinmux sections, triggering problem for PL port.
->
-> Signed-off-by: Krzysztof Adamski <k@japko.eu>
+On Fri, Feb 05, 2016 at 02:05:37PM +0530, Jayachandran Chandrashekaran Nair wrote:
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+[...]
 
-(resent as my mail setup failed to deliver)
+> pci_host_acpi.c is a generic implementation of these using a sysdata
+> pointing to acpi_pci_root_info, and using a pointer to the pci_mmcfg_region
+> to access ECAM area, Maybe I can rename this file to
+> pci_acpi_host_generic.c to reflect this better.
+
+Maybe you should stop sending this series and work with Tomasz to
+get this done, you are confusing everyone and I am really really
+annoyed about this.
+
+Do you realize there is no point in having two patch series doing
+the same thing and wasting everyone's review time ?
+
+Do you realize he started this work long before you and went through
+several rounds of review already (I told you before but in case you
+forgot) ?
+
+Tomasz posted a version yesterday, integrating comments following months
+of review and testing and I think it is ready to get upstream:
+
+https://lkml.org/lkml/2016/2/4/646
+
+Did you even consider reviewing his code or helping him instead of
+churning out more patches doing the *SAME* thing ?
+
+Do you want all of us to go through your code and re-fix what has
+already been fixed in Tomasz's series with the end result of missing
+yet another merge window ?
+
+This is really annoying, stop it please, really.
+
+Thank you,
+Lorenzo
