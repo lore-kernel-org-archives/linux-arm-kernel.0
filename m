@@ -1,250 +1,444 @@
-From: akshay.bhat@timesys.com (Akshay Bhat)
-Date: Thu, 4 Feb 2016 18:57:44 -0500
-Subject: [PATCH v7 4/7] ARM: dts: imx: Add support for Advantech/GE Bx50v3
-In-Reply-To: <20160203145256.GR8307@tiger>
-References: <1454109558-22800-1-git-send-email-akshay.bhat@timesys.com>
- <1454109558-22800-5-git-send-email-akshay.bhat@timesys.com>
- <20160203145256.GR8307@tiger>
-Message-ID: <56B3E578.2080209@timesys.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Thu, 4 Feb 2016 18:04:52 -0600
+Subject: [PATCH v4 2/2] pci, pci-thunder-pem: Add PCIe host driver for
+ ThunderX processors.
+In-Reply-To: <1453844781-24380-3-git-send-email-ddaney.cavm@gmail.com>
+References: <1453844781-24380-1-git-send-email-ddaney.cavm@gmail.com>
+ <1453844781-24380-3-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <20160205000452.GI7031@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi David,
 
+Looks good, a few trival questions below.
 
-On 02/03/2016 09:52 AM, Shawn Guo wrote:
-> On Fri, Jan 29, 2016 at 06:19:15PM -0500, Akshay Bhat wrote:
->> From: Justin Waters <justin.waters@timesys.com>
->>
->> Advantech has 3 carrier boards (B450v3, B650v3, B850v3) which use
->> the Advantech BA-16 module (based on iMX6D). This file has the
->> devicetree entries that are common to all 3 boards.
->>
->> Signed-off-by: Akshay Bhat <akshay.bhat@timesys.com>
->> Signed-off-by: Justin Waters <justin.waters@timesys.com>
->> ---
->>   arch/arm/boot/dts/imx6q-bx50v3.dtsi | 239 ++++++++++++++++++++++++++++++++++++
->>   1 file changed, 239 insertions(+)
->>   create mode 100644 arch/arm/boot/dts/imx6q-bx50v3.dtsi
->>
->> diff --git a/arch/arm/boot/dts/imx6q-bx50v3.dtsi b/arch/arm/boot/dts/imx6q-bx50v3.dtsi
->> new file mode 100644
->> index 0000000..a44b074
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/imx6q-bx50v3.dtsi
->> @@ -0,0 +1,239 @@
->> +/*
->> + * Copyright 2015 Timesys Corporation.
->> + * Copyright 2015 General Electric Company
->> + *
->> + * This file is dual-licensed: you can use it either under the terms
->> + * of the GPL or the X11 license, at your option. Note that this dual
->> + * licensing only applies to this file, and not this project as a
->> + * whole.
->> + *
->> + *  a) This file is free software; you can redistribute it and/or
->> + *     modify it under the terms of the GNU General Public License
->> + *     version 2 as published by the Free Software Foundation.
->> + *
->> + *     This file is distributed in the hope that it will be useful
->> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + *     GNU General Public License for more details.
->> + *
->> + * Or, alternatively
->> + *
->> + *  b) Permission is hereby granted, free of charge, to any person
->> + *     obtaining a copy of this software and associated documentation
->> + *     files (the "Software"), to deal in the Software without
->> + *     restriction, including without limitation the rights to use
->> + *     copy, modify, merge, publish, distribute, sublicense, and/or
->> + *     sell copies of the Software, and to permit persons to whom the
->> + *     Software is furnished to do so, subject to the following
->> + *     conditions:
->> + *
->> + *     The above copyright notice and this permission notice shall be
->> + *     included in all copies or substantial portions of the Software.
->> + *
->> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
->> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
->> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
->> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
->> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
->> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
->> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
->> + *     OTHER DEALINGS IN THE SOFTWARE.
->> + */
->> +
->> +#include "imx6q-ba16.dtsi"
->> +
->> +/ {
->> +	clocks {
->> +		#address-cells = <1>;
->> +		#size-cells = <0>;
->
-> These are already specified in imx6qdl.dtsi.
->
+On Tue, Jan 26, 2016 at 01:46:21PM -0800, David Daney wrote:
+> From: David Daney <david.daney@cavium.com>
+> 
+> Some Cavium ThunderX processors require quirky access methods for the
+> config space of the PCIe bridge.  Add a driver to provide these config
+> space accessor functions.  The pci-host-common code is used to
+> configure the PCI machinery.
+> 
+> Signed-off-by: David Daney <david.daney@cavium.com>
+> Acked-by: Rob Herring <robh@kernel.org>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  .../devicetree/bindings/pci/pci-thunder-pem.txt    |  43 ++++
+>  MAINTAINERS                                        |   8 +
+>  drivers/pci/host/Kconfig                           |   7 +
+>  drivers/pci/host/Makefile                          |   1 +
+>  drivers/pci/host/pci-thunder-pem.c                 | 283 +++++++++++++++++++++
 
-Will fix this. Once it is removed, should I have a new line before the 
-child node?
-eg:
+What's the significance of the "pem" part of the name?  I'm wondering
+if we can shorten the filenames and function names by dropping it and
+referring to this simply as "thunder" or "thunderx".
 
-clocks {
+>  5 files changed, 342 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pci/pci-thunder-pem.txt
+>  create mode 100644 drivers/pci/host/pci-thunder-pem.c
+> 
+> diff --git a/Documentation/devicetree/bindings/pci/pci-thunder-pem.txt b/Documentation/devicetree/bindings/pci/pci-thunder-pem.txt
+> new file mode 100644
+> index 0000000..f131fae
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pci/pci-thunder-pem.txt
+> @@ -0,0 +1,43 @@
+> +* ThunderX PEM PCIe host controller
+> +
+> +Firmware-initialized PCI host controller found on some Cavium
+> +ThunderX processors.
+> +
+> +The properties and their meanings are identical to those described in
+> +host-generic-pci.txt except as listed below.
+> +
+> +Properties of the host controller node that differ from
+> +host-generic-pci.txt:
+> +
+> +- compatible     : Must be "cavium,pci-host-thunder-pem"
+> +
+> +- reg            : Two entries: First the configuration space for down
+> +                   stream devices base address and size, as accessed
+> +                   from the parent bus. Second, the register bank of
+> +                   the PEM device PCIe bridge.
+> +
+> +Example:
+> +
+> +    pci at 87e0,c2000000 {
+> +	compatible = "cavium,pci-host-thunder-pem";
+> +	device_type = "pci";
+> +	msi-parent = <&its>;
+> +	msi-map = <0 &its 0x10000 0x10000>;
+> +	bus-range = <0x8f 0xc7>;
+> +	#size-cells = <2>;
+> +	#address-cells = <3>;
+> +
+> +	reg = <0x8880 0x8f000000 0x0 0x39000000>,  /* Configuration space */
+> +	      <0x87e0 0xc2000000 0x0 0x00010000>; /* PEM space */
+> +	ranges = <0x01000000 0x00 0x00020000 0x88b0 0x00020000 0x00 0x00010000>, /* I/O */
+> +		 <0x03000000 0x00 0x10000000 0x8890 0x10000000 0x0f 0xf0000000>, /* mem64 */
+> +		 <0x43000000 0x10 0x00000000 0x88a0 0x00000000 0x10 0x00000000>, /* mem64-pref */
+> +		 <0x03000000 0x87e0 0xc2f00000 0x87e0 0xc2000000 0x00 0x00100000>; /* mem64 PEM BAR4 */
+> +
+> +	#interrupt-cells = <1>;
+> +	interrupt-map-mask = <0 0 0 7>;
+> +	interrupt-map = <0 0 0 1 &gic0 0 0 0 24 4>, /* INTA */
+> +			<0 0 0 2 &gic0 0 0 0 25 4>, /* INTB */
+> +			<0 0 0 3 &gic0 0 0 0 26 4>, /* INTC */
+> +			<0 0 0 4 &gic0 0 0 0 27 4>; /* INTD */
+> +    };
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 73c5bde..1aa8f82 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -8419,6 +8419,14 @@ L:     linux-arm-msm at vger.kernel.org
+>  S:     Maintained
+>  F:     drivers/pci/host/*qcom*
+>  
+> +PCIE DRIVER FOR CAVIUM THUNDERX
+> +M:	David Daney <david.daney@cavium.com>
+> +L:	linux-pci at vger.kernel.org
+> +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> +S:	Supported
+> +F:	Documentation/devicetree/bindings/pci/pci-thunder-*
+> +F:	drivers/pci/host/pci-thunder-*
+> +
+>  PCMCIA SUBSYSTEM
+>  P:	Linux PCMCIA Team
+>  L:	linux-pcmcia at lists.infradead.org
+> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+> index 65709b4..184df22 100644
+> --- a/drivers/pci/host/Kconfig
+> +++ b/drivers/pci/host/Kconfig
+> @@ -195,4 +195,11 @@ config PCIE_QCOM
+>  	  PCIe controller uses the Designware core plus Qualcomm-specific
+>  	  hardware wrappers.
+>  
+> +config PCI_HOST_THUNDER_PEM
+> +	bool "Cavium Thunder PCIe controller to off-chip devices"
+> +	depends on OF && ARM64
+> +	select PCI_HOST_COMMON
+> +	help
+> +	  Say Y here if you want PCIe support for CN88XX Cavium Thunder SoCs.
+> +
+>  endmenu
+> diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile
+> index 3b24af8..8903172 100644
+> --- a/drivers/pci/host/Makefile
+> +++ b/drivers/pci/host/Makefile
+> @@ -23,3 +23,4 @@ obj-$(CONFIG_PCIE_ALTERA) += pcie-altera.o
+>  obj-$(CONFIG_PCIE_ALTERA_MSI) += pcie-altera-msi.o
+>  obj-$(CONFIG_PCI_HISI) += pcie-hisi.o
+>  obj-$(CONFIG_PCIE_QCOM) += pcie-qcom.o
+> +obj-$(CONFIG_PCI_HOST_THUNDER_PEM) += pci-thunder-pem.o
+> diff --git a/drivers/pci/host/pci-thunder-pem.c b/drivers/pci/host/pci-thunder-pem.c
+> new file mode 100644
+> index 0000000..43fa6f5
+> --- /dev/null
+> +++ b/drivers/pci/host/pci-thunder-pem.c
+> @@ -0,0 +1,283 @@
+> +/*
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + *
+> + * Copyright (C) 2015 Cavium, Inc.
+> + *
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_pci.h>
+> +#include <linux/platform_device.h>
+> +
+> +#include "pci-host-common.h"
+> +
+> +#define PEM_CFG_WR 0x28
+> +#define PEM_CFG_RD 0x30
+> +
+> +struct thunder_pem_pci {
+> +	struct gen_pci	gen_pci;
+> +	u32		ea_entry[3];
+> +	void __iomem	*pem_reg_base;
+> +};
+> +
+> +static int thunder_pem_config_read(struct pci_bus *bus, unsigned int devfn,
+> +				   int where, int size, u32 *val)
+> +{
+> +	int r;
+> +	struct thunder_pem_pci *pem_pci;
+> +	struct gen_pci *pci = bus->sysdata;
+> +
+> +	pem_pci = container_of(pci, struct thunder_pem_pci, gen_pci);
+> +
+> +	/*
+> +	 * The first device on the bus in the PEM PCIe bridge.
+> +	 * Special case its config access.
+> +	 */
+> +	if (bus->number == pci->cfg.bus_range->start) {
+> +		u64 read_val;
+> +
+> +		if (devfn != 0 || where >= 2048) {
+> +			*val = ~0;
+> +			return PCIBIOS_DEVICE_NOT_FOUND;
+> +		}
+> +
+> +		/*
+> +		 * 32-bit accesses only.  Write the address to the low
+> +		 * order bits of PEM_CFG_RD, then trigger the read by
+> +		 * reading back.  The config data lands in the upper
+> +		 * 32-bits of PEM_CFG_RD.
+> +		 */
+> +		read_val = where & ~3ull;
+> +		writeq(read_val, pem_pci->pem_reg_base + PEM_CFG_RD);
+> +		read_val = readq(pem_pci->pem_reg_base + PEM_CFG_RD);
+> +		read_val >>= 32;
+> +
+> +		/*
+> +		 * The config space contains some garbage, fix it up.
+> +		 * Also synthesize an EA capability for the BAR used
+> +		 * by MSI-X.
+> +		 */
+> +		switch (where & ~3u) {
+> +		case 0x40:
+> +			read_val &= 0xffff00ff;
+> +			read_val |= 0x00007000; /* Skip MSI CAP */
+> +			break;
+> +		case 0x70: /* Express Cap */
+> +			/* PME interrupt on vector 2*/
+> +			read_val |= (2u << 25);
+> +			break;
+> +		case 0xb0: /* MSI-X Cap */
+> +			/* TableSize=4, Next Cap is EA */
+> +			read_val &= 0xc00000ff;
+> +			read_val |= 0x0003bc00;
+> +			break;
+> +		case 0xb4:
+> +			/* Table offset=0, BIR=0 */
+> +			read_val = 0x00000000;
+> +			break;
+> +		case 0xb8:
+> +			/* BPA offset=0xf0000, BIR=0 */
+> +			read_val = 0x000f0000;
+> +			break;
+> +		case 0xbc:
+> +			/* EA, 1 entry, no next Cap */
+> +			read_val = 0x00010014;
+> +			break;
+> +		case 0xc0:
+> +			/* DW2 for type-1 */
+> +			read_val = 0x00000000;
+> +			break;
+> +		case 0xc4:
+> +			/* Entry BEI=0, PP=0x00, SP=0xff, ES=3 */
+> +			read_val = 0x80ff0003;
+> +			break;
+> +		case 0xc8:
+> +			read_val = pem_pci->ea_entry[0];
+> +			break;
+> +		case 0xcc:
+> +			read_val = pem_pci->ea_entry[1];
+> +			break;
+> +		case 0xd0:
+> +			read_val = pem_pci->ea_entry[2];
+> +			break;
+> +		default:
+> +			break;
+> +		}
+> +		read_val >>= (8 * (where & 3));
+> +		switch (size) {
+> +		case 1:
+> +			read_val &= 0xff;
+> +			break;
+> +		case 2:
+> +			read_val &= 0xffff;
+> +			break;
+> +		default:
+> +			break;
+> +		}
+> +		*val = read_val;
+> +		return PCIBIOS_SUCCESSFUL;
+> +	}
+> +	if (bus->number < pci->cfg.bus_range->start ||
+> +	    bus->number > pci->cfg.bus_range->end)
+> +		return PCIBIOS_DEVICE_NOT_FOUND;
+> +
+> +	r = pci_generic_config_read(bus, devfn, where, size, val);
+> +	return r;
+> +}
+> +
+> +static int thunder_pem_config_write(struct pci_bus *bus, unsigned int devfn,
+> +				    int where, int size, u32 val)
+> +{
+> +	struct gen_pci *pci = bus->sysdata;
+> +	struct thunder_pem_pci *pem_pci;
+> +
+> +	pem_pci = container_of(pci, struct thunder_pem_pci, gen_pci);
+> +
+> +	/*
+> +	 * The first device on the bus in the PEM PCIe bridge.
+> +	 * Special case its config access.
+> +	 */
+> +	if (bus->number == pci->cfg.bus_range->start) {
+> +		u64 write_val, read_val;
+> +
+> +		if (devfn != 0 || where >= 2048)
+> +			return PCIBIOS_DEVICE_NOT_FOUND;
+> +
+> +		/*
+> +		 * 32-bit accesses only.  If the write is for a size
+> +		 * smaller than 32-bits, we must first read the 32-bit
+> +		 * value and merge in the desired bits and then write
+> +		 * the whole 32-bits back out.
+> +		 */
 
-	mclk: clock at 0 {
-		compatible = "fixed-clock";
->> +
->> +		mclk: clock at 0 {
->> +			compatible = "fixed-clock";
->> +			reg = <0>;
->> +			#clock-cells = <0>;
->> +			clock-frequency = <22000000>;
->> +		};
->> +	};
->
-> <snip>
->
->> +&i2c1 {
->> +	pca9547: mux at 70 {
->> +		compatible = "nxp,pca9547";
->> +		reg = <0x70>;
->> +		#address-cells = <1>;
->> +		#size-cells = <0>;
->> +
->> +		mux1_i2c1: i2c at 0 {
->> +			#address-cells = <1>;
->> +			#size-cells = <0>;
->> +			reg = <0x0>;
->> +
->> +			ads7830: ads7830 at 48 {
->> +				compatible = "ti,ads7830";
->> +				reg = <0x48>;
->> +			};
->> +
->> +			mma8453: mma8453 at 1c {
->> +				compatible = "fsl,mma8453";
->> +				reg = <0x1c>;
->> +			};
->> +		};
->> +
->> +		mux1_i2c2: i2c at 1 {
->> +			#address-cells = <1>;
->> +			#size-cells = <0>;
->> +			reg = <0x1>;
->> +
->> +			eeprom: eeprom at 50 {
->> +				compatible = "atmel,24c08";
->> +				reg = <0x50>;
->> +			};
->> +
->> +			mpl3115: mpl3115 at 60 {
->> +				compatible = "fsl,mpl3115";
->> +				reg = <0x60>;
->> +			};
->> +		};
->> +
->> +		mux1_i2c3: i2c at 2 {
->> +			#address-cells = <1>;
->> +			#size-cells = <0>;
->> +			reg = <0x2>;
->> +		};
->> +
->> +		mux1_i2c4: i2c at 3 {
->> +			#address-cells = <1>;
->> +			#size-cells = <0>;
->> +			reg = <0x3>;
->> +
->> +			codec: sgtl5000 at 0a {
->
-> I think the naming schema below matches DT convention better, i.e. the
-> node name should be generic.
->
-> 			sgtl5000: codec at 0a {
->
+Ugh.  Another device that only supports 32-bit writes.  I guess this
+only affects this single device, and maybe you "know" that it has no
+registers where RW1C bits may be corrupted.  Although I suppose this
+device has the standard status registers (Status at 0x06, Secondary
+Status at 0x1e, Device Status in PCIe capability, etc.), which do
+contain RW1C bits.
 
-Will update the naming.
+We need to print a warning at probe-time so we know to consider the
+possibility of corruption when debugging.
 
->> +				compatible = "fsl,sgtl5000";
->> +				reg = <0x0a>;
->> +				clocks = <&mclk>;
->> +				VDDA-supply = <&reg_1p8v>;
->> +				VDDIO-supply = <&reg_3p3v>;
->> +			};
->> +		};
->
-> <snip>
->
->> +&usdhc4 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&pinctrl_usdhc4>;
->> +	bus-width = <4>;
->> +	vmmc-supply = <&reg_wl18xx_vmmc>;
->> +	no-1-8-v;
->> +	non-removable;
->> +	wakeup-source;
->> +	keep-power-in-suspend;
->> +	cap-power-off-card;
->> +	max-frequency = <25000000>;
->> +	status = "okay";
->> +
->
-> Drop this new line and have 'status' be the last property.
->
+> +		switch (size) {
+> +		case 1:
+> +			read_val = where & ~3ull;
+> +			writeq(read_val, pem_pci->pem_reg_base + PEM_CFG_RD);
+> +			read_val = readq(pem_pci->pem_reg_base + PEM_CFG_RD);
+> +			read_val >>= 32;
+> +			read_val &= ~(0xff << (8 * (where & 3)));
+> +			val = (val & 0xff) << (8 * (where & 3));
+> +			val |= (u32)read_val;
+> +			break;
+> +		case 2:
+> +			read_val = where & ~3ull;
+> +			writeq(read_val, pem_pci->pem_reg_base + PEM_CFG_RD);
+> +			read_val = readq(pem_pci->pem_reg_base + PEM_CFG_RD);
+> +			read_val >>= 32;
+> +			read_val &= ~(0xffff << (8 * (where & 3)));
+> +			val = (val & 0xffff) << (8 * (where & 3));
+> +			val |= (u32)read_val;
+> +			break;
+> +		default:
+> +			break;
+> +
+> +		}
+> +		/*
+> +		 * Low order bits are the config address, the high
+> +		 * order 32 bits are the data to be written.
+> +		 */
+> +		write_val = where & ~3ull;
+> +		write_val |= (((u64)val) << 32);
+> +		writeq(write_val, pem_pci->pem_reg_base + PEM_CFG_WR);
+> +		return PCIBIOS_SUCCESSFUL;
+> +	}
+> +	if (bus->number < pci->cfg.bus_range->start ||
+> +	    bus->number > pci->cfg.bus_range->end)
+> +		return PCIBIOS_DEVICE_NOT_FOUND;
+> +	return pci_generic_config_write(bus, devfn, where, size, val);
+> +}
+> +
+> +static void __iomem *map_cfg_bus_thunder_pem(struct pci_bus *bus,
+> +					     unsigned int devfn,
+> +					     int where)
+> +{
+> +	struct gen_pci *pci = bus->sysdata;
+> +	resource_size_t idx = bus->number - pci->cfg.bus_range->start;
+> +
+> +	return pci->cfg.win[idx] + ((devfn << 16) | where);
+> +}
+> +
+> +static struct gen_pci_cfg_bus_ops thunder_pem_bus_ops = {
+> +	.bus_shift	= 24,
+> +	.ops		= {
+> +		.map_bus	= map_cfg_bus_thunder_pem,
 
-Will update the same.
+How about "thunder_pem_map_bus"?
 
->> +	#address-cells = <1>;
->> +	#size-cells = <0>;
->
-> I'm not sure why this and a 'reg' property in sub-nodes are necessary at
-> all, but ...
->
-
-Most other devicetrees that use ti wlcore had the above properties along 
-with a 'reg' property in the sub-node. So I used them as reference. 
-Since there is a single child node here, is it preferred to change this to:
-
-&usdhc4 {
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_usdhc4>;
-	bus-width = <4>;
-	vmmc-supply = <&reg_wl18xx_vmmc>;
-	no-1-8-v;
-	non-removable;
-	wakeup-source;
-	keep-power-in-suspend;
-	cap-power-off-card;
-	max-frequency = <25000000>;
-	status = "okay";
-
-	wlcore {
-		compatible = "ti,wl1837";
-		interrupt-parent = <&gpio2>;
-		interrupts = <6 IRQ_TYPE_LEVEL_HIGH>;
-		tcxo-clock-frequency = <26000000>;
-	};	
-};
-
->> +
->> +	wlcore: wlcore at 0 {
->> +		compatible = "ti,wl1837";
->> +		reg = <2>;
->
-> ... at least the 'reg' property should match the unit-address after node
-> name.
->
-> Shawn
->
-Will fix this.
-
-Thanks,
-Akshay
-
->> +		interrupt-parent = <&gpio2>;
->> +		interrupts = <6 IRQ_TYPE_LEVEL_HIGH>;
->> +		tcxo-clock-frequency = <26000000>;
->> +	};
->> +};
->> --
->> 2.7.0
->>
->>
+> +		.read		= thunder_pem_config_read,
+> +		.write		= thunder_pem_config_write,
+> +	}
+> +};
+> +
+> +static const struct of_device_id thunder_pem_of_match[] = {
+> +	{ .compatible = "cavium,pci-host-thunder-pem",
+> +	  .data = &thunder_pem_bus_ops },
+> +
+> +	{ },
+> +};
+> +MODULE_DEVICE_TABLE(of, thunder_pem_of_match);
+> +
+> +static int thunder_pem_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	const struct of_device_id *of_id;
+> +	resource_size_t bar4_start;
+> +	struct resource *res_pem;
+> +	struct thunder_pem_pci *pem_pci;
+> +
+> +	pem_pci = devm_kzalloc(dev, sizeof(*pem_pci), GFP_KERNEL);
+> +	if (!pem_pci)
+> +		return -ENOMEM;
+> +
+> +	of_id = of_match_node(thunder_pem_of_match, dev->of_node);
+> +	pem_pci->gen_pci.cfg.ops = (struct gen_pci_cfg_bus_ops *)of_id->data;
+> +
+> +	/*
+> +	 * The second register range is the PEM bridge to the PCIe
+> +	 * bus.  It has a different config access method than those
+> +	 * devices behind the bridge.
+> +	 */
+> +	res_pem = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+> +	if (!res_pem) {
+> +		dev_err(dev, "missing \"reg[1]\"property\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	pem_pci->pem_reg_base = devm_ioremap(dev, res_pem->start, 0x10000);
+> +	if (!pem_pci->pem_reg_base)
+> +		return -ENOMEM;
+> +
+> +	/*
+> +	 * The MSI-X BAR for the PEM and AER interrupts is located at
+> +	 * a fixed offset from the PEM register base.  Generate a
+> +	 * fragment of the synthesized Enhanced Allocation capability
+> +	 * structure here for the BAR.
+> +	 */
+> +	bar4_start = res_pem->start + 0xf00000;
+> +	pem_pci->ea_entry[0] = (u32)bar4_start | 2;
+> +	pem_pci->ea_entry[1] = (u32)(res_pem->end - bar4_start) & ~3u;
+> +	pem_pci->ea_entry[2] = (u32)(bar4_start >> 32);
+> +
+> +	return pci_host_common_probe(pdev, &pem_pci->gen_pci);
+> +}
+> +
+> +static struct platform_driver thunder_pem_driver = {
+> +	.driver = {
+> +		.name = KBUILD_MODNAME,
+> +		.of_match_table = thunder_pem_of_match,
+> +	},
+> +	.probe = thunder_pem_probe,
+> +};
+> +module_platform_driver(thunder_pem_driver);
+> +
+> +MODULE_DESCRIPTION("Thunder PEM PCIe host driver");
+> +MODULE_LICENSE("GPL v2");
+> -- 
+> 1.8.3.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
