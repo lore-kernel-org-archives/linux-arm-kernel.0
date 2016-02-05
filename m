@@ -1,83 +1,187 @@
-From: shameerali.kolothum.thodi@huawei.com (Shameerali Kolothum Thodi)
-Date: Fri, 5 Feb 2016 12:04:02 +0000
-Subject: [QUESTION ]ARM64 external L3 cache support in topology info
-Message-ID: <5FC3163CFD30C246ABAA99954A238FA8172E13A4@lhreml504-mbs>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 5 Feb 2016 13:05:19 +0100
+Subject: [PATCHv2 2/3] arm64: Add support for ARCH_SUPPORTS_DEBUG_PAGEALLOC
+In-Reply-To: <1454615017-24672-3-git-send-email-labbott@fedoraproject.org>
+References: <1454615017-24672-1-git-send-email-labbott@fedoraproject.org>
+ <1454615017-24672-3-git-send-email-labbott@fedoraproject.org>
+Message-ID: <CAKv+Gu8sy4Uc6rQMcTW1qmy+z4RcFb78vERR-ZXk9-2B7t+Shg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Laura,
 
-This is a query to get the external L3 cache included in the cache
-topology info. ARM64 kernel now has the cache topology info added
-based on the patch here [1].
+On 4 February 2016 at 20:43, Laura Abbott <labbott@fedoraproject.org> wrote:
+>
+> ARCH_SUPPORTS_DEBUG_PAGEALLOC provides a hook to map and unmap
+> pages for debugging purposes. This requires memory be mapped
+> with PAGE_SIZE mappings since breaking down larger mappings
+> at runtime will lead to TLB conflicts. Check if debug_pagealloc
+> is enabled at runtime and if so, map everyting with PAGE_SIZE
+> pages. Implement the functions to actually map/unmap the
+> pages at runtime.
+>
+> Signed-off-by: Laura Abbott <labbott@fedoraproject.org>
 
-1. http://permalink.gmane.org/gmane.linux.ports.arm.kernel/383628
+This looks correct to me, but I still have a concern below.
 
-> 
-> This patch adds support for cacheinfo on ARM64.
-> 
-> On ARMv8, the cache hierarchy can be identified through Cache Level ID
-> (CLIDR) register while the cache geometry is provided by Cache Size ID
-> (CCSIDR) register.
-> 
-> Since the architecture doesn't provide any way of detecting the cpus 
-> sharing particular cache, device tree is used for the same purpose.
 
-We have a ARM64 board(Hisilicon D02) and it has got an external L3 cache.
-As per my understanding after talking to our SoC guys, this cache is not
-integrated into the processor and is not visible in (CLIDR) register. 
-But this looks to be fine as per the Programmer's Guide for ARMv8-A.
-
-"The CLIDR register is only aware of how many levels of cache are 
-integrated into the processor itself. It cannot provide information
-about any caches in the external memory system. For example, if 
-only L1 and L2 are integrated, CLIDR/CLIDR_EL1 identifies two levels
-of cache and the processor is unaware of any external L3 cache. 
-It might be necessary to take into account non-integrated caches
-when performing cache maintenance, or code that is maintaining
-coherency with integrated caches."
-
-> Signed-off-by: Sudeep Holla <sudeep.holla <at> arm.com>
-> Cc: Catalin Marinas <catalin.marinas <at> arm.com>
-> Cc: Will Deacon <will.deacon <at> arm.com>
-> Cc: Mark Rutland <mark.rutland <at> arm.com>
-> Cc: linux-arm-kernel <at> lists.infradead.org
 > ---
->  arch/arm64/include/asm/cachetype.h |  29 +++++++--
->  arch/arm64/kernel/Makefile         |   2 +-
->  arch/arm64/kernel/cacheinfo.c      | 128 
-[....]
-
-> +static int __populate_cache_leaves(unsigned int cpu)
-> +{
-> +    unsigned int level, idx;
-> +    enum cache_type type;
-> +    struct cpu_cacheinfo *this_cpu_ci = get_cpu_cacheinfo(cpu);
-> +    struct cacheinfo *this_leaf = this_cpu_ci->info_list;
+>  arch/arm64/Kconfig       |  3 +++
+>  arch/arm64/mm/mmu.c      | 25 +++++++++++++++++++++----
+>  arch/arm64/mm/pageattr.c | 46 ++++++++++++++++++++++++++++++++++++----------
+>  3 files changed, 60 insertions(+), 14 deletions(-)
+>
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 8cc6228..0f33218 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -537,6 +537,9 @@ config HOTPLUG_CPU
+>  source kernel/Kconfig.preempt
+>  source kernel/Kconfig.hz
+>
+> +config ARCH_SUPPORTS_DEBUG_PAGEALLOC
+> +       def_bool y
 > +
-> +    for (idx = 0, level = 1; level <= this_cpu_ci->num_levels &&
-> +         idx < this_cpu_ci->num_leaves; idx++, level++) {
-> +        type = get_cache_type(level);
-> +        if (type == CACHE_TYPE_SEPARATE) {
-> +            ci_leaf_init(this_leaf++, CACHE_TYPE_DATA, level);
-> +            ci_leaf_init(this_leaf++, CACHE_TYPE_INST, level);
-> +        } else {
-> +            ci_leaf_init(this_leaf++, type, level);
-> +        }
-> +    }
-> +    return 0;
+>  config ARCH_HAS_HOLES_MEMORYMODEL
+>         def_bool y if SPARSEMEM
+>
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index ef0d66c..be81a59 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -180,8 +180,14 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
+>         pmd = pmd_set_fixmap_offset(pud, addr);
+>         do {
+>                 next = pmd_addr_end(addr, end);
+> -               /* try section mapping first */
+> -               if (((addr | next | phys) & ~SECTION_MASK) == 0) {
+> +               /*
+> +                * try a section mapping first
+> +                *
+> +                * See comment in use_1G_block for why we need the check
+> +                * for !pgtable_alloc with !debug_pagealloc
+> +                */
+> +               if (((addr | next | phys) & ~SECTION_MASK) == 0 &&
+> +                     (!debug_pagealloc_enabled() || !pgtable_alloc)) {
+>                         pmd_t old_pmd =*pmd;
+>                         set_pmd(pmd, __pmd(phys |
+>                                            pgprot_val(mk_sect_prot(prot))));
+> @@ -208,8 +214,19 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
+>  }
+>
+>  static inline bool use_1G_block(unsigned long addr, unsigned long next,
+> -                       unsigned long phys)
+> +                       unsigned long phys, phys_addr_t (*pgtable_alloc)(void))
+>  {
+> +       /*
+> +        * If debug_page_alloc is enabled we don't want to be using sections
+> +        * since everything needs to be mapped with pages. The catch is
+> +        * that we only want to force pages if we can allocate the next
+> +        * layer of page tables. If there is no pgtable_alloc function,
+> +        * it's too early to allocate another layer and we should use
+> +        * section mappings.
+> +        */
+> +       if (pgtable_alloc && debug_pagealloc_enabled())
+> +               return false;
+> +
+
+I would suggest you stick this comment and test in a separate function
+'bool block_mappings_allowed(phys_addr_t (*pgtable_alloc)(void))' (or
+a better name if you can think of one, by all means) and call it from
+both sites where you need to perform the check. This keeps the
+symmetry, and removes the need to change the prototype of
+use_1G_block() to pass pgtable_alloc only to test it for NULL-ness
+
+With that change:
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro,.org>
+
+
+>         if (PAGE_SHIFT != 12)
+>                 return false;
+>
+> @@ -241,7 +258,7 @@ static void alloc_init_pud(pgd_t *pgd, unsigned long addr, unsigned long end,
+>                 /*
+>                  * For 4K granule only, attempt to put down a 1GB block
+>                  */
+> -               if (use_1G_block(addr, next, phys)) {
+> +               if (use_1G_block(addr, next, phys, pgtable_alloc)) {
+>                         pud_t old_pud = *pud;
+>                         set_pud(pud, __pud(phys |
+>                                            pgprot_val(mk_sect_prot(prot))));
+> diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
+> index 1360a02..57877af 100644
+> --- a/arch/arm64/mm/pageattr.c
+> +++ b/arch/arm64/mm/pageattr.c
+> @@ -37,14 +37,31 @@ static int change_page_range(pte_t *ptep, pgtable_t token, unsigned long addr,
+>         return 0;
+>  }
+>
+> +/*
+> + * This function assumes that the range is mapped with PAGE_SIZE pages.
+> + */
+> +static int __change_memory_common(unsigned long start, unsigned long size,
+> +                               pgprot_t set_mask, pgprot_t clear_mask)
+> +{
+> +       struct page_change_data data;
+> +       int ret;
+> +
+> +       data.set_mask = set_mask;
+> +       data.clear_mask = clear_mask;
+> +
+> +       ret = apply_to_page_range(&init_mm, start, size, change_page_range,
+> +                                       &data);
+> +
+> +       flush_tlb_kernel_range(start, start+size);
+> +       return ret;
 > +}
-Here the cache leaves are populated on what CLIDR is reporting, and dts
-entry is only used to find out the sharing info. Not sure purpose of
-this patch is only to report the cache that is integrated to the processor.
-
-In our case, the L3 cache seems to be intelligent enough and doesn't
-require any additional maintenance ops. So there is no cache-controller
-code for this. I am just wondering what's the best way to add this L3
-cache info to the topology. Overriding the CLIDR register, if there is
-a next-level-cache entry in the dts and then retrieve the cache geometry
-either from dts or from cache specific registers( but this will be
-implementation specific) ? Or am I missing something here? 
-
-Thanks,
-Shameer
+> +
+>  static int change_memory_common(unsigned long addr, int numpages,
+>                                 pgprot_t set_mask, pgprot_t clear_mask)
+>  {
+>         unsigned long start = addr;
+>         unsigned long size = PAGE_SIZE*numpages;
+>         unsigned long end = start + size;
+> -       int ret;
+> -       struct page_change_data data;
+>         struct vm_struct *area;
+>
+>         if (!PAGE_ALIGNED(addr)) {
+> @@ -72,14 +89,7 @@ static int change_memory_common(unsigned long addr, int numpages,
+>             !(area->flags & VM_ALLOC))
+>                 return -EINVAL;
+>
+> -       data.set_mask = set_mask;
+> -       data.clear_mask = clear_mask;
+> -
+> -       ret = apply_to_page_range(&init_mm, start, size, change_page_range,
+> -                                       &data);
+> -
+> -       flush_tlb_kernel_range(start, end);
+> -       return ret;
+> +       return __change_memory_common(start, size, set_mask, clear_mask);
+>  }
+>
+>  int set_memory_ro(unsigned long addr, int numpages)
+> @@ -111,3 +121,19 @@ int set_memory_x(unsigned long addr, int numpages)
+>                                         __pgprot(PTE_PXN));
+>  }
+>  EXPORT_SYMBOL_GPL(set_memory_x);
+> +
+> +#ifdef CONFIG_DEBUG_PAGEALLOC
+> +void __kernel_map_pages(struct page *page, int numpages, int enable)
+> +{
+> +       unsigned long addr = (unsigned long) page_address(page);
+> +
+> +       if (enable)
+> +               __change_memory_common(addr, PAGE_SIZE*numpages,
+> +                                       __pgprot(PTE_VALID),
+> +                                       __pgprot(0));
+> +       else
+> +               __change_memory_common(addr, PAGE_SIZE*numpages,
+> +                                       __pgprot(0),
+> +                                       __pgprot(PTE_VALID));
+> +}
+> +#endif
+> --
+> 2.5.0
+>
