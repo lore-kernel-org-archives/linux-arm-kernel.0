@@ -1,60 +1,28 @@
-From: yang.shi@linaro.org (Shi, Yang)
-Date: Fri, 5 Feb 2016 12:45:25 -0800
-Subject: [PATCH] PCI: layerscape: add ls2085a compatible
-In-Reply-To: <20160205203858.GA11780@localhost>
-References: <1453915925-19198-1-git-send-email-yang.shi@linaro.org>
- <20160205203858.GA11780@localhost>
-Message-ID: <56B509E5.2050602@linaro.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 5 Feb 2016 21:48:09 +0100
+Subject: [PATCH 2/3] ARM: dts: orion5x: split linkstation lswtgl into
+ common and device parts
+In-Reply-To: <1454689998-9579-3-git-send-email-rogershimizu@gmail.com>
+References: <1454689998-9579-1-git-send-email-rogershimizu@gmail.com>
+ <1454689998-9579-3-git-send-email-rogershimizu@gmail.com>
+Message-ID: <20160205204809.GC8063@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/5/2016 12:38 PM, Bjorn Helgaas wrote:
-> [+cc Rob, et al]
->
-> On Wed, Jan 27, 2016 at 09:32:05AM -0800, Yang Shi wrote:
->> The layerscape PCI host driver needs recognize ls2085a compatible when using
->> firmware with ls2085a compatible property, otherwise the PCI bus won't be
->> detected even though ls2085a compatible is included by the dts.
->>
->> Signed-off-by: Yang Shi <yang.shi@linaro.org>
->> ---
->>   drivers/pci/host/pci-layerscape.c | 1 +
->>   1 file changed, 1 insertion(+)
->>
->> diff --git a/drivers/pci/host/pci-layerscape.c b/drivers/pci/host/pci-layerscape.c
->> index 3923bed..c40d8b2 100644
->> --- a/drivers/pci/host/pci-layerscape.c
->> +++ b/drivers/pci/host/pci-layerscape.c
->> @@ -203,6 +203,7 @@ static const struct of_device_id ls_pcie_of_match[] = {
->>   	{ .compatible = "fsl,ls1021a-pcie", .data = &ls1021_drvdata },
->>   	{ .compatible = "fsl,ls1043a-pcie", .data = &ls1043_drvdata },
->>   	{ .compatible = "fsl,ls2080a-pcie", .data = &ls2080_drvdata },
->> +	{ .compatible = "fsl,ls2085a-pcie", .data = &ls2080_drvdata },
->
-> Hmm, "fsl,ls2085a-pcie" doesn't appear in
-> Documentation/devicetree/bindings/pci/.
->
-> Aren't we supposed to add these strings to the bindings before or at
-> the same time we add them to drivers?
+On Sat, Feb 06, 2016 at 01:33:17AM +0900, Roger Shimizu wrote:
+> In order to support more linkstation devices, common part of current
+> .dts file goes into .dtsi file. Some .dtsi are not with "orion5x" prefix
+> because other kirkwood based linkstation devices are in this shape, and
+> will be migrated some time later.
+>   - orion5x-linkstation.dtsi
+>   - linkstation-gpio-simple.dtsi
+>   - linkstation-fan.dtsi
 
-The below patch will add it into dts and binding doc. I should mentioned 
-this in the commit log.
+Hi Roger
 
-https://patchwork.kernel.org/patch/7767061/
+I would prefer these have an mvebu- prefix. That then covers orion5x
+and kirkwood.
 
-Thanks,
-Yang
+Otherwise these look O.K.
 
->
-> checkpatch doesn't complain though, so maybe I'm wrong about this.
->
->>   	{ },
->>   };
->>   MODULE_DEVICE_TABLE(of, ls_pcie_of_match);
->> --
->> 2.0.2
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+	  Andrew
