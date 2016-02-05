@@ -1,74 +1,56 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Fri, 5 Feb 2016 11:05:48 +0800
-Subject: [PATCH v4 13/17] ARM: Xen: Document UEFI support on Xen ARM virtual
- platforms
-In-Reply-To: <1454641552-12576-1-git-send-email-zhaoshenglong@huawei.com>
-References: <1454641552-12576-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1454641552-12576-14-git-send-email-zhaoshenglong@huawei.com>
+From: friesendrywall@gmail.com (Erik Friesen)
+Date: Thu, 4 Feb 2016 22:08:35 -0500
+Subject: SGTL5000 misc
+In-Reply-To: <CAOMZO5BxFRzi3qJAK=xDGger_MK9GZhuM00ugo836PHK_zJKjQ@mail.gmail.com>
+References: <CAEuupiuhPR48Upo=8f0zV8cxf0Vefgx3qA+vC+QDWAOV4n-e3Q@mail.gmail.com>
+ <CAOMZO5BPNc1ncz6J8yhcBYywCVuTxKYMYhiNUt_Jq3LZsKdi+A@mail.gmail.com>
+ <CAEuupiszxAj7JkJu-5ozqgEnTWkz9FQEpxN8dmEN+KtaV-76ww@mail.gmail.com>
+ <CAOMZO5DhrzdVyTVPB3FNquV4rDQ8a0MQrsJMosVsUQN63hj1Ww@mail.gmail.com>
+ <CAEuupiuoB7nMSc8Fbyort1rJd=ZhYc0zfJNkd=ckUYk1qd8Z7Q@mail.gmail.com>
+ <CAOMZO5C4QUHnJr=pisnYWCYZ0zUt+7HO846aPQui0zcLyX0N-Q@mail.gmail.com>
+ <CAEuupivdftoopCOX3f7KRbV9poKdjdD3s9hfcbgB2TYjHmrjvw@mail.gmail.com>
+ <CAEuupit8pVdnehkZkZPmq1QBHaS0sUG4NFuVFX37dKHn18j7DQ@mail.gmail.com>
+ <CAOMZO5BxFRzi3qJAK=xDGger_MK9GZhuM00ugo836PHK_zJKjQ@mail.gmail.com>
+Message-ID: <CAEuupium67HD-sz+ViPx8-L4S0TsS-C8ZrX3po382r=E-9QYgw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shannon Zhao <shannon.zhao@linaro.org>
+There is another issue here, but when I have this connected to
+external power, it won't start the card on every other boot.
 
-Add a "uefi" node under /hypervisor node in FDT, then Linux kernel could
-scan this to get the UEFI information.
+With the code below, it seems to start every time.  If I don't skip,
+it dies on #8, which is the write of 0x7060 to CHIP_ANA_POWER
 
-Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-Acked-by: Rob Herring <robh@kernel.org>
----
-CC: Rob Herring <robh@kernel.org>
----
- Documentation/devicetree/bindings/arm/xen.txt | 33 +++++++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
+This embeddedarm board supposedly power cycles the regulators, don't
+know if that is a factor or not.  The board finishes powerup 0x4060,
+but comes back on reboot at the reset value of 0x7060
 
-diff --git a/Documentation/devicetree/bindings/arm/xen.txt b/Documentation/devicetree/bindings/arm/xen.txt
-index 0f7b9c2..6f83f76 100644
---- a/Documentation/devicetree/bindings/arm/xen.txt
-+++ b/Documentation/devicetree/bindings/arm/xen.txt
-@@ -15,6 +15,26 @@ the following properties:
- - interrupts: the interrupt used by Xen to inject event notifications.
-   A GIC node is also required.
- 
-+To support UEFI on Xen ARM virtual platforms, Xen populates the FDT "uefi" node
-+under /hypervisor with following parameters:
-+
-+________________________________________________________________________________
-+Name                      | Size   | Description
-+================================================================================
-+xen,uefi-system-table     | 64-bit | Guest physical address of the UEFI System
-+			  |	   | Table.
-+--------------------------------------------------------------------------------
-+xen,uefi-mmap-start       | 64-bit | Guest physical address of the UEFI memory
-+			  |	   | map.
-+--------------------------------------------------------------------------------
-+xen,uefi-mmap-size        | 32-bit | Size in bytes of the UEFI memory map
-+                          |        | pointed to in previous entry.
-+--------------------------------------------------------------------------------
-+xen,uefi-mmap-desc-size   | 32-bit | Size in bytes of each entry in the UEFI
-+                          |        | memory map.
-+--------------------------------------------------------------------------------
-+xen,uefi-mmap-desc-ver    | 32-bit | Version of the mmap descriptor format.
-+--------------------------------------------------------------------------------
- 
- Example (assuming #address-cells = <2> and #size-cells = <2>):
- 
-@@ -22,4 +42,17 @@ hypervisor {
- 	compatible = "xen,xen-4.3", "xen,xen";
- 	reg = <0 0xb0000000 0 0x20000>;
- 	interrupts = <1 15 0xf08>;
-+	uefi {
-+		xen,uefi-system-table = <0xXXXXXXXX>;
-+		xen,uefi-mmap-start = <0xXXXXXXXX>;
-+		xen,uefi-mmap-size = <0xXXXXXXXX>;
-+		xen,uefi-mmap-desc-size = <0xXXXXXXXX>;
-+		xen,uefi-mmap-desc-ver = <0xXXXXXXXX>;
-+        };
- };
-+
-+The format and meaning of the "xen,uefi-*" parameters are similar to those in
-+Documentation/arm/uefi.txt, which are provided by the regular UEFI stub. However
-+they differ because they are provided by the Xen hypervisor, together with a set
-+of UEFI runtime services implemented via hypercalls, see
-+http://xenbits.xen.org/docs/unstable/hypercall/x86_64/include,public,platform.h.html.
--- 
-2.0.4
+static int sgtl5000_fill_defaults(struct sgtl5000_priv *sgtl5000)
+{
+  int i, ret, val, index;
+  int reg;
+  for (i = 0; i < ARRAY_SIZE(sgtl5000_reg_defaults); i++) {
+    val = sgtl5000_reg_defaults[i].def;
+    index = sgtl5000_reg_defaults[i].reg;
+    ret = regmap_read(sgtl5000->regmap, index, &reg);
+    if (reg != val) {
+      ret = regmap_write(sgtl5000->regmap, index, val);
+    } else {
+     printk(KERN_INFO "SGTL5000 probe skipped at %i with OE val of
+%x\n", i, reg);
+    }
+  if (ret) {
+    printk(KERN_WARNING "SGTL5000 probe failed at %i with OE val of
+%x\n", i, reg);
+    return ret;
+    }
+  }
+
+  return 0;
+}
+
+On Wed, Feb 3, 2016 at 5:20 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> On Wed, Feb 3, 2016 at 8:05 PM, Erik Friesen <friesendrywall@gmail.com> wrote:
+>> Anyway, I think something like this should be added to sgtl5000.c
+>
+> Yes, please send a formal patch for it.
