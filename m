@@ -1,63 +1,74 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 5 Feb 2016 10:31:06 +0100
-Subject: [PATCH v2 07/51] mtd: nand: core: use mtd_ooblayout_xxx()
- helpers where appropriate
-In-Reply-To: <1454580434-32078-8-git-send-email-boris.brezillon@free-electrons.com>
-References: <1454580434-32078-1-git-send-email-boris.brezillon@free-electrons.com>
- <1454580434-32078-8-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20160205103106.53710c48@bbrezillon>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 05 Feb 2016 10:37:00 +0100
+Subject: [PATCH v4 1/1] USB: core: let USB device know device node
+In-Reply-To: <20160205061124.GB1858@shlinux2>
+References: <1453706679-18948-1-git-send-email-peter.chen@freescale.com>
+ <1454582690.3356.18.camel@pengutronix.de> <20160205061124.GB1858@shlinux2>
+Message-ID: <1454665020.6406.21.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu,  4 Feb 2016 11:06:30 +0100
-Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
+Am Freitag, den 05.02.2016, 14:11 +0800 schrieb Peter Chen:
+[...]
+> > The reference recommendation states that for single-configuration USB
+> > devices the compatible should contain all of the applicable strings from
+> > the list starting with 2) "usbVID,PID.REV" and ending with 11)
+> > "usb,device". Are we going to ignore this?
+>
+> I have not seen benefits if we write several compatibles in dts,
+> the information of compatibles listed in doc can be got during
+> the enumeration.
+> 
+> I suggest we use the simple pattern for this compatible, in that
+> case, every one can be easy to follow it, and will not be confused
+> which compatibles should be used, and the style can be unify.
 
-> The mtd_ooblayout_xxx() helper functions have been added to avoid direct
-> accesses to the ecclayout field, and thus ease for future reworks.
-> Use these helpers in all places where the oobfree[] and eccpos[] arrays
-> where directly accessed.
-> 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> ---
->  drivers/mtd/nand/nand_base.c | 169 ++++++++++++++++++-------------------------
->  drivers/mtd/nand/nand_bch.c  |   3 +-
->  2 files changed, 74 insertions(+), 98 deletions(-)
-> 
-> diff --git a/drivers/mtd/nand/nand_base.c b/drivers/mtd/nand/nand_base.c
-> index 572369d..e01a9b5 100644
-> --- a/drivers/mtd/nand/nand_base.c
-> +++ b/drivers/mtd/nand/nand_base.c
+Just pointing it out, a comment why this differs from the recommendation
+would be nice to avoid confusion.
 
 [...]
+> > > +		compatible = "usb05e3,0608";
+> > > +		reg = <0x1>;
+> > > +	};
+> > 
+> > I'd have written this node as:
+> > 
+> > 	hub: hub at 1 {
+> > 		compatible = "usb5e3,608", "usb5e3,class9",
+> > 			     "usb,class9", "usb,device";
+> > 		reg = <1>;
+> > 	};
+> 
+> The reg should be hexadecimal, do we need to add "0x" before the value?
 
-> @@ -4116,7 +4092,6 @@ static bool nand_ecc_strength_good(struct mtd_info *mtd)
->   */
->  int nand_scan_tail(struct mtd_info *mtd)
->  {
-> -	int i;
->  	struct nand_chip *chip = mtd_to_nand(mtd);
->  	struct nand_ecc_ctrl *ecc = &chip->ecc;
->  	struct nand_buffers *nbuf;
-> @@ -4315,9 +4290,9 @@ int nand_scan_tail(struct mtd_info *mtd)
->  	 * The number of bytes available for a client to place data into
->  	 * the out of band area.
->  	 */
-> -	mtd->oobavail = 0;
-> -	for (i = 0; ecc->layout->oobfree[i].length; i++)
-> -		mtd->oobavail += ecc->layout->oobfree[i].length;
-> +	mtd->oobavail = mtd_ooblayout_count_freebytes(mtd);
+The unit-address name part should be hexadecimal, the reg property value
+doesn't have to be. As long as the value is < 10 I don't see a problem.
 
-We should call that after setting the mtd->ecclayout field.
+> > As another example, I'd like to introduce the USB WLAN Adapter soldered
+> > onto the imx6q-gk802 board to its power enable GPIO via the device tree:
+> > 
+> > /* Internal USB port (USBH1) */
+> > &usbh1 {
+> > 	#address-cells = <1>;
+> > 	#size-cells = <0>;
+> > 	status = "okay";
+> > 
+> > 	/* RTL8192CU 802.11n WLAN Adapter */
+> > 	device at 1 {
+> > 		compatible = "usbbda,8176.200", "usbbda,8176",
+> > 			     "usb,device";
+> > 		reg = <1>;
+> > 
+> > 		enable-gpios = <&gpio2 0 GPIO_ACTIVE_LOW>;
+> > 	};
+> > };
+> > 
+> 
+> It is okay to use your example, but I still insist like below:
 
-> +	if (mtd->oobavail < 0)
-> +		mtd->oobavail = 0;
->  
->  	/* ECC sanity check: warn if it's too weak */
->  	if (!nand_ecc_strength_good(mtd))
+Sorry for being imprecise. The hub example is fine for the
+documentation. I just wanted to illustrate how and why I am interested
+in this discussion.
 
-
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+best regards
+Philipp
