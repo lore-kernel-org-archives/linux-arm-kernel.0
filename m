@@ -1,319 +1,126 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 4 Feb 2016 18:19:07 -0600
-Subject: [PATCH v7 5/5] PCI: ACPI: Add a generic ACPI based host controller
-In-Reply-To: <1454058340-7904-6-git-send-email-jchandra@broadcom.com>
-References: <1454058340-7904-1-git-send-email-jchandra@broadcom.com>
- <1454058340-7904-6-git-send-email-jchandra@broadcom.com>
-Message-ID: <20160205001907.GJ7031@localhost>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Thu, 4 Feb 2016 16:28:29 -0800
+Subject: [PATCH v4 2/2] pci, pci-thunder-pem: Add PCIe host driver for
+ ThunderX processors.
+In-Reply-To: <20160205000452.GI7031@localhost>
+References: <1453844781-24380-1-git-send-email-ddaney.cavm@gmail.com>
+ <1453844781-24380-3-git-send-email-ddaney.cavm@gmail.com>
+ <20160205000452.GI7031@localhost>
+Message-ID: <56B3ECAD.4050605@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jayachandran,
+On 02/04/2016 04:04 PM, Bjorn Helgaas wrote:
+> Hi David,
+>
+> Looks good, a few trival questions below.
+>
+> On Tue, Jan 26, 2016 at 01:46:21PM -0800, David Daney wrote:
+>> From: David Daney <david.daney@cavium.com>
+>>
+>> Some Cavium ThunderX processors require quirky access methods for the
+>> config space of the PCIe bridge.  Add a driver to provide these config
+>> space accessor functions.  The pci-host-common code is used to
+>> configure the PCI machinery.
+>>
+>> Signed-off-by: David Daney <david.daney@cavium.com>
+>> Acked-by: Rob Herring <robh@kernel.org>
+>> Acked-by: Arnd Bergmann <arnd@arndb.de>
+>> ---
+>>   .../devicetree/bindings/pci/pci-thunder-pem.txt    |  43 ++++
+>>   MAINTAINERS                                        |   8 +
+>>   drivers/pci/host/Kconfig                           |   7 +
+>>   drivers/pci/host/Makefile                          |   1 +
+>>   drivers/pci/host/pci-thunder-pem.c                 | 283 +++++++++++++++++++++
+>
+> What's the significance of the "pem" part of the name?  I'm wondering
+> if we can shorten the filenames and function names by dropping it and
+> referring to this simply as "thunder" or "thunderx".
 
-On Fri, Jan 29, 2016 at 02:35:40PM +0530, Jayachandran C wrote:
-> Add a simple ACPI based PCI host controller under config option
-> ACPI_PCI_HOST_GENERIC. This is done by providing an implementation
-> of pci_acpi_scan_root().
-> 
-> The pci_mmcfg_list handling is done by the ACPI code, so we keep a
-> reference to the pci_mmcfg_region in sysdata. The ECAM region will
-> be already mapped, so map_bus can be implemented by using the
-> virt pointer for the pci_mmcfg_region. pci_generic_config_read
-> and pci_generic_config_write are used for config space read/write.
-> 
-> Also, we provide implementations of raw_pci_read and raw_pci_write
-> hat are needed by ACPI based on the pci_mmcfg_list.
-> 
-> pci_acpi_set_companion() and acpi_pci_get_segment() are defined
-> using sysdata of generic ACPI host controller so that PCI domain
-> and ACPI companion are set in PCI code rather than platform code.
-> 
-> This code is currently enabled only for ARM64.
-> 
-> Signed-off-by: Jayachandran C <jchandra@broadcom.com>
-> ---
->  drivers/acpi/Kconfig         |   8 ++
->  drivers/acpi/Makefile        |   1 +
->  drivers/acpi/pci_host_acpi.c | 186 +++++++++++++++++++++++++++++++++++++++++++
->  include/linux/pci-acpi.h     |  17 ++++
->  4 files changed, 212 insertions(+)
->  create mode 100644 drivers/acpi/pci_host_acpi.c
+PEM == PCI Express MAC, Essentially the circuitry related to off-chip 
+PCI devices.  This differentiates it from the internal on-chip devices 
+which are connected to internal buses we refer to as "ECAMs"
 
-I'm speaking a little bit out of turn here, because this is ACPI code,
-but I'm confused about pci_host_acpi.c.  We already have pci_root.c,
-which is *supposed* to be arch-independent.  I know pci_root.c is
-crufty and could be improved, but it does work today on x86 and ia64,
-and it handles some generic things that pci_host_acpi.c does not,
-e.g., _OSC, NUMA, host bridge hotplug, etc.
+See also the follow on patch, from me, that adds the pci-thunder-ecam.c 
+driver.
 
-I'd really like to see pci_root.c improved so it could work on x86,
-ia64, and arm64.  I'm sure that was probably the first thing you
-tried, so likely there are issues there.  Are they insurmountable?
+Since PEM and ECAM are terminology used in the hardware manuals that 
+have specific meanings relative to the Thunder SoC family, I think it is 
+not too inconvenient to carry them over into the file names.
 
-Bjorn
+>
+>>   5 files changed, 342 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/pci/pci-thunder-pem.txt
+>>   create mode 100644 drivers/pci/host/pci-thunder-pem.c
+>>
 
-> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-> index 82b96ee..65fb483 100644
-> --- a/drivers/acpi/Kconfig
-> +++ b/drivers/acpi/Kconfig
-> @@ -294,6 +294,14 @@ config ACPI_NUMA
->  	depends on (X86 || IA64)
->  	default y if IA64_GENERIC || IA64_SGI_SN2
->  
-> +config ACPI_PCI_HOST_GENERIC
-> +	bool "Generic ACPI PCI host controller"
-> +	depends on ARM64 && ACPI
-> +	help
-> +	  Say Y here if you want to support a simple generic ACPI PCI host
-> +	  controller.
-> +
-> +
->  config ACPI_CUSTOM_DSDT_FILE
->  	string "Custom DSDT Table file to include"
->  	default ""
-> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
-> index 74976f1..346101c 100644
-> --- a/drivers/acpi/Makefile
-> +++ b/drivers/acpi/Makefile
-> @@ -41,6 +41,7 @@ acpi-y				+= ec.o
->  acpi-$(CONFIG_ACPI_DOCK)	+= dock.o
->  acpi-y				+= pci_root.o pci_link.o pci_irq.o
->  acpi-$(CONFIG_PCI_MMCONFIG)	+= pci_mcfg.o
-> +acpi-$(CONFIG_ACPI_PCI_HOST_GENERIC) += pci_host_acpi.o
->  acpi-y				+= acpi_lpss.o acpi_apd.o
->  acpi-y				+= acpi_platform.o
->  acpi-y				+= acpi_pnp.o
-> diff --git a/drivers/acpi/pci_host_acpi.c b/drivers/acpi/pci_host_acpi.c
-> new file mode 100644
-> index 0000000..9dbdd81
-> --- /dev/null
-> +++ b/drivers/acpi/pci_host_acpi.c
-> @@ -0,0 +1,186 @@
-> +/*
-> + * Generic PCI host controller driver for ACPI based systems
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + *
-> + * Copyright (c) 2015 Broadcom Corporation
-> + *
-> + * Based on drivers/pci/host/pci-host-generic.c
-> + * Copyright (C) 2014 ARM Limited
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/pci.h>
-> +#include <linux/acpi.h>
-> +#include <linux/pci-acpi.h>
-> +#include <linux/sfi_acpi.h>
-> +#include <linux/slab.h>
-> +
-> +#define PREFIX			"pci-host-acpi:"
-> +
-> +/* sysdata pointer is ->root_info */
-> +struct gen_acpi_root_info {
-> +	struct acpi_pci_root_info	common;
-> +	struct pci_mmcfg_region		*mcfg;
-> +	bool				mcfg_added;
-> +};
-> +
-> +/* find mapping of a MCFG area */
-> +static void __iomem *gen_acpi_map_cfg_bus(struct pci_bus *bus,
-> +			unsigned int devfn, int where)
-> +{
-> +	struct gen_acpi_root_info *pci = bus->sysdata;
-> +	struct pci_mmcfg_region *mcfg = pci->mcfg;
-> +
-> +	if (bus->number < mcfg->start_bus || bus->number > mcfg->end_bus)
-> +		return NULL;
-> +
-> +	return mcfg->virt +
-> +		PCI_MMCFG_OFFSET(bus->number - mcfg->start_bus, devfn) +
-> +		where;
-> +}
-> +
-> +static struct pci_ops gen_acpi_pci_ops = {
-> +	.map_bus	= gen_acpi_map_cfg_bus,
-> +	.read		= pci_generic_config_read,
-> +	.write		= pci_generic_config_write,
-> +};
-> +
-> +/* Insert the ECFG area for a root bus */
-> +static int pci_acpi_root_init_info(struct acpi_pci_root_info *ci)
-> +{
-> +	struct gen_acpi_root_info *info;
-> +	struct acpi_pci_root *root = ci->root;
-> +	struct device *dev = &ci->bridge->dev;
-> +	int err;
-> +
-> +	info = container_of(ci, struct gen_acpi_root_info, common);
-> +	err = pci_mmconfig_insert(dev, root->segment, root->secondary.start,
-> +			root->secondary.end, root->mcfg_addr);
-> +	if (err && err != -EEXIST)
-> +		return err;
-> +
-> +	info->mcfg = pci_mmconfig_lookup(root->segment, root->secondary.start);
-> +	WARN_ON(info->mcfg == NULL);
-> +	info->mcfg_added = (err == -EEXIST);
-> +	return 0;
-> +}
-> +
-> +static void pci_acpi_root_release_info(struct acpi_pci_root_info *ci)
-> +{
-> +	struct gen_acpi_root_info *info;
-> +	struct acpi_pci_root *root = ci->root;
-> +
-> +	info = container_of(ci, struct gen_acpi_root_info, common);
-> +	if (info->mcfg_added)
-> +		pci_mmconfig_delete(root->segment, root->secondary.start,
-> +					root->secondary.end);
-> +	info->mcfg = NULL;
-> +}
-> +
-> +static struct acpi_pci_root_ops pci_acpi_root_ops = {
-> +	.pci_ops = &gen_acpi_pci_ops,
-> +	.init_info = pci_acpi_root_init_info,
-> +	.release_info = pci_acpi_root_release_info,
-> +};
-> +
-> +struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
-> +{
-> +	struct acpi_device *device = root->device;
-> +	struct gen_acpi_root_info *ri;
-> +	struct pci_bus *bus, *child;
-> +
-> +	/* allocate acpi_info/sysdata */
-> +	ri = devm_kzalloc(&device->dev, sizeof(*ri), GFP_KERNEL);
-> +	if (!ri) {
-> +		dev_err(&device->dev,
-> +			"pci_bus %04x:%02x: ignored (out of memory)\n",
-> +			root->segment, (int)root->secondary.start);
-> +		return NULL;
-> +	}
-> +
-> +	bus =  acpi_pci_root_create(root, &pci_acpi_root_ops,
-> +					&ri->common, ri);
-> +	if (!bus) {
-> +		dev_err(&device->dev, "Scanning rootbus failed");
-> +		return NULL;
-> +	}
-> +
-> +	pci_bus_size_bridges(bus);
-> +	pci_bus_assign_resources(bus);
-> +	list_for_each_entry(child, &bus->children, node)
-> +		pcie_bus_configure_settings(child);
-> +
-> +	return bus;
-> +}
-> +
-> +int raw_pci_read(unsigned int seg, unsigned int bus,
-> +		  unsigned int devfn, int reg, int len, u32 *val)
-> +{
-> +	struct pci_mmcfg_region *mcfg;
-> +	void __iomem *addr;
-> +	int err = -EINVAL;
-> +
-> +	rcu_read_lock();
-> +	mcfg = pci_mmconfig_lookup(seg, bus);
-> +	if (!mcfg || !mcfg->virt)
-> +		goto err;
-> +
-> +	addr = mcfg->virt + PCI_MMCFG_OFFSET(bus, devfn);
-> +	switch (len) {
-> +	case 1:
-> +		*val = readb(addr + reg);
-> +		break;
-> +	case 2:
-> +		*val = readw(addr + reg);
-> +		break;
-> +	case 4:
-> +		*val = readl(addr + reg);
-> +		break;
-> +	}
-> +	err = 0;
-> +err:
-> +	rcu_read_unlock();
-> +	return err;
-> +}
-> +
-> +int raw_pci_write(unsigned int seg, unsigned int bus,
-> +		unsigned int devfn, int reg, int len, u32 val)
-> +{
-> +	struct pci_mmcfg_region *mcfg;
-> +	void __iomem *addr;
-> +	int err = -EINVAL;
-> +
-> +	rcu_read_lock();
-> +	mcfg = pci_mmconfig_lookup(seg, bus);
-> +	if (!mcfg || !mcfg->virt)
-> +		goto err;
-> +
-> +	addr = mcfg->virt + PCI_MMCFG_OFFSET(bus, devfn);
-> +	switch (len) {
-> +	case 1:
-> +		writeb(val, addr + reg);
-> +		break;
-> +	case 2:
-> +		writew(val, addr + reg);
-> +		break;
-> +	case 4:
-> +		writel(val, addr + reg);
-> +		break;
-> +	}
-> +	err = 0;
-> +err:
-> +	rcu_read_unlock();
-> +	return err;
-> +}
-> diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
-> index d410885..f8d62e3 100644
-> --- a/include/linux/pci-acpi.h
-> +++ b/include/linux/pci-acpi.h
-> @@ -143,6 +143,22 @@ static inline void acpi_pci_add_bus(struct pci_bus *bus) { }
->  static inline void acpi_pci_remove_bus(struct pci_bus *bus) { }
->  #endif	/* CONFIG_ACPI */
->  
-> +#if defined(CONFIG_ACPI) && defined(CONFIG_ACPI_PCI_HOST_GENERIC)
-> +static inline void pci_acpi_set_companion(struct pci_host_bridge *bridge)
-> +{
-> +	struct pci_bus *b = bridge->bus;
-> +	struct acpi_pci_root_info *ci = (struct acpi_pci_root_info *)b->sysdata;
-> +
-> +	ACPI_COMPANION_SET(&bridge->dev, ci->bridge);
-> +}
-> +
-> +static inline u16 acpi_pci_get_segment(void *sysdata)
-> +{
-> +	struct acpi_pci_root_info *ci = (struct acpi_pci_root_info *)sysdata;
-> +
-> +	return ci->root->segment;
-> +}
-> +#else
->  static inline void pci_acpi_set_companion(struct pci_host_bridge *bridge)
->  {
->  	/* leave it to the platform for now */
-> @@ -152,6 +168,7 @@ static inline u16 acpi_pci_get_segment(void *sysdata)
->  {
->  	return 0;
->  }
-> +#endif
->  
->  #ifdef CONFIG_ACPI_APEI
->  extern bool aer_acpi_firmware_first(void);
-> -- 
-> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> +
+>> +static int thunder_pem_config_write(struct pci_bus *bus, unsigned int devfn,
+>> +				    int where, int size, u32 val)
+>> +{
+>> +	struct gen_pci *pci = bus->sysdata;
+>> +	struct thunder_pem_pci *pem_pci;
+>> +
+>> +	pem_pci = container_of(pci, struct thunder_pem_pci, gen_pci);
+>> +
+>> +	/*
+>> +	 * The first device on the bus in the PEM PCIe bridge.
+>> +	 * Special case its config access.
+>> +	 */
+>> +	if (bus->number == pci->cfg.bus_range->start) {
+>> +		u64 write_val, read_val;
+>> +
+>> +		if (devfn != 0 || where >= 2048)
+>> +			return PCIBIOS_DEVICE_NOT_FOUND;
+>> +
+>> +		/*
+>> +		 * 32-bit accesses only.  If the write is for a size
+>> +		 * smaller than 32-bits, we must first read the 32-bit
+>> +		 * value and merge in the desired bits and then write
+>> +		 * the whole 32-bits back out.
+>> +		 */
+>
+> Ugh.  Another device that only supports 32-bit writes.  I guess this
+> only affects this single device, and maybe you "know" that it has no
+> registers where RW1C bits may be corrupted.  Although I suppose this
+> device has the standard status registers (Status at 0x06, Secondary
+> Status at 0x1e, Device Status in PCIe capability, etc.), which do
+> contain RW1C bits.
+
+This device is exactly the specific PCIe host bridge implementation, 
+present on these SoCs.  The only sane way to access its config space is 
+via 32-bit operations.  We know that it presents the appropriate Class 
+and other registers to be recognized as, and operate as, a standard PCIe 
+bridge.
+
+>
+> We need to print a warning at probe-time so we know to consider the
+> possibility of corruption when debugging.
+
+If you really want it, I suppose I can add that, but I am somewhat hesitant.
+
+>
+[...]
+>> +
+>> +static struct gen_pci_cfg_bus_ops thunder_pem_bus_ops = {
+>> +	.bus_shift	= 24,
+>> +	.ops		= {
+>> +		.map_bus	= map_cfg_bus_thunder_pem,
+>
+> How about "thunder_pem_map_bus"?
+
+That would be better.  Actually, I wonder how I came up with that crappy 
+name in the first place...
+
+>
+>> +		.read		= thunder_pem_config_read,
+>> +		.write		= thunder_pem_config_write,
+>> +	}
+>> +};
+>> +
+
+I will wait a day to see if you have any response, and then send a new 
+version of the patch set.
+
+Thanks,
+David Daney
