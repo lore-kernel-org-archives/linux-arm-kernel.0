@@ -1,79 +1,144 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 5 Feb 2016 17:21:17 +0000
-Subject: [PATCH v5sub2 1/8] arm64: add support for module PLTs
-In-Reply-To: <CAKv+Gu-W_zKYEz0yKVevtO2b2A8+TEEXfX+iGG8PLcV7M63JYw@mail.gmail.com>
-References: <1454332178-4414-1-git-send-email-ard.biesheuvel@linaro.org>
- <1454332178-4414-2-git-send-email-ard.biesheuvel@linaro.org>
- <20160204151303.GB6076@e104818-lin.cambridge.arm.com>
- <CAKv+Gu9n=bmsZ=UOBiLWzaG2JSsbdC8k1mB7yFbH0czrbXS-1g@mail.gmail.com>
- <20160205154234.GF6076@e104818-lin.cambridge.arm.com>
- <CAKv+Gu-poQiuc7+O38n93Xt2o-SYi3kYD0k_9+-6T0=FXV9uXA@mail.gmail.com>
- <20160205160054.GG6076@e104818-lin.cambridge.arm.com>
- <CAKv+Gu8g7FHHZgmbFww_XZjf5J1utmigwBiNqCg8a3crfB4xFA@mail.gmail.com>
- <20160205164648.GH6076@e104818-lin.cambridge.arm.com>
- <CAKv+Gu-W_zKYEz0yKVevtO2b2A8+TEEXfX+iGG8PLcV7M63JYw@mail.gmail.com>
-Message-ID: <20160205172117.GI6076@e104818-lin.cambridge.arm.com>
+From: fijam@archlinux.us (JM)
+Date: Fri, 5 Feb 2016 18:21:58 +0100
+Subject: marvell_cesa fails to register on kirkwood (88F6282)
+In-Reply-To: <20160205172856.2923d938@bbrezillon>
+References: <CAKzmTe0mvZD5UwqM47uXbM7Z7oAJpE4g4BVMba1hkzqNu+Zbgw@mail.gmail.com>
+ <20160205090246.GE32272@lunn.ch> <20160205112907.796afb05@bbrezillon>
+ <CAKzmTe20fT8BcRaDaf2gz92KMAK0kEUkaD-kPq_cPF1WKBdroA@mail.gmail.com>
+ <87vb632maf.fsf@free-electrons.com>
+ <CAKzmTe1AqNQwjcsAULotd010NXuk1AYjj5p6UoqT_Zu=BCHdcw@mail.gmail.com>
+ <20160205172856.2923d938@bbrezillon>
+Message-ID: <CAKzmTe0wvwkyBAe6S6syRpK13pMDxpiUAK75xb-FW=YNFy3jRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 05, 2016 at 05:54:46PM +0100, Ard Biesheuvel wrote:
-> On 5 February 2016 at 17:46, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > On Fri, Feb 05, 2016 at 05:20:14PM +0100, Ard Biesheuvel wrote:
-> >> On 5 February 2016 at 17:00, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> >> > On Fri, Feb 05, 2016 at 04:53:10PM +0100, Ard Biesheuvel wrote:
-> >> >> On 5 February 2016 at 16:42, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> >> >> > On Thu, Feb 04, 2016 at 04:31:59PM +0100, Ard Biesheuvel wrote:
-> >> >> >> On 4 February 2016 at 16:13, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> >> >> >> > On Mon, Feb 01, 2016 at 02:09:31PM +0100, Ard Biesheuvel wrote:
-> >> >> >> >> This adds support for emitting PLTs at module load time for relative
-> >> >> >> >> branches that are out of range. This is a prerequisite for KASLR, which
-> >> >> >> >> may place the kernel and the modules anywhere in the vmalloc area,
-> >> >> >> >> making it more likely that branch target offsets exceed the maximum
-> >> >> >> >> range of +/- 128 MB.
-> >> >> >> >
-> >> >> >> > Any downside to trying to keep the kernel+modules coupled together so
-> >> >> >> > that we avoid the PLT?
-> >> >> >>
-> >> >> >> First of all, note that it is unlikely that the PLTs are ever required
-> >> >> >> in practice, considering that either
-> >> >> >> a) the kernel is loaded at the default location right at the base of
-> >> >> >> the vmalloc range, and in this case, the module space is reserved for
-> >> >> >> modules only, or
-> >> >> >> b) the kernel is loaded at some random offset in the 240+ GB vmalloc
-> >> >> >> space, and it is unlikely that all VMA space around the kernel happens
-> >> >> >> to be given out to non-randomized vmalloc/ioremap allocations
-> >> >> >
-> >> >> > My worry is that we merge some code that's rarely tested.
-> >> >>
-> >> >> I understand. But unfortunately, having corner cases that are unlikely
-> >> >> but not impossible comes with the territory of randomization.
-> >> >>
-> >> >> Alternatively, we could take the performance hit if KASLR is in effect
-> >> >> and allocate each module completely randomly as well. This way, the
-> >> >> code is always exercised (for now), and we can always backpedal later
-> >> >> if the performance is measurably worse.
-> >> >
-> >> > I'm fine with this. You can post it as a separate patch that we can
-> >> > easily revert/modify later (like turning it into a config option).
-> >>
-> >> OK, I will hack something up
-> >
-> > If it's simpler, you can just add a config option but defaulting to the
-> > full vmalloc space for modules.
-> 
-> What would be the simplest is to randomize the 128 MB module region as
-> a whole, and either put it close to the kernel (which is what I am
-> doing now), or put it at a random offset inside the vmalloc space, in
-> which case all branches will be resolved via PLTs. My suggestion to
-> randomize each module_alloc() call separately is actually not that
-> straight-forward.
-> 
-> So what I propose now is to keep a single module_load_offset that
-> randomizes the base of the region, and add a default-n config option
-> that shrinks the interval it is chosen from so that PLTs are usually
-> not needed.
+On Fri, Feb 5, 2016 at 5:28 PM, Boris Brezillon
+<boris.brezillon@free-electrons.com> wrote:
+> On Fri, 5 Feb 2016 17:01:45 +0100
+> JM <fijam@archlinux.us> wrote:
+>
+>> On Fri, Feb 5, 2016 at 4:45 PM, Gregory CLEMENT
+>> <gregory.clement@free-electrons.com> wrote:
+>> > Hi JM,
+>> >
+>> >  On ven., f?vr. 05 2016, JM <fijam@archlinux.us> wrote:
+>> >
+>> >> On Fri, Feb 5, 2016 at 11:29 AM, Boris Brezillon
+>> >> <boris.brezillon@free-electrons.com> wrote:
+>> >>> Jan, Andrew
+>> >>>
+>> >>> On Fri, 5 Feb 2016 10:02:46 +0100
+>> >>> Andrew Lunn <andrew@lunn.ch> wrote:
+>> >>>
+>> >>>> On Fri, Feb 05, 2016 at 06:01:18AM +0100, JM wrote:
+>> >>>> > Hi,
+>> >>>> >
+>> >>>> > I am testing marvell_cesa on a kirkwood device (QNAP TS-212p, Marvell
+>> >>>> > Kirkwood 88F6282, dts: http://pastebin.com/Gk95KFHf ).
+>> >>>> > As of kernel 4.4 (4.4.0-trunk-kirkwood #1 Debian 4.4-1~exp1) it fails
+>> >>>> > in the following way:
+>> >>>> >
+>> >>>> > modprobe marvell_cesa allhwsupport=1
+>> >>>> > dmesg | tail -n 1
+>> >>>> > [ 1057.855091] marvell-cesa: probe of f1030000.crypto failed with error -12
+>> >>>> >
+>> >>>> > or:
+>> >>>> >
+>> >>>> > modprobe marvell_cesa
+>> >>>> > dmesg | tail -n 1
+>> >>>> > [ 9178.399357] marvell-cesa: probe of f1030000.crypto failed with error -524
+>> >>>> >
+>> >>>> > With kernel 4.3 it would fail with error -22 on that hardware. There
+>> >>>> > are scattered reports from other users experiencing the same issue
+>> >>>> > (1,2,3)
+>> >>>> >
+>> >>>> > I wonder if this is a result of an invalid definition of the
+>> >>>> > crypto-sram in the dts of this SoC, or perhaps some other problem
+>> >>>> > (PEBKAC included).
+>> >>>>
+>> >>>> Hi Jan
+>> >>>>
+>> >>>> Do you have SRAM enabled in your kernel configuration. The
+>> >>>> mvebu_v5_defconfig does not have it, which is a bug really.
+>> >>>
+>> >>> Hm, the CRYPTO_DEV_MARVELL_CESA option selects the SRAM one [1].
+>> >>> Anyway, I also think this error is related to the SRAM (not sure why the
+>> >>> driver is not able to get the SRAM though).
+>> >>>
+>> >>> Best Regards,
+>> >>>
+>> >>> Boris
+>> >>>
+>> >>> [1]http://lxr.free-electrons.com/source/drivers/crypto/Kconfig#L168
+>> >>>
+>> >>>
+>> >>> --
+>> >>> Boris Brezillon, Free Electrons
+>> >>> Embedded Linux and Kernel engineering
+>> >>> http://free-electrons.com
+>> >>
+>> >> Hi,
+>> >>
+>> >> Thanks for getting back to me. Indeed, CONFIG_SRAM is enabled, I put
+>> >> the complete .config here: http://pastebin.com/40eKMJqE
+>> >>
+>> >> If there is anything I can do to help squish this bug, please let me
+>> >> know.
+>> >
+>> > How do you get your dts?
+>> > it seems that you generated it from your dtb (or from /proc).
+>> >
+>> > I tried to do the same from arch/arm/boot/dts/kirkwood-ts219-6282.dtb,
+>> > but the resulting dts is too different for an easy comparison.
+>> >
+>> > Could you also provide your dtb, maybe by using the same dtc with the
+>> > option -s I will manage to get the something easier to compare.
+>> >
+>> > Gregory
+>> >
+>> >
+>> >>
+>> >> Best regards,
+>> >> Jan
+>> >>
+>> >> _______________________________________________
+>> >> linux-arm-kernel mailing list
+>> >> linux-arm-kernel at lists.infradead.org
+>> >> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>> >
+>> > --
+>> > Gregory Clement, Free Electrons
+>> > Kernel, drivers, real-time and embedded Linux
+>> > development, consulting, training and support.
+>> > http://free-electrons.com
+>>
+>> Hi,
+>>
+>> Yes, I simply used dtc -I fs /proc/device-tree to obtain the dts.
+>>
+>> Here is the relevant .dtb file : http://heap.ovh/files/kirkwood-ts219-6282.dtb
+>
+> Can you try to apply this patch [1], and let me know where it fails?
+>
+> [1]http://code.bulix.org/qnuq8m-90700
+>
+>
+>
+>
+> --
+> Boris Brezillon, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
 
-Sounds fine.
+Hello again,
 
--- 
-Catalin
+With the patch applied (I had to add struct device *dev = cesa->dev;
+under static int mv_cesa_get_sram or I'd get error: ?dev? undeclared
+during compilation, hope that's correct)
+I am getting the following:
+
+[53595.279886] marvell-cesa f1030000.crypto: failed get SRAM region
+[53595.289485] marvell-cesa: probe of f1030000.crypto failed with error -12
+
+Best regards,
+Jan
