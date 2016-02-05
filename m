@@ -1,53 +1,59 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 5 Feb 2016 14:33:18 +0100
-Subject: [PATCH v10 5/5] Watchdog: ARM SBSA Generic Watchdog half
- timeout panic support
-In-Reply-To: <56B49EC7.4050306@codeaurora.org>
-References: <1454519923-25230-1-git-send-email-fu.wei@linaro.org>
- <1454519923-25230-6-git-send-email-fu.wei@linaro.org>
- <56B23883.7000501@codeaurora.org>
- <CADyBb7sxPg-QUjTbeHFtYkctKc_g7D8O=+jqbXN+DCCoCEnFqA@mail.gmail.com>
- <56B23E99.1030604@codeaurora.org>
- <CADyBb7s4opxfPFuX=1-qEE6uhsaMXgofAJPbHUQHrng2AUwqNA@mail.gmail.com>
- <56B2423B.1020109@codeaurora.org>
- <CADyBb7uULCn97ea19zH8dB4QX1QA8=AXL94d6gXgFxXM8haBNA@mail.gmail.com>
- <56B24642.8090105@codeaurora.org>
- <CADyBb7s_QeU=pYqN9G+5WMtx-L+=QC6uZR6N6ZWPOixnkHzPjw@mail.gmail.com>
- <56B24AB5.3070001@codeaurora.org>
- <CADyBb7usPpY=YLjecXce63zY5e1tniPLmNsVY=8CJHJsCqBgQw@mail.gmail.com>
- <56B2DEE4.7060901@roeck-us.net>
- <CADyBb7unAHEOMfruWS82RkHK6uwPAWCxUx9jqzSkiHU4LHDSeA@mail.gmail.com>
- <20160205140259.72a33699@free-electrons.com>
- <56B49EC7.4050306@codeaurora.org>
-Message-ID: <20160205143318.2de2815c@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 05 Feb 2016 14:37:44 +0100
+Subject: [PATCH] PCI: generic: map config window in one go
+In-Reply-To: <CAKv+Gu8oZADs_FRN=p7_Nz0wXJVWVmzVNsxtzscyp7_cFAreAQ@mail.gmail.com>
+References: <1454077035-23872-1-git-send-email-ard.biesheuvel@linaro.org>
+ <4090946.AhejVJy7MO@wuerfel>
+ <CAKv+Gu8oZADs_FRN=p7_Nz0wXJVWVmzVNsxtzscyp7_cFAreAQ@mail.gmail.com>
+Message-ID: <1507671.sEYIrU8dv6@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Fri, 5 Feb 2016 07:08:23 -0600, Timur Tabi wrote:
-
-> > I'm quite certainly missing something completely obvious here, but how
-> > can you get the WS1 interrupt*after*  raising a panic? Aren't all
-> > interrupts disabled and the system fully halted once you get a panic(),
-> > especially when raised from an interrupt handler? If that's the case,
-> > how can the system continue to do things, such as receiving the WS1
-> > interrupt and resetting ?
+On Friday 05 February 2016 11:48:54 Ard Biesheuvel wrote:
+> On 29 January 2016 at 15:52, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Friday 29 January 2016 15:32:01 Ard Biesheuvel wrote:
+> >> On 29 January 2016 at 15:28, Will Deacon <will.deacon@arm.com> wrote:
+> >> > Hi Ard,
+> >> >
+> >> > On Fri, Jan 29, 2016 at 03:17:15PM +0100, Ard Biesheuvel wrote:
+> >> >> Instead of iterating over the PCI config window and performing individual
+> >> >> ioremap() calls on all the adjacent slices, perform a single ioremap() to
+> >> >> map the entire region, and divvy it up later. This not only prevents
+> >> >> leaving some of it mapped if we fail half way through, it also ensures that
+> >> >> archs that support huge-vmap can use section mappings to perform the
+> >> >> mapping.
+> >> >>
+> >> >> On my Seattle A0 box, this transforms 128 separate 1 MB mappings that are
+> >> >> mapped down to 4 KB pages into a single 128 MB mapping using 2 MB sections,
+> >> >> saving 512 KB worth of page tables.
+> >> >>
+> >> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >> >> ---
+> >> >
+> >> > The code was written this way in response to feedback during driver review
+> >> > that we couldn't necessarily grab that much contiguous vmalloc space on
+> >> > 32-bit ARM. Unless that's changed, we probably want to to predicate this
+> >> > change on having a 64-bit arch.
+> >> >
+> >>
+> >> Ah right. How about testing for the ARCH_HAVE_HUGE_VMAP Kconfig symbol
+> >> explicitly?
+> >>
+> >
+> > Testing for 64BIT should be sufficient.
+> >
 > 
-> Typically, WS1 is not an interrupt.  Instead, it's a hard system-level 
-> reset.
+> Does it make sense to spin a v2 for this patch? Given the discussion
+> we had regarding allocating only the config regions for busses that
+> are populated, perhaps there is a better approach here?
 
-Ah, right, true. I missed that aspect because on my HW, triggering a
-system-level reset on WS1 is optional. I can actually get an interrupt
-on both WS0 and WS1, and no reset at all.
+Allocating only the config regions that are actually used would
+be ideal, the problem is that you need to access the config space
+in order to know which ones are, so this is certainly a bit tricky.
 
-But a normal configuration indeed involves having the WS1 event
-configured in HW to be a system-level reset.
+Are there any downsides to the x86 approach of using fixmap to
+map each patch separately during the access? It's probably a bit
+slower per access, but we don't do a lot of those accesses after
+the system is booted.
 
-So, OK, it makes sense. Thanks for the clarification!
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+	Arnd
