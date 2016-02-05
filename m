@@ -1,32 +1,32 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Fri,  5 Feb 2016 19:00:19 +0000
-Subject: [PATCH 0/6] arm64: dts: apq8016 dt patches.
-Message-ID: <1454698819-13885-1-git-send-email-srinivas.kandagatla@linaro.org>
+Date: Fri,  5 Feb 2016 19:00:47 +0000
+Subject: [PATCH 1/6] arm64: dts: qcom: add manual pullup setting to otg.
+In-Reply-To: <1454698819-13885-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1454698819-13885-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1454698847-13929-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andy, 
+This patch adds manual pull up setting for usb otg indicating that the
+vbus is vbus is not routed to USB controller/phy therefore enables
+pull-up explicitly before starting controller.
 
-Here are few more dt patches which enables usb and lpass.
-I have tested these patches with few changes to defconfig on DB410C.
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+---
+ arch/arm64/boot/dts/qcom/msm8916.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-Thanks,
-srini
-
-
-Srinivas Kandagatla (6):
-  arm64: dts: qcom: add manual pullup setting to otg.
-  arm64: dts: qcom: apq8016-sbc: add usb support
-  arm64: dts: qcom: add audio pinctrls
-  arm64: dts: qcom: add lpass node
-  arm64: dts: qcom: apq8016-sbc: enable lpass on DB410c
-  arm64: dts: qcom: fix usb digital voltage levels
-
- arch/arm64/boot/dts/qcom/apq8016-sbc-soc-pins.dtsi |  15 ++
- arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi          |  39 ++++
- arch/arm64/boot/dts/qcom/msm8916-pins.dtsi         | 216 +++++++++++++++++++++
- arch/arm64/boot/dts/qcom/msm8916.dtsi              |  29 ++-
- 4 files changed, 298 insertions(+), 1 deletion(-)
-
+diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+index ff7ca44..c1592d4 100644
+--- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+@@ -399,6 +399,7 @@
+ 			qcom,phy-init-sequence = <0x44 0x6B 0x24 0x13>;
+ 			dr_mode = "peripheral";
+ 			qcom,otg-control = <2>; // PMIC
++			qcom,manual-pullup;
+ 
+ 			clocks = <&gcc GCC_USB_HS_AHB_CLK>,
+ 				 <&gcc GCC_USB_HS_SYSTEM_CLK>,
 -- 
 1.9.1
