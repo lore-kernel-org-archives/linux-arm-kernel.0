@@ -1,51 +1,90 @@
-From: alim.akhtar@samsung.com (Alim Akhtar)
-Date: Fri, 05 Feb 2016 11:34:29 +0530
-Subject: [PATCH v3] arm64: defconfig: Enable samsung MFD and related configs
-Message-ID: <1454652269-6100-1-git-send-email-alim.akhtar@samsung.com>
+From: minghuan.lian@nxp.com (Minghuan Lian)
+Date: Fri, 5 Feb 2016 06:07:10 +0000
+Subject: [PATCH] PCI: layerscape: add ls2085a compatible
+In-Reply-To: <VI1PR04MB1230AA5CAEEEE0D4AD8E3DF288D20@VI1PR04MB1230.eurprd04.prod.outlook.com>
+References: <1453915925-19198-1-git-send-email-yang.shi@linaro.org>
+ <56A906F4.3050809@linaro.org> <20160204223711.GE7031@localhost>
+ <56B3E386.8010002@linaro.org>
+ <VI1PR04MB1230AA5CAEEEE0D4AD8E3DF288D20@VI1PR04MB1230.eurprd04.prod.outlook.com>
+Message-ID: <VI1PR04MB16155E4265922D6659B439C1E8D20@VI1PR04MB1615.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exynos7 based espresso board uses S2MPS15, a multifunction device.
-This patch enables S2MPS1X regulator, pmic-clk and rtc drivers utilized by
-the same.
+The patch is ok to me.
 
-Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
-Changes since v2:
-* Added Reviewed-by from Krzysztof
-* rebased on next-20160204
+Thanks,
+Minghuan
 
-Changes since v1:
-* updated the comment message to describe which platfrom uses it.
-* enable COMMON_CLK_S2MPS11 which is needed to enable pmic-clk block.
-
- arch/arm64/configs/defconfig |    3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 86581f7..2fd2264 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -151,9 +151,11 @@ CONFIG_GPIO_XGENE=y
- CONFIG_POWER_RESET_XGENE=y
- CONFIG_POWER_RESET_SYSCON=y
- # CONFIG_HWMON is not set
-+CONFIG_MFD_SEC_CORE=y
- CONFIG_REGULATOR=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
- CONFIG_REGULATOR_QCOM_SMD_RPM=y
-+CONFIG_REGULATOR_S2MPS11=y
- CONFIG_FB=y
- CONFIG_FB_ARMCLCD=y
- CONFIG_FRAMEBUFFER_CONSOLE=y
-@@ -188,6 +190,7 @@ CONFIG_LEDS_TRIGGERS=y
- CONFIG_LEDS_TRIGGER_HEARTBEAT=y
- CONFIG_LEDS_TRIGGER_CPU=y
- CONFIG_RTC_CLASS=y
-+CONFIG_RTC_DRV_S5M=y
- CONFIG_RTC_DRV_EFI=y
- CONFIG_RTC_DRV_PL031=y
- CONFIG_RTC_DRV_XGENE=y
--- 
-1.7.10.4
+> -----Original Message-----
+> From: Bhupesh Sharma
+> Sent: Friday, February 05, 2016 1:36 PM
+> To: Shi, Yang <yang.shi@linaro.org>; Bjorn Helgaas <helgaas@kernel.org>;
+> Yang-Leo Li <leoyang.li@nxp.com>; shawn.guo at linaro.org
+> Cc: Mingkai Hu <mingkai.hu@nxp.com>; Minghuan Lian
+> <minghuan.lian@nxp.com>; bhelgaas at google.com; linux-pci at vger.kernel.org;
+> linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> linaro-kernel at lists.linaro.org
+> Subject: RE: [PATCH] PCI: layerscape: add ls2085a compatible
+> 
+> > From: Shi, Yang
+> > Sent: Friday, February 05, 2016 5:19 AM
+> >
+> > On 2/4/2016 2:37 PM, Bjorn Helgaas wrote:
+> > > On Wed, Jan 27, 2016 at 10:05:40AM -0800, Shi, Yang wrote:
+> > >> Correct FSL folks email address to nxp.com, sorry for the
+> > inconvenience.
+> > >
+> > > Do we need some MAINTAINERS updates in addition to the ack for this
+> > patch?
+> > > I see a bunch of @freescale.com addresses in MAINTAINERS.
+> >
+> > I guess so if the @freescale.com address is not valid anymore.
+> 
+> All @freescale.com address have shifted to @nxp.com.
+> 
+> Leo, Minghuan - can you kindly review this patch.
+> 
+> Shawn - can you take this through your tree, once Leo and Minghuan have
+> reviewed the code.
+> 
+> Regards,
+> Bhupesh
+> 
+> >
+> > >
+> > >> On 1/27/2016 9:32 AM, Yang Shi wrote:
+> > >>> The layerscape PCI host driver needs recognize ls2085a compatible
+> > >>> when using firmware with ls2085a compatible property, otherwise
+> > >>> the PCI bus won't be detected even though ls2085a compatible is
+> > >>> included
+> > by the dts.
+> > >>>
+> > >>> Signed-off-by: Yang Shi <yang.shi@linaro.org>
+> > >>> ---
+> > >>>   drivers/pci/host/pci-layerscape.c | 1 +
+> > >>>   1 file changed, 1 insertion(+)
+> > >>>
+> > >>> diff --git a/drivers/pci/host/pci-layerscape.c
+> > >>> b/drivers/pci/host/pci-layerscape.c
+> > >>> index 3923bed..c40d8b2 100644
+> > >>> --- a/drivers/pci/host/pci-layerscape.c
+> > >>> +++ b/drivers/pci/host/pci-layerscape.c
+> > >>> @@ -203,6 +203,7 @@ static const struct of_device_id
+> > ls_pcie_of_match[] = {
+> > >>>   	{ .compatible = "fsl,ls1021a-pcie", .data = &ls1021_drvdata
+> > },
+> > >>>   	{ .compatible = "fsl,ls1043a-pcie", .data = &ls1043_drvdata
+> > },
+> > >>>   	{ .compatible = "fsl,ls2080a-pcie", .data = &ls2080_drvdata
+> > },
+> > >>> +	{ .compatible = "fsl,ls2085a-pcie", .data = &ls2080_drvdata },
+> > >>>   	{ },
+> > >>>   };
+> > >>>   MODULE_DEVICE_TABLE(of, ls_pcie_of_match);
+> > >>>
+> > >>
+> >
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-pci"
+> > in the body of a message to majordomo at vger.kernel.org More majordomo
+> > info at http://vger.kernel.org/majordomo-info.html
