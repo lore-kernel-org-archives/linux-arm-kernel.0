@@ -1,47 +1,73 @@
-From: jonmason@broadcom.com (Jon Mason)
-Date: Fri,  5 Feb 2016 17:43:24 -0500
-Subject: [PATCH 5/5] ARM: dts: NSP: Add SP804 Support to DT
-In-Reply-To: <1454712204-30419-1-git-send-email-jonmason@broadcom.com>
-References: <1454712204-30419-1-git-send-email-jonmason@broadcom.com>
-Message-ID: <1454712204-30419-6-git-send-email-jonmason@broadcom.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri, 05 Feb 2016 14:47:08 -0800
+Subject: [PATCH 1/5] PM / AVS: rockchip-io: make io-domains a child of the
+ GRF
+In-Reply-To: <1454707218-23676-2-git-send-email-heiko@sntech.de> (Heiko
+ Stuebner's message of "Fri, 5 Feb 2016 22:20:14 +0100")
+References: <1454707218-23676-1-git-send-email-heiko@sntech.de>
+ <1454707218-23676-2-git-send-email-heiko@sntech.de>
+Message-ID: <7hio22bwr7.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the ARM SP804 timer to the Northstar Plus device tree.
+Heiko Stuebner <heiko@sntech.de> writes:
 
-Signed-off-by: Jon Mason <jonmason@broadcom.com>
----
- arch/arm/boot/dts/bcm-nsp.dtsi | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+> IO-domain handling is part of the general register files, so should live
+> under the grf directly. This change allows the grf to be a simple-mfd and
+> the io-domains fetching the syscon regmap from that parent-node.
+>
+> The old binding is of course preserved, though deprecated.
+>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 
-diff --git a/arch/arm/boot/dts/bcm-nsp.dtsi b/arch/arm/boot/dts/bcm-nsp.dtsi
-index 0e8cb6e..06a242e 100644
---- a/arch/arm/boot/dts/bcm-nsp.dtsi
-+++ b/arch/arm/boot/dts/bcm-nsp.dtsi
-@@ -194,6 +194,24 @@
- 			brcm,nand-has-wp;
- 		};
- 
-+		ccbtimer0: timer at 34000 {
-+			compatible = "arm,sp804";
-+			reg = <0x34000 0x1000>;
-+			interrupts = <GIC_SPI 90 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&iprocslow>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		ccbtimer1: timer at 35000 {
-+			compatible = "arm,sp804";
-+			reg = <0x35000 0x1000>;
-+			interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 93 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&iprocslow>;
-+			clock-names = "apb_pclk";
-+		};
-+
- 		i2c0: i2c at 38000 {
- 			compatible = "brcm,iproc-i2c";
- 			reg = <0x38000 0x50>;
--- 
-1.9.1
+Acked-by: Kevin Hilman <khilman@baylibre.com>
+
+> ---
+>  Documentation/devicetree/bindings/power/rockchip-io-domain.txt |  4 +++-
+>  drivers/power/avs/rockchip-io-domain.c                         | 10 +++++++++-
+>  2 files changed, 12 insertions(+), 2 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/power/rockchip-io-domain.txt b/Documentation/devicetree/bindings/power/rockchip-io-domain.txt
+> index b8627e7..7ed5518 100644
+> --- a/Documentation/devicetree/bindings/power/rockchip-io-domain.txt
+> +++ b/Documentation/devicetree/bindings/power/rockchip-io-domain.txt
+> @@ -35,8 +35,10 @@ Required properties:
+>    - "rockchip,rk3288-io-voltage-domain" for rk3288
+>    - "rockchip,rk3368-io-voltage-domain" for rk3368
+>    - "rockchip,rk3368-pmu-io-voltage-domain" for rk3368 pmu-domains
+> -- rockchip,grf: phandle to the syscon managing the "general register files"
+>  
+> +Deprecated properties:
+> +- rockchip,grf: phandle to the syscon managing the "general register files"
+> +    Systems should move the io-domains to a sub-node of the grf simple-mfd.
+>  
+>  You specify supplies using the standard regulator bindings by including
+>  a phandle the relevant regulator.  All specified supplies must be able
+> diff --git a/drivers/power/avs/rockchip-io-domain.c b/drivers/power/avs/rockchip-io-domain.c
+> index 8099456..a5a07d8 100644
+> --- a/drivers/power/avs/rockchip-io-domain.c
+> +++ b/drivers/power/avs/rockchip-io-domain.c
+> @@ -278,6 +278,7 @@ static int rockchip_iodomain_probe(struct platform_device *pdev)
+>  	struct device_node *np = pdev->dev.of_node;
+>  	const struct of_device_id *match;
+>  	struct rockchip_iodomain *iod;
+> +	struct device *parent;
+>  	int i, ret = 0;
+>  
+>  	if (!np)
+> @@ -293,7 +294,14 @@ static int rockchip_iodomain_probe(struct platform_device *pdev)
+>  	match = of_match_node(rockchip_iodomain_match, np);
+>  	iod->soc_data = (struct rockchip_iodomain_soc_data *)match->data;
+>  
+> -	iod->grf = syscon_regmap_lookup_by_phandle(np, "rockchip,grf");
+> +	parent = pdev->dev.parent;
+> +	if (parent && parent->of_node) {
+> +		iod->grf = syscon_node_to_regmap(parent->of_node);
+> +	} else {
+> +		dev_dbg(&pdev->dev, "falling back to old binding\n");
+> +		iod->grf = syscon_regmap_lookup_by_phandle(np, "rockchip,grf");
+> +	}
+> +
+>  	if (IS_ERR(iod->grf)) {
+>  		dev_err(&pdev->dev, "couldn't find grf regmap\n");
+>  		return PTR_ERR(iod->grf);
