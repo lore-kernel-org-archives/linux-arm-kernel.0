@@ -1,125 +1,177 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Fri, 5 Feb 2016 15:13:57 +0800
-Subject: [PATCH v11 02/21] KVM: ARM64: Define PMU data structure for each vcpu
+Date: Fri, 5 Feb 2016 15:14:15 +0800
+Subject: [PATCH v11 20/21] KVM: ARM: Introduce per-vcpu kvm device controls
 In-Reply-To: <1454656456-11640-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1454656456-11640-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1454656456-11640-3-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1454656456-11640-21-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Here we plan to support virtual PMU for guest by full software
-emulation, so define some basic structs and functions preparing for
-futher steps. Define struct kvm_pmc for performance monitor counter and
-struct kvm_pmu for performance monitor unit for each vcpu. According to
-ARMv8 spec, the PMU contains at most 32(ARMV8_MAX_COUNTERS) counters.
+In some cases it needs to get/set attributes specific to a vcpu and so
+needs something else than ONE_REG.
 
-Since this only supports ARM64 (or PMUv3), add a separate config symbol
-for it.
+Let's copy the KVM_DEVICE approach, and define the respective ioctls
+for the vcpu file descriptor.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Reviewed-by: Andrew Jones <drjones@redhat.com>
+Acked-by: Peter Maydell <peter.maydell@linaro.org>
 ---
- arch/arm64/include/asm/kvm_host.h |  2 ++
- arch/arm64/kvm/Kconfig            |  7 +++++++
- include/kvm/arm_pmu.h             | 42 +++++++++++++++++++++++++++++++++++++++
- 3 files changed, 51 insertions(+)
- create mode 100644 include/kvm/arm_pmu.h
+CC: Peter Maydell <peter.maydell@linaro.org>
+---
+ Documentation/virtual/kvm/api.txt          | 10 +++---
+ Documentation/virtual/kvm/devices/vcpu.txt |  8 +++++
+ arch/arm/kvm/arm.c                         | 55 ++++++++++++++++++++++++++++++
+ arch/arm64/kvm/reset.c                     |  1 +
+ include/uapi/linux/kvm.h                   |  1 +
+ 5 files changed, 71 insertions(+), 4 deletions(-)
+ create mode 100644 Documentation/virtual/kvm/devices/vcpu.txt
 
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 689d4c9..6f0241f 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -36,6 +36,7 @@
+diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+index 9684f8d..cb2ef0b 100644
+--- a/Documentation/virtual/kvm/api.txt
++++ b/Documentation/virtual/kvm/api.txt
+@@ -2507,8 +2507,9 @@ struct kvm_create_device {
  
- #include <kvm/arm_vgic.h>
- #include <kvm/arm_arch_timer.h>
-+#include <kvm/arm_pmu.h>
+ 4.80 KVM_SET_DEVICE_ATTR/KVM_GET_DEVICE_ATTR
  
- #define KVM_MAX_VCPUS VGIC_V3_MAX_CPUS
+-Capability: KVM_CAP_DEVICE_CTRL, KVM_CAP_VM_ATTRIBUTES for vm device
+-Type: device ioctl, vm ioctl
++Capability: KVM_CAP_DEVICE_CTRL, KVM_CAP_VM_ATTRIBUTES for vm device,
++  KVM_CAP_VCPU_ATTRIBUTES for vcpu device
++Type: device ioctl, vm ioctl, vcpu ioctl
+ Parameters: struct kvm_device_attr
+ Returns: 0 on success, -1 on error
+ Errors:
+@@ -2533,8 +2534,9 @@ struct kvm_device_attr {
  
-@@ -211,6 +212,7 @@ struct kvm_vcpu_arch {
- 	/* VGIC state */
- 	struct vgic_cpu vgic_cpu;
- 	struct arch_timer_cpu timer_cpu;
-+	struct kvm_pmu pmu;
+ 4.81 KVM_HAS_DEVICE_ATTR
  
- 	/*
- 	 * Anything that is not used directly from assembly code goes
-diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
-index a5272c0..de7450d 100644
---- a/arch/arm64/kvm/Kconfig
-+++ b/arch/arm64/kvm/Kconfig
-@@ -36,6 +36,7 @@ config KVM
- 	select HAVE_KVM_EVENTFD
- 	select HAVE_KVM_IRQFD
- 	select KVM_ARM_VGIC_V3
-+	select KVM_ARM_PMU if HW_PERF_EVENTS
- 	---help---
- 	  Support hosting virtualized guest machines.
- 	  We don't support KVM with 16K page tables yet, due to the multiple
-@@ -48,6 +49,12 @@ config KVM_ARM_HOST
- 	---help---
- 	  Provides host support for ARM processors.
- 
-+config KVM_ARM_PMU
-+	bool
-+	---help---
-+	  Adds support for a virtual Performance Monitoring Unit (PMU) in
-+	  virtual machines.
-+
- source drivers/vhost/Kconfig
- 
- endif # VIRTUALIZATION
-diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
+-Capability: KVM_CAP_DEVICE_CTRL, KVM_CAP_VM_ATTRIBUTES for vm device
+-Type: device ioctl, vm ioctl
++Capability: KVM_CAP_DEVICE_CTRL, KVM_CAP_VM_ATTRIBUTES for vm device,
++  KVM_CAP_VCPU_ATTRIBUTES for vcpu device
++Type: device ioctl, vm ioctl, vcpu ioctl
+ Parameters: struct kvm_device_attr
+ Returns: 0 on success, -1 on error
+ Errors:
+diff --git a/Documentation/virtual/kvm/devices/vcpu.txt b/Documentation/virtual/kvm/devices/vcpu.txt
 new file mode 100644
-index 0000000..be220ee
+index 0000000..3cc59c5
 --- /dev/null
-+++ b/include/kvm/arm_pmu.h
-@@ -0,0 +1,42 @@
-+/*
-+ * Copyright (C) 2015 Linaro Ltd.
-+ * Author: Shannon Zhao <shannon.zhao@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
++++ b/Documentation/virtual/kvm/devices/vcpu.txt
+@@ -0,0 +1,8 @@
++Generic vcpu interface
++====================================
 +
-+#ifndef __ASM_ARM_KVM_PMU_H
-+#define __ASM_ARM_KVM_PMU_H
++The virtual cpu "device" also accepts the ioctls KVM_SET_DEVICE_ATTR,
++KVM_GET_DEVICE_ATTR, and KVM_HAS_DEVICE_ATTR. The interface uses the same struct
++kvm_device_attr as other devices, but targets VCPU-wide settings and controls.
 +
-+#ifdef CONFIG_KVM_ARM_PMU
++The groups and attributes per virtual cpu, if any, are architecture specific.
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index d2c2cc3..34d7395 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -826,11 +826,51 @@ static int kvm_arch_vcpu_ioctl_vcpu_init(struct kvm_vcpu *vcpu,
+ 	return 0;
+ }
+ 
++static int kvm_arm_vcpu_set_attr(struct kvm_vcpu *vcpu,
++				 struct kvm_device_attr *attr)
++{
++	int ret = -ENXIO;
 +
-+#include <linux/perf_event.h>
-+#include <asm/pmu.h>
++	switch (attr->group) {
++	default:
++		break;
++	}
 +
-+struct kvm_pmc {
-+	u8 idx;/* index into the pmu->pmc array */
-+	struct perf_event *perf_event;
-+	u64 bitmask;
-+};
++	return ret;
++}
 +
-+struct kvm_pmu {
-+	int irq_num;
-+	struct kvm_pmc pmc[ARMV8_MAX_COUNTERS];
-+	bool ready;
-+};
-+#else
-+struct kvm_pmu {
-+};
-+#endif
++static int kvm_arm_vcpu_get_attr(struct kvm_vcpu *vcpu,
++				 struct kvm_device_attr *attr)
++{
++	int ret = -ENXIO;
 +
-+#endif
++	switch (attr->group) {
++	default:
++		break;
++	}
++
++	return ret;
++}
++
++static int kvm_arm_vcpu_has_attr(struct kvm_vcpu *vcpu,
++				 struct kvm_device_attr *attr)
++{
++	int ret = -ENXIO;
++
++	switch (attr->group) {
++	default:
++		break;
++	}
++
++	return ret;
++}
++
+ long kvm_arch_vcpu_ioctl(struct file *filp,
+ 			 unsigned int ioctl, unsigned long arg)
+ {
+ 	struct kvm_vcpu *vcpu = filp->private_data;
+ 	void __user *argp = (void __user *)arg;
++	struct kvm_device_attr attr;
+ 
+ 	switch (ioctl) {
+ 	case KVM_ARM_VCPU_INIT: {
+@@ -873,6 +913,21 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
+ 			return -E2BIG;
+ 		return kvm_arm_copy_reg_indices(vcpu, user_list->reg);
+ 	}
++	case KVM_SET_DEVICE_ATTR: {
++		if (copy_from_user(&attr, argp, sizeof(attr)))
++			return -EFAULT;
++		return kvm_arm_vcpu_set_attr(vcpu, &attr);
++	}
++	case KVM_GET_DEVICE_ATTR: {
++		if (copy_from_user(&attr, argp, sizeof(attr)))
++			return -EFAULT;
++		return kvm_arm_vcpu_get_attr(vcpu, &attr);
++	}
++	case KVM_HAS_DEVICE_ATTR: {
++		if (copy_from_user(&attr, argp, sizeof(attr)))
++			return -EFAULT;
++		return kvm_arm_vcpu_has_attr(vcpu, &attr);
++	}
+ 	default:
+ 		return -EINVAL;
+ 	}
+diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+index cf4f28a..9677bf0 100644
+--- a/arch/arm64/kvm/reset.c
++++ b/arch/arm64/kvm/reset.c
+@@ -81,6 +81,7 @@ int kvm_arch_dev_ioctl_check_extension(long ext)
+ 		r = kvm_arm_support_pmu_v3();
+ 		break;
+ 	case KVM_CAP_SET_GUEST_DEBUG:
++	case KVM_CAP_VCPU_ATTRIBUTES:
+ 		r = 1;
+ 		break;
+ 	default:
+diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+index dc16d30..50f44a2 100644
+--- a/include/uapi/linux/kvm.h
++++ b/include/uapi/linux/kvm.h
+@@ -851,6 +851,7 @@ struct kvm_ppc_smmu_info {
+ #define KVM_CAP_HYPERV_SYNIC 123
+ #define KVM_CAP_S390_RI 124
+ #define KVM_CAP_ARM_PMU_V3 125
++#define KVM_CAP_VCPU_ATTRIBUTES 126
+ 
+ #ifdef KVM_CAP_IRQ_ROUTING
+ 
 -- 
 2.0.4
