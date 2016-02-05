@@ -1,50 +1,40 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 5 Feb 2016 16:32:02 +0100
-Subject: [PATCH v2] clocksource/arm_arch_timer: Enable and verify MMIO
- access
-In-Reply-To: <56B4BFC8.6050201@arm.com>
-References: <71bf617f4083b116b2aeab24f13fc5fed99a816f.1454327031.git.robin.murphy@arm.com>
- <20160201195816.GL4848@codeaurora.org> <56B4BFC8.6050201@arm.com>
-Message-ID: <56B4C072.3040409@linaro.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 5 Feb 2016 15:32:58 +0000
+Subject: [PATCH v2 1/2] regulator: Add coupled regulator
+In-Reply-To: <20160205143328.GD31506@lukather>
+References: <1452605842-9317-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1452605842-9317-2-git-send-email-maxime.ripard@free-electrons.com>
+ <20160112143100.GA14628@rob-hp-laptop>
+ <20160115085734.GG4581@lukather>
+ <20160117000434.GB7774@rob-hp-laptop>
+ <20160118162538.GH6588@sirena.org.uk>
+ <20160121154649.GE3997@lukather>
+ <20160121162802.GL6588@sirena.org.uk>
+ <20160205143328.GD31506@lukather>
+Message-ID: <20160205153258.GW4455@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/05/2016 04:29 PM, Robin Murphy wrote:
-> On 01/02/16 19:58, Stephen Boyd wrote:
->> On 02/01, Robin Murphy wrote:
->>> So far, we have been blindly assuming that having access to a
->>> memory-mapped timer frame implies that the individual elements of that
->>> frame frame are already enabled. Whilst it's the firmware's job to give
->>> us non-secure access to frames in the first place, we should not rely
->>> on implementations always being generous enough to also configure CNTACR
->>> for those non-secure frames (e.g. [1]).
->>>
->>> Explicitly enable feature-level access per-frame, and verify that the
->>> access we want is really implemented before trying to make use of it.
->>>
->>> [1]:https://github.com/ARM-software/tf-issues/issues/170
->>>
->>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->>> ---
->>
->> Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
->> Tested-by: Stephen Boyd <sboyd@codeaurora.org>
->
-> Great, thanks!
->
-> Daniel, am I right in hoping this is something you'll pick up, or should
-> I be resending it to arm-soc?
+On Fri, Feb 05, 2016 at 03:33:28PM +0100, Maxime Ripard wrote:
+> On Thu, Jan 21, 2016 at 04:28:02PM +0000, Mark Brown wrote:
+> > On Thu, Jan 21, 2016 at 04:46:49PM +0100, Maxime Ripard wrote:
 
-I will be reviewing timers patches next week. I will take care of this one.
+> > > Anyway, I'm fine with both approaches, just let me know what you
+> > > prefer.
 
-Thanks
-   -- Daniel
+> > Without seeing an implementation of the lists it's hard to say.
 
+> Just to make sure we're on the same page: you want to keep the
+> regulator, but instead of giving the parent through vinX-supplies
+> properties, you want to have a single *-supply property, with a list
+> of regulators, right?
 
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Either that or an explicit regulator describing the merge.  Rob wants
+the list I think but I really don't care.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160205/d5a0c1d4/attachment.sig>
