@@ -1,58 +1,45 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri,  5 Feb 2016 22:20:18 +0100
-Subject: [PATCH 5/5] arm64: dts: rockchip: add rk3368 iodomains
-In-Reply-To: <1454707218-23676-1-git-send-email-heiko@sntech.de>
-References: <1454707218-23676-1-git-send-email-heiko@sntech.de>
-Message-ID: <1454707218-23676-6-git-send-email-heiko@sntech.de>
+Date: Fri,  5 Feb 2016 22:20:13 +0100
+Subject: [PATCH 0/5] ARM: rockchip: move io-domains under GRF
+Message-ID: <1454707218-23676-1-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the supply-links according to the R88 schematics.
+The GRF contains both individual settings-bits as well as somewhat more
+fully blocks like different phy-controls and also the io-voltage selection.
+Similar to the power-domains living under the pmu, things like said
+io-voltage selection should live under the grf instead of separate
+nodes higher up.
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- arch/arm64/boot/dts/rockchip/rk3368-r88.dts | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+This is even more important now that socs like the rk3368 and probably
+more future socs seem to contain more than one GRF-area (a second one
+under the PMU power-domain) with each containing a part of the voltage
+selection. So having that in the correct place also prevents confusion.
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3368-r88.dts b/arch/arm64/boot/dts/rockchip/rk3368-r88.dts
-index 104cbee..e6e2a1f 100644
---- a/arch/arm64/boot/dts/rockchip/rk3368-r88.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3368-r88.dts
-@@ -211,6 +211,18 @@
- 	status = "ok";
- };
- 
-+&grf {
-+	io-domains {
-+		compatible = "rockchip,rk3368-io-voltage-domain";
-+
-+		audio-supply = <&vcc_io>;
-+		gpio30-supply = <&vcc_io>;
-+		gpio1830-supply = <&vcc_io>;
-+		sdcard-supply = <&vccio_sd>;
-+		wifi-supply = <&vccio_wl>;
-+	};
-+};
-+
- &i2c0 {
- 	status = "okay";
- 
-@@ -331,6 +343,16 @@
- 	};
- };
- 
-+&pmugrf {
-+	io-domains {
-+		compatible = "rockchip,rk3368-pmu-io-voltage-domain";
-+		rockchip,grf = <&pmugrf>;
-+
-+		pmu-supply = <&vcc_io>;
-+		vop-supply = <&vcc_io>;
-+	};
-+};
-+
- &saradc {
- 	vref-supply = <&vcc_18>;
- 	status = "okay";
+
+Ideally patch1 would go into 4.6 through the power or avs tree and the
+devicetree-related things should wait until after the next merge window
+due to the updated binding, which I can then simply apply to my dts
+branches.
+
+
+Heiko Stuebner (5):
+  PM / AVS: rockchip-io: make io-domains a child of the GRF
+  ARM: dts: rockchip: make rk3288-grf a simple-mfd
+  ARM: dts: rockchip: move rk3288 io-domain nodes to the grf
+  arm64: dts: rockchip: make rk3368 grf syscons simple-mfds as well
+  arm64: dts: rockchip: add rk3368 iodomains
+
+ .../bindings/power/rockchip-io-domain.txt          |  4 ++-
+ arch/arm/boot/dts/rk3288-firefly.dtsi              | 33 +++++++++++----------
+ arch/arm/boot/dts/rk3288-popmetal.dts              | 34 ++++++++++++----------
+ arch/arm/boot/dts/rk3288-rock2-som.dtsi            | 34 ++++++++++++----------
+ arch/arm/boot/dts/rk3288-veyron.dtsi               | 28 +++++++++---------
+ arch/arm/boot/dts/rk3288.dtsi                      |  2 +-
+ arch/arm64/boot/dts/rockchip/rk3368-r88.dts        | 22 ++++++++++++++
+ arch/arm64/boot/dts/rockchip/rk3368.dtsi           |  4 +--
+ drivers/power/avs/rockchip-io-domain.c             | 10 ++++++-
+ 9 files changed, 105 insertions(+), 66 deletions(-)
+
 -- 
 2.6.4
