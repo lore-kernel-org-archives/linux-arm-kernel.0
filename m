@@ -1,95 +1,25 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 5 Feb 2016 09:54:12 -0600
-Subject: [PATCH] PCI: layerscape: add ls2085a compatible
-In-Reply-To: <VI1PR04MB16155E4265922D6659B439C1E8D20@VI1PR04MB1615.eurprd04.prod.outlook.com>
-References: <1453915925-19198-1-git-send-email-yang.shi@linaro.org>
- <56A906F4.3050809@linaro.org> <20160204223711.GE7031@localhost>
- <56B3E386.8010002@linaro.org>
- <VI1PR04MB1230AA5CAEEEE0D4AD8E3DF288D20@VI1PR04MB1230.eurprd04.prod.outlook.com>
- <VI1PR04MB16155E4265922D6659B439C1E8D20@VI1PR04MB1615.eurprd04.prod.outlook.com>
-Message-ID: <20160205155412.GB29306@localhost>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 5 Feb 2016 13:58:23 -0200
+Subject: marvell_cesa fails to register on kirkwood (88F6282)
+In-Reply-To: <CAKzmTe0mvZD5UwqM47uXbM7Z7oAJpE4g4BVMba1hkzqNu+Zbgw@mail.gmail.com>
+References: <CAKzmTe0mvZD5UwqM47uXbM7Z7oAJpE4g4BVMba1hkzqNu+Zbgw@mail.gmail.com>
+Message-ID: <CAOMZO5AkyVnfCnaOp=tNo3xe3HL7YMWgcJCNQqD0+jK3jBs5sQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 05, 2016 at 06:07:10AM +0000, Minghuan Lian wrote:
-> The patch is ok to me.
+On Fri, Feb 5, 2016 at 3:01 AM, JM <fijam@archlinux.us> wrote:
+> Hi,
+>
+> I am testing marvell_cesa on a kirkwood device (QNAP TS-212p, Marvell
+> Kirkwood 88F6282, dts: http://pastebin.com/Gk95KFHf ).
+> As of kernel 4.4 (4.4.0-trunk-kirkwood #1 Debian 4.4-1~exp1) it fails
+> in the following way:
+>
+> modprobe marvell_cesa allhwsupport=1
+> dmesg | tail -n 1
+> [ 1057.855091] marvell-cesa: probe of f1030000.crypto failed with error -12
 
-Thanks, I'll transform that into an ack.
+It seems like this is the similar issue I saw with the sahara driver.
 
-Who's going to post a patch to update MAINTAINERS to fix the
-@freescale.com addresses?  If we can get that in for v4.5, it will
-save some hassle.
-
-> > -----Original Message-----
-> > From: Bhupesh Sharma
-> > Sent: Friday, February 05, 2016 1:36 PM
-> > To: Shi, Yang <yang.shi@linaro.org>; Bjorn Helgaas <helgaas@kernel.org>;
-> > Yang-Leo Li <leoyang.li@nxp.com>; shawn.guo at linaro.org
-> > Cc: Mingkai Hu <mingkai.hu@nxp.com>; Minghuan Lian
-> > <minghuan.lian@nxp.com>; bhelgaas at google.com; linux-pci at vger.kernel.org;
-> > linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> > linaro-kernel at lists.linaro.org
-> > Subject: RE: [PATCH] PCI: layerscape: add ls2085a compatible
-> > 
-> > > From: Shi, Yang
-> > > Sent: Friday, February 05, 2016 5:19 AM
-> > >
-> > > On 2/4/2016 2:37 PM, Bjorn Helgaas wrote:
-> > > > On Wed, Jan 27, 2016 at 10:05:40AM -0800, Shi, Yang wrote:
-> > > >> Correct FSL folks email address to nxp.com, sorry for the
-> > > inconvenience.
-> > > >
-> > > > Do we need some MAINTAINERS updates in addition to the ack for this
-> > > patch?
-> > > > I see a bunch of @freescale.com addresses in MAINTAINERS.
-> > >
-> > > I guess so if the @freescale.com address is not valid anymore.
-> > 
-> > All @freescale.com address have shifted to @nxp.com.
-> > 
-> > Leo, Minghuan - can you kindly review this patch.
-> > 
-> > Shawn - can you take this through your tree, once Leo and Minghuan have
-> > reviewed the code.
-> > 
-> > Regards,
-> > Bhupesh
-> > 
-> > >
-> > > >
-> > > >> On 1/27/2016 9:32 AM, Yang Shi wrote:
-> > > >>> The layerscape PCI host driver needs recognize ls2085a compatible
-> > > >>> when using firmware with ls2085a compatible property, otherwise
-> > > >>> the PCI bus won't be detected even though ls2085a compatible is
-> > > >>> included
-> > > by the dts.
-> > > >>>
-> > > >>> Signed-off-by: Yang Shi <yang.shi@linaro.org>
-> > > >>> ---
-> > > >>>   drivers/pci/host/pci-layerscape.c | 1 +
-> > > >>>   1 file changed, 1 insertion(+)
-> > > >>>
-> > > >>> diff --git a/drivers/pci/host/pci-layerscape.c
-> > > >>> b/drivers/pci/host/pci-layerscape.c
-> > > >>> index 3923bed..c40d8b2 100644
-> > > >>> --- a/drivers/pci/host/pci-layerscape.c
-> > > >>> +++ b/drivers/pci/host/pci-layerscape.c
-> > > >>> @@ -203,6 +203,7 @@ static const struct of_device_id
-> > > ls_pcie_of_match[] = {
-> > > >>>   	{ .compatible = "fsl,ls1021a-pcie", .data = &ls1021_drvdata
-> > > },
-> > > >>>   	{ .compatible = "fsl,ls1043a-pcie", .data = &ls1043_drvdata
-> > > },
-> > > >>>   	{ .compatible = "fsl,ls2080a-pcie", .data = &ls2080_drvdata
-> > > },
-> > > >>> +	{ .compatible = "fsl,ls2085a-pcie", .data = &ls2080_drvdata },
-> > > >>>   	{ },
-> > > >>>   };
-> > > >>>   MODULE_DEVICE_TABLE(of, ls_pcie_of_match);
-> > > >>>
-> > > >>
-> > >
-> > > --
-> > > To unsubscribe from this list: send the line "unsubscribe linux-pci"
-> > > in the body of a message to majordomo at vger.kernel.org More majordomo
-> > > info at http://vger.kernel.org/majordomo-info.html
+Could you try a fix like this?
+http://www.spinics.net/lists/linux-crypto/msg18393.html
