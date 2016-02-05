@@ -1,86 +1,125 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Fri, 5 Feb 2016 15:14:12 +0800
-Subject: [PATCH v11 17/21] KVM: ARM64: Reset PMU state when resetting vcpu
+Date: Fri, 5 Feb 2016 15:13:57 +0800
+Subject: [PATCH v11 02/21] KVM: ARM64: Define PMU data structure for each vcpu
 In-Reply-To: <1454656456-11640-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1454656456-11640-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1454656456-11640-18-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1454656456-11640-3-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-When resetting vcpu, it needs to reset the PMU state to initial status.
+Here we plan to support virtual PMU for guest by full software
+emulation, so define some basic structs and functions preparing for
+futher steps. Define struct kvm_pmc for performance monitor counter and
+struct kvm_pmu for performance monitor unit for each vcpu. According to
+ARMv8 spec, the PMU contains at most 32(ARMV8_MAX_COUNTERS) counters.
+
+Since this only supports ARM64 (or PMUv3), add a separate config symbol
+for it.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Reviewed-by: Andrew Jones <drjones@redhat.com>
 ---
- arch/arm64/kvm/reset.c |  3 +++
- include/kvm/arm_pmu.h  |  2 ++
- virt/kvm/arm/pmu.c     | 17 +++++++++++++++++
- 3 files changed, 22 insertions(+)
+ arch/arm64/include/asm/kvm_host.h |  2 ++
+ arch/arm64/kvm/Kconfig            |  7 +++++++
+ include/kvm/arm_pmu.h             | 42 +++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 51 insertions(+)
+ create mode 100644 include/kvm/arm_pmu.h
 
-diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-index f34745c..dfbce78 100644
---- a/arch/arm64/kvm/reset.c
-+++ b/arch/arm64/kvm/reset.c
-@@ -120,6 +120,9 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
- 	/* Reset system registers */
- 	kvm_reset_sys_regs(vcpu);
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 689d4c9..6f0241f 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -36,6 +36,7 @@
  
-+	/* Reset PMU */
-+	kvm_pmu_vcpu_reset(vcpu);
+ #include <kvm/arm_vgic.h>
+ #include <kvm/arm_arch_timer.h>
++#include <kvm/arm_pmu.h>
+ 
+ #define KVM_MAX_VCPUS VGIC_V3_MAX_CPUS
+ 
+@@ -211,6 +212,7 @@ struct kvm_vcpu_arch {
+ 	/* VGIC state */
+ 	struct vgic_cpu vgic_cpu;
+ 	struct arch_timer_cpu timer_cpu;
++	struct kvm_pmu pmu;
+ 
+ 	/*
+ 	 * Anything that is not used directly from assembly code goes
+diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
+index a5272c0..de7450d 100644
+--- a/arch/arm64/kvm/Kconfig
++++ b/arch/arm64/kvm/Kconfig
+@@ -36,6 +36,7 @@ config KVM
+ 	select HAVE_KVM_EVENTFD
+ 	select HAVE_KVM_IRQFD
+ 	select KVM_ARM_VGIC_V3
++	select KVM_ARM_PMU if HW_PERF_EVENTS
+ 	---help---
+ 	  Support hosting virtualized guest machines.
+ 	  We don't support KVM with 16K page tables yet, due to the multiple
+@@ -48,6 +49,12 @@ config KVM_ARM_HOST
+ 	---help---
+ 	  Provides host support for ARM processors.
+ 
++config KVM_ARM_PMU
++	bool
++	---help---
++	  Adds support for a virtual Performance Monitoring Unit (PMU) in
++	  virtual machines.
 +
- 	/* Reset timer */
- 	return kvm_timer_vcpu_reset(vcpu, cpu_vtimer_irq);
- }
+ source drivers/vhost/Kconfig
+ 
+ endif # VIRTUALIZATION
 diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
-index 44a3c75..191908c 100644
---- a/include/kvm/arm_pmu.h
+new file mode 100644
+index 0000000..be220ee
+--- /dev/null
 +++ b/include/kvm/arm_pmu.h
-@@ -41,6 +41,7 @@ struct kvm_pmu {
- u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u64 select_idx);
- void kvm_pmu_set_counter_value(struct kvm_vcpu *vcpu, u64 select_idx, u64 val);
- u64 kvm_pmu_valid_counter_mask(struct kvm_vcpu *vcpu);
-+void kvm_pmu_vcpu_reset(struct kvm_vcpu *vcpu);
- void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val);
- void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val);
- void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val);
-@@ -65,6 +66,7 @@ static inline u64 kvm_pmu_valid_counter_mask(struct kvm_vcpu *vcpu)
- {
- 	return 0;
- }
-+static inline void kvm_pmu_vcpu_reset(struct kvm_vcpu *vcpu) {}
- static inline void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val) {}
- static inline void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val) {}
- static inline void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val) {}
-diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
-index 5f983cb..3ea9a89 100644
---- a/virt/kvm/arm/pmu.c
-+++ b/virt/kvm/arm/pmu.c
-@@ -84,6 +84,23 @@ static void kvm_pmu_stop_counter(struct kvm_vcpu *vcpu, struct kvm_pmc *pmc)
- 	}
- }
- 
-+/**
-+ * kvm_pmu_vcpu_reset - reset pmu state for cpu
-+ * @vcpu: The vcpu pointer
+@@ -0,0 +1,42 @@
++/*
++ * Copyright (C) 2015 Linaro Ltd.
++ * Author: Shannon Zhao <shannon.zhao@linaro.org>
 + *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
-+void kvm_pmu_vcpu_reset(struct kvm_vcpu *vcpu)
-+{
-+	int i;
-+	struct kvm_pmu *pmu = &vcpu->arch.pmu;
 +
-+	for (i = 0; i < ARMV8_MAX_COUNTERS; i++) {
-+		kvm_pmu_stop_counter(vcpu, &pmu->pmc[i]);
-+		pmu->pmc[i].idx = i;
-+		pmu->pmc[i].bitmask = 0xffffffffUL;
-+	}
-+}
++#ifndef __ASM_ARM_KVM_PMU_H
++#define __ASM_ARM_KVM_PMU_H
 +
- u64 kvm_pmu_valid_counter_mask(struct kvm_vcpu *vcpu)
- {
- 	u64 val = vcpu_sys_reg(vcpu, PMCR_EL0) >> ARMV8_PMCR_N_SHIFT;
++#ifdef CONFIG_KVM_ARM_PMU
++
++#include <linux/perf_event.h>
++#include <asm/pmu.h>
++
++struct kvm_pmc {
++	u8 idx;/* index into the pmu->pmc array */
++	struct perf_event *perf_event;
++	u64 bitmask;
++};
++
++struct kvm_pmu {
++	int irq_num;
++	struct kvm_pmc pmc[ARMV8_MAX_COUNTERS];
++	bool ready;
++};
++#else
++struct kvm_pmu {
++};
++#endif
++
++#endif
 -- 
 2.0.4
