@@ -1,35 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 05 Feb 2016 16:40:54 +0100
-Subject: [PATCH v2 0/5] arm64: kernel: Add support for User Access Override
-In-Reply-To: <1454684330-892-1-git-send-email-james.morse@arm.com>
-References: <1454684330-892-1-git-send-email-james.morse@arm.com>
-Message-ID: <13475776.5b1DTHhHh9@wuerfel>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 5 Feb 2016 15:42:34 +0000
+Subject: [PATCH v5sub2 1/8] arm64: add support for module PLTs
+In-Reply-To: <CAKv+Gu9n=bmsZ=UOBiLWzaG2JSsbdC8k1mB7yFbH0czrbXS-1g@mail.gmail.com>
+References: <1454332178-4414-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1454332178-4414-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20160204151303.GB6076@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu9n=bmsZ=UOBiLWzaG2JSsbdC8k1mB7yFbH0czrbXS-1g@mail.gmail.com>
+Message-ID: <20160205154234.GF6076@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 05 February 2016 14:58:45 James Morse wrote:
-> This series adds support for User Access Override (UAO; part of the ARMv8.2
-> Extensions[0]). When enabled, this causes the get_user() accessors to use
-> the unprivileged load/store instructions. When addr_limit is set to
-> KERNEL_DS, we set the override bit allowing privileged access.
+On Thu, Feb 04, 2016 at 04:31:59PM +0100, Ard Biesheuvel wrote:
+> On 4 February 2016 at 16:13, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Mon, Feb 01, 2016 at 02:09:31PM +0100, Ard Biesheuvel wrote:
+> >> This adds support for emitting PLTs at module load time for relative
+> >> branches that are out of range. This is a prerequisite for KASLR, which
+> >> may place the kernel and the modules anywhere in the vmalloc area,
+> >> making it more likely that branch target offsets exceed the maximum
+> >> range of +/- 128 MB.
+> >
+> > Any downside to trying to keep the kernel+modules coupled together so
+> > that we avoid the PLT?
 > 
-> Because the unprivileged instructions don't trip PAN, the last patch changes
-> which 'alternative' values are swapped in, allowing PAN to be left enabled
-> during get_user() and friends.
-> 
-> This series can be retrieved from:
-> git://linux-arm.org/linux-jm.git -b uao/v2
-> 
+> First of all, note that it is unlikely that the PLTs are ever required
+> in practice, considering that either
+> a) the kernel is loaded at the default location right at the base of
+> the vmalloc range, and in this case, the module space is reserved for
+> modules only, or
+> b) the kernel is loaded at some random offset in the 240+ GB vmalloc
+> space, and it is unlikely that all VMA space around the kernel happens
+> to be given out to non-randomized vmalloc/ioremap allocations
 
-Looks very nice. I have no complaints about the implementations, but two questions:
+My worry is that we merge some code that's rarely tested.
 
-* There was recently some work in reducing the number of set_fs() calls in
-  the compat_ioctl, which further reduces the attack surface. Should we try to
-  continue that effort in other syscalls?
+> So the bottom line is that it may be possible, but it is unlikely to
+> be worth the effort imo
 
-* Do we expect to handle this using live patching indefinitely? I can imagine
-  that at some point in the future, ARMv8.2+ systems will be the vast majority,
-  so it might be nice to support enabling it unconditionally (same for any
-  of the alternative bits really). Is there a long-term strategy?
+The alternative of having our own allocator for modules isn't that
+appealing either, so let's stick with the PLTs.
 
-	Arnd
+-- 
+Catalin
