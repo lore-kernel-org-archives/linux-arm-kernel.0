@@ -1,76 +1,52 @@
-From: dietmar.eggemann@arm.com (Dietmar Eggemann)
-Date: Fri, 5 Feb 2016 17:19:11 +0000
-Subject: [PATCH v3 6/6] arm64: add sysfs cpu_capacity attribute
-In-Reply-To: <1454500799-18451-7-git-send-email-juri.lelli@arm.com>
-References: <1454500799-18451-1-git-send-email-juri.lelli@arm.com>
- <1454500799-18451-7-git-send-email-juri.lelli@arm.com>
-Message-ID: <56B4D98F.3090103@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 5 Feb 2016 17:32:48 +0000
+Subject: [PATCH v5sub2 0/8] arm64: implement virtual KASLR
+In-Reply-To: <CAKv+Gu-AhLcatkDsQVeoFGJ+pTEwaW1Hy9M-fY1-VWvRc_E47w@mail.gmail.com>
+References: <1454332178-4414-1-git-send-email-ard.biesheuvel@linaro.org>
+ <CAKv+Gu-AhLcatkDsQVeoFGJ+pTEwaW1Hy9M-fY1-VWvRc_E47w@mail.gmail.com>
+Message-ID: <20160205173248.GJ6076@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Juri,
-
-On 03/02/16 11:59, Juri Lelli wrote:
-> Add a sysfs cpu_capacity attribute with which it is possible to read and
-> write (thus over-writing default values) CPUs capacity. This might be
-> useful in situation where there is no way to get proper default values
-> at boot time.
+On Mon, Feb 01, 2016 at 02:35:03PM +0100, Ard Biesheuvel wrote:
+> On 1 February 2016 at 14:09, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> > At the request of Catalin, this series has been split off from my series
+> > 'arm64: implement support for KASLR v4' [1]. This sub-series deals with
+> > creating a relocatable binary, and randomizing the virtual placement of
+> > the kernel itself, the modules and the linear region based on entropy
+> > supplied by the bootloader in the /chosen/kaslr-seed DT property.
+> >
+> > Changes since v4:
+> > - add randomization of the linear region, i.e., if the linear region is
+> >   substantially larger than the space spanned by RAM, the mapping of RAM
+> >   is moved to a random offset inside the linear region.
+> > - dropped the CRC check in kaslr_early_init(), since the only code that may
+> >   modify .data through __fixmap_remap_fdt() is instrumentation that should
+> >   deal with that correctly (For instance, the branch profiling records taken
+> >   branches in structs allocated in .data, and these counts will not be reset
+> >   to 0 between the first and the second call to __mmap_switched())
+> > - add Mark's ack to patch #4
+> >
 > 
-> The new attribute shows up as:
+> NOTE: I have omitted the relative kallsyms and relative extable
+> patches, since they already queued in akpm's tree. However, while the
+> kallsyms patch is merely an optimization, the extable patches are in
+> fact required for correct operation, since the build time sorting does
+> not work on absolute extables (this is due to the fact that the
+> resolution of the relocations is deferred until runtime, and so the
+> extable addresses are all zero at sorting time)
 > 
->  /sys/devices/system/cpu/cpu*/cpu_capacity
-> 
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Mark Brown <broonie@linaro.org>
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> Signed-off-by: Juri Lelli <juri.lelli@arm.com>
-> ---
->  arch/arm64/kernel/topology.c | 68 ++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 68 insertions(+)
-> 
-> diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-> index f2513a6..f05cc07 100644
-> --- a/arch/arm64/kernel/topology.c
-> +++ b/arch/arm64/kernel/topology.c
-> @@ -40,6 +40,74 @@ bool arch_wants_init_cpu_capacity(void)
->  	return true;
->  }
->  
-> +#ifdef CONFIG_PROC_SYSCTL
-> +#include <asm/cpu.h>
-> +#include <linux/string.h>
-> +static ssize_t show_cpu_capacity(struct device *dev,
-> +				 struct device_attribute *attr,
-> +				 char *buf)
-> +{
-> +	struct cpu *cpu = container_of(dev, struct cpu, dev);
-> +	ssize_t rc;
-> +	int cpunum = cpu->dev.id;
-> +	unsigned long capacity = arch_scale_cpu_capacity(NULL, cpunum);
+> http://ozlabs.org/~akpm/mmotm/broken-out/extable-add-support-for-relative-extables-to-search-and-sort-routines.patch
+> http://ozlabs.org/~akpm/mmotm/broken-out/arm64-switch-to-relative-exception-tables.patch
 
-Gives me an implicit declaration of function ?arch_scale_cpu_capacity?
-error [without the commit fbc899610e1a ("arm64: Update
-arch_scale_cpu_capacity() to reflect change to define") on your
-git://linux-arm.org/linux-jl.git upstream/default_caps_v3 branch].
+I'm still trying to get my head around how we merge those. Since I
+assume akpm will push them during the merging window, part of your code
+cannot be tested before.
 
-Why don't you just return cpu_scale
+Can we deselect CONFIG_BUILDTIME_EXTABLE_SORT temporarily while we use
+absolute extable addresses? We patch them at boot-time and sort them
+at run-time. Once the above patches go in, we can revert to build-time
+extable sorting.
 
-@@ -49,10 +49,8 @@ static ssize_t show_cpu_capacity(struct device *dev,
- {
-        struct cpu *cpu = container_of(dev, struct cpu, dev);
-        ssize_t rc;
--       int cpunum = cpu->dev.id;
--       unsigned long capacity = arch_scale_cpu_capacity(NULL, cpunum);
-
--       rc = sprintf(buf, "%lu\n", capacity);
-+       rc = sprintf(buf, "%lu\n", per_cpu(cpu_scale, cpu->dev.id));
-
-        return rc;
- }
-
-to get rid of this dependency?
-
--- Dietmar
-
-[...]
+-- 
+Catalin
