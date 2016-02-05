@@ -1,74 +1,80 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 05 Feb 2016 10:37:00 +0100
-Subject: [PATCH v4 1/1] USB: core: let USB device know device node
-In-Reply-To: <20160205061124.GB1858@shlinux2>
-References: <1453706679-18948-1-git-send-email-peter.chen@freescale.com>
- <1454582690.3356.18.camel@pengutronix.de> <20160205061124.GB1858@shlinux2>
-Message-ID: <1454665020.6406.21.camel@pengutronix.de>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Fri, 5 Feb 2016 17:37:23 +0800
+Subject: [PATCH v6 0/7] Add clock support for Mediatek MT2701
+Message-ID: <1454665050-37776-1-git-send-email-jamesjj.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 05.02.2016, 14:11 +0800 schrieb Peter Chen:
-[...]
-> > The reference recommendation states that for single-configuration USB
-> > devices the compatible should contain all of the applicable strings from
-> > the list starting with 2) "usbVID,PID.REV" and ending with 11)
-> > "usb,device". Are we going to ignore this?
->
-> I have not seen benefits if we write several compatibles in dts,
-> the information of compatibles listed in doc can be got during
-> the enumeration.
-> 
-> I suggest we use the simple pattern for this compatible, in that
-> case, every one can be easy to follow it, and will not be confused
-> which compatibles should be used, and the style can be unify.
+This series is based on 4.5-rc1 and [1], add clock and reset controller
+support for Mediatek MT2701.
 
-Just pointing it out, a comment why this differs from the recommendation
-would be nice to avoid confusion.
+This series also refined makefile and Kconfig to support configurable
+multiple SoC clock support.
 
-[...]
-> > > +		compatible = "usb05e3,0608";
-> > > +		reg = <0x1>;
-> > > +	};
-> > 
-> > I'd have written this node as:
-> > 
-> > 	hub: hub at 1 {
-> > 		compatible = "usb5e3,608", "usb5e3,class9",
-> > 			     "usb,class9", "usb,device";
-> > 		reg = <1>;
-> > 	};
-> 
-> The reg should be hexadecimal, do we need to add "0x" before the value?
+changes since v5:
+- Rebase to v4.5-rc1 and [1].
+- Enable critical clocks for MT2701
+- Refine dt-binding documents, add reset controller support for hifsys.
 
-The unit-address name part should be hexadecimal, the reg property value
-doesn't have to be. As long as the value is < 10 I don't see a problem.
+changes since v4:
+- Rebase to v4.5-rc1.
+- Remove CLK_SET_RATE_PARENT from divider flags.
+- Add img_jpgdec_smi clock.
+- Move clk/mediatek/Kconfig into menu section in clk/Kconfig.
 
-> > As another example, I'd like to introduce the USB WLAN Adapter soldered
-> > onto the imx6q-gk802 board to its power enable GPIO via the device tree:
-> > 
-> > /* Internal USB port (USBH1) */
-> > &usbh1 {
-> > 	#address-cells = <1>;
-> > 	#size-cells = <0>;
-> > 	status = "okay";
-> > 
-> > 	/* RTL8192CU 802.11n WLAN Adapter */
-> > 	device at 1 {
-> > 		compatible = "usbbda,8176.200", "usbbda,8176",
-> > 			     "usb,device";
-> > 		reg = <1>;
-> > 
-> > 		enable-gpios = <&gpio2 0 GPIO_ACTIVE_LOW>;
-> > 	};
-> > };
-> > 
-> 
-> It is okay to use your example, but I still insist like below:
+changes since v3:
+- Change the parent of mm_mdp_bls_26m from clk26m to pwm_sel.
 
-Sorry for being imprecise. The hub example is fine for the
-documentation. I just wanted to illustrate how and why I am interested
-in this discussion.
+changes since v2:
+- Fix ethsys definition.
+- Replace read-modify-write with regmap_update_bits() in clock operations.
+- Move mt2701-resets.h to include/dt-bindings/reset/.
+- Add hifsys reset patch from John Crispin.
 
-best regards
-Philipp
+changes since v1:
+- Document MT2701 compatible strings.
+
+[1] https://patchwork.kernel.org/patch/8147901/
+
+James Liao (3):
+  clk: mediatek: Refine the makefile to support multiple clock drivers
+  dt-bindings: ARM: Mediatek: Document bindings for MT2701
+  clk: mediatek: Enable critical clocks for MT2701
+
+Shunli Wang (4):
+  clk: mediatek: Add dt-bindings for MT2701 clocks
+  clk: mediatek: Add MT2701 clock support
+  reset: mediatek: Add MT2701 reset controller dt-binding file
+  reset: mediatek: Add MT2701 reset driver
+
+ .../bindings/arm/mediatek/mediatek,apmixedsys.txt  |    3 +-
+ .../bindings/arm/mediatek/mediatek,bdpsys.txt      |   22 +
+ .../bindings/arm/mediatek/mediatek,ethsys.txt      |   22 +
+ .../bindings/arm/mediatek/mediatek,hifsys.txt      |   24 +
+ .../bindings/arm/mediatek/mediatek,imgsys.txt      |    3 +-
+ .../bindings/arm/mediatek/mediatek,infracfg.txt    |    3 +-
+ .../bindings/arm/mediatek/mediatek,mmsys.txt       |    3 +-
+ .../bindings/arm/mediatek/mediatek,pericfg.txt     |    3 +-
+ .../bindings/arm/mediatek/mediatek,topckgen.txt    |    3 +-
+ .../bindings/arm/mediatek/mediatek,vdecsys.txt     |    3 +-
+ drivers/clk/Kconfig                                |    1 +
+ drivers/clk/mediatek/Kconfig                       |   31 +
+ drivers/clk/mediatek/Makefile                      |    7 +-
+ drivers/clk/mediatek/clk-gate.c                    |   52 +
+ drivers/clk/mediatek/clk-gate.h                    |    2 +
+ drivers/clk/mediatek/clk-mt2701.c                  | 1236 ++++++++++++++++++++
+ drivers/clk/mediatek/clk-mtk.c                     |   25 +
+ drivers/clk/mediatek/clk-mtk.h                     |   34 +-
+ include/dt-bindings/clock/mt2701-clk.h             |  482 ++++++++
+ include/dt-bindings/reset/mt2701-resets.h          |   83 ++
+ 20 files changed, 2029 insertions(+), 13 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,bdpsys.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,ethsys.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,hifsys.txt
+ create mode 100644 drivers/clk/mediatek/Kconfig
+ create mode 100644 drivers/clk/mediatek/clk-mt2701.c
+ create mode 100644 include/dt-bindings/clock/mt2701-clk.h
+ create mode 100644 include/dt-bindings/reset/mt2701-resets.h
+
+--
+1.9.1
