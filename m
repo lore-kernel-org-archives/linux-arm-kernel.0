@@ -1,144 +1,76 @@
-From: fijam@archlinux.us (JM)
-Date: Fri, 5 Feb 2016 18:21:58 +0100
-Subject: marvell_cesa fails to register on kirkwood (88F6282)
-In-Reply-To: <20160205172856.2923d938@bbrezillon>
-References: <CAKzmTe0mvZD5UwqM47uXbM7Z7oAJpE4g4BVMba1hkzqNu+Zbgw@mail.gmail.com>
- <20160205090246.GE32272@lunn.ch> <20160205112907.796afb05@bbrezillon>
- <CAKzmTe20fT8BcRaDaf2gz92KMAK0kEUkaD-kPq_cPF1WKBdroA@mail.gmail.com>
- <87vb632maf.fsf@free-electrons.com>
- <CAKzmTe1AqNQwjcsAULotd010NXuk1AYjj5p6UoqT_Zu=BCHdcw@mail.gmail.com>
- <20160205172856.2923d938@bbrezillon>
-Message-ID: <CAKzmTe0wvwkyBAe6S6syRpK13pMDxpiUAK75xb-FW=YNFy3jRg@mail.gmail.com>
+From: dietmar.eggemann@arm.com (Dietmar Eggemann)
+Date: Fri, 5 Feb 2016 17:19:11 +0000
+Subject: [PATCH v3 6/6] arm64: add sysfs cpu_capacity attribute
+In-Reply-To: <1454500799-18451-7-git-send-email-juri.lelli@arm.com>
+References: <1454500799-18451-1-git-send-email-juri.lelli@arm.com>
+ <1454500799-18451-7-git-send-email-juri.lelli@arm.com>
+Message-ID: <56B4D98F.3090103@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 5, 2016 at 5:28 PM, Boris Brezillon
-<boris.brezillon@free-electrons.com> wrote:
-> On Fri, 5 Feb 2016 17:01:45 +0100
-> JM <fijam@archlinux.us> wrote:
->
->> On Fri, Feb 5, 2016 at 4:45 PM, Gregory CLEMENT
->> <gregory.clement@free-electrons.com> wrote:
->> > Hi JM,
->> >
->> >  On ven., f?vr. 05 2016, JM <fijam@archlinux.us> wrote:
->> >
->> >> On Fri, Feb 5, 2016 at 11:29 AM, Boris Brezillon
->> >> <boris.brezillon@free-electrons.com> wrote:
->> >>> Jan, Andrew
->> >>>
->> >>> On Fri, 5 Feb 2016 10:02:46 +0100
->> >>> Andrew Lunn <andrew@lunn.ch> wrote:
->> >>>
->> >>>> On Fri, Feb 05, 2016 at 06:01:18AM +0100, JM wrote:
->> >>>> > Hi,
->> >>>> >
->> >>>> > I am testing marvell_cesa on a kirkwood device (QNAP TS-212p, Marvell
->> >>>> > Kirkwood 88F6282, dts: http://pastebin.com/Gk95KFHf ).
->> >>>> > As of kernel 4.4 (4.4.0-trunk-kirkwood #1 Debian 4.4-1~exp1) it fails
->> >>>> > in the following way:
->> >>>> >
->> >>>> > modprobe marvell_cesa allhwsupport=1
->> >>>> > dmesg | tail -n 1
->> >>>> > [ 1057.855091] marvell-cesa: probe of f1030000.crypto failed with error -12
->> >>>> >
->> >>>> > or:
->> >>>> >
->> >>>> > modprobe marvell_cesa
->> >>>> > dmesg | tail -n 1
->> >>>> > [ 9178.399357] marvell-cesa: probe of f1030000.crypto failed with error -524
->> >>>> >
->> >>>> > With kernel 4.3 it would fail with error -22 on that hardware. There
->> >>>> > are scattered reports from other users experiencing the same issue
->> >>>> > (1,2,3)
->> >>>> >
->> >>>> > I wonder if this is a result of an invalid definition of the
->> >>>> > crypto-sram in the dts of this SoC, or perhaps some other problem
->> >>>> > (PEBKAC included).
->> >>>>
->> >>>> Hi Jan
->> >>>>
->> >>>> Do you have SRAM enabled in your kernel configuration. The
->> >>>> mvebu_v5_defconfig does not have it, which is a bug really.
->> >>>
->> >>> Hm, the CRYPTO_DEV_MARVELL_CESA option selects the SRAM one [1].
->> >>> Anyway, I also think this error is related to the SRAM (not sure why the
->> >>> driver is not able to get the SRAM though).
->> >>>
->> >>> Best Regards,
->> >>>
->> >>> Boris
->> >>>
->> >>> [1]http://lxr.free-electrons.com/source/drivers/crypto/Kconfig#L168
->> >>>
->> >>>
->> >>> --
->> >>> Boris Brezillon, Free Electrons
->> >>> Embedded Linux and Kernel engineering
->> >>> http://free-electrons.com
->> >>
->> >> Hi,
->> >>
->> >> Thanks for getting back to me. Indeed, CONFIG_SRAM is enabled, I put
->> >> the complete .config here: http://pastebin.com/40eKMJqE
->> >>
->> >> If there is anything I can do to help squish this bug, please let me
->> >> know.
->> >
->> > How do you get your dts?
->> > it seems that you generated it from your dtb (or from /proc).
->> >
->> > I tried to do the same from arch/arm/boot/dts/kirkwood-ts219-6282.dtb,
->> > but the resulting dts is too different for an easy comparison.
->> >
->> > Could you also provide your dtb, maybe by using the same dtc with the
->> > option -s I will manage to get the something easier to compare.
->> >
->> > Gregory
->> >
->> >
->> >>
->> >> Best regards,
->> >> Jan
->> >>
->> >> _______________________________________________
->> >> linux-arm-kernel mailing list
->> >> linux-arm-kernel at lists.infradead.org
->> >> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->> >
->> > --
->> > Gregory Clement, Free Electrons
->> > Kernel, drivers, real-time and embedded Linux
->> > development, consulting, training and support.
->> > http://free-electrons.com
->>
->> Hi,
->>
->> Yes, I simply used dtc -I fs /proc/device-tree to obtain the dts.
->>
->> Here is the relevant .dtb file : http://heap.ovh/files/kirkwood-ts219-6282.dtb
->
-> Can you try to apply this patch [1], and let me know where it fails?
->
-> [1]http://code.bulix.org/qnuq8m-90700
->
->
->
->
-> --
-> Boris Brezillon, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+Hi Juri,
 
-Hello again,
+On 03/02/16 11:59, Juri Lelli wrote:
+> Add a sysfs cpu_capacity attribute with which it is possible to read and
+> write (thus over-writing default values) CPUs capacity. This might be
+> useful in situation where there is no way to get proper default values
+> at boot time.
+> 
+> The new attribute shows up as:
+> 
+>  /sys/devices/system/cpu/cpu*/cpu_capacity
+> 
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Mark Brown <broonie@linaro.org>
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> Signed-off-by: Juri Lelli <juri.lelli@arm.com>
+> ---
+>  arch/arm64/kernel/topology.c | 68 ++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 68 insertions(+)
+> 
+> diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+> index f2513a6..f05cc07 100644
+> --- a/arch/arm64/kernel/topology.c
+> +++ b/arch/arm64/kernel/topology.c
+> @@ -40,6 +40,74 @@ bool arch_wants_init_cpu_capacity(void)
+>  	return true;
+>  }
+>  
+> +#ifdef CONFIG_PROC_SYSCTL
+> +#include <asm/cpu.h>
+> +#include <linux/string.h>
+> +static ssize_t show_cpu_capacity(struct device *dev,
+> +				 struct device_attribute *attr,
+> +				 char *buf)
+> +{
+> +	struct cpu *cpu = container_of(dev, struct cpu, dev);
+> +	ssize_t rc;
+> +	int cpunum = cpu->dev.id;
+> +	unsigned long capacity = arch_scale_cpu_capacity(NULL, cpunum);
 
-With the patch applied (I had to add struct device *dev = cesa->dev;
-under static int mv_cesa_get_sram or I'd get error: ?dev? undeclared
-during compilation, hope that's correct)
-I am getting the following:
+Gives me an implicit declaration of function ?arch_scale_cpu_capacity?
+error [without the commit fbc899610e1a ("arm64: Update
+arch_scale_cpu_capacity() to reflect change to define") on your
+git://linux-arm.org/linux-jl.git upstream/default_caps_v3 branch].
 
-[53595.279886] marvell-cesa f1030000.crypto: failed get SRAM region
-[53595.289485] marvell-cesa: probe of f1030000.crypto failed with error -12
+Why don't you just return cpu_scale
 
-Best regards,
-Jan
+@@ -49,10 +49,8 @@ static ssize_t show_cpu_capacity(struct device *dev,
+ {
+        struct cpu *cpu = container_of(dev, struct cpu, dev);
+        ssize_t rc;
+-       int cpunum = cpu->dev.id;
+-       unsigned long capacity = arch_scale_cpu_capacity(NULL, cpunum);
+
+-       rc = sprintf(buf, "%lu\n", capacity);
++       rc = sprintf(buf, "%lu\n", per_cpu(cpu_scale, cpu->dev.id));
+
+        return rc;
+ }
+
+to get rid of this dependency?
+
+-- Dietmar
+
+[...]
