@@ -1,48 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri,  5 Feb 2016 16:21:50 +0100
-Subject: [PATCH] staging: wilc1000: fix compilation without CONFIG_PM
-Message-ID: <1454685729-3663377-1-git-send-email-arnd@arndb.de>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 5 Feb 2016 15:29:12 +0000
+Subject: [PATCH v2] clocksource/arm_arch_timer: Enable and verify MMIO
+ access
+In-Reply-To: <20160201195816.GL4848@codeaurora.org>
+References: <71bf617f4083b116b2aeab24f13fc5fed99a816f.1454327031.git.robin.murphy@arm.com>
+ <20160201195816.GL4848@codeaurora.org>
+Message-ID: <56B4BFC8.6050201@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After the addition of the wakeup code in wilc1000, it no longer
-builds when CONFIG_PM is disabled:
+On 01/02/16 19:58, Stephen Boyd wrote:
+> On 02/01, Robin Murphy wrote:
+>> So far, we have been blindly assuming that having access to a
+>> memory-mapped timer frame implies that the individual elements of that
+>> frame frame are already enabled. Whilst it's the firmware's job to give
+>> us non-secure access to frames in the first place, we should not rely
+>> on implementations always being generous enough to also configure CNTACR
+>> for those non-secure frames (e.g. [1]).
+>>
+>> Explicitly enable feature-level access per-frame, and verify that the
+>> access we want is really implemented before trying to make use of it.
+>>
+>> [1]:https://github.com/ARM-software/tf-issues/issues/170
+>>
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>> ---
+>
+> Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+> Tested-by: Stephen Boyd <sboyd@codeaurora.org>
 
-drivers/staging/wilc1000/wilc_wfi_cfgoperations.c: In function 'wilc_create_wiphy':
-drivers/staging/wilc1000/wilc_wfi_cfgoperations.c:2632:13: error: 'struct wiphy' has no member named 'wowlan'
-  wdev->wiphy->wowlan = &wowlan_support;
+Great, thanks!
 
-This marks the wowlan_support variable as __maybe_unused and hides
-the reference when CONFIG_PM is disabled to avoid the build error.
+Daniel, am I right in hoping this is something you'll pick up, or should 
+I be resending it to arm-soc?
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 73584a40d748 ("staging: wilc1000: add ops resuem/suspend/wakeup in cfg80211")
----
- drivers/staging/wilc1000/wilc_wfi_cfgoperations.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/staging/wilc1000/wilc_wfi_cfgoperations.c b/drivers/staging/wilc1000/wilc_wfi_cfgoperations.c
-index 4eede2b4e661..7e6262026070 100644
---- a/drivers/staging/wilc1000/wilc_wfi_cfgoperations.c
-+++ b/drivers/staging/wilc1000/wilc_wfi_cfgoperations.c
-@@ -74,7 +74,7 @@ static const struct ieee80211_txrx_stypes
- 	}
- };
- 
--static const struct wiphy_wowlan_support wowlan_support = {
-+static const struct wiphy_wowlan_support wowlan_support __maybe_unused = {
- 	.flags = WIPHY_WOWLAN_ANY
- };
- 
-@@ -2629,7 +2629,9 @@ struct wireless_dev *wilc_create_wiphy(struct net_device *net, struct device *de
- 	sema_init(&(priv->SemHandleUpdateStats), 1);
- 	priv->wdev = wdev;
- 	wdev->wiphy->max_scan_ssids = MAX_NUM_PROBED_SSID;
-+#ifdef CONFIG_PM
- 	wdev->wiphy->wowlan = &wowlan_support;
-+#endif
- 	wdev->wiphy->max_num_pmkids = WILC_MAX_NUM_PMKIDS;
- 	PRINT_INFO(CFG80211_DBG, "Max number of PMKIDs = %d\n", wdev->wiphy->max_num_pmkids);
- 
--- 
-2.7.0
+Thanks,
+Robin.
