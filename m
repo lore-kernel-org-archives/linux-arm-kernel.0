@@ -1,76 +1,112 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 05 Feb 2016 17:03:23 +0100
-Subject: [PATCH v2 08/12] devicetree: bindings: add DT binding for the
- Marvell Armada 3700 SoC family
-In-Reply-To: <20160203213825.4fa6a0ef@free-electrons.com> (Thomas Petazzoni's
- message of "Wed, 3 Feb 2016 21:38:25 +0100")
-References: <1454524889-9207-1-git-send-email-gregory.clement@free-electrons.com>
- <1454524889-9207-9-git-send-email-gregory.clement@free-electrons.com>
- <20160203213825.4fa6a0ef@free-electrons.com>
-Message-ID: <87r3gr2lh0.fsf@free-electrons.com>
+Date: Fri, 05 Feb 2016 17:09:34 +0100
+Subject: marvell_cesa fails to register on kirkwood (88F6282)
+In-Reply-To: <CAKzmTe1AqNQwjcsAULotd010NXuk1AYjj5p6UoqT_Zu=BCHdcw@mail.gmail.com>
+ (JM's message of "Fri, 5 Feb 2016 17:01:45 +0100")
+References: <CAKzmTe0mvZD5UwqM47uXbM7Z7oAJpE4g4BVMba1hkzqNu+Zbgw@mail.gmail.com>
+ <20160205090246.GE32272@lunn.ch> <20160205112907.796afb05@bbrezillon>
+ <CAKzmTe20fT8BcRaDaf2gz92KMAK0kEUkaD-kPq_cPF1WKBdroA@mail.gmail.com>
+ <87vb632maf.fsf@free-electrons.com>
+ <CAKzmTe1AqNQwjcsAULotd010NXuk1AYjj5p6UoqT_Zu=BCHdcw@mail.gmail.com>
+Message-ID: <87mvrf2l6p.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Hi JM,
  
- On mer., f?vr. 03 2016, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+ On ven., f?vr. 05 2016, JM <fijam@archlinux.us> wrote:
 
-> Hello,
+> On Fri, Feb 5, 2016 at 4:45 PM, Gregory CLEMENT
+> <gregory.clement@free-electrons.com> wrote:
+>> Hi JM,
+>>
+>>  On ven., f?vr. 05 2016, JM <fijam@archlinux.us> wrote:
+>>
+>>> On Fri, Feb 5, 2016 at 11:29 AM, Boris Brezillon
+>>> <boris.brezillon@free-electrons.com> wrote:
+>>>> Jan, Andrew
+>>>>
+>>>> On Fri, 5 Feb 2016 10:02:46 +0100
+>>>> Andrew Lunn <andrew@lunn.ch> wrote:
+>>>>
+>>>>> On Fri, Feb 05, 2016 at 06:01:18AM +0100, JM wrote:
+>>>>> > Hi,
+>>>>> >
+>>>>> > I am testing marvell_cesa on a kirkwood device (QNAP TS-212p, Marvell
+>>>>> > Kirkwood 88F6282, dts: http://pastebin.com/Gk95KFHf ).
+>>>>> > As of kernel 4.4 (4.4.0-trunk-kirkwood #1 Debian 4.4-1~exp1) it fails
+>>>>> > in the following way:
+>>>>> >
+>>>>> > modprobe marvell_cesa allhwsupport=1
+>>>>> > dmesg | tail -n 1
+>>>>> > [ 1057.855091] marvell-cesa: probe of f1030000.crypto failed with error -12
+>>>>> >
+>>>>> > or:
+>>>>> >
+>>>>> > modprobe marvell_cesa
+>>>>> > dmesg | tail -n 1
+>>>>> > [ 9178.399357] marvell-cesa: probe of f1030000.crypto failed with error -524
+>>>>> >
+>>>>> > With kernel 4.3 it would fail with error -22 on that hardware. There
+>>>>> > are scattered reports from other users experiencing the same issue
+>>>>> > (1,2,3)
+>>>>> >
+>>>>> > I wonder if this is a result of an invalid definition of the
+>>>>> > crypto-sram in the dts of this SoC, or perhaps some other problem
+>>>>> > (PEBKAC included).
+>>>>>
+>>>>> Hi Jan
+>>>>>
+>>>>> Do you have SRAM enabled in your kernel configuration. The
+>>>>> mvebu_v5_defconfig does not have it, which is a bug really.
+>>>>
+>>>> Hm, the CRYPTO_DEV_MARVELL_CESA option selects the SRAM one [1].
+>>>> Anyway, I also think this error is related to the SRAM (not sure why the
+>>>> driver is not able to get the SRAM though).
+>>>>
+>>>> Best Regards,
+>>>>
+>>>> Boris
+>>>>
+>>>> [1]http://lxr.free-electrons.com/source/drivers/crypto/Kconfig#L168
+>>>>
+>>>>
+>>>> --
+>>>> Boris Brezillon, Free Electrons
+>>>> Embedded Linux and Kernel engineering
+>>>> http://free-electrons.com
+>>>
+>>> Hi,
+>>>
+>>> Thanks for getting back to me. Indeed, CONFIG_SRAM is enabled, I put
+>>> the complete .config here: http://pastebin.com/40eKMJqE
+>>>
+>>> If there is anything I can do to help squish this bug, please let me
+>>> know.
+>>
+>> How do you get your dts?
+>> it seems that you generated it from your dtb (or from /proc).
+>>
+>> I tried to do the same from arch/arm/boot/dts/kirkwood-ts219-6282.dtb,
+>> but the resulting dts is too different for an easy comparison.
+>>
+>> Could you also provide your dtb, maybe by using the same dtc with the
+>> option -s I will manage to get the something easier to compare.
 >
-> On Wed,  3 Feb 2016 19:41:25 +0100, Gregory CLEMENT wrote:
->> The Marvell Armada 3700 is a family of ARMv8 CA53 SoCs. This commit
->> introduces the Device Tree binding that documents the top-level
->> compatible strings for Armada 3700 based platforms.
->> 
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->> ---
->>  .../devicetree/bindings/arm/marvell/armada-37xx.txt      | 16 ++++++++++++++++
->>  1 file changed, 16 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt
->> 
->> diff --git a/Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt b/Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt
->> new file mode 100644
->> index 000000000000..17e90e8b5f76
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt
->> @@ -0,0 +1,16 @@
->> +Marvell Armada 37xx Platforms Device Tree Bindings
->> +--------------------------------------------------
->> +
->> +Boards using a SoC of the Marvell Armada 37xx family must carry the
->> +following root node property:
->> +
->> + - compatible: must contain "marvell,armada3710"
+
+> Yes, I simply used dtc -I fs /proc/device-tree to obtain the dts.
 >
-> Are we sure at this point that the 3720 is a strict super-set of the
-> 3710 ?
-
-I think we are in the same situation with the Armada 380 with the other
-Armada 38x. At this point the 3720 is a super-set of the 3710.
-
+> Here is the relevant .dtb file : http://heap.ovh/files/kirkwood-ts219-6282.dtb
 >
-> If that's not the case, then it would be somewhat weird for a platform
-> using the 3720 platform to carry the marvell,armada3710 compatible
-> string, no?
 
-Actually, we only said that the 3720 is compatible with the 3710 not
-really a strict super-set. More over, for a 3720 we must use
-marvell,armada3720 _and_ marvell,armada3710, and in case of conflict
-marvell,armada3720 must be used.
-
-I really prefer using marvell,armada3710 as common compatible for all
-the Armada 3700 SoCs, that having no common compatible at all.
-
-Thanks,
+OK so this dtb is exacly the one from the mainline. As most of the CESU
+stuff is set in te dtis, we will be able to compare it on the other
+kirkwood based board.
 
 Gregory
 
->
-> Thomas
-> -- 
-> Thomas Petazzoni, CTO, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+> Best regards,
+> Jan
 
 -- 
 Gregory Clement, Free Electrons
