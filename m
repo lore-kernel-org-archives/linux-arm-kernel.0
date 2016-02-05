@@ -1,280 +1,191 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri,  5 Feb 2016 17:20:50 +0100
-Subject: [PATCH 3/3] ARM: ixp4xx: move indirect I/O into common-pci.c
-In-Reply-To: <1454689262-613421-1-git-send-email-arnd@arndb.de>
-References: <1454689262-613421-1-git-send-email-arnd@arndb.de>
-Message-ID: <1454689262-613421-3-git-send-email-arnd@arndb.de>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 5 Feb 2016 16:26:17 +0000
+Subject: [PATCH v4 07/13] arm64: Change cpu_resume() to enable mmu early
+ then access sleep_sp by va
+In-Reply-To: <1453977766-20907-8-git-send-email-james.morse@arm.com>
+References: <1453977766-20907-1-git-send-email-james.morse@arm.com>
+ <1453977766-20907-8-git-send-email-james.morse@arm.com>
+Message-ID: <20160205162617.GD31547@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pointer comparison in is_pci_memory() confuses gcc, so it
-starts throwing bogus warnings about the use of possibly uninitialized
-variables:
+Hi James,
 
-drivers/ata/ahci_qoriq.c: In function 'ahci_qoriq_hardreset':
-arch/arm/include/asm/io.h:101:2: error: 'px_is' may be used uninitialized in this function [-Werror=maybe-uninitialized]
-drivers/crypto/ixp4xx_crypto.c: In function 'aead_perform':
-drivers/crypto/ixp4xx_crypto.c:1072:5: error: 'lastlen' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+On Thu, Jan 28, 2016 at 10:42:40AM +0000, James Morse wrote:
+> By enabling the MMU early in cpu_resume(), the sleep_save_sp and stack can
+> be accessed by VA, which avoids the need to convert-addresses and clean to
+> PoC on the suspend path.
+> 
+> MMU setup is shared with the boot path, meaning the swapper_pg_dir is
+> restored directly: ttbr1_el1 is no longer saved/restored.
+> 
+> struct sleep_save_sp is removed, replacing it with a single array of
+> pointers.
+> 
+> cpu_do_{suspend,resume} could be further reduced to not restore: cpacr_el1,
+> mdscr_el1, tcr_el1, vbar_el1 and sctlr_el1, all of which are set by
+> __cpu_setup(). However these values all contain res0 bits that may be used
+> to enable future features.
 
-The code is that gets warned about is correct, and we should not warn
-about this. Moving the code into a .c file makes the object files
-smaller and avoids the warnings.
+This patch is a very nice clean-up, a comment below.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/mach-ixp4xx/common-pci.c      | 98 ++++++++++++++++++++++++++++++++++
- arch/arm/mach-ixp4xx/include/mach/io.h | 95 +++-----------------------------
- 2 files changed, 104 insertions(+), 89 deletions(-)
+I think that for registers like tcr_el1 and sctlr_el1 we should define
+a restore mask (to avoid overwriting bits set-up by __cpu_setup), eg
+current code that restores the tcr_el1 seems wrong to me, see below.
 
-diff --git a/arch/arm/mach-ixp4xx/common-pci.c b/arch/arm/mach-ixp4xx/common-pci.c
-index 4977296f0c78..6f5d92f88062 100644
---- a/arch/arm/mach-ixp4xx/common-pci.c
-+++ b/arch/arm/mach-ixp4xx/common-pci.c
-@@ -166,6 +166,104 @@ int ixp4xx_pci_write(u32 addr, u32 cmd, u32 data)
- 	return retval;
- }
- 
-+#ifdef CONFIG_IXP4XX_INDIRECT_PCI
-+void __indirect_writeb(u8 value, volatile void __iomem *p)
-+{
-+	u32 addr = (u32)p;
-+	u32 n, byte_enables, data;
-+
-+	if (!is_pci_memory(addr)) {
-+		__raw_writeb(value, p);
-+		return;
-+	}
-+
-+	n = addr % 4;
-+	byte_enables = (0xf & ~BIT(n)) << IXP4XX_PCI_NP_CBE_BESL;
-+	data = value << (8*n);
-+	ixp4xx_pci_write(addr, byte_enables | NP_CMD_MEMWRITE, data);
-+}
-+EXPORT_SYMBOL(__indirect_writeb);
-+
-+void __indirect_writew(u16 value, volatile void __iomem *p)
-+{
-+	u32 addr = (u32)p;
-+	u32 n, byte_enables, data;
-+
-+	if (!is_pci_memory(addr)) {
-+		__raw_writew(value, p);
-+		return;
-+	}
-+
-+	n = addr % 4;
-+	byte_enables = (0xf & ~(BIT(n) | BIT(n+1))) << IXP4XX_PCI_NP_CBE_BESL;
-+	data = value << (8*n);
-+	ixp4xx_pci_write(addr, byte_enables | NP_CMD_MEMWRITE, data);
-+}
-+EXPORT_SYMBOL(__indirect_writew);
-+
-+void __indirect_writel(u32 value, volatile void __iomem *p)
-+{
-+	u32 addr = (__force u32)p;
-+
-+	if (!is_pci_memory(addr)) {
-+		__raw_writel(value, p);
-+		return;
-+	}
-+
-+	ixp4xx_pci_write(addr, NP_CMD_MEMWRITE, value);
-+}
-+EXPORT_SYMBOL(__indirect_writel);
-+
-+u8 __indirect_readb(const volatile void __iomem *p)
-+{
-+	u32 addr = (u32)p;
-+	u32 n, byte_enables, data;
-+
-+	if (!is_pci_memory(addr))
-+		return __raw_readb(p);
-+
-+	n = addr % 4;
-+	byte_enables = (0xf & ~BIT(n)) << IXP4XX_PCI_NP_CBE_BESL;
-+	if (ixp4xx_pci_read(addr, byte_enables | NP_CMD_MEMREAD, &data))
-+		return 0xff;
-+
-+	return data >> (8*n);
-+}
-+EXPORT_SYMBOL(__indirect_readb);
-+
-+u16 __indirect_readw(const volatile void __iomem *p)
-+{
-+	u32 addr = (u32)p;
-+	u32 n, byte_enables, data;
-+
-+	if (!is_pci_memory(addr))
-+		return __raw_readw(p);
-+
-+	n = addr % 4;
-+	byte_enables = (0xf & ~(BIT(n) | BIT(n+1))) << IXP4XX_PCI_NP_CBE_BESL;
-+	if (ixp4xx_pci_read(addr, byte_enables | NP_CMD_MEMREAD, &data))
-+		return 0xffff;
-+
-+	return data>>(8*n);
-+}
-+EXPORT_SYMBOL(__indirect_readw);
-+
-+u32 __indirect_readl(const volatile void __iomem *p)
-+{
-+	u32 addr = (__force u32)p;
-+	u32 data;
-+
-+	if (!is_pci_memory(addr))
-+		return __raw_readl(p);
-+
-+	if (ixp4xx_pci_read(addr, NP_CMD_MEMREAD, &data))
-+		return 0xffffffff;
-+
-+	return data;
-+}
-+EXPORT_SYMBOL(__indirect_readl);
-+#endif
-+
- static u32 ixp4xx_config_addr(u8 bus_num, u16 devfn, int where)
- {
- 	u32 addr;
-diff --git a/arch/arm/mach-ixp4xx/include/mach/io.h b/arch/arm/mach-ixp4xx/include/mach/io.h
-index d8c2a4dc54d7..e770858b490a 100644
---- a/arch/arm/mach-ixp4xx/include/mach/io.h
-+++ b/arch/arm/mach-ixp4xx/include/mach/io.h
-@@ -78,21 +78,12 @@ static inline int is_pci_memory(u32 addr)
- #define readsw(p, v, l)			__indirect_readsw(p, v, l)
- #define readsl(p, v, l)			__indirect_readsl(p, v, l)
- 
--static inline void __indirect_writeb(u8 value, volatile void __iomem *p)
--{
--	u32 addr = (u32)p;
--	u32 n, byte_enables, data;
--
--	if (!is_pci_memory(addr)) {
--		__raw_writeb(value, p);
--		return;
--	}
--
--	n = addr % 4;
--	byte_enables = (0xf & ~BIT(n)) << IXP4XX_PCI_NP_CBE_BESL;
--	data = value << (8*n);
--	ixp4xx_pci_write(addr, byte_enables | NP_CMD_MEMWRITE, data);
--}
-+void __indirect_writeb(u8 value, volatile void __iomem *p);
-+void __indirect_writew(u16 value, volatile void __iomem *p);
-+void __indirect_writel(u32 value, volatile void __iomem *p);
-+u8 __indirect_readb(const volatile void __iomem *p);
-+u16 __indirect_readw(const volatile void __iomem *p);
-+u32 __indirect_readl(const volatile void __iomem *p);
- 
- static inline void __indirect_writesb(volatile void __iomem *bus_addr,
- 				      const void *p, int count)
-@@ -103,22 +94,6 @@ static inline void __indirect_writesb(volatile void __iomem *bus_addr,
- 		writeb(*vaddr++, bus_addr);
- }
- 
--static inline void __indirect_writew(u16 value, volatile void __iomem *p)
--{
--	u32 addr = (u32)p;
--	u32 n, byte_enables, data;
--
--	if (!is_pci_memory(addr)) {
--		__raw_writew(value, p);
--		return;
--	}
--
--	n = addr % 4;
--	byte_enables = (0xf & ~(BIT(n) | BIT(n+1))) << IXP4XX_PCI_NP_CBE_BESL;
--	data = value << (8*n);
--	ixp4xx_pci_write(addr, byte_enables | NP_CMD_MEMWRITE, data);
--}
--
- static inline void __indirect_writesw(volatile void __iomem *bus_addr,
- 				      const void *p, int count)
- {
-@@ -128,18 +103,6 @@ static inline void __indirect_writesw(volatile void __iomem *bus_addr,
- 		writew(*vaddr++, bus_addr);
- }
- 
--static inline void __indirect_writel(u32 value, volatile void __iomem *p)
--{
--	u32 addr = (__force u32)p;
--
--	if (!is_pci_memory(addr)) {
--		__raw_writel(value, p);
--		return;
--	}
--
--	ixp4xx_pci_write(addr, NP_CMD_MEMWRITE, value);
--}
--
- static inline void __indirect_writesl(volatile void __iomem *bus_addr,
- 				      const void *p, int count)
- {
-@@ -148,22 +111,6 @@ static inline void __indirect_writesl(volatile void __iomem *bus_addr,
- 		writel(*vaddr++, bus_addr);
- }
- 
--static inline u8 __indirect_readb(const volatile void __iomem *p)
--{
--	u32 addr = (u32)p;
--	u32 n, byte_enables, data;
--
--	if (!is_pci_memory(addr))
--		return __raw_readb(p);
--
--	n = addr % 4;
--	byte_enables = (0xf & ~BIT(n)) << IXP4XX_PCI_NP_CBE_BESL;
--	if (ixp4xx_pci_read(addr, byte_enables | NP_CMD_MEMREAD, &data))
--		return 0xff;
--
--	return data >> (8*n);
--}
--
- static inline void __indirect_readsb(const volatile void __iomem *bus_addr,
- 				     void *p, u32 count)
- {
-@@ -173,22 +120,6 @@ static inline void __indirect_readsb(const volatile void __iomem *bus_addr,
- 		*vaddr++ = readb(bus_addr);
- }
- 
--static inline u16 __indirect_readw(const volatile void __iomem *p)
--{
--	u32 addr = (u32)p;
--	u32 n, byte_enables, data;
--
--	if (!is_pci_memory(addr))
--		return __raw_readw(p);
--
--	n = addr % 4;
--	byte_enables = (0xf & ~(BIT(n) | BIT(n+1))) << IXP4XX_PCI_NP_CBE_BESL;
--	if (ixp4xx_pci_read(addr, byte_enables | NP_CMD_MEMREAD, &data))
--		return 0xffff;
--
--	return data>>(8*n);
--}
--
- static inline void __indirect_readsw(const volatile void __iomem *bus_addr,
- 				     void *p, u32 count)
- {
-@@ -198,20 +129,6 @@ static inline void __indirect_readsw(const volatile void __iomem *bus_addr,
- 		*vaddr++ = readw(bus_addr);
- }
- 
--static inline u32 __indirect_readl(const volatile void __iomem *p)
--{
--	u32 addr = (__force u32)p;
--	u32 data;
--
--	if (!is_pci_memory(addr))
--		return __raw_readl(p);
--
--	if (ixp4xx_pci_read(addr, NP_CMD_MEMREAD, &data))
--		return 0xffffffff;
--
--	return data;
--}
--
- static inline void __indirect_readsl(const volatile void __iomem *bus_addr,
- 				     void *p, u32 count)
- {
--- 
-2.7.0
+[...]
+
+> -/*
+>   * This hook is provided so that cpu_suspend code can restore HW
+>   * breakpoints as early as possible in the resume path, before reenabling
+>   * debug exceptions. Code cannot be run from a CPU PM notifier since by the
+>  {
+>  	/*
+> -	 * We are resuming from reset with TTBR0_EL1 set to the
+> -	 * idmap to enable the MMU; set the TTBR0 to the reserved
+> -	 * page tables to prevent speculative TLB allocations, flush
+> -	 * the local tlb and set the default tcr_el1.t0sz so that
+> -	 * the TTBR0 address space set-up is properly restored.
+> -	 * If the current active_mm != &init_mm we entered cpu_suspend
+> -	 * with mappings in TTBR0 that must be restored, so we switch
+> -	 * them back to complete the address space configuration
+> -	 * restoration before returning.
+> +	 * We resume from suspend directly into the swapper_pg_dir. We may
+> +	 * also need to load user-space page tables.
+>  	 */
+> -	cpu_set_reserved_ttbr0();
+> -	local_flush_tlb_all();
+> -	cpu_set_default_tcr_t0sz();
+
+You remove the code above since you restore tcr_el1 in cpu_do_resume(),
+but this is not the way it should be done, ie the restore should be done
+with the code sequence above otherwise it is not safe.
+
+>  	if (mm != &init_mm)
+>  		cpu_switch_mm(mm->pgd, mm);
+>  
+> @@ -149,22 +114,17 @@ int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
+>  	return ret;
+>  }
+>  
+> -struct sleep_save_sp sleep_save_sp;
+> +unsigned long *sleep_save_stash;
+>  
+>  static int __init cpu_suspend_init(void)
+>  {
+> -	void *ctx_ptr;
+> -
+>  	/* ctx_ptr is an array of physical addresses */
+> -	ctx_ptr = kcalloc(mpidr_hash_size(), sizeof(phys_addr_t), GFP_KERNEL);
+> +	sleep_save_stash = kcalloc(mpidr_hash_size(), sizeof(*sleep_save_stash),
+> +				   GFP_KERNEL);
+>  
+> -	if (WARN_ON(!ctx_ptr))
+> +	if (WARN_ON(!sleep_save_stash))
+>  		return -ENOMEM;
+>  
+> -	sleep_save_sp.save_ptr_stash = ctx_ptr;
+> -	sleep_save_sp.save_ptr_stash_phys = virt_to_phys(ctx_ptr);
+> -	__flush_dcache_area(&sleep_save_sp, sizeof(struct sleep_save_sp));
+> -
+>  	return 0;
+>  }
+>  early_initcall(cpu_suspend_init);
+> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+> index 3c7d170de822..a755108aaa75 100644
+> --- a/arch/arm64/mm/proc.S
+> +++ b/arch/arm64/mm/proc.S
+> @@ -61,62 +61,45 @@ ENTRY(cpu_do_suspend)
+>  	mrs	x2, tpidr_el0
+>  	mrs	x3, tpidrro_el0
+>  	mrs	x4, contextidr_el1
+> -	mrs	x5, mair_el1
+>  	mrs	x6, cpacr_el1
+> -	mrs	x7, ttbr1_el1
+>  	mrs	x8, tcr_el1
+>  	mrs	x9, vbar_el1
+>  	mrs	x10, mdscr_el1
+>  	mrs	x11, oslsr_el1
+>  	mrs	x12, sctlr_el1
+>  	stp	x2, x3, [x0]
+> -	stp	x4, x5, [x0, #16]
+> -	stp	x6, x7, [x0, #32]
+> -	stp	x8, x9, [x0, #48]
+> -	stp	x10, x11, [x0, #64]
+> -	str	x12, [x0, #80]
+> +	stp	x4, xzr, [x0, #16]
+> +	stp	x6, x8, [x0, #32]
+> +	stp	x9, x10, [x0, #48]
+> +	stp	x11, x12, [x0, #64]
+>  	ret
+>  ENDPROC(cpu_do_suspend)
+>  
+>  /**
+>   * cpu_do_resume - restore CPU register context
+>   *
+> - * x0: Physical address of context pointer
+> - * x1: ttbr0_el1 to be restored
+> - *
+> - * Returns:
+> - *	sctlr_el1 value in x0
+> + * x0: Address of context pointer
+>   */
+>  ENTRY(cpu_do_resume)
+> -	/*
+> -	 * Invalidate local tlb entries before turning on MMU
+> -	 */
+> -	tlbi	vmalle1
+>  	ldp	x2, x3, [x0]
+>  	ldp	x4, x5, [x0, #16]
+> -	ldp	x6, x7, [x0, #32]
+> -	ldp	x8, x9, [x0, #48]
+> -	ldp	x10, x11, [x0, #64]
+> -	ldr	x12, [x0, #80]
+> +	ldp	x6, x8, [x0, #32]
+> +	ldp	x9, x10, [x0, #48]
+> +	ldp	x11, x12, [x0, #64]
+>  	msr	tpidr_el0, x2
+>  	msr	tpidrro_el0, x3
+>  	msr	contextidr_el1, x4
+> -	msr	mair_el1, x5
+>  	msr	cpacr_el1, x6
+> -	msr	ttbr0_el1, x1
+> -	msr	ttbr1_el1, x7
+> -	tcr_set_idmap_t0sz x8, x7
+>  	msr	tcr_el1, x8
+
+I do not think that's correct. You restore tcr_el1 here, but this has
+side effect of "restoring" t0sz too and that's not correct since this
+has to be done with the sequence you removed above.
+
+I'd rather not touch t0sz at all (use a mask) and restore t0sz in
+__cpu_suspend_exit() as it is done at present using:
+
+cpu_set_reserved_ttbr0();
+local_flush_tlb_all();
+cpu_set_default_tcr_t0sz();
+
+That's the only safe way of doing it.
+
+Other than that the patch seems fine to me.
+
+Thanks,
+Lorenzo
+
+>  	msr	vbar_el1, x9
+>  	msr	mdscr_el1, x10
+> +	msr	sctlr_el1, x12
+>  	/*
+>  	 * Restore oslsr_el1 by writing oslar_el1
+>  	 */
+>  	ubfx	x11, x11, #1, #1
+>  	msr	oslar_el1, x11
+>  	msr	pmuserenr_el0, xzr		// Disable PMU access from EL0
+> -	mov	x0, x12
+> -	dsb	nsh		// Make sure local tlb invalidation completed
+>  	isb
+>  	ret
+>  ENDPROC(cpu_do_resume)
+> -- 
+> 2.6.2
+> 
