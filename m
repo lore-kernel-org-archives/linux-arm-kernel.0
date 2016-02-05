@@ -1,50 +1,54 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 5 Feb 2016 14:34:04 +0000
-Subject: [PATCHv3 3/3] arm64: ptdump: Indicate whether memory should be
- faulting
-In-Reply-To: <1454615017-24672-4-git-send-email-labbott@fedoraproject.org>
-References: <1454615017-24672-1-git-send-email-labbott@fedoraproject.org>
- <1454615017-24672-4-git-send-email-labbott@fedoraproject.org>
-Message-ID: <20160205143403.GD19614@leverpostej>
+From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
+Date: Fri,  5 Feb 2016 16:37:08 +0200
+Subject: [PATCH] ARM: OMAP2+: Fix onenand initialization to avoid filesystem
+ corruption
+In-Reply-To: <linux-kernel@vger.kernel.org>
+References: <linux-kernel@vger.kernel.org>
+Message-ID: <1454683028-4193-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 04, 2016 at 11:43:37AM -0800, Laura Abbott wrote:
-> 
-> With CONFIG_DEBUG_PAGEALLOC, pages do not have the valid bit
-> set when free in the buddy allocator. Add an indiciation to
-> the page table dumping code that the valid bit is not set,
-> 'F' for fault, to make this easier to understand.
-> 
-> Signed-off-by: Laura Abbott <labbott@fedoraproject.org>
+Commit <e7b11dc7b77bfce0a351230a5feeadc1d0bba997> ("ARM: OMAP2+: Fix
+onenand rate detection to avoid filesystem corruption") partially fixed
+onenand configuration when GPMC module is reset. Finish the job by also
+providing the correct values in ONENAND_REG_SYS_CFG1 register.
 
-This looks sensible to me, and worked in testing.
+Signed-off-by: Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com>
+---
+ arch/arm/mach-omap2/gpmc-onenand.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-Tested-by: Mark Rutland <mark.rutland@arm.com>
-
-Mark.
-
-> ---
->  arch/arm64/mm/dump.c | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
-> index 5a22a11..f381ac9 100644
-> --- a/arch/arm64/mm/dump.c
-> +++ b/arch/arm64/mm/dump.c
-> @@ -90,6 +90,11 @@ struct prot_bits {
->  
->  static const struct prot_bits pte_bits[] = {
->  	{
-> +		.mask	= PTE_VALID,
-> +		.val	= PTE_VALID,
-> +		.set	= " ",
-> +		.clear	= "F",
-> +	}, {
->  		.mask	= PTE_USER,
->  		.val	= PTE_USER,
->  		.set	= "USR",
-> -- 
-> 2.5.0
-> 
+diff --git a/arch/arm/mach-omap2/gpmc-onenand.c b/arch/arm/mach-omap2/gpmc-onenand.c
+index 7b76ce0..8633c70 100644
+--- a/arch/arm/mach-omap2/gpmc-onenand.c
++++ b/arch/arm/mach-omap2/gpmc-onenand.c
+@@ -101,10 +101,8 @@ static void omap2_onenand_set_async_mode(void __iomem *onenand_base)
+ 
+ static void set_onenand_cfg(void __iomem *onenand_base)
+ {
+-	u32 reg;
++	u32 reg = ONENAND_SYS_CFG1_RDY | ONENAND_SYS_CFG1_INT;
+ 
+-	reg = readw(onenand_base + ONENAND_REG_SYS_CFG1);
+-	reg &= ~((0x7 << ONENAND_SYS_CFG1_BRL_SHIFT) | (0x7 << 9));
+ 	reg |=	(latency << ONENAND_SYS_CFG1_BRL_SHIFT) |
+ 		ONENAND_SYS_CFG1_BL_16;
+ 	if (onenand_flags & ONENAND_FLAG_SYNCREAD)
+@@ -123,6 +121,7 @@ static void set_onenand_cfg(void __iomem *onenand_base)
+ 		reg |= ONENAND_SYS_CFG1_VHF;
+ 	else
+ 		reg &= ~ONENAND_SYS_CFG1_VHF;
++
+ 	writew(reg, onenand_base + ONENAND_REG_SYS_CFG1);
+ }
+ 
+@@ -289,6 +288,7 @@ static int omap2_onenand_setup_async(void __iomem *onenand_base)
+ 		}
+ 	}
+ 
++	onenand_async.sync_write = true;
+ 	omap2_onenand_calc_async_timings(&t);
+ 
+ 	ret = gpmc_cs_program_settings(gpmc_onenand_data->cs, &onenand_async);
+-- 
+1.9.1
