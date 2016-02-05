@@ -1,45 +1,62 @@
 From: rogershimizu@gmail.com (Roger Shimizu)
-Date: Sat,  6 Feb 2016 01:33:15 +0900
-Subject: [PATCH 0/3] fix and new support for orion5x based linkstation
-Message-ID: <1454689998-9579-1-git-send-email-rogershimizu@gmail.com>
+Date: Sat,  6 Feb 2016 01:33:16 +0900
+Subject: [PATCH 1/3] ARM: dts: orion5x: fix the missing mtd flash on
+ linkstation lswtgl
+In-Reply-To: <1454689998-9579-1-git-send-email-rogershimizu@gmail.com>
+References: <1454689998-9579-1-git-send-email-rogershimizu@gmail.com>
+Message-ID: <1454689998-9579-2-git-send-email-rogershimizu@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Orion5x Maintainer,
+MTD flash stores u-boot and u-boot environment on linkstation lswtgl.
+The latter one can be easily read/write by u-boot-tools package in Debian.
 
-Here're fix and new support for orion5x based linkstation devices.
+Signed-off-by: Roger Shimizu <rogershimizu@gmail.com>
+---
+ arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts | 31 ++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
 
-Firstly, it add the missing mtd flash support, which I consider a fix
-and can be backported to stable kernels, so I made the patch explicit.
-
-Second, like the changes I made for kirkwood based linkstation DT,
-I split the orion5x-linkstation-lswtgl.dts file into common and device
-specific part, in order to support more devices.
-
-Third, so there's a new device.
-
-Hope this can be kindly accepted. Thank you!
-
-Cheers,
-Roger
-
-Roger Shimizu (3):
-  ARM: dts: orion5x: fix the missing mtd flash on linkstation lswtgl
-  ARM: dts: orion5x: split linkstation lswtgl into common and device
-    parts
-  ARM: dts: orion5x: add device tree for buffalo linkstation ls-gl
-
- arch/arm/boot/dts/Makefile                       |   1 +
- arch/arm/boot/dts/linkstation-fan.dtsi           |  72 ++++++++
- arch/arm/boot/dts/linkstation-gpio-simple.dtsi   | 105 +++++++++++
- arch/arm/boot/dts/orion5x-linkstation-lsgl.dts   |  87 +++++++++
- arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts | 214 +++++------------------
- arch/arm/boot/dts/orion5x-linkstation.dtsi       | 180 +++++++++++++++++++
- 6 files changed, 491 insertions(+), 168 deletions(-)
- create mode 100644 arch/arm/boot/dts/linkstation-fan.dtsi
- create mode 100644 arch/arm/boot/dts/linkstation-gpio-simple.dtsi
- create mode 100644 arch/arm/boot/dts/orion5x-linkstation-lsgl.dts
- create mode 100644 arch/arm/boot/dts/orion5x-linkstation.dtsi
-
+diff --git a/arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts b/arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts
+index 420788229e6f..aae8a7aceab7 100644
+--- a/arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts
++++ b/arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts
+@@ -228,6 +228,37 @@
+ 	};
+ };
+ 
++&devbus_bootcs {
++	status = "okay";
++	devbus,keep-config;
++
++	flash at 0 {
++		compatible = "jedec-flash";
++		reg = <0 0x40000>;
++		bank-width = <1>;
++
++		partitions {
++			compatible = "fixed-partitions";
++			#address-cells = <1>;
++			#size-cells = <1>;
++
++			header at 0 {
++				reg = <0 0x30000>;
++				read-only;
++			};
++
++			uboot at 30000 {
++				reg = <0x30000 0xF000>;
++				read-only;
++			};
++
++			uboot_env at 3F000 {
++				reg = <0x3F000 0x1000>;
++			};
++		};
++	};
++};
++
+ &mdio {
+ 	status = "okay";
+ 
 -- 
 2.1.4
