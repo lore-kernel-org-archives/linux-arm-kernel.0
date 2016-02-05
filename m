@@ -1,77 +1,77 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Fri, 5 Feb 2016 11:05:38 +0800
-Subject: [PATCH v4 03/17] Xen: xlate: Use page_to_xen_pfn instead of
- page_to_pfn
-In-Reply-To: <1454641552-12576-1-git-send-email-zhaoshenglong@huawei.com>
-References: <1454641552-12576-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1454641552-12576-4-git-send-email-zhaoshenglong@huawei.com>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Fri, 5 Feb 2016 11:36:28 +0800
+Subject: [PATCH v10 0/2] mfd: act8945a: add Active-semi ACT8945A PMIC MFD
+ driver
+Message-ID: <1454643390-16910-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shannon Zhao <shannon.zhao@linaro.org>
+This patch set adds support for the Active-semi ACT8945A PMIC
+MFD driver. It is a Multi Function Device with the following
+subdevices:
+ - Regulator
+ - Charger
 
-Make xen_xlate_map_ballooned_pages work with 64K pages. In that case
-Kernel pages are 64K in size but Xen pages remain 4K in size. Xen pfns
-refer to 4K pages.
+It is interfaced to the host controller using I2C interface,
+ACT8945A is a child device of the I2C.
 
-Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
----
- drivers/xen/xlate_mmu.c | 26 ++++++++++++++++----------
- 1 file changed, 16 insertions(+), 10 deletions(-)
+Changes in v10:
+ - remove the mfd cell .of_compatible.
+ - update the example, due to the subdevices are not regarded as
+   a child node.
 
-diff --git a/drivers/xen/xlate_mmu.c b/drivers/xen/xlate_mmu.c
-index 9692656..28f728b 100644
---- a/drivers/xen/xlate_mmu.c
-+++ b/drivers/xen/xlate_mmu.c
-@@ -207,9 +207,12 @@ int __init xen_xlate_map_ballooned_pages(xen_pfn_t **gfns, void **virt,
- 	void *vaddr;
- 	int rc;
- 	unsigned int i;
-+	unsigned long nr_pages;
-+	xen_pfn_t xen_pfn = 0;
- 
- 	BUG_ON(nr_grant_frames == 0);
--	pages = kcalloc(nr_grant_frames, sizeof(pages[0]), GFP_KERNEL);
-+	nr_pages = DIV_ROUND_UP(nr_grant_frames, XEN_PFN_PER_PAGE);
-+	pages = kcalloc(nr_pages, sizeof(pages[0]), GFP_KERNEL);
- 	if (!pages)
- 		return -ENOMEM;
- 
-@@ -218,22 +221,25 @@ int __init xen_xlate_map_ballooned_pages(xen_pfn_t **gfns, void **virt,
- 		kfree(pages);
- 		return -ENOMEM;
- 	}
--	rc = alloc_xenballooned_pages(nr_grant_frames, pages);
-+	rc = alloc_xenballooned_pages(nr_pages, pages);
- 	if (rc) {
--		pr_warn("%s Couldn't balloon alloc %ld pfns rc:%d\n", __func__,
--			nr_grant_frames, rc);
-+		pr_warn("%s Couldn't balloon alloc %ld pages rc:%d\n", __func__,
-+			nr_pages, rc);
- 		kfree(pages);
- 		kfree(pfns);
- 		return rc;
- 	}
--	for (i = 0; i < nr_grant_frames; i++)
--		pfns[i] = page_to_pfn(pages[i]);
-+	for (i = 0; i < nr_grant_frames; i++) {
-+		if ((i % XEN_PFN_PER_PAGE) == 0)
-+			xen_pfn = page_to_xen_pfn(pages[i / XEN_PFN_PER_PAGE]);
-+		pfns[i] = pfn_to_gfn(xen_pfn++);
-+	}
- 
--	vaddr = vmap(pages, nr_grant_frames, 0, PAGE_KERNEL);
-+	vaddr = vmap(pages, nr_pages, 0, PAGE_KERNEL);
- 	if (!vaddr) {
--		pr_warn("%s Couldn't map %ld pfns rc:%d\n", __func__,
--			nr_grant_frames, rc);
--		free_xenballooned_pages(nr_grant_frames, pages);
-+		pr_warn("%s Couldn't map %ld pages rc:%d\n", __func__,
-+			nr_pages, rc);
-+		free_xenballooned_pages(nr_pages, pages);
- 		kfree(pages);
- 		kfree(pfns);
- 		return -ENOMEM;
+Changes in v9:
+ - remove unneeded struct act8945a_dev structure.
+ - collect Acked from Lee.
+ - collect Acked from Peter.
+
+Changes in v8:
+ - change the subdevice's name "act8945a-pmic" to "act8945a-regulator".
+
+Changes in v7:
+ - remove struct act8945a_dev to .c file.
+ - remove unused .h file.
+ - collect Acked-by from Lee Jones
+
+Changes in v6:
+ - change MFD_ACT8945A type from bool to tristate.
+ - revert depends on to 'I2C'.
+ - change the regulator name.
+
+Changes in v5:
+ - change depends on to 'I2C=y'.
+
+Changes in v4:
+ - add a space before .compatible.
+ - collect Reviewed-by from Krzysztof Kozlowski.
+
+Changes in v3:
+ - fix the tabbing errors in Example.
+ - use "pmic at 5b" label, not "act8945a at 5b" in Example.
+ - collect Acked-by from Rob.
+
+Changes in v2:
+ - add more help information in Kconfig.
+ - update the file header with short version license and author line.
+ - remove unused structure members (dev, i2c_client) of stuct act8945a_dev.
+ - use define "PLATFORM_DEVID_NONE" for mfd_add_devices(), instead of '-1'.
+ - use more explicit info to indicate the failure to add sub devices.
+ - remove the unnecessary print out.
+ - substitute MODULE_LICENSE("GPL") for MODULE_LICENSE("GPL v2").
+ - use more specific label in Example.
+ - add pmic and charger nodes in Example.
+
+Wenyou Yang (2):
+  mfd: act8945a: add Active-semi ACT8945A PMIC MFD driver
+  mfd: add documentation for ACT8945A DT bindings
+
+ Documentation/devicetree/bindings/mfd/act8945a.txt |   76 +++++++++++++++
+ drivers/mfd/Kconfig                                |   11 +++
+ drivers/mfd/Makefile                               |    1 +
+ drivers/mfd/act8945a.c                             |  102 ++++++++++++++++++++
+ 4 files changed, 190 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mfd/act8945a.txt
+ create mode 100644 drivers/mfd/act8945a.c
+
 -- 
-2.0.4
+1.7.9.5
