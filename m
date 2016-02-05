@@ -1,52 +1,45 @@
-From: slash.tmp@free.fr (Mason)
-Date: Fri, 5 Feb 2016 17:29:35 +0100
-Subject: Common/typical fractional divider HW API
-In-Reply-To: <1454688729.31169.87.camel@linux.intel.com>
-References: <56B4B67D.2080707@free.fr>
- <1454684758.31169.77.camel@linux.intel.com> <56B4C775.50808@free.fr>
- <1454688729.31169.87.camel@linux.intel.com>
-Message-ID: <56B4CDEF.3080606@free.fr>
+From: rogershimizu@gmail.com (Roger Shimizu)
+Date: Sat,  6 Feb 2016 01:33:15 +0900
+Subject: [PATCH 0/3] fix and new support for orion5x based linkstation
+Message-ID: <1454689998-9579-1-git-send-email-rogershimizu@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/02/2016 17:12, Andy Shevchenko wrote:
+Dear Orion5x Maintainer,
 
-> On Fri, 2016-02-05 at 17:01 +0100, Mason wrote:
-> 
->> So, do you agree that
->>
->>   DIV = 2^I * (1 + F/256)
->>
->> gives a more useful DIV distribution than
->>
->>   DIV = I + F/16
-> 
-> If you can change hardware why not to use any existing approach which
-> suits better to your device?
+Here're fix and new support for orion5x based linkstation devices.
 
-Sorry, I don't understand the question.
+Firstly, it add the missing mtd flash support, which I consider a fix
+and can be backported to stable kernels, so I made the patch explicit.
 
-In this part of my message, I was trying to argue that one HW API
-"2^I * (1 + F/256)" seemed better than another one "I + F/16" on
-any hardware.
+Second, like the changes I made for kirkwood based linkstation DT,
+I split the orion5x-linkstation-lswtgl.dts file into common and device
+specific part, in order to support more devices.
 
-> I don't remember any existing, though I didn't check much, divider
-> register which takes something like that.
+Third, so there's a new device.
 
-IIUC, you are saying that you've never seen hardware use the
-"2^I * (1 + F/256)" formula, is that correct?
+Hope this can be kindly accepted. Thank you!
 
->> I'm not sure how to parse that. I'm using the divider driver
->> for a CPU clock, to do D(V)FS in cpufreq.
-> 
-> If you are using custom stuff for custom hardware, I hope it's okay.
-> But if we are talking about generic solutions (like clk-fractional-
-> divider), I would suggest to consider existing users / hardware.
+Cheers,
+Roger
 
-Are you saying that I could use the clk-fractional-divider with
-hardware that computes "I + F/16" ?
+Roger Shimizu (3):
+  ARM: dts: orion5x: fix the missing mtd flash on linkstation lswtgl
+  ARM: dts: orion5x: split linkstation lswtgl into common and device
+    parts
+  ARM: dts: orion5x: add device tree for buffalo linkstation ls-gl
 
-Maybe the clk-fractional-divider could be made more generic by having
-the register update part done in a call-back function?
+ arch/arm/boot/dts/Makefile                       |   1 +
+ arch/arm/boot/dts/linkstation-fan.dtsi           |  72 ++++++++
+ arch/arm/boot/dts/linkstation-gpio-simple.dtsi   | 105 +++++++++++
+ arch/arm/boot/dts/orion5x-linkstation-lsgl.dts   |  87 +++++++++
+ arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts | 214 +++++------------------
+ arch/arm/boot/dts/orion5x-linkstation.dtsi       | 180 +++++++++++++++++++
+ 6 files changed, 491 insertions(+), 168 deletions(-)
+ create mode 100644 arch/arm/boot/dts/linkstation-fan.dtsi
+ create mode 100644 arch/arm/boot/dts/linkstation-gpio-simple.dtsi
+ create mode 100644 arch/arm/boot/dts/orion5x-linkstation-lsgl.dts
+ create mode 100644 arch/arm/boot/dts/orion5x-linkstation.dtsi
 
-Regards.
+-- 
+2.1.4
