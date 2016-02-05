@@ -1,72 +1,50 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Fri, 5 Feb 2016 20:55:55 +0800
-Subject: [PATCH v4 1/1] USB: core: let USB device know device node
-In-Reply-To: <Pine.LNX.4.44L0.1602041130590.1515-100000@iolanthe.rowland.org>
-References: <20160204015928.GA11158@shlinux2>
- <Pine.LNX.4.44L0.1602041130590.1515-100000@iolanthe.rowland.org>
-Message-ID: <CAL411-oOgSYJy_cLVkGWkLbzBewKtj1jgfQqxCsjE_-3NLYcTA@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 5 Feb 2016 14:02:59 +0100
+Subject: [PATCH v10 5/5] Watchdog: ARM SBSA Generic Watchdog half
+ timeout panic support
+In-Reply-To: <CADyBb7unAHEOMfruWS82RkHK6uwPAWCxUx9jqzSkiHU4LHDSeA@mail.gmail.com>
+References: <1454519923-25230-1-git-send-email-fu.wei@linaro.org>
+ <1454519923-25230-6-git-send-email-fu.wei@linaro.org>
+ <56B23883.7000501@codeaurora.org>
+ <CADyBb7sxPg-QUjTbeHFtYkctKc_g7D8O=+jqbXN+DCCoCEnFqA@mail.gmail.com>
+ <56B23E99.1030604@codeaurora.org>
+ <CADyBb7s4opxfPFuX=1-qEE6uhsaMXgofAJPbHUQHrng2AUwqNA@mail.gmail.com>
+ <56B2423B.1020109@codeaurora.org>
+ <CADyBb7uULCn97ea19zH8dB4QX1QA8=AXL94d6gXgFxXM8haBNA@mail.gmail.com>
+ <56B24642.8090105@codeaurora.org>
+ <CADyBb7s_QeU=pYqN9G+5WMtx-L+=QC6uZR6N6ZWPOixnkHzPjw@mail.gmail.com>
+ <56B24AB5.3070001@codeaurora.org>
+ <CADyBb7usPpY=YLjecXce63zY5e1tniPLmNsVY=8CJHJsCqBgQw@mail.gmail.com>
+ <56B2DEE4.7060901@roeck-us.net>
+ <CADyBb7unAHEOMfruWS82RkHK6uwPAWCxUx9jqzSkiHU4LHDSeA@mail.gmail.com>
+Message-ID: <20160205140259.72a33699@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 5, 2016 at 12:36 AM, Alan Stern <stern@rowland.harvard.edu> wrote:
-> On Thu, 4 Feb 2016, Peter Chen wrote:
->
->> On Mon, Jan 25, 2016 at 03:24:39PM +0800, Peter Chen wrote:
->> > Although most of USB devices are hot-plug's, there are still some devices
->> > are hard wired on the board, eg, for HSIC and SSIC interface USB devices.
->> > If these kinds of USB devices are multiple functions, and they can supply
->> > other interfaces like i2c, gpios for other devices, we may need to
->> > describe these at device tree.
->> >
->> > In this commit, it uses "reg" in dts as physical port number to match
->> > the phyiscal port number decided by USB core, if they are the same,
->> > then the device node is for the device we are creating for USB core.
->> >
->> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
->> > ---
->> > Changes for v4:
->> > - The range of "reg" should be 1-31, changing device node address
->> >   style as in lower case hexadecimal with leading zeroes suppressed
->> >   [binding doc, usb-device.txt]
->> > - Improve the example at binding doc, it describes node from the top
->> >   (the controller)
->> > - Delete the struct of_node * within struct usb_device
->> > - Using usb_hcd_find_raw_port_number to get raw port number under root
->> >   hub port
->> >
->>
->> Hi Alan, Arnd, and others, would you please give Ack for it if you
->> are OK with this patch? I am not sure if Greg will queue it or not
->> if no one Acks it, thanks.
->
->
->> > @@ -508,11 +509,20 @@ struct usb_device *usb_alloc_dev(struct usb_device *parent,
->> >     dev->connect_time = jiffies;
->> >     dev->active_duration = -jiffies;
->> >  #endif
->> > -   if (root_hub)   /* Root hub always ok [and always wired] */
->> > +   if (root_hub) { /* Root hub always ok [and always wired] */
->> >             dev->authorized = 1;
->> > -   else {
->> > +           dev->dev.of_node = bus->controller->of_node;
->> > +   } else {
->> >             dev->authorized = !!HCD_DEV_AUTHORIZED(usb_hcd);
->> >             dev->wusb = usb_bus_is_wusb(bus) ? 1 : 0;
->> > +
->> > +           if (dev->dev.parent->parent == bus->controller)
->> > +                   /* device under root hub's port */
->> > +                   port1 = usb_hcd_find_raw_port_number(usb_hcd,
->> > +                           port1);
->
-> I would change the test to "if (!parent->parent)" and add {} around the
-> body (since it's 3 lines long).  Also, although this doesn't really
-> matter, you could consider putting the new code inside the previous big
-> "if" statement instead of down here at the end of the function.
->
+Hello,
 
-Sorry, Alan, I can understand using (!parent->parent) to stands for
-the device connects to the root hub port, others I can't understand.
+On Fri, 5 Feb 2016 17:51:52 +0800, Fu Wei wrote:
 
+> OK, my thought is
+> 
+> if panic is enabled :
+> |--------WOR-------WS0--------WOR-------WS1
+> |------timeout------(panic)------timeout-----reset
+
+I'm quite certainly missing something completely obvious here, but how
+can you get the WS1 interrupt *after* raising a panic? Aren't all
+interrupts disabled and the system fully halted once you get a panic(),
+especially when raised from an interrupt handler? If that's the case,
+how can the system continue to do things, such as receiving the WS1
+interrupt and resetting ?
+
+Again, I'm probably missing something obvious, but I'm interested to
+understand the reasoning here.
+
+Thanks!
+
+Thomas
 -- 
-BR,
-Peter Chen
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
