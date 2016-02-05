@@ -1,132 +1,125 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Fri, 5 Feb 2016 11:36:30 +0800
-Subject: [PATCH v10 2/2] mfd: add documentation for ACT8945A DT bindings
-In-Reply-To: <1454643390-16910-1-git-send-email-wenyou.yang@atmel.com>
-References: <1454643390-16910-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1454643390-16910-3-git-send-email-wenyou.yang@atmel.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 5 Feb 2016 09:49:55 +0530
+Subject: [PATCH v3 3/3] pci: dra7xx: use pdata callbacks to perform reset
+In-Reply-To: <56B087AD.4000505@ti.com>
+References: <1452780672-14339-1-git-send-email-kishon@ti.com>
+ <1452780672-14339-4-git-send-email-kishon@ti.com>
+ <20160127173104.GQ19432@atomide.com> <56A90971.4020409@ti.com>
+ <20160127185649.GV19432@atomide.com> <56A94FB7.6020903@ti.com>
+ <20160128183156.GH19432@atomide.com> <56B087AD.4000505@ti.com>
+Message-ID: <56B422EB.5000603@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Active-semi ACT8945A PMIC is a Multi-Function Device, it has
-two subdevices:
- - Regulator
- - Charger
+Hi Paul,
 
-This patch adds documentation for ACT8945A DT bindings.
+On Tuesday 02 February 2016 04:10 PM, Kishon Vijay Abraham I wrote:
+> Hi,
+> 
+> On Friday 29 January 2016 12:01 AM, Tony Lindgren wrote:
+>> * Suman Anna <s-anna@ti.com> [160127 15:17]:
+>>> On 01/27/2016 12:56 PM, Tony Lindgren wrote:
+>>>> * Suman Anna <s-anna@ti.com> [160127 10:17]:
+>>>>> On 01/27/2016 11:31 AM, Tony Lindgren wrote:
+>>>>>> Why do you need another reset here? Can't you just implement PM runtime
+>>>>>> in the driver and do the usual pm_runtime_put_sync followed by
+>>>>>> pm_runtime_disable?
+>>>>>
+>>>>> The omap_hwmod_enable/disable code does not deal with hardresets (PRCM
+>>>>> reset lines) and so the pm_runtime_get_sync/put_sync only end up dealing
+>>>>> with clocks, and we need to invoke the reset functions separately.
+>>>>> Modules with softresets in SYSCONFIG are ok, as they are dealt with
+>>>>> properly.
+>>>>
+>>>> Hmm _reset() in omap_hwmod.c has this to call _assert_hardreset:
+>>>>
+>>>> 	if (oh->class->reset) {
+>>>> 		r = oh->class->reset(oh);
+>>>> 	} else {
+>>>> 		if (oh->rst_lines_cnt > 0) {
+>>>> 			for (i = 0; i < oh->rst_lines_cnt; i++)
+>>>> 				_assert_hardreset(oh, oh->rst_lines[i].name);
+>>>> 			return 0;
+>>>> 		} else {
+>>>> 			r = _ocp_softreset(oh);
+>>>> 			if (r == -ENOENT)
+>>>> 				r = 0;
+>>>> 		}
+>>>> 	}
+>>>
+>>> Right, hwmod code does the initial reset.
+>>>
+>>>> Care to explain what exactly the problem with the hwmod code not doing
+>>>> the reset on init?
+>>>
+>>> And we only need to deassert the reset in probe. Technically, we don't
+>>> need to assert first and deassert in probe, and that was a design choice
+>>> made by Kishon.
+>>
+>> OK so if hwmod code has already done the reset, then why would you need
+>> to deassert reset in the device driver probe?
+> 
+> The hwmod code only asserts the reset lines and that is not enough to access
+> the PCI registers. The reset lines must be de-asserted before accessing the
+> PCIe registers.
+>>
+>>>> And why do you need to do another reset in dra7xx_pcie_remove()?
+>>>
+>>> Primarily to restore the reset state back to what it was after the
+>>> driver remove gets called. We cannot call deassert twice without calling
+>>> a assert in between. Kishon had originally added the assert and deassert
+>>> only in probe, but nothing in remove, they ought to be deassert in probe
+>>> and assert in remove to match initial hardware state, and to also make
+>>> it work across multiple probe/remove.
+> 
+> right. I thought if some program like the bootloader requires the reset lines
+> to be in initial hw state, then it might break on 'reboot'. So restored it back
+> to the initial hw state.
+>>
+>> I don't understand this part either.. Usually you just power up and init
+>> the registers to a sane state in a device driver probe and on exit just
+>> power down the device.
+>>
+>>>>>> Basically I'm wondering how come we need these platform data callbacks
+>>>>>> at all.
+>>>>>
+>>>>> The hardresets are controlled through the
+>>>>> omap_device_assert(deassert)_hardreset functions, and since these are
+>>>>> limited to mach-omap2, we are invoking them through platform data callbacks.
+>>>>
+>>>> Right.. But I'm wondering about the why you need to do this in the
+>>>> driver at all part :)
+>>>
+>>> The initial reset at init time is okay, but hwmod _enable() bails out if
+>>> the resets lines are asserted. This was a change made long time back, I
+>>> believe to deal with the problems around the DSP enabling sequences. As
+>>> such, pm_runtime_get_sync() and put_sync() do not deassert and assert
+>>> the resets.
+>>
+>> OK if the hwmod code does not deassert reset lines properly on enable,
+>> then that sounds like a bug that should be fixed instead of adding
+>> device specific work arounds.
+> 
+> I think some devices require the reset lines to be asserted and some devices
+> require it to be de-asserted and hwmod was designed when there was only the
+> first type of devices. I'm not sure though.
+>>
+>> Sorry to keep dragging this on a bit longer, but I think we need to
+>> hear Paul's comments on this one.
+> 
+> I agree.
+> Paul, what do you think is the best way forward to perform reset?
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-Acked-by: Rob Herring <robh@kernel.org>
-Acked-by: Lee Jones <lee.jones@linaro.org>
----
+Can you give your feedback as we are at the risk of PCIe driver being removed?
 
-Changes in v10:
- - update the example, due to the subdevices are not regarded as
-   a child node.
+Thanks
+Kishon
 
-Changes in v9: None
-Changes in v8: None
-Changes in v7:
- - collect Acked-by from Lee Jones
-
-Changes in v6:
- - change the regulator name.
-
-Changes in v5: None
-Changes in v4: None
-Changes in v3:
- - fix the tabbing errors in Example.
- - use "pmic at 5b" label, not "act8945a at 5b" in Example.
- - collect Acked-by from Rob.
-
-Changes in v2:
- - use more specific label in Example.
- - add pmic and charger nodes in Example.
-
- Documentation/devicetree/bindings/mfd/act8945a.txt |   76 ++++++++++++++++++++
- 1 file changed, 76 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mfd/act8945a.txt
-
-diff --git a/Documentation/devicetree/bindings/mfd/act8945a.txt b/Documentation/devicetree/bindings/mfd/act8945a.txt
-new file mode 100644
-index 0000000..f712830
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mfd/act8945a.txt
-@@ -0,0 +1,76 @@
-+Device-Tree bindings for Active-semi ACT8945A MFD driver
-+
-+Required properties:
-+ - compatible: "active-semi,act8945a".
-+ - reg: the I2C slave address for the ACT8945A chip
-+
-+The chip exposes two subdevices:
-+ - a regulators: see ../regulator/act8945a-regulator.txt
-+ - a charger: see ../power/act8945a-charger.txt
-+
-+Example:
-+	pmic at 5b {
-+		compatible = "active-semi,act8945a";
-+		reg = <0x5b>;
-+		status = "okay";
-+
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_charger_chglev>;
-+		active-semi,chglev-gpio = <&pioA 12 GPIO_ACTIVE_HIGH>;
-+		active-semi,input-voltage-threshold-microvolt = <6600>;
-+		active-semi,precondition-timeout = <40>;
-+		active-semi,total-timeout = <3>;
-+
-+		active-semi,vsel-high;
-+
-+		regulators {
-+			vdd_1v35_reg: REG_DCDC1 {
-+				regulator-name = "VDD_1V35";
-+				regulator-min-microvolt = <1350000>;
-+				regulator-max-microvolt = <1350000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_1v2_reg: REG_DCDC2 {
-+				regulator-name = "VDD_1V2";
-+				regulator-min-microvolt = <1100000>;
-+				regulator-max-microvolt = <1300000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_3v3_reg: REG_DCDC3 {
-+				regulator-name = "VDD_3V3";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_fuse_reg: REG_LDO1 {
-+				regulator-name = "VDD_FUSE";
-+				regulator-min-microvolt = <2500000>;
-+				regulator-max-microvolt = <2500000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_3v3_lp_reg: REG_LDO2 {
-+				regulator-name = "VDD_3V3_LP";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_led_reg: REG_LDO3 {
-+				regulator-name = "VDD_LED";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_sdhc_1v8_reg: REG_LDO4 {
-+				regulator-name = "VDD_SDHC_1V8";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-always-on;
-+			};
-+		};
-+	};
--- 
-1.7.9.5
+> 
+> Thanks
+> Kishon
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
