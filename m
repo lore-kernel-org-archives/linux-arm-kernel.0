@@ -1,71 +1,83 @@
-From: k@japko.eu (Krzysztof Adamski)
-Date: Fri, 5 Feb 2016 12:58:37 +0100
-Subject: [PATCH v3 1/5] clk: sunxi: Add apb0 gates for H3
-In-Reply-To: <20160205111152.GA31506@lukather>
-References: <1454542430-16572-1-git-send-email-k@japko.eu>
- <1454542430-16572-2-git-send-email-k@japko.eu>
- <20160204154752.4df7808be3364a98c496c030@free.fr>
- <20160205111152.GA31506@lukather>
-Message-ID: <20160205115837.GD12071@box2.japko.eu>
+From: shameerali.kolothum.thodi@huawei.com (Shameerali Kolothum Thodi)
+Date: Fri, 5 Feb 2016 12:04:02 +0000
+Subject: [QUESTION ]ARM64 external L3 cache support in topology info
+Message-ID: <5FC3163CFD30C246ABAA99954A238FA8172E13A4@lhreml504-mbs>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 05, 2016 at 12:11:52PM +0100, Maxime Ripard wrote:
->Hi,
->
->On Thu, Feb 04, 2016 at 03:47:52PM +0100, Jean-Francois Moine wrote:
->> On Thu,  4 Feb 2016 00:33:46 +0100
->> Krzysztof Adamski <k@japko.eu> wrote:
->>
->> > This patch adds support for APB0 in H3. It seems to be compatible with
->> > earlier SOCs. apb0 gates controls R_ block peripherals (R_PIO, R_IR,
->> > etc).
->> >
->> > Signed-off-by: Krzysztof Adamski <k@japko.eu>
->> > ---
->> >  Documentation/devicetree/bindings/clock/sunxi.txt | 1 +
->> >  drivers/clk/sunxi/clk-simple-gates.c              | 2 ++
->> >  2 files changed, 3 insertions(+)
->> >
->> > diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
->> > index e59f57b..751c8b9f0 100644
->> > --- a/Documentation/devicetree/bindings/clock/sunxi.txt
->> > +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
->> > @@ -45,6 +45,7 @@ Required properties:
->> >  	"allwinner,sun6i-a31-apb0-gates-clk" - for the APB0 gates on A31
->> >  	"allwinner,sun7i-a20-apb0-gates-clk" - for the APB0 gates on A20
->> >  	"allwinner,sun8i-a23-apb0-gates-clk" - for the APB0 gates on A23
->> > +	"allwinner,sun8i-h3-apb0-gates-clk" - for the APB0 gates on H3
->> >  	"allwinner,sun9i-a80-apb0-gates-clk" - for the APB0 gates on A80
->> >  	"allwinner,sun4i-a10-apb1-clk" - for the APB1 clock
->> >  	"allwinner,sun9i-a80-apb1-clk" - for the APB1 bus clock on A80
->> > diff --git a/drivers/clk/sunxi/clk-simple-gates.c b/drivers/clk/sunxi/clk-simple-gates.c
->> > index f4da52b..6753c87 100644
->> > --- a/drivers/clk/sunxi/clk-simple-gates.c
->> > +++ b/drivers/clk/sunxi/clk-simple-gates.c
->> > @@ -130,6 +130,8 @@ CLK_OF_DECLARE(sun8i_a23_apb2, "allwinner,sun8i-a23-apb2-gates-clk",
->> >  	       sunxi_simple_gates_init);
->> >  CLK_OF_DECLARE(sun8i_a33_ahb1, "allwinner,sun8i-a33-ahb1-gates-clk",
->> >  	       sunxi_simple_gates_init);
->> > +CLK_OF_DECLARE(sun8i_h3_apb0, "allwinner,sun8i-h3-apb0-gates-clk",
->> > +	       sunxi_simple_gates_init);
->> >  CLK_OF_DECLARE(sun9i_a80_ahb0, "allwinner,sun9i-a80-ahb0-gates-clk",
->> >  	       sunxi_simple_gates_init);
->> >  CLK_OF_DECLARE(sun9i_a80_ahb1, "allwinner,sun9i-a80-ahb1-gates-clk",
->>
->> It seems that the other compatible strings are there for historical
->> reasons. Why do you need a new one with such a specific name?
->>
->> It would have been more sensible to add a generic compatible string as
->> "allwinner,apb-gates", letting the removal of the other strings for a
->> later patch...
->
->Yeah, it's a good idea, and it's probably time that we move to that.
->
->However, I'd like to keep per-soc and per-clocks compatibles in the
->DT, in case we need to protect a clock in the future. That doesn't
->prevent to have two compatibles thoughe, the specific and the generic.
->
+Hi,
 
-So now I'm not sure what you mean. You suggest that I should keep using 
-specific (sun8i_h3_apb0) or change to generic (apb-gates) in my patch? 
+This is a query to get the external L3 cache included in the cache
+topology info. ARM64 kernel now has the cache topology info added
+based on the patch here [1].
+
+1. http://permalink.gmane.org/gmane.linux.ports.arm.kernel/383628
+
+> 
+> This patch adds support for cacheinfo on ARM64.
+> 
+> On ARMv8, the cache hierarchy can be identified through Cache Level ID
+> (CLIDR) register while the cache geometry is provided by Cache Size ID
+> (CCSIDR) register.
+> 
+> Since the architecture doesn't provide any way of detecting the cpus 
+> sharing particular cache, device tree is used for the same purpose.
+
+We have a ARM64 board(Hisilicon D02) and it has got an external L3 cache.
+As per my understanding after talking to our SoC guys, this cache is not
+integrated into the processor and is not visible in (CLIDR) register. 
+But this looks to be fine as per the Programmer's Guide for ARMv8-A.
+
+"The CLIDR register is only aware of how many levels of cache are 
+integrated into the processor itself. It cannot provide information
+about any caches in the external memory system. For example, if 
+only L1 and L2 are integrated, CLIDR/CLIDR_EL1 identifies two levels
+of cache and the processor is unaware of any external L3 cache. 
+It might be necessary to take into account non-integrated caches
+when performing cache maintenance, or code that is maintaining
+coherency with integrated caches."
+
+> Signed-off-by: Sudeep Holla <sudeep.holla <at> arm.com>
+> Cc: Catalin Marinas <catalin.marinas <at> arm.com>
+> Cc: Will Deacon <will.deacon <at> arm.com>
+> Cc: Mark Rutland <mark.rutland <at> arm.com>
+> Cc: linux-arm-kernel <at> lists.infradead.org
+> ---
+>  arch/arm64/include/asm/cachetype.h |  29 +++++++--
+>  arch/arm64/kernel/Makefile         |   2 +-
+>  arch/arm64/kernel/cacheinfo.c      | 128 
+[....]
+
+> +static int __populate_cache_leaves(unsigned int cpu)
+> +{
+> +    unsigned int level, idx;
+> +    enum cache_type type;
+> +    struct cpu_cacheinfo *this_cpu_ci = get_cpu_cacheinfo(cpu);
+> +    struct cacheinfo *this_leaf = this_cpu_ci->info_list;
+> +
+> +    for (idx = 0, level = 1; level <= this_cpu_ci->num_levels &&
+> +         idx < this_cpu_ci->num_leaves; idx++, level++) {
+> +        type = get_cache_type(level);
+> +        if (type == CACHE_TYPE_SEPARATE) {
+> +            ci_leaf_init(this_leaf++, CACHE_TYPE_DATA, level);
+> +            ci_leaf_init(this_leaf++, CACHE_TYPE_INST, level);
+> +        } else {
+> +            ci_leaf_init(this_leaf++, type, level);
+> +        }
+> +    }
+> +    return 0;
+> +}
+Here the cache leaves are populated on what CLIDR is reporting, and dts
+entry is only used to find out the sharing info. Not sure purpose of
+this patch is only to report the cache that is integrated to the processor.
+
+In our case, the L3 cache seems to be intelligent enough and doesn't
+require any additional maintenance ops. So there is no cache-controller
+code for this. I am just wondering what's the best way to add this L3
+cache info to the topology. Overriding the CLIDR register, if there is
+a next-level-cache entry in the dts and then retrieve the cache geometry
+either from dts or from cache specific registers( but this will be
+implementation specific) ? Or am I missing something here? 
+
+Thanks,
+Shameer
