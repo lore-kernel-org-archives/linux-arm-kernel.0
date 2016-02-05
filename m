@@ -1,67 +1,67 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Fri, 5 Feb 2016 15:14:00 +0800
-Subject: [PATCH v11 05/21] KVM: ARM64: Add access handler for PMSELR register
-In-Reply-To: <1454656456-11640-1-git-send-email-zhaoshenglong@huawei.com>
-References: <1454656456-11640-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1454656456-11640-6-git-send-email-zhaoshenglong@huawei.com>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Fri, 5 Feb 2016 13:30:25 +0530
+Subject: [PATCH V7 3/6] i2c: qup: Transfer each i2c_msg in i2c_msgs
+ without a stop bit
+In-Reply-To: <20160204200903.GE1958@tetsubishi>
+References: <1453197766-18976-1-git-send-email-sricharan@codeaurora.org>
+ <1453197766-18976-4-git-send-email-sricharan@codeaurora.org>
+ <20160124112915.GA1775@katana>
+ <001401d15988$59f6dcf0$0de496d0$@codeaurora.org>
+ <20160204200903.GE1958@tetsubishi>
+Message-ID: <006e01d15feb$4a08d0a0$de1a71e0$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shannon Zhao <shannon.zhao@linaro.org>
+Hi Wolfram,
 
-Since the reset value of PMSELR_EL0 is UNKNOWN, use reset_unknown for
-its reset handler. When reading PMSELR, return the PMSELR.SEL field to
-guest.
+> -----Original Message-----
+> From: linux-arm-kernel [mailto:linux-arm-kernel-
+> bounces at lists.infradead.org] On Behalf Of Wolfram Sang
+> Sent: Friday, February 05, 2016 1:39 AM
+> To: Sricharan
+> Cc: devicetree at vger.kernel.org; architt at codeaurora.org; linux-arm-
+> msm at vger.kernel.org; ntelkar at codeaurora.org; galak at codeaurora.org;
+> linux-kernel at vger.kernel.org; andy.gross at linaro.org; linux-
+> i2c at vger.kernel.org; iivanov at mm-sol.com; agross at codeaurora.org;
+> dmaengine at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH V7 3/6] i2c: qup: Transfer each i2c_msg in i2c_msgs
+> without a stop bit
+> 
+> Hi,
+> 
+> > Ah, so what I meant above is there is no 'STOP' bit between each msg
+> > in i2c_msgs, but 'REAPEATED_START' still holds true.  We are sending
+> > 'START' bit for each msg.
+> > So these is how each msg in i2c_msg is sent,
+> >
+> > |------MSG1--------|-----MSG2---------|------MSG3------------|
+> >
+> >   |START|DATA|------|START|DATA|---|START|DATA|STOP|
+> >
+> > If my commit text does not make this clear, I  can reword that ?
+> 
+> OK, now this looks to me perfectly fine: A number of *messages*
+> concatenated into one *transfer* by repeated start. That's the way it
+should
+> be.
+> 
+> So, I'd simply remove these words:
+> 
+> "The QUP i2c hardware has no way to inform that there should not be a
+> 'STOP' at the end of transaction. The only way to implement this is to
+> coalesce all the i2c_msg in i2c_msgs in to one transaction and transfer
+them."
+> 
+> This sounded like the HW needed a special handling, so I was under the
+> impression REP_START was broken. However, unless I misunderstood
+> something again, this now sounds like the standard case and we can keep
+> the commit message simple. If you are okay with that, I can update it
+here,
+> no need to resend.
+> 
+      Yes the above modified commit text looks perfect to be updated and
+thanks
+      for the update as well.
 
-Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-Reviewed-by: Andrew Jones <drjones@redhat.com>
----
- arch/arm64/kvm/sys_regs.c | 19 +++++++++++++++++--
- 1 file changed, 17 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 97fea84..fc60041 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -477,6 +477,21 @@ static bool access_pmcr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 	return true;
- }
- 
-+static bool access_pmselr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
-+			  const struct sys_reg_desc *r)
-+{
-+	if (!kvm_arm_pmu_v3_ready(vcpu))
-+		return trap_raz_wi(vcpu, p, r);
-+
-+	if (p->is_write)
-+		vcpu_sys_reg(vcpu, PMSELR_EL0) = p->regval;
-+	else
-+		/* return PMSELR.SEL field */
-+		p->regval = vcpu_sys_reg(vcpu, PMSELR_EL0) & ARMV8_COUNTER_MASK;
-+
-+	return true;
-+}
-+
- /* Silly macro to expand the DBG{BCR,BVR,WVR,WCR}n_EL1 registers in one go */
- #define DBG_BCR_BVR_WCR_WVR_EL1(n)					\
- 	/* DBGBVRn_EL1 */						\
-@@ -676,7 +691,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
- 	  trap_raz_wi },
- 	/* PMSELR_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b101),
--	  trap_raz_wi },
-+	  access_pmselr, reset_unknown, PMSELR_EL0 },
- 	/* PMCEID0_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b110),
- 	  trap_raz_wi },
-@@ -927,7 +942,7 @@ static const struct sys_reg_desc cp15_regs[] = {
- 	{ Op1( 0), CRn( 9), CRm(12), Op2( 1), trap_raz_wi },
- 	{ Op1( 0), CRn( 9), CRm(12), Op2( 2), trap_raz_wi },
- 	{ Op1( 0), CRn( 9), CRm(12), Op2( 3), trap_raz_wi },
--	{ Op1( 0), CRn( 9), CRm(12), Op2( 5), trap_raz_wi },
-+	{ Op1( 0), CRn( 9), CRm(12), Op2( 5), access_pmselr },
- 	{ Op1( 0), CRn( 9), CRm(12), Op2( 6), trap_raz_wi },
- 	{ Op1( 0), CRn( 9), CRm(12), Op2( 7), trap_raz_wi },
- 	{ Op1( 0), CRn( 9), CRm(13), Op2( 0), trap_raz_wi },
--- 
-2.0.4
+Regards,
+ Sricharan
