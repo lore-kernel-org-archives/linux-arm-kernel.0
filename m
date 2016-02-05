@@ -1,29 +1,54 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 5 Feb 2016 15:44:42 +0100
-Subject: [PATCH 3/3] thermal: allow u8500-thermal driver to be a module
-In-Reply-To: <1453740264-1972562-4-git-send-email-arnd@arndb.de>
-References: <1453740264-1972562-1-git-send-email-arnd@arndb.de>
- <1453740264-1972562-4-git-send-email-arnd@arndb.de>
-Message-ID: <CACRpkdYUERZwbEi6cP=heVk+nzcsrG=evE=AsrOL7onf7bYX-A@mail.gmail.com>
+From: slash.tmp@free.fr (Mason)
+Date: Fri, 5 Feb 2016 15:49:33 +0100
+Subject: Common/typical fractional divider HW API
+Message-ID: <56B4B67D.2080707@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 25, 2016 at 5:44 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+Hello,
 
-> When the thermal subsystem is a loadable module, the u8500 driver
-> fails to build:
->
-> drivers/thermal/built-in.o: In function `db8500_thermal_probe':
-> db8500_thermal.c:(.text+0x96c): undefined reference to `thermal_zone_device_register'
-> drivers/thermal/built-in.o: In function `db8500_thermal_work':
-> db8500_thermal.c:(.text+0xab4): undefined reference to `thermal_zone_device_update'
->
-> This changes the symbol to a tristate, so Kconfig can track the
-> dependency correctly.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+AFAICT, the clk-fractional-divider driver implements the following
+hardware API:
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+  M and N are two fields in the same register.
+  DIV = M / N
 
-Yours,
-Linus Walleij
+Is this HW API common/typical in the embedded world?
+in the PC world?
+
+
+My hardware uses a slightly weird (to me) API:
+
+  I = 0-255 (8 bits)
+  F = 0-15  (4 bits)
+
+  I = 0 => DIV = +INF
+  I = 1 => DIV = 1 + F/(32-F)
+  I > 1 => DIV = I + F/16
+
+Is this HW API common/typical in the embedded world?
+(Perhaps just the linear part for I > 1)
+
+I see two downsides to this API:
+
+1) I = 1 is a special case
+2) A lot of the value space is wasted on large values.
+
+For example, when I = 250, we don't really care about 250.0625, 250.125,
+etc, or even nearby integer values, for that matter.
+
+I think it's better to have a distribution with high density in small
+values, and low density in high values (sort of like floating point).
+
+For example:
+
+  I = 0-15  (4 bits)
+  F = 0-255 (8 bits)
+  DIV = 2^I * (1 + F/256)
+
+(We could probably even shave 2-4 bits on F.)
+
+Are there downsides to this HW API?
+Is this HW API common/typical in the embedded world?
+
+Regards.
