@@ -1,53 +1,63 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Fri, 5 Feb 2016 09:06:44 -0500 (EST)
-Subject: [PATCH v4 1/1] USB: core: let USB device know device node
-In-Reply-To: <CAL411-oOgSYJy_cLVkGWkLbzBewKtj1jgfQqxCsjE_-3NLYcTA@mail.gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1602050904300.20600-100000@netrider.rowland.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 5 Feb 2016 15:09:49 +0100
+Subject: [PATCH] PCI: generic: map config window in one go
+In-Reply-To: <1507671.sEYIrU8dv6@wuerfel>
+References: <1454077035-23872-1-git-send-email-ard.biesheuvel@linaro.org>
+ <4090946.AhejVJy7MO@wuerfel>
+ <CAKv+Gu8oZADs_FRN=p7_Nz0wXJVWVmzVNsxtzscyp7_cFAreAQ@mail.gmail.com>
+ <1507671.sEYIrU8dv6@wuerfel>
+Message-ID: <CAKv+Gu8aw0NepDSp_mQAuGK+2u5q40K2XGJBWhGyr4nA2E5uxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 5 Feb 2016, Peter Chen wrote:
+On 5 February 2016 at 14:37, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 05 February 2016 11:48:54 Ard Biesheuvel wrote:
+>> On 29 January 2016 at 15:52, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > On Friday 29 January 2016 15:32:01 Ard Biesheuvel wrote:
+>> >> On 29 January 2016 at 15:28, Will Deacon <will.deacon@arm.com> wrote:
+>> >> > Hi Ard,
+>> >> >
+>> >> > On Fri, Jan 29, 2016 at 03:17:15PM +0100, Ard Biesheuvel wrote:
+>> >> >> Instead of iterating over the PCI config window and performing individual
+>> >> >> ioremap() calls on all the adjacent slices, perform a single ioremap() to
+>> >> >> map the entire region, and divvy it up later. This not only prevents
+>> >> >> leaving some of it mapped if we fail half way through, it also ensures that
+>> >> >> archs that support huge-vmap can use section mappings to perform the
+>> >> >> mapping.
+>> >> >>
+>> >> >> On my Seattle A0 box, this transforms 128 separate 1 MB mappings that are
+>> >> >> mapped down to 4 KB pages into a single 128 MB mapping using 2 MB sections,
+>> >> >> saving 512 KB worth of page tables.
+>> >> >>
+>> >> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> >> >> ---
+>> >> >
+>> >> > The code was written this way in response to feedback during driver review
+>> >> > that we couldn't necessarily grab that much contiguous vmalloc space on
+>> >> > 32-bit ARM. Unless that's changed, we probably want to to predicate this
+>> >> > change on having a 64-bit arch.
+>> >> >
+>> >>
+>> >> Ah right. How about testing for the ARCH_HAVE_HUGE_VMAP Kconfig symbol
+>> >> explicitly?
+>> >>
+>> >
+>> > Testing for 64BIT should be sufficient.
+>> >
+>>
+>> Does it make sense to spin a v2 for this patch? Given the discussion
+>> we had regarding allocating only the config regions for busses that
+>> are populated, perhaps there is a better approach here?
+>
+> Allocating only the config regions that are actually used would
+> be ideal, the problem is that you need to access the config space
+> in order to know which ones are, so this is certainly a bit tricky.
+>
+> Are there any downsides to the x86 approach of using fixmap to
+> map each patch separately during the access? It's probably a bit
+> slower per access, but we don't do a lot of those accesses after
+> the system is booted.
+>
 
-> >> > @@ -508,11 +509,20 @@ struct usb_device *usb_alloc_dev(struct usb_device *parent,
-> >> >     dev->connect_time = jiffies;
-> >> >     dev->active_duration = -jiffies;
-> >> >  #endif
-> >> > -   if (root_hub)   /* Root hub always ok [and always wired] */
-> >> > +   if (root_hub) { /* Root hub always ok [and always wired] */
-> >> >             dev->authorized = 1;
-> >> > -   else {
-> >> > +           dev->dev.of_node = bus->controller->of_node;
-> >> > +   } else {
-> >> >             dev->authorized = !!HCD_DEV_AUTHORIZED(usb_hcd);
-> >> >             dev->wusb = usb_bus_is_wusb(bus) ? 1 : 0;
-> >> > +
-> >> > +           if (dev->dev.parent->parent == bus->controller)
-> >> > +                   /* device under root hub's port */
-> >> > +                   port1 = usb_hcd_find_raw_port_number(usb_hcd,
-> >> > +                           port1);
-> >
-> > I would change the test to "if (!parent->parent)" and add {} around the
-> > body (since it's 3 lines long).  Also, although this doesn't really
-> > matter, you could consider putting the new code inside the previous big
-> > "if" statement instead of down here at the end of the function.
-> >
-> 
-> Sorry, Alan, I can understand using (!parent->parent) to stands for
-> the device connects to the root hub port, others I can't understand.
-
-Change it to
-
-+		if (!parent->parent) {
-+			/* device under root hub's port */
-+			port1 = usb_hcd_find_raw_port_number(usb_hcd,
-+				port1);
-+		}
-
-That is, add braces { }.
-          
-If you look at the whole usb_alloc_dev() function, you'll see it has
-one big "if" statement and then a small "if" statement near the end.  
-You added your new code to the small "if" statement; I'm suggesting you
-add it into the big "if" statement instead.
-
-Alan Stern
+Yes, I guess that makes a lot more sense than ioremapping 10s to 100s
+of MBs and hardly ever using them.
