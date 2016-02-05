@@ -1,51 +1,61 @@
 From: contact@paulk.fr (Paul Kocialkowski)
-Date: Fri, 05 Feb 2016 19:48:10 +0100
+Date: Fri, 05 Feb 2016 19:48:53 +0100
 Subject: [PATCH 4/6] regulator: lp872x: Add enable GPIO pin support
-In-Reply-To: <20160118163248.GI6588@sirena.org.uk>
-References: <5681D7A8.2030101@ti.com> <1451387613.18148.9.camel@collins>
- <568323B7.7080101@ti.com> <1451464521.2531.4.camel@collins>
- <20151230163307.GW16023@sirena.org.uk> <1451500639.14341.6.camel@collins>
- <20151231214007.GC16023@sirena.org.uk> <1451599146.9673.2.camel@collins>
- <20151231221407.GF16023@sirena.org.uk> <1452929533.2520.1.camel@collins>
- <20160118163248.GI6588@sirena.org.uk>
-Message-ID: <1454698090.2623.3.camel@collins>
+In-Reply-To: <CAL_JsqLiuNR_MQ+eX_TQVMDtn85hUTweNRL2Q+7Z8Tq-HJhx2g@mail.gmail.com>
+References: <1450868319-20513-1-git-send-email-contact@paulk.fr>
+ <1450868319-20513-5-git-send-email-contact@paulk.fr>
+ <20151229200244.GA27426@rob-hp-laptop> <1451424412.13576.1.camel@collins>
+ <CAL_JsqLiuNR_MQ+eX_TQVMDtn85hUTweNRL2Q+7Z8Tq-HJhx2g@mail.gmail.com>
+Message-ID: <1454698133.2623.4.camel@collins>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Le lundi 18 janvier 2016 ? 16:32 +0000, Mark Brown a ?crit :
-> On Sat, Jan 16, 2016 at 08:32:13AM +0100, Paul Kocialkowski wrote:
+Le mardi 29 d?cembre 2015 ? 15:55 -0600, Rob Herring a ?crit :
+> On Tue, Dec 29, 2015 at 3:26 PM, Paul Kocialkowski <contact@paulk.fr> wrote:
+> > Le mardi 29 d?cembre 2015 ? 14:02 -0600, Rob Herring a ?crit :
+> >> On Wed, Dec 23, 2015 at 11:58:37AM +0100, Paul Kocialkowski wrote:
+> >> > LP872x regulators are made active via the EN pin, which might be hooked to a
+> >> > GPIO. This adds support for driving the GPIO high when the driver is in use.
+> >> >
+> >> > Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+> >> > ---
+> >> >  .../devicetree/bindings/regulator/lp872x.txt       |  1 +
+> >> >  drivers/regulator/lp872x.c                         | 33 ++++++++++++++++++++--
+> >> >  include/linux/regulator/lp872x.h                   |  2 ++
+> >> >  3 files changed, 33 insertions(+), 3 deletions(-)
+> >> >
+> >> > diff --git a/Documentation/devicetree/bindings/regulator/lp872x.txt b/Documentation/devicetree/bindings/regulator/lp872x.txt
+> >> > index 7818318..0559c25 100644
+> >> > --- a/Documentation/devicetree/bindings/regulator/lp872x.txt
+> >> > +++ b/Documentation/devicetree/bindings/regulator/lp872x.txt
+> >> > @@ -28,6 +28,7 @@ Optional properties:
+> >> >    - ti,dvs-gpio: GPIO specifier for external DVS pin control of LP872x devices.
+> >> >    - ti,dvs-vsel: DVS selector. 0 = SEL_V1, 1 = SEL_V2.
+> >> >    - ti,dvs-state: initial DVS pin state. 0 = DVS_LOW, 1 = DVS_HIGH.
+> >> > +  - ti,enable-gpio: GPIO specifier for EN pin control of LP872x devices.
+> >>
+> >> Should be "-gpios" instead of "-gpio".
+
+Thanks for the review Rob, I have just submitted v2 with those
+suggestions integrated.
+
+> > Care to comment why? There is only one GPIO that can be used here, since
+> > there is only one single EN pin. I thought this matched what is done
+> > already with "ti,dvs-gpio".
 > 
-> > Is there some git tree I can work with that has regulator runtime PM
-> > support at this point? I'll certainly end up handling the GPIO in the
-> > driver otherwise.
+> To be consistent. We use "clocks" and "interrupts" always whether one
+> or more for example.
 > 
-> No, the last week was much more busy than I was expecting.  I'm hoping
-> for this week (or you could have a go at implementing it, it'd be adding
-> the PM operations in _regulator_enable() or _regulator_do_enable() if a
-> flag was set in the regulator_desc).
+> -gpio is documented as deprecated now.
+> 
+> Rob
 
-I decided to go with a function simply requesting the GPIO for v2.
-Support for runtime PM can be added later. I'll get back to you on this
-on the thread related to your patches, since it appears to be somewhat
-broken for now.
-
-Thanks!
--- 
-Paul Kocialkowski, Replicant developer
-
-Replicant is a fully free Android distribution running on several
-devices, a free software mobile operating system putting the emphasis on
-freedom and privacy/security.
-
-Website: https://www.replicant.us/
-Blog: https://blog.replicant.us/
-Wiki/tracker/forums: https://redmine.replicant.us/
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160205/b35e9556/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160205/6e237f9c/attachment.sig>
