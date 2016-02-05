@@ -1,63 +1,82 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 5 Feb 2016 15:09:49 +0100
-Subject: [PATCH] PCI: generic: map config window in one go
-In-Reply-To: <1507671.sEYIrU8dv6@wuerfel>
-References: <1454077035-23872-1-git-send-email-ard.biesheuvel@linaro.org>
- <4090946.AhejVJy7MO@wuerfel>
- <CAKv+Gu8oZADs_FRN=p7_Nz0wXJVWVmzVNsxtzscyp7_cFAreAQ@mail.gmail.com>
- <1507671.sEYIrU8dv6@wuerfel>
-Message-ID: <CAKv+Gu8aw0NepDSp_mQAuGK+2u5q40K2XGJBWhGyr4nA2E5uxw@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 5 Feb 2016 17:12:40 +0300
+Subject: [PATCH v3 1/3] libahci: Implement the capability to override the
+ generic ahci interrupt handler.
+In-Reply-To: <1454620826-22554-2-git-send-email-stripathi@apm.com>
+References: <1454620826-22554-1-git-send-email-stripathi@apm.com>
+ <1454620826-22554-2-git-send-email-stripathi@apm.com>
+Message-ID: <56B4ADD8.1020008@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 February 2016 at 14:37, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 05 February 2016 11:48:54 Ard Biesheuvel wrote:
->> On 29 January 2016 at 15:52, Arnd Bergmann <arnd@arndb.de> wrote:
->> > On Friday 29 January 2016 15:32:01 Ard Biesheuvel wrote:
->> >> On 29 January 2016 at 15:28, Will Deacon <will.deacon@arm.com> wrote:
->> >> > Hi Ard,
->> >> >
->> >> > On Fri, Jan 29, 2016 at 03:17:15PM +0100, Ard Biesheuvel wrote:
->> >> >> Instead of iterating over the PCI config window and performing individual
->> >> >> ioremap() calls on all the adjacent slices, perform a single ioremap() to
->> >> >> map the entire region, and divvy it up later. This not only prevents
->> >> >> leaving some of it mapped if we fail half way through, it also ensures that
->> >> >> archs that support huge-vmap can use section mappings to perform the
->> >> >> mapping.
->> >> >>
->> >> >> On my Seattle A0 box, this transforms 128 separate 1 MB mappings that are
->> >> >> mapped down to 4 KB pages into a single 128 MB mapping using 2 MB sections,
->> >> >> saving 512 KB worth of page tables.
->> >> >>
->> >> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> >> >> ---
->> >> >
->> >> > The code was written this way in response to feedback during driver review
->> >> > that we couldn't necessarily grab that much contiguous vmalloc space on
->> >> > 32-bit ARM. Unless that's changed, we probably want to to predicate this
->> >> > change on having a 64-bit arch.
->> >> >
->> >>
->> >> Ah right. How about testing for the ARCH_HAVE_HUGE_VMAP Kconfig symbol
->> >> explicitly?
->> >>
->> >
->> > Testing for 64BIT should be sufficient.
->> >
->>
->> Does it make sense to spin a v2 for this patch? Given the discussion
->> we had regarding allocating only the config regions for busses that
->> are populated, perhaps there is a better approach here?
->
-> Allocating only the config regions that are actually used would
-> be ideal, the problem is that you need to access the config space
-> in order to know which ones are, so this is certainly a bit tricky.
->
-> Are there any downsides to the x86 approach of using fixmap to
-> map each patch separately during the access? It's probably a bit
-> slower per access, but we don't do a lot of those accesses after
-> the system is booted.
->
+Hello.
 
-Yes, I guess that makes a lot more sense than ioremapping 10s to 100s
-of MBs and hardly ever using them.
+On 02/05/2016 12:20 AM, suman Tripathi wrote:
+
+> From: Suman Tripathi <stripathi@apm.com>
+>
+> This patch implements the capability to override the generic
+> ahci interrupt handler so that the LDD drivers can implement
+
+    AHCI.
+
+> there own custom interrupt handler routines.
+
+    s/there/their/.
+
+> Signed-off-by: Suman Tripathi <stripathi@apm.com>
+> ---
+>   drivers/ata/ahci.h    |    2 ++
+>   drivers/ata/libahci.c |   32 +++++++++++++++++++++++---------
+>   2 files changed, 25 insertions(+), 9 deletions(-)
+>
+> diff --git a/drivers/ata/ahci.h b/drivers/ata/ahci.h
+> index a4faa43..3d883ee 100644
+> --- a/drivers/ata/ahci.h
+> +++ b/drivers/ata/ahci.h
+> @@ -360,6 +360,7 @@ struct ahci_host_priv {
+>   	 * be overridden anytime before the host is activated.
+>   	 */
+>   	void			(*start_engine)(struct ata_port *ap);
+> +	irqreturn_t 		(*ahci_irq_intr)(int irq, void *dev_instance);
+
+    The 'ahci_irq_intr' name is somewhat tautological.
+
+
+[...]
+> diff --git a/drivers/ata/libahci.c b/drivers/ata/libahci.c
+> index eda3cf2..5d3035a 100644
+> --- a/drivers/ata/libahci.c
+> +++ b/drivers/ata/libahci.c
+[...]
+> @@ -2504,15 +2505,28 @@ int ahci_host_activate(struct ata_host *host, struct scsi_host_template *sht)
+>   	struct ahci_host_priv *hpriv = host->private_data;
+>   	int irq = hpriv->irq;
+>   	int rc;
+> +	irqreturn_t (*ahci_irq_handler)(int irq, void *dev_instance);
+>
+> -	if (hpriv->flags & (AHCI_HFLAG_MULTI_MSI | AHCI_HFLAG_MULTI_MSIX))
+> -		rc = ahci_host_activate_multi_irqs(host, sht);
+> -	else if (hpriv->flags & AHCI_HFLAG_EDGE_IRQ)
+> -		rc = ata_host_activate(host, irq, ahci_single_edge_irq_intr,
+> -				       IRQF_SHARED, sht);
+> -	else
+> -		rc = ata_host_activate(host, irq, ahci_single_level_irq_intr,
+> -				       IRQF_SHARED, sht);
+> +	ahci_irq_handler = hpriv->ahci_irq_intr;
+> +
+> +	if (hpriv->flags & (AHCI_HFLAG_MULTI_MSI | AHCI_HFLAG_MULTI_MSIX)) {
+> +		if (!ahci_irq_handler)
+> +			rc = ahci_host_activate_multi_irqs(host, sht);
+> +		else
+> +			dev_warn(host->dev, "both AHCI_HFLAG_MULTI_MSI flag set \
+> +				 and custom irq handler implemented\n");
+> +
+> +	} else {
+> +		if (!ahci_irq_handler) {
+
+    Why not *else* *if* on a single line?
+
+[...]
+
+MBR, Sergei
