@@ -1,30 +1,80 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 05 Feb 2016 15:15:16 +0100
-Subject: [PATCH 4/4] ARM: davinci: make I2C support optional
-In-Reply-To: <56B4A19D.4060307@ti.com>
-References: <1454358962-640598-1-git-send-email-arnd@arndb.de>
- <1454358962-640598-5-git-send-email-arnd@arndb.de> <56B4A19D.4060307@ti.com>
-Message-ID: <5475182.6SLDQGvbZt@wuerfel>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 5 Feb 2016 14:15:18 +0000
+Subject: [PATCH v4 16/17] FDT: Add a helper to get specified name subnode
+In-Reply-To: <1454641552-12576-17-git-send-email-zhaoshenglong@huawei.com>
+References: <1454641552-12576-1-git-send-email-zhaoshenglong@huawei.com>
+ <1454641552-12576-17-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <alpine.DEB.2.02.1602051415120.27008@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 05 February 2016 18:50:29 Sekhar Nori wrote:
-> > I checked that CONFIG_I2C is still enabled with davinci_all_defconfig,
-> > so that does not have to change.
-> > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > Fixes: 45b146d746ea ("ARM: Davinci: Fix I2C build errors")
-> > Fixes: 22ca466847ad ("davinci: kconfig: select at24 eeprom for selected boards")
+On Fri, 5 Feb 2016, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
 > 
-> This looks good to me. The #ifdefs in the middle of davinci_evm_init()
-> are an eyesore, but getting rid of the selects is a big plus.
+> Sometimes it needs to check if there is a node in FDT by full path.
+> Introduce this helper to get the specified name subnode if it exists.
 > 
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 
-I agree on the eyesore. I had an earlier version using "if (IS_BUILTIN(CONFIG_I2C))"
-checks that was much nicer, but it didn't work because all the declarations
-in include/linux/i2c.h are hidden behind an #ifdef.
+Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
-I thought about sending a patch for that file too, but I think it has come up
-before and was nacked then.
 
-	Arnd
+> CC: Rob Herring <robh@kernel.org>
+> ---
+>  drivers/of/fdt.c       | 25 +++++++++++++++++++++++++
+>  include/linux/of_fdt.h |  2 ++
+>  2 files changed, 27 insertions(+)
+> 
+> diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+> index 655f79d..eacb188 100644
+> --- a/drivers/of/fdt.c
+> +++ b/drivers/of/fdt.c
+> @@ -645,6 +645,31 @@ int __init of_scan_flat_dt(int (*it)(unsigned long node,
+>  }
+>  
+>  /**
+> + * of_get_flat_dt_subnode_by_name - get subnode of specified node by name
+> + *
+> + * @node: the parent node
+> + * @uname: the name of subnode
+> + * @return offset of the subnode, or -FDT_ERR_NOTFOUND if there is none
+> + */
+> +
+> +int of_get_flat_dt_subnode_by_name(unsigned long node, const char *uname)
+> +{
+> +	const void *blob = initial_boot_params;
+> +	int offset;
+> +	const char *pathp;
+> +
+> +	for (offset = fdt_first_subnode(blob, node);
+> +	     offset >= 0;
+> +	     offset = fdt_next_subnode(blob, offset)) {
+> +		pathp = fdt_get_name(blob, offset, NULL);
+> +		if (strcmp(pathp, uname) == 0)
+> +			return offset;
+> +	}
+> +
+> +	return -FDT_ERR_NOTFOUND;
+> +}
+> +
+> +/**
+>   * of_get_flat_dt_root - find the root node in the flat blob
+>   */
+>  unsigned long __init of_get_flat_dt_root(void)
+> diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
+> index df9ef38..fc28162 100644
+> --- a/include/linux/of_fdt.h
+> +++ b/include/linux/of_fdt.h
+> @@ -52,6 +52,8 @@ extern char __dtb_end[];
+>  extern int of_scan_flat_dt(int (*it)(unsigned long node, const char *uname,
+>  				     int depth, void *data),
+>  			   void *data);
+> +extern int of_get_flat_dt_subnode_by_name(unsigned long node,
+> +					  const char *uname);
+>  extern const void *of_get_flat_dt_prop(unsigned long node, const char *name,
+>  				       int *size);
+>  extern int of_flat_dt_is_compatible(unsigned long node, const char *name);
+> -- 
+> 2.0.4
+> 
+> 
