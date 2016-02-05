@@ -1,48 +1,72 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Fri, 05 Feb 2016 14:55:31 +0200
-Subject: [PATCH V2 1/6] stm class: Add ioctl get_options interface
-In-Reply-To: <1454487337-30184-2-git-send-email-zhang.chunyan@linaro.org>
-References: <1454487337-30184-1-git-send-email-zhang.chunyan@linaro.org>
- <1454487337-30184-2-git-send-email-zhang.chunyan@linaro.org>
-Message-ID: <87k2mj5nb0.fsf@ashishki-desk.ger.corp.intel.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Fri, 5 Feb 2016 20:55:55 +0800
+Subject: [PATCH v4 1/1] USB: core: let USB device know device node
+In-Reply-To: <Pine.LNX.4.44L0.1602041130590.1515-100000@iolanthe.rowland.org>
+References: <20160204015928.GA11158@shlinux2>
+ <Pine.LNX.4.44L0.1602041130590.1515-100000@iolanthe.rowland.org>
+Message-ID: <CAL411-oOgSYJy_cLVkGWkLbzBewKtj1jgfQqxCsjE_-3NLYcTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chunyan Zhang <zhang.chunyan@linaro.org> writes:
-
-> There is already an interface of set_options, but no get_options yet.
-> Before setting any options, one would may want to see the current
-> status of that option by means of get_options interface. This
-> interface has been used in CoreSight STM driver.
+On Fri, Feb 5, 2016 at 12:36 AM, Alan Stern <stern@rowland.harvard.edu> wrote:
+> On Thu, 4 Feb 2016, Peter Chen wrote:
 >
-> Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
-> ---
->  drivers/hwtracing/stm/core.c | 11 +++++++++++
->  include/linux/stm.h          |  3 +++
->  include/uapi/linux/stm.h     |  1 +
->  3 files changed, 15 insertions(+)
+>> On Mon, Jan 25, 2016 at 03:24:39PM +0800, Peter Chen wrote:
+>> > Although most of USB devices are hot-plug's, there are still some devices
+>> > are hard wired on the board, eg, for HSIC and SSIC interface USB devices.
+>> > If these kinds of USB devices are multiple functions, and they can supply
+>> > other interfaces like i2c, gpios for other devices, we may need to
+>> > describe these at device tree.
+>> >
+>> > In this commit, it uses "reg" in dts as physical port number to match
+>> > the phyiscal port number decided by USB core, if they are the same,
+>> > then the device node is for the device we are creating for USB core.
+>> >
+>> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+>> > ---
+>> > Changes for v4:
+>> > - The range of "reg" should be 1-31, changing device node address
+>> >   style as in lower case hexadecimal with leading zeroes suppressed
+>> >   [binding doc, usb-device.txt]
+>> > - Improve the example at binding doc, it describes node from the top
+>> >   (the controller)
+>> > - Delete the struct of_node * within struct usb_device
+>> > - Using usb_hcd_find_raw_port_number to get raw port number under root
+>> >   hub port
+>> >
+>>
+>> Hi Alan, Arnd, and others, would you please give Ack for it if you
+>> are OK with this patch? I am not sure if Greg will queue it or not
+>> if no one Acks it, thanks.
 >
-> diff --git a/drivers/hwtracing/stm/core.c b/drivers/hwtracing/stm/core.c
-> index b6445d9..86bb4e3 100644
-> --- a/drivers/hwtracing/stm/core.c
-> +++ b/drivers/hwtracing/stm/core.c
-> @@ -571,6 +571,17 @@ stm_char_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
->  						    options);
->  
->  		break;
-> +
-> +	case STP_GET_OPTIONS:
-> +		if (stm_data->get_options)
-> +			err = stm_data->get_options(stm_data,
-> +						    stmf->output.master,
-> +						    stmf->output.channel,
-> +						    stmf->output.nr_chans,
-> +						    &options);
-> +
-> +		return copy_to_user((void __user *)arg, &options, sizeof(u64));
+>
+>> > @@ -508,11 +509,20 @@ struct usb_device *usb_alloc_dev(struct usb_device *parent,
+>> >     dev->connect_time = jiffies;
+>> >     dev->active_duration = -jiffies;
+>> >  #endif
+>> > -   if (root_hub)   /* Root hub always ok [and always wired] */
+>> > +   if (root_hub) { /* Root hub always ok [and always wired] */
+>> >             dev->authorized = 1;
+>> > -   else {
+>> > +           dev->dev.of_node = bus->controller->of_node;
+>> > +   } else {
+>> >             dev->authorized = !!HCD_DEV_AUTHORIZED(usb_hcd);
+>> >             dev->wusb = usb_bus_is_wusb(bus) ? 1 : 0;
+>> > +
+>> > +           if (dev->dev.parent->parent == bus->controller)
+>> > +                   /* device under root hub's port */
+>> > +                   port1 = usb_hcd_find_raw_port_number(usb_hcd,
+>> > +                           port1);
+>
+> I would change the test to "if (!parent->parent)" and add {} around the
+> body (since it's 3 lines long).  Also, although this doesn't really
+> matter, you could consider putting the new code inside the previous big
+> "if" statement instead of down here at the end of the function.
+>
 
-The return value of copy_to_user() is not what you assume it is.
+Sorry, Alan, I can understand using (!parent->parent) to stands for
+the device connects to the root hub port, others I can't understand.
 
-Regards,
---
-Alex
+-- 
+BR,
+Peter Chen
