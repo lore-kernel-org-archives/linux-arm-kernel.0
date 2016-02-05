@@ -1,147 +1,147 @@
-From: xinliang.liu@linaro.org (Xinliang Liu)
-Date: Fri,  5 Feb 2016 11:10:30 +0800
-Subject: [PATCH v2] drm: Clean up drm Makefile
-Message-ID: <1454641830-19307-1-git-send-email-xinliang.liu@linaro.org>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Fri, 5 Feb 2016 11:05:46 +0800
+Subject: [PATCH v4 11/17] ARM: XEN: Move xen_early_init() before efi_init()
+In-Reply-To: <1454641552-12576-1-git-send-email-zhaoshenglong@huawei.com>
+References: <1454641552-12576-1-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1454641552-12576-12-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch cleans up the Makefile of drm root directory.
-Make core and device drivers configuration list sorted Alphabetically.
+From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
-Reviewed-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
-Reviewed-by: Yifan Liu <liu_fanyi@163.com>
+Move xen_early_init() before efi_init(), then when calling efi_init()
+could initialize Xen specific UEFI.
+
+Check if it runs on Xen hypervisor through the flat dts.
+
+Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 ---
- drivers/gpu/drm/Makefile | 102 ++++++++++++++++++++++++-----------------------
- 1 file changed, 52 insertions(+), 50 deletions(-)
+ arch/arm/xen/enlighten.c  | 56 ++++++++++++++++++++++++++++++++++-------------
+ arch/arm64/kernel/setup.c |  2 +-
+ 2 files changed, 42 insertions(+), 16 deletions(-)
 
-diff --git a/drivers/gpu/drm/Makefile b/drivers/gpu/drm/Makefile
-index 61766dec6a8d..23e57948f68f 100644
---- a/drivers/gpu/drm/Makefile
-+++ b/drivers/gpu/drm/Makefile
-@@ -2,6 +2,9 @@
- # Makefile for the drm device driver.  This driver provides support for the
- # Direct Rendering Infrastructure (DRI) in XFree86 4.1.0 and higher.
+diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+index 807a93e..0e542b8 100644
+--- a/arch/arm/xen/enlighten.c
++++ b/arch/arm/xen/enlighten.c
+@@ -20,6 +20,7 @@
+ #include <linux/irqreturn.h>
+ #include <linux/module.h>
+ #include <linux/of.h>
++#include <linux/of_fdt.h>
+ #include <linux/of_irq.h>
+ #include <linux/of_address.h>
+ #include <linux/cpuidle.h>
+@@ -53,8 +54,6 @@ struct xen_memory_region xen_extra_mem[XEN_EXTRA_MEM_MAX_REGIONS] __initdata;
  
-+CFLAGS_drm_trace_points.o := -I$(src)
-+
-+# core. Please keep this list sorted alphabetically
- drm-y       :=	drm_auth.o drm_bufs.o drm_cache.o \
- 		drm_context.o drm_dma.o \
- 		drm_fops.o drm_gem.o drm_ioctl.o drm_irq.o \
-@@ -13,64 +16,63 @@ drm-y       :=	drm_auth.o drm_bufs.o drm_cache.o \
- 		drm_trace_points.o drm_global.o drm_prime.o \
- 		drm_rect.o drm_vma_manager.o drm_flip_work.o \
- 		drm_modeset_lock.o drm_atomic.o drm_bridge.o
+ static __read_mostly unsigned int xen_events_irq;
+ 
+-static __initdata struct device_node *xen_node;
 -
--drm-$(CONFIG_COMPAT) += drm_ioc32.o
--drm-$(CONFIG_DRM_GEM_CMA_HELPER) += drm_gem_cma_helper.o
- drm-$(CONFIG_PCI) += ati_pcigart.o
--drm-$(CONFIG_DRM_PANEL) += drm_panel.o
--drm-$(CONFIG_OF) += drm_of.o
- drm-$(CONFIG_AGP) += drm_agpsupport.o
-+drm-$(CONFIG_DRM_GEM_CMA_HELPER) += drm_gem_cma_helper.o
-+drm-$(CONFIG_COMPAT) += drm_ioc32.o
-+drm-$(CONFIG_OF) += drm_of.o
-+drm-$(CONFIG_DRM_PANEL) += drm_panel.o
-+obj-$(CONFIG_DRM)	+= drm.o
+ int xen_remap_domain_gfn_array(struct vm_area_struct *vma,
+ 			       unsigned long addr,
+ 			       xen_pfn_t *gfn, int nr,
+@@ -238,6 +237,33 @@ static irqreturn_t xen_arm_callback(int irq, void *arg)
+ 	return IRQ_HANDLED;
+ }
+ 
++static __initdata struct {
++	const char *compat;
++	const char *prefix;
++	const char *version;
++	bool found;
++} hyper_node = {"xen,xen", "xen,xen-", NULL, false};
 +
-+obj-$(CONFIG_DRM_MIPI_DSI) += drm_mipi_dsi.o
- 
- drm_kms_helper-y := drm_crtc_helper.o drm_dp_helper.o drm_probe_helper.o \
- 		drm_plane_helper.o drm_dp_mst_topology.o drm_atomic_helper.o
- drm_kms_helper-$(CONFIG_DRM_LOAD_EDID_FIRMWARE) += drm_edid_load.o
--drm_kms_helper-$(CONFIG_DRM_FBDEV_EMULATION) += drm_fb_helper.o
- drm_kms_helper-$(CONFIG_DRM_KMS_CMA_HELPER) += drm_fb_cma_helper.o
++static int __init fdt_find_hyper_node(unsigned long node, const char *uname,
++				      int depth, void *data)
++{
++	const void *s = NULL;
++	int len;
++
++	if (depth != 1 || strcmp(uname, "hypervisor") != 0)
++		return 0;
++
++	if (of_flat_dt_is_compatible(node, hyper_node.compat))
++		hyper_node.found = true;
++
++	s = of_get_flat_dt_prop(node, "compatible", &len);
++	if (strlen(hyper_node.prefix) + 3  < len &&
++	    !strncmp(hyper_node.prefix, s, strlen(hyper_node.prefix)))
++		hyper_node.version = s + strlen(hyper_node.prefix);
++
++	return 0;
++}
++
+ /*
+  * see Documentation/devicetree/bindings/arm/xen.txt for the
+  * documentation of the Xen Device Tree format.
+@@ -245,26 +271,18 @@ static irqreturn_t xen_arm_callback(int irq, void *arg)
+ #define GRANT_TABLE_PHYSADDR 0
+ void __init xen_early_init(void)
+ {
+-	int len;
+-	const char *s = NULL;
+-	const char *version = NULL;
+-	const char *xen_prefix = "xen,xen-";
 -
-+drm_kms_helper-$(CONFIG_DRM_FBDEV_EMULATION) += drm_fb_helper.o
- obj-$(CONFIG_DRM_KMS_HELPER) += drm_kms_helper.o
+-	xen_node = of_find_compatible_node(NULL, NULL, "xen,xen");
+-	if (!xen_node) {
++	of_scan_flat_dt(fdt_find_hyper_node, NULL);
++	if (!hyper_node.found) {
+ 		pr_debug("No Xen support\n");
+ 		return;
+ 	}
+-	s = of_get_property(xen_node, "compatible", &len);
+-	if (strlen(xen_prefix) + 3  < len &&
+-			!strncmp(xen_prefix, s, strlen(xen_prefix)))
+-		version = s + strlen(xen_prefix);
+-	if (version == NULL) {
++
++	if (hyper_node.version == NULL) {
+ 		pr_debug("Xen version not found\n");
+ 		return;
+ 	}
  
--CFLAGS_drm_trace_points.o := -I$(src)
-+obj-$(CONFIG_DRM_TTM) += ttm/
+-	pr_info("Xen %s support found\n", version);
++	pr_info("Xen %s support found\n", hyper_node.version);
  
--obj-$(CONFIG_DRM)	+= drm.o
--obj-$(CONFIG_DRM_MIPI_DSI) += drm_mipi_dsi.o
--obj-$(CONFIG_DRM_TTM)	+= ttm/
--obj-$(CONFIG_DRM_TDFX)	+= tdfx/
--obj-$(CONFIG_DRM_R128)	+= r128/
--obj-$(CONFIG_HSA_AMD) += amd/amdkfd/
--obj-$(CONFIG_DRM_RADEON)+= radeon/
--obj-$(CONFIG_DRM_AMDGPU)+= amd/amdgpu/
--obj-$(CONFIG_DRM_MGA)	+= mga/
--obj-$(CONFIG_DRM_I810)	+= i810/
--obj-$(CONFIG_DRM_I915)  += i915/
--obj-$(CONFIG_DRM_MGAG200) += mgag200/
--obj-$(CONFIG_DRM_VC4)  += vc4/
--obj-$(CONFIG_DRM_CIRRUS_QEMU) += cirrus/
--obj-$(CONFIG_DRM_SIS)   += sis/
--obj-$(CONFIG_DRM_SAVAGE)+= savage/
--obj-$(CONFIG_DRM_VMWGFX)+= vmwgfx/
--obj-$(CONFIG_DRM_VIA)	+=via/
--obj-$(CONFIG_DRM_VGEM)	+= vgem/
--obj-$(CONFIG_DRM_NOUVEAU) +=nouveau/
--obj-$(CONFIG_DRM_EXYNOS) +=exynos/
--obj-$(CONFIG_DRM_ROCKCHIP) +=rockchip/
--obj-$(CONFIG_DRM_GMA500) += gma500/
--obj-$(CONFIG_DRM_UDL) += udl/
--obj-$(CONFIG_DRM_AST) += ast/
--obj-$(CONFIG_DRM_ARMADA) += armada/
-+# device drivers. Please keep this list sorted alphabetically
-+obj-$(CONFIG_HSA_AMD)		+= amd/amdkfd/
-+obj-$(CONFIG_DRM_AMDGPU)	+= amd/amdgpu/
-+obj-$(CONFIG_DRM_ARMADA)	+= armada/
-+obj-$(CONFIG_DRM_AST)		+= ast/
- obj-$(CONFIG_DRM_ATMEL_HLCDC)	+= atmel-hlcdc/
--obj-$(CONFIG_DRM_RCAR_DU) += rcar-du/
--obj-$(CONFIG_DRM_SHMOBILE) +=shmobile/
--obj-y			+= omapdrm/
--obj-y			+= tilcdc/
--obj-$(CONFIG_DRM_QXL) += qxl/
--obj-$(CONFIG_DRM_BOCHS) += bochs/
--obj-$(CONFIG_DRM_VIRTIO_GPU) += virtio/
--obj-$(CONFIG_DRM_MSM) += msm/
--obj-$(CONFIG_DRM_TEGRA) += tegra/
--obj-$(CONFIG_DRM_STI) += sti/
--obj-$(CONFIG_DRM_IMX) += imx/
--obj-y			+= i2c/
--obj-y			+= panel/
--obj-y			+= bridge/
--obj-$(CONFIG_DRM_FSL_DCU) += fsl-dcu/
--obj-$(CONFIG_DRM_ETNAVIV) += etnaviv/
-+obj-$(CONFIG_DRM_BOCHS)		+= bochs/
-+obj-y				+= bridge/
-+obj-$(CONFIG_DRM_CIRRUS_QEMU)	+= cirrus/
-+obj-$(CONFIG_DRM_ETNAVIV)	+= etnaviv/
-+obj-$(CONFIG_DRM_EXYNOS)	+= exynos/
-+obj-$(CONFIG_DRM_FSL_DCU)	+= fsl-dcu/
-+obj-$(CONFIG_DRM_GMA500)	+= gma500/
-+obj-y				+= i2c/
-+obj-$(CONFIG_DRM_I810)		+= i810/
-+obj-$(CONFIG_DRM_I915)		+= i915/
-+obj-$(CONFIG_DRM_IMX)		+= imx/
-+obj-$(CONFIG_DRM_MGA)		+= mga/
-+obj-$(CONFIG_DRM_MGAG200)	+= mgag200/
-+obj-$(CONFIG_DRM_MSM)		+= msm/
-+obj-$(CONFIG_DRM_NOUVEAU)	+= nouveau/
-+obj-y				+= omapdrm/
-+obj-y				+= panel/
-+obj-$(CONFIG_DRM_QXL)		+= qxl/
-+obj-$(CONFIG_DRM_R128)		+= r128/
-+obj-$(CONFIG_DRM_RADEON)	+= radeon/
-+obj-$(CONFIG_DRM_RCAR_DU)	+= rcar-du/
-+obj-$(CONFIG_DRM_ROCKCHIP)	+= rockchip/
-+obj-$(CONFIG_DRM_SAVAGE)	+= savage/
-+obj-$(CONFIG_DRM_SHMOBILE)	+= shmobile/
-+obj-$(CONFIG_DRM_SIS)		+= sis/
-+obj-$(CONFIG_DRM_STI)		+= sti/
-+obj-$(CONFIG_DRM_TDFX)		+= tdfx/
-+obj-$(CONFIG_DRM_TEGRA)		+= tegra/
-+obj-y				+= tilcdc/
-+obj-$(CONFIG_DRM_UDL)		+= udl/
-+obj-$(CONFIG_DRM_VC4)		+= vc4/
-+obj-$(CONFIG_DRM_VGEM)		+= vgem/
-+obj-$(CONFIG_DRM_VIA)		+= via/
-+obj-$(CONFIG_DRM_VIRTIO_GPU)	+= virtio/
-+obj-$(CONFIG_DRM_VMWGFX)	+= vmwgfx/
+ 	xen_domain_type = XEN_HVM_DOMAIN;
+ 
+@@ -305,6 +323,14 @@ static void __init xen_acpi_guest_init(void)
+ 
+ static void __init xen_dt_guest_init(void)
+ {
++	struct device_node *xen_node;
++
++	xen_node = of_find_compatible_node(NULL, NULL, "xen,xen");
++	if (!xen_node) {
++		pr_err("Xen support was detected before, but it has disappeared\n");
++		return;
++	}
++
+ 	xen_events_irq = irq_of_parse_and_map(xen_node, 0);
+ }
+ 
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 8119479..a4a2878 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -313,6 +313,7 @@ void __init setup_arch(char **cmdline_p)
+ 	 */
+ 	local_async_enable();
+ 
++	xen_early_init();
+ 	efi_init();
+ 	arm64_memblock_init();
+ 
+@@ -334,7 +335,6 @@ void __init setup_arch(char **cmdline_p)
+ 	} else {
+ 		psci_acpi_init();
+ 	}
+-	xen_early_init();
+ 
+ 	cpu_read_bootcpu_ops();
+ 	smp_init_cpus();
 -- 
-1.9.1
+2.0.4
