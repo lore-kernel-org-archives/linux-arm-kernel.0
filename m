@@ -1,67 +1,74 @@
-From: sricharan@codeaurora.org (Sricharan)
-Date: Fri, 5 Feb 2016 13:30:25 +0530
-Subject: [PATCH V7 3/6] i2c: qup: Transfer each i2c_msg in i2c_msgs
- without a stop bit
-In-Reply-To: <20160204200903.GE1958@tetsubishi>
-References: <1453197766-18976-1-git-send-email-sricharan@codeaurora.org>
- <1453197766-18976-4-git-send-email-sricharan@codeaurora.org>
- <20160124112915.GA1775@katana>
- <001401d15988$59f6dcf0$0de496d0$@codeaurora.org>
- <20160204200903.GE1958@tetsubishi>
-Message-ID: <006e01d15feb$4a08d0a0$de1a71e0$@codeaurora.org>
+From: jayachandran.chandrashekaran@broadcom.com (Jayachandran Chandrashekaran Nair)
+Date: Fri, 5 Feb 2016 14:05:37 +0530
+Subject: [PATCH v7 5/5] PCI: ACPI: Add a generic ACPI based host controller
+In-Reply-To: <20160205001907.GJ7031@localhost>
+References: <1454058340-7904-1-git-send-email-jchandra@broadcom.com>
+ <1454058340-7904-6-git-send-email-jchandra@broadcom.com>
+ <20160205001907.GJ7031@localhost>
+Message-ID: <CAKc_7PXYtFt1MQE-UGO0O5vvQ+xFKa2b5=F8wXB=EN-JUJVzZw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
+Hi Bjorn,
 
-> -----Original Message-----
-> From: linux-arm-kernel [mailto:linux-arm-kernel-
-> bounces at lists.infradead.org] On Behalf Of Wolfram Sang
-> Sent: Friday, February 05, 2016 1:39 AM
-> To: Sricharan
-> Cc: devicetree at vger.kernel.org; architt at codeaurora.org; linux-arm-
-> msm at vger.kernel.org; ntelkar at codeaurora.org; galak at codeaurora.org;
-> linux-kernel at vger.kernel.org; andy.gross at linaro.org; linux-
-> i2c at vger.kernel.org; iivanov at mm-sol.com; agross at codeaurora.org;
-> dmaengine at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH V7 3/6] i2c: qup: Transfer each i2c_msg in i2c_msgs
-> without a stop bit
-> 
-> Hi,
-> 
-> > Ah, so what I meant above is there is no 'STOP' bit between each msg
-> > in i2c_msgs, but 'REAPEATED_START' still holds true.  We are sending
-> > 'START' bit for each msg.
-> > So these is how each msg in i2c_msg is sent,
-> >
-> > |------MSG1--------|-----MSG2---------|------MSG3------------|
-> >
-> >   |START|DATA|------|START|DATA|---|START|DATA|STOP|
-> >
-> > If my commit text does not make this clear, I  can reword that ?
-> 
-> OK, now this looks to me perfectly fine: A number of *messages*
-> concatenated into one *transfer* by repeated start. That's the way it
-should
-> be.
-> 
-> So, I'd simply remove these words:
-> 
-> "The QUP i2c hardware has no way to inform that there should not be a
-> 'STOP' at the end of transaction. The only way to implement this is to
-> coalesce all the i2c_msg in i2c_msgs in to one transaction and transfer
-them."
-> 
-> This sounded like the HW needed a special handling, so I was under the
-> impression REP_START was broken. However, unless I misunderstood
-> something again, this now sounds like the standard case and we can keep
-> the commit message simple. If you are okay with that, I can update it
-here,
-> no need to resend.
-> 
-      Yes the above modified commit text looks perfect to be updated and
-thanks
-      for the update as well.
+On Fri, Feb 5, 2016 at 5:49 AM, Bjorn Helgaas <helgaas@kernel.org> wrote:
+> Hi Jayachandran,
+>
+> On Fri, Jan 29, 2016 at 02:35:40PM +0530, Jayachandran C wrote:
+>> Add a simple ACPI based PCI host controller under config option
+>> ACPI_PCI_HOST_GENERIC. This is done by providing an implementation
+>> of pci_acpi_scan_root().
+>>
+>> The pci_mmcfg_list handling is done by the ACPI code, so we keep a
+>> reference to the pci_mmcfg_region in sysdata. The ECAM region will
+>> be already mapped, so map_bus can be implemented by using the
+>> virt pointer for the pci_mmcfg_region. pci_generic_config_read
+>> and pci_generic_config_write are used for config space read/write.
+>>
+>> Also, we provide implementations of raw_pci_read and raw_pci_write
+>> hat are needed by ACPI based on the pci_mmcfg_list.
+>>
+>> pci_acpi_set_companion() and acpi_pci_get_segment() are defined
+>> using sysdata of generic ACPI host controller so that PCI domain
+>> and ACPI companion are set in PCI code rather than platform code.
+>>
+>> This code is currently enabled only for ARM64.
+>>
+>> Signed-off-by: Jayachandran C <jchandra@broadcom.com>
+>> ---
+>>  drivers/acpi/Kconfig         |   8 ++
+>>  drivers/acpi/Makefile        |   1 +
+>>  drivers/acpi/pci_host_acpi.c | 186 +++++++++++++++++++++++++++++++++++++++++++
+>>  include/linux/pci-acpi.h     |  17 ++++
+>>  4 files changed, 212 insertions(+)
+>>  create mode 100644 drivers/acpi/pci_host_acpi.c
+>
+> I'm speaking a little bit out of turn here, because this is ACPI code,
+> but I'm confused about pci_host_acpi.c.  We already have pci_root.c,
+> which is *supposed* to be arch-independent.  I know pci_root.c is
+> crufty and could be improved, but it does work today on x86 and ia64,
+> and it handles some generic things that pci_host_acpi.c does not,
+> e.g., _OSC, NUMA, host bridge hotplug, etc.
+>
+> I'd really like to see pci_root.c improved so it could work on x86,
+> ia64, and arm64.  I'm sure that was probably the first thing you
+> tried, so likely there are issues there.  Are they insurmountable?
 
-Regards,
- Sricharan
+pci_root.c leaves the implementation of pci_acpi_scan_root() to the
+architecture. Implementing pci_acpi_scan_root needs a
+pci_acpi_root_ops instance and a pci_ops instance and related functions.
+The architecture is also expected to implement raw_pci_read and
+raw_pci_write.
+
+pci_host_acpi.c is a generic implementation of these using a sysdata
+pointing to acpi_pci_root_info, and using a pointer to the pci_mmcfg_region
+to access ECAM area, Maybe I can rename this file to
+pci_acpi_host_generic.c to reflect this better.
+
+arm64 is the only user of this generic implementation now. The config
+option CONFIG_ACPI_PCI_HOST_GENERIC has to be set on the
+architecture that chooses to use this generic code instead of its own
+implementation.
+
+JC.
+{Sorry if the formatting is wrong, using webmail due to internal IT changes]
