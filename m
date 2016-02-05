@@ -1,73 +1,61 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Fri, 05 Feb 2016 18:43:19 +0200
-Subject: Common/typical fractional divider HW API
-In-Reply-To: <56B4CDEF.3080606@free.fr>
-References: <56B4B67D.2080707@free.fr>
- <1454684758.31169.77.camel@linux.intel.com> <56B4C775.50808@free.fr>
- <1454688729.31169.87.camel@linux.intel.com> <56B4CDEF.3080606@free.fr>
-Message-ID: <1454690599.31169.103.camel@linux.intel.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 5 Feb 2016 16:46:48 +0000
+Subject: [PATCH v5sub2 1/8] arm64: add support for module PLTs
+In-Reply-To: <CAKv+Gu8g7FHHZgmbFww_XZjf5J1utmigwBiNqCg8a3crfB4xFA@mail.gmail.com>
+References: <1454332178-4414-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1454332178-4414-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20160204151303.GB6076@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu9n=bmsZ=UOBiLWzaG2JSsbdC8k1mB7yFbH0czrbXS-1g@mail.gmail.com>
+ <20160205154234.GF6076@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu-poQiuc7+O38n93Xt2o-SYi3kYD0k_9+-6T0=FXV9uXA@mail.gmail.com>
+ <20160205160054.GG6076@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu8g7FHHZgmbFww_XZjf5J1utmigwBiNqCg8a3crfB4xFA@mail.gmail.com>
+Message-ID: <20160205164648.GH6076@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2016-02-05 at 17:29 +0100, Mason wrote:
-> On 05/02/2016 17:12, Andy Shevchenko wrote:
+On Fri, Feb 05, 2016 at 05:20:14PM +0100, Ard Biesheuvel wrote:
+> On 5 February 2016 at 17:00, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Fri, Feb 05, 2016 at 04:53:10PM +0100, Ard Biesheuvel wrote:
+> >> On 5 February 2016 at 16:42, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> >> > On Thu, Feb 04, 2016 at 04:31:59PM +0100, Ard Biesheuvel wrote:
+> >> >> On 4 February 2016 at 16:13, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> >> >> > On Mon, Feb 01, 2016 at 02:09:31PM +0100, Ard Biesheuvel wrote:
+> >> >> >> This adds support for emitting PLTs at module load time for relative
+> >> >> >> branches that are out of range. This is a prerequisite for KASLR, which
+> >> >> >> may place the kernel and the modules anywhere in the vmalloc area,
+> >> >> >> making it more likely that branch target offsets exceed the maximum
+> >> >> >> range of +/- 128 MB.
+> >> >> >
+> >> >> > Any downside to trying to keep the kernel+modules coupled together so
+> >> >> > that we avoid the PLT?
+> >> >>
+> >> >> First of all, note that it is unlikely that the PLTs are ever required
+> >> >> in practice, considering that either
+> >> >> a) the kernel is loaded at the default location right at the base of
+> >> >> the vmalloc range, and in this case, the module space is reserved for
+> >> >> modules only, or
+> >> >> b) the kernel is loaded at some random offset in the 240+ GB vmalloc
+> >> >> space, and it is unlikely that all VMA space around the kernel happens
+> >> >> to be given out to non-randomized vmalloc/ioremap allocations
+> >> >
+> >> > My worry is that we merge some code that's rarely tested.
+> >>
+> >> I understand. But unfortunately, having corner cases that are unlikely
+> >> but not impossible comes with the territory of randomization.
+> >>
+> >> Alternatively, we could take the performance hit if KASLR is in effect
+> >> and allocate each module completely randomly as well. This way, the
+> >> code is always exercised (for now), and we can always backpedal later
+> >> if the performance is measurably worse.
+> >
+> > I'm fine with this. You can post it as a separate patch that we can
+> > easily revert/modify later (like turning it into a config option).
 > 
-> > On Fri, 2016-02-05 at 17:01 +0100, Mason wrote:
-> > 
-> > > So, do you agree that
-> > > 
-> > > ? DIV = 2^I * (1 + F/256)
-> > > 
-> > > gives a more useful DIV distribution than
-> > > 
-> > > ? DIV = I + F/16
-> > 
-> > If you can change hardware why not to use any existing approach
-> > which
-> > suits better to your device?
-> 
-> Sorry, I don't understand the question.
-> 
+> OK, I will hack something up
 
-There are plenty of implementations of the divider. You might consider
-to use one than inventing new one:
-
-https://xkcd.com/927/
-
-> In this part of my message, I was trying to argue that one HW API
-> "2^I * (1 + F/256)" seemed better than another one "I + F/16" on
-> any hardware.
-
-I disagree in a part 2^I.
-
-> 
-> > I don't remember any existing, though I didn't check much, divider
-> > register which takes something like that.
-> 
-> IIUC, you are saying that you've never seen hardware use the
-> "2^I * (1 + F/256)" formula, is that correct?
-
-Yep, though it doesn't mean there is no such.
-
-> I'm not sure how to parse that. I'm using the divider driver
-> > > for a CPU clock, to do D(V)FS in cpufreq.
-> > 
-> > If you are using custom stuff for custom hardware, I hope it's
-> > okay.
-> > But if we are talking about generic solutions (like clk-fractional-
-> > divider), I would suggest to consider existing users / hardware.
-> 
-> Are you saying that I could use the clk-fractional-divider with
-> hardware that computes "I + F/16" ?
-
-No.
-
-> Maybe the clk-fractional-divider could be made more generic by having
-> the register update part done in a call-back function?
-
-Why do you need to touch that module at all if your hardware doesn't
-suit it?
+If it's simpler, you can just add a config option but defaulting to the
+full vmalloc space for modules.
 
 -- 
-Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Intel Finland Oy
+Catalin
