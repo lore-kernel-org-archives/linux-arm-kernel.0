@@ -1,101 +1,36 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 5 Feb 2016 06:42:42 -0800
-Subject: [PATCH v10 5/5] Watchdog: ARM SBSA Generic Watchdog half timeout
- panic support
-In-Reply-To: <CADyBb7unAHEOMfruWS82RkHK6uwPAWCxUx9jqzSkiHU4LHDSeA@mail.gmail.com>
-References: <1454519923-25230-1-git-send-email-fu.wei@linaro.org>
- <1454519923-25230-6-git-send-email-fu.wei@linaro.org>
- <56B23883.7000501@codeaurora.org>
- <CADyBb7sxPg-QUjTbeHFtYkctKc_g7D8O=+jqbXN+DCCoCEnFqA@mail.gmail.com>
- <56B23E99.1030604@codeaurora.org>
- <CADyBb7s4opxfPFuX=1-qEE6uhsaMXgofAJPbHUQHrng2AUwqNA@mail.gmail.com>
- <56B2423B.1020109@codeaurora.org>
- <CADyBb7uULCn97ea19zH8dB4QX1QA8=AXL94d6gXgFxXM8haBNA@mail.gmail.com>
- <56B24642.8090105@codeaurora.org>
- <CADyBb7s_QeU=pYqN9G+5WMtx-L+=QC6uZR6N6ZWPOixnkHzPjw@mail.gmail.com>
- <56B24AB5.3070001@codeaurora.org>
- <CADyBb7usPpY=YLjecXce63zY5e1tniPLmNsVY=8CJHJsCqBgQw@mail.gmail.com>
- <56B2DEE4.7060901@roeck-us.net>
- <CADyBb7unAHEOMfruWS82RkHK6uwPAWCxUx9jqzSkiHU4LHDSeA@mail.gmail.com>
-Message-ID: <56B4B4E2.40105@roeck-us.net>
+From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
+Date: Fri, 5 Feb 2016 16:43:54 +0200
+Subject: [PATCH 2/2] memory: omap-gpmc: Add Kconfig option for debug
+In-Reply-To: <20160205061021.GS19432@atomide.com>
+References: <20160108022619.GS12777@atomide.com> <568F4596.8020206@gmail.com>
+ <20160108075913.GN11364@pali> <569052FE.1040008@gmail.com>
+ <20160121091437.GT7192@pali> <56B077D4.3030902@gmail.com>
+ <20160202233911.GB19432@atomide.com> <20160203000045.GE19432@atomide.com>
+ <56B1A654.1060905@gmail.com> <56B22FC3.3050900@gmail.com>
+ <20160205061021.GS19432@atomide.com>
+Message-ID: <56B4B52A.4060102@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/05/2016 01:51 AM, Fu Wei wrote:
-> Hi Guenter,
->
-> On 4 February 2016 at 13:17, Guenter Roeck <linux@roeck-us.net> wrote:
->> On 02/03/2016 03:00 PM, Fu Wei wrote:
->>>
->>> On 4 February 2016 at 02:45, Timur Tabi <timur@codeaurora.org> wrote:
->>>>
->>>> Fu Wei wrote:
->>>>>
->>>>>
->>>>> As you know I have made the pre-timeout support patch, If people like
->>>>> it, i am happy to go on upstream it separately.
->>>>>
->>>>> If we want to use pre-timeout here, user only can use get_pretimeout
->>>>> and disable panic by setting pretimeout to 0
->>>>> but user can not really set pretimeout, because "pre-timeout  ==
->>>>> timeout / 2 (always)".
->>>>> if user want to change pretimeout, he/she has to set_time instead.
->>>>
->>>>
->>>>
->>>> Ok, I think patches 4 and 5 should be combined, and I think the Kconfig
->>>> entry should be removed and just use panic_enabled.
->>
->>
->> Agreed.
->
-> np, will do
->
->>>
->>>
->>> NP, will update this patchset like that ,  thanks :-)
->>>
->>
->> Also, if panic is enabled, the timeout needs to be adjusted accordingly
->> (to only panic after the entire timeout period has expired, not after
->> half of it). We can not panic the system after timeout / 2.
->
-> OK, my thought is
->
-> if panic is enabled :
-> |--------WOR-------WS0--------WOR-------WS1
-> |------timeout------(panic)------timeout-----reset
->
-> if panic is disabled .
-> |--------WOR-------WS0--------WOR-------WS1
-> |---------------------timeout---------------------reset
->
->   panic_enabled only can be configured when module is loaded by module parameter
->
-> But user should know that max_timeout(panic_enable) =
-> max_timeout(panic_disable) / 2
->
 
-That means you'll have to update max_timeout accordingly.
 
->>
->> I am not too happy with the parameter name (panic_enabled). How about
->> "action", to match machzwd ?
+On  5.02.2016 08:10, Tony Lindgren wrote:
+
+> This seems to fix things here for legacy booting and booting the
+> maemo zImage after dts image. Care to give it a try?
 >
-> yes, makes sense. Maybe we can do something  like this:
+> Basically onenand after reset is in wrong state, have not looked
+> up the bits yet. Will post a better patch when I get a chance
+> over next few days.
 >
-> /*
->   * action refers to action taken when watchdog gets WS0
->   * 0 = SKIP
->   * 1 = PANIC
->   * defaults to SKIP (0)
->   */
-> static int action;
-> module_param(action, int, 0);
-> MODULE_PARM_DESC(action, "after watchdog gets WS0 interrupt, do: "
-> "0 = SKIP(*)  1 = PANIC");
+> Regards,
 >
-Yes, though I would suggest to use lower case letters.
+> Tony
+
+Yep, that looks to fix the things, I submitted a patch "[PATCH] ARM: 
+OMAP2+: Fix onenand initialization to avoid filesystem corruption" (it 
+was supposed to be a reply to this mail, but my git-send-mail-fu failed 
+on me as always :) )
 
 Thanks,
-Guenter
+Ivo
