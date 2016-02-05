@@ -1,57 +1,45 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Fri, 5 Feb 2016 11:05:47 +0800
-Subject: [PATCH v4 12/17] ARM64: ACPI: Check if it runs on Xen to enable or
- disable ACPI
+Date: Fri, 5 Feb 2016 11:05:44 +0800
+Subject: [PATCH v4 09/17] xen/hvm/params: Add a new delivery type for
+ event-channel in HVM_PARAM_CALLBACK_IRQ
 In-Reply-To: <1454641552-12576-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1454641552-12576-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1454641552-12576-13-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1454641552-12576-10-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-When it's a Xen domain0 booting with ACPI, it will supply a /chosen and
-a /hypervisor node in DT. So check if it needs to enable ACPI.
+Add a new delivery type:
+val[63:56] == 3: val[15:8] is flag: val[7:0] is a PPI.
+To the flag, bit 0 stands the interrupt mode is edge(1) or level(0) and
+bit 1 stands the interrupt polarity is active low(1) or high(0).
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
+Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 ---
-CC: Hanjun Guo <hanjun.guo@linaro.org>
----
- arch/arm64/kernel/acpi.c | 12 ++++++++----
- 1 file changed, 8 insertions(+), 4 deletions(-)
+ include/xen/interface/hvm/params.h | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-index d1ce8e2..4e92be0 100644
---- a/arch/arm64/kernel/acpi.c
-+++ b/arch/arm64/kernel/acpi.c
-@@ -67,10 +67,13 @@ static int __init dt_scan_depth1_nodes(unsigned long node,
- {
- 	/*
- 	 * Return 1 as soon as we encounter a node at depth 1 that is
--	 * not the /chosen node.
-+	 * not the /chosen node, or /hypervisor node when running on Xen.
- 	 */
--	if (depth == 1 && (strcmp(uname, "chosen") != 0))
--		return 1;
-+	if (depth == 1 && (strcmp(uname, "chosen") != 0)) {
-+		if (!xen_initial_domain() || (strcmp(uname, "hypervisor") != 0))
-+			return 1;
-+	}
-+
- 	return 0;
- }
+diff --git a/include/xen/interface/hvm/params.h b/include/xen/interface/hvm/params.h
+index 70ad208..5dd629f 100644
+--- a/include/xen/interface/hvm/params.h
++++ b/include/xen/interface/hvm/params.h
+@@ -53,6 +53,15 @@
+  * if this delivery method is available.
+  */
  
-@@ -184,7 +187,8 @@ void __init acpi_boot_table_init(void)
- 	/*
- 	 * Enable ACPI instead of device tree unless
- 	 * - ACPI has been disabled explicitly (acpi=off), or
--	 * - the device tree is not empty (it has more than just a /chosen node)
-+	 * - the device tree is not empty (it has more than just a /chosen node,
-+	 *   and a /hypervisor node when running on Xen)
- 	 *   and ACPI has not been force enabled (acpi=force)
- 	 */
- 	if (param_acpi_off ||
++#define HVM_PARAM_CALLBACK_TYPE_EVENT    3
++/*
++ * val[15:8] is flag of event-channel interrupt:
++ *  bit 0: interrupt is edge(1) or level(0) triggered
++ *  bit 1: interrupt is active low(1) or high(0)
++ * val[7:0] is PPI number used by event-channel.
++ * This is only used by ARM/ARM64.
++ */
++
+ #define HVM_PARAM_STORE_PFN    1
+ #define HVM_PARAM_STORE_EVTCHN 2
+ 
 -- 
 2.0.4
