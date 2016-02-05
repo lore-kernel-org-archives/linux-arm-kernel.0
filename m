@@ -1,50 +1,88 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 5 Feb 2016 14:02:59 +0100
-Subject: [PATCH v10 5/5] Watchdog: ARM SBSA Generic Watchdog half
- timeout panic support
-In-Reply-To: <CADyBb7unAHEOMfruWS82RkHK6uwPAWCxUx9jqzSkiHU4LHDSeA@mail.gmail.com>
-References: <1454519923-25230-1-git-send-email-fu.wei@linaro.org>
- <1454519923-25230-6-git-send-email-fu.wei@linaro.org>
- <56B23883.7000501@codeaurora.org>
- <CADyBb7sxPg-QUjTbeHFtYkctKc_g7D8O=+jqbXN+DCCoCEnFqA@mail.gmail.com>
- <56B23E99.1030604@codeaurora.org>
- <CADyBb7s4opxfPFuX=1-qEE6uhsaMXgofAJPbHUQHrng2AUwqNA@mail.gmail.com>
- <56B2423B.1020109@codeaurora.org>
- <CADyBb7uULCn97ea19zH8dB4QX1QA8=AXL94d6gXgFxXM8haBNA@mail.gmail.com>
- <56B24642.8090105@codeaurora.org>
- <CADyBb7s_QeU=pYqN9G+5WMtx-L+=QC6uZR6N6ZWPOixnkHzPjw@mail.gmail.com>
- <56B24AB5.3070001@codeaurora.org>
- <CADyBb7usPpY=YLjecXce63zY5e1tniPLmNsVY=8CJHJsCqBgQw@mail.gmail.com>
- <56B2DEE4.7060901@roeck-us.net>
- <CADyBb7unAHEOMfruWS82RkHK6uwPAWCxUx9jqzSkiHU4LHDSeA@mail.gmail.com>
-Message-ID: <20160205140259.72a33699@free-electrons.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Fri, 5 Feb 2016 21:03:43 +0800
+Subject: [PATCH v4 1/1] USB: core: let USB device know device node
+In-Reply-To: <1454665020.6406.21.camel@pengutronix.de>
+References: <1453706679-18948-1-git-send-email-peter.chen@freescale.com>
+ <1454582690.3356.18.camel@pengutronix.de> <20160205061124.GB1858@shlinux2>
+ <1454665020.6406.21.camel@pengutronix.de>
+Message-ID: <CAL411-rEqqQA=mJ64eqqawWOXTJ3FK6nKjGu=09RmofvOnz4Lw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Fri, Feb 5, 2016 at 5:37 PM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
+> Am Freitag, den 05.02.2016, 14:11 +0800 schrieb Peter Chen:
+> [...]
+>> > The reference recommendation states that for single-configuration USB
+>> > devices the compatible should contain all of the applicable strings from
+>> > the list starting with 2) "usbVID,PID.REV" and ending with 11)
+>> > "usb,device". Are we going to ignore this?
+>>
+>> I have not seen benefits if we write several compatibles in dts,
+>> the information of compatibles listed in doc can be got during
+>> the enumeration.
+>>
+>> I suggest we use the simple pattern for this compatible, in that
+>> case, every one can be easy to follow it, and will not be confused
+>> which compatibles should be used, and the style can be unify.
+>
+> Just pointing it out, a comment why this differs from the recommendation
+> would be nice to avoid confusion.
+>
 
-On Fri, 5 Feb 2016 17:51:52 +0800, Fu Wei wrote:
+Thanks, I will.
 
-> OK, my thought is
-> 
-> if panic is enabled :
-> |--------WOR-------WS0--------WOR-------WS1
-> |------timeout------(panic)------timeout-----reset
+> [...]
+>> > > +         compatible = "usb05e3,0608";
+>> > > +         reg = <0x1>;
+>> > > + };
+>> >
+>> > I'd have written this node as:
+>> >
+>> >     hub: hub at 1 {
+>> >             compatible = "usb5e3,608", "usb5e3,class9",
+>> >                          "usb,class9", "usb,device";
+>> >             reg = <1>;
+>> >     };
+>>
+>> The reg should be hexadecimal, do we need to add "0x" before the value?
+>
+> The unit-address name part should be hexadecimal, the reg property value
+> doesn't have to be. As long as the value is < 10 I don't see a problem.
+>
 
-I'm quite certainly missing something completely obvious here, but how
-can you get the WS1 interrupt *after* raising a panic? Aren't all
-interrupts disabled and the system fully halted once you get a panic(),
-especially when raised from an interrupt handler? If that's the case,
-how can the system continue to do things, such as receiving the WS1
-interrupt and resetting ?
+I see.
 
-Again, I'm probably missing something obvious, but I'm interested to
-understand the reasoning here.
+>> > As another example, I'd like to introduce the USB WLAN Adapter soldered
+>> > onto the imx6q-gk802 board to its power enable GPIO via the device tree:
+>> >
+>> > /* Internal USB port (USBH1) */
+>> > &usbh1 {
+>> >     #address-cells = <1>;
+>> >     #size-cells = <0>;
+>> >     status = "okay";
+>> >
+>> >     /* RTL8192CU 802.11n WLAN Adapter */
+>> >     device at 1 {
+>> >             compatible = "usbbda,8176.200", "usbbda,8176",
+>> >                          "usb,device";
+>> >             reg = <1>;
+>> >
+>> >             enable-gpios = <&gpio2 0 GPIO_ACTIVE_LOW>;
+>> >     };
+>> > };
+>> >
+>>
+>> It is okay to use your example, but I still insist like below:
+>
+> Sorry for being imprecise. The hub example is fine for the
+> documentation. I just wanted to illustrate how and why I am interested
+> in this discussion.
+>
 
-Thanks!
+Thanks for commenting it.
 
-Thomas
+I will be in Chinese New Year holiday, will send next version after Feb 15th.
+
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+BR,
+Peter Chen
