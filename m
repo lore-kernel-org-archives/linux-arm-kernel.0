@@ -1,70 +1,28 @@
-From: slash.tmp@free.fr (Mason)
-Date: Fri, 5 Feb 2016 17:58:38 +0100
-Subject: [PATCH RFC] Add cpufreq support
-Message-ID: <56B4D4BE.2040008@free.fr>
+From: tj@kernel.org (Tejun Heo)
+Date: Fri, 5 Feb 2016 12:04:23 -0500
+Subject: [PATCH] AHCI: Workaround for ThunderX Errata#22536
+In-Reply-To: <1454539065-16891-1-git-send-email-tchalamarla@caviumnetworks.com>
+References: <1454539065-16891-1-git-send-email-tchalamarla@caviumnetworks.com>
+Message-ID: <20160205170423.GE4401@htj.duckdns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'm throwing this out there to ask:
-Is this the right way to enable cpufreq on my platform?
----
- arch/arm/boot/dts/tango4-common.dtsi  | 4 ++++
- arch/arm/boot/dts/tango4-smp8758.dtsi | 2 ++
- arch/arm/mach-tango/setup.c           | 7 +++++++
- 3 files changed, 13 insertions(+)
+Hello, Tirumalesh.
 
-diff --git a/arch/arm/boot/dts/tango4-common.dtsi b/arch/arm/boot/dts/tango4-common.dtsi
-index 41dff0a93419..557cb67d183f 100644
---- a/arch/arm/boot/dts/tango4-common.dtsi
-+++ b/arch/arm/boot/dts/tango4-common.dtsi
-@@ -193,3 +193,7 @@
- 		};
- 	};
- };
-+
-+&cpu0 {
-+	clocks = <&clkgen CPU_CLK>;
-+};
-diff --git a/arch/arm/boot/dts/tango4-smp8758.dtsi b/arch/arm/boot/dts/tango4-smp8758.dtsi
-index 7ed88ee629fb..0db290a8334d 100644
---- a/arch/arm/boot/dts/tango4-smp8758.dtsi
-+++ b/arch/arm/boot/dts/tango4-smp8758.dtsi
-@@ -11,6 +11,8 @@
- 			next-level-cache = <&l2cc>;
- 			device_type = "cpu";
- 			reg = <0>;
-+			clock-latency = <300000>;
-+			operating-points = <1215000 0 607500 0 405000 0 243000 0 135000 0>;
- 		};
- 
- 		cpu1: cpu at 1 {
-diff --git a/arch/arm/mach-tango/setup.c b/arch/arm/mach-tango/setup.c
-index a796841c039b..0e8f90f70e85 100644
---- a/arch/arm/mach-tango/setup.c
-+++ b/arch/arm/mach-tango/setup.c
-@@ -1,6 +1,7 @@
- #include <asm/mach/map.h>
- #include <asm/mach/arch.h>
- #include <asm/hardware/cache-l2x0.h>
-+#include <linux/platform_device.h>
- #include "smc.h"
- 
- static struct map_desc tango_map_desc[] __initdata = {
-@@ -23,6 +24,11 @@ static void tango_l2c_write(unsigned long val, unsigned int reg)
- 		tango_set_l2_control(val);
- }
- 
-+static void __init tango_init_late(void)
-+{
-+	platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
-+}
-+
- static const char *const tango_dt_compat[] = { "sigma,tango4", NULL };
- 
- DT_MACHINE_START(TANGO_DT, "Sigma Tango DT")
-@@ -30,4 +36,5 @@ DT_MACHINE_START(TANGO_DT, "Sigma Tango DT")
- 	.l2c_aux_mask	= ~0,
- 	.l2c_write_sec	= tango_l2c_write,
- 	.map_io		= tango_map_io,
-+	.init_late	= tango_init_late,
- MACHINE_END
+On Wed, Feb 03, 2016 at 02:37:45PM -0800, tchalamarla at caviumnetworks.com wrote:
+> From: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
+> 
+> Due to Errata in some versions of ThunderX,
+> HOST_IRQ_STAT is neither EDGE nor LEVEL,
+> ThunderX needs a special sequence for handling interrupt.
+> The patch attempts to satisfy the need.
+
+Please take a look at the following patchset and coordinate with
+Suman.
+
+ http://lkml.kernel.org/g/1454620826-22554-2-git-send-email-stripathi at apm.com
+
+Thanks.
+
+-- 
+tejun
