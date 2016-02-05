@@ -1,45 +1,28 @@
-From: santosh.shilimkar@oracle.com (santosh shilimkar)
-Date: Fri, 5 Feb 2016 10:42:40 -0800
-Subject: [PATCH 0/3] Add initial support for TI's K2G SOC
-In-Reply-To: <56B142E8.4090301@oracle.com>
-References: <1454455517-7360-1-git-send-email-fcooper@ti.com>
- <56B142E8.4090301@oracle.com>
-Message-ID: <56B4ED20.8030004@oracle.com>
+From: contact@paulk.fr (Paul Kocialkowski)
+Date: Fri,  5 Feb 2016 19:42:17 +0100
+Subject: [PATCH v2 0/6] LG Optimus Black (P970) codename sniper support and
+ lp872x improvements
+Message-ID: <1454697741-8687-1-git-send-email-contact@paulk.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/2/2016 3:59 PM, santosh shilimkar wrote:
-> On 2/2/2016 3:25 PM, Franklin S Cooper Jr wrote:
->> This patchset provides initial support for K2G the latest addition to
->> Texas
->> Instruments Keystone 2 product family. These patches are built on top of
->> the latest 4.5-rc2 commit.
->>
->> K2G is a A15 + C66x DSP processor built to address the needs of
->> industrial
->> communication and control, automotive and performance audio applications.
->>
->> Supported peripherals include MMC,USB2.0,DCAN,DSS,McASP and PCIe SS.
->>
->> The technical reference manual for K2G can be found here:
->> http://www.ti.com/lit/ug/spruhy8/spruhy8.pdf
->>
->> This patchset provides the ability to boot K2G's general purpose evm
->> using
->> a ramfs filesystem.
->>
->> Additional patches will follow this series that will add support for new
->> drivers that will enable additional peripherals and features
->>
->> K2G Bootlog on 4.5-rc2:
->> http://pastebin.ubuntu.com/14861580/
->>
-> Quick scan of the series looks fine to me. I will wait for others to
-> come back for a week or so and then add to 4.6 queue.
->
-> Thanks for the series !!
->
-You should start seeing the patches in linux-next build soon.
+Changes since v1:
+* Remove lp872x patches that were accepted already from the series
+* Explain why removing the invalid DVS GPIO warning is enough
+* Update copyright notice on omap3-sniper.dts
+* Rename the devicetree property for the enable GPIO to enable-gpios
+* Rename function to enable GPIO to lp872x_hw_enable
+* Add enable delays after requesting the enable GPIO
+* Use IOPAD macros for pinmux description
+* Mux the dp3t uart selection pins to gpio
+* Restrict not-reset gpio controllers to only avoid reset when needed
 
-Reagrds,
-Santosh
+This series introduces support for the LG Optimus Black, as described in the
+patch adding devicetree support for the device.
+
+In order to power the external mmc (mmc1), the lp872x regulator is used.
+Its code had to be improved a bit to work on the device.
+
+Note that the patch adding devicetree support for the device requires the
+changes applied to the lp872x regulator, so all this is sent in one series
+despite the fact they're different parts of the code.
