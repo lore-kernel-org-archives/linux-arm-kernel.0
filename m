@@ -1,272 +1,90 @@
-From: contact@paulk.fr (Paul Kocialkowski)
-Date: Fri, 05 Feb 2016 20:39:00 +0100
-Subject: [PATCH v2 3/4] ARM: LG Optimus Black (P970) codename sniper
- support, with basic features
-In-Reply-To: <1454697741-8687-4-git-send-email-contact@paulk.fr>
-References: <1454697741-8687-1-git-send-email-contact@paulk.fr>
- <1454697741-8687-4-git-send-email-contact@paulk.fr>
-Message-ID: <1454701140.2623.12.camel@collins>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 5 Feb 2016 13:49:27 -0600
+Subject: [PATCH v4 2/2] pci, pci-thunder-pem: Add PCIe host driver for
+ ThunderX processors.
+In-Reply-To: <56B4D812.7080106@caviumnetworks.com>
+References: <1453844781-24380-1-git-send-email-ddaney.cavm@gmail.com>
+ <1453844781-24380-3-git-send-email-ddaney.cavm@gmail.com>
+ <20160205000452.GI7031@localhost>
+ <56B3ECAD.4050605@caviumnetworks.com>
+ <20160205031042.GA31722@localhost>
+ <56B4D812.7080106@caviumnetworks.com>
+Message-ID: <20160205194927.GA6581@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Feb 05, 2016 at 09:12:50AM -0800, David Daney wrote:
+> On 02/04/2016 07:10 PM, Bjorn Helgaas wrote:
+> >On Thu, Feb 04, 2016 at 04:28:29PM -0800, David Daney wrote:
+> >>On 02/04/2016 04:04 PM, Bjorn Helgaas wrote:
+> >>>On Tue, Jan 26, 2016 at 01:46:21PM -0800, David Daney wrote:
+> >>>>From: David Daney <david.daney@cavium.com>
+> >>>>
+> >>>>Some Cavium ThunderX processors require quirky access methods for the
+> >>>>config space of the PCIe bridge.  Add a driver to provide these config
+> >>>>space accessor functions.  The pci-host-common code is used to
+> >>>>configure the PCI machinery.
+> >>>>
+> >>>>Signed-off-by: David Daney <david.daney@cavium.com>
+> >>>>Acked-by: Rob Herring <robh@kernel.org>
+> >>>>Acked-by: Arnd Bergmann <arnd@arndb.de>
+> >>>>---
+> >>>>  .../devicetree/bindings/pci/pci-thunder-pem.txt    |  43 ++++
+> >>>>  MAINTAINERS                                        |   8 +
+> >>>>  drivers/pci/host/Kconfig                           |   7 +
+> >>>>  drivers/pci/host/Makefile                          |   1 +
+> >>>>  drivers/pci/host/pci-thunder-pem.c                 | 283 +++++++++++++++++++++
+> >>>
+> >>>What's the significance of the "pem" part of the name?  I'm wondering
+> >>>if we can shorten the filenames and function names by dropping it and
+> >>>referring to this simply as "thunder" or "thunderx".
+> ...
 
-Le vendredi 05 f?vrier 2016 ? 19:42 +0100, Paul Kocialkowski a ?crit :
-> The LG Optimus Black (P970) codename sniper is a smartphone that was designed
-> and manufactured by LG Electronics (LGE) and released back in 2011.
-> It is using an OMAP3630 SoC, GP version.
+> >>Since PEM and ECAM are terminology used in the hardware manuals that
+> >>have specific meanings relative to the Thunder SoC family, I think
+> >>it is not too inconvenient to carry them over into the file names.
+> >
+> >As long as PEM and ECAM are really two distinct root complexes that
+> >are unrelated, I guess this is OK.
 > 
-> This adds devicetree support for the device, with only a few basic features
-> supported, such as debug uart, i2c, internal emmc and external mmc.
+> They are, see above.
+
+OK, I'm convinced.
+
+> >>>>+		/*
+> >>>>+		 * 32-bit accesses only.  If the write is for a size
+> >>>>+		 * smaller than 32-bits, we must first read the 32-bit
+> >>>>+		 * value and merge in the desired bits and then write
+> >>>>+		 * the whole 32-bits back out.
+> >>>>+		 */
+> >>>
+> >>>Ugh.  Another device that only supports 32-bit writes.  I guess this
+> >>>only affects this single device, and maybe you "know" that it has no
+> >>>registers where RW1C bits may be corrupted.  Although I suppose this
+> >>>device has the standard status registers (Status at 0x06, Secondary
+> >>>Status at 0x1e, Device Status in PCIe capability, etc.), which do
+> >>>contain RW1C bits.
+> ...
+
+> I will add a WARN_ONCE or similar. and send a new patch set.
 > 
-> Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
-> ---
->  arch/arm/boot/dts/Makefile         |   1 +
->  arch/arm/boot/dts/omap3-sniper.dts | 215 +++++++++++++++++++++++++++++++++++++
->  2 files changed, 216 insertions(+)
->  create mode 100644 arch/arm/boot/dts/omap3-sniper.dts
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index a4a6d70..7314cf8 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -460,6 +460,7 @@ dtb-$(CONFIG_ARCH_OMAP3) += \
->  	omap3-sbc-t3517.dtb \
->  	omap3-sbc-t3530.dtb \
->  	omap3-sbc-t3730.dtb \
-> +	omap3-sniper.dtb \
->  	omap3-thunder.dtb \
->  	omap3-zoom3.dtb
->  dtb-$(CONFIG_SOC_TI81XX) += \
-> diff --git a/arch/arm/boot/dts/omap3-sniper.dts b/arch/arm/boot/dts/omap3-sniper.dts
-> new file mode 100644
-> index 0000000..24bcd82
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/omap3-sniper.dts
-> @@ -0,0 +1,215 @@
-> +/*
-> + * Copyright (C) 2015-2016 Paul Kocialkowski <contact@paulk.fr>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +/dts-v1/;
-> +
-> +#include "omap36xx.dtsi"
-> +
-> +/ {
-> +	model = "LG Optimus Black (P970)";
-> +	compatible = "lge,omap3-sniper", "ti,omap36xx", "ti,omap3";
-> +
-> +	cpus {
-> +		cpu at 0 {
-> +			cpu0-supply = <&vcc>;
-> +		};
-> +	};
-> +
-> +	memory {
-> +		device_type = "memory";
-> +		reg = <0x80000000 0x20000000>; /* 512 MB */
-> +	};
-> +};
-> +
-> +&omap3_pmx_core {
-> +	pinctrl-names = "default";
-> +
-> +	uart3_pins: pinmux_uart3_pins {
-> +		pinctrl-single,pins = <
-> +			OMAP3_CORE1_IOPAD(0x219e, PIN_INPUT | MUX_MODE0)	/* uart3_rx_irrx */
-> +			OMAP3_CORE1_IOPAD(0x21a0, PIN_OUTPUT | MUX_MODE0)	/* uart3_tx_irtx */
-> +		>;
-> +	};
-> +
-> +	dp3t_sel_pins: pinmux_dp3t_sel_pins {
-> +		pinctrl-single,pins = <
-> +			OMAP3_CORE1_IOPAD(0x2196, PIN_OUTPUT | MUX_MODE4)	/* gpio_161 */
-> +			OMAP3_CORE1_IOPAD(0x2198, PIN_OUTPUT | MUX_MODE4)	/* gpio_162 */
-> +		>;
-> +	};
-> +
-> +	i2c1_pins: pinmux_i2c1_pins {
-> +		pinctrl-single,pins = <
-> +			OMAP3_CORE1_IOPAD(0x21ba, PIN_INPUT | MUX_MODE0)	/* i2c1_scl */
-> +			OMAP3_CORE1_IOPAD(0x21bc, PIN_INPUT | MUX_MODE0)	/* i2c1_sda */
-> +		>;
-> +	};
-> +
-> +	i2c2_pins: pinmux_i2c2_pins {
-> +		pinctrl-single,pins = <
-> +			OMAP3_CORE1_IOPAD(0x21be, PIN_INPUT | MUX_MODE0)	/* i2c2_scl */
-> +			OMAP3_CORE1_IOPAD(0x21c0, PIN_INPUT | MUX_MODE0)	/* i2c2_sda */
-> +		>;
-> +	};
-> +
-> +	i2c3_pins: pinmux_i2c3_pins {
-> +		pinctrl-single,pins = <
-> +			OMAP3_CORE1_IOPAD(0x21c2, PIN_INPUT | MUX_MODE0)	/* i2c3_scl */
-> +			OMAP3_CORE1_IOPAD(0x21c4, PIN_INPUT | MUX_MODE0)	/* i2c3_sda */
-> +		>;
-> +	};
-> +
-> +	lp8720_en_pin: pinmux_lp8720_en_pin {
-> +		pinctrl-single,pins = <
-> +			OMAP3_CORE1_IOPAD(0x2080, PIN_OUTPUT | MUX_MODE4)	/* gpio_37 */
-> +		>;
-> +	};
-> +
-> +	mmc1_pins: pinmux_mmc1_pins {
-> +		pinctrl-single,pins = <
-> +			OMAP3_CORE1_IOPAD(0x2144, PIN_INPUT | MUX_MODE0)	/* sdmmc1_clk */
-> +			OMAP3_CORE1_IOPAD(0x2146, PIN_INPUT | MUX_MODE0)	/* sdmmc1_cmd */
-> +			OMAP3_CORE1_IOPAD(0x2148, PIN_INPUT | MUX_MODE0)	/* sdmmc1_dat0 */
-> +			OMAP3_CORE1_IOPAD(0x214a, PIN_INPUT | MUX_MODE0)	/* sdmmc1_dat1 */
-> +			OMAP3_CORE1_IOPAD(0x214c, PIN_INPUT | MUX_MODE0)	/* sdmmc1_dat2 */
-> +			OMAP3_CORE1_IOPAD(0x214e, PIN_INPUT | MUX_MODE0)	/* sdmmc1_dat3 */
-> +		>;
-> +	};
-> +
-> +	mmc2_pins: pinmux_mmc2_pins {
-> +		pinctrl-single,pins = <
-> +			OMAP3_CORE1_IOPAD(0x2158, PIN_INPUT | MUX_MODE0)	/* sdmmc2_clk */
-> +			OMAP3_CORE1_IOPAD(0x215a, PIN_INPUT | MUX_MODE0)	/* sdmmc2_cmd */
-> +			OMAP3_CORE1_IOPAD(0x215c, PIN_INPUT | MUX_MODE0)	/* sdmmc2_dat0 */
-> +			OMAP3_CORE1_IOPAD(0x215e, PIN_INPUT | MUX_MODE0)	/* sdmmc2_dat1 */
-> +			OMAP3_CORE1_IOPAD(0x2160, PIN_INPUT | MUX_MODE0)	/* sdmmc2_dat2 */
-> +			OMAP3_CORE1_IOPAD(0x2162, PIN_INPUT | MUX_MODE0)	/* sdmmc2_dat3 */
-> +			OMAP3_CORE1_IOPAD(0x2164, PIN_INPUT | MUX_MODE0)	/* sdmmc2_dat4 */
-> +			OMAP3_CORE1_IOPAD(0x2166, PIN_INPUT | MUX_MODE0)	/* sdmmc2_dat5 */
-> +			OMAP3_CORE1_IOPAD(0x2168, PIN_INPUT | MUX_MODE0)	/* sdmmc2_dat6 */
-> +			OMAP3_CORE1_IOPAD(0x216a, PIN_INPUT | MUX_MODE0)	/* sdmmc2_dat7 */
-> +		>;
-> +	};
-> +};
-> +
-> +&omap3_pmx_wkup {
-> +	pinctrl-names = "default";
-> +
-> +	mmc1_cd_pin: pinmux_mmc1_cd_pin {
-> +		pinctrl-single,pins = <
-> +			OMAP3_WKUP_IOPAD(0x2a1a, PIN_INPUT | MUX_MODE4)		/* gpio_10 */
-> +		>;
-> +	};
-> +};
-> +
-> +&gpio2 {
-> +	ti,no-reset-on-init;
-> +};
-> +
-> +&gpio5 {
-> +	ti,no-reset-on-init;
-> +};
-> +
-> +&gpio6 {
-> +	ti,no-reset-on-init;
-> +};
-> +
-> +&uart3 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&uart3_pins &dp3t_sel_pins>;
-> +
-> +	interrupts-extended = <&intc 74 &omap3_pmx_core OMAP3_UART3_RX>;
-> +};
-> +
-> +&i2c1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&i2c1_pins>;
-> +
-> +	clock-frequency = <2600000>;
-> +
-> +	twl: twl at 48 {
-> +		reg = <0x48>;
-> +		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
-> +		interrupt-parent = <&intc>;
-> +
-> +		twl_power: power {
-> +			compatible = "ti,twl4030-power";
-> +			ti,use_poweroff;
-> +		};
-> +	};
-> +};
-> +
-> +#include "twl4030.dtsi"
-> +#include "twl4030_omap3.dtsi"
-> +
-> +&i2c2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&i2c2_pins>;
-> +
-> +	clock-frequency = <400000>;
-> +};
-> +
-> +&i2c3 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&i2c3_pins>;
-> +
-> +	clock-frequency = <400000>;
-> +
-> +	lp8720 at 7d {
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&lp8720_en_pin>;
-> +
-> +		compatible = "ti,lp8720";
-> +		reg = <0x7d>;
-> +
-> +		enable-gpios = <&gpio2 5 GPIO_ACTIVE_HIGH>; /* gpio_37 */
-> +
-> +		lp8720_ldo1: ldo1 {
-> +			regulator-min-microvolt = <3000000>;
-> +			regulator-max-microvolt = <3000000>;
-> +		};
-> +	};
-> +};
-> +
-> +&mmc1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&mmc1_pins &mmc1_cd_pin>;
-> +	vmmc-supply = <&lp8720_ldo1>;
-> +	cd-gpios = <&gpio1 10 GPIO_ACTIVE_LOW>; /* gpio 10 */
-> +	bus-width = <4>;
-> +};
-> +
-> +&mmc2 {
-> +
+> FWIW, I think I have been able to get the message through to the
+> hardware architects that building root complexes that are not
+> exposed as PCI standard ECAMs makes things very difficult.  This was
+> the original intention, but turned out not to be possible when we
+> looked more closely at the hardware implementation.  I am optimistic
+> that subsequent generations of Thunder will be much improved in this
+> area.
 
-Please discard this newline in case v2 gets merged.
+Great!  Since there's apparently only one ThunderX device (devfn == 0
+on the root bus) that has this problem, and you know exactly what that
+device is and where all its RW1C bits are, you *could* fix this in the
+*_config_write() functions by clearing any RW1C bits before the
+"modify/write" part of any read/modify/write cycle.
 
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&mmc2_pins>;
-> +	vmmc-supply = <&vmmc2>;
-> +	ti,non-removable;
-> +	bus-width = <8>;
-> +};
-> +
-> +&mmc3 {
-> +	status = "disabled";
-> +};
-> +
-> +/*
-> + * The TWL4030 VAUX2 and VDAC regulators power sensors that are slaves on I2C3.
-> + * When not powered, these sensors cause the I2C3 clock to stay low at all times,
-> + * making it impossible to reach other devices on I2C3.
-> + */
-> +
-> +&vaux2 {
-> +	regulator-min-microvolt = <2800000>;
-> +	regulator-max-microvolt = <2800000>;
-> +	regulator-always-on;
-> +};
-> +
-> +&vdac {
-> +	regulator-min-microvolt = <1800000>;
-> +	regulator-max-microvolt = <1800000>;
-> +	regulator-always-on;
-> +};
+BTW, minor nit, when you repost these, can you reorder the
+map_bus/read/write functions in that order so they match the order
+they're declared in struct pci_ops?  I think both pem and ecam
+versions could benefit from this.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160205/5a66aaca/attachment.sig>
+Bjorn
