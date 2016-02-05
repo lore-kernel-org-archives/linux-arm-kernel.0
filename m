@@ -1,223 +1,70 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri,  5 Feb 2016 22:20:16 +0100
-Subject: [PATCH 3/5] ARM: dts: rockchip: move rk3288 io-domain nodes to the grf
-In-Reply-To: <1454707218-23676-1-git-send-email-heiko@sntech.de>
-References: <1454707218-23676-1-git-send-email-heiko@sntech.de>
-Message-ID: <1454707218-23676-4-git-send-email-heiko@sntech.de>
+From: yang.shi@linaro.org (Shi, Yang)
+Date: Fri, 5 Feb 2016 13:25:47 -0800
+Subject: [PATCH] arm64: reenable interrupt when handling ptrace breakpoint
+In-Reply-To: <56969312.7070309@linaro.org>
+References: <1450225088-2456-1-git-send-email-yang.shi@linaro.org>
+ <20151216111316.GD4308@arm.com> <5671CD5B.9030907@linaro.org>
+ <20151221104818.GF23092@arm.com> <alpine.DEB.2.11.1512211749180.28591@nanos>
+ <20151221170028.GT23092@arm.com> <56955B3A.5010303@linaro.org>
+ <20160113102622.GC25458@arm.com> <569686BA.6050703@linaro.org>
+ <20160113172303.GH25458@arm.com> <56969312.7070309@linaro.org>
+Message-ID: <56B5135B.3050801@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-io-voltage control is actually part of the grf, so move the node under the
-newly available grf simple-mfd.
+On 1/13/2016 10:10 AM, Shi, Yang wrote:
+> On 1/13/2016 9:23 AM, Will Deacon wrote:
+>> On Wed, Jan 13, 2016 at 09:17:46AM -0800, Shi, Yang wrote:
+>>> On 1/13/2016 2:26 AM, Will Deacon wrote:
+>>>> On Tue, Jan 12, 2016 at 11:59:54AM -0800, Shi, Yang wrote:
+>>>>> This might be buried in email storm during the holiday. Just want
+>>>>> to double
+>>>>> check the status. I'm supposed there is no objection for getting it
+>>>>> merged
+>>>>> in upstream?
+>>>>
+>>>> Sorry, when you replied with:
+>>>>
+>>>>> I think we could just extend the "signal delay send" approach from
+>>>>> x86-64
+>>>>> to arm64, which is currently used by x86-64 on -rt kernel only.
+>>>>
+>>>> I understood that you were going to fix -rt, so I dropped this pending
+>>>> anything more from you.
+>>>>
+>>>> What's the plan?
+>>>
+>>> Sorry for the confusion. The "signal delay send" approach used by
+>>> x86-64 -rt
+>>> should be not necessary for arm64 right now. Reenabling interrupt is
+>>> still
+>>> the preferred approach.
+>>>
+>>> Since x86-64 has per-CPU IST exception stack, so preemption has to be
+>>> disabled all the time. However, it is not applicable to other
+>>> architectures
+>>> for now, including arm64.
+>>
+>> Actually, we grew support for a separate IRQ stack in the recent merge
+>> window. Does that change things here, or are you referring to something
+>> else?
+>
+> Had a quick look at the patches, it looks the irq stack is not nestable
+> and it switches back to the original stack as long as irq handler is
+> done before preempt happens. So, it sounds it won't change things here.
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- arch/arm/boot/dts/rk3288-firefly.dtsi   | 33 ++++++++++++++++----------------
- arch/arm/boot/dts/rk3288-popmetal.dts   | 34 +++++++++++++++++----------------
- arch/arm/boot/dts/rk3288-rock2-som.dtsi | 34 +++++++++++++++++----------------
- arch/arm/boot/dts/rk3288-veyron.dtsi    | 28 ++++++++++++++-------------
- 4 files changed, 68 insertions(+), 61 deletions(-)
 
-diff --git a/arch/arm/boot/dts/rk3288-firefly.dtsi b/arch/arm/boot/dts/rk3288-firefly.dtsi
-index 49ec20d..f219389 100644
---- a/arch/arm/boot/dts/rk3288-firefly.dtsi
-+++ b/arch/arm/boot/dts/rk3288-firefly.dtsi
-@@ -63,22 +63,6 @@
- 		clock-output-names = "ext_gmac";
- 	};
- 
--	io_domains: io-domains {
--		compatible = "rockchip,rk3288-io-voltage-domain";
--		rockchip,grf = <&grf>;
--
--		audio-supply = <&vcca_33>;
--		bb-supply = <&vcc_io>;
--		dvp-supply = <&dovdd_1v8>;
--		flash0-supply = <&vcc_flash>;
--		flash1-supply = <&vcc_lan>;
--		gpio30-supply = <&vcc_io>;
--		gpio1830-supply = <&vcc_io>;
--		lcdc-supply = <&vcc_io>;
--		sdcard-supply = <&vccio_sd>;
--		wifi-supply = <&vccio_wl>;
--	};
--
- 	ir: ir-receiver {
- 		compatible = "gpio-ir-receiver";
- 		pinctrl-names = "default";
-@@ -237,6 +221,23 @@
- 	status = "ok";
- };
- 
-+&grf {
-+	io_domains: io-domains {
-+		compatible = "rockchip,rk3288-io-voltage-domain";
-+
-+		audio-supply = <&vcca_33>;
-+		bb-supply = <&vcc_io>;
-+		dvp-supply = <&dovdd_1v8>;
-+		flash0-supply = <&vcc_flash>;
-+		flash1-supply = <&vcc_lan>;
-+		gpio30-supply = <&vcc_io>;
-+		gpio1830-supply = <&vcc_io>;
-+		lcdc-supply = <&vcc_io>;
-+		sdcard-supply = <&vccio_sd>;
-+		wifi-supply = <&vccio_wl>;
-+	};
-+};
-+
- &hdmi {
- 	ddc-i2c-bus = <&i2c5>;
- 	status = "okay";
-diff --git a/arch/arm/boot/dts/rk3288-popmetal.dts b/arch/arm/boot/dts/rk3288-popmetal.dts
-index 65c4756..4d434f7 100644
---- a/arch/arm/boot/dts/rk3288-popmetal.dts
-+++ b/arch/arm/boot/dts/rk3288-popmetal.dts
-@@ -79,22 +79,6 @@
- 		};
- 	};
- 
--	io_domains: io-domains {
--		compatible = "rockchip,rk3288-io-voltage-domain";
--		rockchip,grf = <&grf>;
--
--		audio-supply = <&vcca_33>;
--		bb-supply = <&vcc_io>;
--		dvp-supply = <&vcc18_dvp>;
--		flash0-supply = <&vcc_flash>;
--		flash1-supply = <&vcc_lan>;
--		gpio30-supply = <&vcc_io>;
--		gpio1830-supply = <&vcc_io>;
--		lcdc-supply = <&vcc_io>;
--		sdcard-supply = <&vccio_sd>;
--		wifi-supply = <&vccio_wl>;
--	};
--
- 	ir: ir-receiver {
- 		compatible = "gpio-ir-receiver";
- 		gpios = <&gpio0 6 GPIO_ACTIVE_LOW>;
-@@ -205,6 +189,24 @@
- 	status = "ok";
- };
- 
-+&grf {
-+	io_domains: io-domains {
-+		compatible = "rockchip,rk3288-io-voltage-domain";
-+		rockchip,grf = <&grf>;
-+
-+		audio-supply = <&vcca_33>;
-+		bb-supply = <&vcc_io>;
-+		dvp-supply = <&vcc18_dvp>;
-+		flash0-supply = <&vcc_flash>;
-+		flash1-supply = <&vcc_lan>;
-+		gpio30-supply = <&vcc_io>;
-+		gpio1830-supply = <&vcc_io>;
-+		lcdc-supply = <&vcc_io>;
-+		sdcard-supply = <&vccio_sd>;
-+		wifi-supply = <&vccio_wl>;
-+	};
-+};
-+
- &hdmi {
- 	ddc-i2c-bus = <&i2c5>;
- 	status = "okay";
-diff --git a/arch/arm/boot/dts/rk3288-rock2-som.dtsi b/arch/arm/boot/dts/rk3288-rock2-som.dtsi
-index e1ee9f9..8660b8a 100644
---- a/arch/arm/boot/dts/rk3288-rock2-som.dtsi
-+++ b/arch/arm/boot/dts/rk3288-rock2-som.dtsi
-@@ -61,22 +61,6 @@
- 		clock-output-names = "ext_gmac";
- 	};
- 
--	io_domains: io-domains {
--		compatible = "rockchip,rk3288-io-voltage-domain";
--		rockchip,grf = <&grf>;
--
--		audio-supply = <&vcc_io>;
--		bb-supply = <&vcc_io>;
--		dvp-supply = <&vcc_18>;
--		flash0-supply = <&vcc_flash>;
--		flash1-supply = <&vccio_pmu>;
--		gpio30-supply = <&vccio_pmu>;
--		gpio1830 = <&vcc_io>;
--		lcdc-supply = <&vcc_io>;
--		sdcard-supply = <&vccio_sd>;
--		wifi-supply = <&vcc_18>;
--	};
--
- 	vcc_flash: flash-regulator {
- 		compatible = "regulator-fixed";
- 		regulator-name = "vcc_sys";
-@@ -129,6 +113,24 @@
- 	tx_delay = <0x30>;
- };
- 
-+&grf {
-+	io_domains: io-domains {
-+		compatible = "rockchip,rk3288-io-voltage-domain";
-+		rockchip,grf = <&grf>;
-+
-+		audio-supply = <&vcc_io>;
-+		bb-supply = <&vcc_io>;
-+		dvp-supply = <&vcc_18>;
-+		flash0-supply = <&vcc_flash>;
-+		flash1-supply = <&vccio_pmu>;
-+		gpio30-supply = <&vccio_pmu>;
-+		gpio1830 = <&vcc_io>;
-+		lcdc-supply = <&vcc_io>;
-+		sdcard-supply = <&vccio_sd>;
-+		wifi-supply = <&vcc_18>;
-+	};
-+};
-+
- &i2c0 {
- 	status = "okay";
- 
-diff --git a/arch/arm/boot/dts/rk3288-veyron.dtsi b/arch/arm/boot/dts/rk3288-veyron.dtsi
-index 0a43e21..fd55697 100644
---- a/arch/arm/boot/dts/rk3288-veyron.dtsi
-+++ b/arch/arm/boot/dts/rk3288-veyron.dtsi
-@@ -83,19 +83,6 @@
- 		reset-gpios = <&gpio2 9 GPIO_ACTIVE_HIGH>;
- 	};
- 
--	io_domains: io-domains {
--		compatible = "rockchip,rk3288-io-voltage-domain";
--		rockchip,grf = <&grf>;
--
--		bb-supply = <&vcc33_io>;
--		dvp-supply = <&vcc_18>;
--		flash0-supply = <&vcc18_flashio>;
--		gpio1830-supply = <&vcc33_io>;
--		gpio30-supply = <&vcc33_io>;
--		lcdc-supply = <&vcc33_lcd>;
--		wifi-supply = <&vcc18_wl>;
--	};
--
- 	sdio_pwrseq: sdio-pwrseq {
- 		compatible = "mmc-pwrseq-simple";
- 		clocks = <&rk808 RK808_CLKOUT1>;
-@@ -159,6 +146,21 @@
- 	pinctrl-0 = <&emmc_clk &emmc_cmd &emmc_bus8>;
- };
- 
-+&grf {
-+	io_domains: io-domains {
-+		compatible = "rockchip,rk3288-io-voltage-domain";
-+		rockchip,grf = <&grf>;
-+
-+		bb-supply = <&vcc33_io>;
-+		dvp-supply = <&vcc_18>;
-+		flash0-supply = <&vcc18_flashio>;
-+		gpio1830-supply = <&vcc33_io>;
-+		gpio30-supply = <&vcc33_io>;
-+		lcdc-supply = <&vcc33_lcd>;
-+		wifi-supply = <&vcc18_wl>;
-+	};
-+};
-+
- &hdmi {
- 	ddc-i2c-bus = <&i2c5>;
- 	status = "okay";
--- 
-2.6.4
+Just had a quick test on 4.5-rc1. It survives with kgdbts, ptrace and 
+ltp. So, it sounds safe with the "separate IRQ stack" change.
+
+Thanks,
+Yang
+
+>
+> Thanks.,
+> Yang
+>
+>>
+>> Will
+>>
+>
