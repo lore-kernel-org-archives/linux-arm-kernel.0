@@ -1,37 +1,53 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 05 Feb 2016 15:30:19 +0100
-Subject: [PATCH V2 6/6] coresight-stm: adding driver for CoreSight STM
- component
-In-Reply-To: <87h9hn5msz.fsf@ashishki-desk.ger.corp.intel.com>
-References: <1454487337-30184-1-git-send-email-zhang.chunyan@linaro.org>
- <1454487337-30184-7-git-send-email-zhang.chunyan@linaro.org>
- <87h9hn5msz.fsf@ashishki-desk.ger.corp.intel.com>
-Message-ID: <1481791.6NqBhgWcKU@wuerfel>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 5 Feb 2016 15:33:28 +0100
+Subject: [PATCH v2 1/2] regulator: Add coupled regulator
+In-Reply-To: <20160121162802.GL6588@sirena.org.uk>
+References: <1452605842-9317-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1452605842-9317-2-git-send-email-maxime.ripard@free-electrons.com>
+ <20160112143100.GA14628@rob-hp-laptop>
+ <20160115085734.GG4581@lukather>
+ <20160117000434.GB7774@rob-hp-laptop>
+ <20160118162538.GH6588@sirena.org.uk>
+ <20160121154649.GE3997@lukather>
+ <20160121162802.GL6588@sirena.org.uk>
+Message-ID: <20160205143328.GD31506@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 05 February 2016 15:06:20 Alexander Shishkin wrote:
-> Chunyan Zhang <zhang.chunyan@linaro.org> writes:
+Hi Mark,
+
+On Thu, Jan 21, 2016 at 04:28:02PM +0000, Mark Brown wrote:
+> On Thu, Jan 21, 2016 at 04:46:49PM +0100, Maxime Ripard wrote:
 > 
-> > +#ifndef CONFIG_64BIT
-> > +static inline void __raw_writeq(u64 val, volatile void __iomem *addr)
-> > +{
-> > +     asm volatile("strd %1, %0"
-> > +                  : "+Qo" (*(volatile u64 __force *)addr)
-> > +                  : "r" (val));
-> > +}
+> > I guess a separate driver would make it easier to deal with cases like
+> > the one you suggested (shutting down when the load is going to be
+> > lower). I don't see how we could have a good DT representation of that
+> > if we're going to use lists.
 > 
-> Is it really ok to do this for all !64bit arms, inside a driver, just
-> like that? I'm not an expert, but I'm pretty sure there's more to it.
+> We can have a driver regardless of what the DT looks like, it's a
+> question of how things get instantiated.
+> 
+> > Anyway, I'm fine with both approaches, just let me know what you
+> > prefer.
+> 
+> Without seeing an implementation of the lists it's hard to say.
 
-It's normally device dependent whether this works or not, on 32-bit
-architectures, a 64-bit access to an I/O bus tends to get split into
-two 32 bit accesses and the order might not be the as what was
-intended.
+Just to make sure we're on the same page: you want to keep the
+regulator, but instead of giving the parent through vinX-supplies
+properties, you want to have a single *-supply property, with a list
+of regulators, right?
 
-We have functions in include/linux/io-64-nonatomic-hi-lo.h
-and include/linux/io-64-nonatomic-lo-hi.h that are meant to
-do this right. Maybe the driver can be changed to use whichever
-one is correct for it.
+Thanks!
+Maxime
 
-	Arnd
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160205/72f96a81/attachment.sig>
