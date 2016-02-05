@@ -1,34 +1,60 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Fri, 5 Feb 2016 12:42:30 -0800
-Subject: [PATCH v5sub2 0/8] arm64: implement virtual KASLR
-In-Reply-To: <CAKv+Gu_v1sXM7sivz+Uu86ZG3=Th7wqqh7M1N8wF7Ess4NdTZQ@mail.gmail.com>
-References: <1454332178-4414-1-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu-AhLcatkDsQVeoFGJ+pTEwaW1Hy9M-fY1-VWvRc_E47w@mail.gmail.com>
- <20160205173248.GJ6076@e104818-lin.cambridge.arm.com>
- <CAKv+Gu_v1sXM7sivz+Uu86ZG3=Th7wqqh7M1N8wF7Ess4NdTZQ@mail.gmail.com>
-Message-ID: <CAGXu5j+JpwRrVy1b_h+LJ4sCzsT7BV9RdcD0CvR-4aVJQhCpvg@mail.gmail.com>
+From: yang.shi@linaro.org (Shi, Yang)
+Date: Fri, 5 Feb 2016 12:45:25 -0800
+Subject: [PATCH] PCI: layerscape: add ls2085a compatible
+In-Reply-To: <20160205203858.GA11780@localhost>
+References: <1453915925-19198-1-git-send-email-yang.shi@linaro.org>
+ <20160205203858.GA11780@localhost>
+Message-ID: <56B509E5.2050602@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 5, 2016 at 9:38 AM, Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> On 5 February 2016 at 18:32, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> I'm still trying to get my head around how we merge those. Since I
->> assume akpm will push them during the merging window, part of your code
->> cannot be tested before.
+On 2/5/2016 12:38 PM, Bjorn Helgaas wrote:
+> [+cc Rob, et al]
 >
-> Actually, my original idea was for akpm to take them as a late merge
-> after rebasing to -rc1, since they touch a variety of architectures,
-> but I am not sure if that came across.
+> On Wed, Jan 27, 2016 at 09:32:05AM -0800, Yang Shi wrote:
+>> The layerscape PCI host driver needs recognize ls2085a compatible when using
+>> firmware with ls2085a compatible property, otherwise the PCI bus won't be
+>> detected even though ls2085a compatible is included by the dts.
+>>
+>> Signed-off-by: Yang Shi <yang.shi@linaro.org>
+>> ---
+>>   drivers/pci/host/pci-layerscape.c | 1 +
+>>   1 file changed, 1 insertion(+)
+>>
+>> diff --git a/drivers/pci/host/pci-layerscape.c b/drivers/pci/host/pci-layerscape.c
+>> index 3923bed..c40d8b2 100644
+>> --- a/drivers/pci/host/pci-layerscape.c
+>> +++ b/drivers/pci/host/pci-layerscape.c
+>> @@ -203,6 +203,7 @@ static const struct of_device_id ls_pcie_of_match[] = {
+>>   	{ .compatible = "fsl,ls1021a-pcie", .data = &ls1021_drvdata },
+>>   	{ .compatible = "fsl,ls1043a-pcie", .data = &ls1043_drvdata },
+>>   	{ .compatible = "fsl,ls2080a-pcie", .data = &ls2080_drvdata },
+>> +	{ .compatible = "fsl,ls2085a-pcie", .data = &ls2080_drvdata },
 >
-> You could always take the series through your tree instead, I guess?
+> Hmm, "fsl,ls2085a-pcie" doesn't appear in
+> Documentation/devicetree/bindings/pci/.
+>
+> Aren't we supposed to add these strings to the bindings before or at
+> the same time we add them to drivers?
 
-Traditionally akpm will de-duplicate patches he's carrying that appear
-in another tree. I think it should be okay to carry them in both
-places. (Though I'm CCing akpm just to see if I'm talking crazy.)
+The below patch will add it into dts and binding doc. I should mentioned 
+this in the commit log.
 
--Kees
+https://patchwork.kernel.org/patch/7767061/
 
--- 
-Kees Cook
-Chrome OS & Brillo Security
+Thanks,
+Yang
+
+>
+> checkpatch doesn't complain though, so maybe I'm wrong about this.
+>
+>>   	{ },
+>>   };
+>>   MODULE_DEVICE_TABLE(of, ls_pcie_of_match);
+>> --
+>> 2.0.2
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
