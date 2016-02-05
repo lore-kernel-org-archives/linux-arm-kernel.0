@@ -1,48 +1,32 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 5 Feb 2016 09:47:40 +0000
-Subject: [PATCH v7 5/5] PCI: ACPI: Add a generic ACPI based host controller
-In-Reply-To: <CAKc_7PXYtFt1MQE-UGO0O5vvQ+xFKa2b5=F8wXB=EN-JUJVzZw@mail.gmail.com>
-References: <1454058340-7904-1-git-send-email-jchandra@broadcom.com>
- <1454058340-7904-6-git-send-email-jchandra@broadcom.com>
- <20160205001907.GJ7031@localhost>
- <CAKc_7PXYtFt1MQE-UGO0O5vvQ+xFKa2b5=F8wXB=EN-JUJVzZw@mail.gmail.com>
-Message-ID: <20160205094740.GA31547@red-moon>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 5 Feb 2016 10:46:51 +0100
+Subject: [PATCH v3 3/5] pinctrl: sunxi: Add H3 R_PIO controller support
+In-Reply-To: <1454542430-16572-4-git-send-email-k@japko.eu>
+References: <1454542430-16572-1-git-send-email-k@japko.eu>
+ <1454542430-16572-4-git-send-email-k@japko.eu>
+Message-ID: <20160205094651.GG1139@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 05, 2016 at 02:05:37PM +0530, Jayachandran Chandrashekaran Nair wrote:
+On Thu, Feb 04, 2016 at 12:33:48AM +0100, Krzysztof Adamski wrote:
+> H3 has additional PIO controller similar to what we can find on A23.
+> It's a 12 pin port, described in H3 Datasheet rev 1.1, pages 345-350.
+> 
+> Signed-off-by: Krzysztof Adamski <k@japko.eu>
 
-[...]
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-> pci_host_acpi.c is a generic implementation of these using a sysdata
-> pointing to acpi_pci_root_info, and using a pointer to the pci_mmcfg_region
-> to access ECAM area, Maybe I can rename this file to
-> pci_acpi_host_generic.c to reflect this better.
+Thanks!
+Maxime
 
-Maybe you should stop sending this series and work with Tomasz to
-get this done, you are confusing everyone and I am really really
-annoyed about this.
-
-Do you realize there is no point in having two patch series doing
-the same thing and wasting everyone's review time ?
-
-Do you realize he started this work long before you and went through
-several rounds of review already (I told you before but in case you
-forgot) ?
-
-Tomasz posted a version yesterday, integrating comments following months
-of review and testing and I think it is ready to get upstream:
-
-https://lkml.org/lkml/2016/2/4/646
-
-Did you even consider reviewing his code or helping him instead of
-churning out more patches doing the *SAME* thing ?
-
-Do you want all of us to go through your code and re-fix what has
-already been fixed in Tomasz's series with the end result of missing
-yet another merge window ?
-
-This is really annoying, stop it please, really.
-
-Thank you,
-Lorenzo
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160205/31e319eb/attachment-0001.sig>
