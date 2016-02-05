@@ -1,52 +1,52 @@
-From: shameerali.kolothum.thodi@huawei.com (Shameerali Kolothum Thodi)
-Date: Fri, 5 Feb 2016 15:33:55 +0000
-Subject: [QUESTION ]ARM64 external L3 cache support in topology info
-In-Reply-To: <56B4B1FA.5030309@arm.com>
-References: <5FC3163CFD30C246ABAA99954A238FA8172E13A4@lhreml504-mbs>
- <56B4B1FA.5030309@arm.com>
-Message-ID: <5FC3163CFD30C246ABAA99954A238FA8172E1638@lhreml504-mbs>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 5 Feb 2016 15:34:54 +0000
+Subject: [PATCH v2] clocksource/arm_arch_timer: Enable and verify MMIO
+ access
+In-Reply-To: <56B4C072.3040409@linaro.org>
+References: <71bf617f4083b116b2aeab24f13fc5fed99a816f.1454327031.git.robin.murphy@arm.com>
+ <20160201195816.GL4848@codeaurora.org> <56B4BFC8.6050201@arm.com>
+ <56B4C072.3040409@linaro.org>
+Message-ID: <56B4C11E.1040702@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 05/02/16 15:32, Daniel Lezcano wrote:
+> On 02/05/2016 04:29 PM, Robin Murphy wrote:
+>> On 01/02/16 19:58, Stephen Boyd wrote:
+>>> On 02/01, Robin Murphy wrote:
+>>>> So far, we have been blindly assuming that having access to a
+>>>> memory-mapped timer frame implies that the individual elements of that
+>>>> frame frame are already enabled. Whilst it's the firmware's job to give
+>>>> us non-secure access to frames in the first place, we should not rely
+>>>> on implementations always being generous enough to also configure
+>>>> CNTACR
+>>>> for those non-secure frames (e.g. [1]).
+>>>>
+>>>> Explicitly enable feature-level access per-frame, and verify that the
+>>>> access we want is really implemented before trying to make use of it.
+>>>>
+>>>> [1]:https://github.com/ARM-software/tf-issues/issues/170
+>>>>
+>>>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>>>> ---
+>>>
+>>> Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+>>> Tested-by: Stephen Boyd <sboyd@codeaurora.org>
+>>
+>> Great, thanks!
+>>
+>> Daniel, am I right in hoping this is something you'll pick up, or should
+>> I be resending it to arm-soc?
+>
+> I will be reviewing timers patches next week. I will take care of this one.
 
+Cool, thanks for the confirmation.
 
-> -----Original Message-----
-> From: Sudeep Holla [mailto:sudeep.holla at arm.com]
-> Sent: Friday, February 05, 2016 2:30 PM
-> To: Shameerali Kolothum Thodi; linux-arm-kernel at lists.infradead.org
-> Cc: Sudeep Holla
-> Subject: Re: [QUESTION ]ARM64 external L3 cache support in topology
-> info
-> 
-> [..]
-> 
-> >
-> > In our case, the L3 cache seems to be intelligent enough and doesn't
-> > require any additional maintenance ops. So there is no cache-
-> controller
-> > code for this. I am just wondering what's the best way to add this L3
-> > cache info to the topology. Overriding the CLIDR register, if there
-> is
-> > a next-level-cache entry in the dts and then retrieve the cache
-> geometry
-> > either from dts or from cache specific registers( but this will be
-> > implementation specific) ? Or am I missing something here?
-> >
-> 
-> Recent discussion on this [1] made it clear that we need to support
-> overriding cache properties using DT for some designs. I will consider
-> this "transparent" external/system level cache when I look into moving
-> PPC DT code in generic cacheinfo. I am not sure if it's OK to support
-> mixed information source for a platform(all internal caches via CLIDR
-> and external ones via DT), but we can pick up discussion once we I have
-> the patch.
+Robin.
 
-Ok. Will wait for that then. Thanks.
-
-> --
-> Regards,
-> Sudeep
-> 
-> [1]
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-
-> October/381758.html
+>
+> Thanks
+>    -- Daniel
+>
+>
+>
