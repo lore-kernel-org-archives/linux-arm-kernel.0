@@ -1,304 +1,58 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 5 Feb 2016 10:03:37 +0100
-Subject: [PATCH 11/11] arm64: dts: add Pine64 support
-In-Reply-To: <1454348370-3816-12-git-send-email-andre.przywara@arm.com>
-References: <1454348370-3816-1-git-send-email-andre.przywara@arm.com>
- <1454348370-3816-12-git-send-email-andre.przywara@arm.com>
-Message-ID: <20160205090337.GB1139@lukather>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 5 Feb 2016 10:05:45 +0100
+Subject: [PATCH v2 2/3] Input: rotary-encoder - move configuration data
+ to driver data
+In-Reply-To: <20160204211842.GA40137@dtor-ws>
+References: <1454408678-6011-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1454408678-6011-3-git-send-email-u.kleine-koenig@pengutronix.de>
+ <56B09CAB.5020600@zonque.org>
+ <20160203093527.GD13664@pengutronix.de>
+ <20160204211842.GA40137@dtor-ws>
+Message-ID: <20160205090545.GM13664@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello Dmitry,
 
-On Mon, Feb 01, 2016 at 05:39:30PM +0000, Andre Przywara wrote:
-> The Pine64 is a cost-efficient development board based on the
-> Allwinner A64 SoC.
-> There are three models: the basic version with Fast Ethernet and
-> 512 MB of DRAM (Pine64) and two Pine64+ versions, which both
-> feature Gigabit Ethernet and additional connectors for touchscreens
-> and a camera. Or as my son put it: "Those are smaller and these are
-> missing." ;-)
-> The two Pine64+ models just differ in the amount of DRAM
-> (1GB vs. 2GB). Since U-Boot will figure out the right size for us and
-> patches the DT accordingly we just need to provide one DT for the
-> Pine64+.
+On Thu, Feb 04, 2016 at 01:18:42PM -0800, Dmitry Torokhov wrote:
+> On Wed, Feb 03, 2016 at 10:35:27AM +0100, Uwe Kleine-K?nig wrote:
+> > Hello,
+> > 
+> > On Tue, Feb 02, 2016 at 01:10:19PM +0100, Daniel Mack wrote:
+> > > On 02/02/2016 11:24 AM, Uwe Kleine-K?nig wrote:
+> > > > This is a preparation for the next patche. There is no change in
+> > > > behaviour intended.
+> > > 
+> > > This one looks good to me, but it clashes with Dmitry's latest patch
+> > > sets (which I haven't found the time to test yet, sorry!).
+> > 
+> > There is nothing in next-20160203, so I assume Dmitry either fixes this
+> > up when applying my patches or tells me when I should rebase.
 > 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  .../devicetree/bindings/vendor-prefixes.txt        |  1 +
->  arch/arm64/boot/dts/Makefile                       |  1 +
->  arch/arm64/boot/dts/allwinner/Makefile             |  5 ++
->  arch/arm64/boot/dts/allwinner/pine64.dts           | 58 +++++++++++++++++
->  arch/arm64/boot/dts/allwinner/pine64_common.dtsi   | 76 ++++++++++++++++++++++
->  arch/arm64/boot/dts/allwinner/pine64_plus.dts      | 59 +++++++++++++++++
->  6 files changed, 200 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/allwinner/Makefile
->  create mode 100644 arch/arm64/boot/dts/allwinner/pine64.dts
->  create mode 100644 arch/arm64/boot/dts/allwinner/pine64_common.dtsi
->  create mode 100644 arch/arm64/boot/dts/allwinner/pine64_plus.dts
-> 
-> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> index 72e2c5a..0c22fa9 100644
-> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> @@ -175,6 +175,7 @@ parade	Parade Technologies Inc.
->  pericom	Pericom Technology Inc.
->  phytec	PHYTEC Messtechnik GmbH
->  picochip	Picochip Ltd
-> +pine64	Pine64
->  plathome	Plat'Home Co., Ltd.
->  plda	PLDA
->  pixcir  PIXCIR MICROELECTRONICS Co., Ltd
+> Please take a look at my rotary-encoder branch. I am waiting to merge it
+> into next until I can get some testers. If you have raumfild device that
+> would be awesome.
 
-Please make a separate patch for this one.
+I don't have a raumfeld device. I did a similar conversion and the only
+relevant difference is that I used
 
-> diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
-> index f832b8a..3b7428a 100644
-> --- a/arch/arm64/boot/dts/Makefile
-> +++ b/arch/arm64/boot/dts/Makefile
-> @@ -1,3 +1,4 @@
-> +dts-dirs += allwinner
+	.dev_id = "rotary_encoder.0",
 
-Could you also add a patch to add this path to MAINTAINERS too?
+while you used
 
->  dts-dirs += altera
->  dts-dirs += amd
->  dts-dirs += apm
-> diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
-> new file mode 100644
-> index 0000000..65f4e24
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/allwinner/Makefile
-> @@ -0,0 +1,5 @@
-> +dtb-$(CONFIG_ARCH_SUNXI) += pine64_plus.dtb pine64.dtb
-> +
-> +always		:= $(dtb-y)
-> +subdir-y	:= $(dts-dirs)
-> +clean-files	:= *.dtb
-> diff --git a/arch/arm64/boot/dts/allwinner/pine64.dts b/arch/arm64/boot/dts/allwinner/pine64.dts
-> new file mode 100644
-> index 0000000..ebea5dd
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/allwinner/pine64.dts
-> @@ -0,0 +1,58 @@
-> +/*
-> + * Copyright (c) 2016 ARM Ltd.
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This library is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This library is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "pine64_common.dtsi"
-> +
-> +/ {
-> +	model = "Pine64";
-> +	compatible = "pine64,pine64", "allwinner,a64", "allwinner,sunxi";
-> +
-> +	chosen {
-> +		stdout-path = "serial0:115200n8";
-> +	};
-> +
-> +	memory {
-> +		reg = <0x40000000 0x20000000>;
-> +	};
-> +};
-> diff --git a/arch/arm64/boot/dts/allwinner/pine64_common.dtsi b/arch/arm64/boot/dts/allwinner/pine64_common.dtsi
-> new file mode 100644
-> index 0000000..d968d76
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/allwinner/pine64_common.dtsi
-> @@ -0,0 +1,76 @@
-> +/*
-> + * Copyright (c) 2016 ARM Ltd.
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This library is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This library is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +#include "a64.dtsi"
-> +
-> +&mmc0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&mmc0_pins>, <&mmc0_default_cd_pin>;
-> +	vmmc-supply = <&reg_vcc3v3>;
-> +	cd-gpios = <&pio 5 6 0>;
-> +	cd-inverted;
-> +	status = "okay";
-> +};
-> +
-> +&uart0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&uart0_pins_a>;
-> +	status = "okay";
-> +};
-> +
-> +&uart2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&uart2_pins>;
-> +	status = "okay";
-> +};
-> +
-> +&uart3 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&uart3_pins_a>;
-> +	status = "okay";
-> +};
-> +
-> +&uart4 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&uart4_pins>;
-> +	status = "okay";
-> +};
+	.dev_id = "rotary-encoder",
 
-Our policy for boards with "open" pin headers the user can plug
-anything he wants is that unless the pin is explicitly dedicated to
-that usage, we simply leave them aside so that we don't enforce
-anything.
+in raumfeld_rotary_gpios_table.
+I think a mixture of these is the right thing, i.e.
 
->From the quick look at the schematics, I guess only the UART0 on the
-10-pin expansion header is elligible.
+	.dev_id = "rotary-encoder.0",
 
-> diff --git a/arch/arm64/boot/dts/allwinner/pine64_plus.dts b/arch/arm64/boot/dts/allwinner/pine64_plus.dts
-> new file mode 100644
-> index 0000000..344752e
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/allwinner/pine64_plus.dts
-> @@ -0,0 +1,59 @@
-> +/*
-> + * Copyright (c) 2016 ARM Ltd.
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This library is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This library is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "pine64_common.dtsi"
-> +
-> +/ {
-> +	model = "Pine64+";
-> +	compatible = "pine64,pine64_plus", "allwinner,a64", "allwinner,sunxi";
+Your series obsoletes my first two patches, so I will port my third
+patch on top of your branch and retest there.
 
-The usual separator in the compatibles is a dash and not an underscore.
-
-Thanks!
-Maxime
+Best regards
+Uwe
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160205/232729b4/attachment.sig>
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
