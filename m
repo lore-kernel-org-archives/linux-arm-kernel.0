@@ -1,70 +1,69 @@
-From: yang.shi@linaro.org (Shi, Yang)
-Date: Fri, 5 Feb 2016 13:25:47 -0800
-Subject: [PATCH] arm64: reenable interrupt when handling ptrace breakpoint
-In-Reply-To: <56969312.7070309@linaro.org>
-References: <1450225088-2456-1-git-send-email-yang.shi@linaro.org>
- <20151216111316.GD4308@arm.com> <5671CD5B.9030907@linaro.org>
- <20151221104818.GF23092@arm.com> <alpine.DEB.2.11.1512211749180.28591@nanos>
- <20151221170028.GT23092@arm.com> <56955B3A.5010303@linaro.org>
- <20160113102622.GC25458@arm.com> <569686BA.6050703@linaro.org>
- <20160113172303.GH25458@arm.com> <56969312.7070309@linaro.org>
-Message-ID: <56B5135B.3050801@linaro.org>
+From: keescook@chromium.org (Kees Cook)
+Date: Fri, 5 Feb 2016 13:48:38 -0800
+Subject: [PATCH v2] ARM: mm: flip priority of CONFIG_DEBUG_RODATA
+In-Reply-To: <20160104220743.GP19062@n2100.arm.linux.org.uk>
+References: <20151202202725.GA794@www.outflux.net>
+ <20151223195129.GP2793@atomide.com> <567B04AB.6010906@redhat.com>
+ <20151223212911.GR2793@atomide.com>
+ <alpine.LFD.2.20.1512231637110.3603@knanqh.ubzr>
+ <20151224001121.GS2793@atomide.com>
+ <20151224003406.GA8644@n2100.arm.linux.org.uk>
+ <CAGXu5j+MrX-OvnVTYH0hqF2XgZW10PQOviyN=e5heejLsXewVA@mail.gmail.com>
+ <20160104220743.GP19062@n2100.arm.linux.org.uk>
+Message-ID: <CAGXu5jJTOZL5yQfj5KuRjVO00mnNL3yd=7ONacYK96yLAOtgKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/13/2016 10:10 AM, Shi, Yang wrote:
-> On 1/13/2016 9:23 AM, Will Deacon wrote:
->> On Wed, Jan 13, 2016 at 09:17:46AM -0800, Shi, Yang wrote:
->>> On 1/13/2016 2:26 AM, Will Deacon wrote:
->>>> On Tue, Jan 12, 2016 at 11:59:54AM -0800, Shi, Yang wrote:
->>>>> This might be buried in email storm during the holiday. Just want
->>>>> to double
->>>>> check the status. I'm supposed there is no objection for getting it
->>>>> merged
->>>>> in upstream?
->>>>
->>>> Sorry, when you replied with:
->>>>
->>>>> I think we could just extend the "signal delay send" approach from
->>>>> x86-64
->>>>> to arm64, which is currently used by x86-64 on -rt kernel only.
->>>>
->>>> I understood that you were going to fix -rt, so I dropped this pending
->>>> anything more from you.
->>>>
->>>> What's the plan?
->>>
->>> Sorry for the confusion. The "signal delay send" approach used by
->>> x86-64 -rt
->>> should be not necessary for arm64 right now. Reenabling interrupt is
->>> still
->>> the preferred approach.
->>>
->>> Since x86-64 has per-CPU IST exception stack, so preemption has to be
->>> disabled all the time. However, it is not applicable to other
->>> architectures
->>> for now, including arm64.
+On Mon, Jan 4, 2016 at 2:07 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Jan 04, 2016 at 12:34:28PM -0800, Kees Cook wrote:
+>> On Wed, Dec 23, 2015 at 4:34 PM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > On Wed, Dec 23, 2015 at 04:11:22PM -0800, Tony Lindgren wrote:
+>> >> * Nicolas Pitre <nicolas.pitre@linaro.org> [151223 13:45]:
+>> >> > We fixed a bunch of similar issues where code was located in the .data
+>> >> > section for ease of use from assembly code.  See commit b4e61537 and
+>> >> > d0776aff for example.
+>> >>
+>> >> Thanks hey some assembly fun for the holidays :) I also need to check what
+>> >> all gets relocated to SRAM here.
+>> >>
+>> >> In any case, seems like the $subject patch is too intrusive for v4.5 at
+>> >> this point.
+>> >
+>> > Given Christmas and an unknown time between that and the merge window
+>> > actually opening, I decided Tuesday would be the last day I take any
+>> > patches into my tree - and today would be the day that I drop anything
+>> > that causes problems.
+>> >
+>> > So, I've already dropped this, so tomorrow's linux-next should not have
+>> > this change.
+>> >
+>> > You'll still see breakage if people enable RODATA though, but that's no
+>> > different from previous kernels.
 >>
->> Actually, we grew support for a separate IRQ stack in the recent merge
->> window. Does that change things here, or are you referring to something
->> else?
->
-> Had a quick look at the patches, it looks the irq stack is not nestable
-> and it switches back to the original stack as long as irq handler is
-> done before preempt happens. So, it sounds it won't change things here.
-
-
-Just had a quick test on 4.5-rc1. It survives with kgdbts, ptrace and 
-ltp. So, it sounds safe with the "separate IRQ stack" change.
-
-Thanks,
-Yang
-
->
-> Thanks.,
-> Yang
->
+>> Ugh, sorry for the breakage.
 >>
->> Will
->>
+>> Should this patch stay as-is and people will fix their various RODATA
+>> failures during the next devel window, or should I remove the "default
+>> y if CPU_V7"?
 >
+> I think we'll keep it as-is, and have another go with it at -rc1 time,
+> when people have ample chance to then queue up fixes.
+>
+> They'll have had notice of it, so there's no excuse folk can't work on
+> the problem in the mean time.  (But, of course, they won't...)
+
+Hi,
+
+Just checking on this -- I resent it to the patch tracker at -rc1
+time. Is this waiting for the other fixes to land first, or is there
+something I should be doing?
+
+Thanks!
+
+-Kees
+
+-- 
+Kees Cook
+Chrome OS & Brillo Security
