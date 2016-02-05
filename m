@@ -1,73 +1,93 @@
-From: fijam@archlinux.us (JM)
-Date: Fri, 5 Feb 2016 16:00:49 +0100
-Subject: marvell_cesa fails to register on kirkwood (88F6282)
-In-Reply-To: <20160205112907.796afb05@bbrezillon>
-References: <CAKzmTe0mvZD5UwqM47uXbM7Z7oAJpE4g4BVMba1hkzqNu+Zbgw@mail.gmail.com>
- <20160205090246.GE32272@lunn.ch> <20160205112907.796afb05@bbrezillon>
-Message-ID: <CAKzmTe20fT8BcRaDaf2gz92KMAK0kEUkaD-kPq_cPF1WKBdroA@mail.gmail.com>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Fri, 05 Feb 2016 17:05:58 +0200
+Subject: Common/typical fractional divider HW API
+In-Reply-To: <56B4B67D.2080707@free.fr>
+References: <56B4B67D.2080707@free.fr>
+Message-ID: <1454684758.31169.77.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 5, 2016 at 11:29 AM, Boris Brezillon
-<boris.brezillon@free-electrons.com> wrote:
-> Jan, Andrew
->
-> On Fri, 5 Feb 2016 10:02:46 +0100
-> Andrew Lunn <andrew@lunn.ch> wrote:
->
->> On Fri, Feb 05, 2016 at 06:01:18AM +0100, JM wrote:
->> > Hi,
->> >
->> > I am testing marvell_cesa on a kirkwood device (QNAP TS-212p, Marvell
->> > Kirkwood 88F6282, dts: http://pastebin.com/Gk95KFHf ).
->> > As of kernel 4.4 (4.4.0-trunk-kirkwood #1 Debian 4.4-1~exp1) it fails
->> > in the following way:
->> >
->> > modprobe marvell_cesa allhwsupport=1
->> > dmesg | tail -n 1
->> > [ 1057.855091] marvell-cesa: probe of f1030000.crypto failed with error -12
->> >
->> > or:
->> >
->> > modprobe marvell_cesa
->> > dmesg | tail -n 1
->> > [ 9178.399357] marvell-cesa: probe of f1030000.crypto failed with error -524
->> >
->> > With kernel 4.3 it would fail with error -22 on that hardware. There
->> > are scattered reports from other users experiencing the same issue
->> > (1,2,3)
->> >
->> > I wonder if this is a result of an invalid definition of the
->> > crypto-sram in the dts of this SoC, or perhaps some other problem
->> > (PEBKAC included).
->>
->> Hi Jan
->>
->> Do you have SRAM enabled in your kernel configuration. The
->> mvebu_v5_defconfig does not have it, which is a bug really.
->
-> Hm, the CRYPTO_DEV_MARVELL_CESA option selects the SRAM one [1].
-> Anyway, I also think this error is related to the SRAM (not sure why the
-> driver is not able to get the SRAM though).
->
-> Best Regards,
->
-> Boris
->
-> [1]http://lxr.free-electrons.com/source/drivers/crypto/Kconfig#L168
->
->
-> --
-> Boris Brezillon, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+On Fri, 2016-02-05 at 15:49 +0100, Mason wrote:
+> Hello,
+> 
+> AFAICT, the clk-fractional-divider driver implements the following
+> hardware API:
+> 
+> ? M and N are two fields in the same register.
+> ? DIV = M / N
+> 
+> Is this HW API common/typical in the embedded world?
+> in the PC world?
+> 
 
-Hi,
+At least all new Intel SoCs have it, besides that there is one more
+user of the struct clk_fractional_divider, but I have no idea if they
+have something similar to this.
 
-Thanks for getting back to me. Indeed, CONFIG_SRAM is enabled, I put
-the complete .config here: http://pastebin.com/40eKMJqE
+> 
+> My hardware uses a slightly weird (to me) API:
+> 
+> ? I = 0-255 (8 bits)
+> ? F = 0-15??(4 bits)
 
-If there is anything I can do to help squish this bug, please let me know.
+This part is okay.
 
-Best regards,
-Jan
+> 
+> ? I = 0 => DIV = +INF
+
+On Intel we recognize this as an absence of the divider.
+
+> ? I = 1 => DIV = 1 + F/(32-F)
+
+Weird part, indeed. But seems it doubles a precision in a range
+[1 .. 1 + 1/2]
+
+> ? I > 1 => DIV = I + F/16
+
+This just normal operation.
+
+> 
+> Is this HW API common/typical in the embedded world?
+> (Perhaps just the linear part for I > 1)
+
+I saw similar approach in few UART drivers, but they do not use CLK
+framework.
+
+So, I could consider this one is more popular / wider, than what we
+have in Intel SoCs.
+
+> 
+> I see two downsides to this API:
+> 
+> 1) I = 1 is a special case
+
+> 2) A lot of the value space is wasted on large values.
+> 
+> For example, when I = 250, we don't really care about 250.0625,
+> 250.125,
+> etc, or even nearby integer values, for that matter.
+> 
+> I think it's better to have a distribution with high density in small
+> values, and low density in high values (sort of like floating point).
+> 
+> For example:
+> 
+> ? I = 0-15??(4 bits)
+> ? F = 0-255 (8 bits)
+> ? DIV = 2^I * (1 + F/256)
+> 
+> (We could probably even shave 2-4 bits on F.)
+> 
+> Are there downsides to this HW API?
+> Is this HW API common/typical in the embedded world?
+
+So, what is your intention? If you would like to use CLK framework you
+might consider existing providers and users and might implement a
+specific one for similar cases.
+
+Also it's possible to convert clock providers for, e.g., UARTs to use
+this kind of divider.
+
+-- 
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
