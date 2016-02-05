@@ -1,61 +1,48 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 5 Feb 2016 11:29:07 +0100
-Subject: marvell_cesa fails to register on kirkwood (88F6282)
-In-Reply-To: <20160205090246.GE32272@lunn.ch>
-References: <CAKzmTe0mvZD5UwqM47uXbM7Z7oAJpE4g4BVMba1hkzqNu+Zbgw@mail.gmail.com>
- <20160205090246.GE32272@lunn.ch>
-Message-ID: <20160205112907.796afb05@bbrezillon>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 5 Feb 2016 11:48:54 +0100
+Subject: [PATCH] PCI: generic: map config window in one go
+In-Reply-To: <4090946.AhejVJy7MO@wuerfel>
+References: <1454077035-23872-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20160129142831.GF4541@arm.com>
+ <CAKv+Gu_V83bUktPX0EiHd6qCDT2y0NEx=4n-uVv=P2MF9AZbMQ@mail.gmail.com>
+ <4090946.AhejVJy7MO@wuerfel>
+Message-ID: <CAKv+Gu8oZADs_FRN=p7_Nz0wXJVWVmzVNsxtzscyp7_cFAreAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jan, Andrew
+On 29 January 2016 at 15:52, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 29 January 2016 15:32:01 Ard Biesheuvel wrote:
+>> On 29 January 2016 at 15:28, Will Deacon <will.deacon@arm.com> wrote:
+>> > Hi Ard,
+>> >
+>> > On Fri, Jan 29, 2016 at 03:17:15PM +0100, Ard Biesheuvel wrote:
+>> >> Instead of iterating over the PCI config window and performing individual
+>> >> ioremap() calls on all the adjacent slices, perform a single ioremap() to
+>> >> map the entire region, and divvy it up later. This not only prevents
+>> >> leaving some of it mapped if we fail half way through, it also ensures that
+>> >> archs that support huge-vmap can use section mappings to perform the
+>> >> mapping.
+>> >>
+>> >> On my Seattle A0 box, this transforms 128 separate 1 MB mappings that are
+>> >> mapped down to 4 KB pages into a single 128 MB mapping using 2 MB sections,
+>> >> saving 512 KB worth of page tables.
+>> >>
+>> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> >> ---
+>> >
+>> > The code was written this way in response to feedback during driver review
+>> > that we couldn't necessarily grab that much contiguous vmalloc space on
+>> > 32-bit ARM. Unless that's changed, we probably want to to predicate this
+>> > change on having a 64-bit arch.
+>> >
+>>
+>> Ah right. How about testing for the ARCH_HAVE_HUGE_VMAP Kconfig symbol
+>> explicitly?
+>>
+>
+> Testing for 64BIT should be sufficient.
+>
 
-On Fri, 5 Feb 2016 10:02:46 +0100
-Andrew Lunn <andrew@lunn.ch> wrote:
-
-> On Fri, Feb 05, 2016 at 06:01:18AM +0100, JM wrote:
-> > Hi,
-> > 
-> > I am testing marvell_cesa on a kirkwood device (QNAP TS-212p, Marvell
-> > Kirkwood 88F6282, dts: http://pastebin.com/Gk95KFHf ).
-> > As of kernel 4.4 (4.4.0-trunk-kirkwood #1 Debian 4.4-1~exp1) it fails
-> > in the following way:
-> > 
-> > modprobe marvell_cesa allhwsupport=1
-> > dmesg | tail -n 1
-> > [ 1057.855091] marvell-cesa: probe of f1030000.crypto failed with error -12
-> > 
-> > or:
-> > 
-> > modprobe marvell_cesa
-> > dmesg | tail -n 1
-> > [ 9178.399357] marvell-cesa: probe of f1030000.crypto failed with error -524
-> > 
-> > With kernel 4.3 it would fail with error -22 on that hardware. There
-> > are scattered reports from other users experiencing the same issue
-> > (1,2,3)
-> > 
-> > I wonder if this is a result of an invalid definition of the
-> > crypto-sram in the dts of this SoC, or perhaps some other problem
-> > (PEBKAC included).
-> 
-> Hi Jan
-> 
-> Do you have SRAM enabled in your kernel configuration. The
-> mvebu_v5_defconfig does not have it, which is a bug really.
-
-Hm, the CRYPTO_DEV_MARVELL_CESA option selects the SRAM one [1].
-Anyway, I also think this error is related to the SRAM (not sure why the
-driver is not able to get the SRAM though).
-
-Best Regards,
-
-Boris
-
-[1]http://lxr.free-electrons.com/source/drivers/crypto/Kconfig#L168
-
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Does it make sense to spin a v2 for this patch? Given the discussion
+we had regarding allocating only the config regions for busses that
+are populated, perhaps there is a better approach here?
