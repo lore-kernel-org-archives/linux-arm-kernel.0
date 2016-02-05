@@ -1,33 +1,52 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 4 Feb 2016 17:08:11 -0800
-Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
- v4.5-rc1
-In-Reply-To: <CAPDyKFrMZYdeun67FBXdWL16DBOuO16qqOxRsks3QBJhNB8SoQ@mail.gmail.com>
-References: <CAPDyKFpRnmn+h_VH3jtC3u-BOf7-00nbzD30omaxaaZOOAK8Gg@mail.gmail.com>
- <Pine.LNX.4.44L0.1602041702550.1515-100000@iolanthe.rowland.org>
- <CAPDyKFrMZYdeun67FBXdWL16DBOuO16qqOxRsks3QBJhNB8SoQ@mail.gmail.com>
-Message-ID: <20160205010810.GR19432@atomide.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 05 Feb 2016 10:36:20 +0900
+Subject: [PATCH v2] arm64: defconfig: Enable samsung MFD and related
+ configs
+In-Reply-To: <56B2CD46.6070607@samsung.com>
+References: <1446787654-18306-1-git-send-email-alim.akhtar@samsung.com>
+ <CAJKOXPeWerSTi2QedEwyHRVN4xA0vWM2CSOvb5v9SWUmOSPe7Q@mail.gmail.com>
+ <20151106163743.GA7637@e104818-lin.cambridge.arm.com>
+ <56B2CD46.6070607@samsung.com>
+Message-ID: <56B3FC94.9090205@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ulf Hansson <ulf.hansson@linaro.org> [160204 14:35]:
-> On 4 February 2016 at 23:09, Alan Stern <stern@rowland.harvard.edu> wrote:
-> > On Thu, 4 Feb 2016, Ulf Hansson wrote:
-> >
-> >> I am really not questioning the autosuspend feature at all, it's a
-> >> really great feature!
-> >>
-> >> Now, I question the minor benefit we actually gain from having the
-> >> runtime PM core to update the mark in rpm_resume().
-> >
-> > As Tony pointed out, it prevents some devices from going to sleep right
-> > away.
-> 
-> Because their drivers don't care to update the last busy mark!?
+On 04.02.2016 13:02, Alim Akhtar wrote:
+> On 11/06/2015 10:07 PM, Catalin Marinas wrote:
+>> On Fri, Nov 06, 2015 at 02:47:12PM +0900, Krzysztof Kozlowski wrote:
+>>> 2015-11-06 14:27 GMT+09:00 Alim Akhtar <alim.akhtar@samsung.com>:
+>>>> Exynos7 based espresso board uses S2MPS15, a multifunction device.
+>>>> This patch enables S2MPS1X regulator, pmic-clk and rtc drivers
+>>>> utilized by
+>>>> the same.
+>>>>
+>>>> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+>>>> ---
+>>>> Changes since v1:
+>>>> * updated the comment message to describe which platfrom uses it.
+>>>> * enable COMMON_CLK_S2MPS11 which is needed to enable pmic-clk block.
+>>>>
+>>>>   arch/arm64/configs/defconfig |    4 ++++
+>>>>   1 file changed, 4 insertions(+)
+>>>
+>>> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>>>
+>>> Catalin,
+>>>
+>>> Are you usually taking such arm64 defconfig changes or should they go
+>>> through arm-soc?
+>>
+>> Usually arm-soc but I don't mind either way.
+>>
+> Looks like this patch is not merged...because of this 4.5-rc1 on
+> exynos7-esspreso does not boot to user space.
+> Do I need to resend this patch?
 
-Nope. Without that devices may never resume at all so the drivers
-can't do anything about it.
+Yes, please resend.
+I reviewed it on the list archives (from different email) but for
+applying I need to get the patch delivered to my mail box. Unfortunately
+you didn't put Samsung SoC guys on recipients list and at the same time
+patchwork does not work in company network.
 
-Regards,
-
-Tony
+Best regards,
+Krzysztof
