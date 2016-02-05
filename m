@@ -1,69 +1,63 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Fri, 5 Feb 2016 13:48:38 -0800
-Subject: [PATCH v2] ARM: mm: flip priority of CONFIG_DEBUG_RODATA
-In-Reply-To: <20160104220743.GP19062@n2100.arm.linux.org.uk>
-References: <20151202202725.GA794@www.outflux.net>
- <20151223195129.GP2793@atomide.com> <567B04AB.6010906@redhat.com>
- <20151223212911.GR2793@atomide.com>
- <alpine.LFD.2.20.1512231637110.3603@knanqh.ubzr>
- <20151224001121.GS2793@atomide.com>
- <20151224003406.GA8644@n2100.arm.linux.org.uk>
- <CAGXu5j+MrX-OvnVTYH0hqF2XgZW10PQOviyN=e5heejLsXewVA@mail.gmail.com>
- <20160104220743.GP19062@n2100.arm.linux.org.uk>
-Message-ID: <CAGXu5jJTOZL5yQfj5KuRjVO00mnNL3yd=7ONacYK96yLAOtgKg@mail.gmail.com>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Fri,  5 Feb 2016 14:52:42 -0700
+Subject: [PATCH net-next V2 0/8] net: fec: cleanup/fixes
+Message-ID: <1454709170-19527-1-git-send-email-troy.kisky@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 4, 2016 at 2:07 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Jan 04, 2016 at 12:34:28PM -0800, Kees Cook wrote:
->> On Wed, Dec 23, 2015 at 4:34 PM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > On Wed, Dec 23, 2015 at 04:11:22PM -0800, Tony Lindgren wrote:
->> >> * Nicolas Pitre <nicolas.pitre@linaro.org> [151223 13:45]:
->> >> > We fixed a bunch of similar issues where code was located in the .data
->> >> > section for ease of use from assembly code.  See commit b4e61537 and
->> >> > d0776aff for example.
->> >>
->> >> Thanks hey some assembly fun for the holidays :) I also need to check what
->> >> all gets relocated to SRAM here.
->> >>
->> >> In any case, seems like the $subject patch is too intrusive for v4.5 at
->> >> this point.
->> >
->> > Given Christmas and an unknown time between that and the merge window
->> > actually opening, I decided Tuesday would be the last day I take any
->> > patches into my tree - and today would be the day that I drop anything
->> > that causes problems.
->> >
->> > So, I've already dropped this, so tomorrow's linux-next should not have
->> > this change.
->> >
->> > You'll still see breakage if people enable RODATA though, but that's no
->> > different from previous kernels.
->>
->> Ugh, sorry for the breakage.
->>
->> Should this patch stay as-is and people will fix their various RODATA
->> failures during the next devel window, or should I remove the "default
->> y if CPU_V7"?
->
-> I think we'll keep it as-is, and have another go with it at -rc1 time,
-> when people have ample chance to then queue up fixes.
->
-> They'll have had notice of it, so there's no excuse folk can't work on
-> the problem in the mean time.  (But, of course, they won't...)
 
-Hi,
+V2 is a rebase on top of johannes endian-safe patch and
+is only the 1st eight patches.
+The testing for this series was done on a nitrogen6x.
+The base commit was
+commit b45efa30a626e915192a6c548cd8642379cd47cc
+    Merge git://git.kernel.org/pub/scm/linux/kernel/git/davem/net
 
-Just checking on this -- I resent it to the patch tracker at -rc1
-time. Is this waiting for the other fixes to land first, or is there
-something I should be doing?
+Testing showed no change in performance.
+Testing used imx_v6_v7_defconfig + CONFIG_MICREL_PHY.
+The processor was running at 996Mhz.
+The following commands were used to get the transfer rates.
 
-Thanks!
+On an x86 ubunto system,
+iperf -s -i.5 -u
 
--Kees
+
+On a nitrogen6x board, running via SD Card.
+I first stopped some background processes
+
+stop cron
+stop upstart-file-bridge
+stop upstart-socket-bridge
+stop upstart-udev-bridge
+stop rsyslog
+stop dbus
+killall dhclient
+echo performance >/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+
+taskset 0x2 iperf -c 192.168.0.201 -u -t60 -b500M -r
+
+There is a branch available on github with this series, and the rest of
+my fec patches, for those who would like to test it.
+https://github.com:boundarydevices/linux-imx6.git branch net-next_master
+
+
+
+Troy Kisky (8):
+SDCard
+ TX/RX
+378/405  before any patches
+379/407  net: fec: stop the "rcv is not +last, " error messages
+378/405  net: fec: fix rx error counts
+379/396  net: fec: fix fec_enet_get_free_txdesc_num
+379/403  net: fec: add struct bufdesc_prop
+390/396  net: fec: add variable reg_desc_active to speed things up
+388/396  net: fec: don't disable FEC_ENET_TS_TIMER interrupt
+382/403  net: fec: don't transfer ownership until descriptor write is complete
+378/403  net: fec: improve error handling
+
+ drivers/net/ethernet/freescale/fec.h      |  38 ++-
+ drivers/net/ethernet/freescale/fec_main.c | 396 ++++++++++++++----------------
+ 2 files changed, 196 insertions(+), 238 deletions(-)
 
 -- 
-Kees Cook
-Chrome OS & Brillo Security
+2.5.0
