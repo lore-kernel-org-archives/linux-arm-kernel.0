@@ -1,79 +1,112 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Fri, 5 Feb 2016 12:26:08 +0800
-Subject: [PATCH v8 2/2] power: add documentation for ACT8945A's charger DT
- bindings
-In-Reply-To: <1454646368-18193-1-git-send-email-wenyou.yang@atmel.com>
-References: <1454646368-18193-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1454646368-18193-3-git-send-email-wenyou.yang@atmel.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Thu,  4 Feb 2016 23:34:32 -0500
+Subject: [PATCH V14 1/9] dma: qcom_bam_dma: move to qcom directory
+In-Reply-To: <1454646882-24369-1-git-send-email-okaya@codeaurora.org>
+References: <1454646882-24369-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1454646882-24369-2-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds documentation for the DT bindings of the charger
-subdevice of ACT8945A MFD.
+Creating a QCOM directory for all QCOM DMA source files.
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+Reviewed-by: Andy Gross <agross@codeaurora.org>
 ---
+ drivers/dma/Kconfig                            | 11 ++---------
+ drivers/dma/Makefile                           |  2 +-
+ drivers/dma/qcom/Kconfig                       |  8 ++++++++
+ drivers/dma/qcom/Makefile                      |  1 +
+ drivers/dma/{qcom_bam_dma.c => qcom/bam_dma.c} |  4 ++--
+ 5 files changed, 14 insertions(+), 12 deletions(-)
+ create mode 100644 drivers/dma/qcom/Kconfig
+ create mode 100644 drivers/dma/qcom/Makefile
+ rename drivers/dma/{qcom_bam_dma.c => qcom/bam_dma.c} (99%)
 
-Changes in v8:
- - due the mfd cell .of_compatible removal, update the compatibe
-   description and example.
-
-Changes in v7: None
-Changes in v6: None
-Changes in v5:
- - collect Reviewed-by from Krzysztof.
-
-Changes in v4:
- - change the properties with more legible name, clearer description.
-
-Changes in v3: None
-Changes in v2: None
-
- .../devicetree/bindings/power/act8945a-charger.txt |   35 ++++++++++++++++++++
- 1 file changed, 35 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/power/act8945a-charger.txt
-
-diff --git a/Documentation/devicetree/bindings/power/act8945a-charger.txt b/Documentation/devicetree/bindings/power/act8945a-charger.txt
+diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+index 79b1390..245b061 100644
+--- a/drivers/dma/Kconfig
++++ b/drivers/dma/Kconfig
+@@ -408,15 +408,6 @@ config PXA_DMA
+ 	  16 to 32 channels for peripheral to memory or memory to memory
+ 	  transfers.
+ 
+-config QCOM_BAM_DMA
+-	tristate "QCOM BAM DMA support"
+-	depends on ARCH_QCOM || (COMPILE_TEST && OF && ARM)
+-	select DMA_ENGINE
+-	select DMA_VIRTUAL_CHANNELS
+-	---help---
+-	  Enable support for the QCOM BAM DMA controller.  This controller
+-	  provides DMA capabilities for a variety of on-chip devices.
+-
+ config SIRF_DMA
+ 	tristate "CSR SiRFprimaII/SiRFmarco DMA support"
+ 	depends on ARCH_SIRF
+@@ -539,6 +530,8 @@ config ZX_DMA
+ # driver files
+ source "drivers/dma/bestcomm/Kconfig"
+ 
++source "drivers/dma/qcom/Kconfig"
++
+ source "drivers/dma/dw/Kconfig"
+ 
+ source "drivers/dma/hsu/Kconfig"
+diff --git a/drivers/dma/Makefile b/drivers/dma/Makefile
+index 2dd0a067..6084127 100644
+--- a/drivers/dma/Makefile
++++ b/drivers/dma/Makefile
+@@ -52,7 +52,6 @@ obj-$(CONFIG_PCH_DMA) += pch_dma.o
+ obj-$(CONFIG_PL330_DMA) += pl330.o
+ obj-$(CONFIG_PPC_BESTCOMM) += bestcomm/
+ obj-$(CONFIG_PXA_DMA) += pxa_dma.o
+-obj-$(CONFIG_QCOM_BAM_DMA) += qcom_bam_dma.o
+ obj-$(CONFIG_RENESAS_DMA) += sh/
+ obj-$(CONFIG_SIRF_DMA) += sirf-dma.o
+ obj-$(CONFIG_STE_DMA40) += ste_dma40.o ste_dma40_ll.o
+@@ -67,4 +66,5 @@ obj-$(CONFIG_TI_EDMA) += edma.o
+ obj-$(CONFIG_XGENE_DMA) += xgene-dma.o
+ obj-$(CONFIG_ZX_DMA) += zx296702_dma.o
+ 
++obj-y += qcom/
+ obj-y += xilinx/
+diff --git a/drivers/dma/qcom/Kconfig b/drivers/dma/qcom/Kconfig
 new file mode 100644
-index 0000000..bea254c
+index 0000000..f17c272
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/power/act8945a-charger.txt
-@@ -0,0 +1,35 @@
-+Device-Tree bindings for charger of Active-semi ACT8945A Multi-Function Device
-+
-+Required properties:
-+ - compatible: "active-semi,act8945a", please refer to ../mfd/act8945a.txt.
-+ - active-semi,chglev-gpios: charge current level phandle with args
-+   as described in ../gpio/gpio.txt.
-+
-+Optional properties:
-+ - active-semi,check-battery-temperature: boolean to check the battery
-+   temperature or not.
-+ - active-semi,input-voltage-threshold-microvolt: unit: mV;
-+   Specifies the charger's input over-voltage threshold value;
-+   The value can be: 6600, 7000, 7500, 8000; default: 6600
-+ - active-semi,precondition-timeout: unit: minutes;
-+   Specifies the charger's PRECONDITION safety timer setting value;
-+   The value can be: 40, 60, 80, 0; If 0, it means to disable this timer;
-+   default: 40.
-+ - active-semi,total-timeout: unit: hours;
-+   Specifies the charger's total safety timer setting value;
-+   The value can be: 3, 4, 5, 0; If 0, it means to disable this timer;
-+   default: 3.
-+
-+Example:
-+	pmic at 5b {
-+		compatible = "active-semi,act8945a";
-+		reg = <0x5b>;
-+		status = "okay";
-+
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_charger_chglev>;
-+		active-semi,chglev-gpios = <&pioA 12 GPIO_ACTIVE_HIGH>;
-+		active-semi,input-voltage-threshold-microvolt = <6600>;
-+		active-semi,precondition-timeout = <40>;
-+		active-semi,total-timeout = <3>;
-+	};
++++ b/drivers/dma/qcom/Kconfig
+@@ -0,0 +1,8 @@
++config QCOM_BAM_DMA
++	tristate "QCOM BAM DMA support"
++	depends on ARCH_QCOM || (COMPILE_TEST && OF && ARM)
++	select DMA_ENGINE
++	select DMA_VIRTUAL_CHANNELS
++	---help---
++	  Enable support for the QCOM BAM DMA controller.  This controller
++	  provides DMA capabilities for a variety of on-chip devices.
+diff --git a/drivers/dma/qcom/Makefile b/drivers/dma/qcom/Makefile
+new file mode 100644
+index 0000000..f612ae3
+--- /dev/null
++++ b/drivers/dma/qcom/Makefile
+@@ -0,0 +1 @@
++obj-$(CONFIG_QCOM_BAM_DMA) += bam_dma.o
+diff --git a/drivers/dma/qcom_bam_dma.c b/drivers/dma/qcom/bam_dma.c
+similarity index 99%
+rename from drivers/dma/qcom_bam_dma.c
+rename to drivers/dma/qcom/bam_dma.c
+index 5a250cd..b6f053d 100644
+--- a/drivers/dma/qcom_bam_dma.c
++++ b/drivers/dma/qcom/bam_dma.c
+@@ -49,8 +49,8 @@
+ #include <linux/clk.h>
+ #include <linux/dmaengine.h>
+ 
+-#include "dmaengine.h"
+-#include "virt-dma.h"
++#include "../dmaengine.h"
++#include "../virt-dma.h"
+ 
+ struct bam_desc_hw {
+ 	u32 addr;		/* Buffer physical address */
 -- 
-1.7.9.5
+1.8.2.1
