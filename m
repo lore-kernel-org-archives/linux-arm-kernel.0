@@ -1,34 +1,33 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Fri,  5 Feb 2016 19:01:44 +0000
-Subject: [PATCH 5/6] arm64: dts: qcom: apq8016-sbc: enable lpass on DB410c
+Date: Fri,  5 Feb 2016 19:01:50 +0000
+Subject: [PATCH 6/6] arm64: dts: qcom: fix usb digital voltage levels
 In-Reply-To: <1454698819-13885-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <1454698819-13885-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1454698904-14100-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1454698910-14142-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables the lpass on DB410C. LPASS is used as cpu dai for
-both analog and digital audio.
+This patch updates the digital voltage levels from corner values to
+microvolts as we are going to use s1 regulator directly for vddcx
+instead of s1_corner.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm64/boot/dts/qcom/msm8916.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-index e80bdc2..cb52afb 100644
---- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-+++ b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-@@ -186,6 +186,10 @@
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&usb_sw_sel_pm>;
- 		};
-+
-+		lpass at 07700000 {
-+			status = "okay";
-+		};
- 	};
- };
+diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+index cdda026..cb82f4f 100644
+--- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+@@ -421,7 +421,7 @@
+ 			interrupts = <GIC_SPI 134 IRQ_TYPE_EDGE_BOTH>,
+ 				     <GIC_SPI 140 IRQ_TYPE_EDGE_RISING>;
  
+-			qcom,vdd-levels = <1 5 7>;
++			qcom,vdd-levels = <500000 1000000 1320000>;
+ 			qcom,phy-init-sequence = <0x44 0x6B 0x24 0x13>;
+ 			dr_mode = "peripheral";
+ 			qcom,otg-control = <2>; // PMIC
 -- 
 1.9.1
