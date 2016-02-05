@@ -1,80 +1,36 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 5 Feb 2016 14:15:18 +0000
-Subject: [PATCH v4 16/17] FDT: Add a helper to get specified name subnode
-In-Reply-To: <1454641552-12576-17-git-send-email-zhaoshenglong@huawei.com>
-References: <1454641552-12576-1-git-send-email-zhaoshenglong@huawei.com>
- <1454641552-12576-17-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <alpine.DEB.2.02.1602051415120.27008@kaball.uk.xensource.com>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 05 Feb 2016 14:18:18 +0000
+Subject: [PATCH v4 00/13] arm64: kernel: Add support for
+ hibernate/suspend-to-disk
+In-Reply-To: <7hmvrid3pv.fsf@baylibre.com>
+References: <1453977766-20907-1-git-send-email-james.morse@arm.com>	<7hvb6chv5e.fsf@baylibre.com>
+ <56AF1D07.3000604@arm.com> <7hmvrid3pv.fsf@baylibre.com>
+Message-ID: <56B4AF2A.2070503@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 5 Feb 2016, Shannon Zhao wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
-> 
-> Sometimes it needs to check if there is a node in FDT by full path.
-> Introduce this helper to get the specified name subnode if it exists.
-> 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+Hi Kevin,
 
-Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+On 03/02/16 00:42, Kevin Hilman wrote:
+> James Morse <james.morse@arm.com> writes:
+>> On 29/01/16 22:34, Kevin Hilman wrote:
+>>> James Morse <james.morse@arm.com> writes:
+>>> I'd like to help in testing this so I'm just curious which platforms
+>>> you've been testing this on.  I'm assuming a Juno (r2?), anything else?
+>>
+>> That would be great - thanks!
+>>
+>> I've done most of the testing on a Juno r1, but also gave it a spin on a
+>> stray Seattle.
+> 
+> OK, I'm using a very recently arrived Juno R2, and I did get it
+> working.  I have a few other arm64 boards around that ar part of
+> kernelci.org and will try those as well.
+
+Great,
+It would be good to have a Tested-by if it works to your satisfaction...
 
 
-> CC: Rob Herring <robh@kernel.org>
-> ---
->  drivers/of/fdt.c       | 25 +++++++++++++++++++++++++
->  include/linux/of_fdt.h |  2 ++
->  2 files changed, 27 insertions(+)
-> 
-> diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
-> index 655f79d..eacb188 100644
-> --- a/drivers/of/fdt.c
-> +++ b/drivers/of/fdt.c
-> @@ -645,6 +645,31 @@ int __init of_scan_flat_dt(int (*it)(unsigned long node,
->  }
->  
->  /**
-> + * of_get_flat_dt_subnode_by_name - get subnode of specified node by name
-> + *
-> + * @node: the parent node
-> + * @uname: the name of subnode
-> + * @return offset of the subnode, or -FDT_ERR_NOTFOUND if there is none
-> + */
-> +
-> +int of_get_flat_dt_subnode_by_name(unsigned long node, const char *uname)
-> +{
-> +	const void *blob = initial_boot_params;
-> +	int offset;
-> +	const char *pathp;
-> +
-> +	for (offset = fdt_first_subnode(blob, node);
-> +	     offset >= 0;
-> +	     offset = fdt_next_subnode(blob, offset)) {
-> +		pathp = fdt_get_name(blob, offset, NULL);
-> +		if (strcmp(pathp, uname) == 0)
-> +			return offset;
-> +	}
-> +
-> +	return -FDT_ERR_NOTFOUND;
-> +}
-> +
-> +/**
->   * of_get_flat_dt_root - find the root node in the flat blob
->   */
->  unsigned long __init of_get_flat_dt_root(void)
-> diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
-> index df9ef38..fc28162 100644
-> --- a/include/linux/of_fdt.h
-> +++ b/include/linux/of_fdt.h
-> @@ -52,6 +52,8 @@ extern char __dtb_end[];
->  extern int of_scan_flat_dt(int (*it)(unsigned long node, const char *uname,
->  				     int depth, void *data),
->  			   void *data);
-> +extern int of_get_flat_dt_subnode_by_name(unsigned long node,
-> +					  const char *uname);
->  extern const void *of_get_flat_dt_prop(unsigned long node, const char *name,
->  				       int *size);
->  extern int of_flat_dt_is_compatible(unsigned long node, const char *name);
-> -- 
-> 2.0.4
-> 
-> 
+Thanks,
+
+James
