@@ -1,49 +1,75 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Fri, 5 Feb 2016 17:20:29 +0800
-Subject: [PATCH v10 5/5] Watchdog: ARM SBSA Generic Watchdog half timeout
- panic support
-In-Reply-To: <56B37FA0.5000209@codeaurora.org>
-References: <1454519923-25230-1-git-send-email-fu.wei@linaro.org>
- <1454519923-25230-6-git-send-email-fu.wei@linaro.org>
- <CANLsYkyLBfSKFM6CCyPP+Eaua2B+n80wL2hnQVSvfUNMPd3OdQ@mail.gmail.com>
- <56B37FA0.5000209@codeaurora.org>
-Message-ID: <CADyBb7uUK-vTpm9gtxNqtbS6gxbpZdKNKspqzX8wGTNHbdH_HQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri,  5 Feb 2016 10:20:21 +0100
+Subject: [PATCH] netfilter: tee: select NF_DUP_IPV6 unconditionally
+Message-ID: <1454664040-1344109-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 February 2016 at 00:43, Timur Tabi <timur@codeaurora.org> wrote:
-> Mathieu Poirier wrote:
->>>
->>> >+#ifdef CONFIG_ARM_SBSA_WATCHDOG_PANIC
->>> >+       irq = platform_get_irq(pdev, 0);
->>> >+       if (irq < 0) {
->>> >+               dev_err(dev, "unable to get ws0 interrupt.\n");
->>> >+               return irq;
->>> >+       }
->>> >+#endif
->>> >+
->>
->> Can't the driver revert to single stage mode if platform_get_irq()
->> fails?  That way the value of 'irq' can be tested throughout the
->> _probe() function and the #ifdefs removed.
->
->
-> I like that idea.  The same can be done with the devm_request_irq() call.
-> It should definitely still display a warning if the command-line option is
-> set but no interrupt is available.
+The NETFILTER_XT_TARGET_TEE option selects NF_DUP_IPV6 whenever
+IP6_NF_IPTABLES is enabled, and it ensures that it cannot be
+builtin itself if NF_CONNTRACK is a loadable module, as that
+is a dependency for NF_DUP_IPV6.
 
-Yes, I agree with that too, brilliant idea, this will be in v11 patchset
+However, NF_DUP_IPV6 can be enabled even if IP6_NF_IPTABLES is
+turned off, and it only really depends on IPV6. With the current
+check in tee_tg6, we call nf_dup_ipv6() whenever NF_DUP_IPV6
+is enabled. This can however be a loadable module which is
+unreachable from a built-in xt_TEE:
 
+net/built-in.o: In function `tee_tg6':
+:(.text+0x67728): undefined reference to `nf_dup_ipv6'
 
+The bug was originally introduced in the split of the xt_TEE module
+into separate modules for ipv4 and ipv6, and two patches tried
+to fix it unsuccessfully afterwards.
 
+This is a revert of the the first incorrect attempt to fix it,
+going back to depending on IPV6 as the dependency, and we
+adapt the 'select' condition accordingly.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: bbde9fc1824a ("netfilter: factor out packet duplication for IPv4/IPv6")
+Fixes: 116984a316c3 ("netfilter: xt_TEE: use IS_ENABLED(CONFIG_NF_DUP_IPV6)")
+Fixes: 74ec4d55c4d2 ("netfilter: fix xt_TEE and xt_TPROXY dependencies")
+---
+ net/netfilter/Kconfig  | 2 +-
+ net/netfilter/xt_TEE.c | 4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/net/netfilter/Kconfig b/net/netfilter/Kconfig
+index 8c067e6663a1..95e757c377f9 100644
+--- a/net/netfilter/Kconfig
++++ b/net/netfilter/Kconfig
+@@ -891,7 +891,7 @@ config NETFILTER_XT_TARGET_TEE
+ 	depends on IPV6 || IPV6=n
+ 	depends on !NF_CONNTRACK || NF_CONNTRACK
+ 	select NF_DUP_IPV4
+-	select NF_DUP_IPV6 if IP6_NF_IPTABLES != n
++	select NF_DUP_IPV6 if IPV6
+ 	---help---
+ 	This option adds a "TEE" target with which a packet can be cloned and
+ 	this clone be rerouted to another nexthop.
+diff --git a/net/netfilter/xt_TEE.c b/net/netfilter/xt_TEE.c
+index 3eff7b67cdf2..6e57a3966dc5 100644
+--- a/net/netfilter/xt_TEE.c
++++ b/net/netfilter/xt_TEE.c
+@@ -38,7 +38,7 @@ tee_tg4(struct sk_buff *skb, const struct xt_action_param *par)
+ 	return XT_CONTINUE;
+ }
+ 
+-#if IS_ENABLED(CONFIG_NF_DUP_IPV6)
++#if IS_ENABLED(CONFIG_IPV6)
+ static unsigned int
+ tee_tg6(struct sk_buff *skb, const struct xt_action_param *par)
+ {
+@@ -131,7 +131,7 @@ static struct xt_target tee_tg_reg[] __read_mostly = {
+ 		.destroy    = tee_tg_destroy,
+ 		.me         = THIS_MODULE,
+ 	},
+-#if IS_ENABLED(CONFIG_NF_DUP_IPV6)
++#if IS_ENABLED(CONFIG_IPV6)
+ 	{
+ 		.name       = "TEE",
+ 		.revision   = 1,
 -- 
-Best regards,
-
-Fu Wei
-Software Engineer
-Red Hat Software (Beijing) Co.,Ltd.Shanghai Branch
-Ph: +86 21 61221326(direct)
-Ph: +86 186 2020 4684 (mobile)
-Room 1512, Regus One Corporate Avenue,Level 15,
-One Corporate Avenue,222 Hubin Road,Huangpu District,
-Shanghai,China 200021
+2.7.0
