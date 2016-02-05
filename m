@@ -1,71 +1,33 @@
-From: bhupesh.sharma@nxp.com (Bhupesh Sharma)
-Date: Fri, 5 Feb 2016 05:36:28 +0000
-Subject: [PATCH] PCI: layerscape: add ls2085a compatible
-In-Reply-To: <56B3E386.8010002@linaro.org>
-References: <1453915925-19198-1-git-send-email-yang.shi@linaro.org>
- <56A906F4.3050809@linaro.org> <20160204223711.GE7031@localhost>
- <56B3E386.8010002@linaro.org>
-Message-ID: <VI1PR04MB1230AA5CAEEEE0D4AD8E3DF288D20@VI1PR04MB1230.eurprd04.prod.outlook.com>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Fri, 5 Feb 2016 11:12:29 +0530
+Subject: [PATCH v4 0/3] ARM: OMAP2+: hwmod: RTC: Add lock and unlock hooks
+Message-ID: <1454650952-20154-1-git-send-email-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: Shi, Yang
-> Sent: Friday, February 05, 2016 5:19 AM
-> 
-> On 2/4/2016 2:37 PM, Bjorn Helgaas wrote:
-> > On Wed, Jan 27, 2016 at 10:05:40AM -0800, Shi, Yang wrote:
-> >> Correct FSL folks email address to nxp.com, sorry for the
-> inconvenience.
-> >
-> > Do we need some MAINTAINERS updates in addition to the ack for this
-> patch?
-> > I see a bunch of @freescale.com addresses in MAINTAINERS.
-> 
-> I guess so if the @freescale.com address is not valid anymore.
+This series implements lock and unlock functions for RTC and hooks
+the same to DRA7 and AMx3xx hwmod.
 
-All @freescale.com address have shifted to @nxp.com.
+Tested RTC functionality on:
+DRA74-EVM: http://pastebin.ubuntu.com/14885542/
+BeagleBoard-X15: http://pastebin.ubuntu.com/14885568/
+AM437x-GP EVM: http://pastebin.ubuntu.com/14885589/
+AM335x BeagleBoneBlack: http://pastebin.ubuntu.com/14885600/
 
-Leo, Minghuan - can you kindly review this patch.
+Changes since v3:
+- Rebased on top of latest Mainline.
+Link to v3 series: https://www.mail-archive.com/linux-omap%40vger.kernel.org/msg118342.html
 
-Shawn - can you take this through your tree, once Leo and Minghuan have reviewed the code.
+Lokesh Vutla (3):
+  ARM: hwmod: RTC: Add lock and unlock functions
+  ARM: DRA7: RTC: Add lock and unlock functions
+  ARM: AMx3xx: RTC: Add lock and unlock functions
 
-Regards,
-Bhupesh
- 
-> 
-> >
-> >> On 1/27/2016 9:32 AM, Yang Shi wrote:
-> >>> The layerscape PCI host driver needs recognize ls2085a compatible
-> >>> when using firmware with ls2085a compatible property, otherwise the
-> >>> PCI bus won't be detected even though ls2085a compatible is included
-> by the dts.
-> >>>
-> >>> Signed-off-by: Yang Shi <yang.shi@linaro.org>
-> >>> ---
-> >>>   drivers/pci/host/pci-layerscape.c | 1 +
-> >>>   1 file changed, 1 insertion(+)
-> >>>
-> >>> diff --git a/drivers/pci/host/pci-layerscape.c
-> >>> b/drivers/pci/host/pci-layerscape.c
-> >>> index 3923bed..c40d8b2 100644
-> >>> --- a/drivers/pci/host/pci-layerscape.c
-> >>> +++ b/drivers/pci/host/pci-layerscape.c
-> >>> @@ -203,6 +203,7 @@ static const struct of_device_id
-> ls_pcie_of_match[] = {
-> >>>   	{ .compatible = "fsl,ls1021a-pcie", .data = &ls1021_drvdata
-> },
-> >>>   	{ .compatible = "fsl,ls1043a-pcie", .data = &ls1043_drvdata
-> },
-> >>>   	{ .compatible = "fsl,ls2080a-pcie", .data = &ls2080_drvdata
-> },
-> >>> +	{ .compatible = "fsl,ls2085a-pcie", .data = &ls2080_drvdata },
-> >>>   	{ },
-> >>>   };
-> >>>   MODULE_DEVICE_TABLE(of, ls_pcie_of_match);
-> >>>
-> >>
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org More majordomo info at
-> http://vger.kernel.org/majordomo-info.html
+ arch/arm/mach-omap2/omap_hwmod.h                   |  2 +
+ .../mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c |  2 +
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c          |  2 +
+ arch/arm/mach-omap2/omap_hwmod_reset.c             | 65 ++++++++++++++++++++++
+ 4 files changed, 71 insertions(+)
+
+-- 
+2.1.4
