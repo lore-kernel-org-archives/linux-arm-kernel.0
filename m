@@ -1,109 +1,272 @@
-From: leoyang.li@nxp.com (Yang-Leo Li)
-Date: Fri, 5 Feb 2016 19:36:50 +0000
-Subject: [PATCH] PCI: layerscape: add ls2085a compatible
-In-Reply-To: <20160205155412.GB29306@localhost>
-References: <1453915925-19198-1-git-send-email-yang.shi@linaro.org>
- <56A906F4.3050809@linaro.org> <20160204223711.GE7031@localhost>
- <56B3E386.8010002@linaro.org>
- <VI1PR04MB1230AA5CAEEEE0D4AD8E3DF288D20@VI1PR04MB1230.eurprd04.prod.outlook.com>
- <VI1PR04MB16155E4265922D6659B439C1E8D20@VI1PR04MB1615.eurprd04.prod.outlook.com>
- <20160205155412.GB29306@localhost>
-Message-ID: <AM2PR04MB0770FD6ED4FD45AFE600C6DB8FD20@AM2PR04MB0770.eurprd04.prod.outlook.com>
+From: contact@paulk.fr (Paul Kocialkowski)
+Date: Fri, 05 Feb 2016 20:39:00 +0100
+Subject: [PATCH v2 3/4] ARM: LG Optimus Black (P970) codename sniper
+ support, with basic features
+In-Reply-To: <1454697741-8687-4-git-send-email-contact@paulk.fr>
+References: <1454697741-8687-1-git-send-email-contact@paulk.fr>
+ <1454697741-8687-4-git-send-email-contact@paulk.fr>
+Message-ID: <1454701140.2623.12.camel@collins>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Fri, Feb 05, 2016 at 06:07:10AM +0000, Minghuan Lian wrote:
-> > The patch is ok to me.
+Hi,
+
+Le vendredi 05 f?vrier 2016 ? 19:42 +0100, Paul Kocialkowski a ?crit :
+> The LG Optimus Black (P970) codename sniper is a smartphone that was designed
+> and manufactured by LG Electronics (LGE) and released back in 2011.
+> It is using an OMAP3630 SoC, GP version.
 > 
-> Thanks, I'll transform that into an ack.
-
-Also
-Acked-by: Li Yang <leoyang.li@nxp.com>
-
+> This adds devicetree support for the device, with only a few basic features
+> supported, such as debug uart, i2c, internal emmc and external mmc.
 > 
-> Who's going to post a patch to update MAINTAINERS to fix the @freescale.com
-> addresses?  If we can get that in for v4.5, it will save some hassle.
-
-The @freescale.com address can still reach us for some time(not sure how long though).  I don't know if all the people want to change to an NXP company email address in MAINTAINERS or just update to a personal email address as some already did.
-
-Regards,
-Leo
-
+> Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+> ---
+>  arch/arm/boot/dts/Makefile         |   1 +
+>  arch/arm/boot/dts/omap3-sniper.dts | 215 +++++++++++++++++++++++++++++++++++++
+>  2 files changed, 216 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/omap3-sniper.dts
 > 
-> > > -----Original Message-----
-> > > From: Bhupesh Sharma
-> > > Sent: Friday, February 05, 2016 1:36 PM
-> > > To: Shi, Yang <yang.shi@linaro.org>; Bjorn Helgaas
-> > > <helgaas@kernel.org>; Yang-Leo Li <leoyang.li@nxp.com>;
-> > > shawn.guo at linaro.org
-> > > Cc: Mingkai Hu <mingkai.hu@nxp.com>; Minghuan Lian
-> > > <minghuan.lian@nxp.com>; bhelgaas at google.com;
-> > > linux-pci at vger.kernel.org; linux-kernel at vger.kernel.org;
-> > > linux-arm-kernel at lists.infradead.org;
-> > > linaro-kernel at lists.linaro.org
-> > > Subject: RE: [PATCH] PCI: layerscape: add ls2085a compatible
-> > >
-> > > > From: Shi, Yang
-> > > > Sent: Friday, February 05, 2016 5:19 AM
-> > > >
-> > > > On 2/4/2016 2:37 PM, Bjorn Helgaas wrote:
-> > > > > On Wed, Jan 27, 2016 at 10:05:40AM -0800, Shi, Yang wrote:
-> > > > >> Correct FSL folks email address to nxp.com, sorry for the
-> > > > inconvenience.
-> > > > >
-> > > > > Do we need some MAINTAINERS updates in addition to the ack for
-> > > > > this
-> > > > patch?
-> > > > > I see a bunch of @freescale.com addresses in MAINTAINERS.
-> > > >
-> > > > I guess so if the @freescale.com address is not valid anymore.
-> > >
-> > > All @freescale.com address have shifted to @nxp.com.
-> > >
-> > > Leo, Minghuan - can you kindly review this patch.
-> > >
-> > > Shawn - can you take this through your tree, once Leo and Minghuan
-> > > have reviewed the code.
-> > >
-> > > Regards,
-> > > Bhupesh
-> > >
-> > > >
-> > > > >
-> > > > >> On 1/27/2016 9:32 AM, Yang Shi wrote:
-> > > > >>> The layerscape PCI host driver needs recognize ls2085a
-> > > > >>> compatible when using firmware with ls2085a compatible
-> > > > >>> property, otherwise the PCI bus won't be detected even though
-> > > > >>> ls2085a compatible is included
-> > > > by the dts.
-> > > > >>>
-> > > > >>> Signed-off-by: Yang Shi <yang.shi@linaro.org>
-> > > > >>> ---
-> > > > >>>   drivers/pci/host/pci-layerscape.c | 1 +
-> > > > >>>   1 file changed, 1 insertion(+)
-> > > > >>>
-> > > > >>> diff --git a/drivers/pci/host/pci-layerscape.c
-> > > > >>> b/drivers/pci/host/pci-layerscape.c
-> > > > >>> index 3923bed..c40d8b2 100644
-> > > > >>> --- a/drivers/pci/host/pci-layerscape.c
-> > > > >>> +++ b/drivers/pci/host/pci-layerscape.c
-> > > > >>> @@ -203,6 +203,7 @@ static const struct of_device_id
-> > > > ls_pcie_of_match[] = {
-> > > > >>>   	{ .compatible = "fsl,ls1021a-pcie", .data = &ls1021_drvdata
-> > > > },
-> > > > >>>   	{ .compatible = "fsl,ls1043a-pcie", .data = &ls1043_drvdata
-> > > > },
-> > > > >>>   	{ .compatible = "fsl,ls2080a-pcie", .data = &ls2080_drvdata
-> > > > },
-> > > > >>> +	{ .compatible = "fsl,ls2085a-pcie", .data = &ls2080_drvdata
-> > > > >>> +},
-> > > > >>>   	{ },
-> > > > >>>   };
-> > > > >>>   MODULE_DEVICE_TABLE(of, ls_pcie_of_match);
-> > > > >>>
-> > > > >>
-> > > >
-> > > > --
-> > > > To unsubscribe from this list: send the line "unsubscribe linux-pci"
-> > > > in the body of a message to majordomo at vger.kernel.org More
-> > > > majordomo info at http://vger.kernel.org/majordomo-info.html
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index a4a6d70..7314cf8 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -460,6 +460,7 @@ dtb-$(CONFIG_ARCH_OMAP3) += \
+>  	omap3-sbc-t3517.dtb \
+>  	omap3-sbc-t3530.dtb \
+>  	omap3-sbc-t3730.dtb \
+> +	omap3-sniper.dtb \
+>  	omap3-thunder.dtb \
+>  	omap3-zoom3.dtb
+>  dtb-$(CONFIG_SOC_TI81XX) += \
+> diff --git a/arch/arm/boot/dts/omap3-sniper.dts b/arch/arm/boot/dts/omap3-sniper.dts
+> new file mode 100644
+> index 0000000..24bcd82
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/omap3-sniper.dts
+> @@ -0,0 +1,215 @@
+> +/*
+> + * Copyright (C) 2015-2016 Paul Kocialkowski <contact@paulk.fr>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +/dts-v1/;
+> +
+> +#include "omap36xx.dtsi"
+> +
+> +/ {
+> +	model = "LG Optimus Black (P970)";
+> +	compatible = "lge,omap3-sniper", "ti,omap36xx", "ti,omap3";
+> +
+> +	cpus {
+> +		cpu at 0 {
+> +			cpu0-supply = <&vcc>;
+> +		};
+> +	};
+> +
+> +	memory {
+> +		device_type = "memory";
+> +		reg = <0x80000000 0x20000000>; /* 512 MB */
+> +	};
+> +};
+> +
+> +&omap3_pmx_core {
+> +	pinctrl-names = "default";
+> +
+> +	uart3_pins: pinmux_uart3_pins {
+> +		pinctrl-single,pins = <
+> +			OMAP3_CORE1_IOPAD(0x219e, PIN_INPUT | MUX_MODE0)	/* uart3_rx_irrx */
+> +			OMAP3_CORE1_IOPAD(0x21a0, PIN_OUTPUT | MUX_MODE0)	/* uart3_tx_irtx */
+> +		>;
+> +	};
+> +
+> +	dp3t_sel_pins: pinmux_dp3t_sel_pins {
+> +		pinctrl-single,pins = <
+> +			OMAP3_CORE1_IOPAD(0x2196, PIN_OUTPUT | MUX_MODE4)	/* gpio_161 */
+> +			OMAP3_CORE1_IOPAD(0x2198, PIN_OUTPUT | MUX_MODE4)	/* gpio_162 */
+> +		>;
+> +	};
+> +
+> +	i2c1_pins: pinmux_i2c1_pins {
+> +		pinctrl-single,pins = <
+> +			OMAP3_CORE1_IOPAD(0x21ba, PIN_INPUT | MUX_MODE0)	/* i2c1_scl */
+> +			OMAP3_CORE1_IOPAD(0x21bc, PIN_INPUT | MUX_MODE0)	/* i2c1_sda */
+> +		>;
+> +	};
+> +
+> +	i2c2_pins: pinmux_i2c2_pins {
+> +		pinctrl-single,pins = <
+> +			OMAP3_CORE1_IOPAD(0x21be, PIN_INPUT | MUX_MODE0)	/* i2c2_scl */
+> +			OMAP3_CORE1_IOPAD(0x21c0, PIN_INPUT | MUX_MODE0)	/* i2c2_sda */
+> +		>;
+> +	};
+> +
+> +	i2c3_pins: pinmux_i2c3_pins {
+> +		pinctrl-single,pins = <
+> +			OMAP3_CORE1_IOPAD(0x21c2, PIN_INPUT | MUX_MODE0)	/* i2c3_scl */
+> +			OMAP3_CORE1_IOPAD(0x21c4, PIN_INPUT | MUX_MODE0)	/* i2c3_sda */
+> +		>;
+> +	};
+> +
+> +	lp8720_en_pin: pinmux_lp8720_en_pin {
+> +		pinctrl-single,pins = <
+> +			OMAP3_CORE1_IOPAD(0x2080, PIN_OUTPUT | MUX_MODE4)	/* gpio_37 */
+> +		>;
+> +	};
+> +
+> +	mmc1_pins: pinmux_mmc1_pins {
+> +		pinctrl-single,pins = <
+> +			OMAP3_CORE1_IOPAD(0x2144, PIN_INPUT | MUX_MODE0)	/* sdmmc1_clk */
+> +			OMAP3_CORE1_IOPAD(0x2146, PIN_INPUT | MUX_MODE0)	/* sdmmc1_cmd */
+> +			OMAP3_CORE1_IOPAD(0x2148, PIN_INPUT | MUX_MODE0)	/* sdmmc1_dat0 */
+> +			OMAP3_CORE1_IOPAD(0x214a, PIN_INPUT | MUX_MODE0)	/* sdmmc1_dat1 */
+> +			OMAP3_CORE1_IOPAD(0x214c, PIN_INPUT | MUX_MODE0)	/* sdmmc1_dat2 */
+> +			OMAP3_CORE1_IOPAD(0x214e, PIN_INPUT | MUX_MODE0)	/* sdmmc1_dat3 */
+> +		>;
+> +	};
+> +
+> +	mmc2_pins: pinmux_mmc2_pins {
+> +		pinctrl-single,pins = <
+> +			OMAP3_CORE1_IOPAD(0x2158, PIN_INPUT | MUX_MODE0)	/* sdmmc2_clk */
+> +			OMAP3_CORE1_IOPAD(0x215a, PIN_INPUT | MUX_MODE0)	/* sdmmc2_cmd */
+> +			OMAP3_CORE1_IOPAD(0x215c, PIN_INPUT | MUX_MODE0)	/* sdmmc2_dat0 */
+> +			OMAP3_CORE1_IOPAD(0x215e, PIN_INPUT | MUX_MODE0)	/* sdmmc2_dat1 */
+> +			OMAP3_CORE1_IOPAD(0x2160, PIN_INPUT | MUX_MODE0)	/* sdmmc2_dat2 */
+> +			OMAP3_CORE1_IOPAD(0x2162, PIN_INPUT | MUX_MODE0)	/* sdmmc2_dat3 */
+> +			OMAP3_CORE1_IOPAD(0x2164, PIN_INPUT | MUX_MODE0)	/* sdmmc2_dat4 */
+> +			OMAP3_CORE1_IOPAD(0x2166, PIN_INPUT | MUX_MODE0)	/* sdmmc2_dat5 */
+> +			OMAP3_CORE1_IOPAD(0x2168, PIN_INPUT | MUX_MODE0)	/* sdmmc2_dat6 */
+> +			OMAP3_CORE1_IOPAD(0x216a, PIN_INPUT | MUX_MODE0)	/* sdmmc2_dat7 */
+> +		>;
+> +	};
+> +};
+> +
+> +&omap3_pmx_wkup {
+> +	pinctrl-names = "default";
+> +
+> +	mmc1_cd_pin: pinmux_mmc1_cd_pin {
+> +		pinctrl-single,pins = <
+> +			OMAP3_WKUP_IOPAD(0x2a1a, PIN_INPUT | MUX_MODE4)		/* gpio_10 */
+> +		>;
+> +	};
+> +};
+> +
+> +&gpio2 {
+> +	ti,no-reset-on-init;
+> +};
+> +
+> +&gpio5 {
+> +	ti,no-reset-on-init;
+> +};
+> +
+> +&gpio6 {
+> +	ti,no-reset-on-init;
+> +};
+> +
+> +&uart3 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&uart3_pins &dp3t_sel_pins>;
+> +
+> +	interrupts-extended = <&intc 74 &omap3_pmx_core OMAP3_UART3_RX>;
+> +};
+> +
+> +&i2c1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&i2c1_pins>;
+> +
+> +	clock-frequency = <2600000>;
+> +
+> +	twl: twl at 48 {
+> +		reg = <0x48>;
+> +		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
+> +		interrupt-parent = <&intc>;
+> +
+> +		twl_power: power {
+> +			compatible = "ti,twl4030-power";
+> +			ti,use_poweroff;
+> +		};
+> +	};
+> +};
+> +
+> +#include "twl4030.dtsi"
+> +#include "twl4030_omap3.dtsi"
+> +
+> +&i2c2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&i2c2_pins>;
+> +
+> +	clock-frequency = <400000>;
+> +};
+> +
+> +&i2c3 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&i2c3_pins>;
+> +
+> +	clock-frequency = <400000>;
+> +
+> +	lp8720 at 7d {
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&lp8720_en_pin>;
+> +
+> +		compatible = "ti,lp8720";
+> +		reg = <0x7d>;
+> +
+> +		enable-gpios = <&gpio2 5 GPIO_ACTIVE_HIGH>; /* gpio_37 */
+> +
+> +		lp8720_ldo1: ldo1 {
+> +			regulator-min-microvolt = <3000000>;
+> +			regulator-max-microvolt = <3000000>;
+> +		};
+> +	};
+> +};
+> +
+> +&mmc1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&mmc1_pins &mmc1_cd_pin>;
+> +	vmmc-supply = <&lp8720_ldo1>;
+> +	cd-gpios = <&gpio1 10 GPIO_ACTIVE_LOW>; /* gpio 10 */
+> +	bus-width = <4>;
+> +};
+> +
+> +&mmc2 {
+> +
+
+Please discard this newline in case v2 gets merged.
+
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&mmc2_pins>;
+> +	vmmc-supply = <&vmmc2>;
+> +	ti,non-removable;
+> +	bus-width = <8>;
+> +};
+> +
+> +&mmc3 {
+> +	status = "disabled";
+> +};
+> +
+> +/*
+> + * The TWL4030 VAUX2 and VDAC regulators power sensors that are slaves on I2C3.
+> + * When not powered, these sensors cause the I2C3 clock to stay low at all times,
+> + * making it impossible to reach other devices on I2C3.
+> + */
+> +
+> +&vaux2 {
+> +	regulator-min-microvolt = <2800000>;
+> +	regulator-max-microvolt = <2800000>;
+> +	regulator-always-on;
+> +};
+> +
+> +&vdac {
+> +	regulator-min-microvolt = <1800000>;
+> +	regulator-max-microvolt = <1800000>;
+> +	regulator-always-on;
+> +};
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160205/5a66aaca/attachment.sig>
