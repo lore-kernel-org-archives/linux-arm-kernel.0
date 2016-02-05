@@ -1,33 +1,49 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Fri,  5 Feb 2016 19:01:50 +0000
-Subject: [PATCH 6/6] arm64: dts: qcom: fix usb digital voltage levels
-In-Reply-To: <1454698819-13885-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1454698819-13885-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1454698910-14142-1-git-send-email-srinivas.kandagatla@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 5 Feb 2016 11:10:42 -0800
+Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
+ v4.5-rc1
+In-Reply-To: <CAPDyKFoawbrj3w_+2p5ugjByrwxwmA1S2God1VAvkRbh2rUtjg@mail.gmail.com>
+References: <CAPDyKFpRnmn+h_VH3jtC3u-BOf7-00nbzD30omaxaaZOOAK8Gg@mail.gmail.com>
+ <Pine.LNX.4.44L0.1602041702550.1515-100000@iolanthe.rowland.org>
+ <CAPDyKFrMZYdeun67FBXdWL16DBOuO16qqOxRsks3QBJhNB8SoQ@mail.gmail.com>
+ <20160205010810.GR19432@atomide.com>
+ <CAPDyKFoawbrj3w_+2p5ugjByrwxwmA1S2God1VAvkRbh2rUtjg@mail.gmail.com>
+Message-ID: <20160205191042.GT19432@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates the digital voltage levels from corner values to
-microvolts as we are going to use s1 regulator directly for vddcx
-instead of s1_corner.
+* Ulf Hansson <ulf.hansson@linaro.org> [160204 22:55]:
+> On 5 February 2016 at 02:08, Tony Lindgren <tony@atomide.com> wrote:
+> > * Ulf Hansson <ulf.hansson@linaro.org> [160204 14:35]:
+> >> On 4 February 2016 at 23:09, Alan Stern <stern@rowland.harvard.edu> wrote:
+> >> > On Thu, 4 Feb 2016, Ulf Hansson wrote:
+> >> >
+> >> >> I am really not questioning the autosuspend feature at all, it's a
+> >> >> really great feature!
+> >> >>
+> >> >> Now, I question the minor benefit we actually gain from having the
+> >> >> runtime PM core to update the mark in rpm_resume().
+> >> >
+> >> > As Tony pointed out, it prevents some devices from going to sleep right
+> >> > away.
+> >>
+> >> Because their drivers don't care to update the last busy mark!?
+> >
+> > Nope. Without that devices may never resume at all so the drivers
+> > can't do anything about it.
+> 
+> I don't get it. Why not? Because of another abuse of the runtime PM API?
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- arch/arm64/boot/dts/qcom/msm8916.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I think you should be able to test this case in your test driver by
+calling pm_runtime_resume() for your test driver after your
+test drive has autosuspended. Probably you need some delayed_work to
+do this in your test driver unless you have some test bus to go with it.
 
-diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-index cdda026..cb82f4f 100644
---- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-@@ -421,7 +421,7 @@
- 			interrupts = <GIC_SPI 134 IRQ_TYPE_EDGE_BOTH>,
- 				     <GIC_SPI 140 IRQ_TYPE_EDGE_RISING>;
- 
--			qcom,vdd-levels = <1 5 7>;
-+			qcom,vdd-levels = <500000 1000000 1320000>;
- 			qcom,phy-init-sequence = <0x44 0x6B 0x24 0x13>;
- 			dr_mode = "peripheral";
- 			qcom,otg-control = <2>; // PMIC
--- 
-1.9.1
+> Or we should probably continue to focus on fixing the regression. :-)
+
+Naturally we should fix up things yeah :) Having a test driver
+that works on any architecture sure makes things easier to verify.
+
+Regards,
+
+Tony
