@@ -1,57 +1,174 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 4 Feb 2016 22:10:21 -0800
-Subject: [PATCH 2/2] memory: omap-gpmc: Add Kconfig option for debug
-In-Reply-To: <56B22FC3.3050900@gmail.com>
-References: <20160108022619.GS12777@atomide.com> <568F4596.8020206@gmail.com>
- <20160108075913.GN11364@pali> <569052FE.1040008@gmail.com>
- <20160121091437.GT7192@pali> <56B077D4.3030902@gmail.com>
- <20160202233911.GB19432@atomide.com>
- <20160203000045.GE19432@atomide.com> <56B1A654.1060905@gmail.com>
- <56B22FC3.3050900@gmail.com>
-Message-ID: <20160205061021.GS19432@atomide.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Fri, 5 Feb 2016 14:11:25 +0800
+Subject: [PATCH v4 1/1] USB: core: let USB device know device node
+In-Reply-To: <1454582690.3356.18.camel@pengutronix.de>
+References: <1453706679-18948-1-git-send-email-peter.chen@freescale.com>
+ <1454582690.3356.18.camel@pengutronix.de>
+Message-ID: <20160205061124.GB1858@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com> [160203 08:51]:
-> - flashed maemo rootfs
+On Thu, Feb 04, 2016 at 11:44:50AM +0100, Philipp Zabel wrote:
+> Hi Peter,
 > 
-> sudo flasher-3.5 -f -F RX-51_2009SE_20.2010.36-2_PR_COMBINED_MR0_ARM.bin
-> --flash-only=rootfs -R
+> Am Montag, den 25.01.2016, 15:24 +0800 schrieb Peter Chen:
+> > Although most of USB devices are hot-plug's, there are still some devices
+> > are hard wired on the board, eg, for HSIC and SSIC interface USB devices.
+> > If these kinds of USB devices are multiple functions, and they can supply
+> > other interfaces like i2c, gpios for other devices, we may need to
+> > describe these at device tree.
+> > 
+> > In this commit, it uses "reg" in dts as physical port number to match
+> > the phyiscal port number decided by USB core, if they are the same,
+> > then the device node is for the device we are creating for USB core.
+> > 
+> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> > ---
+> > Changes for v4:
+> > - The range of "reg" should be 1-31, changing device node address
+> >   style as in lower case hexadecimal with leading zeroes suppressed
+> >   [binding doc, usb-device.txt]
+> > - Improve the example at binding doc, it describes node from the top
+> >   (the controller)
+> > - Delete the struct of_node * within struct usb_device
+> > - Using usb_hcd_find_raw_port_number to get raw port number under root
+> >   hub port
+> > 
+> > Changes for v3:
+> > - typo: s/descirbe/describe/
+> > 
+> > Changes for v2:
+> > - Fix build error reported by kbuild robot, lack of "static" for
+> >   inline usb_of_get_child_node
+> > - Fix typo, "devcie_node" -> "device_node"
+> > - Add kernel-doc for of_node at struct usb_device
+> > 
+> > Changes from RFC:
+> > - Fix the error address for binding doc, and add compatible for binding doc
+> > - Change get child node API from "usb_of_find_node" to
+> >   "usb_of_get_child_node"
+> > - Delete unecessary header files
+> > - One typo
+> > 
+> >  .../devicetree/bindings/usb/usb-device.txt         | 25 ++++++++++++
+> >  drivers/usb/core/Makefile                          |  2 +-
+> >  drivers/usb/core/of.c                              | 47 ++++++++++++++++++++++
+> >  drivers/usb/core/usb.c                             | 14 ++++++-
+> >  include/linux/usb/of.h                             |  7 ++++
+> >  5 files changed, 92 insertions(+), 3 deletions(-)
+> >  create mode 100644 Documentation/devicetree/bindings/usb/usb-device.txt
+> >  create mode 100644 drivers/usb/core/of.c
+> > 
+> > diff --git a/Documentation/devicetree/bindings/usb/usb-device.txt b/Documentation/devicetree/bindings/usb/usb-device.txt
+> > new file mode 100644
+> > index 0000000..c702885
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/usb/usb-device.txt
+> > @@ -0,0 +1,25 @@
+> > +Generic USB Device Properties
+> > +
+> > +Usually, we only use device tree for hard wired USB device.
+> > +The reference binding doc is from:
+> > +http://www.firmware.org/1275/bindings/usb/usb-1_0.ps
+> > +
+> > +Required properties:
+> > +- compatible: usbVID,PID
 > 
-> - booted to maemo and powered the device off
+> The reference recommendation states that for single-configuration USB
+> devices the compatible should contain all of the applicable strings from
+> the list starting with 2) "usbVID,PID.REV" and ending with 11)
+> "usb,device". Are we going to ignore this?
 > 
-> sudo flasher-3.5 -k zImage  -l -b"init=/sbin/preinit ubi.mtd=rootfs
-> root=ubi0:rootfs rootfstype=ubifs rootflags=bulk_read,no_chk_data_crc rw
-> mtdoops.mtddev=log  omapfb_vram=7M omapfb.mode=lcd:848x480-16
-> nokia-modem.pm=0"
 
-This seems to fix things here for legacy booting and booting the
-maemo zImage after dts image. Care to give it a try?
+I have not seen benefits if we write several compatibles in dts,
+the information of compatibles listed in doc can be got during
+the enumeration.
 
-Basically onenand after reset is in wrong state, have not looked
-up the bits yet. Will post a better patch when I get a chance
-over next few days.
+I suggest we use the simple pattern for this compatible, in that
+case, every one can be easy to follow it, and will not be confused
+which compatibles should be used, and the style can be unify.
 
-Regards,
+> The document also states that "the textual representation of VID, PID
+> [...] shall be in lower case hexadecimal with leading zeroes
+> suppressed". This should be documented here.
 
-Tony
+I will change.
 
-8< -----------
---- a/arch/arm/mach-omap2/gpmc-onenand.c
-+++ b/arch/arm/mach-omap2/gpmc-onenand.c
-@@ -104,6 +104,7 @@ static void set_onenand_cfg(void __iomem *onenand_base)
- 	u32 reg;
- 
- 	reg = readw(onenand_base + ONENAND_REG_SYS_CFG1);
-+	reg = 0x06c0;
- 	reg &= ~((0x7 << ONENAND_SYS_CFG1_BRL_SHIFT) | (0x7 << 9));
- 	reg |=	(latency << ONENAND_SYS_CFG1_BRL_SHIFT) |
- 		ONENAND_SYS_CFG1_BL_16;
-@@ -289,6 +290,7 @@ static int omap2_onenand_setup_async(void __iomem *onenand_base)
- 		}
- 	}
- 
-+	onenand_async.sync_write = true;
- 	omap2_onenand_calc_async_timings(&t);
- 
- 	ret = gpmc_cs_program_settings(gpmc_onenand_data->cs, &onenand_async);
+> 
+> > +- reg: the port number which this device is connecting to, the range
+> > +  is 1-31.
+> > +
+> > +
+> > +Example:
+> > +
+> > +&usb1 {
+> > +	status = "okay";
+> > +
+> > +	#address-cells = <1>;
+> > +	#size-cells = <0>;
+> > +
+> > +	hub: genesys at 1 {
+> 
+> There are node names specified for hubs and mass storage devices:
+> "hub", "storage", "cdrom", "tape", "solid-state", and "device" for
+> everything else. Should we follow this recommendation?
+
+I agree.
+
+> 
+> > +		compatible = "usb05e3,0608";
+> > +		reg = <0x1>;
+> > +	};
+> 
+> I'd have written this node as:
+> 
+> 	hub: hub at 1 {
+> 		compatible = "usb5e3,608", "usb5e3,class9",
+> 			     "usb,class9", "usb,device";
+> 		reg = <1>;
+> 	};
+
+The reg should be hexadecimal, do we need to add "0x" before the value?
+
+> As another example, I'd like to introduce the USB WLAN Adapter soldered
+> onto the imx6q-gk802 board to its power enable GPIO via the device tree:
+> 
+> /* Internal USB port (USBH1) */
+> &usbh1 {
+> 	#address-cells = <1>;
+> 	#size-cells = <0>;
+> 	status = "okay";
+> 
+> 	/* RTL8192CU 802.11n WLAN Adapter */
+> 	device at 1 {
+> 		compatible = "usbbda,8176.200", "usbbda,8176",
+> 			     "usb,device";
+> 		reg = <1>;
+> 
+> 		enable-gpios = <&gpio2 0 GPIO_ACTIVE_LOW>;
+> 	};
+> };
+> 
+
+It is okay to use your example, but I still insist like below:
+
+/* Internal USB port (USBH1) */
+&usbh1 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	status = "okay";
+
+	/* RTL8192CU 802.11n WLAN Adapter */
+	device at 1 {
+		compatible = "usbbda,8176";
+		reg = <1>;
+
+		enable-gpios = <&gpio2 0 GPIO_ACTIVE_LOW>;
+	};
+};
+
+
+-- 
+
+Best Regards,
+Peter Chen
