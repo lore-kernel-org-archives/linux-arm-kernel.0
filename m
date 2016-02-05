@@ -1,51 +1,109 @@
-From: tchalamarla@caviumnetworks.com (tchalamarla at caviumnetworks.com)
-Date: Fri, 5 Feb 2016 11:28:16 -0800
-Subject: [PATCH] arm64: KVM: Add 48bit PA support for EL2  translations
-Message-ID: <1454700496-21221-1-git-send-email-tchalamarla@caviumnetworks.com>
+From: leoyang.li@nxp.com (Yang-Leo Li)
+Date: Fri, 5 Feb 2016 19:36:50 +0000
+Subject: [PATCH] PCI: layerscape: add ls2085a compatible
+In-Reply-To: <20160205155412.GB29306@localhost>
+References: <1453915925-19198-1-git-send-email-yang.shi@linaro.org>
+ <56A906F4.3050809@linaro.org> <20160204223711.GE7031@localhost>
+ <56B3E386.8010002@linaro.org>
+ <VI1PR04MB1230AA5CAEEEE0D4AD8E3DF288D20@VI1PR04MB1230.eurprd04.prod.outlook.com>
+ <VI1PR04MB16155E4265922D6659B439C1E8D20@VI1PR04MB1615.eurprd04.prod.outlook.com>
+ <20160205155412.GB29306@localhost>
+Message-ID: <AM2PR04MB0770FD6ED4FD45AFE600C6DB8FD20@AM2PR04MB0770.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
+> On Fri, Feb 05, 2016 at 06:07:10AM +0000, Minghuan Lian wrote:
+> > The patch is ok to me.
+> 
+> Thanks, I'll transform that into an ack.
 
-Systems where RAM is at higher address and MultiNode systems
-whith higher address RAM, 39 bit max PA for EL2 translations
-is not sufficient.
+Also
+Acked-by: Li Yang <leoyang.li@nxp.com>
 
-This patch sets max possible PA(48bit) for EL2 translations.
+> 
+> Who's going to post a patch to update MAINTAINERS to fix the @freescale.com
+> addresses?  If we can get that in for v4.5, it will save some hassle.
 
-Signed-off-by: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
----
- arch/arm64/include/asm/kvm_arm.h | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+The @freescale.com address can still reach us for some time(not sure how long though).  I don't know if all the people want to change to an NXP company email address in MAINTAINERS or just update to a personal email address as some already did.
 
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index 738a95f..3fc38a4 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -98,7 +98,12 @@
- #define TCR_EL2_RES1	((1 << 31) | (1 << 23))
- #define TCR_EL2_TBI	(1 << 20)
- #define TCR_EL2_PS	(7 << 16)
-+#define TCR_EL2_PS_32B	(0 << 16)
-+#define TCR_EL2_PS_36B	(1 << 16)
- #define TCR_EL2_PS_40B	(2 << 16)
-+#define TCR_EL2_PS_42B	(3 << 16)
-+#define TCR_EL2_PS_44B	(4 << 16)
-+#define TCR_EL2_PS_48B	(5 << 16)
- #define TCR_EL2_TG0	(1 << 14)
- #define TCR_EL2_SH0	(3 << 12)
- #define TCR_EL2_ORGN0	(3 << 10)
-@@ -107,7 +112,10 @@
- #define TCR_EL2_MASK	(TCR_EL2_TG0 | TCR_EL2_SH0 | \
- 			 TCR_EL2_ORGN0 | TCR_EL2_IRGN0 | TCR_EL2_T0SZ)
- 
--#define TCR_EL2_FLAGS	(TCR_EL2_RES1 | TCR_EL2_PS_40B)
-+/*
-+ * Assign the highest possible PS.
-+ */
-+#define TCR_EL2_FLAGS	(TCR_EL2_RES1 | TCR_EL2_PS_48B)
- 
- /* VTCR_EL2 Registers bits */
- #define VTCR_EL2_RES1		(1 << 31)
--- 
-2.1.0
+Regards,
+Leo
+
+> 
+> > > -----Original Message-----
+> > > From: Bhupesh Sharma
+> > > Sent: Friday, February 05, 2016 1:36 PM
+> > > To: Shi, Yang <yang.shi@linaro.org>; Bjorn Helgaas
+> > > <helgaas@kernel.org>; Yang-Leo Li <leoyang.li@nxp.com>;
+> > > shawn.guo at linaro.org
+> > > Cc: Mingkai Hu <mingkai.hu@nxp.com>; Minghuan Lian
+> > > <minghuan.lian@nxp.com>; bhelgaas at google.com;
+> > > linux-pci at vger.kernel.org; linux-kernel at vger.kernel.org;
+> > > linux-arm-kernel at lists.infradead.org;
+> > > linaro-kernel at lists.linaro.org
+> > > Subject: RE: [PATCH] PCI: layerscape: add ls2085a compatible
+> > >
+> > > > From: Shi, Yang
+> > > > Sent: Friday, February 05, 2016 5:19 AM
+> > > >
+> > > > On 2/4/2016 2:37 PM, Bjorn Helgaas wrote:
+> > > > > On Wed, Jan 27, 2016 at 10:05:40AM -0800, Shi, Yang wrote:
+> > > > >> Correct FSL folks email address to nxp.com, sorry for the
+> > > > inconvenience.
+> > > > >
+> > > > > Do we need some MAINTAINERS updates in addition to the ack for
+> > > > > this
+> > > > patch?
+> > > > > I see a bunch of @freescale.com addresses in MAINTAINERS.
+> > > >
+> > > > I guess so if the @freescale.com address is not valid anymore.
+> > >
+> > > All @freescale.com address have shifted to @nxp.com.
+> > >
+> > > Leo, Minghuan - can you kindly review this patch.
+> > >
+> > > Shawn - can you take this through your tree, once Leo and Minghuan
+> > > have reviewed the code.
+> > >
+> > > Regards,
+> > > Bhupesh
+> > >
+> > > >
+> > > > >
+> > > > >> On 1/27/2016 9:32 AM, Yang Shi wrote:
+> > > > >>> The layerscape PCI host driver needs recognize ls2085a
+> > > > >>> compatible when using firmware with ls2085a compatible
+> > > > >>> property, otherwise the PCI bus won't be detected even though
+> > > > >>> ls2085a compatible is included
+> > > > by the dts.
+> > > > >>>
+> > > > >>> Signed-off-by: Yang Shi <yang.shi@linaro.org>
+> > > > >>> ---
+> > > > >>>   drivers/pci/host/pci-layerscape.c | 1 +
+> > > > >>>   1 file changed, 1 insertion(+)
+> > > > >>>
+> > > > >>> diff --git a/drivers/pci/host/pci-layerscape.c
+> > > > >>> b/drivers/pci/host/pci-layerscape.c
+> > > > >>> index 3923bed..c40d8b2 100644
+> > > > >>> --- a/drivers/pci/host/pci-layerscape.c
+> > > > >>> +++ b/drivers/pci/host/pci-layerscape.c
+> > > > >>> @@ -203,6 +203,7 @@ static const struct of_device_id
+> > > > ls_pcie_of_match[] = {
+> > > > >>>   	{ .compatible = "fsl,ls1021a-pcie", .data = &ls1021_drvdata
+> > > > },
+> > > > >>>   	{ .compatible = "fsl,ls1043a-pcie", .data = &ls1043_drvdata
+> > > > },
+> > > > >>>   	{ .compatible = "fsl,ls2080a-pcie", .data = &ls2080_drvdata
+> > > > },
+> > > > >>> +	{ .compatible = "fsl,ls2085a-pcie", .data = &ls2080_drvdata
+> > > > >>> +},
+> > > > >>>   	{ },
+> > > > >>>   };
+> > > > >>>   MODULE_DEVICE_TABLE(of, ls_pcie_of_match);
+> > > > >>>
+> > > > >>
+> > > >
+> > > > --
+> > > > To unsubscribe from this list: send the line "unsubscribe linux-pci"
+> > > > in the body of a message to majordomo at vger.kernel.org More
+> > > > majordomo info at http://vger.kernel.org/majordomo-info.html
