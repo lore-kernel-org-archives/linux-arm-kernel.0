@@ -1,90 +1,57 @@
-From: minghuan.lian@nxp.com (Minghuan Lian)
-Date: Fri, 5 Feb 2016 06:07:10 +0000
-Subject: [PATCH] PCI: layerscape: add ls2085a compatible
-In-Reply-To: <VI1PR04MB1230AA5CAEEEE0D4AD8E3DF288D20@VI1PR04MB1230.eurprd04.prod.outlook.com>
-References: <1453915925-19198-1-git-send-email-yang.shi@linaro.org>
- <56A906F4.3050809@linaro.org> <20160204223711.GE7031@localhost>
- <56B3E386.8010002@linaro.org>
- <VI1PR04MB1230AA5CAEEEE0D4AD8E3DF288D20@VI1PR04MB1230.eurprd04.prod.outlook.com>
-Message-ID: <VI1PR04MB16155E4265922D6659B439C1E8D20@VI1PR04MB1615.eurprd04.prod.outlook.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 4 Feb 2016 22:10:21 -0800
+Subject: [PATCH 2/2] memory: omap-gpmc: Add Kconfig option for debug
+In-Reply-To: <56B22FC3.3050900@gmail.com>
+References: <20160108022619.GS12777@atomide.com> <568F4596.8020206@gmail.com>
+ <20160108075913.GN11364@pali> <569052FE.1040008@gmail.com>
+ <20160121091437.GT7192@pali> <56B077D4.3030902@gmail.com>
+ <20160202233911.GB19432@atomide.com>
+ <20160203000045.GE19432@atomide.com> <56B1A654.1060905@gmail.com>
+ <56B22FC3.3050900@gmail.com>
+Message-ID: <20160205061021.GS19432@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch is ok to me.
+* Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com> [160203 08:51]:
+> - flashed maemo rootfs
+> 
+> sudo flasher-3.5 -f -F RX-51_2009SE_20.2010.36-2_PR_COMBINED_MR0_ARM.bin
+> --flash-only=rootfs -R
+> 
+> - booted to maemo and powered the device off
+> 
+> sudo flasher-3.5 -k zImage  -l -b"init=/sbin/preinit ubi.mtd=rootfs
+> root=ubi0:rootfs rootfstype=ubifs rootflags=bulk_read,no_chk_data_crc rw
+> mtdoops.mtddev=log  omapfb_vram=7M omapfb.mode=lcd:848x480-16
+> nokia-modem.pm=0"
 
-Thanks,
-Minghuan
+This seems to fix things here for legacy booting and booting the
+maemo zImage after dts image. Care to give it a try?
 
-> -----Original Message-----
-> From: Bhupesh Sharma
-> Sent: Friday, February 05, 2016 1:36 PM
-> To: Shi, Yang <yang.shi@linaro.org>; Bjorn Helgaas <helgaas@kernel.org>;
-> Yang-Leo Li <leoyang.li@nxp.com>; shawn.guo at linaro.org
-> Cc: Mingkai Hu <mingkai.hu@nxp.com>; Minghuan Lian
-> <minghuan.lian@nxp.com>; bhelgaas at google.com; linux-pci at vger.kernel.org;
-> linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> linaro-kernel at lists.linaro.org
-> Subject: RE: [PATCH] PCI: layerscape: add ls2085a compatible
-> 
-> > From: Shi, Yang
-> > Sent: Friday, February 05, 2016 5:19 AM
-> >
-> > On 2/4/2016 2:37 PM, Bjorn Helgaas wrote:
-> > > On Wed, Jan 27, 2016 at 10:05:40AM -0800, Shi, Yang wrote:
-> > >> Correct FSL folks email address to nxp.com, sorry for the
-> > inconvenience.
-> > >
-> > > Do we need some MAINTAINERS updates in addition to the ack for this
-> > patch?
-> > > I see a bunch of @freescale.com addresses in MAINTAINERS.
-> >
-> > I guess so if the @freescale.com address is not valid anymore.
-> 
-> All @freescale.com address have shifted to @nxp.com.
-> 
-> Leo, Minghuan - can you kindly review this patch.
-> 
-> Shawn - can you take this through your tree, once Leo and Minghuan have
-> reviewed the code.
-> 
-> Regards,
-> Bhupesh
-> 
-> >
-> > >
-> > >> On 1/27/2016 9:32 AM, Yang Shi wrote:
-> > >>> The layerscape PCI host driver needs recognize ls2085a compatible
-> > >>> when using firmware with ls2085a compatible property, otherwise
-> > >>> the PCI bus won't be detected even though ls2085a compatible is
-> > >>> included
-> > by the dts.
-> > >>>
-> > >>> Signed-off-by: Yang Shi <yang.shi@linaro.org>
-> > >>> ---
-> > >>>   drivers/pci/host/pci-layerscape.c | 1 +
-> > >>>   1 file changed, 1 insertion(+)
-> > >>>
-> > >>> diff --git a/drivers/pci/host/pci-layerscape.c
-> > >>> b/drivers/pci/host/pci-layerscape.c
-> > >>> index 3923bed..c40d8b2 100644
-> > >>> --- a/drivers/pci/host/pci-layerscape.c
-> > >>> +++ b/drivers/pci/host/pci-layerscape.c
-> > >>> @@ -203,6 +203,7 @@ static const struct of_device_id
-> > ls_pcie_of_match[] = {
-> > >>>   	{ .compatible = "fsl,ls1021a-pcie", .data = &ls1021_drvdata
-> > },
-> > >>>   	{ .compatible = "fsl,ls1043a-pcie", .data = &ls1043_drvdata
-> > },
-> > >>>   	{ .compatible = "fsl,ls2080a-pcie", .data = &ls2080_drvdata
-> > },
-> > >>> +	{ .compatible = "fsl,ls2085a-pcie", .data = &ls2080_drvdata },
-> > >>>   	{ },
-> > >>>   };
-> > >>>   MODULE_DEVICE_TABLE(of, ls_pcie_of_match);
-> > >>>
-> > >>
-> >
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-pci"
-> > in the body of a message to majordomo at vger.kernel.org More majordomo
-> > info at http://vger.kernel.org/majordomo-info.html
+Basically onenand after reset is in wrong state, have not looked
+up the bits yet. Will post a better patch when I get a chance
+over next few days.
+
+Regards,
+
+Tony
+
+8< -----------
+--- a/arch/arm/mach-omap2/gpmc-onenand.c
++++ b/arch/arm/mach-omap2/gpmc-onenand.c
+@@ -104,6 +104,7 @@ static void set_onenand_cfg(void __iomem *onenand_base)
+ 	u32 reg;
+ 
+ 	reg = readw(onenand_base + ONENAND_REG_SYS_CFG1);
++	reg = 0x06c0;
+ 	reg &= ~((0x7 << ONENAND_SYS_CFG1_BRL_SHIFT) | (0x7 << 9));
+ 	reg |=	(latency << ONENAND_SYS_CFG1_BRL_SHIFT) |
+ 		ONENAND_SYS_CFG1_BL_16;
+@@ -289,6 +290,7 @@ static int omap2_onenand_setup_async(void __iomem *onenand_base)
+ 		}
+ 	}
+ 
++	onenand_async.sync_write = true;
+ 	omap2_onenand_calc_async_timings(&t);
+ 
+ 	ret = gpmc_cs_program_settings(gpmc_onenand_data->cs, &onenand_async);
