@@ -1,76 +1,70 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 5 Feb 2016 17:54:46 +0100
-Subject: [PATCH v5sub2 1/8] arm64: add support for module PLTs
-In-Reply-To: <20160205164648.GH6076@e104818-lin.cambridge.arm.com>
-References: <1454332178-4414-1-git-send-email-ard.biesheuvel@linaro.org>
- <1454332178-4414-2-git-send-email-ard.biesheuvel@linaro.org>
- <20160204151303.GB6076@e104818-lin.cambridge.arm.com>
- <CAKv+Gu9n=bmsZ=UOBiLWzaG2JSsbdC8k1mB7yFbH0czrbXS-1g@mail.gmail.com>
- <20160205154234.GF6076@e104818-lin.cambridge.arm.com>
- <CAKv+Gu-poQiuc7+O38n93Xt2o-SYi3kYD0k_9+-6T0=FXV9uXA@mail.gmail.com>
- <20160205160054.GG6076@e104818-lin.cambridge.arm.com>
- <CAKv+Gu8g7FHHZgmbFww_XZjf5J1utmigwBiNqCg8a3crfB4xFA@mail.gmail.com>
- <20160205164648.GH6076@e104818-lin.cambridge.arm.com>
-Message-ID: <CAKv+Gu-W_zKYEz0yKVevtO2b2A8+TEEXfX+iGG8PLcV7M63JYw@mail.gmail.com>
+From: slash.tmp@free.fr (Mason)
+Date: Fri, 5 Feb 2016 17:58:38 +0100
+Subject: [PATCH RFC] Add cpufreq support
+Message-ID: <56B4D4BE.2040008@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 February 2016 at 17:46, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Fri, Feb 05, 2016 at 05:20:14PM +0100, Ard Biesheuvel wrote:
->> On 5 February 2016 at 17:00, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> > On Fri, Feb 05, 2016 at 04:53:10PM +0100, Ard Biesheuvel wrote:
->> >> On 5 February 2016 at 16:42, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> >> > On Thu, Feb 04, 2016 at 04:31:59PM +0100, Ard Biesheuvel wrote:
->> >> >> On 4 February 2016 at 16:13, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> >> >> > On Mon, Feb 01, 2016 at 02:09:31PM +0100, Ard Biesheuvel wrote:
->> >> >> >> This adds support for emitting PLTs at module load time for relative
->> >> >> >> branches that are out of range. This is a prerequisite for KASLR, which
->> >> >> >> may place the kernel and the modules anywhere in the vmalloc area,
->> >> >> >> making it more likely that branch target offsets exceed the maximum
->> >> >> >> range of +/- 128 MB.
->> >> >> >
->> >> >> > Any downside to trying to keep the kernel+modules coupled together so
->> >> >> > that we avoid the PLT?
->> >> >>
->> >> >> First of all, note that it is unlikely that the PLTs are ever required
->> >> >> in practice, considering that either
->> >> >> a) the kernel is loaded at the default location right at the base of
->> >> >> the vmalloc range, and in this case, the module space is reserved for
->> >> >> modules only, or
->> >> >> b) the kernel is loaded at some random offset in the 240+ GB vmalloc
->> >> >> space, and it is unlikely that all VMA space around the kernel happens
->> >> >> to be given out to non-randomized vmalloc/ioremap allocations
->> >> >
->> >> > My worry is that we merge some code that's rarely tested.
->> >>
->> >> I understand. But unfortunately, having corner cases that are unlikely
->> >> but not impossible comes with the territory of randomization.
->> >>
->> >> Alternatively, we could take the performance hit if KASLR is in effect
->> >> and allocate each module completely randomly as well. This way, the
->> >> code is always exercised (for now), and we can always backpedal later
->> >> if the performance is measurably worse.
->> >
->> > I'm fine with this. You can post it as a separate patch that we can
->> > easily revert/modify later (like turning it into a config option).
->>
->> OK, I will hack something up
->
-> If it's simpler, you can just add a config option but defaulting to the
-> full vmalloc space for modules.
->
+I'm throwing this out there to ask:
+Is this the right way to enable cpufreq on my platform?
+---
+ arch/arm/boot/dts/tango4-common.dtsi  | 4 ++++
+ arch/arm/boot/dts/tango4-smp8758.dtsi | 2 ++
+ arch/arm/mach-tango/setup.c           | 7 +++++++
+ 3 files changed, 13 insertions(+)
 
-What would be the simplest is to randomize the 128 MB module region as
-a whole, and either put it close to the kernel (which is what I am
-doing now), or put it at a random offset inside the vmalloc space, in
-which case all branches will be resolved via PLTs. My suggestion to
-randomize each module_alloc() call separately is actually not that
-straight-forward.
-
-So what I propose now is to keep a single module_load_offset that
-randomizes the base of the region, and add a default-n config option
-that shrinks the interval it is chosen from so that PLTs are usually
-not needed.
-
--- 
-Ard.
+diff --git a/arch/arm/boot/dts/tango4-common.dtsi b/arch/arm/boot/dts/tango4-common.dtsi
+index 41dff0a93419..557cb67d183f 100644
+--- a/arch/arm/boot/dts/tango4-common.dtsi
++++ b/arch/arm/boot/dts/tango4-common.dtsi
+@@ -193,3 +193,7 @@
+ 		};
+ 	};
+ };
++
++&cpu0 {
++	clocks = <&clkgen CPU_CLK>;
++};
+diff --git a/arch/arm/boot/dts/tango4-smp8758.dtsi b/arch/arm/boot/dts/tango4-smp8758.dtsi
+index 7ed88ee629fb..0db290a8334d 100644
+--- a/arch/arm/boot/dts/tango4-smp8758.dtsi
++++ b/arch/arm/boot/dts/tango4-smp8758.dtsi
+@@ -11,6 +11,8 @@
+ 			next-level-cache = <&l2cc>;
+ 			device_type = "cpu";
+ 			reg = <0>;
++			clock-latency = <300000>;
++			operating-points = <1215000 0 607500 0 405000 0 243000 0 135000 0>;
+ 		};
+ 
+ 		cpu1: cpu at 1 {
+diff --git a/arch/arm/mach-tango/setup.c b/arch/arm/mach-tango/setup.c
+index a796841c039b..0e8f90f70e85 100644
+--- a/arch/arm/mach-tango/setup.c
++++ b/arch/arm/mach-tango/setup.c
+@@ -1,6 +1,7 @@
+ #include <asm/mach/map.h>
+ #include <asm/mach/arch.h>
+ #include <asm/hardware/cache-l2x0.h>
++#include <linux/platform_device.h>
+ #include "smc.h"
+ 
+ static struct map_desc tango_map_desc[] __initdata = {
+@@ -23,6 +24,11 @@ static void tango_l2c_write(unsigned long val, unsigned int reg)
+ 		tango_set_l2_control(val);
+ }
+ 
++static void __init tango_init_late(void)
++{
++	platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
++}
++
+ static const char *const tango_dt_compat[] = { "sigma,tango4", NULL };
+ 
+ DT_MACHINE_START(TANGO_DT, "Sigma Tango DT")
+@@ -30,4 +36,5 @@ DT_MACHINE_START(TANGO_DT, "Sigma Tango DT")
+ 	.l2c_aux_mask	= ~0,
+ 	.l2c_write_sec	= tango_l2c_write,
+ 	.map_io		= tango_map_io,
++	.init_late	= tango_init_late,
+ MACHINE_END
