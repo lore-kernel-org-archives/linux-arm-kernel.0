@@ -1,89 +1,103 @@
-From: stillcompiling@gmail.com (Joshua Clayton)
-Date: Fri, 5 Feb 2016 17:03:47 -0800
-Subject: [PATCH net-next V2 7/8] net: fec: don't transfer ownership
- until descriptor write is complete
-In-Reply-To: <1454709170-19527-8-git-send-email-troy.kisky@boundarydevices.com>
-References: <1454709170-19527-1-git-send-email-troy.kisky@boundarydevices.com>
- <1454709170-19527-8-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <20160205170347.45a91314@jclayton-pc>
+From: xinliang.liu@linaro.org (Xinliang Liu)
+Date: Sat,  6 Feb 2016 11:24:47 +0800
+Subject: [PATCH v4 00/11] Add DRM Driver for HiSilicon Kirin hi6220 SoC
+Message-ID: <1454729098-79807-1-git-send-email-xinliang.liu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri,  5 Feb 2016 14:52:49 -0700
-Troy Kisky <troy.kisky@boundarydevices.com> wrote:
+This patch set adds a new drm driver for HiSilicon Kirin hi6220 SoC.
+Current testing and support board is Hikey board which is one of Linaro
+96boards. It is an arm64 open source board. For more information about
+this board, please access https://www.96boards.org.
 
-> If you don't own it, you shouldn't write to it.
-> 
-> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
-> ---
->  drivers/net/ethernet/freescale/fec_main.c | 14 +++++++++++++-
->  1 file changed, 13 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/net/ethernet/freescale/fec_main.c
-> b/drivers/net/ethernet/freescale/fec_main.c index ca2708d..97ca72a
-> 100644 --- a/drivers/net/ethernet/freescale/fec_main.c
-> +++ b/drivers/net/ethernet/freescale/fec_main.c
-> @@ -390,6 +390,10 @@ fec_enet_txq_submit_frag_skb(struct
-> fec_enet_priv_tx_q *txq, 
->  		bdp->cbd_bufaddr = cpu_to_fec32(addr);
->  		bdp->cbd_datlen = cpu_to_fec16(frag_len);
-> +		/* Make sure the updates to rest of the descriptor
-> are
-> +		 * performed before transferring ownership.
-> +		 */
-> +		wmb();
->  		bdp->cbd_sc = cpu_to_fec16(status);
-You use almost exactly the same code in each place.
-I'd prefer to have wmb(); bdp->cbd_sc = cpu_to_fec16(status) wrapped in
-a function or function like macro, and put the comment in one place.
+Hardware Detail
+---------------
+  The display subsystem of Hi6220 SoC is shown as bellow:
+ +-----+       +----------+     +-----+     +-------------+
+ |     |       |          |     |     |     |             |             	
+ | FB  |------>|   ADE    |---->| DSI |---->|   External  |
+ |     |       |          |     |     |     |  HDMI/panel |
+ +-----+       +----------+     +-----+     +-------------+
 
-e.g.
+- ADE(Advanced Display Engine) is the display controller. It contains 7
+channels, 3 overlay compositors and a LDI.
+  - A channel looks like: DMA-->clip-->scale-->ctrans(or called csc).
+  - Overlay compositor is response to compose planes which come from 7
+  channels and pass composed image to LDI.
+  - LDI is response to generate timings and RGB data stream.
+- DSI converts the RGB data stream from ADE to DSI packets.
+- External HDMI/panel module is connected with DSI bus. Now Hikey use a
+  ADI's ADV7533 external HDMI chip.
 
-/* Make sure the updates to rest of the descriptor
- * performed before transferring ownership.
- */
-#define fec_enet_xfr_ownership(status) \
-	do { \
-		wmb();
-		bdp->cbd_sc = cpu_to_fec16(status);
-	} while (0)
+Change History
+-------------
+Changes in v4:
+- Describe more specific of clocks and ports of binding docs.
+- Fix indentation of binding docs.
 
-(I don't know if thats the right macro name, I'm just basing it off
-your comment)
+Changes in v3:
+- Move and rename all the files to kirin sub-directory.
+  So that we could separate different seires SoCs' driver.
+- Make ade as the drm master node.
+- Replace drm_platform_init, load, unload implementation.
+- Use assigned-clocks to set clock rate.
+- Use ports to connect display relavant nodes.
+- Rename hisi_drm_dsi.c to dw_drm_dsi.c
+- Make encoder type as DRM_MODE_ENCODER_DSI.
+- A few cleanup on regs and code.
 
->  	}
->  
-> @@ -499,6 +503,10 @@ static int fec_enet_txq_submit_skb(struct
-> fec_enet_priv_tx_q *txq, 
->  	bdp->cbd_datlen = cpu_to_fec16(buflen);
->  	bdp->cbd_bufaddr = cpu_to_fec32(addr);
-> +	/* Make sure the updates to rest of the descriptor are
-> performed before
-> +	 * transferring ownership.
-> +	 */
-> +	wmb();
->  
->  	/* Send it on its way.  Tell FEC it's ready, interrupt when
-> done,
->  	 * it's the last BD of the frame, and to put the CRC on the
-> end. @@ -1475,7 +1483,6 @@ rx_processing_done:
->  
->  		/* Mark the buffer empty */
->  		status |= BD_ENET_RX_EMPTY;
-> -		bdp->cbd_sc = cpu_to_fec16(status);
->  
->  		if (fep->bufdesc_ex) {
->  			struct bufdesc_ex *ebdp = (struct bufdesc_ex
-> *)bdp; @@ -1484,6 +1491,11 @@ rx_processing_done:
->  			ebdp->cbd_prot = 0;
->  			ebdp->cbd_bdu = 0;
->  		}
-> +		/* Make sure the updates to rest of the descriptor
-> are
-> +		 * performed before transferring ownership.
-> +		 */
-> +		wmb();
-> +		bdp->cbd_sc = cpu_to_fec16(status);
->  
->  		/* Update BD pointer to next entry */
->  		bdp = fec_enet_get_nextdesc(bdp, &rxq->bd);
+Changes in v2:
+- Remove abtraction layer of plane/crtc/encoder/connector.
+- Refactor atomic implementation according to Daniel Vetter's guides:
+http://blog.ffwll.ch/2014/11/atomic-modeset-support-for-kms-drivers.html
+http://blog.ffwll.ch/2015/09/xdc-2015-atomic-modesetting-for-drivers.html
+http://blog.ffwll.ch/2015/08/atomic-modesetting-design-overview.html
+- Use bridge instead of slave encoder to connect external HDMI.
+- Move dt binding docs to bindings/display/hisilicon directory. 
+
+Xinliang Liu (11):
+  drm/hisilicon: Add device tree binding for hi6220 display subsystem
+  drm/hisilicon: Add hisilicon kirin drm master driver
+  drm/hisilicon: Add crtc driver for ADE
+  drm/hisilicon: Add plane driver for ADE
+  drm/hisilicon: Add vblank driver for ADE
+  drm/hisilicon: Add cma fbdev and hotplug
+  drm/hisilicon: Add designware dsi encoder driver
+  drm/hisilicon: Add designware dsi host driver
+  drm/hisilicon: Add support for external bridge
+  MAINTAINERS: Add maintainer for hisilicon DRM driver
+  arm64: dts: hisilicon: Add display subsystem DT nodes for hi6220
+
+ .../bindings/display/hisilicon/dw-dsi.txt          |   77 ++
+ .../bindings/display/hisilicon/hisi-ade.txt        |   69 ++
+ MAINTAINERS                                        |   10 +
+ arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts     |   44 +
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi          |   53 +
+ drivers/gpu/drm/Kconfig                            |    2 +
+ drivers/gpu/drm/Makefile                           |    1 +
+ drivers/gpu/drm/hisilicon/Kconfig                  |    5 +
+ drivers/gpu/drm/hisilicon/Makefile                 |    5 +
+ drivers/gpu/drm/hisilicon/kirin/Kconfig            |   10 +
+ drivers/gpu/drm/hisilicon/kirin/Makefile           |    5 +
+ drivers/gpu/drm/hisilicon/kirin/dw_drm_dsi.c       |  845 ++++++++++++++++
+ drivers/gpu/drm/hisilicon/kirin/dw_dsi_reg.h       |   83 ++
+ drivers/gpu/drm/hisilicon/kirin/kirin_ade_reg.h    |  280 ++++++
+ drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c    | 1053 ++++++++++++++++++++
+ drivers/gpu/drm/hisilicon/kirin/kirin_drm_drv.c    |  382 +++++++
+ drivers/gpu/drm/hisilicon/kirin/kirin_drm_drv.h    |   31 +
+ 17 files changed, 2955 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/hisilicon/dw-dsi.txt
+ create mode 100644 Documentation/devicetree/bindings/display/hisilicon/hisi-ade.txt
+ create mode 100644 drivers/gpu/drm/hisilicon/Kconfig
+ create mode 100644 drivers/gpu/drm/hisilicon/Makefile
+ create mode 100644 drivers/gpu/drm/hisilicon/kirin/Kconfig
+ create mode 100644 drivers/gpu/drm/hisilicon/kirin/Makefile
+ create mode 100644 drivers/gpu/drm/hisilicon/kirin/dw_drm_dsi.c
+ create mode 100644 drivers/gpu/drm/hisilicon/kirin/dw_dsi_reg.h
+ create mode 100644 drivers/gpu/drm/hisilicon/kirin/kirin_ade_reg.h
+ create mode 100644 drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c
+ create mode 100644 drivers/gpu/drm/hisilicon/kirin/kirin_drm_drv.c
+ create mode 100644 drivers/gpu/drm/hisilicon/kirin/kirin_drm_drv.h
+
+-- 
+1.9.1
