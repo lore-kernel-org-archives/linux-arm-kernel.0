@@ -1,65 +1,24 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat,  6 Feb 2016 22:48:35 +0100
-Subject: [PATCH] ARM: pxa: pxa3xx device-tree support cleanup
-Message-ID: <1454795315-11294-1-git-send-email-robert.jarzmik@free.fr>
+Date: Sat, 06 Feb 2016 22:55:05 +0100
+Subject: [PATCH v2 18/51] mtd: docg3: use mtd_set_ecclayout() where
+ appropriate
+In-Reply-To: <1454580434-32078-19-git-send-email-boris.brezillon@free-electrons.com>
+ (Boris Brezillon's message of "Thu, 4 Feb 2016 11:06:41 +0100")
+References: <1454580434-32078-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1454580434-32078-19-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <8737t54i86.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Clocks, timer and several other drivers have well defined and working
-device-tree bindings. Clean-up the code to leave only the strict
-minimum. The final goal will be to remove the lookup array.
+Boris Brezillon <boris.brezillon@free-electrons.com> writes:
 
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
----
- arch/arm/mach-pxa/pxa-dt.c | 24 ------------------------
- 1 file changed, 24 deletions(-)
+> Use the mtd_set_ecclayout() helper instead of directly assigning the
+> mtd->ecclayout field.
+>
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
 
-diff --git a/arch/arm/mach-pxa/pxa-dt.c b/arch/arm/mach-pxa/pxa-dt.c
-index 8e0e62ccdced..f128133a8f30 100644
---- a/arch/arm/mach-pxa/pxa-dt.c
-+++ b/arch/arm/mach-pxa/pxa-dt.c
-@@ -19,42 +19,18 @@
- #include "generic.h"
- 
- #ifdef CONFIG_PXA3xx
--static const struct of_dev_auxdata const pxa3xx_auxdata_lookup[] __initconst = {
--	OF_DEV_AUXDATA("mrvl,pxa-uart",		0x40100000, "pxa2xx-uart.0", NULL),
--	OF_DEV_AUXDATA("mrvl,pxa-uart",		0x40200000, "pxa2xx-uart.1", NULL),
--	OF_DEV_AUXDATA("mrvl,pxa-uart",		0x40700000, "pxa2xx-uart.2", NULL),
--	OF_DEV_AUXDATA("mrvl,pxa-uart",		0x41600000, "pxa2xx-uart.3", NULL),
--	OF_DEV_AUXDATA("marvell,pxa-mmc",	0x41100000, "pxa2xx-mci.0", NULL),
--	OF_DEV_AUXDATA("intel,pxa3xx-gpio",	0x40e00000, "pxa3xx-gpio", NULL),
--	OF_DEV_AUXDATA("marvell,pxa-ohci",	0x4c000000, "pxa27x-ohci", NULL),
--	OF_DEV_AUXDATA("mrvl,pxa-i2c",		0x40301680, "pxa2xx-i2c.0", NULL),
--	OF_DEV_AUXDATA("mrvl,pwri2c",		0x40f500c0, "pxa3xx-i2c.1", NULL),
--	OF_DEV_AUXDATA("marvell,pxa3xx-nand",	0x43100000, "pxa3xx-nand", NULL),
--	{}
--};
--
--static void __init pxa3xx_dt_init(void)
--{
--	of_platform_populate(NULL, of_default_bus_match_table,
--			     pxa3xx_auxdata_lookup, NULL);
--}
--
- static const char *const pxa3xx_dt_board_compat[] __initconst = {
- 	"marvell,pxa300",
- 	"marvell,pxa310",
- 	"marvell,pxa320",
- 	NULL,
- };
--#endif
- 
--#ifdef CONFIG_PXA3xx
- DT_MACHINE_START(PXA_DT, "Marvell PXA3xx (Device Tree Support)")
- 	.map_io		= pxa3xx_map_io,
- 	.init_irq	= pxa3xx_dt_init_irq,
- 	.handle_irq	= pxa3xx_handle_irq,
--	.init_time	= pxa_timer_init,
- 	.restart	= pxa_restart,
--	.init_machine	= pxa3xx_dt_init,
- 	.dt_compat	= pxa3xx_dt_board_compat,
- MACHINE_END
- #endif
--- 
-2.1.4
+Cheers.
+
+--
+Robert
