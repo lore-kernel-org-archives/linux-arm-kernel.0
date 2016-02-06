@@ -1,63 +1,26 @@
-From: jayachandran.chandrashekaran@broadcom.com (Jayachandran Chandrashekaran Nair)
-Date: Sat, 6 Feb 2016 15:28:26 +0530
-Subject: [PATCH v7 5/5] PCI: ACPI: Add a generic ACPI based host controller
-In-Reply-To: <3576289.1ltj0IceQ5@vostro.rjw.lan>
-References: <1454058340-7904-1-git-send-email-jchandra@broadcom.com>
- <CAKc_7PXYtFt1MQE-UGO0O5vvQ+xFKa2b5=F8wXB=EN-JUJVzZw@mail.gmail.com>
- <20160205094740.GA31547@red-moon> <3576289.1ltj0IceQ5@vostro.rjw.lan>
-Message-ID: <CAKc_7PV69xZ-+yeq+fVAMykuQ53HsjpACz9yH9LpJE-=X5xggA@mail.gmail.com>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Sat, 6 Feb 2016 11:23:07 +0100
+Subject: [PATCH v4 01/17] Xen: ACPI: Hide UART used by Xen
+In-Reply-To: <1454641552-12576-2-git-send-email-zhaoshenglong@huawei.com>
+References: <1454641552-12576-1-git-send-email-zhaoshenglong@huawei.com>
+ <1454641552-12576-2-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <CAJZ5v0id-035AtyQ_SccPuCxD7+pa6GCgj3WBAojM+rFqssGQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael,
-
-On Sat, Feb 6, 2016 at 4:56 AM, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> On Friday, February 05, 2016 09:47:40 AM Lorenzo Pieralisi wrote:
->> On Fri, Feb 05, 2016 at 02:05:37PM +0530, Jayachandran Chandrashekaran Nair wrote:
->>
->> [...]
->>
->> > pci_host_acpi.c is a generic implementation of these using a sysdata
->> > pointing to acpi_pci_root_info, and using a pointer to the pci_mmcfg_region
->> > to access ECAM area, Maybe I can rename this file to
->> > pci_acpi_host_generic.c to reflect this better.
->>
->> Maybe you should stop sending this series and work with Tomasz to
->> get this done, you are confusing everyone and I am really really
->> annoyed about this.
->>
->> Do you realize there is no point in having two patch series doing
->> the same thing and wasting everyone's review time ?
->>
->> Do you realize he started this work long before you and went through
->> several rounds of review already (I told you before but in case you
->> forgot) ?
->>
->> Tomasz posted a version yesterday, integrating comments following months
->> of review and testing and I think it is ready to get upstream:
->>
->> https://lkml.org/lkml/2016/2/4/646
->>
->> Did you even consider reviewing his code or helping him instead of
->> churning out more patches doing the *SAME* thing ?
->>
->> Do you want all of us to go through your code and re-fix what has
->> already been fixed in Tomasz's series with the end result of missing
->> yet another merge window ?
->>
->> This is really annoying, stop it please, really.
+On Fri, Feb 5, 2016 at 4:05 AM, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
 >
-> OK, so to be crystal clear here.
+> ACPI 6.0 introduces a new table STAO to list the devices which are used
+> by Xen and can't be used by Dom0. On Xen virtual platforms, the physical
+> UART is used by Xen. So here it hides UART from Dom0.
 >
-> I'm going to ignore the series the $subject patch belongs to going forward.
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
-It looks like you can already reviewed Tomasz's patchset and as Lorenzo
-says thinks that it can be merged.
+Well, this doesn't look right to me.
 
-When I first posted the patchset the state of arm64 ACPI/PCI was not that
-clear - and I thought an alternative will help. Ideally I would expect
-maintainers to look at technical merit, but in this case any working solution
-merged will be great news.
+We need to find a nicer way to achieve what you want.
 
 Thanks,
-JC.
+Rafael
