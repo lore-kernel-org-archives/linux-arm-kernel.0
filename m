@@ -1,61 +1,64 @@
-From: fijam@archlinux.us (JM)
-Date: Sat, 6 Feb 2016 16:14:49 +0100
-Subject: marvell_cesa fails to register on kirkwood (88F6282)
-In-Reply-To: <87twlmdg2b.fsf@natisbad.org>
-References: <CAKzmTe0mvZD5UwqM47uXbM7Z7oAJpE4g4BVMba1hkzqNu+Zbgw@mail.gmail.com>
- <20160205090246.GE32272@lunn.ch> <20160205112907.796afb05@bbrezillon>
- <CAKzmTe20fT8BcRaDaf2gz92KMAK0kEUkaD-kPq_cPF1WKBdroA@mail.gmail.com>
- <87vb632maf.fsf@free-electrons.com>
- <CAKzmTe1AqNQwjcsAULotd010NXuk1AYjj5p6UoqT_Zu=BCHdcw@mail.gmail.com>
- <87mvrf2l6p.fsf@free-electrons.com> <87io232kat.fsf@free-electrons.com>
- <8760y2vqje.fsf@natisbad.org> <87twlmdg2b.fsf@natisbad.org>
-Message-ID: <CAKzmTe24iz1Ka7Kkke=ZTVbDGZxxDjBH0m2iEVCQOGuuEpi4Gg@mail.gmail.com>
+From: blogic@openwrt.org (John Crispin)
+Date: Sat, 6 Feb 2016 16:40:03 +0100
+Subject: [PATCH] MIPS: pci-mt7620: Fix return value check in
+ mt7620_pci_probe()
+In-Reply-To: <1454768659-32720-1-git-send-email-weiyj_lk@163.com>
+References: <1454768659-32720-1-git-send-email-weiyj_lk@163.com>
+Message-ID: <56B613D3.2070709@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 5, 2016 at 10:04 PM, Arnaud Ebalard <arno@natisbad.org> wrote:
-> Hi,
->
->> I'll try and do the same now w/ CESA support compiled as module to see
->> what I get. I'll keep you posted.
->
-> root at mood:~# insmod /tmp/marvell-cesa.ko
-> [  573.897977] marvell-cesa f1030000.crypto: CESA device successfully registered
->
-> root at mood:~# uname -a
-> Linux mood 4.4.0.duov2 #2 Fri Feb 5 21:42:49 CET 2016 armv5tel GNU/Linux
->
-> root at mood:~# zcat /proc/config.gz | grep -i CESA
-> # CONFIG_CRYPTO_DEV_MV_CESA is not set
-> CONFIG_CRYPTO_DEV_MARVELL_CESA=m
->
-> Cheers,
->
-> a+
->
-> ps: my config is temporarily at http://natisbad.org/config-duov2-cesa
 
-I've built a vanilla 4.4.1 kernel image without any debian-specific
-patches but using the same oldconfig
-(http://heap.ovh/files/config-4.4.1.vanilla).
+On 06/02/2016 15:24, weiyj_lk at 163.com wrote:
+> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> 
+> In case of error, the function devm_ioremap_resource() returns
+> ERR_PTR() and never returns NULL. The NULL test in the return
+> value check should be replaced with IS_ERR().
+> 
+> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-# uname -a
-Linux yukikaze 4.4.1.vanilla #1 Sat Feb 6 14:18:19 CET 2016 armv5tel GNU/Linux
+Hi,
 
-# modprobe marvell_cesa allhwsupport=1
+thanks for the fix.
 
-# dmesg | tail -n1
-[  116.972828] marvell-cesa: probe of f1030000.crypto failed with error -12
+Acked-by: John Crispin <blogic@openwrt.org>
 
-The dtb hasn't changed:
-# diff -s kirkwood-ts219-6282.dtb dtb-4.4.1.vanilla
-Files kirkwood-ts219-6282.dtb and dtb-4.4.1.vanilla are identical
+@Ralf: can you merge this via LMO with the next PR please ?
 
-I am also attaching lsmod: http://heap.ovh/files/lsmod-vanilla-4.4.1
-and full dmesg: http://heap.ovh/files/dmesg-vanilla-4.4.1
+@mbgg: ignore the patch please it is for the legacy MIPS SoCs
 
-Perhaps I am missing something obvious? I suppose the next step would
-be to build a minimal kernel based on the config for the duov2?
+	John
 
-Best regards,
-Jan
+> ---
+>  arch/mips/pci/pci-mt7620.c | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/mips/pci/pci-mt7620.c b/arch/mips/pci/pci-mt7620.c
+> index a009ee4..044c1cd 100644
+> --- a/arch/mips/pci/pci-mt7620.c
+> +++ b/arch/mips/pci/pci-mt7620.c
+> @@ -297,12 +297,12 @@ static int mt7620_pci_probe(struct platform_device *pdev)
+>  		return PTR_ERR(rstpcie0);
+>  
+>  	bridge_base = devm_ioremap_resource(&pdev->dev, bridge_res);
+> -	if (!bridge_base)
+> -		return -ENOMEM;
+> +	if (IS_ERR(bridge_base))
+> +		return PTR_ERR(bridge_base);
+>  
+>  	pcie_base = devm_ioremap_resource(&pdev->dev, pcie_res);
+> -	if (!pcie_base)
+> -		return -ENOMEM;
+> +	if (IS_ERR(pcie_base))
+> +		return PTR_ERR(pcie_base);
+>  
+>  	iomem_resource.start = 0;
+>  	iomem_resource.end = ~0;
+> 
+> 
+> _______________________________________________
+> Linux-mediatek mailing list
+> Linux-mediatek at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-mediatek
+> 
