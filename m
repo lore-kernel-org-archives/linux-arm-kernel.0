@@ -1,49 +1,43 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 6 Feb 2016 18:38:54 +0000
-Subject: [PATCH] iio: chemical: select IRQ_WORK for ATLAS ph sensor
-In-Reply-To: <CAKzfze8b7Q4ZHyXW=wq4K2ETFoMrfERpTci2dSAzSgCCrWpnzg@mail.gmail.com>
-References: <5127664.OXcBoKUPQO@wuerfel>
- <CAKzfze8b7Q4ZHyXW=wq4K2ETFoMrfERpTci2dSAzSgCCrWpnzg@mail.gmail.com>
-Message-ID: <56B63DBE.8040507@kernel.org>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Sat, 6 Feb 2016 12:55:37 -0600
+Subject: [PATCH v10 5/5] Watchdog: ARM SBSA Generic Watchdog half timeout
+ panic support
+In-Reply-To: <CADyBb7vRKjDoeOfH=3Uwz+D0xyXaC9cM4ZSEO+MwL8Gw5T-Umg@mail.gmail.com>
+References: <1454519923-25230-1-git-send-email-fu.wei@linaro.org>
+ <1454519923-25230-6-git-send-email-fu.wei@linaro.org>
+ <56B23883.7000501@codeaurora.org>
+ <CADyBb7sxPg-QUjTbeHFtYkctKc_g7D8O=+jqbXN+DCCoCEnFqA@mail.gmail.com>
+ <56B23E99.1030604@codeaurora.org>
+ <CADyBb7s4opxfPFuX=1-qEE6uhsaMXgofAJPbHUQHrng2AUwqNA@mail.gmail.com>
+ <56B2423B.1020109@codeaurora.org>
+ <CADyBb7uULCn97ea19zH8dB4QX1QA8=AXL94d6gXgFxXM8haBNA@mail.gmail.com>
+ <56B24642.8090105@codeaurora.org>
+ <CADyBb7s_QeU=pYqN9G+5WMtx-L+=QC6uZR6N6ZWPOixnkHzPjw@mail.gmail.com>
+ <56B24AB5.3070001@codeaurora.org>
+ <CADyBb7usPpY=YLjecXce63zY5e1tniPLmNsVY=8CJHJsCqBgQw@mail.gmail.com>
+ <56B2DEE4.7060901@roeck-us.net>
+ <CADyBb7unAHEOMfruWS82RkHK6uwPAWCxUx9jqzSkiHU4LHDSeA@mail.gmail.com>
+ <56B4B4E2.40105@roeck-us.net>
+ <CADyBb7sP=d+BWOdmNEAs38yRcmXVjYsFX=XNffNpGqfybpxTfQ@mail.gmail.com>
+ <56B5363D.20200@roeck-us.net>
+ <CADyBb7vRKjDoeOfH=3Uwz+D0xyXaC9cM4ZSEO+MwL8Gw5T-Umg@mail.gmail.com>
+Message-ID: <56B641A9.3040801@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/02/16 07:55, Matt Ranostay wrote:
-> Reviewed-by: Matt Ranostay <mranostay@gmail.com>
-> 
-> On Tue, Feb 2, 2016 at 6:36 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> The newly added atlas-ph-sensor driver uses irq_work_queue, which
->> may not always be enabled:
->>
->> ERROR: "irq_work_queue" [drivers/iio/chemical/atlas-ph-sensor.ko] undefined!
->>
->> This adds a 'select' statement to Kconfig to ensure it's there
->> when we need it.
->>
->> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->> Fixes: 27dec00ecf2d ("iio: chemical: add Atlas pH-SM sensor support")
->>
-Applied to the togreg branch of iio.git and pushed out as testing for
-the autobuilders to fail to spot and IRQ_WORK related issues ;)
+Fu Wei wrote:
+> if (action) {
+>          wdd->min_timeout = 1;
+>          wdd->max_timeout = U32_MAX / gwdt->clk;
+> } else {
+>          wdd->min_timeout = 2;
+>          wdd->max_timeout = U32_MAX / gwdt->clk * 2;
+> }
 
-Thanks,
+Why would the minimum timeout be 2?  You can program WOR to timeout in 
+half a second, can't you?
 
-Jonathan
->> diff --git a/drivers/iio/chemical/Kconfig b/drivers/iio/chemical/Kconfig
->> index ce7cd1370f74..f73290f84c90 100644
->> --- a/drivers/iio/chemical/Kconfig
->> +++ b/drivers/iio/chemical/Kconfig
->> @@ -10,6 +10,7 @@ config ATLAS_PH_SENSOR
->>         select REGMAP_I2C
->>         select IIO_BUFFER
->>         select IIO_TRIGGERED_BUFFER
->> +       select IRQ_WORK
->>         help
->>          Say Y here to build I2C interface support for the Atlas
->>          Scientific OEM pH-SM sensor.
->>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the
+Code Aurora Forum, hosted by The Linux Foundation.
