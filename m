@@ -1,48 +1,51 @@
-From: gary.bisson@boundarydevices.com (Gary Bisson)
-Date: Sat, 6 Feb 2016 20:54:28 +0100
-Subject: [PATCH 1/2] ARM: dts: mx53qsb: Enable VPU support
-In-Reply-To: <1372683396.4971.35.camel@pizza.hi.pengutronix.de>
-References: <1372459759-10488-1-git-send-email-festevam@gmail.com>
- <1372683396.4971.35.camel@pizza.hi.pengutronix.de>
-Message-ID: <20160206195428.GA10316@x240.lan>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sun, 7 Feb 2016 00:37:39 +0300
+Subject: [PATCH 4/5] ARM: dts: NSP: Add SP805 Support to DT
+In-Reply-To: <CA+JzhdJa9juORA73TRjWbM=p4dZ1wbO=+RmkyOt9h8_MUU_FZw@mail.gmail.com>
+References: <1454712204-30419-1-git-send-email-jonmason@broadcom.com>
+ <1454712204-30419-5-git-send-email-jonmason@broadcom.com>
+ <56B5EBCB.4080305@cogentembedded.com>
+ <CAC3K-4p9kMALwg-Y355c-u06sAT-HLLY04=XMUer+R71OJLdcQ@mail.gmail.com>
+ <CA+JzhdJa9juORA73TRjWbM=p4dZ1wbO=+RmkyOt9h8_MUU_FZw@mail.gmail.com>
+Message-ID: <56B667A3.8010200@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
+On 02/06/2016 11:47 PM, Scott Branden wrote:
 
-On Mon, Jul 01, 2013 at 02:56:36PM +0200, Philipp Zabel wrote:
-> Hi Fabio,
-> 
-> Am Freitag, den 28.06.2013, 19:49 -0300 schrieb Fabio Estevam:
-> > From: Fabio Estevam <fabio.estevam@freescale.com>
-> > 
-> > Enable Video Processing Unit (VPU) support.
-> > 
-> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> > ---
-> > Depends on Philipp Zabel's patch:
-> > [PATCH] ARM: dts: add sram for imx53 and imx6q
-> > 
-> > Philipp,
-> > 
-> > I tried using the original mx53 vpu firmware that comes with the FSL BSP, but it
-> > failed to load:
-> > 
-> > coda 63ff4000.vpu: firmware get command error                                   
-> > coda 63ff4000.vpu: HW initialization failed  
-> > 
-> > Any suggestions?
-> > 
-> > Thanks!
-> 
-> /*
->  * The CODA driver needs the raw firmware without header in memory order.
->  * This is how I converted vpu_fw_imx53.bin from the Freescale BSP into
->  * v4l2-coda7541-imx53.bin:
->  */
+>             Add support for the ARM SP805 Watchdog timer to the Northstar Plus
+>             device tree.
+>
+>             Signed-off-by: Jon Mason <jonmason@broadcom.com
+>             <mailto:jonmason@broadcom.com>>
+>             ---
+>                arch/arm/boot/dts/bcm-nsp.dtsi | 8 ++++++++
+>                1 file changed, 8 insertions(+)
+>
+>             diff --git a/arch/arm/boot/dts/bcm-nsp.dtsi
+>             b/arch/arm/boot/dts/bcm-nsp.dtsi
+>             index 415a0a6..0e8cb6e 100644
+>             --- a/arch/arm/boot/dts/bcm-nsp.dtsi
+>             +++ b/arch/arm/boot/dts/bcm-nsp.dtsi
+>             @@ -203,6 +203,14 @@
+>                                      clock-frequency = <100000>;
+>                              };
+>
+>             +               wdt at 39000 {
+>
+>
+>             Should be "watchdog at 39000", according to ePAPR.
+>
+>
+>     Thanks, I'll fix it and send it right out.
 
-Sorry to revive an old thread but I was wondering if that firmware
-conversion tool is available somewhere on a git repo?
+> I didn't know ePAPR was a requirement for a linux dtb?  We haven't done this
+> with the wtd in other dts files.  Is this described somewhere?
 
-Regards,
-Gary
+    Nobody reads the docs. Like this:
+
+http://www.devicetree.org/Device_Tree_Usage
+
+    That page refers to the ePAPR 1.0 (not the most recent).
+
+MBR, Sergei
