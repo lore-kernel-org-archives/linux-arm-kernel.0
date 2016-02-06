@@ -1,71 +1,50 @@
 From: zhang.chunyan@linaro.org (Chunyan Zhang)
-Date: Sat,  6 Feb 2016 19:04:27 +0800
-Subject: [PATCH V3 1/6] stm class: Add ioctl get_options interface
+Date: Sat,  6 Feb 2016 19:04:28 +0800
+Subject: [PATCH V3 2/6] stm class: Support devices with multiple instances
 In-Reply-To: <1454756672-12790-1-git-send-email-zhang.chunyan@linaro.org>
 References: <1454756672-12790-1-git-send-email-zhang.chunyan@linaro.org>
-Message-ID: <1454756672-12790-2-git-send-email-zhang.chunyan@linaro.org>
+Message-ID: <1454756672-12790-3-git-send-email-zhang.chunyan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is already an interface of set_options, but no get_options yet.
-Before setting any options, one would may want to see the current
-status of that option by means of get_options interface. This
-interface has been used in CoreSight STM driver.
+From: Alexander Shishkin <alexander.shishkin@linux.intel.com>
 
-Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
+By convention, the name of the stm policy directory in configfs consists of
+the device name to which it applies and the actual policy name, separated
+by a dot. Now, some devices already have dots in their names that separate
+name of the actual device from its instance identifier. Such devices will
+result in two (or more, who can tell) dots in the policy directory name.
+
+Existing policy code, however, will treat the first dot as the one that
+separates device name from policy name, therefore failing the above case.
+
+This patch makes the last dot in the directory name be the separator, thus
+prohibiting dots from being used in policy names.
+
+Suggested-by: Chunyan Zhang <zhang.chunyan@linaro.org>
+Signed-off-by: Alexander Shishkin <alexander.shishkin@linux.intel.com>
 ---
- drivers/hwtracing/stm/core.c | 12 ++++++++++++
- include/linux/stm.h          |  3 +++
- include/uapi/linux/stm.h     |  1 +
- 3 files changed, 16 insertions(+)
+ drivers/hwtracing/stm/policy.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/hwtracing/stm/core.c b/drivers/hwtracing/stm/core.c
-index b6445d9..854a16d 100644
---- a/drivers/hwtracing/stm/core.c
-+++ b/drivers/hwtracing/stm/core.c
-@@ -571,6 +571,18 @@ stm_char_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
- 						    options);
+diff --git a/drivers/hwtracing/stm/policy.c b/drivers/hwtracing/stm/policy.c
+index 11ab6d0..17a1416 100644
+--- a/drivers/hwtracing/stm/policy.c
++++ b/drivers/hwtracing/stm/policy.c
+@@ -320,10 +320,11 @@ stp_policies_make(struct config_group *group, const char *name)
  
- 		break;
-+
-+	case STP_GET_OPTIONS:
-+		if (stm_data->get_options)
-+			err = stm_data->get_options(stm_data,
-+						    stmf->output.master,
-+						    stmf->output.channel,
-+						    stmf->output.nr_chans,
-+						    &options);
-+
-+		if (copy_to_user((void __user *)arg, &options, sizeof(u64)))
-+			return -EFAULT;
-+
- 	default:
- 		break;
- 	}
-diff --git a/include/linux/stm.h b/include/linux/stm.h
-index 9d0083d..f351d62 100644
---- a/include/linux/stm.h
-+++ b/include/linux/stm.h
-@@ -88,6 +88,9 @@ struct stm_data {
- 	long			(*set_options)(struct stm_data *, unsigned int,
- 					       unsigned int, unsigned int,
- 					       unsigned long);
-+	long			(*get_options)(struct stm_data *, unsigned int,
-+					       unsigned int, unsigned int,
-+					       u64 *);
- };
- 
- int stm_register_device(struct device *parent, struct stm_data *stm_data,
-diff --git a/include/uapi/linux/stm.h b/include/uapi/linux/stm.h
-index 626a8d3..0dab16e 100644
---- a/include/uapi/linux/stm.h
-+++ b/include/uapi/linux/stm.h
-@@ -46,5 +46,6 @@ struct stp_policy_id {
- #define STP_POLICY_ID_SET	_IOWR('%', 0, struct stp_policy_id)
- #define STP_POLICY_ID_GET	_IOR('%', 1, struct stp_policy_id)
- #define STP_SET_OPTIONS		_IOW('%', 2, __u64)
-+#define STP_GET_OPTIONS		_IOR('%', 3, __u64)
- 
- #endif /* _UAPI_LINUX_STM_H */
+ 	/*
+ 	 * node must look like <device_name>.<policy_name>, where
+-	 * <device_name> is the name of an existing stm device and
+-	 * <policy_name> is an arbitrary string
++	 * <device_name> is the name of an existing stm device; may
++	 *               contain dots;
++	 * <policy_name> is an arbitrary string; may not contain dots
+ 	 */
+-	p = strchr(devname, '.');
++	p = strrchr(devname, '.');
+ 	if (!p) {
+ 		kfree(devname);
+ 		return ERR_PTR(-EINVAL);
 -- 
 1.9.1
