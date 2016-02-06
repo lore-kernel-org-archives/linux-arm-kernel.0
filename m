@@ -1,163 +1,116 @@
 From: labbott@fedoraproject.org (Laura Abbott)
-Date: Fri,  5 Feb 2016 16:24:47 -0800
-Subject: [PATCHv4 2/3] arm64: Add support for ARCH_SUPPORTS_DEBUG_PAGEALLOC
+Date: Fri,  5 Feb 2016 16:24:46 -0800
+Subject: [PATCHv4 1/3] arm64: Drop alloc function from create_mapping
 In-Reply-To: <1454718288-31374-1-git-send-email-labbott@fedoraproject.org>
 References: <1454718288-31374-1-git-send-email-labbott@fedoraproject.org>
-Message-ID: <1454718288-31374-3-git-send-email-labbott@fedoraproject.org>
+Message-ID: <1454718288-31374-2-git-send-email-labbott@fedoraproject.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-ARCH_SUPPORTS_DEBUG_PAGEALLOC provides a hook to map and unmap
-pages for debugging purposes. This requires memory be mapped
-with PAGE_SIZE mappings since breaking down larger mappings
-at runtime will lead to TLB conflicts. Check if debug_pagealloc
-is enabled at runtime and if so, map everyting with PAGE_SIZE
-pages. Implement the functions to actually map/unmap the
-pages at runtime.
+create_mapping is only used in fixmap_remap_fdt. All the create_mapping
+calls need to happen on existing translation table pages without
+additional allocations. Rather than have an alloc function be called
+and fail, just set it to NULL and catch its use. Also change
+the name to create_mapping_noalloc to better capture what exactly is
+going on.
 
 Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-Tested-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Laura Abbott <labbott@fedoraproject.org>
 ---
- arch/arm64/Kconfig       |  3 +++
- arch/arm64/mm/mmu.c      | 19 +++++++++++++++++--
- arch/arm64/mm/pageattr.c | 46 ++++++++++++++++++++++++++++++++++++----------
- 3 files changed, 56 insertions(+), 12 deletions(-)
+ arch/arm64/mm/mmu.c | 29 ++++++++++++++++++++---------
+ 1 file changed, 20 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 8cc6228..0f33218 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -537,6 +537,9 @@ config HOTPLUG_CPU
- source kernel/Kconfig.preempt
- source kernel/Kconfig.hz
- 
-+config ARCH_SUPPORTS_DEBUG_PAGEALLOC
-+	def_bool y
-+
- config ARCH_HAS_HOLES_MEMORYMODEL
- 	def_bool y if SPARSEMEM
- 
 diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index ef0d66c..29dcc83 100644
+index 7711554..ef0d66c 100644
 --- a/arch/arm64/mm/mmu.c
 +++ b/arch/arm64/mm/mmu.c
-@@ -149,6 +149,19 @@ static void split_pud(pud_t *old_pud, pmd_t *pmd)
- 	} while (pmd++, i++, i < PTRS_PER_PMD);
+@@ -116,7 +116,9 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
+ 	pte_t *pte;
+ 
+ 	if (pmd_none(*pmd) || pmd_sect(*pmd)) {
+-		phys_addr_t pte_phys = pgtable_alloc();
++		phys_addr_t pte_phys;
++		BUG_ON(!pgtable_alloc);
++		pte_phys = pgtable_alloc();
+ 		pte = pte_set_fixmap(pte_phys);
+ 		if (pmd_sect(*pmd))
+ 			split_pmd(pmd, pte);
+@@ -158,7 +160,9 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
+ 	 * Check for initial section mappings in the pgd/pud and remove them.
+ 	 */
+ 	if (pud_none(*pud) || pud_sect(*pud)) {
+-		phys_addr_t pmd_phys = pgtable_alloc();
++		phys_addr_t pmd_phys;
++		BUG_ON(!pgtable_alloc);
++		pmd_phys = pgtable_alloc();
+ 		pmd = pmd_set_fixmap(pmd_phys);
+ 		if (pud_sect(*pud)) {
+ 			/*
+@@ -223,7 +227,9 @@ static void alloc_init_pud(pgd_t *pgd, unsigned long addr, unsigned long end,
+ 	unsigned long next;
+ 
+ 	if (pgd_none(*pgd)) {
+-		phys_addr_t pud_phys = pgtable_alloc();
++		phys_addr_t pud_phys;
++		BUG_ON(!pgtable_alloc);
++		pud_phys = pgtable_alloc();
+ 		__pgd_populate(pgd, pud_phys, PUD_TYPE_TABLE);
+ 	}
+ 	BUG_ON(pgd_bad(*pgd));
+@@ -312,7 +318,12 @@ static void __create_pgd_mapping(pgd_t *pgdir, phys_addr_t phys,
+ 	init_pgd(pgd_offset_raw(pgdir, virt), phys, virt, size, prot, alloc);
  }
  
-+bool block_mappings_allowed(phys_addr_t (*pgtable_alloc)(void))
-+{
-+
-+	/*
-+	 * If debug_page_alloc is enabled we must map the linear map
-+	 * using pages. However, other mappings created by
-+	 * create_mapping_noalloc must use sections in some cases. Allow
-+	 * sections to be used in those cases, where no pgtable_alloc
-+	 * function is provided.
-+	 */
-+	return !pgtable_alloc || !debug_pagealloc_enabled();
-+}
-+
- static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
- 				  phys_addr_t phys, pgprot_t prot,
- 				  phys_addr_t (*pgtable_alloc)(void))
-@@ -181,7 +194,8 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
- 	do {
- 		next = pmd_addr_end(addr, end);
- 		/* try section mapping first */
--		if (((addr | next | phys) & ~SECTION_MASK) == 0) {
-+		if (((addr | next | phys) & ~SECTION_MASK) == 0 &&
-+		      block_mappings_allowed(pgtable_alloc)) {
- 			pmd_t old_pmd =*pmd;
- 			set_pmd(pmd, __pmd(phys |
- 					   pgprot_val(mk_sect_prot(prot))));
-@@ -241,7 +255,8 @@ static void alloc_init_pud(pgd_t *pgd, unsigned long addr, unsigned long end,
- 		/*
- 		 * For 4K granule only, attempt to put down a 1GB block
- 		 */
--		if (use_1G_block(addr, next, phys)) {
-+		if (use_1G_block(addr, next, phys) &&
-+		    block_mappings_allowed(pgtable_alloc)) {
- 			pud_t old_pud = *pud;
- 			set_pud(pud, __pud(phys |
- 					   pgprot_val(mk_sect_prot(prot))));
-diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
-index 1360a02..7ba87c4 100644
---- a/arch/arm64/mm/pageattr.c
-+++ b/arch/arm64/mm/pageattr.c
-@@ -37,14 +37,31 @@ static int change_page_range(pte_t *ptep, pgtable_t token, unsigned long addr,
- 	return 0;
- }
- 
+-static void __init create_mapping(phys_addr_t phys, unsigned long virt,
 +/*
-+ * This function assumes that the range is mapped with PAGE_SIZE pages.
++ * This function can only be used to modify existing table entries,
++ * without allocating new levels of table. Note that this permits the
++ * creation of new section or page entries.
 + */
-+static int __change_memory_common(unsigned long start, unsigned long size,
-+				pgprot_t set_mask, pgprot_t clear_mask)
-+{
-+	struct page_change_data data;
-+	int ret;
-+
-+	data.set_mask = set_mask;
-+	data.clear_mask = clear_mask;
-+
-+	ret = apply_to_page_range(&init_mm, start, size, change_page_range,
-+					&data);
-+
-+	flush_tlb_kernel_range(start, start + size);
-+	return ret;
-+}
-+
- static int change_memory_common(unsigned long addr, int numpages,
- 				pgprot_t set_mask, pgprot_t clear_mask)
++static void __init create_mapping_noalloc(phys_addr_t phys, unsigned long virt,
+ 				  phys_addr_t size, pgprot_t prot)
  {
- 	unsigned long start = addr;
- 	unsigned long size = PAGE_SIZE*numpages;
- 	unsigned long end = start + size;
--	int ret;
--	struct page_change_data data;
- 	struct vm_struct *area;
- 
- 	if (!PAGE_ALIGNED(addr)) {
-@@ -72,14 +89,7 @@ static int change_memory_common(unsigned long addr, int numpages,
- 	    !(area->flags & VM_ALLOC))
- 		return -EINVAL;
- 
--	data.set_mask = set_mask;
--	data.clear_mask = clear_mask;
--
--	ret = apply_to_page_range(&init_mm, start, size, change_page_range,
--					&data);
--
--	flush_tlb_kernel_range(start, end);
--	return ret;
-+	return __change_memory_common(start, size, set_mask, clear_mask);
+ 	if (virt < VMALLOC_START) {
+@@ -321,7 +332,7 @@ static void __init create_mapping(phys_addr_t phys, unsigned long virt,
+ 		return;
+ 	}
+ 	__create_pgd_mapping(init_mm.pgd, phys, virt, size, prot,
+-			     early_pgtable_alloc);
++			     NULL);
  }
  
- int set_memory_ro(unsigned long addr, int numpages)
-@@ -111,3 +121,19 @@ int set_memory_x(unsigned long addr, int numpages)
- 					__pgprot(PTE_PXN));
- }
- EXPORT_SYMBOL_GPL(set_memory_x);
-+
-+#ifdef CONFIG_DEBUG_PAGEALLOC
-+void __kernel_map_pages(struct page *page, int numpages, int enable)
-+{
-+	unsigned long addr = (unsigned long) page_address(page);
-+
-+	if (enable)
-+		__change_memory_common(addr, PAGE_SIZE * numpages,
-+					__pgprot(PTE_VALID),
-+					__pgprot(0));
-+	else
-+		__change_memory_common(addr, PAGE_SIZE * numpages,
-+					__pgprot(0),
-+					__pgprot(PTE_VALID));
-+}
-+#endif
+ void __init create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
+@@ -680,7 +691,7 @@ void *__init fixmap_remap_fdt(phys_addr_t dt_phys)
+ 	/*
+ 	 * Make sure that the FDT region can be mapped without the need to
+ 	 * allocate additional translation table pages, so that it is safe
+-	 * to call create_mapping() this early.
++	 * to call create_mapping_noalloc() this early.
+ 	 *
+ 	 * On 64k pages, the FDT will be mapped using PTEs, so we need to
+ 	 * be in the same PMD as the rest of the fixmap.
+@@ -696,8 +707,8 @@ void *__init fixmap_remap_fdt(phys_addr_t dt_phys)
+ 	dt_virt = (void *)dt_virt_base + offset;
+ 
+ 	/* map the first chunk so we can read the size from the header */
+-	create_mapping(round_down(dt_phys, SWAPPER_BLOCK_SIZE), dt_virt_base,
+-		       SWAPPER_BLOCK_SIZE, prot);
++	create_mapping_noalloc(round_down(dt_phys, SWAPPER_BLOCK_SIZE),
++			dt_virt_base, SWAPPER_BLOCK_SIZE, prot);
+ 
+ 	if (fdt_check_header(dt_virt) != 0)
+ 		return NULL;
+@@ -707,7 +718,7 @@ void *__init fixmap_remap_fdt(phys_addr_t dt_phys)
+ 		return NULL;
+ 
+ 	if (offset + size > SWAPPER_BLOCK_SIZE)
+-		create_mapping(round_down(dt_phys, SWAPPER_BLOCK_SIZE), dt_virt_base,
++		create_mapping_noalloc(round_down(dt_phys, SWAPPER_BLOCK_SIZE), dt_virt_base,
+ 			       round_up(offset + size, SWAPPER_BLOCK_SIZE), prot);
+ 
+ 	memblock_reserve(dt_phys, size);
 -- 
 2.5.0
