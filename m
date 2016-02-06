@@ -1,29 +1,48 @@
-From: friesendrywall@gmail.com (Erik Friesen)
-Date: Sat, 6 Feb 2016 14:29:45 -0500
-Subject: SGTL5000 misc
-In-Reply-To: <CAOMZO5BaYKuTrWvopJn5RbvoJqEt4dQt1vmB7QCHLPaKD-ohLQ@mail.gmail.com>
-References: <CAEuupiuhPR48Upo=8f0zV8cxf0Vefgx3qA+vC+QDWAOV4n-e3Q@mail.gmail.com>
- <CAOMZO5BPNc1ncz6J8yhcBYywCVuTxKYMYhiNUt_Jq3LZsKdi+A@mail.gmail.com>
- <CAEuupiszxAj7JkJu-5ozqgEnTWkz9FQEpxN8dmEN+KtaV-76ww@mail.gmail.com>
- <CAOMZO5DhrzdVyTVPB3FNquV4rDQ8a0MQrsJMosVsUQN63hj1Ww@mail.gmail.com>
- <CAEuupiuoB7nMSc8Fbyort1rJd=ZhYc0zfJNkd=ckUYk1qd8Z7Q@mail.gmail.com>
- <CAOMZO5C4QUHnJr=pisnYWCYZ0zUt+7HO846aPQui0zcLyX0N-Q@mail.gmail.com>
- <CAEuupivdftoopCOX3f7KRbV9poKdjdD3s9hfcbgB2TYjHmrjvw@mail.gmail.com>
- <CAEuupit8pVdnehkZkZPmq1QBHaS0sUG4NFuVFX37dKHn18j7DQ@mail.gmail.com>
- <CAOMZO5BxFRzi3qJAK=xDGger_MK9GZhuM00ugo836PHK_zJKjQ@mail.gmail.com>
- <CAEuupium67HD-sz+ViPx8-L4S0TsS-C8ZrX3po382r=E-9QYgw@mail.gmail.com>
- <CAOMZO5Dos2xidZWrGffHRw33GjcJi+CvitFC5hKW3Hy0++GEmg@mail.gmail.com>
- <CAEuupiti=Z9CeQpgUyvyQcfWEE_ReS4RpY9sHtY=OdN3YFjZQw@mail.gmail.com>
- <CAOMZO5BaYKuTrWvopJn5RbvoJqEt4dQt1vmB7QCHLPaKD-ohLQ@mail.gmail.com>
-Message-ID: <CAEuupis2WSckA+QQd0A6kw=MFuGowOQX-GFvrs=8TegBcP2Xiw@mail.gmail.com>
+From: gary.bisson@boundarydevices.com (Gary Bisson)
+Date: Sat, 6 Feb 2016 20:54:28 +0100
+Subject: [PATCH 1/2] ARM: dts: mx53qsb: Enable VPU support
+In-Reply-To: <1372683396.4971.35.camel@pizza.hi.pengutronix.de>
+References: <1372459759-10488-1-git-send-email-festevam@gmail.com>
+ <1372683396.4971.35.camel@pizza.hi.pengutronix.de>
+Message-ID: <20160206195428.GA10316@x240.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I am subscribed and getting emails from the list, not sure what is up.
+Hi Philipp,
 
-On Sat, Feb 6, 2016 at 12:33 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> On Sat, Feb 6, 2016 at 3:22 PM, Erik Friesen <friesendrywall@gmail.com> wrote:
->> Well, I have posted a thing or two there, not sure if the mailing list
->> is even working, as I haven't received any replies.
->
-> I haven't seen your patches there. You need to subscribe to alsa-devel first.
+On Mon, Jul 01, 2013 at 02:56:36PM +0200, Philipp Zabel wrote:
+> Hi Fabio,
+> 
+> Am Freitag, den 28.06.2013, 19:49 -0300 schrieb Fabio Estevam:
+> > From: Fabio Estevam <fabio.estevam@freescale.com>
+> > 
+> > Enable Video Processing Unit (VPU) support.
+> > 
+> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> > ---
+> > Depends on Philipp Zabel's patch:
+> > [PATCH] ARM: dts: add sram for imx53 and imx6q
+> > 
+> > Philipp,
+> > 
+> > I tried using the original mx53 vpu firmware that comes with the FSL BSP, but it
+> > failed to load:
+> > 
+> > coda 63ff4000.vpu: firmware get command error                                   
+> > coda 63ff4000.vpu: HW initialization failed  
+> > 
+> > Any suggestions?
+> > 
+> > Thanks!
+> 
+> /*
+>  * The CODA driver needs the raw firmware without header in memory order.
+>  * This is how I converted vpu_fw_imx53.bin from the Freescale BSP into
+>  * v4l2-coda7541-imx53.bin:
+>  */
+
+Sorry to revive an old thread but I was wondering if that firmware
+conversion tool is available somewhere on a git repo?
+
+Regards,
+Gary
