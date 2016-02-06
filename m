@@ -1,23 +1,74 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Sat, 6 Feb 2016 11:26:05 +0100
-Subject: [PATCH v3 1/5] clk: sunxi: Add apb0 gates for H3
-In-Reply-To: <20160205111152.GA31506@lukather>
-References: <1454542430-16572-1-git-send-email-k@japko.eu>
- <1454542430-16572-2-git-send-email-k@japko.eu>
- <20160204154752.4df7808be3364a98c496c030@free.fr>
- <20160205111152.GA31506@lukather>
-Message-ID: <20160206112605.4005784d1d0962c8adfe58a0@free.fr>
+From: zhang.chunyan@linaro.org (Chunyan Zhang)
+Date: Sat,  6 Feb 2016 19:04:26 +0800
+Subject: [PATCH V3 0/6] Introduce CoreSight STM support
+Message-ID: <1454756672-12790-1-git-send-email-zhang.chunyan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 5 Feb 2016 12:11:52 +0100
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+This patchset adds support for CoreSight STM IP block. It also makes
+a little modification to the generic STM framework to cover the
+CoreSight STM requirements. Full description follows the changelog.
 
-> However, I'd like to keep per-soc and per-clocks compatibles in the
-> DT, in case we need to protect a clock in the future.
+Changes from v1:
+ - Added a definition of coresight_simple_func() in CS-STM driver to
+   avoid the kbuild test robot error for the time being.  This
+   modification will be removed when merging the code in which the
+   coresight_simple_func() has been moved to the header file.
+ - Calculate the channel number according to the channel memory space size.
 
-What do you mean by "protect a clock"?
+Changes from V2:
+ - Changed to return -EFAULT if failed on the command STP_GET_OPTIONS.
+ - Used Alex's patch [1] instead of the last 2/6.
+ - Removed the while loop from stm_send(), since the packet size passed
+   to it isn't larger than 4 bytes on 32-bit system and 8 bytes on
+   64-bit system.
+ - Removed stm_send_64bit(), since the process of packets on 64-bit
+   CS-STM should be basically the same with on 32-bit system, except the 
+   maximum length of writing STM at a time.
+ - Removed the support of writing 64-bit to CoreSight STM buffer at a time
+   on 32-bit ARM architecture according to an ARM engineer suggestion.  As
+   he said that the STM might receive a 64-bit write, or might receive a
+   pair of 32-bit writes to the two addressed words in either order.
+   So 64-bit write isn't guaranteed to work on the ARM 32-bit architecture.
+
+Thanks,
+Chunyan
+
+[1] https://lkml.org/lkml/2016/2/4/652
+
+Alexander Shishkin (1):
+  stm class: Support devices with multiple instances
+
+Chunyan Zhang (2):
+  stm class: Add ioctl get_options interface
+  Documentations: Add explanations of the case for non-configurable
+    masters
+
+Mathieu Poirier (2):
+  stm class: provision for statically assigned masterIDs
+  coresight-stm: Bindings for System Trace Macrocell
+
+Pratik Patel (1):
+  coresight-stm: adding driver for CoreSight STM component
+
+ .../ABI/testing/sysfs-bus-coresight-devices-stm    |  53 ++
+ .../devicetree/bindings/arm/coresight.txt          |  28 +
+ Documentation/trace/coresight.txt                  |  37 +-
+ Documentation/trace/stm.txt                        |   6 +
+ drivers/hwtracing/coresight/Kconfig                |  11 +
+ drivers/hwtracing/coresight/Makefile               |   1 +
+ drivers/hwtracing/coresight/coresight-stm.c        | 928 +++++++++++++++++++++
+ drivers/hwtracing/stm/core.c                       |  30 +-
+ drivers/hwtracing/stm/policy.c                     |  25 +-
+ include/linux/coresight-stm.h                      |   6 +
+ include/linux/stm.h                                |  11 +
+ include/uapi/linux/coresight-stm.h                 |  12 +
+ include/uapi/linux/stm.h                           |   1 +
+ 13 files changed, 1140 insertions(+), 9 deletions(-)
+ create mode 100644 Documentation/ABI/testing/sysfs-bus-coresight-devices-stm
+ create mode 100644 drivers/hwtracing/coresight/coresight-stm.c
+ create mode 100644 include/linux/coresight-stm.h
+ create mode 100644 include/uapi/linux/coresight-stm.h
 
 -- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+1.9.1
