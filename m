@@ -1,31 +1,31 @@
-From: yang.shi@linaro.org (Yang Shi)
-Date: Fri,  5 Feb 2016 15:50:18 -0800
-Subject: [PATCH] arm64: ubsan: select ARCH_HAS_UBSAN_SANITIZE_ALL
-Message-ID: <1454716218-4918-1-git-send-email-yang.shi@linaro.org>
+From: labbott@fedoraproject.org (Laura Abbott)
+Date: Fri,  5 Feb 2016 16:24:45 -0800
+Subject: [PATCHv4 0/3] ARCH_SUPPORTS_DEBUG_PAGEALLOC for arm64
+Message-ID: <1454718288-31374-1-git-send-email-labbott@fedoraproject.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To enable UBSAN on arm64, ARCH_HAS_UBSAN_SANITIZE_ALL need to be selected.
+Hi,
 
-Basic kernel bootup test is passed on arm64 with CONFIG_UBSAN_SANITIZE_ALL
-enabled.
+This is hopefully the last update to add proper ARCH_SUPPORTS_DEBUG_PAGEALLOC
+support for arm64.
 
-Signed-off-by: Yang Shi <yang.shi@linaro.org>
----
- arch/arm64/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+Changes since v3:
+- More acks
+- Pulled out block check into a separate function
+- Style fixups
+- Comment tweaking
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 8cc6228..1c29e20 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -14,6 +14,7 @@ config ARM64
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
- 	select ARCH_WANT_FRAME_POINTERS
-+	select ARCH_HAS_UBSAN_SANITIZE_ALL
- 	select ARM_AMBA
- 	select ARM_ARCH_TIMER
- 	select ARM_GIC
+Laura Abbott (3):
+  arm64: Drop alloc function from create_mapping
+  arm64: Add support for ARCH_SUPPORTS_DEBUG_PAGEALLOC
+  arm64: ptdump: Indicate whether memory should be faulting
+
+ arch/arm64/Kconfig       |  3 +++
+ arch/arm64/mm/dump.c     |  5 +++++
+ arch/arm64/mm/mmu.c      | 48 +++++++++++++++++++++++++++++++++++++-----------
+ arch/arm64/mm/pageattr.c | 46 ++++++++++++++++++++++++++++++++++++----------
+ 4 files changed, 81 insertions(+), 21 deletions(-)
+
 -- 
-2.0.2
+2.5.0
