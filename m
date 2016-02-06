@@ -1,51 +1,30 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sun, 7 Feb 2016 00:37:39 +0300
-Subject: [PATCH 4/5] ARM: dts: NSP: Add SP805 Support to DT
-In-Reply-To: <CA+JzhdJa9juORA73TRjWbM=p4dZ1wbO=+RmkyOt9h8_MUU_FZw@mail.gmail.com>
-References: <1454712204-30419-1-git-send-email-jonmason@broadcom.com>
- <1454712204-30419-5-git-send-email-jonmason@broadcom.com>
- <56B5EBCB.4080305@cogentembedded.com>
- <CAC3K-4p9kMALwg-Y355c-u06sAT-HLLY04=XMUer+R71OJLdcQ@mail.gmail.com>
- <CA+JzhdJa9juORA73TRjWbM=p4dZ1wbO=+RmkyOt9h8_MUU_FZw@mail.gmail.com>
-Message-ID: <56B667A3.8010200@cogentembedded.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 06 Feb 2016 22:46:00 +0100
+Subject: [PATCH] ARM: pxa: fix irq initialization for pxa3xx devicetree
+In-Reply-To: <1454274354-4381-1-git-send-email-robert.jarzmik@free.fr> (Robert
+ Jarzmik's message of "Sun, 31 Jan 2016 22:05:54 +0100")
+References: <1454274354-4381-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <877fih4inb.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/06/2016 11:47 PM, Scott Branden wrote:
+Robert Jarzmik <robert.jarzmik@free.fr> writes:
 
->             Add support for the ARM SP805 Watchdog timer to the Northstar Plus
->             device tree.
+> The initialization of interrupt controller for devicetree platform was
+> done for pxa2xx platforms, but not for pxa3xx ones.
 >
->             Signed-off-by: Jon Mason <jonmason@broadcom.com
->             <mailto:jonmason@broadcom.com>>
->             ---
->                arch/arm/boot/dts/bcm-nsp.dtsi | 8 ++++++++
->                1 file changed, 8 insertions(+)
+> Fix this my adding the missing initialization call.
 >
->             diff --git a/arch/arm/boot/dts/bcm-nsp.dtsi
->             b/arch/arm/boot/dts/bcm-nsp.dtsi
->             index 415a0a6..0e8cb6e 100644
->             --- a/arch/arm/boot/dts/bcm-nsp.dtsi
->             +++ b/arch/arm/boot/dts/bcm-nsp.dtsi
->             @@ -203,6 +203,14 @@
->                                      clock-frequency = <100000>;
->                              };
->
->             +               wdt at 39000 {
->
->
->             Should be "watchdog at 39000", according to ePAPR.
->
->
->     Thanks, I'll fix it and send it right out.
+> Fixes: 089d03629b04 ("ARM: pxa: add devicetree code for irq handling")
+> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+No, this is incorrect.
 
-> I didn't know ePAPR was a requirement for a linux dtb?  We haven't done this
-> with the wtd in other dts files.  Is this described somewhere?
+The reason behind is that it relies on a patch not yet upstreamed, which was
+breaking exactly this init_irq.
 
-    Nobody reads the docs. Like this:
+Let's drop this and replace it with the good patch.
 
-http://www.devicetree.org/Device_Tree_Usage
+Cheers.
 
-    That page refers to the ePAPR 1.0 (not the most recent).
-
-MBR, Sergei
+--
+Robert
