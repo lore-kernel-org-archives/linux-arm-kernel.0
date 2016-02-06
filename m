@@ -1,116 +1,89 @@
-From: labbott@fedoraproject.org (Laura Abbott)
-Date: Fri,  5 Feb 2016 16:24:46 -0800
-Subject: [PATCHv4 1/3] arm64: Drop alloc function from create_mapping
-In-Reply-To: <1454718288-31374-1-git-send-email-labbott@fedoraproject.org>
-References: <1454718288-31374-1-git-send-email-labbott@fedoraproject.org>
-Message-ID: <1454718288-31374-2-git-send-email-labbott@fedoraproject.org>
+From: stillcompiling@gmail.com (Joshua Clayton)
+Date: Fri, 5 Feb 2016 17:03:47 -0800
+Subject: [PATCH net-next V2 7/8] net: fec: don't transfer ownership
+ until descriptor write is complete
+In-Reply-To: <1454709170-19527-8-git-send-email-troy.kisky@boundarydevices.com>
+References: <1454709170-19527-1-git-send-email-troy.kisky@boundarydevices.com>
+ <1454709170-19527-8-git-send-email-troy.kisky@boundarydevices.com>
+Message-ID: <20160205170347.45a91314@jclayton-pc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri,  5 Feb 2016 14:52:49 -0700
+Troy Kisky <troy.kisky@boundarydevices.com> wrote:
 
+> If you don't own it, you shouldn't write to it.
+> 
+> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+> ---
+>  drivers/net/ethernet/freescale/fec_main.c | 14 +++++++++++++-
+>  1 file changed, 13 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/net/ethernet/freescale/fec_main.c
+> b/drivers/net/ethernet/freescale/fec_main.c index ca2708d..97ca72a
+> 100644 --- a/drivers/net/ethernet/freescale/fec_main.c
+> +++ b/drivers/net/ethernet/freescale/fec_main.c
+> @@ -390,6 +390,10 @@ fec_enet_txq_submit_frag_skb(struct
+> fec_enet_priv_tx_q *txq, 
+>  		bdp->cbd_bufaddr = cpu_to_fec32(addr);
+>  		bdp->cbd_datlen = cpu_to_fec16(frag_len);
+> +		/* Make sure the updates to rest of the descriptor
+> are
+> +		 * performed before transferring ownership.
+> +		 */
+> +		wmb();
+>  		bdp->cbd_sc = cpu_to_fec16(status);
+You use almost exactly the same code in each place.
+I'd prefer to have wmb(); bdp->cbd_sc = cpu_to_fec16(status) wrapped in
+a function or function like macro, and put the comment in one place.
 
-create_mapping is only used in fixmap_remap_fdt. All the create_mapping
-calls need to happen on existing translation table pages without
-additional allocations. Rather than have an alloc function be called
-and fail, just set it to NULL and catch its use. Also change
-the name to create_mapping_noalloc to better capture what exactly is
-going on.
+e.g.
 
-Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Laura Abbott <labbott@fedoraproject.org>
----
- arch/arm64/mm/mmu.c | 29 ++++++++++++++++++++---------
- 1 file changed, 20 insertions(+), 9 deletions(-)
+/* Make sure the updates to rest of the descriptor
+ * performed before transferring ownership.
+ */
+#define fec_enet_xfr_ownership(status) \
+	do { \
+		wmb();
+		bdp->cbd_sc = cpu_to_fec16(status);
+	} while (0)
 
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 7711554..ef0d66c 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -116,7 +116,9 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
- 	pte_t *pte;
- 
- 	if (pmd_none(*pmd) || pmd_sect(*pmd)) {
--		phys_addr_t pte_phys = pgtable_alloc();
-+		phys_addr_t pte_phys;
-+		BUG_ON(!pgtable_alloc);
-+		pte_phys = pgtable_alloc();
- 		pte = pte_set_fixmap(pte_phys);
- 		if (pmd_sect(*pmd))
- 			split_pmd(pmd, pte);
-@@ -158,7 +160,9 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
- 	 * Check for initial section mappings in the pgd/pud and remove them.
- 	 */
- 	if (pud_none(*pud) || pud_sect(*pud)) {
--		phys_addr_t pmd_phys = pgtable_alloc();
-+		phys_addr_t pmd_phys;
-+		BUG_ON(!pgtable_alloc);
-+		pmd_phys = pgtable_alloc();
- 		pmd = pmd_set_fixmap(pmd_phys);
- 		if (pud_sect(*pud)) {
- 			/*
-@@ -223,7 +227,9 @@ static void alloc_init_pud(pgd_t *pgd, unsigned long addr, unsigned long end,
- 	unsigned long next;
- 
- 	if (pgd_none(*pgd)) {
--		phys_addr_t pud_phys = pgtable_alloc();
-+		phys_addr_t pud_phys;
-+		BUG_ON(!pgtable_alloc);
-+		pud_phys = pgtable_alloc();
- 		__pgd_populate(pgd, pud_phys, PUD_TYPE_TABLE);
- 	}
- 	BUG_ON(pgd_bad(*pgd));
-@@ -312,7 +318,12 @@ static void __create_pgd_mapping(pgd_t *pgdir, phys_addr_t phys,
- 	init_pgd(pgd_offset_raw(pgdir, virt), phys, virt, size, prot, alloc);
- }
- 
--static void __init create_mapping(phys_addr_t phys, unsigned long virt,
-+/*
-+ * This function can only be used to modify existing table entries,
-+ * without allocating new levels of table. Note that this permits the
-+ * creation of new section or page entries.
-+ */
-+static void __init create_mapping_noalloc(phys_addr_t phys, unsigned long virt,
- 				  phys_addr_t size, pgprot_t prot)
- {
- 	if (virt < VMALLOC_START) {
-@@ -321,7 +332,7 @@ static void __init create_mapping(phys_addr_t phys, unsigned long virt,
- 		return;
- 	}
- 	__create_pgd_mapping(init_mm.pgd, phys, virt, size, prot,
--			     early_pgtable_alloc);
-+			     NULL);
- }
- 
- void __init create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
-@@ -680,7 +691,7 @@ void *__init fixmap_remap_fdt(phys_addr_t dt_phys)
- 	/*
- 	 * Make sure that the FDT region can be mapped without the need to
- 	 * allocate additional translation table pages, so that it is safe
--	 * to call create_mapping() this early.
-+	 * to call create_mapping_noalloc() this early.
- 	 *
- 	 * On 64k pages, the FDT will be mapped using PTEs, so we need to
- 	 * be in the same PMD as the rest of the fixmap.
-@@ -696,8 +707,8 @@ void *__init fixmap_remap_fdt(phys_addr_t dt_phys)
- 	dt_virt = (void *)dt_virt_base + offset;
- 
- 	/* map the first chunk so we can read the size from the header */
--	create_mapping(round_down(dt_phys, SWAPPER_BLOCK_SIZE), dt_virt_base,
--		       SWAPPER_BLOCK_SIZE, prot);
-+	create_mapping_noalloc(round_down(dt_phys, SWAPPER_BLOCK_SIZE),
-+			dt_virt_base, SWAPPER_BLOCK_SIZE, prot);
- 
- 	if (fdt_check_header(dt_virt) != 0)
- 		return NULL;
-@@ -707,7 +718,7 @@ void *__init fixmap_remap_fdt(phys_addr_t dt_phys)
- 		return NULL;
- 
- 	if (offset + size > SWAPPER_BLOCK_SIZE)
--		create_mapping(round_down(dt_phys, SWAPPER_BLOCK_SIZE), dt_virt_base,
-+		create_mapping_noalloc(round_down(dt_phys, SWAPPER_BLOCK_SIZE), dt_virt_base,
- 			       round_up(offset + size, SWAPPER_BLOCK_SIZE), prot);
- 
- 	memblock_reserve(dt_phys, size);
--- 
-2.5.0
+(I don't know if thats the right macro name, I'm just basing it off
+your comment)
+
+>  	}
+>  
+> @@ -499,6 +503,10 @@ static int fec_enet_txq_submit_skb(struct
+> fec_enet_priv_tx_q *txq, 
+>  	bdp->cbd_datlen = cpu_to_fec16(buflen);
+>  	bdp->cbd_bufaddr = cpu_to_fec32(addr);
+> +	/* Make sure the updates to rest of the descriptor are
+> performed before
+> +	 * transferring ownership.
+> +	 */
+> +	wmb();
+>  
+>  	/* Send it on its way.  Tell FEC it's ready, interrupt when
+> done,
+>  	 * it's the last BD of the frame, and to put the CRC on the
+> end. @@ -1475,7 +1483,6 @@ rx_processing_done:
+>  
+>  		/* Mark the buffer empty */
+>  		status |= BD_ENET_RX_EMPTY;
+> -		bdp->cbd_sc = cpu_to_fec16(status);
+>  
+>  		if (fep->bufdesc_ex) {
+>  			struct bufdesc_ex *ebdp = (struct bufdesc_ex
+> *)bdp; @@ -1484,6 +1491,11 @@ rx_processing_done:
+>  			ebdp->cbd_prot = 0;
+>  			ebdp->cbd_bdu = 0;
+>  		}
+> +		/* Make sure the updates to rest of the descriptor
+> are
+> +		 * performed before transferring ownership.
+> +		 */
+> +		wmb();
+> +		bdp->cbd_sc = cpu_to_fec16(status);
+>  
+>  		/* Update BD pointer to next entry */
+>  		bdp = fec_enet_get_nextdesc(bdp, &rxq->bd);
