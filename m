@@ -1,135 +1,98 @@
 From: xinliang.liu@linaro.org (Xinliang Liu)
-Date: Sat,  6 Feb 2016 11:24:58 +0800
-Subject: [PATCH v4 11/11] arm64: dts: hisilicon: Add display subsystem DT
- nodes for hi6220
+Date: Sat,  6 Feb 2016 11:24:55 +0800
+Subject: [PATCH v4 08/11] drm/hisilicon: Add designware dsi host driver
 In-Reply-To: <1454729098-79807-1-git-send-email-xinliang.liu@linaro.org>
 References: <1454729098-79807-1-git-send-email-xinliang.liu@linaro.org>
-Message-ID: <1454729098-79807-12-git-send-email-xinliang.liu@linaro.org>
+Message-ID: <1454729098-79807-9-git-send-email-xinliang.liu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add ade, dsi and adv7533 DT nodes for hikey board.
+Add DesignWare dsi host driver for hi6220 SoC.
+
+v4: None.
+v3: None.
+v2:
+- Remove abtraction layer.
 
 Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
 ---
- arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 44 +++++++++++++++++++++
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi      | 53 ++++++++++++++++++++++++++
- 2 files changed, 97 insertions(+)
+ drivers/gpu/drm/hisilicon/kirin/dw_drm_dsi.c | 50 ++++++++++++++++++++++++++++
+ 1 file changed, 50 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-index 818525197508..5c3557c8e59b 100644
---- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-+++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-@@ -39,3 +39,47 @@
- &uart3 {
- 	label = "LS-UART1";
- };
+diff --git a/drivers/gpu/drm/hisilicon/kirin/dw_drm_dsi.c b/drivers/gpu/drm/hisilicon/kirin/dw_drm_dsi.c
+index 7c9423537b71..2837af01e935 100644
+--- a/drivers/gpu/drm/hisilicon/kirin/dw_drm_dsi.c
++++ b/drivers/gpu/drm/hisilicon/kirin/dw_drm_dsi.c
+@@ -79,6 +79,7 @@ struct dsi_hw_ctx {
+ 
+ struct dw_dsi {
+ 	struct drm_encoder encoder;
++	struct mipi_dsi_host host;
+ 	struct drm_display_mode cur_mode;
+ 	struct dsi_hw_ctx *ctx;
+ 	struct mipi_phy_params phy;
+@@ -642,6 +643,51 @@ static int dw_drm_encoder_init(struct device *dev,
+ 	return 0;
+ }
+ 
++static int dsi_host_attach(struct mipi_dsi_host *host,
++			   struct mipi_dsi_device *mdsi)
++{
++	struct dw_dsi *dsi = host_to_dsi(host);
 +
-+&ade {
-+	status = "okay";
++	if (mdsi->lanes < 1 || mdsi->lanes > 4) {
++		DRM_ERROR("dsi device params invalid\n");
++		return -EINVAL;
++	}
++
++	dsi->lanes = mdsi->lanes;
++	dsi->format = mdsi->format;
++	dsi->mode_flags = mdsi->mode_flags;
++
++	return 0;
++}
++
++static int dsi_host_detach(struct mipi_dsi_host *host,
++			   struct mipi_dsi_device *mdsi)
++{
++	/* do nothing */
++	return 0;
++}
++
++static const struct mipi_dsi_host_ops dsi_host_ops = {
++	.attach = dsi_host_attach,
++	.detach = dsi_host_detach,
 +};
 +
-+&dsi {
-+	status = "ok";
++static int dsi_host_init(struct device *dev, struct dw_dsi *dsi)
++{
++	struct mipi_dsi_host *host = &dsi->host;
++	int ret;
 +
-+	ports {
-+		 /* 1 for output port */
-+		port at 1 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <1>;
++	host->dev = dev;
++	host->ops = &dsi_host_ops;
++	ret = mipi_dsi_host_register(host);
++	if (ret) {
++		DRM_ERROR("failed to register dsi host\n");
++		return ret;
++	}
 +
-+			/* 0 for bridge, other value for panel */
-+			dsi_out0: endpoint at 0 {
-+				reg = <0>;
-+				remote-endpoint = <&adv7533_in>;
-+			};
-+		};
-+	};
-+};
++	return 0;
++}
 +
-+&i2c2 {
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	status = "ok";
+ static int dsi_bind(struct device *dev, struct device *master, void *data)
+ {
+ 	struct dsi_data *ddata = dev_get_drvdata(dev);
+@@ -653,6 +699,10 @@ static int dsi_bind(struct device *dev, struct device *master, void *data)
+ 	if (ret)
+ 		return ret;
+ 
++	ret = dsi_host_init(dev, dsi);
++	if (ret)
++		return ret;
 +
-+	adv7533: adv7533 at 39 {
-+		compatible = "adi,adv7533";
-+		reg = <0x39>;
-+		interrupt-parent = <&gpio1>;
-+		interrupts = <1 2>;
-+		pd-gpio = <&gpio0 4 0>;
-+		adi,dsi-lanes = <4>;
-+
-+		port {
-+			adv7533_in: endpoint {
-+				remote-endpoint = <&dsi_out0>;
-+			};
-+		};
-+	};
-+};
-diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-index ad1f1ebcb05c..e50e81cdd242 100644
---- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-@@ -209,5 +209,58 @@
- 			clock-names = "uartclk", "apb_pclk";
- 			status = "disabled";
- 		};
-+
-+		ade: ade at f4100000 {
-+			compatible = "hisilicon,hi6220-ade";
-+			reg = <0x0 0xf4100000 0x0 0x7800>,
-+			      <0x0 0xf4410000 0x0 0x1000>,
-+			      <0x0 0xf4520000 0x0 0x1000>;
-+			reg-names = "ade_base",
-+				    "media_base",
-+				    "media_noc_base";
-+
-+			interrupts = <0 115 4>; /* ldi interrupt */
-+
-+			clocks = <&media_ctrl HI6220_ADE_CORE>,
-+				 <&media_ctrl HI6220_CODEC_JPEG>,
-+				 <&media_ctrl HI6220_ADE_PIX_SRC>;
-+			/*clock name*/
-+			clock-names  = "clk_ade_core",
-+				       "clk_codec_jpeg",
-+				       "clk_ade_pix";
-+
-+			assigned-clocks = <&media_ctrl HI6220_ADE_CORE>,
-+				<&media_ctrl HI6220_CODEC_JPEG>;
-+			assigned-clock-rates = <360000000>, <288000000>;
-+			dma-coherent;
-+			status = "disabled";
-+
-+			port {
-+				ade_out: endpoint {
-+					remote-endpoint = <&dsi_in>;
-+				};
-+			};
-+		};
-+
-+		dsi: dsi at f4107800 {
-+			compatible = "hisilicon,hi6220-dsi";
-+			reg = <0x0 0xf4107800 0x0 0x100>;
-+			clocks = <&media_ctrl  HI6220_DSI_PCLK>;
-+			clock-names = "pclk_dsi";
-+			status = "disabled";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				/* 0 for input port */
-+				port at 0 {
-+					reg = <0>;
-+					dsi_in: endpoint {
-+						remote-endpoint = <&ade_out>;
-+					};
-+				};
-+			};
-+		};
- 	};
- };
+ 	return 0;
+ }
+ 
 -- 
 1.9.1
