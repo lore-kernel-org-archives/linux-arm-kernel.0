@@ -1,64 +1,34 @@
-From: blogic@openwrt.org (John Crispin)
-Date: Sat, 6 Feb 2016 16:40:03 +0100
-Subject: [PATCH] MIPS: pci-mt7620: Fix return value check in
- mt7620_pci_probe()
-In-Reply-To: <1454768659-32720-1-git-send-email-weiyj_lk@163.com>
-References: <1454768659-32720-1-git-send-email-weiyj_lk@163.com>
-Message-ID: <56B613D3.2070709@openwrt.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat,  6 Feb 2016 23:53:45 +0800
+Subject: [PATCH 2/6] ARM: sunxi_defconfig: Enable A10 audio codec driver
+In-Reply-To: <1454774029-10469-1-git-send-email-wens@csie.org>
+References: <1454774029-10469-1-git-send-email-wens@csie.org>
+Message-ID: <1454774029-10469-3-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The A10 audio codec driver supports the on-chip audio codec found on
+Allwinner A10, A10s, A13, A20 SoCs.
 
-On 06/02/2016 15:24, weiyj_lk at 163.com wrote:
-> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-> 
-> In case of error, the function devm_ioremap_resource() returns
-> ERR_PTR() and never returns NULL. The NULL test in the return
-> value check should be replaced with IS_ERR().
-> 
-> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/configs/sunxi_defconfig | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Hi,
-
-thanks for the fix.
-
-Acked-by: John Crispin <blogic@openwrt.org>
-
-@Ralf: can you merge this via LMO with the next PR please ?
-
-@mbgg: ignore the patch please it is for the legacy MIPS SoCs
-
-	John
-
-> ---
->  arch/mips/pci/pci-mt7620.c | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/mips/pci/pci-mt7620.c b/arch/mips/pci/pci-mt7620.c
-> index a009ee4..044c1cd 100644
-> --- a/arch/mips/pci/pci-mt7620.c
-> +++ b/arch/mips/pci/pci-mt7620.c
-> @@ -297,12 +297,12 @@ static int mt7620_pci_probe(struct platform_device *pdev)
->  		return PTR_ERR(rstpcie0);
->  
->  	bridge_base = devm_ioremap_resource(&pdev->dev, bridge_res);
-> -	if (!bridge_base)
-> -		return -ENOMEM;
-> +	if (IS_ERR(bridge_base))
-> +		return PTR_ERR(bridge_base);
->  
->  	pcie_base = devm_ioremap_resource(&pdev->dev, pcie_res);
-> -	if (!pcie_base)
-> -		return -ENOMEM;
-> +	if (IS_ERR(pcie_base))
-> +		return PTR_ERR(pcie_base);
->  
->  	iomem_resource.start = 0;
->  	iomem_resource.end = ~0;
-> 
-> 
-> _______________________________________________
-> Linux-mediatek mailing list
-> Linux-mediatek at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-mediatek
-> 
+diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
+index 7d2e7bf81a47..efa12c88fe1c 100644
+--- a/arch/arm/configs/sunxi_defconfig
++++ b/arch/arm/configs/sunxi_defconfig
+@@ -100,6 +100,10 @@ CONFIG_FB=y
+ CONFIG_FB_SIMPLE=y
+ CONFIG_FRAMEBUFFER_CONSOLE=y
+ CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
++CONFIG_SOUND=y
++CONFIG_SND=y
++CONFIG_SND_SOC=y
++CONFIG_SND_SUN4I_CODEC=y
+ CONFIG_USB=y
+ CONFIG_USB_EHCI_HCD=y
+ CONFIG_USB_EHCI_HCD_PLATFORM=y
+-- 
+2.7.0
