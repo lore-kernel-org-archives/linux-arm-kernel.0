@@ -1,25 +1,19 @@
 From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Sat, 6 Feb 2016 15:46:17 +0800
-Subject: [PATCH 02/11] crypto: sunxi-ss: prevent compilation on 64-bit
-In-Reply-To: <1454348370-3816-3-git-send-email-andre.przywara@arm.com>
-References: <1454348370-3816-1-git-send-email-andre.przywara@arm.com>
- <1454348370-3816-3-git-send-email-andre.przywara@arm.com>
-Message-ID: <20160206074617.GB22220@gondor.apana.org.au>
+Date: Sat, 6 Feb 2016 15:49:21 +0800
+Subject: [PATCH 0/2] crypto: atmel-sha - fix resource management
+In-Reply-To: <cover.1454675769.git.cyrille.pitchen@atmel.com>
+References: <cover.1454675769.git.cyrille.pitchen@atmel.com>
+Message-ID: <20160206074921.GK22220@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 01, 2016 at 05:39:21PM +0000, Andre Przywara wrote:
-> The driver for the sunxi-ss crypto engine is not entirely 64-bit safe,
-> compilation on arm64 spits some warnings.
-> The proper fix was deemed to involved [1], so since 64-bit SoCs won't
-> have this IP block we just disable this driver for 64-bit.
+On Fri, Feb 05, 2016 at 01:45:11PM +0100, Cyrille Pitchen wrote:
+> Hi all,
 > 
-> [1]: http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/399988.html
->      (and the reply)
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> these two small patches fix resource release and clock management in
+> atomic context.
 
-Applied.
+Applied to crypto.
 -- 
 Email: Herbert Xu <herbert@gondor.apana.org.au>
 Home Page: http://gondor.apana.org.au/~herbert/
