@@ -1,7 +1,7 @@
 From: weiyj_lk@163.com (weiyj_lk at 163.com)
-Date: Sat,  6 Feb 2016 22:24:19 +0800
-Subject: [PATCH] MIPS: pci-mt7620: Fix return value check in mt7620_pci_probe()
-Message-ID: <1454768659-32720-1-git-send-email-weiyj_lk@163.com>
+Date: Sat,  6 Feb 2016 22:24:56 +0800
+Subject: [PATCH] ARM: zx: Fix return value check in zx296702_pd_probe()
+Message-ID: <1454768696-340-1-git-send-email-weiyj_lk@163.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,27 +13,22 @@ value check should be replaced with IS_ERR().
 
 Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 ---
- arch/mips/pci/pci-mt7620.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/mach-zx/zx296702-pm-domain.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/mips/pci/pci-mt7620.c b/arch/mips/pci/pci-mt7620.c
-index a009ee4..044c1cd 100644
---- a/arch/mips/pci/pci-mt7620.c
-+++ b/arch/mips/pci/pci-mt7620.c
-@@ -297,12 +297,12 @@ static int mt7620_pci_probe(struct platform_device *pdev)
- 		return PTR_ERR(rstpcie0);
+diff --git a/arch/arm/mach-zx/zx296702-pm-domain.c b/arch/arm/mach-zx/zx296702-pm-domain.c
+index e08574d..2037bcb 100644
+--- a/arch/arm/mach-zx/zx296702-pm-domain.c
++++ b/arch/arm/mach-zx/zx296702-pm-domain.c
+@@ -169,9 +169,9 @@ static int zx296702_pd_probe(struct platform_device *pdev)
+ 	}
  
- 	bridge_base = devm_ioremap_resource(&pdev->dev, bridge_res);
--	if (!bridge_base)
--		return -ENOMEM;
-+	if (IS_ERR(bridge_base))
-+		return PTR_ERR(bridge_base);
+ 	pcubase = devm_ioremap_resource(&pdev->dev, res);
+-	if (!pcubase) {
++	if (IS_ERR(pcubase)) {
+ 		dev_err(&pdev->dev, "ioremap fail.\n");
+-		return -EIO;
++		return PTR_ERR(pcubase);
+ 	}
  
- 	pcie_base = devm_ioremap_resource(&pdev->dev, pcie_res);
--	if (!pcie_base)
--		return -ENOMEM;
-+	if (IS_ERR(pcie_base))
-+		return PTR_ERR(pcie_base);
- 
- 	iomem_resource.start = 0;
- 	iomem_resource.end = ~0;
+ 	for (i = 0; i < ARRAY_SIZE(zx296702_pm_domains); ++i)
