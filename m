@@ -1,49 +1,63 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 6 Feb 2016 17:56:00 +0800
-Subject: [PATCH v4 1/2] clk: sunxi: Add sun6i/8i video support
-In-Reply-To: <20160206103751.eb21edf56ddc6ef7c27907f0@free.fr>
-References: <cover.1454435944.git.moinejf@free.fr>
- <3c0e2cdea659e9e682f80ecf42b252c740095f15.1454435944.git.moinejf@free.fr>
- <20160205093915.GF1139@lukather>
- <20160206103751.eb21edf56ddc6ef7c27907f0@free.fr>
-Message-ID: <CAGb2v640YWtdT7Rhz2jP7gnQ1U6HJe9POU40HCp==7GrZxDz0A@mail.gmail.com>
+From: jayachandran.chandrashekaran@broadcom.com (Jayachandran Chandrashekaran Nair)
+Date: Sat, 6 Feb 2016 15:28:26 +0530
+Subject: [PATCH v7 5/5] PCI: ACPI: Add a generic ACPI based host controller
+In-Reply-To: <3576289.1ltj0IceQ5@vostro.rjw.lan>
+References: <1454058340-7904-1-git-send-email-jchandra@broadcom.com>
+ <CAKc_7PXYtFt1MQE-UGO0O5vvQ+xFKa2b5=F8wXB=EN-JUJVzZw@mail.gmail.com>
+ <20160205094740.GA31547@red-moon> <3576289.1ltj0IceQ5@vostro.rjw.lan>
+Message-ID: <CAKc_7PV69xZ-+yeq+fVAMykuQ53HsjpACz9yH9LpJE-=X5xggA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 6, 2016 at 5:37 PM, Jean-Francois Moine <moinejf@free.fr> wrote:
-> On Fri, 5 Feb 2016 10:39:15 +0100
-> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
->
->> > +CLK_OF_DECLARE(sun6i_display, "allwinner,sun6i-display-clk", sun6i_display_setup);
+Hi Rafael,
+
+On Sat, Feb 6, 2016 at 4:56 AM, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> On Friday, February 05, 2016 09:47:40 AM Lorenzo Pieralisi wrote:
+>> On Fri, Feb 05, 2016 at 02:05:37PM +0530, Jayachandran Chandrashekaran Nair wrote:
 >>
->> Please use the display driver from my DRM serie, it covers everything
->> you need here.
->
-> If you give me a pointer, I will have a look.
->
->> > +CLK_OF_DECLARE(sun6i_pll3, "allwinner,sun6i-pll3-clk", sun6i_pll3_setup);
+>> [...]
 >>
->> And please use the clk-factors code here.
+>> > pci_host_acpi.c is a generic implementation of these using a sysdata
+>> > pointing to acpi_pci_root_info, and using a pointer to the pci_mmcfg_region
+>> > to access ECAM area, Maybe I can rename this file to
+>> > pci_acpi_host_generic.c to reflect this better.
+>>
+>> Maybe you should stop sending this series and work with Tomasz to
+>> get this done, you are confusing everyone and I am really really
+>> annoyed about this.
+>>
+>> Do you realize there is no point in having two patch series doing
+>> the same thing and wasting everyone's review time ?
+>>
+>> Do you realize he started this work long before you and went through
+>> several rounds of review already (I told you before but in case you
+>> forgot) ?
+>>
+>> Tomasz posted a version yesterday, integrating comments following months
+>> of review and testing and I think it is ready to get upstream:
+>>
+>> https://lkml.org/lkml/2016/2/4/646
+>>
+>> Did you even consider reviewing his code or helping him instead of
+>> churning out more patches doing the *SAME* thing ?
+>>
+>> Do you want all of us to go through your code and re-fix what has
+>> already been fixed in Tomasz's series with the end result of missing
+>> yet another merge window ?
+>>
+>> This is really annoying, stop it please, really.
 >
-> I don't see how I can get direct 297MHz and 270MHz in fractional mode
-> with that code.
+> OK, so to be crystal clear here.
+>
+> I'm going to ignore the series the $subject patch belongs to going forward.
 
-clk-factors now supports a custom .recalc callback. Along with get_factors,
-you can support pretty much any clock that has four variables, not including
-the mux and clock gate.
+It looks like you can already reviewed Tomasz's patchset and as Lorenzo
+says thinks that it can be merged.
 
-So for this you'd have the div as factor m, and the integer mode bit as p,
-and the fraction bit as n, and recalc would be somewhat like this:
+When I first posted the patchset the state of arm64 ACPI/PCI was not that
+clear - and I thought an alternative will help. Ideally I would expect
+maintainers to look at technical merit, but in this case any working solution
+merged will be great news.
 
-if (p) {
-        rate = parent_rate / (m + 1);
-} else if (n) {
-        rate = 297000000;
-} else {
-        rate = 270000000;
-}
-
-get_factors should be easy enough to figure out.
-
-Regards
-ChenYu
+Thanks,
+JC.
