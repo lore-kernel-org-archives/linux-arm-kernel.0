@@ -1,31 +1,43 @@
 From: labbott@fedoraproject.org (Laura Abbott)
-Date: Fri,  5 Feb 2016 16:24:45 -0800
-Subject: [PATCHv4 0/3] ARCH_SUPPORTS_DEBUG_PAGEALLOC for arm64
-Message-ID: <1454718288-31374-1-git-send-email-labbott@fedoraproject.org>
+Date: Fri,  5 Feb 2016 16:24:48 -0800
+Subject: [PATCHv4 3/3] arm64: ptdump: Indicate whether memory should be
+ faulting
+In-Reply-To: <1454718288-31374-1-git-send-email-labbott@fedoraproject.org>
+References: <1454718288-31374-1-git-send-email-labbott@fedoraproject.org>
+Message-ID: <1454718288-31374-4-git-send-email-labbott@fedoraproject.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-This is hopefully the last update to add proper ARCH_SUPPORTS_DEBUG_PAGEALLOC
-support for arm64.
 
-Changes since v3:
-- More acks
-- Pulled out block check into a separate function
-- Style fixups
-- Comment tweaking
+With CONFIG_DEBUG_PAGEALLOC, pages do not have the valid bit
+set when free in the buddy allocator. Add an indiciation to
+the page table dumping code that the valid bit is not set,
+'F' for fault, to make this easier to understand.
 
-Laura Abbott (3):
-  arm64: Drop alloc function from create_mapping
-  arm64: Add support for ARCH_SUPPORTS_DEBUG_PAGEALLOC
-  arm64: ptdump: Indicate whether memory should be faulting
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+Tested-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Laura Abbott <labbott@fedoraproject.org>
+---
+ arch/arm64/mm/dump.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
- arch/arm64/Kconfig       |  3 +++
- arch/arm64/mm/dump.c     |  5 +++++
- arch/arm64/mm/mmu.c      | 48 +++++++++++++++++++++++++++++++++++++-----------
- arch/arm64/mm/pageattr.c | 46 ++++++++++++++++++++++++++++++++++++----------
- 4 files changed, 81 insertions(+), 21 deletions(-)
-
+diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
+index 5a22a11..f381ac9 100644
+--- a/arch/arm64/mm/dump.c
++++ b/arch/arm64/mm/dump.c
+@@ -90,6 +90,11 @@ struct prot_bits {
+ 
+ static const struct prot_bits pte_bits[] = {
+ 	{
++		.mask	= PTE_VALID,
++		.val	= PTE_VALID,
++		.set	= " ",
++		.clear	= "F",
++	}, {
+ 		.mask	= PTE_USER,
+ 		.val	= PTE_USER,
+ 		.set	= "USR",
 -- 
 2.5.0
