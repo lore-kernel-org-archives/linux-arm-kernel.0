@@ -1,23 +1,22 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat, 06 Feb 2016 22:57:39 +0100
-Subject: [PATCH v2 20/51] mtd: docg3: switch to mtd_ooblayout_ops
-In-Reply-To: <1454580434-32078-21-git-send-email-boris.brezillon@free-electrons.com>
- (Boris Brezillon's message of "Thu, 4 Feb 2016 11:06:43 +0100")
-References: <1454580434-32078-1-git-send-email-boris.brezillon@free-electrons.com>
- <1454580434-32078-21-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <87y4ax33jg.fsf@belgarion.home>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Sat,  6 Feb 2016 22:01:07 +0000
+Subject: [PATCH 0/2] ARM: bcm2835_defconfig: Enable RPi power domain driver
+Message-ID: <1454796069-26830-1-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Boris Brezillon <boris.brezillon@free-electrons.com> writes:
+This patch series allow us to enable power domains on the Raspberry Pi
+in the defconfig.
 
-> Replace the nand_ecclayout definition by the equivalent mtd_ooblayout_ops
-> definition.
->
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
+This requires Stephen Warren's latest series ("ARM: bcm2835_defconfig:
+rebuild on next-20160205") applied first.
 
-Cheers.
+Stefan Wahren (2):
+  ARM: bcm2835_defconfig: Enable RPi firmware driver
+  ARM: bcm2835_defconfig: Enable RPi power domain driver
 
---
-Robert
+ arch/arm/configs/bcm2835_defconfig |    2 ++
+ 1 file changed, 2 insertions(+)
+
+-- 
+1.7.9.5
