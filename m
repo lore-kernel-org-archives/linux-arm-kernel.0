@@ -1,20 +1,49 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 6 Feb 2016 19:34:14 +0100
-Subject: net: mv643xx: interface does not transmit after some time
-In-Reply-To: <E4F9E0D0-9DA8-4E33-9F89-B49E47F11CE0@schloeter.net>
-References: <E4F9E0D0-9DA8-4E33-9F89-B49E47F11CE0@schloeter.net>
-Message-ID: <20160206183414.GD17218@lunn.ch>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sat, 6 Feb 2016 18:38:54 +0000
+Subject: [PATCH] iio: chemical: select IRQ_WORK for ATLAS ph sensor
+In-Reply-To: <CAKzfze8b7Q4ZHyXW=wq4K2ETFoMrfERpTci2dSAzSgCCrWpnzg@mail.gmail.com>
+References: <5127664.OXcBoKUPQO@wuerfel>
+ <CAKzfze8b7Q4ZHyXW=wq4K2ETFoMrfERpTci2dSAzSgCCrWpnzg@mail.gmail.com>
+Message-ID: <56B63DBE.8040507@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> How can I figure out what is wrong?
+On 03/02/16 07:55, Matt Ranostay wrote:
+> Reviewed-by: Matt Ranostay <mranostay@gmail.com>
+> 
+> On Tue, Feb 2, 2016 at 6:36 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> The newly added atlas-ph-sensor driver uses irq_work_queue, which
+>> may not always be enabled:
+>>
+>> ERROR: "irq_work_queue" [drivers/iio/chemical/atlas-ph-sensor.ko] undefined!
+>>
+>> This adds a 'select' statement to Kconfig to ensure it's there
+>> when we need it.
+>>
+>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>> Fixes: 27dec00ecf2d ("iio: chemical: add Atlas pH-SM sensor support")
+>>
+Applied to the togreg branch of iio.git and pushed out as testing for
+the autobuilders to fail to spot and IRQ_WORK related issues ;)
 
-Hi Thomas
+Thanks,
 
-Can you find an easily way to reproduce it? iperf, or scp a big file
-etc.
-
-If you have a simple and reliable way to reproduce it, i would suggest
-doing a git bisect to find out which change broke it.
-
-      Andrew
+Jonathan
+>> diff --git a/drivers/iio/chemical/Kconfig b/drivers/iio/chemical/Kconfig
+>> index ce7cd1370f74..f73290f84c90 100644
+>> --- a/drivers/iio/chemical/Kconfig
+>> +++ b/drivers/iio/chemical/Kconfig
+>> @@ -10,6 +10,7 @@ config ATLAS_PH_SENSOR
+>>         select REGMAP_I2C
+>>         select IIO_BUFFER
+>>         select IIO_TRIGGERED_BUFFER
+>> +       select IRQ_WORK
+>>         help
+>>          Say Y here to build I2C interface support for the Atlas
+>>          Scientific OEM pH-SM sensor.
+>>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
