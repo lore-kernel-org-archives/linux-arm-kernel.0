@@ -1,41 +1,25 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Sun, 07 Feb 2016 12:16:55 +0100
-Subject: [PATCH v2 03/12] serial: mvebu-uart: initial support for
- Armada-3700 serial port
-In-Reply-To: <20160207071747.GA14010@kroah.com> (Greg Kroah-Hartman's message
- of "Sat, 6 Feb 2016 23:17:47 -0800")
-References: <1454524889-9207-1-git-send-email-gregory.clement@free-electrons.com>
- <1454524889-9207-4-git-send-email-gregory.clement@free-electrons.com>
- <20160207071747.GA14010@kroah.com>
-Message-ID: <87a8nc3h3s.fsf@free-electrons.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Sun, 7 Feb 2016 17:52:12 +0530
+Subject: [PATCH RFC] Add cpufreq support
+In-Reply-To: <3308645.nrPBoahQ2V@wuerfel>
+References: <56B4D4BE.2040008@free.fr>
+ <3308645.nrPBoahQ2V@wuerfel>
+Message-ID: <20160207122212.GA3808@vireshk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
- 
- On dim., f?vr. 07 2016, Greg Kroah-Hartman <gregkh@linuxfoundation.org> wrote:
+On 05-02-16, 23:24, Arnd Bergmann wrote:
+> We no longer call platform_device_register_simple() from platform code, at least
+> for new platforms, and we should probably remove the code from the existing
+> platforms that still do it. I forget what the replacement was, but I'm not
+> going to take this version. Viresh should be able to help you do it the right
+> way.
 
-> On Wed, Feb 03, 2016 at 07:41:20PM +0100, Gregory CLEMENT wrote:
->> +static struct console mvebu_uart_console = {
->> +	.name	= "ttyS",
->
-> You aren't ttyS, that's a reserved name for a different chip, please use
-> a new name and major/minor numbers.
+We thought initially that opp-v2's compatible string can be used to probe the
+drivers, but that was denied later and all we do today is add platform devices
+for cpufreq.
 
-Oh sorry, I changed the ttyS to ttyMV in the uart_driver struct but I
-forgot the console. I will fix it in next version.
-
-Thanks,
-
-Gregory
-
->
-> thanks,
->
-> greg k-h
+What do you have in mind Arnd ?
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+viresh
