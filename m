@@ -1,40 +1,52 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Sun, 7 Feb 2016 21:35:00 +0530
-Subject: [GIT PULL] Mailbox fixes for -rc3
-Message-ID: <CABb+yY0Da=jRU9RMW5bJ2LHgnxjVLhs6A_AvHWg=i1+6j=k8PA@mail.gmail.com>
+From: slash.tmp@free.fr (Mason)
+Date: Sun, 7 Feb 2016 17:04:54 +0100
+Subject: Common/typical fractional divider HW API
+In-Reply-To: <1454690599.31169.103.camel@linux.intel.com>
+References: <56B4B67D.2080707@free.fr>
+ <1454684758.31169.77.camel@linux.intel.com> <56B4C775.50808@free.fr>
+ <1454688729.31169.87.camel@linux.intel.com> <56B4CDEF.3080606@free.fr>
+ <1454690599.31169.103.camel@linux.intel.com>
+Message-ID: <56B76B26.4050306@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On 05/02/2016 17:43, Andy Shevchenko wrote:
 
-The following changes since commit 34229b277480f46c1e9a19f027f30b074512e68b:
+> There are plenty of implementations of the divider.
 
-  Merge git://git.kernel.org/pub/scm/linux/kernel/git/davem/net
-(2016-02-01 15:56:08 -0800)
+I'd be happy to read an overview on the subject, if you have
+some links to share.
 
-are available in the git repository at:
+> You might consider to use one than inventing new one
 
+I find it hard to believe that the interface I'm discussing
+has not been used (several times) in the past. (It's merely
+a trivial floating point scheme.)
 
-  git://git.linaro.org/landing-teams/working/fujitsu/integration.git
-mailbox-devel
+As a matter of fact, the integer divider driver supports
+"I" and "2^I", so extending 2^I to "2^I * (1 + F/256)"
+is an obvious step.
 
-for you to fetch changes up to 65d3b04a814679a31fe4d5edd19d89dd5b94fd40:
+>> In this part of my message, I was trying to argue that one HW API
+>> "2^I * (1 + F/256)" seemed better than another one "I + F/16" on
+>> any hardware.
+> 
+> I disagree in a part 2^I.
 
-  mailbox: Fix dependencies for !HAS_IOMEM archs (2016-02-02 16:47:14 +0530)
+I don't know what that means. If you speak Russian, maybe you
+can write in Russian, and I'll try to figure it out.
 
-----------------------------------------------------------------
+>> Maybe the clk-fractional-divider could be made more generic by having
+>> the register update part done in a call-back function?
+> 
+> Why do you need to touch that module at all if your hardware doesn't
+> suit it?
 
-- Fix getting element from the pcc-channels array by simply indexing into it
+What does it mean "your hardware doesn't suit it" ?
 
-- Prevent building mailbox-test driver for archs that don't have IOMEM
+I am saying that if the register update were moved into a call-back
+function, then any scheme could be supported. Maybe you think this
+is just vague hand-waving. I'll send a patch to illustrate what
+I'm saying.
 
-----------------------------------------------------------------
-Alexey Klimov (1):
-      mailbox: pcc: fix channel calculation in get_pcc_channel()
-
-Richard Weinberger (1):
-      mailbox: Fix dependencies for !HAS_IOMEM archs
-
- drivers/mailbox/Kconfig | 1 +
- drivers/mailbox/pcc.c   | 8 +-------
- 2 files changed, 2 insertions(+), 7 deletions(-)
+Regards.
