@@ -1,53 +1,40 @@
-From: contact@paulk.fr (Paul Kocialkowski)
-Date: Sun, 07 Feb 2016 16:23:51 +0100
-Subject: [PATCH v2 3/4] ARM: LG Optimus Black (P970) codename sniper
- support, with basic features
-In-Reply-To: <1454701140.2623.12.camel@collins>
-References: <1454697741-8687-1-git-send-email-contact@paulk.fr>
- <1454697741-8687-4-git-send-email-contact@paulk.fr>
- <1454701140.2623.12.camel@collins>
-Message-ID: <1454858631.2547.7.camel@aldrin>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Sun, 7 Feb 2016 21:35:00 +0530
+Subject: [GIT PULL] Mailbox fixes for -rc3
+Message-ID: <CABb+yY0Da=jRU9RMW5bJ2LHgnxjVLhs6A_AvHWg=i1+6j=k8PA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Linus,
 
-Le vendredi 05 f?vrier 2016 ? 20:39 +0100, Paul Kocialkowski a ?crit :
-> Le vendredi 05 f?vrier 2016 ? 19:42 +0100, Paul Kocialkowski a ?crit :
-> > The LG Optimus Black (P970) codename sniper is a smartphone that was designed
-> > and manufactured by LG Electronics (LGE) and released back in 2011.
-> > It is using an OMAP3630 SoC, GP version.
-> > 
-> > This adds devicetree support for the device, with only a few basic features
-> > supported, such as debug uart, i2c, internal emmc and external mmc.
+The following changes since commit 34229b277480f46c1e9a19f027f30b074512e68b:
 
-[snip}
+  Merge git://git.kernel.org/pub/scm/linux/kernel/git/davem/net
+(2016-02-01 15:56:08 -0800)
 
-> > +&mmc2 {
-> > +
-> 
-> Please discard this newline in case v2 gets merged.
+are available in the git repository at:
 
-All things considered, I'd rather not have this patch merged as-is, but
-wait for the next version.
 
-I'll wait for feedback before sending v3.
+  git://git.linaro.org/landing-teams/working/fujitsu/integration.git
+mailbox-devel
 
--- 
-Paul Kocialkowski, Replicant developer
+for you to fetch changes up to 65d3b04a814679a31fe4d5edd19d89dd5b94fd40:
 
-Replicant is a fully free Android distribution running on several
-devices, a free software mobile operating system putting the emphasis on
-freedom and privacy/security.
+  mailbox: Fix dependencies for !HAS_IOMEM archs (2016-02-02 16:47:14 +0530)
 
-Website: https://www.replicant.us/
-Blog: https://blog.replicant.us/
-Wiki/tracker/forums: https://redmine.replicant.us/
+----------------------------------------------------------------
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160207/e83bf34d/attachment.sig>
+- Fix getting element from the pcc-channels array by simply indexing into it
+
+- Prevent building mailbox-test driver for archs that don't have IOMEM
+
+----------------------------------------------------------------
+Alexey Klimov (1):
+      mailbox: pcc: fix channel calculation in get_pcc_channel()
+
+Richard Weinberger (1):
+      mailbox: Fix dependencies for !HAS_IOMEM archs
+
+ drivers/mailbox/Kconfig | 1 +
+ drivers/mailbox/pcc.c   | 8 +-------
+ 2 files changed, 2 insertions(+), 7 deletions(-)
