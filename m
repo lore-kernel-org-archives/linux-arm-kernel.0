@@ -1,53 +1,73 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sun, 7 Feb 2016 21:30:25 +0800
-Subject: [PATCH v3 6/6] kvm: arm64: Add ACPI support for virt arch timer
-In-Reply-To: <1454358418-5157-7-git-send-email-fu.wei@linaro.org>
-Message-ID: <201602072148.KCt0P2NE%fengguang.wu@intel.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Sun, 7 Feb 2016 14:48:42 +0100 (CET)
+Subject: [PATCH] [media] mx3_camera: use %pad format string for dma_ddr_t
+In-Reply-To: <1527735.0V0q3NFh2C@wuerfel>
+References: <1527735.0V0q3NFh2C@wuerfel>
+Message-ID: <Pine.LNX.4.64.1602071446310.11458@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fu,
+Hi Arnd,
 
-[auto build test ERROR on tip/timers/core]
-[also build test ERROR on v4.5-rc2 next-20160205]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+On Mon, 1 Feb 2016, Arnd Bergmann wrote:
 
-url:    https://github.com/0day-ci/linux/commits/fu-wei-linaro-org/acpi-clocksource-kvm-add-GTDT-and-ARM-memory-mapped-timer-support/20160202-043111
-config: arm64-allyesconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+> The mx3_camera driver prints DMA addresses using the "%x" format
+> string, which is wrong when using a 64-bit dma_addr_t definition:
+> 
+> media/platform/soc_camera/mx3_camera.c: In function 'mx3_cam_dma_done':
+> media/platform/soc_camera/mx3_camera.c:149:125: error: format '%x' expects argument of type 'unsigned int', but argument 5 has type 'dma_addr_t {aka long long unsigned int}' [-Werror=format=]
+> media/platform/soc_camera/mx3_camera.c: In function 'mx3_videobuf_queue':
+> media/platform/soc_camera/mx3_camera.c:317:119: error: format '%x' expects argument of type 'unsigned int', but argument 5 has type 'dma_addr_t {aka long long unsigned int}' [-Werror=format=]
+> media/platform/soc_camera/mx3_camera.c: In function 'mx3_videobuf_release':
+> media/platform/soc_camera/mx3_camera.c:346:119: error: format '%x' expects argument of type 'unsigned int', but argument 5 has type 'dma_addr_t {aka long long unsigned int}' [-Werror=format=]
+> 
+> This changes the code to use the special %pad format string, which
+> always does the right thing.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-All errors (new ones prefixed by >>):
+Thanks for the patch. I'll queue it for 4.6.
 
-   arch/arm64/kvm/../../../virt/kvm/arm/arch_timer.c: In function 'kvm_timer_get_ppi':
->> arch/arm64/kvm/../../../virt/kvm/arm/arch_timer.c:404:2: error: implicit declaration of function 'gtdt_arch_timer_data_init' [-Werror=implicit-function-declaration]
-     if (!*ppi && !gtdt_arch_timer_data_init(NULL, &data))
-     ^
-   cc1: some warnings being treated as errors
+Guennadi
 
-vim +/gtdt_arch_timer_data_init +404 arch/arm64/kvm/../../../virt/kvm/arm/arch_timer.c
-
-   398	
-   399		*ppi = irq_of_parse_and_map(np, VIRT_PPI);
-   400		of_node_put(np);
-   401	
-   402	skip_of:
-   403	#ifdef CONFIG_ACPI_GTDT
- > 404		if (!*ppi && !gtdt_arch_timer_data_init(NULL, &data))
-   405			*ppi = data.virt_ppi;
-   406	#endif
-   407	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 48152 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160207/e26b4b75/attachment-0001.obj>
+> ---
+> Another old bug that only rarely shows up in ARM randconfigs.
+> 
+> diff --git a/drivers/media/platform/soc_camera/mx3_camera.c b/drivers/media/platform/soc_camera/mx3_camera.c
+> index 169ed1150226..aa39e9569b1a 100644
+> --- a/drivers/media/platform/soc_camera/mx3_camera.c
+> +++ b/drivers/media/platform/soc_camera/mx3_camera.c
+> @@ -146,8 +146,8 @@ static void mx3_cam_dma_done(void *arg)
+>  	struct idmac_channel *ichannel = to_idmac_chan(chan);
+>  	struct mx3_camera_dev *mx3_cam = ichannel->client;
+>  
+> -	dev_dbg(chan->device->dev, "callback cookie %d, active DMA 0x%08x\n",
+> -		desc->txd.cookie, mx3_cam->active ? sg_dma_address(&mx3_cam->active->sg) : 0);
+> +	dev_dbg(chan->device->dev, "callback cookie %d, active DMA %pad\n",
+> +		desc->txd.cookie, mx3_cam->active ? &sg_dma_address(&mx3_cam->active->sg) : NULL);
+>  
+>  	spin_lock(&mx3_cam->lock);
+>  	if (mx3_cam->active) {
+> @@ -314,8 +314,8 @@ static void mx3_videobuf_queue(struct vb2_buffer *vb)
+>  	spin_unlock_irq(&mx3_cam->lock);
+>  
+>  	cookie = txd->tx_submit(txd);
+> -	dev_dbg(icd->parent, "Submitted cookie %d DMA 0x%08x\n",
+> -		cookie, sg_dma_address(&buf->sg));
+> +	dev_dbg(icd->parent, "Submitted cookie %d DMA %pad\n",
+> +		cookie, &sg_dma_address(&buf->sg));
+>  
+>  	if (cookie >= 0)
+>  		return;
+> @@ -344,8 +344,8 @@ static void mx3_videobuf_release(struct vb2_buffer *vb)
+>  	unsigned long flags;
+>  
+>  	dev_dbg(icd->parent,
+> -		"Release%s DMA 0x%08x, queue %sempty\n",
+> -		mx3_cam->active == buf ? " active" : "", sg_dma_address(&buf->sg),
+> +		"Release%s DMA %pad, queue %sempty\n",
+> +		mx3_cam->active == buf ? " active" : "", &sg_dma_address(&buf->sg),
+>  		list_empty(&buf->queue) ? "" : "not ");
+>  
+>  	spin_lock_irqsave(&mx3_cam->lock, flags);
+> 
