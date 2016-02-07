@@ -1,197 +1,32 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Sun, 7 Feb 2016 10:12:12 +0800
-Subject: [PATCH v10 5/5] Watchdog: ARM SBSA Generic Watchdog half timeout
- panic support
-In-Reply-To: <56B6422C.7070302@roeck-us.net>
-References: <1454519923-25230-1-git-send-email-fu.wei@linaro.org>
- <1454519923-25230-6-git-send-email-fu.wei@linaro.org>
- <56B23883.7000501@codeaurora.org>
- <CADyBb7sxPg-QUjTbeHFtYkctKc_g7D8O=+jqbXN+DCCoCEnFqA@mail.gmail.com>
- <56B23E99.1030604@codeaurora.org>
- <CADyBb7s4opxfPFuX=1-qEE6uhsaMXgofAJPbHUQHrng2AUwqNA@mail.gmail.com>
- <56B2423B.1020109@codeaurora.org>
- <CADyBb7uULCn97ea19zH8dB4QX1QA8=AXL94d6gXgFxXM8haBNA@mail.gmail.com>
- <56B24642.8090105@codeaurora.org>
- <CADyBb7s_QeU=pYqN9G+5WMtx-L+=QC6uZR6N6ZWPOixnkHzPjw@mail.gmail.com>
- <56B24AB5.3070001@codeaurora.org>
- <CADyBb7usPpY=YLjecXce63zY5e1tniPLmNsVY=8CJHJsCqBgQw@mail.gmail.com>
- <56B2DEE4.7060901@roeck-us.net>
- <CADyBb7unAHEOMfruWS82RkHK6uwPAWCxUx9jqzSkiHU4LHDSeA@mail.gmail.com>
- <56B4B4E2.40105@roeck-us.net>
- <CADyBb7sP=d+BWOdmNEAs38yRcmXVjYsFX=XNffNpGqfybpxTfQ@mail.gmail.com>
- <56B5363D.20200@roeck-us.net>
- <CADyBb7vRKjDoeOfH=3Uwz+D0xyXaC9cM4ZSEO+MwL8Gw5T-Umg@mail.gmail.com>
- <56B6422C.7070302@roeck-us.net>
-Message-ID: <CADyBb7vTeamcE68FJ6G8X-VKww-AAbfptvB9jcKLg9oRTzVcLg@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Sat, 6 Feb 2016 22:03:54 -0800
+Subject: [PATCH] staging: wilc1000: fix compilation without CONFIG_PM
+In-Reply-To: <1454685729-3663377-1-git-send-email-arnd@arndb.de>
+References: <1454685729-3663377-1-git-send-email-arnd@arndb.de>
+Message-ID: <20160207060354.GA2714@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 February 2016 at 02:57, Guenter Roeck <linux@roeck-us.net> wrote:
-> On 02/06/2016 10:02 AM, Fu Wei wrote:
->>
->> Hi Guenter,
->>
->> On 6 February 2016 at 07:54, Guenter Roeck <linux@roeck-us.net> wrote:
->>>
->>> On 02/05/2016 10:21 AM, Fu Wei wrote:
->>>>
->>>>
->>>> On 5 February 2016 at 22:42, Guenter Roeck <linux@roeck-us.net> wrote:
->>>>>
->>>>>
->>>>> On 02/05/2016 01:51 AM, Fu Wei wrote:
->>>>>>
->>>>>>
->>>>>>
->>>>>> Hi Guenter,
->>>>>>
->>>>>> On 4 February 2016 at 13:17, Guenter Roeck <linux@roeck-us.net> wrote:
->>>>>>>
->>>>>>>
->>>>>>>
->>>>>>> On 02/03/2016 03:00 PM, Fu Wei wrote:
->>>>>>>>
->>>>>>>>
->>>>>>>>
->>>>>>>>
->>>>>>>> On 4 February 2016 at 02:45, Timur Tabi <timur@codeaurora.org>
->>>>>>>> wrote:
->>>>>>>>>
->>>>>>>>>
->>>>>>>>>
->>>>>>>>>
->>>>>>>>> Fu Wei wrote:
->>>>>>>>>>
->>>>>>>>>>
->>>>>>>>>>
->>>>>>>>>>
->>>>>>>>>>
->>>>>>>>>> As you know I have made the pre-timeout support patch, If people
->>>>>>>>>> like
->>>>>>>>>> it, i am happy to go on upstream it separately.
->>>>>>>>>>
->>>>>>>>>> If we want to use pre-timeout here, user only can use
->>>>>>>>>> get_pretimeout
->>>>>>>>>> and disable panic by setting pretimeout to 0
->>>>>>>>>> but user can not really set pretimeout, because "pre-timeout  ==
->>>>>>>>>> timeout / 2 (always)".
->>>>>>>>>> if user want to change pretimeout, he/she has to set_time instead.
->>>>>>>>>
->>>>>>>>>
->>>>>>>>>
->>>>>>>>>
->>>>>>>>>
->>>>>>>>>
->>>>>>>>> Ok, I think patches 4 and 5 should be combined, and I think the
->>>>>>>>> Kconfig
->>>>>>>>> entry should be removed and just use panic_enabled.
->>>>>>>
->>>>>>>
->>>>>>>
->>>>>>>
->>>>>>>
->>>>>>> Agreed.
->>>>>>
->>>>>>
->>>>>>
->>>>>>
->>>>>> np, will do
->>>>>>
->>>>>>>>
->>>>>>>>
->>>>>>>> NP, will update this patchset like that ,  thanks :-)
->>>>>>>>
->>>>>>>
->>>>>>> Also, if panic is enabled, the timeout needs to be adjusted
->>>>>>> accordingly
->>>>>>> (to only panic after the entire timeout period has expired, not after
->>>>>>> half of it). We can not panic the system after timeout / 2.
->>>>>>
->>>>>>
->>>>>>
->>>>>>
->>>>>> OK, my thought is
->>>>>>
->>>>>> if panic is enabled :
->>>>>> |--------WOR-------WS0--------WOR-------WS1
->>>>>> |------timeout------(panic)------timeout-----reset
->>>>>>
->>>>>> if panic is disabled .
->>>>>> |--------WOR-------WS0--------WOR-------WS1
->>>>>> |---------------------timeout---------------------reset
->>>>>>
->>>>>>     panic_enabled only can be configured when module is loaded by
->>>>>> module
->>>>>> parameter
->>>>>>
->>>>>> But user should know that max_timeout(panic_enable) =
->>>>>> max_timeout(panic_disable) / 2
->>>>>>
->>>>>
->>>>> That means you'll have to update max_timeout accordingly.
->>>>
->>>>
->>>>
->>>> panic_enabled only can be configured when module is loaded, so we
->>>> don't need to update it.
->>>>
->>>> max_timeout will only be set up in the init stage.
->>>>
->>>> Does it make sense ? :-)
->>>>
->>> Not sure I understand your problem or question.
->>>
->>> max_timeout will have to reflect the correct maximum timeout, under
->>> all circumstances. It will have to be set to the correct value before
->>> the watchdog driver is registered.
->>
->>
->> yes, understood,  my thought is :
->>
->> in  static int sbsa_gwdt_probe(struct platform_device *pdev)
->>
->> if (action) {
->>          wdd->min_timeout = 1;
->>          wdd->max_timeout = U32_MAX / gwdt->clk;
->> } else {
->>          wdd->min_timeout = 2;
->>          wdd->max_timeout = U32_MAX / gwdt->clk * 2;
->
->
-> Pretty much, though you would also have to adjust all calculations
-> using gwdt->clk, in both set_timeout() and get_timeout(). Wonder if
-> you could adjust gwdt->clk instead.
->
-> Does min_timeout really have to be 2 if panic is disabled ?
-> The only reason seems to be the calculation in sbsa_gwdt_set_timeout().
->
->         writel(timeout / 2 * gwdt->clk, gwdt->control_base + SBSA_GWDT_WOR);
->
-> Maybe you could use something like
->
->         writel(timeout * (gwdt->clk / 2), ...);
->
-> instead. Or, as mentioned above, adjust the value of gwdt->clk
-> to include the factor.
+On Fri, Feb 05, 2016 at 04:21:50PM +0100, Arnd Bergmann wrote:
+> After the addition of the wakeup code in wilc1000, it no longer
+> builds when CONFIG_PM is disabled:
+> 
+> drivers/staging/wilc1000/wilc_wfi_cfgoperations.c: In function 'wilc_create_wiphy':
+> drivers/staging/wilc1000/wilc_wfi_cfgoperations.c:2632:13: error: 'struct wiphy' has no member named 'wowlan'
+>   wdev->wiphy->wowlan = &wowlan_support;
+> 
+> This marks the wowlan_support variable as __maybe_unused and hides
+> the reference when CONFIG_PM is disabled to avoid the build error.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 73584a40d748 ("staging: wilc1000: add ops resuem/suspend/wakeup in cfg80211")
+> ---
+>  drivers/staging/wilc1000/wilc_wfi_cfgoperations.c | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
 
-yes,  Thanks for pointing it out.
-I will fix that following your suggestion.
+A different patch was sent just before yours.  Actually 2 different
+ones...
 
->
-> Thanks,
-> Guenter
->
+thanks,
 
-
-
--- 
-Best regards,
-
-Fu Wei
-Software Engineer
-Red Hat Software (Beijing) Co.,Ltd.Shanghai Branch
-Ph: +86 21 61221326(direct)
-Ph: +86 186 2020 4684 (mobile)
-Room 1512, Regus One Corporate Avenue,Level 15,
-One Corporate Avenue,222 Hubin Road,Huangpu District,
-Shanghai,China 200021
+greg k-h
