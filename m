@@ -1,52 +1,34 @@
-From: slash.tmp@free.fr (Mason)
-Date: Sun, 7 Feb 2016 17:04:54 +0100
-Subject: Common/typical fractional divider HW API
-In-Reply-To: <1454690599.31169.103.camel@linux.intel.com>
-References: <56B4B67D.2080707@free.fr>
- <1454684758.31169.77.camel@linux.intel.com> <56B4C775.50808@free.fr>
- <1454688729.31169.87.camel@linux.intel.com> <56B4CDEF.3080606@free.fr>
- <1454690599.31169.103.camel@linux.intel.com>
-Message-ID: <56B76B26.4050306@free.fr>
+From: adam@baker-net.org.uk (Adam Baker)
+Date: Sun, 7 Feb 2016 16:15:36 +0000
+Subject: net: mv643xx: interface does not transmit after some time
+In-Reply-To: <20160206231935.GA30734@jirafa.cyrius.com>
+References: <E4F9E0D0-9DA8-4E33-9F89-B49E47F11CE0@schloeter.net>
+ <20160206183414.GD17218@lunn.ch> <20160206231935.GA30734@jirafa.cyrius.com>
+Message-ID: <56B76DA8.3090500@baker-net.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/02/2016 17:43, Andy Shevchenko wrote:
+On 06/02/16 23:19, Martin Michlmayr wrote:
+> * Andrew Lunn <andrew@lunn.ch> [2016-02-06 19:34]:
+>> Can you find an easily way to reproduce it? iperf, or scp a big file
+>> etc.
+>
+> FWIW, we had a similar bug report in Debian recently:
+> https://lists.debian.org/debian-arm/2016/01/msg00098.html
+>
+> Turning off TCP RX and TX offloading make it go away:
+> https://lists.debian.org/debian-arm/2016/01/msg00100.html
+>
+> Hopefully Thomas can do a bisect.
+>
 
-> There are plenty of implementations of the divider.
+I observed a similar issue when performing a large NFSv4 transfer with a 
+kirkwood based server. Unfortunately I'd just jumped from 3.14 to 4.4 so 
+I could do with a better starting point to bisect from.
 
-I'd be happy to read an overview on the subject, if you have
-some links to share.
+It failed several times while transferring a 4GB file over NFS but is 
+stable in normal use.
 
-> You might consider to use one than inventing new one
+Regards
 
-I find it hard to believe that the interface I'm discussing
-has not been used (several times) in the past. (It's merely
-a trivial floating point scheme.)
-
-As a matter of fact, the integer divider driver supports
-"I" and "2^I", so extending 2^I to "2^I * (1 + F/256)"
-is an obvious step.
-
->> In this part of my message, I was trying to argue that one HW API
->> "2^I * (1 + F/256)" seemed better than another one "I + F/16" on
->> any hardware.
-> 
-> I disagree in a part 2^I.
-
-I don't know what that means. If you speak Russian, maybe you
-can write in Russian, and I'll try to figure it out.
-
->> Maybe the clk-fractional-divider could be made more generic by having
->> the register update part done in a call-back function?
-> 
-> Why do you need to touch that module at all if your hardware doesn't
-> suit it?
-
-What does it mean "your hardware doesn't suit it" ?
-
-I am saying that if the register update were moved into a call-back
-function, then any scheme could be supported. Maybe you think this
-is just vague hand-waving. I'll send a patch to illustrate what
-I'm saying.
-
-Regards.
+Adam
