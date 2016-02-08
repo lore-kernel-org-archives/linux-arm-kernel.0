@@ -1,18 +1,24 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 8 Feb 2016 13:37:05 -0800
-Subject: [PATCH] ARM: netx: remove redundant "depends on ARCH_NETX"
-In-Reply-To: <1454694197-15200-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1454694197-15200-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20160208213705.GF25468@localhost>
+Date: Mon, 8 Feb 2016 13:38:58 -0800
+Subject: [PATCH V2 01/12] MAINTAINERS: Adding Maintainers for AMD Seattle
+ Device Tree
+In-Reply-To: <1454954357-8395-2-git-send-email-Suravee.Suthikulpanit@amd.com>
+References: <1454954357-8395-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <1454954357-8395-2-git-send-email-Suravee.Suthikulpanit@amd.com>
+Message-ID: <20160208213858.GG25468@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 06, 2016 at 02:43:17AM +0900, Masahiro Yamada wrote:
-> These options already reside inside the ARCH_NETX-dependent menu.
+On Mon, Feb 08, 2016 at 11:59:06AM -0600, Suravee Suthikulpanit wrote:
+> From: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
 > 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> Adding maintainers for AMD Seattle device tree.
+> 
+> Signed-off-by: Brijesh Singh <brijeshkumar.singh@amd.com>
+> Signed-off-by: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
+> Signed-off-by: Tom Lendacky <thomas.lendacky@amd.com>
 
-Thanks, applied to next/cleanup.
+Thanks, I've applied the series to next/dt64 now.
 
 
 -Olof
