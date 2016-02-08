@@ -1,59 +1,105 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon,  8 Feb 2016 18:14:12 +0100
-Subject: [PATCH v3 04/12] ata: ahci_mvebu: add support for Armada 3700 variant
+Date: Mon,  8 Feb 2016 18:14:15 +0100
+Subject: [PATCH v3 07/12] Documentation: dt: Tidy up the Marvell related files
 In-Reply-To: <1454951660-13289-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1454951660-13289-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1454951660-13289-5-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1454951660-13289-8-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lior Amsalem <alior@marvell.com>
+Over the last releases we have added more and more Marvell related binding
+directly in the arm directory. It's time to have our proper directory
+inside it, and move all the files in it.
 
-The main difference in the new Armada 3700 is that no address
-decoding needs to take place in the driver probe.
-
-[gregory.clement at free-electrons.com: reformulate the commit log]
-
-Signed-off-by: Lior Amsalem <alior@marvell.com>
-Reviewed-by: Nadav Haklai <nadavh@marvell.com>
-Tested-by: Nadav Haklai <nadavh@marvell.com>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- drivers/ata/ahci_mvebu.c | 14 +++++++++-----
- 1 file changed, 9 insertions(+), 5 deletions(-)
+ .../devicetree/bindings/arm/{ => marvell}/armada-370-xp-pmsu.txt          | 0
+ Documentation/devicetree/bindings/arm/{ => marvell}/armada-370-xp.txt     | 0
+ Documentation/devicetree/bindings/arm/{ => marvell}/armada-375.txt        | 0
+ .../devicetree/bindings/arm/{ => marvell}/armada-380-mpcore-soc-ctrl.txt  | 0
+ Documentation/devicetree/bindings/arm/{ => marvell}/armada-38x.txt        | 0
+ Documentation/devicetree/bindings/arm/{ => marvell}/armada-39x.txt        | 0
+ Documentation/devicetree/bindings/arm/{ => marvell}/armada-cpu-reset.txt  | 0
+ Documentation/devicetree/bindings/arm/{ => marvell}/coherency-fabric.txt  | 0
+ Documentation/devicetree/bindings/arm/{ => marvell}/kirkwood.txt          | 0
+ Documentation/devicetree/bindings/arm/{ => marvell}/marvell,berlin.txt    | 0
+ Documentation/devicetree/bindings/arm/{ => marvell}/marvell,dove.txt      | 0
+ Documentation/devicetree/bindings/arm/{ => marvell}/marvell,kirkwood.txt  | 0
+ Documentation/devicetree/bindings/arm/{ => marvell}/mvebu-cpu-config.txt  | 0
+ .../devicetree/bindings/arm/{ => marvell}/mvebu-system-controller.txt     | 0
+ 14 files changed, 0 insertions(+), 0 deletions(-)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/armada-370-xp-pmsu.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/armada-370-xp.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/armada-375.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/armada-380-mpcore-soc-ctrl.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/armada-38x.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/armada-39x.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/armada-cpu-reset.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/coherency-fabric.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/kirkwood.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/marvell,berlin.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/marvell,dove.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/marvell,kirkwood.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/mvebu-cpu-config.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/mvebu-system-controller.txt (100%)
 
-diff --git a/drivers/ata/ahci_mvebu.c b/drivers/ata/ahci_mvebu.c
-index f7a7fa81740e..de7128d81e9c 100644
---- a/drivers/ata/ahci_mvebu.c
-+++ b/drivers/ata/ahci_mvebu.c
-@@ -112,12 +112,15 @@ static int ahci_mvebu_probe(struct platform_device *pdev)
- 	if (rc)
- 		return rc;
- 
--	dram = mv_mbus_dram_info();
--	if (!dram)
--		return -ENODEV;
-+	if (of_device_is_compatible(pdev->dev.of_node,
-+				    "marvell,armada-380-ahci")) {
-+		dram = mv_mbus_dram_info();
-+		if (!dram)
-+			return -ENODEV;
- 
--	ahci_mvebu_mbus_config(hpriv, dram);
--	ahci_mvebu_regret_option(hpriv);
-+		ahci_mvebu_mbus_config(hpriv, dram);
-+		ahci_mvebu_regret_option(hpriv);
-+	}
- 
- 	rc = ahci_platform_init_host(pdev, hpriv, &ahci_mvebu_port_info,
- 				     &ahci_platform_sht);
-@@ -133,6 +136,7 @@ disable_resources:
- 
- static const struct of_device_id ahci_mvebu_of_match[] = {
- 	{ .compatible = "marvell,armada-380-ahci", },
-+	{ .compatible = "marvell,armada-3700-ahci", },
- 	{ },
- };
- MODULE_DEVICE_TABLE(of, ahci_mvebu_of_match);
+diff --git a/Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt b/Documentation/devicetree/bindings/arm/marvell/armada-370-xp-pmsu.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt
+rename to Documentation/devicetree/bindings/arm/marvell/armada-370-xp-pmsu.txt
+diff --git a/Documentation/devicetree/bindings/arm/armada-370-xp.txt b/Documentation/devicetree/bindings/arm/marvell/armada-370-xp.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/arm/armada-370-xp.txt
+rename to Documentation/devicetree/bindings/arm/marvell/armada-370-xp.txt
+diff --git a/Documentation/devicetree/bindings/arm/armada-375.txt b/Documentation/devicetree/bindings/arm/marvell/armada-375.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/arm/armada-375.txt
+rename to Documentation/devicetree/bindings/arm/marvell/armada-375.txt
+diff --git a/Documentation/devicetree/bindings/arm/armada-380-mpcore-soc-ctrl.txt b/Documentation/devicetree/bindings/arm/marvell/armada-380-mpcore-soc-ctrl.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/arm/armada-380-mpcore-soc-ctrl.txt
+rename to Documentation/devicetree/bindings/arm/marvell/armada-380-mpcore-soc-ctrl.txt
+diff --git a/Documentation/devicetree/bindings/arm/armada-38x.txt b/Documentation/devicetree/bindings/arm/marvell/armada-38x.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/arm/armada-38x.txt
+rename to Documentation/devicetree/bindings/arm/marvell/armada-38x.txt
+diff --git a/Documentation/devicetree/bindings/arm/armada-39x.txt b/Documentation/devicetree/bindings/arm/marvell/armada-39x.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/arm/armada-39x.txt
+rename to Documentation/devicetree/bindings/arm/marvell/armada-39x.txt
+diff --git a/Documentation/devicetree/bindings/arm/armada-cpu-reset.txt b/Documentation/devicetree/bindings/arm/marvell/armada-cpu-reset.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/arm/armada-cpu-reset.txt
+rename to Documentation/devicetree/bindings/arm/marvell/armada-cpu-reset.txt
+diff --git a/Documentation/devicetree/bindings/arm/coherency-fabric.txt b/Documentation/devicetree/bindings/arm/marvell/coherency-fabric.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/arm/coherency-fabric.txt
+rename to Documentation/devicetree/bindings/arm/marvell/coherency-fabric.txt
+diff --git a/Documentation/devicetree/bindings/arm/kirkwood.txt b/Documentation/devicetree/bindings/arm/marvell/kirkwood.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/arm/kirkwood.txt
+rename to Documentation/devicetree/bindings/arm/marvell/kirkwood.txt
+diff --git a/Documentation/devicetree/bindings/arm/marvell,berlin.txt b/Documentation/devicetree/bindings/arm/marvell/marvell,berlin.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/arm/marvell,berlin.txt
+rename to Documentation/devicetree/bindings/arm/marvell/marvell,berlin.txt
+diff --git a/Documentation/devicetree/bindings/arm/marvell,dove.txt b/Documentation/devicetree/bindings/arm/marvell/marvell,dove.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/arm/marvell,dove.txt
+rename to Documentation/devicetree/bindings/arm/marvell/marvell,dove.txt
+diff --git a/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt b/Documentation/devicetree/bindings/arm/marvell/marvell,kirkwood.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
+rename to Documentation/devicetree/bindings/arm/marvell/marvell,kirkwood.txt
+diff --git a/Documentation/devicetree/bindings/arm/mvebu-cpu-config.txt b/Documentation/devicetree/bindings/arm/marvell/mvebu-cpu-config.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/arm/mvebu-cpu-config.txt
+rename to Documentation/devicetree/bindings/arm/marvell/mvebu-cpu-config.txt
+diff --git a/Documentation/devicetree/bindings/arm/mvebu-system-controller.txt b/Documentation/devicetree/bindings/arm/marvell/mvebu-system-controller.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/arm/mvebu-system-controller.txt
+rename to Documentation/devicetree/bindings/arm/marvell/mvebu-system-controller.txt
 -- 
 2.5.0
