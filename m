@@ -1,72 +1,78 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Mon, 8 Feb 2016 13:17:58 +0000
-Subject: [RFC PATCH 0/4] Add ACPI support for HiSilicon PCIe Host
- Controllers
-In-Reply-To: <1930535.mkCdtpUWq7@wuerfel>
-References: <1454585860-60709-1-git-send-email-gabriele.paoloni@huawei.com>
- <76564455.dlc1WHiVY2@wuerfel>
- <EE11001F9E5DDD47B7634E2F8A612F2E1EC9EF4B@lhreml503-mbs>
- <1930535.mkCdtpUWq7@wuerfel>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1ECAC944@lhreml503-mbs>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Mon, 08 Feb 2016 15:26:48 +0200
+Subject: [PATCH V2 3/6] stm class: provision for statically assigned
+ masterIDs
+In-Reply-To: <CANLsYky2twQ98u241YyHD=atYRp1N56YVHUQNY2E2Ljsq0cseA@mail.gmail.com>
+References: <1454487337-30184-1-git-send-email-zhang.chunyan@linaro.org>
+ <1454487337-30184-4-git-send-email-zhang.chunyan@linaro.org>
+ <87mvrf5ngl.fsf@ashishki-desk.ger.corp.intel.com>
+ <CANLsYky2twQ98u241YyHD=atYRp1N56YVHUQNY2E2Ljsq0cseA@mail.gmail.com>
+Message-ID: <87twlj49k7.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: 04 February 2016 17:02
-> To: Gabriele Paoloni
-> Cc: Guohanjun (Hanjun Guo); Wangzhou (B); liudongdong (C); Linuxarm;
-> qiujiang; bhelgaas at google.com; Lorenzo.Pieralisi at arm.com;
-> tn at semihalf.com; zhangjukuo; xuwei (O); Liguozhu (Kenneth); linux-
-> pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
-> acpi at vger.kernel.org; linux-kernel at vger.kernel.org; jcm at redhat.com
-> Subject: Re: [RFC PATCH 0/4] Add ACPI support for HiSilicon PCIe Host
-> Controllers
-> 
-> On Thursday 04 February 2016 16:44:12 Gabriele Paoloni wrote:
-> > Effectively the ACPI version of the HiSilicon driver does not rely on
-> > Designware as much as the DT version (that calls
-> dw_pcie_host_init());
-> > however in order to do what you suggest I'd need to copy and paste
-> and
-> > modify dw_pcie_rd_conf and dw_pcie_wr_conf.
-> > Also I'd need to declare duplicate version of the functions in
-> > pcie-hisi-common.c (if I do not want to split the object across
-> > different paths "drivers/pci/host" and "drivers/acpi/")
-> >
-> > Now I can do it but I thought it was more correct to pass
-> &dw_pcie_ops
-> > as input pointer in DECLARE_ACPI_MCFG_FIXUP(); this is also because
-> maybe in
-> > future other Designware based controllers may need to support ACPI
-> and it
-> > would be easier for them to reuse their DT based driver functions
-> >
-> > Honestly I am a bit confused...
-> >
-> 
-> I don't think you can use the dw_pcie_ops as-is anyway, as they in
-> turn rely on the device driver structure, and you also don't need
-> those as they seem to be written for the generic case of a 32-bit
-> architecture that does not have enough space to map the entire
-> config space into MMIO. Just set up all those mapping registers from
-> the firmware and pass the config space base address as you'd normally
-> do on ACPI.
+Mathieu Poirier <mathieu.poirier@linaro.org> writes:
 
-Hi Arnd
+> On 5 February 2016 at 05:52, Alexander Shishkin
+> <alexander.shishkin@linux.intel.com> wrote:
+>> Chunyan Zhang <zhang.chunyan@linaro.org> writes:
+>>
+>>> From: Mathieu Poirier <mathieu.poirier@linaro.org>
+>>>
+>>> Some architecture like ARM assign masterIDs statically at the HW design
+>>> phase, making masterID manipulation in the generic STM core irrelevant.
+>>>
+>>> This patch adds a new 'mstatic' flag to struct stm_data that tells the
+>>> core that this specific STM device doesn't need explicit masterID
+>>> management.
+>>
+>> So why do we need this patch? If your STM only has master 42 allocated
+>> for software sources, simply set sw_start = 42, sw_end = 42 and you're
+>> good to go, software will have exactly one channel to choose from. See
+>> also the comment from <linux/stm.h>:
+>
+> On ARM each source, i.e entity capable of accessing STM channels, has
+> a different master ID set in HW.  We can't assume the IDs are
+> contiguous and from a SW point of view there is no way to probe the
+> values.
 
-I have now sent out patchset v2.
+Ok, it's the 'static' word that got me confused. From Mike's explanation
+it seems to me that it's the antithesis of static; the master ID
+assignment is so dynamic that it's not controllable by the software and
+may or may not reflect core id, power state, phase of the moon, etc.
 
-Now I have removed the dependency from designware but I still think
-the best location for the code is in "drivers/pci/host/":
-the ACPI quirks share the config read/write functions with the DT
-driver, moreover for other hosts in future I think it makes sense
-to stay in "drivers/pci/host/" as they could even share more init
-code with their respective DT versions...
+>>> In the core sw_start/end of masterID are set to '1',
+>>> i.e there is only one masterID to deal with.
+>>
+>> This is also a completely arbitrary and unnecessary requirement. Again,
+>> you can set both to 42 and it will still work.
+>
+> True - any value will do. The important thing to remember is that on
+> ARM, there is only one masterID channel (from an STM core point of
+> view).  But we could also proceed differently, see below for more
+> details.
 
-Cheers
+Well, we have the masters attribute with two numbers in it that define
+the range of master IDs that the software can choose from. More
+specifically to this situation:
 
-Gab
+ * the number of channel ID spaces available to the SW is
+   $end - $start + 1, that is, in your case, just 1;
+ * the number of master IDs for the SW to choose from is $end - $start;
+ * if $end==$start, their actual numeric value doesn't really matter,
+   either for the policy definition or for the actual writers.
 
-> 
-> 	Arnd
+This $end==$start situation itself may be ambiguous and can be
+interpreted either as having just one *static* master ID fixed for all
+SW writers (what I assumed from your commit message) or as having a
+floating master ID, which changes of its own accord and is not
+controllable by software.
+
+These two situations are really the same thing from the perspective of
+the system under tracing. Also, both of these situations should already
+work if the driver sets both sw_start and sw_end to the same
+value.
+
+Regards,
+--
+Alex
