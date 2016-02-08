@@ -1,36 +1,89 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 8 Feb 2016 16:32:06 +0100
-Subject: [PATCH v2] clk: shmobile: r8a7795: Add SD divider support
-In-Reply-To: <20160204193036.GA1958@tetsubishi>
-References: <1454135639-4102-1-git-send-email-dirk.behme@gmail.com>
- <20160204193036.GA1958@tetsubishi>
-Message-ID: <CAMuHMdW3Cp-Ga9NCb=TgGE7QxUTNp-PbOXsNu47Vvgcf-m0bSw@mail.gmail.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 8 Feb 2016 16:43:29 +0100
+Subject: [linux-sunxi][PATCH] ARM: dts: sun7i: Enable USB DRC on Olimex
+ A20 EVB
+In-Reply-To: <1454945387-29424-1-git-send-email-codekipper@gmail.com>
+References: <1454945387-29424-1-git-send-email-codekipper@gmail.com>
+Message-ID: <56B8B7A1.5020800@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 4, 2016 at 8:30 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
-> On Sat, Jan 30, 2016 at 07:33:59AM +0100, Dirk Behme wrote:
->> This patch adds SD[0..3] clock divider support for R-Car Gen3 SoC.
->>
->> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
->> Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
+Hi,
+
+On 08-02-16 16:29, codekipper at gmail.com wrote:
+> From: Marcus Cooper <codekipper@gmail.com>
 >
-> Tested-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> Enable the otg/drc usb controller on the Olimex A20 EVB.
+
+Does the A20 EVB not have some form of Vbus detect for the OTG
+port hooked up ? That does not sound right. Please double check.
+
+Regards,
+
+Hans
+
+
 >
-> Since we don't have UHS support currently, changing the clock is not
-> really exercised; but the code looks good and if it needs fixing, we can
-> do it incrementally IMO. What is currently needed works fine on my
-> Salvator-X for the exposed SD interfaces.
-
-Thanks, will queue for next renesas-drivers and v4.6.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+> ---
+>   arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts | 24 ++++++++++++++++++++++++
+>   1 file changed, 24 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
+> index c3c626b..93bbf26 100644
+> --- a/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
+> +++ b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
+> @@ -198,6 +198,10 @@
+>   	status = "okay";
+>   };
+>
+> +&otg_sram {
+> +	status = "okay";
+> +};
+> +
+>   &pio {
+>   	ahci_pwr_pin_olimex_som_evb: ahci_pwr_pin at 1 {
+>   		allwinner,pins = "PC3";
+> @@ -219,6 +223,13 @@
+>   		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+>   		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+>   	};
+> +
+> +	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
+> +		allwinner,pins = "PH4";
+> +		allwinner,function = "gpio_in";
+> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> +	};
+>   };
+>
+>   &reg_ahci_5v {
+> @@ -254,6 +265,10 @@
+>   	regulator-name = "avcc";
+>   };
+>
+> +&reg_usb0_vbus {
+> +	status = "okay";
+> +};
+> +
+>   &reg_usb1_vbus {
+>   	status = "okay";
+>   };
+> @@ -268,7 +283,16 @@
+>   	status = "okay";
+>   };
+>
+> +&usb_otg {
+> +	dr_mode = "otg";
+> +	status = "okay";
+> +};
+> +
+>   &usbphy {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&usb0_id_detect_pin>;
+> +	usb0_id_det-gpios = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH04 */
+> +	usb0_vbus-supply = <&reg_usb0_vbus>;
+>   	usb1_vbus-supply = <&reg_usb1_vbus>;
+>   	usb2_vbus-supply = <&reg_usb2_vbus>;
+>   	status = "okay";
+>
