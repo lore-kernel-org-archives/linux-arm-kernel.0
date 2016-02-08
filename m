@@ -1,50 +1,136 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Mon, 8 Feb 2016 15:15:05 +0530
-Subject: [PATCH] arm: dts: AM57XX: Correct the thermal thresholds
-Message-ID: <1454924705-8382-1-git-send-email-j-keerthy@ti.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 8 Feb 2016 10:48:26 +0100
+Subject: ARM PCI/MSI KVM passthrough with GICv2M
+In-Reply-To: <20160205111700.726ac061@t450s.home>
+References: <1454017899.23148.0.camel@redhat.com> <56AB78B1.2030202@linaro.org>
+ <1454096004.9301.1.camel@redhat.com> <56ABD8E0.6080409@linaro.org>
+ <20160201140351.GE6828@arm.com> <20160203125047.GB13974@cbox>
+ <20160203131057.GA20217@arm.com> <20160203153606.GC13974@cbox>
+ <56B4DC97.60904@linaro.org> <20160205111700.726ac061@t450s.home>
+Message-ID: <20160208094826.GA620@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The thermal threholds for am57xx are different from that of dra7.
-Correcting the thresholds for the same.
+On Fri, Feb 05, 2016 at 11:17:00AM -0700, Alex Williamson wrote:
+> On Fri, 5 Feb 2016 18:32:07 +0100
+> Eric Auger <eric.auger@linaro.org> wrote:
+> 
+> > Hi Alex,
+> > 
+> > I tried to sketch a proposal for guaranteeing the IRQ integrity when
+> > doing ARM PCI/MSI passthrough with ARM GICv2M msi-controller. This is
+> > based on extended VFIO group viability control, as detailed below.
+> > 
+> > As opposed to ARM GICv3 ITS, this MSI controller does *not* support IRQ
+> > remapping. It can expose 1 or more 4kB MSI frame. Each frame contains a
+> > single register where the msi data is written.
+> > 
+> > I would be grateful to you if you could tell me whether it makes any sense.
+> > 
+> > Thanks in advance
+> > 
+> > Best Regards
+> > 
+> > Eric
+> > 
+> > 
+> > 1) GICv2m with a single 4kB single frame
+> >    all devices having this msi-controller as msi-parent share this
+> >    single MSI frame. Those devices can work on behalf of the host
+> >    or work on behalf of 1 or more guests (KVM assigned devices). We
+> >    must make sure either the host only or 1 single VM can access to the
+> >    single frame to guarantee interrupt integrity: a device assigned
+> >    to 1 VM should not be able to trigger MSI targeted to the host
+> >    or another VM.
+> > 
+> >    I would propose to extend the VFIO notion of group viability.
+> >    Currently a VFIO group is viable if:
+> >    all devices belonging to the same group are bound to a VFIO driver
+> >    or unbound.
+> > 
+> >    Let's imagine we extend the viability check as follows:
+> > 
+> >    0) keep the current viable check: all the devices belonging to
+> >       the group must be vfio bound or unbound.
+> >    1) retrieve the MSI parent of the device and list all the
+> >       other devices using that MSI controller as MSI-parent (does not
+> >       look straightforward):
+> >    2) they must be VFIO driver bound or unbound as well (meaning
+> >       they are not used by the host). If not, reject device attachment
+> >    - in case they are VFIO bound (a VFIO group is set):
+> >      x if all VFIO containers are the same as the one of the device's
+> >        we try to attach, that's OK. This means the other devices
+> >        use different IOMMU mappings, eventually will target the
+> >        MSI frame but they all work for the same user space client/VM.
+> >      x 1 or more devices has a different container than the device
+> >        under attachment:
+> >        It works on behalf of a different user space client/VM,
+> >        we can't attach the new device. I think there is a case however
+> >        where severals containers can be opened by a single QEMU.
+> > 
+> > Of course the dynamic aspects, ie a new device showing up or an unbind
+> > event bring significant complexity.
+> > 
+> > 2) GICv2M with multiple 4kB frames
+> >    Each msi-frame is enumerated as msi-controller. The device tree
+> >    statically defines which device is attached to each msi frame.
+> >    In case devices are assigned we cannot change this attachment
+> >    anyway since there might be physical contraints behind.
+> >    So devices likely to be assigned to guests should be linked to a
+> >    different MSI frame than devices that are not.
+> > 
+> >    I think extended viability concept can be used as well.
+> > 
+> >    This model still is not ideal: in case we have a SR-IOV device
+> >    plugged onto an host bridge attached to a single MSI parent you won't
+> >    be able anyway to have 1 Virtual Function working for host and 1 VF
+> >    working for a guest. Only Interrupt translation (ITS) will bring that
+> >    feature.
+> > 
+> > 3) GICv3 ITS
+> >    This one supports interrupt translation service ~ Intel
+> >    IRQ remapping.
+> >    This means a single frame can be used by all devices. A deviceID is
+> >    used exclusively by the host or a guest. I assume the ITS driver
+> >    allocates/populates deviceid interrupt translation table featuring
+> >    separate LPI spaces ie by construction different ITT cannot feature
+> >    same LPIs. So no need to do the extended viability test.
+> > 
+> >    The MSI controller should have a property telling whether
+> >    it supports interrupt translation. This kind of property currently
+> >    exists on IOMMU side for INTEL remapping.
+> > 
+> 
+> Hi Eric,
+> 
+> Would anyone be terribly upset if we simply assume the worst case
+> scenario on GICv2m/M, have the IOMMU not claim IOMMU_CAP_INTR_REMAP, and
+> require the user to opt-in via the allow_unsafe_interrupts on the
+> vfio_iommu_type1 module?  That would make it very compatible with what
+> we already do on x86, where it really is all or nothing.  
 
-Signed-off-by: Keerthy <j-keerthy@ti.com>
----
+meaning either you allow unsafe multiplexing with passthrough in every
+flavor (unsafely) or you don't allow it at all?
 
-Depends on: https://lkml.org/lkml/2016/2/8/90
+I didn't know such on option existed, but it seems to me that this fits
+the bill exactly.
 
- arch/arm/boot/dts/am57xx-beagle-x15.dts | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
 
-Index: linux/arch/arm/boot/dts/am57xx-beagle-x15.dts
-===================================================================
---- linux.orig/arch/arm/boot/dts/am57xx-beagle-x15.dts	2016-02-08 14:57:05.514959101 +0530
-+++ linux/arch/arm/boot/dts/am57xx-beagle-x15.dts	2016-02-08 14:57:05.510959168 +0530
-@@ -825,3 +825,27 @@
- 		status = "okay";
- 	};
- };
-+
-+&cpu_alert0 {
-+	temperature = <90000>; /* milliCelsius */
-+};
-+
-+&cpu_crit {
-+	temperature = <105000>; /* milliCelsius */
-+};
-+
-+&gpu_crit {
-+	temperature = <105000>; /* milliCelsius */
-+};
-+
-+&core_crit {
-+	temperature = <105000>; /* milliCelsius */
-+};
-+
-+&dspeve_crit {
-+	temperature = <105000>; /* milliCelsius */
-+};
-+
-+&iva_crit {
-+	temperature = <105000>; /* milliCelsius */
-+};
+> My assumption
+> is that GICv2 would be phased out in favor of GICv3, so there's always
+> a hardware upgrade path to having more complete isolation, but the
+> return on investment for figuring out whether a given device really has
+> this sort of isolation seems pretty low.  Often users already have some
+> degree of trust in the VMs they use for device assignment anyway.  An
+> especially prudent user can still look at the hardware specs for their
+> specific system to understand whether any devices are fully isolated
+> and only make use of those for device assignment.  Does that seem like
+> a reasonable alternative?
+> 
+
+It sounds good to me, that would allow us to release a GICv2m-based
+solution for MSI passthrough on currently available hardware like the
+Seattle.
+
+Thanks,
+-Christoffer
