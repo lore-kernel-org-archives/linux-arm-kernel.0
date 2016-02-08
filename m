@@ -1,49 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon,  8 Feb 2016 15:25:58 +0100
-Subject: [PATCH 3/3] ARM: kprobes: use "I" constraint for inline assembly
- offsets
-In-Reply-To: <1454941613-2775081-1-git-send-email-arnd@arndb.de>
-References: <1454941613-2775081-1-git-send-email-arnd@arndb.de>
-Message-ID: <1454941613-2775081-3-git-send-email-arnd@arndb.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 8 Feb 2016 14:29:12 +0000
+Subject: [PATCH 1/6] irqchip: add the Alpine MSIX interrupt controller
+In-Reply-To: <20160208141754.GG4117@kwain>
+References: <1454922971-17405-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1454922971-17405-2-git-send-email-antoine.tenart@free-electrons.com>
+ <alpine.DEB.2.11.1602081125560.25254@nanos> <20160208141754.GG4117@kwain>
+Message-ID: <56B8A638.1040903@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-build-testing with clang showed that the "J" constraint does not take
-positive arguments on clang when building in for Thumb-2:
+On 08/02/16 14:17, Antoine Tenart wrote:
+> Thomas,
+> 
+> On Mon, Feb 08, 2016 at 11:31:47AM +0100, Thomas Gleixner wrote:
+>> On Mon, 8 Feb 2016, Antoine Tenart wrote:
+>>> +static int alpine_msix_set_affinity(struct irq_data *irq_data,
+>>> +				    const struct cpumask *mask, bool force)
+>>> +{
+>>> +	int ret;
+>>> +
+>>> +	ret = irq_chip_set_affinity_parent(irq_data, mask, force);
+>>> +	return ret == IRQ_SET_MASK_OK ? IRQ_SET_MASK_OK_DONE : ret;
+>>
+>> What's the point of this exercise? Why can't you just set the affinity
+>> callback to irq_chip_set_affinity_parent() ?
+> 
+> That's what done in irq-gic-v2m.c. Besides that, I see no point. I'll
+> update for v2.
 
-core.c:540:3: error: invalid operand for inline asm constraint 'J'
+That's because there is no need to do another compose_msi_msg/write_msg
+in msi_domain_set_affinity() once the affinity has been updated at the
+GIC level. Alternatively, updating the GIC driver to always return
+IRQ_SET_MASK_OK_DONE would be perfectly acceptable.
 
-This has been reported as llvm bug https://llvm.org/bugs/show_bug.cgi?id=26061
+Thanks,
 
-However, looking at the source code in depth, I found that the
-kernel is also wrong, and it should not use "J" at all, but should
-use "I" to pass an immediate argument to the inline assembly when that
-is used as an offset to an 'ldr' instruction rather than the 'sub'
-argument.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/probes/kprobes/core.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/probes/kprobes/core.c b/arch/arm/probes/kprobes/core.c
-index a4ec240ee7ba..4b34b40ca917 100644
---- a/arch/arm/probes/kprobes/core.c
-+++ b/arch/arm/probes/kprobes/core.c
-@@ -570,10 +570,10 @@ void __kprobes jprobe_return(void)
- 		:
- 		: "r" (kcb->jprobe_saved_regs.ARM_sp),
- 		  "I" (sizeof(struct pt_regs) * 2),
--		  "J" (offsetof(struct pt_regs, ARM_sp)),
--		  "J" (offsetof(struct pt_regs, ARM_pc)),
--		  "J" (offsetof(struct pt_regs, ARM_cpsr)),
--		  "J" (offsetof(struct pt_regs, ARM_lr))
-+		  "I" (offsetof(struct pt_regs, ARM_sp)),
-+		  "I" (offsetof(struct pt_regs, ARM_pc)),
-+		  "I" (offsetof(struct pt_regs, ARM_cpsr)),
-+		  "I" (offsetof(struct pt_regs, ARM_lr))
- 		: "memory", "cc");
- }
- 
+	M.
 -- 
-2.7.0
+Jazz is not dead. It just smells funny...
