@@ -1,73 +1,31 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon,  8 Feb 2016 14:04:59 +0900
-Subject: [PATCH 2/2] ARM: descend into arch/arm/boot only once to generate
- boot images
-In-Reply-To: <1454907899-32101-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1454907899-32101-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1454907899-32101-2-git-send-email-yamada.masahiro@socionext.com>
+From: anup.patel@broadcom.com (Anup Patel)
+Date: Mon,  8 Feb 2016 10:47:28 +0530
+Subject: [PATCH v2 0/4] iommu/arm-smmu: misc fixes for SMMUv1/SMMUv2
+Message-ID: <1454908652-15317-1-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 3939f3345050 ("ARM: 8418/1: add boot image dependencies to not
-generate invalid images") fixed bad images generation in the parallel
-building, but it is not efficient to descend into arch/arm/boot over
-and over again.  It is also clumsy to display the same log message
-"Kernel: arch/arm/boot/Image is ready" a couple of times.
+The intention behind this patchset is to allow usage of IOMMU based
+DMA mappings for 32bit devices. It is based on '4.5-rc3' tag of linux
+mainline tree and Robin's SMMU patchset "[PATCH 0/4] Miscellaneous
+ARM SMMU patches".
 
-  $ make ARCH=arm UIMAGE_LOADADDR=0x80208000 all uImage
-      [snip]
-    Kernel: arch/arm/boot/Image is ready
-    Kernel: arch/arm/boot/Image is ready
-    Kernel: arch/arm/boot/zImage is ready
-    Building modules, stage 2.
-    MODPOST 279 modules
-    Kernel: arch/arm/boot/Image is ready
-    Kernel: arch/arm/boot/zImage is ready
-    UIMAGE  arch/arm/boot/uImage
-  Image Name:   Linux-4.5.0-rc3
-  Created:      Mon Feb  8 13:22:53 2016
-  Image Type:   ARM Linux Kernel Image (uncompressed)
-  Data Size:    6768768 Bytes = 6610.12 kB = 6.46 MB
-  Load Address: 80208000
-  Entry Point:  80208000
-    Image arch/arm/boot/uImage is ready
+This patchset and its dependent patches are available in smmu_v2
+branch of https://github.com/Broadcom/arm64-linux.git
 
-This commit allows arch/arm/boot/Makefile to build boot images at once
-instead of generating them one by one.  Of course, it works correctly
-also in parallel building.
+All patches have been tested on Broadcom SoCs having SMMU-500.
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+Anup Patel (3):
+  iommu/arm-smmu: Invoke DT probe from arm_smmu_of_setup()
+  of: iommu: Increment DT node refcount in of_iommu_set_ops()
+  iommu/arm-smmu: Add stub of_xlate() operation in SMMUv1/SMMUv2 driver
 
- arch/arm/Makefile | 14 +++++++++-----
- 1 file changed, 9 insertions(+), 5 deletions(-)
+Sricharan R (1):
+  iommu/arm-smmu: Init driver using IOMMU_OF_DECLARE
 
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index d6d453f..6db669e 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -315,13 +315,17 @@ archprepare:
- BOOT_TARGETS	= zImage Image xipImage bootpImage uImage
- INSTALL_TARGETS	= zinstall uinstall install
- 
--PHONY += $(BOOT_TARGETS) $(INSTALL_TARGETS)
-+PHONY += $(BOOT_TARGETS) $(INSTALL_TARGETS) __build_images
- 
--bootpImage uImage: zImage
--zImage: Image
-+$(BOOT_TARGETS): __build_images
-+	@:
- 
--$(BOOT_TARGETS): vmlinux
--	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
-+__build_images: vmlinux
-+	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) \
-+	$(addprefix $(boot)/,
-+		$(sort $(filter $(BOOT_TARGETS),$(MAKECMDGOALS)) \
-+			$(if $(filter all,$(MAKECMDGOALS)), $(KBUILD_IMAGE)) \
-+			$(if $(MAKECMDGOALS),,$(KBUILD_IMAGE))))
- 
- $(INSTALL_TARGETS):
- 	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $@
+ drivers/iommu/arm-smmu.c | 52 ++++++++++++++++++++++++++++++++++++------------
+ drivers/iommu/of_iommu.c |  1 +
+ 2 files changed, 40 insertions(+), 13 deletions(-)
+
 -- 
 1.9.1
