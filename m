@@ -1,89 +1,98 @@
 From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
-Date: Mon,  8 Feb 2016 17:37:47 +0530
-Subject: [PATCH 1/6] net,
- thunderx: Add TX timeout and RX buffer alloc failure stats.
+Date: Mon,  8 Feb 2016 17:37:49 +0530
+Subject: [PATCH 3/6] net: thunderx: Assign affinity hints to vf's interrupts
 In-Reply-To: <1454933272-45005-1-git-send-email-sunil.kovvuri@gmail.com>
 References: <1454933272-45005-1-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <1454933272-45005-2-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <1454933272-45005-4-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thanneeru Srinivasulu <tsrinivasulu@caviumnetworks.com>
+From: Sunil Goutham <sgoutham@cavium.com>
 
-When system is low on atomic memory, too many error messages are logged.
-Since this is not a total failure but a simple switch to non-atomic allocation
-better to have a stat.
+This affinity hint can be used by user space irqbalance tool to set
+preferred CPU mask for irqs registered by this VF. Irqbalance needs
+to be in 'exact' mode to set irq affinity same as indicated by
+affinity hint.
 
-Also add a stat for reset, kicked due to transmit watchdog timeout.
-
-Signed-off-by: Thanneeru Srinivasulu <tsrinivasulu@caviumnetworks.com>
 Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
 ---
- drivers/net/ethernet/cavium/thunder/nic.h          |    3 +++
- .../net/ethernet/cavium/thunder/nicvf_ethtool.c    |    2 ++
- drivers/net/ethernet/cavium/thunder/nicvf_main.c   |    1 +
- drivers/net/ethernet/cavium/thunder/nicvf_queues.c |    3 +--
- 4 files changed, 7 insertions(+), 2 deletions(-)
+ drivers/net/ethernet/cavium/thunder/nic.h        |    1 +
+ drivers/net/ethernet/cavium/thunder/nicvf_main.c |   37 ++++++++++++++++++++-
+ 2 files changed, 36 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/net/ethernet/cavium/thunder/nic.h b/drivers/net/ethernet/cavium/thunder/nic.h
-index 6888288..8af363a 100644
+index 8af363a..00cc915 100644
 --- a/drivers/net/ethernet/cavium/thunder/nic.h
 +++ b/drivers/net/ethernet/cavium/thunder/nic.h
-@@ -248,10 +248,13 @@ struct nicvf_drv_stats {
- 	u64 rx_frames_jumbo;
- 	u64 rx_drops;
+@@ -309,6 +309,7 @@ struct nicvf {
+ 	struct msix_entry	msix_entries[NIC_VF_MSIX_VECTORS];
+ 	char			irq_name[NIC_VF_MSIX_VECTORS][20];
+ 	bool			irq_allocated[NIC_VF_MSIX_VECTORS];
++	cpumask_var_t		affinity_mask[NIC_VF_MSIX_VECTORS];
  
-+	u64 rcv_buffer_alloc_failures;
-+
- 	/* Tx */
- 	u64 tx_frames_ok;
- 	u64 tx_drops;
- 	u64 tx_tso;
-+	u64 tx_timeout;
- 	u64 txq_stop;
- 	u64 txq_wake;
- };
-diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_ethtool.c b/drivers/net/ethernet/cavium/thunder/nicvf_ethtool.c
-index a12b2e3..d2d8ef2 100644
---- a/drivers/net/ethernet/cavium/thunder/nicvf_ethtool.c
-+++ b/drivers/net/ethernet/cavium/thunder/nicvf_ethtool.c
-@@ -89,9 +89,11 @@ static const struct nicvf_stat nicvf_drv_stats[] = {
- 	NICVF_DRV_STAT(rx_frames_1518),
- 	NICVF_DRV_STAT(rx_frames_jumbo),
- 	NICVF_DRV_STAT(rx_drops),
-+	NICVF_DRV_STAT(rcv_buffer_alloc_failures),
- 	NICVF_DRV_STAT(tx_frames_ok),
- 	NICVF_DRV_STAT(tx_tso),
- 	NICVF_DRV_STAT(tx_drops),
-+	NICVF_DRV_STAT(tx_timeout),
- 	NICVF_DRV_STAT(txq_stop),
- 	NICVF_DRV_STAT(txq_wake),
- };
+ 	/* VF <-> PF mailbox communication */
+ 	bool			pf_acked;
 diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_main.c b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-index c24cb2a..95db6b7 100644
+index c6f146c..90ce93e 100644
 --- a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
 +++ b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-@@ -1394,6 +1394,7 @@ static void nicvf_tx_timeout(struct net_device *dev)
- 		netdev_warn(dev, "%s: Transmit timed out, resetting\n",
- 			    dev->name);
- 
-+	nic->drv_stats.tx_timeout++;
- 	schedule_work(&nic->reset_task);
+@@ -899,6 +899,31 @@ static void nicvf_disable_msix(struct nicvf *nic)
+ 	}
  }
  
-diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-index d0d1b54..50ab6f4 100644
---- a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-+++ b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-@@ -96,8 +96,7 @@ static inline int nicvf_alloc_rcv_buffer(struct nicvf *nic, gfp_t gfp,
- 		nic->rb_page = alloc_pages(gfp | __GFP_COMP | __GFP_NOWARN,
- 					   order);
- 		if (!nic->rb_page) {
--			netdev_err(nic->netdev,
--				   "Failed to allocate new rcv buffer\n");
-+			nic->drv_stats.rcv_buffer_alloc_failures++;
- 			return -ENOMEM;
- 		}
- 		nic->rb_page_offset = 0;
++static void nicvf_set_irq_affinity(struct nicvf *nic)
++{
++	int vec, cpu;
++	int irqnum;
++
++	for (vec = 0; vec < nic->num_vec; vec++) {
++		if (!nic->irq_allocated[vec])
++			continue;
++
++		if (!zalloc_cpumask_var(&nic->affinity_mask[vec], GFP_KERNEL))
++			return;
++		 /* CQ interrupts */
++		if (vec < NICVF_INTR_ID_SQ)
++			/* Leave CPU0 for RBDR and other interrupts */
++			cpu = nicvf_netdev_qidx(nic, vec) + 1;
++		else
++			cpu = 0;
++
++		cpumask_set_cpu(cpumask_local_spread(cpu, nic->node),
++				nic->affinity_mask[vec]);
++		irqnum = nic->msix_entries[vec].vector;
++		irq_set_affinity_hint(irqnum, nic->affinity_mask[vec]);
++	}
++}
++
+ static int nicvf_register_interrupts(struct nicvf *nic)
+ {
+ 	int irq, ret = 0;
+@@ -944,8 +969,13 @@ static int nicvf_register_interrupts(struct nicvf *nic)
+ 	ret = request_irq(nic->msix_entries[irq].vector,
+ 			  nicvf_qs_err_intr_handler,
+ 			  0, nic->irq_name[irq], nic);
+-	if (!ret)
+-		nic->irq_allocated[irq] = true;
++	if (ret)
++		goto err;
++
++	nic->irq_allocated[irq] = true;
++
++	/* Set IRQ affinities */
++	nicvf_set_irq_affinity(nic);
+ 
+ err:
+ 	if (ret)
+@@ -963,6 +993,9 @@ static void nicvf_unregister_interrupts(struct nicvf *nic)
+ 		if (!nic->irq_allocated[irq])
+ 			continue;
+ 
++		irq_set_affinity_hint(nic->msix_entries[irq].vector, NULL);
++		free_cpumask_var(nic->affinity_mask[irq]);
++
+ 		if (irq < NICVF_INTR_ID_SQ)
+ 			free_irq(nic->msix_entries[irq].vector, nic->napi[irq]);
+ 		else
 -- 
 1.7.1
