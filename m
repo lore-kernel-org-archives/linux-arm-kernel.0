@@ -1,76 +1,30 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 8 Feb 2016 16:52:15 +0000
-Subject: [PATCH v3 21/23] arm64: hw_breakpoint: Allow EL2 breakpoints if
- running in HYP
-In-Reply-To: <56B8C638.2010402@arm.com>
-References: <1454522416-6874-1-git-send-email-marc.zyngier@arm.com>
- <1454522416-6874-22-git-send-email-marc.zyngier@arm.com>
- <20160208155625.GQ6076@e104818-lin.cambridge.arm.com>
- <56B8C638.2010402@arm.com>
-Message-ID: <20160208165214.GV6076@e104818-lin.cambridge.arm.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Mon, 8 Feb 2016 08:52:26 -0800
+Subject: [PATCH v2 04/10] serial: mps2-uart: add MPS2 UART driver
+In-Reply-To: <56B87928.7020803@arm.com>
+References: <1454413199-26573-1-git-send-email-vladimir.murzin@arm.com>
+ <1454413199-26573-5-git-send-email-vladimir.murzin@arm.com>
+ <20160207071154.GA32017@kroah.com> <56B87928.7020803@arm.com>
+Message-ID: <20160208165226.GA11593@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 08, 2016 at 04:45:44PM +0000, Marc Zyngier wrote:
-> I was being overzealous, and your solution is clearly better. I ended up with the following:
+On Mon, Feb 08, 2016 at 11:16:56AM +0000, Vladimir Murzin wrote:
+> On 07/02/16 07:11, Greg KH wrote:
+> >> +
+> >> +#define SERIAL_NAME "ttyS"
+> > 
+> > You can't be "ttyS", there's already a serial port named that, please
+> > use a unique name and a new major/minor number (dynamic ideally).
+> > 
 > 
-> diff --git a/arch/arm64/include/asm/hw_breakpoint.h b/arch/arm64/include/asm/hw_breakpoint.h
-> index 9732908..c872b2f 100644
-> --- a/arch/arm64/include/asm/hw_breakpoint.h
-> +++ b/arch/arm64/include/asm/hw_breakpoint.h
-[...]
-> @@ -62,6 +45,7 @@ static inline void decode_ctrl_reg(u32 reg,
->  #define AARCH64_ESR_ACCESS_MASK	(1 << 6)
->  
->  /* Privilege Levels */
-> +#define AARCH64_BREAKPOINT_EL2	0
->  #define AARCH64_BREAKPOINT_EL1	1
->  #define AARCH64_BREAKPOINT_EL0	2
->  
-> @@ -76,6 +60,35 @@ static inline void decode_ctrl_reg(u32 reg,
->  #define ARM_KERNEL_STEP_ACTIVE	1
->  #define ARM_KERNEL_STEP_SUSPEND	2
->  
-> +#define DBG_HMC_HYP		(1 << 13)
-> +#define DBG_SSC_HYP		(3 << 14)
-> +
-> +static inline u32 encode_ctrl_reg(struct arch_hw_breakpoint_ctrl ctrl)
-> +{
-> +	u32 val = (ctrl.len << 5) | (ctrl.type << 3) | ctrl.enabled;
-> +
-> +	if (is_kernel_in_hyp_mode() && ctrl.privilege == AARCH64_BREAKPOINT_EL1)
-> +		val |= DBG_HMC_HYP | DBG_SSC_HYP;
-
-Nitpick, for completeness:
-
-		val |= DBG_HMC_HYP | DBG_SSC_HYP | (AARCH64_BREAKPOINT_EL2 << 1);
-
-> +	else
-> +		val |= ctrl.privilege << 1;
-> +
-> +	return val;
-> +}
-> +
-> +static inline void decode_ctrl_reg(u32 reg,
-> +				   struct arch_hw_breakpoint_ctrl *ctrl)
-> +{
-> +	ctrl->enabled	= reg & 0x1;
-> +	reg >>= 1;
-> +	ctrl->privilege	= reg & 0x3;
-> +	if (ctrl->privilege == AARCH64_BREAKPOINT_EL2)
-> +		ctrl->privilege	= AARCH64_BREAKPOINT_EL1;
-> +	reg >>= 2;
-> +	ctrl->type	= reg & 0x3;
-> +	reg >>= 2;
-> +	ctrl->len	= reg & 0xff;
-> +}
-> +
->  /*
->   * Limits.
->   * Changing these will require modifications to the register accessors.
+> Hi Greg,
 > 
-> Was that what you had in mind?
+> I did s/ttyMPS/ttyS per your request for v1 [1]. I'm fine to change it
+> back if you prefer that, but I'd be glad to know what I've been missing?
+> 
+> [1] https://lkml.org/lkml/2015/12/13/8
 
-Looks fine:
+Yeah, I was wrong, sorry about that, my fault.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+greg k-h
