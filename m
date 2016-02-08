@@ -1,48 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 08 Feb 2016 10:59:26 +0100
-Subject: [PATCH 4/5] drivers/pci: make host/pci-keystone-dw.c modular
-In-Reply-To: <1454889644-27830-5-git-send-email-paul.gortmaker@windriver.com>
-References: <1454889644-27830-1-git-send-email-paul.gortmaker@windriver.com>
- <1454889644-27830-5-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <91848876.ZYig6qgHLq@wuerfel>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 8 Feb 2016 10:08:02 +0000
+Subject: [PATCH 1/6] irqchip: add the Alpine MSIX interrupt controller
+In-Reply-To: <20160208105322.78b20cba@free-electrons.com>
+References: <1454922971-17405-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1454922971-17405-2-git-send-email-antoine.tenart@free-electrons.com>
+ <56B86391.1030609@arm.com> <20160208105322.78b20cba@free-electrons.com>
+Message-ID: <56B86902.3090700@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 07 February 2016 19:00:43 Paul Gortmaker wrote:
-> Export the symbols that this driver requires in order for it to
-> be modular.  In addition to the one use case of a dw_pci sym, it
-> has many instances of its own ks_dw_pci syms that need exporting
-> in order to modpost w/o error.
+Hi Thomas,
+
+On 08/02/16 09:53, Thomas Petazzoni wrote:
+> Hello Marc,
 > 
-> Cc: Murali Karicheri <m-karicheri2@ti.com>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Stanimir Varbanov <svarbanov@mm-sol.com>
-> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
-> Cc: Thierry Reding <thierry.reding@gmail.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: linux-pci at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
-> ---
+> On Mon, 8 Feb 2016 09:44:49 +0000, Marc Zyngier wrote:
+> 
+>>> +static struct msi_domain_info alpine_msix_domain_info = {
+>>> +	.flags	= MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
+>>> +		  MSI_FLAG_PCI_MSIX,
+>>
+>> You can probably add MSI_FLAG_PCI_MSI, it should work as well (MULTI_MSI
+>> obviously won't).
+> 
+> Why wouldn't MULTI_MSI work? The code is using
+> bitmap_find_next_zero_area() in alpine_msix_allocate_sgi() precisely to
+> find num_req consecutive bits set to 0, in order to allocate multiple
+> MSIs at once. Am I missing something?
 
+The clue is in the patch:
 
-Could we just have one module for the driver  instead of two?
++	msg->address_lo = priv->addr_low + (data->hwirq << 3);
 
-Something like below (untested)
+Multi-MSI imposes a single doorbell address, and consecutive message
+identifiers. So while the allocator deals perfectly with the consecutive
+IDs part, the fact that you have to encode the message in the address
+(instead of putting it in the data field) makes it completely
+incompatible with Multi-MSI.
 
-	Arnd
+It is a bit silly that brand new HW comes out with such limitations (but
+Multi-MSI is such a pain anyway...).
 
-diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile
-index 7b2f20c6ccc6..0b472c680348 100644
---- a/drivers/pci/host/Makefile
-+++ b/drivers/pci/host/Makefile
-@@ -8,7 +8,8 @@ obj-$(CONFIG_PCI_RCAR_GEN2) += pci-rcar-gen2.o
- obj-$(CONFIG_PCI_RCAR_GEN2_PCIE) += pcie-rcar.o
- obj-$(CONFIG_PCI_HOST_GENERIC) += pci-host-generic.o
- obj-$(CONFIG_PCIE_SPEAR13XX) += pcie-spear13xx.o
--obj-$(CONFIG_PCI_KEYSTONE) += pci-keystone-dw.o pci-keystone.o
-+obj-$(CONFIG_PCI_KEYSTONE) pci-keystone-mod.o
-+pci-keystone-mod-objs := pci-keystone-dw.o pci-keystone.o
- obj-$(CONFIG_PCIE_XILINX) += pcie-xilinx.o
- obj-$(CONFIG_PCI_XGENE) += pci-xgene.o
- obj-$(CONFIG_PCI_XGENE_MSI) += pci-xgene-msi.o
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
