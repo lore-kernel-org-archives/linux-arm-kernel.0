@@ -1,160 +1,39 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon,  8 Feb 2016 15:33:42 +0100
-Subject: [PATCH] net: am79c961a: avoid %? in inline assembly
-Message-ID: <1454942025-2779812-1-git-send-email-arnd@arndb.de>
+Date: Mon,  8 Feb 2016 15:34:21 +0100
+Subject: [PATCH] lkdtm: mark execute_location as noinline
+Message-ID: <1454942069-2780643-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The am79c961a.c driver fails to build with clang because of an
-unusual inline assembly construct:
+The kernel sometimes fails to link when lkdrm is built-in and
+compiled with clang:
 
-drivers/net/ethernet/amd/am79c961a.c:53:7: error: invalid % escape in inline assembly string
- "str%?h        %1, [%2]        @ NET_RAP\n\t"
+relocation truncated to fit: R_ARM_THM_CALL against `.bss'
 
-The same change has been done a decade ago in arch/arm as of
-6a39dd6222dd ("[ARM] 3759/2: Remove uses of %?"), but apparently
-some drivers were missed.
+The reason here is that a relocation from .text to .bss fails to
+generate a trampoline because .bss is not an executable section.
+
+Marking the function 'noinline' turns the relative branch to .bss
+into an absolute branch to the function argument, and that works
+fine.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/net/ethernet/amd/am79c961a.c | 64 ++++++++++++++++++------------------
- 1 file changed, 32 insertions(+), 32 deletions(-)
+ drivers/misc/lkdtm.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/net/ethernet/amd/am79c961a.c b/drivers/net/ethernet/amd/am79c961a.c
-index 87e727b921dc..fcdf5dda448f 100644
---- a/drivers/net/ethernet/amd/am79c961a.c
-+++ b/drivers/net/ethernet/amd/am79c961a.c
-@@ -50,8 +50,8 @@ static const char version[] =
- static void write_rreg(u_long base, u_int reg, u_int val)
- {
- 	asm volatile(
--	"str%?h	%1, [%2]	@ NET_RAP\n\t"
--	"str%?h	%0, [%2, #-4]	@ NET_RDP"
-+	"strh	%1, [%2]	@ NET_RAP\n\t"
-+	"strh	%0, [%2, #-4]	@ NET_RDP"
- 	:
- 	: "r" (val), "r" (reg), "r" (ISAIO_BASE + 0x0464));
+diff --git a/drivers/misc/lkdtm.c b/drivers/misc/lkdtm.c
+index 11fdadc68e53..5c1351b19029 100644
+--- a/drivers/misc/lkdtm.c
++++ b/drivers/misc/lkdtm.c
+@@ -335,7 +335,7 @@ static noinline void corrupt_stack(void)
+ 	memset((void *)data, 0, 64);
  }
-@@ -60,8 +60,8 @@ static inline unsigned short read_rreg(u_long base_addr, u_int reg)
+ 
+-static void execute_location(void *dst)
++static void noinline execute_location(void *dst)
  {
- 	unsigned short v;
- 	asm volatile(
--	"str%?h	%1, [%2]	@ NET_RAP\n\t"
--	"ldr%?h	%0, [%2, #-4]	@ NET_RDP"
-+	"strh	%1, [%2]	@ NET_RAP\n\t"
-+	"ldrh	%0, [%2, #-4]	@ NET_RDP"
- 	: "=r" (v)
- 	: "r" (reg), "r" (ISAIO_BASE + 0x0464));
- 	return v;
-@@ -70,8 +70,8 @@ static inline unsigned short read_rreg(u_long base_addr, u_int reg)
- static inline void write_ireg(u_long base, u_int reg, u_int val)
- {
- 	asm volatile(
--	"str%?h	%1, [%2]	@ NET_RAP\n\t"
--	"str%?h	%0, [%2, #8]	@ NET_IDP"
-+	"strh	%1, [%2]	@ NET_RAP\n\t"
-+	"strh	%0, [%2, #8]	@ NET_IDP"
- 	:
- 	: "r" (val), "r" (reg), "r" (ISAIO_BASE + 0x0464));
- }
-@@ -80,8 +80,8 @@ static inline unsigned short read_ireg(u_long base_addr, u_int reg)
- {
- 	u_short v;
- 	asm volatile(
--	"str%?h	%1, [%2]	@ NAT_RAP\n\t"
--	"ldr%?h	%0, [%2, #8]	@ NET_IDP\n\t"
-+	"strh	%1, [%2]	@ NAT_RAP\n\t"
-+	"ldrh	%0, [%2, #8]	@ NET_IDP\n\t"
- 	: "=r" (v)
- 	: "r" (reg), "r" (ISAIO_BASE + 0x0464));
- 	return v;
-@@ -96,7 +96,7 @@ am_writebuffer(struct net_device *dev, u_int offset, unsigned char *buf, unsigne
- 	offset = ISAMEM_BASE + (offset << 1);
- 	length = (length + 1) & ~1;
- 	if ((int)buf & 2) {
--		asm volatile("str%?h	%2, [%0], #4"
-+		asm volatile("strh	%2, [%0], #4"
- 		 : "=&r" (offset) : "0" (offset), "r" (buf[0] | (buf[1] << 8)));
- 		buf += 2;
- 		length -= 2;
-@@ -104,20 +104,20 @@ am_writebuffer(struct net_device *dev, u_int offset, unsigned char *buf, unsigne
- 	while (length > 8) {
- 		register unsigned int tmp asm("r2"), tmp2 asm("r3");
- 		asm volatile(
--			"ldm%?ia	%0!, {%1, %2}"
-+			"ldmia	%0!, {%1, %2}"
- 			: "+r" (buf), "=&r" (tmp), "=&r" (tmp2));
- 		length -= 8;
- 		asm volatile(
--			"str%?h	%1, [%0], #4\n\t"
--			"mov%?	%1, %1, lsr #16\n\t"
--			"str%?h	%1, [%0], #4\n\t"
--			"str%?h	%2, [%0], #4\n\t"
--			"mov%?	%2, %2, lsr #16\n\t"
--			"str%?h	%2, [%0], #4"
-+			"strh	%1, [%0], #4\n\t"
-+			"mov	%1, %1, lsr #16\n\t"
-+			"strh	%1, [%0], #4\n\t"
-+			"strh	%2, [%0], #4\n\t"
-+			"mov	%2, %2, lsr #16\n\t"
-+			"strh	%2, [%0], #4"
- 		: "+r" (offset), "=&r" (tmp), "=&r" (tmp2));
- 	}
- 	while (length > 0) {
--		asm volatile("str%?h	%2, [%0], #4"
-+		asm volatile("strh	%2, [%0], #4"
- 		 : "=&r" (offset) : "0" (offset), "r" (buf[0] | (buf[1] << 8)));
- 		buf += 2;
- 		length -= 2;
-@@ -132,23 +132,23 @@ am_readbuffer(struct net_device *dev, u_int offset, unsigned char *buf, unsigned
- 	if ((int)buf & 2) {
- 		unsigned int tmp;
- 		asm volatile(
--			"ldr%?h	%2, [%0], #4\n\t"
--			"str%?b	%2, [%1], #1\n\t"
--			"mov%?	%2, %2, lsr #8\n\t"
--			"str%?b	%2, [%1], #1"
-+			"ldrh	%2, [%0], #4\n\t"
-+			"strb	%2, [%1], #1\n\t"
-+			"mov	%2, %2, lsr #8\n\t"
-+			"strb	%2, [%1], #1"
- 		: "=&r" (offset), "=&r" (buf), "=r" (tmp): "0" (offset), "1" (buf));
- 		length -= 2;
- 	}
- 	while (length > 8) {
- 		register unsigned int tmp asm("r2"), tmp2 asm("r3"), tmp3;
- 		asm volatile(
--			"ldr%?h	%2, [%0], #4\n\t"
--			"ldr%?h	%4, [%0], #4\n\t"
--			"ldr%?h	%3, [%0], #4\n\t"
--			"orr%?	%2, %2, %4, lsl #16\n\t"
--			"ldr%?h	%4, [%0], #4\n\t"
--			"orr%?	%3, %3, %4, lsl #16\n\t"
--			"stm%?ia	%1!, {%2, %3}"
-+			"ldrh	%2, [%0], #4\n\t"
-+			"ldrh	%4, [%0], #4\n\t"
-+			"ldrh	%3, [%0], #4\n\t"
-+			"orr	%2, %2, %4, lsl #16\n\t"
-+			"ldrh	%4, [%0], #4\n\t"
-+			"orr	%3, %3, %4, lsl #16\n\t"
-+			"stmia	%1!, {%2, %3}"
- 		: "=&r" (offset), "=&r" (buf), "=r" (tmp), "=r" (tmp2), "=r" (tmp3)
- 		: "0" (offset), "1" (buf));
- 		length -= 8;
-@@ -156,10 +156,10 @@ am_readbuffer(struct net_device *dev, u_int offset, unsigned char *buf, unsigned
- 	while (length > 0) {
- 		unsigned int tmp;
- 		asm volatile(
--			"ldr%?h	%2, [%0], #4\n\t"
--			"str%?b	%2, [%1], #1\n\t"
--			"mov%?	%2, %2, lsr #8\n\t"
--			"str%?b	%2, [%1], #1"
-+			"ldrh	%2, [%0], #4\n\t"
-+			"strb	%2, [%1], #1\n\t"
-+			"mov	%2, %2, lsr #8\n\t"
-+			"strb	%2, [%1], #1"
- 		: "=&r" (offset), "=&r" (buf), "=r" (tmp) : "0" (offset), "1" (buf));
- 		length -= 2;
- 	}
+ 	void (*func)(void) = dst;
+ 
 -- 
 2.7.0
