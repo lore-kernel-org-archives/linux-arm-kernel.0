@@ -1,78 +1,42 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon,  8 Feb 2016 15:18:51 +0100
-Subject: [PATCH] dmaengine: pxa_dma: fix the maximum requestor line
-Message-ID: <1454941131-12308-1-git-send-email-robert.jarzmik@free.fr>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 08 Feb 2016 15:23:21 +0100
+Subject: [GIT PULL] ARM: mvebu: cleanup for v4.6 (#1)
+Message-ID: <8760xz2sdi.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current number of requestor lines is limited to 31. This was an
-error of a previous commit, as this number is platform dependent, and is
-actually :
- - for pxa25x: 40 requestor lines
- - for pxa27x: 74 requestor lines
- - for pxa3xx: 100 requestor lines
+Hi,
 
-As the driver doesn't need to know the exact number, but only an
-absolute maximum value above which is it not using any flow control, set
-the maximum to 0x8000 requestor lines, which should never be reached.
+Here is the first pull request for cleanup for mvebu for v4.6.
 
-The previous testing did not reveal the faulty constant as on pxa[23]xx
-platforms, only camera, MSL and USB are above requestor 32, and in these
-only the camera has a driver using dma.
+Gregory
 
-Fixes: e87ffbdf0697 ("dmaengine: pxa_dma: fix the no-requestor case")
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
----
- drivers/dma/pxa_dma.c | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
+The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
 
-diff --git a/drivers/dma/pxa_dma.c b/drivers/dma/pxa_dma.c
-index ca6c088edc8a..817a2bdc423d 100644
---- a/drivers/dma/pxa_dma.c
-+++ b/drivers/dma/pxa_dma.c
-@@ -53,6 +53,7 @@
- 
- #define DRCMR_MAPVLD	BIT(7)	/* Map Valid (read / write) */
- #define DRCMR_CHLNUM	0x1f	/* mask for Channel Number (read / write) */
-+#define DRCMR_MAXREQST	0x7fff	/* Maximum requestor line */
- 
- #define DDADR_DESCADDR	0xfffffff0	/* Address of next descriptor (mask) */
- #define DDADR_STOP	BIT(0)	/* Stop (read / write) */
-@@ -473,7 +474,7 @@ static void pxad_free_phy(struct pxad_chan *chan)
- 		return;
- 
- 	/* clear the channel mapping in DRCMR */
--	if (chan->drcmr <= DRCMR_CHLNUM) {
-+	if (chan->drcmr <= DRCMR_MAXREQST) {
- 		reg = pxad_drcmr(chan->drcmr);
- 		writel_relaxed(0, chan->phy->base + reg);
- 	}
-@@ -518,7 +519,7 @@ static void phy_enable(struct pxad_phy *phy, bool misaligned)
- 		"%s(); phy=%p(%d) misaligned=%d\n", __func__,
- 		phy, phy->idx, misaligned);
- 
--	if (phy->vchan->drcmr <= DRCMR_CHLNUM) {
-+	if (phy->vchan->drcmr <= DRCMR_MAXREQST) {
- 		reg = pxad_drcmr(phy->vchan->drcmr);
- 		writel_relaxed(DRCMR_MAPVLD | phy->idx, phy->base + reg);
- 	}
-@@ -922,7 +923,7 @@ static void pxad_get_config(struct pxad_chan *chan,
- 		dev_addr = chan->cfg.src_addr;
- 		*dev_src = dev_addr;
- 		*dcmd |= PXA_DCMD_INCTRGADDR;
--		if (chan->drcmr <= DRCMR_CHLNUM)
-+		if (chan->drcmr <= DRCMR_MAXREQST)
- 			*dcmd |= PXA_DCMD_FLOWSRC;
- 	}
- 	if (dir == DMA_MEM_TO_DEV) {
-@@ -931,7 +932,7 @@ static void pxad_get_config(struct pxad_chan *chan,
- 		dev_addr = chan->cfg.dst_addr;
- 		*dev_dst = dev_addr;
- 		*dcmd |= PXA_DCMD_INCSRCADDR;
--		if (chan->drcmr <= DRCMR_CHLNUM)
-+		if (chan->drcmr <= DRCMR_MAXREQST)
- 			*dcmd |= PXA_DCMD_FLOWTRG;
- 	}
- 	if (dir == DMA_MEM_TO_MEM)
--- 
-2.1.4
+  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-cleanup-4.6-1
+
+for you to fetch changes up to 727c62d29c3a0b982fb72ef993db95e9d2036e07:
+
+  ARM: mv78xx0: use "depends on" instead of "if" after prompt (2016-01-25 16:43:16 +0100)
+
+----------------------------------------------------------------
+mvebu cleanup for 4.6 (part 1)
+
+use "depends on" instead of "if" after prompt for mv78xx0
+
+----------------------------------------------------------------
+Masahiro Yamada (1):
+      ARM: mv78xx0: use "depends on" instead of "if" after prompt
+
+ arch/arm/mach-mv78xx0/Kconfig | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+--
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
