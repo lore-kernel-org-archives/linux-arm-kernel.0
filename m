@@ -1,36 +1,38 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 8 Feb 2016 14:02:57 +0000
-Subject: [PATCH v7 0/9] Fix broken DMAFLUSHP on Rockchips platform
-In-Reply-To: <20160208131419.GA19598@localhost>
-References: <1453460812-8498-1-git-send-email-wxt@rock-chips.com>
- <56AF01B6.6030204@gmail.com> <20160208031134.GI2531@localhost>
- <3817335.PXCk0JfYDT@phil> <20160208131419.GA19598@localhost>
-Message-ID: <20160208140257.GC7265@sirena.org.uk>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Mon, 8 Feb 2016 15:04:29 +0100
+Subject: [PATCH 1/6] irqchip: add the Alpine MSIX interrupt controller
+In-Reply-To: <56B86391.1030609@arm.com>
+References: <1454922971-17405-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1454922971-17405-2-git-send-email-antoine.tenart@free-electrons.com>
+ <56B86391.1030609@arm.com>
+Message-ID: <20160208140429.GF4117@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 08, 2016 at 06:44:19PM +0530, Vinod Koul wrote:
-> On Mon, Feb 08, 2016 at 10:27:04AM +0100, Heiko Stuebner wrote:
+Hi Marc,
 
-> > I think the more regular way is for the driver maintainer to take the 
-> > driver-specific stuff and the devicetree parts going through the specific arm-
-> > tree. But if you really want to take the whole series, for patches 4,5,6
+On Mon, Feb 08, 2016 at 09:44:49AM +0000, Marc Zyngier wrote:
+> On 08/02/16 09:16, Antoine Tenart wrote:
+> > +
+> > +static struct msi_domain_info alpine_msix_domain_info = {
+> > +	.flags	= MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
+> > +		  MSI_FLAG_PCI_MSIX,
+> 
+> You can probably add MSI_FLAG_PCI_MSI
 
-> Yes but that causes cross tree dependencies, which looking at this won't be
-> a big problem, so I can safely merge dmaengine changes and rest can go thru
-> ARM tree.
+Are you sure such a flag is available? (Or am I missing something
+obvious?).
 
-Not for the DT stuff - since the DT is supposed to be a stable ABI there
-really shouldn't be any hard dependencies on things outside the DT.
+Antoine
 
-> Typically submitter should say which tree he/she prefers, which was not
-> provided..
-
-It's the norm for DT stuff.
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160208/42079e83/attachment.sig>
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160208/18f7073a/attachment.sig>
