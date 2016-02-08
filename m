@@ -1,153 +1,61 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 8 Feb 2016 16:45:44 +0000
-Subject: [PATCH v3 21/23] arm64: hw_breakpoint: Allow EL2 breakpoints if
- running in HYP
-In-Reply-To: <20160208155625.GQ6076@e104818-lin.cambridge.arm.com>
-References: <1454522416-6874-1-git-send-email-marc.zyngier@arm.com>
- <1454522416-6874-22-git-send-email-marc.zyngier@arm.com>
- <20160208155625.GQ6076@e104818-lin.cambridge.arm.com>
-Message-ID: <56B8C638.2010402@arm.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Mon, 8 Feb 2016 11:45:44 -0500
+Subject: [PATCH 2/2] serial: 8250: fix building Ingenic with SERIAL_8250=m
+In-Reply-To: <1454935947-2743255-2-git-send-email-arnd@arndb.de>
+References: <1454935947-2743255-1-git-send-email-arnd@arndb.de>
+ <1454935947-2743255-2-git-send-email-arnd@arndb.de>
+Message-ID: <20160208164543.GY23093@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/02/16 15:56, Catalin Marinas wrote:
-> On Wed, Feb 03, 2016 at 06:00:14PM +0000, Marc Zyngier wrote:
->> @@ -76,6 +59,36 @@ static inline void decode_ctrl_reg(u32 reg,
->>  #define ARM_KERNEL_STEP_ACTIVE	1
->>  #define ARM_KERNEL_STEP_SUSPEND	2
->>  
->> +#define DBG_HMC_HYP		(1 << 13)
->> +#define DBG_SSC_HYP		(3 << 14)
->> +
->> +static inline u32 encode_ctrl_reg(struct arch_hw_breakpoint_ctrl ctrl)
->> +{
->> +	u32 val = (ctrl.len << 5) | (ctrl.type << 3) | ctrl.enabled;
->> +
->> +	if (is_kernel_in_hyp_mode() && ctrl.privilege == AARCH64_BREAKPOINT_EL1)
->> +		val |= DBG_HMC_HYP | DBG_SSC_HYP;
->> +	else
->> +		val |= ctrl.privilege << 1;
->> +
->> +	return val;
->> +}
->> +
->> +static inline void decode_ctrl_reg(u32 reg,
->> +				   struct arch_hw_breakpoint_ctrl *ctrl)
->> +{
->> +	ctrl->enabled	= reg & 0x1;
->> +	reg >>= 1;
->> +	if (is_kernel_in_hyp_mode())
->> +		ctrl->privilege = !!(reg & (DBG_HMC_HYP >> 1));
-> 
-> I don't particularly like this part as it's not clear just by looking at
-> the code that it, in fact, generates AARCH64_BREAKPOINT_EL1. I would
-> make this clearer:
-> 
-> 	if (is_kernel_in_hyp_mode() && (reg & (DBG_HMC_HYP >> 1)))
-> 		ctrl->privilege = AARCH64_BREAKPOINT_EL1;
-> 
-> Alternatively, you could define the PMC field value as:
-> 
-> #define AARCH64_BREAKPOINT_EL2	0
-> 
-> and change the privilege to EL1 after masking, something like:
-> 
-> 	ctrl->privilege = reg & 0x3;
-> 	if (ctrl->privilege == AARCH64_BREAKPOINT_EL2)
-> 		ctrl->privilege = AARCH64_BREAKPOINT_EL1;
-> 
-> BTW, do we need to check is_kernel_in_hyp_mode() when decoding? Is there
-> anything else that could have set this SSC/HMC/PMC fields other than
-> encode_ctrl_reg()?
+[[PATCH 2/2] serial: 8250: fix building Ingenic with SERIAL_8250=m] On 08/02/2016 (Mon 13:51) Arnd Bergmann wrote:
 
-I was being overzealous, and your solution is clearly better. I ended up with the following:
+> The Ingenic 8250 driver has a 'bool' Kconfig symbol, but that
+> breaks when SERIAL_8250 is a loadable module:
+> 
+> drivers/tty/built-in.o: In function `ingenic_uart_probe':
+> 8250_ingenic.c:(.text+0x1c1a0): undefined reference to `serial8250_register_8250_port'
+> 
+> This changes the symbol to a 'tristate', plus a dependency on
 
-diff --git a/arch/arm64/include/asm/hw_breakpoint.h b/arch/arm64/include/asm/hw_breakpoint.h
-index 9732908..c872b2f 100644
---- a/arch/arm64/include/asm/hw_breakpoint.h
-+++ b/arch/arm64/include/asm/hw_breakpoint.h
-@@ -18,6 +18,7 @@
- 
- #include <asm/cputype.h>
- #include <asm/cpufeature.h>
-+#include <asm/virt.h>
- 
- #ifdef __KERNEL__
- 
-@@ -35,24 +36,6 @@ struct arch_hw_breakpoint {
- 	struct arch_hw_breakpoint_ctrl ctrl;
- };
- 
--static inline u32 encode_ctrl_reg(struct arch_hw_breakpoint_ctrl ctrl)
--{
--	return (ctrl.len << 5) | (ctrl.type << 3) | (ctrl.privilege << 1) |
--		ctrl.enabled;
--}
--
--static inline void decode_ctrl_reg(u32 reg,
--				   struct arch_hw_breakpoint_ctrl *ctrl)
--{
--	ctrl->enabled	= reg & 0x1;
--	reg >>= 1;
--	ctrl->privilege	= reg & 0x3;
--	reg >>= 2;
--	ctrl->type	= reg & 0x3;
--	reg >>= 2;
--	ctrl->len	= reg & 0xff;
--}
--
- /* Breakpoint */
- #define ARM_BREAKPOINT_EXECUTE	0
- 
-@@ -62,6 +45,7 @@ static inline void decode_ctrl_reg(u32 reg,
- #define AARCH64_ESR_ACCESS_MASK	(1 << 6)
- 
- /* Privilege Levels */
-+#define AARCH64_BREAKPOINT_EL2	0
- #define AARCH64_BREAKPOINT_EL1	1
- #define AARCH64_BREAKPOINT_EL0	2
- 
-@@ -76,6 +60,35 @@ static inline void decode_ctrl_reg(u32 reg,
- #define ARM_KERNEL_STEP_ACTIVE	1
- #define ARM_KERNEL_STEP_SUSPEND	2
- 
-+#define DBG_HMC_HYP		(1 << 13)
-+#define DBG_SSC_HYP		(3 << 14)
-+
-+static inline u32 encode_ctrl_reg(struct arch_hw_breakpoint_ctrl ctrl)
-+{
-+	u32 val = (ctrl.len << 5) | (ctrl.type << 3) | ctrl.enabled;
-+
-+	if (is_kernel_in_hyp_mode() && ctrl.privilege == AARCH64_BREAKPOINT_EL1)
-+		val |= DBG_HMC_HYP | DBG_SSC_HYP;
-+	else
-+		val |= ctrl.privilege << 1;
-+
-+	return val;
-+}
-+
-+static inline void decode_ctrl_reg(u32 reg,
-+				   struct arch_hw_breakpoint_ctrl *ctrl)
-+{
-+	ctrl->enabled	= reg & 0x1;
-+	reg >>= 1;
-+	ctrl->privilege	= reg & 0x3;
-+	if (ctrl->privilege == AARCH64_BREAKPOINT_EL2)
-+		ctrl->privilege	= AARCH64_BREAKPOINT_EL1;
-+	reg >>= 2;
-+	ctrl->type	= reg & 0x3;
-+	reg >>= 2;
-+	ctrl->len	= reg & 0xff;
-+}
-+
- /*
-  * Limits.
-  * Changing these will require modifications to the register accessors.
+Note that Greg just queued a patch yesterday (but sent in 2015) that
+removed what was the dead modular code.
 
-Was that what you had in mind?
+It could also depend on SERIAL_8250=y to resolve the build issue you
+found, if nobody cares about having modular SOC console UART drivers.
 
-Thanks,
+Either way, I don't have issue with it being tristate vs bool, but if
+you do go with tristate, then my patch will have to be dropped/reverted.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Paul.
+--
+
+> SERIAL_8250, which makes it work again. Unlike the other
+> soc-specific backends, this one has no dependency on an
+> architecture or a platform. I'm adding a dependency on
+> MIPS || COMPILE_TEST as well here, to avoid showing the driver
+> on architectures that are not interested in it.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  drivers/tty/serial/8250/Kconfig | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/8250/Kconfig b/drivers/tty/serial/8250/Kconfig
+> index 6ae0fae4f796..13c63b14179f 100644
+> --- a/drivers/tty/serial/8250/Kconfig
+> +++ b/drivers/tty/serial/8250/Kconfig
+> @@ -384,8 +384,8 @@ config SERIAL_8250_UNIPHIER
+>  	  serial ports, say Y to this option. If unsure, say N.
+>  
+>  config SERIAL_8250_INGENIC
+> -	bool "Support for Ingenic SoC serial ports"
+> -	depends on OF_FLATTREE
+> +	tristate "Support for Ingenic SoC serial ports"
+> +	depends on SERIAL_8250 && OF_FLATTREE && (MIPS || COMPILE_TEST)
+>  	select LIBFDT
+>  	help
+>  	  If you have a system using an Ingenic SoC and wish to make use of
+> -- 
+> 2.7.0
+> 
