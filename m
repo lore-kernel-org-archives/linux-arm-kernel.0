@@ -1,25 +1,60 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 8 Feb 2016 14:53:47 +0000
-Subject: [PATCH 07/11] ARM: dts: sunxi: Add dtsi file for AXP809 PMIC
-In-Reply-To: <CAGb2v657zYT30KbuK0fyVOmhv0kzJjj9gTsTFRaS4i3d6YhiHQ@mail.gmail.com>
-References: <1454408864-24112-1-git-send-email-wens@csie.org>
- <1454408864-24112-8-git-send-email-wens@csie.org>
- <20160202121733.GO4455@sirena.org.uk>
- <CAGb2v657zYT30KbuK0fyVOmhv0kzJjj9gTsTFRaS4i3d6YhiHQ@mail.gmail.com>
-Message-ID: <20160208145347.GD7265@sirena.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 8 Feb 2016 14:55:57 +0000
+Subject: [PATCH 2/6] Documentation: bindings: document the Alpine MSIX
+ driver
+In-Reply-To: <1454922971-17405-3-git-send-email-antoine.tenart@free-electrons.com>
+References: <1454922971-17405-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1454922971-17405-3-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <56B8AC7D.8060102@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 06, 2016 at 08:42:24PM +0800, Chen-Yu Tsai wrote:
+On 08/02/16 09:16, Antoine Tenart wrote:
+> Following the addition of the Alpine MSIX driver, this patch adds the
+> corresponding bindings documentation.
+> 
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+> Signed-off-by: Tsahee Zidenberg <tsahee@annapurnalabs.com>
+> ---
+>  .../interrupt-controller/al,alpine-msix.txt        | 22 ++++++++++++++++++++++
+>  1 file changed, 22 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/al,alpine-msix.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/interrupt-controller/al,alpine-msix.txt b/Documentation/devicetree/bindings/interrupt-controller/al,alpine-msix.txt
+> new file mode 100644
+> index 000000000000..a77d5a76e8d5
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/interrupt-controller/al,alpine-msix.txt
+> @@ -0,0 +1,22 @@
+> +Alpine MSIX controller
+> +
+> +Required properties:
+> +
+> +- compatible: should be "al,alpine-msix"
+> +- reg: physical base address and size of the registers
+> +- interrupt-controller: identifies the node as an interrupt controller
+> +- msi-controller: identifies the node as an PCI Message Signaled Interrupt
+> +		  controller
+> +- al,msi-base-spi: SPI base of the MSI frame
+> +- al,msi-num-spis: number of SPIs assigned to the MSI frame
+> +
+> +Example:
+> +
+> +msix: msix {
+> +	compatible = "al,alpine-msix";
+> +	reg = <0x0 0xfbe00000 0x0 0x100000>;
+> +	interrupt-controller;
+> +	msi-controller;
+> +	al,msi-base-spi = <160>;
+> +	al,msi-num-spis = <160>;
+> +};
+> 
 
-> Mark, may I assume you are OK with this DTS include listing
-> the regulators, even if their sections are empty?
+This example seems to rely on an implicit interrupt-parent. You probably
+want to update the example to clarify it.
 
-If it has no content why have it?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160208/65f9a19d/attachment.sig>
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
