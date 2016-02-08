@@ -1,51 +1,50 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 08 Feb 2016 17:31:20 +0100
-Subject: [PATCH] ARM: mvebu: add missing of_node_put()
-In-Reply-To: <1454912232-13169-1-git-send-email-yamada.masahiro@socionext.com>
- (Masahiro Yamada's message of "Mon, 8 Feb 2016 15:17:12 +0900")
-References: <1454912232-13169-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <8760xz17vr.fsf@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 08 Feb 2016 17:29:40 +0100
+Subject: [RFC PATCH v2 2/3] PCI: hisi: Make the HiSilicon PCIe host
+ controller ECAM compliant
+In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E1ECACF44@lhreml503-mbs>
+References: <1454935264-6076-1-git-send-email-gabriele.paoloni@huawei.com>
+ <3532826.pJr5R5Xa4c@wuerfel>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1ECACF44@lhreml503-mbs>
+Message-ID: <2599997.xBRrI3qHak@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Masahiro,
- 
- On lun., f?vr. 08 2016, Masahiro Yamada <yamada.masahiro@socionext.com> wrote:
+On Monday 08 February 2016 15:55:35 Gabriele Paoloni wrote:
+> > Doesn't this break backwards compatibility?
+> 
+> Well Hip05/Hip06 SoCs are used into evaluation boards
+> For the Estuary project.
+> 
+> https://github.com/hisilicon/estuary
+> 
+> As this new driver gets upstream we'll merge this new driver into estuary
+> and release a new version of the firmware to support it.
 
-> This node pointer is returned by of_find_compatible_node() in this
-> function.  It should be put before exitting this function.
->
+So what happens to folks running the old firmware then?
 
-Applied on mvebu/cleanup
+> > I think you need to use a new compatible string in the firmware
+> > if you change the register layout, and then change the driver
+> > to support both the old and the new layout.
+> 
+> You are right, for some reason in this patchset I missed the Documentation
+> update that I posted in the previous one, i.e.:
+> 
+> --- a/Documentation/devicetree/bindings/pci/hisilicon-pcie.txt
+> +++ b/Documentation/devicetree/bindings/pci/hisilicon-pcie.txt
+> @@ -23,8 +23,8 @@ Optional properties:
+>  Hip05 Example (note that Hip06 is the same except compatible):
+>         pcie at 0xb0080000 {
+>                 compatible = "hisilicon,hip05-pcie", "snps,dw-pcie";
+> -               reg = <0 0xb0080000 0 0x10000>, <0x220 0x00000000 0 0x2000>;
+> -               reg-names = "rc_dbi", "config";
+> +               reg = <0 0xb0080000 0 0x10000>, <0x220 0x00100000 0 0x0f00000>;
+> +               reg-names = "rc_dbi", "ecam-cfg";
+> 
 
-Thanks,
+That is not the compatible string, it's an undocumented register set.
+You can either define the a new compatible string that gives the "config"
+registers a new meaning, or you change the binding to allow two either
+a "config" or an "ecam-cfg" register set, and let the driver handle both.
 
-Gregory
-
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
->
->  arch/arm/mach-mvebu/platsmp.c | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
-> index f9597b7..46c742d 100644
-> --- a/arch/arm/mach-mvebu/platsmp.c
-> +++ b/arch/arm/mach-mvebu/platsmp.c
-> @@ -140,6 +140,7 @@ static void __init armada_xp_smp_prepare_cpus(unsigned int max_cpus)
->  		panic("Cannot find 'marvell,bootrom' compatible node");
->  
->  	err = of_address_to_resource(node, 0, &res);
-> +	of_node_put(node);
->  	if (err < 0)
->  		panic("Cannot get 'bootrom' node address");
->  
-> -- 
-> 1.9.1
->
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+	Arnd
