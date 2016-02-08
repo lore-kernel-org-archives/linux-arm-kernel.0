@@ -1,51 +1,91 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 8 Feb 2016 12:44:46 -0800
-Subject: [PATCH 0/3] omap: hwmod: add default reset handling support
-In-Reply-To: <1454929941-23949-1-git-send-email-kishon@ti.com>
-References: <1454929941-23949-1-git-send-email-kishon@ti.com>
-Message-ID: <20160208204446.GC19432@atomide.com>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Mon, 8 Feb 2016 12:47:18 -0800
+Subject: [PATCH v5 3/3] pci,
+ pci-thunder-ecam: Add driver for ThunderX-pass1 on-chip devices
+In-Reply-To: <20160208195642.GA15103@rob-hp-laptop>
+References: <1454715675-17512-1-git-send-email-ddaney.cavm@gmail.com>
+ <1454715675-17512-4-git-send-email-ddaney.cavm@gmail.com>
+ <20160208195642.GA15103@rob-hp-laptop>
+Message-ID: <56B8FED6.1050804@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
+On 02/08/2016 11:56 AM, Rob Herring wrote:
+> On Fri, Feb 05, 2016 at 03:41:15PM -0800, David Daney wrote:
+>> From: David Daney <david.daney@cavium.com>
+>>
+>> The cavium,pci-thunder-ecam devices are exactly ECAM based PCI root
+>> complexes.  These root complexes (loosely referred to as ECAM units in
+>> the hardware manuals) are used to access the Thunder on-chips devices.
+>> They are special in that all the BARs on devices behind these root
+>> complexes are at fixed addresses.  To handle this in a manner
+>> compatible with the core PCI code, we have the config access functions
+>> synthesize Enhanced Allocation (EA) capability entries for each BAR.
+>>
+>> Since this EA synthesis is needed for exactly one chip model, we can
+>> hard code some assumptions about the device topology and the
+>> properties of specific DEVFNs in the driver.
+>>
+>> Signed-off-by: David Daney <david.daney@cavium.com>
+>> ---
+>>   .../devicetree/bindings/pci/pci-thunder-ecam.txt   |  30 ++
+>>   drivers/pci/host/Kconfig                           |   7 +
+>>   drivers/pci/host/Makefile                          |   1 +
+>>   drivers/pci/host/pci-thunder-ecam.c                | 358 +++++++++++++++++++++
+>>   4 files changed, 396 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/pci/pci-thunder-ecam.txt
+>>   create mode 100644 drivers/pci/host/pci-thunder-ecam.c
+>>
+>> diff --git a/Documentation/devicetree/bindings/pci/pci-thunder-ecam.txt b/Documentation/devicetree/bindings/pci/pci-thunder-ecam.txt
+>> new file mode 100644
+>> index 0000000..34658f2
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/pci/pci-thunder-ecam.txt
+>> @@ -0,0 +1,30 @@
+>> +* ThunderX PCI host controller for pass-1.x silicon
+>> +
+>> +Firmware-initialized PCI host controller to on-chip devices found on
+>> +some Cavium ThunderX processors.  These devices have ECAM based config
+>> +access, but the BARs are all at fixed addresses.  We handle the fixed
+>> +addresses by synthesizing Enhanced Allocation (EA) capabilities for
+>> +these devices.
+>> +
+>> +The properties and their meanings are identical to those described in
+>> +host-generic-pci.txt except as listed below.
+>> +
+>> +Properties of the host controller node that differ from
+>> +host-generic-pci.txt:
+>> +
+>> +- compatible     : Must be "cavium,pci-host-thunder-ecam"
+>> +
+>> +Example:
+>> +
+>> +	pci at 84b0,00000000 {
+>
+> Drop the comma,
 
-* Kishon Vijay Abraham I <kishon@ti.com> [160208 03:13]:
-> Add a new hwmod flag to indicate custom reset handling and use it
-> for devices that require custom reset handling (like dsp, ipu, iva).
-> 
-> Tested PCIe on dra7-evm and dra72-evm.
-> I need help in testing DSP, IPU, IVA, PRU, GFX, M3 in other platforms.
-> Or a way to test these cores to see if reset is not broken. Suman?
-> 
-> I'll post this series once again after performing these tests.
+OK...
 
-Do we also still need to patch something in the pcie driver too
-or can all that be left out now?
+> and the node name should be "pcie".
+>
 
-Regards,
+Why pcie?
 
-Tony
+There are no PCIe devices or buses reachable from this type of root 
+complex.  There are however many PCI devices.
 
-
-> Paul Walmsley (3):
->   ARM: omap2+: omap_hwmod: introduce hwmod flag for custom reset
->     handling
->   ARM: OMAP2+: hwmod: use HWMOD_CUSTOM_HARDRESET for custom reset
->     handling
->   ARM: OMAP2+: hwmod: Add default reset handling
-> 
->  arch/arm/mach-omap2/omap_hwmod.c                   |   16 +++++++++++-----
->  arch/arm/mach-omap2/omap_hwmod.h                   |   12 ++++++++++++
->  arch/arm/mach-omap2/omap_hwmod_2420_data.c         |    2 ++
->  arch/arm/mach-omap2/omap_hwmod_2430_data.c         |    1 +
->  .../mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c |    2 ++
->  arch/arm/mach-omap2/omap_hwmod_33xx_data.c         |    1 +
->  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |    3 +++
->  arch/arm/mach-omap2/omap_hwmod_43xx_data.c         |    1 +
->  arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |    6 ++++++
->  arch/arm/mach-omap2/omap_hwmod_54xx_data.c         |    2 ++
->  10 files changed, 41 insertions(+), 5 deletions(-)
-> 
-> -- 
-> 1.7.9.5
-> 
+> Otherwise,
+>
+> Acked-by: Rob Herring <robh@kernel.org>
+>
+>> +		compatible = "cavium,pci-host-thunder-ecam";
+>> +		device_type = "pci";
+>> +		msi-parent = <&its>;
+>> +		msi-map = <0 &its 0x30000 0x10000>;
+>> +		bus-range = <0 31>;
+>> +		#size-cells = <2>;
+>> +		#address-cells = <3>;
+>> +		#stream-id-cells = <1>;
+>> +		reg = <0x84b0 0x00000000 0 0x02000000>;  /* Configuration space */
+>> +		ranges = <0x03000000 0x8180 0x00000000 0x8180 0x00000000 0x80 0x00000000>; /* mem ranges */
+>> +	};
