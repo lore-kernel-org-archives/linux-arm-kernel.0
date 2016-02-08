@@ -1,70 +1,21 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 8 Feb 2016 09:57:21 -0600
-Subject: [PATCH 07/11] clk: sunxi: add generic allwinner,sunxi name
-In-Reply-To: <1454348370-3816-8-git-send-email-andre.przywara@arm.com>
-References: <1454348370-3816-1-git-send-email-andre.przywara@arm.com>
- <1454348370-3816-8-git-send-email-andre.przywara@arm.com>
-Message-ID: <20160208155721.GB4677@rob-hp-laptop>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 8 Feb 2016 15:58:04 +0000
+Subject: [PATCH v3 22/23] arm64: VHE: Add support for running Linux in
+ EL2 mode
+In-Reply-To: <1454522416-6874-23-git-send-email-marc.zyngier@arm.com>
+References: <1454522416-6874-1-git-send-email-marc.zyngier@arm.com>
+ <1454522416-6874-23-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20160208155804.GR6076@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 01, 2016 at 05:39:26PM +0000, Andre Przywara wrote:
-> The only difference between the different compatible matches at the
-> end of clk-sunxi.c are the critical clocks. Two SoCs get away so far
-> without any, so there is no reason to enumerate those SoCs in here
-> explicitly, though we have to keep them in for compatibility reasons.
+On Wed, Feb 03, 2016 at 06:00:15PM +0000, Marc Zyngier wrote:
+> With ARMv8.1 VHE, the architecture is able to (almost) transparently
+> run the kernel at EL2, despite being written for EL1.
 > 
-> Rename the init function to highlight this generic feature and add a
-> new, generic DT compatible string which can be used as a fallback value
-> in the future should a particular SoC don't need any special treatment.
+> This patch takes care of the "almost" part, mostly preventing the kernel
+> from dropping from EL2 to EL1, and setting up the HYP configuration.
 > 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  Documentation/devicetree/bindings/arm/sunxi.txt |  4 ++++
->  drivers/clk/sunxi/clk-sunxi.c                   | 14 ++++++--------
->  2 files changed, 10 insertions(+), 8 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
-> index 7e79fcc..980e065 100644
-> --- a/Documentation/devicetree/bindings/arm/sunxi.txt
-> +++ b/Documentation/devicetree/bindings/arm/sunxi.txt
-> @@ -14,3 +14,7 @@ using one of the following compatible strings:
->    allwinner,sun8i-a83t
->    allwinner,sun8i-h3
->    allwinner,sun9i-a80
-> +
-> +For Allwinner SoCs without any specific needs the generic fallback value of:
-> +  allwinner,sunxi
-> +can be used.
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Perhaps "fallback" implies this, but be more specific that it can be 
-used in addition to a specific string.
-
-> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-> index e460a6b..efcce85 100644
-> --- a/drivers/clk/sunxi/clk-sunxi.c
-> +++ b/drivers/clk/sunxi/clk-sunxi.c
-> @@ -1052,14 +1052,12 @@ CLK_OF_DECLARE(sun8i_a23_clk_init, "allwinner,sun8i-a23", sun6i_init_clocks);
->  CLK_OF_DECLARE(sun8i_a33_clk_init, "allwinner,sun8i-a33", sun6i_init_clocks);
->  CLK_OF_DECLARE(sun8i_h3_clk_init, "allwinner,sun8i-h3", sun6i_init_clocks);
->  
-> -static void __init sun8i_a83t_init_clocks(struct device_node *node)
-> +static void __init sunxi_generic_init_clocks(struct device_node *node)
->  {
->  	sunxi_init_clocks(NULL, 0);
->  }
-> -CLK_OF_DECLARE(sun8i_a83t_clk_init, "allwinner,sun8i-a83t", sun8i_a83t_init_clocks);
-> -
-> -static void __init sun9i_init_clocks(struct device_node *node)
-> -{
-> -	sunxi_init_clocks(NULL, 0);
-> -}
-> -CLK_OF_DECLARE(sun9i_a80_clk_init, "allwinner,sun9i-a80", sun9i_init_clocks);
-> +CLK_OF_DECLARE(sun8i_a83t_clk_init, "allwinner,sun8i-a83t",
-> +	       sunxi_generic_init_clocks);
-> +CLK_OF_DECLARE(sun9i_a80_clk_init, "allwinner,sun9i-a80",
-> +	       sunxi_generic_init_clocks);
-> +CLK_OF_DECLARE(sunxi_clk_init, "allwinner,sunxi", sunxi_generic_init_clocks);
-> -- 
-> 2.6.4
-> 
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
