@@ -1,52 +1,40 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 8 Feb 2016 13:09:50 +0100
-Subject: [PATCH v11 06/21] KVM: ARM64: Add access handler for PMCEID0 and
- PMCEID1 register
-In-Reply-To: <1454656456-11640-7-git-send-email-zhaoshenglong@huawei.com>
-References: <1454656456-11640-1-git-send-email-zhaoshenglong@huawei.com>
- <1454656456-11640-7-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <20160208120950.GC620@cbox>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 8 Feb 2016 12:14:31 +0000
+Subject: [PATCH v5sub2 0/8] arm64: implement virtual KASLR
+In-Reply-To: <CAGXu5j+JpwRrVy1b_h+LJ4sCzsT7BV9RdcD0CvR-4aVJQhCpvg@mail.gmail.com>
+References: <1454332178-4414-1-git-send-email-ard.biesheuvel@linaro.org>
+ <CAKv+Gu-AhLcatkDsQVeoFGJ+pTEwaW1Hy9M-fY1-VWvRc_E47w@mail.gmail.com>
+ <20160205173248.GJ6076@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu_v1sXM7sivz+Uu86ZG3=Th7wqqh7M1N8wF7Ess4NdTZQ@mail.gmail.com>
+ <CAGXu5j+JpwRrVy1b_h+LJ4sCzsT7BV9RdcD0CvR-4aVJQhCpvg@mail.gmail.com>
+Message-ID: <20160208121430.GL6076@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 05, 2016 at 03:14:01PM +0800, Shannon Zhao wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
+On Fri, Feb 05, 2016 at 12:42:30PM -0800, Kees Cook wrote:
+> On Fri, Feb 5, 2016 at 9:38 AM, Ard Biesheuvel
+> <ard.biesheuvel@linaro.org> wrote:
+> > On 5 February 2016 at 18:32, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> >> I'm still trying to get my head around how we merge those. Since I
+> >> assume akpm will push them during the merging window, part of your code
+> >> cannot be tested before.
+> >
+> > Actually, my original idea was for akpm to take them as a late merge
+> > after rebasing to -rc1, since they touch a variety of architectures,
+> > but I am not sure if that came across.
+> >
+> > You could always take the series through your tree instead, I guess?
 > 
-> Add access handler which gets host value of PMCEID0 or PMCEID1 when
-> guest access these registers. Writing action to PMCEID0 or PMCEID1 is
-> UNDEFINED.
-> 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> ---
->  arch/arm64/kvm/sys_regs.c | 29 +++++++++++++++++++++++++----
->  1 file changed, 25 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index fc60041..06257e2 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -492,6 +492,27 @@ static bool access_pmselr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
->  	return true;
->  }
->  
-> +static bool access_pmceid(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
-> +			  const struct sys_reg_desc *r)
-> +{
-> +	u64 pmceid;
-> +
-> +	if (!kvm_arm_pmu_v3_ready(vcpu))
-> +		return trap_raz_wi(vcpu, p, r);
-> +
-> +	if (p->is_write)
-> +		return false;
+> Traditionally akpm will de-duplicate patches he's carrying that appear
+> in another tree. I think it should be okay to carry them in both
+> places. (Though I'm CCing akpm just to see if I'm talking crazy.)
 
-Isn't it really a BUG_ON(p->is_write) ?
+For now, I'll merge this series in the arm64 tree and push it to next:
 
-Presumably a guest write to these registers will raise an undefined
-exception in EL0/1 and we don't get here by any other path than the trap
-handler, do we?
+http://lkml.kernel.org/r/1452007180-27411-1-git-send-email-ard.biesheuvel at linaro.org
 
-Otherwise looks good to me.
+If there are any objections, I can drop the patches and do the
+BUILDTIME_EXTABLE_SORT disabling trick until they end up in mainline.
 
-Thanks,
--Christoffer
+-- 
+Catalin
