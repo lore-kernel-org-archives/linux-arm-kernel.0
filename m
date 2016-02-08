@@ -1,69 +1,72 @@
-From: ian.campbell@citrix.com (Ian Campbell)
-Date: Mon, 8 Feb 2016 13:33:56 +0000
-Subject: [PATCH] xen/arm: correctly handle DMA mapping of compound pages
-Message-ID: <1454938450-26282-1-git-send-email-ian.campbell@citrix.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon,  8 Feb 2016 14:36:13 +0100
+Subject: [PATCH] 8250: mediatek: mark PM functions as __maybe_unused
+Message-ID: <1454938591-2743892-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently xen_dma_map_page concludes that DMA to anything other than
-the head page of a compound page must be foreign, since the PFN of the
-page is that of the head.
+The mtk8250_runtime_suspend function is not used when runtime PM is
+disabled, so we get a warning about an unused function:
 
-Fix the check to instead consider the whole of a compound page to be
-local if the PFN of the head passes the 1:1 check.
+drivers/tty/serial/8250/8250_mtk.c:119:12: error: 'mtk8250_runtime_suspend' defined but not used [-Werror=unused-function]
+ static int mtk8250_runtime_suspend(struct device *dev)
 
-We can never see a compound page which is a mixture of foreign and
-local sub-pages.
+This marks all the PM functions as __maybe_unused to avoid the warning,
+and removes the #ifdef around the PM_SLEEP functions for consistency.
 
-The comment already correctly described the intention, but fixup the
-spelling and some grammar.
-
-This fixes the various SSH protocol errors which we have been seeing
-on the cubietrucks in our automated test infrastructure.
-
-This has been broken since "xen/arm: use hypercall to flush caches in
-map_page" (3567258d281b), which was in v3.19-rc1.
-
-NB arch/arm64/.../xen/page-coherent.h also includes this file.
-
-Signed-off-by: Ian Campbell <ian.campbell@citrix.com>
-Cc: xen-devel at lists.xenproject.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: stable at vger.kernel.org # v3.19+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/include/asm/xen/page-coherent.h | 19 ++++++++++++-------
- 1 file changed, 12 insertions(+), 7 deletions(-)
+ drivers/tty/serial/8250/8250_mtk.c | 10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/include/asm/xen/page-coherent.h b/arch/arm/include/asm/xen/page-coherent.h
-index 0375c8c..5653739 100644
---- a/arch/arm/include/asm/xen/page-coherent.h
-+++ b/arch/arm/include/asm/xen/page-coherent.h
-@@ -35,14 +35,19 @@ static inline void xen_dma_map_page(struct device *hwdev, struct page *page,
- 	     dma_addr_t dev_addr, unsigned long offset, size_t size,
- 	     enum dma_data_direction dir, struct dma_attrs *attrs)
+diff --git a/drivers/tty/serial/8250/8250_mtk.c b/drivers/tty/serial/8250/8250_mtk.c
+index 0e590b233f03..9038843cadc7 100644
+--- a/drivers/tty/serial/8250/8250_mtk.c
++++ b/drivers/tty/serial/8250/8250_mtk.c
+@@ -116,7 +116,7 @@ mtk8250_set_termios(struct uart_port *port, struct ktermios *termios,
+ 		tty_termios_encode_baud_rate(termios, baud, baud);
+ }
+ 
+-static int mtk8250_runtime_suspend(struct device *dev)
++static int __maybe_unused mtk8250_runtime_suspend(struct device *dev)
  {
--	bool local = XEN_PFN_DOWN(dev_addr) == page_to_xen_pfn(page);
-+	unsigned long page_pfn = page_to_xen_pfn(page);
-+	unsigned long dev_pfn = XEN_PFN_DOWN(dev_addr);
-+	unsigned long compound_pages = 1<<compound_order(page);
-+	bool local = page_pfn <= dev_pfn && dev_pfn - page_pfn < compound_pages;
-+
- 	/*
--	 * Dom0 is mapped 1:1, while the Linux page can be spanned accross
--	 * multiple Xen page, it's not possible to have a mix of local and
--	 * foreign Xen page. So if the first xen_pfn == mfn the page is local
--	 * otherwise it's a foreign page grant-mapped in dom0. If the page is
--	 * local we can safely call the native dma_ops function, otherwise we
--	 * call the xen specific function.
-+	 * Dom0 is mapped 1:1, while the Linux page can span across
-+	 * multiple Xen pages, it's not possible for it to contain a
-+	 * mix of local and foreign Xen pages. So if the first xen_pfn
-+	 * == mfn the page is local otherwise it's a foreign page
-+	 * grant-mapped in dom0. If the page is local we can safely
-+	 * call the native dma_ops function, otherwise we call the xen
-+	 * specific function.
- 	 */
- 	if (local)
- 		__generic_dma_ops(hwdev)->map_page(hwdev, page, offset, size, dir, attrs);
+ 	struct mtk8250_data *data = dev_get_drvdata(dev);
+ 
+@@ -126,7 +126,7 @@ static int mtk8250_runtime_suspend(struct device *dev)
+ 	return 0;
+ }
+ 
+-static int mtk8250_runtime_resume(struct device *dev)
++static int __maybe_unused mtk8250_runtime_resume(struct device *dev)
+ {
+ 	struct mtk8250_data *data = dev_get_drvdata(dev);
+ 	int err;
+@@ -245,8 +245,7 @@ static int mtk8250_probe(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-#ifdef CONFIG_PM_SLEEP
+-static int mtk8250_suspend(struct device *dev)
++static int __maybe_unused mtk8250_suspend(struct device *dev)
+ {
+ 	struct mtk8250_data *data = dev_get_drvdata(dev);
+ 
+@@ -255,7 +254,7 @@ static int mtk8250_suspend(struct device *dev)
+ 	return 0;
+ }
+ 
+-static int mtk8250_resume(struct device *dev)
++static int __maybe_unused mtk8250_resume(struct device *dev)
+ {
+ 	struct mtk8250_data *data = dev_get_drvdata(dev);
+ 
+@@ -263,7 +262,6 @@ static int mtk8250_resume(struct device *dev)
+ 
+ 	return 0;
+ }
+-#endif /* CONFIG_PM_SLEEP */
+ 
+ static const struct dev_pm_ops mtk8250_pm_ops = {
+ 	SET_SYSTEM_SLEEP_PM_OPS(mtk8250_suspend, mtk8250_resume)
 -- 
-2.1.4
+2.7.0
