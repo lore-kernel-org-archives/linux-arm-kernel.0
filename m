@@ -1,66 +1,35 @@
 From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
-Date: Mon,  8 Feb 2016 17:37:51 +0530
-Subject: [PATCH 5/6] net: thunderx: bgx: Add log message when setting mac
- address
+Date: Mon,  8 Feb 2016 17:37:52 +0530
+Subject: [PATCH 6/6] net: thunderx: Alloc higher order pages when pagesize is
+ small
 In-Reply-To: <1454933272-45005-1-git-send-email-sunil.kovvuri@gmail.com>
 References: <1454933272-45005-1-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <1454933272-45005-6-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <1454933272-45005-7-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Robert Richter <rrichter@cavium.com>
+From: Sunil Goutham <sgoutham@cavium.com>
 
-Signed-off-by: Robert Richter <rrichter@cavium.com>
+Allocate higher order pages when pagesize is small, this will
+reduce number of calls to page allocator and wastage of memory.
+
 Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
 ---
- drivers/net/ethernet/cavium/thunder/thunder_bgx.c |   11 ++++++++---
- 1 files changed, 8 insertions(+), 3 deletions(-)
+ drivers/net/ethernet/cavium/thunder/nicvf_queues.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-index 111835b..cfee496 100644
---- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-+++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-@@ -886,7 +886,8 @@ static void bgx_get_qlm_mode(struct bgx *bgx)
- 
- #ifdef CONFIG_ACPI
- 
--static int acpi_get_mac_address(struct acpi_device *adev, u8 *dst)
-+static int acpi_get_mac_address(struct device *dev, struct acpi_device *adev,
-+				u8 *dst)
+diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
+index 50ab6f4..5adb208 100644
+--- a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
++++ b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
+@@ -78,7 +78,7 @@ static void nicvf_free_q_desc_mem(struct nicvf *nic, struct q_desc_mem *dmem)
+ static inline int nicvf_alloc_rcv_buffer(struct nicvf *nic, gfp_t gfp,
+ 					 u32 buf_len, u64 **rbuf)
  {
- 	u8 mac[ETH_ALEN];
- 	int ret;
-@@ -897,10 +898,13 @@ static int acpi_get_mac_address(struct acpi_device *adev, u8 *dst)
- 		goto out;
+-	int order = get_order(buf_len);
++	int order = (PAGE_SIZE <= 4096) ?  PAGE_ALLOC_COSTLY_ORDER : 0;
  
- 	if (!is_valid_ether_addr(mac)) {
-+		dev_warn(dev, "MAC address invalid: %pM\n", mac);
- 		ret = -EINVAL;
- 		goto out;
- 	}
- 
-+	dev_info(dev, "MAC address set to: %pM\n", mac);
-+
- 	memcpy(dst, mac, ETH_ALEN);
- out:
- 	return ret;
-@@ -911,14 +915,15 @@ static acpi_status bgx_acpi_register_phy(acpi_handle handle,
- 					 u32 lvl, void *context, void **rv)
- {
- 	struct bgx *bgx = context;
-+	struct device *dev = &bgx->pdev->dev;
- 	struct acpi_device *adev;
- 
- 	if (acpi_bus_get_device(handle, &adev))
- 		goto out;
- 
--	acpi_get_mac_address(adev, bgx->lmac[bgx->lmac_count].mac);
-+	acpi_get_mac_address(dev, adev, bgx->lmac[bgx->lmac_count].mac);
- 
--	SET_NETDEV_DEV(&bgx->lmac[bgx->lmac_count].netdev, &bgx->pdev->dev);
-+	SET_NETDEV_DEV(&bgx->lmac[bgx->lmac_count].netdev, dev);
- 
- 	bgx->lmac[bgx->lmac_count].lmacid = bgx->lmac_count;
- out:
+ 	/* Check if request can be accomodated in previous allocated page */
+ 	if (nic->rb_page) {
 -- 
 1.7.1
