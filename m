@@ -1,25 +1,57 @@
-From: bjorn@mork.no (=?utf-8?Q?Bj=C3=B8rn_Mork?=)
-Date: Mon, 08 Feb 2016 14:49:41 +0100
-Subject: [PATCH 5/6] net: thunderx: bgx: Add log message when setting mac
- address
-In-Reply-To: <56B8987D.7000901@cogentembedded.com> (Sergei Shtylyov's message
- of "Mon, 8 Feb 2016 16:30:37 +0300")
-References: <1454933272-45005-1-git-send-email-sunil.kovvuri@gmail.com>
- <1454933272-45005-6-git-send-email-sunil.kovvuri@gmail.com>
- <56B8987D.7000901@cogentembedded.com>
-Message-ID: <87vb5z1fd6.fsf@nemi.mork.no>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 08 Feb 2016 14:45:23 +0100
+Subject: [PATCH RFC] Add cpufreq support
+In-Reply-To: <20160208131625.GI8294@vireshk>
+References: <56B4D4BE.2040008@free.fr> <22002072.L04zy0K2AP@wuerfel>
+ <20160208131625.GI8294@vireshk>
+Message-ID: <7910928.pmJjZiV1Lk@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sergei Shtylyov <sergei.shtylyov@cogentembedded.com> writes:
+On Monday 08 February 2016 18:46:25 Viresh Kumar wrote:
+> On 08-02-16, 14:10, Arnd Bergmann wrote:
+> > I don't remember the exact discussion, but the compatible string is
+> > exactly meant to do one thing: it tells you what you can or cannot do
+> > with one device.
+> 
+> Yeah, and many people argued that we can't add two values to that
+> string like: "cpufreq-dt" and "cpufreq-big-little" for same kind of
+> OPP bindings, as a different compatible string should be required only
+> if there is a difference in the bindings.
+> 
+> For example, if a platform (like ST did recently) adds more
+> platform-specific properties, then they can define a new value of
+> those strings.
+>
+> > I had not realized that we don't even have a compatible string
+> > for opp-v2, so if we are missing that, we obviously can't compare
+> > against that string.
+> 
+> The binding says that we can have a string, but its not compulsory
+> yet. Its only used by STM as they have some specific properties of
+> their own.
 
->    dev_er(), maybe?
+Right, so when those properties are required for that machine,
+that makes it incompatible with the generic driver, and it should
+really have its own compatible string.
 
-I like that!
+That's why I said we could introduce a 'v3' with the meaning
+it should have had to start with: compatible means actually
+compatible with the driver.
 
-It's often hard to know whether to print something or be quiet.
-pr_er(), dev_er(), netdev_er() etc would be the perfect solution to that
-problem.
+I guess we could also start a blacklist and list all machines
+that are not compatible with the generic binding before falling
+back to using that driver.
 
+> > I thought there was a compatible property in there that told us
+> > whether the operating-points-v2/cooling-min-level/#cooling-cells/...
+> > properties were considered valid.
+> 
+> Yeah, "OPP-v2" DT node can have a compatible string, which isn't
+> compulsory as of now, but because of the reasons mentioned earlier, we
+> can't use it to differentiate between drivers that use exactly same
+> version of bindings.
 
-Bj?rn
+Right, unless we introduce a new compatible string for future machines.
+
+	Arnd
