@@ -1,36 +1,36 @@
-From: Al.Grant@arm.com (Al Grant)
-Date: Mon, 8 Feb 2016 17:44:49 +0000
-Subject: [PATCH V2 3/6] stm class: provision for statically assigned
- masterIDs
-In-Reply-To: <CANLsYkw=mG+ch8QzxmbwWs9o+mndVNo1MuqXcrPrNJYj_SQcHQ@mail.gmail.com>
-References: <1454487337-30184-1-git-send-email-zhang.chunyan@linaro.org>
- <1454487337-30184-4-git-send-email-zhang.chunyan@linaro.org>
- <87mvrf5ngl.fsf@ashishki-desk.ger.corp.intel.com>
- <CANLsYky2twQ98u241YyHD=atYRp1N56YVHUQNY2E2Ljsq0cseA@mail.gmail.com>
- <87twlj49k7.fsf@ashishki-desk.ger.corp.intel.com>
- <CANLsYkw=mG+ch8QzxmbwWs9o+mndVNo1MuqXcrPrNJYj_SQcHQ@mail.gmail.com>
-Message-ID: <AM4PR08MB0785EAA2B628765D7EA3FDA086D50@AM4PR08MB0785.eurprd08.prod.outlook.com>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Mon, 8 Feb 2016 18:50:25 +0100
+Subject: [PATCH v5 0/9] Add STM32 pinctrl/GPIO driver
+In-Reply-To: <1454497485-464-1-git-send-email-mcoquelin.stm32@gmail.com>
+References: <1454497485-464-1-git-send-email-mcoquelin.stm32@gmail.com>
+Message-ID: <CALszF6D_2zcg0SsV8HQ8kiSMypau1SV28L08fuz+Pziqyu8QKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Mike did write "master IDs are hardwired to individual cores and core security
-> states", which make assignment for one platform very static.
-> On the flip side those will change from one system to another.
+2016-02-03 12:04 GMT+01:00 Maxime Coquelin <mcoquelin.stm32@gmail.com>:
+> Hi Linus,
+>
+> This is the fifth round of STM32 pinctrl series, which is rebased on top of
+> v4.5-rc1 and removes no more needed dependency between DT and driver.
+>
+> Also, it fixes the Makefile so that it is really built when COMPILE_TEST is
+> set and not ARCH_STM32.
+>
+> The STM32 family has 16 pins per GPIO bank, and the number of bank varies
+> depending on the model.
+>
+> Pins can be multiplexed either in GPIO mode, alternate function (up to 15
+> functions per pin) or analog (for ADC/DAC).
+>
+> Changes since v4:
+> -----------------
+>  - Rebase on v4.5-rc1
+>  - Fix compilation breakage due to gpio_chip struct .dev field renaming
+>  - Move the macros from includes/dt-bindings to STM32 pinctrl driver directory
+> to avoid uneeded dependency between DT and driver.
+>  - Fix Makefile so that driver is built with COMPILE_TEST set
 
-It depends on your perspective.  From the perspective of a userspace
-process not pinned to a core, the master id will appear to vary
-dynamically and unpredictably as the thread migrates from one
-core to another.  (That's actually useful if the decoder wants to know
-where the thread is running at any given point, as it can find that out
-for free, without the need to track migration events.)
+Please discard this series, the changes above are being handled on top of v4.
 
-On the other hand if you are pinned (e.g. you're the kernel on a
-particular core, or you're a per-core worker thread in some thread
-pooling system) then you have a fixed master id, and then you can
-have one instance per core all using the same range of channel
-numbers, with the master id indicating the core - this saves on
-channel space compared to having to give each core its own
-range of channel space.
-
-Al
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+Regards,
+Maxime
