@@ -1,242 +1,75 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 8 Feb 2016 15:29:33 +0000
-Subject: [PATCH 2/3] arm64: dts: add the Alpine v2 EVP
-In-Reply-To: <1454922699-16785-3-git-send-email-antoine.tenart@free-electrons.com>
-References: <1454922699-16785-1-git-send-email-antoine.tenart@free-electrons.com>
- <1454922699-16785-3-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <56B8B45D.1020902@arm.com>
+From: codekipper@gmail.com (codekipper at gmail.com)
+Date: Mon,  8 Feb 2016 16:29:47 +0100
+Subject: [linux-sunxi][PATCH] ARM: dts: sun7i: Enable USB DRC on Olimex A20 EVB
+Message-ID: <1454945387-29424-1-git-send-email-codekipper@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/02/16 09:11, Antoine Tenart wrote:
-> This patch adds the initial support for the Alpine v2 EVP board from
-> Annapurna Labs (Amazon).
-> 
-> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-> Signed-off-by: Barak Wasserstrom <barak@annapurnalabs.com>
-> Signed-off-by: Tsahee Zidenberg <tsahee@annapurnalabs.com>
-> ---
->  arch/arm64/boot/dts/Makefile             |   1 +
->  arch/arm64/boot/dts/al/Makefile          |   5 +
->  arch/arm64/boot/dts/al/alpine-v2-evp.dts |  46 +++++++
->  arch/arm64/boot/dts/al/alpine-v2.dtsi    | 221 +++++++++++++++++++++++++++++++
->  4 files changed, 273 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/al/Makefile
->  create mode 100644 arch/arm64/boot/dts/al/alpine-v2-evp.dts
->  create mode 100644 arch/arm64/boot/dts/al/alpine-v2.dtsi
-> 
-> diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
-> index f832b8a7453a..fd80617a9c6f 100644
-> --- a/arch/arm64/boot/dts/Makefile
-> +++ b/arch/arm64/boot/dts/Makefile
-> @@ -1,3 +1,4 @@
-> +dts-dirs += al
->  dts-dirs += altera
->  dts-dirs += amd
->  dts-dirs += apm
-> diff --git a/arch/arm64/boot/dts/al/Makefile b/arch/arm64/boot/dts/al/Makefile
-> new file mode 100644
-> index 000000000000..8a6cde4f9b23
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/al/Makefile
-> @@ -0,0 +1,5 @@
-> +dtb-$(CONFIG_ARCH_ALPINE)	+= alpine-v2-evp.dtb
-> +
-> +always		:= $(dtb-y)
-> +subdir-y	:= $(dts-dirs)
-> +clean-files	:= *.dtb
-> diff --git a/arch/arm64/boot/dts/al/alpine-v2-evp.dts b/arch/arm64/boot/dts/al/alpine-v2-evp.dts
-> new file mode 100644
-> index 000000000000..3e3080fa45e4
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/al/alpine-v2-evp.dts
-> @@ -0,0 +1,46 @@
-> +/*
-> + * Copyright 2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.
-> + *
-> + * Antoine Tenart <antoine.tenart@free-electrons.com>
-> + *
-> + * This software is available to you under a choice of one of two
-> + * licenses.  You may choose to be licensed under the terms of the GNU
-> + * General Public License (GPL) Version 2, available from the file
-> + * COPYING in the main directory of this source tree, or the
-> + * BSD license below:
-> + *
-> + *     Redistribution and use in source and binary forms, with or
-> + *     without modification, are permitted provided that the following
-> + *     conditions are met:
-> + *
-> + *      - Redistributions of source code must retain the above
-> + *        copyright notice, this list of conditions and the following
-> + *        disclaimer.
-> + *
-> + *      - Redistributions in binary form must reproduce the above
-> + *        copyright notice, this list of conditions and the following
-> + *        disclaimer in the documentation and/or other materials
-> + *        provided with the distribution.
-> + *
-> + * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-> + * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
-> + * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
-> + * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-> + * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-> + * SOFTWARE.
-> + */
-> +
-> +#include "alpine-v2.dtsi"
-> +
-> +/ {
-> +	model = "Annapurna Labs Alpine v2 EVP";
-> +	compatible = "al,alpine-v2-evp", "al,alpine-v2";
-> +
-> +	chosen {
-> +		stdout-path = "console0:115200n8";
-> +	};
-> +};
-> +
-> +&uart0 { status = "okay"; };
-> diff --git a/arch/arm64/boot/dts/al/alpine-v2.dtsi b/arch/arm64/boot/dts/al/alpine-v2.dtsi
-> new file mode 100644
-> index 000000000000..eb7a03b71456
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/al/alpine-v2.dtsi
-> @@ -0,0 +1,221 @@
-> +/*
-> + * Copyright 2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.
-> + *
-> + * Antoine Tenart <antoine.tenart@free-electrons.com>
-> + *
-> + * This software is available to you under a choice of one of two
-> + * licenses.  You may choose to be licensed under the terms of the GNU
-> + * General Public License (GPL) Version 2, available from the file
-> + * COPYING in the main directory of this source tree, or the
-> + * BSD license below:
-> + *
-> + *     Redistribution and use in source and binary forms, with or
-> + *     without modification, are permitted provided that the following
-> + *     conditions are met:
-> + *
-> + *      - Redistributions of source code must retain the above
-> + *        copyright notice, this list of conditions and the following
-> + *        disclaimer.
-> + *
-> + *      - Redistributions in binary form must reproduce the above
-> + *        copyright notice, this list of conditions and the following
-> + *        disclaimer in the documentation and/or other materials
-> + *        provided with the distribution.
-> + *
-> + * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-> + * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
-> + * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
-> + * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-> + * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-> + * SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include <dt-bindings/interrupt-controller/arm-gic.h>
-> +
-> +/ {
-> +	model = "Annapurna Labs Alpine v2";
-> +	compatible = "al,alpine-v2";
-> +	#address-cells = <2>;
-> +	#size-cells = <2>;
-> +
-> +	aliases {
-> +		serial0 = &uart0;
-> +		serial1 = &uart1;
-> +		serial2 = &uart2;
-> +		serial3 = &uart3;
-> +	};
-> +
-> +	cpus {
-> +		#address-cells = <2>;
-> +		#size-cells = <0>;
-> +
-> +		cpu at 0 {
-> +			compatible = "arm,cortex-a57", "arm,armv8";
-> +			device_type = "cpu";
-> +			reg = <0x0 0x0>;
-> +			enable-method = "psci";
-> +		};
-> +
-> +		cpu at 1 {
-> +			compatible = "arm,cortex-a57", "arm,armv8";
-> +			device_type = "cpu";
-> +			reg = <0x0 0x1>;
-> +			enable-method = "psci";
-> +		};
-> +
-> +		cpu at 2 {
-> +			compatible = "arm,cortex-a57", "arm,armv8";
-> +			device_type = "cpu";
-> +			reg = <0x0 0x2>;
-> +			enable-method = "psci";
-> +		};
-> +
-> +		cpu at 3 {
-> +			compatible = "arm,cortex-a57", "arm,armv8";
-> +			device_type = "cpu";
-> +			reg = <0x0 0x3>;
-> +			enable-method = "psci";
-> +		};
-> +	};
-> +
-> +	psci {
-> +		compatible = "arm,psci-0.2", "arm,psci";
-> +		method = "smc";
-> +		cpu_on = <0x84000003>;
-> +	};
-> +
-> +	sbclk: sbclk {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <1000000>;
-> +	};
-> +
-> +	soc {
-> +		compatible = "simple-bus";
-> +		#address-cells = <2>;
-> +		#size-cells = <2>;
-> +
-> +		interrupt-parent = <&gic>;
-> +		ranges;
-> +
-> +		timer {
-> +			compatible = "arm,armv8-timer";
-> +			interrupts = <GIC_PPI 0xd 0xff08>,
-> +				     <GIC_PPI 0xe 0xff08>,
-> +				     <GIC_PPI 0xb 0xff08>,
-> +				     <GIC_PPI 0xa 0xff08>;
-> +		};
+From: Marcus Cooper <codekipper@gmail.com>
 
-This is not a valid interrupt specifier for GICv3, as the 3rd field
-shouldn't bear this 0xff thing.
+Enable the otg/drc usb controller on the Olimex A20 EVB.
 
-> +		gic: gic at f0100000 {
-> +			compatible = "arm,gic-v3";
-> +			reg = <0x0 0xf0200000 0x0 0x10000>,	/* GIC Dist */
-> +			      <0x0 0xf0280000 0x0 0x200000>,	/* GICR */
-> +			      <0x0 0xf0100000 0x0 0x2000>;	/* GICC */
-> +			interrupt-controller;
-> +			#interrupt-cells = <3>;
-> +		};
+Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+---
+ arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-Something is wrong here. Either you are missing GICH and GICV (assuming
-you have legacy support), or you have an extra GICC region (which
-doesn't make sense on its own).
-
-You're also missing the maintenance interrupt.
-
-Has Anapurna really built a GICv3 without an ITS?
-
-Thanks,
-
-	M.
+diff --git a/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
+index c3c626b..93bbf26 100644
+--- a/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
++++ b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
+@@ -198,6 +198,10 @@
+ 	status = "okay";
+ };
+ 
++&otg_sram {
++	status = "okay";
++};
++
+ &pio {
+ 	ahci_pwr_pin_olimex_som_evb: ahci_pwr_pin at 1 {
+ 		allwinner,pins = "PC3";
+@@ -219,6 +223,13 @@
+ 		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+ 		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+ 	};
++
++	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
++		allwinner,pins = "PH4";
++		allwinner,function = "gpio_in";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
+ };
+ 
+ &reg_ahci_5v {
+@@ -254,6 +265,10 @@
+ 	regulator-name = "avcc";
+ };
+ 
++&reg_usb0_vbus {
++	status = "okay";
++};
++
+ &reg_usb1_vbus {
+ 	status = "okay";
+ };
+@@ -268,7 +283,16 @@
+ 	status = "okay";
+ };
+ 
++&usb_otg {
++	dr_mode = "otg";
++	status = "okay";
++};
++
+ &usbphy {
++	pinctrl-names = "default";
++	pinctrl-0 = <&usb0_id_detect_pin>;
++	usb0_id_det-gpios = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH04 */
++	usb0_vbus-supply = <&reg_usb0_vbus>;
+ 	usb1_vbus-supply = <&reg_usb1_vbus>;
+ 	usb2_vbus-supply = <&reg_usb2_vbus>;
+ 	status = "okay";
 -- 
-Jazz is not dead. It just smells funny...
+2.7.1
