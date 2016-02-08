@@ -1,49 +1,78 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Mon, 8 Feb 2016 09:54:46 +0100
-Subject: [PATCH] clk: meson: Fix meson_clk_register_clks() signature type
- mismatch
-In-Reply-To: <CAOQ7t2YwHa7cJdqv4m8rPx50ZnFZJJzcU2AjtE=Q2AYEAf84hg@mail.gmail.com>
-References: <1454879583-27036-1-git-send-email-afaerber@suse.de>
- <CAOQ7t2YwHa7cJdqv4m8rPx50ZnFZJJzcU2AjtE=Q2AYEAf84hg@mail.gmail.com>
-Message-ID: <CAOQ7t2brTxmE-snjXxZG1ZrHNYCEugj6EwORBpVtaMHME_pewQ@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 8 Feb 2016 10:01:11 +0100
+Subject: [PATCH v2] arm64: dts: r8a7795: Add L2 cache-controller nodes
+In-Reply-To: <56B857AC.4090701@de.bosch.com>
+References: <1452953856-5146-1-git-send-email-dirk.behme@gmail.com>
+ <56B2370D.2010102@gmail.com> <20160205095758.GE16556@verge.net.au>
+ <CAMuHMdVRhwGh2bvfNSguX0XnMW0eEgLRTCt3Y3-+KfV0Jy9WHw@mail.gmail.com>
+ <56B857AC.4090701@de.bosch.com>
+Message-ID: <CAMuHMdUTUss=fR0Mdz+7tDD=RC6hufvkLC99Fp=PTiTgaSSGNA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 8, 2016 at 9:34 AM, Carlo Caione <carlo@caione.org> wrote:
-> On Sun, Feb 7, 2016 at 10:13 PM, Andreas F?rber <afaerber@suse.de> wrote:
->> As preparation for arm64 based mesongxbb, which pulls in this code once
->> enabling ARCH_MESON, fix a size_t vs. unsigned int type mismatch.
->> The loop uses a local unsigned int variable, so adopt that type,
->> matching the header.
+Hi Dirk,
+
+On Mon, Feb 8, 2016 at 9:54 AM, Dirk Behme <dirk.behme@de.bosch.com> wrote:
+> On 08.02.2016 09:42, Geert Uytterhoeven wrote:
+>> On Fri, Feb 5, 2016 at 10:57 AM, Simon Horman <horms@verge.net.au> wrote:
+>>> On Wed, Feb 03, 2016 at 06:21:17PM +0100, Dirk Behme wrote:
+>>>> On 16.01.2016 15:17, Dirk Behme wrote:
+>>>>> From: Geert Uytterhoeven <geert+renesas@glider.be>
+>>>>>
+>>>>> Add device nodes for the L2 caches, and link the CPU node to its L2
+>>>>> cache node.
+>>>>>
+>>>>> The L2 cache for the Cortex-A57 CPU cores is 2 MiB large (organized as
+>>>>> 128 KiB x 16 ways).
+>>>>>
+>>>>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>>>>> Signed-off-by: Dirk Behme <dirk.behme@gmail.com>
+>>>
+>>> [snip]
+>>>
+>>>> Any further comments to this? If not, could this be applied?
+>>>
+>>> Sorry for the delay.
+>>>
+>>> This looks good; I have queued it up.
+>>>
+>>> It should appear in the next (and devel) branches of my renesas tree
+>>> soon.
+>>> And in linux-next whenever it includes my updated next branch.
 >>
->> Fixes: 7a29a869434e ("clk: meson: Add support for Meson clock controller")
->> Signed-off-by: Andreas F?rber <afaerber@suse.de>
->> ---
->>  drivers/clk/meson/clkc.c | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
+>> So you not only dropped the (controversial) timing related properties, but
+>> in addition:
 >>
->> diff --git a/drivers/clk/meson/clkc.c b/drivers/clk/meson/clkc.c
->> index c83ae1367abc..d920d410b51d 100644
->> --- a/drivers/clk/meson/clkc.c
->> +++ b/drivers/clk/meson/clkc.c
->> @@ -198,7 +198,7 @@ meson_clk_register_fixed_rate(const struct clk_conf *clk_conf,
->>  }
+>> +               cache-unified;
+>> +               cache-level = <2>;
 >>
->>  void __init meson_clk_register_clks(const struct clk_conf *clk_confs,
->> -                                   size_t nr_confs,
->> +                                   unsigned int nr_confs,
->>                                     void __iomem *clk_base)
->>  {
->>         unsigned int i;
+>> At least the "cache-level" property is marked as required in ePAPR.
+>> For "cache-unified", the wording is not that strict in ePAPR, but that
+>> property
+>> depends on being a unified cache in the first place.
+>>
+>> So I think these two properties should be re-added.
 >
-> Nit: I'd prefer to fix declaration in drivers/clk/meson/clkc.h with
-> size_t since we are going to use it for array indexing.
+> If I remember correctly, first, these entries are not used at all on ARMv8.
+> And second, I think it was mentioned that we therefore want to drop them:
+>
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/394936.html
+>
+> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/Documentation/devicetree/bindings/arm/l2c2x0.txt?id=0bed4b7aa02c06e05121875dc443295d55b9d91d
 
-On a second thought it's ok since we use i to cycle through clocks.
+I believe the discussion was only about the latency properties, which are
+documented in the l2c2x0 DT bindings, and deemed to not apply here
+(CC Sudeep).
+The DT bindings documented in ePAPR are generic, and apply to all hardware,
+unless extended or overridden by more-specific DT bindings.
 
-Acked-by: Carlo Caione <carlo@endlessm.com>
+Gr{oetje,eeting}s,
 
-Cheers,
+                        Geert
 
--- 
-Carlo Caione
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
