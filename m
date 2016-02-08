@@ -1,432 +1,61 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 8 Feb 2016 13:52:47 +0100
-Subject: [PATCH v11 21/21] KVM: ARM64: Add a new vcpu device control
- group for PMUv3
-In-Reply-To: <1454656456-11640-22-git-send-email-zhaoshenglong@huawei.com>
-References: <1454656456-11640-1-git-send-email-zhaoshenglong@huawei.com>
- <1454656456-11640-22-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <20160208125247.GG620@cbox>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon,  8 Feb 2016 13:51:42 +0100
+Subject: [PATCH 1/2] serial: 8250: fix building mediatek with SERIAL_8250=m
+Message-ID: <1454935947-2743255-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 05, 2016 at 03:14:16PM +0800, Shannon Zhao wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
-> 
-> To configure the virtual PMUv3 overflow interrupt number, we use the
-> vcpu kvm_device ioctl, encapsulating the KVM_ARM_VCPU_PMU_V3_IRQ
-> attribute within the KVM_ARM_VCPU_PMU_V3_CTRL group.
-> 
-> After configuring the PMUv3, call the vcpu ioctl with attribute
-> KVM_ARM_VCPU_PMU_V3_INIT to initialize the PMUv3.
-> 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> Acked-by: Peter Maydell <peter.maydell@linaro.org>
-> Reviewed-by: Andrew Jones <drjones@redhat.com>
-> ---
-> CC: Peter Maydell <peter.maydell@linaro.org>
-> ---
->  Documentation/virtual/kvm/devices/vcpu.txt |  24 ++++++
->  arch/arm/include/asm/kvm_host.h            |  15 ++++
->  arch/arm/kvm/arm.c                         |   3 +
->  arch/arm64/include/asm/kvm_host.h          |   6 ++
->  arch/arm64/include/uapi/asm/kvm.h          |   5 ++
->  arch/arm64/kvm/guest.c                     |  51 ++++++++++++
->  include/kvm/arm_pmu.h                      |  23 ++++++
->  virt/kvm/arm/pmu.c                         | 128 +++++++++++++++++++++++++++++
->  8 files changed, 255 insertions(+)
-> 
-> diff --git a/Documentation/virtual/kvm/devices/vcpu.txt b/Documentation/virtual/kvm/devices/vcpu.txt
-> index 3cc59c5..d626237 100644
-> --- a/Documentation/virtual/kvm/devices/vcpu.txt
-> +++ b/Documentation/virtual/kvm/devices/vcpu.txt
-> @@ -6,3 +6,27 @@ KVM_GET_DEVICE_ATTR, and KVM_HAS_DEVICE_ATTR. The interface uses the same struct
->  kvm_device_attr as other devices, but targets VCPU-wide settings and controls.
->  
->  The groups and attributes per virtual cpu, if any, are architecture specific.
-> +
-> +1. GROUP: KVM_ARM_VCPU_PMU_V3_CTRL
-> +Architectures: ARM64
-> +
-> +1.1. ATTRIBUTE: KVM_ARM_VCPU_PMU_V3_IRQ
-> +Parameters: in kvm_device_attr.addr the address for PMU overflow interrupt
+The Mediatek 8250 driver has a 'bool' Kconfig symbol, but that
+breaks when SERIAL_8250 is a loadable module:
 
-so kvm_device_attr.addr is a pointer to an unsigned long or an int, or?
+drivers/tty/built-in.o: In function `mtk8250_set_termios':
+8250_ingenic.c:(.text+0x1bee8): undefined reference to `serial8250_do_set_termios'
+8250_ingenic.c:(.text+0x1bf10): undefined reference to `uart_get_baud_rate'
+8250_ingenic.c:(.text+0x1c09c): undefined reference to `uart_get_divisor'
+drivers/tty/built-in.o: In function `mtk8250_do_pm':
+8250_ingenic.c:(.text+0x1c0d0): undefined reference to `serial8250_do_pm'
+drivers/tty/built-in.o: In function `mtk8250_probe':
+8250_ingenic.c:(.text+0x1c2e4): undefined reference to `serial8250_register_8250_port'
+serial/8250/8250_mtk.c:287:242: error: data definition has no type or storage class [-Werror]
+serial/8250/8250_mtk.c:287:122: error: 'mtk8250_platform_driver_init' defined but not used [-Werror=unused-function]
 
-> +Returns: -EBUSY: The PMU overflow interrupt is already set
-> +         -ENXIO: The overflow interrupt not set when attempting to get it
-> +         -ENODEV: PMUv3 not supported
-> +         -EINVAL: Invalid PMU overflow interrupt number supplied
-> +
-> +A value describing the PMUv3 (Performance Monitor Unit v3) overflow interrupt
-> +number for this vcpu. This interrupt could be a PPI or SPI, but the interrupt
-> +type must be same for each vcpu. As a PPI, the interrupt number is same for all
+This changes the symbol to a 'tristate', so the dependency on
+SERIAL_8250 also works when that is set to 'm'.
+To actually build the driver, we also need to include <linux/module.h>.
 
-nit: s/is same/is the same/
+Note that the driver uses builtin_platform_driver() and implements
+no .remove() callback, so unloading the module is not possible.
 
-> +vcpus, while as an SPI it must be different for each vcpu.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/tty/serial/8250/8250_mtk.c | 1 +
+ drivers/tty/serial/8250/Kconfig    | 2 +-
+ 2 files changed, 2 insertions(+), 1 deletion(-)
 
-nit: s/it must be different for each vcpu/
-       it must be a separate number per vcpu/
-
-> +
-> +1.2 ATTRIBUTE: KVM_ARM_VCPU_PMU_V3_INIT
-> +Parameters: no additional parameter in kvm_device_attr.addr
-> +Returns: -ENODEV: PMUv3 not supported
-> +         -ENXIO: PMUv3 not properly configured as required prior to calling this
-> +                 attribute
-> +         -EBUSY: PMUv3 already initialized
-> +
-> +Request the initialization of the PMUv3.
-> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> index f9f2779..6dd0992 100644
-> --- a/arch/arm/include/asm/kvm_host.h
-> +++ b/arch/arm/include/asm/kvm_host.h
-> @@ -242,5 +242,20 @@ static inline void kvm_arm_init_debug(void) {}
->  static inline void kvm_arm_setup_debug(struct kvm_vcpu *vcpu) {}
->  static inline void kvm_arm_clear_debug(struct kvm_vcpu *vcpu) {}
->  static inline void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu) {}
-> +static inline int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
-> +					     struct kvm_device_attr *attr)
-> +{
-> +	return -ENXIO;
-> +}
-> +static inline int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
-> +					     struct kvm_device_attr *attr)
-> +{
-> +	return -ENXIO;
-> +}
-> +static inline int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
-> +					     struct kvm_device_attr *attr)
-> +{
-> +	return -ENXIO;
-> +}
->  
->  #endif /* __ARM_KVM_HOST_H__ */
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index 34d7395..dc8644f 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -833,6 +833,7 @@ static int kvm_arm_vcpu_set_attr(struct kvm_vcpu *vcpu,
->  
->  	switch (attr->group) {
->  	default:
-> +		ret = kvm_arm_vcpu_arch_set_attr(vcpu, attr);
->  		break;
->  	}
->  
-> @@ -846,6 +847,7 @@ static int kvm_arm_vcpu_get_attr(struct kvm_vcpu *vcpu,
->  
->  	switch (attr->group) {
->  	default:
-> +		ret = kvm_arm_vcpu_arch_get_attr(vcpu, attr);
->  		break;
->  	}
->  
-> @@ -859,6 +861,7 @@ static int kvm_arm_vcpu_has_attr(struct kvm_vcpu *vcpu,
->  
->  	switch (attr->group) {
->  	default:
-> +		ret = kvm_arm_vcpu_arch_has_attr(vcpu, attr);
->  		break;
->  	}
->  
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index cb220b7..a855a30 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -359,5 +359,11 @@ void kvm_arm_init_debug(void);
->  void kvm_arm_setup_debug(struct kvm_vcpu *vcpu);
->  void kvm_arm_clear_debug(struct kvm_vcpu *vcpu);
->  void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu);
-> +int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
-> +			       struct kvm_device_attr *attr);
-> +int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
-> +			       struct kvm_device_attr *attr);
-> +int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
-> +			       struct kvm_device_attr *attr);
->  
->  #endif /* __ARM64_KVM_HOST_H__ */
-> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-> index 6aedbe3..f209ea1 100644
-> --- a/arch/arm64/include/uapi/asm/kvm.h
-> +++ b/arch/arm64/include/uapi/asm/kvm.h
-> @@ -205,6 +205,11 @@ struct kvm_arch_memory_slot {
->  #define KVM_DEV_ARM_VGIC_GRP_CTRL	4
->  #define   KVM_DEV_ARM_VGIC_CTRL_INIT	0
->  
-> +/* Device Control API on vcpu fd */
-> +#define KVM_ARM_VCPU_PMU_V3_CTRL	0
-> +#define   KVM_ARM_VCPU_PMU_V3_IRQ	0
-> +#define   KVM_ARM_VCPU_PMU_V3_INIT	1
-> +
->  /* KVM_IRQ_LINE irq field index values */
->  #define KVM_ARM_IRQ_TYPE_SHIFT		24
->  #define KVM_ARM_IRQ_TYPE_MASK		0xff
-> diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-> index fcb7788..dbe45c3 100644
-> --- a/arch/arm64/kvm/guest.c
-> +++ b/arch/arm64/kvm/guest.c
-> @@ -380,3 +380,54 @@ int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
->  	}
->  	return 0;
->  }
-> +
-> +int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
-> +			       struct kvm_device_attr *attr)
-> +{
-> +	int ret;
-> +
-> +	switch (attr->group) {
-> +	case KVM_ARM_VCPU_PMU_V3_CTRL:
-> +		ret = kvm_arm_pmu_v3_set_attr(vcpu, attr);
-> +		break;
-> +	default:
-> +		ret = -ENXIO;
-> +		break;
-> +	}
-> +
-> +	return ret;
-> +}
-> +
-> +int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
-> +			       struct kvm_device_attr *attr)
-> +{
-> +	int ret;
-> +
-> +	switch (attr->group) {
-> +	case KVM_ARM_VCPU_PMU_V3_CTRL:
-> +		ret = kvm_arm_pmu_v3_get_attr(vcpu, attr);
-> +		break;
-> +	default:
-> +		ret = -ENXIO;
-> +		break;
-> +	}
-> +
-> +	return ret;
-> +}
-> +
-> +int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
-> +			       struct kvm_device_attr *attr)
-> +{
-> +	int ret;
-> +
-> +	switch (attr->group) {
-> +	case KVM_ARM_VCPU_PMU_V3_CTRL:
-> +		ret = kvm_arm_pmu_v3_has_attr(vcpu, attr);
-> +		break;
-> +	default:
-> +		ret = -ENXIO;
-> +		break;
-> +	}
-> +
-> +	return ret;
-> +}
-> diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
-> index 5f86e1d..f09abf6 100644
-> --- a/include/kvm/arm_pmu.h
-> +++ b/include/kvm/arm_pmu.h
-> @@ -38,6 +38,7 @@ struct kvm_pmu {
->  };
->  
->  #define kvm_arm_pmu_v3_ready(v)		((v)->arch.pmu.ready)
-> +#define kvm_arm_pmu_irq_initialized(v)	((v)->arch.pmu.irq_num >= VGIC_NR_SGIS)
->  u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u64 select_idx);
->  void kvm_pmu_set_counter_value(struct kvm_vcpu *vcpu, u64 select_idx, u64 val);
->  u64 kvm_pmu_valid_counter_mask(struct kvm_vcpu *vcpu);
-> @@ -52,11 +53,18 @@ void kvm_pmu_handle_pmcr(struct kvm_vcpu *vcpu, u64 val);
->  void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
->  				    u64 select_idx);
->  bool kvm_arm_support_pmu_v3(void);
-> +int kvm_arm_pmu_v3_set_attr(struct kvm_vcpu *vcpu,
-> +			    struct kvm_device_attr *attr);
-> +int kvm_arm_pmu_v3_get_attr(struct kvm_vcpu *vcpu,
-> +			    struct kvm_device_attr *attr);
-> +int kvm_arm_pmu_v3_has_attr(struct kvm_vcpu *vcpu,
-> +			    struct kvm_device_attr *attr);
->  #else
->  struct kvm_pmu {
->  };
->  
->  #define kvm_arm_pmu_v3_ready(v)		(false)
-> +#define kvm_arm_pmu_irq_initialized(v)	(false)
->  static inline u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu,
->  					    u64 select_idx)
->  {
-> @@ -79,6 +87,21 @@ static inline void kvm_pmu_handle_pmcr(struct kvm_vcpu *vcpu, u64 val) {}
->  static inline void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu,
->  						  u64 data, u64 select_idx) {}
->  static inline bool kvm_arm_support_pmu_v3(void) { return false; }
-> +static inline int kvm_arm_pmu_v3_set_attr(struct kvm_vcpu *vcpu,
-> +					  struct kvm_device_attr *attr)
-> +{
-> +	return -ENXIO;
-> +}
-> +static inline int kvm_arm_pmu_v3_get_attr(struct kvm_vcpu *vcpu,
-> +					  struct kvm_device_attr *attr)
-> +{
-> +	return -ENXIO;
-> +}
-> +static inline int kvm_arm_pmu_v3_has_attr(struct kvm_vcpu *vcpu,
-> +					  struct kvm_device_attr *attr)
-> +{
-> +	return -ENXIO;
-> +}
->  #endif
->  
->  #endif
-> diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
-> index 2467d62..06b7cb3 100644
-> --- a/virt/kvm/arm/pmu.c
-> +++ b/virt/kvm/arm/pmu.c
-> @@ -19,6 +19,7 @@
->  #include <linux/kvm.h>
->  #include <linux/kvm_host.h>
->  #include <linux/perf_event.h>
-> +#include <linux/uaccess.h>
->  #include <asm/kvm_emulate.h>
->  #include <kvm/arm_pmu.h>
->  #include <kvm/arm_vgic.h>
-> @@ -393,3 +394,130 @@ bool kvm_arm_support_pmu_v3(void)
->  	 */
->  	return (perf_num_counters() > 0);
->  }
-> +
-> +static int kvm_arm_pmu_v3_init(struct kvm_vcpu *vcpu)
-> +{
-> +	if (!kvm_arm_support_pmu_v3())
-> +		return -ENODEV;
-> +
-> +	if (!test_bit(KVM_ARM_VCPU_PMU_V3, vcpu->arch.features) ||
-> +	    !kvm_arm_pmu_irq_initialized(vcpu))
-> +		return -ENXIO;
-> +
-> +	if (kvm_arm_pmu_v3_ready(vcpu))
-> +		return -EBUSY;
-> +
-> +	kvm_pmu_vcpu_reset(vcpu);
-> +	vcpu->arch.pmu.ready = true;
-> +
-> +	return 0;
-> +}
-> +
-> +static int kvm_arm_pmu_irq_access(struct kvm_vcpu *vcpu,
-> +				  struct kvm_device_attr *attr,
-> +				  int *irq, bool is_set)
-> +{
-> +	if (!is_set) {
-> +		if (!kvm_arm_pmu_irq_initialized(vcpu))
-> +			return -ENXIO;
-> +
-> +		*irq = vcpu->arch.pmu.irq_num;
-> +	} else {
-> +		if (kvm_arm_pmu_irq_initialized(vcpu))
-> +			return -EBUSY;
-> +
-> +		kvm_debug("Set kvm ARM PMU irq: %d\n", *irq);
-> +		vcpu->arch.pmu.irq_num = *irq;
-> +	}
-> +
-> +	return 0;
-> +}
-
-are you going to be reusing this function in later patches?  If not, I
-don't see the benefit of having this indirection over simply including
-it directly in the callers below.
-
-> +
-> +static bool irq_is_valid(struct kvm *kvm, int irq, bool is_ppi)
-> +{
-> +	int i;
-> +	struct kvm_vcpu *vcpu;
-> +
-> +	kvm_for_each_vcpu(i, vcpu, kvm) {
-> +		if (!kvm_arm_pmu_irq_initialized(vcpu))
-> +			continue;
-> +
-> +		if (is_ppi) {
-> +			if (vcpu->arch.pmu.irq_num != irq)
-> +				return false;
-> +		} else {
-> +			if (vcpu->arch.pmu.irq_num == irq)
-> +				return false;
-> +		}
-> +	}
-> +
-> +	return true;
-> +}
-> +
-> +
-> +int kvm_arm_pmu_v3_set_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
-> +{
-> +	switch (attr->attr) {
-> +	case KVM_ARM_VCPU_PMU_V3_IRQ: {
-> +		int __user *uaddr = (int __user *)(long)attr->addr;
-> +		int reg;
-> +
-> +		if (!test_bit(KVM_ARM_VCPU_PMU_V3, vcpu->arch.features))
-> +			return -ENODEV;
-> +
-> +		if (get_user(reg, uaddr))
-> +			return -EFAULT;
-> +
-> +		/*
-> +		 * The PMU overflow interrupt could be a PPI or SPI, but for one
-> +		 * VM the interrupt type must be same for each vcpu. As a PPI,
-> +		 * the interrupt number is same for all vcpus, while as an SPI
-> +		 * it must be different for each vcpu.
-> +		 */
-> +		if (reg < VGIC_NR_SGIS || reg >= vcpu->kvm->arch.vgic.nr_irqs ||
-> +		    !irq_is_valid(vcpu->kvm, reg, reg < VGIC_NR_PRIVATE_IRQS))
-> +			return -EINVAL;
-> +
-> +		return kvm_arm_pmu_irq_access(vcpu, attr, &reg, true);
-> +	}
-> +	case KVM_ARM_VCPU_PMU_V3_INIT:
-> +		return kvm_arm_pmu_v3_init(vcpu);
-> +	}
-> +
-> +	return -ENXIO;
-> +}
-> +
-> +int kvm_arm_pmu_v3_get_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
-> +{
-> +	int ret;
-> +
-> +	switch (attr->attr) {
-> +	case KVM_ARM_VCPU_PMU_V3_IRQ: {
-> +		int __user *uaddr = (int __user *)(long)attr->addr;
-> +		int reg = -1;
-> +
-> +		if (!test_bit(KVM_ARM_VCPU_PMU_V3, vcpu->arch.features))
-> +			return -ENODEV;
-> +
-> +		ret = kvm_arm_pmu_irq_access(vcpu, attr, &reg, false);
-> +		if (ret)
-> +			return ret;
-> +		return put_user(reg, uaddr);
-> +	}
-> +	}
-> +
-> +	return -ENXIO;
-> +}
-> +
-> +int kvm_arm_pmu_v3_has_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
-> +{
-> +	switch (attr->attr) {
-> +	case KVM_ARM_VCPU_PMU_V3_IRQ:
-> +	case KVM_ARM_VCPU_PMU_V3_INIT:
-> +		if (kvm_arm_support_pmu_v3() &&
-> +		    test_bit(KVM_ARM_VCPU_PMU_V3, vcpu->arch.features))
-> +			return 0;
-> +	}
-> +
-> +	return -ENXIO;
-> +}
-> -- 
-> 2.0.4
-> 
-> 
-
-Besides the style and wording comments:
-
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+diff --git a/drivers/tty/serial/8250/8250_mtk.c b/drivers/tty/serial/8250/8250_mtk.c
+index 9038843cadc7..7e9242a5ddfe 100644
+--- a/drivers/tty/serial/8250/8250_mtk.c
++++ b/drivers/tty/serial/8250/8250_mtk.c
+@@ -19,6 +19,7 @@
+ #include <linux/init.h>
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
++#include <linux/module.h>
+ #include <linux/platform_device.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/serial_8250.h>
+diff --git a/drivers/tty/serial/8250/Kconfig b/drivers/tty/serial/8250/Kconfig
+index 67ad6b0d595b..6ae0fae4f796 100644
+--- a/drivers/tty/serial/8250/Kconfig
++++ b/drivers/tty/serial/8250/Kconfig
+@@ -370,7 +370,7 @@ config SERIAL_8250_LPC18XX
+ 	  serial port, say Y to this option. If unsure, say Y.
+ 
+ config SERIAL_8250_MT6577
+-	bool "Mediatek serial port support"
++	tristate "Mediatek serial port support"
+ 	depends on SERIAL_8250 && ARCH_MEDIATEK
+ 	help
+ 	  If you have a Mediatek based board and want to use the
+-- 
+2.7.0
