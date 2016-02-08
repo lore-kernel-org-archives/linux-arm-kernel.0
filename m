@@ -1,55 +1,53 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Mon, 8 Feb 2016 23:22:06 +0100
-Subject: [PATCH] clk: meson: Fix meson_clk_register_clks() signature type
- mismatch
-In-Reply-To: <20160208221508.GT4848@codeaurora.org>
-References: <1454879583-27036-1-git-send-email-afaerber@suse.de>
- <20160208221508.GT4848@codeaurora.org>
-Message-ID: <56B9150E.5010808@suse.de>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon, 08 Feb 2016 23:21:57 +0100
+Subject: [PATCH v7 0/9] Fix broken DMAFLUSHP on Rockchips platform
+In-Reply-To: <20160208131419.GA19598@localhost>
+References: <1453460812-8498-1-git-send-email-wxt@rock-chips.com>
+ <3817335.PXCk0JfYDT@phil> <20160208131419.GA19598@localhost>
+Message-ID: <2223201.4nEkyUQu1O@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 08.02.2016 um 23:15 schrieb Stephen Boyd:
-> On 02/07, Andreas F?rber wrote:
->> As preparation for arm64 based mesongxbb, which pulls in this code once
->> enabling ARCH_MESON, fix a size_t vs. unsigned int type mismatch.
->> The loop uses a local unsigned int variable, so adopt that type,
->> matching the header.
->>
->> Fixes: 7a29a869434e ("clk: meson: Add support for Meson clock controller")
->> Signed-off-by: Andreas F?rber <afaerber@suse.de>
->> ---
+Hi Vinod,
+
+Am Montag, 8. Februar 2016, 18:44:19 schrieb Vinod Koul:
+> On Mon, Feb 08, 2016 at 10:27:04AM +0100, Heiko Stuebner wrote:
+> > Am Montag, 8. Februar 2016, 08:41:34 schrieb Vinod Koul:
+> > > On Mon, Feb 01, 2016 at 02:56:54PM +0800, Caesar Wang wrote:
+> > > > Hello Vinod,
+> > > > 
+> > > > Is there any chance apply the DMA patches?:-)
+> > > 
+> > > I was waiting for any ACKs on ARM patches before I merge this series.
+> > 
+> > I think the more regular way is for the driver maintainer to take the
+> > driver-specific stuff and the devicetree parts going through the
+> > specific arm- tree. But if you really want to take the whole series,
+> > for patches 4,5,6
+> Yes but that causes cross tree dependencies, which looking at this won't
+> be a big problem, so I can safely merge dmaengine changes and rest can go
+> thru ARM tree.
 > 
-> Applied to clk-next. It would have been nice to have the
-> compilation error though
+> Typically submitter should say which tree he/she prefers, which was not
+> provided..
+> 
+> So, are all okay to merge the entire series thru dmaengine tree or
+> independent. I don't mind either
 
-Ask and you shall receive:
+In general I don't mind either solution, but would prefer me taking the 3 
+"ARM: dts: foo" patches, while the rest would go through your tree.
 
-  CC      drivers/clk/meson/clkc.o
-drivers/clk/meson/clkc.c:200:13: error: conflicting types for
-'meson_clk_register_clks'
- void __init meson_clk_register_clks(const struct clk_conf *clk_confs,
-             ^
-In file included from drivers/clk/meson/clkc.c:22:0:
-drivers/clk/meson/clkc.h:180:6: note: previous declaration of
-'meson_clk_register_clks' was here
- void meson_clk_register_clks(const struct clk_conf *clk_confs,
-      ^
-scripts/Makefile.build:258: recipe for target 'drivers/clk/meson/clkc.o'
-failed
-make[3]: *** [drivers/clk/meson/clkc.o] Error 1
-scripts/Makefile.build:407: recipe for target 'drivers/clk/meson' failed
-make[2]: *** [drivers/clk/meson] Error 2
-scripts/Makefile.build:407: recipe for target 'drivers/clk' failed
-make[1]: *** [drivers/clk] Error 2
-Makefile:959: recipe for target 'drivers' failed
-make: *** [drivers] Error 2
+Main reason is to prevent any possible conflicts with other Rockchip 
+devicetree additions also going into 4.6 .
 
-Not really telling, is it. ;)
 
-Regards,
-Andreas
+Thanks
+Heiko
 
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton; HRB 21284 (AG N?rnberg)
+> > - ARM: dts: Add arm, pl330-broken-no-flushp quirk for rk3288 platform
+> > - ARM: dts: Add arm, pl330-broken-no-flushp quirk for rk3xxx platform
+> > - ARM: dts: add pl330-broken-no-flushp quirk for rk3036 SoCs
+> > 
+> > Acked-by: Heiko Stuebner <heiko@sntech.de>
+> 
+> Thanks
