@@ -1,40 +1,119 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 8 Feb 2016 16:22:44 +0000
-Subject: [PATCH 07/11] ARM: dts: sunxi: Add dtsi file for AXP809 PMIC
-In-Reply-To: <CAGb2v64ySLAVbPf_XaZnzm5T=SmQLip4iO2p4cGXg=C0=51eqA@mail.gmail.com>
-References: <1454408864-24112-1-git-send-email-wens@csie.org>
- <1454408864-24112-8-git-send-email-wens@csie.org>
- <20160202121733.GO4455@sirena.org.uk>
- <CAGb2v657zYT30KbuK0fyVOmhv0kzJjj9gTsTFRaS4i3d6YhiHQ@mail.gmail.com>
- <20160208145347.GD7265@sirena.org.uk>
- <CAGb2v64ySLAVbPf_XaZnzm5T=SmQLip4iO2p4cGXg=C0=51eqA@mail.gmail.com>
-Message-ID: <20160208162244.GG7265@sirena.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 8 Feb 2016 16:24:03 +0000
+Subject: [PATCH v3 23/23] arm64: Panic when VHE and non VHE CPUs coexist
+In-Reply-To: <20160208160445.GS6076@e104818-lin.cambridge.arm.com>
+References: <1454522416-6874-1-git-send-email-marc.zyngier@arm.com>
+ <1454522416-6874-24-git-send-email-marc.zyngier@arm.com>
+ <20160208160445.GS6076@e104818-lin.cambridge.arm.com>
+Message-ID: <20160208162402.GC14146@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 08, 2016 at 10:56:05PM +0800, Chen-Yu Tsai wrote:
-> On Mon, Feb 8, 2016 at 10:53 PM, Mark Brown <broonie@kernel.org> wrote:
-> > On Sat, Feb 06, 2016 at 08:42:24PM +0800, Chen-Yu Tsai wrote:
+On Mon, Feb 08, 2016 at 04:04:46PM +0000, Catalin Marinas wrote:
+> On Wed, Feb 03, 2016 at 06:00:16PM +0000, Marc Zyngier wrote:
+> > Having both VHE and non-VHE capable CPUs in the same system
+> > is likely to be a recipe for disaster.
+> > 
+> > If the boot CPU has VHE, but a secondary is not, we won't be
+> > able to downgrade and run the kernel at EL1. Add CPU hotplug
+> > to the mix, and this produces a terrifying mess.
+> > 
+> > Let's solve the problem once and for all. If you mix VHE and
+> > non-VHE CPUs in the same system, you deserve to loose, and this
+> > patch makes sure you don't get a chance.
+> > 
+> > This is implemented by storing the kernel execution level in
+> > a global variable. Secondaries will park themselves in a
+> > WFI loop if they observe a mismatch. Also, the primary CPU
+> > will detect that the secondary CPU has died on a mismatched
+> > execution level. Panic will follow.
+> > 
+> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> > ---
+> >  arch/arm64/include/asm/virt.h | 17 +++++++++++++++++
+> >  arch/arm64/kernel/head.S      | 20 ++++++++++++++++++++
+> >  arch/arm64/kernel/smp.c       |  3 +++
+> >  3 files changed, 40 insertions(+)
+> > 
+> > diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
+> > index 9f22dd6..f81a345 100644
+> > --- a/arch/arm64/include/asm/virt.h
+> > +++ b/arch/arm64/include/asm/virt.h
+> > @@ -36,6 +36,11 @@
+> >   */
+> >  extern u32 __boot_cpu_mode[2];
+> >  
+> > +/*
+> > + * __run_cpu_mode records the mode the boot CPU uses for the kernel.
+> > + */
+> > +extern u32 __run_cpu_mode[2];
+> > +
+> >  void __hyp_set_vectors(phys_addr_t phys_vector_base);
+> >  phys_addr_t __hyp_get_vectors(void);
+> >  
+> > @@ -60,6 +65,18 @@ static inline bool is_kernel_in_hyp_mode(void)
+> >  	return el == CurrentEL_EL2;
+> >  }
+> >  
+> > +static inline bool is_kernel_mode_mismatched(void)
+> > +{
+> > +	/*
+> > +	 * A mismatched CPU will have written its own CurrentEL in
+> > +	 * __run_cpu_mode[1] (initially set to zero) after failing to
+> > +	 * match the value in __run_cpu_mode[0]. Thus, a non-zero
+> > +	 * value in __run_cpu_mode[1] is enough to detect the
+> > +	 * pathological case.
+> > +	 */
+> > +	return !!ACCESS_ONCE(__run_cpu_mode[1]);
+> > +}
+> > +
+> >  /* The section containing the hypervisor text */
+> >  extern char __hyp_text_start[];
+> >  extern char __hyp_text_end[];
+> > diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> > index 6f2f377..f9b6a5b 100644
+> > --- a/arch/arm64/kernel/head.S
+> > +++ b/arch/arm64/kernel/head.S
+> > @@ -578,7 +578,24 @@ ENTRY(set_cpu_boot_mode_flag)
+> >  1:	str	w20, [x1]			// This CPU has booted in EL1
+> >  	dmb	sy
+> >  	dc	ivac, x1			// Invalidate potentially stale cache line
+> > +	adr_l	x1, __run_cpu_mode
+> > +	ldr	w0, [x1]
+> > +	mrs	x20, CurrentEL
+> > +	cbz	x0, skip_el_check
+> > +	cmp	x0, x20
+> > +	bne	mismatched_el
+> >  	ret
+> > +skip_el_check:			// Only the first CPU gets to set the rule
+> > +	str	w20, [x1]
+> > +	dmb	sy
+> > +	dc	ivac, x1	// Invalidate potentially stale cache line
+> > +	ret
+> > +mismatched_el:
+> > +	str	w20, [x1, #4]
+> > +	dmb	sy
+> > +	dc	ivac, x1	// Invalidate potentially stale cache line
+> > +1:	wfi
+> > +	b	1b
+> >  ENDPROC(set_cpu_boot_mode_flag)
+> 
+> Do we need to wait for the D-cache maintenance completion before
+> entering WFI (like issuing a DSB)? Same for the skip_el_check path
+> before the RET.
 
-> >> Mark, may I assume you are OK with this DTS include listing
-> >> the regulators, even if their sections are empty?
+We would need that to complete the maintenance, yes.
 
-> > If it has no content why have it?
+However, given we're going into WFI immediately afterwards, and not
+signalling completion to other CPUs, what we gain is somewhat
+questionable.
 
-> I'd like the regulator core to disable any unused ones. The core
-> considers regulators that don't have nodes as not having constraints,
-> and won't touch them.
+Perhaps it's always better to do the maintenance on the read side (for
+consistency with [1]).
 
-> Any other ways to do this? Or am I going about this the wrong way?
+Regardless, we'd probably want a DSB to ensure the write had
+completed...
 
-The whole point with constraints is that they describe what is safe on a
-given board.  This includes powering off unused regulators - it should
-be something that the system integrator configures, not something that
-they get as default.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160208/3ee8675a/attachment.sig>
+Mark.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-February/404661.html
