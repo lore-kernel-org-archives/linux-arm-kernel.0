@@ -1,77 +1,37 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Sun, 7 Feb 2016 20:22:20 -0800
-Subject: [PATCH] tty: serial: meson: Implement earlycon support
-In-Reply-To: <1454878635-24396-1-git-send-email-afaerber@suse.de>
-References: <1454878635-24396-1-git-send-email-afaerber@suse.de>
-Message-ID: <56B817FC.4000604@hurleysoftware.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Mon,  8 Feb 2016 14:04:58 +0900
+Subject: [PATCH 1/2] ARM: remove bzImage target
+Message-ID: <1454907899-32101-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andreas,
+bzImage has been just an alias for zImage for more than a decade.
+It would not hurt to delete it.
 
-On 02/07/2016 12:57 PM, Andreas F?rber wrote:
-> Reuse the existing console write implementation for implementing
-> DT-based and command-line-based earlycon support.
-> 
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> ---
->  Documentation/kernel-parameters.txt |  6 ++++++
->  drivers/tty/serial/meson_uart.c     | 13 +++++++++++++
->  2 files changed, 19 insertions(+)
-> 
-> diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
-> index 602065c..90801ac 100644
-> --- a/Documentation/kernel-parameters.txt
-> +++ b/Documentation/kernel-parameters.txt
-> @@ -1030,6 +1030,12 @@ Such letter suffixes can also be entirely omitted.
->  			the driver will use only 32-bit accessors to read/write
->  			the device registers.
->  
-> +		meson_serial,<addr>
-> +			Start an early, polled-mode console on a meson serial
-> +			port at the specified address. The serial port must
-> +			already be setup and configured. Options are not yet
-> +			supported.
-> +
->  		msm_serial,<addr>
->  			Start an early, polled-mode console on an msm serial
->  			port at the specified address. The serial port
-> diff --git a/drivers/tty/serial/meson_uart.c b/drivers/tty/serial/meson_uart.c
-> index b12a37b..6f89567 100644
-> --- a/drivers/tty/serial/meson_uart.c
-> +++ b/drivers/tty/serial/meson_uart.c
-> @@ -548,6 +548,19 @@ static int __init meson_serial_console_init(void)
->  }
->  console_initcall(meson_serial_console_init);
->  
-> +static int __init
-> +meson_serial_early_console_setup(struct earlycon_device *device, const char *opt)
-> +{
-> +	if (!device->port.membase)
-> +		return -ENODEV;
-> +
-> +	device->con->write = meson_serial_console_write;
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-meson_serial_console_write() is not appropriate for earlycon; it assumes the
-earlycon port is the same as the driver port (it isn't).
+ arch/arm/Makefile | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
 
-
-> +	return 0;
-> +}
-> +EARLYCON_DECLARE(meson_serial, meson_serial_early_console_setup);
-> +OF_EARLYCON_DECLARE(meson_serial, "amlogic,meson-uart",
-> +		    meson_serial_early_console_setup);
-
-With today's linux-next (or Greg's tty-next tree), it is no longer necessary to
-declare separate earlycon's when you want both; OF_EARLYCON_DECLARE() declares
-both a devicetree-enabled earlycon and automatically provides for a command line
-earlycon of the same name.
-
-Regards,
-Peter Hurley
-
-> +
->  #define MESON_SERIAL_CONSOLE	(&meson_serial_console)
->  #else
->  #define MESON_SERIAL_CONSOLE	NULL
-> 
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 46fb1ca..d6d453f 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -312,13 +312,10 @@ boot := arch/arm/boot
+ archprepare:
+ 	$(Q)$(MAKE) $(build)=arch/arm/tools include/generated/mach-types.h
+ 
+-# Convert bzImage to zImage
+-bzImage: zImage
+-
+ BOOT_TARGETS	= zImage Image xipImage bootpImage uImage
+ INSTALL_TARGETS	= zinstall uinstall install
+ 
+-PHONY += bzImage $(BOOT_TARGETS) $(INSTALL_TARGETS)
++PHONY += $(BOOT_TARGETS) $(INSTALL_TARGETS)
+ 
+ bootpImage uImage: zImage
+ zImage: Image
+-- 
+1.9.1
