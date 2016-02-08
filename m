@@ -1,290 +1,331 @@
 From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Mon, 8 Feb 2016 12:41:04 +0000
-Subject: [RFC PATCH v2 3/3] PCI/ACPI: hisi: Add ACPI support for HiSilicon
- SoCs Host Controllers
+Date: Mon, 8 Feb 2016 12:41:02 +0000
+Subject: [RFC PATCH v2 1/3] PCI: hisi: re-architect Hip05/Hip06 controllers
+ driver to preapare for ACPI
 In-Reply-To: <1454935264-6076-1-git-send-email-gabriele.paoloni@huawei.com>
 References: <1454935264-6076-1-git-send-email-gabriele.paoloni@huawei.com>
-Message-ID: <1454935264-6076-4-git-send-email-gabriele.paoloni@huawei.com>
+Message-ID: <1454935264-6076-2-git-send-email-gabriele.paoloni@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: gabriele paoloni <gabriele.paoloni@huawei.com>
 
-This patch adds specific quirks for PCI config space accessors,
-it uses _HID to decide whether to hook pci_ops or not.
+re-architect the Hip05/Hip06 host controllers driver to prepare
+for the ACPI based driver.
+The common functions used also by the ACPI driver have been grouped
+into a new "common" file
 
-Signed-off-by: Dongdong Liu <liudongdong3@huawei.com>
 Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
 ---
- MAINTAINERS                       |   1 +
- drivers/pci/host/Kconfig          |   8 ++
- drivers/pci/host/Makefile         |   1 +
- drivers/pci/host/pcie-hisi-acpi.c | 188 ++++++++++++++++++++++++++++++++++++++
- drivers/pci/host/pcie-hisi.c      |   2 -
- drivers/pci/host/pcie-hisi.h      |   2 +
- 6 files changed, 200 insertions(+), 2 deletions(-)
- create mode 100644 drivers/pci/host/pcie-hisi-acpi.c
+ MAINTAINERS                         |   2 +
+ drivers/pci/host/Makefile           |   2 +-
+ drivers/pci/host/pcie-hisi-common.c |  73 ++++++++++++++++++++++
+ drivers/pci/host/pcie-hisi.c        | 119 +++++++++++-------------------------
+ drivers/pci/host/pcie-hisi.h        |  23 +++++++
+ 5 files changed, 135 insertions(+), 84 deletions(-)
+ create mode 100644 drivers/pci/host/pcie-hisi-common.c
+ create mode 100644 drivers/pci/host/pcie-hisi.h
 
 diff --git a/MAINTAINERS b/MAINTAINERS
-index d69f436..f184c3e 100644
+index 30aca4a..d69f436 100644
 --- a/MAINTAINERS
 +++ b/MAINTAINERS
-@@ -8412,6 +8412,7 @@ F:	Documentation/devicetree/bindings/pci/hisilicon-pcie.txt
- F:	drivers/pci/host/pcie-hisi.h
+@@ -8409,7 +8409,9 @@ M:	Gabriele Paoloni <gabriele.paoloni@huawei.com>
+ L:	linux-pci at vger.kernel.org
+ S:	Maintained
+ F:	Documentation/devicetree/bindings/pci/hisilicon-pcie.txt
++F:	drivers/pci/host/pcie-hisi.h
  F:	drivers/pci/host/pcie-hisi.c
- F:	drivers/pci/host/pcie-hisi-common.c
-+F:	drivers/pci/host/pcie-hisi-acpi.c
++F:	drivers/pci/host/pcie-hisi-common.c
  
  PCIE DRIVER FOR QUALCOMM MSM
  M:     Stanimir Varbanov <svarbanov@mm-sol.com>
-diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-index 75a6054..65b1add 100644
---- a/drivers/pci/host/Kconfig
-+++ b/drivers/pci/host/Kconfig
-@@ -181,6 +181,14 @@ config PCI_HISI
- 	  Say Y here if you want PCIe controller support on HiSilicon
- 	  Hip05 and Hip06 SoCs
- 
-+config PCI_HISI_ACPI
-+	depends on ACPI
-+	bool "HiSilicon Hip05 and Hip06 SoCs ACPI PCIe controllers"
-+	select ACPI_PCI_HOST_GENERIC
-+	help
-+	  Say Y here if you want ACPI PCIe controller support on HiSilicon
-+	  Hip05 and Hip06 SoCs
-+
- config PCIE_QCOM
- 	bool "Qualcomm PCIe controller"
- 	depends on ARCH_QCOM && OF
 diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile
-index 8c93c0f..57e4379 100644
+index 7b2f20c..8c93c0f 100644
 --- a/drivers/pci/host/Makefile
 +++ b/drivers/pci/host/Makefile
-@@ -21,4 +21,5 @@ obj-$(CONFIG_PCIE_IPROC_BCMA) += pcie-iproc-bcma.o
+@@ -20,5 +20,5 @@ obj-$(CONFIG_PCIE_IPROC_PLATFORM) += pcie-iproc-platform.o
+ obj-$(CONFIG_PCIE_IPROC_BCMA) += pcie-iproc-bcma.o
  obj-$(CONFIG_PCIE_ALTERA) += pcie-altera.o
  obj-$(CONFIG_PCIE_ALTERA_MSI) += pcie-altera-msi.o
- obj-$(CONFIG_PCI_HISI) += pcie-hisi.o pcie-hisi-common.o
-+obj-$(CONFIG_PCI_HISI_ACPI) += pcie-hisi-acpi.o pcie-hisi-common.o
+-obj-$(CONFIG_PCI_HISI) += pcie-hisi.o
++obj-$(CONFIG_PCI_HISI) += pcie-hisi.o pcie-hisi-common.o
  obj-$(CONFIG_PCIE_QCOM) += pcie-qcom.o
-diff --git a/drivers/pci/host/pcie-hisi-acpi.c b/drivers/pci/host/pcie-hisi-acpi.c
+diff --git a/drivers/pci/host/pcie-hisi-common.c b/drivers/pci/host/pcie-hisi-common.c
 new file mode 100644
-index 0000000..3605260
+index 0000000..6dfb4c3
 --- /dev/null
-+++ b/drivers/pci/host/pcie-hisi-acpi.c
-@@ -0,0 +1,188 @@
++++ b/drivers/pci/host/pcie-hisi-common.c
+@@ -0,0 +1,73 @@
 +/*
-+ * PCIe host controller driver for HiSilicon HipXX SoCs
++ * PCIe host controller common functions for HiSilicon SoCs
 + *
-+ * Copyright (C) 2016 HiSilicon Co., Ltd. http://www.hisilicon.com
++ * Copyright (C) 2015 HiSilicon Co., Ltd. http://www.hisilicon.com
 + *
-+ * Author: Dongdong Liu <liudongdong3@huawei.com>
++ * Author: Zhou Wang <wangzhou1@hisilicon.com>
++ *         Dacai Zhu <zhudacai@hisilicon.com>
 + *         Gabriele Paoloni <gabriele.paoloni@huawei.com>
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
 + */
-+#include <linux/interrupt.h>
++
 +#include <linux/acpi.h>
-+#include <linux/ecam.h>
-+#include <linux/pci.h>
-+#include <linux/pci-acpi.h>
++#include <linux/interrupt.h>
++#include <linux/module.h>
++#include <linux/mfd/syscon.h>
++#include <linux/of_pci.h>
++#include <linux/regmap.h>
++
++#include "pcie-designware.h"
 +#include "pcie-hisi.h"
 +
-+#define GET_PCIE_LINK_STATUS  0x0
-+
-+/* uuid 6d30f553-836c-408e-b6ad-45bccc957949 */
-+const u8 hisi_pcie_acpi_dsm_uuid[] = {
-+	0x53, 0xf5, 0x30, 0x6d, 0x6c, 0x83, 0x8e, 0x40,
-+	0xb6, 0xad, 0x45, 0xbc, 0xcc, 0x95, 0x79, 0x49
-+};
-+
-+static const struct acpi_device_id hisi_pcie_ids[] = {
-+	{"HISI0080", 0},
-+	{"", 0},
-+};
-+
-+static int hisi_pcie_get_addr(struct acpi_pci_root *root, const char *name,
-+				void __iomem **addr)
++/* HipXX PCIe host only supports 32-bit config access */
++int hisi_pcie_common_cfg_read(void __iomem *reg_base, int where, int size,
++			      u32 *val)
 +{
-+	struct acpi_device *device;
-+	u64 base;
-+	u64 size;
-+	u32 buf[4];
-+	int ret;
++	u32 reg;
++	u32 reg_val;
++	void *walker = &reg_val;
 +
-+	device =  root->device;
-+	ret = fwnode_property_read_u32_array(&device->fwnode, name,
-+					buf, ARRAY_SIZE(buf));
-+	if (ret) {
-+		dev_err(&device->dev, "can't get %s\n", name);
-+		return ret;
-+	}
++	walker += (where & 0x3);
++	reg = where & ~0x3;
++	reg_val = readl(reg_base + reg);
 +
-+	base = ((u64)buf[0] << 32) | buf[1];
-+	size =  ((u64)buf[2] << 32) | buf[3];
-+	*addr = devm_ioremap(&device->dev, base, size);
-+	if (!(*addr)) {
-+		dev_err(&device->dev, "error with ioremap\n");
-+		return -ENOMEM;
-+	}
++	if (size == 1)
++		*val = *(u8 __force *) walker;
++	else if (size == 2)
++		*val = *(u16 __force *) walker;
++	else if (size == 4)
++		*val = reg_val;
++	else
++		return PCIBIOS_BAD_REGISTER_NUMBER;
 +
-+	return 0;
++	return PCIBIOS_SUCCESSFUL;
 +}
 +
-+
-+static int hisi_pcie_link_up_acpi(struct acpi_pci_root *root)
++/* HipXX PCIe host only supports 32-bit config access */
++int hisi_pcie_common_cfg_write(void __iomem *reg_base, int where, int  size,
++				u32 val)
 +{
-+	u32 val;
-+	struct acpi_device *device;
-+	union acpi_object *obj;
++	u32 reg_val;
++	u32 reg;
++	void *walker = &reg_val;
 +
-+	device = root->device;
-+	obj = acpi_evaluate_dsm(device->handle,
-+		hisi_pcie_acpi_dsm_uuid, 0,
-+		GET_PCIE_LINK_STATUS, NULL);
++	walker += (where & 0x3);
++	reg = where & ~0x3;
++	if (size == 4)
++		writel(val, reg_base + reg);
++	else if (size == 2) {
++		reg_val = readl(reg_base + reg);
++		*(u16 __force *) walker = val;
++		writel(val, reg_base + reg);
++	} else if (size == 1) {
++		reg_val = readl(reg_base + reg);
++		*(u8 __force *) walker = val;
++		writel(val, reg_base + reg);
++	} else
++		return PCIBIOS_BAD_REGISTER_NUMBER;
 +
-+	if (!obj  ||  obj->type != ACPI_TYPE_INTEGER)  {
-+		dev_err(&device->dev, "can't get link status from _DSM\n");
-+		return 0;
-+	}
-+	val = obj->integer.value;
-+
-+	return ((val & PCIE_LTSSM_STATE_MASK) == PCIE_LTSSM_LINKUP_STATE);
-+
++	return PCIBIOS_SUCCESSFUL;
 +}
-+
-+/*
-+ * Retrieve rc_dbi base and size from _DSD
-+ * Name (_DSD, Package () {
-+ *	ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
-+ *	Package () {
-+ *	Package () {"rc-dbi", Package () { 0x0, 0xb0080000, 0x0, 0x10000 }},
-+ *	}
-+ *	})
-+ */
-+static int hisi_pcie_init(struct acpi_pci_root *root)
-+{
-+	int ret;
-+	struct acpi_device *device;
-+	void __iomem *reg_base;
-+
-+	device =  root->device;
-+	ret = hisi_pcie_get_addr(root, "rc-dbi", &reg_base);
-+	if (ret) {
-+		dev_err(&device->dev, "can't get rc-dbi\n");
-+		return ret;
-+	}
-+
-+	root->sysdata = reg_base;
-+	return 0;
-+}
-+
-+static int hisi_pcie_match(struct pci_mcfg_fixup *fixup,
-+			struct acpi_pci_root *root)
-+{
-+	int ret;
-+	struct acpi_device *device;
-+
-+	device = root->device;
-+	ret = acpi_match_device_ids(device, hisi_pcie_ids);
-+	if (ret)
-+		return 0;
-+
-+	ret = hisi_pcie_init(root);
-+	if (ret)
-+		dev_warn(&device->dev, "hisi pcie init fail\n");
-+
-+	return 1;
-+}
-+
-+static int hisi_pcie_acpi_valid_config(struct acpi_pci_root *root,
-+				struct pci_bus *bus, int dev)
-+{
-+	/* If there is no link, then there is no device */
-+	if (bus->number != root->secondary.start) {
-+		if (!hisi_pcie_link_up_acpi(root))
-+			return 0;
-+	}
-+
-+	/* access only one slot on each root port */
-+	if (bus->number == root->secondary.start && dev > 0)
-+		return 0;
-+
-+	/*
-+	 * do not read more than one device on the bus directly attached
-+	 * to RC's (Virtual Bridge's) DS side.
-+	 */
-+	if (bus->primary == root->secondary.start && dev > 0)
-+		return 0;
-+
-+	return 1;
-+}
-+
-+static int hisi_pcie_acpi_rd_conf(struct pci_bus *bus, u32 devfn, int where,
-+		int size, u32 *val)
-+{
-+	struct acpi_pci_root *root = bus->sysdata;
-+	void __iomem *reg_base = root->sysdata;
-+
-+	if (hisi_pcie_acpi_valid_config(root, bus, PCI_SLOT(devfn)) == 0)
-+		return PCIBIOS_DEVICE_NOT_FOUND;
-+
-+	if (bus->number == root->secondary.start)
-+		return hisi_pcie_common_cfg_read(reg_base, where, size, val);
-+
-+	return pci_generic_config_read(bus, devfn, where, size, val);
-+}
-+
-+static int hisi_pcie_acpi_wr_conf(struct pci_bus *bus, u32 devfn,
-+		int where, int size, u32 val)
-+{
-+	struct acpi_pci_root *root = bus->sysdata;
-+	void __iomem *reg_base = root->sysdata;
-+
-+	if (hisi_pcie_acpi_valid_config(root, bus, PCI_SLOT(devfn)) == 0)
-+		return PCIBIOS_DEVICE_NOT_FOUND;
-+
-+	if (bus->number == root->secondary.start)
-+		return hisi_pcie_common_cfg_write(reg_base, where, size, val);
-+
-+	return pci_generic_config_write(bus, devfn, where, size, val);
-+}
-+
-+struct pci_ops hisi_pcie_acpi_ops = {
-+	.map_bus = pci_mcfg_dev_base,
-+	.read = hisi_pcie_acpi_rd_conf,
-+	.write = hisi_pcie_acpi_wr_conf,
-+};
-+
-+
-+DECLARE_ACPI_MCFG_FIXUP(NULL, hisi_pcie_match, &hisi_pcie_acpi_ops,
-+	PCI_MCFG_DOMAIN_ANY, PCI_MCFG_BUS_ANY);
 diff --git a/drivers/pci/host/pcie-hisi.c b/drivers/pci/host/pcie-hisi.c
-index eb3201a..ed0b0b2 100644
+index 3e98d4e..458d0f8 100644
 --- a/drivers/pci/host/pcie-hisi.c
 +++ b/drivers/pci/host/pcie-hisi.c
-@@ -23,8 +23,6 @@
+@@ -21,6 +21,7 @@
+ #include <linux/regmap.h>
+ 
  #include "pcie-designware.h"
- #include "pcie-hisi.h"
++#include "pcie-hisi.h"
  
--#define PCIE_LTSSM_LINKUP_STATE				0x11
--#define PCIE_LTSSM_STATE_MASK				0x3F
- #define PCIE_SUBCTRL_SYS_STATE4_REG			0x6818
- #define PCIE_SYS_STATE4						0x31c
- #define PCIE_HIP06_CTRL_OFF					0x1000
+ #define PCIE_LTSSM_LINKUP_STATE				0x11
+ #define PCIE_LTSSM_STATE_MASK				0x3F
+@@ -30,12 +31,6 @@
+ 
+ #define to_hisi_pcie(x)	container_of(x, struct hisi_pcie, pp)
+ 
+-struct hisi_pcie;
+-
+-struct pcie_soc_ops {
+-	int (*hisi_pcie_link_up)(struct hisi_pcie *pcie);
+-};
+-
+ struct hisi_pcie {
+ 	struct regmap *subctrl;
+ 	void __iomem *reg_base;
+@@ -44,87 +39,24 @@ struct hisi_pcie {
+ 	struct pcie_soc_ops *soc_ops;
+ };
+ 
+-static inline void hisi_pcie_apb_writel(struct hisi_pcie *pcie,
+-					u32 val, u32 reg)
+-{
+-	writel(val, pcie->reg_base + reg);
+-}
+-
+-static inline u32 hisi_pcie_apb_readl(struct hisi_pcie *pcie, u32 reg)
+-{
+-	return readl(pcie->reg_base + reg);
+-}
+-
+-/* HipXX PCIe host only supports 32-bit config access */
+-static int hisi_pcie_cfg_read(struct pcie_port *pp, int where, int size,
+-			      u32 *val)
+-{
+-	u32 reg;
+-	u32 reg_val;
+-	struct hisi_pcie *pcie = to_hisi_pcie(pp);
+-	void *walker = &reg_val;
+-
+-	walker += (where & 0x3);
+-	reg = where & ~0x3;
+-	reg_val = hisi_pcie_apb_readl(pcie, reg);
+-
+-	if (size == 1)
+-		*val = *(u8 __force *) walker;
+-	else if (size == 2)
+-		*val = *(u16 __force *) walker;
+-	else if (size == 4)
+-		*val = reg_val;
+-	else
+-		return PCIBIOS_BAD_REGISTER_NUMBER;
+-
+-	return PCIBIOS_SUCCESSFUL;
+-}
++struct pcie_soc_ops {
++	int (*hisi_pcie_link_up)(struct hisi_pcie *pcie);
++};
+ 
+-/* HipXX PCIe host only supports 32-bit config access */
+-static int hisi_pcie_cfg_write(struct pcie_port *pp, int where, int  size,
+-				u32 val)
++static inline int hisi_pcie_cfg_read(struct pcie_port *pp, int where,
++		int size, u32 *val)
+ {
+-	u32 reg_val;
+-	u32 reg;
+ 	struct hisi_pcie *pcie = to_hisi_pcie(pp);
+-	void *walker = &reg_val;
+-
+-	walker += (where & 0x3);
+-	reg = where & ~0x3;
+-	if (size == 4)
+-		hisi_pcie_apb_writel(pcie, val, reg);
+-	else if (size == 2) {
+-		reg_val = hisi_pcie_apb_readl(pcie, reg);
+-		*(u16 __force *) walker = val;
+-		hisi_pcie_apb_writel(pcie, reg_val, reg);
+-	} else if (size == 1) {
+-		reg_val = hisi_pcie_apb_readl(pcie, reg);
+-		*(u8 __force *) walker = val;
+-		hisi_pcie_apb_writel(pcie, reg_val, reg);
+-	} else
+-		return PCIBIOS_BAD_REGISTER_NUMBER;
+-
+-	return PCIBIOS_SUCCESSFUL;
+-}
+ 
+-static int hisi_pcie_link_up_hip05(struct hisi_pcie *hisi_pcie)
+-{
+-	u32 val;
+-
+-	regmap_read(hisi_pcie->subctrl, PCIE_SUBCTRL_SYS_STATE4_REG +
+-		    0x100 * hisi_pcie->port_id, &val);
+-
+-	return ((val & PCIE_LTSSM_STATE_MASK) == PCIE_LTSSM_LINKUP_STATE);
++	return hisi_pcie_common_cfg_read(pcie->reg_base, where, size, val);
+ }
+ 
+-static int hisi_pcie_link_up_hip06(struct hisi_pcie *hisi_pcie)
++static inline int hisi_pcie_cfg_write(struct pcie_port *pp, int where,
++		int size, u32 val)
+ {
+-	u32 val;
+-
+-	val = hisi_pcie_apb_readl(hisi_pcie, PCIE_HIP06_CTRL_OFF +
+-			PCIE_SYS_STATE4);
++	struct hisi_pcie *pcie = to_hisi_pcie(pp);
+ 
+-	return ((val & PCIE_LTSSM_STATE_MASK) == PCIE_LTSSM_LINKUP_STATE);
++	return hisi_pcie_common_cfg_write(pcie->reg_base, where, size, val);
+ }
+ 
+ static int hisi_pcie_link_up(struct pcie_port *pp)
+@@ -134,12 +66,13 @@ static int hisi_pcie_link_up(struct pcie_port *pp)
+ 	return hisi_pcie->soc_ops->hisi_pcie_link_up(hisi_pcie);
+ }
+ 
+-static struct pcie_host_ops hisi_pcie_host_ops = {
+-	.rd_own_conf = hisi_pcie_cfg_read,
+-	.wr_own_conf = hisi_pcie_cfg_write,
+-	.link_up = hisi_pcie_link_up,
++struct pcie_host_ops hisi_pcie_host_ops = {
++		.rd_own_conf = hisi_pcie_cfg_read,
++		.wr_own_conf = hisi_pcie_cfg_write,
++		.link_up = hisi_pcie_link_up,
+ };
+ 
++
+ static int hisi_add_pcie_port(struct pcie_port *pp,
+ 				     struct platform_device *pdev)
+ {
+@@ -215,6 +148,26 @@ static int hisi_pcie_probe(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static int hisi_pcie_link_up_hip05(struct hisi_pcie *hisi_pcie)
++{
++	u32 val;
++
++	regmap_read(hisi_pcie->subctrl, PCIE_SUBCTRL_SYS_STATE4_REG +
++		    0x100 * hisi_pcie->port_id, &val);
++
++	return ((val & PCIE_LTSSM_STATE_MASK) == PCIE_LTSSM_LINKUP_STATE);
++}
++
++static int hisi_pcie_link_up_hip06(struct hisi_pcie *hisi_pcie)
++{
++	u32 val;
++
++	val = readl(hisi_pcie->reg_base + PCIE_HIP06_CTRL_OFF +
++			PCIE_SYS_STATE4);
++
++	return ((val & PCIE_LTSSM_STATE_MASK) == PCIE_LTSSM_LINKUP_STATE);
++}
++
+ static struct pcie_soc_ops hip05_ops = {
+ 		&hisi_pcie_link_up_hip05
+ };
 diff --git a/drivers/pci/host/pcie-hisi.h b/drivers/pci/host/pcie-hisi.h
-index 29e0790..45cf0fd 100644
---- a/drivers/pci/host/pcie-hisi.h
+new file mode 100644
+index 0000000..29e0790
+--- /dev/null
 +++ b/drivers/pci/host/pcie-hisi.h
-@@ -14,6 +14,8 @@
- #ifndef PCIE_HISI_H_
- #define PCIE_HISI_H_
- 
-+#define PCIE_LTSSM_LINKUP_STATE				0x11
-+#define PCIE_LTSSM_STATE_MASK				0x3F
- 
- int hisi_pcie_common_cfg_read(void __iomem *reg_base, int where, int size,
- 			      u32 *val);
+@@ -0,0 +1,23 @@
++/*
++ * PCIe host controller driver for HiSilicon SoCs
++ *
++ * Copyright (C) 2015 HiSilicon Co., Ltd. http://www.hisilicon.com
++ *
++ * Author: Zhou Wang <wangzhou1@hisilicon.com>
++ *         Dacai Zhu <zhudacai@hisilicon.com>
++ *         Gabriele Paoloni <gabriele.paoloni@huawei.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#ifndef PCIE_HISI_H_
++#define PCIE_HISI_H_
++
++
++int hisi_pcie_common_cfg_read(void __iomem *reg_base, int where, int size,
++			      u32 *val);
++int hisi_pcie_common_cfg_write(void __iomem *reg_base, int where, int  size,
++				u32 val);
++
++#endif /* PCIE_HISI_H_ */
 -- 
 1.9.1
