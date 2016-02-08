@@ -1,73 +1,36 @@
-From: yang.shi@linaro.org (Yang Shi)
-Date: Mon,  8 Feb 2016 09:13:09 -0800
-Subject: [PATCH v2] arm64: disable kasan when accessing frame->fp in
- unwind_frame
-Message-ID: <1454951589-18238-1-git-send-email-yang.shi@linaro.org>
+From: Al.Grant@arm.com (Al Grant)
+Date: Mon, 8 Feb 2016 17:44:49 +0000
+Subject: [PATCH V2 3/6] stm class: provision for statically assigned
+ masterIDs
+In-Reply-To: <CANLsYkw=mG+ch8QzxmbwWs9o+mndVNo1MuqXcrPrNJYj_SQcHQ@mail.gmail.com>
+References: <1454487337-30184-1-git-send-email-zhang.chunyan@linaro.org>
+ <1454487337-30184-4-git-send-email-zhang.chunyan@linaro.org>
+ <87mvrf5ngl.fsf@ashishki-desk.ger.corp.intel.com>
+ <CANLsYky2twQ98u241YyHD=atYRp1N56YVHUQNY2E2Ljsq0cseA@mail.gmail.com>
+ <87twlj49k7.fsf@ashishki-desk.ger.corp.intel.com>
+ <CANLsYkw=mG+ch8QzxmbwWs9o+mndVNo1MuqXcrPrNJYj_SQcHQ@mail.gmail.com>
+Message-ID: <AM4PR08MB0785EAA2B628765D7EA3FDA086D50@AM4PR08MB0785.eurprd08.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When boot arm64 kernel with KASAN enabled, the below error is reported by
-kasan:
+> Mike did write "master IDs are hardwired to individual cores and core security
+> states", which make assignment for one platform very static.
+> On the flip side those will change from one system to another.
 
-BUG: KASAN: out-of-bounds in unwind_frame+0xec/0x260 at addr ffffffc064d57ba0
-Read of size 8 by task pidof/499
-page:ffffffbdc39355c0 count:0 mapcount:0 mapping:          (null) index:0x0
-flags: 0x0()
-page dumped because: kasan: bad access detected
-CPU: 2 PID: 499 Comm: pidof Not tainted 4.5.0-rc1 #119
-Hardware name: Freescale Layerscape 2085a RDB Board (DT)
-Call trace:
-[<ffffffc00008d078>] dump_backtrace+0x0/0x290
-[<ffffffc00008d32c>] show_stack+0x24/0x30
-[<ffffffc0006a981c>] dump_stack+0x8c/0xd8
-[<ffffffc0002e4400>] kasan_report_error+0x558/0x588
-[<ffffffc0002e4958>] kasan_report+0x60/0x70
-[<ffffffc0002e3188>] __asan_load8+0x60/0x78
-[<ffffffc00008c92c>] unwind_frame+0xec/0x260
-[<ffffffc000087e60>] get_wchan+0x110/0x160
-[<ffffffc0003b647c>] do_task_stat+0xb44/0xb68
-[<ffffffc0003b7730>] proc_tgid_stat+0x40/0x50
-[<ffffffc0003ac840>] proc_single_show+0x88/0xd8
-[<ffffffc000345be8>] seq_read+0x370/0x770
-[<ffffffc00030aba0>] __vfs_read+0xc8/0x1d8
-[<ffffffc00030c0ec>] vfs_read+0x94/0x168
-[<ffffffc00030d458>] SyS_read+0xb8/0x128
-[<ffffffc000086530>] el0_svc_naked+0x24/0x28
-Memory state around the buggy address:
- ffffffc064d57a80: 00 00 00 00 00 00 00 00 f1 f1 f1 f1 00 00 f4 f4
- ffffffc064d57b00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
->ffffffc064d57b80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-                                  ^
- ffffffc064d57c00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
- ffffffc064d57c80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+It depends on your perspective.  From the perspective of a userspace
+process not pinned to a core, the master id will appear to vary
+dynamically and unpredictably as the thread migrates from one
+core to another.  (That's actually useful if the decoder wants to know
+where the thread is running at any given point, as it can find that out
+for free, without the need to track migration events.)
 
-Since the shadow byte pointed by the report is 0, so it may mean it is just hit
-oob in non-current task. So, disable the instrumentation to silence these
-warnings.
+On the other hand if you are pinned (e.g. you're the kernel on a
+particular core, or you're a per-core worker thread in some thread
+pooling system) then you have a fixed master id, and then you can
+have one instance per core all using the same range of channel
+numbers, with the master id indicating the core - this saves on
+channel space compared to having to give each core its own
+range of channel space.
 
-Signed-off-by: Yang Shi <yang.shi@linaro.org>
----
-v1 --> v2:
- * Replace kasan_disable{enable}_current to READ_ONCE_NOCHECK.
- * Cover the following statement too.
-
- arch/arm64/kernel/stacktrace.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
-index 4fad978..12a18cb 100644
---- a/arch/arm64/kernel/stacktrace.c
-+++ b/arch/arm64/kernel/stacktrace.c
-@@ -64,8 +64,8 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
- 		return -EINVAL;
- 
- 	frame->sp = fp + 0x10;
--	frame->fp = *(unsigned long *)(fp);
--	frame->pc = *(unsigned long *)(fp + 8);
-+	frame->fp = READ_ONCE_NOCHECK(*(unsigned long *)(fp));
-+	frame->pc = READ_ONCE_NOCHECK(*(unsigned long *)(fp + 8));
- 
- #ifdef CONFIG_FUNCTION_GRAPH_TRACER
- 	if (tsk && tsk->ret_stack &&
--- 
-2.0.2
+Al
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
