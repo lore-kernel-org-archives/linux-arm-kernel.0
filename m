@@ -1,50 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 8 Feb 2016 17:27:00 +0000
-Subject: [PATCH 1/5] ARM: add EXPORT_SYMBOL of hook_fault_code for PCI
- host modularization
-In-Reply-To: <2567476.SknW0BEsQJ@wuerfel>
-References: <1454889644-27830-1-git-send-email-paul.gortmaker@windriver.com>
- <1454889644-27830-2-git-send-email-paul.gortmaker@windriver.com>
- <2567476.SknW0BEsQJ@wuerfel>
-Message-ID: <20160208172700.GR10826@n2100.arm.linux.org.uk>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Mon, 8 Feb 2016 09:28:31 -0800
+Subject: [PATCH v2 04/10] serial: mps2-uart: add MPS2 UART driver
+In-Reply-To: <56B8CDC5.5010504@arm.com>
+References: <1454413199-26573-1-git-send-email-vladimir.murzin@arm.com>
+ <1454413199-26573-5-git-send-email-vladimir.murzin@arm.com>
+ <20160207071154.GA32017@kroah.com> <56B87928.7020803@arm.com>
+ <20160208165226.GA11593@kroah.com> <56B8CDC5.5010504@arm.com>
+Message-ID: <20160208172831.GB6715@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 08, 2016 at 10:53:10AM +0100, Arnd Bergmann wrote:
-> On Sunday 07 February 2016 19:00:40 Paul Gortmaker wrote:
-> > In a discussion of a previous patch set[1], it was suggested that
-> > modularizing some of the PCI host support would be good to keep
-> > multi platform bzImage sizes smaller.
+On Mon, Feb 08, 2016 at 05:17:57PM +0000, Vladimir Murzin wrote:
+> On 08/02/16 16:52, Greg KH wrote:
+> > On Mon, Feb 08, 2016 at 11:16:56AM +0000, Vladimir Murzin wrote:
+> >> On 07/02/16 07:11, Greg KH wrote:
+> >>>> +
+> >>>> +#define SERIAL_NAME "ttyS"
+> >>>
+> >>> You can't be "ttyS", there's already a serial port named that, please
+> >>> use a unique name and a new major/minor number (dynamic ideally).
+> >>>
+> >>
+> >> Hi Greg,
+> >>
+> >> I did s/ttyMPS/ttyS per your request for v1 [1]. I'm fine to change it
+> >> back if you prefer that, but I'd be glad to know what I've been missing?
+> >>
+> >> [1] https://lkml.org/lkml/2015/12/13/8
 > > 
-> > Two of the files that are candidates for conversion to tristate
-> > from bool are:
-> > 
-> > drivers/pci/host/pci-imx6.c
-> > drivers/pci/host/pci-keystone.c
-> > 
-> > However, doing the conversion reveals that they are going to fail
-> > at modpost time since hook_fault_code isn't currently exported.
-> > 
-> > Since we are now going to export it we also need to remove the
-> > __init tag, as the fcn needs to be present at insmod time.
-> > 
-> > [1] https://lkml.kernel.org/r/20160108203102.GH5354 at localhost
+> > Yeah, I was wrong, sorry about that, my fault.
 > > 
 > 
-> If we want to make hook_fault_code() visible, we at least also need
-> an unhook_fault_code() function that removes the fault handler
-> when unloading the module, and preferably does so in a safe way.
-> 
-> The usage of hook_fault_code() at least in the imx driver is also
-> problematic, as it just ignores all "imprecise external abort"
-> faults, whether they come from PCI or not.
+> I got -EDOUBT from my parser. What should I stick with "ttyS" or "ttyMPS"?
 
-And that gets a NAK from me.  We can't take locks around this code
-(to do so would be deadlocky due to imprecise aborts), so we can't
-ever safely remove any function that has been hooked into the fault
-processing.
+Please use ttyMPS.
 
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+> P.S.
+> Any chance you could look at the rest of the patch?
+
+It's long gone from my queue, sorry, you'll have to resend it.
+
+thanks,
+
+greg k-h
