@@ -1,78 +1,65 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Mon, 8 Feb 2016 11:26:56 +0100
-Subject: [PATCH 1/6] irqchip: add the Alpine MSIX interrupt controller
-In-Reply-To: <56B86391.1030609@arm.com>
-References: <1454922971-17405-1-git-send-email-antoine.tenart@free-electrons.com>
- <1454922971-17405-2-git-send-email-antoine.tenart@free-electrons.com>
- <56B86391.1030609@arm.com>
-Message-ID: <20160208102656.GA4117@kwain>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon, 08 Feb 2016 11:28:22 +0100
+Subject: [PATCH v2 04/10] ARM64: dts: rockchip: Add GMAC to GeekBox
+In-Reply-To: <1454897859-7601-5-git-send-email-afaerber@suse.de>
+References: <1454897859-7601-1-git-send-email-afaerber@suse.de>
+ <1454897859-7601-5-git-send-email-afaerber@suse.de>
+Message-ID: <5875277.Y7zJ7W9GkY@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Hi Andreas,
 
-On Mon, Feb 08, 2016 at 09:44:49AM +0000, Marc Zyngier wrote:
-> On 08/02/16 09:16, Antoine Tenart wrote:
-> > +
-> > +/* MSIX message address format: local GIC target */
-> > +#define ALPINE_MSIX_SPI_TARGET_CLUSTER0		BIT(16)
-> > +
-> > +struct alpine_msix_data {
-> > +	spinlock_t msi_map_lock;
-> > +	u32 addr_high;
-> > +	u32 addr_low;
+Am Montag, 8. Februar 2016, 03:17:33 schrieb Andreas F?rber:
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+
+is there some special reason that gmac, emmc, ir, etc are in separate 
+patches? I guess I'll just fold them into the core patch otherwise.
+
+
+Heiko
+
+> ---
+>  v2: New
 > 
-> As this looks to be a physical address, please consider using phys_addr_t.
-
-Sure.
-
-[?]
-
-> > +static int alpine_msix_init(struct device_node *node,
-> > +			    struct device_node *parent)
-> > +{
-> > +	struct alpine_msix_data *priv;
-> > +	struct resource res;
-> > +	int ret;
-> > +
-> > +	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
-> > +	if (!priv)
-> > +		return -ENOMEM;
-> > +
-> > +	spin_lock_init(&priv->msi_map_lock);
-> > +
-> > +	ret = of_address_to_resource(node, 0, &res);
-> > +	if (ret) {
-> > +		pr_err("Failed to allocate resource\n");
-> > +		goto err_priv;
-> > +	}
-> > +
-> > +	priv->addr_high = upper_32_bits((u64)res.start);
-> > +	priv->addr_low = lower_32_bits(res.start) + ALPINE_MSIX_SPI_TARGET_CLUSTER0;
+>  arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts | 20 ++++++++++++++++++++
+> 1 file changed, 20 insertions(+)
 > 
-> This is a bit odd. If you always set bit 16, why isn't that reflected in
-> the base address coming from the DT?
-
-The 20 least significant bits of addr_low provide direct information
-regarding the interrupt destination, so I thought it would be clearer
-to have this explicitly in the driver so that we know what those bits
-mean.
-
-What do you think?
-
-
-Thanks for the review!
-
-Antoine
-
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160208/bd26f3fe/attachment-0001.sig>
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts
+> b/arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts index
+> bc91d39758ab..a8dcf3c2b0c1 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts
+> +++ b/arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts
+> @@ -56,6 +56,13 @@
+>  		reg = <0x0 0x0 0x0 0x80000000>;
+>  	};
+> 
+> +	ext_gmac: gmac-clk {
+> +		compatible = "fixed-clock";
+> +		clock-frequency = <125000000>;
+> +		clock-output-names = "ext_gmac";
+> +		#clock-cells = <0>;
+> +	};
+> +
+>  	leds: gpio-leds {
+>  		compatible = "gpio-leds";
+> 
+> @@ -82,6 +89,19 @@
+>  	};
+>  };
+> 
+> +&gmac {
+> +	status = "okay";
+> +	phy-supply = <&vcc_lan>;
+> +	phy-mode = "rgmii";
+> +	clock_in_out = "input";
+> +	assigned-clocks = <&cru SCLK_MAC>;
+> +	assigned-clock-parents = <&ext_gmac>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&rgmii_pins>;
+> +	tx_delay = <0x30>;
+> +	rx_delay = <0x10>;
+> +};
+> +
+>  &i2c0 {
+>  	status = "okay";
