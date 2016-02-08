@@ -1,38 +1,47 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Mon, 8 Feb 2016 11:51:04 +0100
-Subject: [PATCH v2 09/10] Documentation: devicetree: rockchip: Document
- Landingship
-In-Reply-To: <6744409.i2u8076vm4@phil>
-References: <1454897859-7601-1-git-send-email-afaerber@suse.de>
- <1454897859-7601-10-git-send-email-afaerber@suse.de>
- <6744409.i2u8076vm4@phil>
-Message-ID: <56B87318.9020007@suse.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 8 Feb 2016 10:51:05 +0000
+Subject: [PATCH 2/3] arm64: dts: add the Alpine v2 EVP
+In-Reply-To: <1454922699-16785-3-git-send-email-antoine.tenart@free-electrons.com>
+References: <1454922699-16785-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1454922699-16785-3-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <20160208105104.GA12991@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 08.02.2016 um 11:29 schrieb Heiko Stuebner:
-> Am Montag, 8. Februar 2016, 03:17:38 schrieb Andreas F?rber:
->> Use "geekbuying,landingship" compatible string, plus those of GeekBox.
-> 
-> I do believe this would be better as geekbuying,geekbox-landingship . They 
-> might reuse the landingship naming for future baseboards as well ;-)
+Hi,
 
-Well, the question is: Is this MXM3 interface as generic as Qseven so
-that it could be used as is for other modules (and baseboards from other
-manufacturers could be used for the module)? Then my thought was
-landingship as identifier for the baseboard and geekbox as identifier
-for the contained module.
+> +	chosen {
+> +		stdout-path = "console0:115200n8";
+> +	};
 
-I agree that if this Landingship is specific to the GeekBox then
-geekbox-landingship would be more appropriate. We could also do both.
+There is no console0 alias, so this cannot work.
 
-Can you tell? Unfortunately I spot no real documentation of the MXM3
-connector pins in the schematics we could compare, only an on-board
-documentation of the three-row pins.
+Did you mean serial0?
 
-Regards,
-Andreas
+[...]
 
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton; HRB 21284 (AG N?rnberg)
+> +	aliases {
+> +		serial0 = &uart0;
+> +		serial1 = &uart1;
+> +		serial2 = &uart2;
+> +		serial3 = &uart3;
+> +	};
+
+[...]
+
+> +	psci {
+> +		compatible = "arm,psci-0.2", "arm,psci";
+> +		method = "smc";
+> +		cpu_on = <0x84000003>;
+> +	};
+
+If you have PSCI 0.2, the cpu_on ID (and all other mandatory function
+IDs) are implicit.
+
+If you want to have "arm,psci" as a fallback, then please add the IDs
+for functions mandatory in PSCI 0.2 which existed in the "arm,psci"
+binding. Otherwise, drop "arm,psci" from the compatible list, along
+with the cpu_on function ID.
+
+THanks,
+Mark.
