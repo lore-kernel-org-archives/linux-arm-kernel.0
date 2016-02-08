@@ -1,57 +1,34 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon,  8 Feb 2016 18:14:20 +0100
-Subject: [PATCH v3 12/12] arm64: defconfig: enable Armada 3700 related config
+Date: Mon,  8 Feb 2016 18:14:14 +0100
+Subject: [PATCH v3 06/12] Documentation: dt-bindings: Add a new compatible for
+ the Armada 3700
 In-Reply-To: <1454951660-13289-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1454951660-13289-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1454951660-13289-13-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1454951660-13289-7-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables the configuration for the Armada 3700 family and for
-the related driver it uses.
+The AHCI interfaces used in the Armada 3700 has a few differences with
+the one used in the Armada 38x, so it deserves its own compatible string.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- arch/arm64/configs/defconfig | 5 +++++
- 1 file changed, 5 insertions(+)
+ Documentation/devicetree/bindings/ata/ahci-platform.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 18ca9fb9e65f..7ca2f0247ec5 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -31,6 +31,7 @@ CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
- # CONFIG_BLK_DEV_BSG is not set
- # CONFIG_IOSCHED_DEADLINE is not set
-+CONFIG_ARCH_MVEBU=y
- CONFIG_ARCH_BCM_IPROC=y
- CONFIG_ARCH_BERLIN=y
- CONFIG_ARCH_EXYNOS7=y
-@@ -93,6 +94,7 @@ CONFIG_ATA=y
- CONFIG_SATA_AHCI=y
- CONFIG_SATA_AHCI_PLATFORM=y
- CONFIG_AHCI_CEVA=y
-+CONFIG_AHCI_MVEBU=y
- CONFIG_AHCI_XGENE=y
- CONFIG_SATA_RCAR=y
- CONFIG_PATA_PLATFORM=y
-@@ -132,6 +134,7 @@ CONFIG_SERIAL_MSM_CONSOLE=y
- CONFIG_SERIAL_OF_PLATFORM=y
- CONFIG_SERIAL_XILINX_PS_UART=y
- CONFIG_SERIAL_XILINX_PS_UART_CONSOLE=y
-+CONFIG_SERIAL_MVEBU_UART=y
- CONFIG_VIRTIO_CONSOLE=y
- # CONFIG_HW_RANDOM is not set
- CONFIG_I2C=y
-@@ -162,6 +165,8 @@ CONFIG_SND_SOC=y
- CONFIG_SND_SOC_RCAR=y
- CONFIG_SND_SOC_AK4613=y
- CONFIG_USB=y
-+CONFIG_USB_XHCI_HCD=y
-+CONFIG_USB_XHCI_PLATFORM=y
- CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_EHCI_HCD_PLATFORM=y
- CONFIG_USB_OHCI_HCD=y
+diff --git a/Documentation/devicetree/bindings/ata/ahci-platform.txt b/Documentation/devicetree/bindings/ata/ahci-platform.txt
+index c2340eeeb97f..796e2c23e5df 100644
+--- a/Documentation/devicetree/bindings/ata/ahci-platform.txt
++++ b/Documentation/devicetree/bindings/ata/ahci-platform.txt
+@@ -13,6 +13,7 @@ Required properties:
+   - "hisilicon,hisi-ahci"
+   - "ibm,476gtr-ahci"
+   - "marvell,armada-380-ahci"
++  - "marvell,armada-3700-ahci"
+   - "snps,dwc-ahci"
+   - "snps,exynos5440-ahci"
+   - "snps,spear-ahci"
 -- 
 2.5.0
