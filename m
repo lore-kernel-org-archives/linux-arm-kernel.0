@@ -1,64 +1,28 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 8 Feb 2016 10:56:16 +0000
-Subject: [PATCH 1/6] irqchip: add the Alpine MSIX interrupt controller
-In-Reply-To: <20160208104407.GB4117@kwain>
-References: <1454922971-17405-1-git-send-email-antoine.tenart@free-electrons.com>
- <1454922971-17405-2-git-send-email-antoine.tenart@free-electrons.com>
- <56B86391.1030609@arm.com> <20160208102656.GA4117@kwain>
- <56B86EA8.9070306@arm.com> <20160208104407.GB4117@kwain>
-Message-ID: <56B87450.1040500@arm.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Mon, 8 Feb 2016 10:57:01 +0000
+Subject: [PATCH v4 01/17] Xen: ACPI: Hide UART used by Xen
+In-Reply-To: <CAJZ5v0id-035AtyQ_SccPuCxD7+pa6GCgj3WBAojM+rFqssGQQ@mail.gmail.com>
+References: <1454641552-12576-1-git-send-email-zhaoshenglong@huawei.com>
+ <1454641552-12576-2-git-send-email-zhaoshenglong@huawei.com>
+ <CAJZ5v0id-035AtyQ_SccPuCxD7+pa6GCgj3WBAojM+rFqssGQQ@mail.gmail.com>
+Message-ID: <alpine.DEB.2.02.1602081054350.27008@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/02/16 10:44, Antoine Tenart wrote:
-> On Mon, Feb 08, 2016 at 10:32:08AM +0000, Marc Zyngier wrote:
->> On 08/02/16 10:26, Antoine Tenart wrote:
->>>>> +static int alpine_msix_init(struct device_node *node,
->>>>> +			    struct device_node *parent)
->>>>> +{
->>>>> +	struct alpine_msix_data *priv;
->>>>> +	struct resource res;
->>>>> +	int ret;
->>>>> +
->>>>> +	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
->>>>> +	if (!priv)
->>>>> +		return -ENOMEM;
->>>>> +
->>>>> +	spin_lock_init(&priv->msi_map_lock);
->>>>> +
->>>>> +	ret = of_address_to_resource(node, 0, &res);
->>>>> +	if (ret) {
->>>>> +		pr_err("Failed to allocate resource\n");
->>>>> +		goto err_priv;
->>>>> +	}
->>>>> +
->>>>> +	priv->addr_high = upper_32_bits((u64)res.start);
->>>>> +	priv->addr_low = lower_32_bits(res.start) + ALPINE_MSIX_SPI_TARGET_CLUSTER0;
->>>>
->>>> This is a bit odd. If you always set bit 16, why isn't that reflected in
->>>> the base address coming from the DT?
->>>
->>> The 20 least significant bits of addr_low provide direct information
->>> regarding the interrupt destination, so I thought it would be clearer
->>> to have this explicitly in the driver so that we know what those bits
->>> mean.
->>
->> So what is this information? TARGET_CLUSTER0 is not very expressive, and
->> doesn't show what the alternatives are. Could you please elaborate a bit
->> on that front?
+On Sat, 6 Feb 2016, Rafael J. Wysocki wrote:
+> On Fri, Feb 5, 2016 at 4:05 AM, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
+> > From: Shannon Zhao <shannon.zhao@linaro.org>
+> >
+> > ACPI 6.0 introduces a new table STAO to list the devices which are used
+> > by Xen and can't be used by Dom0. On Xen virtual platforms, the physical
+> > UART is used by Xen. So here it hides UART from Dom0.
+> >
+> > Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> > Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 > 
-> For now lots of bits are reserved, so there aren't many alternatives.
-> Bits [18:17] are used to set the GIC to which to route the MSI and bit
-> 16 must be set when this target GIC is the primary GIC (bits [18:17] set
-> to 0x0). There aren't other options available for now (that I'm aware
-> of) for the target GIC configuration.
+> Well, this doesn't look right to me.
+> 
+> We need to find a nicer way to achieve what you want.
 
-OK. So maybe add that as a comment, so that people know what is
-happening there. And if the code gets updated to include new
-functionalities, it will be easier to track the changes.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+I take that you are talking about how to honor the STAO table in Linux.
+Do you have any concrete suggestions?
