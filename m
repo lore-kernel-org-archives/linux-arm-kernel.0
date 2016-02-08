@@ -1,43 +1,68 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  8 Feb 2016 11:40:16 +0000
-Subject: [PATCH 2/8] ARM: KVM: Properly sort the invariant table
+Date: Mon,  8 Feb 2016 11:40:17 +0000
+Subject: [PATCH 3/8] ARM: KVM: Enforce sorting of all CP tables
 In-Reply-To: <1454931622-14902-1-git-send-email-marc.zyngier@arm.com>
 References: <1454931622-14902-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1454931622-14902-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1454931622-14902-4-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Not having the invariant table properly sorted is an oddity, and
-may get in the way of future optimisations. Let's fix it.
+Since we're obviously terrible at sorting the CP tables, make sure
+we're going to do it properly (or fail to boot). arm64 has had the
+same mechanism for a while, and nobody ever broke it...
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kvm/coproc.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/kvm/coproc.c | 25 +++++++++++++++++--------
+ 1 file changed, 17 insertions(+), 8 deletions(-)
 
 diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
-index f3d88dc..16c74f8 100644
+index 16c74f8..03f5d14 100644
 --- a/arch/arm/kvm/coproc.c
 +++ b/arch/arm/kvm/coproc.c
-@@ -645,6 +645,9 @@ static struct coproc_reg invariant_cp15[] = {
- 	{ CRn( 0), CRm( 0), Op1( 0), Op2( 3), is32, NULL, get_TLBTR },
- 	{ CRn( 0), CRm( 0), Op1( 0), Op2( 6), is32, NULL, get_REVIDR },
- 
-+	{ CRn( 0), CRm( 0), Op1( 1), Op2( 1), is32, NULL, get_CLIDR },
-+	{ CRn( 0), CRm( 0), Op1( 1), Op2( 7), is32, NULL, get_AIDR },
-+
- 	{ CRn( 0), CRm( 1), Op1( 0), Op2( 0), is32, NULL, get_ID_PFR0 },
- 	{ CRn( 0), CRm( 1), Op1( 0), Op2( 1), is32, NULL, get_ID_PFR1 },
- 	{ CRn( 0), CRm( 1), Op1( 0), Op2( 2), is32, NULL, get_ID_DFR0 },
-@@ -660,9 +663,6 @@ static struct coproc_reg invariant_cp15[] = {
- 	{ CRn( 0), CRm( 2), Op1( 0), Op2( 3), is32, NULL, get_ID_ISAR3 },
- 	{ CRn( 0), CRm( 2), Op1( 0), Op2( 4), is32, NULL, get_ID_ISAR4 },
- 	{ CRn( 0), CRm( 2), Op1( 0), Op2( 5), is32, NULL, get_ID_ISAR5 },
--
--	{ CRn( 0), CRm( 0), Op1( 1), Op2( 1), is32, NULL, get_CLIDR },
--	{ CRn( 0), CRm( 0), Op1( 1), Op2( 7), is32, NULL, get_AIDR },
+@@ -381,17 +381,26 @@ static const struct coproc_reg cp15_regs[] = {
+ 	{ CRn(15), CRm( 0), Op1( 4), Op2( 0), is32, access_cbar},
  };
  
- /*
++static int check_reg_table(const struct coproc_reg *table, unsigned int n)
++{
++	unsigned int i;
++
++	for (i = 1; i < n; i++) {
++		if (cmp_reg(&table[i-1], &table[i]) >= 0) {
++			kvm_err("reg table %p out of order (%d)\n", table, i - 1);
++			return 1;
++		}
++	}
++
++	return 0;
++}
++
+ /* Target specific emulation tables */
+ static struct kvm_coproc_target_table *target_tables[KVM_ARM_NUM_TARGETS];
+ 
+ void kvm_register_target_coproc_table(struct kvm_coproc_target_table *table)
+ {
+-	unsigned int i;
+-
+-	for (i = 1; i < table->num; i++)
+-		BUG_ON(cmp_reg(&table->table[i-1],
+-			       &table->table[i]) >= 0);
+-
++	BUG_ON(check_reg_table(table->table, table->num));
+ 	target_tables[table->target] = table;
+ }
+ 
+@@ -1210,8 +1219,8 @@ void kvm_coproc_table_init(void)
+ 	unsigned int i;
+ 
+ 	/* Make sure tables are unique and in order. */
+-	for (i = 1; i < ARRAY_SIZE(cp15_regs); i++)
+-		BUG_ON(cmp_reg(&cp15_regs[i-1], &cp15_regs[i]) >= 0);
++	BUG_ON(check_reg_table(cp15_regs, ARRAY_SIZE(cp15_regs)));
++	BUG_ON(check_reg_table(invariant_cp15, ARRAY_SIZE(invariant_cp15)));
+ 
+ 	/* We abuse the reset function to overwrite the table itself. */
+ 	for (i = 0; i < ARRAY_SIZE(invariant_cp15); i++)
 -- 
 2.1.4
