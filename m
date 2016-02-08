@@ -1,25 +1,25 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 8 Feb 2016 14:13:35 -0800
-Subject: [PATCH] clk: socfpga: fix __init annotation
-In-Reply-To: <1454942356-2783135-1-git-send-email-arnd@arndb.de>
-References: <1454942356-2783135-1-git-send-email-arnd@arndb.de>
-Message-ID: <20160208221335.GS4848@codeaurora.org>
+Date: Mon, 8 Feb 2016 14:15:08 -0800
+Subject: [PATCH] clk: meson: Fix meson_clk_register_clks() signature type
+ mismatch
+In-Reply-To: <1454879583-27036-1-git-send-email-afaerber@suse.de>
+References: <1454879583-27036-1-git-send-email-afaerber@suse.de>
+Message-ID: <20160208221508.GT4848@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/08, Arnd Bergmann wrote:
-> clang found a bug with the __socfpga_pll_init definition:
+On 02/07, Andreas F?rber wrote:
+> As preparation for arm64 based mesongxbb, which pulls in this code once
+> enabling ARCH_MESON, fix a size_t vs. unsigned int type mismatch.
+> The loop uses a local unsigned int variable, so adopt that type,
+> matching the header.
 > 
-> drivers/clk/socfpga/clk-pll-a10.c:77:15: error: '__section__' attribute only applies to functions and
->       global variables
-> 
-> This moves the __init annotation to the right place so the function
-> actually gets discarded.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 7a29a869434e ("clk: meson: Add support for Meson clock controller")
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
 > ---
 
-Applied to clk-next
+Applied to clk-next. It would have been nice to have the
+compilation error though
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
