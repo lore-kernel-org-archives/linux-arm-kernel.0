@@ -1,28 +1,69 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 8 Feb 2016 14:33:04 +0100
-Subject: [PATCH v1] clocksource: atmel-pit: register as a sched_clock
-In-Reply-To: <1454606493-15094-1-git-send-email-romain.izard.pro@gmail.com>
-References: <1454606493-15094-1-git-send-email-romain.izard.pro@gmail.com>
-Message-ID: <56B89910.3060305@linaro.org>
+From: ian.campbell@citrix.com (Ian Campbell)
+Date: Mon, 8 Feb 2016 13:33:56 +0000
+Subject: [PATCH] xen/arm: correctly handle DMA mapping of compound pages
+Message-ID: <1454938450-26282-1-git-send-email-ian.campbell@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/04/2016 06:21 PM, Romain Izard wrote:
-> Register the counter of the Periodic Interval Timer as a possible source
-> for sched_clock. This provides a better precision than the jiffies-based
-> default.
->
-> Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
+Currently xen_dma_map_page concludes that DMA to anything other than
+the head page of a compound page must be foreign, since the PFN of the
+page is that of the head.
 
-Nicolas, Boris,
+Fix the check to instead consider the whole of a compound page to be
+local if the PFN of the head passes the 1:1 check.
 
-Are you ok with this patch ?
+We can never see a compound page which is a mixture of foreign and
+local sub-pages.
 
-[ ... ]
+The comment already correctly described the intention, but fixup the
+spelling and some grammar.
 
+This fixes the various SSH protocol errors which we have been seeing
+on the cubietrucks in our automated test infrastructure.
+
+This has been broken since "xen/arm: use hypercall to flush caches in
+map_page" (3567258d281b), which was in v3.19-rc1.
+
+NB arch/arm64/.../xen/page-coherent.h also includes this file.
+
+Signed-off-by: Ian Campbell <ian.campbell@citrix.com>
+Cc: xen-devel at lists.xenproject.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: stable at vger.kernel.org # v3.19+
+---
+ arch/arm/include/asm/xen/page-coherent.h | 19 ++++++++++++-------
+ 1 file changed, 12 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm/include/asm/xen/page-coherent.h b/arch/arm/include/asm/xen/page-coherent.h
+index 0375c8c..5653739 100644
+--- a/arch/arm/include/asm/xen/page-coherent.h
++++ b/arch/arm/include/asm/xen/page-coherent.h
+@@ -35,14 +35,19 @@ static inline void xen_dma_map_page(struct device *hwdev, struct page *page,
+ 	     dma_addr_t dev_addr, unsigned long offset, size_t size,
+ 	     enum dma_data_direction dir, struct dma_attrs *attrs)
+ {
+-	bool local = XEN_PFN_DOWN(dev_addr) == page_to_xen_pfn(page);
++	unsigned long page_pfn = page_to_xen_pfn(page);
++	unsigned long dev_pfn = XEN_PFN_DOWN(dev_addr);
++	unsigned long compound_pages = 1<<compound_order(page);
++	bool local = page_pfn <= dev_pfn && dev_pfn - page_pfn < compound_pages;
++
+ 	/*
+-	 * Dom0 is mapped 1:1, while the Linux page can be spanned accross
+-	 * multiple Xen page, it's not possible to have a mix of local and
+-	 * foreign Xen page. So if the first xen_pfn == mfn the page is local
+-	 * otherwise it's a foreign page grant-mapped in dom0. If the page is
+-	 * local we can safely call the native dma_ops function, otherwise we
+-	 * call the xen specific function.
++	 * Dom0 is mapped 1:1, while the Linux page can span across
++	 * multiple Xen pages, it's not possible for it to contain a
++	 * mix of local and foreign Xen pages. So if the first xen_pfn
++	 * == mfn the page is local otherwise it's a foreign page
++	 * grant-mapped in dom0. If the page is local we can safely
++	 * call the native dma_ops function, otherwise we call the xen
++	 * specific function.
+ 	 */
+ 	if (local)
+ 		__generic_dma_ops(hwdev)->map_page(hwdev, page, offset, size, dir, attrs);
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+2.1.4
