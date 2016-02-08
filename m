@@ -1,75 +1,33 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Mon, 8 Feb 2016 14:03:07 -0500
-Subject: [PATCH 4/5] drivers/pci: make host/pci-keystone-dw.c modular
-In-Reply-To: <20160208155324.GU23093@windriver.com>
-References: <1454889644-27830-1-git-send-email-paul.gortmaker@windriver.com>
- <1454889644-27830-5-git-send-email-paul.gortmaker@windriver.com>
- <91848876.ZYig6qgHLq@wuerfel> <20160208155324.GU23093@windriver.com>
-Message-ID: <56B8E66B.3060309@ti.com>
+From: jbaron@akamai.com (Jason Baron)
+Date: Mon, 8 Feb 2016 14:09:13 -0500
+Subject: [PATCH] locking/static_keys: avoid nested functions
+In-Reply-To: <1454942223-2781480-1-git-send-email-arnd@arndb.de>
+References: <1454942223-2781480-1-git-send-email-arnd@arndb.de>
+Message-ID: <56B8E7D9.1080301@akamai.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/08/2016 10:53 AM, Paul Gortmaker wrote:
-> [Re: [PATCH 4/5] drivers/pci: make host/pci-keystone-dw.c modular] On 08/02/2016 (Mon 10:59) Arnd Bergmann wrote:
+On 02/08/2016 09:36 AM, Arnd Bergmann wrote:
+> clang does not support nested functions inside of an array definition:
 > 
->> On Sunday 07 February 2016 19:00:43 Paul Gortmaker wrote:
->>> Export the symbols that this driver requires in order for it to
->>> be modular.  In addition to the one use case of a dw_pci sym, it
->>> has many instances of its own ks_dw_pci syms that need exporting
->>> in order to modpost w/o error.
->>>
->>> Cc: Murali Karicheri <m-karicheri2@ti.com>
->>> Cc: Bjorn Helgaas <bhelgaas@google.com>
->>> Cc: Stanimir Varbanov <svarbanov@mm-sol.com>
->>> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
->>> Cc: Thierry Reding <thierry.reding@gmail.com>
->>> Cc: Arnd Bergmann <arnd@arndb.de>
->>> Cc: linux-pci at vger.kernel.org
->>> Cc: linux-arm-kernel at lists.infradead.org
->>> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
->>> ---
->>
->>
->> Could we just have one module for the driver  instead of two?
-
-I agree. Please note that Keystone PCI is tested only as static. 
-I can help test the module if this series get to the next revision,
-but it might be a while before I can do the test.
-
-Murali
-
+> lib/test_static_keys.c:105:16: error: function definition is not allowed here
+>                         .test_key       = test_key_func(&old_true_key, static_key_true),
+> lib/test_static_keys.c:50:20: note: expanded from macro 'test_key_func'
+>         ({bool func(void) { return branch(key); } func; })
 > 
-> That thought crossed my mind, but I was considering merging the C files
-> and figured it might be more churn than the maintainer wanted.  If
-> maintainers are good with the below (assuming it works) then yes that
-> also seems reasonable.
+> That code appears to have been a little too clever, so this
+> simplifies it a bit by defining functions outside of the array.
 > 
-> P.
-> --
-> 
->>
->> Something like below (untested)
->>
->> 	Arnd
->>
->> diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile
->> index 7b2f20c6ccc6..0b472c680348 100644
->> --- a/drivers/pci/host/Makefile
->> +++ b/drivers/pci/host/Makefile
->> @@ -8,7 +8,8 @@ obj-$(CONFIG_PCI_RCAR_GEN2) += pci-rcar-gen2.o
->>  obj-$(CONFIG_PCI_RCAR_GEN2_PCIE) += pcie-rcar.o
->>  obj-$(CONFIG_PCI_HOST_GENERIC) += pci-host-generic.o
->>  obj-$(CONFIG_PCIE_SPEAR13XX) += pcie-spear13xx.o
->> -obj-$(CONFIG_PCI_KEYSTONE) += pci-keystone-dw.o pci-keystone.o
->> +obj-$(CONFIG_PCI_KEYSTONE) pci-keystone-mod.o
->> +pci-keystone-mod-objs := pci-keystone-dw.o pci-keystone.o
->>  obj-$(CONFIG_PCIE_XILINX) += pcie-xilinx.o
->>  obj-$(CONFIG_PCI_XGENE) += pci-xgene.o
->>  obj-$(CONFIG_PCI_XGENE_MSI) += pci-xgene-msi.o
->>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  lib/test_static_keys.c | 62 ++++++++++++++++++++++++++++++++++----------------
+>  1 file changed, 42 insertions(+), 20 deletions(-)
 > 
 
+Works for me.
 
--- 
-Murali Karicheri
-Linux Kernel, Keystone
+Acked-by: Jason Baron <jbaron@akamai.com>
+
+Thanks,
+
+-Jason
