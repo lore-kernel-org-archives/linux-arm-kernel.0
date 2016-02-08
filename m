@@ -1,61 +1,33 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Mon, 8 Feb 2016 11:45:44 -0500
-Subject: [PATCH 2/2] serial: 8250: fix building Ingenic with SERIAL_8250=m
-In-Reply-To: <1454935947-2743255-2-git-send-email-arnd@arndb.de>
-References: <1454935947-2743255-1-git-send-email-arnd@arndb.de>
- <1454935947-2743255-2-git-send-email-arnd@arndb.de>
-Message-ID: <20160208164543.GY23093@windriver.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 8 Feb 2016 16:46:46 +0000
+Subject: [PATCH v5sub2 0/8] arm64: implement virtual KASLR
+In-Reply-To: <CAKv+Gu9RmhaYBHOKwsPNynJ4Zia2kSJ6Yr3U4c6F13UHdbzFtw@mail.gmail.com>
+References: <1454332178-4414-1-git-send-email-ard.biesheuvel@linaro.org>
+ <CAKv+Gu-AhLcatkDsQVeoFGJ+pTEwaW1Hy9M-fY1-VWvRc_E47w@mail.gmail.com>
+ <20160205173248.GJ6076@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu_v1sXM7sivz+Uu86ZG3=Th7wqqh7M1N8wF7Ess4NdTZQ@mail.gmail.com>
+ <CAGXu5j+JpwRrVy1b_h+LJ4sCzsT7BV9RdcD0CvR-4aVJQhCpvg@mail.gmail.com>
+ <20160208121430.GL6076@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu-=RLS8Zgn_evmoUUSHqSVfaw9_hjVMgfg1FZGRDGFVag@mail.gmail.com>
+ <20160208161918.GT6076@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu9RmhaYBHOKwsPNynJ4Zia2kSJ6Yr3U4c6F13UHdbzFtw@mail.gmail.com>
+Message-ID: <20160208164646.GU6076@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[[PATCH 2/2] serial: 8250: fix building Ingenic with SERIAL_8250=m] On 08/02/2016 (Mon 13:51) Arnd Bergmann wrote:
-
-> The Ingenic 8250 driver has a 'bool' Kconfig symbol, but that
-> breaks when SERIAL_8250 is a loadable module:
+On Mon, Feb 08, 2016 at 05:20:41PM +0100, Ard Biesheuvel wrote:
+> On 8 February 2016 at 17:19, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Mon, Feb 08, 2016 at 03:30:47PM +0100, Ard Biesheuvel wrote:
+> >> However, the arm64 patch (#6) now conflicts with futex.h in -rc3 after
+> >> the PAN fix, not sure how to best address that ...
+> >
+> > I'll have a look.
 > 
-> drivers/tty/built-in.o: In function `ingenic_uart_probe':
-> 8250_ingenic.c:(.text+0x1c1a0): undefined reference to `serial8250_register_8250_port'
-> 
-> This changes the symbol to a 'tristate', plus a dependency on
+> Note that the fix is trivial, but I don't know who should be carrying
+> the fix is all
 
-Note that Greg just queued a patch yesterday (but sent in 2015) that
-removed what was the dead modular code.
+I'll push the arm64 for-next/core branch (including your series) out
+against 4.5-rc3, so there won't be any conflict.
 
-It could also depend on SERIAL_8250=y to resolve the build issue you
-found, if nobody cares about having modular SOC console UART drivers.
-
-Either way, I don't have issue with it being tristate vs bool, but if
-you do go with tristate, then my patch will have to be dropped/reverted.
-
-Paul.
---
-
-> SERIAL_8250, which makes it work again. Unlike the other
-> soc-specific backends, this one has no dependency on an
-> architecture or a platform. I'm adding a dependency on
-> MIPS || COMPILE_TEST as well here, to avoid showing the driver
-> on architectures that are not interested in it.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  drivers/tty/serial/8250/Kconfig | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/tty/serial/8250/Kconfig b/drivers/tty/serial/8250/Kconfig
-> index 6ae0fae4f796..13c63b14179f 100644
-> --- a/drivers/tty/serial/8250/Kconfig
-> +++ b/drivers/tty/serial/8250/Kconfig
-> @@ -384,8 +384,8 @@ config SERIAL_8250_UNIPHIER
->  	  serial ports, say Y to this option. If unsure, say N.
->  
->  config SERIAL_8250_INGENIC
-> -	bool "Support for Ingenic SoC serial ports"
-> -	depends on OF_FLATTREE
-> +	tristate "Support for Ingenic SoC serial ports"
-> +	depends on SERIAL_8250 && OF_FLATTREE && (MIPS || COMPILE_TEST)
->  	select LIBFDT
->  	help
->  	  If you have a system using an Ingenic SoC and wish to make use of
-> -- 
-> 2.7.0
-> 
+-- 
+Catalin
