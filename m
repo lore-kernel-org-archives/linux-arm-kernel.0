@@ -1,74 +1,73 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 08 Feb 2016 16:58:27 +0100
-Subject: [PATCH 1/1] ARM: kirkwood-ds112.dts: use unique machine name
-In-Reply-To: <20160207192632.GA28121@lunn.ch> (Andrew Lunn's message of "Sun,
- 7 Feb 2016 20:26:32 +0100")
-References: <1454870066-3353-1-git-send-email-xypron.glpk@gmx.de>
- <20160207192632.GA28121@lunn.ch>
-Message-ID: <87h9hj19ek.fsf@free-electrons.com>
+From: codekipper@gmail.com (codekipper at gmail.com)
+Date: Mon,  8 Feb 2016 16:59:27 +0100
+Subject: [linux-sunxi][PATCH] ARM: dts: sun7i: Enable USB DRC on Itead Ibox
+Message-ID: <1454947167-12236-1-git-send-email-codekipper@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heinrich,
+From: Marcus Cooper <codekipper@gmail.com>
+
+Enable the otg/drc usb controller on the Itead Ibox device.
+
+Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+---
+ arch/arm/boot/dts/sun7i-a20-itead-ibox.dts     | 14 ++++++++++++++
+ arch/arm/boot/dts/sunxi-itead-core-common.dtsi |  9 +++++++++
+ 2 files changed, 23 insertions(+)
+
+diff --git a/arch/arm/boot/dts/sun7i-a20-itead-ibox.dts b/arch/arm/boot/dts/sun7i-a20-itead-ibox.dts
+index 661c21d..a512581 100644
+--- a/arch/arm/boot/dts/sun7i-a20-itead-ibox.dts
++++ b/arch/arm/boot/dts/sun7i-a20-itead-ibox.dts
+@@ -118,8 +118,22 @@
+ 		allwinner,drive = <SUN4I_PINCTRL_20_MA>;
+ 		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 	};
++
++	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
++		allwinner,pins = "PH4";
++		allwinner,function = "gpio_in";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
+ };
  
- On dim., f?vr. 07 2016, Andrew Lunn <andrew@lunn.ch> wrote:
-
-> On Sun, Feb 07, 2016 at 07:34:26PM +0100, Heinrich Schuchardt wrote:
->> Downstream packages like Debian flash-kernel use
->> /proc/device-tree/model
->> to determine which dtb file to install.
->> 
->> Hence each dts in the Linux kernel should provide a unique model
->> identifier.
->> 
->> Commit 2d0a7addbd10 ("ARM: Kirkwood: Add support for many Synology NAS
->> devices") created the new files kirkwood-ds111.dts and kirkwood-ds112.dts
->> using the same model identifier.
->> 
->> This patch provides a unique model identifier for the
->> Synology DiskStation DS112.
->> 
->> Signed-off-by: Heinrich Schuchardt <xypron.glpk@gmx.de>
->
-> Fixes: 2d0a7addbd10 ("ARM: Kirkwood: Add support for many Synology NAS devices")
->
-> Reviewed-by: Andrew Lunn <andrew@lunn.ch>
-
-Applied on mvebu/fixes with the Fixes tag and Andrew Reviewed-by tag.
-
-Thanks,
-
-Gregory
-
-
-
->
->     Thanks
-> 	Andrew	     
->
->> ---
->>  arch/arm/boot/dts/kirkwood-ds112.dts | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->> 
->> diff --git a/arch/arm/boot/dts/kirkwood-ds112.dts b/arch/arm/boot/dts/kirkwood-ds112.dts
->> index bf4143c..b84af3d 100644
->> --- a/arch/arm/boot/dts/kirkwood-ds112.dts
->> +++ b/arch/arm/boot/dts/kirkwood-ds112.dts
->> @@ -14,7 +14,7 @@
->>  #include "kirkwood-synology.dtsi"
->>  
->>  / {
->> -	model = "Synology DS111";
->> +	model = "Synology DS112";
->>  	compatible = "synology,ds111", "marvell,kirkwood";
->>  
->>  	memory {
->> -- 
->> 2.1.4
->> 
-
+ &reg_ahci_5v {
+ 	status = "okay";
+ };
++
++&usbphy {
++	pinctrl-names = "default";
++	pinctrl-0 = <&usb0_id_detect_pin>;
++	usb0_id_det-gpio = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/sunxi-itead-core-common.dtsi b/arch/arm/boot/dts/sunxi-itead-core-common.dtsi
+index 2565d51..d22eea3 100644
+--- a/arch/arm/boot/dts/sunxi-itead-core-common.dtsi
++++ b/arch/arm/boot/dts/sunxi-itead-core-common.dtsi
+@@ -88,6 +88,10 @@
+ 	status = "okay";
+ };
+ 
++&otg_sram {
++	status = "okay";
++};
++
+ #include "axp209.dtsi"
+ 
+ &reg_dcdc2 {
+@@ -129,6 +133,11 @@
+ 	status = "okay";
+ };
+ 
++&usb_otg {
++	dr_mode = "otg";
++	status = "okay";
++};
++
+ &usbphy {
+ 	usb1_vbus-supply = <&reg_usb1_vbus>;
+ 	usb2_vbus-supply = <&reg_usb2_vbus>;
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.7.1
