@@ -1,78 +1,67 @@
 From: brian.starkey@arm.com (Brian Starkey)
-Date: Mon,  8 Feb 2016 17:30:50 +0000
-Subject: [RESEND2 PATCH 1/3] memremap: add MEMREMAP_WC flag
+Date: Mon,  8 Feb 2016 17:30:52 +0000
+Subject: [RESEND2 PATCH 3/3] drivers: dma-coherent: use memset_io for
+ DMA_MEMORY_IO mappings
 In-Reply-To: <cover.1454950917.git.brian.starkey@arm.com>
 References: <cover.1454950917.git.brian.starkey@arm.com>
-Message-ID: <9085d37fa97a762a46b9d58719c085368682c64f.1454950917.git.brian.starkey@arm.com>
+Message-ID: <073de716b49028bbbd819fc403c2532a12992abe.1454950917.git.brian.starkey@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a flag to memremap() for writecombine mappings. Mappings satisfied
-by this flag will not be cached, however writes may be delayed or
-combined into more efficient bursts. This is most suitable for
-buffers written sequentially by the CPU for use by other DMA devices.
+Use memset_io() for DMA_MEMORY_IO mappings which are mapped as I/O
+memory, and regular memset() for DMA_MEMORY_MAP mappings.
+
+This fixes the below alignment fault on arm64 for DMA_MEMORY_IO
+mappings, where memset() uses the DC ZVA instruction which is
+invalid on device memory.
+
+   Unhandled fault: alignment fault (0x96000061) at 0xffffff8000380000
+   Internal error: : 96000061 [#1] PREEMPT SMP
+   Modules linked in: hdlcd(+) clk_scpi
+   CPU: 4 PID: 1355 Comm: systemd-udevd Not tainted 4.4.0-rc1+ #5
+   Hardware name: ARM Juno development board (r0) (DT)
+   task: ffffffc9763eee00 ti: ffffffc9758c4000 task.ti: ffffffc9758c4000
+   PC is at __efistub_memset+0x1ac/0x200
+   LR is at dma_alloc_from_coherent+0xb0/0x120
+   pc : [<ffffffc00030ff2c>] lr : [<ffffffc00042a918>] pstate: 400001c5
+   sp : ffffffc9758c79a0
+   x29: ffffffc9758c79a0 x28: ffffffc000635cd0
+   x27: 0000000000000124 x26: ffffffc000119ef4
+   x25: 0000000000010000 x24: 0000000000000140
+   x23: ffffffc07e9ac3a8 x22: ffffffc9758c7a58
+   x21: ffffffc9758c7a68 x20: 0000000000000004
+   x19: ffffffc07e9ac380 x18: 0000000000000001
+   x17: 0000007fae1bbba8 x16: ffffffc0001b2d1c
+   x15: ffffffffffffffff x14: 0ffffffffffffffe
+   x13: 0000000000000010 x12: ffffff800837ffff
+   x11: ffffff800837ffff x10: 0000000040000000
+   x9 : 0000000000000000 x8 : ffffff8000380000
+   x7 : 0000000000000000 x6 : 000000000000003f
+   x5 : 0000000000000040 x4 : 0000000000000000
+   x3 : 0000000000000004 x2 : 000000000000ffc0
+   x1 : 0000000000000000 x0 : ffffff8000380000
 
 Signed-off-by: Brian Starkey <brian.starkey@arm.com>
 Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- include/linux/io.h |    1 +
- kernel/memremap.c  |   15 +++++++++++++--
- 2 files changed, 14 insertions(+), 2 deletions(-)
+ drivers/base/dma-coherent.c |    5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/include/linux/io.h b/include/linux/io.h
-index 32403b5..e2c8419 100644
---- a/include/linux/io.h
-+++ b/include/linux/io.h
-@@ -135,6 +135,7 @@ enum {
- 	/* See memremap() kernel-doc for usage description... */
- 	MEMREMAP_WB = 1 << 0,
- 	MEMREMAP_WT = 1 << 1,
-+	MEMREMAP_WC = 1 << 2,
- };
+diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
+index f98359a..4e4ad30 100644
+--- a/drivers/base/dma-coherent.c
++++ b/drivers/base/dma-coherent.c
+@@ -193,7 +193,10 @@ int dma_alloc_from_coherent(struct device *dev, ssize_t size,
+ 	 */
+ 	*dma_handle = mem->device_base + (pageno << PAGE_SHIFT);
+ 	*ret = mem->virt_base + (pageno << PAGE_SHIFT);
+-	memset(*ret, 0, size);
++	if (mem->flags & DMA_MEMORY_MAP)
++		memset(*ret, 0, size);
++	else
++		memset_io(*ret, 0, size);
+ 	spin_unlock_irqrestore(&mem->spinlock, flags);
  
- void *memremap(resource_size_t offset, size_t size, unsigned long flags);
-diff --git a/kernel/memremap.c b/kernel/memremap.c
-index e517a16..3849987 100644
---- a/kernel/memremap.c
-+++ b/kernel/memremap.c
-@@ -41,11 +41,13 @@ static void *try_ram_remap(resource_size_t offset, size_t size)
-  * memremap() - remap an iomem_resource as cacheable memory
-  * @offset: iomem resource start address
-  * @size: size of remap
-- * @flags: either MEMREMAP_WB or MEMREMAP_WT
-+ * @flags: any of MEMREMAP_WB, MEMREMAP_WT and MEMREMAP_WC
-  *
-  * memremap() is "ioremap" for cases where it is known that the resource
-  * being mapped does not have i/o side effects and the __iomem
-- * annotation is not applicable.
-+ * annotation is not applicable. In the case of multiple flags, the different
-+ * mapping types will be attempted in the order listed below until one of
-+ * them succeeds.
-  *
-  * MEMREMAP_WB - matches the default mapping for "System RAM" on
-  * the architecture.  This is usually a read-allocate write-back cache.
-@@ -57,6 +59,10 @@ static void *try_ram_remap(resource_size_t offset, size_t size)
-  * cache or are written through to memory and never exist in a
-  * cache-dirty state with respect to program visibility.  Attempts to
-  * map "System RAM" with this mapping type will fail.
-+ *
-+ * MEMREMAP_WC - establish a writecombine mapping, whereby writes may
-+ * be coalesced together (e.g. in the CPU's write buffers), but is otherwise
-+ * uncached. Attempts to map "System RAM" with this mapping type will fail.
-  */
- void *memremap(resource_size_t offset, size_t size, unsigned long flags)
- {
-@@ -101,6 +107,11 @@ void *memremap(resource_size_t offset, size_t size, unsigned long flags)
- 		addr = ioremap_wt(offset, size);
- 	}
- 
-+	if (!addr && (flags & MEMREMAP_WC)) {
-+		flags &= ~MEMREMAP_WC;
-+		addr = ioremap_wc(offset, size);
-+	}
-+
- 	return addr;
- }
- EXPORT_SYMBOL(memremap);
+ 	return 1;
 -- 
 1.7.9.5
