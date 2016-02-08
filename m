@@ -1,29 +1,53 @@
 From: j-keerthy@ti.com (Keerthy)
-Date: Mon, 8 Feb 2016 14:46:27 +0530
-Subject: [PATCH 0/3] arm: dts: DRA7: Add IVA and DSPEVE thermal domain data
-Message-ID: <1454922990-7501-1-git-send-email-j-keerthy@ti.com>
+Date: Mon, 8 Feb 2016 14:46:29 +0530
+Subject: [PATCH 2/3] arm: dts: DRA7: Add IVA thermal data
+In-Reply-To: <1454922990-7501-1-git-send-email-j-keerthy@ti.com>
+References: <1454922990-7501-1-git-send-email-j-keerthy@ti.com>
+Message-ID: <1454922990-7501-3-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP5 has 3 thermal zones cpu, core and multimedia.
-On the other hand DRA7 has 5 thermal zones cpu, gpu, core, dspeve
-and iva. Currently cpu, core and multimedia are being added via dt
-and the other 2 are getting added via kernel. Add the missing thermal
-domains in dt so as give the correct trip numbers, type and temperatures.
+This patch changes a dtsi file to contain the thermal data
+for IVA domain. This data will enable a thermal shutdown at 125C.
 
-Tested on DRA7-EVM.
- 
-Keerthy (3):
-  arm: dts: DRA7: Add DSPEVE thermal data
-  arm: dts: DRA7: Add IVA thermal data
-  arm: dts: DRA7: Add missing IVA and DSPEVE thermal domain data
-
- arch/arm/boot/dts/dra7-dspeve-thermal.dtsi | 27 +++++++++++++++++++++++++++
- arch/arm/boot/dts/dra7-iva-thermal.dtsi    | 27 +++++++++++++++++++++++++++
- arch/arm/boot/dts/dra7.dtsi                |  2 ++
- 3 files changed, 56 insertions(+)
- create mode 100644 arch/arm/boot/dts/dra7-dspeve-thermal.dtsi
+Signed-off-by: Keerthy <j-keerthy@ti.com>
+---
+ arch/arm/boot/dts/dra7-iva-thermal.dtsi | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
  create mode 100644 arch/arm/boot/dts/dra7-iva-thermal.dtsi
 
+diff --git a/arch/arm/boot/dts/dra7-iva-thermal.dtsi b/arch/arm/boot/dts/dra7-iva-thermal.dtsi
+new file mode 100644
+index 0000000..dd74a53
+--- /dev/null
++++ b/arch/arm/boot/dts/dra7-iva-thermal.dtsi
+@@ -0,0 +1,27 @@
++/*
++ * Device Tree Source for DRA7x SoC IVA thermal
++ *
++ * Copyright (C) 2016 Texas Instruments Incorporated - http://www.ti.com/
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
++
++#include <dt-bindings/thermal/thermal.h>
++
++iva_thermal: iva_thermal {
++	polling-delay-passive = <250>; /* milliseconds */
++	polling-delay = <500>; /* milliseconds */
++
++			/* sensor       ID */
++	thermal-sensors = <&bandgap     4>;
++
++	trips {
++		iva_crit: iva_crit {
++			temperature = <125000>; /* milliCelsius */
++			hysteresis = <2000>; /* milliCelsius */
++			type = "critical";
++		};
++	};
++};
 -- 
 1.9.1
