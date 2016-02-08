@@ -1,42 +1,45 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 8 Feb 2016 18:11:27 +0530
-Subject: [PATCH RFC] Add cpufreq support
-In-Reply-To: <45004963.Im3DmqJ5ez@wuerfel>
-References: <56B4D4BE.2040008@free.fr> <2425296.hvcP5NDLXy@wuerfel>
- <20160208123111.GE8294@vireshk> <45004963.Im3DmqJ5ez@wuerfel>
-Message-ID: <20160208124127.GF8294@vireshk>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Mon, 8 Feb 2016 12:41:01 +0000
+Subject: [RFC PATCH v2 0/3] Add ACPI support for HiSilicon PCIe Host
+ Controllers
+Message-ID: <1454935264-6076-1-git-send-email-gabriele.paoloni@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08-02-16, 13:34, Arnd Bergmann wrote:
-> Maybe add a opp-v3 compatible string?
+From: gabriele paoloni <gabriele.paoloni@huawei.com>
 
-How will that help?
+This patchset adds ACPI support for the HiSilicon Hip05/Hip06 SoC PCIe controllers
+The four patches respectively:
+        - re-architect the current HiSilicon driver to make it scalable to the
+          new ACPI quirks
+        - rework the current HiSilicon driver to make it ECAM compliant
+        - adds the HiSilicon ACPI specific quirks.
 
-The problem was that the compatibility string of "opp-v2" specifies
-the way we need to parse the bindings and shouldn't be (ab)used to
-probe a driver like cpufreq-dt. And so we got stuck.
+   This patchset  is based on
+   https://github.com/semihalf-nowicki-tomasz/linux.git
+   branch pci-acpi-v4
 
-> I really don't care what you
-> match on, as long we don't need any code in arch/arm/ to create a
-> device we don't need.
+Changes v1 -> v2: removed the ACPI quirks dependency on Designware framework
 
-Sure.
+gabriele paoloni (3):
+  PCI: hisi: re-architect Hip05/Hip06 controllers driver to preapare for
+    ACPI
+  PCI: hisi: Make the HiSilicon PCIe host controller ECAM compliant
+  PCI/ACPI: hisi: Add ACPI support for HiSilicon SoCs Host Controllers
 
-> Don't add the device to DT, we really don't want that.
-
-I agree.
-
-> If there
-> is too much opposition to looking at the cpus nodes in the initcall,
-
-I didn't get this one, what can we do by looking at CPUs nodes ?
-
-> start with a whitelist for known machines, that at least keeps the
-> existing behavior.
-
-That can be a valid solution I would say, but that separate driver
-(cpufreq-dt-device.c) needs to be changed for every new platform.
+ MAINTAINERS                         |   3 +
+ drivers/pci/host/Kconfig            |   8 ++
+ drivers/pci/host/Makefile           |   3 +-
+ drivers/pci/host/pcie-designware.c  |   4 +-
+ drivers/pci/host/pcie-designware.h  |   2 +
+ drivers/pci/host/pcie-hisi-acpi.c   | 188 ++++++++++++++++++++++++++++++++++++
+ drivers/pci/host/pcie-hisi-common.c |  73 ++++++++++++++
+ drivers/pci/host/pcie-hisi.c        | 144 +++++++++++++--------------
+ drivers/pci/host/pcie-hisi.h        |  25 +++++
+ 9 files changed, 367 insertions(+), 83 deletions(-)
+ create mode 100644 drivers/pci/host/pcie-hisi-acpi.c
+ create mode 100644 drivers/pci/host/pcie-hisi-common.c
+ create mode 100644 drivers/pci/host/pcie-hisi.h
 
 -- 
-viresh
+1.9.1
