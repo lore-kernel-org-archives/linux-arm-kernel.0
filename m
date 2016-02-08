@@ -1,88 +1,232 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 8 Feb 2016 16:06:15 +0000
-Subject: [PATCH 07/11] clk: sunxi: add generic allwinner,sunxi name
-In-Reply-To: <20160208155721.GB4677@rob-hp-laptop>
-References: <1454348370-3816-1-git-send-email-andre.przywara@arm.com>
- <1454348370-3816-8-git-send-email-andre.przywara@arm.com>
- <20160208155721.GB4677@rob-hp-laptop>
-Message-ID: <56B8BCF7.4080701@arm.com>
+From: tthayer@opensource.altera.com (Thor Thayer)
+Date: Mon, 8 Feb 2016 10:10:53 -0600
+Subject: [PATCHv9 1/4] EDAC, altera: Add Altera L2 Cache and OCRAM EDAC
+ Support
+In-Reply-To: <20160208113919.GB28980@pd.tnic>
+References: <1453911203-30202-1-git-send-email-tthayer@opensource.altera.com>
+ <20160208113919.GB28980@pd.tnic>
+Message-ID: <56B8BE0D.8070000@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Boris.
 
-On 08/02/16 15:57, Rob Herring wrote:
-> On Mon, Feb 01, 2016 at 05:39:26PM +0000, Andre Przywara wrote:
->> The only difference between the different compatible matches at the
->> end of clk-sunxi.c are the critical clocks. Two SoCs get away so far
->> without any, so there is no reason to enumerate those SoCs in here
->> explicitly, though we have to keep them in for compatibility reasons.
+On 02/08/2016 05:39 AM, Borislav Petkov wrote:
+> On Wed, Jan 27, 2016 at 10:13:20AM -0600, tthayer at opensource.altera.com wrote:
+>> From: Thor Thayer <tthayer@opensource.altera.com>
 >>
->> Rename the init function to highlight this generic feature and add a
->> new, generic DT compatible string which can be used as a fallback value
->> in the future should a particular SoC don't need any special treatment.
+>> Adding L2 Cache and On-Chip RAM EDAC support for the
+>> Altera SoCs using the EDAC device  model. The SDRAM
+>> controller is using the Memory Controller model.
 >>
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> Each type of ECC is individually configurable.
+>>
+>> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
 >> ---
->>  Documentation/devicetree/bindings/arm/sunxi.txt |  4 ++++
->>  drivers/clk/sunxi/clk-sunxi.c                   | 14 ++++++--------
->>  2 files changed, 10 insertions(+), 8 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
->> index 7e79fcc..980e065 100644
->> --- a/Documentation/devicetree/bindings/arm/sunxi.txt
->> +++ b/Documentation/devicetree/bindings/arm/sunxi.txt
->> @@ -14,3 +14,7 @@ using one of the following compatible strings:
->>    allwinner,sun8i-a83t
->>    allwinner,sun8i-h3
->>    allwinner,sun9i-a80
+>> v9: Improve device tree node release. Free managed resources
+>>      on error path. Fix ocram memory leak.
+>> v8: Remove MASK from single bit mask names.
+>>      s/altr,edac/altr,socfpga-ecc-manager
+>>      Use debugfs instead of sysfs.
+>>      Add chip family name to match string.
+>>      Fix header year.
+>>      Fix build dependencies & change commit accordingly.
+>>      s/CONFIG_EDAC_ALTERA_MC/CONFIG_EDAC_ALTERA
+>> v7: s/of_get_named_gen_pool/of_gen_pool_get
+>>      Remove #ifdef for EDAC_DEBUG
+>>      Use -ENODEV instead of EPROBE_DEFER
+>> v6: Convert to nested EDAC in device tree. Force L2 cache
+>>      on for L2Cache ECC & remove L2 cache syscon for checking
+>>      enable bit. Update year in header.
+>> v5: No change.
+>> v4: Change mask defines to use BIT().
+>>      Fix comment style to agree with kernel coding style.
+>>      Better printk description for read != write in trigger.
+>>      Remove SysFS debugging message.
+>>      Better dci->mod_name
+>>      Move gen_pool pointer assignment to end of function.
+>>      Invert logic to reduce indent in ocram depenency check.
+>>      Change from dev_err() to edac_printk()
+>>      Replace magic numbers with defines & comments.
+>>      Improve error injection test.
+>>      Change Makefile intermediary name to altr (from alt)
+>> v3: Move OCRAM and L2 cache EDAC functions into altera_edac.c
+>>      instead of separate files.
+>> v2: Fix L2 dependency comments.
+>> ---
+>>   drivers/edac/Kconfig       |   26 ++-
+>>   drivers/edac/Makefile      |    2 +-
+>>   drivers/edac/altera_edac.c |  487 +++++++++++++++++++++++++++++++++++++++++++-
+>>   3 files changed, 507 insertions(+), 8 deletions(-)
+>
+> I'm still waiting for the people on CC to confirm the DT changes. A
+> couple of comments on the EDAC bits below.
+>
+>
+
+Understood. I did get a conditional ACK from Rob Herring on the DT 
+portion of the patch from the last revision (as long as I made the 
+changes he suggested which I did in this patch). There may be other 
+comments though.
+
+> ....
+>
+>
+>> +static irqreturn_t altr_edac_device_handler(int irq, void *dev_id)
+>> +{
+>> +	struct edac_device_ctl_info *dci = dev_id;
+>> +	struct altr_edac_device_dev *drvdata = dci->pvt_info;
+>> +	const struct edac_device_prv_data *priv = drvdata->data;
 >> +
->> +For Allwinner SoCs without any specific needs the generic fallback value of:
->> +  allwinner,sunxi
->> +can be used.
-> 
-> Perhaps "fallback" implies this, but be more specific that it can be 
-> used in addition to a specific string.
+>> +	if (irq == drvdata->sb_irq) {
+>> +		if (priv->ce_clear_mask)
+>> +			writel(priv->ce_clear_mask, drvdata->base);
+>> +		edac_device_handle_ce(dci, 0, 0, drvdata->edac_dev_name);
+>> +	}
+>> +	if (irq == drvdata->db_irq) {
+>> +		if (priv->ue_clear_mask)
+>> +			writel(priv->ue_clear_mask, drvdata->base);
+>> +		edac_device_handle_ue(dci, 0, 0, drvdata->edac_dev_name);
+>> +		panic("\nEDAC:ECC_DEVICE[Uncorrectable errors]\n");
+>> +	}
+>
+> And irq is guaranteed to always be ->sb_irq or ->db_irq?
+>
+> Otherwise, you can do
+>
+> 	else
+> 		WARN_ON(1);
+>
+> just in case.
 
-Yeah, good point.
+Those are the only cases of irq but it would be good to be alerted if 
+that is not the case. I will add. Thanks!
 
-But Maxime's latest rework [1] made this patch here actually obsolete,
-so we don't match on a root compatible string anymore to register the
-sunxi clock drivers. Instead each clock is registered and matched on
-it's own compatible string. Much nicer now, IMHO.
+>
+>> +
+>> +	return IRQ_HANDLED;
+>> +}
+>
+> ...
+>
+>> +/*
+>> + * altr_edac_device_probe()
+>> + *	This is a generic EDAC device driver that will support
+>> + *	various Altera memory devices such as the L2 cache ECC and
+>> + *	OCRAM ECC as well as the memories for other peripherals.
+>> + *	Module specific initialization is done by passing the
+>> + *	function index in the device tree.
+>> + */
+>> +static int altr_edac_device_probe(struct platform_device *pdev)
+>> +{
 
-Thanks for having a look!
-Andre.
+<snip>
 
-[1]
-https://git.kernel.org/cgit/linux/kernel/git/mripard/linux.git/commit/?h=sunxi/for-next&id=78e3fb4c745114b16a12458036d48aa96ea5b36d
+>> +
+>> +	dci->mod_name = "Altera ECC Manager";
+>> +	dci->dev_name = drvdata->edac_dev_name;
+>> +
+>> +	debugfs = edac_debugfs_create_dir(ecc_name);
+>> +	if (debugfs)
+>> +		altr_create_edacdev_dbgfs(dci, drvdata->data, debugfs);
+>> +
+>> +	if (edac_device_add_device(dci))
+>
+> <--- if you end up here and debugfs nodes have been created, you need to
+> destroy them here. You probably could change edac_debugfs_exit() to call
+> debugfs_remove_recursive() and make sure your driver calls it.
+>
+> Right now we're calling edac_debugfs_exit() in edac_exit() and I *think*
+> that is ok for a platform device driver as this one but I haven't
+> actually *verified* that.
 
->> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
->> index e460a6b..efcce85 100644
->> --- a/drivers/clk/sunxi/clk-sunxi.c
->> +++ b/drivers/clk/sunxi/clk-sunxi.c
->> @@ -1052,14 +1052,12 @@ CLK_OF_DECLARE(sun8i_a23_clk_init, "allwinner,sun8i-a23", sun6i_init_clocks);
->>  CLK_OF_DECLARE(sun8i_a33_clk_init, "allwinner,sun8i-a33", sun6i_init_clocks);
->>  CLK_OF_DECLARE(sun8i_h3_clk_init, "allwinner,sun8i-h3", sun6i_init_clocks);
->>  
->> -static void __init sun8i_a83t_init_clocks(struct device_node *node)
->> +static void __init sunxi_generic_init_clocks(struct device_node *node)
->>  {
->>  	sunxi_init_clocks(NULL, 0);
->>  }
->> -CLK_OF_DECLARE(sun8i_a83t_clk_init, "allwinner,sun8i-a83t", sun8i_a83t_init_clocks);
->> -
->> -static void __init sun9i_init_clocks(struct device_node *node)
->> -{
->> -	sunxi_init_clocks(NULL, 0);
->> -}
->> -CLK_OF_DECLARE(sun9i_a80_clk_init, "allwinner,sun9i-a80", sun9i_init_clocks);
->> +CLK_OF_DECLARE(sun8i_a83t_clk_init, "allwinner,sun8i-a83t",
->> +	       sunxi_generic_init_clocks);
->> +CLK_OF_DECLARE(sun9i_a80_clk_init, "allwinner,sun9i-a80",
->> +	       sunxi_generic_init_clocks);
->> +CLK_OF_DECLARE(sunxi_clk_init, "allwinner,sunxi", sunxi_generic_init_clocks);
->> -- 
->> 2.6.4
->>
-> 
+Yes, thanks. I was using the xgene code as an example but I missed the 
+unregister (although it looks like the xgene's unregister affects sysfs 
+instead of debugfs). I'm also moving the debugfs creation to the end of 
+the probe since it is not critical and avoids an error path if creation 
+fails.
+
+I'll make the debugfs_remove_recursive() change as a separate patch in 
+my next version.
+
+>
+>> +		goto fail1;
+>> +
+>> +	devres_close_group(&pdev->dev, NULL);
+
+<snip>
+
+>> +
+>> +	memset(sram_addr, 0, size);
+>> +	wmb();	/* Ensure data is written out */
+>> +
+>> +	*other = gp;	/* Remember this handle for freeing  later */
+>
+> Please put comments ontop of the line they're referring to. Those
+> side-things are cluttering the code unnecessarily.
+>
+OK.
+
+>> +
+>> +	return sram_addr;
+>> +}
+>> +
+>> +static void ocram_free_mem(void *p, size_t size, void *other)
+>> +{
+>> +	gen_pool_free((struct gen_pool *)other, (u32)p, size);
+>> +}
+>> +
+>> +/*
+>> + * altr_ocram_dependencies()
+>> + *	Test for OCRAM cache ECC dependencies upon entry because
+>> + *	platform specific startup should have initialized the
+>> + *	On-Chip RAM memory and enabled the ECC.
+>> + *	Can't turn on ECC here because accessing un-initialized
+>> + *	memory will cause CE/UE errors possibly causing an ABORT.
+>> + */
+>> +static int altr_ocram_dependencies(struct platform_device *pdev,
+>
+> A verb in the name?
+>
+> 	altr_ocram_test_deps
+>
+> or
+> 	altr_ocram_check_deps
+>
+> or so?
+>
+
+OK. Thanks.
+
+>> +				   void __iomem *base)
+>> +{
+>> +	u32 control;
+>> +
+
+<snip>
+
+
+>> + *	Note that L2 Cache Enable is forced at build time.
+>> + */
+>> +static int altr_l2_dependencies(struct platform_device *pdev,
+>
+> Here too, pls add a verb in the function name.
+>
+OK. Thanks.
+
+>> +				void __iomem *base)
+>> +{
+>> +	u32 control;
+>> +
+>> +	control = readl(base) & ALTR_L2_ECC_EN;
+>> +	if (!control) {
+>> +		edac_printk(KERN_ERR, EDAC_DEVICE,
+>> +			    "L2: No ECC present, or ECC disabled\n");
+>> +		return -ENODEV;
+>> +	}
+>> +
+>> +	return 0;
+>> +}
+>
+
+Thanks for reviewing!
