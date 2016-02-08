@@ -1,47 +1,61 @@
-From: k@japko.eu (Krzysztof Adamski)
-Date: Mon, 8 Feb 2016 09:39:12 +0100
-Subject: [PATCH v3 4/5] ARM: dts: sun8i-h3: Add R_PIO controller node to
- the dtsi
-In-Reply-To: <CAGb2v67ftGhjPHjHKQ0iYnOeRbi5qcqyT2P1gePW=UoMm5QRig@mail.gmail.com>
-References: <1454542430-16572-1-git-send-email-k@japko.eu>
- <1454542430-16572-5-git-send-email-k@japko.eu>
- <CAGb2v67ftGhjPHjHKQ0iYnOeRbi5qcqyT2P1gePW=UoMm5QRig@mail.gmail.com>
-Message-ID: <20160208083912.GF12071@box2.japko.eu>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 8 Feb 2016 09:42:55 +0100
+Subject: [PATCH v2] arm64: dts: r8a7795: Add L2 cache-controller nodes
+In-Reply-To: <20160205095758.GE16556@verge.net.au>
+References: <1452953856-5146-1-git-send-email-dirk.behme@gmail.com>
+ <56B2370D.2010102@gmail.com> <20160205095758.GE16556@verge.net.au>
+Message-ID: <CAMuHMdVRhwGh2bvfNSguX0XnMW0eEgLRTCt3Y3-+KfV0Jy9WHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 05, 2016 at 05:46:32PM +0800, Chen-Yu Tsai wrote:
->On Thu, Feb 4, 2016 at 7:33 AM, Krzysztof Adamski <k@japko.eu> wrote:
->> Add the corresponding device node for R_PIO on H3 to the dtsi. Support
->> for the controller was added in earlier commit.
->>
->> Signed-off-by: Krzysztof Adamski <k@japko.eu>
->> ---
->>  arch/arm/boot/dts/sun8i-h3.dtsi | 12 ++++++++++++
->>  1 file changed, 12 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
->> index bb37f52..f618a95 100644
->> --- a/arch/arm/boot/dts/sun8i-h3.dtsi
->> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
->> @@ -517,5 +517,17 @@
->>                         compatible = "allwinner,sun6i-a31-clock-reset";
->>                         #reset-cells = <1>;
->>                 };
->> +
->> +               r_pio: pinctrl at 01f02c00 {
->> +                       compatible = "allwinner,sun8i-h3-r-pinctrl";
->> +                       reg = <0x01f02c00 0x400>;
->> +                       interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
->> +                       clocks = <&apb0_gates 0>;
->> +                       resets = <&apb0_reset 0>;
->> +                       gpio-controller;
->> +                       #gpio-cells = <3>;
->> +                       interrupt-controller;
->> +                       #interrupt-cells = <2>;
->
->This should be 3: bank number + pin number + flags.
->The rest looks good.
+Hi Dirk,
 
-Nicly spotted. I took it from pio description in the same file. So 
-there's a bug there too.
+On Fri, Feb 5, 2016 at 10:57 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Wed, Feb 03, 2016 at 06:21:17PM +0100, Dirk Behme wrote:
+>> On 16.01.2016 15:17, Dirk Behme wrote:
+>> >From: Geert Uytterhoeven <geert+renesas@glider.be>
+>> >
+>> >Add device nodes for the L2 caches, and link the CPU node to its L2
+>> >cache node.
+>> >
+>> >The L2 cache for the Cortex-A57 CPU cores is 2 MiB large (organized as
+>> >128 KiB x 16 ways).
+>> >
+>> >Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>> >Signed-off-by: Dirk Behme <dirk.behme@gmail.com>
+>
+> [snip]
+>
+>> Any further comments to this? If not, could this be applied?
+>
+> Sorry for the delay.
+>
+> This looks good; I have queued it up.
+>
+> It should appear in the next (and devel) branches of my renesas tree soon.
+> And in linux-next whenever it includes my updated next branch.
+
+So you not only dropped the (controversial) timing related properties, but
+in addition:
+
++               cache-unified;
++               cache-level = <2>;
+
+At least the "cache-level" property is marked as required in ePAPR.
+For "cache-unified", the wording is not that strict in ePAPR, but that property
+depends on being a unified cache in the first place.
+
+So I think these two properties should be re-added.
+
+Sorry for not noticing before.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
