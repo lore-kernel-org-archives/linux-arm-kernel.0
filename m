@@ -1,98 +1,85 @@
-From: yang.shi@linaro.org (Yang Shi)
-Date: Mon,  8 Feb 2016 14:49:24 -0800
-Subject: [PATCH] arm64: replace read_lock to rcu lock in call_step_hook
-Message-ID: <1454971764-30720-1-git-send-email-yang.shi@linaro.org>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Mon, 8 Feb 2016 17:24:30 -0600
+Subject: [PATCH v5 3/3] pci, pci-thunder-ecam: Add driver for
+ ThunderX-pass1 on-chip devices
+In-Reply-To: <56B919A5.5090000@caviumnetworks.com>
+References: <1454715675-17512-1-git-send-email-ddaney.cavm@gmail.com>
+ <1454715675-17512-4-git-send-email-ddaney.cavm@gmail.com>
+ <20160208195642.GA15103@rob-hp-laptop>
+ <56B8FED6.1050804@caviumnetworks.com>
+ <CAL_JsqJNndZ59465YhpkP=dQYaijaar+LcQG4KQEJwF5e1ryLQ@mail.gmail.com>
+ <56B90B09.7090500@caviumnetworks.com>
+ <20160208221204.GA30821@localhost>
+ <56B919A5.5090000@caviumnetworks.com>
+Message-ID: <20160208232430.GA1353@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-BUG: sleeping function called from invalid context at kernel/locking/rtmutex.c:917
-in_atomic(): 1, irqs_disabled(): 128, pid: 383, name: sh
-Preemption disabled at:[<ffff800000124c18>] kgdb_cpu_enter+0x158/0x6b8
+On Mon, Feb 08, 2016 at 02:41:41PM -0800, David Daney wrote:
+> On 02/08/2016 02:12 PM, Bjorn Helgaas wrote:
+> >On Mon, Feb 08, 2016 at 01:39:21PM -0800, David Daney wrote:
+> >>On 02/08/2016 01:12 PM, Rob Herring wrote:
+> >>>On Mon, Feb 8, 2016 at 2:47 PM, David Daney <ddaney@caviumnetworks.com> wrote:
+> >>>>On 02/08/2016 11:56 AM, Rob Herring wrote:
+> >>>>>On Fri, Feb 05, 2016 at 03:41:15PM -0800, David Daney wrote:
+> >>>>>>From: David Daney <david.daney@cavium.com>
+> >>>>>>+Properties of the host controller node that differ from
+> >>>>>>+host-generic-pci.txt:
+> >>>>>>+
+> >>>>>>+- compatible     : Must be "cavium,pci-host-thunder-ecam"
+> >>>>>>+
+> >>>>>>+Example:
+> >>>>>>+
+> >>>>>>+       pci at 84b0,00000000 {
+> ...
+> >>>>>and the node name should be "pcie".
+> >>>>
+> >>>>Why pcie?
+> >>>>
+> >>>>There are no PCIe devices or buses reachable from this type of root complex.
+> >>>>There are however many PCI devices.
+> ...
 
-CPU: 3 PID: 383 Comm: sh Tainted: G        W       4.1.13-rt13 #2
-Hardware name: Freescale Layerscape 2085a RDB Board (DT)
-Call trace:
-[<ffff8000000885e8>] dump_backtrace+0x0/0x128
-[<ffff800000088734>] show_stack+0x24/0x30
-[<ffff80000079a7c4>] dump_stack+0x80/0xa0
-[<ffff8000000bd324>] ___might_sleep+0x18c/0x1a0
-[<ffff8000007a20ac>] __rt_spin_lock+0x2c/0x40
-[<ffff8000007a2268>] rt_read_lock+0x40/0x58
-[<ffff800000085328>] single_step_handler+0x38/0xd8
-[<ffff800000082368>] do_debug_exception+0x58/0xb8
-Exception stack(0xffff80834a1e7c80 to 0xffff80834a1e7da0)
-7c80: ffffff9c ffffffff 92c23ba0 0000ffff 4a1e7e40 ffff8083 001bfcc4 ffff8000
-7ca0: f2000400 00000000 00000000 00000000 4a1e7d80 ffff8083 0049501c ffff8000
-7cc0: 00005402 00000000 00aaa210 ffff8000 4a1e7ea0 ffff8083 000833f4 ffff8000
-7ce0: ffffff9c ffffffff 92c23ba0 0000ffff 4a1e7ea0 ffff8083 001bfcc0 ffff8000
-7d00: 4a0fc400 ffff8083 00005402 00000000 4a1e7d40 ffff8083 00490324 ffff8000
-7d20: ffffff9c 00000000 92c23ba0 0000ffff 000a0000 00000000 00000000 00000000
-7d40: 00000008 00000000 00080000 00000000 92c23b8b 0000ffff 92c23b8e 0000ffff
-7d60: 00000038 00000000 00001cb2 00000000 00000005 00000000 92d7b498 0000ffff
-7d80: 01010101 01010101 92be9000 0000ffff 00000000 00000000 00000030 00000000
-[<ffff8000000833f4>] el1_dbg+0x18/0x6c
+> >>Really, it is a bit of a gray area here as we don't have any bridges
+> >>to PCIe buses and there are multiple devices residing on each bus,
+> >>so from that point of view it cannot be PCIe.  There are, however,
+> >>devices that implement the PCI Express Capability structure, so does
+> >>that make it PCIe?  It is not clear what the specifications demand
+> >>here.
+> >
+> >The PCI core doesn't care about the node name in the device tree.  But
+> >it *does* care about some details of PCI/PCIe topology.  We consider
+> >anything with a PCIe capability to be PCIe.  For example,
+> >
+> >   - pci_cfg_space_size() thinks PCIe devices have 4K of config space
+> >
+> >   - only_one_child() thinks a PCIe bus, i.e., a link, only has a
+> >     single device on it
+> >
+> >   - a PCIe device should have a PCIe Root Port or PCIe Downstream Port
+> >     upstream from it (we did remove some of these restrictions with
+> >     b35b1df5e6c2 ("PCI: Tolerate hierarchies with no Root Port"), but
+> >     it's possible we didn't get them all)
+> >
+> >I assume your system conforms to expectations like these; I'm just
+> >pointing them out because you mentioned buses with multiple devices on
+> >them, which is definitely something one doesn't expect in PCIe.
+> 
+> The topology we have is currently working with the kernel's core PCI
+> code.  I don't really want to get into discussing what the
+> definition of PCIe is.  We have multiple devices (more than 32) on a
+> single bus, and they have PCI Express and ARI Capabilities.  Is that
+> PCIe?  I don't know.
 
-This issue is similar with 62c6c61("arm64: replace read_lock to rcu lock in
-call_break_hook"), but comes to single_step_handler.
+I don't need to know the details of your topology.  As long as it
+conforms to the PCIe spec, it should be fine.  If it *doesn't* conform
+to the spec, but things currently seem to work, that's less fine,
+because a future Linux change is liable to break something for you.
 
-This also solves kgdbts boot test silent hang issue on 4.4 -rt kernel.
+I was a little concerned about your statement that "there are multiple
+devices residing on each bus, so from that point of view it cannot be
+PCIe."  That made it sound like you're doing something outside the
+spec.  If you're just using regular multi-function devices or ARI,
+then I don't see any issue (or any reason to say it can't be PCIe).
 
-Signed-off-by: Yang Shi <yang.shi@linaro.org>
----
- arch/arm64/kernel/debug-monitors.c | 21 +++++++++++----------
- 1 file changed, 11 insertions(+), 10 deletions(-)
-
-diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
-index 8aee3ae..c1492ba 100644
---- a/arch/arm64/kernel/debug-monitors.c
-+++ b/arch/arm64/kernel/debug-monitors.c
-@@ -186,20 +186,21 @@ static void clear_regs_spsr_ss(struct pt_regs *regs)
- 
- /* EL1 Single Step Handler hooks */
- static LIST_HEAD(step_hook);
--static DEFINE_RWLOCK(step_hook_lock);
-+static DEFINE_SPINLOCK(step_hook_lock);
- 
- void register_step_hook(struct step_hook *hook)
- {
--	write_lock(&step_hook_lock);
--	list_add(&hook->node, &step_hook);
--	write_unlock(&step_hook_lock);
-+	spin_lock(&step_hook_lock);
-+	list_add_rcu(&hook->node, &step_hook);
-+	spin_unlock(&step_hook_lock);
- }
- 
- void unregister_step_hook(struct step_hook *hook)
- {
--	write_lock(&step_hook_lock);
--	list_del(&hook->node);
--	write_unlock(&step_hook_lock);
-+	spin_lock(&step_hook_lock);
-+	list_del_rcu(&hook->node);
-+	spin_unlock(&step_hook_lock);
-+	synchronize_rcu();
- }
- 
- /*
-@@ -213,15 +214,15 @@ static int call_step_hook(struct pt_regs *regs, unsigned int esr)
- 	struct step_hook *hook;
- 	int retval = DBG_HOOK_ERROR;
- 
--	read_lock(&step_hook_lock);
-+	rcu_read_lock();
- 
--	list_for_each_entry(hook, &step_hook, node)	{
-+	list_for_each_entry_rcu(hook, &step_hook, node)	{
- 		retval = hook->fn(regs, esr);
- 		if (retval == DBG_HOOK_HANDLED)
- 			break;
- 	}
- 
--	read_unlock(&step_hook_lock);
-+	rcu_read_unlock();
- 
- 	return retval;
- }
--- 
-2.0.2
+Bjorn
