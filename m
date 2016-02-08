@@ -1,51 +1,36 @@
-From: krzysztof.adamski@tieto.com (Krzysztof Adamski)
-Date: Mon,  8 Feb 2016 15:37:22 +0100
-Subject: [PATCH] pinctrl: sunxi: set pin function as input on export
-Message-ID: <1454942242-25690-1-git-send-email-krzysztof.adamski@tieto.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon,  8 Feb 2016 15:38:32 +0100
+Subject: [PATCH] Kbuild: provide a __UNIQUE_ID for clang
+Message-ID: <1454942318-2782493-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Default function of a pin in sunxi SoCs is "disabled". By default gpios
-exported by sysfs are set as input and indeed, when reading "direction"
-file you will get "in". The "value" pin won't return proper value,
-though, confusing user of this interface.
+The default __UNIQUE_ID macro in compiler.h fails to work for some drivers:
 
-This patch sets direction of a GPIO as input when exporting it.
+drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c:615:1: error: redefinition of
+      '__UNIQUE_ID_firmware615'
+BRCMF_FW_NVRAM_DEF(4354, "brcmfmac4354-sdio.bin", "brcmfmac4354-sdio.txt");
 
-Signed-off-by: Krzysztof Adamski <krzysztof.adamski@tieto.com>
+This adds a copy of the version we use for gcc-4.3 and higher, as the same
+one works with all versions of clang that I could find in svn (2.6 and higher).
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/pinctrl/sunxi/pinctrl-sunxi.c | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
+ include/linux/compiler-clang.h | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-index 7a2465f..905a9fb 100644
---- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-+++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-@@ -452,6 +452,16 @@ static int sunxi_pinctrl_gpio_direction_input(struct gpio_chip *chip,
- 	return pinctrl_gpio_direction_input(chip->base + offset);
- }
- 
-+int sunxi_pinctrl_gpio_request(struct gpio_chip *chip, unsigned offset)
-+{
-+	int ret = pinctrl_gpio_direction_input(chip->base + offset);
+diff --git a/include/linux/compiler-clang.h b/include/linux/compiler-clang.h
+index d1e49d52b640..de179993e039 100644
+--- a/include/linux/compiler-clang.h
++++ b/include/linux/compiler-clang.h
+@@ -10,3 +10,8 @@
+ #undef uninitialized_var
+ #define uninitialized_var(x) x = *(&(x))
+ #endif
 +
-+	if (ret)
-+		return ret;
-+
-+	return pinctrl_request_gpio(chip->base + offset);
-+}
-+
- static int sunxi_pinctrl_gpio_get(struct gpio_chip *chip, unsigned offset)
- {
- 	struct sunxi_pinctrl *pctl = gpiochip_get_data(chip);
-@@ -946,7 +956,7 @@ int sunxi_pinctrl_init(struct platform_device *pdev,
- 
- 	last_pin = pctl->desc->pins[pctl->desc->npins - 1].pin.number;
- 	pctl->chip->owner = THIS_MODULE;
--	pctl->chip->request = gpiochip_generic_request,
-+	pctl->chip->request = sunxi_pinctrl_gpio_request,
- 	pctl->chip->free = gpiochip_generic_free,
- 	pctl->chip->direction_input = sunxi_pinctrl_gpio_direction_input,
- 	pctl->chip->direction_output = sunxi_pinctrl_gpio_direction_output,
++/* same as gcc, this was present in clang-2.6 so we can assume it works
++ * with any version that can compile the kernel
++ */
++#define __UNIQUE_ID(prefix) __PASTE(__PASTE(__UNIQUE_ID_, prefix), __COUNTER__)
 -- 
-2.4.2
+2.7.0
