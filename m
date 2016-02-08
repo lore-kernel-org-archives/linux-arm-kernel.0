@@ -1,83 +1,91 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Mon, 8 Feb 2016 16:09:37 +0200
-Subject: [PATCH v4 00/13] mmc: use sdhci_pltfm_init for private allocation
- and clean up
-In-Reply-To: <CAPDyKFpFSTYsAUCG9nFnnzmVsA3zm4hAPO8+6REArt9BJtn+0Q@mail.gmail.com>
-References: <1453803353-6266-1-git-send-email-jszhang@marvell.com>
- <CAPDyKFpFSTYsAUCG9nFnnzmVsA3zm4hAPO8+6REArt9BJtn+0Q@mail.gmail.com>
-Message-ID: <56B8A1A1.2080408@intel.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Mon, 8 Feb 2016 15:17:54 +0100
+Subject: [PATCH 1/6] irqchip: add the Alpine MSIX interrupt controller
+In-Reply-To: <alpine.DEB.2.11.1602081125560.25254@nanos>
+References: <1454922971-17405-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1454922971-17405-2-git-send-email-antoine.tenart@free-electrons.com>
+ <alpine.DEB.2.11.1602081125560.25254@nanos>
+Message-ID: <20160208141754.GG4117@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/02/16 12:38, Ulf Hansson wrote:
-> + Adrian
-> 
-> On 26 January 2016 at 11:15, Jisheng Zhang <jszhang@marvell.com> wrote:
->> These patches are to complete the TODOs in Commit 0e748234293f ("mmc:
->> sdhci: Add size for caller in init+register"), I.E:
->>
->> - todo: migrate clients to using allocation this way
->> - todo: remove priv variable once migration is complete
->>
->> Since v3:
->>  - based on v4.5-rc1
->>  - add Ludovic's ack for sdhci-of-at91 changes
->>  - fix use-after-free in some drivers: some host drivers still needs to
->>    access sdhci_pltfm_host->private after sdhci_pltfm_unregister(), but
->>    the private should be already freed by sdhci_pltfm_unregister.
->>  - add patch5 to fix one clk bug in sdhci_arasan_remove(). IMHO, It's
->>    better to add this patch to fixes rather than waiting for next merge
->>    window
->>
->> Since v2:
->>  - based on mmc next tree and remove all priv usage introduced in newly
->>    commits in this tree
->>  - don't break two lines if sdhci_pltfm_init() call could be put into
->>    one line. Thank Ludovic Desroches.
->>
->> Since v1:
->>  - add new patch03 to factorise sdhci_msm_pdata outisde of sdhci_msm_host.
->>    This is to fix drivers/mmc/host/sdhci-msm.c:440:32: warning: 'msm_host'
->>    is used uninitialized in this function [-Wuninitialized]
->>  - Add Arnd's Ack for all patches except patch3 which is new in v2
->>
->>
->> Jisheng Zhang (13):
->>   mmc: sdhci-bcm2835: use sdhci_pltfm_init for private allocation
->>   mmc: sdhci-esdhc-imx: use sdhci_pltfm_init for private allocation
->>   mmc: sdhci-msm: factorise sdhci_msm_pdata outisde of sdhci_msm_host
->>   mmc: sdhci-msm: use sdhci_pltfm_init for private allocation
->>   mmc: sdhci-of-arasan: fix clk issue in sdhci_arasan_remove()
->>   mmc: sdhci-of-arasan: use sdhci_pltfm_init for private allocation
->>   mmc: sdhci-of-at91: use sdhci_pltfm_init for private allocation
->>   mmc: sdhci-of-esdhc: use sdhci_pltfm_init for private allocation
->>   mmc: sdhci-pxav3: use sdhci_pltfm_init for private allocation
->>   mmc: sdhci-st: use sdhci_pltfm_init for private allocation
->>   mmc: sdhci-tegra: use sdhci_pltfm_init for private allocation
->>   mmc: sdhci-pxav2: remove unnecessary assignment of pltfm_host->priv
->>   mmc: sdhci-pltfm: remove priv variable from sdhci_pltfm_host
->>
->>  drivers/mmc/host/sdhci-bcm2835.c   | 14 +++----------
->>  drivers/mmc/host/sdhci-esdhc-imx.c | 38 ++++++++++++++++--------------------
->>  drivers/mmc/host/sdhci-msm.c       | 25 +++++++++++-------------
->>  drivers/mmc/host/sdhci-of-arasan.c | 33 +++++++++++++++----------------
->>  drivers/mmc/host/sdhci-of-at91.c   | 33 ++++++++++++++-----------------
->>  drivers/mmc/host/sdhci-of-esdhc.c  | 19 +++++++++---------
->>  drivers/mmc/host/sdhci-pltfm.h     |  1 -
->>  drivers/mmc/host/sdhci-pxav2.c     |  1 -
->>  drivers/mmc/host/sdhci-pxav3.c     | 20 ++++++++-----------
->>  drivers/mmc/host/sdhci-st.c        | 40 +++++++++++++++++++-------------------
->>  drivers/mmc/host/sdhci-tegra.c     | 21 +++++++-------------
->>  11 files changed, 106 insertions(+), 139 deletions(-)
->>
->> --
->> 2.7.0
->>
-> 
-> To avoid confusions. I don't intend to pick up any further sdhci
-> patches, unless they are acked by Adrian Hunter.
+Thomas,
 
-The patches look OK, although patch 6 doesn't apply cleanly anymore.
-Nevertheless:
+On Mon, Feb 08, 2016 at 11:31:47AM +0100, Thomas Gleixner wrote:
+> On Mon, 8 Feb 2016, Antoine Tenart wrote:
+> > +static int alpine_msix_set_affinity(struct irq_data *irq_data,
+> > +				    const struct cpumask *mask, bool force)
+> > +{
+> > +	int ret;
+> > +
+> > +	ret = irq_chip_set_affinity_parent(irq_data, mask, force);
+> > +	return ret == IRQ_SET_MASK_OK ? IRQ_SET_MASK_OK_DONE : ret;
+> 
+> What's the point of this exercise? Why can't you just set the affinity
+> callback to irq_chip_set_affinity_parent() ?
 
-Acked-by: Adrian Hunter <adrian.hunter@intel.com>
+That's what done in irq-gic-v2m.c. Besides that, I see no point. I'll
+update for v2.
+
+> > +static struct irq_chip alpine_msix_irq_chip = {
+> > +	.name			= "MSIx",
+> > +	.irq_mask		= alpine_msix_mask_msi_irq,
+> > +	.irq_unmask		= alpine_msix_unmask_msi_irq,
+> > +	.irq_eoi		= irq_chip_eoi_parent,
+> > +	.irq_set_affinity	= alpine_msix_set_affinity,
+> > +};
+> > +
+> > +static int alpine_msix_allocate_sgi(struct alpine_msix_data *priv, int num_req)
+> > +{
+> > +	int first, i;
+> > +
+> > +	spin_lock(&priv->msi_map_lock);
+> > +
+> > +	first = bitmap_find_next_zero_area(priv->msi_map, priv->num_spis, 0,
+> > +					   num_req, 0);
+> > +	if (first >= priv->num_spis) {
+> > +		spin_unlock(&priv->msi_map_lock);
+> > +		return -ENOSPC;
+> > +	}
+> > +
+> > +	for (i = 0; i < num_req; i++)
+> > +		set_bit(first + i, priv->msi_map);
+> 
+>   bitmap_set() ??
+
+Indeed, that's better :)
+
+> > +	spin_unlock(&priv->msi_map_lock);
+> > +
+> > +	return priv->spi_first + first;
+> > +}
+> > +
+> > +static void alpine_msix_free_sgi(struct alpine_msix_data *priv, unsigned sgi,
+> > +				 int num_req)
+> > +{
+> > +	int i, first;
+> > +
+> > +	first = sgi - priv->spi_first;
+> > +
+> > +	spin_lock(&priv->msi_map_lock);
+> > +
+> > +	for (i = 0; i < num_req; i++)
+> > +		clear_bit(first + i, priv->msi_map);
+> 
+>   bitmap_clear() ??
+
+Ditto.
+
+Antoine
+
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160208/9197c055/attachment.sig>
