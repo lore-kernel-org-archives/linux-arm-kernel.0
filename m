@@ -1,57 +1,40 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 08 Feb 2016 14:45:23 +0100
-Subject: [PATCH RFC] Add cpufreq support
-In-Reply-To: <20160208131625.GI8294@vireshk>
-References: <56B4D4BE.2040008@free.fr> <22002072.L04zy0K2AP@wuerfel>
- <20160208131625.GI8294@vireshk>
-Message-ID: <7910928.pmJjZiV1Lk@wuerfel>
+Date: Mon, 08 Feb 2016 14:50:15 +0100
+Subject: [RFC PATCH v2 1/3] PCI: hisi: re-architect Hip05/Hip06
+ controllers driver to preapare for ACPI
+In-Reply-To: <1454935264-6076-2-git-send-email-gabriele.paoloni@huawei.com>
+References: <1454935264-6076-1-git-send-email-gabriele.paoloni@huawei.com>
+ <1454935264-6076-2-git-send-email-gabriele.paoloni@huawei.com>
+Message-ID: <2409806.1aGBrN4l0X@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 08 February 2016 18:46:25 Viresh Kumar wrote:
-> On 08-02-16, 14:10, Arnd Bergmann wrote:
-> > I don't remember the exact discussion, but the compatible string is
-> > exactly meant to do one thing: it tells you what you can or cannot do
-> > with one device.
-> 
-> Yeah, and many people argued that we can't add two values to that
-> string like: "cpufreq-dt" and "cpufreq-big-little" for same kind of
-> OPP bindings, as a different compatible string should be required only
-> if there is a difference in the bindings.
-> 
-> For example, if a platform (like ST did recently) adds more
-> platform-specific properties, then they can define a new value of
-> those strings.
->
-> > I had not realized that we don't even have a compatible string
-> > for opp-v2, so if we are missing that, we obviously can't compare
-> > against that string.
-> 
-> The binding says that we can have a string, but its not compulsory
-> yet. Its only used by STM as they have some specific properties of
-> their own.
+On Monday 08 February 2016 12:41:02 Gabriele Paoloni wrote:
+> +
+> +/* HipXX PCIe host only supports 32-bit config access */
+> +int hisi_pcie_common_cfg_read(void __iomem *reg_base, int where, int size,
+> +			      u32 *val)
+> +{
+> +	u32 reg;
+> +	u32 reg_val;
+> +	void *walker = &reg_val;
+> +
+> +	walker += (where & 0x3);
+> +	reg = where & ~0x3;
+> +	reg_val = readl(reg_base + reg);
+> +
+> +	if (size == 1)
+> +		*val = *(u8 __force *) walker;
+> +	else if (size == 2)
+> +		*val = *(u16 __force *) walker;
+> +	else if (size == 4)
+> +		*val = reg_val;
+> +	else
+> +		return PCIBIOS_BAD_REGISTER_NUMBER;
+> +
+> +	return PCIBIOS_SUCCESSFUL;
+> +}
 
-Right, so when those properties are required for that machine,
-that makes it incompatible with the generic driver, and it should
-really have its own compatible string.
-
-That's why I said we could introduce a 'v3' with the meaning
-it should have had to start with: compatible means actually
-compatible with the driver.
-
-I guess we could also start a blacklist and list all machines
-that are not compatible with the generic binding before falling
-back to using that driver.
-
-> > I thought there was a compatible property in there that told us
-> > whether the operating-points-v2/cooling-min-level/#cooling-cells/...
-> > properties were considered valid.
-> 
-> Yeah, "OPP-v2" DT node can have a compatible string, which isn't
-> compulsory as of now, but because of the reasons mentioned earlier, we
-> can't use it to differentiate between drivers that use exactly same
-> version of bindings.
-
-Right, unless we introduce a new compatible string for future machines.
+Isn't this the same hack that Qualcomm are using?
 
 	Arnd
