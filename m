@@ -1,28 +1,20 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 8 Feb 2016 14:45:03 -0800
-Subject: [PATCH v3 4/6] qcom: ipq4019: Add basic board/dts support for
- IPQ4019 SoC
-In-Reply-To: <1447975173-29485-5-git-send-email-mmcclint@qca.qualcomm.com>
-References: <1447975173-29485-1-git-send-email-mmcclint@qca.qualcomm.com>
- <1447975173-29485-5-git-send-email-mmcclint@qca.qualcomm.com>
-Message-ID: <20160208224503.GC10791@codeaurora.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 09 Feb 2016 01:55:58 +0300
+Subject: [PATCH 0/5] Add R8A7794 sound DT support
+Message-ID: <4253511.vvGjIdOnb6@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/19, Matthew McClintock wrote:
-> +
-> +/ {
-> +
-> +	clocks {
-> +		sleep_clk: sleep_clk {
-> +			compatible = "fixed-clock";
-> +			clock-frequency = <32768>;
-> +			#clock-cells = <0>;
-> +		};
-> +	};
+Hello.
 
-The timer should be right here in the SoC file.
+   Here's the set of 5 patches against Simon Horman's 'renesas.git' repo,
+'renesas-devel-20160208-v4.5-rc3' tag. I'm adding the sound device tree support
+for the R8A7794 SoC. The sound patch for the SILK board will be posted RSN. :-)
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+[1/5] ARM: dts: r8a7794: add audio clocks
+[2/5] ARM: dts: r8a7794: add MSTP5 clocks
+[3/5] ARM: dts: r8a7794: add MSTP10 clocks
+[4/5] ARM: dts: r8a7794: add Audio-DMAC support
+[5/5] ARM: dts: r8a7794 add sound support
+
+WBR, Sergei
