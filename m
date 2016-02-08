@@ -1,71 +1,91 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 8 Feb 2016 17:50:55 +0000
-Subject: [RESEND2 PATCH 0/3] Fix kernel panic in dma-coherent
-In-Reply-To: <cover.1454950917.git.brian.starkey@arm.com>
-References: <cover.1454950917.git.brian.starkey@arm.com>
-Message-ID: <20160208175054.GD15443@leverpostej>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 8 Feb 2016 18:51:31 +0100
+Subject: [RFC 1/3] dt-bindings: soc: Add documentation for the MediaTek
+ GCE unit
+In-Reply-To: <1453433893.15298.13.camel@mtksdaap41>
+References: <1453266881-16849-1-git-send-email-hs.liao@mediatek.com>
+ <1453266881-16849-2-git-send-email-hs.liao@mediatek.com>
+ <20160120163826.GA23400@rob-hp-laptop> <1453433893.15298.13.camel@mtksdaap41>
+Message-ID: <56B8D5A3.3000506@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 08, 2016 at 05:30:49PM +0000, Brian Starkey wrote:
-> Hi,
-> 
-> I'm resending these again to try and garner some interest. Without
-> this series, dma-coherent cannot be used on arm64 platforms.
 
-I think you need to characterize that a bit better. I see plenty of
-instances of 'dma-coherent' in dts files, assuming you mean the DT
-dma-coehrent property.
 
-If not, feel free to stop reading now.
+On 22/01/16 04:38, Horng-Shyang Liao wrote:
+> Hi Rob,
+>
+> On Wed, 2016-01-20 at 10:38 -0600, Rob Herring wrote:
+>> On Wed, Jan 20, 2016 at 01:14:38PM +0800, hs.liao at mediatek.com wrote:
+>>> From: HS Liao <hs.liao@mediatek.com>
+>>>
+>>> This adds documentation for the MediaTek Global Command Engine (GCE) unit
+>>> found in MT8173 SoCs.
+>>>
+>>> Signed-off-by: HS Liao <hs.liao@mediatek.com>
+>>> ---
+>>>   .../devicetree/bindings/soc/mediatek/gce.txt       |   33 ++++++++++++++++++++
+>>>   1 file changed, 33 insertions(+)
+>>>   create mode 100644 Documentation/devicetree/bindings/soc/mediatek/gce.txt
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/soc/mediatek/gce.txt b/Documentation/devicetree/bindings/soc/mediatek/gce.txt
+>>> new file mode 100644
+>>> index 0000000..878b11e
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/soc/mediatek/gce.txt
+>>> @@ -0,0 +1,33 @@
+>>> +MediaTek GCE
+>>> +===============
+>>> +
+>>> +The Global Command Engine (GCE) is used to help read/write registers with
+>>> +critical time limitation, such as updating display configuration during the
+>>> +vblank. The GCE can be used to implement the Command Queue (CMDQ) driver.
+>>> +Currently, the GCE only supports display related hardwares, but we expect
+>>> +it can be extended to other hardwares for future requirements.
+>>
+>> That's a hardware limitation or just s/w is only using it for display?
+>> If the latter, that's not really relevant to this binding and should be
+>> removed.
+>
+> Just s/w is only using it for display.
+> I will remove it from next patch.
+>
+>>> +
+>>> +Required properties:
+>>> +- compatible: Must be "mediatek,mt8173-gce"
+>>> +- reg: Address range of the GCE unit
+>>> +- interrupts: The interrupt signal from the GCE block
+>>> +- clock: Clocks according to the common clock binding
+>>> +- clock-names: Must be "gce" to stand for GCE clock
+>>> +
+>>> +Example:
+>>> +
+>>> +	gce: gce at 10212000 {
+>>> +		compatible = "mediatek,mt8173-gce";
+>>> +		reg = <0 0x10212000 0 0x1000>;
+>>> +		interrupts = <GIC_SPI 135 IRQ_TYPE_LEVEL_LOW>;
+>>> +		clocks = <&infracfg CLK_INFRA_GCE>;
+>>> +		clock-names = "gce";
+>>> +	};
+>>> +
+>>> +	mmsys: clock-controller at 14000000 {
+>>> +		compatible = "mediatek,mt8173-mmsys", "syscon";
+>>> +		reg = <0 0x14000000 0 0x1000>;
+>>> +		power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
+>>> +		#clock-cells = <1>;
+>>> +		mediatek,gce = <&gce>;
+>>
+>> Not documented.
+>
+> It's just an example about how gce is used by display mmsys.
+> After I discussed with Mediatek display owner,
+> we think this can be moved to display device tree document.
+> Do you agree with this suggestion?
+> If so, I will remove it from next patch, too.
+>
 
-Currently dma-coherent isn't well-defined, but it's de-facto semantics
-are that a device makes accesses which are coherent with data accesses
-made by CPUs with Normal, Inner Shareable, Inner Write-Back Cacheable,
-Outer Write-Back Cacheable attributes.
+The problem is that mediatek,gce is not documented, but only 
+mediatek,mt8173-gce.
 
-> The decision to add MEMREMAP_WC came out of a previous discussion with
-> Dan Williams and Catalin Marinas about the same problem[1].
-
-As pgprot_writecombine is Normal Non-Cacheable, this is a completely
-different idea of coherency to that described by the DT dma-coherent
-property.
-
-We should not overload that to mean different things.
-
-Thanks,
-Mark.
-
-> These patches implement a MEMREMAP_WC flag for memremap(), which can
-> be used to obtain writecombine mappings. This is then used for setting
-> up dma_coherent_mem regions which use the DMA_MEMORY_MAP flag.
-> They apply cleanly on 4.5-rc3.
-> 
-> Patch 3 makes sure that the appropriate memset function is used
-> when zeroing coherent allocations, which fixes an alignment fault on
-> arm64.
-> 
-> Best Regards,
-> Brian
-> 
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/390857.html
-> 
-> Brian Starkey (3):
->   memremap: add MEMREMAP_WC flag
->   drivers: dma-coherent: use MEMREMAP_WC for DMA_MEMORY_MAP
->   drivers: dma-coherent: use memset_io for DMA_MEMORY_IO
-> 
->  drivers/base/dma-coherent.c |   25 ++++++++++++++++++++-----
->  include/linux/io.h          |    1 +
->  kernel/memremap.c           |   15 +++++++++++++--
->  3 files changed, 34 insertions(+), 7 deletions(-)
-> 
-> -- 
-> 1.7.9.5
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Regards,
+Matthias
