@@ -1,64 +1,38 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon,  8 Feb 2016 18:14:09 +0100
-Subject: [PATCH v3 01/12] irqchip: armada-370-xp: add Kconfig option for the
- driver
+Date: Mon,  8 Feb 2016 18:14:10 +0100
+Subject: [PATCH v3 02/12] irqchip: armada-370-xp: do not enable it by default
+ when ARCH_MVEBU is selected
 In-Reply-To: <1454951660-13289-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1454951660-13289-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1454951660-13289-2-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1454951660-13289-3-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+The irq-armada-370-xp driver can only be built for ARM 32 bits. The mvebu
+family had grown with a new ARM64 SoC which will also select the
+ARCH_MEVBU configuration. Since "ARM: mvebu: use the ARMADA_370_XP_IRQ
+option", the ARM32 mvebu SoC directly select this new option. Selecting
+it by default when ARCH_MEVBU is selected is no more needed.
 
-Instead of building the irq-armada-370-xp driver directly when
-CONFIG_ARCH_MVEBU is enabled, this commit introduces an intermediate
-CONFIG_ARMADA_370_XP_IRQ hidden Kconfig option.
+This patch removes this dependency, thanks to this, a kernel for ARM64
+mvebu SoC can be built without error due this driver.
 
-This allows this option to select other interrupt-related Kconfig
-options (which will be needed in follow-up commits) rather than having
-such selects done from arch/arm/mach-<foo>/.
-
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/irqchip/Kconfig  | 5 +++++
- drivers/irqchip/Makefile | 2 +-
- 2 files changed, 6 insertions(+), 1 deletion(-)
+ drivers/irqchip/Kconfig | 1 -
+ 1 file changed, 1 deletion(-)
 
 diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-index 715923d5236c..e2cab879d641 100644
+index e2cab879d641..b6e7e86a57e1 100644
 --- a/drivers/irqchip/Kconfig
 +++ b/drivers/irqchip/Kconfig
-@@ -60,6 +60,11 @@ config ARM_VIC_NR
- 	  The maximum number of VICs available in the system, for
- 	  power management.
+@@ -62,7 +62,6 @@ config ARM_VIC_NR
  
-+config ARMADA_370_XP_IRQ
-+	bool
-+	default y if ARCH_MVEBU
-+	select GENERIC_IRQ_CHIP
-+
- config ATMEL_AIC_IRQ
+ config ARMADA_370_XP_IRQ
  	bool
+-	default y if ARCH_MVEBU
  	select GENERIC_IRQ_CHIP
-diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-index 18caacb60d58..30dba044d0b8 100644
---- a/drivers/irqchip/Makefile
-+++ b/drivers/irqchip/Makefile
-@@ -5,7 +5,6 @@ obj-$(CONFIG_ARCH_BCM2835)		+= irq-bcm2836.o
- obj-$(CONFIG_ARCH_EXYNOS)		+= exynos-combiner.o
- obj-$(CONFIG_ARCH_HIP04)		+= irq-hip04.o
- obj-$(CONFIG_ARCH_MMP)			+= irq-mmp.o
--obj-$(CONFIG_ARCH_MVEBU)		+= irq-armada-370-xp.o
- obj-$(CONFIG_IRQ_MXS)			+= irq-mxs.o
- obj-$(CONFIG_ARCH_TEGRA)		+= irq-tegra.o
- obj-$(CONFIG_ARCH_S3C24XX)		+= irq-s3c24xx.o
-@@ -28,6 +27,7 @@ obj-$(CONFIG_ARM_GIC_V3_ITS)		+= irq-gic-v3-its.o irq-gic-v3-its-pci-msi.o irq-g
- obj-$(CONFIG_HISILICON_IRQ_MBIGEN)	+= irq-mbigen.o
- obj-$(CONFIG_ARM_NVIC)			+= irq-nvic.o
- obj-$(CONFIG_ARM_VIC)			+= irq-vic.o
-+obj-$(CONFIG_ARMADA_370_XP_IRQ)		+= irq-armada-370-xp.o
- obj-$(CONFIG_ATMEL_AIC_IRQ)		+= irq-atmel-aic-common.o irq-atmel-aic.o
- obj-$(CONFIG_ATMEL_AIC5_IRQ)	+= irq-atmel-aic-common.o irq-atmel-aic5.o
- obj-$(CONFIG_I8259)			+= irq-i8259.o
+ 
+ config ATMEL_AIC_IRQ
 -- 
 2.5.0
