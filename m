@@ -1,55 +1,93 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Mon,  8 Feb 2016 18:57:38 +0100
-Subject: [PATCH 1/2] pinctrl: stm32: Remove dependency with DT bindings header
- files
-In-Reply-To: <1454954259-4923-1-git-send-email-mcoquelin.stm32@gmail.com>
-References: <1454954259-4923-1-git-send-email-mcoquelin.stm32@gmail.com>
-Message-ID: <1454954259-4923-2-git-send-email-mcoquelin.stm32@gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 8 Feb 2016 17:59:25 +0000
+Subject: [RESEND2 PATCH 0/3] Fix kernel panic in dma-coherent
+In-Reply-To: <20160208175054.GD15443@leverpostej>
+References: <cover.1454950917.git.brian.starkey@arm.com>
+ <20160208175054.GD15443@leverpostej>
+Message-ID: <56B8D77D.3050305@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some macros where defined in DT bindings headers, whereas only used
-in the driver.
+Hi Mark,
 
-This patch moves these macros to the driver side.
+On 08/02/16 17:50, Mark Rutland wrote:
+> On Mon, Feb 08, 2016 at 05:30:49PM +0000, Brian Starkey wrote:
+>> Hi,
+>>
+>> I'm resending these again to try and garner some interest. Without
+>> this series, dma-coherent cannot be used on arm64 platforms.
+>
+> I think you need to characterize that a bit better. I see plenty of
+> instances of 'dma-coherent' in dts files, assuming you mean the DT
+> dma-coehrent property.
+>
+> If not, feel free to stop reading now.
 
-Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
----
- drivers/pinctrl/stm32/pinctrl-stm32.c | 2 --
- drivers/pinctrl/stm32/pinctrl-stm32.h | 8 ++++++++
- 2 files changed, 8 insertions(+), 2 deletions(-)
+Terminology overload: the dma-coherent DT property is about devices 
+having cache-coherent access to system memory within the linear map. The 
+dma-coherent thing here is pretty much the precise opposite of that - 
+namely creating CPU mappings for memory which belongs to the device 
+itself and may be behind an I/O bus (e.g. a framebuffer on a video card).
 
-diff --git a/drivers/pinctrl/stm32/pinctrl-stm32.c b/drivers/pinctrl/stm32/pinctrl-stm32.c
-index 9a08222..8deb566 100644
---- a/drivers/pinctrl/stm32/pinctrl-stm32.c
-+++ b/drivers/pinctrl/stm32/pinctrl-stm32.c
-@@ -23,8 +23,6 @@
- #include <linux/reset.h>
- #include <linux/slab.h>
- 
--#include <dt-bindings/pinctrl/pinctrl-stm32.h>
--
- #include "../core.h"
- #include "../pinconf.h"
- #include "../pinctrl-utils.h"
-diff --git a/drivers/pinctrl/stm32/pinctrl-stm32.h b/drivers/pinctrl/stm32/pinctrl-stm32.h
-index 1b7c369..35ebc94 100644
---- a/drivers/pinctrl/stm32/pinctrl-stm32.h
-+++ b/drivers/pinctrl/stm32/pinctrl-stm32.h
-@@ -9,6 +9,14 @@
- #include <linux/pinctrl/pinctrl.h>
- #include <linux/pinctrl/pinconf-generic.h>
- 
-+#define STM32_PIN_NO(x) ((x) << 8)
-+#define STM32_GET_PIN_NO(x) ((x) >> 8)
-+#define STM32_GET_PIN_FUNC(x) ((x) & 0xff)
-+
-+#define STM32_PIN_GPIO		0
-+#define STM32_PIN_AF(x)		((x) + 1)
-+#define STM32_PIN_ANALOG	(STM32_PIN_AF(15) + 1)
-+
- struct stm32_desc_function {
- 	const char *name;
- 	const unsigned char num;
--- 
-1.9.1
+> Currently dma-coherent isn't well-defined,
+
+True dat.
+
+Robin.
+
+> but it's de-facto semantics
+> are that a device makes accesses which are coherent with data accesses
+> made by CPUs with Normal, Inner Shareable, Inner Write-Back Cacheable,
+> Outer Write-Back Cacheable attributes.
+>
+>> The decision to add MEMREMAP_WC came out of a previous discussion with
+>> Dan Williams and Catalin Marinas about the same problem[1].
+>
+> As pgprot_writecombine is Normal Non-Cacheable, this is a completely
+> different idea of coherency to that described by the DT dma-coherent
+> property.
+>
+> We should not overload that to mean different things.
+>
+> Thanks,
+> Mark.
+>
+>> These patches implement a MEMREMAP_WC flag for memremap(), which can
+>> be used to obtain writecombine mappings. This is then used for setting
+>> up dma_coherent_mem regions which use the DMA_MEMORY_MAP flag.
+>> They apply cleanly on 4.5-rc3.
+>>
+>> Patch 3 makes sure that the appropriate memset function is used
+>> when zeroing coherent allocations, which fixes an alignment fault on
+>> arm64.
+>>
+>> Best Regards,
+>> Brian
+>>
+>> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/390857.html
+>>
+>> Brian Starkey (3):
+>>    memremap: add MEMREMAP_WC flag
+>>    drivers: dma-coherent: use MEMREMAP_WC for DMA_MEMORY_MAP
+>>    drivers: dma-coherent: use memset_io for DMA_MEMORY_IO
+>>
+>>   drivers/base/dma-coherent.c |   25 ++++++++++++++++++++-----
+>>   include/linux/io.h          |    1 +
+>>   kernel/memremap.c           |   15 +++++++++++++--
+>>   3 files changed, 34 insertions(+), 7 deletions(-)
+>>
+>> --
+>> 1.7.9.5
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
