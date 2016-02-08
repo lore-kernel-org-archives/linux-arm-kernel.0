@@ -1,35 +1,46 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 8 Feb 2016 16:04:34 +0100
-Subject: [PATCH 0/3] ARM: shmobile: SCU cleanup and consolidation
-In-Reply-To: <20160202140550.GB4304@verge.net.au>
-References: <1453994012-12696-1-git-send-email-geert+renesas@glider.be>
- <20160202140550.GB4304@verge.net.au>
-Message-ID: <CAMuHMdUn7=AAehQqG5ezc4wkKjytOoVz7U9HT_HvPLVj+Na7Vg@mail.gmail.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Mon, 8 Feb 2016 16:05:01 +0100
+Subject: [PATCH 2/6] Documentation: bindings: document the Alpine MSIX
+ driver
+In-Reply-To: <56B8AC7D.8060102@arm.com>
+References: <1454922971-17405-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1454922971-17405-3-git-send-email-antoine.tenart@free-electrons.com>
+ <56B8AC7D.8060102@arm.com>
+Message-ID: <20160208150501.GA19758@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On Mon, Feb 08, 2016 at 02:55:57PM +0000, Marc Zyngier wrote:
+> On 08/02/16 09:16, Antoine Tenart wrote:
+> > +
+> > +Example:
+> > +
+> > +msix: msix {
+> > +	compatible = "al,alpine-msix";
+> > +	reg = <0x0 0xfbe00000 0x0 0x100000>;
+> > +	interrupt-controller;
+> > +	msi-controller;
+> > +	al,msi-base-spi = <160>;
+> > +	al,msi-num-spis = <160>;
+> > +};
+> > 
+> 
+> This example seems to rely on an implicit interrupt-parent. You probably
+> want to update the example to clarify it.
 
-On Tue, Feb 2, 2016 at 3:05 PM, Simon Horman <horms@verge.net.au> wrote:
-> On Thu, Jan 28, 2016 at 04:13:29PM +0100, Geert Uytterhoeven wrote:
->> This patch series contains cleanups and consolidations of the SCU code
->> for shmobile SoCs with Cortex-A9 CPU cores.
->>
->> This has been tested on emev2/kzm9d, r8a7779/marzen, and sh73a0/kzm9g.
->>
->> Thanks!
->
-> Thanks, I have queued these up.
+Right. I'll add the interrupt-parent property in the required properties
+and in the example msix node.
 
-Except for the third patch?
+Antoine
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160208/ff723db7/attachment.sig>
