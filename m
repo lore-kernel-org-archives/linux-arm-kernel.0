@@ -1,35 +1,37 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 8 Feb 2016 14:11:31 +0000
-Subject: [PATCH 1/6] irqchip: add the Alpine MSIX interrupt controller
-In-Reply-To: <20160208140429.GF4117@kwain>
-References: <1454922971-17405-1-git-send-email-antoine.tenart@free-electrons.com>
- <1454922971-17405-2-git-send-email-antoine.tenart@free-electrons.com>
- <56B86391.1030609@arm.com> <20160208140429.GF4117@kwain>
-Message-ID: <56B8A213.2020704@arm.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 8 Feb 2016 09:11:32 -0500
+Subject: [RFC PATCH 0/4] Add ACPI support for HiSilicon PCIe Host
+ Controllers
+In-Reply-To: <7297343.ktGck3KQJN@wuerfel>
+References: <1454585860-60709-1-git-send-email-gabriele.paoloni@huawei.com>
+ <1930535.mkCdtpUWq7@wuerfel>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1ECAC944@lhreml503-mbs>
+ <7297343.ktGck3KQJN@wuerfel>
+Message-ID: <56B8A214.8040203@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/02/16 14:04, Antoine Tenart wrote:
-> Hi Marc,
+On 2/8/2016 8:55 AM, Arnd Bergmann wrote:
+> I haven't really followed what is going on with ACPI. Do you expect
+> to see future machines come out that are not just implementing SBSA
+> but that still need to run ACPI? I thought this was just a hack
+> for some early machines that only run with ACPI but are not actually
+> compliant.
 > 
-> On Mon, Feb 08, 2016 at 09:44:49AM +0000, Marc Zyngier wrote:
->> On 08/02/16 09:16, Antoine Tenart wrote:
->>> +
->>> +static struct msi_domain_info alpine_msix_domain_info = {
->>> +	.flags	= MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
->>> +		  MSI_FLAG_PCI_MSIX,
->>
->> You can probably add MSI_FLAG_PCI_MSI
-> 
-> Are you sure such a flag is available? (Or am I missing something
-> obvious?).
+> 	Arnd
 
-No, I'm just confused (first patch in the morning, what did you
-expect?). It looks like we consider single MSI as a given, please ignore
-my rambling...
+I agree. We shouldn't be playing with half-baked ACPI solutions. We have seen
+two variants already that claim to be ACPI compliant yet they do not tie into
+anything inside ACPICA. 
 
-Thanks,
+The correct route is to use Tomasz's ACPI PCI root bridge driver and use the ACPI
+framework.
 
-	M.
+If a platform has quirks, Tomasz's patches allow vendors add quirks too.
+
+The combination of PCI host bridge driver + ACPI hack is not right.
+
 -- 
-Jazz is not dead. It just smells funny...
+Sinan Kaya
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
