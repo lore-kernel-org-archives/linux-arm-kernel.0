@@ -1,35 +1,51 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon,  8 Feb 2016 15:29:49 +0100
-Subject: [PATCH] pinctrl: coh901: fix initconst annotation
-Message-ID: <1454941800-2776480-1-git-send-email-arnd@arndb.de>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 8 Feb 2016 15:30:47 +0100
+Subject: [PATCH v5sub2 0/8] arm64: implement virtual KASLR
+In-Reply-To: <20160208121430.GL6076@e104818-lin.cambridge.arm.com>
+References: <1454332178-4414-1-git-send-email-ard.biesheuvel@linaro.org>
+ <CAKv+Gu-AhLcatkDsQVeoFGJ+pTEwaW1Hy9M-fY1-VWvRc_E47w@mail.gmail.com>
+ <20160205173248.GJ6076@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu_v1sXM7sivz+Uu86ZG3=Th7wqqh7M1N8wF7Ess4NdTZQ@mail.gmail.com>
+ <CAGXu5j+JpwRrVy1b_h+LJ4sCzsT7BV9RdcD0CvR-4aVJQhCpvg@mail.gmail.com>
+ <20160208121430.GL6076@e104818-lin.cambridge.arm.com>
+Message-ID: <CAKv+Gu-=RLS8Zgn_evmoUUSHqSVfaw9_hjVMgfg1FZGRDGFVag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Clang correctly points out that the section attribute for u300_gpio_confdata
-is in the wrong place:
+On 8 February 2016 at 13:14, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Fri, Feb 05, 2016 at 12:42:30PM -0800, Kees Cook wrote:
+>> On Fri, Feb 5, 2016 at 9:38 AM, Ard Biesheuvel
+>> <ard.biesheuvel@linaro.org> wrote:
+>> > On 5 February 2016 at 18:32, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>> >> I'm still trying to get my head around how we merge those. Since I
+>> >> assume akpm will push them during the merging window, part of your code
+>> >> cannot be tested before.
+>> >
+>> > Actually, my original idea was for akpm to take them as a late merge
+>> > after rebasing to -rc1, since they touch a variety of architectures,
+>> > but I am not sure if that came across.
+>> >
+>> > You could always take the series through your tree instead, I guess?
+>>
+>> Traditionally akpm will de-duplicate patches he's carrying that appear
+>> in another tree. I think it should be okay to carry them in both
+>> places. (Though I'm CCing akpm just to see if I'm talking crazy.)
+>
+> For now, I'll merge this series in the arm64 tree and push it to next:
+>
+> http://lkml.kernel.org/r/1452007180-27411-1-git-send-email-ard.biesheuvel at linaro.org
+>
+> If there are any objections, I can drop the patches and do the
+> BUILDTIME_EXTABLE_SORT disabling trick until they end up in mainline.
+>
 
-drivers/pinctrl/pinctrl-coh901.c:130:37: error: '__section__' attribute only applies to functions and global variables
+Latest version is here:
+http://lkml.kernel.org/r/1453892123-17973-1-git-send-email-ard.biesheuvel at linaro.org
+(only difference is an ack from that Alpha maintainter/supporter to
+patches #1 and #2)
 
-This moves it from the type name to the variable, so it actually gets
-discarded.
+However, the arm64 patch (#6) now conflicts with futex.h in -rc3 after
+the PAN fix, not sure how to best address that ...
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/pinctrl/pinctrl-coh901.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/pinctrl/pinctrl-coh901.c b/drivers/pinctrl/pinctrl-coh901.c
-index cf7788df0f95..741b39eaeb8b 100644
---- a/drivers/pinctrl/pinctrl-coh901.c
-+++ b/drivers/pinctrl/pinctrl-coh901.c
-@@ -127,7 +127,7 @@ struct u300_gpio_confdata {
- }
- 
- /* Initial configuration */
--static const struct __initconst u300_gpio_confdata
-+static const struct u300_gpio_confdata __initconst
- bs335_gpio_config[U300_GPIO_NUM_PORTS][U300_GPIO_PINS_PER_PORT] = {
- 	/* Port 0, pins 0-7 */
- 	{
 -- 
-2.7.0
+Ard.
