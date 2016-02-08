@@ -1,52 +1,57 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Mon, 8 Feb 2016 10:17:09 -0600
-Subject: [RFC PATCH 0/3] arm64 initrd mapping/relocation
-In-Reply-To: <CAKv+Gu__xLKxwAXXf=C3VxpLizjP3oADYyk0bQzQT1G-gTxFqQ@mail.gmail.com>
-References: <1454435802-7604-1-git-send-email-ard.biesheuvel@linaro.org>
- <20160202180622.GP10166@arm.com> <1454509367.4108.3.camel@redhat.com>
- <CAKv+Gu__xLKxwAXXf=C3VxpLizjP3oADYyk0bQzQT1G-gTxFqQ@mail.gmail.com>
-Message-ID: <56B8BF85.2060407@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 8 Feb 2016 16:19:19 +0000
+Subject: [PATCH v5sub2 0/8] arm64: implement virtual KASLR
+In-Reply-To: <CAKv+Gu-=RLS8Zgn_evmoUUSHqSVfaw9_hjVMgfg1FZGRDGFVag@mail.gmail.com>
+References: <1454332178-4414-1-git-send-email-ard.biesheuvel@linaro.org>
+ <CAKv+Gu-AhLcatkDsQVeoFGJ+pTEwaW1Hy9M-fY1-VWvRc_E47w@mail.gmail.com>
+ <20160205173248.GJ6076@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu_v1sXM7sivz+Uu86ZG3=Th7wqqh7M1N8wF7Ess4NdTZQ@mail.gmail.com>
+ <CAGXu5j+JpwRrVy1b_h+LJ4sCzsT7BV9RdcD0CvR-4aVJQhCpvg@mail.gmail.com>
+ <20160208121430.GL6076@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu-=RLS8Zgn_evmoUUSHqSVfaw9_hjVMgfg1FZGRDGFVag@mail.gmail.com>
+Message-ID: <20160208161918.GT6076@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/03/2016 08:26 AM, Ard Biesheuvel wrote:
-> On 3 February 2016 at 15:22, Mark Salter <msalter@redhat.com> wrote:
->> On Tue, 2016-02-02 at 18:06 +0000, Will Deacon wrote:
->>> On Tue, Feb 02, 2016 at 06:56:39PM +0100, Ard Biesheuvel wrote:
->>>> After discussing in linux-efi with Mark, and on #armlinux with Will, this is
->>>> a proposal for dealing with initrd memory that is potentially not covered by
->>>> the linear region.
->>>>
->>>> Note that this will look slightly differently when some of the KASLR work gets
->>>> merged, but this should only affect the way we deal with the initrd if it sits
->>>> outside of the linear region.
->>>>
->>>> Mostly intended for discussion, not tested at all.
->>>
->>> Thanks Ard, this looks like a much better approach to me. Mark -- does
->>> the general idea work for you too?
->>>
->>> Will
->>
->> Yeah, much simpler. I like it in concept but am I missing something or is it
->> adding memory to the system beyond the mem= limit?
->
-> Indeed. I think it is reasonable to require that if you pass both mem=
-> and initrd= *and* you need your memory limit to be honored strictly,
-> it is up to you to ensure that the initrd does not live in the memory
-> you are throwing away.
->
->> But even that may not be
->> a big deal. And I need to look at the KASLR work and understand the issues
->> with it and mem= if any. I'm traveling right now and can't really try it out
->> until tomorrow...
->>
->
-> No worries. My estimation is that Will is not going to take this as a
-> fix anyway, so we have plenty of time to test and/or discuss
+On Mon, Feb 08, 2016 at 03:30:47PM +0100, Ard Biesheuvel wrote:
+> On 8 February 2016 at 13:14, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Fri, Feb 05, 2016 at 12:42:30PM -0800, Kees Cook wrote:
+> >> On Fri, Feb 5, 2016 at 9:38 AM, Ard Biesheuvel
+> >> <ard.biesheuvel@linaro.org> wrote:
+> >> > On 5 February 2016 at 18:32, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> >> >> I'm still trying to get my head around how we merge those. Since I
+> >> >> assume akpm will push them during the merging window, part of your code
+> >> >> cannot be tested before.
+> >> >
+> >> > Actually, my original idea was for akpm to take them as a late merge
+> >> > after rebasing to -rc1, since they touch a variety of architectures,
+> >> > but I am not sure if that came across.
+> >> >
+> >> > You could always take the series through your tree instead, I guess?
+> >>
+> >> Traditionally akpm will de-duplicate patches he's carrying that appear
+> >> in another tree. I think it should be okay to carry them in both
+> >> places. (Though I'm CCing akpm just to see if I'm talking crazy.)
+> >
+> > For now, I'll merge this series in the arm64 tree and push it to next:
+> >
+> > http://lkml.kernel.org/r/1452007180-27411-1-git-send-email-ard.biesheuvel at linaro.org
+> >
+> > If there are any objections, I can drop the patches and do the
+> > BUILDTIME_EXTABLE_SORT disabling trick until they end up in mainline.
+> 
+> Latest version is here:
+> http://lkml.kernel.org/r/1453892123-17973-1-git-send-email-ard.biesheuvel at linaro.org
+> (only difference is an ack from that Alpha maintainter/supporter to
+> patches #1 and #2)
 
+I applied the acks manually but I'll double-check to make sure I haven't
+missed anything.
 
-I needed these patches to successfully boot a JunoR2 with a recent 
-tianocore firmware.
+> However, the arm64 patch (#6) now conflicts with futex.h in -rc3 after
+> the PAN fix, not sure how to best address that ...
 
-Thanks,
+I'll have a look.
+
+-- 
+Catalin
