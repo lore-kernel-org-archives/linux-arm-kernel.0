@@ -1,48 +1,44 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 8 Feb 2016 15:12:23 -0600
-Subject: [PATCH v5 3/3] pci, pci-thunder-ecam: Add driver for
- ThunderX-pass1 on-chip devices
-In-Reply-To: <56B8FED6.1050804@caviumnetworks.com>
-References: <1454715675-17512-1-git-send-email-ddaney.cavm@gmail.com>
- <1454715675-17512-4-git-send-email-ddaney.cavm@gmail.com>
- <20160208195642.GA15103@rob-hp-laptop>
- <56B8FED6.1050804@caviumnetworks.com>
-Message-ID: <CAL_JsqJNndZ59465YhpkP=dQYaijaar+LcQG4KQEJwF5e1ryLQ@mail.gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Mon, 08 Feb 2016 13:20:35 -0800
+Subject: [PATCH v4 00/13] arm64: kernel: Add support for
+ hibernate/suspend-to-disk
+In-Reply-To: <56B4AF2A.2070503@arm.com> (James Morse's message of "Fri, 05 Feb
+ 2016 14:18:18 +0000")
+References: <1453977766-20907-1-git-send-email-james.morse@arm.com>
+ <7hvb6chv5e.fsf@baylibre.com> <56AF1D07.3000604@arm.com>
+ <7hmvrid3pv.fsf@baylibre.com> <56B4AF2A.2070503@arm.com>
+Message-ID: <7h8u2uc318.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 8, 2016 at 2:47 PM, David Daney <ddaney@caviumnetworks.com> wrote:
-> On 02/08/2016 11:56 AM, Rob Herring wrote:
->>
->> On Fri, Feb 05, 2016 at 03:41:15PM -0800, David Daney wrote:
+James Morse <james.morse@arm.com> writes:
+
+> Hi Kevin,
+>
+> On 03/02/16 00:42, Kevin Hilman wrote:
+>> James Morse <james.morse@arm.com> writes:
+>>> On 29/01/16 22:34, Kevin Hilman wrote:
+>>>> James Morse <james.morse@arm.com> writes:
+>>>> I'd like to help in testing this so I'm just curious which platforms
+>>>> you've been testing this on.  I'm assuming a Juno (r2?), anything else?
 >>>
->>> From: David Daney <david.daney@cavium.com>
+>>> That would be great - thanks!
+>>>
+>>> I've done most of the testing on a Juno r1, but also gave it a spin on a
+>>> stray Seattle.
+>> 
+>> OK, I'm using a very recently arrived Juno R2, and I did get it
+>> working.  I have a few other arm64 boards around that ar part of
+>> kernelci.org and will try those as well.
+>
+> Great,
+> It would be good to have a Tested-by if it works to your satisfaction...
 
-[...]
+Yes, feel free to add
 
->>> +Properties of the host controller node that differ from
->>> +host-generic-pci.txt:
->>> +
->>> +- compatible     : Must be "cavium,pci-host-thunder-ecam"
->>> +
->>> +Example:
->>> +
->>> +       pci at 84b0,00000000 {
->>
->>
->> Drop the comma,
->
->
-> OK...
->
->> and the node name should be "pcie".
->>
->
-> Why pcie?
->
-> There are no PCIe devices or buses reachable from this type of root complex.
-> There are however many PCI devices.
+Tested-by: Kevin Hilman <khilman@baylibre.com> # Tested on Juno R2
 
-I thought ECAM is a PCIe thing. If not, then nevermind.
+I tried to also test on the qcom 96boards, but that platform doesn't
+support suspend/resume yet. :(
 
-Rob
+Kevin
