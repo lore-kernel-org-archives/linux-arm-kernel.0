@@ -1,78 +1,160 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Mon, 08 Feb 2016 15:26:48 +0200
-Subject: [PATCH V2 3/6] stm class: provision for statically assigned
- masterIDs
-In-Reply-To: <CANLsYky2twQ98u241YyHD=atYRp1N56YVHUQNY2E2Ljsq0cseA@mail.gmail.com>
-References: <1454487337-30184-1-git-send-email-zhang.chunyan@linaro.org>
- <1454487337-30184-4-git-send-email-zhang.chunyan@linaro.org>
- <87mvrf5ngl.fsf@ashishki-desk.ger.corp.intel.com>
- <CANLsYky2twQ98u241YyHD=atYRp1N56YVHUQNY2E2Ljsq0cseA@mail.gmail.com>
-Message-ID: <87twlj49k7.fsf@ashishki-desk.ger.corp.intel.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Mon, 8 Feb 2016 14:27:41 +0100
+Subject: ARM PCI/MSI KVM passthrough with GICv2M
+In-Reply-To: <20160208094826.GA620@cbox>
+References: <1454017899.23148.0.camel@redhat.com>
+ <56AB78B1.2030202@linaro.org> <1454096004.9301.1.camel@redhat.com>
+ <56ABD8E0.6080409@linaro.org> <20160201140351.GE6828@arm.com>
+ <20160203125047.GB13974@cbox> <20160203131057.GA20217@arm.com>
+ <20160203153606.GC13974@cbox> <56B4DC97.60904@linaro.org>
+ <20160205111700.726ac061@t450s.home> <20160208094826.GA620@cbox>
+Message-ID: <56B897CD.1000402@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mathieu Poirier <mathieu.poirier@linaro.org> writes:
-
-> On 5 February 2016 at 05:52, Alexander Shishkin
-> <alexander.shishkin@linux.intel.com> wrote:
->> Chunyan Zhang <zhang.chunyan@linaro.org> writes:
+Hi Alex, Christoffer,
+On 02/08/2016 10:48 AM, Christoffer Dall wrote:
+> On Fri, Feb 05, 2016 at 11:17:00AM -0700, Alex Williamson wrote:
+>> On Fri, 5 Feb 2016 18:32:07 +0100
+>> Eric Auger <eric.auger@linaro.org> wrote:
 >>
->>> From: Mathieu Poirier <mathieu.poirier@linaro.org>
+>>> Hi Alex,
 >>>
->>> Some architecture like ARM assign masterIDs statically at the HW design
->>> phase, making masterID manipulation in the generic STM core irrelevant.
+>>> I tried to sketch a proposal for guaranteeing the IRQ integrity when
+>>> doing ARM PCI/MSI passthrough with ARM GICv2M msi-controller. This is
+>>> based on extended VFIO group viability control, as detailed below.
 >>>
->>> This patch adds a new 'mstatic' flag to struct stm_data that tells the
->>> core that this specific STM device doesn't need explicit masterID
->>> management.
+>>> As opposed to ARM GICv3 ITS, this MSI controller does *not* support IRQ
+>>> remapping. It can expose 1 or more 4kB MSI frame. Each frame contains a
+>>> single register where the msi data is written.
+>>>
+>>> I would be grateful to you if you could tell me whether it makes any sense.
+>>>
+>>> Thanks in advance
+>>>
+>>> Best Regards
+>>>
+>>> Eric
+>>>
+>>>
+>>> 1) GICv2m with a single 4kB single frame
+>>>    all devices having this msi-controller as msi-parent share this
+>>>    single MSI frame. Those devices can work on behalf of the host
+>>>    or work on behalf of 1 or more guests (KVM assigned devices). We
+>>>    must make sure either the host only or 1 single VM can access to the
+>>>    single frame to guarantee interrupt integrity: a device assigned
+>>>    to 1 VM should not be able to trigger MSI targeted to the host
+>>>    or another VM.
+>>>
+>>>    I would propose to extend the VFIO notion of group viability.
+>>>    Currently a VFIO group is viable if:
+>>>    all devices belonging to the same group are bound to a VFIO driver
+>>>    or unbound.
+>>>
+>>>    Let's imagine we extend the viability check as follows:
+>>>
+>>>    0) keep the current viable check: all the devices belonging to
+>>>       the group must be vfio bound or unbound.
+>>>    1) retrieve the MSI parent of the device and list all the
+>>>       other devices using that MSI controller as MSI-parent (does not
+>>>       look straightforward):
+>>>    2) they must be VFIO driver bound or unbound as well (meaning
+>>>       they are not used by the host). If not, reject device attachment
+>>>    - in case they are VFIO bound (a VFIO group is set):
+>>>      x if all VFIO containers are the same as the one of the device's
+>>>        we try to attach, that's OK. This means the other devices
+>>>        use different IOMMU mappings, eventually will target the
+>>>        MSI frame but they all work for the same user space client/VM.
+>>>      x 1 or more devices has a different container than the device
+>>>        under attachment:
+>>>        It works on behalf of a different user space client/VM,
+>>>        we can't attach the new device. I think there is a case however
+>>>        where severals containers can be opened by a single QEMU.
+>>>
+>>> Of course the dynamic aspects, ie a new device showing up or an unbind
+>>> event bring significant complexity.
+>>>
+>>> 2) GICv2M with multiple 4kB frames
+>>>    Each msi-frame is enumerated as msi-controller. The device tree
+>>>    statically defines which device is attached to each msi frame.
+>>>    In case devices are assigned we cannot change this attachment
+>>>    anyway since there might be physical contraints behind.
+>>>    So devices likely to be assigned to guests should be linked to a
+>>>    different MSI frame than devices that are not.
+>>>
+>>>    I think extended viability concept can be used as well.
+>>>
+>>>    This model still is not ideal: in case we have a SR-IOV device
+>>>    plugged onto an host bridge attached to a single MSI parent you won't
+>>>    be able anyway to have 1 Virtual Function working for host and 1 VF
+>>>    working for a guest. Only Interrupt translation (ITS) will bring that
+>>>    feature.
+>>>
+>>> 3) GICv3 ITS
+>>>    This one supports interrupt translation service ~ Intel
+>>>    IRQ remapping.
+>>>    This means a single frame can be used by all devices. A deviceID is
+>>>    used exclusively by the host or a guest. I assume the ITS driver
+>>>    allocates/populates deviceid interrupt translation table featuring
+>>>    separate LPI spaces ie by construction different ITT cannot feature
+>>>    same LPIs. So no need to do the extended viability test.
+>>>
+>>>    The MSI controller should have a property telling whether
+>>>    it supports interrupt translation. This kind of property currently
+>>>    exists on IOMMU side for INTEL remapping.
+>>>
 >>
->> So why do we need this patch? If your STM only has master 42 allocated
->> for software sources, simply set sw_start = 42, sw_end = 42 and you're
->> good to go, software will have exactly one channel to choose from. See
->> also the comment from <linux/stm.h>:
->
-> On ARM each source, i.e entity capable of accessing STM channels, has
-> a different master ID set in HW.  We can't assume the IDs are
-> contiguous and from a SW point of view there is no way to probe the
-> values.
-
-Ok, it's the 'static' word that got me confused. From Mike's explanation
-it seems to me that it's the antithesis of static; the master ID
-assignment is so dynamic that it's not controllable by the software and
-may or may not reflect core id, power state, phase of the moon, etc.
-
->>> In the core sw_start/end of masterID are set to '1',
->>> i.e there is only one masterID to deal with.
+>> Hi Eric,
 >>
->> This is also a completely arbitrary and unnecessary requirement. Again,
->> you can set both to 42 and it will still work.
+>> Would anyone be terribly upset if we simply assume the worst case
+>> scenario on GICv2m/M, have the IOMMU not claim IOMMU_CAP_INTR_REMAP, and
+>> require the user to opt-in via the allow_unsafe_interrupts on the
+>> vfio_iommu_type1 module?  That would make it very compatible with what
+>> we already do on x86, where it really is all or nothing.  
+> 
+> meaning either you allow unsafe multiplexing with passthrough in every
+> flavor (unsafely) or you don't allow it at all?
+that's my understanding. if the iommu does not expose
+IOMMU_CAP_INTR_REMAP, the end-user must explicitly turn
+allow_unsafe_interrupts on. On ARM we will have the handle the fact the
+interrupt translation is handled on interrupt controller side and not on
+iommu side though;
 >
-> True - any value will do. The important thing to remember is that on
-> ARM, there is only one masterID channel (from an STM core point of
-> view).  But we could also proceed differently, see below for more
-> details.
+> I didn't know such on option existed, but it seems to me that this fits
+> the bill exactly.
+well I think the support of multiple GICv2m MSI frames was devised to
+allow safe interrupts but extending the VFIO viability notion as
+described above effectively seems a huge work with small benefits since
+we don't have much HW featuring multiple frames I am afraid. So I think
+it is a good compromise to have a minimal integration with GICv2m and
+full feature with best fitted HW, ie. GICv3 ITS.
+> 
+> 
+>> My assumption
+>> is that GICv2 would be phased out in favor of GICv3, so there's always
+>> a hardware upgrade path to having more complete isolation, but the
+>> return on investment for figuring out whether a given device really has
+>> this sort of isolation seems pretty low.  Often users already have some
+>> degree of trust in the VMs they use for device assignment anyway.  An
+>> especially prudent user can still look at the hardware specs for their
+>> specific system to understand whether any devices are fully isolated
+>> and only make use of those for device assignment.  Does that seem like
+>> a reasonable alternative?
+>>
+> 
+> It sounds good to me, that would allow us to release a GICv2m-based
+> solution for MSI passthrough on currently available hardware like the
+> Seattle.
 
-Well, we have the masters attribute with two numbers in it that define
-the range of master IDs that the software can choose from. More
-specifically to this situation:
+Sounds good to me too. I am going to respin the kernel series according
+to this discussion and previous comments.
 
- * the number of channel ID spaces available to the SW is
-   $end - $start + 1, that is, in your case, just 1;
- * the number of master IDs for the SW to choose from is $end - $start;
- * if $end==$start, their actual numeric value doesn't really matter,
-   either for the policy definition or for the actual writers.
+Thanks for your comments!
 
-This $end==$start situation itself may be ambiguous and can be
-interpreted either as having just one *static* master ID fixed for all
-SW writers (what I assumed from your commit message) or as having a
-floating master ID, which changes of its own accord and is not
-controllable by software.
+Best Regards
 
-These two situations are really the same thing from the perspective of
-the system under tracing. Also, both of these situations should already
-work if the driver sets both sw_start and sw_end to the same
-value.
-
-Regards,
---
-Alex
+Eric
+> 
+> Thanks,
+> -Christoffer
+> 
