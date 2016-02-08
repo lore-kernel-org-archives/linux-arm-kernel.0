@@ -1,70 +1,96 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Mon, 8 Feb 2016 16:06:54 +0000
-Subject: [RFC PATCH v2 1/3] PCI: hisi: re-architect Hip05/Hip06
- controllers driver to preapare for ACPI
-In-Reply-To: <2409806.1aGBrN4l0X@wuerfel>
-References: <1454935264-6076-1-git-send-email-gabriele.paoloni@huawei.com>
- <1454935264-6076-2-git-send-email-gabriele.paoloni@huawei.com>
- <2409806.1aGBrN4l0X@wuerfel>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1ECACFDD@lhreml503-mbs>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 08 Feb 2016 17:09:38 +0100
+Subject: [PATCH v2 0/3] fix and new support for orion5x based linkstation
+In-Reply-To: <87lh6v19p4.fsf@free-electrons.com> (Gregory CLEMENT's message of
+ "Mon, 08 Feb 2016 16:52:07 +0100")
+References: <1454689998-9579-1-git-send-email-rogershimizu@gmail.com>
+ <1454738393-14114-1-git-send-email-rogershimizu@gmail.com>
+ <87lh6v19p4.fsf@free-electrons.com>
+Message-ID: <87d1s718vx.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd
+Hi,
+ 
+ On lun., f?vr. 08 2016, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
 
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: 08 February 2016 13:50
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: Gabriele Paoloni; Guohanjun (Hanjun Guo); Wangzhou (B); liudongdong
-> (C); Linuxarm; qiujiang; bhelgaas at google.com;
-> Lorenzo.Pieralisi at arm.com; tn at semihalf.com; linux-pci at vger.kernel.org;
-> linux-kernel at vger.kernel.org; xuwei (O); linux-acpi at vger.kernel.org;
-> jcm at redhat.com; zhangjukuo; Liguozhu (Kenneth)
-> Subject: Re: [RFC PATCH v2 1/3] PCI: hisi: re-architect Hip05/Hip06
-> controllers driver to preapare for ACPI
-> 
-> On Monday 08 February 2016 12:41:02 Gabriele Paoloni wrote:
-> > +
-> > +/* HipXX PCIe host only supports 32-bit config access */
-> > +int hisi_pcie_common_cfg_read(void __iomem *reg_base, int where, int
-> size,
-> > +			      u32 *val)
-> > +{
-> > +	u32 reg;
-> > +	u32 reg_val;
-> > +	void *walker = &reg_val;
-> > +
-> > +	walker += (where & 0x3);
-> > +	reg = where & ~0x3;
-> > +	reg_val = readl(reg_base + reg);
-> > +
-> > +	if (size == 1)
-> > +		*val = *(u8 __force *) walker;
-> > +	else if (size == 2)
-> > +		*val = *(u16 __force *) walker;
-> > +	else if (size == 4)
-> > +		*val = reg_val;
-> > +	else
-> > +		return PCIBIOS_BAD_REGISTER_NUMBER;
-> > +
-> > +	return PCIBIOS_SUCCESSFUL;
-> > +}
-> 
-> Isn't this the same hack that Qualcomm are using?
+> Hi Roger,
+>  
+>  On sam., f?vr. 06 2016, Roger Shimizu <rogershimizu@gmail.com> wrote:
+>
+>> Dear Orion5x Maintainer,
+>>
+>> Here're fix and new support for orion5x based linkstation devices.
+>>
+>> Firstly, it add the missing mtd flash support, which I consider a fix
+>> and can be backported to stable kernels, so I made the patch explicit.
+>>
+>> Second, like the changes I made for kirkwood based linkstation DT,
+>> I split the orion5x-linkstation-lswtgl.dts file into common and device
+>> specific part, in order to support more devices.
+>>
+>> Third, so there's a new device.
+>>
+>> Hope this can be kindly accepted. Thank you!
+>>
+>> Changes in v2:
+>> - add "Fixes" tag for patch 1/3
+>> - add "mvebu-" prefix to common .dtsi file to share between orion5x
+>>   and kirkwood, which address comment from Andrew Lunn
+>> - add "Reviewed-by" tag from Andrew Lunn for all 3 patches
+>>
+>> Cheers,
+>> Roger
+>>
+>> Roger Shimizu (3):
+>>   ARM: dts: orion5x: fix the missing mtd flash on linkstation lswtgl
+>>   ARM: dts: orion5x: split linkstation lswtgl into common and device
+>>     parts
+>>   ARM: dts: orion5x: add device tree for buffalo linkstation ls-gl
+>
+>
+> The 3 patches have been applied on mvebu/dt
 
-As far as I can see Qualcomm defines its own config access
-mechanism only for RC config read and also it seems they're
-having problems with reporting the device class...
+Humm, finally I moved the first patch to mvebu/fixes
 
-https://github.com/torvalds/linux/blob/master/drivers/pci/host/pcie-qcom.c#L474
+Gregory
 
-Our problem is that our HW can only perform 32b rd/wr accesses
-So we can't use readw/readb/writew/writeb...
+>
+> Thanks,
+>
+> Gregory
+>
+>
+>>
+>>  arch/arm/boot/dts/Makefile                         |   1 +
+>>  arch/arm/boot/dts/mvebu-linkstation-fan.dtsi       |  72 +++++++
+>>  .../boot/dts/mvebu-linkstation-gpio-simple.dtsi    | 105 ++++++++++
+>>  arch/arm/boot/dts/orion5x-linkstation-lsgl.dts     |  87 +++++++++
+>>  arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts   | 214 +++++----------------
+>>  arch/arm/boot/dts/orion5x-linkstation.dtsi         | 180 +++++++++++++++++
+>>  6 files changed, 491 insertions(+), 168 deletions(-)
+>>  create mode 100644 arch/arm/boot/dts/mvebu-linkstation-fan.dtsi
+>>  create mode 100644 arch/arm/boot/dts/mvebu-linkstation-gpio-simple.dtsi
+>>  create mode 100644 arch/arm/boot/dts/orion5x-linkstation-lsgl.dts
+>>  create mode 100644 arch/arm/boot/dts/orion5x-linkstation.dtsi
+>>
+>> -- 
+>> 2.1.4
+>>
+>
+> -- 
+> Gregory Clement, Free Electrons
+> Kernel, drivers, real-time and embedded Linux
+> development, consulting, training and support.
+> http://free-electrons.com
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-Thanks
-
-Gab
-
-> 
-> 	Arnd
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
