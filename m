@@ -1,22 +1,35 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 8 Feb 2016 01:50:56 +0000 (UTC)
-Subject: [PATCH v3 1/3] ARM: DRA7: hwmod: Add reset data for PCIe
-In-Reply-To: <1452780672-14339-2-git-send-email-kishon@ti.com>
-References: <1452780672-14339-1-git-send-email-kishon@ti.com>
- <1452780672-14339-2-git-send-email-kishon@ti.com>
-Message-ID: <alpine.DEB.2.02.1602080150390.2182@utopia.booyaka.com>
+From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
+Date: Mon,  8 Feb 2016 03:17:31 +0100
+Subject: [PATCH v2 02/10] Documentation: devicetree: rockchip: Document GeekBox
+In-Reply-To: <1454897859-7601-1-git-send-email-afaerber@suse.de>
+References: <1454897859-7601-1-git-send-email-afaerber@suse.de>
+Message-ID: <1454897859-7601-3-git-send-email-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 14 Jan 2016, Kishon Vijay Abraham I wrote:
+Use "geekbuying,geekbox" compatible string.
 
-> Add PCIe reset data to PCIe hwmods on DRA7x.
-> 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
-> Reviewed-by: Suman Anna <s-anna@ti.com>
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
+---
+ v2: New (Heiko)
+ 
+ Documentation/devicetree/bindings/arm/rockchip.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Thanks, queued for v4.6.
-
-
-- Paul
+diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
+index 078c14fcdaaa..f633595b196c 100644
+--- a/Documentation/devicetree/bindings/arm/rockchip.txt
++++ b/Documentation/devicetree/bindings/arm/rockchip.txt
+@@ -87,6 +87,10 @@ Rockchip platforms device tree bindings
+ 		     "google,veyron-speedy-rev3", "google,veyron-speedy-rev2",
+ 		     "google,veyron-speedy", "google,veyron", "rockchip,rk3288";
+ 
++- GeekBuying GeekBox:
++    Required root node properties:
++      - compatible = "geekbuying,geekbox", "rockchip,rk3368";
++
+ - Rockchip RK3368 evb:
+     Required root node properties:
+       - compatible = "rockchip,rk3368-evb-act8846", "rockchip,rk3368";
+-- 
+2.6.2
