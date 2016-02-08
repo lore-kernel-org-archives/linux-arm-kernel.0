@@ -1,38 +1,74 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 8 Feb 2016 09:54:05 -0600
-Subject: [PATCH 05/11] drivers: pinctrl: add driver for Allwinner A64 SoC
-In-Reply-To: <20160204165151.GK4270@lukather>
-References: <1454348370-3816-1-git-send-email-andre.przywara@arm.com>
- <1454348370-3816-6-git-send-email-andre.przywara@arm.com>
- <20160201182754.GA14737@excalibur.cnev.de>
- <56AFE0EC.8080207@arm.com> <20160202100046.GM4652@lukather>
- <56B0DF26.10203@arm.com> <20160204165151.GK4270@lukather>
-Message-ID: <20160208155405.GA4677@rob-hp-laptop>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Mon, 8 Feb 2016 15:55:35 +0000
+Subject: [RFC PATCH v2 2/3] PCI: hisi: Make the HiSilicon PCIe host
+ controller ECAM compliant
+In-Reply-To: <3532826.pJr5R5Xa4c@wuerfel>
+References: <1454935264-6076-1-git-send-email-gabriele.paoloni@huawei.com>
+ <1454935264-6076-3-git-send-email-gabriele.paoloni@huawei.com>
+ <3532826.pJr5R5Xa4c@wuerfel>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1ECACF44@lhreml503-mbs>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 04, 2016 at 05:51:51PM +0100, Maxime Ripard wrote:
-> Hi Andre,
+> -----Original Message-----
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: 08 February 2016 13:48
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: Gabriele Paoloni; Guohanjun (Hanjun Guo); Wangzhou (B); liudongdong
+> (C); Linuxarm; qiujiang; bhelgaas at google.com;
+> Lorenzo.Pieralisi at arm.com; tn at semihalf.com; linux-pci at vger.kernel.org;
+> linux-kernel at vger.kernel.org; xuwei (O); linux-acpi at vger.kernel.org;
+> jcm at redhat.com; zhangjukuo; Liguozhu (Kenneth)
+> Subject: Re: [RFC PATCH v2 2/3] PCI: hisi: Make the HiSilicon PCIe host
+> controller ECAM compliant
 > 
-> On Tue, Feb 02, 2016 at 04:53:58PM +0000, Andre Przywara wrote:
-> > > So, droping it in the filenames, why not. But I'd really like to keep
-> > > the same compatible scheme.
-> > 
-> > And I still don't get this: in the DT compatible scheme we always have a
-> > vendor prefix, so allwinner,a64 is surely not a mysterious ARM Ltd. core
-> > or a new Apple SoC. Instead it is the A64 from Allwinner, full stop. So
-> > why should we add an arbitrary and confusing sun50i naming to it (when
-> > it actually should be more like "sun8i-a64").
+> On Monday 08 February 2016 12:41:03 Gabriele Paoloni wrote:
+> > From: gabriele paoloni <gabriele.paoloni@huawei.com>
+> >
+> > This patch modifies the current Hip05/Hip06 PCIe host controller
+> > driver to make it ECAM compliant. This is needed in preparation
+> > for the ACPI based driver to allow both DT and ACPI drivers to
+> > use the same BIOS (that configure the Designware iATUs).
+> >
+> > Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
+> > Signed-off-by: Dongdong Liu <liudongdong3@huawei.com>
+> >
 > 
-> I don't decide on their marketing names. And I know you want to start
-> anew with the arm64 SoCs, but the truth is, you don't. Most of the
-> compatibles in the DTSI are from earlier SoCs, and we have to keep
-> that legacy and remain consistent with it. With all the good and bad
-> things a legacy imply.
+> Doesn't this break backwards compatibility?
 
-I have to agree. Unless there is some agreement to move to another 
-naming scheme, then just follow the same pattern. If sunXi is just a 
-made up name outside of Allwinner to provide some logical grouping of 
-SoCs, then yes, that probably should not have been done.
+Well Hip05/Hip06 SoCs are used into evaluation boards
+For the Estuary project.
 
-Rob
+https://github.com/hisilicon/estuary
+
+As this new driver gets upstream we'll merge this new driver into estuary
+and release a new version of the firmware to support it.
+
+> 
+> I think you need to use a new compatible string in the firmware
+> if you change the register layout, and then change the driver
+> to support both the old and the new layout.
+
+You are right, for some reason in this patchset I missed the Documentation
+update that I posted in the previous one, i.e.:
+
+--- a/Documentation/devicetree/bindings/pci/hisilicon-pcie.txt
++++ b/Documentation/devicetree/bindings/pci/hisilicon-pcie.txt
+@@ -23,8 +23,8 @@ Optional properties:
+ Hip05 Example (note that Hip06 is the same except compatible):
+ 	pcie at 0xb0080000 {
+ 		compatible = "hisilicon,hip05-pcie", "snps,dw-pcie";
+-		reg = <0 0xb0080000 0 0x10000>, <0x220 0x00000000 0 0x2000>;
+-		reg-names = "rc_dbi", "config";
++		reg = <0 0xb0080000 0 0x10000>, <0x220 0x00100000 0 0x0f00000>;
++		reg-names = "rc_dbi", "ecam-cfg";
+
+I will fix this in v3
+
+Thanks
+
+Gab 
+
+
+> 
+> 	Arnd
