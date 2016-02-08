@@ -1,42 +1,34 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 8 Feb 2016 14:12:46 -0600
-Subject: [PATCH v4 01/11] drm/hisilicon: Add device tree binding for
- hi6220 display subsystem
-In-Reply-To: <1454729098-79807-2-git-send-email-xinliang.liu@linaro.org>
-References: <1454729098-79807-1-git-send-email-xinliang.liu@linaro.org>
- <1454729098-79807-2-git-send-email-xinliang.liu@linaro.org>
-Message-ID: <20160208201246.GA17459@rob-hp-laptop>
+From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
+Date: Mon, 8 Feb 2016 22:14:18 +0200
+Subject: [PATCH] ARM: OMAP2+: Fix onenand initialization to avoid
+ filesystem corruption
+In-Reply-To: <20160208193644.GU19432@atomide.com>
+References: <linux-kernel@vger.kernel.org>
+ <1454683028-4193-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
+ <20160208193644.GU19432@atomide.com>
+Message-ID: <56B8F71A.7090102@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 06, 2016 at 11:24:48AM +0800, Xinliang Liu wrote:
-> Add ADE display controller binding doc.
-> Add DesignWare DSI Host Controller v1.20a binding doc.
+Hi
 
-One comment, otherwise:
+On  8.02.2016 21:36, Tony Lindgren wrote:
+>
+> OK. So probably the INT or RDY polarity made the ECC not work.
+>
 
-Acked-by: Rob Herring <robh@kernel.org>
+Well, ECC disable bit (ONENAND_SYS_CFG1_NO_ECC) was set as well, so most 
+probably it was the bugger :)
 
-> +Board specific:
-> +	&dsi {
-> +		status = "ok";
-> +
-> +		ports {
-> +			/* 1 for output port */
-> +			port at 1 {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				reg = <1>;
-> +
-> +				/* 0 for bridge, other value for panel */
+> Aaro, care to dump out also the nolo configured CFG1 value from
+> n8x0 and n9(50)?
+>
+> You can do it by adding something like this to the beginning
+> of set_onenand_cfg():
+>
 
-The endpoint address would not change based on bridge or panel. So you 
-can drop the unit address here.
+Also, do not forget to restore HWMOD_INIT_NO_RESET in gpmc_hwmod in 
+question and (maybe) revert e7b11dc7b77bfce0a351230a5feeadc1d0bba997.
 
-> +				dsi_out0: endpoint at 0 {
-> +					reg = <0>;
-> +					remote-endpoint = <&adv7533_in>;
-> +				};
-> +			};
-> +		};
-> +	};
+Regards,
+Ivo
