@@ -1,40 +1,42 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Mon,  8 Feb 2016 10:16:09 +0100
-Subject: [PATCH 4/6] ARM: dts: alpine: add the MSIX node
-In-Reply-To: <1454922971-17405-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1454922971-17405-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1454922971-17405-5-git-send-email-antoine.tenart@free-electrons.com>
+Date: Mon,  8 Feb 2016 10:16:05 +0100
+Subject: [PATCH 0/6] irqchip: introduce the Alpine MSIX driver
+Message-ID: <1454922971-17405-1-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the newly available MSIX driver for Alpine, add the corresponding
-node in the Alpine device tree.
+Hi all,
 
-Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
----
- arch/arm/boot/dts/alpine.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+This series introduce the Alpine MSIX driver, and enables it in both
+the Alpine v1 and Alpine v2 device trees.
 
-diff --git a/arch/arm/boot/dts/alpine.dtsi b/arch/arm/boot/dts/alpine.dtsi
-index 9af2d60e9a7f..db8752fc480e 100644
---- a/arch/arm/boot/dts/alpine.dtsi
-+++ b/arch/arm/boot/dts/alpine.dtsi
-@@ -155,6 +155,16 @@
- 			ranges = <0x02000000 0x0 0xfe000000 0x0 0xfe000000 0x0 0x1000000>;
- 
- 			bus-range = <0x00 0x00>;
-+			msi-parent = <&msix>;
-+		};
-+
-+		msix: msix at fbe00000 {
-+			compatible = "al,alpine-msix";
-+			reg = <0x0 0xfbe00000 0x0 0x100000>;
-+			interrupt-controller;
-+			msi-controller;
-+			al,msi-base-spi = <96>;
-+			al,msi-num-spis = <64>;
- 		};
- 	};
- };
+This series depends on "[PATCH 0/3] arm64: introduce the Alpine support":
+https://lkml.org/lkml/2016/2/8/75
+
+You can find the series at:
+https://github.com/atenart/linux.git 4.5-rc1/alpinev2-msix
+
+Antoine
+
+Antoine Tenart (6):
+  irqchip: add the Alpine MSIX interrupt controller
+  Documentation: bindings: document the Alpine MSIX driver
+  arm64: dts: alpine: add the MSIX node in the Alpine v2 dtsi
+  ARM: dts: alpine: add the MSIX node
+  arm64: alpine: select the Alpine MSI controller driver
+  arm: alpine: select the Alpine MSI controller driver
+
+ .../interrupt-controller/al,alpine-msix.txt        |  22 ++
+ arch/arm/boot/dts/alpine.dtsi                      |  10 +
+ arch/arm/mach-alpine/Kconfig                       |   1 +
+ arch/arm64/Kconfig.platforms                       |   1 +
+ arch/arm64/boot/dts/al/alpine-v2.dtsi              |  10 +
+ drivers/irqchip/Kconfig                            |   6 +
+ drivers/irqchip/Makefile                           |   1 +
+ drivers/irqchip/irq-alpine-msi.c                   | 297 +++++++++++++++++++++
+ 8 files changed, 348 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/al,alpine-msix.txt
+ create mode 100644 drivers/irqchip/irq-alpine-msi.c
+
 -- 
 2.7.0
