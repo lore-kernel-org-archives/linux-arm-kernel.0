@@ -1,263 +1,43 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 8 Feb 2016 18:30:16 +0000
-Subject: [PATCH 3/5] irqchip/gic-v2: Parse and export virtual GIC
- information
-In-Reply-To: <1454950049-741-4-git-send-email-julien.grall@arm.com>
-References: <1454950049-741-1-git-send-email-julien.grall@arm.com>
- <1454950049-741-4-git-send-email-julien.grall@arm.com>
-Message-ID: <56B8DEB8.4010509@arm.com>
+From: thomas@schloeter.net (=?utf-8?Q?Thomas_Schl=C3=B6ter?=)
+Date: Mon, 8 Feb 2016 19:49:27 +0100
+Subject: net: mv643xx: interface does not transmit after some time
+In-Reply-To: <A21B89D4-5826-4F97-A1C9-E62E5B724082@schloeter.net>
+References: <E4F9E0D0-9DA8-4E33-9F89-B49E47F11CE0@schloeter.net>
+ <20160206183414.GD17218@lunn.ch> <20160206231935.GA30734@jirafa.cyrius.com>
+ <2ACB3A0B-DD51-43C1-A56E-E7C175645554@schloeter.net>
+ <20160207203545.GB29107@lunn.ch>
+ <A21B89D4-5826-4F97-A1C9-E62E5B724082@schloeter.net>
+Message-ID: <312E318A-CAE1-45B1-AB13-EA147B48E315@schloeter.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Julien,
 
-On 08/02/16 16:47, Julien Grall wrote:
-> For now, the firmware tables are parsed 2 times: once in the GIC
-> drivers, the other timer when initializing the vGIC. It means code
-> duplication and make more tedious to add the support for another
-> firmware table (like ACPI).
+> Am 07.02.2016 um 22:07 schrieb Thomas Schl?ter <thomas@schloeter.net>:
 > 
-> Introduce a new structure and set of helpers to get/set the virtual GIC
-> information. Also fill up the structure for GICv2.
+> Am 07.02.2016 um 21:35 schrieb Andrew Lunn <andrew@lunn.ch>:
+>> 
+>>>> FWIW, we had a similar bug report in Debian recently:
+>>>> https://lists.debian.org/debian-arm/2016/01/msg00098.html
+>> 
+>> Hi Thomas
+>> 
+>> I this thread, Ian Campbell mentions a patch. Please could you try
+>> that patch and see if it fixes your problem.
+>> 
+>> Thanks
+>> 	Andrew
 > 
-> Signed-off-by: Julien Grall <julien.grall@arm.com>
-> ---
+> Hi Andrew,
 > 
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> I just applied the patch and the NAS is now running it. I?ll try to crash it tonight and keep you informed whether it worked.
 > 
->  drivers/irqchip/irq-gic-common.c       | 13 ++++++
->  drivers/irqchip/irq-gic-common.h       |  3 ++
->  drivers/irqchip/irq-gic.c              | 78 +++++++++++++++++++++++++++++++++-
->  include/linux/irqchip/arm-gic-common.h | 34 +++++++++++++++
->  4 files changed, 127 insertions(+), 1 deletion(-)
->  create mode 100644 include/linux/irqchip/arm-gic-common.h
-> 
-> diff --git a/drivers/irqchip/irq-gic-common.c b/drivers/irqchip/irq-gic-common.c
-> index f174ce0..704caf4 100644
-> --- a/drivers/irqchip/irq-gic-common.c
-> +++ b/drivers/irqchip/irq-gic-common.c
-> @@ -21,6 +21,19 @@
->  
->  #include "irq-gic-common.h"
->  
-> +static const struct gic_kvm_info *gic_kvm_info;
-> +
-> +const struct gic_kvm_info *gic_get_kvm_info(void)
-> +{
-> +	return gic_kvm_info;
-> +}
-> +
-> +void gic_set_kvm_info(const struct gic_kvm_info *info)
-> +{
-> +	WARN(gic_kvm_info != NULL, "gic_kvm_info already set\n");
-> +	gic_kvm_info = info;
-> +}
-> +
->  void gic_enable_quirks(u32 iidr, const struct gic_quirk *quirks,
->  		void *data)
->  {
-> diff --git a/drivers/irqchip/irq-gic-common.h b/drivers/irqchip/irq-gic-common.h
-> index fff697d..205e5fd 100644
-> --- a/drivers/irqchip/irq-gic-common.h
-> +++ b/drivers/irqchip/irq-gic-common.h
-> @@ -19,6 +19,7 @@
->  
->  #include <linux/of.h>
->  #include <linux/irqdomain.h>
-> +#include <linux/irqchip/arm-gic-common.h>
->  
->  struct gic_quirk {
->  	const char *desc;
-> @@ -35,4 +36,6 @@ void gic_cpu_config(void __iomem *base, void (*sync_access)(void));
->  void gic_enable_quirks(u32 iidr, const struct gic_quirk *quirks,
->  		void *data);
->  
-> +void gic_set_kvm_info(const struct gic_kvm_info *info);
-> +
->  #endif /* _IRQ_GIC_COMMON_H */
-> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> index 911758c..d3a09a4 100644
-> --- a/drivers/irqchip/irq-gic.c
-> +++ b/drivers/irqchip/irq-gic.c
-> @@ -102,6 +102,8 @@ static struct static_key supports_deactivate = STATIC_KEY_INIT_TRUE;
->  
->  static struct gic_chip_data gic_data[CONFIG_ARM_GIC_MAX_NR] __read_mostly;
->  
-> +static struct gic_kvm_info gic_v2_kvm_info;
-> +
->  #ifdef CONFIG_GIC_NON_BANKED
->  static void __iomem *gic_get_percpu_base(union gic_base *base)
->  {
-> @@ -1190,6 +1192,44 @@ static bool gic_check_eoimode(struct device_node *node, void __iomem **base)
->  	return true;
->  }
->  
-> +static void __init gic_of_setup_kvm_info(struct device_node *node)
-> +{
-> +	int ret;
-> +	struct resource r;
-> +	unsigned int irq;
-> +
-> +	gic_v2_kvm_info.type = GIC_V2;
-> +
-> +	irq = irq_of_parse_and_map(node, 0);
-> +	if (!irq)
-> +		gic_v2_kvm_info.maint_irq = -1;
+> Thanks
+> 	Thomas
 
-Please don't do that. 0 *is* the value for an invalid interrupt, and
-this is what you should expose here. Same for GICv3.
+Hi Andrew,
 
-> +	else
-> +		gic_v2_kvm_info.maint_irq = irq;
-> +
-> +	ret = of_address_to_resource(node, 2, &r);
-> +	if (!ret) {
-> +		gic_v2_kvm_info.vctrl_base = r.start;
-> +		gic_v2_kvm_info.vctrl_size = resource_size(&r);
-> +	}
-> +
-> +	ret = of_address_to_resource(node, 3, &r);
-> +	if (!ret) {
-> +		if (!PAGE_ALIGNED(r.start))
-> +			pr_warn("GICV physical address 0x%llx not page aligned\n",
-> +				(unsigned long long)r.start);
-> +		else if (!PAGE_ALIGNED(resource_size(&r)))
-> +			pr_warn("GICV size 0x%llx not a multiple of page size 0x%lx\n",
-> +				(unsigned long long)resource_size(&r),
-> +				PAGE_SIZE);
-> +		else {
-> +			gic_v2_kvm_info.vcpu_base = r.start;
-> +			gic_v2_kvm_info.vcpu_size = resource_size(&r);
+the patch did not fix the problem. After 1.2 GiB RX and 950 MiB TX, the interface crashed again.
 
-This tends to make me think that this should actually be a proper
-resource, and not a set of arbitrary fields.
+Now I switched off RX/TX offload just to make sure we are talking about the same problem. If we are, the interface should be stable without offload, right?
 
-> +		}
-> +	}
-> +
-> +	gic_set_kvm_info(&gic_v2_kvm_info);
-> +}
-> +
->  int __init
->  gic_of_init(struct device_node *node, struct device_node *parent)
->  {
-> @@ -1219,8 +1259,10 @@ gic_of_init(struct device_node *node, struct device_node *parent)
->  
->  	__gic_init_bases(gic_cnt, -1, dist_base, cpu_base, percpu_offset,
->  			 &node->fwnode);
-> -	if (!gic_cnt)
-> +	if (!gic_cnt) {
->  		gic_init_physaddr(node);
-> +		gic_of_setup_kvm_info(node);
-> +	}
->  
->  	if (parent) {
->  		irq = irq_of_parse_and_map(node, 0);
-> @@ -1247,6 +1289,32 @@ IRQCHIP_DECLARE(pl390, "arm,pl390", gic_of_init);
->  
->  #ifdef CONFIG_ACPI
->  static phys_addr_t cpu_phy_base __initdata;
-> +static struct
-> +{
-> +	u32 maint_irq;
-> +	int maint_irq_mode;
-> +	phys_addr_t vctrl_base;
-> +	phys_addr_t vcpu_base;
-> +} acpi_data __initdata;
-> +
-> +static void __init gic_acpi_setup_kvm_info(void)
-> +{
-> +	gic_v2_kvm_info.type = GIC_V2;
-> +
-> +	gic_v2_kvm_info.maint_irq = acpi_register_gsi(NULL,
-> +						      acpi_data.maint_irq,
-> +						      acpi_data.maint_irq_mode,
-> +						      ACPI_ACTIVE_HIGH);
-> +	gic_v2_kvm_info.vctrl_base = acpi_data.vctrl_base;
-> +	if (gic_v2_kvm_info.vctrl_base)
-> +		gic_v2_kvm_info.vctrl_size = SZ_8K;
-> +
-> +	gic_v2_kvm_info.vcpu_base = acpi_data.vcpu_base;
-> +	if (gic_v2_kvm_info.vcpu_base)
-> +		gic_v2_kvm_info.vcpu_size = SZ_8K;
-> +
-> +	gic_set_kvm_info(&gic_v2_kvm_info);
-> +}
->  
->  static int __init
->  gic_acpi_parse_madt_cpu(struct acpi_subtable_header *header,
-> @@ -1270,6 +1338,12 @@ gic_acpi_parse_madt_cpu(struct acpi_subtable_header *header,
->  		return -EINVAL;
->  
->  	cpu_phy_base = gic_cpu_base;
-> +	acpi_data.maint_irq = processor->vgic_interrupt;
-> +	acpi_data.maint_irq_mode = (processor->flags & ACPI_MADT_VGIC_IRQ_MODE) ?
-> +				    ACPI_EDGE_SENSITIVE : ACPI_LEVEL_SENSITIVE;
-> +	acpi_data.vctrl_base = processor->gich_base_address;
-> +	acpi_data.vcpu_base = processor->gicv_base_address;
-> +
-
-Maybe you can now move all the ACPI data into this acpi_data structure?
-This would allow for slightly less clutter...
-
->  	cpu_base_assigned = 1;
->  	return 0;
->  }
-> @@ -1357,6 +1431,8 @@ static int __init gic_v2_acpi_init(struct acpi_subtable_header *header,
->  	if (IS_ENABLED(CONFIG_ARM_GIC_V2M))
->  		gicv2m_init(NULL, gic_data[0].domain);
->  
-> +	gic_acpi_setup_kvm_info();
-> +
->  	return 0;
->  }
->  IRQCHIP_ACPI_DECLARE(gic_v2, ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR,
-> diff --git a/include/linux/irqchip/arm-gic-common.h b/include/linux/irqchip/arm-gic-common.h
-> new file mode 100644
-> index 0000000..30972b1
-> --- /dev/null
-> +++ b/include/linux/irqchip/arm-gic-common.h
-> @@ -0,0 +1,34 @@
-> +/*
-> + * include/linux/irqchip/arm-gic-common.h
-> + *
-> + * Copyright (C) 2016 ARM Limited, All Rights Reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +#ifndef __LINUX_IRQCHIP_ARM_GIC_COMMON_H
-> +#define __LINUX_IRQCHIP_ARM_GIC_COMMON_H
-> +
-> +#include <linux/types.h>
-> +
-> +enum gic_type {
-> +	GIC_V2,
-> +};
-> +
-> +struct gic_kvm_info {
-> +	/* GIC type */
-> +	enum gic_type	type;
-> +	/* Physical address & size of virtual cpu interface */
-> +	phys_addr_t	vcpu_base;
-> +	resource_size_t	vcpu_size;
-> +	/* Interrupt number */
-> +	int		maint_irq;
-> +	/* Physical address & size of virtual control interface */
-> +	phys_addr_t	vctrl_base;
-> +	resource_size_t	vctrl_size;
-> +};
-> +
-> +const struct gic_kvm_info *gic_get_kvm_info(void);
-> +
-> +#endif /* __LINUX_IRQCHIP_ARM_GIC_COMMON_H */
-> 
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+	Thomas
