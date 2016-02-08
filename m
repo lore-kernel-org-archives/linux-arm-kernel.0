@@ -1,78 +1,47 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 8 Feb 2016 10:01:11 +0100
-Subject: [PATCH v2] arm64: dts: r8a7795: Add L2 cache-controller nodes
-In-Reply-To: <56B857AC.4090701@de.bosch.com>
-References: <1452953856-5146-1-git-send-email-dirk.behme@gmail.com>
- <56B2370D.2010102@gmail.com> <20160205095758.GE16556@verge.net.au>
- <CAMuHMdVRhwGh2bvfNSguX0XnMW0eEgLRTCt3Y3-+KfV0Jy9WHw@mail.gmail.com>
- <56B857AC.4090701@de.bosch.com>
-Message-ID: <CAMuHMdUTUss=fR0Mdz+7tDD=RC6hufvkLC99Fp=PTiTgaSSGNA@mail.gmail.com>
+From: james.morse@arm.com (James Morse)
+Date: Mon, 08 Feb 2016 09:03:21 +0000
+Subject: [PATCH v4 07/13] arm64: Change cpu_resume() to enable mmu early
+ then access sleep_sp by va
+In-Reply-To: <20160205162617.GD31547@red-moon>
+References: <1453977766-20907-1-git-send-email-james.morse@arm.com>
+ <1453977766-20907-8-git-send-email-james.morse@arm.com>
+ <20160205162617.GD31547@red-moon>
+Message-ID: <56B859D9.3080601@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dirk,
+Hi Lorenzo,
 
-On Mon, Feb 8, 2016 at 9:54 AM, Dirk Behme <dirk.behme@de.bosch.com> wrote:
-> On 08.02.2016 09:42, Geert Uytterhoeven wrote:
->> On Fri, Feb 5, 2016 at 10:57 AM, Simon Horman <horms@verge.net.au> wrote:
->>> On Wed, Feb 03, 2016 at 06:21:17PM +0100, Dirk Behme wrote:
->>>> On 16.01.2016 15:17, Dirk Behme wrote:
->>>>> From: Geert Uytterhoeven <geert+renesas@glider.be>
->>>>>
->>>>> Add device nodes for the L2 caches, and link the CPU node to its L2
->>>>> cache node.
->>>>>
->>>>> The L2 cache for the Cortex-A57 CPU cores is 2 MiB large (organized as
->>>>> 128 KiB x 16 ways).
->>>>>
->>>>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
->>>>> Signed-off-by: Dirk Behme <dirk.behme@gmail.com>
->>>
->>> [snip]
->>>
->>>> Any further comments to this? If not, could this be applied?
->>>
->>> Sorry for the delay.
->>>
->>> This looks good; I have queued it up.
->>>
->>> It should appear in the next (and devel) branches of my renesas tree
->>> soon.
->>> And in linux-next whenever it includes my updated next branch.
->>
->> So you not only dropped the (controversial) timing related properties, but
->> in addition:
->>
->> +               cache-unified;
->> +               cache-level = <2>;
->>
->> At least the "cache-level" property is marked as required in ePAPR.
->> For "cache-unified", the wording is not that strict in ePAPR, but that
->> property
->> depends on being a unified cache in the first place.
->>
->> So I think these two properties should be re-added.
->
-> If I remember correctly, first, these entries are not used at all on ARMv8.
-> And second, I think it was mentioned that we therefore want to drop them:
->
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/394936.html
->
-> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/Documentation/devicetree/bindings/arm/l2c2x0.txt?id=0bed4b7aa02c06e05121875dc443295d55b9d91d
+On 05/02/16 16:26, Lorenzo Pieralisi wrote:
+>> cpu_do_{suspend,resume} could be further reduced to not restore: cpacr_el1,
+>> mdscr_el1, tcr_el1, vbar_el1 and sctlr_el1, all of which are set by
+>> __cpu_setup(). However these values all contain res0 bits that may be used
+>> to enable future features.
+> 
+> This patch is a very nice clean-up, a comment below.
+> 
+> I think that for registers like tcr_el1 and sctlr_el1 we should define
+> a restore mask (to avoid overwriting bits set-up by __cpu_setup), eg
+> current code that restores the tcr_el1 seems wrong to me, see below.
 
-I believe the discussion was only about the latency properties, which are
-documented in the l2c2x0 DT bindings, and deemed to not apply here
-(CC Sudeep).
-The DT bindings documented in ePAPR are generic, and apply to all hardware,
-unless extended or overridden by more-specific DT bindings.
+Presumably this should be two masks, one to find RES0 bits that are set, and are
+assumed to have some new meaning, and another to find RES1 bits that have been
+cleared.
 
-Gr{oetje,eeting}s,
 
-                        Geert
+>> -	cpu_set_reserved_ttbr0();
+>> -	local_flush_tlb_all();
+>> -	cpu_set_default_tcr_t0sz();
+> 
+> You remove the code above since you restore tcr_el1 in cpu_do_resume(),
+> but this is not the way it should be done, ie the restore should be done
+> with the code sequence above otherwise it is not safe.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+You're right - __cpu_setup() sets a guaranteed-incompatible t0sz value.
+I removed it because all this now gets executed from the swapper page tables,
+not the idmap, but there is more to it than that.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+
+Thanks,
+
+James
