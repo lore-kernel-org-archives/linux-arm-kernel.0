@@ -1,49 +1,38 @@
 From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Mon, 8 Feb 2016 11:59:11 -0600
-Subject: [PATCH V2 06/12] dtb: amd: Misc changes for SATA device tree nodes
+Date: Mon, 8 Feb 2016 11:59:07 -0600
+Subject: [PATCH V2 02/12] dtb: amd: Fix GICv2 hypervisor and virtual interface
+ sizes
 In-Reply-To: <1454954357-8395-1-git-send-email-Suravee.Suthikulpanit@amd.com>
 References: <1454954357-8395-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <1454954357-8395-7-git-send-email-Suravee.Suthikulpanit@amd.com>
+Message-ID: <1454954357-8395-3-git-send-email-Suravee.Suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
+From: Brijesh Singh <brijeshkumar.singh@amd.com>
 
-Add new SATA1 device node, and fix the register range size of SATA0.
+This patch fixes incorrect sizes of the GICv2 device tree node.
+This has triggered error message when booting Xen hypervisor.
 
-Signed-off-by: Tom Lendacky <thomas.lendacky@amd.com>
+Signed-off-by: Brijesh Singh <brijeshkumar.singh@amd.com>
 Signed-off-by: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
 ---
- arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
+ arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi b/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
-index 4be36fd..9f59381 100644
+index 2874d92..fdd0c96 100644
 --- a/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
 +++ b/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
-@@ -66,12 +66,22 @@
- 
- 		sata0: sata at e0300000 {
- 			compatible = "snps,dwc-ahci";
--			reg = <0 0xe0300000 0 0x800>;
-+			reg = <0 0xe0300000 0 0xf0000>;
- 			interrupts = <0 355 4>;
- 			clocks = <&sataclk_333mhz>;
- 			dma-coherent;
- 		};
- 
-+		/* This is for Rev B only */
-+		sata1: sata at e0d00000 {
-+			status = "disabled";
-+			compatible = "snps,dwc-ahci";
-+			reg = <0 0xe0d00000 0 0xf0000>;
-+			interrupts = <0 354 4>;
-+			clocks = <&sataclk_333mhz>;
-+			dma-coherent;
-+		};
-+
- 		i2c0: i2c at e1000000 {
- 			status = "disabled";
- 			compatible = "snps,designware-i2c";
+@@ -18,8 +18,8 @@
+ 		#size-cells = <2>;
+ 		reg = <0x0 0xe1110000 0 0x1000>,
+ 		      <0x0 0xe112f000 0 0x2000>,
+-		      <0x0 0xe1140000 0 0x10000>,
+-		      <0x0 0xe1160000 0 0x10000>;
++		      <0x0 0xe1140000 0 0x2000>,
++		      <0x0 0xe1160000 0 0x2000>;
+ 		interrupts = <1 9 0xf04>;
+ 		ranges = <0 0 0 0xe1100000 0 0x100000>;
+ 		v2m0: v2m at e0080000 {
 -- 
 2.5.0
