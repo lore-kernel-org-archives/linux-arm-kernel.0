@@ -1,61 +1,43 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 8 Feb 2016 09:42:55 +0100
-Subject: [PATCH v2] arm64: dts: r8a7795: Add L2 cache-controller nodes
-In-Reply-To: <20160205095758.GE16556@verge.net.au>
-References: <1452953856-5146-1-git-send-email-dirk.behme@gmail.com>
- <56B2370D.2010102@gmail.com> <20160205095758.GE16556@verge.net.au>
-Message-ID: <CAMuHMdVRhwGh2bvfNSguX0XnMW0eEgLRTCt3Y3-+KfV0Jy9WHw@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon,  8 Feb 2016 09:49:25 +0100
+Subject: [PATCH] ARM: ICST: try other dividends than 1
+Message-ID: <1454921365-4140-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dirk,
+Since the dawn of time the ICST code has only supported divide
+by one or hang in an eternal loop. Luckily we were always dividing
+by one because the reference frequency for the systems using
+the ICSTs is 24MHz and the [min,max] values for the PLL input
+if [10,320] MHz for ICST307 and [6,200] for ICST525, so the loop
+will always terminate immediately without assigning any divisor
+for the reference frequency.
 
-On Fri, Feb 5, 2016 at 10:57 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Wed, Feb 03, 2016 at 06:21:17PM +0100, Dirk Behme wrote:
->> On 16.01.2016 15:17, Dirk Behme wrote:
->> >From: Geert Uytterhoeven <geert+renesas@glider.be>
->> >
->> >Add device nodes for the L2 caches, and link the CPU node to its L2
->> >cache node.
->> >
->> >The L2 cache for the Cortex-A57 CPU cores is 2 MiB large (organized as
->> >128 KiB x 16 ways).
->> >
->> >Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
->> >Signed-off-by: Dirk Behme <dirk.behme@gmail.com>
->
-> [snip]
->
->> Any further comments to this? If not, could this be applied?
->
-> Sorry for the delay.
->
-> This looks good; I have queued it up.
->
-> It should appear in the next (and devel) branches of my renesas tree soon.
-> And in linux-next whenever it includes my updated next branch.
+But for the code to make sense, let's insert the missing i++
 
-So you not only dropped the (controversial) timing related properties, but
-in addition:
+Reported-by: David Binderman <dcb314@hotmail.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: stable at vger.kernel.org
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+I ran into the mail David sent in december and looked closer at
+this. It's not a regression in any deployed systems but it's
+disturbing so let's fix it.
+---
+ arch/arm/common/icst.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-+               cache-unified;
-+               cache-level = <2>;
-
-At least the "cache-level" property is marked as required in ePAPR.
-For "cache-unified", the wording is not that strict in ePAPR, but that property
-depends on being a unified cache in the first place.
-
-So I think these two properties should be re-added.
-
-Sorry for not noticing before.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/arch/arm/common/icst.c b/arch/arm/common/icst.c
+index 2dc6da70ae59..3b3e58b7ba74 100644
+--- a/arch/arm/common/icst.c
++++ b/arch/arm/common/icst.c
+@@ -58,6 +58,7 @@ icst_hz_to_vco(const struct icst_params *p, unsigned long freq)
+ 
+ 		if (f > p->vco_min && f <= p->vco_max)
+ 			break;
++		i++;
+ 	} while (i < 8);
+ 
+ 	if (i >= 8)
+-- 
+2.4.3
