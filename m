@@ -1,51 +1,38 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 08 Feb 2016 11:52:21 +0100
-Subject: [PATCH v7 0/5] Add mipi dsi support for rk3288
-In-Reply-To: <56B869F4.6090507@codeaurora.org>
-References: <1452053038-32098-1-git-send-email-zyw@rock-chips.com>
- <56B869F4.6090507@codeaurora.org>
-Message-ID: <5060470.dfeHX20DRa@phil>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Mon, 08 Feb 2016 12:52:57 +0200
+Subject: [PATCH V2 3/6] stm class: provision for statically assigned
+ masterIDs
+In-Reply-To: <DB3PR08MB0041B8843C61FCEB049B2BB58CD20@DB3PR08MB0041.eurprd08.prod.outlook.com>
+References: <1454487337-30184-1-git-send-email-zhang.chunyan@linaro.org>
+ <1454487337-30184-4-git-send-email-zhang.chunyan@linaro.org>
+ <87mvrf5ngl.fsf@ashishki-desk.ger.corp.intel.com>
+ <DB3PR08MB0041B8843C61FCEB049B2BB58CD20@DB3PR08MB0041.eurprd08.prod.outlook.com>
+Message-ID: <87si13cw3a.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Archit,
+Mike Leach <Mike.Leach@arm.com> writes:
 
-Am Montag, 8. Februar 2016, 15:42:04 schrieb Archit Taneja:
-> On 01/06/2016 09:33 AM, Chris Zhong wrote:
-> > The rk3288 MIPI DSI is a Synopsys DesignWare MIPI DSI host controller
-> > IP. This series adds support for a Synopsys DesignWare MIPI DSI host
-> > controller DRM driver.
-> > 
-> > The MIPI DSI feature is tested on rk3288 evb board, backport them to
-> > chrome os kernel chrome_v3.14, and it can display normally.
-> > 
-> > This patchset is base on the patchset from Ying.liu at freescale.com.
-> > <http://www.spinics.net/lists/dri-devel/msg77181.html>
-> > 
-> > According to the suggestion from Thierry, I have get rid of the bridge,
-> > and register the encoder & connecter in drm/rockchip/dw-mipi-dsi.c.
-> 
-> I've raised this question too late, but what was the reason to not
-> implement the DSI block as a bridge driver?
+> Hi,
+>
+> I think a quick clarification of the ARM hardware STM architecture may be of value here.
+>
+> The ARM hardware STM, when implemented as recommend in a hardware design, the master IDs are not under driver control, but have a hardwire association with source devices in the system. The master IDs are hardwired to individual cores and core security states, and there could be other IDs associated with hardware trace sources requiring output via the hardware STM. (an example of this is the ARM Juno development board).
+>
+> Therefore in multi-core systems many masters may be associated with a single software STM stream. A user-space application running on Core 1, may have a master ID of 0x11 in the STPv2 trace stream, but if this application is context switched and later continues running on Core 2, then master ID could change to 0x21.  Masters identify a hardware source in this scheme, the precise values used will be implementation dependent.
+>
+> So the number of masters "available to the software" depends on your interpretation of the phrase.
+> If you mean "master IDs on which software trace will appear" then that will be many - it depends on which core is running the application. However as described above, this is not predictable by any decoder, and the master set used may not be contiguous.
+> If you mean "master IDs selectable/allocated by the driver" then that will be 0 - the driver has no control, and possibly no knowledge of which master is associated with the current execution context. (this is of course system dependent - it may well be possible to have some configuration database associating cores with hardware IDs, but this will be implementation and board support dependant).
+>
+> Therefore, there is a requirement to tell both the user-space STM client and decoder that not only is master ID management not needed - it is in fact not possible and the key to identify the software source for a given STM packet is the channel alone. In addition we have a nominal single Master ID "available to the software", to satisfy the requirements of the generic ST module API.
+>
+> So on Juno for example, while we do have 128 masters, each with 65536 channels, the master allocation is not visible to system software - each core sees a single master with 65536 channels. Therefore differentiation between software sources in the STM trace is by channel number allocations only.
 
-There seems to always be some sort of contention about those being bridge 
-drivers - I think I remember Thierry speaking up about that. But I don't 
-remember if any different solution was suggested.
+Ok, thanks a lot for the detailed explanation. I was confused by the
+"static" bit in the patch description. It looks like something along the
+lines of this patch might indeed be in order.
 
-Also as we have seen with current shared IPs (dw-hdmi + analogix-dp) there 
-are always implementation-specific parts and deciding which needs to land 
-where is difficult without the secondary user present.
-
-The first iterations where using a bridge-driver-base for it but I guess it 
-was to much hassle without seeing another user on the horizon.
-
-
-> The drm/hisilicon IP seems to use a very similar DSI Designware IP (the
-> register offsets seems to be the same). There is a good potential of
-> re-use here by different kms drivers here the way it's already done for
-> DW HDMI and the analogix DP driver that's in review process.
-
-I guess, the second user now gets to do the generalization ;-)
-
-
-Heiko
+Regards,
+--
+Alex
