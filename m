@@ -1,16 +1,16 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 8 Feb 2016 13:55:17 -0800
-Subject: [GIT PULL] ARM: mvebu: drivers for v4.6 (#1)
-In-Reply-To: <874mdj2scq.fsf@free-electrons.com>
-References: <874mdj2scq.fsf@free-electrons.com>
-Message-ID: <20160208215517.GM25468@localhost>
+Date: Mon, 8 Feb 2016 13:53:53 -0800
+Subject: [GIT PULL] ARM: mvebu: cleanup for v4.6 (#1)
+In-Reply-To: <8760xz2sdi.fsf@free-electrons.com>
+References: <8760xz2sdi.fsf@free-electrons.com>
+Message-ID: <20160208215353.GL25468@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 08, 2016 at 03:23:49PM +0100, Gregory CLEMENT wrote:
+On Mon, Feb 08, 2016 at 03:23:21PM +0100, Gregory CLEMENT wrote:
 > Hi,
 > 
-> Here is the first pull request for drivers for mvebu for v4.6.
+> Here is the first pull request for cleanup for mvebu for v4.6.
 > 
 > Gregory
 > 
@@ -20,16 +20,13 @@ On Mon, Feb 08, 2016 at 03:23:49PM +0100, Gregory CLEMENT wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-drivers-4.6-1
+>   git://git.infradead.org/linux-mvebu.git tags/mvebu-cleanup-4.6-1
 > 
-> for you to fetch changes up to 1e78dbe717b1668e1660556930d952447c7c1197:
+> for you to fetch changes up to 727c62d29c3a0b982fb72ef993db95e9d2036e07:
 > 
->   ARM: orion: implement ARM delay timer (2016-01-27 10:50:17 +0100)
+>   ARM: mv78xx0: use "depends on" instead of "if" after prompt (2016-01-25 16:43:16 +0100)
 
-Merged into next/soc.
-
-
-Thanks!
+Merged into next/cleanup. Thanks!
 
 
 -Olof
