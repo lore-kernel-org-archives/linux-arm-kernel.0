@@ -1,91 +1,45 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 8 Feb 2016 18:51:31 +0100
-Subject: [RFC 1/3] dt-bindings: soc: Add documentation for the MediaTek
- GCE unit
-In-Reply-To: <1453433893.15298.13.camel@mtksdaap41>
-References: <1453266881-16849-1-git-send-email-hs.liao@mediatek.com>
- <1453266881-16849-2-git-send-email-hs.liao@mediatek.com>
- <20160120163826.GA23400@rob-hp-laptop> <1453433893.15298.13.camel@mtksdaap41>
-Message-ID: <56B8D5A3.3000506@gmail.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Mon,  8 Feb 2016 14:53:02 -0300
+Subject: [PATCH 2/3] ARM: omap2plus_defconfig: Enable ISP support and
+ dependencies
+In-Reply-To: <1454953983-8894-1-git-send-email-javier@osg.samsung.com>
+References: <1454953983-8894-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <1454953983-8894-3-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The OMAP3 SoC has a Image Signal Processor (ISP) that's used to accelerate
+camera images processing. The ISP driver implements V4L2, Media Controller
+and V4L2 sub-dev interfaces so enable support for the driver and all these
+dependencies to allow video capture to be tested using this HW IP block.
 
+Also, disable the I2C ancillary drivers auto-select option since the media
+driver does not auto-select the ancillary devices that are attached to the
+bridge because this depends on what's present in the supported OMAP boards.
 
-On 22/01/16 04:38, Horng-Shyang Liao wrote:
-> Hi Rob,
->
-> On Wed, 2016-01-20 at 10:38 -0600, Rob Herring wrote:
->> On Wed, Jan 20, 2016 at 01:14:38PM +0800, hs.liao at mediatek.com wrote:
->>> From: HS Liao <hs.liao@mediatek.com>
->>>
->>> This adds documentation for the MediaTek Global Command Engine (GCE) unit
->>> found in MT8173 SoCs.
->>>
->>> Signed-off-by: HS Liao <hs.liao@mediatek.com>
->>> ---
->>>   .../devicetree/bindings/soc/mediatek/gce.txt       |   33 ++++++++++++++++++++
->>>   1 file changed, 33 insertions(+)
->>>   create mode 100644 Documentation/devicetree/bindings/soc/mediatek/gce.txt
->>>
->>> diff --git a/Documentation/devicetree/bindings/soc/mediatek/gce.txt b/Documentation/devicetree/bindings/soc/mediatek/gce.txt
->>> new file mode 100644
->>> index 0000000..878b11e
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/soc/mediatek/gce.txt
->>> @@ -0,0 +1,33 @@
->>> +MediaTek GCE
->>> +===============
->>> +
->>> +The Global Command Engine (GCE) is used to help read/write registers with
->>> +critical time limitation, such as updating display configuration during the
->>> +vblank. The GCE can be used to implement the Command Queue (CMDQ) driver.
->>> +Currently, the GCE only supports display related hardwares, but we expect
->>> +it can be extended to other hardwares for future requirements.
->>
->> That's a hardware limitation or just s/w is only using it for display?
->> If the latter, that's not really relevant to this binding and should be
->> removed.
->
-> Just s/w is only using it for display.
-> I will remove it from next patch.
->
->>> +
->>> +Required properties:
->>> +- compatible: Must be "mediatek,mt8173-gce"
->>> +- reg: Address range of the GCE unit
->>> +- interrupts: The interrupt signal from the GCE block
->>> +- clock: Clocks according to the common clock binding
->>> +- clock-names: Must be "gce" to stand for GCE clock
->>> +
->>> +Example:
->>> +
->>> +	gce: gce at 10212000 {
->>> +		compatible = "mediatek,mt8173-gce";
->>> +		reg = <0 0x10212000 0 0x1000>;
->>> +		interrupts = <GIC_SPI 135 IRQ_TYPE_LEVEL_LOW>;
->>> +		clocks = <&infracfg CLK_INFRA_GCE>;
->>> +		clock-names = "gce";
->>> +	};
->>> +
->>> +	mmsys: clock-controller at 14000000 {
->>> +		compatible = "mediatek,mt8173-mmsys", "syscon";
->>> +		reg = <0 0x14000000 0 0x1000>;
->>> +		power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
->>> +		#clock-cells = <1>;
->>> +		mediatek,gce = <&gce>;
->>
->> Not documented.
->
-> It's just an example about how gce is used by display mmsys.
-> After I discussed with Mediatek display owner,
-> we think this can be moved to display device tree document.
-> Do you agree with this suggestion?
-> If so, I will remove it from next patch, too.
->
+Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+---
 
-The problem is that mediatek,gce is not documented, but only 
-mediatek,mt8173-gce.
+ arch/arm/configs/omap2plus_defconfig | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-Regards,
-Matthias
+diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+index c53d21c30b20..792a56d5f45c 100644
+--- a/arch/arm/configs/omap2plus_defconfig
++++ b/arch/arm/configs/omap2plus_defconfig
+@@ -288,6 +288,13 @@ CONFIG_REGULATOR_TPS65217=y
+ CONFIG_REGULATOR_TPS65218=y
+ CONFIG_REGULATOR_TPS65910=y
+ CONFIG_REGULATOR_TWL4030=y
++CONFIG_MEDIA_SUPPORT=m
++CONFIG_MEDIA_CAMERA_SUPPORT=y
++CONFIG_MEDIA_CONTROLLER=y
++CONFIG_VIDEO_V4L2_SUBDEV_API=y
++CONFIG_V4L_PLATFORM_DRIVERS=y
++CONFIG_VIDEO_OMAP3=m
++# CONFIG_MEDIA_SUBDRV_AUTOSELECT is not set
+ CONFIG_FB=y
+ CONFIG_FIRMWARE_EDID=y
+ CONFIG_FB_MODE_HELPERS=y
+-- 
+2.5.0
