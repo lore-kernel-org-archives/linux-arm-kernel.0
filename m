@@ -1,81 +1,111 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Mon, 8 Feb 2016 11:55:35 -0500
-Subject: [PATCH 1/2] serial: 8250: fix building mediatek with SERIAL_8250=m
-In-Reply-To: <1454935947-2743255-1-git-send-email-arnd@arndb.de>
-References: <1454935947-2743255-1-git-send-email-arnd@arndb.de>
-Message-ID: <20160208165535.GZ23093@windriver.com>
+From: codekipper@gmail.com (Code Kipper)
+Date: Mon, 8 Feb 2016 17:56:06 +0100
+Subject: [linux-sunxi][PATCH] ARM: dts: sun7i: Enable USB DRC on Itead Ibox
+In-Reply-To: <56B8BED7.9030704@redhat.com>
+References: <1454947167-12236-1-git-send-email-codekipper@gmail.com>
+ <56B8BED7.9030704@redhat.com>
+Message-ID: <CAEKpxBkXp9hx6KWpWyRBvYBFi7Sr0FgFHrD6M0nSBuJ1bV++1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[[PATCH 1/2] serial: 8250: fix building mediatek with SERIAL_8250=m] On 08/02/2016 (Mon 13:51) Arnd Bergmann wrote:
-
-> The Mediatek 8250 driver has a 'bool' Kconfig symbol, but that
-> breaks when SERIAL_8250 is a loadable module:
-> 
-> drivers/tty/built-in.o: In function `mtk8250_set_termios':
-> 8250_ingenic.c:(.text+0x1bee8): undefined reference to `serial8250_do_set_termios'
-> 8250_ingenic.c:(.text+0x1bf10): undefined reference to `uart_get_baud_rate'
-> 8250_ingenic.c:(.text+0x1c09c): undefined reference to `uart_get_divisor'
-> drivers/tty/built-in.o: In function `mtk8250_do_pm':
-> 8250_ingenic.c:(.text+0x1c0d0): undefined reference to `serial8250_do_pm'
-> drivers/tty/built-in.o: In function `mtk8250_probe':
-> 8250_ingenic.c:(.text+0x1c2e4): undefined reference to `serial8250_register_8250_port'
-> serial/8250/8250_mtk.c:287:242: error: data definition has no type or storage class [-Werror]
-> serial/8250/8250_mtk.c:287:122: error: 'mtk8250_platform_driver_init' defined but not used [-Werror=unused-function]
-
-Probably should drop the ingenic lines above ; assuming they are make -j N
-related and that mtk doesn't depend on or build ingenic.
-
-> 
-> This changes the symbol to a 'tristate', so the dependency on
-> SERIAL_8250 also works when that is set to 'm'.
-> To actually build the driver, we also need to include <linux/module.h>.
-> 
-> Note that the driver uses builtin_platform_driver() and implements
-> no .remove() callback, so unloading the module is not possible.
-
-But this is due to d72d391c126e0ffd3047c06c4bef4d795853d5d5.  So again,
-I'm not sure what this achives vs. just making it depend on having
-SERIAL_8250=y as a trivial fix for the one build issue.
-
-If you really see a use case for tristate, then the above should be
-reverted before adding your conversion to tristate I think.
-
-Paul.
---
-
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  drivers/tty/serial/8250/8250_mtk.c | 1 +
->  drivers/tty/serial/8250/Kconfig    | 2 +-
->  2 files changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/tty/serial/8250/8250_mtk.c b/drivers/tty/serial/8250/8250_mtk.c
-> index 9038843cadc7..7e9242a5ddfe 100644
-> --- a/drivers/tty/serial/8250/8250_mtk.c
-> +++ b/drivers/tty/serial/8250/8250_mtk.c
-> @@ -19,6 +19,7 @@
->  #include <linux/init.h>
->  #include <linux/of_irq.h>
->  #include <linux/of_platform.h>
-> +#include <linux/module.h>
->  #include <linux/platform_device.h>
->  #include <linux/pm_runtime.h>
->  #include <linux/serial_8250.h>
-> diff --git a/drivers/tty/serial/8250/Kconfig b/drivers/tty/serial/8250/Kconfig
-> index 67ad6b0d595b..6ae0fae4f796 100644
-> --- a/drivers/tty/serial/8250/Kconfig
-> +++ b/drivers/tty/serial/8250/Kconfig
-> @@ -370,7 +370,7 @@ config SERIAL_8250_LPC18XX
->  	  serial port, say Y to this option. If unsure, say Y.
->  
->  config SERIAL_8250_MT6577
-> -	bool "Mediatek serial port support"
-> +	tristate "Mediatek serial port support"
->  	depends on SERIAL_8250 && ARCH_MEDIATEK
->  	help
->  	  If you have a Mediatek based board and want to use the
-> -- 
-> 2.7.0
-> 
+On 8 February 2016 at 17:14, Hans de Goede <hdegoede@redhat.com> wrote:
+> Hi,
+>
+> On 08-02-16 16:59, codekipper at gmail.com wrote:
+>>
+>> From: Marcus Cooper <codekipper@gmail.com>
+>>
+>> Enable the otg/drc usb controller on the Itead Ibox device.
+>>
+>> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+>
+>
+> Same remark as with your Olimex A20 EVB board patch, please
+> also provide a vbus detect pin setting. If for some reason the
+> VBus detect is not wired up, or not working properly, please mention
+> this explicitly in the commit message.
+Hi Hans,
+I've added vbus detect and it no longer works. It's mentioned that the
+Itead Ibox is similar to the Cubieboard 2 which also doesn't include
+the detect. I can see now in the commit that it states "Note this
+board has the otg-vbus connected directly to the 5v-dcc of the board,
+so there is no vbus0 regulator, nor vbus0-det.", I will add this to
+the commit message and try and dig out a schematic to confirm.
+Thanks,
+CK
+>
+> Note that in some cases the axp209 is used for vbus detect,
+> rather then a gpio, see e.g. :
+>
+> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/arch/arm/boot/dts/sun7i-a20-bananapi.dts?id=dcfd8443d89f593e0c667a988ab017e716b33061
+>
+> Regards,
+>
+> Hans
+>
+>
+>
+>
+>> ---
+>>   arch/arm/boot/dts/sun7i-a20-itead-ibox.dts     | 14 ++++++++++++++
+>>   arch/arm/boot/dts/sunxi-itead-core-common.dtsi |  9 +++++++++
+>>   2 files changed, 23 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/sun7i-a20-itead-ibox.dts
+>> b/arch/arm/boot/dts/sun7i-a20-itead-ibox.dts
+>> index 661c21d..a512581 100644
+>> --- a/arch/arm/boot/dts/sun7i-a20-itead-ibox.dts
+>> +++ b/arch/arm/boot/dts/sun7i-a20-itead-ibox.dts
+>> @@ -118,8 +118,22 @@
+>>                 allwinner,drive = <SUN4I_PINCTRL_20_MA>;
+>>                 allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+>>         };
+>> +
+>> +       usb0_id_detect_pin: usb0_id_detect_pin at 0 {
+>> +               allwinner,pins = "PH4";
+>> +               allwinner,function = "gpio_in";
+>> +               allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+>> +               allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+>> +       };
+>>   };
+>>
+>>   &reg_ahci_5v {
+>>         status = "okay";
+>>   };
+>> +
+>> +&usbphy {
+>> +       pinctrl-names = "default";
+>> +       pinctrl-0 = <&usb0_id_detect_pin>;
+>> +       usb0_id_det-gpio = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
+>> +       status = "okay";
+>> +};
+>> diff --git a/arch/arm/boot/dts/sunxi-itead-core-common.dtsi
+>> b/arch/arm/boot/dts/sunxi-itead-core-common.dtsi
+>> index 2565d51..d22eea3 100644
+>> --- a/arch/arm/boot/dts/sunxi-itead-core-common.dtsi
+>> +++ b/arch/arm/boot/dts/sunxi-itead-core-common.dtsi
+>> @@ -88,6 +88,10 @@
+>>         status = "okay";
+>>   };
+>>
+>> +&otg_sram {
+>> +       status = "okay";
+>> +};
+>> +
+>>   #include "axp209.dtsi"
+>>
+>>   &reg_dcdc2 {
+>> @@ -129,6 +133,11 @@
+>>         status = "okay";
+>>   };
+>>
+>> +&usb_otg {
+>> +       dr_mode = "otg";
+>> +       status = "okay";
+>> +};
+>> +
+>>   &usbphy {
+>>         usb1_vbus-supply = <&reg_usb1_vbus>;
+>>         usb2_vbus-supply = <&reg_usb2_vbus>;
+>>
+>
