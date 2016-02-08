@@ -1,40 +1,41 @@
 From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Mon, 8 Feb 2016 11:59:09 -0600
-Subject: [PATCH V2 04/12] dtb: amd: Fix typo in SPI device nodes
+Date: Mon, 8 Feb 2016 11:59:06 -0600
+Subject: [PATCH V2 01/12] MAINTAINERS: Adding Maintainers for AMD Seattle
+ Device Tree
 In-Reply-To: <1454954357-8395-1-git-send-email-Suravee.Suthikulpanit@amd.com>
 References: <1454954357-8395-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <1454954357-8395-5-git-send-email-Suravee.Suthikulpanit@amd.com>
+Message-ID: <1454954357-8395-2-git-send-email-Suravee.Suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
 
-Remove invalid entry in the SPI device nodes.
+Adding maintainers for AMD Seattle device tree.
 
+Signed-off-by: Brijesh Singh <brijeshkumar.singh@amd.com>
 Signed-off-by: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
+Signed-off-by: Tom Lendacky <thomas.lendacky@amd.com>
 ---
- arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi | 2 --
- 1 file changed, 2 deletions(-)
+ MAINTAINERS | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi b/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
-index 5c73117..c7c759a 100644
---- a/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
-+++ b/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
-@@ -91,7 +91,6 @@
- 		spi0: ssp at e1020000 {
- 			status = "disabled";
- 			compatible = "arm,pl022", "arm,primecell";
--			#gpio-cells = <2>;
- 			reg = <0 0xe1020000 0 0x1000>;
- 			spi-controller;
- 			interrupts = <0 330 4>;
-@@ -102,7 +101,6 @@
- 		spi1: ssp at e1030000 {
- 			status = "disabled";
- 			compatible = "arm,pl022", "arm,primecell";
--			#gpio-cells = <2>;
- 			reg = <0 0xe1030000 0 0x1000>;
- 			spi-controller;
- 			interrupts = <0 329 4>;
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 7f1fa4f..e349a32 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -673,6 +673,13 @@ F:	drivers/gpu/drm/radeon/radeon_kfd.c
+ F:	drivers/gpu/drm/radeon/radeon_kfd.h
+ F:	include/uapi/linux/kfd_ioctl.h
+ 
++AMD SEATTLE DEVICE TREE SUPPORT
++M:	Brijesh Singh <brijeshkumar.singh@amd.com>
++M:	Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
++M:	Tom Lendacky <thomas.lendacky@amd.com>
++S:	Supported
++F:	arch/arm64/boot/dts/amd/
++
+ AMD XGBE DRIVER
+ M:	Tom Lendacky <thomas.lendacky@amd.com>
+ L:	netdev at vger.kernel.org
 -- 
 2.5.0
