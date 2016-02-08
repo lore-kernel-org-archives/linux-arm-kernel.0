@@ -1,37 +1,38 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 8 Feb 2016 11:43:27 +0000
-Subject: [PATCH v4 05/17] xen: memory : Add new XENMAPSPACE type
- XENMAPSPACE_dev_mmio
-In-Reply-To: <1454641552-12576-6-git-send-email-zhaoshenglong@huawei.com>
-References: <1454641552-12576-1-git-send-email-zhaoshenglong@huawei.com>
- <1454641552-12576-6-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <alpine.DEB.2.02.1602081142360.27008@kaball.uk.xensource.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Mon, 8 Feb 2016 09:03:36 -0300
+Subject: [PATCH] drm/exynos: dp: Fix panel and bridge lookup logic
+In-Reply-To: <1454080171-23769-1-git-send-email-javier@osg.samsung.com>
+References: <1454080171-23769-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <56B88418.7090106@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 5 Feb 2016, Shannon Zhao wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
-> 
-> Add a new type of Xen map space for Dom0 to map device's MMIO region.
-> 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> ---
->  include/xen/interface/memory.h | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/include/xen/interface/memory.h b/include/xen/interface/memory.h
-> index 2ecfe4f..9aa8988 100644
-> --- a/include/xen/interface/memory.h
-> +++ b/include/xen/interface/memory.h
-> @@ -160,6 +160,7 @@ DEFINE_GUEST_HANDLE_STRUCT(xen_machphys_mapping_t);
->  #define XENMAPSPACE_gmfn_foreign 4 /* GMFN from another dom,
->  				    * XENMEM_add_to_physmap_range only.
->  				    */
-> +#define XENMAPSPACE_dev_mmio     5 /* device mmio region */
->  
->  /*
->   * Sets the GPFN at which a particular page appears in the specified guest's
+Hello Inki,
 
-This patch needs to wait at least until the corresponding Xen patch
-(the one which introduces XENMAPSPACE_dev_mmio on the Xen side) is
-Acked by one of the Xen maintainers.
+On 01/29/2016 12:09 PM, Javier Martinez Canillas wrote:
+> Commit a9fa852886fd ("drm/exynos: dp: add of_graph dt binding support
+> for panel") made the Exynos DP DT binding more consistent since the OF
+> graph could be used to lookup either a panel or a bridge device node.
+>
+> Before that commit, a panel would be looked up using a phandle and a
+> bridge using the OF graph which made the DT binding not consistent.
+>
+> But the patch broke the later case since not finding a panel dev node
+> would cause the driver's to do a probe deferral instead of attempting
+> to lookup a bridge device node associated with the remote endpoint.
+>
+> So instead of returning a -EPROBE_DEFER if a panel is not found, check
+> if there's a bridge and only do a probe deferral if both aren't found.
+>
+> Fixes: a9fa852886fd ("drm/exynos: dp: add of_graph dt binding support for panel")
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+>
+
+Any comments about this patch? It is needed to have display working on
+machines with a bridge chip again so it should be pushed to -rc ASAP.
+
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
