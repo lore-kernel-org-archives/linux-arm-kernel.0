@@ -1,40 +1,53 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 8 Feb 2016 12:14:31 +0000
-Subject: [PATCH v5sub2 0/8] arm64: implement virtual KASLR
-In-Reply-To: <CAGXu5j+JpwRrVy1b_h+LJ4sCzsT7BV9RdcD0CvR-4aVJQhCpvg@mail.gmail.com>
-References: <1454332178-4414-1-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu-AhLcatkDsQVeoFGJ+pTEwaW1Hy9M-fY1-VWvRc_E47w@mail.gmail.com>
- <20160205173248.GJ6076@e104818-lin.cambridge.arm.com>
- <CAKv+Gu_v1sXM7sivz+Uu86ZG3=Th7wqqh7M1N8wF7Ess4NdTZQ@mail.gmail.com>
- <CAGXu5j+JpwRrVy1b_h+LJ4sCzsT7BV9RdcD0CvR-4aVJQhCpvg@mail.gmail.com>
-Message-ID: <20160208121430.GL6076@e104818-lin.cambridge.arm.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 8 Feb 2016 20:14:08 +0800
+Subject: [PATCH V4 2/2] regulator: mt6323: Add support for MT6323 regulator
+In-Reply-To: <1453896059-44589-2-git-send-email-blogic@openwrt.org>
+Message-ID: <201602082052.nbLmVvYd%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 05, 2016 at 12:42:30PM -0800, Kees Cook wrote:
-> On Fri, Feb 5, 2016 at 9:38 AM, Ard Biesheuvel
-> <ard.biesheuvel@linaro.org> wrote:
-> > On 5 February 2016 at 18:32, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> >> I'm still trying to get my head around how we merge those. Since I
-> >> assume akpm will push them during the merging window, part of your code
-> >> cannot be tested before.
-> >
-> > Actually, my original idea was for akpm to take them as a late merge
-> > after rebasing to -rc1, since they touch a variety of architectures,
-> > but I am not sure if that came across.
-> >
-> > You could always take the series through your tree instead, I guess?
-> 
-> Traditionally akpm will de-duplicate patches he's carrying that appear
-> in another tree. I think it should be okay to carry them in both
-> places. (Though I'm CCing akpm just to see if I'm talking crazy.)
+Hi Chen,
 
-For now, I'll merge this series in the arm64 tree and push it to next:
+[auto build test ERROR on regulator/for-next]
+[also build test ERROR on v4.5-rc3 next-20160208]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 
-http://lkml.kernel.org/r/1452007180-27411-1-git-send-email-ard.biesheuvel at linaro.org
+url:    https://github.com/0day-ci/linux/commits/John-Crispin/regulator-Add-document-for-MT6323-regulator/20160127-200434
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git for-next
+config: frv-allmodconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=frv 
 
-If there are any objections, I can drop the patches and do the
-BUILDTIME_EXTABLE_SORT disabling trick until they end up in mainline.
+All errors (new ones prefixed by >>):
 
--- 
-Catalin
+>> drivers/regulator/mt6323-regulator.c:15:40: fatal error: linux/mfd/mt6323/registers.h: No such file or directory
+    #include <linux/mfd/mt6323/registers.h>
+                                           ^
+   compilation terminated.
+
+vim +15 drivers/regulator/mt6323-regulator.c
+
+     9	
+    10	#include <linux/module.h>
+    11	#include <linux/of.h>
+    12	#include <linux/platform_device.h>
+    13	#include <linux/regmap.h>
+    14	#include <linux/mfd/mt6397/core.h>
+  > 15	#include <linux/mfd/mt6323/registers.h>
+    16	#include <linux/regulator/driver.h>
+    17	#include <linux/regulator/machine.h>
+    18	#include <linux/regulator/mt6323-regulator.h>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 42503 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160208/c1aaa3e3/attachment-0001.obj>
