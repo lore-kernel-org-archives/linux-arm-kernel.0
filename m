@@ -1,49 +1,42 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Mon,  8 Feb 2016 10:16:07 +0100
-Subject: [PATCH 2/6] Documentation: bindings: document the Alpine MSIX driver
+Date: Mon,  8 Feb 2016 10:16:08 +0100
+Subject: [PATCH 3/6] arm64: dts: alpine: add the MSIX node in the Alpine v2
+ dtsi
 In-Reply-To: <1454922971-17405-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1454922971-17405-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1454922971-17405-3-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1454922971-17405-4-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Following the addition of the Alpine MSIX driver, this patch adds the
-corresponding bindings documentation.
+Following the addition of the Alpine MSIX controller driver, add the
+corresponding node in the Alpine v2 device tree.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 Signed-off-by: Tsahee Zidenberg <tsahee@annapurnalabs.com>
 ---
- .../interrupt-controller/al,alpine-msix.txt        | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/interrupt-controller/al,alpine-msix.txt
+ arch/arm64/boot/dts/al/alpine-v2.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/al,alpine-msix.txt b/Documentation/devicetree/bindings/interrupt-controller/al,alpine-msix.txt
-new file mode 100644
-index 000000000000..a77d5a76e8d5
---- /dev/null
-+++ b/Documentation/devicetree/bindings/interrupt-controller/al,alpine-msix.txt
-@@ -0,0 +1,22 @@
-+Alpine MSIX controller
+diff --git a/arch/arm64/boot/dts/al/alpine-v2.dtsi b/arch/arm64/boot/dts/al/alpine-v2.dtsi
+index eb7a03b71456..413062be1674 100644
+--- a/arch/arm64/boot/dts/al/alpine-v2.dtsi
++++ b/arch/arm64/boot/dts/al/alpine-v2.dtsi
+@@ -141,6 +141,16 @@
+ 			/* 32 bit non prefetchable memory space */
+ 			ranges = <0x2000000 0x0 0xfe000000 0x0 0xfe000000 0x0 0x1000000>;
+ 			bus-range = <0x00 0x00>;
++			msi-parent = <&msix>;
++		};
 +
-+Required properties:
-+
-+- compatible: should be "al,alpine-msix"
-+- reg: physical base address and size of the registers
-+- interrupt-controller: identifies the node as an interrupt controller
-+- msi-controller: identifies the node as an PCI Message Signaled Interrupt
-+		  controller
-+- al,msi-base-spi: SPI base of the MSI frame
-+- al,msi-num-spis: number of SPIs assigned to the MSI frame
-+
-+Example:
-+
-+msix: msix {
-+	compatible = "al,alpine-msix";
-+	reg = <0x0 0xfbe00000 0x0 0x100000>;
-+	interrupt-controller;
-+	msi-controller;
-+	al,msi-base-spi = <160>;
-+	al,msi-num-spis = <160>;
-+};
++		msix: msix at fbe00000 {
++			compatible = "al,alpine-msix";
++			reg = <0x0 0xfbe00000 0x0 0x100000>;
++			interrupt-controller;
++			msi-controller;
++			al,msi-base-spi = <160>;
++			al,msi-num-spis = <160>;
+ 		};
+ 
+ 		uart0: uart at fd883000 {
 -- 
 2.7.0
