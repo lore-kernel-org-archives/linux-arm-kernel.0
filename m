@@ -1,84 +1,153 @@
-From: codekipper@gmail.com (Code Kipper)
-Date: Mon, 8 Feb 2016 17:40:34 +0100
-Subject: [PATCH v5 0/2] ASoC: Add SPDIF support for Allwinner SoCs
-In-Reply-To: <1454945167-29324-1-git-send-email-codekipper@gmail.com>
-References: <1454945167-29324-1-git-send-email-codekipper@gmail.com>
-Message-ID: <CAEKpxBkyinCeZ_d-AYkiFoxaa48J3nTwTRtKCtC=xXBeBJhZcA@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 8 Feb 2016 16:45:44 +0000
+Subject: [PATCH v3 21/23] arm64: hw_breakpoint: Allow EL2 breakpoints if
+ running in HYP
+In-Reply-To: <20160208155625.GQ6076@e104818-lin.cambridge.arm.com>
+References: <1454522416-6874-1-git-send-email-marc.zyngier@arm.com>
+ <1454522416-6874-22-git-send-email-marc.zyngier@arm.com>
+ <20160208155625.GQ6076@e104818-lin.cambridge.arm.com>
+Message-ID: <56B8C638.2010402@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-NAK...last bunch of changes introduced a warning which slipped
-through, I'll fix that and send a new patch series.
-CK
+On 08/02/16 15:56, Catalin Marinas wrote:
+> On Wed, Feb 03, 2016 at 06:00:14PM +0000, Marc Zyngier wrote:
+>> @@ -76,6 +59,36 @@ static inline void decode_ctrl_reg(u32 reg,
+>>  #define ARM_KERNEL_STEP_ACTIVE	1
+>>  #define ARM_KERNEL_STEP_SUSPEND	2
+>>  
+>> +#define DBG_HMC_HYP		(1 << 13)
+>> +#define DBG_SSC_HYP		(3 << 14)
+>> +
+>> +static inline u32 encode_ctrl_reg(struct arch_hw_breakpoint_ctrl ctrl)
+>> +{
+>> +	u32 val = (ctrl.len << 5) | (ctrl.type << 3) | ctrl.enabled;
+>> +
+>> +	if (is_kernel_in_hyp_mode() && ctrl.privilege == AARCH64_BREAKPOINT_EL1)
+>> +		val |= DBG_HMC_HYP | DBG_SSC_HYP;
+>> +	else
+>> +		val |= ctrl.privilege << 1;
+>> +
+>> +	return val;
+>> +}
+>> +
+>> +static inline void decode_ctrl_reg(u32 reg,
+>> +				   struct arch_hw_breakpoint_ctrl *ctrl)
+>> +{
+>> +	ctrl->enabled	= reg & 0x1;
+>> +	reg >>= 1;
+>> +	if (is_kernel_in_hyp_mode())
+>> +		ctrl->privilege = !!(reg & (DBG_HMC_HYP >> 1));
+> 
+> I don't particularly like this part as it's not clear just by looking at
+> the code that it, in fact, generates AARCH64_BREAKPOINT_EL1. I would
+> make this clearer:
+> 
+> 	if (is_kernel_in_hyp_mode() && (reg & (DBG_HMC_HYP >> 1)))
+> 		ctrl->privilege = AARCH64_BREAKPOINT_EL1;
+> 
+> Alternatively, you could define the PMC field value as:
+> 
+> #define AARCH64_BREAKPOINT_EL2	0
+> 
+> and change the privilege to EL1 after masking, something like:
+> 
+> 	ctrl->privilege = reg & 0x3;
+> 	if (ctrl->privilege == AARCH64_BREAKPOINT_EL2)
+> 		ctrl->privilege = AARCH64_BREAKPOINT_EL1;
+> 
+> BTW, do we need to check is_kernel_in_hyp_mode() when decoding? Is there
+> anything else that could have set this SSC/HMC/PMC fields other than
+> encode_ctrl_reg()?
 
-On 8 February 2016 at 16:26,  <codekipper@gmail.com> wrote:
-> From: Marcus Cooper <codekipper@gmail.com>
->
-> This patch set adds support for the Allwinner SPDIF transceiver.
->
-> For now just the SPDIF transmitter has been tested on a Mele A2000(A10)
-> and a Itead Ibox(A20).
->
-> In order for this patch set to be functional we require an audio clock patch
-> which will be delivered separately. For those that are interested I've pushed
-> the patches here with all the required changes to get SPDIF audio out of the
-> device.
->
-> https://github.com/codekipper/linux-sunxi/commits/spdif_delivery
->
-> Thanks in advance,
-> CK
->
-> ---
-> Changes since v4:
-> - corrected indentation issues
-> - removed old macros
-> - removed unnecessary enabling of apb clock
->
-> Changes since v3:
-> - removed code required for spdif capture
-> - added disable/enable of apb clk to suspend/resume.
-> - removed unnecessary dt checks in probe
-> - fixed error conditions in probe/resume
-> - modified pm_runtime functionality and confirmed that driver worked when PM was disabled.
-> - removed .owner from platform driver
-> - renamed bindings file
->
-> Changes since v2:
-> - removed sunxi-machine-spdif and replaced with simple audio card
-> - removed untested compatibilities from device tree documentation
-> - added pm_runtime and remove shutdown
-> - removed pll2 as it's the parent of the spdif clock
-> - rename clk to spdif_clk
-> - removed enabling of mclk output
-> - removed interrupts status being cleared as it's not being used
-> - use default fifo settings for now
-> - fixed alignments for wrapped lines
->
-> Changes since v1:
-> - Moved sunxi-machine-spdif.c to separate patch
-> - replaced sunxi in naming scheme with sun4i in the sun4i-spdif driver.
-> - split tx controller into separate enable/disable functions
-> - moved setclk and setfmt functionality into hw params
-> - added support for mono signals.
-> - cleaned up probe clock set up.
-> - removed all writes to transmit status registers.
-> - removed of_id
-> - removed power management code.
-> - Added support for more rates.
->
-> Marcus Cooper (2):
->   dt-bindings: sunxi :add sun4i SPDIF transceiver
->   ASoC: sunxi: Add support for the SPDIF block
->
->  .../bindings/sound/sunxi,sun4i-spdif.txt           |  39 ++
->  sound/soc/sunxi/Kconfig                            |   8 +
->  sound/soc/sunxi/Makefile                           |   1 +
->  sound/soc/sunxi/sun4i-spdif.c                      | 549 +++++++++++++++++++++
->  4 files changed, 597 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/sound/sunxi,sun4i-spdif.txt
->  create mode 100644 sound/soc/sunxi/sun4i-spdif.c
->
-> --
-> 2.7.1
->
+I was being overzealous, and your solution is clearly better. I ended up with the following:
+
+diff --git a/arch/arm64/include/asm/hw_breakpoint.h b/arch/arm64/include/asm/hw_breakpoint.h
+index 9732908..c872b2f 100644
+--- a/arch/arm64/include/asm/hw_breakpoint.h
++++ b/arch/arm64/include/asm/hw_breakpoint.h
+@@ -18,6 +18,7 @@
+ 
+ #include <asm/cputype.h>
+ #include <asm/cpufeature.h>
++#include <asm/virt.h>
+ 
+ #ifdef __KERNEL__
+ 
+@@ -35,24 +36,6 @@ struct arch_hw_breakpoint {
+ 	struct arch_hw_breakpoint_ctrl ctrl;
+ };
+ 
+-static inline u32 encode_ctrl_reg(struct arch_hw_breakpoint_ctrl ctrl)
+-{
+-	return (ctrl.len << 5) | (ctrl.type << 3) | (ctrl.privilege << 1) |
+-		ctrl.enabled;
+-}
+-
+-static inline void decode_ctrl_reg(u32 reg,
+-				   struct arch_hw_breakpoint_ctrl *ctrl)
+-{
+-	ctrl->enabled	= reg & 0x1;
+-	reg >>= 1;
+-	ctrl->privilege	= reg & 0x3;
+-	reg >>= 2;
+-	ctrl->type	= reg & 0x3;
+-	reg >>= 2;
+-	ctrl->len	= reg & 0xff;
+-}
+-
+ /* Breakpoint */
+ #define ARM_BREAKPOINT_EXECUTE	0
+ 
+@@ -62,6 +45,7 @@ static inline void decode_ctrl_reg(u32 reg,
+ #define AARCH64_ESR_ACCESS_MASK	(1 << 6)
+ 
+ /* Privilege Levels */
++#define AARCH64_BREAKPOINT_EL2	0
+ #define AARCH64_BREAKPOINT_EL1	1
+ #define AARCH64_BREAKPOINT_EL0	2
+ 
+@@ -76,6 +60,35 @@ static inline void decode_ctrl_reg(u32 reg,
+ #define ARM_KERNEL_STEP_ACTIVE	1
+ #define ARM_KERNEL_STEP_SUSPEND	2
+ 
++#define DBG_HMC_HYP		(1 << 13)
++#define DBG_SSC_HYP		(3 << 14)
++
++static inline u32 encode_ctrl_reg(struct arch_hw_breakpoint_ctrl ctrl)
++{
++	u32 val = (ctrl.len << 5) | (ctrl.type << 3) | ctrl.enabled;
++
++	if (is_kernel_in_hyp_mode() && ctrl.privilege == AARCH64_BREAKPOINT_EL1)
++		val |= DBG_HMC_HYP | DBG_SSC_HYP;
++	else
++		val |= ctrl.privilege << 1;
++
++	return val;
++}
++
++static inline void decode_ctrl_reg(u32 reg,
++				   struct arch_hw_breakpoint_ctrl *ctrl)
++{
++	ctrl->enabled	= reg & 0x1;
++	reg >>= 1;
++	ctrl->privilege	= reg & 0x3;
++	if (ctrl->privilege == AARCH64_BREAKPOINT_EL2)
++		ctrl->privilege	= AARCH64_BREAKPOINT_EL1;
++	reg >>= 2;
++	ctrl->type	= reg & 0x3;
++	reg >>= 2;
++	ctrl->len	= reg & 0xff;
++}
++
+ /*
+  * Limits.
+  * Changing these will require modifications to the register accessors.
+
+Was that what you had in mind?
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
