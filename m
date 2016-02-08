@@ -1,253 +1,70 @@
-From: julian.calaby@gmail.com (Julian Calaby)
-Date: Mon, 8 Feb 2016 11:55:43 +1100
-Subject: [linux-sunxi] Re: [PATCH 11/11] arm64: dts: add Pine64 support
-In-Reply-To: <56B47391.1040709@arm.com>
-References: <1454348370-3816-1-git-send-email-andre.przywara@arm.com>
- <1454348370-3816-12-git-send-email-andre.przywara@arm.com>
- <20160205090337.GB1139@lukather> <56B47391.1040709@arm.com>
-Message-ID: <CAGRGNgWTMVYExfWZceoY2UKVYq=3g6EnhYBqt9GOFk0Yh6j+4g@mail.gmail.com>
+From: xypron.glpk@gmx.de (Heinrich Schuchardt)
+Date: Mon,  8 Feb 2016 01:55:08 +0100
+Subject: [PATCH 1/1 v3] ARM: dts: imx6dlq-wandboard-revb1.dts: use unique
+ model id
+In-Reply-To: <56B7E06B.2060701@gmx.de>
+References: <56B7E06B.2060701@gmx.de>
+Message-ID: <1454892908-26975-1-git-send-email-xypron.glpk@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andre,
+Downstream packages like Debian flash-kernel use
+/proc/device-tree/model
+to determine which dtb file to install.
 
-On Fri, Feb 5, 2016 at 9:04 PM, Andre Przywara <andre.przywara@arm.com> wrote:
-> Hi,
->
-> On 05/02/16 09:03, Maxime Ripard wrote:
->> Hi,
->>
->> On Mon, Feb 01, 2016 at 05:39:30PM +0000, Andre Przywara wrote:
->>> The Pine64 is a cost-efficient development board based on the
->>> Allwinner A64 SoC.
->>> There are three models: the basic version with Fast Ethernet and
->>> 512 MB of DRAM (Pine64) and two Pine64+ versions, which both
->>> feature Gigabit Ethernet and additional connectors for touchscreens
->>> and a camera. Or as my son put it: "Those are smaller and these are
->>> missing." ;-)
->>> The two Pine64+ models just differ in the amount of DRAM
->>> (1GB vs. 2GB). Since U-Boot will figure out the right size for us and
->>> patches the DT accordingly we just need to provide one DT for the
->>> Pine64+.
->>>
->>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->>> ---
->>>  .../devicetree/bindings/vendor-prefixes.txt        |  1 +
->>>  arch/arm64/boot/dts/Makefile                       |  1 +
->>>  arch/arm64/boot/dts/allwinner/Makefile             |  5 ++
->>>  arch/arm64/boot/dts/allwinner/pine64.dts           | 58 +++++++++++++++++
->>>  arch/arm64/boot/dts/allwinner/pine64_common.dtsi   | 76 ++++++++++++++++++++++
->>>  arch/arm64/boot/dts/allwinner/pine64_plus.dts      | 59 +++++++++++++++++
->>>  6 files changed, 200 insertions(+)
->>>  create mode 100644 arch/arm64/boot/dts/allwinner/Makefile
->>>  create mode 100644 arch/arm64/boot/dts/allwinner/pine64.dts
->>>  create mode 100644 arch/arm64/boot/dts/allwinner/pine64_common.dtsi
->>>  create mode 100644 arch/arm64/boot/dts/allwinner/pine64_plus.dts
->>>
->>> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
->>> index 72e2c5a..0c22fa9 100644
->>> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
->>> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
->>> @@ -175,6 +175,7 @@ parade   Parade Technologies Inc.
->>>  pericom     Pericom Technology Inc.
->>>  phytec      PHYTEC Messtechnik GmbH
->>>  picochip    Picochip Ltd
->>> +pine64      Pine64
->>>  plathome    Plat'Home Co., Ltd.
->>>  plda        PLDA
->>>  pixcir  PIXCIR MICROELECTRONICS Co., Ltd
->>
->> Please make a separate patch for this one.
->>
->>> diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
->>> index f832b8a..3b7428a 100644
->>> --- a/arch/arm64/boot/dts/Makefile
->>> +++ b/arch/arm64/boot/dts/Makefile
->>> @@ -1,3 +1,4 @@
->>> +dts-dirs += allwinner
->>
->> Could you also add a patch to add this path to MAINTAINERS too?
->>
->>>  dts-dirs += altera
->>>  dts-dirs += amd
->>>  dts-dirs += apm
->>> diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
->>> new file mode 100644
->>> index 0000000..65f4e24
->>> --- /dev/null
->>> +++ b/arch/arm64/boot/dts/allwinner/Makefile
->>> @@ -0,0 +1,5 @@
->>> +dtb-$(CONFIG_ARCH_SUNXI) += pine64_plus.dtb pine64.dtb
->>> +
->>> +always              := $(dtb-y)
->>> +subdir-y    := $(dts-dirs)
->>> +clean-files := *.dtb
->>> diff --git a/arch/arm64/boot/dts/allwinner/pine64.dts b/arch/arm64/boot/dts/allwinner/pine64.dts
->>> new file mode 100644
->>> index 0000000..ebea5dd
->>> --- /dev/null
->>> +++ b/arch/arm64/boot/dts/allwinner/pine64.dts
->>> @@ -0,0 +1,58 @@
->>> +/*
->>> + * Copyright (c) 2016 ARM Ltd.
->>> + *
->>> + * This file is dual-licensed: you can use it either under the terms
->>> + * of the GPL or the X11 license, at your option. Note that this dual
->>> + * licensing only applies to this file, and not this project as a
->>> + * whole.
->>> + *
->>> + *  a) This library is free software; you can redistribute it and/or
->>> + *     modify it under the terms of the GNU General Public License as
->>> + *     published by the Free Software Foundation; either version 2 of the
->>> + *     License, or (at your option) any later version.
->>> + *
->>> + *     This library is distributed in the hope that it will be useful,
->>> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
->>> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->>> + *     GNU General Public License for more details.
->>> + *
->>> + * Or, alternatively,
->>> + *
->>> + *  b) Permission is hereby granted, free of charge, to any person
->>> + *     obtaining a copy of this software and associated documentation
->>> + *     files (the "Software"), to deal in the Software without
->>> + *     restriction, including without limitation the rights to use,
->>> + *     copy, modify, merge, publish, distribute, sublicense, and/or
->>> + *     sell copies of the Software, and to permit persons to whom the
->>> + *     Software is furnished to do so, subject to the following
->>> + *     conditions:
->>> + *
->>> + *     The above copyright notice and this permission notice shall be
->>> + *     included in all copies or substantial portions of the Software.
->>> + *
->>> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
->>> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
->>> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
->>> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
->>> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
->>> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
->>> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
->>> + *     OTHER DEALINGS IN THE SOFTWARE.
->>> + */
->>> +
->>> +/dts-v1/;
->>> +
->>> +#include "pine64_common.dtsi"
->>> +
->>> +/ {
->>> +    model = "Pine64";
->>> +    compatible = "pine64,pine64", "allwinner,a64", "allwinner,sunxi";
->>> +
->>> +    chosen {
->>> +            stdout-path = "serial0:115200n8";
->>> +    };
->>> +
->>> +    memory {
->>> +            reg = <0x40000000 0x20000000>;
->>> +    };
->>> +};
->>> diff --git a/arch/arm64/boot/dts/allwinner/pine64_common.dtsi b/arch/arm64/boot/dts/allwinner/pine64_common.dtsi
->>> new file mode 100644
->>> index 0000000..d968d76
->>> --- /dev/null
->>> +++ b/arch/arm64/boot/dts/allwinner/pine64_common.dtsi
->>> @@ -0,0 +1,76 @@
->>> +/*
->>> + * Copyright (c) 2016 ARM Ltd.
->>> + *
->>> + * This file is dual-licensed: you can use it either under the terms
->>> + * of the GPL or the X11 license, at your option. Note that this dual
->>> + * licensing only applies to this file, and not this project as a
->>> + * whole.
->>> + *
->>> + *  a) This library is free software; you can redistribute it and/or
->>> + *     modify it under the terms of the GNU General Public License as
->>> + *     published by the Free Software Foundation; either version 2 of the
->>> + *     License, or (at your option) any later version.
->>> + *
->>> + *     This library is distributed in the hope that it will be useful,
->>> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
->>> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->>> + *     GNU General Public License for more details.
->>> + *
->>> + * Or, alternatively,
->>> + *
->>> + *  b) Permission is hereby granted, free of charge, to any person
->>> + *     obtaining a copy of this software and associated documentation
->>> + *     files (the "Software"), to deal in the Software without
->>> + *     restriction, including without limitation the rights to use,
->>> + *     copy, modify, merge, publish, distribute, sublicense, and/or
->>> + *     sell copies of the Software, and to permit persons to whom the
->>> + *     Software is furnished to do so, subject to the following
->>> + *     conditions:
->>> + *
->>> + *     The above copyright notice and this permission notice shall be
->>> + *     included in all copies or substantial portions of the Software.
->>> + *
->>> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
->>> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
->>> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
->>> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
->>> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
->>> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
->>> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
->>> + *     OTHER DEALINGS IN THE SOFTWARE.
->>> + */
->>> +
->>> +#include "a64.dtsi"
->>> +
->>> +&mmc0 {
->>> +    pinctrl-names = "default";
->>> +    pinctrl-0 = <&mmc0_pins>, <&mmc0_default_cd_pin>;
->>> +    vmmc-supply = <&reg_vcc3v3>;
->>> +    cd-gpios = <&pio 5 6 0>;
->>> +    cd-inverted;
->>> +    status = "okay";
->>> +};
->>> +
->>> +&uart0 {
->>> +    pinctrl-names = "default";
->>> +    pinctrl-0 = <&uart0_pins_a>;
->>> +    status = "okay";
->>> +};
->>> +
->>> +&uart2 {
->>> +    pinctrl-names = "default";
->>> +    pinctrl-0 = <&uart2_pins>;
->>> +    status = "okay";
->>> +};
->>> +
->>> +&uart3 {
->>> +    pinctrl-names = "default";
->>> +    pinctrl-0 = <&uart3_pins_a>;
->>> +    status = "okay";
->>> +};
->>> +
->>> +&uart4 {
->>> +    pinctrl-names = "default";
->>> +    pinctrl-0 = <&uart4_pins>;
->>> +    status = "okay";
->>> +};
->>
->> Our policy for boards with "open" pin headers the user can plug
->> anything he wants is that unless the pin is explicitly dedicated to
->> that usage, we simply leave them aside so that we don't enforce
->> anything.
->
-> Makes sense, I just wonder what a user is expected to do if she wants to
-> use the serial ports?
-> Hack the DT?
-> Use U-Boot to create those nodes on the fly?
-> Use overlays?
-> Directly setup serial ports from userland? (thinking of this bloody
-> mechanism x86 (used to?) have)
+Hence each dts in the Linux kernel should provide a unique model
+identifier.
 
-I believe that device tree overlays are the generally recommended method.
+Commit 8536239e371f ("ARM: dts: Restructure imx6qdl-wandboard.dtsi for new
+rev C1 board.")' created new files imx6dl-wandboard-revb1.dts and
+imx6q-wandboard-revb1.dts but used the same model identifier as in
+imx6dl-wandboard.dts and imx6q-wandboard.dts.
 
-Thanks,
+This patch provides unique model identifiers for revision B1 of
+the Wandboard Dual and Wandbaord Quad.
 
+The patch leaves imx6dl-wandboard.dts and imx6q-wandboard.dts unchanged
+because it is not foreseeable if the same dts will valid for future
+board revisions or not. Furthermore we should avoid unnecessary
+changes.
+
+v3:
+	update imx6dl-wandboard-revb1.dts
+
+v2:
+	correct name of referenced Debian package
+
+Signed-off-by: Heinrich Schuchardt <xypron.glpk@gmx.de>
+---
+ arch/arm/boot/dts/imx6dl-wandboard-revb1.dts | 2 +-
+ arch/arm/boot/dts/imx6q-wandboard-revb1.dts  | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx6dl-wandboard-revb1.dts b/arch/arm/boot/dts/imx6dl-wandboard-revb1.dts
+index f607d4f..8c314ee 100644
+--- a/arch/arm/boot/dts/imx6dl-wandboard-revb1.dts
++++ b/arch/arm/boot/dts/imx6dl-wandboard-revb1.dts
+@@ -13,7 +13,7 @@
+ #include "imx6qdl-wandboard-revb1.dtsi"
+ 
+ / {
+-	model = "Wandboard i.MX6 Dual Lite Board";
++	model = "Wandboard i.MX6 Dual Lite Board rev B1";
+ 	compatible = "wand,imx6dl-wandboard", "fsl,imx6dl";
+ 
+ 	memory {
+diff --git a/arch/arm/boot/dts/imx6q-wandboard-revb1.dts b/arch/arm/boot/dts/imx6q-wandboard-revb1.dts
+index 20bf3c2..9207d80 100644
+--- a/arch/arm/boot/dts/imx6q-wandboard-revb1.dts
++++ b/arch/arm/boot/dts/imx6q-wandboard-revb1.dts
+@@ -13,7 +13,7 @@
+ #include "imx6qdl-wandboard-revb1.dtsi"
+ 
+ / {
+-	model = "Wandboard i.MX6 Quad Board";
++	model = "Wandboard i.MX6 Quad Board rev B1";
+ 	compatible = "wand,imx6q-wandboard", "fsl,imx6q";
+ 
+ 	memory {
 -- 
-Julian Calaby
-
-Email: julian.calaby at gmail.com
-Profile: http://www.google.com/profiles/julian.calaby/
+2.7.0
