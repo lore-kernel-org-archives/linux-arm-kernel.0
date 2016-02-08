@@ -1,40 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 08 Feb 2016 10:53:10 +0100
-Subject: [PATCH 1/5] ARM: add EXPORT_SYMBOL of hook_fault_code for PCI
- host modularization
-In-Reply-To: <1454889644-27830-2-git-send-email-paul.gortmaker@windriver.com>
-References: <1454889644-27830-1-git-send-email-paul.gortmaker@windriver.com>
- <1454889644-27830-2-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <2567476.SknW0BEsQJ@wuerfel>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 08 Feb 2016 10:58:55 +0100
+Subject: [PATCH v3 1/3] reset: Make [of_]reset_control_get[_foo]
+ functions wrappers
+In-Reply-To: <56B4EA46.7060905@redhat.com>
+References: <1453918516-3078-1-git-send-email-hdegoede@redhat.com>
+ <1453918516-3078-2-git-send-email-hdegoede@redhat.com>
+ <1454604866.3356.78.camel@pengutronix.de> <56B4EA46.7060905@redhat.com>
+Message-ID: <1454925535.3466.8.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 07 February 2016 19:00:40 Paul Gortmaker wrote:
-> In a discussion of a previous patch set[1], it was suggested that
-> modularizing some of the PCI host support would be good to keep
-> multi platform bzImage sizes smaller.
+Am Freitag, den 05.02.2016, 19:30 +0100 schrieb Hans de Goede:
+[...]
+> > Even though we are device tree only at this point, I'd prefer to keep an
+> > exported function that takes a struct device argument, for example:
+> >
+> > 	return __reset_control_get(dev, id, 0);
 > 
-> Two of the files that are candidates for conversion to tristate
-> from bool are:
-> 
-> drivers/pci/host/pci-imx6.c
-> drivers/pci/host/pci-keystone.c
-> 
-> However, doing the conversion reveals that they are going to fail
-> at modpost time since hook_fault_code isn't currently exported.
-> 
-> Since we are now going to export it we also need to remove the
-> __init tag, as the fcn needs to be present at insmod time.
-> 
-> [1] https://lkml.kernel.org/r/20160108203102.GH5354 at localhost
-> 
+> I don't really see a reason to do this, this is not userspace abi or some-such
+> we can always later re-introduce an exported function which takes a device
+> argument. But if you insist, you're the boss :)
 
-If we want to make hook_fault_code() visible, we at least also need
-an unhook_fault_code() function that removes the fault handler
-when unloading the module, and preferably does so in a safe way.
+s/boss/janitor/ more like
 
-The usage of hook_fault_code() at least in the imx driver is also
-problematic, as it just ignores all "imprecise external abort"
-faults, whether they come from PCI or not.
+> Let me know if you really
+> want me to make this change for the next version, and I'll add it to v4 of this
+> set.
 
-	Arnd
+Leave it as is. I have a patch to add it back, and yes it looks a bit
+superfluous on its own. I'll add apply that only once its actually
+needed.
+
+regards
+Philipp
