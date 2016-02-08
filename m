@@ -1,75 +1,61 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 08 Feb 2016 16:52:07 +0100
-Subject: [PATCH v2 0/3] fix and new support for orion5x based linkstation
-In-Reply-To: <1454738393-14114-1-git-send-email-rogershimizu@gmail.com> (Roger
- Shimizu's message of "Sat, 6 Feb 2016 14:59:50 +0900")
-References: <1454689998-9579-1-git-send-email-rogershimizu@gmail.com>
- <1454738393-14114-1-git-send-email-rogershimizu@gmail.com>
-Message-ID: <87lh6v19p4.fsf@free-electrons.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Mon, 8 Feb 2016 10:53:24 -0500
+Subject: [PATCH 4/5] drivers/pci: make host/pci-keystone-dw.c modular
+In-Reply-To: <91848876.ZYig6qgHLq@wuerfel>
+References: <1454889644-27830-1-git-send-email-paul.gortmaker@windriver.com>
+ <1454889644-27830-5-git-send-email-paul.gortmaker@windriver.com>
+ <91848876.ZYig6qgHLq@wuerfel>
+Message-ID: <20160208155324.GU23093@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Roger,
- 
- On sam., f?vr. 06 2016, Roger Shimizu <rogershimizu@gmail.com> wrote:
+[Re: [PATCH 4/5] drivers/pci: make host/pci-keystone-dw.c modular] On 08/02/2016 (Mon 10:59) Arnd Bergmann wrote:
 
-> Dear Orion5x Maintainer,
->
-> Here're fix and new support for orion5x based linkstation devices.
->
-> Firstly, it add the missing mtd flash support, which I consider a fix
-> and can be backported to stable kernels, so I made the patch explicit.
->
-> Second, like the changes I made for kirkwood based linkstation DT,
-> I split the orion5x-linkstation-lswtgl.dts file into common and device
-> specific part, in order to support more devices.
->
-> Third, so there's a new device.
->
-> Hope this can be kindly accepted. Thank you!
->
-> Changes in v2:
-> - add "Fixes" tag for patch 1/3
-> - add "mvebu-" prefix to common .dtsi file to share between orion5x
->   and kirkwood, which address comment from Andrew Lunn
-> - add "Reviewed-by" tag from Andrew Lunn for all 3 patches
->
-> Cheers,
-> Roger
->
-> Roger Shimizu (3):
->   ARM: dts: orion5x: fix the missing mtd flash on linkstation lswtgl
->   ARM: dts: orion5x: split linkstation lswtgl into common and device
->     parts
->   ARM: dts: orion5x: add device tree for buffalo linkstation ls-gl
+> On Sunday 07 February 2016 19:00:43 Paul Gortmaker wrote:
+> > Export the symbols that this driver requires in order for it to
+> > be modular.  In addition to the one use case of a dw_pci sym, it
+> > has many instances of its own ks_dw_pci syms that need exporting
+> > in order to modpost w/o error.
+> > 
+> > Cc: Murali Karicheri <m-karicheri2@ti.com>
+> > Cc: Bjorn Helgaas <bhelgaas@google.com>
+> > Cc: Stanimir Varbanov <svarbanov@mm-sol.com>
+> > Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+> > Cc: Thierry Reding <thierry.reding@gmail.com>
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > Cc: linux-pci at vger.kernel.org
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+> > ---
+> 
+> 
+> Could we just have one module for the driver  instead of two?
 
+That thought crossed my mind, but I was considering merging the C files
+and figured it might be more churn than the maintainer wanted.  If
+maintainers are good with the below (assuming it works) then yes that
+also seems reasonable.
 
-The 3 patches have been applied on mvebu/dt
+P.
+--
 
-Thanks,
-
-Gregory
-
-
->
->  arch/arm/boot/dts/Makefile                         |   1 +
->  arch/arm/boot/dts/mvebu-linkstation-fan.dtsi       |  72 +++++++
->  .../boot/dts/mvebu-linkstation-gpio-simple.dtsi    | 105 ++++++++++
->  arch/arm/boot/dts/orion5x-linkstation-lsgl.dts     |  87 +++++++++
->  arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts   | 214 +++++----------------
->  arch/arm/boot/dts/orion5x-linkstation.dtsi         | 180 +++++++++++++++++
->  6 files changed, 491 insertions(+), 168 deletions(-)
->  create mode 100644 arch/arm/boot/dts/mvebu-linkstation-fan.dtsi
->  create mode 100644 arch/arm/boot/dts/mvebu-linkstation-gpio-simple.dtsi
->  create mode 100644 arch/arm/boot/dts/orion5x-linkstation-lsgl.dts
->  create mode 100644 arch/arm/boot/dts/orion5x-linkstation.dtsi
->
-> -- 
-> 2.1.4
->
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> 
+> Something like below (untested)
+> 
+> 	Arnd
+> 
+> diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile
+> index 7b2f20c6ccc6..0b472c680348 100644
+> --- a/drivers/pci/host/Makefile
+> +++ b/drivers/pci/host/Makefile
+> @@ -8,7 +8,8 @@ obj-$(CONFIG_PCI_RCAR_GEN2) += pci-rcar-gen2.o
+>  obj-$(CONFIG_PCI_RCAR_GEN2_PCIE) += pcie-rcar.o
+>  obj-$(CONFIG_PCI_HOST_GENERIC) += pci-host-generic.o
+>  obj-$(CONFIG_PCIE_SPEAR13XX) += pcie-spear13xx.o
+> -obj-$(CONFIG_PCI_KEYSTONE) += pci-keystone-dw.o pci-keystone.o
+> +obj-$(CONFIG_PCI_KEYSTONE) pci-keystone-mod.o
+> +pci-keystone-mod-objs := pci-keystone-dw.o pci-keystone.o
+>  obj-$(CONFIG_PCIE_XILINX) += pcie-xilinx.o
+>  obj-$(CONFIG_PCI_XGENE) += pci-xgene.o
+>  obj-$(CONFIG_PCI_XGENE_MSI) += pci-xgene-msi.o
+> 
