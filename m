@@ -1,65 +1,32 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 8 Feb 2016 17:10:00 +0000
-Subject: [PATCH v3 6/6] kvm: arm64: Add ACPI support for virt arch timer
-In-Reply-To: <1454358418-5157-7-git-send-email-fu.wei@linaro.org>
-References: <1454358418-5157-1-git-send-email-fu.wei@linaro.org>
- <1454358418-5157-7-git-send-email-fu.wei@linaro.org>
-Message-ID: <56B8CBE8.7020305@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 8 Feb 2016 17:10:10 +0000
+Subject: [PATCH 1/2] ARM: make virt_to_idmap() return unsigned long
+In-Reply-To: <56B33BAC.6020303@ti.com>
+References: <E1aO8F2-00074N-E8@rmk-PC.arm.linux.org.uk>
+ <56A84748.3040108@oracle.com>
+ <20160201152015.GU10826@n2100.arm.linux.org.uk>
+ <56AF8F54.7030805@ti.com> <56AF917F.9030505@oracle.com>
+ <56B14546.4070808@oracle.com> <56B20B2E.7060408@ti.com>
+ <56B2201B.7020205@ti.com>
+ <20160203195905.GC10826@n2100.arm.linux.org.uk>
+ <56B33BAC.6020303@ti.com>
+Message-ID: <20160208171009.GP10826@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/02/16 20:26, fu.wei at linaro.org wrote:
-> From: Fu Wei <fu.wei@linaro.org>
-> 
-> This patch adds ACPI/GTDT support for virt arch timer
-> using the API in GTDT driver.
-> 
-> Signed-off-by: Fu Wei <fu.wei@linaro.org>
-> ---
->  virt/kvm/arm/arch_timer.c | 8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-> index 0a279d3..4077347 100644
-> --- a/virt/kvm/arm/arch_timer.c
-> +++ b/virt/kvm/arm/arch_timer.c
-> @@ -385,6 +385,9 @@ static int kvm_timer_get_ppi(unsigned int *ppi)
->  {
->  	struct device_node *np;
->  	int ret = -EINVAL;
-> +#ifdef CONFIG_ACPI_GTDT
-> +	struct arch_timer_data data;
-> +#endif
->  
->  	np = of_find_matching_node(NULL, arch_timer_of_match);
->  	if (!np) {
-> @@ -397,6 +400,11 @@ static int kvm_timer_get_ppi(unsigned int *ppi)
->  	of_node_put(np);
->  
->  skip_of:
-> +#ifdef CONFIG_ACPI_GTDT
-> +	if (!*ppi && !gtdt_arch_timer_data_init(NULL, &data))
-> +		*ppi = data.virt_ppi;
-> +#endif
-> +
->  	if (*ppi)
->  		return 0;
->  
-> 
+On Thu, Feb 04, 2016 at 01:53:16PM +0200, Grygorii Strashko wrote:
+> This patch boot/reboot tested on k2hk-evm (LPAE=y), ping works (with netcp regression fixed)
+> Tested-by: Grygorii Strashko <grygorii.strashko@ti.com>
 
-As I already pointed out in another thread hacking some KVM ACPI stuff,
-this is the wrong approach.
+Thanks.  I've pushed /both/ patches out into linux-next, even though
+no one's tested the second patch.
 
-We should have a *common* accessor in the timer code that exports the
-relevant information, whatever the firmware "du jour" is.
+I'll wait for some progress on the TI side though; I'm unable to do
+anything further on kexec until there's some movement on the items
+I've requested (either kexec userspace tool patches, so I can test
+locally, or a tested kexec kernel patch updated for these two changes.)
 
-See Julien's series, which seems to address the issue in a much more
-convincing way:
-
-https://lists.cs.columbia.edu/pipermail/kvmarm/2016-February/018531.html
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
