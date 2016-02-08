@@ -1,44 +1,44 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon,  8 Feb 2016 18:14:16 +0100
-Subject: [PATCH v3 08/12] devicetree: bindings: add DT binding for the Marvell
- Armada 3700 SoC family
-In-Reply-To: <1454951660-13289-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1454951660-13289-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1454951660-13289-9-git-send-email-gregory.clement@free-electrons.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Mon, 08 Feb 2016 17:17:57 +0000
+Subject: [PATCH v2 04/10] serial: mps2-uart: add MPS2 UART driver
+In-Reply-To: <20160208165226.GA11593@kroah.com>
+References: <1454413199-26573-1-git-send-email-vladimir.murzin@arm.com>
+ <1454413199-26573-5-git-send-email-vladimir.murzin@arm.com>
+ <20160207071154.GA32017@kroah.com> <56B87928.7020803@arm.com>
+ <20160208165226.GA11593@kroah.com>
+Message-ID: <56B8CDC5.5010504@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Marvell Armada 3700 is a family of ARMv8 CA53 SoCs. This commit
-introduces the Device Tree binding that documents the top-level
-compatible strings for Armada 3700 based platforms.
+On 08/02/16 16:52, Greg KH wrote:
+> On Mon, Feb 08, 2016 at 11:16:56AM +0000, Vladimir Murzin wrote:
+>> On 07/02/16 07:11, Greg KH wrote:
+>>>> +
+>>>> +#define SERIAL_NAME "ttyS"
+>>>
+>>> You can't be "ttyS", there's already a serial port named that, please
+>>> use a unique name and a new major/minor number (dynamic ideally).
+>>>
+>>
+>> Hi Greg,
+>>
+>> I did s/ttyMPS/ttyS per your request for v1 [1]. I'm fine to change it
+>> back if you prefer that, but I'd be glad to know what I've been missing?
+>>
+>> [1] https://lkml.org/lkml/2015/12/13/8
+> 
+> Yeah, I was wrong, sorry about that, my fault.
+> 
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- .../devicetree/bindings/arm/marvell/armada-37xx.txt      | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt
+I got -EDOUBT from my parser. What should I stick with "ttyS" or "ttyMPS"?
 
-diff --git a/Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt b/Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt
-new file mode 100644
-index 000000000000..51336e5fc761
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt
-@@ -0,0 +1,16 @@
-+Marvell Armada 37xx Platforms Device Tree Bindings
-+--------------------------------------------------
-+
-+Boards using a SoC of the Marvell Armada 37xx family must carry the
-+following root node property:
-+
-+ - compatible: must contain "marvell,armada3710"
-+
-+In addition, boards using the Marvell Armada 3720 SoC shall have the
-+following property before the previous one:
-+
-+ - compatible: must contain "marvell,armada3720"
-+
-+Example:
-+
-+compatible = "marvell,armada-3720-db", "marvell,armada3720", "marvell,armada3710";
--- 
-2.5.0
+P.S.
+Any chance you could look at the rest of the patch?
+
+Cheers
+Vladimir
+
+> greg k-h
+> 
+> 
+> 
