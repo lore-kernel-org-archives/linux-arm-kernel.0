@@ -1,126 +1,38 @@
-From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Mon, 8 Feb 2016 11:59:17 -0600
-Subject: [PATCH V2 12/12] dtb: amd: Add support for AMD/Linaro 96Boards
- Enterprise Edition Server board
-In-Reply-To: <1454954357-8395-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-References: <1454954357-8395-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <1454954357-8395-13-git-send-email-Suravee.Suthikulpanit@amd.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 8 Feb 2016 18:04:19 +0000
+Subject: [RESEND2 PATCH 0/3] Fix kernel panic in dma-coherent
+In-Reply-To: <56B8D77D.3050305@arm.com>
+References: <cover.1454950917.git.brian.starkey@arm.com>
+ <20160208175054.GD15443@leverpostej> <56B8D77D.3050305@arm.com>
+Message-ID: <20160208180418.GE15443@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
+On Mon, Feb 08, 2016 at 05:59:25PM +0000, Robin Murphy wrote:
+> Hi Mark,
+> 
+> On 08/02/16 17:50, Mark Rutland wrote:
+> >On Mon, Feb 08, 2016 at 05:30:49PM +0000, Brian Starkey wrote:
+> >>Hi,
+> >>
+> >>I'm resending these again to try and garner some interest. Without
+> >>this series, dma-coherent cannot be used on arm64 platforms.
+> >
+> >I think you need to characterize that a bit better. I see plenty of
+> >instances of 'dma-coherent' in dts files, assuming you mean the DT
+> >dma-coehrent property.
+> >
+> >If not, feel free to stop reading now.
+> 
+> Terminology overload: the dma-coherent DT property is about devices
+> having cache-coherent access to system memory within the linear map.
+> The dma-coherent thing here is pretty much the precise opposite of
+> that - namely creating CPU mappings for memory which belongs to the
+> device itself and may be behind an I/O bus (e.g. a framebuffer on a
+> video card).
 
-Add device tree file for AMD/Linaro 96Boards Enterprise Edition Server
-(Husky) Board. This is based on the AMD Seattle Rev.B0 system
+Phew.
 
-Signed-off-by: Leo Duran <leo.duran@amd.com>
-Signed-off-by: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
----
- arch/arm64/boot/dts/amd/Makefile  |  3 +-
- arch/arm64/boot/dts/amd/husky.dts | 83 +++++++++++++++++++++++++++++++++++++++
- 2 files changed, 85 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/boot/dts/amd/husky.dts
+Sorry for the noise, and thanks for setting me straight!
 
-diff --git a/arch/arm64/boot/dts/amd/Makefile b/arch/arm64/boot/dts/amd/Makefile
-index db03293..ba84770 100644
---- a/arch/arm64/boot/dts/amd/Makefile
-+++ b/arch/arm64/boot/dts/amd/Makefile
-@@ -1,5 +1,6 @@
- dtb-$(CONFIG_ARCH_SEATTLE) += amd-overdrive.dtb \
--			amd-overdrive-rev-b0.dtb amd-overdrive-rev-b1.dtb
-+			amd-overdrive-rev-b0.dtb amd-overdrive-rev-b1.dtb \
-+			husky.dtb
- 
- always		:= $(dtb-y)
- subdir-y	:= $(dts-dirs)
-diff --git a/arch/arm64/boot/dts/amd/husky.dts b/arch/arm64/boot/dts/amd/husky.dts
-new file mode 100644
-index 0000000..1381d4b
---- /dev/null
-+++ b/arch/arm64/boot/dts/amd/husky.dts
-@@ -0,0 +1,83 @@
-+/*
-+ * DTS file for AMD/Linaro 96Boards Enterprise Edition Server (Husky) Board
-+ * Note: Based-on AMD Seattle Rev.B0
-+ *
-+ * Copyright (C) 2015 Advanced Micro Devices, Inc.
-+ */
-+
-+/dts-v1/;
-+
-+/include/ "amd-seattle-soc.dtsi"
-+
-+/ {
-+	model = "Linaro 96Boards Enterprise Edition Server (Husky) Board";
-+	compatible = "amd,seattle-overdrive", "amd,seattle";
-+
-+	chosen {
-+		stdout-path = &serial0;
-+	};
-+
-+	psci {
-+		compatible   = "arm,psci-0.2";
-+		method       = "smc";
-+	};
-+};
-+
-+&ccp0 {
-+	status = "ok";
-+	amd,zlib-support = <1>;
-+};
-+
-+/**
-+ * NOTE: In Rev.B, gpio0 is reserved.
-+ */
-+&gpio1 {
-+	status = "ok";
-+};
-+
-+&gpio2 {
-+	status = "ok";
-+};
-+
-+&gpio3 {
-+	status = "ok";
-+};
-+
-+&gpio4 {
-+	status = "ok";
-+};
-+
-+&i2c0 {
-+	status = "ok";
-+};
-+
-+&i2c1 {
-+	status = "ok";
-+};
-+
-+&pcie0 {
-+	status = "ok";
-+};
-+
-+&spi0 {
-+	status = "ok";
-+};
-+
-+&spi1 {
-+	status = "ok";
-+	sdcard0: sdcard at 0 {
-+		compatible = "mmc-spi-slot";
-+		reg = <0>;
-+		spi-max-frequency = <20000000>;
-+		voltage-ranges = <3200 3400>;
-+		pl022,hierarchy = <0>;
-+		pl022,interface = <0>;
-+		pl022,com-mode = <0x0>;
-+		pl022,rx-level-trig = <0>;
-+		pl022,tx-level-trig = <0>;
-+	};
-+};
-+
-+&smb0 {
-+	/include/ "amd-seattle-xgbe-b.dtsi"
-+};
--- 
-2.5.0
+Mark.
