@@ -1,147 +1,51 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 8 Feb 2016 14:31:40 -0600
-Subject: [PATCH 1/2] Documentation: dt: mailbox: Add TI Message Manager
-In-Reply-To: <20160208193706.GA333@rob-hp-laptop>
-References: <1454690044-2560-1-git-send-email-nm@ti.com>
- <1454690044-2560-2-git-send-email-nm@ti.com>
- <20160208193706.GA333@rob-hp-laptop>
-Message-ID: <CAGo_u6oQ3wHB9--2sZGwhM_eQa4ixNDKDVoFaaNStWYjwO2xig@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 8 Feb 2016 12:44:46 -0800
+Subject: [PATCH 0/3] omap: hwmod: add default reset handling support
+In-Reply-To: <1454929941-23949-1-git-send-email-kishon@ti.com>
+References: <1454929941-23949-1-git-send-email-kishon@ti.com>
+Message-ID: <20160208204446.GC19432@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 8, 2016 at 1:37 PM, Rob Herring <robh@kernel.org> wrote:
+Hi Kishon,
 
-Thank you for reviewing the binding.
+* Kishon Vijay Abraham I <kishon@ti.com> [160208 03:13]:
+> Add a new hwmod flag to indicate custom reset handling and use it
+> for devices that require custom reset handling (like dsp, ipu, iva).
+> 
+> Tested PCIe on dra7-evm and dra72-evm.
+> I need help in testing DSP, IPU, IVA, PRU, GFX, M3 in other platforms.
+> Or a way to test these cores to see if reset is not broken. Suman?
+> 
+> I'll post this series once again after performing these tests.
 
-> On Fri, Feb 05, 2016 at 10:34:03AM -0600, Nishanth Menon wrote:
->> Message Manager is a hardware block used to communicate with various
->> processor systems within certain Texas Instrument's Keystone
->> generation SoCs.
->>
->> This hardware engine is used to transfer messages from various compute
->> entities(or processors) within the SoC. It is designed to be self
->> contained without needing software initialization for operation.
->>
->> Signed-off-by: Nishanth Menon <nm@ti.com>
->> ---
->>  .../bindings/mailbox/ti,message-manager.txt        | 72 ++++++++++++++++++++++
->>  1 file changed, 72 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/mailbox/ti,message-manager.txt
->>
->> diff --git a/Documentation/devicetree/bindings/mailbox/ti,message-manager.txt b/Documentation/devicetree/bindings/mailbox/ti,message-manager.txt
->> new file mode 100644
->> index 000000000000..f3d73b0b3c66
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/mailbox/ti,message-manager.txt
->> @@ -0,0 +1,72 @@
->> +Texas Instruments' Message Manager Driver
->> +========================================
->> +
->> +The Texas Instruments' Message Manager is a mailbox controller that has
->> +configurable queues selectable at SoC(System on Chip) integration. The Message
->> +manager is broken up into queues in different address regions that are called
->> +"proxies" - each instance is unidirectional and is instantiated at SoC
->> +integration level to indicate receive or transmit path.
->> +
->> +Message Manager Device Node:
->> +===========================
->> +
->> +Required properties:
->> +--------------------
->> +- compatible:                Shall be:
->> +                             "ti,k2g-message-manager"
->> +                             "ti,message-manager"
->
-> Given that queues are configurable at integration time, does a generic
-> property really make sense here?
+Do we also still need to patch something in the pcie driver too
+or can all that be left out now?
 
-True. I can drop the generic "ti,message-manager" binding.
-
->> +- reg-names          queue_proxy_region - Map the queue Proxy region
->> +                     queue_state_debug_region - Map the queue state debug
->> +                     region.
->> +- reg:                       Contains the register map per reg-names
->> +- #mbox-cells                Shall be 1
->
-> And the value contained is what?
-
-phandle -> I think Suman has already explained in his response.
-
->> +
->> +Child Nodes:
->> +============
->> +A child node is used for representing the actual queue device that is
->> +used for the communication between the host processor and a remote processor.
->> +Each child node should have a unique node name across all the different
->> +message manager device nodes.
->> +
->> +Required Properties:
->> +--------------------
->> +- ti,queue-id:               Indicates the queue number this node represents
->> +- ti,proxy-id:               Proxy ID representing the processor in the SoC.
->
-> What determines these values?
-
-This is SoC integration dependent -> Every queue, proxy combination
-has it's own memory region allocated for it.
-
->> +
->> +Optional Properties:
->> +--------------------
->> +- interrupt-names:   'rx' - indicates a receive interrupt (mandatory ONLY if
->> +                     this is a receive queue)
->
-> Kind of pointless if there is only 1.
->
-
-This is primarily to ensure a future compatibility where we are trying
-to convince the hardware team to provide an error interrupt per queue
-as well for slave usage.
-it would probably be pointless at that time to deal with "legacy"
-binding defintions when the next hardware ip definition takes place.
-
->> +- interrupts:                Contains the interrupt information corresponding to
->> +                     interrupt-names property.
->> +
->> +Example:
->> +--------
->> +
->> +     msgmgr: msgmgr at 02a00000 {
->> +             compatible = "ti,k2g-message-manager", "ti,message-manager";
->> +             #mbox-cells = <1>;
->> +             reg-names = "queue_proxy_region", "queue_state_debug_region";
->> +             reg = <0x02a00000 0x400000>, <0x028c3400 0x400>;
->> +
->> +             msgmgr_proxy_pmmc_tx_prio0: pmmc_tx_prio0 {
->> +                     ti,queue-id = <0>;
->> +                     ti,proxy-id = <0>;
->> +             };
->> +
->> +             msgmgr_proxy_pmmc_rx: pmmc_rx {
->> +                     ti,queue-id = <5>;
->> +                     ti,proxy-id = <2>;
->> +                     interrupt-names = "rx";
->> +                     interrupts = <GIC_SPI 324 IRQ_TYPE_EDGE_RISING>;
->> +             };
->> +     };
->> +
->> +...
->> +     pmmc {
->> +             ...
->> +             mbox-names = "tx", "rx";
->> +             mboxes = <&msgmgr &msgmgr_proxy_pmmc_tx>
->> +                      <&msgmgr &msgmgr_proxy_pmmc_rx>;
->
-> While I guess this is valid DT, it is a bit strange having the cell
-> values be phandles. Why not just make the queue and proxy ids be the
-> cell values? The interrupts could be moved to the parent and the child
-> nodes eliminated altogether.
->
-> The alternative would be just drop msgmgr phandle and point to the child
-> nodes. I prefer getting rid of the child nodes though.
-
-I see that Suman has already responded to this.
-
---
 Regards,
-Nishanth Menon
+
+Tony
+
+
+> Paul Walmsley (3):
+>   ARM: omap2+: omap_hwmod: introduce hwmod flag for custom reset
+>     handling
+>   ARM: OMAP2+: hwmod: use HWMOD_CUSTOM_HARDRESET for custom reset
+>     handling
+>   ARM: OMAP2+: hwmod: Add default reset handling
+> 
+>  arch/arm/mach-omap2/omap_hwmod.c                   |   16 +++++++++++-----
+>  arch/arm/mach-omap2/omap_hwmod.h                   |   12 ++++++++++++
+>  arch/arm/mach-omap2/omap_hwmod_2420_data.c         |    2 ++
+>  arch/arm/mach-omap2/omap_hwmod_2430_data.c         |    1 +
+>  .../mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c |    2 ++
+>  arch/arm/mach-omap2/omap_hwmod_33xx_data.c         |    1 +
+>  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |    3 +++
+>  arch/arm/mach-omap2/omap_hwmod_43xx_data.c         |    1 +
+>  arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |    6 ++++++
+>  arch/arm/mach-omap2/omap_hwmod_54xx_data.c         |    2 ++
+>  10 files changed, 41 insertions(+), 5 deletions(-)
+> 
+> -- 
+> 1.7.9.5
+> 
