@@ -1,86 +1,59 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 8 Feb 2016 15:46:04 +0000
-Subject: [PATCH] xen/arm: correctly handle DMA mapping of compound
- pages
-In-Reply-To: <1454938450-26282-1-git-send-email-ian.campbell@citrix.com>
-References: <1454938450-26282-1-git-send-email-ian.campbell@citrix.com>
-Message-ID: <alpine.DEB.2.02.1602081542410.27008@kaball.uk.xensource.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 08 Feb 2016 16:49:40 +0100
+Subject: [PATCH 0/2] ARM: mvebu: misc DT improvements
+In-Reply-To: <1453908287-29557-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ (Thomas Petazzoni's message of "Wed, 27 Jan 2016 16:24:45 +0100")
+References: <1453908287-29557-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <87pow719t7.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 8 Feb 2016, Ian Campbell wrote:
-> Currently xen_dma_map_page concludes that DMA to anything other than
-> the head page of a compound page must be foreign, since the PFN of the
-> page is that of the head.
-> 
-> Fix the check to instead consider the whole of a compound page to be
-> local if the PFN of the head passes the 1:1 check.
-> 
-> We can never see a compound page which is a mixture of foreign and
-> local sub-pages.
-> 
-> The comment already correctly described the intention, but fixup the
-> spelling and some grammar.
-> 
-> This fixes the various SSH protocol errors which we have been seeing
-> on the cubietrucks in our automated test infrastructure.
-> 
-> This has been broken since "xen/arm: use hypercall to flush caches in
-> map_page" (3567258d281b), which was in v3.19-rc1.
+Hi Thomas,
+ 
+ On mer., janv. 27 2016, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
 
-checkpatch.pl reports a small style issue with this statement.
+> Hello,
+>
+> Here are two fixes/improvements for Marvell EBU platforms, which were
+> initially sent on June 18th 2015, and never got any feedback.
+>
+> This new iteration is simply rebased on v4.5-rc1 with no other
+> changes.
 
+Could you send a new version taking into account the comment from
+Andrew?
 
-> NB arch/arm64/.../xen/page-coherent.h also includes this file.
-> 
-> Signed-off-by: Ian Campbell <ian.campbell@citrix.com>
-> Cc: xen-devel at lists.xenproject.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: stable at vger.kernel.org # v3.19+
-> ---
->  arch/arm/include/asm/xen/page-coherent.h | 19 ++++++++++++-------
->  1 file changed, 12 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/xen/page-coherent.h b/arch/arm/include/asm/xen/page-coherent.h
-> index 0375c8c..5653739 100644
-> --- a/arch/arm/include/asm/xen/page-coherent.h
-> +++ b/arch/arm/include/asm/xen/page-coherent.h
-> @@ -35,14 +35,19 @@ static inline void xen_dma_map_page(struct device *hwdev, struct page *page,
->  	     dma_addr_t dev_addr, unsigned long offset, size_t size,
->  	     enum dma_data_direction dir, struct dma_attrs *attrs)
->  {
-> -	bool local = XEN_PFN_DOWN(dev_addr) == page_to_xen_pfn(page);
-> +	unsigned long page_pfn = page_to_xen_pfn(page);
-> +	unsigned long dev_pfn = XEN_PFN_DOWN(dev_addr);
-> +	unsigned long compound_pages = 1<<compound_order(page);
+Thanks,
 
-To take care of 64k pages, this needs to be:
+Gregory
 
-    unsigned long compound_pages = (1<<compound_order(page)) * XEN_PFN_PER_PAGE;
-
-
-> +	bool local = page_pfn <= dev_pfn && dev_pfn - page_pfn < compound_pages;
-
-Since you are@it, it might be worth adding brackets.
-
-
->  	/*
-> -	 * Dom0 is mapped 1:1, while the Linux page can be spanned accross
-> -	 * multiple Xen page, it's not possible to have a mix of local and
-> -	 * foreign Xen page. So if the first xen_pfn == mfn the page is local
-> -	 * otherwise it's a foreign page grant-mapped in dom0. If the page is
-> -	 * local we can safely call the native dma_ops function, otherwise we
-> -	 * call the xen specific function.
-> +	 * Dom0 is mapped 1:1, while the Linux page can span across
-> +	 * multiple Xen pages, it's not possible for it to contain a
-> +	 * mix of local and foreign Xen pages. So if the first xen_pfn
-> +	 * == mfn the page is local otherwise it's a foreign page
-> +	 * grant-mapped in dom0. If the page is local we can safely
-> +	 * call the native dma_ops function, otherwise we call the xen
-> +	 * specific function.
->  	 */
->  	if (local)
->  		__generic_dma_ops(hwdev)->map_page(hwdev, page, offset, size, dir, attrs);
+>
+> Thanks!
+>
+> Thomas
+>
+> Lior Amsalem (1):
+>   ARM: mvebu: use armada-370-sata for SATA on Armada 375
+>
+> Thomas Petazzoni (1):
+>   ARM: mvebu: add NAND description to Armada 370 DB and Armada XP DB
+>
+>  arch/arm/boot/dts/armada-370-db.dts | 21 +++++++++++++++++++++
+>  arch/arm/boot/dts/armada-375.dtsi   |  2 +-
+>  arch/arm/boot/dts/armada-xp-db.dts  | 21 +++++++++++++++++++++
+>  3 files changed, 43 insertions(+), 1 deletion(-)
+>
 > -- 
-> 2.1.4
-> 
+> 2.6.4
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
