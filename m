@@ -1,31 +1,39 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 8 Feb 2016 15:30:56 +0100
-Subject: [PATCH v2] clocksource/arm_arch_timer: Enable and verify MMIO
- access
-In-Reply-To: <71bf617f4083b116b2aeab24f13fc5fed99a816f.1454327031.git.robin.murphy@arm.com>
-References: <71bf617f4083b116b2aeab24f13fc5fed99a816f.1454327031.git.robin.murphy@arm.com>
-Message-ID: <56B8A6A0.4080704@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon,  8 Feb 2016 15:31:45 +0100
+Subject: [PATCH] ide: icside: remove incorrect initconst annotation
+Message-ID: <1454941909-2778808-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/01/2016 01:00 PM, Robin Murphy wrote:
-> So far, we have been blindly assuming that having access to a
-> memory-mapped timer frame implies that the individual elements of that
-> frame frame are already enabled. Whilst it's the firmware's job to give
-> us non-secure access to frames in the first place, we should not rely
-> on implementations always being generous enough to also configure CNTACR
-> for those non-secure frames (e.g. [1]).
->
-> Explicitly enable feature-level access per-frame, and verify that the
-> access we want is really implemented before trying to make use of it.
->
-> [1]:https://github.com/ARM-software/tf-issues/issues/170
->
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
+The icside_probe function can be called for hotplugged devices, so
+its reference to the __initconst icside_v6_port_info variable
+may be invalid, as Kbuild points out:
 
-Applied to my tree for 4.6.
+WARNING: drivers/ide/icside.o(.text+0x338): Section mismatch in reference from the function icside_probe()
+ to the (unknown reference) .init.rodata:(unknown)
 
-Thanks
+Interestingly, this problem only shows up with clang but not
+with gcc, which optimizes out the __initconst variable.
 
-   - Daniel
+This removes the incorrect annotation.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/ide/icside.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/ide/icside.c b/drivers/ide/icside.c
+index 9f0a48e39b8a..80e933b296f6 100644
+--- a/drivers/ide/icside.c
++++ b/drivers/ide/icside.c
+@@ -451,7 +451,7 @@ err_free:
+ 	return ret;
+ }
+ 
+-static const struct ide_port_info icside_v6_port_info __initconst = {
++static const struct ide_port_info icside_v6_port_info = {
+ 	.init_dma		= icside_dma_off_init,
+ 	.port_ops		= &icside_v6_no_dma_port_ops,
+ 	.host_flags		= IDE_HFLAG_SERIALIZE | IDE_HFLAG_MMIO,
+-- 
+2.7.0
