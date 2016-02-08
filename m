@@ -1,151 +1,184 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 8 Feb 2016 02:51:06 +0000 (UTC)
-Subject: OMAP baseline test results for v4.5-rc3
-Message-ID: <alpine.DEB.2.02.1602080248360.2182@utopia.booyaka.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 8 Feb 2016 08:41:34 +0530
+Subject: [PATCH v7 0/9] Fix broken DMAFLUSHP on Rockchips platform
+In-Reply-To: <56AF01B6.6030204@gmail.com>
+References: <1453460812-8498-1-git-send-email-wxt@rock-chips.com>
+ <56AF01B6.6030204@gmail.com>
+Message-ID: <20160208031134.GI2531@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Feb 01, 2016 at 02:56:54PM +0800, Caesar Wang wrote:
+> Hello Vinod,
+> 
+> Is there any chance apply the DMA patches?:-)
 
-Here are some basic OMAP test results for Linux v4.5-rc3.
-Logs and other details at:
+I was waiting for any ACKs on ARM patches before I merge this series.
 
-    http://www.pwsan.com/omap/testlogs/test_v4.5-rc3/20160207175949/
+> ? 2016?01?22? 19:06, Caesar Wang ??:
+> >This series patches are apply on linus master branch.
+> >Okay, this series patches verified on my github.
+> >(https://github.com/Caesar-github/rockchip/commits/for-dma-tests)
+> >
+> >Linux version 4.4.0+ (wxt at ubuntu)  (Ubuntu/Linaro 4.7.3-12ubuntu1) ) #14
+> >SMP Fri Jan 22 18:13:12 CST 2016
+> >
+> >The perious version 6 from Shawn.
+> >(http://www.spinics.net/lists/dmaengine/msg06606.html)
+> >I pick them up to go on upstream since Shawn hasn't much time to track them.
+> >----
+> >
+> >The purpose of the DMAFLUSHP instruction:
+> >- Tell the peripheral to clear its status and control registers.
+> >- Send a message to the peripheral to resend its level status.
+> >
+> >There are 3 timings described in PL330 Technical Reference Manual:
+> >- Timing 1: Burst request, can work well without DMAFLUSHP.
+> >- Timing 2: Single and burst request, DMAC will ignore the single
+> >             transfer request. This timing happens if there are single
+> >             and burst request.
+> >- Timing 3: Single transfers for a burst request, DMAC should signals
+> >             datype to request the peripheral to flush the contents of
+> >             any control registers. This timing happens if there is
+> >             not enough MFIFO to places the burst data.
+> >
+> >A peripheral may signal a DMA request during the execution of
+> >DMAFLUSHP instruction, that cause DMA request being ignored by DMAC.
+> >
+> >But DMAC and all peripherals on RK3X SoCs DO NOT support DMAFLUSHP.
+> >It can't send a message to the peripheral to resend DMA request,
+> >and the peripheral can't acknowledge a flush request from DMAC.
+> >So all DMA requests should NOT be ignored by DMAC, and DMAC will not
+> >notify the peripheral to flush.
+> >
+> >To fix this problem, we need:
+> >- Do NOT execute DMAFLUSHP instruction.
+> >- Timing 2 and timing 3 should not happen.
+> >
+> >Because on RK3X SoCs, there are 6 or below  channels and 32 MFIFO depth
+> >for DMAC_BUS, and 8 channels and 64 MFIFO depth for DMAC_PERI, it is
+> >impossible to hit the timing 3 if burst length is equal or less than 4.
+> >
+> >Since the request type signal by the peripheral can only be set by
+> >software. We can set Rockchip Soc's GRF_PERIDMAC_CON0[2:1] to select single
+> >or burst request, if it is set b01,  all of the peripharals will signal a brust
+> >request. So the timing 2 will not happen, too.
+> >
+> >So DMAC on RK3X can support single or burst transfer, but can't support
+> >mixed transfer.
+> >
+> >Because burst transfer is more efficient than single transfer, this is
+> >confirmed by our ASIC team, who strongly suggest to use burst transfer.
+> >And this is confirmed by Addy's test on RK3288-Pink2 board, the speed of
+> >spi flash burst transfer will increase about two times than single transfer.
+> >Also, I have tested dw_mmc with pl330 on RK3188 platform to double confirm
+> >the result. That means burst transfer is reansonable.
+> >
+> >So we need a quirk not to execute DMAFLUSHP instruction and to use burst
+> >transfer.
+> >
+> >Note:
+> >- The Rockchip Soc default value of GRF_PERIDMAC_CON0[2:1] is b01. To
+> >   support brust transfer, these bits should not be changed in bootloader.
+> >
+> >Todo:
+> >remove the patches releated to i2s, that will send them at later.
+> >- https://patchwork.kernel.org/patch/7399581/
+> >- https://patchwork.kernel.org/patch/7399671/
+> >
+> >
+> >Changes in v7:
+> >- As vinod comments, fix the subsystem name.
+> >- modify the subject to be better match.
+> >- fix the subsystem.
+> >- fix the subject.
+> >- fix the subject.
+> >
+> >Changes in v6:
+> >- remove expose quirk and add dma max_burst caps for clients
+> >- remove expose quirks and add max_burst for dmaengine
+> >- remove quirks and get dma caps in order to limit burst
+> >
+> >Changes in v5:
+> >- add Mark's tag for spi changes
+> >- remove unnecessary whitespace change
+> >- use switch statement for i2s quirk
+> >
+> >Changes in v4:
+> >- remove spi & i2s dts changes and query quirk from dmaengine API
+> >   suggeseted by Mark.
+> >- fix typo
+> >- Add dmaengine_get_quirk hook and implement it for pl330
+> >
+> >Changes in v3:
+> >- add Sunny's tag
+> >- add more rockchip drivers' changes in this patchset
+> >- add Reviewed-by: Sonny Rao <sonnyrao@chromium.org>
+> >- add Reviewed-by: Sonny Rao <sonnyrao@chromium.org>
+> >- add Reviewed-by: Sonny Rao <sonnyrao@chromium.org>
+> >
+> >Changes in v2:
+> >- amend the author
+> >- reorder the patches suggested by Doug
+> >- add Reviewed-by: Doug Anderson <dianders@chromium.org> for
+> >   rk3288.dtsi patch and arm-pl330.txt patch
+> >- add Reviewed-by: Doug Anderson <dianders@chromium.org>
+> >- amend the author
+> >- fix Olof's mail address
+> >- amend the author
+> >- add Reviewed-by: Doug Anderson <dianders@chromium.org>
+> >- amend Olof's mail address
+> >
+> >Changes in v1:
+> >- rename broken-no-flushp to "arm,pl330-broken-no-flushp" suggested
+> >   by Krzysztof.
+> >- add From original author.
+> >- remove Sunny's tag
+> >- rename broken-no-flushp to "arm,pl330-broken-no-flushp" suggested
+> >   by Krzysztof.
+> >- rename broken-no-flushp to "arm,pl330-broken-no-flushp" suggested
+> >   by Krzysztof.
+> >- remove Sunny's tag
+> >- rename broken-no-flushp to "arm,pl330-broken-no-flushp" suggested
+> >   by Krzysztof.
+> >   - remove Sunny's tag
+> >- rename broken-no-flushp to "arm,pl330-broken-no-flushp" suggested
+> >   by Krzysztof.
+> >
+> >Addy Ke (3):
+> >   dmaengine: pl330: add quirk for broken no flushp
+> >   ARM: dts: Add arm, pl330-broken-no-flushp quirk for rk3288 platform
+> >   spi: rockchip: modify DMA max burst to 1
+> >
+> >Boojin Kim (1):
+> >   dmaengine: pl330: support burst mode for dev-to-mem and mem-to-dev
+> >     transmit
+> >
+> >Caesar Wang (1):
+> >   ARM: dts: add pl330-broken-no-flushp quirk for rk3036 SoCs
+> >
+> >Shawn Lin (4):
+> >   dt/bindings: arm-pl330: add description of arm, pl330-broken-no-flushp
+> >   ARM: dts: Add arm, pl330-broken-no-flushp quirk for rk3xxx platform
+> >   dmaengine: core: expose max burst capability to clients
+> >   dmaengine: pl330: add max burst for dmaengine
+> >
+> >  .../devicetree/bindings/dma/arm-pl330.txt          |   1 +
+> >  arch/arm/boot/dts/rk3036.dtsi                      |   1 +
+> >  arch/arm/boot/dts/rk3288.dtsi                      |   3 +
+> >  arch/arm/boot/dts/rk3xxx.dtsi                      |   3 +
+> >  drivers/dma/dmaengine.c                            |   1 +
+> >  drivers/dma/pl330.c                                | 106 +++++++++++++++------
+> >  drivers/spi/spi-rockchip.c                         |  12 ++-
+> >  include/linux/dmaengine.h                          |   4 +
+> >  8 files changed, 99 insertions(+), 32 deletions(-)
+> >
+> 
+> 
+> -- 
+> Thanks,
+> Caesar
+> 
 
-
-Test summary
-------------
-
-Build: uImage:
-    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
-		  omap1_defconfig_5912osk_only
-
-Build: uImage+dtb:
-    Pass (13/13): omap2plus_defconfig_am33xx_only/am335x-bone,
-		  omap2plus_defconfig/omap4-panda,
-		  omap2plus_defconfig/omap4-panda-es,
-		  omap2plus_defconfig/omap4-var-stk-om44,
-		  omap2plus_defconfig/omap3-evm-37xx,
-		  omap2plus_defconfig_n800_only_a/omap2420-n800,
-		  omap2plus_defconfig/omap2430-sdp,
-		  omap2plus_defconfig/am3517-evm,
-		  omap2plus_defconfig/omap3-beagle,
-		  omap2plus_defconfig/omap3-beagle-xm,
-		  omap2plus_defconfig/omap3-sbc-t3517,
-		  omap2plus_defconfig/omap5-uevm,
-		  omap2plus_defconfig/omap5-sbc-t54
-
-Build: zImage:
-    Pass (17/17): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
-		  omap2plus_defconfig_n800_only_a,
-		  omap2plus_defconfig_n800_multi_omap2xxx,
-		  omap2plus_defconfig_2430sdp_only,
-		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
-		  omap2plus_defconfig_omap2_4_only,
-		  omap2plus_defconfig_omap3_4_only,
-		  omap2plus_defconfig_omap5_only,
-		  omap2plus_defconfig_dra7xx_only,
-		  omap2plus_defconfig_am43xx_only,
-		  rmk_omap3430_ldp_oldconfig,
-		  rmk_omap3430_ldp_allnoconfig,
-		  rmk_omap4430_sdp_oldconfig,
-		  rmk_omap4430_sdp_allnoconfig, multi_v7_defconfig
-
-Build warnings from toolchain: uImage:
-    (none)
-
-Build warnings from toolchain: uImage+dtb:
-    (none)
-
-Build warnings from toolchain: zImage:
-    FAIL ( 1/17): multi_v7_defconfig
-
-Boot to userspace:
-    FAIL ( 1/18): 2430sdp
-    skip ( 3/18): 5912osk, 3517evm, 5430es2sbct54
-    Pass (14/18): am335xbonelt, am437xsk, am335xbone, 4430es2panda,
-		  4460pandaes, 4460varsomom, 37xxevm, 3530es3beagle,
-		  3530es31beagle, 3730beaglexm, 3730es12beaglexm,
-		  cmt3517, 5430es2uevm, 2420n800
-
-Kernel warnings during boot to userspace:
-    FAIL ( 1/18): cmt3517
-
-PM: chip retention via suspend:
-    FAIL ( 7/11): am335xbonelt, 4430es2panda, 4460pandaes,
-		  4460varsomom, 37xxevm, 2430sdp, 5430es2uevm
-    Pass ( 4/11): 3530es3beagle, 3530es31beagle, 3730beaglexm,
-		  3730es12beaglexm
-
-PM: chip retention via dynamic idle:
-    FAIL ( 9/11): am335xbonelt, 4430es2panda, 4460pandaes,
-		  4460varsomom, 37xxevm, 3530es3beagle, 3530es31beagle,
-		  2430sdp, 5430es2uevm
-    Pass ( 2/11): 3730beaglexm, 3730es12beaglexm
-
-PM: chip off (except CORE, due to errata) via suspend:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off (except CORE, due to errata) via dynamic idle:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off via suspend:
-    FAIL ( 2/ 4): 37xxevm, 3530es3beagle
-    Pass ( 2/ 4): 3530es31beagle, 3730es12beaglexm
-
-PM: chip off via dynamic idle:
-    FAIL ( 3/ 4): 37xxevm, 3530es3beagle, 3530es31beagle
-    Pass ( 1/ 4): 3730es12beaglexm
-
-Kernel warnings during PM test:
-    (none)
-
-Obsolete Kconfig symbols:
-    FAIL ( 3/20): omap1_defconfig, omap2plus_defconfig,
-		  multi_v7_defconfig
-
-
-vmlinux object size
-(delta in bytes from test_v4.5-rc2 (36f90b0a2ddd60823fe193a85e60ff1906c2a9b3)):
-   text     data      bss    total  kernel
-   +797      +64        0     +861  omap1_defconfig
-   +761      +64        0     +825  omap1_defconfig_1510innovator_only
-   +765      +64        0     +829  omap1_defconfig_5912osk_only
-  +7514     +352      +64    +7930  multi_v7_defconfig
-  +6486     +416        0    +6902  omap2plus_defconfig
-  +6362     +160        0    +6522  omap2plus_defconfig_2430sdp_only
-  +2518     +288        0    +2806  omap2plus_defconfig_am33xx_only
-  +6610     +288        0    +6898  omap2plus_defconfig_am43xx_only
-  +6486     +416        0    +6902  omap2plus_defconfig_cpupm
-  +6674     +288        0    +6962  omap2plus_defconfig_dra7xx_only
-  +1332     +192        0    +1524  omap2plus_defconfig_n800_multi_omap2xxx
-  +1324     +160        0    +1484  omap2plus_defconfig_n800_only_a
-  +6678     +416        0    +7094  omap2plus_defconfig_no_pm
-  +6614     +256        0    +6870  omap2plus_defconfig_omap2_4_only
-  +6546     +384        0    +6930  omap2plus_defconfig_omap3_4_only
-  +6610     +256        0    +6866  omap2plus_defconfig_omap5_only
-   -204     +224     -148     -128  rmk_omap3430_ldp_allnoconfig
-  +4684     +288        0    +4972  rmk_omap3430_ldp_oldconfig
-    +20      +64     -276     -192  rmk_omap4430_sdp_allnoconfig
-   +396     +160        0     +556  rmk_omap4430_sdp_oldconfig
-
-Boot-time memory difference
-(delta in bytes from test_v4.5-rc2 (36f90b0a2ddd60823fe193a85e60ff1906c2a9b3))
-  avail  rsrvd   high  freed  board          kconfig
- -1952k  1952k      .   844k  2420n800       omap2plus_defconfig_n800_only_a
- -1784k  1784k      .      .  2430sdp        omap2plus_defconfig
- -1784k  1784k      .   568k  3530es31beagle omap2plus_defconfig
- -1784k  1784k      .   568k  3530es3beagle  omap2plus_defconfig
- -1784k  1784k      .   568k  3730beaglexm   omap2plus_defconfig
- -1784k  1784k      .   568k  3730es12beaglexmomap2plus_defconfig
- -1784k  1784k      .   568k  37xxevm        omap2plus_defconfig
- -1784k  1784k      .   568k  4430es2panda   omap2plus_defconfig
- -1784k  1784k      .   568k  4460pandaes    omap2plus_defconfig
- -1784k  1784k      .   568k  4460varsomom   omap2plus_defconfig
- -1784k  1784k      .   568k  5430es2uevm    omap2plus_defconfig
- -2096k  2096k      .   636k  am335xbone     omap2plus_defconfig_am33xx_only
- -1784k  1784k      .   568k  am335xbonelt   omap2plus_defconfig
- -1784k  1784k      .   568k  am437xsk       omap2plus_defconfig
-
-
-Troubling.  An extra ~2MB of RAM used on all boards in an -rc series 
-release?
+-- 
+~Vinod
