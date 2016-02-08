@@ -1,46 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 08 Feb 2016 22:45:07 +0100
-Subject: [PATCH 2/2] serial: 8250: fix building Ingenic with SERIAL_8250=m
-In-Reply-To: <20160208164543.GY23093@windriver.com>
-References: <1454935947-2743255-1-git-send-email-arnd@arndb.de>
- <1454935947-2743255-2-git-send-email-arnd@arndb.de>
- <20160208164543.GY23093@windriver.com>
-Message-ID: <2444356.TvhDejDUJL@wuerfel>
+From: Valdis.Kletnieks@vt.edu (Valdis.Kletnieks at vt.edu)
+Date: Mon, 08 Feb 2016 16:44:33 -0500
+Subject: [PATCH v12 2/4] PM / Domains: add setter for dev.pm_domain
+In-Reply-To: <1783906.XctYjeUNLr@vostro.rjw.lan>
+References: <1452181575-9206-1-git-send-email-tomeu.vizoso@collabora.com>
+ <CAHp75VdWPUZ8F5rsGn3M1e5Pgpcg1CErBej9PE_3+ZPke5CDFA@mail.gmail.com>
+ <CAHp75Vf9TS-AxJALQjiwNjMCT8ct5SBanYzrEsV9aj=DsUw-OA@mail.gmail.com>
+ <1783906.XctYjeUNLr@vostro.rjw.lan>
+Message-ID: <44858.1454967873@turing-police.cc.vt.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 08 February 2016 11:45:44 Paul Gortmaker wrote:
-> [[PATCH 2/2] serial: 8250: fix building Ingenic with SERIAL_8250=m] On 08/02/2016 (Mon 13:51) Arnd Bergmann wrote:
-> 
-> > The Ingenic 8250 driver has a 'bool' Kconfig symbol, but that
-> > breaks when SERIAL_8250 is a loadable module:
+On Fri, 29 Jan 2016 22:35:18 +0100, "Rafael J. Wysocki" said:
+> > One more test unveils this one
 > > 
-> > drivers/tty/built-in.o: In function `ingenic_uart_probe':
-> > 8250_ingenic.c:(.text+0x1c1a0): undefined reference to `serial8250_register_8250_port'
-> > 
-> > This changes the symbol to a 'tristate', plus a dependency on
-> 
-> Note that Greg just queued a patch yesterday (but sent in 2015) that
-> removed what was the dead modular code.
-> 
-> It could also depend on SERIAL_8250=y to resolve the build issue you
-> found, if nobody cares about having modular SOC console UART drivers.
+> > # modprobe -r sdhci-acpi
+> > [ 1289.909441] ------------[ cut here ]------------
+> > [ 1289.918205] WARNING: CPU: 1 PID: 4374 at
+> > /home/andy/prj/linux-otc/drivers/base/power/common.c:150
+> > dev_pm_domain_set+0x51/0x60()
+> > [ 1289.934681] PM domains can only be changed for unbound devices
+> > [ 1289.944843] Modules linked in: sdhci_acpi(-) sdhci mmc_core
+> > led_class [last unloaded: dw_dmac_core]
+> > [ 1289.958802] CPU: 1 PID: 4374 Comm: modprobe Not tainted 4.5.0-rc1+ #3
+> > [ 1289.969736]  ffffffff81c38330 ffff88007bb53d18 ffffffff8133162f
+> > ffff88007bb53d60
+> > [ 1289.981844]  ffff88007bb53d50 ffffffff8105cd12 ffff88017a007410
+> > 0000000000000000
+> > [ 1289.993996]  0000000000000001 0000000000000080 0000000000000000
+> > ffff88007bb53db0
+> > [ 1290.006123] Call Trace:
+> > [ 1290.012600]  [<ffffffff8133162f>] dump_stack+0x44/0x55
+> > [ 1290.022052]  [<ffffffff8105cd12>] warn_slowpath_common+0x82/0xc0
+> > [ 1290.032462]  [<ffffffff8105cd9c>] warn_slowpath_fmt+0x4c/0x50
+> > [ 1290.042589]  [<ffffffff814867c1>] dev_pm_domain_set+0x51/0x60
 
-All other UART drivers can be modules, no need for this to be an
-exception I think. Having it depend on SERIAL_8250=y would make the
-driver disabled on 'allmodconfig', which is a bit counterproductive for
-the purpose of allmodconfig. I don't think anyone actually cares about
-the driver being runtime loaded on real hardware.
+My Dell Latitude laptopi on next-20160201 is throwing a similar error
+at shutdown, except the traceback continues:
 
-> Either way, I don't have issue with it being tristate vs bool, but if
-> you do go with tristate, then my patch will have to be dropped/reverted.
+mei_me_remove+0xbd/0xc0
+pci_device_shutdown+0x32/0x50
+device_shutdown+0xe2/0x210
 
-Fine with me too.
-
-I also now saw in the randconfig builds that the driver is missing an #include
-<linux/module.h>, which I guess is going to be there after reverting your
-patch.
-
-I'll send a new series.
-
-	Arnd
+(sorry, that's all I have, transcribing from one frame of video shot while
+the system was shutting down....)
