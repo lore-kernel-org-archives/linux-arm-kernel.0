@@ -1,31 +1,29 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Mon,  8 Feb 2016 10:16:10 +0100
-Subject: [PATCH 5/6] arm64: alpine: select the Alpine MSI controller driver
-In-Reply-To: <1454922971-17405-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1454922971-17405-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1454922971-17405-6-git-send-email-antoine.tenart@free-electrons.com>
+From: j-keerthy@ti.com (Keerthy)
+Date: Mon, 8 Feb 2016 14:46:27 +0530
+Subject: [PATCH 0/3] arm: dts: DRA7: Add IVA and DSPEVE thermal domain data
+Message-ID: <1454922990-7501-1-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Select the Alpine MSI controller driver when using an Alpine platform.
+OMAP5 has 3 thermal zones cpu, core and multimedia.
+On the other hand DRA7 has 5 thermal zones cpu, gpu, core, dspeve
+and iva. Currently cpu, core and multimedia are being added via dt
+and the other 2 are getting added via kernel. Add the missing thermal
+domains in dt so as give the correct trip numbers, type and temperatures.
 
-Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-Signed-off-by: Tsahee Zidenberg <tsahee@annapurnalabs.com>
----
- arch/arm64/Kconfig.platforms | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index bfbefa3e0dbe..6761e12e5e13 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -2,6 +2,7 @@ menu "Platform selection"
+Tested on DRA7-EVM.
  
- config ARCH_ALPINE
- 	bool "Annapurna Labs Alpine platform"
-+	select ALPINE_MSI
- 	help
- 	  This enables support for the Annapurna Labs Alpine
- 	  Soc family.
+Keerthy (3):
+  arm: dts: DRA7: Add DSPEVE thermal data
+  arm: dts: DRA7: Add IVA thermal data
+  arm: dts: DRA7: Add missing IVA and DSPEVE thermal domain data
+
+ arch/arm/boot/dts/dra7-dspeve-thermal.dtsi | 27 +++++++++++++++++++++++++++
+ arch/arm/boot/dts/dra7-iva-thermal.dtsi    | 27 +++++++++++++++++++++++++++
+ arch/arm/boot/dts/dra7.dtsi                |  2 ++
+ 3 files changed, 56 insertions(+)
+ create mode 100644 arch/arm/boot/dts/dra7-dspeve-thermal.dtsi
+ create mode 100644 arch/arm/boot/dts/dra7-iva-thermal.dtsi
+
 -- 
-2.7.0
+1.9.1
