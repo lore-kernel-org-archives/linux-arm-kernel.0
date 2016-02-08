@@ -1,25 +1,17 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 8 Feb 2016 15:24:43 -0600
-Subject: [PATCH V5 1/2] regulator: Add document for MT6323 regulator
-In-Reply-To: <1454874037-38905-1-git-send-email-blogic@openwrt.org>
-References: <1454874037-38905-1-git-send-email-blogic@openwrt.org>
-Message-ID: <20160208212443.GA32296@rob-hp-laptop>
+Date: Mon, 8 Feb 2016 15:27:38 -0600
+Subject: [PATCH v2 01/10] Documentation: devicetree: Add vendor prefix
+ for GeekBuying.com
+In-Reply-To: <1454897859-7601-2-git-send-email-afaerber@suse.de>
+References: <1454897859-7601-1-git-send-email-afaerber@suse.de>
+ <1454897859-7601-2-git-send-email-afaerber@suse.de>
+Message-ID: <20160208212738.GA564@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 07, 2016 at 08:40:36PM +0100, John Crispin wrote:
-> Signed-off-by: John Crispin <blogic@openwrt.org>
-> Cc: devicetree at vger.kernel.org
+On Mon, Feb 08, 2016 at 03:17:30AM +0100, Andreas F?rber wrote:
+> Use "geekbuying".
 > 
-> ---
-> Changes in V5
-> * regulator vs regulators
-> 
-> Changes in V4
-> * regulator is a subnode and not a property
-> 
->  .../bindings/regulator/mt6323-regulator.txt        |  244 ++++++++++++++++++++
->  1 file changed, 244 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/regulator/mt6323-regulator.txt
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
 
 Acked-by: Rob Herring <robh@kernel.org>
