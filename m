@@ -1,75 +1,58 @@
-From: codekipper@gmail.com (codekipper at gmail.com)
-Date: Mon,  8 Feb 2016 16:29:47 +0100
-Subject: [linux-sunxi][PATCH] ARM: dts: sun7i: Enable USB DRC on Olimex A20 EVB
-Message-ID: <1454945387-29424-1-git-send-email-codekipper@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 8 Feb 2016 15:31:09 +0000
+Subject: [GIT PULL] KVM/ARM updates for 4.5-rc2
+In-Reply-To: <56B8B2DB.9020407@redhat.com>
+References: <1453977038-13516-1-git-send-email-marc.zyngier@arm.com>
+ <56B8B2DB.9020407@redhat.com>
+Message-ID: <56B8B4BD.3080904@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marcus Cooper <codekipper@gmail.com>
+On 08/02/16 15:23, Paolo Bonzini wrote:
+> 
+> 
+> On 28/01/2016 11:30, Marc Zyngier wrote:
+>> Hi Paolo,
+>>
+>> Please find below the KVM/ARM updates for 4.5-rc2. Mostly fixes as a
+>> result of Shannon's work on PMU emulation, which has outlined a few
+>> nits here and there, plus a correctness fix from Dave.
+>>
+>> Please pull!
+>>
+>> Thanks,
+>>
+>> 	M.
+>>
+>> The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
+>>
+>>   Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-4.5-rc2
+>>
+>> for you to fetch changes up to 6327f35a2010c06a3bc2bfb14202a38764fb9920:
+>>
+>>   arm64: KVM: Fix guest dead loop when register accessor returns false (2016-01-24 21:56:01 +0000)
+>>
+>> ----------------------------------------------------------------
+>> KVM/ARM fixes for v4.5-rc2
+>>
+>> A few random fixes, mostly coming from the PMU work by Shannon:
+>>
+>> - fix for injecting faults coming from the guest's userspace
+>> - cleanup for our CPTR_EL2 accessors (reserved bits)
+>> - fix for a bug impacting perf (user/kernel discrimination)
+>> - fix for a 32bit sysreg handling bug
+>>
+>> ----------------------------------------------------------------
+> 
+> Finally pulled, thanks.
 
-Enable the otg/drc usb controller on the Olimex A20 EVB.
+Thanks Paolo. I'll send another PR in a couple of days for another fix
+that landed last week.
 
-Signed-off-by: Marcus Cooper <codekipper@gmail.com>
----
- arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
-
-diff --git a/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
-index c3c626b..93bbf26 100644
---- a/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
-@@ -198,6 +198,10 @@
- 	status = "okay";
- };
- 
-+&otg_sram {
-+	status = "okay";
-+};
-+
- &pio {
- 	ahci_pwr_pin_olimex_som_evb: ahci_pwr_pin at 1 {
- 		allwinner,pins = "PC3";
-@@ -219,6 +223,13 @@
- 		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
- 		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
- 	};
-+
-+	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
-+		allwinner,pins = "PH4";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
- };
- 
- &reg_ahci_5v {
-@@ -254,6 +265,10 @@
- 	regulator-name = "avcc";
- };
- 
-+&reg_usb0_vbus {
-+	status = "okay";
-+};
-+
- &reg_usb1_vbus {
- 	status = "okay";
- };
-@@ -268,7 +283,16 @@
- 	status = "okay";
- };
- 
-+&usb_otg {
-+	dr_mode = "otg";
-+	status = "okay";
-+};
-+
- &usbphy {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&usb0_id_detect_pin>;
-+	usb0_id_det-gpios = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH04 */
-+	usb0_vbus-supply = <&reg_usb0_vbus>;
- 	usb1_vbus-supply = <&reg_usb1_vbus>;
- 	usb2_vbus-supply = <&reg_usb2_vbus>;
- 	status = "okay";
+	M.
 -- 
-2.7.1
+Jazz is not dead. It just smells funny...
