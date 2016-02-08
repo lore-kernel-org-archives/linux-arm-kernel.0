@@ -1,67 +1,38 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Mon, 8 Feb 2016 11:44:07 +0100
-Subject: [PATCH 1/6] irqchip: add the Alpine MSIX interrupt controller
-In-Reply-To: <56B86EA8.9070306@arm.com>
-References: <1454922971-17405-1-git-send-email-antoine.tenart@free-electrons.com>
- <1454922971-17405-2-git-send-email-antoine.tenart@free-electrons.com>
- <56B86391.1030609@arm.com> <20160208102656.GA4117@kwain>
- <56B86EA8.9070306@arm.com>
-Message-ID: <20160208104407.GB4117@kwain>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Mon, 8 Feb 2016 11:51:04 +0100
+Subject: [PATCH v2 09/10] Documentation: devicetree: rockchip: Document
+ Landingship
+In-Reply-To: <6744409.i2u8076vm4@phil>
+References: <1454897859-7601-1-git-send-email-afaerber@suse.de>
+ <1454897859-7601-10-git-send-email-afaerber@suse.de>
+ <6744409.i2u8076vm4@phil>
+Message-ID: <56B87318.9020007@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 08, 2016 at 10:32:08AM +0000, Marc Zyngier wrote:
-> On 08/02/16 10:26, Antoine Tenart wrote:
-> >>> +static int alpine_msix_init(struct device_node *node,
-> >>> +			    struct device_node *parent)
-> >>> +{
-> >>> +	struct alpine_msix_data *priv;
-> >>> +	struct resource res;
-> >>> +	int ret;
-> >>> +
-> >>> +	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
-> >>> +	if (!priv)
-> >>> +		return -ENOMEM;
-> >>> +
-> >>> +	spin_lock_init(&priv->msi_map_lock);
-> >>> +
-> >>> +	ret = of_address_to_resource(node, 0, &res);
-> >>> +	if (ret) {
-> >>> +		pr_err("Failed to allocate resource\n");
-> >>> +		goto err_priv;
-> >>> +	}
-> >>> +
-> >>> +	priv->addr_high = upper_32_bits((u64)res.start);
-> >>> +	priv->addr_low = lower_32_bits(res.start) + ALPINE_MSIX_SPI_TARGET_CLUSTER0;
-> >>
-> >> This is a bit odd. If you always set bit 16, why isn't that reflected in
-> >> the base address coming from the DT?
-> > 
-> > The 20 least significant bits of addr_low provide direct information
-> > regarding the interrupt destination, so I thought it would be clearer
-> > to have this explicitly in the driver so that we know what those bits
-> > mean.
+Am 08.02.2016 um 11:29 schrieb Heiko Stuebner:
+> Am Montag, 8. Februar 2016, 03:17:38 schrieb Andreas F?rber:
+>> Use "geekbuying,landingship" compatible string, plus those of GeekBox.
 > 
-> So what is this information? TARGET_CLUSTER0 is not very expressive, and
-> doesn't show what the alternatives are. Could you please elaborate a bit
-> on that front?
+> I do believe this would be better as geekbuying,geekbox-landingship . They 
+> might reuse the landingship naming for future baseboards as well ;-)
 
-For now lots of bits are reserved, so there aren't many alternatives.
-Bits [18:17] are used to set the GIC to which to route the MSI and bit
-16 must be set when this target GIC is the primary GIC (bits [18:17] set
-to 0x0). There aren't other options available for now (that I'm aware
-of) for the target GIC configuration.
+Well, the question is: Is this MXM3 interface as generic as Qseven so
+that it could be used as is for other modules (and baseboards from other
+manufacturers could be used for the module)? Then my thought was
+landingship as identifier for the baseboard and geekbox as identifier
+for the contained module.
 
-Antoine
+I agree that if this Landingship is specific to the GeekBox then
+geekbox-landingship would be more appropriate. We could also do both.
+
+Can you tell? Unfortunately I spot no real documentation of the MXM3
+connector pins in the schematics we could compare, only an on-board
+documentation of the three-row pins.
+
+Regards,
+Andreas
 
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160208/845247f2/attachment.sig>
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton; HRB 21284 (AG N?rnberg)
