@@ -1,92 +1,127 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  8 Feb 2016 11:40:15 +0000
-Subject: [PATCH 1/8] arm64: KVM: Switch the sys_reg search to be a binary
- search
+Date: Mon,  8 Feb 2016 11:40:20 +0000
+Subject: [PATCH 6/8] KVM: arm/arm64: timer: Add active state caching
 In-Reply-To: <1454931622-14902-1-git-send-email-marc.zyngier@arm.com>
 References: <1454931622-14902-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1454931622-14902-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1454931622-14902-7-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Our 64bit sys_reg table is about 90 entries long (so far, and the
-PMU support is likely to increase this). This means that on average,
-it takes 45 comparaisons to find the right entry (and actually the
-full 90 if we have to search the invariant table).
+Programming the active state in the (re)distributor can be an
+expensive operation so it makes some sense to try and reduce
+the number of accesses as much as possible. So far, we
+program the active state on each VM entry, but there is some
+opportunity to do less.
 
-Not the most efficient thing. Specially when you think that this
-table is already sorted. Switching to a binary search effectively
-reduces the search to about 7 comparaisons. Slightly better!
+An obvious solution is to cache the active state in memory,
+and only program it in the HW when conditions change. But
+because the HW can also change things under our feet (the active
+state can transition from 1 to 0 when the guest does an EOI),
+some precautions have to be taken, which amount to only caching
+an "inactive" state, and always programing it otherwise.
 
-As an added bonus, the comparaison is done by comparing all the
-fields at once, instead of one at a time.
+With this in place, we observe a reduction of around 700 cycles
+on a 2GHz GICv2 platform for a NULL hypercall.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/sys_regs.c | 40 ++++++++++++++++++++++------------------
- 1 file changed, 22 insertions(+), 18 deletions(-)
+ arch/arm/kvm/arm.c           |  1 +
+ include/kvm/arm_arch_timer.h |  5 +++++
+ virt/kvm/arm/arch_timer.c    | 31 +++++++++++++++++++++++++++++++
+ 3 files changed, 37 insertions(+)
 
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index eec3598..0035869 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -20,6 +20,7 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index dda1959..af7c1a3 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -320,6 +320,7 @@ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
+ 	vcpu->cpu = -1;
  
-+#include <linux/bsearch.h>
- #include <linux/kvm_host.h>
- #include <linux/mm.h>
- #include <linux/uaccess.h>
-@@ -942,29 +943,32 @@ static const struct sys_reg_desc *get_target_table(unsigned target,
- 	}
+ 	kvm_arm_set_running_vcpu(NULL);
++	kvm_timer_vcpu_put(vcpu);
  }
  
-+#define reg_to_match_value(x)						\
-+	({								\
-+		unsigned long val;					\
-+		val  = (x)->Op0 << 14;					\
-+		val |= (x)->Op1 << 11;					\
-+		val |= (x)->CRn << 7;					\
-+		val |= (x)->CRm << 3;					\
-+		val |= (x)->Op2;					\
-+		val;							\
-+	 })
+ int kvm_arch_vcpu_ioctl_get_mpstate(struct kvm_vcpu *vcpu,
+diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
+index 1800227..b651aed 100644
+--- a/include/kvm/arm_arch_timer.h
++++ b/include/kvm/arm_arch_timer.h
+@@ -55,6 +55,9 @@ struct arch_timer_cpu {
+ 
+ 	/* VGIC mapping */
+ 	struct irq_phys_map		*map;
 +
-+static int match_sys_reg(const void *key, const void *elt)
++	/* Active IRQ state caching */
++	bool				active_cleared_last;
+ };
+ 
+ int kvm_timer_hyp_init(void);
+@@ -74,4 +77,6 @@ bool kvm_timer_should_fire(struct kvm_vcpu *vcpu);
+ void kvm_timer_schedule(struct kvm_vcpu *vcpu);
+ void kvm_timer_unschedule(struct kvm_vcpu *vcpu);
+ 
++void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu);
++
+ #endif
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 69bca18..bfec447 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -34,6 +34,11 @@ static struct timecounter *timecounter;
+ static struct workqueue_struct *wqueue;
+ static unsigned int host_vtimer_irq;
+ 
++void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
 +{
-+	const unsigned long pval = (unsigned long)key;
-+	const struct sys_reg_desc *r = elt;
-+
-+	return pval - reg_to_match_value(r);
++	vcpu->arch.timer_cpu.active_cleared_last = false;
 +}
 +
- static const struct sys_reg_desc *find_reg(const struct sys_reg_params *params,
- 					 const struct sys_reg_desc table[],
- 					 unsigned int num)
+ static cycle_t kvm_phys_timer_read(void)
  {
--	unsigned int i;
--
--	for (i = 0; i < num; i++) {
--		const struct sys_reg_desc *r = &table[i];
-+	unsigned long pval = reg_to_match_value(params);
+ 	return timecounter->cc->read(timecounter->cc);
+@@ -130,6 +135,7 @@ static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level)
  
--		if (params->Op0 != r->Op0)
--			continue;
--		if (params->Op1 != r->Op1)
--			continue;
--		if (params->CRn != r->CRn)
--			continue;
--		if (params->CRm != r->CRm)
--			continue;
--		if (params->Op2 != r->Op2)
--			continue;
--
--		return r;
--	}
--	return NULL;
-+	return bsearch((void *)pval, table, num, sizeof(table[0]), match_sys_reg);
+ 	BUG_ON(!vgic_initialized(vcpu->kvm));
+ 
++	timer->active_cleared_last = false;
+ 	timer->irq.level = new_level;
+ 	trace_kvm_timer_update_irq(vcpu->vcpu_id, timer->map->virt_irq,
+ 				   timer->irq.level);
+@@ -242,10 +248,35 @@ void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
+ 	else
+ 		phys_active = false;
+ 
++	/*
++	 * We want to avoid hitting the (re)distributor as much as
++	 * possible, as this is a potentially expensive MMIO access
++	 * (not to mention locks in the irq layer), and a solution for
++	 * this is to cache the "active" state in memory.
++	 *
++	 * Things to consider: we cannot cache an "active set" state,
++	 * because the HW can change this behind our back (it becomes
++	 * "clear" in the HW). We must then restrict the caching to
++	 * the "clear" state.
++	 *
++	 * The cache is invalidated on:
++	 * - vcpu put, indicating that the HW cannot be trusted to be
++	 *   in a sane state on the next vcpu load,
++	 * - any change in the interrupt state
++	 *
++	 * Usage conditions:
++	 * - cached value is "active clear"
++	 * - value to be programmed is "active clear"
++	 */
++	if (timer->active_cleared_last && !phys_active)
++		return;
++
+ 	ret = irq_set_irqchip_state(timer->map->irq,
+ 				    IRQCHIP_STATE_ACTIVE,
+ 				    phys_active);
+ 	WARN_ON(ret);
++
++	timer->active_cleared_last = !phys_active;
  }
  
- int kvm_handle_cp14_load_store(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ /**
 -- 
 2.1.4
