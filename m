@@ -1,44 +1,57 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon,  8 Feb 2016 13:51:43 +0100
-Subject: [PATCH 2/2] serial: 8250: fix building Ingenic with SERIAL_8250=m
-In-Reply-To: <1454935947-2743255-1-git-send-email-arnd@arndb.de>
-References: <1454935947-2743255-1-git-send-email-arnd@arndb.de>
-Message-ID: <1454935947-2743255-2-git-send-email-arnd@arndb.de>
+Date: Mon, 08 Feb 2016 14:10:31 +0100
+Subject: [PATCH RFC] Add cpufreq support
+In-Reply-To: <20160208124127.GF8294@vireshk>
+References: <56B4D4BE.2040008@free.fr> <45004963.Im3DmqJ5ez@wuerfel>
+ <20160208124127.GF8294@vireshk>
+Message-ID: <22002072.L04zy0K2AP@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Ingenic 8250 driver has a 'bool' Kconfig symbol, but that
-breaks when SERIAL_8250 is a loadable module:
+On Monday 08 February 2016 18:11:27 Viresh Kumar wrote:
+> On 08-02-16, 13:34, Arnd Bergmann wrote:
+> > Maybe add a opp-v3 compatible string?
+> 
+> How will that help?
+> 
+> The problem was that the compatibility string of "opp-v2" specifies
+> the way we need to parse the bindings and shouldn't be (ab)used to
+> probe a driver like cpufreq-dt. And so we got stuck.
 
-drivers/tty/built-in.o: In function `ingenic_uart_probe':
-8250_ingenic.c:(.text+0x1c1a0): undefined reference to `serial8250_register_8250_port'
+I don't remember the exact discussion, but the compatible string is
+exactly meant to do one thing: it tells you what you can or cannot do
+with one device.
 
-This changes the symbol to a 'tristate', plus a dependency on
-SERIAL_8250, which makes it work again. Unlike the other
-soc-specific backends, this one has no dependency on an
-architecture or a platform. I'm adding a dependency on
-MIPS || COMPILE_TEST as well here, to avoid showing the driver
-on architectures that are not interested in it.
+I had not realized that we don't even have a compatible string
+for opp-v2, so if we are missing that, we obviously can't compare
+against that string.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/tty/serial/8250/Kconfig | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+> > I really don't care what you
+> > match on, as long we don't need any code in arch/arm/ to create a
+> > device we don't need.
+> 
+> Sure.
+> 
+> > Don't add the device to DT, we really don't want that.
+> 
+> I agree.
+> 
+> > If there
+> > is too much opposition to looking at the cpus nodes in the initcall,
+> 
+> I didn't get this one, what can we do by looking at CPUs nodes ?
 
-diff --git a/drivers/tty/serial/8250/Kconfig b/drivers/tty/serial/8250/Kconfig
-index 6ae0fae4f796..13c63b14179f 100644
---- a/drivers/tty/serial/8250/Kconfig
-+++ b/drivers/tty/serial/8250/Kconfig
-@@ -384,8 +384,8 @@ config SERIAL_8250_UNIPHIER
- 	  serial ports, say Y to this option. If unsure, say N.
- 
- config SERIAL_8250_INGENIC
--	bool "Support for Ingenic SoC serial ports"
--	depends on OF_FLATTREE
-+	tristate "Support for Ingenic SoC serial ports"
-+	depends on SERIAL_8250 && OF_FLATTREE && (MIPS || COMPILE_TEST)
- 	select LIBFDT
- 	help
- 	  If you have a system using an Ingenic SoC and wish to make use of
--- 
-2.7.0
+I thought there was a compatible property in there that told us
+whether the operating-points-v2/cooling-min-level/#cooling-cells/...
+properties were considered valid.
+
+> > start with a whitelist for known machines, that at least keeps the
+> > existing behavior.
+> 
+> That can be a valid solution I would say, but that separate driver
+> (cpufreq-dt-device.c) needs to be changed for every new platform.
+
+Until we can agree on a way to describe in the DT whether the opp
+properties are reliable or not.
+
+	Arnd
