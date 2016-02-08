@@ -1,40 +1,37 @@
-From: rogershimizu@gmail.com (Roger Shimizu)
-Date: Mon, 8 Feb 2016 20:09:14 +0900
-Subject: [PATCH 1/3] ARM: dts: orion5x: fix the missing mtd flash on
- linkstation lswtgl
-In-Reply-To: <20160205204040.GB8063@lunn.ch>
-References: <1454689998-9579-1-git-send-email-rogershimizu@gmail.com>
- <1454689998-9579-2-git-send-email-rogershimizu@gmail.com>
- <20160205204040.GB8063@lunn.ch>
-Message-ID: <CAEQ9gE=gjq5kOapphdyzGySaJQrh_PqT4XBL_H89TLNFhqm+yw@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 8 Feb 2016 16:42:18 +0530
+Subject: [PATCH 0/3] omap: hwmod: add default reset handling support
+Message-ID: <1454929941-23949-1-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew,
+Add a new hwmod flag to indicate custom reset handling and use it
+for devices that require custom reset handling (like dsp, ipu, iva).
 
-On Sat, Feb 6, 2016 at 5:40 AM, Andrew Lunn <andrew@lunn.ch> wrote:
-> On Sat, Feb 06, 2016 at 01:33:16AM +0900, Roger Shimizu wrote:
->> MTD flash stores u-boot and u-boot environment on linkstation lswtgl.
->> The latter one can be easily read/write by u-boot-tools package in Debian.
->>
->> Signed-off-by: Roger Shimizu <rogershimizu@gmail.com>
->
-> Reviewed-by: Andrew Lunn <andrew@lunn.ch>
->
-> Thanks for using the partitions node.
+Tested PCIe on dra7-evm and dra72-evm.
+I need help in testing DSP, IPU, IVA, PRU, GFX, M3 in other platforms.
+Or a way to test these cores to see if reset is not broken. Suman?
 
-Since you did not comment my patch v2 yet, I'm wondering that
-- My patch 1/3 is a fix, which fixes the issue since 4.3, so it will
-be firstly applied to 4.5-rc branch as usual, and as I understand the
-process then it will be backported to 4.4/4.3 stable branch.
-- If it's the case described above, it's better not to use partitions
-node, which was introduced since 4.4.
-- By any case, my v2 patch 2/3 and 3/3, which uses partitions node, is fine.
+I'll post this series once again after performing these tests.
 
-If you agree, I can submit a v3 in minutes.
-Thank you and looking forward to your feedback!
+Paul Walmsley (3):
+  ARM: omap2+: omap_hwmod: introduce hwmod flag for custom reset
+    handling
+  ARM: OMAP2+: hwmod: use HWMOD_CUSTOM_HARDRESET for custom reset
+    handling
+  ARM: OMAP2+: hwmod: Add default reset handling
 
-Cheers,
+ arch/arm/mach-omap2/omap_hwmod.c                   |   16 +++++++++++-----
+ arch/arm/mach-omap2/omap_hwmod.h                   |   12 ++++++++++++
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c         |    2 ++
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c         |    1 +
+ .../mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c |    2 ++
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c         |    1 +
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |    3 +++
+ arch/arm/mach-omap2/omap_hwmod_43xx_data.c         |    1 +
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |    6 ++++++
+ arch/arm/mach-omap2/omap_hwmod_54xx_data.c         |    2 ++
+ 10 files changed, 41 insertions(+), 5 deletions(-)
+
 -- 
-Roger Shimizu, GMT +9 Tokyo
-PGP/GPG: 17B3ACB1
+1.7.9.5
