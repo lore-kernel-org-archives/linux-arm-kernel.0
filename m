@@ -1,25 +1,21 @@
-From: mmarek@suse.cz (Michal Marek)
-Date: Mon, 8 Feb 2016 19:13:26 +0100
-Subject: [PATCH] Kbuild: provide a __UNIQUE_ID for clang
-In-Reply-To: <1454942318-2782493-1-git-send-email-arnd@arndb.de>
-References: <1454942318-2782493-1-git-send-email-arnd@arndb.de>
-Message-ID: <20160208181326.GA3784@pobox.suse.cz>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 8 Feb 2016 18:15:53 +0000
+Subject: [PATCH] arm64: ubsan: select ARCH_HAS_UBSAN_SANITIZE_ALL
+In-Reply-To: <1454716218-4918-1-git-send-email-yang.shi@linaro.org>
+References: <1454716218-4918-1-git-send-email-yang.shi@linaro.org>
+Message-ID: <20160208181553.GX6076@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 08, 2016 at 03:38:32PM +0100, Arnd Bergmann wrote:
-> The default __UNIQUE_ID macro in compiler.h fails to work for some drivers:
+On Fri, Feb 05, 2016 at 03:50:18PM -0800, Yang Shi wrote:
+> To enable UBSAN on arm64, ARCH_HAS_UBSAN_SANITIZE_ALL need to be selected.
 > 
-> drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c:615:1: error: redefinition of
->       '__UNIQUE_ID_firmware615'
-> BRCMF_FW_NVRAM_DEF(4354, "brcmfmac4354-sdio.bin", "brcmfmac4354-sdio.txt");
+> Basic kernel bootup test is passed on arm64 with CONFIG_UBSAN_SANITIZE_ALL
+> enabled.
+> 
+> Signed-off-by: Yang Shi <yang.shi@linaro.org>
 
-I applied the patch to kbuild.git#kbuild, but can you tell me with which
-commit and config you get such failure. I only see a single
-MODULE_FIRMWARE() call in the expansion of BRCMF_FW_NVRAM_DEF(), which
-should work with line numbers as well. And I can't reproduce it with
-today's linux-next. If there is some issue with code not yet in
-linux-next, it needs to be worked around, because older GCCs did not
-have __COUNTER__.
+Applied. Thanks.
 
-Michal
+-- 
+Catalin
