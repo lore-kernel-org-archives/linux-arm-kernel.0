@@ -1,88 +1,76 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Mon, 8 Feb 2016 16:51:19 +0000
-Subject: [RFC PATCH v2 1/3] PCI: hisi: re-architect Hip05/Hip06
- controllers driver to preapare for ACPI
-In-Reply-To: <3113837.YSNyDAf4HQ@wuerfel>
-References: <1454935264-6076-1-git-send-email-gabriele.paoloni@huawei.com>
- <2409806.1aGBrN4l0X@wuerfel>
- <EE11001F9E5DDD47B7634E2F8A612F2E1ECACFDD@lhreml503-mbs>
- <3113837.YSNyDAf4HQ@wuerfel>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1ECAD249@lhreml503-mbs>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 8 Feb 2016 16:52:15 +0000
+Subject: [PATCH v3 21/23] arm64: hw_breakpoint: Allow EL2 breakpoints if
+ running in HYP
+In-Reply-To: <56B8C638.2010402@arm.com>
+References: <1454522416-6874-1-git-send-email-marc.zyngier@arm.com>
+ <1454522416-6874-22-git-send-email-marc.zyngier@arm.com>
+ <20160208155625.GQ6076@e104818-lin.cambridge.arm.com>
+ <56B8C638.2010402@arm.com>
+Message-ID: <20160208165214.GV6076@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: 08 February 2016 16:33
-> To: Gabriele Paoloni
-> Cc: linux-arm-kernel at lists.infradead.org; Guohanjun (Hanjun Guo);
-> Wangzhou (B); liudongdong (C); Linuxarm; qiujiang; bhelgaas at google.com;
-> Lorenzo.Pieralisi at arm.com; tn at semihalf.com; linux-pci at vger.kernel.org;
-> linux-kernel at vger.kernel.org; xuwei (O); linux-acpi at vger.kernel.org;
-> jcm at redhat.com; zhangjukuo; Liguozhu (Kenneth)
-> Subject: Re: [RFC PATCH v2 1/3] PCI: hisi: re-architect Hip05/Hip06
-> controllers driver to preapare for ACPI
+On Mon, Feb 08, 2016 at 04:45:44PM +0000, Marc Zyngier wrote:
+> I was being overzealous, and your solution is clearly better. I ended up with the following:
 > 
-> On Monday 08 February 2016 16:06:54 Gabriele Paoloni wrote:
-> > >
-> > > On Monday 08 February 2016 12:41:02 Gabriele Paoloni wrote:
-> > > > +
-> > > > +/* HipXX PCIe host only supports 32-bit config access */
-> > > > +int hisi_pcie_common_cfg_read(void __iomem *reg_base, int where,
-> int
-> > > size,
-> > > > +                         u32 *val)
-> > > > +{
-> > > > +   u32 reg;
-> > > > +   u32 reg_val;
-> > > > +   void *walker = &reg_val;
-> > > > +
-> > > > +   walker += (where & 0x3);
-> > > > +   reg = where & ~0x3;
-> > > > +   reg_val = readl(reg_base + reg);
-> > > > +
-> > > > +   if (size == 1)
-> > > > +           *val = *(u8 __force *) walker;
-> > > > +   else if (size == 2)
-> > > > +           *val = *(u16 __force *) walker;
-> > > > +   else if (size == 4)
-> > > > +           *val = reg_val;
-> > > > +   else
-> > > > +           return PCIBIOS_BAD_REGISTER_NUMBER;
-> > > > +
-> > > > +   return PCIBIOS_SUCCESSFUL;
-> > > > +}
-> > >
-> > > Isn't this the same hack that Qualcomm are using?
-> >
-> > As far as I can see Qualcomm defines its own config access
-> > mechanism only for RC config read and also it seems they're
-> > having problems with reporting the device class...
-> >
-> > https://github.com/torvalds/linux/blob/master/drivers/pci/host/pcie-
-> qcom.c#L474
-> >
-> > Our problem is that our HW can only perform 32b rd/wr accesses
-> > So we can't use readw/readb/writew/writeb...
-> >
-> >
+> diff --git a/arch/arm64/include/asm/hw_breakpoint.h b/arch/arm64/include/asm/hw_breakpoint.h
+> index 9732908..c872b2f 100644
+> --- a/arch/arm64/include/asm/hw_breakpoint.h
+> +++ b/arch/arm64/include/asm/hw_breakpoint.h
+[...]
+> @@ -62,6 +45,7 @@ static inline void decode_ctrl_reg(u32 reg,
+>  #define AARCH64_ESR_ACCESS_MASK	(1 << 6)
+>  
+>  /* Privilege Levels */
+> +#define AARCH64_BREAKPOINT_EL2	0
+>  #define AARCH64_BREAKPOINT_EL1	1
+>  #define AARCH64_BREAKPOINT_EL0	2
+>  
+> @@ -76,6 +60,35 @@ static inline void decode_ctrl_reg(u32 reg,
+>  #define ARM_KERNEL_STEP_ACTIVE	1
+>  #define ARM_KERNEL_STEP_SUSPEND	2
+>  
+> +#define DBG_HMC_HYP		(1 << 13)
+> +#define DBG_SSC_HYP		(3 << 14)
+> +
+> +static inline u32 encode_ctrl_reg(struct arch_hw_breakpoint_ctrl ctrl)
+> +{
+> +	u32 val = (ctrl.len << 5) | (ctrl.type << 3) | ctrl.enabled;
+> +
+> +	if (is_kernel_in_hyp_mode() && ctrl.privilege == AARCH64_BREAKPOINT_EL1)
+> +		val |= DBG_HMC_HYP | DBG_SSC_HYP;
+
+Nitpick, for completeness:
+
+		val |= DBG_HMC_HYP | DBG_SSC_HYP | (AARCH64_BREAKPOINT_EL2 << 1);
+
+> +	else
+> +		val |= ctrl.privilege << 1;
+> +
+> +	return val;
+> +}
+> +
+> +static inline void decode_ctrl_reg(u32 reg,
+> +				   struct arch_hw_breakpoint_ctrl *ctrl)
+> +{
+> +	ctrl->enabled	= reg & 0x1;
+> +	reg >>= 1;
+> +	ctrl->privilege	= reg & 0x3;
+> +	if (ctrl->privilege == AARCH64_BREAKPOINT_EL2)
+> +		ctrl->privilege	= AARCH64_BREAKPOINT_EL1;
+> +	reg >>= 2;
+> +	ctrl->type	= reg & 0x3;
+> +	reg >>= 2;
+> +	ctrl->len	= reg & 0xff;
+> +}
+> +
+>  /*
+>   * Limits.
+>   * Changing these will require modifications to the register accessors.
 > 
-> Sorry, my mistake, I meant Cavium not Qualcomm.
-> See https://lkml.org/lkml/2016/2/5/689 for the patches.
+> Was that what you had in mind?
 
-Well, looking at it Cavium seems quite different, 
+Looks fine:
 
-On read they need to trigger the retrieval of the
-config space info writing to the lower 32b of a 64b register,
-then they need to read data back on the upper 64b of the
-same register and adjust the content to remove the garbage...
-
-We just use 32b accesses and adjust grab the appropriate
-bytes depending on the read/write sizes...
-
-Thanks 
-
-Gab
-
-> 
-> 	Arnd
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
