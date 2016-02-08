@@ -1,76 +1,40 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Mon, 8 Feb 2016 12:01:51 +0100
-Subject: [PATCH 1/6] irqchip: add the Alpine MSIX interrupt controller
-In-Reply-To: <56B87450.1040500@arm.com>
-References: <1454922971-17405-1-git-send-email-antoine.tenart@free-electrons.com>
- <1454922971-17405-2-git-send-email-antoine.tenart@free-electrons.com>
- <56B86391.1030609@arm.com> <20160208102656.GA4117@kwain>
- <56B86EA8.9070306@arm.com> <20160208104407.GB4117@kwain>
- <56B87450.1040500@arm.com>
-Message-ID: <20160208110151.GD4117@kwain>
+From: rogershimizu@gmail.com (Roger Shimizu)
+Date: Mon, 8 Feb 2016 20:09:14 +0900
+Subject: [PATCH 1/3] ARM: dts: orion5x: fix the missing mtd flash on
+ linkstation lswtgl
+In-Reply-To: <20160205204040.GB8063@lunn.ch>
+References: <1454689998-9579-1-git-send-email-rogershimizu@gmail.com>
+ <1454689998-9579-2-git-send-email-rogershimizu@gmail.com>
+ <20160205204040.GB8063@lunn.ch>
+Message-ID: <CAEQ9gE=gjq5kOapphdyzGySaJQrh_PqT4XBL_H89TLNFhqm+yw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 08, 2016 at 10:56:16AM +0000, Marc Zyngier wrote:
-> On 08/02/16 10:44, Antoine Tenart wrote:
-> > On Mon, Feb 08, 2016 at 10:32:08AM +0000, Marc Zyngier wrote:
-> >> On 08/02/16 10:26, Antoine Tenart wrote:
-> >>>>> +static int alpine_msix_init(struct device_node *node,
-> >>>>> +			    struct device_node *parent)
-> >>>>> +{
-> >>>>> +	struct alpine_msix_data *priv;
-> >>>>> +	struct resource res;
-> >>>>> +	int ret;
-> >>>>> +
-> >>>>> +	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
-> >>>>> +	if (!priv)
-> >>>>> +		return -ENOMEM;
-> >>>>> +
-> >>>>> +	spin_lock_init(&priv->msi_map_lock);
-> >>>>> +
-> >>>>> +	ret = of_address_to_resource(node, 0, &res);
-> >>>>> +	if (ret) {
-> >>>>> +		pr_err("Failed to allocate resource\n");
-> >>>>> +		goto err_priv;
-> >>>>> +	}
-> >>>>> +
-> >>>>> +	priv->addr_high = upper_32_bits((u64)res.start);
-> >>>>> +	priv->addr_low = lower_32_bits(res.start) + ALPINE_MSIX_SPI_TARGET_CLUSTER0;
-> >>>>
-> >>>> This is a bit odd. If you always set bit 16, why isn't that reflected in
-> >>>> the base address coming from the DT?
-> >>>
-> >>> The 20 least significant bits of addr_low provide direct information
-> >>> regarding the interrupt destination, so I thought it would be clearer
-> >>> to have this explicitly in the driver so that we know what those bits
-> >>> mean.
-> >>
-> >> So what is this information? TARGET_CLUSTER0 is not very expressive, and
-> >> doesn't show what the alternatives are. Could you please elaborate a bit
-> >> on that front?
-> > 
-> > For now lots of bits are reserved, so there aren't many alternatives.
-> > Bits [18:17] are used to set the GIC to which to route the MSI and bit
-> > 16 must be set when this target GIC is the primary GIC (bits [18:17] set
-> > to 0x0). There aren't other options available for now (that I'm aware
-> > of) for the target GIC configuration.
-> 
-> OK. So maybe add that as a comment, so that people know what is
-> happening there. And if the code gets updated to include new
-> functionalities, it will be easier to track the changes.
+Dear Andrew,
 
-OK, I'll update.
+On Sat, Feb 6, 2016 at 5:40 AM, Andrew Lunn <andrew@lunn.ch> wrote:
+> On Sat, Feb 06, 2016 at 01:33:16AM +0900, Roger Shimizu wrote:
+>> MTD flash stores u-boot and u-boot environment on linkstation lswtgl.
+>> The latter one can be easily read/write by u-boot-tools package in Debian.
+>>
+>> Signed-off-by: Roger Shimizu <rogershimizu@gmail.com>
+>
+> Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+>
+> Thanks for using the partitions node.
 
-Antoine
+Since you did not comment my patch v2 yet, I'm wondering that
+- My patch 1/3 is a fix, which fixes the issue since 4.3, so it will
+be firstly applied to 4.5-rc branch as usual, and as I understand the
+process then it will be backported to 4.4/4.3 stable branch.
+- If it's the case described above, it's better not to use partitions
+node, which was introduced since 4.4.
+- By any case, my v2 patch 2/3 and 3/3, which uses partitions node, is fine.
 
+If you agree, I can submit a v3 in minutes.
+Thank you and looking forward to your feedback!
+
+Cheers,
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160208/6d946471/attachment-0001.sig>
+Roger Shimizu, GMT +9 Tokyo
+PGP/GPG: 17B3ACB1
