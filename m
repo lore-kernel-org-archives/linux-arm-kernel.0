@@ -1,86 +1,80 @@
-From: dirk.behme@gmail.com (Dirk Behme)
-Date: Mon, 8 Feb 2016 18:08:57 +0100
-Subject: [PATCH v2] arm64: dts: r8a7795: Add L2 cache-controller nodes
-In-Reply-To: <CAMuHMdUTUss=fR0Mdz+7tDD=RC6hufvkLC99Fp=PTiTgaSSGNA@mail.gmail.com>
-References: <1452953856-5146-1-git-send-email-dirk.behme@gmail.com>
- <56B2370D.2010102@gmail.com> <20160205095758.GE16556@verge.net.au>
- <CAMuHMdVRhwGh2bvfNSguX0XnMW0eEgLRTCt3Y3-+KfV0Jy9WHw@mail.gmail.com>
- <56B857AC.4090701@de.bosch.com>
- <CAMuHMdUTUss=fR0Mdz+7tDD=RC6hufvkLC99Fp=PTiTgaSSGNA@mail.gmail.com>
-Message-ID: <56B8CBA9.8@gmail.com>
+From: codekipper@gmail.com (codekipper at gmail.com)
+Date: Mon,  8 Feb 2016 18:09:19 +0100
+Subject: [PATCH v6 0/2] ASoC: Add SPDIF support for Allwinner SoCs
+Message-ID: <1454951361-10625-1-git-send-email-codekipper@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+From: Marcus Cooper <codekipper@gmail.com>
 
-On 08.02.2016 10:01, Geert Uytterhoeven wrote:
-> Hi Dirk,
->
-> On Mon, Feb 8, 2016 at 9:54 AM, Dirk Behme <dirk.behme@de.bosch.com> wrote:
->> On 08.02.2016 09:42, Geert Uytterhoeven wrote:
->>> On Fri, Feb 5, 2016 at 10:57 AM, Simon Horman <horms@verge.net.au> wrote:
->>>> On Wed, Feb 03, 2016 at 06:21:17PM +0100, Dirk Behme wrote:
->>>>> On 16.01.2016 15:17, Dirk Behme wrote:
->>>>>> From: Geert Uytterhoeven <geert+renesas@glider.be>
->>>>>>
->>>>>> Add device nodes for the L2 caches, and link the CPU node to its L2
->>>>>> cache node.
->>>>>>
->>>>>> The L2 cache for the Cortex-A57 CPU cores is 2 MiB large (organized as
->>>>>> 128 KiB x 16 ways).
->>>>>>
->>>>>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
->>>>>> Signed-off-by: Dirk Behme <dirk.behme@gmail.com>
->>>>
->>>> [snip]
->>>>
->>>>> Any further comments to this? If not, could this be applied?
->>>>
->>>> Sorry for the delay.
->>>>
->>>> This looks good; I have queued it up.
->>>>
->>>> It should appear in the next (and devel) branches of my renesas tree
->>>> soon.
->>>> And in linux-next whenever it includes my updated next branch.
->>>
->>> So you not only dropped the (controversial) timing related properties, but
->>> in addition:
->>>
->>> +               cache-unified;
->>> +               cache-level = <2>;
->>>
->>> At least the "cache-level" property is marked as required in ePAPR.
->>> For "cache-unified", the wording is not that strict in ePAPR, but that
->>> property
->>> depends on being a unified cache in the first place.
->>>
->>> So I think these two properties should be re-added.
->>
->> If I remember correctly, first, these entries are not used at all on ARMv8.
->> And second, I think it was mentioned that we therefore want to drop them:
->>
->> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/394936.html
->>
->> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/Documentation/devicetree/bindings/arm/l2c2x0.txt?id=0bed4b7aa02c06e05121875dc443295d55b9d91d
->
-> I believe the discussion was only about the latency properties, which are
-> documented in the l2c2x0 DT bindings, and deemed to not apply here
+This patch set adds support for the Allwinner SPDIF transceiver.
 
+For now just the SPDIF transmitter has been tested on a Mele A2000(A10)
+and a Itead Ibox(A20).
 
-Hmm, the two bindings cache-unified and cache-level are documented in 
-bindings/arm/l2c2x0.txt, too.
+In order for this patch set to be functional we require an audio clock patch
+which will be delivered separately. For those that are interested I've pushed
+the patches here with all the required changes to get SPDIF audio out of the
+device.
+
+https://github.com/codekipper/linux-sunxi/commits/spdif_delivery
+
+Thanks in advance,
+CK
+
+---
+Changes since v5:
+- fixed warning that had sneaked in.'
+
+Changes since v4:
+- corrected indentation issues
+- removed old macros
+- removed unnecessary enabling of apb clock
+
+Changes since v3:
+- removed code required for spdif capture
+- added disable/enable of apb clk to suspend/resume.
+- removed unnecessary dt checks in probe
+- fixed error conditions in probe/resume
+- modified pm_runtime functionality and confirmed that driver worked when PM was disabled.
+- removed .owner from platform driver
+- renamed bindings file
+
+Changes since v2:
+- removed sunxi-machine-spdif and replaced with simple audio card
+- removed untested compatibilities from device tree documentation
+- added pm_runtime and remove shutdown
+- removed pll2 as it's the parent of the spdif clock
+- rename clk to spdif_clk
+- removed enabling of mclk output
+- removed interrupts status being cleared as it's not being used
+- use default fifo settings for now
+- fixed alignments for wrapped lines
+
+Changes since v1:
+- Moved sunxi-machine-spdif.c to separate patch
+- replaced sunxi in naming scheme with sun4i in the sun4i-spdif driver.
+- split tx controller into separate enable/disable functions
+- moved setclk and setfmt functionality into hw params
+- added support for mono signals.
+- cleaned up probe clock set up.
+- removed all writes to transmit status registers.
+- removed of_id
+- removed power management code.
+- Added support for more rates.
 
 
-> The DT bindings documented in ePAPR are generic, and apply to all hardware,
-> unless extended or overridden by more-specific DT bindings.
+Marcus Cooper (2):
+  dt-bindings: sunxi :add sun4i SPDIF transceiver
+  ASoC: sunxi: Add support for the SPDIF block
 
+ .../bindings/sound/sunxi,sun4i-spdif.txt           |  39 ++
+ sound/soc/sunxi/Kconfig                            |   8 +
+ sound/soc/sunxi/Makefile                           |   1 +
+ sound/soc/sunxi/sun4i-spdif.c                      | 550 +++++++++++++++++++++
+ 4 files changed, 598 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sound/sunxi,sun4i-spdif.txt
+ create mode 100644 sound/soc/sunxi/sun4i-spdif.c
 
-I still can't see the benefit of adding entries to the device tree 
-which are not used at all (and most probably don't make sense on that 
-platform). But if anybody has a different opinion and maybe good 
-arguments for it, that would be fine, too :)
-
-Best regards
-
-Dirk
+-- 
+2.7.1
