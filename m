@@ -1,86 +1,70 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 8 Feb 2016 11:18:29 +0000
-Subject: [PATCH v2 4/4] iommu/arm-smmu: Add stub of_xlate() operation in
- SMMUv1/SMMUv2 driver
-In-Reply-To: <1454908652-15317-5-git-send-email-anup.patel@broadcom.com>
-References: <1454908652-15317-1-git-send-email-anup.patel@broadcom.com>
- <1454908652-15317-5-git-send-email-anup.patel@broadcom.com>
-Message-ID: <20160208111829.GA13498@leverpostej>
+From: jayachandran.chandrashekaran@broadcom.com (Jayachandran Chandrashekaran Nair)
+Date: Mon, 8 Feb 2016 16:57:46 +0530
+Subject: [PATCH v7 5/5] PCI: ACPI: Add a generic ACPI based host controller
+In-Reply-To: <20160205094740.GA31547@red-moon>
+References: <1454058340-7904-1-git-send-email-jchandra@broadcom.com>
+ <1454058340-7904-6-git-send-email-jchandra@broadcom.com>
+ <20160205001907.GJ7031@localhost>
+ <CAKc_7PXYtFt1MQE-UGO0O5vvQ+xFKa2b5=F8wXB=EN-JUJVzZw@mail.gmail.com>
+ <20160205094740.GA31547@red-moon>
+Message-ID: <CAKc_7PVNm7z8nv_+Tr9FYhrVAA+-vh4CDMB83WAyT8tdi+CHzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 08, 2016 at 10:47:32AM +0530, Anup Patel wrote:
-> To allow use of large memory (> 4Gb) with 32bit devices we need to use
-> IOMMU based DMA mappings for such 32bit devices. The IOMMU dt-bindings
-> allows us do this by specifying 'iommus' attribute in 32bit device DT
-> node. Unfortunately, specifying 'iommus' attribute does not work with
-> current SMMUv1/SMMUv2 driver because it requires of_xlate() operation
-> to be implemented by the driver.
-> 
-> This patch adds a stub implementation of of_xlate() in SMMUv1/SMMUv2
-> driver to allow usage of 'iommus' attribute in DT for 32bit devices.
-> 
-> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
-> Reviewed-by: Ray Jui <rjui@broadcom.com>
-> Reviewed-by: Scott Branden <sbranden@broadcom.com>
-> ---
->  drivers/iommu/arm-smmu.c | 11 +++++++++++
->  1 file changed, 11 insertions(+)
-> 
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index 02cd67d..8e090d8 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -1398,6 +1398,16 @@ static int arm_smmu_init_platform_device(struct device *dev,
->  	return 0;
->  }
->  
-> +int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
-> +{
-> +	/*
-> +	 * Nothing to do here because SMMU is already aware of all
-> +	 * MMU masters and their stream IDs using mmu-master attibute
-> +	 * SMMU DT node.
-> +	 */
-> +	return 0;
-> +}
+Lorenzo,
 
-NAK to this.
+On Fri, Feb 5, 2016 at 3:17 PM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> On Fri, Feb 05, 2016 at 02:05:37PM +0530, Jayachandran Chandrashekaran Nair wrote:
+>
+> [...]
+>
+>> pci_host_acpi.c is a generic implementation of these using a sysdata
+>> pointing to acpi_pci_root_info, and using a pointer to the pci_mmcfg_region
+>> to access ECAM area, Maybe I can rename this file to
+>> pci_acpi_host_generic.c to reflect this better.
+>
+> Maybe you should stop sending this series and work with Tomasz to
+> get this done, you are confusing everyone and I am really really
+> annoyed about this.
+>
+> Do you realize there is no point in having two patch series doing
+> the same thing and wasting everyone's review time ?
+>
+> Do you realize he started this work long before you and went through
+> several rounds of review already (I told you before but in case you
+> forgot) ?
+>
+> Tomasz posted a version yesterday, integrating comments following months
+> of review and testing and I think it is ready to get upstream:
+>
+> https://lkml.org/lkml/2016/2/4/646
+>
+> Did you even consider reviewing his code or helping him instead of
+> churning out more patches doing the *SAME* thing ?
 
-As previously mentioned by others [1], this is an abuse of the generic
-iommu binding support code.
+This is getting ridiculous, I had replied to your earlier mails on why
+my patchset is NOT doing the exact same thing. I had also explained
+why helping was not feasible.
 
-The SMMU binding currently does not define its implementation of the
-generic IOMMU binding. This series did not define what an SMMU's
-#iommu-cells would be nor what the contained values would represent.
-Therefore it is not valid to use an SMMU node with an iommus property as
-the SMMu doesn't follwo the generic IOMMU binding.
+The basic point again: I am trying to give a much simpler patchset
+to solve the same problem, I take it that you haven't reviewed my
+patchset before writing this mail. I would have appreciated
+a technical discussion rather than this pointless flamefest.
 
-There is ongoing work to have generic iommu binding support for the
-SMMU. In the absence of documentation for what this means for the
-binding, I am worried that this hack harms that effort.
+If you have reviewed it, you can see that there are just 5 patches
+instead of 23, and that overall it is a much simpler approach.
 
-To use features of the generic IOMMU binding, we must properly implement
-the generic IOMMU binding for the SMMU rather than bodging it onto the
-side of the existing binding.
+> Do you want all of us to go through your code and re-fix what has
+> already been fixed in Tomasz's series with the end result of missing
+> yet another merge window ?
 
-Thanks,
-Mark.
+Again, as I said, the whole point of my patchset is that is much  easier
+to go thru and validate and merge or drop as needed.
 
-> +
->  static int arm_smmu_add_device(struct device *dev)
->  {
->  	struct iommu_group *group;
-> @@ -1495,6 +1505,7 @@ static struct iommu_ops arm_smmu_ops = {
->  	.unmap			= arm_smmu_unmap,
->  	.map_sg			= default_iommu_map_sg,
->  	.iova_to_phys		= arm_smmu_iova_to_phys,
-> +	.of_xlate		= arm_smmu_of_xlate,
->  	.add_device		= arm_smmu_add_device,
->  	.remove_device		= arm_smmu_remove_device,
->  	.device_group		= arm_smmu_device_group,
-> -- 
-> 1.9.1
-> 
+Anyway, if you are on target to hit this merge window, I really hope
+that happens and there will no need for me to spend further time on
+this.
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/402976.html
+Regards,
+JC.
