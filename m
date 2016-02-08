@@ -1,16 +1,17 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 8 Feb 2016 14:01:59 -0800
-Subject: [GIT PULL] clk: tegra: Fixes for v4.5-rc3
-In-Reply-To: <1454608362-8954-1-git-send-email-thierry.reding@gmail.com>
-References: <1454608362-8954-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <20160208220159.GQ4848@codeaurora.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 8 Feb 2016 13:24:58 -0800
+Subject: [GIT PULL] Renesas ARM Based SoC Defconfig Updates for v4.6
+In-Reply-To: <cover.1454409855.git.horms+renesas@verge.net.au>
+References: <cover.1454409855.git.horms+renesas@verge.net.au>
+Message-ID: <20160208212458.GA25468@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/04, Thierry Reding wrote:
-> From: Thierry Reding <treding@nvidia.com>
+On Tue, Feb 02, 2016 at 04:22:47PM +0100, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
 > 
-> Hi Mike, Stephen,
+> Please consider these Renesas ARM based SoC defconfig updates for v4.6.
+> 
 > 
 > The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
 > 
@@ -18,15 +19,12 @@ On 02/04, Thierry Reding wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.5-clk-fixes
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig-for-v4.6
 > 
-> for you to fetch changes up to 5a1d5eff3ede4de4482015a9999336051054283f:
+> for you to fetch changes up to 20cc7dd4d03d912d28a642701f08c7dba8622436:
 > 
->   clk: tegra: super: Fix sparse warnings for functions not declared as static (2016-02-02 15:49:34 +0100)
-> 
+>   ARM: multi_v7_defconfig: Enable XHCI_RCAR (2016-01-27 18:23:03 +0900)
 
-Thanks, pulled.
+Merged, thanks.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+-Olof
