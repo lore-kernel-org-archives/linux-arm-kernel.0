@@ -1,30 +1,39 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon,  8 Feb 2016 15:17:12 +0900
-Subject: [PATCH] ARM: mvebu: add missing of_node_put()
-Message-ID: <1454912232-13169-1-git-send-email-yamada.masahiro@socionext.com>
+Date: Mon,  8 Feb 2016 15:41:26 +0900
+Subject: [PATCH v2 1/2] ARM: remove bzImage target
+Message-ID: <1454913687-9325-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This node pointer is returned by of_find_compatible_node() in this
-function.  It should be put before exitting this function.
+bzImage has been just an alias for zImage for more than a decade.
+It would not hurt to delete it.
 
 Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
 
- arch/arm/mach-mvebu/platsmp.c | 1 +
- 1 file changed, 1 insertion(+)
+Changes in v2: None
 
-diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
-index f9597b7..46c742d 100644
---- a/arch/arm/mach-mvebu/platsmp.c
-+++ b/arch/arm/mach-mvebu/platsmp.c
-@@ -140,6 +140,7 @@ static void __init armada_xp_smp_prepare_cpus(unsigned int max_cpus)
- 		panic("Cannot find 'marvell,bootrom' compatible node");
+ arch/arm/Makefile | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
+
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 46fb1ca..d6d453f 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -312,13 +312,10 @@ boot := arch/arm/boot
+ archprepare:
+ 	$(Q)$(MAKE) $(build)=arch/arm/tools include/generated/mach-types.h
  
- 	err = of_address_to_resource(node, 0, &res);
-+	of_node_put(node);
- 	if (err < 0)
- 		panic("Cannot get 'bootrom' node address");
+-# Convert bzImage to zImage
+-bzImage: zImage
+-
+ BOOT_TARGETS	= zImage Image xipImage bootpImage uImage
+ INSTALL_TARGETS	= zinstall uinstall install
  
+-PHONY += bzImage $(BOOT_TARGETS) $(INSTALL_TARGETS)
++PHONY += $(BOOT_TARGETS) $(INSTALL_TARGETS)
+ 
+ bootpImage uImage: zImage
+ zImage: Image
 -- 
 1.9.1
