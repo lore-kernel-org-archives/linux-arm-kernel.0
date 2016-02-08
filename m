@@ -1,25 +1,20 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 8 Feb 2016 13:30:18 -0800
-Subject: [PATCH] arm64: defconfig: Add Qualcomm sdhci and restart
- functionality
-In-Reply-To: <1454581976-25364-1-git-send-email-georgi.djakov@linaro.org>
-References: <1454581976-25364-1-git-send-email-georgi.djakov@linaro.org>
-Message-ID: <20160208213018.GB25468@localhost>
+Date: Mon, 8 Feb 2016 13:34:39 -0800
+Subject: [PATCH] arm64: defconfig: add spmi and usb related configs
+In-Reply-To: <1454742453-24157-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1454742453-24157-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <20160208213439.GC25468@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 04, 2016 at 12:32:56PM +0200, Georgi Djakov wrote:
-> Enable sdhci and restart functionality for devices based on msm8916 platform.
-> Also increase the number of minors per block device to detect all available
-> partitions.
+On Sat, Feb 06, 2016 at 07:07:33AM +0000, Srinivas Kandagatla wrote:
+> This patch adds kconfigs for spmi bus support, pinctrl drivers and usb
+> related to get USB working on Qualcomm DB410C board.
 > 
-> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
-
-What's this patch against? It doesn't apply on top of v4.5-rc3. Please rebase
-against our next/arm64 branch and resend.
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 
 
-Thanks!
+Applied to next/arm64, thanks.
 
 
 -Olof
