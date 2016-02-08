@@ -1,105 +1,88 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 8 Feb 2016 16:04:46 +0000
-Subject: [PATCH v3 23/23] arm64: Panic when VHE and non VHE CPUs coexist
-In-Reply-To: <1454522416-6874-24-git-send-email-marc.zyngier@arm.com>
-References: <1454522416-6874-1-git-send-email-marc.zyngier@arm.com>
- <1454522416-6874-24-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20160208160445.GS6076@e104818-lin.cambridge.arm.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 8 Feb 2016 16:06:15 +0000
+Subject: [PATCH 07/11] clk: sunxi: add generic allwinner,sunxi name
+In-Reply-To: <20160208155721.GB4677@rob-hp-laptop>
+References: <1454348370-3816-1-git-send-email-andre.przywara@arm.com>
+ <1454348370-3816-8-git-send-email-andre.przywara@arm.com>
+ <20160208155721.GB4677@rob-hp-laptop>
+Message-ID: <56B8BCF7.4080701@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 03, 2016 at 06:00:16PM +0000, Marc Zyngier wrote:
-> Having both VHE and non-VHE capable CPUs in the same system
-> is likely to be a recipe for disaster.
-> 
-> If the boot CPU has VHE, but a secondary is not, we won't be
-> able to downgrade and run the kernel at EL1. Add CPU hotplug
-> to the mix, and this produces a terrifying mess.
-> 
-> Let's solve the problem once and for all. If you mix VHE and
-> non-VHE CPUs in the same system, you deserve to loose, and this
-> patch makes sure you don't get a chance.
-> 
-> This is implemented by storing the kernel execution level in
-> a global variable. Secondaries will park themselves in a
-> WFI loop if they observe a mismatch. Also, the primary CPU
-> will detect that the secondary CPU has died on a mismatched
-> execution level. Panic will follow.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/include/asm/virt.h | 17 +++++++++++++++++
->  arch/arm64/kernel/head.S      | 20 ++++++++++++++++++++
->  arch/arm64/kernel/smp.c       |  3 +++
->  3 files changed, 40 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
-> index 9f22dd6..f81a345 100644
-> --- a/arch/arm64/include/asm/virt.h
-> +++ b/arch/arm64/include/asm/virt.h
-> @@ -36,6 +36,11 @@
->   */
->  extern u32 __boot_cpu_mode[2];
->  
-> +/*
-> + * __run_cpu_mode records the mode the boot CPU uses for the kernel.
-> + */
-> +extern u32 __run_cpu_mode[2];
-> +
->  void __hyp_set_vectors(phys_addr_t phys_vector_base);
->  phys_addr_t __hyp_get_vectors(void);
->  
-> @@ -60,6 +65,18 @@ static inline bool is_kernel_in_hyp_mode(void)
->  	return el == CurrentEL_EL2;
->  }
->  
-> +static inline bool is_kernel_mode_mismatched(void)
-> +{
-> +	/*
-> +	 * A mismatched CPU will have written its own CurrentEL in
-> +	 * __run_cpu_mode[1] (initially set to zero) after failing to
-> +	 * match the value in __run_cpu_mode[0]. Thus, a non-zero
-> +	 * value in __run_cpu_mode[1] is enough to detect the
-> +	 * pathological case.
-> +	 */
-> +	return !!ACCESS_ONCE(__run_cpu_mode[1]);
-> +}
-> +
->  /* The section containing the hypervisor text */
->  extern char __hyp_text_start[];
->  extern char __hyp_text_end[];
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index 6f2f377..f9b6a5b 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -578,7 +578,24 @@ ENTRY(set_cpu_boot_mode_flag)
->  1:	str	w20, [x1]			// This CPU has booted in EL1
->  	dmb	sy
->  	dc	ivac, x1			// Invalidate potentially stale cache line
-> +	adr_l	x1, __run_cpu_mode
-> +	ldr	w0, [x1]
-> +	mrs	x20, CurrentEL
-> +	cbz	x0, skip_el_check
-> +	cmp	x0, x20
-> +	bne	mismatched_el
->  	ret
-> +skip_el_check:			// Only the first CPU gets to set the rule
-> +	str	w20, [x1]
-> +	dmb	sy
-> +	dc	ivac, x1	// Invalidate potentially stale cache line
-> +	ret
-> +mismatched_el:
-> +	str	w20, [x1, #4]
-> +	dmb	sy
-> +	dc	ivac, x1	// Invalidate potentially stale cache line
-> +1:	wfi
-> +	b	1b
->  ENDPROC(set_cpu_boot_mode_flag)
+Hi,
 
-Do we need to wait for the D-cache maintenance completion before
-entering WFI (like issuing a DSB)? Same for the skip_el_check path
-before the RET.
+On 08/02/16 15:57, Rob Herring wrote:
+> On Mon, Feb 01, 2016 at 05:39:26PM +0000, Andre Przywara wrote:
+>> The only difference between the different compatible matches at the
+>> end of clk-sunxi.c are the critical clocks. Two SoCs get away so far
+>> without any, so there is no reason to enumerate those SoCs in here
+>> explicitly, though we have to keep them in for compatibility reasons.
+>>
+>> Rename the init function to highlight this generic feature and add a
+>> new, generic DT compatible string which can be used as a fallback value
+>> in the future should a particular SoC don't need any special treatment.
+>>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> ---
+>>  Documentation/devicetree/bindings/arm/sunxi.txt |  4 ++++
+>>  drivers/clk/sunxi/clk-sunxi.c                   | 14 ++++++--------
+>>  2 files changed, 10 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
+>> index 7e79fcc..980e065 100644
+>> --- a/Documentation/devicetree/bindings/arm/sunxi.txt
+>> +++ b/Documentation/devicetree/bindings/arm/sunxi.txt
+>> @@ -14,3 +14,7 @@ using one of the following compatible strings:
+>>    allwinner,sun8i-a83t
+>>    allwinner,sun8i-h3
+>>    allwinner,sun9i-a80
+>> +
+>> +For Allwinner SoCs without any specific needs the generic fallback value of:
+>> +  allwinner,sunxi
+>> +can be used.
+> 
+> Perhaps "fallback" implies this, but be more specific that it can be 
+> used in addition to a specific string.
 
-Otherwise:
+Yeah, good point.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+But Maxime's latest rework [1] made this patch here actually obsolete,
+so we don't match on a root compatible string anymore to register the
+sunxi clock drivers. Instead each clock is registered and matched on
+it's own compatible string. Much nicer now, IMHO.
+
+Thanks for having a look!
+Andre.
+
+[1]
+https://git.kernel.org/cgit/linux/kernel/git/mripard/linux.git/commit/?h=sunxi/for-next&id=78e3fb4c745114b16a12458036d48aa96ea5b36d
+
+>> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+>> index e460a6b..efcce85 100644
+>> --- a/drivers/clk/sunxi/clk-sunxi.c
+>> +++ b/drivers/clk/sunxi/clk-sunxi.c
+>> @@ -1052,14 +1052,12 @@ CLK_OF_DECLARE(sun8i_a23_clk_init, "allwinner,sun8i-a23", sun6i_init_clocks);
+>>  CLK_OF_DECLARE(sun8i_a33_clk_init, "allwinner,sun8i-a33", sun6i_init_clocks);
+>>  CLK_OF_DECLARE(sun8i_h3_clk_init, "allwinner,sun8i-h3", sun6i_init_clocks);
+>>  
+>> -static void __init sun8i_a83t_init_clocks(struct device_node *node)
+>> +static void __init sunxi_generic_init_clocks(struct device_node *node)
+>>  {
+>>  	sunxi_init_clocks(NULL, 0);
+>>  }
+>> -CLK_OF_DECLARE(sun8i_a83t_clk_init, "allwinner,sun8i-a83t", sun8i_a83t_init_clocks);
+>> -
+>> -static void __init sun9i_init_clocks(struct device_node *node)
+>> -{
+>> -	sunxi_init_clocks(NULL, 0);
+>> -}
+>> -CLK_OF_DECLARE(sun9i_a80_clk_init, "allwinner,sun9i-a80", sun9i_init_clocks);
+>> +CLK_OF_DECLARE(sun8i_a83t_clk_init, "allwinner,sun8i-a83t",
+>> +	       sunxi_generic_init_clocks);
+>> +CLK_OF_DECLARE(sun9i_a80_clk_init, "allwinner,sun9i-a80",
+>> +	       sunxi_generic_init_clocks);
+>> +CLK_OF_DECLARE(sunxi_clk_init, "allwinner,sunxi", sunxi_generic_init_clocks);
+>> -- 
+>> 2.6.4
+>>
+> 
