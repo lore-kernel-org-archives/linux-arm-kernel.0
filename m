@@ -1,75 +1,83 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Mon,  8 Feb 2016 14:04:08 -0800
-Subject: [PATCH v5 2/3] Documentation: mailbox: Add APM X-Gene SLIMpro mailbox
- dts documentation
-In-Reply-To: <cover.1454967957.git.dhdang@apm.com>
-References: <cover.1454967957.git.dhdang@apm.com>
-Message-ID: <61df03dd1c014bf3b0a4a3fbef980665ce53d849.1454967957.git.dhdang@apm.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Mon, 8 Feb 2016 16:12:04 -0600
+Subject: [PATCH v5 3/3] pci, pci-thunder-ecam: Add driver for
+ ThunderX-pass1 on-chip devices
+In-Reply-To: <56B90B09.7090500@caviumnetworks.com>
+References: <1454715675-17512-1-git-send-email-ddaney.cavm@gmail.com>
+ <1454715675-17512-4-git-send-email-ddaney.cavm@gmail.com>
+ <20160208195642.GA15103@rob-hp-laptop>
+ <56B8FED6.1050804@caviumnetworks.com>
+ <CAL_JsqJNndZ59465YhpkP=dQYaijaar+LcQG4KQEJwF5e1ryLQ@mail.gmail.com>
+ <56B90B09.7090500@caviumnetworks.com>
+Message-ID: <20160208221204.GA30821@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the APM X-Gene SLIMpro mailbox device tree
-node documentation.
+On Mon, Feb 08, 2016 at 01:39:21PM -0800, David Daney wrote:
+> On 02/08/2016 01:12 PM, Rob Herring wrote:
+> >On Mon, Feb 8, 2016 at 2:47 PM, David Daney <ddaney@caviumnetworks.com> wrote:
+> >>On 02/08/2016 11:56 AM, Rob Herring wrote:
+> >>>On Fri, Feb 05, 2016 at 03:41:15PM -0800, David Daney wrote:
+> >>>>From: David Daney <david.daney@cavium.com>
+> >
+> >[...]
+> >
+> >>>>+Properties of the host controller node that differ from
+> >>>>+host-generic-pci.txt:
+> >>>>+
+> >>>>+- compatible     : Must be "cavium,pci-host-thunder-ecam"
+> >>>>+
+> >>>>+Example:
+> >>>>+
+> >>>>+       pci at 84b0,00000000 {
+> >>>
+> >>>
+> >>>Drop the comma,
+> >>
+> >>
+> >>OK...
+> >>
+> >>>and the node name should be "pcie".
+> >>>
+> >>
+> >>Why pcie?
+> >>
+> >>There are no PCIe devices or buses reachable from this type of root complex.
+> >>There are however many PCI devices.
+> >
+> >I thought ECAM is a PCIe thing. If not, then nevermind.
 
-Signed-off-by: Feng Kan <fkan@apm.com>
-Signed-off-by: Duc Dang <dhdang@apm.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
-Changes since v4:
-        - Rebase over v4.5-rc1
-        - Fix number of total interrupts in
-        introduction text
-        - Change node name to mailbox at 10540000
+The "ECAM" confusion bites again :)
 
-Changes since v3:
-        - Rebase over v4.4
-        - Change number of mailbox IRQs to 8
-        - Fix white spaces, typos.
+> Well, Enhanced Configuration Access Mechanism (ECAM) is defined  the
+> the PCI Express(R) base Specification, but it just defines a
+> standard layout of address bits to memory map config space
+> operations.  Since the PCI config space is a sub set of the PCIe
+> config space, ECAM can also be used in PCI systems.
+> 
+> Really, it is a bit of a gray area here as we don't have any bridges
+> to PCIe buses and there are multiple devices residing on each bus,
+> so from that point of view it cannot be PCIe.  There are, however,
+> devices that implement the PCI Express Capability structure, so does
+> that make it PCIe?  It is not clear what the specifications demand
+> here.
 
- .../bindings/mailbox/xgene-slimpro-mailbox.txt     | 35 ++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mailbox/xgene-slimpro-mailbox.txt
+The PCI core doesn't care about the node name in the device tree.  But
+it *does* care about some details of PCI/PCIe topology.  We consider
+anything with a PCIe capability to be PCIe.  For example,
 
-diff --git a/Documentation/devicetree/bindings/mailbox/xgene-slimpro-mailbox.txt b/Documentation/devicetree/bindings/mailbox/xgene-slimpro-mailbox.txt
-new file mode 100644
-index 0000000..e46451b
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mailbox/xgene-slimpro-mailbox.txt
-@@ -0,0 +1,35 @@
-+The APM X-Gene SLIMpro mailbox is used to communicate messages between
-+the ARM64 processors and the Cortex M3 (dubbed SLIMpro). It uses a simple
-+interrupt based door bell mechanism and can exchange simple messages using the
-+internal registers.
-+
-+There are total of 8 interrupts in this mailbox. Each used for an individual
-+door bell (or mailbox channel).
-+
-+Required properties:
-+- compatible:	Should be as "apm,xgene-slimpro-mbox".
-+
-+- reg:		Contains the mailbox register address range.
-+
-+- interrupts:	8 interrupts must be from 0 to 7, interrupt 0 define the
-+		the interrupt for mailbox channel 0 and interrupt 1 for
-+		mailbox channel 1 and so likewise for the reminder.
-+
-+- #mbox-cells:	only one to specify the mailbox channel number.
-+
-+Example:
-+
-+Mailbox Node:
-+		mailbox: mailbox at 10540000 {
-+			compatible = "apm,xgene-slimpro-mbox";
-+			reg = <0x0 0x10540000 0x0 0xa000>;
-+			#mbox-cells = <1>;
-+			interrupts =  	<0x0 0x0 0x4>,
-+					<0x0 0x1 0x4>,
-+					<0x0 0x2 0x4>,
-+					<0x0 0x3 0x4>,
-+					<0x0 0x4 0x4>,
-+					<0x0 0x5 0x4>,
-+					<0x0 0x6 0x4>,
-+					<0x0 0x7 0x4>,
-+		};
--- 
-1.9.1
+  - pci_cfg_space_size() thinks PCIe devices have 4K of config space
+
+  - only_one_child() thinks a PCIe bus, i.e., a link, only has a
+    single device on it
+
+  - a PCIe device should have a PCIe Root Port or PCIe Downstream Port
+    upstream from it (we did remove some of these restrictions with
+    b35b1df5e6c2 ("PCI: Tolerate hierarchies with no Root Port"), but 
+    it's possible we didn't get them all)
+
+I assume your system conforms to expectations like these; I'm just
+pointing them out because you mentioned buses with multiple devices on
+them, which is definitely something one doesn't expect in PCIe.
+
+Bjorn
