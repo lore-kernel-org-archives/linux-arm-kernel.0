@@ -1,55 +1,48 @@
 From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Mon, 8 Feb 2016 11:59:05 -0600
-Subject: [PATCH V2 00/12] dtb: amd: Miscelleneous Updates for AMD Seattle DTS
-Message-ID: <1454954357-8395-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+Date: Mon, 8 Feb 2016 11:59:08 -0600
+Subject: [PATCH V2 03/12] dtb: amd: Fix DMA ranges in device tree
+In-Reply-To: <1454954357-8395-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+References: <1454954357-8395-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+Message-ID: <1454954357-8395-4-git-send-email-Suravee.Suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
 
-This patch series contains several updates for the AMD Seattle SOC DTS files.
-It also adds new board files for newer Overdrive and Linaro 96boards (Husky)
-platforms.
+Fix DMA ranges of smb0 and pcie0 nodes in AMD Seattle SOC.
 
-Thanks,
-Suravee
+Signed-off-by: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
+---
+ arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi | 10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
 
-Changes from V1 (https://lkml.org/lkml/2016/1/27/1251):
-  * Fix duplication in MAINTAINERS file (per Martin review comment)
-  * Remove the PCIe SMMU device tree node for now to rework
-    (based on the discussion in the thread).
-
-Brijesh Singh (2):
-  dtb: amd: Fix GICv2 hypervisor and virtual interface sizes
-  dtb: amd: Add KCS device tree node
-
-Suravee Suthikulpanit (9):
-  MAINTAINERS: Adding Maintainers for AMD Seattle Device Tree
-  dtb: amd: Fix DMA ranges in device tree
-  dtb: amd: Fix typo in SPI device nodes
-  dtb: amd: Misc changes for I2C device nodes
-  dtb: amd: Misc changes for SATA device tree nodes
-  dtb: amd: Misc changes for GPIO devices
-  dtb: amd: Add PERF CCN-504 device tree node
-  dtb: amd: Add support for new AMD Overdrive boards
-  dtb: amd: Add support for AMD/Linaro 96Boards Enterprise Edition
-    Server board
-
-Tom Lendacky (1):
-  dtb: amd: Add AMD XGBE device tree file
-
- MAINTAINERS                                      |   8 ++
- arch/arm64/boot/dts/amd/Makefile                 |   4 +-
- arch/arm64/boot/dts/amd/amd-overdrive-rev-b0.dts |  87 +++++++++++++++++
- arch/arm64/boot/dts/amd/amd-overdrive-rev-b1.dts |  91 ++++++++++++++++++
- arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi     | 105 +++++++++++++++++---
- arch/arm64/boot/dts/amd/amd-seattle-xgbe-b.dtsi  | 117 +++++++++++++++++++++++
- arch/arm64/boot/dts/amd/husky.dts                |  83 ++++++++++++++++
- 7 files changed, 481 insertions(+), 14 deletions(-)
- create mode 100644 arch/arm64/boot/dts/amd/amd-overdrive-rev-b0.dts
- create mode 100644 arch/arm64/boot/dts/amd/amd-overdrive-rev-b1.dts
- create mode 100644 arch/arm64/boot/dts/amd/amd-seattle-xgbe-b.dtsi
- create mode 100644 arch/arm64/boot/dts/amd/husky.dts
-
+diff --git a/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi b/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
+index fdd0c96..5c73117 100644
+--- a/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
++++ b/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
+@@ -55,8 +55,12 @@
+ 		#size-cells = <2>;
+ 		ranges;
+ 
+-		/* DDR range is 40-bit addressing */
+-		dma-ranges = <0x80 0x0 0x80 0x0 0x7f 0xffffffff>;
++		/*
++		 * dma-ranges is 40-bit address space containing:
++		 * - GICv2m MSI register is at 0xe0080000
++		 * - DRAM range [0x8000000000 to 0xffffffffff]
++		 */
++		dma-ranges = <0x0 0x0 0x0 0x0 0x100 0x0>;
+ 
+ 		/include/ "amd-seattle-clks.dtsi"
+ 
+@@ -159,7 +163,7 @@
+ 				<0x1000 0x0 0x0 0x4 &gic0 0x0 0x0 0x0 0x123 0x1>;
+ 
+ 			dma-coherent;
+-			dma-ranges = <0x43000000 0x80 0x0 0x80 0x0 0x7f 0xffffffff>;
++			dma-ranges = <0x43000000 0x0 0x0 0x0 0x0 0x100 0x0>;
+ 			ranges =
+ 				/* I/O Memory (size=64K) */
+ 				<0x01000000 0x00 0x00000000 0x00 0xefff0000 0x00 0x00010000>,
 -- 
 2.5.0
