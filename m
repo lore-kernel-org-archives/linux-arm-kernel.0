@@ -1,42 +1,51 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 08 Feb 2016 11:29:30 +0100
-Subject: [PATCH v2 09/10] Documentation: devicetree: rockchip: Document
- Landingship
-In-Reply-To: <1454897859-7601-10-git-send-email-afaerber@suse.de>
-References: <1454897859-7601-1-git-send-email-afaerber@suse.de>
- <1454897859-7601-10-git-send-email-afaerber@suse.de>
-Message-ID: <6744409.i2u8076vm4@phil>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 8 Feb 2016 10:32:08 +0000
+Subject: [PATCH 1/6] irqchip: add the Alpine MSIX interrupt controller
+In-Reply-To: <20160208102656.GA4117@kwain>
+References: <1454922971-17405-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1454922971-17405-2-git-send-email-antoine.tenart@free-electrons.com>
+ <56B86391.1030609@arm.com> <20160208102656.GA4117@kwain>
+Message-ID: <56B86EA8.9070306@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 8. Februar 2016, 03:17:38 schrieb Andreas F?rber:
-> Use "geekbuying,landingship" compatible string, plus those of GeekBox.
+On 08/02/16 10:26, Antoine Tenart wrote:
+>>> +static int alpine_msix_init(struct device_node *node,
+>>> +			    struct device_node *parent)
+>>> +{
+>>> +	struct alpine_msix_data *priv;
+>>> +	struct resource res;
+>>> +	int ret;
+>>> +
+>>> +	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
+>>> +	if (!priv)
+>>> +		return -ENOMEM;
+>>> +
+>>> +	spin_lock_init(&priv->msi_map_lock);
+>>> +
+>>> +	ret = of_address_to_resource(node, 0, &res);
+>>> +	if (ret) {
+>>> +		pr_err("Failed to allocate resource\n");
+>>> +		goto err_priv;
+>>> +	}
+>>> +
+>>> +	priv->addr_high = upper_32_bits((u64)res.start);
+>>> +	priv->addr_low = lower_32_bits(res.start) + ALPINE_MSIX_SPI_TARGET_CLUSTER0;
+>>
+>> This is a bit odd. If you always set bit 16, why isn't that reflected in
+>> the base address coming from the DT?
+> 
+> The 20 least significant bits of addr_low provide direct information
+> regarding the interrupt destination, so I thought it would be clearer
+> to have this explicitly in the driver so that we know what those bits
+> mean.
 
-I do believe this would be better as geekbuying,geekbox-landingship . They 
-might reuse the landingship naming for future baseboards as well ;-)
+So what is this information? TARGET_CLUSTER0 is not very expressive, and
+doesn't show what the alternatives are. Could you please elaborate a bit
+on that front?
 
-> 
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> ---
->  v2: New
-> 
->  Documentation/devicetree/bindings/arm/rockchip.txt | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt
-> b/Documentation/devicetree/bindings/arm/rockchip.txt index
-> f633595b196c..c6d95f202591 100644
-> --- a/Documentation/devicetree/bindings/arm/rockchip.txt
-> +++ b/Documentation/devicetree/bindings/arm/rockchip.txt
-> @@ -91,6 +91,11 @@ Rockchip platforms device tree bindings
->      Required root node properties:
->        - compatible = "geekbuying,geekbox", "rockchip,rk3368";
-> 
-> +- GeekBuying Landingship:
-> +    Required root node properties:
-> +      - compatible = "geekbuying,landingship",
-> +		     "geekbuying,geekbox", "rockchip,rk3368";
-> +
->  - Rockchip RK3368 evb:
->      Required root node properties:
->        - compatible = "rockchip,rk3368-evb-act8846", "rockchip,rk3368";
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
