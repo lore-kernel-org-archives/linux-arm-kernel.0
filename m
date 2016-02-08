@@ -1,44 +1,37 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 8 Feb 2016 11:55:52 +0000
-Subject: [PATCH v4 07/13] arm64: Change cpu_resume() to enable mmu early
- then access sleep_sp by va
-In-Reply-To: <56B859D9.3080601@arm.com>
-References: <1453977766-20907-1-git-send-email-james.morse@arm.com>
- <1453977766-20907-8-git-send-email-james.morse@arm.com>
- <20160205162617.GD31547@red-moon> <56B859D9.3080601@arm.com>
-Message-ID: <20160208115552.GA5471@red-moon>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Mon, 8 Feb 2016 11:43:27 +0000
+Subject: [PATCH v4 05/17] xen: memory : Add new XENMAPSPACE type
+ XENMAPSPACE_dev_mmio
+In-Reply-To: <1454641552-12576-6-git-send-email-zhaoshenglong@huawei.com>
+References: <1454641552-12576-1-git-send-email-zhaoshenglong@huawei.com>
+ <1454641552-12576-6-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <alpine.DEB.2.02.1602081142360.27008@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 08, 2016 at 09:03:21AM +0000, James Morse wrote:
-> Hi Lorenzo,
+On Fri, 5 Feb 2016, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
 > 
-> On 05/02/16 16:26, Lorenzo Pieralisi wrote:
-> >> cpu_do_{suspend,resume} could be further reduced to not restore: cpacr_el1,
-> >> mdscr_el1, tcr_el1, vbar_el1 and sctlr_el1, all of which are set by
-> >> __cpu_setup(). However these values all contain res0 bits that may be used
-> >> to enable future features.
-> > 
-> > This patch is a very nice clean-up, a comment below.
-> > 
-> > I think that for registers like tcr_el1 and sctlr_el1 we should define
-> > a restore mask (to avoid overwriting bits set-up by __cpu_setup), eg
-> > current code that restores the tcr_el1 seems wrong to me, see below.
+> Add a new type of Xen map space for Dom0 to map device's MMIO region.
 > 
-> Presumably this should be two masks, one to find RES0 bits that are
-> set, and are assumed to have some new meaning, and another to find
-> RES1 bits that have been cleared.
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+>  include/xen/interface/memory.h | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/include/xen/interface/memory.h b/include/xen/interface/memory.h
+> index 2ecfe4f..9aa8988 100644
+> --- a/include/xen/interface/memory.h
+> +++ b/include/xen/interface/memory.h
+> @@ -160,6 +160,7 @@ DEFINE_GUEST_HANDLE_STRUCT(xen_machphys_mapping_t);
+>  #define XENMAPSPACE_gmfn_foreign 4 /* GMFN from another dom,
+>  				    * XENMEM_add_to_physmap_range only.
+>  				    */
+> +#define XENMAPSPACE_dev_mmio     5 /* device mmio region */
+>  
+>  /*
+>   * Sets the GPFN at which a particular page appears in the specified guest's
 
-For the time being, it is ok to just fix t0sz restore which means
-that either you avoid overwriting tcr_el1.t0sz in cpu_do_resume()
-or you force the t0sz value field to be whatever value is already
-present in the register (ie set-up in __cpu_setup through
-tcr_set_idmap_t0sz) and finally set it to correct the default value
-in __cpu_suspend_exit() using the correct procedure:
-
-- set reserved ttbr0
-- flush tlb
-- cpu_set_default_tcr_t0sz
-
-Thanks,
-Lorenzo
+This patch needs to wait at least until the corresponding Xen patch
+(the one which introduces XENMAPSPACE_dev_mmio on the Xen side) is
+Acked by one of the Xen maintainers.
