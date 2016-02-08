@@ -1,44 +1,41 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 8 Feb 2016 15:06:14 +0100
-Subject: [PATCH v1] clocksource: atmel-pit: register as a sched_clock
-In-Reply-To: <56B89910.3060305@linaro.org>
-References: <1454606493-15094-1-git-send-email-romain.izard.pro@gmail.com>
- <56B89910.3060305@linaro.org>
-Message-ID: <20160208150614.5e87133e@bbrezillon>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 8 Feb 2016 14:09:25 +0000
+Subject: [PATCH v2] clocksource/arm_arch_timer: Enable and verify MMIO
+ access
+In-Reply-To: <56B89F98.7020909@linaro.org>
+References: <71bf617f4083b116b2aeab24f13fc5fed99a816f.1454327031.git.robin.murphy@arm.com>
+ <56B89F98.7020909@linaro.org>
+Message-ID: <56B8A195.2050807@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Alexandre
-
-Hi Daniel,
-
-On Mon, 8 Feb 2016 14:33:04 +0100
-Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
-
-> On 02/04/2016 06:21 PM, Romain Izard wrote:
-> > Register the counter of the Periodic Interval Timer as a possible source
-> > for sched_clock. This provides a better precision than the jiffies-based
-> > default.
-> >
-> > Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
+On 08/02/16 14:00, Daniel Lezcano wrote:
+> On 02/01/2016 01:00 PM, Robin Murphy wrote:
+>> So far, we have been blindly assuming that having access to a
+>> memory-mapped timer frame implies that the individual elements of that
+>> frame frame are already enabled. Whilst it's the firmware's job to give
+>> us non-secure access to frames in the first place, we should not rely
+>> on implementations always being generous enough to also configure CNTACR
+>> for those non-secure frames (e.g. [1]).
+>>
+>> Explicitly enable feature-level access per-frame, and verify that the
+>> access we want is really implemented before trying to make use of it.
+>>
+>> [1]:https://github.com/ARM-software/tf-issues/issues/170
+>>
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>> ---
 > 
-> Nicolas, Boris,
+> Hi Marc,
 > 
-> Are you ok with this patch ?
+> can you give your opinion on this patch ?
 
-Not sure yet :). On most platforms we are also declaring a clocksource
-based on the TCB IP, and this one provides a better precision than the
-PIT clocksource.
-What happens if the PIT is de-activated while it's still supposed to
-provide the sched_clock(). Is there a way to flag the clocksource as
-still needed so that the core does not shut it down by when the TCB
-clocksource comes in.
+This seems to do the right thing, so FWIW:
 
-Best Regards,
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Boris
+Thanks,
 
+	M.
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Jazz is not dead. It just smells funny...
