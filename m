@@ -1,37 +1,83 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 8 Feb 2016 09:11:32 -0500
-Subject: [RFC PATCH 0/4] Add ACPI support for HiSilicon PCIe Host
- Controllers
-In-Reply-To: <7297343.ktGck3KQJN@wuerfel>
-References: <1454585860-60709-1-git-send-email-gabriele.paoloni@huawei.com>
- <1930535.mkCdtpUWq7@wuerfel>
- <EE11001F9E5DDD47B7634E2F8A612F2E1ECAC944@lhreml503-mbs>
- <7297343.ktGck3KQJN@wuerfel>
-Message-ID: <56B8A214.8040203@codeaurora.org>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Mon, 8 Feb 2016 16:09:37 +0200
+Subject: [PATCH v4 00/13] mmc: use sdhci_pltfm_init for private allocation
+ and clean up
+In-Reply-To: <CAPDyKFpFSTYsAUCG9nFnnzmVsA3zm4hAPO8+6REArt9BJtn+0Q@mail.gmail.com>
+References: <1453803353-6266-1-git-send-email-jszhang@marvell.com>
+ <CAPDyKFpFSTYsAUCG9nFnnzmVsA3zm4hAPO8+6REArt9BJtn+0Q@mail.gmail.com>
+Message-ID: <56B8A1A1.2080408@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/8/2016 8:55 AM, Arnd Bergmann wrote:
-> I haven't really followed what is going on with ACPI. Do you expect
-> to see future machines come out that are not just implementing SBSA
-> but that still need to run ACPI? I thought this was just a hack
-> for some early machines that only run with ACPI but are not actually
-> compliant.
+On 04/02/16 12:38, Ulf Hansson wrote:
+> + Adrian
 > 
-> 	Arnd
+> On 26 January 2016 at 11:15, Jisheng Zhang <jszhang@marvell.com> wrote:
+>> These patches are to complete the TODOs in Commit 0e748234293f ("mmc:
+>> sdhci: Add size for caller in init+register"), I.E:
+>>
+>> - todo: migrate clients to using allocation this way
+>> - todo: remove priv variable once migration is complete
+>>
+>> Since v3:
+>>  - based on v4.5-rc1
+>>  - add Ludovic's ack for sdhci-of-at91 changes
+>>  - fix use-after-free in some drivers: some host drivers still needs to
+>>    access sdhci_pltfm_host->private after sdhci_pltfm_unregister(), but
+>>    the private should be already freed by sdhci_pltfm_unregister.
+>>  - add patch5 to fix one clk bug in sdhci_arasan_remove(). IMHO, It's
+>>    better to add this patch to fixes rather than waiting for next merge
+>>    window
+>>
+>> Since v2:
+>>  - based on mmc next tree and remove all priv usage introduced in newly
+>>    commits in this tree
+>>  - don't break two lines if sdhci_pltfm_init() call could be put into
+>>    one line. Thank Ludovic Desroches.
+>>
+>> Since v1:
+>>  - add new patch03 to factorise sdhci_msm_pdata outisde of sdhci_msm_host.
+>>    This is to fix drivers/mmc/host/sdhci-msm.c:440:32: warning: 'msm_host'
+>>    is used uninitialized in this function [-Wuninitialized]
+>>  - Add Arnd's Ack for all patches except patch3 which is new in v2
+>>
+>>
+>> Jisheng Zhang (13):
+>>   mmc: sdhci-bcm2835: use sdhci_pltfm_init for private allocation
+>>   mmc: sdhci-esdhc-imx: use sdhci_pltfm_init for private allocation
+>>   mmc: sdhci-msm: factorise sdhci_msm_pdata outisde of sdhci_msm_host
+>>   mmc: sdhci-msm: use sdhci_pltfm_init for private allocation
+>>   mmc: sdhci-of-arasan: fix clk issue in sdhci_arasan_remove()
+>>   mmc: sdhci-of-arasan: use sdhci_pltfm_init for private allocation
+>>   mmc: sdhci-of-at91: use sdhci_pltfm_init for private allocation
+>>   mmc: sdhci-of-esdhc: use sdhci_pltfm_init for private allocation
+>>   mmc: sdhci-pxav3: use sdhci_pltfm_init for private allocation
+>>   mmc: sdhci-st: use sdhci_pltfm_init for private allocation
+>>   mmc: sdhci-tegra: use sdhci_pltfm_init for private allocation
+>>   mmc: sdhci-pxav2: remove unnecessary assignment of pltfm_host->priv
+>>   mmc: sdhci-pltfm: remove priv variable from sdhci_pltfm_host
+>>
+>>  drivers/mmc/host/sdhci-bcm2835.c   | 14 +++----------
+>>  drivers/mmc/host/sdhci-esdhc-imx.c | 38 ++++++++++++++++--------------------
+>>  drivers/mmc/host/sdhci-msm.c       | 25 +++++++++++-------------
+>>  drivers/mmc/host/sdhci-of-arasan.c | 33 +++++++++++++++----------------
+>>  drivers/mmc/host/sdhci-of-at91.c   | 33 ++++++++++++++-----------------
+>>  drivers/mmc/host/sdhci-of-esdhc.c  | 19 +++++++++---------
+>>  drivers/mmc/host/sdhci-pltfm.h     |  1 -
+>>  drivers/mmc/host/sdhci-pxav2.c     |  1 -
+>>  drivers/mmc/host/sdhci-pxav3.c     | 20 ++++++++-----------
+>>  drivers/mmc/host/sdhci-st.c        | 40 +++++++++++++++++++-------------------
+>>  drivers/mmc/host/sdhci-tegra.c     | 21 +++++++-------------
+>>  11 files changed, 106 insertions(+), 139 deletions(-)
+>>
+>> --
+>> 2.7.0
+>>
+> 
+> To avoid confusions. I don't intend to pick up any further sdhci
+> patches, unless they are acked by Adrian Hunter.
 
-I agree. We shouldn't be playing with half-baked ACPI solutions. We have seen
-two variants already that claim to be ACPI compliant yet they do not tie into
-anything inside ACPICA. 
+The patches look OK, although patch 6 doesn't apply cleanly anymore.
+Nevertheless:
 
-The correct route is to use Tomasz's ACPI PCI root bridge driver and use the ACPI
-framework.
-
-If a platform has quirks, Tomasz's patches allow vendors add quirks too.
-
-The combination of PCI host bridge driver + ACPI hack is not right.
-
--- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+Acked-by: Adrian Hunter <adrian.hunter@intel.com>
