@@ -1,45 +1,47 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Mon, 8 Feb 2016 09:34:19 +0100
-Subject: [PATCH] clk: meson: Fix meson_clk_register_clks() signature type
- mismatch
-In-Reply-To: <1454879583-27036-1-git-send-email-afaerber@suse.de>
-References: <1454879583-27036-1-git-send-email-afaerber@suse.de>
-Message-ID: <CAOQ7t2YwHa7cJdqv4m8rPx50ZnFZJJzcU2AjtE=Q2AYEAf84hg@mail.gmail.com>
+From: k@japko.eu (Krzysztof Adamski)
+Date: Mon, 8 Feb 2016 09:39:12 +0100
+Subject: [PATCH v3 4/5] ARM: dts: sun8i-h3: Add R_PIO controller node to
+ the dtsi
+In-Reply-To: <CAGb2v67ftGhjPHjHKQ0iYnOeRbi5qcqyT2P1gePW=UoMm5QRig@mail.gmail.com>
+References: <1454542430-16572-1-git-send-email-k@japko.eu>
+ <1454542430-16572-5-git-send-email-k@japko.eu>
+ <CAGb2v67ftGhjPHjHKQ0iYnOeRbi5qcqyT2P1gePW=UoMm5QRig@mail.gmail.com>
+Message-ID: <20160208083912.GF12071@box2.japko.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 7, 2016 at 10:13 PM, Andreas F?rber <afaerber@suse.de> wrote:
-> As preparation for arm64 based mesongxbb, which pulls in this code once
-> enabling ARCH_MESON, fix a size_t vs. unsigned int type mismatch.
-> The loop uses a local unsigned int variable, so adopt that type,
-> matching the header.
+On Fri, Feb 05, 2016 at 05:46:32PM +0800, Chen-Yu Tsai wrote:
+>On Thu, Feb 4, 2016 at 7:33 AM, Krzysztof Adamski <k@japko.eu> wrote:
+>> Add the corresponding device node for R_PIO on H3 to the dtsi. Support
+>> for the controller was added in earlier commit.
+>>
+>> Signed-off-by: Krzysztof Adamski <k@japko.eu>
+>> ---
+>>  arch/arm/boot/dts/sun8i-h3.dtsi | 12 ++++++++++++
+>>  1 file changed, 12 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+>> index bb37f52..f618a95 100644
+>> --- a/arch/arm/boot/dts/sun8i-h3.dtsi
+>> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+>> @@ -517,5 +517,17 @@
+>>                         compatible = "allwinner,sun6i-a31-clock-reset";
+>>                         #reset-cells = <1>;
+>>                 };
+>> +
+>> +               r_pio: pinctrl at 01f02c00 {
+>> +                       compatible = "allwinner,sun8i-h3-r-pinctrl";
+>> +                       reg = <0x01f02c00 0x400>;
+>> +                       interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
+>> +                       clocks = <&apb0_gates 0>;
+>> +                       resets = <&apb0_reset 0>;
+>> +                       gpio-controller;
+>> +                       #gpio-cells = <3>;
+>> +                       interrupt-controller;
+>> +                       #interrupt-cells = <2>;
 >
-> Fixes: 7a29a869434e ("clk: meson: Add support for Meson clock controller")
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> ---
->  drivers/clk/meson/clkc.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/clk/meson/clkc.c b/drivers/clk/meson/clkc.c
-> index c83ae1367abc..d920d410b51d 100644
-> --- a/drivers/clk/meson/clkc.c
-> +++ b/drivers/clk/meson/clkc.c
-> @@ -198,7 +198,7 @@ meson_clk_register_fixed_rate(const struct clk_conf *clk_conf,
->  }
->
->  void __init meson_clk_register_clks(const struct clk_conf *clk_confs,
-> -                                   size_t nr_confs,
-> +                                   unsigned int nr_confs,
->                                     void __iomem *clk_base)
->  {
->         unsigned int i;
+>This should be 3: bank number + pin number + flags.
+>The rest looks good.
 
-Nit: I'd prefer to fix declaration in drivers/clk/meson/clkc.h with
-size_t since we are going to use it for array indexing.
-
-Also please, CC linux-meson at googlegroups.com on meson related patches.
-
-Thanks!
-
--- 
-Carlo Caione
+Nicly spotted. I took it from pio description in the same file. So 
+there's a bug there too.
