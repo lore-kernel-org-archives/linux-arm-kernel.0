@@ -1,17 +1,16 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 8 Feb 2016 13:36:45 -0800
-Subject: [PATCH] ARM: integrator: remove redundant select in Kconfig
-In-Reply-To: <1454693920-14794-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1454693920-14794-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20160208213645.GE25468@localhost>
+Date: Mon, 8 Feb 2016 13:37:05 -0800
+Subject: [PATCH] ARM: netx: remove redundant "depends on ARCH_NETX"
+In-Reply-To: <1454694197-15200-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1454694197-15200-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <20160208213705.GF25468@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 06, 2016 at 02:38:40AM +0900, Masahiro Yamada wrote:
-> All of these are already select'ed by ARCH_MULTIPLATFORM.
+On Sat, Feb 06, 2016 at 02:43:17AM +0900, Masahiro Yamada wrote:
+> These options already reside inside the ARCH_NETX-dependent menu.
 > 
 > Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
 
 Thanks, applied to next/cleanup.
 
