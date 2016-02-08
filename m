@@ -1,43 +1,26 @@
-From: thomas@schloeter.net (=?utf-8?Q?Thomas_Schl=C3=B6ter?=)
-Date: Mon, 8 Feb 2016 19:49:27 +0100
-Subject: net: mv643xx: interface does not transmit after some time
-In-Reply-To: <A21B89D4-5826-4F97-A1C9-E62E5B724082@schloeter.net>
-References: <E4F9E0D0-9DA8-4E33-9F89-B49E47F11CE0@schloeter.net>
- <20160206183414.GD17218@lunn.ch> <20160206231935.GA30734@jirafa.cyrius.com>
- <2ACB3A0B-DD51-43C1-A56E-E7C175645554@schloeter.net>
- <20160207203545.GB29107@lunn.ch>
- <A21B89D4-5826-4F97-A1C9-E62E5B724082@schloeter.net>
-Message-ID: <312E318A-CAE1-45B1-AB13-EA147B48E315@schloeter.net>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 8 Feb 2016 12:54:09 -0600
+Subject: [PATCH v4 1/8] dt-bindings: Add a binding for Mediatek Video
+ Processor
+In-Reply-To: <1454585703-42428-2-git-send-email-tiffany.lin@mediatek.com>
+References: <1454585703-42428-1-git-send-email-tiffany.lin@mediatek.com>
+ <1454585703-42428-2-git-send-email-tiffany.lin@mediatek.com>
+Message-ID: <20160208185409.GA14017@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> Am 07.02.2016 um 22:07 schrieb Thomas Schl?ter <thomas@schloeter.net>:
+On Thu, Feb 04, 2016 at 07:34:56PM +0800, Tiffany Lin wrote:
+> From: Andrew-CT Chen <andrew-ct.chen@mediatek.com>
 > 
-> Am 07.02.2016 um 21:35 schrieb Andrew Lunn <andrew@lunn.ch>:
->> 
->>>> FWIW, we had a similar bug report in Debian recently:
->>>> https://lists.debian.org/debian-arm/2016/01/msg00098.html
->> 
->> Hi Thomas
->> 
->> I this thread, Ian Campbell mentions a patch. Please could you try
->> that patch and see if it fixes your problem.
->> 
->> Thanks
->> 	Andrew
+> Add a DT binding documentation of Video Processor Unit for the
+> MT8173 SoC from Mediatek.
 > 
-> Hi Andrew,
 > 
-> I just applied the patch and the NAS is now running it. I?ll try to crash it tonight and keep you informed whether it worked.
-> 
-> Thanks
-> 	Thomas
+> Signed-off-by: Andrew-CT Chen <andrew-ct.chen@mediatek.com>
+> Signed-off-by: Tiffany Lin <tiffany.lin@mediatek.com>
+> ---
+>  .../devicetree/bindings/media/mediatek-vpu.txt     |   31 ++++++++++++++++++++
+>  1 file changed, 31 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/media/mediatek-vpu.txt
 
-Hi Andrew,
-
-the patch did not fix the problem. After 1.2 GiB RX and 950 MiB TX, the interface crashed again.
-
-Now I switched off RX/TX offload just to make sure we are talking about the same problem. If we are, the interface should be stable without offload, right?
-
-	Thomas
+Acked-by: Rob Herring <robh@kernel.org>
