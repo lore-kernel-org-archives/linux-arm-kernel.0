@@ -1,28 +1,28 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 8 Feb 2016 16:51:22 +0300
-Subject: [PATCH 5/6] net: thunderx: bgx: Add log message when setting mac
- address
-In-Reply-To: <87vb5z1fd6.fsf@nemi.mork.no>
-References: <1454933272-45005-1-git-send-email-sunil.kovvuri@gmail.com>
- <1454933272-45005-6-git-send-email-sunil.kovvuri@gmail.com>
- <56B8987D.7000901@cogentembedded.com> <87vb5z1fd6.fsf@nemi.mork.no>
-Message-ID: <56B89D5A.8070503@cogentembedded.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 08 Feb 2016 14:55:11 +0100
+Subject: [RFC PATCH 0/4] Add ACPI support for HiSilicon PCIe Host
+ Controllers
+In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E1ECAC944@lhreml503-mbs>
+References: <1454585860-60709-1-git-send-email-gabriele.paoloni@huawei.com>
+ <1930535.mkCdtpUWq7@wuerfel>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1ECAC944@lhreml503-mbs>
+Message-ID: <7297343.ktGck3KQJN@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/08/2016 04:49 PM, Bj?rn Mork wrote:
+On Monday 08 February 2016 13:17:58 Gabriele Paoloni wrote:
+> 
+> Now I have removed the dependency from designware but I still think
+> the best location for the code is in "drivers/pci/host/":
+> the ACPI quirks share the config read/write functions with the DT
+> driver, moreover for other hosts in future I think it makes sense
+> to stay in "drivers/pci/host/" as they could even share more init
+> code with their respective DT versions...
 
->>     dev_er(), maybe?
->
-> I like that!
->
-> It's often hard to know whether to print something or be quiet.
-> pr_er(), dev_er(), netdev_er() etc would be the perfect solution to that
-> problem.
+I haven't really followed what is going on with ACPI. Do you expect
+to see future machines come out that are not just implementing SBSA
+but that still need to run ACPI? I thought this was just a hack
+for some early machines that only run with ACPI but are not actually
+compliant.
 
-    :-D
-    Sorry for the typo...
-
-> Bj?rn
-
-MBR, Sergei
+	Arnd
