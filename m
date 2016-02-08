@@ -1,42 +1,49 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Mon,  8 Feb 2016 10:16:05 +0100
-Subject: [PATCH 0/6] irqchip: introduce the Alpine MSIX driver
-Message-ID: <1454922971-17405-1-git-send-email-antoine.tenart@free-electrons.com>
+Date: Mon,  8 Feb 2016 10:16:07 +0100
+Subject: [PATCH 2/6] Documentation: bindings: document the Alpine MSIX driver
+In-Reply-To: <1454922971-17405-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1454922971-17405-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1454922971-17405-3-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Following the addition of the Alpine MSIX driver, this patch adds the
+corresponding bindings documentation.
 
-This series introduce the Alpine MSIX driver, and enables it in both
-the Alpine v1 and Alpine v2 device trees.
-
-This series depends on "[PATCH 0/3] arm64: introduce the Alpine support":
-https://lkml.org/lkml/2016/2/8/75
-
-You can find the series at:
-https://github.com/atenart/linux.git 4.5-rc1/alpinev2-msix
-
-Antoine
-
-Antoine Tenart (6):
-  irqchip: add the Alpine MSIX interrupt controller
-  Documentation: bindings: document the Alpine MSIX driver
-  arm64: dts: alpine: add the MSIX node in the Alpine v2 dtsi
-  ARM: dts: alpine: add the MSIX node
-  arm64: alpine: select the Alpine MSI controller driver
-  arm: alpine: select the Alpine MSI controller driver
-
- .../interrupt-controller/al,alpine-msix.txt        |  22 ++
- arch/arm/boot/dts/alpine.dtsi                      |  10 +
- arch/arm/mach-alpine/Kconfig                       |   1 +
- arch/arm64/Kconfig.platforms                       |   1 +
- arch/arm64/boot/dts/al/alpine-v2.dtsi              |  10 +
- drivers/irqchip/Kconfig                            |   6 +
- drivers/irqchip/Makefile                           |   1 +
- drivers/irqchip/irq-alpine-msi.c                   | 297 +++++++++++++++++++++
- 8 files changed, 348 insertions(+)
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+Signed-off-by: Tsahee Zidenberg <tsahee@annapurnalabs.com>
+---
+ .../interrupt-controller/al,alpine-msix.txt        | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/al,alpine-msix.txt
- create mode 100644 drivers/irqchip/irq-alpine-msi.c
 
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/al,alpine-msix.txt b/Documentation/devicetree/bindings/interrupt-controller/al,alpine-msix.txt
+new file mode 100644
+index 000000000000..a77d5a76e8d5
+--- /dev/null
++++ b/Documentation/devicetree/bindings/interrupt-controller/al,alpine-msix.txt
+@@ -0,0 +1,22 @@
++Alpine MSIX controller
++
++Required properties:
++
++- compatible: should be "al,alpine-msix"
++- reg: physical base address and size of the registers
++- interrupt-controller: identifies the node as an interrupt controller
++- msi-controller: identifies the node as an PCI Message Signaled Interrupt
++		  controller
++- al,msi-base-spi: SPI base of the MSI frame
++- al,msi-num-spis: number of SPIs assigned to the MSI frame
++
++Example:
++
++msix: msix {
++	compatible = "al,alpine-msix";
++	reg = <0x0 0xfbe00000 0x0 0x100000>;
++	interrupt-controller;
++	msi-controller;
++	al,msi-base-spi = <160>;
++	al,msi-num-spis = <160>;
++};
 -- 
 2.7.0
