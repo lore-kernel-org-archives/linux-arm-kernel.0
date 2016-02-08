@@ -1,46 +1,55 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Mon, 8 Feb 2016 16:05:01 +0100
-Subject: [PATCH 2/6] Documentation: bindings: document the Alpine MSIX
- driver
-In-Reply-To: <56B8AC7D.8060102@arm.com>
-References: <1454922971-17405-1-git-send-email-antoine.tenart@free-electrons.com>
- <1454922971-17405-3-git-send-email-antoine.tenart@free-electrons.com>
- <56B8AC7D.8060102@arm.com>
-Message-ID: <20160208150501.GA19758@kwain>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Mon, 8 Feb 2016 17:23:02 +0200
+Subject: [PATCH v4] dmaengine: edma: fix residue race for cyclic
+In-Reply-To: <87k2mu2e16.fsf@linutronix.de>
+References: <87k2mu2e16.fsf@linutronix.de>
+Message-ID: <CAHp75Vc6th4OnvN1AhVY2Y5KrS+Agza87r6b=dBY97EGQ+p8kw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 08, 2016 at 02:55:57PM +0000, Marc Zyngier wrote:
-> On 08/02/16 09:16, Antoine Tenart wrote:
-> > +
-> > +Example:
-> > +
-> > +msix: msix {
-> > +	compatible = "al,alpine-msix";
-> > +	reg = <0x0 0xfbe00000 0x0 0x100000>;
-> > +	interrupt-controller;
-> > +	msi-controller;
-> > +	al,msi-base-spi = <160>;
-> > +	al,msi-num-spis = <160>;
-> > +};
-> > 
-> 
-> This example seems to rely on an implicit interrupt-parent. You probably
-> want to update the example to clarify it.
+On Thu, Jan 28, 2016 at 12:29 PM, John Ogness <john.ogness@linutronix.de> wrote:
+> When retrieving the residue value, the SRC/DST fields of the
+> active PaRAM are read to determine the current position of
+> the DMA engine. However, the AM335x Technical Reference Manual
+> states:
 
-Right. I'll add the interrupt-parent property in the required properties
-and in the example msix node.
+> +       /*
+> +        * "pos" may represent a transfer request that is still being
+> +        * processed by the EDMACC or EDMATC. We will busy wait until
+> +        * any one of the situations occurs:
+> +        *   1. the DMA hardware is idle
+> +        *   2. a new transfer request is setup
+> +        *   3. we hit the loop limit
+> +        */
+> +       while (edma_read(echan->ecc, EDMA_CCSTAT) & EDMA_CCSTAT_ACTV) {
+> +               /* check if a new transfer request is setup */
+> +               if (edma_get_position(echan->ecc,
+> +                                     echan->slot[0], dst) != pos) {
+> +                       break;
+> +               }
+> +
+> +               if (!--loop_count) {
 
-Antoine
+More usual pattern is
+
+while (... && --count) {
+}
+if (!count) {
+ Timeout!
+}
+
+But since it's minor and already applied, just take into consideration
+for the future.
+
+> +                       dev_dbg_ratelimited(echan->vchan.chan.device->dev,
+> +                               "%s: timeout waiting for PaRAM update\n",
+> +                               __func__);
+> +                       break;
+> +               }
+> +
+> +               cpu_relax();
+> +       }
 
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160208/ff723db7/attachment.sig>
+With Best Regards,
+Andy Shevchenko
