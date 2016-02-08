@@ -1,79 +1,40 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 8 Feb 2016 13:56:42 -0600
-Subject: [PATCH v5 3/3] pci, pci-thunder-ecam: Add driver for
- ThunderX-pass1 on-chip devices
-In-Reply-To: <1454715675-17512-4-git-send-email-ddaney.cavm@gmail.com>
-References: <1454715675-17512-1-git-send-email-ddaney.cavm@gmail.com>
- <1454715675-17512-4-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <20160208195642.GA15103@rob-hp-laptop>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 8 Feb 2016 11:57:04 -0800
+Subject: [PATCH 0/3] arm: dts: DRA7: Add IVA and DSPEVE thermal domain data
+In-Reply-To: <1454922990-7501-1-git-send-email-j-keerthy@ti.com>
+References: <1454922990-7501-1-git-send-email-j-keerthy@ti.com>
+Message-ID: <20160208195704.GW19432@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 05, 2016 at 03:41:15PM -0800, David Daney wrote:
-> From: David Daney <david.daney@cavium.com>
+* Keerthy <j-keerthy@ti.com> [160208 01:19]:
+> OMAP5 has 3 thermal zones cpu, core and multimedia.
+> On the other hand DRA7 has 5 thermal zones cpu, gpu, core, dspeve
+> and iva. Currently cpu, core and multimedia are being added via dt
+> and the other 2 are getting added via kernel. Add the missing thermal
+> domains in dt so as give the correct trip numbers, type and temperatures.
 > 
-> The cavium,pci-thunder-ecam devices are exactly ECAM based PCI root
-> complexes.  These root complexes (loosely referred to as ECAM units in
-> the hardware manuals) are used to access the Thunder on-chips devices.
-> They are special in that all the BARs on devices behind these root
-> complexes are at fixed addresses.  To handle this in a manner
-> compatible with the core PCI code, we have the config access functions
-> synthesize Enhanced Allocation (EA) capability entries for each BAR.
+> Tested on DRA7-EVM.
+
+Are these critical fixes to have for v4.5-rc cycle or can they
+wait for v4.6 merge window?
+
+Regards,
+
+Tony
+
+> Keerthy (3):
+>   arm: dts: DRA7: Add DSPEVE thermal data
+>   arm: dts: DRA7: Add IVA thermal data
+>   arm: dts: DRA7: Add missing IVA and DSPEVE thermal domain data
 > 
-> Since this EA synthesis is needed for exactly one chip model, we can
-> hard code some assumptions about the device topology and the
-> properties of specific DEVFNs in the driver.
+>  arch/arm/boot/dts/dra7-dspeve-thermal.dtsi | 27 +++++++++++++++++++++++++++
+>  arch/arm/boot/dts/dra7-iva-thermal.dtsi    | 27 +++++++++++++++++++++++++++
+>  arch/arm/boot/dts/dra7.dtsi                |  2 ++
+>  3 files changed, 56 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/dra7-dspeve-thermal.dtsi
+>  create mode 100644 arch/arm/boot/dts/dra7-iva-thermal.dtsi
 > 
-> Signed-off-by: David Daney <david.daney@cavium.com>
-> ---
->  .../devicetree/bindings/pci/pci-thunder-ecam.txt   |  30 ++
->  drivers/pci/host/Kconfig                           |   7 +
->  drivers/pci/host/Makefile                          |   1 +
->  drivers/pci/host/pci-thunder-ecam.c                | 358 +++++++++++++++++++++
->  4 files changed, 396 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pci/pci-thunder-ecam.txt
->  create mode 100644 drivers/pci/host/pci-thunder-ecam.c
+> -- 
+> 1.9.1
 > 
-> diff --git a/Documentation/devicetree/bindings/pci/pci-thunder-ecam.txt b/Documentation/devicetree/bindings/pci/pci-thunder-ecam.txt
-> new file mode 100644
-> index 0000000..34658f2
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pci/pci-thunder-ecam.txt
-> @@ -0,0 +1,30 @@
-> +* ThunderX PCI host controller for pass-1.x silicon
-> +
-> +Firmware-initialized PCI host controller to on-chip devices found on
-> +some Cavium ThunderX processors.  These devices have ECAM based config
-> +access, but the BARs are all at fixed addresses.  We handle the fixed
-> +addresses by synthesizing Enhanced Allocation (EA) capabilities for
-> +these devices.
-> +
-> +The properties and their meanings are identical to those described in
-> +host-generic-pci.txt except as listed below.
-> +
-> +Properties of the host controller node that differ from
-> +host-generic-pci.txt:
-> +
-> +- compatible     : Must be "cavium,pci-host-thunder-ecam"
-> +
-> +Example:
-> +
-> +	pci at 84b0,00000000 {
-
-Drop the comma, and the node name should be "pcie".
-
-Otherwise,
-
-Acked-by: Rob Herring <robh@kernel.org>
-
-> +		compatible = "cavium,pci-host-thunder-ecam";
-> +		device_type = "pci";
-> +		msi-parent = <&its>;
-> +		msi-map = <0 &its 0x30000 0x10000>;
-> +		bus-range = <0 31>;
-> +		#size-cells = <2>;
-> +		#address-cells = <3>;
-> +		#stream-id-cells = <1>;
-> +		reg = <0x84b0 0x00000000 0 0x02000000>;  /* Configuration space */
-> +		ranges = <0x03000000 0x8180 0x00000000 0x8180 0x00000000 0x80 0x00000000>; /* mem ranges */
-> +	};
