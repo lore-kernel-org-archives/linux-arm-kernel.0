@@ -1,42 +1,75 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 08 Feb 2016 15:23:49 +0100
-Subject: [GIT PULL] ARM: mvebu: drivers for v4.6 (#1)
-Message-ID: <874mdj2scq.fsf@free-electrons.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 8 Feb 2016 09:24:39 -0500
+Subject: [PATCH V14 0/9] dma: add Qualcomm Technologies HIDMA driver
+In-Reply-To: <20160208101432.GA1150@cbox>
+References: <1454646882-24369-1-git-send-email-okaya@codeaurora.org>
+ <20160208101432.GA1150@cbox>
+Message-ID: <56B8A527.7010206@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Here is the first pull request for drivers for mvebu for v4.6.
+On 2/8/2016 5:14 AM, Christoffer Dall wrote:
+> Hi Sinan,
+> 
+> On Thu, Feb 04, 2016 at 11:34:31PM -0500, Sinan Kaya wrote:
+>> The Qualcomm Technologies HIDMA device has been designed
+>> to support virtualization technology. The driver has been
+>> divided into two to follow the hardware design.
+>>
+>> 1. HIDMA Management driver
+>> 2. HIDMA Channel driver
+>>
+>> Each HIDMA HW consists of multiple channels. These channels
+>> share some set of common parameters. These parameters are
+>> initialized by the management driver during power up.
+>> Same management driver is used for monitoring the execution
+>> of the channels. Management driver can change the performance
+>> behavior dynamically such as bandwidth allocation and
+>> prioritization in the future.
+>>
+>> The management driver is executed in host context and
+>> is the main management entity for all channels provided by
+>> the device.
+> 
+> I'm not at all familiar with this kind of hardware.
+> 
 
-Gregory
+Let me help. 
 
-The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
+> Once an entity (userspace or VM) has a HIDAM channel assigned via VFIO,
+> how does it use it?  
 
-  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+HIDMA is a HW accelerator for memory operations like memcpy and memset. It fits
+into the DMA engine framework.
 
-are available in the git repository at:
+There are two classes of DMA HW. These are slave DMA and standalone DMA. Slave DMA
+is generally related to another piece of HW that needs DMA for moving data. 
+Standalone DMA is intended for OS/CPU consumption not HW. These can be used to offload
+crypto operations (XOR) or other memory transactions (memcpy and memset) that are
+lengthy. 
 
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-drivers-4.6-1
+Once the HIDMA channel is assigned to the guest machine, guest operating system uses the
+DMA channel to offload memory operations as HIDMA only supports memcpy. 
 
-for you to fetch changes up to 1e78dbe717b1668e1660556930d952447c7c1197:
+IOMMU HW provides the isolation from the rest of the host kernel or from other guest machines.
 
-  ARM: orion: implement ARM delay timer (2016-01-27 10:50:17 +0100)
+> Is it used in relation with another device to
+> perform DMA on its behalf or is a HIDMA channel something that's useful
+> on its own?
 
-----------------------------------------------------------------
-mvebu driver for 4.6 (part 1)
+It is standalone only. The relationship you are referring to is known as slave DMA engine. 
+HIDMA does not support slave DMA. HIDMA only supports memcpy and memset in HW and only memcpy in SW
+as the memset support has been removed from the kernel long time ago.
 
-implement ARM delay timer for orion
+> 
+> Thanks,
+> -Christoffer
+> 
 
-----------------------------------------------------------------
-Russell King (1):
-      ARM: orion: implement ARM delay timer
 
- arch/arm/plat-orion/time.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
-
---
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+-- 
+Sinan Kaya
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
