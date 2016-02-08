@@ -1,43 +1,72 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 8 Feb 2016 18:46:25 +0530
-Subject: [PATCH RFC] Add cpufreq support
-In-Reply-To: <22002072.L04zy0K2AP@wuerfel>
-References: <56B4D4BE.2040008@free.fr> <45004963.Im3DmqJ5ez@wuerfel>
- <20160208124127.GF8294@vireshk> <22002072.L04zy0K2AP@wuerfel>
-Message-ID: <20160208131625.GI8294@vireshk>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Mon, 8 Feb 2016 13:17:58 +0000
+Subject: [RFC PATCH 0/4] Add ACPI support for HiSilicon PCIe Host
+ Controllers
+In-Reply-To: <1930535.mkCdtpUWq7@wuerfel>
+References: <1454585860-60709-1-git-send-email-gabriele.paoloni@huawei.com>
+ <76564455.dlc1WHiVY2@wuerfel>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1EC9EF4B@lhreml503-mbs>
+ <1930535.mkCdtpUWq7@wuerfel>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1ECAC944@lhreml503-mbs>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08-02-16, 14:10, Arnd Bergmann wrote:
-> I don't remember the exact discussion, but the compatible string is
-> exactly meant to do one thing: it tells you what you can or cannot do
-> with one device.
+> -----Original Message-----
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: 04 February 2016 17:02
+> To: Gabriele Paoloni
+> Cc: Guohanjun (Hanjun Guo); Wangzhou (B); liudongdong (C); Linuxarm;
+> qiujiang; bhelgaas at google.com; Lorenzo.Pieralisi at arm.com;
+> tn at semihalf.com; zhangjukuo; xuwei (O); Liguozhu (Kenneth); linux-
+> pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
+> acpi at vger.kernel.org; linux-kernel at vger.kernel.org; jcm at redhat.com
+> Subject: Re: [RFC PATCH 0/4] Add ACPI support for HiSilicon PCIe Host
+> Controllers
+> 
+> On Thursday 04 February 2016 16:44:12 Gabriele Paoloni wrote:
+> > Effectively the ACPI version of the HiSilicon driver does not rely on
+> > Designware as much as the DT version (that calls
+> dw_pcie_host_init());
+> > however in order to do what you suggest I'd need to copy and paste
+> and
+> > modify dw_pcie_rd_conf and dw_pcie_wr_conf.
+> > Also I'd need to declare duplicate version of the functions in
+> > pcie-hisi-common.c (if I do not want to split the object across
+> > different paths "drivers/pci/host" and "drivers/acpi/")
+> >
+> > Now I can do it but I thought it was more correct to pass
+> &dw_pcie_ops
+> > as input pointer in DECLARE_ACPI_MCFG_FIXUP(); this is also because
+> maybe in
+> > future other Designware based controllers may need to support ACPI
+> and it
+> > would be easier for them to reuse their DT based driver functions
+> >
+> > Honestly I am a bit confused...
+> >
+> 
+> I don't think you can use the dw_pcie_ops as-is anyway, as they in
+> turn rely on the device driver structure, and you also don't need
+> those as they seem to be written for the generic case of a 32-bit
+> architecture that does not have enough space to map the entire
+> config space into MMIO. Just set up all those mapping registers from
+> the firmware and pass the config space base address as you'd normally
+> do on ACPI.
 
-Yeah, and many people argued that we can't add two values to that
-string like: "cpufreq-dt" and "cpufreq-big-little" for same kind of
-OPP bindings, as a different compatible string should be required only
-if there is a difference in the bindings.
+Hi Arnd
 
-For example, if a platform (like ST did recently) adds more
-platform-specific properties, then they can define a new value of
-those strings.
+I have now sent out patchset v2.
 
-> I had not realized that we don't even have a compatible string
-> for opp-v2, so if we are missing that, we obviously can't compare
-> against that string.
+Now I have removed the dependency from designware but I still think
+the best location for the code is in "drivers/pci/host/":
+the ACPI quirks share the config read/write functions with the DT
+driver, moreover for other hosts in future I think it makes sense
+to stay in "drivers/pci/host/" as they could even share more init
+code with their respective DT versions...
 
-The binding says that we can have a string, but its not compulsory
-yet. Its only used by STM as they have some specific properties of
-their own.
+Cheers
 
-> I thought there was a compatible property in there that told us
-> whether the operating-points-v2/cooling-min-level/#cooling-cells/...
-> properties were considered valid.
+Gab
 
-Yeah, "OPP-v2" DT node can have a compatible string, which isn't
-compulsory as of now, but because of the reasons mentioned earlier, we
-can't use it to differentiate between drivers that use exactly same
-version of bindings.
-
--- 
-viresh
+> 
+> 	Arnd
