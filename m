@@ -1,92 +1,32 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Mon, 8 Feb 2016 17:21:27 +0000
-Subject: [RFC PATCH v2 2/3] PCI: hisi: Make the HiSilicon PCIe host
- controller ECAM compliant
-In-Reply-To: <2599997.xBRrI3qHak@wuerfel>
-References: <1454935264-6076-1-git-send-email-gabriele.paoloni@huawei.com>
- <3532826.pJr5R5Xa4c@wuerfel>
- <EE11001F9E5DDD47B7634E2F8A612F2E1ECACF44@lhreml503-mbs>
- <2599997.xBRrI3qHak@wuerfel>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1ECAD436@lhreml503-mbs>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Mon, 8 Feb 2016 18:23:16 +0100
+Subject: [PATCH] pinctrl: stm32: fix compile error and modernize
+In-Reply-To: <1454712568-6301-1-git-send-email-linus.walleij@linaro.org>
+References: <1454712568-6301-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <CALszF6CYa50SZGys4KmCxkRa0Kp6n1OHdRPUA9C+Lj7erSBjWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd
+2016-02-05 23:49 GMT+01:00 Linus Walleij <linus.walleij@linaro.org>:
+> - Fix the dev->parent assignment compile error
+> - Use gpiochip_get_data() to get the data pointer for the
+>   banks
+>
+> Cc: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+> Cc: Patrice Chotard <patrice.chotard@st.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> I don't even know how to compile test this, I hope it works,
+> Maxime can you verify?
 
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: 08 February 2016 16:30
-> To: Gabriele Paoloni
-> Cc: linux-arm-kernel at lists.infradead.org; Guohanjun (Hanjun Guo);
-> Wangzhou (B); liudongdong (C); Linuxarm; qiujiang; bhelgaas at google.com;
-> Lorenzo.Pieralisi at arm.com; tn at semihalf.com; linux-pci at vger.kernel.org;
-> linux-kernel at vger.kernel.org; xuwei (O); linux-acpi at vger.kernel.org;
-> jcm at redhat.com; zhangjukuo; Liguozhu (Kenneth)
-> Subject: Re: [RFC PATCH v2 2/3] PCI: hisi: Make the HiSilicon PCIe host
-> controller ECAM compliant
-> 
-> On Monday 08 February 2016 15:55:35 Gabriele Paoloni wrote:
-> > > Doesn't this break backwards compatibility?
-> >
-> > Well Hip05/Hip06 SoCs are used into evaluation boards
-> > For the Estuary project.
-> >
-> > https://github.com/hisilicon/estuary
-> >
-> > As this new driver gets upstream we'll merge this new driver into
-> estuary
-> > and release a new version of the firmware to support it.
-> 
-> So what happens to folks running the old firmware then?
+Thanks Linus, I just tested your patch with success:
+Tested-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
 
-So far we haven't released the PCIe nodes dtsi upstream and we think
-we can handle the firmware upgrade for our current users either
-by pointing them to the updated Estuary branch or by internal 
-channels  
+About the compile testing, I have identified the problem last week,
+and sent a v5 of the series.
+I will discard this series, and will send you a patch that fixes
+compile testing,
+and also unneeded dependency with DT bindings header file.
 
-> 
-> > > I think you need to use a new compatible string in the firmware
-> > > if you change the register layout, and then change the driver
-> > > to support both the old and the new layout.
-> >
-> > You are right, for some reason in this patchset I missed the
-> Documentation
-> > update that I posted in the previous one, i.e.:
-> >
-> > --- a/Documentation/devicetree/bindings/pci/hisilicon-pcie.txt
-> > +++ b/Documentation/devicetree/bindings/pci/hisilicon-pcie.txt
-> > @@ -23,8 +23,8 @@ Optional properties:
-> >  Hip05 Example (note that Hip06 is the same except compatible):
-> >         pcie at 0xb0080000 {
-> >                 compatible = "hisilicon,hip05-pcie", "snps,dw-pcie";
-> > -               reg = <0 0xb0080000 0 0x10000>, <0x220 0x00000000 0
-> 0x2000>;
-> > -               reg-names = "rc_dbi", "config";
-> > +               reg = <0 0xb0080000 0 0x10000>, <0x220 0x00100000 0
-> 0x0f00000>;
-> > +               reg-names = "rc_dbi", "ecam-cfg";
-> >
-> 
-> That is not the compatible string, it's an undocumented register set.
-
-Sorry, I misunderstood here, got it now :)
-
-> You can either define the a new compatible string that gives the
-> "config"
-> registers a new meaning, or you change the binding to allow two either
-> a "config" or an "ecam-cfg" register set, and let the driver handle
-> both.
-
-As per reply above I think that it would be quite easy for us to
-let out current users update the BIOS so I don't think there is any
-value in maintaining two version of the drivers one of which will
-not be used.
-
-What do you think?
-
-Thanks
-
-Gab
-
-> 
-> 	Arnd
+Regards,
+Maxime
