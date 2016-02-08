@@ -1,127 +1,95 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  8 Feb 2016 11:40:20 +0000
-Subject: [PATCH 6/8] KVM: arm/arm64: timer: Add active state caching
-In-Reply-To: <1454931622-14902-1-git-send-email-marc.zyngier@arm.com>
-References: <1454931622-14902-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1454931622-14902-7-git-send-email-marc.zyngier@arm.com>
+Date: Mon,  8 Feb 2016 11:40:14 +0000
+Subject: [PATCH 0/8] KVM/ARM: Guest Entry/Exit optimizations
+Message-ID: <1454931622-14902-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Programming the active state in the (re)distributor can be an
-expensive operation so it makes some sense to try and reduce
-the number of accesses as much as possible. So far, we
-program the active state on each VM entry, but there is some
-opportunity to do less.
+I've recently been looking at our entry/exit costs, and profiling
+figures did show some very low hanging fruits.
 
-An obvious solution is to cache the active state in memory,
-and only program it in the HW when conditions change. But
-because the HW can also change things under our feet (the active
-state can transition from 1 to 0 when the guest does an EOI),
-some precautions have to be taken, which amount to only caching
-an "inactive" state, and always programing it otherwise.
+The most obvious cost is that accessing the GIC HW is slow. As in
+"deadly slow", specially when GICv2 is involved. So not hammering the
+HW when there is nothing to write is immediately beneficial, as this
+is the most common cases (whatever people seem to think, interrupts
+are a *rare* event).
 
-With this in place, we observe a reduction of around 700 cycles
-on a 2GHz GICv2 platform for a NULL hypercall.
+Another easy thing to fix is the way we handle trapped system
+registers. We do insist on (mostly) sorting them, but we do perform a
+linear search on trap. We can switch to a binary search for free, and
+get immediate benefits (the PMU code, being extremely trap-happy,
+benefits immediately from this).
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/kvm/arm.c           |  1 +
- include/kvm/arm_arch_timer.h |  5 +++++
- virt/kvm/arm/arch_timer.c    | 31 +++++++++++++++++++++++++++++++
- 3 files changed, 37 insertions(+)
+With these in place, I see an improvement of 20 to 30% (depending on
+the platform) on our world-switch cycle count when running a set of
+hand-crafted guests that are designed to only perform traps.
 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index dda1959..af7c1a3 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -320,6 +320,7 @@ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
- 	vcpu->cpu = -1;
- 
- 	kvm_arm_set_running_vcpu(NULL);
-+	kvm_timer_vcpu_put(vcpu);
- }
- 
- int kvm_arch_vcpu_ioctl_get_mpstate(struct kvm_vcpu *vcpu,
-diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
-index 1800227..b651aed 100644
---- a/include/kvm/arm_arch_timer.h
-+++ b/include/kvm/arm_arch_timer.h
-@@ -55,6 +55,9 @@ struct arch_timer_cpu {
- 
- 	/* VGIC mapping */
- 	struct irq_phys_map		*map;
-+
-+	/* Active IRQ state caching */
-+	bool				active_cleared_last;
- };
- 
- int kvm_timer_hyp_init(void);
-@@ -74,4 +77,6 @@ bool kvm_timer_should_fire(struct kvm_vcpu *vcpu);
- void kvm_timer_schedule(struct kvm_vcpu *vcpu);
- void kvm_timer_unschedule(struct kvm_vcpu *vcpu);
- 
-+void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu);
-+
- #endif
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 69bca18..bfec447 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -34,6 +34,11 @@ static struct timecounter *timecounter;
- static struct workqueue_struct *wqueue;
- static unsigned int host_vtimer_irq;
- 
-+void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
-+{
-+	vcpu->arch.timer_cpu.active_cleared_last = false;
-+}
-+
- static cycle_t kvm_phys_timer_read(void)
- {
- 	return timecounter->cc->read(timecounter->cc);
-@@ -130,6 +135,7 @@ static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level)
- 
- 	BUG_ON(!vgic_initialized(vcpu->kvm));
- 
-+	timer->active_cleared_last = false;
- 	timer->irq.level = new_level;
- 	trace_kvm_timer_update_irq(vcpu->vcpu_id, timer->map->virt_irq,
- 				   timer->irq.level);
-@@ -242,10 +248,35 @@ void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
- 	else
- 		phys_active = false;
- 
-+	/*
-+	 * We want to avoid hitting the (re)distributor as much as
-+	 * possible, as this is a potentially expensive MMIO access
-+	 * (not to mention locks in the irq layer), and a solution for
-+	 * this is to cache the "active" state in memory.
-+	 *
-+	 * Things to consider: we cannot cache an "active set" state,
-+	 * because the HW can change this behind our back (it becomes
-+	 * "clear" in the HW). We must then restrict the caching to
-+	 * the "clear" state.
-+	 *
-+	 * The cache is invalidated on:
-+	 * - vcpu put, indicating that the HW cannot be trusted to be
-+	 *   in a sane state on the next vcpu load,
-+	 * - any change in the interrupt state
-+	 *
-+	 * Usage conditions:
-+	 * - cached value is "active clear"
-+	 * - value to be programmed is "active clear"
-+	 */
-+	if (timer->active_cleared_last && !phys_active)
-+		return;
-+
- 	ret = irq_set_irqchip_state(timer->map->irq,
- 				    IRQCHIP_STATE_ACTIVE,
- 				    phys_active);
- 	WARN_ON(ret);
-+
-+	timer->active_cleared_last = !phys_active;
- }
- 
- /**
+Methodology:
+
+* NULL-hypercall guest: Perform 65536 PSCI_0_2_FN_PSCI_VERSION calls,
+and then a power-off:
+
+__start:
+	mov	x19, #(1 << 16)
+1:	mov	x0, #0x84000000
+	hvc	#0
+	sub	x19, x19, #1
+	cbnz	x19, 1b
+	mov	x0, #0x84000000
+	add	x0, x0, #9
+	hvc	#0
+	b	.
+
+* sysreg trap guest: Perform 2^20 PMSELR_EL0 accesses, and power-off:
+
+__start:
+	mov	x19, #(1 << 20)
+1:	mrs	x0, PMSELR_EL0
+	sub	x19, x19, #1
+	cbnz	x19, 1b
+	mov	x0, #0x84000000
+	add	x0, x0, #9
+	hvc	#0
+	b	.
+
+* These guests are profiled using perf and kvmtool:
+
+taskset -c 1 perf stat -e cycles:kh lkvm run -c1 --kernel do_sysreg.bin 2>&1 >/dev/null| grep cycles
+
+The result is then divided by the number of iterations (2^16 or 2^20).
+
+These tests have been run on Seattle, Mustang, and LS2085, and shown
+significant improvements in all cases. I've only touched the arm64
+GIC code, but obviously the 32bit code should use it as well once
+we've migrated it to C.
+
+I've pushed out a branch (kvm-arm64/suck-less) to the usual location.
+
+Thanks,
+
+	M.
+
+Marc Zyngier (8):
+  arm64: KVM: Switch the sys_reg search to be a binary search
+  ARM: KVM: Properly sort the invariant table
+  ARM: KVM: Enforce sorting of all CP tables
+  ARM: KVM: Rename struct coproc_reg::is_64 to is_64bit
+  ARM: KVM: Switch the CP reg search to be a binary search
+  KVM: arm/arm64: timer: Add active state caching
+  KVM: arm/arm64: Avoid accessing GICH registers
+  KVM: arm64: Avoid accessing ICH registers
+
+ arch/arm/kvm/arm.c              |   1 +
+ arch/arm/kvm/coproc.c           |  74 ++++++-----
+ arch/arm/kvm/coproc.h           |   8 +-
+ arch/arm64/kvm/hyp/vgic-v2-sr.c |  71 +++++++---
+ arch/arm64/kvm/hyp/vgic-v3-sr.c | 288 ++++++++++++++++++++++++----------------
+ arch/arm64/kvm/sys_regs.c       |  40 +++---
+ include/kvm/arm_arch_timer.h    |   5 +
+ include/kvm/arm_vgic.h          |   8 +-
+ virt/kvm/arm/arch_timer.c       |  31 +++++
+ virt/kvm/arm/vgic-v3.c          |   4 +-
+ 10 files changed, 334 insertions(+), 196 deletions(-)
+
 -- 
 2.1.4
