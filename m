@@ -1,101 +1,86 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 8 Feb 2016 10:05:45 -0700
-Subject: [PATCH V2 3/6] stm class: provision for statically assigned
- masterIDs
-In-Reply-To: <87twlj49k7.fsf@ashishki-desk.ger.corp.intel.com>
-References: <1454487337-30184-1-git-send-email-zhang.chunyan@linaro.org>
- <1454487337-30184-4-git-send-email-zhang.chunyan@linaro.org>
- <87mvrf5ngl.fsf@ashishki-desk.ger.corp.intel.com>
- <CANLsYky2twQ98u241YyHD=atYRp1N56YVHUQNY2E2Ljsq0cseA@mail.gmail.com>
- <87twlj49k7.fsf@ashishki-desk.ger.corp.intel.com>
-Message-ID: <CANLsYkw=mG+ch8QzxmbwWs9o+mndVNo1MuqXcrPrNJYj_SQcHQ@mail.gmail.com>
+From: dirk.behme@gmail.com (Dirk Behme)
+Date: Mon, 8 Feb 2016 18:08:57 +0100
+Subject: [PATCH v2] arm64: dts: r8a7795: Add L2 cache-controller nodes
+In-Reply-To: <CAMuHMdUTUss=fR0Mdz+7tDD=RC6hufvkLC99Fp=PTiTgaSSGNA@mail.gmail.com>
+References: <1452953856-5146-1-git-send-email-dirk.behme@gmail.com>
+ <56B2370D.2010102@gmail.com> <20160205095758.GE16556@verge.net.au>
+ <CAMuHMdVRhwGh2bvfNSguX0XnMW0eEgLRTCt3Y3-+KfV0Jy9WHw@mail.gmail.com>
+ <56B857AC.4090701@de.bosch.com>
+ <CAMuHMdUTUss=fR0Mdz+7tDD=RC6hufvkLC99Fp=PTiTgaSSGNA@mail.gmail.com>
+Message-ID: <56B8CBA9.8@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 February 2016 at 06:26, Alexander Shishkin
-<alexander.shishkin@linux.intel.com> wrote:
-> Mathieu Poirier <mathieu.poirier@linaro.org> writes:
+Hi Geert,
+
+On 08.02.2016 10:01, Geert Uytterhoeven wrote:
+> Hi Dirk,
 >
->> On 5 February 2016 at 05:52, Alexander Shishkin
->> <alexander.shishkin@linux.intel.com> wrote:
->>> Chunyan Zhang <zhang.chunyan@linaro.org> writes:
->>>
->>>> From: Mathieu Poirier <mathieu.poirier@linaro.org>
+> On Mon, Feb 8, 2016 at 9:54 AM, Dirk Behme <dirk.behme@de.bosch.com> wrote:
+>> On 08.02.2016 09:42, Geert Uytterhoeven wrote:
+>>> On Fri, Feb 5, 2016 at 10:57 AM, Simon Horman <horms@verge.net.au> wrote:
+>>>> On Wed, Feb 03, 2016 at 06:21:17PM +0100, Dirk Behme wrote:
+>>>>> On 16.01.2016 15:17, Dirk Behme wrote:
+>>>>>> From: Geert Uytterhoeven <geert+renesas@glider.be>
+>>>>>>
+>>>>>> Add device nodes for the L2 caches, and link the CPU node to its L2
+>>>>>> cache node.
+>>>>>>
+>>>>>> The L2 cache for the Cortex-A57 CPU cores is 2 MiB large (organized as
+>>>>>> 128 KiB x 16 ways).
+>>>>>>
+>>>>>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>>>>>> Signed-off-by: Dirk Behme <dirk.behme@gmail.com>
 >>>>
->>>> Some architecture like ARM assign masterIDs statically at the HW design
->>>> phase, making masterID manipulation in the generic STM core irrelevant.
+>>>> [snip]
 >>>>
->>>> This patch adds a new 'mstatic' flag to struct stm_data that tells the
->>>> core that this specific STM device doesn't need explicit masterID
->>>> management.
+>>>>> Any further comments to this? If not, could this be applied?
+>>>>
+>>>> Sorry for the delay.
+>>>>
+>>>> This looks good; I have queued it up.
+>>>>
+>>>> It should appear in the next (and devel) branches of my renesas tree
+>>>> soon.
+>>>> And in linux-next whenever it includes my updated next branch.
 >>>
->>> So why do we need this patch? If your STM only has master 42 allocated
->>> for software sources, simply set sw_start = 42, sw_end = 42 and you're
->>> good to go, software will have exactly one channel to choose from. See
->>> also the comment from <linux/stm.h>:
->>
->> On ARM each source, i.e entity capable of accessing STM channels, has
->> a different master ID set in HW.  We can't assume the IDs are
->> contiguous and from a SW point of view there is no way to probe the
->> values.
->
-> Ok, it's the 'static' word that got me confused. From Mike's explanation
-> it seems to me that it's the antithesis of static; the master ID
-> assignment is so dynamic that it's not controllable by the software and
-> may or may not reflect core id, power state, phase of the moon, etc.
-
-Mike did write "master IDs are hardwired to individual cores and core
-security states", which make assignment for one platform very static.
-On the flip side those will change from one system to another.
-
->
->>>> In the core sw_start/end of masterID are set to '1',
->>>> i.e there is only one masterID to deal with.
+>>> So you not only dropped the (controversial) timing related properties, but
+>>> in addition:
 >>>
->>> This is also a completely arbitrary and unnecessary requirement. Again,
->>> you can set both to 42 and it will still work.
+>>> +               cache-unified;
+>>> +               cache-level = <2>;
+>>>
+>>> At least the "cache-level" property is marked as required in ePAPR.
+>>> For "cache-unified", the wording is not that strict in ePAPR, but that
+>>> property
+>>> depends on being a unified cache in the first place.
+>>>
+>>> So I think these two properties should be re-added.
 >>
->> True - any value will do. The important thing to remember is that on
->> ARM, there is only one masterID channel (from an STM core point of
->> view).  But we could also proceed differently, see below for more
->> details.
+>> If I remember correctly, first, these entries are not used at all on ARMv8.
+>> And second, I think it was mentioned that we therefore want to drop them:
+>>
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/394936.html
+>>
+>> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/Documentation/devicetree/bindings/arm/l2c2x0.txt?id=0bed4b7aa02c06e05121875dc443295d55b9d91d
 >
-> Well, we have the masters attribute with two numbers in it that define
-> the range of master IDs that the software can choose from. More
-> specifically to this situation:
->
->  * the number of channel ID spaces available to the SW is
->    $end - $start + 1, that is, in your case, just 1;
->  * the number of master IDs for the SW to choose from is $end - $start;
->  * if $end==$start, their actual numeric value doesn't really matter,
->    either for the policy definition or for the actual writers.
->
-> This $end==$start situation itself may be ambiguous and can be
-> interpreted either as having just one *static* master ID fixed for all
-> SW writers (what I assumed from your commit message) or as having a
-> floating master ID, which changes of its own accord and is not
-> controllable by software.
+> I believe the discussion was only about the latency properties, which are
+> documented in the l2c2x0 DT bindings, and deemed to not apply here
 
-Some clarification here.
 
-On ARM from a SW point of view $end == $start and that doesn't change
-(with regards to masterIDs) .  The ambiguity comes from the fact that
-on other platforms where masterID configuration does change and is
-important, the condition $end == $start could also be valid.
+Hmm, the two bindings cache-unified and cache-level are documented in 
+bindings/arm/l2c2x0.txt, too.
 
->From configFS, how do we tell users when masterIDs are set in HW?
-That's what I wanted to highlight with the '-1'.  Regardless of the
-solution we choose I think it is important that we inform, at the very
-least, users when masterIDs don't matter.  We could also leave thing
-as is, kill this patch and document things thoroughly.  With the
-former things are obvious.
 
->
-> These two situations are really the same thing from the perspective of
-> the system under tracing. Also, both of these situations should already
-> work if the driver sets both sw_start and sw_end to the same
-> value.
->
-> Regards,
-> --
-> Alex
+> The DT bindings documented in ePAPR are generic, and apply to all hardware,
+> unless extended or overridden by more-specific DT bindings.
+
+
+I still can't see the benefit of adding entries to the device tree 
+which are not used at all (and most probably don't make sense on that 
+platform). But if anybody has a different opinion and maybe good 
+arguments for it, that would be fine, too :)
+
+Best regards
+
+Dirk
