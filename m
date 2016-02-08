@@ -1,35 +1,48 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 08 Feb 2016 10:58:55 +0100
-Subject: [PATCH v3 1/3] reset: Make [of_]reset_control_get[_foo]
- functions wrappers
-In-Reply-To: <56B4EA46.7060905@redhat.com>
-References: <1453918516-3078-1-git-send-email-hdegoede@redhat.com>
- <1453918516-3078-2-git-send-email-hdegoede@redhat.com>
- <1454604866.3356.78.camel@pengutronix.de> <56B4EA46.7060905@redhat.com>
-Message-ID: <1454925535.3466.8.camel@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 08 Feb 2016 10:59:26 +0100
+Subject: [PATCH 4/5] drivers/pci: make host/pci-keystone-dw.c modular
+In-Reply-To: <1454889644-27830-5-git-send-email-paul.gortmaker@windriver.com>
+References: <1454889644-27830-1-git-send-email-paul.gortmaker@windriver.com>
+ <1454889644-27830-5-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <91848876.ZYig6qgHLq@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 05.02.2016, 19:30 +0100 schrieb Hans de Goede:
-[...]
-> > Even though we are device tree only at this point, I'd prefer to keep an
-> > exported function that takes a struct device argument, for example:
-> >
-> > 	return __reset_control_get(dev, id, 0);
+On Sunday 07 February 2016 19:00:43 Paul Gortmaker wrote:
+> Export the symbols that this driver requires in order for it to
+> be modular.  In addition to the one use case of a dw_pci sym, it
+> has many instances of its own ks_dw_pci syms that need exporting
+> in order to modpost w/o error.
 > 
-> I don't really see a reason to do this, this is not userspace abi or some-such
-> we can always later re-introduce an exported function which takes a device
-> argument. But if you insist, you're the boss :)
+> Cc: Murali Karicheri <m-karicheri2@ti.com>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Stanimir Varbanov <svarbanov@mm-sol.com>
+> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+> Cc: Thierry Reding <thierry.reding@gmail.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: linux-pci at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+> ---
 
-s/boss/janitor/ more like
 
-> Let me know if you really
-> want me to make this change for the next version, and I'll add it to v4 of this
-> set.
+Could we just have one module for the driver  instead of two?
 
-Leave it as is. I have a patch to add it back, and yes it looks a bit
-superfluous on its own. I'll add apply that only once its actually
-needed.
+Something like below (untested)
 
-regards
-Philipp
+	Arnd
+
+diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile
+index 7b2f20c6ccc6..0b472c680348 100644
+--- a/drivers/pci/host/Makefile
++++ b/drivers/pci/host/Makefile
+@@ -8,7 +8,8 @@ obj-$(CONFIG_PCI_RCAR_GEN2) += pci-rcar-gen2.o
+ obj-$(CONFIG_PCI_RCAR_GEN2_PCIE) += pcie-rcar.o
+ obj-$(CONFIG_PCI_HOST_GENERIC) += pci-host-generic.o
+ obj-$(CONFIG_PCIE_SPEAR13XX) += pcie-spear13xx.o
+-obj-$(CONFIG_PCI_KEYSTONE) += pci-keystone-dw.o pci-keystone.o
++obj-$(CONFIG_PCI_KEYSTONE) pci-keystone-mod.o
++pci-keystone-mod-objs := pci-keystone-dw.o pci-keystone.o
+ obj-$(CONFIG_PCIE_XILINX) += pcie-xilinx.o
+ obj-$(CONFIG_PCI_XGENE) += pci-xgene.o
+ obj-$(CONFIG_PCI_XGENE_MSI) += pci-xgene-msi.o
