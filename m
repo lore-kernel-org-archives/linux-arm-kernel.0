@@ -1,96 +1,58 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Mon, 8 Feb 2016 15:31:54 -0800
-Subject: [PATCH v5 3/3] pci,
- pci-thunder-ecam: Add driver for ThunderX-pass1 on-chip devices
-In-Reply-To: <20160208232430.GA1353@localhost>
-References: <1454715675-17512-1-git-send-email-ddaney.cavm@gmail.com>
- <1454715675-17512-4-git-send-email-ddaney.cavm@gmail.com>
- <20160208195642.GA15103@rob-hp-laptop> <56B8FED6.1050804@caviumnetworks.com>
- <CAL_JsqJNndZ59465YhpkP=dQYaijaar+LcQG4KQEJwF5e1ryLQ@mail.gmail.com>
- <56B90B09.7090500@caviumnetworks.com> <20160208221204.GA30821@localhost>
- <56B919A5.5090000@caviumnetworks.com> <20160208232430.GA1353@localhost>
-Message-ID: <56B9256A.5040106@caviumnetworks.com>
+From: gerg@uclinux.org (Greg Ungerer)
+Date: Tue, 9 Feb 2016 09:36:00 +1000
+Subject: [PATCH] ARM: ks8695: fix __initdata annotation
+In-Reply-To: <1454941509-2773774-1-git-send-email-arnd@arndb.de>
+References: <1454941509-2773774-1-git-send-email-arnd@arndb.de>
+Message-ID: <56B92660.8060203@uclinux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/08/2016 03:24 PM, Bjorn Helgaas wrote:
-> On Mon, Feb 08, 2016 at 02:41:41PM -0800, David Daney wrote:
->> On 02/08/2016 02:12 PM, Bjorn Helgaas wrote:
->>> On Mon, Feb 08, 2016 at 01:39:21PM -0800, David Daney wrote:
->>>> On 02/08/2016 01:12 PM, Rob Herring wrote:
->>>>> On Mon, Feb 8, 2016 at 2:47 PM, David Daney <ddaney@caviumnetworks.com> wrote:
->>>>>> On 02/08/2016 11:56 AM, Rob Herring wrote:
->>>>>>> On Fri, Feb 05, 2016 at 03:41:15PM -0800, David Daney wrote:
->>>>>>>> From: David Daney <david.daney@cavium.com>
->>>>>>>> +Properties of the host controller node that differ from
->>>>>>>> +host-generic-pci.txt:
->>>>>>>> +
->>>>>>>> +- compatible     : Must be "cavium,pci-host-thunder-ecam"
->>>>>>>> +
->>>>>>>> +Example:
->>>>>>>> +
->>>>>>>> +       pci at 84b0,00000000 {
->> ...
->>>>>>> and the node name should be "pcie".
->>>>>>
->>>>>> Why pcie?
->>>>>>
->>>>>> There are no PCIe devices or buses reachable from this type of root complex.
->>>>>> There are however many PCI devices.
->> ...
->
->>>> Really, it is a bit of a gray area here as we don't have any bridges
->>>> to PCIe buses and there are multiple devices residing on each bus,
->>>> so from that point of view it cannot be PCIe.  There are, however,
->>>> devices that implement the PCI Express Capability structure, so does
->>>> that make it PCIe?  It is not clear what the specifications demand
->>>> here.
->>>
->>> The PCI core doesn't care about the node name in the device tree.  But
->>> it *does* care about some details of PCI/PCIe topology.  We consider
->>> anything with a PCIe capability to be PCIe.  For example,
->>>
->>>    - pci_cfg_space_size() thinks PCIe devices have 4K of config space
->>>
->>>    - only_one_child() thinks a PCIe bus, i.e., a link, only has a
->>>      single device on it
->>>
->>>    - a PCIe device should have a PCIe Root Port or PCIe Downstream Port
->>>      upstream from it (we did remove some of these restrictions with
->>>      b35b1df5e6c2 ("PCI: Tolerate hierarchies with no Root Port"), but
->>>      it's possible we didn't get them all)
->>>
->>> I assume your system conforms to expectations like these; I'm just
->>> pointing them out because you mentioned buses with multiple devices on
->>> them, which is definitely something one doesn't expect in PCIe.
->>
->> The topology we have is currently working with the kernel's core PCI
->> code.  I don't really want to get into discussing what the
->> definition of PCIe is.  We have multiple devices (more than 32) on a
->> single bus, and they have PCI Express and ARI Capabilities.  Is that
->> PCIe?  I don't know.
->
-> I don't need to know the details of your topology.  As long as it
-> conforms to the PCIe spec, it should be fine.  If it *doesn't* conform
-> to the spec, but things currently seem to work, that's less fine,
-> because a future Linux change is liable to break something for you.
->
-> I was a little concerned about your statement that "there are multiple
-> devices residing on each bus, so from that point of view it cannot be
-> PCIe."  That made it sound like you're doing something outside the
-> spec.  If you're just using regular multi-function devices or ARI,
-> then I don't see any issue (or any reason to say it can't be PCIe).
+On 09/02/16 00:24, Arnd Bergmann wrote:
+> Clang complains about the __initdata section attribute being in the
+> wrong place in two files of ks8695:
+> 
+> arch/arm/mach-ks8695/cpu.c:37:31: error: '__section__' attribute only applies to functions and global variables
+> arch/arm/mach-ks8695/board-og.c:83:31: error: '__section__' attribute only applies to functions and global variables
+> 
+> This moves the attribute to the correct place.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-OK, I will make it "pcie at ...."
+Acked-by: Greg Ungerer <gerg@uclinux.org>
 
-Really, ARI is the only reason.  But since ARI is defined in the PCI 
-Express specification, pcie it is.
-
-I will send revised patches today.
+Regards
+Greg
 
 
-David Daney
-
->
-> Bjorn
->
+> ---
+>  arch/arm/mach-ks8695/board-og.c | 2 +-
+>  arch/arm/mach-ks8695/cpu.c      | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-ks8695/board-og.c b/arch/arm/mach-ks8695/board-og.c
+> index 1f4f2f4f25bb..fa1a7c2ca2bb 100644
+> --- a/arch/arm/mach-ks8695/board-og.c
+> +++ b/arch/arm/mach-ks8695/board-og.c
+> @@ -80,7 +80,7 @@ static void __init og_pci_bus_reset(void)
+>  #define	S8250_VIRT	0xf4000000
+>  #define	S8250_SIZE	0x00100000
+>  
+> -static struct __initdata map_desc og_io_desc[] = {
+> +static struct map_desc __initdata og_io_desc[] = {
+>  	{
+>  		.virtual	= S8250_VIRT,
+>  		.pfn		= __phys_to_pfn(S8250_PHYS),
+> diff --git a/arch/arm/mach-ks8695/cpu.c b/arch/arm/mach-ks8695/cpu.c
+> index 474a050da85b..f56937890e3a 100644
+> --- a/arch/arm/mach-ks8695/cpu.c
+> +++ b/arch/arm/mach-ks8695/cpu.c
+> @@ -34,7 +34,7 @@
+>  #include <mach/regs-misc.h>
+>  
+>  
+> -static struct __initdata map_desc ks8695_io_desc[] = {
+> +static struct map_desc __initdata ks8695_io_desc[] = {
+>  	{
+>  		.virtual	= (unsigned long)KS8695_IO_VA,
+>  		.pfn		= __phys_to_pfn(KS8695_IO_PA),
+> 
