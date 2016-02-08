@@ -1,85 +1,286 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon,  8 Feb 2016 21:55:35 +0000
-Subject: [PATCH] ARM: dts: spear: replace gpio-key,
- wakeup with wakeup-source property
-Message-ID: <1454968535-11994-1-git-send-email-sudeep.holla@arm.com>
+Date: Mon,  8 Feb 2016 21:55:43 +0000
+Subject: [PATCH] ARM: dts: tegra: replace legacy *,
+ wakeup property with wakeup-source
+Message-ID: <1454968543-12035-1-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Keyboard driver for GPIO buttons(gpio-keys) checks for the legacy
-"gpio-key,wakeup" boolean property to enable gpio buttons as wakeup
-source.
+Though the keyboard and other driver will continue to support the legacy
+"gpio-key,wakeup", "nvidia,wakeup-source" boolean property to enable the
+wakeup source, "wakeup-source" is the new standard binding.
 
-Few dts files assign value "1" to gpio-key,wakeup which is incorrect.
-Since the presence of the boolean property indicates it is enabled,
-value of "0" or "1" have no significance.
+This patch replaces all the legacy wakeup properties with the unified
+"wakeup-source" property in order to avoid any further copy-paste
+duplication.
 
-This patch replaces the legacy "gpio-key,wakeup" with the unified
-"wakeup-source" property which inturn fixes the above mentioned issue.
-
-Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: Thierry Reding <thierry.reding@gmail.com>
+Cc: Alexandre Courbot <gnurou@gmail.com>
+Cc: linux-tegra at vger.kernel.org
 Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- arch/arm/boot/dts/spear1310-evb.dts | 2 +-
- arch/arm/boot/dts/spear1340-evb.dts | 2 +-
- arch/arm/boot/dts/spear320-hmi.dts  | 4 ++--
- 3 files changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/tegra114-dalmore.dts         | 2 +-
+ arch/arm/boot/dts/tegra114-roth.dts            | 2 +-
+ arch/arm/boot/dts/tegra114-tn7.dts             | 2 +-
+ arch/arm/boot/dts/tegra124-jetson-tk1.dts      | 2 +-
+ arch/arm/boot/dts/tegra124-nyan.dtsi           | 4 ++--
+ arch/arm/boot/dts/tegra124-venice2.dts         | 2 +-
+ arch/arm/boot/dts/tegra20-harmony.dts          | 2 +-
+ arch/arm/boot/dts/tegra20-paz00.dts            | 2 +-
+ arch/arm/boot/dts/tegra20-seaboard.dts         | 4 ++--
+ arch/arm/boot/dts/tegra20-trimslice.dts        | 2 +-
+ arch/arm/boot/dts/tegra20-ventana.dts          | 2 +-
+ arch/arm/boot/dts/tegra20-whistler.dts         | 2 +-
+ arch/arm/boot/dts/tegra30-apalis-eval.dts      | 2 +-
+ arch/arm/boot/dts/tegra30-cardhu.dtsi          | 2 +-
+ arch/arm/boot/dts/tegra30-colibri-eval-v3.dts  | 2 +-
+ arch/arm64/boot/dts/nvidia/tegra132-norrin.dts | 4 ++--
+ 16 files changed, 19 insertions(+), 19 deletions(-)
 
-Hi ARM-SoC guys,
+Hi Thierry/Stephen,
 
-This is the only platform which doesn't have regular pull request,
-Viresh has acked it already. Can you pick this up directly for v4.6 ?
+Most of the other platform/SoC maintainers preferred to take it via
+their tree and few of these got missed during v4.5 merge window.
+Can you take it via your tree for v4.6 ?
 
 Regards,
 Sudeep
 
-diff --git a/arch/arm/boot/dts/spear1310-evb.dts b/arch/arm/boot/dts/spear1310-evb.dts
-index e48857249ce7..84101e4eebbf 100644
---- a/arch/arm/boot/dts/spear1310-evb.dts
-+++ b/arch/arm/boot/dts/spear1310-evb.dts
-@@ -161,7 +161,7 @@
- 				linux,code = <0x100>;
- 				gpios = <&gpio0 7 0x4>;
- 				debounce-interval = <20>;
--				gpio-key,wakeup = <1>;
-+				wakeup-source;
- 			};
+diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
+index 8b7aa0dcdc6e..40b88051ea3e 100644
+--- a/arch/arm/boot/dts/tegra114-dalmore.dts
++++ b/arch/arm/boot/dts/tegra114-dalmore.dts
+@@ -1164,7 +1164,7 @@
+ 			label = "Power";
+ 			gpios = <&gpio TEGRA_GPIO(Q, 0) GPIO_ACTIVE_LOW>;
+ 			linux,code = <KEY_POWER>;
+-			gpio-key,wakeup;
++			wakeup-source;
  		};
  
-diff --git a/arch/arm/boot/dts/spear1340-evb.dts b/arch/arm/boot/dts/spear1340-evb.dts
-index c611f5606dfe..6565f3cb866f 100644
---- a/arch/arm/boot/dts/spear1340-evb.dts
-+++ b/arch/arm/boot/dts/spear1340-evb.dts
-@@ -223,7 +223,7 @@
- 				linux,code = <0x100>;
- 				gpios = <&gpio1 1 0x4>;
- 				debounce-interval = <20>;
--				gpio-key,wakeup = <1>;
-+				wakeup-source;
- 			};
+ 		volume_down {
+diff --git a/arch/arm/boot/dts/tegra114-roth.dts b/arch/arm/boot/dts/tegra114-roth.dts
+index 38acf78d7815..9d868af97b8e 100644
+--- a/arch/arm/boot/dts/tegra114-roth.dts
++++ b/arch/arm/boot/dts/tegra114-roth.dts
+@@ -1047,7 +1047,7 @@
+ 			label = "Power";
+ 			gpios = <&gpio TEGRA_GPIO(Q, 0) GPIO_ACTIVE_LOW>;
+ 			linux,code = <KEY_POWER>;
+-			gpio-key,wakeup;
++			wakeup-source;
+ 		};
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/tegra114-tn7.dts b/arch/arm/boot/dts/tegra114-tn7.dts
+index f91c2c9b2f94..89047edb5c5f 100644
+--- a/arch/arm/boot/dts/tegra114-tn7.dts
++++ b/arch/arm/boot/dts/tegra114-tn7.dts
+@@ -292,7 +292,7 @@
+ 			label = "Power";
+ 			gpios = <&gpio TEGRA_GPIO(Q, 0) GPIO_ACTIVE_LOW>;
+ 			linux,code = <KEY_POWER>;
+-			gpio-key,wakeup;
++			wakeup-source;
  		};
  
-diff --git a/arch/arm/boot/dts/spear320-hmi.dts b/arch/arm/boot/dts/spear320-hmi.dts
-index 0aa6fef5ce22..0d0da1f65f0e 100644
---- a/arch/arm/boot/dts/spear320-hmi.dts
-+++ b/arch/arm/boot/dts/spear320-hmi.dts
-@@ -141,7 +141,7 @@
- 				linux,code = <0x100>;
- 				gpios = <&stmpegpio 3 0x4>;
- 				debounce-interval = <20>;
--				gpio-key,wakeup = <1>;
-+				wakeup-source;
- 			};
- 
- 			button at 2 {
-@@ -149,7 +149,7 @@
- 				linux,code = <0x200>;
- 				gpios = <&stmpegpio 2 0x4>;
- 				debounce-interval = <20>;
--				gpio-key,wakeup = <1>;
-+				wakeup-source;
- 			};
+ 		volume_down {
+diff --git a/arch/arm/boot/dts/tegra124-jetson-tk1.dts b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
+index 66b4451eb2ca..067190532f78 100644
+--- a/arch/arm/boot/dts/tegra124-jetson-tk1.dts
++++ b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
+@@ -1761,7 +1761,7 @@
+ 			gpios = <&gpio TEGRA_GPIO(Q, 0) GPIO_ACTIVE_LOW>;
+ 			linux,code = <KEY_POWER>;
+ 			debounce-interval = <10>;
+-			gpio-key,wakeup;
++			wakeup-source;
  		};
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/tegra124-nyan.dtsi b/arch/arm/boot/dts/tegra124-nyan.dtsi
+index ec1aa64ded68..c8495eb41fdd 100644
+--- a/arch/arm/boot/dts/tegra124-nyan.dtsi
++++ b/arch/arm/boot/dts/tegra124-nyan.dtsi
+@@ -509,7 +509,7 @@
+ 			linux,input-type = <5>;
+ 			linux,code = <KEY_RESERVED>;
+ 			debounce-interval = <1>;
+-			gpio-key,wakeup;
++			wakeup-source;
+ 		};
+ 
+ 		power {
+@@ -517,7 +517,7 @@
+ 			gpios = <&gpio TEGRA_GPIO(Q, 0) GPIO_ACTIVE_LOW>;
+ 			linux,code = <KEY_POWER>;
+ 			debounce-interval = <30>;
+-			gpio-key,wakeup;
++			wakeup-source;
+ 		};
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/tegra124-venice2.dts b/arch/arm/boot/dts/tegra124-venice2.dts
+index cfbdf429b45d..4a5f23c5d893 100644
+--- a/arch/arm/boot/dts/tegra124-venice2.dts
++++ b/arch/arm/boot/dts/tegra124-venice2.dts
+@@ -975,7 +975,7 @@
+ 			gpios = <&gpio TEGRA_GPIO(Q, 0) GPIO_ACTIVE_LOW>;
+ 			linux,code = <KEY_POWER>;
+ 			debounce-interval = <10>;
+-			gpio-key,wakeup;
++			wakeup-source;
+ 		};
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/tegra20-harmony.dts b/arch/arm/boot/dts/tegra20-harmony.dts
+index b926a07b9443..679f9c49e9f4 100644
+--- a/arch/arm/boot/dts/tegra20-harmony.dts
++++ b/arch/arm/boot/dts/tegra20-harmony.dts
+@@ -655,7 +655,7 @@
+ 			label = "Power";
+ 			gpios = <&gpio TEGRA_GPIO(V, 2) GPIO_ACTIVE_LOW>;
+ 			linux,code = <KEY_POWER>;
+-			gpio-key,wakeup;
++			wakeup-source;
+ 		};
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/tegra20-paz00.dts b/arch/arm/boot/dts/tegra20-paz00.dts
+index ed7e1009326c..fce397e3e2ce 100644
+--- a/arch/arm/boot/dts/tegra20-paz00.dts
++++ b/arch/arm/boot/dts/tegra20-paz00.dts
+@@ -521,7 +521,7 @@
+ 			label = "Power";
+ 			gpios = <&gpio TEGRA_GPIO(J, 7) GPIO_ACTIVE_LOW>;
+ 			linux,code = <KEY_POWER>;
+-			gpio-key,wakeup;
++			wakeup-source;
+ 		};
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/tegra20-seaboard.dts b/arch/arm/boot/dts/tegra20-seaboard.dts
+index aea8994b35f2..a112a415ecd5 100644
+--- a/arch/arm/boot/dts/tegra20-seaboard.dts
++++ b/arch/arm/boot/dts/tegra20-seaboard.dts
+@@ -807,7 +807,7 @@
+ 			label = "Power";
+ 			gpios = <&gpio TEGRA_GPIO(V, 2) GPIO_ACTIVE_LOW>;
+ 			linux,code = <KEY_POWER>;
+-			gpio-key,wakeup;
++			wakeup-source;
+ 		};
+ 
+ 		lid {
+@@ -816,7 +816,7 @@
+ 			linux,input-type = <5>; /* EV_SW */
+ 			linux,code = <0>; /* SW_LID */
+ 			debounce-interval = <1>;
+-			gpio-key,wakeup;
++			wakeup-source;
+ 		};
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/tegra20-trimslice.dts b/arch/arm/boot/dts/tegra20-trimslice.dts
+index d99af4ef9c64..a4aaff326f99 100644
+--- a/arch/arm/boot/dts/tegra20-trimslice.dts
++++ b/arch/arm/boot/dts/tegra20-trimslice.dts
+@@ -392,7 +392,7 @@
+ 			label = "Power";
+ 			gpios = <&gpio TEGRA_GPIO(X, 6) GPIO_ACTIVE_LOW>;
+ 			linux,code = <KEY_POWER>;
+-			gpio-key,wakeup;
++			wakeup-source;
+ 		};
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/tegra20-ventana.dts b/arch/arm/boot/dts/tegra20-ventana.dts
+index 04c58e9ca490..b205935a1236 100644
+--- a/arch/arm/boot/dts/tegra20-ventana.dts
++++ b/arch/arm/boot/dts/tegra20-ventana.dts
+@@ -601,7 +601,7 @@
+ 			label = "Power";
+ 			gpios = <&gpio TEGRA_GPIO(V, 2) GPIO_ACTIVE_LOW>;
+ 			linux,code = <KEY_POWER>;
+-			gpio-key,wakeup;
++			wakeup-source;
+ 		};
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/tegra20-whistler.dts b/arch/arm/boot/dts/tegra20-whistler.dts
+index 340d81108df1..5564d6e975d8 100644
+--- a/arch/arm/boot/dts/tegra20-whistler.dts
++++ b/arch/arm/boot/dts/tegra20-whistler.dts
+@@ -508,7 +508,7 @@
+ 		nvidia,repeat-delay-ms = <160>;
+ 		nvidia,kbc-row-pins = <0 1 2>;
+ 		nvidia,kbc-col-pins = <16 17>;
+-		nvidia,wakeup-source;
++		wakeup-source;
+ 		linux,keymap = <MATRIX_KEY(0x00, 0x00, KEY_POWER)
+ 				MATRIX_KEY(0x01, 0x00, KEY_HOME)
+ 				MATRIX_KEY(0x01, 0x01, KEY_BACK)
+diff --git a/arch/arm/boot/dts/tegra30-apalis-eval.dts b/arch/arm/boot/dts/tegra30-apalis-eval.dts
+index f2879cfcca62..3ca3b4c6975b 100644
+--- a/arch/arm/boot/dts/tegra30-apalis-eval.dts
++++ b/arch/arm/boot/dts/tegra30-apalis-eval.dts
+@@ -196,7 +196,7 @@
+ 			gpios = <&gpio TEGRA_GPIO(V, 1) GPIO_ACTIVE_LOW>;
+ 			linux,code = <KEY_WAKEUP>;
+ 			debounce-interval = <10>;
+-			gpio-key,wakeup;
++			wakeup-source;
+ 		};
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/tegra30-cardhu.dtsi b/arch/arm/boot/dts/tegra30-cardhu.dtsi
+index bb1ca158273c..1714e755c3de 100644
+--- a/arch/arm/boot/dts/tegra30-cardhu.dtsi
++++ b/arch/arm/boot/dts/tegra30-cardhu.dtsi
+@@ -626,7 +626,7 @@
+ 			interrupts = <2 0>;
+ 			linux,code = <KEY_POWER>;
+ 			debounce-interval = <100>;
+-			gpio-key,wakeup;
++			wakeup-source;
+ 		};
+ 
+ 		volume-down {
+diff --git a/arch/arm/boot/dts/tegra30-colibri-eval-v3.dts b/arch/arm/boot/dts/tegra30-colibri-eval-v3.dts
+index 3ff019f47d00..72c79ac9a72f 100644
+--- a/arch/arm/boot/dts/tegra30-colibri-eval-v3.dts
++++ b/arch/arm/boot/dts/tegra30-colibri-eval-v3.dts
+@@ -142,7 +142,7 @@
+ 			gpios = <&gpio TEGRA_GPIO(V, 1) GPIO_ACTIVE_HIGH>;
+ 			linux,code = <KEY_WAKEUP>;
+ 			debounce-interval = <10>;
+-			gpio-key,wakeup;
++			wakeup-source;
+ 		};
+ 	};
+ 
+diff --git a/arch/arm64/boot/dts/nvidia/tegra132-norrin.dts b/arch/arm64/boot/dts/nvidia/tegra132-norrin.dts
+index 7dfe1c085966..a5f365d67ca3 100644
+--- a/arch/arm64/boot/dts/nvidia/tegra132-norrin.dts
++++ b/arch/arm64/boot/dts/nvidia/tegra132-norrin.dts
+@@ -971,7 +971,7 @@
+ 			linux,input-type = <5>;
+ 			linux,code = <0>;
+ 			debounce-interval = <1>;
+-			gpio-key,wakeup;
++			wakeup-source;
+ 		};
+ 
+ 		power {
+@@ -979,7 +979,7 @@
+ 			gpios = <&gpio TEGRA_GPIO(Q, 0) GPIO_ACTIVE_LOW>;
+ 			linux,code = <KEY_POWER>;
+ 			debounce-interval = <10>;
+-			gpio-key,wakeup;
++			wakeup-source;
+ 		};
+ 	};
  
 -- 
 1.9.1
