@@ -1,35 +1,43 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Mon,  8 Feb 2016 03:17:31 +0100
-Subject: [PATCH v2 02/10] Documentation: devicetree: rockchip: Document GeekBox
-In-Reply-To: <1454897859-7601-1-git-send-email-afaerber@suse.de>
-References: <1454897859-7601-1-git-send-email-afaerber@suse.de>
-Message-ID: <1454897859-7601-3-git-send-email-afaerber@suse.de>
+Date: Mon,  8 Feb 2016 03:17:29 +0100
+Subject: [PATCH v2 00/10] ARM64: rockchip: Initial GeekBox enablement
+Message-ID: <1454897859-7601-1-git-send-email-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use "geekbuying,geekbox" compatible string.
+Hello,
 
-Signed-off-by: Andreas F?rber <afaerber@suse.de>
----
- v2: New (Heiko)
- 
- Documentation/devicetree/bindings/arm/rockchip.txt | 4 ++++
- 1 file changed, 4 insertions(+)
+This series adds initial support for the RK3368 based GeekBox.
 
-diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
-index 078c14fcdaaa..f633595b196c 100644
---- a/Documentation/devicetree/bindings/arm/rockchip.txt
-+++ b/Documentation/devicetree/bindings/arm/rockchip.txt
-@@ -87,6 +87,10 @@ Rockchip platforms device tree bindings
- 		     "google,veyron-speedy-rev3", "google,veyron-speedy-rev2",
- 		     "google,veyron-speedy", "google,veyron", "rockchip,rk3288";
- 
-+- GeekBuying GeekBox:
-+    Required root node properties:
-+      - compatible = "geekbuying,geekbox", "rockchip,rk3368";
-+
- - Rockchip RK3368 evb:
-     Required root node properties:
-       - compatible = "rockchip,rk3368-evb-act8846", "rockchip,rk3368";
+v2 drops the .dtsi for the module, adds some nodes and a Landingship config.
+
+This is pretty much the state demo'ed at FOSDEM 2016.
+
+Regards,
+Andreas
+
+Cc: devicetree at vger.kernel.org
+
+Andreas F?rber (10):
+  Documentation: devicetree: Add vendor prefix for GeekBuying.com
+  Documentation: devicetree: rockchip: Document GeekBox
+  ARM64: dts: rockchip: Add GeekBox config
+  ARM64: dts: rockchip: Add GMAC to GeekBox
+  ARM64: dts: rockchip: Add eMMC to GeekBox
+  ARM64: dts: rockchip: Add IR receiver to GeekBox
+  ARM64: dts: rockchip: Add power key to GeekBox
+  ARM64: dts: rockchip: Add tsadc for GeekBox
+  Documentation: devicetree: rockchip: Document Landingship
+  ARM64: dts: rockchip: Add Landingship config
+
+ Documentation/devicetree/bindings/arm/rockchip.txt |   9 +
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ arch/arm64/boot/dts/rockchip/Makefile              |   2 +
+ .../dts/rockchip/rk3368-geekbox-landingship.dts    |  56 ++++
+ arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts    | 321 +++++++++++++++++++++
+ 5 files changed, 389 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3368-geekbox-landingship.dts
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts
+
 -- 
 2.6.2
