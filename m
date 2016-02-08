@@ -1,97 +1,58 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Mon, 8 Feb 2016 16:33:19 +0000
-Subject: [PATCH V2] ARM64: tegra: Add support for Google Pixel C
-Message-ID: <1454949199-27050-1-git-send-email-jonathanh@nvidia.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Mon, 8 Feb 2016 11:39:13 -0500
+Subject: [PATCH 1/5] ARM: add EXPORT_SYMBOL of hook_fault_code for PCI
+ host modularization
+In-Reply-To: <2567476.SknW0BEsQJ@wuerfel>
+References: <1454889644-27830-1-git-send-email-paul.gortmaker@windriver.com>
+ <1454889644-27830-2-git-send-email-paul.gortmaker@windriver.com>
+ <2567476.SknW0BEsQJ@wuerfel>
+Message-ID: <20160208163913.GX23093@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add initial device-tree support for Google Pixel C (a.k.a. Smaug) based
-upon Tegra210 SoC with 3 GiB of LPDDR4 RAM.
+[Re: [PATCH 1/5] ARM: add EXPORT_SYMBOL of hook_fault_code for PCI host modularization] On 08/02/2016 (Mon 10:53) Arnd Bergmann wrote:
 
-Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
----
- arch/arm64/boot/dts/nvidia/Makefile           |  1 +
- arch/arm64/boot/dts/nvidia/tegra210-smaug.dts | 60 +++++++++++++++++++++++++++
- 2 files changed, 61 insertions(+)
- create mode 100644 arch/arm64/boot/dts/nvidia/tegra210-smaug.dts
+> On Sunday 07 February 2016 19:00:40 Paul Gortmaker wrote:
+> > In a discussion of a previous patch set[1], it was suggested that
+> > modularizing some of the PCI host support would be good to keep
+> > multi platform bzImage sizes smaller.
+> > 
+> > Two of the files that are candidates for conversion to tristate
+> > from bool are:
+> > 
+> > drivers/pci/host/pci-imx6.c
+> > drivers/pci/host/pci-keystone.c
+> > 
+> > However, doing the conversion reveals that they are going to fail
+> > at modpost time since hook_fault_code isn't currently exported.
+> > 
+> > Since we are now going to export it we also need to remove the
+> > __init tag, as the fcn needs to be present at insmod time.
+> > 
+> > [1] https://lkml.kernel.org/r/20160108203102.GH5354 at localhost
+> > 
+> 
+> If we want to make hook_fault_code() visible, we at least also need
+> an unhook_fault_code() function that removes the fault handler
+> when unloading the module, and preferably does so in a safe way.
 
-diff --git a/arch/arm64/boot/dts/nvidia/Makefile b/arch/arm64/boot/dts/nvidia/Makefile
-index a7e865da1005..0f7cdf3e05c1 100644
---- a/arch/arm64/boot/dts/nvidia/Makefile
-+++ b/arch/arm64/boot/dts/nvidia/Makefile
-@@ -2,6 +2,7 @@ dtb-$(CONFIG_ARCH_TEGRA_132_SOC) += tegra132-norrin.dtb
- dtb-$(CONFIG_ARCH_TEGRA_210_SOC) += tegra210-p2371-0000.dtb
- dtb-$(CONFIG_ARCH_TEGRA_210_SOC) += tegra210-p2371-2180.dtb
- dtb-$(CONFIG_ARCH_TEGRA_210_SOC) += tegra210-p2571.dtb
-+dtb-$(CONFIG_ARCH_TEGRA_210_SOC) += tegra210-smaug.dtb
- 
- always		:= $(dtb-y)
- clean-files	:= *.dtb
-diff --git a/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts b/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts
-new file mode 100644
-index 000000000000..59acdb6b4f23
---- /dev/null
-+++ b/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts
-@@ -0,0 +1,60 @@
-+/dts-v1/;
-+
-+#include "tegra210.dtsi"
-+
-+/ {
-+	model = "Google Pixel C";
-+	compatible = "google,smaug-rev8", "google,smaug-rev7",
-+		     "google,smaug-rev6", "google,smaug-rev5",
-+		     "google,smaug-rev4", "google,smaug-rev3",
-+		     "google,smaug-rev1", "google,smaug", "nvidia,tegra210";
-+
-+	aliases {
-+		serial0 = &uarta;
-+	};
-+
-+	chosen {
-+		bootargs = "earlycon";
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x0 0x80000000 0x0 0xc0000000>;
-+	};
-+
-+	serial at 0,70006000 {
-+		status = "okay";
-+	};
-+
-+	pmc at 0,7000e400 {
-+		nvidia,invert-interrupt;
-+		nvidia,suspend-mode = <0>;
-+		nvidia,cpu-pwr-good-time = <0>;
-+		nvidia,cpu-pwr-off-time = <0>;
-+		nvidia,core-pwr-good-time = <12000 6000>;
-+		nvidia,core-pwr-off-time = <39053>;
-+		nvidia,core-power-req-active-high;
-+		nvidia,sys-clock-req-active-high;
-+		status = "okay";
-+	};
-+
-+	sdhci at 0,700b0600 {
-+		bus-width = <8>;
-+		non-removable;
-+		status = "okay";
-+	};
-+
-+	clocks {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		clk32k_in: clock at 0 {
-+			compatible = "fixed-clock";
-+			reg = <0>;
-+			#clock-cells = <0>;
-+			clock-frequency = <32768>;
-+		};
-+	};
-+};
--- 
-2.1.4
+If it is straight forward by doing an unwind of the existing hook, then
+I can look at having a go at implementing it, but again per the 0/N the
+original goal here was the "step one" of making it at least buildable,
+and then moving on from there, preferably by people with the platforms
+and deeper knowledge of the runtime requirements and issues.
+
+> 
+> The usage of hook_fault_code() at least in the imx driver is also
+> problematic, as it just ignores all "imprecise external abort"
+> faults, whether they come from PCI or not.
+
+That is definitely beyond anything I'm suitably armed to fix within the
+scope of this series, and will have to be from the imx people or similar.
+
+Paul.
+--
+
+
+> 
+> 	Arnd
