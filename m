@@ -1,58 +1,36 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 8 Feb 2016 15:31:09 +0000
-Subject: [GIT PULL] KVM/ARM updates for 4.5-rc2
-In-Reply-To: <56B8B2DB.9020407@redhat.com>
-References: <1453977038-13516-1-git-send-email-marc.zyngier@arm.com>
- <56B8B2DB.9020407@redhat.com>
-Message-ID: <56B8B4BD.3080904@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 8 Feb 2016 16:32:06 +0100
+Subject: [PATCH v2] clk: shmobile: r8a7795: Add SD divider support
+In-Reply-To: <20160204193036.GA1958@tetsubishi>
+References: <1454135639-4102-1-git-send-email-dirk.behme@gmail.com>
+ <20160204193036.GA1958@tetsubishi>
+Message-ID: <CAMuHMdW3Cp-Ga9NCb=TgGE7QxUTNp-PbOXsNu47Vvgcf-m0bSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/02/16 15:23, Paolo Bonzini wrote:
-> 
-> 
-> On 28/01/2016 11:30, Marc Zyngier wrote:
->> Hi Paolo,
+On Thu, Feb 4, 2016 at 8:30 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
+> On Sat, Jan 30, 2016 at 07:33:59AM +0100, Dirk Behme wrote:
+>> This patch adds SD[0..3] clock divider support for R-Car Gen3 SoC.
 >>
->> Please find below the KVM/ARM updates for 4.5-rc2. Mostly fixes as a
->> result of Shannon's work on PMU emulation, which has outlined a few
->> nits here and there, plus a correctness fix from Dave.
->>
->> Please pull!
->>
->> Thanks,
->>
->> 	M.
->>
->> The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
->>
->>   Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
->>
->> are available in the git repository at:
->>
->>   git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-4.5-rc2
->>
->> for you to fetch changes up to 6327f35a2010c06a3bc2bfb14202a38764fb9920:
->>
->>   arm64: KVM: Fix guest dead loop when register accessor returns false (2016-01-24 21:56:01 +0000)
->>
->> ----------------------------------------------------------------
->> KVM/ARM fixes for v4.5-rc2
->>
->> A few random fixes, mostly coming from the PMU work by Shannon:
->>
->> - fix for injecting faults coming from the guest's userspace
->> - cleanup for our CPTR_EL2 accessors (reserved bits)
->> - fix for a bug impacting perf (user/kernel discrimination)
->> - fix for a 32bit sysreg handling bug
->>
->> ----------------------------------------------------------------
-> 
-> Finally pulled, thanks.
+>> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+>> Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
+>
+> Tested-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+>
+> Since we don't have UHS support currently, changing the clock is not
+> really exercised; but the code looks good and if it needs fixing, we can
+> do it incrementally IMO. What is currently needed works fine on my
+> Salvator-X for the exposed SD interfaces.
 
-Thanks Paolo. I'll send another PR in a couple of days for another fix
-that landed last week.
+Thanks, will queue for next renesas-drivers and v4.6.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
