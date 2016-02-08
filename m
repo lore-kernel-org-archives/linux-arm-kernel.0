@@ -1,38 +1,32 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 8 Feb 2016 14:09:25 +0000
-Subject: [PATCH v2] clocksource/arm_arch_timer: Enable and verify MMIO
- access
-In-Reply-To: <56B89F98.7020909@linaro.org>
-References: <71bf617f4083b116b2aeab24f13fc5fed99a816f.1454327031.git.robin.murphy@arm.com>
- <56B89F98.7020909@linaro.org>
-Message-ID: <56B8A195.2050807@arm.com>
+Date: Mon, 8 Feb 2016 14:11:31 +0000
+Subject: [PATCH 1/6] irqchip: add the Alpine MSIX interrupt controller
+In-Reply-To: <20160208140429.GF4117@kwain>
+References: <1454922971-17405-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1454922971-17405-2-git-send-email-antoine.tenart@free-electrons.com>
+ <56B86391.1030609@arm.com> <20160208140429.GF4117@kwain>
+Message-ID: <56B8A213.2020704@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/02/16 14:00, Daniel Lezcano wrote:
-> On 02/01/2016 01:00 PM, Robin Murphy wrote:
->> So far, we have been blindly assuming that having access to a
->> memory-mapped timer frame implies that the individual elements of that
->> frame frame are already enabled. Whilst it's the firmware's job to give
->> us non-secure access to frames in the first place, we should not rely
->> on implementations always being generous enough to also configure CNTACR
->> for those non-secure frames (e.g. [1]).
->>
->> Explicitly enable feature-level access per-frame, and verify that the
->> access we want is really implemented before trying to make use of it.
->>
->> [1]:https://github.com/ARM-software/tf-issues/issues/170
->>
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->> ---
-> 
+On 08/02/16 14:04, Antoine Tenart wrote:
 > Hi Marc,
 > 
-> can you give your opinion on this patch ?
+> On Mon, Feb 08, 2016 at 09:44:49AM +0000, Marc Zyngier wrote:
+>> On 08/02/16 09:16, Antoine Tenart wrote:
+>>> +
+>>> +static struct msi_domain_info alpine_msix_domain_info = {
+>>> +	.flags	= MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
+>>> +		  MSI_FLAG_PCI_MSIX,
+>>
+>> You can probably add MSI_FLAG_PCI_MSI
+> 
+> Are you sure such a flag is available? (Or am I missing something
+> obvious?).
 
-This seems to do the right thing, so FWIW:
-
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+No, I'm just confused (first patch in the morning, what did you
+expect?). It looks like we consider single MSI as a given, please ignore
+my rambling...
 
 Thanks,
 
