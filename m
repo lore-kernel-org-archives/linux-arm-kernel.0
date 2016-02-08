@@ -1,75 +1,96 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 8 Feb 2016 09:24:39 -0500
-Subject: [PATCH V14 0/9] dma: add Qualcomm Technologies HIDMA driver
-In-Reply-To: <20160208101432.GA1150@cbox>
-References: <1454646882-24369-1-git-send-email-okaya@codeaurora.org>
- <20160208101432.GA1150@cbox>
-Message-ID: <56B8A527.7010206@codeaurora.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 08 Feb 2016 15:25:01 +0100
+Subject: [GIT PULL] ARM: mvebu: dt for v4.6 (#1)
+Message-ID: <8737t32saq.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On 2/8/2016 5:14 AM, Christoffer Dall wrote:
-> Hi Sinan,
-> 
-> On Thu, Feb 04, 2016 at 11:34:31PM -0500, Sinan Kaya wrote:
->> The Qualcomm Technologies HIDMA device has been designed
->> to support virtualization technology. The driver has been
->> divided into two to follow the hardware design.
->>
->> 1. HIDMA Management driver
->> 2. HIDMA Channel driver
->>
->> Each HIDMA HW consists of multiple channels. These channels
->> share some set of common parameters. These parameters are
->> initialized by the management driver during power up.
->> Same management driver is used for monitoring the execution
->> of the channels. Management driver can change the performance
->> behavior dynamically such as bandwidth allocation and
->> prioritization in the future.
->>
->> The management driver is executed in host context and
->> is the main management entity for all channels provided by
->> the device.
-> 
-> I'm not at all familiar with this kind of hardware.
-> 
+Here is the first pull request for dt for mvebu for v4.6.
+This one is based on v4.5-rc3 because it depends on fixes merged
+previously.
 
-Let me help. 
+Gregory
 
-> Once an entity (userspace or VM) has a HIDAM channel assigned via VFIO,
-> how does it use it?  
+The following changes since commit 388f7b1d6e8ca06762e2454d28d6c3c55ad0fe95:
 
-HIDMA is a HW accelerator for memory operations like memcpy and memset. It fits
-into the DMA engine framework.
+  Linux 4.5-rc3 (2016-02-07 15:38:30 -0800)
 
-There are two classes of DMA HW. These are slave DMA and standalone DMA. Slave DMA
-is generally related to another piece of HW that needs DMA for moving data. 
-Standalone DMA is intended for OS/CPU consumption not HW. These can be used to offload
-crypto operations (XOR) or other memory transactions (memcpy and memset) that are
-lengthy. 
+are available in the git repository at:
 
-Once the HIDMA channel is assigned to the guest machine, guest operating system uses the
-DMA channel to offload memory operations as HIDMA only supports memcpy. 
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-4.6-1
 
-IOMMU HW provides the isolation from the rest of the host kernel or from other guest machines.
+for you to fetch changes up to ebe1adff92de94f1ec48a46d9afa74ba967674dc:
 
-> Is it used in relation with another device to
-> perform DMA on its behalf or is a HIDMA channel something that's useful
-> on its own?
+  ARM: dts: kirkwood: add device tree for buffalo linkstation ls-qvl (2016-02-08 09:39:41 +0100)
 
-It is standalone only. The relationship you are referring to is known as slave DMA engine. 
-HIDMA does not support slave DMA. HIDMA only supports memcpy and memset in HW and only memcpy in SW
-as the memset support has been removed from the kernel long time ago.
+----------------------------------------------------------------
+mvebu dt for 4.6 (part 1)
 
-> 
-> Thanks,
-> -Christoffer
-> 
+- Improve Armada 388 device tree (SATA and XHCI)
+- Fix SD Card and audio support for OpenRD board
+- Provide template for RS-232/485 configuration for the same board
+- Use a common dtsi file for linkstation boards
+- Add support for Buffalo Linkstation LS-QVL
 
+----------------------------------------------------------------
+Aaro Koskinen (4):
+      ARM: DTS: kirkwood-openrd: fix pin names for UART/SD selection
+      ARM: DTS: kirkwood-openrd: fix SD slot default configuration
+      ARM: DTS: kirkwood-openrd: provide template for RS-232/485 configuration
+      ARM: DTS: kirkwood-openrd-client: fix audio
 
--- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+Gregory CLEMENT (2):
+      ARM: mvebu: use usb-nop-xceiv PHY for the xhci nodes on Armada 388 GP
+      ARM: mvebu: Update the mpp63 function in the device tree on Armada 370
+
+Mario Lange (1):
+      ARM: dts: kirkwood: add device tree for buffalo linkstation ls-qvl
+
+Roger Shimizu (3):
+      ARM: dts: kirkwood: relicense dts of ls-wvl/vl and ls-wxl/wsxl under GPLv2/X11
+      ARM: dts: kirkwood: split lswxl dts to linkstation lswsxl and lswxl
+      ARM: dts: kirkwood: split lswvl dts to linkstation lsvl and lswvl
+
+Thomas Petazzoni (2):
+      ARM: mvebu: adjust board name and compatible for Armada 388 GP
+      ARM: mvebu: use regulator-boot-on for SATA regulators on Armada 388 GP
+
+ .../devicetree/bindings/arm/marvell,kirkwood.txt   |   7 +-
+ .../pinctrl/marvell,armada-370-pinctrl.txt         |   5 +-
+ arch/arm/boot/dts/Makefile                         |   7 +-
+ arch/arm/boot/dts/armada-370-mirabox.dts           |   2 +-
+ arch/arm/boot/dts/armada-370-netgear-rn104.dts     |   2 +-
+ arch/arm/boot/dts/armada-370-synology-ds213j.dts   |   2 +-
+ arch/arm/boot/dts/armada-388-gp.dts                |  36 +--
+ arch/arm/boot/dts/kirkwood-linkstation-6282.dtsi   | 192 +++++++++++++
+ .../boot/dts/kirkwood-linkstation-duo-6281.dtsi    | 186 +++++++++++++
+ arch/arm/boot/dts/kirkwood-linkstation-lsqvl.dts   | 135 +++++++++
+ arch/arm/boot/dts/kirkwood-linkstation-lsvl.dts    |  57 ++++
+ arch/arm/boot/dts/kirkwood-linkstation-lswsxl.dts  |  57 ++++
+ arch/arm/boot/dts/kirkwood-linkstation-lswvl.dts   | 112 ++++++++
+ arch/arm/boot/dts/kirkwood-linkstation-lswxl.dts   | 116 ++++++++
+ arch/arm/boot/dts/kirkwood-linkstation.dtsi        | 202 ++++++++++++++
+ arch/arm/boot/dts/kirkwood-lswvl.dts               | 302 ---------------------
+ arch/arm/boot/dts/kirkwood-lswxl.dts               | 302 ---------------------
+ arch/arm/boot/dts/kirkwood-openrd-client.dts       |   6 +-
+ arch/arm/boot/dts/kirkwood-openrd.dtsi             |  41 ++-
+ arch/arm/boot/dts/kirkwood.dtsi                    |   2 +-
+ 20 files changed, 1137 insertions(+), 634 deletions(-)
+ create mode 100644 arch/arm/boot/dts/kirkwood-linkstation-6282.dtsi
+ create mode 100644 arch/arm/boot/dts/kirkwood-linkstation-duo-6281.dtsi
+ create mode 100644 arch/arm/boot/dts/kirkwood-linkstation-lsqvl.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-linkstation-lsvl.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-linkstation-lswsxl.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-linkstation-lswvl.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-linkstation-lswxl.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-linkstation.dtsi
+ delete mode 100644 arch/arm/boot/dts/kirkwood-lswvl.dts
+ delete mode 100644 arch/arm/boot/dts/kirkwood-lswxl.dts
+
+--
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
