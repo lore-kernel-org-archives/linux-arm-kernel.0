@@ -1,43 +1,34 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon,  8 Feb 2016 09:49:25 +0100
-Subject: [PATCH] ARM: ICST: try other dividends than 1
-Message-ID: <1454921365-4140-1-git-send-email-linus.walleij@linaro.org>
+From: aryabinin@virtuozzo.com (Andrey Ryabinin)
+Date: Mon, 8 Feb 2016 11:51:01 +0300
+Subject: [PATCH] arm64: disable kasan when accessing frame->fp in
+ unwind_frame
+In-Reply-To: <1454713487-5239-1-git-send-email-yang.shi@linaro.org>
+References: <1454713487-5239-1-git-send-email-yang.shi@linaro.org>
+Message-ID: <56B856F5.5080606@virtuozzo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the dawn of time the ICST code has only supported divide
-by one or hang in an eternal loop. Luckily we were always dividing
-by one because the reference frequency for the systems using
-the ICSTs is 24MHz and the [min,max] values for the PLL input
-if [10,320] MHz for ICST307 and [6,200] for ICST525, so the loop
-will always terminate immediately without assigning any divisor
-for the reference frequency.
 
-But for the code to make sense, let's insert the missing i++
 
-Reported-by: David Binderman <dcb314@hotmail.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: stable at vger.kernel.org
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-I ran into the mail David sent in december and looked closer at
-this. It's not a regression in any deployed systems but it's
-disturbing so let's fix it.
----
- arch/arm/common/icst.c | 1 +
- 1 file changed, 1 insertion(+)
+On 02/06/2016 02:04 AM, Yang Shi wrote:
+>  
+>  #include <asm/irq.h>
+>  #include <asm/stacktrace.h>
+> @@ -64,7 +65,9 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
+>  		return -EINVAL;
+>  
+>  	frame->sp = fp + 0x10;
+> +	kasan_disable_current();
+>  	frame->fp = *(unsigned long *)(fp);
 
-diff --git a/arch/arm/common/icst.c b/arch/arm/common/icst.c
-index 2dc6da70ae59..3b3e58b7ba74 100644
---- a/arch/arm/common/icst.c
-+++ b/arch/arm/common/icst.c
-@@ -58,6 +58,7 @@ icst_hz_to_vco(const struct icst_params *p, unsigned long freq)
- 
- 		if (f > p->vco_min && f <= p->vco_max)
- 			break;
-+		i++;
- 	} while (i < 8);
- 
- 	if (i >= 8)
--- 
-2.4.3
+It would be better to use READ_ONCE_NOCHECK() here.
+See f7d27c35ddff7 ("x86/mm, kasan: Silence KASAN warnings in get_wchan()") which solves the same problem for x86.
+
+> +	kasan_enable_current();
+>  	frame->pc = *(unsigned long *)(fp + 8);
+
+Why you left frame->pc out of scope? This line could trigger kasan as well.
+
+>  
+>  #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+> 
