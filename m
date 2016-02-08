@@ -1,73 +1,46 @@
-From: codekipper@gmail.com (codekipper at gmail.com)
-Date: Mon,  8 Feb 2016 16:59:27 +0100
-Subject: [linux-sunxi][PATCH] ARM: dts: sun7i: Enable USB DRC on Itead Ibox
-Message-ID: <1454947167-12236-1-git-send-email-codekipper@gmail.com>
+From: ian.campbell@citrix.com (Ian Campbell)
+Date: Mon, 8 Feb 2016 15:59:32 +0000
+Subject: [PATCH] xen/arm: correctly handle DMA mapping of compound pages
+In-Reply-To: <alpine.DEB.2.02.1602081542410.27008@kaball.uk.xensource.com>
+References: <1454938450-26282-1-git-send-email-ian.campbell@citrix.com>
+ <alpine.DEB.2.02.1602081542410.27008@kaball.uk.xensource.com>
+Message-ID: <1454947172.17191.4.camel@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marcus Cooper <codekipper@gmail.com>
+On Mon, 2016-02-08 at 15:46 +0000, Stefano Stabellini wrote:
+> On Mon, 8 Feb 2016, Ian Campbell wrote:
+> > Currently xen_dma_map_page concludes that DMA to anything other than
+> > the head page of a compound page must be foreign, since the PFN of the
+> > page is that of the head.
+> > 
+> > Fix the check to instead consider the whole of a compound page to be
+> > local if the PFN of the head passes the 1:1 check.
+> > 
+> > We can never see a compound page which is a mixture of foreign and
+> > local sub-pages.
+> > 
+> > The comment already correctly described the intention, but fixup the
+> > spelling and some grammar.
+> > 
+> > This fixes the various SSH protocol errors which we have been seeing
+> > on the cubietrucks in our automated test infrastructure.
+> > 
+> > This has been broken since "xen/arm: use hypercall to flush caches in
+> > map_page" (3567258d281b), which was in v3.19-rc1.
+> 
+> checkpatch.pl reports a small style issue with this statement.
 
-Enable the otg/drc usb controller on the Itead Ibox device.
+Damn, I added that para after I'd already run checkpatch.
 
-Signed-off-by: Marcus Cooper <codekipper@gmail.com>
----
- arch/arm/boot/dts/sun7i-a20-itead-ibox.dts     | 14 ++++++++++++++
- arch/arm/boot/dts/sunxi-itead-core-common.dtsi |  9 +++++++++
- 2 files changed, 23 insertions(+)
+> [...]
+> 
+> To take care of 64k pages, this needs to be:
+> 
+{...]
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-itead-ibox.dts b/arch/arm/boot/dts/sun7i-a20-itead-ibox.dts
-index 661c21d..a512581 100644
---- a/arch/arm/boot/dts/sun7i-a20-itead-ibox.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-itead-ibox.dts
-@@ -118,8 +118,22 @@
- 		allwinner,drive = <SUN4I_PINCTRL_20_MA>;
- 		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 	};
-+
-+	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
-+		allwinner,pins = "PH4";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
- };
- 
- &reg_ahci_5v {
- 	status = "okay";
- };
-+
-+&usbphy {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&usb0_id_detect_pin>;
-+	usb0_id_det-gpio = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/sunxi-itead-core-common.dtsi b/arch/arm/boot/dts/sunxi-itead-core-common.dtsi
-index 2565d51..d22eea3 100644
---- a/arch/arm/boot/dts/sunxi-itead-core-common.dtsi
-+++ b/arch/arm/boot/dts/sunxi-itead-core-common.dtsi
-@@ -88,6 +88,10 @@
- 	status = "okay";
- };
- 
-+&otg_sram {
-+	status = "okay";
-+};
-+
- #include "axp209.dtsi"
- 
- &reg_dcdc2 {
-@@ -129,6 +133,11 @@
- 	status = "okay";
- };
- 
-+&usb_otg {
-+	dr_mode = "otg";
-+	status = "okay";
-+};
-+
- &usbphy {
- 	usb1_vbus-supply = <&reg_usb1_vbus>;
- 	usb2_vbus-supply = <&reg_usb2_vbus>;
--- 
-2.7.1
+> Since you are at it, it might be worth adding brackets.
+
+Will do on both counts. v2 on its way.
+
+Ian.
