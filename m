@@ -1,43 +1,73 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 8 Feb 2016 18:34:59 +0100
-Subject: [linux-sunxi][PATCH] ARM: dts: sun7i: Enable USB DRC on Itead Ibox
-In-Reply-To: <CAEKpxBkXp9hx6KWpWyRBvYBFi7Sr0FgFHrD6M0nSBuJ1bV++1A@mail.gmail.com>
-References: <1454947167-12236-1-git-send-email-codekipper@gmail.com>
- <56B8BED7.9030704@redhat.com>
- <CAEKpxBkXp9hx6KWpWyRBvYBFi7Sr0FgFHrD6M0nSBuJ1bV++1A@mail.gmail.com>
-Message-ID: <56B8D1C3.809@redhat.com>
+From: yang.shi@linaro.org (Yang Shi)
+Date: Mon,  8 Feb 2016 09:13:09 -0800
+Subject: [PATCH v2] arm64: disable kasan when accessing frame->fp in
+ unwind_frame
+Message-ID: <1454951589-18238-1-git-send-email-yang.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+When boot arm64 kernel with KASAN enabled, the below error is reported by
+kasan:
 
-On 08-02-16 17:56, Code Kipper wrote:
-> On 8 February 2016 at 17:14, Hans de Goede <hdegoede@redhat.com> wrote:
->> Hi,
->>
->> On 08-02-16 16:59, codekipper at gmail.com wrote:
->>>
->>> From: Marcus Cooper <codekipper@gmail.com>
->>>
->>> Enable the otg/drc usb controller on the Itead Ibox device.
->>>
->>> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
->>
->>
->> Same remark as with your Olimex A20 EVB board patch, please
->> also provide a vbus detect pin setting. If for some reason the
->> VBus detect is not wired up, or not working properly, please mention
->> this explicitly in the commit message.
-> Hi Hans,
-> I've added vbus detect and it no longer works. It's mentioned that the
-> Itead Ibox is similar to the Cubieboard 2 which also doesn't include
-> the detect. I can see now in the commit that it states "Note this
-> board has the otg-vbus connected directly to the 5v-dcc of the board,
-> so there is no vbus0 regulator, nor vbus0-det.", I will add this to
-> the commit message and try and dig out a schematic to confirm.
+BUG: KASAN: out-of-bounds in unwind_frame+0xec/0x260 at addr ffffffc064d57ba0
+Read of size 8 by task pidof/499
+page:ffffffbdc39355c0 count:0 mapcount:0 mapping:          (null) index:0x0
+flags: 0x0()
+page dumped because: kasan: bad access detected
+CPU: 2 PID: 499 Comm: pidof Not tainted 4.5.0-rc1 #119
+Hardware name: Freescale Layerscape 2085a RDB Board (DT)
+Call trace:
+[<ffffffc00008d078>] dump_backtrace+0x0/0x290
+[<ffffffc00008d32c>] show_stack+0x24/0x30
+[<ffffffc0006a981c>] dump_stack+0x8c/0xd8
+[<ffffffc0002e4400>] kasan_report_error+0x558/0x588
+[<ffffffc0002e4958>] kasan_report+0x60/0x70
+[<ffffffc0002e3188>] __asan_load8+0x60/0x78
+[<ffffffc00008c92c>] unwind_frame+0xec/0x260
+[<ffffffc000087e60>] get_wchan+0x110/0x160
+[<ffffffc0003b647c>] do_task_stat+0xb44/0xb68
+[<ffffffc0003b7730>] proc_tgid_stat+0x40/0x50
+[<ffffffc0003ac840>] proc_single_show+0x88/0xd8
+[<ffffffc000345be8>] seq_read+0x370/0x770
+[<ffffffc00030aba0>] __vfs_read+0xc8/0x1d8
+[<ffffffc00030c0ec>] vfs_read+0x94/0x168
+[<ffffffc00030d458>] SyS_read+0xb8/0x128
+[<ffffffc000086530>] el0_svc_naked+0x24/0x28
+Memory state around the buggy address:
+ ffffffc064d57a80: 00 00 00 00 00 00 00 00 f1 f1 f1 f1 00 00 f4 f4
+ ffffffc064d57b00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+>ffffffc064d57b80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+                                  ^
+ ffffffc064d57c00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+ ffffffc064d57c80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
 
-Ok, thanks for looking into this.
+Since the shadow byte pointed by the report is 0, so it may mean it is just hit
+oob in non-current task. So, disable the instrumentation to silence these
+warnings.
 
-Regards,
+Signed-off-by: Yang Shi <yang.shi@linaro.org>
+---
+v1 --> v2:
+ * Replace kasan_disable{enable}_current to READ_ONCE_NOCHECK.
+ * Cover the following statement too.
 
-Hans
+ arch/arm64/kernel/stacktrace.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
+index 4fad978..12a18cb 100644
+--- a/arch/arm64/kernel/stacktrace.c
++++ b/arch/arm64/kernel/stacktrace.c
+@@ -64,8 +64,8 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
+ 		return -EINVAL;
+ 
+ 	frame->sp = fp + 0x10;
+-	frame->fp = *(unsigned long *)(fp);
+-	frame->pc = *(unsigned long *)(fp + 8);
++	frame->fp = READ_ONCE_NOCHECK(*(unsigned long *)(fp));
++	frame->pc = READ_ONCE_NOCHECK(*(unsigned long *)(fp + 8));
+ 
+ #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+ 	if (tsk && tsk->ret_stack &&
+-- 
+2.0.2
