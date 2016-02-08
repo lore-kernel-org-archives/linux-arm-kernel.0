@@ -1,76 +1,57 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 8 Feb 2016 11:31:47 +0100 (CET)
-Subject: [PATCH 1/6] irqchip: add the Alpine MSIX interrupt controller
-In-Reply-To: <1454922971-17405-2-git-send-email-antoine.tenart@free-electrons.com>
-References: <1454922971-17405-1-git-send-email-antoine.tenart@free-electrons.com>
- <1454922971-17405-2-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <alpine.DEB.2.11.1602081125560.25254@nanos>
+From: kernel@martin.sperl.org (Martin Sperl)
+Date: Mon, 8 Feb 2016 11:39:49 +0100
+Subject: [PATCH V4 1/7] clk: bcm2835: the minimum clock divider is 2
+In-Reply-To: <87egcv5153.fsf@eliezer.anholt.net>
+References: <1452867667-2447-1-git-send-email-kernel@martin.sperl.org>
+ <1452867667-2447-2-git-send-email-kernel@martin.sperl.org>
+ <87oac03tuz.fsf@eliezer.anholt.net> <87egcv5153.fsf@eliezer.anholt.net>
+Message-ID: <56B87075.8000304@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Antoine,
 
-On Mon, 8 Feb 2016, Antoine Tenart wrote:
-> +static int alpine_msix_set_affinity(struct irq_data *irq_data,
-> +				    const struct cpumask *mask, bool force)
-> +{
-> +	int ret;
-> +
-> +	ret = irq_chip_set_affinity_parent(irq_data, mask, force);
-> +	return ret == IRQ_SET_MASK_OK ? IRQ_SET_MASK_OK_DONE : ret;
 
-What's the point of this exercise? Why can't you just set the affinity
-callback to irq_chip_set_affinity_parent() ?
+On 02.02.2016 02:52, Eric Anholt wrote:
+> Eric Anholt <eric@anholt.net> writes:
+>
+>> kernel at martin.sperl.org writes:
+>>
+>>> From: Martin Sperl <kernel@martin.sperl.org>
+>>>
+>>> Testing with different clock divider values has shown
+>>> that (at least for the PCM clock) the clock divider
+>>> has to be at least 2, otherwise the clock will not
+>>> output a signal.
+>>
+>> For a MASH clock (PWM, PCM, SLIMBUS, but not the others), the minimum
+>> integer component of the divider is:
+>>
+>> mash 0: 1
+>> mash 1: 2
+>> mash 2: 3
+>> mash 3: 5
+>
+> More specific MASH list:
+>
+> GP0
+> GP1
+> (*not* gp2)
+> PCM
+> PWM
+> SLIM
+>
+I got the list from the broadcom provided headers for the VC4.
+and where CM_*_DIV range does not start at 12 we have a fractional
+divider (also requires if CM_*_FRAC or CM_*_MASH is set)
 
-> +static struct irq_chip alpine_msix_irq_chip = {
-> +	.name			= "MSIx",
-> +	.irq_mask		= alpine_msix_mask_msi_irq,
-> +	.irq_unmask		= alpine_msix_unmask_msi_irq,
-> +	.irq_eoi		= irq_chip_eoi_parent,
-> +	.irq_set_affinity	= alpine_msix_set_affinity,
-> +};
-> +
-> +static int alpine_msix_allocate_sgi(struct alpine_msix_data *priv, int num_req)
-> +{
-> +	int first, i;
-> +
-> +	spin_lock(&priv->msi_map_lock);
-> +
-> +	first = bitmap_find_next_zero_area(priv->msi_map, priv->num_spis, 0,
-> +					   num_req, 0);
-> +	if (first >= priv->num_spis) {
-> +		spin_unlock(&priv->msi_map_lock);
-> +		return -ENOSPC;
-> +	}
-> +
-> +	for (i = 0; i < num_req; i++)
-> +		set_bit(first + i, priv->msi_map);
+And if CM_*_MASH is set we got a mash enabled clock:
+CM_GNRICCTL_MASH
+CM_GP0CTL_MASH
+CM_GP1CTL_MASH
+CM_PCMCTL_MASH
+CM_PWMCTL_MASH
+CM_SLIMCTL_MASH
 
-  bitmap_set() ??
-
-> +
-> +	spin_unlock(&priv->msi_map_lock);
-> +
-> +	return priv->spi_first + first;
-> +}
-> +
-> +static void alpine_msix_free_sgi(struct alpine_msix_data *priv, unsigned sgi,
-> +				 int num_req)
-> +{
-> +	int i, first;
-> +
-> +	first = sgi - priv->spi_first;
-> +
-> +	spin_lock(&priv->msi_map_lock);
-> +
-> +	for (i = 0; i < num_req; i++)
-> +		clear_bit(first + i, priv->msi_map);
-
-  bitmap_clear() ??
-
-> +	spin_unlock(&priv->msi_map_lock);
-> +}
-
-Thanks,
-
-	tglx
+And this is what can get implemented by configuring mash
+in the DT - otherwise only frac (a.k.a. MASH = 1) is
+used for any clock that has .frac_bits > 0.
