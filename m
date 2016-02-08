@@ -1,47 +1,51 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 8 Feb 2016 10:51:05 +0000
-Subject: [PATCH 2/3] arm64: dts: add the Alpine v2 EVP
-In-Reply-To: <1454922699-16785-3-git-send-email-antoine.tenart@free-electrons.com>
-References: <1454922699-16785-1-git-send-email-antoine.tenart@free-electrons.com>
- <1454922699-16785-3-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <20160208105104.GA12991@leverpostej>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon, 08 Feb 2016 11:52:21 +0100
+Subject: [PATCH v7 0/5] Add mipi dsi support for rk3288
+In-Reply-To: <56B869F4.6090507@codeaurora.org>
+References: <1452053038-32098-1-git-send-email-zyw@rock-chips.com>
+ <56B869F4.6090507@codeaurora.org>
+Message-ID: <5060470.dfeHX20DRa@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Archit,
 
-> +	chosen {
-> +		stdout-path = "console0:115200n8";
-> +	};
+Am Montag, 8. Februar 2016, 15:42:04 schrieb Archit Taneja:
+> On 01/06/2016 09:33 AM, Chris Zhong wrote:
+> > The rk3288 MIPI DSI is a Synopsys DesignWare MIPI DSI host controller
+> > IP. This series adds support for a Synopsys DesignWare MIPI DSI host
+> > controller DRM driver.
+> > 
+> > The MIPI DSI feature is tested on rk3288 evb board, backport them to
+> > chrome os kernel chrome_v3.14, and it can display normally.
+> > 
+> > This patchset is base on the patchset from Ying.liu at freescale.com.
+> > <http://www.spinics.net/lists/dri-devel/msg77181.html>
+> > 
+> > According to the suggestion from Thierry, I have get rid of the bridge,
+> > and register the encoder & connecter in drm/rockchip/dw-mipi-dsi.c.
+> 
+> I've raised this question too late, but what was the reason to not
+> implement the DSI block as a bridge driver?
 
-There is no console0 alias, so this cannot work.
+There seems to always be some sort of contention about those being bridge 
+drivers - I think I remember Thierry speaking up about that. But I don't 
+remember if any different solution was suggested.
 
-Did you mean serial0?
+Also as we have seen with current shared IPs (dw-hdmi + analogix-dp) there 
+are always implementation-specific parts and deciding which needs to land 
+where is difficult without the secondary user present.
 
-[...]
+The first iterations where using a bridge-driver-base for it but I guess it 
+was to much hassle without seeing another user on the horizon.
 
-> +	aliases {
-> +		serial0 = &uart0;
-> +		serial1 = &uart1;
-> +		serial2 = &uart2;
-> +		serial3 = &uart3;
-> +	};
 
-[...]
+> The drm/hisilicon IP seems to use a very similar DSI Designware IP (the
+> register offsets seems to be the same). There is a good potential of
+> re-use here by different kms drivers here the way it's already done for
+> DW HDMI and the analogix DP driver that's in review process.
 
-> +	psci {
-> +		compatible = "arm,psci-0.2", "arm,psci";
-> +		method = "smc";
-> +		cpu_on = <0x84000003>;
-> +	};
+I guess, the second user now gets to do the generalization ;-)
 
-If you have PSCI 0.2, the cpu_on ID (and all other mandatory function
-IDs) are implicit.
 
-If you want to have "arm,psci" as a fallback, then please add the IDs
-for functions mandatory in PSCI 0.2 which existed in the "arm,psci"
-binding. Otherwise, drop "arm,psci" from the compatible list, along
-with the cpu_on function ID.
-
-THanks,
-Mark.
+Heiko
