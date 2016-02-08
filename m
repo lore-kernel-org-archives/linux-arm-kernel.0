@@ -1,44 +1,25 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Mon, 08 Feb 2016 13:20:35 -0800
-Subject: [PATCH v4 00/13] arm64: kernel: Add support for
- hibernate/suspend-to-disk
-In-Reply-To: <56B4AF2A.2070503@arm.com> (James Morse's message of "Fri, 05 Feb
- 2016 14:18:18 +0000")
-References: <1453977766-20907-1-git-send-email-james.morse@arm.com>
- <7hvb6chv5e.fsf@baylibre.com> <56AF1D07.3000604@arm.com>
- <7hmvrid3pv.fsf@baylibre.com> <56B4AF2A.2070503@arm.com>
-Message-ID: <7h8u2uc318.fsf@baylibre.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 8 Feb 2016 15:24:43 -0600
+Subject: [PATCH V5 1/2] regulator: Add document for MT6323 regulator
+In-Reply-To: <1454874037-38905-1-git-send-email-blogic@openwrt.org>
+References: <1454874037-38905-1-git-send-email-blogic@openwrt.org>
+Message-ID: <20160208212443.GA32296@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-James Morse <james.morse@arm.com> writes:
+On Sun, Feb 07, 2016 at 08:40:36PM +0100, John Crispin wrote:
+> Signed-off-by: John Crispin <blogic@openwrt.org>
+> Cc: devicetree at vger.kernel.org
+> 
+> ---
+> Changes in V5
+> * regulator vs regulators
+> 
+> Changes in V4
+> * regulator is a subnode and not a property
+> 
+>  .../bindings/regulator/mt6323-regulator.txt        |  244 ++++++++++++++++++++
+>  1 file changed, 244 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/regulator/mt6323-regulator.txt
 
-> Hi Kevin,
->
-> On 03/02/16 00:42, Kevin Hilman wrote:
->> James Morse <james.morse@arm.com> writes:
->>> On 29/01/16 22:34, Kevin Hilman wrote:
->>>> James Morse <james.morse@arm.com> writes:
->>>> I'd like to help in testing this so I'm just curious which platforms
->>>> you've been testing this on.  I'm assuming a Juno (r2?), anything else?
->>>
->>> That would be great - thanks!
->>>
->>> I've done most of the testing on a Juno r1, but also gave it a spin on a
->>> stray Seattle.
->> 
->> OK, I'm using a very recently arrived Juno R2, and I did get it
->> working.  I have a few other arm64 boards around that ar part of
->> kernelci.org and will try those as well.
->
-> Great,
-> It would be good to have a Tested-by if it works to your satisfaction...
-
-Yes, feel free to add
-
-Tested-by: Kevin Hilman <khilman@baylibre.com> # Tested on Juno R2
-
-I tried to also test on the qcom 96boards, but that platform doesn't
-support suspend/resume yet. :(
-
-Kevin
+Acked-by: Rob Herring <robh@kernel.org>
