@@ -1,34 +1,36 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Mon,  8 Feb 2016 14:53:03 -0300
-Subject: [PATCH 3/3] ARM: omap2plus_defconfig: Enable TI TVP5150 video decoder
- support
-In-Reply-To: <1454953983-8894-1-git-send-email-javier@osg.samsung.com>
-References: <1454953983-8894-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <1454953983-8894-4-git-send-email-javier@osg.samsung.com>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Mon,  8 Feb 2016 18:57:39 +0100
+Subject: [PATCH 2/2] pinctrl: stm32: Fix compile testing selection
+In-Reply-To: <1454954259-4923-1-git-send-email-mcoquelin.stm32@gmail.com>
+References: <1454954259-4923-1-git-send-email-mcoquelin.stm32@gmail.com>
+Message-ID: <1454954259-4923-3-git-send-email-mcoquelin.stm32@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Many OMAP3 boards have a TVP5150/1 video decoder attached to the OMAP3
-ISP so enable support for its driver as a module to be able to test it.
+While selecting the driver for compile testing seemed possible,
+the driver was not compiled because the driver directory was only
+added if ARCH_STM32 was selected.
 
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+This patch now makes the pinctrl Makefile to add stm32 directory if
+PINCTRL_STM32 is selected.
 
+Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
 ---
+ drivers/pinctrl/Makefile | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
- arch/arm/configs/omap2plus_defconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-index 792a56d5f45c..9fc172373aa3 100644
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -295,6 +295,7 @@ CONFIG_VIDEO_V4L2_SUBDEV_API=y
- CONFIG_V4L_PLATFORM_DRIVERS=y
- CONFIG_VIDEO_OMAP3=m
- # CONFIG_MEDIA_SUBDRV_AUTOSELECT is not set
-+CONFIG_VIDEO_TVP5150=m
- CONFIG_FB=y
- CONFIG_FIRMWARE_EDID=y
- CONFIG_FB_MODE_HELPERS=y
+diff --git a/drivers/pinctrl/Makefile b/drivers/pinctrl/Makefile
+index 8adc235..7ea62ef 100644
+--- a/drivers/pinctrl/Makefile
++++ b/drivers/pinctrl/Makefile
+@@ -46,7 +46,7 @@ obj-$(CONFIG_ARCH_QCOM)		+= qcom/
+ obj-$(CONFIG_PINCTRL_SAMSUNG)	+= samsung/
+ obj-$(CONFIG_PINCTRL_SH_PFC)	+= sh-pfc/
+ obj-$(CONFIG_PINCTRL_SPEAR)	+= spear/
+-obj-$(CONFIG_ARCH_STM32)	+= stm32/
++obj-$(CONFIG_PINCTRL_STM32)	+= stm32/
+ obj-$(CONFIG_PINCTRL_SUNXI)	+= sunxi/
+ obj-$(CONFIG_PINCTRL_UNIPHIER)	+= uniphier/
+ obj-$(CONFIG_ARCH_VT8500)	+= vt8500/
 -- 
-2.5.0
+1.9.1
