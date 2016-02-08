@@ -1,58 +1,67 @@
-From: gerg@uclinux.org (Greg Ungerer)
-Date: Tue, 9 Feb 2016 09:36:00 +1000
-Subject: [PATCH] ARM: ks8695: fix __initdata annotation
-In-Reply-To: <1454941509-2773774-1-git-send-email-arnd@arndb.de>
-References: <1454941509-2773774-1-git-send-email-arnd@arndb.de>
-Message-ID: <56B92660.8060203@uclinux.org>
+From: ddaney.cavm@gmail.com (David Daney)
+Date: Mon,  8 Feb 2016 15:55:28 -0800
+Subject: [PATCH v6 0/3] Add host controller drivers for Cavium ThunderX PCI
+Message-ID: <1454975731-13618-1-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/02/16 00:24, Arnd Bergmann wrote:
-> Clang complains about the __initdata section attribute being in the
-> wrong place in two files of ks8695:
-> 
-> arch/arm/mach-ks8695/cpu.c:37:31: error: '__section__' attribute only applies to functions and global variables
-> arch/arm/mach-ks8695/board-og.c:83:31: error: '__section__' attribute only applies to functions and global variables
-> 
-> This moves the attribute to the correct place.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+From: David Daney <david.daney@cavium.com>
 
-Acked-by: Greg Ungerer <gerg@uclinux.org>
+Some Cavium ThunderX processors require quirky access methods for the
+config space of the PCIe bridge.
 
-Regards
-Greg
+There are now three patches:
 
+1) Refactor code in pci-host-generic so that it can more easily be
+   used by other drivers.  This splits the driver for CAM and ECAM
+   access methods to a separate file from the common host driver code.
 
-> ---
->  arch/arm/mach-ks8695/board-og.c | 2 +-
->  arch/arm/mach-ks8695/cpu.c      | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-ks8695/board-og.c b/arch/arm/mach-ks8695/board-og.c
-> index 1f4f2f4f25bb..fa1a7c2ca2bb 100644
-> --- a/arch/arm/mach-ks8695/board-og.c
-> +++ b/arch/arm/mach-ks8695/board-og.c
-> @@ -80,7 +80,7 @@ static void __init og_pci_bus_reset(void)
->  #define	S8250_VIRT	0xf4000000
->  #define	S8250_SIZE	0x00100000
->  
-> -static struct __initdata map_desc og_io_desc[] = {
-> +static struct map_desc __initdata og_io_desc[] = {
->  	{
->  		.virtual	= S8250_VIRT,
->  		.pfn		= __phys_to_pfn(S8250_PHYS),
-> diff --git a/arch/arm/mach-ks8695/cpu.c b/arch/arm/mach-ks8695/cpu.c
-> index 474a050da85b..f56937890e3a 100644
-> --- a/arch/arm/mach-ks8695/cpu.c
-> +++ b/arch/arm/mach-ks8695/cpu.c
-> @@ -34,7 +34,7 @@
->  #include <mach/regs-misc.h>
->  
->  
-> -static struct __initdata map_desc ks8695_io_desc[] = {
-> +static struct map_desc __initdata ks8695_io_desc[] = {
->  	{
->  		.virtual	= (unsigned long)KS8695_IO_VA,
->  		.pfn		= __phys_to_pfn(KS8695_IO_PA),
-> 
+2) Add the ThunderX PCIe driver to external PCIe buses, which
+   leverages the code in pci-host-generic
+
+3) Add ThunderX PCI driver for internel SoC buses used on early
+   ThunderX chip revisions.
+
+Changes from v5: Added Acked-by Rob Herring for the device tree
+binding in 3/3.  Fixed typo and split large functions as suggested by
+Bjorn Helgaas.
+
+Changes from v4: Added patch 3/3.  Stylistic changes to 2/3 suggested
+by Bjorn Helgaas.  When expanding config write width to 32-bits, mask
+out unintened writes to W1C bits, also suggested by Bjorn Helgaas.
+
+Changes from v3: Add some Acked-by, rebased to v4.5.0-rc1
+
+Changes from v2: Improve device tree binding example as noted by Rob
+Herring.  Rename pcie-thunder-pem.* to pci-thunder-pem.* for better
+consistency.  Update MAINTAINERS to reflect the changes.
+
+Changes from v1: Split CAM and ECAM code from common driver code as
+suggested by Arnd Bergmann.  Fix spelling errors in
+pcie-thunder-pem.txt
+
+David Daney (3):
+  PCI: generic: Refactor code to enable reuse by other drivers.
+  pci, pci-thunder-pem: Add PCIe host driver for ThunderX processors.
+  pci, pci-thunder-ecam: Add driver for ThunderX-pass1 on-chip devices
+
+ .../devicetree/bindings/pci/pci-thunder-ecam.txt   |  30 ++
+ .../devicetree/bindings/pci/pci-thunder-pem.txt    |  43 +++
+ MAINTAINERS                                        |   9 +
+ drivers/pci/host/Kconfig                           |  18 ++
+ drivers/pci/host/Makefile                          |   3 +
+ drivers/pci/host/pci-host-common.c                 | 194 +++++++++++
+ drivers/pci/host/pci-host-common.h                 |  47 +++
+ drivers/pci/host/pci-host-generic.c                | 181 +----------
+ drivers/pci/host/pci-thunder-ecam.c                | 358 +++++++++++++++++++++
+ drivers/pci/host/pci-thunder-pem.c                 | 347 ++++++++++++++++++++
+ 10 files changed, 1053 insertions(+), 177 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pci/pci-thunder-ecam.txt
+ create mode 100644 Documentation/devicetree/bindings/pci/pci-thunder-pem.txt
+ create mode 100644 drivers/pci/host/pci-host-common.c
+ create mode 100644 drivers/pci/host/pci-host-common.h
+ create mode 100644 drivers/pci/host/pci-thunder-ecam.c
+ create mode 100644 drivers/pci/host/pci-thunder-pem.c
+
+-- 
+1.8.3.1
