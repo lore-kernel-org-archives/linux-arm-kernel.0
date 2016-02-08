@@ -1,50 +1,74 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Mon, 8 Feb 2016 15:07:08 -0600
-Subject: [PATCH 0/3] omap: hwmod: add default reset handling support
-In-Reply-To: <1454929941-23949-1-git-send-email-kishon@ti.com>
-References: <1454929941-23949-1-git-send-email-kishon@ti.com>
-Message-ID: <56B9037C.2050203@ti.com>
+From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
+Date: Mon, 8 Feb 2016 22:10:22 +0100
+Subject: [PATCH] ARM: RX51: Set system_rev from ATAGS
+In-Reply-To: <1454696102-2214-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
+References: <3663322.UyrB2OmX6o@wuerfel>
+ <1454696102-2214-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
+Message-ID: <20160208211022.GM30075@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/08/2016 05:12 AM, Kishon Vijay Abraham I wrote:
-> Add a new hwmod flag to indicate custom reset handling and use it
-> for devices that require custom reset handling (like dsp, ipu, iva).
-> 
-> Tested PCIe on dra7-evm and dra72-evm.
-> I need help in testing DSP, IPU, IVA, PRU, GFX, M3 in other platforms.
-> Or a way to test these cores to see if reset is not broken. Suman?
+On Friday 05 February 2016 20:15:02 Ivaylo Dimitrov wrote:
+> Signed-off-by: Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com>
 
-I won't be able to test this week, and have requested Dave to check on
-wkup_m3_rproc driver atleast. I see one potential issue (see my commment
-on the other thread), but can confirm that only after testing.
+Reviewed-by: Pali Roh?r <pali.rohar@gmail.com>
+Tested-by: Pali Roh?r <pali.rohar@gmail.com>
 
-Have you tested multiple probe/removal sequences? Can you check the
-return status on the _hardreset_deassert call with your PCIe driver,
-believe even that one would return an error on multiple probes.
+> ---
+>  arch/arm/mach-omap2/board-generic.c | 22 +++++++++++++++++++++-
+>  1 file changed, 21 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+> index 8098272..b91fabe 100644
+> --- a/arch/arm/mach-omap2/board-generic.c
+> +++ b/arch/arm/mach-omap2/board-generic.c
+> @@ -18,6 +18,7 @@
+>  
+>  #include <asm/setup.h>
+>  #include <asm/mach/arch.h>
+> +#include <asm/system_info.h>
+>  
+>  #include "common.h"
+>  
+> @@ -77,12 +78,31 @@ static const char *const n900_boards_compat[] __initconst = {
+>  	NULL,
+>  };
+>  
+> +/* Set system_rev from atags */
+> +static void __init rx51_system_rev(const struct tag *tags)
+> +{
+> +	const struct tag *tag;
+> +
+> +	if (tags->hdr.tag != ATAG_CORE)
+> +		return;
+> +
+> +	for_each_tag(tag, tags) {
+> +		if (tag->hdr.tag == ATAG_REVISION) {
+> +			system_rev = tag->u.revision.rev;
+> +			break;
+> +		}
+> +	}
+> +}
+> +
+>  /* Legacy userspace on Nokia N900 needs ATAGS exported in /proc/atags,
+>   * save them while the data is still not overwritten
+>   */
+>  static void __init rx51_reserve(void)
+>  {
+> -	save_atags((const struct tag *)(PAGE_OFFSET + 0x100));
+> +	const struct tag *tags = (const struct tag *)(PAGE_OFFSET + 0x100);
+> +
+> +	save_atags(tags);
+> +	rx51_system_rev(tags);
 
-regards
-Suman
+Tony, if you are going to take this patch, I would suggest to rename
+function name rx51_system_rev to rx51_set_system_rev as it says what
+function do (set system rev :-)).
 
-> 
-> I'll post this series once again after performing these tests.
-> 
-> Paul Walmsley (3):
->   ARM: omap2+: omap_hwmod: introduce hwmod flag for custom reset
->     handling
->   ARM: OMAP2+: hwmod: use HWMOD_CUSTOM_HARDRESET for custom reset
->     handling
->   ARM: OMAP2+: hwmod: Add default reset handling
-> 
->  arch/arm/mach-omap2/omap_hwmod.c                   |   16 +++++++++++-----
->  arch/arm/mach-omap2/omap_hwmod.h                   |   12 ++++++++++++
->  arch/arm/mach-omap2/omap_hwmod_2420_data.c         |    2 ++
->  arch/arm/mach-omap2/omap_hwmod_2430_data.c         |    1 +
->  .../mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c |    2 ++
->  arch/arm/mach-omap2/omap_hwmod_33xx_data.c         |    1 +
->  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |    3 +++
->  arch/arm/mach-omap2/omap_hwmod_43xx_data.c         |    1 +
->  arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |    6 ++++++
->  arch/arm/mach-omap2/omap_hwmod_54xx_data.c         |    2 ++
->  10 files changed, 41 insertions(+), 5 deletions(-)
-> 
+>  	omap_reserve();
+>  }
+>  
+
+-- 
+Pali Roh?r
+pali.rohar at gmail.com
