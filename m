@@ -1,60 +1,82 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 8 Feb 2016 17:20:41 +0100
-Subject: [PATCH v5sub2 0/8] arm64: implement virtual KASLR
-In-Reply-To: <20160208161918.GT6076@e104818-lin.cambridge.arm.com>
-References: <1454332178-4414-1-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu-AhLcatkDsQVeoFGJ+pTEwaW1Hy9M-fY1-VWvRc_E47w@mail.gmail.com>
- <20160205173248.GJ6076@e104818-lin.cambridge.arm.com>
- <CAKv+Gu_v1sXM7sivz+Uu86ZG3=Th7wqqh7M1N8wF7Ess4NdTZQ@mail.gmail.com>
- <CAGXu5j+JpwRrVy1b_h+LJ4sCzsT7BV9RdcD0CvR-4aVJQhCpvg@mail.gmail.com>
- <20160208121430.GL6076@e104818-lin.cambridge.arm.com>
- <CAKv+Gu-=RLS8Zgn_evmoUUSHqSVfaw9_hjVMgfg1FZGRDGFVag@mail.gmail.com>
- <20160208161918.GT6076@e104818-lin.cambridge.arm.com>
-Message-ID: <CAKv+Gu9RmhaYBHOKwsPNynJ4Zia2kSJ6Yr3U4c6F13UHdbzFtw@mail.gmail.com>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Mon, 8 Feb 2016 16:20:55 +0000
+Subject: [RFC PATCH 0/4] Add ACPI support for HiSilicon PCIe Host
+ Controllers
+In-Reply-To: <56B8A214.8040203@codeaurora.org>
+References: <1454585860-60709-1-git-send-email-gabriele.paoloni@huawei.com>
+ <1930535.mkCdtpUWq7@wuerfel>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1ECAC944@lhreml503-mbs>
+ <7297343.ktGck3KQJN@wuerfel> <56B8A214.8040203@codeaurora.org>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1ECAD0C2@lhreml503-mbs>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 February 2016 at 17:19, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Mon, Feb 08, 2016 at 03:30:47PM +0100, Ard Biesheuvel wrote:
->> On 8 February 2016 at 13:14, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> > On Fri, Feb 05, 2016 at 12:42:30PM -0800, Kees Cook wrote:
->> >> On Fri, Feb 5, 2016 at 9:38 AM, Ard Biesheuvel
->> >> <ard.biesheuvel@linaro.org> wrote:
->> >> > On 5 February 2016 at 18:32, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> >> >> I'm still trying to get my head around how we merge those. Since I
->> >> >> assume akpm will push them during the merging window, part of your code
->> >> >> cannot be tested before.
->> >> >
->> >> > Actually, my original idea was for akpm to take them as a late merge
->> >> > after rebasing to -rc1, since they touch a variety of architectures,
->> >> > but I am not sure if that came across.
->> >> >
->> >> > You could always take the series through your tree instead, I guess?
->> >>
->> >> Traditionally akpm will de-duplicate patches he's carrying that appear
->> >> in another tree. I think it should be okay to carry them in both
->> >> places. (Though I'm CCing akpm just to see if I'm talking crazy.)
->> >
->> > For now, I'll merge this series in the arm64 tree and push it to next:
->> >
->> > http://lkml.kernel.org/r/1452007180-27411-1-git-send-email-ard.biesheuvel at linaro.org
->> >
->> > If there are any objections, I can drop the patches and do the
->> > BUILDTIME_EXTABLE_SORT disabling trick until they end up in mainline.
->>
->> Latest version is here:
->> http://lkml.kernel.org/r/1453892123-17973-1-git-send-email-ard.biesheuvel at linaro.org
->> (only difference is an ack from that Alpha maintainter/supporter to
->> patches #1 and #2)
->
-> I applied the acks manually but I'll double-check to make sure I haven't
-> missed anything.
->
->> However, the arm64 patch (#6) now conflicts with futex.h in -rc3 after
->> the PAN fix, not sure how to best address that ...
->
-> I'll have a look.
->
+Hi Arnd, Sinan
 
-Note that the fix is trivial, but I don't know who should be carrying
-the fix is all
+> -----Original Message-----
+> From: Sinan Kaya [mailto:okaya at codeaurora.org]
+> Sent: 08 February 2016 14:12
+> To: Arnd Bergmann; linux-arm-kernel at lists.infradead.org
+> Cc: Gabriele Paoloni; Lorenzo.Pieralisi at arm.com; jcm at redhat.com;
+> tn at semihalf.com; linux-pci at vger.kernel.org; Linuxarm; xuwei (O); linux-
+> kernel at vger.kernel.org; linux-acpi at vger.kernel.org; Wangzhou (B);
+> liudongdong (C); Guohanjun (Hanjun Guo); bhelgaas at google.com;
+> zhangjukuo; Liguozhu (Kenneth); qiujiang
+> Subject: Re: [RFC PATCH 0/4] Add ACPI support for HiSilicon PCIe Host
+> Controllers
+> 
+> On 2/8/2016 8:55 AM, Arnd Bergmann wrote:
+> > I haven't really followed what is going on with ACPI. Do you expect
+> > to see future machines come out that are not just implementing SBSA
+> > but that still need to run ACPI? I thought this was just a hack
+> > for some early machines that only run with ACPI but are not actually
+> > compliant.
+
+Well from our side (HiSilicon) we're trying to move away from non fully 
+ECAM platforms, so from us in the long term I don't expect too many quirks,
+but I don't know about the other vendors.
+
+Obviously the reason why Tomasz implemented the quirks is to fit non 
+fully ECAM HW and to allow custom HW init; this is why I thought better
+to have the ACPI version in the same dir as the DT (maybe we can create 
+an ACPI sub-dir in drivers/pci/host ?)
+
+
+> >
+> > 	Arnd
+> 
+> I agree. We shouldn't be playing with half-baked ACPI solutions. We
+> have seen
+> two variants already that claim to be ACPI compliant yet they do not
+> tie into
+> anything inside ACPICA.
+> 
+> The correct route is to use Tomasz's ACPI PCI root bridge driver and
+> use the ACPI
+> framework.
+> 
+> If a platform has quirks, Tomasz's patches allow vendors add quirks
+> too.
+> 
+> The combination of PCI host bridge driver + ACPI hack is not right.
+
+If you look at my patchset  you can see that I didn't do any hack,
+
+I just used the framework provided by Tomasz patchset.
+
+The discussion here is more about the code location for the quirks.
+Since the configuration read/write and the HW init sequences can be
+similar between the ACPI variant and DT variant I thought it make 
+sense to have them in "drivers/pci/host"
+
+Thanks
+
+Gab
+
+> 
+> --
+> Sinan Kaya
+> Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center,
+> Inc.
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a
+> Linux Foundation Collaborative Project
