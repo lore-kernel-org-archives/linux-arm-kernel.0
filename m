@@ -1,46 +1,19 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 8 Feb 2016 13:36:21 -0800
-Subject: [PATCH] ARM: drop unused Makefile.boot of Multiplatform SoCs
-In-Reply-To: <20160208200324.GY19432@atomide.com>
-References: <1454693808-13081-1-git-send-email-yamada.masahiro@socionext.com>
- <56B4E2B0.8060808@xilinx.com> <20160208200324.GY19432@atomide.com>
-Message-ID: <20160208213621.GD25468@localhost>
+Date: Mon, 8 Feb 2016 13:36:45 -0800
+Subject: [PATCH] ARM: integrator: remove redundant select in Kconfig
+In-Reply-To: <1454693920-14794-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1454693920-14794-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <20160208213645.GE25468@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 08, 2016 at 12:03:24PM -0800, Tony Lindgren wrote:
-> * Michal Simek <michal.simek@xilinx.com> [160205 09:59]:
-> > On 5.2.2016 18:36, Masahiro Yamada wrote:
-> > > The variable "MACHINE" is empty if CONFIG_ARCH_MULTIPLATFORM=y,
-> > > so these Makefile.boot files are never included.
-> > > 
-> > > Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> > > ---
-> > > 
-> > >  arch/arm/mach-cns3xxx/Makefile.boot    | 3 ---
-> > >  arch/arm/mach-exynos/Makefile.boot     | 2 --
-> > >  arch/arm/mach-integrator/Makefile.boot | 4 ----
-> > >  arch/arm/mach-keystone/Makefile.boot   | 1 -
-> > >  arch/arm/mach-mmp/Makefile.boot        | 1 -
-> > >  arch/arm/mach-mv78xx0/Makefile.boot    | 3 ---
-> > >  arch/arm/mach-nspire/Makefile.boot     | 0
-> > >  arch/arm/mach-omap2/Makefile.boot      | 3 ---
-> > >  arch/arm/mach-orion5x/Makefile.boot    | 3 ---
-> > >  arch/arm/mach-prima2/Makefile.boot     | 3 ---
-> > >  arch/arm/mach-realview/Makefile.boot   | 9 ---------
-> > >  arch/arm/mach-s3c64xx/Makefile.boot    | 2 --
-> > >  arch/arm/mach-spear/Makefile.boot      | 3 ---
-> > >  arch/arm/mach-u300/Makefile.boot       | 4 ----
-> > >  arch/arm/mach-ux500/Makefile.boot      | 3 ---
-> > >  arch/arm/mach-zynq/Makefile.boot       | 3 ---
-> > 
-> > Acked-by: Michal Simek <michal.simek@xilinx.com> (for Zynq)
+On Sat, Feb 06, 2016 at 02:38:40AM +0900, Masahiro Yamada wrote:
+> All of these are already select'ed by ARCH_MULTIPLATFORM.
 > 
-> I doubt anybody wants to go back to disabling MULTIPLATFORM:
-> 
-> Acked-by: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
 
-Agreed. I've applied to next/cleanup now.
+Thanks, applied to next/cleanup.
 
 
 -Olof
