@@ -1,30 +1,87 @@
-From: dietmar.eggemann@arm.com (Dietmar Eggemann)
-Date: Mon, 8 Feb 2016 13:41:25 +0000
-Subject: [PATCH v3 4/6] arm64: Enable dynamic CPU capacity initialization
-In-Reply-To: <20160208131320.GA7265@sirena.org.uk>
-References: <1454500799-18451-1-git-send-email-juri.lelli@arm.com>
- <1454500799-18451-5-git-send-email-juri.lelli@arm.com> <56B889F7.306@arm.com>
- <20160208131320.GA7265@sirena.org.uk>
-Message-ID: <56B89B05.4090207@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 8 Feb 2016 13:42:26 +0000
+Subject: [PATCH v2 4/4] iommu/arm-smmu: Add stub of_xlate() operation in
+ SMMUv1/SMMUv2 driver
+In-Reply-To: <CAALAos94ZHTKF5Gvjt7b56Yq+ZhhSSCN3xLdOWEpRvsrFohW6A@mail.gmail.com>
+References: <1454908652-15317-1-git-send-email-anup.patel@broadcom.com>
+ <1454908652-15317-5-git-send-email-anup.patel@broadcom.com>
+ <20160208111829.GA13498@leverpostej>
+ <CAALAos94ZHTKF5Gvjt7b56Yq+ZhhSSCN3xLdOWEpRvsrFohW6A@mail.gmail.com>
+Message-ID: <20160208134225.GB7700@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/02/16 13:13, Mark Brown wrote:
-> On Mon, Feb 08, 2016 at 12:28:39PM +0000, Dietmar Eggemann wrote:
->> On 03/02/16 11:59, Juri Lelli wrote:
+On Mon, Feb 08, 2016 at 06:13:11PM +0530, Anup Patel wrote:
+> On Mon, Feb 8, 2016 at 4:48 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Mon, Feb 08, 2016 at 10:47:32AM +0530, Anup Patel wrote:
+> >> To allow use of large memory (> 4Gb) with 32bit devices we need to use
+> >> IOMMU based DMA mappings for such 32bit devices. The IOMMU dt-bindings
+> >> allows us do this by specifying 'iommus' attribute in 32bit device DT
+> >> node. Unfortunately, specifying 'iommus' attribute does not work with
+> >> current SMMUv1/SMMUv2 driver because it requires of_xlate() operation
+> >> to be implemented by the driver.
+> >>
+> >> This patch adds a stub implementation of of_xlate() in SMMUv1/SMMUv2
+> >> driver to allow usage of 'iommus' attribute in DT for 32bit devices.
+> >>
+> >> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+> >> Reviewed-by: Ray Jui <rjui@broadcom.com>
+> >> Reviewed-by: Scott Branden <sbranden@broadcom.com>
+> >> ---
+> >>  drivers/iommu/arm-smmu.c | 11 +++++++++++
+> >>  1 file changed, 11 insertions(+)
+> >>
+> >> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> >> index 02cd67d..8e090d8 100644
+> >> --- a/drivers/iommu/arm-smmu.c
+> >> +++ b/drivers/iommu/arm-smmu.c
+> >> @@ -1398,6 +1398,16 @@ static int arm_smmu_init_platform_device(struct device *dev,
+> >>       return 0;
+> >>  }
+> >>
+> >> +int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
+> >> +{
+> >> +     /*
+> >> +      * Nothing to do here because SMMU is already aware of all
+> >> +      * MMU masters and their stream IDs using mmu-master attibute
+> >> +      * SMMU DT node.
+> >> +      */
+> >> +     return 0;
+> >> +}
+> >
+> > NAK to this.
 > 
->>> +bool arch_wants_init_cpu_capacity(void)
->>> +{
->>> +	return true;
-> 
->> Isn't this a little bit too simple? Not every ARM/ARM64 platform is a
->> heterogeneous one.
-> 
-> Does it matter?  Is there any problem with doing the callibration and
-> having it say that all the CPUs performs very similarly?  My
-> understanding was that this was simply saying it was worth checking to
-> see if there was some asymmetry.
-> 
+> I had no intention in continuing this change if I knew some work
+> on generic IOMMU binding was in-progress. In fact, I had asked
+> about alternate options previously. (Refer,
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/403128.html)
 
-No, the calibration would work on any platform. I can see your point,
-you want to have this feature not depend on dt.
+Ok.
+
+To be clear, I expect the generic binding alone to be used for the case
+you described, regardless of who implements that or how long it takes to
+appear.
+
+> > As previously mentioned by others [1], this is an abuse of the generic
+> > iommu binding support code.
+> >
+> > The SMMU binding currently does not define its implementation of the
+> > generic IOMMU binding. This series did not define what an SMMU's
+> > #iommu-cells would be nor what the contained values would represent.
+> > Therefore it is not valid to use an SMMU node with an iommus property as
+> > the SMMu doesn't follwo the generic IOMMU binding.
+> >
+> > There is ongoing work to have generic iommu binding support for the
+> > SMMU. In the absence of documentation for what this means for the
+> > binding, I am worried that this hack harms that effort.
+> 
+> Thanks for the info, I would like to try this on Broadcom SoCs.
+> 
+> Whats the ETA of patches for generic IOMMU binding for SMMU?
+
+That I do not know.
+
+Robin, what's the state of the generic IOMMU binding support?
+
+Thanks,
+Mark.
