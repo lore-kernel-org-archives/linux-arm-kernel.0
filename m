@@ -1,33 +1,88 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 8 Feb 2016 16:46:46 +0000
-Subject: [PATCH v5sub2 0/8] arm64: implement virtual KASLR
-In-Reply-To: <CAKv+Gu9RmhaYBHOKwsPNynJ4Zia2kSJ6Yr3U4c6F13UHdbzFtw@mail.gmail.com>
-References: <1454332178-4414-1-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu-AhLcatkDsQVeoFGJ+pTEwaW1Hy9M-fY1-VWvRc_E47w@mail.gmail.com>
- <20160205173248.GJ6076@e104818-lin.cambridge.arm.com>
- <CAKv+Gu_v1sXM7sivz+Uu86ZG3=Th7wqqh7M1N8wF7Ess4NdTZQ@mail.gmail.com>
- <CAGXu5j+JpwRrVy1b_h+LJ4sCzsT7BV9RdcD0CvR-4aVJQhCpvg@mail.gmail.com>
- <20160208121430.GL6076@e104818-lin.cambridge.arm.com>
- <CAKv+Gu-=RLS8Zgn_evmoUUSHqSVfaw9_hjVMgfg1FZGRDGFVag@mail.gmail.com>
- <20160208161918.GT6076@e104818-lin.cambridge.arm.com>
- <CAKv+Gu9RmhaYBHOKwsPNynJ4Zia2kSJ6Yr3U4c6F13UHdbzFtw@mail.gmail.com>
-Message-ID: <20160208164646.GU6076@e104818-lin.cambridge.arm.com>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Mon, 8 Feb 2016 16:51:19 +0000
+Subject: [RFC PATCH v2 1/3] PCI: hisi: re-architect Hip05/Hip06
+ controllers driver to preapare for ACPI
+In-Reply-To: <3113837.YSNyDAf4HQ@wuerfel>
+References: <1454935264-6076-1-git-send-email-gabriele.paoloni@huawei.com>
+ <2409806.1aGBrN4l0X@wuerfel>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1ECACFDD@lhreml503-mbs>
+ <3113837.YSNyDAf4HQ@wuerfel>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1ECAD249@lhreml503-mbs>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 08, 2016 at 05:20:41PM +0100, Ard Biesheuvel wrote:
-> On 8 February 2016 at 17:19, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > On Mon, Feb 08, 2016 at 03:30:47PM +0100, Ard Biesheuvel wrote:
-> >> However, the arm64 patch (#6) now conflicts with futex.h in -rc3 after
-> >> the PAN fix, not sure how to best address that ...
-> >
-> > I'll have a look.
+> -----Original Message-----
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: 08 February 2016 16:33
+> To: Gabriele Paoloni
+> Cc: linux-arm-kernel at lists.infradead.org; Guohanjun (Hanjun Guo);
+> Wangzhou (B); liudongdong (C); Linuxarm; qiujiang; bhelgaas at google.com;
+> Lorenzo.Pieralisi at arm.com; tn at semihalf.com; linux-pci at vger.kernel.org;
+> linux-kernel at vger.kernel.org; xuwei (O); linux-acpi at vger.kernel.org;
+> jcm at redhat.com; zhangjukuo; Liguozhu (Kenneth)
+> Subject: Re: [RFC PATCH v2 1/3] PCI: hisi: re-architect Hip05/Hip06
+> controllers driver to preapare for ACPI
 > 
-> Note that the fix is trivial, but I don't know who should be carrying
-> the fix is all
+> On Monday 08 February 2016 16:06:54 Gabriele Paoloni wrote:
+> > >
+> > > On Monday 08 February 2016 12:41:02 Gabriele Paoloni wrote:
+> > > > +
+> > > > +/* HipXX PCIe host only supports 32-bit config access */
+> > > > +int hisi_pcie_common_cfg_read(void __iomem *reg_base, int where,
+> int
+> > > size,
+> > > > +                         u32 *val)
+> > > > +{
+> > > > +   u32 reg;
+> > > > +   u32 reg_val;
+> > > > +   void *walker = &reg_val;
+> > > > +
+> > > > +   walker += (where & 0x3);
+> > > > +   reg = where & ~0x3;
+> > > > +   reg_val = readl(reg_base + reg);
+> > > > +
+> > > > +   if (size == 1)
+> > > > +           *val = *(u8 __force *) walker;
+> > > > +   else if (size == 2)
+> > > > +           *val = *(u16 __force *) walker;
+> > > > +   else if (size == 4)
+> > > > +           *val = reg_val;
+> > > > +   else
+> > > > +           return PCIBIOS_BAD_REGISTER_NUMBER;
+> > > > +
+> > > > +   return PCIBIOS_SUCCESSFUL;
+> > > > +}
+> > >
+> > > Isn't this the same hack that Qualcomm are using?
+> >
+> > As far as I can see Qualcomm defines its own config access
+> > mechanism only for RC config read and also it seems they're
+> > having problems with reporting the device class...
+> >
+> > https://github.com/torvalds/linux/blob/master/drivers/pci/host/pcie-
+> qcom.c#L474
+> >
+> > Our problem is that our HW can only perform 32b rd/wr accesses
+> > So we can't use readw/readb/writew/writeb...
+> >
+> >
+> 
+> Sorry, my mistake, I meant Cavium not Qualcomm.
+> See https://lkml.org/lkml/2016/2/5/689 for the patches.
 
-I'll push the arm64 for-next/core branch (including your series) out
-against 4.5-rc3, so there won't be any conflict.
+Well, looking at it Cavium seems quite different, 
 
--- 
-Catalin
+On read they need to trigger the retrieval of the
+config space info writing to the lower 32b of a 64b register,
+then they need to read data back on the upper 64b of the
+same register and adjust the content to remove the garbage...
+
+We just use 32b accesses and adjust grab the appropriate
+bytes depending on the read/write sizes...
+
+Thanks 
+
+Gab
+
+> 
+> 	Arnd
