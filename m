@@ -1,61 +1,38 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Mon, 8 Feb 2016 10:53:24 -0500
-Subject: [PATCH 4/5] drivers/pci: make host/pci-keystone-dw.c modular
-In-Reply-To: <91848876.ZYig6qgHLq@wuerfel>
-References: <1454889644-27830-1-git-send-email-paul.gortmaker@windriver.com>
- <1454889644-27830-5-git-send-email-paul.gortmaker@windriver.com>
- <91848876.ZYig6qgHLq@wuerfel>
-Message-ID: <20160208155324.GU23093@windriver.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 8 Feb 2016 09:54:05 -0600
+Subject: [PATCH 05/11] drivers: pinctrl: add driver for Allwinner A64 SoC
+In-Reply-To: <20160204165151.GK4270@lukather>
+References: <1454348370-3816-1-git-send-email-andre.przywara@arm.com>
+ <1454348370-3816-6-git-send-email-andre.przywara@arm.com>
+ <20160201182754.GA14737@excalibur.cnev.de>
+ <56AFE0EC.8080207@arm.com> <20160202100046.GM4652@lukather>
+ <56B0DF26.10203@arm.com> <20160204165151.GK4270@lukather>
+Message-ID: <20160208155405.GA4677@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Re: [PATCH 4/5] drivers/pci: make host/pci-keystone-dw.c modular] On 08/02/2016 (Mon 10:59) Arnd Bergmann wrote:
-
-> On Sunday 07 February 2016 19:00:43 Paul Gortmaker wrote:
-> > Export the symbols that this driver requires in order for it to
-> > be modular.  In addition to the one use case of a dw_pci sym, it
-> > has many instances of its own ks_dw_pci syms that need exporting
-> > in order to modpost w/o error.
+On Thu, Feb 04, 2016 at 05:51:51PM +0100, Maxime Ripard wrote:
+> Hi Andre,
+> 
+> On Tue, Feb 02, 2016 at 04:53:58PM +0000, Andre Przywara wrote:
+> > > So, droping it in the filenames, why not. But I'd really like to keep
+> > > the same compatible scheme.
 > > 
-> > Cc: Murali Karicheri <m-karicheri2@ti.com>
-> > Cc: Bjorn Helgaas <bhelgaas@google.com>
-> > Cc: Stanimir Varbanov <svarbanov@mm-sol.com>
-> > Cc: Geert Uytterhoeven <geert+renesas@glider.be>
-> > Cc: Thierry Reding <thierry.reding@gmail.com>
-> > Cc: Arnd Bergmann <arnd@arndb.de>
-> > Cc: linux-pci at vger.kernel.org
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
-> > ---
+> > And I still don't get this: in the DT compatible scheme we always have a
+> > vendor prefix, so allwinner,a64 is surely not a mysterious ARM Ltd. core
+> > or a new Apple SoC. Instead it is the A64 from Allwinner, full stop. So
+> > why should we add an arbitrary and confusing sun50i naming to it (when
+> > it actually should be more like "sun8i-a64").
 > 
-> 
-> Could we just have one module for the driver  instead of two?
+> I don't decide on their marketing names. And I know you want to start
+> anew with the arm64 SoCs, but the truth is, you don't. Most of the
+> compatibles in the DTSI are from earlier SoCs, and we have to keep
+> that legacy and remain consistent with it. With all the good and bad
+> things a legacy imply.
 
-That thought crossed my mind, but I was considering merging the C files
-and figured it might be more churn than the maintainer wanted.  If
-maintainers are good with the below (assuming it works) then yes that
-also seems reasonable.
+I have to agree. Unless there is some agreement to move to another 
+naming scheme, then just follow the same pattern. If sunXi is just a 
+made up name outside of Allwinner to provide some logical grouping of 
+SoCs, then yes, that probably should not have been done.
 
-P.
---
-
-> 
-> Something like below (untested)
-> 
-> 	Arnd
-> 
-> diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile
-> index 7b2f20c6ccc6..0b472c680348 100644
-> --- a/drivers/pci/host/Makefile
-> +++ b/drivers/pci/host/Makefile
-> @@ -8,7 +8,8 @@ obj-$(CONFIG_PCI_RCAR_GEN2) += pci-rcar-gen2.o
->  obj-$(CONFIG_PCI_RCAR_GEN2_PCIE) += pcie-rcar.o
->  obj-$(CONFIG_PCI_HOST_GENERIC) += pci-host-generic.o
->  obj-$(CONFIG_PCIE_SPEAR13XX) += pcie-spear13xx.o
-> -obj-$(CONFIG_PCI_KEYSTONE) += pci-keystone-dw.o pci-keystone.o
-> +obj-$(CONFIG_PCI_KEYSTONE) pci-keystone-mod.o
-> +pci-keystone-mod-objs := pci-keystone-dw.o pci-keystone.o
->  obj-$(CONFIG_PCIE_XILINX) += pcie-xilinx.o
->  obj-$(CONFIG_PCI_XGENE) += pci-xgene.o
->  obj-$(CONFIG_PCI_XGENE_MSI) += pci-xgene-msi.o
-> 
+Rob
