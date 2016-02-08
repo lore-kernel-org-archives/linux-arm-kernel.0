@@ -1,13 +1,13 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 08 Feb 2016 15:23:21 +0100
-Subject: [GIT PULL] ARM: mvebu: cleanup for v4.6 (#1)
-Message-ID: <8760xz2sdi.fsf@free-electrons.com>
+Date: Mon, 08 Feb 2016 15:23:49 +0100
+Subject: [GIT PULL] ARM: mvebu: drivers for v4.6 (#1)
+Message-ID: <874mdj2scq.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Here is the first pull request for cleanup for mvebu for v4.6.
+Here is the first pull request for drivers for mvebu for v4.6.
 
 Gregory
 
@@ -17,23 +17,23 @@ The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
 
 are available in the git repository at:
 
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-cleanup-4.6-1
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-drivers-4.6-1
 
-for you to fetch changes up to 727c62d29c3a0b982fb72ef993db95e9d2036e07:
+for you to fetch changes up to 1e78dbe717b1668e1660556930d952447c7c1197:
 
-  ARM: mv78xx0: use "depends on" instead of "if" after prompt (2016-01-25 16:43:16 +0100)
-
-----------------------------------------------------------------
-mvebu cleanup for 4.6 (part 1)
-
-use "depends on" instead of "if" after prompt for mv78xx0
+  ARM: orion: implement ARM delay timer (2016-01-27 10:50:17 +0100)
 
 ----------------------------------------------------------------
-Masahiro Yamada (1):
-      ARM: mv78xx0: use "depends on" instead of "if" after prompt
+mvebu driver for 4.6 (part 1)
 
- arch/arm/mach-mv78xx0/Kconfig | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+implement ARM delay timer for orion
+
+----------------------------------------------------------------
+Russell King (1):
+      ARM: orion: implement ARM delay timer
+
+ arch/arm/plat-orion/time.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
 --
 Gregory Clement, Free Electrons
