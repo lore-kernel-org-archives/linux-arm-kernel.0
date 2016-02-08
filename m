@@ -1,32 +1,49 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 8 Feb 2016 17:10:10 +0000
-Subject: [PATCH 1/2] ARM: make virt_to_idmap() return unsigned long
-In-Reply-To: <56B33BAC.6020303@ti.com>
-References: <E1aO8F2-00074N-E8@rmk-PC.arm.linux.org.uk>
- <56A84748.3040108@oracle.com>
- <20160201152015.GU10826@n2100.arm.linux.org.uk>
- <56AF8F54.7030805@ti.com> <56AF917F.9030505@oracle.com>
- <56B14546.4070808@oracle.com> <56B20B2E.7060408@ti.com>
- <56B2201B.7020205@ti.com>
- <20160203195905.GC10826@n2100.arm.linux.org.uk>
- <56B33BAC.6020303@ti.com>
-Message-ID: <20160208171009.GP10826@n2100.arm.linux.org.uk>
+From: yang.shi@linaro.org (Shi, Yang)
+Date: Mon, 8 Feb 2016 09:12:21 -0800
+Subject: [PATCH] arm64: disable kasan when accessing frame->fp in
+ unwind_frame
+In-Reply-To: <56B856F5.5080606@virtuozzo.com>
+References: <1454713487-5239-1-git-send-email-yang.shi@linaro.org>
+ <56B856F5.5080606@virtuozzo.com>
+Message-ID: <56B8CC75.1000508@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 04, 2016 at 01:53:16PM +0200, Grygorii Strashko wrote:
-> This patch boot/reboot tested on k2hk-evm (LPAE=y), ping works (with netcp regression fixed)
-> Tested-by: Grygorii Strashko <grygorii.strashko@ti.com>
+On 2/8/2016 12:51 AM, Andrey Ryabinin wrote:
+>
+>
+> On 02/06/2016 02:04 AM, Yang Shi wrote:
+>>
+>>   #include <asm/irq.h>
+>>   #include <asm/stacktrace.h>
+>> @@ -64,7 +65,9 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
+>>   		return -EINVAL;
+>>
+>>   	frame->sp = fp + 0x10;
+>> +	kasan_disable_current();
+>>   	frame->fp = *(unsigned long *)(fp);
+>
+> It would be better to use READ_ONCE_NOCHECK() here.
+> See f7d27c35ddff7 ("x86/mm, kasan: Silence KASAN warnings in get_wchan()") which solves the same problem for x86.
 
-Thanks.  I've pushed /both/ patches out into linux-next, even though
-no one's tested the second patch.
+Thanks for the suggestion, I'm going to try it soon.
 
-I'll wait for some progress on the TI side though; I'm unable to do
-anything further on kexec until there's some movement on the items
-I've requested (either kexec userspace tool patches, so I can test
-locally, or a tested kexec kernel patch updated for these two changes.)
+>
+>> +	kasan_enable_current();
+>>   	frame->pc = *(unsigned long *)(fp + 8);
+>
+> Why you left frame->pc out of scope? This line could trigger kasan as well.
 
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Actually, it was not reported as frequently as the first one. In my 
+first a couple of boot test, it was not triggered before I came up with 
+the patch. The first one is triggered every time.
+
+It will be fixed in v2 too.
+
+Thanks,
+Yang
+
+>
+>>
+>>   #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+>>
