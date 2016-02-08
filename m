@@ -1,36 +1,30 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Mon,  8 Feb 2016 10:11:36 +0100
-Subject: [PATCH 0/3] arm64: introduce the Alpine support
-Message-ID: <1454922699-16785-1-git-send-email-antoine.tenart@free-electrons.com>
+Date: Mon,  8 Feb 2016 10:11:39 +0100
+Subject: [PATCH 3/3] arm64: defconfig: enable the Alpine family
+In-Reply-To: <1454922699-16785-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1454922699-16785-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1454922699-16785-4-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Enable the Alpine SoC family in the arm64 defconfig.
 
-This series introduces the support for the arm64 Alpine family from
-Annapurna Labs, by adding a device tree for the Alpine v2 EVP. This
-board has 4 Cortex A57 and a few nodes in its device tree for now.
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+---
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-You can find the series at:
-https://github.com/atenart/linux.git 4.5-rc1/alpinev2-bringup
-
-Antoine
-
-Antoine Tenart (3):
-  arm64: add Alpine SoC family
-  arm64: dts: add the Alpine v2 EVP
-  arm64: defconfig: enable the Alpine family
-
- arch/arm64/Kconfig.platforms             |   6 +
- arch/arm64/boot/dts/Makefile             |   1 +
- arch/arm64/boot/dts/al/Makefile          |   5 +
- arch/arm64/boot/dts/al/alpine-v2-evp.dts |  46 +++++++
- arch/arm64/boot/dts/al/alpine-v2.dtsi    | 221 +++++++++++++++++++++++++++++++
- arch/arm64/configs/defconfig             |   1 +
- 6 files changed, 280 insertions(+)
- create mode 100644 arch/arm64/boot/dts/al/Makefile
- create mode 100644 arch/arm64/boot/dts/al/alpine-v2-evp.dts
- create mode 100644 arch/arm64/boot/dts/al/alpine-v2.dtsi
-
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 18ca9fb9e65f..10387947a164 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -31,6 +31,7 @@ CONFIG_MODULES=y
+ CONFIG_MODULE_UNLOAD=y
+ # CONFIG_BLK_DEV_BSG is not set
+ # CONFIG_IOSCHED_DEADLINE is not set
++CONFIG_ARCH_ALPINE=y
+ CONFIG_ARCH_BCM_IPROC=y
+ CONFIG_ARCH_BERLIN=y
+ CONFIG_ARCH_EXYNOS7=y
 -- 
 2.7.0
