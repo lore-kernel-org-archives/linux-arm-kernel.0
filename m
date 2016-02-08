@@ -1,40 +1,40 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 8 Feb 2016 11:57:04 -0800
-Subject: [PATCH 0/3] arm: dts: DRA7: Add IVA and DSPEVE thermal domain data
-In-Reply-To: <1454922990-7501-1-git-send-email-j-keerthy@ti.com>
-References: <1454922990-7501-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <20160208195704.GW19432@atomide.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Mon, 8 Feb 2016 12:03:17 -0800
+Subject: [RESEND2 PATCH 1/3] memremap: add MEMREMAP_WC flag
+In-Reply-To: <9085d37fa97a762a46b9d58719c085368682c64f.1454950917.git.brian.starkey@arm.com>
+References: <cover.1454950917.git.brian.starkey@arm.com>
+ <9085d37fa97a762a46b9d58719c085368682c64f.1454950917.git.brian.starkey@arm.com>
+Message-ID: <20160208120317.313409dc0ae7634c25d3f021@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Keerthy <j-keerthy@ti.com> [160208 01:19]:
-> OMAP5 has 3 thermal zones cpu, core and multimedia.
-> On the other hand DRA7 has 5 thermal zones cpu, gpu, core, dspeve
-> and iva. Currently cpu, core and multimedia are being added via dt
-> and the other 2 are getting added via kernel. Add the missing thermal
-> domains in dt so as give the correct trip numbers, type and temperatures.
-> 
-> Tested on DRA7-EVM.
+On Mon,  8 Feb 2016 17:30:50 +0000 Brian Starkey <brian.starkey@arm.com> wrote:
 
-Are these critical fixes to have for v4.5-rc cycle or can they
-wait for v4.6 merge window?
-
-Regards,
-
-Tony
-
-> Keerthy (3):
->   arm: dts: DRA7: Add DSPEVE thermal data
->   arm: dts: DRA7: Add IVA thermal data
->   arm: dts: DRA7: Add missing IVA and DSPEVE thermal domain data
+> Add a flag to memremap() for writecombine mappings. Mappings satisfied
+> by this flag will not be cached, however writes may be delayed or
+> combined into more efficient bursts. This is most suitable for
+> buffers written sequentially by the CPU for use by other DMA devices.
 > 
->  arch/arm/boot/dts/dra7-dspeve-thermal.dtsi | 27 +++++++++++++++++++++++++++
->  arch/arm/boot/dts/dra7-iva-thermal.dtsi    | 27 +++++++++++++++++++++++++++
->  arch/arm/boot/dts/dra7.dtsi                |  2 ++
->  3 files changed, 56 insertions(+)
->  create mode 100644 arch/arm/boot/dts/dra7-dspeve-thermal.dtsi
->  create mode 100644 arch/arm/boot/dts/dra7-iva-thermal.dtsi
-> 
-> -- 
-> 1.9.1
-> 
+> ...
+
+The patch generally looks OK to me.  It generates rejects against
+linux-next because of some janitorial changes in memremap.c.
+
+
+> @@ -101,6 +107,11 @@ void *memremap(resource_size_t offset, size_t size, unsigned long flags)
+>  		addr = ioremap_wt(offset, size);
+>  	}
+>  
+> +	if (!addr && (flags & MEMREMAP_WC)) {
+> +		flags &= ~MEMREMAP_WC;
+> +		addr = ioremap_wc(offset, size);
+> +	}
+> +
+>  	return addr;
+>  }
+
+The modifications of `flags' is unneeded (and the compiler will remove
+it).  And generally the modification of incoming args is a bit nasty
+IMO - I find it's better to treat them as const - part of the calling
+environment which can be relied upon to be unaltered as the code
+evolves.
