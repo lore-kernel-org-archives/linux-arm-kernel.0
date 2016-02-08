@@ -1,56 +1,65 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Mon, 8 Feb 2016 12:00:36 +0100
-Subject: [PATCH 2/3] arm64: dts: add the Alpine v2 EVP
-In-Reply-To: <20160208105104.GA12991@leverpostej>
-References: <1454922699-16785-1-git-send-email-antoine.tenart@free-electrons.com>
- <1454922699-16785-3-git-send-email-antoine.tenart@free-electrons.com>
- <20160208105104.GA12991@leverpostej>
-Message-ID: <20160208110036.GC4117@kwain>
+Date: Mon, 8 Feb 2016 12:01:51 +0100
+Subject: [PATCH 1/6] irqchip: add the Alpine MSIX interrupt controller
+In-Reply-To: <56B87450.1040500@arm.com>
+References: <1454922971-17405-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1454922971-17405-2-git-send-email-antoine.tenart@free-electrons.com>
+ <56B86391.1030609@arm.com> <20160208102656.GA4117@kwain>
+ <56B86EA8.9070306@arm.com> <20160208104407.GB4117@kwain>
+ <56B87450.1040500@arm.com>
+Message-ID: <20160208110151.GD4117@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Mon, Feb 08, 2016 at 10:56:16AM +0000, Marc Zyngier wrote:
+> On 08/02/16 10:44, Antoine Tenart wrote:
+> > On Mon, Feb 08, 2016 at 10:32:08AM +0000, Marc Zyngier wrote:
+> >> On 08/02/16 10:26, Antoine Tenart wrote:
+> >>>>> +static int alpine_msix_init(struct device_node *node,
+> >>>>> +			    struct device_node *parent)
+> >>>>> +{
+> >>>>> +	struct alpine_msix_data *priv;
+> >>>>> +	struct resource res;
+> >>>>> +	int ret;
+> >>>>> +
+> >>>>> +	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
+> >>>>> +	if (!priv)
+> >>>>> +		return -ENOMEM;
+> >>>>> +
+> >>>>> +	spin_lock_init(&priv->msi_map_lock);
+> >>>>> +
+> >>>>> +	ret = of_address_to_resource(node, 0, &res);
+> >>>>> +	if (ret) {
+> >>>>> +		pr_err("Failed to allocate resource\n");
+> >>>>> +		goto err_priv;
+> >>>>> +	}
+> >>>>> +
+> >>>>> +	priv->addr_high = upper_32_bits((u64)res.start);
+> >>>>> +	priv->addr_low = lower_32_bits(res.start) + ALPINE_MSIX_SPI_TARGET_CLUSTER0;
+> >>>>
+> >>>> This is a bit odd. If you always set bit 16, why isn't that reflected in
+> >>>> the base address coming from the DT?
+> >>>
+> >>> The 20 least significant bits of addr_low provide direct information
+> >>> regarding the interrupt destination, so I thought it would be clearer
+> >>> to have this explicitly in the driver so that we know what those bits
+> >>> mean.
+> >>
+> >> So what is this information? TARGET_CLUSTER0 is not very expressive, and
+> >> doesn't show what the alternatives are. Could you please elaborate a bit
+> >> on that front?
+> > 
+> > For now lots of bits are reserved, so there aren't many alternatives.
+> > Bits [18:17] are used to set the GIC to which to route the MSI and bit
+> > 16 must be set when this target GIC is the primary GIC (bits [18:17] set
+> > to 0x0). There aren't other options available for now (that I'm aware
+> > of) for the target GIC configuration.
+> 
+> OK. So maybe add that as a comment, so that people know what is
+> happening there. And if the code gets updated to include new
+> functionalities, it will be easier to track the changes.
 
-On Mon, Feb 08, 2016 at 10:51:05AM +0000, Mark Rutland wrote:
-> 
-> > +	chosen {
-> > +		stdout-path = "console0:115200n8";
-> > +	};
-> 
-> There is no console0 alias, so this cannot work.
-> 
-> Did you mean serial0?
-
-Oops... Yes, I meant serial0. I'll fix this.
-
-> [...]
-> 
-> > +	aliases {
-> > +		serial0 = &uart0;
-> > +		serial1 = &uart1;
-> > +		serial2 = &uart2;
-> > +		serial3 = &uart3;
-> > +	};
-> 
-> [...]
-> 
-> > +	psci {
-> > +		compatible = "arm,psci-0.2", "arm,psci";
-> > +		method = "smc";
-> > +		cpu_on = <0x84000003>;
-> > +	};
-> 
-> If you have PSCI 0.2, the cpu_on ID (and all other mandatory function
-> IDs) are implicit.
-> 
-> If you want to have "arm,psci" as a fallback, then please add the IDs
-> for functions mandatory in PSCI 0.2 which existed in the "arm,psci"
-> binding. Otherwise, drop "arm,psci" from the compatible list, along
-> with the cpu_on function ID.
-
-OK. I'll make some tests and update.
-
-Thanks or the review!
+OK, I'll update.
 
 Antoine
 
@@ -64,4 +73,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160208/98bcd677/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160208/6d946471/attachment-0001.sig>
