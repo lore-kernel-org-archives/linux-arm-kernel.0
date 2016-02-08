@@ -1,35 +1,75 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 8 Feb 2016 13:24:28 -0600
-Subject: [PATCH v6 2/7] dt-bindings: ARM: Mediatek: Document bindings for
- MT2701
-In-Reply-To: <1454665050-37776-3-git-send-email-jamesjj.liao@mediatek.com>
-References: <1454665050-37776-1-git-send-email-jamesjj.liao@mediatek.com>
- <1454665050-37776-3-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <20160208192428.GA26367@rob-hp-laptop>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 8 Feb 2016 11:36:45 -0800
+Subject: [PATCH] ARM: OMAP2+: Fix onenand initialization to avoid
+ filesystem corruption
+In-Reply-To: <1454683028-4193-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
+References: <linux-kernel@vger.kernel.org>
+ <1454683028-4193-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
+Message-ID: <20160208193644.GU19432@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 05, 2016 at 05:37:25PM +0800, James Liao wrote:
-> This patch adds the binding documentation for apmixedsys, bdpsys,
-> ethsys, hifsys, imgsys, infracfg, mmsys, pericfg, topckgen and
-> vdecsys for Mediatek MT2701.
-> 
-> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
-> Tested-by: John Crispin <blogic@openwrt.org>
-> ---
->  .../bindings/arm/mediatek/mediatek,apmixedsys.txt  |  3 ++-
->  .../bindings/arm/mediatek/mediatek,bdpsys.txt      | 22 ++++++++++++++++++++
->  .../bindings/arm/mediatek/mediatek,ethsys.txt      | 22 ++++++++++++++++++++
->  .../bindings/arm/mediatek/mediatek,hifsys.txt      | 24 ++++++++++++++++++++++
->  .../bindings/arm/mediatek/mediatek,imgsys.txt      |  3 ++-
->  .../bindings/arm/mediatek/mediatek,infracfg.txt    |  3 ++-
->  .../bindings/arm/mediatek/mediatek,mmsys.txt       |  3 ++-
->  .../bindings/arm/mediatek/mediatek,pericfg.txt     |  3 ++-
->  .../bindings/arm/mediatek/mediatek,topckgen.txt    |  3 ++-
->  .../bindings/arm/mediatek/mediatek,vdecsys.txt     |  3 ++-
->  10 files changed, 82 insertions(+), 7 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,bdpsys.txt
->  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,ethsys.txt
->  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,hifsys.txt
+* Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com> [160205 06:38]:
+> Commit <e7b11dc7b77bfce0a351230a5feeadc1d0bba997> ("ARM: OMAP2+: Fix
+> onenand rate detection to avoid filesystem corruption") partially fixed
+> onenand configuration when GPMC module is reset. Finish the job by also
+> providing the correct values in ONENAND_REG_SYS_CFG1 register.
 
-Acked-by: Rob Herring <robh@kernel.org>
+OK. So probably the INT or RDY polarity made the ECC not work.
+
+Aaro, care to dump out also the nolo configured CFG1 value from
+n8x0 and n9(50)?
+
+You can do it by adding something like this to the beginning
+of set_onenand_cfg():
+
+pr_info("CFG1: 0x%04x\n", readw(onenand_base + ONENAND_REG_SYS_CFG1));
+
+And presumably the values are the same as on n900. If not, we
+should do the legacy file system flash test on all of them
+before committing this fix.
+
+Regards,
+
+Tony
+
+> Signed-off-by: Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com>
+> ---
+>  arch/arm/mach-omap2/gpmc-onenand.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/gpmc-onenand.c b/arch/arm/mach-omap2/gpmc-onenand.c
+> index 7b76ce0..8633c70 100644
+> --- a/arch/arm/mach-omap2/gpmc-onenand.c
+> +++ b/arch/arm/mach-omap2/gpmc-onenand.c
+> @@ -101,10 +101,8 @@ static void omap2_onenand_set_async_mode(void __iomem *onenand_base)
+>  
+>  static void set_onenand_cfg(void __iomem *onenand_base)
+>  {
+> -	u32 reg;
+> +	u32 reg = ONENAND_SYS_CFG1_RDY | ONENAND_SYS_CFG1_INT;
+>  
+> -	reg = readw(onenand_base + ONENAND_REG_SYS_CFG1);
+> -	reg &= ~((0x7 << ONENAND_SYS_CFG1_BRL_SHIFT) | (0x7 << 9));
+>  	reg |=	(latency << ONENAND_SYS_CFG1_BRL_SHIFT) |
+>  		ONENAND_SYS_CFG1_BL_16;
+>  	if (onenand_flags & ONENAND_FLAG_SYNCREAD)
+> @@ -123,6 +121,7 @@ static void set_onenand_cfg(void __iomem *onenand_base)
+>  		reg |= ONENAND_SYS_CFG1_VHF;
+>  	else
+>  		reg &= ~ONENAND_SYS_CFG1_VHF;
+> +
+>  	writew(reg, onenand_base + ONENAND_REG_SYS_CFG1);
+>  }
+>  
+> @@ -289,6 +288,7 @@ static int omap2_onenand_setup_async(void __iomem *onenand_base)
+>  		}
+>  	}
+>  
+> +	onenand_async.sync_write = true;
+>  	omap2_onenand_calc_async_timings(&t);
+>  
+>  	ret = gpmc_cs_program_settings(gpmc_onenand_data->cs, &onenand_async);
+> -- 
+> 1.9.1
+> 
