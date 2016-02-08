@@ -1,70 +1,77 @@
-From: jayachandran.chandrashekaran@broadcom.com (Jayachandran Chandrashekaran Nair)
-Date: Mon, 8 Feb 2016 16:57:46 +0530
-Subject: [PATCH v7 5/5] PCI: ACPI: Add a generic ACPI based host controller
-In-Reply-To: <20160205094740.GA31547@red-moon>
-References: <1454058340-7904-1-git-send-email-jchandra@broadcom.com>
- <1454058340-7904-6-git-send-email-jchandra@broadcom.com>
- <20160205001907.GJ7031@localhost>
- <CAKc_7PXYtFt1MQE-UGO0O5vvQ+xFKa2b5=F8wXB=EN-JUJVzZw@mail.gmail.com>
- <20160205094740.GA31547@red-moon>
-Message-ID: <CAKc_7PVNm7z8nv_+Tr9FYhrVAA+-vh4CDMB83WAyT8tdi+CHzA@mail.gmail.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Mon, 8 Feb 2016 11:31:23 +0000
+Subject: [PATCH v4 13/17] ARM: Xen: Document UEFI support on Xen ARM
+ virtual platforms
+In-Reply-To: <1454641552-12576-14-git-send-email-zhaoshenglong@huawei.com>
+References: <1454641552-12576-1-git-send-email-zhaoshenglong@huawei.com>
+ <1454641552-12576-14-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <alpine.DEB.2.02.1602081130480.27008@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lorenzo,
+On Fri, 5 Feb 2016, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
+> 
+> Add a "uefi" node under /hypervisor node in FDT, then Linux kernel could
+> scan this to get the UEFI information.
+> 
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> Acked-by: Rob Herring <robh@kernel.org>
 
-On Fri, Feb 5, 2016 at 3:17 PM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> On Fri, Feb 05, 2016 at 02:05:37PM +0530, Jayachandran Chandrashekaran Nair wrote:
->
-> [...]
->
->> pci_host_acpi.c is a generic implementation of these using a sysdata
->> pointing to acpi_pci_root_info, and using a pointer to the pci_mmcfg_region
->> to access ECAM area, Maybe I can rename this file to
->> pci_acpi_host_generic.c to reflect this better.
->
-> Maybe you should stop sending this series and work with Tomasz to
-> get this done, you are confusing everyone and I am really really
-> annoyed about this.
->
-> Do you realize there is no point in having two patch series doing
-> the same thing and wasting everyone's review time ?
->
-> Do you realize he started this work long before you and went through
-> several rounds of review already (I told you before but in case you
-> forgot) ?
->
-> Tomasz posted a version yesterday, integrating comments following months
-> of review and testing and I think it is ready to get upstream:
->
-> https://lkml.org/lkml/2016/2/4/646
->
-> Did you even consider reviewing his code or helping him instead of
-> churning out more patches doing the *SAME* thing ?
+Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
-This is getting ridiculous, I had replied to your earlier mails on why
-my patchset is NOT doing the exact same thing. I had also explained
-why helping was not feasible.
 
-The basic point again: I am trying to give a much simpler patchset
-to solve the same problem, I take it that you haven't reviewed my
-patchset before writing this mail. I would have appreciated
-a technical discussion rather than this pointless flamefest.
-
-If you have reviewed it, you can see that there are just 5 patches
-instead of 23, and that overall it is a much simpler approach.
-
-> Do you want all of us to go through your code and re-fix what has
-> already been fixed in Tomasz's series with the end result of missing
-> yet another merge window ?
-
-Again, as I said, the whole point of my patchset is that is much  easier
-to go thru and validate and merge or drop as needed.
-
-Anyway, if you are on target to hit this merge window, I really hope
-that happens and there will no need for me to spend further time on
-this.
-
-Regards,
-JC.
+> CC: Rob Herring <robh@kernel.org>
+> ---
+>  Documentation/devicetree/bindings/arm/xen.txt | 33 +++++++++++++++++++++++++++
+>  1 file changed, 33 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/xen.txt b/Documentation/devicetree/bindings/arm/xen.txt
+> index 0f7b9c2..6f83f76 100644
+> --- a/Documentation/devicetree/bindings/arm/xen.txt
+> +++ b/Documentation/devicetree/bindings/arm/xen.txt
+> @@ -15,6 +15,26 @@ the following properties:
+>  - interrupts: the interrupt used by Xen to inject event notifications.
+>    A GIC node is also required.
+>  
+> +To support UEFI on Xen ARM virtual platforms, Xen populates the FDT "uefi" node
+> +under /hypervisor with following parameters:
+> +
+> +________________________________________________________________________________
+> +Name                      | Size   | Description
+> +================================================================================
+> +xen,uefi-system-table     | 64-bit | Guest physical address of the UEFI System
+> +			  |	   | Table.
+> +--------------------------------------------------------------------------------
+> +xen,uefi-mmap-start       | 64-bit | Guest physical address of the UEFI memory
+> +			  |	   | map.
+> +--------------------------------------------------------------------------------
+> +xen,uefi-mmap-size        | 32-bit | Size in bytes of the UEFI memory map
+> +                          |        | pointed to in previous entry.
+> +--------------------------------------------------------------------------------
+> +xen,uefi-mmap-desc-size   | 32-bit | Size in bytes of each entry in the UEFI
+> +                          |        | memory map.
+> +--------------------------------------------------------------------------------
+> +xen,uefi-mmap-desc-ver    | 32-bit | Version of the mmap descriptor format.
+> +--------------------------------------------------------------------------------
+>  
+>  Example (assuming #address-cells = <2> and #size-cells = <2>):
+>  
+> @@ -22,4 +42,17 @@ hypervisor {
+>  	compatible = "xen,xen-4.3", "xen,xen";
+>  	reg = <0 0xb0000000 0 0x20000>;
+>  	interrupts = <1 15 0xf08>;
+> +	uefi {
+> +		xen,uefi-system-table = <0xXXXXXXXX>;
+> +		xen,uefi-mmap-start = <0xXXXXXXXX>;
+> +		xen,uefi-mmap-size = <0xXXXXXXXX>;
+> +		xen,uefi-mmap-desc-size = <0xXXXXXXXX>;
+> +		xen,uefi-mmap-desc-ver = <0xXXXXXXXX>;
+> +        };
+>  };
+> +
+> +The format and meaning of the "xen,uefi-*" parameters are similar to those in
+> +Documentation/arm/uefi.txt, which are provided by the regular UEFI stub. However
+> +they differ because they are provided by the Xen hypervisor, together with a set
+> +of UEFI runtime services implemented via hypercalls, see
+> +http://xenbits.xen.org/docs/unstable/hypercall/x86_64/include,public,platform.h.html.
