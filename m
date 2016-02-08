@@ -1,48 +1,74 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 8 Feb 2016 15:58:18 +0000
-Subject: [PATCH 05/11] drivers: pinctrl: add driver for Allwinner A64 SoC
-In-Reply-To: <20160208155405.GA4677@rob-hp-laptop>
-References: <1454348370-3816-1-git-send-email-andre.przywara@arm.com>
- <1454348370-3816-6-git-send-email-andre.przywara@arm.com>
- <20160201182754.GA14737@excalibur.cnev.de> <56AFE0EC.8080207@arm.com>
- <20160202100046.GM4652@lukather> <56B0DF26.10203@arm.com>
- <20160204165151.GK4270@lukather> <20160208155405.GA4677@rob-hp-laptop>
-Message-ID: <56B8BB1A.8010705@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 08 Feb 2016 16:58:27 +0100
+Subject: [PATCH 1/1] ARM: kirkwood-ds112.dts: use unique machine name
+In-Reply-To: <20160207192632.GA28121@lunn.ch> (Andrew Lunn's message of "Sun,
+ 7 Feb 2016 20:26:32 +0100")
+References: <1454870066-3353-1-git-send-email-xypron.glpk@gmx.de>
+ <20160207192632.GA28121@lunn.ch>
+Message-ID: <87h9hj19ek.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Heinrich,
+ 
+ On dim., f?vr. 07 2016, Andrew Lunn <andrew@lunn.ch> wrote:
 
-On 08/02/16 15:54, Rob Herring wrote:
-> On Thu, Feb 04, 2016 at 05:51:51PM +0100, Maxime Ripard wrote:
->> Hi Andre,
->>
->> On Tue, Feb 02, 2016 at 04:53:58PM +0000, Andre Przywara wrote:
->>>> So, droping it in the filenames, why not. But I'd really like to keep
->>>> the same compatible scheme.
->>>
->>> And I still don't get this: in the DT compatible scheme we always have a
->>> vendor prefix, so allwinner,a64 is surely not a mysterious ARM Ltd. core
->>> or a new Apple SoC. Instead it is the A64 from Allwinner, full stop. So
->>> why should we add an arbitrary and confusing sun50i naming to it (when
->>> it actually should be more like "sun8i-a64").
->>
->> I don't decide on their marketing names. And I know you want to start
->> anew with the arm64 SoCs, but the truth is, you don't. Most of the
->> compatibles in the DTSI are from earlier SoCs, and we have to keep
->> that legacy and remain consistent with it. With all the good and bad
->> things a legacy imply.
-> 
-> I have to agree. Unless there is some agreement to move to another 
-> naming scheme, then just follow the same pattern. If sunXi is just a 
-> made up name outside of Allwinner to provide some logical grouping of 
-> SoCs, then yes, that probably should not have been done.
+> On Sun, Feb 07, 2016 at 07:34:26PM +0100, Heinrich Schuchardt wrote:
+>> Downstream packages like Debian flash-kernel use
+>> /proc/device-tree/model
+>> to determine which dtb file to install.
+>> 
+>> Hence each dts in the Linux kernel should provide a unique model
+>> identifier.
+>> 
+>> Commit 2d0a7addbd10 ("ARM: Kirkwood: Add support for many Synology NAS
+>> devices") created the new files kirkwood-ds111.dts and kirkwood-ds112.dts
+>> using the same model identifier.
+>> 
+>> This patch provides a unique model identifier for the
+>> Synology DiskStation DS112.
+>> 
+>> Signed-off-by: Heinrich Schuchardt <xypron.glpk@gmx.de>
+>
+> Fixes: 2d0a7addbd10 ("ARM: Kirkwood: Add support for many Synology NAS devices")
+>
+> Reviewed-by: Andrew Lunn <andrew@lunn.ch>
 
-So I still don't like it, but will not waste my time or energy on that
-front.
+Applied on mvebu/fixes with the Fixes tag and Andrew Reviewed-by tag.
 
-Maxime, do you want "allwinner,sun50i-a64" or would
-"allwinner,sunxi-a64" be OK as well?
+Thanks,
 
-Cheers,
-Andre.
+Gregory
+
+
+
+>
+>     Thanks
+> 	Andrew	     
+>
+>> ---
+>>  arch/arm/boot/dts/kirkwood-ds112.dts | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>> 
+>> diff --git a/arch/arm/boot/dts/kirkwood-ds112.dts b/arch/arm/boot/dts/kirkwood-ds112.dts
+>> index bf4143c..b84af3d 100644
+>> --- a/arch/arm/boot/dts/kirkwood-ds112.dts
+>> +++ b/arch/arm/boot/dts/kirkwood-ds112.dts
+>> @@ -14,7 +14,7 @@
+>>  #include "kirkwood-synology.dtsi"
+>>  
+>>  / {
+>> -	model = "Synology DS111";
+>> +	model = "Synology DS112";
+>>  	compatible = "synology,ds111", "marvell,kirkwood";
+>>  
+>>  	memory {
+>> -- 
+>> 2.1.4
+>> 
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
