@@ -1,37 +1,64 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Mon, 8 Feb 2016 11:55:44 +0100
-Subject: [PATCH] clk: meson: Fix meson_clk_register_clks() signature type
- mismatch
-In-Reply-To: <CAOQ7t2YwHa7cJdqv4m8rPx50ZnFZJJzcU2AjtE=Q2AYEAf84hg@mail.gmail.com>
-References: <1454879583-27036-1-git-send-email-afaerber@suse.de>
- <CAOQ7t2YwHa7cJdqv4m8rPx50ZnFZJJzcU2AjtE=Q2AYEAf84hg@mail.gmail.com>
-Message-ID: <56B87430.3040804@suse.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 8 Feb 2016 10:56:16 +0000
+Subject: [PATCH 1/6] irqchip: add the Alpine MSIX interrupt controller
+In-Reply-To: <20160208104407.GB4117@kwain>
+References: <1454922971-17405-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1454922971-17405-2-git-send-email-antoine.tenart@free-electrons.com>
+ <56B86391.1030609@arm.com> <20160208102656.GA4117@kwain>
+ <56B86EA8.9070306@arm.com> <20160208104407.GB4117@kwain>
+Message-ID: <56B87450.1040500@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 08.02.2016 um 09:34 schrieb Carlo Caione:
-> On Sun, Feb 7, 2016 at 10:13 PM, Andreas F?rber <afaerber@suse.de> wrote:
->> As preparation for arm64 based mesongxbb, which pulls in this code once
->> enabling ARCH_MESON, fix a size_t vs. unsigned int type mismatch.
->> The loop uses a local unsigned int variable, so adopt that type,
->> matching the header.
+On 08/02/16 10:44, Antoine Tenart wrote:
+> On Mon, Feb 08, 2016 at 10:32:08AM +0000, Marc Zyngier wrote:
+>> On 08/02/16 10:26, Antoine Tenart wrote:
+>>>>> +static int alpine_msix_init(struct device_node *node,
+>>>>> +			    struct device_node *parent)
+>>>>> +{
+>>>>> +	struct alpine_msix_data *priv;
+>>>>> +	struct resource res;
+>>>>> +	int ret;
+>>>>> +
+>>>>> +	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
+>>>>> +	if (!priv)
+>>>>> +		return -ENOMEM;
+>>>>> +
+>>>>> +	spin_lock_init(&priv->msi_map_lock);
+>>>>> +
+>>>>> +	ret = of_address_to_resource(node, 0, &res);
+>>>>> +	if (ret) {
+>>>>> +		pr_err("Failed to allocate resource\n");
+>>>>> +		goto err_priv;
+>>>>> +	}
+>>>>> +
+>>>>> +	priv->addr_high = upper_32_bits((u64)res.start);
+>>>>> +	priv->addr_low = lower_32_bits(res.start) + ALPINE_MSIX_SPI_TARGET_CLUSTER0;
+>>>>
+>>>> This is a bit odd. If you always set bit 16, why isn't that reflected in
+>>>> the base address coming from the DT?
+>>>
+>>> The 20 least significant bits of addr_low provide direct information
+>>> regarding the interrupt destination, so I thought it would be clearer
+>>> to have this explicitly in the driver so that we know what those bits
+>>> mean.
 >>
->> Fixes: 7a29a869434e ("clk: meson: Add support for Meson clock controller")
->> Signed-off-by: Andreas F?rber <afaerber@suse.de>
->> ---
->>  drivers/clk/meson/clkc.c | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
-[...]
-> Also please, CC linux-meson at googlegroups.com on meson related patches.
+>> So what is this information? TARGET_CLUSTER0 is not very expressive, and
+>> doesn't show what the alternatives are. Could you please elaborate a bit
+>> on that front?
+> 
+> For now lots of bits are reserved, so there aren't many alternatives.
+> Bits [18:17] are used to set the GIC to which to route the MSI and bit
+> 16 must be set when this target GIC is the primary GIC (bits [18:17] set
+> to 0x0). There aren't other options available for now (that I'm aware
+> of) for the target GIC configuration.
 
-I used scripts/get_maintainer.pl --nogit-fallback on next-20160111. :)
+OK. So maybe add that as a comment, so that people know what is
+happening there. And if the code gets updated to include new
+functionalities, it will be easier to track the changes.
 
-If there is no in-flight patch I've missed, I can send a patch against
-MAINTAINERS to update it with that list address.
+Thanks,
 
-Cheers,
-Andreas
-
+	M.
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton; HRB 21284 (AG N?rnberg)
+Jazz is not dead. It just smells funny...
