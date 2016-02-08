@@ -1,326 +1,387 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Mon,  8 Feb 2016 10:11:38 +0100
-Subject: [PATCH 2/3] arm64: dts: add the Alpine v2 EVP
-In-Reply-To: <1454922699-16785-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1454922699-16785-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1454922699-16785-3-git-send-email-antoine.tenart@free-electrons.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon,  8 Feb 2016 10:13:08 +0100
+Subject: [PATCH 05/11 v2] video: ARM CLCD: add special board and panel hooks
+ for Nomadik
+Message-ID: <1454922788-10174-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the initial support for the Alpine v2 EVP board from
-Annapurna Labs (Amazon).
+In the .board_init() callback will set up a mux register in
+the Nomadik system controller. It so happens that the platform
+has two display output engines, and we have to poke a bit in
+a special register to make sure the right engine is muxed in
+as they are mutually exclusive.
 
-Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-Signed-off-by: Barak Wasserstrom <barak@annapurnalabs.com>
-Signed-off-by: Tsahee Zidenberg <tsahee@annapurnalabs.com>
+The Nomadik CLCD variant is instantiated on a platform where
+it is combined with a 800x480 TPO WVGA display. In the
+.panel_init() hook we will detect this display from the
+compatible string and set it up. We also add .enable() and
+.disable() callbacks for it as the sleep state is software
+controlled.
+
+The display is connected with a special 3-wire serial bus
+(this is sadly neither I2C or SPI) using three GPIO lines that
+we bitbang to detect the display and enable/disable sleep
+state.
+
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Rob Herring <robh@kernel.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm64/boot/dts/Makefile             |   1 +
- arch/arm64/boot/dts/al/Makefile          |   5 +
- arch/arm64/boot/dts/al/alpine-v2-evp.dts |  46 +++++++
- arch/arm64/boot/dts/al/alpine-v2.dtsi    | 221 +++++++++++++++++++++++++++++++
- 4 files changed, 273 insertions(+)
- create mode 100644 arch/arm64/boot/dts/al/Makefile
- create mode 100644 arch/arm64/boot/dts/al/alpine-v2-evp.dts
- create mode 100644 arch/arm64/boot/dts/al/alpine-v2.dtsi
+ChangeLog v1->v2:
+- Removed unused "var" pointer variable
+- Follow *endpoint, not endpoint, as that gives us a **
+  rather than a *
+---
+ drivers/video/fbdev/Makefile            |   1 +
+ drivers/video/fbdev/amba-clcd-nomadik.c | 262 ++++++++++++++++++++++++++++++++
+ drivers/video/fbdev/amba-clcd-nomadik.h |  24 +++
+ drivers/video/fbdev/amba-clcd.c         |   6 +-
+ 4 files changed, 292 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/video/fbdev/amba-clcd-nomadik.c
+ create mode 100644 drivers/video/fbdev/amba-clcd-nomadik.h
 
-diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
-index f832b8a7453a..fd80617a9c6f 100644
---- a/arch/arm64/boot/dts/Makefile
-+++ b/arch/arm64/boot/dts/Makefile
-@@ -1,3 +1,4 @@
-+dts-dirs += al
- dts-dirs += altera
- dts-dirs += amd
- dts-dirs += apm
-diff --git a/arch/arm64/boot/dts/al/Makefile b/arch/arm64/boot/dts/al/Makefile
+diff --git a/drivers/video/fbdev/Makefile b/drivers/video/fbdev/Makefile
+index 65fb15075c8f..f0aec3aa213c 100644
+--- a/drivers/video/fbdev/Makefile
++++ b/drivers/video/fbdev/Makefile
+@@ -79,6 +79,7 @@ obj-$(CONFIG_FB_ATMEL)		  += atmel_lcdfb.o
+ obj-$(CONFIG_FB_PVR2)             += pvr2fb.o
+ obj-$(CONFIG_FB_VOODOO1)          += sstfb.o
+ obj-$(CONFIG_FB_ARMCLCD)	  += amba-clcd.o
++obj-$(CONFIG_ARCH_NOMADIK)	  += amba-clcd-nomadik.o
+ obj-$(CONFIG_PLAT_VERSATILE_CLCD) += amba-clcd-versatile.o
+ obj-$(CONFIG_FB_GOLDFISH)         += goldfishfb.o
+ obj-$(CONFIG_FB_68328)            += 68328fb.o
+diff --git a/drivers/video/fbdev/amba-clcd-nomadik.c b/drivers/video/fbdev/amba-clcd-nomadik.c
 new file mode 100644
-index 000000000000..8a6cde4f9b23
+index 000000000000..863b568859b6
 --- /dev/null
-+++ b/arch/arm64/boot/dts/al/Makefile
-@@ -0,0 +1,5 @@
-+dtb-$(CONFIG_ARCH_ALPINE)	+= alpine-v2-evp.dtb
++++ b/drivers/video/fbdev/amba-clcd-nomadik.c
+@@ -0,0 +1,262 @@
++#include <linux/amba/bus.h>
++#include <linux/amba/clcd.h>
++#include <linux/gpio/consumer.h>
++#include <linux/of.h>
++#include <linux/of_graph.h>
++#include <linux/delay.h>
++#include <linux/bitops.h>
++#include <linux/mfd/syscon.h>
++#include <linux/regmap.h>
 +
-+always		:= $(dtb-y)
-+subdir-y	:= $(dts-dirs)
-+clean-files	:= *.dtb
-diff --git a/arch/arm64/boot/dts/al/alpine-v2-evp.dts b/arch/arm64/boot/dts/al/alpine-v2-evp.dts
++#include "amba-clcd-nomadik.h"
++
++static struct gpio_desc *grestb;
++static struct gpio_desc *scen;
++static struct gpio_desc *scl;
++static struct gpio_desc *sda;
++
++static u8 tpg110_readwrite_reg(bool write, u8 address, u8 outval)
++{
++	int i;
++	u8 inval = 0;
++
++	/* Assert SCEN */
++	gpiod_set_value_cansleep(scen, 1);
++	ndelay(150);
++	/* Hammer out the address */
++	for (i = 5; i >= 0; i--) {
++		if (address & BIT(i))
++			gpiod_set_value_cansleep(sda, 1);
++		else
++			gpiod_set_value_cansleep(sda, 0);
++		ndelay(150);
++		/* Send an SCL pulse */
++		gpiod_set_value_cansleep(scl, 1);
++		ndelay(160);
++		gpiod_set_value_cansleep(scl, 0);
++		ndelay(160);
++	}
++
++	if (write) {
++		/* WRITE */
++		gpiod_set_value_cansleep(sda, 0);
++	} else {
++		/* READ */
++		gpiod_set_value_cansleep(sda, 1);
++	}
++	ndelay(150);
++	/* Send an SCL pulse */
++	gpiod_set_value_cansleep(scl, 1);
++	ndelay(160);
++	gpiod_set_value_cansleep(scl, 0);
++	ndelay(160);
++
++	if (!write)
++		/* HiZ turn-around cycle */
++		gpiod_direction_input(sda);
++	ndelay(150);
++	/* Send an SCL pulse */
++	gpiod_set_value_cansleep(scl, 1);
++	ndelay(160);
++	gpiod_set_value_cansleep(scl, 0);
++	ndelay(160);
++
++	/* Hammer in/out the data */
++	for (i = 7; i >= 0; i--) {
++		int value;
++
++		if (write) {
++			value = !!(outval & BIT(i));
++			gpiod_set_value_cansleep(sda, value);
++		} else {
++			value = gpiod_get_value(sda);
++			if (value)
++				inval |= BIT(i);
++		}
++		ndelay(150);
++		/* Send an SCL pulse */
++		gpiod_set_value_cansleep(scl, 1);
++		ndelay(160);
++		gpiod_set_value_cansleep(scl, 0);
++		ndelay(160);
++	}
++
++	gpiod_direction_output(sda, 0);
++	/* Deassert SCEN */
++	gpiod_set_value_cansleep(scen, 0);
++	/* Satisfies SCEN pulse width */
++	udelay(1);
++
++	return inval;
++}
++
++static u8 tpg110_read_reg(u8 address)
++{
++	return tpg110_readwrite_reg(false, address, 0);
++}
++
++static void tpg110_write_reg(u8 address, u8 outval)
++{
++	tpg110_readwrite_reg(true, address, outval);
++}
++
++static void tpg110_startup(struct device *dev)
++{
++	u8 val;
++
++	dev_info(dev, "TPG110 display enable\n");
++	/* De-assert the reset signal */
++	gpiod_set_value_cansleep(grestb, 0);
++	mdelay(1);
++	dev_info(dev, "de-asserted GRESTB\n");
++
++	/* Test display communication */
++	tpg110_write_reg(0x00, 0x55);
++	val = tpg110_read_reg(0x00);
++	if (val == 0x55)
++		dev_info(dev, "passed communication test\n");
++	val = tpg110_read_reg(0x01);
++	dev_info(dev, "TPG110 chip ID: %d version: %d\n",
++		val>>4, val&0x0f);
++
++	/* Show display resolution */
++	val = tpg110_read_reg(0x02);
++	val &= 7;
++	switch (val) {
++	case 0x0:
++		dev_info(dev, "IN 400x240 RGB -> OUT 800x480 RGB (dual scan)");
++		break;
++	case 0x1:
++		dev_info(dev, "IN 480x272 RGB -> OUT 800x480 RGB (dual scan)");
++		break;
++	case 0x4:
++		dev_info(dev, "480x640 RGB");
++		break;
++	case 0x5:
++		dev_info(dev, "480x272 RGB");
++		break;
++	case 0x6:
++		dev_info(dev, "640x480 RGB");
++		break;
++	case 0x7:
++		dev_info(dev, "800x480 RGB");
++		break;
++	default:
++		dev_info(dev, "ILLEGAL RESOLUTION");
++		break;
++	}
++
++	val = tpg110_read_reg(0x03);
++	dev_info(dev, "resolution is controlled by %s\n",
++		(val & BIT(7)) ? "software" : "hardware");
++}
++
++static void tpg110_enable(struct clcd_fb *fb)
++{
++	struct device *dev = &fb->dev->dev;
++	static bool startup;
++	u8 val;
++
++	if (!startup) {
++		tpg110_startup(dev);
++		startup = true;
++	}
++
++	/* Take chip out of standby */
++	val = tpg110_read_reg(0x03);
++	val |= BIT(0);
++	tpg110_write_reg(0x03, val);
++}
++
++static void tpg110_disable(struct clcd_fb *fb)
++{
++	u8 val;
++
++	dev_info(&fb->dev->dev, "TPG110 display disable\n");
++	val = tpg110_read_reg(0x03);
++	/* Put into standby */
++	val &= ~BIT(0);
++	tpg110_write_reg(0x03, val);
++}
++
++static void tpg110_init(struct device *dev, struct device_node *np,
++			struct clcd_board *board)
++{
++	dev_info(dev, "TPG110 display init\n");
++
++	grestb = devm_get_gpiod_from_child(dev, "grestb", &np->fwnode);
++	if (IS_ERR(grestb)) {
++		dev_err(dev, "no GRESTB GPIO\n");
++		return;
++	}
++	/* This asserts the GRESTB signal, putting the display into reset */
++	gpiod_direction_output(grestb, 1);
++
++	scen = devm_get_gpiod_from_child(dev, "scen", &np->fwnode);
++	if (IS_ERR(scen)) {
++		dev_err(dev, "no SCEN GPIO\n");
++		return;
++	}
++	gpiod_direction_output(scen, 0);
++	scl = devm_get_gpiod_from_child(dev, "scl", &np->fwnode);
++	if (IS_ERR(scl)) {
++		dev_err(dev, "no SCL GPIO\n");
++		return;
++	}
++	gpiod_direction_output(scl, 0);
++	sda = devm_get_gpiod_from_child(dev, "sda", &np->fwnode);
++	if (IS_ERR(sda)) {
++		dev_err(dev, "no SDA GPIO\n");
++		return;
++	}
++	gpiod_direction_output(sda, 0);
++	board->enable = tpg110_enable;
++	board->disable = tpg110_disable;
++}
++
++int nomadik_clcd_init_panel(struct clcd_fb *fb,
++			    struct device_node **endpoint)
++{
++	struct device_node *panel;
++
++	*endpoint = of_graph_get_next_endpoint(fb->dev->dev.of_node,
++					       NULL);
++	if (!*endpoint)
++		return -ENODEV;
++
++	panel = of_graph_get_remote_port_parent(*endpoint);
++	if (!panel)
++		return -ENODEV;
++
++	if (of_device_is_compatible(panel, "tpo,tpg110"))
++		tpg110_init(&fb->dev->dev, panel, fb->board);
++	else
++		dev_info(&fb->dev->dev, "unknown panel\n");
++
++	/* Unknown panel, fall through */
++	return 0;
++}
++
++#define PMU_CTRL_OFFSET 0x0000
++#define PMU_CTRL_LCDNDIF BIT(26)
++
++int nomadik_clcd_init_board(struct amba_device *adev,
++			    struct clcd_board *board)
++{
++	struct regmap *pmu_regmap;
++
++	dev_info(&adev->dev, "Nomadik CLCD board init\n");
++	pmu_regmap =
++		syscon_regmap_lookup_by_compatible("stericsson,nomadik-pmu");
++	if (IS_ERR(pmu_regmap)) {
++		dev_err(&adev->dev, "could not find PMU syscon regmap\n");
++		return PTR_ERR(pmu_regmap);
++	}
++	regmap_update_bits(pmu_regmap,
++			   PMU_CTRL_OFFSET,
++			   PMU_CTRL_LCDNDIF,
++			   0);
++	dev_info(&adev->dev, "set PMU mux to CLCD mode\n");
++
++	return 0;
++}
+diff --git a/drivers/video/fbdev/amba-clcd-nomadik.h b/drivers/video/fbdev/amba-clcd-nomadik.h
 new file mode 100644
-index 000000000000..3e3080fa45e4
+index 000000000000..b34dbf3061bf
 --- /dev/null
-+++ b/arch/arm64/boot/dts/al/alpine-v2-evp.dts
-@@ -0,0 +1,46 @@
-+/*
-+ * Copyright 2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.
-+ *
-+ * Antoine Tenart <antoine.tenart@free-electrons.com>
-+ *
-+ * This software is available to you under a choice of one of two
-+ * licenses.  You may choose to be licensed under the terms of the GNU
-+ * General Public License (GPL) Version 2, available from the file
-+ * COPYING in the main directory of this source tree, or the
-+ * BSD license below:
-+ *
-+ *     Redistribution and use in source and binary forms, with or
-+ *     without modification, are permitted provided that the following
-+ *     conditions are met:
-+ *
-+ *      - Redistributions of source code must retain the above
-+ *        copyright notice, this list of conditions and the following
-+ *        disclaimer.
-+ *
-+ *      - Redistributions in binary form must reproduce the above
-+ *        copyright notice, this list of conditions and the following
-+ *        disclaimer in the documentation and/or other materials
-+ *        provided with the distribution.
-+ *
-+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
-+ * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
-+ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-+ * SOFTWARE.
-+ */
++++ b/drivers/video/fbdev/amba-clcd-nomadik.h
+@@ -0,0 +1,24 @@
++#ifndef _AMBA_CLCD_NOMADIK_H
++#define _AMBA_CLCD_NOMADIK_H
 +
-+#include "alpine-v2.dtsi"
++#include <linux/amba/bus.h>
 +
-+/ {
-+	model = "Annapurna Labs Alpine v2 EVP";
-+	compatible = "al,alpine-v2-evp", "al,alpine-v2";
++#ifdef CONFIG_ARCH_NOMADIK
++int nomadik_clcd_init_board(struct amba_device *adev,
++			     struct clcd_board *board);
++int nomadik_clcd_init_panel(struct clcd_fb *fb,
++			    struct device_node **endpoint);
++#else
++static inline int nomadik_clcd_init_board(struct amba_device *adev,
++					  struct clcd_board *board)
++{
++	return 0;
++}
++static inline int nomadik_clcd_init_panel(struct clcd_fb *fb,
++					  struct device_node **endpoint)
++{
++	return 0;
++}
++#endif
 +
-+	chosen {
-+		stdout-path = "console0:115200n8";
-+	};
-+};
++#endif /* inclusion guard */
+diff --git a/drivers/video/fbdev/amba-clcd.c b/drivers/video/fbdev/amba-clcd.c
+index 77fb50e00670..53c5ec31168d 100644
+--- a/drivers/video/fbdev/amba-clcd.c
++++ b/drivers/video/fbdev/amba-clcd.c
+@@ -37,6 +37,8 @@
+ 
+ #include <asm/sizes.h>
+ 
++#include "amba-clcd-nomadik.h"
 +
-+&uart0 { status = "okay"; };
-diff --git a/arch/arm64/boot/dts/al/alpine-v2.dtsi b/arch/arm64/boot/dts/al/alpine-v2.dtsi
-new file mode 100644
-index 000000000000..eb7a03b71456
---- /dev/null
-+++ b/arch/arm64/boot/dts/al/alpine-v2.dtsi
-@@ -0,0 +1,221 @@
-+/*
-+ * Copyright 2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.
-+ *
-+ * Antoine Tenart <antoine.tenart@free-electrons.com>
-+ *
-+ * This software is available to you under a choice of one of two
-+ * licenses.  You may choose to be licensed under the terms of the GNU
-+ * General Public License (GPL) Version 2, available from the file
-+ * COPYING in the main directory of this source tree, or the
-+ * BSD license below:
-+ *
-+ *     Redistribution and use in source and binary forms, with or
-+ *     without modification, are permitted provided that the following
-+ *     conditions are met:
-+ *
-+ *      - Redistributions of source code must retain the above
-+ *        copyright notice, this list of conditions and the following
-+ *        disclaimer.
-+ *
-+ *      - Redistributions in binary form must reproduce the above
-+ *        copyright notice, this list of conditions and the following
-+ *        disclaimer in the documentation and/or other materials
-+ *        provided with the distribution.
-+ *
-+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
-+ * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
-+ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-+ * SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+
-+/ {
-+	model = "Annapurna Labs Alpine v2";
-+	compatible = "al,alpine-v2";
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+
-+	aliases {
-+		serial0 = &uart0;
-+		serial1 = &uart1;
-+		serial2 = &uart2;
-+		serial3 = &uart3;
-+	};
-+
-+	cpus {
-+		#address-cells = <2>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			compatible = "arm,cortex-a57", "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0x0 0x0>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu at 1 {
-+			compatible = "arm,cortex-a57", "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0x0 0x1>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu at 2 {
-+			compatible = "arm,cortex-a57", "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0x0 0x2>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu at 3 {
-+			compatible = "arm,cortex-a57", "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0x0 0x3>;
-+			enable-method = "psci";
-+		};
-+	};
-+
-+	psci {
-+		compatible = "arm,psci-0.2", "arm,psci";
-+		method = "smc";
-+		cpu_on = <0x84000003>;
-+	};
-+
-+	sbclk: sbclk {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <1000000>;
-+	};
-+
-+	soc {
-+		compatible = "simple-bus";
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+
-+		interrupt-parent = <&gic>;
-+		ranges;
-+
-+		timer {
-+			compatible = "arm,armv8-timer";
-+			interrupts = <GIC_PPI 0xd 0xff08>,
-+				     <GIC_PPI 0xe 0xff08>,
-+				     <GIC_PPI 0xb 0xff08>,
-+				     <GIC_PPI 0xa 0xff08>;
-+		};
-+
-+		pmu {
-+			compatible = "arm,armv8-pmuv3";
-+			interrupts = <GIC_SPI 104 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 107 IRQ_TYPE_LEVEL_HIGH>;
-+		};
-+
-+		gic: gic at f0100000 {
-+			compatible = "arm,gic-v3";
-+			reg = <0x0 0xf0200000 0x0 0x10000>,	/* GIC Dist */
-+			      <0x0 0xf0280000 0x0 0x200000>,	/* GICR */
-+			      <0x0 0xf0100000 0x0 0x2000>;	/* GICC */
-+			interrupt-controller;
-+			#interrupt-cells = <3>;
-+		};
-+
-+		pcie-internal at 0xfbc00000 {
-+			compatible = "pci-host-ecam-generic";
-+			device_type = "pci";
-+			#size-cells = <2>;
-+			#address-cells = <3>;
-+			#interrupt-cells = <1>;
-+			reg = <0x0 0xfbc00000 0x0 0x100000>;
-+			interrupt-map-mask = <0xf800 0 0 7>;
-+			/* add legacy interrupts for SATA only */
-+			interrupt-map = <0x4000 0 0 1 &gic 0 53 4>,
-+					<0x4800 0 0 1 &gic 0 54 4>;
-+			/* 32 bit non prefetchable memory space */
-+			ranges = <0x2000000 0x0 0xfe000000 0x0 0xfe000000 0x0 0x1000000>;
-+			bus-range = <0x00 0x00>;
-+		};
-+
-+		uart0: uart at fd883000 {
-+			compatible = "ns16550a";
-+			device_type = "serial";
-+			reg = <0x0 0xfd883000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
-+			clock-frequency = <500000000>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			status = "disabled";
-+		};
-+
-+		uart1: uart at fd884000 {
-+			compatible = "ns16550a";
-+			device_type = "serial";
-+			reg = <0x0 0xfd884000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>;
-+			clock-frequency = <500000000>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			status = "disabled";
-+		};
-+
-+		uart2: uart at fd885000 {
-+			compatible = "ns16550a";
-+			device_type = "serial";
-+			reg = <0x0 0xfd885000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
-+			clock-frequency = <500000000>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			status = "disabled";
-+		};
-+
-+		uart3: uart at fd886000 {
-+			compatible = "ns16550a";
-+			device_type = "serial";
-+			reg = <0x0 0xfd886000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
-+			clock-frequency = <500000000>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			status = "disabled";
-+		};
-+
-+		timer0: timer at fd890000 {
-+			compatible = "arm,sp804", "arm,primecell";
-+			reg = <0x0 0xfd890000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&sbclk>;
-+		};
-+
-+		timer1: timer at fd891000 {
-+			compatible = "arm,sp804", "arm,primecell";
-+			reg = <0x0 0xfd891000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&sbclk>;
-+			status = "disabled";
-+		};
-+
-+		timer2: timer at fd892000 {
-+			compatible = "arm,sp804", "arm,primecell";
-+			reg = <0x0 0xfd892000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&sbclk>;
-+			status = "disabled";
-+		};
-+
-+		timer3: timer at fd893000 {
-+			compatible = "arm,sp804", "arm,primecell";
-+			reg = <0x0 0xfd893000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&sbclk>;
-+			status = "disabled";
-+		};
-+	};
-+};
+ #define to_clcd(info)	container_of(info, struct clcd_fb, fb)
+ 
+ /* This is limited to 16 characters when displayed by X startup */
+@@ -1003,7 +1005,7 @@ static int clcdfb_probe(struct amba_device *dev, const struct amba_id *id)
+ 	if (ret)
+ 		goto free_fb;
+ 
+-	ret = clcdfb_register(fb); 
++	ret = clcdfb_register(fb);
+ 	if (ret == 0) {
+ 		amba_set_drvdata(dev, fb);
+ 		goto out;
+@@ -1047,6 +1049,8 @@ static struct clcd_vendor_data vendor_nomadik = {
+ 	.clock_timregs = true,
+ 	.packed_24_bit_pixels = true,
+ 	.st_bitmux_control = true,
++	.init_board = nomadik_clcd_init_board,
++	.init_panel = nomadik_clcd_init_panel,
+ };
+ 
+ static struct amba_id clcdfb_id_table[] = {
 -- 
-2.7.0
+2.4.3
