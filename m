@@ -1,40 +1,40 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Mon, 8 Feb 2016 12:03:17 -0800
-Subject: [RESEND2 PATCH 1/3] memremap: add MEMREMAP_WC flag
-In-Reply-To: <9085d37fa97a762a46b9d58719c085368682c64f.1454950917.git.brian.starkey@arm.com>
-References: <cover.1454950917.git.brian.starkey@arm.com>
- <9085d37fa97a762a46b9d58719c085368682c64f.1454950917.git.brian.starkey@arm.com>
-Message-ID: <20160208120317.313409dc0ae7634c25d3f021@linux-foundation.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 8 Feb 2016 12:03:24 -0800
+Subject: [PATCH] ARM: drop unused Makefile.boot of Multiplatform SoCs
+In-Reply-To: <56B4E2B0.8060808@xilinx.com>
+References: <1454693808-13081-1-git-send-email-yamada.masahiro@socionext.com>
+ <56B4E2B0.8060808@xilinx.com>
+Message-ID: <20160208200324.GY19432@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon,  8 Feb 2016 17:30:50 +0000 Brian Starkey <brian.starkey@arm.com> wrote:
-
-> Add a flag to memremap() for writecombine mappings. Mappings satisfied
-> by this flag will not be cached, however writes may be delayed or
-> combined into more efficient bursts. This is most suitable for
-> buffers written sequentially by the CPU for use by other DMA devices.
+* Michal Simek <michal.simek@xilinx.com> [160205 09:59]:
+> On 5.2.2016 18:36, Masahiro Yamada wrote:
+> > The variable "MACHINE" is empty if CONFIG_ARCH_MULTIPLATFORM=y,
+> > so these Makefile.boot files are never included.
+> > 
+> > Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> > ---
+> > 
+> >  arch/arm/mach-cns3xxx/Makefile.boot    | 3 ---
+> >  arch/arm/mach-exynos/Makefile.boot     | 2 --
+> >  arch/arm/mach-integrator/Makefile.boot | 4 ----
+> >  arch/arm/mach-keystone/Makefile.boot   | 1 -
+> >  arch/arm/mach-mmp/Makefile.boot        | 1 -
+> >  arch/arm/mach-mv78xx0/Makefile.boot    | 3 ---
+> >  arch/arm/mach-nspire/Makefile.boot     | 0
+> >  arch/arm/mach-omap2/Makefile.boot      | 3 ---
+> >  arch/arm/mach-orion5x/Makefile.boot    | 3 ---
+> >  arch/arm/mach-prima2/Makefile.boot     | 3 ---
+> >  arch/arm/mach-realview/Makefile.boot   | 9 ---------
+> >  arch/arm/mach-s3c64xx/Makefile.boot    | 2 --
+> >  arch/arm/mach-spear/Makefile.boot      | 3 ---
+> >  arch/arm/mach-u300/Makefile.boot       | 4 ----
+> >  arch/arm/mach-ux500/Makefile.boot      | 3 ---
+> >  arch/arm/mach-zynq/Makefile.boot       | 3 ---
 > 
-> ...
+> Acked-by: Michal Simek <michal.simek@xilinx.com> (for Zynq)
 
-The patch generally looks OK to me.  It generates rejects against
-linux-next because of some janitorial changes in memremap.c.
+I doubt anybody wants to go back to disabling MULTIPLATFORM:
 
-
-> @@ -101,6 +107,11 @@ void *memremap(resource_size_t offset, size_t size, unsigned long flags)
->  		addr = ioremap_wt(offset, size);
->  	}
->  
-> +	if (!addr && (flags & MEMREMAP_WC)) {
-> +		flags &= ~MEMREMAP_WC;
-> +		addr = ioremap_wc(offset, size);
-> +	}
-> +
->  	return addr;
->  }
-
-The modifications of `flags' is unneeded (and the compiler will remove
-it).  And generally the modification of incoming args is a bit nasty
-IMO - I find it's better to treat them as const - part of the calling
-environment which can be relied upon to be unaltered as the code
-evolves.
+Acked-by: Tony Lindgren <tony@atomide.com>
