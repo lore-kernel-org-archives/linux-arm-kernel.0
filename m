@@ -1,30 +1,42 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon,  8 Feb 2016 18:07:53 -0200
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: Select CONFIG_CRYPTO_DEV_SAHARA
-Message-ID: <1454962073-22401-1-git-send-email-festevam@gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 8 Feb 2016 14:12:46 -0600
+Subject: [PATCH v4 01/11] drm/hisilicon: Add device tree binding for
+ hi6220 display subsystem
+In-Reply-To: <1454729098-79807-2-git-send-email-xinliang.liu@linaro.org>
+References: <1454729098-79807-1-git-send-email-xinliang.liu@linaro.org>
+ <1454729098-79807-2-git-send-email-xinliang.liu@linaro.org>
+Message-ID: <20160208201246.GA17459@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
+On Sat, Feb 06, 2016 at 11:24:48AM +0800, Xinliang Liu wrote:
+> Add ADE display controller binding doc.
+> Add DesignWare DSI Host Controller v1.20a binding doc.
 
-Select the sahara crypto driver that is used on i.MX53.
+One comment, otherwise:
 
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
- arch/arm/configs/imx_v6_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+Acked-by: Rob Herring <robh@kernel.org>
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 25a6066..d218c27 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -367,6 +367,7 @@ CONFIG_PROVE_LOCKING=y
- # CONFIG_ARM_UNWIND is not set
- CONFIG_SECURITYFS=y
- CONFIG_CRYPTO_DEV_FSL_CAAM=y
-+CONFIG_CRYPTO_DEV_SAHARA=y
- CONFIG_CRC_CCITT=m
- CONFIG_CRC_T10DIF=y
- CONFIG_CRC7=m
--- 
-1.9.1
+> +Board specific:
+> +	&dsi {
+> +		status = "ok";
+> +
+> +		ports {
+> +			/* 1 for output port */
+> +			port at 1 {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				reg = <1>;
+> +
+> +				/* 0 for bridge, other value for panel */
+
+The endpoint address would not change based on bridge or panel. So you 
+can drop the unit address here.
+
+> +				dsi_out0: endpoint at 0 {
+> +					reg = <0>;
+> +					remote-endpoint = <&adv7533_in>;
+> +				};
+> +			};
+> +		};
+> +	};
