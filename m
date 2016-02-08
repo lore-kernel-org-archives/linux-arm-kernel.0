@@ -1,71 +1,32 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon,  8 Feb 2016 21:55:53 +0000
-Subject: [PATCH] ARM: dts: am335x/am57xx: replace gpio-key,
- wakeup with wakeup-source property
-Message-ID: <1454968553-12088-1-git-send-email-sudeep.holla@arm.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 8 Feb 2016 14:01:59 -0800
+Subject: [GIT PULL] clk: tegra: Fixes for v4.5-rc3
+In-Reply-To: <1454608362-8954-1-git-send-email-thierry.reding@gmail.com>
+References: <1454608362-8954-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <20160208220159.GQ4848@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 3efda00129bd ("ARM: dts: am335x: replace gpio-key,wakeup with
-wakeup-source property") replaces all the legacy "gpio-key,wakeup" with
-the unified  "wakeup-source" property to prevent any further copy-paste
-duplication.
+On 02/04, Thierry Reding wrote:
+> From: Thierry Reding <treding@nvidia.com>
+> 
+> Hi Mike, Stephen,
+> 
+> The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
+> 
+>   Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.5-clk-fixes
+> 
+> for you to fetch changes up to 5a1d5eff3ede4de4482015a9999336051054283f:
+> 
+>   clk: tegra: super: Fix sparse warnings for functions not declared as static (2016-02-02 15:49:34 +0100)
+> 
 
-However couple of use of these legacy property sneaked in during the
-merge window. This patch replaces them too.
+Thanks, pulled.
 
-Cc: "Beno?t Cousson" <bcousson@baylibre.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: linux-omap at vger.kernel.org
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
----
- arch/arm/boot/dts/am335x-shc.dts          | 4 ++--
- arch/arm/boot/dts/am57xx-cl-som-am57x.dts | 2 +-
- 2 files changed, 3 insertions(+), 3 deletions(-)
-
-Hi Tony,
-
-I see these files got introduced during v4.5 merge window and we could
-not stop the copy-paste from the earlier versions files from which they
-were copied.
-
-Regards,
-Sudeep
-
-diff --git a/arch/arm/boot/dts/am335x-shc.dts b/arch/arm/boot/dts/am335x-shc.dts
-index 1b5b044fcd91..865de8500f1c 100644
---- a/arch/arm/boot/dts/am335x-shc.dts
-+++ b/arch/arm/boot/dts/am335x-shc.dts
-@@ -46,7 +46,7 @@
- 			gpios = <&gpio1 29 GPIO_ACTIVE_HIGH>;
- 			linux,code = <KEY_BACK>;
- 			debounce-interval = <1000>;
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 
- 		front_button {
-@@ -54,7 +54,7 @@
- 			gpios = <&gpio1 25 GPIO_ACTIVE_HIGH>;
- 			linux,code = <KEY_FRONT>;
- 			debounce-interval = <1000>;
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 	};
- 
-diff --git a/arch/arm/boot/dts/am57xx-cl-som-am57x.dts b/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
-index c53882643ae9..497eb07ced19 100644
---- a/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
-+++ b/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
-@@ -545,7 +545,7 @@
- 		ti,debounce-tol = /bits/ 16 <10>;
- 		ti,debounce-rep = /bits/ 16 <1>;
- 
--		linux,wakeup;
-+		wakeup-source;
- 	};
- };
- 
 -- 
-1.9.1
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
