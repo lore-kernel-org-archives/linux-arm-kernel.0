@@ -1,36 +1,35 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon,  8 Feb 2016 15:38:32 +0100
-Subject: [PATCH] Kbuild: provide a __UNIQUE_ID for clang
-Message-ID: <1454942318-2782493-1-git-send-email-arnd@arndb.de>
+Date: Mon,  8 Feb 2016 15:39:09 +0100
+Subject: [PATCH] clk: socfpga: fix __init annotation
+Message-ID: <1454942356-2783135-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The default __UNIQUE_ID macro in compiler.h fails to work for some drivers:
+clang found a bug with the __socfpga_pll_init definition:
 
-drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c:615:1: error: redefinition of
-      '__UNIQUE_ID_firmware615'
-BRCMF_FW_NVRAM_DEF(4354, "brcmfmac4354-sdio.bin", "brcmfmac4354-sdio.txt");
+drivers/clk/socfpga/clk-pll-a10.c:77:15: error: '__section__' attribute only applies to functions and
+      global variables
 
-This adds a copy of the version we use for gcc-4.3 and higher, as the same
-one works with all versions of clang that I could find in svn (2.6 and higher).
+This moves the __init annotation to the right place so the function
+actually gets discarded.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- include/linux/compiler-clang.h | 5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/clk/socfpga/clk-pll-a10.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/include/linux/compiler-clang.h b/include/linux/compiler-clang.h
-index d1e49d52b640..de179993e039 100644
---- a/include/linux/compiler-clang.h
-+++ b/include/linux/compiler-clang.h
-@@ -10,3 +10,8 @@
- #undef uninitialized_var
- #define uninitialized_var(x) x = *(&(x))
- #endif
-+
-+/* same as gcc, this was present in clang-2.6 so we can assume it works
-+ * with any version that can compile the kernel
-+ */
-+#define __UNIQUE_ID(prefix) __PASTE(__PASTE(__UNIQUE_ID_, prefix), __COUNTER__)
+diff --git a/drivers/clk/socfpga/clk-pll-a10.c b/drivers/clk/socfpga/clk-pll-a10.c
+index 402d630bd531..35fabe1a32c3 100644
+--- a/drivers/clk/socfpga/clk-pll-a10.c
++++ b/drivers/clk/socfpga/clk-pll-a10.c
+@@ -74,7 +74,7 @@ static struct clk_ops clk_pll_ops = {
+ 	.get_parent = clk_pll_get_parent,
+ };
+ 
+-static struct __init clk * __socfpga_pll_init(struct device_node *node,
++static struct clk * __init __socfpga_pll_init(struct device_node *node,
+ 	const struct clk_ops *ops)
+ {
+ 	u32 reg;
 -- 
 2.7.0
