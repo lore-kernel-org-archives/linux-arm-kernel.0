@@ -1,35 +1,77 @@
 From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
-Date: Mon,  8 Feb 2016 17:37:48 +0530
-Subject: [PATCH 2/6] net: thunderx: Use napi_schedule_irqoff()
+Date: Mon,  8 Feb 2016 17:37:50 +0530
+Subject: [PATCH 4/6] net: thunderx: bgx: Use standard firmware node
+ infrastructure.
 In-Reply-To: <1454933272-45005-1-git-send-email-sunil.kovvuri@gmail.com>
 References: <1454933272-45005-1-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <1454933272-45005-3-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <1454933272-45005-5-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sunil Goutham <sgoutham@cavium.com>
+From: David Daney <david.daney@cavium.com>
 
-napi_schedule is being called from hard irq context, hence
-switch to napi_schedule_irqoff which avoids unneeded call
-to local_irq_save and local_irq_restore.
+In the case of OF device tree, the firmware information is attached to
+the BGX device structure in the standard manner, so use the firmware
+iterators and accessors where possible.
 
+Signed-off-by: David Daney <david.daney@cavium.com>
 Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
 ---
- drivers/net/ethernet/cavium/thunder/nicvf_main.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.c |   27 +++++++++++----------
+ 1 files changed, 14 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_main.c b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-index 95db6b7..c6f146c 100644
---- a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-+++ b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-@@ -828,7 +828,7 @@ static irqreturn_t nicvf_intr_handler(int irq, void *cq_irq)
- 	nicvf_disable_intr(nic, NICVF_INTR_CQ, qidx);
+diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+index 9df26c2..111835b 100644
+--- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
++++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+@@ -968,26 +968,27 @@ static int bgx_init_acpi_phy(struct bgx *bgx)
  
- 	/* Schedule NAPI */
--	napi_schedule(&cq_poll->napi);
-+	napi_schedule_irqoff(&cq_poll->napi);
+ static int bgx_init_of_phy(struct bgx *bgx)
+ {
+-	struct device_node *np;
+-	struct device_node *np_child;
++	struct fwnode_handle *fwn;
+ 	u8 lmac = 0;
+-	char bgx_sel[5];
+ 	const char *mac;
  
- 	/* Clear interrupt */
- 	nicvf_clear_intr(nic, NICVF_INTR_CQ, qidx);
+-	/* Get BGX node from DT */
+-	snprintf(bgx_sel, 5, "bgx%d", bgx->bgx_id);
+-	np = of_find_node_by_name(NULL, bgx_sel);
+-	if (!np)
+-		return -ENODEV;
++	device_for_each_child_node(&bgx->pdev->dev, fwn) {
++		struct device_node *phy_np;
++		struct device_node *node = to_of_node(fwn);
++
++		/* If it is not an OF node we cannot handle it yet, so
++		 * exit the loop.
++		 */
++		if (!node)
++			break;
+ 
+-	for_each_child_of_node(np, np_child) {
+-		struct device_node *phy_np = of_parse_phandle(np_child,
+-							      "phy-handle", 0);
++		phy_np = of_parse_phandle(node, "phy-handle", 0);
+ 		if (!phy_np)
+ 			continue;
++
+ 		bgx->lmac[lmac].phydev = of_phy_find_device(phy_np);
+ 
+-		mac = of_get_mac_address(np_child);
++		mac = of_get_mac_address(node);
+ 		if (mac)
+ 			ether_addr_copy(bgx->lmac[lmac].mac, mac);
+ 
+@@ -995,7 +996,7 @@ static int bgx_init_of_phy(struct bgx *bgx)
+ 		bgx->lmac[lmac].lmacid = lmac;
+ 		lmac++;
+ 		if (lmac == MAX_LMAC_PER_BGX) {
+-			of_node_put(np_child);
++			of_node_put(node);
+ 			break;
+ 		}
+ 	}
 -- 
 1.7.1
