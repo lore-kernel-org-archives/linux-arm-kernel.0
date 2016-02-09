@@ -1,82 +1,31 @@
-From: tsahee@annapurnalabs.com (Tsahee Zidenberg)
-Date: Tue, 9 Feb 2016 12:13:04 +0200
-Subject: [PATCH 2/3] arm64: dts: add the Alpine v2 EVP
-In-Reply-To: <56B9B1B5.5070106@arm.com>
-References: <1454922699-16785-1-git-send-email-antoine.tenart@free-electrons.com>
- <1454922699-16785-3-git-send-email-antoine.tenart@free-electrons.com>
- <56B8B45D.1020902@arm.com> <20160209085633.GA5388@kwain>
- <20160209090131.GB5388@kwain> <56B9ACE2.1060200@arm.com>
- <CABM=7knaepbyy4nw_GczVM7E_t6py7gG0ERs8ru_AYoVXvAQ+A@mail.gmail.com>
- <56B9B1B5.5070106@arm.com>
-Message-ID: <CABM=7k=-Y+eFB2nUMfMjd3saTSNDsEyfHyYNf-ef8qQc5jCsxA@mail.gmail.com>
+From: slash.tmp@free.fr (Mason)
+Date: Tue, 9 Feb 2016 11:17:48 +0100
+Subject: [PATCH RFC] Add cpufreq support
+In-Reply-To: <7910928.pmJjZiV1Lk@wuerfel>
+References: <56B4D4BE.2040008@free.fr> <22002072.L04zy0K2AP@wuerfel>
+ <20160208131625.GI8294@vireshk> <7910928.pmJjZiV1Lk@wuerfel>
+Message-ID: <56B9BCCC.8060404@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 February 2016 at 11:30, Marc Zyngier <marc.zyngier@arm.com> wrote:
->
-> On 09/02/16 09:14, Tsahee Zidenberg wrote:
-> >
-> >
-> > On 9 February 2016 at 11:09, Marc Zyngier <marc.zyngier@arm.com
-> > <mailto:marc.zyngier@arm.com>> wrote:
-> >
-> >     On 09/02/16 09:01, Antoine Tenart wrote:
-> >     > On Tue, Feb 09, 2016 at 09:56:33AM +0100, Antoine Tenart wrote:
-> >     >> Hi Marc,
-> >     >>
-> >     >> On Mon, Feb 08, 2016 at 03:29:33PM +0000, Marc Zyngier wrote:
-> >     >>> On 08/02/16 09:11, Antoine Tenart wrote:
-> >     >>>
-> >     >>>> +          gic: gic at f0100000 {
-> >     >>>> +                  compatible = "arm,gic-v3";
-> >     >>>> +                  reg = <0x0 0xf0200000 0x0 0x10000>,     /* GIC Dist */
-> >     >>>> +                        <0x0 0xf0280000 0x0 0x200000>,    /* GICR */
-> >     >>>> +                        <0x0 0xf0100000 0x0 0x2000>;      /* GICC */
-> >     >>>> +                  interrupt-controller;
-> >     >>>> +                  #interrupt-cells = <3>;
-> >     >>>> +          };
-> >     >>>
-> >     >>> Something is wrong here. Either you are missing GICH and GICV (assuming
-> >     >>> you have legacy support), or you have an extra GICC region (which
-> >     >>> doesn't make sense on its own).
-> >     >>
-> >     >> I'll add the missing regions.
-> >     >
-> >     > Hmm, in fact the GICC region shouldn't be there. I'll make some tests
-> >     > and remove it.
-> >
-> >     If you have a GICv3 with legacy support, you will probably have GICC,
-> >     GICH and GICV. Linux itself will only use GICD and GICR, but it needs at
-> >     least GICV to be able to virtualize GICv2 guests. And GICV is not
-> >     allowed to exist without GICC and GICH, so I really recommend that you
-> >     keep GICC around.
-> >
-> >
-> > We use the GIC without legacy support (we disable it in early boot
-> > stages), so I think removing the GICC region is the better solution.
->
-> Disabling legacy support doesn't mean that:
-> - the HW isn't present
-> - the associated regions are not useful
->
-By "disabling lecgacy support in early boot" I don't just mean that
-ARE bit will be set, but it will actually be RAO/WI. There will be no
-way for SW to enable it and use these registers (which, sadly, means
-that there will be no way to enable gicv2 virtualization). If you
-insist - I will dig up the supposed location of GICV and GICH - yet it
-will be both untested and entirely unusable.
+On 08/02/2016 14:45, Arnd Bergmann wrote:
 
-We will add an entry for the maintenance interrupt, as it really can
-be used by future configurations.
+> That's why I said we could introduce a 'v3' with the meaning
+> it should have had to start with: compatible means actually
+> compatible with the driver.
 
-> Here, we describe the HW, not the usage you make of it.
->
-> And unless you think that having working virtualization is completely
-> useless, I strongly suggest that you properly document the HW in the
-> device tree.
->
-> Thanks,
->
->         M.
-> --
-> Jazz is not dead. It just smells funny...
+If I understand correctly, something needs to change in the
+framework before I can push cpufreq support for my platform
+upstream, correct?
+
+Could you CC me if anything happens on that front?
+
+In my local 4.4 branch, I think I should use whatever method
+was recommended at the time.
+
+Was that to define the platform's init_late method, and call
+platform_device_register_simple from there? (Could you take
+a quick glance at the patch, and see if it is acceptable in
+the context of kernel 4.4?)
+
+Regards.
