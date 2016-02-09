@@ -1,55 +1,45 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 9 Feb 2016 17:17:08 +0100
-Subject: [PATCH v4 3/3] kallsyms: remove --page-offset command line option
-In-Reply-To: <HKXPR06MB056549C714A864B2D4F37DCA8AD60@HKXPR06MB0565.apcprd06.prod.outlook.com>
-References: <1455030828-6416-1-git-send-email-ard.biesheuvel@linaro.org>
- <1455030828-6416-4-git-send-email-ard.biesheuvel@linaro.org>
- <HKXPR06MB056549C714A864B2D4F37DCA8AD60@HKXPR06MB0565.apcprd06.prod.outlook.com>
-Message-ID: <CAKv+Gu-rdP7-=Z2SO2jRS_dHzB8UDpZ7-RowN_400d32Qvxmqg@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 9 Feb 2016 16:17:33 +0000
+Subject: [PATCH] of/irq: Fix msi-map calculation for nonzero rid-base
+In-Reply-To: <20160209160812.GC9332@leverpostej>
+References: <9f6845195d03b0e0b0d187bb510fbf7bd497e836.1455015344.git.robin.murphy@arm.com>
+ <56B9D62E.8080003@arm.com>
+ <HE1PR04MB1641AF97F637BBCBB86BA4FE8DD60@HE1PR04MB1641.eurprd04.prod.outlook.com>
+ <20160209160812.GC9332@leverpostej>
+Message-ID: <56BA111D.9050807@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 February 2016 at 17:09, Chris Brandt <Chris.Brandt@renesas.com> wrote:
-> On 9 Feb 2016, Ard Biesheuvel wrote:
->
->>diff --git a/scripts/kallsyms.c b/scripts/kallsyms.c
->>index 02473b71643b..32c8d43590af 100644
->>--- a/scripts/kallsyms.c
->>+++ b/scripts/kallsyms.c
->>@@ -63,7 +63,6 @@ static unsigned int table_size, table_cnt;
->> static int all_symbols = 0;
->> static int absolute_percpu = 0;
->> static char symbol_prefix_char = '\0';
->>-static unsigned long long kernel_start_addr = 0;
->> static int base_relative = 0;
->
->
->
-> You removed kernel_start_addr, but you didn't remove all the instances of it in the file (you did remove them all in V2 though).
->
-> So, now I get:
->
->   CC      scripts/mod/devicetable-offsets.s
-> ../scripts/kallsyms.c: In function 'record_relative_base':
-> ../scripts/kallsyms.c:740:6: error: 'kernel_start_addr' undeclared (first use in this function)
->   if (kernel_start_addr > 0) {
->       ^
-> ../scripts/kallsyms.c:740:6: note: each undeclared identifier is reported only once for each function it appears in
-> make[2]: *** [scripts/kallsyms] Error 1
->
+On 09/02/16 16:08, Mark Rutland wrote:
+[...]
 
-That is because this patch
+>>>> having msi-map-mask clash with a nonzero rid-base, as that's another
+>>>> thing one can easily get wrong.
 
-http://ozlabs.org/~akpm/mmots/broken-out/kallsyms-add-support-for-relative-offsets-in-kallsyms-address-table-v5.patch
+[...]
 
-is also in flight, via akpm's tree, and is expected to hit -next
-tomorrow. That patch removes this reference (or alternatively, will
-not introduce it anymore if akpm decides to fold it into
-http://ozlabs.org/~akpm/mmots/broken-out/kallsyms-add-support-for-relative-offsets-in-kallsyms-address-table.patch
-before submitting it)
+>>>> +		if (rid_base & ~map_mask) {
+>>>> +			dev_err(parent_dev,
+>>>> +				"Invalid msi-map translation - msi-map-mask (0x%x) ignores rid-
+>>> base (0x%x)\n",
+>>>> +				map_mask, rid_base);
+>>>> +			return rid_out;
+>>>> +		}
 
-Going forward, it probably makes sense to only submit #1 of this
-series for v4.6, and queue the remaining two after the merge window.
+[...]
 
-Thanks for testing btw,
-Ard.
+>>                     msi-map = <0x0100 &its 0x11 0x1>;
+>>                     msi-map-mask = <0xff>;
+>>
+>
+> I'd say that this is an inconsistent set of properties, and it's
+> probably worth warning if we encounter this. There is no possible way
+> that rid-base can be encountered.
+
+Indeed ;)
+
+Robin.
+
+> Thanks,
+> Mark.
+>
