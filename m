@@ -1,40 +1,25 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Tue, 9 Feb 2016 10:45:26 +0100
-Subject: [PATCH v3 0/2] Consolidate redundant register/stack access code
-In-Reply-To: <1455010600.13384.3.camel@ellerman.id.au>
-References: <1454996337-7935-1-git-send-email-dave.long@linaro.org>
- <1455010600.13384.3.camel@ellerman.id.au>
-Message-ID: <20160209094526.GB25268@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 9 Feb 2016 09:47:08 +0000
+Subject: [PATCH v2 0/5] arm64: kernel: Add support for User Access Override
+In-Reply-To: <13475776.5b1DTHhHh9@wuerfel>
+References: <1454684330-892-1-git-send-email-james.morse@arm.com>
+ <13475776.5b1DTHhHh9@wuerfel>
+Message-ID: <20160209094707.GA22874@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Feb 05, 2016 at 04:40:54PM +0100, Arnd Bergmann wrote:
+> * Do we expect to handle this using live patching indefinitely? I can imagine
+>   that at some point in the future, ARMv8.2+ systems will be the vast majority,
+>   so it might be nice to support enabling it unconditionally (same for any
+>   of the alternative bits really). Is there a long-term strategy?
 
-* Michael Ellerman <mpe@ellerman.id.au> wrote:
+Another good reason for an option turning these things on by default is
+that it makes debugging *so* much easier when the vmlinux matches what's
+actually running!
 
-> On Tue, 2016-02-09 at 00:38 -0500, David Long wrote:
-> 
-> > From: "David A. Long" <dave.long@linaro.org>
-> >
-> > Move duplicate and functionally equivalent code for accessing registers
-> > and stack (CONFIG_HAVE_REGS_AND_STACK_ACCESS_API) from arch subdirs into
-> > common kernel files.
-> >
-> > I'm sending this out again (with updated distribution list) because v2
-> > just never got pulled in, even though I don't think there were any
-> > outstanding issues.
-> 
-> A big cross arch patch like this would often get taken by Andrew Morton, but
-> AFAICS you didn't CC him - so I just added him, perhaps he'll pick it up for
-> us :D
+So yes, that's definitely something we should look at in the long-term,
+but we still need the live patching for distro kernels that will assumedly
+want a single Image covering ARMv8+ for a while.
 
-The other problem is that the second patch is commingling changes to 6 separate 
-architectures:
-
- 16 files changed, 106 insertions(+), 343 deletions(-)
-
-that should probably be 6 separate patches. Easier to review, easier to bisect to, 
-easier to revert, etc.
-
-Thanks,
-
-	Ingo
+Will
