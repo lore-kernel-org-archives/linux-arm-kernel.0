@@ -1,37 +1,36 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 9 Feb 2016 16:01:24 +0800
-Subject: [PATCH 14/14] clk: qcom: Migrate to clk_hw based registration
- and OF APIs
-In-Reply-To: <1454982341-22715-15-git-send-email-sboyd@codeaurora.org>
-Message-ID: <201602091500.56m6YCnX%fengguang.wu@intel.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 9 Feb 2016 09:14:20 +0100
+Subject: [PATCH 6/6] ARM: multi_v7_defconfig: Enable MUSB HDRC driver
+ with Allwinner glue
+In-Reply-To: <1454774029-10469-7-git-send-email-wens@csie.org>
+References: <1454774029-10469-1-git-send-email-wens@csie.org>
+ <1454774029-10469-7-git-send-email-wens@csie.org>
+Message-ID: <20160209081420.GN31506@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+On Sat, Feb 06, 2016 at 11:53:49PM +0800, Chen-Yu Tsai wrote:
+> Allwinner SoCs typically have a Mentor Graphics Inventra MUSB high speed
+> dual role controller for USB OTG.
+> 
+> Now that the issue with MUSB and USB gadget registration order has been
+> resolved, we can enable this driver in dual role mode.
+> 
+> This patch only enables the driver core and Allwinner platform support.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-[auto build test ERROR on ljones-mfd/for-mfd-next]
-[also build test ERROR on v4.5-rc3]
-[cannot apply to clk/clk-next next-20160208]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+Applied, thanks!
+Maxime
 
-url:    https://github.com/0day-ci/linux/commits/Stephen-Boyd/clk_hw-based-clkdev-DT-providers/20160209-095211
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git for-mfd-next
-config: x86_64-allmodconfig (attached as .config)
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=x86_64 
-
-All errors (new ones prefixed by >>):
-
->> ERROR: "of_clk_add_hw_provider" [drivers/clk/qcom/clk-qcom.ko] undefined!
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 52114 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160209/66c7eadc/attachment-0001.obj>
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160209/c34a9ec8/attachment.sig>
