@@ -1,134 +1,94 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 9 Feb 2016 11:31:09 +0800
-Subject: [PATCH 04/14] clk: Add clk_hw OF clk providers
-In-Reply-To: <1454982341-22715-5-git-send-email-sboyd@codeaurora.org>
-Message-ID: <201602091142.gNVJRY1Y%fengguang.wu@intel.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 9 Feb 2016 09:06:46 +0530
+Subject: [PATCH] dmaengine: pxa_dma: fix the maximum requestor line
+In-Reply-To: <1454941131-12308-1-git-send-email-robert.jarzmik@free.fr>
+References: <1454941131-12308-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <20160209033646.GK19598@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+On Mon, Feb 08, 2016 at 03:18:51PM +0100, Robert Jarzmik wrote:
+> The current number of requestor lines is limited to 31. This was an
+> error of a previous commit, as this number is platform dependent, and is
+> actually :
+>  - for pxa25x: 40 requestor lines
+>  - for pxa27x: 74 requestor lines
+>  - for pxa3xx: 100 requestor lines
+> 
+> As the driver doesn't need to know the exact number, but only an
 
-[auto build test ERROR on ljones-mfd/for-mfd-next]
-[also build test ERROR on v4.5-rc3 next-20160208]
-[cannot apply to clk/clk-next]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+and why would that be a good assumption?
 
-url:    https://github.com/0day-ci/linux/commits/Stephen-Boyd/clk_hw-based-clkdev-DT-providers/20160209-095211
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git for-mfd-next
-config: x86_64-rhel (attached as .config)
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=x86_64 
+Btw shouldn't this data come from DT?
 
-All errors (new ones prefixed by >>):
+> absolute maximum value above which is it not using any flow control, set
+> the maximum to 0x8000 requestor lines, which should never be reached.
+> 
+> The previous testing did not reveal the faulty constant as on pxa[23]xx
+> platforms, only camera, MSL and USB are above requestor 32, and in these
+> only the camera has a driver using dma.
+> 
+> Fixes: e87ffbdf0697 ("dmaengine: pxa_dma: fix the no-requestor case")
+> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> ---
+>  drivers/dma/pxa_dma.c | 9 +++++----
+>  1 file changed, 5 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/dma/pxa_dma.c b/drivers/dma/pxa_dma.c
+> index ca6c088edc8a..817a2bdc423d 100644
+> --- a/drivers/dma/pxa_dma.c
+> +++ b/drivers/dma/pxa_dma.c
+> @@ -53,6 +53,7 @@
+>  
+>  #define DRCMR_MAPVLD	BIT(7)	/* Map Valid (read / write) */
+>  #define DRCMR_CHLNUM	0x1f	/* mask for Channel Number (read / write) */
+> +#define DRCMR_MAXREQST	0x7fff	/* Maximum requestor line */
+>  
+>  #define DDADR_DESCADDR	0xfffffff0	/* Address of next descriptor (mask) */
+>  #define DDADR_STOP	BIT(0)	/* Stop (read / write) */
+> @@ -473,7 +474,7 @@ static void pxad_free_phy(struct pxad_chan *chan)
+>  		return;
+>  
+>  	/* clear the channel mapping in DRCMR */
+> -	if (chan->drcmr <= DRCMR_CHLNUM) {
+> +	if (chan->drcmr <= DRCMR_MAXREQST) {
+>  		reg = pxad_drcmr(chan->drcmr);
+>  		writel_relaxed(0, chan->phy->base + reg);
+>  	}
+> @@ -518,7 +519,7 @@ static void phy_enable(struct pxad_phy *phy, bool misaligned)
+>  		"%s(); phy=%p(%d) misaligned=%d\n", __func__,
+>  		phy, phy->idx, misaligned);
+>  
+> -	if (phy->vchan->drcmr <= DRCMR_CHLNUM) {
+> +	if (phy->vchan->drcmr <= DRCMR_MAXREQST) {
+>  		reg = pxad_drcmr(phy->vchan->drcmr);
+>  		writel_relaxed(DRCMR_MAPVLD | phy->idx, phy->base + reg);
+>  	}
+> @@ -922,7 +923,7 @@ static void pxad_get_config(struct pxad_chan *chan,
+>  		dev_addr = chan->cfg.src_addr;
+>  		*dev_src = dev_addr;
+>  		*dcmd |= PXA_DCMD_INCTRGADDR;
+> -		if (chan->drcmr <= DRCMR_CHLNUM)
+> +		if (chan->drcmr <= DRCMR_MAXREQST)
+>  			*dcmd |= PXA_DCMD_FLOWSRC;
+>  	}
+>  	if (dir == DMA_MEM_TO_DEV) {
+> @@ -931,7 +932,7 @@ static void pxad_get_config(struct pxad_chan *chan,
+>  		dev_addr = chan->cfg.dst_addr;
+>  		*dev_dst = dev_addr;
+>  		*dcmd |= PXA_DCMD_INCSRCADDR;
+> -		if (chan->drcmr <= DRCMR_CHLNUM)
+> +		if (chan->drcmr <= DRCMR_MAXREQST)
+>  			*dcmd |= PXA_DCMD_FLOWTRG;
+>  	}
+>  	if (dir == DMA_MEM_TO_MEM)
+> -- 
+> 2.1.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-   drivers/clk/clk.o: In function `of_clk_hw_simple_get':
->> (.text+0x3ec0): multiple definition of `of_clk_hw_simple_get'
-   drivers/clk/clkdev.o:(.text+0x3e0): first defined here
-   drivers/clk/clk.o: In function `of_clk_hw_onecell_get':
->> (.text+0x3ee0): multiple definition of `of_clk_hw_onecell_get'
-   drivers/clk/clkdev.o:(.text+0x400): first defined here
-   drivers/clk/clk.o: In function `of_clk_add_hw_provider':
->> (.text+0x3eb0): multiple definition of `of_clk_add_hw_provider'
-   drivers/clk/clkdev.o:(.text+0x3d0): first defined here
-   drivers/clk/clk-divider.o: In function `of_clk_hw_simple_get':
-   (.text+0xb20): multiple definition of `of_clk_hw_simple_get'
-   drivers/clk/clkdev.o:(.text+0x3e0): first defined here
-   drivers/clk/clk-divider.o: In function `of_clk_hw_onecell_get':
-   (.text+0xb40): multiple definition of `of_clk_hw_onecell_get'
-   drivers/clk/clkdev.o:(.text+0x400): first defined here
-   drivers/clk/clk-divider.o: In function `of_clk_add_hw_provider':
-   (.text+0xb10): multiple definition of `of_clk_add_hw_provider'
-   drivers/clk/clkdev.o:(.text+0x3d0): first defined here
-   drivers/clk/clk-fixed-factor.o: In function `of_clk_hw_simple_get':
-   (.text+0x170): multiple definition of `of_clk_hw_simple_get'
-   drivers/clk/clkdev.o:(.text+0x3e0): first defined here
-   drivers/clk/clk-fixed-factor.o: In function `of_clk_hw_onecell_get':
-   (.text+0x190): multiple definition of `of_clk_hw_onecell_get'
-   drivers/clk/clkdev.o:(.text+0x400): first defined here
-   drivers/clk/clk-fixed-factor.o: In function `of_clk_add_hw_provider':
-   (.text+0x160): multiple definition of `of_clk_add_hw_provider'
-   drivers/clk/clkdev.o:(.text+0x3d0): first defined here
-   drivers/clk/clk-fixed-rate.o: In function `of_clk_hw_simple_get':
-   (.text+0x120): multiple definition of `of_clk_hw_simple_get'
-   drivers/clk/clkdev.o:(.text+0x3e0): first defined here
-   drivers/clk/clk-fixed-rate.o: In function `of_clk_hw_onecell_get':
-   (.text+0x140): multiple definition of `of_clk_hw_onecell_get'
-   drivers/clk/clkdev.o:(.text+0x400): first defined here
-   drivers/clk/clk-fixed-rate.o: In function `of_clk_add_hw_provider':
-   (.text+0x110): multiple definition of `of_clk_add_hw_provider'
-   drivers/clk/clkdev.o:(.text+0x3d0): first defined here
-   drivers/clk/clk-gate.o: In function `of_clk_hw_simple_get':
-   (.text+0x280): multiple definition of `of_clk_hw_simple_get'
-   drivers/clk/clkdev.o:(.text+0x3e0): first defined here
-   drivers/clk/clk-gate.o: In function `of_clk_hw_onecell_get':
-   (.text+0x2a0): multiple definition of `of_clk_hw_onecell_get'
-   drivers/clk/clkdev.o:(.text+0x400): first defined here
-   drivers/clk/clk-gate.o: In function `of_clk_add_hw_provider':
-   (.text+0x270): multiple definition of `of_clk_add_hw_provider'
-   drivers/clk/clkdev.o:(.text+0x3d0): first defined here
-   drivers/clk/clk-multiplier.o: In function `of_clk_hw_simple_get':
-   (.text+0x2b0): multiple definition of `of_clk_hw_simple_get'
-   drivers/clk/clkdev.o:(.text+0x3e0): first defined here
-   drivers/clk/clk-multiplier.o: In function `of_clk_hw_onecell_get':
-   (.text+0x2d0): multiple definition of `of_clk_hw_onecell_get'
-   drivers/clk/clkdev.o:(.text+0x400): first defined here
-   drivers/clk/clk-multiplier.o: In function `of_clk_add_hw_provider':
-   (.text+0x2a0): multiple definition of `of_clk_add_hw_provider'
-   drivers/clk/clkdev.o:(.text+0x3d0): first defined here
-   drivers/clk/clk-mux.o: In function `of_clk_hw_simple_get':
-   (.text+0x340): multiple definition of `of_clk_hw_simple_get'
-   drivers/clk/clkdev.o:(.text+0x3e0): first defined here
-   drivers/clk/clk-mux.o: In function `of_clk_hw_onecell_get':
-   (.text+0x360): multiple definition of `of_clk_hw_onecell_get'
-   drivers/clk/clkdev.o:(.text+0x400): first defined here
-   drivers/clk/clk-mux.o: In function `of_clk_add_hw_provider':
-   (.text+0x330): multiple definition of `of_clk_add_hw_provider'
-   drivers/clk/clkdev.o:(.text+0x3d0): first defined here
-   drivers/clk/clk-composite.o: In function `of_clk_add_hw_provider':
-   clk-composite.c:(.text+0x3a0): multiple definition of `of_clk_add_hw_provider'
-   drivers/clk/clkdev.o:(.text+0x3d0): first defined here
-   drivers/clk/clk-composite.o: In function `of_clk_hw_simple_get':
-   clk-composite.c:(.text+0x3b0): multiple definition of `of_clk_hw_simple_get'
-   drivers/clk/clkdev.o:(.text+0x3e0): first defined here
-   drivers/clk/clk-composite.o: In function `of_clk_hw_onecell_get':
-   clk-composite.c:(.text+0x3d0): multiple definition of `of_clk_hw_onecell_get'
-   drivers/clk/clkdev.o:(.text+0x400): first defined here
-   drivers/clk/clk-fractional-divider.o: In function `of_clk_hw_simple_get':
-   (.text+0x330): multiple definition of `of_clk_hw_simple_get'
-   drivers/clk/clkdev.o:(.text+0x3e0): first defined here
-   drivers/clk/clk-fractional-divider.o: In function `of_clk_hw_onecell_get':
-   (.text+0x350): multiple definition of `of_clk_hw_onecell_get'
-   drivers/clk/clkdev.o:(.text+0x400): first defined here
-   drivers/clk/clk-fractional-divider.o: In function `of_clk_add_hw_provider':
-   (.text+0x320): multiple definition of `of_clk_add_hw_provider'
-   drivers/clk/clkdev.o:(.text+0x3d0): first defined here
-   drivers/clk/clk-gpio.o: In function `of_clk_hw_simple_get':
-   (.text+0x340): multiple definition of `of_clk_hw_simple_get'
-   drivers/clk/clkdev.o:(.text+0x3e0): first defined here
-   drivers/clk/clk-gpio.o: In function `of_clk_hw_onecell_get':
-   (.text+0x360): multiple definition of `of_clk_hw_onecell_get'
-   drivers/clk/clkdev.o:(.text+0x400): first defined here
-   drivers/clk/clk-gpio.o: In function `of_clk_add_hw_provider':
-   (.text+0x330): multiple definition of `of_clk_add_hw_provider'
-   drivers/clk/clkdev.o:(.text+0x3d0): first defined here
-   drivers/clk/x86/built-in.o: In function `of_clk_hw_simple_get':
-   (.text+0x90): multiple definition of `of_clk_hw_simple_get'
-   drivers/clk/clkdev.o:(.text+0x3e0): first defined here
-   drivers/clk/x86/built-in.o: In function `of_clk_hw_onecell_get':
-   (.text+0xb0): multiple definition of `of_clk_hw_onecell_get'
-   drivers/clk/clkdev.o:(.text+0x400): first defined here
-   drivers/clk/x86/built-in.o: In function `of_clk_add_hw_provider':
-   (.text+0x80): multiple definition of `of_clk_add_hw_provider'
-   drivers/clk/clkdev.o:(.text+0x3d0): first defined here
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 36062 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160209/4189771e/attachment-0001.obj>
+-- 
+~Vinod
