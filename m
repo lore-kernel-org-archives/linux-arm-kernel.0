@@ -1,104 +1,149 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon,  8 Feb 2016 17:45:37 -0800
-Subject: [PATCH 10/14] clk: fractional-divider: Add hw based registration APIs
+Date: Mon,  8 Feb 2016 17:45:35 -0800
+Subject: [PATCH 08/14] clk: mux: Add hw based registration APIs
 In-Reply-To: <1454982341-22715-1-git-send-email-sboyd@codeaurora.org>
 References: <1454982341-22715-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1454982341-22715-11-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1454982341-22715-9-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add registration APIs in the clk fractional divider code to
-return struct clk_hw pointers instead of struct clk pointers.
-This way we hide the struct clk pointer from providers unless
-they need to use consumer facing APIs.
+Add registration APIs in the clk mux code to return struct clk_hw
+pointers instead of struct clk pointers. This way we hide the
+struct clk pointer from providers unless they need to use
+consumer facing APIs.
 
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/clk/clk-fractional-divider.c | 40 +++++++++++++++++++++++++++++++-----
- include/linux/clk-provider.h         |  5 +++++
- 2 files changed, 40 insertions(+), 5 deletions(-)
+ drivers/clk/clk-mux.c        | 57 +++++++++++++++++++++++++++++++++++++++-----
+ include/linux/clk-provider.h | 11 +++++++++
+ 2 files changed, 62 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/clk/clk-fractional-divider.c b/drivers/clk/clk-fractional-divider.c
-index 5c4955e33f7a..e7a315e840e6 100644
---- a/drivers/clk/clk-fractional-divider.c
-+++ b/drivers/clk/clk-fractional-divider.c
-@@ -118,14 +118,15 @@ const struct clk_ops clk_fractional_divider_ops = {
+diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
+index 5ed03c8a8df9..6b0fcd3a4629 100644
+--- a/drivers/clk/clk-mux.c
++++ b/drivers/clk/clk-mux.c
+@@ -115,16 +115,17 @@ const struct clk_ops clk_mux_ro_ops = {
  };
- EXPORT_SYMBOL_GPL(clk_fractional_divider_ops);
+ EXPORT_SYMBOL_GPL(clk_mux_ro_ops);
  
--struct clk *clk_register_fractional_divider(struct device *dev,
-+struct clk_hw *clk_hw_register_fractional_divider(struct device *dev,
- 		const char *name, const char *parent_name, unsigned long flags,
- 		void __iomem *reg, u8 mshift, u8 mwidth, u8 nshift, u8 nwidth,
- 		u8 clk_divider_flags, spinlock_t *lock)
+-struct clk *clk_register_mux_table(struct device *dev, const char *name,
++struct clk_hw *clk_hw_register_mux_table(struct device *dev, const char *name,
+ 		const char * const *parent_names, u8 num_parents,
+ 		unsigned long flags,
+ 		void __iomem *reg, u8 shift, u32 mask,
+ 		u8 clk_mux_flags, u32 *table, spinlock_t *lock)
  {
- 	struct clk_fractional_divider *fd;
- 	struct clk_init_data init;
+ 	struct clk_mux *mux;
 -	struct clk *clk;
 +	struct clk_hw *hw;
+ 	struct clk_init_data init;
+ 	u8 width = 0;
 +	int ret;
  
- 	fd = kzalloc(sizeof(*fd), GFP_KERNEL);
- 	if (!fd)
-@@ -148,10 +149,39 @@ struct clk *clk_register_fractional_divider(struct device *dev,
- 	fd->lock = lock;
- 	fd->hw.init = &init;
+ 	if (clk_mux_flags & CLK_MUX_HIWORD_MASK) {
+ 		width = fls(mask) - ffs(mask) + 1;
+@@ -159,12 +160,31 @@ struct clk *clk_register_mux_table(struct device *dev, const char *name,
+ 	mux->table = table;
+ 	mux->hw.init = &init;
  
--	clk = clk_register(dev, &fd->hw);
+-	clk = clk_register(dev, &mux->hw);
+-
 -	if (IS_ERR(clk))
-+	hw = &fd->hw;
++	hw = &mux->hw;
 +	ret = clk_hw_register(dev, hw);
 +	if (ret) {
- 		kfree(fd);
+ 		kfree(mux);
 +		hw = ERR_PTR(ret);
 +	}
-+
-+	return hw;
-+}
-+EXPORT_SYMBOL_GPL(clk_hw_register_fractional_divider);
  
 -	return clk;
-+struct clk *clk_register_fractional_divider(struct device *dev,
-+		const char *name, const char *parent_name, unsigned long flags,
-+		void __iomem *reg, u8 mshift, u8 mwidth, u8 nshift, u8 nwidth,
-+		u8 clk_divider_flags, spinlock_t *lock)
++	return hw;
++}
++EXPORT_SYMBOL_GPL(clk_hw_register_mux_table);
++
++struct clk *clk_register_mux_table(struct device *dev, const char *name,
++		const char * const *parent_names, u8 num_parents,
++		unsigned long flags,
++		void __iomem *reg, u8 shift, u32 mask,
++		u8 clk_mux_flags, u32 *table, spinlock_t *lock)
 +{
 +	struct clk_hw *hw;
 +
-+	hw = clk_hw_register_fractional_divider(dev, name, parent_name, flags,
-+			reg, mshift, mwidth, nshift, nwidth, clk_divider_flags,
-+			lock);
++	hw = clk_hw_register_mux_table(dev, name, parent_names, num_parents,
++				       flags, reg, shift, mask, clk_mux_flags,
++				       table, lock);
 +	if (IS_ERR(hw))
 +		return ERR_CAST(hw);
 +	return hw->clk;
  }
- EXPORT_SYMBOL_GPL(clk_register_fractional_divider);
-+
-+void clk_hw_unregister_fractional_divider(struct clk_hw *hw)
+ EXPORT_SYMBOL_GPL(clk_register_mux_table);
+ 
+@@ -182,6 +202,20 @@ struct clk *clk_register_mux(struct device *dev, const char *name,
+ }
+ EXPORT_SYMBOL_GPL(clk_register_mux);
+ 
++struct clk_hw *clk_hw_register_mux(struct device *dev, const char *name,
++		const char * const *parent_names, u8 num_parents,
++		unsigned long flags,
++		void __iomem *reg, u8 shift, u8 width,
++		u8 clk_mux_flags, spinlock_t *lock)
 +{
-+	struct clk_fractional_divider *fd;
++	u32 mask = BIT(width) - 1;
 +
-+	fd = to_clk_fd(hw);
++	return clk_hw_register_mux_table(dev, name, parent_names, num_parents,
++				      flags, reg, shift, mask, clk_mux_flags,
++				      NULL, lock);
++}
++EXPORT_SYMBOL_GPL(clk_hw_register_mux);
++
+ void clk_unregister_mux(struct clk *clk)
+ {
+ 	struct clk_mux *mux;
+@@ -197,3 +231,14 @@ void clk_unregister_mux(struct clk *clk)
+ 	kfree(mux);
+ }
+ EXPORT_SYMBOL_GPL(clk_unregister_mux);
++
++void clk_hw_unregister_mux(struct clk_hw *hw)
++{
++	struct clk_mux *mux;
++
++	mux = to_clk_mux(hw);
 +
 +	clk_hw_unregister(hw);
-+	kfree(fd);
++	kfree(mux);
 +}
++EXPORT_SYMBOL_GPL(clk_hw_unregister_mux);
 diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index d4d65f60b85e..549ed3844876 100644
+index b9a83216255b..df6353a086b9 100644
 --- a/include/linux/clk-provider.h
 +++ b/include/linux/clk-provider.h
-@@ -549,6 +549,11 @@ struct clk *clk_register_fractional_divider(struct device *dev,
- 		const char *name, const char *parent_name, unsigned long flags,
- 		void __iomem *reg, u8 mshift, u8 mwidth, u8 nshift, u8 nwidth,
- 		u8 clk_divider_flags, spinlock_t *lock);
-+struct clk_hw *clk_hw_register_fractional_divider(struct device *dev,
-+		const char *name, const char *parent_name, unsigned long flags,
-+		void __iomem *reg, u8 mshift, u8 mwidth, u8 nshift, u8 nwidth,
-+		u8 clk_divider_flags, spinlock_t *lock);
-+void clk_hw_unregister_fractional_divider(struct clk_hw *hw);
+@@ -469,14 +469,25 @@ struct clk *clk_register_mux(struct device *dev, const char *name,
+ 		unsigned long flags,
+ 		void __iomem *reg, u8 shift, u8 width,
+ 		u8 clk_mux_flags, spinlock_t *lock);
++struct clk_hw *clk_hw_register_mux(struct device *dev, const char *name,
++		const char * const *parent_names, u8 num_parents,
++		unsigned long flags,
++		void __iomem *reg, u8 shift, u8 width,
++		u8 clk_mux_flags, spinlock_t *lock);
  
- /**
-  * struct clk_multiplier - adjustable multiplier clock
+ struct clk *clk_register_mux_table(struct device *dev, const char *name,
+ 		const char * const *parent_names, u8 num_parents,
+ 		unsigned long flags,
+ 		void __iomem *reg, u8 shift, u32 mask,
+ 		u8 clk_mux_flags, u32 *table, spinlock_t *lock);
++struct clk_hw *clk_hw_register_mux_table(struct device *dev, const char *name,
++		const char * const *parent_names, u8 num_parents,
++		unsigned long flags,
++		void __iomem *reg, u8 shift, u32 mask,
++		u8 clk_mux_flags, u32 *table, spinlock_t *lock);
+ 
+ void clk_unregister_mux(struct clk *clk);
++void clk_hw_unregister_mux(struct clk_hw *hw);
+ 
+ void of_fixed_factor_clk_setup(struct device_node *node);
+ 
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 a Linux Foundation Collaborative Project
