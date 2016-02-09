@@ -1,42 +1,33 @@
-From: dannym@scratchpost.org (Danny Milosavljevic)
-Date: Tue, 9 Feb 2016 21:33:21 +0100
-Subject: [linux-sunxi] Re: [PATCH 11/11] arm64: dts: add Pine64 support
-In-Reply-To: <CAGRGNgWTMVYExfWZceoY2UKVYq=3g6EnhYBqt9GOFk0Yh6j+4g@mail.gmail.com>
-References: <1454348370-3816-1-git-send-email-andre.przywara@arm.com>
- <1454348370-3816-12-git-send-email-andre.przywara@arm.com>
- <20160205090337.GB1139@lukather> <56B47391.1040709@arm.com>
- <CAGRGNgWTMVYExfWZceoY2UKVYq=3g6EnhYBqt9GOFk0Yh6j+4g@mail.gmail.com>
-Message-ID: <20160209213321.7ab6beba@scratchpost.org>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 9 Feb 2016 21:38:03 +0100
+Subject: [RFC PATCH 0/5] arm/arm64: Making HYP vgic/timer save/restore
+ common
+In-Reply-To: <1453996565-19666-1-git-send-email-marc.zyngier@arm.com>
+References: <1453996565-19666-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20160209203803.GD5171@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Jan 28, 2016 at 03:56:00PM +0000, Marc Zyngier wrote:
+> With the current state of the C conversion of arm and arm64 world
+> switches, we are still unable to share some of the most obvious
+> candidates (GIC and timer save/restore). In order to reduce the bloat,
+> let's move these files to a common location (virt/kvm/arm/hyp).
+> 
+> The changes are extremely mechanical, with a small hack to deal with
+> system register names on the 32bit side (I've decided to align on the
+> 64bit names).
+> 
+> I'd like to know what people think of the common location. Does it
+> makes sense to have a "hyp" subdirectory to indicate that this is not
+> "normal" kernel code?
+> 
+> These patches are on top of 4.5-rc1, plus the VHE and 32bit WS rewrite
+> patches, and I've pushed out a branch at
+> 
+> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/mov-hyp
+> 
 
-On Mon, 8 Feb 2016 11:55:43 +1100
-Julian Calaby <julian.calaby@gmail.com> wrote:
+ack on this series, tested on TC2 and Mustang as well.
 
-> I believe that device tree overlays are the generally recommended method.
-
-I agree. But last time I tried, the device tree compiler didn't 
-support overlays - neither in Debian nor in the in-kernel dtc ("-@" is 
-unsupported; last tried with linux-4.3-rc7). 
-
-And even if you could compile them, the platform has to support specifying which 
-overlays to use in the first place (for example as a Linux cmdline option). 
-
-For example Beaglebone Black (TI Sitara) does. I don't know whether sunxi does.
-
-Also, the overlay dts files are very different from normal dts files, see 
-<http://www.patternagents.com/news/2015/01/29/devicetree-overlays.html>.
-
-The original Linux device tree changeset patchset also introduced an in-kernel 
-interface for loading/unloading of DT overlays at runtime. AFAIK, this is still 
-not available to user space.
-
-More info at <https://lwn.net/Articles/616859/>.
-
-(I tried some 4 months ago - it wasn't integrated enough. 
- So now I just patch the main dts every time - which I probably shouldn't)
-
-Regards,
-   Danny
+-Christoffer
