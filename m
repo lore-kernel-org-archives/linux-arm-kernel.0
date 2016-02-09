@@ -1,47 +1,48 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 9 Feb 2016 10:00:30 +0100
-Subject: [PATCH] ARM: ks8695: fix __initdata annotation
-In-Reply-To: <1454941509-2773774-1-git-send-email-arnd@arndb.de>
-References: <1454941509-2773774-1-git-send-email-arnd@arndb.de>
-Message-ID: <20160209090030.GS13664@pengutronix.de>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Tue, 9 Feb 2016 10:01:31 +0100
+Subject: [PATCH 2/3] arm64: dts: add the Alpine v2 EVP
+In-Reply-To: <20160209085633.GA5388@kwain>
+References: <1454922699-16785-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1454922699-16785-3-git-send-email-antoine.tenart@free-electrons.com>
+ <56B8B45D.1020902@arm.com> <20160209085633.GA5388@kwain>
+Message-ID: <20160209090131.GB5388@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 08, 2016 at 03:24:57PM +0100, Arnd Bergmann wrote:
-> Clang complains about the __initdata section attribute being in the
-> wrong place in two files of ks8695:
+On Tue, Feb 09, 2016 at 09:56:33AM +0100, Antoine Tenart wrote:
+> Hi Marc,
 > 
-> arch/arm/mach-ks8695/cpu.c:37:31: error: '__section__' attribute only applies to functions and global variables
-> arch/arm/mach-ks8695/board-og.c:83:31: error: '__section__' attribute only applies to functions and global variables
+> On Mon, Feb 08, 2016 at 03:29:33PM +0000, Marc Zyngier wrote:
+> > On 08/02/16 09:11, Antoine Tenart wrote:
+> > 
+> > > +		gic: gic at f0100000 {
+> > > +			compatible = "arm,gic-v3";
+> > > +			reg = <0x0 0xf0200000 0x0 0x10000>,	/* GIC Dist */
+> > > +			      <0x0 0xf0280000 0x0 0x200000>,	/* GICR */
+> > > +			      <0x0 0xf0100000 0x0 0x2000>;	/* GICC */
+> > > +			interrupt-controller;
+> > > +			#interrupt-cells = <3>;
+> > > +		};
+> > 
+> > Something is wrong here. Either you are missing GICH and GICV (assuming
+> > you have legacy support), or you have an extra GICC region (which
+> > doesn't make sense on its own).
 > 
-> This moves the attribute to the correct place.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  arch/arm/mach-ks8695/board-og.c | 2 +-
->  arch/arm/mach-ks8695/cpu.c      | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-ks8695/board-og.c b/arch/arm/mach-ks8695/board-og.c
-> index 1f4f2f4f25bb..fa1a7c2ca2bb 100644
-> --- a/arch/arm/mach-ks8695/board-og.c
-> +++ b/arch/arm/mach-ks8695/board-og.c
-> @@ -80,7 +80,7 @@ static void __init og_pci_bus_reset(void)
->  #define	S8250_VIRT	0xf4000000
->  #define	S8250_SIZE	0x00100000
->  
-> -static struct __initdata map_desc og_io_desc[] = {
-> +static struct map_desc __initdata og_io_desc[] = {
+> I'll add the missing regions.
 
-I would have expected that
+Hmm, in fact the GICC region shouldn't be there. I'll make some tests
+and remove it.
 
-+static struct map_desc og_io_desc[] __initdata = {
-
-is the correct variant?
-
-Best regards
-Uwe
+Antoine
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160209/e4c102f6/attachment.sig>
