@@ -1,31 +1,39 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 9 Feb 2016 23:57:24 +0100
-Subject: [PATCH] dmaengine: use phys_addr_t for slave configuration
-In-Reply-To: <CAMuHMdXe8i2JbhOP2sWkVkqHEeBnW4AfVBbRaoZW=Kg0s_9m3g@mail.gmail.com>
-References: <1366967214-20776-1-git-send-email-linus.walleij@linaro.org>
- <CAMuHMdUTzTBT8DyRb5WN048U5DbVsFnhJB0c5tjHBnA4rfetJg@mail.gmail.com>
- <20150710081411.GF836@localhost>
- <CAMuHMdV8a1W1MyJPanUNBzaiNsL96JYzetBVSiZoC3=eKXzo1Q@mail.gmail.com>
- <20151215172649.GK1854@localhost>
- <CAMuHMdXe8i2JbhOP2sWkVkqHEeBnW4AfVBbRaoZW=Kg0s_9m3g@mail.gmail.com>
-Message-ID: <20160209225724.GA1522@katana>
+From: Lijun.Pan@freescale.com (Lijun Pan)
+Date: Tue, 9 Feb 2016 17:08:07 -0600
+Subject: [PATCH] ARM: dts: ls2080a: Add quirk for Erratum A009116
+Message-ID: <1455059287-2500-1-git-send-email-Lijun.Pan@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add "snps,quirk-frame-length-adjustment" property to
+USB3 node for erratum A009116. This property provides
+value of GFLADJ_30MHZ for post silicon frame length
+adjustment.
 
-> This is a dependency for adding iommu support to the rcar-dmac driver, cfr.
-> "[PATCH v2 0/5] dmaengine: rcar-dmac: add iommu support for slave transfers".
-> http://www.spinics.net/lists/linux-renesas-soc/msg00066.html
-> https://www.mail-archive.com/linux-renesas-soc at vger.kernel.org/msg00108.html
-> 
-> Thank you for applying!
+Signed-off-by: Lijun Pan <Lijun.Pan@freescale.com>
+---
+ arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi |    2 ++
+ 1 file changed, 2 insertions(+)
 
-Yup, we really need it. Anything we can do to help?
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160209/1375b676/attachment.sig>
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+index 6e9e033..fa506f5 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+@@ -501,6 +501,7 @@
+ 			reg = <0x0 0x3100000 0x0 0x10000>;
+ 			interrupts = <0 80 0x4>; /* Level high type */
+ 			dr_mode = "host";
++			snps,quirk-frame-length-adjustment = <0x20>;
+ 		};
+ 
+ 		usb1: usb3 at 3110000 {
+@@ -509,6 +510,7 @@
+ 			reg = <0x0 0x3110000 0x0 0x10000>;
+ 			interrupts = <0 81 0x4>; /* Level high type */
+ 			dr_mode = "host";
++			snps,quirk-frame-length-adjustment = <0x20>;
+ 		};
+ 
+ 		ccn at 4000000 {
+-- 
+1.7.9.5
