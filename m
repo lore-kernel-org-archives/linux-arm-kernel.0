@@ -1,65 +1,39 @@
-From: tchalamarla@caviumnetworks.com (tchalamarla at caviumnetworks.com)
-Date: Tue, 9 Feb 2016 14:15:13 -0800
-Subject: [PATCH V2] arm64: KVM: Configure TCR_EL2.ps at runtime
-Message-ID: <1455056113-25948-1-git-send-email-tchalamarla@caviumnetworks.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 9 Feb 2016 16:16:16 -0600
+Subject: [PATCH] arm: dts: AM57XX: Correct the thermal thresholds
+In-Reply-To: <20160209220901.GC28102@localhost.localdomain>
+References: <1454924705-8382-1-git-send-email-j-keerthy@ti.com>
+ <20160209220901.GC28102@localhost.localdomain>
+Message-ID: <56BA6530.4030102@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
+On 02/09/2016 04:09 PM, Eduardo Valentin wrote:
+> On Mon, Feb 08, 2016 at 03:15:05PM +0530, Keerthy wrote:
+>> The thermal threholds for am57xx are different from that of dra7.
+>> Correcting the thresholds for the same.
+>>
+>> Signed-off-by: Keerthy <j-keerthy@ti.com>
+>> ---
+>>
+>> Depends on: https://lkml.org/lkml/2016/2/8/90
+>>
+>>  arch/arm/boot/dts/am57xx-beagle-x15.dts | 24 ++++++++++++++++++++++++
+>>  1 file changed, 24 insertions(+)
+>>
+>> Index: linux/arch/arm/boot/dts/am57xx-beagle-x15.dts
+>> ===================================================================
+>> --- linux.orig/arch/arm/boot/dts/am57xx-beagle-x15.dts	2016-02-08 14:57:05.514959101 +0530
+>> +++ linux/arch/arm/boot/dts/am57xx-beagle-x15.dts	2016-02-08 14:57:05.510959168 +0530
+> 
+> Sorry, did not bother to check, but is this the only user of am57xx?
 
-Setting TCR_EL2.ps to 40 bits is wrong on systems with ps size is
-less than 40 bits. and with systems where RAM is at higher address,
-this will break KVM.
+we will have AM57xx-IDK as well coming down the line. we already have
+arch/arm/boot/dts/am57xx-cl-som-am57x.dts
+arch/arm/boot/dts/am57xx-sbc-am57x.dts - not really sure what grade of
+silicon are used in cl-SOM and sbc boards.
 
-This patch sets TCR_EL2.ps at runtime similar to VTCR_EL.ps
 
-Signed-off-by: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
----
- arch/arm64/include/asm/kvm_arm.h |  5 ++++-
- arch/arm64/kvm/hyp-init.S        | 10 ++++++----
- 2 files changed, 10 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index 738a95f..92f2ffd 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -107,7 +107,10 @@
- #define TCR_EL2_MASK	(TCR_EL2_TG0 | TCR_EL2_SH0 | \
- 			 TCR_EL2_ORGN0 | TCR_EL2_IRGN0 | TCR_EL2_T0SZ)
- 
--#define TCR_EL2_FLAGS	(TCR_EL2_RES1 | TCR_EL2_PS_40B)
-+/*
-+ * TCR_EL2.ps is configured at runtime similar to VTCR_EL2
-+ */
-+#define TCR_EL2_FLAGS	(TCR_EL2_RES1)
- 
- /* VTCR_EL2 Registers bits */
- #define VTCR_EL2_RES1		(1 << 31)
-diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
-index 3e568dc..b246de1e 100644
---- a/arch/arm64/kvm/hyp-init.S
-+++ b/arch/arm64/kvm/hyp-init.S
-@@ -85,15 +85,17 @@ __do_hyp_init:
- 	ldr_l	x5, idmap_t0sz
- 	bfi	x4, x5, TCR_T0SZ_OFFSET, TCR_TxSZ_WIDTH
- #endif
--	msr	tcr_el2, x4
--
--	ldr	x4, =VTCR_EL2_FLAGS
- 	/*
- 	 * Read the PARange bits from ID_AA64MMFR0_EL1 and set the PS bits in
--	 * VTCR_EL2.
-+	 * TCR_EL2 and VTCR_EL2.
- 	 */
- 	mrs	x5, ID_AA64MMFR0_EL1
- 	bfi	x4, x5, #16, #3
-+
-+	msr	tcr_el2, x4
-+
-+	ldr	x4, =VTCR_EL2_FLAGS
-+	bfi	x4, x5, #16, #3
- 	/*
- 	 * Read the VMIDBits bits from ID_AA64MMFR1_EL1 and set the VS bit in
- 	 * VTCR_EL2.
 -- 
-2.1.0
+Regards,
+Nishanth Menon
