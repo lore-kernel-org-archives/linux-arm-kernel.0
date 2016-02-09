@@ -1,65 +1,67 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 9 Feb 2016 12:02:17 +0000
-Subject: [PATCH v3 23/23] arm64: Panic when VHE and non VHE CPUs coexist
-In-Reply-To: <20160208162402.GC14146@leverpostej>
-References: <1454522416-6874-1-git-send-email-marc.zyngier@arm.com>
- <1454522416-6874-24-git-send-email-marc.zyngier@arm.com>
- <20160208160445.GS6076@e104818-lin.cambridge.arm.com>
- <20160208162402.GC14146@leverpostej>
-Message-ID: <20160209120217.GE16122@e104818-lin.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 9 Feb 2016 12:06:06 +0000
+Subject: [PATCH] of/irq: Fix msi-map calculation for nonzero rid-base
+In-Reply-To: <9f6845195d03b0e0b0d187bb510fbf7bd497e836.1455015344.git.robin.murphy@arm.com>
+References: <9f6845195d03b0e0b0d187bb510fbf7bd497e836.1455015344.git.robin.murphy@arm.com>
+Message-ID: <56B9D62E.8080003@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 08, 2016 at 04:24:03PM +0000, Mark Rutland wrote:
-> On Mon, Feb 08, 2016 at 04:04:46PM +0000, Catalin Marinas wrote:
-> > On Wed, Feb 03, 2016 at 06:00:16PM +0000, Marc Zyngier wrote:
-> > > diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> > > index 6f2f377..f9b6a5b 100644
-> > > --- a/arch/arm64/kernel/head.S
-> > > +++ b/arch/arm64/kernel/head.S
-> > > @@ -578,7 +578,24 @@ ENTRY(set_cpu_boot_mode_flag)
-> > >  1:	str	w20, [x1]			// This CPU has booted in EL1
-> > >  	dmb	sy
-> > >  	dc	ivac, x1			// Invalidate potentially stale cache line
-> > > +	adr_l	x1, __run_cpu_mode
-> > > +	ldr	w0, [x1]
-> > > +	mrs	x20, CurrentEL
-> > > +	cbz	x0, skip_el_check
-> > > +	cmp	x0, x20
-> > > +	bne	mismatched_el
-> > >  	ret
-> > > +skip_el_check:			// Only the first CPU gets to set the rule
-> > > +	str	w20, [x1]
-> > > +	dmb	sy
-> > > +	dc	ivac, x1	// Invalidate potentially stale cache line
-> > > +	ret
-> > > +mismatched_el:
-> > > +	str	w20, [x1, #4]
-> > > +	dmb	sy
-> > > +	dc	ivac, x1	// Invalidate potentially stale cache line
-> > > +1:	wfi
-> > > +	b	1b
-> > >  ENDPROC(set_cpu_boot_mode_flag)
-> > 
-> > Do we need to wait for the D-cache maintenance completion before
-> > entering WFI (like issuing a DSB)? Same for the skip_el_check path
-> > before the RET.
-> 
-> We would need that to complete the maintenance, yes.
-> 
-> However, given we're going into WFI immediately afterwards, and not
-> signalling completion to other CPUs, what we gain is somewhat
-> questionable.
-> 
-> Perhaps it's always better to do the maintenance on the read side (for
-> consistency with [1]).
-> 
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-February/404661.html
+Hi Robin,
 
-While [1] looks clearer to me, it seems that it is not consistent with
-the rest of the head.S file. Maybe we can clean them up as a separate
-patch and leave the dc ivac here. We also seem to miss barriers in other
-similar situations in head.S.
+On 09/02/16 11:04, Robin Murphy wrote:
+> The existing msi-map code is fine for shifting the entire RID space
+> upwards, but attempting finer-grained remapping reveals a bug. It turns
+> out that we are mistakenly treating the msi-base part as an offset, not
+> as a new base to remap onto, so things get squiffy when rid-base is
+> nonzero. Fix this, and at the same time add a sanity check against
+> having msi-map-mask clash with a nonzero rid-base, as that's another
+> thing one can easily get wrong.
+> 
+> CC: <stable@vger.kernel.org>
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 
+Looks like Stuart and you both found the same bug at the same time:
+https://lkml.org/lkml/2016/2/8/1066
+
+but yours seem more correct to me (the rid_base masking in Stuart's
+version seems odd).
+
+> ---
+>  drivers/of/irq.c | 9 ++++++++-
+>  1 file changed, 8 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/of/irq.c b/drivers/of/irq.c
+> index 7ee21ae..e7bfc17 100644
+> --- a/drivers/of/irq.c
+> +++ b/drivers/of/irq.c
+> @@ -635,6 +635,13 @@ static u32 __of_msi_map_rid(struct device *dev, struct device_node **np,
+>  		msi_base = be32_to_cpup(msi_map + 2);
+>  		rid_len = be32_to_cpup(msi_map + 3);
+>  
+> +		if (rid_base & ~map_mask) {
+> +			dev_err(parent_dev,
+> +				"Invalid msi-map translation - msi-map-mask (0x%x) ignores rid-base (0x%x)\n",
+> +				map_mask, rid_base);
+> +			return rid_out;
+> +		}
+> +
+>  		msi_controller_node = of_find_node_by_phandle(phandle);
+>  
+>  		matched = (masked_rid >= rid_base &&
+> @@ -654,7 +661,7 @@ static u32 __of_msi_map_rid(struct device *dev, struct device_node **np,
+>  	if (!matched)
+>  		return rid_out;
+>  
+> -	rid_out = masked_rid + msi_base;
+> +	rid_out = masked_rid - rid_base + msi_base;
+>  	dev_dbg(dev,
+>  		"msi-map at: %s, using mask %08x, rid-base: %08x, msi-base: %08x, length: %08x, rid: %08x -> %08x\n",
+>  		dev_name(parent_dev), map_mask, rid_base, msi_base,
+> 
+
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+
+	M.
 -- 
-Catalin
+Jazz is not dead. It just smells funny...
