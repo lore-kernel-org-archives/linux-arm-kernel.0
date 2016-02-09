@@ -1,39 +1,57 @@
-From: Chris.Brandt@renesas.com (Chris Brandt)
-Date: Tue, 9 Feb 2016 16:09:58 +0000
-Subject: [PATCH v4 3/3] kallsyms: remove --page-offset command line option
-In-Reply-To: <1455030828-6416-4-git-send-email-ard.biesheuvel@linaro.org>
-References: <1455030828-6416-1-git-send-email-ard.biesheuvel@linaro.org>
- <1455030828-6416-4-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <HKXPR06MB056549C714A864B2D4F37DCA8AD60@HKXPR06MB0565.apcprd06.prod.outlook.com>
+From: paul.burton@imgtec.com (Paul Burton)
+Date: Tue, 9 Feb 2016 08:11:34 -0800
+Subject: [PATCH V3 3/5] PCI: xilinx: Modifying AXI PCIe Host Bridge
+ driver to work on both  Zynq and Microblaze
+In-Reply-To: <1455014518-8708-4-git-send-email-bharatku@xilinx.com>
+References: <1455014518-8708-1-git-send-email-bharatku@xilinx.com>
+ <1455014518-8708-4-git-send-email-bharatku@xilinx.com>
+Message-ID: <20160209161134.GA24244@NP-P-BURTON>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 Feb 2016, Ard Biesheuvel wrote:
+On Tue, Feb 09, 2016 at 04:11:56PM +0530, Bharat Kumar Gogada wrote:
+> Modifying Xilinx AXI PCIe Host Bridge Soft IP driver to work on both
+> Zynq and Microblaze Architectures.
+> With these modifications drivers/pci/host/pcie-xilinx.c, will
+> work on both Zynq and Microblaze Architectures.
+> 
+> Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
+> Signed-off-by: Ravi Kiran Gummaluri <rgummal@xilinx.com>
+> ---
+> Changes:
+> Removed unneccessary architecture dependent number of MSI's.
+> Added #ifdef to pci_fixup_irqs which is ARM specific API.
 
->diff --git a/scripts/kallsyms.c b/scripts/kallsyms.c
->index 02473b71643b..32c8d43590af 100644
->--- a/scripts/kallsyms.c
->+++ b/scripts/kallsyms.c
->@@ -63,7 +63,6 @@ static unsigned int table_size, table_cnt;
-> static int all_symbols = 0;
-> static int absolute_percpu = 0;
-> static char symbol_prefix_char = '\0';
->-static unsigned long long kernel_start_addr = 0;
-> static int base_relative = 0;
+Hi Bharat,
 
+Why do you say pci_fixup_irqs is ARM-specific? It's declared in
+include/linux/pci.h, defined in drivers/pci/setup-irq.c & used by
+multiple architectures (alpha, arm, m68k, mips, sh, sparc, tile,
+unicore32 from a quick grep).
 
+Will you not break INTX-style interrupts by removing this?
 
-You removed kernel_start_addr, but you didn't remove all the instances of it in the file (you did remove them all in V2 though).
+Thanks,
+    Paul
 
-So, now I get:
-
-  CC      scripts/mod/devicetable-offsets.s
-../scripts/kallsyms.c: In function 'record_relative_base':
-../scripts/kallsyms.c:740:6: error: 'kernel_start_addr' undeclared (first use in this function)
-  if (kernel_start_addr > 0) {
-      ^
-../scripts/kallsyms.c:740:6: note: each undeclared identifier is reported only once for each function it appears in
-make[2]: *** [scripts/kallsyms] Error 1
-
-
-Chris
+> ---
+>  drivers/pci/host/pcie-xilinx.c | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
+> index 13fec35..6cbce34 100644
+> --- a/drivers/pci/host/pcie-xilinx.c
+> +++ b/drivers/pci/host/pcie-xilinx.c
+> @@ -704,7 +704,9 @@ static int xilinx_pcie_probe(struct platform_device *pdev)
+>  #endif
+>  	pci_scan_child_bus(bus);
+>  	pci_assign_unassigned_bus_resources(bus);
+> +#ifdef CONFIG_ARM
+>  	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
+> +#endif
+>  	pci_bus_add_devices(bus);
+>  	platform_set_drvdata(pdev, port);
+>  
+> -- 
+> 2.1.1
+> 
