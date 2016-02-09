@@ -1,50 +1,20 @@
-From: yang.shi@linaro.org (Yang Shi)
-Date: Tue,  9 Feb 2016 13:26:22 -0800
-Subject: [PATCH] arm64: use raw_smp_processor_id in stack backtrace dump
-Message-ID: <1455053182-31404-1-git-send-email-yang.shi@linaro.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 10 Feb 2016 00:52:09 +0300
+Subject: [PATCH v2 0/5] Add R8A7794 sound DT support
+Message-ID: <12033353.rt0nolnBmD@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dump_backtrace may be called in kthread context, which is not bound to a single
-cpu, i.e. khungtaskd, then calling smp_processor_id may trigger the below bug
-report:
+Hello.
 
-BUG: using smp_processor_id() in preemptible [00000000] code: khungtaskd/71
-caller is debug_smp_processor_id+0x1c/0x28
-CPU: 3 PID: 71 Comm: khungtaskd Not tainted 4.5.0-rc1 #144
-Hardware name: Freescale Layerscape 2085a RDB Board (DT)
-Call trace:
-[<ffffffc00008d120>] dump_backtrace+0x0/0x290
-[<ffffffc00008d3d4>] show_stack+0x24/0x30
-[<ffffffc0006bfd1c>] dump_stack+0x8c/0xd8
-[<ffffffc0006fe56c>] check_preemption_disabled+0x184/0x188
-[<ffffffc0006fe58c>] debug_smp_processor_id+0x1c/0x28
-[<ffffffc00008d1a4>] dump_backtrace+0x84/0x290
-[<ffffffc00008d3d4>] show_stack+0x24/0x30
-[<ffffffc00012aa5c>] sched_show_task+0x16c/0x280
-[<ffffffc0001f3df8>] watchdog+0x560/0x708
-[<ffffffc000111bb8>] kthread+0x1b0/0x1d0
-[<ffffffc0000864d0>] ret_from_fork+0x10/0x40
+   Here's the set of 5 patches against Simon Horman's 'renesas.git' repo,
+'renesas-devel-20160208-v4.5-rc3' tag. I'm adding the sound device tree support
+for the R8A7794 SoC. The sound patch for the SILK board will be posted RSN. :-)
 
-Replace it to raw version to prevent from the race condition.
+[1/5] ARM: dts: r8a7794: add audio clocks
+[2/5] ARM: dts: r8a7794: add MSTP5 clocks
+[3/5] ARM: dts: r8a7794: add MSTP10 clocks
+[4/5] ARM: dts: r8a7794: add Audio-DMAC support
+[5/5] ARM: dts: r8a7794 add sound support
 
-Signed-off-by: Yang Shi <yang.shi@linaro.org>
----
- arch/arm64/kernel/traps.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index cbedd72..9abe236 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -146,7 +146,7 @@ static void dump_instr(const char *lvl, struct pt_regs *regs)
- static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
- {
- 	struct stackframe frame;
--	unsigned long irq_stack_ptr = IRQ_STACK_PTR(smp_processor_id());
-+	unsigned long irq_stack_ptr = IRQ_STACK_PTR(raw_smp_processor_id());
- 	int skip;
- 
- 	pr_debug("%s(regs = %p tsk = %p)\n", __func__, regs, tsk);
--- 
-2.0.2
+WBR, Sergei
