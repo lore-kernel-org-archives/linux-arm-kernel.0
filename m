@@ -1,59 +1,229 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Tue, 9 Feb 2016 09:03:11 -0800
-Subject: [PATCH] of/irq: Fix msi-map calculation for nonzero rid-base
-In-Reply-To: <9f6845195d03b0e0b0d187bb510fbf7bd497e836.1455015344.git.robin.murphy@arm.com>
-References: <9f6845195d03b0e0b0d187bb510fbf7bd497e836.1455015344.git.robin.murphy@arm.com>
-Message-ID: <56BA1BCF.8080309@caviumnetworks.com>
+From: Tirumalesh.Chalamarla@caviumnetworks.com (Chalamarla, Tirumalesh)
+Date: Tue, 9 Feb 2016 17:07:47 +0000
+Subject: [PATCH] iommu/arm-smmu-v2: Workaround for ThunderX errata#27704
+In-Reply-To: <56B9D2F4.8070308@arm.com>
+References: <1454698027-20911-1-git-send-email-tchalamarla@caviumnetworks.com>
+ <56B9D2F4.8070308@arm.com>
+Message-ID: <D3352A05-3713-457E-AB65-1DEFB6F9E912@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/09/2016 03:04 AM, Robin Murphy wrote:
-> The existing msi-map code is fine for shifting the entire RID space
-> upwards, but attempting finer-grained remapping reveals a bug. It turns
-> out that we are mistakenly treating the msi-base part as an offset, not
-> as a new base to remap onto, so things get squiffy when rid-base is
-> nonzero. Fix this, and at the same time add a sanity check against
-> having msi-map-mask clash with a nonzero rid-base, as that's another
-> thing one can easily get wrong.
->
-> CC: <stable@vger.kernel.org>
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-
-This is equivalent to what I tested yesterday.  Thanks for fixing it...
-
-Acked-by: David Daney <david.daney@cavium.com>
 
 
 
-> ---
->   drivers/of/irq.c | 9 ++++++++-
->   1 file changed, 8 insertions(+), 1 deletion(-)
+
+
+On 2/9/16, 3:52 AM, "Robin Murphy" <robin.murphy@arm.com> wrote:
+
+>On 05/02/16 18:47, tchalamarla at caviumnetworks.com wrote:
+>> From: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
+>>
+>> An issue exists whereby the Linux kernel requires that ASIDs are a
+>> unique namespace per SMMU.
 >
-> diff --git a/drivers/of/irq.c b/drivers/of/irq.c
-> index 7ee21ae..e7bfc17 100644
-> --- a/drivers/of/irq.c
-> +++ b/drivers/of/irq.c
-> @@ -635,6 +635,13 @@ static u32 __of_msi_map_rid(struct device *dev, struct device_node **np,
->   		msi_base = be32_to_cpup(msi_map + 2);
->   		rid_len = be32_to_cpup(msi_map + 3);
+>I too tend to consider the SMMUv2 architecture an "issue", but we should 
+>probably still call it by its name ;)
 >
-> +		if (rid_base & ~map_mask) {
-> +			dev_err(parent_dev,
-> +				"Invalid msi-map translation - msi-map-mask (0x%x) ignores rid-base (0x%x)\n",
-> +				map_mask, rid_base);
-> +			return rid_out;
-> +		}
-> +
->   		msi_controller_node = of_find_node_by_phandle(phandle);
+>>  That ASID-local choice conflicts with the
+>> CN88xx SMMU, where only shared ASID namespaces are supported;
+>> specifically within a given node SMMU0 and SMMU1 share, as does SMMU2
+>> and SMMU3. CN88xx SMMU also requires global VMIDs.
 >
->   		matched = (masked_rid >= rid_base &&
-> @@ -654,7 +661,7 @@ static u32 __of_msi_map_rid(struct device *dev, struct device_node **np,
->   	if (!matched)
->   		return rid_out;
+>"Global" meaning unique across all 4 SMMUs? Or just unique across each 
+>pair as per ASIDs?...
 >
-> -	rid_out = masked_rid + msi_base;
-> +	rid_out = masked_rid - rid_base + msi_base;
->   	dev_dbg(dev,
->   		"msi-map at: %s, using mask %08x, rid-base: %08x, msi-base: %08x, length: %08x, rid: %08x -> %08x\n",
->   		dev_name(parent_dev), map_mask, rid_base, msi_base,
+>> This patch tries to address these issuee by supplying asid and vmid
+>> transformations from devicetree.
+>>
+>> Signed-off-by: Akula Geethasowjanya <Geethasowjanya.Akula@caviumnetworks.com>
+>> Signed-off-by: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
+>> ---
+>>   .../devicetree/bindings/iommu/arm,smmu.txt         | 16 ++++++
+>>   drivers/iommu/arm-smmu.c                           | 59 ++++++++++++++++++----
+>>   2 files changed, 65 insertions(+), 10 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+>> index 7180745..eef06d0 100644
+>> --- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+>> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+>> @@ -55,6 +55,22 @@ conditions.
+>>                     aliases of secure registers have to be used during
+>>                     SMMU configuration.
+>>
+>> +- thunderx,smmu-asid-transform	: Enable proper handling for buggy
+>> +		  implementations that require special transformations
+>> +		  for smmu asid. if this property exists asid-transform
+>> +		  property must be present.
+>> +
+>> +- thunderx,smmu-vmid-transform	: Enable proper handling for buggy
+>> +		  implementations that require special transformations
+>> +		  for smmu vmid. if this property exists vmid-transform
+>> +		  property must be present.
+>> +
+>> +- asid-transform 	: Transform mask that needs to be applied to asid.
+>> +			This property has to be specified as '/bits/ 8' value.
+>> +
+>> +- vmid-transform 	: Transform mask that needs to be applied to vmid.
+>> +			This property has to be specified as '/bits/ 8' value.
+>> +
+>
+>...because I've seen a ThunderX boot log indicating 4x128 context banks, 
+>and I don't see how applying an 8-bit mask to an 8-bit value is going to 
+>produce anything _globally_ unique in that case.
+>
+>Regardless, I'm not sure this is an accurate description of the hardware 
+>as DT should be - this is more implying that each SMMU _requires_ a 
+>particular set of ASIDs/VMIDs to be used, which is not the same thing 
+>that the commit message and other comments say.
+
+I am rewriting this patch to include additional patches to support 16bit VMID and ASID. Will rebase this patch on top of it.
+Though for 128 bit 7 bits are sufficient I thought it is still good idea to have this on top of 16bit VMID and ASID. 
+>
+>Robin.
+>
+>>   Example:
+>>
+>>           smmu {
+>> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+>> index 59ee4b8..8047834 100644
+>> --- a/drivers/iommu/arm-smmu.c
+>> +++ b/drivers/iommu/arm-smmu.c
+>> @@ -300,8 +300,12 @@ struct arm_smmu_device {
+>>   	u32				features;
+>>
+>>   #define ARM_SMMU_OPT_SECURE_CFG_ACCESS (1 << 0)
+>> +#define ARM_SMMU_OPT_TRANSFORM_ASID	(1 << 1)
+>> +#define ARM_SMMU_OPT_TRANSFORM_VMID	(1 << 2)
+>>   	u32				options;
+>>   	enum arm_smmu_arch_version	version;
+>> +	u8				asid_transform;
+>> +	u8				vmid_transform;
+>>
+>>   	u32				num_context_banks;
+>>   	u32				num_s2_context_banks;
+>> @@ -330,8 +334,25 @@ struct arm_smmu_cfg {
+>>   };
+>>   #define INVALID_IRPTNDX			0xff
+>>
+>> -#define ARM_SMMU_CB_ASID(cfg)		((cfg)->cbndx)
+>> -#define ARM_SMMU_CB_VMID(cfg)		((cfg)->cbndx + 1)
+>> +/*
+>> + * ThunderX has a unique requirement because of ERRATA#27704
+>> + * An issue exists whereby the Linux kernel requires that ASIDs are a
+>> + * unique namespace per SMMU.  That ASID-local choice conflicts with the
+>> + * CN88xx SMMU, where only shared ASID namespaces are supported;
+>> + * specifically within a given node SMMU0 and SMMU1 share, as does SMMU2
+>> + * and SMMU3.
+>> + * CN88xx SMMU also requires global VMIDs.
+>> + */
+>> +
+>> +#define ARM_SMMU_CB_ASID(smmu, cfg)					\
+>> +		(((smmu)->options & ARM_SMMU_OPT_TRANSFORM_ASID)	\
+>> +		? ((cfg)->cbndx | (smmu)->asid_transform)		\
+>> +		: ((cfg)->cbndx))
+>> +
+>> +#define ARM_SMMU_CB_VMID(smmu, cfg)					\
+>> +		(((smmu)->options & ARM_SMMU_OPT_TRANSFORM_VMID)	\
+>> +		? (((cfg)->cbndx + 1) | (smmu)->vmid_transform)		\
+>> +		: ((cfg)->cbndx + 1))
+>>
+>>   enum arm_smmu_domain_stage {
+>>   	ARM_SMMU_DOMAIN_S1 = 0,
+>> @@ -361,6 +382,8 @@ struct arm_smmu_option_prop {
+>>
+>>   static struct arm_smmu_option_prop arm_smmu_options[] = {
+>>   	{ ARM_SMMU_OPT_SECURE_CFG_ACCESS, "calxeda,smmu-secure-config-access" },
+>> +	{ ARM_SMMU_OPT_TRANSFORM_ASID, "thunderx,smmu-asid-transform" },
+>> +	{ ARM_SMMU_OPT_TRANSFORM_VMID, "thunderx,smmu-vmid-transform" },
+>>   	{ 0, NULL},
+>>   };
+>>
+>> @@ -570,11 +593,11 @@ static void arm_smmu_tlb_inv_context(void *cookie)
+>>
+>>   	if (stage1) {
+>>   		base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cfg->cbndx);
+>> -		writel_relaxed(ARM_SMMU_CB_ASID(cfg),
+>> +		writel_relaxed(ARM_SMMU_CB_ASID(smmu, cfg),
+>>   			       base + ARM_SMMU_CB_S1_TLBIASID);
+>>   	} else {
+>>   		base = ARM_SMMU_GR0(smmu);
+>> -		writel_relaxed(ARM_SMMU_CB_VMID(cfg),
+>> +		writel_relaxed(ARM_SMMU_CB_VMID(smmu, cfg),
+>>   			       base + ARM_SMMU_GR0_TLBIVMID);
+>>   	}
+>>
+>> @@ -596,7 +619,7 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
+>>
+>>   		if (!IS_ENABLED(CONFIG_64BIT) || smmu->version == ARM_SMMU_V1) {
+>>   			iova &= ~12UL;
+>> -			iova |= ARM_SMMU_CB_ASID(cfg);
+>> +			iova |= ARM_SMMU_CB_ASID(smmu, cfg);
+>>   			do {
+>>   				writel_relaxed(iova, reg);
+>>   				iova += granule;
+>> @@ -604,7 +627,7 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
+>>   #ifdef CONFIG_64BIT
+>>   		} else {
+>>   			iova >>= 12;
+>> -			iova |= (u64)ARM_SMMU_CB_ASID(cfg) << 48;
+>> +			iova |= (u64)ARM_SMMU_CB_ASID(smmu, cfg) << 48;
+>>   			do {
+>>   				writeq_relaxed(iova, reg);
+>>   				iova += granule >> 12;
+>> @@ -624,7 +647,7 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
+>>   #endif
+>>   	} else {
+>>   		reg = ARM_SMMU_GR0(smmu) + ARM_SMMU_GR0_TLBIVMID;
+>> -		writel_relaxed(ARM_SMMU_CB_VMID(cfg), reg);
+>> +		writel_relaxed(ARM_SMMU_CB_VMID(smmu, cfg), reg);
+>>   	}
+>>   }
+>>
+>> @@ -752,7 +775,7 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
+>>   		reg |= (CBAR_S1_BPSHCFG_NSH << CBAR_S1_BPSHCFG_SHIFT) |
+>>   			(CBAR_S1_MEMATTR_WB << CBAR_S1_MEMATTR_SHIFT);
+>>   	} else {
+>> -		reg |= ARM_SMMU_CB_VMID(cfg) << CBAR_VMID_SHIFT;
+>> +		reg |= ARM_SMMU_CB_VMID(smmu, cfg) << CBAR_VMID_SHIFT;
+>>   	}
+>>   	writel_relaxed(reg, gr1_base + ARM_SMMU_GR1_CBAR(cfg->cbndx));
+>>
+>> @@ -760,11 +783,11 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
+>>   	if (stage1) {
+>>   		reg64 = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0];
+>>
+>> -		reg64 |= ((u64)ARM_SMMU_CB_ASID(cfg)) << TTBRn_ASID_SHIFT;
+>> +		reg64 |= ((u64)ARM_SMMU_CB_ASID(smmu, cfg)) << TTBRn_ASID_SHIFT;
+>>   		smmu_writeq(reg64, cb_base + ARM_SMMU_CB_TTBR0);
+>>
+>>   		reg64 = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1];
+>> -		reg64 |= ((u64)ARM_SMMU_CB_ASID(cfg)) << TTBRn_ASID_SHIFT;
+>> +		reg64 |= ((u64)ARM_SMMU_CB_ASID(smmu, cfg)) << TTBRn_ASID_SHIFT;
+>>   		smmu_writeq(reg64, cb_base + ARM_SMMU_CB_TTBR1);
+>>   	} else {
+>>   		reg64 = pgtbl_cfg->arm_lpae_s2_cfg.vttbr;
+>> @@ -1793,6 +1816,22 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+>>
+>>   	parse_driver_options(smmu);
+>>
+>> +	if (smmu->options & ARM_SMMU_OPT_TRANSFORM_ASID) {
+>> +		if (of_property_read_u8(dev->of_node, "#asid-transform",
+>> +					 &smmu->asid_transform)) {
+>> +			dev_err(dev, "missing #asid-transform property\n");
+>> +			return -ENODEV;
+>> +		}
+>> +	}
+>> +
+>> +	if (smmu->options & ARM_SMMU_OPT_TRANSFORM_VMID) {
+>> +		if (of_property_read_u8(dev->of_node, "#vmid-transform",
+>> +					 &smmu->vmid_transform)) {
+>> +			dev_err(dev, "missing #vmid-transform property\n");
+>> +			return -ENODEV;
+>> +		}
+>> +	}
+>> +
+>>   	if (smmu->version > ARM_SMMU_V1 &&
+>>   	    smmu->num_context_banks != smmu->num_context_irqs) {
+>>   		dev_err(dev,
+>>
 >
