@@ -1,52 +1,37 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 9 Feb 2016 20:07:15 +0000
-Subject: [PATCH] arm64: Add workaround for Cavium erratum 27456
-In-Reply-To: <56BA450E.50109@caviumnetworks.com>
-References: <1455046156-10582-1-git-send-email-ddaney.cavm@gmail.com>
- <20160209195222.0882d7f7@arm.com>
- <56BA450E.50109@caviumnetworks.com>
-Message-ID: <20160209200715.22487785@arm.com>
+From: Valdis.Kletnieks@vt.edu (Valdis.Kletnieks at vt.edu)
+Date: Tue, 09 Feb 2016 15:14:35 -0500
+Subject: [PATCH v12 2/4] PM / Domains: add setter for dev.pm_domain
+In-Reply-To: <CAJZ5v0jUipo06fpSQsKi+5Po_32ntgc3Ns29=17SgQr2PSj+kA@mail.gmail.com>
+References: <1452181575-9206-1-git-send-email-tomeu.vizoso@collabora.com>
+ <CAHp75VdWPUZ8F5rsGn3M1e5Pgpcg1CErBej9PE_3+ZPke5CDFA@mail.gmail.com>
+ <CAHp75Vf9TS-AxJALQjiwNjMCT8ct5SBanYzrEsV9aj=DsUw-OA@mail.gmail.com>
+ <1783906.XctYjeUNLr@vostro.rjw.lan>
+ <44858.1454967873@turing-police.cc.vt.edu>
+ <CAJZ5v0jUipo06fpSQsKi+5Po_32ntgc3Ns29=17SgQr2PSj+kA@mail.gmail.com>
+Message-ID: <43751.1455048875@turing-police.cc.vt.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 9 Feb 2016 11:59:10 -0800
-David Daney <ddaney@caviumnetworks.com> wrote:
+On Mon, 08 Feb 2016 22:50:39 +0100, "Rafael J. Wysocki" said:
+> On Mon, Feb 8, 2016 at 10:44 PM,  <Valdis.Kletnieks@vt.edu> wrote:
 
-> On 02/09/2016 11:52 AM, Marc Zyngier wrote:
-> > On Tue,  9 Feb 2016 11:29:16 -0800
-> > David Daney <ddaney.cavm@gmail.com> wrote:
+> > My Dell Latitude laptopi on next-20160201 is throwing a similar error
+> > at shutdown, except the traceback continues:
 > >
-> > Hi David,
+> > mei_me_remove+0xbd/0xc0
+> > pci_device_shutdown+0x32/0x50
+> > device_shutdown+0xe2/0x210
 > >
-> >> From: Andrew Pinski <apinski@cavium.com>
-> >>
-> >> On ThunderX T88 pass 1.x through 2.1 parts, broadcast TLBI
-> >> instructions may cause the icache to become invalid if it contains
-> >> data for a non-current ASID.
-> >>
-> >> This patch implements the workaround (which flushes the local icache
-> >> when switching the mm) by using code patching.
-> >>
-> >> Signed-off-by: Andrew Pinski <apinski@cavium.com>
-> >> Signed-off-by: David Daney <david.daney@cavium.com>
-> >> ---
-> >>   arch/arm64/Kconfig                  | 11 +++++++++++
-> >>   arch/arm64/include/asm/cpufeature.h |  3 ++-
-> >>   arch/arm64/kernel/cpu_errata.c      |  9 +++++++++
-> >>   arch/arm64/mm/proc.S                | 12 ++++++++++++
-> >>   4 files changed, 34 insertions(+), 1 deletion(-)
-> >
-> > It would be good to update Documentation/arm64/silicon-errata.txt to
-> > reflect the fact that there is a workaround available for this erratum.
-> 
-> Would you prefer a separate patch for that, or should I roll it into 
-> this one and resubmit?
+> > (sorry, that's all I have, transcribing from one frame of video shot while
+> > the system was shutting down....)
+>
+> This should be fixed in 4.5-rc3, so please retest.
 
-It'd feel more logical to keep it all together, but I'll leave that
-decision to Catalin and Will.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny.
+Confirming that next-20160201 has the problem, but it is fixed as of next-20160208.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 848 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160209/21dddf40/attachment.sig>
