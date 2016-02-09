@@ -1,27 +1,46 @@
-From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Tue, 9 Feb 2016 17:35:34 -0600
-Subject: [PATCH V2 08/12] dtb: amd: Add PERF CCN-504 device tree node
-In-Reply-To: <3090961.S0JY5ma2pB@wuerfel>
-References: <1454954357-8395-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <1454954357-8395-9-git-send-email-Suravee.Suthikulpanit@amd.com>
- <3090961.S0JY5ma2pB@wuerfel>
-Message-ID: <56BA77C6.6020803@amd.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Tue, 09 Feb 2016 15:44:02 -0800
+Subject: [PATCH 1/4] spi: bcm2835aux: fix bitmask defines
+In-Reply-To: <1455041435-8015-2-git-send-email-stephanolbrich@gmx.de>
+References: <1455041435-8015-1-git-send-email-stephanolbrich@gmx.de>
+ <1455041435-8015-2-git-send-email-stephanolbrich@gmx.de>
+Message-ID: <87lh6t4fgd.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+stephanolbrich at gmx.de writes:
 
-
-On 02/09/2016 08:58 AM, Arnd Bergmann wrote:
-> On Monday 08 February 2016 11:59:13 Suravee Suthikulpanit wrote:
->> +               /* Perf CCN504 PMU */
->> +               ccn: ccn at 0xe8000000 {
->>
+> From: Stephan Olbrich <stephanolbrich@gmx.de>
 >
-> The address is wrong, please remove the '0x'.
+> The bitmasks for txempty and idle interrupts were interchanged.
 >
-> 	Arnd
+> Signed-off-by: Stephan Olbrich <stephanolbrich@gmx.de>
+> ---
+>  drivers/spi/spi-bcm2835aux.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 >
+> diff --git a/drivers/spi/spi-bcm2835aux.c b/drivers/spi/spi-bcm2835aux.c
+> index 7de6f84..ecc73c0 100644
+> --- a/drivers/spi/spi-bcm2835aux.c
+> +++ b/drivers/spi/spi-bcm2835aux.c
+> @@ -73,8 +73,8 @@
+>  
+>  /* Bitfields in CNTL1 */
+>  #define BCM2835_AUX_SPI_CNTL1_CSHIGH	0x00000700
+> -#define BCM2835_AUX_SPI_CNTL1_IDLE	0x00000080
+> -#define BCM2835_AUX_SPI_CNTL1_TXEMPTY	0x00000040
+> +#define BCM2835_AUX_SPI_CNTL1_TXEMPTY	0x00000080
+> +#define BCM2835_AUX_SPI_CNTL1_IDLE	0x00000040
+>  #define BCM2835_AUX_SPI_CNTL1_MSBF_IN	0x00000002
+>  #define BCM2835_AUX_SPI_CNTL1_KEEP_IN	0x00000001
 
-Right, thanks for catching this.
+Confirmed by looking at the hardware.
 
-Suravee
+Reviewed-by: Eric Anholt <eric@anholt.net>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160209/d846cff3/attachment.sig>
