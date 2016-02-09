@@ -1,48 +1,26 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Tue, 9 Feb 2016 17:34:17 +0000
-Subject: [RFC PATCH v3 0/3] Add ACPI support for HiSilicon PCIe Host
- Controllers
-Message-ID: <1455039260-6040-1-git-send-email-gabriele.paoloni@huawei.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Tue, 9 Feb 2016 11:39:26 -0600
+Subject: [PATCH v11 4/4] Watchdog: introduce ARM SBSA watchdog driver
+In-Reply-To: <1455037240-16192-5-git-send-email-fu.wei@linaro.org>
+References: <1455037240-16192-1-git-send-email-fu.wei@linaro.org>
+ <1455037240-16192-5-git-send-email-fu.wei@linaro.org>
+Message-ID: <56BA244E.1020402@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: gabriele paoloni <gabriele.paoloni@huawei.com>
+fu.wei at linaro.org wrote:
 
-This patchset adds ACPI support for the HiSilicon Hip05/Hip06 SoC PCIe controllers
-The four patches respectively:
-        - re-architect the current HiSilicon driver to make it scalable to the
-          new ACPI quirks
-        - rework the current HiSilicon driver to add support for ECAM platforms
-        - adds the HiSilicon ACPI specific quirks.
+> +		if (!action)
+> +			dev_warn(dev, "fall back to signle stage mode.\n");
 
-   This patchset  is based on
-   https://github.com/semihalf-nowicki-tomasz/linux.git
-   branch pci-acpi-v4
+"falling back to single stage mode"
 
-Changes v1 -> v2: removed the ACPI quirks dependency on Designware framework
+Acked-by: Timur Tabi <timur@codeaurora.org>
 
-Changes v2 -> v3: kept backward compatibility for non-ECAM platforms
-
-gabriele paoloni (3):
-  PCI: hisi: re-architect Hip05/Hip06 controllers driver to preapare for
-    ACPI
-  PCI: hisi: Add ECAM support to HiSilicon PCIe host controller
-  PCI/ACPI: hisi: Add ACPI support for HiSilicon SoCs Host Controllers
-
- .../devicetree/bindings/pci/hisilicon-pcie.txt     |  15 +-
- MAINTAINERS                                        |   3 +
- drivers/pci/host/Kconfig                           |   8 +
- drivers/pci/host/Makefile                          |   3 +-
- drivers/pci/host/pcie-designware.c                 |   4 +-
- drivers/pci/host/pcie-designware.h                 |   2 +
- drivers/pci/host/pcie-hisi-acpi.c                  | 188 +++++++++++++++++++++
- drivers/pci/host/pcie-hisi-common.c                |  73 ++++++++
- drivers/pci/host/pcie-hisi.c                       | 149 ++++++++--------
- drivers/pci/host/pcie-hisi.h                       |  25 +++
- 10 files changed, 382 insertions(+), 88 deletions(-)
- create mode 100644 drivers/pci/host/pcie-hisi-acpi.c
- create mode 100644 drivers/pci/host/pcie-hisi-common.c
- create mode 100644 drivers/pci/host/pcie-hisi.h
+The whole "calculate the timeouts different if 'action' is enabled" 
+seems clunky to me, but I can't think of a better way to handle it.
 
 -- 
-1.9.1
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
+Forum, a Linux Foundation collaborative project.
