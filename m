@@ -1,95 +1,47 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Tue, 9 Feb 2016 20:24:07 +0530
-Subject: [PATCH 1/2] Documentation: dt: mailbox: Add TI Message Manager
-In-Reply-To: <56B9DC30.5040806@ti.com>
-References: <1454690044-2560-1-git-send-email-nm@ti.com>
- <1454690044-2560-2-git-send-email-nm@ti.com>
- <CABb+yY3kGq_R49Xx4fK3UMqtuFiuv-pXJWvjkEFLPL9xRu5T4A@mail.gmail.com>
- <56B9DC30.5040806@ti.com>
-Message-ID: <CABb+yY24XzsWaSGLMCE4_nvgWx0OhhQmcaP41g06FxdjQYFchg@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 9 Feb 2016 14:54:26 +0000
+Subject: [PATCH] arm64: replace read_lock to rcu lock in call_step_hook
+In-Reply-To: <1454971764-30720-1-git-send-email-yang.shi@linaro.org>
+References: <1454971764-30720-1-git-send-email-yang.shi@linaro.org>
+Message-ID: <20160209145426.GR22874@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 9, 2016 at 6:01 PM, Nishanth Menon <nm@ti.com> wrote:
-> On 02/08/2016 10:14 PM, Jassi Brar wrote:
->
-> Thanks for the review.
->
->> On Fri, Feb 5, 2016 at 10:04 PM, Nishanth Menon <nm@ti.com> wrote:
->>> +
->>> +       msgmgr: msgmgr at 02a00000 {
->>> +               compatible = "ti,k2g-message-manager", "ti,message-manager";
->>> +               #mbox-cells = <1>;
->>> +               reg-names = "queue_proxy_region", "queue_state_debug_region";
->>> +               reg = <0x02a00000 0x400000>, <0x028c3400 0x400>;
->>> +
->>> +               msgmgr_proxy_pmmc_tx_prio0: pmmc_tx_prio0 {
->>> +                       ti,queue-id = <0>;
->>> +                       ti,proxy-id = <0>;
->>> +               };
->>> +
->>> +               msgmgr_proxy_pmmc_rx: pmmc_rx {
->>> +                       ti,queue-id = <5>;
->>> +                       ti,proxy-id = <2>;
->>> +                       interrupt-names = "rx";
->>> +                       interrupts = <GIC_SPI 32I didn't respond because I think Suman got Rob's point wrong.I didn't respond because I think Suman got Rob's point wrong.4 IRQ_TYPE_EDGE_RISING>;
->>> +               };
->>> +       };
->>> +
->> I think we should get rid of consumer specifics from the provider node...
->
->
-> If I get rid of the consumer nodes, how do you propose I describe the rx
-> queue interrupt(s) in the msmgr dt node (Every Rx queue will have it's
-> own interrupt - and it cannot be reverse computed from queue ID, proxy ID)?
->
-One option is to have controller driver construct interrupt name from
-queue and proxy ids like
+On Mon, Feb 08, 2016 at 02:49:24PM -0800, Yang Shi wrote:
+> BUG: sleeping function called from invalid context at kernel/locking/rtmutex.c:917
+> in_atomic(): 1, irqs_disabled(): 128, pid: 383, name: sh
+> Preemption disabled at:[<ffff800000124c18>] kgdb_cpu_enter+0x158/0x6b8
+> 
+> CPU: 3 PID: 383 Comm: sh Tainted: G        W       4.1.13-rt13 #2
+> Hardware name: Freescale Layerscape 2085a RDB Board (DT)
+> Call trace:
+> [<ffff8000000885e8>] dump_backtrace+0x0/0x128
+> [<ffff800000088734>] show_stack+0x24/0x30
+> [<ffff80000079a7c4>] dump_stack+0x80/0xa0
+> [<ffff8000000bd324>] ___might_sleep+0x18c/0x1a0
+> [<ffff8000007a20ac>] __rt_spin_lock+0x2c/0x40
+> [<ffff8000007a2268>] rt_read_lock+0x40/0x58
+> [<ffff800000085328>] single_step_handler+0x38/0xd8
+> [<ffff800000082368>] do_debug_exception+0x58/0xb8
+> Exception stack(0xffff80834a1e7c80 to 0xffff80834a1e7da0)
+> 7c80: ffffff9c ffffffff 92c23ba0 0000ffff 4a1e7e40 ffff8083 001bfcc4 ffff8000
+> 7ca0: f2000400 00000000 00000000 00000000 4a1e7d80 ffff8083 0049501c ffff8000
+> 7cc0: 00005402 00000000 00aaa210 ffff8000 4a1e7ea0 ffff8083 000833f4 ffff8000
+> 7ce0: ffffff9c ffffffff 92c23ba0 0000ffff 4a1e7ea0 ffff8083 001bfcc0 ffff8000
+> 7d00: 4a0fc400 ffff8083 00005402 00000000 4a1e7d40 ffff8083 00490324 ffff8000
+> 7d20: ffffff9c 00000000 92c23ba0 0000ffff 000a0000 00000000 00000000 00000000
+> 7d40: 00000008 00000000 00080000 00000000 92c23b8b 0000ffff 92c23b8e 0000ffff
+> 7d60: 00000038 00000000 00001cb2 00000000 00000005 00000000 92d7b498 0000ffff
+> 7d80: 01010101 01010101 92be9000 0000ffff 00000000 00000000 00000030 00000000
+> [<ffff8000000833f4>] el1_dbg+0x18/0x6c
+> 
+> This issue is similar with 62c6c61("arm64: replace read_lock to rcu lock in
+> call_break_hook"), but comes to single_step_handler.
+> 
+> This also solves kgdbts boot test silent hang issue on 4.4 -rt kernel.
+> 
+> Signed-off-by: Yang Shi <yang.shi@linaro.org>
 
-msgmgr: msgmgr at 02a00000 {
-   ....
-     interrupt-names = "irq_5_2", "irq_0_0";     /* irq_<queue-id>_<proxy-id> */
-     interrupts = <GIC_SPI 324 IRQ_TYPE_EDGE_RISING>,
-                        <GIC_SPI 325 IRQ_TYPE_EDGE_RISING>;
-}
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-and have the consumer specify queue and proxy ids in mboxes property like
- pmmc {
-       ....
-       mbox-names = "tx", "rx";
-       mboxes = <&msgmgr 0 0>
-                          <&msgmgr 5 2>;
-};
-
-
->>> +...
->>> +       pmmc {
->>> +               ...
->>> +               mbox-names = "tx", "rx";
->>> +               mboxes = <&msgmgr &msgmgr_proxy_pmmc_tx>
->>> +                        <&msgmgr &msgmgr_proxy_pmmc_rx>;
->>> +               ...
->>> +       };
->>>
->> ... and have consumers like
->>        pmmc {
->>                ...
->>                mbox-names = "tx", "rx";
->>                mboxes = <&msgmgr 0 0>
->>                         <&msgmgr 5 2>;
->>        };
->>
->> I leave the IRQ for you to decide how to specify - a 'dummy' or
->> 'valid' always provided as last cell in mboxes or some other way.
->> (I'll review other patches in detail later)
->
-> What do we do with the issues that Suman pointed out in the mailbox
-> framework itself? Could you respond to that thread[1] as well?
->
-Phandle of provider in consumer node is quite normal and acceptable.
-I think Rob (at least I am) is talking about the second cell where you
-specify phandle (&msgmgr_proxy_xxx) instead of values from those child
-nodes directly.
-Which is what I suggest   mboxes = <&msgmgr 0 0>,  <&msgmgr 5 2>;
-
-Cheers!
+Will
