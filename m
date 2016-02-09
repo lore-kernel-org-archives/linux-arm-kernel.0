@@ -1,89 +1,61 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 8 Feb 2016 23:04:56 -0600
-Subject: [PATCH v4 16/17] FDT: Add a helper to get specified name subnode
-In-Reply-To: <1454641552-12576-17-git-send-email-zhaoshenglong@huawei.com>
-References: <1454641552-12576-1-git-send-email-zhaoshenglong@huawei.com>
- <1454641552-12576-17-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <CAL_JsqK8F6PQX2kC_+CtDk1-ykKRB3YB54o4FaypsRY_tNzK5w@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 9 Feb 2016 10:43:22 +0530
+Subject: [PATCH 0/3] omap: hwmod: add default reset handling support
+In-Reply-To: <20160208204446.GC19432@atomide.com>
+References: <1454929941-23949-1-git-send-email-kishon@ti.com>
+ <20160208204446.GC19432@atomide.com>
+Message-ID: <56B97572.6080100@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 4, 2016 at 9:05 PM, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
->
-> Sometimes it needs to check if there is a node in FDT by full path.
+Hi Tony,
 
-I'm confused. Are you searching by full path or...
+On Tuesday 09 February 2016 02:14 AM, Tony Lindgren wrote:
+> Hi Kishon,
+> 
+> * Kishon Vijay Abraham I <kishon@ti.com> [160208 03:13]:
+>> Add a new hwmod flag to indicate custom reset handling and use it
+>> for devices that require custom reset handling (like dsp, ipu, iva).
+>>
+>> Tested PCIe on dra7-evm and dra72-evm.
+>> I need help in testing DSP, IPU, IVA, PRU, GFX, M3 in other platforms.
+>> Or a way to test these cores to see if reset is not broken. Suman?
+>>
+>> I'll post this series once again after performing these tests.
+> 
+> Do we also still need to patch something in the pcie driver too
+> or can all that be left out now?
 
-> Introduce this helper to get the specified name subnode if it exists.
+With this series changes in PCIe driver is not required at all.
 
-name of sub node?
+Thanks
+Kishon
 
-Either way, fdt_subnode_offset or fdt_path_offset doesn't work?
-
->
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> ---
-> CC: Rob Herring <robh@kernel.org>
-> ---
->  drivers/of/fdt.c       | 25 +++++++++++++++++++++++++
->  include/linux/of_fdt.h |  2 ++
->  2 files changed, 27 insertions(+)
->
-> diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
-> index 655f79d..eacb188 100644
-> --- a/drivers/of/fdt.c
-> +++ b/drivers/of/fdt.c
-> @@ -645,6 +645,31 @@ int __init of_scan_flat_dt(int (*it)(unsigned long node,
->  }
->
->  /**
-> + * of_get_flat_dt_subnode_by_name - get subnode of specified node by name
-> + *
-> + * @node: the parent node
-> + * @uname: the name of subnode
-> + * @return offset of the subnode, or -FDT_ERR_NOTFOUND if there is none
-> + */
-> +
-> +int of_get_flat_dt_subnode_by_name(unsigned long node, const char *uname)
-> +{
-> +       const void *blob = initial_boot_params;
-> +       int offset;
-> +       const char *pathp;
-> +
-> +       for (offset = fdt_first_subnode(blob, node);
-> +            offset >= 0;
-> +            offset = fdt_next_subnode(blob, offset)) {
-> +               pathp = fdt_get_name(blob, offset, NULL);
-> +               if (strcmp(pathp, uname) == 0)
-> +                       return offset;
-> +       }
-> +
-> +       return -FDT_ERR_NOTFOUND;
-> +}
-> +
-> +/**
->   * of_get_flat_dt_root - find the root node in the flat blob
->   */
->  unsigned long __init of_get_flat_dt_root(void)
-> diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
-> index df9ef38..fc28162 100644
-> --- a/include/linux/of_fdt.h
-> +++ b/include/linux/of_fdt.h
-> @@ -52,6 +52,8 @@ extern char __dtb_end[];
->  extern int of_scan_flat_dt(int (*it)(unsigned long node, const char *uname,
->                                      int depth, void *data),
->                            void *data);
-> +extern int of_get_flat_dt_subnode_by_name(unsigned long node,
-> +                                         const char *uname);
->  extern const void *of_get_flat_dt_prop(unsigned long node, const char *name,
->                                        int *size);
->  extern int of_flat_dt_is_compatible(unsigned long node, const char *name);
-> --
-> 2.0.4
->
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> Regards,
+> 
+> Tony
+> 
+> 
+>> Paul Walmsley (3):
+>>   ARM: omap2+: omap_hwmod: introduce hwmod flag for custom reset
+>>     handling
+>>   ARM: OMAP2+: hwmod: use HWMOD_CUSTOM_HARDRESET for custom reset
+>>     handling
+>>   ARM: OMAP2+: hwmod: Add default reset handling
+>>
+>>  arch/arm/mach-omap2/omap_hwmod.c                   |   16 +++++++++++-----
+>>  arch/arm/mach-omap2/omap_hwmod.h                   |   12 ++++++++++++
+>>  arch/arm/mach-omap2/omap_hwmod_2420_data.c         |    2 ++
+>>  arch/arm/mach-omap2/omap_hwmod_2430_data.c         |    1 +
+>>  .../mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c |    2 ++
+>>  arch/arm/mach-omap2/omap_hwmod_33xx_data.c         |    1 +
+>>  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |    3 +++
+>>  arch/arm/mach-omap2/omap_hwmod_43xx_data.c         |    1 +
+>>  arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |    6 ++++++
+>>  arch/arm/mach-omap2/omap_hwmod_54xx_data.c         |    2 ++
+>>  10 files changed, 41 insertions(+), 5 deletions(-)
+>>
+>> -- 
+>> 1.7.9.5
+>>
