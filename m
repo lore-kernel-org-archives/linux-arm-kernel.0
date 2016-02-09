@@ -1,73 +1,62 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 09 Feb 2016 17:27:05 +0100
-Subject: [RFC PATCH v2 1/3] PCI: hisi: re-architect Hip05/Hip06
- controllers driver to preapare for ACPI
-In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E1ECAD249@lhreml503-mbs>
-References: <1454935264-6076-1-git-send-email-gabriele.paoloni@huawei.com>
- <3113837.YSNyDAf4HQ@wuerfel>
- <EE11001F9E5DDD47B7634E2F8A612F2E1ECAD249@lhreml503-mbs>
-Message-ID: <5968234.D2a3VCM72k@wuerfel>
+Date: Tue, 09 Feb 2016 17:31:26 +0100
+Subject: [PATCH v5 3/3] pci,
+ pci-thunder-ecam: Add driver for ThunderX-pass1 on-chip devices
+In-Reply-To: <20160209162628.GA20171@localhost>
+References: <1454715675-17512-1-git-send-email-ddaney.cavm@gmail.com>
+ <12842339.z2KnaZPlyO@wuerfel> <20160209162628.GA20171@localhost>
+Message-ID: <4260938.2z2RNjENMM@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 08 February 2016 16:51:19 Gabriele Paoloni wrote:
-> > From: Arnd Bergmann [mailto:arnd at arndb.de]
-> > On Monday 08 February 2016 16:06:54 Gabriele Paoloni wrote:
-> > > > On Monday 08 February 2016 12:41:02 Gabriele Paoloni wrote:
-> > int
-> > > > size,
-> > > > > +                         u32 *val)
-> > > > > +{
-> > > > > +   u32 reg;
-> > > > > +   u32 reg_val;
-> > > > > +   void *walker = &reg_val;
-> > > > > +
-> > > > > +   walker += (where & 0x3);
-> > > > > +   reg = where & ~0x3;
-> > > > > +   reg_val = readl(reg_base + reg);
-> > > > > +
-> > > > > +   if (size == 1)
-> > > > > +           *val = *(u8 __force *) walker;
-> > > > > +   else if (size == 2)
-> > > > > +           *val = *(u16 __force *) walker;
-> > > > > +   else if (size == 4)
-> > > > > +           *val = reg_val;
-> > > > > +   else
-> > > > > +           return PCIBIOS_BAD_REGISTER_NUMBER;
-> > > > > +
-> > > > > +   return PCIBIOS_SUCCESSFUL;
-> > > > > +}
-> > > >
-> > > > Isn't this the same hack that Qualcomm are using?
-> > >
-> > > As far as I can see Qualcomm defines its own config access
-> > > mechanism only for RC config read and also it seems they're
-> > > having problems with reporting the device class...
-> > >
-> > > https://github.com/torvalds/linux/blob/master/drivers/pci/host/pcie-
-> > qcom.c#L474
-> > >
-> > > Our problem is that our HW can only perform 32b rd/wr accesses
-> > > So we can't use readw/readb/writew/writeb...
-> > >
-> > >
+On Tuesday 09 February 2016 10:26:28 Bjorn Helgaas wrote:
+> On Tue, Feb 09, 2016 at 10:25:33AM +0100, Arnd Bergmann wrote:
+> > On Monday 08 February 2016 17:24:30 Bjorn Helgaas wrote:
+> > > > >
+> > > > >I assume your system conforms to expectations like these; I'm just
+> > > > >pointing them out because you mentioned buses with multiple devices on
+> > > > >them, which is definitely something one doesn't expect in PCIe.
+> > > > 
+> > > > The topology we have is currently working with the kernel's core PCI
+> > > > code.  I don't really want to get into discussing what the
+> > > > definition of PCIe is.  We have multiple devices (more than 32) on a
+> > > > single bus, and they have PCI Express and ARI Capabilities.  Is that
+> > > > PCIe?  I don't know.
+> > > 
+> > > I don't need to know the details of your topology.  As long as it
+> > > conforms to the PCIe spec, it should be fine.  If it *doesn't* conform
+> > > to the spec, but things currently seem to work, that's less fine,
+> > > because a future Linux change is liable to break something for you.
+> > > 
+> > > I was a little concerned about your statement that "there are multiple
+> > > devices residing on each bus, so from that point of view it cannot be
+> > > PCIe."  That made it sound like you're doing something outside the
+> > > spec.  If you're just using regular multi-function devices or ARI,
+> > > then I don't see any issue (or any reason to say it can't be PCIe).
 > > 
-> > Sorry, my mistake, I meant Cavium not Qualcomm.
-> > See https://lkml.org/lkml/2016/2/5/689 for the patches.
+> > It doesn't conform to the PCIe port spec, because there are no external
+> > ports but just integrated devices in the host bridge. 
 > 
-> Well, looking at it Cavium seems quite different, 
-> 
-> On read they need to trigger the retrieval of the
-> config space info writing to the lower 32b of a 64b register,
-> then they need to read data back on the upper 64b of the
-> same register and adjust the content to remove the garbage...
-> 
-> We just use 32b accesses and adjust grab the appropriate
-> bytes depending on the read/write sizes...
+> Is there a spec section you have in mind?  Based on sec 1.3.1, I don't
+> think there's a requirement to have PCI Express Ports (is that what
+> you mean by "external ports"?)
 
-Hmm, I must have misremembered that too then, let me try once more ;-)
+No, I was just assuming that ports are specified in their own document,
+which would not be followed here if there are none. There is nothing in
+here that leads me to believe that the hardware is actually noncompliant
+with any relevant standard.
 
-The above appears to reimplement pci_generic_config_read32(). Can you
-just use that instead?
+> Root Complex Integrated Endpoints (sec 1.3.2.3) are clearly supported
+> and they would not be behind a Root Port.  If you're using those, I
+> hope they're correctly identified via the PCIe capability Device/Port
+> Type (sec 7.8.2) because we rely on that type to figure out whether
+> the link-related registers are implemented.
+> 
+> The spec does include rules related to peer-to-peer transactions, MPS,
+> ASPM, error reporting, etc., and Linux relies on those, so I think it
+> would be important to get those right.
+
+David can probably explain more if the registers are compliant with
+those parts of the spec.
 
 	Arnd
