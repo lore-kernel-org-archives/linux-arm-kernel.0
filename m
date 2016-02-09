@@ -1,68 +1,159 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 9 Feb 2016 17:23:11 +0000
-Subject: [PATCH v2] arm64: disable kasan when accessing frame->fp in
- unwind_frame
-In-Reply-To: <56BA1F18.2020103@linaro.org>
-References: <1454951589-18238-1-git-send-email-yang.shi@linaro.org>
- <20160209165414.GT22874@arm.com> <56BA1F18.2020103@linaro.org>
-Message-ID: <20160209172310.GV22874@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 9 Feb 2016 09:24:04 -0800
+Subject: N900 sleep mode (in 4.5-rc0, if that matters)
+In-Reply-To: <20160207212316.GA6147@amd>
+References: <20160125163332.GT19432@atomide.com> <20160126140010.GA29723@amd>
+ <20160126172527.GY3500@atomide.com> <20160130200244.GA30429@amd>
+ <20160130201452.GC30429@amd> <20160130221509.GA28644@amd>
+ <20160201181316.GM19432@atomide.com> <20160201211736.GA11283@amd>
+ <20160201221111.GP19432@atomide.com> <20160207212316.GA6147@amd>
+Message-ID: <20160209172403.GK19432@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 09, 2016 at 09:17:12AM -0800, Shi, Yang wrote:
-> On 2/9/2016 8:54 AM, Will Deacon wrote:
-> >On Mon, Feb 08, 2016 at 09:13:09AM -0800, Yang Shi wrote:
-> >>When boot arm64 kernel with KASAN enabled, the below error is reported by
-> >>kasan:
-> >>
-> >>BUG: KASAN: out-of-bounds in unwind_frame+0xec/0x260 at addr ffffffc064d57ba0
-> >>Read of size 8 by task pidof/499
-> >>page:ffffffbdc39355c0 count:0 mapcount:0 mapping:          (null) index:0x0
-> >>flags: 0x0()
-> >>page dumped because: kasan: bad access detected
-> >>CPU: 2 PID: 499 Comm: pidof Not tainted 4.5.0-rc1 #119
-> >>Hardware name: Freescale Layerscape 2085a RDB Board (DT)
-> >>Call trace:
-> >>[<ffffffc00008d078>] dump_backtrace+0x0/0x290
-> >>[<ffffffc00008d32c>] show_stack+0x24/0x30
-> >>[<ffffffc0006a981c>] dump_stack+0x8c/0xd8
-> >>[<ffffffc0002e4400>] kasan_report_error+0x558/0x588
-> >>[<ffffffc0002e4958>] kasan_report+0x60/0x70
-> >>[<ffffffc0002e3188>] __asan_load8+0x60/0x78
-> >>[<ffffffc00008c92c>] unwind_frame+0xec/0x260
-> >>[<ffffffc000087e60>] get_wchan+0x110/0x160
-> >>[<ffffffc0003b647c>] do_task_stat+0xb44/0xb68
-> >>[<ffffffc0003b7730>] proc_tgid_stat+0x40/0x50
-> >>[<ffffffc0003ac840>] proc_single_show+0x88/0xd8
-> >>[<ffffffc000345be8>] seq_read+0x370/0x770
-> >>[<ffffffc00030aba0>] __vfs_read+0xc8/0x1d8
-> >>[<ffffffc00030c0ec>] vfs_read+0x94/0x168
-> >>[<ffffffc00030d458>] SyS_read+0xb8/0x128
-> >>[<ffffffc000086530>] el0_svc_naked+0x24/0x28
-> >>Memory state around the buggy address:
-> >>  ffffffc064d57a80: 00 00 00 00 00 00 00 00 f1 f1 f1 f1 00 00 f4 f4
-> >>  ffffffc064d57b00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-> >>>ffffffc064d57b80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-> >>                                   ^
-> >>  ffffffc064d57c00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-> >>  ffffffc064d57c80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-> >>
-> >>Since the shadow byte pointed by the report is 0, so it may mean it is just hit
-> >>oob in non-current task. So, disable the instrumentation to silence these
-> >>warnings.
-> >
-> >Curious, but how did you trigger this? I'm just trying to confirm that
-> >mainline is affected, but my machine boots happily with KASAN and STACKTRACE
-> >selected and I can cat /proc/self/{stack,stat} quite happily.
-> >
-> >What am I missing?
+* Pavel Machek <pavel@ucw.cz> [160207 13:24]:
+> Hi!
 > 
-> I'm using mainline 4.5-rc1 kernel with gcc 5.2. And, my rootfs is NFS
-> mounted.
+> > > (I assume I have to insmod and rmmod, right? Because powersave is not
+> > > entered if I simply compile-out usb).
+> > 
+> > Depending on what the bootloader does and probably also if
+> > USB was used during the booting.. So yeah you may need to modprobe
+> > and then rmmod.
+> > 
+> > > Would you have commit ids for those rmmod fixes? It might be good to
+> > > push them into stable, and I should try again with them applied...
+> > 
+> > 055555fc459 ("usb: musb: core: Fix handling of the phy notifications")
+> > 03e43528ab68 ("usb: musb: Fix unbalanced pm_runtime_enable")
 > 
-> Not sure if other kernel configs, i.e tracing stuff will have impact on the
-> trigger since I'm not using the defconfig.
+> Ok, with that, I can insmod and rmmod. But I still get:
+> 
+> 00001fff 48005020 (fa005020) cm_idlest_per blocking bits: 0007e000
 
-If you could put your .config somewhere, that would be helpful, please.
+I think the cm_idlest_per is fine.
 
-Will
+> ffdffebd 48004a20 (fa004a20) cm_idlest1_core blocking bits: 00200042
+> 0000000d 48004a28 (fa004a28) cm_idlest3_core
+
+Bit 21 in cm_idlest1_core is for MCSPI4 so WLAN. Does that go
+down if do sleep 5; cat /sys/kernel/debug/pm_debug/count ?
+
+If not, the're PM runtime missing or broken somewhere.
+
+FYI, below is my omap3 usb test script that I use to start and
+stop USB, it also works on n900. And after stopping it n900
+continues hitting deeper idle states just fine.
+
+That is with these two phy patches applied on v4.5-rc3:
+
+"phy: twl4030-usb: Fix unbalanced pm_runtime_enable on module reload")
+"phy: twl4030-usb: Relase usb phy on unload")
+
+Maybe I gave you wrong info on the USB patches needed.. But these
+two above are needed on v4.5-rc3. And looks like Kishon has now
+applied them.
+
+Oh and I also have the MMC PM runtime regression fix here that I
+have not yet posted. Will post today. But I guess you're on
+v4.4 right now still.
+
+Regards,
+
+Tony
+
+8< --------
+#!/bin/bash
+
+# Change for your UDC controller
+phy_module=phy_twl4030_usb
+udc_glue=omap2430
+udc_module=musb_hdrc
+udc_name=musb-hdrc.0.auto
+
+start_usb_gadgets() {
+	vendor=0x1d6b
+	product=0x0106
+	file=$1
+  
+	mount -t configfs none /sys/kernel/config
+	mkdir /sys/kernel/config/usb_gadget/g1
+	old_pwd=$(pwd)
+	cd /sys/kernel/config/usb_gadget/g1
+	
+	echo $product > idProduct
+	echo $vendor > idVendor
+	mkdir strings/0x409
+	echo 123456789 > strings/0x409/serialnumber
+	echo foo > strings/0x409/manufacturer
+	echo "Multi Gadget" > strings/0x409/product
+	
+	mkdir configs/c.1
+	echo 100 > configs/c.1/MaxPower
+	mkdir configs/c.1/strings/0x409
+	echo "Config 100mA" > configs/c.1/strings/0x409/configuration
+	
+	mkdir configs/c.5
+	echo 500 > configs/c.5/MaxPower
+	mkdir configs/c.5/strings/0x409
+	echo "Config 500mA" > configs/c.5/strings/0x409/configuration
+
+	mkdir functions/mass_storage.0
+	echo $file > functions/mass_storage.0/lun.0/file
+	ln -s functions/mass_storage.0 configs/c.1
+	ln -s functions/mass_storage.0 configs/c.5
+
+	mkdir functions/acm.0
+	ln -s functions/acm.0 configs/c.1
+	ln -s functions/acm.0 configs/c.5
+
+	mkdir functions/ecm.0
+	ln -s functions/ecm.0 configs/c.1
+	ln -s functions/ecm.0 configs/c.5
+
+	# Adding rndis seems to cause alignment trap or some
+	# random oops on reboot after rmmod $udc_glue
+
+	echo $udc_name > /sys/kernel/config/usb_gadget/g1/UDC
+	cd $old_pwd
+}
+
+stop_usb_gadgets() {
+	old_pwd=$(pwd)
+	cd /sys/kernel/config/usb_gadget/g1
+
+	echo "" > /sys/kernel/config/usb_gadget/g1/UDC
+
+	rm configs/c.1/ecm.0
+	rm configs/c.5/ecm.0
+	rmdir functions/ecm.0
+
+	rm configs/c.1/acm.0
+	rm configs/c.5/acm.0
+	rmdir functions/acm.0
+
+	echo "" > functions/mass_storage.0/lun.0/file
+	rm configs/c.1/mass_storage.0
+	rm configs/c.5/mass_storage.0
+	rmdir functions/mass_storage.0
+
+	rmmod $udc_glue
+	rmmod $phy_module
+	rmmod $udc_module
+
+	cd $old_pwd
+}
+
+case $1 in
+	start)
+	modprobe libcomposite
+	modprobe $phy_module
+	modprobe $udc_glue
+	start_usb_gadgets ""
+        ;;
+	stop)
+	stop_usb_gadgets
+	;;
+        *)
+        ;;
+esac
