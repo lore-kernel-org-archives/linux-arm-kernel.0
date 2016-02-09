@@ -1,81 +1,151 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon,  8 Feb 2016 17:45:28 -0800
-Subject: [PATCH 01/14] mfd: intel_quark_i2c_gpio: Use clkdev_create()
+Date: Mon,  8 Feb 2016 17:45:32 -0800
+Subject: [PATCH 05/14] clkdev: Add clk_hw based registration APIs
 In-Reply-To: <1454982341-22715-1-git-send-email-sboyd@codeaurora.org>
 References: <1454982341-22715-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1454982341-22715-2-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1454982341-22715-6-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert this driver to use clkdev_create() instead of
-clk_register_clkdevs(). The latter API is only used by this driver,
-although this driver only allocates one clk to add anyway.
-Furthermore, this driver allocates the clk_lookup structure with
-devm, but clkdev_drop() will free that structure when passed,
-leading to a double free when this driver is removed. Clean it
-all up and pave the way for the removal of clk_register_clkdevs().
+Now that we have a clk registration API that doesn't return
+struct clks, we need to have some way to hand out struct clks via
+the clk_get() APIs that doesn't involve associating struct clk
+pointers with a struct clk_lookup. Luckily, clkdev already
+operates on struct clk_hw pointers, except for the registration
+facing APIs where it converts struct clk pointers into struct
+clk_hw pointers almost immediately.
 
-Cc: Lee Jones <lee.jones@linaro.org>
-Cc: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Let's add clk_hw based registration APIs so that we can skip the
+conversion step and provide a way for clk provider drivers to
+operate exclusively on clk_hw structs. This way we clearly
+split the API between consumers and providers.
+
 Cc: Russell King <linux@arm.linux.org.uk>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/mfd/intel_quark_i2c_gpio.c | 26 +++++++++-----------------
- 1 file changed, 9 insertions(+), 17 deletions(-)
+ drivers/clk/clkdev.c   | 60 ++++++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/clkdev.h |  7 ++++++
+ 2 files changed, 67 insertions(+)
 
-diff --git a/drivers/mfd/intel_quark_i2c_gpio.c b/drivers/mfd/intel_quark_i2c_gpio.c
-index 042137465300..bdc5e27222c0 100644
---- a/drivers/mfd/intel_quark_i2c_gpio.c
-+++ b/drivers/mfd/intel_quark_i2c_gpio.c
-@@ -52,8 +52,6 @@
- /* The Quark I2C controller source clock */
- #define INTEL_QUARK_I2C_CLK_HZ	33000000
- 
--#define INTEL_QUARK_I2C_NCLK	1
--
- struct intel_quark_mfd {
- 	struct pci_dev		*pdev;
- 	struct clk		*i2c_clk;
-@@ -128,30 +126,24 @@ MODULE_DEVICE_TABLE(pci, intel_quark_mfd_ids);
- static int intel_quark_register_i2c_clk(struct intel_quark_mfd *quark_mfd)
- {
- 	struct pci_dev *pdev = quark_mfd->pdev;
--	struct clk_lookup *i2c_clk_lookup;
- 	struct clk *i2c_clk;
--	int ret;
--
--	i2c_clk_lookup = devm_kcalloc(&pdev->dev, INTEL_QUARK_I2C_NCLK,
--				      sizeof(*i2c_clk_lookup), GFP_KERNEL);
--	if (!i2c_clk_lookup)
--		return -ENOMEM;
--
--	i2c_clk_lookup[0].dev_id = INTEL_QUARK_I2C_CONTROLLER_CLK;
- 
- 	i2c_clk = clk_register_fixed_rate(&pdev->dev,
- 					  INTEL_QUARK_I2C_CONTROLLER_CLK, NULL,
- 					  CLK_IS_ROOT, INTEL_QUARK_I2C_CLK_HZ);
-+	if (IS_ERR(i2c_clk))
-+		return PTR_ERR(i2c_clk);
- 
--	quark_mfd->i2c_clk_lookup = i2c_clk_lookup;
- 	quark_mfd->i2c_clk = i2c_clk;
-+	quark_mfd->i2c_clk_lookup = clkdev_create(i2c_clk, NULL,
-+						INTEL_QUARK_I2C_CONTROLLER_CLK);
- 
--	ret = clk_register_clkdevs(i2c_clk, i2c_clk_lookup,
--				   INTEL_QUARK_I2C_NCLK);
--	if (ret)
--		dev_err(&pdev->dev, "Fixed clk register failed: %d\n", ret);
-+	if (!quark_mfd->i2c_clk_lookup) {
-+		dev_err(&pdev->dev, "Fixed clk register failed\n");
-+		return -ENOMEM;
-+	}
- 
--	return ret;
-+	return 0;
+diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
+index ae61f2e57048..485d3b141843 100644
+--- a/drivers/clk/clkdev.c
++++ b/drivers/clk/clkdev.c
+@@ -301,6 +301,20 @@ clkdev_alloc(struct clk *clk, const char *con_id, const char *dev_fmt, ...)
  }
+ EXPORT_SYMBOL(clkdev_alloc);
  
- static void intel_quark_unregister_i2c_clk(struct pci_dev *pdev)
++struct clk_lookup *
++clkdev_hw_alloc(struct clk_hw *hw, const char *con_id, const char *dev_fmt, ...)
++{
++	struct clk_lookup *cl;
++	va_list ap;
++
++	va_start(ap, dev_fmt);
++	cl = vclkdev_alloc(hw, con_id, dev_fmt, ap);
++	va_end(ap);
++
++	return cl;
++}
++EXPORT_SYMBOL(clkdev_hw_alloc);
++
+ /**
+  * clkdev_create - allocate and add a clkdev lookup structure
+  * @clk: struct clk to associate with all clk_lookups
+@@ -324,6 +338,29 @@ struct clk_lookup *clkdev_create(struct clk *clk, const char *con_id,
+ }
+ EXPORT_SYMBOL_GPL(clkdev_create);
+ 
++/**
++ * clkdev_hw_create - allocate and add a clkdev lookup structure
++ * @hw: struct clk_hw to associate with all clk_lookups
++ * @con_id: connection ID string on device
++ * @dev_fmt: format string describing device name
++ *
++ * Returns a clk_lookup structure, which can be later unregistered and
++ * freed.
++ */
++struct clk_lookup *clkdev_hw_create(struct clk_hw *hw, const char *con_id,
++	const char *dev_fmt, ...)
++{
++	struct clk_lookup *cl;
++	va_list ap;
++
++	va_start(ap, dev_fmt);
++	cl = vclkdev_create(hw, con_id, dev_fmt, ap);
++	va_end(ap);
++
++	return cl;
++}
++EXPORT_SYMBOL_GPL(clkdev_hw_create);
++
+ int clk_add_alias(const char *alias, const char *alias_dev_name,
+ 	const char *con_id, struct device *dev)
+ {
+@@ -383,3 +420,26 @@ int clk_register_clkdev(struct clk *clk, const char *con_id,
+ 	return cl ? 0 : -ENOMEM;
+ }
+ EXPORT_SYMBOL(clk_register_clkdev);
++
++/**
++ * clk_hw_register_clkdev - register one clock lookup for a struct clk_hw
++ * @hw: struct clk_hw to associate with all clk_lookups
++ * @con_id: connection ID string on device
++ * @dev_id: format string describing device name
++ *
++ * con_id or dev_id may be NULL as a wildcard, just as in the rest of
++ * clkdev.
++ */
++int clk_hw_register_clkdev(struct clk_hw *hw, const char *con_id,
++	const char *dev_fmt, ...)
++{
++	struct clk_lookup *cl;
++	va_list ap;
++
++	va_start(ap, dev_fmt);
++	cl = vclkdev_create(hw, con_id, dev_fmt, ap);
++	va_end(ap);
++
++	return cl ? 0 : -ENOMEM;
++}
++EXPORT_SYMBOL(clk_hw_register_clkdev);
+diff --git a/include/linux/clkdev.h b/include/linux/clkdev.h
+index 43a8c2e8ac29..5084295617dc 100644
+--- a/include/linux/clkdev.h
++++ b/include/linux/clkdev.h
+@@ -15,6 +15,7 @@
+ #include <asm/clkdev.h>
+ 
+ struct clk;
++struct clk_hw;
+ struct device;
+ 
+ struct clk_lookup {
+@@ -34,18 +35,24 @@ struct clk_lookup {
+ 
+ struct clk_lookup *clkdev_alloc(struct clk *clk, const char *con_id,
+ 	const char *dev_fmt, ...) __printf(3, 4);
++struct clk_lookup *clkdev_hw_alloc(struct clk_hw *hw, const char *con_id,
++	const char *dev_fmt, ...) __printf(3, 4);
+ 
+ void clkdev_add(struct clk_lookup *cl);
+ void clkdev_drop(struct clk_lookup *cl);
+ 
+ struct clk_lookup *clkdev_create(struct clk *clk, const char *con_id,
+ 	const char *dev_fmt, ...) __printf(3, 4);
++struct clk_lookup *clkdev_hw_create(struct clk_hw *hw, const char *con_id,
++	const char *dev_fmt, ...) __printf(3, 4);
+ 
+ void clkdev_add_table(struct clk_lookup *, size_t);
+ int clk_add_alias(const char *, const char *, const char *, struct device *);
+ 
+ int clk_register_clkdev(struct clk *, const char *, const char *, ...)
+ 	__printf(3, 4);
++int clk_hw_register_clkdev(struct clk_hw *, const char *, const char *, ...)
++	__printf(3, 4);
+ 
+ #ifdef CONFIG_COMMON_CLK
+ int __clk_get(struct clk *clk);
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 a Linux Foundation Collaborative Project
