@@ -1,109 +1,100 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Tue, 9 Feb 2016 19:29:26 +0800
-Subject: [PATCH v4 4/8] dt-bindings: Add a binding for Mediatek Video
- Encoder
-In-Reply-To: <1454585703-42428-5-git-send-email-tiffany.lin@mediatek.com>
-References: <1454585703-42428-1-git-send-email-tiffany.lin@mediatek.com>
- <1454585703-42428-2-git-send-email-tiffany.lin@mediatek.com>
- <1454585703-42428-3-git-send-email-tiffany.lin@mediatek.com>
- <1454585703-42428-4-git-send-email-tiffany.lin@mediatek.com>
- <1454585703-42428-5-git-send-email-tiffany.lin@mediatek.com>
-Message-ID: <CAGS+omDQW+yqhixCWPfQb9eaHeufgiEDscrvXGwBTc05+eDGCQ@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 9 Feb 2016 11:31:55 +0000
+Subject: [PATCH 3/5] irqchip/gic-v2: Parse and export virtual GIC
+ information
+In-Reply-To: <56B9CC4B.90403@arm.com>
+References: <1454950049-741-1-git-send-email-julien.grall@arm.com>
+ <1454950049-741-4-git-send-email-julien.grall@arm.com>
+ <56B8DEB8.4010509@arm.com> <56B9CC4B.90403@arm.com>
+Message-ID: <56B9CE2B.4040709@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tiffany,
+On 09/02/16 11:23, Julien Grall wrote:
+> On 08/02/16 18:30, Marc Zyngier wrote:
+>> Julien,
+> 
+> Hi Marc,
+> 
+>> On 08/02/16 16:47, Julien Grall wrote:
+> 
+> [...]
+> 
+>>> +static void __init gic_of_setup_kvm_info(struct device_node *node)
+>>> +{
+>>> +	int ret;
+>>> +	struct resource r;
+>>> +	unsigned int irq;
+>>> +
+>>> +	gic_v2_kvm_info.type = GIC_V2;
+>>> +
+>>> +	irq = irq_of_parse_and_map(node, 0);
+>>> +	if (!irq)
+>>> +		gic_v2_kvm_info.maint_irq = -1;
+>>
+>> Please don't do that. 0 *is* the value for an invalid interrupt, and
+>> this is what you should expose here. Same for GICv3.
+> 
+> I decided to use -1, because the function acpi_register_gsi is returning 
+> a negative value when an error occurred.
+> 
+> AFAICT, returning 0 would be a valid value for acpi_register_gsi.
 
-On Thu, Feb 4, 2016 at 7:34 PM, Tiffany Lin <tiffany.lin@mediatek.com> wrote:
-> Add a DT binding documentation of Video Encoder for the
-> MT8173 SoC from Mediatek.
->
-> Signed-off-by: Tiffany Lin <tiffany.lin@mediatek.com>
-> ---
->  .../devicetree/bindings/media/mediatek-vcodec.txt  |   59 ++++++++++++++++++++
->  1 file changed, 59 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/media/mediatek-vcodec.txt
->
-> diff --git a/Documentation/devicetree/bindings/media/mediatek-vcodec.txt b/Documentation/devicetree/bindings/media/mediatek-vcodec.txt
-> new file mode 100644
-> index 0000000..572bfdd
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/media/mediatek-vcodec.txt
-> @@ -0,0 +1,59 @@
-> +Mediatek Video Codec
-> +
-> +Mediatek Video Codec is the video codec hw present in Mediatek SoCs which
-> +supports high resolution encoding functionalities.
-> +
-> +Required properties:
-> +- compatible : "mediatek,mt8173-vcodec-enc" for encoder
-> +- reg : Physical base address of the video codec registers and length of
-> +  memory mapped region.
-> +- interrupts : interrupt number to the cpu.
-> +- mediatek,larb : must contain the local arbiters in the current Socs.
-> +- clocks : list of clock specifiers, corresponding to entries in
-> +  the clock-names property.
-> +- clock-names: encoder must contain "vencpll_d2", "venc_sel", "univpll1_d2",
-> +  "venc_lt_sel".
-> +- iommus : should point to the respective IOMMU block with master port as
-> +  argument, see Documentation/devicetree/bindings/iommu/mediatek,iommu.txt
-> +  for details.
-> +- mediatek,vpu : the node of video processor unit
-> +
-> +Example:
-> +vcodec_enc: vcodec at 0x18002000 {
-> +    compatible = "mediatek,mt8173-vcodec-enc";
-> +    reg = <0 0x18002000 0 0x1000>,    /*VENC_SYS*/
-> +          <0 0x19002000 0 0x1000>;    /*VENC_LT_SYS*/
+No really. It either returns -EINVAL, or the result of
+irq_create_fwspec_mapping, which is either going to return a virtual
+interrupt number (strictly positive), or zero if the mapping was impossible.
 
-This really looks like two encoder devices combined into a single
-device tree node.
-There are two register sets, two irqs, two sets of iommus, and two
-sets of clocks.
+So anything <= 0 is an error, and you can use 0 to indicate it. In
+general, there is no such thing as IRQ0 (if you're not convinced, please
+argue with Linus: http://yarchive.net/comp/linux/zero.html).
 
-If possible, please split this node into two, one for each encoder.
+>>> +	else
+>>> +		gic_v2_kvm_info.maint_irq = irq;
+>>> +
+>>> +	ret = of_address_to_resource(node, 2, &r);
+>>> +	if (!ret) {
+>>> +		gic_v2_kvm_info.vctrl_base = r.start;
+>>> +		gic_v2_kvm_info.vctrl_size = resource_size(&r);
+>>> +	}
+>>> +
+>>> +	ret = of_address_to_resource(node, 3, &r);
+>>> +	if (!ret) {
+>>> +		if (!PAGE_ALIGNED(r.start))
+>>> +			pr_warn("GICV physical address 0x%llx not page aligned\n",
+>>> +				(unsigned long long)r.start);
+>>> +		else if (!PAGE_ALIGNED(resource_size(&r)))
+>>> +			pr_warn("GICV size 0x%llx not a multiple of page size 0x%lx\n",
+>>> +				(unsigned long long)resource_size(&r),
+>>> +				PAGE_SIZE);
+>>> +		else {
+>>> +			gic_v2_kvm_info.vcpu_base = r.start;
+>>> +			gic_v2_kvm_info.vcpu_size = resource_size(&r);
+>>
+>> This tends to make me think that this should actually be a proper
+>> resource, and not a set of arbitrary fields.
+> 
+> I will give a look.
+> 
+> [..]
+> 
+>>> @@ -1270,6 +1338,12 @@ gic_acpi_parse_madt_cpu(struct acpi_subtable_header *header,
+>>>   		return -EINVAL;
+>>>
+>>>   	cpu_phy_base = gic_cpu_base;
+>>> +	acpi_data.maint_irq = processor->vgic_interrupt;
+>>> +	acpi_data.maint_irq_mode = (processor->flags & ACPI_MADT_VGIC_IRQ_MODE) ?
+>>> +				    ACPI_EDGE_SENSITIVE : ACPI_LEVEL_SENSITIVE;
+>>> +	acpi_data.vctrl_base = processor->gich_base_address;
+>>> +	acpi_data.vcpu_base = processor->gicv_base_address;
+>>> +
+>>
+>> Maybe you can now move all the ACPI data into this acpi_data structure?
+>> This would allow for slightly less clutter...
+> 
+> Good idea, I will do it in the next version.
 
+Thanks,
 
-> +    interrupts = <GIC_SPI 198 IRQ_TYPE_LEVEL_LOW>,
-> +           <GIC_SPI 202 IRQ_TYPE_LEVEL_LOW>;
-> +    mediatek,larb = <&larb3>,
-> +                   <&larb5>;
-> +    iommus = <&iommu M4U_PORT_VENC_RCPU>,
-> +             <&iommu M4U_PORT_VENC_REC>,
-> +             <&iommu M4U_PORT_VENC_BSDMA>,
-> +             <&iommu M4U_PORT_VENC_SV_COMV>,
-> +             <&iommu M4U_PORT_VENC_RD_COMV>,
-> +             <&iommu M4U_PORT_VENC_CUR_LUMA>,
-> +             <&iommu M4U_PORT_VENC_CUR_CHROMA>,
-> +             <&iommu M4U_PORT_VENC_REF_LUMA>,
-> +             <&iommu M4U_PORT_VENC_REF_CHROMA>,
-> +             <&iommu M4U_PORT_VENC_NBM_RDMA>,
-> +             <&iommu M4U_PORT_VENC_NBM_WDMA>,
-> +             <&iommu M4U_PORT_VENC_RCPU_SET2>,
-> +             <&iommu M4U_PORT_VENC_REC_FRM_SET2>,
-> +             <&iommu M4U_PORT_VENC_BSDMA_SET2>,
-> +             <&iommu M4U_PORT_VENC_SV_COMA_SET2>,
-> +             <&iommu M4U_PORT_VENC_RD_COMA_SET2>,
-> +             <&iommu M4U_PORT_VENC_CUR_LUMA_SET2>,
-> +             <&iommu M4U_PORT_VENC_CUR_CHROMA_SET2>,
-> +             <&iommu M4U_PORT_VENC_REF_LUMA_SET2>,
-> +             <&iommu M4U_PORT_VENC_REC_CHROMA_SET2>;
-> +    mediatek,vpu = <&vpu>;
-> +    clocks = <&topckgen CLK_TOP_VENCPLL_D2>,
-> +             <&topckgen CLK_TOP_VENC_SEL>,
-> +             <&topckgen CLK_TOP_UNIVPLL1_D2>,
-> +             <&topckgen CLK_TOP_VENC_LT_SEL>;
-> +    clock-names = "vencpll_d2",
-> +                  "venc_sel",
-> +                  "univpll1_d2",
-> +                  "venc_lt_sel";
-
-The names of these clocks should be from the perspective of the
-encoder, not the clock provider.
-
--Dan
-
-> +  };
-> --
-> 1.7.9.5
->
+	M.
+-- 
+Jazz is not dead. It just smells funny...
