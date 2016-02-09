@@ -1,31 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 09 Feb 2016 15:59:17 +0100
-Subject: [PATCH V2 09/12] dtb: amd: Add KCS device tree node
-In-Reply-To: <1454954357-8395-10-git-send-email-Suravee.Suthikulpanit@amd.com>
-References: <1454954357-8395-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <1454954357-8395-10-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <4018438.bPuTyoUuqf@wuerfel>
+From: krzysztof.adamski@tieto.com (Krzysztof Adamski)
+Date: Tue,  9 Feb 2016 15:58:44 +0100
+Subject: [PATCH v4 0/5] pinctrl: sunxi: Add H3 R_PIO controller support
+Message-ID: <1455029929-18547-1-git-send-email-k@japko.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 08 February 2016 11:59:14 Suravee Suthikulpanit wrote:
-> +
-> +               ipmi_kcs: kcs at e0010000 {
-> +                       status = "disabled";
-> +                       compatible = "ipmi-kcs";
-> +                       device_type = "ipmi";
-> +                       reg = <0x0 0xe0010000 0 0x8>;
-> +                       interrupts = <0 389 4>;
-> +                       interrupt-names = "ipmi_kcs";
-> +                       reg-size = <1>;
-> +                       reg-spacing = <4>;
-> +               };
->         };
-> 
+This patch series is extension of my original single patch with the same
+subject. It adds support for R_PIO so that GPIO port L can be used in H3
+based devices. It was tested on OrangePi PC where PL is connected amount
+others to an onboard led, a switch, an IR receiver and some VCC
+controllers.
 
-I see we don't have a binding file for this, can you add one please?
+Patchset is based on next-20160209.
+
+--- 
+
+Changes since v3:
+- collect some acked-bys
+- fix r_pios #interrupt-cells
+
+Changes since v2:
+- fixed apb0 parrent clocks list
+- moved binding documentation change to the proper patch
+- simplified sunxi_pinctrl_gpio_get according to ChenYu suggestions
+- fixed ordering in sunxi binding documentation
+
+Changes since v1:
+- splited patch to two separate - dtsi and c files
+- added APB0 clocks a parent for R_PIO
+- added fix in sunxi_pinctrl_gpio_get for getting pin value when in irq
+  mode and on 2nd pinctrl
+- fixed a "pwn" > "pwm" typo
+- fixed order in allwinner,sunxi-pinctrl.txt
 
 
-Why the strange name for the interrupt?
+Krzysztof Adamski (5):
+  clk: sunxi: Add apb0 gates for H3
+  dts: sun8i-h3: Add APB0 related clocks and resets
+  pinctrl: sunxi: Add H3 R_PIO controller support
+  ARM: dts: sun8i-h3: Add R_PIO controller node to the dtsi
+  pinctrl: sunxi: Use pin number when calling sunxi_pmx_set
 
-	Arnd
+ Documentation/devicetree/bindings/clock/sunxi.txt  |   1 +
+ .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   |   1 +
+ arch/arm/boot/dts/sun8i-h3.dtsi                    |  36 +++++++
+ drivers/clk/sunxi/clk-simple-gates.c               |   2 +
+ drivers/pinctrl/sunxi/Kconfig                      |   4 +
+ drivers/pinctrl/sunxi/Makefile                     |   1 +
+ drivers/pinctrl/sunxi/pinctrl-sun8i-h3-r.c         | 106 +++++++++++++++++++++
+ drivers/pinctrl/sunxi/pinctrl-sunxi.c              |   5 +-
+ 8 files changed, 154 insertions(+), 2 deletions(-)
+ create mode 100644 drivers/pinctrl/sunxi/pinctrl-sun8i-h3-r.c
+
+-- 
+2.1.4
