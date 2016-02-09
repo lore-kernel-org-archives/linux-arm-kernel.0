@@ -1,40 +1,51 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 9 Feb 2016 19:52:22 +0000
-Subject: [PATCH] arm64: Add workaround for Cavium erratum 27456
-In-Reply-To: <1455046156-10582-1-git-send-email-ddaney.cavm@gmail.com>
-References: <1455046156-10582-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <20160209195222.0882d7f7@arm.com>
+From: info@lategoodbye.de (Stefan Wahren)
+Date: Tue, 9 Feb 2016 20:54:03 +0100
+Subject: [PATCH 1/4] spi: bcm2835aux: fix bitmask defines
+In-Reply-To: <1455041435-8015-2-git-send-email-stephanolbrich@gmx.de>
+References: <1455041435-8015-1-git-send-email-stephanolbrich@gmx.de>
+ <1455041435-8015-2-git-send-email-stephanolbrich@gmx.de>
+Message-ID: <56BA43DB.7030209@lategoodbye.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue,  9 Feb 2016 11:29:16 -0800
-David Daney <ddaney.cavm@gmail.com> wrote:
+Hi Stephan,
 
-Hi David,
-
-> From: Andrew Pinski <apinski@cavium.com>
-> 
-> On ThunderX T88 pass 1.x through 2.1 parts, broadcast TLBI
-> instructions may cause the icache to become invalid if it contains
-> data for a non-current ASID.
-> 
-> This patch implements the workaround (which flushes the local icache
-> when switching the mm) by using code patching.
-> 
-> Signed-off-by: Andrew Pinski <apinski@cavium.com>
-> Signed-off-by: David Daney <david.daney@cavium.com>
+Am 09.02.2016 um 19:10 schrieb stephanolbrich at gmx.de:
+> From: Stephan Olbrich <stephanolbrich@gmx.de>
+>
+> The bitmasks for txempty and idle interrupts were interchanged.
+>
+> Signed-off-by: Stephan Olbrich <stephanolbrich@gmx.de>
 > ---
->  arch/arm64/Kconfig                  | 11 +++++++++++
->  arch/arm64/include/asm/cpufeature.h |  3 ++-
->  arch/arm64/kernel/cpu_errata.c      |  9 +++++++++
->  arch/arm64/mm/proc.S                | 12 ++++++++++++
->  4 files changed, 34 insertions(+), 1 deletion(-)
+>   drivers/spi/spi-bcm2835aux.c | 4 ++--
+>   1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/spi/spi-bcm2835aux.c b/drivers/spi/spi-bcm2835aux.c
+> index 7de6f84..ecc73c0 100644
+> --- a/drivers/spi/spi-bcm2835aux.c
+> +++ b/drivers/spi/spi-bcm2835aux.c
+> @@ -73,8 +73,8 @@
+>
+>   /* Bitfields in CNTL1 */
+>   #define BCM2835_AUX_SPI_CNTL1_CSHIGH	0x00000700
+> -#define BCM2835_AUX_SPI_CNTL1_IDLE	0x00000080
+> -#define BCM2835_AUX_SPI_CNTL1_TXEMPTY	0x00000040
 
-It would be good to update Documentation/arm64/silicon-errata.txt to
-reflect the fact that there is a workaround available for this erratum.
+according to a comment in this file these values are from 
+brcm_usrlib/dag/vmcsx/vcinclude/bcm2708_chip/aux_io.h.
 
-Thanks,
+So you want to say that at least these 2 are wrong and you took the 
+values from BCM2835-ARM-Peripherals.pdf [1]?
 
-	M.
--- 
-Jazz is not dead. It just smells funny.
+I think it's worth to mention it.
+
+Regards
+
+[1] - 
+https://www.raspberrypi.org/wp-content/uploads/2012/02/BCM2835-ARM-Peripherals.pdf
+
+> +#define BCM2835_AUX_SPI_CNTL1_TXEMPTY	0x00000080
+> +#define BCM2835_AUX_SPI_CNTL1_IDLE	0x00000040
+>   #define BCM2835_AUX_SPI_CNTL1_MSBF_IN	0x00000002
+>   #define BCM2835_AUX_SPI_CNTL1_KEEP_IN	0x00000001
+>
