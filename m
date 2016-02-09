@@ -1,203 +1,70 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue,  9 Feb 2016 18:11:41 +0000
-Subject: [PATCH] arm64: Rework valid_user_regs
-Message-ID: <1455041501-30018-1-git-send-email-mark.rutland@arm.com>
+From: stuart.yoder@nxp.com (Stuart Yoder)
+Date: Tue, 9 Feb 2016 18:12:24 +0000
+Subject: [PATCH] of/irq: Fix msi-map calculation for nonzero rid-base
+In-Reply-To: <9f6845195d03b0e0b0d187bb510fbf7bd497e836.1455015344.git.robin.murphy@arm.com>
+References: <9f6845195d03b0e0b0d187bb510fbf7bd497e836.1455015344.git.robin.murphy@arm.com>
+Message-ID: <HE1PR04MB16413597FD97D47AFB9880D78DD60@HE1PR04MB1641.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We validate pstate using PSR_MODE32_BIT, which is part of the
-user-provided pstate (and cannot be trusted). Also, we conflate
-validation of AArch32 and AArch64 pstate values, making the code
-difficult to reason about.
 
-Instead, validate the pstate value based on the associated task. The
-task may or may not be current (e.g. when using ptrace), so this must be
-passed explicitly by callers. To avoid circular header dependencies via
-sched.h, is_compat_task is pulled out of asm/ptrace.h.
 
-To make the code possible to reason about, the AArch64 and AArch32
-validation is split into separate functions. Software must respect the
-RES0 policy for SPSR bits, and thus the kernel mirrors the hardware
-policy (RAZ/WI) for bits as-yet unallocated. When these acquire an
-architected meaning writes may be permitted (potentially with additional
-validation).
+> -----Original Message-----
+> From: Robin Murphy [mailto:robin.murphy at arm.com]
+> Sent: Tuesday, February 09, 2016 5:05 AM
+> To: robh+dt at kernel.org; frowand.list at gmail.com; grant.likely at linaro.org;
+> devicetree at vger.kernel.org
+> Cc: marc.zyngier at arm.com; mark.rutland at arm.com; david.daney at cavium.com; Stuart Yoder
+> <stuart.yoder@nxp.com>; linux-arm-kernel at lists.infradead.org; linux-
+> kernel at vger.kernel.org; stable at vger.kernel.org
+> Subject: [PATCH] of/irq: Fix msi-map calculation for nonzero rid-base
+> 
+> The existing msi-map code is fine for shifting the entire RID space
+> upwards, but attempting finer-grained remapping reveals a bug. It turns
+> out that we are mistakenly treating the msi-base part as an offset, not
+> as a new base to remap onto, so things get squiffy when rid-base is
+> nonzero. Fix this, and at the same time add a sanity check against
+> having msi-map-mask clash with a nonzero rid-base, as that's another
+> thing one can easily get wrong.
+> 
+> CC: <stable@vger.kernel.org>
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+>  drivers/of/irq.c | 9 ++++++++-
+>  1 file changed, 8 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/of/irq.c b/drivers/of/irq.c
+> index 7ee21ae..e7bfc17 100644
+> --- a/drivers/of/irq.c
+> +++ b/drivers/of/irq.c
+> @@ -635,6 +635,13 @@ static u32 __of_msi_map_rid(struct device *dev, struct device_node
+> **np,
+>  		msi_base = be32_to_cpup(msi_map + 2);
+>  		rid_len = be32_to_cpup(msi_map + 3);
+> 
+> +		if (rid_base & ~map_mask) {
+> +			dev_err(parent_dev,
+> +				"Invalid msi-map translation - msi-map-mask (0x%x) ignores rid-
+> base (0x%x)\n",
+> +				map_mask, rid_base);
+> +			return rid_out;
+> +		}
+> +
+>  		msi_controller_node = of_find_node_by_phandle(phandle);
+> 
+>  		matched = (masked_rid >= rid_base &&
+> @@ -654,7 +661,7 @@ static u32 __of_msi_map_rid(struct device *dev, struct device_node
+> **np,
+>  	if (!matched)
+>  		return rid_out;
+> 
+> -	rid_out = masked_rid + msi_base;
+> +	rid_out = masked_rid - rid_base + msi_base;
+>  	dev_dbg(dev,
+>  		"msi-map at: %s, using mask %08x, rid-base: %08x, msi-base: %08x, length:
+> %08x, rid: %08x -> %08x\n",
+>  		dev_name(parent_dev), map_mask, rid_base, msi_base,
+> --
+> 2.7.0.25.gfc10eb5.dirty
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Dave Martin <dave.martin@arm.com>
-Cc: James Morse <james.morse@arm.com>
-Cc: Peter Maydell <peter.maydell@linaro.org>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/ptrace.h | 32 ++-------------------
- arch/arm64/kernel/ptrace.c      | 64 +++++++++++++++++++++++++++++++++++++++--
- arch/arm64/kernel/signal.c      |  4 +--
- arch/arm64/kernel/signal32.c    |  2 +-
- 4 files changed, 68 insertions(+), 34 deletions(-)
-
-diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
-index e9e5467..0bb538b 100644
---- a/arch/arm64/include/asm/ptrace.h
-+++ b/arch/arm64/include/asm/ptrace.h
-@@ -151,35 +151,9 @@ static inline unsigned long regs_return_value(struct pt_regs *regs)
- 	return regs->regs[0];
- }
- 
--/*
-- * Are the current registers suitable for user mode? (used to maintain
-- * security in signal handlers)
-- */
--static inline int valid_user_regs(struct user_pt_regs *regs)
--{
--	if (user_mode(regs) && (regs->pstate & PSR_I_BIT) == 0) {
--		regs->pstate &= ~(PSR_F_BIT | PSR_A_BIT);
--
--		/* The T bit is reserved for AArch64 */
--		if (!(regs->pstate & PSR_MODE32_BIT))
--			regs->pstate &= ~COMPAT_PSR_T_BIT;
--
--		return 1;
--	}
--
--	/*
--	 * Force PSR to something logical...
--	 */
--	regs->pstate &= PSR_f | PSR_s | (PSR_x & ~PSR_A_BIT) | \
--			COMPAT_PSR_T_BIT | PSR_MODE32_BIT;
--
--	if (!(regs->pstate & PSR_MODE32_BIT)) {
--		regs->pstate &= ~COMPAT_PSR_T_BIT;
--		regs->pstate |= PSR_MODE_EL0t;
--	}
--
--	return 0;
--}
-+/* We must avoid circular header include via sched.h */
-+struct task_struct;
-+int valid_user_regs(struct user_pt_regs *regs, struct task_struct *task);
- 
- #define instruction_pointer(regs)	((unsigned long)(regs)->pc)
- 
-diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index ff7f132..23c20c2 100644
---- a/arch/arm64/kernel/ptrace.c
-+++ b/arch/arm64/kernel/ptrace.c
-@@ -500,7 +500,7 @@ static int gpr_set(struct task_struct *target, const struct user_regset *regset,
- 	if (ret)
- 		return ret;
- 
--	if (!valid_user_regs(&newregs))
-+	if (!valid_user_regs(&newregs, target))
- 		return -EINVAL;
- 
- 	task_pt_regs(target)->user_regs = newregs;
-@@ -770,7 +770,7 @@ static int compat_gpr_set(struct task_struct *target,
- 
- 	}
- 
--	if (valid_user_regs(&newregs.user_regs))
-+	if (valid_user_regs(&newregs.user_regs, target))
- 		*task_pt_regs(target) = newregs;
- 	else
- 		ret = -EINVAL;
-@@ -1272,3 +1272,63 @@ asmlinkage void syscall_trace_exit(struct pt_regs *regs)
- 	if (test_thread_flag(TIF_SYSCALL_TRACE))
- 		tracehook_report_syscall(regs, PTRACE_SYSCALL_EXIT);
- }
-+
-+/*
-+ * Bits which are architecturally RES0 per ARM DDI 0487A.h
-+ * The kernel matches the HW policy. Userspace cannot use these until they have
-+ * an architectural meaning.
-+ */
-+#define SPSR_EL1_AARCH64_RES0_BITS \
-+	(GENMASK_ULL(63,32) | GENMASK_ULL(27, 22) | GENMASK_ULL(19, 10) | \
-+	 GENMASK_ULL(5, 5))
-+#define SPSR_EL1_AARCH32_RES0_BITS \
-+	(GENMASK_ULL(63,32) | (GENMASK_ULL(23, 22)))
-+
-+static int valid_aa32_regs(struct user_pt_regs *regs)
-+{
-+	regs->pstate &= ~SPSR_EL1_AARCH32_RES0_BITS;
-+
-+	if (user_mode(regs) && (regs->pstate & PSR_MODE32_BIT) &&
-+	    (regs->pstate & COMPAT_PSR_A_BIT) == 0 &&
-+	    (regs->pstate & COMPAT_PSR_I_BIT) == 0 &&
-+	    (regs->pstate & COMPAT_PSR_F_BIT) == 0) {
-+		return 1;
-+	}
-+
-+	/* Force PSR to a valid 32-bit EL0t */
-+	regs->pstate |= PSR_MODE32_BIT;
-+	regs->pstate &= PSR_f | PSR_s | (PSR_x & ~COMPAT_PSR_A_BIT) | \
-+			COMPAT_PSR_T_BIT;
-+
-+	return 0;
-+}
-+
-+static int valid_aa64_regs(struct user_pt_regs *regs)
-+{
-+	regs->pstate &= ~SPSR_EL1_AARCH64_RES0_BITS;
-+
-+	if (user_mode(regs) && !(regs->pstate & PSR_MODE32_BIT) &&
-+	    (regs->pstate & PSR_D_BIT) == 0 &&
-+	    (regs->pstate & PSR_A_BIT) == 0 &&
-+	    (regs->pstate & PSR_I_BIT) == 0 &&
-+	    (regs->pstate & PSR_F_BIT) == 0) {
-+		return 1;
-+	}
-+
-+	/* Force PSR to a valid 64-bit EL0t */
-+	regs->pstate &= PSR_f | PSR_s;
-+
-+	return 0;
-+}
-+
-+/*
-+ * Are the current registers suitable for user mode? (used to maintain
-+ * security in signal handlers)
-+ */
-+int valid_user_regs(struct user_pt_regs *regs, struct task_struct *task)
-+{
-+	if (is_compat_thread(task_thread_info(task)))
-+		return valid_aa32_regs(regs);
-+	else
-+		return valid_aa64_regs(regs);
-+}
-diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-index e18c48c..a8eafdb 100644
---- a/arch/arm64/kernel/signal.c
-+++ b/arch/arm64/kernel/signal.c
-@@ -115,7 +115,7 @@ static int restore_sigframe(struct pt_regs *regs,
- 	 */
- 	regs->syscallno = ~0UL;
- 
--	err |= !valid_user_regs(&regs->user_regs);
-+	err |= !valid_user_regs(&regs->user_regs, current);
- 
- 	if (err == 0) {
- 		struct fpsimd_context *fpsimd_ctx =
-@@ -307,7 +307,7 @@ static void handle_signal(struct ksignal *ksig, struct pt_regs *regs)
- 	/*
- 	 * Check that the resulting registers are actually sane.
- 	 */
--	ret |= !valid_user_regs(&regs->user_regs);
-+	ret |= !valid_user_regs(&regs->user_regs, current);
- 
- 	/*
- 	 * Fast forward the stepping logic so we step into the signal
-diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
-index 71ef6dc..1073356 100644
---- a/arch/arm64/kernel/signal32.c
-+++ b/arch/arm64/kernel/signal32.c
-@@ -356,7 +356,7 @@ static int compat_restore_sigframe(struct pt_regs *regs,
- 	 */
- 	regs->syscallno = ~0UL;
- 
--	err |= !valid_user_regs(&regs->user_regs);
-+	err |= !valid_user_regs(&regs->user_regs, current);
- 
- 	aux = (struct compat_aux_sigframe __user *) sf->uc.uc_regspace;
- 	if (err == 0)
--- 
-1.9.1
+Tested-by: Stuart Yoder <stuart.yoder@nxp.com>
