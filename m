@@ -1,30 +1,30 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 9 Feb 2016 19:49:20 +0100
-Subject: [PATCH v2 00/28] ARM: KVM: Rewrite the world switch in C (mostly)
-In-Reply-To: <1454583645-10144-1-git-send-email-marc.zyngier@arm.com>
-References: <1454583645-10144-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20160209184920.GB5171@cbox>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 9 Feb 2016 19:54:42 +0100
+Subject: [PATCH 0/2] ARM: shmobile: Remove legacy machine_desc.map_io()
+ callbacks
+In-Reply-To: <CAMuHMdVP8_9Nk8FQvHyVqfhK+Yhz2g0weE3nCxQeZ1wpeAEEUQ@mail.gmail.com>
+References: <1453994246-12886-1-git-send-email-geert+renesas@glider.be>
+ <20160202140738.GC4304@verge.net.au>
+ <CAMuHMdVP8_9Nk8FQvHyVqfhK+Yhz2g0weE3nCxQeZ1wpeAEEUQ@mail.gmail.com>
+Message-ID: <20160209185441.GA12049@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 04, 2016 at 11:00:17AM +0000, Marc Zyngier wrote:
-> Now that the arm64 rewrite is in mainline, I've taken a stab at fixing
-> the 32bit code the same way. This is fairly straightforward (once
-> you've been through it once...), with a few patches that adapt the
-> code to be similar to the 64bit version.
+On Mon, Feb 08, 2016 at 04:03:29PM +0100, Geert Uytterhoeven wrote:
+> Hi Simon,
 > 
-> Note that the timer and GIC code should be made common between the two
-> architectures, as this is litterally the exact same code (I've posted
-> some proof of concept for that a while ago, see
-> http://www.spinics.net/lists/kvm/msg126775.html).
+> On Tue, Feb 2, 2016 at 3:07 PM, Simon Horman <horms@verge.net.au> wrote:
+> > On Thu, Jan 28, 2016 at 04:17:24PM +0100, Geert Uytterhoeven wrote:
+> >> This patch series removes the legacy machine_desc.map_io() callback for
+> >> SoCs that no longer rely on it, but use ioremap() instead.
+> >>
+> >> The patch for emev2 depends on "ARM: shmobile: Consolidate SCU mapping
+> >> code" ("FIXME" commit ID reference to be updated).
+> >>
+> >> Thanks!
+> >
+> > Thanks, I have queued these up.
 > 
-> This has been tested on a Dual A7, and the code is pushed on a branch:
-> 
-> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm/wsinc
-> 
+> Thanks, but unfortunately it's not in renesas-devel-20160205-v4.5-rc2?
 
-This looks good overall.
-
-I tested it briefly on TC2 and it seems generally happy.
-
--Christoffer
+Sorry about that, I'll try to actually queue it up this time.
