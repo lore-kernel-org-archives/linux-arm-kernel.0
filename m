@@ -1,79 +1,46 @@
-From: codekipper@gmail.com (codekipper at gmail.com)
-Date: Tue,  9 Feb 2016 10:25:32 +0100
-Subject: [linux-sunxi][PATCH] ARM: dts: sun7i: Enable USB DRC on MK808C
-Message-ID: <1455009932-27616-1-git-send-email-codekipper@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 09 Feb 2016 10:25:33 +0100
+Subject: [PATCH v5 3/3] pci,
+ pci-thunder-ecam: Add driver for ThunderX-pass1 on-chip devices
+In-Reply-To: <20160208232430.GA1353@localhost>
+References: <1454715675-17512-1-git-send-email-ddaney.cavm@gmail.com>
+ <56B919A5.5090000@caviumnetworks.com> <20160208232430.GA1353@localhost>
+Message-ID: <12842339.z2KnaZPlyO@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marcus Cooper <codekipper@gmail.com>
+On Monday 08 February 2016 17:24:30 Bjorn Helgaas wrote:
+> > >
+> > >I assume your system conforms to expectations like these; I'm just
+> > >pointing them out because you mentioned buses with multiple devices on
+> > >them, which is definitely something one doesn't expect in PCIe.
+> > 
+> > The topology we have is currently working with the kernel's core PCI
+> > code.  I don't really want to get into discussing what the
+> > definition of PCIe is.  We have multiple devices (more than 32) on a
+> > single bus, and they have PCI Express and ARI Capabilities.  Is that
+> > PCIe?  I don't know.
+> 
+> I don't need to know the details of your topology.  As long as it
+> conforms to the PCIe spec, it should be fine.  If it *doesn't* conform
+> to the spec, but things currently seem to work, that's less fine,
+> because a future Linux change is liable to break something for you.
+> 
+> I was a little concerned about your statement that "there are multiple
+> devices residing on each bus, so from that point of view it cannot be
+> PCIe."  That made it sound like you're doing something outside the
+> spec.  If you're just using regular multi-function devices or ARI,
+> then I don't see any issue (or any reason to say it can't be PCIe).
 
-Enable the otg/drc usb controller on the MK808C.
+It doesn't conform to the PCIe port spec, because there are no external
+ports but just integrated devices in the host bridge. For this special
+case, I don't think it matters at all from the point of view of the DT
+binding whether we call the node name "pci" or "pcie".
 
-Signed-off-by: Marcus Cooper <codekipper@gmail.com>
----
- arch/arm/boot/dts/sun7i-a20-mk808c.dts | 35 ++++++++++++++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
+IIRC, even on real Open Firmware, the three companies that shipped
+PCIe (or Hypertransport, which doesn't even have a formal binding)
+based machines (Sun, IBM, Apple) were using slightly different
+bindings in practice, so I wouldn't read to much into it. Any OS
+that wants to run on real OF already has to support it either way.
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-mk808c.dts b/arch/arm/boot/dts/sun7i-a20-mk808c.dts
-index c9e648d..90ff4a2 100644
---- a/arch/arm/boot/dts/sun7i-a20-mk808c.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-mk808c.dts
-@@ -53,6 +53,7 @@
- 
- #include <dt-bindings/gpio/gpio.h>
- #include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
- 
- / {
- 	model = "mk808c";
-@@ -125,6 +126,30 @@
- 	status = "okay";
- };
- 
-+&otg_sram {
-+	status = "okay";
-+};
-+
-+&pio {
-+	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
-+		allwinner,pins = "PH4";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+
-+	usb0_vbus_detect_pin: usb0_vbus_detect_pin at 0 {
-+		allwinner,pins = "PH5";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+};
-+
-+&reg_usb0_vbus {
-+	status = "okay";
-+};
-+
- &reg_usb1_vbus {
- 	status = "okay";
- };
-@@ -145,7 +170,17 @@
- 	status = "okay";
- };
- 
-+&usb_otg {
-+	dr_mode = "otg";
-+	status = "okay";
-+};
-+
- &usbphy {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&usb0_id_detect_pin>, <&usb0_vbus_detect_pin>;
-+	usb0_id_det-gpios = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
-+	usb0_vbus_det-gpios = <&pio 7 5 GPIO_ACTIVE_HIGH>; /* PH5 */
-+	usb0_vbus-supply = <&reg_usb0_vbus>;
- 	usb1_vbus-supply = <&reg_usb1_vbus>;
- 	usb2_vbus-supply = <&reg_usb2_vbus>;
- 	status = "okay";
--- 
-2.7.1
+	Arnd
