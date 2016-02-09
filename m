@@ -1,70 +1,34 @@
-From: yang.shi@linaro.org (Shi, Yang)
-Date: Tue, 9 Feb 2016 09:17:12 -0800
-Subject: [PATCH v2] arm64: disable kasan when accessing frame->fp in
- unwind_frame
-In-Reply-To: <20160209165414.GT22874@arm.com>
-References: <1454951589-18238-1-git-send-email-yang.shi@linaro.org>
- <20160209165414.GT22874@arm.com>
-Message-ID: <56BA1F18.2020103@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 9 Feb 2016 17:20:58 +0000
+Subject: [PATCH v4 0/7] arm64: Verify early CPU features
+In-Reply-To: <1453745225-27736-1-git-send-email-suzuki.poulose@arm.com>
+References: <1453745225-27736-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20160209172057.GU22874@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/9/2016 8:54 AM, Will Deacon wrote:
-> On Mon, Feb 08, 2016 at 09:13:09AM -0800, Yang Shi wrote:
->> When boot arm64 kernel with KASAN enabled, the below error is reported by
->> kasan:
->>
->> BUG: KASAN: out-of-bounds in unwind_frame+0xec/0x260 at addr ffffffc064d57ba0
->> Read of size 8 by task pidof/499
->> page:ffffffbdc39355c0 count:0 mapcount:0 mapping:          (null) index:0x0
->> flags: 0x0()
->> page dumped because: kasan: bad access detected
->> CPU: 2 PID: 499 Comm: pidof Not tainted 4.5.0-rc1 #119
->> Hardware name: Freescale Layerscape 2085a RDB Board (DT)
->> Call trace:
->> [<ffffffc00008d078>] dump_backtrace+0x0/0x290
->> [<ffffffc00008d32c>] show_stack+0x24/0x30
->> [<ffffffc0006a981c>] dump_stack+0x8c/0xd8
->> [<ffffffc0002e4400>] kasan_report_error+0x558/0x588
->> [<ffffffc0002e4958>] kasan_report+0x60/0x70
->> [<ffffffc0002e3188>] __asan_load8+0x60/0x78
->> [<ffffffc00008c92c>] unwind_frame+0xec/0x260
->> [<ffffffc000087e60>] get_wchan+0x110/0x160
->> [<ffffffc0003b647c>] do_task_stat+0xb44/0xb68
->> [<ffffffc0003b7730>] proc_tgid_stat+0x40/0x50
->> [<ffffffc0003ac840>] proc_single_show+0x88/0xd8
->> [<ffffffc000345be8>] seq_read+0x370/0x770
->> [<ffffffc00030aba0>] __vfs_read+0xc8/0x1d8
->> [<ffffffc00030c0ec>] vfs_read+0x94/0x168
->> [<ffffffc00030d458>] SyS_read+0xb8/0x128
->> [<ffffffc000086530>] el0_svc_naked+0x24/0x28
->> Memory state around the buggy address:
->>   ffffffc064d57a80: 00 00 00 00 00 00 00 00 f1 f1 f1 f1 00 00 f4 f4
->>   ffffffc064d57b00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
->>> ffffffc064d57b80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
->>                                    ^
->>   ffffffc064d57c00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
->>   ffffffc064d57c80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
->>
->> Since the shadow byte pointed by the report is 0, so it may mean it is just hit
->> oob in non-current task. So, disable the instrumentation to silence these
->> warnings.
->
-> Curious, but how did you trigger this? I'm just trying to confirm that
-> mainline is affected, but my machine boots happily with KASAN and STACKTRACE
-> selected and I can cat /proc/self/{stack,stat} quite happily.
->
-> What am I missing?
+On Mon, Jan 25, 2016 at 06:06:58PM +0000, Suzuki K Poulose wrote:
+> From: Suzuki K. Poulose <suzuki.poulose@arm.com>
+> 
+> This series adds support for verifying some of the cpufeatures
+> that are decided early in the boot process based on the boot
+> CPU and cannot be delayed until all the CPUs are up (e.g, ASIDBits
+> and may be VHE?). It also adds support for handling the failures
+> in booting the secondary CPUs which could not be synchronised
+> with the master CPU, otherwise.
+> 
+> It also adds one of the users of this early hook, check for ASIDBits.
+> The mm_context id is based on the ASIDBits width supported by the
+> boot CPU and is used early in the initialisation. So we need to make
+> sure that all the secondary CPUs supports the width reported by the
+> booting CPU, failing which we crash the system.
+> 
+> This series has been tested on Juno, Fast model by injecting smaller
+> ASIDBits, lack of page-size support and missing features(PAN)
 
-I'm using mainline 4.5-rc1 kernel with gcc 5.2. And, my rootfs is NFS 
-mounted.
+Module the comments from Mark and Catalin on patch 4, the rest looks
+good to me:
 
-Not sure if other kernel configs, i.e tracing stuff will have impact on 
-the trigger since I'm not using the defconfig.
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-Thanks,
-Yang
-
->
-> Will
->
+Will
