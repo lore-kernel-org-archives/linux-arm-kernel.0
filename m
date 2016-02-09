@@ -1,75 +1,53 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 9 Feb 2016 10:35:13 +0000
-Subject: [PATCH v10 4/8] mfd: fsl imx25 Touchscreen ADC driver
-In-Reply-To: <6151166.y0HMDdqtvF@adelgunde>
-References: <1450101234-2191-1-git-send-email-mpa@pengutronix.de>
- <1450101234-2191-5-git-send-email-mpa@pengutronix.de>
- <20160111065441.GW3331@x1> <6151166.y0HMDdqtvF@adelgunde>
-Message-ID: <20160209103513.GC24522@x1>
+From: juri.lelli@arm.com (Juri Lelli)
+Date: Tue, 9 Feb 2016 10:37:48 +0000
+Subject: [PATCH v3 0/6] CPUs capacity information for heterogeneous systems
+In-Reply-To: <56B92BF4.4030405@linaro.org>
+References: <1454500799-18451-1-git-send-email-juri.lelli@arm.com>
+ <56B92BF4.4030405@linaro.org>
+Message-ID: <20160209103748.GP11415@e106622-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 02 Feb 2016, Markus Pargmann wrote:
+Hi Steve,
 
-> Hi,
+On 08/02/16 15:59, Steve Muckle wrote:
+> Hi Juri,
 > 
-> On Monday, January 11, 2016 06:54:41 AM Lee Jones wrote:
-> > On Mon, 14 Dec 2015, Markus Pargmann wrote:
+> On 02/03/2016 03:59 AM, Juri Lelli wrote:
+> >  v1: DT + sysfs [1]
 > > 
-> > > This is the core driver for imx25 touchscreen/adc driver. The module
-> > > has one shared ADC and two different conversion queues which use the
-> > > ADC. The two queues are identical. Both can be used for general purpose
-> > > ADC but one is meant to be used for touchscreens.
-> > > 
-> > > This driver is the core which manages the central components and
-> > > registers of the TSC/ADC unit. It manages the IRQs and forwards them to
-> > > the correct components.
-> > > 
-> > > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> > > Signed-off-by: Denis Carikli <denis@eukrea.com>
-> > > 
-> > > [ensure correct ADC clock depending on the IPG clock]
-> > > Signed-off-by: Juergen Borleis <jbe@pengutronix.de>
-> > > Acked-by: Jonathan Cameron <jic23@kernel.org>
-> > > ---
-> > > 
-> > > Notes:
-> > >     Changes in v7:
-> > >      - Cleanup bit defines in header files to be more readable
-> > >      - Fix irq check to return with an error for irq <= 0
-> > >      - Add COMPILE_TEST in Kconfig file
-> > >     
-> > >     Changes in v5:
-> > >      - Remove ifdef CONFIG_OF as this driver is only for DT usage
-> > >      - Remove module owner
-> > >      - Add Kconfig dependencies ARCH_MX25 and OF
-> > > 
-> > >  drivers/mfd/Kconfig             |   9 ++
-> > >  drivers/mfd/Makefile            |   2 +
-> > >  drivers/mfd/fsl-imx25-tsadc.c   | 203 ++++++++++++++++++++++++++++++++++++++++
-> > >  include/linux/mfd/imx25-tsadc.h | 140 +++++++++++++++++++++++++++
-> > >  4 files changed, 354 insertions(+)
-> > >  create mode 100644 drivers/mfd/fsl-imx25-tsadc.c
-> > >  create mode 100644 include/linux/mfd/imx25-tsadc.h
+> >  v2: Dynamic profiling at boot [2]
 > > 
-> > For my own reference:
-> >   Acked-by: Lee Jones <lee.jones@linaro.org>
-> > 
-> > I will apply this and sent out pull-requests to the relevant
-> > maintainers once -rc1 is out.
+> > Third version of this patchset proposes what seems to be the solution we agreed
+> > upon (see [2] for reference) to the problem of how do we init CPUs original
+> > capacity: we run a bogus benchmark (stealing int_sqrt from lib/ we run that in
+> > a loop to perform some integer computation, better benchmarks are welcome)
+> > on the first cpu of each frequency domain (assuming no u-arch differences
+> > inside domains), measure time to complete a fixed number of iterations and then
+> > normalize results to SCHED_CAPACITY_SCALE (1024). This time around we also
+> > added a boot time parameter to disable profiling at boot (as it can be time
+> > consuming) and sysfs attributes with which default values can be overwritten.
+> > The proposed solution is basically putting together bits of v1 and v2 that are
+> > considered valuable and acceptable for mainline.
 > 
-> Thanks. Do you mean just this patch or the whole series?
+> I'm still concerned that there's no way to obtain optimal boot time on a
+> heterogeneous system. Either the dynamic benchmarking is enabled, adding
+> 1 sec, or the benchmarking is skipped, and task distribution on the
+> heterogeneous CPUs is determined by the platform's CPU numbering and
+> chance, potentially impacting performance nondeterministically until
+> userspace sets the correct capacity values via sysfs.
+> 
+> I believe you tested the impact on boot time of using equal capacity
+> values and saw little difference. I'm wondering though, what was the CPU
+> numbering on that target?
+> 
 
-I will take all of the /driver patches.  The ARM patches need to go in
-through ARM-SoC via the relevant sub-arch maintainer(s).
+My targets (Juno and TC2) had big cluster on 1,2 and little on the
+remaining cpus. Why do you think this might matter?
 
-> Shall I resend the whole series to fix the commit title of the first
-> patch?
+Anyway, IMHO boot time performance is not what we are targeting here, so
+I wouldn't be too worried about this particular point.
 
-No, that's fine.  I'll handle that *this time*.
+Best,
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+- Juri
