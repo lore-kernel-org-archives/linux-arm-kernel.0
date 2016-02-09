@@ -1,37 +1,63 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 09 Feb 2016 12:14:15 +0100
-Subject: [PATCH] ARM: ks8695: fix __initdata annotation
-In-Reply-To: <20160209090030.GS13664@pengutronix.de>
-References: <1454941509-2773774-1-git-send-email-arnd@arndb.de>
- <20160209090030.GS13664@pengutronix.de>
-Message-ID: <18237653.x9qPaNvtCU@wuerfel>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Tue, 9 Feb 2016 11:19:02 +0000
+Subject: [PATCH v4 01/17] Xen: ACPI: Hide UART used by Xen
+In-Reply-To: <2213954.ztOe55fprN@vostro.rjw.lan>
+References: <1454641552-12576-1-git-send-email-zhaoshenglong@huawei.com>
+ <CAJZ5v0id-035AtyQ_SccPuCxD7+pa6GCgj3WBAojM+rFqssGQQ@mail.gmail.com>
+ <alpine.DEB.2.02.1602081054350.27008@kaball.uk.xensource.com>
+ <2213954.ztOe55fprN@vostro.rjw.lan>
+Message-ID: <alpine.DEB.2.02.1602091116240.27008@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 09 February 2016 10:00:30 Uwe Kleine-K?nig wrote:
-> > diff --git a/arch/arm/mach-ks8695/board-og.c b/arch/arm/mach-ks8695/board-og.c
-> > index 1f4f2f4f25bb..fa1a7c2ca2bb 100644
-> > --- a/arch/arm/mach-ks8695/board-og.c
-> > +++ b/arch/arm/mach-ks8695/board-og.c
-> > @@ -80,7 +80,7 @@ static void __init og_pci_bus_reset(void)
-> >  #define      S8250_VIRT      0xf4000000
-> >  #define      S8250_SIZE      0x00100000
-> >  
-> > -static struct __initdata map_desc og_io_desc[] = {
-> > +static struct map_desc __initdata og_io_desc[] = {
+On Mon, 8 Feb 2016, Rafael J. Wysocki wrote:
+> On Monday, February 08, 2016 10:57:01 AM Stefano Stabellini wrote:
+> > On Sat, 6 Feb 2016, Rafael J. Wysocki wrote:
+> > > On Fri, Feb 5, 2016 at 4:05 AM, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
+> > > > From: Shannon Zhao <shannon.zhao@linaro.org>
+> > > >
+> > > > ACPI 6.0 introduces a new table STAO to list the devices which are used
+> > > > by Xen and can't be used by Dom0. On Xen virtual platforms, the physical
+> > > > UART is used by Xen. So here it hides UART from Dom0.
+> > > >
+> > > > Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> > > > Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > > 
+> > > Well, this doesn't look right to me.
+> > > 
+> > > We need to find a nicer way to achieve what you want.
+> > 
+> > I take that you are talking about how to honor the STAO table in Linux.
+> > Do you have any concrete suggestions?
 > 
-> I would have expected that
+> I do.
 > 
-> +static struct map_desc og_io_desc[] __initdata = {
+> The last hunk of the patch is likely what it needs to be, although I'm
+> not sure if the place it is added to is the right one.  That's a minor thing,
+> though.
 > 
-> is the correct variant?
+> The other part is problematic.  Not that as it doesn't work, but because of
+> how it works.  With these changes the device will be visible to the OS (in
+> fact to user space even), but will never be "present".  I'm not sure if
+> that's what you want?
 > 
+> It might be better to add a check to acpi_bus_type_and_status() that will
+> evaluate the "should ignore?" thing and return -ENODEV if this is true.  This
+> way the device won't be visible at all.
 
-I think those two mean the exact same thing, and we have tons of examples
-for either one in the kernel, unlike the one I removed. I have
-verified that the resulting object files are identical.
+Something like below?  Actually your suggestion is better, thank you!
 
-Can you point me to some documentation that clarifies which one to use,
-and why?
-
-	Arnd
+diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
+index 78d5f02..4778c51 100644
+--- a/drivers/acpi/scan.c
++++ b/drivers/acpi/scan.c
+@@ -1455,6 +1455,9 @@ static int acpi_bus_type_and_status(acpi_handle handle, int *type,
+ 	if (ACPI_FAILURE(status))
+ 		return -ENODEV;
+ 
++	if (acpi_check_device_is_ignored(handle))
++		return -ENODEV;
++
+ 	switch (acpi_type) {
+ 	case ACPI_TYPE_ANY:		/* for ACPI_ROOT_OBJECT */
+ 	case ACPI_TYPE_DEVICE:
