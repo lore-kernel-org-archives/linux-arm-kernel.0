@@ -1,77 +1,70 @@
-From: rrichter@caviumnetworks.com (Robert Richter)
-Date: Tue, 9 Feb 2016 14:53:46 +0100
-Subject: [PATCH v4 6/6] arm64/efi: ignore DT memreserve entries instead of
- removing them
-In-Reply-To: <1455026026-11571-1-git-send-email-rrichter@caviumnetworks.com>
-References: <1455026026-11571-1-git-send-email-rrichter@caviumnetworks.com>
-Message-ID: <1455026026-11571-7-git-send-email-rrichter@caviumnetworks.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 9 Feb 2016 14:06:31 +0000
+Subject: [PATCH 2/4] iommu/arm-smmu: Allow disabling unmatched stream
+ bypass
+In-Reply-To: <10ebf5a136a787da54ffd1d6167953f82f01a834.1453830752.git.robin.murphy@arm.com>
+References: <cover.1453830752.git.robin.murphy@arm.com>
+ <10ebf5a136a787da54ffd1d6167953f82f01a834.1453830752.git.robin.murphy@arm.com>
+Message-ID: <20160209140631.GM22874@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Hi Robin,
 
-Now that the reservation of the FDT image itself is split off from
-the processing of memory reservations described by the device tree,
-we can make the DT scanning of memreserves conditional on whether
-we booted via UEFI and have its memory map available. This allows
-us to drop deletion of these memreserves in the stub. It also fixes
-the issue where the /reserved-memory node (which offers another
-way of reserving memory ranges) was not being ignored under UEFI.
+On Tue, Jan 26, 2016 at 06:06:35PM +0000, Robin Murphy wrote:
+> Borrow the disable_bypass parameter from the SMMUv3 driver as a handy
+> debugging/security feature so that unmatched stream IDs (i.e. devices
+> not attached to an IOMMU domain) may be configured to fault.
+> 
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+>  drivers/iommu/arm-smmu.c | 32 +++++++++++++++++++++++---------
+>  1 file changed, 23 insertions(+), 9 deletions(-)
+> 
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index 1f9093d..d1b7dc1 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -141,6 +141,8 @@
+>  #define ID2_PTFS_16K			(1 << 13)
+>  #define ID2_PTFS_64K			(1 << 14)
+>  
+> +#define sGFSR_USF			(1 << 1)
+> +
+>  /* Global TLB invalidation */
+>  #define ARM_SMMU_GR0_TLBIVMID		0x64
+>  #define ARM_SMMU_GR0_TLBIALLNSNH	0x68
+> @@ -263,6 +265,10 @@ static int force_stage;
+>  module_param_named(force_stage, force_stage, int, S_IRUGO);
+>  MODULE_PARM_DESC(force_stage,
+>  	"Force SMMU mappings to be installed at a particular stage of translation. A value of '1' or '2' forces the corresponding stage. All other values are ignored (i.e. no stage is forced). Note that selecting a specific stage will disable support for nested translation.");
+> +static bool disable_bypass;
+> +module_param_named(disable_bypass, disable_bypass, bool, S_IRUGO);
+> +MODULE_PARM_DESC(disable_bypass,
+> +	"Disable bypass streams such that incoming transactions from devices that are not attached to an iommu domain will report an abort back to the device and will not be allowed to pass through the SMMU.");
+>  
+>  enum arm_smmu_arch_version {
+>  	ARM_SMMU_V1 = 1,
+> @@ -704,8 +710,12 @@ static irqreturn_t arm_smmu_global_fault(int irq, void *dev)
+>  	if (!gfsr)
+>  		return IRQ_NONE;
+>  
+> -	dev_err_ratelimited(smmu->dev,
+> -		"Unexpected global fault, this could be serious\n");
+> +	if (gfsr & sGFSR_USF)
+> +		dev_err_ratelimited(smmu->dev, "Unmatched stream fault: ID 0x%x\n",
+> +				    gfsynr1 & SMR_ID_MASK);
+> +	else
 
-Note that this reverts 0ceac9e094b0 ("efi/arm64: Fix fdt-related
-memory reservation").
+I think I'd rather drop this message -- a global error is still indicative
+that something has gone horriby wrong, and we already print the gsynr
+registers below. Furthermore, if we take multiple faults, it might look
+like they're all exclusively due to unmatched streams.
 
-Acked-by: Leif Lindholm <leif.lindholm@linaro.org>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Message-Id: <1442881288-13962-7-git-send-email-ard.biesheuvel@linaro.org>
-Signed-off-by: Robert Richter <rrichter@cavium.com>
----
- arch/arm64/mm/init.c               |  3 ++-
- drivers/firmware/efi/libstub/fdt.c | 11 +----------
- 2 files changed, 3 insertions(+), 11 deletions(-)
+On top of that, I'm not convinced that USF will be set for an SMMU that
+doesn't implement stream-matching (because it will match an S2CR of type
+FAULT).
 
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index eda226e85c71..ee061658866f 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -171,7 +171,8 @@ void __init arm64_memblock_init(void)
- 		memblock_reserve(__virt_to_phys(initrd_start), initrd_end - initrd_start);
- #endif
- 
--	early_init_fdt_scan_reserved_mem();
-+	if (!efi_enabled(EFI_MEMMAP))
-+		early_init_fdt_scan_reserved_mem();
- 
- 	/* 4GB maximum for 32-bit only capable devices */
- 	if (IS_ENABLED(CONFIG_ZONE_DMA))
-diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
-index 9df1560d57bc..12cb2a30a63f 100644
---- a/drivers/firmware/efi/libstub/fdt.c
-+++ b/drivers/firmware/efi/libstub/fdt.c
-@@ -24,8 +24,7 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
- 			unsigned long map_size, unsigned long desc_size,
- 			u32 desc_ver)
- {
--	int node, num_rsv;
--	int status;
-+	int node, status;
- 	u32 fdt_val32;
- 	u64 fdt_val64;
- 
-@@ -53,14 +52,6 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
- 	if (status != 0)
- 		goto fdt_set_fail;
- 
--	/*
--	 * Delete all memory reserve map entries. When booting via UEFI,
--	 * kernel will use the UEFI memory map to find reserved regions.
--	 */
--	num_rsv = fdt_num_mem_rsv(fdt);
--	while (num_rsv-- > 0)
--		fdt_del_mem_rsv(fdt, num_rsv);
--
- 	node = fdt_subnode_offset(fdt, 0, "chosen");
- 	if (node < 0) {
- 		node = fdt_add_subnode(fdt, 0, "chosen");
--- 
-2.7.0.rc3
+Other than that, looks good.
+
+Will
