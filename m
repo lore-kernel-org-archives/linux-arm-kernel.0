@@ -1,221 +1,150 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 9 Feb 2016 18:00:42 +0100
-Subject: [PATCH v2 18/28] ARM: KVM: Add HYP mode entry code
-In-Reply-To: <1454583645-10144-19-git-send-email-marc.zyngier@arm.com>
-References: <1454583645-10144-1-git-send-email-marc.zyngier@arm.com>
- <1454583645-10144-19-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20160209170042.GA5171@cbox>
+From: fu.wei@linaro.org (fu.wei at linaro.org)
+Date: Wed, 10 Feb 2016 01:00:36 +0800
+Subject: [PATCH v11 0/4] Watchdog: introduce ARM SBSA watchdog driver
+Message-ID: <1455037240-16192-1-git-send-email-fu.wei@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 04, 2016 at 11:00:35AM +0000, Marc Zyngier wrote:
-> This part is almost entierely borrowed from the existing code, just
-> slightly simplifying the HYP function call (as we now save SPSR_hyp
-> in the world switch).
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/kvm/hyp/Makefile    |   1 +
->  arch/arm/kvm/hyp/hyp-entry.S | 157 +++++++++++++++++++++++++++++++++++++++++++
->  arch/arm/kvm/hyp/hyp.h       |   2 +
->  3 files changed, 160 insertions(+)
->  create mode 100644 arch/arm/kvm/hyp/hyp-entry.S
-> 
-> diff --git a/arch/arm/kvm/hyp/Makefile b/arch/arm/kvm/hyp/Makefile
-> index cfab402..a7d3a7e 100644
-> --- a/arch/arm/kvm/hyp/Makefile
-> +++ b/arch/arm/kvm/hyp/Makefile
-> @@ -9,4 +9,5 @@ obj-$(CONFIG_KVM_ARM_HOST) += vgic-v2-sr.o
->  obj-$(CONFIG_KVM_ARM_HOST) += vfp.o
->  obj-$(CONFIG_KVM_ARM_HOST) += banked-sr.o
->  obj-$(CONFIG_KVM_ARM_HOST) += entry.o
-> +obj-$(CONFIG_KVM_ARM_HOST) += hyp-entry.o
->  obj-$(CONFIG_KVM_ARM_HOST) += switch.o
-> diff --git a/arch/arm/kvm/hyp/hyp-entry.S b/arch/arm/kvm/hyp/hyp-entry.S
-> new file mode 100644
-> index 0000000..44bc11f
-> --- /dev/null
-> +++ b/arch/arm/kvm/hyp/hyp-entry.S
-> @@ -0,0 +1,157 @@
-> +/*
-> + * Copyright (C) 2012 - Virtual Open Systems and Columbia University
-> + * Author: Christoffer Dall <c.dall@virtualopensystems.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License, version 2, as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-> + */
-> +
-> +#include <linux/linkage.h>
-> +#include <asm/kvm_arm.h>
-> +#include <asm/kvm_asm.h>
-> +
-> +	.arch_extension     virt
-> +
-> +	.text
-> +	.pushsection	.hyp.text, "ax"
-> +
-> +.macro load_vcpu	reg
-> +	mrc	p15, 4, \reg, c13, c0, 2	@ HTPIDR
-> +.endm
-> +
-> +/********************************************************************
-> + * Hypervisor exception vector and handlers
-> + *
-> + *
-> + * The KVM/ARM Hypervisor ABI is defined as follows:
-> + *
-> + * Entry to Hyp mode from the host kernel will happen _only_ when an HVC
-> + * instruction is issued since all traps are disabled when running the host
-> + * kernel as per the Hyp-mode initialization at boot time.
-> + *
-> + * HVC instructions cause a trap to the vector page + offset 0x14 (see hyp_hvc
-> + * below) when the HVC instruction is called from SVC mode (i.e. a guest or the
-> + * host kernel) and they cause a trap to the vector page + offset 0x8 when HVC
-> + * instructions are called from within Hyp-mode.
-> + *
-> + * Hyp-ABI: Calling HYP-mode functions from host (in SVC mode):
-> + *    Switching to Hyp mode is done through a simple HVC #0 instruction. The
-> + *    exception vector code will check that the HVC comes from VMID==0.
-> + *    - r0 contains a pointer to a HYP function
-> + *    - r1, r2, and r3 contain arguments to the above function.
-> + *    - The HYP function will be called with its arguments in r0, r1 and r2.
-> + *    On HYP function return, we return directly to SVC.
-> + *
-> + * Note that the above is used to execute code in Hyp-mode from a host-kernel
-> + * point of view, and is a different concept from performing a world-switch and
-> + * executing guest code SVC mode (with a VMID != 0).
-> + */
-> +
-> +	.align 5
-> +__hyp_vector:
-> +	.global	__hyp_vector
-> +__kvm_hyp_vector:
-> +	.weak __kvm_hyp_vector
-> +
-> +	@ Hyp-mode exception vector
-> +	W(b)	hyp_reset
-> +	W(b)	hyp_undef
-> +	W(b)	hyp_svc
-> +	W(b)	hyp_pabt
-> +	W(b)	hyp_dabt
-> +	W(b)	hyp_hvc
-> +	W(b)	hyp_irq
-> +	W(b)	hyp_fiq
-> +
-> +.macro invalid_vector label, cause
-> +	.align
-> +\label:	b	.
-> +.endm
-> +
-> +	invalid_vector	hyp_reset
-> +	invalid_vector	hyp_undef
-> +	invalid_vector	hyp_svc
-> +	invalid_vector	hyp_pabt
-> +	invalid_vector	hyp_dabt
-> +	invalid_vector	hyp_fiq
-> +
-> +hyp_hvc:
-> +	/*
-> +	 * Getting here is either because of a trap from a guest,
-> +	 * or from executing HVC from the host kernel, which means
-> +	 * "do something in Hyp mode".
-> +	 */
-> +	push	{r0, r1, r2}
-> +
-> +	@ Check syndrome register
-> +	mrc	p15, 4, r1, c5, c2, 0	@ HSR
-> +	lsr	r0, r1, #HSR_EC_SHIFT
-> +	cmp	r0, #HSR_EC_HVC
-> +	bne	guest_trap		@ Not HVC instr.
-> +
-> +	/*
-> +	 * Let's check if the HVC came from VMID 0 and allow simple
-> +	 * switch to Hyp mode
-> +	 */
-> +	mrrc    p15, 6, r0, r2, c2
-> +	lsr     r2, r2, #16
-> +	and     r2, r2, #0xff
-> +	cmp     r2, #0
-> +	bne	guest_trap		@ Guest called HVC
-> +
-> +	/*
-> +	 * Getting here means host called HVC, we shift parameters and branch
-> +	 * to Hyp function.
-> +	 */
-> +	pop	{r0, r1, r2}
-> +
-> +	/* Check for __hyp_get_vectors */
-> +	cmp	r0, #-1
-> +	mrceq	p15, 4, r0, c12, c0, 0	@ get HVBAR
-> +	beq	1f
-> +
-> +	push	{lr}
-> +
-> +	mov	lr, r0
-> +	mov	r0, r1
-> +	mov	r1, r2
-> +	mov	r2, r3
-> +
-> +THUMB(	orr	lr, #1)
-> +	blx	lr			@ Call the HYP function
-> +
-> +	pop	{lr}
-> +1:	eret
-> +
-> +guest_trap:
-> +	load_vcpu r0			@ Load VCPU pointer to r0
-> +
-> +	@ Check if we need the fault information
+From: Fu Wei <fu.wei@linaro.org>
 
-nit: this is not about faults at this point, so this comment should
-either go or be reworded to "let's check if we trapped on guest VFP
-access"
+This patchset:
+    (1)Introduce Documentation/devicetree/bindings/watchdog/sbsa-gwdt.txt
+    for FDT info of SBSA Generic Watchdog, and give two examples of
+    adding SBSA Generic Watchdog device node into the dts files:
+    foundation-v8.dts and amd-seattle-soc.dtsi.
 
-and I think the lsr can be moved into the ifdef as well.
+    (2)Introduce ARM SBSA watchdog driver:
+        a.Use linux kernel watchdog framework;
+        b.Work with FDT on ARM64;
+        c.Support getting timeout from parameter and FDT at the driver
+          init stage.
+        d.The driver works in two modes:
+          (1) single stage timeout (ignore WS0 interrupt)
+          (2) two stages timeout (register WS0 interrupt, do panic in routine)
+        e.User can config working mode by module parameter "action".
 
-> +	lsr	r1, r1, #HSR_EC_SHIFT
-> +#ifdef CONFIG_VFPv3
-> +	cmp	r1, #HSR_EC_CP_0_13
-> +	beq	__vfp_guest_restore
-> +#endif
-> +
-> +	mov	r1, #ARM_EXCEPTION_HVC
-> +	b	__guest_exit
-> +
-> +hyp_irq:
-> +	push	{r0, r1, r2}
-> +	mov	r1, #ARM_EXCEPTION_IRQ
-> +	load_vcpu r0			@ Load VCPU pointer to r0
-> +	b	__guest_exit
-> +
-> +	.ltorg
-> +
-> +	.popsection
-> diff --git a/arch/arm/kvm/hyp/hyp.h b/arch/arm/kvm/hyp/hyp.h
-> index 7ddca54..8bbd2a7 100644
-> --- a/arch/arm/kvm/hyp/hyp.h
-> +++ b/arch/arm/kvm/hyp/hyp.h
-> @@ -123,4 +123,6 @@ void __hyp_text __banked_restore_state(struct kvm_cpu_context *ctxt);
->  
->  int asmlinkage __guest_enter(struct kvm_vcpu *vcpu,
->  			     struct kvm_cpu_context *host);
-> +int asmlinkage __hyp_do_panic(const char *, int, u32);
-> +
->  #endif /* __ARM_KVM_HYP_H__ */
-> -- 
-> 2.1.4
-> 
-Otherwise looke good.
+This patchset has been tested with watchdog daemon
+(ACPI/FDT, module/build-in) on the following platforms:
+    (1)ARM Foundation v8 model
+    (2)AMD Seattle platform
 
-Thanks,
--Christoffer
+This patchset has been tested with kdump successfully.
+
+Changelog:
+v11:Merge patch 4 and 5.
+    Improve some comments.
+    The driver works in two modes, it's configured by "action"(instead of
+    panic_enabled).
+    Improve the initialization of the timeout limits.
+    Feeding dog by writing "0" to WRR.
+
+v10:https://lkml.org/lkml/2016/2/3/817
+    Delete pretimeout support.
+    Separate the driver to two parts:
+        (1) single stage timeout driver(ignore WS0 interrupt);
+        (2) register WS0 interrupt for the half timeout panic.
+    timeout == (enable --> WS1).
+
+v9: https://lkml.org/lkml/2015/11/9/57
+    Rebase to latest kernel version(4.3).
+    Update the Documentation of sbsa-gwdt device node info of FDT:
+        (1) move some introduction to pretimeout patch
+        (2) delete WS1 value from "interrupts" of binding documentation,
+            since WS1 won't be handled by Linux.
+
+v8: https://lkml.org/lkml/2015/10/27/466
+    Rebase to latest kernel version(4.3-rc7).
+    Separate the patches of GTDT support and arm_arch_timer. This
+    clocksource relevant patch will upstreamed in a individual patchset.
+    Update all the default timeout and pretimeout to 30s and 60s.
+    Improve documentation and inline comments.
+    Fix a bug in pretimeout support which makes timeout and pretimeout
+    parameters initialization fail.
+
+v7: https://lkml.org/lkml/2015/8/24/611
+    Rebase to latest kernel version(4.2-rc7).
+    Improve FDT support: geting resource by order, instead of name.
+    According to the FDT support, Update the example dts file, gtdt.c
+    and sbsa_gwdt.c.
+    Pass the sparse test, and fix the warning.
+    Fix the max_pretimeout and max_timeout value overflow bug.
+    Delete the WCV output value.
+    
+
+v6: https://lkml.org/lkml/2015/6/23/359
+    Improve the dtb example files: reduce the register frame size to 4K.
+    Improve pretimeout support:
+        (1) improve watchdog_init_timeouts function
+	(2) rename watchdog_check_min_max_timeouts back to the original name
+        (1) improve watchdog_timeout_invalid/watchdog_pretimeout_invalid
+    Add the new features in the sbsa_gwdt driver:
+	(1) In the second stage, user can feed the dog without cleaning WS0.
+	(2) In the second stage, user can trigger WS1 by setting pretimeout = 0.
+	(3) expand the max value of pretimeout, in case 10 second is not enough
+	    for a kdump kernel reboot in panic.
+
+v5: https://lkml.org/lkml/2015/6/10/357
+    Improve pretimeout support:
+        (1)fix typo in documentation and comments.
+	(2)fix the timeout limits validation bug.
+    Simplify sbsa_gwdt driver:
+	(1)integrate all the registers access functions into caller.
+
+v4: https://lkml.org/lkml/2015/6/2/4
+    Refactor GTDT support code: remove it from arch/arm64/kernel/acpi.c,
+    put it into drivers/acpi/gtdt.c file.
+    Integrate the GTDT code of drivers/clocksource/arm_arch_timer.c into
+    drivers/acpi/gtdt.c.
+    Improve pretimeout support, fix "pretimeout == 0" problem.
+    Simplify sbsa_gwdt driver:
+        (1)timeout/pretimeout limits setup;
+        (2)keepalive function;
+        (3)delete "clk == 0" check;
+        (4)delete WS0 status bit check in interrupt routine;
+        (5)sbsa_gwdt_set_wcv function.
+
+v3: https://lkml.org/lkml/2015/5/25/111
+    Delete "export arch_timer_get_rate" patch.
+    Driver back to use arch_timer_get_cntfrq.
+    Improve watchdog_init_timeouts function and update relevant documentation.
+    Improve watchdog_timeout_invalid and watchdog_pretimeout_invalid.
+    Improve foundation-v8.dts: delete the unnecessary tag of device node.
+    Remove "ARM64 || COMPILE_TEST" from Kconfig.
+    Add comments in arch/arm64/kernel/acpi.c
+    Fix typoes and incorrect comments.
+
+v2: https://lkml.org/lkml/2015/5/21/172
+    Improve watchdog-kernel-api.txt documentation for pretimeout support.
+    Export "arch_timer_get_rate" in arm_arch_timer.c.
+    Add watchdog_init_timeouts API for pretimeout support in framework.
+    Improve suspend and resume foundation in driver
+    Improve timeout/pretimeout values init code in driver.
+    Delete unnecessary items of the sbsa_gwdt struct and #define.
+    Delete all unnecessary debug info in driver.
+    Fix 64bit division bug.
+    Use the arch_timer interface to get watchdog clock rate.
+    Add MODULE_DEVICE_TABLE for platform device id.
+    Fix typoes.
+
+v1: https://lkml.org/lkml/2015/5/15/279
+    The first version upstream patchset to linux mailing list.
+
+Fu Wei (4):
+  Documentation: add sbsa-gwdt driver documentation
+  ARM64: add SBSA Generic Watchdog device node in foundation-v8.dts
+  ARM64: add SBSA Generic Watchdog device node in amd-seattle-soc.dtsi
+  Watchdog: introduce ARM SBSA watchdog driver
+
+ .../devicetree/bindings/watchdog/sbsa-gwdt.txt     |  35 ++
+ Documentation/watchdog/watchdog-parameters.txt     |   7 +
+ arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi       |   9 +
+ arch/arm64/boot/dts/arm/foundation-v8.dts          |   8 +
+ drivers/watchdog/Kconfig                           |  20 +
+ drivers/watchdog/Makefile                          |   1 +
+ drivers/watchdog/sbsa_gwdt.c                       | 403 +++++++++++++++++++++
+ 7 files changed, 483 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/watchdog/sbsa-gwdt.txt
+ create mode 100644 drivers/watchdog/sbsa_gwdt.c
+
+-- 
+2.5.0
