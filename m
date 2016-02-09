@@ -1,51 +1,48 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Tue, 9 Feb 2016 04:08:23 +0100
-Subject: [PATCH v2 06/10] ARM64: dts: rockchip: Add IR receiver to GeekBox
-In-Reply-To: <1454897859-7601-7-git-send-email-afaerber@suse.de>
-References: <1454897859-7601-1-git-send-email-afaerber@suse.de>
- <1454897859-7601-7-git-send-email-afaerber@suse.de>
-Message-ID: <56B95827.7060204@suse.de>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 9 Feb 2016 08:51:05 +0530
+Subject: [PATCH v7 0/9] Fix broken DMAFLUSHP on Rockchips platform
+In-Reply-To: <2223201.4nEkyUQu1O@phil>
+References: <1453460812-8498-1-git-send-email-wxt@rock-chips.com>
+ <3817335.PXCk0JfYDT@phil> <20160208131419.GA19598@localhost>
+ <2223201.4nEkyUQu1O@phil>
+Message-ID: <20160209032105.GD19598@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 08.02.2016 um 03:17 schrieb Andreas F?rber:
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> ---
->  v2: New
->  
->  arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
+On Mon, Feb 08, 2016 at 11:21:57PM +0100, Heiko Stuebner wrote:
+> Hi Vinod,
 > 
-> diff --git a/arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts b/arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts
-> index e4523a74050f..e84383fd6f10 100644
-> --- a/arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts
-> +++ b/arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts
-> @@ -63,6 +63,13 @@
->  		#clock-cells = <0>;
->  	};
->  
-> +	ir: ir-receiver {
-> +		compatible = "gpio-ir-receiver";
-> +		gpios = <&gpio3 30 GPIO_ACTIVE_LOW>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&ir_int>;
+> Am Montag, 8. Februar 2016, 18:44:19 schrieb Vinod Koul:
+> > On Mon, Feb 08, 2016 at 10:27:04AM +0100, Heiko Stuebner wrote:
+> > > Am Montag, 8. Februar 2016, 08:41:34 schrieb Vinod Koul:
+> > > > On Mon, Feb 01, 2016 at 02:56:54PM +0800, Caesar Wang wrote:
+> > > > > Hello Vinod,
+> > > > > 
+> > > > > Is there any chance apply the DMA patches?:-)
+> > > > 
+> > > > I was waiting for any ACKs on ARM patches before I merge this series.
+> > > 
+> > > I think the more regular way is for the driver maintainer to take the
+> > > driver-specific stuff and the devicetree parts going through the
+> > > specific arm- tree. But if you really want to take the whole series,
+> > > for patches 4,5,6
+> > Yes but that causes cross tree dependencies, which looking at this won't
+> > be a big problem, so I can safely merge dmaengine changes and rest can go
+> > thru ARM tree.
+> > 
+> > Typically submitter should say which tree he/she prefers, which was not
+> > provided..
+> > 
+> > So, are all okay to merge the entire series thru dmaengine tree or
+> > independent. I don't mind either
+> 
+> In general I don't mind either solution, but would prefer me taking the 3 
+> "ARM: dts: foo" patches, while the rest would go through your tree.
+> 
+> Main reason is to prevent any possible conflicts with other Rockchip 
+> devicetree additions also going into 4.6 .
 
-		status = "disabled";
-
-Should only be enabled in the new Landingship config. Will fix.
-
-Andreas
-
-P.S. See Heiko, two bugs in the new nodes already, glad I have them
-separate. :)
-
-> +	};
-> +
->  	leds: gpio-leds {
->  		compatible = "gpio-leds";
->  
-[snip]
+Sounds good, will queue them up
 
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton; HRB 21284 (AG N?rnberg)
+~Vinod
