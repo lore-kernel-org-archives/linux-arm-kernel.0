@@ -1,55 +1,39 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue,  9 Feb 2016 10:31:02 +0100
-Subject: [PATCH v3 3/3] kallsyms: remove --page-offset command line option
+Date: Tue,  9 Feb 2016 10:31:01 +0100
+Subject: [PATCH v3 2/3] kallsyms: remove special lower address limit for
+ CONFIG_ARM
 In-Reply-To: <1455010262-28894-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1455010262-28894-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1455010262-28894-4-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1455010262-28894-3-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The --page-offset command line option was only used for ARM, to filter
-symbol addresses below CONFIG_PAGE_OFFSET. This is no longer needed, so
-remove the functionality altogether.
+Now that we no longer emit .stubs symbols into a section VMA loaded
+at absolute address 0x1000, we can drop the ARM-specific override that
+sets a lower limit based on CONFIG_PAGE_OFFSET, below which symbols are
+filtered from the kallsyms output.
 
 Acked-by: Nicolas Pitre <nico@linaro.org>
 Acked-by: Chris Brandt <chris.brandt@renesas.com>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- scripts/kallsyms.c | 8 --------
- 1 file changed, 8 deletions(-)
+ scripts/link-vmlinux.sh | 4 ----
+ 1 file changed, 4 deletions(-)
 
-diff --git a/scripts/kallsyms.c b/scripts/kallsyms.c
-index 638b143ee60f..de9b74b083c2 100644
---- a/scripts/kallsyms.c
-+++ b/scripts/kallsyms.c
-@@ -63,7 +63,6 @@ static unsigned int table_size, table_cnt;
- static int all_symbols = 0;
- static int absolute_percpu = 0;
- static char symbol_prefix_char = '\0';
--static unsigned long long kernel_start_addr = 0;
- static int base_relative = 0;
+diff --git a/scripts/link-vmlinux.sh b/scripts/link-vmlinux.sh
+index 49d61ade9425..f0f6d9d75435 100755
+--- a/scripts/link-vmlinux.sh
++++ b/scripts/link-vmlinux.sh
+@@ -82,10 +82,6 @@ kallsyms()
+ 		kallsymopt="${kallsymopt} --all-symbols"
+ 	fi
  
- int token_profit[0x10000];
-@@ -228,10 +227,6 @@ static int symbol_valid(struct sym_entry *s)
- 	int i;
- 	char *sym_name = (char *)s->sym + 1;
- 
+-	if [ -n "${CONFIG_ARM}" ] && [ -z "${CONFIG_XIP_KERNEL}" ] && [ -n "${CONFIG_PAGE_OFFSET}" ]; then
+-		kallsymopt="${kallsymopt} --page-offset=$CONFIG_PAGE_OFFSET"
+-	fi
 -
--	if (s->addr < kernel_start_addr)
--		return 0;
--
- 	/* skip prefix char */
- 	if (symbol_prefix_char && *sym_name == symbol_prefix_char)
- 		sym_name++;
-@@ -765,9 +760,6 @@ int main(int argc, char **argv)
- 				if ((*p == '"' && *(p+2) == '"') || (*p == '\'' && *(p+2) == '\''))
- 					p++;
- 				symbol_prefix_char = *p;
--			} else if (strncmp(argv[i], "--page-offset=", 14) == 0) {
--				const char *p = &argv[i][14];
--				kernel_start_addr = strtoull(p, NULL, 16);
- 			} else if (strcmp(argv[i], "--base-relative") == 0)
- 				base_relative = 1;
- 			else
+ 	if [ -n "${CONFIG_KALLSYMS_ABSOLUTE_PERCPU}" ]; then
+ 		kallsymopt="${kallsymopt} --absolute-percpu"
+ 	fi
 -- 
 2.5.0
