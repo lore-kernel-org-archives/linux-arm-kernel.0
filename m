@@ -1,42 +1,43 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 9 Feb 2016 13:46:57 +0200
-Subject: [PATCH] ARM: DTS: am57xx-beagle-x15: Select SYS_CLK2 for audio clocks
-Message-ID: <1455018417-2608-1-git-send-email-peter.ujfalusi@ti.com>
+From: kernel@martin.sperl.org (kernel at martin.sperl.org)
+Date: Tue,  9 Feb 2016 11:47:16 +0000
+Subject: [PATCH] serial: bcm2835: fix unsigned int issue with irq
+Message-ID: <1455018437-2405-1-git-send-email-kernel@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The tlv320aic3104 codec's master clock is coming from the SoC's CLKOUT2.
-Select the SYS_CLK2 (via divider) as parent clock for CLKOUT2 and select
-the same clock (SYS_CLK2) for McASP3 AHCLKX clock as well.
-SYS_CLK2 is sourced from an external oscillator running 22.5792MHz and it
-is coming in to the SoC via the X1_OSC1.
+From: Martin Sperl <kernel@martin.sperl.org>
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Fixes error condition check when requesting the irq,
+that would not trigger because of uart_port.irq being
+defined as unsigned int.
+
+Reported by: Dan Carpenter <dan.carpenter@oracle.com>
+Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
 ---
- arch/arm/boot/dts/am57xx-beagle-x15.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/tty/serial/8250/8250_bcm2835aux.c |   10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-index c37a5193f199..592e65c3a4e0 100644
---- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
-+++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-@@ -173,6 +173,8 @@
+diff --git a/drivers/tty/serial/8250/8250_bcm2835aux.c b/drivers/tty/serial/8250/8250_bcm2835aux.c
+index ecf89f1..e10f124 100644
+--- a/drivers/tty/serial/8250/8250_bcm2835aux.c
++++ b/drivers/tty/serial/8250/8250_bcm2835aux.c
+@@ -59,12 +59,12 @@ static int bcm2835aux_serial_probe(struct platform_device *pdev)
+ 	}
  
- 		sound0_master: simple-audio-card,codec {
- 			sound-dai = <&tlv320aic3104>;
-+			assigned-clocks = <&clkoutmux2_clk_mux>;
-+			assigned-clock-parents = <&sys_clk2_dclk_div>;
- 			clocks = <&clkout2_clk>;
- 		};
- 	};
-@@ -795,6 +797,8 @@
- 	pinctrl-names = "default", "sleep";
- 	pinctrl-0 = <&mcasp3_pins_default>;
- 	pinctrl-1 = <&mcasp3_pins_sleep>;
-+	assigned-clocks = <&mcasp3_ahclkx_mux>;
-+	assigned-clock-parents = <&sys_clkin2>;
- 	status = "okay";
+ 	/* get the interrupt */
+-	data->uart.port.irq = platform_get_irq(pdev, 0);
+-	if (data->uart.port.irq < 0) {
+-		dev_err(&pdev->dev, "irq not found - %i",
+-			data->uart.port.irq);
+-		return data->uart.port.irq;
++	ret = platform_get_irq(pdev, 0);
++	if (ret < 0) {
++		dev_err(&pdev->dev, "irq not found - %i", ret);
++		return ret;
+ 	}
++	data->uart.port.irq = ret;
  
- 	op-mode = <0>;	/* MCASP_IIS_MODE */
+ 	/* map the main registers */
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 -- 
-2.7.1
+1.7.10.4
