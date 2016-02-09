@@ -1,195 +1,71 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon,  8 Feb 2016 17:45:33 -0800
-Subject: [PATCH 06/14] clk: divider: Add hw based registration APIs
-In-Reply-To: <1454982341-22715-1-git-send-email-sboyd@codeaurora.org>
-References: <1454982341-22715-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1454982341-22715-7-git-send-email-sboyd@codeaurora.org>
+Date: Mon,  8 Feb 2016 17:45:27 -0800
+Subject: [PATCH 00/14] clk_hw based clkdev/DT providers
+Message-ID: <1454982341-22715-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add registration APIs in the clk divider code to return struct
-clk_hw pointers instead of struct clk pointers. This way we hide
-the struct clk pointer from providers unless they need to use
-consumer facing APIs.
+We've mostly split the clk API between consumers and providers
+along struct clk and struct clk_hw, but the registration and
+clkdev/DT code is still struct clk focused. This series
+lays the foundation for changing that design by making
+clk_register() return an int instead of a struct clk and
+clkdev/DT lookups take a struct clk_hw instead of a struct clk.
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/clk/clk-divider.c    | 91 ++++++++++++++++++++++++++++++++++++++++----
- include/linux/clk-provider.h | 10 +++++
- 2 files changed, 93 insertions(+), 8 deletions(-)
+After this series is applied, we can avoid using struct clk
+in provider drivers entirely, unless we want to use the consumer
+APIs. There are quite a few registration callers, so this change
+will require converting all of them. I plan to do that gradually
+over the coming weeks, but I've included a change to qcom
+platforms because I could easily test it and show how things
+will work.
 
-diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-index ded3ff4b91b9..65ea60c32856 100644
---- a/drivers/clk/clk-divider.c
-+++ b/drivers/clk/clk-divider.c
-@@ -423,15 +423,16 @@ const struct clk_ops clk_divider_ops = {
- };
- EXPORT_SYMBOL_GPL(clk_divider_ops);
- 
--static struct clk *_register_divider(struct device *dev, const char *name,
-+static struct clk_hw *_register_divider(struct device *dev, const char *name,
- 		const char *parent_name, unsigned long flags,
- 		void __iomem *reg, u8 shift, u8 width,
- 		u8 clk_divider_flags, const struct clk_div_table *table,
- 		spinlock_t *lock)
- {
- 	struct clk_divider *div;
--	struct clk *clk;
-+	struct clk_hw *hw;
- 	struct clk_init_data init;
-+	int ret;
- 
- 	if (clk_divider_flags & CLK_DIVIDER_HIWORD_MASK) {
- 		if (width + shift > 16) {
-@@ -461,12 +462,14 @@ static struct clk *_register_divider(struct device *dev, const char *name,
- 	div->table = table;
- 
- 	/* register the clock */
--	clk = clk_register(dev, &div->hw);
--
--	if (IS_ERR(clk))
-+	hw = &div->hw;
-+	ret = clk_hw_register(dev, hw);
-+	if (ret) {
- 		kfree(div);
-+		hw = ERR_PTR(ret);
-+	}
- 
--	return clk;
-+	return hw;
- }
- 
- /**
-@@ -486,12 +489,39 @@ struct clk *clk_register_divider(struct device *dev, const char *name,
- 		void __iomem *reg, u8 shift, u8 width,
- 		u8 clk_divider_flags, spinlock_t *lock)
- {
--	return _register_divider(dev, name, parent_name, flags, reg, shift,
-+	struct clk_hw *hw;
-+
-+	hw =  _register_divider(dev, name, parent_name, flags, reg, shift,
- 			width, clk_divider_flags, NULL, lock);
-+	if (IS_ERR(hw))
-+		return ERR_CAST(hw);
-+	return hw->clk;
- }
- EXPORT_SYMBOL_GPL(clk_register_divider);
- 
- /**
-+ * clk_hw_register_divider - register a divider clock with the clock framework
-+ * @dev: device registering this clock
-+ * @name: name of this clock
-+ * @parent_name: name of clock's parent
-+ * @flags: framework-specific flags
-+ * @reg: register address to adjust divider
-+ * @shift: number of bits to shift the bitfield
-+ * @width: width of the bitfield
-+ * @clk_divider_flags: divider-specific flags for this clock
-+ * @lock: shared register lock for this clock
-+ */
-+struct clk_hw *clk_hw_register_divider(struct device *dev, const char *name,
-+		const char *parent_name, unsigned long flags,
-+		void __iomem *reg, u8 shift, u8 width,
-+		u8 clk_divider_flags, spinlock_t *lock)
-+{
-+	return _register_divider(dev, name, parent_name, flags, reg, shift,
-+			width, clk_divider_flags, NULL, lock);
-+}
-+EXPORT_SYMBOL_GPL(clk_hw_register_divider);
-+
-+/**
-  * clk_register_divider_table - register a table based divider clock with
-  * the clock framework
-  * @dev: device registering this clock
-@@ -511,11 +541,41 @@ struct clk *clk_register_divider_table(struct device *dev, const char *name,
- 		u8 clk_divider_flags, const struct clk_div_table *table,
- 		spinlock_t *lock)
- {
--	return _register_divider(dev, name, parent_name, flags, reg, shift,
-+	struct clk_hw *hw;
-+
-+	hw =  _register_divider(dev, name, parent_name, flags, reg, shift,
- 			width, clk_divider_flags, table, lock);
-+	if (IS_ERR(hw))
-+		return ERR_CAST(hw);
-+	return hw->clk;
- }
- EXPORT_SYMBOL_GPL(clk_register_divider_table);
- 
-+/**
-+ * clk_hw_register_divider_table - register a table based divider clock with
-+ * the clock framework
-+ * @dev: device registering this clock
-+ * @name: name of this clock
-+ * @parent_name: name of clock's parent
-+ * @flags: framework-specific flags
-+ * @reg: register address to adjust divider
-+ * @shift: number of bits to shift the bitfield
-+ * @width: width of the bitfield
-+ * @clk_divider_flags: divider-specific flags for this clock
-+ * @table: array of divider/value pairs ending with a div set to 0
-+ * @lock: shared register lock for this clock
-+ */
-+struct clk_hw *clk_hw_register_divider_table(struct device *dev,
-+		const char *name, const char *parent_name, unsigned long flags,
-+		void __iomem *reg, u8 shift, u8 width,
-+		u8 clk_divider_flags, const struct clk_div_table *table,
-+		spinlock_t *lock)
-+{
-+	return _register_divider(dev, name, parent_name, flags, reg, shift,
-+			width, clk_divider_flags, table, lock);
-+}
-+EXPORT_SYMBOL_GPL(clk_hw_register_divider_table);
-+
- void clk_unregister_divider(struct clk *clk)
- {
- 	struct clk_divider *div;
-@@ -531,3 +591,18 @@ void clk_unregister_divider(struct clk *clk)
- 	kfree(div);
- }
- EXPORT_SYMBOL_GPL(clk_unregister_divider);
-+
-+/**
-+ * clk_hw_unregister_divider - unregister a clk divider
-+ * @hw: hardware-specific clock data to unregister
-+ */
-+void clk_hw_unregister_divider(struct clk_hw *hw)
-+{
-+	struct clk_divider *div;
-+
-+	div = to_clk_divider(hw);
-+
-+	clk_hw_unregister(hw);
-+	kfree(div);
-+}
-+EXPORT_SYMBOL_GPL(clk_hw_unregister_divider);
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 1af1afae05f8..666462958ef2 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -400,12 +400,22 @@ struct clk *clk_register_divider(struct device *dev, const char *name,
- 		const char *parent_name, unsigned long flags,
- 		void __iomem *reg, u8 shift, u8 width,
- 		u8 clk_divider_flags, spinlock_t *lock);
-+struct clk_hw *clk_hw_register_divider(struct device *dev, const char *name,
-+		const char *parent_name, unsigned long flags,
-+		void __iomem *reg, u8 shift, u8 width,
-+		u8 clk_divider_flags, spinlock_t *lock);
- struct clk *clk_register_divider_table(struct device *dev, const char *name,
- 		const char *parent_name, unsigned long flags,
- 		void __iomem *reg, u8 shift, u8 width,
- 		u8 clk_divider_flags, const struct clk_div_table *table,
- 		spinlock_t *lock);
-+struct clk_hw *clk_hw_register_divider_table(struct device *dev,
-+		const char *name, const char *parent_name, unsigned long flags,
-+		void __iomem *reg, u8 shift, u8 width,
-+		u8 clk_divider_flags, const struct clk_div_table *table,
-+		spinlock_t *lock);
- void clk_unregister_divider(struct clk *clk);
-+void clk_hw_unregister_divider(struct clk_hw *hw);
- 
- /**
-  * struct clk_mux - multiplexer clock
+The first two patches are cleanups to clkdev APIs that I found
+while doing this work. I'd like to take those into clk-next
+with the appropriate acks. They're mostly included because
+they cause merge conflicts otherwise.
+
+Cc: Lee Jones <lee.jones@linaro.org>
+Cc: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+
+Stephen Boyd (14):
+  mfd: intel_quark_i2c_gpio: Use clkdev_create()
+  clkdev: Remove clk_register_clkdevs()
+  clk: Add {devm_}clk_hw_{register,unregister}() APIs
+  clk: Add clk_hw OF clk providers
+  clkdev: Add clk_hw based registration APIs
+  clk: divider: Add hw based registration APIs
+  clk: gate: Add hw based registration APIs
+  clk: mux: Add hw based registration APIs
+  clk: fixed-factor: Add hw based registration APIs
+  clk: fractional-divider: Add hw based registration APIs
+  clk: composite: Add hw based registration APIs
+  clk: gpio: Add hw based registration APIs
+  clk: fixed-rate: Add hw based registration APIs
+  clk: qcom: Migrate to clk_hw based registration and OF APIs
+
+ Documentation/driver-model/devres.txt |   1 +
+ drivers/clk/clk-composite.c           |  45 ++++++---
+ drivers/clk/clk-divider.c             |  91 ++++++++++++++++--
+ drivers/clk/clk-fixed-factor.c        |  41 ++++++--
+ drivers/clk/clk-fixed-rate.c          |  44 +++++++--
+ drivers/clk/clk-fractional-divider.c  |  40 +++++++-
+ drivers/clk/clk-gate.c                |  43 +++++++--
+ drivers/clk/clk-gpio.c                |  52 ++++++++---
+ drivers/clk/clk-mux.c                 |  57 ++++++++++--
+ drivers/clk/clk.c                     | 170 +++++++++++++++++++++++++++++++++-
+ drivers/clk/clkdev.c                  |  71 ++++++++++----
+ drivers/clk/qcom/clk-regmap.c         |   5 +-
+ drivers/clk/qcom/clk-regmap.h         |   3 +-
+ drivers/clk/qcom/common.c             |  41 ++++----
+ drivers/clk/qcom/gcc-msm8996.c        |   9 +-
+ drivers/clk/qcom/mmcc-msm8996.c       |   9 +-
+ drivers/mfd/intel_quark_i2c_gpio.c    |  26 ++----
+ include/linux/clk-provider.h          |  92 ++++++++++++++++++
+ include/linux/clkdev.h                |   8 +-
+ 19 files changed, 706 insertions(+), 142 deletions(-)
+
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 a Linux Foundation Collaborative Project
