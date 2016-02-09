@@ -1,24 +1,53 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Tue, 9 Feb 2016 10:07:58 -0500
-Subject: [PATCH] arm64: replace read_lock to rcu lock in call_step_hook
-In-Reply-To: <20160209145426.GR22874@arm.com>
-References: <1454971764-30720-1-git-send-email-yang.shi@linaro.org>
- <20160209145426.GR22874@arm.com>
-Message-ID: <20160209100758.69d9006f@gandalf.local.home>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue,  9 Feb 2016 07:08:59 -0800
+Subject: [PATCH] tty/serial: digicolor: Fix bad usage of IS_ERR_VALUE
+Message-ID: <1455030539-10798-1-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 9 Feb 2016 14:54:26 +0000
-Will Deacon <will.deacon@arm.com> wrote:
+IS_ERR_VALUE() assumes that its parameter is an unsigned long.
+It can not be used to check if an unsigned int reflects an error.
+Doing so can result in the following build warning.
 
+drivers/tty/serial/digicolor-usart.c: In function ?digicolor_uart_probe?:
+include/linux/err.h:21:38: warning:
+	comparison is always false due to limited range of data type
+drivers/tty/serial/digicolor-usart.c:485:6: note:
+	in expansion of macro ?IS_ERR_VALUE?
 
-> Acked-by: Will Deacon <will.deacon@arm.com>
+If that warning is seen, an error return from platform_get_irq() is missed.
 
-Will,
+Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+---
+ drivers/tty/serial/digicolor-usart.c | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
-The patch looks good to me. Do you want to take it through your tree?
-
-It benefits mainline too as a rcu_read_lock() is more efficient than
-rwlocks. Although I will say this is a slow path anyway.
-
--- Steve
+diff --git a/drivers/tty/serial/digicolor-usart.c b/drivers/tty/serial/digicolor-usart.c
+index a80cdad114f3..02ad6953b167 100644
+--- a/drivers/tty/serial/digicolor-usart.c
++++ b/drivers/tty/serial/digicolor-usart.c
+@@ -453,7 +453,7 @@ static struct uart_driver digicolor_uart = {
+ static int digicolor_uart_probe(struct platform_device *pdev)
+ {
+ 	struct device_node *np = pdev->dev.of_node;
+-	int ret, index;
++	int irq, ret, index;
+ 	struct digicolor_port *dp;
+ 	struct resource *res;
+ 	struct clk *uart_clk;
+@@ -481,9 +481,10 @@ static int digicolor_uart_probe(struct platform_device *pdev)
+ 	if (IS_ERR(dp->port.membase))
+ 		return PTR_ERR(dp->port.membase);
+ 
+-	dp->port.irq = platform_get_irq(pdev, 0);
+-	if (IS_ERR_VALUE(dp->port.irq))
+-		return dp->port.irq;
++	irq = platform_get_irq(pdev, 0);
++	if (irq < 0)
++		return irq;
++	dp->port.irq = irq;
+ 
+ 	dp->port.iotype = UPIO_MEM;
+ 	dp->port.uartclk = clk_get_rate(uart_clk);
+-- 
+2.5.0
