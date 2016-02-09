@@ -1,37 +1,38 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 9 Feb 2016 13:30:47 +0800
-Subject: [PATCH 14/14] clk: qcom: Migrate to clk_hw based registration
- and OF APIs
-In-Reply-To: <1454982341-22715-15-git-send-email-sboyd@codeaurora.org>
-Message-ID: <201602091317.cFLg4PVI%fengguang.wu@intel.com>
+From: maitysanchayan@gmail.com (Sanchayan Maity)
+Date: Tue,  9 Feb 2016 10:56:04 +0530
+Subject: [PATCH v1 0/2] Add DAC driver support for Vybrid SoC
+Message-ID: <cover.1454939346.git.maitysanchayan@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Hello,
 
-[auto build test ERROR on ljones-mfd/for-mfd-next]
-[also build test ERROR on v4.5-rc3]
-[cannot apply to clk/clk-next next-20160208]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+This patchset adds support for the DAC peripheral on Vybrid SoC.
+Patchset is based on top of shawn's for-next branch and has been
+tested on a Toradex Colibri VF50 module.
 
-url:    https://github.com/0day-ci/linux/commits/Stephen-Boyd/clk_hw-based-clkdev-DT-providers/20160209-095211
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git for-mfd-next
-config: i386-allmodconfig (attached as .config)
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+I had one query as to whether my implementation under the
+IIO_CHAN_INFO_SCALE correct? I am not clear on exactly on how
+the voltage_scale parameter is suppose to be set and used.
 
-All errors (new ones prefixed by >>):
+Feedbacks and comments most welcome.
 
->> ERROR: "of_clk_add_hw_provider" undefined!
+Thanks & Regards,
+Sanchayan.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 53452 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160209/22b3ed58/attachment-0001.obj>
+
+Sanchayan Maity (2):
+  ARM: dts: vfxxx: Add DAC node for Vybrid SoC
+  iio: dac: vf610_dac: Add IIO DAC driver for Vybrid SoC
+
+ .../devicetree/bindings/iio/dac/vf610-dac.txt      |  20 ++
+ arch/arm/boot/dts/vfxxx.dtsi                       |  18 ++
+ drivers/iio/dac/Kconfig                            |   8 +
+ drivers/iio/dac/Makefile                           |   1 +
+ drivers/iio/dac/vf610_dac.c                        | 302 +++++++++++++++++++++
+ 5 files changed, 349 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/iio/dac/vf610-dac.txt
+ create mode 100644 drivers/iio/dac/vf610_dac.c
+
+-- 
+2.7.1
