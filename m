@@ -1,97 +1,65 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Tue, 9 Feb 2016 14:19:32 -0600
-Subject: [PATCH 0/3] omap: hwmod: add default reset handling support
-In-Reply-To: <56BA258D.3040002@ti.com>
-References: <1454929941-23949-1-git-send-email-kishon@ti.com>
- <56B9037C.2050203@ti.com> <56B9767D.7000708@ti.com> <56BA258D.3040002@ti.com>
-Message-ID: <56BA49D4.8040900@ti.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Tue, 09 Feb 2016 21:22:08 +0100
+Subject: [PATCH] dmaengine: pxa_dma: fix the maximum requestor line
+In-Reply-To: <20160209152007.GQ19598@localhost> (Vinod Koul's message of "Tue,
+ 9 Feb 2016 20:50:07 +0530")
+References: <1454941131-12308-1-git-send-email-robert.jarzmik@free.fr>
+ <20160209033646.GK19598@localhost> <878u2u2vve.fsf@belgarion.home>
+ <20160209152007.GQ19598@localhost>
+Message-ID: <874mdh3a8f.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-On 02/09/2016 11:44 AM, Suman Anna wrote:
-> On 02/08/2016 11:17 PM, Kishon Vijay Abraham I wrote:
->> Hi,
->>
->> On Tuesday 09 February 2016 02:37 AM, Suman Anna wrote:
->>> On 02/08/2016 05:12 AM, Kishon Vijay Abraham I wrote:
->>>> Add a new hwmod flag to indicate custom reset handling and use it
->>>> for devices that require custom reset handling (like dsp, ipu, iva).
->>>>
->>>> Tested PCIe on dra7-evm and dra72-evm.
->>>> I need help in testing DSP, IPU, IVA, PRU, GFX, M3 in other platforms.
->>>> Or a way to test these cores to see if reset is not broken. Suman?
->>>
->>> I won't be able to test this week, and have requested Dave to check on
->>> wkup_m3_rproc driver atleast. I see one potential issue (see my commment
->>> on the other thread), but can confirm that only after testing.
->>>
->>> Have you tested multiple probe/removal sequences? Can you check the
->>> return status on the _hardreset_deassert call with your PCIe driver,
->>> believe even that one would return an error on multiple probes.
->>
->> hmm.. the PCIe driver is built-in and can't be made as module because of other
->> issues in PCIe core. But looks like the first deassert succeeded since I didn't
->> observe the boot hang because of PCIe.
+Vinod Koul <vinod.koul@intel.com> writes:
+
+> On Tue, Feb 09, 2016 at 08:20:05AM +0100, Robert Jarzmik wrote:
+>> Vinod Koul <vinod.koul@intel.com> writes:
+>> 
+>> > On Mon, Feb 08, 2016 at 03:18:51PM +0100, Robert Jarzmik wrote:
+>> >> The current number of requestor lines is limited to 31. This was an
+>> >> error of a previous commit, as this number is platform dependent, and is
+>> >> actually :
+>> >>  - for pxa25x: 40 requestor lines
+>> >>  - for pxa27x: 74 requestor lines
+>> >>  - for pxa3xx: 100 requestor lines
+>> >> 
+>> >> As the driver doesn't need to know the exact number, but only an
+>> >
+>> > and why would that be a good assumption?
+>> Well, the driver doesn't use the exact value. Would that be 128, 1000 or 10000,
+>> it wouldn't change its behavior. The clients either pass -1UL (ie. no flow
+>> control) or a requestor line number.
 >
-> You can try unbind and bind through sysfs, it should result in a remove
-> and probe even if your driver is built-in.
-
-Sorry got held up by the discussion here [1], that regression affects 
-rmmod/re-insmod of wkup_m3_rproc as well. If I revert the guilty patch 
-5de85b9d57ab ("PM / runtime: Re-init runtime
-PM states at probe error and driver unbind") and apply these three 
-patches, on initial probe of the wkup_m3_rproc and wkup_m3_ipc drivers 
-in v4.5-rc3 I see:
-
-[   15.593460] omap_hwmod: wkup_m3: _wait_target_disable failed
-
-Which is triggered by the reset of the wkup_m3 from the wkup_m3_ipc 
-driver when booting the wkup_m3_rproc. Flow is:
-
-1. wkup_m3_rproc probes and calls pm_runtime_get_sync, which calls hwmod 
-_enable but bails out because _are_all_hardreset_lines_asserted(oh) 
-causes it to return 0.
-
-2. wkup_m3_ipc probes and calls rproc_boot, which triggers 
-omap_device_deassert_hardreset in order to let the wkup_m3 start.
-
-It is inside the omap_device_deassert_hardreset ( and inside that, 
-omap_hwmod_deassert_hardreset) where I end up with the error message, 
-but after that rmmod/insmod of the module over and over again shows no 
-additional error messages (at least with the above mentioned PM patch 
-reverted).
-
-Regards,
-Dave
-
-[1] http://www.spinics.net/lists/arm-kernel/msg477160.html
-
+> Somehow that does not sound right to me. You seem to have no way of knowing
+> what is the actual max request line for a platforms. What if on pxa25x user
+> requests more than 40 lines?
 >
-> regards
-> Suman
->>>
->>>>
->>>> I'll post this series once again after performing these tests.
->>>>
->>>> Paul Walmsley (3):
->>>>    ARM: omap2+: omap_hwmod: introduce hwmod flag for custom reset
->>>>      handling
->>>>    ARM: OMAP2+: hwmod: use HWMOD_CUSTOM_HARDRESET for custom reset
->>>>      handling
->>>>    ARM: OMAP2+: hwmod: Add default reset handling
->>>>
->>>>   arch/arm/mach-omap2/omap_hwmod.c                   |   16 +++++++++++-----
->>>>   arch/arm/mach-omap2/omap_hwmod.h                   |   12 ++++++++++++
->>>>   arch/arm/mach-omap2/omap_hwmod_2420_data.c         |    2 ++
->>>>   arch/arm/mach-omap2/omap_hwmod_2430_data.c         |    1 +
->>>>   .../mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c |    2 ++
->>>>   arch/arm/mach-omap2/omap_hwmod_33xx_data.c         |    1 +
->>>>   arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |    3 +++
->>>>   arch/arm/mach-omap2/omap_hwmod_43xx_data.c         |    1 +
->>>>   arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |    6 ++++++
->>>>   arch/arm/mach-omap2/omap_hwmod_54xx_data.c         |    2 ++
->>>>   10 files changed, 41 insertions(+), 5 deletions(-)
->>>>
->>>
+>> > Btw shouldn't this data come from DT?
+>> It can if you wish, but in this case I must amend the platform data case too, ie
+>> mmp_dma_platdata. And this has an impact on MMP architecture. I'd rather have
+>> the simpler approach unless you really want the exact number of requestor lines
+>> to be passed in platform_data+DT.
 >
+> The information that you have X lines on a platform needs to be described
+> and queried. I see current approach error prone
+
+Actually I have thought over your point, and you're quite right (this is your
+case of more than 40 lines).
+
+The exception I have found is :
+ - a device driver is wrongly written
+ - it requests the requestor line 0x1000 (below 0x8000)
+ - pxa_dma computes the register in pxad_drcmr(0x1000)
+   => this gives : base + 0x1000 + 4 * 0x1000 = base + 0x5000
+   => this is a not existing iomapped register
+
+So yes, I will respin the patchset, with :
+ - one patch adding the number of requestors in mmp_dma.h
+ - one patch adding the number of requestors in devicetree description
+ - one patch adding the number of requestors in arch/arm/mach-pxa (my tree)
+ - one patch adding the use of number of requestors in pxa_dma.c
+
+Cheers.
+
+-- 
+Robert
