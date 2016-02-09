@@ -1,53 +1,85 @@
-From: aryabinin@virtuozzo.com (Andrey Ryabinin)
-Date: Tue, 9 Feb 2016 16:50:14 +0300
-Subject: [PATCH v2] arm64: disable kasan when accessing frame->fp in
- unwind_frame
-In-Reply-To: <1454951589-18238-1-git-send-email-yang.shi@linaro.org>
-References: <1454951589-18238-1-git-send-email-yang.shi@linaro.org>
-Message-ID: <56B9EE96.9060804@virtuozzo.com>
+From: rrichter@caviumnetworks.com (Robert Richter)
+Date: Tue, 9 Feb 2016 14:53:40 +0100
+Subject: [PATCH v4 0/6] arm64 UEFI early FDT handling
+Message-ID: <1455026026-11571-1-git-send-email-rrichter@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/08/2016 08:13 PM, Yang Shi wrote:
-> When boot arm64 kernel with KASAN enabled, the below error is reported by
-> kasan:
-> 
-> BUG: KASAN: out-of-bounds in unwind_frame+0xec/0x260 at addr ffffffc064d57ba0
-> Read of size 8 by task pidof/499
-> page:ffffffbdc39355c0 count:0 mapcount:0 mapping:          (null) index:0x0
-> flags: 0x0()
-> page dumped because: kasan: bad access detected
-> CPU: 2 PID: 499 Comm: pidof Not tainted 4.5.0-rc1 #119
-> Hardware name: Freescale Layerscape 2085a RDB Board (DT)
-> Call trace:
-> [<ffffffc00008d078>] dump_backtrace+0x0/0x290
-> [<ffffffc00008d32c>] show_stack+0x24/0x30
-> [<ffffffc0006a981c>] dump_stack+0x8c/0xd8
-> [<ffffffc0002e4400>] kasan_report_error+0x558/0x588
-> [<ffffffc0002e4958>] kasan_report+0x60/0x70
-> [<ffffffc0002e3188>] __asan_load8+0x60/0x78
-> [<ffffffc00008c92c>] unwind_frame+0xec/0x260
-> [<ffffffc000087e60>] get_wchan+0x110/0x160
-> [<ffffffc0003b647c>] do_task_stat+0xb44/0xb68
-> [<ffffffc0003b7730>] proc_tgid_stat+0x40/0x50
-> [<ffffffc0003ac840>] proc_single_show+0x88/0xd8
-> [<ffffffc000345be8>] seq_read+0x370/0x770
-> [<ffffffc00030aba0>] __vfs_read+0xc8/0x1d8
-> [<ffffffc00030c0ec>] vfs_read+0x94/0x168
-> [<ffffffc00030d458>] SyS_read+0xb8/0x128
-> [<ffffffc000086530>] el0_svc_naked+0x24/0x28
-> Memory state around the buggy address:
->  ffffffc064d57a80: 00 00 00 00 00 00 00 00 f1 f1 f1 f1 00 00 f4 f4
->  ffffffc064d57b00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
->> ffffffc064d57b80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
->                                   ^
->  ffffffc064d57c00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
->  ffffffc064d57c80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-> 
-> Since the shadow byte pointed by the report is 0, so it may mean it is just hit
-> oob in non-current task. So, disable the instrumentation to silence these
-> warnings.
-> 
-> Signed-off-by: Yang Shi <yang.shi@linaro.org>
+From: Robert Richter <rrichter@cavium.com>
 
-Acked-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
+Reposting an updated version of this patches ported to 4.5-rc1. It is
+a followup to the version 3 from:
+
+ http://lkml.kernel.org/r/1442881288-13962-1-git-send-email-ard.biesheuvel at linaro.org
+
+The series is essential for NUMA on arm64. Early FDT handling is
+required to make system topology data from firmware, esp. for cpus and
+memory available to the early boot process. Ganapat's numa patches
+depend on it. This series has been tested with his series v10 posted
+here:
+
+ http://lkml.kernel.org/r/1454407763-1017-1-git-send-email-gkulkarni at caviumnetworks.com
+
+A number of minor issues exist in the early UEFI/FDT handling path, such as:
+- when booting via UEFI, memreserve entries are removed from the device tree but
+  the /reserved-memory node is not
+- memory nodes are removed from the device tree in a way that is not officially
+  supported by the libfdt API (i.e., you cannot delete nodes while traversing
+  the tree)
+- removal of memory nodes may discard annotations (such as NUMA topology) that
+  should ideally be retained, or may corrupt the tree by discarding nodes
+  referenced by phandles.
+
+Patches #1 and #2 introduce an arm64 specific version of
+early_init_dt_add_memory_arch() so that we can modify it later to ignore DT
+memory nodes if booting via UEFI.
+
+Patch #3 moves some UEFI+FDT init code around before making changes to it.
+
+Patch #4 moves the UEFI initialization to before the early FDT scanning so we
+know at that point whether we are booting via UEFI or not.
+
+Patch #5 changes the UEFI init code so that memory nodes are simply ignored, so
+that they don't have to be removed by the stub anymore.
+
+Patch #6 does the same as #5, but for memreserves and the /reserved-memory
+node.
+
+Changes since v3:
+- prorted to v4.5-rc1
+
+Changes since v2:
+- instead of copying the generic implementation, turn
+  early_init_dt_add_memory_arch() into a weak alias so that it is still
+  accessible to overrides
+
+Changes since v1:
+- dropped first two patches, they have been merged into v4.2-rc1
+- dropped last patch regarding FDT placement by the stub, this is not entirely
+  relevant to the primary issue targeted by this series
+- rebased onto for-next/core (arm64) as of today
+
+Ard Biesheuvel (6):
+  of/fdt: make generic early_init_dt_add_memory_arch() a weak alias
+  arm64: override generic version of early_init_dt_add_memory_arch()
+  efi: move FDT handling to separate object file
+  arm64/efi: move EFI /chosen node parsing before early FDT processing
+  arm64/efi: ignore DT memory nodes instead of removing them
+  arm64/efi: ignore DT memreserve entries instead of removing them
+
+ arch/arm64/include/asm/efi.h       |  2 +
+ arch/arm64/kernel/setup.c          |  3 ++
+ arch/arm64/mm/init.c               | 12 +++++-
+ drivers/firmware/efi/Makefile      |  1 +
+ drivers/firmware/efi/arm-init.c    | 36 ++++++++++------
+ drivers/firmware/efi/efi-fdt.c     | 73 +++++++++++++++++++++++++++++++++
+ drivers/firmware/efi/efi.c         | 84 --------------------------------------
+ drivers/firmware/efi/libstub/fdt.c | 33 +--------------
+ drivers/of/fdt.c                   |  7 +++-
+ include/linux/efi.h                |  2 +-
+ include/linux/of_fdt.h             |  1 +
+ 11 files changed, 121 insertions(+), 133 deletions(-)
+ create mode 100644 drivers/firmware/efi/efi-fdt.c
+
+-- 
+2.7.0.rc3
