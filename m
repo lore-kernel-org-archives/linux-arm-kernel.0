@@ -1,64 +1,115 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 9 Feb 2016 14:28:51 -0500 (EST)
-Subject: [PATCH v4 3/3] kallsyms: remove --page-offset command line option
-In-Reply-To: <CAKv+Gu-rdP7-=Z2SO2jRS_dHzB8UDpZ7-RowN_400d32Qvxmqg@mail.gmail.com>
-References: <1455030828-6416-1-git-send-email-ard.biesheuvel@linaro.org>
- <1455030828-6416-4-git-send-email-ard.biesheuvel@linaro.org>
- <HKXPR06MB056549C714A864B2D4F37DCA8AD60@HKXPR06MB0565.apcprd06.prod.outlook.com>
- <CAKv+Gu-rdP7-=Z2SO2jRS_dHzB8UDpZ7-RowN_400d32Qvxmqg@mail.gmail.com>
-Message-ID: <alpine.LFD.2.20.1602091407380.17825@knanqh.ubzr>
+From: ddaney.cavm@gmail.com (David Daney)
+Date: Tue,  9 Feb 2016 11:29:16 -0800
+Subject: [PATCH] arm64: Add workaround for Cavium erratum 27456
+Message-ID: <1455046156-10582-1-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 9 Feb 2016, Ard Biesheuvel wrote:
+From: Andrew Pinski <apinski@cavium.com>
 
-> On 9 February 2016 at 17:09, Chris Brandt <Chris.Brandt@renesas.com> wrote:
-> > On 9 Feb 2016, Ard Biesheuvel wrote:
-> >
-> >>diff --git a/scripts/kallsyms.c b/scripts/kallsyms.c
-> >>index 02473b71643b..32c8d43590af 100644
-> >>--- a/scripts/kallsyms.c
-> >>+++ b/scripts/kallsyms.c
-> >>@@ -63,7 +63,6 @@ static unsigned int table_size, table_cnt;
-> >> static int all_symbols = 0;
-> >> static int absolute_percpu = 0;
-> >> static char symbol_prefix_char = '\0';
-> >>-static unsigned long long kernel_start_addr = 0;
-> >> static int base_relative = 0;
-> >
-> >
-> >
-> > You removed kernel_start_addr, but you didn't remove all the instances of it in the file (you did remove them all in V2 though).
-> >
-> > So, now I get:
-> >
-> >   CC      scripts/mod/devicetable-offsets.s
-> > ../scripts/kallsyms.c: In function 'record_relative_base':
-> > ../scripts/kallsyms.c:740:6: error: 'kernel_start_addr' undeclared (first use in this function)
-> >   if (kernel_start_addr > 0) {
-> >       ^
-> > ../scripts/kallsyms.c:740:6: note: each undeclared identifier is reported only once for each function it appears in
-> > make[2]: *** [scripts/kallsyms] Error 1
-> >
-> 
-> That is because this patch
-> 
-> http://ozlabs.org/~akpm/mmots/broken-out/kallsyms-add-support-for-relative-offsets-in-kallsyms-address-table-v5.patch
-> 
-> is also in flight, via akpm's tree, and is expected to hit -next
-> tomorrow. That patch removes this reference (or alternatively, will
-> not introduce it anymore if akpm decides to fold it into
-> http://ozlabs.org/~akpm/mmots/broken-out/kallsyms-add-support-for-relative-offsets-in-kallsyms-address-table.patch
-> before submitting it)
-> 
-> Going forward, it probably makes sense to only submit #1 of this
-> series for v4.6, and queue the remaining two after the merge window.
+On ThunderX T88 pass 1.x through 2.1 parts, broadcast TLBI
+instructions may cause the icache to become invalid if it contains
+data for a non-current ASID.
 
-Well... If akpm agrees, you could get those patches back and create a 
-tree of your own with all ACKs for this work to avoi all this patch 
-ordering dependency nightmare (including the work that depends on this) 
-and submit it upstream (to Linus maybe?) while having it merged in 
-linux-next in the mean time.
+This patch implements the workaround (which flushes the local icache
+when switching the mm) by using code patching.
 
+Signed-off-by: Andrew Pinski <apinski@cavium.com>
+Signed-off-by: David Daney <david.daney@cavium.com>
+---
+ arch/arm64/Kconfig                  | 11 +++++++++++
+ arch/arm64/include/asm/cpufeature.h |  3 ++-
+ arch/arm64/kernel/cpu_errata.c      |  9 +++++++++
+ arch/arm64/mm/proc.S                | 12 ++++++++++++
+ 4 files changed, 34 insertions(+), 1 deletion(-)
 
-Nicolas
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 8cc6228..a969970 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -432,6 +432,17 @@ config CAVIUM_ERRATUM_23154
+ 
+ 	  If unsure, say Y.
+ 
++config CAVIUM_ERRATUM_27456
++	bool "Cavium erratum 27456: Broadcast TLBI instructions may cause the icache to become invalid"
++	default y
++	help
++	  On ThunderX T88 pass 1.x through 2.1 parts, broadcast TLBI
++	  instructions may cause the icache to become invalid if it
++	  contains data for a non-current ASID.  The fix is to flush
++	  the icache when changing the mm context.
++
++	  If unsure, say Y.
++
+ endmenu
+ 
+ 
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index 8f271b8..8136afc 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -30,8 +30,9 @@
+ #define ARM64_HAS_LSE_ATOMICS			5
+ #define ARM64_WORKAROUND_CAVIUM_23154		6
+ #define ARM64_WORKAROUND_834220			7
++#define ARM64_WORKAROUND_CAVIUM_27456		8
+ 
+-#define ARM64_NCAPS				8
++#define ARM64_NCAPS				9
+ 
+ #ifndef __ASSEMBLY__
+ 
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index feb6b4e..a3e846a 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -100,6 +100,15 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+ 		MIDR_RANGE(MIDR_THUNDERX, 0x00, 0x01),
+ 	},
+ #endif
++#ifdef CONFIG_CAVIUM_ERRATUM_27456
++	{
++	/* Cavium ThunderX, T88 pass 1.x - 2.1 */
++		.desc = "Cavium erratum 27456",
++		.capability = ARM64_WORKAROUND_CAVIUM_27456,
++		MIDR_RANGE(MIDR_THUNDERX, 0x00,
++			   (1 << MIDR_VARIANT_SHIFT) | 1),
++	},
++#endif
+ 	{
+ 	}
+ };
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index c164d2c..0f3be00 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -25,6 +25,8 @@
+ #include <asm/hwcap.h>
+ #include <asm/pgtable-hwdef.h>
+ #include <asm/pgtable.h>
++#include <asm/cpufeature.h>
++#include <asm/alternative.h>
+ 
+ #include "proc-macros.S"
+ 
+@@ -137,7 +139,17 @@ ENTRY(cpu_do_switch_mm)
+ 	bfi	x0, x1, #48, #16		// set the ASID
+ 	msr	ttbr0_el1, x0			// set TTBR0
+ 	isb
++alternative_if_not ARM64_WORKAROUND_CAVIUM_27456
+ 	ret
++	nop
++	nop
++	nop
++alternative_else
++	ic	iallu
++	dsb	nsh
++	isb
++	ret
++alternative_endif
+ ENDPROC(cpu_do_switch_mm)
+ 
+ /*
+-- 
+1.8.3.1
