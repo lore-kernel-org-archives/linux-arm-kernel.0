@@ -1,107 +1,90 @@
-From: rrichter@caviumnetworks.com (Robert Richter)
-Date: Tue, 9 Feb 2016 14:53:45 +0100
-Subject: [PATCH v4 5/6] arm64/efi: ignore DT memory nodes instead of removing
- them
-In-Reply-To: <1455026026-11571-1-git-send-email-rrichter@caviumnetworks.com>
-References: <1455026026-11571-1-git-send-email-rrichter@caviumnetworks.com>
-Message-ID: <1455026026-11571-6-git-send-email-rrichter@caviumnetworks.com>
+From: tsahee@annapurnalabs.com (Tsahee Zidenberg)
+Date: Tue, 9 Feb 2016 15:54:31 +0200
+Subject: [PATCH 2/3] arm64: dts: add the Alpine v2 EVP
+In-Reply-To: <56B9D20A.8010709@arm.com>
+References: <1454922699-16785-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1454922699-16785-3-git-send-email-antoine.tenart@free-electrons.com>
+ <56B8B45D.1020902@arm.com> <20160209085633.GA5388@kwain>
+ <20160209090131.GB5388@kwain> <56B9ACE2.1060200@arm.com>
+ <CABM=7knaepbyy4nw_GczVM7E_t6py7gG0ERs8ru_AYoVXvAQ+A@mail.gmail.com>
+ <56B9B1B5.5070106@arm.com>
+ <CABM=7k=-Y+eFB2nUMfMjd3saTSNDsEyfHyYNf-ef8qQc5jCsxA@mail.gmail.com>
+ <56B9D20A.8010709@arm.com>
+Message-ID: <CABM=7k=5WJj_rF1fWO+rnKiF_bcr=i8Bg8E4sKGOR=ER4zjgWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+On 9 February 2016 at 13:48, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 09/02/16 10:13, Tsahee Zidenberg wrote:
+>> On 9 February 2016 at 11:30, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>>
+>>> On 09/02/16 09:14, Tsahee Zidenberg wrote:
+>>>>
+>>>>
+>>>> On 9 February 2016 at 11:09, Marc Zyngier <marc.zyngier@arm.com
+>>>> <mailto:marc.zyngier@arm.com>> wrote:
+>>>>
+>>>>     On 09/02/16 09:01, Antoine Tenart wrote:
+>>>>     > On Tue, Feb 09, 2016 at 09:56:33AM +0100, Antoine Tenart wrote:
+>>>>     >> Hi Marc,
+>>>>     >>
+>>>>     >> On Mon, Feb 08, 2016 at 03:29:33PM +0000, Marc Zyngier wrote:
+>>>>     >>> On 08/02/16 09:11, Antoine Tenart wrote:
+>>>>     >>>
+>>>>     >>>> +          gic: gic at f0100000 {
+>>>>     >>>> +                  compatible = "arm,gic-v3";
+>>>>     >>>> +                  reg = <0x0 0xf0200000 0x0 0x10000>,     /* GIC Dist */
+>>>>     >>>> +                        <0x0 0xf0280000 0x0 0x200000>,    /* GICR */
+>>>>     >>>> +                        <0x0 0xf0100000 0x0 0x2000>;      /* GICC */
+>>>>     >>>> +                  interrupt-controller;
+>>>>     >>>> +                  #interrupt-cells = <3>;
+>>>>     >>>> +          };
+>>>>     >>>
+>>>>     >>> Something is wrong here. Either you are missing GICH and GICV (assuming
+>>>>     >>> you have legacy support), or you have an extra GICC region (which
+>>>>     >>> doesn't make sense on its own).
+>>>>     >>
+>>>>     >> I'll add the missing regions.
+>>>>     >
+>>>>     > Hmm, in fact the GICC region shouldn't be there. I'll make some tests
+>>>>     > and remove it.
+>>>>
+>>>>     If you have a GICv3 with legacy support, you will probably have GICC,
+>>>>     GICH and GICV. Linux itself will only use GICD and GICR, but it needs at
+>>>>     least GICV to be able to virtualize GICv2 guests. And GICV is not
+>>>>     allowed to exist without GICC and GICH, so I really recommend that you
+>>>>     keep GICC around.
+>>>>
+>>>>
+>>>> We use the GIC without legacy support (we disable it in early boot
+>>>> stages), so I think removing the GICC region is the better solution.
+>>>
+>>> Disabling legacy support doesn't mean that:
+>>> - the HW isn't present
+>>> - the associated regions are not useful
+>>>
+>> By "disabling lecgacy support in early boot" I don't just mean that
+>> ARE bit will be set, but it will actually be RAO/WI. There will be no
+>> way for SW to enable it and use these registers (which, sadly, means
+>> that there will be no way to enable gicv2 virtualization). If you
+>> insist - I will dig up the supposed location of GICV and GICH - yet it
+>> will be both untested and entirely unusable.
+>
+> Just to make sure you are not missing the point: ARE==1 does *not* mean
+> that GICV is unusable. Quite the opposite. It only makes it illegal to
+> use GICC and GICH, but leaves GICV usable for a guest.
+>
+> So the real question is: do you have any additional HW that would
+> actively prevent GICV from being used? If the answer to that is "no",
+> and assuming your GICv3 implementation is compliant with the
+> architecture, then GICV will be usable, and you should document all 3
+> regions.
+>
 
-There are two problems with the UEFI stub DT memory node removal
-routine:
-- it deletes nodes as it traverses the tree, which happens to work
-  but is not supported, as deletion invalidates the node iterator;
-- deleting memory nodes entirely may discard annotations in the form
-  of additional properties on the nodes.
+O.K. will add to next version.
 
-Now that the UEFI initialization has moved to an earlier stage, we can
-actually just ignore any memblocks that are installed after we have
-processed the UEFI memory map. This way, it is no longer necessary to
-remove the nodes, so we can remove that logic from the stub as well.
-
-Acked-by: Leif Lindholm <leif.lindholm@linaro.org>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Message-Id: <1442881288-13962-6-git-send-email-ard.biesheuvel@linaro.org>
-[ rric: Ported to v4.5-rc1 ]
-Signed-off-by: Robert Richter <rrichter@cavium.com>
----
- arch/arm64/mm/init.c               |  6 +++++-
- drivers/firmware/efi/arm-init.c    |  2 +-
- drivers/firmware/efi/libstub/fdt.c | 24 +-----------------------
- 3 files changed, 7 insertions(+), 25 deletions(-)
-
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 208c1d359018..eda226e85c71 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -383,5 +383,9 @@ __setup("keepinitrd", keepinitrd_setup);
- 
- void __init early_init_dt_add_memory_arch(u64 base, u64 size)
- {
--	early_init_dt_add_memory(base, size);
-+	/*
-+	 * Ignore DT memory nodes if we are booting via UEFI.
-+	 */
-+	if (!efi_enabled(EFI_MEMMAP))
-+		early_init_dt_add_memory(base, size);
- }
-diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
-index 9fe04648d4d3..ded895706633 100644
---- a/drivers/firmware/efi/arm-init.c
-+++ b/drivers/firmware/efi/arm-init.c
-@@ -159,7 +159,7 @@ static __init void reserve_regions(void)
- 		size = npages << PAGE_SHIFT;
- 
- 		if (is_normal_ram(md))
--			early_init_dt_add_memory_arch(paddr, size);
-+			early_init_dt_add_memory(paddr, size);
- 
- 		if (is_reserve_region(md)) {
- 			memblock_mark_nomap(paddr, size);
-diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
-index cf7b7d46302a..9df1560d57bc 100644
---- a/drivers/firmware/efi/libstub/fdt.c
-+++ b/drivers/firmware/efi/libstub/fdt.c
-@@ -24,7 +24,7 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
- 			unsigned long map_size, unsigned long desc_size,
- 			u32 desc_ver)
- {
--	int node, prev, num_rsv;
-+	int node, num_rsv;
- 	int status;
- 	u32 fdt_val32;
- 	u64 fdt_val64;
-@@ -54,28 +54,6 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
- 		goto fdt_set_fail;
- 
- 	/*
--	 * Delete any memory nodes present. We must delete nodes which
--	 * early_init_dt_scan_memory may try to use.
--	 */
--	prev = 0;
--	for (;;) {
--		const char *type;
--		int len;
--
--		node = fdt_next_node(fdt, prev, NULL);
--		if (node < 0)
--			break;
--
--		type = fdt_getprop(fdt, node, "device_type", &len);
--		if (type && strncmp(type, "memory", len) == 0) {
--			fdt_del_node(fdt, node);
--			continue;
--		}
--
--		prev = node;
--	}
--
--	/*
- 	 * Delete all memory reserve map entries. When booting via UEFI,
- 	 * kernel will use the UEFI memory map to find reserved regions.
- 	 */
--- 
-2.7.0.rc3
+> Thanks,
+>
+>         M.
+> --
+> Jazz is not dead. It just smells funny...
