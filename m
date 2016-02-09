@@ -1,24 +1,97 @@
-From: info@lategoodbye.de (Stefan Wahren)
-Date: Tue, 9 Feb 2016 21:21:15 +0100
-Subject: [PATCH 4/4] spi: bcm2835aux: fix CPOL/CPHA setting
-In-Reply-To: <1455041435-8015-5-git-send-email-stephanolbrich@gmx.de>
-References: <1455041435-8015-1-git-send-email-stephanolbrich@gmx.de>
- <1455041435-8015-5-git-send-email-stephanolbrich@gmx.de>
-Message-ID: <56BA4A3B.3090605@lategoodbye.de>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Tue, 9 Feb 2016 14:19:32 -0600
+Subject: [PATCH 0/3] omap: hwmod: add default reset handling support
+In-Reply-To: <56BA258D.3040002@ti.com>
+References: <1454929941-23949-1-git-send-email-kishon@ti.com>
+ <56B9037C.2050203@ti.com> <56B9767D.7000708@ti.com> <56BA258D.3040002@ti.com>
+Message-ID: <56BA49D4.8040900@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephan,
-
-Am 09.02.2016 um 19:10 schrieb stephanolbrich at gmx.de:
-> From: Stephan Olbrich <stephanolbrich@gmx.de>
+Hi,
+On 02/09/2016 11:44 AM, Suman Anna wrote:
+> On 02/08/2016 11:17 PM, Kishon Vijay Abraham I wrote:
+>> Hi,
+>>
+>> On Tuesday 09 February 2016 02:37 AM, Suman Anna wrote:
+>>> On 02/08/2016 05:12 AM, Kishon Vijay Abraham I wrote:
+>>>> Add a new hwmod flag to indicate custom reset handling and use it
+>>>> for devices that require custom reset handling (like dsp, ipu, iva).
+>>>>
+>>>> Tested PCIe on dra7-evm and dra72-evm.
+>>>> I need help in testing DSP, IPU, IVA, PRU, GFX, M3 in other platforms.
+>>>> Or a way to test these cores to see if reset is not broken. Suman?
+>>>
+>>> I won't be able to test this week, and have requested Dave to check on
+>>> wkup_m3_rproc driver atleast. I see one potential issue (see my commment
+>>> on the other thread), but can confirm that only after testing.
+>>>
+>>> Have you tested multiple probe/removal sequences? Can you check the
+>>> return status on the _hardreset_deassert call with your PCIe driver,
+>>> believe even that one would return an error on multiple probes.
+>>
+>> hmm.. the PCIe driver is built-in and can't be made as module because of other
+>> issues in PCIe core. But looks like the first deassert succeeded since I didn't
+>> observe the boot hang because of PCIe.
 >
-> The auxiliary spi supports only CPHA=0 modes as the first bit is
-> always output to the pin before the first clock cycle. In CPHA=1
-> modes the first clock edge outputs the second bit hence the slave
-> can never read the first bit.
+> You can try unbind and bind through sysfs, it should result in a remove
+> and probe even if your driver is built-in.
 
-in case auxiliary spi isn't able to handle all modes shouldn't we report 
-this to the upper layers?
+Sorry got held up by the discussion here [1], that regression affects 
+rmmod/re-insmod of wkup_m3_rproc as well. If I revert the guilty patch 
+5de85b9d57ab ("PM / runtime: Re-init runtime
+PM states at probe error and driver unbind") and apply these three 
+patches, on initial probe of the wkup_m3_rproc and wkup_m3_ipc drivers 
+in v4.5-rc3 I see:
 
-Regards
+[   15.593460] omap_hwmod: wkup_m3: _wait_target_disable failed
+
+Which is triggered by the reset of the wkup_m3 from the wkup_m3_ipc 
+driver when booting the wkup_m3_rproc. Flow is:
+
+1. wkup_m3_rproc probes and calls pm_runtime_get_sync, which calls hwmod 
+_enable but bails out because _are_all_hardreset_lines_asserted(oh) 
+causes it to return 0.
+
+2. wkup_m3_ipc probes and calls rproc_boot, which triggers 
+omap_device_deassert_hardreset in order to let the wkup_m3 start.
+
+It is inside the omap_device_deassert_hardreset ( and inside that, 
+omap_hwmod_deassert_hardreset) where I end up with the error message, 
+but after that rmmod/insmod of the module over and over again shows no 
+additional error messages (at least with the above mentioned PM patch 
+reverted).
+
+Regards,
+Dave
+
+[1] http://www.spinics.net/lists/arm-kernel/msg477160.html
+
+>
+> regards
+> Suman
+>>>
+>>>>
+>>>> I'll post this series once again after performing these tests.
+>>>>
+>>>> Paul Walmsley (3):
+>>>>    ARM: omap2+: omap_hwmod: introduce hwmod flag for custom reset
+>>>>      handling
+>>>>    ARM: OMAP2+: hwmod: use HWMOD_CUSTOM_HARDRESET for custom reset
+>>>>      handling
+>>>>    ARM: OMAP2+: hwmod: Add default reset handling
+>>>>
+>>>>   arch/arm/mach-omap2/omap_hwmod.c                   |   16 +++++++++++-----
+>>>>   arch/arm/mach-omap2/omap_hwmod.h                   |   12 ++++++++++++
+>>>>   arch/arm/mach-omap2/omap_hwmod_2420_data.c         |    2 ++
+>>>>   arch/arm/mach-omap2/omap_hwmod_2430_data.c         |    1 +
+>>>>   .../mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c |    2 ++
+>>>>   arch/arm/mach-omap2/omap_hwmod_33xx_data.c         |    1 +
+>>>>   arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |    3 +++
+>>>>   arch/arm/mach-omap2/omap_hwmod_43xx_data.c         |    1 +
+>>>>   arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |    6 ++++++
+>>>>   arch/arm/mach-omap2/omap_hwmod_54xx_data.c         |    2 ++
+>>>>   10 files changed, 41 insertions(+), 5 deletions(-)
+>>>>
+>>>
+>
