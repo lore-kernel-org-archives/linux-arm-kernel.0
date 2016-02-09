@@ -1,63 +1,69 @@
-From: chauveau.julien@gmail.com (Julien Chauveau)
-Date: Tue, 09 Feb 2016 11:45:08 +0100
-Subject: [PATCH v2 06/10] ARM64: dts: rockchip: Add IR receiver to
- GeekBox
-In-Reply-To: <56B95827.7060204@suse.de>
-References: <1454897859-7601-1-git-send-email-afaerber@suse.de>
- <1454897859-7601-7-git-send-email-afaerber@suse.de>
- <56B95827.7060204@suse.de>
-Message-ID: <56B9C334.2070002@gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 9 Feb 2016 13:52:09 +0300
+Subject: [PATCH 5/5] ARM: dts: r8a7794 add sound support
+In-Reply-To: <87mvraoikj.wl%kuninori.morimoto.gx@renesas.com>
+References: <4253511.vvGjIdOnb6@wasted.cogentembedded.com>
+ <2179456.HznTXDfKhZ@wasted.cogentembedded.com>
+ <87mvraoikj.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <56B9C4D9.6020808@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 2/9/2016 3:08 AM, Kuninori Morimoto wrote:
 
-Le 09/02/2016 04:08, Andreas F?rber a ?crit :
-> Am 08.02.2016 um 03:17 schrieb Andreas F?rber:
->> Signed-off-by: Andreas F?rber <afaerber@suse.de>
->> ---
->>   v2: New
->>   
->>   arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts | 13 +++++++++++++
->>   1 file changed, 13 insertions(+)
+>> Define the generic R8A7794 part of  the sound device node.
+>> This sound device  is a complex one and comprises the Audio Clock Generator
+>> (ADG), Sampling Rate Converter Unit (SCU), Serial Sound Interface [Unit]
+>> (SSI[U]), and Audio DMAC-Peripheral-Peripheral.
+>> It is up  to the board file to enable the device.
 >>
->> diff --git a/arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts b/arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts
->> index e4523a74050f..e84383fd6f10 100644
->> --- a/arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts
->> +++ b/arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts
->> @@ -63,6 +63,13 @@
->>   		#clock-cells = <0>;
->>   	};
->>   
->> +	ir: ir-receiver {
->> +		compatible = "gpio-ir-receiver";
->> +		gpios = <&gpio3 30 GPIO_ACTIVE_LOW>;
->> +		pinctrl-names = "default";
->> +		pinctrl-0 = <&ir_int>;
-> 		status = "disabled";
+>> This patch is based on the R8A7791 sound work by Kuninori Morimoto.
+>>
+>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> (snip)
+>> +		clocks = <&mstp10_clks R8A7794_CLK_SSI_ALL>,
+>> +			 <&mstp10_clks R8A7794_CLK_SSI9>,
+>> +			 <&mstp10_clks R8A7794_CLK_SSI8>,
+>> +			 <&mstp10_clks R8A7794_CLK_SSI7>,
+>> +			 <&mstp10_clks R8A7794_CLK_SSI6>,
+>> +			 <&mstp10_clks R8A7794_CLK_SSI5>,
+>> +			 <&mstp10_clks R8A7794_CLK_SSI4>,
+>> +			 <&mstp10_clks R8A7794_CLK_SSI3>,
+>> +			 <&mstp10_clks R8A7794_CLK_SSI2>,
+>> +			 <&mstp10_clks R8A7794_CLK_SSI1>,
+>> +			 <&mstp10_clks R8A7794_CLK_SSI0>,
+>> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC9>,
+>> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC8>,
+>> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC7>,
+>> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC6>,
+>> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC5>,
+>> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC4>,
+>> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC3>,
+>> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC2>,
+>> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC1>,
+>> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC0>,
+>> +			 <&mstp10_clks R8A7794_CLK_SCU_CTU0_MIX0>,
+>> +			 <&mstp10_clks R8A7794_CLK_SCU_CTU1_MIX1>,
+>> +			 <&mstp10_clks R8A7794_CLK_SCU_CTU0_MIX0>,
+>> +			 <&mstp10_clks R8A7794_CLK_SCU_CTU1_MIX1>,
+>> +			 <&mstp10_clks R8A7794_CLK_SCU_DVC0>,
+>> +			 <&mstp10_clks R8A7794_CLK_SCU_DVC1>,
+>> +			 <&audio_clka>, <&audio_clkb>, <&audio_clkc>,
+>> +			 <&m2_clk>;
+>> +		clock-names = "ssi-all",
+>> +			      "ssi.9", "ssi.8", "ssi.7", "ssi.6", "ssi.5",
+>> +			      "ssi.4", "ssi.3", "ssi.2", "ssi.1", "ssi.0",
+>> +			      "src.9", "src.8", "src.7", "src.6", "src.5",
+>> +			      "src.4", "src.3", "src.2", "src.1", "src.0",
+>> +			      "clk_a", "clk_b", "clk_c", "clk_i";
 >
-> Should only be enabled in the new Landingship config. Will fix.
->
-> Andreas
-Actually there's two IR receivers:
-- one on the geekbox module (on the bottom side)
-- and another one on the landingship.
+> This patch doesn't support "CTU/MIX/DVC".
 
-Both are connected to the same GPIO pin, so you can keep it enabled in 
-the main geekbox dts.
+    It doesn't.
 
-About the pinctrl, same remark as for gpio-keys: there's already 
-external pull-up resistors on this pin, so it should be better to use 
-pcfg_pull_none instead of pcfg_pull_up.
+> Your "clocks" includes "R8A7794_CLK_SCU_CTUx_MIXx", and "R8A7794_CLK_SCU_DVCx",
+> but "clock-names" doesn't include "ctu.x", "dvc.x".
 
-Julien
->
-> P.S. See Heiko, two bugs in the new nodes already, glad I have them
-> separate. :)
->
->> +	};
->> +
->>   	leds: gpio-leds {
->>   		compatible = "gpio-leds";
->>   
-> [snip]
->
+    Oops, thank you for noticing. Will fix.
+
+MBR, Sergei
