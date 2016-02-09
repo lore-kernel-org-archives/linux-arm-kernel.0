@@ -1,45 +1,57 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Tue, 9 Feb 2016 13:52:12 -0800
-Subject: [PATCH 0/3] arm: dts: DRA7: Add IVA and DSPEVE thermal domain data
-In-Reply-To: <1454922990-7501-1-git-send-email-j-keerthy@ti.com>
-References: <1454922990-7501-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <20160209215210.GB27284@localhost.localdomain>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 10 Feb 2016 00:53:18 +0300
+Subject: [PATCH v2 1/5] ARM: dts: r8a7794: add audio clocks
+In-Reply-To: <12033353.rt0nolnBmD@wasted.cogentembedded.com>
+References: <12033353.rt0nolnBmD@wasted.cogentembedded.com>
+Message-ID: <2889404.8PU5kSFXZ7@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 08, 2016 at 02:46:27PM +0530, Keerthy wrote:
-> OMAP5 has 3 thermal zones cpu, core and multimedia.
-> On the other hand DRA7 has 5 thermal zones cpu, gpu, core, dspeve
-> and iva. Currently cpu, core and multimedia are being added via dt
-> and the other 2 are getting added via kernel. Add the missing thermal
-> domains in dt so as give the correct trip numbers, type and temperatures.
-> 
-> Tested on DRA7-EVM.
+Describe the external audio clocks (signals AUDIO_CLK[ABC]) required by
+the sound driver. Boards that provide audio clocks need to override the
+clock frequencies.
 
-For the series:
+This patch is based on the commit 0d3dbde84a45 ("ARM: shmobile: r8a7791:
+add  audio clock on DTSI").
 
-Acked-by: Eduardo Valentin <edubezval@gmail.com>
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
->  
-> Keerthy (3):
->   arm: dts: DRA7: Add DSPEVE thermal data
->   arm: dts: DRA7: Add IVA thermal data
->   arm: dts: DRA7: Add missing IVA and DSPEVE thermal domain data
-> 
->  arch/arm/boot/dts/dra7-dspeve-thermal.dtsi | 27 +++++++++++++++++++++++++++
->  arch/arm/boot/dts/dra7-iva-thermal.dtsi    | 27 +++++++++++++++++++++++++++
->  arch/arm/boot/dts/dra7.dtsi                |  2 ++
->  3 files changed, 56 insertions(+)
->  create mode 100644 arch/arm/boot/dts/dra7-dspeve-thermal.dtsi
->  create mode 100644 arch/arm/boot/dts/dra7-iva-thermal.dtsi
-> 
-> -- 
-> 1.9.1
-> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160209/7401701f/attachment.sig>
+---
+ arch/arm/boot/dts/r8a7794.dtsi |   24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+
+Index: renesas/arch/arm/boot/dts/r8a7794.dtsi
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/r8a7794.dtsi
++++ renesas/arch/arm/boot/dts/r8a7794.dtsi
+@@ -833,6 +833,30 @@
+ 			status = "disabled";
+ 		};
+ 
++		/*
++		 * The external audio clocks are configured  as 0 Hz fixed
++		 * frequency clocks by default.  Boards that provide audio
++		 * clocks should override them.
++		 */
++		audio_clka: audio_clka {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <0>;
++			clock-output-names = "audio_clka";
++		};
++		audio_clkb: audio_clkb {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <0>;
++			clock-output-names = "audio_clkb";
++		};
++		audio_clkc: audio_clkc {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <0>;
++			clock-output-names = "audio_clkc";
++		};
++
+ 		/* Special CPG clocks */
+ 		cpg_clocks: cpg_clocks at e6150000 {
+ 			compatible = "renesas,r8a7794-cpg-clocks",
