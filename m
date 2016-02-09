@@ -1,46 +1,50 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 9 Feb 2016 21:34:32 +0000 (UTC)
-Subject: [PATCH 0/3] omap: hwmod: add default reset handling support
-In-Reply-To: <56BA49D4.8040900@ti.com>
-References: <1454929941-23949-1-git-send-email-kishon@ti.com>
- <56B9037C.2050203@ti.com> <56B9767D.7000708@ti.com> <56BA258D.3040002@ti.com>
- <56BA49D4.8040900@ti.com>
-Message-ID: <alpine.DEB.2.02.1602092131280.27214@utopia.booyaka.com>
+From: yang.shi@linaro.org (Yang Shi)
+Date: Tue,  9 Feb 2016 13:26:22 -0800
+Subject: [PATCH] arm64: use raw_smp_processor_id in stack backtrace dump
+Message-ID: <1455053182-31404-1-git-send-email-yang.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 9 Feb 2016, Dave Gerlach wrote:
+dump_backtrace may be called in kthread context, which is not bound to a single
+cpu, i.e. khungtaskd, then calling smp_processor_id may trigger the below bug
+report:
 
-> Sorry got held up by the discussion here [1], that regression affects
-> rmmod/re-insmod of wkup_m3_rproc as well. If I revert the guilty patch
-> 5de85b9d57ab ("PM / runtime: Re-init runtime
-> PM states at probe error and driver unbind") and apply these three patches, on
-> initial probe of the wkup_m3_rproc and wkup_m3_ipc drivers in v4.5-rc3 I see:
-> 
-> [   15.593460] omap_hwmod: wkup_m3: _wait_target_disable failed
-> 
-> Which is triggered by the reset of the wkup_m3 from the wkup_m3_ipc driver
-> when booting the wkup_m3_rproc. Flow is:
-> 
-> 1. wkup_m3_rproc probes and calls pm_runtime_get_sync, which calls hwmod
-> _enable but bails out because _are_all_hardreset_lines_asserted(oh) causes it
-> to return 0.
-> 
-> 2. wkup_m3_ipc probes and calls rproc_boot, which triggers
-> omap_device_deassert_hardreset in order to let the wkup_m3 start.
+BUG: using smp_processor_id() in preemptible [00000000] code: khungtaskd/71
+caller is debug_smp_processor_id+0x1c/0x28
+CPU: 3 PID: 71 Comm: khungtaskd Not tainted 4.5.0-rc1 #144
+Hardware name: Freescale Layerscape 2085a RDB Board (DT)
+Call trace:
+[<ffffffc00008d120>] dump_backtrace+0x0/0x290
+[<ffffffc00008d3d4>] show_stack+0x24/0x30
+[<ffffffc0006bfd1c>] dump_stack+0x8c/0xd8
+[<ffffffc0006fe56c>] check_preemption_disabled+0x184/0x188
+[<ffffffc0006fe58c>] debug_smp_processor_id+0x1c/0x28
+[<ffffffc00008d1a4>] dump_backtrace+0x84/0x290
+[<ffffffc00008d3d4>] show_stack+0x24/0x30
+[<ffffffc00012aa5c>] sched_show_task+0x16c/0x280
+[<ffffffc0001f3df8>] watchdog+0x560/0x708
+[<ffffffc000111bb8>] kthread+0x1b0/0x1d0
+[<ffffffc0000864d0>] ret_from_fork+0x10/0x40
 
-The patches that Kishon posted shouldn't change the existing hardreset 
-behavior for any IP block with HWMOD_CUSTOM_HARDRESET marked.  If the
-behavior changes before and after that patch set, something isn't right.
+Replace it to raw version to prevent from the race condition.
 
-> It is inside the omap_device_deassert_hardreset ( and inside that,
-> omap_hwmod_deassert_hardreset) where I end up with the error message, but
-> after that rmmod/insmod of the module over and over again shows no additional
-> error messages (at least with the above mentioned PM patch reverted).
+Signed-off-by: Yang Shi <yang.shi@linaro.org>
+---
+ arch/arm64/kernel/traps.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I no longer recall why we had the _are_all_hardreset_lines_asserted(oh) 
-test in place.  But we might be able to drop it now that we have the 
-HWMOD_CUSTOM_HARDRESET flag.
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index cbedd72..9abe236 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -146,7 +146,7 @@ static void dump_instr(const char *lvl, struct pt_regs *regs)
+ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
+ {
+ 	struct stackframe frame;
+-	unsigned long irq_stack_ptr = IRQ_STACK_PTR(smp_processor_id());
++	unsigned long irq_stack_ptr = IRQ_STACK_PTR(raw_smp_processor_id());
+ 	int skip;
  
-
-- Paul
+ 	pr_debug("%s(regs = %p tsk = %p)\n", __func__, regs, tsk);
+-- 
+2.0.2
