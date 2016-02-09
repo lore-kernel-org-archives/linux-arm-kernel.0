@@ -1,48 +1,65 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Tue, 9 Feb 2016 14:10:27 -0800
-Subject: [PATCH 3/3] thermal: allow u8500-thermal driver to be a module
-In-Reply-To: <20160127073300.GJ3368@x1>
-References: <1453740264-1972562-1-git-send-email-arnd@arndb.de>
- <1453740264-1972562-4-git-send-email-arnd@arndb.de>
- <20160127073300.GJ3368@x1>
-Message-ID: <20160209221026.GD28102@localhost.localdomain>
+From: tchalamarla@caviumnetworks.com (tchalamarla at caviumnetworks.com)
+Date: Tue, 9 Feb 2016 14:15:13 -0800
+Subject: [PATCH V2] arm64: KVM: Configure TCR_EL2.ps at runtime
+Message-ID: <1455056113-25948-1-git-send-email-tchalamarla@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 27, 2016 at 07:33:00AM +0000, Lee Jones wrote:
-> On Mon, 25 Jan 2016, Arnd Bergmann wrote:
-> 
-> > When the thermal subsystem is a loadable module, the u8500 driver
-> > fails to build:
-> > 
-> > drivers/thermal/built-in.o: In function `db8500_thermal_probe':
-> > db8500_thermal.c:(.text+0x96c): undefined reference to `thermal_zone_device_register'
-> > drivers/thermal/built-in.o: In function `db8500_thermal_work':
-> > db8500_thermal.c:(.text+0xab4): undefined reference to `thermal_zone_device_update'
-> > 
-> > This changes the symbol to a tristate, so Kconfig can track the
-> > dependency correctly.
-> > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > ---
-> >  drivers/mfd/db8500-prcmu.c | 3 +++
-> >  drivers/thermal/Kconfig    | 4 ++--
-> >  2 files changed, 5 insertions(+), 2 deletions(-)
-> 
-> As this touches a core Thermal file, I think it's better off going in
-> via that tree.  If that's a problem, I can take it with the relevant
-> Acks.
-> 
-> Acked-by: Lee Jones <lee.jones@linaro.org>
+From: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
 
+Setting TCR_EL2.ps to 40 bits is wrong on systems with ps size is
+less than 40 bits. and with systems where RAM is at higher address,
+this will break KVM.
 
-Thanks, I am adding to linux-next to see how it goes.
+This patch sets TCR_EL2.ps at runtime similar to VTCR_EL.ps
 
+Signed-off-by: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
+---
+ arch/arm64/include/asm/kvm_arm.h |  5 ++++-
+ arch/arm64/kvm/hyp-init.S        | 10 ++++++----
+ 2 files changed, 10 insertions(+), 5 deletions(-)
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160209/3f8a8e06/attachment.sig>
+diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+index 738a95f..92f2ffd 100644
+--- a/arch/arm64/include/asm/kvm_arm.h
++++ b/arch/arm64/include/asm/kvm_arm.h
+@@ -107,7 +107,10 @@
+ #define TCR_EL2_MASK	(TCR_EL2_TG0 | TCR_EL2_SH0 | \
+ 			 TCR_EL2_ORGN0 | TCR_EL2_IRGN0 | TCR_EL2_T0SZ)
+ 
+-#define TCR_EL2_FLAGS	(TCR_EL2_RES1 | TCR_EL2_PS_40B)
++/*
++ * TCR_EL2.ps is configured at runtime similar to VTCR_EL2
++ */
++#define TCR_EL2_FLAGS	(TCR_EL2_RES1)
+ 
+ /* VTCR_EL2 Registers bits */
+ #define VTCR_EL2_RES1		(1 << 31)
+diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
+index 3e568dc..b246de1e 100644
+--- a/arch/arm64/kvm/hyp-init.S
++++ b/arch/arm64/kvm/hyp-init.S
+@@ -85,15 +85,17 @@ __do_hyp_init:
+ 	ldr_l	x5, idmap_t0sz
+ 	bfi	x4, x5, TCR_T0SZ_OFFSET, TCR_TxSZ_WIDTH
+ #endif
+-	msr	tcr_el2, x4
+-
+-	ldr	x4, =VTCR_EL2_FLAGS
+ 	/*
+ 	 * Read the PARange bits from ID_AA64MMFR0_EL1 and set the PS bits in
+-	 * VTCR_EL2.
++	 * TCR_EL2 and VTCR_EL2.
+ 	 */
+ 	mrs	x5, ID_AA64MMFR0_EL1
+ 	bfi	x4, x5, #16, #3
++
++	msr	tcr_el2, x4
++
++	ldr	x4, =VTCR_EL2_FLAGS
++	bfi	x4, x5, #16, #3
+ 	/*
+ 	 * Read the VMIDBits bits from ID_AA64MMFR1_EL1 and set the VS bit in
+ 	 * VTCR_EL2.
+-- 
+2.1.0
