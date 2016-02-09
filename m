@@ -1,59 +1,188 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 10 Feb 2016 00:56:34 +0300
-Subject: [PATCH v2 4/5] ARM: dts: r8a7794: add Audio-DMAC support
-In-Reply-To: <12033353.rt0nolnBmD@wasted.cogentembedded.com>
-References: <12033353.rt0nolnBmD@wasted.cogentembedded.com>
-Message-ID: <5519679.0f6oS5evyW@wasted.cogentembedded.com>
+From: wei@redhat.com (Wei Huang)
+Date: Tue, 9 Feb 2016 15:57:12 -0600
+Subject: [PATCH 3/5] irqchip/gic-v2: Parse and export virtual GIC
+ information
+In-Reply-To: <20160209204914.GE5171@cbox>
+References: <1454950049-741-1-git-send-email-julien.grall@arm.com>
+ <1454950049-741-4-git-send-email-julien.grall@arm.com>
+ <20160209204914.GE5171@cbox>
+Message-ID: <56BA60B8.3020008@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Describe Audio-DMAC in the R8A7794 device tree.
 
-This patch is loosely based on the commit 8994fff67761 ("ARM: shmobile:
-r8a7791: Add Audio DMAC devices to DT").
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+On 02/09/2016 02:49 PM, Christoffer Dall wrote:
+> On Mon, Feb 08, 2016 at 04:47:27PM +0000, Julien Grall wrote:
+>> For now, the firmware tables are parsed 2 times: once in the GIC
+>> drivers, the other timer when initializing the vGIC. It means code
+>> duplication and make more tedious to add the support for another
+>> firmware table (like ACPI).
+>>
+>> Introduce a new structure and set of helpers to get/set the virtual GIC
+>> information. Also fill up the structure for GICv2.
+>>
+>> Signed-off-by: Julien Grall <julien.grall@arm.com>
+>> ---
+>>
+>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>> Cc: Jason Cooper <jason@lakedaemon.net>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>>
+>>  drivers/irqchip/irq-gic-common.c       | 13 ++++++
+>>  drivers/irqchip/irq-gic-common.h       |  3 ++
+>>  drivers/irqchip/irq-gic.c              | 78 +++++++++++++++++++++++++++++++++-
+>>  include/linux/irqchip/arm-gic-common.h | 34 +++++++++++++++
+>>  4 files changed, 127 insertions(+), 1 deletion(-)
+>>  create mode 100644 include/linux/irqchip/arm-gic-common.h
+>>
+>> diff --git a/drivers/irqchip/irq-gic-common.c b/drivers/irqchip/irq-gic-common.c
+>> index f174ce0..704caf4 100644
+>> --- a/drivers/irqchip/irq-gic-common.c
+>> +++ b/drivers/irqchip/irq-gic-common.c
+>> @@ -21,6 +21,19 @@
+>>  
+>>  #include "irq-gic-common.h"
+>>  
+>> +static const struct gic_kvm_info *gic_kvm_info;
+>> +
+>> +const struct gic_kvm_info *gic_get_kvm_info(void)
+>> +{
+>> +	return gic_kvm_info;
+>> +}
+>> +
+>> +void gic_set_kvm_info(const struct gic_kvm_info *info)
+>> +{
+>> +	WARN(gic_kvm_info != NULL, "gic_kvm_info already set\n");
+>> +	gic_kvm_info = info;
+>> +}
+>> +
+>>  void gic_enable_quirks(u32 iidr, const struct gic_quirk *quirks,
+>>  		void *data)
+>>  {
+>> diff --git a/drivers/irqchip/irq-gic-common.h b/drivers/irqchip/irq-gic-common.h
+>> index fff697d..205e5fd 100644
+>> --- a/drivers/irqchip/irq-gic-common.h
+>> +++ b/drivers/irqchip/irq-gic-common.h
+>> @@ -19,6 +19,7 @@
+>>  
+>>  #include <linux/of.h>
+>>  #include <linux/irqdomain.h>
+>> +#include <linux/irqchip/arm-gic-common.h>
+>>  
+>>  struct gic_quirk {
+>>  	const char *desc;
+>> @@ -35,4 +36,6 @@ void gic_cpu_config(void __iomem *base, void (*sync_access)(void));
+>>  void gic_enable_quirks(u32 iidr, const struct gic_quirk *quirks,
+>>  		void *data);
+>>  
+>> +void gic_set_kvm_info(const struct gic_kvm_info *info);
+>> +
+>>  #endif /* _IRQ_GIC_COMMON_H */
+>> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+>> index 911758c..d3a09a4 100644
+>> --- a/drivers/irqchip/irq-gic.c
+>> +++ b/drivers/irqchip/irq-gic.c
+>> @@ -102,6 +102,8 @@ static struct static_key supports_deactivate = STATIC_KEY_INIT_TRUE;
+>>  
+>>  static struct gic_chip_data gic_data[CONFIG_ARM_GIC_MAX_NR] __read_mostly;
+>>  
+>> +static struct gic_kvm_info gic_v2_kvm_info;
+>> +
+>>  #ifdef CONFIG_GIC_NON_BANKED
+>>  static void __iomem *gic_get_percpu_base(union gic_base *base)
+>>  {
+>> @@ -1190,6 +1192,44 @@ static bool gic_check_eoimode(struct device_node *node, void __iomem **base)
+>>  	return true;
+>>  }
+>>  
+>> +static void __init gic_of_setup_kvm_info(struct device_node *node)
+>> +{
+>> +	int ret;
+>> +	struct resource r;
+>> +	unsigned int irq;
+>> +
+>> +	gic_v2_kvm_info.type = GIC_V2;
+>> +
+>> +	irq = irq_of_parse_and_map(node, 0);
+>> +	if (!irq)
+>> +		gic_v2_kvm_info.maint_irq = -1;
+>> +	else
+>> +		gic_v2_kvm_info.maint_irq = irq;
+>> +
+>> +	ret = of_address_to_resource(node, 2, &r);
+>> +	if (!ret) {
+>> +		gic_v2_kvm_info.vctrl_base = r.start;
+>> +		gic_v2_kvm_info.vctrl_size = resource_size(&r);
+>> +	}
+>> +
+>> +	ret = of_address_to_resource(node, 3, &r);
+>> +	if (!ret) {
+>> +		if (!PAGE_ALIGNED(r.start))
+>> +			pr_warn("GICV physical address 0x%llx not page aligned\n",
+>> +				(unsigned long long)r.start);
+>> +		else if (!PAGE_ALIGNED(resource_size(&r)))
+>> +			pr_warn("GICV size 0x%llx not a multiple of page size 0x%lx\n",
+>> +				(unsigned long long)resource_size(&r),
+>> +				PAGE_SIZE);
+>> +		else {
+>> +			gic_v2_kvm_info.vcpu_base = r.start;
+>> +			gic_v2_kvm_info.vcpu_size = resource_size(&r);
+>> +		}
+>> +	}
+>> +
+>> +	gic_set_kvm_info(&gic_v2_kvm_info);
+>> +}
+>> +
+>>  int __init
+>>  gic_of_init(struct device_node *node, struct device_node *parent)
+>>  {
+>> @@ -1219,8 +1259,10 @@ gic_of_init(struct device_node *node, struct device_node *parent)
+>>  
+>>  	__gic_init_bases(gic_cnt, -1, dist_base, cpu_base, percpu_offset,
+>>  			 &node->fwnode);
+>> -	if (!gic_cnt)
+>> +	if (!gic_cnt) {
+>>  		gic_init_physaddr(node);
+>> +		gic_of_setup_kvm_info(node);
+>> +	}
+>>  
+>>  	if (parent) {
+>>  		irq = irq_of_parse_and_map(node, 0);
+>> @@ -1247,6 +1289,32 @@ IRQCHIP_DECLARE(pl390, "arm,pl390", gic_of_init);
+>>  
+>>  #ifdef CONFIG_ACPI
+>>  static phys_addr_t cpu_phy_base __initdata;
+>> +static struct
+>> +{
+>> +	u32 maint_irq;
+>> +	int maint_irq_mode;
+>> +	phys_addr_t vctrl_base;
+>> +	phys_addr_t vcpu_base;
+>> +} acpi_data __initdata;
+>> +
+>> +static void __init gic_acpi_setup_kvm_info(void)
+>> +{
+>> +	gic_v2_kvm_info.type = GIC_V2;
+>> +
+>> +	gic_v2_kvm_info.maint_irq = acpi_register_gsi(NULL,
+>> +						      acpi_data.maint_irq,
+>> +						      acpi_data.maint_irq_mode,
+>> +						      ACPI_ACTIVE_HIGH);
+>> +	gic_v2_kvm_info.vctrl_base = acpi_data.vctrl_base;
+>> +	if (gic_v2_kvm_info.vctrl_base)
+>> +		gic_v2_kvm_info.vctrl_size = SZ_8K;
+>> +
+>> +	gic_v2_kvm_info.vcpu_base = acpi_data.vcpu_base;
+>> +	if (gic_v2_kvm_info.vcpu_base)
+>> +		gic_v2_kvm_info.vcpu_size = SZ_8K;
+> 
+> why are the sizes hard-coded to 8K in this case?
 
----
- arch/arm/boot/dts/r8a7794.dtsi |   28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+ACPI doesn't provide the size info for GICH and GICV resources. So we
+have to pick a default one, which is 8K.
 
-Index: renesas/arch/arm/boot/dts/r8a7794.dtsi
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7794.dtsi
-+++ renesas/arch/arm/boot/dts/r8a7794.dtsi
-@@ -281,6 +281,34 @@
- 		dma-channels = <15>;
- 	};
- 
-+	audma0: dma-controller at ec700000 {
-+		compatible = "renesas,dmac-r8a7794", "renesas,rcar-dmac";
-+		reg = <0 0xec700000 0 0x10000>;
-+		interrupts =	<GIC_SPI 346 IRQ_TYPE_LEVEL_HIGH
-+				 GIC_SPI 320 IRQ_TYPE_LEVEL_HIGH
-+				 GIC_SPI 321 IRQ_TYPE_LEVEL_HIGH
-+				 GIC_SPI 322 IRQ_TYPE_LEVEL_HIGH
-+				 GIC_SPI 323 IRQ_TYPE_LEVEL_HIGH
-+				 GIC_SPI 324 IRQ_TYPE_LEVEL_HIGH
-+				 GIC_SPI 325 IRQ_TYPE_LEVEL_HIGH
-+				 GIC_SPI 326 IRQ_TYPE_LEVEL_HIGH
-+				 GIC_SPI 327 IRQ_TYPE_LEVEL_HIGH
-+				 GIC_SPI 328 IRQ_TYPE_LEVEL_HIGH
-+				 GIC_SPI 329 IRQ_TYPE_LEVEL_HIGH
-+				 GIC_SPI 330 IRQ_TYPE_LEVEL_HIGH
-+				 GIC_SPI 331 IRQ_TYPE_LEVEL_HIGH
-+				 GIC_SPI 332 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-names = "error",
-+				  "ch0", "ch1", "ch2", "ch3", "ch4", "ch5",
-+				  "ch6", "ch7", "ch8", "ch9", "ch10", "ch11",
-+				  "ch12";
-+		clocks = <&mstp5_clks R8A7794_CLK_AUDIO_DMAC0>;
-+		clock-names = "fck";
-+		power-domains = <&cpg_clocks>;
-+		#dma-cells = <1>;
-+		dma-channels = <13>;
-+	};
-+
- 	scifa0: serial at e6c40000 {
- 		compatible = "renesas,scifa-r8a7794",
- 			     "renesas,rcar-gen2-scifa", "renesas,scifa";
+> 
+> Thanks,
+> -Christoffer
+> 
