@@ -1,69 +1,92 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 9 Feb 2016 09:30:29 +0000
-Subject: [PATCH 2/3] arm64: dts: add the Alpine v2 EVP
-In-Reply-To: <CABM=7knaepbyy4nw_GczVM7E_t6py7gG0ERs8ru_AYoVXvAQ+A@mail.gmail.com>
-References: <1454922699-16785-1-git-send-email-antoine.tenart@free-electrons.com>
- <1454922699-16785-3-git-send-email-antoine.tenart@free-electrons.com>
- <56B8B45D.1020902@arm.com> <20160209085633.GA5388@kwain>
- <20160209090131.GB5388@kwain> <56B9ACE2.1060200@arm.com>
- <CABM=7knaepbyy4nw_GczVM7E_t6py7gG0ERs8ru_AYoVXvAQ+A@mail.gmail.com>
-Message-ID: <56B9B1B5.5070106@arm.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 9 Feb 2016 10:30:51 +0100
+Subject: [linux-sunxi][PATCH] ARM: dts: sun7i: Enable USB DRC on MK808C
+In-Reply-To: <1455009932-27616-1-git-send-email-codekipper@gmail.com>
+References: <1455009932-27616-1-git-send-email-codekipper@gmail.com>
+Message-ID: <56B9B1CB.102@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/02/16 09:14, Tsahee Zidenberg wrote:
-> 
-> 
-> On 9 February 2016 at 11:09, Marc Zyngier <marc.zyngier@arm.com
-> <mailto:marc.zyngier@arm.com>> wrote:
-> 
->     On 09/02/16 09:01, Antoine Tenart wrote:
->     > On Tue, Feb 09, 2016 at 09:56:33AM +0100, Antoine Tenart wrote:
->     >> Hi Marc,
->     >>
->     >> On Mon, Feb 08, 2016 at 03:29:33PM +0000, Marc Zyngier wrote:
->     >>> On 08/02/16 09:11, Antoine Tenart wrote:
->     >>>
->     >>>> +          gic: gic at f0100000 {
->     >>>> +                  compatible = "arm,gic-v3";
->     >>>> +                  reg = <0x0 0xf0200000 0x0 0x10000>,     /* GIC Dist */
->     >>>> +                        <0x0 0xf0280000 0x0 0x200000>,    /* GICR */
->     >>>> +                        <0x0 0xf0100000 0x0 0x2000>;      /* GICC */
->     >>>> +                  interrupt-controller;
->     >>>> +                  #interrupt-cells = <3>;
->     >>>> +          };
->     >>>
->     >>> Something is wrong here. Either you are missing GICH and GICV (assuming
->     >>> you have legacy support), or you have an extra GICC region (which
->     >>> doesn't make sense on its own).
->     >>
->     >> I'll add the missing regions.
->     >
->     > Hmm, in fact the GICC region shouldn't be there. I'll make some tests
->     > and remove it.
-> 
->     If you have a GICv3 with legacy support, you will probably have GICC,
->     GICH and GICV. Linux itself will only use GICD and GICR, but it needs at
->     least GICV to be able to virtualize GICv2 guests. And GICV is not
->     allowed to exist without GICC and GICH, so I really recommend that you
->     keep GICC around.
-> 
-> 
-> We use the GIC without legacy support (we disable it in early boot
-> stages), so I think removing the GICC region is the better solution.
+Hi,
 
-Disabling legacy support doesn't mean that:
-- the HW isn't present
-- the associated regions are not useful
+On 09-02-16 10:25, codekipper at gmail.com wrote:
+> From: Marcus Cooper <codekipper@gmail.com>
+>
+> Enable the otg/drc usb controller on the MK808C.
+>
+> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
 
-Here, we describe the HW, not the usage you make of it.
+Thanks patch looks good to me:
 
-And unless you think that having working virtualization is completely
-useless, I strongly suggest that you properly document the HW in the
-device tree.
+Reviewed-by: Hans de Goede <hdegoede@redhat.com>
 
-Thanks,
+Regards,
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Hans
+
+> ---
+>   arch/arm/boot/dts/sun7i-a20-mk808c.dts | 35 ++++++++++++++++++++++++++++++++++
+>   1 file changed, 35 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sun7i-a20-mk808c.dts b/arch/arm/boot/dts/sun7i-a20-mk808c.dts
+> index c9e648d..90ff4a2 100644
+> --- a/arch/arm/boot/dts/sun7i-a20-mk808c.dts
+> +++ b/arch/arm/boot/dts/sun7i-a20-mk808c.dts
+> @@ -53,6 +53,7 @@
+>
+>   #include <dt-bindings/gpio/gpio.h>
+>   #include <dt-bindings/interrupt-controller/irq.h>
+> +#include <dt-bindings/pinctrl/sun4i-a10.h>
+>
+>   / {
+>   	model = "mk808c";
+> @@ -125,6 +126,30 @@
+>   	status = "okay";
+>   };
+>
+> +&otg_sram {
+> +	status = "okay";
+> +};
+> +
+> +&pio {
+> +	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
+> +		allwinner,pins = "PH4";
+> +		allwinner,function = "gpio_in";
+> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> +	};
+> +
+> +	usb0_vbus_detect_pin: usb0_vbus_detect_pin at 0 {
+> +		allwinner,pins = "PH5";
+> +		allwinner,function = "gpio_in";
+> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> +	};
+> +};
+> +
+> +&reg_usb0_vbus {
+> +	status = "okay";
+> +};
+> +
+>   &reg_usb1_vbus {
+>   	status = "okay";
+>   };
+> @@ -145,7 +170,17 @@
+>   	status = "okay";
+>   };
+>
+> +&usb_otg {
+> +	dr_mode = "otg";
+> +	status = "okay";
+> +};
+> +
+>   &usbphy {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&usb0_id_detect_pin>, <&usb0_vbus_detect_pin>;
+> +	usb0_id_det-gpios = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
+> +	usb0_vbus_det-gpios = <&pio 7 5 GPIO_ACTIVE_HIGH>; /* PH5 */
+> +	usb0_vbus-supply = <&reg_usb0_vbus>;
+>   	usb1_vbus-supply = <&reg_usb1_vbus>;
+>   	usb2_vbus-supply = <&reg_usb2_vbus>;
+>   	status = "okay";
+>
