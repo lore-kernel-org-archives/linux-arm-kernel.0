@@ -1,99 +1,221 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Tue, 9 Feb 2016 08:58:50 -0800
-Subject: [PATCH v5 3/3] pci,
- pci-thunder-ecam: Add driver for ThunderX-pass1 on-chip devices
-In-Reply-To: <4260938.2z2RNjENMM@wuerfel>
-References: <1454715675-17512-1-git-send-email-ddaney.cavm@gmail.com>
- <12842339.z2KnaZPlyO@wuerfel> <20160209162628.GA20171@localhost>
- <4260938.2z2RNjENMM@wuerfel>
-Message-ID: <56BA1ACA.3090106@caviumnetworks.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 9 Feb 2016 18:00:42 +0100
+Subject: [PATCH v2 18/28] ARM: KVM: Add HYP mode entry code
+In-Reply-To: <1454583645-10144-19-git-send-email-marc.zyngier@arm.com>
+References: <1454583645-10144-1-git-send-email-marc.zyngier@arm.com>
+ <1454583645-10144-19-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20160209170042.GA5171@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/09/2016 08:31 AM, Arnd Bergmann wrote:
-> On Tuesday 09 February 2016 10:26:28 Bjorn Helgaas wrote:
->> On Tue, Feb 09, 2016 at 10:25:33AM +0100, Arnd Bergmann wrote:
->>> On Monday 08 February 2016 17:24:30 Bjorn Helgaas wrote:
->>>>>>
->>>>>> I assume your system conforms to expectations like these; I'm just
->>>>>> pointing them out because you mentioned buses with multiple devices on
->>>>>> them, which is definitely something one doesn't expect in PCIe.
->>>>>
->>>>> The topology we have is currently working with the kernel's core PCI
->>>>> code.  I don't really want to get into discussing what the
->>>>> definition of PCIe is.  We have multiple devices (more than 32) on a
->>>>> single bus, and they have PCI Express and ARI Capabilities.  Is that
->>>>> PCIe?  I don't know.
->>>>
->>>> I don't need to know the details of your topology.  As long as it
->>>> conforms to the PCIe spec, it should be fine.  If it *doesn't* conform
->>>> to the spec, but things currently seem to work, that's less fine,
->>>> because a future Linux change is liable to break something for you.
->>>>
->>>> I was a little concerned about your statement that "there are multiple
->>>> devices residing on each bus, so from that point of view it cannot be
->>>> PCIe."  That made it sound like you're doing something outside the
->>>> spec.  If you're just using regular multi-function devices or ARI,
->>>> then I don't see any issue (or any reason to say it can't be PCIe).
->>>
->>> It doesn't conform to the PCIe port spec, because there are no external
->>> ports but just integrated devices in the host bridge.
->>
->> Is there a spec section you have in mind?  Based on sec 1.3.1, I don't
->> think there's a requirement to have PCI Express Ports (is that what
->> you mean by "external ports"?)
->
-> No, I was just assuming that ports are specified in their own document,
-> which would not be followed here if there are none. There is nothing in
-> here that leads me to believe that the hardware is actually noncompliant
-> with any relevant standard.
->
->> Root Complex Integrated Endpoints (sec 1.3.2.3) are clearly supported
->> and they would not be behind a Root Port.  If you're using those, I
->> hope they're correctly identified via the PCIe capability Device/Port
->> Type (sec 7.8.2) because we rely on that type to figure out whether
->> the link-related registers are implemented.
->>
->> The spec does include rules related to peer-to-peer transactions, MPS,
->> ASPM, error reporting, etc., and Linux relies on those, so I think it
->> would be important to get those right.
->
-> David can probably explain more if the registers are compliant with
-> those parts of the spec.
+On Thu, Feb 04, 2016 at 11:00:35AM +0000, Marc Zyngier wrote:
+> This part is almost entierely borrowed from the existing code, just
+> slightly simplifying the HYP function call (as we now save SPSR_hyp
+> in the world switch).
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm/kvm/hyp/Makefile    |   1 +
+>  arch/arm/kvm/hyp/hyp-entry.S | 157 +++++++++++++++++++++++++++++++++++++++++++
+>  arch/arm/kvm/hyp/hyp.h       |   2 +
+>  3 files changed, 160 insertions(+)
+>  create mode 100644 arch/arm/kvm/hyp/hyp-entry.S
+> 
+> diff --git a/arch/arm/kvm/hyp/Makefile b/arch/arm/kvm/hyp/Makefile
+> index cfab402..a7d3a7e 100644
+> --- a/arch/arm/kvm/hyp/Makefile
+> +++ b/arch/arm/kvm/hyp/Makefile
+> @@ -9,4 +9,5 @@ obj-$(CONFIG_KVM_ARM_HOST) += vgic-v2-sr.o
+>  obj-$(CONFIG_KVM_ARM_HOST) += vfp.o
+>  obj-$(CONFIG_KVM_ARM_HOST) += banked-sr.o
+>  obj-$(CONFIG_KVM_ARM_HOST) += entry.o
+> +obj-$(CONFIG_KVM_ARM_HOST) += hyp-entry.o
+>  obj-$(CONFIG_KVM_ARM_HOST) += switch.o
+> diff --git a/arch/arm/kvm/hyp/hyp-entry.S b/arch/arm/kvm/hyp/hyp-entry.S
+> new file mode 100644
+> index 0000000..44bc11f
+> --- /dev/null
+> +++ b/arch/arm/kvm/hyp/hyp-entry.S
+> @@ -0,0 +1,157 @@
+> +/*
+> + * Copyright (C) 2012 - Virtual Open Systems and Columbia University
+> + * Author: Christoffer Dall <c.dall@virtualopensystems.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License, version 2, as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, write to the Free Software
+> + * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+> + */
+> +
+> +#include <linux/linkage.h>
+> +#include <asm/kvm_arm.h>
+> +#include <asm/kvm_asm.h>
+> +
+> +	.arch_extension     virt
+> +
+> +	.text
+> +	.pushsection	.hyp.text, "ax"
+> +
+> +.macro load_vcpu	reg
+> +	mrc	p15, 4, \reg, c13, c0, 2	@ HTPIDR
+> +.endm
+> +
+> +/********************************************************************
+> + * Hypervisor exception vector and handlers
+> + *
+> + *
+> + * The KVM/ARM Hypervisor ABI is defined as follows:
+> + *
+> + * Entry to Hyp mode from the host kernel will happen _only_ when an HVC
+> + * instruction is issued since all traps are disabled when running the host
+> + * kernel as per the Hyp-mode initialization at boot time.
+> + *
+> + * HVC instructions cause a trap to the vector page + offset 0x14 (see hyp_hvc
+> + * below) when the HVC instruction is called from SVC mode (i.e. a guest or the
+> + * host kernel) and they cause a trap to the vector page + offset 0x8 when HVC
+> + * instructions are called from within Hyp-mode.
+> + *
+> + * Hyp-ABI: Calling HYP-mode functions from host (in SVC mode):
+> + *    Switching to Hyp mode is done through a simple HVC #0 instruction. The
+> + *    exception vector code will check that the HVC comes from VMID==0.
+> + *    - r0 contains a pointer to a HYP function
+> + *    - r1, r2, and r3 contain arguments to the above function.
+> + *    - The HYP function will be called with its arguments in r0, r1 and r2.
+> + *    On HYP function return, we return directly to SVC.
+> + *
+> + * Note that the above is used to execute code in Hyp-mode from a host-kernel
+> + * point of view, and is a different concept from performing a world-switch and
+> + * executing guest code SVC mode (with a VMID != 0).
+> + */
+> +
+> +	.align 5
+> +__hyp_vector:
+> +	.global	__hyp_vector
+> +__kvm_hyp_vector:
+> +	.weak __kvm_hyp_vector
+> +
+> +	@ Hyp-mode exception vector
+> +	W(b)	hyp_reset
+> +	W(b)	hyp_undef
+> +	W(b)	hyp_svc
+> +	W(b)	hyp_pabt
+> +	W(b)	hyp_dabt
+> +	W(b)	hyp_hvc
+> +	W(b)	hyp_irq
+> +	W(b)	hyp_fiq
+> +
+> +.macro invalid_vector label, cause
+> +	.align
+> +\label:	b	.
+> +.endm
+> +
+> +	invalid_vector	hyp_reset
+> +	invalid_vector	hyp_undef
+> +	invalid_vector	hyp_svc
+> +	invalid_vector	hyp_pabt
+> +	invalid_vector	hyp_dabt
+> +	invalid_vector	hyp_fiq
+> +
+> +hyp_hvc:
+> +	/*
+> +	 * Getting here is either because of a trap from a guest,
+> +	 * or from executing HVC from the host kernel, which means
+> +	 * "do something in Hyp mode".
+> +	 */
+> +	push	{r0, r1, r2}
+> +
+> +	@ Check syndrome register
+> +	mrc	p15, 4, r1, c5, c2, 0	@ HSR
+> +	lsr	r0, r1, #HSR_EC_SHIFT
+> +	cmp	r0, #HSR_EC_HVC
+> +	bne	guest_trap		@ Not HVC instr.
+> +
+> +	/*
+> +	 * Let's check if the HVC came from VMID 0 and allow simple
+> +	 * switch to Hyp mode
+> +	 */
+> +	mrrc    p15, 6, r0, r2, c2
+> +	lsr     r2, r2, #16
+> +	and     r2, r2, #0xff
+> +	cmp     r2, #0
+> +	bne	guest_trap		@ Guest called HVC
+> +
+> +	/*
+> +	 * Getting here means host called HVC, we shift parameters and branch
+> +	 * to Hyp function.
+> +	 */
+> +	pop	{r0, r1, r2}
+> +
+> +	/* Check for __hyp_get_vectors */
+> +	cmp	r0, #-1
+> +	mrceq	p15, 4, r0, c12, c0, 0	@ get HVBAR
+> +	beq	1f
+> +
+> +	push	{lr}
+> +
+> +	mov	lr, r0
+> +	mov	r0, r1
+> +	mov	r1, r2
+> +	mov	r2, r3
+> +
+> +THUMB(	orr	lr, #1)
+> +	blx	lr			@ Call the HYP function
+> +
+> +	pop	{lr}
+> +1:	eret
+> +
+> +guest_trap:
+> +	load_vcpu r0			@ Load VCPU pointer to r0
+> +
+> +	@ Check if we need the fault information
 
-It is somewhat moot, but in the interest of keeping this thread alive:
+nit: this is not about faults at this point, so this comment should
+either go or be reworded to "let's check if we trapped on guest VFP
+access"
 
-None of the "on-chip" devices behind these root complexes implements 
-ASPM, AER, etc.  The capability structures for all the features you 
-mention are not present.
+and I think the lsr can be moved into the ifdef as well.
 
-All that is there beyond standard PCI capabilities are:
+> +	lsr	r1, r1, #HSR_EC_SHIFT
+> +#ifdef CONFIG_VFPv3
+> +	cmp	r1, #HSR_EC_CP_0_13
+> +	beq	__vfp_guest_restore
+> +#endif
+> +
+> +	mov	r1, #ARM_EXCEPTION_HVC
+> +	b	__guest_exit
+> +
+> +hyp_irq:
+> +	push	{r0, r1, r2}
+> +	mov	r1, #ARM_EXCEPTION_IRQ
+> +	load_vcpu r0			@ Load VCPU pointer to r0
+> +	b	__guest_exit
+> +
+> +	.ltorg
+> +
+> +	.popsection
+> diff --git a/arch/arm/kvm/hyp/hyp.h b/arch/arm/kvm/hyp/hyp.h
+> index 7ddca54..8bbd2a7 100644
+> --- a/arch/arm/kvm/hyp/hyp.h
+> +++ b/arch/arm/kvm/hyp/hyp.h
+> @@ -123,4 +123,6 @@ void __hyp_text __banked_restore_state(struct kvm_cpu_context *ctxt);
+>  
+>  int asmlinkage __guest_enter(struct kvm_vcpu *vcpu,
+>  			     struct kvm_cpu_context *host);
+> +int asmlinkage __hyp_do_panic(const char *, int, u32);
+> +
+>  #endif /* __ARM_KVM_HYP_H__ */
+> -- 
+> 2.1.4
+> 
+Otherwise looke good.
 
-   - PCI Express capability, to indicate presence of PCI Express 
-Extended Capabilities.
-
-   - ARI capability so we can fit more than 16 devices on a bus.
-
-   - SRIOV capability on devices that are virtualizable.
-
-   - That's it!
-
-The reality is that they are not really PCI/PCIe devices at all.  All 
-the device registers are at fixed addresses and are connected to 
-proprietary internal buses with various weird properties.  Witness the 
-need for Enhanced Allocation capabilities to describe the fixed addressing.
-
-The PCI config space is a veneer laid on top of it all to aid in device 
-discovery and interrupt routing.
-
-So is it PCI or PCIe?  It is not really important to say.  All we want, 
-is to be able to get the pci-host-generic root complex driver to bind to 
-our ECAM/ECAM-like configuration space accessors.
-
-David Daney
-
-
-
->
-> 	Arnd
->
+Thanks,
+-Christoffer
