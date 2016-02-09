@@ -1,45 +1,79 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Tue, 9 Feb 2016 10:19:16 +0100
-Subject: [PATCH 0/2] ARM: zynq: address silent L2 cache corruption
-In-Reply-To: <cover.1454465714.git.joshc@ni.com>
-References: <cover.1454465714.git.joshc@ni.com>
-Message-ID: <56B9AF14.3070706@xilinx.com>
+From: codekipper@gmail.com (codekipper at gmail.com)
+Date: Tue,  9 Feb 2016 10:25:32 +0100
+Subject: [linux-sunxi][PATCH] ARM: dts: sun7i: Enable USB DRC on MK808C
+Message-ID: <1455009932-27616-1-git-send-email-codekipper@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3.2.2016 03:30, Josh Cartwright wrote:
-> The Zynq has a bug where the L2 cache will return invalid data in some
-> circumstances unless the L2C_RAM register is set to 0x20202 before the first
-> enabling of the L2 cache.
-> 
-> The Xilinx-recommended solution to this problem is to ensure that early one of
-> the earlier bootstages correctly initialize L2C_RAM, however, this issue wasn't
-> discovered and fixed until after their EDK/SDK 14.4 release.  For systems built
-> prior to that, and which lack field-upgradable bootloaders, this issue still
-> exists and silent data corruption can be seen in the wild.
-> 
-> Fix these systems by ensuring L2C_RAM is properly initialized at the
-> earliest convenient moment prior to the L2 being brought up, which is
-> when the SLCR is first mapped.
-> 
-> Unfortunately, there isn't much public documentation on exactly what the
-> L2C_RAM register is for, or how it is used, only that software is responsible
-> for initializing it to the proper value prior to bringing up L2.
-> 
-> You can find more information about this bug in AR#54190[1].
-> 
-> 1: http://www.xilinx.com/support/answers/54190.html
-> 
-> Josh Cartwright (2):
->   ARM: zynq: initialize slcr mapping earlier
->   ARM: zynq: address L2 cache data corruption
-> 
->  arch/arm/mach-zynq/common.c | 3 +--
->  arch/arm/mach-zynq/slcr.c   | 4 ++++
->  2 files changed, 5 insertions(+), 2 deletions(-)
-> 
+From: Marcus Cooper <codekipper@gmail.com>
 
-Applied both.
+Enable the otg/drc usb controller on the MK808C.
 
-Thanks,
-Michal
+Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+---
+ arch/arm/boot/dts/sun7i-a20-mk808c.dts | 35 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
+
+diff --git a/arch/arm/boot/dts/sun7i-a20-mk808c.dts b/arch/arm/boot/dts/sun7i-a20-mk808c.dts
+index c9e648d..90ff4a2 100644
+--- a/arch/arm/boot/dts/sun7i-a20-mk808c.dts
++++ b/arch/arm/boot/dts/sun7i-a20-mk808c.dts
+@@ -53,6 +53,7 @@
+ 
+ #include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/pinctrl/sun4i-a10.h>
+ 
+ / {
+ 	model = "mk808c";
+@@ -125,6 +126,30 @@
+ 	status = "okay";
+ };
+ 
++&otg_sram {
++	status = "okay";
++};
++
++&pio {
++	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
++		allwinner,pins = "PH4";
++		allwinner,function = "gpio_in";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++
++	usb0_vbus_detect_pin: usb0_vbus_detect_pin at 0 {
++		allwinner,pins = "PH5";
++		allwinner,function = "gpio_in";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++};
++
++&reg_usb0_vbus {
++	status = "okay";
++};
++
+ &reg_usb1_vbus {
+ 	status = "okay";
+ };
+@@ -145,7 +170,17 @@
+ 	status = "okay";
+ };
+ 
++&usb_otg {
++	dr_mode = "otg";
++	status = "okay";
++};
++
+ &usbphy {
++	pinctrl-names = "default";
++	pinctrl-0 = <&usb0_id_detect_pin>, <&usb0_vbus_detect_pin>;
++	usb0_id_det-gpios = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
++	usb0_vbus_det-gpios = <&pio 7 5 GPIO_ACTIVE_HIGH>; /* PH5 */
++	usb0_vbus-supply = <&reg_usb0_vbus>;
+ 	usb1_vbus-supply = <&reg_usb1_vbus>;
+ 	usb2_vbus-supply = <&reg_usb2_vbus>;
+ 	status = "okay";
+-- 
+2.7.1
