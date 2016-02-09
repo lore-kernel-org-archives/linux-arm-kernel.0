@@ -1,35 +1,37 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 9 Feb 2016 10:18:39 +0000
-Subject: [PATCH 02/11] mfd: axp20x: Add bindings for AXP809 PMIC
-In-Reply-To: <20160202224348.GA15250@rob-hp-laptop>
-References: <1454408864-24112-1-git-send-email-wens@csie.org>
- <1454408864-24112-3-git-send-email-wens@csie.org>
- <20160202224348.GA15250@rob-hp-laptop>
-Message-ID: <20160209101839.GA24522@x1>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Tue, 9 Feb 2016 11:19:57 +0100
+Subject: [PATCH 0/2] CREG clk driver for NXP LPC18xx family
+In-Reply-To: <20160208222637.GV4848@codeaurora.org>
+References: <1436651307-24098-1-git-send-email-manabian@gmail.com>
+ <20160208222637.GV4848@codeaurora.org>
+Message-ID: <CAGhQ9Vy14XR+-kgACiqPgs0SPueizD6Gd2q5kaNqM5mGna0V=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 02 Feb 2016, Rob Herring wrote:
+Hi Stephen,
 
-> On Tue, Feb 02, 2016 at 06:27:35PM +0800, Chen-Yu Tsai wrote:
-> > This patch adds the basic and regulator bindings for the X-Powers AXP809
-> > PMIC.
-> > 
-> > Also update the DC-DC converter operating frequency for AXP22X/AXP80X.
-> > 
-> > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> > ---
-> >  Documentation/devicetree/bindings/mfd/axp20x.txt | 31 ++++++++++++++++++++++--
-> >  1 file changed, 29 insertions(+), 2 deletions(-)
-> 
-> Acked-by: Rob Herring <robh@kernel.org>
+On 8 February 2016 at 23:26, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 07/11, Joachim Eastwood wrote:
+>> This patch set adds a clk driver for the low power clocks found in
+>> the CREG block on lpc18xx. CREG is a collection of miscellaneous
+>> configuration registers that can be accessed through a syscon
+>> regmap interface. The clk driver makes it possible to setup and
+>> enabled these two clocks.
+>>
+>> This need to support peripherals like the internal RTC on the
+>> lpc18xx platform.
+>>
+>
+> I know this is many months old, but is this driver still
+> required? I can apply it to clk-next if so.
 
-No idea what's going on here.  Somehow I must have been in the
-Reply-To, but never actually sent the patches initially.  So I have
-people's replies, but not the original submission.
+It is still needed for the internal RTC (rtc-lpc24xx) on lpc18xx. The
+RTC uses a 1 kHz clock that is controlled in CREG (misc system regs).
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Note; if you apply it you will most likely get a very trivial conflict
+in drivers/clk/nxp/Makefile because clk-lpc32xx.c has been added since
+these patches was sent.
+
+
+regards,
+Joachim Eastwood
