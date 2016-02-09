@@ -1,71 +1,130 @@
-From: dietmar.eggemann@arm.com (Dietmar Eggemann)
-Date: Tue, 9 Feb 2016 15:54:50 +0000
-Subject: [PATCH v3 2/6] drivers/cpufreq: implement
- init_cpu_capacity_default()
-In-Reply-To: <20160205093040.GG29586@e106622-lin>
-References: <1454500799-18451-1-git-send-email-juri.lelli@arm.com>
- <1454500799-18451-3-git-send-email-juri.lelli@arm.com>
- <CAKfTPtDGk5BC25WqHdhDYDOBgUsuidAMhrXS=eDi6wJPZjfrwA@mail.gmail.com>
- <20160204093559.GA14099@e105550-lin.cambridge.arm.com>
- <CAKfTPtB4G3bP5N0hU6zWXJTddO34x3RnyGpp-4_otc8O=Wq2hw@mail.gmail.com>
- <20160204121620.GB29586@e106622-lin>
- <CAKfTPtDVasamRtG2kLxP0HsohmVQTPrXRgx36e+jb3gozDoo6g@mail.gmail.com>
- <20160204141345.GD29586@e106622-lin>
- <CAKfTPtDWP-AgqXsSuxCfVj33dh+i7oqDTkL=gUy7n-AB1anoow@mail.gmail.com>
- <CAKfTPtD4jTmUZoShGBm3oAFywizjp8jsEukmkeZU+x+zk-KZRA@mail.gmail.com>
- <20160205093040.GG29586@e106622-lin>
-Message-ID: <56BA0BCA.6090903@arm.com>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Tue, 9 Feb 2016 15:56:26 +0000
+Subject: [RFC PATCH v2 2/3] PCI: hisi: Make the HiSilicon PCIe host
+ controller ECAM compliant
+In-Reply-To: <3763449.y3Mfs92xrA@wuerfel>
+References: <1454935264-6076-1-git-send-email-gabriele.paoloni@huawei.com>
+ <2599997.xBRrI3qHak@wuerfel>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1ECAD436@lhreml503-mbs>
+ <3763449.y3Mfs92xrA@wuerfel>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1ECAF200@lhreml503-mbs>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/02/16 09:30, Juri Lelli wrote:
-> On 04/02/16 16:46, Vincent Guittot wrote:
->> On 4 February 2016 at 16:44, Vincent Guittot <vincent.guittot@linaro.org> wrote:
->>> On 4 February 2016 at 15:13, Juri Lelli <juri.lelli@arm.com> wrote:
->>>> On 04/02/16 13:35, Vincent Guittot wrote:
->>>>> On 4 February 2016 at 13:16, Juri Lelli <juri.lelli@arm.com> wrote:
->>>>>> Hi Vincent,
->>>>>>
->>>>>> On 04/02/16 13:03, Vincent Guittot wrote:
->>>>>>> On 4 February 2016 at 10:36, Morten Rasmussen <morten.rasmussen@arm.com> wrote:
->>>>>>>> On Wed, Feb 03, 2016 at 10:04:37PM +0100, Vincent Guittot wrote:
->>>>>>>>> On 3 February 2016 at 12:59, Juri Lelli <juri.lelli@arm.com> wrote:
-
-[...]
-
->>>
->>> AFAICT, They don't have a dedicated cpufreq driver.
->>>
->>> More generally speaking, it can take time before having
->>
->> email sent before the ne d of the sentence ...
->>
->> More generally speaking, it can take time before having a cpufreq
->> driver whereas we want to run and test scheduler behavior of these
->> heterogenous platform
->>
+> -----Original Message-----
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: 09 February 2016 15:32
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: Gabriele Paoloni; Lorenzo.Pieralisi at arm.com; jcm at redhat.com;
+> tn at semihalf.com; linux-pci at vger.kernel.org; Linuxarm; xuwei (O); linux-
+> kernel at vger.kernel.org; linux-acpi at vger.kernel.org; Wangzhou (B);
+> liudongdong (C); Guohanjun (Hanjun Guo); bhelgaas at google.com;
+> zhangjukuo; Liguozhu (Kenneth); qiujiang
+> Subject: Re: [RFC PATCH v2 2/3] PCI: hisi: Make the HiSilicon PCIe host
+> controller ECAM compliant
 > 
-> I'm not familiar with this platform, but from what you are saying and
-> what I could find online, it looks like full Linux support is not
-> finished yet. Can we consider that as still in development? And if we
-> can do that, maybe is fair enough that we use the sysfs interface to
-> play with that platform until support is complete.
+> On Monday 08 February 2016 17:21:27 Gabriele Paoloni wrote:
+> > Hi Arnd
+> >
+> > > -----Original Message-----
+> > > From: Arnd Bergmann [mailto:arnd at arndb.de]
+> > > Sent: 08 February 2016 16:30
+> > > To: Gabriele Paoloni
+> > > Cc: linux-arm-kernel at lists.infradead.org; Guohanjun (Hanjun Guo);
+> > > Wangzhou (B); liudongdong (C); Linuxarm; qiujiang;
+> bhelgaas at google.com;
+> > > Lorenzo.Pieralisi at arm.com; tn at semihalf.com; linux-
+> pci at vger.kernel.org;
+> > > linux-kernel at vger.kernel.org; xuwei (O); linux-acpi at vger.kernel.org;
+> > > jcm at redhat.com; zhangjukuo; Liguozhu (Kenneth)
+> > > Subject: Re: [RFC PATCH v2 2/3] PCI: hisi: Make the HiSilicon PCIe
+> host
+> > > controller ECAM compliant
+> > >
+> > > On Monday 08 February 2016 15:55:35 Gabriele Paoloni wrote:
+> > > > > Doesn't this break backwards compatibility?
+> > > >
+> > > > Well Hip05/Hip06 SoCs are used into evaluation boards
+> > > > For the Estuary project.
+> > > >
+> > > > https://github.com/hisilicon/estuary
+> > > >
+> > > > As this new driver gets upstream we'll merge this new driver into
+> > > estuary
+> > > > and release a new version of the firmware to support it.
+> > >
+> > > So what happens to folks running the old firmware then?
+> >
+> > So far we haven't released the PCIe nodes dtsi upstream and we think
+> > we can handle the firmware upgrade for our current users either
+> > by pointing them to the updated Estuary branch or by internal
+> > channels
 > 
-> Do others have any opinion on this point?
+> The dts files in the kernel tree are not really that important,
+> the question is whether you are breaking things for real users.
+> 
+> If the upstream drivers work on some released firmware version,
+> they should keep working.
+> 
+> > >
+> > > > > I think you need to use a new compatible string in the firmware
+> > > > > if you change the register layout, and then change the driver
+> > > > > to support both the old and the new layout.
+> > > >
+> > > > You are right, for some reason in this patchset I missed the
+> > > Documentation
+> > > > update that I posted in the previous one, i.e.:
+> > > >
+> > > > --- a/Documentation/devicetree/bindings/pci/hisilicon-pcie.txt
+> > > > +++ b/Documentation/devicetree/bindings/pci/hisilicon-pcie.txt
+> > > > @@ -23,8 +23,8 @@ Optional properties:
+> > > >  Hip05 Example (note that Hip06 is the same except compatible):
+> > > >         pcie at 0xb0080000 {
+> > > >                 compatible = "hisilicon,hip05-pcie", "snps,dw-
+> pcie";
+> > > > -               reg = <0 0xb0080000 0 0x10000>, <0x220 0x00000000
+> 0
+> > > 0x2000>;
+> > > > -               reg-names = "rc_dbi", "config";
+> > > > +               reg = <0 0xb0080000 0 0x10000>, <0x220 0x00100000
+> 0
+> > > 0x0f00000>;
+> > > > +               reg-names = "rc_dbi", "ecam-cfg";
+> > > >
+> > >
+> > > That is not the compatible string, it's an undocumented register
+> set.
+> >
+> > Sorry, I misunderstood here, got it now :)
+> >
+> > > You can either define the a new compatible string that gives the
+> > > "config"
+> > > registers a new meaning, or you change the binding to allow two
+> either
+> > > a "config" or an "ecam-cfg" register set, and let the driver handle
+> > > both.
+> >
+> > As per reply above I think that it would be quite easy for us to
+> > let out current users update the BIOS so I don't think there is any
+> > value in maintaining two version of the drivers one of which will
+> > not be used.
+> >
+> > What do you think?
+> 
+> Requiring a BIOS update for a kernel update is really bad, even more
+> so when the same BIOS update breaks older kernels.
 
-IMHO, the solution should work for all of heterogeneous systems, (a) w/
-cpufreq and driver, (b) w/ cpufreq and no driver loaded (yet) or (c) w/o
-cpufreq.
+Well I see your point.
 
-That means that you can't put the benchmarking only into
-cpufreq_register_driver() and rely on cpufreq policy topology.
+To be honest I won't expect many users of the old BIOS version since
+as I said we plan to send out the BIOS update to pretty much every user,
+however on the other side it is not too much effort for me to add code
+to support both ECAM/non ECAM, 
+so ok I'll fix this in v3,
 
-Maybe you could do this for (b) and (c) inside an initcall and use
-topology_core_cpumask() to figure out which cpu to profile?
+Many Thanks
 
-This would then happen w/ the cpu frequency set by the fw.
+Gab
 
-But this then has to be synchronized somehow with the benchmarking
-approach in cpufreq_register_driver().
-
-[...]
+> 
+> 	Arnd
