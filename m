@@ -1,179 +1,33 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 9 Feb 2016 21:49:14 +0100
-Subject: [PATCH 3/5] irqchip/gic-v2: Parse and export virtual GIC
- information
-In-Reply-To: <1454950049-741-4-git-send-email-julien.grall@arm.com>
-References: <1454950049-741-1-git-send-email-julien.grall@arm.com>
- <1454950049-741-4-git-send-email-julien.grall@arm.com>
-Message-ID: <20160209204914.GE5171@cbox>
+From: dave.long@linaro.org (David Long)
+Date: Tue, 9 Feb 2016 15:53:39 -0500
+Subject: [PATCH v3 0/2] Consolidate redundant register/stack access code
+In-Reply-To: <1455010600.13384.3.camel@ellerman.id.au>
+References: <1454996337-7935-1-git-send-email-dave.long@linaro.org>
+ <1455010600.13384.3.camel@ellerman.id.au>
+Message-ID: <56BA51D3.9030204@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 08, 2016 at 04:47:27PM +0000, Julien Grall wrote:
-> For now, the firmware tables are parsed 2 times: once in the GIC
-> drivers, the other timer when initializing the vGIC. It means code
-> duplication and make more tedious to add the support for another
-> firmware table (like ACPI).
-> 
-> Introduce a new structure and set of helpers to get/set the virtual GIC
-> information. Also fill up the structure for GICv2.
-> 
-> Signed-off-by: Julien Grall <julien.grall@arm.com>
-> ---
-> 
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> 
->  drivers/irqchip/irq-gic-common.c       | 13 ++++++
->  drivers/irqchip/irq-gic-common.h       |  3 ++
->  drivers/irqchip/irq-gic.c              | 78 +++++++++++++++++++++++++++++++++-
->  include/linux/irqchip/arm-gic-common.h | 34 +++++++++++++++
->  4 files changed, 127 insertions(+), 1 deletion(-)
->  create mode 100644 include/linux/irqchip/arm-gic-common.h
-> 
-> diff --git a/drivers/irqchip/irq-gic-common.c b/drivers/irqchip/irq-gic-common.c
-> index f174ce0..704caf4 100644
-> --- a/drivers/irqchip/irq-gic-common.c
-> +++ b/drivers/irqchip/irq-gic-common.c
-> @@ -21,6 +21,19 @@
->  
->  #include "irq-gic-common.h"
->  
-> +static const struct gic_kvm_info *gic_kvm_info;
-> +
-> +const struct gic_kvm_info *gic_get_kvm_info(void)
-> +{
-> +	return gic_kvm_info;
-> +}
-> +
-> +void gic_set_kvm_info(const struct gic_kvm_info *info)
-> +{
-> +	WARN(gic_kvm_info != NULL, "gic_kvm_info already set\n");
-> +	gic_kvm_info = info;
-> +}
-> +
->  void gic_enable_quirks(u32 iidr, const struct gic_quirk *quirks,
->  		void *data)
->  {
-> diff --git a/drivers/irqchip/irq-gic-common.h b/drivers/irqchip/irq-gic-common.h
-> index fff697d..205e5fd 100644
-> --- a/drivers/irqchip/irq-gic-common.h
-> +++ b/drivers/irqchip/irq-gic-common.h
-> @@ -19,6 +19,7 @@
->  
->  #include <linux/of.h>
->  #include <linux/irqdomain.h>
-> +#include <linux/irqchip/arm-gic-common.h>
->  
->  struct gic_quirk {
->  	const char *desc;
-> @@ -35,4 +36,6 @@ void gic_cpu_config(void __iomem *base, void (*sync_access)(void));
->  void gic_enable_quirks(u32 iidr, const struct gic_quirk *quirks,
->  		void *data);
->  
-> +void gic_set_kvm_info(const struct gic_kvm_info *info);
-> +
->  #endif /* _IRQ_GIC_COMMON_H */
-> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> index 911758c..d3a09a4 100644
-> --- a/drivers/irqchip/irq-gic.c
-> +++ b/drivers/irqchip/irq-gic.c
-> @@ -102,6 +102,8 @@ static struct static_key supports_deactivate = STATIC_KEY_INIT_TRUE;
->  
->  static struct gic_chip_data gic_data[CONFIG_ARM_GIC_MAX_NR] __read_mostly;
->  
-> +static struct gic_kvm_info gic_v2_kvm_info;
-> +
->  #ifdef CONFIG_GIC_NON_BANKED
->  static void __iomem *gic_get_percpu_base(union gic_base *base)
->  {
-> @@ -1190,6 +1192,44 @@ static bool gic_check_eoimode(struct device_node *node, void __iomem **base)
->  	return true;
->  }
->  
-> +static void __init gic_of_setup_kvm_info(struct device_node *node)
-> +{
-> +	int ret;
-> +	struct resource r;
-> +	unsigned int irq;
-> +
-> +	gic_v2_kvm_info.type = GIC_V2;
-> +
-> +	irq = irq_of_parse_and_map(node, 0);
-> +	if (!irq)
-> +		gic_v2_kvm_info.maint_irq = -1;
-> +	else
-> +		gic_v2_kvm_info.maint_irq = irq;
-> +
-> +	ret = of_address_to_resource(node, 2, &r);
-> +	if (!ret) {
-> +		gic_v2_kvm_info.vctrl_base = r.start;
-> +		gic_v2_kvm_info.vctrl_size = resource_size(&r);
-> +	}
-> +
-> +	ret = of_address_to_resource(node, 3, &r);
-> +	if (!ret) {
-> +		if (!PAGE_ALIGNED(r.start))
-> +			pr_warn("GICV physical address 0x%llx not page aligned\n",
-> +				(unsigned long long)r.start);
-> +		else if (!PAGE_ALIGNED(resource_size(&r)))
-> +			pr_warn("GICV size 0x%llx not a multiple of page size 0x%lx\n",
-> +				(unsigned long long)resource_size(&r),
-> +				PAGE_SIZE);
-> +		else {
-> +			gic_v2_kvm_info.vcpu_base = r.start;
-> +			gic_v2_kvm_info.vcpu_size = resource_size(&r);
-> +		}
-> +	}
-> +
-> +	gic_set_kvm_info(&gic_v2_kvm_info);
-> +}
-> +
->  int __init
->  gic_of_init(struct device_node *node, struct device_node *parent)
->  {
-> @@ -1219,8 +1259,10 @@ gic_of_init(struct device_node *node, struct device_node *parent)
->  
->  	__gic_init_bases(gic_cnt, -1, dist_base, cpu_base, percpu_offset,
->  			 &node->fwnode);
-> -	if (!gic_cnt)
-> +	if (!gic_cnt) {
->  		gic_init_physaddr(node);
-> +		gic_of_setup_kvm_info(node);
-> +	}
->  
->  	if (parent) {
->  		irq = irq_of_parse_and_map(node, 0);
-> @@ -1247,6 +1289,32 @@ IRQCHIP_DECLARE(pl390, "arm,pl390", gic_of_init);
->  
->  #ifdef CONFIG_ACPI
->  static phys_addr_t cpu_phy_base __initdata;
-> +static struct
-> +{
-> +	u32 maint_irq;
-> +	int maint_irq_mode;
-> +	phys_addr_t vctrl_base;
-> +	phys_addr_t vcpu_base;
-> +} acpi_data __initdata;
-> +
-> +static void __init gic_acpi_setup_kvm_info(void)
-> +{
-> +	gic_v2_kvm_info.type = GIC_V2;
-> +
-> +	gic_v2_kvm_info.maint_irq = acpi_register_gsi(NULL,
-> +						      acpi_data.maint_irq,
-> +						      acpi_data.maint_irq_mode,
-> +						      ACPI_ACTIVE_HIGH);
-> +	gic_v2_kvm_info.vctrl_base = acpi_data.vctrl_base;
-> +	if (gic_v2_kvm_info.vctrl_base)
-> +		gic_v2_kvm_info.vctrl_size = SZ_8K;
-> +
-> +	gic_v2_kvm_info.vcpu_base = acpi_data.vcpu_base;
-> +	if (gic_v2_kvm_info.vcpu_base)
-> +		gic_v2_kvm_info.vcpu_size = SZ_8K;
+On 02/09/2016 04:36 AM, Michael Ellerman wrote:
+> On Tue, 2016-02-09 at 00:38 -0500, David Long wrote:
+>
+>> From: "David A. Long" <dave.long@linaro.org>
+>>
+>> Move duplicate and functionally equivalent code for accessing registers
+>> and stack (CONFIG_HAVE_REGS_AND_STACK_ACCESS_API) from arch subdirs into
+>> common kernel files.
+>>
+>> I'm sending this out again (with updated distribution list) because v2
+>> just never got pulled in, even though I don't think there were any
+>> outstanding issues.
+>
+> A big cross arch patch like this would often get taken by Andrew Morton, but
+> AFAICS you didn't CC him - so I just added him, perhaps he'll pick it up for
+> us :D
+>
+> cheers
+>
 
-why are the sizes hard-coded to 8K in this case?
+Thanks much.
 
-Thanks,
--Christoffer
+-dl
