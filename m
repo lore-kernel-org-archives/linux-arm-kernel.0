@@ -1,53 +1,48 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 9 Feb 2016 16:26:34 +0800
-Subject: [PATCH 3/6] ARM: sunxi_defconfig: Enable MUSB HDRC driver with
- Allwinner glue
-In-Reply-To: <20160209081529.GP31506@lukather>
-References: <1454774029-10469-1-git-send-email-wens@csie.org>
- <1454774029-10469-4-git-send-email-wens@csie.org>
- <20160209081529.GP31506@lukather>
-Message-ID: <CAGb2v65bsQ9etypAH=v-pYBLtSvzLbpxKsJ2=YMJR9dahqNjbA@mail.gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 09 Feb 2016 09:30:02 +0100
+Subject: [PATCH v4 09/10] arm64: dts: Add main Thermal info to rk3368.dtsi
+In-Reply-To: <1447044542-30859-10-git-send-email-wxt@rock-chips.com>
+References: <1447044542-30859-1-git-send-email-wxt@rock-chips.com>
+ <1447044542-30859-10-git-send-email-wxt@rock-chips.com>
+Message-ID: <42802946.20XC68fnyM@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 9, 2016 at 4:15 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
->
-> On Sat, Feb 06, 2016 at 11:53:46PM +0800, Chen-Yu Tsai wrote:
->> Allwinner SoCs typically have a Mentor Graphics Inventra MUSB dual role
->> controller for USB OTG.
->>
->> Now that the issue with MUSB and USB gadget registration order has been
->> resolved, we can enable this driver in dual role mode. This requires the
->> NOP USB transceiver driver, which is also enabled.
->>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> ---
->>  arch/arm/configs/sunxi_defconfig | 5 +++++
->>  1 file changed, 5 insertions(+)
->>
->> diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
->> index efa12c88fe1c..e29b81694184 100644
->> --- a/arch/arm/configs/sunxi_defconfig
->> +++ b/arch/arm/configs/sunxi_defconfig
->> @@ -109,6 +109,11 @@ CONFIG_USB_EHCI_HCD=y
->>  CONFIG_USB_EHCI_HCD_PLATFORM=y
->>  CONFIG_USB_OHCI_HCD=y
->>  CONFIG_USB_OHCI_HCD_PLATFORM=y
->> +CONFIG_USB_MUSB_HDRC=y
->> +CONFIG_USB_MUSB_SUNXI=y
->> +CONFIG_NOP_USB_XCEIV=y
->> +CONFIG_USB_GADGET=y
->> +CONFIG_USB_CDC_COMPOSITE=y
->
-> I'd prefer not to have any default gadget here, just like you did on
-> multi_v7.
+Hi Caesar,
 
-FYI the default here (in Kconfig) would be CONFIG_USB_ETH
-"Ethernet Gadget (with CDC Ethernet support)".
+Am Montag, 9. November 2015, 12:49:01 schrieb Caesar Wang:
+> This patch add the thermal needed info on RK3368.
+> Meanwhile, support the trips to throttle for thermal.
+> 
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+> Acked-by: Eduardo Valentin <edubezval@gmail.com>
 
-CDC_COMPOSITE (CDC Ethernet + serial) is somewhat more useful.
-But I'll change it.
+[...]
 
-ChenYu
+> @@ -829,6 +855,16 @@
+>  			};
+>  		};
+> 
+> +		tsadc {
+> +			otp_gpio: otp-gpio {
+> +				rockchip,pins = <0 10 RK_FUNC_GPIO &pcfg_pull_none>;
+> +			};
+> +
+> +			otp_out: otp-out {
+> +				rockchip,pins = <0 10 RK_FUNC_1 &pcfg_pull_none>;
+> +			};
+> +		};
+> +
+>  		uart0 {
+>  			uart0_xfer: uart0-xfer {
+>  				rockchip,pins = <2 24 RK_FUNC_1 &pcfg_pull_up>,
+
+As it came up just now, these pinctrl settings seem strange. I.e. according 
+to the TRM gpio0b2 [= gpio0 10] func_1 is sc_rst, which seems to be the 
+smartcard controller?
+
+It came up because it seems the Tronsmart R68 board seems to use this pin 
+for controlling the vcc_host regulator instead.
+
+
+Heiko
