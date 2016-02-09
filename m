@@ -1,27 +1,45 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 9 Feb 2016 09:18:01 +0000 (UTC)
-Subject: [PATCH v2] ARM: DRA7: hwmod: Fix OCP2SCP sysconfig
-In-Reply-To: <1455008743-21660-1-git-send-email-kishon@ti.com>
-References: <1455008743-21660-1-git-send-email-kishon@ti.com>
-Message-ID: <alpine.DEB.2.02.1602090917040.2906@utopia.booyaka.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Tue, 9 Feb 2016 10:19:16 +0100
+Subject: [PATCH 0/2] ARM: zynq: address silent L2 cache corruption
+In-Reply-To: <cover.1454465714.git.joshc@ni.com>
+References: <cover.1454465714.git.joshc@ni.com>
+Message-ID: <56B9AF14.3070706@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 9 Feb 2016, Kishon Vijay Abraham I wrote:
-
-> OCP2SCP doesn't support smart idle wakeup according to
-> Table 26-22. OCP2SCP_SYSCONFIG in AM572x TRM [1] and
-> Table 26-22. OCP2SCP_SYSCONFIG in AM571x TRM [2].
-> Remove SIDLE_SMART_WKUP from the list of supported SIDLE modes
-> in hwmod data.
+On 3.2.2016 03:30, Josh Cartwright wrote:
+> The Zynq has a bug where the L2 cache will return invalid data in some
+> circumstances unless the L2C_RAM register is set to 0x20202 before the first
+> enabling of the L2 cache.
 > 
-> [1] -> http://www.ti.com/lit/ug/spruhz6e/spruhz6e.pdf
-> [2] -> http://www.ti.com/lit/ug/spruhz7a/spruhz7a.pdf
+> The Xilinx-recommended solution to this problem is to ensure that early one of
+> the earlier bootstages correctly initialize L2C_RAM, however, this issue wasn't
+> discovered and fixed until after their EDK/SDK 14.4 release.  For systems built
+> prior to that, and which lack field-upgradable bootloaders, this issue still
+> exists and silent data corruption can be seen in the wild.
 > 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> Fix these systems by ensuring L2C_RAM is properly initialized at the
+> earliest convenient moment prior to the L2 being brought up, which is
+> when the SLCR is first mapped.
+> 
+> Unfortunately, there isn't much public documentation on exactly what the
+> L2C_RAM register is for, or how it is used, only that software is responsible
+> for initializing it to the proper value prior to bringing up L2.
+> 
+> You can find more information about this bug in AR#54190[1].
+> 
+> 1: http://www.xilinx.com/support/answers/54190.html
+> 
+> Josh Cartwright (2):
+>   ARM: zynq: initialize slcr mapping earlier
+>   ARM: zynq: address L2 cache data corruption
+> 
+>  arch/arm/mach-zynq/common.c | 3 +--
+>  arch/arm/mach-zynq/slcr.c   | 4 ++++
+>  2 files changed, 5 insertions(+), 2 deletions(-)
+> 
 
-Thanks, queued for v4.6.  If you'd like it queued as a fix, please resend 
-with a description of the regression that it fixes.
+Applied both.
 
-
-- Paul
+Thanks,
+Michal
