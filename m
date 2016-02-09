@@ -1,31 +1,90 @@
-From: slash.tmp@free.fr (Mason)
-Date: Tue, 9 Feb 2016 11:17:48 +0100
-Subject: [PATCH RFC] Add cpufreq support
-In-Reply-To: <7910928.pmJjZiV1Lk@wuerfel>
-References: <56B4D4BE.2040008@free.fr> <22002072.L04zy0K2AP@wuerfel>
- <20160208131625.GI8294@vireshk> <7910928.pmJjZiV1Lk@wuerfel>
-Message-ID: <56B9BCCC.8060404@free.fr>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Tue, 9 Feb 2016 11:18:33 +0100
+Subject: [PATCH 2/3] arm64: dts: add the Alpine v2 EVP
+In-Reply-To: <2530828.WgKqLzsO0l@wuerfel>
+References: <1454922699-16785-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1454922699-16785-3-git-send-email-antoine.tenart@free-electrons.com>
+ <2530828.WgKqLzsO0l@wuerfel>
+Message-ID: <20160209101833.GD5388@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/02/2016 14:45, Arnd Bergmann wrote:
+Hello Arnd,
 
-> That's why I said we could introduce a 'v3' with the meaning
-> it should have had to start with: compatible means actually
-> compatible with the driver.
+On Mon, Feb 08, 2016 at 01:20:40PM +0100, Arnd Bergmann wrote:
+> On Monday 08 February 2016 10:11:38 Antoine Tenart wrote:
+> > index 000000000000..3e3080fa45e4
+> > --- /dev/null
+> > +
+> > +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> > +
+> > +/ {
+> > +	model = "Annapurna Labs Alpine v2";
+> > +	compatible = "al,alpine-v2";
+> > +	#address-cells = <2>;
+> > +	#size-cells = <2>;
+> > +
+> > +	aliases {
+> > +		serial0 = &uart0;
+> > +		serial1 = &uart1;
+> > +		serial2 = &uart2;
+> > +		serial3 = &uart3;
+> > +	};
+> 
+> Move the aliases to the .dts files and drop the ones that are disabled.
 
-If I understand correctly, something needs to change in the
-framework before I can push cpufreq support for my platform
-upstream, correct?
+Sure.
 
-Could you CC me if anything happens on that front?
+> > +
+> > +		pcie-internal at 0xfbc00000 {
+> 
+> make this
+> 
+> 		pci at fbc00000 {
 
-In my local 4.4 branch, I think I should use whatever method
-was recommended at the time.
+Will do.
 
-Was that to define the platform's init_late method, and call
-platform_device_register_simple from there? (Could you take
-a quick glance at the patch, and see if it is acceptable in
-the context of kernel 4.4?)
+> 
+> > +			compatible = "pci-host-ecam-generic";
+> > +			device_type = "pci";
+> > +			#size-cells = <2>;
+> > +			#address-cells = <3>;
+> > +			#interrupt-cells = <1>;
+> > +			reg = <0x0 0xfbc00000 0x0 0x100000>;
+> > +			interrupt-map-mask = <0xf800 0 0 7>;
+> > +			/* add legacy interrupts for SATA only */
+> > +			interrupt-map = <0x4000 0 0 1 &gic 0 53 4>,
+> > +					<0x4800 0 0 1 &gic 0 54 4>;
+> 
+> What's wrong with the other IRQs? Not connected?
 
-Regards.
+>From what I know the other IRQs are disconnected.
+
+> > +
+> > +		uart0: uart at fd883000 {
+> 
+> 			serial at fd883000
+> 
+> 
+> Almost all devices are in the 0xfd000000 range. Could this be a bus in the
+> SoC that has all the devices attached to it? Maybe use a "ranges" property
+> to reflect that. In doubt, use the register numbers from the data sheet if you
+> have one.
+
+I'll try using a range property in the v2 of the series.
+
+Thanks for the review!
+
+Antoine
+
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160209/4136e467/attachment.sig>
