@@ -1,495 +1,59 @@
-From: fu.wei@linaro.org (fu.wei at linaro.org)
-Date: Wed, 10 Feb 2016 01:00:40 +0800
-Subject: [PATCH v11 4/4] Watchdog: introduce ARM SBSA watchdog driver
-In-Reply-To: <1455037240-16192-1-git-send-email-fu.wei@linaro.org>
-References: <1455037240-16192-1-git-send-email-fu.wei@linaro.org>
-Message-ID: <1455037240-16192-5-git-send-email-fu.wei@linaro.org>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Tue, 9 Feb 2016 09:03:11 -0800
+Subject: [PATCH] of/irq: Fix msi-map calculation for nonzero rid-base
+In-Reply-To: <9f6845195d03b0e0b0d187bb510fbf7bd497e836.1455015344.git.robin.murphy@arm.com>
+References: <9f6845195d03b0e0b0d187bb510fbf7bd497e836.1455015344.git.robin.murphy@arm.com>
+Message-ID: <56BA1BCF.8080309@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fu Wei <fu.wei@linaro.org>
+On 02/09/2016 03:04 AM, Robin Murphy wrote:
+> The existing msi-map code is fine for shifting the entire RID space
+> upwards, but attempting finer-grained remapping reveals a bug. It turns
+> out that we are mistakenly treating the msi-base part as an offset, not
+> as a new base to remap onto, so things get squiffy when rid-base is
+> nonzero. Fix this, and at the same time add a sanity check against
+> having msi-map-mask clash with a nonzero rid-base, as that's another
+> thing one can easily get wrong.
+>
+> CC: <stable@vger.kernel.org>
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 
-According to Server Base System Architecture (SBSA) specification,
-the SBSA Generic Watchdog has two stage timeouts: the first signal (WS0)
-is for alerting the system by interrupt, the second one (WS1) is a real
-hardware reset.
-More details about the hardware specification of this device:
-ARM DEN0029B - Server Base System Architecture (SBSA)
+This is equivalent to what I tested yesterday.  Thanks for fixing it...
 
-This driver can operate ARM SBSA Generic Watchdog as a single stage watchdog
-or a two stages watchdog, it's set up by the module parameter "action".
-In the single stage mode, when the timeout is reached, your system
-will be reset by WS1. The first signal (WS0) is ignored.
-In the two stages mode, when the timeout is reached, the first signal (WS0)
-will trigger panic. If the system is getting into trouble and cannot be reset
-by panic or restart properly by the kdump kernel(if supported), then the
-second stage (as long as the first stage) will be reached, system will be
-reset by WS1. This function can help administrator to backup the system
-context info by panic console output or kdump.
+Acked-by: David Daney <david.daney@cavium.com>
 
-This driver bases on linux kernel watchdog framework, so it can get
-timeout from module parameter and FDT at the driver init stage.
 
-Signed-off-by: Fu Wei <fu.wei@linaro.org>
-Reviewed-by: Graeme Gregory <graeme.gregory@linaro.org>
-Tested-by: Pratyush Anand <panand@redhat.com>
----
- drivers/watchdog/Kconfig     |  20 +++
- drivers/watchdog/Makefile    |   1 +
- drivers/watchdog/sbsa_gwdt.c | 403 +++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 424 insertions(+)
 
-diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-index 0f6d851..ed9a5cb 100644
---- a/drivers/watchdog/Kconfig
-+++ b/drivers/watchdog/Kconfig
-@@ -202,6 +202,26 @@ config ARM_SP805_WATCHDOG
- 	  ARM Primecell SP805 Watchdog timer. This will reboot your system when
- 	  the timeout is reached.
- 
-+config ARM_SBSA_WATCHDOG
-+	tristate "ARM SBSA Generic Watchdog"
-+	depends on ARM64
-+	depends on ARM_ARCH_TIMER
-+	select WATCHDOG_CORE
-+	help
-+	  ARM SBSA Generic Watchdog has two stage timeouts:
-+	  the first signal (WS0) is for alerting the system by interrupt,
-+	  the second one (WS1) is a real hardware reset.
-+	  More details: ARM DEN0029B - Server Base System Architecture (SBSA)
-+
-+	  This driver can operate ARM SBSA Generic Watchdog as a single stage
-+	  or a two stages watchdog, it depends on the module parameter "action".
-+
-+	  Note: the maximum timeout in the two stages mode is half of that in
-+	  the single stage mode.
-+
-+	  To compile this driver as module, choose M here: The module
-+	  will be called sbsa_gwdt.
-+
- config ASM9260_WATCHDOG
- 	tristate "Alphascale ASM9260 watchdog"
- 	depends on MACH_ASM9260
-diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
-index f566753..f9826d4 100644
---- a/drivers/watchdog/Makefile
-+++ b/drivers/watchdog/Makefile
-@@ -30,6 +30,7 @@ obj-$(CONFIG_USBPCWATCHDOG) += pcwd_usb.o
- 
- # ARM Architecture
- obj-$(CONFIG_ARM_SP805_WATCHDOG) += sp805_wdt.o
-+obj-$(CONFIG_ARM_SBSA_WATCHDOG) += sbsa_gwdt.o
- obj-$(CONFIG_ASM9260_WATCHDOG) += asm9260_wdt.o
- obj-$(CONFIG_AT91RM9200_WATCHDOG) += at91rm9200_wdt.o
- obj-$(CONFIG_AT91SAM9X_WATCHDOG) += at91sam9_wdt.o
-diff --git a/drivers/watchdog/sbsa_gwdt.c b/drivers/watchdog/sbsa_gwdt.c
-new file mode 100644
-index 0000000..f506762
---- /dev/null
-+++ b/drivers/watchdog/sbsa_gwdt.c
-@@ -0,0 +1,403 @@
-+/*
-+ * SBSA(Server Base System Architecture) Generic Watchdog driver
-+ *
-+ * Copyright (c) 2015, Linaro Ltd.
-+ * Author: Fu Wei <fu.wei@linaro.org>
-+ *         Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-+ *         Al Stone <al.stone@linaro.org>
-+ *         Timur Tabi <timur@codeaurora.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License 2 as published
-+ * by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * ARM SBSA Generic Watchdog has two stage timeouts:
-+ * the first signal (WS0) is for alerting the system by interrupt,
-+ * the second one (WS1) is a real hardware reset.
-+ * More details about the hardware specification of this device:
-+ * ARM DEN0029B - Server Base System Architecture (SBSA)
-+ *
-+ * This driver can operate ARM SBSA Generic Watchdog as a single stage watchdog
-+ * or a two stages watchdog, it's set up by the module parameter "action".
-+ * In the single stage mode, when the timeout is reached, your system
-+ * will be reset by WS1. The first signal (WS0) is ignored.
-+ * In the two stages mode, when the timeout is reached, the first signal (WS0)
-+ * will trigger panic. If the system is getting into trouble and cannot be reset
-+ * by panic or restart properly by the kdump kernel(if supported), then the
-+ * second stage (as long as the first stage) will be reached, system will be
-+ * reset by WS1. This function can help administrator to backup the system
-+ * context info by panic console output or kdump.
-+ *
-+ * SBSA GWDT:
-+ * if action is 1 (the two stages mode):
-+ * |--------WOR-------WS0--------WOR-------WS1
-+ * |----timeout-----(panic)----timeout-----reset
-+ *
-+ * if action is 0 (the single stage mode):
-+ * |------WOR-----WS0(ignored)-----WOR------WS1
-+ * |--------------timeout-------------------reset
-+ *
-+ * Note: Since this watchdog timer has two stages, and each stage is determined
-+ * by WOR, in the single stage mode, the timeout is (WOR * 2); in the two
-+ * stages mode, the timeout is WOR. The maximum timeout in the two stages mode
-+ * is half of that in the single stage mode.
-+ *
-+ */
-+
-+#include <linux/io.h>
-+#include <linux/interrupt.h>
-+#include <linux/module.h>
-+#include <linux/moduleparam.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
-+#include <linux/uaccess.h>
-+#include <linux/watchdog.h>
-+#include <asm/arch_timer.h>
-+
-+/* SBSA Generic Watchdog register definitions */
-+/* refresh frame */
-+#define SBSA_GWDT_WRR				0x000
-+
-+/* control frame */
-+#define SBSA_GWDT_WCS				0x000
-+#define SBSA_GWDT_WOR				0x008
-+#define SBSA_GWDT_WCV				0x010
-+
-+/* refresh/control frame */
-+#define SBSA_GWDT_W_IIDR			0xfcc
-+#define SBSA_GWDT_IDR				0xfd0
-+
-+/* Watchdog Control and Status Register */
-+#define SBSA_GWDT_WCS_EN			BIT(0)
-+#define SBSA_GWDT_WCS_WS0			BIT(1)
-+#define SBSA_GWDT_WCS_WS1			BIT(2)
-+
-+/**
-+ * struct sbsa_gwdt - Internal representation of the SBSA GWDT
-+ * @wdd:		kernel watchdog_device structure
-+ * @clk:		store the System Counter clock frequency, in Hz.
-+ * @refresh_base:	Virtual address of the watchdog refresh frame
-+ * @control_base:	Virtual address of the watchdog control frame
-+ */
-+struct sbsa_gwdt {
-+	struct watchdog_device	wdd;
-+	u32			clk;
-+	void __iomem		*refresh_base;
-+	void __iomem		*control_base;
-+};
-+
-+#define to_sbsa_gwdt(e) container_of(e, struct sbsa_gwdt, wdd)
-+
-+#define DEFAULT_TIMEOUT		10 /* seconds, the 1st + 2nd watch periods*/
-+
-+static unsigned int timeout;
-+module_param(timeout, uint, 0);
-+MODULE_PARM_DESC(timeout,
-+		 "Watchdog timeout in seconds. (>=0, default="
-+		 __MODULE_STRING(DEFAULT_TIMEOUT) ")");
-+
-+/*
-+ * action refers to action taken when watchdog gets WS0
-+ * 0 = skip
-+ * 1 = panic
-+ * defaults to skip (0)
-+ */
-+static int action;
-+module_param(action, int, 0);
-+MODULE_PARM_DESC(action, "after watchdog gets WS0 interrupt, do: "
-+		 "0 = skip(*)  1 = panic");
-+
-+static bool nowayout = WATCHDOG_NOWAYOUT;
-+module_param(nowayout, bool, S_IRUGO);
-+MODULE_PARM_DESC(nowayout,
-+		 "Watchdog cannot be stopped once started (default="
-+		 __MODULE_STRING(WATCHDOG_NOWAYOUT) ")");
-+
-+/*
-+ * watchdog operation functions
-+ */
-+static int sbsa_gwdt_set_timeout(struct watchdog_device *wdd,
-+				 unsigned int timeout)
-+{
-+	struct sbsa_gwdt *gwdt = to_sbsa_gwdt(wdd);
-+
-+	wdd->timeout = timeout;
-+
-+	if (action)
-+		writel(gwdt->clk * timeout,
-+		       gwdt->control_base + SBSA_GWDT_WOR);
-+	else
-+		/*
-+		 * In the single stage mode, The first signal (WS0) is ignored,
-+		 * the timeout is (WOR * 2), so the WOR should be configured
-+		 * to half value of timeout.
-+		 */
-+		writel(gwdt->clk / 2 * timeout,
-+		       gwdt->control_base + SBSA_GWDT_WOR);
-+
-+	return 0;
-+}
-+
-+static unsigned int sbsa_gwdt_get_timeleft(struct watchdog_device *wdd)
-+{
-+	struct sbsa_gwdt *gwdt = to_sbsa_gwdt(wdd);
-+	u64 timeleft = 0;
-+
-+	/*
-+	 * In the single stage mode, if WS0 is deasserted
-+	 * (watchdog is in the first stage),
-+	 * timeleft = WOR + (WCV - system counter)
-+	 */
-+	if (!action &&
-+	    !(readl(gwdt->control_base + SBSA_GWDT_WCS) & SBSA_GWDT_WCS_WS0))
-+		timeleft += readl(gwdt->control_base + SBSA_GWDT_WOR);
-+
-+	timeleft += readq(gwdt->control_base + SBSA_GWDT_WCV) -
-+		    arch_counter_get_cntvct();
-+
-+	do_div(timeleft, gwdt->clk);
-+
-+	return timeleft;
-+}
-+
-+static int sbsa_gwdt_keepalive(struct watchdog_device *wdd)
-+{
-+	struct sbsa_gwdt *gwdt = to_sbsa_gwdt(wdd);
-+
-+	/*
-+	* Writing WRR for an explicit watchdog refresh.
-+	* You can write anyting (like 0).
-+	*/
-+	writel(0, gwdt->refresh_base + SBSA_GWDT_WRR);
-+
-+	return 0;
-+}
-+
-+static unsigned int sbsa_gwdt_status(struct watchdog_device *wdd)
-+{
-+	struct sbsa_gwdt *gwdt = to_sbsa_gwdt(wdd);
-+	u32 status = readl(gwdt->control_base + SBSA_GWDT_WCS);
-+
-+	/* is the watchdog timer running? */
-+	return (status & SBSA_GWDT_WCS_EN) << WDOG_ACTIVE;
-+}
-+
-+static int sbsa_gwdt_start(struct watchdog_device *wdd)
-+{
-+	struct sbsa_gwdt *gwdt = to_sbsa_gwdt(wdd);
-+
-+	/* writing WCS will cause an explicit watchdog refresh */
-+	writel(SBSA_GWDT_WCS_EN, gwdt->control_base + SBSA_GWDT_WCS);
-+
-+	return sbsa_gwdt_keepalive(wdd);
-+}
-+
-+static int sbsa_gwdt_stop(struct watchdog_device *wdd)
-+{
-+	struct sbsa_gwdt *gwdt = to_sbsa_gwdt(wdd);
-+
-+	/* Simply write 0 to WCS to clean WCS_EN bit */
-+	writel(0, gwdt->control_base + SBSA_GWDT_WCS);
-+
-+	return 0;
-+}
-+
-+static irqreturn_t sbsa_gwdt_interrupt(int irq, void *dev_id)
-+{
-+	panic("SBSA Watchdog timeout");
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static struct watchdog_info sbsa_gwdt_info = {
-+	.identity	= "SBSA Generic Watchdog",
-+	.options	= WDIOF_SETTIMEOUT |
-+			  WDIOF_KEEPALIVEPING |
-+			  WDIOF_MAGICCLOSE |
-+			  WDIOF_CARDRESET,
-+};
-+
-+static struct watchdog_ops sbsa_gwdt_ops = {
-+	.owner		= THIS_MODULE,
-+	.start		= sbsa_gwdt_start,
-+	.stop		= sbsa_gwdt_stop,
-+	.status		= sbsa_gwdt_status,
-+	.ping		= sbsa_gwdt_keepalive,
-+	.set_timeout	= sbsa_gwdt_set_timeout,
-+	.get_timeleft	= sbsa_gwdt_get_timeleft,
-+};
-+
-+static int sbsa_gwdt_probe(struct platform_device *pdev)
-+{
-+	void __iomem *rf_base, *cf_base;
-+	struct device *dev = &pdev->dev;
-+	struct watchdog_device *wdd;
-+	struct sbsa_gwdt *gwdt;
-+	struct resource *res;
-+	int ret, irq;
-+	u32 status;
-+
-+	gwdt = devm_kzalloc(dev, sizeof(*gwdt), GFP_KERNEL);
-+	if (!gwdt)
-+		return -ENOMEM;
-+	platform_set_drvdata(pdev, gwdt);
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	cf_base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(cf_base))
-+		return PTR_ERR(cf_base);
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-+	rf_base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(rf_base))
-+		return PTR_ERR(rf_base);
-+
-+	if (action) {
-+		irq = platform_get_irq(pdev, 0);
-+		if (irq < 0) {
-+			action = 0;
-+			dev_warn(dev, "unable to get ws0 interrupt.\n");
-+		} else {
-+			if (devm_request_irq(dev, irq, sbsa_gwdt_interrupt, 0,
-+					     pdev->name, gwdt)) {
-+				action = 0;
-+				dev_warn(dev, "unable to request IRQ %d.\n",
-+					 irq);
-+			}
-+		}
-+		if (!action)
-+			dev_warn(dev, "fall back to signle stage mode.\n");
-+	}
-+
-+	/*
-+	 * Get the frequency of system counter from the cp15 interface of ARM
-+	 * Generic timer. We don't need to check it, because if it returns "0",
-+	 * system would panic in very early stage.
-+	 */
-+	gwdt->clk = arch_timer_get_cntfrq();
-+	gwdt->refresh_base = rf_base;
-+	gwdt->control_base = cf_base;
-+
-+	wdd = &gwdt->wdd;
-+	wdd->parent = dev;
-+	wdd->info = &sbsa_gwdt_info;
-+	wdd->ops = &sbsa_gwdt_ops;
-+	watchdog_set_drvdata(wdd, gwdt);
-+	watchdog_set_nowayout(wdd, nowayout);
-+
-+	wdd->min_timeout = 1;
-+	wdd->max_timeout = U32_MAX / gwdt->clk;
-+	/*
-+	 * In the single stage mode, The first signal (WS0) is ignored,
-+	 * the timeout is (WOR * 2), so the maximum timeout should be double.
-+	 */
-+	if (!action)
-+		wdd->max_timeout *= 2;
-+
-+	wdd->timeout = DEFAULT_TIMEOUT;
-+	watchdog_init_timeout(wdd, timeout, dev);
-+
-+	status = readl(gwdt->control_base + SBSA_GWDT_WCS);
-+	if (status & SBSA_GWDT_WCS_WS1) {
-+		dev_warn(dev, "System reset by WDT.\n");
-+		wdd->bootstatus |= WDIOF_CARDRESET;
-+	}
-+
-+	ret = watchdog_register_device(wdd);
-+	if (ret)
-+		return ret;
-+
-+	/*
-+	 * Update timeout to WOR.
-+	 * Because of the explicit watchdog refresh mechanism,
-+	 * it's also a ping, if watchdog is enabled.
-+	 */
-+	sbsa_gwdt_set_timeout(wdd, wdd->timeout);
-+
-+	dev_info(dev, "Initialized with %ds timeout @ %u Hz, action=%d.%s\n",
-+		 wdd->timeout, gwdt->clk, action,
-+		 status & SBSA_GWDT_WCS_EN ? " [enabled]" : "");
-+
-+	return 0;
-+}
-+
-+static void sbsa_gwdt_shutdown(struct platform_device *pdev)
-+{
-+	struct sbsa_gwdt *gwdt = platform_get_drvdata(pdev);
-+
-+	sbsa_gwdt_stop(&gwdt->wdd);
-+}
-+
-+static int sbsa_gwdt_remove(struct platform_device *pdev)
-+{
-+	struct sbsa_gwdt *gwdt = platform_get_drvdata(pdev);
-+
-+	watchdog_unregister_device(&gwdt->wdd);
-+
-+	return 0;
-+}
-+
-+/* Disable watchdog if it is active during suspend */
-+static int __maybe_unused sbsa_gwdt_suspend(struct device *dev)
-+{
-+	struct sbsa_gwdt *gwdt = dev_get_drvdata(dev);
-+
-+	if (watchdog_active(&gwdt->wdd))
-+		sbsa_gwdt_stop(&gwdt->wdd);
-+
-+	return 0;
-+}
-+
-+/* Enable watchdog and configure it if necessary */
-+static int __maybe_unused sbsa_gwdt_resume(struct device *dev)
-+{
-+	struct sbsa_gwdt *gwdt = dev_get_drvdata(dev);
-+
-+	if (watchdog_active(&gwdt->wdd))
-+		sbsa_gwdt_start(&gwdt->wdd);
-+
-+	return 0;
-+}
-+
-+static const struct dev_pm_ops sbsa_gwdt_pm_ops = {
-+	SET_SYSTEM_SLEEP_PM_OPS(sbsa_gwdt_suspend, sbsa_gwdt_resume)
-+};
-+
-+static const struct of_device_id sbsa_gwdt_of_match[] = {
-+	{ .compatible = "arm,sbsa-gwdt", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, sbsa_gwdt_of_match);
-+
-+static const struct platform_device_id sbsa_gwdt_pdev_match[] = {
-+	{ .name = "sbsa-gwdt", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(platform, sbsa_gwdt_pdev_match);
-+
-+static struct platform_driver sbsa_gwdt_driver = {
-+	.driver = {
-+		.name = "sbsa-gwdt",
-+		.pm = &sbsa_gwdt_pm_ops,
-+		.of_match_table = sbsa_gwdt_of_match,
-+	},
-+	.probe = sbsa_gwdt_probe,
-+	.remove = sbsa_gwdt_remove,
-+	.shutdown = sbsa_gwdt_shutdown,
-+	.id_table = sbsa_gwdt_pdev_match,
-+};
-+
-+module_platform_driver(sbsa_gwdt_driver);
-+
-+MODULE_DESCRIPTION("SBSA Generic Watchdog Driver");
-+MODULE_AUTHOR("Fu Wei <fu.wei@linaro.org>");
-+MODULE_AUTHOR("Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>");
-+MODULE_AUTHOR("Al Stone <al.stone@linaro.org>");
-+MODULE_AUTHOR("Timur Tabi <timur@codeaurora.org>");
-+MODULE_LICENSE("GPL v2");
--- 
-2.5.0
+> ---
+>   drivers/of/irq.c | 9 ++++++++-
+>   1 file changed, 8 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/of/irq.c b/drivers/of/irq.c
+> index 7ee21ae..e7bfc17 100644
+> --- a/drivers/of/irq.c
+> +++ b/drivers/of/irq.c
+> @@ -635,6 +635,13 @@ static u32 __of_msi_map_rid(struct device *dev, struct device_node **np,
+>   		msi_base = be32_to_cpup(msi_map + 2);
+>   		rid_len = be32_to_cpup(msi_map + 3);
+>
+> +		if (rid_base & ~map_mask) {
+> +			dev_err(parent_dev,
+> +				"Invalid msi-map translation - msi-map-mask (0x%x) ignores rid-base (0x%x)\n",
+> +				map_mask, rid_base);
+> +			return rid_out;
+> +		}
+> +
+>   		msi_controller_node = of_find_node_by_phandle(phandle);
+>
+>   		matched = (masked_rid >= rid_base &&
+> @@ -654,7 +661,7 @@ static u32 __of_msi_map_rid(struct device *dev, struct device_node **np,
+>   	if (!matched)
+>   		return rid_out;
+>
+> -	rid_out = masked_rid + msi_base;
+> +	rid_out = masked_rid - rid_base + msi_base;
+>   	dev_dbg(dev,
+>   		"msi-map at: %s, using mask %08x, rid-base: %08x, msi-base: %08x, length: %08x, rid: %08x -> %08x\n",
+>   		dev_name(parent_dev), map_mask, rid_base, msi_base,
+>
