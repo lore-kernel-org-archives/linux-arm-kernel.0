@@ -1,120 +1,81 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon,  8 Feb 2016 17:45:34 -0800
-Subject: [PATCH 07/14] clk: gate: Add hw based registration APIs
+Date: Mon,  8 Feb 2016 17:45:28 -0800
+Subject: [PATCH 01/14] mfd: intel_quark_i2c_gpio: Use clkdev_create()
 In-Reply-To: <1454982341-22715-1-git-send-email-sboyd@codeaurora.org>
 References: <1454982341-22715-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1454982341-22715-8-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1454982341-22715-2-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add registration APIs in the clk gate code to return struct
-clk_hw pointers instead of struct clk pointers. This way we hide
-the struct clk pointer from providers unless they need to use
-consumer facing APIs.
+Convert this driver to use clkdev_create() instead of
+clk_register_clkdevs(). The latter API is only used by this driver,
+although this driver only allocates one clk to add anyway.
+Furthermore, this driver allocates the clk_lookup structure with
+devm, but clkdev_drop() will free that structure when passed,
+leading to a double free when this driver is removed. Clean it
+all up and pave the way for the removal of clk_register_clkdevs().
 
+Cc: Lee Jones <lee.jones@linaro.org>
+Cc: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Cc: Russell King <linux@arm.linux.org.uk>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/clk/clk-gate.c       | 43 ++++++++++++++++++++++++++++++++++++-------
- include/linux/clk-provider.h |  5 +++++
- 2 files changed, 41 insertions(+), 7 deletions(-)
+ drivers/mfd/intel_quark_i2c_gpio.c | 26 +++++++++-----------------
+ 1 file changed, 9 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/clk/clk-gate.c b/drivers/clk/clk-gate.c
-index de0b322f5f58..3559a05dad15 100644
---- a/drivers/clk/clk-gate.c
-+++ b/drivers/clk/clk-gate.c
-@@ -112,7 +112,7 @@ const struct clk_ops clk_gate_ops = {
- EXPORT_SYMBOL_GPL(clk_gate_ops);
+diff --git a/drivers/mfd/intel_quark_i2c_gpio.c b/drivers/mfd/intel_quark_i2c_gpio.c
+index 042137465300..bdc5e27222c0 100644
+--- a/drivers/mfd/intel_quark_i2c_gpio.c
++++ b/drivers/mfd/intel_quark_i2c_gpio.c
+@@ -52,8 +52,6 @@
+ /* The Quark I2C controller source clock */
+ #define INTEL_QUARK_I2C_CLK_HZ	33000000
  
- /**
-- * clk_register_gate - register a gate clock with the clock framework
-+ * clk_hw_register_gate - register a gate clock with the clock framework
-  * @dev: device that is registering this clock
-  * @name: name of this clock
-  * @parent_name: name of this clock's parent
-@@ -122,14 +122,15 @@ EXPORT_SYMBOL_GPL(clk_gate_ops);
-  * @clk_gate_flags: gate-specific flags for this clock
-  * @lock: shared register lock for this clock
-  */
--struct clk *clk_register_gate(struct device *dev, const char *name,
-+struct clk_hw *clk_hw_register_gate(struct device *dev, const char *name,
- 		const char *parent_name, unsigned long flags,
- 		void __iomem *reg, u8 bit_idx,
- 		u8 clk_gate_flags, spinlock_t *lock)
- {
- 	struct clk_gate *gate;
--	struct clk *clk;
-+	struct clk_hw *hw;
- 	struct clk_init_data init;
-+	int ret;
- 
- 	if (clk_gate_flags & CLK_GATE_HIWORD_MASK) {
- 		if (bit_idx > 15) {
-@@ -156,12 +157,29 @@ struct clk *clk_register_gate(struct device *dev, const char *name,
- 	gate->lock = lock;
- 	gate->hw.init = &init;
- 
--	clk = clk_register(dev, &gate->hw);
+-#define INTEL_QUARK_I2C_NCLK	1
 -
--	if (IS_ERR(clk))
-+	hw = &gate->hw;
-+	ret = clk_hw_register(dev, hw);
-+	if (ret) {
- 		kfree(gate);
-+		hw = ERR_PTR(ret);
+ struct intel_quark_mfd {
+ 	struct pci_dev		*pdev;
+ 	struct clk		*i2c_clk;
+@@ -128,30 +126,24 @@ MODULE_DEVICE_TABLE(pci, intel_quark_mfd_ids);
+ static int intel_quark_register_i2c_clk(struct intel_quark_mfd *quark_mfd)
+ {
+ 	struct pci_dev *pdev = quark_mfd->pdev;
+-	struct clk_lookup *i2c_clk_lookup;
+ 	struct clk *i2c_clk;
+-	int ret;
+-
+-	i2c_clk_lookup = devm_kcalloc(&pdev->dev, INTEL_QUARK_I2C_NCLK,
+-				      sizeof(*i2c_clk_lookup), GFP_KERNEL);
+-	if (!i2c_clk_lookup)
+-		return -ENOMEM;
+-
+-	i2c_clk_lookup[0].dev_id = INTEL_QUARK_I2C_CONTROLLER_CLK;
+ 
+ 	i2c_clk = clk_register_fixed_rate(&pdev->dev,
+ 					  INTEL_QUARK_I2C_CONTROLLER_CLK, NULL,
+ 					  CLK_IS_ROOT, INTEL_QUARK_I2C_CLK_HZ);
++	if (IS_ERR(i2c_clk))
++		return PTR_ERR(i2c_clk);
+ 
+-	quark_mfd->i2c_clk_lookup = i2c_clk_lookup;
+ 	quark_mfd->i2c_clk = i2c_clk;
++	quark_mfd->i2c_clk_lookup = clkdev_create(i2c_clk, NULL,
++						INTEL_QUARK_I2C_CONTROLLER_CLK);
+ 
+-	ret = clk_register_clkdevs(i2c_clk, i2c_clk_lookup,
+-				   INTEL_QUARK_I2C_NCLK);
+-	if (ret)
+-		dev_err(&pdev->dev, "Fixed clk register failed: %d\n", ret);
++	if (!quark_mfd->i2c_clk_lookup) {
++		dev_err(&pdev->dev, "Fixed clk register failed\n");
++		return -ENOMEM;
 +	}
  
--	return clk;
-+	return hw;
-+}
-+EXPORT_SYMBOL_GPL(clk_hw_register_gate);
-+
-+struct clk *clk_register_gate(struct device *dev, const char *name,
-+		const char *parent_name, unsigned long flags,
-+		void __iomem *reg, u8 bit_idx,
-+		u8 clk_gate_flags, spinlock_t *lock)
-+{
-+	struct clk_hw *hw;
-+
-+	hw = clk_hw_register_gate(dev, name, parent_name, flags, reg,
-+				  bit_idx, clk_gate_flags, lock);
-+	if (IS_ERR(hw))
-+		return ERR_CAST(hw);
-+	return hw->clk;
+-	return ret;
++	return 0;
  }
- EXPORT_SYMBOL_GPL(clk_register_gate);
  
-@@ -180,3 +198,14 @@ void clk_unregister_gate(struct clk *clk)
- 	kfree(gate);
- }
- EXPORT_SYMBOL_GPL(clk_unregister_gate);
-+
-+void clk_hw_unregister_gate(struct clk_hw *hw)
-+{
-+	struct clk_gate *gate;
-+
-+	gate = to_clk_gate(hw);
-+
-+	clk_hw_unregister(hw);
-+	kfree(gate);
-+}
-+EXPORT_SYMBOL_GPL(clk_hw_unregister_gate);
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 666462958ef2..b9a83216255b 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -322,7 +322,12 @@ struct clk *clk_register_gate(struct device *dev, const char *name,
- 		const char *parent_name, unsigned long flags,
- 		void __iomem *reg, u8 bit_idx,
- 		u8 clk_gate_flags, spinlock_t *lock);
-+struct clk_hw *clk_hw_register_gate(struct device *dev, const char *name,
-+		const char *parent_name, unsigned long flags,
-+		void __iomem *reg, u8 bit_idx,
-+		u8 clk_gate_flags, spinlock_t *lock);
- void clk_unregister_gate(struct clk *clk);
-+void clk_hw_unregister_gate(struct clk_hw *hw);
- 
- struct clk_div_table {
- 	unsigned int	val;
+ static void intel_quark_unregister_i2c_clk(struct pci_dev *pdev)
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 a Linux Foundation Collaborative Project
