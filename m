@@ -1,188 +1,220 @@
-From: wei@redhat.com (Wei Huang)
-Date: Tue, 9 Feb 2016 15:57:12 -0600
-Subject: [PATCH 3/5] irqchip/gic-v2: Parse and export virtual GIC
- information
-In-Reply-To: <20160209204914.GE5171@cbox>
-References: <1454950049-741-1-git-send-email-julien.grall@arm.com>
- <1454950049-741-4-git-send-email-julien.grall@arm.com>
- <20160209204914.GE5171@cbox>
-Message-ID: <56BA60B8.3020008@redhat.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 10 Feb 2016 00:58:48 +0300
+Subject: [PATCH v2 5/5] ARM: dts: r8a7794: add sound support
+In-Reply-To: <12033353.rt0nolnBmD@wasted.cogentembedded.com>
+References: <12033353.rt0nolnBmD@wasted.cogentembedded.com>
+Message-ID: <2543047.yYrDdYb9v5@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Define the generic R8A7794 part of  the sound device node.
+This sound device  is a complex one and comprises the Audio Clock Generator
+(ADG), Sampling Rate Converter Unit (SCU), Serial Sound Interface [Unit]
+(SSI[U]), and Audio DMAC-Peripheral-Peripheral.
+It is up  to the board file to enable the device.
 
+This patch is based on the R8A7791 sound work by Kuninori Morimoto.
 
-On 02/09/2016 02:49 PM, Christoffer Dall wrote:
-> On Mon, Feb 08, 2016 at 04:47:27PM +0000, Julien Grall wrote:
->> For now, the firmware tables are parsed 2 times: once in the GIC
->> drivers, the other timer when initializing the vGIC. It means code
->> duplication and make more tedious to add the support for another
->> firmware table (like ACPI).
->>
->> Introduce a new structure and set of helpers to get/set the virtual GIC
->> information. Also fill up the structure for GICv2.
->>
->> Signed-off-by: Julien Grall <julien.grall@arm.com>
->> ---
->>
->> Cc: Thomas Gleixner <tglx@linutronix.de>
->> Cc: Jason Cooper <jason@lakedaemon.net>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->>
->>  drivers/irqchip/irq-gic-common.c       | 13 ++++++
->>  drivers/irqchip/irq-gic-common.h       |  3 ++
->>  drivers/irqchip/irq-gic.c              | 78 +++++++++++++++++++++++++++++++++-
->>  include/linux/irqchip/arm-gic-common.h | 34 +++++++++++++++
->>  4 files changed, 127 insertions(+), 1 deletion(-)
->>  create mode 100644 include/linux/irqchip/arm-gic-common.h
->>
->> diff --git a/drivers/irqchip/irq-gic-common.c b/drivers/irqchip/irq-gic-common.c
->> index f174ce0..704caf4 100644
->> --- a/drivers/irqchip/irq-gic-common.c
->> +++ b/drivers/irqchip/irq-gic-common.c
->> @@ -21,6 +21,19 @@
->>  
->>  #include "irq-gic-common.h"
->>  
->> +static const struct gic_kvm_info *gic_kvm_info;
->> +
->> +const struct gic_kvm_info *gic_get_kvm_info(void)
->> +{
->> +	return gic_kvm_info;
->> +}
->> +
->> +void gic_set_kvm_info(const struct gic_kvm_info *info)
->> +{
->> +	WARN(gic_kvm_info != NULL, "gic_kvm_info already set\n");
->> +	gic_kvm_info = info;
->> +}
->> +
->>  void gic_enable_quirks(u32 iidr, const struct gic_quirk *quirks,
->>  		void *data)
->>  {
->> diff --git a/drivers/irqchip/irq-gic-common.h b/drivers/irqchip/irq-gic-common.h
->> index fff697d..205e5fd 100644
->> --- a/drivers/irqchip/irq-gic-common.h
->> +++ b/drivers/irqchip/irq-gic-common.h
->> @@ -19,6 +19,7 @@
->>  
->>  #include <linux/of.h>
->>  #include <linux/irqdomain.h>
->> +#include <linux/irqchip/arm-gic-common.h>
->>  
->>  struct gic_quirk {
->>  	const char *desc;
->> @@ -35,4 +36,6 @@ void gic_cpu_config(void __iomem *base, void (*sync_access)(void));
->>  void gic_enable_quirks(u32 iidr, const struct gic_quirk *quirks,
->>  		void *data);
->>  
->> +void gic_set_kvm_info(const struct gic_kvm_info *info);
->> +
->>  #endif /* _IRQ_GIC_COMMON_H */
->> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
->> index 911758c..d3a09a4 100644
->> --- a/drivers/irqchip/irq-gic.c
->> +++ b/drivers/irqchip/irq-gic.c
->> @@ -102,6 +102,8 @@ static struct static_key supports_deactivate = STATIC_KEY_INIT_TRUE;
->>  
->>  static struct gic_chip_data gic_data[CONFIG_ARM_GIC_MAX_NR] __read_mostly;
->>  
->> +static struct gic_kvm_info gic_v2_kvm_info;
->> +
->>  #ifdef CONFIG_GIC_NON_BANKED
->>  static void __iomem *gic_get_percpu_base(union gic_base *base)
->>  {
->> @@ -1190,6 +1192,44 @@ static bool gic_check_eoimode(struct device_node *node, void __iomem **base)
->>  	return true;
->>  }
->>  
->> +static void __init gic_of_setup_kvm_info(struct device_node *node)
->> +{
->> +	int ret;
->> +	struct resource r;
->> +	unsigned int irq;
->> +
->> +	gic_v2_kvm_info.type = GIC_V2;
->> +
->> +	irq = irq_of_parse_and_map(node, 0);
->> +	if (!irq)
->> +		gic_v2_kvm_info.maint_irq = -1;
->> +	else
->> +		gic_v2_kvm_info.maint_irq = irq;
->> +
->> +	ret = of_address_to_resource(node, 2, &r);
->> +	if (!ret) {
->> +		gic_v2_kvm_info.vctrl_base = r.start;
->> +		gic_v2_kvm_info.vctrl_size = resource_size(&r);
->> +	}
->> +
->> +	ret = of_address_to_resource(node, 3, &r);
->> +	if (!ret) {
->> +		if (!PAGE_ALIGNED(r.start))
->> +			pr_warn("GICV physical address 0x%llx not page aligned\n",
->> +				(unsigned long long)r.start);
->> +		else if (!PAGE_ALIGNED(resource_size(&r)))
->> +			pr_warn("GICV size 0x%llx not a multiple of page size 0x%lx\n",
->> +				(unsigned long long)resource_size(&r),
->> +				PAGE_SIZE);
->> +		else {
->> +			gic_v2_kvm_info.vcpu_base = r.start;
->> +			gic_v2_kvm_info.vcpu_size = resource_size(&r);
->> +		}
->> +	}
->> +
->> +	gic_set_kvm_info(&gic_v2_kvm_info);
->> +}
->> +
->>  int __init
->>  gic_of_init(struct device_node *node, struct device_node *parent)
->>  {
->> @@ -1219,8 +1259,10 @@ gic_of_init(struct device_node *node, struct device_node *parent)
->>  
->>  	__gic_init_bases(gic_cnt, -1, dist_base, cpu_base, percpu_offset,
->>  			 &node->fwnode);
->> -	if (!gic_cnt)
->> +	if (!gic_cnt) {
->>  		gic_init_physaddr(node);
->> +		gic_of_setup_kvm_info(node);
->> +	}
->>  
->>  	if (parent) {
->>  		irq = irq_of_parse_and_map(node, 0);
->> @@ -1247,6 +1289,32 @@ IRQCHIP_DECLARE(pl390, "arm,pl390", gic_of_init);
->>  
->>  #ifdef CONFIG_ACPI
->>  static phys_addr_t cpu_phy_base __initdata;
->> +static struct
->> +{
->> +	u32 maint_irq;
->> +	int maint_irq_mode;
->> +	phys_addr_t vctrl_base;
->> +	phys_addr_t vcpu_base;
->> +} acpi_data __initdata;
->> +
->> +static void __init gic_acpi_setup_kvm_info(void)
->> +{
->> +	gic_v2_kvm_info.type = GIC_V2;
->> +
->> +	gic_v2_kvm_info.maint_irq = acpi_register_gsi(NULL,
->> +						      acpi_data.maint_irq,
->> +						      acpi_data.maint_irq_mode,
->> +						      ACPI_ACTIVE_HIGH);
->> +	gic_v2_kvm_info.vctrl_base = acpi_data.vctrl_base;
->> +	if (gic_v2_kvm_info.vctrl_base)
->> +		gic_v2_kvm_info.vctrl_size = SZ_8K;
->> +
->> +	gic_v2_kvm_info.vcpu_base = acpi_data.vcpu_base;
->> +	if (gic_v2_kvm_info.vcpu_base)
->> +		gic_v2_kvm_info.vcpu_size = SZ_8K;
-> 
-> why are the sizes hard-coded to 8K in this case?
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-ACPI doesn't provide the size info for GICH and GICV resources. So we
-have to pick a default one, which is 8K.
+---
+Changes in version 2:
+- added "ctu.[01]", "mix.[01]", "dvc.[01]" to the "clock-names" prop;
+- added  CTU/DVC/MIX subnodes;
+- removed SRC0/7/8/9 subnodes;
+- added missing colon to the subject.
 
-> 
-> Thanks,
-> -Christoffer
-> 
+ arch/arm/boot/dts/r8a7794.dtsi |  182 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 182 insertions(+)
+
+Index: renesas/arch/arm/boot/dts/r8a7794.dtsi
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/r8a7794.dtsi
++++ renesas/arch/arm/boot/dts/r8a7794.dtsi
+@@ -1309,4 +1309,186 @@
+ 		#iommu-cells = <1>;
+ 		status = "disabled";
+ 	};
++
++	rcar_sound: sound at ec500000 {
++		/*
++		 * #sound-dai-cells is required
++		 *
++		 * Single DAI : #sound-dai-cells = <0>;         <&rcar_sound>;
++		 * Multi  DAI : #sound-dai-cells = <1>;         <&rcar_sound N>;
++		 */
++		compatible = "renesas,rcar_sound-r8a7794",
++			     "renesas,rcar_sound-gen2";
++		reg =	<0 0xec500000 0 0x1000>, /* SCU */
++			<0 0xec5a0000 0 0x100>,  /* ADG */
++			<0 0xec540000 0 0x1000>, /* SSIU */
++			<0 0xec541000 0 0x280>,  /* SSI */
++			<0 0xec740000 0 0x200>;  /* Audio DMAC peri peri */
++		reg-names = "scu", "adg", "ssiu", "ssi", "audmapp";
++
++		clocks = <&mstp10_clks R8A7794_CLK_SSI_ALL>,
++			 <&mstp10_clks R8A7794_CLK_SSI9>,
++			 <&mstp10_clks R8A7794_CLK_SSI8>,
++			 <&mstp10_clks R8A7794_CLK_SSI7>,
++			 <&mstp10_clks R8A7794_CLK_SSI6>,
++			 <&mstp10_clks R8A7794_CLK_SSI5>,
++			 <&mstp10_clks R8A7794_CLK_SSI4>,
++			 <&mstp10_clks R8A7794_CLK_SSI3>,
++			 <&mstp10_clks R8A7794_CLK_SSI2>,
++			 <&mstp10_clks R8A7794_CLK_SSI1>,
++			 <&mstp10_clks R8A7794_CLK_SSI0>,
++			 <&mstp10_clks R8A7794_CLK_SCU_SRC9>,
++			 <&mstp10_clks R8A7794_CLK_SCU_SRC8>,
++			 <&mstp10_clks R8A7794_CLK_SCU_SRC7>,
++			 <&mstp10_clks R8A7794_CLK_SCU_SRC6>,
++			 <&mstp10_clks R8A7794_CLK_SCU_SRC5>,
++			 <&mstp10_clks R8A7794_CLK_SCU_SRC4>,
++			 <&mstp10_clks R8A7794_CLK_SCU_SRC3>,
++			 <&mstp10_clks R8A7794_CLK_SCU_SRC2>,
++			 <&mstp10_clks R8A7794_CLK_SCU_SRC1>,
++			 <&mstp10_clks R8A7794_CLK_SCU_SRC0>,
++			 <&mstp10_clks R8A7794_CLK_SCU_CTU0_MIX0>,
++			 <&mstp10_clks R8A7794_CLK_SCU_CTU1_MIX1>,
++			 <&mstp10_clks R8A7794_CLK_SCU_CTU0_MIX0>,
++			 <&mstp10_clks R8A7794_CLK_SCU_CTU1_MIX1>,
++			 <&mstp10_clks R8A7794_CLK_SCU_DVC0>,
++			 <&mstp10_clks R8A7794_CLK_SCU_DVC1>,
++			 <&audio_clka>, <&audio_clkb>, <&audio_clkc>,
++			 <&m2_clk>;
++		clock-names = "ssi-all",
++			      "ssi.9", "ssi.8", "ssi.7", "ssi.6", "ssi.5",
++			      "ssi.4", "ssi.3", "ssi.2", "ssi.1", "ssi.0",
++			      "src.9", "src.8", "src.7", "src.6", "src.5",
++			      "src.4", "src.3", "src.2", "src.1", "src.0",
++			      "ctu.0", "ctu.1",
++			      "mix.0", "mix.1",
++			      "dvc.0", "dvc.1",
++			      "clk_a", "clk_b", "clk_c", "clk_i";
++		power-domains = <&cpg_clocks>;
++
++		status = "disabled";
++
++		rcar_sound,dvc {
++			dvc0: dvc at 0 {
++				dmas = <&audma0 0xbc>;
++				dma-names = "tx";
++			};
++			dvc1: dvc at 1 {
++				dmas = <&audma0 0xbe>;
++				dma-names = "tx";
++			};
++		};
++
++		rcar_sound,mix {
++			mix0: mix at 0 { };
++			mix1: mix at 1 { };
++		};
++
++		rcar_sound,ctu {
++			ctu00: ctu at 0 { };
++			ctu01: ctu at 1 { };
++			ctu02: ctu at 2 { };
++			ctu03: ctu at 3 { };
++			ctu10: ctu at 4 { };
++			ctu11: ctu at 5 { };
++			ctu12: ctu at 6 { };
++			ctu13: ctu at 7 { };
++		};
++
++		rcar_sound,src {
++			src1: src at 1 {
++				interrupts = <GIC_SPI 353 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x87>, <&audma0 0x9c>;
++				dma-names = "rx", "tx";
++			};
++			src2: src at 2 {
++				interrupts = <GIC_SPI 354 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x89>, <&audma0 0x9e>;
++				dma-names = "rx", "tx";
++			};
++			src3: src at 3 {
++				interrupts = <GIC_SPI 355 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x8b>, <&audma0 0xa0>;
++				dma-names = "rx", "tx";
++			};
++			src4: src at 4 {
++				interrupts = <GIC_SPI 356 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x8d>, <&audma0 0xb0>;
++				dma-names = "rx", "tx";
++			};
++			src5: src at 5 {
++				interrupts = <GIC_SPI 357 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x8f>, <&audma0 0xb2>;
++				dma-names = "rx", "tx";
++			};
++			src6: src at 6 {
++				interrupts = <GIC_SPI 358 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x91>, <&audma0 0xb4>;
++				dma-names = "rx", "tx";
++			};
++		};
++
++		rcar_sound,ssi {
++			ssi0: ssi at 0 {
++				interrupts = <GIC_SPI 370 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x01>, <&audma0 0x02>,
++				       <&audma0 0x15>, <&audma0 0x16>;
++				dma-names = "rx", "tx", "rxu", "txu";
++			};
++			ssi1: ssi at 1 {
++				interrupts = <GIC_SPI 371 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x03>, <&audma0 0x04>,
++				       <&audma0 0x49>, <&audma0 0x4a>;
++				dma-names = "rx", "tx", "rxu", "txu";
++			};
++			ssi2: ssi at 2 {
++				interrupts = <GIC_SPI 372 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x05>, <&audma0 0x06>,
++				       <&audma0 0x63>, <&audma0 0x64>;
++				dma-names = "rx", "tx", "rxu", "txu";
++			};
++			ssi3: ssi at 3 {
++				interrupts = <GIC_SPI 373 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x07>, <&audma0 0x08>,
++				       <&audma0 0x6f>, <&audma0 0x70>;
++				dma-names = "rx", "tx", "rxu", "txu";
++			};
++			ssi4: ssi at 4 {
++				interrupts = <GIC_SPI 374 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x09>, <&audma0 0x0a>,
++				       <&audma0 0x71>, <&audma0 0x72>;
++				dma-names = "rx", "tx", "rxu", "txu";
++			};
++			ssi5: ssi at 5 {
++				interrupts = <GIC_SPI 375 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x0b>, <&audma0 0x0c>,
++				       <&audma0 0x73>, <&audma0 0x74>;
++				dma-names = "rx", "tx", "rxu", "txu";
++			};
++			ssi6: ssi at 6 {
++				interrupts = <GIC_SPI 376 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x0d>, <&audma0 0x0e>,
++				       <&audma0 0x75>, <&audma0 0x76>;
++				dma-names = "rx", "tx", "rxu", "txu";
++			};
++			ssi7: ssi at 7 {
++				interrupts = <GIC_SPI 377 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x0f>, <&audma0 0x10>,
++				       <&audma0 0x79>, <&audma0 0x7a>;
++				dma-names = "rx", "tx", "rxu", "txu";
++			};
++			ssi8: ssi at 8 {
++				interrupts = <GIC_SPI 378 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x11>, <&audma0 0x12>,
++				       <&audma0 0x7b>, <&audma0 0x7c>;
++				dma-names = "rx", "tx", "rxu", "txu";
++			};
++			ssi9: ssi at 9 {
++				interrupts = <GIC_SPI 379 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x13>, <&audma0 0x14>,
++				       <&audma0 0x7d>, <&audma0 0x7e>;
++				dma-names = "rx", "tx", "rxu", "txu";
++			};
++		};
++	};
+ };
