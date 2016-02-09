@@ -1,41 +1,89 @@
-From: jun.nie@linaro.org (Jun Nie)
-Date: Tue, 9 Feb 2016 13:02:12 +0800
-Subject: [PATCH] ARM: zx: Fix return value check in zx296702_pd_probe()
-In-Reply-To: <1454768696-340-1-git-send-email-weiyj_lk@163.com>
-References: <1454768696-340-1-git-send-email-weiyj_lk@163.com>
-Message-ID: <56B972D4.8040608@linaro.org>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 8 Feb 2016 23:04:56 -0600
+Subject: [PATCH v4 16/17] FDT: Add a helper to get specified name subnode
+In-Reply-To: <1454641552-12576-17-git-send-email-zhaoshenglong@huawei.com>
+References: <1454641552-12576-1-git-send-email-zhaoshenglong@huawei.com>
+ <1454641552-12576-17-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <CAL_JsqK8F6PQX2kC_+CtDk1-ykKRB3YB54o4FaypsRY_tNzK5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016?02?06? 22:24, weiyj_lk at 163.com wrote:
-> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+On Thu, Feb 4, 2016 at 9:05 PM, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
 >
-> In case of error, the function devm_ioremap_resource() returns
-> ERR_PTR() and never returns NULL. The NULL test in the return
-> value check should be replaced with IS_ERR().
->
-> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-> ---
->   arch/arm/mach-zx/zx296702-pm-domain.c | 4 ++--
->   1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/mach-zx/zx296702-pm-domain.c b/arch/arm/mach-zx/zx296702-pm-domain.c
-> index e08574d..2037bcb 100644
-> --- a/arch/arm/mach-zx/zx296702-pm-domain.c
-> +++ b/arch/arm/mach-zx/zx296702-pm-domain.c
-> @@ -169,9 +169,9 @@ static int zx296702_pd_probe(struct platform_device *pdev)
->   	}
->
->   	pcubase = devm_ioremap_resource(&pdev->dev, res);
-> -	if (!pcubase) {
-> +	if (IS_ERR(pcubase)) {
->   		dev_err(&pdev->dev, "ioremap fail.\n");
-> -		return -EIO;
-> +		return PTR_ERR(pcubase);
->   	}
->
->   	for (i = 0; i < ARRAY_SIZE(zx296702_pm_domains); ++i)
->
+> Sometimes it needs to check if there is a node in FDT by full path.
 
-Thanks for fixing this issue.
-Reviewed-by: Jun Nie <jun.nie@linaro.org>
+I'm confused. Are you searching by full path or...
+
+> Introduce this helper to get the specified name subnode if it exists.
+
+name of sub node?
+
+Either way, fdt_subnode_offset or fdt_path_offset doesn't work?
+
+>
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+> CC: Rob Herring <robh@kernel.org>
+> ---
+>  drivers/of/fdt.c       | 25 +++++++++++++++++++++++++
+>  include/linux/of_fdt.h |  2 ++
+>  2 files changed, 27 insertions(+)
+>
+> diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+> index 655f79d..eacb188 100644
+> --- a/drivers/of/fdt.c
+> +++ b/drivers/of/fdt.c
+> @@ -645,6 +645,31 @@ int __init of_scan_flat_dt(int (*it)(unsigned long node,
+>  }
+>
+>  /**
+> + * of_get_flat_dt_subnode_by_name - get subnode of specified node by name
+> + *
+> + * @node: the parent node
+> + * @uname: the name of subnode
+> + * @return offset of the subnode, or -FDT_ERR_NOTFOUND if there is none
+> + */
+> +
+> +int of_get_flat_dt_subnode_by_name(unsigned long node, const char *uname)
+> +{
+> +       const void *blob = initial_boot_params;
+> +       int offset;
+> +       const char *pathp;
+> +
+> +       for (offset = fdt_first_subnode(blob, node);
+> +            offset >= 0;
+> +            offset = fdt_next_subnode(blob, offset)) {
+> +               pathp = fdt_get_name(blob, offset, NULL);
+> +               if (strcmp(pathp, uname) == 0)
+> +                       return offset;
+> +       }
+> +
+> +       return -FDT_ERR_NOTFOUND;
+> +}
+> +
+> +/**
+>   * of_get_flat_dt_root - find the root node in the flat blob
+>   */
+>  unsigned long __init of_get_flat_dt_root(void)
+> diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
+> index df9ef38..fc28162 100644
+> --- a/include/linux/of_fdt.h
+> +++ b/include/linux/of_fdt.h
+> @@ -52,6 +52,8 @@ extern char __dtb_end[];
+>  extern int of_scan_flat_dt(int (*it)(unsigned long node, const char *uname,
+>                                      int depth, void *data),
+>                            void *data);
+> +extern int of_get_flat_dt_subnode_by_name(unsigned long node,
+> +                                         const char *uname);
+>  extern const void *of_get_flat_dt_prop(unsigned long node, const char *name,
+>                                        int *size);
+>  extern int of_flat_dt_is_compatible(unsigned long node, const char *name);
+> --
+> 2.0.4
+>
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
