@@ -1,67 +1,56 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 9 Feb 2016 12:06:06 +0000
-Subject: [PATCH] of/irq: Fix msi-map calculation for nonzero rid-base
-In-Reply-To: <9f6845195d03b0e0b0d187bb510fbf7bd497e836.1455015344.git.robin.murphy@arm.com>
-References: <9f6845195d03b0e0b0d187bb510fbf7bd497e836.1455015344.git.robin.murphy@arm.com>
-Message-ID: <56B9D62E.8080003@arm.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Tue, 9 Feb 2016 13:17:13 +0100
+Subject: [PATCH] ARM: dts: zynq: Enable USB and USB PHY for ZYBO
+In-Reply-To: <1454503265-20605-1-git-send-email-nathan@nathanrossi.com>
+References: <1454503265-20605-1-git-send-email-nathan@nathanrossi.com>
+Message-ID: <56B9D8C9.7060000@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
-
-On 09/02/16 11:04, Robin Murphy wrote:
-> The existing msi-map code is fine for shifting the entire RID space
-> upwards, but attempting finer-grained remapping reveals a bug. It turns
-> out that we are mistakenly treating the msi-base part as an offset, not
-> as a new base to remap onto, so things get squiffy when rid-base is
-> nonzero. Fix this, and at the same time add a sanity check against
-> having msi-map-mask clash with a nonzero rid-base, as that's another
-> thing one can easily get wrong.
+On 3.2.2016 13:41, Nathan Rossi wrote:
+> Setup the USB controller and configure it to operate in host mode.
+> Additionally add the USB phy node for the ZYBO, including reset gpio
+> which is connected to a external MIO pin.
 > 
-> CC: <stable@vger.kernel.org>
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-
-Looks like Stuart and you both found the same bug at the same time:
-https://lkml.org/lkml/2016/2/8/1066
-
-but yours seem more correct to me (the rid_base masking in Stuart's
-version seems odd).
-
+> Signed-off-by: Nathan Rossi <nathan@nathanrossi.com>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Michal Simek <michal.simek@xilinx.com>
+> Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
 > ---
->  drivers/of/irq.c | 9 ++++++++-
->  1 file changed, 8 insertions(+), 1 deletion(-)
+>  arch/arm/boot/dts/zynq-zybo.dts | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
 > 
-> diff --git a/drivers/of/irq.c b/drivers/of/irq.c
-> index 7ee21ae..e7bfc17 100644
-> --- a/drivers/of/irq.c
-> +++ b/drivers/of/irq.c
-> @@ -635,6 +635,13 @@ static u32 __of_msi_map_rid(struct device *dev, struct device_node **np,
->  		msi_base = be32_to_cpup(msi_map + 2);
->  		rid_len = be32_to_cpup(msi_map + 3);
+> diff --git a/arch/arm/boot/dts/zynq-zybo.dts b/arch/arm/boot/dts/zynq-zybo.dts
+> index 16c9cac..8f085b3 100644
+> --- a/arch/arm/boot/dts/zynq-zybo.dts
+> +++ b/arch/arm/boot/dts/zynq-zybo.dts
+> @@ -33,6 +33,11 @@
+>  		stdout-path = "serial0:115200n8";
+>  	};
 >  
-> +		if (rid_base & ~map_mask) {
-> +			dev_err(parent_dev,
-> +				"Invalid msi-map translation - msi-map-mask (0x%x) ignores rid-base (0x%x)\n",
-> +				map_mask, rid_base);
-> +			return rid_out;
-> +		}
+> +	usb_phy0: phy0 {
+> +		#phy-cells = <0>;
+> +		compatible = "usb-nop-xceiv";
+> +		reset-gpios = <&gpio0 46 1>;
+> +	};
+>  };
+>  
+>  &clkc {
+> @@ -56,3 +61,9 @@
+>  &uart1 {
+>  	status = "okay";
+>  };
 > +
->  		msi_controller_node = of_find_node_by_phandle(phandle);
->  
->  		matched = (masked_rid >= rid_base &&
-> @@ -654,7 +661,7 @@ static u32 __of_msi_map_rid(struct device *dev, struct device_node **np,
->  	if (!matched)
->  		return rid_out;
->  
-> -	rid_out = masked_rid + msi_base;
-> +	rid_out = masked_rid - rid_base + msi_base;
->  	dev_dbg(dev,
->  		"msi-map at: %s, using mask %08x, rid-base: %08x, msi-base: %08x, length: %08x, rid: %08x -> %08x\n",
->  		dev_name(parent_dev), map_mask, rid_base, msi_base,
+> +&usb0 {
+> +	status = "okay";
+> +	dr_mode = "host";
+> +	usb-phy = <&usb_phy0>;
+> +};
 > 
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Applied.
+
+Thanks,
+Michal
