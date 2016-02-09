@@ -1,43 +1,40 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue,  9 Feb 2016 23:31:27 +0800
-Subject: [PATCH v2] ARM: sunxi_defconfig: Enable MUSB HDRC driver with
- Allwinner glue
-Message-ID: <1455031887-14147-1-git-send-email-wens@csie.org>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Tue, 9 Feb 2016 20:50:25 +0530
+Subject: [PATCH] mfd: Provide MACRO to declare commonly defined MFD cell
+ attributes
+In-Reply-To: <1455028027-1527-1-git-send-email-lee.jones@linaro.org>
+References: <1455028027-1527-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <56BA03B9.2010801@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner SoCs typically have a Mentor Graphics Inventra MUSB dual role
-controller for USB OTG.
 
-Now that the issue with MUSB and USB gadget registration order has been
-resolved, we can enable this driver in dual role mode. This requires the
-NOP USB transceiver driver, which is also enabled.
+On Tuesday 09 February 2016 07:57 PM, Lee Jones wrote:
+> +
+> +#define MFD_CELL_NAME(_name)						\
+> +	{								\
+> +		MFD_CELL_ALL(_name, NULL, NULL, 0, NULL, NULL)		\
+> +	}
+> +
+>   struct irq_domain;
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
+It is failed in compilation as we can not use ARRAY_SIZE(NULL)
 
-Changes since v1:
+static struct mfd_cell max77620_children[] = {
+         MFD_CELL_NAME("max77620-pinctrl"),
+};
 
- - Dropped default USB gadget driver.
+  CC      drivers/mfd/max77620.o
+drivers/mfd/max77620.c:57:2: warning: braces around scalar initializer
+   MFD_CELL_NAME("max77620-pinctrl"),
 
----
- arch/arm/configs/sunxi_defconfig | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
-index a55c48e27309..81a1b92fd4e6 100644
---- a/arch/arm/configs/sunxi_defconfig
-+++ b/arch/arm/configs/sunxi_defconfig
-@@ -110,6 +110,10 @@ CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_EHCI_HCD_PLATFORM=y
- CONFIG_USB_OHCI_HCD=y
- CONFIG_USB_OHCI_HCD_PLATFORM=y
-+CONFIG_USB_MUSB_HDRC=y
-+CONFIG_USB_MUSB_SUNXI=y
-+CONFIG_NOP_USB_XCEIV=y
-+CONFIG_USB_GADGET=y
- CONFIG_MMC=y
- CONFIG_MMC_SUNXI=y
- CONFIG_NEW_LEDS=y
--- 
-2.7.0
+include/linux/compiler-gcc.h:64:63: warning: taking address of 
+expression of type 'void'
+  #define __must_be_array(a) BUILD_BUG_ON_ZERO(__same_type((a), &(a)[0]))
+                                                                ^
+include/linux/bug.h:33:55: note: in definition of macro 'BUILD_BUG_ON_ZERO'
+  #define BUILD_BUG_ON_ZERO(e) (sizeof(struct { int:-!!(e); }))
+                                                        ^
+include/linux/compiler-gcc.h:64:46: note: in expansion of macro 
+'__same_type'
+  #define __must_be_array(a) BUILD_BUG_ON_ZERO(__same_type((a), &(a)[0]))
