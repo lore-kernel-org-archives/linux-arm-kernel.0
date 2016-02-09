@@ -1,62 +1,58 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 9 Feb 2016 10:45:33 +0000
-Subject: [PATCH] arm64: allow the module region to be randomized
- independently
-In-Reply-To: <CAKv+Gu-vxhJRUMK7sqv1saw+wkQRD5xFydpgTLbKgWhoNj5LmA@mail.gmail.com>
-References: <CAGXu5j+1rcScYedzQ5o0aaGZJWPCBGk-gai0D8jY8Huc-VuG7A@mail.gmail.com>
- <1454926332-25929-1-git-send-email-ard.biesheuvel@linaro.org>
- <20160208181305.GW6076@e104818-lin.cambridge.arm.com>
- <CAKv+Gu-vxhJRUMK7sqv1saw+wkQRD5xFydpgTLbKgWhoNj5LmA@mail.gmail.com>
-Message-ID: <20160209104533.GB16122@e104818-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 09 Feb 2016 12:04 +0100
+Subject: [PATCH 1/3] input: cygnus-update touchscreen dt node document
+In-Reply-To: <1455008277-8312-2-git-send-email-raveendra.padasalagi@broadcom.com>
+References: <1455008277-8312-1-git-send-email-raveendra.padasalagi@broadcom.com>
+ <1455008277-8312-2-git-send-email-raveendra.padasalagi@broadcom.com>
+Message-ID: <2631849.GeOulu78vx@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 09, 2016 at 11:03:01AM +0100, Ard Biesheuvel wrote:
-> On 8 February 2016 at 19:13, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > On Mon, Feb 08, 2016 at 11:12:12AM +0100, Ard Biesheuvel wrote:
-> >> This adds the option to randomize the module region independently from the
-> >> core kernel, and enables it by default. This makes it less likely that the
-> >> location of core kernel data structures can be determined by an adversary,
-> >> but causes all function calls from modules into the core kernel to be
-> >> resolved via entries in the module PLTs.
-> >>
-> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >> ---
-> >>  arch/arm64/Kconfig              | 15 ++++++++
-> >>  arch/arm64/include/asm/module.h |  6 ++++
-> >>  arch/arm64/kernel/kaslr.c       | 36 +++++++++++++++-----
-> >>  arch/arm64/kernel/module.c      |  9 ++---
-> >>  4 files changed, 50 insertions(+), 16 deletions(-)
-> >
-> > With this patch I get an unhandled paging request, coming from
-> > kernel/module.c:2982 (the memset). The PC is wrongly attributed but it's
-> > in arch/arm64/lib/memset.S:
-> >
-> 
-> This was due to a thinko in kaslr_early_init(). Folding the following
-> hunk will fix it (or I can resend the patch if you prefer)
-> 
-> -------8<----------
-> diff --git a/arch/arm64/kernel/kaslr.c b/arch/arm64/kernel/kaslr.c
-> index f8ad30160026..d7eba99ab140 100644
-> --- a/arch/arm64/kernel/kaslr.c
-> +++ b/arch/arm64/kernel/kaslr.c
-> @@ -82,6 +82,12 @@ u64 __init kaslr_early_init(u64 dt_phys)
->         int size;
-> 
->         /*
-> +        * Set a reasonable default for module_alloc_base in case
-> +        * we end up running with KASLR disabled.
-> +        */
-> +       module_alloc_base = (u64)_etext - MODULES_VSIZE;
+On Tuesday 09 February 2016 14:27:55 Raveendra Padasalagi wrote:
 > +
-> +       /*
->          * Try to map the FDT early. If this fails, we simply bail,
->          * and proceed with KASLR disabled. We will make another
->          * attempt at mapping the FDT in setup_machine()
-> -------8<----------
+> +One of the below 2 property is mandatory.
+> +- ts_syscon: handler of syscon node defining physical base address
+> +  of the controller and length of memory mapped region.
+> +  If this property is selected please make sure MFD_SYSCON config
+> +  is enabled in the defconfig file.
+> +or
+> +- reg: physical base address of the controller and length of memory
+> +  mapped region.
+> +
+>  - clocks:  The clock provided by the SOC to driver the tsc
+>  - clock-name:  name for the clock
+>  - interrupts: The touchscreen controller's interrupt
+> @@ -54,12 +62,16 @@ Optional properties:
+>  - touchscreen-inverted-y: Y axis is inverted (boolean)
+>  
+>  Example:
+> +       ts_adc_syscon: ts_adc_syscon at 0x180a6000 {
+> +               compatible = "syscon";
+> +               reg = <0x180a6000 0xc30>;
+> +       };
+>  
+>         touchscreen: tsc at 0x180A6000 {
+>                 compatible = "brcm,iproc-touchscreen";
+>                 #address-cells = <1>;
+>                 #size-cells = <1>;
+> -               reg = <0x180A6000 0x40>;
+> +               syscon = <&ts_adc_syscon>;
+>                 clocks = <&adc_clk>;
+>                 clock-names = "tsc_clk";
+>                 interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>;
 
-I'll fold the hunk in and give it a try. Thanks.
+This doesn't seem right: For one thing, it's an incompatible binding
+change which you should try to avoid.
 
--- 
-Catalin
+Worse, the syscon has a name indicating that it really has a particular
+function, but the name is completely generic (just "syscon"). Please
+add a specific compatible string identifying the device that owns
+the registers, and put any other associated properties (clocks,
+interrupts, ...) that are for that device in general rather than just
+the touchscreen in there.
+
+Your changelog text fails to describe why you do this change in
+the first place, and why you can't do it in a backward-compatible
+way, so please rewrite that text.
+
+	Arnd
