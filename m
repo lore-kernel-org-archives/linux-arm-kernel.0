@@ -1,37 +1,46 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Tue, 9 Feb 2016 11:19:57 +0100
-Subject: [PATCH 0/2] CREG clk driver for NXP LPC18xx family
-In-Reply-To: <20160208222637.GV4848@codeaurora.org>
-References: <1436651307-24098-1-git-send-email-manabian@gmail.com>
- <20160208222637.GV4848@codeaurora.org>
-Message-ID: <CAGhQ9Vy14XR+-kgACiqPgs0SPueizD6Gd2q5kaNqM5mGna0V=g@mail.gmail.com>
+From: georgi.djakov@linaro.org (Georgi Djakov)
+Date: Tue,  9 Feb 2016 12:19:45 +0200
+Subject: [PATCH v2] arm64: defconfig: Add Qualcomm sdhci and restart
+ functionality
+Message-ID: <1455013185-946-1-git-send-email-georgi.djakov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Enable sdhci and restart functionality for devices based on msm8916 platform.
+Also increase the number of minors per block device to detect all available
+partitions.
 
-On 8 February 2016 at 23:26, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 07/11, Joachim Eastwood wrote:
->> This patch set adds a clk driver for the low power clocks found in
->> the CREG block on lpc18xx. CREG is a collection of miscellaneous
->> configuration registers that can be accessed through a syscon
->> regmap interface. The clk driver makes it possible to setup and
->> enabled these two clocks.
->>
->> This need to support peripherals like the internal RTC on the
->> lpc18xx platform.
->>
->
-> I know this is many months old, but is this driver still
-> required? I can apply it to clk-next if so.
+Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
+---
 
-It is still needed for the internal RTC (rtc-lpc24xx) on lpc18xx. The
-RTC uses a 1 kHz clock that is controlled in CREG (misc system regs).
+Changes since v1 (https://lkml.org/lkml/2016/2/4/259)
+ * Rebased onto arm-soc/next/arm64
 
-Note; if you apply it you will most likely get a very trivial conflict
-in drivers/clk/nxp/Makefile because clk-lpc32xx.c has been added since
-these patches was sent.
+ arch/arm64/configs/defconfig |    3 +++
+ 1 file changed, 3 insertions(+)
 
-
-regards,
-Joachim Eastwood
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 91ae2634cae9..ad26a53ddfe9 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -150,6 +150,7 @@ CONFIG_PINCTRL_QCOM_SPMI_PMIC=y
+ CONFIG_GPIO_PL061=y
+ CONFIG_GPIO_RCAR=y
+ CONFIG_GPIO_XGENE=y
++CONFIG_POWER_RESET_MSM=y
+ CONFIG_POWER_RESET_XGENE=y
+ CONFIG_POWER_RESET_SYSCON=y
+ # CONFIG_HWMON is not set
+@@ -186,10 +187,12 @@ CONFIG_USB_MSM_OTG=y
+ CONFIG_USB_ULPI=y
+ CONFIG_USB_GADGET=y
+ CONFIG_MMC=y
++CONFIG_MMC_BLOCK_MINORS=32
+ CONFIG_MMC_ARMMMCI=y
+ CONFIG_MMC_SDHCI=y
+ CONFIG_MMC_SDHCI_PLTFM=y
+ CONFIG_MMC_SDHCI_TEGRA=y
++CONFIG_MMC_SDHCI_MSM=y
+ CONFIG_MMC_SPI=y
+ CONFIG_MMC_DW=y
+ CONFIG_MMC_DW_EXYNOS=y
