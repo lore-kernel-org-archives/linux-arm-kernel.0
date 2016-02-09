@@ -1,26 +1,65 @@
-From: Chris.Brandt@renesas.com (Chris Brandt)
-Date: Tue, 9 Feb 2016 12:02:00 +0000
-Subject: [PATCH v3 0/3] kallsyms: remove special handling for CONFIG_ARM
-In-Reply-To: <1455010262-28894-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1455010262-28894-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <HKXPR06MB0565C2168EFA7CFF79C323DA8AD60@HKXPR06MB0565.apcprd06.prod.outlook.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 9 Feb 2016 12:02:17 +0000
+Subject: [PATCH v3 23/23] arm64: Panic when VHE and non VHE CPUs coexist
+In-Reply-To: <20160208162402.GC14146@leverpostej>
+References: <1454522416-6874-1-git-send-email-marc.zyngier@arm.com>
+ <1454522416-6874-24-git-send-email-marc.zyngier@arm.com>
+ <20160208160445.GS6076@e104818-lin.cambridge.arm.com>
+ <20160208162402.GC14146@leverpostej>
+Message-ID: <20160209120217.GE16122@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 Feb 2016, Ard Biesheuvel wrote:
+On Mon, Feb 08, 2016 at 04:24:03PM +0000, Mark Rutland wrote:
+> On Mon, Feb 08, 2016 at 04:04:46PM +0000, Catalin Marinas wrote:
+> > On Wed, Feb 03, 2016 at 06:00:16PM +0000, Marc Zyngier wrote:
+> > > diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> > > index 6f2f377..f9b6a5b 100644
+> > > --- a/arch/arm64/kernel/head.S
+> > > +++ b/arch/arm64/kernel/head.S
+> > > @@ -578,7 +578,24 @@ ENTRY(set_cpu_boot_mode_flag)
+> > >  1:	str	w20, [x1]			// This CPU has booted in EL1
+> > >  	dmb	sy
+> > >  	dc	ivac, x1			// Invalidate potentially stale cache line
+> > > +	adr_l	x1, __run_cpu_mode
+> > > +	ldr	w0, [x1]
+> > > +	mrs	x20, CurrentEL
+> > > +	cbz	x0, skip_el_check
+> > > +	cmp	x0, x20
+> > > +	bne	mismatched_el
+> > >  	ret
+> > > +skip_el_check:			// Only the first CPU gets to set the rule
+> > > +	str	w20, [x1]
+> > > +	dmb	sy
+> > > +	dc	ivac, x1	// Invalidate potentially stale cache line
+> > > +	ret
+> > > +mismatched_el:
+> > > +	str	w20, [x1, #4]
+> > > +	dmb	sy
+> > > +	dc	ivac, x1	// Invalidate potentially stale cache line
+> > > +1:	wfi
+> > > +	b	1b
+> > >  ENDPROC(set_cpu_boot_mode_flag)
+> > 
+> > Do we need to wait for the D-cache maintenance completion before
+> > entering WFI (like issuing a DSB)? Same for the skip_el_check path
+> > before the RET.
+> 
+> We would need that to complete the maintenance, yes.
+> 
+> However, given we're going into WFI immediately afterwards, and not
+> signalling completion to other CPUs, what we gain is somewhat
+> questionable.
+> 
+> Perhaps it's always better to do the maintenance on the read side (for
+> consistency with [1]).
+> 
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-February/404661.html
 
->Ard Biesheuvel (3):
->  ARM: move .vectors and .stubs sections back into the kernel VMA
->  kallsyms: remove special lower address limit for CONFIG_ARM
->  kallsyms: remove --page-offset command line option
->
-> arch/arm/kernel/entry-armv.S  | 3 +--
-> arch/arm/kernel/vmlinux.lds.S | 6 ++++--
-> scripts/kallsyms.c            | 8 --------
-> scripts/link-vmlinux.sh       | 4 ----
-> 4 files changed, 5 insertions(+), 16 deletions(-)
+While [1] looks clearer to me, it seems that it is not consistent with
+the rest of the head.S file. Maybe we can clean them up as a separate
+patch and leave the dc ivac here. We also seem to miss barriers in other
+similar situations in head.S.
 
-
-The linker script split (XIP vs non-XIP) has been applied, so now there's a vmlinux-xip.lds.S. So, you'd think you would need to mirror these changes in there (since the breakage of XIP_KERNEL is what started this).
-
-Chris
+-- 
+Catalin
