@@ -1,48 +1,42 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 09 Feb 2016 09:30:02 +0100
-Subject: [PATCH v4 09/10] arm64: dts: Add main Thermal info to rk3368.dtsi
-In-Reply-To: <1447044542-30859-10-git-send-email-wxt@rock-chips.com>
-References: <1447044542-30859-1-git-send-email-wxt@rock-chips.com>
- <1447044542-30859-10-git-send-email-wxt@rock-chips.com>
-Message-ID: <42802946.20XC68fnyM@phil>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 9 Feb 2016 08:49:13 +0000 (UTC)
+Subject: [PATCH v3 3/3] pci: dra7xx: use pdata callbacks to perform reset
+In-Reply-To: <56B900E9.9040306@ti.com>
+References: <1452780672-14339-1-git-send-email-kishon@ti.com>
+ <1452780672-14339-4-git-send-email-kishon@ti.com>
+ <20160127173104.GQ19432@atomide.com> <56A90971.4020409@ti.com>
+ <20160127185649.GV19432@atomide.com> <56A94FB7.6020903@ti.com>
+ <20160128183156.GH19432@atomide.com> <56B087AD.4000505@ti.com>
+ <alpine.DEB.2.02.1602080208070.2182@utopia.booyaka.com>
+ <56B900E9.9040306@ti.com>
+Message-ID: <alpine.DEB.2.02.1602090846480.2906@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Caesar,
+On Mon, 8 Feb 2016, Suman Anna wrote:
 
-Am Montag, 9. November 2015, 12:49:01 schrieb Caesar Wang:
-> This patch add the thermal needed info on RK3368.
-> Meanwhile, support the trips to throttle for thermal.
+> On 02/07/2016 08:48 PM, Paul Walmsley wrote:
+> > On Tue, 2 Feb 2016, Kishon Vijay Abraham I wrote:
+> > 
+> >> Paul, what do you think is the best way forward to perform reset?
+> > 
+> > Many of the IP blocks with PRM hardreset lines are processor IP blocks. 
+> > Those often need special reset handling to ensure that WFI/HLT-like 
+> > instructions are executed after reset.  This special handling ensures that 
+> > the IP blocks' bus initiator interfaces indicate that they are in standby 
+> > to the PRCM - thus allowing power management for the rest of the chip to 
+> > work correctly.
+> > 
+> > But that doesn't seem to be the case with PCIe - and maybe others - 
+> > possibly some of the MMUs?  
 > 
-> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-> Acked-by: Eduardo Valentin <edubezval@gmail.com>
+> Yeah, the sequencing between clocks and resets would still be the same
+> for MMUs, so, adding the custom flags for MMUs is fine.
 
-[...]
-
-> @@ -829,6 +855,16 @@
->  			};
->  		};
-> 
-> +		tsadc {
-> +			otp_gpio: otp-gpio {
-> +				rockchip,pins = <0 10 RK_FUNC_GPIO &pcfg_pull_none>;
-> +			};
-> +
-> +			otp_out: otp-out {
-> +				rockchip,pins = <0 10 RK_FUNC_1 &pcfg_pull_none>;
-> +			};
-> +		};
-> +
->  		uart0 {
->  			uart0_xfer: uart0-xfer {
->  				rockchip,pins = <2 24 RK_FUNC_1 &pcfg_pull_up>,
-
-As it came up just now, these pinctrl settings seem strange. I.e. according 
-to the TRM gpio0b2 [= gpio0 10] func_1 is sc_rst, which seems to be the 
-smartcard controller?
-
-It came up because it seems the Tronsmart R68 board seems to use this pin 
-for controlling the vcc_host regulator instead.
+I'm curious as to whether HWMOD_CUSTOM_HARDRESET is needed for the MMUs.  
+We've stated that the main point of the custom hardreset code is to handle 
+processors that need to be placed into WFI/HLT, but it doesn't seem like 
+there would be an equivalent for MMUs.  Thoughts?
 
 
-Heiko
+- Paul
