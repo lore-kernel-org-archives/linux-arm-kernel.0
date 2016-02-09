@@ -1,34 +1,47 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 9 Feb 2016 17:20:58 +0000
-Subject: [PATCH v4 0/7] arm64: Verify early CPU features
-In-Reply-To: <1453745225-27736-1-git-send-email-suzuki.poulose@arm.com>
-References: <1453745225-27736-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20160209172057.GU22874@arm.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue, 9 Feb 2016 10:06:18 -0700
+Subject: [PATCH V2 3/6] stm class: provision for statically assigned
+ masterIDs
+In-Reply-To: <AM4PR08MB0785EAA2B628765D7EA3FDA086D50@AM4PR08MB0785.eurprd08.prod.outlook.com>
+References: <1454487337-30184-1-git-send-email-zhang.chunyan@linaro.org>
+ <1454487337-30184-4-git-send-email-zhang.chunyan@linaro.org>
+ <87mvrf5ngl.fsf@ashishki-desk.ger.corp.intel.com>
+ <CANLsYky2twQ98u241YyHD=atYRp1N56YVHUQNY2E2Ljsq0cseA@mail.gmail.com>
+ <87twlj49k7.fsf@ashishki-desk.ger.corp.intel.com>
+ <CANLsYkw=mG+ch8QzxmbwWs9o+mndVNo1MuqXcrPrNJYj_SQcHQ@mail.gmail.com>
+ <AM4PR08MB0785EAA2B628765D7EA3FDA086D50@AM4PR08MB0785.eurprd08.prod.outlook.com>
+Message-ID: <CANLsYkzJEsq-jZAZu6xjwP+UhxJHehgpVB0s0oi8wkYksRwDMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 25, 2016 at 06:06:58PM +0000, Suzuki K Poulose wrote:
-> From: Suzuki K. Poulose <suzuki.poulose@arm.com>
-> 
-> This series adds support for verifying some of the cpufeatures
-> that are decided early in the boot process based on the boot
-> CPU and cannot be delayed until all the CPUs are up (e.g, ASIDBits
-> and may be VHE?). It also adds support for handling the failures
-> in booting the secondary CPUs which could not be synchronised
-> with the master CPU, otherwise.
-> 
-> It also adds one of the users of this early hook, check for ASIDBits.
-> The mm_context id is based on the ASIDBits width supported by the
-> boot CPU and is used early in the initialisation. So we need to make
-> sure that all the secondary CPUs supports the width reported by the
-> booting CPU, failing which we crash the system.
-> 
-> This series has been tested on Juno, Fast model by injecting smaller
-> ASIDBits, lack of page-size support and missing features(PAN)
+On 8 February 2016 at 10:44, Al Grant <Al.Grant@arm.com> wrote:
+>> Mike did write "master IDs are hardwired to individual cores and core security
+>> states", which make assignment for one platform very static.
+>> On the flip side those will change from one system to another.
+>
+> It depends on your perspective.  From the perspective of a userspace
+> process not pinned to a core, the master id will appear to vary
+> dynamically and unpredictably as the thread migrates from one
+> core to another.  (That's actually useful if the decoder wants to know
+> where the thread is running at any given point, as it can find that out
+> for free, without the need to track migration events.)
 
-Module the comments from Mark and Catalin on patch 4, the rest looks
-good to me:
+Right, that's the expected (and desired) behaviour.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+>
+> On the other hand if you are pinned (e.g. you're the kernel on a
+> particular core, or you're a per-core worker thread in some thread
+> pooling system) then you have a fixed master id, and then you can
+> have one instance per core all using the same range of channel
+> numbers, with the master id indicating the core - this saves on
+> channel space compared to having to give each core its own
+> range of channel space.
 
-Will
+>From an STM core and driver point of view channel mapping works the
+same way - pinning of tasks is  a kernel artefact.  The problem of
+representing masterIDs in the STM core for an architecture with HW
+assigned masterIDs is still unresolved.
+
+>
+> Al
+> IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
