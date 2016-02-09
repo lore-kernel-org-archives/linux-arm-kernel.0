@@ -1,53 +1,41 @@
-From: juri.lelli@arm.com (Juri Lelli)
-Date: Tue, 9 Feb 2016 10:37:48 +0000
-Subject: [PATCH v3 0/6] CPUs capacity information for heterogeneous systems
-In-Reply-To: <56B92BF4.4030405@linaro.org>
-References: <1454500799-18451-1-git-send-email-juri.lelli@arm.com>
- <56B92BF4.4030405@linaro.org>
-Message-ID: <20160209103748.GP11415@e106622-lin>
+From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
+Date: Tue, 9 Feb 2016 16:11:56 +0530
+Subject: [PATCH V3 3/5] PCI: xilinx: Modifying AXI PCIe Host Bridge driver to
+ work on both Zynq and Microblaze
+In-Reply-To: <1455014518-8708-1-git-send-email-bharatku@xilinx.com>
+References: <1455014518-8708-1-git-send-email-bharatku@xilinx.com>
+Message-ID: <1455014518-8708-4-git-send-email-bharatku@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Steve,
+Modifying Xilinx AXI PCIe Host Bridge Soft IP driver to work on both
+Zynq and Microblaze Architectures.
+With these modifications drivers/pci/host/pcie-xilinx.c, will
+work on both Zynq and Microblaze Architectures.
 
-On 08/02/16 15:59, Steve Muckle wrote:
-> Hi Juri,
-> 
-> On 02/03/2016 03:59 AM, Juri Lelli wrote:
-> >  v1: DT + sysfs [1]
-> > 
-> >  v2: Dynamic profiling at boot [2]
-> > 
-> > Third version of this patchset proposes what seems to be the solution we agreed
-> > upon (see [2] for reference) to the problem of how do we init CPUs original
-> > capacity: we run a bogus benchmark (stealing int_sqrt from lib/ we run that in
-> > a loop to perform some integer computation, better benchmarks are welcome)
-> > on the first cpu of each frequency domain (assuming no u-arch differences
-> > inside domains), measure time to complete a fixed number of iterations and then
-> > normalize results to SCHED_CAPACITY_SCALE (1024). This time around we also
-> > added a boot time parameter to disable profiling at boot (as it can be time
-> > consuming) and sysfs attributes with which default values can be overwritten.
-> > The proposed solution is basically putting together bits of v1 and v2 that are
-> > considered valuable and acceptable for mainline.
-> 
-> I'm still concerned that there's no way to obtain optimal boot time on a
-> heterogeneous system. Either the dynamic benchmarking is enabled, adding
-> 1 sec, or the benchmarking is skipped, and task distribution on the
-> heterogeneous CPUs is determined by the platform's CPU numbering and
-> chance, potentially impacting performance nondeterministically until
-> userspace sets the correct capacity values via sysfs.
-> 
-> I believe you tested the impact on boot time of using equal capacity
-> values and saw little difference. I'm wondering though, what was the CPU
-> numbering on that target?
-> 
+Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
+Signed-off-by: Ravi Kiran Gummaluri <rgummal@xilinx.com>
+---
+Changes:
+Removed unneccessary architecture dependent number of MSI's.
+Added #ifdef to pci_fixup_irqs which is ARM specific API.
+---
+ drivers/pci/host/pcie-xilinx.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-My targets (Juno and TC2) had big cluster on 1,2 and little on the
-remaining cpus. Why do you think this might matter?
-
-Anyway, IMHO boot time performance is not what we are targeting here, so
-I wouldn't be too worried about this particular point.
-
-Best,
-
-- Juri
+diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
+index 13fec35..6cbce34 100644
+--- a/drivers/pci/host/pcie-xilinx.c
++++ b/drivers/pci/host/pcie-xilinx.c
+@@ -704,7 +704,9 @@ static int xilinx_pcie_probe(struct platform_device *pdev)
+ #endif
+ 	pci_scan_child_bus(bus);
+ 	pci_assign_unassigned_bus_resources(bus);
++#ifdef CONFIG_ARM
+ 	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
++#endif
+ 	pci_bus_add_devices(bus);
+ 	platform_set_drvdata(pdev, port);
+ 
+-- 
+2.1.1
