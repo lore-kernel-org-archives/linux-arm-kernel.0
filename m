@@ -1,105 +1,151 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Tue, 9 Feb 2016 16:52:38 +0000
-Subject: [RFC PATCH v2 1/3] PCI: hisi: re-architect Hip05/Hip06
- controllers driver to preapare for ACPI
-In-Reply-To: <5968234.D2a3VCM72k@wuerfel>
-References: <1454935264-6076-1-git-send-email-gabriele.paoloni@huawei.com>
- <3113837.YSNyDAf4HQ@wuerfel>
- <EE11001F9E5DDD47B7634E2F8A612F2E1ECAD249@lhreml503-mbs>
- <5968234.D2a3VCM72k@wuerfel>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1ECAF48D@lhreml503-mbs>
+From: stuart.yoder@nxp.com (Stuart Yoder)
+Date: Tue, 9 Feb 2016 16:53:58 +0000
+Subject: [PATCH] of/irq: Fix msi-map calculation for nonzero rid-base
+In-Reply-To: <20160209160812.GC9332@leverpostej>
+References: <9f6845195d03b0e0b0d187bb510fbf7bd497e836.1455015344.git.robin.murphy@arm.com>
+ <56B9D62E.8080003@arm.com>
+ <HE1PR04MB1641AF97F637BBCBB86BA4FE8DD60@HE1PR04MB1641.eurprd04.prod.outlook.com>
+ <20160209160812.GC9332@leverpostej>
+Message-ID: <HE1PR04MB1641792D75BC60CA549F45A98DD60@HE1PR04MB1641.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+
+
 > -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: 09 February 2016 16:27
-> To: Gabriele Paoloni
-> Cc: linux-arm-kernel at lists.infradead.org; Guohanjun (Hanjun Guo);
-> Wangzhou (B); liudongdong (C); Linuxarm; qiujiang; bhelgaas at google.com;
-> Lorenzo.Pieralisi at arm.com; tn at semihalf.com; linux-pci at vger.kernel.org;
-> linux-kernel at vger.kernel.org; xuwei (O); linux-acpi at vger.kernel.org;
-> jcm at redhat.com; zhangjukuo; Liguozhu (Kenneth)
-> Subject: Re: [RFC PATCH v2 1/3] PCI: hisi: re-architect Hip05/Hip06
-> controllers driver to preapare for ACPI
+> From: Mark Rutland [mailto:mark.rutland at arm.com]
+> Sent: Tuesday, February 09, 2016 10:08 AM
+> To: Stuart Yoder <stuart.yoder@nxp.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>; Robin Murphy <robin.murphy@arm.com>;
+> robh+dt at kernel.org; frowand.list at gmail.com; grant.likely at linaro.org;
+> devicetree at vger.kernel.org; david.daney at cavium.com; linux-arm-
+> kernel at lists.infradead.org; linux-kernel at vger.kernel.org; stable at vger.kernel.org
+> Subject: Re: [PATCH] of/irq: Fix msi-map calculation for nonzero rid-base
 > 
-> On Monday 08 February 2016 16:51:19 Gabriele Paoloni wrote:
-> > > From: Arnd Bergmann [mailto:arnd at arndb.de]
-> > > On Monday 08 February 2016 16:06:54 Gabriele Paoloni wrote:
-> > > > > On Monday 08 February 2016 12:41:02 Gabriele Paoloni wrote:
-> > > int
-> > > > > size,
-> > > > > > +                         u32 *val)
-> > > > > > +{
-> > > > > > +   u32 reg;
-> > > > > > +   u32 reg_val;
-> > > > > > +   void *walker = &reg_val;
-> > > > > > +
-> > > > > > +   walker += (where & 0x3);
-> > > > > > +   reg = where & ~0x3;
-> > > > > > +   reg_val = readl(reg_base + reg);
-> > > > > > +
-> > > > > > +   if (size == 1)
-> > > > > > +           *val = *(u8 __force *) walker;
-> > > > > > +   else if (size == 2)
-> > > > > > +           *val = *(u16 __force *) walker;
-> > > > > > +   else if (size == 4)
-> > > > > > +           *val = reg_val;
-> > > > > > +   else
-> > > > > > +           return PCIBIOS_BAD_REGISTER_NUMBER;
-> > > > > > +
-> > > > > > +   return PCIBIOS_SUCCESSFUL;
-> > > > > > +}
-> > > > >
-> > > > > Isn't this the same hack that Qualcomm are using?
-> > > >
-> > > > As far as I can see Qualcomm defines its own config access
-> > > > mechanism only for RC config read and also it seems they're
-> > > > having problems with reporting the device class...
-> > > >
-> > > >
-> https://github.com/torvalds/linux/blob/master/drivers/pci/host/pcie-
-> > > qcom.c#L474
-> > > >
-> > > > Our problem is that our HW can only perform 32b rd/wr accesses
-> > > > So we can't use readw/readb/writew/writeb...
-> > > >
-> > > >
+> On Tue, Feb 09, 2016 at 03:56:55PM +0000, Stuart Yoder wrote:
+> >
+> > > -----Original Message-----
+> > > From: Marc Zyngier [mailto:marc.zyngier at arm.com]
+> > > Sent: Tuesday, February 09, 2016 6:06 AM
+> > > To: Robin Murphy <robin.murphy@arm.com>; robh+dt at kernel.org; frowand.list at gmail.com;
+> > > grant.likely at linaro.org; devicetree at vger.kernel.org
+> > > Cc: mark.rutland at arm.com; david.daney at cavium.com; Stuart Yoder
+> <stuart.yoder@nxp.com>;
+> > > linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
+> > > stable at vger.kernel.org
+> > > Subject: Re: [PATCH] of/irq: Fix msi-map calculation for nonzero rid-base
 > > >
-> > > Sorry, my mistake, I meant Cavium not Qualcomm.
-> > > See https://lkml.org/lkml/2016/2/5/689 for the patches.
+> > > Hi Robin,
+> > >
+> > > On 09/02/16 11:04, Robin Murphy wrote:
+> > > > The existing msi-map code is fine for shifting the entire RID space
+> > > > upwards, but attempting finer-grained remapping reveals a bug. It turns
+> > > > out that we are mistakenly treating the msi-base part as an offset, not
+> > > > as a new base to remap onto, so things get squiffy when rid-base is
+> > > > nonzero. Fix this, and at the same time add a sanity check against
+> > > > having msi-map-mask clash with a nonzero rid-base, as that's another
+> > > > thing one can easily get wrong.
+> > > >
+> > > > CC: <stable@vger.kernel.org>
+> > > > Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> > >
+> > > Looks like Stuart and you both found the same bug at the same time:
+> > > https://lkml.org/lkml/2016/2/8/1066
+> > >
+> > > but yours seem more correct to me (the rid_base masking in Stuart's
+> > > version seems odd).
+> > >
+> > > > ---
+> > > >  drivers/of/irq.c | 9 ++++++++-
+> > > >  1 file changed, 8 insertions(+), 1 deletion(-)
+> > > >
+> > > > diff --git a/drivers/of/irq.c b/drivers/of/irq.c
+> > > > index 7ee21ae..e7bfc17 100644
+> > > > --- a/drivers/of/irq.c
+> > > > +++ b/drivers/of/irq.c
+> > > > @@ -635,6 +635,13 @@ static u32 __of_msi_map_rid(struct device *dev, struct
+> > > device_node **np,
+> > > >  		msi_base = be32_to_cpup(msi_map + 2);
+> > > >  		rid_len = be32_to_cpup(msi_map + 3);
+> > > >
+> > > > +		if (rid_base & ~map_mask) {
+> > > > +			dev_err(parent_dev,
+> > > > +				"Invalid msi-map translation - msi-map-mask (0x%x) ignores
+> rid-
+> > > base (0x%x)\n",
+> > > > +				map_mask, rid_base);
+> > > > +			return rid_out;
+> > > > +		}
+> > > > +
+> > > >  		msi_controller_node = of_find_node_by_phandle(phandle);
+> > > >
+> > > >  		matched = (masked_rid >= rid_base &&
+> > > > @@ -654,7 +661,7 @@ static u32 __of_msi_map_rid(struct device *dev, struct
+> device_node
+> > > **np,
+> > > >  	if (!matched)
+> > > >  		return rid_out;
+> > > >
+> > > > -	rid_out = masked_rid + msi_base;
+> > > > +	rid_out = masked_rid - rid_base + msi_base;
+> > > >  	dev_dbg(dev,
+> > > >  		"msi-map at: %s, using mask %08x, rid-base: %08x, msi-base: %08x,
+> length:
+> > > %08x, rid: %08x -> %08x\n",
+> > > >  		dev_name(parent_dev), map_mask, rid_base, msi_base,
+> > > >
 > >
-> > Well, looking at it Cavium seems quite different,
+> > This computation:  masked_rid - rid_base
 > >
-> > On read they need to trigger the retrieval of the
-> > config space info writing to the lower 32b of a 64b register,
-> > then they need to read data back on the upper 64b of the
-> > same register and adjust the content to remove the garbage...
+> > ...doesn't seem right to me.  We are taking a rid that
+> > has been already masked and subtracting a rid base that has
+> > not been masked.
+> 
+> The binding only mentions that the input RID is masked, not the base, so
+> that seems correct to me.
+> 
+> > I don't see how you can combine masked and unmasked values in the same
+> > calculation.
 > >
-> > We just use 32b accesses and adjust grab the appropriate
-> > bytes depending on the read/write sizes...
+> > Say I have this msi mapping:
+> >
+> >                    msi-map = <0x0100 &its 0x11 0x1>;
+> >                    msi-map-mask = <0xff>;
+> >
 > 
-> Hmm, I must have misremembered that too then, let me try once more ;-)
+> I'd say that this is an inconsistent set of properties, and it's
+> probably worth warning if we encounter this. There is no possible way
+> that rid-base can be encountered.
 > 
-> The above appears to reimplement pci_generic_config_read32(). Can you
-> just use that instead?
-
-Nope I don't think so,
-
-When we read the root complex config space we need to use a configuration
-address space that is different from the one used to map the rest of the
-hierarchy; I think this is something to do with Designware itself. It
-is clear if you look at
-
-http://lxr.free-electrons.com/source/drivers/pci/host/pcie-designware.c#L657
-
-Here you can see that in calling "dw_pcie_wr_own_conf" Designware does not
-pass "bus" and "devfn" that are actually required by pci_generic_config_read32()
-to map the addr...
-
-Many Thanks
-
-Gab
-
+> > masked_rid = 0x0
+> > rid_base = 0x0100
+> > msi_base = 0x11
+> >
+> > masked_rid - rid_base is 0x0 - 0x0100...which does not
+> > give the msi index/offset we want.
+> >
+> > Correct final answer should be 0x11.
 > 
-> 	Arnd
+> You can unambiguously describe this with:
+> 
+> 	msi-map = <0x00 &its 0x11 0x1>;
+> 	msi-map-mask = <0xff>;
+> 
+> This is exactly the pattern we follow in example 2 in the binding
+> document.
+> 
+> > In my patch I masked the rid_base so it can be subtracted
+> > from the masked_rid.
+> >
+> > masked_rid_base = 0x00
+> >
+> >    msi_base + (masked_rid - masked_rid_base) = 0x11
+> 
+> As above, I think that this is an inconsistent DT, and we should
+> warn/fail in that case.
+
+Thanks...understand now.  I'll test Robin's patch and confirm
+that it works as is for me.
+
+Thanks,
+Stuart
