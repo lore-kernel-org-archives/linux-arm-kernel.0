@@ -1,167 +1,148 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon,  8 Feb 2016 17:45:39 -0800
-Subject: [PATCH 12/14] clk: gpio: Add hw based registration APIs
+Date: Mon,  8 Feb 2016 17:45:38 -0800
+Subject: [PATCH 11/14] clk: composite: Add hw based registration APIs
 In-Reply-To: <1454982341-22715-1-git-send-email-sboyd@codeaurora.org>
 References: <1454982341-22715-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1454982341-22715-13-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1454982341-22715-12-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add registration APIs in the clk gpio code to return struct
+Add registration APIs in the clk composite code to return struct
 clk_hw pointers instead of struct clk pointers. This way we hide
 the struct clk pointer from providers unless they need to use
 consumer facing APIs.
 
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/clk/clk-gpio.c       | 52 ++++++++++++++++++++++++++++++++++----------
- include/linux/clk-provider.h |  8 +++++++
- 2 files changed, 49 insertions(+), 11 deletions(-)
+ drivers/clk/clk-composite.c  | 45 ++++++++++++++++++++++++++++++++------------
+ include/linux/clk-provider.h |  7 +++++++
+ 2 files changed, 40 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/clk/clk-gpio.c b/drivers/clk/clk-gpio.c
-index 19fed65587e8..807a94486324 100644
---- a/drivers/clk/clk-gpio.c
-+++ b/drivers/clk/clk-gpio.c
-@@ -94,13 +94,13 @@ const struct clk_ops clk_gpio_mux_ops = {
- };
- EXPORT_SYMBOL_GPL(clk_gpio_mux_ops);
+diff --git a/drivers/clk/clk-composite.c b/drivers/clk/clk-composite.c
+index 4735de0660cc..9c38a3563e8c 100644
+--- a/drivers/clk/clk-composite.c
++++ b/drivers/clk/clk-composite.c
+@@ -186,17 +186,18 @@ static void clk_composite_disable(struct clk_hw *hw)
+ 	gate_ops->disable(gate_hw);
+ }
  
--static struct clk *clk_register_gpio(struct device *dev, const char *name,
-+static struct clk_hw *clk_register_gpio(struct device *dev, const char *name,
- 		const char * const *parent_names, u8 num_parents, unsigned gpio,
- 		bool active_low, unsigned long flags,
- 		const struct clk_ops *clk_gpio_ops)
+-struct clk *clk_register_composite(struct device *dev, const char *name,
++struct clk_hw *clk_hw_register_composite(struct device *dev, const char *name,
+ 			const char * const *parent_names, int num_parents,
+ 			struct clk_hw *mux_hw, const struct clk_ops *mux_ops,
+ 			struct clk_hw *rate_hw, const struct clk_ops *rate_ops,
+ 			struct clk_hw *gate_hw, const struct clk_ops *gate_ops,
+ 			unsigned long flags)
  {
- 	struct clk_gpio *clk_gpio;
 -	struct clk *clk;
 +	struct clk_hw *hw;
- 	struct clk_init_data init = {};
- 	unsigned long gpio_flags;
- 	int err;
-@@ -141,24 +141,26 @@ static struct clk *clk_register_gpio(struct device *dev, const char *name,
- 	clk_gpio->gpiod = gpio_to_desc(gpio);
- 	clk_gpio->hw.init = &init;
+ 	struct clk_init_data init;
+ 	struct clk_composite *composite;
+ 	struct clk_ops *clk_composite_ops;
++	int ret;
  
-+	hw = &clk_gpio->hw;
- 	if (dev)
--		clk = devm_clk_register(dev, &clk_gpio->hw);
-+		err = devm_clk_hw_register(dev, hw);
- 	else
--		clk = clk_register(NULL, &clk_gpio->hw);
-+		err = clk_hw_register(NULL, hw);
+ 	composite = kzalloc(sizeof(*composite), GFP_KERNEL);
+ 	if (!composite)
+@@ -206,12 +207,13 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
+ 	init.flags = flags | CLK_IS_BASIC;
+ 	init.parent_names = parent_names;
+ 	init.num_parents = num_parents;
++	hw = &composite->hw;
  
--	if (!IS_ERR(clk))
--		return clk;
-+	if (!err)
-+		return hw;
+ 	clk_composite_ops = &composite->ops;
  
- 	if (!dev) {
- 		gpiod_put(clk_gpio->gpiod);
- 		kfree(clk_gpio);
- 	}
+ 	if (mux_hw && mux_ops) {
+ 		if (!mux_ops->get_parent) {
+-			clk = ERR_PTR(-EINVAL);
++			hw = ERR_PTR(-EINVAL);
+ 			goto err;
+ 		}
+ 
+@@ -226,7 +228,7 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
+ 
+ 	if (rate_hw && rate_ops) {
+ 		if (!rate_ops->recalc_rate) {
+-			clk = ERR_PTR(-EINVAL);
++			hw = ERR_PTR(-EINVAL);
+ 			goto err;
+ 		}
+ 		clk_composite_ops->recalc_rate = clk_composite_recalc_rate;
+@@ -255,7 +257,7 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
+ 	if (gate_hw && gate_ops) {
+ 		if (!gate_ops->is_enabled || !gate_ops->enable ||
+ 		    !gate_ops->disable) {
+-			clk = ERR_PTR(-EINVAL);
++			hw = ERR_PTR(-EINVAL);
+ 			goto err;
+ 		}
+ 
+@@ -269,22 +271,41 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
+ 	init.ops = clk_composite_ops;
+ 	composite->hw.init = &init;
+ 
+-	clk = clk_register(dev, &composite->hw);
+-	if (IS_ERR(clk))
++	ret = clk_hw_register(dev, hw);
++	if (ret) {
++		hw = ERR_PTR(ret);
+ 		goto err;
++	}
+ 
+ 	if (composite->mux_hw)
+-		composite->mux_hw->clk = clk;
++		composite->mux_hw->clk = hw->clk;
+ 
+ 	if (composite->rate_hw)
+-		composite->rate_hw->clk = clk;
++		composite->rate_hw->clk = hw->clk;
+ 
+ 	if (composite->gate_hw)
+-		composite->gate_hw->clk = clk;
++		composite->gate_hw->clk = hw->clk;
  
 -	return clk;
-+	return ERR_PTR(err);
- }
++	return hw;
  
- /**
-- * clk_register_gpio_gate - register a gpio clock gate with the clock framework
-+ * clk_hw_register_gpio_gate - register a gpio clock gate with the clock
-+ * framework
-  * @dev: device that is registering this clock
-  * @name: name of this clock
-  * @parent_name: name of this clock's parent
-@@ -166,7 +168,7 @@ static struct clk *clk_register_gpio(struct device *dev, const char *name,
-  * @active_low: true if gpio should be set to 0 to enable clock
-  * @flags: clock flags
-  */
--struct clk *clk_register_gpio_gate(struct device *dev, const char *name,
-+struct clk_hw *clk_hw_register_gpio_gate(struct device *dev, const char *name,
- 		const char *parent_name, unsigned gpio, bool active_low,
- 		unsigned long flags)
- {
-@@ -175,10 +177,24 @@ struct clk *clk_register_gpio_gate(struct device *dev, const char *name,
- 			(parent_name ? 1 : 0), gpio, active_low, flags,
- 			&clk_gpio_gate_ops);
- }
-+EXPORT_SYMBOL_GPL(clk_hw_register_gpio_gate);
+ err:
+ 	kfree(composite);
+-	return clk;
++	return hw;
++}
 +
-+struct clk *clk_register_gpio_gate(struct device *dev, const char *name,
-+		const char *parent_name, unsigned gpio, bool active_low,
-+		unsigned long flags)
++struct clk *clk_register_composite(struct device *dev, const char *name,
++			const char * const *parent_names, int num_parents,
++			struct clk_hw *mux_hw, const struct clk_ops *mux_ops,
++			struct clk_hw *rate_hw, const struct clk_ops *rate_ops,
++			struct clk_hw *gate_hw, const struct clk_ops *gate_ops,
++			unsigned long flags)
 +{
 +	struct clk_hw *hw;
 +
-+	hw = clk_hw_register_gpio_gate(dev, name, parent_name, gpio, active_low,
-+				       flags);
++	hw = clk_hw_register_composite(dev, name, parent_names, num_parents,
++			mux_hw, mux_ops, rate_hw, rate_ops, gate_hw, gate_ops,
++			flags);
 +	if (IS_ERR(hw))
 +		return ERR_CAST(hw);
 +	return hw->clk;
-+}
- EXPORT_SYMBOL_GPL(clk_register_gpio_gate);
- 
- /**
-- * clk_register_gpio_mux - register a gpio clock mux with the clock framework
-+ * clk_hw_register_gpio_mux - register a gpio clock mux with the clock framework
-  * @dev: device that is registering this clock
-  * @name: name of this clock
-  * @parent_names: names of this clock's parents
-@@ -187,7 +203,7 @@ EXPORT_SYMBOL_GPL(clk_register_gpio_gate);
-  * @active_low: true if gpio should be set to 0 to enable clock
-  * @flags: clock flags
-  */
--struct clk *clk_register_gpio_mux(struct device *dev, const char *name,
-+struct clk_hw *clk_hw_register_gpio_mux(struct device *dev, const char *name,
- 		const char * const *parent_names, u8 num_parents, unsigned gpio,
- 		bool active_low, unsigned long flags)
- {
-@@ -199,6 +215,20 @@ struct clk *clk_register_gpio_mux(struct device *dev, const char *name,
- 	return clk_register_gpio(dev, name, parent_names, num_parents,
- 			gpio, active_low, flags, &clk_gpio_mux_ops);
  }
-+EXPORT_SYMBOL_GPL(clk_hw_register_gpio_mux);
-+
-+struct clk *clk_register_gpio_mux(struct device *dev, const char *name,
-+		const char * const *parent_names, u8 num_parents, unsigned gpio,
-+		bool active_low, unsigned long flags)
-+{
-+	struct clk_hw *hw;
-+
-+	hw = clk_hw_register_gpio_mux(dev, name, parent_names, num_parents,
-+			gpio, active_low, flags);
-+	if (IS_ERR(hw))
-+		return ERR_CAST(hw);
-+	return hw->clk;
-+}
- EXPORT_SYMBOL_GPL(clk_register_gpio_mux);
- 
- #ifdef CONFIG_OF
 diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 64037ab95a31..148ad0dc2906 100644
+index 549ed3844876..64037ab95a31 100644
 --- a/include/linux/clk-provider.h
 +++ b/include/linux/clk-provider.h
-@@ -647,6 +647,10 @@ extern const struct clk_ops clk_gpio_gate_ops;
- struct clk *clk_register_gpio_gate(struct device *dev, const char *name,
- 		const char *parent_name, unsigned gpio, bool active_low,
+@@ -620,6 +620,13 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
+ 		struct clk_hw *rate_hw, const struct clk_ops *rate_ops,
+ 		struct clk_hw *gate_hw, const struct clk_ops *gate_ops,
  		unsigned long flags);
-+struct clk_hw *clk_hw_register_gpio_gate(struct device *dev, const char *name,
-+		const char *parent_name, unsigned gpio, bool active_low,
++struct clk_hw *clk_hw_register_composite(struct device *dev, const char *name,
++		const char * const *parent_names, int num_parents,
++		struct clk_hw *mux_hw, const struct clk_ops *mux_ops,
++		struct clk_hw *rate_hw, const struct clk_ops *rate_ops,
++		struct clk_hw *gate_hw, const struct clk_ops *gate_ops,
 +		unsigned long flags);
-+void clk_hw_unregister_gpio_gate(struct clk_hw *hw);
++void clk_hw_unregister_composite(struct clk_hw *hw);
  
- void of_gpio_clk_gate_setup(struct device_node *node);
- 
-@@ -664,6 +668,10 @@ extern const struct clk_ops clk_gpio_mux_ops;
- struct clk *clk_register_gpio_mux(struct device *dev, const char *name,
- 		const char * const *parent_names, u8 num_parents, unsigned gpio,
- 		bool active_low, unsigned long flags);
-+struct clk_hw *clk_hw_register_gpio_mux(struct device *dev, const char *name,
-+		const char * const *parent_names, u8 num_parents, unsigned gpio,
-+		bool active_low, unsigned long flags);
-+void clk_hw_unregister_gpio_mux(struct clk_hw *hw);
- 
- void of_gpio_mux_clk_setup(struct device_node *node);
- 
+ /***
+  * struct clk_gpio_gate - gpio gated clock
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 a Linux Foundation Collaborative Project
