@@ -1,49 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 09 Feb 2016 17:00:48 +0100
-Subject: [PATCH V2 09/12] dtb: amd: Add KCS device tree node
-In-Reply-To: <56BA0A2B.5000705@amd.com>
-References: <1454954357-8395-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <4018438.bPuTyoUuqf@wuerfel> <56BA0A2B.5000705@amd.com>
-Message-ID: <15181064.RzzsN4CWec@wuerfel>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 9 Feb 2016 16:04:42 +0000
+Subject: [PATCH] arm64: replace read_lock to rcu lock in call_step_hook
+In-Reply-To: <20160209100758.69d9006f@gandalf.local.home>
+References: <1454971764-30720-1-git-send-email-yang.shi@linaro.org>
+ <20160209145426.GR22874@arm.com>
+ <20160209100758.69d9006f@gandalf.local.home>
+Message-ID: <20160209160442.GS22874@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 09 February 2016 09:47:55 Brijesh Singh wrote:
-> > 
-> > I see we don't have a binding file for this, can you add one please?
-> >
-> There is binding file ipmi.txt [1]. Am I missing something ?
->  
-> [1] http://lxr.free-electrons.com/source/Documentation/devicetree/bindings/ipmi.txt
-
-Sorry, my mistake: I was looking for "ipmi_kcs", which is not in there.
-
-> > 
-> > Why the strange name for the interrupt?
-> > 
+On Tue, Feb 09, 2016 at 10:07:58AM -0500, Steven Rostedt wrote:
+> On Tue, 9 Feb 2016 14:54:26 +0000
+> Will Deacon <will.deacon@arm.com> wrote:
 > 
-> Now I don't remember the doc but sometime back while implementing BMC on Seattle I saw that interrupt was labeled as "ipmi_kcs"
-> hence used the same name in DT. But if you want to use different name then let me know the string and will update it.
 > 
-> Theoretically IPMI system interface supports the following interface and any of these interfaces can be used by
-> A57 to communicate with BMC:
+> > Acked-by: Will Deacon <will.deacon@arm.com>
 > 
-> * Keyboard controller style (KCS)
-> * System Management Interface (SMIC)
-> * Block transfer (BT)
-> * SMBus system interface (SSIF)
-> 
-> AMD Seattle platform supports "KCS".
-> 
+> Will,
 
-The important part for interrupt/reg/... names is that you must use exactly the
-names that are listed in the binding. If there is no name in there, it's better
-not to add the name property.
+Hi Steve,
 
-The other point is that "ipmi_kcs" is a name that is picked really badly, as it
-uses a '_' character while DT properties by convention use '-' between names,
-and the name of the IRQ is the same as the device itself, which is really
-not a useful way to disambiguate multiple interrupts in the same device, if
-someone ever adds another irq line.
+> The patch looks good to me. Do you want to take it through your tree?
+> 
+> It benefits mainline too as a rcu_read_lock() is more efficient than
+> rwlocks. Although I will say this is a slow path anyway.
 
-	Arnd
+I was thinking that Catalin would queue it for 4.6 in the arm64 tree,
+since that's probably easiest in case any unlikely conflicts crop up.
+
+Will
