@@ -1,38 +1,77 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 9 Feb 2016 11:32:04 +0000
-Subject: [PATCH 07/11] ARM: dts: sunxi: Add dtsi file for AXP809 PMIC
-In-Reply-To: <CAGb2v66a=LLMBEbrR2qCzuYp+-fa96qLROFN10+aNvfGTtW-Zg@mail.gmail.com>
-References: <1454408864-24112-1-git-send-email-wens@csie.org>
- <1454408864-24112-8-git-send-email-wens@csie.org>
- <20160202121733.GO4455@sirena.org.uk>
- <CAGb2v657zYT30KbuK0fyVOmhv0kzJjj9gTsTFRaS4i3d6YhiHQ@mail.gmail.com>
- <20160208145347.GD7265@sirena.org.uk>
- <CAGb2v64ySLAVbPf_XaZnzm5T=SmQLip4iO2p4cGXg=C0=51eqA@mail.gmail.com>
- <20160208162244.GG7265@sirena.org.uk>
- <CAGb2v66a=LLMBEbrR2qCzuYp+-fa96qLROFN10+aNvfGTtW-Zg@mail.gmail.com>
-Message-ID: <20160209113204.GC13270@sirena.org.uk>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 9 Feb 2016 12:36:24 +0100
+Subject: [PATCH] ARM: ks8695: fix __initdata annotation
+In-Reply-To: <18237653.x9qPaNvtCU@wuerfel>
+References: <1454941509-2773774-1-git-send-email-arnd@arndb.de>
+ <20160209090030.GS13664@pengutronix.de>
+ <18237653.x9qPaNvtCU@wuerfel>
+Message-ID: <20160209113624.GU13664@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 09, 2016 at 01:41:37PM +0800, Chen-Yu Tsai wrote:
-> On Tue, Feb 9, 2016 at 12:22 AM, Mark Brown <broonie@kernel.org> wrote:
+Hello Arnd,
 
-> > The whole point with constraints is that they describe what is safe on a
-> > given board.  This includes powering off unused regulators - it should
-> > be something that the system integrator configures, not something that
-> > they get as default.
+On Tue, Feb 09, 2016 at 12:14:15PM +0100, Arnd Bergmann wrote:
+> On Tuesday 09 February 2016 10:00:30 Uwe Kleine-K?nig wrote:
+> > > diff --git a/arch/arm/mach-ks8695/board-og.c b/arch/arm/mach-ks8695/board-og.c
+> > > index 1f4f2f4f25bb..fa1a7c2ca2bb 100644
+> > > --- a/arch/arm/mach-ks8695/board-og.c
+> > > +++ b/arch/arm/mach-ks8695/board-og.c
+> > > @@ -80,7 +80,7 @@ static void __init og_pci_bus_reset(void)
+> > >  #define      S8250_VIRT      0xf4000000
+> > >  #define      S8250_SIZE      0x00100000
+> > >  
+> > > -static struct __initdata map_desc og_io_desc[] = {
+> > > +static struct map_desc __initdata og_io_desc[] = {
+> > 
+> > I would have expected that
+> > 
+> > +static struct map_desc og_io_desc[] __initdata = {
+> > 
+> > is the correct variant?
+> > 
+> 
+> I think those two mean the exact same thing, and we have tons of examples
+> for either one in the kernel, unlike the one I removed. I have
+> verified that the resulting object files are identical.
+> 
+> Can you point me to some documentation that clarifies which one to use,
+> and why?
 
-> OK. So how should one describe a regulator as unused? Just leave it out
-> since it's not wired to anything? Or have an empty node at the board
-> level? One of the regulators involved on my board is by (hardware)
-> default on.
+Having the attribute list after the declarator isn't recommended as
+explicit as I remember having read it somewhere in the gcc docs.
 
-Like I say do it at the board level, you know it's not connected on that
-board but another board may use it.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160209/a5356163/attachment.sig>
+	info gcc "Attribute Syntax"
+
+has:
+
+	 An attribute specifier list may appear immediately before a declarator
+	(other than the first) in a comma-separated list of declarators in a
+	declaration of more than one identifier using a single list of
+	specifiers and qualifiers.  Such attribute specifiers apply only to the
+	identifier before whose declarator they appear.  For example, in
+
+	     __attribute__((noreturn)) void d0 (void),
+		 __attribute__((format(printf, 1, 2))) d1 (const char *, ...),
+		  d2 (void)
+
+	the 'noreturn' attribute applies to all the functions declared; the
+	'format' attribute only applies to 'd1'.
+
+(Funny enough, in the example the attribute specifier list doesn't
+appear *immediately* before the declarator d0.)
+
+This might be interpreted as "usually the attribute specifier list appears
+after the declarator". Other than that I cannot find an explict
+recommended placement in the docs. The examples in
+
+	info gcc "Variable Attributes"
+
+always have the attribute list after the declarator.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
