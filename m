@@ -1,43 +1,435 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 9 Feb 2016 13:41:37 +0800
-Subject: [PATCH 07/11] ARM: dts: sunxi: Add dtsi file for AXP809 PMIC
-In-Reply-To: <20160208162244.GG7265@sirena.org.uk>
-References: <1454408864-24112-1-git-send-email-wens@csie.org>
- <1454408864-24112-8-git-send-email-wens@csie.org>
- <20160202121733.GO4455@sirena.org.uk>
- <CAGb2v657zYT30KbuK0fyVOmhv0kzJjj9gTsTFRaS4i3d6YhiHQ@mail.gmail.com>
- <20160208145347.GD7265@sirena.org.uk>
- <CAGb2v64ySLAVbPf_XaZnzm5T=SmQLip4iO2p4cGXg=C0=51eqA@mail.gmail.com>
- <20160208162244.GG7265@sirena.org.uk>
-Message-ID: <CAGb2v66a=LLMBEbrR2qCzuYp+-fa96qLROFN10+aNvfGTtW-Zg@mail.gmail.com>
+From: pmeerw@pmeerw.net (Peter Meerwald-Stadler)
+Date: Tue, 9 Feb 2016 07:43:14 +0100 (CET)
+Subject: [PATCH v1 2/2] iio: dac: vf610_dac: Add IIO DAC driver for Vybrid
+ SoC
+In-Reply-To: <5a699d45c89d239f3e49fa83d16a9b467016e219.1454939346.git.maitysanchayan@gmail.com>
+References: <cover.1454939346.git.maitysanchayan@gmail.com>
+ <5a699d45c89d239f3e49fa83d16a9b467016e219.1454939346.git.maitysanchayan@gmail.com>
+Message-ID: <alpine.DEB.2.02.1602090729130.22963@pmeerw.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 9, 2016 at 12:22 AM, Mark Brown <broonie@kernel.org> wrote:
-> On Mon, Feb 08, 2016 at 10:56:05PM +0800, Chen-Yu Tsai wrote:
->> On Mon, Feb 8, 2016 at 10:53 PM, Mark Brown <broonie@kernel.org> wrote:
->> > On Sat, Feb 06, 2016 at 08:42:24PM +0800, Chen-Yu Tsai wrote:
->
->> >> Mark, may I assume you are OK with this DTS include listing
->> >> the regulators, even if their sections are empty?
->
->> > If it has no content why have it?
->
->> I'd like the regulator core to disable any unused ones. The core
->> considers regulators that don't have nodes as not having constraints,
->> and won't touch them.
->
->> Any other ways to do this? Or am I going about this the wrong way?
->
-> The whole point with constraints is that they describe what is safe on a
-> given board.  This includes powering off unused regulators - it should
-> be something that the system integrator configures, not something that
-> they get as default.
+On Tue, 9 Feb 2016, Sanchayan Maity wrote:
 
-OK. So how should one describe a regulator as unused? Just leave it out
-since it's not wired to anything? Or have an empty node at the board
-level? One of the regulators involved on my board is by (hardware)
-default on.
+> Add driver support for DAC peripheral on Vybrid SoC.
 
-Thanks
-ChenYu
+comments below
+ 
+> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+> ---
+>  .../devicetree/bindings/iio/dac/vf610-dac.txt      |  20 ++
+>  drivers/iio/dac/Kconfig                            |   8 +
+>  drivers/iio/dac/Makefile                           |   1 +
+>  drivers/iio/dac/vf610_dac.c                        | 302 +++++++++++++++++++++
+>  4 files changed, 331 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/iio/dac/vf610-dac.txt
+>  create mode 100644 drivers/iio/dac/vf610_dac.c
+> 
+> diff --git a/Documentation/devicetree/bindings/iio/dac/vf610-dac.txt b/Documentation/devicetree/bindings/iio/dac/vf610-dac.txt
+> new file mode 100644
+> index 0000000..97d7a40
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/iio/dac/vf610-dac.txt
+> @@ -0,0 +1,20 @@
+> +Freescale vf610 Digital to Analog Converter bindings
+> +
+> +The devicetree bindings are for the new DAC driver written for
+> +vf610 SoCs from Freescale.
+> +
+> +Required properties:
+> +- compatible: Should contain "fsl,vf610-dac"
+> +- reg: Offset and length of the register set for the device
+> +- interrupts: Should contain the interrupt for the device
+> +- clocks: The clock is needed by the DAC controller
+> +- clock-names: Must contain "dac", matching entry in the clocks property.
+
+the last sentence is not quite clear; is the comma needed?
+
+> +
+> +Example:
+> +dac0: dac at 400cc000 {
+> +	compatible = "fsl,vf610-dac";
+> +	reg = <0x400cc000 0x1000>;
+> +	interrupts = <55 IRQ_TYPE_LEVEL_HIGH>;
+> +	clock-names = "dac";
+> +	clocks = <&clks VF610_CLK_DAC0>;
+> +};
+> diff --git a/drivers/iio/dac/Kconfig b/drivers/iio/dac/Kconfig
+> index e701e28..8eb0502 100644
+> --- a/drivers/iio/dac/Kconfig
+> +++ b/drivers/iio/dac/Kconfig
+> @@ -196,4 +196,12 @@ config MCP4922
+>  	  To compile this driver as a module, choose M here: the module
+>  	  will be called mcp4922.
+>  
+> +config VF610_DAC
+> +	tristate "Vybrid vf610 DAC driver"
+> +	help
+> +	  Say yes here to support Vybrid board digital-to-analog converter.
+> +
+> +	  This driver can also be built as a module. If so, the module will
+> +	  be called vf610_dac.
+> +
+>  endmenu
+> diff --git a/drivers/iio/dac/Makefile b/drivers/iio/dac/Makefile
+> index 63ae056..93feb27 100644
+> --- a/drivers/iio/dac/Makefile
+> +++ b/drivers/iio/dac/Makefile
+> @@ -21,3 +21,4 @@ obj-$(CONFIG_MAX517) += max517.o
+>  obj-$(CONFIG_MAX5821) += max5821.o
+>  obj-$(CONFIG_MCP4725) += mcp4725.o
+>  obj-$(CONFIG_MCP4922) += mcp4922.o
+> +obj-$(CONFIG_VF610_DAC) += vf610_dac.o
+> diff --git a/drivers/iio/dac/vf610_dac.c b/drivers/iio/dac/vf610_dac.c
+> new file mode 100644
+> index 0000000..775b349
+> --- /dev/null
+> +++ b/drivers/iio/dac/vf610_dac.c
+> @@ -0,0 +1,302 @@
+> +/*
+> + * Freescale Vybrid vf610 DAC driver
+> + *
+> + * Copyright 2016 Toradex AG
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/err.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/io.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/regulator/consumer.h>
+> +#include <linux/slab.h>
+> +
+> +#include <linux/iio/iio.h>
+> +#include <linux/iio/sysfs.h>
+> +
+> +#define DRIVER_NAME "vf610-dac"
+
+VF610_ prefix
+
+> +
+> +#define VF610_DACx_STATCTRL		0x20
+> +
+> +#define VF610_DAC_DACEN			BIT(15)
+> +#define VF610_DAC_DACRFS		BIT(14)
+> +#define VF610_DAC_LPEN			BIT(11)
+> +
+> +#define VF610_DAC_DAT0(x)		((x) & 0xFFF)
+> +
+> +enum conversion_mode_sel {
+
+vf610_ prefix
+
+> +	VF610_DAC_CONV_HIGH_POWER,
+> +	VF610_DAC_CONV_LOW_POWER,
+> +};
+> +
+> +struct vf610_dac {
+> +	struct clk *clk;
+> +	struct device *dev;
+> +	enum conversion_mode_sel conv_mode;
+> +	void __iomem *regs;
+> +	int irq;
+> +};
+> +
+> +static int vf610_dac_init(struct vf610_dac *info)
+
+should be void, or check the return value
+
+> +{
+> +	int val;
+> +
+> +	info->conv_mode = VF610_DAC_CONV_LOW_POWER;
+> +	val = VF610_DAC_DACEN | VF610_DAC_DACRFS |
+> +		VF610_DAC_LPEN;
+> +	writel(val, info->regs + VF610_DACx_STATCTRL);
+> +
+> +	return 0;
+> +}
+> +
+> +static int vf610_set_conversion_mode(struct iio_dev *indio_dev,
+> +				const struct iio_chan_spec *chan,
+> +				unsigned int mode)
+
+mode should be enum conversion_mode_sel?
+
+> +{
+> +	struct vf610_dac *info = iio_priv(indio_dev);
+> +	int val;
+> +
+> +	mutex_lock(&indio_dev->mlock);
+> +	info->conv_mode = mode;
+> +	val = readl(info->regs + VF610_DACx_STATCTRL);
+> +	if (mode)
+> +		val |= VF610_DAC_LPEN;
+> +	else
+> +		val &= ~VF610_DAC_LPEN;
+> +	writel(val, info->regs + VF610_DACx_STATCTRL);
+> +	mutex_unlock(&indio_dev->mlock);
+> +
+> +	return 0;
+> +}
+> +
+> +static int vf610_get_conversion_mode(struct iio_dev *indio_dev,
+
+return of type enum conversion_mode_sel?
+
+> +				const struct iio_chan_spec *chan)
+> +{
+> +	struct vf610_dac *info = iio_priv(indio_dev);
+> +
+> +	return info->conv_mode;
+> +}
+> +
+> +static const char * const vf610_conv_modes[] = { "high-power", "low-power"};
+
+this should be documented in sysfs-bus-iio-vf610; maybe high-power should 
+be high-speed
+
+probably this interface should have been exposed as a settable 
+conversion rate
+
+> +
+> +static const struct iio_enum vf610_conversion_mode = {
+> +	.items = vf610_conv_modes,
+> +	.num_items = ARRAY_SIZE(vf610_conv_modes),
+> +	.get = vf610_get_conversion_mode,
+> +	.set = vf610_set_conversion_mode,
+> +};
+> +
+> +static const struct iio_chan_spec_ext_info vf610_ext_info[] = {
+> +	IIO_ENUM("conversion_mode", IIO_SHARED_BY_DIR,
+> +		&vf610_conversion_mode),
+> +	{},
+> +};
+> +
+> +#define VF610_DAC_CHAN(_chan_type) { \
+> +	.type = (_chan_type), \
+> +	.indexed = -1, \
+
+indexed should be 0 (or not specified) if no indexing is to be used
+
+> +	.output = 1, \
+> +	.info_mask_separate = BIT(IIO_CHAN_INFO_RAW), \
+> +	.info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE), \
+> +	.ext_info = vf610_ext_info, \
+> +}
+> +
+> +static const struct iio_chan_spec vf610_dac_iio_channels[] = {
+> +	VF610_DAC_CHAN(IIO_VOLTAGE),
+> +};
+> +
+> +static int vf610_read_raw(struct iio_dev *indio_dev,
+> +			struct iio_chan_spec const *chan,
+> +			int *val, int *val2,
+> +			long mask)
+> +{
+> +	struct vf610_dac *info = iio_priv(indio_dev);
+> +
+> +	switch (mask) {
+> +	case IIO_CHAN_INFO_RAW:
+> +		*val = VF610_DAC_DAT0(readl(info->regs));
+> +		return IIO_VAL_INT;
+> +	case IIO_CHAN_INFO_SCALE:
+> +		/*
+> +		 * DACRFS is always 1 for valid reference and typical
+> +		 * reference voltage as per Vybrid datasheet is 3.3V
+> +		 * from section 9.1.2.1 of Vybrid datasheet
+> +		 */
+> +		*val = 3300 /* mV */;
+> +		*val2 = 12;
+> +		return IIO_VAL_FRACTIONAL_LOG2;
+> +
+> +	default:
+> +		break;
+
+just return -EINVAL here?
+and remove it below below
+
+> +	}
+> +
+> +	return -EINVAL;
+> +}
+> +
+> +static int vf610_write_raw(struct iio_dev *indio_dev,
+> +			struct iio_chan_spec const *chan,
+> +			int val, int val2,
+> +			long mask)
+> +{
+> +	struct vf610_dac *info = iio_priv(indio_dev);
+> +
+> +	switch (mask) {
+> +	case IIO_CHAN_INFO_RAW:
+> +		mutex_lock(&indio_dev->mlock);
+> +		writel(VF610_DAC_DAT0(val), info->regs);
+> +		mutex_unlock(&indio_dev->mlock);
+> +		return 0;
+> +
+> +	default:
+> +		break;
+
+return -EINVAL here should save two lines
+
+> +	}
+> +
+> +	return -EINVAL;
+> +}
+> +
+> +static const struct iio_info vf610_dac_iio_info = {
+> +	.driver_module = THIS_MODULE,
+> +	.read_raw = &vf610_read_raw,
+> +	.write_raw = &vf610_write_raw,
+> +};
+> +
+> +static const struct of_device_id vf610_dac_match[] = {
+> +	{ .compatible = "fsl,vf610-dac", },
+> +	{ /* sentinel */ }
+> +};
+> +MODULE_DEVICE_TABLE(of, vf610_dac_match);
+> +
+> +static int vf610_dac_probe(struct platform_device *pdev)
+> +{
+> +	struct iio_dev *indio_dev;
+> +	struct vf610_dac *info;
+> +	struct resource *mem;
+> +	int ret;
+> +
+> +	indio_dev = devm_iio_device_alloc(&pdev->dev,
+> +					sizeof(struct vf610_dac));
+> +	if (!indio_dev) {
+> +		dev_err(&pdev->dev, "Failed allocating iio device\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	info = iio_priv(indio_dev);
+> +	info->dev = &pdev->dev;
+> +
+> +	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	info->regs = devm_ioremap_resource(&pdev->dev, mem);
+> +	if (IS_ERR(info->regs))
+> +		return PTR_ERR(info->regs);
+> +
+> +	info->clk = devm_clk_get(&pdev->dev, "dac");
+> +	if (IS_ERR(info->clk)) {
+> +		dev_err(&pdev->dev, "failed getting clock, err = %ld\n",
+
+"Failed getting ..."
+
+> +			PTR_ERR(info->clk));
+> +		return PTR_ERR(info->clk);
+> +	}
+> +
+> +	platform_set_drvdata(pdev, indio_dev);
+> +
+> +	indio_dev->name = dev_name(&pdev->dev);
+> +	indio_dev->dev.parent = &pdev->dev;
+> +	indio_dev->dev.of_node = pdev->dev.of_node;
+> +	indio_dev->info = &vf610_dac_iio_info;
+> +	indio_dev->modes = INDIO_DIRECT_MODE;
+> +	indio_dev->channels = vf610_dac_iio_channels;
+> +	indio_dev->num_channels = ARRAY_SIZE(vf610_dac_iio_channels);
+> +
+> +	ret = clk_prepare_enable(info->clk);
+> +	if (ret) {
+> +		dev_err(&pdev->dev,
+> +			"Could not prepare or enable the clock\n");
+> +		return ret;
+> +	}
+> +
+> +	ret = iio_device_register(indio_dev);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "Couldn't register the device\n");
+> +		goto error_iio_device_register;
+> +	}
+> +
+> +	vf610_dac_init(info);
+
+there is a race here, move _dac_init() before _register()
+return value is not checked (or use void)
+
+> +
+> +	return 0;
+> +
+> +error_iio_device_register:
+> +	clk_disable_unprepare(info->clk);
+> +
+> +	return ret;
+> +}
+> +
+> +static int vf610_dac_remove(struct platform_device *pdev)
+> +{
+> +	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
+> +	struct vf610_dac *info = iio_priv(indio_dev);
+> +
+> +	iio_device_unregister(indio_dev);
+> +	clk_disable_unprepare(info->clk);
+> +
+> +	return 0;
+> +}
+> +
+> +#ifdef CONFIG_PM_SLEEP
+> +static int vf610_dac_suspend(struct device *dev)
+> +{
+> +	struct iio_dev *indio_dev = dev_get_drvdata(dev);
+> +	struct vf610_dac *info = iio_priv(indio_dev);
+> +	int val;
+> +
+> +	val = readl(info->regs + VF610_DACx_STATCTRL);
+> +	val &= ~VF610_DAC_DACEN;
+> +	writel(val, info->regs + VF610_DACx_STATCTRL);
+> +
+> +	clk_disable_unprepare(info->clk);
+> +
+> +	return 0;
+> +}
+> +
+> +static int vf610_dac_resume(struct device *dev)
+> +{
+> +	struct iio_dev *indio_dev = dev_get_drvdata(dev);
+> +	struct vf610_dac *info = iio_priv(indio_dev);
+> +	int ret;
+> +
+> +	ret = clk_prepare_enable(info->clk);
+> +	if (ret)
+> +		return ret;
+> +
+> +	vf610_dac_init(info);
+> +
+> +	return 0;
+> +}
+> +#endif
+> +
+> +static SIMPLE_DEV_PM_OPS(vf610_dac_pm_ops, vf610_dac_suspend, vf610_dac_resume);
+> +
+> +static struct platform_driver vf610_dac_driver = {
+> +	.probe          = vf610_dac_probe,
+> +	.remove         = vf610_dac_remove,
+> +	.driver         = {
+> +		.name   = DRIVER_NAME,
+> +		.of_match_table = vf610_dac_match,
+> +		.pm     = &vf610_dac_pm_ops,
+> +	},
+> +};
+> +module_platform_driver(vf610_dac_driver);
+> +
+> +MODULE_AUTHOR("Sanchayan Maity <sanchayan.maity@toradex.com");
+> +MODULE_DESCRIPTION("Freescale VF610 DAC driver");
+> +MODULE_LICENSE("GPL v2");
+> 
+
+-- 
+
+Peter Meerwald-Stadler
++43-664-2444418 (mobile)
