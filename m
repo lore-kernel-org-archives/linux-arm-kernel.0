@@ -1,88 +1,26 @@
-From: codekipper@gmail.com (codekipper at gmail.com)
-Date: Tue,  9 Feb 2016 10:33:28 +0100
-Subject: [linux-sunxi][PATCH v2] ARM: dts: sun7i: Enable USB DRC on Olimex A20
- EVB
-Message-ID: <1455010408-27896-1-git-send-email-codekipper@gmail.com>
+From: mpe@ellerman.id.au (Michael Ellerman)
+Date: Tue, 09 Feb 2016 20:36:40 +1100
+Subject: [PATCH v3 0/2] Consolidate redundant register/stack access code
+In-Reply-To: <1454996337-7935-1-git-send-email-dave.long@linaro.org>
+References: <1454996337-7935-1-git-send-email-dave.long@linaro.org>
+Message-ID: <1455010600.13384.3.camel@ellerman.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marcus Cooper <codekipper@gmail.com>
+On Tue, 2016-02-09 at 00:38 -0500, David Long wrote:
 
-Enable the otg/drc usb controller on the Olimex A20 EVB.
+> From: "David A. Long" <dave.long@linaro.org>
+>
+> Move duplicate and functionally equivalent code for accessing registers
+> and stack (CONFIG_HAVE_REGS_AND_STACK_ACCESS_API) from arch subdirs into
+> common kernel files.
+>
+> I'm sending this out again (with updated distribution list) because v2
+> just never got pulled in, even though I don't think there were any
+> outstanding issues.
 
-Signed-off-by: Marcus Cooper <codekipper@gmail.com>
----
-Changes since v1:
-- Added vbus0 regulator and vbus0 detection to dts 
+A big cross arch patch like this would often get taken by Andrew Morton, but
+AFAICS you didn't CC him - so I just added him, perhaps he'll pick it up for
+us :D
 
----
- arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts | 32 ++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
-
-diff --git a/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
-index c3c626b..23aacce 100644
---- a/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
-@@ -198,6 +198,10 @@
- 	status = "okay";
- };
- 
-+&otg_sram {
-+	status = "okay";
-+};
-+
- &pio {
- 	ahci_pwr_pin_olimex_som_evb: ahci_pwr_pin at 1 {
- 		allwinner,pins = "PC3";
-@@ -219,6 +223,20 @@
- 		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
- 		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
- 	};
-+
-+	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
-+		allwinner,pins = "PH4";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+
-+	usb0_vbus_detect_pin: usb0_vbus_detect_pin at 0 {
-+		allwinner,pins = "PH5";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
- };
- 
- &reg_ahci_5v {
-@@ -254,6 +272,10 @@
- 	regulator-name = "avcc";
- };
- 
-+&reg_usb0_vbus {
-+	status = "okay";
-+};
-+
- &reg_usb1_vbus {
- 	status = "okay";
- };
-@@ -268,7 +290,17 @@
- 	status = "okay";
- };
- 
-+&usb_otg {
-+	dr_mode = "otg";
-+	status = "okay";
-+};
-+
- &usbphy {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&usb0_id_detect_pin>, <&usb0_vbus_detect_pin>;
-+	usb0_id_det-gpios = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH04 */
-+	usb0_vbus_det-gpios = <&pio 7 5 GPIO_ACTIVE_HIGH>; /* PH05 */
-+	usb0_vbus-supply = <&reg_usb0_vbus>;
- 	usb1_vbus-supply = <&reg_usb1_vbus>;
- 	usb2_vbus-supply = <&reg_usb2_vbus>;
- 	status = "okay";
--- 
-2.7.1
+cheers
