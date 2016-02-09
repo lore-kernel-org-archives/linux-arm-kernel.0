@@ -1,80 +1,175 @@
-From: codekipper@gmail.com (codekipper at gmail.com)
-Date: Tue,  9 Feb 2016 10:29:16 +0100
-Subject: [linux-sunxi][PATCH v2] ARM: dts: sun7i: Enable USB DRC on Itead Ibox
-Message-ID: <1455010156-27754-1-git-send-email-codekipper@gmail.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Tue, 9 Feb 2016 10:29:41 +0100
+Subject: [RESEND PATCH v1] drm: Clean up drm Makefile
+In-Reply-To: <CAFCwf120-19JKDGGPOBQ4ALg=f5ESG4pVhMeN1s=0uz3OpoFpg@mail.gmail.com>
+References: <1454147777-77577-1-git-send-email-xinliang.liu@linaro.org>
+ <CAFCwf120-19JKDGGPOBQ4ALg=f5ESG4pVhMeN1s=0uz3OpoFpg@mail.gmail.com>
+Message-ID: <20160209092941.GE11240@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marcus Cooper <codekipper@gmail.com>
+On Sat, Jan 30, 2016 at 01:11:01PM +0200, Oded Gabbay wrote:
+> On Sat, Jan 30, 2016 at 11:56 AM, Xinliang Liu <xinliang.liu@linaro.org> wrote:
+> > This patch cleans up the Makefile of drm root directory.
+> > Make core and device drivers configuration list sorted Alphabetically.
+> >
+> > Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
+> > Reviewed-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
+> > Reviewed-by: Yifan Liu <liu_fanyi@163.com>
+> > ---
+> >  drivers/gpu/drm/Makefile | 102 ++++++++++++++++++++++++-----------------------
+> >  1 file changed, 52 insertions(+), 50 deletions(-)
+> >
+> > diff --git a/drivers/gpu/drm/Makefile b/drivers/gpu/drm/Makefile
+> > index 61766dec6a8d..77000717305b 100644
+> > --- a/drivers/gpu/drm/Makefile
+> > +++ b/drivers/gpu/drm/Makefile
+> > @@ -2,6 +2,9 @@
+> >  # Makefile for the drm device driver.  This driver provides support for the
+> >  # Direct Rendering Infrastructure (DRI) in XFree86 4.1.0 and higher.
+> >
+> > +CFLAGS_drm_trace_points.o := -I$(src)
+> > +
+> > +# core. Please keep this list sorted alphabetically
+> >  drm-y       := drm_auth.o drm_bufs.o drm_cache.o \
+> >                 drm_context.o drm_dma.o \
+> >                 drm_fops.o drm_gem.o drm_ioctl.o drm_irq.o \
+> > @@ -13,64 +16,63 @@ drm-y       :=      drm_auth.o drm_bufs.o drm_cache.o \
+> >                 drm_trace_points.o drm_global.o drm_prime.o \
+> >                 drm_rect.o drm_vma_manager.o drm_flip_work.o \
+> >                 drm_modeset_lock.o drm_atomic.o drm_bridge.o
+> > -
+> > -drm-$(CONFIG_COMPAT) += drm_ioc32.o
+> > -drm-$(CONFIG_DRM_GEM_CMA_HELPER) += drm_gem_cma_helper.o
+> >  drm-$(CONFIG_PCI) += ati_pcigart.o
+> > -drm-$(CONFIG_DRM_PANEL) += drm_panel.o
+> > -drm-$(CONFIG_OF) += drm_of.o
+> >  drm-$(CONFIG_AGP) += drm_agpsupport.o
+> > +drm-$(CONFIG_DRM_GEM_CMA_HELPER) += drm_gem_cma_helper.o
+> > +drm-$(CONFIG_COMPAT) += drm_ioc32.o
+> > +drm-$(CONFIG_OF) += drm_of.o
+> > +drm-$(CONFIG_DRM_PANEL) += drm_panel.o
+> > +obj-$(CONFIG_DRM)      += drm.o
+> > +
+> > +obj-$(CONFIG_DRM_MIPI_DSI) += drm_mipi_dsi.o
+> >
+> >  drm_kms_helper-y := drm_crtc_helper.o drm_dp_helper.o drm_probe_helper.o \
+> >                 drm_plane_helper.o drm_dp_mst_topology.o drm_atomic_helper.o
+> >  drm_kms_helper-$(CONFIG_DRM_LOAD_EDID_FIRMWARE) += drm_edid_load.o
+> > -drm_kms_helper-$(CONFIG_DRM_FBDEV_EMULATION) += drm_fb_helper.o
+> >  drm_kms_helper-$(CONFIG_DRM_KMS_CMA_HELPER) += drm_fb_cma_helper.o
+> > -
+> > +drm_kms_helper-$(CONFIG_DRM_FBDEV_EMULATION) += drm_fb_helper.o
+> >  obj-$(CONFIG_DRM_KMS_HELPER) += drm_kms_helper.o
+> >
+> > -CFLAGS_drm_trace_points.o := -I$(src)
+> > +obj-$(CONFIG_DRM_TTM) += ttm/
+> >
+> > -obj-$(CONFIG_DRM)      += drm.o
+> > -obj-$(CONFIG_DRM_MIPI_DSI) += drm_mipi_dsi.o
+> > -obj-$(CONFIG_DRM_TTM)  += ttm/
+> > -obj-$(CONFIG_DRM_TDFX) += tdfx/
+> > -obj-$(CONFIG_DRM_R128) += r128/
+> > -obj-$(CONFIG_HSA_AMD) += amd/amdkfd/
+> > -obj-$(CONFIG_DRM_RADEON)+= radeon/
+> > -obj-$(CONFIG_DRM_AMDGPU)+= amd/amdgpu/
+> > -obj-$(CONFIG_DRM_MGA)  += mga/
+> > -obj-$(CONFIG_DRM_I810) += i810/
+> > -obj-$(CONFIG_DRM_I915)  += i915/
+> > -obj-$(CONFIG_DRM_MGAG200) += mgag200/
+> > -obj-$(CONFIG_DRM_VC4)  += vc4/
+> > -obj-$(CONFIG_DRM_CIRRUS_QEMU) += cirrus/
+> > -obj-$(CONFIG_DRM_SIS)   += sis/
+> > -obj-$(CONFIG_DRM_SAVAGE)+= savage/
+> > -obj-$(CONFIG_DRM_VMWGFX)+= vmwgfx/
+> > -obj-$(CONFIG_DRM_VIA)  +=via/
+> > -obj-$(CONFIG_DRM_VGEM) += vgem/
+> > -obj-$(CONFIG_DRM_NOUVEAU) +=nouveau/
+> > -obj-$(CONFIG_DRM_EXYNOS) +=exynos/
+> > -obj-$(CONFIG_DRM_ROCKCHIP) +=rockchip/
+> > -obj-$(CONFIG_DRM_GMA500) += gma500/
+> > -obj-$(CONFIG_DRM_UDL) += udl/
+> > -obj-$(CONFIG_DRM_AST) += ast/
+> > -obj-$(CONFIG_DRM_ARMADA) += armada/
+> > +# device drivers. Please keep this list sorted alphabetically
+> > +obj-$(CONFIG_DRM_AMDGPU)       += amd/amdgpu/
+> > +obj-$(CONFIG_HSA_AMD)          += amd/amdkfd/
+> > +obj-$(CONFIG_DRM_ARMADA)       += armada/
+> > +obj-$(CONFIG_DRM_AST)          += ast/
+> >  obj-$(CONFIG_DRM_ATMEL_HLCDC)  += atmel-hlcdc/
+> > -obj-$(CONFIG_DRM_RCAR_DU) += rcar-du/
+> > -obj-$(CONFIG_DRM_SHMOBILE) +=shmobile/
+> > -obj-y                  += omapdrm/
+> > -obj-y                  += tilcdc/
+> > -obj-$(CONFIG_DRM_QXL) += qxl/
+> > -obj-$(CONFIG_DRM_BOCHS) += bochs/
+> > -obj-$(CONFIG_DRM_VIRTIO_GPU) += virtio/
+> > -obj-$(CONFIG_DRM_MSM) += msm/
+> > -obj-$(CONFIG_DRM_TEGRA) += tegra/
+> > -obj-$(CONFIG_DRM_STI) += sti/
+> > -obj-$(CONFIG_DRM_IMX) += imx/
+> > -obj-y                  += i2c/
+> > -obj-y                  += panel/
+> > -obj-y                  += bridge/
+> > -obj-$(CONFIG_DRM_FSL_DCU) += fsl-dcu/
+> > -obj-$(CONFIG_DRM_ETNAVIV) += etnaviv/
+> > +obj-$(CONFIG_DRM_BOCHS)                += bochs/
+> > +obj-y                          += bridge/
+> > +obj-$(CONFIG_DRM_CIRRUS_QEMU)  += cirrus/
+> > +obj-$(CONFIG_DRM_ETNAVIV)      += etnaviv/
+> > +obj-$(CONFIG_DRM_EXYNOS)       += exynos/
+> > +obj-$(CONFIG_DRM_FSL_DCU)      += fsl-dcu/
+> > +obj-$(CONFIG_DRM_GMA500)       += gma500/
+> > +obj-y                          += i2c/
+> > +obj-$(CONFIG_DRM_I810)         += i810/
+> > +obj-$(CONFIG_DRM_I915)         += i915/
+> > +obj-$(CONFIG_DRM_IMX)          += imx/
+> > +obj-$(CONFIG_DRM_MGA)          += mga/
+> > +obj-$(CONFIG_DRM_MGAG200)      += mgag200/
+> > +obj-$(CONFIG_DRM_MSM)          += msm/
+> > +obj-$(CONFIG_DRM_NOUVEAU)      += nouveau/
+> > +obj-y                          += omapdrm/
+> > +obj-y                          += panel/
+> > +obj-$(CONFIG_DRM_QXL)          += qxl/
+> > +obj-$(CONFIG_DRM_R128)         += r128/
+> > +obj-$(CONFIG_DRM_RADEON)       += radeon/
+> > +obj-$(CONFIG_DRM_RCAR_DU)      += rcar-du/
+> > +obj-$(CONFIG_DRM_ROCKCHIP)     += rockchip/
+> > +obj-$(CONFIG_DRM_SAVAGE)       += savage/
+> > +obj-$(CONFIG_DRM_SHMOBILE)     += shmobile/
+> > +obj-$(CONFIG_DRM_SIS)          += sis/
+> > +obj-$(CONFIG_DRM_STI)          += sti/
+> > +obj-$(CONFIG_DRM_TDFX)         += tdfx/
+> > +obj-$(CONFIG_DRM_TEGRA)                += tegra/
+> > +obj-y                          += tilcdc/
+> > +obj-$(CONFIG_DRM_UDL)          += udl/
+> > +obj-$(CONFIG_DRM_VC4)          += vc4/
+> > +obj-$(CONFIG_DRM_VGEM)         += vgem/
+> > +obj-$(CONFIG_DRM_VIA)          += via/
+> > +obj-$(CONFIG_DRM_VIRTIO_GPU)   += virtio/
+> > +obj-$(CONFIG_DRM_VMWGFX)       += vmwgfx/
+> > --
+> > 1.9.1
+> >
+> > _______________________________________________
+> > dri-devel mailing list
+> > dri-devel at lists.freedesktop.org
+> > http://lists.freedesktop.org/mailman/listinfo/dri-devel
+> 
+> NACK, amdkfd *must* be before amdgpu *and* radeon, because it needs to
+> be already loaded when amdgpu/radeon get loaded, and when all these
+> drivers are compiled inside the kernel, the order is maintained by the
+> linkage order in the makefile.
 
-Enable the otg/drc usb controller on the Itead Ibox device.
+That's not how this is supposed to be done. If you have inter-driver
+depencies like this you need to check for them, and defer the driver
+loading by returngin -EPROBE_DEFER. The core kernel will then re-probe
+your driver once other drivers have loaded. Handling inter-driver deps
+using compile-ordering is seriously too fragile.
 
-Note this board has the otg-vbus connected directly to the 5v-dcc of
-the board, so there is no vbus0 regulator, nor vbus0-det.
-
-Signed-off-by: Marcus Cooper <codekipper@gmail.com>
----
-Changes since v1:
-- Added comment concerning vbus0 regulator and detection to commit message
-
----
- arch/arm/boot/dts/sun7i-a20-itead-ibox.dts     | 14 ++++++++++++++
- arch/arm/boot/dts/sunxi-itead-core-common.dtsi |  9 +++++++++
- 2 files changed, 23 insertions(+)
-
-diff --git a/arch/arm/boot/dts/sun7i-a20-itead-ibox.dts b/arch/arm/boot/dts/sun7i-a20-itead-ibox.dts
-index 661c21d..a512581 100644
---- a/arch/arm/boot/dts/sun7i-a20-itead-ibox.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-itead-ibox.dts
-@@ -118,8 +118,22 @@
- 		allwinner,drive = <SUN4I_PINCTRL_20_MA>;
- 		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 	};
-+
-+	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
-+		allwinner,pins = "PH4";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
- };
- 
- &reg_ahci_5v {
- 	status = "okay";
- };
-+
-+&usbphy {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&usb0_id_detect_pin>;
-+	usb0_id_det-gpio = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/sunxi-itead-core-common.dtsi b/arch/arm/boot/dts/sunxi-itead-core-common.dtsi
-index 2565d51..d22eea3 100644
---- a/arch/arm/boot/dts/sunxi-itead-core-common.dtsi
-+++ b/arch/arm/boot/dts/sunxi-itead-core-common.dtsi
-@@ -88,6 +88,10 @@
- 	status = "okay";
- };
- 
-+&otg_sram {
-+	status = "okay";
-+};
-+
- #include "axp209.dtsi"
- 
- &reg_dcdc2 {
-@@ -129,6 +133,11 @@
- 	status = "okay";
- };
- 
-+&usb_otg {
-+	dr_mode = "otg";
-+	status = "okay";
-+};
-+
- &usbphy {
- 	usb1_vbus-supply = <&reg_usb1_vbus>;
- 	usb2_vbus-supply = <&reg_usb2_vbus>;
+Please fix this up, thanks.
+-Daniel
 -- 
-2.7.1
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
