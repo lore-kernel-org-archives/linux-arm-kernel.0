@@ -1,39 +1,38 @@
 From: stephanolbrich@gmx.de (stephanolbrich at gmx.de)
-Date: Tue,  9 Feb 2016 19:10:31 +0100
-Subject: [PATCH 0/4] spi: bcm2835aux: auxiliary spi improvements
-Message-ID: <1455041435-8015-1-git-send-email-stephanolbrich@gmx.de>
+Date: Tue,  9 Feb 2016 19:10:33 +0100
+Subject: [PATCH 2/4] spi: bcm2835aux: disable tx fifo empty irq
+In-Reply-To: <1455041435-8015-1-git-send-email-stephanolbrich@gmx.de>
+References: <1455041435-8015-1-git-send-email-stephanolbrich@gmx.de>
+Message-ID: <1455041435-8015-3-git-send-email-stephanolbrich@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Stephan Olbrich <stephanolbrich@gmx.de>
 
-This patch series has some improvements and fixes for the auxiliary spi.
+The tx empty irq can be disabled when all data was copied.
+This prevents unnecessary interrupts while the last bytes are sent.
 
-1. fix bitmask defines
- just fixes a typo (needed in 2.)
+Signed-off-by: Stephan Olbrich <stephanolbrich@gmx.de>
+---
+ drivers/spi/spi-bcm2835aux.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-2. disable tx fifo empty irq
- reduces the numer of interrupts with nothing to do
-
-3. set up spi-mode before asserting cs-gpio
- As Martin Sperl suggested this is done in the same way as in spi-bcm2835.c
- acace73df2c1913a526c1b41e4741a4a6704c863
-
-4. fix CPOL/CPHA setting
- From what I've seen in the documentation [1] and seen on the scope this chip
- doesn't support modes with CPHA=1. With this patch spi mode 0 and 2 should
- work correctly whereas mode 1 and 3 do not. 
-
-[1] https://www.raspberrypi.org/wp-content/uploads/2012/02/BCM2835-ARM-Peripherals.pdf
-
-Stephan Olbrich (4):
-  spi: bcm2835aux: fix bitmask defines
-  spi: bcm2835aux: disable tx fifo empty irq
-  spi: bcm2835aux: set up spi-mode before asserting cs-gpio
-  spi: bcm2835aux: fix CPOL/CPHA setting
-
- drivers/spi/spi-bcm2835aux.c | 64 +++++++++++++++++++++++++++++++-------------
- 1 file changed, 46 insertions(+), 18 deletions(-)
-
+diff --git a/drivers/spi/spi-bcm2835aux.c b/drivers/spi/spi-bcm2835aux.c
+index ecc73c0..d2f0067 100644
+--- a/drivers/spi/spi-bcm2835aux.c
++++ b/drivers/spi/spi-bcm2835aux.c
+@@ -212,6 +212,12 @@ static irqreturn_t bcm2835aux_spi_interrupt(int irq, void *dev_id)
+ 		ret = IRQ_HANDLED;
+ 	}
+ 
++	if (!bs->tx_len) {
++		/* disable tx fifo empty interrupt */
++		bcm2835aux_wr(bs, BCM2835_AUX_SPI_CNTL1, bs->cntl[1] |
++			BCM2835_AUX_SPI_CNTL1_IDLE);
++	}
++
+ 	/* and if rx_len is 0 then wake up completion and disable spi */
+ 	if (!bs->rx_len) {
+ 		bcm2835aux_spi_reset_hw(bs);
 -- 
 2.5.0
