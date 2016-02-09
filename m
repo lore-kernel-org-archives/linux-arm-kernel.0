@@ -1,68 +1,48 @@
 From: edubezval@gmail.com (Eduardo Valentin)
-Date: Tue, 9 Feb 2016 14:09:01 -0800
-Subject: [PATCH] arm: dts: AM57XX: Correct the thermal thresholds
-In-Reply-To: <1454924705-8382-1-git-send-email-j-keerthy@ti.com>
-References: <1454924705-8382-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <20160209220901.GC28102@localhost.localdomain>
+Date: Tue, 9 Feb 2016 14:10:27 -0800
+Subject: [PATCH 3/3] thermal: allow u8500-thermal driver to be a module
+In-Reply-To: <20160127073300.GJ3368@x1>
+References: <1453740264-1972562-1-git-send-email-arnd@arndb.de>
+ <1453740264-1972562-4-git-send-email-arnd@arndb.de>
+ <20160127073300.GJ3368@x1>
+Message-ID: <20160209221026.GD28102@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 08, 2016 at 03:15:05PM +0530, Keerthy wrote:
-> The thermal threholds for am57xx are different from that of dra7.
-> Correcting the thresholds for the same.
+On Wed, Jan 27, 2016 at 07:33:00AM +0000, Lee Jones wrote:
+> On Mon, 25 Jan 2016, Arnd Bergmann wrote:
 > 
-> Signed-off-by: Keerthy <j-keerthy@ti.com>
-> ---
+> > When the thermal subsystem is a loadable module, the u8500 driver
+> > fails to build:
+> > 
+> > drivers/thermal/built-in.o: In function `db8500_thermal_probe':
+> > db8500_thermal.c:(.text+0x96c): undefined reference to `thermal_zone_device_register'
+> > drivers/thermal/built-in.o: In function `db8500_thermal_work':
+> > db8500_thermal.c:(.text+0xab4): undefined reference to `thermal_zone_device_update'
+> > 
+> > This changes the symbol to a tristate, so Kconfig can track the
+> > dependency correctly.
+> > 
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > ---
+> >  drivers/mfd/db8500-prcmu.c | 3 +++
+> >  drivers/thermal/Kconfig    | 4 ++--
+> >  2 files changed, 5 insertions(+), 2 deletions(-)
 > 
-> Depends on: https://lkml.org/lkml/2016/2/8/90
+> As this touches a core Thermal file, I think it's better off going in
+> via that tree.  If that's a problem, I can take it with the relevant
+> Acks.
 > 
->  arch/arm/boot/dts/am57xx-beagle-x15.dts | 24 ++++++++++++++++++++++++
->  1 file changed, 24 insertions(+)
-> 
-> Index: linux/arch/arm/boot/dts/am57xx-beagle-x15.dts
-> ===================================================================
-> --- linux.orig/arch/arm/boot/dts/am57xx-beagle-x15.dts	2016-02-08 14:57:05.514959101 +0530
-> +++ linux/arch/arm/boot/dts/am57xx-beagle-x15.dts	2016-02-08 14:57:05.510959168 +0530
-
-Sorry, did not bother to check, but is this the only user of am57xx?
-
-Apart from the above:
-
-Acked-by: Eduardo Valentin <edubezval@gmail.com>
+> Acked-by: Lee Jones <lee.jones@linaro.org>
 
 
-> @@ -825,3 +825,27 @@
->  		status = "okay";
->  	};
->  };
-> +
-> +&cpu_alert0 {
-> +	temperature = <90000>; /* milliCelsius */
-> +};
-> +
-> +&cpu_crit {
-> +	temperature = <105000>; /* milliCelsius */
-> +};
-> +
-> +&gpu_crit {
-> +	temperature = <105000>; /* milliCelsius */
-> +};
-> +
-> +&core_crit {
-> +	temperature = <105000>; /* milliCelsius */
-> +};
-> +
-> +&dspeve_crit {
-> +	temperature = <105000>; /* milliCelsius */
-> +};
-> +
-> +&iva_crit {
-> +	temperature = <105000>; /* milliCelsius */
-> +};
+Thanks, I am adding to linux-next to see how it goes.
+
+
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 473 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160209/e62133ba/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160209/3f8a8e06/attachment.sig>
