@@ -1,56 +1,71 @@
-From: brijesh.singh@amd.com (Brijesh Singh)
-Date: Tue, 9 Feb 2016 09:47:55 -0600
-Subject: [PATCH V2 09/12] dtb: amd: Add KCS device tree node
-In-Reply-To: <4018438.bPuTyoUuqf@wuerfel>
-References: <1454954357-8395-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <1454954357-8395-10-git-send-email-Suravee.Suthikulpanit@amd.com>
- <4018438.bPuTyoUuqf@wuerfel>
-Message-ID: <56BA0A2B.5000705@amd.com>
+From: dietmar.eggemann@arm.com (Dietmar Eggemann)
+Date: Tue, 9 Feb 2016 15:54:50 +0000
+Subject: [PATCH v3 2/6] drivers/cpufreq: implement
+ init_cpu_capacity_default()
+In-Reply-To: <20160205093040.GG29586@e106622-lin>
+References: <1454500799-18451-1-git-send-email-juri.lelli@arm.com>
+ <1454500799-18451-3-git-send-email-juri.lelli@arm.com>
+ <CAKfTPtDGk5BC25WqHdhDYDOBgUsuidAMhrXS=eDi6wJPZjfrwA@mail.gmail.com>
+ <20160204093559.GA14099@e105550-lin.cambridge.arm.com>
+ <CAKfTPtB4G3bP5N0hU6zWXJTddO34x3RnyGpp-4_otc8O=Wq2hw@mail.gmail.com>
+ <20160204121620.GB29586@e106622-lin>
+ <CAKfTPtDVasamRtG2kLxP0HsohmVQTPrXRgx36e+jb3gozDoo6g@mail.gmail.com>
+ <20160204141345.GD29586@e106622-lin>
+ <CAKfTPtDWP-AgqXsSuxCfVj33dh+i7oqDTkL=gUy7n-AB1anoow@mail.gmail.com>
+ <CAKfTPtD4jTmUZoShGBm3oAFywizjp8jsEukmkeZU+x+zk-KZRA@mail.gmail.com>
+ <20160205093040.GG29586@e106622-lin>
+Message-ID: <56BA0BCA.6090903@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 05/02/16 09:30, Juri Lelli wrote:
+> On 04/02/16 16:46, Vincent Guittot wrote:
+>> On 4 February 2016 at 16:44, Vincent Guittot <vincent.guittot@linaro.org> wrote:
+>>> On 4 February 2016 at 15:13, Juri Lelli <juri.lelli@arm.com> wrote:
+>>>> On 04/02/16 13:35, Vincent Guittot wrote:
+>>>>> On 4 February 2016 at 13:16, Juri Lelli <juri.lelli@arm.com> wrote:
+>>>>>> Hi Vincent,
+>>>>>>
+>>>>>> On 04/02/16 13:03, Vincent Guittot wrote:
+>>>>>>> On 4 February 2016 at 10:36, Morten Rasmussen <morten.rasmussen@arm.com> wrote:
+>>>>>>>> On Wed, Feb 03, 2016 at 10:04:37PM +0100, Vincent Guittot wrote:
+>>>>>>>>> On 3 February 2016 at 12:59, Juri Lelli <juri.lelli@arm.com> wrote:
 
-On 02/09/2016 08:59 AM, Arnd Bergmann wrote:
-> On Monday 08 February 2016 11:59:14 Suravee Suthikulpanit wrote:
->> +
->> +               ipmi_kcs: kcs at e0010000 {
->> +                       status = "disabled";
->> +                       compatible = "ipmi-kcs";
->> +                       device_type = "ipmi";
->> +                       reg = <0x0 0xe0010000 0 0x8>;
->> +                       interrupts = <0 389 4>;
->> +                       interrupt-names = "ipmi_kcs";
->> +                       reg-size = <1>;
->> +                       reg-spacing = <4>;
->> +               };
->>         };
+[...]
+
+>>>
+>>> AFAICT, They don't have a dedicated cpufreq driver.
+>>>
+>>> More generally speaking, it can take time before having
+>>
+>> email sent before the ne d of the sentence ...
+>>
+>> More generally speaking, it can take time before having a cpufreq
+>> driver whereas we want to run and test scheduler behavior of these
+>> heterogenous platform
 >>
 > 
-> I see we don't have a binding file for this, can you add one please?
->
-There is binding file ipmi.txt [1]. Am I missing something ?
- 
-[1] http://lxr.free-electrons.com/source/Documentation/devicetree/bindings/ipmi.txt
-
+> I'm not familiar with this platform, but from what you are saying and
+> what I could find online, it looks like full Linux support is not
+> finished yet. Can we consider that as still in development? And if we
+> can do that, maybe is fair enough that we use the sysfs interface to
+> play with that platform until support is complete.
 > 
-> Why the strange name for the interrupt?
-> 
+> Do others have any opinion on this point?
 
-Now I don't remember the doc but sometime back while implementing BMC on Seattle I saw that interrupt was labeled as "ipmi_kcs"
-hence used the same name in DT. But if you want to use different name then let me know the string and will update it.
+IMHO, the solution should work for all of heterogeneous systems, (a) w/
+cpufreq and driver, (b) w/ cpufreq and no driver loaded (yet) or (c) w/o
+cpufreq.
 
-Theoretically IPMI system interface supports the following interface and any of these interfaces can be used by
-A57 to communicate with BMC:
+That means that you can't put the benchmarking only into
+cpufreq_register_driver() and rely on cpufreq policy topology.
 
-* Keyboard controller style (KCS)
-* System Management Interface (SMIC)
-* Block transfer (BT)
-* SMBus system interface (SSIF)
+Maybe you could do this for (b) and (c) inside an initcall and use
+topology_core_cpumask() to figure out which cpu to profile?
 
-AMD Seattle platform supports "KCS".
+This would then happen w/ the cpu frequency set by the fw.
 
+But this then has to be synchronized somehow with the benchmarking
+approach in cpufreq_register_driver().
 
-
-> 	Arnd
-> 
+[...]
