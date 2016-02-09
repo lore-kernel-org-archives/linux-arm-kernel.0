@@ -1,157 +1,172 @@
 From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
-Date: Tue, 9 Feb 2016 16:11:58 +0530
-Subject: [PATCH V3 5/5] Microblaze: Modifying microblaze PCI subsytem to
- support generic Xilinx AXI PCIe Host Bridge IP driver
+Date: Tue, 9 Feb 2016 16:11:54 +0530
+Subject: [PATCH V3 1/5] PCI: xilinx: Removing xilinx_pcie_parse_and_add_res
+ function
 In-Reply-To: <1455014518-8708-1-git-send-email-bharatku@xilinx.com>
 References: <1455014518-8708-1-git-send-email-bharatku@xilinx.com>
-Message-ID: <1455014518-8708-6-git-send-email-bharatku@xilinx.com>
+Message-ID: <1455014518-8708-2-git-send-email-bharatku@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch does required modifications to microblaze PCI subsystem, to
-work with generic driver (drivers/pci/host/pcie-xilinx.c) on Microblaze
-and Zynq.
+Removing xilinx_pcie_parse_and_add_res function replacing with
+of_pci_get_host_bridge_resources API.
 
 Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
 Signed-off-by: Ravi Kiran Gummaluri <rgummal@xilinx.com>
 ---
 Changes:
-Removed pcibios_get_phb_of_node in pci-common.c, using generic version
-instead.
-Modified pcibios_fixup_bus in pci-common.c, as per generic architecuture.
-Modified pcibios_align_resource in pci-common.c, as per generic
-architecuture, removed temporary variable.
-Removed pci_domain_nr in pci-common.c, instead using generic code.
-Added pcibios_add_device in pci-common.c, as per generic architecuture.
-Adding Kernel configuration in arch/microblaze as required for generic PCI
-domains.
-Added kernel configuration for driver to support Microblaze.
+Removing xilinx_pcie_parse_and_add_res function and replacing it
+with of_pci_get_host_bridge_resources kernel API which does the same.
 ---
- arch/microblaze/Kconfig          |  3 +++
- arch/microblaze/pci/pci-common.c | 56 +++++++---------------------------------
- drivers/pci/host/Kconfig         |  2 +-
- 3 files changed, 14 insertions(+), 47 deletions(-)
+ drivers/pci/host/pcie-xilinx.c | 107 ++---------------------------------------
+ 1 file changed, 5 insertions(+), 102 deletions(-)
 
-diff --git a/arch/microblaze/Kconfig b/arch/microblaze/Kconfig
-index 0bce820..c3702b9 100644
---- a/arch/microblaze/Kconfig
-+++ b/arch/microblaze/Kconfig
-@@ -271,6 +271,9 @@ config PCI
- config PCI_DOMAINS
- 	def_bool PCI
+diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
+index 3c7a0d5..627878d 100644
+--- a/drivers/pci/host/pcie-xilinx.c
++++ b/drivers/pci/host/pcie-xilinx.c
+@@ -94,9 +94,6 @@
+ /* Number of MSI IRQs */
+ #define XILINX_NUM_MSI_IRQS		128
  
-+config PCI_DOMAINS_GENERIC
-+	def_bool PCI_DOMAINS
-+
- config PCI_SYSCALL
- 	def_bool PCI
- 
-diff --git a/arch/microblaze/pci/pci-common.c b/arch/microblaze/pci/pci-common.c
-index ae838ed..35654be 100644
---- a/arch/microblaze/pci/pci-common.c
-+++ b/arch/microblaze/pci/pci-common.c
-@@ -123,17 +123,6 @@ unsigned long pci_address_to_pio(phys_addr_t address)
+-/* Number of Memory Resources */
+-#define XILINX_MAX_NUM_RESOURCES	3
+-
+ /**
+  * struct xilinx_pcie_port - PCIe port information
+  * @reg_base: IO Mapped Register Base
+@@ -105,7 +102,6 @@
+  * @root_busno: Root Bus number
+  * @dev: Device pointer
+  * @irq_domain: IRQ domain pointer
+- * @bus_range: Bus range
+  * @resources: Bus Resources
+  */
+ struct xilinx_pcie_port {
+@@ -659,97 +655,6 @@ static struct pci_bus *xilinx_pcie_scan_bus(int nr, struct pci_sys_data *sys)
  }
- EXPORT_SYMBOL_GPL(pci_address_to_pio);
  
--/*
-- * Return the domain number for this bus.
+ /**
+- * xilinx_pcie_parse_and_add_res - Add resources by parsing ranges
+- * @port: PCIe port information
+- *
+- * Return: '0' on success and error value on failure
 - */
--int pci_domain_nr(struct pci_bus *bus)
+-static int xilinx_pcie_parse_and_add_res(struct xilinx_pcie_port *port)
 -{
--	struct pci_controller *hose = pci_bus_to_host(bus);
+-	struct device *dev = port->dev;
+-	struct device_node *node = dev->of_node;
+-	struct resource *mem;
+-	resource_size_t offset;
+-	struct of_pci_range_parser parser;
+-	struct of_pci_range range;
+-	struct resource_entry *win;
+-	int err = 0, mem_resno = 0;
 -
--	return hose->global_number;
--}
--EXPORT_SYMBOL(pci_domain_nr);
--
- /* This routine is meant to be used early during boot, when the
-  * PCI bus numbers have not yet been assigned, and you need to
-  * issue PCI config cycles to an OF device.
-@@ -863,26 +852,10 @@ void pcibios_setup_bus_devices(struct pci_bus *bus)
- 
- void pcibios_fixup_bus(struct pci_bus *bus)
- {
--	/* When called from the generic PCI probe, read PCI<->PCI bridge
--	 * bases. This is -not- called when generating the PCI tree from
--	 * the OF device-tree.
--	 */
--	if (bus->self != NULL)
--		pci_read_bridge_bases(bus);
--
--	/* Now fixup the bus bus */
--	pcibios_setup_bus_self(bus);
--
--	/* Now fixup devices on that bus */
--	pcibios_setup_bus_devices(bus);
-+	/* nothing to do */
- }
- EXPORT_SYMBOL(pcibios_fixup_bus);
- 
--static int skip_isa_ioresource_align(struct pci_dev *dev)
--{
--	return 0;
--}
--
- /*
-  * We need to avoid collisions with `mirrored' VGA ports
-  * and other strange ISA hardware, so we always want the
-@@ -899,20 +872,18 @@ static int skip_isa_ioresource_align(struct pci_dev *dev)
- resource_size_t pcibios_align_resource(void *data, const struct resource *res,
- 				resource_size_t size, resource_size_t align)
- {
--	struct pci_dev *dev = data;
--	resource_size_t start = res->start;
--
--	if (res->flags & IORESOURCE_IO) {
--		if (skip_isa_ioresource_align(dev))
--			return start;
--		if (start & 0x300)
--			start = (start + 0x3ff) & ~0x3ff;
+-	/* Get the ranges */
+-	if (of_pci_range_parser_init(&parser, node)) {
+-		dev_err(dev, "missing \"ranges\" property\n");
+-		return -EINVAL;
 -	}
 -
--	return start;
-+	return res->start;
- }
- EXPORT_SYMBOL(pcibios_align_resource);
- 
-+int pcibios_add_device(struct pci_dev *dev)
-+{
-+	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL(pcibios_add_device);
-+
- /*
-  * Reparent resource children of pr that conflict with res
-  * under res, and make res replace those children.
-@@ -1333,13 +1304,6 @@ static void pcibios_setup_phb_resources(struct pci_controller *hose,
- 		 (unsigned long)hose->io_base_virt - _IO_BASE);
- }
- 
--struct device_node *pcibios_get_phb_of_node(struct pci_bus *bus)
--{
--	struct pci_controller *hose = bus->sysdata;
+-	/* Parse the ranges and add the resources found to the list */
+-	for_each_of_pci_range(&parser, &range) {
 -
--	return of_node_get(hose->dn);
+-		if (mem_resno >= XILINX_MAX_NUM_RESOURCES) {
+-			dev_err(dev, "Maximum memory resources exceeded\n");
+-			return -EINVAL;
+-		}
+-
+-		mem = devm_kmalloc(dev, sizeof(*mem), GFP_KERNEL);
+-		if (!mem) {
+-			err = -ENOMEM;
+-			goto free_resources;
+-		}
+-
+-		of_pci_range_to_resource(&range, node, mem);
+-
+-		switch (mem->flags & IORESOURCE_TYPE_BITS) {
+-		case IORESOURCE_MEM:
+-			offset = range.cpu_addr - range.pci_addr;
+-			mem_resno++;
+-			break;
+-		default:
+-			err = -EINVAL;
+-			break;
+-		}
+-
+-		if (err < 0) {
+-			dev_warn(dev, "Invalid resource found %pR\n", mem);
+-			continue;
+-		}
+-
+-		err = request_resource(&iomem_resource, mem);
+-		if (err)
+-			goto free_resources;
+-
+-		pci_add_resource_offset(&port->resources, mem, offset);
+-	}
+-
+-	/* Get the bus range */
+-	if (of_pci_parse_bus_range(node, &port->bus_range)) {
+-		u32 val = pcie_read(port, XILINX_PCIE_REG_BIR);
+-		u8 last;
+-
+-		last = (val & XILINX_PCIE_BIR_ECAM_SZ_MASK) >>
+-			XILINX_PCIE_BIR_ECAM_SZ_SHIFT;
+-
+-		port->bus_range = (struct resource) {
+-			.name	= node->name,
+-			.start	= 0,
+-			.end	= last,
+-			.flags	= IORESOURCE_BUS,
+-		};
+-	}
+-
+-	/* Register bus resource */
+-	pci_add_resource(&port->resources, &port->bus_range);
+-
+-	return 0;
+-
+-free_resources:
+-	release_child_resources(&iomem_resource);
+-	resource_list_for_each_entry(win, &port->resources)
+-		devm_kfree(dev, win->res);
+-	pci_free_resource_list(&port->resources);
+-
+-	return err;
 -}
 -
- static void pcibios_scan_phb(struct pci_controller *hose)
- {
- 	LIST_HEAD(resources);
-diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-index d5e58ba..7c56c2e 100644
---- a/drivers/pci/host/Kconfig
-+++ b/drivers/pci/host/Kconfig
-@@ -79,7 +79,7 @@ config PCI_KEYSTONE
+-/**
+  * xilinx_pcie_parse_dt - Parse Device tree
+  * @port: PCIe port information
+  *
+@@ -802,6 +707,8 @@ static int xilinx_pcie_probe(struct platform_device *pdev)
+ 	struct hw_pci hw;
+ 	struct device *dev = &pdev->dev;
+ 	int err;
++	resource_size_t iobase = 0;
++	LIST_HEAD(res);
  
- config PCIE_XILINX
- 	bool "Xilinx AXI PCIe host bridge support"
--	depends on ARCH_ZYNQ
-+	depends on ARCH_ZYNQ || MICROBLAZE
- 	help
- 	  Say 'Y' here if you want kernel to support the Xilinx AXI PCIe
- 	  Host Bridge driver.
+ 	if (!dev->of_node)
+ 		return -ENODEV;
+@@ -826,14 +733,10 @@ static int xilinx_pcie_probe(struct platform_device *pdev)
+ 		return err;
+ 	}
+ 
+-	/*
+-	 * Parse PCI ranges, configuration bus range and
+-	 * request their resources
+-	 */
+-	INIT_LIST_HEAD(&port->resources);
+-	err = xilinx_pcie_parse_and_add_res(port);
++	err = of_pci_get_host_bridge_resources(dev->of_node, 0, 0xff, &res,
++					       &iobase);
+ 	if (err) {
+-		dev_err(dev, "Failed adding resources\n");
++		dev_err(dev, "Getting bridge resources failed\n");
+ 		return err;
+ 	}
+ 
 -- 
 2.1.1
