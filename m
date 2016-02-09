@@ -1,93 +1,35 @@
-From: yang.shi@linaro.org (Shi, Yang)
-Date: Tue, 9 Feb 2016 09:32:53 -0800
-Subject: [PATCH v2] arm64: disable kasan when accessing frame->fp in
- unwind_frame
-In-Reply-To: <56BA2269.1000908@linaro.org>
-References: <1454951589-18238-1-git-send-email-yang.shi@linaro.org>
- <20160209165414.GT22874@arm.com> <56BA1F18.2020103@linaro.org>
- <20160209172310.GV22874@arm.com> <56BA2269.1000908@linaro.org>
-Message-ID: <56BA22C5.1090004@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 9 Feb 2016 17:36:06 +0000
+Subject: [PATCH 6/6] arm64: compat: Check for AArch32 state
+In-Reply-To: <1453980737-6126-7-git-send-email-suzuki.poulose@arm.com>
+References: <1453980737-6126-1-git-send-email-suzuki.poulose@arm.com>
+ <1453980737-6126-7-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20160209173606.GX22874@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/9/2016 9:31 AM, Shi, Yang wrote:
-> On 2/9/2016 9:23 AM, Will Deacon wrote:
->> On Tue, Feb 09, 2016 at 09:17:12AM -0800, Shi, Yang wrote:
->>> On 2/9/2016 8:54 AM, Will Deacon wrote:
->>>> On Mon, Feb 08, 2016 at 09:13:09AM -0800, Yang Shi wrote:
->>>>> When boot arm64 kernel with KASAN enabled, the below error is
->>>>> reported by
->>>>> kasan:
->>>>>
->>>>> BUG: KASAN: out-of-bounds in unwind_frame+0xec/0x260 at addr
->>>>> ffffffc064d57ba0
->>>>> Read of size 8 by task pidof/499
->>>>> page:ffffffbdc39355c0 count:0 mapcount:0 mapping:          (null)
->>>>> index:0x0
->>>>> flags: 0x0()
->>>>> page dumped because: kasan: bad access detected
->>>>> CPU: 2 PID: 499 Comm: pidof Not tainted 4.5.0-rc1 #119
->>>>> Hardware name: Freescale Layerscape 2085a RDB Board (DT)
->>>>> Call trace:
->>>>> [<ffffffc00008d078>] dump_backtrace+0x0/0x290
->>>>> [<ffffffc00008d32c>] show_stack+0x24/0x30
->>>>> [<ffffffc0006a981c>] dump_stack+0x8c/0xd8
->>>>> [<ffffffc0002e4400>] kasan_report_error+0x558/0x588
->>>>> [<ffffffc0002e4958>] kasan_report+0x60/0x70
->>>>> [<ffffffc0002e3188>] __asan_load8+0x60/0x78
->>>>> [<ffffffc00008c92c>] unwind_frame+0xec/0x260
->>>>> [<ffffffc000087e60>] get_wchan+0x110/0x160
->>>>> [<ffffffc0003b647c>] do_task_stat+0xb44/0xb68
->>>>> [<ffffffc0003b7730>] proc_tgid_stat+0x40/0x50
->>>>> [<ffffffc0003ac840>] proc_single_show+0x88/0xd8
->>>>> [<ffffffc000345be8>] seq_read+0x370/0x770
->>>>> [<ffffffc00030aba0>] __vfs_read+0xc8/0x1d8
->>>>> [<ffffffc00030c0ec>] vfs_read+0x94/0x168
->>>>> [<ffffffc00030d458>] SyS_read+0xb8/0x128
->>>>> [<ffffffc000086530>] el0_svc_naked+0x24/0x28
->>>>> Memory state around the buggy address:
->>>>>   ffffffc064d57a80: 00 00 00 00 00 00 00 00 f1 f1 f1 f1 00 00 f4 f4
->>>>>   ffffffc064d57b00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
->>>>>> ffffffc064d57b80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
->>>>>                                    ^
->>>>>   ffffffc064d57c00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
->>>>>   ffffffc064d57c80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
->>>>>
->>>>> Since the shadow byte pointed by the report is 0, so it may mean it
->>>>> is just hit
->>>>> oob in non-current task. So, disable the instrumentation to silence
->>>>> these
->>>>> warnings.
->>>>
->>>> Curious, but how did you trigger this? I'm just trying to confirm that
->>>> mainline is affected, but my machine boots happily with KASAN and
->>>> STACKTRACE
->>>> selected and I can cat /proc/self/{stack,stat} quite happily.
->>>>
->>>> What am I missing?
->>>
->>> I'm using mainline 4.5-rc1 kernel with gcc 5.2. And, my rootfs is NFS
->>> mounted.
->>>
->>> Not sure if other kernel configs, i.e tracing stuff will have impact
->>> on the
->>> trigger since I'm not using the defconfig.
->>
->> If you could put your .config somewhere, that would be helpful, please.
->
-> Attached it. BTW, I run the test on LS2085a RDB board which has 8 A57
-> cores. Not sure if it could be reproduced on other boards easily.
+On Thu, Jan 28, 2016 at 11:32:17AM +0000, Suzuki K Poulose wrote:
+> Make sure we have AArch32 state available for running COMPAT binaries.
+> 
+> Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+> [ Added checks for ELF HWCAP, Use cap bit in cap_hwcaps ]
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-This config has GCOV enabled, my test is run with it disabled. So, you 
-may need disable it to replicate the trigger.
+[...]
 
-Regards,
-Yang
+> diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
+> index 8cc2a86..2890b74 100644
+> --- a/arch/arm64/kernel/cpuinfo.c
+> +++ b/arch/arm64/kernel/cpuinfo.c
+> @@ -124,7 +124,8 @@ static int c_show(struct seq_file *m, void *v)
+>  		 * software which does already (at least for 32-bit).
+>  		 */
+>  		seq_puts(m, "Features\t:");
+> -		if (personality(current->personality) == PER_LINUX32) {
+> +		if (system_supports_32bit_el0() &&
+> +			personality(current->personality) == PER_LINUX32) {
 
->
-> Yang
->
->>
->> Will
->>
->
+Wouldn't it be better to prevent tasks changing to the PER_LINUX32
+personality on systems that don't support AArch32 at EL0?
+
+Will
