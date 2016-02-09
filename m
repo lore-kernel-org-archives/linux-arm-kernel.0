@@ -1,42 +1,46 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 9 Feb 2016 10:43:22 +0530
+Date: Tue, 9 Feb 2016 10:47:49 +0530
 Subject: [PATCH 0/3] omap: hwmod: add default reset handling support
-In-Reply-To: <20160208204446.GC19432@atomide.com>
+In-Reply-To: <56B9037C.2050203@ti.com>
 References: <1454929941-23949-1-git-send-email-kishon@ti.com>
- <20160208204446.GC19432@atomide.com>
-Message-ID: <56B97572.6080100@ti.com>
+ <56B9037C.2050203@ti.com>
+Message-ID: <56B9767D.7000708@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Hi,
 
-On Tuesday 09 February 2016 02:14 AM, Tony Lindgren wrote:
-> Hi Kishon,
-> 
-> * Kishon Vijay Abraham I <kishon@ti.com> [160208 03:13]:
+On Tuesday 09 February 2016 02:37 AM, Suman Anna wrote:
+> On 02/08/2016 05:12 AM, Kishon Vijay Abraham I wrote:
 >> Add a new hwmod flag to indicate custom reset handling and use it
 >> for devices that require custom reset handling (like dsp, ipu, iva).
 >>
 >> Tested PCIe on dra7-evm and dra72-evm.
 >> I need help in testing DSP, IPU, IVA, PRU, GFX, M3 in other platforms.
 >> Or a way to test these cores to see if reset is not broken. Suman?
->>
->> I'll post this series once again after performing these tests.
 > 
-> Do we also still need to patch something in the pcie driver too
-> or can all that be left out now?
+> I won't be able to test this week, and have requested Dave to check on
+> wkup_m3_rproc driver atleast. I see one potential issue (see my commment
+> on the other thread), but can confirm that only after testing.
+> 
+> Have you tested multiple probe/removal sequences? Can you check the
+> return status on the _hardreset_deassert call with your PCIe driver,
+> believe even that one would return an error on multiple probes.
 
-With this series changes in PCIe driver is not required at all.
+hmm.. the PCIe driver is built-in and can't be made as module because of other
+issues in PCIe core. But looks like the first deassert succeeded since I didn't
+observe the boot hang because of PCIe.
 
 Thanks
 Kishon
 
 > 
-> Regards,
+> regards
+> Suman
 > 
-> Tony
-> 
-> 
+>>
+>> I'll post this series once again after performing these tests.
+>>
 >> Paul Walmsley (3):
 >>   ARM: omap2+: omap_hwmod: introduce hwmod flag for custom reset
 >>     handling
@@ -56,6 +60,4 @@ Kishon
 >>  arch/arm/mach-omap2/omap_hwmod_54xx_data.c         |    2 ++
 >>  10 files changed, 41 insertions(+), 5 deletions(-)
 >>
->> -- 
->> 1.7.9.5
->>
+> 
