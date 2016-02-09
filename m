@@ -1,58 +1,241 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Tue, 9 Feb 2016 14:54:55 +0100
-Subject: [PATCH] drm/tegra: remove unused variable
-In-Reply-To: <1455020923-1089878-1-git-send-email-arnd@arndb.de>
-References: <1455020923-1089878-1-git-send-email-arnd@arndb.de>
-Message-ID: <20160209135455.GW11240@phenom.ffwll.local>
+From: rrichter@caviumnetworks.com (Robert Richter)
+Date: Tue, 9 Feb 2016 14:53:43 +0100
+Subject: [PATCH v4 3/6] efi: move FDT handling to separate object file
+In-Reply-To: <1455026026-11571-1-git-send-email-rrichter@caviumnetworks.com>
+References: <1455026026-11571-1-git-send-email-rrichter@caviumnetworks.com>
+Message-ID: <1455026026-11571-4-git-send-email-rrichter@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 09, 2016 at 01:28:15PM +0100, Arnd Bergmann wrote:
-> A newly merged patch removed the only user of this variable,
-> leading to a harmless gcc warning:
-> 
-> drivers/gpu/drm/tegra/drm.c: In function 'tegra_drm_preclose':
-> drivers/gpu/drm/tegra/drm.c:861:19: error: unused variable 'crtc' [-Werror=unused-variable]
-> 
-> This removes the variable as well.
-> 
-> Cc: Terje Bergstr?m <tbergstrom@nvidia.com>
-> Cc: Daniel Stone <daniels@collabora.com>
-> Cc: Alex Deucher <alexander.deucher@amd.com>
-> Cc: Thierry Reding <treding@nvidia.com>
-> Cc: Daniel Vetter <daniel.vetter@intel.com>
-> Fixes: 0417d424ac0d ("drm/tegra: Stop cancelling page flip events")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Already fixed by Dave in 10c1b6183a163aca59ba92b88f2b4c4cecd20d4c. Thanks
-anyway for the quick patch.
--Daniel
+The EFI specific FDT handling is compiled conditionally, and is
+logically independent of the rest of efi.o. So move it to a separate
+file before making changes to it in subsequent patches.
 
-> ---
->  drivers/gpu/drm/tegra/drm.c | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/drivers/gpu/drm/tegra/drm.c b/drivers/gpu/drm/tegra/drm.c
-> index 021d0e1398fb..8e6b18caa706 100644
-> --- a/drivers/gpu/drm/tegra/drm.c
-> +++ b/drivers/gpu/drm/tegra/drm.c
-> @@ -858,7 +858,6 @@ static void tegra_drm_preclose(struct drm_device *drm, struct drm_file *file)
->  {
->  	struct tegra_drm_file *fpriv = file->driver_priv;
->  	struct tegra_drm_context *context, *tmp;
-> -	struct drm_crtc *crtc;
->  
->  	list_for_each_entry_safe(context, tmp, &fpriv->contexts, list)
->  		tegra_drm_context_free(context);
-> -- 
-> 2.7.0
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+Acked-by: Matt Fleming <matt.fleming@intel.com>
+Acked-by: Leif Lindholm <leif.lindholm@linaro.org>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Message-Id: <1442881288-13962-4-git-send-email-ard.biesheuvel@linaro.org>
+[ rric: Ported to v4.5-rc1 ]
+Signed-off-by: Robert Richter <rrichter@cavium.com>
+---
+ drivers/firmware/efi/Makefile  |  1 +
+ drivers/firmware/efi/efi-fdt.c | 91 ++++++++++++++++++++++++++++++++++++++++++
+ drivers/firmware/efi/efi.c     | 84 --------------------------------------
+ 3 files changed, 92 insertions(+), 84 deletions(-)
+ create mode 100644 drivers/firmware/efi/efi-fdt.c
 
+diff --git a/drivers/firmware/efi/Makefile b/drivers/firmware/efi/Makefile
+index 62e654f255f4..bb7ec2fac25c 100644
+--- a/drivers/firmware/efi/Makefile
++++ b/drivers/firmware/efi/Makefile
+@@ -18,6 +18,7 @@ obj-$(CONFIG_EFI_RUNTIME_MAP)		+= runtime-map.o
+ obj-$(CONFIG_EFI_RUNTIME_WRAPPERS)	+= runtime-wrappers.o
+ obj-$(CONFIG_EFI_STUB)			+= libstub/
+ obj-$(CONFIG_EFI_FAKE_MEMMAP)		+= fake_mem.o
++obj-$(CONFIG_EFI_PARAMS_FROM_FDT)	+= efi-fdt.o
+ 
+ arm-obj-$(CONFIG_EFI)			:= arm-init.o arm-runtime.o
+ obj-$(CONFIG_ARM)			+= $(arm-obj-y)
+diff --git a/drivers/firmware/efi/efi-fdt.c b/drivers/firmware/efi/efi-fdt.c
+new file mode 100644
+index 000000000000..8f3ce66e2b02
+--- /dev/null
++++ b/drivers/firmware/efi/efi-fdt.c
+@@ -0,0 +1,91 @@
++/*
++ * Copyright (C) 2013 - 2015 Linaro Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/init.h>
++#include <linux/efi.h>
++#include <linux/of.h>
++#include <linux/of_fdt.h>
++
++#define UEFI_PARAM(name, prop, field)			   \
++	{						   \
++		{ name },				   \
++		{ prop },				   \
++		offsetof(struct efi_fdt_params, field),    \
++		FIELD_SIZEOF(struct efi_fdt_params, field) \
++	}
++
++static __initdata struct {
++	const char name[32];
++	const char propname[32];
++	int offset;
++	int size;
++} dt_params[] = {
++	UEFI_PARAM("System Table", "linux,uefi-system-table", system_table),
++	UEFI_PARAM("MemMap Address", "linux,uefi-mmap-start", mmap),
++	UEFI_PARAM("MemMap Size", "linux,uefi-mmap-size", mmap_size),
++	UEFI_PARAM("MemMap Desc. Size", "linux,uefi-mmap-desc-size", desc_size),
++	UEFI_PARAM("MemMap Desc. Version", "linux,uefi-mmap-desc-ver", desc_ver)
++};
++
++struct param_info {
++	int found;
++	void *params;
++};
++
++static int __init fdt_find_uefi_params(unsigned long node, const char *uname,
++				       int depth, void *data)
++{
++	struct param_info *info = data;
++	const void *prop;
++	void *dest;
++	u64 val;
++	int i, len;
++
++	if (depth != 1 || strcmp(uname, "chosen") != 0)
++		return 0;
++
++	for (i = 0; i < ARRAY_SIZE(dt_params); i++) {
++		prop = of_get_flat_dt_prop(node, dt_params[i].propname, &len);
++		if (!prop)
++			return 0;
++		dest = info->params + dt_params[i].offset;
++		info->found++;
++
++		val = of_read_number(prop, len / sizeof(u32));
++
++		if (dt_params[i].size == sizeof(u32))
++			*(u32 *)dest = val;
++		else
++			*(u64 *)dest = val;
++
++		if (efi_enabled(EFI_DBG))
++			pr_info("  %s: 0x%0*llx\n", dt_params[i].name,
++				dt_params[i].size * 2, val);
++	}
++	return 1;
++}
++
++int __init efi_get_fdt_params(struct efi_fdt_params *params)
++{
++	struct param_info info;
++	int ret;
++
++	pr_info("Getting EFI parameters from FDT:\n");
++
++	info.found = 0;
++	info.params = params;
++
++	ret = of_scan_flat_dt(fdt_find_uefi_params, &info);
++	if (!info.found)
++		pr_info("UEFI not found.\n");
++	else if (!ret)
++		pr_err("Can't find '%s' in device tree!\n",
++		       dt_params[info.found].name);
++
++	return ret;
++}
+diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
+index 2cd37dad67a6..7c41c4284814 100644
+--- a/drivers/firmware/efi/efi.c
++++ b/drivers/firmware/efi/efi.c
+@@ -20,8 +20,6 @@
+ #include <linux/init.h>
+ #include <linux/device.h>
+ #include <linux/efi.h>
+-#include <linux/of.h>
+-#include <linux/of_fdt.h>
+ #include <linux/io.h>
+ #include <linux/platform_device.h>
+ 
+@@ -490,88 +488,6 @@ static int __init efi_load_efivars(void)
+ device_initcall(efi_load_efivars);
+ #endif
+ 
+-#ifdef CONFIG_EFI_PARAMS_FROM_FDT
+-
+-#define UEFI_PARAM(name, prop, field)			   \
+-	{						   \
+-		{ name },				   \
+-		{ prop },				   \
+-		offsetof(struct efi_fdt_params, field),    \
+-		FIELD_SIZEOF(struct efi_fdt_params, field) \
+-	}
+-
+-static __initdata struct {
+-	const char name[32];
+-	const char propname[32];
+-	int offset;
+-	int size;
+-} dt_params[] = {
+-	UEFI_PARAM("System Table", "linux,uefi-system-table", system_table),
+-	UEFI_PARAM("MemMap Address", "linux,uefi-mmap-start", mmap),
+-	UEFI_PARAM("MemMap Size", "linux,uefi-mmap-size", mmap_size),
+-	UEFI_PARAM("MemMap Desc. Size", "linux,uefi-mmap-desc-size", desc_size),
+-	UEFI_PARAM("MemMap Desc. Version", "linux,uefi-mmap-desc-ver", desc_ver)
+-};
+-
+-struct param_info {
+-	int found;
+-	void *params;
+-};
+-
+-static int __init fdt_find_uefi_params(unsigned long node, const char *uname,
+-				       int depth, void *data)
+-{
+-	struct param_info *info = data;
+-	const void *prop;
+-	void *dest;
+-	u64 val;
+-	int i, len;
+-
+-	if (depth != 1 || strcmp(uname, "chosen") != 0)
+-		return 0;
+-
+-	for (i = 0; i < ARRAY_SIZE(dt_params); i++) {
+-		prop = of_get_flat_dt_prop(node, dt_params[i].propname, &len);
+-		if (!prop)
+-			return 0;
+-		dest = info->params + dt_params[i].offset;
+-		info->found++;
+-
+-		val = of_read_number(prop, len / sizeof(u32));
+-
+-		if (dt_params[i].size == sizeof(u32))
+-			*(u32 *)dest = val;
+-		else
+-			*(u64 *)dest = val;
+-
+-		if (efi_enabled(EFI_DBG))
+-			pr_info("  %s: 0x%0*llx\n", dt_params[i].name,
+-				dt_params[i].size * 2, val);
+-	}
+-	return 1;
+-}
+-
+-int __init efi_get_fdt_params(struct efi_fdt_params *params)
+-{
+-	struct param_info info;
+-	int ret;
+-
+-	pr_info("Getting EFI parameters from FDT:\n");
+-
+-	info.found = 0;
+-	info.params = params;
+-
+-	ret = of_scan_flat_dt(fdt_find_uefi_params, &info);
+-	if (!info.found)
+-		pr_info("UEFI not found.\n");
+-	else if (!ret)
+-		pr_err("Can't find '%s' in device tree!\n",
+-		       dt_params[info.found].name);
+-
+-	return ret;
+-}
+-#endif /* CONFIG_EFI_PARAMS_FROM_FDT */
+-
+ static __initdata char memory_type_name[][20] = {
+ 	"Reserved",
+ 	"Loader Code",
 -- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+2.7.0.rc3
