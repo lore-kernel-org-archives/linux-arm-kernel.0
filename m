@@ -1,70 +1,104 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon,  8 Feb 2016 17:45:29 -0800
-Subject: [PATCH 02/14] clkdev: Remove clk_register_clkdevs()
+Date: Mon,  8 Feb 2016 17:45:37 -0800
+Subject: [PATCH 10/14] clk: fractional-divider: Add hw based registration APIs
 In-Reply-To: <1454982341-22715-1-git-send-email-sboyd@codeaurora.org>
 References: <1454982341-22715-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1454982341-22715-3-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1454982341-22715-11-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we've converted the only caller over to another clkdev
-API, remove this one.
+Add registration APIs in the clk fractional divider code to
+return struct clk_hw pointers instead of struct clk pointers.
+This way we hide the struct clk pointer from providers unless
+they need to use consumer facing APIs.
 
-Cc: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Cc: Russell King <linux@arm.linux.org.uk>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/clk/clkdev.c   | 27 ---------------------------
- include/linux/clkdev.h |  1 -
- 2 files changed, 28 deletions(-)
+ drivers/clk/clk-fractional-divider.c | 40 +++++++++++++++++++++++++++++++-----
+ include/linux/clk-provider.h         |  5 +++++
+ 2 files changed, 40 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-index 779b6ff0c7ad..ae61f2e57048 100644
---- a/drivers/clk/clkdev.c
-+++ b/drivers/clk/clkdev.c
-@@ -383,30 +383,3 @@ int clk_register_clkdev(struct clk *clk, const char *con_id,
- 	return cl ? 0 : -ENOMEM;
- }
- EXPORT_SYMBOL(clk_register_clkdev);
--
--/**
-- * clk_register_clkdevs - register a set of clk_lookup for a struct clk
-- * @clk: struct clk to associate with all clk_lookups
-- * @cl: array of clk_lookup structures with con_id and dev_id pre-initialized
-- * @num: number of clk_lookup structures to register
-- *
-- * To make things easier for mass registration, we detect error clks
-- * from a previous clk_register() call, and return the error code for
-- * those.  This is to permit this function to be called immediately
-- * after clk_register().
-- */
--int clk_register_clkdevs(struct clk *clk, struct clk_lookup *cl, size_t num)
--{
--	unsigned i;
--
+diff --git a/drivers/clk/clk-fractional-divider.c b/drivers/clk/clk-fractional-divider.c
+index 5c4955e33f7a..e7a315e840e6 100644
+--- a/drivers/clk/clk-fractional-divider.c
++++ b/drivers/clk/clk-fractional-divider.c
+@@ -118,14 +118,15 @@ const struct clk_ops clk_fractional_divider_ops = {
+ };
+ EXPORT_SYMBOL_GPL(clk_fractional_divider_ops);
+ 
+-struct clk *clk_register_fractional_divider(struct device *dev,
++struct clk_hw *clk_hw_register_fractional_divider(struct device *dev,
+ 		const char *name, const char *parent_name, unsigned long flags,
+ 		void __iomem *reg, u8 mshift, u8 mwidth, u8 nshift, u8 nwidth,
+ 		u8 clk_divider_flags, spinlock_t *lock)
+ {
+ 	struct clk_fractional_divider *fd;
+ 	struct clk_init_data init;
+-	struct clk *clk;
++	struct clk_hw *hw;
++	int ret;
+ 
+ 	fd = kzalloc(sizeof(*fd), GFP_KERNEL);
+ 	if (!fd)
+@@ -148,10 +149,39 @@ struct clk *clk_register_fractional_divider(struct device *dev,
+ 	fd->lock = lock;
+ 	fd->hw.init = &init;
+ 
+-	clk = clk_register(dev, &fd->hw);
 -	if (IS_ERR(clk))
--		return PTR_ERR(clk);
--
--	for (i = 0; i < num; i++, cl++) {
--		cl->clk_hw = __clk_get_hw(clk);
--		__clkdev_add(cl);
--	}
--
--	return 0;
--}
--EXPORT_SYMBOL(clk_register_clkdevs);
-diff --git a/include/linux/clkdev.h b/include/linux/clkdev.h
-index 08bffcc466de..43a8c2e8ac29 100644
---- a/include/linux/clkdev.h
-+++ b/include/linux/clkdev.h
-@@ -46,7 +46,6 @@ int clk_add_alias(const char *, const char *, const char *, struct device *);
++	hw = &fd->hw;
++	ret = clk_hw_register(dev, hw);
++	if (ret) {
+ 		kfree(fd);
++		hw = ERR_PTR(ret);
++	}
++
++	return hw;
++}
++EXPORT_SYMBOL_GPL(clk_hw_register_fractional_divider);
  
- int clk_register_clkdev(struct clk *, const char *, const char *, ...)
- 	__printf(3, 4);
--int clk_register_clkdevs(struct clk *, struct clk_lookup *, size_t);
+-	return clk;
++struct clk *clk_register_fractional_divider(struct device *dev,
++		const char *name, const char *parent_name, unsigned long flags,
++		void __iomem *reg, u8 mshift, u8 mwidth, u8 nshift, u8 nwidth,
++		u8 clk_divider_flags, spinlock_t *lock)
++{
++	struct clk_hw *hw;
++
++	hw = clk_hw_register_fractional_divider(dev, name, parent_name, flags,
++			reg, mshift, mwidth, nshift, nwidth, clk_divider_flags,
++			lock);
++	if (IS_ERR(hw))
++		return ERR_CAST(hw);
++	return hw->clk;
+ }
+ EXPORT_SYMBOL_GPL(clk_register_fractional_divider);
++
++void clk_hw_unregister_fractional_divider(struct clk_hw *hw)
++{
++	struct clk_fractional_divider *fd;
++
++	fd = to_clk_fd(hw);
++
++	clk_hw_unregister(hw);
++	kfree(fd);
++}
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index d4d65f60b85e..549ed3844876 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -549,6 +549,11 @@ struct clk *clk_register_fractional_divider(struct device *dev,
+ 		const char *name, const char *parent_name, unsigned long flags,
+ 		void __iomem *reg, u8 mshift, u8 mwidth, u8 nshift, u8 nwidth,
+ 		u8 clk_divider_flags, spinlock_t *lock);
++struct clk_hw *clk_hw_register_fractional_divider(struct device *dev,
++		const char *name, const char *parent_name, unsigned long flags,
++		void __iomem *reg, u8 mshift, u8 mwidth, u8 nshift, u8 nwidth,
++		u8 clk_divider_flags, spinlock_t *lock);
++void clk_hw_unregister_fractional_divider(struct clk_hw *hw);
  
- #ifdef CONFIG_COMMON_CLK
- int __clk_get(struct clk *clk);
+ /**
+  * struct clk_multiplier - adjustable multiplier clock
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 a Linux Foundation Collaborative Project
