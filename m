@@ -1,32 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 09 Feb 2016 16:26:38 +0100
-Subject: [PATCH] tty/serial: digicolor: Fix bad usage of IS_ERR_VALUE
-In-Reply-To: <1455030539-10798-1-git-send-email-linux@roeck-us.net>
-References: <1455030539-10798-1-git-send-email-linux@roeck-us.net>
-Message-ID: <4571887.rTPndCnv20@wuerfel>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue,  9 Feb 2016 23:31:27 +0800
+Subject: [PATCH v2] ARM: sunxi_defconfig: Enable MUSB HDRC driver with
+ Allwinner glue
+Message-ID: <1455031887-14147-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 09 February 2016 07:08:59 Guenter Roeck wrote:
-> IS_ERR_VALUE() assumes that its parameter is an unsigned long.
-> It can not be used to check if an unsigned int reflects an error.
-> Doing so can result in the following build warning.
-> 
-> drivers/tty/serial/digicolor-usart.c: In function ?digicolor_uart_probe?:
-> include/linux/err.h:21:38: warning:
->         comparison is always false due to limited range of data type
-> drivers/tty/serial/digicolor-usart.c:485:6: note:
->         in expansion of macro ?IS_ERR_VALUE?
-> 
-> If that warning is seen, an error return from platform_get_irq() is missed.
-> 
-> 
+Allwinner SoCs typically have a Mentor Graphics Inventra MUSB dual role
+controller for USB OTG.
 
-The patch looks correct to me, but what compiler version and which kernel
-tree is it that triggered the warning?
+Now that the issue with MUSB and USB gadget registration order has been
+resolved, we can enable this driver in dual role mode. This requires the
+NOP USB transceiver driver, which is also enabled.
 
-Andrzej Hajda just modified the definition of IS_ERR_VALUE(), and the
-changes are still under discussion, but I don't see that warning with
-any of the versions.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
 
-	Arnd
+Changes since v1:
+
+ - Dropped default USB gadget driver.
+
+---
+ arch/arm/configs/sunxi_defconfig | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
+index a55c48e27309..81a1b92fd4e6 100644
+--- a/arch/arm/configs/sunxi_defconfig
++++ b/arch/arm/configs/sunxi_defconfig
+@@ -110,6 +110,10 @@ CONFIG_USB_EHCI_HCD=y
+ CONFIG_USB_EHCI_HCD_PLATFORM=y
+ CONFIG_USB_OHCI_HCD=y
+ CONFIG_USB_OHCI_HCD_PLATFORM=y
++CONFIG_USB_MUSB_HDRC=y
++CONFIG_USB_MUSB_SUNXI=y
++CONFIG_NOP_USB_XCEIV=y
++CONFIG_USB_GADGET=y
+ CONFIG_MMC=y
+ CONFIG_MMC_SUNXI=y
+ CONFIG_NEW_LEDS=y
+-- 
+2.7.0
