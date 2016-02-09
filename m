@@ -1,35 +1,36 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 9 Feb 2016 07:58:11 -0800
-Subject: [PATCH 0/3] arm: dts: DRA7: Add IVA and DSPEVE thermal domain data
-In-Reply-To: <56B95EF7.9080107@ti.com>
-References: <1454922990-7501-1-git-send-email-j-keerthy@ti.com>
- <20160208195704.GW19432@atomide.com> <56B95EF7.9080107@ti.com>
-Message-ID: <20160209155811.GH19432@atomide.com>
+Date: Tue, 9 Feb 2016 07:58:36 -0800
+Subject: [PATCH 0/3] omap: hwmod: add default reset handling support
+In-Reply-To: <56B97572.6080100@ti.com>
+References: <1454929941-23949-1-git-send-email-kishon@ti.com>
+ <20160208204446.GC19432@atomide.com> <56B97572.6080100@ti.com>
+Message-ID: <20160209155836.GI19432@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Keerthy <a0393675@ti.com> [160208 19:38]:
+* Kishon Vijay Abraham I <kishon@ti.com> [160208 21:14]:
+> Hi Tony,
 > 
-> 
-> On Tuesday 09 February 2016 01:27 AM, Tony Lindgren wrote:
-> >* Keerthy <j-keerthy@ti.com> [160208 01:19]:
-> >>OMAP5 has 3 thermal zones cpu, core and multimedia.
-> >>On the other hand DRA7 has 5 thermal zones cpu, gpu, core, dspeve
-> >>and iva. Currently cpu, core and multimedia are being added via dt
-> >>and the other 2 are getting added via kernel. Add the missing thermal
-> >>domains in dt so as give the correct trip numbers, type and temperatures.
+> On Tuesday 09 February 2016 02:14 AM, Tony Lindgren wrote:
+> > Hi Kishon,
+> > 
+> > * Kishon Vijay Abraham I <kishon@ti.com> [160208 03:13]:
+> >> Add a new hwmod flag to indicate custom reset handling and use it
+> >> for devices that require custom reset handling (like dsp, ipu, iva).
 > >>
-> >>Tested on DRA7-EVM.
-> >
-> >Are these critical fixes to have for v4.5-rc cycle or can they
-> >wait for v4.6 merge window?
+> >> Tested PCIe on dra7-evm and dra72-evm.
+> >> I need help in testing DSP, IPU, IVA, PRU, GFX, M3 in other platforms.
+> >> Or a way to test these cores to see if reset is not broken. Suman?
+> >>
+> >> I'll post this series once again after performing these tests.
+> > 
+> > Do we also still need to patch something in the pcie driver too
+> > or can all that be left out now?
 > 
-> Driver configures some default thresholds that are a bit higher but there
-> are some thresholds already for dspeve and iva too. So guess these can wait
-> if its already too late.
+> With this series changes in PCIe driver is not required at all.
 
-OK let's rather wait then.
+OK good to hear.
 
-Regards,
+Thanks,
 
 Tony
