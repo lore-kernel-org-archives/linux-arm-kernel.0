@@ -1,20 +1,59 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 9 Feb 2016 14:16:11 +0000
-Subject: [PATCH 0/4] Miscellaneous ARM SMMU patches
-In-Reply-To: <cover.1453830752.git.robin.murphy@arm.com>
-References: <cover.1453830752.git.robin.murphy@arm.com>
-Message-ID: <20160209141610.GP22874@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue,  9 Feb 2016 14:27:07 +0000
+Subject: [PATCH] mfd: Provide MACRO to declare commonly defined MFD cell
+ attributes
+Message-ID: <1455028027-1527-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 26, 2016 at 06:06:33PM +0000, Robin Murphy wrote:
-> Here's my current "miscellaneous SMMU enhancements" branch for your
-> consideration. Patch #1 solves a subtle corner case that cropped up
-> while exercising stage 1 context formats on the DMA330-MMU500 model;
-> #3 will be wanted fairly soon for DMA ops integration so may as well
-> get some exposure now; #2 and #4 are more nice-to-haves.
+Cc: Laxman Dewangan <ldewangan@nvidia.com>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ include/linux/mfd/core.h | 32 ++++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
 
-Cheers, Robin. I've queued #1 and #3 for 4.6. If you address the comments
-on the other two, I can queue those as well.
-
-Will
+diff --git a/include/linux/mfd/core.h b/include/linux/mfd/core.h
+index 27dac3f..dacdc49 100644
+--- a/include/linux/mfd/core.h
++++ b/include/linux/mfd/core.h
+@@ -16,6 +16,38 @@
+ 
+ #include <linux/platform_device.h>
+ 
++#define MFD_CELL_ALL(_name, _res, _pdata, _id, _compat, _match)		\
++	{								\
++		.name = (_name),					\
++		.num_resources = ARRAY_SIZE((_res)),			\
++		.resources = (_res),					\
++		.platform_data = (_pdata),				\
++		.pdata_size = ARRAY_SIZE((_pdata)),			\
++		.of_compatible = (_compat),				\
++		.acpi_match = (_match),					\
++		.id = _id,						\
++	}
++
++#define OF_MFD_CELL(_name, _res, _pdata, _id, _compat)			\
++	{								\
++		MFD_CELL_ALL(_name, _res, _pdata, _id, _compat, NULL)	\
++	}
++
++#define ACPI_MFD_CELL(_name, _res, _pdata, _id, _match)			\
++	{								\
++		MFD_CELL_ALL(_name, _res, _pdata, _id, NULL, _match)	\
++	}
++
++#define MFD_CELL_BASIC(_name, _res, _pdata, _id)			\
++	{								\
++		MFD_CELL_ALL(_name, _res, _pdata, _id, NULL, NULL)	\
++	}
++
++#define MFD_CELL_NAME(_name)						\
++	{								\
++		MFD_CELL_ALL(_name, NULL, NULL, 0, NULL, NULL)		\
++	}
++
+ struct irq_domain;
+ 
+ /* Matches ACPI PNP id, either _HID or _CID, or ACPI _ADR */
+-- 
+1.9.1
