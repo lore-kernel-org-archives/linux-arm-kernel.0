@@ -1,66 +1,48 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 9 Feb 2016 09:38:08 -0800
-Subject: N900 sleep mode (in 4.5-rc0, if that matters)
-In-Reply-To: <20160209172403.GK19432@atomide.com>
-References: <20160126140010.GA29723@amd> <20160126172527.GY3500@atomide.com>
- <20160130200244.GA30429@amd> <20160130201452.GC30429@amd>
- <20160130221509.GA28644@amd> <20160201181316.GM19432@atomide.com>
- <20160201211736.GA11283@amd> <20160201221111.GP19432@atomide.com>
- <20160207212316.GA6147@amd> <20160209172403.GK19432@atomide.com>
-Message-ID: <20160209173807.GL19432@atomide.com>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Tue, 9 Feb 2016 17:34:17 +0000
+Subject: [RFC PATCH v3 0/3] Add ACPI support for HiSilicon PCIe Host
+ Controllers
+Message-ID: <1455039260-6040-1-git-send-email-gabriele.paoloni@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [160209 09:26]:
-> * Pavel Machek <pavel@ucw.cz> [160207 13:24]:
-> > Hi!
-> > 
-> > > > (I assume I have to insmod and rmmod, right? Because powersave is not
-> > > > entered if I simply compile-out usb).
-> > > 
-> > > Depending on what the bootloader does and probably also if
-> > > USB was used during the booting.. So yeah you may need to modprobe
-> > > and then rmmod.
-> > > 
-> > > > Would you have commit ids for those rmmod fixes? It might be good to
-> > > > push them into stable, and I should try again with them applied...
-> > > 
-> > > 055555fc459 ("usb: musb: core: Fix handling of the phy notifications")
-> > > 03e43528ab68 ("usb: musb: Fix unbalanced pm_runtime_enable")
-> > 
-> > Ok, with that, I can insmod and rmmod. But I still get:
-> > 
-> > 00001fff 48005020 (fa005020) cm_idlest_per blocking bits: 0007e000
-> 
-> I think the cm_idlest_per is fine.
-> 
-> > ffdffebd 48004a20 (fa004a20) cm_idlest1_core blocking bits: 00200042
-> > 0000000d 48004a28 (fa004a28) cm_idlest3_core
-> 
-> Bit 21 in cm_idlest1_core is for MCSPI4 so WLAN. Does that go
-> down if do sleep 5; cat /sys/kernel/debug/pm_debug/count ?
-> 
-> If not, the're PM runtime missing or broken somewhere.
-> 
-> FYI, below is my omap3 usb test script that I use to start and
-> stop USB, it also works on n900. And after stopping it n900
-> continues hitting deeper idle states just fine.
-> 
-> That is with these two phy patches applied on v4.5-rc3:
-> 
-> "phy: twl4030-usb: Fix unbalanced pm_runtime_enable on module reload")
-> "phy: twl4030-usb: Relase usb phy on unload")
-> 
-> Maybe I gave you wrong info on the USB patches needed.. But these
-> two above are needed on v4.5-rc3. And looks like Kishon has now
-> applied them.
-> 
-> Oh and I also have the MMC PM runtime regression fix here that I
-> have not yet posted. Will post today. But I guess you're on
-> v4.4 right now still.
+From: gabriele paoloni <gabriele.paoloni@huawei.com>
 
-And looks like the USB RNDIS gadget has some extra issues
-breaking reboot. So I'd stick to ECM if possible and leave out
-RNDIS completely.
+This patchset adds ACPI support for the HiSilicon Hip05/Hip06 SoC PCIe controllers
+The four patches respectively:
+        - re-architect the current HiSilicon driver to make it scalable to the
+          new ACPI quirks
+        - rework the current HiSilicon driver to add support for ECAM platforms
+        - adds the HiSilicon ACPI specific quirks.
 
-Tony
+   This patchset  is based on
+   https://github.com/semihalf-nowicki-tomasz/linux.git
+   branch pci-acpi-v4
+
+Changes v1 -> v2: removed the ACPI quirks dependency on Designware framework
+
+Changes v2 -> v3: kept backward compatibility for non-ECAM platforms
+
+gabriele paoloni (3):
+  PCI: hisi: re-architect Hip05/Hip06 controllers driver to preapare for
+    ACPI
+  PCI: hisi: Add ECAM support to HiSilicon PCIe host controller
+  PCI/ACPI: hisi: Add ACPI support for HiSilicon SoCs Host Controllers
+
+ .../devicetree/bindings/pci/hisilicon-pcie.txt     |  15 +-
+ MAINTAINERS                                        |   3 +
+ drivers/pci/host/Kconfig                           |   8 +
+ drivers/pci/host/Makefile                          |   3 +-
+ drivers/pci/host/pcie-designware.c                 |   4 +-
+ drivers/pci/host/pcie-designware.h                 |   2 +
+ drivers/pci/host/pcie-hisi-acpi.c                  | 188 +++++++++++++++++++++
+ drivers/pci/host/pcie-hisi-common.c                |  73 ++++++++
+ drivers/pci/host/pcie-hisi.c                       | 149 ++++++++--------
+ drivers/pci/host/pcie-hisi.h                       |  25 +++
+ 10 files changed, 382 insertions(+), 88 deletions(-)
+ create mode 100644 drivers/pci/host/pcie-hisi-acpi.c
+ create mode 100644 drivers/pci/host/pcie-hisi-common.c
+ create mode 100644 drivers/pci/host/pcie-hisi.h
+
+-- 
+1.9.1
