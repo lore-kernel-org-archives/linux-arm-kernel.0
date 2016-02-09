@@ -1,146 +1,40 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 9 Feb 2016 20:50:54 +0100
-Subject: [PATCH 5/5] ARM: dts: r8a7794 add sound support
-In-Reply-To: <2179456.HznTXDfKhZ@wasted.cogentembedded.com>
-References: <4253511.vvGjIdOnb6@wasted.cogentembedded.com>
- <2179456.HznTXDfKhZ@wasted.cogentembedded.com>
-Message-ID: <20160209195054.GA14008@verge.net.au>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 9 Feb 2016 19:52:22 +0000
+Subject: [PATCH] arm64: Add workaround for Cavium erratum 27456
+In-Reply-To: <1455046156-10582-1-git-send-email-ddaney.cavm@gmail.com>
+References: <1455046156-10582-1-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <20160209195222.0882d7f7@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 09, 2016 at 02:04:07AM +0300, Sergei Shtylyov wrote:
-> Define the generic R8A7794 part of  the sound device node.
-> This sound device  is a complex one and comprises the Audio Clock Generator
-> (ADG), Sampling Rate Converter Unit (SCU), Serial Sound Interface [Unit]
-> (SSI[U]), and Audio DMAC-Peripheral-Peripheral.
-> It is up  to the board file to enable the device.
+On Tue,  9 Feb 2016 11:29:16 -0800
+David Daney <ddaney.cavm@gmail.com> wrote:
+
+Hi David,
+
+> From: Andrew Pinski <apinski@cavium.com>
 > 
-> This patch is based on the R8A7791 sound work by Kuninori Morimoto.
+> On ThunderX T88 pass 1.x through 2.1 parts, broadcast TLBI
+> instructions may cause the icache to become invalid if it contains
+> data for a non-current ASID.
 > 
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> This patch implements the workaround (which flushes the local icache
+> when switching the mm) by using code patching.
 > 
+> Signed-off-by: Andrew Pinski <apinski@cavium.com>
+> Signed-off-by: David Daney <david.daney@cavium.com>
 > ---
->  arch/arm/boot/dts/r8a7794.dtsi |  171 +++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 171 insertions(+)
-> 
-> Index: renesas/arch/arm/boot/dts/r8a7794.dtsi
-> ===================================================================
-> --- renesas.orig/arch/arm/boot/dts/r8a7794.dtsi
-> +++ renesas/arch/arm/boot/dts/r8a7794.dtsi
-> @@ -1309,4 +1309,175 @@
->  		#iommu-cells = <1>;
->  		status = "disabled";
->  	};
-> +
-> +	rcar_sound: sound at ec500000 {
-> +		/*
-> +		 * #sound-dai-cells is required
-> +		 *
-> +		 * Single DAI : #sound-dai-cells = <0>;         <&rcar_sound>;
-> +		 * Multi  DAI : #sound-dai-cells = <1>;         <&rcar_sound N>;
-> +		 */
-> +		compatible = "renesas,rcar_sound-r8a7794",
-> +			     "renesas,rcar_sound-gen2";
-> +		reg =	<0 0xec500000 0 0x1000>, /* SCU */
-> +			<0 0xec5a0000 0 0x100>,  /* ADG */
-> +			<0 0xec540000 0 0x1000>, /* SSIU */
-> +			<0 0xec541000 0 0x280>,  /* SSI */
-> +			<0 0xec740000 0 0x200>;  /* Audio DMAC peri peri */
-> +		reg-names = "scu", "adg", "ssiu", "ssi", "audmapp";
-> +
-> +		clocks = <&mstp10_clks R8A7794_CLK_SSI_ALL>,
-> +			 <&mstp10_clks R8A7794_CLK_SSI9>,
-> +			 <&mstp10_clks R8A7794_CLK_SSI8>,
-> +			 <&mstp10_clks R8A7794_CLK_SSI7>,
-> +			 <&mstp10_clks R8A7794_CLK_SSI6>,
-> +			 <&mstp10_clks R8A7794_CLK_SSI5>,
-> +			 <&mstp10_clks R8A7794_CLK_SSI4>,
-> +			 <&mstp10_clks R8A7794_CLK_SSI3>,
-> +			 <&mstp10_clks R8A7794_CLK_SSI2>,
-> +			 <&mstp10_clks R8A7794_CLK_SSI1>,
-> +			 <&mstp10_clks R8A7794_CLK_SSI0>,
-> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC9>,
-> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC8>,
-> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC7>,
-> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC6>,
-> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC5>,
-> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC4>,
-> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC3>,
-> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC2>,
-> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC1>,
-> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC0>,
-> +			 <&mstp10_clks R8A7794_CLK_SCU_CTU0_MIX0>,
-> +			 <&mstp10_clks R8A7794_CLK_SCU_CTU1_MIX1>,
-> +			 <&mstp10_clks R8A7794_CLK_SCU_CTU0_MIX0>,
-> +			 <&mstp10_clks R8A7794_CLK_SCU_CTU1_MIX1>,
-> +			 <&mstp10_clks R8A7794_CLK_SCU_DVC0>,
-> +			 <&mstp10_clks R8A7794_CLK_SCU_DVC1>,
-> +			 <&audio_clka>, <&audio_clkb>, <&audio_clkc>,
-> +			 <&m2_clk>;
-> +		clock-names = "ssi-all",
-> +			      "ssi.9", "ssi.8", "ssi.7", "ssi.6", "ssi.5",
-> +			      "ssi.4", "ssi.3", "ssi.2", "ssi.1", "ssi.0",
-> +			      "src.9", "src.8", "src.7", "src.6", "src.5",
-> +			      "src.4", "src.3", "src.2", "src.1", "src.0",
-> +			      "clk_a", "clk_b", "clk_c", "clk_i";
-> +		power-domains = <&cpg_clocks>;
-> +
-> +		status = "disabled";
-> +		rcar_sound,src {
-> +			src0: src at 0 {
-> +				interrupts = <GIC_SPI 352 IRQ_TYPE_LEVEL_HIGH>;
-> +				dmas = <&audma0 0x85>, <&audma0 0x9a>;
-> +				dma-names = "rx", "tx";
-> +			};
-> +			src1: src at 1 {
-> +				interrupts = <GIC_SPI 353 IRQ_TYPE_LEVEL_HIGH>;
-> +				dmas = <&audma0 0x87>, <&audma0 0x9c>;
-> +				dma-names = "rx", "tx";
-> +			};
-> +			src2: src at 2 {
-> +				interrupts = <GIC_SPI 354 IRQ_TYPE_LEVEL_HIGH>;
-> +				dmas = <&audma0 0x89>, <&audma0 0x9e>;
-> +				dma-names = "rx", "tx";
-> +			};
-> +			src3: src at 3 {
-> +				interrupts = <GIC_SPI 355 IRQ_TYPE_LEVEL_HIGH>;
-> +				dmas = <&audma0 0x8b>, <&audma0 0xa0>;
-> +				dma-names = "rx", "tx";
-> +			};
-> +			src4: src at 4 {
-> +				interrupts = <GIC_SPI 356 IRQ_TYPE_LEVEL_HIGH>;
-> +				dmas = <&audma0 0x8d>, <&audma0 0xb0>;
-> +				dma-names = "rx", "tx";
-> +			};
-> +			src5: src at 5 {
-> +				interrupts = <GIC_SPI 357 IRQ_TYPE_LEVEL_HIGH>;
-> +				dmas = <&audma0 0x8f>, <&audma0 0xb2>;
-> +				dma-names = "rx", "tx";
-> +			};
-> +			src6: src at 6 {
-> +				interrupts = <GIC_SPI 358 IRQ_TYPE_LEVEL_HIGH>;
-> +				dmas = <&audma0 0x91>, <&audma0 0xb4>;
-> +				dma-names = "rx", "tx";
-> +			};
-> +			src7: src at 7 {
-> +				interrupts = <GIC_SPI 359 IRQ_TYPE_LEVEL_HIGH>;
-> +				dmas = <&audma0 0x93>, <&audma0 0xb6>;
-> +				dma-names = "rx", "tx";
-> +			};
-> +			src8: src at 8 {
-> +				interrupts = <GIC_SPI 360 IRQ_TYPE_LEVEL_HIGH>;
-> +				dmas = <&audma0 0x95>, <&audma0 0xb8>;
-> +				dma-names = "rx", "tx";
-> +			};
-> +			src9: src at 9 {
-> +				interrupts = <GIC_SPI 361 IRQ_TYPE_LEVEL_HIGH>;
-> +				dmas = <&audma0 0x97>, <&audma0 0xba>;
-> +				dma-names = "rx", "tx";
-> +			};
-> +		};
+>  arch/arm64/Kconfig                  | 11 +++++++++++
+>  arch/arm64/include/asm/cpufeature.h |  3 ++-
+>  arch/arm64/kernel/cpu_errata.c      |  9 +++++++++
+>  arch/arm64/mm/proc.S                | 12 ++++++++++++
+>  4 files changed, 34 insertions(+), 1 deletion(-)
 
-My reading of the documentation is that src0, 7, 8 and 9 are not
-present on the r8a7794. I am referring to Figure 38.1b or r1.02 of
-the R-Car Gen2 User's Manual.
+It would be good to update Documentation/arm64/silicon-errata.txt to
+reflect the fact that there is a workaround available for this erratum.
 
-[snip]
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny.
