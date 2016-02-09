@@ -1,50 +1,25 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Tue, 9 Feb 2016 09:56:33 +0100
-Subject: [PATCH 2/3] arm64: dts: add the Alpine v2 EVP
-In-Reply-To: <56B8B45D.1020902@arm.com>
-References: <1454922699-16785-1-git-send-email-antoine.tenart@free-electrons.com>
- <1454922699-16785-3-git-send-email-antoine.tenart@free-electrons.com>
- <56B8B45D.1020902@arm.com>
-Message-ID: <20160209085633.GA5388@kwain>
+From: raveendra.padasalagi@broadcom.com (Raveendra Padasalagi)
+Date: Tue,  9 Feb 2016 14:27:54 +0530
+Subject: [PATCH 0/3] Syscon support for iProc touchscreen driver
+Message-ID: <1455008277-8312-1-git-send-email-raveendra.padasalagi@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+This patchset is based on v4.5-rc3 tag and its tested on
+Broadcom Cygnus SoC.
 
-On Mon, Feb 08, 2016 at 03:29:33PM +0000, Marc Zyngier wrote:
-> On 08/02/16 09:11, Antoine Tenart wrote:
-> 
-> > +		gic: gic at f0100000 {
-> > +			compatible = "arm,gic-v3";
-> > +			reg = <0x0 0xf0200000 0x0 0x10000>,	/* GIC Dist */
-> > +			      <0x0 0xf0280000 0x0 0x200000>,	/* GICR */
-> > +			      <0x0 0xf0100000 0x0 0x2000>;	/* GICC */
-> > +			interrupt-controller;
-> > +			#interrupt-cells = <3>;
-> > +		};
-> 
-> Something is wrong here. Either you are missing GICH and GICV (assuming
-> you have legacy support), or you have an extra GICC region (which
-> doesn't make sense on its own).
-> 
-> You're also missing the maintenance interrupt.
-> 
-> Has Anapurna really built a GICv3 without an ITS?
+The patches can be fetched from iproc-tsc-v1 branch of
+https://github.com/Broadcom/arm64-linux.git
 
-I documented myself and Annapurna's GIC really doesn't have an ITS.
+Raveendra Padasalagi (3):
+  input: cygnus-update touchscreen dt node document
+  input: syscon support in bcm_iproc_tsc driver
+  ARM: dts: use syscon in cygnus touchscreen dt node
 
-I'll add the missing regions.
-
-Antoine
+ .../input/touchscreen/brcm,iproc-touchscreen.txt   |  18 ++-
+ arch/arm/boot/dts/bcm-cygnus.dtsi                  |   9 +-
+ drivers/input/touchscreen/bcm_iproc_tsc.c          | 122 +++++++++++++++------
+ 3 files changed, 112 insertions(+), 37 deletions(-)
 
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160209/61618e8e/attachment.sig>
+1.9.1
