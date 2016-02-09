@@ -1,69 +1,29 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 9 Feb 2016 20:06:16 +0100
-Subject: [RFC PATCH 0/5] arm/arm64: Making HYP vgic/timer save/restore
- common
-In-Reply-To: <1453996565-19666-1-git-send-email-marc.zyngier@arm.com>
-References: <1453996565-19666-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20160209190616.GC5171@cbox>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 9 Feb 2016 20:07:27 +0100
+Subject: [PATCH 0/3] ARM: shmobile: SCU cleanup and consolidation
+In-Reply-To: <CAMuHMdUn7=AAehQqG5ezc4wkKjytOoVz7U9HT_HvPLVj+Na7Vg@mail.gmail.com>
+References: <1453994012-12696-1-git-send-email-geert+renesas@glider.be>
+ <20160202140550.GB4304@verge.net.au>
+ <CAMuHMdUn7=AAehQqG5ezc4wkKjytOoVz7U9HT_HvPLVj+Na7Vg@mail.gmail.com>
+Message-ID: <20160209190727.GB12049@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 28, 2016 at 03:56:00PM +0000, Marc Zyngier wrote:
-> With the current state of the C conversion of arm and arm64 world
-> switches, we are still unable to share some of the most obvious
-> candidates (GIC and timer save/restore). In order to reduce the bloat,
-> let's move these files to a common location (virt/kvm/arm/hyp).
+On Mon, Feb 08, 2016 at 04:04:34PM +0100, Geert Uytterhoeven wrote:
+> Hi Simon,
 > 
-> The changes are extremely mechanical, with a small hack to deal with
-> system register names on the 32bit side (I've decided to align on the
-> 64bit names).
+> On Tue, Feb 2, 2016 at 3:05 PM, Simon Horman <horms@verge.net.au> wrote:
+> > On Thu, Jan 28, 2016 at 04:13:29PM +0100, Geert Uytterhoeven wrote:
+> >> This patch series contains cleanups and consolidations of the SCU code
+> >> for shmobile SoCs with Cortex-A9 CPU cores.
+> >>
+> >> This has been tested on emev2/kzm9d, r8a7779/marzen, and sh73a0/kzm9g.
+> >>
+> >> Thanks!
+> >
+> > Thanks, I have queued these up.
 > 
-> I'd like to know what people think of the common location. Does it
-> makes sense to have a "hyp" subdirectory to indicate that this is not
-> "normal" kernel code?
+> Except for the third patch?
 
-I think so, it means to me typically executing in "hyp/el2" or just
-low-level hypervisor logic, in the case of VHE.
-
-
-> 
-> These patches are on top of 4.5-rc1, plus the VHE and 32bit WS rewrite
-> patches, and I've pushed out a branch at
-> 
-> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/mov-hyp
-> 
-> Marc Zyngier (5):
->   arm64: KVM: Move kvm/hyp/hyp.h to include/asm/kvm_hyp.h
->   arm64: KVM: Move vgic-v2 and timer save/restore to virt/kvm/arm/hyp
->   ARM: KVM: Move kvm/hyp/hyp.h to include/asm/kvm_hyp.h
->   ARM: KVM: Use common version of vgic-v2-sr.c
->   ARM: KVM: Use common version of timer-sr.c
-> 
->  arch/arm/{kvm/hyp/hyp.h => include/asm/kvm_hyp.h}  |  9 +++
->  arch/arm/kvm/hyp/Makefile                          |  7 +-
->  arch/arm/kvm/hyp/banked-sr.c                       |  2 +-
->  arch/arm/kvm/hyp/cp15-sr.c                         |  2 +-
->  arch/arm/kvm/hyp/switch.c                          |  2 +-
->  arch/arm/kvm/hyp/timer-sr.c                        | 71 ------------------
->  arch/arm/kvm/hyp/tlb.c                             |  2 +-
->  arch/arm/kvm/hyp/vgic-v2-sr.c                      | 84 ----------------------
->  .../arm64/{kvm/hyp/hyp.h => include/asm/kvm_hyp.h} |  0
->  arch/arm64/kvm/hyp/Makefile                        |  7 +-
->  arch/arm64/kvm/hyp/debug-sr.c                      |  4 +-
->  arch/arm64/kvm/hyp/switch.c                        |  3 +-
->  arch/arm64/kvm/hyp/sysreg-sr.c                     |  4 +-
->  arch/arm64/kvm/hyp/tlb.c                           |  2 +-
->  arch/arm64/kvm/hyp/vgic-v3-sr.c                    |  4 +-
->  {arch/arm64/kvm => virt/kvm/arm}/hyp/timer-sr.c    |  4 +-
->  {arch/arm64/kvm => virt/kvm/arm}/hyp/vgic-v2-sr.c  |  4 +-
->  17 files changed, 30 insertions(+), 181 deletions(-)
->  rename arch/arm/{kvm/hyp/hyp.h => include/asm/kvm_hyp.h} (93%)
->  delete mode 100644 arch/arm/kvm/hyp/timer-sr.c
->  delete mode 100644 arch/arm/kvm/hyp/vgic-v2-sr.c
->  rename arch/arm64/{kvm/hyp/hyp.h => include/asm/kvm_hyp.h} (100%)
->  rename {arch/arm64/kvm => virt/kvm/arm}/hyp/timer-sr.c (97%)
->  rename {arch/arm64/kvm => virt/kvm/arm}/hyp/vgic-v2-sr.c (98%)
-> 
-> -- 
-> 2.1.4
-> 
+It seems that I missed the first one too.
+I'll try to do better this time around :^)
