@@ -1,43 +1,66 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 9 Feb 2016 19:36:16 +0000
-Subject: [PATCH v5 3/5] mtd: devices: m25p80: add support for mmap read
- request
-In-Reply-To: <1449807000-6457-4-git-send-email-vigneshr@ti.com>
-References: <1449807000-6457-1-git-send-email-vigneshr@ti.com>
- <1449807000-6457-4-git-send-email-vigneshr@ti.com>
-Message-ID: <20160209193616.GN13270@sirena.org.uk>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 9 Feb 2016 19:36:40 +0000 (UTC)
+Subject: [PATCH v3 3/3] pci: dra7xx: use pdata callbacks to perform reset
+In-Reply-To: <56BA2495.9020407@ti.com>
+References: <1452780672-14339-1-git-send-email-kishon@ti.com>
+ <1452780672-14339-4-git-send-email-kishon@ti.com>
+ <20160127173104.GQ19432@atomide.com> <56A90971.4020409@ti.com>
+ <20160127185649.GV19432@atomide.com> <56A94FB7.6020903@ti.com>
+ <20160128183156.GH19432@atomide.com> <56B087AD.4000505@ti.com>
+ <alpine.DEB.2.02.1602080208070.2182@utopia.booyaka.com>
+ <56B900E9.9040306@ti.com>
+ <alpine.DEB.2.02.1602090846480.2906@utopia.booyaka.com>
+ <56BA2495.9020407@ti.com>
+Message-ID: <alpine.DEB.2.02.1602091932160.2906@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 11, 2015 at 09:39:58AM +0530, Vignesh R wrote:
+Hi Suman 
 
-> +	if (spi_flash_read_supported(spi)) {
-> +		struct spi_flash_read_message msg;
-> +		int ret;
-> +
-> +		msg.buf = buf;
-> +		msg.from = from;
-> +		msg.len = len;
-> +		msg.read_opcode = nor->read_opcode;
-> +		msg.addr_width = nor->addr_width;
-> +		msg.dummy_bytes = dummy;
-> +		/* TODO: Support other combinations */
-> +		msg.opcode_nbits = SPI_NBITS_SINGLE;
-> +		msg.addr_nbits = SPI_NBITS_SINGLE;
-> +		msg.data_nbits = m25p80_rx_nbits(nor);
-> +
-> +		ret = spi_flash_read(spi, &msg);
-> +		*retlen = msg.retlen;
-> +		return ret;
+On Tue, 9 Feb 2016, Suman Anna wrote:
 
-Looking at this I can't help but think that spi_flash_read() ought to
-have the stub in rather than the caller.  But given that we're pretty
-much only ever expecting one user I'm not 100% sure it actually matters.
-Anyway, I applied the first two patches.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160209/4e2f6800/attachment.sig>
+> On 02/09/2016 02:49 AM, Paul Walmsley wrote:
+> > On Mon, 8 Feb 2016, Suman Anna wrote:
+> >> On 02/07/2016 08:48 PM, Paul Walmsley wrote:
+> >>> On Tue, 2 Feb 2016, Kishon Vijay Abraham I wrote:
+> >>>
+> >>>> Paul, what do you think is the best way forward to perform reset?
+> >>>
+> >>> Many of the IP blocks with PRM hardreset lines are processor IP blocks. 
+> >>> Those often need special reset handling to ensure that WFI/HLT-like 
+> >>> instructions are executed after reset.  This special handling ensures that 
+> >>> the IP blocks' bus initiator interfaces indicate that they are in standby 
+> >>> to the PRCM - thus allowing power management for the rest of the chip to 
+> >>> work correctly.
+> >>>
+> >>> But that doesn't seem to be the case with PCIe - and maybe others - 
+> >>> possibly some of the MMUs?  
+> >>
+> >> Yeah, the sequencing between clocks and resets would still be the same
+> >> for MMUs, so, adding the custom flags for MMUs is fine.
+> > 
+> > I'm curious as to whether HWMOD_CUSTOM_HARDRESET is needed for the MMUs.  
+> > We've stated that the main point of the custom hardreset code is to handle 
+> > processors that need to be placed into WFI/HLT, but it doesn't seem like 
+> > there would be an equivalent for MMUs.  Thoughts?
+> 
+> The current OMAP IOMMU code already leverages the pdata ops for
+> performing the resets, so not adding the flags would also require
+> additional changes in the driver.
+> 
+> Also, the reset lines controlling the MMUs actually also manage the
+> reset for all the other sub-modules other than the processor cores
+> within the sub-systems. We have currently different issues (see [1] for
+> eg. around the IPU sub-system entering RET in between), so from a PM
+> point of view, we do prefer to place the MMUs also in reset when we are
+> runtime suspended.
+
+Should we reassert hardreset in _idle() for IP blocks that don't have 
+HWMOD_CUSTOM_HARDRESET set on them?  Would that allow us to use this 
+mechanism for the uncore hardreset lines, or are there other quirks?
+
+Also - would that address the potential issue that you mentioned with the 
+PCIe block, or is that a different issue?
+
+
+- Paul
