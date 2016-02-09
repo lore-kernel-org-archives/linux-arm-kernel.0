@@ -1,331 +1,120 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Tue, 9 Feb 2016 17:34:18 +0000
-Subject: [RFC PATCH v3 1/3] PCI: hisi: re-architect Hip05/Hip06 controllers
- driver to preapare for ACPI
-In-Reply-To: <1455039260-6040-1-git-send-email-gabriele.paoloni@huawei.com>
-References: <1455039260-6040-1-git-send-email-gabriele.paoloni@huawei.com>
-Message-ID: <1455039260-6040-2-git-send-email-gabriele.paoloni@huawei.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Tue, 9 Feb 2016 09:43:51 -0800
+Subject: [PATCH 1/3] input: cygnus-update touchscreen dt node document
+In-Reply-To: <3b53af6b6c6735d10cb88518c8b8a0ae@mail.gmail.com>
+References: <1455008277-8312-1-git-send-email-raveendra.padasalagi@broadcom.com>
+ <1455008277-8312-2-git-send-email-raveendra.padasalagi@broadcom.com>
+ <2631849.GeOulu78vx@wuerfel>
+ <3b53af6b6c6735d10cb88518c8b8a0ae@mail.gmail.com>
+Message-ID: <20160209174351.GC40460@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: gabriele paoloni <gabriele.paoloni@huawei.com>
+On Tue, Feb 09, 2016 at 10:25:26PM +0530, Raveendra Padasalagi wrote:
+> > -----Original Message-----
+> > From: Arnd Bergmann [mailto:arnd at arndb.de]
+> > Sent: 09 February 2016 16:34
+> > To: Raveendra Padasalagi
+> > Cc: Dmitry Torokhov; Russell King; devicetree at vger.kernel.org;
+> linux-arm-
+> > kernel at lists.infradead.org; linux-input at vger.kernel.org; Rob Herring;
+> Pawel
+> > Moll; Mark Rutland; Ian Campbell; Kumar Gala; Jonathan Richardson; Jon
+> > Mason; Florian Fainelli; Ray Jui; Scott Branden;
+> linux-kernel at vger.kernel.org;
+> > bcm-kernel-feedback-list at broadcom.com
+> > Subject: Re: [PATCH 1/3] input: cygnus-update touchscreen dt node
+> document
+> >
+> > On Tuesday 09 February 2016 14:27:55 Raveendra Padasalagi wrote:
+> > > +
+> > > +One of the below 2 property is mandatory.
+> > > +- ts_syscon: handler of syscon node defining physical base address
+> > > +  of the controller and length of memory mapped region.
+> > > +  If this property is selected please make sure MFD_SYSCON config
+> > > +  is enabled in the defconfig file.
+> > > +or
+> > > +- reg: physical base address of the controller and length of memory
+> > > +  mapped region.
+> > > +
+> > >  - clocks:  The clock provided by the SOC to driver the tsc
+> > >  - clock-name:  name for the clock
+> > >  - interrupts: The touchscreen controller's interrupt @@ -54,12 +62,16
+> > > @@ Optional properties:
+> > >  - touchscreen-inverted-y: Y axis is inverted (boolean)
+> > >
+> > >  Example:
+> > > +       ts_adc_syscon: ts_adc_syscon at 0x180a6000 {
+> > > +               compatible = "syscon";
+> > > +               reg = <0x180a6000 0xc30>;
+> > > +       };
+> > >
+> > >         touchscreen: tsc at 0x180A6000 {
+> > >                 compatible = "brcm,iproc-touchscreen";
+> > >                 #address-cells = <1>;
+> > >                 #size-cells = <1>;
+> > > -               reg = <0x180A6000 0x40>;
+> > > +               syscon = <&ts_adc_syscon>;
+> > >                 clocks = <&adc_clk>;
+> > >                 clock-names = "tsc_clk";
+> > >                 interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>;
+> >
+> > This doesn't seem right: For one thing, it's an incompatible binding
+> change which
+> > you should try to avoid.
+> 
+> > Worse, the syscon has a name indicating that it really has a particular
+> function,
+> > but the name is completely generic (just "syscon"). Please add a
+> specific
+> > compatible string identifying the device that owns the registers, and
+> put any
+> > other associated properties (clocks, interrupts, ...) that are for that
+> device in
+> > general rather than just the touchscreen in there.
+> 
+> By mistake "syscon" name is documented in "touchscreen" label above. In
+> the
+> touchscreen driver code and .dtsi file it's named and used as "ts_syscon".
+> Please refer https://lkml.org/lkml/2016/2/9/71 for the changes.
+> Let me know if this ok. I will correct the documentation in the next
+> patch.
+> 
+> > Your changelog text fails to describe why you do this change in the
+> first place,
+> > and why you can't do it in a backward-compatible way, so please rewrite
+> that
+> > text.
+> 
+> Yes, I will update the change log in the next patch.
+> 
+> In Cygnus SOC, Touch screen controller registers are shared with ADC and
+> flex timer IP's.
+> Using readl/writel could lead to race condition. So this patch is
+> introduced to take care
+> mutually exclusive access of register's in such a case.
+> 
+> In the platform's where touchscreen register's are not shared normal
+> readl/writel
+> could be used.
 
-re-architect the Hip05/Hip06 host controllers driver to prepare
-for the ACPI based driver.
-The common functions used also by the ACPI driver have been grouped
-into a new "common" file
+Are there currently platforms where the registers are not shared? If we
+have to use regmap to correctly update registers (and thus we need
+syscon) then I wonder if we should even attempt to support direct
+register access by the driver.
 
-Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
----
- MAINTAINERS                         |   2 +
- drivers/pci/host/Makefile           |   2 +-
- drivers/pci/host/pcie-hisi-common.c |  73 ++++++++++++++++++++++
- drivers/pci/host/pcie-hisi.c        | 119 +++++++++++-------------------------
- drivers/pci/host/pcie-hisi.h        |  23 +++++++
- 5 files changed, 135 insertions(+), 84 deletions(-)
- create mode 100644 drivers/pci/host/pcie-hisi-common.c
- create mode 100644 drivers/pci/host/pcie-hisi.h
+> 
+> Based on the dt  property entry "reg" or "ts_syscon" register accesses are
+> handled.
+> if "reg" is provided normal readl/writel API's are used to access
+> register's else if
+> "ts_syscon" is provided then syscon API's are used.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 30aca4a..d69f436 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -8409,7 +8409,9 @@ M:	Gabriele Paoloni <gabriele.paoloni@huawei.com>
- L:	linux-pci at vger.kernel.org
- S:	Maintained
- F:	Documentation/devicetree/bindings/pci/hisilicon-pcie.txt
-+F:	drivers/pci/host/pcie-hisi.h
- F:	drivers/pci/host/pcie-hisi.c
-+F:	drivers/pci/host/pcie-hisi-common.c
- 
- PCIE DRIVER FOR QUALCOMM MSM
- M:     Stanimir Varbanov <svarbanov@mm-sol.com>
-diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile
-index 7b2f20c..8c93c0f 100644
---- a/drivers/pci/host/Makefile
-+++ b/drivers/pci/host/Makefile
-@@ -20,5 +20,5 @@ obj-$(CONFIG_PCIE_IPROC_PLATFORM) += pcie-iproc-platform.o
- obj-$(CONFIG_PCIE_IPROC_BCMA) += pcie-iproc-bcma.o
- obj-$(CONFIG_PCIE_ALTERA) += pcie-altera.o
- obj-$(CONFIG_PCIE_ALTERA_MSI) += pcie-altera-msi.o
--obj-$(CONFIG_PCI_HISI) += pcie-hisi.o
-+obj-$(CONFIG_PCI_HISI) += pcie-hisi.o pcie-hisi-common.o
- obj-$(CONFIG_PCIE_QCOM) += pcie-qcom.o
-diff --git a/drivers/pci/host/pcie-hisi-common.c b/drivers/pci/host/pcie-hisi-common.c
-new file mode 100644
-index 0000000..6dfb4c3
---- /dev/null
-+++ b/drivers/pci/host/pcie-hisi-common.c
-@@ -0,0 +1,73 @@
-+/*
-+ * PCIe host controller common functions for HiSilicon SoCs
-+ *
-+ * Copyright (C) 2015 HiSilicon Co., Ltd. http://www.hisilicon.com
-+ *
-+ * Author: Zhou Wang <wangzhou1@hisilicon.com>
-+ *         Dacai Zhu <zhudacai@hisilicon.com>
-+ *         Gabriele Paoloni <gabriele.paoloni@huawei.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/acpi.h>
-+#include <linux/interrupt.h>
-+#include <linux/module.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/of_pci.h>
-+#include <linux/regmap.h>
-+
-+#include "pcie-designware.h"
-+#include "pcie-hisi.h"
-+
-+/* HipXX PCIe host only supports 32-bit config access */
-+int hisi_pcie_common_cfg_read(void __iomem *reg_base, int where, int size,
-+			      u32 *val)
-+{
-+	u32 reg;
-+	u32 reg_val;
-+	void *walker = &reg_val;
-+
-+	walker += (where & 0x3);
-+	reg = where & ~0x3;
-+	reg_val = readl(reg_base + reg);
-+
-+	if (size == 1)
-+		*val = *(u8 __force *) walker;
-+	else if (size == 2)
-+		*val = *(u16 __force *) walker;
-+	else if (size == 4)
-+		*val = reg_val;
-+	else
-+		return PCIBIOS_BAD_REGISTER_NUMBER;
-+
-+	return PCIBIOS_SUCCESSFUL;
-+}
-+
-+/* HipXX PCIe host only supports 32-bit config access */
-+int hisi_pcie_common_cfg_write(void __iomem *reg_base, int where, int  size,
-+				u32 val)
-+{
-+	u32 reg_val;
-+	u32 reg;
-+	void *walker = &reg_val;
-+
-+	walker += (where & 0x3);
-+	reg = where & ~0x3;
-+	if (size == 4)
-+		writel(val, reg_base + reg);
-+	else if (size == 2) {
-+		reg_val = readl(reg_base + reg);
-+		*(u16 __force *) walker = val;
-+		writel(val, reg_base + reg);
-+	} else if (size == 1) {
-+		reg_val = readl(reg_base + reg);
-+		*(u8 __force *) walker = val;
-+		writel(val, reg_base + reg);
-+	} else
-+		return PCIBIOS_BAD_REGISTER_NUMBER;
-+
-+	return PCIBIOS_SUCCESSFUL;
-+}
-diff --git a/drivers/pci/host/pcie-hisi.c b/drivers/pci/host/pcie-hisi.c
-index 3e98d4e..458d0f8 100644
---- a/drivers/pci/host/pcie-hisi.c
-+++ b/drivers/pci/host/pcie-hisi.c
-@@ -21,6 +21,7 @@
- #include <linux/regmap.h>
- 
- #include "pcie-designware.h"
-+#include "pcie-hisi.h"
- 
- #define PCIE_LTSSM_LINKUP_STATE				0x11
- #define PCIE_LTSSM_STATE_MASK				0x3F
-@@ -30,12 +31,6 @@
- 
- #define to_hisi_pcie(x)	container_of(x, struct hisi_pcie, pp)
- 
--struct hisi_pcie;
--
--struct pcie_soc_ops {
--	int (*hisi_pcie_link_up)(struct hisi_pcie *pcie);
--};
--
- struct hisi_pcie {
- 	struct regmap *subctrl;
- 	void __iomem *reg_base;
-@@ -44,87 +39,24 @@ struct hisi_pcie {
- 	struct pcie_soc_ops *soc_ops;
- };
- 
--static inline void hisi_pcie_apb_writel(struct hisi_pcie *pcie,
--					u32 val, u32 reg)
--{
--	writel(val, pcie->reg_base + reg);
--}
--
--static inline u32 hisi_pcie_apb_readl(struct hisi_pcie *pcie, u32 reg)
--{
--	return readl(pcie->reg_base + reg);
--}
--
--/* HipXX PCIe host only supports 32-bit config access */
--static int hisi_pcie_cfg_read(struct pcie_port *pp, int where, int size,
--			      u32 *val)
--{
--	u32 reg;
--	u32 reg_val;
--	struct hisi_pcie *pcie = to_hisi_pcie(pp);
--	void *walker = &reg_val;
--
--	walker += (where & 0x3);
--	reg = where & ~0x3;
--	reg_val = hisi_pcie_apb_readl(pcie, reg);
--
--	if (size == 1)
--		*val = *(u8 __force *) walker;
--	else if (size == 2)
--		*val = *(u16 __force *) walker;
--	else if (size == 4)
--		*val = reg_val;
--	else
--		return PCIBIOS_BAD_REGISTER_NUMBER;
--
--	return PCIBIOS_SUCCESSFUL;
--}
-+struct pcie_soc_ops {
-+	int (*hisi_pcie_link_up)(struct hisi_pcie *pcie);
-+};
- 
--/* HipXX PCIe host only supports 32-bit config access */
--static int hisi_pcie_cfg_write(struct pcie_port *pp, int where, int  size,
--				u32 val)
-+static inline int hisi_pcie_cfg_read(struct pcie_port *pp, int where,
-+		int size, u32 *val)
- {
--	u32 reg_val;
--	u32 reg;
- 	struct hisi_pcie *pcie = to_hisi_pcie(pp);
--	void *walker = &reg_val;
--
--	walker += (where & 0x3);
--	reg = where & ~0x3;
--	if (size == 4)
--		hisi_pcie_apb_writel(pcie, val, reg);
--	else if (size == 2) {
--		reg_val = hisi_pcie_apb_readl(pcie, reg);
--		*(u16 __force *) walker = val;
--		hisi_pcie_apb_writel(pcie, reg_val, reg);
--	} else if (size == 1) {
--		reg_val = hisi_pcie_apb_readl(pcie, reg);
--		*(u8 __force *) walker = val;
--		hisi_pcie_apb_writel(pcie, reg_val, reg);
--	} else
--		return PCIBIOS_BAD_REGISTER_NUMBER;
--
--	return PCIBIOS_SUCCESSFUL;
--}
- 
--static int hisi_pcie_link_up_hip05(struct hisi_pcie *hisi_pcie)
--{
--	u32 val;
--
--	regmap_read(hisi_pcie->subctrl, PCIE_SUBCTRL_SYS_STATE4_REG +
--		    0x100 * hisi_pcie->port_id, &val);
--
--	return ((val & PCIE_LTSSM_STATE_MASK) == PCIE_LTSSM_LINKUP_STATE);
-+	return hisi_pcie_common_cfg_read(pcie->reg_base, where, size, val);
- }
- 
--static int hisi_pcie_link_up_hip06(struct hisi_pcie *hisi_pcie)
-+static inline int hisi_pcie_cfg_write(struct pcie_port *pp, int where,
-+		int size, u32 val)
- {
--	u32 val;
--
--	val = hisi_pcie_apb_readl(hisi_pcie, PCIE_HIP06_CTRL_OFF +
--			PCIE_SYS_STATE4);
-+	struct hisi_pcie *pcie = to_hisi_pcie(pp);
- 
--	return ((val & PCIE_LTSSM_STATE_MASK) == PCIE_LTSSM_LINKUP_STATE);
-+	return hisi_pcie_common_cfg_write(pcie->reg_base, where, size, val);
- }
- 
- static int hisi_pcie_link_up(struct pcie_port *pp)
-@@ -134,12 +66,13 @@ static int hisi_pcie_link_up(struct pcie_port *pp)
- 	return hisi_pcie->soc_ops->hisi_pcie_link_up(hisi_pcie);
- }
- 
--static struct pcie_host_ops hisi_pcie_host_ops = {
--	.rd_own_conf = hisi_pcie_cfg_read,
--	.wr_own_conf = hisi_pcie_cfg_write,
--	.link_up = hisi_pcie_link_up,
-+struct pcie_host_ops hisi_pcie_host_ops = {
-+		.rd_own_conf = hisi_pcie_cfg_read,
-+		.wr_own_conf = hisi_pcie_cfg_write,
-+		.link_up = hisi_pcie_link_up,
- };
- 
-+
- static int hisi_add_pcie_port(struct pcie_port *pp,
- 				     struct platform_device *pdev)
- {
-@@ -215,6 +148,26 @@ static int hisi_pcie_probe(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static int hisi_pcie_link_up_hip05(struct hisi_pcie *hisi_pcie)
-+{
-+	u32 val;
-+
-+	regmap_read(hisi_pcie->subctrl, PCIE_SUBCTRL_SYS_STATE4_REG +
-+		    0x100 * hisi_pcie->port_id, &val);
-+
-+	return ((val & PCIE_LTSSM_STATE_MASK) == PCIE_LTSSM_LINKUP_STATE);
-+}
-+
-+static int hisi_pcie_link_up_hip06(struct hisi_pcie *hisi_pcie)
-+{
-+	u32 val;
-+
-+	val = readl(hisi_pcie->reg_base + PCIE_HIP06_CTRL_OFF +
-+			PCIE_SYS_STATE4);
-+
-+	return ((val & PCIE_LTSSM_STATE_MASK) == PCIE_LTSSM_LINKUP_STATE);
-+}
-+
- static struct pcie_soc_ops hip05_ops = {
- 		&hisi_pcie_link_up_hip05
- };
-diff --git a/drivers/pci/host/pcie-hisi.h b/drivers/pci/host/pcie-hisi.h
-new file mode 100644
-index 0000000..29e0790
---- /dev/null
-+++ b/drivers/pci/host/pcie-hisi.h
-@@ -0,0 +1,23 @@
-+/*
-+ * PCIe host controller driver for HiSilicon SoCs
-+ *
-+ * Copyright (C) 2015 HiSilicon Co., Ltd. http://www.hisilicon.com
-+ *
-+ * Author: Zhou Wang <wangzhou1@hisilicon.com>
-+ *         Dacai Zhu <zhudacai@hisilicon.com>
-+ *         Gabriele Paoloni <gabriele.paoloni@huawei.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#ifndef PCIE_HISI_H_
-+#define PCIE_HISI_H_
-+
-+
-+int hisi_pcie_common_cfg_read(void __iomem *reg_base, int where, int size,
-+			      u32 *val);
-+int hisi_pcie_common_cfg_write(void __iomem *reg_base, int where, int  size,
-+				u32 val);
-+
-+#endif /* PCIE_HISI_H_ */
+If we decide that we still allow register access then please change the
+driver so it instantiates its own regmap instance in this case instead
+of doing checks all the time.
+
+Thanks.
+
 -- 
-1.9.1
+Dmitry
