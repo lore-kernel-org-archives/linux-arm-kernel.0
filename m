@@ -1,182 +1,50 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 9 Feb 2016 17:28:00 +0000
-Subject: [PATCH V4 12/23] x86, ia64, pci: Remove ACPI companion device
- from platform specific data.
-In-Reply-To: <1454606941-9523-13-git-send-email-tn@semihalf.com>
-References: <1454606941-9523-1-git-send-email-tn@semihalf.com>
- <1454606941-9523-13-git-send-email-tn@semihalf.com>
-Message-ID: <20160209172800.GB22868@red-moon>
+From: steve.muckle@linaro.org (Steve Muckle)
+Date: Tue, 9 Feb 2016 09:30:05 -0800
+Subject: [PATCH v3 0/6] CPUs capacity information for heterogeneous systems
+In-Reply-To: <20160209103748.GP11415@e106622-lin>
+References: <1454500799-18451-1-git-send-email-juri.lelli@arm.com>
+ <56B92BF4.4030405@linaro.org> <20160209103748.GP11415@e106622-lin>
+Message-ID: <56BA221D.1030907@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz,
+On 02/09/2016 02:37 AM, Juri Lelli wrote:
+>> I'm still concerned that there's no way to obtain optimal boot time on a
+>> > heterogeneous system. Either the dynamic benchmarking is enabled, adding
+>> > 1 sec, or the benchmarking is skipped, and task distribution on the
+>> > heterogeneous CPUs is determined by the platform's CPU numbering and
+>> > chance, potentially impacting performance nondeterministically until
+>> > userspace sets the correct capacity values via sysfs.
+>> > 
+>> > I believe you tested the impact on boot time of using equal capacity
+>> > values and saw little difference. I'm wondering though, what was the CPU
+>> > numbering on that target?
+>> > 
+>
+> My targets (Juno and TC2) had big cluster on 1,2 and little on the
+> remaining cpus. Why do you think this might matter?
 
-On Thu, Feb 04, 2016 at 06:28:50PM +0100, Tomasz Nowicki wrote:
-> Since PCI core code is setting ACPI companion device for us now,
-> platform specific ACPI companion device setting turns out to be dead now.
-> Therefore we can get rid of it, including related companion reference
-> from PCI sysdata structure.
-> 
-> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> Tested-by: Duc Dang <dhdang@apm.com>
-> Tested-by: Dongdong Liu <liudongdong3@huawei.com>
-> Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Tested-by: Graeme Gregory <graeme.gregory@linaro.org>
-> Tested-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
->  arch/ia64/hp/common/sba_iommu.c    |  2 +-
->  arch/ia64/include/asm/pci.h        |  1 -
->  arch/ia64/pci/pci.c                | 16 ----------------
->  arch/ia64/sn/kernel/io_acpi_init.c |  4 ++--
->  arch/x86/include/asm/pci.h         |  3 ---
->  arch/x86/pci/acpi.c                | 17 -----------------
->  6 files changed, 3 insertions(+), 40 deletions(-)
+There's a natural bias in the scheduler AFAIK towards lower-numbered
+CPUs since they are typically scanned in numerically ascending order. So
+when all capacities are initially defaulted to be the same I think
+you'll be more likely to use the lower numbered CPUs.
 
-This patch has to be squashed with the previous one otherwise it
-has bisectability issues (ie the previous patch passes the parent
-to the pci_create_root_bus() call so, without this patch applied,
-the companion initialization would fail).
+I'd be curious what the performance penalty is on a b.L system where the
+lowest numbered CPUs are small. I don't have such a target but maybe
+it's possible to compare booting just with bigs vs just with littles, at
+least until userspace intializes and a script can bring up the others,
+which is the same point at which capacities could be properly set. That
+would give something of an upper bound.
 
-Other than that:
+> Anyway, IMHO boot time performance is not what we are targeting here, so
+> I wouldn't be too worried about this particular point.
 
-Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+It may not be the most important thing but it is a factor worth
+considering - as mentioned earlier there are applications where boot
+time is critical such as automotive. It seems unfortunate that actual
+performance may be left on the table due to (IMO anyway) a tenuous
+concern over DT semantics. But it looks like that may just be my
+position :/ .
 
-> diff --git a/arch/ia64/hp/common/sba_iommu.c b/arch/ia64/hp/common/sba_iommu.c
-> index a6d6190..78e4444 100644
-> --- a/arch/ia64/hp/common/sba_iommu.c
-> +++ b/arch/ia64/hp/common/sba_iommu.c
-> @@ -1981,7 +1981,7 @@ sba_connect_bus(struct pci_bus *bus)
->  	if (PCI_CONTROLLER(bus)->iommu)
->  		return;
->  
-> -	handle = acpi_device_handle(PCI_CONTROLLER(bus)->companion);
-> +	handle = acpi_device_handle(ACPI_COMPANION(bus->bridge));
->  	if (!handle)
->  		return;
->  
-> diff --git a/arch/ia64/include/asm/pci.h b/arch/ia64/include/asm/pci.h
-> index 07039d1..5050748 100644
-> --- a/arch/ia64/include/asm/pci.h
-> +++ b/arch/ia64/include/asm/pci.h
-> @@ -65,7 +65,6 @@ extern int pci_mmap_legacy_page_range(struct pci_bus *bus,
->  #define pci_legacy_write platform_pci_legacy_write
->  
->  struct pci_controller {
-> -	struct acpi_device *companion;
->  	void *iommu;
->  	int segment;
->  	int node;		/* nearest node with memory or NUMA_NO_NODE for global allocation */
-> diff --git a/arch/ia64/pci/pci.c b/arch/ia64/pci/pci.c
-> index 8f6ac2f..978d6af 100644
-> --- a/arch/ia64/pci/pci.c
-> +++ b/arch/ia64/pci/pci.c
-> @@ -301,28 +301,12 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
->  	}
->  
->  	info->controller.segment = root->segment;
-> -	info->controller.companion = device;
->  	info->controller.node = acpi_get_node(device->handle);
->  	INIT_LIST_HEAD(&info->io_resources);
->  	return acpi_pci_root_create(root, &pci_acpi_root_ops,
->  				    &info->common, &info->controller);
->  }
->  
-> -int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
-> -{
-> -	/*
-> -	 * We pass NULL as parent to pci_create_root_bus(), so if it is not NULL
-> -	 * here, pci_create_root_bus() has been called by someone else and
-> -	 * sysdata is likely to be different from what we expect.  Let it go in
-> -	 * that case.
-> -	 */
-> -	if (!bridge->dev.parent) {
-> -		struct pci_controller *controller = bridge->bus->sysdata;
-> -		ACPI_COMPANION_SET(&bridge->dev, controller->companion);
-> -	}
-> -	return 0;
-> -}
-> -
->  void pcibios_fixup_device_resources(struct pci_dev *dev)
->  {
->  	int idx;
-> diff --git a/arch/ia64/sn/kernel/io_acpi_init.c b/arch/ia64/sn/kernel/io_acpi_init.c
-> index 0640739..bcfddc2 100644
-> --- a/arch/ia64/sn/kernel/io_acpi_init.c
-> +++ b/arch/ia64/sn/kernel/io_acpi_init.c
-> @@ -132,7 +132,7 @@ sn_get_bussoft_ptr(struct pci_bus *bus)
->  	struct acpi_resource_vendor_typed *vendor;
->  
->  
-> -	handle = acpi_device_handle(PCI_CONTROLLER(bus)->companion);
-> +	handle = acpi_device_handle(ACPI_COMPANION(bus->bridge));
->  	status = acpi_get_vendor_resource(handle, METHOD_NAME__CRS,
->  					  &sn_uuid, &buffer);
->  	if (ACPI_FAILURE(status)) {
-> @@ -360,7 +360,7 @@ sn_acpi_get_pcidev_info(struct pci_dev *dev, struct pcidev_info **pcidev_info,
->  	acpi_status status;
->  	struct acpi_buffer name_buffer = { ACPI_ALLOCATE_BUFFER, NULL };
->  
-> -	rootbus_handle = acpi_device_handle(PCI_CONTROLLER(dev)->companion);
-> +	rootbus_handle = acpi_device_handle(ACPI_COMPANION(dev->bus->bridge));
->          status = acpi_evaluate_integer(rootbus_handle, METHOD_NAME__SEG, NULL,
->                                         &segment);
->          if (ACPI_SUCCESS(status)) {
-> diff --git a/arch/x86/include/asm/pci.h b/arch/x86/include/asm/pci.h
-> index 4625943..a98c022 100644
-> --- a/arch/x86/include/asm/pci.h
-> +++ b/arch/x86/include/asm/pci.h
-> @@ -14,9 +14,6 @@
->  struct pci_sysdata {
->  	int		domain;		/* PCI domain */
->  	int		node;		/* NUMA node */
-> -#ifdef CONFIG_ACPI
-> -	struct acpi_device *companion;	/* ACPI companion device */
-> -#endif
->  #ifdef CONFIG_X86_64
->  	void		*iommu;		/* IOMMU private data */
->  #endif
-> diff --git a/arch/x86/pci/acpi.c b/arch/x86/pci/acpi.c
-> index 8e89921..d5086d1 100644
-> --- a/arch/x86/pci/acpi.c
-> +++ b/arch/x86/pci/acpi.c
-> @@ -341,7 +341,6 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
->  		struct pci_sysdata sd = {
->  			.domain = domain,
->  			.node = node,
-> -			.companion = root->device
->  		};
->  
->  		memcpy(bus->sysdata, &sd, sizeof(sd));
-> @@ -356,7 +355,6 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
->  		else {
->  			info->sd.domain = domain;
->  			info->sd.node = node;
-> -			info->sd.companion = root->device;
->  			bus = acpi_pci_root_create(root, &acpi_pci_root_ops,
->  						   &info->common, &info->sd);
->  		}
-> @@ -374,21 +372,6 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
->  	return bus;
->  }
->  
-> -int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
-> -{
-> -	/*
-> -	 * We pass NULL as parent to pci_create_root_bus(), so if it is not NULL
-> -	 * here, pci_create_root_bus() has been called by someone else and
-> -	 * sysdata is likely to be different from what we expect.  Let it go in
-> -	 * that case.
-> -	 */
-> -	if (!bridge->dev.parent) {
-> -		struct pci_sysdata *sd = bridge->bus->sysdata;
-> -		ACPI_COMPANION_SET(&bridge->dev, sd->companion);
-> -	}
-> -	return 0;
-> -}
-> -
->  int __init pci_acpi_init(void)
->  {
->  	struct pci_dev *dev = NULL;
-> -- 
-> 1.9.1
-> 
+thanks,
+Steve
