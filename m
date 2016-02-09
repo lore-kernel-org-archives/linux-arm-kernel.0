@@ -1,55 +1,41 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Tue, 9 Feb 2016 09:44:20 +0530
-Subject: [PATCH 1/2] Documentation: dt: mailbox: Add TI Message Manager
-In-Reply-To: <1454690044-2560-2-git-send-email-nm@ti.com>
-References: <1454690044-2560-1-git-send-email-nm@ti.com>
- <1454690044-2560-2-git-send-email-nm@ti.com>
-Message-ID: <CABb+yY3kGq_R49Xx4fK3UMqtuFiuv-pXJWvjkEFLPL9xRu5T4A@mail.gmail.com>
+From: jun.nie@linaro.org (Jun Nie)
+Date: Tue, 9 Feb 2016 13:02:12 +0800
+Subject: [PATCH] ARM: zx: Fix return value check in zx296702_pd_probe()
+In-Reply-To: <1454768696-340-1-git-send-email-weiyj_lk@163.com>
+References: <1454768696-340-1-git-send-email-weiyj_lk@163.com>
+Message-ID: <56B972D4.8040608@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 5, 2016 at 10:04 PM, Nishanth Menon <nm@ti.com> wrote:
-> +
-> +       msgmgr: msgmgr at 02a00000 {
-> +               compatible = "ti,k2g-message-manager", "ti,message-manager";
-> +               #mbox-cells = <1>;
-> +               reg-names = "queue_proxy_region", "queue_state_debug_region";
-> +               reg = <0x02a00000 0x400000>, <0x028c3400 0x400>;
-> +
-> +               msgmgr_proxy_pmmc_tx_prio0: pmmc_tx_prio0 {
-> +                       ti,queue-id = <0>;
-> +                       ti,proxy-id = <0>;
-> +               };
-> +
-> +               msgmgr_proxy_pmmc_rx: pmmc_rx {
-> +                       ti,queue-id = <5>;
-> +                       ti,proxy-id = <2>;
-> +                       interrupt-names = "rx";
-> +                       interrupts = <GIC_SPI 324 IRQ_TYPE_EDGE_RISING>;
-> +               };
-> +       };
-> +
-I think we should get rid of consumer specifics from the provider node...
-
-> +...
-> +       pmmc {
-> +               ...
-> +               mbox-names = "tx", "rx";
-> +               mboxes = <&msgmgr &msgmgr_proxy_pmmc_tx>
-> +                        <&msgmgr &msgmgr_proxy_pmmc_rx>;
-> +               ...
-> +       };
+On 2016?02?06? 22:24, weiyj_lk at 163.com wrote:
+> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 >
-... and have consumers like
-       pmmc {
-               ...
-               mbox-names = "tx", "rx";
-               mboxes = <&msgmgr 0 0>
-                        <&msgmgr 5 2>;
-       };
+> In case of error, the function devm_ioremap_resource() returns
+> ERR_PTR() and never returns NULL. The NULL test in the return
+> value check should be replaced with IS_ERR().
+>
+> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> ---
+>   arch/arm/mach-zx/zx296702-pm-domain.c | 4 ++--
+>   1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/mach-zx/zx296702-pm-domain.c b/arch/arm/mach-zx/zx296702-pm-domain.c
+> index e08574d..2037bcb 100644
+> --- a/arch/arm/mach-zx/zx296702-pm-domain.c
+> +++ b/arch/arm/mach-zx/zx296702-pm-domain.c
+> @@ -169,9 +169,9 @@ static int zx296702_pd_probe(struct platform_device *pdev)
+>   	}
+>
+>   	pcubase = devm_ioremap_resource(&pdev->dev, res);
+> -	if (!pcubase) {
+> +	if (IS_ERR(pcubase)) {
+>   		dev_err(&pdev->dev, "ioremap fail.\n");
+> -		return -EIO;
+> +		return PTR_ERR(pcubase);
+>   	}
+>
+>   	for (i = 0; i < ARRAY_SIZE(zx296702_pm_domains); ++i)
+>
 
-I leave the IRQ for you to decide how to specify - a 'dummy' or
-'valid' always provided as last cell in mboxes or some other way.
-(I'll review other patches in detail later)
-
-cheers.
+Thanks for fixing this issue.
+Reviewed-by: Jun Nie <jun.nie@linaro.org>
