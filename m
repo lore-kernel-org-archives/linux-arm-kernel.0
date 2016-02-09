@@ -1,42 +1,50 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 9 Feb 2016 08:49:13 +0000 (UTC)
-Subject: [PATCH v3 3/3] pci: dra7xx: use pdata callbacks to perform reset
-In-Reply-To: <56B900E9.9040306@ti.com>
-References: <1452780672-14339-1-git-send-email-kishon@ti.com>
- <1452780672-14339-4-git-send-email-kishon@ti.com>
- <20160127173104.GQ19432@atomide.com> <56A90971.4020409@ti.com>
- <20160127185649.GV19432@atomide.com> <56A94FB7.6020903@ti.com>
- <20160128183156.GH19432@atomide.com> <56B087AD.4000505@ti.com>
- <alpine.DEB.2.02.1602080208070.2182@utopia.booyaka.com>
- <56B900E9.9040306@ti.com>
-Message-ID: <alpine.DEB.2.02.1602090846480.2906@utopia.booyaka.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Tue, 9 Feb 2016 09:56:33 +0100
+Subject: [PATCH 2/3] arm64: dts: add the Alpine v2 EVP
+In-Reply-To: <56B8B45D.1020902@arm.com>
+References: <1454922699-16785-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1454922699-16785-3-git-send-email-antoine.tenart@free-electrons.com>
+ <56B8B45D.1020902@arm.com>
+Message-ID: <20160209085633.GA5388@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 8 Feb 2016, Suman Anna wrote:
+Hi Marc,
 
-> On 02/07/2016 08:48 PM, Paul Walmsley wrote:
-> > On Tue, 2 Feb 2016, Kishon Vijay Abraham I wrote:
-> > 
-> >> Paul, what do you think is the best way forward to perform reset?
-> > 
-> > Many of the IP blocks with PRM hardreset lines are processor IP blocks. 
-> > Those often need special reset handling to ensure that WFI/HLT-like 
-> > instructions are executed after reset.  This special handling ensures that 
-> > the IP blocks' bus initiator interfaces indicate that they are in standby 
-> > to the PRCM - thus allowing power management for the rest of the chip to 
-> > work correctly.
-> > 
-> > But that doesn't seem to be the case with PCIe - and maybe others - 
-> > possibly some of the MMUs?  
+On Mon, Feb 08, 2016 at 03:29:33PM +0000, Marc Zyngier wrote:
+> On 08/02/16 09:11, Antoine Tenart wrote:
 > 
-> Yeah, the sequencing between clocks and resets would still be the same
-> for MMUs, so, adding the custom flags for MMUs is fine.
+> > +		gic: gic at f0100000 {
+> > +			compatible = "arm,gic-v3";
+> > +			reg = <0x0 0xf0200000 0x0 0x10000>,	/* GIC Dist */
+> > +			      <0x0 0xf0280000 0x0 0x200000>,	/* GICR */
+> > +			      <0x0 0xf0100000 0x0 0x2000>;	/* GICC */
+> > +			interrupt-controller;
+> > +			#interrupt-cells = <3>;
+> > +		};
+> 
+> Something is wrong here. Either you are missing GICH and GICV (assuming
+> you have legacy support), or you have an extra GICC region (which
+> doesn't make sense on its own).
+> 
+> You're also missing the maintenance interrupt.
+> 
+> Has Anapurna really built a GICv3 without an ITS?
 
-I'm curious as to whether HWMOD_CUSTOM_HARDRESET is needed for the MMUs.  
-We've stated that the main point of the custom hardreset code is to handle 
-processors that need to be placed into WFI/HLT, but it doesn't seem like 
-there would be an equivalent for MMUs.  Thoughts?
+I documented myself and Annapurna's GIC really doesn't have an ITS.
 
+I'll add the missing regions.
 
-- Paul
+Antoine
+
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160209/61618e8e/attachment.sig>
