@@ -1,36 +1,49 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 9 Feb 2016 07:58:36 -0800
-Subject: [PATCH 0/3] omap: hwmod: add default reset handling support
-In-Reply-To: <56B97572.6080100@ti.com>
-References: <1454929941-23949-1-git-send-email-kishon@ti.com>
- <20160208204446.GC19432@atomide.com> <56B97572.6080100@ti.com>
-Message-ID: <20160209155836.GI19432@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 09 Feb 2016 17:00:48 +0100
+Subject: [PATCH V2 09/12] dtb: amd: Add KCS device tree node
+In-Reply-To: <56BA0A2B.5000705@amd.com>
+References: <1454954357-8395-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <4018438.bPuTyoUuqf@wuerfel> <56BA0A2B.5000705@amd.com>
+Message-ID: <15181064.RzzsN4CWec@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kishon Vijay Abraham I <kishon@ti.com> [160208 21:14]:
-> Hi Tony,
-> 
-> On Tuesday 09 February 2016 02:14 AM, Tony Lindgren wrote:
-> > Hi Kishon,
+On Tuesday 09 February 2016 09:47:55 Brijesh Singh wrote:
 > > 
-> > * Kishon Vijay Abraham I <kishon@ti.com> [160208 03:13]:
-> >> Add a new hwmod flag to indicate custom reset handling and use it
-> >> for devices that require custom reset handling (like dsp, ipu, iva).
-> >>
-> >> Tested PCIe on dra7-evm and dra72-evm.
-> >> I need help in testing DSP, IPU, IVA, PRU, GFX, M3 in other platforms.
-> >> Or a way to test these cores to see if reset is not broken. Suman?
-> >>
-> >> I'll post this series once again after performing these tests.
+> > I see we don't have a binding file for this, can you add one please?
+> >
+> There is binding file ipmi.txt [1]. Am I missing something ?
+>  
+> [1] http://lxr.free-electrons.com/source/Documentation/devicetree/bindings/ipmi.txt
+
+Sorry, my mistake: I was looking for "ipmi_kcs", which is not in there.
+
 > > 
-> > Do we also still need to patch something in the pcie driver too
-> > or can all that be left out now?
+> > Why the strange name for the interrupt?
+> > 
 > 
-> With this series changes in PCIe driver is not required at all.
+> Now I don't remember the doc but sometime back while implementing BMC on Seattle I saw that interrupt was labeled as "ipmi_kcs"
+> hence used the same name in DT. But if you want to use different name then let me know the string and will update it.
+> 
+> Theoretically IPMI system interface supports the following interface and any of these interfaces can be used by
+> A57 to communicate with BMC:
+> 
+> * Keyboard controller style (KCS)
+> * System Management Interface (SMIC)
+> * Block transfer (BT)
+> * SMBus system interface (SSIF)
+> 
+> AMD Seattle platform supports "KCS".
+> 
 
-OK good to hear.
+The important part for interrupt/reg/... names is that you must use exactly the
+names that are listed in the binding. If there is no name in there, it's better
+not to add the name property.
 
-Thanks,
+The other point is that "ipmi_kcs" is a name that is picked really badly, as it
+uses a '_' character while DT properties by convention use '-' between names,
+and the name of the IRQ is the same as the device itself, which is really
+not a useful way to disambiguate multiple interrupts in the same device, if
+someone ever adds another irq line.
 
-Tony
+	Arnd
