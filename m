@@ -1,50 +1,54 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue,  9 Feb 2016 11:04:45 +0000
-Subject: [PATCH] of/irq: Fix msi-map calculation for nonzero rid-base
-Message-ID: <9f6845195d03b0e0b0d187bb510fbf7bd497e836.1455015344.git.robin.murphy@arm.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Tue,  9 Feb 2016 08:08:14 -0300
+Subject: [PATCH] rtc: mt6397: Add platform device ID table
+Message-ID: <1455016095-13724-1-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The existing msi-map code is fine for shifting the entire RID space
-upwards, but attempting finer-grained remapping reveals a bug. It turns
-out that we are mistakenly treating the msi-base part as an offset, not
-as a new base to remap onto, so things get squiffy when rid-base is
-nonzero. Fix this, and at the same time add a sanity check against
-having msi-map-mask clash with a nonzero rid-base, as that's another
-thing one can easily get wrong.
+The platform bus_type .match callback attempts to match the platform device
+name with an entry on the .id_table if provided and fallbacks to match with
+the driver's name if a table is not provided.
 
-CC: <stable@vger.kernel.org>
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+Using a platform device ID to match is more explicit, allows the driver to
+support more than one device and also the MODULE_DEVICE_TABLE macro can be
+used to export the module aliases information instead of the MODULE_ALIAS.
+
+Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+
 ---
- drivers/of/irq.c | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/of/irq.c b/drivers/of/irq.c
-index 7ee21ae..e7bfc17 100644
---- a/drivers/of/irq.c
-+++ b/drivers/of/irq.c
-@@ -635,6 +635,13 @@ static u32 __of_msi_map_rid(struct device *dev, struct device_node **np,
- 		msi_base = be32_to_cpup(msi_map + 2);
- 		rid_len = be32_to_cpup(msi_map + 3);
+ drivers/rtc/rtc-mt6397.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/rtc/rtc-mt6397.c b/drivers/rtc/rtc-mt6397.c
+index 06a5c52b292f..46533f11f7fc 100644
+--- a/drivers/rtc/rtc-mt6397.c
++++ b/drivers/rtc/rtc-mt6397.c
+@@ -404,6 +404,12 @@ static const struct of_device_id mt6397_rtc_of_match[] = {
+ };
+ MODULE_DEVICE_TABLE(of, mt6397_rtc_of_match);
  
-+		if (rid_base & ~map_mask) {
-+			dev_err(parent_dev,
-+				"Invalid msi-map translation - msi-map-mask (0x%x) ignores rid-base (0x%x)\n",
-+				map_mask, rid_base);
-+			return rid_out;
-+		}
++static const struct platform_device_id mt6397_rtc_id[] = {
++	{"mt6397-rtc", 0},
++	{ /* sentinel */ },
++};
++MODULE_DEVICE_TABLE(platform, mt6397_rtc_id);
 +
- 		msi_controller_node = of_find_node_by_phandle(phandle);
+ static struct platform_driver mtk_rtc_driver = {
+ 	.driver = {
+ 		.name = "mt6397-rtc",
+@@ -412,6 +418,7 @@ static struct platform_driver mtk_rtc_driver = {
+ 	},
+ 	.probe	= mtk_rtc_probe,
+ 	.remove = mtk_rtc_remove,
++	.id_table = mt6397_rtc_id,
+ };
  
- 		matched = (masked_rid >= rid_base &&
-@@ -654,7 +661,7 @@ static u32 __of_msi_map_rid(struct device *dev, struct device_node **np,
- 	if (!matched)
- 		return rid_out;
- 
--	rid_out = masked_rid + msi_base;
-+	rid_out = masked_rid - rid_base + msi_base;
- 	dev_dbg(dev,
- 		"msi-map at: %s, using mask %08x, rid-base: %08x, msi-base: %08x, length: %08x, rid: %08x -> %08x\n",
- 		dev_name(parent_dev), map_mask, rid_base, msi_base,
+ module_platform_driver(mtk_rtc_driver);
+@@ -419,4 +426,3 @@ module_platform_driver(mtk_rtc_driver);
+ MODULE_LICENSE("GPL v2");
+ MODULE_AUTHOR("Tianping Fang <tianping.fang@mediatek.com>");
+ MODULE_DESCRIPTION("RTC Driver for MediaTek MT6397 PMIC");
+-MODULE_ALIAS("platform:mt6397-rtc");
 -- 
-2.7.0.25.gfc10eb5.dirty
+2.5.0
