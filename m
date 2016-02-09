@@ -1,34 +1,30 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Tue,  9 Feb 2016 19:45:04 +0100
-Subject: [PATCH] ARM: shmobile: r8a7740: Remove obsolete #include
- <asm/hardware/cache-l2x0.h>
-Message-ID: <1455043504-27933-1-git-send-email-geert+renesas@glider.be>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 9 Feb 2016 19:49:20 +0100
+Subject: [PATCH v2 00/28] ARM: KVM: Rewrite the world switch in C (mostly)
+In-Reply-To: <1454583645-10144-1-git-send-email-marc.zyngier@arm.com>
+References: <1454583645-10144-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20160209184920.GB5171@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As of commit 540977ae9746e60c ("ARM: shmobile: r8a7740: Migrate to
-generic l2c OF initialization"), no l2x0 functionality is used from
-platform code, so the include can be removed.
+On Thu, Feb 04, 2016 at 11:00:17AM +0000, Marc Zyngier wrote:
+> Now that the arm64 rewrite is in mainline, I've taken a stab at fixing
+> the 32bit code the same way. This is fairly straightforward (once
+> you've been through it once...), with a few patches that adapt the
+> code to be similar to the 64bit version.
+> 
+> Note that the timer and GIC code should be made common between the two
+> architectures, as this is litterally the exact same code (I've posted
+> some proof of concept for that a while ago, see
+> http://www.spinics.net/lists/kvm/msg126775.html).
+> 
+> This has been tested on a Dual A7, and the code is pushed on a branch:
+> 
+> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm/wsinc
+> 
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-As you plan to respin renesas-dt-for-v4.6, perhaps this can still be
-folded in the original commit?
+This looks good overall.
 
- arch/arm/mach-shmobile/setup-r8a7740.c | 1 -
- 1 file changed, 1 deletion(-)
+I tested it briefly on TC2 and it seems generally happy.
 
-diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
-index 496569f9d578b863..3e71cd4168dd00cb 100644
---- a/arch/arm/mach-shmobile/setup-r8a7740.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7740.c
-@@ -23,7 +23,6 @@
- #include <asm/mach/map.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/time.h>
--#include <asm/hardware/cache-l2x0.h>
- 
- #include "common.h"
- 
--- 
-1.9.1
+-Christoffer
