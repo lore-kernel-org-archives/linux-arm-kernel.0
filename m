@@ -1,82 +1,63 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 9 Feb 2016 10:42:47 +0000
-Subject: [PATCH 2/3] arm64: dts: add the Alpine v2 EVP
-In-Reply-To: <CABM=7k=-Y+eFB2nUMfMjd3saTSNDsEyfHyYNf-ef8qQc5jCsxA@mail.gmail.com>
-References: <1454922699-16785-1-git-send-email-antoine.tenart@free-electrons.com>
- <1454922699-16785-3-git-send-email-antoine.tenart@free-electrons.com>
- <56B8B45D.1020902@arm.com> <20160209085633.GA5388@kwain>
- <20160209090131.GB5388@kwain> <56B9ACE2.1060200@arm.com>
- <CABM=7knaepbyy4nw_GczVM7E_t6py7gG0ERs8ru_AYoVXvAQ+A@mail.gmail.com>
- <56B9B1B5.5070106@arm.com>
- <CABM=7k=-Y+eFB2nUMfMjd3saTSNDsEyfHyYNf-ef8qQc5jCsxA@mail.gmail.com>
-Message-ID: <56B9C2A7.4040402@arm.com>
+From: chauveau.julien@gmail.com (Julien Chauveau)
+Date: Tue, 09 Feb 2016 11:45:08 +0100
+Subject: [PATCH v2 06/10] ARM64: dts: rockchip: Add IR receiver to
+ GeekBox
+In-Reply-To: <56B95827.7060204@suse.de>
+References: <1454897859-7601-1-git-send-email-afaerber@suse.de>
+ <1454897859-7601-7-git-send-email-afaerber@suse.de>
+ <56B95827.7060204@suse.de>
+Message-ID: <56B9C334.2070002@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/02/16 10:13, Tsahee Zidenberg wrote:
-> On 9 February 2016 at 11:30, Marc Zyngier <marc.zyngier@arm.com> wrote:
+
+Le 09/02/2016 04:08, Andreas F?rber a ?crit :
+> Am 08.02.2016 um 03:17 schrieb Andreas F?rber:
+>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+>> ---
+>>   v2: New
+>>   
+>>   arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts | 13 +++++++++++++
+>>   1 file changed, 13 insertions(+)
 >>
->> On 09/02/16 09:14, Tsahee Zidenberg wrote:
->>>
->>>
->>> On 9 February 2016 at 11:09, Marc Zyngier <marc.zyngier@arm.com
->>> <mailto:marc.zyngier@arm.com>> wrote:
->>>
->>>     On 09/02/16 09:01, Antoine Tenart wrote:
->>>     > On Tue, Feb 09, 2016 at 09:56:33AM +0100, Antoine Tenart wrote:
->>>     >> Hi Marc,
->>>     >>
->>>     >> On Mon, Feb 08, 2016 at 03:29:33PM +0000, Marc Zyngier wrote:
->>>     >>> On 08/02/16 09:11, Antoine Tenart wrote:
->>>     >>>
->>>     >>>> +          gic: gic at f0100000 {
->>>     >>>> +                  compatible = "arm,gic-v3";
->>>     >>>> +                  reg = <0x0 0xf0200000 0x0 0x10000>,     /* GIC Dist */
->>>     >>>> +                        <0x0 0xf0280000 0x0 0x200000>,    /* GICR */
->>>     >>>> +                        <0x0 0xf0100000 0x0 0x2000>;      /* GICC */
->>>     >>>> +                  interrupt-controller;
->>>     >>>> +                  #interrupt-cells = <3>;
->>>     >>>> +          };
->>>     >>>
->>>     >>> Something is wrong here. Either you are missing GICH and GICV (assuming
->>>     >>> you have legacy support), or you have an extra GICC region (which
->>>     >>> doesn't make sense on its own).
->>>     >>
->>>     >> I'll add the missing regions.
->>>     >
->>>     > Hmm, in fact the GICC region shouldn't be there. I'll make some tests
->>>     > and remove it.
->>>
->>>     If you have a GICv3 with legacy support, you will probably have GICC,
->>>     GICH and GICV. Linux itself will only use GICD and GICR, but it needs at
->>>     least GICV to be able to virtualize GICv2 guests. And GICV is not
->>>     allowed to exist without GICC and GICH, so I really recommend that you
->>>     keep GICC around.
->>>
->>>
->>> We use the GIC without legacy support (we disable it in early boot
->>> stages), so I think removing the GICC region is the better solution.
->>
->> Disabling legacy support doesn't mean that:
->> - the HW isn't present
->> - the associated regions are not useful
->>
-> By "disabling lecgacy support in early boot" I don't just mean that
-> ARE bit will be set, but it will actually be RAO/WI. There will be no
-> way for SW to enable it and use these registers (which, sadly, means
-> that there will be no way to enable gicv2 virtualization). If you
-> insist - I will dig up the supposed location of GICV and GICH - yet it
-> will be both untested and entirely unusable.
+>> diff --git a/arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts b/arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts
+>> index e4523a74050f..e84383fd6f10 100644
+>> --- a/arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts
+>> +++ b/arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts
+>> @@ -63,6 +63,13 @@
+>>   		#clock-cells = <0>;
+>>   	};
+>>   
+>> +	ir: ir-receiver {
+>> +		compatible = "gpio-ir-receiver";
+>> +		gpios = <&gpio3 30 GPIO_ACTIVE_LOW>;
+>> +		pinctrl-names = "default";
+>> +		pinctrl-0 = <&ir_int>;
+> 		status = "disabled";
+>
+> Should only be enabled in the new Landingship config. Will fix.
+>
+> Andreas
+Actually there's two IR receivers:
+- one on the geekbox module (on the bottom side)
+- and another one on the landingship.
 
-That's quite sad indeed. You are pointlessly breaking existing software.
-But hey, that's your choice. At that point, I can't be bothered to care.
+Both are connected to the same GPIO pin, so you can keep it enabled in 
+the main geekbox dts.
 
-> We will add an entry for the maintenance interrupt, as it really can
-> be used by future configurations.
+About the pinctrl, same remark as for gpio-keys: there's already 
+external pull-up resistors on this pin, so it should be better to use 
+pcfg_pull_none instead of pcfg_pull_up.
 
-Well, at least you'll be able to run GICv3 guests, assuming everything
-else is usable.
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Julien
+>
+> P.S. See Heiko, two bugs in the new nodes already, glad I have them
+> separate. :)
+>
+>> +	};
+>> +
+>>   	leds: gpio-leds {
+>>   		compatible = "gpio-leds";
+>>   
+> [snip]
+>
