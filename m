@@ -1,130 +1,108 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Tue, 9 Feb 2016 15:56:26 +0000
-Subject: [RFC PATCH v2 2/3] PCI: hisi: Make the HiSilicon PCIe host
- controller ECAM compliant
-In-Reply-To: <3763449.y3Mfs92xrA@wuerfel>
-References: <1454935264-6076-1-git-send-email-gabriele.paoloni@huawei.com>
- <2599997.xBRrI3qHak@wuerfel>
- <EE11001F9E5DDD47B7634E2F8A612F2E1ECAD436@lhreml503-mbs>
- <3763449.y3Mfs92xrA@wuerfel>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1ECAF200@lhreml503-mbs>
+From: stuart.yoder@nxp.com (Stuart Yoder)
+Date: Tue, 9 Feb 2016 15:56:55 +0000
+Subject: [PATCH] of/irq: Fix msi-map calculation for nonzero rid-base
+In-Reply-To: <56B9D62E.8080003@arm.com>
+References: <9f6845195d03b0e0b0d187bb510fbf7bd497e836.1455015344.git.robin.murphy@arm.com>
+ <56B9D62E.8080003@arm.com>
+Message-ID: <HE1PR04MB1641AF97F637BBCBB86BA4FE8DD60@HE1PR04MB1641.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+
 > -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: 09 February 2016 15:32
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: Gabriele Paoloni; Lorenzo.Pieralisi at arm.com; jcm at redhat.com;
-> tn at semihalf.com; linux-pci at vger.kernel.org; Linuxarm; xuwei (O); linux-
-> kernel at vger.kernel.org; linux-acpi at vger.kernel.org; Wangzhou (B);
-> liudongdong (C); Guohanjun (Hanjun Guo); bhelgaas at google.com;
-> zhangjukuo; Liguozhu (Kenneth); qiujiang
-> Subject: Re: [RFC PATCH v2 2/3] PCI: hisi: Make the HiSilicon PCIe host
-> controller ECAM compliant
+> From: Marc Zyngier [mailto:marc.zyngier at arm.com]
+> Sent: Tuesday, February 09, 2016 6:06 AM
+> To: Robin Murphy <robin.murphy@arm.com>; robh+dt at kernel.org; frowand.list at gmail.com;
+> grant.likely at linaro.org; devicetree at vger.kernel.org
+> Cc: mark.rutland at arm.com; david.daney at cavium.com; Stuart Yoder <stuart.yoder@nxp.com>;
+> linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
+> stable at vger.kernel.org
+> Subject: Re: [PATCH] of/irq: Fix msi-map calculation for nonzero rid-base
 > 
-> On Monday 08 February 2016 17:21:27 Gabriele Paoloni wrote:
-> > Hi Arnd
-> >
-> > > -----Original Message-----
-> > > From: Arnd Bergmann [mailto:arnd at arndb.de]
-> > > Sent: 08 February 2016 16:30
-> > > To: Gabriele Paoloni
-> > > Cc: linux-arm-kernel at lists.infradead.org; Guohanjun (Hanjun Guo);
-> > > Wangzhou (B); liudongdong (C); Linuxarm; qiujiang;
-> bhelgaas at google.com;
-> > > Lorenzo.Pieralisi at arm.com; tn at semihalf.com; linux-
-> pci at vger.kernel.org;
-> > > linux-kernel at vger.kernel.org; xuwei (O); linux-acpi at vger.kernel.org;
-> > > jcm at redhat.com; zhangjukuo; Liguozhu (Kenneth)
-> > > Subject: Re: [RFC PATCH v2 2/3] PCI: hisi: Make the HiSilicon PCIe
-> host
-> > > controller ECAM compliant
-> > >
-> > > On Monday 08 February 2016 15:55:35 Gabriele Paoloni wrote:
-> > > > > Doesn't this break backwards compatibility?
-> > > >
-> > > > Well Hip05/Hip06 SoCs are used into evaluation boards
-> > > > For the Estuary project.
-> > > >
-> > > > https://github.com/hisilicon/estuary
-> > > >
-> > > > As this new driver gets upstream we'll merge this new driver into
-> > > estuary
-> > > > and release a new version of the firmware to support it.
-> > >
-> > > So what happens to folks running the old firmware then?
-> >
-> > So far we haven't released the PCIe nodes dtsi upstream and we think
-> > we can handle the firmware upgrade for our current users either
-> > by pointing them to the updated Estuary branch or by internal
-> > channels
+> Hi Robin,
 > 
-> The dts files in the kernel tree are not really that important,
-> the question is whether you are breaking things for real users.
+> On 09/02/16 11:04, Robin Murphy wrote:
+> > The existing msi-map code is fine for shifting the entire RID space
+> > upwards, but attempting finer-grained remapping reveals a bug. It turns
+> > out that we are mistakenly treating the msi-base part as an offset, not
+> > as a new base to remap onto, so things get squiffy when rid-base is
+> > nonzero. Fix this, and at the same time add a sanity check against
+> > having msi-map-mask clash with a nonzero rid-base, as that's another
+> > thing one can easily get wrong.
+> >
+> > CC: <stable@vger.kernel.org>
+> > Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 > 
-> If the upstream drivers work on some released firmware version,
-> they should keep working.
+> Looks like Stuart and you both found the same bug at the same time:
+> https://lkml.org/lkml/2016/2/8/1066
 > 
-> > >
-> > > > > I think you need to use a new compatible string in the firmware
-> > > > > if you change the register layout, and then change the driver
-> > > > > to support both the old and the new layout.
-> > > >
-> > > > You are right, for some reason in this patchset I missed the
-> > > Documentation
-> > > > update that I posted in the previous one, i.e.:
-> > > >
-> > > > --- a/Documentation/devicetree/bindings/pci/hisilicon-pcie.txt
-> > > > +++ b/Documentation/devicetree/bindings/pci/hisilicon-pcie.txt
-> > > > @@ -23,8 +23,8 @@ Optional properties:
-> > > >  Hip05 Example (note that Hip06 is the same except compatible):
-> > > >         pcie at 0xb0080000 {
-> > > >                 compatible = "hisilicon,hip05-pcie", "snps,dw-
-> pcie";
-> > > > -               reg = <0 0xb0080000 0 0x10000>, <0x220 0x00000000
-> 0
-> > > 0x2000>;
-> > > > -               reg-names = "rc_dbi", "config";
-> > > > +               reg = <0 0xb0080000 0 0x10000>, <0x220 0x00100000
-> 0
-> > > 0x0f00000>;
-> > > > +               reg-names = "rc_dbi", "ecam-cfg";
-> > > >
-> > >
-> > > That is not the compatible string, it's an undocumented register
-> set.
-> >
-> > Sorry, I misunderstood here, got it now :)
-> >
-> > > You can either define the a new compatible string that gives the
-> > > "config"
-> > > registers a new meaning, or you change the binding to allow two
-> either
-> > > a "config" or an "ecam-cfg" register set, and let the driver handle
-> > > both.
-> >
-> > As per reply above I think that it would be quite easy for us to
-> > let out current users update the BIOS so I don't think there is any
-> > value in maintaining two version of the drivers one of which will
-> > not be used.
-> >
-> > What do you think?
+> but yours seem more correct to me (the rid_base masking in Stuart's
+> version seems odd).
 > 
-> Requiring a BIOS update for a kernel update is really bad, even more
-> so when the same BIOS update breaks older kernels.
+> > ---
+> >  drivers/of/irq.c | 9 ++++++++-
+> >  1 file changed, 8 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/drivers/of/irq.c b/drivers/of/irq.c
+> > index 7ee21ae..e7bfc17 100644
+> > --- a/drivers/of/irq.c
+> > +++ b/drivers/of/irq.c
+> > @@ -635,6 +635,13 @@ static u32 __of_msi_map_rid(struct device *dev, struct
+> device_node **np,
+> >  		msi_base = be32_to_cpup(msi_map + 2);
+> >  		rid_len = be32_to_cpup(msi_map + 3);
+> >
+> > +		if (rid_base & ~map_mask) {
+> > +			dev_err(parent_dev,
+> > +				"Invalid msi-map translation - msi-map-mask (0x%x) ignores rid-
+> base (0x%x)\n",
+> > +				map_mask, rid_base);
+> > +			return rid_out;
+> > +		}
+> > +
+> >  		msi_controller_node = of_find_node_by_phandle(phandle);
+> >
+> >  		matched = (masked_rid >= rid_base &&
+> > @@ -654,7 +661,7 @@ static u32 __of_msi_map_rid(struct device *dev, struct device_node
+> **np,
+> >  	if (!matched)
+> >  		return rid_out;
+> >
+> > -	rid_out = masked_rid + msi_base;
+> > +	rid_out = masked_rid - rid_base + msi_base;
+> >  	dev_dbg(dev,
+> >  		"msi-map at: %s, using mask %08x, rid-base: %08x, msi-base: %08x, length:
+> %08x, rid: %08x -> %08x\n",
+> >  		dev_name(parent_dev), map_mask, rid_base, msi_base,
+> >
 
-Well I see your point.
+This computation:  masked_rid - rid_base
 
-To be honest I won't expect many users of the old BIOS version since
-as I said we plan to send out the BIOS update to pretty much every user,
-however on the other side it is not too much effort for me to add code
-to support both ECAM/non ECAM, 
-so ok I'll fix this in v3,
+...doesn't seem right to me.  We are taking a rid that
+has been already masked and subtracting a rid base that has
+not been masked.   I don't see how you can combine masked
+and unmasked values in the same calculation.
 
-Many Thanks
+Say I have this msi mapping:
 
-Gab
+                   msi-map = <0x0100 &its 0x11 0x1>;
+                   msi-map-mask = <0xff>;
 
-> 
-> 	Arnd
+masked_rid = 0x0
+rid_base = 0x0100
+msi_base = 0x11
+
+masked_rid - rid_base is 0x0 - 0x0100...which does not
+give the msi index/offset we want.
+
+Correct final answer should be 0x11.
+
+In my patch I masked the rid_base so it can be subtracted
+from the masked_rid.
+
+masked_rid_base = 0x00
+
+   msi_base + (masked_rid - masked_rid_base) = 0x11
+
+
+Stuart
