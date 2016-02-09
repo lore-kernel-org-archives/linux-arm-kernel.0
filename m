@@ -1,55 +1,184 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 9 Feb 2016 13:22:15 +0000
-Subject: [PATCH v2] arm64: disable kasan when accessing frame->fp in
- unwind_frame
-In-Reply-To: <1454951589-18238-1-git-send-email-yang.shi@linaro.org>
-References: <1454951589-18238-1-git-send-email-yang.shi@linaro.org>
-Message-ID: <20160209132215.GL22874@arm.com>
+From: oded.gabbay@gmail.com (Oded Gabbay)
+Date: Tue, 9 Feb 2016 15:39:01 +0200
+Subject: [RESEND PATCH v1] drm: Clean up drm Makefile
+In-Reply-To: <20160209092941.GE11240@phenom.ffwll.local>
+References: <1454147777-77577-1-git-send-email-xinliang.liu@linaro.org>
+ <CAFCwf120-19JKDGGPOBQ4ALg=f5ESG4pVhMeN1s=0uz3OpoFpg@mail.gmail.com>
+ <20160209092941.GE11240@phenom.ffwll.local>
+Message-ID: <CAFCwf11hRvb1u9SghgJofyVa59B0q8f1JYm=uRofzrm+pvLpTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 08, 2016 at 09:13:09AM -0800, Yang Shi wrote:
-> When boot arm64 kernel with KASAN enabled, the below error is reported by
-> kasan:
-> 
-> BUG: KASAN: out-of-bounds in unwind_frame+0xec/0x260 at addr ffffffc064d57ba0
-> Read of size 8 by task pidof/499
-> page:ffffffbdc39355c0 count:0 mapcount:0 mapping:          (null) index:0x0
-> flags: 0x0()
-> page dumped because: kasan: bad access detected
-> CPU: 2 PID: 499 Comm: pidof Not tainted 4.5.0-rc1 #119
-> Hardware name: Freescale Layerscape 2085a RDB Board (DT)
-> Call trace:
-> [<ffffffc00008d078>] dump_backtrace+0x0/0x290
-> [<ffffffc00008d32c>] show_stack+0x24/0x30
-> [<ffffffc0006a981c>] dump_stack+0x8c/0xd8
-> [<ffffffc0002e4400>] kasan_report_error+0x558/0x588
-> [<ffffffc0002e4958>] kasan_report+0x60/0x70
-> [<ffffffc0002e3188>] __asan_load8+0x60/0x78
-> [<ffffffc00008c92c>] unwind_frame+0xec/0x260
-> [<ffffffc000087e60>] get_wchan+0x110/0x160
-> [<ffffffc0003b647c>] do_task_stat+0xb44/0xb68
-> [<ffffffc0003b7730>] proc_tgid_stat+0x40/0x50
-> [<ffffffc0003ac840>] proc_single_show+0x88/0xd8
-> [<ffffffc000345be8>] seq_read+0x370/0x770
-> [<ffffffc00030aba0>] __vfs_read+0xc8/0x1d8
-> [<ffffffc00030c0ec>] vfs_read+0x94/0x168
-> [<ffffffc00030d458>] SyS_read+0xb8/0x128
-> [<ffffffc000086530>] el0_svc_naked+0x24/0x28
-> Memory state around the buggy address:
->  ffffffc064d57a80: 00 00 00 00 00 00 00 00 f1 f1 f1 f1 00 00 f4 f4
->  ffffffc064d57b00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-> >ffffffc064d57b80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
->                                   ^
->  ffffffc064d57c00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
->  ffffffc064d57c80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-> 
-> Since the shadow byte pointed by the report is 0, so it may mean it is just hit
-> oob in non-current task. So, disable the instrumentation to silence these
-> warnings.
-> 
-> Signed-off-by: Yang Shi <yang.shi@linaro.org>
+On Tue, Feb 9, 2016 at 11:29 AM, Daniel Vetter <daniel@ffwll.ch> wrote:
+> On Sat, Jan 30, 2016 at 01:11:01PM +0200, Oded Gabbay wrote:
+>> On Sat, Jan 30, 2016 at 11:56 AM, Xinliang Liu <xinliang.liu@linaro.org> wrote:
+>> > This patch cleans up the Makefile of drm root directory.
+>> > Make core and device drivers configuration list sorted Alphabetically.
+>> >
+>> > Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
+>> > Reviewed-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
+>> > Reviewed-by: Yifan Liu <liu_fanyi@163.com>
+>> > ---
+>> >  drivers/gpu/drm/Makefile | 102 ++++++++++++++++++++++++-----------------------
+>> >  1 file changed, 52 insertions(+), 50 deletions(-)
+>> >
+>> > diff --git a/drivers/gpu/drm/Makefile b/drivers/gpu/drm/Makefile
+>> > index 61766dec6a8d..77000717305b 100644
+>> > --- a/drivers/gpu/drm/Makefile
+>> > +++ b/drivers/gpu/drm/Makefile
+>> > @@ -2,6 +2,9 @@
+>> >  # Makefile for the drm device driver.  This driver provides support for the
+>> >  # Direct Rendering Infrastructure (DRI) in XFree86 4.1.0 and higher.
+>> >
+>> > +CFLAGS_drm_trace_points.o := -I$(src)
+>> > +
+>> > +# core. Please keep this list sorted alphabetically
+>> >  drm-y       := drm_auth.o drm_bufs.o drm_cache.o \
+>> >                 drm_context.o drm_dma.o \
+>> >                 drm_fops.o drm_gem.o drm_ioctl.o drm_irq.o \
+>> > @@ -13,64 +16,63 @@ drm-y       :=      drm_auth.o drm_bufs.o drm_cache.o \
+>> >                 drm_trace_points.o drm_global.o drm_prime.o \
+>> >                 drm_rect.o drm_vma_manager.o drm_flip_work.o \
+>> >                 drm_modeset_lock.o drm_atomic.o drm_bridge.o
+>> > -
+>> > -drm-$(CONFIG_COMPAT) += drm_ioc32.o
+>> > -drm-$(CONFIG_DRM_GEM_CMA_HELPER) += drm_gem_cma_helper.o
+>> >  drm-$(CONFIG_PCI) += ati_pcigart.o
+>> > -drm-$(CONFIG_DRM_PANEL) += drm_panel.o
+>> > -drm-$(CONFIG_OF) += drm_of.o
+>> >  drm-$(CONFIG_AGP) += drm_agpsupport.o
+>> > +drm-$(CONFIG_DRM_GEM_CMA_HELPER) += drm_gem_cma_helper.o
+>> > +drm-$(CONFIG_COMPAT) += drm_ioc32.o
+>> > +drm-$(CONFIG_OF) += drm_of.o
+>> > +drm-$(CONFIG_DRM_PANEL) += drm_panel.o
+>> > +obj-$(CONFIG_DRM)      += drm.o
+>> > +
+>> > +obj-$(CONFIG_DRM_MIPI_DSI) += drm_mipi_dsi.o
+>> >
+>> >  drm_kms_helper-y := drm_crtc_helper.o drm_dp_helper.o drm_probe_helper.o \
+>> >                 drm_plane_helper.o drm_dp_mst_topology.o drm_atomic_helper.o
+>> >  drm_kms_helper-$(CONFIG_DRM_LOAD_EDID_FIRMWARE) += drm_edid_load.o
+>> > -drm_kms_helper-$(CONFIG_DRM_FBDEV_EMULATION) += drm_fb_helper.o
+>> >  drm_kms_helper-$(CONFIG_DRM_KMS_CMA_HELPER) += drm_fb_cma_helper.o
+>> > -
+>> > +drm_kms_helper-$(CONFIG_DRM_FBDEV_EMULATION) += drm_fb_helper.o
+>> >  obj-$(CONFIG_DRM_KMS_HELPER) += drm_kms_helper.o
+>> >
+>> > -CFLAGS_drm_trace_points.o := -I$(src)
+>> > +obj-$(CONFIG_DRM_TTM) += ttm/
+>> >
+>> > -obj-$(CONFIG_DRM)      += drm.o
+>> > -obj-$(CONFIG_DRM_MIPI_DSI) += drm_mipi_dsi.o
+>> > -obj-$(CONFIG_DRM_TTM)  += ttm/
+>> > -obj-$(CONFIG_DRM_TDFX) += tdfx/
+>> > -obj-$(CONFIG_DRM_R128) += r128/
+>> > -obj-$(CONFIG_HSA_AMD) += amd/amdkfd/
+>> > -obj-$(CONFIG_DRM_RADEON)+= radeon/
+>> > -obj-$(CONFIG_DRM_AMDGPU)+= amd/amdgpu/
+>> > -obj-$(CONFIG_DRM_MGA)  += mga/
+>> > -obj-$(CONFIG_DRM_I810) += i810/
+>> > -obj-$(CONFIG_DRM_I915)  += i915/
+>> > -obj-$(CONFIG_DRM_MGAG200) += mgag200/
+>> > -obj-$(CONFIG_DRM_VC4)  += vc4/
+>> > -obj-$(CONFIG_DRM_CIRRUS_QEMU) += cirrus/
+>> > -obj-$(CONFIG_DRM_SIS)   += sis/
+>> > -obj-$(CONFIG_DRM_SAVAGE)+= savage/
+>> > -obj-$(CONFIG_DRM_VMWGFX)+= vmwgfx/
+>> > -obj-$(CONFIG_DRM_VIA)  +=via/
+>> > -obj-$(CONFIG_DRM_VGEM) += vgem/
+>> > -obj-$(CONFIG_DRM_NOUVEAU) +=nouveau/
+>> > -obj-$(CONFIG_DRM_EXYNOS) +=exynos/
+>> > -obj-$(CONFIG_DRM_ROCKCHIP) +=rockchip/
+>> > -obj-$(CONFIG_DRM_GMA500) += gma500/
+>> > -obj-$(CONFIG_DRM_UDL) += udl/
+>> > -obj-$(CONFIG_DRM_AST) += ast/
+>> > -obj-$(CONFIG_DRM_ARMADA) += armada/
+>> > +# device drivers. Please keep this list sorted alphabetically
+>> > +obj-$(CONFIG_DRM_AMDGPU)       += amd/amdgpu/
+>> > +obj-$(CONFIG_HSA_AMD)          += amd/amdkfd/
+>> > +obj-$(CONFIG_DRM_ARMADA)       += armada/
+>> > +obj-$(CONFIG_DRM_AST)          += ast/
+>> >  obj-$(CONFIG_DRM_ATMEL_HLCDC)  += atmel-hlcdc/
+>> > -obj-$(CONFIG_DRM_RCAR_DU) += rcar-du/
+>> > -obj-$(CONFIG_DRM_SHMOBILE) +=shmobile/
+>> > -obj-y                  += omapdrm/
+>> > -obj-y                  += tilcdc/
+>> > -obj-$(CONFIG_DRM_QXL) += qxl/
+>> > -obj-$(CONFIG_DRM_BOCHS) += bochs/
+>> > -obj-$(CONFIG_DRM_VIRTIO_GPU) += virtio/
+>> > -obj-$(CONFIG_DRM_MSM) += msm/
+>> > -obj-$(CONFIG_DRM_TEGRA) += tegra/
+>> > -obj-$(CONFIG_DRM_STI) += sti/
+>> > -obj-$(CONFIG_DRM_IMX) += imx/
+>> > -obj-y                  += i2c/
+>> > -obj-y                  += panel/
+>> > -obj-y                  += bridge/
+>> > -obj-$(CONFIG_DRM_FSL_DCU) += fsl-dcu/
+>> > -obj-$(CONFIG_DRM_ETNAVIV) += etnaviv/
+>> > +obj-$(CONFIG_DRM_BOCHS)                += bochs/
+>> > +obj-y                          += bridge/
+>> > +obj-$(CONFIG_DRM_CIRRUS_QEMU)  += cirrus/
+>> > +obj-$(CONFIG_DRM_ETNAVIV)      += etnaviv/
+>> > +obj-$(CONFIG_DRM_EXYNOS)       += exynos/
+>> > +obj-$(CONFIG_DRM_FSL_DCU)      += fsl-dcu/
+>> > +obj-$(CONFIG_DRM_GMA500)       += gma500/
+>> > +obj-y                          += i2c/
+>> > +obj-$(CONFIG_DRM_I810)         += i810/
+>> > +obj-$(CONFIG_DRM_I915)         += i915/
+>> > +obj-$(CONFIG_DRM_IMX)          += imx/
+>> > +obj-$(CONFIG_DRM_MGA)          += mga/
+>> > +obj-$(CONFIG_DRM_MGAG200)      += mgag200/
+>> > +obj-$(CONFIG_DRM_MSM)          += msm/
+>> > +obj-$(CONFIG_DRM_NOUVEAU)      += nouveau/
+>> > +obj-y                          += omapdrm/
+>> > +obj-y                          += panel/
+>> > +obj-$(CONFIG_DRM_QXL)          += qxl/
+>> > +obj-$(CONFIG_DRM_R128)         += r128/
+>> > +obj-$(CONFIG_DRM_RADEON)       += radeon/
+>> > +obj-$(CONFIG_DRM_RCAR_DU)      += rcar-du/
+>> > +obj-$(CONFIG_DRM_ROCKCHIP)     += rockchip/
+>> > +obj-$(CONFIG_DRM_SAVAGE)       += savage/
+>> > +obj-$(CONFIG_DRM_SHMOBILE)     += shmobile/
+>> > +obj-$(CONFIG_DRM_SIS)          += sis/
+>> > +obj-$(CONFIG_DRM_STI)          += sti/
+>> > +obj-$(CONFIG_DRM_TDFX)         += tdfx/
+>> > +obj-$(CONFIG_DRM_TEGRA)                += tegra/
+>> > +obj-y                          += tilcdc/
+>> > +obj-$(CONFIG_DRM_UDL)          += udl/
+>> > +obj-$(CONFIG_DRM_VC4)          += vc4/
+>> > +obj-$(CONFIG_DRM_VGEM)         += vgem/
+>> > +obj-$(CONFIG_DRM_VIA)          += via/
+>> > +obj-$(CONFIG_DRM_VIRTIO_GPU)   += virtio/
+>> > +obj-$(CONFIG_DRM_VMWGFX)       += vmwgfx/
+>> > --
+>> > 1.9.1
+>> >
+>> > _______________________________________________
+>> > dri-devel mailing list
+>> > dri-devel at lists.freedesktop.org
+>> > http://lists.freedesktop.org/mailman/listinfo/dri-devel
+>>
+>> NACK, amdkfd *must* be before amdgpu *and* radeon, because it needs to
+>> be already loaded when amdgpu/radeon get loaded, and when all these
+>> drivers are compiled inside the kernel, the order is maintained by the
+>> linkage order in the makefile.
+>
+> That's not how this is supposed to be done. If you have inter-driver
+> depencies like this you need to check for them, and defer the driver
+> loading by returngin -EPROBE_DEFER. The core kernel will then re-probe
+> your driver once other drivers have loaded. Handling inter-driver deps
+> using compile-ordering is seriously too fragile.
+>
+> Please fix this up, thanks.
+> -Daniel
+> --
+> Daniel Vetter
+> Software Engineer, Intel Corporation
+> http://blog.ffwll.ch
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+Hi Daniel,
 
-Will
+Thanks for the EPROBE_DEFER pointer - I'll try to take a look and see
+if it could be fixed quickly for 4.6
+
+Oded
