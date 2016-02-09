@@ -1,84 +1,36 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 9 Feb 2016 21:59:19 +0100
-Subject: [PATCH 0/8] KVM/ARM: Guest Entry/Exit optimizations
-In-Reply-To: <1454931622-14902-1-git-send-email-marc.zyngier@arm.com>
-References: <1454931622-14902-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20160209205919.GF5171@cbox>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Tue, 9 Feb 2016 16:01:16 -0500
+Subject: [PATCH V13 08/10] dma: qcom_hidma: read the channel id from HW
+In-Reply-To: <56B75CF8.9070709@codeaurora.org>
+References: <1454106914-15857-1-git-send-email-okaya@codeaurora.org>
+ <1454106914-15857-9-git-send-email-okaya@codeaurora.org>
+ <20160201153542.GA20396@leverpostej> <56B247A1.20503@codeaurora.org>
+ <20160203183650.GI1234@leverpostej> <56B75CF8.9070709@codeaurora.org>
+Message-ID: <56BA539C.4030403@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 08, 2016 at 11:40:14AM +0000, Marc Zyngier wrote:
-> I've recently been looking at our entry/exit costs, and profiling
-> figures did show some very low hanging fruits.
+On 2/7/2016 10:04 AM, Sinan Kaya wrote:
+> Hi Mark,
 > 
-> The most obvious cost is that accessing the GIC HW is slow. As in
-> "deadly slow", specially when GICv2 is involved. So not hammering the
-> HW when there is nothing to write is immediately beneficial, as this
-> is the most common cases (whatever people seem to think, interrupts
-> are a *rare* event).
+> On 2/3/2016 1:36 PM, Mark Rutland wrote:
+>> > Sorry, but it's going to be far easier to review with useless code
+>> > removed, so I will wait until the next posting where this patch is
+>> > folded in.
+> V14 of the patch have been posted on the mail-list where this patch has
+> been folder into the existing code. 
 > 
-> Another easy thing to fix is the way we handle trapped system
-> registers. We do insist on (mostly) sorting them, but we do perform a
-> linear search on trap. We can switch to a binary search for free, and
-> get immediate benefits (the PMU code, being extremely trap-happy,
-> benefits immediately from this).
+> https://lkml.org/lkml/2016/2/4/1086
 > 
-> With these in place, I see an improvement of 20 to 30% (depending on
-> the platform) on our world-switch cycle count when running a set of
-> hand-crafted guests that are designed to only perform traps.
+> I have also captured the information you previously asked into the cover 
+> letter as you asked.
+> 
+> I'm looking forward to hear your other comments.
+> Sinan
 
-I'm curious about the weight of these two?  My guess based on the
-measurement work I did is that the GIC is by far the worst sinner, but
-that was exacerbated on X-Gene compared to Seattle.
+ping
 
-> 
-> Methodology:
-> 
-> * NULL-hypercall guest: Perform 65536 PSCI_0_2_FN_PSCI_VERSION calls,
-> and then a power-off:
-> 
-> __start:
-> 	mov	x19, #(1 << 16)
-> 1:	mov	x0, #0x84000000
-> 	hvc	#0
-> 	sub	x19, x19, #1
-> 	cbnz	x19, 1b
-> 	mov	x0, #0x84000000
-> 	add	x0, x0, #9
-> 	hvc	#0
-> 	b	.
-> 
-> * sysreg trap guest: Perform 2^20 PMSELR_EL0 accesses, and power-off:
-> 
-> __start:
-> 	mov	x19, #(1 << 20)
-> 1:	mrs	x0, PMSELR_EL0
-> 	sub	x19, x19, #1
-> 	cbnz	x19, 1b
-> 	mov	x0, #0x84000000
-> 	add	x0, x0, #9
-> 	hvc	#0
-> 	b	.
-> 
-> * These guests are profiled using perf and kvmtool:
-> 
-> taskset -c 1 perf stat -e cycles:kh lkvm run -c1 --kernel do_sysreg.bin 2>&1 >/dev/null| grep cycles
-
-these would be good to add to kvm-unit-tests so we can keep an eye on
-this sort of thing...
-
-
-> 
-> The result is then divided by the number of iterations (2^16 or 2^20).
-> 
-> These tests have been run on Seattle, Mustang, and LS2085, and shown
-> significant improvements in all cases. I've only touched the arm64
-> GIC code, but obviously the 32bit code should use it as well once
-> we've migrated it to C.
-> 
-> I've pushed out a branch (kvm-arm64/suck-less) to the usual location.
-> 
-
-Looks promising!
-
--Christoffer
+-- 
+Sinan Kaya
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
