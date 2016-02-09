@@ -1,73 +1,40 @@
 From: rrichter@caviumnetworks.com (Robert Richter)
-Date: Tue, 9 Feb 2016 14:53:41 +0100
-Subject: [PATCH v4 1/6] of/fdt: make generic early_init_dt_add_memory_arch() a
- weak alias
+Date: Tue, 9 Feb 2016 14:53:42 +0100
+Subject: [PATCH v4 2/6] arm64: override generic version of
+ early_init_dt_add_memory_arch()
 In-Reply-To: <1455026026-11571-1-git-send-email-rrichter@caviumnetworks.com>
 References: <1455026026-11571-1-git-send-email-rrichter@caviumnetworks.com>
-Message-ID: <1455026026-11571-2-git-send-email-rrichter@caviumnetworks.com>
+Message-ID: <1455026026-11571-3-git-send-email-rrichter@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-The function early_init_dt_add_memory_arch() is defined as __weak
-so that archs can override it. However, in this override implementation,
-it may still be useful to invoke the generic implementation, so instead,
-rename the generic version to early_init_dt_add_memory() and turn the
-original definition into a weak alias. This way, the generic version can
-still be called even in the presence of an arch specific override.
+Override the __weak early_init_dt_add_memory_arch() with our own
+version. We need this in a subsequent patch to make the handling of
+the memory nodes conditional on whether we are booting via UEFI or
+not. Note that for now, all that our version does is invoke the generic
+implementation.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Message-Id: <1442881288-13962-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-Id: <1442881288-13962-3-git-send-email-ard.biesheuvel@linaro.org>
 Signed-off-by: Robert Richter <rrichter@cavium.com>
 ---
- drivers/of/fdt.c       | 7 +++++--
- include/linux/of_fdt.h | 1 +
- 2 files changed, 6 insertions(+), 2 deletions(-)
+ arch/arm64/mm/init.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
-index 655f79db7899..cba8281ab5fd 100644
---- a/drivers/of/fdt.c
-+++ b/drivers/of/fdt.c
-@@ -980,7 +980,7 @@ int __init early_init_dt_scan_chosen(unsigned long node, const char *uname,
- #define MAX_MEMBLOCK_ADDR	((phys_addr_t)~0)
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index f3b061e67bfe..208c1d359018 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -380,3 +380,8 @@ static int __init keepinitrd_setup(char *__unused)
+ 
+ __setup("keepinitrd", keepinitrd_setup);
  #endif
- 
--void __init __weak early_init_dt_add_memory_arch(u64 base, u64 size)
-+void __init early_init_dt_add_memory(u64 base, u64 size)
- {
- 	const u64 phys_offset = __pa(PAGE_OFFSET);
- 
-@@ -1038,7 +1038,7 @@ void * __init __weak early_init_dt_alloc_memory_arch(u64 size, u64 align)
- 	return __va(memblock_alloc(size, align));
- }
- #else
--void __init __weak early_init_dt_add_memory_arch(u64 base, u64 size)
-+void __init early_init_dt_add_memory(u64 base, u64 size)
- {
- 	WARN_ON(1);
- }
-@@ -1058,6 +1058,9 @@ void * __init __weak early_init_dt_alloc_memory_arch(u64 size, u64 align)
- }
- #endif
- 
-+__weak __alias(early_init_dt_add_memory)
-+void early_init_dt_add_memory_arch(u64 base, u64 size);
 +
- bool __init early_init_dt_verify(void *params)
- {
- 	if (!params)
-diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
-index df9ef3801812..463a06ba87ac 100644
---- a/include/linux/of_fdt.h
-+++ b/include/linux/of_fdt.h
-@@ -65,6 +65,7 @@ extern int early_init_dt_scan_memory(unsigned long node, const char *uname,
- 				     int depth, void *data);
- extern void early_init_fdt_scan_reserved_mem(void);
- extern void early_init_fdt_reserve_self(void);
-+extern void early_init_dt_add_memory(u64 base, u64 size);
- extern void early_init_dt_add_memory_arch(u64 base, u64 size);
- extern int early_init_dt_reserve_memory_arch(phys_addr_t base, phys_addr_t size,
- 					     bool no_map);
++void __init early_init_dt_add_memory_arch(u64 base, u64 size)
++{
++	early_init_dt_add_memory(base, size);
++}
 -- 
 2.7.0.rc3
