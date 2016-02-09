@@ -1,57 +1,105 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 9 Feb 2016 16:54:14 +0000
-Subject: [PATCH v2] arm64: disable kasan when accessing frame->fp in
- unwind_frame
-In-Reply-To: <1454951589-18238-1-git-send-email-yang.shi@linaro.org>
-References: <1454951589-18238-1-git-send-email-yang.shi@linaro.org>
-Message-ID: <20160209165414.GT22874@arm.com>
+From: raveendra.padasalagi@broadcom.com (Raveendra Padasalagi)
+Date: Tue, 9 Feb 2016 22:25:26 +0530
+Subject: [PATCH 1/3] input: cygnus-update touchscreen dt node document
+In-Reply-To: <2631849.GeOulu78vx@wuerfel>
+References: <1455008277-8312-1-git-send-email-raveendra.padasalagi@broadcom.com>
+ <1455008277-8312-2-git-send-email-raveendra.padasalagi@broadcom.com>
+ <2631849.GeOulu78vx@wuerfel>
+Message-ID: <3b53af6b6c6735d10cb88518c8b8a0ae@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 08, 2016 at 09:13:09AM -0800, Yang Shi wrote:
-> When boot arm64 kernel with KASAN enabled, the below error is reported by
-> kasan:
-> 
-> BUG: KASAN: out-of-bounds in unwind_frame+0xec/0x260 at addr ffffffc064d57ba0
-> Read of size 8 by task pidof/499
-> page:ffffffbdc39355c0 count:0 mapcount:0 mapping:          (null) index:0x0
-> flags: 0x0()
-> page dumped because: kasan: bad access detected
-> CPU: 2 PID: 499 Comm: pidof Not tainted 4.5.0-rc1 #119
-> Hardware name: Freescale Layerscape 2085a RDB Board (DT)
-> Call trace:
-> [<ffffffc00008d078>] dump_backtrace+0x0/0x290
-> [<ffffffc00008d32c>] show_stack+0x24/0x30
-> [<ffffffc0006a981c>] dump_stack+0x8c/0xd8
-> [<ffffffc0002e4400>] kasan_report_error+0x558/0x588
-> [<ffffffc0002e4958>] kasan_report+0x60/0x70
-> [<ffffffc0002e3188>] __asan_load8+0x60/0x78
-> [<ffffffc00008c92c>] unwind_frame+0xec/0x260
-> [<ffffffc000087e60>] get_wchan+0x110/0x160
-> [<ffffffc0003b647c>] do_task_stat+0xb44/0xb68
-> [<ffffffc0003b7730>] proc_tgid_stat+0x40/0x50
-> [<ffffffc0003ac840>] proc_single_show+0x88/0xd8
-> [<ffffffc000345be8>] seq_read+0x370/0x770
-> [<ffffffc00030aba0>] __vfs_read+0xc8/0x1d8
-> [<ffffffc00030c0ec>] vfs_read+0x94/0x168
-> [<ffffffc00030d458>] SyS_read+0xb8/0x128
-> [<ffffffc000086530>] el0_svc_naked+0x24/0x28
-> Memory state around the buggy address:
->  ffffffc064d57a80: 00 00 00 00 00 00 00 00 f1 f1 f1 f1 00 00 f4 f4
->  ffffffc064d57b00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-> >ffffffc064d57b80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
->                                   ^
->  ffffffc064d57c00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
->  ffffffc064d57c80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-> 
-> Since the shadow byte pointed by the report is 0, so it may mean it is just hit
-> oob in non-current task. So, disable the instrumentation to silence these
-> warnings.
+> -----Original Message-----
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: 09 February 2016 16:34
+> To: Raveendra Padasalagi
+> Cc: Dmitry Torokhov; Russell King; devicetree at vger.kernel.org;
+linux-arm-
+> kernel at lists.infradead.org; linux-input at vger.kernel.org; Rob Herring;
+Pawel
+> Moll; Mark Rutland; Ian Campbell; Kumar Gala; Jonathan Richardson; Jon
+> Mason; Florian Fainelli; Ray Jui; Scott Branden;
+linux-kernel at vger.kernel.org;
+> bcm-kernel-feedback-list at broadcom.com
+> Subject: Re: [PATCH 1/3] input: cygnus-update touchscreen dt node
+document
+>
+> On Tuesday 09 February 2016 14:27:55 Raveendra Padasalagi wrote:
+> > +
+> > +One of the below 2 property is mandatory.
+> > +- ts_syscon: handler of syscon node defining physical base address
+> > +  of the controller and length of memory mapped region.
+> > +  If this property is selected please make sure MFD_SYSCON config
+> > +  is enabled in the defconfig file.
+> > +or
+> > +- reg: physical base address of the controller and length of memory
+> > +  mapped region.
+> > +
+> >  - clocks:  The clock provided by the SOC to driver the tsc
+> >  - clock-name:  name for the clock
+> >  - interrupts: The touchscreen controller's interrupt @@ -54,12 +62,16
+> > @@ Optional properties:
+> >  - touchscreen-inverted-y: Y axis is inverted (boolean)
+> >
+> >  Example:
+> > +       ts_adc_syscon: ts_adc_syscon at 0x180a6000 {
+> > +               compatible = "syscon";
+> > +               reg = <0x180a6000 0xc30>;
+> > +       };
+> >
+> >         touchscreen: tsc at 0x180A6000 {
+> >                 compatible = "brcm,iproc-touchscreen";
+> >                 #address-cells = <1>;
+> >                 #size-cells = <1>;
+> > -               reg = <0x180A6000 0x40>;
+> > +               syscon = <&ts_adc_syscon>;
+> >                 clocks = <&adc_clk>;
+> >                 clock-names = "tsc_clk";
+> >                 interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>;
+>
+> This doesn't seem right: For one thing, it's an incompatible binding
+change which
+> you should try to avoid.
 
-Curious, but how did you trigger this? I'm just trying to confirm that
-mainline is affected, but my machine boots happily with KASAN and STACKTRACE
-selected and I can cat /proc/self/{stack,stat} quite happily.
+> Worse, the syscon has a name indicating that it really has a particular
+function,
+> but the name is completely generic (just "syscon"). Please add a
+specific
+> compatible string identifying the device that owns the registers, and
+put any
+> other associated properties (clocks, interrupts, ...) that are for that
+device in
+> general rather than just the touchscreen in there.
 
-What am I missing?
+By mistake "syscon" name is documented in "touchscreen" label above. In
+the
+touchscreen driver code and .dtsi file it's named and used as "ts_syscon".
+Please refer https://lkml.org/lkml/2016/2/9/71 for the changes.
+Let me know if this ok. I will correct the documentation in the next
+patch.
 
-Will
+> Your changelog text fails to describe why you do this change in the
+first place,
+> and why you can't do it in a backward-compatible way, so please rewrite
+that
+> text.
+
+Yes, I will update the change log in the next patch.
+
+In Cygnus SOC, Touch screen controller registers are shared with ADC and
+flex timer IP's.
+Using readl/writel could lead to race condition. So this patch is
+introduced to take care
+mutually exclusive access of register's in such a case.
+
+In the platform's where touchscreen register's are not shared normal
+readl/writel
+could be used.
+
+Based on the dt  property entry "reg" or "ts_syscon" register accesses are
+handled.
+if "reg" is provided normal readl/writel API's are used to access
+register's else if
+"ts_syscon" is provided then syscon API's are used.
+
+> 	Arnd
