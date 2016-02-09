@@ -1,38 +1,47 @@
 From: maitysanchayan@gmail.com (Sanchayan Maity)
-Date: Tue,  9 Feb 2016 10:56:04 +0530
-Subject: [PATCH v1 0/2] Add DAC driver support for Vybrid SoC
-Message-ID: <cover.1454939346.git.maitysanchayan@gmail.com>
+Date: Tue,  9 Feb 2016 10:56:05 +0530
+Subject: [PATCH v1 1/2] ARM: dts: vfxxx: Add DAC node for Vybrid SoC
+In-Reply-To: <cover.1454939346.git.maitysanchayan@gmail.com>
+References: <cover.1454939346.git.maitysanchayan@gmail.com>
+Message-ID: <537afe56ca3ceafe130604d66636bc90bc827298.1454939346.git.maitysanchayan@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Add a device tree node entry for DAC peripheral on Vybrid SoC.
 
-This patchset adds support for the DAC peripheral on Vybrid SoC.
-Patchset is based on top of shawn's for-next branch and has been
-tested on a Toradex Colibri VF50 module.
+Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+---
+ arch/arm/boot/dts/vfxxx.dtsi | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-I had one query as to whether my implementation under the
-IIO_CHAN_INFO_SCALE correct? I am not clear on exactly on how
-the voltage_scale parameter is suppose to be set and used.
-
-Feedbacks and comments most welcome.
-
-Thanks & Regards,
-Sanchayan.
-
-
-Sanchayan Maity (2):
-  ARM: dts: vfxxx: Add DAC node for Vybrid SoC
-  iio: dac: vf610_dac: Add IIO DAC driver for Vybrid SoC
-
- .../devicetree/bindings/iio/dac/vf610-dac.txt      |  20 ++
- arch/arm/boot/dts/vfxxx.dtsi                       |  18 ++
- drivers/iio/dac/Kconfig                            |   8 +
- drivers/iio/dac/Makefile                           |   1 +
- drivers/iio/dac/vf610_dac.c                        | 302 +++++++++++++++++++++
- 5 files changed, 349 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/iio/dac/vf610-dac.txt
- create mode 100644 drivers/iio/dac/vf610_dac.c
-
+diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
+index a5f07e3..8238069 100644
+--- a/arch/arm/boot/dts/vfxxx.dtsi
++++ b/arch/arm/boot/dts/vfxxx.dtsi
+@@ -602,6 +602,24 @@
+ 				status = "disabled";
+ 			};
+ 
++			dac0: dac at 400cc000 {
++				compatible = "fsl,vf610-dac";
++				reg = <0x400cc000 1000>;
++				interrupts = <55 IRQ_TYPE_LEVEL_HIGH>;
++				clock-names = "dac";
++				clocks = <&clks VF610_CLK_DAC0>;
++				status = "disabled";
++			};
++
++			dac1: dac at 400cd000 {
++				compatible = "fsl,vf610-dac";
++				reg = <0x400cd000 1000>;
++				interrupts = <56 IRQ_TYPE_LEVEL_HIGH>;
++				clock-names = "dac";
++				clocks = <&clks VF610_CLK_DAC1>;
++				status = "disabled";
++			};
++
+ 			fec0: ethernet at 400d0000 {
+ 				compatible = "fsl,mvf600-fec";
+ 				reg = <0x400d0000 0x1000>;
 -- 
 2.7.1
