@@ -1,21 +1,40 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Tue, 9 Feb 2016 10:02:19 +0100
-Subject: [PATCH] arm64: replace read_lock to rcu lock in call_step_hook
-In-Reply-To: <1454971764-30720-1-git-send-email-yang.shi@linaro.org>
-References: <1454971764-30720-1-git-send-email-yang.shi@linaro.org>
-Message-ID: <20160209090219.GA13035@linutronix.de>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 9 Feb 2016 14:35:43 +0530
+Subject: [PATCH v2] ARM: DRA7: hwmod: Fix OCP2SCP sysconfig
+Message-ID: <1455008743-21660-1-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Yang Shi | 2016-02-08 14:49:24 [-0800]:
+OCP2SCP doesn't support smart idle wakeup according to
+Table 26-22. OCP2SCP_SYSCONFIG in AM572x TRM [1] and
+Table 26-22. OCP2SCP_SYSCONFIG in AM571x TRM [2].
+Remove SIDLE_SMART_WKUP from the list of supported SIDLE modes
+in hwmod data.
 
->BUG: sleeping function called from invalid context at kernel/locking/rtmutex.c:917
-?
->This issue is similar with 62c6c61("arm64: replace read_lock to rcu lock in
->call_break_hook"), but comes to single_step_handler.
->
->This also solves kgdbts boot test silent hang issue on 4.4 -rt kernel.
+[1] -> http://www.ti.com/lit/ug/spruhz6e/spruhz6e.pdf
+[2] -> http://www.ti.com/lit/ug/spruhz7a/spruhz7a.pdf
 
-I am going to apply this for -RT.
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+Changes from v1:
+*) Updated commit log to use public TRM links.
 
-Sebastian
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c |    3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+index 848356e..84c2699 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+@@ -1482,8 +1482,7 @@ static struct omap_hwmod_class_sysconfig dra7xx_ocp2scp_sysc = {
+ 	.syss_offs	= 0x0014,
+ 	.sysc_flags	= (SYSC_HAS_AUTOIDLE | SYSC_HAS_SIDLEMODE |
+ 			   SYSC_HAS_SOFTRESET | SYSS_HAS_RESET_STATUS),
+-	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
+-			   SIDLE_SMART_WKUP),
++	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
+ 	.sysc_fields	= &omap_hwmod_sysc_type1,
+ };
+ 
+-- 
+1.7.9.5
