@@ -1,47 +1,47 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Mon,  8 Feb 2016 16:32:58 -0800
-Subject: [GIT PULL] bcm2835 DT changes for 4.6
-Message-ID: <1454977978-17491-1-git-send-email-eric@anholt.net>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Mon, 08 Feb 2016 17:18:55 -0800
+Subject: mt1873-evb: MMC failing with linux-next
+Message-ID: <7hegcmadfk.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian.  Here's the first set of patches for bcm2835 for 4.6.
-We've got more DT patches that are going to happen for new boards,
-too, but they're still getting polished.
+Hello,
 
-The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
+I tried getting MMC working with linux-next (next-20160208) on
+mt8173-evb by enabling a few options[1] on top of the default defconfig,
+and this results in a kernel that hangs as soon as it starts userspace.
 
-  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+The MMC driver seems to start, though has some regulator issues:
 
-are available in the git repository at:
+[    0.526380] sdhci: Secure Digital Host Controller Interface driver
+[    0.527176] sdhci: Copyright(c) Pierre Ossman
+[    0.528835] vio18: unsupportable voltage range: 3300000-1980000uV
+[    0.529610] mtk-msdc 11230000.mmc: Regulator set error -22:    3300000 - 3300000
+[    0.563731] mtk-msdc 11240000.mmc: Got CD GPIO
+    
+The driver appears to be attempting to set 3.3V but using a 1.8V
+regulator (vio18), which is failing.
 
-  git at github.com:anholt/linux.git tags/bcm2835-dt-next-2016-02-04
+Then, the kernel hangs after freeing unused memory:
 
-for you to fetch changes up to 5ec6f2cd8ec4bcd38ba199ea8711a5ec906d85e7:
+[    0.616386] hctosys: unable to open rtc device (rtc0)
+[    0.624118] usb_vbus: disabling
+[    0.624547] vusb: disabling
+[    0.624929] vgp6: disabling
+[    0.625635] ALSA device list:
+[    0.626009]   No soundcards found.
+[    0.626963] Freeing unused kernel memory: 724K (ffffffc000977000 - ffffffc000a2c000)
 
-  ARM: bcm2835: Add the Raspberry Pi power domain driver to the DT. (2016-02-02 20:02:45 -0800)
+And nothing further here.
 
-----------------------------------------------------------------
-This pull request covers mostly DT changes that didn't make it into
-4.5 because required header files went through other trees.
+It boots fine when disabling the MMC driver (CONFIG_MMC_MTK=n).
 
-----------------------------------------------------------------
-Alexander Aring (1):
-      ARM: bcm2835: Add the Raspberry Pi power domain driver to the DT.
+Any ideas?
 
-Lubomir Rintel (1):
-      ARM: bcm2835: dt: Add Raspberry Pi Model A
+Kevin
 
-Martin Sperl (2):
-      ARM: bcm2835: add the auxiliary spi1 and spi2 to the device tree
-      ARM: bcm2835: follow dt uart node-naming convention
-
-Remi Pommarel (1):
-      ARM: bcm2835: Add PWM clock support to the device tree
-
- arch/arm/boot/dts/Makefile          |  1 +
- arch/arm/boot/dts/bcm2835-rpi-a.dts | 24 ++++++++++++++++++++++++
- arch/arm/boot/dts/bcm2835-rpi.dtsi  | 16 ++++++++++++++++
- arch/arm/boot/dts/bcm283x.dtsi      | 35 +++++++++++++++++++++++++++++++++--
- 4 files changed, 74 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/boot/dts/bcm2835-rpi-a.dts
+[1]
+CONFIG_MMC_MTK=y
+CONFIG_MFD_MT6397=y
+CONFIG_REGULATOR_MT6397=y
+CONFIG_MTK_PMIC_WRAP=y
