@@ -1,81 +1,216 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 10 Feb 2016 15:47:00 +0100
-Subject: [PATCH v3 5/6] irqchip: irq-armada-370-xp: allow allocation of
- multiple MSIs
-In-Reply-To: <1455115621-22846-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1455115621-22846-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1455115621-22846-6-git-send-email-thomas.petazzoni@free-electrons.com>
+From: alim.akhtar@gmail.com (Alim Akhtar)
+Date: Wed, 10 Feb 2016 20:23:14 +0530
+Subject: [PATCH] ARM: dts: Move syscon reboot/poweroff to common dtsi for
+ Exynos
+In-Reply-To: <1455042606-10075-1-git-send-email-javier@osg.samsung.com>
+References: <1455042606-10075-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <CAGOxZ53YNc43W6ja+p=u-SMLnj0MfaN9uMq7Qqd28s6RWHHY0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for allocating multiple MSIs at the same time, so that the
-MSI_FLAG_MULTI_PCI_MSI flag can be added to the msi_domain_info
-structure.
+Hi Javier,
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- drivers/irqchip/irq-armada-370-xp.c | 25 ++++++++++++++-----------
- 1 file changed, 14 insertions(+), 11 deletions(-)
+On Wed, Feb 10, 2016 at 12:00 AM, Javier Martinez Canillas
+<javier@osg.samsung.com> wrote:
+> All Exynos SoCs have the same syscon reboot and poweroff device nodes so
+> there is no need to duplicate the same on each SoC dtsi and can be moved
+> to a common dtsi that can be included by all the SoCs dtsi files.
+>
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+>
+Looks good to me.
+Reviewed-by: Alim Akhtar <alim.akhtar@samsung,com>
+> ---
+> Hello,
+>
+> The patch was tested on an Exynos5800 Peach Pi Chromebook and an
+> Exynos5422 Odroid XU4 board. Reboot and poweroff worked for both.
+>
+> But testing on Exynos3 and Exynos4 will be highly appreciated.
+>
+> Best regards,
+> Javier
+>
+>  arch/arm/boot/dts/exynos-syscon-restart.dtsi | 23 +++++++++++++++++++++++
+>  arch/arm/boot/dts/exynos3250.dtsi            | 15 +--------------
+>  arch/arm/boot/dts/exynos4.dtsi               | 15 +--------------
+>  arch/arm/boot/dts/exynos5.dtsi               | 15 +--------------
+>  arch/arm/boot/dts/exynos5410.dtsi            | 15 +--------------
+>  5 files changed, 27 insertions(+), 56 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/exynos-syscon-restart.dtsi
+>
+> diff --git a/arch/arm/boot/dts/exynos-syscon-restart.dtsi b/arch/arm/boot/dts/exynos-syscon-restart.dtsi
+> new file mode 100644
+> index 000000000000..2b8acf554881
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/exynos-syscon-restart.dtsi
+> @@ -0,0 +1,23 @@
+> +/*
+> + * Samsung's Exynos SoC syscon reboot/poweroff nodes common definition.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +/ {
+> +       poweroff: syscon-poweroff {
+> +               compatible = "syscon-poweroff";
+> +               regmap = <&pmu_system_controller>;
+> +               offset = <0x330C>; /* PS_HOLD_CONTROL */
+> +               mask = <0x5200>; /* reset value */
+> +       };
+> +
+> +       reboot: syscon-reboot {
+> +               compatible = "syscon-reboot";
+> +               regmap = <&pmu_system_controller>;
+> +               offset = <0x0400>; /* SWRESET */
+> +               mask = <0x1>;
+> +       };
+> +};
+> diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
+> index 18e3deffbf48..d9c221517935 100644
+> --- a/arch/arm/boot/dts/exynos3250.dtsi
+> +++ b/arch/arm/boot/dts/exynos3250.dtsi
+> @@ -19,6 +19,7 @@
+>
+>  #include "skeleton.dtsi"
+>  #include "exynos4-cpu-thermal.dtsi"
+> +#include "exynos-syscon-restart.dtsi"
+>  #include <dt-bindings/clock/exynos3250.h>
+>
+>  / {
+> @@ -152,20 +153,6 @@
+>                         interrupt-parent = <&gic>;
+>                 };
+>
+> -               poweroff: syscon-poweroff {
+> -                       compatible = "syscon-poweroff";
+> -                       regmap = <&pmu_system_controller>;
+> -                       offset = <0x330C>; /* PS_HOLD_CONTROL */
+> -                       mask = <0x5200>; /* Reset value */
+> -               };
+> -
+> -               reboot: syscon-reboot {
+> -                       compatible = "syscon-reboot";
+> -                       regmap = <&pmu_system_controller>;
+> -                       offset = <0x0400>; /* SWRESET */
+> -                       mask = <0x1>;
+> -               };
+> -
+>                 mipi_phy: video-phy at 10020710 {
+>                         compatible = "samsung,s5pv210-mipi-video-phy";
+>                         #phy-cells = <1>;
+> diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+> index ca621a92319e..e6f6939ccdfa 100644
+> --- a/arch/arm/boot/dts/exynos4.dtsi
+> +++ b/arch/arm/boot/dts/exynos4.dtsi
+> @@ -21,6 +21,7 @@
+>
+>  #include <dt-bindings/clock/exynos4.h>
+>  #include <dt-bindings/clock/exynos-audss-clk.h>
+> +#include "exynos-syscon-restart.dtsi"
+>  #include "skeleton.dtsi"
+>
+>  / {
+> @@ -163,20 +164,6 @@
+>                 interrupt-parent = <&gic>;
+>         };
+>
+> -       poweroff: syscon-poweroff {
+> -               compatible = "syscon-poweroff";
+> -               regmap = <&pmu_system_controller>;
+> -               offset = <0x330C>; /* PS_HOLD_CONTROL */
+> -               mask = <0x5200>; /* reset value */
+> -       };
+> -
+> -       reboot: syscon-reboot {
+> -               compatible = "syscon-reboot";
+> -               regmap = <&pmu_system_controller>;
+> -               offset = <0x0400>; /* SWRESET */
+> -               mask = <0x1>;
+> -       };
+> -
+>         dsi_0: dsi at 11C80000 {
+>                 compatible = "samsung,exynos4210-mipi-dsi";
+>                 reg = <0x11C80000 0x10000>;
+> diff --git a/arch/arm/boot/dts/exynos5.dtsi b/arch/arm/boot/dts/exynos5.dtsi
+> index b61d1f637510..92313cac035e 100644
+> --- a/arch/arm/boot/dts/exynos5.dtsi
+> +++ b/arch/arm/boot/dts/exynos5.dtsi
+> @@ -14,6 +14,7 @@
+>   */
+>
+>  #include "skeleton.dtsi"
+> +#include "exynos-syscon-restart.dtsi"
+>
+>  / {
+>         interrupt-parent = <&gic>;
+> @@ -93,20 +94,6 @@
+>                 status = "disabled";
+>         };
+>
+> -       poweroff: syscon-poweroff {
+> -               compatible = "syscon-poweroff";
+> -               regmap = <&pmu_system_controller>;
+> -               offset = <0x330C>; /* PS_HOLD_CONTROL */
+> -               mask = <0x5200>; /* reset value */
+> -       };
+> -
+> -       reboot: syscon-reboot {
+> -               compatible = "syscon-reboot";
+> -               regmap = <&pmu_system_controller>;
+> -               offset = <0x0400>; /* SWRESET */
+> -               mask = <0x1>;
+> -       };
+> -
+>         fimd: fimd at 14400000 {
+>                 compatible = "samsung,exynos5250-fimd";
+>                 interrupt-parent = <&combiner>;
+> diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
+> index f3490f567344..fa558674ac76 100644
+> --- a/arch/arm/boot/dts/exynos5410.dtsi
+> +++ b/arch/arm/boot/dts/exynos5410.dtsi
+> @@ -14,6 +14,7 @@
+>   */
+>
+>  #include "skeleton.dtsi"
+> +#include "exynos-syscon-restart.dtsi"
+>  #include <dt-bindings/clock/exynos5410.h>
+>
+>  / {
+> @@ -117,20 +118,6 @@
+>                         reg = <0x10040000 0x5000>;
+>                 };
+>
+> -               poweroff: syscon-poweroff {
+> -                       compatible = "syscon-poweroff";
+> -                       regmap = <&pmu_system_controller>;
+> -                       offset = <0x330C>; /* PS_HOLD_CONTROL */
+> -                       mask = <0x5200>; /* reset value */
+> -               };
+> -
+> -               reboot: syscon-reboot {
+> -                       compatible = "syscon-reboot";
+> -                       regmap = <&pmu_system_controller>;
+> -                       offset = <0x0400>; /* SWRESET */
+> -                       mask = <0x1>;
+> -               };
+> -
+>                 mct: mct at 101C0000 {
+>                         compatible = "samsung,exynos4210-mct";
+>                         reg = <0x101C0000 0xB00>;
+> --
+> 2.5.0
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
-index c99ae5f..e7dc6cb 100644
---- a/drivers/irqchip/irq-armada-370-xp.c
-+++ b/drivers/irqchip/irq-armada-370-xp.c
-@@ -123,7 +123,8 @@ static struct irq_chip armada_370_xp_msi_irq_chip = {
- };
- 
- static struct msi_domain_info armada_370_xp_msi_domain_info = {
--	.flags	= (MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS),
-+	.flags	= (MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
-+		   MSI_FLAG_MULTI_PCI_MSI),
- 	.chip	= &armada_370_xp_msi_irq_chip,
- };
- 
-@@ -149,21 +150,26 @@ static struct irq_chip armada_370_xp_msi_bottom_irq_chip = {
- static int armada_370_xp_msi_alloc(struct irq_domain *domain, unsigned int virq,
- 				   unsigned int nr_irqs, void *args)
- {
--	int hwirq;
-+	int hwirq, i;
- 
- 	mutex_lock(&msi_used_lock);
--	hwirq = find_first_zero_bit(&msi_used, PCI_MSI_DOORBELL_NR);
-+
-+	hwirq = bitmap_find_next_zero_area(msi_used, PCI_MSI_DOORBELL_NR,
-+					   0, nr_irqs, 0);
- 	if (hwirq >= PCI_MSI_DOORBELL_NR) {
- 		mutex_unlock(&msi_used_lock);
- 		return -ENOSPC;
- 	}
- 
--	set_bit(hwirq, msi_used);
-+	bitmap_set(msi_used, hwirq, nr_irqs);
- 	mutex_unlock(&msi_used_lock);
- 
--	irq_domain_set_info(domain, virq, hwirq, &armada_370_xp_msi_bottom_irq_chip,
--			    domain->host_data, handle_simple_irq,
--			    NULL, NULL);
-+	for (i = 0; i < nr_irqs; i++) {
-+		irq_domain_set_info(domain, virq + i, hwirq + i,
-+				    &armada_370_xp_msi_bottom_irq_chip,
-+				    domain->host_data, handle_simple_irq,
-+				    NULL, NULL);
-+	}
- 
- 	return hwirq;
- }
-@@ -174,10 +180,7 @@ static void armada_370_xp_msi_free(struct irq_domain *domain,
- 	struct irq_data *d = irq_domain_get_irq_data(domain, virq);
- 
- 	mutex_lock(&msi_used_lock);
--	if (!test_bit(d->hwirq, msi_used))
--		pr_err("trying to free unused MSI#%lu\n", d->hwirq);
--	else
--		clear_bit(d->hwirq, msi_used);
-+	bitmap_clear(msi_used, d->hwirq, nr_irqs);
- 	mutex_unlock(&msi_used_lock);
- }
- 
+
+
 -- 
-2.6.4
+Regards,
+Alim
