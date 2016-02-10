@@ -1,53 +1,78 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 10 Feb 2016 13:35:07 -0800
-Subject: [PATCH] ARM: OMAP3: Fix imprecise external abort for off mode on 36xx
-Message-ID: <1455140107-3328-1-git-send-email-tony@atomide.com>
+From: david.brown@linaro.org (David Brown)
+Date: Wed, 10 Feb 2016 13:52:22 -0800
+Subject: [PATCH] arm64: vdso: Mark vDSO code as read-only
+Message-ID: <1455141142-6838-1-git-send-email-david.brown@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With CONFIG_DEBUG_RODATA enabled I started noticing imprecise external
-aborts on a dm3730 when hitting off idle. These don't seem to happen
-on 34xx.
+Although the arm64 vDSO is cleanly separated by code/data with the
+code being read-only in userspace mappings, the code page is still
+writable from the kernel.  There have been exploits (such as
+http://itszn.com/blog/?p=21) that take advantage of this on x86 to go
+from a bad kernel write to full root.
 
-Pretty much changing anything in the code made these go away, like
-changing .config options. At first I though it might be an alignment
-issue in the 36xx specific assembly code in sleep34xx.S, or something
-related to the recent rodata fixes. But that does not seem to be
-the case. It seems to be a timing issue instead.
+Prevent this specific exploit on arm64 by putting the vDSO code page
+in read-only memory as well.
 
-Adding few extra nop instructions after the wfi seems to fix the
-issue. When adding 5 nops, the errors showed up less often. With
-add ed 6 nops, I don't seem to get them at all any longer.
+Before the change:
+[    3.138366] vdso: 2 pages (1 code @ ffffffc000a71000, 1 data @ ffffffc000a70000)
+---[ Kernel Mapping ]---
+0xffffffc000000000-0xffffffc000082000         520K     RW NX SHD AF            UXN MEM/NORMAL
+0xffffffc000082000-0xffffffc000200000        1528K     ro x  SHD AF            UXN MEM/NORMAL
+0xffffffc000200000-0xffffffc000800000           6M     ro x  SHD AF        BLK UXN MEM/NORMAL
+0xffffffc000800000-0xffffffc0009b6000        1752K     ro x  SHD AF            UXN MEM/NORMAL
+0xffffffc0009b6000-0xffffffc000c00000        2344K     RW NX SHD AF            UXN MEM/NORMAL
+0xffffffc000c00000-0xffffffc008000000         116M     RW NX SHD AF        BLK UXN MEM/NORMAL
+0xffffffc00c000000-0xffffffc07f000000        1840M     RW NX SHD AF        BLK UXN MEM/NORMAL
+0xffffffc800000000-0xffffffc840000000           1G     RW NX SHD AF        BLK UXN MEM/NORMAL
+0xffffffc840000000-0xffffffc87ae00000         942M     RW NX SHD AF        BLK UXN MEM/NORMAL
+0xffffffc87ae00000-0xffffffc87ae70000         448K     RW NX SHD AF            UXN MEM/NORMAL
+0xffffffc87af80000-0xffffffc87af8a000          40K     RW NX SHD AF            UXN MEM/NORMAL
+0xffffffc87af8b000-0xffffffc87b000000         468K     RW NX SHD AF            UXN MEM/NORMAL
+0xffffffc87b000000-0xffffffc87fe00000          78M     RW NX SHD AF        BLK UXN MEM/NORMAL
+0xffffffc87fe00000-0xffffffc87ff50000        1344K     RW NX SHD AF            UXN MEM/NORMAL
+0xffffffc87ff90000-0xffffffc87ffa0000          64K     RW NX SHD AF            UXN MEM/NORMAL
+0xffffffc87fff0000-0xffffffc880000000          64K     RW NX SHD AF            UXN MEM/NORMAL
 
-Cc: Grygorii Strashko <grygorii.strashko@ti.com>
-Cc: Nishanth Menon <nm@ti.com>
-Cc: Richard Woodruff <r-woodruff2@ti.com>
-Cc: Tero Kristo <t-kristo@ti.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
+After:
+[    3.138368] vdso: 2 pages (1 code @ ffffffc0006de000, 1 data @ ffffffc000a74000)
+---[ Kernel Mapping ]---
+0xffffffc000000000-0xffffffc000082000         520K     RW NX SHD AF            UXN MEM/NORMAL
+0xffffffc000082000-0xffffffc000200000        1528K     ro x  SHD AF            UXN MEM/NORMAL
+0xffffffc000200000-0xffffffc000800000           6M     ro x  SHD AF        BLK UXN MEM/NORMAL
+0xffffffc000800000-0xffffffc0009b8000        1760K     ro x  SHD AF            UXN MEM/NORMAL
+0xffffffc0009b8000-0xffffffc000c00000        2336K     RW NX SHD AF            UXN MEM/NORMAL
+0xffffffc000c00000-0xffffffc008000000         116M     RW NX SHD AF        BLK UXN MEM/NORMAL
+0xffffffc00c000000-0xffffffc07f000000        1840M     RW NX SHD AF        BLK UXN MEM/NORMAL
+0xffffffc800000000-0xffffffc840000000           1G     RW NX SHD AF        BLK UXN MEM/NORMAL
+0xffffffc840000000-0xffffffc87ae00000         942M     RW NX SHD AF        BLK UXN MEM/NORMAL
+0xffffffc87ae00000-0xffffffc87ae70000         448K     RW NX SHD AF            UXN MEM/NORMAL
+0xffffffc87af80000-0xffffffc87af8a000          40K     RW NX SHD AF            UXN MEM/NORMAL
+0xffffffc87af8b000-0xffffffc87b000000         468K     RW NX SHD AF            UXN MEM/NORMAL
+0xffffffc87b000000-0xffffffc87fe00000          78M     RW NX SHD AF        BLK UXN MEM/NORMAL
+0xffffffc87fe00000-0xffffffc87ff50000        1344K     RW NX SHD AF            UXN MEM/NORMAL
+0xffffffc87ff90000-0xffffffc87ffa0000          64K     RW NX SHD AF            UXN MEM/NORMAL
+0xffffffc87fff0000-0xffffffc880000000          64K     RW NX SHD AF            UXN MEM/NORMAL
+
+Inspired by https://lkml.org/lkml/2016/1/19/494 based on work by the
+PaX Team, Brad Spengler, and Kees Cook.
+
+Signed-off-by: David Brown <david.brown@linaro.org>
 ---
+ arch/arm64/kernel/vdso/vdso.S | 1 +
+ 1 file changed, 1 insertion(+)
 
-Anybody else seen this issue before?
-
----
- arch/arm/mach-omap2/sleep34xx.S | 6 ++++++
- 1 file changed, 6 insertions(+)
-
-diff --git a/arch/arm/mach-omap2/sleep34xx.S b/arch/arm/mach-omap2/sleep34xx.S
-index 1b9f052..0fbaa08 100644
---- a/arch/arm/mach-omap2/sleep34xx.S
-+++ b/arch/arm/mach-omap2/sleep34xx.S
-@@ -264,6 +264,12 @@ ENTRY(omap3_do_wfi)
- 	nop
- 	nop
- 	nop
-+	nop
-+	nop
-+	nop
-+	nop
-+	nop
-+	nop
+diff --git a/arch/arm64/kernel/vdso/vdso.S b/arch/arm64/kernel/vdso/vdso.S
+index 60c1db5..db7c0f2 100644
+--- a/arch/arm64/kernel/vdso/vdso.S
++++ b/arch/arm64/kernel/vdso/vdso.S
+@@ -24,6 +24,7 @@
+ 	__PAGE_ALIGNED_DATA
  
- /*
-  * This function implements the erratum ID i581 WA:
+ 	.globl vdso_start, vdso_end
++	.section .rodata
+ 	.balign PAGE_SIZE
+ vdso_start:
+ 	.incbin "arch/arm64/kernel/vdso/vdso.so"
 -- 
-2.7.0
+2.7.1
