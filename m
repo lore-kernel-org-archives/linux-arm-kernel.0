@@ -1,46 +1,104 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 10 Feb 2016 18:10:18 -0200
-Subject: noise issues when recording sound on i.MX28
-In-Reply-To: <20160210150315.GC13664@pengutronix.de>
-References: <20160127105613.GC13664@pengutronix.de>
- <CAOMZO5BpLen517q2heramSta-R6pdESkjM6w=7FRMZebY6ue-Q@mail.gmail.com>
- <20160127144340.GD13664@pengutronix.de>
- <CAOMZO5AE6HwBYz7kOFORt0HTojJLSb0MYUbkb_HCshDHy=d27g@mail.gmail.com>
- <20160210150315.GC13664@pengutronix.de>
-Message-ID: <CAOMZO5D5H4F90nse9kyW9KvsJStN-sCGktup4FDPw_zTeNfS2g@mail.gmail.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Wed, 10 Feb 2016 14:13:40 -0600
+Subject: [PATCH 1/2] Documentation: dt: mailbox: Add TI Message Manager
+In-Reply-To: <20160209181031.GA23603@kahuna>
+References: <1454690044-2560-1-git-send-email-nm@ti.com>
+ <1454690044-2560-2-git-send-email-nm@ti.com>
+ <CABb+yY3kGq_R49Xx4fK3UMqtuFiuv-pXJWvjkEFLPL9xRu5T4A@mail.gmail.com>
+ <56B9DC30.5040806@ti.com>
+ <CABb+yY24XzsWaSGLMCE4_nvgWx0OhhQmcaP41g06FxdjQYFchg@mail.gmail.com>
+ <CAGo_u6qGaQj9Qvjwrm7cD=cr2UjLN+62tcquXYPsQrRjYD=UCw@mail.gmail.com>
+ <20160209181031.GA23603@kahuna>
+Message-ID: <56BB99F4.3040702@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+Hi Nishanth,
 
-On Wed, Feb 10, 2016 at 1:03 PM, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
-> Hello Fabio,
->
-> On Tue, Feb 02, 2016 at 11:00:33AM -0200, Fabio Estevam wrote:
->> On Wed, Jan 27, 2016 at 12:43 PM, Uwe Kleine-K?nig
->> <u.kleine-koenig@pengutronix.de> wrote:
->>
->> > So you didn't hit the problem that resetting a saif didn't work, right?
->>
->> No, we haven't seen this reset issue.
->>
->> > Do you have a few more technical details here? A usecase of my machine
->>
->> Let me find out as it has been several years I worked on this problem.
->> Will let you know.
->
-> Anything new on your end? I know from Lothar that he invested quite some
-> time to debug his hardware setup, tested the codec instead of the i.MX28
-> as clock provider and several more things. I also spend some time on
-> this issue and we both hope that Freescale/NXP can help in better
-> understanding the issue and hopefully can come up with a recipe to make
-> concurrent recording and playback on i.MX28 work.
->
-> Lothar is in contact with Freescale, too, but up to now with little
-> success. The company I'm working for at the moment would also welcome a
-> solution here.
+On 02/09/2016 12:10 PM, Menon, Nishanth wrote:
+> On 09:43-20160209, Nishanth Menon wrote:
+>> On Tue, Feb 9, 2016 at 8:54 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+> [..]
+>> Let me prototype this as part of of_xlate and see if I can pull the
+>> qinst data back out.. obviously one negative will be that I will
+>> register *all* valid channels as part of probe.. at least based on
+>> initial code i wrote today morning..
+> 
+> OK - I believe I have it working now. How does the following look? If
+> this looks fine to you, then I will post a v2 including the driver
+> update.
+> Changes here:
+> 	- dropped the generic message-manager compatible
+> 	- dropped child nodes
+> 	- moved the valid queue information to driver (no longer in dts)
+> 	- rx interrupts per SoC are explicitly named list in binding(and
+> 	  dts)
+> 
+> Texas Instruments' Message Manager Driver
+> ========================================
+> 
+> The Texas Instruments' Message Manager is a mailbox controller that has
+> configurable queues selectable at SoC(System on Chip) integration. The Message
+> manager is broken up into queues in different address regions that are called
+> "proxies" - each instance is unidirectional and is instantiated at SoC
+> integration level to indicate receive or transmit path.
+> 
+> Message Manager Device Node:
+> ===========================
+> Required properties:
+> --------------------
+> - compatible:		Shall be: "ti,k2g-message-manager"
+> - reg-names 		queue_proxy_region - Map the queue proxy region.
+> 			queue_state_debug_region - Map the queue state debug
+> 			region.
+> - reg:			Contains the register map per reg-names.
+> - #mbox-cells		Shall be 2. Contains the queue ID and proxy ID in that
+> 		        order referring to the transfer path.
+> - interrupt-names:	Contains interrupt names matching the rx transfer path
+> 			for a given SoC. Receive interrupts shall be of the
+> 			format: "rx_<QID>_<PID>".
+> 			For ti,k2g-message-manager, this shall contain:
+> 				"rx_005_002", "rx_057_002"
 
-Sorry for the delay. I have been on holidays.
+Are these the only two that will ever be supported for
+ti,k2g-message-manager or there can be more in the future? You did
+mention about 11 possible valid qid_pid values for the ARM, and the
+driver match data is
+registering all of those mboxes.
 
-Can you confirm you have both SAIF interfaces being clocked from ref_pll?
+> - interrupts:		Contains the interrupt information corresponding to
+> 			interrupt-names property.
+> 
+> Example(K2G):
+> ------------
+> 
+> 	msgmgr: msgmgr at 02a00000 {
+> 		compatible = "ti,k2g-message-manager";
+> 		#mbox-cells = <2>;
+> 		reg-names = "queue_proxy_region", "queue_state_debug_region";
+> 		reg = <0x02a00000 0x400000>, <0x028c3400 0x400>;
+> 		interrupt-names = "rx_005_002",
+> 				  "rx_057_002";
+> 		interrupts = <GIC_SPI 324 IRQ_TYPE_LEVEL_HIGH>,
+> 			     <GIC_SPI 327 IRQ_TYPE_LEVEL_HIGH>;
+> 	};
+> 
+> 	pmmc: pmmc {
+> 		[...]
+> 		mbox-names = "rx", "tx";
+> 		# RX queue ID is 5, proxy ID is 2
+> 		# TX queue ID is 0, proxy ID is 0
+> 		mboxes= <&msgmgr 5 2>,
+> 			<&msgmgr 0 0>;
+> 		[...]
+> 	};
+
+Yeah, this will also work. I am fine with this approach - my only
+concern was that the probe doesn't have to go parsing all the nodes to
+be able to register the mailbox channels with the mailbox core. Since
+you are registering them using match data, that is not a concern anymore.
+
+Anyway, will let Rob give the final ACK.
+
+regards
+Suman
