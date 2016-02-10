@@ -1,70 +1,39 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 10 Feb 2016 17:01:27 +0000
-Subject: [PATCH V3 1/4] dt-bindings: mfd: Add bindings for the MediaTek
- MT6323 PMIC
-In-Reply-To: <1453895258-44369-1-git-send-email-blogic@openwrt.org>
-References: <1453895258-44369-1-git-send-email-blogic@openwrt.org>
-Message-ID: <20160210170127.GW3782@x1>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Wed, 10 Feb 2016 18:04:20 +0100
+Subject: [PATCH v4] clk: sunxi: Refactor A31 PLL6 so that it can be reused
+In-Reply-To: <20160210125333.GC31506@lukather>
+References: <1454358000-13594-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20160204120507.GC4270@lukather>
+ <20160204162545.f806fcb64a826d2c3313985b@free.fr>
+ <20160210125333.GC31506@lukather>
+Message-ID: <20160210180420.0968c2018bf5fbe54a28a505@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If you're submitting a set of patches like this, you really ought to
-be providing a cover-letter.
+On Wed, 10 Feb 2016 13:53:33 +0100
+Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 
-Also, when submitting patches, please do so in the style expected by
-the subsystem.  I will fix these once up for now, but please bear that
-in mind in the future.
-
-`git log --oneline -- <subsystem>` works well for this.
-
-> Signed-off-by: John Crispin <blogic@openwrt.org>
-> Cc: devicetree at vger.kernel.org
-> ---
->  Documentation/devicetree/bindings/mfd/mt6397.txt |   10 ++++++----
->  1 file changed, 6 insertions(+), 4 deletions(-)
+> > I don't agree:
+> > - you changed the DTs of many SoCs without any valid reason,
 > 
-> diff --git a/Documentation/devicetree/bindings/mfd/mt6397.txt b/Documentation/devicetree/bindings/mfd/mt6397.txt
-> index 15043e6..949c85f 100644
-> --- a/Documentation/devicetree/bindings/mfd/mt6397.txt
-> +++ b/Documentation/devicetree/bindings/mfd/mt6397.txt
-> @@ -1,6 +1,6 @@
-> -MediaTek MT6397 Multifunction Device Driver
-> +MediaTek MT6397/MT6323 Multifunction Device Driver
->  
-> -MT6397 is a multifunction device with the following sub modules:
-> +MT6397/MT6323 is a multifunction device with the following sub modules:
->  - Regulator
->  - RTC
->  - Audio codec
-> @@ -8,14 +8,14 @@ MT6397 is a multifunction device with the following sub modules:
->  - Clock
->  
->  It is interfaced to host controller using SPI interface by a proprietary hardware
-> -called PMIC wrapper or pwrap. MT6397 MFD is a child device of pwrap.
-> +called PMIC wrapper or pwrap. MT6397/MT6323 MFD is a child device of pwrap.
->  See the following for pwarp node definitions:
->  Documentation/devicetree/bindings/soc/pwrap.txt
->  
->  This document describes the binding for MFD device and its sub module.
->  
->  Required properties:
-> -compatible: "mediatek,mt6397"
-> +compatible: "mediatek,mt6397" or "mediatek,mt6323"
->  
->  Optional subnodes:
->  
-> @@ -26,6 +26,8 @@ Optional subnodes:
->  	Required properties:
->  		- compatible: "mediatek,mt6397-regulator"
->  	see Documentation/devicetree/bindings/regulator/mt6397-regulator.txt
-> +		- compatible: "mediatek,mt6323-regulator"
-> +	see Documentation/devicetree/bindings/regulator/mt6323-regulator.txt
->  - codec
->  	Required properties:
->  		- compatible: "mediatek,mt6397-codec"
+> I did give you a significant number of reasons [1]. The fact that you
+> chose to ignore them is up to you.
+
+Sorry, I don't see any reason for changing the DT definition of the pll6.
+The clock is named "pll6" with "#clock-cells = <1>;" in all DTs,
+and it works as it is.
+If you want an other clock as "pll8", with the same HW description,
+you must add new code for this clock.
+
+> Except that it doesn't match the hardware and that the parenthood
+> relationship is inversed. The pll6 output is 24 MHz * n * k / 2, as
+> seen in any datasheet that uses it. Your clock driver doesn't
+> represent that fact.
+
+The datasheet says that the pll6x2 output is 24 MHz * n * k, then, if
+I remember correctly my lessons at primary school, defining pll6 as
+(pll6x2 / 2) gives 24 MHz * n * k / 2 as the pll6 output. No?
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
