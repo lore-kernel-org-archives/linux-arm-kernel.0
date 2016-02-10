@@ -1,52 +1,109 @@
 From: niklas.soderlund+renesas@ragnatech.se (=?UTF-8?q?Niklas=20S=C3=B6derlund?=)
-Date: Wed, 10 Feb 2016 01:57:51 +0100
-Subject: [PATCH v3 1/8] iommu: Add MMIO mapping type
+Date: Wed, 10 Feb 2016 01:57:54 +0100
+Subject: [PATCH v3 4/8] arm: dma-mapping: add {map,
+ unmap}_resource for iommu ops
 In-Reply-To: <1455065878-11906-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
 References: <1455065878-11906-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
-Message-ID: <1455065878-11906-2-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+Message-ID: <1455065878-11906-5-git-send-email-niklas.soderlund+renesas@ragnatech.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Robin Murphy <robin.murphy@arm.com>
+Add methods to map/unmap device resources addresses for dma_map_ops that
+are IOMMU aware. This is needed to map a device MMIO register from a
+physical address.
 
-On some platforms, MMIO regions might need slightly different treatment
-compared to mapping regular memory; add the notion of MMIO mappings to
-the IOMMU API's memory type flags, so that callers can let the IOMMU
-drivers know to do the right thing.
-
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
 ---
- drivers/iommu/io-pgtable-arm.c | 4 +++-
- include/linux/iommu.h          | 1 +
- 2 files changed, 4 insertions(+), 1 deletion(-)
+ arch/arm/mm/dma-mapping.c | 63 +++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 63 insertions(+)
 
-diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
-index 381ca5a..3ff4f87 100644
---- a/drivers/iommu/io-pgtable-arm.c
-+++ b/drivers/iommu/io-pgtable-arm.c
-@@ -364,7 +364,9 @@ static arm_lpae_iopte arm_lpae_prot_to_pte(struct arm_lpae_io_pgtable *data,
- 			pte |= ARM_LPAE_PTE_HAP_READ;
- 		if (prot & IOMMU_WRITE)
- 			pte |= ARM_LPAE_PTE_HAP_WRITE;
--		if (prot & IOMMU_CACHE)
-+		if (prot & IOMMU_MMIO)
-+			pte |= ARM_LPAE_PTE_MEMATTR_DEV;
-+		else if (prot & IOMMU_CACHE)
- 			pte |= ARM_LPAE_PTE_MEMATTR_OIWB;
- 		else
- 			pte |= ARM_LPAE_PTE_MEMATTR_NC;
-diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-index a5c539f..34b6432 100644
---- a/include/linux/iommu.h
-+++ b/include/linux/iommu.h
-@@ -30,6 +30,7 @@
- #define IOMMU_WRITE	(1 << 1)
- #define IOMMU_CACHE	(1 << 2) /* DMA cache coherency */
- #define IOMMU_NOEXEC	(1 << 3)
-+#define IOMMU_MMIO	(1 << 4) /* e.g. things like MSI doorbells */
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 0eca381..ae2b175 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -1814,6 +1814,63 @@ static void arm_iommu_unmap_page(struct device *dev, dma_addr_t handle,
+ 	__free_iova(mapping, iova, len);
+ }
  
- struct iommu_ops;
- struct iommu_group;
++/**
++ * arm_iommu_map_resource - map a device resource for DMA
++ * @dev: valid struct device pointer
++ * @phys_addr: physical address of resource
++ * @size: size of resource to map
++ * @dir: DMA transfer direction
++ */
++static dma_addr_t arm_iommu_map_resource(struct device *dev,
++		phys_addr_t phys_addr, size_t size,
++		enum dma_data_direction dir, struct dma_attrs *attrs)
++{
++	struct dma_iommu_mapping *mapping = to_dma_iommu_mapping(dev);
++	dma_addr_t dma_addr;
++	int ret, prot;
++	phys_addr_t addr = phys_addr & PAGE_MASK;
++	int offset = phys_addr & ~PAGE_MASK;
++	int len = PAGE_ALIGN(size + offset);
++
++	dma_addr = __alloc_iova(mapping, size);
++	if (dma_addr == DMA_ERROR_CODE)
++		return dma_addr;
++
++	prot = __dma_direction_to_prot(dir) | IOMMU_MMIO;
++
++	ret = iommu_map(mapping->domain, dma_addr, addr, len, prot);
++	if (ret < 0)
++		goto fail;
++
++	return dma_addr + offset;
++fail:
++	__free_iova(mapping, dma_addr, size);
++	return DMA_ERROR_CODE;
++}
++
++/**
++ * arm_iommu_unmap_resource - unmap a device DMA resource
++ * @dev: valid struct device pointer
++ * @dma_handle: DMA address to resource
++ * @size: size of resource to map
++ * @dir: DMA transfer direction
++ */
++static void arm_iommu_unmap_resource(struct device *dev, dma_addr_t dma_handle,
++		size_t size, enum dma_data_direction dir,
++		struct dma_attrs *attrs)
++{
++	struct dma_iommu_mapping *mapping = to_dma_iommu_mapping(dev);
++	dma_addr_t iova = dma_handle & PAGE_MASK;
++	int offset = dma_handle & ~PAGE_MASK;
++	int len = PAGE_ALIGN(size + offset);
++
++	if (!iova)
++		return;
++
++	iommu_unmap(mapping->domain, iova, len);
++	__free_iova(mapping, iova, len);
++}
++
+ static void arm_iommu_sync_single_for_cpu(struct device *dev,
+ 		dma_addr_t handle, size_t size, enum dma_data_direction dir)
+ {
+@@ -1858,6 +1915,9 @@ struct dma_map_ops iommu_ops = {
+ 	.sync_sg_for_cpu	= arm_iommu_sync_sg_for_cpu,
+ 	.sync_sg_for_device	= arm_iommu_sync_sg_for_device,
+ 
++	.map_resource		= arm_iommu_map_resource,
++	.unmap_resource		= arm_iommu_unmap_resource,
++
+ 	.set_dma_mask		= arm_dma_set_mask,
+ };
+ 
+@@ -1873,6 +1933,9 @@ struct dma_map_ops iommu_coherent_ops = {
+ 	.map_sg		= arm_coherent_iommu_map_sg,
+ 	.unmap_sg	= arm_coherent_iommu_unmap_sg,
+ 
++	.map_resource	= arm_iommu_map_resource,
++	.unmap_resource	= arm_iommu_unmap_resource,
++
+ 	.set_dma_mask	= arm_dma_set_mask,
+ };
+ 
 -- 
 2.7.1
