@@ -1,48 +1,92 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 10 Feb 2016 16:14:52 +0000
-Subject: [PATCH v7 04/10] mfd: axp20x: Add missing copyright notice
-In-Reply-To: <20160125152958.GO7908@lukather>
-References: <1452655854-1528-1-git-send-email-wens@csie.org>
- <1452655854-1528-5-git-send-email-wens@csie.org>
- <20160125143957.GS3368@x1> <20160125152958.GO7908@lukather>
-Message-ID: <20160210161452.GB3782@x1>
+Date: Wed, 10 Feb 2016 16:23:49 +0000
+Subject: [PATCH 01/14] mfd: intel_quark_i2c_gpio: Use clkdev_create()
+In-Reply-To: <1454982341-22715-2-git-send-email-sboyd@codeaurora.org>
+References: <1454982341-22715-1-git-send-email-sboyd@codeaurora.org>
+ <1454982341-22715-2-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20160210162349.GJ3782@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 25 Jan 2016, Maxime Ripard wrote:
-> On Mon, Jan 25, 2016 at 02:39:57PM +0000, Lee Jones wrote:
-> > On Wed, 13 Jan 2016, Chen-Yu Tsai wrote:
-> > 
-> > > When the driver was merged, the original author did not include a proper
-> > > copyright notice. This patch adds the notice, backdated to when the
-> > > driver was merged.
-> > 
-> > This is very wordy. 
-> > 
-> > "Supply a backdated copyright notice."
-> > 
-> > > Cc: Carlo Caione <carlo@caione.org>
-> > > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> > > ---
-> > > 
-> > > New patch in v7.
-> > > 
-> > > ---
-> > >  drivers/mfd/axp20x.c | 2 ++
-> > >  1 file changed, 2 insertions(+)
-> > 
-> > Patch looks fine though:
-> > 
-> > Acked-by: Lee Jones <lee.jones@linaro.org>
-> 
-> How do you want to merge these patches ?
-> 
-> AFAIK, it's mostly MFD patches that could go through your tree, so
-> feel free to apply them, I'll apply the DT parts.
+On Mon, 08 Feb 2016, Stephen Boyd wrote:
 
-Apologies for the delay, I've been super busy.
+> Convert this driver to use clkdev_create() instead of
+> clk_register_clkdevs(). The latter API is only used by this driver,
+> although this driver only allocates one clk to add anyway.
+> Furthermore, this driver allocates the clk_lookup structure with
+> devm, but clkdev_drop() will free that structure when passed,
+> leading to a double free when this driver is removed. Clean it
+> all up and pave the way for the removal of clk_register_clkdevs().
+> 
+> Cc: Lee Jones <lee.jones@linaro.org>
+> Cc: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  drivers/mfd/intel_quark_i2c_gpio.c | 26 +++++++++-----------------
+>  1 file changed, 9 insertions(+), 17 deletions(-)
 
-Yes, please take the ARM patches, I'll take the rest.
+I never much liked this code [0]
+
+Glad for it to be simplified.
+
+Applied, thanks.
+
+[0] https://lkml.org/lkml/2014/11/25/845
+
+> diff --git a/drivers/mfd/intel_quark_i2c_gpio.c b/drivers/mfd/intel_quark_i2c_gpio.c
+> index 042137465300..bdc5e27222c0 100644
+> --- a/drivers/mfd/intel_quark_i2c_gpio.c
+> +++ b/drivers/mfd/intel_quark_i2c_gpio.c
+> @@ -52,8 +52,6 @@
+>  /* The Quark I2C controller source clock */
+>  #define INTEL_QUARK_I2C_CLK_HZ	33000000
+>  
+> -#define INTEL_QUARK_I2C_NCLK	1
+> -
+>  struct intel_quark_mfd {
+>  	struct pci_dev		*pdev;
+>  	struct clk		*i2c_clk;
+> @@ -128,30 +126,24 @@ MODULE_DEVICE_TABLE(pci, intel_quark_mfd_ids);
+>  static int intel_quark_register_i2c_clk(struct intel_quark_mfd *quark_mfd)
+>  {
+>  	struct pci_dev *pdev = quark_mfd->pdev;
+> -	struct clk_lookup *i2c_clk_lookup;
+>  	struct clk *i2c_clk;
+> -	int ret;
+> -
+> -	i2c_clk_lookup = devm_kcalloc(&pdev->dev, INTEL_QUARK_I2C_NCLK,
+> -				      sizeof(*i2c_clk_lookup), GFP_KERNEL);
+> -	if (!i2c_clk_lookup)
+> -		return -ENOMEM;
+> -
+> -	i2c_clk_lookup[0].dev_id = INTEL_QUARK_I2C_CONTROLLER_CLK;
+>  
+>  	i2c_clk = clk_register_fixed_rate(&pdev->dev,
+>  					  INTEL_QUARK_I2C_CONTROLLER_CLK, NULL,
+>  					  CLK_IS_ROOT, INTEL_QUARK_I2C_CLK_HZ);
+> +	if (IS_ERR(i2c_clk))
+> +		return PTR_ERR(i2c_clk);
+>  
+> -	quark_mfd->i2c_clk_lookup = i2c_clk_lookup;
+>  	quark_mfd->i2c_clk = i2c_clk;
+> +	quark_mfd->i2c_clk_lookup = clkdev_create(i2c_clk, NULL,
+> +						INTEL_QUARK_I2C_CONTROLLER_CLK);
+>  
+> -	ret = clk_register_clkdevs(i2c_clk, i2c_clk_lookup,
+> -				   INTEL_QUARK_I2C_NCLK);
+> -	if (ret)
+> -		dev_err(&pdev->dev, "Fixed clk register failed: %d\n", ret);
+> +	if (!quark_mfd->i2c_clk_lookup) {
+> +		dev_err(&pdev->dev, "Fixed clk register failed\n");
+> +		return -ENOMEM;
+> +	}
+>  
+> -	return ret;
+> +	return 0;
+>  }
+>  
+>  static void intel_quark_unregister_i2c_clk(struct pci_dev *pdev)
 
 -- 
 Lee Jones
