@@ -1,63 +1,47 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 10 Feb 2016 23:57:17 +0100
-Subject: net: mv643xx: interface does not transmit after some time
-In-Reply-To: <A6128DBC-59DB-4231-A08D-B84C1D8C26CC@schloeter.net>
-References: <E4F9E0D0-9DA8-4E33-9F89-B49E47F11CE0@schloeter.net>
- <20160206183414.GD17218@lunn.ch>
- <20160206231935.GA30734@jirafa.cyrius.com>
- <2ACB3A0B-DD51-43C1-A56E-E7C175645554@schloeter.net>
- <20160207203545.GB29107@lunn.ch>
- <A21B89D4-5826-4F97-A1C9-E62E5B724082@schloeter.net>
- <312E318A-CAE1-45B1-AB13-EA147B48E315@schloeter.net>
- <A6128DBC-59DB-4231-A08D-B84C1D8C26CC@schloeter.net>
-Message-ID: <20160210225717.GD14610@lunn.ch>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 10 Feb 2016 15:02:43 -0800
+Subject: [PATCH 0/7] PM runtime regression fixes for omaps
+Message-ID: <1455145370-20301-1-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 10, 2016 at 07:40:54PM +0100, Thomas Schl?ter wrote:
-> 
-> > Am 08.02.2016 um 19:49 schrieb Thomas Schl?ter <thomas@schloeter.net>:
-> > 
-> > 
-> >> Am 07.02.2016 um 22:07 schrieb Thomas Schl?ter <thomas@schloeter.net>:
-> >> 
-> >> Am 07.02.2016 um 21:35 schrieb Andrew Lunn <andrew@lunn.ch>:
-> >>> 
-> >>>>> FWIW, we had a similar bug report in Debian recently:
-> >>>>> https://lists.debian.org/debian-arm/2016/01/msg00098.html
-> >>> 
-> >>> Hi Thomas
-> >>> 
-> >>> I this thread, Ian Campbell mentions a patch. Please could you try
-> >>> that patch and see if it fixes your problem.
-> >>> 
-> >>> Thanks
-> >>> 	Andrew
-> >> 
-> >> Hi Andrew,
-> >> 
-> >> I just applied the patch and the NAS is now running it. I???ll try to crash it tonight and keep you informed whether it worked.
-> >> 
-> >> Thanks
-> >> 	Thomas
-> > 
-> > Hi Andrew,
-> > 
-> > the patch did not fix the problem. After 1.2 GiB RX and 950 MiB TX, the interface crashed again.
-> > 
-> > Now I switched off RX/TX offload just to make sure we are talking about the same problem. If we are, the interface should be stable without offload, right?
-> > 
-> > 	Thomas
-> 
-> Okay, so I have installed ethtool and switched off all offload features available. Now the NAS is running rock solid for two days. I backed up my Mac using Time Machine / netatalk (450 GiB transferred) and some Linux machines via NFS (100 GiB total) without a problem.
-> 
-> How much code is used for mv643xx offload functionality?
-> Is it possible to debug things in the driver and figure out what happens during the crash?
-> Is the hardware offload interface proprietary or reverse engineered or is it a well known API that can be analyzed?
+Hi all,
 
-Hi Thomas
+Here are some PM runtime regression fixes for omaps after recent
+pm_runtime_reinit changes.
 
-Ezequiel Garcia probably knows this part of the driver and hardware
-the best...
+We basically have to use pm_runtime_put_sync_suspend() or
+a combination of pm_runtime_dont_use_autosuspend() and
+pm_runtime_put_sync() if the driver has enabled autoidle.
 
-    Andrew
+If no objections, I'd like to merge this whole series via
+the ARM SoC tree.
+
+Regards,
+
+Tony
+
+
+Tony Lindgren (7):
+  mmc: omap_hsmmc: Fix PM regression with deferred probe for
+    pm_runtime_reinit
+  i2c: omap: Fix PM regression with deferred probe for pm_runtime_reinit
+  spi: omap2-mcspi: Fix PM regression with deferred probe for
+    pm_runtime_reinit
+  serial: 8250_omap: Fix PM regression with deferred probe for
+    pm_runtime_reinit
+  serial: omap: Fix PM regression with deferred probe for
+    pm_runtime_reinit
+  ARM: OMAP2+: Improve omap_device error for driver writers
+  ARM: OMAP2+: Fix omap_device for module reload on PM runtime forbid
+
+ arch/arm/mach-omap2/omap_device.c   | 14 +++++++++++++-
+ drivers/i2c/busses/i2c-omap.c       |  4 +++-
+ drivers/mmc/host/omap_hsmmc.c       |  6 ++++--
+ drivers/spi/spi-omap2-mcspi.c       |  3 +++
+ drivers/tty/serial/8250/8250_omap.c |  4 +++-
+ drivers/tty/serial/omap-serial.c    |  4 +++-
+ 6 files changed, 29 insertions(+), 6 deletions(-)
+
+-- 
+2.7.0
