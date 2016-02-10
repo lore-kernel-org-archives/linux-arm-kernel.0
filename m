@@ -1,38 +1,29 @@
 From: lars.persson@axis.com (Lars Persson)
-Date: Wed, 10 Feb 2016 13:41:57 +0100
-Subject: [PATCH 8/8] arm: mach-artpec: add entry to MAINTAINERS
+Date: Wed, 10 Feb 2016 13:41:56 +0100
+Subject: [PATCH 7/8] arm: multi_v7_defconfig: add MACH_ARTPEC6
 In-Reply-To: <cover.1455107681.git.larper@axis.com>
 References: <cover.1455107681.git.larper@axis.com>
-Message-ID: <0b705a87e60c75c71721f3cf013b544eea746a95.1455107681.git.larper@axis.com>
+Message-ID: <36d8a6a0236e08bc7286085018e2fa7a67691b39.1455107681.git.larper@axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Lars Persson <larper@axis.com>
-Signed-off-by: Jesper Nilsson <jesper.nilsson@axis.com>
 ---
- MAINTAINERS | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/configs/multi_v7_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 7f1fa4f..d32c1aa 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -932,6 +932,16 @@ M:	Tsahee Zidenberg <tsahee@annapurnalabs.com>
- S:	Maintained
- F:	arch/arm/mach-alpine/
- 
-+ARM/ARTPEC MACHINE SUPPORT
-+M:	Jesper Nilsson <jesper.nilsson@axis.com>
-+M:	Lars Persson <lars.persson@axis.com>
-+M:	Niklas Cassel <niklas.cassel@axis.com>
-+S:	Maintained
-+L:	linux-arm-kernel at axis.com
-+F:	arch/arm/mach-artpec
-+F:	arch/arm/boot/dts/artpec6*
-+F:	drivers/clk/clk-artpec6.c
-+
- ARM/ATMEL AT91RM9200, AT91SAM9 AND SAMA5 SOC SUPPORT
- M:	Nicolas Ferre <nicolas.ferre@atmel.com>
- M:	Alexandre Belloni <alexandre.belloni@free-electrons.com>
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 8e8b2ac..bf3840e 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -16,6 +16,8 @@ CONFIG_ARCH_MULTI_V7=y
+ # CONFIG_ARCH_MULTI_V4 is not set
+ CONFIG_ARCH_VIRT=y
+ CONFIG_ARCH_ALPINE=y
++CONFIG_ARCH_ARTPEC=y
++CONFIG_MACH_ARTPEC6=y
+ CONFIG_ARCH_MVEBU=y
+ CONFIG_MACH_ARMADA_370=y
+ CONFIG_MACH_ARMADA_375=y
 -- 
 2.1.4
