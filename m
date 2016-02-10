@@ -1,158 +1,87 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 10 Feb 2016 13:02:25 +0000
-Subject: [PATCH 08/11] pwm: sti: Add support for PWM Capture IRQs
+Date: Wed, 10 Feb 2016 13:02:28 +0000
+Subject: [PATCH 11/11] pwm: sti: Take the opportunity to conduct a little
+ house keeping
 In-Reply-To: <1455109348-32767-1-git-send-email-lee.jones@linaro.org>
 References: <1455109348-32767-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1455109348-32767-9-git-send-email-lee.jones@linaro.org>
+Message-ID: <1455109348-32767-12-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here we're requesting the PWM Capture IRQ and supplying the
-handler which will be called in the event of an IRQ fire to
-handle it.
+This includes fixing some Coding Style issues and re-ordering/
+simplifying a little code.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/pwm/pwm-sti.c | 91 ++++++++++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 90 insertions(+), 1 deletion(-)
+ drivers/pwm/pwm-sti.c | 27 ++++++++++++++-------------
+ 1 file changed, 14 insertions(+), 13 deletions(-)
 
 diff --git a/drivers/pwm/pwm-sti.c b/drivers/pwm/pwm-sti.c
-index fca692a..82a69e4 100644
+index 93cf20e..93e3abf 100644
 --- a/drivers/pwm/pwm-sti.c
 +++ b/drivers/pwm/pwm-sti.c
-@@ -12,6 +12,7 @@
+@@ -144,13 +144,13 @@ static int sti_pwm_get_prescale(struct sti_pwm_chip *pc, unsigned long period,
+ 	val = NSEC_PER_SEC / clk_rate;
+ 	val *= cdata->max_pwm_cnt + 1;
  
- #include <linux/clk.h>
- #include <linux/gpio.h>
-+#include <linux/interrupt.h>
- #include <linux/math64.h>
- #include <linux/mfd/syscon.h>
- #include <linux/module.h>
-@@ -94,7 +95,9 @@ struct sti_pwm_chip {
- 	struct regmap_field *prescale_low;
- 	struct regmap_field *prescale_high;
- 	struct regmap_field *pwm_out_en;
-+	struct regmap_field *pwm_cpt_en;
- 	struct regmap_field *pwm_cpt_int_en;
-+	struct regmap_field *pwm_cpt_int_stat;
- 	struct pwm_chip chip;
- 	struct pwm_device *cur;
- 	unsigned long configured;
-@@ -314,6 +317,74 @@ static const struct pwm_ops sti_pwm_ops = {
- 	.owner = THIS_MODULE,
- };
+-	if (period % val) {
++	if (period % val)
+ 		return -EINVAL;
+-	} else {
+-		ps  = period / val - 1;
+-		if (ps > cdata->max_prescale)
+-			return -EINVAL;
+-	}
++
++	ps  = period / val - 1;
++	if (ps > cdata->max_prescale)
++		return -EINVAL;
++
+ 	*prescale = ps;
  
-+static irqreturn_t sti_pwm_interrupt(int irq, void *data)
-+{
-+	struct sti_pwm_chip *pc = data;
-+	struct device *dev = pc->dev;
-+	struct sti_cpt_data *d;
-+	int channel;
-+	int cpt_int_stat;
-+	int reg;
-+	int ret = IRQ_NONE;
-+
-+	ret = regmap_field_read(pc->pwm_cpt_int_stat, &cpt_int_stat);
-+	if (ret)
-+		return ret;
-+
-+	while (cpt_int_stat) {
-+		channel = ffs(cpt_int_stat) - 1;
-+
-+		d = pc->cpt_data[channel];
-+
-+		/*
-+		 * Capture input:
-+		 *    _______                   _______
-+		 *   |       |                 |       |
-+		 * __|       |_________________|       |________
-+		 *   ^0      ^1                ^2
-+		 *
-+		 * Capture start by the first available rising edge
-+		 * When a capture event occurs, capture value (CPT_VALx)
-+		 * is stored, index incremented, capture edge changed.
-+		 *
-+		 * After the capture, if the index > 1, we have collected
-+		 * the necessary data so we signal the thread waiting for it
-+		 * and disable the capture by setting capture edge to none
-+		 *
-+		 */
-+
-+		regmap_read(pc->regmap,
-+			    PWM_CPT_VAL(channel), &d->snapshot[d->index]);
-+
-+		switch (d->index) {
-+		case 0:
-+		case 1:
-+			regmap_read(pc->regmap, PWM_CPT_EDGE(channel), &reg);
-+			reg ^= PWM_CPT_EDGE_MASK;
-+			regmap_write(pc->regmap, PWM_CPT_EDGE(channel), reg);
-+
-+			d->index++;
-+			break;
-+		case 2:
-+			regmap_write(pc->regmap,
-+				     PWM_CPT_EDGE(channel), CPT_EDGE_DISABLED);
-+			wake_up(&d->wait);
-+			break;
-+		default:
-+			dev_err(dev, "Internal error\n");
-+		}
-+
-+		clear_bit(channel, (unsigned long int *)&cpt_int_stat);
-+
-+		ret = IRQ_HANDLED;
-+	}
-+
-+	/* Just ACK everything */
-+	regmap_write(pc->regmap, PWM_INT_ACK, PWM_INT_ACK_MASK);
-+
-+	return ret;
-+}
-+
- static int sti_pwm_probe_dt(struct sti_pwm_chip *pc)
+ 	return 0;
+@@ -166,7 +166,7 @@ static int sti_pwm_get_prescale(struct sti_pwm_chip *pc, unsigned long period,
+  * 256 values.
+  */
+ static int sti_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+-			 int duty_ns, int period_ns)
++			int duty_ns, int period_ns)
  {
- 	struct device *dev = pc->dev;
-@@ -354,6 +425,11 @@ static int sti_pwm_probe_dt(struct sti_pwm_chip *pc)
+ 	struct sti_pwm_chip *pc = to_sti_pwmchip(chip);
+ 	struct sti_pwm_compat_data *cdata = pc->cdata;
+@@ -212,7 +212,7 @@ static int sti_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+ 
+ 			ret =
+ 			regmap_field_write(pc->prescale_low,
+-					   prescale & PWM_PRESCALE_LOW_MASK);
++				prescale & PWM_PRESCALE_LOW_MASK);
+ 			if (ret)
+ 				goto clk_dis;
+ 
+@@ -506,7 +506,7 @@ static int sti_pwm_probe_dt(struct sti_pwm_chip *pc)
+ 		return PTR_ERR(pc->pwm_cpt_en);
+ 
+ 	pc->pwm_cpt_int_en = devm_regmap_field_alloc(dev, pc->regmap,
+-						 reg_fields[PWM_CPT_INT_EN]);
++						reg_fields[PWM_CPT_INT_EN]);
  	if (IS_ERR(pc->pwm_cpt_int_en))
  		return PTR_ERR(pc->pwm_cpt_int_en);
  
-+	pc->pwm_cpt_int_stat = devm_regmap_field_alloc(dev, pc->regmap,
-+						reg_fields[PWM_CPT_INT_STAT]);
-+	if (IS_ERR(pc->pwm_cpt_int_stat))
-+		return PTR_ERR(pc->pwm_cpt_int_stat);
-+
- 	return 0;
- }
- 
-@@ -371,7 +447,7 @@ static int sti_pwm_probe(struct platform_device *pdev)
- 	struct sti_pwm_chip *pc;
- 	struct resource *res;
- 	unsigned int chan;
--	int ret;
-+	int ret, irq;
- 
- 	pc = devm_kzalloc(dev, sizeof(*pc), GFP_KERNEL);
- 	if (!pc)
-@@ -392,6 +468,19 @@ static int sti_pwm_probe(struct platform_device *pdev)
- 	if (IS_ERR(pc->regmap))
- 		return PTR_ERR(pc->regmap);
- 
-+	irq = platform_get_irq(pdev, 0);
-+	if (irq < 0) {
-+		dev_err(&pdev->dev, "Failed to obtain IRQ\n");
-+		return -ENODEV;
-+	}
-+
-+	ret = devm_request_irq(&pdev->dev, irq, sti_pwm_interrupt,
-+			       0, pdev->name, (void *) pc);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "Failed to request IRQ\n");
-+		return ret;
-+	}
-+
- 	/*
+@@ -570,10 +570,11 @@ static int sti_pwm_probe(struct platform_device *pdev)
  	 * Setup PWM data with default values: some values could be replaced
  	 * with specific ones provided from Device Tree.
+ 	 */
+-	cdata->reg_fields   = &sti_pwm_regfields[0];
+-	cdata->max_prescale = 0xff;
+-	cdata->max_pwm_cnt  = 255;
+-	cdata->pwm_num_chan     = 1;
++
++	cdata->reg_fields	= &sti_pwm_regfields[0];
++	cdata->max_prescale	= 0xff;
++	cdata->max_pwm_cnt	= 255;
++	cdata->pwm_num_chan	= 1;
+ 	cdata->cpt_num_chan	= 0;
+ 
+ 	pc->cdata = cdata;
 -- 
 1.9.1
