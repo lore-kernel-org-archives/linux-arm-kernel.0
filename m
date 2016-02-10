@@ -1,66 +1,54 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 10 Feb 2016 15:02:49 -0800
-Subject: [PATCH 6/7] ARM: OMAP2+: Improve omap_device error for driver writers
-In-Reply-To: <1455145370-20301-1-git-send-email-tony@atomide.com>
-References: <1455145370-20301-1-git-send-email-tony@atomide.com>
-Message-ID: <1455145370-20301-7-git-send-email-tony@atomide.com>
+From: martin@sperl.org (Martin Sperl)
+Date: Thu, 11 Feb 2016 00:19:39 +0100
+Subject: [PATCH 3/4] spi: bcm2835aux: set up spi-mode before asserting
+ cs-gpio
+In-Reply-To: <2743238.b2UJKq0efN@chaos-desktop>
+References: <1455041435-8015-1-git-send-email-stephanolbrich@gmx.de>
+ <878u2s2xym.fsf@eliezer.anholt.net> <20160210190204.GD13270@sirena.org.uk>
+ <2743238.b2UJKq0efN@chaos-desktop>
+Message-ID: <7B5ED5ED-EF09-4D44-8989-1BBCD7C01463@sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Drivers using pm_runtime_use_autosuspend() may not get disabled after
--EPROBE_DEFER. On the following device driver probe, hardware state
-is different from the PM runtime state causing omap_device to produce
-the following error:
 
-omap_device_enable() called from invalid state 1
+> On 10.02.2016, at 21:26, Stephan Olbrich <stephanolbrich@gmx.de> wrote:
+> 
+> Am Wednesday 10 February 2016, 19:02:04 schrieb Mark Brown:
+>> On Wed, Feb 10, 2016 at 10:59:29AM -0800, Eric Anholt wrote:
+>>> Oops, this makes more sense now.  Subject even mentioned gpio, and a
+>>> GPIO CS must be getting set around the transfer_one call.  I'll be ready
+>>> to send an r-b for a v2 with the speed update bug fixed (unless transfer
+>>> speeds are guaranteed to be constant between a prepare and unprepare).
+>> 
+>> No guarantee that they'll not change, especially in a situation where we
+>> have two devices on different speeds on a bus working at the same time.
+> Are you saying, that between a prepare and unprepare there could be transfers 
+> for another device? Then all the clock setting couldn't be done in prepare 
+> either.
+> Apart from that, if two transfers in the same message are not guarantied to 
+> have the same speed, this still needs to be fixed. I'll roll a v2.
 
-And with omap_device and omap hardware being picky for PM, this will
-block any deeper idle states in hardware.
+Prepare/unprepare is always called when processing an spi message.
+there is never a phase where two spi_messages are prepared concurrently
+for the same spi bus.
 
-Let's add a proper error message so driver writers can easily fix
-their drivers for PM.
+See the implementation of __spi_pump_messages
 
-In general, the solution is to fix the drivers to follow the PM
-runtime documentation:
+The sequence for processing is:
+* master->prepare_hardware
+* master->prepare_message
+* spi_map_message
+* master->transfer_one_message
+  * spi_set_cs(true)
+  at end of message:
+  * spi_finalize_current_message
+    * spi_set_cs(false)
+    * master->unprepare_message 
 
-1. For sections of code that needs the device disabled, use
-   pm_runtime_put_sync_suspend() if pm_runtime_set_autosuspend() has
-   been set.
+So the use of prepare_message in this context is valid.
 
-2. For driver exit code, use pm_runtime_dont_use_autosuspend() before
-   pm_runtime_put_sync() if pm_runtime_use_autosuspend() has been
-   set.
+Otherwise we would need to add an additional method to setup
+polarity/cs prior to spi_set_cs(true).
 
-Let's not return with 0 from _od_runtime_resume() as that will
-eventually lead into new drivers with broken PM runtime that will
-block deeper idle states on omaps.
-
-Cc: Alan Stern <stern@rowland.harvard.edu>
-Cc: Kevin Hilman <khilman@baylibre.com>
-Cc: Nishanth Menon <nm@ti.com>
-Cc: Rafael J. Wysocki <rafael@kernel.org>
-Cc: Ulf Hansson <ulf.hansson@linaro.org>
-Cc: Tero Kristo <t-kristo@ti.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/omap_device.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
-index 0437537..ebd8369 100644
---- a/arch/arm/mach-omap2/omap_device.c
-+++ b/arch/arm/mach-omap2/omap_device.c
-@@ -602,8 +602,10 @@ static int _od_runtime_resume(struct device *dev)
- 	int ret;
- 
- 	ret = omap_device_enable(pdev);
--	if (ret)
-+	if (ret) {
-+		dev_err(dev, "use pm_runtime_put_sync_suspend() in driver?\n");
- 		return ret;
-+	}
- 
- 	return pm_generic_runtime_resume(dev);
- }
--- 
-2.7.0
+Ciao,
+	Martin
