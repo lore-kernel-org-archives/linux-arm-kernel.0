@@ -1,28 +1,38 @@
 From: linux@baker-net.org.uk (Adam Baker)
-Date: Wed, 10 Feb 2016 23:33:44 +0000
-Subject: [PATCH 3/3] ARM: mvebu: Add the hardware monitor to the NSA320 device
- tree
+Date: Wed, 10 Feb 2016 23:33:42 +0000
+Subject: [PATCH 1/3] ARM: mvebu: Define binding for the nsa3xx-hwmon driver
 In-Reply-To: <1455147224-6742-1-git-send-email-linux@baker-net.org.uk>
 References: <1455147224-6742-1-git-send-email-linux@baker-net.org.uk>
-Message-ID: <1455147224-6742-4-git-send-email-linux@baker-net.org.uk>
+Message-ID: <1455147224-6742-2-git-send-email-linux@baker-net.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add an entry for the hardware monitoring MCU
+Define a binding for the hardware monitoring chip present in several
+variants of the Zyxel NSA3xx NAS devices.
 
 Signed-off-by: Adam Baker <linux@baker-net.org.uk>
 ---
- arch/arm/boot/dts/kirkwood-nsa320.dts | 13 +++++++++++--
- 1 file changed, 11 insertions(+), 2 deletions(-)
+ .../devicetree/bindings/hwmon/nsa320-mcu.txt        | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/hwmon/nsa320-mcu.txt
 
-diff --git a/arch/arm/boot/dts/kirkwood-nsa320.dts b/arch/arm/boot/dts/kirkwood-nsa320.dts
-index 24f686d..2a935e9 100644
---- a/arch/arm/boot/dts/kirkwood-nsa320.dts
-+++ b/arch/arm/boot/dts/kirkwood-nsa320.dts
-@@ -193,10 +193,19 @@
- 		};
- 	};
- 
+diff --git a/Documentation/devicetree/bindings/hwmon/nsa320-mcu.txt b/Documentation/devicetree/bindings/hwmon/nsa320-mcu.txt
+new file mode 100644
+index 0000000..7b346d4
+--- /dev/null
++++ b/Documentation/devicetree/bindings/hwmon/nsa320-mcu.txt
+@@ -0,0 +1,21 @@
++Bindings for the fan / temperature monitor microcontroller used on
++the Zyxel NSA 320 and several subsequent models.
++
++Required properties:
++- compatible	: "zyxel,nsa320-mcu"
++- data-gpios	: The GPIO pin connected to the data line on the MCU
++- clk-gpios	: The GPIO pin connected to the clock line on the MCU
++- act-gpios	: The GPIO pin connected to the active line on the MCU
++
++Example:
++
 +	hwmon {
 +		compatible = "zyxel,nsa320-mcu";
 +		pinctrl-0 = <&pmx_mcu_data &pmx_mcu_clk &pmx_mcu_act>;
@@ -33,13 +43,5 @@ index 24f686d..2a935e9 100644
 +		act-gpios = <&gpio0 17 GPIO_ACTIVE_LOW>;
 +	};
 +
- 	/* The following pins are currently not assigned to a driver,
- 	   some of them should be configured as inputs.
--	pinctrl-0 = <&pmx_mcu_data &pmx_mcu_clk &pmx_mcu_act
--		     &pmx_htp &pmx_vid_b1
-+	pinctrl-0 = <&pmx_htp &pmx_vid_b1
- 		     &pmx_power_resume_data &pmx_power_resume_clk>; */
- };
- 
 -- 
 2.1.4
