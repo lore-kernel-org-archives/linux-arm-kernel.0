@@ -1,25 +1,36 @@
-From: stephanolbrich@gmx.de (Stephan Olbrich)
-Date: Wed, 10 Feb 2016 21:26:05 +0100
-Subject: [PATCH 3/4] spi: bcm2835aux: set up spi-mode before asserting
- cs-gpio
-In-Reply-To: <20160210190204.GD13270@sirena.org.uk>
-References: <1455041435-8015-1-git-send-email-stephanolbrich@gmx.de>
- <878u2s2xym.fsf@eliezer.anholt.net> <20160210190204.GD13270@sirena.org.uk>
-Message-ID: <2743238.b2UJKq0efN@chaos-desktop>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 10 Feb 2016 21:40:12 +0100
+Subject: [PATCH 0/8] KVM/ARM: Guest Entry/Exit optimizations
+In-Reply-To: <1454931622-14902-1-git-send-email-marc.zyngier@arm.com>
+References: <1454931622-14902-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20160210204012.GS5171@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Wednesday 10 February 2016, 19:02:04 schrieb Mark Brown:
-> On Wed, Feb 10, 2016 at 10:59:29AM -0800, Eric Anholt wrote:
-> > Oops, this makes more sense now.  Subject even mentioned gpio, and a
-> > GPIO CS must be getting set around the transfer_one call.  I'll be ready
-> > to send an r-b for a v2 with the speed update bug fixed (unless transfer
-> > speeds are guaranteed to be constant between a prepare and unprepare).
+On Mon, Feb 08, 2016 at 11:40:14AM +0000, Marc Zyngier wrote:
+> I've recently been looking at our entry/exit costs, and profiling
+> figures did show some very low hanging fruits.
 > 
-> No guarantee that they'll not change, especially in a situation where we
-> have two devices on different speeds on a bus working at the same time.
-Are you saying, that between a prepare and unprepare there could be transfers 
-for another device? Then all the clock setting couldn't be done in prepare 
-either.
-Apart from that, if two transfers in the same message are not guarantied to 
-have the same speed, this still needs to be fixed. I'll roll a v2.
+> The most obvious cost is that accessing the GIC HW is slow. As in
+> "deadly slow", specially when GICv2 is involved. So not hammering the
+> HW when there is nothing to write is immediately beneficial, as this
+> is the most common cases (whatever people seem to think, interrupts
+> are a *rare* event).
+> 
+> Another easy thing to fix is the way we handle trapped system
+> registers. We do insist on (mostly) sorting them, but we do perform a
+> linear search on trap. We can switch to a binary search for free, and
+> get immediate benefits (the PMU code, being extremely trap-happy,
+> benefits immediately from this).
+> 
+> With these in place, I see an improvement of 20 to 30% (depending on
+> the platform) on our world-switch cycle count when running a set of
+> hand-crafted guests that are designed to only perform traps.
+> 
+
+By the way, I took this whole stack of changes (wsinc, vhe, and
+optimizations) and ran it on Mustang and fired up UEFI and did a reboot
+and things seem to work, so that's a small shallow
+'tested-by-something-else-than-a-linux-guest' statement from me.
+
+-Christoffer
