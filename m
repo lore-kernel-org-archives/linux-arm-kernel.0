@@ -1,39 +1,194 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 10 Feb 2016 16:01:27 +0000
-Subject: [PATCH] arm64: Rework valid_user_regs
-In-Reply-To: <20160210144324.GL1052@arm.com>
-References: <1455041501-30018-1-git-send-email-mark.rutland@arm.com>
- <20160210115853.GG1052@arm.com> <20160210123110.GD2632@leverpostej>
- <CAFEAcA-3mgxu6hNSOLhFMmfzB705xyZTyfa5eiRWX6MOnYMVvQ@mail.gmail.com>
- <20160210144324.GL1052@arm.com>
-Message-ID: <20160210160127.GE2632@leverpostej>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 10 Feb 2016 16:02:14 +0000
+Subject: [PATCH v2 18/28] ARM: KVM: Add HYP mode entry code
+In-Reply-To: <20160209170042.GA5171@cbox>
+References: <1454583645-10144-1-git-send-email-marc.zyngier@arm.com>
+ <1454583645-10144-19-git-send-email-marc.zyngier@arm.com>
+ <20160209170042.GA5171@cbox>
+Message-ID: <56BB5F06.9000606@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 10, 2016 at 02:43:24PM +0000, Will Deacon wrote:
-> On Wed, Feb 10, 2016 at 02:23:29PM +0000, Peter Maydell wrote:
-> > On 10 February 2016 at 12:31, Mark Rutland <mark.rutland@arm.com> wrote:
-> > > On Wed, Feb 10, 2016 at 11:58:53AM +0000, Will Deacon wrote:
-> > >> I think we should err on the side of caution and nuke SS and IL for both
-> > >> native and compat too, although that seems a odds with the PSR_s mask.
-> > >> I wonder how relevant those PSR groups are in ARMv8...
-> > >
-> > > Ok.
-> > 
-> > If you nuke SS does that have any side effects in the case
-> > of (for instance) interactions between ptrace single step
-> > and ptrace syscall tracing? (ie do we ever end up in a situation
-> > where the ptracer can read a PSR for the debuggee which has
-> > SS set? if so then it should be able to write back the PSR
-> > it has just read without any bits being unset.)
+On 09/02/16 17:00, Christoffer Dall wrote:
+> On Thu, Feb 04, 2016 at 11:00:35AM +0000, Marc Zyngier wrote:
+>> This part is almost entierely borrowed from the existing code, just
+>> slightly simplifying the HYP function call (as we now save SPSR_hyp
+>> in the world switch).
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm/kvm/hyp/Makefile    |   1 +
+>>  arch/arm/kvm/hyp/hyp-entry.S | 157 +++++++++++++++++++++++++++++++++++++++++++
+>>  arch/arm/kvm/hyp/hyp.h       |   2 +
+>>  3 files changed, 160 insertions(+)
+>>  create mode 100644 arch/arm/kvm/hyp/hyp-entry.S
+>>
+>> diff --git a/arch/arm/kvm/hyp/Makefile b/arch/arm/kvm/hyp/Makefile
+>> index cfab402..a7d3a7e 100644
+>> --- a/arch/arm/kvm/hyp/Makefile
+>> +++ b/arch/arm/kvm/hyp/Makefile
+>> @@ -9,4 +9,5 @@ obj-$(CONFIG_KVM_ARM_HOST) += vgic-v2-sr.o
+>>  obj-$(CONFIG_KVM_ARM_HOST) += vfp.o
+>>  obj-$(CONFIG_KVM_ARM_HOST) += banked-sr.o
+>>  obj-$(CONFIG_KVM_ARM_HOST) += entry.o
+>> +obj-$(CONFIG_KVM_ARM_HOST) += hyp-entry.o
+>>  obj-$(CONFIG_KVM_ARM_HOST) += switch.o
+>> diff --git a/arch/arm/kvm/hyp/hyp-entry.S b/arch/arm/kvm/hyp/hyp-entry.S
+>> new file mode 100644
+>> index 0000000..44bc11f
+>> --- /dev/null
+>> +++ b/arch/arm/kvm/hyp/hyp-entry.S
+>> @@ -0,0 +1,157 @@
+>> +/*
+>> + * Copyright (C) 2012 - Virtual Open Systems and Columbia University
+>> + * Author: Christoffer Dall <c.dall@virtualopensystems.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License, version 2, as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License
+>> + * along with this program; if not, write to the Free Software
+>> + * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+>> + */
+>> +
+>> +#include <linux/linkage.h>
+>> +#include <asm/kvm_arm.h>
+>> +#include <asm/kvm_asm.h>
+>> +
+>> +	.arch_extension     virt
+>> +
+>> +	.text
+>> +	.pushsection	.hyp.text, "ax"
+>> +
+>> +.macro load_vcpu	reg
+>> +	mrc	p15, 4, \reg, c13, c0, 2	@ HTPIDR
+>> +.endm
+>> +
+>> +/********************************************************************
+>> + * Hypervisor exception vector and handlers
+>> + *
+>> + *
+>> + * The KVM/ARM Hypervisor ABI is defined as follows:
+>> + *
+>> + * Entry to Hyp mode from the host kernel will happen _only_ when an HVC
+>> + * instruction is issued since all traps are disabled when running the host
+>> + * kernel as per the Hyp-mode initialization at boot time.
+>> + *
+>> + * HVC instructions cause a trap to the vector page + offset 0x14 (see hyp_hvc
+>> + * below) when the HVC instruction is called from SVC mode (i.e. a guest or the
+>> + * host kernel) and they cause a trap to the vector page + offset 0x8 when HVC
+>> + * instructions are called from within Hyp-mode.
+>> + *
+>> + * Hyp-ABI: Calling HYP-mode functions from host (in SVC mode):
+>> + *    Switching to Hyp mode is done through a simple HVC #0 instruction. The
+>> + *    exception vector code will check that the HVC comes from VMID==0.
+>> + *    - r0 contains a pointer to a HYP function
+>> + *    - r1, r2, and r3 contain arguments to the above function.
+>> + *    - The HYP function will be called with its arguments in r0, r1 and r2.
+>> + *    On HYP function return, we return directly to SVC.
+>> + *
+>> + * Note that the above is used to execute code in Hyp-mode from a host-kernel
+>> + * point of view, and is a different concept from performing a world-switch and
+>> + * executing guest code SVC mode (with a VMID != 0).
+>> + */
+>> +
+>> +	.align 5
+>> +__hyp_vector:
+>> +	.global	__hyp_vector
+>> +__kvm_hyp_vector:
+>> +	.weak __kvm_hyp_vector
+>> +
+>> +	@ Hyp-mode exception vector
+>> +	W(b)	hyp_reset
+>> +	W(b)	hyp_undef
+>> +	W(b)	hyp_svc
+>> +	W(b)	hyp_pabt
+>> +	W(b)	hyp_dabt
+>> +	W(b)	hyp_hvc
+>> +	W(b)	hyp_irq
+>> +	W(b)	hyp_fiq
+>> +
+>> +.macro invalid_vector label, cause
+>> +	.align
+>> +\label:	b	.
+>> +.endm
+>> +
+>> +	invalid_vector	hyp_reset
+>> +	invalid_vector	hyp_undef
+>> +	invalid_vector	hyp_svc
+>> +	invalid_vector	hyp_pabt
+>> +	invalid_vector	hyp_dabt
+>> +	invalid_vector	hyp_fiq
+>> +
+>> +hyp_hvc:
+>> +	/*
+>> +	 * Getting here is either because of a trap from a guest,
+>> +	 * or from executing HVC from the host kernel, which means
+>> +	 * "do something in Hyp mode".
+>> +	 */
+>> +	push	{r0, r1, r2}
+>> +
+>> +	@ Check syndrome register
+>> +	mrc	p15, 4, r1, c5, c2, 0	@ HSR
+>> +	lsr	r0, r1, #HSR_EC_SHIFT
+>> +	cmp	r0, #HSR_EC_HVC
+>> +	bne	guest_trap		@ Not HVC instr.
+>> +
+>> +	/*
+>> +	 * Let's check if the HVC came from VMID 0 and allow simple
+>> +	 * switch to Hyp mode
+>> +	 */
+>> +	mrrc    p15, 6, r0, r2, c2
+>> +	lsr     r2, r2, #16
+>> +	and     r2, r2, #0xff
+>> +	cmp     r2, #0
+>> +	bne	guest_trap		@ Guest called HVC
+>> +
+>> +	/*
+>> +	 * Getting here means host called HVC, we shift parameters and branch
+>> +	 * to Hyp function.
+>> +	 */
+>> +	pop	{r0, r1, r2}
+>> +
+>> +	/* Check for __hyp_get_vectors */
+>> +	cmp	r0, #-1
+>> +	mrceq	p15, 4, r0, c12, c0, 0	@ get HVBAR
+>> +	beq	1f
+>> +
+>> +	push	{lr}
+>> +
+>> +	mov	lr, r0
+>> +	mov	r0, r1
+>> +	mov	r1, r2
+>> +	mov	r2, r3
+>> +
+>> +THUMB(	orr	lr, #1)
+>> +	blx	lr			@ Call the HYP function
+>> +
+>> +	pop	{lr}
+>> +1:	eret
+>> +
+>> +guest_trap:
+>> +	load_vcpu r0			@ Load VCPU pointer to r0
+>> +
+>> +	@ Check if we need the fault information
 > 
-> I don't think so -- the signal dispatch logic "fast-forwards" the stepping
-> state machine so that we step into the signal handler, therefore the SS
-> bit should always be clear on entry afaict.
+> nit: this is not about faults at this point, so this comment should
+> either go or be reworded to "let's check if we trapped on guest VFP
+> access"
+> 
+> and I think the lsr can be moved into the ifdef as well.
 
-That handles entry, but what about exit?
+Yes, both good points.
 
-Is there are a guarantee that we won't call user_enable_single_step() if
-the return path is traced?
+Thanks,
 
-Mark.
+	M.
+-- 
+Jazz is not dead. It just smells funny...
