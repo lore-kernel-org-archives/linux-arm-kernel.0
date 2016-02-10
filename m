@@ -1,50 +1,45 @@
-From: martin@sperl.org (Martin Sperl)
-Date: Wed, 10 Feb 2016 17:39:10 +0100
-Subject: [GIT PULL] bcm2835 DT changes for 4.6
-In-Reply-To: <1454977978-17491-1-git-send-email-eric@anholt.net>
-References: <1454977978-17491-1-git-send-email-eric@anholt.net>
-Message-ID: <DDFB1D8B-805B-488F-9582-796EBCEF287B@sperl.org>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 10 Feb 2016 17:39:57 +0100
+Subject: [PATCH v5 RESEND 2/5] ARM: sa1111: ensure no negative value gets
+ returned on positive match
+In-Reply-To: <1455101250-11327-3-git-send-email-m.szyprowski@samsung.com>
+References: <1455101250-11327-1-git-send-email-m.szyprowski@samsung.com>
+ <1455101250-11327-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <CAPDyKFqJTB=Q=uQtqHVy7_ssoDyUSDZtB7H+k00QFnwXqDkzDQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 10 February 2016 at 11:47, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+> This patch ensures that existing bus match callbacks don't return
+> negative values (which might be interpreted as potential errors in the
+> future) in case of positive match.
+>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 
-> On 09.02.2016, at 01:32, Eric Anholt <eric@anholt.net> wrote:
-> 
-> Hi Florian.  Here's the first set of patches for bcm2835 for 4.6.
-> We've got more DT patches that are going to happen for new boards,
-> too, but they're still getting polished.
-> 
-> The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
-> 
->  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
-> 
-> are available in the git repository at:
-> 
->  git at github.com:anholt/linux.git tags/bcm2835-dt-next-2016-02-04
-> 
-> for you to fetch changes up to 5ec6f2cd8ec4bcd38ba199ea8711a5ec906d85e7:
-> 
->  ARM: bcm2835: Add the Raspberry Pi power domain driver to the DT. (2016-02-02 20:02:45 -0800)
-> 
-> ----------------------------------------------------------------
-> This pull request covers mostly DT changes that didn't make it into
-> 4.5 because required header files went through other trees.
-> 
-> ----------------------------------------------------------------
-> Alexander Aring (1):
->      ARM: bcm2835: Add the Raspberry Pi power domain driver to the DT.
-> 
-> Lubomir Rintel (1):
->      ARM: bcm2835: dt: Add Raspberry Pi Model A
-> 
-> Martin Sperl (2):
->      ARM: bcm2835: add the auxiliary spi1 and spi2 to the device tree
->      ARM: bcm2835: follow dt uart node-naming convention
+FYI:
+This one has actually been acked by Russell.
+https://lkml.org/lkml/2015/12/23/111
 
-Do you want me to resend a rebased version of:
-     ARM: bcm2835: add bcm2835-aux-uart support to default DT
+Kind regards
+Uffe
 
-The corresponding driver has been added to tty/tty-next.
-
-Thanks,
-	Martin
+> ---
+>  arch/arm/common/sa1111.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/common/sa1111.c b/arch/arm/common/sa1111.c
+> index 3d22494..fb0a0a4 100644
+> --- a/arch/arm/common/sa1111.c
+> +++ b/arch/arm/common/sa1111.c
+> @@ -1290,7 +1290,7 @@ static int sa1111_match(struct device *_dev, struct device_driver *_drv)
+>         struct sa1111_dev *dev = SA1111_DEV(_dev);
+>         struct sa1111_driver *drv = SA1111_DRV(_drv);
+>
+> -       return dev->devid & drv->devid;
+> +       return !!(dev->devid & drv->devid);
+>  }
+>
+>  static int sa1111_bus_suspend(struct device *dev, pm_message_t state)
+> --
+> 1.9.2
+>
