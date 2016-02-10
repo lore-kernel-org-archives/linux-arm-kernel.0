@@ -1,73 +1,41 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 10 Feb 2016 10:36:01 +0000
-Subject: [PATCH v10 01/21] ARM64: Move PMU register related defines to
- asm/pmu.h
-In-Reply-To: <1453866709-20324-2-git-send-email-zhaoshenglong@huawei.com>
-References: <1453866709-20324-1-git-send-email-zhaoshenglong@huawei.com>
- <1453866709-20324-2-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <20160210103600.GE1052@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 10 Feb 2016 10:38:14 +0000
+Subject: [PATCHv4 2/3] arm64: Add support for ARCH_SUPPORTS_DEBUG_PAGEALLOC
+In-Reply-To: <1454718288-31374-3-git-send-email-labbott@fedoraproject.org>
+References: <1454718288-31374-1-git-send-email-labbott@fedoraproject.org>
+ <1454718288-31374-3-git-send-email-labbott@fedoraproject.org>
+Message-ID: <20160210103814.GC13577@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 27, 2016 at 11:51:29AM +0800, Shannon Zhao wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
-> 
-> To use the ARMv8 PMU related register defines from the KVM code,
-> we move the relevant definitions to asm/pmu.h header file.
-> 
-> Signed-off-by: Anup Patel <anup.patel@linaro.org>
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/include/asm/pmu.h   | 67 ++++++++++++++++++++++++++++++++++++++++++
->  arch/arm64/kernel/perf_event.c | 36 +----------------------
->  2 files changed, 68 insertions(+), 35 deletions(-)
->  create mode 100644 arch/arm64/include/asm/pmu.h
-> 
-> diff --git a/arch/arm64/include/asm/pmu.h b/arch/arm64/include/asm/pmu.h
-> new file mode 100644
-> index 0000000..4406184
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/pmu.h
-
-I think you can stick this in perf_event.h and avoid having a brand
-new header.
-
-> @@ -0,0 +1,67 @@
-> +/*
-> + * PMU support
-> + *
-> + * Copyright (C) 2012 ARM Limited
-> + * Author: Will Deacon <will.deacon@arm.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +#ifndef __ASM_PMU_H
-> +#define __ASM_PMU_H
+On Fri, Feb 05, 2016 at 04:24:47PM -0800, Laura Abbott wrote:
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -149,6 +149,19 @@ static void split_pud(pud_t *old_pud, pmd_t *pmd)
+>  	} while (pmd++, i++, i < PTRS_PER_PMD);
+>  }
+>  
+> +bool block_mappings_allowed(phys_addr_t (*pgtable_alloc)(void))
+> +{
 > +
-> +#define ARMV8_MAX_COUNTERS      32
-> +#define ARMV8_COUNTER_MASK      (ARMV8_MAX_COUNTERS - 1)
+> +	/*
+> +	 * If debug_page_alloc is enabled we must map the linear map
+> +	 * using pages. However, other mappings created by
+> +	 * create_mapping_noalloc must use sections in some cases. Allow
+> +	 * sections to be used in those cases, where no pgtable_alloc
+> +	 * function is provided.
+> +	 */
+> +	return !pgtable_alloc || !debug_pagealloc_enabled();
+> +}
 
-[...]
+This breaks the build when CONFIG_DEBUG_PAGEALLOC is not enabled
+(defconfig) since debug_pagealloc_enabled() is not defined. A fix went
+in next/master as commit 0987684b855c
+("mm-slab-clean-up-debug_pagealloc-processing-code-fix"). I need to
+track it down and merge it via the arm64 tree, otherwise I'll add some
+#ifdefs in this function.
 
-> +/*
-> + * Event filters for PMUv3
-> + */
-> +#define	ARMV8_EXCLUDE_EL1	(1 << 31)
-> +#define	ARMV8_EXCLUDE_EL0	(1 << 30)
-> +#define	ARMV8_INCLUDE_EL2	(1 << 27)
+BTW, shouldn't the block_mappings_allowed() function be static?
 
-You should prefix these more specifically if they're going to be exposed
-like this. Something like ARMV8_PMU_*.
-
-Will
+-- 
+Catalin
