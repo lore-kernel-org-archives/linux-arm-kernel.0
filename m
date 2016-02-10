@@ -1,52 +1,78 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 10 Feb 2016 21:40:11 +0100
-Subject: [PATCH V3 3/5] PCI: xilinx: Modifying AXI PCIe Host Bridge driver
- to work on both Zynq and Microblaze
-In-Reply-To: <20160210172707.GA29590@NP-P-BURTON>
-References: <1455014518-8708-1-git-send-email-bharatku@xilinx.com>
- <8520D5D51A55D047800579B09414719825881780@XAP-PVEXMBX01.xlnx.xilinx.com>
- <20160210172707.GA29590@NP-P-BURTON>
-Message-ID: <2818168.2fmZIs86hN@wuerfel>
+From: Jean-Philippe.Brucker@arm.com (Jean-Philippe Brucker)
+Date: Wed, 10 Feb 2016 20:42:21 +0000
+Subject: [PATCH] ARM: virt: enable GICv3 system registers
+In-Reply-To: <1453721639-24733-1-git-send-email-jean-philippe.brucker@arm.com>
+References: <1453721639-24733-1-git-send-email-jean-philippe.brucker@arm.com>
+Message-ID: <20160210204221.GA2749@e106794-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 10 February 2016 09:27:07 Paul Burton wrote:
-> On Wed, Feb 10, 2016 at 05:55:51AM +0000, Bharat Kumar Gogada wrote:
-> > > On Tue, Feb 09, 2016 at 04:11:56PM +0530, Bharat Kumar Gogada wrote:
-> > > > Modifying Xilinx AXI PCIe Host Bridge Soft IP driver to work on both
-> > > > Zynq and Microblaze Architectures.
-> > > > With these modifications drivers/pci/host/pcie-xilinx.c, will work on
-> > > > both Zynq and Microblaze Architectures.
-> > > >
-> > > > Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
-> > > > Signed-off-by: Ravi Kiran Gummaluri <rgummal@xilinx.com>
-> > > > ---
-> > > > Changes:
-> > > > Removed unneccessary architecture dependent number of MSI's.
-> > > > Added #ifdef to pci_fixup_irqs which is ARM specific API.
-> > > 
-> > > Hi Bharat,
-> > > 
-> > > Why do you say pci_fixup_irqs is ARM-specific? It's declared in
-> > > include/linux/pci.h, defined in drivers/pci/setup-irq.c & used by multiple
-> > > architectures (alpha, arm, m68k, mips, sh, sparc, tile,
-> > > unicore32 from a quick grep).
-> > > 
-> > > Will you not break INTX-style interrupts by removing this?
-> > > 
-> > I meant to say ARM specific w.r.t Microblaze architecture, which is
-> > what this patch series are for. This has been already discussed in my
-> > previous patch by  Arnd Bergmann and Lorenzo Pieralisi .
-> > (https://lkml.org/lkml/2016/1/12/707)
+On Mon, Jan 25, 2016 at 11:33:59AM +0000, Jean-Philippe Brucker wrote:
+> ARMv8 introduces system registers for the Generic Interrupt Controller's
+> CPU and virtual interfaces.
+> When GICv3 is implemented, EL2 needs to allow the kernel to use those
+> registers, by changing the value of ICC_HSRE.
 > 
-> Hi Bharat,
+> Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
+> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+
+Russell, does this look OK for your tree?
+
+Thanks,
+Jean-Philippe
+
+> ---
+>  arch/arm/kernel/hyp-stub.S |   24 ++++++++++++++++++++++++
+>  1 file changed, 24 insertions(+)
 > 
-> Ok, so you don't need it for microblaze but do need it for zynq/ARM. We
-> also need it for MIPS, where my recent patches enable this driver. So if
-> #ifdef'ing this is the current way forwards could you please invert the
-> condition to #ifndef CONFIG_MICROBLAZE?
-
-I think we are getting to the point where we should try much harder
-to make sure nobody needs that hack and it all works out of the box.
-
-	Arnd
+> diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
+> index 2a55373..0b1e4a9 100644
+> --- a/arch/arm/kernel/hyp-stub.S
+> +++ b/arch/arm/kernel/hyp-stub.S
+> @@ -17,6 +17,7 @@
+>   */
+>  
+>  #include <linux/init.h>
+> +#include <linux/irqchip/arm-gic-v3.h>
+>  #include <linux/linkage.h>
+>  #include <asm/assembler.h>
+>  #include <asm/virt.h>
+> @@ -161,6 +162,29 @@ ARM_BE8(orr	r7, r7, #(1 << 25))     @ HSCTLR.EE
+>  1:
+>  #endif
+>  
+> +#ifdef CONFIG_ARM_GIC_V3
+> +	@ Check whether GICv3 system registers are available
+> +	mrc	p15, 0, r7, c0, c1, 1	@ ID_PFR1
+> +	ubfx	r7, r7, #28, #4
+> +	cmp	r7, #1
+> +	bne	2f
+> +
+> +	@ Enable system register accesses
+> +	mrc	p15, 4, r7, c12, c9, 5	@ ICC_HSRE
+> +	orr	r7, r7, #(ICC_SRE_EL2_ENABLE | ICC_SRE_EL2_SRE)
+> +	mcr	p15, 4, r7, c12, c9, 5	@ ICC_HSRE
+> +	isb
+> +
+> +	@ SRE bit could be forced to 0 by firmware.
+> +	@ Check whether it sticks before accessing any other sysreg
+> +	mrc	p15, 4, r7, c12, c9, 5	@ ICC_HSRE
+> +	tst	r7, #ICC_SRE_EL2_SRE
+> +	beq	2f
+> +	mov	r7, #0
+> +	mcr	p15, 4, r7, c12, c11, 0	@ ICH_HCR
+> +2:
+> +#endif
+> +
+>  	bx	lr			@ The boot CPU mode is left in r4.
+>  ENDPROC(__hyp_stub_install_secondary)
+>  
+> -- 
+> 1.7.9.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
