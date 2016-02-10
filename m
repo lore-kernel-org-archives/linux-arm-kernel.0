@@ -1,54 +1,81 @@
-From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Thu, 11 Feb 2016 03:56:16 +0700
-Subject: [PATCH v11 3/4] ARM64: add SBSA Generic Watchdog device node in
- amd-seattle-soc.dtsi
-In-Reply-To: <1455037240-16192-4-git-send-email-fu.wei@linaro.org>
-References: <1455037240-16192-1-git-send-email-fu.wei@linaro.org>
- <1455037240-16192-4-git-send-email-fu.wei@linaro.org>
-Message-ID: <56BBA3F0.4010908@amd.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Wed, 10 Feb 2016 22:09:34 +0100
+Subject: [PATCH V4 11/23] pci, acpi: Move ACPI host bridge device
+ companion assignment to core code.
+In-Reply-To: <20160209180227.GC22868@red-moon>
+References: <1454606941-9523-1-git-send-email-tn@semihalf.com>
+ <1454606941-9523-12-git-send-email-tn@semihalf.com>
+ <20160209180227.GC22868@red-moon>
+Message-ID: <56BBA70E.908@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fu Wei,
-
-On 2/10/16 00:00, fu.wei at linaro.org wrote:
-> From: Fu Wei <fu.wei@linaro.org>
+On 02/09/2016 07:02 PM, Lorenzo Pieralisi wrote:
+> On Thu, Feb 04, 2016 at 06:28:49PM +0100, Tomasz Nowicki wrote:
+>> Currently we have two platforms (x86 & ia64) capable of PCI ACPI host
+>> bridge initialization. They both use sysdata to pass down parent
+>> device reference and both rely on NULL parent in pci_create_root_bus()
+>> to validate sysdata content.
+>>
+>> It looks hacky and prevents us from getting some firmware specific
+>> info for PCI host controller e.g. PCI bus domain number.
+>> However, we overcome that blocker by passing down parent
+>> device via pci_create_root_bus parameter (as the ACPI device type)
+>> and using ACPI_COMPANION_SET in core code for ACPI boot method.
+>> ACPI_COMPANION_SET is safe to run for all cases DT, ACPI and DT&ACPI.
+>>
+>> Suggested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+>> Tested-by: Duc Dang <dhdang@apm.com>
+>> Tested-by: Dongdong Liu <liudongdong3@huawei.com>
+>> Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> Tested-by: Graeme Gregory <graeme.gregory@linaro.org>
+>> Tested-by: Sinan Kaya <okaya@codeaurora.org>
+>> ---
+>>   drivers/acpi/pci_root.c | 5 ++++-
+>>   drivers/pci/probe.c     | 2 ++
+>>   2 files changed, 6 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/acpi/pci_root.c b/drivers/acpi/pci_root.c
+>> index ae3fe4e..a65c8c2 100644
+>> --- a/drivers/acpi/pci_root.c
+>> +++ b/drivers/acpi/pci_root.c
+>> @@ -846,7 +846,10 @@ struct pci_bus *acpi_pci_root_create(struct acpi_pci_root *root,
+>>   
+>>   	pci_acpi_root_add_resources(info);
+>>   	pci_add_resource(&info->resources, &root->secondary);
+>> -	bus = pci_create_root_bus(NULL, busnum, ops->pci_ops,
+>> +
+>> +	/* Root bridge device needs to be sure of parent ACPI type */
+> You can improve the comment.
 >
-> This can be a example of adding SBSA Generic Watchdog device node
-> into some dts files for the Soc which contains SBSA Generic Watchdog.
+> "pci_create_root_bus() needs to detect the parent device type,
+> so initialize its companion data accordingly".
+Agree, I will change comment.
 >
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> Signed-off-by: Fu Wei <fu.wei@linaro.org>
-> ---
->   arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi | 9 +++++++++
->   1 file changed, 9 insertions(+)
+>> +	ACPI_COMPANION_SET(&device->dev, device);
+>> +	bus = pci_create_root_bus(&device->dev, busnum, ops->pci_ops,
+>>   				  sysdata, &info->resources);
+>>   	if (!bus)
+>>   		goto out_release_info;
+>> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+>> index 6d7ab9b..81dd3a2 100644
+>> --- a/drivers/pci/probe.c
+>> +++ b/drivers/pci/probe.c
+>> @@ -2100,6 +2100,8 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
+>>   	bridge->dev.parent = parent;
+>>   	bridge->dev.release = pci_release_host_bridge_dev;
+>>   	dev_set_name(&bridge->dev, "pci%04x:%02x", pci_domain_nr(b), bus);
+>> +	ACPI_COMPANION_SET(&bridge->dev,
+>> +			   parent ? to_acpi_device_node(parent->fwnode) : NULL);
+> if (parent)
+> 	ACPI_COMPANION_SET(&bridge->dev, ACPI_COMPANION(parent));
 >
-> diff --git a/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi b/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
-> index 2874d92..67eb636 100644
-> --- a/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
-> +++ b/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
-> @@ -84,6 +84,15 @@
->   			clock-names = "uartclk", "apb_pclk";
->   		};
+> ?
+Looks better.
 >
-> +		watchdog0: watchdog at e0bb0000 {
-> +			compatible = "arm,sbsa-gwdt";
-> +			reg = <0x0 0xe0bc0000 0 0x1000>,
-> +				<0x0 0xe0bb0000 0 0x1000>;
-> +			interrupts = <0 337 4>;
-> +			timeout-sec = <15>;
-> +			status = "disabled";
-
-Could you please remove this status line? I do not think it is necessary 
-for this one here anymore.
-
+> It seems fine to me, hopefully Rafael can have a look to countercheck.
+>
+> Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Thanks,
-Suravee
-
-> +		};
-> +
->   		spi0: ssp at e1020000 {
->   			status = "disabled";
->   			compatible = "arm,pl022", "arm,primecell";
->
+Tomasz
