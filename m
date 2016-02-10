@@ -1,110 +1,261 @@
 From: lars.persson@axis.com (Lars Persson)
-Date: Wed, 10 Feb 2016 13:41:51 +0100
-Subject: [PATCH 2/8] clk: add artpec-6 pll1 clock driver
+Date: Wed, 10 Feb 2016 13:41:53 +0100
+Subject: [PATCH 4/8] arm: dts: add Artpec-6 soc dtsi file
 In-Reply-To: <cover.1455107681.git.larper@axis.com>
 References: <cover.1455107681.git.larper@axis.com>
-Message-ID: <30bfa3b9a237699a7a2078c51903238aa330b992.1455107681.git.larper@axis.com>
+Message-ID: <733065957e9ec67d698870cf832b4641d0da30cb.1455107681.git.larper@axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PLL1 clock is a fixed-factor clock with factors derived from boot
-mode pins. This driver is a simple wrapper to register the fixed
-factor clock according to the pin settings.
-
 Signed-off-by: Lars Persson <larper@axis.com>
 ---
- drivers/clk/Makefile      |  1 +
- drivers/clk/clk-artpec6.c | 70 +++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 71 insertions(+)
- create mode 100644 drivers/clk/clk-artpec6.c
+ arch/arm/boot/dts/artpec6.dtsi | 238 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 238 insertions(+)
+ create mode 100644 arch/arm/boot/dts/artpec6.dtsi
 
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index b038e36..388f0cf 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -17,6 +17,7 @@ endif
- 
- # hardware specific clock types
- # please keep this section sorted lexicographically by file/directory path name
-+obj-$(CONFIG_MACH_ARTPEC6)		+= clk-artpec6.o
- obj-$(CONFIG_MACH_ASM9260)		+= clk-asm9260.o
- obj-$(CONFIG_COMMON_CLK_AXI_CLKGEN)	+= clk-axi-clkgen.o
- obj-$(CONFIG_ARCH_AXXIA)		+= clk-axm5516.o
-diff --git a/drivers/clk/clk-artpec6.c b/drivers/clk/clk-artpec6.c
+diff --git a/arch/arm/boot/dts/artpec6.dtsi b/arch/arm/boot/dts/artpec6.dtsi
 new file mode 100644
-index 0000000..3664c44
+index 0000000..c1790d8
 --- /dev/null
-+++ b/drivers/clk/clk-artpec6.c
-@@ -0,0 +1,70 @@
++++ b/arch/arm/boot/dts/artpec6.dtsi
+@@ -0,0 +1,238 @@
 +/*
-+ * ARTPEC-6 clock initialization
++ * Device Tree Source for the Axis ARTPEC-6 SoC
 + *
-+ * Copyright 2015 Axis Comunications AB.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
 + */
 +
-+#include <linux/clk-provider.h>
-+#include <linux/clkdev.h>
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++#include "skeleton.dtsi"
 +
-+static void __init of_artpec6_pll1_setup(struct device_node *np)
-+{
-+	void __iomem *devstat;
-+	struct clk *clk;
-+	const char *clk_name = np->name;
-+	const char *parent_name;
-+	u32 pll_mode, pll_m, pll_n;
++/ {
++	compatible = "axis,artpec6";
++	interrupt-parent = <&intc>;
 +
-+	parent_name = of_clk_get_parent_name(np, 0);
++	aliases {
++		serial0 = &uart0;
++		serial1 = &uart1;
++		serial2 = &uart2;
++		serial3 = &uart3;
++	};
 +
-+	devstat = of_iomap(np, 0);
-+	if (devstat == NULL) {
-+		pr_err("error to ioremap DEVSTAT\n");
-+		return;
-+	}
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
 +
-+	/* DEVSTAT register contains PLL settings */
-+	pll_mode = (readl(devstat) >> 6) & 3;
-+	iounmap(devstat);
++		cpu0: cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			reg = <0>;
++			next-level-cache = <&pl310>;
++		};
 +
-+	/*
-+	 * pll1 settings are designed for different DDR speeds using a fixed
-+	 * 50MHz external clock. However, a different external clock could be
-+	 * used on different boards.
-+	 * CPU clock is half the DDR clock.
-+	 */
-+	switch (pll_mode) {
-+	case 0: /* DDR3-2133 mode */
-+		pll_m = 4;
-+		pll_n = 85;
-+		break;
-+	case 1: /* DDR3-1866 mode */
-+		pll_m = 6;
-+		pll_n = 112;
-+		break;
-+	case 2: /* DDR3-1600 mode */
-+		pll_m = 4;
-+		pll_n = 64;
-+		break;
-+	case 3: /* DDR3-1333 mode */
-+		pll_m = 8;
-+		pll_n = 106;
-+		break;
-+	}
-+	/* ext_clk is defined in device tree */
-+	clk = clk_register_fixed_factor(NULL, clk_name, parent_name, 0,
-+			pll_n, pll_m);
-+	if (IS_ERR(clk)) {
-+		pr_err("%s not registered\n", clk_name);
-+		return;
-+	}
-+	of_clk_add_provider(np, of_clk_src_simple_get, clk);
-+}
-+CLK_OF_DECLARE(artpec6_pll1, "axis,artpec6-pll1-clock", of_artpec6_pll1_setup);
++		cpu1: cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			reg = <1>;
++			next-level-cache = <&pl310>;
++		};
++	};
++
++	psci {
++		compatible = "arm,psci-0.2", "arm,psci";
++		method = "smc";
++		psci_version = <0x84000000>;
++		cpu_on = <0x84000003>;
++		system_reset = <0x84000009>;
++	};
++
++	scu at faf00000 {
++		compatible = "arm,cortex-a9-scu";
++		reg = <0xfaf00000 0x58>;
++	};
++
++	/* Main external clock driving CPU and peripherals */
++	ext_clk: ext_clk {
++		#clock-cells = <0>;
++		compatible = "fixed-clock";
++		clock-frequency = <50000000>;
++	};
++
++	/* PLL1 is used by CPU and some peripherals */
++	pll1_clk: pll1_clk at f8000000 {
++		#clock-cells = <0>;
++		compatible = "axis,artpec6-pll1-clock";
++		reg = <0xf8000000 4>;
++		clocks = <&ext_clk>;
++	};
++
++	cpu_clk: cpu_clk {
++		#clock-cells = <0>;
++		compatible = "fixed-factor-clock";
++		clock-div = <1>;
++		clock-mult = <1>;
++		clocks = <&pll1_clk>;
++		clock-output-names = "cpu_clk";
++	};
++
++	cpu_clkdiv2: cpu_clkdiv2 {
++		#clock-cells = <0>;
++		compatible = "fixed-factor-clock";
++		clock-div = <2>;
++		clock-mult = <1>;
++		clocks = <&cpu_clk>;
++	};
++
++	cpu_clkdiv4: cpu_clkdiv4 {
++		#clock-cells = <0>;
++		compatible = "fixed-factor-clock";
++		clock-div = <4>;
++		clock-mult = <1>;
++		clocks = <&cpu_clk>;
++	};
++
++	apb_pclk: apb_pclk {
++		#clock-cells = <0>;
++		compatible = "fixed-factor-clock";
++		clock-div = <8>;
++		clock-mult = <1>;
++		clocks = <&cpu_clk>;
++		clock-output-names = "apb_pclk";
++	};
++
++	/* PLL2 is used by a number of peripherals, including UDL */
++	pll2: pll2 {
++		#clock-cells = <0>;
++		compatible = "fixed-factor-clock";
++		clock-div = <1>;
++		clock-mult = <24>;
++		clocks = <&ext_clk>;
++	};
++
++	/* PLL2DIV2 is used by the Fractional Clock Divider, for i2s */
++	pll2div2: pll2div2 {
++		#clock-cells = <0>;
++		compatible = "fixed-factor-clock";
++		clock-div = <2>;
++		clock-mult = <1>;
++		clocks = <&pll2>;
++	};
++
++	pll2div12: pll2div12 {
++		#clock-cells = <0>;
++		compatible = "fixed-factor-clock";
++		clock-div = <12>;
++		clock-mult = <1>;
++		clocks = <&pll2>;
++	};
++
++	pll2div24: pll2div24 {
++		#clock-cells = <0>;
++		compatible = "fixed-factor-clock";
++		clock-div = <24>;
++		clock-mult = <1>;
++		clocks = <&pll2>;
++		clock-output-names = "uart_clk";
++	};
++
++
++	gtimer at faf00200 {
++		compatible = "arm,cortex-a9-global-timer";
++		reg = <0xfaf00200 0x20>;
++		interrupts = <GIC_PPI 11 0xf01>;
++		clocks = <&cpu_clkdiv2>;
++	};
++
++	timer at faf00600 {
++		compatible = "arm,cortex-a9-twd-timer";
++		reg = <0xfaf00600 0x20>;
++		interrupts = <GIC_PPI 13 0xf04>;
++		clocks = <&cpu_clkdiv2>;
++		status = "disabled";
++	};
++
++	intc: interrupt-controller at faf01000 {
++		interrupt-controller;
++		compatible = "arm,cortex-a9-gic";
++		#interrupt-cells = <3>;
++		reg = < 0xfaf01000 0x1000 >, < 0xfaf00100 0x0100 >;
++	};
++
++	pl310: cache-controller at faf10000 {
++		compatible = "arm,pl310-cache";
++		cache-unified;
++		cache-level = <2>;
++		reg = <0xfaf10000 0x1000>;
++		interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
++		arm,data-latency = <1 1 1>;
++		arm,tag-latency = <1 1 1>;
++		arm,filter-ranges = <0x0 0x80000000>;
++	};
++
++	pmu {
++		compatible = "arm,cortex-a9-pmu";
++		interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>,
++			<GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-parent = <&intc>;
++	};
++
++	amba at 0 {
++		compatible = "simple-bus";
++		#address-cells = <0x1>;
++		#size-cells = <0x1>;
++		interrupt-parent = <&intc>;
++		ranges;
++		dma-ranges = <0x80000000 0x00000000 0x40000000>;
++		dma-coherent;
++
++		ethernet: ethernet at f8010000 {
++			clock-names = "phy_ref_clk", "apb_pclk";
++			clocks = <&ext_clk>, <&apb_pclk>;
++			compatible = "snps,dwc-qos-ethernet-4.10";
++			interrupt-parent = <&intc>;
++			interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>;
++			reg = <0xf8010000 0x4000>;
++
++			snps,write-requests = <2>;
++			snps,read-requests = <16>;
++			snps,txpbl = <8>;
++			snps,rxpbl = <2>;
++
++			status = "disabled";
++		};
++
++		uart0: uart at f8036000 {
++			compatible = "arm,pl011", "arm,primecell";
++			reg = <0xf8036000 0x1000>;
++			interrupts = <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&pll2div24>, <&apb_pclk>;
++			clock-names = "uart_clk", "apb_pclk";
++			status = "disabled";
++		};
++		uart1: uart at f8037000 {
++			compatible = "arm,pl011", "arm,primecell";
++			reg = <0xf8037000 0x1000>;
++			interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&pll2div24>, <&apb_pclk>;
++			clock-names = "uart_clk", "apb_pclk";
++			status = "disabled";
++		};
++		uart2: uart at f8038000 {
++			compatible = "arm,pl011", "arm,primecell";
++			reg = <0xf8038000 0x1000>;
++			interrupts = <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&pll2div24>, <&apb_pclk>;
++			clock-names = "uart_clk", "apb_pclk";
++			status = "disabled";
++		};
++		uart3: uart at f8039000 {
++			compatible = "arm,pl011", "arm,primecell";
++			reg = <0xf8039000 0x1000>;
++			interrupts = <GIC_SPI 129 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&pll2div24>, <&apb_pclk>;
++			clock-names = "uart_clk", "apb_pclk";
++			status = "disabled";
++		};
++	};
++};
 -- 
 2.1.4
