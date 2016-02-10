@@ -1,123 +1,197 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Wed, 10 Feb 2016 18:21:31 +0100
-Subject: serial: clk: bcm2835: Strange effects when using aux-uart in
- console
-In-Reply-To: <A5F427B7-9B78-4892-9722-69418C4D0C10@martin.sperl.org>
-References: <A5F427B7-9B78-4892-9722-69418C4D0C10@martin.sperl.org>
-Message-ID: <56BB719B.8070007@i2se.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 10 Feb 2016 18:23:21 +0100
+Subject: [PATCH v2 18/28] ARM: KVM: Add HYP mode entry code
+In-Reply-To: <56BB5F06.9000606@arm.com>
+References: <1454583645-10144-1-git-send-email-marc.zyngier@arm.com>
+ <1454583645-10144-19-git-send-email-marc.zyngier@arm.com>
+ <20160209170042.GA5171@cbox> <56BB5F06.9000606@arm.com>
+Message-ID: <20160210172321.GP5171@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Feb 10, 2016 at 04:02:14PM +0000, Marc Zyngier wrote:
+> On 09/02/16 17:00, Christoffer Dall wrote:
+> > On Thu, Feb 04, 2016 at 11:00:35AM +0000, Marc Zyngier wrote:
+> >> This part is almost entierely borrowed from the existing code, just
+> >> slightly simplifying the HYP function call (as we now save SPSR_hyp
+> >> in the world switch).
+> >>
+> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> >> ---
+> >>  arch/arm/kvm/hyp/Makefile    |   1 +
+> >>  arch/arm/kvm/hyp/hyp-entry.S | 157 +++++++++++++++++++++++++++++++++++++++++++
+> >>  arch/arm/kvm/hyp/hyp.h       |   2 +
+> >>  3 files changed, 160 insertions(+)
+> >>  create mode 100644 arch/arm/kvm/hyp/hyp-entry.S
+> >>
+> >> diff --git a/arch/arm/kvm/hyp/Makefile b/arch/arm/kvm/hyp/Makefile
+> >> index cfab402..a7d3a7e 100644
+> >> --- a/arch/arm/kvm/hyp/Makefile
+> >> +++ b/arch/arm/kvm/hyp/Makefile
+> >> @@ -9,4 +9,5 @@ obj-$(CONFIG_KVM_ARM_HOST) += vgic-v2-sr.o
+> >>  obj-$(CONFIG_KVM_ARM_HOST) += vfp.o
+> >>  obj-$(CONFIG_KVM_ARM_HOST) += banked-sr.o
+> >>  obj-$(CONFIG_KVM_ARM_HOST) += entry.o
+> >> +obj-$(CONFIG_KVM_ARM_HOST) += hyp-entry.o
+> >>  obj-$(CONFIG_KVM_ARM_HOST) += switch.o
+> >> diff --git a/arch/arm/kvm/hyp/hyp-entry.S b/arch/arm/kvm/hyp/hyp-entry.S
+> >> new file mode 100644
+> >> index 0000000..44bc11f
+> >> --- /dev/null
+> >> +++ b/arch/arm/kvm/hyp/hyp-entry.S
+> >> @@ -0,0 +1,157 @@
+> >> +/*
+> >> + * Copyright (C) 2012 - Virtual Open Systems and Columbia University
+> >> + * Author: Christoffer Dall <c.dall@virtualopensystems.com>
+> >> + *
+> >> + * This program is free software; you can redistribute it and/or modify
+> >> + * it under the terms of the GNU General Public License, version 2, as
+> >> + * published by the Free Software Foundation.
+> >> + *
+> >> + * This program is distributed in the hope that it will be useful,
+> >> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> >> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> >> + * GNU General Public License for more details.
+> >> + *
+> >> + * You should have received a copy of the GNU General Public License
+> >> + * along with this program; if not, write to the Free Software
+> >> + * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+> >> + */
+> >> +
+> >> +#include <linux/linkage.h>
+> >> +#include <asm/kvm_arm.h>
+> >> +#include <asm/kvm_asm.h>
+> >> +
+> >> +	.arch_extension     virt
+> >> +
+> >> +	.text
+> >> +	.pushsection	.hyp.text, "ax"
+> >> +
+> >> +.macro load_vcpu	reg
+> >> +	mrc	p15, 4, \reg, c13, c0, 2	@ HTPIDR
+> >> +.endm
+> >> +
+> >> +/********************************************************************
+> >> + * Hypervisor exception vector and handlers
+> >> + *
+> >> + *
+> >> + * The KVM/ARM Hypervisor ABI is defined as follows:
+> >> + *
+> >> + * Entry to Hyp mode from the host kernel will happen _only_ when an HVC
+> >> + * instruction is issued since all traps are disabled when running the host
+> >> + * kernel as per the Hyp-mode initialization at boot time.
+> >> + *
+> >> + * HVC instructions cause a trap to the vector page + offset 0x14 (see hyp_hvc
+> >> + * below) when the HVC instruction is called from SVC mode (i.e. a guest or the
+> >> + * host kernel) and they cause a trap to the vector page + offset 0x8 when HVC
+> >> + * instructions are called from within Hyp-mode.
+> >> + *
+> >> + * Hyp-ABI: Calling HYP-mode functions from host (in SVC mode):
+> >> + *    Switching to Hyp mode is done through a simple HVC #0 instruction. The
+> >> + *    exception vector code will check that the HVC comes from VMID==0.
+> >> + *    - r0 contains a pointer to a HYP function
+> >> + *    - r1, r2, and r3 contain arguments to the above function.
+> >> + *    - The HYP function will be called with its arguments in r0, r1 and r2.
+> >> + *    On HYP function return, we return directly to SVC.
+> >> + *
+> >> + * Note that the above is used to execute code in Hyp-mode from a host-kernel
+> >> + * point of view, and is a different concept from performing a world-switch and
+> >> + * executing guest code SVC mode (with a VMID != 0).
+> >> + */
+> >> +
+> >> +	.align 5
+> >> +__hyp_vector:
+> >> +	.global	__hyp_vector
+> >> +__kvm_hyp_vector:
+> >> +	.weak __kvm_hyp_vector
+> >> +
+> >> +	@ Hyp-mode exception vector
+> >> +	W(b)	hyp_reset
+> >> +	W(b)	hyp_undef
+> >> +	W(b)	hyp_svc
+> >> +	W(b)	hyp_pabt
+> >> +	W(b)	hyp_dabt
+> >> +	W(b)	hyp_hvc
+> >> +	W(b)	hyp_irq
+> >> +	W(b)	hyp_fiq
+> >> +
+> >> +.macro invalid_vector label, cause
+> >> +	.align
+> >> +\label:	b	.
+> >> +.endm
+> >> +
+> >> +	invalid_vector	hyp_reset
+> >> +	invalid_vector	hyp_undef
+> >> +	invalid_vector	hyp_svc
+> >> +	invalid_vector	hyp_pabt
+> >> +	invalid_vector	hyp_dabt
+> >> +	invalid_vector	hyp_fiq
+> >> +
+> >> +hyp_hvc:
+> >> +	/*
+> >> +	 * Getting here is either because of a trap from a guest,
+> >> +	 * or from executing HVC from the host kernel, which means
+> >> +	 * "do something in Hyp mode".
+> >> +	 */
+> >> +	push	{r0, r1, r2}
+> >> +
+> >> +	@ Check syndrome register
+> >> +	mrc	p15, 4, r1, c5, c2, 0	@ HSR
+> >> +	lsr	r0, r1, #HSR_EC_SHIFT
+> >> +	cmp	r0, #HSR_EC_HVC
+> >> +	bne	guest_trap		@ Not HVC instr.
+> >> +
+> >> +	/*
+> >> +	 * Let's check if the HVC came from VMID 0 and allow simple
+> >> +	 * switch to Hyp mode
+> >> +	 */
+> >> +	mrrc    p15, 6, r0, r2, c2
+> >> +	lsr     r2, r2, #16
+> >> +	and     r2, r2, #0xff
+> >> +	cmp     r2, #0
+> >> +	bne	guest_trap		@ Guest called HVC
+> >> +
+> >> +	/*
+> >> +	 * Getting here means host called HVC, we shift parameters and branch
+> >> +	 * to Hyp function.
+> >> +	 */
+> >> +	pop	{r0, r1, r2}
+> >> +
+> >> +	/* Check for __hyp_get_vectors */
+> >> +	cmp	r0, #-1
+> >> +	mrceq	p15, 4, r0, c12, c0, 0	@ get HVBAR
+> >> +	beq	1f
+> >> +
+> >> +	push	{lr}
+> >> +
+> >> +	mov	lr, r0
+> >> +	mov	r0, r1
+> >> +	mov	r1, r2
+> >> +	mov	r2, r3
+> >> +
+> >> +THUMB(	orr	lr, #1)
+> >> +	blx	lr			@ Call the HYP function
+> >> +
+> >> +	pop	{lr}
+> >> +1:	eret
+> >> +
+> >> +guest_trap:
+> >> +	load_vcpu r0			@ Load VCPU pointer to r0
+> >> +
+> >> +	@ Check if we need the fault information
+> > 
+> > nit: this is not about faults at this point, so this comment should
+> > either go or be reworded to "let's check if we trapped on guest VFP
+> > access"
+> > 
+> > and I think the lsr can be moved into the ifdef as well.
+> 
+> Yes, both good points.
+> 
+fixing that, you can also have my
 
-Am 10.02.2016 um 16:12 schrieb Martin Sperl:
-> Hi!
->
-> I got a strange effect when using the auxiliar UART as the logging console:
->
-> The kernel is configured for drivers/tty/serial/8250/8250_bcm2835aux.c to
-> get linked into the main kernel (requires also 8250.c to be linked in).
->
-> As long as I boot using the main UART (PL011) in the kernel parameters:
->   earlyprintk consoleblank=0 console=ttyAMA0 root=/dev/mmcblk0p2 rootwait
->
-> Everything works fine - early_printk works and normal logging works as well.
-> Both configured ttys (/dev/ttyAMA0 and /dev/ttyS0) in /etc/initttab
-> work fine.
->
-> Now when I switch the console to use the auxiliar UART
-> (which right now does not support early_printk) like this:
->   earlyprintk consoleblank=0 console=ttyS0,115200n1 root=/dev/mmcblk0p2 rootwait
->
-> I get the situation where:
-> * u-boot starts and writes to the main UART
-> * Kernel boots using early_printk logging to the main UART until we get to:
->   [    2.657090] bootconsole [earlycon0] disabled
-> * then we see the earlyprintk buffer dumped on the aux-uart
-> * then booting continues and logging happens on the aux-uart:
->   [    2.657090] bootconsole [earlycon0] disabled
->   [    2.662673] 20201000.serial: ttyAMA0 at MMIO 0x20201000 (irq = 81, base_baud = 0) is a PL011 rev2
->   [    2.663793] console [ttyS0] disabled
->   [    2.663899] 20215040.serial: ttyS0 at MMIO 0x0 (irq = 53, base_baud = 31224999) is a 16550
->   [    3.384166] console [ttyS0] enabled
-> * everything works fine and I get networking and everything up
->   [....] Starting NTP server: ntpd. ok
->   [....] Starting OpenBSD Secure Shell server: sshd. ok
->   My IP address is 10.10.10.41 ::127.0.0.1
->
->   Raspbian GNU/Linux 7 raspcm.intern.sperl.org ttyS0
-> * I can even log in via SSH and networking works.
->   Note that I have the getty for ttyAMA0 disabled in inittab
-> * when I then enable the tty on the main UART like this:
->   root at raspcm:~# /sbin/getty -a root -L ttyAMA0 115200 vt100
-> * I get the following:
->   [   72.962845] uart-pl011 20201000.serial: no DMA platform data
-> * the system freezes?
-> * sometimes I still get the following on the auxiliar UART before the system ?crashes":
->   (at least when starting the tty from inittab)
->   [   73.072985] bcm2835-clk 20101000.cprman: plld: couldn't lock PLL
->   [   73.079132] ------------[ cut here ]------------
->   [   73.083848] WARNING: CPU: 0 PID: 2329 at drivers/clk/clk.c:680 clk_core_disable+0x34/0xf0()
->   [   73.093067] ---[ end trace 416e78cea88f5fb5 ]---
->   [   73.097848] ------------[ cut here ]------------
->   [   73.102616] WARNING: CPU: 0 PID: 2329 at drivers/clk/clk.c:575 clk_core_unprepare+0x34/0x110()
->   [   73.112219] ---[ end trace 416e78cea88f5fb6 ]---
->
-> A similar effect I get when using stty: 
->   root at raspcm:~# stty -F /dev/ttyAMA0
->   [  128.878127] uart-pl011 20201000.serial: no DMA platform data
->   speed 9600 baud; line = 0;
->   -brkint -imaxbel
-> Then the system freezes.
->
-> As if the plld does not lock - even if it (probably) is already locked.
->
-> Or the message actually comes from bcm2835_clock_wait_busy which also
-> produces this message - so maybe we should better identify the message.
->
-> Note that the same also applies if I remove earlyprintk with
-> the only difference being that I do not get the initial boot
-> messages on the main UART.
-> (at that time only: "Uncompressing Linux... done, booting the kernel.?
-> shows on the main uart after u-boot start..)
->
-> Unfortunately it is only possible to really test this on a
-> rpi-Compute module, as only there we can expose both uarts
-> on distinct GPIOs at the same time:
->   GPIO 14: level=1 fsel=4 alt=0 func=TXD0
->   GPIO 15: level=1 fsel=4 alt=0 func=RXD0
->   GPIO 32: level=1 fsel=2 alt=5 func=TXD1
->   GPIO 33: level=1 fsel=2 alt=5 func=RXD1
->
-> Here the commits I have used based on spi/for-next (based on 4.4.0)
-> with the patches (* prefix) for the driver for aux-uart
-> added separately as they are not in the tree I have used:
-> * a96f6c7 serial: bcm2835: add driver for bcm2835-aux-uart
-> * 464e876 clk: bcm2835: Add bindings for the auxiliary peripheral clock gates.
-> * 1af1b28 clk: bcm2835: Add a driver for the auxiliary peripheral clock gates.
-> ece19b8 Merge remote-tracking branch 'spi/fix/loopback' into spi-linus
-> 887e6a3 Merge tag 'spi-v4.5' into spi-linus
-> ebea7c0 spi: fix counting in spi-loopback-test code
-> cabeea9 Merge remote-tracking branches 'spi/topic/sun4i', 'spi/topic/topcliff-pc
-> 4f95307 Merge remote-tracking branches 'spi/topic/overlay', 'spi/topic/pxa2xx',
-> 41d5a70 Merge remote-tracking branches 'spi/topic/lm70llp', 'spi/topic/loopback'
-> 635b9b2 Merge remote-tracking branches 'spi/topic/dw', 'spi/topic/dw-mid', 'spi/
-> 3c27892 Merge remote-tracking branches 'spi/topic/bcm63xx', 'spi/topic/butterfly
-> 9b17e80 Merge remote-tracking branch 'spi/topic/sunxi' into spi-next
-> 174c211 Merge remote-tracking branch 'spi/topic/core' into spi-next
-> f30f072 Merge remote-tracking branch 'spi/fix/mtk' into spi-linus
-> afd2ff9 Linux 4.4
->
-> Maybe someone has gotten any idea?
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-this sounds like an issue i had with the compute module here:
+if I didn't give it already.
 
-http://permalink.gmane.org/gmane.linux.kernel.rpi/2197
-
-Unfortunately i don't have the cm anymore.
-
-Maybe you can try this downstream patch:
-
-https://github.com/raspberrypi/linux/commit/09041f7ccbd1cde792edae91c41266886d5d1382
-
-Regards
+-Christoffer
