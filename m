@@ -1,45 +1,29 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 10 Feb 2016 16:21:19 +0100
-Subject: [PATCH] tty/serial: digicolor: Fix bad usage of IS_ERR_VALUE
-In-Reply-To: <56BAA27A.9050605@roeck-us.net>
-References: <1455030539-10798-1-git-send-email-linux@roeck-us.net>
- <4571887.rTPndCnv20@wuerfel> <56BAA27A.9050605@roeck-us.net>
-Message-ID: <2606061.l722KO95iI@wuerfel>
+Date: Wed, 10 Feb 2016 16:24:38 +0100
+Subject: EMXX platform support
+In-Reply-To: <20160209201743.GA5628@reno.home>
+References: <20160209201743.GA5628@reno.home>
+Message-ID: <56882101.BaoQy5A3Ep@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 09 February 2016 18:37:46 Guenter Roeck wrote:
-> On 02/09/2016 07:26 AM, Arnd Bergmann wrote:
-> > On Tuesday 09 February 2016 07:08:59 Guenter Roeck wrote:
-> >> IS_ERR_VALUE() assumes that its parameter is an unsigned long.
-> >> It can not be used to check if an unsigned int reflects an error.
-> >> Doing so can result in the following build warning.
-> >>
-> >> drivers/tty/serial/digicolor-usart.c: In function ?digicolor_uart_probe?:
-> >> include/linux/err.h:21:38: warning:
-> >>          comparison is always false due to limited range of data type
-> >> drivers/tty/serial/digicolor-usart.c:485:6: note:
-> >>          in expansion of macro ?IS_ERR_VALUE?
-> >>
-> >> If that warning is seen, an error return from platform_get_irq() is missed.
-> >>
-> >>
-> >
-> > The patch looks correct to me, but what compiler version and which kernel
-> > tree is it that triggered the warning?
-> >
-> > Andrzej Hajda just modified the definition of IS_ERR_VALUE(), and the
-> > changes are still under discussion, but I don't see that warning with
-> > any of the versions.
-> >
-> I see it with gcc 5.1 and 5.2 (and W=1). I did not see / notice Andrzej's patch.
+On Tuesday 09 February 2016 21:17:44 Martin Langer wrote:
+> Hello,
 > 
-> I agree that fixing the problem in IS_ERR_VALUE() is preferrable.
+> are there any plans in supporting emxx platform?
 > 
+> The Sony PCM D-100 is based on this platform and they released a lot of their linux code:
+> http://oss.sony.net/Products/Linux/Audio/PCM-D100.html
+> 
+> ... including basic code for the kernel 2.6.35, see:
+> http://oss.sony.net/Products/Linux/Audio/Download/PCM-D100/linux-kernel-2.6.35.tgz
+> 
+> I'm wondering that it is not yet part of the kernel. Probably I am the first person who looked into their package.
 > 
 
-Ah, W=1 explains it. We are still debating about the proper solution. Al Viro
-pointed out that most users of IS_ERR_VALUE() shouldn't be using it at all,
-so your patch is probably best here after all.
+You are welcome to start contributing a port, but please be aware that
+platform support has been almost completely changed since 2.6.35, so
+if you want to add something here, that likely involves a rewrite of
+anything under arch/arm.
 
 	Arnd
