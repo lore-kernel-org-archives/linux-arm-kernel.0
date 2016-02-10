@@ -1,55 +1,112 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 10 Feb 2016 18:17:38 +0100
-Subject: [PATCH v2 1/2] ARM: mvebu: use armada-370-sata for SATA on
- Armada 375
-In-Reply-To: <1455121756-20804-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Wed, 10 Feb 2016 18:18:51 +0100
+Subject: [PATCH v2 2/2] ARM: mvebu: add NAND description to Armada 370 DB
+ and Armada XP DB
+In-Reply-To: <1455121756-20804-2-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1455121756-20804-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20160210171738.GC9492@lunn.ch>
+ <1455121756-20804-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20160210171851.GD9492@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 10, 2016 at 05:29:15PM +0100, Thomas Petazzoni wrote:
-> From: Lior Amsalem <alior@marvell.com>
+On Wed, Feb 10, 2016 at 05:29:16PM +0100, Thomas Petazzoni wrote:
+> This commit adds the Device Tree description for the 1GB NAND flash
+> present in the Armada 370 DB and Armada XP DB evaluation boards from
+> Marvell.
 > 
-> The Armada 375 has the same SATA IP as Armada 370 and Armada XP, which
-> requires the PHY speed to be set in the LP_PHY_CTL register for SATA
-> hotplug to work.
-> 
-> Therefore, this commit updates the compatible string used to describe
-> the SATA IP in Armada 375 from marvell,orion-sata to
-> marvell,armada-370-sata.
-> 
-> Fixes: 4de59085091f753d08c8429d756b46756ab94665 ("ARM: mvebu: add Device Tree description of the Armada 375 SoC")
-> Cc: <stable@vger.kernel.org>
-> Signed-off-by: Lior Amsalem <alior@marvell.com>
 > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
 Reviewed-by: Andrew Lunn <andrew@lunn.ch>
 
-Thanks for adding the tags,
-       
-       Andrew
+Thanks
+	Andrew
 
 > ---
 > Changes since v1:
->  - Add Fixes: tag, and add stable@ in Cc, as suggested by Andrew Lunn.
+>  - Use the new MTD partitions DT binding, with all partitions grouped
+>    into a 'partitions' subnode. Suggested by Andrew Lunn.
 > ---
->  arch/arm/boot/dts/armada-375.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  arch/arm/boot/dts/armada-370-db.dts | 27 +++++++++++++++++++++++++++
+>  arch/arm/boot/dts/armada-xp-db.dts  | 28 ++++++++++++++++++++++++++++
+>  2 files changed, 55 insertions(+)
 > 
-> diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
-> index 7ccce75..cc952cf 100644
-> --- a/arch/arm/boot/dts/armada-375.dtsi
-> +++ b/arch/arm/boot/dts/armada-375.dtsi
-> @@ -529,7 +529,7 @@
+> diff --git a/arch/arm/boot/dts/armada-370-db.dts b/arch/arm/boot/dts/armada-370-db.dts
+> index bb280de..2364fc5 100644
+> --- a/arch/arm/boot/dts/armada-370-db.dts
+> +++ b/arch/arm/boot/dts/armada-370-db.dts
+> @@ -168,6 +168,33 @@
+>  					spi-max-frequency = <50000000>;
+>  				};
 >  			};
+> +
+> +			nand at d0000 {
+> +				status = "okay";
+> +				num-cs = <1>;
+> +				marvell,nand-keep-config;
+> +				marvell,nand-enable-arbiter;
+> +				nand-on-flash-bbt;
+> +
+> +				partitions {
+> +					compatible = "fixed-partitions";
+> +					#address-cells = <1>;
+> +					#size-cells = <1>;
+> +
+> +					partition at 0 {
+> +						label = "U-Boot";
+> +						reg = <0 0x800000>;
+> +					};
+> +					partition at 800000 {
+> +						label = "Linux";
+> +						reg = <0x800000 0x800000>;
+> +					};
+> +					partition at 1000000 {
+> +						label = "Filesystem";
+> +						reg = <0x1000000 0x3f000000>;
+> +					};
+> +				};
+> +			};
+>  		};
 >  
->  			sata at a0000 {
-> -				compatible = "marvell,orion-sata";
-> +				compatible = "marvell,armada-370-sata";
->  				reg = <0xa0000 0x5000>;
->  				interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
->  				clocks = <&gateclk 14>, <&gateclk 20>;
+>  		pcie-controller {
+> diff --git a/arch/arm/boot/dts/armada-xp-db.dts b/arch/arm/boot/dts/armada-xp-db.dts
+> index f774101..96aaaed 100644
+> --- a/arch/arm/boot/dts/armada-xp-db.dts
+> +++ b/arch/arm/boot/dts/armada-xp-db.dts
+> @@ -229,6 +229,34 @@
+>  					spi-max-frequency = <20000000>;
+>  				};
+>  			};
+> +
+> +			nand at d0000 {
+> +				status = "okay";
+> +				num-cs = <1>;
+> +				marvell,nand-keep-config;
+> +				marvell,nand-enable-arbiter;
+> +				nand-on-flash-bbt;
+> +
+> +				partitions {
+> +					compatible = "fixed-partitions";
+> +					#address-cells = <1>;
+> +					#size-cells = <1>;
+> +
+> +					partition at 0 {
+> +						label = "U-Boot";
+> +						reg = <0 0x800000>;
+> +					};
+> +					partition at 800000 {
+> +						label = "Linux";
+> +						reg = <0x800000 0x800000>;
+> +					};
+> +					partition at 1000000 {
+> +						label = "Filesystem";
+> +						reg = <0x1000000 0x3f000000>;
+> +
+> +					};
+> +				};
+> +			};
+>  		};
+>  	};
+>  };
 > -- 
 > 2.6.4
 > 
