@@ -1,30 +1,37 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 10 Feb 2016 19:02:04 +0000
-Subject: [PATCH 3/4] spi: bcm2835aux: set up spi-mode before asserting
- cs-gpio
-In-Reply-To: <878u2s2xym.fsf@eliezer.anholt.net>
-References: <1455041435-8015-1-git-send-email-stephanolbrich@gmx.de>
- <1455041435-8015-4-git-send-email-stephanolbrich@gmx.de>
- <87d1s54f7f.fsf@eliezer.anholt.net>
- <20160210080149.GQ13270@sirena.org.uk>
- <878u2s2xym.fsf@eliezer.anholt.net>
-Message-ID: <20160210190204.GD13270@sirena.org.uk>
+From: tj@kernel.org (Tejun Heo)
+Date: Wed, 10 Feb 2016 14:05:07 -0500
+Subject: [PATCH v4 0/3] ata: Fixes related to edge trigger latch for the
+ ahci_xgene_driver.
+In-Reply-To: <CAOHikRBNL2gLJwhB2SEKJXZtOpmqwBET4P9RgRrPdhyH4bn0zA@mail.gmail.com>
+References: <1454738124-9351-1-git-send-email-stripathi@apm.com>
+ <20160210162547.GJ3741@mtj.duckdns.org>
+ <CAOHikRBNL2gLJwhB2SEKJXZtOpmqwBET4P9RgRrPdhyH4bn0zA@mail.gmail.com>
+Message-ID: <20160210190507.GS3741@mtj.duckdns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 10, 2016 at 10:59:29AM -0800, Eric Anholt wrote:
+On Wed, Feb 10, 2016 at 10:59:31AM -0800, Suman Tripathi wrote:
+> Hi Tejun,
+> 
+> On Wed, Feb 10, 2016 at 8:25 AM, Tejun Heo <tj@kernel.org> wrote:
+> > On Sat, Feb 06, 2016 at 11:25:21AM +0530, suman Tripathi wrote:
+> >> From: Suman Tripathi <stripathi@apm.com>
+> >>
+> >> This patch set implements a workaround for an errate in the APM
+> >> X-Gene SATA host controller with edge interrupt. The HOST_IRQ_STAT
+> >> misses the edge interrupt from the PORT_IRQ_STAT when clearing the
+> >> HOST_IRQ_STAT and reporting the PORT_IRQ_STAT happens in same clock
+> >> cycle. It also implements the capability to override generic interrupt
+> >> handler.
+> >
+> > Applied 1-3 to libata/for-4.6 with minor updates.
+> 
+> will this patchset  go to 4.5 ?
 
-> Oops, this makes more sense now.  Subject even mentioned gpio, and a
-> GPIO CS must be getting set around the transfer_one call.  I'll be ready
-> to send an r-b for a v2 with the speed update bug fixed (unless transfer
-> speeds are guaranteed to be constant between a prepare and unprepare).
+I applied them to for-4.6 but it can go through for-4.5-fixes if
+necessary.  Is it necessary?
 
-No guarantee that they'll not change, especially in a situation where we
-have two devices on different speeds on a bus working at the same time.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160210/80c1d3df/attachment.sig>
+Thanks.
+
+-- 
+tejun
