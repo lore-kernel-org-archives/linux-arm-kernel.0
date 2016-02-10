@@ -1,20 +1,60 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 10 Feb 2016 10:56:05 +0100
-Subject: [PATCH] pinctrl: uniphier: add COMPILE_TEST option
-In-Reply-To: <1454247171-25028-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1454247171-25028-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CACRpkdY88xjpZayhOVWmo7AGYjOAmZc60uRJ+DrT0aKV=8C0VA@mail.gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 10 Feb 2016 18:56:45 +0900
+Subject: [PATCH] pinctrl: mediatek: guard sub-directory with
+ CONFIG_PINCTRL_MTK
+In-Reply-To: <CACRpkdaA37GXf8c=EznSpocLp33CaU8dYqb8V0pua4dVfZa_2w@mail.gmail.com>
+References: <1453563204-30407-1-git-send-email-yamada.masahiro@socionext.com>
+ <CACRpkdbrJ5P8Ro4RQUquMOTuXhN+54ZHYGbLqrbwW6tbwCC7Mg@mail.gmail.com>
+ <CAK7LNAQ_8o0FiRpb7D6RBmA+7WxRMFhWJjo2f4E_NH5qAGYb4A@mail.gmail.com>
+ <CACRpkdaA37GXf8c=EznSpocLp33CaU8dYqb8V0pua4dVfZa_2w@mail.gmail.com>
+Message-ID: <CAK7LNATxUjsEtVmD3i4ZByC3kjnOk7gMf29hOn7ZfQa2MB9Gqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 31, 2016 at 2:32 PM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
+Hi Linus,
 
-> Add COMPILE_TEST for the compilation test coverage.
+
+2016-02-10 18:29 GMT+09:00 Linus Walleij <linus.walleij@linaro.org>:
+> On Thu, Jan 28, 2016 at 5:22 AM, Masahiro Yamada
+> <yamada.masahiro@socionext.com> wrote:
+>> Hi Linus
+>>
+>> 2016-01-27 23:11 GMT+09:00 Linus Walleij <linus.walleij@linaro.org>:
+>>> On Sat, Jan 23, 2016 at 4:33 PM, Masahiro Yamada
+>>> <yamada.masahiro@socionext.com> wrote:
+>>>
+>>>> CONFIG_PINCTRL_MTK is more suitable than CONFIG_ARCH_MEDIATEK
+>>>> to guard the drivers/pinctrl/mediatek/ directory.
+>>>> (I renamed CONFIG_PINCTRL_MTK_COMMON to CONFIG_PINCTRL_MTK.)
+>>>>
+>>>> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+>>>
+>>> This patch does not apply to linux v4.5-rc1, please rebase the
+>>> patch and resend.
+>>
+>>
+>> These two patches can be applied in this order:
+>> https://patchwork.kernel.org/patch/8097541/
+>> https://patchwork.kernel.org/patch/8097551/
+>>
+>> (Sorry, I should have sent them as a series.)
 >
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> No order works for me and I have merged quite a lot of other stuff
+> that had higher priority.
+>
+> But please rebase both patches on my "devel" branch and resend
+> and I will apply them.
+>
 
-Patch applied.
+Sure.
 
-Yours,
-Linus Walleij
+The first one is already in your devel branch.
+
+I've rebased and posted the second one.
+
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
