@@ -1,67 +1,58 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Tue, 09 Feb 2016 16:13:06 -0800
-Subject: [PATCH 4/4] spi: bcm2835aux: fix CPOL/CPHA setting
-In-Reply-To: <1455041435-8015-5-git-send-email-stephanolbrich@gmx.de>
-References: <1455041435-8015-1-git-send-email-stephanolbrich@gmx.de>
- <1455041435-8015-5-git-send-email-stephanolbrich@gmx.de>
-Message-ID: <87a8n94e3x.fsf@eliezer.anholt.net>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Wed, 10 Feb 2016 02:19:03 +0200
+Subject: [PATCH 00/11] clk: lpc32xx: add clock support for NXP LPC32xx
+In-Reply-To: <loom.20160209T215103-78@post.gmane.org>
+References: <1447981511-29653-1-git-send-email-vz@mleia.com>
+ <loom.20160209T215103-78@post.gmane.org>
+Message-ID: <56BA81F7.4080006@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-stephanolbrich at gmx.de writes:
+Hi Sylvain,
 
-> From: Stephan Olbrich <stephanolbrich@gmx.de>
->
-> The auxiliary spi supports only CPHA=0 modes as the first bit is
-> always output to the pin before the first clock cycle. In CPHA=1
-> modes the first clock edge outputs the second bit hence the slave
-> can never read the first bit.
->
-> Also the CPHA registers switch between clocking data in/out on
-> rising/falling edge hence depend on the CPOL setting.
->
-> Signed-off-by: Stephan Olbrich <stephanolbrich@gmx.de>
-> ---
->  drivers/spi/spi-bcm2835aux.c | 10 +++++-----
->  1 file changed, 5 insertions(+), 5 deletions(-)
->
-> diff --git a/drivers/spi/spi-bcm2835aux.c b/drivers/spi/spi-bcm2835aux.c
-> index b90aa34..169f521 100644
-> --- a/drivers/spi/spi-bcm2835aux.c
-> +++ b/drivers/spi/spi-bcm2835aux.c
-> @@ -386,12 +386,12 @@ static int bcm2835aux_spi_prepare_message(struct spi_master *master,
->  	bs->cntl[1] = BCM2835_AUX_SPI_CNTL1_MSBF_IN;
->  
->  	/* handle all the modes */
-> -	if (spi->mode & SPI_CPOL)
-> +	if (spi->mode & SPI_CPOL) {
->  		bs->cntl[0] |= BCM2835_AUX_SPI_CNTL0_CPOL;
-> -	if (spi->mode & SPI_CPHA)
-> -		bs->cntl[0] |= BCM2835_AUX_SPI_CNTL0_CPHA_OUT |
-> -			       BCM2835_AUX_SPI_CNTL0_CPHA_IN;
-> -
-> +		bs->cntl[0] |= BCM2835_AUX_SPI_CNTL0_CPHA_OUT;
-> +	} else {
-> +		bs->cntl[0] |= BCM2835_AUX_SPI_CNTL0_CPHA_IN;
-> +	}
->  	bcm2835aux_wr(bs, BCM2835_AUX_SPI_CNTL1, bs->cntl[1]);
->  	bcm2835aux_wr(bs, BCM2835_AUX_SPI_CNTL0, bs->cntl[0]);
+On 09.02.2016 23:01, Sylvain Lemieux wrote:
+> Vladimir Zapolskiy <vz@...> writes:
+>>
+>> This changeset adds common clock framework driver for NXP LPC32xx
+>> boards.
+> 
+> Hi Vladimir,
+> 
+> Just to let you know that we did some testing using this changeset;
+> I installed patches 4 to 7, 10 & 11 on top of 4.5-rc1.
+> 
+> I was able to run our software (SIC1 interrupt sources disable)
+> without any problem a custom LPC32xx board.
 
-(Note for other readers: A better name for CNTL0_CPHA_* would be
-CNTL0_*_RISING).
+this is a known issue, and I hope it will be fixed in upstream in v4.6,
+the required changes in irqchip and gpiochip drivers were sent for
+review some time ago, a bit more work is needed to 
 
-I think you're right about not actually supporting CPHA.  I don't see
-wany way to keep bit 1 out lasting through the first full clock cycle.
-I think Stefan's right that we should drop CPHA from MODE_BITS
-(actually, MODE_BITS would be nicer if we just merged it into its one
-user, I think).
+Also 2-3 more clean-up changes in USB host and gadget drivers are done
+locally (no more need to configure clocks out of the common clock
+framework), but not yet submitted, will do it tomorrow.
 
-However, this hunk appears to be correct and would fix the timing of our
-data going out in the CPOL=0 case and of sampling IN data for CPOL=1.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160209/c71b2207/attachment-0001.sig>
+> We did not get any problem with the clock signals we are using.
+> 
+
+Thank you for testing, I'm going to add your Tested-by tag (if you
+don't mind) and submit a PR to ARM maintainers shortly.
+
+>> Vladimir Zapolskiy (11):
+>>   dt-bindings: clock: add description of LPC32xx clock controller
+>>   dt-bindings: clock: add description of LPC32xx USB clock controller
+>>   dt-bindings: clock: add NXP LPC32xx clock list for consumers
+>>   arm: dts: lpc32xx: add device nodes for external oscillators
+>>   arm: dts: lpc32xx: add clock controller device node
+>>   arm: dts: lpc32xx: add clock properties to device nodes
+>>   arm: dts: lpc32xx: add USB clock controller
+>>   clk: lpc18xx: add NXP specific common clock framework selection
+>>   clk: lpc32xx: add common clock framework driver
+>>   arm: lpc32xx: switch to common clock framework
+>>   arm: dts: lpc32xx: remove clock frequency property from UART device
+>>     nodes
+> 
+> 
+
+With best wishes,
+Vladimir
