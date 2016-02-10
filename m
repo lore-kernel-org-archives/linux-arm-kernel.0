@@ -1,46 +1,35 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Wed, 10 Feb 2016 10:22:43 +0100
-Subject: [PATCH v2 0/3] arm64: introduce the Alpine support
-Message-ID: <1455096166-4899-1-git-send-email-antoine.tenart@free-electrons.com>
+Date: Wed, 10 Feb 2016 10:22:44 +0100
+Subject: [PATCH v2 1/3] arm64: add Alpine SoC family
+In-Reply-To: <1455096166-4899-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1455096166-4899-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1455096166-4899-2-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+This patch introduces ARCH_ALPINE to add the support of the Alpine SoC
+family for the arm64 architecture.
 
-This series introduces the support for the arm64 Alpine family from
-Annapurna Labs, by adding a device tree for the Alpine v2 EVP. This
-board has 4 Cortex A57 and a few nodes in its device tree for now.
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+---
+ arch/arm64/Kconfig.platforms | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-You can find the series at:
-https://github.com/atenart/linux.git 4.5-rc1/alpinev2-bringup
-
-Antoine
-
-Since v1:
-  - Fixed the armv8-timer interrupts.
-  - Added the GICV and GIVH ranges.
-  - Added the GIC maintainance interrupt.
-  - Moved the aliases to the dts file.
-  - Fixed the pci node.
-  - Added the arm,psci cpu_off and cpu_suspend functions.
-  - Added the io-fabric bus.
-  - Fixed the stdout-path.
-
-Antoine Tenart (3):
-  arm64: add Alpine SoC family
-  arm64: dts: add the Alpine v2 EVP
-  arm64: defconfig: enable the Alpine family
-
- arch/arm64/Kconfig.platforms             |   6 +
- arch/arm64/boot/dts/Makefile             |   1 +
- arch/arm64/boot/dts/al/Makefile          |   5 +
- arch/arm64/boot/dts/al/alpine-v2-evp.dts |  53 ++++++++
- arch/arm64/boot/dts/al/alpine-v2.dtsi    | 226 +++++++++++++++++++++++++++++++
- arch/arm64/configs/defconfig             |   1 +
- 6 files changed, 292 insertions(+)
- create mode 100644 arch/arm64/boot/dts/al/Makefile
- create mode 100644 arch/arm64/boot/dts/al/alpine-v2-evp.dts
- create mode 100644 arch/arm64/boot/dts/al/alpine-v2.dtsi
-
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index 21074f674bde..bfbefa3e0dbe 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -1,5 +1,11 @@
+ menu "Platform selection"
+ 
++config ARCH_ALPINE
++	bool "Annapurna Labs Alpine platform"
++	help
++	  This enables support for the Annapurna Labs Alpine
++	  Soc family.
++
+ config ARCH_BCM_IPROC
+ 	bool "Broadcom iProc SoC Family"
+ 	help
 -- 
 2.7.0
