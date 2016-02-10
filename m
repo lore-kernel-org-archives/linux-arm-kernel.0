@@ -1,107 +1,24 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 10 Feb 2016 08:34:21 +0000
-Subject: [PATCH 0/8] KVM/ARM: Guest Entry/Exit optimizations
-In-Reply-To: <20160209205919.GF5171@cbox>
-References: <1454931622-14902-1-git-send-email-marc.zyngier@arm.com>
- <20160209205919.GF5171@cbox>
-Message-ID: <56BAF60D.6020506@arm.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Wed, 10 Feb 2016 09:55:04 +0100
+Subject: [PATCH V3 00/10] Introduce ACPI world to GICv3 & ITS irqchip
+In-Reply-To: <1453209083-3358-1-git-send-email-tn@semihalf.com>
+References: <1453209083-3358-1-git-send-email-tn@semihalf.com>
+Message-ID: <56BAFAE8.4070308@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/02/16 20:59, Christoffer Dall wrote:
-> On Mon, Feb 08, 2016 at 11:40:14AM +0000, Marc Zyngier wrote:
->> I've recently been looking at our entry/exit costs, and profiling
->> figures did show some very low hanging fruits.
->>
->> The most obvious cost is that accessing the GIC HW is slow. As in
->> "deadly slow", specially when GICv2 is involved. So not hammering the
->> HW when there is nothing to write is immediately beneficial, as this
->> is the most common cases (whatever people seem to think, interrupts
->> are a *rare* event).
->>
->> Another easy thing to fix is the way we handle trapped system
->> registers. We do insist on (mostly) sorting them, but we do perform a
->> linear search on trap. We can switch to a binary search for free, and
->> get immediate benefits (the PMU code, being extremely trap-happy,
->> benefits immediately from this).
->>
->> With these in place, I see an improvement of 20 to 30% (depending on
->> the platform) on our world-switch cycle count when running a set of
->> hand-crafted guests that are designed to only perform traps.
-> 
-> I'm curious about the weight of these two?  My guess based on the
-> measurement work I did is that the GIC is by far the worst sinner, but
-> that was exacerbated on X-Gene compared to Seattle.
+On 19.01.2016 14:11, Tomasz Nowicki wrote:
+> Patches base on Suravee's ACPI GICv2m support:
+> https://lkml.org/lkml/2015/12/10/475
+>
+> The following git branch contains submitted patches along with
+> the useful patches from the test point of view (mainly ACPI ARM64 PCI support).
+> https://github.com/semihalf-nowicki-tomasz/linux.git (gicv3-its-acpi-v3)
+>
 
-Indeed, the GIC is the real pig. 80% of the benefit is provided by not
-accessing it when not absolutely required. The sysreg access is only
-visible for workloads that are extremely trap-happy, but that's what
-happens with as soon as you start exercising the PMU code.
+Hi Marc,
 
->>
->> Methodology:
->>
->> * NULL-hypercall guest: Perform 65536 PSCI_0_2_FN_PSCI_VERSION calls,
->> and then a power-off:
->>
->> __start:
->> 	mov	x19, #(1 << 16)
->> 1:	mov	x0, #0x84000000
->> 	hvc	#0
->> 	sub	x19, x19, #1
->> 	cbnz	x19, 1b
->> 	mov	x0, #0x84000000
->> 	add	x0, x0, #9
->> 	hvc	#0
->> 	b	.
->>
->> * sysreg trap guest: Perform 2^20 PMSELR_EL0 accesses, and power-off:
->>
->> __start:
->> 	mov	x19, #(1 << 20)
->> 1:	mrs	x0, PMSELR_EL0
->> 	sub	x19, x19, #1
->> 	cbnz	x19, 1b
->> 	mov	x0, #0x84000000
->> 	add	x0, x0, #9
->> 	hvc	#0
->> 	b	.
->>
->> * These guests are profiled using perf and kvmtool:
->>
->> taskset -c 1 perf stat -e cycles:kh lkvm run -c1 --kernel do_sysreg.bin 2>&1 >/dev/null| grep cycles
-> 
-> these would be good to add to kvm-unit-tests so we can keep an eye on
-> this sort of thing...
+Can you please have a look at this series. I think your previous 
+concerns have been addressed.
 
-Yeah, I was thinking of that too. In the meantime, I've also created a
-GICv2 self-IPI test case, which has led to further improvement (a 10%
-reduction in the number of cycles on Seattle). The ugly thing about that
-test is that it knows where kvmtool places the GIC (I didn't fancy
-parsing the DT in assembly code). Hopefully there is a way to abstract this.
-
-We definitely run that kind of things on a regular basis and track the
-evolutions...
-
-> 
->>
->> The result is then divided by the number of iterations (2^16 or 2^20).
->>
->> These tests have been run on Seattle, Mustang, and LS2085, and shown
->> significant improvements in all cases. I've only touched the arm64
->> GIC code, but obviously the 32bit code should use it as well once
->> we've migrated it to C.
->>
->> I've pushed out a branch (kvm-arm64/suck-less) to the usual location.
->>
-> 
-> Looks promising!
-
-I thought as much. I'll keep on updating this branch, as it looks like
-there is a few more low hanging fruits around there...
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Tomasz
