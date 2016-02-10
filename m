@@ -1,56 +1,33 @@
 From: shaun.ren@linux.com (Shaun Ren)
-Date: Tue,  9 Feb 2016 18:45:25 -0800
-Subject: [PATCH v3 6/9] Staging: rts5208: rtsx_transport.c: Fix label naming
- convention
+Date: Tue,  9 Feb 2016 18:45:28 -0800
+Subject: [PATCH v3 9/9] Staging: rts5208: Add missing dma_mapping_error
 In-Reply-To: <1455072328-7033-1-git-send-email-shaun.ren@linux.com>
 References: <1454981485-15686-1-git-send-email-shaun.ren@linux.com>
  <1455072328-7033-1-git-send-email-shaun.ren@linux.com>
-Message-ID: <1455072328-7033-7-git-send-email-shaun.ren@linux.com>
+Message-ID: <1455072328-7033-10-git-send-email-shaun.ren@linux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the following naming convention issue in rtsx_transport.c,
-as reported by checkpatch.pl:
-
-CHECK: Avoid CamelCase: <Handle_Errors>
+This patch adds a dma_mapping_error call to debug potential DMA mapping
+errors after the dma_map_single call in rtsx_transport.c.
 
 Signed-off-by: Shaun Ren <shaun.ren@linux.com>
 ---
-Changes since v2
- * Update patch to reflect the changes made in PATCH 1/9 (block comments)
-
- drivers/staging/rts5208/rtsx_transport.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/staging/rts5208/rtsx_transport.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/staging/rts5208/rtsx_transport.c b/drivers/staging/rts5208/rtsx_transport.c
-index 14321c0..ea00347 100644
+index 46fc8c2..2b38de7 100644
 --- a/drivers/staging/rts5208/rtsx_transport.c
 +++ b/drivers/staging/rts5208/rtsx_transport.c
-@@ -170,14 +170,14 @@ void rtsx_invoke_transport(struct scsi_cmnd *srb, struct rtsx_chip *chip)
- 	if (rtsx_chk_stat(chip, RTSX_STAT_ABORT)) {
- 		dev_dbg(rtsx_dev(chip), "-- command was aborted\n");
- 		srb->result = DID_ABORT << 16;
--		goto Handle_Errors;
-+		goto handle_errors;
- 	}
+@@ -658,7 +658,7 @@ static int rtsx_transfer_buf(struct rtsx_chip *chip, u8 card, void *buf,
+ 		return -ENXIO;
  
- 	/* if there is a transport error, reset and don't auto-sense */
- 	if (result == TRANSPORT_ERROR) {
- 		dev_dbg(rtsx_dev(chip), "-- transport indicates error, resetting\n");
- 		srb->result = DID_ERROR << 16;
--		goto Handle_Errors;
-+		goto handle_errors;
- 	}
+ 	addr = dma_map_single(&rtsx->pci->dev, buf, len, dma_dir);
+-	if (!addr)
++	if (dma_mapping_error(&rtsx->pci->dev, addr))
+ 		return -ENOMEM;
  
- 	srb->result = SAM_STAT_GOOD;
-@@ -197,7 +197,7 @@ void rtsx_invoke_transport(struct scsi_cmnd *srb, struct rtsx_chip *chip)
- 
- 	return;
- 
--Handle_Errors:
-+handle_errors:
- 	return;
- }
- 
+ 	if (card == SD_CARD)
 -- 
 2.7.0
