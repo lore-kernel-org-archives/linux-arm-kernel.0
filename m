@@ -1,62 +1,113 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 10 Feb 2016 16:58:56 +0000
-Subject: [PATCH V3 1/4] dt-bindings: mfd: Add bindings for the MediaTek
- MT6323 PMIC
-In-Reply-To: <1453895258-44369-1-git-send-email-blogic@openwrt.org>
+Date: Wed, 10 Feb 2016 16:59:07 +0000
+Subject: [PATCH V3 2/4] mfd: mt6397: int_con and int_status may vary in
+ location
+In-Reply-To: <1453895258-44369-2-git-send-email-blogic@openwrt.org>
 References: <1453895258-44369-1-git-send-email-blogic@openwrt.org>
-Message-ID: <20160210165856.GS3782@x1>
+ <1453895258-44369-2-git-send-email-blogic@openwrt.org>
+Message-ID: <20160210165907.GT3782@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, 27 Jan 2016, John Crispin wrote:
 
+> MT6323 has the INT_CON and INT_STATUS located at a different position.
+> Make the registers locations configurable.
+> 
 > Signed-off-by: John Crispin <blogic@openwrt.org>
-> Cc: devicetree at vger.kernel.org
 > ---
->  Documentation/devicetree/bindings/mfd/mt6397.txt |   10 ++++++----
->  1 file changed, 6 insertions(+), 4 deletions(-)
+>  drivers/mfd/mt6397-core.c       |   27 +++++++++++++++++----------
+>  include/linux/mfd/mt6397/core.h |    2 ++
+>  2 files changed, 19 insertions(+), 10 deletions(-)
 
 Applied, thanks.
 
-> diff --git a/Documentation/devicetree/bindings/mfd/mt6397.txt b/Documentation/devicetree/bindings/mfd/mt6397.txt
-> index 15043e6..949c85f 100644
-> --- a/Documentation/devicetree/bindings/mfd/mt6397.txt
-> +++ b/Documentation/devicetree/bindings/mfd/mt6397.txt
-> @@ -1,6 +1,6 @@
-> -MediaTek MT6397 Multifunction Device Driver
-> +MediaTek MT6397/MT6323 Multifunction Device Driver
+> diff --git a/drivers/mfd/mt6397-core.c b/drivers/mfd/mt6397-core.c
+> index 1749c1c..75ad0fe 100644
+> --- a/drivers/mfd/mt6397-core.c
+> +++ b/drivers/mfd/mt6397-core.c
+> @@ -69,8 +69,10 @@ static void mt6397_irq_sync_unlock(struct irq_data *data)
+>  {
+>  	struct mt6397_chip *mt6397 = irq_data_get_irq_chip_data(data);
 >  
-> -MT6397 is a multifunction device with the following sub modules:
-> +MT6397/MT6323 is a multifunction device with the following sub modules:
->  - Regulator
->  - RTC
->  - Audio codec
-> @@ -8,14 +8,14 @@ MT6397 is a multifunction device with the following sub modules:
->  - Clock
+> -	regmap_write(mt6397->regmap, MT6397_INT_CON0, mt6397->irq_masks_cur[0]);
+> -	regmap_write(mt6397->regmap, MT6397_INT_CON1, mt6397->irq_masks_cur[1]);
+> +	regmap_write(mt6397->regmap, mt6397->int_con[0],
+> +		     mt6397->irq_masks_cur[0]);
+> +	regmap_write(mt6397->regmap, mt6397->int_con[1],
+> +		     mt6397->irq_masks_cur[1]);
 >  
->  It is interfaced to host controller using SPI interface by a proprietary hardware
-> -called PMIC wrapper or pwrap. MT6397 MFD is a child device of pwrap.
-> +called PMIC wrapper or pwrap. MT6397/MT6323 MFD is a child device of pwrap.
->  See the following for pwarp node definitions:
->  Documentation/devicetree/bindings/soc/pwrap.txt
+>  	mutex_unlock(&mt6397->irqlock);
+>  }
+> @@ -147,8 +149,8 @@ static irqreturn_t mt6397_irq_thread(int irq, void *data)
+>  {
+>  	struct mt6397_chip *mt6397 = data;
 >  
->  This document describes the binding for MFD device and its sub module.
+> -	mt6397_irq_handle_reg(mt6397, MT6397_INT_STATUS0, 0);
+> -	mt6397_irq_handle_reg(mt6397, MT6397_INT_STATUS1, 16);
+> +	mt6397_irq_handle_reg(mt6397, mt6397->int_status[0], 0);
+> +	mt6397_irq_handle_reg(mt6397, mt6397->int_status[1], 16);
 >  
->  Required properties:
-> -compatible: "mediatek,mt6397"
-> +compatible: "mediatek,mt6397" or "mediatek,mt6323"
+>  	return IRQ_HANDLED;
+>  }
+> @@ -177,8 +179,8 @@ static int mt6397_irq_init(struct mt6397_chip *mt6397)
+>  	mutex_init(&mt6397->irqlock);
 >  
->  Optional subnodes:
+>  	/* Mask all interrupt sources */
+> -	regmap_write(mt6397->regmap, MT6397_INT_CON0, 0x0);
+> -	regmap_write(mt6397->regmap, MT6397_INT_CON1, 0x0);
+> +	regmap_write(mt6397->regmap, mt6397->int_con[0], 0x0);
+> +	regmap_write(mt6397->regmap, mt6397->int_con[1], 0x0);
 >  
-> @@ -26,6 +26,8 @@ Optional subnodes:
->  	Required properties:
->  		- compatible: "mediatek,mt6397-regulator"
->  	see Documentation/devicetree/bindings/regulator/mt6397-regulator.txt
-> +		- compatible: "mediatek,mt6323-regulator"
-> +	see Documentation/devicetree/bindings/regulator/mt6323-regulator.txt
->  - codec
->  	Required properties:
->  		- compatible: "mediatek,mt6397-codec"
+>  	mt6397->irq_domain = irq_domain_add_linear(mt6397->dev->of_node,
+>  		MT6397_IRQ_NR, &mt6397_irq_domain_ops, mt6397);
+> @@ -203,8 +205,8 @@ static int mt6397_irq_suspend(struct device *dev)
+>  {
+>  	struct mt6397_chip *chip = dev_get_drvdata(dev);
+>  
+> -	regmap_write(chip->regmap, MT6397_INT_CON0, chip->wake_mask[0]);
+> -	regmap_write(chip->regmap, MT6397_INT_CON1, chip->wake_mask[1]);
+> +	regmap_write(chip->regmap, chip->int_con[0], chip->wake_mask[0]);
+> +	regmap_write(chip->regmap, chip->int_con[1], chip->wake_mask[1]);
+>  
+>  	enable_irq_wake(chip->irq);
+>  
+> @@ -215,8 +217,8 @@ static int mt6397_irq_resume(struct device *dev)
+>  {
+>  	struct mt6397_chip *chip = dev_get_drvdata(dev);
+>  
+> -	regmap_write(chip->regmap, MT6397_INT_CON0, chip->irq_masks_cur[0]);
+> -	regmap_write(chip->regmap, MT6397_INT_CON1, chip->irq_masks_cur[1]);
+> +	regmap_write(chip->regmap, chip->int_con[0], chip->irq_masks_cur[0]);
+> +	regmap_write(chip->regmap, chip->int_con[1], chip->irq_masks_cur[1]);
+>  
+>  	disable_irq_wake(chip->irq);
+>  
+> @@ -237,6 +239,11 @@ static int mt6397_probe(struct platform_device *pdev)
+>  		return -ENOMEM;
+>  
+>  	mt6397->dev = &pdev->dev;
+> +	mt6397->int_con[0] = MT6397_INT_CON0;
+> +	mt6397->int_con[1] = MT6397_INT_CON1;
+> +	mt6397->int_status[0] = MT6397_INT_STATUS0;
+> +	mt6397->int_status[1] = MT6397_INT_STATUS1;
+> +
+>  	/*
+>  	 * mt6397 MFD is child device of soc pmic wrapper.
+>  	 * Regmap is set from its parent.
+> diff --git a/include/linux/mfd/mt6397/core.h b/include/linux/mfd/mt6397/core.h
+> index 45b8e8a..d678f52 100644
+> --- a/include/linux/mfd/mt6397/core.h
+> +++ b/include/linux/mfd/mt6397/core.h
+> @@ -60,6 +60,8 @@ struct mt6397_chip {
+>  	u16 wake_mask[2];
+>  	u16 irq_masks_cur[2];
+>  	u16 irq_masks_cache[2];
+> +	u16 int_con[2];
+> +	u16 int_status[2];
+>  };
+>  
+>  #endif /* __MFD_MT6397_CORE_H__ */
 
 -- 
 Lee Jones
