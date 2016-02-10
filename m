@@ -1,42 +1,70 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 10 Feb 2016 16:59:54 +0000
-Subject: [RFC PATCH 0/5] arm/arm64: Making HYP vgic/timer save/restore
- common
-In-Reply-To: <20160209203803.GD5171@cbox>
-References: <1453996565-19666-1-git-send-email-marc.zyngier@arm.com>
- <20160209203803.GD5171@cbox>
-Message-ID: <56BB6C8A.1080109@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 10 Feb 2016 17:01:27 +0000
+Subject: [PATCH V3 1/4] dt-bindings: mfd: Add bindings for the MediaTek
+ MT6323 PMIC
+In-Reply-To: <1453895258-44369-1-git-send-email-blogic@openwrt.org>
+References: <1453895258-44369-1-git-send-email-blogic@openwrt.org>
+Message-ID: <20160210170127.GW3782@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/02/16 20:38, Christoffer Dall wrote:
-> On Thu, Jan 28, 2016 at 03:56:00PM +0000, Marc Zyngier wrote:
->> With the current state of the C conversion of arm and arm64 world
->> switches, we are still unable to share some of the most obvious
->> candidates (GIC and timer save/restore). In order to reduce the bloat,
->> let's move these files to a common location (virt/kvm/arm/hyp).
->>
->> The changes are extremely mechanical, with a small hack to deal with
->> system register names on the 32bit side (I've decided to align on the
->> 64bit names).
->>
->> I'd like to know what people think of the common location. Does it
->> makes sense to have a "hyp" subdirectory to indicate that this is not
->> "normal" kernel code?
->>
->> These patches are on top of 4.5-rc1, plus the VHE and 32bit WS rewrite
->> patches, and I've pushed out a branch at
->>
->> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/mov-hyp
->>
+If you're submitting a set of patches like this, you really ought to
+be providing a cover-letter.
+
+Also, when submitting patches, please do so in the style expected by
+the subsystem.  I will fix these once up for now, but please bear that
+in mind in the future.
+
+`git log --oneline -- <subsystem>` works well for this.
+
+> Signed-off-by: John Crispin <blogic@openwrt.org>
+> Cc: devicetree at vger.kernel.org
+> ---
+>  Documentation/devicetree/bindings/mfd/mt6397.txt |   10 ++++++----
+>  1 file changed, 6 insertions(+), 4 deletions(-)
 > 
-> ack on this series, tested on TC2 and Mustang as well.
+> diff --git a/Documentation/devicetree/bindings/mfd/mt6397.txt b/Documentation/devicetree/bindings/mfd/mt6397.txt
+> index 15043e6..949c85f 100644
+> --- a/Documentation/devicetree/bindings/mfd/mt6397.txt
+> +++ b/Documentation/devicetree/bindings/mfd/mt6397.txt
+> @@ -1,6 +1,6 @@
+> -MediaTek MT6397 Multifunction Device Driver
+> +MediaTek MT6397/MT6323 Multifunction Device Driver
+>  
+> -MT6397 is a multifunction device with the following sub modules:
+> +MT6397/MT6323 is a multifunction device with the following sub modules:
+>  - Regulator
+>  - RTC
+>  - Audio codec
+> @@ -8,14 +8,14 @@ MT6397 is a multifunction device with the following sub modules:
+>  - Clock
+>  
+>  It is interfaced to host controller using SPI interface by a proprietary hardware
+> -called PMIC wrapper or pwrap. MT6397 MFD is a child device of pwrap.
+> +called PMIC wrapper or pwrap. MT6397/MT6323 MFD is a child device of pwrap.
+>  See the following for pwarp node definitions:
+>  Documentation/devicetree/bindings/soc/pwrap.txt
+>  
+>  This document describes the binding for MFD device and its sub module.
+>  
+>  Required properties:
+> -compatible: "mediatek,mt6397"
+> +compatible: "mediatek,mt6397" or "mediatek,mt6323"
+>  
+>  Optional subnodes:
+>  
+> @@ -26,6 +26,8 @@ Optional subnodes:
+>  	Required properties:
+>  		- compatible: "mediatek,mt6397-regulator"
+>  	see Documentation/devicetree/bindings/regulator/mt6397-regulator.txt
+> +		- compatible: "mediatek,mt6323-regulator"
+> +	see Documentation/devicetree/bindings/regulator/mt6323-regulator.txt
+>  - codec
+>  	Required properties:
+>  		- compatible: "mediatek,mt6397-codec"
 
-Thanks for all the reviewing!
-
-I'll rebase it once the dust settles on VHE and WSINC, and that will
-form one bloody long series...
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
