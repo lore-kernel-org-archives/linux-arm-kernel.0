@@ -1,78 +1,67 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 10 Feb 2016 21:09:06 +0300
-Subject: [PATCH v2 5/5] ARM: dts: r8a7794: add sound support
-In-Reply-To: <874mdhtn7d.wl%kuninori.morimoto.gx@renesas.com>
-References: <12033353.rt0nolnBmD@wasted.cogentembedded.com>
- <2543047.yYrDdYb9v5@wasted.cogentembedded.com>
- <874mdhtn7d.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <56BB7CC2.1060706@cogentembedded.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 10 Feb 2016 19:09:20 +0100
+Subject: [PATCH v2 0/6] irqchip: irq-armada-370-xp: generic MSI
+ infrastructure and assorted fixes
+In-Reply-To: <20160210153829.GA5183@io.lakedaemon.net> (Jason Cooper's message
+ of "Wed, 10 Feb 2016 15:38:29 +0000")
+References: <1453899395-3532-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20160210150046.118fc991@free-electrons.com>
+ <56BB4451.3070707@arm.com> <20160210153829.GA5183@io.lakedaemon.net>
+Message-ID: <87mvr8xwrz.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi Jason,
+ 
+ On mer., f?vr. 10 2016, Jason Cooper <jason@lakedaemon.net> wrote:
 
-On 02/10/2016 03:41 AM, Kuninori Morimoto wrote:
-
-> Sorry for my un-ordered response
-
-    Not sure what you mean by that. :-)
-
->> Define the generic R8A7794 part of  the sound device node.
->> This sound device  is a complex one and comprises the Audio Clock Generator
->> (ADG), Sampling Rate Converter Unit (SCU), Serial Sound Interface [Unit]
->> (SSI[U]), and Audio DMAC-Peripheral-Peripheral.
->> It is up  to the board file to enable the device.
->>
->> This patch is based on the R8A7791 sound work by Kuninori Morimoto.
->>
->> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> (snip)
->> +		rcar_sound,src {
->> +			src1: src at 1 {
->> +				interrupts = <GIC_SPI 353 IRQ_TYPE_LEVEL_HIGH>;
->> +				dmas = <&audma0 0x87>, <&audma0 0x9c>;
->> +				dma-names = "rx", "tx";
->> +			};
->> +			src2: src at 2 {
->> +				interrupts = <GIC_SPI 354 IRQ_TYPE_LEVEL_HIGH>;
->> +				dmas = <&audma0 0x89>, <&audma0 0x9e>;
->> +				dma-names = "rx", "tx";
->> +			};
->> +			src3: src at 3 {
->> +				interrupts = <GIC_SPI 355 IRQ_TYPE_LEVEL_HIGH>;
->> +				dmas = <&audma0 0x8b>, <&audma0 0xa0>;
->> +				dma-names = "rx", "tx";
->> +			};
->> +			src4: src at 4 {
->> +				interrupts = <GIC_SPI 356 IRQ_TYPE_LEVEL_HIGH>;
->> +				dmas = <&audma0 0x8d>, <&audma0 0xb0>;
->> +				dma-names = "rx", "tx";
->> +			};
->> +			src5: src at 5 {
->> +				interrupts = <GIC_SPI 357 IRQ_TYPE_LEVEL_HIGH>;
->> +				dmas = <&audma0 0x8f>, <&audma0 0xb2>;
->> +				dma-names = "rx", "tx";
->> +			};
->> +			src6: src at 6 {
->> +				interrupts = <GIC_SPI 358 IRQ_TYPE_LEVEL_HIGH>;
->> +				dmas = <&audma0 0x91>, <&audma0 0xb4>;
->> +				dma-names = "rx", "tx";
->> +			};
->> +		};
+> On Wed, Feb 10, 2016 at 02:08:17PM +0000, Marc Zyngier wrote:
+>> On 10/02/16 14:00, Thomas Petazzoni wrote:
+>> > Hello,
+>> > 
+>> > On Wed, 27 Jan 2016 13:56:29 +0100, Thomas Petazzoni wrote:
+>> > 
+>> >> Thomas Petazzoni (6):
+>> >>   irqchip: irq-armada-370-xp: add Kconfig option for the driver
+>> >>   irqchip: irq-armada-370-xp: use the generic MSI infrastructure
+>> >>   irqchip: irq-armada-370-xp: use PCI_MSI_DOORBELL_START where
+>> >>     appropriate
+>> >>   irqchip: irq-armada-370-xp: use shorter names for irq_chip
+>> >>   irqchip: irq-armada-370-xp: allow allocation of multiple MSIs
+>> >>   ARM: mvebu: use the ARMADA_370_XP_IRQ option
+>> > 
+>> > Jason, Thomas, any chance to get this applied soonish?
+>> > 
+>> > The core patch of the series, which migrates the irq-armada-370-xp
+>> > driver to use the generic MSI infrastructure has been Reviewed-by: Marc
+>> > Zyngier, and the other patches in the series have Acked-by/Reviewed-by
+>> > from Gregory Clement.
+>> > 
+>> > Of course, if there's anything left to be changed, I'd be happy to
+>> > respin a new version of this series.
+>> > 
+>> 
+>> Noticing the distribution list, it would be good to repost these patches
+>> with acks and co to LKML...
 >
-> I think this can't work correctly, because driver is assuming
-> DT has all channles (from 0). (see linux/sound/soc/sh/rcar/src.c :: rsnd_src_probe)
+> agreed, and I'll pick it up within the next day or so.  Still getting my
+> home network setup... too much wifi. :(
 
-    At least it doesn't crash and burn. :-)
-    Playback and recording still work too.
+I proposed that you take the 6th patch to ensure that this driver will
+always be selected for the mvebu platform which need it. It is still OK
+but, since this offer, I sent a series which depend of the 1st patch:
+http://thread.gmane.org/gmane.linux.ide/61178
 
-> Can you adds dummy src0 with some comments ?
+Would you agree to provide an immutable tag containing the first patch?
+Thanks to this I will be able to provide it to the arm-soc maintainer
+for my pull request.
 
-    Don't think that's an option. We are supposed to describe the hardware, 
-not the driver's behavior.
+Thanks,
 
-> or fix src.c driver ?
+Gregory
 
-    Will try to look into it...
-
-MBR, Sergei
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
