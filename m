@@ -1,58 +1,50 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 10 Feb 2016 18:25:39 +0100
-Subject: [PATCH v2 07/28] ARM: KVM: Add system register accessor macros
-In-Reply-To: <1454583645-10144-8-git-send-email-marc.zyngier@arm.com>
-References: <1454583645-10144-1-git-send-email-marc.zyngier@arm.com>
- <1454583645-10144-8-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20160210172539.GQ5171@cbox>
+From: paul.burton@imgtec.com (Paul Burton)
+Date: Wed, 10 Feb 2016 09:27:07 -0800
+Subject: [PATCH V3 3/5] PCI: xilinx: Modifying AXI PCIe Host Bridge
+ driver to work on both  Zynq and Microblaze
+In-Reply-To: <8520D5D51A55D047800579B09414719825881780@XAP-PVEXMBX01.xlnx.xilinx.com>
+References: <1455014518-8708-1-git-send-email-bharatku@xilinx.com>
+ <1455014518-8708-4-git-send-email-bharatku@xilinx.com>
+ <20160209161134.GA24244@NP-P-BURTON>
+ <8520D5D51A55D047800579B09414719825881780@XAP-PVEXMBX01.xlnx.xilinx.com>
+Message-ID: <20160210172707.GA29590@NP-P-BURTON>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 04, 2016 at 11:00:24AM +0000, Marc Zyngier wrote:
-> In order to move system register (CP15, mostly) access to C code,
-> add a few macros to facilitate this, and minimize the difference
-> between 32 and 64bit CP15 registers.
-> 
-> This will get heavily used in the following patches.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/kvm/hyp/hyp.h | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
-> 
-> diff --git a/arch/arm/kvm/hyp/hyp.h b/arch/arm/kvm/hyp/hyp.h
-> index c723870..727089f 100644
-> --- a/arch/arm/kvm/hyp/hyp.h
-> +++ b/arch/arm/kvm/hyp/hyp.h
-> @@ -27,4 +27,19 @@
->  #define kern_hyp_va(v) (v)
->  #define hyp_kern_va(v) (v)
->  
-> +#define __ACCESS_CP15(CRn, Op1, CRm, Op2)	\
-> +	"mrc", "mcr", __stringify(p15, Op1, %0, CRn, CRm, Op2), u32
-> +#define __ACCESS_CP15_64(Op1, CRm)		\
-> +	"mrrc", "mcrr", __stringify(p15, Op1, %Q0, %R0, CRm), u64
-> +
-> +#define __write_sysreg(v, r, w, c, t)	asm volatile(w " " c : : "r" ((t)(v)))
-> +#define write_sysreg(v, ...)		__write_sysreg(v, __VA_ARGS__)
-> +
-> +#define __read_sysreg(r, w, c, t) ({				\
-> +	t __val;						\
-> +	asm volatile(r " " c : "=r" (__val));			\
-> +	__val;							\
-> +})
-> +#define read_sysreg(...)		__read_sysreg(__VA_ARGS__)
-> +
->  #endif /* __ARM_KVM_HYP_H__ */
-> -- 
-> 2.1.4
-> 
+On Wed, Feb 10, 2016 at 05:55:51AM +0000, Bharat Kumar Gogada wrote:
+> > On Tue, Feb 09, 2016 at 04:11:56PM +0530, Bharat Kumar Gogada wrote:
+> > > Modifying Xilinx AXI PCIe Host Bridge Soft IP driver to work on both
+> > > Zynq and Microblaze Architectures.
+> > > With these modifications drivers/pci/host/pcie-xilinx.c, will work on
+> > > both Zynq and Microblaze Architectures.
+> > >
+> > > Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
+> > > Signed-off-by: Ravi Kiran Gummaluri <rgummal@xilinx.com>
+> > > ---
+> > > Changes:
+> > > Removed unneccessary architecture dependent number of MSI's.
+> > > Added #ifdef to pci_fixup_irqs which is ARM specific API.
+> > 
+> > Hi Bharat,
+> > 
+> > Why do you say pci_fixup_irqs is ARM-specific? It's declared in
+> > include/linux/pci.h, defined in drivers/pci/setup-irq.c & used by multiple
+> > architectures (alpha, arm, m68k, mips, sh, sparc, tile,
+> > unicore32 from a quick grep).
+> > 
+> > Will you not break INTX-style interrupts by removing this?
+> > 
+> I meant to say ARM specific w.r.t Microblaze architecture, which is
+> what this patch series are for. This has been already discussed in my
+> previous patch by  Arnd Bergmann and Lorenzo Pieralisi .
+> (https://lkml.org/lkml/2016/1/12/707)
 
-I sort of figured that a reviewed-by tag on patches that actually use
-these macros would be an implicit review of this code.
+Hi Bharat,
 
-not feeling comfortable enough that I read this jibberish perfectly in
-isolation, but given that the stuff compiles and works, I'll just ack
-it:
+Ok, so you don't need it for microblaze but do need it for zynq/ARM. We
+also need it for MIPS, where my recent patches enable this driver. So if
+#ifdef'ing this is the current way forwards could you please invert the
+condition to #ifndef CONFIG_MICROBLAZE?
 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Thanks,
+    Paul
