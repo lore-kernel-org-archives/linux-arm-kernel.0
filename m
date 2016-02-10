@@ -1,46 +1,28 @@
-From: julien.grall@arm.com (Julien Grall)
-Date: Wed, 10 Feb 2016 14:19:08 +0000
-Subject: [PATCH 3/5] irqchip/gic-v2: Parse and export virtual GIC
- information
-In-Reply-To: <20160209204914.GE5171@cbox>
-References: <1454950049-741-1-git-send-email-julien.grall@arm.com>
- <1454950049-741-4-git-send-email-julien.grall@arm.com>
- <20160209204914.GE5171@cbox>
-Message-ID: <56BB46DC.7080202@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 10 Feb 2016 14:21:13 +0000
+Subject: [PATCH v3 3/3] iommu/io-pgtable: Avoid redundant TLB syncs
+In-Reply-To: <81a5e784494a04713e152659c95b34e92d944f32.1453723096.git.robin.murphy@arm.com>
+References: <cover.1453723096.git.robin.murphy@arm.com>
+ <81a5e784494a04713e152659c95b34e92d944f32.1453723096.git.robin.murphy@arm.com>
+Message-ID: <20160210142112.GK1052@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
+On Tue, Jan 26, 2016 at 05:13:15PM +0000, Robin Murphy wrote:
+> In certain unmapping situations it is quite possible to end up issuing
+> back-to-back TLB synchronisations, which at best is a waste of time and
+> effort, and at worst causes some hardware to get rather confused. Whilst
+> the pagetable implementations, or the IOMMU drivers, or both, could keep
+> track of things to avoid this happening, it seems to make the most sense
+> to prevent code duplication and add some simple state tracking in the
+> common interface between the two.
+> 
+> Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+>  drivers/iommu/io-pgtable.h | 9 ++++++++-
+>  1 file changed, 8 insertions(+), 1 deletion(-)
 
-On 09/02/16 20:49, Christoffer Dall wrote:
->> +static void __init gic_acpi_setup_kvm_info(void)
->> +{
->> +	gic_v2_kvm_info.type = GIC_V2;
->> +
->> +	gic_v2_kvm_info.maint_irq = acpi_register_gsi(NULL,
->> +						      acpi_data.maint_irq,
->> +						      acpi_data.maint_irq_mode,
->> +						      ACPI_ACTIVE_HIGH);
->> +	gic_v2_kvm_info.vctrl_base = acpi_data.vctrl_base;
->> +	if (gic_v2_kvm_info.vctrl_base)
->> +		gic_v2_kvm_info.vctrl_size = SZ_8K;
->> +
->> +	gic_v2_kvm_info.vcpu_base = acpi_data.vcpu_base;
->> +	if (gic_v2_kvm_info.vcpu_base)
->> +		gic_v2_kvm_info.vcpu_size = SZ_8K;
->
-> why are the sizes hard-coded to 8K in this case?
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-The MADT only provides the base addresses and not the size. The default 
-value has been chosen based on the GICv2 spec (ARM IHI 0048B.b)
-	* GICV: See 5.5
-	* GICH: I can't find again the section about it. But the example 
-bindings in 
-Documents/devicetree/bindings/interrupt-controller/arm,gic.txt uses 8K.
-
-I will add a comment in the code explaining where the 8K come from.
-
-Cheers,
-
--- 
-Julien Grall
+Will
