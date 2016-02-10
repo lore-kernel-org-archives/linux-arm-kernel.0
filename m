@@ -1,53 +1,63 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 10 Feb 2016 18:15:22 +0000
-Subject: [PATCH] arm64: Add workaround for Cavium erratum 27456
-In-Reply-To: <56BB7C91.5010205@caviumnetworks.com>
-References: <1455046156-10582-1-git-send-email-ddaney.cavm@gmail.com>
- <20160210092822.GA1052@arm.com>
- <56BB7C91.5010205@caviumnetworks.com>
-Message-ID: <20160210181522.GW1052@arm.com>
+From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
+Date: Wed, 10 Feb 2016 20:23:02 +0200
+Subject: [PATCH v1] ARM: RX51: Set system_rev from ATAGS
+In-Reply-To: <20160209161659.GJ19432@atomide.com>
+References: <20160209161659.GJ19432@atomide.com>
+Message-ID: <1455128582-25669-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 10, 2016 at 10:08:17AM -0800, David Daney wrote:
-> On 02/10/2016 01:28 AM, Will Deacon wrote:
-> >On Tue, Feb 09, 2016 at 11:29:16AM -0800, David Daney wrote:
-> >>From: Andrew Pinski <apinski@cavium.com>
-> >>
-> >>On ThunderX T88 pass 1.x through 2.1 parts, broadcast TLBI
-> >>instructions may cause the icache to become invalid if it contains
-> >>data for a non-current ASID.
-> >>
-> >>This patch implements the workaround (which flushes the local icache
-> >>when switching the mm) by using code patching.
-> >
-> >So, to be clear, is this "just" a performance problem as opposed to a
-> >correctness issue?
-> 
-> No.  It is a correctness issue.  Without this workaround in place, userspace
-> programs end up executing the wrong instructions, which leads to
-> unpredictable behavior and program crashes.
+This fixed a regression with DT boot compared to legacy boot.
 
-Ok, so I think the description in the commit log isn't quite right. An
-"invalid" line in i-cache simply means that it needs to be refetched.
-What you're talking about sounds like data corruption.
+Signed-off-by: Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com>
+---
+ arch/arm/mach-omap2/board-generic.c | 22 +++++++++++++++++++++-
+ 1 file changed, 21 insertions(+), 1 deletion(-)
 
-I also don't understand how the workaround fixes things like TLBIs due
-to copy-on-write faults triggered by another core. Also, what's the
-interaction with virtual machines, or is the VMID not affected in the
-same way as the ASID?
-
-Sorry to be a pain on this, but we need to understand the issue well
-enough to maintain the workaround in the future!
-
-> >If so, do you have any numbers with and without this
-> >change?
-> 
-> We tried to measure it, but the impact is not measurable in the tests we
-> have done.  Switching the mm is not often done so the extra ICache
-> invalidation is rare.
-
-Oh, sure. I was only interested in perf figures if this was a performance
-problem rather than a functional one.
-
-Will
+diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+index 8098272..bab814d 100644
+--- a/arch/arm/mach-omap2/board-generic.c
++++ b/arch/arm/mach-omap2/board-generic.c
+@@ -18,6 +18,7 @@
+ 
+ #include <asm/setup.h>
+ #include <asm/mach/arch.h>
++#include <asm/system_info.h>
+ 
+ #include "common.h"
+ 
+@@ -77,12 +78,31 @@ static const char *const n900_boards_compat[] __initconst = {
+ 	NULL,
+ };
+ 
++/* Set system_rev from atags */
++static void __init rx51_set_system_rev(const struct tag *tags)
++{
++	const struct tag *tag;
++
++	if (tags->hdr.tag != ATAG_CORE)
++		return;
++
++	for_each_tag(tag, tags) {
++		if (tag->hdr.tag == ATAG_REVISION) {
++			system_rev = tag->u.revision.rev;
++			break;
++		}
++	}
++}
++
+ /* Legacy userspace on Nokia N900 needs ATAGS exported in /proc/atags,
+  * save them while the data is still not overwritten
+  */
+ static void __init rx51_reserve(void)
+ {
+-	save_atags((const struct tag *)(PAGE_OFFSET + 0x100));
++	const struct tag *tags = (const struct tag *)(PAGE_OFFSET + 0x100);
++
++	save_atags(tags);
++	rx51_set_system_rev(tags);
+ 	omap_reserve();
+ }
+ 
+-- 
+1.9.1
