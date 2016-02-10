@@ -1,59 +1,40 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Wed, 10 Feb 2016 10:51:55 -0800
-Subject: [GIT PULL] bcm2835 DT changes for 4.6
-In-Reply-To: <DDFB1D8B-805B-488F-9582-796EBCEF287B@sperl.org>
-References: <1454977978-17491-1-git-send-email-eric@anholt.net>
- <DDFB1D8B-805B-488F-9582-796EBCEF287B@sperl.org>
-Message-ID: <87d1s42yb8.fsf@eliezer.anholt.net>
+From: stripathi@apm.com (Suman Tripathi)
+Date: Wed, 10 Feb 2016 10:59:31 -0800
+Subject: [PATCH v4 0/3] ata: Fixes related to edge trigger latch for the
+ ahci_xgene_driver.
+In-Reply-To: <20160210162547.GJ3741@mtj.duckdns.org>
+References: <1454738124-9351-1-git-send-email-stripathi@apm.com>
+ <20160210162547.GJ3741@mtj.duckdns.org>
+Message-ID: <CAOHikRBNL2gLJwhB2SEKJXZtOpmqwBET4P9RgRrPdhyH4bn0zA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Martin Sperl <martin@sperl.org> writes:
+Hi Tejun,
 
->> On 09.02.2016, at 01:32, Eric Anholt <eric@anholt.net> wrote:
->> 
->> Hi Florian.  Here's the first set of patches for bcm2835 for 4.6.
->> We've got more DT patches that are going to happen for new boards,
->> too, but they're still getting polished.
->> 
->> The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
->> 
->>  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
->> 
->> are available in the git repository at:
->> 
->>  git at github.com:anholt/linux.git tags/bcm2835-dt-next-2016-02-04
->> 
->> for you to fetch changes up to 5ec6f2cd8ec4bcd38ba199ea8711a5ec906d85e7:
->> 
->>  ARM: bcm2835: Add the Raspberry Pi power domain driver to the DT. (2016-02-02 20:02:45 -0800)
->> 
->> ----------------------------------------------------------------
->> This pull request covers mostly DT changes that didn't make it into
->> 4.5 because required header files went through other trees.
->> 
->> ----------------------------------------------------------------
->> Alexander Aring (1):
->>      ARM: bcm2835: Add the Raspberry Pi power domain driver to the DT.
->> 
->> Lubomir Rintel (1):
->>      ARM: bcm2835: dt: Add Raspberry Pi Model A
->> 
->> Martin Sperl (2):
->>      ARM: bcm2835: add the auxiliary spi1 and spi2 to the device tree
->>      ARM: bcm2835: follow dt uart node-naming convention
+On Wed, Feb 10, 2016 at 8:25 AM, Tejun Heo <tj@kernel.org> wrote:
+> On Sat, Feb 06, 2016 at 11:25:21AM +0530, suman Tripathi wrote:
+>> From: Suman Tripathi <stripathi@apm.com>
+>>
+>> This patch set implements a workaround for an errate in the APM
+>> X-Gene SATA host controller with edge interrupt. The HOST_IRQ_STAT
+>> misses the edge interrupt from the PORT_IRQ_STAT when clearing the
+>> HOST_IRQ_STAT and reporting the PORT_IRQ_STAT happens in same clock
+>> cycle. It also implements the capability to override generic interrupt
+>> handler.
 >
-> Do you want me to resend a rebased version of:
->      ARM: bcm2835: add bcm2835-aux-uart support to default DT
->
-> The corresponding driver has been added to tty/tty-next.
+> Applied 1-3 to libata/for-4.6 with minor updates.
 
-It hadn't landed last time I checked.  A rebased version that you've
-tested would be great!
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160210/48eedbe7/attachment.sig>
+will this patchset  go to 4.5 ?
+
+>
+> Thanks.
+>
+> --
+> tejun
+
+
+
+-- 
+Thanks,
+with regards,
+Suman Tripathi
