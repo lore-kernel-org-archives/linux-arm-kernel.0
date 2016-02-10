@@ -1,62 +1,66 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 10 Feb 2016 15:02:50 -0800
-Subject: [PATCH 7/7] ARM: OMAP2+: Fix omap_device for module reload on PM
- runtime forbid
+Date: Wed, 10 Feb 2016 15:02:49 -0800
+Subject: [PATCH 6/7] ARM: OMAP2+: Improve omap_device error for driver writers
 In-Reply-To: <1455145370-20301-1-git-send-email-tony@atomide.com>
 References: <1455145370-20301-1-git-send-email-tony@atomide.com>
-Message-ID: <1455145370-20301-8-git-send-email-tony@atomide.com>
+Message-ID: <1455145370-20301-7-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If a driver PM runtime is disabled via sysfs, and the module is
-unloaded, PM runtime can't do anything to disable the device. Let's
-let the interconnect disable the device on BUS_NOTIFY_UNBOUND_DRIVER.
+Drivers using pm_runtime_use_autosuspend() may not get disabled after
+-EPROBE_DEFER. On the following device driver probe, hardware state
+is different from the PM runtime state causing omap_device to produce
+the following error:
 
-Otherwise omap_device will produce and error on the following module
-reload. This can be easily tested with something like:
+omap_device_enable() called from invalid state 1
 
-# modprobe omap_hsmmc
-# echo on > /sys/devices/platform/68000000.ocp/4809c000.mmc/power/control
-# rmmod omap_hsmmc
-# modprobe omap_hsmmc
+And with omap_device and omap hardware being picky for PM, this will
+block any deeper idle states in hardware.
+
+Let's add a proper error message so driver writers can easily fix
+their drivers for PM.
+
+In general, the solution is to fix the drivers to follow the PM
+runtime documentation:
+
+1. For sections of code that needs the device disabled, use
+   pm_runtime_put_sync_suspend() if pm_runtime_set_autosuspend() has
+   been set.
+
+2. For driver exit code, use pm_runtime_dont_use_autosuspend() before
+   pm_runtime_put_sync() if pm_runtime_use_autosuspend() has been
+   set.
+
+Let's not return with 0 from _od_runtime_resume() as that will
+eventually lead into new drivers with broken PM runtime that will
+block deeper idle states on omaps.
 
 Cc: Alan Stern <stern@rowland.harvard.edu>
 Cc: Kevin Hilman <khilman@baylibre.com>
 Cc: Nishanth Menon <nm@ti.com>
 Cc: Rafael J. Wysocki <rafael@kernel.org>
+Cc: Ulf Hansson <ulf.hansson@linaro.org>
 Cc: Tero Kristo <t-kristo@ti.com>
-Reported-by: Ulf Hansson <ulf.hansson@linaro.org>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/omap_device.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/mach-omap2/omap_device.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
-index ebd8369..f7ff3b9 100644
+index 0437537..ebd8369 100644
 --- a/arch/arm/mach-omap2/omap_device.c
 +++ b/arch/arm/mach-omap2/omap_device.c
-@@ -191,12 +191,22 @@ static int _omap_device_notifier_call(struct notifier_block *nb,
- {
- 	struct platform_device *pdev = to_platform_device(dev);
- 	struct omap_device *od;
-+	int err;
+@@ -602,8 +602,10 @@ static int _od_runtime_resume(struct device *dev)
+ 	int ret;
  
- 	switch (event) {
- 	case BUS_NOTIFY_DEL_DEVICE:
- 		if (pdev->archdata.od)
- 			omap_device_delete(pdev->archdata.od);
- 		break;
-+	case BUS_NOTIFY_UNBOUND_DRIVER:
-+		od = to_omap_device(pdev);
-+		if (od && (od->_state == OMAP_DEVICE_STATE_ENABLED)) {
-+			dev_info(dev, "enabled after unload, idling\n");
-+			err = omap_device_idle(pdev);
-+			if (err)
-+				dev_err(dev, "failed to idle\n");
-+		}
-+		break;
- 	case BUS_NOTIFY_ADD_DEVICE:
- 		if (pdev->dev.of_node)
- 			omap_device_build_from_dt(pdev);
+ 	ret = omap_device_enable(pdev);
+-	if (ret)
++	if (ret) {
++		dev_err(dev, "use pm_runtime_put_sync_suspend() in driver?\n");
+ 		return ret;
++	}
+ 
+ 	return pm_generic_runtime_resume(dev);
+ }
 -- 
 2.7.0
