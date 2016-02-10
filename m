@@ -1,27 +1,42 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 10 Feb 2016 10:12:39 +0000
-Subject: next-20160210 build: 2 failures 4 warnings (next-20160210)
-In-Reply-To: <20160210100837.GT13270@sirena.org.uk>
-References: <E1aTQoy-0005cH-Tr@optimist> <20160210100837.GT13270@sirena.org.uk>
-Message-ID: <20160210101238.GC1052@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 10 Feb 2016 10:16:31 +0000
+Subject: [PATCH V3 03/10] irqchip,GICv3,ACPI: Add redistributor support
+ via GICC structures.
+In-Reply-To: <1453209083-3358-4-git-send-email-tn@semihalf.com>
+References: <1453209083-3358-1-git-send-email-tn@semihalf.com>
+ <1453209083-3358-4-git-send-email-tn@semihalf.com>
+Message-ID: <56BB0DFF.1040802@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 10, 2016 at 10:08:37AM +0000, Mark Brown wrote:
-> On Wed, Feb 10, 2016 at 09:12:25AM +0000, Build bot for Mark Brown wrote:
+On 19/01/16 13:11, Tomasz Nowicki wrote:
+> Following ACPI spec:
+> On systems supporting GICv3 and above, GICR Base Address in MADT GICC
+> structure holds the 64-bit physical address of the associated Redistributor.
+> If all of the GIC Redistributors are in the always-on power domain,
+> GICR structures should be used to describe the Redistributors instead,
+> and this field must be set to 0.
 > 
-> Today's -next fails to build an arm64 allmodconfig due to:
+> It means that we have two ways to initialize registirbutors map.
+> 1. via GICD structure which can accommodate many redistributors as a region
+> 2. via GICC which is able to describe single redistributor
 > 
-> > 	arm64-allmodconfig
-> > ../arch/arm64/include/asm/processor.h:183:15: error: expected string literal before 'ARM64_LSE_ATOMIC_INSN'
+> This patch is going to add support for second option.
+> Considering redistributors, GICD and GICC subtables have be mutually
+> exclusive. While discovering and mapping redistributor, we need to know
+> its size in advance. For the GICC case, redistributor can be in
+> a power-domain that is off, thus we cannot relay on GICR TYPER register.
+> Therefore, we get GIC version from distributor register and map 2xSZ_64K
+> for GICv3 and 4xSZ_64K for GICv4.
 > 
-> due to 52e662326e1e915 (arm64: prefetch: don't provide
-> spin_lock_prefetch with LSE) which adds use of ARM64_LSE_ATOMIC_INSN but
-> does not add an inclusion of asm/lse.h which defines it.  Most files
-> have an implicit include so build fine but a few don't which causes the
-> failure.  It does add an inclusion of asm/alternative.h which may be the
-> best place to add the inclusion.
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
 
-I just sent a fix to the list.
+This is incredibly convoluted, but I'm not sure there is a better way
+given the current ACPI API. Still, it hurts.
 
-Will
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
