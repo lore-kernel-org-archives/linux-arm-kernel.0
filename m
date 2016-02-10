@@ -1,29 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 10 Feb 2016 16:24:38 +0100
-Subject: EMXX platform support
-In-Reply-To: <20160209201743.GA5628@reno.home>
-References: <20160209201743.GA5628@reno.home>
-Message-ID: <56882101.BaoQy5A3Ep@wuerfel>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Wed, 10 Feb 2016 16:28:33 +0100
+Subject: [PATCH] cpufreq: select IRQ_WORK in Kconfig
+In-Reply-To: <1455117265-3007562-1-git-send-email-arnd@arndb.de>
+References: <1455117265-3007562-1-git-send-email-arnd@arndb.de>
+Message-ID: <CAJZ5v0jqyd41Vzm61BEMeSHs=sAGYghM77nipBMVhQiyRfeqGw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 09 February 2016 21:17:44 Martin Langer wrote:
-> Hello,
-> 
-> are there any plans in supporting emxx platform?
-> 
-> The Sony PCM D-100 is based on this platform and they released a lot of their linux code:
-> http://oss.sony.net/Products/Linux/Audio/PCM-D100.html
-> 
-> ... including basic code for the kernel 2.6.35, see:
-> http://oss.sony.net/Products/Linux/Audio/Download/PCM-D100/linux-kernel-2.6.35.tgz
-> 
-> I'm wondering that it is not yet part of the kernel. Probably I am the first person who looked into their package.
-> 
+On Wed, Feb 10, 2016 at 4:14 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> The cpufreq core code has started using the irq_work infrastructure, but that
+> can be disabled in Kconfig, causing a link failure:
+>
+> drivers/cpufreq/cpufreq_governor.c: In function 'gov_queue_irq_work':
+> drivers/cpufreq/cpufreq_governor.c:251:3: error: implicit declaration of function 'irq_work_queue_on' [-Werror=implicit-function-declaration]
+>
+> This adds an explicit 'select' to ensure it's always enabled.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 0144fa03ef46 ("cpufreq: governor: Replace timers with utilization update callbacks")
+> ---
+>  drivers/cpufreq/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/drivers/cpufreq/Kconfig b/drivers/cpufreq/Kconfig
+> index 3050e8d48887..ca05037dd565 100644
+> --- a/drivers/cpufreq/Kconfig
+> +++ b/drivers/cpufreq/Kconfig
+> @@ -3,6 +3,7 @@ menu "CPU Frequency scaling"
+>  config CPU_FREQ
+>         bool "CPU Frequency scaling"
+>         select SRCU
+> +       select IRQ_WORK
+>         help
+>           CPU Frequency scaling allows you to change the clock speed of
+>           CPUs on the fly. This is a nice method to save power, because
+> --
 
-You are welcome to start contributing a port, but please be aware that
-platform support has been almost completely changed since 2.6.35, so
-if you want to add something here, that likely involves a rewrite of
-anything under arch/arm.
+Good catch, thanks!
 
-	Arnd
+I'll update the patch to do that.
+
+Thanks,
+Rafael
