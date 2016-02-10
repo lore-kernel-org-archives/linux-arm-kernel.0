@@ -1,63 +1,94 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 10 Feb 2016 15:46:56 +0100
-Subject: [PATCH v3 1/6] irqchip: irq-armada-370-xp: add Kconfig option for the
- driver
-In-Reply-To: <1455115621-22846-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1455115621-22846-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1455115621-22846-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Wed, 10 Feb 2016 15:46:55 +0100
+Subject: [PATCH v3 0/6] irqchip: irq-armada-370-xp: generic MSI infrastructure
+ and assorted fixes
+Message-ID: <1455115621-22846-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of building the irq-armada-370-xp driver directly when
-CONFIG_ARCH_MVEBU is enabled, this commit introduces an intermediate
-CONFIG_ARMADA_370_XP_IRQ hidden Kconfig option.
+Hello,
 
-This allows this option to select other interrupt-related Kconfig
-options (which will be needed in follow-up commits) rather than having
-such selects done from arch/arm/mach-<foo>/.
+This patch series converts the Armada 370/XP irqchip driver (also used
+on Armada 375, 38x and 39x) to the new MSI infrastructure put in place
+by Marc. It doesn't bring any functional difference other than using
+the right, modern, MSI mechanism, which might ultimately allow Marc to
+remove the old way of implementing MSI support.
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- drivers/irqchip/Kconfig  | 5 +++++
- drivers/irqchip/Makefile | 2 +-
- 2 files changed, 6 insertions(+), 1 deletion(-)
+It has been tested on Armada 38x and Armada XP with an Intel e1000e
+NIC and an Intel IGB NIC, both of which use MSI interrupts.
 
-diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-index 715923d..e2cab87 100644
---- a/drivers/irqchip/Kconfig
-+++ b/drivers/irqchip/Kconfig
-@@ -60,6 +60,11 @@ config ARM_VIC_NR
- 	  The maximum number of VICs available in the system, for
- 	  power management.
- 
-+config ARMADA_370_XP_IRQ
-+	bool
-+	default y if ARCH_MVEBU
-+	select GENERIC_IRQ_CHIP
-+
- config ATMEL_AIC_IRQ
- 	bool
- 	select GENERIC_IRQ_CHIP
-diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-index 18caacb..30dba04 100644
---- a/drivers/irqchip/Makefile
-+++ b/drivers/irqchip/Makefile
-@@ -5,7 +5,6 @@ obj-$(CONFIG_ARCH_BCM2835)		+= irq-bcm2836.o
- obj-$(CONFIG_ARCH_EXYNOS)		+= exynos-combiner.o
- obj-$(CONFIG_ARCH_HIP04)		+= irq-hip04.o
- obj-$(CONFIG_ARCH_MMP)			+= irq-mmp.o
--obj-$(CONFIG_ARCH_MVEBU)		+= irq-armada-370-xp.o
- obj-$(CONFIG_IRQ_MXS)			+= irq-mxs.o
- obj-$(CONFIG_ARCH_TEGRA)		+= irq-tegra.o
- obj-$(CONFIG_ARCH_S3C24XX)		+= irq-s3c24xx.o
-@@ -28,6 +27,7 @@ obj-$(CONFIG_ARM_GIC_V3_ITS)		+= irq-gic-v3-its.o irq-gic-v3-its-pci-msi.o irq-g
- obj-$(CONFIG_HISILICON_IRQ_MBIGEN)	+= irq-mbigen.o
- obj-$(CONFIG_ARM_NVIC)			+= irq-nvic.o
- obj-$(CONFIG_ARM_VIC)			+= irq-vic.o
-+obj-$(CONFIG_ARMADA_370_XP_IRQ)		+= irq-armada-370-xp.o
- obj-$(CONFIG_ATMEL_AIC_IRQ)		+= irq-atmel-aic-common.o irq-atmel-aic.o
- obj-$(CONFIG_ATMEL_AIC5_IRQ)	+= irq-atmel-aic-common.o irq-atmel-aic5.o
- obj-$(CONFIG_I8259)			+= irq-i8259.o
+Note that this patch series depends on the patch series from Marc
+Zyngier for proper operation, which have already been merged in
+tip.git by Thomas Gleixner:
+
+  http://git.kernel.org/cgit/linux/kernel/git/tip/tip.git/commit/?id=530cbe100ef7587aa5b5ac3a4b670cda4d50e598
+  http://git.kernel.org/cgit/linux/kernel/git/tip/tip.git/commit/?id=14a0db3cdd114da757197193f66786e63649c91e
+
+Changes since v2:
+
+ - No code changes.
+
+ - Added Reviewed-by from Marc Zyngier on patches:
+
+   irqchip: irq-armada-370-xp: use the generic MSI infrastructure
+
+ - Added Acked-by from Gregory Clement on patches:
+
+   irqchip: irq-armada-370-xp: use PCI_MSI_DOORBELL_START where appropriate
+   irqchip: irq-armada-370-xp: use shorter names for irq_chip
+   ARM: mvebu: use the ARMADA_370_XP_IRQ option
+
+ - Added Reviewed-by from Gregory Clement on patches:
+
+   irqchip: irq-armada-370-xp: allow allocation of multiple MSIs
+
+ - Posted to a wider audience, including lkml.
+
+Changes since v1:
+
+ - Rebased on top of v4.5-rc1, and the latest version of Marc Zyngier
+   irqchip core fixes, which are needed for this series to work.
+
+ - Added Acked-by from Gregory Clement on patch "irqchip:
+   irq-armada-370-xp: add Kconfig option for the driver"
+
+ - Add a new patch that changes hardcoded "16" values by the
+   appropriate PCI_MSI_DOORBELL_START definition. Noticed by Gregory
+   Clement.
+
+ - Drop the ->irq_enable() and ->irq_disable() callbacks from struct
+   irq_chip armada_370_xp_msi_irq_chip, as they are not needed, since
+   we already provide the same callbacks for ->irq_mask() and
+   ->irq_unmask(). Noticed by Marc Zyngier.
+
+ - Drop the MSI_FLAG_MULTI_PCI_MSI, since we don't (yet) support
+   allocating multiple MSIs as once. Noticed by Marc Zyngier.
+
+ - Added a separate commit actually implementing the allocation of
+   multiple MSIs at once, and therefore adds the
+   MSI_FLAG_MULTI_PCI_MSI.
+
+ - Reorder code in armada_370_xp_mpic_of_init() to make a BUG_ON()
+   really useful. Noticed by Marc Zyngier.
+
+Thanks!
+
+Thomas
+
+Thomas Petazzoni (6):
+  irqchip: irq-armada-370-xp: add Kconfig option for the driver
+  irqchip: irq-armada-370-xp: use the generic MSI infrastructure
+  irqchip: irq-armada-370-xp: use PCI_MSI_DOORBELL_START where
+    appropriate
+  irqchip: irq-armada-370-xp: use shorter names for irq_chip
+  irqchip: irq-armada-370-xp: allow allocation of multiple MSIs
+  ARM: mvebu: use the ARMADA_370_XP_IRQ option
+
+ arch/arm/mach-mvebu/Kconfig         |   6 +-
+ drivers/irqchip/Kconfig             |   6 ++
+ drivers/irqchip/Makefile            |   2 +-
+ drivers/irqchip/irq-armada-370-xp.c | 156 +++++++++++++++---------------------
+ 4 files changed, 78 insertions(+), 92 deletions(-)
+
 -- 
 2.6.4
