@@ -1,61 +1,37 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Wed, 10 Feb 2016 00:41:30 +0000
-Subject: [PATCH v2 5/5] ARM: dts: r8a7794: add sound support
-In-Reply-To: <2543047.yYrDdYb9v5@wasted.cogentembedded.com>
-References: <12033353.rt0nolnBmD@wasted.cogentembedded.com>
- <2543047.yYrDdYb9v5@wasted.cogentembedded.com>
-Message-ID: <874mdhtn7d.wl%kuninori.morimoto.gx@renesas.com>
+From: niklas.soderlund+renesas@ragnatech.se (=?UTF-8?q?Niklas=20S=C3=B6derlund?=)
+Date: Wed, 10 Feb 2016 01:57:52 +0100
+Subject: [PATCH v3 2/8] dma-mapping: add {map,unmap}_resource to dma_map_ops
+In-Reply-To: <1455065878-11906-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+References: <1455065878-11906-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+Message-ID: <1455065878-11906-3-git-send-email-niklas.soderlund+renesas@ragnatech.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add methods to handle mapping of device resources from a physical
+address. This is needed for example to map be able to map MMIO FIFO
+registers to a IOMMU.
 
-Hi Sergei
+Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+---
+ include/linux/dma-mapping.h | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Sorry for my un-ordered response
-
-> Define the generic R8A7794 part of  the sound device node.
-> This sound device  is a complex one and comprises the Audio Clock Generator
-> (ADG), Sampling Rate Converter Unit (SCU), Serial Sound Interface [Unit]
-> (SSI[U]), and Audio DMAC-Peripheral-Peripheral.
-> It is up  to the board file to enable the device.
-> 
-> This patch is based on the R8A7791 sound work by Kuninori Morimoto.
-> 
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-(snip)
-> +		rcar_sound,src {
-> +			src1: src at 1 {
-> +				interrupts = <GIC_SPI 353 IRQ_TYPE_LEVEL_HIGH>;
-> +				dmas = <&audma0 0x87>, <&audma0 0x9c>;
-> +				dma-names = "rx", "tx";
-> +			};
-> +			src2: src at 2 {
-> +				interrupts = <GIC_SPI 354 IRQ_TYPE_LEVEL_HIGH>;
-> +				dmas = <&audma0 0x89>, <&audma0 0x9e>;
-> +				dma-names = "rx", "tx";
-> +			};
-> +			src3: src at 3 {
-> +				interrupts = <GIC_SPI 355 IRQ_TYPE_LEVEL_HIGH>;
-> +				dmas = <&audma0 0x8b>, <&audma0 0xa0>;
-> +				dma-names = "rx", "tx";
-> +			};
-> +			src4: src at 4 {
-> +				interrupts = <GIC_SPI 356 IRQ_TYPE_LEVEL_HIGH>;
-> +				dmas = <&audma0 0x8d>, <&audma0 0xb0>;
-> +				dma-names = "rx", "tx";
-> +			};
-> +			src5: src at 5 {
-> +				interrupts = <GIC_SPI 357 IRQ_TYPE_LEVEL_HIGH>;
-> +				dmas = <&audma0 0x8f>, <&audma0 0xb2>;
-> +				dma-names = "rx", "tx";
-> +			};
-> +			src6: src at 6 {
-> +				interrupts = <GIC_SPI 358 IRQ_TYPE_LEVEL_HIGH>;
-> +				dmas = <&audma0 0x91>, <&audma0 0xb4>;
-> +				dma-names = "rx", "tx";
-> +			};
-> +		};
-
-I think this can't work correctly, because driver is assuming
-DT has all channles (from 0). (see linux/sound/soc/sh/rcar/src.c :: rsnd_src_probe)
-Can you adds dummy src0 with some comments ? or fix src.c driver ?
+diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
+index 75857cd..e3aba4e 100644
+--- a/include/linux/dma-mapping.h
++++ b/include/linux/dma-mapping.h
+@@ -49,6 +49,12 @@ struct dma_map_ops {
+ 			 struct scatterlist *sg, int nents,
+ 			 enum dma_data_direction dir,
+ 			 struct dma_attrs *attrs);
++	dma_addr_t (*map_resource)(struct device *dev, phys_addr_t phys_addr,
++			       size_t size, enum dma_data_direction dir,
++			       struct dma_attrs *attrs);
++	void (*unmap_resource)(struct device *dev, dma_addr_t dma_handle,
++			   size_t size, enum dma_data_direction dir,
++			   struct dma_attrs *attrs);
+ 	void (*sync_single_for_cpu)(struct device *dev,
+ 				    dma_addr_t dma_handle, size_t size,
+ 				    enum dma_data_direction dir);
+-- 
+2.7.1
