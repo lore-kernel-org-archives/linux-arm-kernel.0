@@ -1,64 +1,92 @@
-From: slemieux.tyco@gmail.com (Sylvain Lemieux)
-Date: Wed, 10 Feb 2016 09:25:17 -0500
-Subject: [PATCH 00/11] clk: lpc32xx: add clock support for NXP LPC32xx
-In-Reply-To: <56BA81F7.4080006@mleia.com>
-References: <1447981511-29653-1-git-send-email-vz@mleia.com>
- <loom.20160209T215103-78@post.gmane.org>  <56BA81F7.4080006@mleia.com>
-Message-ID: <1455114317.23786.11.camel@localhost>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 10 Feb 2016 14:25:33 +0000
+Subject: [PATCH v2] iommu/arm-smmu: Allow disabling unmatched stream bypass
+In-Reply-To: <20160209140631.GM22874@arm.com>
+References: <cover.1453830752.git.robin.murphy@arm.com>
+ <10ebf5a136a787da54ffd1d6167953f82f01a834.1453830752.git.robin.murphy@arm.com>
+ <20160209140631.GM22874@arm.com>
+Message-ID: <72d7de65c4ace47b55c31fc4e74ce4f1891eabb4.1455114028.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vladimir,
+Borrow the disable_bypass parameter from the SMMUv3 driver as a handy
+debugging/security feature so that unmatched stream IDs (i.e. devices
+not attached to an IOMMU domain) may be configured to fault.
 
-On Wed, 2016-02-10 at 02:19 +0200, Vladimir Zapolskiy wrote:
-> Hi Sylvain,
-> 
-> On 09.02.2016 23:01, Sylvain Lemieux wrote:
-> > Vladimir Zapolskiy <vz@...> writes:
-> >>
-> >> This changeset adds common clock framework driver for NXP LPC32xx
-> >> boards.
-> > 
-> > Just to let you know that we did some testing using this changeset;
-> > I installed patches 4 to 7, 10 & 11 on top of 4.5-rc1.
-> > 
-> > I was able to run our software (SIC1 interrupt sources disable)
-> > without any problem a custom LPC32xx board.
-> 
-> this is a known issue, and I hope it will be fixed in upstream in v4.6,
-> the required changes in irqchip and gpiochip drivers were sent for
-> review some time ago, a bit more work is needed to 
-> 
-I also tested the irqchip patches you sent previously;
-I will send a separate e-mail with the information.
+Rather than introduce unsightly inconsistency, or repeat the existing
+unnecessary use of module_param_named(), fix that as well in passing.
 
-> Also 2-3 more clean-up changes in USB host and gadget drivers are done
-> locally (no more need to configure clocks out of the common clock
-> framework), but not yet submitted, will do it tomorrow.
-> 
-> > We did not get any problem with the clock signals we are using.
-> > 
-> 
-> Thank you for testing, I'm going to add your Tested-by tag (if you
-> don't mind) and submit a PR to ARM maintainers shortly.
-> 
-You can go ahead for the tag; please use slemieux at tycoint.com
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
 
-> >> Vladimir Zapolskiy (11):
-> >>   dt-bindings: clock: add description of LPC32xx clock controller
-> >>   dt-bindings: clock: add description of LPC32xx USB clock controller
-> >>   dt-bindings: clock: add NXP LPC32xx clock list for consumers
-> >>   arm: dts: lpc32xx: add device nodes for external oscillators
-> >>   arm: dts: lpc32xx: add clock controller device node
-> >>   arm: dts: lpc32xx: add clock properties to device nodes
-> >>   arm: dts: lpc32xx: add USB clock controller
-> >>   clk: lpc18xx: add NXP specific common clock framework selection
-> >>   clk: lpc32xx: add common clock framework driver
-> >>   arm: lpc32xx: switch to common clock framework
-> >>   arm: dts: lpc32xx: remove clock frequency property from UART device
-> >>     nodes
-> > 
-> > 
-> 
-> With best wishes,
-> Vladimir
+v2:
+- Don't bother trying to report the fault specially.
+- Realise that calling module_param_named() with identical variable
+  and parameter names is silly.
+
+ drivers/iommu/arm-smmu.c | 24 ++++++++++++++++--------
+ 1 file changed, 16 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 1f9093d..cf1e330 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -260,9 +260,13 @@
+ #define FSYNR0_WNR			(1 << 4)
+ 
+ static int force_stage;
+-module_param_named(force_stage, force_stage, int, S_IRUGO);
++module_param(force_stage, int, S_IRUGO);
+ MODULE_PARM_DESC(force_stage,
+ 	"Force SMMU mappings to be installed@a particular stage of translation. A value of '1' or '2' forces the corresponding stage. All other values are ignored (i.e. no stage is forced). Note that selecting a specific stage will disable support for nested translation.");
++static bool disable_bypass;
++module_param(disable_bypass, bool, S_IRUGO);
++MODULE_PARM_DESC(disable_bypass,
++	"Disable bypass streams such that incoming transactions from devices that are not attached to an iommu domain will report an abort back to the device and will not be allowed to pass through the SMMU.");
+ 
+ enum arm_smmu_arch_version {
+ 	ARM_SMMU_V1 = 1,
+@@ -1111,9 +1115,9 @@ static void arm_smmu_domain_remove_master(struct arm_smmu_domain *smmu_domain,
+ 	 */
+ 	for (i = 0; i < cfg->num_streamids; ++i) {
+ 		u32 idx = cfg->smrs ? cfg->smrs[i].idx : cfg->streamids[i];
++		u32 reg = disable_bypass ? S2CR_TYPE_FAULT : S2CR_TYPE_BYPASS;
+ 
+-		writel_relaxed(S2CR_TYPE_BYPASS,
+-			       gr0_base + ARM_SMMU_GR0_S2CR(idx));
++		writel_relaxed(reg, gr0_base + ARM_SMMU_GR0_S2CR(idx));
+ 	}
+ 
+ 	arm_smmu_master_free_smrs(smmu, cfg);
+@@ -1476,11 +1480,11 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
+ 	reg = readl_relaxed(ARM_SMMU_GR0_NS(smmu) + ARM_SMMU_GR0_sGFSR);
+ 	writel(reg, ARM_SMMU_GR0_NS(smmu) + ARM_SMMU_GR0_sGFSR);
+ 
+-	/* Mark all SMRn as invalid and all S2CRn as bypass */
++	/* Mark all SMRn as invalid and all S2CRn as bypass unless overridden */
++	reg = disable_bypass ? S2CR_TYPE_FAULT : S2CR_TYPE_BYPASS;
+ 	for (i = 0; i < smmu->num_mapping_groups; ++i) {
+ 		writel_relaxed(0, gr0_base + ARM_SMMU_GR0_SMR(i));
+-		writel_relaxed(S2CR_TYPE_BYPASS,
+-			gr0_base + ARM_SMMU_GR0_S2CR(i));
++		writel_relaxed(reg, gr0_base + ARM_SMMU_GR0_S2CR(i));
+ 	}
+ 
+ 	/* Make sure all context banks are disabled and clear CB_FSR  */
+@@ -1502,8 +1506,12 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
+ 	/* Disable TLB broadcasting. */
+ 	reg |= (sCR0_VMIDPNE | sCR0_PTM);
+ 
+-	/* Enable client access, but bypass when no mapping is found */
+-	reg &= ~(sCR0_CLIENTPD | sCR0_USFCFG);
++	/* Enable client access, handling unmatched streams as appropriate */
++	reg &= ~sCR0_CLIENTPD;
++	if (disable_bypass)
++		reg |= sCR0_USFCFG;
++	else
++		reg &= ~sCR0_USFCFG;
+ 
+ 	/* Disable forced broadcasting */
+ 	reg &= ~sCR0_FB;
+-- 
+2.7.0.25.gfc10eb5.dirty
