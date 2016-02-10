@@ -1,75 +1,59 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 10 Feb 2016 16:30:01 +0000
-Subject: breaking DT compatibility (was: Re: [PATCH v4] clk: sunxi:
- Refactor A31 PLL6 so that it can be reused)
-In-Reply-To: <20160210143755.GE31506@lukather>
-References: <1454358000-13594-1-git-send-email-maxime.ripard@free-electrons.com>
- <56B4E2FB.3050703@arm.com> <56BB2D79.6090402@arm.com>
- <CABGGiswOKztmRT40w4t_7BD729WgM8ueLtOD-UF_wgMbmcg4cg@mail.gmail.com>
- <20160210143755.GE31506@lukather>
-Message-ID: <20160210163001.GG2632@leverpostej>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 10 Feb 2016 16:36:15 +0000
+Subject: [PATCH] arm64: Rework valid_user_regs
+In-Reply-To: <20160210160550.GF2632@leverpostej>
+References: <1455041501-30018-1-git-send-email-mark.rutland@arm.com>
+ <20160210115853.GG1052@arm.com> <20160210123110.GD2632@leverpostej>
+ <CAFEAcA-3mgxu6hNSOLhFMmfzB705xyZTyfa5eiRWX6MOnYMVvQ@mail.gmail.com>
+ <20160210144324.GL1052@arm.com> <20160210160127.GE2632@leverpostej>
+ <20160210160420.GQ1052@arm.com> <20160210160550.GF2632@leverpostej>
+Message-ID: <20160210163615.GR1052@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 10, 2016 at 03:37:55PM +0100, Maxime Ripard wrote:
-> Hi Rob,
-> 
-> On Wed, Feb 10, 2016 at 07:42:02AM -0600, Rob Herring wrote:
-> > On Wed, Feb 10, 2016 at 6:30 AM, Andre Przywara <andre.przywara@arm.com> wrote:
-> > > Hi,
-> > >
-> > > just a ping:
-> > >
-> > > Are we really OK with breaking existing DTs in 4.6? (per the code in
-> > > -next: f7d372ba54ea04d528a291b8dbe34716507bb60b, which is this patch).
+On Wed, Feb 10, 2016 at 04:05:50PM +0000, Mark Rutland wrote:
+> On Wed, Feb 10, 2016 at 04:04:21PM +0000, Will Deacon wrote:
+> > On Wed, Feb 10, 2016 at 04:01:27PM +0000, Mark Rutland wrote:
+> > > On Wed, Feb 10, 2016 at 02:43:24PM +0000, Will Deacon wrote:
+> > > > On Wed, Feb 10, 2016 at 02:23:29PM +0000, Peter Maydell wrote:
+> > > > > On 10 February 2016 at 12:31, Mark Rutland <mark.rutland@arm.com> wrote:
+> > > > > > On Wed, Feb 10, 2016 at 11:58:53AM +0000, Will Deacon wrote:
+> > > > > >> I think we should err on the side of caution and nuke SS and IL for both
+> > > > > >> native and compat too, although that seems a odds with the PSR_s mask.
+> > > > > >> I wonder how relevant those PSR groups are in ARMv8...
+> > > > > >
+> > > > > > Ok.
+> > > > > 
+> > > > > If you nuke SS does that have any side effects in the case
+> > > > > of (for instance) interactions between ptrace single step
+> > > > > and ptrace syscall tracing? (ie do we ever end up in a situation
+> > > > > where the ptracer can read a PSR for the debuggee which has
+> > > > > SS set? if so then it should be able to write back the PSR
+> > > > > it has just read without any bits being unset.)
+> > > > 
+> > > > I don't think so -- the signal dispatch logic "fast-forwards" the stepping
+> > > > state machine so that we step into the signal handler, therefore the SS
+> > > > bit should always be clear on entry afaict.
+> > > 
+> > > That handles entry, but what about exit?
+> > > 
+> > > Is there are a guarantee that we won't call user_enable_single_step() if
+> > > the return path is traced?
 > > 
-> > I only warn and make sure people are aware of the issue. I leave that
-> > up to platform maintainers to decide. It depends on the maturity of
-> > the platform and users.
+> > Why would that be a problem? I think I'm missing your point...
 > 
-> The impacted SoCs support is really partial. For the most supported
-> one, big things like display or sound are totally missing, and we
-> still update them on a regular basis to add support for new
-> devices. As such, users are very likely to upgrade the DT from one
-> version to another just because there's new devices available to
-> them. And the newest SoC impacted just got introduced in 4.5, and only
-> has the UART and MMC devices available.
+> We would nuke the SS bit if the tracing happens after
+> user_enable_single_step, if the tracer fiddled with pstate at all. So
+> you wouldn't get the single stepping you expected.
 > 
-> > If people complain about it then it's their mess. For platforms
-> > supported in distros such as debian or fedora, I would strongly
-> > recommend against breaking compatibility.
-> 
-> None of them are officially supported:
-> https://www.debian.org/releases/stable/armhf/ch02s01.html.en
-> https://fedoraproject.org/wiki/Architectures/ARM#Fedora_23
-> 
-> Only the older one are, and they are not affected by this patch.
-> 
-> > They do ship dtbs, but it's a chicken and egg problem. If dtbs were
-> > stable and provided by firmware, then they wouldn't have to provide
-> > them. If dtbs are unstable, then they have no choice.
-> 
-> And while it might work great on platforms that have all the needed
-> documentation, or a perfect one, which is our case. Almost each
-> release, we discover that something is not working as it was
-> documented, when it was documented in the first place.
-> 
-> It also seems that even on well documented platforms, supported by the
-> vendors, the stable ABI dream is not going to happen:
-> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/arm/Atmel/README#n105
-> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/devicetree/bindings/arm/marvell,berlin.txt#n4
+> Maybe I'm missing some reason this is prevented by construction.
 
-To be quite frank, I completely disagree with that stance.
+Ok, for some reason I thought this was all about signal handling, but I
+now see Peter was referring to general ptrace register manipulation.
 
-It seems like the only reason DT bindings aren't remaining stable is
-because people are deliberately ignoring the requirement and reasoning
-for doing so.
+In which case, we could force SS to zero if TIF_SINGLESTEP is not set
+on the tracee, otherwise letting it be set. Ultimately, MDSCR_EL1.SS
+prevents PSTATE.SS from taking effect if !TIF_SINGLESTEP, but it's
+worth cleaning this up imo.
 
-I agree that it can be painful, and that we cannot predict the future.
-There will always be bugs.
-
-Having code in mainline comes with responsibilities. One of those is to
-keep said code working for existing users. Otherwise, why bother having
-it in mainline at all?
-
-Mark.
+Will
