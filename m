@@ -1,37 +1,61 @@
-From: stripathi@apm.com (Suman Tripathi)
-Date: Wed, 10 Feb 2016 11:34:33 -0800
-Subject: [PATCH v4 0/3] ata: Fixes related to edge trigger latch for the
- ahci_xgene_driver.
-In-Reply-To: <CAOS58YO+OOopQjHDjcO=evV=ujcwGQ66G=+TgrUx=V1FAujqxQ@mail.gmail.com>
-References: <1454738124-9351-1-git-send-email-stripathi@apm.com>
- <20160210162547.GJ3741@mtj.duckdns.org>
- <CAOHikRBNL2gLJwhB2SEKJXZtOpmqwBET4P9RgRrPdhyH4bn0zA@mail.gmail.com>
- <20160210190507.GS3741@mtj.duckdns.org>
- <CAOHikRDcChOdP9v2_0a515XAXeG3kZOaLe==mymTJTpmog-6Ow@mail.gmail.com>
- <CAOS58YO+OOopQjHDjcO=evV=ujcwGQ66G=+TgrUx=V1FAujqxQ@mail.gmail.com>
-Message-ID: <CAOHikRAW8y52u8sC+FFO9hpbCTUx=qe+O=GYUOridBj7x322Bw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 10 Feb 2016 20:52:11 +0100
+Subject: [PATCH 1/2] serial: 8250: fix building mediatek with SERIAL_8250=m
+In-Reply-To: <56BB7C23.5070600@gmail.com>
+References: <1454935947-2743255-1-git-send-email-arnd@arndb.de>
+ <56BB7C23.5070600@gmail.com>
+Message-ID: <7590955.HIrRGSSVmH@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 10, 2016 at 11:24 AM, Tejun Heo <tj@kernel.org> wrote:
-> On Wed, Feb 10, 2016 at 2:08 PM, Suman Tripathi <stripathi@apm.com> wrote:
->>> I applied them to for-4.6 but it can go through for-4.5-fixes if
->>> necessary.  Is it necessary?
->>
->> It would be nice because our vendors are using 4.5.
->
-> Sure thing.  Moving to for-4.5-fixes.
->
-> Thanks.
+On Wednesday 10 February 2016 19:06:27 Matthias Brugger wrote:
+> > ---
+> 
+> I tried this with:
+> commit 2178cbc68f3602dc0b5949b9be2c8383ad3d93ef
+> 
+> $ grep 8250 .config
+> CONFIG_SERIAL_8250=m
+> # CONFIG_SERIAL_8250_DEPRECATED_OPTIONS is not set
+> CONFIG_SERIAL_8250_PCI=m
+> CONFIG_SERIAL_8250_NR_UARTS=4
+> CONFIG_SERIAL_8250_RUNTIME_UARTS=4
+> # CONFIG_SERIAL_8250_EXTENDED is not set
+> # CONFIG_SERIAL_8250_DW is not set
+> # CONFIG_SERIAL_8250_RT288X is not set
+> CONFIG_SERIAL_8250_MT6577=y
+> # CONFIG_SERIAL_8250_INGENIC is not set
+> # CONFIG_SERIAL_8250_MID is not set
+> 
+> $ make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- drivers/tty/
+> 
+> compiles just fine.
+> 
+> Do I missing something?
+> 
 
-Thanks a lot Tejun !!
->
-> --
-> tejun
+I was simplifying the situation in the patch description: When CONFIG_SERIAL_8250=m,
+Kbuild does not actually descend into drivers/tty/serial/8250/ while building
+built-in code, so none of the built-in subdrivers actually get built.
 
+After spotting the problem, I was building with this patch that I considered
+submitting:
 
+diff --git a/drivers/tty/serial/Makefile b/drivers/tty/serial/Makefile
+index ceba33c4ebb4..28121885e78e 100644
+--- a/drivers/tty/serial/Makefile
++++ b/drivers/tty/serial/Makefile
+@@ -18,7 +18,7 @@ obj-$(CONFIG_SERIAL_SUNSU) += sunsu.o
+ obj-$(CONFIG_SERIAL_SUNSAB) += sunsab.o
+ 
+ # Now bring in any enabled 8250/16450/16550 type drivers.
+-obj-$(CONFIG_SERIAL_8250) += 8250/
++obj-y += 8250/
+ 
+ obj-$(CONFIG_SERIAL_AMBA_PL010) += amba-pl010.o
+ obj-$(CONFIG_SERIAL_AMBA_PL011) += amba-pl011.o
 
--- 
-Thanks,
-with regards,
-Suman Tripathi
+However, after the other problems are fixed, it's not actually needed
+any more, so I did not submit it.
+
+	Arnd
