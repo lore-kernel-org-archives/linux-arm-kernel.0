@@ -1,67 +1,70 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 10 Feb 2016 19:09:20 +0100
-Subject: [PATCH v2 0/6] irqchip: irq-armada-370-xp: generic MSI
- infrastructure and assorted fixes
-In-Reply-To: <20160210153829.GA5183@io.lakedaemon.net> (Jason Cooper's message
- of "Wed, 10 Feb 2016 15:38:29 +0000")
-References: <1453899395-3532-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20160210150046.118fc991@free-electrons.com>
- <56BB4451.3070707@arm.com> <20160210153829.GA5183@io.lakedaemon.net>
-Message-ID: <87mvr8xwrz.fsf@free-electrons.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 10 Feb 2016 21:10:43 +0300
+Subject: [PATCH v2 5/5] ARM: dts: r8a7794: add sound support
+In-Reply-To: <87lh6ts1o0.wl%kuninori.morimoto.gx@renesas.com>
+References: <12033353.rt0nolnBmD@wasted.cogentembedded.com>
+ <2543047.yYrDdYb9v5@wasted.cogentembedded.com>
+ <87lh6ts1o0.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <56BB7D23.3010005@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
- 
- On mer., f?vr. 10 2016, Jason Cooper <jason@lakedaemon.net> wrote:
+On 02/10/2016 06:12 AM, Kuninori Morimoto wrote:
 
-> On Wed, Feb 10, 2016 at 02:08:17PM +0000, Marc Zyngier wrote:
->> On 10/02/16 14:00, Thomas Petazzoni wrote:
->> > Hello,
->> > 
->> > On Wed, 27 Jan 2016 13:56:29 +0100, Thomas Petazzoni wrote:
->> > 
->> >> Thomas Petazzoni (6):
->> >>   irqchip: irq-armada-370-xp: add Kconfig option for the driver
->> >>   irqchip: irq-armada-370-xp: use the generic MSI infrastructure
->> >>   irqchip: irq-armada-370-xp: use PCI_MSI_DOORBELL_START where
->> >>     appropriate
->> >>   irqchip: irq-armada-370-xp: use shorter names for irq_chip
->> >>   irqchip: irq-armada-370-xp: allow allocation of multiple MSIs
->> >>   ARM: mvebu: use the ARMADA_370_XP_IRQ option
->> > 
->> > Jason, Thomas, any chance to get this applied soonish?
->> > 
->> > The core patch of the series, which migrates the irq-armada-370-xp
->> > driver to use the generic MSI infrastructure has been Reviewed-by: Marc
->> > Zyngier, and the other patches in the series have Acked-by/Reviewed-by
->> > from Gregory Clement.
->> > 
->> > Of course, if there's anything left to be changed, I'd be happy to
->> > respin a new version of this series.
->> > 
->> 
->> Noticing the distribution list, it would be good to repost these patches
->> with acks and co to LKML...
+>> Define the generic R8A7794 part of  the sound device node.
+>> This sound device  is a complex one and comprises the Audio Clock Generator
+>> (ADG), Sampling Rate Converter Unit (SCU), Serial Sound Interface [Unit]
+>> (SSI[U]), and Audio DMAC-Peripheral-Peripheral.
+>> It is up  to the board file to enable the device.
+>>
+>> This patch is based on the R8A7791 sound work by Kuninori Morimoto.
+>>
+>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> (snip)
+>> +		clocks = <&mstp10_clks R8A7794_CLK_SSI_ALL>,
+>> +			 <&mstp10_clks R8A7794_CLK_SSI9>,
+>> +			 <&mstp10_clks R8A7794_CLK_SSI8>,
+>> +			 <&mstp10_clks R8A7794_CLK_SSI7>,
+>> +			 <&mstp10_clks R8A7794_CLK_SSI6>,
+>> +			 <&mstp10_clks R8A7794_CLK_SSI5>,
+>> +			 <&mstp10_clks R8A7794_CLK_SSI4>,
+>> +			 <&mstp10_clks R8A7794_CLK_SSI3>,
+>> +			 <&mstp10_clks R8A7794_CLK_SSI2>,
+>> +			 <&mstp10_clks R8A7794_CLK_SSI1>,
+>> +			 <&mstp10_clks R8A7794_CLK_SSI0>,
+>> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC9>,
+>> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC8>,
+>> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC7>,
+>> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC6>,
+>> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC5>,
+>> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC4>,
+>> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC3>,
+>> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC2>,
+>> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC1>,
+>> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC0>,
+>> +			 <&mstp10_clks R8A7794_CLK_SCU_CTU0_MIX0>,
+>> +			 <&mstp10_clks R8A7794_CLK_SCU_CTU1_MIX1>,
+>> +			 <&mstp10_clks R8A7794_CLK_SCU_CTU0_MIX0>,
+>> +			 <&mstp10_clks R8A7794_CLK_SCU_CTU1_MIX1>,
+>> +			 <&mstp10_clks R8A7794_CLK_SCU_DVC0>,
+>> +			 <&mstp10_clks R8A7794_CLK_SCU_DVC1>,
+>> +			 <&audio_clka>, <&audio_clkb>, <&audio_clkc>,
+>> +			 <&m2_clk>;
+>> +		clock-names = "ssi-all",
+>> +			      "ssi.9", "ssi.8", "ssi.7", "ssi.6", "ssi.5",
+>> +			      "ssi.4", "ssi.3", "ssi.2", "ssi.1", "ssi.0",
+>> +			      "src.9", "src.8", "src.7", "src.6", "src.5",
+>> +			      "src.4", "src.3", "src.2", "src.1", "src.0",
+>> +			      "ctu.0", "ctu.1",
+>> +			      "mix.0", "mix.1",
+>> +			      "dvc.0", "dvc.1",
+>> +			      "clk_a", "clk_b", "clk_c", "clk_i";
 >
-> agreed, and I'll pick it up within the next day or so.  Still getting my
-> home network setup... too much wifi. :(
+> I'm sorry about my previous email. I think I made you confuse.
+> I meant you can remove CTU/MIX field if your patch doesn't care these.
 
-I proposed that you take the 6th patch to ensure that this driver will
-always be selected for the mvebu platform which need it. It is still OK
-but, since this offer, I sent a series which depend of the 1st patch:
-http://thread.gmane.org/gmane.linux.ide/61178
+    No, I got your idea right.
+    But I decided to go for a more complete hardware representation, on par 
+with the other R-Car SoCs.
 
-Would you agree to provide an immutable tag containing the first patch?
-Thanks to this I will be able to provide it to the arm-soc maintainer
-for my pull request.
-
-Thanks,
-
-Gregory
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+MBR, Sergei
