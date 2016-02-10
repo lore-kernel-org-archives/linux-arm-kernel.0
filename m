@@ -1,40 +1,66 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 10 Feb 2016 15:00:46 +0100
-Subject: [PATCH v2 0/6] irqchip: irq-armada-370-xp: generic MSI
- infrastructure and assorted fixes
-In-Reply-To: <1453899395-3532-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1453899395-3532-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20160210150046.118fc991@free-electrons.com>
+From: rob.herring@linaro.org (Rob Herring)
+Date: Wed, 10 Feb 2016 08:02:45 -0600
+Subject: [PATCH v4] clk: sunxi: Refactor A31 PLL6 so that it can be reused
+In-Reply-To: <20160210125936.GD31506@lukather>
+References: <1454358000-13594-1-git-send-email-maxime.ripard@free-electrons.com>
+ <56B4E2FB.3050703@arm.com> <20160210125936.GD31506@lukather>
+Message-ID: <CABGGisxORFOxLVQiTZ=gEr6j2JnVcjQxTLJFPa7uG93g46CKwg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wed, Feb 10, 2016 at 6:59 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi,
+>
+> On Fri, Feb 05, 2016 at 05:59:23PM +0000, Andre Przywara wrote:
+>> Hi Maxime,
+>>
+>> just found this while looking at your current git branch, so sorry for
+>> the late reply.
+>>
+>> CC:ing DT people, since you touch both existing DTs(!) and the binding doc.
 
-On Wed, 27 Jan 2016 13:56:29 +0100, Thomas Petazzoni wrote:
+[...]
 
-> Thomas Petazzoni (6):
->   irqchip: irq-armada-370-xp: add Kconfig option for the driver
->   irqchip: irq-armada-370-xp: use the generic MSI infrastructure
->   irqchip: irq-armada-370-xp: use PCI_MSI_DOORBELL_START where
->     appropriate
->   irqchip: irq-armada-370-xp: use shorter names for irq_chip
->   irqchip: irq-armada-370-xp: allow allocation of multiple MSIs
->   ARM: mvebu: use the ARMADA_370_XP_IRQ option
+>> So are you really breaking all those systems by changing the DT and the
+>> driver in an incompatible way?
+>
+> Yes.
+>
+>> Please correct me if this assessment is wrong, but to me it looks like
+>> any user out there is either stuck with 4.5 at best _or_ will only be
+>> able to run 4.6 and later (depending on which version of the DT she is
+>> using)? And no, switching DTs along with the kernel is _not_ an option.
+>
+> It is. And it is one that every other ARM platform chose. And so did
+> every distribution.
 
-Jason, Thomas, any chance to get this applied soonish?
+I do leave it to platform maintainers judgement (perhaps that should
+be reconsidered), but it should still be case by case basis not an all
+out disregard for the ABI. If you decide to ignore the ABI, then there
+is no decision for the distros or other users.
 
-The core patch of the series, which migrates the irq-armada-370-xp
-driver to use the generic MSI infrastructure has been Reviewed-by: Marc
-Zyngier, and the other patches in the series have Acked-by/Reviewed-by
-from Gregory Clement.
+>> That is not how I understand DT.
+>
+> I'm sorry for that. This has never been something we said was
+> happening.
+>
+>> Also this totally ignores any other DT user (U-Boot, FreeBSD, you
+>> name it).
+>
+> Which all have their own DT copies, with their own bindings, that we
+> (ie Linux) never agreed on.
 
-Of course, if there's anything left to be changed, I'd be happy to
-respin a new version of this series.
+That is not really true. There are some differences ATM, but they are
+largely derivatives of the kernel copy and the goal is to align them.
+If we don't maintain an ABI, that will never happen.
 
-Thanks a lot!
+> By further extending that argument, you're currently looking at the DT
+> from Allwinner, do you want to support theirs as well?
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Vendor ones we treat like vendor kernels. However, if the differences
+come down to bikeshedding, then we will take vendor bindings to
+maintain the ABI. That's generally only when the compatible string
+differs though.
+
+Rob
