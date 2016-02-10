@@ -1,60 +1,42 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 10 Feb 2016 18:56:45 +0900
-Subject: [PATCH] pinctrl: mediatek: guard sub-directory with
- CONFIG_PINCTRL_MTK
-In-Reply-To: <CACRpkdaA37GXf8c=EznSpocLp33CaU8dYqb8V0pua4dVfZa_2w@mail.gmail.com>
-References: <1453563204-30407-1-git-send-email-yamada.masahiro@socionext.com>
- <CACRpkdbrJ5P8Ro4RQUquMOTuXhN+54ZHYGbLqrbwW6tbwCC7Mg@mail.gmail.com>
- <CAK7LNAQ_8o0FiRpb7D6RBmA+7WxRMFhWJjo2f4E_NH5qAGYb4A@mail.gmail.com>
- <CACRpkdaA37GXf8c=EznSpocLp33CaU8dYqb8V0pua4dVfZa_2w@mail.gmail.com>
-Message-ID: <CAK7LNATxUjsEtVmD3i4ZByC3kjnOk7gMf29hOn7ZfQa2MB9Gqw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 10 Feb 2016 10:07:30 +0000
+Subject: [PATCH] arm64: prefetch: add missing #include for spin_lock_prefetch
+Message-ID: <1455098850-3551-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+As of 52e662326e1e ("arm64: prefetch: don't provide spin_lock_prefetch
+with LSE"), spin_lock_prefetch is patched at runtime when the LSE atomics
+are in use. This relies on the ARM64_LSE_ATOMIC_INSN macro to drive
+the alternatives framework, but that macro is only available via
+asm/lse.h, which isn't explicitly included in processor.h. Consequently,
+drivers can run into build failures such as:
 
+   In file included from include/linux/prefetch.h:14:0,
+                    from drivers/net/ethernet/intel/i40e/i40e_txrx.c:27:
+   arch/arm64/include/asm/processor.h: In function 'spin_lock_prefetch':
+   arch/arm64/include/asm/processor.h:183:15: error: expected string literal before 'ARM64_LSE_ATOMIC_INSN'
+     asm volatile(ARM64_LSE_ATOMIC_INSN(
 
-2016-02-10 18:29 GMT+09:00 Linus Walleij <linus.walleij@linaro.org>:
-> On Thu, Jan 28, 2016 at 5:22 AM, Masahiro Yamada
-> <yamada.masahiro@socionext.com> wrote:
->> Hi Linus
->>
->> 2016-01-27 23:11 GMT+09:00 Linus Walleij <linus.walleij@linaro.org>:
->>> On Sat, Jan 23, 2016 at 4:33 PM, Masahiro Yamada
->>> <yamada.masahiro@socionext.com> wrote:
->>>
->>>> CONFIG_PINCTRL_MTK is more suitable than CONFIG_ARCH_MEDIATEK
->>>> to guard the drivers/pinctrl/mediatek/ directory.
->>>> (I renamed CONFIG_PINCTRL_MTK_COMMON to CONFIG_PINCTRL_MTK.)
->>>>
->>>> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
->>>
->>> This patch does not apply to linux v4.5-rc1, please rebase the
->>> patch and resend.
->>
->>
->> These two patches can be applied in this order:
->> https://patchwork.kernel.org/patch/8097541/
->> https://patchwork.kernel.org/patch/8097551/
->>
->> (Sorry, I should have sent them as a series.)
->
-> No order works for me and I have merged quite a lot of other stuff
-> that had higher priority.
->
-> But please rebase both patches on my "devel" branch and resend
-> and I will apply them.
->
+This patch add the missing include and gets things building again.
 
-Sure.
+Reported-by: kbuild test robot <fengguang.wu@intel.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/processor.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-The first one is already in your devel branch.
-
-I've rebased and posted the second one.
-
-
-
-
+diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+index 31b76fce4477..5bb1d763d17a 100644
+--- a/arch/arm64/include/asm/processor.h
++++ b/arch/arm64/include/asm/processor.h
+@@ -32,6 +32,7 @@
+ #include <asm/alternative.h>
+ #include <asm/fpsimd.h>
+ #include <asm/hw_breakpoint.h>
++#include <asm/lse.h>
+ #include <asm/pgtable-hwdef.h>
+ #include <asm/ptrace.h>
+ #include <asm/types.h>
 -- 
-Best Regards
-Masahiro Yamada
+2.1.4
