@@ -1,10 +1,10 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 10 Feb 2016 15:02:47 -0800
-Subject: [PATCH 4/7] serial: 8250_omap: Fix PM regression with deferred probe
+Date: Wed, 10 Feb 2016 15:02:44 -0800
+Subject: [PATCH 1/7] mmc: omap_hsmmc: Fix PM regression with deferred probe
  for pm_runtime_reinit
 In-Reply-To: <1455145370-20301-1-git-send-email-tony@atomide.com>
 References: <1455145370-20301-1-git-send-email-tony@atomide.com>
-Message-ID: <1455145370-20301-5-git-send-email-tony@atomide.com>
+Message-ID: <1455145370-20301-2-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -36,47 +36,61 @@ The solution is to fix the drivers to follow the PM runtime documentation:
 
 Fixes: 5de85b9d57ab ("PM / runtime: Re-init runtime PM states at probe
 error and driver unbind")
-Cc: linux-serial at vger.kernel.org
+Cc: linux-mmc at vger.kernel.org
 Cc: Alan Stern <stern@rowland.harvard.edu>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: Kevin Hilman <khilman@baylibre.com>
 Cc: Nishanth Menon <nm@ti.com>
-Cc: Peter Hurley <peter@hurleysoftware.com>
 Cc: Rafael J. Wysocki <rafael@kernel.org>
 Cc: Ulf Hansson <ulf.hansson@linaro.org>
 Cc: Tero Kristo <t-kristo@ti.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
 
-Greg & Peter, I'd like to merge this along with other related fixes
-via the ARM SoC tree if no objections, please review and ack if this
-look OK to you.
+Ulf, I'd like to merge this along with other related fixes via the
+ARM SoC tree if no objections, please review and ack if this look OK
+to you.
 
 ---
- drivers/tty/serial/8250/8250_omap.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ drivers/mmc/host/omap_hsmmc.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/tty/serial/8250/8250_omap.c b/drivers/tty/serial/8250/8250_omap.c
-index a2c0734..81ff337 100644
---- a/drivers/tty/serial/8250/8250_omap.c
-+++ b/drivers/tty/serial/8250/8250_omap.c
-@@ -1235,7 +1235,8 @@ static int omap8250_probe(struct platform_device *pdev)
- 	pm_runtime_put_autosuspend(&pdev->dev);
- 	return 0;
- err:
--	pm_runtime_put(&pdev->dev);
-+	pm_runtime_dont_use_autosuspend(&pdev->dev);
-+	pm_runtime_put_sync(&pdev->dev);
- 	pm_runtime_disable(&pdev->dev);
- 	return ret;
- }
-@@ -1244,6 +1245,7 @@ static int omap8250_remove(struct platform_device *pdev)
- {
- 	struct omap8250_priv *priv = platform_get_drvdata(pdev);
+diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+index b6639ea..32bc112 100644
+--- a/drivers/mmc/host/omap_hsmmc.c
++++ b/drivers/mmc/host/omap_hsmmc.c
+@@ -1247,7 +1247,7 @@ static int omap_hsmmc_switch_opcond(struct omap_hsmmc_host *host, int vdd)
+ 	int ret;
  
-+	pm_runtime_dont_use_autosuspend(&pdev->dev);
- 	pm_runtime_put_sync(&pdev->dev);
- 	pm_runtime_disable(&pdev->dev);
- 	serial8250_unregister_port(priv->line);
+ 	/* Disable the clocks */
+-	pm_runtime_put_sync(host->dev);
++	pm_runtime_put_sync_suspend(host->dev);
+ 	if (host->dbclk)
+ 		clk_disable_unprepare(host->dbclk);
+ 
+@@ -2232,6 +2232,7 @@ err_irq:
+ 		dma_release_channel(host->tx_chan);
+ 	if (host->rx_chan)
+ 		dma_release_channel(host->rx_chan);
++	pm_runtime_dont_use_autosuspend(host->dev);
+ 	pm_runtime_put_sync(host->dev);
+ 	pm_runtime_disable(host->dev);
+ 	if (host->dbclk)
+@@ -2253,6 +2254,7 @@ static int omap_hsmmc_remove(struct platform_device *pdev)
+ 	dma_release_channel(host->tx_chan);
+ 	dma_release_channel(host->rx_chan);
+ 
++	pm_runtime_dont_use_autosuspend(host->dev);
+ 	pm_runtime_put_sync(host->dev);
+ 	pm_runtime_disable(host->dev);
+ 	device_init_wakeup(&pdev->dev, false);
+@@ -2285,7 +2287,7 @@ static int omap_hsmmc_suspend(struct device *dev)
+ 	if (host->dbclk)
+ 		clk_disable_unprepare(host->dbclk);
+ 
+-	pm_runtime_put_sync(host->dev);
++	pm_runtime_put_sync_suspend(host->dev);
+ 	return 0;
+ }
+ 
 -- 
 2.7.0
