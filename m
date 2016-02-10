@@ -1,64 +1,129 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Wed, 10 Feb 2016 03:12:02 +0000
-Subject: [PATCH v2 5/5] ARM: dts: r8a7794: add sound support
-In-Reply-To: <2543047.yYrDdYb9v5@wasted.cogentembedded.com>
-References: <12033353.rt0nolnBmD@wasted.cogentembedded.com>
- <2543047.yYrDdYb9v5@wasted.cogentembedded.com>
-Message-ID: <87lh6ts1o0.wl%kuninori.morimoto.gx@renesas.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 10 Feb 2016 11:25:28 +0800
+Subject: [PATCH 1/2] clk: sunxi: Add support for A80 APBS clock
+In-Reply-To: <20160202111541.GN4652@lukather>
+References: <1454337769-4130-1-git-send-email-wens@csie.org>
+ <1454337769-4130-2-git-send-email-wens@csie.org>
+ <20160202111541.GN4652@lukather>
+Message-ID: <CAGb2v64Jz49y+pUJe=FPw8Nh2rDo=-=+mXNVa4B7f_V2GjTfiw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Feb 2, 2016 at 7:15 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi Chen-Yu
+>
+> On Mon, Feb 01, 2016 at 10:42:48PM +0800, Chen-Yu Tsai wrote:
+>> A80's APBS clock is not the same as the APB0 clock on A23. The A80's
+>> is a zero-based divider, while the A23's is a power-of-two divider.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>>  Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
+>>  drivers/clk/sunxi/Makefile                        |  2 +-
+>>  drivers/clk/sunxi/clk-sun9i-apbs.c                | 64 +++++++++++++++++++++++
+>>  3 files changed, 66 insertions(+), 1 deletion(-)
+>>  create mode 100644 drivers/clk/sunxi/clk-sun9i-apbs.c
+>>
+>> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+>> index e59f57b24777..fad81157798c 100644
+>> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
+>> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+>> @@ -58,6 +58,7 @@ Required properties:
+>>       "allwinner,sun6i-a31-apb2-gates-clk" - for the APB2 gates on A31
+>>       "allwinner,sun8i-a23-apb2-gates-clk" - for the APB2 gates on A23
+>>       "allwinner,sun8i-h3-bus-gates-clk" - for the bus gates on H3
+>> +     "allwinner,sun9i-a80-apbs-clk" - for the APBS clock on A80
+>>       "allwinner,sun9i-a80-apbs-gates-clk" - for the APBS gates on A80
+>>       "allwinner,sun4i-a10-dram-gates-clk" - for the DRAM gates on A10
+>>       "allwinner,sun5i-a13-mbus-clk" - for the MBUS clock on A13
+>> diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
+>> index 3fd7901d48e4..df433b3f789d 100644
+>> --- a/drivers/clk/sunxi/Makefile
+>> +++ b/drivers/clk/sunxi/Makefile
+>> @@ -17,7 +17,7 @@ obj-y += clk-sun9i-core.o
+>>  obj-y += clk-sun9i-mmc.o
+>>  obj-y += clk-usb.o
+>>
+>> -obj-$(CONFIG_MACH_SUN9I) += clk-sun8i-apb0.o
+>> +obj-$(CONFIG_MACH_SUN9I) += clk-sun9i-apbs.o
+>>  obj-$(CONFIG_MACH_SUN9I) += clk-sun9i-cpus.o
+>>
+>>  obj-$(CONFIG_MFD_SUN6I_PRCM) += \
+>> diff --git a/drivers/clk/sunxi/clk-sun9i-apbs.c b/drivers/clk/sunxi/clk-sun9i-apbs.c
+>> new file mode 100644
+>> index 000000000000..aacb92873621
+>> --- /dev/null
+>> +++ b/drivers/clk/sunxi/clk-sun9i-apbs.c
+>> @@ -0,0 +1,64 @@
+>> +/*
+>> + * Copyright (C) 2016 Chen-Yu Tsai
+>> + * Author: Chen-Yu Tsai <wens@csie.org>
+>> + *
+>> + * Allwinner A80 APBS clock driver
+>> + *
+>> + * License Terms: GNU General Public License v2
+>> + *
+>> + * Based on clk-sun6i-apbs.c
+>> + * Allwinner A31 APB0 clock driver
+>> + *
+>> + * Copyright (C) 2014 Free Electrons
+>> + * Author: Boris BREZILLON <boris.brezillon@free-electrons.com>
+>> + *
+>> + */
+>> +
+>> +#include <linux/clk-provider.h>
+>> +#include <linux/module.h>
+>> +#include <linux/of.h>
+>> +#include <linux/of_address.h>
+>> +#include <linux/platform_device.h>
+>> +
+>> +static void sun9i_apbs_setup(struct device_node *node)
+>> +{
+>> +     const char *name = node->name;
+>> +     const char *parent;
+>> +     struct resource res;
+>> +     struct clk *clk;
+>> +     void __iomem *reg;
+>> +     int ret;
+>> +
+>> +     reg = of_io_request_and_map(node, 0, of_node_full_name(node));
+>> +     if (IS_ERR(reg)) {
+>> +             pr_err("Could not get registers for a80-apbs-clk\n");
+>> +             return;
+>> +     }
+>> +
+>> +     parent = of_clk_get_parent_name(node, 0);
+>> +     if (!parent)
+>> +             return;
+>> +
+>> +     of_property_read_string(node, "clock-output-names", &name);
+>> +
+>> +     /* The A80 APBS clock is a standard 2 bit wide divider clock */
+>> +     clk = clk_register_divider(NULL, name, parent, 0, reg, 0, 2, 0, NULL);
+>> +     if (IS_ERR(clk)) {
+>> +             pr_err("failed to register a80-apbs-clk: %ld\n", PTR_ERR(clk));
+>> +             goto err_unmap;
+>> +     }
+>> +
+>> +     ret = of_clk_add_provider(node, of_clk_src_simple_get, clk);
+>> +     if (ret)
+>> +             goto err_unregister;
+>> +
+>> +     return;
+>> +
+>> +err_unregister:
+>> +     clk_unregister_divider(clk);
+>> +err_unmap:
+>> +     iounmap(reg);
+>> +     of_address_to_resource(node, 0, &res);
+>> +     release_mem_region(res.start, resource_size(&res));
+>> +}
+>> +CLK_OF_DECLARE(sun9i_apbs, "allwinner,sun9i-a80-apbs-clk", sun9i_apbs_setup);
+>
+> So it's just a different set of flags? Maybe we can simply reuse the
+> same driver.
 
-Hi Sergei, again
+We could. I'll look into it.
 
-> Define the generic R8A7794 part of  the sound device node.
-> This sound device  is a complex one and comprises the Audio Clock Generator
-> (ADG), Sampling Rate Converter Unit (SCU), Serial Sound Interface [Unit]
-> (SSI[U]), and Audio DMAC-Peripheral-Peripheral.
-> It is up  to the board file to enable the device.
-> 
-> This patch is based on the R8A7791 sound work by Kuninori Morimoto.
-> 
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-(snip)
-> +		clocks = <&mstp10_clks R8A7794_CLK_SSI_ALL>,
-> +			 <&mstp10_clks R8A7794_CLK_SSI9>,
-> +			 <&mstp10_clks R8A7794_CLK_SSI8>,
-> +			 <&mstp10_clks R8A7794_CLK_SSI7>,
-> +			 <&mstp10_clks R8A7794_CLK_SSI6>,
-> +			 <&mstp10_clks R8A7794_CLK_SSI5>,
-> +			 <&mstp10_clks R8A7794_CLK_SSI4>,
-> +			 <&mstp10_clks R8A7794_CLK_SSI3>,
-> +			 <&mstp10_clks R8A7794_CLK_SSI2>,
-> +			 <&mstp10_clks R8A7794_CLK_SSI1>,
-> +			 <&mstp10_clks R8A7794_CLK_SSI0>,
-> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC9>,
-> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC8>,
-> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC7>,
-> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC6>,
-> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC5>,
-> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC4>,
-> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC3>,
-> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC2>,
-> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC1>,
-> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC0>,
-> +			 <&mstp10_clks R8A7794_CLK_SCU_CTU0_MIX0>,
-> +			 <&mstp10_clks R8A7794_CLK_SCU_CTU1_MIX1>,
-> +			 <&mstp10_clks R8A7794_CLK_SCU_CTU0_MIX0>,
-> +			 <&mstp10_clks R8A7794_CLK_SCU_CTU1_MIX1>,
-> +			 <&mstp10_clks R8A7794_CLK_SCU_DVC0>,
-> +			 <&mstp10_clks R8A7794_CLK_SCU_DVC1>,
-> +			 <&audio_clka>, <&audio_clkb>, <&audio_clkc>,
-> +			 <&m2_clk>;
-> +		clock-names = "ssi-all",
-> +			      "ssi.9", "ssi.8", "ssi.7", "ssi.6", "ssi.5",
-> +			      "ssi.4", "ssi.3", "ssi.2", "ssi.1", "ssi.0",
-> +			      "src.9", "src.8", "src.7", "src.6", "src.5",
-> +			      "src.4", "src.3", "src.2", "src.1", "src.0",
-> +			      "ctu.0", "ctu.1",
-> +			      "mix.0", "mix.1",
-> +			      "dvc.0", "dvc.1",
-> +			      "clk_a", "clk_b", "clk_c", "clk_i";
-
-I'm sorry about my previous email. I think I made you confuse.
-I meant you can remove CTU/MIX field if your patch doesn't care these.
+ChenYu
