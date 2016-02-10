@@ -1,94 +1,110 @@
 From: lars.persson@axis.com (Lars Persson)
-Date: Wed, 10 Feb 2016 13:41:54 +0100
-Subject: [PATCH 5/8] arm: dts: add Artpec-6 development board dts
+Date: Wed, 10 Feb 2016 13:41:51 +0100
+Subject: [PATCH 2/8] clk: add artpec-6 pll1 clock driver
 In-Reply-To: <cover.1455107681.git.larper@axis.com>
 References: <cover.1455107681.git.larper@axis.com>
-Message-ID: <a1015afcbd0a726915c674ad58425be951a4158f.1455107681.git.larper@axis.com>
+Message-ID: <30bfa3b9a237699a7a2078c51903238aa330b992.1455107681.git.larper@axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The PLL1 clock is a fixed-factor clock with factors derived from boot
+mode pins. This driver is a simple wrapper to register the fixed
+factor clock according to the pin settings.
+
 Signed-off-by: Lars Persson <larper@axis.com>
 ---
- arch/arm/boot/dts/Makefile             |  2 ++
- arch/arm/boot/dts/artpec6-devboard.dts | 57 ++++++++++++++++++++++++++++++++++
- 2 files changed, 59 insertions(+)
- create mode 100644 arch/arm/boot/dts/artpec6-devboard.dts
+ drivers/clk/Makefile      |  1 +
+ drivers/clk/clk-artpec6.c | 70 +++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 71 insertions(+)
+ create mode 100644 drivers/clk/clk-artpec6.c
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index a4a6d70..2ebe99c 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -2,6 +2,8 @@ ifeq ($(CONFIG_OF),y)
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index b038e36..388f0cf 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -17,6 +17,7 @@ endif
  
- dtb-$(CONFIG_ARCH_ALPINE) += \
- 	alpine-db.dtb
-+dtb-$(CONFIG_MACH_ARTPEC6) += \
-+	artpec6-devboard.dtb
- dtb-$(CONFIG_MACH_ASM9260) += \
- 	alphascale-asm9260-devkit.dtb
- # Keep at91 dtb files sorted alphabetically for each SoC
-diff --git a/arch/arm/boot/dts/artpec6-devboard.dts b/arch/arm/boot/dts/artpec6-devboard.dts
+ # hardware specific clock types
+ # please keep this section sorted lexicographically by file/directory path name
++obj-$(CONFIG_MACH_ARTPEC6)		+= clk-artpec6.o
+ obj-$(CONFIG_MACH_ASM9260)		+= clk-asm9260.o
+ obj-$(CONFIG_COMMON_CLK_AXI_CLKGEN)	+= clk-axi-clkgen.o
+ obj-$(CONFIG_ARCH_AXXIA)		+= clk-axm5516.o
+diff --git a/drivers/clk/clk-artpec6.c b/drivers/clk/clk-artpec6.c
 new file mode 100644
-index 0000000..f6c5e4f
+index 0000000..3664c44
 --- /dev/null
-+++ b/arch/arm/boot/dts/artpec6-devboard.dts
-@@ -0,0 +1,57 @@
++++ b/drivers/clk/clk-artpec6.c
+@@ -0,0 +1,70 @@
 +/*
-+ * Axis ARTPEC-6 development board.
++ * ARTPEC-6 clock initialization
 + *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
++ * Copyright 2015 Axis Comunications AB.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 + */
 +
-+/dts-v1/;
-+#include "artpec6.dtsi"
++#include <linux/clk-provider.h>
++#include <linux/clkdev.h>
++#include <linux/io.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
 +
-+/ {
-+	model = "ARTPEC-6 development board";
-+	compatible = "axis,artpec6-dev-board", "axis,artpec6";
++static void __init of_artpec6_pll1_setup(struct device_node *np)
++{
++	void __iomem *devstat;
++	struct clk *clk;
++	const char *clk_name = np->name;
++	const char *parent_name;
++	u32 pll_mode, pll_m, pll_n;
 +
-+	chosen {
-+		stdout-path = "serial3:115200n8";
-+	};
++	parent_name = of_clk_get_parent_name(np, 0);
 +
-+	memory {
-+		device_type = "memory";
-+		reg = <0x0 0x10000000>;
-+	};
-+};
++	devstat = of_iomap(np, 0);
++	if (devstat == NULL) {
++		pr_err("error to ioremap DEVSTAT\n");
++		return;
++	}
 +
-+&uart0 {
-+	status = "okay";
-+};
++	/* DEVSTAT register contains PLL settings */
++	pll_mode = (readl(devstat) >> 6) & 3;
++	iounmap(devstat);
 +
-+&uart1 {
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	status = "okay";
-+};
-+
-+&uart3 {
-+	status = "okay";
-+};
-+
-+&ethernet {
-+	status = "okay";
-+
-+	phy-handle = <&phy1>;
-+	phy-mode = "gmii";
-+
-+	mdio {
-+		#address-cells = <0x1>;
-+		#size-cells = <0x0>;
-+		phy1: phy at 0 {
-+			compatible = "ethernet-phy-ieee802.3-c22";
-+			device_type = "ethernet-phy";
-+			reg = <0x0>;
-+		};
-+	};
-+};
++	/*
++	 * pll1 settings are designed for different DDR speeds using a fixed
++	 * 50MHz external clock. However, a different external clock could be
++	 * used on different boards.
++	 * CPU clock is half the DDR clock.
++	 */
++	switch (pll_mode) {
++	case 0: /* DDR3-2133 mode */
++		pll_m = 4;
++		pll_n = 85;
++		break;
++	case 1: /* DDR3-1866 mode */
++		pll_m = 6;
++		pll_n = 112;
++		break;
++	case 2: /* DDR3-1600 mode */
++		pll_m = 4;
++		pll_n = 64;
++		break;
++	case 3: /* DDR3-1333 mode */
++		pll_m = 8;
++		pll_n = 106;
++		break;
++	}
++	/* ext_clk is defined in device tree */
++	clk = clk_register_fixed_factor(NULL, clk_name, parent_name, 0,
++			pll_n, pll_m);
++	if (IS_ERR(clk)) {
++		pr_err("%s not registered\n", clk_name);
++		return;
++	}
++	of_clk_add_provider(np, of_clk_src_simple_get, clk);
++}
++CLK_OF_DECLARE(artpec6_pll1, "axis,artpec6-pll1-clock", of_artpec6_pll1_setup);
 -- 
 2.1.4
