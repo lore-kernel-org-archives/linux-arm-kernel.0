@@ -1,47 +1,55 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 10 Feb 2016 15:38:29 +0000
-Subject: [PATCH v2 0/6] irqchip: irq-armada-370-xp: generic MSI
- infrastructure and assorted fixes
-In-Reply-To: <56BB4451.3070707@arm.com>
-References: <1453899395-3532-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20160210150046.118fc991@free-electrons.com>
- <56BB4451.3070707@arm.com>
-Message-ID: <20160210153829.GA5183@io.lakedaemon.net>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 10 Feb 2016 15:38:46 +0000
+Subject: [PATCH v2] mfd: Provide MACRO to declare commonly defined MFD cell
+ attributes
+In-Reply-To: <1455028027-1527-1-git-send-email-lee.jones@linaro.org>
+References: <1455028027-1527-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <20160210153846.GB26950@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 10, 2016 at 02:08:17PM +0000, Marc Zyngier wrote:
-> On 10/02/16 14:00, Thomas Petazzoni wrote:
-> > Hello,
-> > 
-> > On Wed, 27 Jan 2016 13:56:29 +0100, Thomas Petazzoni wrote:
-> > 
-> >> Thomas Petazzoni (6):
-> >>   irqchip: irq-armada-370-xp: add Kconfig option for the driver
-> >>   irqchip: irq-armada-370-xp: use the generic MSI infrastructure
-> >>   irqchip: irq-armada-370-xp: use PCI_MSI_DOORBELL_START where
-> >>     appropriate
-> >>   irqchip: irq-armada-370-xp: use shorter names for irq_chip
-> >>   irqchip: irq-armada-370-xp: allow allocation of multiple MSIs
-> >>   ARM: mvebu: use the ARMADA_370_XP_IRQ option
-> > 
-> > Jason, Thomas, any chance to get this applied soonish?
-> > 
-> > The core patch of the series, which migrates the irq-armada-370-xp
-> > driver to use the generic MSI infrastructure has been Reviewed-by: Marc
-> > Zyngier, and the other patches in the series have Acked-by/Reviewed-by
-> > from Gregory Clement.
-> > 
-> > Of course, if there's anything left to be changed, I'd be happy to
-> > respin a new version of this series.
-> > 
-> 
-> Noticing the distribution list, it would be good to repost these patches
-> with acks and co to LKML...
+mfd: Provide MACRO to declare commonly defined MFD cell attributes
+    
+Cc: Laxman Dewangan <ldewangan@nvidia.com>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-agreed, and I'll pick it up within the next day or so.  Still getting my
-home network setup... too much wifi. :(
+---
+ include/linux/mfd/core.h | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
-thx,
-
-Jason.
+diff --git a/include/linux/mfd/core.h b/include/linux/mfd/core.h
+index bc6f7e0..1a5a87f 100644
+--- a/include/linux/mfd/core.h
++++ b/include/linux/mfd/core.h
+@@ -16,6 +16,32 @@
+ 
+ #include <linux/platform_device.h>
+ 
++#define MFD_ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
++
++#define MFD_CELL_ALL(_name, _res, _pdata, _id, _compat, _match)		\
++	{								\
++		.name = (_name),					\
++		.resources = (_res),					\
++		.num_resources = MFD_ARRAY_SIZE((_res)),		\
++		.platform_data = (_pdata),				\
++		.pdata_size = MFD_ARRAY_SIZE((_pdata)), 		\
++		.of_compatible = (_compat),				\
++		.acpi_match = (_match),					\
++		.id = _id,						\
++	}
++
++#define OF_MFD_CELL(_name, _res, _pdata, _id, _compat)			\
++		MFD_CELL_ALL(_name, _res, _pdata, _id, _compat, NULL)	\
++
++#define ACPI_MFD_CELL(_name, _res, _pdata, _id, _match)			\
++		MFD_CELL_ALL(_name, _res, _pdata, _id, NULL, _match)	\
++
++#define MFD_CELL_BASIC(_name, _res, _pdata, _id)			\
++		MFD_CELL_ALL(_name, _res, _pdata, _id, NULL, NULL)	\
++
++#define MFD_CELL_NAME(_name)						\
++		MFD_CELL_ALL(_name, NULL, NULL, 0, NULL, NULL)		\
++
+ struct irq_domain;
+ struct property_set;
