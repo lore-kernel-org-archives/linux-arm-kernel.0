@@ -1,94 +1,267 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 10 Feb 2016 15:46:55 +0100
-Subject: [PATCH v3 0/6] irqchip: irq-armada-370-xp: generic MSI infrastructure
- and assorted fixes
-Message-ID: <1455115621-22846-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Wed, 10 Feb 2016 15:46:57 +0100
+Subject: [PATCH v3 2/6] irqchip: irq-armada-370-xp: use the generic MSI
+ infrastructure
+In-Reply-To: <1455115621-22846-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1455115621-22846-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1455115621-22846-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This commit moves the irq-armada-370-xp driver from using the
+PCI-specific MSI infrastructure to the generic MSI infrastructure, to
+which drivers are progressively converted.
 
-This patch series converts the Armada 370/XP irqchip driver (also used
-on Armada 375, 38x and 39x) to the new MSI infrastructure put in place
-by Marc. It doesn't bring any functional difference other than using
-the right, modern, MSI mechanism, which might ultimately allow Marc to
-remove the old way of implementing MSI support.
+In this hardware, the MSI controller is directly bundled inside the
+interrupt controller, so we have a single Device Tree node to which
+multiple IRQ domaines are attached: the wired interrupt domain and the
+MSI interrupt domain. In order to ensure that they can be
+differentiated, we have to force the bus_token of the wired interrupt
+domain to be DOMAIN_BUS_WIRED. The MSI domain bus_token is
+automatically set to the appropriate value by
+pci_msi_create_irq_domain().
 
-It has been tested on Armada 38x and Armada XP with an Intel e1000e
-NIC and an Intel IGB NIC, both of which use MSI interrupts.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Suggested-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ drivers/irqchip/Kconfig             |   1 +
+ drivers/irqchip/irq-armada-370-xp.c | 149 +++++++++++++++---------------------
+ 2 files changed, 62 insertions(+), 88 deletions(-)
 
-Note that this patch series depends on the patch series from Marc
-Zyngier for proper operation, which have already been merged in
-tip.git by Thomas Gleixner:
-
-  http://git.kernel.org/cgit/linux/kernel/git/tip/tip.git/commit/?id=530cbe100ef7587aa5b5ac3a4b670cda4d50e598
-  http://git.kernel.org/cgit/linux/kernel/git/tip/tip.git/commit/?id=14a0db3cdd114da757197193f66786e63649c91e
-
-Changes since v2:
-
- - No code changes.
-
- - Added Reviewed-by from Marc Zyngier on patches:
-
-   irqchip: irq-armada-370-xp: use the generic MSI infrastructure
-
- - Added Acked-by from Gregory Clement on patches:
-
-   irqchip: irq-armada-370-xp: use PCI_MSI_DOORBELL_START where appropriate
-   irqchip: irq-armada-370-xp: use shorter names for irq_chip
-   ARM: mvebu: use the ARMADA_370_XP_IRQ option
-
- - Added Reviewed-by from Gregory Clement on patches:
-
-   irqchip: irq-armada-370-xp: allow allocation of multiple MSIs
-
- - Posted to a wider audience, including lkml.
-
-Changes since v1:
-
- - Rebased on top of v4.5-rc1, and the latest version of Marc Zyngier
-   irqchip core fixes, which are needed for this series to work.
-
- - Added Acked-by from Gregory Clement on patch "irqchip:
-   irq-armada-370-xp: add Kconfig option for the driver"
-
- - Add a new patch that changes hardcoded "16" values by the
-   appropriate PCI_MSI_DOORBELL_START definition. Noticed by Gregory
-   Clement.
-
- - Drop the ->irq_enable() and ->irq_disable() callbacks from struct
-   irq_chip armada_370_xp_msi_irq_chip, as they are not needed, since
-   we already provide the same callbacks for ->irq_mask() and
-   ->irq_unmask(). Noticed by Marc Zyngier.
-
- - Drop the MSI_FLAG_MULTI_PCI_MSI, since we don't (yet) support
-   allocating multiple MSIs as once. Noticed by Marc Zyngier.
-
- - Added a separate commit actually implementing the allocation of
-   multiple MSIs at once, and therefore adds the
-   MSI_FLAG_MULTI_PCI_MSI.
-
- - Reorder code in armada_370_xp_mpic_of_init() to make a BUG_ON()
-   really useful. Noticed by Marc Zyngier.
-
-Thanks!
-
-Thomas
-
-Thomas Petazzoni (6):
-  irqchip: irq-armada-370-xp: add Kconfig option for the driver
-  irqchip: irq-armada-370-xp: use the generic MSI infrastructure
-  irqchip: irq-armada-370-xp: use PCI_MSI_DOORBELL_START where
-    appropriate
-  irqchip: irq-armada-370-xp: use shorter names for irq_chip
-  irqchip: irq-armada-370-xp: allow allocation of multiple MSIs
-  ARM: mvebu: use the ARMADA_370_XP_IRQ option
-
- arch/arm/mach-mvebu/Kconfig         |   6 +-
- drivers/irqchip/Kconfig             |   6 ++
- drivers/irqchip/Makefile            |   2 +-
- drivers/irqchip/irq-armada-370-xp.c | 156 +++++++++++++++---------------------
- 4 files changed, 78 insertions(+), 92 deletions(-)
-
+diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+index e2cab87..d233a80 100644
+--- a/drivers/irqchip/Kconfig
++++ b/drivers/irqchip/Kconfig
+@@ -64,6 +64,7 @@ config ARMADA_370_XP_IRQ
+ 	bool
+ 	default y if ARCH_MVEBU
+ 	select GENERIC_IRQ_CHIP
++	select PCI_MSI_IRQ_DOMAIN if PCI_MSI
+ 
+ config ATMEL_AIC_IRQ
+ 	bool
+diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
+index 3f3a8c3..e5738c5 100644
+--- a/drivers/irqchip/irq-armada-370-xp.c
++++ b/drivers/irqchip/irq-armada-370-xp.c
+@@ -71,6 +71,7 @@ static u32 doorbell_mask_reg;
+ static int parent_irq;
+ #ifdef CONFIG_PCI_MSI
+ static struct irq_domain *armada_370_xp_msi_domain;
++static struct irq_domain *armada_370_xp_msi_inner_domain;
+ static DECLARE_BITMAP(msi_used, PCI_MSI_DOORBELL_NR);
+ static DEFINE_MUTEX(msi_used_lock);
+ static phys_addr_t msi_doorbell_addr;
+@@ -115,127 +116,99 @@ static void armada_370_xp_irq_unmask(struct irq_data *d)
+ 
+ #ifdef CONFIG_PCI_MSI
+ 
+-static int armada_370_xp_alloc_msi(void)
+-{
+-	int hwirq;
+-
+-	mutex_lock(&msi_used_lock);
+-	hwirq = find_first_zero_bit(&msi_used, PCI_MSI_DOORBELL_NR);
+-	if (hwirq >= PCI_MSI_DOORBELL_NR)
+-		hwirq = -ENOSPC;
+-	else
+-		set_bit(hwirq, msi_used);
+-	mutex_unlock(&msi_used_lock);
++static struct irq_chip armada_370_xp_msi_irq_chip = {
++	.name = "armada_370_xp_msi_irq",
++	.irq_mask = pci_msi_mask_irq,
++	.irq_unmask = pci_msi_unmask_irq,
++};
+ 
+-	return hwirq;
+-}
++static struct msi_domain_info armada_370_xp_msi_domain_info = {
++	.flags	= (MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS),
++	.chip	= &armada_370_xp_msi_irq_chip,
++};
+ 
+-static void armada_370_xp_free_msi(int hwirq)
++static void armada_370_xp_compose_msi_msg(struct irq_data *data, struct msi_msg *msg)
+ {
+-	mutex_lock(&msi_used_lock);
+-	if (!test_bit(hwirq, msi_used))
+-		pr_err("trying to free unused MSI#%d\n", hwirq);
+-	else
+-		clear_bit(hwirq, msi_used);
+-	mutex_unlock(&msi_used_lock);
++	msg->address_lo = lower_32_bits(msi_doorbell_addr);
++	msg->address_hi = upper_32_bits(msi_doorbell_addr);
++	msg->data = 0xf00 | (data->hwirq + PCI_MSI_DOORBELL_START);
+ }
+ 
+-static int armada_370_xp_setup_msi_irq(struct msi_controller *chip,
+-				       struct pci_dev *pdev,
+-				       struct msi_desc *desc)
++static int armada_370_xp_msi_set_affinity(struct irq_data *irq_data,
++					  const struct cpumask *mask, bool force)
+ {
+-	struct msi_msg msg;
+-	int virq, hwirq;
++	 return -EINVAL;
++}
+ 
+-	/* We support MSI, but not MSI-X */
+-	if (desc->msi_attrib.is_msix)
+-		return -EINVAL;
++static struct irq_chip armada_370_xp_msi_bottom_irq_chip = {
++	.name			= "armada_370_xp_msi_irq",
++	.irq_compose_msi_msg	= armada_370_xp_compose_msi_msg,
++	.irq_set_affinity	= armada_370_xp_msi_set_affinity,
++};
+ 
+-	hwirq = armada_370_xp_alloc_msi();
+-	if (hwirq < 0)
+-		return hwirq;
++static int armada_370_xp_msi_alloc(struct irq_domain *domain, unsigned int virq,
++				   unsigned int nr_irqs, void *args)
++{
++	int hwirq;
+ 
+-	virq = irq_create_mapping(armada_370_xp_msi_domain, hwirq);
+-	if (!virq) {
+-		armada_370_xp_free_msi(hwirq);
+-		return -EINVAL;
++	mutex_lock(&msi_used_lock);
++	hwirq = find_first_zero_bit(&msi_used, PCI_MSI_DOORBELL_NR);
++	if (hwirq >= PCI_MSI_DOORBELL_NR) {
++		mutex_unlock(&msi_used_lock);
++		return -ENOSPC;
+ 	}
+ 
+-	irq_set_msi_desc(virq, desc);
++	set_bit(hwirq, msi_used);
++	mutex_unlock(&msi_used_lock);
+ 
+-	msg.address_lo = msi_doorbell_addr;
+-	msg.address_hi = 0;
+-	msg.data = 0xf00 | (hwirq + 16);
++	irq_domain_set_info(domain, virq, hwirq, &armada_370_xp_msi_bottom_irq_chip,
++			    domain->host_data, handle_simple_irq,
++			    NULL, NULL);
+ 
+-	pci_write_msi_msg(virq, &msg);
+-	return 0;
++	return hwirq;
+ }
+ 
+-static void armada_370_xp_teardown_msi_irq(struct msi_controller *chip,
+-					   unsigned int irq)
++static void armada_370_xp_msi_free(struct irq_domain *domain,
++				   unsigned int virq, unsigned int nr_irqs)
+ {
+-	struct irq_data *d = irq_get_irq_data(irq);
+-	unsigned long hwirq = d->hwirq;
+-
+-	irq_dispose_mapping(irq);
+-	armada_370_xp_free_msi(hwirq);
+-}
+-
+-static struct irq_chip armada_370_xp_msi_irq_chip = {
+-	.name = "armada_370_xp_msi_irq",
+-	.irq_enable = pci_msi_unmask_irq,
+-	.irq_disable = pci_msi_mask_irq,
+-	.irq_mask = pci_msi_mask_irq,
+-	.irq_unmask = pci_msi_unmask_irq,
+-};
++	struct irq_data *d = irq_domain_get_irq_data(domain, virq);
+ 
+-static int armada_370_xp_msi_map(struct irq_domain *domain, unsigned int virq,
+-				 irq_hw_number_t hw)
+-{
+-	irq_set_chip_and_handler(virq, &armada_370_xp_msi_irq_chip,
+-				 handle_simple_irq);
+-
+-	return 0;
++	mutex_lock(&msi_used_lock);
++	if (!test_bit(d->hwirq, msi_used))
++		pr_err("trying to free unused MSI#%lu\n", d->hwirq);
++	else
++		clear_bit(d->hwirq, msi_used);
++	mutex_unlock(&msi_used_lock);
+ }
+ 
+-static const struct irq_domain_ops armada_370_xp_msi_irq_ops = {
+-	.map = armada_370_xp_msi_map,
++static const struct irq_domain_ops armada_370_xp_msi_domain_ops = {
++	.alloc	= armada_370_xp_msi_alloc,
++	.free	= armada_370_xp_msi_free,
+ };
+ 
+ static int armada_370_xp_msi_init(struct device_node *node,
+ 				  phys_addr_t main_int_phys_base)
+ {
+-	struct msi_controller *msi_chip;
+ 	u32 reg;
+-	int ret;
+ 
+ 	msi_doorbell_addr = main_int_phys_base +
+ 		ARMADA_370_XP_SW_TRIG_INT_OFFS;
+ 
+-	msi_chip = kzalloc(sizeof(*msi_chip), GFP_KERNEL);
+-	if (!msi_chip)
++	armada_370_xp_msi_inner_domain =
++		irq_domain_add_linear(NULL, PCI_MSI_DOORBELL_NR,
++				      &armada_370_xp_msi_domain_ops, NULL);
++	if (!armada_370_xp_msi_inner_domain)
+ 		return -ENOMEM;
+ 
+-	msi_chip->setup_irq = armada_370_xp_setup_msi_irq;
+-	msi_chip->teardown_irq = armada_370_xp_teardown_msi_irq;
+-	msi_chip->of_node = node;
+-
+ 	armada_370_xp_msi_domain =
+-		irq_domain_add_linear(NULL, PCI_MSI_DOORBELL_NR,
+-				      &armada_370_xp_msi_irq_ops,
+-				      NULL);
++		pci_msi_create_irq_domain(of_node_to_fwnode(node),
++					  &armada_370_xp_msi_domain_info,
++					  armada_370_xp_msi_inner_domain);
+ 	if (!armada_370_xp_msi_domain) {
+-		kfree(msi_chip);
++		irq_domain_remove(armada_370_xp_msi_inner_domain);
+ 		return -ENOMEM;
+ 	}
+ 
+-	ret = of_pci_msi_chip_add(msi_chip);
+-	if (ret < 0) {
+-		irq_domain_remove(armada_370_xp_msi_domain);
+-		kfree(msi_chip);
+-		return ret;
+-	}
+-
+ 	reg = readl(per_cpu_int_base + ARMADA_370_XP_IN_DRBEL_MSK_OFFS)
+ 		| PCI_MSI_DOORBELL_MASK;
+ 
+@@ -427,12 +400,12 @@ static void armada_370_xp_handle_msi_irq(struct pt_regs *regs, bool is_chained)
+ 			continue;
+ 
+ 		if (is_chained) {
+-			irq = irq_find_mapping(armada_370_xp_msi_domain,
++			irq = irq_find_mapping(armada_370_xp_msi_inner_domain,
+ 					       msinr - 16);
+ 			generic_handle_irq(irq);
+ 		} else {
+ 			irq = msinr - 16;
+-			handle_domain_irq(armada_370_xp_msi_domain,
++			handle_domain_irq(armada_370_xp_msi_inner_domain,
+ 					  irq, regs);
+ 		}
+ 	}
+@@ -604,8 +577,8 @@ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
+ 	armada_370_xp_mpic_domain =
+ 		irq_domain_add_linear(node, nr_irqs,
+ 				&armada_370_xp_mpic_irq_ops, NULL);
+-
+ 	BUG_ON(!armada_370_xp_mpic_domain);
++	armada_370_xp_mpic_domain->bus_token = DOMAIN_BUS_WIRED;
+ 
+ 	/* Setup for the boot CPU */
+ 	armada_xp_mpic_perf_init();
 -- 
 2.6.4
