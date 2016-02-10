@@ -1,44 +1,78 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Wed, 10 Feb 2016 10:08:17 -0800
-Subject: [PATCH] arm64: Add workaround for Cavium erratum 27456
-In-Reply-To: <20160210092822.GA1052@arm.com>
-References: <1455046156-10582-1-git-send-email-ddaney.cavm@gmail.com>
- <20160210092822.GA1052@arm.com>
-Message-ID: <56BB7C91.5010205@caviumnetworks.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 10 Feb 2016 21:09:06 +0300
+Subject: [PATCH v2 5/5] ARM: dts: r8a7794: add sound support
+In-Reply-To: <874mdhtn7d.wl%kuninori.morimoto.gx@renesas.com>
+References: <12033353.rt0nolnBmD@wasted.cogentembedded.com>
+ <2543047.yYrDdYb9v5@wasted.cogentembedded.com>
+ <874mdhtn7d.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <56BB7CC2.1060706@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/10/2016 01:28 AM, Will Deacon wrote:
-> On Tue, Feb 09, 2016 at 11:29:16AM -0800, David Daney wrote:
->> From: Andrew Pinski <apinski@cavium.com>
+Hello.
+
+On 02/10/2016 03:41 AM, Kuninori Morimoto wrote:
+
+> Sorry for my un-ordered response
+
+    Not sure what you mean by that. :-)
+
+>> Define the generic R8A7794 part of  the sound device node.
+>> This sound device  is a complex one and comprises the Audio Clock Generator
+>> (ADG), Sampling Rate Converter Unit (SCU), Serial Sound Interface [Unit]
+>> (SSI[U]), and Audio DMAC-Peripheral-Peripheral.
+>> It is up  to the board file to enable the device.
 >>
->> On ThunderX T88 pass 1.x through 2.1 parts, broadcast TLBI
->> instructions may cause the icache to become invalid if it contains
->> data for a non-current ASID.
+>> This patch is based on the R8A7791 sound work by Kuninori Morimoto.
 >>
->> This patch implements the workaround (which flushes the local icache
->> when switching the mm) by using code patching.
+>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> (snip)
+>> +		rcar_sound,src {
+>> +			src1: src at 1 {
+>> +				interrupts = <GIC_SPI 353 IRQ_TYPE_LEVEL_HIGH>;
+>> +				dmas = <&audma0 0x87>, <&audma0 0x9c>;
+>> +				dma-names = "rx", "tx";
+>> +			};
+>> +			src2: src at 2 {
+>> +				interrupts = <GIC_SPI 354 IRQ_TYPE_LEVEL_HIGH>;
+>> +				dmas = <&audma0 0x89>, <&audma0 0x9e>;
+>> +				dma-names = "rx", "tx";
+>> +			};
+>> +			src3: src at 3 {
+>> +				interrupts = <GIC_SPI 355 IRQ_TYPE_LEVEL_HIGH>;
+>> +				dmas = <&audma0 0x8b>, <&audma0 0xa0>;
+>> +				dma-names = "rx", "tx";
+>> +			};
+>> +			src4: src at 4 {
+>> +				interrupts = <GIC_SPI 356 IRQ_TYPE_LEVEL_HIGH>;
+>> +				dmas = <&audma0 0x8d>, <&audma0 0xb0>;
+>> +				dma-names = "rx", "tx";
+>> +			};
+>> +			src5: src at 5 {
+>> +				interrupts = <GIC_SPI 357 IRQ_TYPE_LEVEL_HIGH>;
+>> +				dmas = <&audma0 0x8f>, <&audma0 0xb2>;
+>> +				dma-names = "rx", "tx";
+>> +			};
+>> +			src6: src at 6 {
+>> +				interrupts = <GIC_SPI 358 IRQ_TYPE_LEVEL_HIGH>;
+>> +				dmas = <&audma0 0x91>, <&audma0 0xb4>;
+>> +				dma-names = "rx", "tx";
+>> +			};
+>> +		};
 >
-> So, to be clear, is this "just" a performance problem as opposed to a
-> correctness issue?
+> I think this can't work correctly, because driver is assuming
+> DT has all channles (from 0). (see linux/sound/soc/sh/rcar/src.c :: rsnd_src_probe)
 
-No.  It is a correctness issue.  Without this workaround in place, 
-userspace programs end up executing the wrong instructions, which leads 
-to unpredictable behavior and program crashes.
+    At least it doesn't crash and burn. :-)
+    Playback and recording still work too.
 
+> Can you adds dummy src0 with some comments ?
 
-> If so, do you have any numbers with and without this
-> change?
+    Don't think that's an option. We are supposed to describe the hardware, 
+not the driver's behavior.
 
-We tried to measure it, but the impact is not measurable in the tests we 
-have done.  Switching the mm is not often done so the extra ICache 
-invalidation is rare.
+> or fix src.c driver ?
 
-Also note that for the non-workaround case, the code path is unchanged. 
-  Since the following function (__cpu_setup()) is not on the hot path of 
-anything, any extra ICache pressure from the three NOPs is unlikely to 
-matter.
+    Will try to look into it...
 
->
-> Will
->
+MBR, Sergei
