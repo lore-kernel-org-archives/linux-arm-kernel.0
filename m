@@ -1,44 +1,79 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 10 Feb 2016 16:03:15 +0100
-Subject: noise issues when recording sound on i.MX28
-In-Reply-To: <CAOMZO5AE6HwBYz7kOFORt0HTojJLSb0MYUbkb_HCshDHy=d27g@mail.gmail.com>
-References: <20160127105613.GC13664@pengutronix.de>
- <CAOMZO5BpLen517q2heramSta-R6pdESkjM6w=7FRMZebY6ue-Q@mail.gmail.com>
- <20160127144340.GD13664@pengutronix.de>
- <CAOMZO5AE6HwBYz7kOFORt0HTojJLSb0MYUbkb_HCshDHy=d27g@mail.gmail.com>
-Message-ID: <20160210150315.GC13664@pengutronix.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 10 Feb 2016 16:06:43 +0100
+Subject: [linux-sunxi] Re: [PATCH v3 1/5] clk: sunxi: Add apb0 gates for H3
+In-Reply-To: <20160210071713.GA19622@box2.japko.eu>
+References: <1454542430-16572-1-git-send-email-k@japko.eu>
+ <1454542430-16572-2-git-send-email-k@japko.eu>
+ <20160204154752.4df7808be3364a98c496c030@free.fr>
+ <20160205111152.GA31506@lukather>
+ <20160205115837.GD12071@box2.japko.eu>
+ <20160209171040.GR31506@lukather>
+ <20160210071713.GA19622@box2.japko.eu>
+Message-ID: <20160210150643.GG31506@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Fabio,
+Hi,
 
-On Tue, Feb 02, 2016 at 11:00:33AM -0200, Fabio Estevam wrote:
-> On Wed, Jan 27, 2016 at 12:43 PM, Uwe Kleine-K?nig
-> <u.kleine-koenig@pengutronix.de> wrote:
+On Wed, Feb 10, 2016 at 08:17:14AM +0100, Krzysztof Adamski wrote:
+> On Tue, Feb 09, 2016 at 06:10:40PM +0100, Maxime Ripard wrote:
+> >>>>It seems that the other compatible strings are there for historical
+> >>>>reasons. Why do you need a new one with such a specific name?
+> >>>>
+> >>>>It would have been more sensible to add a generic compatible string as
+> >>>>"allwinner,apb-gates", letting the removal of the other strings for a
+> >>>>later patch...
+> >>>
+> >>>Yeah, it's a good idea, and it's probably time that we move to that.
+> >>>
+> >>>However, I'd like to keep per-soc and per-clocks compatibles in the
+> >>>DT, in case we need to protect a clock in the future. That doesn't
+> >>>prevent to have two compatibles thoughe, the specific and the generic.
+> >>>
+> >>
+> >>So now I'm not sure what you mean. You suggest that I should keep using
+> >>specific (sun8i_h3_apb0) or change to generic (apb-gates) in my patch?
+> >
+> >Both.
+> >
+> >To have something like that:
+> >
+> >compatible = "allwinner,sun8i-h3-apb0-gates-clk", "allwinner,sun4i-a10-gates-clk";
+> >
+> >sun4i-a10-gates-clk being the generic compatible that we would use,
+> >and we can always match against the h3 specific compatible if we need
+> >to have a different behaviour.
 > 
-> > So you didn't hit the problem that resetting a saif didn't work, right?
-> 
-> No, we haven't seen this reset issue.
-> 
-> > Do you have a few more technical details here? A usecase of my machine
-> 
-> Let me find out as it has been several years I worked on this problem.
-> Will let you know.
+> This seems like a good idea to me but since this is new thing anyways (other
+> sunxi SoCs don't do this right now) shouldn't we introduce other
+> more generic name for generic clock (like "allwinner,apb-gates" mentioned
+> earlier, or maybe "allwinner,simple-apb-gates")?
 
-Anything new on your end? I know from Lothar that he invested quite some
-time to debug his hardware setup, tested the codec instead of the i.MX28
-as clock provider and several more things. I also spend some time on
-this issue and we both hope that Freescale/NXP can help in better
-understanding the issue and hopefully can come up with a recipe to make
-concurrent recording and playback on i.MX28 work.
+This is not specific to the APB bus, and the earlier SoC that
+introduced those kind of clocks was the A10, hence why I was
+suggesting that compatible (since we generally try to use the SoC that
+introduced that hardware block in the compatible name).
 
-Lothar is in contact with Freescale, too, but up to now with little
-success. The company I'm working for at the moment would also welcome a
-solution here.
+> Also, wouldn't this be cleaner if I use only specific compatible string
+> right now and provide separate patch that adds generic compatible string to
+> all current SoCs at once? The downside of this is that it's easier to get
+> merge conflicts unless I wait for applying this patchset.
 
-Best regards
-Uwe
+I'd prefer if you added the generic one and were using it in your
+subsequent patches. We can always mass convert the existing drivers
+later on.
+
+Thanks!
+Maxime
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160210/edc4c658/attachment.sig>
