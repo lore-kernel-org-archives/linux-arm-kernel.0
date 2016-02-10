@@ -1,83 +1,37 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 10 Feb 2016 11:08:35 +0530
-Subject: [PATCH v3 3/3] pci: dra7xx: use pdata callbacks to perform reset
-In-Reply-To: <56BA958A.1020503@ti.com>
-References: <1452780672-14339-1-git-send-email-kishon@ti.com>
- <1452780672-14339-4-git-send-email-kishon@ti.com>
- <20160127173104.GQ19432@atomide.com> <56A90971.4020409@ti.com>
- <20160127185649.GV19432@atomide.com> <56A94FB7.6020903@ti.com>
- <20160128183156.GH19432@atomide.com> <56B087AD.4000505@ti.com>
- <alpine.DEB.2.02.1602080208070.2182@utopia.booyaka.com>
- <56B900E9.9040306@ti.com>
- <alpine.DEB.2.02.1602090846480.2906@utopia.booyaka.com>
- <56BA2495.9020407@ti.com>
- <alpine.DEB.2.02.1602091932160.2906@utopia.booyaka.com>
- <56BA958A.1020503@ti.com>
-Message-ID: <56BACCDB.2070507@ti.com>
+From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
+Date: Wed, 10 Feb 2016 05:55:51 +0000
+Subject: [PATCH V3 3/5] PCI: xilinx: Modifying AXI PCIe Host Bridge
+ driver to work on both  Zynq and Microblaze
+In-Reply-To: <20160209161134.GA24244@NP-P-BURTON>
+References: <1455014518-8708-1-git-send-email-bharatku@xilinx.com>
+ <1455014518-8708-4-git-send-email-bharatku@xilinx.com>
+ <20160209161134.GA24244@NP-P-BURTON>
+Message-ID: <8520D5D51A55D047800579B09414719825881780@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wednesday 10 February 2016 07:12 AM, Suman Anna wrote:
-> Hi Paul,
+> On Tue, Feb 09, 2016 at 04:11:56PM +0530, Bharat Kumar Gogada wrote:
+> > Modifying Xilinx AXI PCIe Host Bridge Soft IP driver to work on both
+> > Zynq and Microblaze Architectures.
+> > With these modifications drivers/pci/host/pcie-xilinx.c, will work on
+> > both Zynq and Microblaze Architectures.
+> >
+> > Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
+> > Signed-off-by: Ravi Kiran Gummaluri <rgummal@xilinx.com>
+> > ---
+> > Changes:
+> > Removed unneccessary architecture dependent number of MSI's.
+> > Added #ifdef to pci_fixup_irqs which is ARM specific API.
 > 
-> On 02/09/2016 01:36 PM, Paul Walmsley wrote:
->> Hi Suman 
->>
->> On Tue, 9 Feb 2016, Suman Anna wrote:
->>
->>> On 02/09/2016 02:49 AM, Paul Walmsley wrote:
->>>> On Mon, 8 Feb 2016, Suman Anna wrote:
->>>>> On 02/07/2016 08:48 PM, Paul Walmsley wrote:
->>>>>> On Tue, 2 Feb 2016, Kishon Vijay Abraham I wrote:
->>>>>>
->>>>>>> Paul, what do you think is the best way forward to perform reset?
->>>>>>
->>>>>> Many of the IP blocks with PRM hardreset lines are processor IP blocks. 
->>>>>> Those often need special reset handling to ensure that WFI/HLT-like 
->>>>>> instructions are executed after reset.  This special handling ensures that 
->>>>>> the IP blocks' bus initiator interfaces indicate that they are in standby 
->>>>>> to the PRCM - thus allowing power management for the rest of the chip to 
->>>>>> work correctly.
->>>>>>
->>>>>> But that doesn't seem to be the case with PCIe - and maybe others - 
->>>>>> possibly some of the MMUs?  
->>>>>
->>>>> Yeah, the sequencing between clocks and resets would still be the same
->>>>> for MMUs, so, adding the custom flags for MMUs is fine.
->>>>
->>>> I'm curious as to whether HWMOD_CUSTOM_HARDRESET is needed for the MMUs.  
->>>> We've stated that the main point of the custom hardreset code is to handle 
->>>> processors that need to be placed into WFI/HLT, but it doesn't seem like 
->>>> there would be an equivalent for MMUs.  Thoughts?
->>>
->>> The current OMAP IOMMU code already leverages the pdata ops for
->>> performing the resets, so not adding the flags would also require
->>> additional changes in the driver.
->>>
->>> Also, the reset lines controlling the MMUs actually also manage the
->>> reset for all the other sub-modules other than the processor cores
->>> within the sub-systems. We have currently different issues (see [1] for
->>> eg. around the IPU sub-system entering RET in between), so from a PM
->>> point of view, we do prefer to place the MMUs also in reset when we are
->>> runtime suspended.
->>
->> Should we reassert hardreset in _idle() for IP blocks that don't have 
->> HWMOD_CUSTOM_HARDRESET set on them?  Would that allow us to use this 
->> mechanism for the uncore hardreset lines, or are there other quirks?
->>
->> Also - would that address the potential issue that you mentioned with the 
->> PCIe block, or is that a different issue?
+> Hi Bharat,
 > 
-> Yeah, I think that would address the PCIe block issue in terms of reset
-> state balancing between pm_runtime_get_sync() and pm_runtime_put()
-> calls. Right now, they are unbalanced. The PCIe block is using these
-> only in probe and remove, so it should work for that IP.
+> Why do you say pci_fixup_irqs is ARM-specific? It's declared in
+> include/linux/pci.h, defined in drivers/pci/setup-irq.c & used by multiple
+> architectures (alpha, arm, m68k, mips, sh, sparc, tile,
+> unicore32 from a quick grep).
+> 
+> Will you not break INTX-style interrupts by removing this?
+> 
+I meant to say ARM specific w.r.t Microblaze architecture, which is what this patch series are for. This has been already discussed in my previous patch by  Arnd Bergmann and Lorenzo Pieralisi . (https://lkml.org/lkml/2016/1/12/707)
 
-As I mentioned before this would result in undesired behavior during
-suspend/resume cycle in PCIe. (This should be okay for the current mainline
-code but would break once we add suspend/resume support for PCIe).
-
-Thanks
-Kishon
+Bharat
