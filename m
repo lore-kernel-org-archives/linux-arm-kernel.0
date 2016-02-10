@@ -1,37 +1,35 @@
-From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
-Date: Wed, 10 Feb 2016 05:55:51 +0000
-Subject: [PATCH V3 3/5] PCI: xilinx: Modifying AXI PCIe Host Bridge
- driver to work on both  Zynq and Microblaze
-In-Reply-To: <20160209161134.GA24244@NP-P-BURTON>
-References: <1455014518-8708-1-git-send-email-bharatku@xilinx.com>
- <1455014518-8708-4-git-send-email-bharatku@xilinx.com>
- <20160209161134.GA24244@NP-P-BURTON>
-Message-ID: <8520D5D51A55D047800579B09414719825881780@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: anup.patel@broadcom.com (Anup Patel)
+Date: Wed, 10 Feb 2016 11:40:45 +0530
+Subject: [PATCH 0/6] More updates for NS2 DT
+Message-ID: <1455084651-29325-1-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Tue, Feb 09, 2016 at 04:11:56PM +0530, Bharat Kumar Gogada wrote:
-> > Modifying Xilinx AXI PCIe Host Bridge Soft IP driver to work on both
-> > Zynq and Microblaze Architectures.
-> > With these modifications drivers/pci/host/pcie-xilinx.c, will work on
-> > both Zynq and Microblaze Architectures.
-> >
-> > Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
-> > Signed-off-by: Ravi Kiran Gummaluri <rgummal@xilinx.com>
-> > ---
-> > Changes:
-> > Removed unneccessary architecture dependent number of MSI's.
-> > Added #ifdef to pci_fixup_irqs which is ARM specific API.
-> 
-> Hi Bharat,
-> 
-> Why do you say pci_fixup_irqs is ARM-specific? It's declared in
-> include/linux/pci.h, defined in drivers/pci/setup-irq.c & used by multiple
-> architectures (alpha, arm, m68k, mips, sh, sparc, tile,
-> unicore32 from a quick grep).
-> 
-> Will you not break INTX-style interrupts by removing this?
-> 
-I meant to say ARM specific w.r.t Microblaze architecture, which is what this patch series are for. This has been already discussed in my previous patch by  Arnd Bergmann and Lorenzo Pieralisi . (https://lkml.org/lkml/2016/1/12/707)
+This patchset primarily adds more DT nodes for NS2 SVK. It also does
+minor update to arch/arm64/Kconfig.platforms and adds missing DT
+bindings document for sp805 driver.
 
-Bharat
+The patchset is based on v4.5-rc3 tag and is available in ns2_dt2_v1
+branch of https://github.com/Broadcom/arm64-linux.git
+
+All patches have been tested on Broadcom NS2 SVK.
+
+Anup Patel (5):
+  arm64: Select COMMON_CLK_IPROC, PINCTRL and GPIOLIB for iProc SoCs
+  arm64: dts: Add SDHCI DT node for NS2
+  arm64: dts: Add ARM SP804 timer DT nodes for NS2
+  dt-bindings: watchdog: Add ARM SP805 DT bindings
+  arm64: dts: Add ARM SP805 watchdog DT node for NS2
+
+Ray Jui (1):
+  arm64: dts: Add PCIe0 and PCIe4 DT nodes for NS2
+
+ .../devicetree/bindings/watchdog/arm,sp805.txt     |  17 +++
+ arch/arm64/Kconfig.platforms                       |   3 +
+ arch/arm64/boot/dts/broadcom/ns2-svk.dts           |  12 ++
+ arch/arm64/boot/dts/broadcom/ns2.dtsi              | 140 +++++++++++++++++++++
+ 4 files changed, 172 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/watchdog/arm,sp805.txt
+
+-- 
+1.9.1
