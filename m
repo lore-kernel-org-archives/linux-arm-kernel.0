@@ -1,126 +1,105 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 10 Feb 2016 11:47:28 +0100
-Subject: [PATCH v5 RESEND 3/5] driver core: handle -EPROBE_DEFER from
- bus_type.match()
-In-Reply-To: <1455101250-11327-1-git-send-email-m.szyprowski@samsung.com>
-References: <1455101250-11327-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1455101250-11327-4-git-send-email-m.szyprowski@samsung.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 10 Feb 2016 10:49:31 +0000
+Subject: [PATCH v3 6/8] dmaengine: rcar-dmac: add iommu support for slave
+ transfers
+In-Reply-To: <1455065878-11906-7-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+References: <1455065878-11906-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+ <1455065878-11906-7-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+Message-ID: <56BB15BB.30806@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+On 10/02/16 00:57, Niklas S?derlund wrote:
+> Enable slave transfers to devices behind IPMMU:s by mapping the slave
+> addresses using the dma-mapping API.
+>
+> Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+> ---
+>   drivers/dma/sh/rcar-dmac.c | 57 ++++++++++++++++++++++++++++++++++++++++++----
+>   1 file changed, 52 insertions(+), 5 deletions(-)
+>
+> diff --git a/drivers/dma/sh/rcar-dmac.c b/drivers/dma/sh/rcar-dmac.c
+> index 743873c..268407c 100644
+> --- a/drivers/dma/sh/rcar-dmac.c
+> +++ b/drivers/dma/sh/rcar-dmac.c
+> @@ -1106,21 +1106,68 @@ rcar_dmac_prep_dma_cyclic(struct dma_chan *chan, dma_addr_t buf_addr,
+>   	return desc;
+>   }
+>
+> +static int rcar_dmac_set_slave_addr(struct dma_chan *chan,
+> +				     struct rcar_dmac_chan_slave *slave,
+> +				     phys_addr_t addr, size_t size)
+> +{
+> +	struct dma_attrs attrs;
+> +	enum dma_data_direction dir;
+> +
+> +	init_dma_attrs(&attrs);
+> +	dma_set_attr(DMA_ATTR_NO_KERNEL_MAPPING, &attrs);
+> +	dma_set_attr(DMA_ATTR_SKIP_CPU_SYNC, &attrs);
 
-Allow implementations of the match() callback in struct bus_type to
-return errors and if it's -EPROBE_DEFER then queue the device for
-deferred probing.
+Now that we have a way to deal with MMIO addresses properly, we don't 
+need these any more.
 
-This is useful to buses such as AMBA in which devices are registered
-before their matching information can be retrieved from the HW
-(typically because a clock driver hasn't probed yet).
+Robin.
 
-Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-[changed if-else code structure, adjusted documentation to match the code,
-extended comments]
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- Documentation/driver-model/porting.txt |  6 ++++--
- drivers/base/dd.c                      | 24 ++++++++++++++++++++++--
- include/linux/device.h                 |  7 +++++--
- 3 files changed, 31 insertions(+), 6 deletions(-)
-
-diff --git a/Documentation/driver-model/porting.txt b/Documentation/driver-model/porting.txt
-index 92d86f7..453053f 100644
---- a/Documentation/driver-model/porting.txt
-+++ b/Documentation/driver-model/porting.txt
-@@ -340,8 +340,10 @@ comparison:
- 
-   int (*match)(struct device * dev, struct device_driver * drv);
- 
--match should return '1' if the driver supports the device, and '0'
--otherwise. 
-+match should return positive value if the driver supports the device,
-+and zero otherwise. It may also return error code (for example
-+-EPROBE_DEFER) if determining that given driver supports the device is
-+not possible.
- 
- When a device is registered, the bus's list of drivers is iterated
- over. bus->match() is called for each one until a match is found. 
-diff --git a/drivers/base/dd.c b/drivers/base/dd.c
-index 7399be7..7c3f1f1 100644
---- a/drivers/base/dd.c
-+++ b/drivers/base/dd.c
-@@ -544,6 +544,7 @@ static int __device_attach_driver(struct device_driver *drv, void *_data)
- 	struct device_attach_data *data = _data;
- 	struct device *dev = data->dev;
- 	bool async_allowed;
-+	int ret;
- 
- 	/*
- 	 * Check if device has already been claimed. This may
-@@ -554,8 +555,17 @@ static int __device_attach_driver(struct device_driver *drv, void *_data)
- 	if (dev->driver)
- 		return -EBUSY;
- 
--	if (!driver_match_device(drv, dev))
-+	ret = driver_match_device(drv, dev);
-+	if (ret == 0) {
-+		/* no match */
- 		return 0;
-+	} else if (ret == -EPROBE_DEFER) {
-+		dev_dbg(dev, "Device match requests probe deferral\n");
-+		driver_deferred_probe_add(dev);
-+	} else if (ret < 0) {
-+		dev_dbg(dev, "Bus failed to match device: %d", ret);
-+		return ret;
-+	} /* ret > 0 means positive match */
- 
- 	async_allowed = driver_allows_async_probing(drv);
- 
-@@ -675,6 +685,7 @@ void device_initial_probe(struct device *dev)
- static int __driver_attach(struct device *dev, void *data)
- {
- 	struct device_driver *drv = data;
-+	int ret;
- 
- 	/*
- 	 * Lock device and try to bind to it. We drop the error
-@@ -686,8 +697,17 @@ static int __driver_attach(struct device *dev, void *data)
- 	 * is an error.
- 	 */
- 
--	if (!driver_match_device(drv, dev))
-+	ret = driver_match_device(drv, dev);
-+	if (ret == 0) {
-+		/* no match */
- 		return 0;
-+	} else if (ret == -EPROBE_DEFER) {
-+		dev_dbg(dev, "Device match requests probe deferral\n");
-+		driver_deferred_probe_add(dev);
-+	} else if (ret < 0) {
-+		dev_dbg(dev, "Bus failed to match device: %d", ret);
-+		return ret;
-+	} /* ret > 0 means positive match */
- 
- 	if (dev->parent)	/* Needed for USB */
- 		device_lock(dev->parent);
-diff --git a/include/linux/device.h b/include/linux/device.h
-index f627ba2..75a2cde 100644
---- a/include/linux/device.h
-+++ b/include/linux/device.h
-@@ -70,8 +70,11 @@ extern void bus_remove_file(struct bus_type *, struct bus_attribute *);
-  * @dev_groups:	Default attributes of the devices on the bus.
-  * @drv_groups: Default attributes of the device drivers on the bus.
-  * @match:	Called, perhaps multiple times, whenever a new device or driver
-- *		is added for this bus. It should return a nonzero value if the
-- *		given device can be handled by the given driver.
-+ *		is added for this bus. It should return a positive value if the
-+ *		given device can be handled by the given driver and zero
-+ *		otherwise. It may also return error code if determining that
-+ *		the driver supports the device is not possible. In case of
-+ *		-EPROBE_DEFER it will queue the device for deferred probing.
-  * @uevent:	Called when a device is added, removed, or a few other things
-  *		that generate uevents to add the environment variables.
-  * @probe:	Called when a new device or driver add to this bus, and callback
--- 
-1.9.2
+> +
+> +	/*
+> +	 * We can't know the direction at this time, see documentation for
+> +	 * 'direction' in struct dma_slave_config.
+> +	 */
+> +	dir = DMA_BIDIRECTIONAL;
+> +
+> +	if (slave->xfer_size) {
+> +		dma_unmap_resource(chan->device->dev, slave->slave_addr,
+> +				slave->xfer_size, dir, &attrs);
+> +		slave->slave_addr = 0;
+> +		slave->xfer_size = 0;
+> +	}
+> +
+> +	if (size) {
+> +		slave->slave_addr = dma_map_resource(chan->device->dev, addr,
+> +				size, dir, &attrs);
+> +
+> +		if (dma_mapping_error(chan->device->dev, slave->slave_addr)) {
+> +			struct rcar_dmac_chan *rchan = to_rcar_dmac_chan(chan);
+> +
+> +			dev_err(chan->device->dev,
+> +					"chan%u: failed to map %zx@%pap",
+> +					rchan->index, size, &addr);
+> +			return -EIO;
+> +		}
+> +
+> +		slave->xfer_size = size;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+>   static int rcar_dmac_device_config(struct dma_chan *chan,
+>   				   struct dma_slave_config *cfg)
+>   {
+>   	struct rcar_dmac_chan *rchan = to_rcar_dmac_chan(chan);
+> +	int ret;
+>
+>   	/*
+>   	 * We could lock this, but you shouldn't be configuring the
+>   	 * channel, while using it...
+>   	 */
+> -	rchan->src.slave_addr = cfg->src_addr;
+> -	rchan->dst.slave_addr = cfg->dst_addr;
+> -	rchan->src.xfer_size = cfg->src_addr_width;
+> -	rchan->dst.xfer_size = cfg->dst_addr_width;
+>
+> -	return 0;
+> +	ret = rcar_dmac_set_slave_addr(chan, &rchan->src, cfg->src_addr,
+> +			cfg->src_addr_width);
+> +	if (ret)
+> +		return ret;
+> +
+> +	ret = rcar_dmac_set_slave_addr(chan, &rchan->dst, cfg->dst_addr,
+> +			cfg->dst_addr_width);
+> +	return ret;
+>   }
+>
+>   static int rcar_dmac_chan_terminate_all(struct dma_chan *chan)
+>
