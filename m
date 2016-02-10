@@ -1,135 +1,96 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 10 Feb 2016 15:39:38 +0000
-Subject: [PATCH v2] mfd: ab8500: Provide a small example using new MFD cell
- MACROs
-In-Reply-To: <1455028027-1527-1-git-send-email-lee.jones@linaro.org>
-References: <1455028027-1527-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <20160210153938.GC26950@x1>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 10 Feb 2016 10:40:49 -0500 (EST)
+Subject: [PATCH v2 1/2] ARM: shmobile: Move shmobile_smp_{mpidr, fn, arg}[]
+ from .text to .data
+In-Reply-To: <1455112615-6970-2-git-send-email-geert+renesas@glider.be>
+References: <1455112615-6970-1-git-send-email-geert+renesas@glider.be>
+ <1455112615-6970-2-git-send-email-geert+renesas@glider.be>
+Message-ID: <alpine.LFD.2.20.1602101037430.17825@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mfd: ab8500: Provide a small example using new MFD cell MACROs
-    
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/mfd/ab8500-core.c | 106 +++++++++++++++-------------------------------
- 1 file changed, 34 insertions(+), 72 deletions(-)
+On Wed, 10 Feb 2016, Geert Uytterhoeven wrote:
 
-diff --git a/drivers/mfd/ab8500-core.c b/drivers/mfd/ab8500-core.c
-index f3d6891..c03a86e 100644
---- a/drivers/mfd/ab8500-core.c
-+++ b/drivers/mfd/ab8500-core.c
-@@ -634,79 +634,41 @@ static const struct mfd_cell ab8500_bm_devs[] = {
- 
- static const struct mfd_cell ab8500_devs[] = {
- #ifdef CONFIG_DEBUG_FS
--	{
--		.name = "ab8500-debug",
--		.of_compatible = "stericsson,ab8500-debug",
--	},
-+	OF_MFD_CELL("ab8500-debug",
-+		    NULL, NULL, 0, "stericsson,ab8500-debug"),
- #endif
--	{
--		.name = "ab8500-sysctrl",
--		.of_compatible = "stericsson,ab8500-sysctrl",
--	},
--	{
--		.name = "ab8500-ext-regulator",
--		.of_compatible = "stericsson,ab8500-ext-regulator",
--	},
--	{
--		.name = "ab8500-regulator",
--		.of_compatible = "stericsson,ab8500-regulator",
--	},
--	{
--		.name = "abx500-clk",
--		.of_compatible = "stericsson,abx500-clk",
--	},
--	{
--		.name = "ab8500-gpadc",
--		.of_compatible = "stericsson,ab8500-gpadc",
--	},
--	{
--		.name = "ab8500-rtc",
--		.of_compatible = "stericsson,ab8500-rtc",
--	},
--	{
--		.name = "ab8500-acc-det",
--		.of_compatible = "stericsson,ab8500-acc-det",
--	},
--	{
--
--		.name = "ab8500-poweron-key",
--		.of_compatible = "stericsson,ab8500-poweron-key",
--	},
--	{
--		.name = "ab8500-pwm",
--		.of_compatible = "stericsson,ab8500-pwm",
--		.id = 1,
--	},
--	{
--		.name = "ab8500-pwm",
--		.of_compatible = "stericsson,ab8500-pwm",
--		.id = 2,
--	},
--	{
--		.name = "ab8500-pwm",
--		.of_compatible = "stericsson,ab8500-pwm",
--		.id = 3,
--	},
--	{
--		.name = "ab8500-denc",
--		.of_compatible = "stericsson,ab8500-denc",
--	},
--	{
--		.name = "pinctrl-ab8500",
--		.of_compatible = "stericsson,ab8500-gpio",
--	},
--	{
--		.name = "abx500-temp",
--		.of_compatible = "stericsson,abx500-temp",
--	},
--	{
--		.name = "ab8500-usb",
--		.of_compatible = "stericsson,ab8500-usb",
--	},
--	{
--		.name = "ab8500-codec",
--		.of_compatible = "stericsson,ab8500-codec",
--	},
-+	OF_MFD_CELL("ab8500-sysctrl",
-+		    NULL, NULL, 0, "stericsson,ab8500-sysctrl"),
-+	OF_MFD_CELL("ab8500-ext-regulator",
-+		    NULL, NULL, 0, "stericsson,ab8500-ext-regulator"),
-+	OF_MFD_CELL("ab8500-regulator",
-+		    NULL, NULL, 0, "stericsson,ab8500-regulator"),
-+	OF_MFD_CELL("abx500-clk",
-+		    NULL, NULL, 0, "stericsson,abx500-clk"),
-+	OF_MFD_CELL("ab8500-gpadc",
-+		    NULL, NULL, 0, "stericsson,ab8500-gpadc"),
-+	OF_MFD_CELL("ab8500-rtc",
-+		    NULL, NULL, 0, "stericsson,ab8500-rtc"),
-+	OF_MFD_CELL("ab8500-acc-det",
-+		    NULL, NULL, 0, "stericsson,ab8500-acc-det"),
-+	OF_MFD_CELL("ab8500-poweron-key",
-+		    NULL, NULL, 0, "stericsson,ab8500-poweron-key"),
-+	OF_MFD_CELL("ab8500-pwm",
-+		    NULL, NULL, 1, "stericsson,ab8500-pwm"),
-+	OF_MFD_CELL("ab8500-pwm",
-+		    NULL, NULL, 2, "stericsson,ab8500-pwm"),
-+	OF_MFD_CELL("ab8500-pwm",
-+		    NULL, NULL, 3, "stericsson,ab8500-pwm"),
-+	OF_MFD_CELL("ab8500-denc",
-+		    NULL, NULL, 0, "stericsson,ab8500-denc"),
-+	OF_MFD_CELL("pinctrl-ab8500",
-+		    NULL, NULL, 0, "stericsson,ab8500-gpio"),
-+	OF_MFD_CELL("abx500-temp",
-+		    NULL, NULL, 0, "stericsson,abx500-temp"),
-+	OF_MFD_CELL("ab8500-usb",
-+		    NULL, NULL, 0, "stericsson,ab8500-usb"),
-+	OF_MFD_CELL("ab8500-codec",
-+		    NULL, NULL, 0, "stericsson,ab8500-codec"),
- };
- 
- static const struct mfd_cell ab9540_devs[] = {
+> If CONFIG_DEBUG_RODATA=y, the kernel crashes during system suspend:
+> 
+>     Freezing user space processes ... (elapsed 0.004 seconds) done.
+>     Freezing remaining freezable tasks ... (elapsed 0.002 seconds)
+>     done.
+>     PM: suspend of devices complete after 111.948 msecs
+>     PM: late suspend of devices complete after 1.086 msecs
+>     PM: noirq suspend of devices complete after 11.576 msecs
+>     Disabling non-boot CPUs ...
+>     Kernel panic - not syncing: Attempted to kill the idle task!
+>     1014ec ---[ end Kernel panic - not syncing: Attempted to kill the idle task!
+>     CPU0: stopping
+> 
+> This happens because the .text section is marked read-only, while the
+> arrays shmobile_smp_mpidr[], shmobile_smp_fn[], and shmobile_smp_arg[]
+> are being written to.
+> 
+> Fix this by moving these arrays from the .text to the .data section.
+> This requires accessing them through PC-relative offsets.
+> 
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Reviewed-by: Kees Cook <keescook@chromium.org>
+
+You could replace .data with .bss to avoid allocating zero-initialized 
+space in the kernel binary.  Then you may add
+
+Reviewed-by: Nicolas Pitre <nico@linaro.org>
+
+
+> ---
+> v2:
+>   - Add Reviewed-by,
+>   - Store offsets instead of pointers, as suggested by Nicolas Pitre
+>     <nicolas.pitre@linaro.org>.
+> ---
+>  arch/arm/mach-shmobile/headsmp.S | 20 ++++++++++++++------
+>  1 file changed, 14 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/mach-shmobile/headsmp.S b/arch/arm/mach-shmobile/headsmp.S
+> index 330c1fc63197df89..4cf7f0b016b0b0fe 100644
+> --- a/arch/arm/mach-shmobile/headsmp.S
+> +++ b/arch/arm/mach-shmobile/headsmp.S
+> @@ -50,9 +50,11 @@ ENTRY(shmobile_smp_boot)
+>  	mrc	p15, 0, r1, c0, c0, 5		@ r1 = MPIDR
+>  	and	r0, r1, r0			@ r0 = cpu_logical_map() value
+>  	mov	r1, #0				@ r1 = CPU index
+> -	adr	r5, 1f				@ array of per-cpu mpidr values
+> -	adr	r6, 2f				@ array of per-cpu functions
+> -	adr	r7, 3f				@ array of per-cpu arguments
+> +	adr	r2, 1f
+> +	ldmia	r2, {r5, r6, r7}
+> +	add	r5, r5, r2			@ array of per-cpu mpidr values
+> +	add	r6, r6, r2			@ array of per-cpu functions
+> +	add	r7, r7, r2			@ array of per-cpu arguments
+>  
+>  shmobile_smp_boot_find_mpidr:
+>  	ldr	r8, [r5, r1, lsl #2]
+> @@ -80,12 +82,18 @@ ENTRY(shmobile_smp_sleep)
+>  	b	shmobile_smp_boot
+>  ENDPROC(shmobile_smp_sleep)
+>  
+> +	.align	2
+> +1:	.long	shmobile_smp_mpidr - .
+> +	.long	shmobile_smp_fn - 1b
+> +	.long	shmobile_smp_arg - 1b
+> +
+> +	.data
+>  	.globl	shmobile_smp_mpidr
+>  shmobile_smp_mpidr:
+> -1:	.space	NR_CPUS * 4
+> +	.space	NR_CPUS * 4
+>  	.globl	shmobile_smp_fn
+>  shmobile_smp_fn:
+> -2:	.space	NR_CPUS * 4
+> +	.space	NR_CPUS * 4
+>  	.globl	shmobile_smp_arg
+>  shmobile_smp_arg:
+> -3:	.space	NR_CPUS * 4
+> +	.space	NR_CPUS * 4
+> -- 
+> 1.9.1
+> 
+> 
