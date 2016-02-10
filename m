@@ -1,261 +1,38 @@
 From: lars.persson@axis.com (Lars Persson)
-Date: Wed, 10 Feb 2016 13:41:53 +0100
-Subject: [PATCH 4/8] arm: dts: add Artpec-6 soc dtsi file
+Date: Wed, 10 Feb 2016 13:41:57 +0100
+Subject: [PATCH 8/8] arm: mach-artpec: add entry to MAINTAINERS
 In-Reply-To: <cover.1455107681.git.larper@axis.com>
 References: <cover.1455107681.git.larper@axis.com>
-Message-ID: <733065957e9ec67d698870cf832b4641d0da30cb.1455107681.git.larper@axis.com>
+Message-ID: <0b705a87e60c75c71721f3cf013b544eea746a95.1455107681.git.larper@axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Lars Persson <larper@axis.com>
+Signed-off-by: Jesper Nilsson <jesper.nilsson@axis.com>
 ---
- arch/arm/boot/dts/artpec6.dtsi | 238 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 238 insertions(+)
- create mode 100644 arch/arm/boot/dts/artpec6.dtsi
+ MAINTAINERS | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm/boot/dts/artpec6.dtsi b/arch/arm/boot/dts/artpec6.dtsi
-new file mode 100644
-index 0000000..c1790d8
---- /dev/null
-+++ b/arch/arm/boot/dts/artpec6.dtsi
-@@ -0,0 +1,238 @@
-+/*
-+ * Device Tree Source for the Axis ARTPEC-6 SoC
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 7f1fa4f..d32c1aa 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -932,6 +932,16 @@ M:	Tsahee Zidenberg <tsahee@annapurnalabs.com>
+ S:	Maintained
+ F:	arch/arm/mach-alpine/
+ 
++ARM/ARTPEC MACHINE SUPPORT
++M:	Jesper Nilsson <jesper.nilsson@axis.com>
++M:	Lars Persson <lars.persson@axis.com>
++M:	Niklas Cassel <niklas.cassel@axis.com>
++S:	Maintained
++L:	linux-arm-kernel at axis.com
++F:	arch/arm/mach-artpec
++F:	arch/arm/boot/dts/artpec6*
++F:	drivers/clk/clk-artpec6.c
 +
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include "skeleton.dtsi"
-+
-+/ {
-+	compatible = "axis,artpec6";
-+	interrupt-parent = <&intc>;
-+
-+	aliases {
-+		serial0 = &uart0;
-+		serial1 = &uart1;
-+		serial2 = &uart2;
-+		serial3 = &uart3;
-+	};
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu0: cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0>;
-+			next-level-cache = <&pl310>;
-+		};
-+
-+		cpu1: cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <1>;
-+			next-level-cache = <&pl310>;
-+		};
-+	};
-+
-+	psci {
-+		compatible = "arm,psci-0.2", "arm,psci";
-+		method = "smc";
-+		psci_version = <0x84000000>;
-+		cpu_on = <0x84000003>;
-+		system_reset = <0x84000009>;
-+	};
-+
-+	scu at faf00000 {
-+		compatible = "arm,cortex-a9-scu";
-+		reg = <0xfaf00000 0x58>;
-+	};
-+
-+	/* Main external clock driving CPU and peripherals */
-+	ext_clk: ext_clk {
-+		#clock-cells = <0>;
-+		compatible = "fixed-clock";
-+		clock-frequency = <50000000>;
-+	};
-+
-+	/* PLL1 is used by CPU and some peripherals */
-+	pll1_clk: pll1_clk at f8000000 {
-+		#clock-cells = <0>;
-+		compatible = "axis,artpec6-pll1-clock";
-+		reg = <0xf8000000 4>;
-+		clocks = <&ext_clk>;
-+	};
-+
-+	cpu_clk: cpu_clk {
-+		#clock-cells = <0>;
-+		compatible = "fixed-factor-clock";
-+		clock-div = <1>;
-+		clock-mult = <1>;
-+		clocks = <&pll1_clk>;
-+		clock-output-names = "cpu_clk";
-+	};
-+
-+	cpu_clkdiv2: cpu_clkdiv2 {
-+		#clock-cells = <0>;
-+		compatible = "fixed-factor-clock";
-+		clock-div = <2>;
-+		clock-mult = <1>;
-+		clocks = <&cpu_clk>;
-+	};
-+
-+	cpu_clkdiv4: cpu_clkdiv4 {
-+		#clock-cells = <0>;
-+		compatible = "fixed-factor-clock";
-+		clock-div = <4>;
-+		clock-mult = <1>;
-+		clocks = <&cpu_clk>;
-+	};
-+
-+	apb_pclk: apb_pclk {
-+		#clock-cells = <0>;
-+		compatible = "fixed-factor-clock";
-+		clock-div = <8>;
-+		clock-mult = <1>;
-+		clocks = <&cpu_clk>;
-+		clock-output-names = "apb_pclk";
-+	};
-+
-+	/* PLL2 is used by a number of peripherals, including UDL */
-+	pll2: pll2 {
-+		#clock-cells = <0>;
-+		compatible = "fixed-factor-clock";
-+		clock-div = <1>;
-+		clock-mult = <24>;
-+		clocks = <&ext_clk>;
-+	};
-+
-+	/* PLL2DIV2 is used by the Fractional Clock Divider, for i2s */
-+	pll2div2: pll2div2 {
-+		#clock-cells = <0>;
-+		compatible = "fixed-factor-clock";
-+		clock-div = <2>;
-+		clock-mult = <1>;
-+		clocks = <&pll2>;
-+	};
-+
-+	pll2div12: pll2div12 {
-+		#clock-cells = <0>;
-+		compatible = "fixed-factor-clock";
-+		clock-div = <12>;
-+		clock-mult = <1>;
-+		clocks = <&pll2>;
-+	};
-+
-+	pll2div24: pll2div24 {
-+		#clock-cells = <0>;
-+		compatible = "fixed-factor-clock";
-+		clock-div = <24>;
-+		clock-mult = <1>;
-+		clocks = <&pll2>;
-+		clock-output-names = "uart_clk";
-+	};
-+
-+
-+	gtimer at faf00200 {
-+		compatible = "arm,cortex-a9-global-timer";
-+		reg = <0xfaf00200 0x20>;
-+		interrupts = <GIC_PPI 11 0xf01>;
-+		clocks = <&cpu_clkdiv2>;
-+	};
-+
-+	timer at faf00600 {
-+		compatible = "arm,cortex-a9-twd-timer";
-+		reg = <0xfaf00600 0x20>;
-+		interrupts = <GIC_PPI 13 0xf04>;
-+		clocks = <&cpu_clkdiv2>;
-+		status = "disabled";
-+	};
-+
-+	intc: interrupt-controller at faf01000 {
-+		interrupt-controller;
-+		compatible = "arm,cortex-a9-gic";
-+		#interrupt-cells = <3>;
-+		reg = < 0xfaf01000 0x1000 >, < 0xfaf00100 0x0100 >;
-+	};
-+
-+	pl310: cache-controller at faf10000 {
-+		compatible = "arm,pl310-cache";
-+		cache-unified;
-+		cache-level = <2>;
-+		reg = <0xfaf10000 0x1000>;
-+		interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
-+		arm,data-latency = <1 1 1>;
-+		arm,tag-latency = <1 1 1>;
-+		arm,filter-ranges = <0x0 0x80000000>;
-+	};
-+
-+	pmu {
-+		compatible = "arm,cortex-a9-pmu";
-+		interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>,
-+			<GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-parent = <&intc>;
-+	};
-+
-+	amba at 0 {
-+		compatible = "simple-bus";
-+		#address-cells = <0x1>;
-+		#size-cells = <0x1>;
-+		interrupt-parent = <&intc>;
-+		ranges;
-+		dma-ranges = <0x80000000 0x00000000 0x40000000>;
-+		dma-coherent;
-+
-+		ethernet: ethernet at f8010000 {
-+			clock-names = "phy_ref_clk", "apb_pclk";
-+			clocks = <&ext_clk>, <&apb_pclk>;
-+			compatible = "snps,dwc-qos-ethernet-4.10";
-+			interrupt-parent = <&intc>;
-+			interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>;
-+			reg = <0xf8010000 0x4000>;
-+
-+			snps,write-requests = <2>;
-+			snps,read-requests = <16>;
-+			snps,txpbl = <8>;
-+			snps,rxpbl = <2>;
-+
-+			status = "disabled";
-+		};
-+
-+		uart0: uart at f8036000 {
-+			compatible = "arm,pl011", "arm,primecell";
-+			reg = <0xf8036000 0x1000>;
-+			interrupts = <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&pll2div24>, <&apb_pclk>;
-+			clock-names = "uart_clk", "apb_pclk";
-+			status = "disabled";
-+		};
-+		uart1: uart at f8037000 {
-+			compatible = "arm,pl011", "arm,primecell";
-+			reg = <0xf8037000 0x1000>;
-+			interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&pll2div24>, <&apb_pclk>;
-+			clock-names = "uart_clk", "apb_pclk";
-+			status = "disabled";
-+		};
-+		uart2: uart at f8038000 {
-+			compatible = "arm,pl011", "arm,primecell";
-+			reg = <0xf8038000 0x1000>;
-+			interrupts = <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&pll2div24>, <&apb_pclk>;
-+			clock-names = "uart_clk", "apb_pclk";
-+			status = "disabled";
-+		};
-+		uart3: uart at f8039000 {
-+			compatible = "arm,pl011", "arm,primecell";
-+			reg = <0xf8039000 0x1000>;
-+			interrupts = <GIC_SPI 129 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&pll2div24>, <&apb_pclk>;
-+			clock-names = "uart_clk", "apb_pclk";
-+			status = "disabled";
-+		};
-+	};
-+};
+ ARM/ATMEL AT91RM9200, AT91SAM9 AND SAMA5 SOC SUPPORT
+ M:	Nicolas Ferre <nicolas.ferre@atmel.com>
+ M:	Alexandre Belloni <alexandre.belloni@free-electrons.com>
 -- 
 2.1.4
