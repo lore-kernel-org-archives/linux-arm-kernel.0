@@ -1,41 +1,63 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 10 Feb 2016 15:46:58 +0100
-Subject: [PATCH v3 3/6] irqchip: irq-armada-370-xp: use PCI_MSI_DOORBELL_START
- where appropriate
+Date: Wed, 10 Feb 2016 15:46:56 +0100
+Subject: [PATCH v3 1/6] irqchip: irq-armada-370-xp: add Kconfig option for the
+ driver
 In-Reply-To: <1455115621-22846-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1455115621-22846-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1455115621-22846-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1455115621-22846-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As suggested by Gregory Clement, this commit adjusts the
-irq-armada-370-xp driver to use the PCI_MSI_DOORBELL_START define in
-the armada_370_xp_handle_msi_irq() function, rather than hardcoding
-its value.
+Instead of building the irq-armada-370-xp driver directly when
+CONFIG_ARCH_MVEBU is enabled, this commit introduces an intermediate
+CONFIG_ARMADA_370_XP_IRQ hidden Kconfig option.
 
-Suggested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+This allows this option to select other interrupt-related Kconfig
+options (which will be needed in follow-up commits) rather than having
+such selects done from arch/arm/mach-<foo>/.
+
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/irqchip/irq-armada-370-xp.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/irqchip/Kconfig  | 5 +++++
+ drivers/irqchip/Makefile | 2 +-
+ 2 files changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
-index e5738c5..f53eb71 100644
---- a/drivers/irqchip/irq-armada-370-xp.c
-+++ b/drivers/irqchip/irq-armada-370-xp.c
-@@ -401,10 +401,10 @@ static void armada_370_xp_handle_msi_irq(struct pt_regs *regs, bool is_chained)
+diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+index 715923d..e2cab87 100644
+--- a/drivers/irqchip/Kconfig
++++ b/drivers/irqchip/Kconfig
+@@ -60,6 +60,11 @@ config ARM_VIC_NR
+ 	  The maximum number of VICs available in the system, for
+ 	  power management.
  
- 		if (is_chained) {
- 			irq = irq_find_mapping(armada_370_xp_msi_inner_domain,
--					       msinr - 16);
-+					       msinr - PCI_MSI_DOORBELL_START);
- 			generic_handle_irq(irq);
- 		} else {
--			irq = msinr - 16;
-+			irq = msinr - PCI_MSI_DOORBELL_START;
- 			handle_domain_irq(armada_370_xp_msi_inner_domain,
- 					  irq, regs);
- 		}
++config ARMADA_370_XP_IRQ
++	bool
++	default y if ARCH_MVEBU
++	select GENERIC_IRQ_CHIP
++
+ config ATMEL_AIC_IRQ
+ 	bool
+ 	select GENERIC_IRQ_CHIP
+diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+index 18caacb..30dba04 100644
+--- a/drivers/irqchip/Makefile
++++ b/drivers/irqchip/Makefile
+@@ -5,7 +5,6 @@ obj-$(CONFIG_ARCH_BCM2835)		+= irq-bcm2836.o
+ obj-$(CONFIG_ARCH_EXYNOS)		+= exynos-combiner.o
+ obj-$(CONFIG_ARCH_HIP04)		+= irq-hip04.o
+ obj-$(CONFIG_ARCH_MMP)			+= irq-mmp.o
+-obj-$(CONFIG_ARCH_MVEBU)		+= irq-armada-370-xp.o
+ obj-$(CONFIG_IRQ_MXS)			+= irq-mxs.o
+ obj-$(CONFIG_ARCH_TEGRA)		+= irq-tegra.o
+ obj-$(CONFIG_ARCH_S3C24XX)		+= irq-s3c24xx.o
+@@ -28,6 +27,7 @@ obj-$(CONFIG_ARM_GIC_V3_ITS)		+= irq-gic-v3-its.o irq-gic-v3-its-pci-msi.o irq-g
+ obj-$(CONFIG_HISILICON_IRQ_MBIGEN)	+= irq-mbigen.o
+ obj-$(CONFIG_ARM_NVIC)			+= irq-nvic.o
+ obj-$(CONFIG_ARM_VIC)			+= irq-vic.o
++obj-$(CONFIG_ARMADA_370_XP_IRQ)		+= irq-armada-370-xp.o
+ obj-$(CONFIG_ATMEL_AIC_IRQ)		+= irq-atmel-aic-common.o irq-atmel-aic.o
+ obj-$(CONFIG_ATMEL_AIC5_IRQ)	+= irq-atmel-aic-common.o irq-atmel-aic5.o
+ obj-$(CONFIG_I8259)			+= irq-i8259.o
 -- 
 2.6.4
