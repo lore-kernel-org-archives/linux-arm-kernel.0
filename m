@@ -1,26 +1,43 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Wed, 10 Feb 2016 11:25:47 -0500
-Subject: [PATCH v4 0/3] ata: Fixes related to edge trigger latch for the
- ahci_xgene_driver.
-In-Reply-To: <1454738124-9351-1-git-send-email-stripathi@apm.com>
-References: <1454738124-9351-1-git-send-email-stripathi@apm.com>
-Message-ID: <20160210162547.GJ3741@mtj.duckdns.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 10 Feb 2016 17:29:15 +0100
+Subject: [PATCH v2 1/2] ARM: mvebu: use armada-370-sata for SATA on Armada 375
+Message-ID: <1455121756-20804-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 06, 2016 at 11:25:21AM +0530, suman Tripathi wrote:
-> From: Suman Tripathi <stripathi@apm.com>
-> 
-> This patch set implements a workaround for an errate in the APM
-> X-Gene SATA host controller with edge interrupt. The HOST_IRQ_STAT
-> misses the edge interrupt from the PORT_IRQ_STAT when clearing the
-> HOST_IRQ_STAT and reporting the PORT_IRQ_STAT happens in same clock
-> cycle. It also implements the capability to override generic interrupt
-> handler.
+From: Lior Amsalem <alior@marvell.com>
 
-Applied 1-3 to libata/for-4.6 with minor updates.
+The Armada 375 has the same SATA IP as Armada 370 and Armada XP, which
+requires the PHY speed to be set in the LP_PHY_CTL register for SATA
+hotplug to work.
 
-Thanks.
+Therefore, this commit updates the compatible string used to describe
+the SATA IP in Armada 375 from marvell,orion-sata to
+marvell,armada-370-sata.
 
+Fixes: 4de59085091f753d08c8429d756b46756ab94665 ("ARM: mvebu: add Device Tree description of the Armada 375 SoC")
+Cc: <stable@vger.kernel.org>
+Signed-off-by: Lior Amsalem <alior@marvell.com>
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+Changes since v1:
+ - Add Fixes: tag, and add stable@ in Cc, as suggested by Andrew Lunn.
+---
+ arch/arm/boot/dts/armada-375.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
+index 7ccce75..cc952cf 100644
+--- a/arch/arm/boot/dts/armada-375.dtsi
++++ b/arch/arm/boot/dts/armada-375.dtsi
+@@ -529,7 +529,7 @@
+ 			};
+ 
+ 			sata at a0000 {
+-				compatible = "marvell,orion-sata";
++				compatible = "marvell,armada-370-sata";
+ 				reg = <0xa0000 0x5000>;
+ 				interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
+ 				clocks = <&gateclk 14>, <&gateclk 20>;
 -- 
-tejun
+2.6.4
