@@ -1,92 +1,69 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 10 Feb 2016 14:25:33 +0000
-Subject: [PATCH v2] iommu/arm-smmu: Allow disabling unmatched stream bypass
-In-Reply-To: <20160209140631.GM22874@arm.com>
-References: <cover.1453830752.git.robin.murphy@arm.com>
- <10ebf5a136a787da54ffd1d6167953f82f01a834.1453830752.git.robin.murphy@arm.com>
- <20160209140631.GM22874@arm.com>
-Message-ID: <72d7de65c4ace47b55c31fc4e74ce4f1891eabb4.1455114028.git.robin.murphy@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 10 Feb 2016 14:27:16 +0000
+Subject: [GIT PULL] VExpress/Juno: DT updates for v4.6
+Message-ID: <56BB48C4.4040604@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Borrow the disable_bypass parameter from the SMMUv3 driver as a handy
-debugging/security feature so that unmatched stream IDs (i.e. devices
-not attached to an IOMMU domain) may be configured to fault.
+Hi ARM-SoC team,
 
-Rather than introduce unsightly inconsistency, or repeat the existing
-unnecessary use of module_param_named(), fix that as well in passing.
+Please pull DT updates for VExpress/Juno platforms
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
+--
+Regards,
+Sudeep
 
-v2:
-- Don't bother trying to report the fault specially.
-- Realise that calling module_param_named() with identical variable
-  and parameter names is silly.
+The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
 
- drivers/iommu/arm-smmu.c | 24 ++++++++++++++++--------
- 1 file changed, 16 insertions(+), 8 deletions(-)
+   Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 1f9093d..cf1e330 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -260,9 +260,13 @@
- #define FSYNR0_WNR			(1 << 4)
- 
- static int force_stage;
--module_param_named(force_stage, force_stage, int, S_IRUGO);
-+module_param(force_stage, int, S_IRUGO);
- MODULE_PARM_DESC(force_stage,
- 	"Force SMMU mappings to be installed@a particular stage of translation. A value of '1' or '2' forces the corresponding stage. All other values are ignored (i.e. no stage is forced). Note that selecting a specific stage will disable support for nested translation.");
-+static bool disable_bypass;
-+module_param(disable_bypass, bool, S_IRUGO);
-+MODULE_PARM_DESC(disable_bypass,
-+	"Disable bypass streams such that incoming transactions from devices that are not attached to an iommu domain will report an abort back to the device and will not be allowed to pass through the SMMU.");
- 
- enum arm_smmu_arch_version {
- 	ARM_SMMU_V1 = 1,
-@@ -1111,9 +1115,9 @@ static void arm_smmu_domain_remove_master(struct arm_smmu_domain *smmu_domain,
- 	 */
- 	for (i = 0; i < cfg->num_streamids; ++i) {
- 		u32 idx = cfg->smrs ? cfg->smrs[i].idx : cfg->streamids[i];
-+		u32 reg = disable_bypass ? S2CR_TYPE_FAULT : S2CR_TYPE_BYPASS;
- 
--		writel_relaxed(S2CR_TYPE_BYPASS,
--			       gr0_base + ARM_SMMU_GR0_S2CR(idx));
-+		writel_relaxed(reg, gr0_base + ARM_SMMU_GR0_S2CR(idx));
- 	}
- 
- 	arm_smmu_master_free_smrs(smmu, cfg);
-@@ -1476,11 +1480,11 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
- 	reg = readl_relaxed(ARM_SMMU_GR0_NS(smmu) + ARM_SMMU_GR0_sGFSR);
- 	writel(reg, ARM_SMMU_GR0_NS(smmu) + ARM_SMMU_GR0_sGFSR);
- 
--	/* Mark all SMRn as invalid and all S2CRn as bypass */
-+	/* Mark all SMRn as invalid and all S2CRn as bypass unless overridden */
-+	reg = disable_bypass ? S2CR_TYPE_FAULT : S2CR_TYPE_BYPASS;
- 	for (i = 0; i < smmu->num_mapping_groups; ++i) {
- 		writel_relaxed(0, gr0_base + ARM_SMMU_GR0_SMR(i));
--		writel_relaxed(S2CR_TYPE_BYPASS,
--			gr0_base + ARM_SMMU_GR0_S2CR(i));
-+		writel_relaxed(reg, gr0_base + ARM_SMMU_GR0_S2CR(i));
- 	}
- 
- 	/* Make sure all context banks are disabled and clear CB_FSR  */
-@@ -1502,8 +1506,12 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
- 	/* Disable TLB broadcasting. */
- 	reg |= (sCR0_VMIDPNE | sCR0_PTM);
- 
--	/* Enable client access, but bypass when no mapping is found */
--	reg &= ~(sCR0_CLIENTPD | sCR0_USFCFG);
-+	/* Enable client access, handling unmatched streams as appropriate */
-+	reg &= ~sCR0_CLIENTPD;
-+	if (disable_bypass)
-+		reg |= sCR0_USFCFG;
-+	else
-+		reg &= ~sCR0_USFCFG;
- 
- 	/* Disable forced broadcasting */
- 	reg &= ~sCR0_FB;
--- 
-2.7.0.25.gfc10eb5.dirty
+are available in the git repository at:
+
+   git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git 
+tags/vexpress-for-v4.6/dt-updates
+
+for you to fetch changes up to 9fd9288ed0899f9e318a97d73e777d6d3357265e:
+
+   arm64: dts: Add HDLCD support on Juno platforms (2016-02-10 10:58:33 
+  +0000)
+
+----------------------------------------------------------------
+Few updates for ARM VExpress/Juno platforms
+
+1. GICv3 support on Foundation models
+
+2. Support for Juno R2 board
+
+3. Support for ARM HDLCD on all Juno platforms
+
+----------------------------------------------------------------
+Andre Przywara (4):
+       arm64: dts: prepare foundation-v8.dts to cope with GICv3
+       arm64: dts: Foundation model: increase GICC region to allow EOImode=1
+       arm64: dts: split Foundation model dts to put the GIC separately
+       arm64: dts: add .dts for GICv3 Foundation model
+
+Liviu Dudau (2):
+       Documentation: drm: Add DT bindings for ARM HDLCD
+       arm64: dts: Add HDLCD support on Juno platforms
+
+Sudeep Holla (2):
+       arm64: dts: move juno pcie-controller to base file
+       arm64: dts: Add support for Juno r2 board
+
+  Documentation/devicetree/bindings/arm/arm-boards   |   1 +
+  .../devicetree/bindings/display/arm,hdlcd.txt      |  79 +++++++
+  arch/arm64/boot/dts/arm/Makefile                   |   4 +-
+  arch/arm64/boot/dts/arm/foundation-v8-gicv3.dts    |  30 +++
+  arch/arm64/boot/dts/arm/foundation-v8.dts          | 227 
++-------------------
+  arch/arm64/boot/dts/arm/foundation-v8.dtsi         | 228 
++++++++++++++++++++++
+  arch/arm64/boot/dts/arm/juno-base.dtsi             |  68 +++++-
+  arch/arm64/boot/dts/arm/juno-r1.dts                |  25 +--
+  arch/arm64/boot/dts/arm/juno-r2.dts                | 183 +++++++++++++++++
+  9 files changed, 595 insertions(+), 250 deletions(-)
+  create mode 100644 Documentation/devicetree/bindings/display/arm,hdlcd.txt
+  create mode 100644 arch/arm64/boot/dts/arm/foundation-v8-gicv3.dts
+  create mode 100644 arch/arm64/boot/dts/arm/foundation-v8.dtsi
+  create mode 100644 arch/arm64/boot/dts/arm/juno-r2.dts
