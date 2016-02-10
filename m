@@ -1,36 +1,52 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 10 Feb 2016 21:40:12 +0100
-Subject: [PATCH 0/8] KVM/ARM: Guest Entry/Exit optimizations
-In-Reply-To: <1454931622-14902-1-git-send-email-marc.zyngier@arm.com>
-References: <1454931622-14902-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20160210204012.GS5171@cbox>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 10 Feb 2016 21:40:11 +0100
+Subject: [PATCH V3 3/5] PCI: xilinx: Modifying AXI PCIe Host Bridge driver
+ to work on both Zynq and Microblaze
+In-Reply-To: <20160210172707.GA29590@NP-P-BURTON>
+References: <1455014518-8708-1-git-send-email-bharatku@xilinx.com>
+ <8520D5D51A55D047800579B09414719825881780@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <20160210172707.GA29590@NP-P-BURTON>
+Message-ID: <2818168.2fmZIs86hN@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 08, 2016 at 11:40:14AM +0000, Marc Zyngier wrote:
-> I've recently been looking at our entry/exit costs, and profiling
-> figures did show some very low hanging fruits.
+On Wednesday 10 February 2016 09:27:07 Paul Burton wrote:
+> On Wed, Feb 10, 2016 at 05:55:51AM +0000, Bharat Kumar Gogada wrote:
+> > > On Tue, Feb 09, 2016 at 04:11:56PM +0530, Bharat Kumar Gogada wrote:
+> > > > Modifying Xilinx AXI PCIe Host Bridge Soft IP driver to work on both
+> > > > Zynq and Microblaze Architectures.
+> > > > With these modifications drivers/pci/host/pcie-xilinx.c, will work on
+> > > > both Zynq and Microblaze Architectures.
+> > > >
+> > > > Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
+> > > > Signed-off-by: Ravi Kiran Gummaluri <rgummal@xilinx.com>
+> > > > ---
+> > > > Changes:
+> > > > Removed unneccessary architecture dependent number of MSI's.
+> > > > Added #ifdef to pci_fixup_irqs which is ARM specific API.
+> > > 
+> > > Hi Bharat,
+> > > 
+> > > Why do you say pci_fixup_irqs is ARM-specific? It's declared in
+> > > include/linux/pci.h, defined in drivers/pci/setup-irq.c & used by multiple
+> > > architectures (alpha, arm, m68k, mips, sh, sparc, tile,
+> > > unicore32 from a quick grep).
+> > > 
+> > > Will you not break INTX-style interrupts by removing this?
+> > > 
+> > I meant to say ARM specific w.r.t Microblaze architecture, which is
+> > what this patch series are for. This has been already discussed in my
+> > previous patch by  Arnd Bergmann and Lorenzo Pieralisi .
+> > (https://lkml.org/lkml/2016/1/12/707)
 > 
-> The most obvious cost is that accessing the GIC HW is slow. As in
-> "deadly slow", specially when GICv2 is involved. So not hammering the
-> HW when there is nothing to write is immediately beneficial, as this
-> is the most common cases (whatever people seem to think, interrupts
-> are a *rare* event).
+> Hi Bharat,
 > 
-> Another easy thing to fix is the way we handle trapped system
-> registers. We do insist on (mostly) sorting them, but we do perform a
-> linear search on trap. We can switch to a binary search for free, and
-> get immediate benefits (the PMU code, being extremely trap-happy,
-> benefits immediately from this).
-> 
-> With these in place, I see an improvement of 20 to 30% (depending on
-> the platform) on our world-switch cycle count when running a set of
-> hand-crafted guests that are designed to only perform traps.
-> 
+> Ok, so you don't need it for microblaze but do need it for zynq/ARM. We
+> also need it for MIPS, where my recent patches enable this driver. So if
+> #ifdef'ing this is the current way forwards could you please invert the
+> condition to #ifndef CONFIG_MICROBLAZE?
 
-By the way, I took this whole stack of changes (wsinc, vhe, and
-optimizations) and ran it on Mustang and fired up UEFI and did a reboot
-and things seem to work, so that's a small shallow
-'tested-by-something-else-than-a-linux-guest' statement from me.
+I think we are getting to the point where we should try much harder
+to make sure nobody needs that hack and it all works out of the box.
 
--Christoffer
+	Arnd
