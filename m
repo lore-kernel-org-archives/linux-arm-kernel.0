@@ -1,69 +1,53 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 10 Feb 2016 18:13:26 +0000
-Subject: [PATCH v2 0/6] irqchip: irq-armada-370-xp: generic MSI
- infrastructure and assorted fixes
-In-Reply-To: <87mvr8xwrz.fsf@free-electrons.com>
-References: <1453899395-3532-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20160210150046.118fc991@free-electrons.com>
- <56BB4451.3070707@arm.com>
- <20160210153829.GA5183@io.lakedaemon.net>
- <87mvr8xwrz.fsf@free-electrons.com>
-Message-ID: <20160210181325.GB5183@io.lakedaemon.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 10 Feb 2016 18:15:22 +0000
+Subject: [PATCH] arm64: Add workaround for Cavium erratum 27456
+In-Reply-To: <56BB7C91.5010205@caviumnetworks.com>
+References: <1455046156-10582-1-git-send-email-ddaney.cavm@gmail.com>
+ <20160210092822.GA1052@arm.com>
+ <56BB7C91.5010205@caviumnetworks.com>
+Message-ID: <20160210181522.GW1052@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 10, 2016 at 07:09:20PM +0100, Gregory CLEMENT wrote:
-> Hi Jason,
->  
->  On mer., f?vr. 10 2016, Jason Cooper <jason@lakedaemon.net> wrote:
-> 
-> > On Wed, Feb 10, 2016 at 02:08:17PM +0000, Marc Zyngier wrote:
-> >> On 10/02/16 14:00, Thomas Petazzoni wrote:
-> >> > Hello,
-> >> > 
-> >> > On Wed, 27 Jan 2016 13:56:29 +0100, Thomas Petazzoni wrote:
-> >> > 
-> >> >> Thomas Petazzoni (6):
-> >> >>   irqchip: irq-armada-370-xp: add Kconfig option for the driver
-> >> >>   irqchip: irq-armada-370-xp: use the generic MSI infrastructure
-> >> >>   irqchip: irq-armada-370-xp: use PCI_MSI_DOORBELL_START where
-> >> >>     appropriate
-> >> >>   irqchip: irq-armada-370-xp: use shorter names for irq_chip
-> >> >>   irqchip: irq-armada-370-xp: allow allocation of multiple MSIs
-> >> >>   ARM: mvebu: use the ARMADA_370_XP_IRQ option
-> >> > 
-> >> > Jason, Thomas, any chance to get this applied soonish?
-> >> > 
-> >> > The core patch of the series, which migrates the irq-armada-370-xp
-> >> > driver to use the generic MSI infrastructure has been Reviewed-by: Marc
-> >> > Zyngier, and the other patches in the series have Acked-by/Reviewed-by
-> >> > from Gregory Clement.
-> >> > 
-> >> > Of course, if there's anything left to be changed, I'd be happy to
-> >> > respin a new version of this series.
-> >> > 
-> >> 
-> >> Noticing the distribution list, it would be good to repost these patches
-> >> with acks and co to LKML...
+On Wed, Feb 10, 2016 at 10:08:17AM -0800, David Daney wrote:
+> On 02/10/2016 01:28 AM, Will Deacon wrote:
+> >On Tue, Feb 09, 2016 at 11:29:16AM -0800, David Daney wrote:
+> >>From: Andrew Pinski <apinski@cavium.com>
+> >>
+> >>On ThunderX T88 pass 1.x through 2.1 parts, broadcast TLBI
+> >>instructions may cause the icache to become invalid if it contains
+> >>data for a non-current ASID.
+> >>
+> >>This patch implements the workaround (which flushes the local icache
+> >>when switching the mm) by using code patching.
 > >
-> > agreed, and I'll pick it up within the next day or so.  Still getting my
-> > home network setup... too much wifi. :(
+> >So, to be clear, is this "just" a performance problem as opposed to a
+> >correctness issue?
 > 
-> I proposed that you take the 6th patch to ensure that this driver will
-> always be selected for the mvebu platform which need it. It is still OK
-> but, since this offer, I sent a series which depend of the 1st patch:
-> http://thread.gmane.org/gmane.linux.ide/61178
+> No.  It is a correctness issue.  Without this workaround in place, userspace
+> programs end up executing the wrong instructions, which leads to
+> unpredictable behavior and program crashes.
 
-I saw that. ;-)
+Ok, so I think the description in the commit log isn't quite right. An
+"invalid" line in i-cache simply means that it needs to be refetched.
+What you're talking about sounds like data corruption.
 
-> Would you agree to provide an immutable tag containing the first patch?
-> Thanks to this I will be able to provide it to the arm-soc maintainer
-> for my pull request.
+I also don't understand how the workaround fixes things like TLBIs due
+to copy-on-write faults triggered by another core. Also, what's the
+interaction with virtual machines, or is the VMID not affected in the
+same way as the ASID?
 
-Sure, that's my default MO since most of the time, people only touch
-irqchip drivers when they are changing something else.  Thus, there's
-usually a dependency on the irqchip changes.
+Sorry to be a pain on this, but we need to understand the issue well
+enough to maintain the workaround in the future!
 
-thx,
+> >If so, do you have any numbers with and without this
+> >change?
+> 
+> We tried to measure it, but the impact is not measurable in the tests we
+> have done.  Switching the mm is not often done so the extra ICache
+> invalidation is rare.
 
-Jason.
+Oh, sure. I was only interested in perf figures if this was a performance
+problem rather than a functional one.
+
+Will
