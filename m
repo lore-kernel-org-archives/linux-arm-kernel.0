@@ -1,102 +1,46 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 10 Feb 2016 12:31:10 +0000
-Subject: [PATCH] arm64: Rework valid_user_regs
-In-Reply-To: <20160210115853.GG1052@arm.com>
-References: <1455041501-30018-1-git-send-email-mark.rutland@arm.com>
- <20160210115853.GG1052@arm.com>
-Message-ID: <20160210123110.GD2632@leverpostej>
+From: lars.persson@axis.com (Lars Persson)
+Date: Wed, 10 Feb 2016 13:41:49 +0100
+Subject: [PATCH 0/8] arm: Add Artpec-6 SoC
+Message-ID: <cover.1455107681.git.larper@axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 10, 2016 at 11:58:53AM +0000, Will Deacon wrote:
-> Hi Mark,
-> 
-> On Tue, Feb 09, 2016 at 06:11:41PM +0000, Mark Rutland wrote:
-> > +/*
-> > + * Bits which are architecturally RES0 per ARM DDI 0487A.h
-> > + * The kernel matches the HW policy. Userspace cannot use these until they have
-> > + * an architectural meaning.
-> > + */
-> > +#define SPSR_EL1_AARCH64_RES0_BITS \
-> > +	(GENMASK_ULL(63,32) | GENMASK_ULL(27, 22) | GENMASK_ULL(19, 10) | \
-> > +	 GENMASK_ULL(5, 5))
-> > +#define SPSR_EL1_AARCH32_RES0_BITS \
-> > +	(GENMASK_ULL(63,32) | (GENMASK_ULL(23, 22)))
-> 
-> The J bit (24) is also RES0 and the E bit (9) can be RES0/RES1 depending
-> on what the CPU supports.
+Basic support for the Axis Artpec-6 ARM SoC. Timers, interrupts, UARTs and
+ethernet are wired up.
 
->From a quick look, J is always RES0 for ARMv8. I'll add that to the
-mask.
+Lars Persson (8):
+  clk: add device tree binding for artpec-6 pll1 clock
+  clk: add artpec-6 pll1 clock driver
+  arm: add device-tree SoC bindings for Axis Artpec-6
+  arm: dts: add Artpec-6 soc dtsi file
+  arm: dts: add Artpec-6 development board dts
+  arm: initial machine port for artpec-6 SoC
+  arm: multi_v7_defconfig: add MACH_ARTPEC6
+  arm: mach-artpec: add entry to MAINTAINERS
 
-E is a bit more complex; I'll see about handling that dynamically in
-valid_compat_user_regs.
+ Documentation/devicetree/bindings/arm/axis.txt     |   8 +
+ .../devicetree/bindings/clock/artpec6.txt          |  14 ++
+ MAINTAINERS                                        |  10 +
+ arch/arm/Kconfig                                   |   2 +
+ arch/arm/Makefile                                  |   1 +
+ arch/arm/boot/dts/Makefile                         |   2 +
+ arch/arm/boot/dts/artpec6-devboard.dts             |  57 +++++
+ arch/arm/boot/dts/artpec6.dtsi                     | 238 +++++++++++++++++++++
+ arch/arm/configs/multi_v7_defconfig                |   2 +
+ arch/arm/mach-artpec/Kconfig                       |  22 ++
+ arch/arm/mach-artpec/Makefile                      |   1 +
+ arch/arm/mach-artpec/board-artpec6.c               |  66 ++++++
+ drivers/clk/Makefile                               |   1 +
+ drivers/clk/clk-artpec6.c                          |  70 ++++++
+ 14 files changed, 494 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/axis.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/artpec6.txt
+ create mode 100644 arch/arm/boot/dts/artpec6-devboard.dts
+ create mode 100644 arch/arm/boot/dts/artpec6.dtsi
+ create mode 100644 arch/arm/mach-artpec/Kconfig
+ create mode 100644 arch/arm/mach-artpec/Makefile
+ create mode 100644 arch/arm/mach-artpec/board-artpec6.c
+ create mode 100644 drivers/clk/clk-artpec6.c
 
-> It also might be worth negating these in the definition, rather than
-> on every use.
-
-Does that make anything clearer? They're constants which get used once
-each, and SPSR_EL1_AARCH*_MASK wouldn't make it clear what the bits
-actually are.
-
-If you have a better suggestion for a name I'm happy to change it.
-
-> > +static int valid_aa32_regs(struct user_pt_regs *regs)
-> 
-> valid_compat_user_regs
-
-Ok
-
-> > +static int valid_aa64_regs(struct user_pt_regs *regs)
-> 
-> valid_native_user_regs
-
-Ok.
-
-> > +{
-> > +	regs->pstate &= ~SPSR_EL1_AARCH64_RES0_BITS;
-> > +
-> > +	if (user_mode(regs) && !(regs->pstate & PSR_MODE32_BIT) &&
-> > +	    (regs->pstate & PSR_D_BIT) == 0 &&
-> > +	    (regs->pstate & PSR_A_BIT) == 0 &&
-> > +	    (regs->pstate & PSR_I_BIT) == 0 &&
-> > +	    (regs->pstate & PSR_F_BIT) == 0) {
-> > +		return 1;
-> > +	}
-> 
-> I think we should err on the side of caution and nuke SS and IL for both
-> native and compat too, although that seems a odds with the PSR_s mask.
-> I wonder how relevant those PSR groups are in ARMv8...
-
-Ok.
-
-I couldn't spot anything in the ARM ARM regarding PSR bit groups,; I was
-cargo-culting from the existing code. I'm more than happy to make the
-PSR_* groups an aarch32/compat thing.
-
-> > +int valid_user_regs(struct user_pt_regs *regs, struct task_struct *task)
-> > +{
-> > +	if (is_compat_thread(task_thread_info(task)))
-> 
-> is_compat_task
-
-Can't do; is_compat_task() takes no task_struct and assumes we're asking
-about current (which doesn't work for the ptrace cases).
-
-We could add a new helper for this, but I think that should be future
-cleanup as we'd want to alter the other uses:
-
-[mark at leverpostej:~/src/linux]% git grep is_compat_thread origin/master
-origin/master:arch/arm64/include/asm/compat.h:static inline int is_compat_thread(struct thread_info *thread)
-origin/master:arch/arm64/include/asm/compat.h:static inline int is_compat_thread(struct thread_info *thread)
-origin/master:arch/arm64/include/asm/processor.h:       if (is_compat_thread(task_thread_info(t)))                      \
-origin/master:arch/arm64/kernel/hw_breakpoint.c:        return tsk && is_compat_thread(task_thread_info(tsk));
-origin/master:arch/arm64/kernel/perf_regs.c:    if (is_compat_thread(task_thread_info(task)))
-origin/master:arch/arm64/kernel/process.c:                      if (is_compat_thread(task_thread_info(p)))
-origin/master:arch/arm64/kernel/process.c:      tpidrro = is_compat_thread(task_thread_info(next)) ?
-origin/master:arch/arm64/kernel/ptrace.c:       else if (is_compat_thread(task_thread_info(task)))
-
-I'm happy to look at cleaning that up as a later patch/series.
-
-Thanks,
-Mark.
+-- 
+2.1.4
