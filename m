@@ -1,173 +1,42 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 10 Feb 2016 17:43:54 +0000
-Subject: [PATCH 7/8] KVM: arm/arm64: Avoid accessing GICH registers
-In-Reply-To: <20160210173054.GR5171@cbox>
-References: <1454931622-14902-1-git-send-email-marc.zyngier@arm.com>
- <1454931622-14902-8-git-send-email-marc.zyngier@arm.com>
- <20160210124506.GN5171@cbox> <56BB3C74.9000105@arm.com>
- <20160210173054.GR5171@cbox>
-Message-ID: <56BB76DA.4080905@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 10 Feb 2016 17:44:55 +0000
+Subject: [PATCH V1 0/6] Add UEFI 2.6 and ACPI 6.1 updates for RAS on ARM64
+In-Reply-To: <1454699608-22760-1-git-send-email-tbaicar@codeaurora.org>
+References: <1454699608-22760-1-git-send-email-tbaicar@codeaurora.org>
+Message-ID: <20160210174454.GS1052@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/02/16 17:30, Christoffer Dall wrote:
-> On Wed, Feb 10, 2016 at 01:34:44PM +0000, Marc Zyngier wrote:
->> On 10/02/16 12:45, Christoffer Dall wrote:
->>> On Mon, Feb 08, 2016 at 11:40:21AM +0000, Marc Zyngier wrote:
->>>> GICv2 registers are *slow*. As in "terrifyingly slow". Which is bad.
->>>> But we're equaly bad, as we make a point in accessing them even if
->>>> we don't have any interrupt in flight.
->>>>
->>>> A good solution is to first find out if we have anything useful to
->>>> write into the GIC, and if we don't, to simply not do it. This
->>>> involves tracking which LRs actually have something valid there.
->>>>
->>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>>> ---
->>>>  arch/arm64/kvm/hyp/vgic-v2-sr.c | 71 ++++++++++++++++++++++++++++-------------
->>>>  include/kvm/arm_vgic.h          |  2 ++
->>>>  2 files changed, 51 insertions(+), 22 deletions(-)
->>>>
->>>> diff --git a/arch/arm64/kvm/hyp/vgic-v2-sr.c b/arch/arm64/kvm/hyp/vgic-v2-sr.c
->>>> index e717612..874a08d 100644
->>>> --- a/arch/arm64/kvm/hyp/vgic-v2-sr.c
->>>> +++ b/arch/arm64/kvm/hyp/vgic-v2-sr.c
->>>> @@ -38,28 +38,40 @@ void __hyp_text __vgic_v2_save_state(struct kvm_vcpu *vcpu)
->>>>  
->>>>  	nr_lr = vcpu->arch.vgic_cpu.nr_lr;
->>>>  	cpu_if->vgic_vmcr = readl_relaxed(base + GICH_VMCR);
->>>> -	cpu_if->vgic_misr = readl_relaxed(base + GICH_MISR);
->>>> -	eisr0  = readl_relaxed(base + GICH_EISR0);
->>>> -	elrsr0 = readl_relaxed(base + GICH_ELRSR0);
->>>> -	if (unlikely(nr_lr > 32)) {
->>>> -		eisr1  = readl_relaxed(base + GICH_EISR1);
->>>> -		elrsr1 = readl_relaxed(base + GICH_ELRSR1);
->>>> -	} else {
->>>> -		eisr1 = elrsr1 = 0;
->>>> -	}
->>>> +
->>>> +	if (vcpu->arch.vgic_cpu.live_lrs) {
->>>> +		eisr0  = readl_relaxed(base + GICH_EISR0);
->>>> +		elrsr0 = readl_relaxed(base + GICH_ELRSR0);
->>>> +		cpu_if->vgic_misr = readl_relaxed(base + GICH_MISR);
->>>> +		cpu_if->vgic_apr    = readl_relaxed(base + GICH_APR);
->>>> +
->>>> +		if (unlikely(nr_lr > 32)) {
->>>> +			eisr1  = readl_relaxed(base + GICH_EISR1);
->>>> +			elrsr1 = readl_relaxed(base + GICH_ELRSR1);
->>>> +		} else {
->>>> +			eisr1 = elrsr1 = 0;
->>>> +		}
->>>> +
->>>>  #ifdef CONFIG_CPU_BIG_ENDIAN
->>>> -	cpu_if->vgic_eisr  = ((u64)eisr0 << 32) | eisr1;
->>>> -	cpu_if->vgic_elrsr = ((u64)elrsr0 << 32) | elrsr1;
->>>> +		cpu_if->vgic_eisr  = ((u64)eisr0 << 32) | eisr1;
->>>> +		cpu_if->vgic_elrsr = ((u64)elrsr0 << 32) | elrsr1;
->>>>  #else
->>>> -	cpu_if->vgic_eisr  = ((u64)eisr1 << 32) | eisr0;
->>>> -	cpu_if->vgic_elrsr = ((u64)elrsr1 << 32) | elrsr0;
->>>> +		cpu_if->vgic_eisr  = ((u64)eisr1 << 32) | eisr0;
->>>> +		cpu_if->vgic_elrsr = ((u64)elrsr1 << 32) | elrsr0;
->>>>  #endif
->>>> -	cpu_if->vgic_apr    = readl_relaxed(base + GICH_APR);
->>>>  
->>>> -	writel_relaxed(0, base + GICH_HCR);
->>>> +		for (i = 0; i < nr_lr; i++)
->>>> +			if (vcpu->arch.vgic_cpu.live_lrs & (1UL << i))
->>>> +				cpu_if->vgic_lr[i] = readl_relaxed(base + GICH_LR0 + (i * 4));
->>>>  
->>>> -	for (i = 0; i < nr_lr; i++)
->>>> -		cpu_if->vgic_lr[i] = readl_relaxed(base + GICH_LR0 + (i * 4));
->>>> +		writel_relaxed(0, base + GICH_HCR);
->>>> +
->>>> +		vcpu->arch.vgic_cpu.live_lrs = 0;
->>>> +	} else {
->>>> +		cpu_if->vgic_eisr = 0;
->>>> +		cpu_if->vgic_elrsr = ~0UL;
->>>> +		cpu_if->vgic_misr = 0;
->>>> +	}
->>>>  }
->>>>  
->>>>  /* vcpu is already in the HYP VA space */
->>>> @@ -70,15 +82,30 @@ void __hyp_text __vgic_v2_restore_state(struct kvm_vcpu *vcpu)
->>>>  	struct vgic_dist *vgic = &kvm->arch.vgic;
->>>>  	void __iomem *base = kern_hyp_va(vgic->vctrl_base);
->>>>  	int i, nr_lr;
->>>> +	u64 live_lrs = 0;
->>>>  
->>>>  	if (!base)
->>>>  		return;
->>>>  
->>>> -	writel_relaxed(cpu_if->vgic_hcr, base + GICH_HCR);
->>>> -	writel_relaxed(cpu_if->vgic_vmcr, base + GICH_VMCR);
->>>> -	writel_relaxed(cpu_if->vgic_apr, base + GICH_APR);
->>>> -
->>>>  	nr_lr = vcpu->arch.vgic_cpu.nr_lr;
->>>> +
->>>>  	for (i = 0; i < nr_lr; i++)
->>>> -		writel_relaxed(cpu_if->vgic_lr[i], base + GICH_LR0 + (i * 4));
->>>> +		if (cpu_if->vgic_lr[i] & GICH_LR_STATE)
->>>> +			live_lrs |= 1UL << i;
->>>> +
->>>> +	if (live_lrs) {
->>>> +		writel_relaxed(cpu_if->vgic_hcr, base + GICH_HCR);
->>>> +		writel_relaxed(cpu_if->vgic_apr, base + GICH_APR);
->>>> +		for (i = 0; i < nr_lr; i++) {
->>>> +			u32 val = 0;
->>>> +
->>>> +			if (live_lrs & (1UL << i))
->>>> +				val = cpu_if->vgic_lr[i];
->>>> +
->>>> +			writel_relaxed(val, base + GICH_LR0 + (i * 4));
->>>> +		}
->>>> +	}
->>>> +
->>>> +	writel_relaxed(cpu_if->vgic_vmcr, base + GICH_VMCR);
->>>
->>> couldn't you optimize this out by storing the last read value and
->>> compare if anything changed?  (you'd have to invalidate the cached value
->>> on vcpu_put obviously).
->>
->> Yeah, very good point. Only the guest can update this, so we could even
->> move it to vcpu_load/vcpu_put entirely, and never save/restore it inside
->> the run loop.
+On Fri, Feb 05, 2016 at 12:13:22PM -0700, Tyler Baicar wrote:
+> Add support for Generic Hardware Error Source (GHES) v2, which introduces the
+> capability for the OS to acknowledge the consumption of the error record
+> generated by the Reliability, Availability and Serviceability (RAS) controller.
+> This eliminates potential race conditions between the OS and the RAS controller.
 > 
-> If vcpu_load is called *after* loading incoming state on migration, this
-> should work, yes.
-
-Hmmm. That could be an issue, actually. I need to check if we do a
-vcpu_load on SET_ONE_REG access. If we do, then vcpu_put will overwrite
-the value we've written in the shadow copies by reading back the old
-value from the HW.
-
-I'll investigate when I get the time.
-
->>
->> I'll keep that for a further patch, as it requires a bit of infrastructure.
->>
-> Sounds good.
+> Add support for the timestamp field added to the Generic Error Data Entry v3,
+> allowing the OS to log the time that the error is generated by the firmware,
+> rather than the time the error is consumed. This improves the correctness of
+> event sequences when analyzing error logs. The timestamp is added in
+> ACPI 6.1, reference Table 18-343 Generic Error Data Entry.
 > 
-> We can probably also optimize the writing of the LRs further, but I
-> figure it's not worth it as the interrupt delivery path is the slow path
-> anyway and we should care about optimizing the common case.
+> Add support for ARMv8 Common Platform Error Record (CPER) per UEFI 2.6
+> specification. ARMv8 specific processor error information is reported as part of
+> the CPER records.  This provides more detail on for processor error logs.
 > 
-> I wouldn't think saving 2-3 writes to some LRs would be measurable for
-> interrupt delivery anyhow.
+> Synchronous External Abort (SEA) represents a specific processor error condition
+> in ARM systems. A handler is added to recognize SEA errors, and a notifier is
+> added to parse and report the errors before the process is killed. Refer to
+> section N.2.1.1 in the Common Platform Error Record appendix of the UEFI 2.6
+> specification.
+> 
+> Depends on: [PATCH v5] acpi, apei, arm64: APEI initial support for aarch64.
+>             https://lkml.org/lkml/2015/12/10/131
 
-I found out that some other simple optimizations did save about 800
-cycles for a single interrupt injection, which is about 10% of the
-complete exit/enter path.
+Did the TLB flushing issue ever get sorted out with that series?
 
-Guilty ones are the maintenance interrupt status registers (MISR, EISR),
-and zeroing of LRs. That's with GICv2 though, and GICv3 seems less
-sensitive to that kind of thing...
+http://marc.info/?l=linux-arm-kernel&m=145009373307418&w=2
 
-But I agree with you: this is a fairly slow path overall, and we'll
-quickly approach the point of diminishing returns.
+It doesn't affect arm64, but I think it's a real issue for x86 when local
+invalidation is in effect to avoid IPIs from interrupt context.
 
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Will
