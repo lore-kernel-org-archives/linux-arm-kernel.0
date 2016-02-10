@@ -1,87 +1,64 @@
-From: juri.lelli@arm.com (Juri Lelli)
-Date: Wed, 10 Feb 2016 14:25:24 +0000
-Subject: [PATCH v3 2/6] drivers/cpufreq: implement
- init_cpu_capacity_default()
-In-Reply-To: <56BA0BCA.6090903@arm.com>
-References: <CAKfTPtDGk5BC25WqHdhDYDOBgUsuidAMhrXS=eDi6wJPZjfrwA@mail.gmail.com>
- <20160204093559.GA14099@e105550-lin.cambridge.arm.com>
- <CAKfTPtB4G3bP5N0hU6zWXJTddO34x3RnyGpp-4_otc8O=Wq2hw@mail.gmail.com>
- <20160204121620.GB29586@e106622-lin>
- <CAKfTPtDVasamRtG2kLxP0HsohmVQTPrXRgx36e+jb3gozDoo6g@mail.gmail.com>
- <20160204141345.GD29586@e106622-lin>
- <CAKfTPtDWP-AgqXsSuxCfVj33dh+i7oqDTkL=gUy7n-AB1anoow@mail.gmail.com>
- <CAKfTPtD4jTmUZoShGBm3oAFywizjp8jsEukmkeZU+x+zk-KZRA@mail.gmail.com>
- <20160205093040.GG29586@e106622-lin> <56BA0BCA.6090903@arm.com>
-Message-ID: <20160210142524.GE11415@e106622-lin>
+From: slemieux.tyco@gmail.com (Sylvain Lemieux)
+Date: Wed, 10 Feb 2016 09:25:17 -0500
+Subject: [PATCH 00/11] clk: lpc32xx: add clock support for NXP LPC32xx
+In-Reply-To: <56BA81F7.4080006@mleia.com>
+References: <1447981511-29653-1-git-send-email-vz@mleia.com>
+ <loom.20160209T215103-78@post.gmane.org>  <56BA81F7.4080006@mleia.com>
+Message-ID: <1455114317.23786.11.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/02/16 15:54, Dietmar Eggemann wrote:
-> On 05/02/16 09:30, Juri Lelli wrote:
-> > On 04/02/16 16:46, Vincent Guittot wrote:
-> >> On 4 February 2016 at 16:44, Vincent Guittot <vincent.guittot@linaro.org> wrote:
-> >>> On 4 February 2016 at 15:13, Juri Lelli <juri.lelli@arm.com> wrote:
-> >>>> On 04/02/16 13:35, Vincent Guittot wrote:
-> >>>>> On 4 February 2016 at 13:16, Juri Lelli <juri.lelli@arm.com> wrote:
-> >>>>>> Hi Vincent,
-> >>>>>>
-> >>>>>> On 04/02/16 13:03, Vincent Guittot wrote:
-> >>>>>>> On 4 February 2016 at 10:36, Morten Rasmussen <morten.rasmussen@arm.com> wrote:
-> >>>>>>>> On Wed, Feb 03, 2016 at 10:04:37PM +0100, Vincent Guittot wrote:
-> >>>>>>>>> On 3 February 2016 at 12:59, Juri Lelli <juri.lelli@arm.com> wrote:
+Hi Vladimir,
+
+On Wed, 2016-02-10 at 02:19 +0200, Vladimir Zapolskiy wrote:
+> Hi Sylvain,
 > 
-> [...]
-> 
-> >>>
-> >>> AFAICT, They don't have a dedicated cpufreq driver.
-> >>>
-> >>> More generally speaking, it can take time before having
+> On 09.02.2016 23:01, Sylvain Lemieux wrote:
+> > Vladimir Zapolskiy <vz@...> writes:
 > >>
-> >> email sent before the ne d of the sentence ...
-> >>
-> >> More generally speaking, it can take time before having a cpufreq
-> >> driver whereas we want to run and test scheduler behavior of these
-> >> heterogenous platform
-> >>
+> >> This changeset adds common clock framework driver for NXP LPC32xx
+> >> boards.
 > > 
-> > I'm not familiar with this platform, but from what you are saying and
-> > what I could find online, it looks like full Linux support is not
-> > finished yet. Can we consider that as still in development? And if we
-> > can do that, maybe is fair enough that we use the sysfs interface to
-> > play with that platform until support is complete.
+> > Just to let you know that we did some testing using this changeset;
+> > I installed patches 4 to 7, 10 & 11 on top of 4.5-rc1.
 > > 
-> > Do others have any opinion on this point?
+> > I was able to run our software (SIC1 interrupt sources disable)
+> > without any problem a custom LPC32xx board.
 > 
-> IMHO, the solution should work for all of heterogeneous systems, (a) w/
-> cpufreq and driver, (b) w/ cpufreq and no driver loaded (yet) or (c) w/o
-> cpufreq.
+> this is a known issue, and I hope it will be fixed in upstream in v4.6,
+> the required changes in irqchip and gpiochip drivers were sent for
+> review some time ago, a bit more work is needed to 
 > 
-> That means that you can't put the benchmarking only into
-> cpufreq_register_driver() and rely on cpufreq policy topology.
-> 
-> Maybe you could do this for (b) and (c) inside an initcall and use
-> topology_core_cpumask() to figure out which cpu to profile?
-> 
-> This would then happen w/ the cpu frequency set by the fw.
-> 
-> But this then has to be synchronized somehow with the benchmarking
-> approach in cpufreq_register_driver().
-> 
+I also tested the irqchip patches you sent previously;
+I will send a separate e-mail with the information.
 
-Yes, I guess the tricky situation is the mixed one, when we might have
-the benchmarking executing in a late_initcall when cpufreq kicks in. Or
-we can also end up doing the benchmarking twice if cpufreq finishes
-initialization after the late_initcall has been executed.
+> Also 2-3 more clean-up changes in USB host and gadget drivers are done
+> locally (no more need to configure clocks out of the common clock
+> framework), but not yet submitted, will do it tomorrow.
+> 
+> > We did not get any problem with the clock signals we are using.
+> > 
+> 
+> Thank you for testing, I'm going to add your Tested-by tag (if you
+> don't mind) and submit a PR to ARM maintainers shortly.
+> 
+You can go ahead for the tag; please use slemieux at tycoint.com
 
-I'm not sure how this can be solved in a clean way. Ideally we would
-start benchmarking in the late_initcall (at the frequency set by fw) and
-then bailout if cpufreq kicks in. That should work also for the cpufreq
-driver as a module case. But, we could do the same thing twice if the
-late_initcall is faster or gets executed before cpufreq starts to be
-initialized.
-
-Any suggestion anyone? :)
-
-Best,
-
-- Juri
+> >> Vladimir Zapolskiy (11):
+> >>   dt-bindings: clock: add description of LPC32xx clock controller
+> >>   dt-bindings: clock: add description of LPC32xx USB clock controller
+> >>   dt-bindings: clock: add NXP LPC32xx clock list for consumers
+> >>   arm: dts: lpc32xx: add device nodes for external oscillators
+> >>   arm: dts: lpc32xx: add clock controller device node
+> >>   arm: dts: lpc32xx: add clock properties to device nodes
+> >>   arm: dts: lpc32xx: add USB clock controller
+> >>   clk: lpc18xx: add NXP specific common clock framework selection
+> >>   clk: lpc32xx: add common clock framework driver
+> >>   arm: lpc32xx: switch to common clock framework
+> >>   arm: dts: lpc32xx: remove clock frequency property from UART device
+> >>     nodes
+> > 
+> > 
+> 
+> With best wishes,
+> Vladimir
