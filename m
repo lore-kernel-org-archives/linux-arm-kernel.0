@@ -1,26 +1,33 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 10 Feb 2016 15:28:56 +0100
-Subject: [PATCH] pci: xgene: Add ECAM fixups
-In-Reply-To: <1455068984-22210-1-git-send-email-dhdang@apm.com>
-References: <1455068984-22210-1-git-send-email-dhdang@apm.com>
-Message-ID: <2994764.UGKJE3zfLx@wuerfel>
+Date: Wed, 10 Feb 2016 15:36:03 +0100
+Subject: [PATCH 1/8] clk: add device tree binding for artpec-6 pll1 clock
+In-Reply-To: <c092f501a595032f9b76f18fc4bf093503a181c8.1455107681.git.larper@axis.com>
+References: <cover.1455107681.git.larper@axis.com>
+ <c092f501a595032f9b76f18fc4bf093503a181c8.1455107681.git.larper@axis.com>
+Message-ID: <12746231.crYxCXlbXY@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 09 February 2016 17:49:44 Duc Dang wrote:
-> X-Gene PCIe controller does not fully support ECAM.
-> This patch adds required ECAM fixup to allow X-Gene
-> PCIe controller to be functional in ACPI boot mode.
-> 
-> This patch is based on the original work of
-> Mark Salter <msalter@redhat.com> and depends on
-> Tomasz's PCIe ACPI series:
-> https://lkml.org/lkml/2016/2/4/646
-> 
-> Signed-off-by: Duc Dang <dhdang@apm.com>
+On Wednesday 10 February 2016 13:41:50 Lars Persson wrote:
+> Signed-off-by: Lars Persson <larper@axis.com>
 > ---
 
-This really has nothing to do with the PCI host device driver, please
-keep it in a separate file in drivers/acpi/.
+Always write a changelog comment.
 
-	Arnd
+> +* Clock bindings for Axis ARTPEC-6 chip
+> +
+> +Required properties:
+> +- compatible: Should be "axis,artpec6-pll1-clock"
+> +- #clock-cells: Should be <1>
+
+What is the clock cell used for?
+
+> +Examples:
+> +
+> +pll1_clk: pll1_clk {
+> +	#clock-cells = <1>;
+> +	compatible = "axis,artpec6-pll1-clock";
+> +	clocks = <&ext_clk>;
+> +	status = "okay";
+> +};
+> 
