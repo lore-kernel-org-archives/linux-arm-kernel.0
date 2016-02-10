@@ -1,42 +1,71 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 10 Feb 2016 15:45:01 +0100
-Subject: breaking DT compatibility (was: Re: [PATCH v4] clk: sunxi:
- Refactor A31 PLL6 so that it can be reused)
-In-Reply-To: <20160210143755.GE31506@lukather>
-References: <1454358000-13594-1-git-send-email-maxime.ripard@free-electrons.com>
- <CABGGiswOKztmRT40w4t_7BD729WgM8ueLtOD-UF_wgMbmcg4cg@mail.gmail.com>
- <20160210143755.GE31506@lukather>
-Message-ID: <3703606.9ibfaTDDFx@wuerfel>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Wed, 10 Feb 2016 14:45:09 +0000
+Subject: [RFC PATCH v3 3/3] PCI/ACPI: hisi: Add ACPI support for
+ HiSilicon SoCs Host Controllers
+In-Reply-To: <20160210111234.GC2632@leverpostej>
+References: <1455039260-6040-1-git-send-email-gabriele.paoloni@huawei.com>
+ <1455039260-6040-4-git-send-email-gabriele.paoloni@huawei.com>
+ <20160209182429.GD4348@leverpostej>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1ECB1591@lhreml503-mbs>
+ <20160210111234.GC2632@leverpostej>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1ECB1D30@lhreml503-mbs>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 10 February 2016 15:37:55 Maxime Ripard wrote:
-> Hi Rob,
+> -----Original Message-----
+> From: linux-kernel-owner at vger.kernel.org [mailto:linux-kernel-
+> owner at vger.kernel.org] On Behalf Of Mark Rutland
+> Sent: 10 February 2016 11:13
+> To: Gabriele Paoloni
+> Cc: Guohanjun (Hanjun Guo); Wangzhou (B); liudongdong (C); Linuxarm;
+> qiujiang; bhelgaas at google.com; arnd at arndb.de;
+> Lorenzo.Pieralisi at arm.com; tn at semihalf.com; linux-pci at vger.kernel.org;
+> linux-kernel at vger.kernel.org; xuwei (O); linux-acpi at vger.kernel.org;
+> jcm at redhat.com; zhangjukuo; Liguozhu (Kenneth); linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [RFC PATCH v3 3/3] PCI/ACPI: hisi: Add ACPI support for
+> HiSilicon SoCs Host Controllers
 > 
-> On Wed, Feb 10, 2016 at 07:42:02AM -0600, Rob Herring wrote:
-> > On Wed, Feb 10, 2016 at 6:30 AM, Andre Przywara <andre.przywara@arm.com> wrote:
-> > > Hi,
+> On Wed, Feb 10, 2016 at 09:52:36AM +0000, Gabriele Paoloni wrote:
+> > Hi Mark
+> >
+> > > On Tue, Feb 09, 2016 at 05:34:20PM +0000, Gabriele Paoloni wrote:
+> > > > From: gabriele paoloni <gabriele.paoloni@huawei.com>
+> > > > +/*
+> > > > + * Retrieve rc_dbi base and size from _DSD
+> > > > + * Name (_DSD, Package () {
+> > > > + *	ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
+> > > > + *	Package () {
+> > > > + *	Package () {"rc-dbi", Package () { 0x0, 0xb0080000, 0x0,
+> 0x10000
+> > > }},
+> > > > + *	}
+> > > > + *	})
+> > > > + */
 > > >
-> > > just a ping:
-> > >
-> > > Are we really OK with breaking existing DTs in 4.6? (per the code in
-> > > -next: f7d372ba54ea04d528a291b8dbe34716507bb60b, which is this patch).
-> > 
-> > I only warn and make sure people are aware of the issue. I leave that
-> > up to platform maintainers to decide. It depends on the maturity of
-> > the platform and users.
+> > > As above, this does not look right. ACPI has standard mechanisms
+> for
+> > > describing addresses. Making something up like this is not a good
+> idea.
+> >
+> > I am quite new to ACPI, may I ask you to explain a bit?
 > 
-> The impacted SoCs support is really partial. For the most supported
-> one, big things like display or sound are totally missing, and we
-> still update them on a regular basis to add support for new
-> devices. As such, users are very likely to upgrade the DT from one
-> version to another just because there's new devices available to
-> them. And the newest SoC impacted just got introduced in 4.5, and only
-> has the UART and MMC devices available.
-> 
-> 
+> ACPI has standard mechanisms for describing certain resources, and
+> these
+> should not be described in _DSD. Memory or IO address regions are such
+> resources (in _CRS, IIRC), and should not be described in _DSD.
 
-I think the main problems we had were around people building their
-own boards and maintaining out-of-tree dts files.
+Hi Mark,
 
-	Arnd
+In my case I think in need to look into the MCFG object as the problem
+I have is RC using a different range than the rest of the hierarchy.
+
+I'll investigate this and try to come with a solution in v4
+
+Many Thanks
+
+Gab 
+
+> 
+> Thanks,
+> Mark.
