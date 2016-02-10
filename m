@@ -1,78 +1,58 @@
-From: david.brown@linaro.org (David Brown)
-Date: Wed, 10 Feb 2016 13:52:22 -0800
-Subject: [PATCH] arm64: vdso: Mark vDSO code as read-only
-Message-ID: <1455141142-6838-1-git-send-email-david.brown@linaro.org>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 10 Feb 2016 14:08:07 -0800
+Subject: [PATCH 4/6] dt-bindings: watchdog: Add ARM SP805 DT bindings
+In-Reply-To: <1455084651-29325-5-git-send-email-anup.patel@broadcom.com>
+References: <1455084651-29325-1-git-send-email-anup.patel@broadcom.com>
+ <1455084651-29325-5-git-send-email-anup.patel@broadcom.com>
+Message-ID: <56BBB4C7.9040209@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Although the arm64 vDSO is cleanly separated by code/data with the
-code being read-only in userspace mappings, the code page is still
-writable from the kernel.  There have been exploits (such as
-http://itszn.com/blog/?p=21) that take advantage of this on x86 to go
-from a bad kernel write to full root.
+On 09/02/16 22:10, Anup Patel wrote:
+> The ARM SP805 DT node is already present in various DTS files.
+> This patch adds missing DT bindings documentation for ARM SP805.
+> 
+> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+> Reviewed-by: Ray Jui <rjui@broadcom.com>
+> Reviewed-by: Vikram Prakash <vikramp@broadcom.com>
+> Reviewed-by: Scott Branden <sbranden@broadcom.com>
 
-Prevent this specific exploit on arm64 by putting the vDSO code page
-in read-only memory as well.
+Rob, we would probably want an Ack from you on this one, but should we
+route this through an arm-soc pull request for Broadcom SoCs, or do you
+want to pick it in your tree directly?
 
-Before the change:
-[    3.138366] vdso: 2 pages (1 code @ ffffffc000a71000, 1 data @ ffffffc000a70000)
----[ Kernel Mapping ]---
-0xffffffc000000000-0xffffffc000082000         520K     RW NX SHD AF            UXN MEM/NORMAL
-0xffffffc000082000-0xffffffc000200000        1528K     ro x  SHD AF            UXN MEM/NORMAL
-0xffffffc000200000-0xffffffc000800000           6M     ro x  SHD AF        BLK UXN MEM/NORMAL
-0xffffffc000800000-0xffffffc0009b6000        1752K     ro x  SHD AF            UXN MEM/NORMAL
-0xffffffc0009b6000-0xffffffc000c00000        2344K     RW NX SHD AF            UXN MEM/NORMAL
-0xffffffc000c00000-0xffffffc008000000         116M     RW NX SHD AF        BLK UXN MEM/NORMAL
-0xffffffc00c000000-0xffffffc07f000000        1840M     RW NX SHD AF        BLK UXN MEM/NORMAL
-0xffffffc800000000-0xffffffc840000000           1G     RW NX SHD AF        BLK UXN MEM/NORMAL
-0xffffffc840000000-0xffffffc87ae00000         942M     RW NX SHD AF        BLK UXN MEM/NORMAL
-0xffffffc87ae00000-0xffffffc87ae70000         448K     RW NX SHD AF            UXN MEM/NORMAL
-0xffffffc87af80000-0xffffffc87af8a000          40K     RW NX SHD AF            UXN MEM/NORMAL
-0xffffffc87af8b000-0xffffffc87b000000         468K     RW NX SHD AF            UXN MEM/NORMAL
-0xffffffc87b000000-0xffffffc87fe00000          78M     RW NX SHD AF        BLK UXN MEM/NORMAL
-0xffffffc87fe00000-0xffffffc87ff50000        1344K     RW NX SHD AF            UXN MEM/NORMAL
-0xffffffc87ff90000-0xffffffc87ffa0000          64K     RW NX SHD AF            UXN MEM/NORMAL
-0xffffffc87fff0000-0xffffffc880000000          64K     RW NX SHD AF            UXN MEM/NORMAL
+Thanks!
 
-After:
-[    3.138368] vdso: 2 pages (1 code @ ffffffc0006de000, 1 data @ ffffffc000a74000)
----[ Kernel Mapping ]---
-0xffffffc000000000-0xffffffc000082000         520K     RW NX SHD AF            UXN MEM/NORMAL
-0xffffffc000082000-0xffffffc000200000        1528K     ro x  SHD AF            UXN MEM/NORMAL
-0xffffffc000200000-0xffffffc000800000           6M     ro x  SHD AF        BLK UXN MEM/NORMAL
-0xffffffc000800000-0xffffffc0009b8000        1760K     ro x  SHD AF            UXN MEM/NORMAL
-0xffffffc0009b8000-0xffffffc000c00000        2336K     RW NX SHD AF            UXN MEM/NORMAL
-0xffffffc000c00000-0xffffffc008000000         116M     RW NX SHD AF        BLK UXN MEM/NORMAL
-0xffffffc00c000000-0xffffffc07f000000        1840M     RW NX SHD AF        BLK UXN MEM/NORMAL
-0xffffffc800000000-0xffffffc840000000           1G     RW NX SHD AF        BLK UXN MEM/NORMAL
-0xffffffc840000000-0xffffffc87ae00000         942M     RW NX SHD AF        BLK UXN MEM/NORMAL
-0xffffffc87ae00000-0xffffffc87ae70000         448K     RW NX SHD AF            UXN MEM/NORMAL
-0xffffffc87af80000-0xffffffc87af8a000          40K     RW NX SHD AF            UXN MEM/NORMAL
-0xffffffc87af8b000-0xffffffc87b000000         468K     RW NX SHD AF            UXN MEM/NORMAL
-0xffffffc87b000000-0xffffffc87fe00000          78M     RW NX SHD AF        BLK UXN MEM/NORMAL
-0xffffffc87fe00000-0xffffffc87ff50000        1344K     RW NX SHD AF            UXN MEM/NORMAL
-0xffffffc87ff90000-0xffffffc87ffa0000          64K     RW NX SHD AF            UXN MEM/NORMAL
-0xffffffc87fff0000-0xffffffc880000000          64K     RW NX SHD AF            UXN MEM/NORMAL
+> ---
+>  .../devicetree/bindings/watchdog/arm,sp805.txt          | 17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/watchdog/arm,sp805.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/watchdog/arm,sp805.txt b/Documentation/devicetree/bindings/watchdog/arm,sp805.txt
+> new file mode 100644
+> index 0000000..6ebb77d
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/watchdog/arm,sp805.txt
+> @@ -0,0 +1,17 @@
+> +ARM AMBA Primecell SP805 Watchdog
+> +
+> +Required properties:
+> +- compatible: Should be "arm,sp805" & "arm,primecell"
+> +- reg: Should contain location and length for watchdog timer register.
+> +- interrupts: Should contain the list of watchdog timer interrupts.
+> +- clocks: clocks driving the watchdog timer hardware. This list should be 2
+> +	clocks. With 2 clocks, the order is wdogclk clock, apb_pclk.
+> +
+> +Example:
+> +	wdt at 66090000 {
+> +		compatible = "arm,sp805", "arm,primecell";
+> +		reg = <0x66090000 0x1000>;
+> +		interrupts = <GIC_SPI 406 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&apb_pclk>,<&apb_pclk>;
+> +		clock-names = "wdogclk", "apb_pclk";
+> +	};
+> 
 
-Inspired by https://lkml.org/lkml/2016/1/19/494 based on work by the
-PaX Team, Brad Spengler, and Kees Cook.
 
-Signed-off-by: David Brown <david.brown@linaro.org>
----
- arch/arm64/kernel/vdso/vdso.S | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm64/kernel/vdso/vdso.S b/arch/arm64/kernel/vdso/vdso.S
-index 60c1db5..db7c0f2 100644
---- a/arch/arm64/kernel/vdso/vdso.S
-+++ b/arch/arm64/kernel/vdso/vdso.S
-@@ -24,6 +24,7 @@
- 	__PAGE_ALIGNED_DATA
- 
- 	.globl vdso_start, vdso_end
-+	.section .rodata
- 	.balign PAGE_SIZE
- vdso_start:
- 	.incbin "arch/arm64/kernel/vdso/vdso.so"
 -- 
-2.7.1
+Florian
