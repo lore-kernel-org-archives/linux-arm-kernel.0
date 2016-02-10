@@ -1,80 +1,50 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Tue, 9 Feb 2016 19:42:34 -0600
-Subject: [PATCH v3 3/3] pci: dra7xx: use pdata callbacks to perform reset
-In-Reply-To: <alpine.DEB.2.02.1602091932160.2906@utopia.booyaka.com>
-References: <1452780672-14339-1-git-send-email-kishon@ti.com>
- <1452780672-14339-4-git-send-email-kishon@ti.com>
- <20160127173104.GQ19432@atomide.com> <56A90971.4020409@ti.com>
- <20160127185649.GV19432@atomide.com> <56A94FB7.6020903@ti.com>
- <20160128183156.GH19432@atomide.com> <56B087AD.4000505@ti.com>
- <alpine.DEB.2.02.1602080208070.2182@utopia.booyaka.com>
- <56B900E9.9040306@ti.com>
- <alpine.DEB.2.02.1602090846480.2906@utopia.booyaka.com>
- <56BA2495.9020407@ti.com>
- <alpine.DEB.2.02.1602091932160.2906@utopia.booyaka.com>
-Message-ID: <56BA958A.1020503@ti.com>
+From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
+Date: Tue,  9 Feb 2016 22:54:24 -0300
+Subject: [PATCH v2 0/3] lpc32xx clockevent: Support periodic mode and ARM
+ delay timer
+Message-ID: <1455069267-4784-1-git-send-email-ezequiel@vanguardiasur.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+This patchset introduces periodic timer mode. As was discussed on v1,
+the current implementation (MR0=1, PR=ticks) is not suitable for
+implementing a periodoc timer mode.
 
-On 02/09/2016 01:36 PM, Paul Walmsley wrote:
-> Hi Suman 
-> 
-> On Tue, 9 Feb 2016, Suman Anna wrote:
-> 
->> On 02/09/2016 02:49 AM, Paul Walmsley wrote:
->>> On Mon, 8 Feb 2016, Suman Anna wrote:
->>>> On 02/07/2016 08:48 PM, Paul Walmsley wrote:
->>>>> On Tue, 2 Feb 2016, Kishon Vijay Abraham I wrote:
->>>>>
->>>>>> Paul, what do you think is the best way forward to perform reset?
->>>>>
->>>>> Many of the IP blocks with PRM hardreset lines are processor IP blocks. 
->>>>> Those often need special reset handling to ensure that WFI/HLT-like 
->>>>> instructions are executed after reset.  This special handling ensures that 
->>>>> the IP blocks' bus initiator interfaces indicate that they are in standby 
->>>>> to the PRCM - thus allowing power management for the rest of the chip to 
->>>>> work correctly.
->>>>>
->>>>> But that doesn't seem to be the case with PCIe - and maybe others - 
->>>>> possibly some of the MMUs?  
->>>>
->>>> Yeah, the sequencing between clocks and resets would still be the same
->>>> for MMUs, so, adding the custom flags for MMUs is fine.
->>>
->>> I'm curious as to whether HWMOD_CUSTOM_HARDRESET is needed for the MMUs.  
->>> We've stated that the main point of the custom hardreset code is to handle 
->>> processors that need to be placed into WFI/HLT, but it doesn't seem like 
->>> there would be an equivalent for MMUs.  Thoughts?
->>
->> The current OMAP IOMMU code already leverages the pdata ops for
->> performing the resets, so not adding the flags would also require
->> additional changes in the driver.
->>
->> Also, the reset lines controlling the MMUs actually also manage the
->> reset for all the other sub-modules other than the processor cores
->> within the sub-systems. We have currently different issues (see [1] for
->> eg. around the IPU sub-system entering RET in between), so from a PM
->> point of view, we do prefer to place the MMUs also in reset when we are
->> runtime suspended.
-> 
-> Should we reassert hardreset in _idle() for IP blocks that don't have 
-> HWMOD_CUSTOM_HARDRESET set on them?  Would that allow us to use this 
-> mechanism for the uncore hardreset lines, or are there other quirks?
-> 
-> Also - would that address the potential issue that you mentioned with the 
-> PCIe block, or is that a different issue?
+This can be seen with a very simple test, by counting the number of
+interrupts during 1-second.
 
-Yeah, I think that would address the PCIe block issue in terms of reset
-state balancing between pm_runtime_get_sync() and pm_runtime_put()
-calls. Right now, they are unbalanced. The PCIe block is using these
-only in probe and remove, so it should work for that IP.
+Implementing the periodic timer mode with MR0=1, PR=ticks_per_jiffy
+results in half the expected number of interrupts (CONFIG_HZ=100):
 
-The IPUs and DSPs in general would also place the reset lines asserted
-when suspended, as the power up sequence almost always involves
-releasing a reset line with the boot-up code on the processor detecting
-that it is a power restore boot.
+(See: http://git.infradead.org/users/ezequielg/linux/shortlog/refs/heads/lpc32xx_periodic_with_pr)
 
-regards
-Suman
+$ cat /proc/interrupts | grep clockevent && sleep 1 && cat /proc/interrupts | grep clockevent
+ 16:        846  nvic_irq  13 Edge      lpc3220 clockevent
+ 16:        900  nvic_irq  13 Edge      lpc3220 clockevent
+
+On the other side, with this patchset the number of interrupts
+is closer to the expected:
+
+$ cat /proc/interrupts | grep clockevent && sleep 1 && cat /proc/interrupts | grep clockevent
+ 16:       1580  nvic_irq  13 Edge      lpc3220 clockevent
+ 16:       1688  nvic_irq  13 Edge      lpc3220 clockevent
+
+Therefore, the first patch switches the timer one-shot implementation
+to use PR=0 and MR0=ticks. The second patch implements periodic mode
+using this.
+
+The last patch adds support for the ARM delay timer, which is used
+for udelay and also to skip the delay loop calibration.
+
+Ezequiel Garcia (3):
+  clocksource/drivers/lpc32xx: Don't use the prescaler counter for
+    clockevents
+  clocksource/drivers/lpc32xx: Support periodic mode
+  clocksource/drivers/lpc32xx: Support timer-based ARM delay
+
+ drivers/clocksource/Kconfig        |  1 +
+ drivers/clocksource/time-lpc32xx.c | 66 ++++++++++++++++++++++++++++++--------
+ 2 files changed, 54 insertions(+), 13 deletions(-)
+
+-- 
+2.7.0
