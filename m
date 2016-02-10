@@ -1,98 +1,64 @@
 From: niklas.soderlund+renesas@ragnatech.se (=?UTF-8?q?Niklas=20S=C3=B6derlund?=)
-Date: Wed, 10 Feb 2016 01:57:56 +0100
-Subject: [PATCH v3 6/8] dmaengine: rcar-dmac: add iommu support for slave
- transfers
+Date: Wed, 10 Feb 2016 01:57:58 +0100
+Subject: [PATCH v3 8/8] ARM: dts: r8a7791: add iommus to dmac0 and dmac1
 In-Reply-To: <1455065878-11906-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
 References: <1455065878-11906-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
-Message-ID: <1455065878-11906-7-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+Message-ID: <1455065878-11906-9-git-send-email-niklas.soderlund+renesas@ragnatech.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable slave transfers to devices behind IPMMU:s by mapping the slave
-addresses using the dma-mapping API.
-
 Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
 ---
- drivers/dma/sh/rcar-dmac.c | 57 ++++++++++++++++++++++++++++++++++++++++++----
- 1 file changed, 52 insertions(+), 5 deletions(-)
+ arch/arm/boot/dts/r8a7791.dtsi | 30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
 
-diff --git a/drivers/dma/sh/rcar-dmac.c b/drivers/dma/sh/rcar-dmac.c
-index 743873c..268407c 100644
---- a/drivers/dma/sh/rcar-dmac.c
-+++ b/drivers/dma/sh/rcar-dmac.c
-@@ -1106,21 +1106,68 @@ rcar_dmac_prep_dma_cyclic(struct dma_chan *chan, dma_addr_t buf_addr,
- 	return desc;
- }
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index 2a369dd..6dff061 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -283,6 +283,21 @@
+ 		power-domains = <&cpg_clocks>;
+ 		#dma-cells = <1>;
+ 		dma-channels = <15>;
++		iommus = <&ipmmu_ds 0>,
++			 <&ipmmu_ds 1>,
++			 <&ipmmu_ds 2>,
++			 <&ipmmu_ds 3>,
++			 <&ipmmu_ds 4>,
++			 <&ipmmu_ds 5>,
++			 <&ipmmu_ds 6>,
++			 <&ipmmu_ds 7>,
++			 <&ipmmu_ds 8>,
++			 <&ipmmu_ds 9>,
++			 <&ipmmu_ds 10>,
++			 <&ipmmu_ds 11>,
++			 <&ipmmu_ds 12>,
++			 <&ipmmu_ds 13>,
++			 <&ipmmu_ds 14>;
+ 	};
  
-+static int rcar_dmac_set_slave_addr(struct dma_chan *chan,
-+				     struct rcar_dmac_chan_slave *slave,
-+				     phys_addr_t addr, size_t size)
-+{
-+	struct dma_attrs attrs;
-+	enum dma_data_direction dir;
-+
-+	init_dma_attrs(&attrs);
-+	dma_set_attr(DMA_ATTR_NO_KERNEL_MAPPING, &attrs);
-+	dma_set_attr(DMA_ATTR_SKIP_CPU_SYNC, &attrs);
-+
-+	/*
-+	 * We can't know the direction at this time, see documentation for
-+	 * 'direction' in struct dma_slave_config.
-+	 */
-+	dir = DMA_BIDIRECTIONAL;
-+
-+	if (slave->xfer_size) {
-+		dma_unmap_resource(chan->device->dev, slave->slave_addr,
-+				slave->xfer_size, dir, &attrs);
-+		slave->slave_addr = 0;
-+		slave->xfer_size = 0;
-+	}
-+
-+	if (size) {
-+		slave->slave_addr = dma_map_resource(chan->device->dev, addr,
-+				size, dir, &attrs);
-+
-+		if (dma_mapping_error(chan->device->dev, slave->slave_addr)) {
-+			struct rcar_dmac_chan *rchan = to_rcar_dmac_chan(chan);
-+
-+			dev_err(chan->device->dev,
-+					"chan%u: failed to map %zx@%pap",
-+					rchan->index, size, &addr);
-+			return -EIO;
-+		}
-+
-+		slave->xfer_size = size;
-+	}
-+
-+	return 0;
-+}
-+
- static int rcar_dmac_device_config(struct dma_chan *chan,
- 				   struct dma_slave_config *cfg)
- {
- 	struct rcar_dmac_chan *rchan = to_rcar_dmac_chan(chan);
-+	int ret;
+ 	dmac1: dma-controller at e6720000 {
+@@ -314,6 +329,21 @@
+ 		power-domains = <&cpg_clocks>;
+ 		#dma-cells = <1>;
+ 		dma-channels = <15>;
++		iommus = <&ipmmu_ds 15>,
++			 <&ipmmu_ds 16>,
++			 <&ipmmu_ds 17>,
++			 <&ipmmu_ds 18>,
++			 <&ipmmu_ds 19>,
++			 <&ipmmu_ds 20>,
++			 <&ipmmu_ds 21>,
++			 <&ipmmu_ds 22>,
++			 <&ipmmu_ds 23>,
++			 <&ipmmu_ds 24>,
++			 <&ipmmu_ds 25>,
++			 <&ipmmu_ds 26>,
++			 <&ipmmu_ds 27>,
++			 <&ipmmu_ds 28>,
++			 <&ipmmu_ds 29>;
+ 	};
  
- 	/*
- 	 * We could lock this, but you shouldn't be configuring the
- 	 * channel, while using it...
- 	 */
--	rchan->src.slave_addr = cfg->src_addr;
--	rchan->dst.slave_addr = cfg->dst_addr;
--	rchan->src.xfer_size = cfg->src_addr_width;
--	rchan->dst.xfer_size = cfg->dst_addr_width;
- 
--	return 0;
-+	ret = rcar_dmac_set_slave_addr(chan, &rchan->src, cfg->src_addr,
-+			cfg->src_addr_width);
-+	if (ret)
-+		return ret;
-+
-+	ret = rcar_dmac_set_slave_addr(chan, &rchan->dst, cfg->dst_addr,
-+			cfg->dst_addr_width);
-+	return ret;
- }
- 
- static int rcar_dmac_chan_terminate_all(struct dma_chan *chan)
+ 	audma0: dma-controller at ec700000 {
 -- 
 2.7.1
