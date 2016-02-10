@@ -1,28 +1,73 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 10 Feb 2016 10:30:46 +0000
-Subject: [PATCH V3 05/10] irqchip, gicv3, its: Mark its_init() and its
- children as __init
-In-Reply-To: <1453209083-3358-6-git-send-email-tn@semihalf.com>
-References: <1453209083-3358-1-git-send-email-tn@semihalf.com>
- <1453209083-3358-6-git-send-email-tn@semihalf.com>
-Message-ID: <56BB1156.4070507@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 10 Feb 2016 10:36:01 +0000
+Subject: [PATCH v10 01/21] ARM64: Move PMU register related defines to
+ asm/pmu.h
+In-Reply-To: <1453866709-20324-2-git-send-email-zhaoshenglong@huawei.com>
+References: <1453866709-20324-1-git-send-email-zhaoshenglong@huawei.com>
+ <1453866709-20324-2-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <20160210103600.GE1052@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/01/16 13:11, Tomasz Nowicki wrote:
-> gicv3_init_bases() is the only caller for its_init(),
-> also it is a __init function, so mark its_init() as __init too,
-> then recursively mark the functions called as __init.
+On Wed, Jan 27, 2016 at 11:51:29AM +0800, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
 > 
-> This will help to introduce ITS initialization using ACPI tables as
-> we will use acpi_table_parse_entries family functions there which
-> belong to __init section as well.
+> To use the ARMv8 PMU related register defines from the KVM code,
+> we move the relevant definitions to asm/pmu.h header file.
 > 
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/include/asm/pmu.h   | 67 ++++++++++++++++++++++++++++++++++++++++++
+>  arch/arm64/kernel/perf_event.c | 36 +----------------------
+>  2 files changed, 68 insertions(+), 35 deletions(-)
+>  create mode 100644 arch/arm64/include/asm/pmu.h
+> 
+> diff --git a/arch/arm64/include/asm/pmu.h b/arch/arm64/include/asm/pmu.h
+> new file mode 100644
+> index 0000000..4406184
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/pmu.h
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+I think you can stick this in perf_event.h and avoid having a brand
+new header.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> @@ -0,0 +1,67 @@
+> +/*
+> + * PMU support
+> + *
+> + * Copyright (C) 2012 ARM Limited
+> + * Author: Will Deacon <will.deacon@arm.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +#ifndef __ASM_PMU_H
+> +#define __ASM_PMU_H
+> +
+> +#define ARMV8_MAX_COUNTERS      32
+> +#define ARMV8_COUNTER_MASK      (ARMV8_MAX_COUNTERS - 1)
+
+[...]
+
+> +/*
+> + * Event filters for PMUv3
+> + */
+> +#define	ARMV8_EXCLUDE_EL1	(1 << 31)
+> +#define	ARMV8_EXCLUDE_EL0	(1 << 30)
+> +#define	ARMV8_INCLUDE_EL2	(1 << 27)
+
+You should prefix these more specifically if they're going to be exposed
+like this. Something like ARMV8_PMU_*.
+
+Will
