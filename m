@@ -1,34 +1,30 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 10 Feb 2016 07:42:47 +0000
-Subject: [PATCH v2 22/28] ARM: KVM: Switch to C-based stage2 init
-In-Reply-To: <20160209184513.GX5171@cbox>
-References: <1454583645-10144-1-git-send-email-marc.zyngier@arm.com>
- <1454583645-10144-23-git-send-email-marc.zyngier@arm.com>
- <20160209184513.GX5171@cbox>
-Message-ID: <20160210074247.589db14b@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 10 Feb 2016 08:01:49 +0000
+Subject: [PATCH 3/4] spi: bcm2835aux: set up spi-mode before asserting
+ cs-gpio
+In-Reply-To: <87d1s54f7f.fsf@eliezer.anholt.net>
+References: <1455041435-8015-1-git-send-email-stephanolbrich@gmx.de>
+ <1455041435-8015-4-git-send-email-stephanolbrich@gmx.de>
+ <87d1s54f7f.fsf@eliezer.anholt.net>
+Message-ID: <20160210080149.GQ13270@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 9 Feb 2016 19:45:13 +0100
-Christoffer Dall <christoffer.dall@linaro.org> wrote:
+On Tue, Feb 09, 2016 at 03:49:24PM -0800, Eric Anholt wrote:
 
-> Mising (sarcastic) commit message?
+> This patch surprised me.  I would have thought that the solution was to
+> just write the updated CNTL bits for CPOL and wait a moment whenever it
+> changes.  The CS only gets asserted later on when we get some data in
+> the TX FIFO, so I think you're just reducing the chance of losing the
+> race to get our inverted clock noticed by the device before the CS gets
+> asserted.
 
-Ah! I'll try to think of something along the lines of:
-
-"Let's now retire the code that bravely served us for three
-years, and enjoy a brand new set of bugs. At least, we can blame the
-compiler this time."
-
-> On Thu, Feb 04, 2016 at 11:00:39AM +0000, Marc Zyngier wrote:
-> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> > ---
-> 
-> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-> 
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny.
+We support (and generally want to use since hardware chip selects are
+often very limited in what they do) chip select on GPIO.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160210/5b1f94c4/attachment.sig>
