@@ -1,27 +1,36 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 10 Feb 2016 09:50:52 +0000
-Subject: [PATCH V3 01/10] irqchip / GICv3: Refactor gic_of_init() for
- GICv3 driver
-In-Reply-To: <1453209083-3358-2-git-send-email-tn@semihalf.com>
-References: <1453209083-3358-1-git-send-email-tn@semihalf.com>
- <1453209083-3358-2-git-send-email-tn@semihalf.com>
-Message-ID: <56BB07FC.8040609@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 10 Feb 2016 09:51:32 +0000
+Subject: [PATCH] ARM: dts: rockchip: replace gpio-key,wakeup with
+ wakeup-source property
+In-Reply-To: <48510660.EJbbczq5fX@phil>
+References: <1454968512-11956-1-git-send-email-sudeep.holla@arm.com>
+ <48510660.EJbbczq5fX@phil>
+Message-ID: <56BB0824.2030900@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/01/16 13:11, Tomasz Nowicki wrote:
-> Isolate hardware abstraction (FDT) code to gic_of_init().
-> Rest of the logic goes to gic_init_bases() and expects well
-> defined data to initialize GIC properly. The same solution
-> is used for GICv2 driver.
-> 
-> This is needed for ACPI initialization later.
-> 
-> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-	M.
+On 09/02/16 23:32, Heiko Stuebner wrote:
+> Hi Sudeep,
+>
+> Am Montag, 8. Februar 2016, 21:55:12 schrieb Sudeep Holla:
+
+[..]
+
+>> Hi Heiko,
+>>
+>> You can reviewed this, however there are couple of ARM64 dts additions.
+>> Also most of the other platform/SoC maintainers preferred to take it via
+>> their tree and few of these got missed during v4.5 merge window.
+>> Can you take it via your tree for v4.6 ?
+>
+> I've split the patch in two, as the 32 and 64 bit devicetree parts go
+> through separate branches and applied both to their respective branches for
+> v4.6
+
+Thanks for splitting up the patch yourself.
+
 -- 
-Jazz is not dead. It just smells funny...
+Regards,
+Sudeep
