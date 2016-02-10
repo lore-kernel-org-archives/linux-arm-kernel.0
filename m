@@ -1,113 +1,38 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Tue,  9 Feb 2016 17:56:24 -0800
-Subject: [PATCH] PCI/MSI: pci-xgene-msi: Enable MSI support in ACPI boot for
- X-Gene v1
-Message-ID: <1455069384-22323-1-git-send-email-dhdang@apm.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 9 Feb 2016 18:37:46 -0800
+Subject: [PATCH] tty/serial: digicolor: Fix bad usage of IS_ERR_VALUE
+In-Reply-To: <4571887.rTPndCnv20@wuerfel>
+References: <1455030539-10798-1-git-send-email-linux@roeck-us.net>
+ <4571887.rTPndCnv20@wuerfel>
+Message-ID: <56BAA27A.9050605@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch makes pci-xgene-msi driver ACPI-aware and provides
-MSI capability for X-Gene v1 PCIe controllers in ACPI boot mode.
+On 02/09/2016 07:26 AM, Arnd Bergmann wrote:
+> On Tuesday 09 February 2016 07:08:59 Guenter Roeck wrote:
+>> IS_ERR_VALUE() assumes that its parameter is an unsigned long.
+>> It can not be used to check if an unsigned int reflects an error.
+>> Doing so can result in the following build warning.
+>>
+>> drivers/tty/serial/digicolor-usart.c: In function ?digicolor_uart_probe?:
+>> include/linux/err.h:21:38: warning:
+>>          comparison is always false due to limited range of data type
+>> drivers/tty/serial/digicolor-usart.c:485:6: note:
+>>          in expansion of macro ?IS_ERR_VALUE?
+>>
+>> If that warning is seen, an error return from platform_get_irq() is missed.
+>>
+>>
+>
+> The patch looks correct to me, but what compiler version and which kernel
+> tree is it that triggered the warning?
+>
+> Andrzej Hajda just modified the definition of IS_ERR_VALUE(), and the
+> changes are still under discussion, but I don't see that warning with
+> any of the versions.
+>
+I see it with gcc 5.1 and 5.2 (and W=1). I did not see / notice Andrzej's patch.
 
-Signed-off-by: Duc Dang <dhdang@apm.com>
----
- drivers/pci/host/pci-xgene-msi.c | 35 ++++++++++++++++++++++++++++++++---
- 1 file changed, 32 insertions(+), 3 deletions(-)
+I agree that fixing the problem in IS_ERR_VALUE() is preferrable.
 
-diff --git a/drivers/pci/host/pci-xgene-msi.c b/drivers/pci/host/pci-xgene-msi.c
-index a6456b5..466aa93 100644
---- a/drivers/pci/host/pci-xgene-msi.c
-+++ b/drivers/pci/host/pci-xgene-msi.c
-@@ -24,6 +24,7 @@
- #include <linux/pci.h>
- #include <linux/platform_device.h>
- #include <linux/of_pci.h>
-+#include <linux/acpi.h>
- 
- #define MSI_IR0			0x000000
- #define MSI_INT0		0x800000
-@@ -39,7 +40,7 @@ struct xgene_msi_group {
- };
- 
- struct xgene_msi {
--	struct device_node	*node;
-+	struct fwnode_handle	*fwnode;
- 	struct irq_domain	*inner_domain;
- 	struct irq_domain	*msi_domain;
- 	u64			msi_addr;
-@@ -249,6 +250,13 @@ static const struct irq_domain_ops msi_domain_ops = {
- 	.free   = xgene_irq_domain_free,
- };
- 
-+#ifdef CONFIG_ACPI
-+static struct fwnode_handle *xgene_msi_get_fwnode(struct device *dev)
-+{
-+	return xgene_msi_ctrl.fwnode;
-+}
-+#endif
-+
- static int xgene_allocate_domains(struct xgene_msi *msi)
- {
- 	msi->inner_domain = irq_domain_add_linear(NULL, NR_MSI_VEC,
-@@ -256,7 +264,7 @@ static int xgene_allocate_domains(struct xgene_msi *msi)
- 	if (!msi->inner_domain)
- 		return -ENOMEM;
- 
--	msi->msi_domain = pci_msi_create_irq_domain(of_node_to_fwnode(msi->node),
-+	msi->msi_domain = pci_msi_create_irq_domain(msi->fwnode,
- 						    &xgene_msi_domain_info,
- 						    msi->inner_domain);
- 
-@@ -265,6 +273,9 @@ static int xgene_allocate_domains(struct xgene_msi *msi)
- 		return -ENOMEM;
- 	}
- 
-+#ifdef CONFIG_ACPI
-+	pci_msi_register_fwnode_provider(&xgene_msi_get_fwnode);
-+#endif
- 	return 0;
- }
- 
-@@ -473,6 +484,13 @@ static const struct of_device_id xgene_msi_match_table[] = {
- 	{},
- };
- 
-+#ifdef CONFIG_ACPI
-+static const struct acpi_device_id xgene_msi_acpi_ids[] = {
-+	{"APMC0D0E", 0},
-+	{ },
-+};
-+#endif
-+
- static int xgene_msi_probe(struct platform_device *pdev)
- {
- 	struct resource *res;
-@@ -494,7 +512,17 @@ static int xgene_msi_probe(struct platform_device *pdev)
- 		goto error;
- 	}
- 	xgene_msi->msi_addr = res->start;
--	xgene_msi->node = pdev->dev.of_node;
-+
-+	xgene_msi->fwnode = of_node_to_fwnode(pdev->dev.of_node);
-+	if (!xgene_msi->fwnode) {
-+		xgene_msi->fwnode = irq_domain_alloc_fwnode(NULL);
-+		if (!xgene_msi->fwnode) {
-+			dev_err(&pdev->dev, "Failed to create fwnode\n");
-+			rc = ENOMEM;
-+			goto error;
-+		}
-+	}
-+
- 	xgene_msi->num_cpus = num_possible_cpus();
- 
- 	rc = xgene_msi_init_allocator(xgene_msi);
-@@ -571,6 +599,7 @@ static struct platform_driver xgene_msi_driver = {
- 	.driver = {
- 		.name = "xgene-msi",
- 		.of_match_table = xgene_msi_match_table,
-+		.acpi_match_table = ACPI_PTR(xgene_msi_acpi_ids),
- 	},
- 	.probe = xgene_msi_probe,
- 	.remove = xgene_msi_remove,
--- 
-1.9.1
+Guenter
