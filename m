@@ -1,109 +1,92 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 10 Feb 2016 13:53:33 +0100
+Date: Wed, 10 Feb 2016 13:59:36 +0100
 Subject: [PATCH v4] clk: sunxi: Refactor A31 PLL6 so that it can be reused
-In-Reply-To: <20160204162545.f806fcb64a826d2c3313985b@free.fr>
+In-Reply-To: <56B4E2FB.3050703@arm.com>
 References: <1454358000-13594-1-git-send-email-maxime.ripard@free-electrons.com>
- <20160204120507.GC4270@lukather>
- <20160204162545.f806fcb64a826d2c3313985b@free.fr>
-Message-ID: <20160210125333.GC31506@lukather>
+ <56B4E2FB.3050703@arm.com>
+Message-ID: <20160210125936.GD31506@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 04, 2016 at 04:25:45PM +0100, Jean-Francois Moine wrote:
-> On Thu, 4 Feb 2016 13:05:07 +0100
-> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+Hi,
+
+On Fri, Feb 05, 2016 at 05:59:23PM +0000, Andre Przywara wrote:
+> Hi Maxime,
 > 
-> > On Mon, Feb 01, 2016 at 09:20:00PM +0100, Maxime Ripard wrote:
-> > > Remove the fixed dividers from the PLL6 driver to be able to have a
-> > > reusable driver that can be used across several SoCs that share the same
-> > > controller, but don't have the same set of dividers for this clock, and to
-> > > also be reused multiple times in the same SoC, since we're droping the
-> > > clock name.
-> > > 
-> > > Acked-by: Chen-Yu Tsai <wens@csie.org>
-> > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> just found this while looking at your current git branch, so sorry for
+> the late reply.
+> 
+> CC:ing DT people, since you touch both existing DTs(!) and the binding doc.
+> 
+> On 01/02/16 20:20, Maxime Ripard wrote:
+> > Remove the fixed dividers from the PLL6 driver to be able to have a
+> > reusable driver that can be used across several SoCs that share the same
+> > controller, but don't have the same set of dividers for this clock, and to
+> > also be reused multiple times in the same SoC, since we're droping the
+> > clock name.
 > > 
-> > Applied.
+> > Acked-by: Chen-Yu Tsai <wens@csie.org>
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
 > > 
-> > Maxime
+> > Changes from v3:
+> >   - Fixed the documentation
+> >   - Added pll6d2 back
+> > 
+> > Changes from v2:
+> >   - Rebased and converted over to the new factors refactoring. Fixed the
+> >     retrieved rate
+> > 
+> >  Documentation/devicetree/bindings/clock/sunxi.txt |  2 +-
+> >  arch/arm/boot/dts/sun6i-a31.dtsi                  | 36 +++++++++++-----------
+> >  arch/arm/boot/dts/sun8i-a23-a33.dtsi              | 25 ++++++++++-----
+> >  arch/arm/boot/dts/sun8i-a23.dtsi                  |  2 +-
+> >  arch/arm/boot/dts/sun8i-a33.dtsi                  |  4 +--
+> >  arch/arm/boot/dts/sun8i-h3.dtsi                   | 37 ++++++++++++++---------
 > 
-> I don't agree:
-> - you changed the DTs of many SoCs without any valid reason,
+> So are you really breaking all those systems by changing the DT and the
+> driver in an incompatible way?
 
-I did give you a significant number of reasons [1]. The fact that you
-chose to ignore them is up to you.
+Yes.
 
-> - you complexified the treatment of the pll6 in clk-sunxi.c while
->   defining a x2 rate instead of the single rate would also work for
->   the other pll periphs (pll8).
+> Please correct me if this assessment is wrong, but to me it looks like
+> any user out there is either stuck with 4.5 at best _or_ will only be
+> able to run 4.6 and later (depending on which version of the DT she is
+> using)? And no, switching DTs along with the kernel is _not_ an option.
 
-I've not used in this patch anything that is not already in there, so
-I'm not really sure how it complexifies anything. Feel free to
-enlighten me.
+It is. And it is one that every other ARM platform chose. And so did
+every distribution.
 
+> That is not how I understand DT.
+
+I'm sorry for that. This has never been something we said was
+happening.
+
+> Also this totally ignores any other DT user (U-Boot, FreeBSD, you
+> name it).
+
+Which all have their own DT copies, with their own bindings, that we
+(ie Linux) never agreed on.
+
+By further extending that argument, you're currently looking at the DT
+from Allwinner, do you want to support theirs as well?
+
+> I actually appreciate this rework, it's more flexible now and looks
+> better, but you really can't do this in a way to breaks compatibility
+> with existing DTs.
 > 
-> Here is a simpler patch:
-> 
-> --- a/arch/arm/boot/dts/sun8i-h3.dtsi	2016-02-01 08:24:06.179396522 +0100
-> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi	2016-02-04 16:18:05.911509291 +0100
-> @@ -137,12 +137,23 @@
->  			clock-output-names = "pll6d2";
->  		};
->  
-> -		/* dummy clock until pll6 can be reused */
-> +		pll8x2: clk at 01c20044 {			/* PLL_PERIPH1 */
-> +			#clock-cells = <0>;
-> +			compatible = "allwinner,pll-periphx2-clk";
-> +			reg = <0x01c20044 0x4>;
-> +			clocks = <&osc24M>;
-> +			clock-output-names = "pll8x2";
-> +		};
-> +
->  		pll8: pll8_clk {
->  			#clock-cells = <0>;
-> -			compatible = "fixed-clock";
-> -			clock-frequency = <1>;
-> +			compatible = "fixed-factor-clock";
-> +			clock-div = <2>;
-> +			clock-mult = <1>;
-> +			clocks = <&pll8x2>;
->  			clock-output-names = "pll8";
-> +			assigned-clocks = <&pll8x2>;
-> +			assigned-clock-rates = <1200000000>;
->  		};
->  
->  		cpu: cpu_clk at 01c20050 {
-> --- a/drivers/clk/sunxi/clk-sunxi.c	2016-02-01 08:24:06.199396132 +0100
-> +++ b/drivers/clk/sunxi/clk-sunxi.c	2016-02-04 16:03:41.056322804 +0100
-> @@ -714,6 +714,12 @@
->  	.name = "pll6",
->  };
->  
-> +static const struct factors_data pll_periphx2_data __initconst = {
-> +	.enable = 31,
-> +	.table = &sun6i_a31_pll6_config,
-> +	.getter = sun6i_a31_get_pll6_factors,
-> +};
-> +
->  static const struct factors_data sun6i_a31_pll6_data __initconst = {
->  	.enable = 31,
->  	.table = &sun6i_a31_pll6_config,
-> @@ -1110,6 +1116,7 @@
->  	{.compatible = "allwinner,sun5i-a13-ahb-clk", .data = &sun5i_a13_ahb_data,},
->  	{.compatible = "allwinner,sun4i-a10-apb1-clk", .data = &sun4i_apb1_data,},
->  	{.compatible = "allwinner,sun7i-a20-out-clk", .data = &sun7i_a20_out_data,},
-> +	{.compatible = "allwinner,pll-periphx2-clk", .data = &pll_periphx2_data,},
->  	{}
->  };
+> Jean-Francois came up with another solution for the pll8 clock [1], so
+> could this be considered at least?
+> I think changing the H3 PLL8 clock from dummy to something real is a
+> different story in terms of compatibility (since it never really worked
+> before and this wouldn't change for any old-DT user).
 
-Except that it doesn't match the hardware and that the parenthood
-relationship is inversed. The pll6 output is 24 MHz * n * k / 2, as
-seen in any datasheet that uses it. Your clock driver doesn't
-represent that fact.
+So, one would have to update the DT anyway to benefit from these
+changes? What's the point of maintaining DT stability if you add every
+new release new stuff to the DT that users are going to want? Beside
+adding untested, unmaintained, dead, and possibly broken code, that is.
 
 Maxime
-
-[1]: http://www.spinics.net/lists/arm-kernel/msg479744.html
 
 -- 
 Maxime Ripard, Free Electrons
@@ -115,4 +98,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160210/aec9593f/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160210/76711c11/attachment.sig>
