@@ -1,37 +1,46 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 10 Feb 2016 15:10:56 +0100
-Subject: [PATCH v2 0/6] irqchip: irq-armada-370-xp: generic MSI
- infrastructure and assorted fixes
-In-Reply-To: <56BB4451.3070707@arm.com>
-References: <1453899395-3532-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20160210150046.118fc991@free-electrons.com>
- <56BB4451.3070707@arm.com>
-Message-ID: <20160210151056.08a57312@free-electrons.com>
+From: julien.grall@arm.com (Julien Grall)
+Date: Wed, 10 Feb 2016 14:19:08 +0000
+Subject: [PATCH 3/5] irqchip/gic-v2: Parse and export virtual GIC
+ information
+In-Reply-To: <20160209204914.GE5171@cbox>
+References: <1454950049-741-1-git-send-email-julien.grall@arm.com>
+ <1454950049-741-4-git-send-email-julien.grall@arm.com>
+ <20160209204914.GE5171@cbox>
+Message-ID: <56BB46DC.7080202@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Christoffer,
 
-On Wed, 10 Feb 2016 14:08:17 +0000, Marc Zyngier wrote:
+On 09/02/16 20:49, Christoffer Dall wrote:
+>> +static void __init gic_acpi_setup_kvm_info(void)
+>> +{
+>> +	gic_v2_kvm_info.type = GIC_V2;
+>> +
+>> +	gic_v2_kvm_info.maint_irq = acpi_register_gsi(NULL,
+>> +						      acpi_data.maint_irq,
+>> +						      acpi_data.maint_irq_mode,
+>> +						      ACPI_ACTIVE_HIGH);
+>> +	gic_v2_kvm_info.vctrl_base = acpi_data.vctrl_base;
+>> +	if (gic_v2_kvm_info.vctrl_base)
+>> +		gic_v2_kvm_info.vctrl_size = SZ_8K;
+>> +
+>> +	gic_v2_kvm_info.vcpu_base = acpi_data.vcpu_base;
+>> +	if (gic_v2_kvm_info.vcpu_base)
+>> +		gic_v2_kvm_info.vcpu_size = SZ_8K;
+>
+> why are the sizes hard-coded to 8K in this case?
 
-> > Jason, Thomas, any chance to get this applied soonish?
-> > 
-> > The core patch of the series, which migrates the irq-armada-370-xp
-> > driver to use the generic MSI infrastructure has been Reviewed-by: Marc
-> > Zyngier, and the other patches in the series have Acked-by/Reviewed-by
-> > from Gregory Clement.
-> > 
-> > Of course, if there's anything left to be changed, I'd be happy to
-> > respin a new version of this series.
-> > 
-> 
-> Noticing the distribution list, it would be good to repost these patches
-> with acks and co to LKML...
+The MADT only provides the base addresses and not the size. The default 
+value has been chosen based on the GICv2 spec (ARM IHI 0048B.b)
+	* GICV: See 5.5
+	* GICH: I can't find again the section about it. But the example 
+bindings in 
+Documents/devicetree/bindings/interrupt-controller/arm,gic.txt uses 8K.
 
-Right, will do. Thanks for the suggestion.
+I will add a comment in the code explaining where the 8K come from.
 
-Thomas
+Cheers,
+
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Julien Grall
