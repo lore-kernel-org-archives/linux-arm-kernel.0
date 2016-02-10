@@ -1,58 +1,36 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Wed, 10 Feb 2016 23:12:26 +0200
-Subject: [PATCH] ARM: OMAP2+: Fix onenand initialization to avoid
- filesystem corruption
-In-Reply-To: <20160208193644.GU19432@atomide.com>
-References: <linux-kernel@vger.kernel.org>
- <1454683028-4193-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
- <20160208193644.GU19432@atomide.com>
-Message-ID: <20160210211226.GB1640@darkstar.musicnaut.iki.fi>
+From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
+Date: Thu, 11 Feb 2016 04:13:50 +0700
+Subject: [PATCH V2 03/12] dtb: amd: Fix DMA ranges in device tree
+In-Reply-To: <2845776.WTPtnQzg8d@wuerfel>
+References: <1454954357-8395-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <1454954357-8395-4-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <2845776.WTPtnQzg8d@wuerfel>
+Message-ID: <56BBA80E.6090205@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Arnd,
 
-On Mon, Feb 08, 2016 at 11:36:45AM -0800, Tony Lindgren wrote:
-> * Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com> [160205 06:38]:
-> > Commit <e7b11dc7b77bfce0a351230a5feeadc1d0bba997> ("ARM: OMAP2+: Fix
-> > onenand rate detection to avoid filesystem corruption") partially fixed
-> > onenand configuration when GPMC module is reset. Finish the job by also
-> > providing the correct values in ONENAND_REG_SYS_CFG1 register.
-> 
-> OK. So probably the INT or RDY polarity made the ECC not work.
-> 
-> Aaro, care to dump out also the nolo configured CFG1 value from
-> n8x0 and n9(50)?
-> 
-> You can do it by adding something like this to the beginning
-> of set_onenand_cfg():
-> 
-> pr_info("CFG1: 0x%04x\n", readw(onenand_base + ONENAND_REG_SYS_CFG1));
-> 
-> And presumably the values are the same as on n900. If not, we
-> should do the legacy file system flash test on all of them
-> before committing this fix.
+On 2/9/16 21:57, Arnd Bergmann wrote:
+> On Monday 08 February 2016 11:59:08 Suravee Suthikulpanit wrote:
+>> From: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
+>>
+>> Fix DMA ranges of smb0 and pcie0 nodes in AMD Seattle SOC.
+>>
+>> Signed-off-by: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
+>>
+>
+> This could use a changelog text to explain why it's broken and how the
+> fix works.
+>
+> 	Arnd
+>
 
-I got these (with CONFIG_OMAP_GPMC_DEBUG also enabled):
+So, I have not experience the breakage. However, IIUC, the GICv2m MSI 
+frame is also considered DMA-able. So, I think it should be included in 
+the dma-range specified here. Please let me know if my assumption is 
+incorrect. Otherwise, I will include more description in the commit log 
+in my next rev.
 
-N800:
-[    2.803100] CFG1: 0x46c0
-[    3.150115] CFG1: 0x06c0
-
-N810:
-[    2.802368] CFG1: 0x46c0
-[    3.148620] CFG1: 0x06c0
-
-N900:
-[    4.965576] CFG1: 0x46c0
-[    5.333740] CFG1: 0x06c0
-
-N950:
-[    4.217193] CFG1: 0x66c4
-[    4.583221] CFG1: 0x06c0
-
-N9:
-[    4.212677] CFG1: 0x66c4
-[    4.578613] CFG1: 0x06c0
-
-A.
+Thanks,
+Suravee
