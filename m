@@ -1,36 +1,134 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed, 10 Feb 2016 11:37:24 +0000
-Subject: [PATCH v2 8/8] arm64: dts: qcom: Fix MPP's function used for LED
- control
-In-Reply-To: <1455104164-29356-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1455104164-29356-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1455104244-10813-1-git-send-email-srinivas.kandagatla@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 10 Feb 2016 11:46:03 +0000
+Subject: [PATCH V3 08/10] irqchip, gicv3, its: Probe ITS in the ACPI way.
+In-Reply-To: <1453209083-3358-9-git-send-email-tn@semihalf.com>
+References: <1453209083-3358-1-git-send-email-tn@semihalf.com>
+ <1453209083-3358-9-git-send-email-tn@semihalf.com>
+Message-ID: <56BB22FB.5060609@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Ivan T. Ivanov" <ivan.ivanov@linaro.org>
+On 19/01/16 13:11, Tomasz Nowicki wrote:
+> Since we prepared ITS for being initialized different that via DT,
+> it is now possible to parse MADT and pass mandatory info to
+> firmware-agnostic ITS init call.
+> 
+> Note that we are using here IORT lib to keep track of allocated
+> domain handler which will be used to build PCI MSI domain on top
+> in the later patches.
+> 
+> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>  drivers/irqchip/irq-gic-v3-its.c | 57 +++++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 56 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index fecb7a6..42f378a 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -15,10 +15,13 @@
+>   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>   */
+>  
+> +#include <linux/acpi.h>
+>  #include <linux/bitmap.h>
+>  #include <linux/cpu.h>
+>  #include <linux/delay.h>
+>  #include <linux/interrupt.h>
+> +#include <linux/irqdomain.h>
+> +#include <linux/iort.h>
+>  #include <linux/log2.h>
+>  #include <linux/mm.h>
+>  #include <linux/msi.h>
+> @@ -1272,6 +1275,11 @@ static int its_irq_gic_domain_alloc(struct irq_domain *domain,
+>  		fwspec.param[0] = GIC_IRQ_TYPE_LPI;
+>  		fwspec.param[1] = hwirq;
+>  		fwspec.param[2] = IRQ_TYPE_EDGE_RISING;
+> +	} else if (is_fwnode_irqchip(domain->parent->fwnode)) {
+> +		fwspec.fwnode = domain->parent->fwnode;
+> +		fwspec.param_count = 2;
+> +		fwspec.param[0] = hwirq;
+> +		fwspec.param[1] = IRQ_TYPE_EDGE_RISING;
+>  	} else {
+>  		return -EINVAL;
+>  	}
+> @@ -1594,6 +1602,52 @@ int its_cpu_init(void)
+>  	return 0;
+>  }
+>  
+> +#ifdef CONFIG_ACPI
+> +
+> +#define ACPI_GICV3_ITS_MEM_SIZE (2 * SZ_64K)
+> +
+> +static struct irq_domain *its_parent __initdata;
+> +
+> +static int __init
+> +gic_acpi_parse_madt_its(struct acpi_subtable_header *header,
+> +			const unsigned long end)
+> +{
+> +	struct acpi_madt_generic_translator *its_entry;
+> +	struct fwnode_handle *domain_handle;
+> +	int err;
+> +
+> +	its_entry = (struct acpi_madt_generic_translator *)header;
+> +	domain_handle = irq_domain_alloc_fwnode((void *)its_entry->base_address);
+> +	if (!domain_handle) {
+> +		pr_err("Unable to allocate GICv2m domain token\n");
 
-The qcom-spmi-mpp driver is now using string "digital" to denote
-old "normal" functionality. Update DTS file.
-Also update the powersource.
+-ECOPYPASTE.
 
-Signed-off-by: Ivan T. Ivanov <ivan.ivanov@linaro.org>
----
- arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> +		return -ENOMEM;
+> +	}
+> +
+> +	/* ITS works as msi controller in ACPI case */
+> +	err = its_probe_one(its_entry->base_address, ACPI_GICV3_ITS_MEM_SIZE,
+> +			    its_parent, true, domain_handle);
+> +	if (err) {
+> +		irq_domain_free_fwnode(domain_handle);
+> +		return err;
+> +	}
+> +	iort_register_domain_token(its_entry->translation_id, domain_handle);
 
-diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi
-index e03c11d..f881437 100644
---- a/arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi
-+++ b/arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi
-@@ -33,7 +33,7 @@
- 	pm8916_mpps_leds: pm8916_mpps_leds {
- 		pinconf {
- 			pins = "mpp2", "mpp3";
--			function = PMIC_GPIO_FUNC_NORMAL;
-+			function = "digital";
- 			output-low;
- 		};
- 	};
+And what if this fails?
+
+> +	return 0;
+> +}
+> +
+> +void __init its_acpi_probe(struct irq_domain *parent_domain)
+> +{
+> +	int count;
+> +
+> +	its_parent = parent_domain;
+> +	count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_TRANSLATOR,
+> +				      gic_acpi_parse_madt_its, 0);
+> +	if (count <= 0)
+> +		pr_info("No valid GIC ITS entries exist\n");
+> +}
+> +#else
+> +static inline void __init its_acpi_probe(struct irq_domain *parent_domain) { }
+> +#endif
+> +
+>  static struct of_device_id its_device_id[] = {
+>  	{	.compatible	= "arm,gic-v3-its",	},
+>  	{},
+> @@ -1610,7 +1664,8 @@ int __init its_init(struct fwnode_handle *handle, struct rdists *rdists,
+>  		     np = of_find_matching_node(np, its_device_id)) {
+>  			its_of_probe(np, parent_domain);
+>  		}
+> -	}
+> +	} else
+> +		its_acpi_probe(parent_domain);
+
+Missing braces.
+
+>  
+>  	if (list_empty(&its_nodes)) {
+>  		pr_warn("ITS: No ITS available, not enabling LPIs\n");
+> 
+
+Thanks,
+
+	M.
 -- 
-1.9.1
+Jazz is not dead. It just smells funny...
