@@ -1,62 +1,69 @@
-From: yang.shi@linaro.org (Shi, Yang)
-Date: Wed, 10 Feb 2016 10:12:11 -0800
-Subject: [PATCH] arm64: use raw_smp_processor_id in stack backtrace dump
-In-Reply-To: <20160210121030.GH1052@arm.com>
-References: <1455053182-31404-1-git-send-email-yang.shi@linaro.org>
- <20160210102939.GD1052@arm.com> <56BB247F.6040202@arm.com>
- <20160210121030.GH1052@arm.com>
-Message-ID: <56BB7D7B.4060002@linaro.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 10 Feb 2016 18:13:26 +0000
+Subject: [PATCH v2 0/6] irqchip: irq-armada-370-xp: generic MSI
+ infrastructure and assorted fixes
+In-Reply-To: <87mvr8xwrz.fsf@free-electrons.com>
+References: <1453899395-3532-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20160210150046.118fc991@free-electrons.com>
+ <56BB4451.3070707@arm.com>
+ <20160210153829.GA5183@io.lakedaemon.net>
+ <87mvr8xwrz.fsf@free-electrons.com>
+Message-ID: <20160210181325.GB5183@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/10/2016 4:10 AM, Will Deacon wrote:
-> On Wed, Feb 10, 2016 at 11:52:31AM +0000, James Morse wrote:
->> On 10/02/16 10:29, Will Deacon wrote:
->>> On Tue, Feb 09, 2016 at 01:26:22PM -0800, Yang Shi wrote:
->>>> dump_backtrace may be called in kthread context, which is not bound to a single
->>>> cpu, i.e. khungtaskd, then calling smp_processor_id may trigger the below bug
->>>> report:
->>>
->>> If we're preemptible here, it means that our irq_stack_ptr is potentially
->>> bogus. Whilst this isn't an issue for kthreads, it does feel like we
->>> could make this slightly more robust in the face of potential frame
->>> corruption. Maybe just zero the IRQ stack pointer if we're in preemptible
->>> context?
->>
->> Switching between stacks is only valid if we are tracing ourselves while on the
->> irq_stack, we should probably prevent it for other tasks too.
->>
->> Something like (untested):
->> ---------------------
->> if (tsk == current && in_atomic())
->> 	irq_stack_ptr = IRQ_STACK_PTR(smp_processor_id());
+On Wed, Feb 10, 2016 at 07:09:20PM +0100, Gregory CLEMENT wrote:
+> Hi Jason,
+>  
+>  On mer., f?vr. 10 2016, Jason Cooper <jason@lakedaemon.net> wrote:
+> 
+> > On Wed, Feb 10, 2016 at 02:08:17PM +0000, Marc Zyngier wrote:
+> >> On 10/02/16 14:00, Thomas Petazzoni wrote:
+> >> > Hello,
+> >> > 
+> >> > On Wed, 27 Jan 2016 13:56:29 +0100, Thomas Petazzoni wrote:
+> >> > 
+> >> >> Thomas Petazzoni (6):
+> >> >>   irqchip: irq-armada-370-xp: add Kconfig option for the driver
+> >> >>   irqchip: irq-armada-370-xp: use the generic MSI infrastructure
+> >> >>   irqchip: irq-armada-370-xp: use PCI_MSI_DOORBELL_START where
+> >> >>     appropriate
+> >> >>   irqchip: irq-armada-370-xp: use shorter names for irq_chip
+> >> >>   irqchip: irq-armada-370-xp: allow allocation of multiple MSIs
+> >> >>   ARM: mvebu: use the ARMADA_370_XP_IRQ option
+> >> > 
+> >> > Jason, Thomas, any chance to get this applied soonish?
+> >> > 
+> >> > The core patch of the series, which migrates the irq-armada-370-xp
+> >> > driver to use the generic MSI infrastructure has been Reviewed-by: Marc
+> >> > Zyngier, and the other patches in the series have Acked-by/Reviewed-by
+> >> > from Gregory Clement.
+> >> > 
+> >> > Of course, if there's anything left to be changed, I'd be happy to
+> >> > respin a new version of this series.
+> >> > 
+> >> 
+> >> Noticing the distribution list, it would be good to repost these patches
+> >> with acks and co to LKML...
+> >
+> > agreed, and I'll pick it up within the next day or so.  Still getting my
+> > home network setup... too much wifi. :(
+> 
+> I proposed that you take the 6th patch to ensure that this driver will
+> always be selected for the mvebu platform which need it. It is still OK
+> but, since this offer, I sent a series which depend of the 1st patch:
+> http://thread.gmane.org/gmane.linux.ide/61178
 
-One follow up question, is it possible to have both tsk != current and 
-on_irq_stack is true at the same time? If it is possible, this may be a 
-problem in unwind_frame called by profile_pc which has tsk being NULL.
+I saw that. ;-)
 
-Thanks,
-Yang
+> Would you agree to provide an immutable tag containing the first patch?
+> Thanks to this I will be able to provide it to the arm-soc maintainer
+> for my pull request.
 
->> else
->> 	irq_stack_ptr = 0;
->> ---------------------
->>
->> This would work when we trace ourselves while on the irq_stack, but break*
->> tracing a running task on a remote cpu (khungtaskd doesn't do this).
->>
->> The same fix would apply to unwind_frame(), we have 'tsk' in both functions.
->>
->> Thoughts?
->
-> in_atomic is a misnomer:
->
->    https://lwn.net/Articles/274695/
->
-> ;)
->
-> So we might be better off zeroing the pointer if tsk != current ||
-> preemptible(). But yeah, I think we're in general agreement about this.
->
-> Will
->
+Sure, that's my default MO since most of the time, people only touch
+irqchip drivers when they are changing something else.  Thus, there's
+usually a dependency on the irqchip changes.
+
+thx,
+
+Jason.
