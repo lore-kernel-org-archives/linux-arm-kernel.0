@@ -1,56 +1,65 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 10 Feb 2016 18:55:01 +0100
-Subject: [PATCH v5sub3 0/4] arm64: KASLR: EFI stub part
-Message-ID: <1455126905-22688-1-git-send-email-ard.biesheuvel@linaro.org>
+Date: Wed, 10 Feb 2016 18:55:04 +0100
+Subject: [PATCH v5sub3 3/4] efi: stub: use high allocation for converted
+ command line
+In-Reply-To: <1455126905-22688-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1455126905-22688-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1455126905-22688-4-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This subseries contains the EFI stub specific changes of my KASLR series
-for arm64. The original v4 series can be found here:
-http://thread.gmane.org/gmane.linux.kernel/2135931
+Before we can move the command line processing before the allocation
+of the kernel, which is required for detecting the 'nokaslr' option
+which controls that allocation, move the converted command line higher
+up in memory, to prevent it from interfering with the kernel itself.
 
-This series consists of the patches that result in the kernel to be allocated
-at a random physical offset on UEFI systems that implement the EFI_RNG_PROTOCOL
-protocol (if so configured), and pass a random value in /chosen/kaslr-seed in
-the device tree, to be used by the kernel proper to randomize the layout of
-the kernel virtual address space.
+Since x86 needs the address to fit in 32 bits, use UINT_MAX as the upper
+bound there. Otherwise, use ULONG_MAX (i.e., no limit)
 
-Changes since v4:
-- added R-b's from Matt and Kees (#2
-- removed a redundant efi_status_t initializer (#2)
-- fixed an issue in update_fdt() (#4) where 'int status' was mistaken for a
-  efi_status_t
+Reviewed-by: Matt Fleming <matt@codeblueprint.co.uk>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/x86/include/asm/efi.h                     | 2 ++
+ drivers/firmware/efi/libstub/efi-stub-helper.c | 7 ++++++-
+ 2 files changed, 8 insertions(+), 1 deletion(-)
 
-Patch #1 implements efi_get_random_bytes() based on the EFI_RNG_PROTOCOL
-
-Patch #2 implements efi_random_alloc()
-
-Patch #3 moves the allocation for the converted command line (UTF-16 to ASCII)
-away from the base of memory. This is necessary since for parsing the command
-line before allocating the kernel image.
-
-Patch #4 implements the actual KASLR, by randomizing the kernel physical
-address, and passing entropy in /chosen/kaslr-seed so that the kernel proper can
-relocate itself virtually.
-
-Ard Biesheuvel (4):
-  efi: stub: implement efi_get_random_bytes() based on EFI_RNG_PROTOCOL
-  efi: stub: add implementation of efi_random_alloc()
-  efi: stub: use high allocation for converted command line
-  arm64: efi: invoke EFI_RNG_PROTOCOL to supply KASLR randomness
-
- arch/arm64/Kconfig                             |   5 +
- arch/x86/include/asm/efi.h                     |   2 +
- drivers/firmware/efi/libstub/Makefile          |   2 +-
- drivers/firmware/efi/libstub/arm-stub.c        |  40 ++++--
- drivers/firmware/efi/libstub/arm64-stub.c      |  78 +++++++----
- drivers/firmware/efi/libstub/efi-stub-helper.c |   7 +-
- drivers/firmware/efi/libstub/efistub.h         |   7 +
- drivers/firmware/efi/libstub/fdt.c             |  14 ++
- drivers/firmware/efi/libstub/random.c          | 135 ++++++++++++++++++++
- include/linux/efi.h                            |   5 +-
- 10 files changed, 257 insertions(+), 38 deletions(-)
- create mode 100644 drivers/firmware/efi/libstub/random.c
-
+diff --git a/arch/x86/include/asm/efi.h b/arch/x86/include/asm/efi.h
+index 0010c78c4998..08b1f2f6ea50 100644
+--- a/arch/x86/include/asm/efi.h
++++ b/arch/x86/include/asm/efi.h
+@@ -25,6 +25,8 @@
+ #define EFI32_LOADER_SIGNATURE	"EL32"
+ #define EFI64_LOADER_SIGNATURE	"EL64"
+ 
++#define MAX_CMDLINE_ADDRESS	UINT_MAX
++
+ #ifdef CONFIG_X86_32
+ 
+ 
+diff --git a/drivers/firmware/efi/libstub/efi-stub-helper.c b/drivers/firmware/efi/libstub/efi-stub-helper.c
+index f07d4a67fa76..29ed2f9b218c 100644
+--- a/drivers/firmware/efi/libstub/efi-stub-helper.c
++++ b/drivers/firmware/efi/libstub/efi-stub-helper.c
+@@ -649,6 +649,10 @@ static u8 *efi_utf16_to_utf8(u8 *dst, const u16 *src, int n)
+ 	return dst;
+ }
+ 
++#ifndef MAX_CMDLINE_ADDRESS
++#define MAX_CMDLINE_ADDRESS	ULONG_MAX
++#endif
++
+ /*
+  * Convert the unicode UEFI command line to ASCII to pass to kernel.
+  * Size of memory allocated return in *cmd_line_len.
+@@ -684,7 +688,8 @@ char *efi_convert_cmdline(efi_system_table_t *sys_table_arg,
+ 
+ 	options_bytes++;	/* NUL termination */
+ 
+-	status = efi_low_alloc(sys_table_arg, options_bytes, 0, &cmdline_addr);
++	status = efi_high_alloc(sys_table_arg, options_bytes, 0,
++				&cmdline_addr, MAX_CMDLINE_ADDRESS);
+ 	if (status != EFI_SUCCESS)
+ 		return NULL;
+ 
 -- 
 2.5.0
