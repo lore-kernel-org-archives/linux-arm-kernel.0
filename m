@@ -1,106 +1,60 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 10 Feb 2016 18:03:45 +0000
-Subject: [PATCH V1 4/6] arm64: exception: handle Synchronous External Abort
-In-Reply-To: <1454699608-22760-5-git-send-email-tbaicar@codeaurora.org>
-References: <1454699608-22760-1-git-send-email-tbaicar@codeaurora.org>
- <1454699608-22760-5-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <20160210180344.GV1052@arm.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Wed, 10 Feb 2016 19:06:27 +0100
+Subject: [PATCH 1/2] serial: 8250: fix building mediatek with SERIAL_8250=m
+In-Reply-To: <1454935947-2743255-1-git-send-email-arnd@arndb.de>
+References: <1454935947-2743255-1-git-send-email-arnd@arndb.de>
+Message-ID: <56BB7C23.5070600@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 05, 2016 at 12:13:26PM -0700, Tyler Baicar wrote:
-> SEA exceptions are often caused by an uncorrected hardware
-> error and are handled when data abort and instruction abort
-> exception classes have specific values for their Fault Status
-> Code.
-> 
-> When SEA occurs, before killing the process, go through
-> the handlers registered in the notification list.
-> 
-> Update fault_info[] with specific SEA faults so that the
-> new SEA handler is used.
-> 
-> Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
-> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
-> Signed-off-by: Naveen Kaje <nkaje@codeaurora.org>
+
+
+On 08/02/16 13:51, Arnd Bergmann wrote:
+> The Mediatek 8250 driver has a 'bool' Kconfig symbol, but that
+> breaks when SERIAL_8250 is a loadable module:
+>
+> drivers/tty/built-in.o: In function `mtk8250_set_termios':
+> 8250_ingenic.c:(.text+0x1bee8): undefined reference to `serial8250_do_set_termios'
+> 8250_ingenic.c:(.text+0x1bf10): undefined reference to `uart_get_baud_rate'
+> 8250_ingenic.c:(.text+0x1c09c): undefined reference to `uart_get_divisor'
+> drivers/tty/built-in.o: In function `mtk8250_do_pm':
+> 8250_ingenic.c:(.text+0x1c0d0): undefined reference to `serial8250_do_pm'
+> drivers/tty/built-in.o: In function `mtk8250_probe':
+> 8250_ingenic.c:(.text+0x1c2e4): undefined reference to `serial8250_register_8250_port'
+> serial/8250/8250_mtk.c:287:242: error: data definition has no type or storage class [-Werror]
+> serial/8250/8250_mtk.c:287:122: error: 'mtk8250_platform_driver_init' defined but not used [-Werror=unused-function]
+>
+> This changes the symbol to a 'tristate', so the dependency on
+> SERIAL_8250 also works when that is set to 'm'.
+> To actually build the driver, we also need to include <linux/module.h>.
+>
+> Note that the driver uses builtin_platform_driver() and implements
+> no .remove() callback, so unloading the module is not possible.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > ---
->  arch/arm64/include/asm/system_misc.h | 13 ++++++++
->  arch/arm64/mm/fault.c                | 58 +++++++++++++++++++++++++++++-------
->  2 files changed, 61 insertions(+), 10 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
-> index 57f110b..90daf4a 100644
-> --- a/arch/arm64/include/asm/system_misc.h
-> +++ b/arch/arm64/include/asm/system_misc.h
-> @@ -64,4 +64,17 @@ extern void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
->  
->  #endif	/* __ASSEMBLY__ */
->  
-> +/*
-> + * The functions below are used to register and unregister callbacks
-> + * that are to be invoked when a Synchronous External Abort (SEA)
-> + * occurs. An SEA is raised by certain fault status codes that have
-> + * either data or instruction abort as the exception class, and
-> + * callbacks may be registered to parse or handle such hardware errors.
-> + *
-> + * Registered callbacks are run in an interrupt/atomic context. They
-> + * are not allowed to block or sleep.
-> + */
-> +int sea_register_handler_chain(struct notifier_block *nb);
-> +void sea_unregister_handler_chain(struct notifier_block *nb);
-> +
->  #endif	/* __ASM_SYSTEM_MISC_H */
-> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-> index 92ddac1..d6fa691 100644
-> --- a/arch/arm64/mm/fault.c
-> +++ b/arch/arm64/mm/fault.c
-> @@ -39,6 +39,22 @@
->  #include <asm/pgtable.h>
->  #include <asm/tlbflush.h>
->  
-> +/*
-> + * GHES SEA handler code may register a notifier call here to
-> + * handle HW error record passed from platform.
-> + */
-> +static ATOMIC_NOTIFIER_HEAD(sea_handler_chain);
-> +
-> +int sea_register_handler_chain(struct notifier_block *nb)
-> +{
-> +	return atomic_notifier_chain_register(&sea_handler_chain, nb);
-> +}
-> +
-> +void sea_unregister_handler_chain(struct notifier_block *nb)
-> +{
-> +	atomic_notifier_chain_unregister(&sea_handler_chain, nb);
-> +}
-> +
->  static const char *fault_name(unsigned int esr);
->  
->  /*
-> @@ -379,6 +395,28 @@ static int do_bad(unsigned long addr, unsigned int esr, struct pt_regs *regs)
->  	return 1;
->  }
->  
-> +/*
-> + * This abort handler deals with Synchronous External Abort.
-> + * It calls notifiers, and then returns "fault".
-> + */
-> +static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
-> +{
-> +	struct siginfo info;
-> +
-> +	atomic_notifier_call_chain(&sea_handler_chain, 0, NULL);
-> +
-> +	pr_err("Synchronous External Abort: %s (0x%08x) at 0x%016lx\n",
-> +		 fault_name(esr), esr, addr);
-> +
-> +	info.si_signo = SIGBUS;
-> +	info.si_errno = 0;
-> +	info.si_code  = 0;
-> +	info.si_addr  = (void __user *)addr;
-> +	arm64_notify_die("", regs, &info, esr);
 
-Surely we don't want to call this if the notifier chain handled the
-exception?
+I tried this with:
+commit 2178cbc68f3602dc0b5949b9be2c8383ad3d93ef
 
-Will
+$ grep 8250 .config
+CONFIG_SERIAL_8250=m
+# CONFIG_SERIAL_8250_DEPRECATED_OPTIONS is not set
+CONFIG_SERIAL_8250_PCI=m
+CONFIG_SERIAL_8250_NR_UARTS=4
+CONFIG_SERIAL_8250_RUNTIME_UARTS=4
+# CONFIG_SERIAL_8250_EXTENDED is not set
+# CONFIG_SERIAL_8250_DW is not set
+# CONFIG_SERIAL_8250_RT288X is not set
+CONFIG_SERIAL_8250_MT6577=y
+# CONFIG_SERIAL_8250_INGENIC is not set
+# CONFIG_SERIAL_8250_MID is not set
+
+$ make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- drivers/tty/
+
+compiles just fine.
+
+Do I missing something?
+
+Regards,
+Matthias
