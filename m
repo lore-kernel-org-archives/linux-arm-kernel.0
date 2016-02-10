@@ -1,51 +1,101 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 10 Feb 2016 10:54:54 +0000
-Subject: [PATCHv4 2/3] arm64: Add support for ARCH_SUPPORTS_DEBUG_PAGEALLOC
-In-Reply-To: <20160210103814.GC13577@e104818-lin.cambridge.arm.com>
-References: <1454718288-31374-1-git-send-email-labbott@fedoraproject.org>
- <1454718288-31374-3-git-send-email-labbott@fedoraproject.org>
- <20160210103814.GC13577@e104818-lin.cambridge.arm.com>
-Message-ID: <20160210105453.GB2632@leverpostej>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Wed, 10 Feb 2016 10:57:11 +0000
+Subject: [PATCH V5 10/14] Documentation: DT: bindings: Add power domain
+ info for NVIDIA PMC
+In-Reply-To: <CAL_JsqLcoKW2znNNvM=sYLmZ6O6ZWqn7+aXspkXoONw6-O1ygg@mail.gmail.com>
+References: <1453998832-27383-1-git-send-email-jonathanh@nvidia.com>
+ <1453998832-27383-11-git-send-email-jonathanh@nvidia.com>
+ <20160129160625.GA21918@rob-hp-laptop> <56B1DE40.7080403@nvidia.com>
+ <CAL_JsqLcoKW2znNNvM=sYLmZ6O6ZWqn7+aXspkXoONw6-O1ygg@mail.gmail.com>
+Message-ID: <56BB1787.4050801@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 10, 2016 at 10:38:14AM +0000, Catalin Marinas wrote:
-> On Fri, Feb 05, 2016 at 04:24:47PM -0800, Laura Abbott wrote:
-> > --- a/arch/arm64/mm/mmu.c
-> > +++ b/arch/arm64/mm/mmu.c
-> > @@ -149,6 +149,19 @@ static void split_pud(pud_t *old_pud, pmd_t *pmd)
-> >  	} while (pmd++, i++, i < PTRS_PER_PMD);
-> >  }
-> >  
-> > +bool block_mappings_allowed(phys_addr_t (*pgtable_alloc)(void))
-> > +{
-> > +
-> > +	/*
-> > +	 * If debug_page_alloc is enabled we must map the linear map
-> > +	 * using pages. However, other mappings created by
-> > +	 * create_mapping_noalloc must use sections in some cases. Allow
-> > +	 * sections to be used in those cases, where no pgtable_alloc
-> > +	 * function is provided.
-> > +	 */
-> > +	return !pgtable_alloc || !debug_pagealloc_enabled();
-> > +}
+
+On 03/02/16 15:48, Rob Herring wrote:
+> On Wed, Feb 3, 2016 at 5:02 AM, Jon Hunter <jonathanh@nvidia.com> wrote:
+>>
+>> On 29/01/16 16:06, Rob Herring wrote:
+>>> On Thu, Jan 28, 2016 at 04:33:48PM +0000, Jon Hunter wrote:
+>>>> Add power-domain binding documentation for the NVIDIA PMC driver in
+>>>> order to support generic power-domains.
+>>>>
+>>>> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+>>>> ---
+>>>>  .../bindings/arm/tegra/nvidia,tegra20-pmc.txt      | 55 ++++++++++++++++++++++
+>>>>  1 file changed, 55 insertions(+)
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
+>>>> index 53aa5496c5cf..3c77373aa826 100644
+>>>> --- a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
+>>>> +++ b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
+>>>> @@ -1,5 +1,7 @@
+>>>>  NVIDIA Tegra Power Management Controller (PMC)
+>>>>
+>>>> +== Power Management Controller Node ==
+>>>> +
+>>>>  The PMC block interacts with an external Power Management Unit. The PMC
+>>>>  mostly controls the entry and exit of the system from different sleep
+>>>>  modes. It provides power-gating controllers for SoC and CPU power-islands.
+>>>> @@ -70,6 +72,10 @@ Optional properties for hardware-triggered thermal reset (inside 'i2c-thermtrip'
+>>>>                       Defaults to 0. Valid values are described in section 12.5.2
+>>>>                       "Pinmux Support" of the Tegra4 Technical Reference Manual.
+>>>>
+>>>> +Optional nodes:
+>>>> +- powergates : This node contains a hierarchy of power domain nodes, which
+>>>> +           should match the powergates on the Tegra SoC.
+>>>> +
+>>>>  Example:
+>>>>
+>>>>  / SoC dts including file
+>>>> @@ -115,3 +121,52 @@ pmc at 7000f400 {
+>>>>      };
+>>>>      ...
+>>>>  };
+>>>> +
+>>>> +
+>>>> +== PM Domain Nodes ==
+>>>> +
+>>>> +Each of the PM domain nodes represents a power-domain on the Tegra SoC
+>>>> +that can be power-gated by the PMC and should be named appropriately.
+>>>> +
+>>>> +Required properties:
+>>>> +  - clocks: Must contain an entry for each clock required by the PMC for
+>>>> +    controlling a power-gate. See ../clocks/clock-bindings.txt for details.
+>>>> +  - resets: Must contain an entry for each reset required by the PMC for
+>>>> +    controlling a power-gate. See ../reset/reset.txt for details.
+>>>> +  - nvidia,powergate: Integer cell that contains an identifier for the PMC
+>>>> +    power-gate that is associated with the power-domain. Please refer to
+>>>> +    the Tegra TRM for more details.
+>>>
+>>> Why not make this value be the power-domain cell for consumers and the
+>>> pmc be the phandle.
+>>
+>> Is there anything wrong with using a label for the consumers? Seems
+>> simpler, if you can just say ...
+>>
+>>         adma: adma at 702e2000 {
+>>                 ...
+>>                 power-domains = <&pd_audio>;
+>>                 ...
+>>         };
 > 
-> This breaks the build when CONFIG_DEBUG_PAGEALLOC is not enabled
-> (defconfig) since debug_pagealloc_enabled() is not defined. A fix went
-> in next/master as commit 0987684b855c
-> ("mm-slab-clean-up-debug_pagealloc-processing-code-fix"). I need to
-> track it down and merge it via the arm64 tree, otherwise I'll add some
-> #ifdefs in this function.
+> Only that is a bit unusual. It would only really matter if we had some
+> common parsing that we wanted to share. I'd look at other examples and
+> try to align. If there's no clear pattern, then it is fine.
 
-In the cover for v2 [1],  it was mentioend that we needed a patch [2]
-"mm: provide debug_pagealloc_enabled() without CONFIG_DEBUG_PAGEALLOC".
-I assumed that was already queued via the mm tree.
+So I have been having a look at this and it appears to be mixed across
+the various SoCs. It seems that those SoCs that define the generic PM
+domains statically in the machine/soc code use a phandle plus a argument
+to identify the power domain. However, for those that describe the
+power-domain in the DT (listing clocks, resets, etc), they just use a
+phandle to the power-domain itself (like I have above). It looks like if
+you are describing the power domain in DT, then it is much simplier to
+do this.
 
-> BTW, shouldn't the block_mappings_allowed() function be static?
+Given that I wish to keep the description of the power-domain in DT, it
+is much easier to stick with the same conventions that the other SoCs
+are using.
 
-That would make sense to me, yes.
-
-Mark.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/403439.html  
-[2] http://article.gmane.org/gmane.linux.kernel.mm/1452
+Cheers
+Jon
