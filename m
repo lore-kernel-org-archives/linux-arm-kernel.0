@@ -1,53 +1,158 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 10 Feb 2016 12:10:33 +0800
-Subject: [PATCH] pci: xgene: Add ECAM fixups
-In-Reply-To: <1455068984-22210-1-git-send-email-dhdang@apm.com>
-Message-ID: <201602101236.v5Xf48zl%fengguang.wu@intel.com>
+From: raveendra.padasalagi@broadcom.com (Raveendra Padasalagi)
+Date: Wed, 10 Feb 2016 10:24:43 +0530
+Subject: [PATCH 1/3] input: cygnus-update touchscreen dt node document
+In-Reply-To: <20160209174351.GC40460@dtor-ws>
+References: <1455008277-8312-1-git-send-email-raveendra.padasalagi@broadcom.com>
+ <1455008277-8312-2-git-send-email-raveendra.padasalagi@broadcom.com>
+ <2631849.GeOulu78vx@wuerfel> <3b53af6b6c6735d10cb88518c8b8a0ae@mail.gmail.com>
+ <20160209174351.GC40460@dtor-ws>
+Message-ID: <979fb4dc5fba643a6780759d2a13530a@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Duc,
+> -----Original Message-----
+> From: Dmitry Torokhov [mailto:dmitry.torokhov at gmail.com]
+> Sent: 09 February 2016 23:14
+> To: Raveendra Padasalagi
+> Cc: Arnd Bergmann; Russell King; devicetree at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; linux-input at vger.kernel.org; Rob Herring;
+Pawel
+> Moll; Mark Rutland; Ian Campbell; Kumar Gala; Jonathan Richardson; Jon
+> Mason; Florian Fainelli; Ray Jui; Scott Branden;
+linux-kernel at vger.kernel.org;
+> bcm-kernel-feedback-list at broadcom.com
+> Subject: Re: [PATCH 1/3] input: cygnus-update touchscreen dt node
+document
+>
+> On Tue, Feb 09, 2016 at 10:25:26PM +0530, Raveendra Padasalagi wrote:
+> > > -----Original Message-----
+> > > From: Arnd Bergmann [mailto:arnd at arndb.de]
+> > > Sent: 09 February 2016 16:34
+> > > To: Raveendra Padasalagi
+> > > Cc: Dmitry Torokhov; Russell King; devicetree at vger.kernel.org;
+> > linux-arm-
+> > > kernel at lists.infradead.org; linux-input at vger.kernel.org; Rob
+> > > Herring;
+> > Pawel
+> > > Moll; Mark Rutland; Ian Campbell; Kumar Gala; Jonathan Richardson;
+> > > Jon Mason; Florian Fainelli; Ray Jui; Scott Branden;
+> > linux-kernel at vger.kernel.org;
+> > > bcm-kernel-feedback-list at broadcom.com
+> > > Subject: Re: [PATCH 1/3] input: cygnus-update touchscreen dt node
+> > document
+> > >
+> > > On Tuesday 09 February 2016 14:27:55 Raveendra Padasalagi wrote:
+> > > > +
+> > > > +One of the below 2 property is mandatory.
+> > > > +- ts_syscon: handler of syscon node defining physical base
+> > > > +address
+> > > > +  of the controller and length of memory mapped region.
+> > > > +  If this property is selected please make sure MFD_SYSCON config
+> > > > +  is enabled in the defconfig file.
+> > > > +or
+> > > > +- reg: physical base address of the controller and length of
+> > > > +memory
+> > > > +  mapped region.
+> > > > +
+> > > >  - clocks:  The clock provided by the SOC to driver the tsc
+> > > >  - clock-name:  name for the clock
+> > > >  - interrupts: The touchscreen controller's interrupt @@ -54,12
+> > > > +62,16 @@ Optional properties:
+> > > >  - touchscreen-inverted-y: Y axis is inverted (boolean)
+> > > >
+> > > >  Example:
+> > > > +       ts_adc_syscon: ts_adc_syscon at 0x180a6000 {
+> > > > +               compatible = "syscon";
+> > > > +               reg = <0x180a6000 0xc30>;
+> > > > +       };
+> > > >
+> > > >         touchscreen: tsc at 0x180A6000 {
+> > > >                 compatible = "brcm,iproc-touchscreen";
+> > > >                 #address-cells = <1>;
+> > > >                 #size-cells = <1>;
+> > > > -               reg = <0x180A6000 0x40>;
+> > > > +               syscon = <&ts_adc_syscon>;
+> > > >                 clocks = <&adc_clk>;
+> > > >                 clock-names = "tsc_clk";
+> > > >                 interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>;
+> > >
+> > > This doesn't seem right: For one thing, it's an incompatible binding
+> > change which
+> > > you should try to avoid.
+> >
+> > > Worse, the syscon has a name indicating that it really has a
+> > > particular
+> > function,
+> > > but the name is completely generic (just "syscon"). Please add a
+> > specific
+> > > compatible string identifying the device that owns the registers,
+> > > and
+> > put any
+> > > other associated properties (clocks, interrupts, ...) that are for
+> > > that
+> > device in
+> > > general rather than just the touchscreen in there.
+> >
+> > By mistake "syscon" name is documented in "touchscreen" label above.
+> > In the touchscreen driver code and .dtsi file it's named and used as
+> > "ts_syscon".
+> > Please refer https://lkml.org/lkml/2016/2/9/71 for the changes.
+> > Let me know if this ok. I will correct the documentation in the next
+> > patch.
+> >
+> > > Your changelog text fails to describe why you do this change in the
+> > first place,
+> > > and why you can't do it in a backward-compatible way, so please
+> > > rewrite
+> > that
+> > > text.
+> >
+> > Yes, I will update the change log in the next patch.
+> >
+> > In Cygnus SOC, Touch screen controller registers are shared with ADC
+> > and flex timer IP's.
+> > Using readl/writel could lead to race condition. So this patch is
+> > introduced to take care mutually exclusive access of register's in
+> > such a case.
+> >
+> > In the platform's where touchscreen register's are not shared normal
+> > readl/writel could be used.
+>
+> Are there currently platforms where the registers are not shared? If we
+have to
+> use regmap to correctly update registers (and thus we need
+> syscon) then I wonder if we should even attempt to support direct
+register
+> access by the driver.
 
-[auto build test ERROR on pci/next]
-[also build test ERROR on v4.5-rc3 next-20160209]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+Currently there are no platforms without register sharing, but we would
+like to keep
+the driver generic enough to take care of future SOC's if comes with
+dedicated registers
+and same touchscreen IP being re-used.
+> >
+> > Based on the dt  property entry "reg" or "ts_syscon" register accesses
+> > are handled.
+> > if "reg" is provided normal readl/writel API's are used to access
+> > register's else if "ts_syscon" is provided then syscon API's are used.
+>
+> If we decide that we still allow register access then please change the
+driver so it
+> instantiates its own regmap instance in this case instead of doing
+checks all the
+> time.
 
-url:    https://github.com/0day-ci/linux/commits/Duc-Dang/pci-xgene-Add-ECAM-fixups/20160210-095702
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git next
-config: arm64-allyesconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+Using remap will leads to overhead of locking and unlocking for each
+register access
+in case if a dedicated register's present in the platform. I think current
+implementation
+of simple check of regs or remap is better over using regmap read/write
+calls with locking
+overhead. Let me know your opinion.
 
-All errors (new ones prefixed by >>):
 
->> drivers/pci/host/pci-xgene.c:34:24: fatal error: linux/ecam.h: No such file or directory
-    #include <linux/ecam.h>
-                           ^
-   compilation terminated.
 
-vim +34 drivers/pci/host/pci-xgene.c
-
-    28	#include <linux/of_pci.h>
-    29	#include <linux/pci.h>
-    30	#include <linux/platform_device.h>
-    31	#include <linux/slab.h>
-    32	#ifdef CONFIG_ACPI
-    33	#include <linux/acpi.h>
-  > 34	#include <linux/ecam.h>
-    35	#include <linux/pci-acpi.h>
-    36	#endif
-    37	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 48147 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160210/ef5471ae/attachment-0001.obj>
+> Thanks.
+>
+> --
+> Dmitry
