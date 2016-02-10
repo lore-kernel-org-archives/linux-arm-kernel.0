@@ -1,58 +1,45 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Wed, 10 Feb 2016 02:19:03 +0200
-Subject: [PATCH 00/11] clk: lpc32xx: add clock support for NXP LPC32xx
-In-Reply-To: <loom.20160209T215103-78@post.gmane.org>
-References: <1447981511-29653-1-git-send-email-vz@mleia.com>
- <loom.20160209T215103-78@post.gmane.org>
-Message-ID: <56BA81F7.4080006@mleia.com>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Wed, 10 Feb 2016 00:32:48 +0000
+Subject: [PATCH 5/5] ARM: dts: r8a7794 add sound support
+In-Reply-To: <56BA4B3D.1030301@cogentembedded.com>
+References: <4253511.vvGjIdOnb6@wasted.cogentembedded.com>
+ <2179456.HznTXDfKhZ@wasted.cogentembedded.com>
+ <20160209195054.GA14008@verge.net.au>
+ <56BA4B3D.1030301@cogentembedded.com>
+Message-ID: <877fidtnm6.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylvain,
 
-On 09.02.2016 23:01, Sylvain Lemieux wrote:
-> Vladimir Zapolskiy <vz@...> writes:
->>
->> This changeset adds common clock framework driver for NXP LPC32xx
->> boards.
+Hi
+
+> >> Define the generic R8A7794 part of  the sound device node.
+> >> This sound device  is a complex one and comprises the Audio Clock Generator
+> >> (ADG), Sampling Rate Converter Unit (SCU), Serial Sound Interface [Unit]
+> >> (SSI[U]), and Audio DMAC-Peripheral-Peripheral.
+> >> It is up  to the board file to enable the device.
+> >>
+> >> This patch is based on the R8A7791 sound work by Kuninori Morimoto.
+> >>
+> >> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> >>
+> >> ---
+(snip)
+> > My reading of the documentation is that src0, 7, 8 and 9 are not
+> > present on the r8a7794. I am referring to Figure 38.1b or r1.02 of
+> > the R-Car Gen2 User's Manual.
 > 
-> Hi Vladimir,
-> 
-> Just to let you know that we did some testing using this changeset;
-> I installed patches 4 to 7, 10 & 11 on top of 4.5-rc1.
-> 
-> I was able to run our software (SIC1 interrupt sources disable)
-> without any problem a custom LPC32xx board.
+>    Indeed, thank you for the timely comment (I'm working on the series
+> respin)! However, table 7A.12 still lists the SRC0/7/8/9 clocks for
+> R8A7794, table 11.1 still lists SRC0/7/8/9 interrupts for R8A7794, and
+> table 43.4 still lists SRC0/7/8/9 MID+RID for R8A7794 -- go figure...
 
-this is a known issue, and I hope it will be fixed in upstream in v4.6,
-the required changes in irqchip and gpiochip drivers were sent for
-review some time ago, a bit more work is needed to 
+Oops, current rsnd driver is assuming that DT has all channels.
+This means it doesn't check src number itself.
 
-Also 2-3 more clean-up changes in USB host and gadget drivers are done
-locally (no more need to configure clocks out of the common clock
-framework), but not yet submitted, will do it tomorrow.
+Can you add src0, 7, 8, 9 with "non exist" comment ?
+Otherwise, we need to modify driver, but I'm not sure how this assumption is deep.
 
-> We did not get any problem with the clock signals we are using.
-> 
-
-Thank you for testing, I'm going to add your Tested-by tag (if you
-don't mind) and submit a PR to ARM maintainers shortly.
-
->> Vladimir Zapolskiy (11):
->>   dt-bindings: clock: add description of LPC32xx clock controller
->>   dt-bindings: clock: add description of LPC32xx USB clock controller
->>   dt-bindings: clock: add NXP LPC32xx clock list for consumers
->>   arm: dts: lpc32xx: add device nodes for external oscillators
->>   arm: dts: lpc32xx: add clock controller device node
->>   arm: dts: lpc32xx: add clock properties to device nodes
->>   arm: dts: lpc32xx: add USB clock controller
->>   clk: lpc18xx: add NXP specific common clock framework selection
->>   clk: lpc32xx: add common clock framework driver
->>   arm: lpc32xx: switch to common clock framework
->>   arm: dts: lpc32xx: remove clock frequency property from UART device
->>     nodes
-> 
-> 
-
-With best wishes,
-Vladimir
+Best regards
+---
+Kuninori Morimoto
