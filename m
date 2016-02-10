@@ -1,52 +1,96 @@
-From: shaun.ren@linux.com (Shaun Ren)
-Date: Tue,  9 Feb 2016 18:45:27 -0800
-Subject: [PATCH v3 8/9] Staging: rts5208: rtsx_transport.c: Fix comparisons to
- NULL
-In-Reply-To: <1455072328-7033-1-git-send-email-shaun.ren@linux.com>
+From: joe@perches.com (Joe Perches)
+Date: Tue, 09 Feb 2016 18:58:11 -0800
+Subject: [PATCH v3 2/9] Staging: rts5208: rtsx_transport.c: Align to
+ open parenthesis
+In-Reply-To: <1455072328-7033-3-git-send-email-shaun.ren@linux.com>
 References: <1454981485-15686-1-git-send-email-shaun.ren@linux.com>
  <1455072328-7033-1-git-send-email-shaun.ren@linux.com>
-Message-ID: <1455072328-7033-9-git-send-email-shaun.ren@linux.com>
+ <1455072328-7033-3-git-send-email-shaun.ren@linux.com>
+Message-ID: <1455073091.3333.24.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch changes all comparsions to NULL with !..., as reported by
-checkpatch.pl.
+On Tue, 2016-02-09 at 18:45 -0800, Shaun Ren wrote:
+> This patch fixes the alignment issue reported by checkpatch.pl:
+> 
+> CHECK: Alignment should match open parenthesis
+> 
+> Signed-off-by: Shaun Ren <shaun.ren@linux.com>
+> ---
+> ?drivers/staging/rts5208/rtsx_transport.c | 61 ++++++++++++++++++--------------
+> ?1 file changed, 35 insertions(+), 26 deletions(-)
+> 
+> diff --git a/drivers/staging/rts5208/rtsx_transport.c b/drivers/staging/rts5208/rtsx_transport.c
+> index 5de8913..17bea8a 100644
+> --- a/drivers/staging/rts5208/rtsx_transport.c
+> +++ b/drivers/staging/rts5208/rtsx_transport.c
+> @@ -42,8 +42,11 @@
+> ? */
+> ?
+> ?unsigned int rtsx_stor_access_xfer_buf(unsigned char *buffer,
+> -	unsigned int buflen, struct scsi_cmnd *srb, unsigned int *index,
+> -	unsigned int *offset, enum xfer_buf_dir dir)
+> +				???????unsigned int buflen,
+> +				???????struct scsi_cmnd *srb,
+> +				???????unsigned int *index,
+> +				???????unsigned int *offset,
+> +				?????enum xfer_buf_dir dir)
 
-Signed-off-by: Shaun Ren <shaun.ren@linux.com>
----
- drivers/staging/rts5208/rtsx_transport.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+Doesn't this look odd to you?
 
-diff --git a/drivers/staging/rts5208/rtsx_transport.c b/drivers/staging/rts5208/rtsx_transport.c
-index c956072..46fc8c2 100644
---- a/drivers/staging/rts5208/rtsx_transport.c
-+++ b/drivers/staging/rts5208/rtsx_transport.c
-@@ -336,7 +336,7 @@ static int rtsx_transfer_sglist_adma_partial(struct rtsx_chip *chip, u8 card,
- 	struct scatterlist *sg_ptr;
- 	u32 val = TRIG_DMA;
- 
--	if ((sg == NULL) || (num_sg <= 0) || !offset || !index)
-+	if (!sg || (num_sg <= 0) || !offset || !index)
- 		return -EIO;
- 
- 	if (dma_dir == DMA_TO_DEVICE)
-@@ -500,7 +500,7 @@ static int rtsx_transfer_sglist_adma(struct rtsx_chip *chip, u8 card,
- 	long timeleft;
- 	struct scatterlist *sg_ptr;
- 
--	if ((sg == NULL) || (num_sg <= 0))
-+	if (!sg || (num_sg <= 0))
- 		return -EIO;
- 
- 	if (dma_dir == DMA_TO_DEVICE)
-@@ -647,7 +647,7 @@ static int rtsx_transfer_buf(struct rtsx_chip *chip, u8 card, void *buf,
- 	u32 val = 1 << 31;
- 	long timeleft;
- 
--	if ((buf == NULL) || (len <= 0))
-+	if (!buf || (len <= 0))
- 		return -EIO;
- 
- 	if (dma_dir == DMA_TO_DEVICE)
--- 
-2.7.0
+> ?{
+> ?	unsigned int cnt;
+> ?
+> @@ -54,10 +57,10 @@ unsigned int rtsx_stor_access_xfer_buf(unsigned char *buffer,
+> ?		cnt = min(buflen, scsi_bufflen(srb) - *offset);
+> ?		if (dir == TO_XFER_BUF)
+> ?			memcpy((unsigned char *) scsi_sglist(srb) + *offset,
+> -					buffer, cnt);
+> +			???????buffer, cnt);
+> ?		else
+> ?			memcpy(buffer, (unsigned char *) scsi_sglist(srb) +
+> -					*offset, cnt);
+> +			???????*offset, cnt);
+
+If you really want to make this look nicer and more
+intelligible, it's probably be better to use a more
+symmetric form like:
+
+		if (dir == TO_XFER_BUF)
+			memcpy((unsigned char *)scsi_sglist(srb) + *offset,
+			       buffer,
+			       cnt);
+		else
+			memcpy(buffer,
+			       (unsigned char *)scsi_sglist(srb) + *offset,
+			       cnt);
+or maybe
+
+		void *to;
+		void *from;
+
+		[...]
+
+		if (dir == TO_XFER_BUF) {
+			to = (unsigned char *)scsi_sglist(srb) + *offset;
+			from = buffer;
+		} else {
+			to = buffer;
+			from = (unsigned char *)scsi_sglist(srb) +
+*offset;
+		}
+		memcpy(to, from, cnt);
+
+or maybe
+
+		void *to;
+		void *from;
+
+		[...]
+
+		to = (unsigned char *)scsi_sglist(srb) + *offset;
+		from = buffer;
+		if (dir != TO_XFER_BUF)
+			swap(to, from);
+
+		memcpy(to, from, cnt);
