@@ -1,81 +1,51 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 10 Feb 2016 12:02:45 +0000
-Subject: [PATCH V3 10/10] acpi, gicv3, its: Use MADT ITS subtable to do
- PCI/MSI domain initialization.
-In-Reply-To: <1453209083-3358-11-git-send-email-tn@semihalf.com>
-References: <1453209083-3358-1-git-send-email-tn@semihalf.com>
- <1453209083-3358-11-git-send-email-tn@semihalf.com>
-Message-ID: <56BB26E5.6060703@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 10 Feb 2016 12:10:30 +0000
+Subject: [PATCH] arm64: use raw_smp_processor_id in stack backtrace dump
+In-Reply-To: <56BB247F.6040202@arm.com>
+References: <1455053182-31404-1-git-send-email-yang.shi@linaro.org>
+ <20160210102939.GD1052@arm.com> <56BB247F.6040202@arm.com>
+Message-ID: <20160210121030.GH1052@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/01/16 13:11, Tomasz Nowicki wrote:
-> After refactoring DT code, we let ACPI to build ITS PCI MSI domain
-> and do requester ID to device ID translation using IORT table.
+On Wed, Feb 10, 2016 at 11:52:31AM +0000, James Morse wrote:
+> On 10/02/16 10:29, Will Deacon wrote:
+> > On Tue, Feb 09, 2016 at 01:26:22PM -0800, Yang Shi wrote:
+> >> dump_backtrace may be called in kthread context, which is not bound to a single
+> >> cpu, i.e. khungtaskd, then calling smp_processor_id may trigger the below bug
+> >> report:
+> > 
+> > If we're preemptible here, it means that our irq_stack_ptr is potentially
+> > bogus. Whilst this isn't an issue for kthreads, it does feel like we
+> > could make this slightly more robust in the face of potential frame
+> > corruption. Maybe just zero the IRQ stack pointer if we're in preemptible
+> > context?
 > 
-> We have now full PCI MSI domain stack, thus we can enable ITS initialization
-> from GICv3 core driver for ACPI scenario.
+> Switching between stacks is only valid if we are tracing ourselves while on the
+> irq_stack, we should probably prevent it for other tasks too.
 > 
-> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> ---
->  drivers/irqchip/irq-gic-v3-its-pci-msi.c | 44 +++++++++++++++++++++++++++++++-
->  drivers/irqchip/irq-gic-v3.c             |  3 +--
->  drivers/pci/msi.c                        |  3 +++
->  3 files changed, 47 insertions(+), 3 deletions(-)
+> Something like (untested):
+> ---------------------
+> if (tsk == current && in_atomic())
+> 	irq_stack_ptr = IRQ_STACK_PTR(smp_processor_id());
+> else
+> 	irq_stack_ptr = 0;
+> ---------------------
 > 
-> diff --git a/drivers/irqchip/irq-gic-v3-its-pci-msi.c b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-> index 06165cb..7f0a958 100644
-> --- a/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-> +++ b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-> @@ -15,6 +15,8 @@
->   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->   */
->  
-> +#include <linux/acpi.h>
-> +#include <linux/iort.h>
->  #include <linux/msi.h>
->  #include <linux/of.h>
->  #include <linux/of_irq.h>
-> @@ -143,10 +145,50 @@ static int __init its_pci_of_msi_init(void)
->  	return 0;
->  }
->  
-> +#ifdef CONFIG_ACPI
-> +
-> +static int __init
-> +its_pci_msi_parse_madt(struct acpi_subtable_header *header,
-> +		    const unsigned long end)
-> +{
-> +	struct acpi_madt_generic_translator *its_entry;
-> +	struct fwnode_handle *domain_handle;
-> +
-> +	its_entry = (struct acpi_madt_generic_translator *)header;
-> +	domain_handle = iort_find_its_domain_token(its_entry->translation_id);
-> +	if (!domain_handle) {
-> +		pr_err("ITS at 0x%lx: Unable to locate ITS domain handle\n",
-> +		       (long)its_entry->base_address);
-> +		return 0;
-> +	}
-> +
-> +	if (its_pci_msi_init_one(domain_handle))
-> +		return 0;
-> +
-> +	pci_msi_register_fwnode_provider(&iort_find_pci_domain_token);
+> This would work when we trace ourselves while on the irq_stack, but break*
+> tracing a running task on a remote cpu (khungtaskd doesn't do this).
+> 
+> The same fix would apply to unwind_frame(), we have 'tsk' in both functions.
+> 
+> Thoughts?
 
-I'm a bit worried by this. You are registering this for each and every
-ITS that gets probed (useless, but why not). But also, you're using a
-hook that is designed to work at the bus level, without caring for the
-actual PCI devices. That's fine for something like GICv2m, which exposes
-a single domain, but I can't picture how this works when you have
-devices sitting behind a single RC that talk to different ITSs.
+in_atomic is a misnomer:
 
-My understanding is that IORT was behaving in a similar way the msi-map
-property works, so I'm a bit puzzled here.
+  https://lwn.net/Articles/274695/
 
-Can you please shed some light on that?
+;)
 
-Thanks,
+So we might be better off zeroing the pointer if tsk != current ||
+preemptible(). But yeah, I think we're in general agreement about this.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Will
