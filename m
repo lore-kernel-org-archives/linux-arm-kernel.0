@@ -1,69 +1,147 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 10 Feb 2016 15:48:16 +0000
-Subject: [PATCH v3 1/3] iommu/io-pgtable: Add ARMv7 short descriptor
- support
-In-Reply-To: <066c4af0e29c9cc658bd5e48edc5e2d7ba7140a1.1453723096.git.robin.murphy@arm.com>
-References: <cover.1453723096.git.robin.murphy@arm.com>
- <066c4af0e29c9cc658bd5e48edc5e2d7ba7140a1.1453723096.git.robin.murphy@arm.com>
-Message-ID: <20160210154815.GO1052@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 10 Feb 2016 15:48:35 +0000
+Subject: [PATCH v2 14/28] ARM: KVM: Add guest entry code
+In-Reply-To: <20160209184445.GR5171@cbox>
+References: <1454583645-10144-1-git-send-email-marc.zyngier@arm.com>
+ <1454583645-10144-15-git-send-email-marc.zyngier@arm.com>
+ <20160209184445.GR5171@cbox>
+Message-ID: <56BB5BD3.8020600@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
-
-On Tue, Jan 26, 2016 at 05:13:13PM +0000, Robin Murphy wrote:
-> Add a nearly-complete ARMv7 short descriptor implementation, omitting
-> only a few legacy and CPU-centric aspects which shouldn't be necessary
-> for IOMMU API use anyway.
+On 09/02/16 18:44, Christoffer Dall wrote:
+> On Thu, Feb 04, 2016 at 11:00:31AM +0000, Marc Zyngier wrote:
+>> Add the very minimal piece of code that is now required to jump
+>> into the guest (and return from it). This code is only concerned
+>> with save/restoring the USR registers (r0-r12+lr for the guest,
+>> r4-r12+lr for the host), as everything else is dealt with in C
+>> (VFP is another matter though).
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm/kvm/hyp/Makefile |  1 +
+>>  arch/arm/kvm/hyp/entry.S  | 70 +++++++++++++++++++++++++++++++++++++++++++++++
+>>  arch/arm/kvm/hyp/hyp.h    |  2 ++
+>>  3 files changed, 73 insertions(+)
+>>  create mode 100644 arch/arm/kvm/hyp/entry.S
+>>
+>> diff --git a/arch/arm/kvm/hyp/Makefile b/arch/arm/kvm/hyp/Makefile
+>> index 173bd1d..c779690 100644
+>> --- a/arch/arm/kvm/hyp/Makefile
+>> +++ b/arch/arm/kvm/hyp/Makefile
+>> @@ -8,3 +8,4 @@ obj-$(CONFIG_KVM_ARM_HOST) += timer-sr.o
+>>  obj-$(CONFIG_KVM_ARM_HOST) += vgic-v2-sr.o
+>>  obj-$(CONFIG_KVM_ARM_HOST) += vfp.o
+>>  obj-$(CONFIG_KVM_ARM_HOST) += banked-sr.o
+>> +obj-$(CONFIG_KVM_ARM_HOST) += entry.o
+>> diff --git a/arch/arm/kvm/hyp/entry.S b/arch/arm/kvm/hyp/entry.S
+>> new file mode 100644
+>> index 0000000..32f79b0
+>> --- /dev/null
+>> +++ b/arch/arm/kvm/hyp/entry.S
+>> @@ -0,0 +1,70 @@
+>> +/*
+>> + * Copyright (C) 2016 - ARM Ltd
+>> + * Author: Marc Zyngier <marc.zyngier@arm.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License
+>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>> +*/
+>> +
+>> +#include <linux/linkage.h>
+>> +#include <asm/asm-offsets.h>
+>> +#include <asm/kvm_arm.h>
+>> +
+>> +	.arch_extension     virt
+>> +
+>> +	.text
+>> +	.pushsection	.hyp.text, "ax"
+>> +
+>> +#define USR_REGS_OFFSET		(CPU_CTXT_GP_REGS + GP_REGS_USR)
+>> +
+>> +/* int __guest_enter(struct kvm_vcpu *vcpu, struct kvm_cpu_context *host) */
+>> +ENTRY(__guest_enter)
+>> +	@ Save host registers
+>> +	add	r1, r1, #(USR_REGS_OFFSET + S_R4)
+>> +	stm	r1!, {r4-r12}
+>> +	str	lr, [r1, #4]	@ Skip SP_usr (already saved)
+>> +
+>> +	@ Restore guest registers
+>> +	add	r0, r0,  #(VCPU_GUEST_CTXT + USR_REGS_OFFSET + S_R0)
 > 
-> Signed-off-by: Yong Wu <yong.wu@mediatek.com>
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
->  drivers/iommu/Kconfig              |  19 +
->  drivers/iommu/Makefile             |   1 +
->  drivers/iommu/io-pgtable-arm-v7s.c | 849 +++++++++++++++++++++++++++++++++++++
->  drivers/iommu/io-pgtable.c         |   3 +
->  drivers/iommu/io-pgtable.h         |  14 +-
->  5 files changed, 885 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/iommu/io-pgtable-arm-v7s.c
+> this really relies on offsetof(struct pt_regs, ARM_r0) == 0, which I
+> guess will likely never change, but given there's both a kernel and uapi
+> version of struct pt_regs, are we sure about this?
 
-This looks good to me, with one minor comment below.
+If they did diverge, a lot of things would just break. arm64 does have
+different types between user and kernel, but the userspace version is
+guaranteed to be a strict prefix of the kernel one. I believe arm would
+have to enforce the same thing if it changed.
 
-> diff --git a/drivers/iommu/io-pgtable.h b/drivers/iommu/io-pgtable.h
-> index 36673c8..aa57073 100644
-> --- a/drivers/iommu/io-pgtable.h
-> +++ b/drivers/iommu/io-pgtable.h
-> @@ -1,5 +1,6 @@
->  #ifndef __IO_PGTABLE_H
->  #define __IO_PGTABLE_H
-> +#include <linux/bitops.h>
->  
->  /*
->   * Public API for use by IOMMU drivers
-> @@ -9,6 +10,7 @@ enum io_pgtable_fmt {
->  	ARM_32_LPAE_S2,
->  	ARM_64_LPAE_S1,
->  	ARM_64_LPAE_S2,
-> +	ARM_V7S,
->  	IO_PGTABLE_NUM_FMTS,
->  };
->  
-> @@ -45,7 +47,9 @@ struct iommu_gather_ops {
->   *                 page table walker.
->   */
->  struct io_pgtable_cfg {
-> -	#define IO_PGTABLE_QUIRK_ARM_NS	(1 << 0)	/* Set NS bit in PTEs */
-> +	#define IO_PGTABLE_QUIRK_ARM_NS		BIT(0) /* Set NS bit in PTEs */
-> +	#define IO_PGTABLE_QUIRK_NO_PERMS	BIT(1) /* No AP/XN bits */
-> +	#define IO_PGTABLE_QUIRK_TLBI_ON_MAP	BIT(2) /* TLB Inv. on map */
+> 
+>> +	ldr	lr, [r0, #S_LR]
+>> +	ldm	r0, {r0-r12}
+>> +
+>> +	clrex
+>> +	eret
+>> +ENDPROC(__guest_enter)
+>> +
+>> +ENTRY(__guest_exit)
+>> +	/*
+>> +	 * return convention:
+>> +	 * guest r0, r1, r2 saved on the stack
+>> +	 * r0: vcpu pointer
+>> +	 * r1: exception code
+>> +	 */
+>> +
+>> +	add	r2, r0, #(VCPU_GUEST_CTXT + USR_REGS_OFFSET + S_R3)
+>> +	stm	r2!, {r3-r12}
+>> +	str	lr, [r2, #4]
+>> +	add	r2, r0, #(VCPU_GUEST_CTXT + USR_REGS_OFFSET + S_R0)
+>> +	pop	{r3, r4, r5}		@ r0, r1, r2
+>> +	stm	r2, {r3-r5}
+>> +
+>> +	ldr	r0, [r0, #VCPU_HOST_CTXT]
+>> +	add	r0, r0, #(USR_REGS_OFFSET + S_R4)
+>> +	ldm	r0!, {r4-r12}
+>> +	ldr	lr, [r0, #4]
+>> +
+>> +	mov	r0, r1
+>> +	bx	lr
+>> +ENDPROC(__guest_exit)
+>> +
+>> +	.popsection
+>> +
+>> diff --git a/arch/arm/kvm/hyp/hyp.h b/arch/arm/kvm/hyp/hyp.h
+>> index 278eb1f..b3f6ed2 100644
+>> --- a/arch/arm/kvm/hyp/hyp.h
+>> +++ b/arch/arm/kvm/hyp/hyp.h
+>> @@ -110,4 +110,6 @@ static inline bool __vfp_enabled(void)
+>>  void __hyp_text __banked_save_state(struct kvm_cpu_context *ctxt);
+>>  void __hyp_text __banked_restore_state(struct kvm_cpu_context *ctxt);
+>>  
+>> +int asmlinkage __guest_enter(struct kvm_vcpu *vcpu,
+>> +			     struct kvm_cpu_context *host);
+>>  #endif /* __ARM_KVM_HYP_H__ */
+>> -- 
+>> 2.1.4
+>>
+> 
+> Otherwise:
+> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+> 
 
-We should either try to keep these generic or add _ARM_ in the names. I
-don't see why we couldn't have them as generic quicks, but that means
-you should fix the AP/XN comment to be architecture agnostic and also
-hack the lpae iopgtable alloc code to reject a cfg with unsupported
-quirks.
+Thanks,
 
-With that change, I'm happy to queue this via my tree or whatever is
-easiest for Yong/Joerg.
-
-Will
+	M.
+-- 
+Jazz is not dead. It just smells funny...
