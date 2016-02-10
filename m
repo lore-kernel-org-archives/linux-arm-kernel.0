@@ -1,28 +1,79 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Wed, 10 Feb 2016 13:49:14 +0000
-Subject: [PATCH 1/8] arm64: KVM: Switch the sys_reg search to be a binary
- search
-In-Reply-To: <1454931622-14902-2-git-send-email-marc.zyngier@arm.com>
-References: <1454931622-14902-1-git-send-email-marc.zyngier@arm.com>
- <1454931622-14902-2-git-send-email-marc.zyngier@arm.com>
-Message-ID: <87ziv8vfol.fsf@linaro.org>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Wed, 10 Feb 2016 14:56:53 +0100
+Subject: [PATCH v2 0/2] ARM: shmobile: Avoid writing to .text
+Message-ID: <1455112615-6970-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+        Hi Simon, Magnus,
 
-Marc Zyngier <marc.zyngier@arm.com> writes:
+When CONFIG_DEBUG_RODATA=y, the kernel crashes during system suspend:
 
-> Our 64bit sys_reg table is about 90 entries long (so far, and the
-> PMU support is likely to increase this). This means that on average,
-> it takes 45 comparaisons to find the right entry (and actually the
-> full 90 if we have to search the invariant table).
->
-> Not the most efficient thing. Specially when you think that this
-> table is already sorted. Switching to a binary search effectively
-> reduces the search to about 7 comparaisons. Slightly better!
+    Freezing user space processes ... (elapsed 0.004 seconds) done.
+    Freezing remaining freezable tasks ... (elapsed 0.002 seconds)
+    done.
+    PM: suspend of devices complete after 111.948 msecs
+    PM: late suspend of devices complete after 1.086 msecs
+    PM: noirq suspend of devices complete after 11.576 msecs
+    Disabling non-boot CPUs ...
+    Kernel panic - not syncing: Attempted to kill the idle task!
+    1014ec ---[ end Kernel panic - not syncing: Attempted to kill the idle task!
+    CPU0: stopping
 
-Is there an argument for making this a hash table instead or is this not
-possible as you would have to use dynamically allocated instead?
+This happens because the shmobile assembler sources have several
+variables that are written to in the .text section, while .text is
+mapped read-only after kernel bootup if CONFIG_DEBUG_RODATA=y.
+
+This series fixes this by moving variables from .text to .data, or just
+removing them.
+Note that there's still an issue with shmobile_boot_fn in
+arch/arm/mach-shmobile/headsmp.S.  So far I didn't manage to fix this
+(the code and data are copied to SRAM on some SoCs).  However, currently
+this is mostly harmless, as this is written to during early kernel boot
+up only, before .text is marked read-only. It does matter for XIP
+(anyone using that with SMP?), so we do want to fix that in the long
+run, too.
+
+These issues were uncovered by "[PATCH v2] ARM: mm: flip priority of
+CONFIG_DEBUG_RODATA". As that patch is already queued in arm/for-next, I
+think all these fixes should be queued for v4.5, to avoid a dependency
+with the arm tree.
+
+Changes compared to v1:
+  - Dropped "ARM: shmobile: Move shmobile_scu_base from .text to .data",
+    which Simon has applied, and queued in soc-for-v4.6 (should be
+    soc-for-v4.5?),
+  - Added Reviewed-by,
+  - Store offsets instead of pointers, as suggested by Nicolas Pitre
+    <nicolas.pitre@linaro.org>,
+  - Added "ARM: shmobile: Remove shmobile_boot_arg".
+
+Tested hard on sh73a0/kzm9g, r8a7791/koelsch.
+Tested lighter on emev2/kzm9d[*], r8a73a4/ape6evm, r8a7740/armadillo, and
+r8a7779/marzen[*] ([*] = no remote resume).
+
+Thanks!
+
+Geert Uytterhoeven (2):
+  ARM: shmobile: Move shmobile_smp_{mpidr,fn,arg}[] from .text to .data
+  ARM: shmobile: Remove shmobile_boot_arg
+
+ arch/arm/mach-shmobile/common.h       |  1 -
+ arch/arm/mach-shmobile/headsmp.S      | 28 ++++++++++++++++------------
+ arch/arm/mach-shmobile/platsmp-apmu.c |  1 -
+ arch/arm/mach-shmobile/platsmp-scu.c  |  1 -
+ 4 files changed, 16 insertions(+), 15 deletions(-)
+
+-- 
+1.9.1
+
+Gr{oetje,eeting}s,
+
+						Geert
 
 --
-Alex Benn?e
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
