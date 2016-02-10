@@ -1,105 +1,51 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 10 Feb 2016 10:49:31 +0000
-Subject: [PATCH v3 6/8] dmaengine: rcar-dmac: add iommu support for slave
- transfers
-In-Reply-To: <1455065878-11906-7-git-send-email-niklas.soderlund+renesas@ragnatech.se>
-References: <1455065878-11906-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
- <1455065878-11906-7-git-send-email-niklas.soderlund+renesas@ragnatech.se>
-Message-ID: <56BB15BB.30806@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 10 Feb 2016 10:54:54 +0000
+Subject: [PATCHv4 2/3] arm64: Add support for ARCH_SUPPORTS_DEBUG_PAGEALLOC
+In-Reply-To: <20160210103814.GC13577@e104818-lin.cambridge.arm.com>
+References: <1454718288-31374-1-git-send-email-labbott@fedoraproject.org>
+ <1454718288-31374-3-git-send-email-labbott@fedoraproject.org>
+ <20160210103814.GC13577@e104818-lin.cambridge.arm.com>
+Message-ID: <20160210105453.GB2632@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/02/16 00:57, Niklas S?derlund wrote:
-> Enable slave transfers to devices behind IPMMU:s by mapping the slave
-> addresses using the dma-mapping API.
->
-> Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
-> ---
->   drivers/dma/sh/rcar-dmac.c | 57 ++++++++++++++++++++++++++++++++++++++++++----
->   1 file changed, 52 insertions(+), 5 deletions(-)
->
-> diff --git a/drivers/dma/sh/rcar-dmac.c b/drivers/dma/sh/rcar-dmac.c
-> index 743873c..268407c 100644
-> --- a/drivers/dma/sh/rcar-dmac.c
-> +++ b/drivers/dma/sh/rcar-dmac.c
-> @@ -1106,21 +1106,68 @@ rcar_dmac_prep_dma_cyclic(struct dma_chan *chan, dma_addr_t buf_addr,
->   	return desc;
->   }
->
-> +static int rcar_dmac_set_slave_addr(struct dma_chan *chan,
-> +				     struct rcar_dmac_chan_slave *slave,
-> +				     phys_addr_t addr, size_t size)
-> +{
-> +	struct dma_attrs attrs;
-> +	enum dma_data_direction dir;
-> +
-> +	init_dma_attrs(&attrs);
-> +	dma_set_attr(DMA_ATTR_NO_KERNEL_MAPPING, &attrs);
-> +	dma_set_attr(DMA_ATTR_SKIP_CPU_SYNC, &attrs);
+On Wed, Feb 10, 2016 at 10:38:14AM +0000, Catalin Marinas wrote:
+> On Fri, Feb 05, 2016 at 04:24:47PM -0800, Laura Abbott wrote:
+> > --- a/arch/arm64/mm/mmu.c
+> > +++ b/arch/arm64/mm/mmu.c
+> > @@ -149,6 +149,19 @@ static void split_pud(pud_t *old_pud, pmd_t *pmd)
+> >  	} while (pmd++, i++, i < PTRS_PER_PMD);
+> >  }
+> >  
+> > +bool block_mappings_allowed(phys_addr_t (*pgtable_alloc)(void))
+> > +{
+> > +
+> > +	/*
+> > +	 * If debug_page_alloc is enabled we must map the linear map
+> > +	 * using pages. However, other mappings created by
+> > +	 * create_mapping_noalloc must use sections in some cases. Allow
+> > +	 * sections to be used in those cases, where no pgtable_alloc
+> > +	 * function is provided.
+> > +	 */
+> > +	return !pgtable_alloc || !debug_pagealloc_enabled();
+> > +}
+> 
+> This breaks the build when CONFIG_DEBUG_PAGEALLOC is not enabled
+> (defconfig) since debug_pagealloc_enabled() is not defined. A fix went
+> in next/master as commit 0987684b855c
+> ("mm-slab-clean-up-debug_pagealloc-processing-code-fix"). I need to
+> track it down and merge it via the arm64 tree, otherwise I'll add some
+> #ifdefs in this function.
 
-Now that we have a way to deal with MMIO addresses properly, we don't 
-need these any more.
+In the cover for v2 [1],  it was mentioend that we needed a patch [2]
+"mm: provide debug_pagealloc_enabled() without CONFIG_DEBUG_PAGEALLOC".
+I assumed that was already queued via the mm tree.
 
-Robin.
+> BTW, shouldn't the block_mappings_allowed() function be static?
 
-> +
-> +	/*
-> +	 * We can't know the direction at this time, see documentation for
-> +	 * 'direction' in struct dma_slave_config.
-> +	 */
-> +	dir = DMA_BIDIRECTIONAL;
-> +
-> +	if (slave->xfer_size) {
-> +		dma_unmap_resource(chan->device->dev, slave->slave_addr,
-> +				slave->xfer_size, dir, &attrs);
-> +		slave->slave_addr = 0;
-> +		slave->xfer_size = 0;
-> +	}
-> +
-> +	if (size) {
-> +		slave->slave_addr = dma_map_resource(chan->device->dev, addr,
-> +				size, dir, &attrs);
-> +
-> +		if (dma_mapping_error(chan->device->dev, slave->slave_addr)) {
-> +			struct rcar_dmac_chan *rchan = to_rcar_dmac_chan(chan);
-> +
-> +			dev_err(chan->device->dev,
-> +					"chan%u: failed to map %zx@%pap",
-> +					rchan->index, size, &addr);
-> +			return -EIO;
-> +		}
-> +
-> +		slave->xfer_size = size;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
->   static int rcar_dmac_device_config(struct dma_chan *chan,
->   				   struct dma_slave_config *cfg)
->   {
->   	struct rcar_dmac_chan *rchan = to_rcar_dmac_chan(chan);
-> +	int ret;
->
->   	/*
->   	 * We could lock this, but you shouldn't be configuring the
->   	 * channel, while using it...
->   	 */
-> -	rchan->src.slave_addr = cfg->src_addr;
-> -	rchan->dst.slave_addr = cfg->dst_addr;
-> -	rchan->src.xfer_size = cfg->src_addr_width;
-> -	rchan->dst.xfer_size = cfg->dst_addr_width;
->
-> -	return 0;
-> +	ret = rcar_dmac_set_slave_addr(chan, &rchan->src, cfg->src_addr,
-> +			cfg->src_addr_width);
-> +	if (ret)
-> +		return ret;
-> +
-> +	ret = rcar_dmac_set_slave_addr(chan, &rchan->dst, cfg->dst_addr,
-> +			cfg->dst_addr_width);
-> +	return ret;
->   }
->
->   static int rcar_dmac_chan_terminate_all(struct dma_chan *chan)
->
+That would make sense to me, yes.
+
+Mark.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/403439.html  
+[2] http://article.gmane.org/gmane.linux.kernel.mm/1452
