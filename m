@@ -1,42 +1,34 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Wed, 10 Feb 2016 14:23:00 +0100
-Subject: [PATCH v2 4/7] arm64: dts: alpine: add the MSIX node in the Alpine v2
- dtsi
+Date: Wed, 10 Feb 2016 14:22:57 +0100
+Subject: [PATCH v2 1/7] irqchip/gic-v3: always return IRQ_SET_MASK_OK_DONE in
+ gic_set_affinity
 In-Reply-To: <1455110583-19515-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1455110583-19515-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1455110583-19515-5-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1455110583-19515-2-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Following the addition of the Alpine MSIX controller driver, add the
-corresponding node in the Alpine v2 device tree.
+Always return IRQ_SET_MASK_OK_DONE instead of IRQ_SET_MASK_OK when the
+affinity has been updated. When using stacked irqchips, returning
+IRQ_SET_MASK_OK_DONE means skipping all descendant irqchips.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-Signed-off-by: Tsahee Zidenberg <tsahee@annapurnalabs.com>
 ---
- arch/arm64/boot/dts/al/alpine-v2.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ drivers/irqchip/irq-gic-v3.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/al/alpine-v2.dtsi b/arch/arm64/boot/dts/al/alpine-v2.dtsi
-index c021e077343b..5b7bef684256 100644
---- a/arch/arm64/boot/dts/al/alpine-v2.dtsi
-+++ b/arch/arm64/boot/dts/al/alpine-v2.dtsi
-@@ -139,6 +139,16 @@
- 			/* 32 bit non prefetchable memory space */
- 			ranges = <0x2000000 0x0 0xfe000000 0x0 0xfe000000 0x0 0x1000000>;
- 			bus-range = <0x00 0x00>;
-+			msi-parent = <&msix>;
-+		};
-+
-+		msix: msix at fbe00000 {
-+			compatible = "al,alpine-msix";
-+			reg = <0x0 0xfbe00000 0x0 0x100000>;
-+			interrupt-controller;
-+			msi-controller;
-+			al,msi-base-spi = <160>;
-+			al,msi-num-spis = <160>;
- 		};
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index d7be6ddc34f6..ca120a99bd5a 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -634,7 +634,7 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+ 	else
+ 		gic_dist_wait_for_rwp();
  
- 		io-fabric {
+-	return IRQ_SET_MASK_OK;
++	return IRQ_SET_MASK_OK_DONE;
+ }
+ #else
+ #define gic_set_affinity	NULL
 -- 
 2.7.0
