@@ -1,69 +1,24 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 10 Feb 2016 10:25:07 +0000
-Subject: [PATCH v3 3/8] dma-mapping: add dma_{map,unmap}_resource
-In-Reply-To: <1455065878-11906-4-git-send-email-niklas.soderlund+renesas@ragnatech.se>
-References: <1455065878-11906-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
- <1455065878-11906-4-git-send-email-niklas.soderlund+renesas@ragnatech.se>
-Message-ID: <56BB1003.8020409@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 10 Feb 2016 10:25:39 +0000
+Subject: [PATCH V3 04/10] irqchip / GICv3: remove gic root node in ITS
+In-Reply-To: <1453209083-3358-5-git-send-email-tn@semihalf.com>
+References: <1453209083-3358-1-git-send-email-tn@semihalf.com>
+ <1453209083-3358-5-git-send-email-tn@semihalf.com>
+Message-ID: <56BB1023.4090005@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Niklas,
+On 19/01/16 13:11, Tomasz Nowicki wrote:
+> From: Hanjun Guo <hanjun.guo@linaro.org>
+> 
+> The gic_root_node defined in ITS driver is not actually
+> used, and the ITS driver seems will not use it in the
+> future, so just remove it.
+> 
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 
-Thanks for doing this, it looks good. Just a couple of minor comments on 
-this and the next patch...
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-On 10/02/16 00:57, Niklas S?derlund wrote:
-> Map/Unmap a device resource from a physical address. If no dma_map_ops
-> method is available the operation is a no-op.
->
-> Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
-> ---
->   include/linux/dma-mapping.h | 27 +++++++++++++++++++++++++++
->   1 file changed, 27 insertions(+)
->
-> diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
-> index e3aba4e..21bf986 100644
-> --- a/include/linux/dma-mapping.h
-> +++ b/include/linux/dma-mapping.h
-> @@ -216,6 +216,33 @@ static inline void dma_unmap_page(struct device *dev, dma_addr_t addr,
->   	debug_dma_unmap_page(dev, addr, size, dir, false);
->   }
->
-> +static inline dma_addr_t dma_map_resource(struct device *dev,
-> +					  phys_addr_t phys_addr,
-> +					  size_t size,
-> +					  enum dma_data_direction dir,
-> +					  struct dma_attrs *attrs)
-> +{
-> +	struct dma_map_ops *ops = get_dma_ops(dev);
-> +
-> +	BUG_ON(!valid_dma_direction(dir));
-
-I think it would be worth also having the same inverse pfn_valid() check 
-as ioremap() here, to make sure this is similarly hard to misuse.
-
-Robin.
-
-> +	if (ops->map_resource)
-> +		return ops->map_resource(dev, phys_addr, size, dir, attrs);
-> +
-> +	return phys_addr;
-> +}
-> +
-> +static inline void dma_unmap_resource(struct device *dev, dma_addr_t addr,
-> +				      size_t size, enum dma_data_direction dir,
-> +				      struct dma_attrs *attrs)
-> +{
-> +	struct dma_map_ops *ops = get_dma_ops(dev);
-> +
-> +	BUG_ON(!valid_dma_direction(dir));
-> +	if (ops->unmap_resource)
-> +		ops->unmap_resource(dev, addr, size, dir, attrs);
-> +
-> +}
-> +
->   static inline void dma_sync_single_for_cpu(struct device *dev, dma_addr_t addr,
->   					   size_t size,
->   					   enum dma_data_direction dir)
->
+	M.
+-- 
+Jazz is not dead. It just smells funny...
