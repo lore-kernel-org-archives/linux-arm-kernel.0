@@ -1,81 +1,62 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 10 Feb 2016 15:02:48 -0800
-Subject: [PATCH 5/7] serial: omap: Fix PM regression with deferred probe for
- pm_runtime_reinit
+Date: Wed, 10 Feb 2016 15:02:50 -0800
+Subject: [PATCH 7/7] ARM: OMAP2+: Fix omap_device for module reload on PM
+ runtime forbid
 In-Reply-To: <1455145370-20301-1-git-send-email-tony@atomide.com>
 References: <1455145370-20301-1-git-send-email-tony@atomide.com>
-Message-ID: <1455145370-20301-6-git-send-email-tony@atomide.com>
+Message-ID: <1455145370-20301-8-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 5de85b9d57ab ("PM / runtime: Re-init runtime PM states at probe
-error and driver unbind") introduced pm_runtime_reinit() that is used
-to reinitialize PM runtime after -EPROBE_DEFER. This allows shutting
-down the device after a failed probe.
+If a driver PM runtime is disabled via sysfs, and the module is
+unloaded, PM runtime can't do anything to disable the device. Let's
+let the interconnect disable the device on BUS_NOTIFY_UNBOUND_DRIVER.
 
-However, for drivers using pm_runtime_use_autosuspend() this can cause
-a state where suspend callback is never called after -EPROBE_DEFER.
-On the following device driver probe, hardware state is different from
-the PM runtime state causing omap_device to produce the following
-error:
+Otherwise omap_device will produce and error on the following module
+reload. This can be easily tested with something like:
 
-omap_device_enable() called from invalid state 1
+# modprobe omap_hsmmc
+# echo on > /sys/devices/platform/68000000.ocp/4809c000.mmc/power/control
+# rmmod omap_hsmmc
+# modprobe omap_hsmmc
 
-And with omap_device and omap hardware being picky for PM, this will
-block any deeper idle states in hardware.
-
-The solution is to fix the drivers to follow the PM runtime documentation:
-
-1. For sections of code that needs the device disabled, use
-   pm_runtime_put_sync_suspend() if pm_runtime_set_autosuspend() has
-   been set.
-
-2. For driver exit code, use pm_runtime_dont_use_autosuspend() before
-   pm_runtime_put_sync() if pm_runtime_use_autosuspend() has been
-   set.
-
-Fixes: 5de85b9d57ab ("PM / runtime: Re-init runtime PM states at probe
-error and driver unbind")
-Cc: linux-serial at vger.kernel.org
 Cc: Alan Stern <stern@rowland.harvard.edu>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: Kevin Hilman <khilman@baylibre.com>
 Cc: Nishanth Menon <nm@ti.com>
 Cc: Rafael J. Wysocki <rafael@kernel.org>
-Cc: Ulf Hansson <ulf.hansson@linaro.org>
 Cc: Tero Kristo <t-kristo@ti.com>
+Reported-by: Ulf Hansson <ulf.hansson@linaro.org>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
+ arch/arm/mach-omap2/omap_device.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-Greg & Peter, I'd like to merge this along with other related fixes
-via the ARM SoC tree if no objections, please review and ack if
-this look OK to you.
-
----
- drivers/tty/serial/omap-serial.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-index b645f92..5c43f75 100644
---- a/drivers/tty/serial/omap-serial.c
-+++ b/drivers/tty/serial/omap-serial.c
-@@ -1708,7 +1708,8 @@ static int serial_omap_probe(struct platform_device *pdev)
- 	return 0;
- 
- err_add_port:
--	pm_runtime_put(&pdev->dev);
-+	pm_runtime_dont_use_autosuspend(&pdev->dev);
-+	pm_runtime_put_sync(&pdev->dev);
- 	pm_runtime_disable(&pdev->dev);
- 	pm_qos_remove_request(&up->pm_qos_request);
- 	device_init_wakeup(up->dev, false);
-@@ -1721,6 +1722,7 @@ static int serial_omap_remove(struct platform_device *dev)
+diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
+index ebd8369..f7ff3b9 100644
+--- a/arch/arm/mach-omap2/omap_device.c
++++ b/arch/arm/mach-omap2/omap_device.c
+@@ -191,12 +191,22 @@ static int _omap_device_notifier_call(struct notifier_block *nb,
  {
- 	struct uart_omap_port *up = platform_get_drvdata(dev);
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct omap_device *od;
++	int err;
  
-+	pm_runtime_dont_use_autosuspend(up->dev);
- 	pm_runtime_put_sync(up->dev);
- 	pm_runtime_disable(up->dev);
- 	uart_remove_one_port(&serial_omap_reg, &up->port);
+ 	switch (event) {
+ 	case BUS_NOTIFY_DEL_DEVICE:
+ 		if (pdev->archdata.od)
+ 			omap_device_delete(pdev->archdata.od);
+ 		break;
++	case BUS_NOTIFY_UNBOUND_DRIVER:
++		od = to_omap_device(pdev);
++		if (od && (od->_state == OMAP_DEVICE_STATE_ENABLED)) {
++			dev_info(dev, "enabled after unload, idling\n");
++			err = omap_device_idle(pdev);
++			if (err)
++				dev_err(dev, "failed to idle\n");
++		}
++		break;
+ 	case BUS_NOTIFY_ADD_DEVICE:
+ 		if (pdev->dev.of_node)
+ 			omap_device_build_from_dt(pdev);
 -- 
 2.7.0
