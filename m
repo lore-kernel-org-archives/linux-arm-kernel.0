@@ -1,66 +1,119 @@
-From: rob.herring@linaro.org (Rob Herring)
-Date: Wed, 10 Feb 2016 08:02:45 -0600
-Subject: [PATCH v4] clk: sunxi: Refactor A31 PLL6 so that it can be reused
-In-Reply-To: <20160210125936.GD31506@lukather>
-References: <1454358000-13594-1-git-send-email-maxime.ripard@free-electrons.com>
- <56B4E2FB.3050703@arm.com> <20160210125936.GD31506@lukather>
-Message-ID: <CABGGisxORFOxLVQiTZ=gEr6j2JnVcjQxTLJFPa7uG93g46CKwg@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 10 Feb 2016 14:06:03 +0000
+Subject: [PATCH V4 15/23] acpi, mcfg: Implement two calls that might be
+ used to inject/remove MCFG region.
+In-Reply-To: <1454606941-9523-16-git-send-email-tn@semihalf.com>
+References: <1454606941-9523-1-git-send-email-tn@semihalf.com>
+ <1454606941-9523-16-git-send-email-tn@semihalf.com>
+Message-ID: <20160210140602.GB25060@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 10, 2016 at 6:59 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
->
-> On Fri, Feb 05, 2016 at 05:59:23PM +0000, Andre Przywara wrote:
->> Hi Maxime,
->>
->> just found this while looking at your current git branch, so sorry for
->> the late reply.
->>
->> CC:ing DT people, since you touch both existing DTs(!) and the binding doc.
+On Thu, Feb 04, 2016 at 06:28:53PM +0100, Tomasz Nowicki wrote:
+> Lets abstract two calls which allow to inject and remove MCFG regions
+> which may come from DSDT table. These calls will be used for x86 and ARM64
+> PCI host bridge driver in the later patches.
+> 
+> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+> Tested-by: Duc Dang <dhdang@apm.com>
+> Tested-by: Dongdong Liu <liudongdong3@huawei.com>
+> Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Tested-by: Graeme Gregory <graeme.gregory@linaro.org>
+> Tested-by: Sinan Kaya <okaya@codeaurora.org>
+> ---
+>  drivers/acpi/mcfg.c      | 38 ++++++++++++++++++++++++++++++++++++++
+>  include/linux/pci-acpi.h |  9 +++++++++
+>  2 files changed, 47 insertions(+)
+> 
+> diff --git a/drivers/acpi/mcfg.c b/drivers/acpi/mcfg.c
+> index 3e1e7be..dca4c4e 100644
+> --- a/drivers/acpi/mcfg.c
+> +++ b/drivers/acpi/mcfg.c
+> @@ -10,6 +10,7 @@
+>  #include <linux/acpi.h>
+>  #include <linux/ecam.h>
+>  #include <linux/pci.h>
+> +#include <linux/pci-acpi.h>
+>  
+>  #define	PREFIX	"MCFG: "
+>  
+> @@ -77,6 +78,43 @@ int __init acpi_parse_mcfg(struct acpi_table_header *header)
+>  	return 0;
+>  }
+>  
+> +int pci_mmcfg_setup_map(struct acpi_pci_root_info *ci)
+> +{
+> +	struct pci_mmcfg_region *cfg;
+> +	struct acpi_pci_root *root;
+> +	int seg, start, end, err;
+> +
+> +	root = ci->root;
+> +	seg = root->segment;
+> +	start = root->secondary.start;
+> +	end = root->secondary.end;
+> +
+> +	cfg = pci_mmconfig_lookup(seg, start);
+> +	if (cfg)
+> +		return 0;
+> +
+> +	cfg = pci_mmconfig_alloc(seg, start, end, root->mcfg_addr);
+> +	if (!cfg)
+> +		return -ENOMEM;
+> +
+> +	err = pci_mmconfig_inject(cfg);
+> +	return err;
 
-[...]
+When you integrate Jayachandran's patch this whole function will
+become a pci_mmconfig_insert() and that's where hot_added should
+be set.
 
->> So are you really breaking all those systems by changing the DT and the
->> driver in an incompatible way?
->
-> Yes.
->
->> Please correct me if this assessment is wrong, but to me it looks like
->> any user out there is either stuck with 4.5 at best _or_ will only be
->> able to run 4.6 and later (depending on which version of the DT she is
->> using)? And no, switching DTs along with the kernel is _not_ an option.
->
-> It is. And it is one that every other ARM platform chose. And so did
-> every distribution.
+> +}
+> +
+> +void pci_mmcfg_teardown_map(struct acpi_pci_root_info *ci)
+> +{
+> +	struct acpi_pci_root *root = ci->root;
+> +	struct pci_mmcfg_region *cfg;
+> +
+> +	cfg = pci_mmconfig_lookup(root->segment, root->secondary.start);
+> +	if (!cfg)
+> +		return;
+> +
+> +	if (cfg->hot_added)
 
-I do leave it to platform maintainers judgement (perhaps that should
-be reconsidered), but it should still be case by case basis not an all
-out disregard for the ABI. If you decide to ignore the ABI, then there
-is no decision for the distros or other users.
+Move the hot_added check in pci_mmconfig_delete() (that does the look
+up again), we do not want to carry out pci_mmconfig_lookup only to
+check that flag here (and we miss rcu locking for the look-up BTW).
 
->> That is not how I understand DT.
->
-> I'm sorry for that. This has never been something we said was
-> happening.
->
->> Also this totally ignores any other DT user (U-Boot, FreeBSD, you
->> name it).
->
-> Which all have their own DT copies, with their own bindings, that we
-> (ie Linux) never agreed on.
+Thanks,
+Lorenzo
 
-That is not really true. There are some differences ATM, but they are
-largely derivatives of the kernel copy and the goal is to align them.
-If we don't maintain an ABI, that will never happen.
-
-> By further extending that argument, you're currently looking at the DT
-> from Allwinner, do you want to support theirs as well?
-
-Vendor ones we treat like vendor kernels. However, if the differences
-come down to bikeshedding, then we will take vendor bindings to
-maintain the ABI. That's generally only when the compatible string
-differs though.
-
-Rob
+> +		pci_mmconfig_delete(root->segment, root->secondary.start,
+> +				    root->secondary.end);
+> +}
+> +
+>  int __init __weak acpi_mcfg_check_entry(struct acpi_table_mcfg *mcfg,
+>  					struct acpi_mcfg_allocation *cfg)
+>  {
+> diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
+> index a72e22d..65b91f3 100644
+> --- a/include/linux/pci-acpi.h
+> +++ b/include/linux/pci-acpi.h
+> @@ -80,6 +80,15 @@ extern struct pci_bus *acpi_pci_root_create(struct acpi_pci_root *root,
+>  void acpi_pci_add_bus(struct pci_bus *bus);
+>  void acpi_pci_remove_bus(struct pci_bus *bus);
+>  
+> +#ifdef	CONFIG_PCI_MMCONFIG
+> +int pci_mmcfg_setup_map(struct acpi_pci_root_info *ci);
+> +void pci_mmcfg_teardown_map(struct acpi_pci_root_info *ci);
+> +#else
+> +static inline int pci_mmcfg_setup_map(struct acpi_pci_root_info *ci)
+> +{ return 0; }
+> +static inline void pci_mmcfg_teardown_map(struct acpi_pci_root_info *ci) { }
+> +#endif
+> +
+>  #ifdef	CONFIG_ACPI_PCI_SLOT
+>  void acpi_pci_slot_init(void);
+>  void acpi_pci_slot_enumerate(struct pci_bus *bus);
+> -- 
+> 1.9.1
+> 
