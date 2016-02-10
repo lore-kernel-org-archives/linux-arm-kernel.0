@@ -1,55 +1,30 @@
-From: thomas@schloeter.net (=?utf-8?Q?Thomas_Schl=C3=B6ter?=)
-Date: Wed, 10 Feb 2016 19:40:54 +0100
-Subject: net: mv643xx: interface does not transmit after some time
-In-Reply-To: <312E318A-CAE1-45B1-AB13-EA147B48E315@schloeter.net>
-References: <E4F9E0D0-9DA8-4E33-9F89-B49E47F11CE0@schloeter.net>
- <20160206183414.GD17218@lunn.ch> <20160206231935.GA30734@jirafa.cyrius.com>
- <2ACB3A0B-DD51-43C1-A56E-E7C175645554@schloeter.net>
- <20160207203545.GB29107@lunn.ch>
- <A21B89D4-5826-4F97-A1C9-E62E5B724082@schloeter.net>
- <312E318A-CAE1-45B1-AB13-EA147B48E315@schloeter.net>
-Message-ID: <A6128DBC-59DB-4231-A08D-B84C1D8C26CC@schloeter.net>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 10 Feb 2016 18:41:12 +0000
+Subject: [PATCH v4] clk: sunxi: Refactor A31 PLL6 so that it can be reused
+In-Reply-To: <20160210125936.GD31506@lukather>
+References: <1454358000-13594-1-git-send-email-maxime.ripard@free-electrons.com>
+ <56B4E2FB.3050703@arm.com> <20160210125936.GD31506@lukather>
+Message-ID: <20160210184112.GC28728@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Feb 10, 2016 at 01:59:36PM +0100, Maxime Ripard wrote:
+> > Also this totally ignores any other DT user (U-Boot, FreeBSD, you
+> > name it).
+> 
+> Which all have their own DT copies, with their own bindings, that we
+> (ie Linux) never agreed on.
 
-> Am 08.02.2016 um 19:49 schrieb Thomas Schl?ter <thomas@schloeter.net>:
-> 
-> 
->> Am 07.02.2016 um 22:07 schrieb Thomas Schl?ter <thomas@schloeter.net>:
->> 
->> Am 07.02.2016 um 21:35 schrieb Andrew Lunn <andrew@lunn.ch>:
->>> 
->>>>> FWIW, we had a similar bug report in Debian recently:
->>>>> https://lists.debian.org/debian-arm/2016/01/msg00098.html
->>> 
->>> Hi Thomas
->>> 
->>> I this thread, Ian Campbell mentions a patch. Please could you try
->>> that patch and see if it fixes your problem.
->>> 
->>> Thanks
->>> 	Andrew
->> 
->> Hi Andrew,
->> 
->> I just applied the patch and the NAS is now running it. I?ll try to crash it tonight and keep you informed whether it worked.
->> 
->> Thanks
->> 	Thomas
-> 
-> Hi Andrew,
-> 
-> the patch did not fix the problem. After 1.2 GiB RX and 950 MiB TX, the interface crashed again.
-> 
-> Now I switched off RX/TX offload just to make sure we are talking about the same problem. If we are, the interface should be stable without offload, right?
-> 
-> 	Thomas
+The FreeBSD guys are actually trying to align with the Linux DTs, which
+they periodically import (at least for arm64). From everything I've seen
+the U-Boot guys generally want to align with Linux, and have been
+attempting to some extent to do so (e.g. submitting bindings).
 
-Okay, so I have installed ethtool and switched off all offload features available. Now the NAS is running rock solid for two days. I backed up my Mac using Time Machine / netatalk (450 GiB transferred) and some Linux machines via NFS (100 GiB total) without a problem.
+So if anything, Linux DTs are being used by others who didn't have much
+say on them, rather than the other way around.
 
-How much code is used for mv643xx offload functionality?
-Is it possible to debug things in the driver and figure out what happens during the crash?
-Is the hardware offload interface proprietary or reverse engineered or is it a well known API that can be analyzed?
+Regardless, the existece of fragmentation is not a good argument for
+more fragmentation.
 
-	Thomas
+Thanks,
+Mark.
