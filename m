@@ -1,77 +1,78 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Wed, 10 Feb 2016 10:42:18 -0800
-Subject: [PATCH] arm64: Add workaround for Cavium erratum 27456
-In-Reply-To: <20160210181522.GW1052@arm.com>
-References: <1455046156-10582-1-git-send-email-ddaney.cavm@gmail.com>
- <20160210092822.GA1052@arm.com> <56BB7C91.5010205@caviumnetworks.com>
- <20160210181522.GW1052@arm.com>
-Message-ID: <56BB848A.6060603@caviumnetworks.com>
+From: tchalamarla@caviumnetworks.com (tchalamarla at caviumnetworks.com)
+Date: Wed, 10 Feb 2016 10:46:53 -0800
+Subject: [PATCH] arm64: KVM: Configure TCR_EL2.PS at runtime
+Message-ID: <1455130013-28644-1-git-send-email-tchalamarla@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/10/2016 10:15 AM, Will Deacon wrote:
-> On Wed, Feb 10, 2016 at 10:08:17AM -0800, David Daney wrote:
->> On 02/10/2016 01:28 AM, Will Deacon wrote:
->>> On Tue, Feb 09, 2016 at 11:29:16AM -0800, David Daney wrote:
->>>> From: Andrew Pinski <apinski@cavium.com>
->>>>
->>>> On ThunderX T88 pass 1.x through 2.1 parts, broadcast TLBI
->>>> instructions may cause the icache to become invalid if it contains
->>>> data for a non-current ASID.
->>>>
->>>> This patch implements the workaround (which flushes the local icache
->>>> when switching the mm) by using code patching.
->>>
->>> So, to be clear, is this "just" a performance problem as opposed to a
->>> correctness issue?
->>
->> No.  It is a correctness issue.  Without this workaround in place, userspace
->> programs end up executing the wrong instructions, which leads to
->> unpredictable behavior and program crashes.
->
-> Ok, so I think the description in the commit log isn't quite right. An
-> "invalid" line in i-cache simply means that it needs to be refetched.
-> What you're talking about sounds like data corruption.
+From: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
 
-Yes.  I guess I will be sending v3 with an improved description.
+Setting TCR_EL2.PS to 40 bits is wrong on systems with PS size is
+less than 40 bits. and with systems where RAM is at higher address,
+this will break KVM.
 
->
-> I also don't understand how the workaround fixes things like TLBIs due
-> to copy-on-write faults triggered by another core.
+This patch sets TCR_EL2.PS at runtime similar to VTCR_EL2.PS
 
-Caveat: I don't fully understand the internal ICache implementation 
-details.  But ...
+changes form V2:
+	- Modified subject line and commit message.
+	- Removed TCR_EL2_FLAGS.
 
-External broadcast TLBIs arriving for the current ASID (as set in 
-TTBR0_EL1) are handled properly.  The issue is that cached data for 
-other ASIDs, under some circumstances, may be inadvertently "blessed" 
-into the current ASID.  If we take care that no data for "foreign" ASIDs 
-is in the Icache, the problematical case can never occur.
+changes from V1:
+        - Moved to dynamic configuration.
 
-> Also, what's the
-> interaction with virtual machines, or is the VMID not affected in the
-> same way as the ASID?
+Signed-off-by: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
+---
+ arch/arm64/include/asm/kvm_arm.h |  2 --
+ arch/arm64/kvm/hyp-init.S        | 12 +++++++-----
+ 2 files changed, 7 insertions(+), 7 deletions(-)
 
-Ah, the $10^6 question.  Current information on how this interacts with 
-KVM is less well developed.  We think the workaround doesn't cause 
-failures in virtual machines.
-
-I realize that this is different than asserting that virtual machines 
-are guaranteed to operate error free.
-
->
-> Sorry to be a pain on this, but we need to understand the issue well
-> enough to maintain the workaround in the future!
->
->>> If so, do you have any numbers with and without this
->>> change?
->>
->> We tried to measure it, but the impact is not measurable in the tests we
->> have done.  Switching the mm is not often done so the extra ICache
->> invalidation is rare.
->
-> Oh, sure. I was only interested in perf figures if this was a performance
-> problem rather than a functional one.
->
-> Will
->
+diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+index 738a95f..3776db0 100644
+--- a/arch/arm64/include/asm/kvm_arm.h
++++ b/arch/arm64/include/asm/kvm_arm.h
+@@ -107,8 +107,6 @@
+ #define TCR_EL2_MASK	(TCR_EL2_TG0 | TCR_EL2_SH0 | \
+ 			 TCR_EL2_ORGN0 | TCR_EL2_IRGN0 | TCR_EL2_T0SZ)
+ 
+-#define TCR_EL2_FLAGS	(TCR_EL2_RES1 | TCR_EL2_PS_40B)
+-
+ /* VTCR_EL2 Registers bits */
+ #define VTCR_EL2_RES1		(1 << 31)
+ #define VTCR_EL2_PS_MASK	(7 << 16)
+diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
+index 3e568dc..b5ab1b0 100644
+--- a/arch/arm64/kvm/hyp-init.S
++++ b/arch/arm64/kvm/hyp-init.S
+@@ -64,7 +64,7 @@ __do_hyp_init:
+ 	mrs	x4, tcr_el1
+ 	ldr	x5, =TCR_EL2_MASK
+ 	and	x4, x4, x5
+-	ldr	x5, =TCR_EL2_FLAGS
++	ldr	x5, =TCR_EL2_RES1
+ 	orr	x4, x4, x5
+ 
+ #ifndef CONFIG_ARM64_VA_BITS_48
+@@ -85,15 +85,17 @@ __do_hyp_init:
+ 	ldr_l	x5, idmap_t0sz
+ 	bfi	x4, x5, TCR_T0SZ_OFFSET, TCR_TxSZ_WIDTH
+ #endif
+-	msr	tcr_el2, x4
+-
+-	ldr	x4, =VTCR_EL2_FLAGS
+ 	/*
+ 	 * Read the PARange bits from ID_AA64MMFR0_EL1 and set the PS bits in
+-	 * VTCR_EL2.
++	 * TCR_EL2 and VTCR_EL2.
+ 	 */
+ 	mrs	x5, ID_AA64MMFR0_EL1
+ 	bfi	x4, x5, #16, #3
++
++	msr	tcr_el2, x4
++
++	ldr	x4, =VTCR_EL2_FLAGS
++	bfi	x4, x5, #16, #3
+ 	/*
+ 	 * Read the VMIDBits bits from ID_AA64MMFR1_EL1 and set the VS bit in
+ 	 * VTCR_EL2.
+-- 
+2.1.0
