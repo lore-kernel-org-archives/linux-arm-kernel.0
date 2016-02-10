@@ -1,113 +1,114 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 10 Feb 2016 16:59:07 +0000
-Subject: [PATCH V3 2/4] mfd: mt6397: int_con and int_status may vary in
- location
-In-Reply-To: <1453895258-44369-2-git-send-email-blogic@openwrt.org>
+Date: Wed, 10 Feb 2016 16:59:19 +0000
+Subject: [PATCH V3 3/4] mfd: mt6397: add support for different Slave types
+In-Reply-To: <1453895258-44369-3-git-send-email-blogic@openwrt.org>
 References: <1453895258-44369-1-git-send-email-blogic@openwrt.org>
- <1453895258-44369-2-git-send-email-blogic@openwrt.org>
-Message-ID: <20160210165907.GT3782@x1>
+ <1453895258-44369-3-git-send-email-blogic@openwrt.org>
+Message-ID: <20160210165919.GU3782@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, 27 Jan 2016, John Crispin wrote:
 
-> MT6323 has the INT_CON and INT_STATUS located at a different position.
-> Make the registers locations configurable.
-> 
 > Signed-off-by: John Crispin <blogic@openwrt.org>
 > ---
->  drivers/mfd/mt6397-core.c       |   27 +++++++++++++++++----------
->  include/linux/mfd/mt6397/core.h |    2 ++
->  2 files changed, 19 insertions(+), 10 deletions(-)
+>  drivers/mfd/mt6397-core.c |   58 ++++++++++++++++++++++++++++++++-------------
+>  1 file changed, 41 insertions(+), 17 deletions(-)
 
 Applied, thanks.
 
 > diff --git a/drivers/mfd/mt6397-core.c b/drivers/mfd/mt6397-core.c
-> index 1749c1c..75ad0fe 100644
+> index 75ad0fe..aa91606 100644
 > --- a/drivers/mfd/mt6397-core.c
 > +++ b/drivers/mfd/mt6397-core.c
-> @@ -69,8 +69,10 @@ static void mt6397_irq_sync_unlock(struct irq_data *data)
+> @@ -24,6 +24,9 @@
+>  #define MT6397_RTC_BASE		0xe000
+>  #define MT6397_RTC_SIZE		0x3e
+>  
+> +#define MT6391_CID_CODE		0x91
+> +#define MT6397_CID_CODE		0x97
+> +
+>  static const struct resource mt6397_rtc_resources[] = {
+>  	{
+>  		.start = MT6397_RTC_BASE,
+> @@ -232,39 +235,60 @@ static SIMPLE_DEV_PM_OPS(mt6397_pm_ops, mt6397_irq_suspend,
+>  static int mt6397_probe(struct platform_device *pdev)
 >  {
->  	struct mt6397_chip *mt6397 = irq_data_get_irq_chip_data(data);
+>  	int ret;
+> -	struct mt6397_chip *mt6397;
+> +	unsigned int id;
+> +	struct mt6397_chip *pmic;
 >  
-> -	regmap_write(mt6397->regmap, MT6397_INT_CON0, mt6397->irq_masks_cur[0]);
-> -	regmap_write(mt6397->regmap, MT6397_INT_CON1, mt6397->irq_masks_cur[1]);
-> +	regmap_write(mt6397->regmap, mt6397->int_con[0],
-> +		     mt6397->irq_masks_cur[0]);
-> +	regmap_write(mt6397->regmap, mt6397->int_con[1],
-> +		     mt6397->irq_masks_cur[1]);
->  
->  	mutex_unlock(&mt6397->irqlock);
->  }
-> @@ -147,8 +149,8 @@ static irqreturn_t mt6397_irq_thread(int irq, void *data)
->  {
->  	struct mt6397_chip *mt6397 = data;
->  
-> -	mt6397_irq_handle_reg(mt6397, MT6397_INT_STATUS0, 0);
-> -	mt6397_irq_handle_reg(mt6397, MT6397_INT_STATUS1, 16);
-> +	mt6397_irq_handle_reg(mt6397, mt6397->int_status[0], 0);
-> +	mt6397_irq_handle_reg(mt6397, mt6397->int_status[1], 16);
->  
->  	return IRQ_HANDLED;
->  }
-> @@ -177,8 +179,8 @@ static int mt6397_irq_init(struct mt6397_chip *mt6397)
->  	mutex_init(&mt6397->irqlock);
->  
->  	/* Mask all interrupt sources */
-> -	regmap_write(mt6397->regmap, MT6397_INT_CON0, 0x0);
-> -	regmap_write(mt6397->regmap, MT6397_INT_CON1, 0x0);
-> +	regmap_write(mt6397->regmap, mt6397->int_con[0], 0x0);
-> +	regmap_write(mt6397->regmap, mt6397->int_con[1], 0x0);
->  
->  	mt6397->irq_domain = irq_domain_add_linear(mt6397->dev->of_node,
->  		MT6397_IRQ_NR, &mt6397_irq_domain_ops, mt6397);
-> @@ -203,8 +205,8 @@ static int mt6397_irq_suspend(struct device *dev)
->  {
->  	struct mt6397_chip *chip = dev_get_drvdata(dev);
->  
-> -	regmap_write(chip->regmap, MT6397_INT_CON0, chip->wake_mask[0]);
-> -	regmap_write(chip->regmap, MT6397_INT_CON1, chip->wake_mask[1]);
-> +	regmap_write(chip->regmap, chip->int_con[0], chip->wake_mask[0]);
-> +	regmap_write(chip->regmap, chip->int_con[1], chip->wake_mask[1]);
->  
->  	enable_irq_wake(chip->irq);
->  
-> @@ -215,8 +217,8 @@ static int mt6397_irq_resume(struct device *dev)
->  {
->  	struct mt6397_chip *chip = dev_get_drvdata(dev);
->  
-> -	regmap_write(chip->regmap, MT6397_INT_CON0, chip->irq_masks_cur[0]);
-> -	regmap_write(chip->regmap, MT6397_INT_CON1, chip->irq_masks_cur[1]);
-> +	regmap_write(chip->regmap, chip->int_con[0], chip->irq_masks_cur[0]);
-> +	regmap_write(chip->regmap, chip->int_con[1], chip->irq_masks_cur[1]);
->  
->  	disable_irq_wake(chip->irq);
->  
-> @@ -237,6 +239,11 @@ static int mt6397_probe(struct platform_device *pdev)
+> -	mt6397 = devm_kzalloc(&pdev->dev, sizeof(*mt6397), GFP_KERNEL);
+> -	if (!mt6397)
+> +	pmic = devm_kzalloc(&pdev->dev, sizeof(*pmic), GFP_KERNEL);
+> +	if (!pmic)
 >  		return -ENOMEM;
 >  
->  	mt6397->dev = &pdev->dev;
-> +	mt6397->int_con[0] = MT6397_INT_CON0;
-> +	mt6397->int_con[1] = MT6397_INT_CON1;
-> +	mt6397->int_status[0] = MT6397_INT_STATUS0;
-> +	mt6397->int_status[1] = MT6397_INT_STATUS1;
-> +
+> -	mt6397->dev = &pdev->dev;
+> -	mt6397->int_con[0] = MT6397_INT_CON0;
+> -	mt6397->int_con[1] = MT6397_INT_CON1;
+> -	mt6397->int_status[0] = MT6397_INT_STATUS0;
+> -	mt6397->int_status[1] = MT6397_INT_STATUS1;
+> +	pmic->dev = &pdev->dev;
+>  
 >  	/*
 >  	 * mt6397 MFD is child device of soc pmic wrapper.
 >  	 * Regmap is set from its parent.
-> diff --git a/include/linux/mfd/mt6397/core.h b/include/linux/mfd/mt6397/core.h
-> index 45b8e8a..d678f52 100644
-> --- a/include/linux/mfd/mt6397/core.h
-> +++ b/include/linux/mfd/mt6397/core.h
-> @@ -60,6 +60,8 @@ struct mt6397_chip {
->  	u16 wake_mask[2];
->  	u16 irq_masks_cur[2];
->  	u16 irq_masks_cache[2];
-> +	u16 int_con[2];
-> +	u16 int_status[2];
->  };
+>  	 */
+> -	mt6397->regmap = dev_get_regmap(pdev->dev.parent, NULL);
+> -	if (!mt6397->regmap)
+> +	pmic->regmap = dev_get_regmap(pdev->dev.parent, NULL);
+> +	if (!pmic->regmap)
+>  		return -ENODEV;
 >  
->  #endif /* __MFD_MT6397_CORE_H__ */
+> -	platform_set_drvdata(pdev, mt6397);
+> +	platform_set_drvdata(pdev, pmic);
+> +
+> +	ret = regmap_read(pmic->regmap, MT6397_CID, &id);
+> +	if (ret) {
+> +		dev_err(pmic->dev, "Failed to read chip id: %d\n", ret);
+> +		goto fail_irq;
+> +	}
+> +
+> +	switch (id & 0xff) {
+> +	case MT6397_CID_CODE:
+> +	case MT6391_CID_CODE:
+> +		pmic->int_con[0] = MT6397_INT_CON0;
+> +		pmic->int_con[1] = MT6397_INT_CON1;
+> +		pmic->int_status[0] = MT6397_INT_STATUS0;
+> +		pmic->int_status[1] = MT6397_INT_STATUS1;
+> +		ret = mfd_add_devices(&pdev->dev, -1, mt6397_devs,
+> +				ARRAY_SIZE(mt6397_devs), NULL, 0, NULL);
+> +		break;
+> +
+> +	default:
+> +		dev_err(&pdev->dev, "unsupported chip: %d\n", id);
+> +		ret = -ENODEV;
+> +		break;
+> +	}
+>  
+> -	mt6397->irq = platform_get_irq(pdev, 0);
+> -	if (mt6397->irq > 0) {
+> -		ret = mt6397_irq_init(mt6397);
+> +	pmic->irq = platform_get_irq(pdev, 0);
+> +	if (pmic->irq > 0) {
+> +		ret = mt6397_irq_init(pmic);
+>  		if (ret)
+>  			return ret;
+>  	}
+>  
+> -	ret = mfd_add_devices(&pdev->dev, -1, mt6397_devs,
+> -			ARRAY_SIZE(mt6397_devs), NULL, 0, NULL);
+> -	if (ret)
+> +fail_irq:
+> +	if (ret) {
+> +		irq_domain_remove(pmic->irq_domain);
+>  		dev_err(&pdev->dev, "failed to add child devices: %d\n", ret);
+> +	}
+>  
+>  	return ret;
+>  }
 
 -- 
 Lee Jones
