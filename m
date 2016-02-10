@@ -1,41 +1,37 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 10 Feb 2016 10:16:31 +0000
-Subject: [PATCH V3 03/10] irqchip,GICv3,ACPI: Add redistributor support
- via GICC structures.
-In-Reply-To: <1453209083-3358-4-git-send-email-tn@semihalf.com>
+Date: Wed, 10 Feb 2016 10:19:06 +0000
+Subject: [PATCH V3 00/10] Introduce ACPI world to GICv3 & ITS irqchip
+In-Reply-To: <56BAFAE8.4070308@semihalf.com>
 References: <1453209083-3358-1-git-send-email-tn@semihalf.com>
- <1453209083-3358-4-git-send-email-tn@semihalf.com>
-Message-ID: <56BB0DFF.1040802@arm.com>
+ <56BAFAE8.4070308@semihalf.com>
+Message-ID: <56BB0E9A.6010809@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/01/16 13:11, Tomasz Nowicki wrote:
-> Following ACPI spec:
-> On systems supporting GICv3 and above, GICR Base Address in MADT GICC
-> structure holds the 64-bit physical address of the associated Redistributor.
-> If all of the GIC Redistributors are in the always-on power domain,
-> GICR structures should be used to describe the Redistributors instead,
-> and this field must be set to 0.
-> 
-> It means that we have two ways to initialize registirbutors map.
-> 1. via GICD structure which can accommodate many redistributors as a region
-> 2. via GICC which is able to describe single redistributor
-> 
-> This patch is going to add support for second option.
-> Considering redistributors, GICD and GICC subtables have be mutually
-> exclusive. While discovering and mapping redistributor, we need to know
-> its size in advance. For the GICC case, redistributor can be in
-> a power-domain that is off, thus we cannot relay on GICR TYPER register.
-> Therefore, we get GIC version from distributor register and map 2xSZ_64K
-> for GICv3 and 4xSZ_64K for GICv4.
-> 
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+Thomasz,
 
-This is incredibly convoluted, but I'm not sure there is a better way
-given the current ACPI API. Still, it hurts.
+On 10/02/16 08:55, Tomasz Nowicki wrote:
+> On 19.01.2016 14:11, Tomasz Nowicki wrote:
+>> Patches base on Suravee's ACPI GICv2m support:
+>> https://lkml.org/lkml/2015/12/10/475
+>>
+>> The following git branch contains submitted patches along with
+>> the useful patches from the test point of view (mainly ACPI ARM64 PCI support).
+>> https://github.com/semihalf-nowicki-tomasz/linux.git (gicv3-its-acpi-v3)
+>>
+> 
+> Hi Marc,
+> 
+> Can you please have a look at this series. I think your previous 
+> concerns have been addressed.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+I've just acked the first 3 patches, which I believe are good to go.
+
+The ITS support is a separate thing, mostly because it introduces a
+completely new infrastructure (IORT). I'll review that separately (no
+need to resend the patches though).
+
+Thanks,
 
 	M.
 -- 
