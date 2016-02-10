@@ -1,77 +1,34 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 10 Feb 2016 15:42:14 +0100
-Subject: [PATCH 6/8] arm: initial machine port for artpec-6 SoC
-In-Reply-To: <fa3483f1a388e443245084c3b5e9aa1ad2f61392.1455107681.git.larper@axis.com>
+Date: Wed, 10 Feb 2016 15:42:32 +0100
+Subject: [PATCH 7/8] arm: multi_v7_defconfig: add MACH_ARTPEC6
+In-Reply-To: <36d8a6a0236e08bc7286085018e2fa7a67691b39.1455107681.git.larper@axis.com>
 References: <cover.1455107681.git.larper@axis.com>
- <fa3483f1a388e443245084c3b5e9aa1ad2f61392.1455107681.git.larper@axis.com>
-Message-ID: <2600190.zvDdb99M2V@wuerfel>
+ <36d8a6a0236e08bc7286085018e2fa7a67691b39.1455107681.git.larper@axis.com>
+Message-ID: <22004657.zNDLNVmTMr@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 10 February 2016 13:41:55 Lars Persson wrote:
-> @@ -0,0 +1,22 @@
-> +menuconfig ARCH_ARTPEC
-> +	bool "Axis Communications ARM based ARTPEC SoCs" if ARCH_MULTI_V7
-> +
-> +if ARCH_ARTPEC
-> +
-> +config MACH_ARTPEC6
-> +	bool "Axis ARTPEC-6 ARM Cortex A9 Platform" if ARCH_MULTI_V7
-
-Change both to use
-
-	depends on ARCH_MULTI_V7
-
-like we changed all other platforms in 4.5
-
-> +	select ARM_AMBA
-> +	select ARM_GIC
-> +	select ARM_GLOBAL_TIMER
-> +	select ARM_PSCI
-> +	select COMMON_CLK
-> +	select GENERIC_CLOCKEVENTS
-> +	select HAVE_ARM_ARCH_TIMER
-> +	select HAVE_ARM_SCU
-> +	select HAVE_ARM_TWD if SMP
-> +	select SPARSE_IRQ
-> +	select USE_OF
-
-No need for GENERIC_CLOCKEVENTS, COMMON_CLK, USE_OF or SPARSE_IRQ to be selected, they
-are always enabled with ARCH_MULTIPLATFORM. Check the others as well to see if 
-you can drop more of them.
-
-> +
-> +#define ARTPEC6_DMACFG 0xf8000010
-> +#define ARTPEC6_DMACFG_UARTS_BURST 0xff
-> +
-> +#define SECURE_OP_L2C_WRITEREG 0xb4000001
-> +
-> +static void __init artpec6_init_machine(void)
-> +{
-> +	void __iomem *dmacfg;
-> +
-> +	/* Use PL011 DMA Burst Request signal instead of DMA Single Request */
-> +	dmacfg = ioremap(ARTPEC6_DMACFG, 4);
-> +	if (dmacfg) {
-> +		__raw_writel(ARTPEC6_DMACFG_UARTS_BURST, dmacfg);
-> +		iounmap(dmacfg);
-> +	}
-
-Can you do this in the bootloader?
-
-If not, please use a DT node to pass the address rather than hardcoding it,
-and use writel() instead of __raw_writel() so it works with on big-endian kernels.
-
-> +DT_MACHINE_START(ARTPEC6, "Axis ARTPEC-6 Platform")
-> +	.l2c_aux_val	= 0x0C000000,
-> +	.l2c_aux_mask	= 0xF3FFFFFF,
-> +	.l2c_write_sec  = artpec6_l2c310_write_sec,
-> +	.init_irq	= irqchip_init,
-> +	.init_machine	= artpec6_init_machine,
-> +	.dt_compat	= artpec6_dt_match,
-> +MACHINE_END
+On Wednesday 10 February 2016 13:41:56 Lars Persson wrote:
+> Signed-off-by: Lars Persson <larper@axis.com>
+> ---
+>  arch/arm/configs/multi_v7_defconfig | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> index 8e8b2ac..bf3840e 100644
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -16,6 +16,8 @@ CONFIG_ARCH_MULTI_V7=y
+>  # CONFIG_ARCH_MULTI_V4 is not set
+>  CONFIG_ARCH_VIRT=y
+>  CONFIG_ARCH_ALPINE=y
+> +CONFIG_ARCH_ARTPEC=y
+> +CONFIG_MACH_ARTPEC6=y
+>  CONFIG_ARCH_MVEBU=y
+>  CONFIG_MACH_ARMADA_370=y
+>  CONFIG_MACH_ARMADA_375=y
 > 
 
-You can drop the irqchip_init.
+No other drivers that you need here?
 
 	Arnd
