@@ -1,96 +1,25 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 10 Feb 2016 10:40:49 -0500 (EST)
-Subject: [PATCH v2 1/2] ARM: shmobile: Move shmobile_smp_{mpidr, fn, arg}[]
- from .text to .data
-In-Reply-To: <1455112615-6970-2-git-send-email-geert+renesas@glider.be>
-References: <1455112615-6970-1-git-send-email-geert+renesas@glider.be>
- <1455112615-6970-2-git-send-email-geert+renesas@glider.be>
-Message-ID: <alpine.LFD.2.20.1602101037430.17825@knanqh.ubzr>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 10 Feb 2016 16:42:04 +0100
+Subject: [PATCH v5] pinctrl: rockchip: add support for the rk3399
+In-Reply-To: <1454295501-32165-1-git-send-email-david.wu@rock-chips.com>
+References: <1454295501-32165-1-git-send-email-david.wu@rock-chips.com>
+Message-ID: <CACRpkdYsYse-EYQ2YJFbRRMVrfp-0k-CctvCZtGtzNgJNyo1Bg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 10 Feb 2016, Geert Uytterhoeven wrote:
+On Mon, Feb 1, 2016 at 3:58 AM, David Wu <david.wu@rock-chips.com> wrote:
 
-> If CONFIG_DEBUG_RODATA=y, the kernel crashes during system suspend:
-> 
->     Freezing user space processes ... (elapsed 0.004 seconds) done.
->     Freezing remaining freezable tasks ... (elapsed 0.002 seconds)
->     done.
->     PM: suspend of devices complete after 111.948 msecs
->     PM: late suspend of devices complete after 1.086 msecs
->     PM: noirq suspend of devices complete after 11.576 msecs
->     Disabling non-boot CPUs ...
->     Kernel panic - not syncing: Attempted to kill the idle task!
->     1014ec ---[ end Kernel panic - not syncing: Attempted to kill the idle task!
->     CPU0: stopping
-> 
-> This happens because the .text section is marked read-only, while the
-> arrays shmobile_smp_mpidr[], shmobile_smp_fn[], and shmobile_smp_arg[]
-> are being written to.
-> 
-> Fix this by moving these arrays from the .text to the .data section.
-> This requires accessing them through PC-relative offsets.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Reviewed-by: Kees Cook <keescook@chromium.org>
-
-You could replace .data with .bss to avoid allocating zero-initialized 
-space in the kernel binary.  Then you may add
-
-Reviewed-by: Nicolas Pitre <nico@linaro.org>
-
-
+> The pinctrl of rk3399 is much different from other's,
+> especially the 3bits of drive strength.
+>
+> Signed-off-by: David Wu <david.wu@rock-chips.com>
+> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
 > ---
-> v2:
->   - Add Reviewed-by,
->   - Store offsets instead of pointers, as suggested by Nicolas Pitre
->     <nicolas.pitre@linaro.org>.
-> ---
->  arch/arm/mach-shmobile/headsmp.S | 20 ++++++++++++++------
->  1 file changed, 14 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/mach-shmobile/headsmp.S b/arch/arm/mach-shmobile/headsmp.S
-> index 330c1fc63197df89..4cf7f0b016b0b0fe 100644
-> --- a/arch/arm/mach-shmobile/headsmp.S
-> +++ b/arch/arm/mach-shmobile/headsmp.S
-> @@ -50,9 +50,11 @@ ENTRY(shmobile_smp_boot)
->  	mrc	p15, 0, r1, c0, c0, 5		@ r1 = MPIDR
->  	and	r0, r1, r0			@ r0 = cpu_logical_map() value
->  	mov	r1, #0				@ r1 = CPU index
-> -	adr	r5, 1f				@ array of per-cpu mpidr values
-> -	adr	r6, 2f				@ array of per-cpu functions
-> -	adr	r7, 3f				@ array of per-cpu arguments
-> +	adr	r2, 1f
-> +	ldmia	r2, {r5, r6, r7}
-> +	add	r5, r5, r2			@ array of per-cpu mpidr values
-> +	add	r6, r6, r2			@ array of per-cpu functions
-> +	add	r7, r7, r2			@ array of per-cpu arguments
->  
->  shmobile_smp_boot_find_mpidr:
->  	ldr	r8, [r5, r1, lsl #2]
-> @@ -80,12 +82,18 @@ ENTRY(shmobile_smp_sleep)
->  	b	shmobile_smp_boot
->  ENDPROC(shmobile_smp_sleep)
->  
-> +	.align	2
-> +1:	.long	shmobile_smp_mpidr - .
-> +	.long	shmobile_smp_fn - 1b
-> +	.long	shmobile_smp_arg - 1b
-> +
-> +	.data
->  	.globl	shmobile_smp_mpidr
->  shmobile_smp_mpidr:
-> -1:	.space	NR_CPUS * 4
-> +	.space	NR_CPUS * 4
->  	.globl	shmobile_smp_fn
->  shmobile_smp_fn:
-> -2:	.space	NR_CPUS * 4
-> +	.space	NR_CPUS * 4
->  	.globl	shmobile_smp_arg
->  shmobile_smp_arg:
-> -3:	.space	NR_CPUS * 4
-> +	.space	NR_CPUS * 4
-> -- 
-> 1.9.1
-> 
-> 
+> Changes in v5:
+> - merge the binding-doc-addition in one patch (Linus Heiko)
+> - fix the comment of bit15 drive setting (Heiko)
+
+Patch applied.
+
+Yours,
+Linus Walleij
