@@ -1,54 +1,28 @@
-From: martin@sperl.org (Martin Sperl)
-Date: Thu, 11 Feb 2016 00:19:39 +0100
-Subject: [PATCH 3/4] spi: bcm2835aux: set up spi-mode before asserting
- cs-gpio
-In-Reply-To: <2743238.b2UJKq0efN@chaos-desktop>
-References: <1455041435-8015-1-git-send-email-stephanolbrich@gmx.de>
- <878u2s2xym.fsf@eliezer.anholt.net> <20160210190204.GD13270@sirena.org.uk>
- <2743238.b2UJKq0efN@chaos-desktop>
-Message-ID: <7B5ED5ED-EF09-4D44-8989-1BBCD7C01463@sperl.org>
+From: linux@baker-net.org.uk (Adam Baker)
+Date: Wed, 10 Feb 2016 23:33:41 +0000
+Subject: [PATCH 0/3] ARM: mvebu: Add driver for the Zyxel NSA3XX hwmon MCU
+Message-ID: <1455147224-6742-1-git-send-email-linux@baker-net.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch series adds a driver to support the hardware monitoring MCU
+that is present in some models of the Zyxel NSA3xx series of NAS units.
 
-> On 10.02.2016, at 21:26, Stephan Olbrich <stephanolbrich@gmx.de> wrote:
-> 
-> Am Wednesday 10 February 2016, 19:02:04 schrieb Mark Brown:
->> On Wed, Feb 10, 2016 at 10:59:29AM -0800, Eric Anholt wrote:
->>> Oops, this makes more sense now.  Subject even mentioned gpio, and a
->>> GPIO CS must be getting set around the transfer_one call.  I'll be ready
->>> to send an r-b for a v2 with the speed update bug fixed (unless transfer
->>> speeds are guaranteed to be constant between a prepare and unprepare).
->> 
->> No guarantee that they'll not change, especially in a situation where we
->> have two devices on different speeds on a bus working at the same time.
-> Are you saying, that between a prepare and unprepare there could be transfers 
-> for another device? Then all the clock setting couldn't be done in prepare 
-> either.
-> Apart from that, if two transfers in the same message are not guarantied to 
-> have the same speed, this still needs to be fixed. I'll roll a v2.
+A patch is included to add it to the device tree for the NSA320 model,
+patches to the other device trees will be included if testers come
+forward (I already have a possible tester for NSA325).
 
-Prepare/unprepare is always called when processing an spi message.
-there is never a phase where two spi_messages are prepared concurrently
-for the same spi bus.
+There are no dependencies between the patches so I guess the first two
+should go via the hardware monitoring maintainers and the third via
+the ARM mvebu maintainers.
 
-See the implementation of __spi_pump_messages
+ [PATCH 1/3] Define a binding for the hardware monitoring chip present
+ [PATCH 2/3] Create a driver to support the hardware monitoring chip
+ [PATCH 3/3] Add an entry for the hardware monitoring MCU
 
-The sequence for processing is:
-* master->prepare_hardware
-* master->prepare_message
-* spi_map_message
-* master->transfer_one_message
-  * spi_set_cs(true)
-  at end of message:
-  * spi_finalize_current_message
-    * spi_set_cs(false)
-    * master->unprepare_message 
-
-So the use of prepare_message in this context is valid.
-
-Otherwise we would need to add an additional method to setup
-polarity/cs prior to spi_set_cs(true).
-
-Ciao,
-	Martin
+ Documentation/devicetree/bindings/hwmon/nsa320-mcu.txt |  21 ++++++++
+ arch/arm/boot/dts/kirkwood-nsa320.dts                  |  13 ++++-
+ drivers/hwmon/Kconfig                                  |  13 +++++
+ drivers/hwmon/Makefile                                 |   1 +
+ drivers/hwmon/nsa3xx-hwmon.c                           | 223 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 269 insertions(+), 2 deletions(-)
