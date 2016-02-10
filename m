@@ -1,101 +1,61 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Wed, 10 Feb 2016 10:57:11 +0000
-Subject: [PATCH V5 10/14] Documentation: DT: bindings: Add power domain
- info for NVIDIA PMC
-In-Reply-To: <CAL_JsqLcoKW2znNNvM=sYLmZ6O6ZWqn7+aXspkXoONw6-O1ygg@mail.gmail.com>
-References: <1453998832-27383-1-git-send-email-jonathanh@nvidia.com>
- <1453998832-27383-11-git-send-email-jonathanh@nvidia.com>
- <20160129160625.GA21918@rob-hp-laptop> <56B1DE40.7080403@nvidia.com>
- <CAL_JsqLcoKW2znNNvM=sYLmZ6O6ZWqn7+aXspkXoONw6-O1ygg@mail.gmail.com>
-Message-ID: <56BB1787.4050801@nvidia.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 10 Feb 2016 11:58:46 +0100
+Subject: [PATCH v5 1/3] gpio: xgene: Enable X-Gene standby GPIO as
+ interrupt controller
+In-Reply-To: <1454041735-8434-2-git-send-email-qnguyen@apm.com>
+References: <1454041735-8434-1-git-send-email-qnguyen@apm.com>
+ <1454041735-8434-2-git-send-email-qnguyen@apm.com>
+Message-ID: <CACRpkdZXFVgtQfMM_r+xxceiAuiUDsxH-XGBOpEA9Am0BF+gRQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Jan 29, 2016 at 5:28 AM, Quan Nguyen <qnguyen@apm.com> wrote:
 
-On 03/02/16 15:48, Rob Herring wrote:
-> On Wed, Feb 3, 2016 at 5:02 AM, Jon Hunter <jonathanh@nvidia.com> wrote:
->>
->> On 29/01/16 16:06, Rob Herring wrote:
->>> On Thu, Jan 28, 2016 at 04:33:48PM +0000, Jon Hunter wrote:
->>>> Add power-domain binding documentation for the NVIDIA PMC driver in
->>>> order to support generic power-domains.
->>>>
->>>> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
->>>> ---
->>>>  .../bindings/arm/tegra/nvidia,tegra20-pmc.txt      | 55 ++++++++++++++++++++++
->>>>  1 file changed, 55 insertions(+)
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
->>>> index 53aa5496c5cf..3c77373aa826 100644
->>>> --- a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
->>>> +++ b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
->>>> @@ -1,5 +1,7 @@
->>>>  NVIDIA Tegra Power Management Controller (PMC)
->>>>
->>>> +== Power Management Controller Node ==
->>>> +
->>>>  The PMC block interacts with an external Power Management Unit. The PMC
->>>>  mostly controls the entry and exit of the system from different sleep
->>>>  modes. It provides power-gating controllers for SoC and CPU power-islands.
->>>> @@ -70,6 +72,10 @@ Optional properties for hardware-triggered thermal reset (inside 'i2c-thermtrip'
->>>>                       Defaults to 0. Valid values are described in section 12.5.2
->>>>                       "Pinmux Support" of the Tegra4 Technical Reference Manual.
->>>>
->>>> +Optional nodes:
->>>> +- powergates : This node contains a hierarchy of power domain nodes, which
->>>> +           should match the powergates on the Tegra SoC.
->>>> +
->>>>  Example:
->>>>
->>>>  / SoC dts including file
->>>> @@ -115,3 +121,52 @@ pmc at 7000f400 {
->>>>      };
->>>>      ...
->>>>  };
->>>> +
->>>> +
->>>> +== PM Domain Nodes ==
->>>> +
->>>> +Each of the PM domain nodes represents a power-domain on the Tegra SoC
->>>> +that can be power-gated by the PMC and should be named appropriately.
->>>> +
->>>> +Required properties:
->>>> +  - clocks: Must contain an entry for each clock required by the PMC for
->>>> +    controlling a power-gate. See ../clocks/clock-bindings.txt for details.
->>>> +  - resets: Must contain an entry for each reset required by the PMC for
->>>> +    controlling a power-gate. See ../reset/reset.txt for details.
->>>> +  - nvidia,powergate: Integer cell that contains an identifier for the PMC
->>>> +    power-gate that is associated with the power-domain. Please refer to
->>>> +    the Tegra TRM for more details.
->>>
->>> Why not make this value be the power-domain cell for consumers and the
->>> pmc be the phandle.
->>
->> Is there anything wrong with using a label for the consumers? Seems
->> simpler, if you can just say ...
->>
->>         adma: adma at 702e2000 {
->>                 ...
->>                 power-domains = <&pd_audio>;
->>                 ...
->>         };
-> 
-> Only that is a bit unusual. It would only really matter if we had some
-> common parsing that we wanted to share. I'd look at other examples and
-> try to align. If there's no clear pattern, then it is fine.
+> Enable X-Gene standby GPIO controller as interrupt controller to provide
+> its own resources. This avoids ambiguity where GIC interrupt resource is
+> use as X-Gene standby GPIO interrupt resource in user driver.
+>
+> Signed-off-by: Y Vo <yvo@apm.com>
+> Signed-off-by: Quan Nguyen <qnguyen@apm.com>
 
-So I have been having a look at this and it appears to be mixed across
-the various SoCs. It seems that those SoCs that define the generic PM
-domains statically in the machine/soc code use a phandle plus a argument
-to identify the power domain. However, for those that describe the
-power-domain in the DT (listing clocks, resets, etc), they just use a
-phandle to the power-domain itself (like I have above). It looks like if
-you are describing the power domain in DT, then it is much simplier to
-do this.
+I want Marc's ACK on this before I merge it.
 
-Given that I wish to keep the description of the power-domain in DT, it
-is much easier to stick with the same conventions that the other SoCs
-are using.
+But it is looking way more acceptable than earlier incarnations! :)
 
-Cheers
-Jon
+> +       /* Propagate IRQ type setting to parent */
+> +       if (type & IRQ_TYPE_EDGE_BOTH)
+> +               return irq_chip_set_type_parent(d, IRQ_TYPE_EDGE_RISING);
+> +       else
+> +               return irq_chip_set_type_parent(d, IRQ_TYPE_LEVEL_HIGH);
+
+This makes it look much more solid, nice.
+
+> +static void xgene_gpio_sb_irq_shutdown(struct irq_data *d)
+> +{
+> +       struct xgene_gpio_sb *priv = irq_data_get_irq_chip_data(d);
+> +
+> +       gpiochip_unlock_as_irq(&priv->gc, HWIRQ_TO_GPIO(priv, d->hwirq));
+
+Oh really. Well.
+
+> +       if (is_of_node(domain->parent->fwnode)) {
+> +               parent_fwspec.fwnode = domain->parent->fwnode;
+> +               parent_fwspec.param_count = 3;
+> +               parent_fwspec.param[0] = 0;/* SPI */
+> +               /* Skip SGIs and PPIs*/
+> +               parent_fwspec.param[1] = hwirq + priv->parent_irq_base - 32;
+> +               parent_fwspec.param[2] = fwspec->param[1];
+> +       } else if (is_fwnode_irqchip(domain->parent->fwnode)) {
+> +               parent_fwspec.fwnode = domain->parent->fwnode;
+> +               parent_fwspec.param_count = 2;
+> +               parent_fwspec.param[0] = hwirq + priv->parent_irq_base;
+> +               parent_fwspec.param[1] = fwspec->param[1];
+> +       } else
+> +               return -EINVAL;
+
+This kind of stuff hardcodes knowledge of the GIC into this controller,
+like that the SGI+PPI occupy the first 32 hwIRQs. But maybe there is
+no better way to do it?
+
+Yours,
+Linus Walleij
