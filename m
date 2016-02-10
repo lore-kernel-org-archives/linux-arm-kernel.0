@@ -1,24 +1,35 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Wed, 10 Feb 2016 09:55:04 +0100
-Subject: [PATCH V3 00/10] Introduce ACPI world to GICv3 & ITS irqchip
-In-Reply-To: <1453209083-3358-1-git-send-email-tn@semihalf.com>
-References: <1453209083-3358-1-git-send-email-tn@semihalf.com>
-Message-ID: <56BAFAE8.4070308@semihalf.com>
+From: ralf@linux-mips.org (Ralf Baechle)
+Date: Wed, 10 Feb 2016 10:01:06 +0100
+Subject: [PATCH] MIPS: pci-mt7620: Fix return value check in
+ mt7620_pci_probe()
+In-Reply-To: <56B613D3.2070709@openwrt.org>
+References: <1454768659-32720-1-git-send-email-weiyj_lk@163.com>
+ <56B613D3.2070709@openwrt.org>
+Message-ID: <20160210090106.GA10352@linux-mips.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19.01.2016 14:11, Tomasz Nowicki wrote:
-> Patches base on Suravee's ACPI GICv2m support:
-> https://lkml.org/lkml/2015/12/10/475
->
-> The following git branch contains submitted patches along with
-> the useful patches from the test point of view (mainly ACPI ARM64 PCI support).
-> https://github.com/semihalf-nowicki-tomasz/linux.git (gicv3-its-acpi-v3)
->
+On Sat, Feb 06, 2016 at 04:40:03PM +0100, John Crispin wrote:
 
-Hi Marc,
+> On 06/02/2016 15:24, weiyj_lk at 163.com wrote:
+> > From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> > 
+> > In case of error, the function devm_ioremap_resource() returns
+> > ERR_PTR() and never returns NULL. The NULL test in the return
+> > value check should be replaced with IS_ERR().
+> > 
+> > Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> 
+> Hi,
+> 
+> thanks for the fix.
+> 
+> Acked-by: John Crispin <blogic@openwrt.org>
+> 
+> @Ralf: can you merge this via LMO with the next PR please ?
+> 
+> @mbgg: ignore the patch please it is for the legacy MIPS SoCs
 
-Can you please have a look at this series. I think your previous 
-concerns have been addressed.
+Applied.  Thanks folks,
 
-Tomasz
+  Ralf
