@@ -1,70 +1,62 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 10 Feb 2016 21:10:43 +0300
-Subject: [PATCH v2 5/5] ARM: dts: r8a7794: add sound support
-In-Reply-To: <87lh6ts1o0.wl%kuninori.morimoto.gx@renesas.com>
-References: <12033353.rt0nolnBmD@wasted.cogentembedded.com>
- <2543047.yYrDdYb9v5@wasted.cogentembedded.com>
- <87lh6ts1o0.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <56BB7D23.3010005@cogentembedded.com>
+From: yang.shi@linaro.org (Shi, Yang)
+Date: Wed, 10 Feb 2016 10:12:11 -0800
+Subject: [PATCH] arm64: use raw_smp_processor_id in stack backtrace dump
+In-Reply-To: <20160210121030.GH1052@arm.com>
+References: <1455053182-31404-1-git-send-email-yang.shi@linaro.org>
+ <20160210102939.GD1052@arm.com> <56BB247F.6040202@arm.com>
+ <20160210121030.GH1052@arm.com>
+Message-ID: <56BB7D7B.4060002@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/10/2016 06:12 AM, Kuninori Morimoto wrote:
+On 2/10/2016 4:10 AM, Will Deacon wrote:
+> On Wed, Feb 10, 2016 at 11:52:31AM +0000, James Morse wrote:
+>> On 10/02/16 10:29, Will Deacon wrote:
+>>> On Tue, Feb 09, 2016 at 01:26:22PM -0800, Yang Shi wrote:
+>>>> dump_backtrace may be called in kthread context, which is not bound to a single
+>>>> cpu, i.e. khungtaskd, then calling smp_processor_id may trigger the below bug
+>>>> report:
+>>>
+>>> If we're preemptible here, it means that our irq_stack_ptr is potentially
+>>> bogus. Whilst this isn't an issue for kthreads, it does feel like we
+>>> could make this slightly more robust in the face of potential frame
+>>> corruption. Maybe just zero the IRQ stack pointer if we're in preemptible
+>>> context?
+>>
+>> Switching between stacks is only valid if we are tracing ourselves while on the
+>> irq_stack, we should probably prevent it for other tasks too.
+>>
+>> Something like (untested):
+>> ---------------------
+>> if (tsk == current && in_atomic())
+>> 	irq_stack_ptr = IRQ_STACK_PTR(smp_processor_id());
 
->> Define the generic R8A7794 part of  the sound device node.
->> This sound device  is a complex one and comprises the Audio Clock Generator
->> (ADG), Sampling Rate Converter Unit (SCU), Serial Sound Interface [Unit]
->> (SSI[U]), and Audio DMAC-Peripheral-Peripheral.
->> It is up  to the board file to enable the device.
+One follow up question, is it possible to have both tsk != current and 
+on_irq_stack is true at the same time? If it is possible, this may be a 
+problem in unwind_frame called by profile_pc which has tsk being NULL.
+
+Thanks,
+Yang
+
+>> else
+>> 	irq_stack_ptr = 0;
+>> ---------------------
 >>
->> This patch is based on the R8A7791 sound work by Kuninori Morimoto.
+>> This would work when we trace ourselves while on the irq_stack, but break*
+>> tracing a running task on a remote cpu (khungtaskd doesn't do this).
 >>
->> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> (snip)
->> +		clocks = <&mstp10_clks R8A7794_CLK_SSI_ALL>,
->> +			 <&mstp10_clks R8A7794_CLK_SSI9>,
->> +			 <&mstp10_clks R8A7794_CLK_SSI8>,
->> +			 <&mstp10_clks R8A7794_CLK_SSI7>,
->> +			 <&mstp10_clks R8A7794_CLK_SSI6>,
->> +			 <&mstp10_clks R8A7794_CLK_SSI5>,
->> +			 <&mstp10_clks R8A7794_CLK_SSI4>,
->> +			 <&mstp10_clks R8A7794_CLK_SSI3>,
->> +			 <&mstp10_clks R8A7794_CLK_SSI2>,
->> +			 <&mstp10_clks R8A7794_CLK_SSI1>,
->> +			 <&mstp10_clks R8A7794_CLK_SSI0>,
->> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC9>,
->> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC8>,
->> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC7>,
->> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC6>,
->> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC5>,
->> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC4>,
->> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC3>,
->> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC2>,
->> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC1>,
->> +			 <&mstp10_clks R8A7794_CLK_SCU_SRC0>,
->> +			 <&mstp10_clks R8A7794_CLK_SCU_CTU0_MIX0>,
->> +			 <&mstp10_clks R8A7794_CLK_SCU_CTU1_MIX1>,
->> +			 <&mstp10_clks R8A7794_CLK_SCU_CTU0_MIX0>,
->> +			 <&mstp10_clks R8A7794_CLK_SCU_CTU1_MIX1>,
->> +			 <&mstp10_clks R8A7794_CLK_SCU_DVC0>,
->> +			 <&mstp10_clks R8A7794_CLK_SCU_DVC1>,
->> +			 <&audio_clka>, <&audio_clkb>, <&audio_clkc>,
->> +			 <&m2_clk>;
->> +		clock-names = "ssi-all",
->> +			      "ssi.9", "ssi.8", "ssi.7", "ssi.6", "ssi.5",
->> +			      "ssi.4", "ssi.3", "ssi.2", "ssi.1", "ssi.0",
->> +			      "src.9", "src.8", "src.7", "src.6", "src.5",
->> +			      "src.4", "src.3", "src.2", "src.1", "src.0",
->> +			      "ctu.0", "ctu.1",
->> +			      "mix.0", "mix.1",
->> +			      "dvc.0", "dvc.1",
->> +			      "clk_a", "clk_b", "clk_c", "clk_i";
+>> The same fix would apply to unwind_frame(), we have 'tsk' in both functions.
+>>
+>> Thoughts?
 >
-> I'm sorry about my previous email. I think I made you confuse.
-> I meant you can remove CTU/MIX field if your patch doesn't care these.
-
-    No, I got your idea right.
-    But I decided to go for a more complete hardware representation, on par 
-with the other R-Car SoCs.
-
-MBR, Sergei
+> in_atomic is a misnomer:
+>
+>    https://lwn.net/Articles/274695/
+>
+> ;)
+>
+> So we might be better off zeroing the pointer if tsk != current ||
+> preemptible(). But yeah, I think we're in general agreement about this.
+>
+> Will
+>
