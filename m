@@ -1,81 +1,58 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Wed, 10 Feb 2016 22:09:34 +0100
-Subject: [PATCH V4 11/23] pci, acpi: Move ACPI host bridge device
- companion assignment to core code.
-In-Reply-To: <20160209180227.GC22868@red-moon>
-References: <1454606941-9523-1-git-send-email-tn@semihalf.com>
- <1454606941-9523-12-git-send-email-tn@semihalf.com>
- <20160209180227.GC22868@red-moon>
-Message-ID: <56BBA70E.908@semihalf.com>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Wed, 10 Feb 2016 23:12:26 +0200
+Subject: [PATCH] ARM: OMAP2+: Fix onenand initialization to avoid
+ filesystem corruption
+In-Reply-To: <20160208193644.GU19432@atomide.com>
+References: <linux-kernel@vger.kernel.org>
+ <1454683028-4193-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
+ <20160208193644.GU19432@atomide.com>
+Message-ID: <20160210211226.GB1640@darkstar.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/09/2016 07:02 PM, Lorenzo Pieralisi wrote:
-> On Thu, Feb 04, 2016 at 06:28:49PM +0100, Tomasz Nowicki wrote:
->> Currently we have two platforms (x86 & ia64) capable of PCI ACPI host
->> bridge initialization. They both use sysdata to pass down parent
->> device reference and both rely on NULL parent in pci_create_root_bus()
->> to validate sysdata content.
->>
->> It looks hacky and prevents us from getting some firmware specific
->> info for PCI host controller e.g. PCI bus domain number.
->> However, we overcome that blocker by passing down parent
->> device via pci_create_root_bus parameter (as the ACPI device type)
->> and using ACPI_COMPANION_SET in core code for ACPI boot method.
->> ACPI_COMPANION_SET is safe to run for all cases DT, ACPI and DT&ACPI.
->>
->> Suggested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
->> Tested-by: Duc Dang <dhdang@apm.com>
->> Tested-by: Dongdong Liu <liudongdong3@huawei.com>
->> Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
->> Tested-by: Graeme Gregory <graeme.gregory@linaro.org>
->> Tested-by: Sinan Kaya <okaya@codeaurora.org>
->> ---
->>   drivers/acpi/pci_root.c | 5 ++++-
->>   drivers/pci/probe.c     | 2 ++
->>   2 files changed, 6 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/acpi/pci_root.c b/drivers/acpi/pci_root.c
->> index ae3fe4e..a65c8c2 100644
->> --- a/drivers/acpi/pci_root.c
->> +++ b/drivers/acpi/pci_root.c
->> @@ -846,7 +846,10 @@ struct pci_bus *acpi_pci_root_create(struct acpi_pci_root *root,
->>   
->>   	pci_acpi_root_add_resources(info);
->>   	pci_add_resource(&info->resources, &root->secondary);
->> -	bus = pci_create_root_bus(NULL, busnum, ops->pci_ops,
->> +
->> +	/* Root bridge device needs to be sure of parent ACPI type */
-> You can improve the comment.
->
-> "pci_create_root_bus() needs to detect the parent device type,
-> so initialize its companion data accordingly".
-Agree, I will change comment.
->
->> +	ACPI_COMPANION_SET(&device->dev, device);
->> +	bus = pci_create_root_bus(&device->dev, busnum, ops->pci_ops,
->>   				  sysdata, &info->resources);
->>   	if (!bus)
->>   		goto out_release_info;
->> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
->> index 6d7ab9b..81dd3a2 100644
->> --- a/drivers/pci/probe.c
->> +++ b/drivers/pci/probe.c
->> @@ -2100,6 +2100,8 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
->>   	bridge->dev.parent = parent;
->>   	bridge->dev.release = pci_release_host_bridge_dev;
->>   	dev_set_name(&bridge->dev, "pci%04x:%02x", pci_domain_nr(b), bus);
->> +	ACPI_COMPANION_SET(&bridge->dev,
->> +			   parent ? to_acpi_device_node(parent->fwnode) : NULL);
-> if (parent)
-> 	ACPI_COMPANION_SET(&bridge->dev, ACPI_COMPANION(parent));
->
-> ?
-Looks better.
->
-> It seems fine to me, hopefully Rafael can have a look to countercheck.
->
-> Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Thanks,
-Tomasz
+Hi,
+
+On Mon, Feb 08, 2016 at 11:36:45AM -0800, Tony Lindgren wrote:
+> * Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com> [160205 06:38]:
+> > Commit <e7b11dc7b77bfce0a351230a5feeadc1d0bba997> ("ARM: OMAP2+: Fix
+> > onenand rate detection to avoid filesystem corruption") partially fixed
+> > onenand configuration when GPMC module is reset. Finish the job by also
+> > providing the correct values in ONENAND_REG_SYS_CFG1 register.
+> 
+> OK. So probably the INT or RDY polarity made the ECC not work.
+> 
+> Aaro, care to dump out also the nolo configured CFG1 value from
+> n8x0 and n9(50)?
+> 
+> You can do it by adding something like this to the beginning
+> of set_onenand_cfg():
+> 
+> pr_info("CFG1: 0x%04x\n", readw(onenand_base + ONENAND_REG_SYS_CFG1));
+> 
+> And presumably the values are the same as on n900. If not, we
+> should do the legacy file system flash test on all of them
+> before committing this fix.
+
+I got these (with CONFIG_OMAP_GPMC_DEBUG also enabled):
+
+N800:
+[    2.803100] CFG1: 0x46c0
+[    3.150115] CFG1: 0x06c0
+
+N810:
+[    2.802368] CFG1: 0x46c0
+[    3.148620] CFG1: 0x06c0
+
+N900:
+[    4.965576] CFG1: 0x46c0
+[    5.333740] CFG1: 0x06c0
+
+N950:
+[    4.217193] CFG1: 0x66c4
+[    4.583221] CFG1: 0x06c0
+
+N9:
+[    4.212677] CFG1: 0x66c4
+[    4.578613] CFG1: 0x06c0
+
+A.
