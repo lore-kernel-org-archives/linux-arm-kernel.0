@@ -1,103 +1,75 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 10 Feb 2016 17:29:16 +0100
-Subject: [PATCH v2 2/2] ARM: mvebu: add NAND description to Armada 370 DB and
- Armada XP DB
-In-Reply-To: <1455121756-20804-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1455121756-20804-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1455121756-20804-2-git-send-email-thomas.petazzoni@free-electrons.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 10 Feb 2016 16:30:01 +0000
+Subject: breaking DT compatibility (was: Re: [PATCH v4] clk: sunxi:
+ Refactor A31 PLL6 so that it can be reused)
+In-Reply-To: <20160210143755.GE31506@lukather>
+References: <1454358000-13594-1-git-send-email-maxime.ripard@free-electrons.com>
+ <56B4E2FB.3050703@arm.com> <56BB2D79.6090402@arm.com>
+ <CABGGiswOKztmRT40w4t_7BD729WgM8ueLtOD-UF_wgMbmcg4cg@mail.gmail.com>
+ <20160210143755.GE31506@lukather>
+Message-ID: <20160210163001.GG2632@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds the Device Tree description for the 1GB NAND flash
-present in the Armada 370 DB and Armada XP DB evaluation boards from
-Marvell.
+On Wed, Feb 10, 2016 at 03:37:55PM +0100, Maxime Ripard wrote:
+> Hi Rob,
+> 
+> On Wed, Feb 10, 2016 at 07:42:02AM -0600, Rob Herring wrote:
+> > On Wed, Feb 10, 2016 at 6:30 AM, Andre Przywara <andre.przywara@arm.com> wrote:
+> > > Hi,
+> > >
+> > > just a ping:
+> > >
+> > > Are we really OK with breaking existing DTs in 4.6? (per the code in
+> > > -next: f7d372ba54ea04d528a291b8dbe34716507bb60b, which is this patch).
+> > 
+> > I only warn and make sure people are aware of the issue. I leave that
+> > up to platform maintainers to decide. It depends on the maturity of
+> > the platform and users.
+> 
+> The impacted SoCs support is really partial. For the most supported
+> one, big things like display or sound are totally missing, and we
+> still update them on a regular basis to add support for new
+> devices. As such, users are very likely to upgrade the DT from one
+> version to another just because there's new devices available to
+> them. And the newest SoC impacted just got introduced in 4.5, and only
+> has the UART and MMC devices available.
+> 
+> > If people complain about it then it's their mess. For platforms
+> > supported in distros such as debian or fedora, I would strongly
+> > recommend against breaking compatibility.
+> 
+> None of them are officially supported:
+> https://www.debian.org/releases/stable/armhf/ch02s01.html.en
+> https://fedoraproject.org/wiki/Architectures/ARM#Fedora_23
+> 
+> Only the older one are, and they are not affected by this patch.
+> 
+> > They do ship dtbs, but it's a chicken and egg problem. If dtbs were
+> > stable and provided by firmware, then they wouldn't have to provide
+> > them. If dtbs are unstable, then they have no choice.
+> 
+> And while it might work great on platforms that have all the needed
+> documentation, or a perfect one, which is our case. Almost each
+> release, we discover that something is not working as it was
+> documented, when it was documented in the first place.
+> 
+> It also seems that even on well documented platforms, supported by the
+> vendors, the stable ABI dream is not going to happen:
+> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/arm/Atmel/README#n105
+> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/devicetree/bindings/arm/marvell,berlin.txt#n4
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
-Changes since v1:
- - Use the new MTD partitions DT binding, with all partitions grouped
-   into a 'partitions' subnode. Suggested by Andrew Lunn.
----
- arch/arm/boot/dts/armada-370-db.dts | 27 +++++++++++++++++++++++++++
- arch/arm/boot/dts/armada-xp-db.dts  | 28 ++++++++++++++++++++++++++++
- 2 files changed, 55 insertions(+)
+To be quite frank, I completely disagree with that stance.
 
-diff --git a/arch/arm/boot/dts/armada-370-db.dts b/arch/arm/boot/dts/armada-370-db.dts
-index bb280de..2364fc5 100644
---- a/arch/arm/boot/dts/armada-370-db.dts
-+++ b/arch/arm/boot/dts/armada-370-db.dts
-@@ -168,6 +168,33 @@
- 					spi-max-frequency = <50000000>;
- 				};
- 			};
-+
-+			nand at d0000 {
-+				status = "okay";
-+				num-cs = <1>;
-+				marvell,nand-keep-config;
-+				marvell,nand-enable-arbiter;
-+				nand-on-flash-bbt;
-+
-+				partitions {
-+					compatible = "fixed-partitions";
-+					#address-cells = <1>;
-+					#size-cells = <1>;
-+
-+					partition at 0 {
-+						label = "U-Boot";
-+						reg = <0 0x800000>;
-+					};
-+					partition at 800000 {
-+						label = "Linux";
-+						reg = <0x800000 0x800000>;
-+					};
-+					partition at 1000000 {
-+						label = "Filesystem";
-+						reg = <0x1000000 0x3f000000>;
-+					};
-+				};
-+			};
- 		};
- 
- 		pcie-controller {
-diff --git a/arch/arm/boot/dts/armada-xp-db.dts b/arch/arm/boot/dts/armada-xp-db.dts
-index f774101..96aaaed 100644
---- a/arch/arm/boot/dts/armada-xp-db.dts
-+++ b/arch/arm/boot/dts/armada-xp-db.dts
-@@ -229,6 +229,34 @@
- 					spi-max-frequency = <20000000>;
- 				};
- 			};
-+
-+			nand at d0000 {
-+				status = "okay";
-+				num-cs = <1>;
-+				marvell,nand-keep-config;
-+				marvell,nand-enable-arbiter;
-+				nand-on-flash-bbt;
-+
-+				partitions {
-+					compatible = "fixed-partitions";
-+					#address-cells = <1>;
-+					#size-cells = <1>;
-+
-+					partition at 0 {
-+						label = "U-Boot";
-+						reg = <0 0x800000>;
-+					};
-+					partition at 800000 {
-+						label = "Linux";
-+						reg = <0x800000 0x800000>;
-+					};
-+					partition at 1000000 {
-+						label = "Filesystem";
-+						reg = <0x1000000 0x3f000000>;
-+
-+					};
-+				};
-+			};
- 		};
- 	};
- };
--- 
-2.6.4
+It seems like the only reason DT bindings aren't remaining stable is
+because people are deliberately ignoring the requirement and reasoning
+for doing so.
+
+I agree that it can be painful, and that we cannot predict the future.
+There will always be bugs.
+
+Having code in mainline comes with responsibilities. One of those is to
+keep said code working for existing users. Otherwise, why bother having
+it in mainline at all?
+
+Mark.
