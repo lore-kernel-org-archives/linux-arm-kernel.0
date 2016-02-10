@@ -1,128 +1,54 @@
-From: anup.patel@broadcom.com (Anup Patel)
-Date: Wed, 10 Feb 2016 11:40:51 +0530
-Subject: [PATCH 6/6] arm64: dts: Add PCIe0 and PCIe4 DT nodes for NS2
-In-Reply-To: <1455084651-29325-1-git-send-email-anup.patel@broadcom.com>
-References: <1455084651-29325-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <1455084651-29325-7-git-send-email-anup.patel@broadcom.com>
+From: k@japko.eu (Krzysztof Adamski)
+Date: Wed, 10 Feb 2016 08:17:14 +0100
+Subject: [linux-sunxi] Re: [PATCH v3 1/5] clk: sunxi: Add apb0 gates for H3
+In-Reply-To: <20160209171040.GR31506@lukather>
+References: <1454542430-16572-1-git-send-email-k@japko.eu>
+ <1454542430-16572-2-git-send-email-k@japko.eu>
+ <20160204154752.4df7808be3364a98c496c030@free.fr>
+ <20160205111152.GA31506@lukather>
+ <20160205115837.GD12071@box2.japko.eu>
+ <20160209171040.GR31506@lukather>
+Message-ID: <20160210071713.GA19622@box2.japko.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ray Jui <rjui@broadcom.com>
+On Tue, Feb 09, 2016 at 06:10:40PM +0100, Maxime Ripard wrote:
+>> >>It seems that the other compatible strings are there for historical
+>> >>reasons. Why do you need a new one with such a specific name?
+>> >>
+>> >>It would have been more sensible to add a generic compatible string as
+>> >>"allwinner,apb-gates", letting the removal of the other strings for a
+>> >>later patch...
+>> >
+>> >Yeah, it's a good idea, and it's probably time that we move to that.
+>> >
+>> >However, I'd like to keep per-soc and per-clocks compatibles in the
+>> >DT, in case we need to protect a clock in the future. That doesn't
+>> >prevent to have two compatibles thoughe, the specific and the generic.
+>> >
+>>
+>> So now I'm not sure what you mean. You suggest that I should keep using
+>> specific (sun8i_h3_apb0) or change to generic (apb-gates) in my patch?
+>
+>Both.
+>
+>To have something like that:
+>
+>compatible = "allwinner,sun8i-h3-apb0-gates-clk", "allwinner,sun4i-a10-gates-clk";
+>
+>sun4i-a10-gates-clk being the generic compatible that we would use,
+>and we can always match against the h3 specific compatible if we need
+>to have a different behaviour.
 
-This patch enables PCIe0 and PCIe4 for NS2 by adding
-appropriate DT nodes in NS2 DT.
+This seems like a good idea to me but since this is new thing anyways 
+(other sunxi SoCs don't do this right now) shouldn't we introduce other
+more generic name for generic clock (like "allwinner,apb-gates" 
+mentioned earlier, or maybe "allwinner,simple-apb-gates")?
 
-Signed-off-by: Ray Jui <rjui@broadcom.com>
-Signed-off-by: Anup Patel <anup.patel@broadcom.com>
-Reviewed-by: Scott Branden <sbranden@broadcom.com>
----
- arch/arm64/boot/dts/broadcom/ns2-svk.dts |  8 ++++
- arch/arm64/boot/dts/broadcom/ns2.dtsi    | 74 ++++++++++++++++++++++++++++++++
- 2 files changed, 82 insertions(+)
+Also, wouldn't this be cleaner if I use only specific compatible string 
+right now and provide separate patch that adds generic compatible string 
+to all current SoCs at once? The downside of this is that it's easier to 
+get merge conflicts unless I wait for applying this patchset.
 
-diff --git a/arch/arm64/boot/dts/broadcom/ns2-svk.dts b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
-index 3321bd1..ce0ab84 100644
---- a/arch/arm64/boot/dts/broadcom/ns2-svk.dts
-+++ b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
-@@ -52,6 +52,14 @@
- 	};
- };
- 
-+&pcie0 {
-+	status = "ok";
-+};
-+
-+&pcie4 {
-+	status = "ok";
-+};
-+
- &i2c0 {
- 	status = "ok";
- };
-diff --git a/arch/arm64/boot/dts/broadcom/ns2.dtsi b/arch/arm64/boot/dts/broadcom/ns2.dtsi
-index 062616b4..6f81c9d 100644
---- a/arch/arm64/boot/dts/broadcom/ns2.dtsi
-+++ b/arch/arm64/boot/dts/broadcom/ns2.dtsi
-@@ -137,6 +137,80 @@
- 		};
- 	};
- 
-+	pcie0: pcie at 20020000 {
-+		compatible = "brcm,iproc-pcie";
-+		reg = <0 0x20020000 0 0x1000>;
-+
-+		#interrupt-cells = <1>;
-+		interrupt-map-mask = <0 0 0 0>;
-+		interrupt-map = <0 0 0 0 &gic GIC_SPI 281 IRQ_TYPE_NONE>;
-+
-+		linux,pci-domain = <0>;
-+
-+		bus-range = <0x00 0xff>;
-+
-+		#address-cells = <3>;
-+		#size-cells = <2>;
-+		device_type = "pci";
-+		ranges = <0x83000000 0 0x00000000 0 0x00000000 0 0x20000000>;
-+
-+		brcm,pcie-ob;
-+		brcm,pcie-ob-oarr-size;
-+		brcm,pcie-ob-axi-offset = <0x00000000>;
-+		brcm,pcie-ob-window-size = <256>;
-+
-+		status = "disabled";
-+
-+		msi-parent = <&msi0>;
-+		msi0: msi at 20020000 {
-+			compatible = "brcm,iproc-msi";
-+			msi-controller;
-+			interrupt-parent = <&gic>;
-+			interrupts = <GIC_SPI 277 IRQ_TYPE_NONE>,
-+				     <GIC_SPI 278 IRQ_TYPE_NONE>,
-+				     <GIC_SPI 279 IRQ_TYPE_NONE>,
-+				     <GIC_SPI 280 IRQ_TYPE_NONE>;
-+			brcm,num-eq-region = <1>;
-+			brcm,num-msi-msg-region = <1>;
-+		};
-+	};
-+
-+	pcie4: pcie at 50020000 {
-+		compatible = "brcm,iproc-pcie";
-+		reg = <0 0x50020000 0 0x1000>;
-+
-+		#interrupt-cells = <1>;
-+		interrupt-map-mask = <0 0 0 0>;
-+		interrupt-map = <0 0 0 0 &gic GIC_SPI 305 IRQ_TYPE_NONE>;
-+
-+		linux,pci-domain = <4>;
-+
-+		bus-range = <0x00 0xff>;
-+
-+		#address-cells = <3>;
-+		#size-cells = <2>;
-+		device_type = "pci";
-+		ranges = <0x83000000 0 0x00000000 0 0x30000000 0 0x20000000>;
-+
-+		brcm,pcie-ob;
-+		brcm,pcie-ob-oarr-size;
-+		brcm,pcie-ob-axi-offset = <0x30000000>;
-+		brcm,pcie-ob-window-size = <256>;
-+
-+		status = "disabled";
-+
-+		msi-parent = <&msi4>;
-+		msi4: msi at 50020000 {
-+			compatible = "brcm,iproc-msi";
-+			msi-controller;
-+			interrupt-parent = <&gic>;
-+			interrupts = <GIC_SPI 301 IRQ_TYPE_NONE>,
-+				     <GIC_SPI 302 IRQ_TYPE_NONE>,
-+				     <GIC_SPI 303 IRQ_TYPE_NONE>,
-+				     <GIC_SPI 304 IRQ_TYPE_NONE>;
-+		};
-+	};
-+
- 	soc: soc {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
--- 
-1.9.1
+Best regards,
+Krzysztof Adamski
