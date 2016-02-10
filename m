@@ -1,139 +1,149 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 10 Feb 2016 13:34:44 +0000
-Subject: [PATCH 7/8] KVM: arm/arm64: Avoid accessing GICH registers
-In-Reply-To: <20160210124506.GN5171@cbox>
-References: <1454931622-14902-1-git-send-email-marc.zyngier@arm.com>
- <1454931622-14902-8-git-send-email-marc.zyngier@arm.com>
- <20160210124506.GN5171@cbox>
-Message-ID: <56BB3C74.9000105@arm.com>
+From: rob.herring@linaro.org (Rob Herring)
+Date: Wed, 10 Feb 2016 07:42:02 -0600
+Subject: breaking DT compatibility (was: Re: [PATCH v4] clk: sunxi:
+ Refactor A31 PLL6 so that it can be reused)
+In-Reply-To: <56BB2D79.6090402@arm.com>
+References: <1454358000-13594-1-git-send-email-maxime.ripard@free-electrons.com>
+ <56B4E2FB.3050703@arm.com> <56BB2D79.6090402@arm.com>
+Message-ID: <CABGGiswOKztmRT40w4t_7BD729WgM8ueLtOD-UF_wgMbmcg4cg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/02/16 12:45, Christoffer Dall wrote:
-> On Mon, Feb 08, 2016 at 11:40:21AM +0000, Marc Zyngier wrote:
->> GICv2 registers are *slow*. As in "terrifyingly slow". Which is bad.
->> But we're equaly bad, as we make a point in accessing them even if
->> we don't have any interrupt in flight.
+On Wed, Feb 10, 2016 at 6:30 AM, Andre Przywara <andre.przywara@arm.com> wrote:
+> Hi,
+>
+> just a ping:
+>
+> Are we really OK with breaking existing DTs in 4.6? (per the code in
+> -next: f7d372ba54ea04d528a291b8dbe34716507bb60b, which is this patch).
+
+I only warn and make sure people are aware of the issue. I leave that
+up to platform maintainers to decide. It depends on the maturity of
+the platform and users. If people complain about it then it's their
+mess. For platforms supported in distros such as debian or fedora, I
+would strongly recommend against breaking compatibility. They do ship
+dtbs, but it's a chicken and egg problem. If dtbs were stable and
+provided by firmware, then they wouldn't have to provide them. If dtbs
+are unstable, then they have no choice.
+
+> Also I think one needs ACKs from DT maintainers before merging something
+> in the respective directories, which I don't see here.
+
+It can go in with subsystem maintainers ack, but there are problems
+with this one regardless of compatibility.
+
+> As I am somewhat blocked on that patch, I'd like to have some discussion
+> on the list.
+>
+> Thanks,
+> Andre.
+>
+> On 05/02/16 17:59, Andre Przywara wrote:
+>> Hi Maxime,
 >>
->> A good solution is to first find out if we have anything useful to
->> write into the GIC, and if we don't, to simply not do it. This
->> involves tracking which LRs actually have something valid there.
+>> just found this while looking at your current git branch, so sorry for
+>> the late reply.
 >>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm64/kvm/hyp/vgic-v2-sr.c | 71 ++++++++++++++++++++++++++++-------------
->>  include/kvm/arm_vgic.h          |  2 ++
->>  2 files changed, 51 insertions(+), 22 deletions(-)
+>> CC:ing DT people, since you touch both existing DTs(!) and the binding doc.
 >>
->> diff --git a/arch/arm64/kvm/hyp/vgic-v2-sr.c b/arch/arm64/kvm/hyp/vgic-v2-sr.c
->> index e717612..874a08d 100644
->> --- a/arch/arm64/kvm/hyp/vgic-v2-sr.c
->> +++ b/arch/arm64/kvm/hyp/vgic-v2-sr.c
->> @@ -38,28 +38,40 @@ void __hyp_text __vgic_v2_save_state(struct kvm_vcpu *vcpu)
->>  
->>  	nr_lr = vcpu->arch.vgic_cpu.nr_lr;
->>  	cpu_if->vgic_vmcr = readl_relaxed(base + GICH_VMCR);
->> -	cpu_if->vgic_misr = readl_relaxed(base + GICH_MISR);
->> -	eisr0  = readl_relaxed(base + GICH_EISR0);
->> -	elrsr0 = readl_relaxed(base + GICH_ELRSR0);
->> -	if (unlikely(nr_lr > 32)) {
->> -		eisr1  = readl_relaxed(base + GICH_EISR1);
->> -		elrsr1 = readl_relaxed(base + GICH_ELRSR1);
->> -	} else {
->> -		eisr1 = elrsr1 = 0;
->> -	}
->> +
->> +	if (vcpu->arch.vgic_cpu.live_lrs) {
->> +		eisr0  = readl_relaxed(base + GICH_EISR0);
->> +		elrsr0 = readl_relaxed(base + GICH_ELRSR0);
->> +		cpu_if->vgic_misr = readl_relaxed(base + GICH_MISR);
->> +		cpu_if->vgic_apr    = readl_relaxed(base + GICH_APR);
->> +
->> +		if (unlikely(nr_lr > 32)) {
->> +			eisr1  = readl_relaxed(base + GICH_EISR1);
->> +			elrsr1 = readl_relaxed(base + GICH_ELRSR1);
->> +		} else {
->> +			eisr1 = elrsr1 = 0;
->> +		}
->> +
->>  #ifdef CONFIG_CPU_BIG_ENDIAN
->> -	cpu_if->vgic_eisr  = ((u64)eisr0 << 32) | eisr1;
->> -	cpu_if->vgic_elrsr = ((u64)elrsr0 << 32) | elrsr1;
->> +		cpu_if->vgic_eisr  = ((u64)eisr0 << 32) | eisr1;
->> +		cpu_if->vgic_elrsr = ((u64)elrsr0 << 32) | elrsr1;
->>  #else
->> -	cpu_if->vgic_eisr  = ((u64)eisr1 << 32) | eisr0;
->> -	cpu_if->vgic_elrsr = ((u64)elrsr1 << 32) | elrsr0;
->> +		cpu_if->vgic_eisr  = ((u64)eisr1 << 32) | eisr0;
->> +		cpu_if->vgic_elrsr = ((u64)elrsr1 << 32) | elrsr0;
->>  #endif
->> -	cpu_if->vgic_apr    = readl_relaxed(base + GICH_APR);
->>  
->> -	writel_relaxed(0, base + GICH_HCR);
->> +		for (i = 0; i < nr_lr; i++)
->> +			if (vcpu->arch.vgic_cpu.live_lrs & (1UL << i))
->> +				cpu_if->vgic_lr[i] = readl_relaxed(base + GICH_LR0 + (i * 4));
->>  
->> -	for (i = 0; i < nr_lr; i++)
->> -		cpu_if->vgic_lr[i] = readl_relaxed(base + GICH_LR0 + (i * 4));
->> +		writel_relaxed(0, base + GICH_HCR);
->> +
->> +		vcpu->arch.vgic_cpu.live_lrs = 0;
->> +	} else {
->> +		cpu_if->vgic_eisr = 0;
->> +		cpu_if->vgic_elrsr = ~0UL;
->> +		cpu_if->vgic_misr = 0;
->> +	}
->>  }
->>  
->>  /* vcpu is already in the HYP VA space */
->> @@ -70,15 +82,30 @@ void __hyp_text __vgic_v2_restore_state(struct kvm_vcpu *vcpu)
->>  	struct vgic_dist *vgic = &kvm->arch.vgic;
->>  	void __iomem *base = kern_hyp_va(vgic->vctrl_base);
->>  	int i, nr_lr;
->> +	u64 live_lrs = 0;
->>  
->>  	if (!base)
->>  		return;
->>  
->> -	writel_relaxed(cpu_if->vgic_hcr, base + GICH_HCR);
->> -	writel_relaxed(cpu_if->vgic_vmcr, base + GICH_VMCR);
->> -	writel_relaxed(cpu_if->vgic_apr, base + GICH_APR);
->> -
->>  	nr_lr = vcpu->arch.vgic_cpu.nr_lr;
->> +
->>  	for (i = 0; i < nr_lr; i++)
->> -		writel_relaxed(cpu_if->vgic_lr[i], base + GICH_LR0 + (i * 4));
->> +		if (cpu_if->vgic_lr[i] & GICH_LR_STATE)
->> +			live_lrs |= 1UL << i;
->> +
->> +	if (live_lrs) {
->> +		writel_relaxed(cpu_if->vgic_hcr, base + GICH_HCR);
->> +		writel_relaxed(cpu_if->vgic_apr, base + GICH_APR);
->> +		for (i = 0; i < nr_lr; i++) {
->> +			u32 val = 0;
->> +
->> +			if (live_lrs & (1UL << i))
->> +				val = cpu_if->vgic_lr[i];
->> +
->> +			writel_relaxed(val, base + GICH_LR0 + (i * 4));
->> +		}
->> +	}
->> +
->> +	writel_relaxed(cpu_if->vgic_vmcr, base + GICH_VMCR);
-> 
-> couldn't you optimize this out by storing the last read value and
-> compare if anything changed?  (you'd have to invalidate the cached value
-> on vcpu_put obviously).
+>> On 01/02/16 20:20, Maxime Ripard wrote:
+>>> Remove the fixed dividers from the PLL6 driver to be able to have a
+>>> reusable driver that can be used across several SoCs that share the same
+>>> controller, but don't have the same set of dividers for this clock, and to
+>>> also be reused multiple times in the same SoC, since we're droping the
+>>> clock name.
 
-Yeah, very good point. Only the guest can update this, so we could even
-move it to vcpu_load/vcpu_put entirely, and never save/restore it inside
-the run loop.
+Removing a compatible name or not has nothing to do with sharing code.
 
-I'll keep that for a further patch, as it requires a bit of infrastructure.
+>>>
+>>> Acked-by: Chen-Yu Tsai <wens@csie.org>
+>>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>>> ---
+>>>
+>>> Changes from v3:
+>>>   - Fixed the documentation
+>>>   - Added pll6d2 back
+>>>
+>>> Changes from v2:
+>>>   - Rebased and converted over to the new factors refactoring. Fixed the
+>>>     retrieved rate
+>>>
+>>>  Documentation/devicetree/bindings/clock/sunxi.txt |  2 +-
+>>>  arch/arm/boot/dts/sun6i-a31.dtsi                  | 36 +++++++++++-----------
+>>>  arch/arm/boot/dts/sun8i-a23-a33.dtsi              | 25 ++++++++++-----
+>>>  arch/arm/boot/dts/sun8i-a23.dtsi                  |  2 +-
+>>>  arch/arm/boot/dts/sun8i-a33.dtsi                  |  4 +--
+>>>  arch/arm/boot/dts/sun8i-h3.dtsi                   | 37 ++++++++++++++---------
+>>
+>> So are you really breaking all those systems by changing the DT and the
+>> driver in an incompatible way?
+>> Please correct me if this assessment is wrong, but to me it looks like
+>> any user out there is either stuck with 4.5 at best _or_ will only be
+>> able to run 4.6 and later (depending on which version of the DT she is
+>> using)? And no, switching DTs along with the kernel is _not_ an option.
+>> That is not how I understand DT.
+>> Also this totally ignores any other DT user (U-Boot, FreeBSD, you name it).
+>>
+>> I actually appreciate this rework, it's more flexible now and looks
+>> better, but you really can't do this in a way to breaks compatibility
+>> with existing DTs.
+>>
+>> Jean-Francois came up with another solution for the pll8 clock [1], so
+>> could this be considered at least?
+>> I think changing the H3 PLL8 clock from dummy to something real is a
+>> different story in terms of compatibility (since it never really worked
+>> before and this wouldn't change for any old-DT user).
+>>
+>> Cheers,
+>> Andre.
+>>
+>> [1]
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-February/405104.html
+>>
+>>>  drivers/clk/sunxi/clk-sunxi.c                     | 32 ++++++++++----------
+>>>  7 files changed, 78 insertions(+), 60 deletions(-)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+>>> index e59f57b24777..f82850c0f6a5 100644
+>>> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
+>>> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+>>> @@ -86,7 +86,7 @@ Required properties for all clocks:
+>>>  - #clock-cells : from common clock binding; shall be set to 0 except for
+>>>      the following compatibles where it shall be set to 1:
+>>>      "allwinner,*-gates-clk", "allwinner,sun4i-pll5-clk",
+>>> -    "allwinner,sun4i-pll6-clk", "allwinner,sun6i-a31-pll6-clk",
+>>> +    "allwinner,sun4i-pll6-clk",
+>>>      "allwinner,*-usb-clk", "allwinner,*-mmc-clk",
+>>>      "allwinner,*-mmc-config-clk"
+>>>  - clock-output-names : shall be the corresponding names of the outputs.
+>>> diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+>>> index b6ad7850fac6..05fe3d1aa328 100644
+>>> --- a/arch/arm/boot/dts/sun6i-a31.dtsi
+>>> +++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+>>> @@ -65,7 +65,7 @@
+>>>                      compatible = "allwinner,simple-framebuffer",
+>>>                                   "simple-framebuffer";
+>>>                      allwinner,pipeline = "de_be0-lcd0-hdmi";
+>>> -                    clocks = <&pll6 0>;
+>>> +                    clocks = <&pll6>;
+>>>                      status = "disabled";
+>>>              };
+>>>
+>>> @@ -73,7 +73,7 @@
+>>>                      compatible = "allwinner,simple-framebuffer",
+>>>                                   "simple-framebuffer";
+>>>                      allwinner,pipeline = "de_be0-lcd0";
+>>> -                    clocks = <&pll6 0>;
+>>> +                    clocks = <&pll6>;
+>>>                      status = "disabled";
+>>>              };
+>>>      };
+>>> @@ -201,11 +201,11 @@
+>>>              };
+>>>
+>>>              pll6: clk at 01c20028 {
+>>> -                    #clock-cells = <1>;
+>>> +                    #clock-cells = <0>;
+>>>                      compatible = "allwinner,sun6i-a31-pll6-clk";
 
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+The name is removed, but remains here?
