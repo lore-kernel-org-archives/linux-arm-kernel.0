@@ -1,57 +1,52 @@
 From: niklas.soderlund+renesas@ragnatech.se (=?UTF-8?q?Niklas=20S=C3=B6derlund?=)
-Date: Wed, 10 Feb 2016 01:57:53 +0100
-Subject: [PATCH v3 3/8] dma-mapping: add dma_{map,unmap}_resource
+Date: Wed, 10 Feb 2016 01:57:51 +0100
+Subject: [PATCH v3 1/8] iommu: Add MMIO mapping type
 In-Reply-To: <1455065878-11906-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
 References: <1455065878-11906-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
-Message-ID: <1455065878-11906-4-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+Message-ID: <1455065878-11906-2-git-send-email-niklas.soderlund+renesas@ragnatech.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Map/Unmap a device resource from a physical address. If no dma_map_ops
-method is available the operation is a no-op.
+From: Robin Murphy <robin.murphy@arm.com>
 
-Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+On some platforms, MMIO regions might need slightly different treatment
+compared to mapping regular memory; add the notion of MMIO mappings to
+the IOMMU API's memory type flags, so that callers can let the IOMMU
+drivers know to do the right thing.
+
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 ---
- include/linux/dma-mapping.h | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+ drivers/iommu/io-pgtable-arm.c | 4 +++-
+ include/linux/iommu.h          | 1 +
+ 2 files changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
-index e3aba4e..21bf986 100644
---- a/include/linux/dma-mapping.h
-+++ b/include/linux/dma-mapping.h
-@@ -216,6 +216,33 @@ static inline void dma_unmap_page(struct device *dev, dma_addr_t addr,
- 	debug_dma_unmap_page(dev, addr, size, dir, false);
- }
+diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
+index 381ca5a..3ff4f87 100644
+--- a/drivers/iommu/io-pgtable-arm.c
++++ b/drivers/iommu/io-pgtable-arm.c
+@@ -364,7 +364,9 @@ static arm_lpae_iopte arm_lpae_prot_to_pte(struct arm_lpae_io_pgtable *data,
+ 			pte |= ARM_LPAE_PTE_HAP_READ;
+ 		if (prot & IOMMU_WRITE)
+ 			pte |= ARM_LPAE_PTE_HAP_WRITE;
+-		if (prot & IOMMU_CACHE)
++		if (prot & IOMMU_MMIO)
++			pte |= ARM_LPAE_PTE_MEMATTR_DEV;
++		else if (prot & IOMMU_CACHE)
+ 			pte |= ARM_LPAE_PTE_MEMATTR_OIWB;
+ 		else
+ 			pte |= ARM_LPAE_PTE_MEMATTR_NC;
+diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+index a5c539f..34b6432 100644
+--- a/include/linux/iommu.h
++++ b/include/linux/iommu.h
+@@ -30,6 +30,7 @@
+ #define IOMMU_WRITE	(1 << 1)
+ #define IOMMU_CACHE	(1 << 2) /* DMA cache coherency */
+ #define IOMMU_NOEXEC	(1 << 3)
++#define IOMMU_MMIO	(1 << 4) /* e.g. things like MSI doorbells */
  
-+static inline dma_addr_t dma_map_resource(struct device *dev,
-+					  phys_addr_t phys_addr,
-+					  size_t size,
-+					  enum dma_data_direction dir,
-+					  struct dma_attrs *attrs)
-+{
-+	struct dma_map_ops *ops = get_dma_ops(dev);
-+
-+	BUG_ON(!valid_dma_direction(dir));
-+	if (ops->map_resource)
-+		return ops->map_resource(dev, phys_addr, size, dir, attrs);
-+
-+	return phys_addr;
-+}
-+
-+static inline void dma_unmap_resource(struct device *dev, dma_addr_t addr,
-+				      size_t size, enum dma_data_direction dir,
-+				      struct dma_attrs *attrs)
-+{
-+	struct dma_map_ops *ops = get_dma_ops(dev);
-+
-+	BUG_ON(!valid_dma_direction(dir));
-+	if (ops->unmap_resource)
-+		ops->unmap_resource(dev, addr, size, dir, attrs);
-+
-+}
-+
- static inline void dma_sync_single_for_cpu(struct device *dev, dma_addr_t addr,
- 					   size_t size,
- 					   enum dma_data_direction dir)
+ struct iommu_ops;
+ struct iommu_group;
 -- 
 2.7.1
