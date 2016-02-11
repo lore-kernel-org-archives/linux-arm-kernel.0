@@ -1,144 +1,85 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 11 Feb 2016 12:54:28 +0100
-Subject: [PATCH V5 04/11] soc: mediatek: PMIC wrap: split SoC specific
- init into callback
-In-Reply-To: <1454841778-35529-5-git-send-email-blogic@openwrt.org>
-References: <1454841778-35529-1-git-send-email-blogic@openwrt.org>
- <1454841778-35529-5-git-send-email-blogic@openwrt.org>
-Message-ID: <56BC7674.9030706@gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 11 Feb 2016 11:58:53 +0000
+Subject: [PATCH V4 22/23] arm64, pci, acpi: Assign legacy IRQs once
+ device is enable.
+In-Reply-To: <1454606941-9523-23-git-send-email-tn@semihalf.com>
+References: <1454606941-9523-1-git-send-email-tn@semihalf.com>
+ <1454606941-9523-23-git-send-email-tn@semihalf.com>
+Message-ID: <20160211115843.GA24136@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Feb 04, 2016 at 06:29:00PM +0100, Tomasz Nowicki wrote:
+> This is the last step before enabling generic ACPI PCI host controller
+> for ARM64. We need to take care of legacy IRQ mapping for non-MSI(X)
+> PCI devices. pcibios_enable_device() boot order is not sensitive to
+> ACPI device enumeration, so it is the best place to assign device's IRQs.
 
+I guess you are referring to:
 
-On 07/02/16 11:42, John Crispin wrote:
-> This patch moves the SoC specific wrapper init code into separate callback
-> to avoid pwrap_init() getting too large.
->
+https://lists.linaro.org/pipermail/linaro-acpi/2015-October/005944.html
 
-Please explain a bit more, what the patch does.
+It is weird that the dependency can't be enforced, I will have a look
+into this, it would be nice to have DT and ACPI legacy IRQs mapping
+confined in pcibios_add_device() so that we can remove them in one go
+when Matthew's series is merged.
 
-> Signed-off-by: John Crispin <blogic@openwrt.org>
+As for the MSI check, by reading commit history its need I think
+it harks back to bba6f6fc, which was supposed to be a quick hack and it
+has been in the kernel for 9 years :), is it really needed ?
+
+> NOTE: *This is going to be temporary solution*. There is ongoing work
+> which aims for cleaning legacy IRQ allocation, see [1].
+> We can consider this patch as the necessary evil which will be removed
+> once [1] series hits mailnline in the near future.
+> 
+> 1. http://comments.gmane.org/gmane.linux.kernel.pci/46461
+> 
+> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
 > ---
-> Changes in V5
-> * only check the return code of init_special() if the function is
->    actually called
->
->   drivers/soc/mediatek/mtk-pmic-wrap.c |   67 +++++++++++++++++++++-------------
->   1 file changed, 42 insertions(+), 25 deletions(-)
->
-> diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
-> index b22b664..e3bbee5 100644
-> --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
-> +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
-> @@ -372,6 +372,7 @@ struct pmic_wrapper_type {
->   	enum pwrap_type type;
->   	u32 arb_en_all;
->   	int (*init_reg_clock)(struct pmic_wrapper *wrp);
-> +	int (*init_special)(struct pmic_wrapper *wrp);
-
-Nit:
-I wonder if we can find a better name for the callback, as init_special 
-sounds quite generic to me.
-
-Thanks,
-Matthias
-
->   };
->
->   static inline int pwrap_is_mt8135(struct pmic_wrapper *wrp)
-> @@ -665,6 +666,41 @@ static int pwrap_init_cipher(struct pmic_wrapper *wrp)
->   	return 0;
->   }
->
-> +static int pwrap_mt8135_init_special(struct pmic_wrapper *wrp)
-> +{
-> +	/* enable pwrap events and pwrap bridge in AP side */
-> +	pwrap_writel(wrp, 0x1, PWRAP_EVENT_IN_EN);
-> +	pwrap_writel(wrp, 0xffff, PWRAP_EVENT_DST_EN);
-> +	writel(0x7f, wrp->bridge_base + PWRAP_MT8135_BRIDGE_IORD_ARB_EN);
-> +	writel(0x1, wrp->bridge_base + PWRAP_MT8135_BRIDGE_WACS3_EN);
-> +	writel(0x1, wrp->bridge_base + PWRAP_MT8135_BRIDGE_WACS4_EN);
-> +	writel(0x1, wrp->bridge_base + PWRAP_MT8135_BRIDGE_WDT_UNIT);
-> +	writel(0xffff, wrp->bridge_base + PWRAP_MT8135_BRIDGE_WDT_SRC_EN);
-> +	writel(0x1, wrp->bridge_base + PWRAP_MT8135_BRIDGE_TIMER_EN);
-> +	writel(0x7ff, wrp->bridge_base + PWRAP_MT8135_BRIDGE_INT_EN);
+>  arch/arm64/kernel/pci.c | 14 ++++++++++++--
+>  1 file changed, 12 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+> index 023b983..d1a701f 100644
+> --- a/arch/arm64/kernel/pci.c
+> +++ b/arch/arm64/kernel/pci.c
+> @@ -39,16 +39,26 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+>  }
+>  
+>  /**
+> - * pcibios_enable_device - Enable I/O and memory.
+> + * pcibios_enable_device - Enable I/O, memory and legacy IRQs for ACPI.
+>   * @dev: PCI device to be enabled
+>   * @mask: bitmask of BARs to enable
+>   */
+>  int pcibios_enable_device(struct pci_dev *dev, int mask)
+>  {
+> +	int ret;
 > +
-> +	/* enable PMIC event out and sources */
-> +	if (pwrap_write(wrp, PWRAP_DEW_EVENT_OUT_EN, 0x1) ||
-> +		pwrap_write(wrp, PWRAP_DEW_EVENT_SRC_EN, 0xffff)) {
-> +		dev_err(wrp->dev, "enable dewrap fail\n");
-> +		return -EFAULT;
-> +	}
+>  	if (pci_has_flag(PCI_PROBE_ONLY))
+>  		return 0;
+>  
+> -	return pci_enable_resources(dev, mask);
+> +	ret = pci_enable_resources(dev, mask);
+> +	if (ret < 0)
+> +		return ret;
 > +
+> +#ifdef CONFIG_ACPI
+> +	if (!pci_dev_msi_enabled(dev))
+> +		return acpi_pci_irq_enable(dev);
+
+You need a guard here anyway, we do not want to probe ACPI IRQ if
+it is disabled (ie acpi_pci_disabled). Same goes for DT in
+pcibios_add_device(), which is not making this code any nicer.
+
+Lorenzo
+
+> +#endif
 > +	return 0;
-> +}
-> +
-> +static int pwrap_mt8173_init_special(struct pmic_wrapper *wrp)
-> +{
-> +	/* PMIC_DEWRAP enables */
-> +	if (pwrap_write(wrp, PWRAP_DEW_EVENT_OUT_EN, 0x1) ||
-> +		pwrap_write(wrp, PWRAP_DEW_EVENT_SRC_EN, 0xffff)) {
-> +		dev_err(wrp->dev, "enable dewrap fail\n");
-> +		return -EFAULT;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
->   static int pwrap_init(struct pmic_wrapper *wrp)
->   {
->   	int ret;
-> @@ -743,31 +779,10 @@ static int pwrap_init(struct pmic_wrapper *wrp)
->   	pwrap_writel(wrp, 0x5, PWRAP_STAUPD_PRD);
->   	pwrap_writel(wrp, 0xff, PWRAP_STAUPD_GRPEN);
->
-> -	if (pwrap_is_mt8135(wrp)) {
-> -		/* enable pwrap events and pwrap bridge in AP side */
-> -		pwrap_writel(wrp, 0x1, PWRAP_EVENT_IN_EN);
-> -		pwrap_writel(wrp, 0xffff, PWRAP_EVENT_DST_EN);
-> -		writel(0x7f, wrp->bridge_base + PWRAP_MT8135_BRIDGE_IORD_ARB_EN);
-> -		writel(0x1, wrp->bridge_base + PWRAP_MT8135_BRIDGE_WACS3_EN);
-> -		writel(0x1, wrp->bridge_base + PWRAP_MT8135_BRIDGE_WACS4_EN);
-> -		writel(0x1, wrp->bridge_base + PWRAP_MT8135_BRIDGE_WDT_UNIT);
-> -		writel(0xffff, wrp->bridge_base + PWRAP_MT8135_BRIDGE_WDT_SRC_EN);
-> -		writel(0x1, wrp->bridge_base + PWRAP_MT8135_BRIDGE_TIMER_EN);
-> -		writel(0x7ff, wrp->bridge_base + PWRAP_MT8135_BRIDGE_INT_EN);
-> -
-> -		/* enable PMIC event out and sources */
-> -		if (pwrap_write(wrp, PWRAP_DEW_EVENT_OUT_EN, 0x1) ||
-> -				pwrap_write(wrp, PWRAP_DEW_EVENT_SRC_EN, 0xffff)) {
-> -			dev_err(wrp->dev, "enable dewrap fail\n");
-> -			return -EFAULT;
-> -		}
-> -	} else {
-> -		/* PMIC_DEWRAP enables */
-> -		if (pwrap_write(wrp, PWRAP_DEW_EVENT_OUT_EN, 0x1) ||
-> -				pwrap_write(wrp, PWRAP_DEW_EVENT_SRC_EN, 0xffff)) {
-> -			dev_err(wrp->dev, "enable dewrap fail\n");
-> -			return -EFAULT;
-> -		}
-> +	if (wrp->master->init_special) {
-> +		ret = wrp->master->init_special(wrp);
-> +		if (ret)
-> +			return ret;
->   	}
->
->   	/* Setup the init done registers */
-> @@ -811,6 +826,7 @@ static struct pmic_wrapper_type pwrap_mt8135 = {
->   	.type = PWRAP_MT8135,
->   	.arb_en_all = 0x1ff,
->   	.init_reg_clock = pwrap_mt8135_init_reg_clock,
-> +	.init_special = pwrap_mt8135_init_special,
->   };
->
->   static struct pmic_wrapper_type pwrap_mt8173 = {
-> @@ -818,6 +834,7 @@ static struct pmic_wrapper_type pwrap_mt8173 = {
->   	.type = PWRAP_MT8173,
->   	.arb_en_all = 0x3f,
->   	.init_reg_clock = pwrap_mt8173_init_reg_clock,
-> +	.init_special = pwrap_mt8173_init_special,
->   };
->
->   static struct of_device_id of_pwrap_match_tbl[] = {
->
+>  }
+>  
+>  /*
+> -- 
+> 1.9.1
+> 
