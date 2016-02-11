@@ -1,50 +1,33 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 11 Feb 2016 11:08:42 +0200
-Subject: [PATCH v2] dmaengine: edma: Implement device_synchronize callback
-Message-ID: <1455181722-32099-1-git-send-email-peter.ujfalusi@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 11 Feb 2016 09:10:36 +0000
+Subject: [PATCH v2] mfd: Provide MACRO to declare commonly defined MFD
+ cell attributes
+In-Reply-To: <56BB7865.3060004@nvidia.com>
+References: <1455028027-1527-1-git-send-email-lee.jones@linaro.org>
+ <20160210153846.GB26950@x1> <56BB7865.3060004@nvidia.com>
+Message-ID: <20160211091036.GZ3782@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need the callback to support the dmaengine_terminate_sync().
+On Wed, 10 Feb 2016, Laxman Dewangan wrote:
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- drivers/dma/edma.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+> 
+> On Wednesday 10 February 2016 09:08 PM, Lee Jones wrote:
+> >mfd: Provide MACRO to declare commonly defined MFD cell attributes
+> >Cc: Laxman Dewangan <ldewangan@nvidia.com>
+> >Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> 
+> Build passed with this patch when using it.
+> 
+> Acked-by: Laxman Dewangan <ldewangan@nvidia.com>
+> 
+> Please let me know if you applying this. I am going to use the macro
+> from this patch on max77620 series on next spin.
 
-diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-index 2dac314a2d7a..290e1a721c5b 100644
---- a/drivers/dma/edma.c
-+++ b/drivers/dma/edma.c
-@@ -869,6 +869,13 @@ static int edma_terminate_all(struct dma_chan *chan)
- 	return 0;
- }
- 
-+static void edma_synchronize(struct dma_chan *chan)
-+{
-+	struct edma_chan *echan = to_edma_chan(chan);
-+
-+	vchan_synchronize(&echan->vchan);
-+}
-+
- static int edma_slave_config(struct dma_chan *chan,
- 	struct dma_slave_config *cfg)
- {
-@@ -1808,6 +1815,7 @@ static void edma_dma_init(struct edma_cc *ecc, bool legacy_mode)
- 	s_ddev->device_pause = edma_dma_pause;
- 	s_ddev->device_resume = edma_dma_resume;
- 	s_ddev->device_terminate_all = edma_terminate_all;
-+	s_ddev->device_synchronize = edma_synchronize;
- 
- 	s_ddev->src_addr_widths = EDMA_DMA_BUSWIDTHS;
- 	s_ddev->dst_addr_widths = EDMA_DMA_BUSWIDTHS;
-@@ -1833,6 +1841,7 @@ static void edma_dma_init(struct edma_cc *ecc, bool legacy_mode)
- 		m_ddev->device_pause = edma_dma_pause;
- 		m_ddev->device_resume = edma_dma_resume;
- 		m_ddev->device_terminate_all = edma_terminate_all;
-+		m_ddev->device_synchronize = edma_synchronize;
- 
- 		m_ddev->src_addr_widths = EDMA_DMA_BUSWIDTHS;
- 		m_ddev->dst_addr_widths = EDMA_DMA_BUSWIDTHS;
+As you are the first user, just submit it as 0/1 of your set.
+
 -- 
-2.7.1
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
