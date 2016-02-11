@@ -1,37 +1,38 @@
 From: lars.persson@axis.com (Lars Persson)
-Date: Thu, 11 Feb 2016 15:04:41 +0100
-Subject: [PATCH v2 7/8] arm: multi_v7_defconfig: add MACH_ARTPEC6
+Date: Thu, 11 Feb 2016 15:04:42 +0100
+Subject: [PATCH v2 8/8] arm: mach-artpec: add entry to MAINTAINERS
 In-Reply-To: <cover.1455198819.git.larper@axis.com>
 References: <cover.1455198819.git.larper@axis.com>
-Message-ID: <59ff2b8e89d207ffb14e5c77803280c5586a893f.1455198819.git.larper@axis.com>
+Message-ID: <b5adeda17294fceb282d14446ab684316fc3028b.1455198819.git.larper@axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Lars Persson <larper@axis.com>
+Signed-off-by: Jesper Nilsson <jesper.nilsson@axis.com>
 ---
- arch/arm/configs/multi_v7_defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+ MAINTAINERS | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 8e8b2ac..1149642 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -16,6 +16,8 @@ CONFIG_ARCH_MULTI_V7=y
- # CONFIG_ARCH_MULTI_V4 is not set
- CONFIG_ARCH_VIRT=y
- CONFIG_ARCH_ALPINE=y
-+CONFIG_ARCH_ARTPEC=y
-+CONFIG_MACH_ARTPEC6=y
- CONFIG_ARCH_MVEBU=y
- CONFIG_MACH_ARMADA_370=y
- CONFIG_MACH_ARMADA_375=y
-@@ -227,6 +229,7 @@ CONFIG_R8169=y
- CONFIG_SH_ETH=y
- CONFIG_SMSC911X=y
- CONFIG_STMMAC_ETH=y
-+CONFIG_SYNOPSYS_DWC_ETH_QOS=y
- CONFIG_TI_CPSW=y
- CONFIG_XILINX_EMACLITE=y
- CONFIG_AT803X_PHY=y
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 7f1fa4f..d32c1aa 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -932,6 +932,16 @@ M:	Tsahee Zidenberg <tsahee@annapurnalabs.com>
+ S:	Maintained
+ F:	arch/arm/mach-alpine/
+ 
++ARM/ARTPEC MACHINE SUPPORT
++M:	Jesper Nilsson <jesper.nilsson@axis.com>
++M:	Lars Persson <lars.persson@axis.com>
++M:	Niklas Cassel <niklas.cassel@axis.com>
++S:	Maintained
++L:	linux-arm-kernel at axis.com
++F:	arch/arm/mach-artpec
++F:	arch/arm/boot/dts/artpec6*
++F:	drivers/clk/clk-artpec6.c
++
+ ARM/ATMEL AT91RM9200, AT91SAM9 AND SAMA5 SOC SUPPORT
+ M:	Nicolas Ferre <nicolas.ferre@atmel.com>
+ M:	Alexandre Belloni <alexandre.belloni@free-electrons.com>
 -- 
 2.1.4
