@@ -1,44 +1,52 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 10 Feb 2016 16:02:25 -0800
-Subject: [PATCH 1/2] ARM: dts: vf610twr: assign Ethernet clock explicitly
-Message-ID: <1455148946-26903-1-git-send-email-stefan@agner.ch>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 11 Feb 2016 02:03:40 +0200
+Subject: [PATCH v3 2/8] dma-mapping: add {map,
+ unmap}_resource to dma_map_ops
+In-Reply-To: <1455065878-11906-3-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+References: <1455065878-11906-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+ <1455065878-11906-3-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+Message-ID: <1751306.gvBkWbovht@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Assign Ethernet clock parents explicitly. The VF610 Tower Board
-uses the external Ethernet clock input which is connected to
-a 50MHz clock.
+Hi Niklas,
 
-The Vybrid SoC has two ethernet interfaces (fec0 and fec1) which
-use the same clock source (VF610_CLK_ENET). Therefore this parent
-configuration affects multiple consumer devices and need to be
-specified in the clock provider node.
+Thank you for the patch.
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
-So far we rely on the boot loader to configure this, however it
-can be problematic e.g. for suspend/resume...
+On Wednesday 10 February 2016 01:57:52 Niklas S?derlund wrote:
+> Add methods to handle mapping of device resources from a physical
+> address. This is needed for example to map be able to map MMIO FIFO
+> registers to a IOMMU.
+> 
+> Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
 
---
-Stefan
+Apart from the typo in the commit message that Sergei already pointed out,
 
- arch/arm/boot/dts/vf610-twr.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
-index 5438ee4..8419c06 100644
---- a/arch/arm/boot/dts/vf610-twr.dts
-+++ b/arch/arm/boot/dts/vf610-twr.dts
-@@ -96,6 +96,10 @@
- &clks {
- 	clocks = <&sxosc>, <&fxosc>, <&enet_ext>, <&audio_ext>;
- 	clock-names = "sxosc", "fxosc", "enet_ext", "audio_ext";
-+	assigned-clocks = <&clks VF610_CLK_ENET_SEL>,
-+			  <&clks VF610_CLK_ENET_TS_SEL>;
-+	assigned-clock-parents = <&clks VF610_CLK_ENET_EXT>,
-+				 <&clks VF610_CLK_ENET_EXT>;
- };
- 
- &dspi0 {
+> ---
+>  include/linux/dma-mapping.h | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
+> index 75857cd..e3aba4e 100644
+> --- a/include/linux/dma-mapping.h
+> +++ b/include/linux/dma-mapping.h
+> @@ -49,6 +49,12 @@ struct dma_map_ops {
+>  			 struct scatterlist *sg, int nents,
+>  			 enum dma_data_direction dir,
+>  			 struct dma_attrs *attrs);
+> +	dma_addr_t (*map_resource)(struct device *dev, phys_addr_t phys_addr,
+> +			       size_t size, enum dma_data_direction dir,
+> +			       struct dma_attrs *attrs);
+> +	void (*unmap_resource)(struct device *dev, dma_addr_t dma_handle,
+> +			   size_t size, enum dma_data_direction dir,
+> +			   struct dma_attrs *attrs);
+>  	void (*sync_single_for_cpu)(struct device *dev,
+>  				    dma_addr_t dma_handle, size_t size,
+>  				    enum dma_data_direction dir);
+
 -- 
-2.7.1
+Regards,
+
+Laurent Pinchart
