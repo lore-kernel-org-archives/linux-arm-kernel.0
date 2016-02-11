@@ -1,51 +1,54 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 11 Feb 2016 19:10:50 +0000
-Subject: [PATCH v4 00/23] arm64: Virtualization Host Extension support
-In-Reply-To: <20160211190701.GA4842@cbox>
-References: <1455216004-19499-1-git-send-email-marc.zyngier@arm.com>
- <20160211190701.GA4842@cbox>
-Message-ID: <56BCDCBA.5080202@arm.com>
+From: kirill.shutemov@linux.intel.com (Kirill A. Shutemov)
+Date: Thu, 11 Feb 2016 22:12:53 +0300
+Subject: [BUG] random kernel crashes after THP rework on s390 (maybe also
+ on PowerPC and ARM)
+In-Reply-To: <20160211190942.GA10244@node.shutemov.name>
+References: <20160211192223.4b517057@thinkpad>
+ <20160211190942.GA10244@node.shutemov.name>
+Message-ID: <20160211191253.GA8589@black.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/02/16 19:07, Christoffer Dall wrote:
-> On Thu, Feb 11, 2016 at 06:39:41PM +0000, Marc Zyngier wrote:
->> ARMv8.1 comes with the "Virtualization Host Extension" (VHE for
->> short), which enables simpler support of Type-2 hypervisors.
->>
->> This extension allows the kernel to directly run at EL2, and
->> significantly reduces the number of system registers shared between
->> host and guest, reducing the overhead of virtualization.
->>
->> In order to have the same kernel binary running on all versions of the
->> architecture, this series makes heavy use of runtime code patching.
->>
->> The first 22 patches massage the KVM code to deal with VHE and enable
->> Linux to run at EL2. The last patch catches an ugly case when VHE
->> capable CPUs are paired with some of their less capable siblings. This
->> should never happen, but hey...
->>
->> I have deliberately left out some of the more "advanced"
->> optimizations, as they are likely to distract the reviewer from the
->> core infrastructure, which is what I care about at the moment.
->>
->> Note: GDB is currently busted on VHE systems, as it checks for version
->>       6 on the debug architecture, while VHE is version 7. The
->>       binutils people are on the case.
->>
->> This has been tested on the FVP_Base_SLV-V8-A model, and based on
->> v4.5-rc3 + kvmarm/master. I've put a branch out on:
->>
->> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/vhe
+On Thu, Feb 11, 2016 at 09:09:42PM +0200, Kirill A. Shutemov wrote:
+> On Thu, Feb 11, 2016 at 07:22:23PM +0100, Gerald Schaefer wrote:
+> > Hi,
+> > 
+> > Sebastian Ott reported random kernel crashes beginning with v4.5-rc1 and
+> > he also bisected this to commit 61f5d698 "mm: re-enable THP". Further
+> > review of the THP rework patches, which cannot be bisected, revealed
+> > commit fecffad "s390, thp: remove infrastructure for handling splitting PMDs"
+> > (and also similar commits for other archs).
+> > 
+> > This commit removes the THP splitting bit and also the architecture
+> > implementation of pmdp_splitting_flush(), which took care of the IPI for
+> > fast_gup serialization. The commit message says
+> > 
+> >     pmdp_splitting_flush() is not needed too: on splitting PMD we will do
+> >     pmdp_clear_flush() + set_pte_at().  pmdp_clear_flush() will do IPI as
+> >     needed for fast_gup
+> > 
+> > The assumption that a TLB flush will also produce an IPI is wrong on s390,
+> > and maybe also on other architectures, and I thought that this was actually
+> > the main reason for having an arch-specific pmdp_splitting_flush().
+> > 
+> > At least PowerPC and ARM also had an individual implementation of
+> > pmdp_splitting_flush() that used kick_all_cpus_sync() instead of a TLB
+> > flush to send the IPI, and those were also removed. Putting the arch
+> > maintainers and mailing lists on cc to verify.
+> > 
+> > On s390 this will break the IPI serialization against fast_gup, which
+> > would certainly explain the random kernel crashes, please revert or fix
+> > the pmdp_splitting_flush() removal.
 > 
-> I'm happy with this series as it stands, we just need someone to take a
-> look at that debug patch and be happy with it.
+> Sorry for that.
+> 
+> I believe, the problem was already addressed for PowerPC:
+> 
+> http://lkml.kernel.org/g/454980831-16631-1-git-send-email-aneesh.kumar at linux.vnet.ibm.com
 
-I think Will is planning to have a go at it shortly. Once he and Catalin
-are happy with the thing, I'll throw it into -next for a good shake.
+Correct link is
 
-Thanks,
+http://lkml.kernel.org/g/1454980831-16631-1-git-send-email-aneesh.kumar at linux.vnet.ibm.com
 
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+ Kirill A. Shutemov
