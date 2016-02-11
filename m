@@ -1,34 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 11 Feb 2016 17:31:56 +0100
-Subject: [PATCH v2 5/6] serial: 8250/mediatek: fix building with
- SERIAL_8250=m
-In-Reply-To: <20160211160438.GH28452@windriver.com>
-References: <1455205297-1021302-1-git-send-email-arnd@arndb.de>
- <1455205297-1021302-6-git-send-email-arnd@arndb.de>
- <20160211160438.GH28452@windriver.com>
-Message-ID: <4817391.g2eX6rsJJ6@wuerfel>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 11 Feb 2016 16:32:31 +0000
+Subject: [PATCH v2 0/7] ARM/efi minor fixes + stub pre-boot compat checks
+In-Reply-To: <20160211162920.GN4134@codeblueprint.co.uk>
+References: <1454601030-9093-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20160211161621.GM4134@codeblueprint.co.uk>
+ <CAKv+Gu-kZrcLYhF7i0u8F2TOMqEVKp==jNoBc+Rfk61cwSkDhQ@mail.gmail.com>
+ <20160211162920.GN4134@codeblueprint.co.uk>
+Message-ID: <20160211163231.GB20077@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 11 February 2016 11:04:38 you wrote:
-> > diff --git a/drivers/tty/serial/8250/8250_mtk.c b/drivers/tty/serial/8250/8250_mtk.c
-> > index 6ecc6e3e82dc..55be90c1d85e 100644
-> > --- a/drivers/tty/serial/8250/8250_mtk.c
-> > +++ b/drivers/tty/serial/8250/8250_mtk.c
-> > @@ -19,6 +19,7 @@
-> >  #include <linux/module.h>
-> >  #include <linux/of_irq.h>
-> >  #include <linux/of_platform.h>
-> > +#include <linux/module.h>
+On Thu, Feb 11, 2016 at 04:29:20PM +0000, Matt Fleming wrote:
+> On Thu, 11 Feb, at 05:18:12PM, Ard Biesheuvel wrote:
+> > On 11 February 2016 at 17:16, Matt Fleming <matt@codeblueprint.co.uk> wrote:
+> > > On Thu, 04 Feb, at 04:50:23PM, Ard Biesheuvel wrote:
+> > >> I merged two EFI/ARM related series, whose v1's I sent out last week:
+> > >>
+> > >> Changes since v1:
+> > >> - added various tags from various people
+> > >> - new patch #3 to undefine __init
+> > >>
+> > >> @Matt: are you happy with all of this going through the arm64 tree? I don't
+> > >> think it clashes with anything else we've got queued up for v4.6 in tip/efi/core
+> > >
+> > > How come this is going through the arm64 tree? Are there other patch
+> > > series that this depends on or that depend on it?
+> > >
+> > > If it makes the most sense to take it through that tree, then I'm fine
+> > > with it but I'd like to hear a rationale.
+> > 
+> > I simply thought it would be most convenient, since it touches
+> > ARM-specific files only. But if you feel it should go via the EFI tree
+> > instead, that is also fine by me.
 > 
-> Something isn't right here ; I can see module.h three lines up in the
-> context.  Guessing your addition of the revert makes this addition no
-> longer required...
-> 
+> Since the diff stat is heavily weighted towards drivers/firmware/efi I
+> think it should go via the EFI tree. So I'll pick this up (the changes
+> look fine) unless Will or Catalin complain otherwise.
 
-Ok, thanks for noticing this. Also, I really should know my alphabet
-at this point. I saw that the headers were sorted alphabetically and
-thought I had added it in the right place, which would have worked fine
-after the revert. Oh well.
+No complaints here (the arm64 bits are all acked).
 
-	Arnd
+Will
