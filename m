@@ -1,29 +1,41 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 11 Feb 2016 09:56:58 -0800
-Subject: [PATCH 2/7] i2c: omap: Fix PM regression with deferred probe for
- pm_runtime_reinit
-In-Reply-To: <20160211173427.GB1524@katana>
-References: <1455145370-20301-1-git-send-email-tony@atomide.com>
- <1455145370-20301-3-git-send-email-tony@atomide.com>
- <20160211173427.GB1524@katana>
-Message-ID: <20160211175658.GW19432@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 11 Feb 2016 18:00:32 +0000
+Subject: [PATCH v2] ARM: mm: mark section-aligned portion of rodata NX
+In-Reply-To: <CAGXu5jLDK8eVO2kUD1cB3TArL8k8pF=igc3O04Fa40QgQ2pwNw@mail.gmail.com>
+References: <20151207223534.GA13722@www.outflux.net>
+ <CAKv+Gu9EeKQk7GOAPV2cvff10=kD49u+oP-yEiOrJBPOF=QNtw@mail.gmail.com>
+ <CAGXu5j+Pc7ucC4tmxHyDW7aW88pwQvMejuR2Ehdxp=vY+pv-5w@mail.gmail.com>
+ <CAGXu5jLDK8eVO2kUD1cB3TArL8k8pF=igc3O04Fa40QgQ2pwNw@mail.gmail.com>
+Message-ID: <20160211180032.GY10826@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Wolfram Sang <wsa@the-dreams.de> [160211 09:35]:
-> 
-> > Wolfram, I'd like to merge this along with other related fixes via
-> > the ARM SoC tree if no objections, please review and ack if this
-> > look OK to you.
-> 
-> Well, since most patches seem to be picked up individually now, I'd
-> prefer to do the same. This is v4.5 material, or?
+On Fri, Jan 22, 2016 at 01:19:03PM -0800, Kees Cook wrote:
+> On Tue, Dec 8, 2015 at 10:38 AM, Kees Cook <keescook@chromium.org> wrote:
+> > On Mon, Dec 7, 2015 at 11:47 PM, Ard Biesheuvel
+> > <ard.biesheuvel@linaro.org> wrote:
+> >> On 7 December 2015 at 23:35, Kees Cook <keescook@chromium.org> wrote:
+> >>>  /*
+> >>> + * Without CONFIG_DEBUG_ALIGN_RODATA, __start_rodata_section_aligned will
+> >>> + * be the first section-aligned location after __start_rodata. Otherwise,
+> >>> + * it will be equal to __start_rodata.
+> >>> + */
+> >>> +__start_rodata_section_aligned = ALIGN(__start_rodata, 1 << SECTION_SHIFT);
+...
 
-Sure please do, thanks. And yes for v4.5 please. Although
-I've only seen this happen with the MMC driver so far, there's
-still a slight chance of this happening with the other drivers
-using omap_device.
+I'm afraid this causes build errors on two configurations:
 
-Regards,
+./arch/arm/kernel/vmlinux.lds:701: undefined symbol `SECTION_SHIFT' referenced in expression
 
-Tony
+which I think is down to the new __start_rodata_section_aligned line.
+
+Olof's builder errored out with this for both allnoconfig and
+lpc18xx_defconfig builds.  Both probably due to CONFIG_MMU being
+unset, and hence no definition for SECTION_SHIFT.
+
+I think you need to make this conditional on CONFIG_MMU.
+
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently@9.6Mbps down 400kbps up
+according to speedtest.net.
