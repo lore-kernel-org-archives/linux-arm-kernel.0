@@ -1,5 +1,5 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Thu, 11 Feb 2016 10:26:53 +0000
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 11 Feb 2016 11:28:19 +0100
 Subject: [PATCH V5 11/14] soc: tegra: pmc: Add generic PM domain support
 In-Reply-To: <56BC5EE0.2040804@nvidia.com>
 References: <1453998832-27383-1-git-send-email-jonathanh@nvidia.com>
@@ -10,14 +10,12 @@ References: <1453998832-27383-1-git-send-email-jonathanh@nvidia.com>
  <56BC50C2.7050609@nvidia.com>
  <CAPDyKFrdmufsMqNL0U7q5gPEUqsg3SrkrNChcziQjEOjvd30Ng@mail.gmail.com>
  <56BC5EE0.2040804@nvidia.com>
-Message-ID: <56BC61ED.6000201@nvidia.com>
+Message-ID: <CAPDyKFq_0t4tcvkgMBW8p8ubJDALWMjdhgGM+_Z6auRxEkSPdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 11/02/16 10:13, Jon Hunter wrote:
-> 
+On 11 February 2016 at 11:13, Jon Hunter <jonathanh@nvidia.com> wrote:
+>
 > On 11/02/16 09:57, Ulf Hansson wrote:
 >> On 11 February 2016 at 10:13, Jon Hunter <jonathanh@nvidia.com> wrote:
 >>>
@@ -76,17 +74,17 @@ On 11/02/16 10:13, Jon Hunter wrote:
 >> Why not make pm_genpd_remove() to behave as you describe for
 >> pm_genpd_remove_tail()?
 >> That's probably the only sane way to remove genpds anyhow!?
-> 
+>
 > Simply to offer flexibility. I could see that for some devices that have
 > no dependencies between pm-domains and have a static list of pm-domains,
 > they can simply call pm_genpd_remove() for a given pm-domain. However,
 > that said, I can envision a case where a single pm-domain would be
 > removed by itself and so may be there is no benefit?
 
-By the way, do you think that instead of passing the struct device * to
-pm_genpd_remove(), we should just have a void *dev_id in the same way
-the request_irq()/free_irq() work? In other words, it would allow people
-to use the struct device or struct device_node, etc?
+If I understand correctly, you agree to try with the most simple
+approach first and thus without providing too much flexibility.
 
-Cheers
-Jon
+Anyway, I am looking forward to review your next version of the patchset! :-)
+
+Kind regards
+Uffe
