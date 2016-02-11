@@ -1,52 +1,42 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Thu, 11 Feb 2016 13:13:28 +0100
-Subject: [PATCH v2] dmaengine: edma: Implement device_synchronize callback
-In-Reply-To: <56BC6C94.1060409@ti.com>
-References: <1455181722-32099-1-git-send-email-peter.ujfalusi@ti.com>
- <56BC5759.80000@metafoo.de> <56BC6C94.1060409@ti.com>
-Message-ID: <56BC7AE8.2070009@metafoo.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 11 Feb 2016 13:36:48 +0100
+Subject: [PATCH 01/14] pinctrl: sunxi: Add A83T R_PIO controller support
+In-Reply-To: <CACRpkdbCgOBQw28d=qc1fAURY3x8UdoWqiMtXMZ=uWLaQj-nbg@mail.gmail.com>
+References: <1454203266-4450-1-git-send-email-vishnupatekar0510@gmail.com>
+ <1454203266-4450-2-git-send-email-vishnupatekar0510@gmail.com>
+ <CACRpkdbCgOBQw28d=qc1fAURY3x8UdoWqiMtXMZ=uWLaQj-nbg@mail.gmail.com>
+Message-ID: <20160211123648.GN31506@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/11/2016 12:12 PM, Peter Ujfalusi wrote:
-> On 02/11/2016 11:41 AM, Lars-Peter Clausen wrote:
->> On 02/11/2016 10:08 AM, Peter Ujfalusi wrote:
->>> We need the callback to support the dmaengine_terminate_sync().
->>>
->>> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
->>
->> Looks good, but I noticed a slight race condition in
->> edma_completion_handler(). You need to fetch echan->desc while holding the
->> vchan.lock. Otherwise this can race against terminate_all() and the callback
->> might get scheduled even though terminate_all() completed and then there is
->> a race where the synchronize() operation could be called before the callback
->> gets scheduled, which means it doesn't do its intended job. Highly unlikely
->> to happen, but theoretically possible.
+Hi Linus,
+
+On Thu, Feb 11, 2016 at 12:59:47PM +0100, Linus Walleij wrote:
+> On Sun, Jan 31, 2016 at 2:20 AM, Vishnu Patekar
+> <vishnupatekar0510@gmail.com> wrote:
 > 
-> Right, actually I had (have) another series fixing the very same race in a
-> different way - patching the terminate_all (series attached).
-> We have seen race with RT kernel on uniprocessor setup.
+> > The A83T has R_PIO pin controller, it's same as A23, execpt A83T
+> > interrupt bit is 6th and A83T has one extra pin PL12.
+> >
+> > Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
 > 
-> The tasklet_kill after the terminate_all will execute the scheduled task
-> unconditionally, so the vchan_complete() will run after we have terminated the
-> channel, which might be not what we want.
-> I have also seen a race condition as explained in the first patch. The only
-> way I was able to fix that by using the attached patches. Unfortunately I can
-> not test RT with mainline yet, so I'm not 100% sure if by using the
-> dmaengine_terminate_sync() in drivers will fix the issue.
-> 
+> Maxime, can you look at this patch?
 
-Yes, dmaengine_terminate_sync() is supposed to fix the same issue. One of
-the problems when implementing this was that e.g. for audio it might happen
-that we terminate the transfer from within the tasklet callback itself. In
-that case doing tasklet_disable() will deadlock since it will wait until the
-tasklet has finished from within the tasklet.
+Chen-Yu had one minor comment on it, and he's also the Allwinner
+maintainer now, so you can trust his Acked-by just like you would
+trust mine ;)
 
-This is why the synchronize API has two primitives. Terminate and
-synchronize, so you can split them if necessary.
+Thanks!
+Maxime
 
-The only thing you need to make sure is that the implementation of
-synchronize() is correct. In the EDMA case echan->desc is read without
-holding a lock which still keeps the race condition open.
-
-- Lars
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160211/f0fd5ef1/attachment.sig>
