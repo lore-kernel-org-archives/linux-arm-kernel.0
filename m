@@ -1,65 +1,143 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Thu, 11 Feb 2016 19:39:12 +0100
-Subject: [PATCH V4 22/23] arm64, pci, acpi: Assign legacy IRQs once device
- is enable.
-In-Reply-To: <20160211171700.GB25235@red-moon>
-References: <1454606941-9523-1-git-send-email-tn@semihalf.com>
- <1454606941-9523-23-git-send-email-tn@semihalf.com>
- <20160211115843.GA24136@red-moon> <20160211171700.GB25235@red-moon>
-Message-ID: <56BCD550.2050601@semihalf.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 11 Feb 2016 18:39:51 +0000
+Subject: [PATCH v4 10/23] arm64: KVM: VHE: Differenciate host/guest sysreg
+ save/restore
+In-Reply-To: <1455216004-19499-1-git-send-email-marc.zyngier@arm.com>
+References: <1455216004-19499-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1455216004-19499-11-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11.02.2016 18:17, Lorenzo Pieralisi wrote:
-> Here (on top of your series), ready for flak.
->
-> Lorenzo
->
-> -- >8 --
-> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-> index 0b53262..26ee291 100644
-> --- a/arch/arm64/kernel/pci.c
-> +++ b/arch/arm64/kernel/pci.c
-> @@ -45,28 +45,23 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
->    */
->   int pcibios_enable_device(struct pci_dev *dev, int mask)
->   {
-> -	int ret;
-> -
->   	if (pci_has_flag(PCI_PROBE_ONLY))
->   		return 0;
->
-> -	ret = pci_enable_resources(dev, mask);
-> -	if (ret < 0)
-> -		return ret;
-> -
-> -#ifdef CONFIG_ACPI
-> -	if (!pci_dev_msi_enabled(dev))
-> -		return acpi_pci_irq_enable(dev);
-> -#endif
-> -	return 0;
-> +	return pci_enable_resources(dev, mask);
->   }
->
->   /*
-> - * Try to assign the IRQ number from DT when adding a new device
-> + * Try to assign the IRQ number when probing a new device
->    */
-> -int pcibios_add_device(struct pci_dev *dev)
-> +int pcibios_alloc_irq(struct pci_dev *dev)
->   {
-> -	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
-> +	if (acpi_disabled)
-> +		dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
-> +#ifdef CONFIG_ACPI
-> +	else
-> +		return acpi_pci_irq_enable(dev);
-> +#endif
->
->   	return 0;
->   }
+With ARMv8, host and guest share the same system register file,
+making the save/restore procedure completely symetrical.
+With VHE, host and guest now have different requirements, as they
+use different sysregs.
 
-I miss that way of solving the problem. OK lets try this way. I will 
-integrate it.
+In order to prepare for this, add split sysreg save/restore functions
+for both host and guest. No functional changes yet.
 
-Tomasz
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/kvm/hyp/hyp.h       |  6 ++++--
+ arch/arm64/kvm/hyp/switch.c    | 10 +++++-----
+ arch/arm64/kvm/hyp/sysreg-sr.c | 24 ++++++++++++++++++++++--
+ 3 files changed, 31 insertions(+), 9 deletions(-)
+
+diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
+index 744c919..5dfa883 100644
+--- a/arch/arm64/kvm/hyp/hyp.h
++++ b/arch/arm64/kvm/hyp/hyp.h
+@@ -153,8 +153,10 @@ void __vgic_v3_restore_state(struct kvm_vcpu *vcpu);
+ void __timer_save_state(struct kvm_vcpu *vcpu);
+ void __timer_restore_state(struct kvm_vcpu *vcpu);
+ 
+-void __sysreg_save_state(struct kvm_cpu_context *ctxt);
+-void __sysreg_restore_state(struct kvm_cpu_context *ctxt);
++void __sysreg_save_host_state(struct kvm_cpu_context *ctxt);
++void __sysreg_restore_host_state(struct kvm_cpu_context *ctxt);
++void __sysreg_save_guest_state(struct kvm_cpu_context *ctxt);
++void __sysreg_restore_guest_state(struct kvm_cpu_context *ctxt);
+ void __sysreg32_save_state(struct kvm_vcpu *vcpu);
+ void __sysreg32_restore_state(struct kvm_vcpu *vcpu);
+ 
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index f0e7bdf..68f3cba 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -102,7 +102,7 @@ static int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
+ 	host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
+ 	guest_ctxt = &vcpu->arch.ctxt;
+ 
+-	__sysreg_save_state(host_ctxt);
++	__sysreg_save_host_state(host_ctxt);
+ 	__debug_cond_save_host_state(vcpu);
+ 
+ 	__activate_traps(vcpu);
+@@ -116,7 +116,7 @@ static int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
+ 	 * to Cortex-A57 erratum #852523.
+ 	 */
+ 	__sysreg32_restore_state(vcpu);
+-	__sysreg_restore_state(guest_ctxt);
++	__sysreg_restore_guest_state(guest_ctxt);
+ 	__debug_restore_state(vcpu, kern_hyp_va(vcpu->arch.debug_ptr), guest_ctxt);
+ 
+ 	/* Jump in the fire! */
+@@ -125,7 +125,7 @@ static int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
+ 
+ 	fp_enabled = __fpsimd_enabled();
+ 
+-	__sysreg_save_state(guest_ctxt);
++	__sysreg_save_guest_state(guest_ctxt);
+ 	__sysreg32_save_state(vcpu);
+ 	__timer_save_state(vcpu);
+ 	__vgic_save_state(vcpu);
+@@ -133,7 +133,7 @@ static int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
+ 	__deactivate_traps(vcpu);
+ 	__deactivate_vm(vcpu);
+ 
+-	__sysreg_restore_state(host_ctxt);
++	__sysreg_restore_host_state(host_ctxt);
+ 
+ 	if (fp_enabled) {
+ 		__fpsimd_save_state(&guest_ctxt->gp_regs.fp_regs);
+@@ -165,7 +165,7 @@ void __hyp_text __noreturn __hyp_panic(void)
+ 		host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
+ 		__deactivate_traps(vcpu);
+ 		__deactivate_vm(vcpu);
+-		__sysreg_restore_state(host_ctxt);
++		__sysreg_restore_host_state(host_ctxt);
+ 	}
+ 
+ 	/* Call panic for real */
+diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
+index 42563098..bd5b543 100644
+--- a/arch/arm64/kvm/hyp/sysreg-sr.c
++++ b/arch/arm64/kvm/hyp/sysreg-sr.c
+@@ -24,7 +24,7 @@
+ #include "hyp.h"
+ 
+ /* ctxt is already in the HYP VA space */
+-void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
++static void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
+ {
+ 	ctxt->sys_regs[MPIDR_EL1]	= read_sysreg(vmpidr_el2);
+ 	ctxt->sys_regs[CSSELR_EL1]	= read_sysreg(csselr_el1);
+@@ -57,7 +57,17 @@ void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
+ 	ctxt->gp_regs.spsr[KVM_SPSR_EL1]= read_sysreg(spsr_el1);
+ }
+ 
+-void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
++void __hyp_text __sysreg_save_host_state(struct kvm_cpu_context *ctxt)
++{
++	__sysreg_save_state(ctxt);
++}
++
++void __hyp_text __sysreg_save_guest_state(struct kvm_cpu_context *ctxt)
++{
++	__sysreg_save_state(ctxt);
++}
++
++static void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
+ {
+ 	write_sysreg(ctxt->sys_regs[MPIDR_EL1],	  vmpidr_el2);
+ 	write_sysreg(ctxt->sys_regs[CSSELR_EL1],  csselr_el1);
+@@ -90,6 +100,16 @@ void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
+ 	write_sysreg(ctxt->gp_regs.spsr[KVM_SPSR_EL1], spsr_el1);
+ }
+ 
++void __hyp_text __sysreg_restore_host_state(struct kvm_cpu_context *ctxt)
++{
++	__sysreg_restore_state(ctxt);
++}
++
++void __hyp_text __sysreg_restore_guest_state(struct kvm_cpu_context *ctxt)
++{
++	__sysreg_restore_state(ctxt);
++}
++
+ void __hyp_text __sysreg32_save_state(struct kvm_vcpu *vcpu)
+ {
+ 	u64 *spsr, *sysreg;
+-- 
+2.1.4
