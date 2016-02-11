@@ -1,50 +1,62 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Thu, 11 Feb 2016 15:45:44 +0100
-Subject: [PATCH v2 0/7] irqchip: introduce the Alpine MSIX driver
-In-Reply-To: <56BC8F9C.3060505@arm.com>
-References: <1455110583-19515-1-git-send-email-antoine.tenart@free-electrons.com>
- <56BC8F9C.3060505@arm.com>
-Message-ID: <20160211144544.GC5820@kwain>
+From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
+Date: Thu, 11 Feb 2016 15:50:43 +0100
+Subject: USB Ethernet gadget on Nokia n900
+In-Reply-To: <20160211144347.GY30075@pali>
+References: <20141019090107.GA19132@amd> <20150707074626.GB12087@pali>
+ <20150707114658.GT10705@atomide.com> <201601192158.19810@pali>
+ <20160211144347.GY30075@pali>
+Message-ID: <20160211145043.GZ30075@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Marc,
-
-On Thu, Feb 11, 2016 at 01:41:48PM +0000, Marc Zyngier wrote:
-> On 10/02/16 13:22, Antoine Tenart wrote:
+On Thursday 11 February 2016 15:43:47 Pali Roh?r wrote:
+> On Tuesday 19 January 2016 21:58:19 Pali Roh?r wrote:
+> > On Tuesday 07 July 2015 13:46:59 Tony Lindgren wrote:
+> > > * Pali Roh?r <pali.rohar@gmail.com> [150707 00:48]:
+> > > > On Monday 06 July 2015 06:53:18 Tony Lindgren wrote:
+> > > > > * Pali Roh?r <pali.rohar@gmail.com> [150706 06:27]:
+> > > > > > On Tuesday 28 October 2014 23:26:41 Tony Lindgren wrote:
+> > > > > > > * Pavel Machek <pavel@ucw.cz> [141028 15:22]:
+> > > > > > > > On Tue 2014-10-28 23:04:50, Pavel Machek wrote:
+> > > > > > > > > Networking now works against 3.17-based kernel. Thanks!
+> > > > > > > > 
+> > > > > > > > It works on 3.18-rc1 kernel, too. (I had to hand-modify
+> > > > > > > > patch to apply to 3.17, no changes needed for 3.18-rc1.)
+> > > > > > > > 
+> > > > > > > > Tested-by: Pavel Machek <pavel@ucw.cz>
+> > > > > > > 
+> > > > > > > Whatever we decice to do to fix this regression, it should
+> > > > > > > probably be backported to at least v3.16 stable for distro
+> > > > > > > use, maybe earlier too. I'd assume this is broken on
+> > > > > > > multiple platforms currently.
+> > > > > > 
+> > > > > > it looks like this patch was not included into any kernel
+> > > > > > version... I'm still using it on top of 4.x kernels. Are you
+> > > > > > going to send this patch into upstream? Or do you have another
+> > > > > > fix for this problem?
+> > > > > 
+> > > > > I think Felipe mentioned a better built-in gether fix that's been
+> > > > > reviewed on linux-usb list.
+> > > > 
+> > > > Do you have link to that email thread? Or was Felipe's fix already
+> > > > merged into mainline kernel?
+> > > 
+> > > Sorry I don't have a link, maybe Felipe can point you to the right
+> > > patch.
+> > > 
+> > > Regards,
+> > > 
+> > > Tony
 > > 
-> > This series introduce the Alpine MSIX driver, and enables it in both
-> > the Alpine v1 and Alpine v2 device trees.
+> > Felipe, ping
 > > 
-> > This series depends on "[PATCH v2 0/3] arm64: introduce the Alpine support":
-> > https://lkml.org/lkml/2016/2/10/83
-> > 
-> > You can find the series at:
-> > https://github.com/atenart/linux.git 4.5-rc1/alpinev2-msix
 > 
-> So I'm quite happy with this as it is (modulo the documentation fix on
-> patch 3). I can take the first 3 patches through my GIC tree, but the
-> last 4 patches depend on your other series.
+> PING?
+> 
 
-I'll fix the documentation.
-
-> Would it be a problem to get these 4 patches merged after 4.6-rc1, so
-> that all the code can be merged before?
-
-I think we can live with that :)
-
-Thanks,
-
-Antoine
+Ok, Felipe address is dead:
+550 Invalid recipient <balbi@ti.com> (#5.1.1)
 
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160211/062ef4de/attachment.sig>
+Pali Roh?r
+pali.rohar at gmail.com
