@@ -1,84 +1,87 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Wed, 10 Feb 2016 16:38:30 -0800
-Subject: [PATCH 3/3] clk: Provide OF helper to mark clocks as CRITICAL
-In-Reply-To: <20160201082245.GV3368@x1>
-References: <1453127331-20616-1-git-send-email-lee.jones@linaro.org>
- <1453127331-20616-4-git-send-email-lee.jones@linaro.org>
- <56A95811.8010200@arm.com> <20160201063256.GE32462@lukather>
- <20160201082245.GV3368@x1>
-Message-ID: <20160211003830.26445.88202@quark.deferred.io>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 11 Feb 2016 02:41:28 +0200
+Subject: [PATCH v3 7/8] ARM: dts: r8a7790: add iommus to dmac0 and dmac1
+In-Reply-To: <1455065878-11906-8-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+References: <1455065878-11906-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+ <1455065878-11906-8-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+Message-ID: <1704813.5Ff44u3Kaz@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Lee Jones (2016-02-01 00:22:45)
-> On Mon, 01 Feb 2016, Maxime Ripard wrote:
-> > On Wed, Jan 27, 2016 at 11:51:45PM +0000, Andr? Przywara wrote:
-> > > Hi,
-> > > 
-> > > On 18/01/16 14:28, Lee Jones wrote:
-> > > > This call matches clocks which have been marked as critical in DT
-> > > > and sets the appropriate flag.  These flags can then be used to
-> > > > mark the clock core flags appropriately prior to registration.
-> > > 
-> > > I like the idea of having a generic property very much. Also this solves
-> > > a problem I have in a very elegant way.
-> > 
-> > Not really. It has a significant set of drawbacks that we already
-> > detailed in the initial thread, which are mostly related to the fact
-> > that the clocks are to be left on is something that totally depends on
-> > the software support in the kernel. Some clocks should be reported as
-> > critical because they are simply missing a driver for it, some should
-> > be because the driver for it as not been compiled, some should because
-> > we don't have the proper clocks drivers yet for one of their
-> > downstream clocks.
+Hi Niklas,
+
+Thank you for the patch.
+
+On Wednesday 10 February 2016 01:57:57 Niklas S?derlund wrote:
+
+No commit message ? I'd at least mention that as a side effect of this patch 
+channel 0 and 15 are disabled, reducing the effective number of channels to 14 
+per DMAC.
+
+> Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+Same comment and ack for patch 8/8.
+
+Note that we should still try to find a way to selectively enable the IOMMU in 
+a per-device fashion, as system integrators might want it to be disabled for 
+some devices. There's no urgency though.
+
+> ---
+>  arch/arm/boot/dts/r8a7790.dtsi | 30 ++++++++++++++++++++++++++++++
+>  1 file changed, 30 insertions(+)
 > 
-> Exactly.  This is a not a CLK_DRIVER_NOT_{AUTHORED|UPSTREAM} or
-> CLK_DRIVER_NOT_ENABLED implementation, it's for CLK_CRITICALs.
-> Critical clocks must _never_ be turned off, no matter what, else
-> something really bad will happen.  In our use-case, if the clocks are
-> turned of, it will be catastrophic to the running system.
+> diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+> index 7dfd393..048bbf8 100644
+> --- a/arch/arm/boot/dts/r8a7790.dtsi
+> +++ b/arch/arm/boot/dts/r8a7790.dtsi
+> @@ -294,6 +294,21 @@
+>  		power-domains = <&cpg_clocks>;
+>  		#dma-cells = <1>;
+>  		dma-channels = <15>;
+> +		iommus = <&ipmmu_ds 0>,
+> +			 <&ipmmu_ds 1>,
+> +			 <&ipmmu_ds 2>,
+> +			 <&ipmmu_ds 3>,
+> +			 <&ipmmu_ds 4>,
+> +			 <&ipmmu_ds 5>,
+> +			 <&ipmmu_ds 6>,
+> +			 <&ipmmu_ds 7>,
+> +			 <&ipmmu_ds 8>,
+> +			 <&ipmmu_ds 9>,
+> +			 <&ipmmu_ds 10>,
+> +			 <&ipmmu_ds 11>,
+> +			 <&ipmmu_ds 12>,
+> +			 <&ipmmu_ds 13>,
+> +			 <&ipmmu_ds 14>;
+>  	};
 > 
-> > Basically, it all boils down to this: some clocks should never ever be
-> > shutdown because <hardware reason>, and I believe it's the case Lee is
-> > in. But most of the current code that would use it might, and might
-> > even need at some point to shut down such a clock.
+>  	dmac1: dma-controller at e6720000 {
+> @@ -325,6 +340,21 @@
+>  		power-domains = <&cpg_clocks>;
+>  		#dma-cells = <1>;
+>  		dma-channels = <15>;
+> +		iommus = <&ipmmu_ds 15>,
+> +			 <&ipmmu_ds 16>,
+> +			 <&ipmmu_ds 17>,
+> +			 <&ipmmu_ds 18>,
+> +			 <&ipmmu_ds 19>,
+> +			 <&ipmmu_ds 20>,
+> +			 <&ipmmu_ds 21>,
+> +			 <&ipmmu_ds 22>,
+> +			 <&ipmmu_ds 23>,
+> +			 <&ipmmu_ds 24>,
+> +			 <&ipmmu_ds 25>,
+> +			 <&ipmmu_ds 26>,
+> +			 <&ipmmu_ds 27>,
+> +			 <&ipmmu_ds 28>,
+> +			 <&ipmmu_ds 29>;
+>  	};
+> 
+>  	audma0: dma-controller at ec700000 {
 
-Handoff clocks solved both the handoff clock problem (which Rhyland's
-thread[0] brings back up) and the critical clock problem entirely except
-for a single corner case: if a *critical* clk is enabled at boot via the
-HANDOFF flag and then a driver get's that clk and enables/disables it.
-Then we lose the refcount and the critical clock (which must never be
-gated) will be gated.
-
-That is the executive summary of my discussion with Lee last year. I'm
-fine to merge both critical clocks and handoff clocks into the clk core
-to cover all corner cases.
-
-I'll post a series combining both sets of patches later today for
-review.
-
-> > 
-> > Mike's solution with the flags + handover was solving all this, I'm
-> > not sure why he's not pushed it forward.
-
-Because I was super busy. I'm still super busy but now I will ignore
-other important things and catch up on clk land. ;-)
-
-[0] https://lkml.org/lkml/2016/2/9/817
-
+-- 
 Regards,
-Mike
 
-> 
-> Right, but I think you are missing part of the conversation.  Mike and
-> I had a face-to-face meeting in San Francisco last year.  The
-> conclusion was that the CLK_CRITICAL and CLK_HANDOVER solutions should
-> be separated.  Different handling, different code.  This submission
-> only solves the former problem.  I believe Mike was going to submit
-> and follow-up on the CLK_HANDOVER solution separately.
-> 
-> -- 
-> Lee Jones
-> Linaro STMicroelectronics Landing Team Lead
-> Linaro.org ? Open source software for ARM SoCs
-> Follow Linaro: Facebook | Twitter | Blog
+Laurent Pinchart
