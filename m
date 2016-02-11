@@ -1,24 +1,42 @@
-From: matt@codeblueprint.co.uk (Matt Fleming)
-Date: Thu, 11 Feb 2016 16:16:21 +0000
-Subject: [PATCH v2 0/7] ARM/efi minor fixes + stub pre-boot compat checks
-In-Reply-To: <1454601030-9093-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1454601030-9093-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160211161621.GM4134@codeblueprint.co.uk>
+From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
+Date: Thu, 11 Feb 2016 21:50:20 +0530
+Subject: [PATCH v2 0/6] net: thunderx: Setting IRQ affinity hints and other
+ optimizations
+Message-ID: <1455207626-35488-1-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 04 Feb, at 04:50:23PM, Ard Biesheuvel wrote:
-> I merged two EFI/ARM related series, whose v1's I sent out last week:
-> 
-> Changes since v1:
-> - added various tags from various people
-> - new patch #3 to undefine __init
-> 
-> @Matt: are you happy with all of this going through the arm64 tree? I don't
-> think it clashes with anything else we've got queued up for v4.6 in tip/efi/core
+From: Sunil Goutham <sgoutham@cavium.com>
 
-How come this is going through the arm64 tree? Are there other patch
-series that this depends on or that depend on it?
+This patch series contains changes
+- To add support for virtual function's irq affinity hint
+- Replace napi_schedule() with napi_schedule_irqoff()
+- Reduce page allocation overhead by allocating pages
+  of higher order when pagesize is 4KB.
+- Add couple of stats which helps in debugging
+- Some miscellaneous changes to BGX driver.
 
-If it makes the most sense to take it through that tree, then I'm fine
-with it but I'd like to hear a rationale.
+Changes from v1:
+- As suggested changed MAC address invalid log message 
+  to dev_err() instead of dev_warn().
+
+David Daney (1):
+  net: thunderx: bgx: Use standard firmware node infrastructure.
+
+Robert Richter (1):
+  net: thunderx: bgx: Add log message when setting mac address
+
+Sunil Goutham (3):
+  net: thunderx: Use napi_schedule_irqoff()
+  net: thunderx: Assign affinity hints to vf's interrupts
+  net: thunderx: Alloc higher order pages when pagesize is small
+
+Thanneeru Srinivasulu (1):
+  net, thunderx: Add TX timeout and RX buffer alloc failure stats.
+
+ drivers/net/ethernet/cavium/thunder/nic.h          |    4 ++
+ .../net/ethernet/cavium/thunder/nicvf_ethtool.c    |    2 +
+ drivers/net/ethernet/cavium/thunder/nicvf_main.c   |   40 ++++++++++++++++++-
+ drivers/net/ethernet/cavium/thunder/nicvf_queues.c |    5 +-
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.c  |   38 +++++++++++--------
+ 5 files changed, 67 insertions(+), 22 deletions(-)
