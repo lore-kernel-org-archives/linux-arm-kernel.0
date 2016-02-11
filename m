@@ -1,45 +1,36 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Thu, 11 Feb 2016 14:34:19 +0000
-Subject: [RFC v2 12/15] msi: export msi_get_domain_info
+Date: Thu, 11 Feb 2016 14:34:21 +0000
+Subject: [RFC v2 14/15] iommu/arm-smmu: do not advertise IOMMU_CAP_INTR_REMAP
 In-Reply-To: <1455201262-5259-1-git-send-email-eric.auger@linaro.org>
 References: <1455201262-5259-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1455201262-5259-13-git-send-email-eric.auger@linaro.org>
+Message-ID: <1455201262-5259-15-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We plan to use msi_get_domain_info in VFIO module so let's export it.
+Do not advertise IOMMU_CAP_INTR_REMAP for arm-smmu. Indeed the
+irq_remapping capability is abstracted on irqchip side for ARM as
+opposed to Intel IOMMU featuring IRQ remapping HW.
+
+So to check IRQ remmapping capability, the msi domain needs to be
+checked instead.
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
 ---
- include/linux/msi.h | 4 ++++
- kernel/irq/msi.c    | 1 +
- 2 files changed, 5 insertions(+)
+ drivers/iommu/arm-smmu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/include/linux/msi.h b/include/linux/msi.h
-index 03eda72..df19315 100644
---- a/include/linux/msi.h
-+++ b/include/linux/msi.h
-@@ -323,6 +323,10 @@ static inline struct irq_domain *pci_msi_get_device_domain(struct pci_dev *pdev)
- {
- 	return NULL;
- }
-+static struct msi_domain_info *msi_get_domain_info(struct irq_domain *domain)
-+{
-+	return NULL;
-+}
- #endif /* CONFIG_PCI_MSI_IRQ_DOMAIN */
- 
- #endif /* LINUX_MSI_H */
-diff --git a/kernel/irq/msi.c b/kernel/irq/msi.c
-index 38e89ce..9b0ba4a 100644
---- a/kernel/irq/msi.c
-+++ b/kernel/irq/msi.c
-@@ -400,5 +400,6 @@ struct msi_domain_info *msi_get_domain_info(struct irq_domain *domain)
- {
- 	return (struct msi_domain_info *)domain->host_data;
- }
-+EXPORT_SYMBOL_GPL(msi_get_domain_info);
- 
- #endif /* CONFIG_GENERIC_MSI_IRQ_DOMAIN */
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index ae8a97d..9a83285 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -1354,7 +1354,7 @@ static bool arm_smmu_capable(enum iommu_cap cap)
+ 		 */
+ 		return true;
+ 	case IOMMU_CAP_INTR_REMAP:
+-		return true; /* MSIs are just memory writes */
++		return false; /* MSIs are just memory writes */
+ 	case IOMMU_CAP_NOEXEC:
+ 		return true;
+ 	default:
 -- 
 1.9.1
