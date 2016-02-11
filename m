@@ -1,41 +1,50 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 11 Feb 2016 15:49:12 +0100
-Subject: [GIT PULL 1/4] rockchip soc-driver changes for 4.6
-In-Reply-To: <1734524.3yNt5L3F1F@phil>
-References: <1734524.3yNt5L3F1F@phil>
-Message-ID: <2006551.mXAMdNYBE2@phil>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Thu, 11 Feb 2016 15:45:44 +0100
+Subject: [PATCH v2 0/7] irqchip: introduce the Alpine MSIX driver
+In-Reply-To: <56BC8F9C.3060505@arm.com>
+References: <1455110583-19515-1-git-send-email-antoine.tenart@free-electrons.com>
+ <56BC8F9C.3060505@arm.com>
+Message-ID: <20160211144544.GC5820@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof, Kevin,
+Hello Marc,
 
-This one change enables the rockchip timer driver on 64bit socs as well,
-after it got fixed to actually work on 64bit in 4.5-rc1.
- 
-Thanks
-Heiko
+On Thu, Feb 11, 2016 at 01:41:48PM +0000, Marc Zyngier wrote:
+> On 10/02/16 13:22, Antoine Tenart wrote:
+> > 
+> > This series introduce the Alpine MSIX driver, and enables it in both
+> > the Alpine v1 and Alpine v2 device trees.
+> > 
+> > This series depends on "[PATCH v2 0/3] arm64: introduce the Alpine support":
+> > https://lkml.org/lkml/2016/2/10/83
+> > 
+> > You can find the series at:
+> > https://github.com/atenart/linux.git 4.5-rc1/alpinev2-msix
+> 
+> So I'm quite happy with this as it is (modulo the documentation fix on
+> patch 3). I can take the first 3 patches through my GIC tree, but the
+> last 4 patches depend on your other series.
 
+I'll fix the documentation.
 
-The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
+> Would it be a problem to get these 4 patches merged after 4.6-rc1, so
+> that all the code can be merged before?
 
-  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+I think we can live with that :)
 
-are available in the git repository at:
+Thanks,
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.6-rockchip-soc64-1
+Antoine
 
-for you to fetch changes up to c840f28bbf643c361c463bcb8fb815d0b2dad4e8:
-
-  arm64: Enable the timer on Rockchip architecture (2016-01-24 23:33:14 +0100)
-
-----------------------------------------------------------------
-Enable the rockchip-specific timers on arm64 rockchip platforms.
-The driver got reworked to not use arm32-specific dsb calls in
-4.5-rc1, so now we can safely enable it.
-
-----------------------------------------------------------------
-Caesar Wang (1):
-      arm64: Enable the timer on Rockchip architecture
-
- arch/arm64/Kconfig.platforms | 1 +
- 1 file changed, 1 insertion(+)
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160211/062ef4de/attachment.sig>
