@@ -1,39 +1,39 @@
-From: gerald.schaefer@de.ibm.com (Gerald Schaefer)
-Date: Thu, 11 Feb 2016 19:22:23 +0100
-Subject: [BUG] random kernel crashes after THP rework on s390 (maybe also on
- PowerPC and ARM)
-Message-ID: <20160211192223.4b517057@thinkpad>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 11 Feb 2016 18:36:40 +0000
+Subject: [PATCH 3/7] spi: omap2-mcspi: Fix PM regression with deferred
+ probe for pm_runtime_reinit
+In-Reply-To: <20160211173620.GU19432@atomide.com>
+References: <1455145370-20301-1-git-send-email-tony@atomide.com>
+ <1455145370-20301-4-git-send-email-tony@atomide.com>
+ <20160211115128.GF13270@sirena.org.uk>
+ <20160211150806.GS19432@atomide.com>
+ <20160211155255.GA1953@sirena.org.uk>
+ <20160211173620.GU19432@atomide.com>
+Message-ID: <20160211183640.GB1953@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Feb 11, 2016 at 09:36:20AM -0800, Tony Lindgren wrote:
+> * Mark Brown <broonie@kernel.org> [160211 07:54]:
 
-Sebastian Ott reported random kernel crashes beginning with v4.5-rc1 and
-he also bisected this to commit 61f5d698 "mm: re-enable THP". Further
-review of the THP rework patches, which cannot be bisected, revealed
-commit fecffad "s390, thp: remove infrastructure for handling splitting PMDs"
-(and also similar commits for other archs).
+> > This does sound like there's been a change in the interface compared to
+> > what users are actually doing - is this an actual problem or is it just
+> > a divergence from docs?
 
-This commit removes the THP splitting bit and also the architecture
-implementation of pmdp_splitting_flush(), which took care of the IPI for
-fast_gup serialization. The commit message says
+> It's an actual problem at least on omaps as the omap_device code
+> is very picky about the hardware state.
 
-    pmdp_splitting_flush() is not needed too: on splitting PMD we will do
-    pmdp_clear_flush() + set_pte_at().  pmdp_clear_flush() will do IPI as
-    needed for fast_gup
+> Depending how the PM runtime is implemented, it may be a problem
+> for some other cases too.
 
-The assumption that a TLB flush will also produce an IPI is wrong on s390,
-and maybe also on other architectures, and I thought that this was actually
-the main reason for having an arch-specific pmdp_splitting_flush().
-
-At least PowerPC and ARM also had an individual implementation of
-pmdp_splitting_flush() that used kick_all_cpus_sync() instead of a TLB
-flush to send the IPI, and those were also removed. Putting the arch
-maintainers and mailing lists on cc to verify.
-
-On s390 this will break the IPI serialization against fast_gup, which
-would certainly explain the random kernel crashes, please revert or fix
-the pmdp_splitting_flush() removal.
-
-Regards,
-Gerald
+Or people just aren't testing mainline that well (if this is broken in
+v4.5 that suggests nobody noticed in -next) - do you know when this
+broke?  It really seems like we may need to spin round on how this is
+deployed.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160211/f1717419/attachment.sig>
