@@ -1,62 +1,46 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
-Date: Thu, 11 Feb 2016 15:50:43 +0100
-Subject: USB Ethernet gadget on Nokia n900
-In-Reply-To: <20160211144347.GY30075@pali>
-References: <20141019090107.GA19132@amd> <20150707074626.GB12087@pali>
- <20150707114658.GT10705@atomide.com> <201601192158.19810@pali>
- <20160211144347.GY30075@pali>
-Message-ID: <20160211145043.GZ30075@pali>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 11 Feb 2016 15:50:51 +0100
+Subject: [GIT PULL 2/4] rockchip arm64 changes for 4.6
+In-Reply-To: <1734524.3yNt5L3F1F@phil>
+References: <1734524.3yNt5L3F1F@phil>
+Message-ID: <2157996.gfpT01ltKJ@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 11 February 2016 15:43:47 Pali Roh?r wrote:
-> On Tuesday 19 January 2016 21:58:19 Pali Roh?r wrote:
-> > On Tuesday 07 July 2015 13:46:59 Tony Lindgren wrote:
-> > > * Pali Roh?r <pali.rohar@gmail.com> [150707 00:48]:
-> > > > On Monday 06 July 2015 06:53:18 Tony Lindgren wrote:
-> > > > > * Pali Roh?r <pali.rohar@gmail.com> [150706 06:27]:
-> > > > > > On Tuesday 28 October 2014 23:26:41 Tony Lindgren wrote:
-> > > > > > > * Pavel Machek <pavel@ucw.cz> [141028 15:22]:
-> > > > > > > > On Tue 2014-10-28 23:04:50, Pavel Machek wrote:
-> > > > > > > > > Networking now works against 3.17-based kernel. Thanks!
-> > > > > > > > 
-> > > > > > > > It works on 3.18-rc1 kernel, too. (I had to hand-modify
-> > > > > > > > patch to apply to 3.17, no changes needed for 3.18-rc1.)
-> > > > > > > > 
-> > > > > > > > Tested-by: Pavel Machek <pavel@ucw.cz>
-> > > > > > > 
-> > > > > > > Whatever we decice to do to fix this regression, it should
-> > > > > > > probably be backported to at least v3.16 stable for distro
-> > > > > > > use, maybe earlier too. I'd assume this is broken on
-> > > > > > > multiple platforms currently.
-> > > > > > 
-> > > > > > it looks like this patch was not included into any kernel
-> > > > > > version... I'm still using it on top of 4.x kernels. Are you
-> > > > > > going to send this patch into upstream? Or do you have another
-> > > > > > fix for this problem?
-> > > > > 
-> > > > > I think Felipe mentioned a better built-in gether fix that's been
-> > > > > reviewed on linux-usb list.
-> > > > 
-> > > > Do you have link to that email thread? Or was Felipe's fix already
-> > > > merged into mainline kernel?
-> > > 
-> > > Sorry I don't have a link, maybe Felipe can point you to the right
-> > > patch.
-> > > 
-> > > Regards,
-> > > 
-> > > Tony
-> > 
-> > Felipe, ping
-> > 
-> 
-> PING?
-> 
+Hi Arnd, Olof, Kevin,
 
-Ok, Felipe address is dead:
-550 Invalid recipient <balbi@ti.com> (#5.1.1)
+This one change enables the rockchip timer driver on 64bit socs as well,
+after it got fixed to actually work on 64bit in 4.5-rc1.
 
--- 
-Pali Roh?r
-pali.rohar at gmail.com
+This time I actually also updated the subject from my previous send-attempt, 
+so here it is again.
+
+Thanks
+Heiko
+
+
+The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
+
+  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git 
+tags/v4.6-rockchip-soc64-1
+
+for you to fetch changes up to c840f28bbf643c361c463bcb8fb815d0b2dad4e8:
+
+  arm64: Enable the timer on Rockchip architecture (2016-01-24 23:33:14 
++0100)
+
+----------------------------------------------------------------
+Enable the rockchip-specific timers on arm64 rockchip platforms.
+The driver got reworked to not use arm32-specific dsb calls in
+4.5-rc1, so now we can safely enable it.
+
+----------------------------------------------------------------
+Caesar Wang (1):
+      arm64: Enable the timer on Rockchip architecture
+
+ arch/arm64/Kconfig.platforms | 1 +
+ 1 file changed, 1 insertion(+)
