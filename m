@@ -1,49 +1,42 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 11 Feb 2016 09:09:46 +0000
-Subject: [PATCH 01/14] mfd: intel_quark_i2c_gpio: Use clkdev_create()
-In-Reply-To: <20160210183504.GG30978@codeaurora.org>
-References: <1454982341-22715-1-git-send-email-sboyd@codeaurora.org>
- <1454982341-22715-2-git-send-email-sboyd@codeaurora.org>
- <20160210162349.GJ3782@x1> <20160210183504.GG30978@codeaurora.org>
-Message-ID: <20160211090946.GY3782@x1>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 11 Feb 2016 11:08:34 +0200
+Subject: [PATCH v2] dmaengine: omap-dma: Implement device_synchronize callback
+Message-ID: <1455181714-32057-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 10 Feb 2016, Stephen Boyd wrote:
+We need the callback to support the dmaengine_terminate_sync().
 
-> On 02/10, Lee Jones wrote:
-> > On Mon, 08 Feb 2016, Stephen Boyd wrote:
-> > 
-> > > Convert this driver to use clkdev_create() instead of
-> > > clk_register_clkdevs(). The latter API is only used by this driver,
-> > > although this driver only allocates one clk to add anyway.
-> > > Furthermore, this driver allocates the clk_lookup structure with
-> > > devm, but clkdev_drop() will free that structure when passed,
-> > > leading to a double free when this driver is removed. Clean it
-> > > all up and pave the way for the removal of clk_register_clkdevs().
-> > > 
-> > > Cc: Lee Jones <lee.jones@linaro.org>
-> > > Cc: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-> > > Cc: Russell King <linux@arm.linux.org.uk>
-> > > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> > > ---
-> > >  drivers/mfd/intel_quark_i2c_gpio.c | 26 +++++++++-----------------
-> > >  1 file changed, 9 insertions(+), 17 deletions(-)
-> > 
-> > I never much liked this code [0]
-> > 
-> > Glad for it to be simplified.
-> > 
-> > Applied, thanks.
-> > 
-> 
-> Can you please ack the patch instead? I'd like to take it through
-> the clk tree so that I can remove clk_register_clkdevs() as well.
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+---
+ drivers/dma/omap-dma.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-I'll make a branch you can pull from.
-
+diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
+index e691f48f9d73..bfdf29aa3428 100644
+--- a/drivers/dma/omap-dma.c
++++ b/drivers/dma/omap-dma.c
+@@ -1007,6 +1007,13 @@ static int omap_dma_terminate_all(struct dma_chan *chan)
+ 	return 0;
+ }
+ 
++static void omap_dma_synchronize(struct dma_chan *chan)
++{
++	struct omap_chan *c = to_omap_dma_chan(chan);
++
++	vchan_synchronize(&c->vc);
++}
++
+ static int omap_dma_pause(struct dma_chan *chan)
+ {
+ 	struct omap_chan *c = to_omap_dma_chan(chan);
+@@ -1110,6 +1117,7 @@ static int omap_dma_probe(struct platform_device *pdev)
+ 	od->ddev.device_pause = omap_dma_pause;
+ 	od->ddev.device_resume = omap_dma_resume;
+ 	od->ddev.device_terminate_all = omap_dma_terminate_all;
++	od->ddev.device_synchronize = omap_dma_synchronize;
+ 	od->ddev.src_addr_widths = OMAP_DMA_BUSWIDTHS;
+ 	od->ddev.dst_addr_widths = OMAP_DMA_BUSWIDTHS;
+ 	od->ddev.directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.7.1
