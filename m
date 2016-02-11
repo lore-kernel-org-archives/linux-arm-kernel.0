@@ -1,42 +1,35 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 11 Feb 2016 11:08:34 +0200
-Subject: [PATCH v2] dmaengine: omap-dma: Implement device_synchronize callback
-Message-ID: <1455181714-32057-1-git-send-email-peter.ujfalusi@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 11 Feb 2016 10:10:00 +0100
+Subject: [PATCH] drm/msm: remove unused variable
+Message-ID: <1455181810-3910161-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need the callback to support the dmaengine_terminate_sync().
+After the drm_device_is_unplugged() was removed, the 'dev' variable is now
+unused, and we get a warning for that:
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+drivers/gpu/drm/msm/msm_fbdev.c: In function 'msm_fbdev_mmap':
+drivers/gpu/drm/msm/msm_fbdev.c:65:21: error: unused variable 'dev' [-Werror=unused-variable]
+
+This removes the variable as well.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: e9f8250f2f92 ("drm/msm: remove the drm_device_is_unplugged check")
 ---
- drivers/dma/omap-dma.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ drivers/gpu/drm/msm/msm_fbdev.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
-index e691f48f9d73..bfdf29aa3428 100644
---- a/drivers/dma/omap-dma.c
-+++ b/drivers/dma/omap-dma.c
-@@ -1007,6 +1007,13 @@ static int omap_dma_terminate_all(struct dma_chan *chan)
- 	return 0;
- }
+diff --git a/drivers/gpu/drm/msm/msm_fbdev.c b/drivers/gpu/drm/msm/msm_fbdev.c
+index e119c2979509..d9759bf3482e 100644
+--- a/drivers/gpu/drm/msm/msm_fbdev.c
++++ b/drivers/gpu/drm/msm/msm_fbdev.c
+@@ -62,7 +62,6 @@ static int msm_fbdev_mmap(struct fb_info *info, struct vm_area_struct *vma)
+ 	struct drm_fb_helper *helper = (struct drm_fb_helper *)info->par;
+ 	struct msm_fbdev *fbdev = to_msm_fbdev(helper);
+ 	struct drm_gem_object *drm_obj = fbdev->bo;
+-	struct drm_device *dev = helper->dev;
+ 	int ret = 0;
  
-+static void omap_dma_synchronize(struct dma_chan *chan)
-+{
-+	struct omap_chan *c = to_omap_dma_chan(chan);
-+
-+	vchan_synchronize(&c->vc);
-+}
-+
- static int omap_dma_pause(struct dma_chan *chan)
- {
- 	struct omap_chan *c = to_omap_dma_chan(chan);
-@@ -1110,6 +1117,7 @@ static int omap_dma_probe(struct platform_device *pdev)
- 	od->ddev.device_pause = omap_dma_pause;
- 	od->ddev.device_resume = omap_dma_resume;
- 	od->ddev.device_terminate_all = omap_dma_terminate_all;
-+	od->ddev.device_synchronize = omap_dma_synchronize;
- 	od->ddev.src_addr_widths = OMAP_DMA_BUSWIDTHS;
- 	od->ddev.dst_addr_widths = OMAP_DMA_BUSWIDTHS;
- 	od->ddev.directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
+ 	ret = drm_gem_mmap_obj(drm_obj, drm_obj->size, vma);
 -- 
-2.7.1
+2.7.0
