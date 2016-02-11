@@ -1,89 +1,50 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 11 Feb 2016 14:27:08 +0100
-Subject: [PATCH] arm64: KVM: Configure TCR_EL2.PS at runtime
-In-Reply-To: <1455130013-28644-1-git-send-email-tchalamarla@caviumnetworks.com>
-References: <1455130013-28644-1-git-send-email-tchalamarla@caviumnetworks.com>
-Message-ID: <20160211132708.GU5171@cbox>
+From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
+Date: Thu, 11 Feb 2016 18:56:48 +0530
+Subject: [PATCH 0/6] net: thunderx: Setting IRQ affinity hints and other
+ optimizations
+In-Reply-To: <1454933272-45005-1-git-send-email-sunil.kovvuri@gmail.com>
+References: <1454933272-45005-1-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <CA+sq2CdXHcWM=PrimSvoQ6dJyCPi0QsiiDzA5=YKKn6zHVsojg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 10, 2016 at 10:46:53AM -0800, tchalamarla at caviumnetworks.com wrote:
-> From: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
-> 
-> Setting TCR_EL2.PS to 40 bits is wrong on systems with PS size is
-> less than 40 bits. and with systems where RAM is at higher address,
-> this will break KVM.
-> 
-> This patch sets TCR_EL2.PS at runtime similar to VTCR_EL2.PS
-> 
-> changes form V2:
-> 	- Modified subject line and commit message.
-> 	- Removed TCR_EL2_FLAGS.
-> 
-> changes from V1:
->         - Moved to dynamic configuration.
-> 
-> Signed-off-by: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
-> ---
->  arch/arm64/include/asm/kvm_arm.h |  2 --
->  arch/arm64/kvm/hyp-init.S        | 12 +++++++-----
->  2 files changed, 7 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-> index 738a95f..3776db0 100644
-> --- a/arch/arm64/include/asm/kvm_arm.h
-> +++ b/arch/arm64/include/asm/kvm_arm.h
-> @@ -107,8 +107,6 @@
->  #define TCR_EL2_MASK	(TCR_EL2_TG0 | TCR_EL2_SH0 | \
->  			 TCR_EL2_ORGN0 | TCR_EL2_IRGN0 | TCR_EL2_T0SZ)
->  
-> -#define TCR_EL2_FLAGS	(TCR_EL2_RES1 | TCR_EL2_PS_40B)
-> -
->  /* VTCR_EL2 Registers bits */
->  #define VTCR_EL2_RES1		(1 << 31)
->  #define VTCR_EL2_PS_MASK	(7 << 16)
-> diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
-> index 3e568dc..b5ab1b0 100644
-> --- a/arch/arm64/kvm/hyp-init.S
-> +++ b/arch/arm64/kvm/hyp-init.S
-> @@ -64,7 +64,7 @@ __do_hyp_init:
->  	mrs	x4, tcr_el1
->  	ldr	x5, =TCR_EL2_MASK
->  	and	x4, x4, x5
-> -	ldr	x5, =TCR_EL2_FLAGS
-> +	ldr	x5, =TCR_EL2_RES1
->  	orr	x4, x4, x5
->  
->  #ifndef CONFIG_ARM64_VA_BITS_48
-> @@ -85,15 +85,17 @@ __do_hyp_init:
->  	ldr_l	x5, idmap_t0sz
->  	bfi	x4, x5, TCR_T0SZ_OFFSET, TCR_TxSZ_WIDTH
->  #endif
-> -	msr	tcr_el2, x4
-> -
-> -	ldr	x4, =VTCR_EL2_FLAGS
->  	/*
->  	 * Read the PARange bits from ID_AA64MMFR0_EL1 and set the PS bits in
-> -	 * VTCR_EL2.
-> +	 * TCR_EL2 and VTCR_EL2.
->  	 */
->  	mrs	x5, ID_AA64MMFR0_EL1
->  	bfi	x4, x5, #16, #3
-> +
-> +	msr	tcr_el2, x4
-> +
-> +	ldr	x4, =VTCR_EL2_FLAGS
-> +	bfi	x4, x5, #16, #3
->  	/*
->  	 * Read the VMIDBits bits from ID_AA64MMFR1_EL1 and set the VS bit in
->  	 * VTCR_EL2.
-> -- 
-> 2.1.0
-> 
+Hi David,
 
-This looks reasonable enough for me.  Did we limit Linux to PS=40 bits
-in the past and have lifted this restriction, or why did we have this
-limitation for EL2 translations in the past?
+If time permits, can you please look at this patchset.
 
 Thanks,
--Christoffer
+Sunil.
+
+On Mon, Feb 8, 2016 at 5:37 PM,  <sunil.kovvuri@gmail.com> wrote:
+> From: Sunil Goutham <sgoutham@cavium.com>
+>
+> This patch series contains changes
+> - To add support for virtual function's irq affinity hint
+> - Replace napi_schedule() with napi_schedule_irqoff()
+> - Reduce page allocation overhead by allocating pages
+>   of higher order when pagesize is 4KB.
+> - Add couple of stats which helps in debugging
+> - Some miscellaneous changes to BGX driver.
+>
+>
+> David Daney (1):
+>   net: thunderx: bgx: Use standard firmware node infrastructure.
+>
+> Robert Richter (1):
+>   net: thunderx: bgx: Add log message when setting mac address
+>
+> Sunil Goutham (3):
+>   net: thunderx: Use napi_schedule_irqoff()
+>   net: thunderx: Assign affinity hints to vf's interrupts
+>   net: thunderx: Alloc higher order pages when pagesize is small
+>
+> Thanneeru Srinivasulu (1):
+>   net, thunderx: Add TX timeout and RX buffer alloc failure stats.
+>
+>  drivers/net/ethernet/cavium/thunder/nic.h          |    4 ++
+>  .../net/ethernet/cavium/thunder/nicvf_ethtool.c    |    2 +
+>  drivers/net/ethernet/cavium/thunder/nicvf_main.c   |   40 ++++++++++++++++++-
+>  drivers/net/ethernet/cavium/thunder/nicvf_queues.c |    5 +-
+>  drivers/net/ethernet/cavium/thunder/thunder_bgx.c  |   38 +++++++++++--------
+>  5 files changed, 67 insertions(+), 22 deletions(-)
+>
