@@ -1,79 +1,106 @@
-From: yang.shi@linaro.org (Shi, Yang)
-Date: Thu, 11 Feb 2016 09:36:52 -0800
-Subject: [PATCH] arm64: use raw_smp_processor_id in stack backtrace dump
-In-Reply-To: <56BC6544.70001@arm.com>
-References: <1455053182-31404-1-git-send-email-yang.shi@linaro.org>
- <20160210102939.GD1052@arm.com> <56BB247F.6040202@arm.com>
- <20160210121030.GH1052@arm.com> <56BB7D7B.4060002@linaro.org>
- <56BC6544.70001@arm.com>
-Message-ID: <56BCC6B4.7060106@linaro.org>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Thu, 11 Feb 2016 18:55:06 +0100 (CET)
+Subject: serial: clk: bcm2835: Strange effects when using aux-uart in
+ console
+In-Reply-To: <56BC895E.2010108@sperl.org>
+References: <A5F427B7-9B78-4892-9722-69418C4D0C10@martin.sperl.org>
+ <56BC895E.2010108@sperl.org>
+Message-ID: <1617009200.323700.219000a8-c162-4594-aacc-a7e9894518b2.open-xchange@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/11/2016 2:41 AM, James Morse wrote:
-> Hi!
->
-> On 10/02/16 18:12, Shi, Yang wrote:
->> On 2/10/2016 4:10 AM, Will Deacon wrote:
->>> On Wed, Feb 10, 2016 at 11:52:31AM +0000, James Morse wrote:
->>>> On 10/02/16 10:29, Will Deacon wrote:
->>>>> On Tue, Feb 09, 2016 at 01:26:22PM -0800, Yang Shi wrote:
->>>>>> dump_backtrace may be called in kthread context, which is not bound to a
->>>>>> single
->>>>>> cpu, i.e. khungtaskd, then calling smp_processor_id may trigger the below bug
->>>>>> report:
->>>>>
->>>>> If we're preemptible here, it means that our irq_stack_ptr is potentially
->>>>> bogus. Whilst this isn't an issue for kthreads, it does feel like we
->>>>> could make this slightly more robust in the face of potential frame
->>>>> corruption. Maybe just zero the IRQ stack pointer if we're in preemptible
->>>>> context?
->>>>
->>>> Switching between stacks is only valid if we are tracing ourselves while on the
->>>> irq_stack, we should probably prevent it for other tasks too.
->>>>
->>>> Something like (untested):
->>>> ---------------------
->>>> if (tsk == current && in_atomic())
->>>>      irq_stack_ptr = IRQ_STACK_PTR(smp_processor_id());
->>
->> One follow up question, is it possible to have both tsk != current and
->> on_irq_stack is true at the same time?
->
-> No. If you are tracing an irq stack, it must be your own stack.
->
-> If this weren't the case, it would be the stack of a running task on a remote
-> CPU, and you would be racing with the remote CPU changing the values you are
-> reading. Fortunately nothing tries to do this.
->
-> (The third case would be tracing a sleeping irq stack - this doesn't happen
->   either, as we switch back to the original stack before calling schedule()).
->
->
->> If it is possible, this may be a problem
->> in unwind_frame called by profile_pc which has tsk being NULL.
->
-> Ah, well spotted. I guess there should also be a != NULL comparison thrown into
-> the mix. I don't think it will be a problem for profile_pc() as it should always
-> find a !in_lock_functions() frame before it needs to switch stack, (which we are
-> preventing it from doing). If this ever did happen, it will return 0.
+Hi,
 
-Thanks for the elaboration. I changed the logic a little bit to:
+> Martin Sperl <martin@sperl.org> hat am 11. Februar 2016 um 14:15 geschrieben:
+>
+> The only real difference is this diff:
+> @@ -41,6 +41,4 @@
+> 20101000.cprman: bcm2835_clock_get_parent - pwm
+> 20101000.cprman: bcm2835_clock_get_parent - hsm
+> 20101000.cprman: bcm2835_pll_on - pllc
+> - 20101000.cprman: bcm2835_pll_on - plld
+> - 20101000.cprman: bcm2835_clock_on - uart
+> 20101000.cprman: bcm2835_clock_on - emmc
+>
+> so plld and uart are not started for the console=ttyS0 case.
+>
+> After I instrumented clk-bcm2835.c to see what happens in the driver
+> and running: /sbin/getty -a root -L ttyAMA0 115200 vt100
+>
+> I get the following:
+> [ 146.342341] bcm2835-clk 20101000.cprman: bcm2835_pll_on - plld
+> [ 146.348426] bcm2835-clk 20101000.cprman: bcm2835_clock_on - uart
+> [ 146.354639] uart-pl011 20201000.uart: no DMA platform data
+> [ 146.375535] bcm2835-clk 20101000.cprman: bcm2835_clock_off - uart
+> [ 146.381776] bcm2835-clk 20101000.cprman: bcm2835_clock_wait_busy - uart
+> [ 146.388595] bcm2835-clk 20101000.cprman: bcm2835_pll_off - plld
+> [ 146.396574] bcm2835-clk 20101000.cprman: bcm2835_pll_on - plld
+> [ 146.502551] bcm2835-clk 20101000.cprman: plld: couldn't lock PLL
+> [ 146.508726] ------------[ cut here ]------------
+> [ 146.513448] WARNING: CPU: 0 PID: 2349 at drivers/clk/clk.c:680
+> clk_core_disa)
+> [ 146.522673] ---[ end trace 33268753126338e9 ]---
+> [ 146.527478] ------------[ cut here ]------------
+> [ 146.532224] WARNING: CPU: 0 PID: 2349 at drivers/clk/clk.c:575
+> clk_core_unpr)
+> [ 146.541866] ---[ end trace 33268753126338ea ]---
+>
+> So I wonder why we would disable and reenable the plld and uart clock
 
-if (tsk == current && !preemptible())
-                 irq_stack_ptr = IRQ_STACK_PTR(smp_processor_id());
-else
-                 irq_stack_ptr = 0;
+I think the reason for this behavior can be found in the uart-pl011 driver which
+plays with the clocks.
 
-In this way, the NULL pointer will be covered by "else" too.
-
-v2 patch will be sent out soon once I'm done some smoke testing.
-
-Yang
+According to the clock tree "plld" seems to be critical and shouldn't be
+disabled?
 
 >
+> Note that just adding a return in bcm2835_pll_off like this:
+> @@ -900,6 +905,9 @@ static void bcm2835_pll_off(struct clk_hw *hw)
+> struct bcm2835_cprman *cprman = pll->cprman;
+> const struct bcm2835_pll_data *data = pll->data;
+>
+> + dev_err(cprman->dev, "%s - %s\n", __FUNCTION__, clk_hw_get_name(hw));
+> + return;
+> +
+> cprman_write(cprman, data->cm_ctrl_reg, CM_PLL_ANARST);
+> cprman_write(cprman, data->a2w_ctrl_reg, A2W_PLL_CTRL_PWRDN);
+> }
+>
+> avoids the crash, but the tty is non-functional.
+>
+> Calling sequence of the clock driver is:
+> [ 145.022546] bcm2835-clk 20101000.cprman: bcm2835_pll_on - plld
+> [ 145.028619] bcm2835-clk 20101000.cprman: bcm2835_clock_on - uart
+> [ 145.034807] uart-pl011 20201000.uart: no DMA platform data
+> [ 145.045089] bcm2835-clk 20101000.cprman: bcm2835_clock_off - uart
+> [ 145.051418] bcm2835-clk 20101000.cprman: bcm2835_clock_wait_busy - uart
+> [ 145.058215] bcm2835-clk 20101000.cprman: bcm2835_pll_off - plld
+> [ 145.065779] bcm2835-clk 20101000.cprman: bcm2835_pll_on - plld
+> [ 145.071761] bcm2835-clk 20101000.cprman: bcm2835_clock_on - uart
+>
+> debugfs shows the following after the above:
+> root at raspcm:~# head /sys/kernel/debug/clk/uart*/clk_rate
+> ==> /sys/kernel/debug/clk/uart0_pclk/clk_rate <==
+> 3000000
+>
+> ==> /sys/kernel/debug/clk/uart1_pclk/clk_rate <==
+> 125000000
+>
+> ==> /sys/kernel/debug/clk/uart/clk_rate <==
+> 2997598
+>
+> Is this maybe related to the uart0_pclk, uart1_pclk, apb_pclk
+> clocks created and registered in bcm2835_init_clocks?
+
+Related or not i think we should get the rid off them.
+
+>
+> Any Ideas?
 >
 > Thanks,
+> Martin
 >
-> James
->
+> _______________________________________________
+> linux-rpi-kernel mailing list
+> linux-rpi-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rpi-kernel
