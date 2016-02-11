@@ -1,158 +1,126 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 11 Feb 2016 18:39:56 +0000
-Subject: [PATCH v4 15/23] arm64: KVM: VHE: Implement VHE
- activate/deactivate_traps
+Date: Thu, 11 Feb 2016 18:40:04 +0000
+Subject: [PATCH v4 23/23] arm64: Panic when VHE and non VHE CPUs coexist
 In-Reply-To: <1455216004-19499-1-git-send-email-marc.zyngier@arm.com>
 References: <1455216004-19499-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1455216004-19499-16-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1455216004-19499-24-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Running the kernel in HYP mode requires the HCR_E2H bit to be set
-at all times, and the HCR_TGE bit to be set when running as a host
-(and cleared when running as a guest). At the same time, the vector
- must be set to the current role of the kernel (either host or
-hypervisor), and a couple of system registers differ between VHE
-and non-VHE.
+Having both VHE and non-VHE capable CPUs in the same system
+is likely to be a recipe for disaster.
 
-We implement these by using another set of alternate functions
-that get dynamically patched.
+If the boot CPU has VHE, but a secondary is not, we won't be
+able to downgrade and run the kernel at EL1. Add CPU hotplug
+to the mix, and this produces a terrifying mess.
+
+Let's solve the problem once and for all. If you mix VHE and
+non-VHE CPUs in the same system, you deserve to loose, and this
+patch makes sure you don't get a chance.
+
+This is implemented by storing the kernel execution level in
+a global variable. Secondaries will park themselves in a
+WFI loop if they observe a mismatch. Also, the primary CPU
+will detect that the secondary CPU has died on a mismatched
+execution level. Panic will follow.
 
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/kvm_arm.h     |  3 +-
- arch/arm64/include/asm/kvm_emulate.h |  3 ++
- arch/arm64/kvm/hyp/switch.c          | 53 ++++++++++++++++++++++++++++++++----
- 3 files changed, 52 insertions(+), 7 deletions(-)
+ arch/arm64/include/asm/virt.h | 17 +++++++++++++++++
+ arch/arm64/kernel/head.S      | 22 ++++++++++++++++++++++
+ arch/arm64/kernel/smp.c       |  3 +++
+ 3 files changed, 42 insertions(+)
 
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index f416714..95ee31e 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -23,6 +23,7 @@
- #include <asm/types.h>
- 
- /* Hyp Configuration Register (HCR) bits */
-+#define HCR_E2H		(UL(1) << 34)
- #define HCR_ID		(UL(1) << 33)
- #define HCR_CD		(UL(1) << 32)
- #define HCR_RW_SHIFT	31
-@@ -81,7 +82,7 @@
- 			 HCR_AMO | HCR_SWIO | HCR_TIDCP | HCR_RW)
- #define HCR_VIRT_EXCP_MASK (HCR_VA | HCR_VI | HCR_VF)
- #define HCR_INT_OVERRIDE   (HCR_FMO | HCR_IMO)
--
-+#define HCR_HOST_VHE_FLAGS (HCR_RW | HCR_TGE | HCR_E2H)
- 
- /* Hyp System Control Register (SCTLR_EL2) bits */
- #define SCTLR_EL2_EE	(1 << 25)
-diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-index 779a587..ae7cdac 100644
---- a/arch/arm64/include/asm/kvm_emulate.h
-+++ b/arch/arm64/include/asm/kvm_emulate.h
-@@ -29,6 +29,7 @@
- #include <asm/kvm_mmio.h>
- #include <asm/ptrace.h>
- #include <asm/cputype.h>
-+#include <asm/virt.h>
- 
- unsigned long *vcpu_reg32(const struct kvm_vcpu *vcpu, u8 reg_num);
- unsigned long *vcpu_spsr32(const struct kvm_vcpu *vcpu);
-@@ -43,6 +44,8 @@ void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr);
- static inline void vcpu_reset_hcr(struct kvm_vcpu *vcpu)
- {
- 	vcpu->arch.hcr_el2 = HCR_GUEST_FLAGS;
-+	if (is_kernel_in_hyp_mode())
-+		vcpu->arch.hcr_el2 |= HCR_E2H;
- 	if (test_bit(KVM_ARM_VCPU_EL1_32BIT, vcpu->arch.features))
- 		vcpu->arch.hcr_el2 &= ~HCR_RW;
- }
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 0d82ae9..e609942 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -15,6 +15,8 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
+index 9f22dd6..f81a345 100644
+--- a/arch/arm64/include/asm/virt.h
++++ b/arch/arm64/include/asm/virt.h
+@@ -36,6 +36,11 @@
   */
+ extern u32 __boot_cpu_mode[2];
  
-+#include <asm/kvm_asm.h>
++/*
++ * __run_cpu_mode records the mode the boot CPU uses for the kernel.
++ */
++extern u32 __run_cpu_mode[2];
 +
- #include "hyp.h"
+ void __hyp_set_vectors(phys_addr_t phys_vector_base);
+ phys_addr_t __hyp_get_vectors(void);
  
- static bool __hyp_text __fpsimd_enabled_nvhe(void)
-@@ -36,6 +38,31 @@ bool __hyp_text __fpsimd_enabled(void)
- 	return __fpsimd_is_enabled()();
+@@ -60,6 +65,18 @@ static inline bool is_kernel_in_hyp_mode(void)
+ 	return el == CurrentEL_EL2;
  }
  
-+static void __hyp_text __activate_traps_vhe(void)
++static inline bool is_kernel_mode_mismatched(void)
 +{
-+	u64 val;
-+
-+	val = read_sysreg(cpacr_el1);
-+	val |= CPACR_EL1_TTA;
-+	val &= ~CPACR_EL1_FPEN;
-+	write_sysreg(val, cpacr_el1);
-+
-+	write_sysreg(__kvm_hyp_vector, vbar_el1);
++	/*
++	 * A mismatched CPU will have written its own CurrentEL in
++	 * __run_cpu_mode[1] (initially set to zero) after failing to
++	 * match the value in __run_cpu_mode[0]. Thus, a non-zero
++	 * value in __run_cpu_mode[1] is enough to detect the
++	 * pathological case.
++	 */
++	return !!ACCESS_ONCE(__run_cpu_mode[1]);
 +}
 +
-+static void __hyp_text __activate_traps_nvhe(void)
-+{
-+	u64 val;
-+
-+	val = CPTR_EL2_DEFAULT;
-+	val |= CPTR_EL2_TTA | CPTR_EL2_TFP;
-+	write_sysreg(val, cptr_el2);
-+}
-+
-+static hyp_alternate_select(__activate_traps_arch,
-+			    __activate_traps_nvhe, __activate_traps_vhe,
-+			    ARM64_HAS_VIRT_HOST_EXTN);
-+
- static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
- {
- 	u64 val;
-@@ -55,20 +82,34 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
- 	write_sysreg(val, hcr_el2);
- 	/* Trap on AArch32 cp15 c15 accesses (EL1 or EL0) */
- 	write_sysreg(1 << 15, hstr_el2);
-+	write_sysreg(vcpu->arch.mdcr_el2, mdcr_el2);
-+	__activate_traps_arch()();
-+}
+ /* The section containing the hypervisor text */
+ extern char __hyp_text_start[];
+ extern char __hyp_text_end[];
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 6f2f377..eb2ba55 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -578,7 +578,26 @@ ENTRY(set_cpu_boot_mode_flag)
+ 1:	str	w20, [x1]			// This CPU has booted in EL1
+ 	dmb	sy
+ 	dc	ivac, x1			// Invalidate potentially stale cache line
++	adr_l	x1, __run_cpu_mode
++	ldr	w0, [x1]
++	mrs	x20, CurrentEL
++	cbz	x0, skip_el_check
++	cmp	x0, x20
++	bne	mismatched_el
+ 	ret
++skip_el_check:			// Only the first CPU gets to set the rule
++	str	w20, [x1]
++	dmb	sy
++	dc	ivac, x1	// Invalidate potentially stale cache line
++	dsb	sy
++	ret
++mismatched_el:
++	str	w20, [x1, #4]
++	dmb	sy
++	dc	ivac, x1	// Invalidate potentially stale cache line
++	dsb	sy
++1:	wfi
++	b	1b
+ ENDPROC(set_cpu_boot_mode_flag)
  
--	val = CPTR_EL2_DEFAULT;
--	val |= CPTR_EL2_TTA | CPTR_EL2_TFP;
--	write_sysreg(val, cptr_el2);
-+static void __hyp_text __deactivate_traps_vhe(void)
-+{
-+	extern char vectors[];	/* kernel exception vectors */
+ /*
+@@ -593,6 +612,9 @@ ENDPROC(set_cpu_boot_mode_flag)
+ ENTRY(__boot_cpu_mode)
+ 	.long	BOOT_CPU_MODE_EL2
+ 	.long	BOOT_CPU_MODE_EL1
++ENTRY(__run_cpu_mode)
++	.long	0
++	.long	0
+ 	.popsection
  
--	write_sysreg(vcpu->arch.mdcr_el2, mdcr_el2);
-+	write_sysreg(HCR_HOST_VHE_FLAGS, hcr_el2);
-+	write_sysreg(CPACR_EL1_FPEN, cpacr_el1);
-+	write_sysreg(vectors, vbar_el1);
- }
- 
--static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
-+static void __hyp_text __deactivate_traps_nvhe(void)
- {
- 	write_sysreg(HCR_RW, hcr_el2);
-+	write_sysreg(CPTR_EL2_DEFAULT, cptr_el2);
-+}
+ 	/*
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index b1adc51..bc7650a 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -113,6 +113,9 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
+ 			pr_crit("CPU%u: failed to come online\n", cpu);
+ 			ret = -EIO;
+ 		}
 +
-+static hyp_alternate_select(__deactivate_traps_arch,
-+			    __deactivate_traps_nvhe, __deactivate_traps_vhe,
-+			    ARM64_HAS_VIRT_HOST_EXTN);
-+
-+static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
-+{
-+	__deactivate_traps_arch()();
- 	write_sysreg(0, hstr_el2);
- 	write_sysreg(read_sysreg(mdcr_el2) & MDCR_EL2_HPMN_MASK, mdcr_el2);
--	write_sysreg(CPTR_EL2_DEFAULT, cptr_el2);
- }
- 
- static void __hyp_text __activate_vm(struct kvm_vcpu *vcpu)
++		if (is_kernel_mode_mismatched())
++			panic("CPU%u: incompatible execution level", cpu);
+ 	} else {
+ 		pr_err("CPU%u: failed to boot: %d\n", cpu, ret);
+ 	}
 -- 
 2.1.4
