@@ -1,48 +1,159 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 11 Feb 2016 13:23:52 -0800
-Subject: [PATCH V2 03/12] dtb: amd: Fix DMA ranges in device tree
-In-Reply-To: <56BBA80E.6090205@amd.com>
-References: <1454954357-8395-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <1454954357-8395-4-git-send-email-Suravee.Suthikulpanit@amd.com>
- <2845776.WTPtnQzg8d@wuerfel> <56BBA80E.6090205@amd.com>
-Message-ID: <CAOesGMgOmmXY2X2bwOd-6m117o6VPpqer6BXrzNePuRPoiz_Nw@mail.gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Thu, 11 Feb 2016 22:23:18 +0100
+Subject: [PATCH 4/4] dmaengine: pxa_dma: fix the maximum requestor line
+In-Reply-To: <1455225798-9510-1-git-send-email-robert.jarzmik@free.fr>
+References: <1455225798-9510-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <1455225798-9510-5-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The current number of requestor lines is limited to 31. This was an
+error of a previous commit, as this number is platform dependent, and is
+actually :
+ - for pxa25x: 40 requestor lines
+ - for pxa27x: 75 requestor lines
+ - for pxa3xx: 100 requestor lines
 
-On Wed, Feb 10, 2016 at 1:13 PM, Suravee Suthikulpanit
-<Suravee.Suthikulpanit@amd.com> wrote:
-> Hi Arnd,
->
->
-> On 2/9/16 21:57, Arnd Bergmann wrote:
->>
->> On Monday 08 February 2016 11:59:08 Suravee Suthikulpanit wrote:
->>>
->>> From: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
->>>
->>> Fix DMA ranges of smb0 and pcie0 nodes in AMD Seattle SOC.
->>>
->>> Signed-off-by: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
->>>
->>
->> This could use a changelog text to explain why it's broken and how the
->> fix works.
->>
->>         Arnd
->>
->
-> So, I have not experience the breakage. However, IIUC, the GICv2m MSI frame
-> is also considered DMA-able. So, I think it should be included in the
-> dma-range specified here. Please let me know if my assumption is incorrect.
-> Otherwise, I will include more description in the commit log in my next rev.
+The previous testing did not reveal the faulty constant as on pxa[23]xx
+platforms, only camera, MSL and USB are above requestor 32, and in these
+only the camera has a driver using dma.
 
-As I replied when I did it -- I've applied the patches, so respinning
-won't work. Instead, please follow up with incremental fixes to this
-series instead.
+Fixes: e87ffbdf0697 ("dmaengine: pxa_dma: fix the no-requestor case")
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+---
+ drivers/dma/pxa_dma.c | 33 ++++++++++++++++++++++-----------
+ 1 file changed, 22 insertions(+), 11 deletions(-)
 
-
-Thanks,
-
--Olof
+diff --git a/drivers/dma/pxa_dma.c b/drivers/dma/pxa_dma.c
+index ca6c088edc8a..bc51d6271373 100644
+--- a/drivers/dma/pxa_dma.c
++++ b/drivers/dma/pxa_dma.c
+@@ -122,6 +122,7 @@ struct pxad_chan {
+ struct pxad_device {
+ 	struct dma_device		slave;
+ 	int				nr_chans;
++	int				nr_requestors;
+ 	void __iomem			*base;
+ 	struct pxad_phy			*phys;
+ 	spinlock_t			phy_lock;	/* Phy association */
+@@ -473,7 +474,7 @@ static void pxad_free_phy(struct pxad_chan *chan)
+ 		return;
+ 
+ 	/* clear the channel mapping in DRCMR */
+-	if (chan->drcmr <= DRCMR_CHLNUM) {
++	if (chan->drcmr <= pdev->nr_requestors) {
+ 		reg = pxad_drcmr(chan->drcmr);
+ 		writel_relaxed(0, chan->phy->base + reg);
+ 	}
+@@ -509,6 +510,7 @@ static bool is_running_chan_misaligned(struct pxad_chan *chan)
+ 
+ static void phy_enable(struct pxad_phy *phy, bool misaligned)
+ {
++	struct pxad_device *pdev;
+ 	u32 reg, dalgn;
+ 
+ 	if (!phy->vchan)
+@@ -518,7 +520,8 @@ static void phy_enable(struct pxad_phy *phy, bool misaligned)
+ 		"%s(); phy=%p(%d) misaligned=%d\n", __func__,
+ 		phy, phy->idx, misaligned);
+ 
+-	if (phy->vchan->drcmr <= DRCMR_CHLNUM) {
++	pdev = to_pxad_dev(phy->vchan->vc.chan.device);
++	if (phy->vchan->drcmr <= pdev->nr_requestors) {
+ 		reg = pxad_drcmr(phy->vchan->drcmr);
+ 		writel_relaxed(DRCMR_MAPVLD | phy->idx, phy->base + reg);
+ 	}
+@@ -914,6 +917,7 @@ static void pxad_get_config(struct pxad_chan *chan,
+ {
+ 	u32 maxburst = 0, dev_addr = 0;
+ 	enum dma_slave_buswidth width = DMA_SLAVE_BUSWIDTH_UNDEFINED;
++	struct pxad_device *pdev = to_pxad_dev(chan->vc.chan.device);
+ 
+ 	*dcmd = 0;
+ 	if (dir == DMA_DEV_TO_MEM) {
+@@ -922,7 +926,7 @@ static void pxad_get_config(struct pxad_chan *chan,
+ 		dev_addr = chan->cfg.src_addr;
+ 		*dev_src = dev_addr;
+ 		*dcmd |= PXA_DCMD_INCTRGADDR;
+-		if (chan->drcmr <= DRCMR_CHLNUM)
++		if (chan->drcmr <= pdev->nr_requestors)
+ 			*dcmd |= PXA_DCMD_FLOWSRC;
+ 	}
+ 	if (dir == DMA_MEM_TO_DEV) {
+@@ -931,7 +935,7 @@ static void pxad_get_config(struct pxad_chan *chan,
+ 		dev_addr = chan->cfg.dst_addr;
+ 		*dev_dst = dev_addr;
+ 		*dcmd |= PXA_DCMD_INCSRCADDR;
+-		if (chan->drcmr <= DRCMR_CHLNUM)
++		if (chan->drcmr <= pdev->nr_requestors)
+ 			*dcmd |= PXA_DCMD_FLOWTRG;
+ 	}
+ 	if (dir == DMA_MEM_TO_MEM)
+@@ -1341,13 +1345,15 @@ static struct dma_chan *pxad_dma_xlate(struct of_phandle_args *dma_spec,
+ 
+ static int pxad_init_dmadev(struct platform_device *op,
+ 			    struct pxad_device *pdev,
+-			    unsigned int nr_phy_chans)
++			    unsigned int nr_phy_chans,
++			    unsigned int nr_requestors)
+ {
+ 	int ret;
+ 	unsigned int i;
+ 	struct pxad_chan *c;
+ 
+ 	pdev->nr_chans = nr_phy_chans;
++	pdev->nr_requestors = nr_requestors;
+ 	INIT_LIST_HEAD(&pdev->slave.channels);
+ 	pdev->slave.device_alloc_chan_resources = pxad_alloc_chan_resources;
+ 	pdev->slave.device_free_chan_resources = pxad_free_chan_resources;
+@@ -1382,7 +1388,7 @@ static int pxad_probe(struct platform_device *op)
+ 	const struct of_device_id *of_id;
+ 	struct mmp_dma_platdata *pdata = dev_get_platdata(&op->dev);
+ 	struct resource *iores;
+-	int ret, dma_channels = 0;
++	int ret, dma_channels = 0, nb_requestors = 0;
+ 	const enum dma_slave_buswidth widths =
+ 		DMA_SLAVE_BUSWIDTH_1_BYTE   | DMA_SLAVE_BUSWIDTH_2_BYTES |
+ 		DMA_SLAVE_BUSWIDTH_4_BYTES;
+@@ -1399,13 +1405,17 @@ static int pxad_probe(struct platform_device *op)
+ 		return PTR_ERR(pdev->base);
+ 
+ 	of_id = of_match_device(pxad_dt_ids, &op->dev);
+-	if (of_id)
++	if (of_id) {
+ 		of_property_read_u32(op->dev.of_node, "#dma-channels",
+ 				     &dma_channels);
+-	else if (pdata && pdata->dma_channels)
++		of_property_read_u32(op->dev.of_node, "#requestors",
++				     &nb_requestors);
++	} else if (pdata && pdata->dma_channels) {
+ 		dma_channels = pdata->dma_channels;
+-	else
++		nb_requestors = pdata->nb_requestors;
++	} else {
+ 		dma_channels = 32;	/* default 32 channel */
++	}
+ 
+ 	dma_cap_set(DMA_SLAVE, pdev->slave.cap_mask);
+ 	dma_cap_set(DMA_MEMCPY, pdev->slave.cap_mask);
+@@ -1423,7 +1433,7 @@ static int pxad_probe(struct platform_device *op)
+ 	pdev->slave.descriptor_reuse = true;
+ 
+ 	pdev->slave.dev = &op->dev;
+-	ret = pxad_init_dmadev(op, pdev, dma_channels);
++	ret = pxad_init_dmadev(op, pdev, dma_channels, nb_requestors);
+ 	if (ret) {
+ 		dev_err(pdev->slave.dev, "unable to register\n");
+ 		return ret;
+@@ -1442,7 +1452,8 @@ static int pxad_probe(struct platform_device *op)
+ 
+ 	platform_set_drvdata(op, pdev);
+ 	pxad_init_debugfs(pdev);
+-	dev_info(pdev->slave.dev, "initialized %d channels\n", dma_channels);
++	dev_info(pdev->slave.dev, "initialized %d channels on %d requestors\n",
++		 dma_channels, nb_requestors);
+ 	return 0;
+ }
+ 
+-- 
+2.1.4
