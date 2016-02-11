@@ -1,167 +1,49 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Thu, 11 Feb 2016 14:34:17 +0000
-Subject: [RFC v2 10/15] vfio: allow the user to register reserved iova range
- for MSI mapping
+Date: Thu, 11 Feb 2016 14:34:18 +0000
+Subject: [RFC v2 11/15] msi: Add a new MSI_FLAG_IRQ_REMAPPING flag
 In-Reply-To: <1455201262-5259-1-git-send-email-eric.auger@linaro.org>
 References: <1455201262-5259-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1455201262-5259-11-git-send-email-eric.auger@linaro.org>
+Message-ID: <1455201262-5259-12-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The user is allowed to register a reserved IOVA range by using the
-DMA MAP API and setting the new flag: VFIO_DMA_MAP_FLAG_MSI_RESERVED_IOVA.
-It provides the base address and the size. This region is stored in the
-vfio_dma rb tree. At that point the iova range is not mapped to any target
-address yet. The host kernel will use those iova when needed, typically
-when the VFIO-PCI device allocates its MSI's.
+Let's introduce a new msi_domain_info flag value, MSI_FLAG_IRQ_REMAPPING
+meant to tell the domain supports IRQ REMAPPING, also known as Interrupt
+Translation Service. On Intel HW this capability is abstracted on IOMMU
+side while on ARM it is abstracted on MSI controller side.
 
-This patch also handles the destruction of the reserved binding RB-tree and
-domain's iova_domains.
+GICv3 ITS HW is the first HW advertising that feature.
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
-Signed-off-by: Bharat Bhushan <Bharat.Bhushan@freescale.com>
-
 ---
+ drivers/irqchip/irq-gic-v3-its.c | 1 +
+ include/linux/msi.h              | 2 ++
+ 2 files changed, 3 insertions(+)
 
-v1 -> v2:
-- set returned value according to alloc_reserved_iova_domain result
-- free the iova domains in case any error occurs
-
-RFC v1 -> v1:
-- takes into account Alex comments, based on
-  [RFC PATCH 1/6] vfio: Add interface for add/del reserved iova region:
-- use the existing dma map/unmap ioctl interface with a flag to register
-  a reserved IOVA range. A single reserved iova region is allowed.
----
- drivers/vfio/vfio_iommu_type1.c | 75 ++++++++++++++++++++++++++++++++++++++++-
- include/uapi/linux/vfio.h       |  9 +++++
- 2 files changed, 83 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
-index b9326c9..c5d3b48 100644
---- a/drivers/vfio/vfio_iommu_type1.c
-+++ b/drivers/vfio/vfio_iommu_type1.c
-@@ -673,6 +673,75 @@ static int vfio_dma_do_map(struct vfio_iommu *iommu,
- 	return ret;
- }
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 3447549..a5e0d8b 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -1544,6 +1544,7 @@ static int its_probe(struct device_node *node, struct irq_domain *parent)
+ 		inner_domain->parent = parent;
+ 		inner_domain->bus_token = DOMAIN_BUS_NEXUS;
+ 		info->ops = &its_msi_domain_ops;
++		info->flags |= MSI_FLAG_IRQ_REMAPPING;
+ 		info->data = its;
+ 		inner_domain->host_data = info;
+ 	}
+diff --git a/include/linux/msi.h b/include/linux/msi.h
+index a2a0068..03eda72 100644
+--- a/include/linux/msi.h
++++ b/include/linux/msi.h
+@@ -261,6 +261,8 @@ enum {
+ 	MSI_FLAG_MULTI_PCI_MSI		= (1 << 3),
+ 	/* Support PCI MSIX interrupts */
+ 	MSI_FLAG_PCI_MSIX		= (1 << 4),
++	/* Support MSI IRQ remapping service */
++	MSI_FLAG_IRQ_REMAPPING		= (1 << 5),
+ };
  
-+static int vfio_register_reserved_iova_range(struct vfio_iommu *iommu,
-+			   struct vfio_iommu_type1_dma_map *map)
-+{
-+	dma_addr_t iova = map->iova;
-+	size_t size = map->size;
-+	uint64_t mask;
-+	struct vfio_dma *dma;
-+	int ret = 0;
-+	struct vfio_domain *d;
-+	unsigned long order;
-+
-+	/* Verify that none of our __u64 fields overflow */
-+	if (map->size != size || map->iova != iova)
-+		return -EINVAL;
-+
-+	order =  __ffs(vfio_pgsize_bitmap(iommu));
-+	mask = ((uint64_t)1 << order) - 1;
-+
-+	WARN_ON(mask & PAGE_MASK);
-+
-+	/* we currently only support MSI_RESERVED_IOVA */
-+	if (!(map->flags & VFIO_DMA_MAP_FLAG_MSI_RESERVED_IOVA))
-+		return -EINVAL;
-+
-+	if (!size || (size | iova) & mask)
-+		return -EINVAL;
-+
-+	/* Don't allow IOVA address wrap */
-+	if (iova + size - 1 < iova)
-+		return -EINVAL;
-+
-+	mutex_lock(&iommu->lock);
-+
-+	/* check if the iova domain has not been instantiated already*/
-+	d = list_first_entry(&iommu->domain_list,
-+				  struct vfio_domain, next);
-+
-+	if (vfio_find_dma(iommu, iova, size)) {
-+		ret =  -EEXIST;
-+		goto out;
-+	}
-+
-+	dma = kzalloc(sizeof(*dma), GFP_KERNEL);
-+	if (!dma) {
-+		ret = -ENOMEM;
-+		goto out;
-+	}
-+
-+	dma->iova = iova;
-+	dma->size = size;
-+	dma->type = VFIO_IOVA_RESERVED;
-+
-+	list_for_each_entry(d, &iommu->domain_list, next)
-+		ret |= iommu_alloc_reserved_iova_domain(d->domain, iova,
-+							size, order);
-+
-+	if (ret) {
-+		list_for_each_entry(d, &iommu->domain_list, next)
-+			iommu_free_reserved_iova_domain(d->domain);
-+		goto out;
-+	}
-+
-+	vfio_link_dma(iommu, dma);
-+
-+out:
-+	mutex_unlock(&iommu->lock);
-+	return ret;
-+}
-+
- static int vfio_bus_type(struct device *dev, void *data)
- {
- 	struct bus_type **bus = data;
-@@ -1045,7 +1114,8 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
- 	} else if (cmd == VFIO_IOMMU_MAP_DMA) {
- 		struct vfio_iommu_type1_dma_map map;
- 		uint32_t mask = VFIO_DMA_MAP_FLAG_READ |
--				VFIO_DMA_MAP_FLAG_WRITE;
-+				VFIO_DMA_MAP_FLAG_WRITE |
-+				VFIO_DMA_MAP_FLAG_MSI_RESERVED_IOVA;
- 
- 		minsz = offsetofend(struct vfio_iommu_type1_dma_map, size);
- 
-@@ -1055,6 +1125,9 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
- 		if (map.argsz < minsz || map.flags & ~mask)
- 			return -EINVAL;
- 
-+		if (map.flags & VFIO_DMA_MAP_FLAG_MSI_RESERVED_IOVA)
-+			return vfio_register_reserved_iova_range(iommu, &map);
-+
- 		return vfio_dma_do_map(iommu, &map);
- 
- 	} else if (cmd == VFIO_IOMMU_UNMAP_DMA) {
-diff --git a/include/uapi/linux/vfio.h b/include/uapi/linux/vfio.h
-index 43e183b..982e326 100644
---- a/include/uapi/linux/vfio.h
-+++ b/include/uapi/linux/vfio.h
-@@ -411,12 +411,21 @@ struct vfio_iommu_type1_info {
-  *
-  * Map process virtual addresses to IO virtual addresses using the
-  * provided struct vfio_dma_map. Caller sets argsz. READ &/ WRITE required.
-+ *
-+ * In case MSI_RESERVED_IOVA is set, the API only aims@registering an IOVA
-+ * region which will be used on some platforms to map the host MSI frame.
-+ * in that specific case, vaddr and prot are ignored. The requirement for
-+ * provisioning such IOVA range can be checked by calling VFIO_IOMMU_GET_INFO
-+ * with the VFIO_IOMMU_INFO_REQUIRE_MSI_MAP attribute. A single
-+ * MSI_RESERVED_IOVA region can be registered
-  */
- struct vfio_iommu_type1_dma_map {
- 	__u32	argsz;
- 	__u32	flags;
- #define VFIO_DMA_MAP_FLAG_READ (1 << 0)		/* readable from device */
- #define VFIO_DMA_MAP_FLAG_WRITE (1 << 1)	/* writable from device */
-+/* reserved iova for MSI vectors*/
-+#define VFIO_DMA_MAP_FLAG_MSI_RESERVED_IOVA (1 << 2)
- 	__u64	vaddr;				/* Process virtual address */
- 	__u64	iova;				/* IO virtual address */
- 	__u64	size;				/* Size of mapping (bytes) */
+ int msi_domain_set_affinity(struct irq_data *data, const struct cpumask *mask,
 -- 
 1.9.1
