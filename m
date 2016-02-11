@@ -1,25 +1,29 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Thu, 11 Feb 2016 15:51:58 +0100
-Subject: breaking DT compatibility (was: Re: [PATCH v4] clk: sunxi:
- Refactor A31 PLL6 so that it can be reused)
-In-Reply-To: <20160211100048.GK31506@lukather>
-References: <1454358000-13594-1-git-send-email-maxime.ripard@free-electrons.com>
- <56B4E2FB.3050703@arm.com> <56BB2D79.6090402@arm.com>
- <CABGGiswOKztmRT40w4t_7BD729WgM8ueLtOD-UF_wgMbmcg4cg@mail.gmail.com>
- <20160210143755.GE31506@lukather>
- <20160210163001.GG2632@leverpostej>
- <20160211100048.GK31506@lukather>
-Message-ID: <20160211145158.GA8824@localhost.localdomain>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 11 Feb 2016 07:02:41 -0800
+Subject: [PATCH 1/7] mmc: omap_hsmmc: Fix PM regression with deferred
+ probe for pm_runtime_reinit
+In-Reply-To: <CAPDyKFpAcsfLgtu93P45fTEg11MjdGwREcyeGSS7vt6GWbNu_w@mail.gmail.com>
+References: <1455145370-20301-1-git-send-email-tony@atomide.com>
+ <1455145370-20301-2-git-send-email-tony@atomide.com>
+ <CAPDyKFpAcsfLgtu93P45fTEg11MjdGwREcyeGSS7vt6GWbNu_w@mail.gmail.com>
+Message-ID: <20160211150240.GR19432@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 11, 2016 at 11:00:48AM +0100, Maxime Ripard wrote:
-> None of our existing users ever complained.
+* Ulf Hansson <ulf.hansson@linaro.org> [160211 02:19]:
+> On 11 February 2016 at 00:02, Tony Lindgren <tony@atomide.com> wrote:
+> >
+> > Ulf, I'd like to merge this along with other related fixes via the
+> > ARM SoC tree if no objections, please review and ack if this look OK
+> > to you.
+> 
+> I have some other omap_hsmmc patches queued for 4.6, so I prefer to
+> send this via my mmc tree.
+> 
+> I guess that's okay as well!?
 
-Note to self:
+Naturally yes, please go ahead thanks!
 
-   Avoid choosing this SoC for new projects.  The maintainers do not
-   care about the end users.
+Regards,
 
-Thanks,
-Richard
+Tony
