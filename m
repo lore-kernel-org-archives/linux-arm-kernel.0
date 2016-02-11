@@ -1,26 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 11 Feb 2016 17:20:27 +0100
-Subject: [PATCH v3 0/6] arm: Add Artpec-6 SoC
-In-Reply-To: <cover.1455205057.git.larper@axis.com>
-References: <cover.1455205057.git.larper@axis.com>
-Message-ID: <2697188.EpDoHh0fx4@wuerfel>
+From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
+Date: Thu, 11 Feb 2016 21:58:06 +0530
+Subject: [PATCH V4 0/5] PCIe Xilinx generic driver for Microblaze and 
+Message-ID: <1455208091-15556-1-git-send-email-bharatku@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 11 February 2016 17:06:15 Lars Persson wrote:
-> Basic support for the Axis Artpec-6 ARM SoC. Timers, interrupts, UARTs and
-> ethernet are wired up.
-> 
-> Changes since v2:
-> - Create a syscon binding for the system controller.
-> - Clock patches split out to new patch series "clk: Add Artpec-6 SoC support".
+This patch series does modifications to pcie-xilinx.c, to support common
+driver on both Zynq and Microblaze architectures.
+Microblaze pci-common.c has been modified to support generic driver.
 
-Looks all good to me now, impressive for v3 on a new platform port!
+Bharat Kumar Gogada (5):
+  PCI: xilinx: Removing xilinx_pcie_parse_and_add_res function
+  PCI: xilinx: Removing struct hw_pci structure.
+  PCI: xilinx: Modifying AXI PCIe Host Bridge driver to work on both
+     Zynq and Microblaze
+  PCI: xilinx: Updating Zynq PCI binding documentation with 
+    Microblaze node.
+  Microblaze: Modifying microblaze PCI subsytem to support  generic
+    Xilinx  AXI PCIe Host Bridge IP driver
 
-We'll apply it in the next few days, unless further review comments come in.
+ .../devicetree/bindings/pci/xilinx-pcie.txt        |  32 +++-
+ arch/microblaze/Kconfig                            |   3 +
+ arch/microblaze/pci/pci-common.c                   |  56 ++----
+ drivers/pci/host/Kconfig                           |   2 +-
+ drivers/pci/host/pcie-xilinx.c                     | 191 +++------------------
+ 5 files changed, 66 insertions(+), 218 deletions(-)
 
-If you end up resending, please add my
-
-Reviewed-by: Arnd Bergmann <arnd@arndb.de>
-
-	Arnd
+-- 
+2.1.1
