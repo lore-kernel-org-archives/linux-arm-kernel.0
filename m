@@ -1,81 +1,104 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 11 Feb 2016 18:39:55 +0000
-Subject: [PATCH v4 14/23] arm64: KVM: VHE: Make __fpsimd_enabled VHE aware
+Date: Thu, 11 Feb 2016 18:40:02 +0000
+Subject: [PATCH v4 21/23] arm64: hw_breakpoint: Allow EL2 breakpoints if
+ running in HYP
 In-Reply-To: <1455216004-19499-1-git-send-email-marc.zyngier@arm.com>
 References: <1455216004-19499-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1455216004-19499-15-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1455216004-19499-22-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As non-VHE and VHE have different ways to express the trapping of
-FPSIMD registers to EL2, make __fpsimd_enabled a patchable predicate
-and provide a VHE implementation.
+With VHE, we place kernel {watch,break}-points at EL2 to get things
+like kgdb and "perf -e mem:..." working.
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+This requires a bit of repainting in the low-level encore/decode,
+but is otherwise pretty simple.
+
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/kvm_arm.h |  3 +++
- arch/arm64/kvm/hyp/hyp.h         |  5 +----
- arch/arm64/kvm/hyp/switch.c      | 19 +++++++++++++++++++
- 3 files changed, 23 insertions(+), 4 deletions(-)
+ arch/arm64/include/asm/hw_breakpoint.h | 49 +++++++++++++++++++++-------------
+ 1 file changed, 31 insertions(+), 18 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index bef6e92..f416714 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -218,4 +218,7 @@
- 	ECN(SOFTSTP_CUR), ECN(WATCHPT_LOW), ECN(WATCHPT_CUR), \
- 	ECN(BKPT32), ECN(VECTOR32), ECN(BRK64)
+diff --git a/arch/arm64/include/asm/hw_breakpoint.h b/arch/arm64/include/asm/hw_breakpoint.h
+index 9732908..4d8d5a8 100644
+--- a/arch/arm64/include/asm/hw_breakpoint.h
++++ b/arch/arm64/include/asm/hw_breakpoint.h
+@@ -18,6 +18,7 @@
  
-+#define CPACR_EL1_FPEN		(3 << 20)
-+#define CPACR_EL1_TTA		(1 << 28)
-+
- #endif /* __ARM64_KVM_ARM_H__ */
-diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
-index 5dfa883..44eaff7 100644
---- a/arch/arm64/kvm/hyp/hyp.h
-+++ b/arch/arm64/kvm/hyp/hyp.h
-@@ -171,10 +171,7 @@ void __debug_cond_restore_host_state(struct kvm_vcpu *vcpu);
+ #include <asm/cputype.h>
+ #include <asm/cpufeature.h>
++#include <asm/virt.h>
  
- void __fpsimd_save_state(struct user_fpsimd_state *fp_regs);
- void __fpsimd_restore_state(struct user_fpsimd_state *fp_regs);
--static inline bool __fpsimd_enabled(void)
+ #ifdef __KERNEL__
+ 
+@@ -35,24 +36,6 @@ struct arch_hw_breakpoint {
+ 	struct arch_hw_breakpoint_ctrl ctrl;
+ };
+ 
+-static inline u32 encode_ctrl_reg(struct arch_hw_breakpoint_ctrl ctrl)
 -{
--	return !(read_sysreg(cptr_el2) & CPTR_EL2_TFP);
+-	return (ctrl.len << 5) | (ctrl.type << 3) | (ctrl.privilege << 1) |
+-		ctrl.enabled;
 -}
-+bool __fpsimd_enabled(void);
+-
+-static inline void decode_ctrl_reg(u32 reg,
+-				   struct arch_hw_breakpoint_ctrl *ctrl)
+-{
+-	ctrl->enabled	= reg & 0x1;
+-	reg >>= 1;
+-	ctrl->privilege	= reg & 0x3;
+-	reg >>= 2;
+-	ctrl->type	= reg & 0x3;
+-	reg >>= 2;
+-	ctrl->len	= reg & 0xff;
+-}
+-
+ /* Breakpoint */
+ #define ARM_BREAKPOINT_EXECUTE	0
  
- u64 __guest_enter(struct kvm_vcpu *vcpu, struct kvm_cpu_context *host_ctxt);
- void __noreturn __hyp_do_panic(unsigned long, ...);
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 68f3cba..0d82ae9 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -17,6 +17,25 @@
+@@ -62,6 +45,7 @@ static inline void decode_ctrl_reg(u32 reg,
+ #define AARCH64_ESR_ACCESS_MASK	(1 << 6)
  
- #include "hyp.h"
+ /* Privilege Levels */
++#define AARCH64_BREAKPOINT_EL2	0
+ #define AARCH64_BREAKPOINT_EL1	1
+ #define AARCH64_BREAKPOINT_EL0	2
  
-+static bool __hyp_text __fpsimd_enabled_nvhe(void)
+@@ -76,6 +60,35 @@ static inline void decode_ctrl_reg(u32 reg,
+ #define ARM_KERNEL_STEP_ACTIVE	1
+ #define ARM_KERNEL_STEP_SUSPEND	2
+ 
++#define DBG_HMC_HYP		(1 << 13)
++#define DBG_SSC_HYP		(3 << 14)
++
++static inline u32 encode_ctrl_reg(struct arch_hw_breakpoint_ctrl ctrl)
 +{
-+	return !(read_sysreg(cptr_el2) & CPTR_EL2_TFP);
++	u32 val = (ctrl.len << 5) | (ctrl.type << 3) | ctrl.enabled;
++
++	if (is_kernel_in_hyp_mode() && ctrl.privilege == AARCH64_BREAKPOINT_EL1)
++		val |= DBG_HMC_HYP | DBG_SSC_HYP | (AARCH64_BREAKPOINT_EL2 << 1);
++	else
++		val |= ctrl.privilege << 1;
++
++	return val;
 +}
 +
-+static bool __hyp_text __fpsimd_enabled_vhe(void)
++static inline void decode_ctrl_reg(u32 reg,
++				   struct arch_hw_breakpoint_ctrl *ctrl)
 +{
-+	return !!(read_sysreg(cpacr_el1) & CPACR_EL1_FPEN);
++	ctrl->enabled	= reg & 0x1;
++	reg >>= 1;
++	ctrl->privilege	= reg & 0x3;
++	if (ctrl->privilege == AARCH64_BREAKPOINT_EL2)
++		ctrl->privilege	= AARCH64_BREAKPOINT_EL1;
++	reg >>= 2;
++	ctrl->type	= reg & 0x3;
++	reg >>= 2;
++	ctrl->len	= reg & 0xff;
 +}
 +
-+static hyp_alternate_select(__fpsimd_is_enabled,
-+			    __fpsimd_enabled_nvhe, __fpsimd_enabled_vhe,
-+			    ARM64_HAS_VIRT_HOST_EXTN);
-+
-+bool __hyp_text __fpsimd_enabled(void)
-+{
-+	return __fpsimd_is_enabled()();
-+}
-+
- static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
- {
- 	u64 val;
+ /*
+  * Limits.
+  * Changing these will require modifications to the register accessors.
 -- 
 2.1.4
