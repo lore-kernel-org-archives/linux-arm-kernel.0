@@ -1,120 +1,80 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 11 Feb 2016 02:12:13 +0200
-Subject: [PATCH v3 4/8] arm: dma-mapping: add {map,
- unmap}_resource for iommu ops
-In-Reply-To: <1455065878-11906-5-git-send-email-niklas.soderlund+renesas@ragnatech.se>
-References: <1455065878-11906-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
- <1455065878-11906-5-git-send-email-niklas.soderlund+renesas@ragnatech.se>
-Message-ID: <3988595.8dtuaVHoSu@avalon>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 10 Feb 2016 16:12:21 -0800
+Subject: [PATCH] ARM: OMAP2+: Fix onenand initialization to avoid
+ filesystem corruption
+In-Reply-To: <20160210211226.GB1640@darkstar.musicnaut.iki.fi>
+References: <linux-kernel@vger.kernel.org>
+ <1454683028-4193-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
+ <20160208193644.GU19432@atomide.com>
+ <20160210211226.GB1640@darkstar.musicnaut.iki.fi>
+Message-ID: <20160211001220.GM19432@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Niklas,
+* Aaro Koskinen <aaro.koskinen@iki.fi> [160210 13:13]:
+> Hi,
+> 
+> On Mon, Feb 08, 2016 at 11:36:45AM -0800, Tony Lindgren wrote:
+> > * Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com> [160205 06:38]:
+> > > Commit <e7b11dc7b77bfce0a351230a5feeadc1d0bba997> ("ARM: OMAP2+: Fix
+> > > onenand rate detection to avoid filesystem corruption") partially fixed
+> > > onenand configuration when GPMC module is reset. Finish the job by also
+> > > providing the correct values in ONENAND_REG_SYS_CFG1 register.
+> > 
+> > OK. So probably the INT or RDY polarity made the ECC not work.
+> > 
+> > Aaro, care to dump out also the nolo configured CFG1 value from
+> > n8x0 and n9(50)?
+> > 
+> > You can do it by adding something like this to the beginning
+> > of set_onenand_cfg():
+> > 
+> > pr_info("CFG1: 0x%04x\n", readw(onenand_base + ONENAND_REG_SYS_CFG1));
+> > 
+> > And presumably the values are the same as on n900. If not, we
+> > should do the legacy file system flash test on all of them
+> > before committing this fix.
+> 
+> I got these (with CONFIG_OMAP_GPMC_DEBUG also enabled):
+> 
+> N800:
+> [    2.803100] CFG1: 0x46c0
+> [    3.150115] CFG1: 0x06c0
+> 
+> N810:
+> [    2.802368] CFG1: 0x46c0
+> [    3.148620] CFG1: 0x06c0
+> 
+> N900:
+> [    4.965576] CFG1: 0x46c0
+> [    5.333740] CFG1: 0x06c0
 
-Thank you for the patch.
+Thanks, so these all should be fine with Ivaylo's patch.
 
-On Wednesday 10 February 2016 01:57:54 Niklas S?derlund wrote:
-> Add methods to map/unmap device resources addresses for dma_map_ops that
-> are IOMMU aware. This is needed to map a device MMIO register from a
-> physical address.
+> N950:
+> [    4.217193] CFG1: 0x66c4
+> [    4.583221] CFG1: 0x06c0
 > 
-> Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+> N9:
+> [    4.212677] CFG1: 0x66c4
+> [    4.578613] CFG1: 0x06c0
 
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Aaro, care to do one more test on n9(50) like Ivaylo posted
+earlier:
 
-> ---
->  arch/arm/mm/dma-mapping.c | 63 ++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 63 insertions(+)
-> 
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index 0eca381..ae2b175 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -1814,6 +1814,63 @@ static void arm_iommu_unmap_page(struct device *dev,
-> dma_addr_t handle, __free_iova(mapping, iova, len);
->  }
-> 
-> +/**
-> + * arm_iommu_map_resource - map a device resource for DMA
-> + * @dev: valid struct device pointer
-> + * @phys_addr: physical address of resource
-> + * @size: size of resource to map
-> + * @dir: DMA transfer direction
-> + */
-> +static dma_addr_t arm_iommu_map_resource(struct device *dev,
-> +		phys_addr_t phys_addr, size_t size,
-> +		enum dma_data_direction dir, struct dma_attrs *attrs)
-> +{
-> +	struct dma_iommu_mapping *mapping = to_dma_iommu_mapping(dev);
-> +	dma_addr_t dma_addr;
-> +	int ret, prot;
-> +	phys_addr_t addr = phys_addr & PAGE_MASK;
-> +	int offset = phys_addr & ~PAGE_MASK;
-> +	int len = PAGE_ALIGN(size + offset);
-> +
-> +	dma_addr = __alloc_iova(mapping, size);
-> +	if (dma_addr == DMA_ERROR_CODE)
-> +		return dma_addr;
-> +
-> +	prot = __dma_direction_to_prot(dir) | IOMMU_MMIO;
-> +
-> +	ret = iommu_map(mapping->domain, dma_addr, addr, len, prot);
-> +	if (ret < 0)
-> +		goto fail;
-> +
-> +	return dma_addr + offset;
-> +fail:
-> +	__free_iova(mapping, dma_addr, size);
-> +	return DMA_ERROR_CODE;
-> +}
-> +
-> +/**
-> + * arm_iommu_unmap_resource - unmap a device DMA resource
-> + * @dev: valid struct device pointer
-> + * @dma_handle: DMA address to resource
-> + * @size: size of resource to map
-> + * @dir: DMA transfer direction
-> + */
-> +static void arm_iommu_unmap_resource(struct device *dev, dma_addr_t
-> dma_handle, +		size_t size, enum dma_data_direction dir,
-> +		struct dma_attrs *attrs)
-> +{
-> +	struct dma_iommu_mapping *mapping = to_dma_iommu_mapping(dev);
-> +	dma_addr_t iova = dma_handle & PAGE_MASK;
-> +	int offset = dma_handle & ~PAGE_MASK;
-> +	int len = PAGE_ALIGN(size + offset);
-> +
-> +	if (!iova)
-> +		return;
-> +
-> +	iommu_unmap(mapping->domain, iova, len);
-> +	__free_iova(mapping, iova, len);
-> +}
-> +
->  static void arm_iommu_sync_single_for_cpu(struct device *dev,
->  		dma_addr_t handle, size_t size, enum dma_data_direction dir)
->  {
-> @@ -1858,6 +1915,9 @@ struct dma_map_ops iommu_ops = {
->  	.sync_sg_for_cpu	= arm_iommu_sync_sg_for_cpu,
->  	.sync_sg_for_device	= arm_iommu_sync_sg_for_device,
-> 
-> +	.map_resource		= arm_iommu_map_resource,
-> +	.unmap_resource		= arm_iommu_unmap_resource,
-> +
->  	.set_dma_mask		= arm_dma_set_mask,
->  };
-> 
-> @@ -1873,6 +1933,9 @@ struct dma_map_ops iommu_coherent_ops = {
->  	.map_sg		= arm_coherent_iommu_map_sg,
->  	.unmap_sg	= arm_coherent_iommu_unmap_sg,
-> 
-> +	.map_resource	= arm_iommu_map_resource,
-> +	.unmap_resource	= arm_iommu_unmap_resource,
-> +
->  	.set_dma_mask	= arm_dma_set_mask,
->  };
+1. Flash original maemo rootfs
 
--- 
+2. Boot mainline kernel with Ivaylo's patch and mount onenand
+
+3. Boot original maemo kernel and check dmesg there's no
+   file corruption
+
+Also.. There's a chance somebody has created a onenand file system
+with recent mainline kernels that did the reset and disabled ECC.
+So with Ivaylo's patch fixing that, those may not mount properly
+any longer. Most likely people just keep their maemo rootfs there
+though with the MMC being available.
+
 Regards,
 
-Laurent Pinchart
+Tony
