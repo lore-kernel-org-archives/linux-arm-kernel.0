@@ -1,79 +1,59 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 11 Feb 2016 13:14:45 +0100
-Subject: [PATCH v4 0/6] arm64 UEFI early FDT handling
-In-Reply-To: <20160211114204.GO24726@rric.localdomain>
-References: <1455026026-11571-1-git-send-email-rrichter@caviumnetworks.com>
- <CAKv+Gu-osoi53cpikDtZitJJX2gtZyhOMuvYf=cfeZi8zJ-LDg@mail.gmail.com>
- <20160211114204.GO24726@rric.localdomain>
-Message-ID: <CAKv+Gu-KpasM9QZ8qrZEk_pUJpf3TceaenLYTx_eAHW6AUmutA@mail.gmail.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Thu, 11 Feb 2016 13:26:26 +0100
+Subject: [PATCH 1/3] ARM64: zynqmp: Keep gpio node alphabetically sorted
+Message-ID: <2f160e012080d5d6de11238ade239bb0bb224f64.1455193571.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 February 2016 at 12:42, Robert Richter
-<robert.richter@caviumnetworks.com> wrote:
-> (+RobH and MarkR)
->
-> On 09.02.16 15:35:42, Ard Biesheuvel wrote:
->> (+ Grant)
->>
->> On 9 February 2016 at 14:53, Robert Richter <rrichter@caviumnetworks.com> wrote:
->> > From: Robert Richter <rrichter@cavium.com>
->> >
->> > Reposting an updated version of this patches ported to 4.5-rc1. It is
->> > a followup to the version 3 from:
->> >
->> >  http://lkml.kernel.org/r/1442881288-13962-1-git-send-email-ard.biesheuvel at linaro.org
->> >
->> > The series is essential for NUMA on arm64. Early FDT handling is
->> > required to make system topology data from firmware, esp. for cpus and
->> > memory available to the early boot process. Ganapat's numa patches
->> > depend on it. This series has been tested with his series v10 posted
->> > here:
->> >
->> >  http://lkml.kernel.org/r/1454407763-1017-1-git-send-email-gkulkarni at caviumnetworks.com
->> >
->>
->> Hello Robert,
->>
->> This series does not reflect anymore what we think is the best way to
->> deal with memory nodes and memreserves on UEFI systems.
->> Please refer to this thread:
->> http://thread.gmane.org/gmane.linux.kernel.efi/6464
->>
->> As far as the memory nodes are concerned, if it is the best place to
->> store these NUMA annotations, then we should indeed preserve them, but
->> I think the discussion stalled without any conclusion having been
->> reached. As far as the /reserved-memory node is concerned, that one we
->> should really keep, so at least patch 6/6 of this series should be
->> replaced with something based on the series above.
->
-> Ard,
->
-> Mark R and Rob have agreed for numa dt binding for mem nodes. So do
-> you think we can at least reuse parts of this series to solve the NUMA
-> issue and try to find a solution for patch #6 which aligns with your
-> alternative approach?
->
+No functional change.
 
-OK, if we are all in agreement that NUMA annotations belong in memory
-nodes, which are otherwise ignored completely on UEFI systems, I am
-fine with this as well.
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+---
 
-However, we have to think about what it means if the memory nodes are
-out of sync with the UEFI memory map, both on NUMA and ordinary
-systems. I know very little about NUMA, but I could imagine that on
-any UEFI system, the UEFI memory map remains authoritative, and memory
-nodes are only used to annotate regions that are already known to
-exist. Alternatively, some sanity check could be appropriate (such as
-the one I proposed for the /reserved-memory node in the link above),
-but we need to consider carefully how the firmware is supposed to
-produce memory nodes and a UEFI memory map that are mutually
-consistent.
+ arch/arm64/boot/dts/xilinx/zynqmp.dtsi | 24 ++++++++++++------------
+ 1 file changed, 12 insertions(+), 12 deletions(-)
 
-I think we can replace 6/6 with the series above, i.e., honour the
-allocations after establishing that the fixed allocations are either
-still available, or entirely disjoint from what the UEFI memory map
-describes.
-
+diff --git a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
+index 200fb588d0f5..7bc65e391530 100644
+--- a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
++++ b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
+@@ -126,18 +126,6 @@
+ 			clock-frequency = <25000000>;
+ 		};
+ 
+-		gpio: gpio at ff0a0000 {
+-			compatible = "xlnx,zynqmp-gpio-1.0";
+-			status = "disabled";
+-			#gpio-cells = <0x2>;
+-			clocks = <&misc_clk>;
+-			interrupt-parent = <&gic>;
+-			interrupts = <0 16 4>;
+-			interrupt-controller;
+-			#interrupt-cells = <2>;
+-			reg = <0x0 0xff0a0000 0x1000>;
+-		};
+-
+ 		gem0: ethernet at ff0b0000 {
+ 			compatible = "cdns,gem";
+ 			status = "disabled";
+@@ -186,6 +174,18 @@
+ 			#size-cells = <0>;
+ 		};
+ 
++		gpio: gpio at ff0a0000 {
++			compatible = "xlnx,zynqmp-gpio-1.0";
++			status = "disabled";
++			#gpio-cells = <0x2>;
++			clocks = <&misc_clk>;
++			interrupt-parent = <&gic>;
++			interrupts = <0 16 4>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
++			reg = <0x0 0xff0a0000 0x1000>;
++		};
++
+ 		i2c_clk: i2c_clk {
+ 			compatible = "fixed-clock";
+ 			#clock-cells = <0x0>;
 -- 
-Ard.
+1.9.1
