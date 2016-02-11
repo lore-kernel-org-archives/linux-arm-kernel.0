@@ -1,34 +1,124 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 11 Feb 2016 17:06:32 +0100
-Subject: [PATCH v2 1/6] Revert "drivers/tty/serial: make 8250/8250_mtk.c
- explicitly non-modular"
-In-Reply-To: <20160211160021.GF28452@windriver.com>
-References: <1455205297-1021302-1-git-send-email-arnd@arndb.de>
- <1455205297-1021302-2-git-send-email-arnd@arndb.de>
- <20160211160021.GF28452@windriver.com>
-Message-ID: <3873766.I9XIY0R8gT@wuerfel>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 11 Feb 2016 16:13:45 +0000
+Subject: [PATCH 4/3] iommu/io-pgtable: Rationalise quirk handling
+In-Reply-To: <20160210154815.GO1052@arm.com>
+References: <cover.1453723096.git.robin.murphy@arm.com>
+ <066c4af0e29c9cc658bd5e48edc5e2d7ba7140a1.1453723096.git.robin.murphy@arm.com>
+ <20160210154815.GO1052@arm.com>
+Message-ID: <ea1f3d3feec0dc9c18d43393678370b50b1275f5.1455206840.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 11 February 2016 11:00:22 Paul Gortmaker wrote:
-> [[PATCH v2 1/6] Revert "drivers/tty/serial: make 8250/8250_mtk.c explicitly non-modular"] On 11/02/2016 (Thu 16:41) Arnd Bergmann wrote:
-> 
-> > This reverts commit d72d391c126e, which tried to remove dead code but
-> > left the driver in a useless state when the main 8250 driver is a
-> 
-> Am I misunderstanding something?  The commit didn't cause the driver to
-> be in a useless state for 8250=m.  But rather isn't that it was a
-> pre-existing condition, independent of the change to 8250_mtk.c to
-> remove the dead code in d72d391c126e?
-> 
-> Since the commit did not touch Kconfig or Makefile, I can't see how it
-> could cause some new useless state that did not already exist, and hence
-> the "Fixes:" tag is invalid as well.
+As the number of io-pgtable implementations grows beyond 1, it's time
+to rationalise the quirks mechanism before things have a chance to
+start getting really ugly and out-of-hand.
 
-My wording may have been bad here. What I meant to say is that it
-was broken before the patch, and still broken after the patch.
+To that end:
+- Indicate exactly which quirks each format can/does support.
+- Fail creating a table if a caller wants unsupported quirks.
+- Properly document where each quirk applies and why.
 
-The Fixes tag was meant to just be a reference to the commit I'm
-reverting.
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ drivers/iommu/io-pgtable-arm-v7s.c |  3 +++
+ drivers/iommu/io-pgtable-arm.c     |  2 ++
+ drivers/iommu/io-pgtable.c         |  3 +++
+ drivers/iommu/io-pgtable.h         | 24 ++++++++++++++++++++----
+ 4 files changed, 28 insertions(+), 4 deletions(-)
 
-	Arnd
+diff --git a/drivers/iommu/io-pgtable-arm-v7s.c b/drivers/iommu/io-pgtable-arm-v7s.c
+index d39a021..9bc607a 100644
+--- a/drivers/iommu/io-pgtable-arm-v7s.c
++++ b/drivers/iommu/io-pgtable-arm-v7s.c
+@@ -690,6 +690,9 @@ out_free_data:
+ struct io_pgtable_init_fns io_pgtable_arm_v7s_init_fns = {
+ 	.alloc	= arm_v7s_alloc_pgtable,
+ 	.free	= arm_v7s_free_pgtable,
++	.supported_quirks = IO_PGTABLE_QUIRK_ARM_NS |
++			    IO_PGTABLE_QUIRK_NO_PERMS |
++			    IO_PGTABLE_QUIRK_TLBI_ON_MAP,
+ };
+ 
+ #ifdef CONFIG_IOMMU_IO_PGTABLE_ARMV7S_SELFTEST
+diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
+index 4095af2..32f94f1 100644
+--- a/drivers/iommu/io-pgtable-arm.c
++++ b/drivers/iommu/io-pgtable-arm.c
+@@ -863,6 +863,7 @@ arm_32_lpae_alloc_pgtable_s2(struct io_pgtable_cfg *cfg, void *cookie)
+ struct io_pgtable_init_fns io_pgtable_arm_64_lpae_s1_init_fns = {
+ 	.alloc	= arm_64_lpae_alloc_pgtable_s1,
+ 	.free	= arm_lpae_free_pgtable,
++	.supported_quirks = IO_PGTABLE_QUIRK_ARM_NS,
+ };
+ 
+ struct io_pgtable_init_fns io_pgtable_arm_64_lpae_s2_init_fns = {
+@@ -873,6 +874,7 @@ struct io_pgtable_init_fns io_pgtable_arm_64_lpae_s2_init_fns = {
+ struct io_pgtable_init_fns io_pgtable_arm_32_lpae_s1_init_fns = {
+ 	.alloc	= arm_32_lpae_alloc_pgtable_s1,
+ 	.free	= arm_lpae_free_pgtable,
++	.supported_quirks = IO_PGTABLE_QUIRK_ARM_NS,
+ };
+ 
+ struct io_pgtable_init_fns io_pgtable_arm_32_lpae_s2_init_fns = {
+diff --git a/drivers/iommu/io-pgtable.c b/drivers/iommu/io-pgtable.c
+index 876f6a7..0f57a45 100644
+--- a/drivers/iommu/io-pgtable.c
++++ b/drivers/iommu/io-pgtable.c
+@@ -52,6 +52,9 @@ struct io_pgtable_ops *alloc_io_pgtable_ops(enum io_pgtable_fmt fmt,
+ 	if (!fns)
+ 		return NULL;
+ 
++	if (cfg->quirks & ~fns->supported_quirks)
++		return NULL;
++
+ 	iop = fns->alloc(cfg, cookie);
+ 	if (!iop)
+ 		return NULL;
+diff --git a/drivers/iommu/io-pgtable.h b/drivers/iommu/io-pgtable.h
+index 4faee7d..6e7f11e 100644
+--- a/drivers/iommu/io-pgtable.h
++++ b/drivers/iommu/io-pgtable.h
+@@ -47,10 +47,24 @@ struct iommu_gather_ops {
+  *                 page table walker.
+  */
+ struct io_pgtable_cfg {
+-	#define IO_PGTABLE_QUIRK_ARM_NS		BIT(0) /* Set NS bit in PTEs */
+-	#define IO_PGTABLE_QUIRK_NO_PERMS	BIT(1) /* No AP/XN bits */
+-	#define IO_PGTABLE_QUIRK_TLBI_ON_MAP	BIT(2) /* TLB Inv. on map */
+-	int				quirks;
++	/*
++	 * IO_PGTABLE_QUIRK_ARM_NS: (ARM formats) Set NS and NSTABLE bits in
++	 *	stage 1 PTEs, for hardware which insists on validating them
++	 *	even in	non-secure state where they should normally be ignored.
++	 *
++	 * IO_PGTABLE_QUIRK_NO_PERMS: Ignore the IOMMU_READ, IOMMU_WRITE and
++	 *	IOMMU_NOEXEC flags and map everything with full access, for
++	 *	hardware which does not implement the permissions of a given
++	 *	format, and/or requires some format-specific default value.
++	 *
++	 * IO_PGTABLE_QUIRK_TLBI_ON_MAP: If the format forbids caching invalid
++	 *	(unmapped) entries but the hardware might do so anyway, perform
++	 *	TLB maintenance when mapping as well as when unmapping.
++	 */
++	#define IO_PGTABLE_QUIRK_ARM_NS		BIT(0)
++	#define IO_PGTABLE_QUIRK_NO_PERMS	BIT(1)
++	#define IO_PGTABLE_QUIRK_TLBI_ON_MAP	BIT(2)
++	unsigned int			quirks;
+ 	unsigned long			pgsize_bitmap;
+ 	unsigned int			ias;
+ 	unsigned int			oas;
+@@ -173,10 +187,12 @@ static inline void io_pgtable_tlb_sync(struct io_pgtable *iop)
+  *
+  * @alloc: Allocate a set of page tables described by cfg.
+  * @free:  Free the page tables associated with iop.
++ * @supported_quirks: Bitmap of quirks supported by the format.
+  */
+ struct io_pgtable_init_fns {
+ 	struct io_pgtable *(*alloc)(struct io_pgtable_cfg *cfg, void *cookie);
+ 	void (*free)(struct io_pgtable *iop);
++	unsigned int supported_quirks;
+ };
+ 
+ extern struct io_pgtable_init_fns io_pgtable_arm_32_lpae_s1_init_fns;
+-- 
+2.7.0.25.gfc10eb5.dirty
