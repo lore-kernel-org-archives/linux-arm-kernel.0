@@ -1,19 +1,23 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 11 Feb 2016 13:00:41 +0100
-Subject: [PATCH V5 07/11] soc: mediatek: PMIC wrap: move wdt_src into the
- pmic_wrapper_type struct
-In-Reply-To: <1454841778-35529-8-git-send-email-blogic@openwrt.org>
-References: <1454841778-35529-1-git-send-email-blogic@openwrt.org>
- <1454841778-35529-8-git-send-email-blogic@openwrt.org>
-Message-ID: <56BC77E9.2080403@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 11 Feb 2016 13:01:32 +0100
+Subject: [PATCH] pinctrl: sunxi: H3 requires irq_read_needs_mux
+In-Reply-To: <20160202100217.GA7483@box2.japko.eu>
+References: <20160202100217.GA7483@box2.japko.eu>
+Message-ID: <CACRpkdbp2J5eVwsJpuyxkjv72mB4ojcauXoDn1_iei7XB0yzxg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Feb 2, 2016 at 11:03 AM, Krzysztof Adamski
+<krzysztof.adamski@sonymobile.com> wrote:
 
-
-On 07/02/16 11:42, John Crispin wrote:
-> Make the handling of wdt_src consitent with the rest of the code.
+> It seems that on H3, just like on A10, when GPIOs are configured as
+> external interrupt data registers does not contain their value.  When
+> value is read, GPIO function must be temporary switched to input for
+> reads.
 >
+> Signed-off-by: Krzysztof Adamski <k@japko.eu>
 
-Same here, please explain what the patch is doing. Or just squash 6 and 
-7, as you like.
+Patch applied for fixes with Maxime's ACK.
+
+Yours,
+Linus Walleij
