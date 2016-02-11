@@ -1,31 +1,21 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 11 Feb 2016 12:50:04 +0000
-Subject: [PATCH] coresight: etb: Remove simple announcement message
-Message-ID: <1455195004-30214-1-git-send-email-broonie@kernel.org>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 11 Feb 2016 13:53:59 +0100
+Subject: [PATCH] ARM: dts: cros-ec-keyboard: Add LOCK key to keyboard
+ matrix
+In-Reply-To: <1454121504-12683-1-git-send-email-djkurtz@chromium.org>
+References: <1454121504-12683-1-git-send-email-djkurtz@chromium.org>
+Message-ID: <3118190.LxA1oBmXCc@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's generally preferred that drivers not print initialisation messages on
-startup that don't contain information gained at runtime such as specific
-hardware revision information. This provides a small speedup on systems
-with serial consoles and keeps the boot less noisy.
+Am Samstag, 30. Januar 2016, 10:38:24 schrieb Daniel Kurtz:
+> From: James Chao <james_chao@asus.com>
+> 
+> The LOCK key is at KSO9/KSI3 for Chromebook Flip and other devices
+> that use the Chrome OS EC keyboard matrix.
+> 
+> Signed-off-by: James Chao <james_chao@asus.com>
+> Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
+> Signed-off-by: YH Huang <yh.huang@mediatek.com>
 
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- drivers/hwtracing/coresight/coresight-etb10.c | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
-index 92969dae739d..18c55d1c428c 100644
---- a/drivers/hwtracing/coresight/coresight-etb10.c
-+++ b/drivers/hwtracing/coresight/coresight-etb10.c
-@@ -481,7 +481,6 @@ static int etb_probe(struct amba_device *adev, const struct amba_id *id)
- 	if (ret)
- 		goto err_misc_register;
- 
--	dev_info(dev, "ETB initialized\n");
- 	return 0;
- 
- err_misc_register:
--- 
-2.7.0
+applied to my dts32 branch for 4.6
