@@ -1,136 +1,100 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 11 Feb 2016 22:39:03 +0200
-Subject: [PATCH 4/3] iommu/io-pgtable: Rationalise quirk handling
-In-Reply-To: <ea1f3d3feec0dc9c18d43393678370b50b1275f5.1455206840.git.robin.murphy@arm.com>
-References: <cover.1453723096.git.robin.murphy@arm.com>
- <20160210154815.GO1052@arm.com>
- <ea1f3d3feec0dc9c18d43393678370b50b1275f5.1455206840.git.robin.murphy@arm.com>
-Message-ID: <8742562.HTCU9VW42O@avalon>
+From: s-anna@ti.com (Suman Anna)
+Date: Thu, 11 Feb 2016 14:43:02 -0600
+Subject: [PATCH v3 3/3] pci: dra7xx: use pdata callbacks to perform reset
+In-Reply-To: <56BACCDB.2070507@ti.com>
+References: <1452780672-14339-1-git-send-email-kishon@ti.com>
+ <1452780672-14339-4-git-send-email-kishon@ti.com>
+ <20160127173104.GQ19432@atomide.com> <56A90971.4020409@ti.com>
+ <20160127185649.GV19432@atomide.com> <56A94FB7.6020903@ti.com>
+ <20160128183156.GH19432@atomide.com> <56B087AD.4000505@ti.com>
+ <alpine.DEB.2.02.1602080208070.2182@utopia.booyaka.com>
+ <56B900E9.9040306@ti.com>
+ <alpine.DEB.2.02.1602090846480.2906@utopia.booyaka.com>
+ <56BA2495.9020407@ti.com>
+ <alpine.DEB.2.02.1602091932160.2906@utopia.booyaka.com>
+ <56BA958A.1020503@ti.com> <56BACCDB.2070507@ti.com>
+Message-ID: <56BCF256.8010903@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+On 02/09/2016 11:38 PM, Kishon Vijay Abraham I wrote:
+> Hi,
+> 
+> On Wednesday 10 February 2016 07:12 AM, Suman Anna wrote:
+>> Hi Paul,
+>>
+>> On 02/09/2016 01:36 PM, Paul Walmsley wrote:
+>>> Hi Suman 
+>>>
+>>> On Tue, 9 Feb 2016, Suman Anna wrote:
+>>>
+>>>> On 02/09/2016 02:49 AM, Paul Walmsley wrote:
+>>>>> On Mon, 8 Feb 2016, Suman Anna wrote:
+>>>>>> On 02/07/2016 08:48 PM, Paul Walmsley wrote:
+>>>>>>> On Tue, 2 Feb 2016, Kishon Vijay Abraham I wrote:
+>>>>>>>
+>>>>>>>> Paul, what do you think is the best way forward to perform reset?
+>>>>>>>
+>>>>>>> Many of the IP blocks with PRM hardreset lines are processor IP blocks. 
+>>>>>>> Those often need special reset handling to ensure that WFI/HLT-like 
+>>>>>>> instructions are executed after reset.  This special handling ensures that 
+>>>>>>> the IP blocks' bus initiator interfaces indicate that they are in standby 
+>>>>>>> to the PRCM - thus allowing power management for the rest of the chip to 
+>>>>>>> work correctly.
+>>>>>>>
+>>>>>>> But that doesn't seem to be the case with PCIe - and maybe others - 
+>>>>>>> possibly some of the MMUs?  
+>>>>>>
+>>>>>> Yeah, the sequencing between clocks and resets would still be the same
+>>>>>> for MMUs, so, adding the custom flags for MMUs is fine.
+>>>>>
+>>>>> I'm curious as to whether HWMOD_CUSTOM_HARDRESET is needed for the MMUs.  
+>>>>> We've stated that the main point of the custom hardreset code is to handle 
+>>>>> processors that need to be placed into WFI/HLT, but it doesn't seem like 
+>>>>> there would be an equivalent for MMUs.  Thoughts?
+>>>>
+>>>> The current OMAP IOMMU code already leverages the pdata ops for
+>>>> performing the resets, so not adding the flags would also require
+>>>> additional changes in the driver.
+>>>>
+>>>> Also, the reset lines controlling the MMUs actually also manage the
+>>>> reset for all the other sub-modules other than the processor cores
+>>>> within the sub-systems. We have currently different issues (see [1] for
+>>>> eg. around the IPU sub-system entering RET in between), so from a PM
+>>>> point of view, we do prefer to place the MMUs also in reset when we are
+>>>> runtime suspended.
+>>>
+>>> Should we reassert hardreset in _idle() for IP blocks that don't have 
+>>> HWMOD_CUSTOM_HARDRESET set on them?  Would that allow us to use this 
+>>> mechanism for the uncore hardreset lines, or are there other quirks?
+>>>
+>>> Also - would that address the potential issue that you mentioned with the 
+>>> PCIe block, or is that a different issue?
+>>
+>> Yeah, I think that would address the PCIe block issue in terms of reset
+>> state balancing between pm_runtime_get_sync() and pm_runtime_put()
+>> calls. Right now, they are unbalanced. The PCIe block is using these
+>> only in probe and remove, so it should work for that IP.
+> 
+> As I mentioned before this would result in undesired behavior during
+> suspend/resume cycle in PCIe. (This should be okay for the current mainline
+> code but would break once we add suspend/resume support for PCIe).
 
-Thank you for the patch.
+Yeah, I was wondering if some peripheral would want only the clock to be
+controlled during _idle() and not reset. Even then for the PCIe case
+that you are talking about, going through a pm_runtime_get_sync(),
+pm_runtime_put_sync()/pm_runtime_put() deasserts the resets everytime
+_enable() is called. Right now, the code block has ignored the return
+value from the _hardreset_deassert(), but if you check it and bail out,
+then your get_sync() would start failing from the second invocation.
 
-On Thursday 11 February 2016 16:13:45 Robin Murphy wrote:
-> As the number of io-pgtable implementations grows beyond 1, it's time
-> to rationalise the quirks mechanism before things have a chance to
-> start getting really ugly and out-of-hand.
-> 
-> To that end:
-> - Indicate exactly which quirks each format can/does support.
-> - Fail creating a table if a caller wants unsupported quirks.
-> - Properly document where each quirk applies and why.
-> 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+Can you elaborate more on what kind of issues you will see on
+suspend/resume cycle with PCIe? Do note that _idle() gets called through
+_od_suspend_no_irq() in omap_device.c if your runtime status is not
+suspended. I had to manage the runtime status in the IPU/DSP
+suspend/resume code to deal with the reset
+(omap_device_assert_hardreset) and clock sequences in
+_idle()/omap_device_idle()
 
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-
-> ---
->  drivers/iommu/io-pgtable-arm-v7s.c |  3 +++
->  drivers/iommu/io-pgtable-arm.c     |  2 ++
->  drivers/iommu/io-pgtable.c         |  3 +++
->  drivers/iommu/io-pgtable.h         | 24 ++++++++++++++++++++----
->  4 files changed, 28 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/iommu/io-pgtable-arm-v7s.c
-> b/drivers/iommu/io-pgtable-arm-v7s.c index d39a021..9bc607a 100644
-> --- a/drivers/iommu/io-pgtable-arm-v7s.c
-> +++ b/drivers/iommu/io-pgtable-arm-v7s.c
-> @@ -690,6 +690,9 @@ out_free_data:
->  struct io_pgtable_init_fns io_pgtable_arm_v7s_init_fns = {
->  	.alloc	= arm_v7s_alloc_pgtable,
->  	.free	= arm_v7s_free_pgtable,
-> +	.supported_quirks = IO_PGTABLE_QUIRK_ARM_NS |
-> +			    IO_PGTABLE_QUIRK_NO_PERMS |
-> +			    IO_PGTABLE_QUIRK_TLBI_ON_MAP,
->  };
-> 
->  #ifdef CONFIG_IOMMU_IO_PGTABLE_ARMV7S_SELFTEST
-> diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
-> index 4095af2..32f94f1 100644
-> --- a/drivers/iommu/io-pgtable-arm.c
-> +++ b/drivers/iommu/io-pgtable-arm.c
-> @@ -863,6 +863,7 @@ arm_32_lpae_alloc_pgtable_s2(struct io_pgtable_cfg *cfg,
-> void *cookie) struct io_pgtable_init_fns io_pgtable_arm_64_lpae_s1_init_fns
-> = { .alloc	= arm_64_lpae_alloc_pgtable_s1,
->  	.free	= arm_lpae_free_pgtable,
-> +	.supported_quirks = IO_PGTABLE_QUIRK_ARM_NS,
->  };
-> 
->  struct io_pgtable_init_fns io_pgtable_arm_64_lpae_s2_init_fns = {
-> @@ -873,6 +874,7 @@ struct io_pgtable_init_fns
-> io_pgtable_arm_64_lpae_s2_init_fns = { struct io_pgtable_init_fns
-> io_pgtable_arm_32_lpae_s1_init_fns = { .alloc	=
-> arm_32_lpae_alloc_pgtable_s1,
->  	.free	= arm_lpae_free_pgtable,
-> +	.supported_quirks = IO_PGTABLE_QUIRK_ARM_NS,
->  };
-> 
->  struct io_pgtable_init_fns io_pgtable_arm_32_lpae_s2_init_fns = {
-> diff --git a/drivers/iommu/io-pgtable.c b/drivers/iommu/io-pgtable.c
-> index 876f6a7..0f57a45 100644
-> --- a/drivers/iommu/io-pgtable.c
-> +++ b/drivers/iommu/io-pgtable.c
-> @@ -52,6 +52,9 @@ struct io_pgtable_ops *alloc_io_pgtable_ops(enum
-> io_pgtable_fmt fmt, if (!fns)
->  		return NULL;
-> 
-> +	if (cfg->quirks & ~fns->supported_quirks)
-> +		return NULL;
-> +
->  	iop = fns->alloc(cfg, cookie);
->  	if (!iop)
->  		return NULL;
-> diff --git a/drivers/iommu/io-pgtable.h b/drivers/iommu/io-pgtable.h
-> index 4faee7d..6e7f11e 100644
-> --- a/drivers/iommu/io-pgtable.h
-> +++ b/drivers/iommu/io-pgtable.h
-> @@ -47,10 +47,24 @@ struct iommu_gather_ops {
->   *                 page table walker.
->   */
->  struct io_pgtable_cfg {
-> -	#define IO_PGTABLE_QUIRK_ARM_NS		BIT(0) /* Set NS bit in PTEs */
-> -	#define IO_PGTABLE_QUIRK_NO_PERMS	BIT(1) /* No AP/XN bits */
-> -	#define IO_PGTABLE_QUIRK_TLBI_ON_MAP	BIT(2) /* TLB Inv. on map */
-> -	int				quirks;
-> +	/*
-> +	 * IO_PGTABLE_QUIRK_ARM_NS: (ARM formats) Set NS and NSTABLE bits in
-> +	 *	stage 1 PTEs, for hardware which insists on validating them
-> +	 *	even in	non-secure state where they should normally be ignored.
-> +	 *
-> +	 * IO_PGTABLE_QUIRK_NO_PERMS: Ignore the IOMMU_READ, IOMMU_WRITE and
-> +	 *	IOMMU_NOEXEC flags and map everything with full access, for
-> +	 *	hardware which does not implement the permissions of a given
-> +	 *	format, and/or requires some format-specific default value.
-> +	 *
-> +	 * IO_PGTABLE_QUIRK_TLBI_ON_MAP: If the format forbids caching invalid
-> +	 *	(unmapped) entries but the hardware might do so anyway, perform
-> +	 *	TLB maintenance when mapping as well as when unmapping.
-> +	 */
-> +	#define IO_PGTABLE_QUIRK_ARM_NS		BIT(0)
-> +	#define IO_PGTABLE_QUIRK_NO_PERMS	BIT(1)
-> +	#define IO_PGTABLE_QUIRK_TLBI_ON_MAP	BIT(2)
-> +	unsigned int			quirks;
->  	unsigned long			pgsize_bitmap;
->  	unsigned int			ias;
->  	unsigned int			oas;
-> @@ -173,10 +187,12 @@ static inline void io_pgtable_tlb_sync(struct
-> io_pgtable *iop) *
->   * @alloc: Allocate a set of page tables described by cfg.
->   * @free:  Free the page tables associated with iop.
-> + * @supported_quirks: Bitmap of quirks supported by the format.
->   */
->  struct io_pgtable_init_fns {
->  	struct io_pgtable *(*alloc)(struct io_pgtable_cfg *cfg, void *cookie);
->  	void (*free)(struct io_pgtable *iop);
-> +	unsigned int supported_quirks;
->  };
-> 
->  extern struct io_pgtable_init_fns io_pgtable_arm_32_lpae_s1_init_fns;
-
--- 
-Regards,
-
-Laurent Pinchart
+regards
+Suman
