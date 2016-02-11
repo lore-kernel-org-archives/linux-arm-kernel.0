@@ -1,56 +1,50 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
-Date: Thu, 11 Feb 2016 15:43:47 +0100
-Subject: USB Ethernet gadget on Nokia n900
-In-Reply-To: <201601192158.19810@pali>
-References: <20141019090107.GA19132@amd> <20150707074626.GB12087@pali>
- <20150707114658.GT10705@atomide.com> <201601192158.19810@pali>
-Message-ID: <20160211144347.GY30075@pali>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 11 Feb 2016 15:47:12 +0100
+Subject: [GIT PULL 1/4] rockchip soc-driver changes for 4.6
+Message-ID: <1734524.3yNt5L3F1F@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 19 January 2016 21:58:19 Pali Roh?r wrote:
-> On Tuesday 07 July 2015 13:46:59 Tony Lindgren wrote:
-> > * Pali Roh?r <pali.rohar@gmail.com> [150707 00:48]:
-> > > On Monday 06 July 2015 06:53:18 Tony Lindgren wrote:
-> > > > * Pali Roh?r <pali.rohar@gmail.com> [150706 06:27]:
-> > > > > On Tuesday 28 October 2014 23:26:41 Tony Lindgren wrote:
-> > > > > > * Pavel Machek <pavel@ucw.cz> [141028 15:22]:
-> > > > > > > On Tue 2014-10-28 23:04:50, Pavel Machek wrote:
-> > > > > > > > Networking now works against 3.17-based kernel. Thanks!
-> > > > > > > 
-> > > > > > > It works on 3.18-rc1 kernel, too. (I had to hand-modify
-> > > > > > > patch to apply to 3.17, no changes needed for 3.18-rc1.)
-> > > > > > > 
-> > > > > > > Tested-by: Pavel Machek <pavel@ucw.cz>
-> > > > > > 
-> > > > > > Whatever we decice to do to fix this regression, it should
-> > > > > > probably be backported to at least v3.16 stable for distro
-> > > > > > use, maybe earlier too. I'd assume this is broken on
-> > > > > > multiple platforms currently.
-> > > > > 
-> > > > > it looks like this patch was not included into any kernel
-> > > > > version... I'm still using it on top of 4.x kernels. Are you
-> > > > > going to send this patch into upstream? Or do you have another
-> > > > > fix for this problem?
-> > > > 
-> > > > I think Felipe mentioned a better built-in gether fix that's been
-> > > > reviewed on linux-usb list.
-> > > 
-> > > Do you have link to that email thread? Or was Felipe's fix already
-> > > merged into mainline kernel?
-> > 
-> > Sorry I don't have a link, maybe Felipe can point you to the right
-> > patch.
-> > 
-> > Regards,
-> > 
-> > Tony
-> 
-> Felipe, ping
-> 
+Hi Arnd, Olof, Kevin,
 
-PING?
+please find below soc driver changes for Rockchip for 4.6
+The tag describes the changes a little bit more.
 
--- 
-Pali Roh?r
-pali.rohar at gmail.com
+
+Thanks
+Heiko
+
+
+The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
+
+  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.6-rockchip-drivers1
+
+for you to fetch changes up to 1d961f11a108af9f7fbe89cc950a8d16ddbdbb28:
+
+  soc: rockchip: power-domain: fix err handle while probing (2016-02-02 22:18:31 +0100)
+
+----------------------------------------------------------------
+Support for the power-domains on rk3368 and a fix for
+a wrong handling of for_each_available_child_of_node.
+
+----------------------------------------------------------------
+Heiko Stuebner (1):
+      Merge branch 'v4.6-shared/pdids' into v4.6-armsoc/drivers
+
+Shawn Lin (1):
+      soc: rockchip: power-domain: fix err handle while probing
+
+zhangqing (3):
+      dt-bindings: add power-domain header for RK3368 SoCs
+      dt-bindings: modify document of Rockchip power domains
+      soc: rockchip: power-domain: Modify power domain driver for rk3368
+
+ .../bindings/soc/rockchip/power_domain.txt         | 21 +++++++++++++
+ drivers/soc/rockchip/pm_domains.c                  | 34 ++++++++++++++++++++++
+ include/dt-bindings/power/rk3368-power.h           | 28 ++++++++++++++++++
+ 3 files changed, 83 insertions(+)
+ create mode 100644 include/dt-bindings/power/rk3368-power.h
