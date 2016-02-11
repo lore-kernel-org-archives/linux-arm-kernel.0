@@ -1,84 +1,136 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Thu, 11 Feb 2016 21:15:55 +0100
-Subject: [PATCH 3/3] ARM64: zynqmp: Use 64bit size cell format
-In-Reply-To: <CAL_JsqJPXvz_9GFtNyN024+GD=iBHARCb=VdSi_36GjMWe=CnA@mail.gmail.com>
-References: <2f160e012080d5d6de11238ade239bb0bb224f64.1455193571.git.michal.simek@xilinx.com>
- <36fb9c4c9b2019b854e84dc0a9a01252a6de2337.1455193571.git.michal.simek@xilinx.com>
- <CAL_JsqK0=LaXqJyr_rGKCzGgt5kFy79-4ARocTGpKved3JU-Ug@mail.gmail.com>
- <56BCD9CB.9030803@monstr.eu>
- <CAL_JsqJPXvz_9GFtNyN024+GD=iBHARCb=VdSi_36GjMWe=CnA@mail.gmail.com>
-Message-ID: <56BCEBFB.3070209@xilinx.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 11 Feb 2016 23:26:38 +0300
+Subject: [PATCH] ARM: dts: silk: add sound support
+In-Reply-To: <1674850.BZpGW9kEud@wasted.cogentembedded.com>
+References: <1674850.BZpGW9kEud@wasted.cogentembedded.com>
+Message-ID: <4246644.0ZLx3MiCIL@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Define the SILK board dependent part of the R8A7794 sound  device node.
+Add device node for Asahi Kasei AK4643 stereo codec to the I2C1 bus.
+Add the "simple-audio-card" device node to interconnect the SoC sound
+device  and the codec.
 
-On 11.2.2016 20:49, Rob Herring wrote:
-> On Thu, Feb 11, 2016 at 12:58 PM, Michal Simek <monstr@monstr.eu> wrote:
->> Hi Rob,
->>
->> On 11.2.2016 17:13, Rob Herring wrote:
->>> On Thu, Feb 11, 2016 at 6:26 AM, Michal Simek <michal.simek@xilinx.com> wrote:
->>>> Use 64bit size cell format instead of 32bit for memory
->>>> description. Change 64bit sizes also for all others IPs.
->>>
->>> Why? As is, this change is completely pointless because nothing needs
->>> a >4GB size. Do you have peripherals with >4GB size?
->>
->> The change I need to do is to support more than 4GB memory. Memory space
->> is divided to some parts. 2GB connected to hard part below 4GB. There
->> there is 1GB connected to PL part below. Then 32GB hard part above of
->> 4GB and a lot of space for PL part (~230GB).
->>
->> PCIe can also address more than 256GB.
-> 
-> So I would expect some amount of the bus structure to be reflected in
-> the DT. For example, hard and PL IP are probably in separate address
-> ranges. I'd guess PL bus has additional logic to enable/disable it for
-> reprogramming, so you'd need a different bus node anyway. For PCIe,
-> it's probably its own bus too.
+This patch is based on the commit 493b4da7c10c ("ARM: dts: porter: add
+sound support").
 
-As you see right now there is separation already.
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-> 
->> That's why I stand before decision. Change size-cell for all IPs which
->> are currently listed. Or just change it for memory node which is listed
->> in mainline.
->> I am not quite sure how PCIe description will look like and if there is
->> any other IP which will required on current buses use sizes more that
->> 4GB. That's why I have change all sizes to support more than 4GB.
->>
->> But definitely current need is to support more than 4GB memory size and
->> I have no problem to use not empty ranges property and keep there
->> #size-cells = <1>;
-> 
-> Then why aren't you adding to the memory? (the bootloader sets the
-> actual size is a valid answer)
+---
+This patch is against the 'renesas-devel-20160209-v4.5-rc3' tag of Simon
+Horman's 'renesas.git' repo. It depends on the 5 R8A7794 sound support patches
+in posted earlier this week  in order to build and the R8A7794 PFC driver
+patches posted yesterday in  order  for  the pins to be properly configured
+(but works without the pins  configured  too)...
 
-I am not fully convinced about it. Bootloader can set it up but there
-shouldn't be dependency on bootloader capability that it will do it.
-Also you don't need to use fully featured bootloader for doing that.
-It means that for board dtses make sense to fill memory node with
-correct values. If bootloader is capable to rewrite it/fix it, then it
-is fine. If not, you can use let's say default values.
+ arch/arm/boot/dts/r8a7794-silk.dts |   71 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 71 insertions(+)
 
-Also the second part of the problem is. You have bootloader which is
-aware about that you have 34GB of memory in two banks. 2GB below 4GB
-limit and 32GB above. But if bootloader starts to rewrite memory node
-where #size-cell = <1> with 32GB size it will probably messes it up.
-
-That's why I see the value to setup size-cells = <2>; earlier rather
-than later.
-IRC someone mentioning that in past when I was pushing zynqmp DTS that
-we should use #size-cells = <2>;
-
->> Both solution works for me. Definitely thank you for your comments.
-> 
-> Either way, I'd change this when you actually need the change, not by itself.
-
-ok. Fair enough. I need this for at least memory node because boards are
-using the same zynqmp.dtsi files. For all other buses I have no problem
-to keep just size-cells = <1>; and setup ranges to make dtc happy.
-
-Thanks,
-Michal
+Index: renesas/arch/arm/boot/dts/r8a7794-silk.dts
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/r8a7794-silk.dts
++++ renesas/arch/arm/boot/dts/r8a7794-silk.dts
+@@ -10,6 +10,17 @@
+  * kind, whether express or implied.
+  */
+ 
++/*
++ * SSI-AK4643
++ *
++ * SW1: 2-1: AK4643
++ *      2-3: ADV7511
++ *
++ * This command is required before playback/capture:
++ *
++ *	amixer set "LINEOUT Mixer DACL" on
++ */
++
+ /dts-v1/;
+ #include "r8a7794.dtsi"
+ #include <dt-bindings/gpio/gpio.h>
+@@ -119,6 +130,30 @@
+ 		#clock-cells = <0>;
+ 		clock-frequency = <74250000>;
+ 	};
++
++	x9_clk: x9-clock {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <12288000>;
++		clock-output-names = "audio_clock";
++	};
++
++	sound {
++		compatible = "simple-audio-card";
++
++		simple-audio-card,format = "left_j";
++		simple-audio-card,bitclock-master = <&soundcodec>;
++		simple-audio-card,frame-master = <&soundcodec>;
++
++		simple-audio-card,cpu {
++			sound-dai = <&rcar_sound>;
++		};
++
++		soundcodec: simple-audio-card,codec {
++			sound-dai = <&ak4643>;
++			clocks = <&x9_clk>;
++		};
++	};
+ };
+ 
+ &extal_clk {
+@@ -183,6 +218,16 @@
+ 		renesas,groups = "usb1";
+ 		renesas,function = "usb1";
+ 	};
++
++	ssi_pins: sound {
++		renesas,groups = "ssi0129_ctrl", "ssi0_data", "ssi1_data";
++		renesas,function = "ssi";
++	};
++
++	audio_clk_pins: audio_clk {
++		renesas,groups = "audio_clkc";
++		renesas,function = "audio_clk";
++	};
+ };
+ 
+ &scif2 {
+@@ -220,6 +265,12 @@
+ 	status = "okay";
+ 	clock-frequency = <400000>;
+ 
++	ak4643: codec at 12 {
++		compatible = "asahi-kasei,ak4643";
++		#sound-dai-cells = <0>;
++		reg = <0x12>;
++	};
++
+ 	composite-in at 20 {
+ 		compatible = "adi,adv7180";
+ 		reg = <0x20>;
+@@ -380,3 +431,23 @@
+ 		};
+ 	};
+ };
++
++&rcar_sound {
++	pinctrl-0 = <&ssi_pins &audio_clk_pins>;
++	pinctrl-names = "default";
++	status = "okay";
++
++	/* Single DAI */
++	#sound-dai-cells = <0>;
++
++	rcar_sound,dai {
++		dai0 {
++			playback = <&ssi0>;
++			capture  = <&ssi1>;
++		};
++	};
++};
++
++&ssi1 {
++	shared-pin;
++};
