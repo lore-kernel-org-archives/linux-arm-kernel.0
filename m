@@ -1,96 +1,37 @@
 From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Wed, 10 Feb 2016 21:51:06 -0600
-Subject: [PATCH V3 07/12] dtb: amd: Misc changes for GPIO devices
+Date: Wed, 10 Feb 2016 21:51:07 -0600
+Subject: [PATCH V3 08/12] dtb: amd: Add PERF CCN-504 device tree node
 In-Reply-To: <1455162671-16044-1-git-send-email-Suravee.Suthikulpanit@amd.com>
 References: <1455162671-16044-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <1455162671-16044-8-git-send-email-Suravee.Suthikulpanit@amd.com>
+Message-ID: <1455162671-16044-9-git-send-email-Suravee.Suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
 
-Add new GPIO device nodes and fix clock on gpio0.
+Add PERF CCN-504 device tree node.
 
 Signed-off-by: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
 ---
- arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi | 49 +++++++++++++++++++++++++---
- 1 file changed, 45 insertions(+), 4 deletions(-)
+ arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi b/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
-index 9f59381..ba455d1 100644
+index ba455d1..70f407d 100644
 --- a/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
 +++ b/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
-@@ -129,7 +129,7 @@
- 			#size-cells = <0>;
+@@ -229,5 +229,12 @@
+ 				/* 64-bit MMIO (size= 124G) */
+ 				<0x03000000 0x01 0x00000000 0x01 0x00000000 0x7f 0x00000000>;
  		};
- 
--		gpio0: gpio at e1040000 {
-+		gpio0: gpio at e1040000 { /* Not available to OS for B0 */
- 			status = "disabled";
- 			compatible = "arm,pl061", "arm,primecell";
- 			#gpio-cells = <2>;
-@@ -138,18 +138,59 @@
- 			interrupts = <0 359 4>;
- 			interrupt-controller;
- 			#interrupt-cells = <2>;
--			clocks = <&uartspiclk_100mhz>;
-+			clocks = <&miscclk_250mhz>;
- 			clock-names = "apb_pclk";
- 		};
- 
--		gpio1: gpio at e1050000 {
-+		gpio1: gpio at e1050000 { /* [0:7] */
- 			status = "disabled";
- 			compatible = "arm,pl061", "arm,primecell";
- 			#gpio-cells = <2>;
- 			reg = <0 0xe1050000 0 0x1000>;
- 			gpio-controller;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
- 			interrupts = <0 358 4>;
--			clocks = <&uartspiclk_100mhz>;
-+			clocks = <&miscclk_250mhz>;
-+			clock-names = "apb_pclk";
-+		};
 +
-+		gpio2: gpio at e0020000 { /* [8:15] */
-+			status = "disabled";
-+			compatible = "arm,pl061", "arm,primecell";
-+			#gpio-cells = <2>;
-+			reg = <0 0xe0020000 0 0x1000>;
-+			gpio-controller;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			interrupts = <0 366 4>;
-+			clocks = <&miscclk_250mhz>;
-+			clock-names = "apb_pclk";
++		/* Perf CCN504 PMU */
++		ccn: ccn at e8000000 {
++			compatible = "arm,ccn-504";
++			reg = <0x0 0xe8000000 0 0x1000000>;
++			interrupts = <0 380 4>;
 +		};
-+
-+		gpio3: gpio at e0030000 { /* [16:23] */
-+			status = "disabled";
-+			compatible = "arm,pl061", "arm,primecell";
-+			#gpio-cells = <2>;
-+			reg = <0 0xe0030000 0 0x1000>;
-+			gpio-controller;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			interrupts = <0 365 4>;
-+			clocks = <&miscclk_250mhz>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		gpio4: gpio at e0080000 { /* [24] */
-+			status = "disabled";
-+			compatible = "arm,pl061", "arm,primecell";
-+			#gpio-cells = <2>;
-+			reg = <0 0xe0080000 0 0x1000>;
-+			gpio-controller;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			interrupts = <0 361 4>;
-+			clocks = <&miscclk_250mhz>;
- 			clock-names = "apb_pclk";
- 		};
- 
+ 	};
+ };
 -- 
 2.5.0
