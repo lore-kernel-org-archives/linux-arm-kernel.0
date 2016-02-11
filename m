@@ -1,124 +1,297 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 11 Feb 2016 16:13:45 +0000
-Subject: [PATCH 4/3] iommu/io-pgtable: Rationalise quirk handling
-In-Reply-To: <20160210154815.GO1052@arm.com>
-References: <cover.1453723096.git.robin.murphy@arm.com>
- <066c4af0e29c9cc658bd5e48edc5e2d7ba7140a1.1453723096.git.robin.murphy@arm.com>
- <20160210154815.GO1052@arm.com>
-Message-ID: <ea1f3d3feec0dc9c18d43393678370b50b1275f5.1455206840.git.robin.murphy@arm.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Thu, 11 Feb 2016 10:13:53 -0600
+Subject: [PATCH 3/3] ARM64: zynqmp: Use 64bit size cell format
+In-Reply-To: <36fb9c4c9b2019b854e84dc0a9a01252a6de2337.1455193571.git.michal.simek@xilinx.com>
+References: <2f160e012080d5d6de11238ade239bb0bb224f64.1455193571.git.michal.simek@xilinx.com>
+ <36fb9c4c9b2019b854e84dc0a9a01252a6de2337.1455193571.git.michal.simek@xilinx.com>
+Message-ID: <CAL_JsqK0=LaXqJyr_rGKCzGgt5kFy79-4ARocTGpKved3JU-Ug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the number of io-pgtable implementations grows beyond 1, it's time
-to rationalise the quirks mechanism before things have a chance to
-start getting really ugly and out-of-hand.
+On Thu, Feb 11, 2016 at 6:26 AM, Michal Simek <michal.simek@xilinx.com> wrote:
+> Use 64bit size cell format instead of 32bit for memory
+> description. Change 64bit sizes also for all others IPs.
 
-To that end:
-- Indicate exactly which quirks each format can/does support.
-- Fail creating a table if a caller wants unsupported quirks.
-- Properly document where each quirk applies and why.
+Why? As is, this change is completely pointless because nothing needs
+a >4GB size. Do you have peripherals with >4GB size?
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- drivers/iommu/io-pgtable-arm-v7s.c |  3 +++
- drivers/iommu/io-pgtable-arm.c     |  2 ++
- drivers/iommu/io-pgtable.c         |  3 +++
- drivers/iommu/io-pgtable.h         | 24 ++++++++++++++++++++----
- 4 files changed, 28 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/iommu/io-pgtable-arm-v7s.c b/drivers/iommu/io-pgtable-arm-v7s.c
-index d39a021..9bc607a 100644
---- a/drivers/iommu/io-pgtable-arm-v7s.c
-+++ b/drivers/iommu/io-pgtable-arm-v7s.c
-@@ -690,6 +690,9 @@ out_free_data:
- struct io_pgtable_init_fns io_pgtable_arm_v7s_init_fns = {
- 	.alloc	= arm_v7s_alloc_pgtable,
- 	.free	= arm_v7s_free_pgtable,
-+	.supported_quirks = IO_PGTABLE_QUIRK_ARM_NS |
-+			    IO_PGTABLE_QUIRK_NO_PERMS |
-+			    IO_PGTABLE_QUIRK_TLBI_ON_MAP,
- };
- 
- #ifdef CONFIG_IOMMU_IO_PGTABLE_ARMV7S_SELFTEST
-diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
-index 4095af2..32f94f1 100644
---- a/drivers/iommu/io-pgtable-arm.c
-+++ b/drivers/iommu/io-pgtable-arm.c
-@@ -863,6 +863,7 @@ arm_32_lpae_alloc_pgtable_s2(struct io_pgtable_cfg *cfg, void *cookie)
- struct io_pgtable_init_fns io_pgtable_arm_64_lpae_s1_init_fns = {
- 	.alloc	= arm_64_lpae_alloc_pgtable_s1,
- 	.free	= arm_lpae_free_pgtable,
-+	.supported_quirks = IO_PGTABLE_QUIRK_ARM_NS,
- };
- 
- struct io_pgtable_init_fns io_pgtable_arm_64_lpae_s2_init_fns = {
-@@ -873,6 +874,7 @@ struct io_pgtable_init_fns io_pgtable_arm_64_lpae_s2_init_fns = {
- struct io_pgtable_init_fns io_pgtable_arm_32_lpae_s1_init_fns = {
- 	.alloc	= arm_32_lpae_alloc_pgtable_s1,
- 	.free	= arm_lpae_free_pgtable,
-+	.supported_quirks = IO_PGTABLE_QUIRK_ARM_NS,
- };
- 
- struct io_pgtable_init_fns io_pgtable_arm_32_lpae_s2_init_fns = {
-diff --git a/drivers/iommu/io-pgtable.c b/drivers/iommu/io-pgtable.c
-index 876f6a7..0f57a45 100644
---- a/drivers/iommu/io-pgtable.c
-+++ b/drivers/iommu/io-pgtable.c
-@@ -52,6 +52,9 @@ struct io_pgtable_ops *alloc_io_pgtable_ops(enum io_pgtable_fmt fmt,
- 	if (!fns)
- 		return NULL;
- 
-+	if (cfg->quirks & ~fns->supported_quirks)
-+		return NULL;
-+
- 	iop = fns->alloc(cfg, cookie);
- 	if (!iop)
- 		return NULL;
-diff --git a/drivers/iommu/io-pgtable.h b/drivers/iommu/io-pgtable.h
-index 4faee7d..6e7f11e 100644
---- a/drivers/iommu/io-pgtable.h
-+++ b/drivers/iommu/io-pgtable.h
-@@ -47,10 +47,24 @@ struct iommu_gather_ops {
-  *                 page table walker.
-  */
- struct io_pgtable_cfg {
--	#define IO_PGTABLE_QUIRK_ARM_NS		BIT(0) /* Set NS bit in PTEs */
--	#define IO_PGTABLE_QUIRK_NO_PERMS	BIT(1) /* No AP/XN bits */
--	#define IO_PGTABLE_QUIRK_TLBI_ON_MAP	BIT(2) /* TLB Inv. on map */
--	int				quirks;
-+	/*
-+	 * IO_PGTABLE_QUIRK_ARM_NS: (ARM formats) Set NS and NSTABLE bits in
-+	 *	stage 1 PTEs, for hardware which insists on validating them
-+	 *	even in	non-secure state where they should normally be ignored.
-+	 *
-+	 * IO_PGTABLE_QUIRK_NO_PERMS: Ignore the IOMMU_READ, IOMMU_WRITE and
-+	 *	IOMMU_NOEXEC flags and map everything with full access, for
-+	 *	hardware which does not implement the permissions of a given
-+	 *	format, and/or requires some format-specific default value.
-+	 *
-+	 * IO_PGTABLE_QUIRK_TLBI_ON_MAP: If the format forbids caching invalid
-+	 *	(unmapped) entries but the hardware might do so anyway, perform
-+	 *	TLB maintenance when mapping as well as when unmapping.
-+	 */
-+	#define IO_PGTABLE_QUIRK_ARM_NS		BIT(0)
-+	#define IO_PGTABLE_QUIRK_NO_PERMS	BIT(1)
-+	#define IO_PGTABLE_QUIRK_TLBI_ON_MAP	BIT(2)
-+	unsigned int			quirks;
- 	unsigned long			pgsize_bitmap;
- 	unsigned int			ias;
- 	unsigned int			oas;
-@@ -173,10 +187,12 @@ static inline void io_pgtable_tlb_sync(struct io_pgtable *iop)
-  *
-  * @alloc: Allocate a set of page tables described by cfg.
-  * @free:  Free the page tables associated with iop.
-+ * @supported_quirks: Bitmap of quirks supported by the format.
-  */
- struct io_pgtable_init_fns {
- 	struct io_pgtable *(*alloc)(struct io_pgtable_cfg *cfg, void *cookie);
- 	void (*free)(struct io_pgtable *iop);
-+	unsigned int supported_quirks;
- };
- 
- extern struct io_pgtable_init_fns io_pgtable_arm_32_lpae_s1_init_fns;
--- 
-2.7.0.25.gfc10eb5.dirty
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> ---
+>
+>  arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts |  2 +-
+>  arch/arm64/boot/dts/xilinx/zynqmp.dtsi      | 63 ++++++++++++++---------------
+>  2 files changed, 32 insertions(+), 33 deletions(-)
+>
+> diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts b/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
+> index acb0527fdc4a..358089687a69 100644
+> --- a/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
+> +++ b/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
+> @@ -29,7 +29,7 @@
+>
+>         memory {
+>                 device_type = "memory";
+> -               reg = <0x0 0x0 0x40000000>;
+> +               reg = <0x0 0x0 0x0 0x40000000>;
+>         };
+>  };
+>
+> diff --git a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
+> index e595f22e7e4b..ef8fe8e6c868 100644
+> --- a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
+> +++ b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
+> @@ -14,7 +14,7 @@
+>  / {
+>         compatible = "xlnx,zynqmp";
+>         #address-cells = <2>;
+> -       #size-cells = <1>;
+> +       #size-cells = <2>;
+>
+>         cpus {
+>                 #address-cells = <1>;
+> @@ -74,16 +74,15 @@
+>         amba_apu {
+>                 compatible = "simple-bus";
+>                 #address-cells = <2>;
+> -               #size-cells = <1>;
+> +               #size-cells = <2>;
+>                 ranges;
+> -
+>                 gic: interrupt-controller at f9010000 {
+>                         compatible = "arm,gic-400", "arm,cortex-a15-gic";
+>                         #interrupt-cells = <3>;
+> -                       reg = <0x0 0xf9010000 0x10000>,
+> -                             <0x0 0xf902f000 0x2000>,
+> -                             <0x0 0xf9040000 0x20000>,
+> -                             <0x0 0xf906f000 0x2000>;
+> +                       reg = <0x0 0xf9010000 0x0 0x10000>,
+> +                             <0x0 0xf902f000 0x0 0x2000>,
+> +                             <0x0 0xf9040000 0x0 0x20000>,
+> +                             <0x0 0xf906f000 0x0 0x2000>;
+>                         interrupt-controller;
+>                         interrupt-parent = <&gic>;
+>                         interrupts = <1 9 0xf04>;
+> @@ -93,14 +92,14 @@
+>         amba: amba {
+>                 compatible = "simple-bus";
+>                 #address-cells = <2>;
+> -               #size-cells = <1>;
+> +               #size-cells = <2>;
+>                 ranges;
+>
+>                 can0: can at ff060000 {
+>                         compatible = "xlnx,zynq-can-1.0";
+>                         status = "disabled";
+>                         clock-names = "can_clk", "pclk";
+> -                       reg = <0x0 0xff060000 0x1000>;
+> +                       reg = <0x0 0xff060000 0x0 0x1000>;
+>                         interrupts = <0 23 4>;
+>                         interrupt-parent = <&gic>;
+>                         tx-fifo-depth = <0x40>;
+> @@ -111,7 +110,7 @@
+>                         compatible = "xlnx,zynq-can-1.0";
+>                         status = "disabled";
+>                         clock-names = "can_clk", "pclk";
+> -                       reg = <0x0 0xff070000 0x1000>;
+> +                       reg = <0x0 0xff070000 0x0 0x1000>;
+>                         interrupts = <0 24 4>;
+>                         interrupt-parent = <&gic>;
+>                         tx-fifo-depth = <0x40>;
+> @@ -123,7 +122,7 @@
+>                         status = "disabled";
+>                         interrupt-parent = <&gic>;
+>                         interrupts = <0 57 4>, <0 57 4>;
+> -                       reg = <0x0 0xff0b0000 0x1000>;
+> +                       reg = <0x0 0xff0b0000 0x0 0x1000>;
+>                         clock-names = "pclk", "hclk", "tx_clk";
+>                         #address-cells = <1>;
+>                         #size-cells = <0>;
+> @@ -134,7 +133,7 @@
+>                         status = "disabled";
+>                         interrupt-parent = <&gic>;
+>                         interrupts = <0 59 4>, <0 59 4>;
+> -                       reg = <0x0 0xff0c0000 0x1000>;
+> +                       reg = <0x0 0xff0c0000 0x0 0x1000>;
+>                         clock-names = "pclk", "hclk", "tx_clk";
+>                         #address-cells = <1>;
+>                         #size-cells = <0>;
+> @@ -145,7 +144,7 @@
+>                         status = "disabled";
+>                         interrupt-parent = <&gic>;
+>                         interrupts = <0 61 4>, <0 61 4>;
+> -                       reg = <0x0 0xff0d0000 0x1000>;
+> +                       reg = <0x0 0xff0d0000 0x0 0x1000>;
+>                         clock-names = "pclk", "hclk", "tx_clk";
+>                         #address-cells = <1>;
+>                         #size-cells = <0>;
+> @@ -156,7 +155,7 @@
+>                         status = "disabled";
+>                         interrupt-parent = <&gic>;
+>                         interrupts = <0 63 4>, <0 63 4>;
+> -                       reg = <0x0 0xff0e0000 0x1000>;
+> +                       reg = <0x0 0xff0e0000 0x0 0x1000>;
+>                         clock-names = "pclk", "hclk", "tx_clk";
+>                         #address-cells = <1>;
+>                         #size-cells = <0>;
+> @@ -170,7 +169,7 @@
+>                         interrupts = <0 16 4>;
+>                         interrupt-controller;
+>                         #interrupt-cells = <2>;
+> -                       reg = <0x0 0xff0a0000 0x1000>;
+> +                       reg = <0x0 0xff0a0000 0x0 0x1000>;
+>                 };
+>
+>                 i2c0: i2c at ff020000 {
+> @@ -178,7 +177,7 @@
+>                         status = "disabled";
+>                         interrupt-parent = <&gic>;
+>                         interrupts = <0 17 4>;
+> -                       reg = <0x0 0xff020000 0x1000>;
+> +                       reg = <0x0 0xff020000 0x0 0x1000>;
+>                         #address-cells = <1>;
+>                         #size-cells = <0>;
+>                 };
+> @@ -188,7 +187,7 @@
+>                         status = "disabled";
+>                         interrupt-parent = <&gic>;
+>                         interrupts = <0 18 4>;
+> -                       reg = <0x0 0xff030000 0x1000>;
+> +                       reg = <0x0 0xff030000 0x0 0x1000>;
+>                         #address-cells = <1>;
+>                         #size-cells = <0>;
+>                 };
+> @@ -196,7 +195,7 @@
+>                 sata: ahci at fd0c0000 {
+>                         compatible = "ceva,ahci-1v84";
+>                         status = "disabled";
+> -                       reg = <0x0 0xfd0c0000 0x2000>;
+> +                       reg = <0x0 0xfd0c0000 0x0 0x2000>;
+>                         interrupt-parent = <&gic>;
+>                         interrupts = <0 133 4>;
+>                 };
+> @@ -206,7 +205,7 @@
+>                         status = "disabled";
+>                         interrupt-parent = <&gic>;
+>                         interrupts = <0 48 4>;
+> -                       reg = <0x0 0xff160000 0x1000>;
+> +                       reg = <0x0 0xff160000 0x0 0x1000>;
+>                         clock-names = "clk_xin", "clk_ahb";
+>                 };
+>
+> @@ -215,13 +214,13 @@
+>                         status = "disabled";
+>                         interrupt-parent = <&gic>;
+>                         interrupts = <0 49 4>;
+> -                       reg = <0x0 0xff170000 0x1000>;
+> +                       reg = <0x0 0xff170000 0x0 0x1000>;
+>                         clock-names = "clk_xin", "clk_ahb";
+>                 };
+>
+>                 smmu: smmu at fd800000 {
+>                         compatible = "arm,mmu-500";
+> -                       reg = <0x0 0xfd800000 0x20000>;
+> +                       reg = <0x0 0xfd800000 0x0 0x20000>;
+>                         #global-interrupts = <1>;
+>                         interrupt-parent = <&gic>;
+>                         interrupts = <0 157 4>,
+> @@ -236,7 +235,7 @@
+>                         status = "disabled";
+>                         interrupt-parent = <&gic>;
+>                         interrupts = <0 19 4>;
+> -                       reg = <0x0 0xff040000 0x1000>;
+> +                       reg = <0x0 0xff040000 0x0 0x1000>;
+>                         clock-names = "ref_clk", "pclk";
+>                         #address-cells = <1>;
+>                         #size-cells = <0>;
+> @@ -247,7 +246,7 @@
+>                         status = "disabled";
+>                         interrupt-parent = <&gic>;
+>                         interrupts = <0 20 4>;
+> -                       reg = <0x0 0xff050000 0x1000>;
+> +                       reg = <0x0 0xff050000 0x0 0x1000>;
+>                         clock-names = "ref_clk", "pclk";
+>                         #address-cells = <1>;
+>                         #size-cells = <0>;
+> @@ -258,7 +257,7 @@
+>                         status = "disabled";
+>                         interrupt-parent = <&gic>;
+>                         interrupts = <0 36 4>, <0 37 4>, <0 38 4>;
+> -                       reg = <0x0 0xff110000 0x1000>;
+> +                       reg = <0x0 0xff110000 0x0 0x1000>;
+>                         timer-width = <32>;
+>                 };
+>
+> @@ -267,7 +266,7 @@
+>                         status = "disabled";
+>                         interrupt-parent = <&gic>;
+>                         interrupts = <0 39 4>, <0 40 4>, <0 41 4>;
+> -                       reg = <0x0 0xff120000 0x1000>;
+> +                       reg = <0x0 0xff120000 0x0 0x1000>;
+>                         timer-width = <32>;
+>                 };
+>
+> @@ -276,7 +275,7 @@
+>                         status = "disabled";
+>                         interrupt-parent = <&gic>;
+>                         interrupts = <0 42 4>, <0 43 4>, <0 44 4>;
+> -                       reg = <0x0 0xff130000 0x1000>;
+> +                       reg = <0x0 0xff130000 0x0 0x1000>;
+>                         timer-width = <32>;
+>                 };
+>
+> @@ -285,7 +284,7 @@
+>                         status = "disabled";
+>                         interrupt-parent = <&gic>;
+>                         interrupts = <0 45 4>, <0 46 4>, <0 47 4>;
+> -                       reg = <0x0 0xff140000 0x1000>;
+> +                       reg = <0x0 0xff140000 0x0 0x1000>;
+>                         timer-width = <32>;
+>                 };
+>
+> @@ -294,7 +293,7 @@
+>                         status = "disabled";
+>                         interrupt-parent = <&gic>;
+>                         interrupts = <0 21 4>;
+> -                       reg = <0x0 0xff000000 0x1000>;
+> +                       reg = <0x0 0xff000000 0x0 0x1000>;
+>                         clock-names = "uart_clk", "pclk";
+>                 };
+>
+> @@ -303,7 +302,7 @@
+>                         status = "disabled";
+>                         interrupt-parent = <&gic>;
+>                         interrupts = <0 22 4>;
+> -                       reg = <0x0 0xff010000 0x1000>;
+> +                       reg = <0x0 0xff010000 0x0 0x1000>;
+>                         clock-names = "uart_clk", "pclk";
+>                 };
+>
+> @@ -312,7 +311,7 @@
+>                         status = "disabled";
+>                         interrupt-parent = <&gic>;
+>                         interrupts = <0 65 4>;
+> -                       reg = <0x0 0xfe200000 0x40000>;
+> +                       reg = <0x0 0xfe200000 0x0 0x40000>;
+>                         clock-names = "clk_xin", "clk_ahb";
+>                 };
+>
+> @@ -321,7 +320,7 @@
+>                         status = "disabled";
+>                         interrupt-parent = <&gic>;
+>                         interrupts = <0 70 4>;
+> -                       reg = <0x0 0xfe300000 0x40000>;
+> +                       reg = <0x0 0xfe300000 0x0 0x40000>;
+>                         clock-names = "clk_xin", "clk_ahb";
+>                 };
+>
+> @@ -330,7 +329,7 @@
+>                         status = "disabled";
+>                         interrupt-parent = <&gic>;
+>                         interrupts = <0 52 1>;
+> -                       reg = <0x0 0xfd4d0000 0x1000>;
+> +                       reg = <0x0 0xfd4d0000 0x0 0x1000>;
+>                         timeout-sec = <10>;
+>                 };
+>         };
+> --
+> 1.9.1
+>
