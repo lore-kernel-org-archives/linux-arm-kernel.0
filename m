@@ -1,46 +1,68 @@
-From: ahs3@redhat.com (Al Stone)
-Date: Wed, 10 Feb 2016 16:39:27 -0700
-Subject: [PATCH 0/3] ACPI: parse the SPCR table
-In-Reply-To: <56A8B570.2060501@linaro.org>
-References: <1453722324-22407-1-git-send-email-aleksey.makarov@linaro.org>
- <56A6494E.3090303@hurleysoftware.com> <56A8B570.2060501@linaro.org>
-Message-ID: <56BBCA2F.3020604@redhat.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 11 Feb 2016 02:02:11 +0200
+Subject: [PATCH v3 1/8] iommu: Add MMIO mapping type
+In-Reply-To: <1455065878-11906-2-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+References: <1455065878-11906-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+ <1455065878-11906-2-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+Message-ID: <13740597.5lZXKsEG19@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/27/2016 05:17 AM, Aleksey Makarov wrote:
-> 
-> 
-> On 01/25/2016 07:11 PM, Peter Hurley wrote:
->> On 01/25/2016 03:45 AM, Aleksey Makarov wrote:
->>> This patchset is based on the patchset by Leif Lindholm [1]
->>>
->>> 'ARM Server Base Boot Requirements' [2] mention SPCR 
->>> (Serial Port Console Redirection Table) [3] as a mandatory
->>> ACPI table that specifies the configuration of serial console.
->>>
->>> Licensing concerns have prevented implementing it in the past, but as of
->>> 10 August 2015, these tables have both been released also under 
->>> OWF 1.0 [4].
->>
->> This license has a patent retaliation provision, which makes it
->> incompatible with GPLv2.
->>
->> *If the license applies to this code*, then this patch set does not
->> meet the criteria for submission.
-> 
-> The license applies not to this code but to the document describing the tables.
+Hi Niklas,
 
-Just for the record, the SPCR table struct definition has been part
-of the Linux kernel since at least commit b24aad44 on 2009-07-24
-(line 1112 of include/acpi/actbl2.h) -- or so git blame tells me.
+Thank you for the patch.
+
+On Wednesday 10 February 2016 01:57:51 Niklas S?derlund wrote:
+> From: Robin Murphy <robin.murphy@arm.com>
+> 
+> On some platforms, MMIO regions might need slightly different treatment
+> compared to mapping regular memory; add the notion of MMIO mappings to
+> the IOMMU API's memory type flags, so that callers can let the IOMMU
+> drivers know to do the right thing.
+> 
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+Answering the question from the cover letter, yes, it's totally fine to pick 
+the ack, that's actually expected.
+
+> ---
+>  drivers/iommu/io-pgtable-arm.c | 4 +++-
+>  include/linux/iommu.h          | 1 +
+
+You might be asked to split this patch in two.
+
+>  2 files changed, 4 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
+> index 381ca5a..3ff4f87 100644
+> --- a/drivers/iommu/io-pgtable-arm.c
+> +++ b/drivers/iommu/io-pgtable-arm.c
+> @@ -364,7 +364,9 @@ static arm_lpae_iopte arm_lpae_prot_to_pte(struct
+> arm_lpae_io_pgtable *data, pte |= ARM_LPAE_PTE_HAP_READ;
+>  		if (prot & IOMMU_WRITE)
+>  			pte |= ARM_LPAE_PTE_HAP_WRITE;
+> -		if (prot & IOMMU_CACHE)
+> +		if (prot & IOMMU_MMIO)
+> +			pte |= ARM_LPAE_PTE_MEMATTR_DEV;
+> +		else if (prot & IOMMU_CACHE)
+>  			pte |= ARM_LPAE_PTE_MEMATTR_OIWB;
+>  		else
+>  			pte |= ARM_LPAE_PTE_MEMATTR_NC;
+> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+> index a5c539f..34b6432 100644
+> --- a/include/linux/iommu.h
+> +++ b/include/linux/iommu.h
+> @@ -30,6 +30,7 @@
+>  #define IOMMU_WRITE	(1 << 1)
+>  #define IOMMU_CACHE	(1 << 2) /* DMA cache coherency */
+>  #define IOMMU_NOEXEC	(1 << 3)
+> +#define IOMMU_MMIO	(1 << 4) /* e.g. things like MSI doorbells */
+> 
+>  struct iommu_ops;
+>  struct iommu_group;
 
 -- 
-ciao,
-al
------------------------------------
-Al Stone
-Software Engineer
-Red Hat, Inc.
-ahs3 at redhat.com
------------------------------------
+Regards,
+
+Laurent Pinchart
