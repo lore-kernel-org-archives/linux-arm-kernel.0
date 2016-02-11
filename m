@@ -1,50 +1,154 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Thu, 11 Feb 2016 03:42:01 +0200
-Subject: [GIT PULL] NXP LPC32xx DT Updates for v4.6 #1
-Message-ID: <56BBE6E9.1080509@mleia.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed, 10 Feb 2016 18:08:18 -0800
+Subject: [PATCH] ARM: imx_v6_v7_defconfig: enable useful configurations for
+ Vybrid
+Message-ID: <1455156498-29949-1-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof, Kevin,
+Enable configuration options useful for Vybrid:
+- NFC NAND driver
+- USB dual-role controller support
+- FTM PWM driver
+- DSPI SPI driver
+- Colibri VF50 Touchscreen support.
 
-please consider to include NXP LPC32xx DT updates (#1) for v4.6.
+Beside that, enable useful configurations such as IIO hwmon support
+(used in i.MX 23/28, patch pending for Vybrid), PWM LED support and
+CPU idle support.
 
-The changes add description of clock providers and clock consumers,
-define default irq types of SoC controllers and add PHY3250 board
-regulators.
+Regenerated config using savedefconfig (which removes some configs
+which are now enabled by default).
 
-I'm adding an official LPC32xx maintainer Roland to Cc, however
-he seems to be unresponsive for a quite long time (since 2014).
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+ arch/arm/configs/imx_v6_v7_defconfig | 19 +++++++++++--------
+ 1 file changed, 11 insertions(+), 8 deletions(-)
 
-----------------------------------------------------------------
-
-The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
-
-  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
-
-are available in the git repository at:
-
-  https://github.com/vzapolskiy/linux.git lpc32xx/dt
-
-for you to fetch changes up to d06670e96267d1f1a771f71f5719c0a2c0092ec1:
-
-  arm: dts: phy3250: add SD fixed regulator (2016-02-11 03:06:36 +0200)
-
-----------------------------------------------------------------
-
-Vladimir Zapolskiy (9):
-      dt-bindings: create arm/nxp folder and move LPC32xx SoC description to it
-      arm: dts: lpc32xx: add device nodes for external oscillators
-      arm: dts: lpc32xx: add clock controller device node
-      arm: dts: lpc32xx: add clock properties to device nodes
-      arm: dts: lpc32xx: add USB clock controller
-      arm: dts: lpc32xx: remove clock frequency property from UART device nodes
-      arm: dts: lpc32xx: assign interrupt types
-      arm: dts: phy3250: add lcd and backlight fixed regulators
-      arm: dts: phy3250: add SD fixed regulator
-
- .../devicetree/bindings/arm/{ => nxp}/lpc32xx.txt  |   0
- arch/arm/boot/dts/lpc32xx.dtsi                     | 150 ++++++++++++++++-----
- arch/arm/boot/dts/phy3250.dts                      |  32 +++++
- 3 files changed, 149 insertions(+), 33 deletions(-)
- rename Documentation/devicetree/bindings/arm/{ => nxp}/lpc32xx.txt (100%)
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 25a6066..dc7dc5c 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -57,6 +57,7 @@ CONFIG_KEXEC=y
+ CONFIG_CPU_FREQ=y
+ CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
+ CONFIG_ARM_IMX6Q_CPUFREQ=y
++CONFIG_CPU_IDLE=y
+ CONFIG_VFP=y
+ CONFIG_NEON=y
+ CONFIG_BINFMT_MISC=m
+@@ -72,7 +73,6 @@ CONFIG_IP_PNP_DHCP=y
+ # CONFIG_INET_XFRM_MODE_TUNNEL is not set
+ # CONFIG_INET_XFRM_MODE_BEET is not set
+ # CONFIG_INET_LRO is not set
+-CONFIG_IPV6=y
+ CONFIG_NETFILTER=y
+ CONFIG_CAN=y
+ CONFIG_CAN_FLEXCAN=y
+@@ -104,10 +104,13 @@ CONFIG_MTD_M25P80=y
+ CONFIG_MTD_SST25L=y
+ CONFIG_MTD_NAND=y
+ CONFIG_MTD_NAND_GPMI_NAND=y
++CONFIG_MTD_NAND_VF610_NFC=y
+ CONFIG_MTD_NAND_MXC=y
+ CONFIG_MTD_SPI_NOR=y
+ CONFIG_SPI_FSL_QUADSPI=y
+ CONFIG_MTD_UBI=y
++CONFIG_MTD_UBI_FASTMAP=y
++CONFIG_MTD_UBI_BLOCK=y
+ CONFIG_BLK_DEV_LOOP=y
+ CONFIG_BLK_DEV_RAM=y
+ CONFIG_BLK_DEV_RAM_SIZE=65536
+@@ -145,7 +148,6 @@ CONFIG_USB_RTL8152=m
+ CONFIG_USB_USBNET=m
+ CONFIG_USB_NET_CDC_EEM=m
+ CONFIG_BRCMFMAC=m
+-CONFIG_WL_TI=y
+ CONFIG_WL12XX=m
+ CONFIG_WLCORE_SDIO=m
+ # CONFIG_WILINK_PLATFORM_DATA is not set
+@@ -164,6 +166,7 @@ CONFIG_TOUCHSCREEN_MC13783=y
+ CONFIG_TOUCHSCREEN_TSC2007=y
+ CONFIG_TOUCHSCREEN_STMPE=y
+ CONFIG_TOUCHSCREEN_SX8654=y
++CONFIG_TOUCHSCREEN_COLIBRI_VF50=y
+ CONFIG_INPUT_MISC=y
+ CONFIG_INPUT_MMA8450=y
+ CONFIG_SERIO_SERPORT=m
+@@ -173,7 +176,6 @@ CONFIG_SERIAL_IMX=y
+ CONFIG_SERIAL_IMX_CONSOLE=y
+ CONFIG_SERIAL_FSL_LPUART=y
+ CONFIG_SERIAL_FSL_LPUART_CONSOLE=y
+-CONFIG_HW_RANDOM=y
+ # CONFIG_I2C_COMPAT is not set
+ CONFIG_I2C_CHARDEV=y
+ # CONFIG_I2C_HELPER_AUTO is not set
+@@ -182,6 +184,7 @@ CONFIG_I2C_ALGOPCA=m
+ CONFIG_I2C_IMX=y
+ CONFIG_SPI=y
+ CONFIG_SPI_IMX=y
++CONFIG_SPI_FSL_DSPI=y
+ CONFIG_GPIO_SYSFS=y
+ CONFIG_GPIO_MC9S08DZ60=y
+ CONFIG_GPIO_PCA953X=y
+@@ -192,6 +195,7 @@ CONFIG_POWER_RESET_IMX=y
+ CONFIG_POWER_RESET_SYSCON=y
+ CONFIG_POWER_RESET_SYSCON_POWEROFF=y
+ CONFIG_SENSORS_GPIO_FAN=y
++CONFIG_SENSORS_IIO_HWMON=y
+ CONFIG_THERMAL=y
+ CONFIG_CPU_THERMAL=y
+ CONFIG_IMX_THERMAL=y
+@@ -227,7 +231,6 @@ CONFIG_DRM=y
+ CONFIG_DRM_PANEL_SIMPLE=y
+ CONFIG_DRM_DW_HDMI_AHB_AUDIO=m
+ CONFIG_DRM_IMX=y
+-CONFIG_DRM_IMX_FB_HELPER=y
+ CONFIG_DRM_IMX_PARALLEL_DISPLAY=y
+ CONFIG_DRM_IMX_TVE=y
+ CONFIG_DRM_IMX_LDB=y
+@@ -271,6 +274,7 @@ CONFIG_USB_EHSET_TEST_FIXTURE=m
+ CONFIG_NOP_USB_XCEIV=y
+ CONFIG_USB_MXS_PHY=y
+ CONFIG_USB_GADGET=y
++CONFIG_USB_FSL_USB2=y
+ CONFIG_USB_CONFIGFS=m
+ CONFIG_USB_CONFIGFS_SERIAL=y
+ CONFIG_USB_CONFIGFS_ACM=y
+@@ -296,6 +300,7 @@ CONFIG_MMC_SDHCI_ESDHC_IMX=y
+ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
+ CONFIG_LEDS_GPIO=y
++CONFIG_LEDS_PWM=y
+ CONFIG_LEDS_TRIGGERS=y
+ CONFIG_LEDS_TRIGGER_TIMER=y
+ CONFIG_LEDS_TRIGGER_ONESHOT=y
+@@ -312,14 +317,15 @@ CONFIG_RTC_DRV_MC13XXX=y
+ CONFIG_RTC_DRV_MXC=y
+ CONFIG_RTC_DRV_SNVS=y
+ CONFIG_DMADEVICES=y
++CONFIG_FSL_EDMA=y
+ CONFIG_IMX_SDMA=y
+ CONFIG_MXS_DMA=y
+-CONFIG_FSL_EDMA=y
+ CONFIG_STAGING=y
+ # CONFIG_IOMMU_SUPPORT is not set
+ CONFIG_IIO=y
+ CONFIG_VF610_ADC=y
+ CONFIG_PWM=y
++CONFIG_PWM_FSL_FTM=y
+ CONFIG_PWM_IMX=y
+ CONFIG_NVMEM=y
+ CONFIG_NVMEM_IMX_OCOTP=y
+@@ -330,9 +336,6 @@ CONFIG_EXT2_FS_SECURITY=y
+ CONFIG_EXT3_FS=y
+ CONFIG_EXT3_FS_POSIX_ACL=y
+ CONFIG_EXT3_FS_SECURITY=y
+-CONFIG_EXT4_FS=y
+-CONFIG_EXT4_FS_POSIX_ACL=y
+-CONFIG_EXT4_FS_SECURITY=y
+ CONFIG_QUOTA=y
+ CONFIG_QUOTA_NETLINK_INTERFACE=y
+ # CONFIG_PRINT_QUOTA_WARNING is not set
+-- 
+2.7.1
