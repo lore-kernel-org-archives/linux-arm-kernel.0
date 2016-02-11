@@ -1,50 +1,35 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Thu, 11 Feb 2016 14:21:27 +0100
-Subject: [GIT PULL] STM32 DT updates for v4.6 #1
-Message-ID: <56BC8AD7.30607@gmail.com>
+From: k@japko.eu (Krzysztof Adamski)
+Date: Thu, 11 Feb 2016 14:20:54 +0100
+Subject: [linux-sunxi] Re: [PATCH v2 5/5] pinctrl: sunxi: Use pin number
+ when calling sunxi_pmx_set
+In-Reply-To: <CACRpkdbc0SfKiCGwUGA2fAPPsUhGv=qGV607Lht6ByYKKgTHjA@mail.gmail.com>
+References: <1454448113-18810-1-git-send-email-k@japko.eu>
+ <1454448113-18810-6-git-send-email-k@japko.eu>
+ <CACRpkdbc0SfKiCGwUGA2fAPPsUhGv=qGV607Lht6ByYKKgTHjA@mail.gmail.com>
+Message-ID: <20160211132054.GC19622@box2.japko.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Anrd and Kevin,
+On Thu, Feb 11, 2016 at 02:17:41PM +0100, Linus Walleij wrote:
+>On Tue, Feb 2, 2016 at 10:21 PM, Krzysztof Adamski <k@japko.eu> wrote:
+>
+>> sunxi_pmx_set accepts pin number and then calculates offset by
+>> subtracting pin_base from it. sunxi_pinctrl_gpio_get, on the other hand,
+>> gets offset so we have to convert it to pin number so we won't get
+>> negative value in sunxi_pmx_set.
+>>
+>> This was only used on A10 so far, where there is only one GPIO chip with
+>> pin_base set to 0 so it didn't matter. However H3 also requires this
+>> workaround but have two pinmux sections, triggering problem for PL port.
+>>
+>> Signed-off-by: Krzysztof Adamski <k@japko.eu>
+>
+>Waiting for Maxime to review this. I guess this patch can be merged
+>independently of the other patches?
 
-Please consider this first round of STM32 DT updates for v4.6:
+Yes it can but it won't have any effect, as stated in the commit 
+message, since other SoCs either don't use this flag or have only one 
+port so theri pin_base=0.
 
-The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
-
-   Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
-
-are available in the git repository at:
-
-   git://git.kernel.org/pub/scm/linux/kernel/git/mcoquelin/stm32.git 
-tags/stm32-dt-for-v4.6-1
-
-for you to fetch changes up to b2aa7f7741f511c6a1ea266d62d203662f121ea7:
-
-   ARM: dts: stm32f429: Boost perfs by remapping SDRAM Bank 1 to 0x0 
-(2016-02-11 12:02:59 +0100)
-
-----------------------------------------------------------------
-Highlights:
------------
-  - Add DMA controller node to stm32f429 MCU
-  - Add pinctrl & gpio nodes to stm32f429 MCU
-  - Remap stm32429-eval board SD-Ram to 0x0 for performance boost
-
-----------------------------------------------------------------
-M'boumba Cedric Madianga (1):
-       ARM: dts: Add STM32 DMA support for STM32F429 MCU
-
-Maxime Coquelin (5):
-       includes: dt-bindings: Add STM32F429 pinctrl DT bindings
-       ARM: dts: Add pinctrl node to STM32F429
-       ARM: dts: Add USART1 pin config to STM32F429 boards
-       ARM: dts: Add leds support to STM32F429 boards
-       ARM: dts: stm32f429: Boost perfs by remapping SDRAM Bank 1 to 0x0
-
-  arch/arm/boot/dts/stm32429i-eval.dts            |   21 +-
-  arch/arm/boot/dts/stm32f429-disco.dts           |   13 +
-  arch/arm/boot/dts/stm32f429.dtsi                |  143 +++
-  include/dt-bindings/pinctrl/stm32f429-pinfunc.h | 1239 
-+++++++++++++++++++++++
-  4 files changed, 1415 insertions(+), 1 deletion(-)
-  create mode 100644 include/dt-bindings/pinctrl/stm32f429-pinfunc.h
+Best regards,
+Krzysztof Adamski
