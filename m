@@ -1,195 +1,127 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 11 Feb 2016 13:54:36 +0000
-Subject: [PATCH] arm64: reenable interrupt when handling ptrace breakpoint
-In-Reply-To: <56B5135B.3050801@linaro.org>
-References: <5671CD5B.9030907@linaro.org> <20151221104818.GF23092@arm.com>
- <alpine.DEB.2.11.1512211749180.28591@nanos>
- <20151221170028.GT23092@arm.com> <56955B3A.5010303@linaro.org>
- <20160113102622.GC25458@arm.com> <569686BA.6050703@linaro.org>
- <20160113172303.GH25458@arm.com> <56969312.7070309@linaro.org>
- <56B5135B.3050801@linaro.org>
-Message-ID: <20160211135435.GG32084@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 11 Feb 2016 13:55:13 +0000
+Subject: [PATCH] arm64: KVM: Configure TCR_EL2.PS at runtime
+In-Reply-To: <20160211133401.GV5171@cbox>
+References: <1455130013-28644-1-git-send-email-tchalamarla@caviumnetworks.com>
+ <20160211132708.GU5171@cbox> <20160211133401.GV5171@cbox>
+Message-ID: <56BC92C1.8060201@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 05, 2016 at 01:25:47PM -0800, Shi, Yang wrote:
-> On 1/13/2016 10:10 AM, Shi, Yang wrote:
-> >On 1/13/2016 9:23 AM, Will Deacon wrote:
-> >>On Wed, Jan 13, 2016 at 09:17:46AM -0800, Shi, Yang wrote:
-> >>>On 1/13/2016 2:26 AM, Will Deacon wrote:
-> >>>>On Tue, Jan 12, 2016 at 11:59:54AM -0800, Shi, Yang wrote:
-> >>>>>This might be buried in email storm during the holiday. Just want
-> >>>>>to double
-> >>>>>check the status. I'm supposed there is no objection for getting it
-> >>>>>merged
-> >>>>>in upstream?
-> >>>>
-> >>>>Sorry, when you replied with:
-> >>>>
-> >>>>>I think we could just extend the "signal delay send" approach from
-> >>>>>x86-64
-> >>>>>to arm64, which is currently used by x86-64 on -rt kernel only.
-> >>>>
-> >>>>I understood that you were going to fix -rt, so I dropped this pending
-> >>>>anything more from you.
-> >>>>
-> >>>>What's the plan?
-> >>>
-> >>>Sorry for the confusion. The "signal delay send" approach used by
-> >>>x86-64 -rt
-> >>>should be not necessary for arm64 right now. Reenabling interrupt is
-> >>>still
-> >>>the preferred approach.
-> >>>
-> >>>Since x86-64 has per-CPU IST exception stack, so preemption has to be
-> >>>disabled all the time. However, it is not applicable to other
-> >>>architectures
-> >>>for now, including arm64.
-> >>
-> >>Actually, we grew support for a separate IRQ stack in the recent merge
-> >>window. Does that change things here, or are you referring to something
-> >>else?
-> >
-> >Had a quick look at the patches, it looks the irq stack is not nestable
-> >and it switches back to the original stack as long as irq handler is
-> >done before preempt happens. So, it sounds it won't change things here.
+On 11/02/16 13:34, Christoffer Dall wrote:
+> On Thu, Feb 11, 2016 at 02:27:08PM +0100, Christoffer Dall wrote:
+>> On Wed, Feb 10, 2016 at 10:46:53AM -0800, tchalamarla at caviumnetworks.com wrote:
+>>> From: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
+>>>
+>>> Setting TCR_EL2.PS to 40 bits is wrong on systems with PS size is
+>>> less than 40 bits. and with systems where RAM is at higher address,
+>>> this will break KVM.
+>>>
+>>> This patch sets TCR_EL2.PS at runtime similar to VTCR_EL2.PS
+>>>
+>>> changes form V2:
+>>> 	- Modified subject line and commit message.
+>>> 	- Removed TCR_EL2_FLAGS.
+>>>
+>>> changes from V1:
+>>>         - Moved to dynamic configuration.
+>>>
+>>> Signed-off-by: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
+>>> ---
+>>>  arch/arm64/include/asm/kvm_arm.h |  2 --
+>>>  arch/arm64/kvm/hyp-init.S        | 12 +++++++-----
+>>>  2 files changed, 7 insertions(+), 7 deletions(-)
+>>>
+>>> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+>>> index 738a95f..3776db0 100644
+>>> --- a/arch/arm64/include/asm/kvm_arm.h
+>>> +++ b/arch/arm64/include/asm/kvm_arm.h
+>>> @@ -107,8 +107,6 @@
+>>>  #define TCR_EL2_MASK	(TCR_EL2_TG0 | TCR_EL2_SH0 | \
+>>>  			 TCR_EL2_ORGN0 | TCR_EL2_IRGN0 | TCR_EL2_T0SZ)
+>>>  
+>>> -#define TCR_EL2_FLAGS	(TCR_EL2_RES1 | TCR_EL2_PS_40B)
+>>> -
+>>>  /* VTCR_EL2 Registers bits */
+>>>  #define VTCR_EL2_RES1		(1 << 31)
+>>>  #define VTCR_EL2_PS_MASK	(7 << 16)
+>>> diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
+>>> index 3e568dc..b5ab1b0 100644
+>>> --- a/arch/arm64/kvm/hyp-init.S
+>>> +++ b/arch/arm64/kvm/hyp-init.S
+>>> @@ -64,7 +64,7 @@ __do_hyp_init:
+>>>  	mrs	x4, tcr_el1
+>>>  	ldr	x5, =TCR_EL2_MASK
+>>>  	and	x4, x4, x5
+>>> -	ldr	x5, =TCR_EL2_FLAGS
+>>> +	ldr	x5, =TCR_EL2_RES1
+>>>  	orr	x4, x4, x5
+>>>  
+>>>  #ifndef CONFIG_ARM64_VA_BITS_48
+>>> @@ -85,15 +85,17 @@ __do_hyp_init:
+>>>  	ldr_l	x5, idmap_t0sz
+>>>  	bfi	x4, x5, TCR_T0SZ_OFFSET, TCR_TxSZ_WIDTH
+>>>  #endif
+>>> -	msr	tcr_el2, x4
+>>> -
+>>> -	ldr	x4, =VTCR_EL2_FLAGS
+>>>  	/*
+>>>  	 * Read the PARange bits from ID_AA64MMFR0_EL1 and set the PS bits in
+>>> -	 * VTCR_EL2.
+>>> +	 * TCR_EL2 and VTCR_EL2.
+>>>  	 */
+>>>  	mrs	x5, ID_AA64MMFR0_EL1
+>>>  	bfi	x4, x5, #16, #3
+>>> +
+>>> +	msr	tcr_el2, x4
+>>> +
+>>> +	ldr	x4, =VTCR_EL2_FLAGS
+>>> +	bfi	x4, x5, #16, #3
+>>>  	/*
+>>>  	 * Read the VMIDBits bits from ID_AA64MMFR1_EL1 and set the VS bit in
+>>>  	 * VTCR_EL2.
+>>> -- 
+>>> 2.1.0
+>>>
+>>
+>> This looks reasonable enough for me.  Did we limit Linux to PS=40 bits
+>> in the past and have lifted this restriction, or why did we have this
+>> limitation for EL2 translations in the past?
+>>
+> Hmm, just went back and looked at my comments [1] on Suzuki's 16K page
+> series, and regarding our stage-2 page table configuration I wrote this:
 > 
+> <quote>
+> ... the constraints of
+> this whole thing is, and make sure we agree on this:
 > 
-> Just had a quick test on 4.5-rc1. It survives with kgdbts, ptrace and ltp.
-> So, it sounds safe with the "separate IRQ stack" change.
+> 1. We fix the IPA max width to 40 bits
+> 2. We don't support systems with a PARange smaller than 40 bits (do we
+>    check this anywhere or document this anywhere?)
+>    3. We always assume we are running on a system with PARange of 40
+>    bits
+>       and we are therefore constrained to use concatination.
+> </quote>
+> 
+> So this change is actually making a bit nervous...  Marc, did you check
+> if all the stuff in arch/arm64/include/asm/kvm_mmu.h still holds after
+> we relax this?
 
-I quite liked the sigtrap consolidation in my earlier (broken) approach.
-Does the following work for you?
+I believe this still works for the following reasons:
 
-Will
+- This only affects the output address of EL2 Stage-1, and basically
+only allows EL2 to reach the same memory as the rest of the host kernel.
 
---->8
+- Stage-2 translation already does the same thing, for similar reasons.
 
->From e04a28d45ff343b47a4ffc4dee3a3e279e76ddfa Mon Sep 17 00:00:00 2001
-From: Will Deacon <will.deacon@arm.com>
-Date: Wed, 10 Feb 2016 16:05:28 +0000
-Subject: [PATCH] arm64: debug: re-enable irqs before sending breakpoint
- SIGTRAP
+- We enforce 40bit IPA by not providing page tables above 40 bits (by
+setting T0SZ to 64-40=24). This has the effect of denying accesses above
+40bit IPA to the guest.
 
-force_sig_info can sleep under an -rt kernel, so attempting to send a
-breakpoint SIGTRAP with interrupts disabled yields the following BUG:
+So I'm quite confident that we're safe here.
 
-  BUG: sleeping function called from invalid context at
-  /kernel-source/kernel/locking/rtmutex.c:917
-  in_atomic(): 0, irqs_disabled(): 128, pid: 551, name: test.sh
-  CPU: 5 PID: 551 Comm: test.sh Not tainted 4.1.13-rt13 #7
-  Hardware name: Freescale Layerscape 2085a RDB Board (DT)
-  Call trace:
-	 dump_backtrace+0x0/0x128
-	 show_stack+0x24/0x30
-	 dump_stack+0x80/0xa0
-	 ___might_sleep+0x128/0x1a0
-	 rt_spin_lock+0x2c/0x40
-	 force_sig_info+0xcc/0x210
-	 brk_handler.part.2+0x6c/0x80
-	 brk_handler+0xd8/0xe8
-	 do_debug_exception+0x58/0xb8
+Thoughts?
 
-This patch fixes the problem by ensuring that interrupts are enabled
-prior to sending the SIGTRAP if they were already enabled in the user
-context.
-
-Reported-by: Yang Shi <yang.shi@linaro.org>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/kernel/debug-monitors.c | 48 +++++++++++++++++---------------------
- 1 file changed, 22 insertions(+), 26 deletions(-)
-
-diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
-index 8aee3aeec3e6..c536c9e307b9 100644
---- a/arch/arm64/kernel/debug-monitors.c
-+++ b/arch/arm64/kernel/debug-monitors.c
-@@ -226,11 +226,28 @@ static int call_step_hook(struct pt_regs *regs, unsigned int esr)
- 	return retval;
- }
- 
-+static void send_user_sigtrap(int si_code)
-+{
-+	struct pt_regs *regs = current_pt_regs();
-+	siginfo_t info = {
-+		.si_signo	= SIGTRAP,
-+		.si_errno	= 0,
-+		.si_code	= si_code,
-+		.si_addr	= (void __user *)instruction_pointer(regs),
-+	};
-+
-+	if (WARN_ON(!user_mode(regs)))
-+		return;
-+
-+	if (interrupts_enabled(regs))
-+		local_irq_enable();
-+
-+	force_sig_info(SIGTRAP, &info, current);
-+}
-+
- static int single_step_handler(unsigned long addr, unsigned int esr,
- 			       struct pt_regs *regs)
- {
--	siginfo_t info;
--
- 	/*
- 	 * If we are stepping a pending breakpoint, call the hw_breakpoint
- 	 * handler first.
-@@ -239,11 +256,7 @@ static int single_step_handler(unsigned long addr, unsigned int esr,
- 		return 0;
- 
- 	if (user_mode(regs)) {
--		info.si_signo = SIGTRAP;
--		info.si_errno = 0;
--		info.si_code  = TRAP_HWBKPT;
--		info.si_addr  = (void __user *)instruction_pointer(regs);
--		force_sig_info(SIGTRAP, &info, current);
-+		send_user_sigtrap(TRAP_HWBKPT);
- 
- 		/*
- 		 * ptrace will disable single step unless explicitly
-@@ -307,17 +320,8 @@ static int call_break_hook(struct pt_regs *regs, unsigned int esr)
- static int brk_handler(unsigned long addr, unsigned int esr,
- 		       struct pt_regs *regs)
- {
--	siginfo_t info;
--
- 	if (user_mode(regs)) {
--		info = (siginfo_t) {
--			.si_signo = SIGTRAP,
--			.si_errno = 0,
--			.si_code  = TRAP_BRKPT,
--			.si_addr  = (void __user *)instruction_pointer(regs),
--		};
--
--		force_sig_info(SIGTRAP, &info, current);
-+		send_user_sigtrap(TRAP_BRKPT);
- 	} else if (call_break_hook(regs, esr) != DBG_HOOK_HANDLED) {
- 		pr_warning("Unexpected kernel BRK exception at EL1\n");
- 		return -EFAULT;
-@@ -328,7 +332,6 @@ static int brk_handler(unsigned long addr, unsigned int esr,
- 
- int aarch32_break_handler(struct pt_regs *regs)
- {
--	siginfo_t info;
- 	u32 arm_instr;
- 	u16 thumb_instr;
- 	bool bp = false;
-@@ -359,14 +362,7 @@ int aarch32_break_handler(struct pt_regs *regs)
- 	if (!bp)
- 		return -EFAULT;
- 
--	info = (siginfo_t) {
--		.si_signo = SIGTRAP,
--		.si_errno = 0,
--		.si_code  = TRAP_BRKPT,
--		.si_addr  = pc,
--	};
--
--	force_sig_info(SIGTRAP, &info, current);
-+	send_user_sigtrap(TRAP_BRKPT);
- 	return 0;
- }
- 
+	M.
 -- 
-2.1.4
+Jazz is not dead. It just smells funny...
