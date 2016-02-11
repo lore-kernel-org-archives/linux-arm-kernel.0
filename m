@@ -1,44 +1,31 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 11 Feb 2016 12:27:41 +0100
-Subject: [PATCH V5 10/11] soc: mediatek: PMIC wrap: add mt6323 slave
- support
-In-Reply-To: <1454841778-35529-11-git-send-email-blogic@openwrt.org>
-References: <1454841778-35529-1-git-send-email-blogic@openwrt.org>
- <1454841778-35529-11-git-send-email-blogic@openwrt.org>
-Message-ID: <56BC702D.8030806@gmail.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Thu, 11 Feb 2016 12:27:58 +0100
+Subject: [PATCHv10 2/4] ARM: dts: Add Altera L2 Cache and OCRAM EDAC
+ entries
+In-Reply-To: <1455132384-17108-2-git-send-email-tthayer@opensource.altera.com>
+References: <1455132384-17108-1-git-send-email-tthayer@opensource.altera.com>
+ <1455132384-17108-2-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <20160211112758.GA5565@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Feb 10, 2016 at 01:26:22PM -0600, tthayer at opensource.altera.com wrote:
+> From: Thor Thayer <tthayer@opensource.altera.com>
+> 
+> Adding the device tree entries and bindings needed to support
+> the Altera L2 cache and On-Chip RAM EDAC. This patch relies upon
+> an earlier patch to declare and setup On-chip RAM properly.
+> http://www.spinics.net/lists/devicetree/msg51117.html
 
+For the future, please use git commit IDs and not some, probably
+unstable URLs:
 
-On 07/02/16 11:42, John Crispin wrote:
-> Add support for MT6323 slaves. This PMIC can be found on MT2701 and MT7623
-> EVB. The only function that we need to touch is pwrap_init_cipher().
->
-> Signed-off-by: John Crispin <blogic@openwrt.org>
-> ---
->   drivers/soc/mediatek/mtk-pmic-wrap.c |   47 ++++++++++++++++++++++++++++++++++
->   1 file changed, 47 insertions(+)
->
-> diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
-> index 2628271..5fbdd5c 100644
-> --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
-> +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
-> @@ -91,6 +91,31 @@ enum dew_regs {
->   	PWRAP_DEW_CIPHER_RDY,
->   	PWRAP_DEW_CIPHER_MODE,
->   	PWRAP_DEW_CIPHER_SWRST,
-> +
-> +	/* MT6323 only regs */
-> +	PWRAP_DEW_CRC_SWRST,
-> +	PWRAP_DEW_CIPHER_EN,
-> +	PWRAP_DEW_RDDMY_NO,
-> +	PWRAP_DEW_RDATA_DLY_SEL,
-> +};
+  8b907c8b62ac ("arm: dts: socfpga: Add OCRAM node")
 
-We just use PWRAP_DEW_CIPHER_EN, right?
-I think it makes the code more readable if we just declare the registers 
-we actually need.
+I've fixed it now while applying.
 
-Thanks,
-Matthias
+-- 
+Regards/Gruss,
+    Boris.
+
+ECO tip #101: Trim your mails when you reply.
