@@ -1,41 +1,64 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 11 Feb 2016 15:52:55 +0000
-Subject: [PATCH 3/7] spi: omap2-mcspi: Fix PM regression with deferred
- probe for pm_runtime_reinit
-In-Reply-To: <20160211150806.GS19432@atomide.com>
-References: <1455145370-20301-1-git-send-email-tony@atomide.com>
- <1455145370-20301-4-git-send-email-tony@atomide.com>
- <20160211115128.GF13270@sirena.org.uk>
- <20160211150806.GS19432@atomide.com>
-Message-ID: <20160211155255.GA1953@sirena.org.uk>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 11 Feb 2016 15:56:33 +0000
+Subject: [GIT PULL] Immutable branch between MFD, Input and IIO
+In-Reply-To: <1450101234-2191-1-git-send-email-mpa@pengutronix.de>
+References: <1450101234-2191-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <20160211155633.GB20693@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 11, 2016 at 07:08:06AM -0800, Tony Lindgren wrote:
-> * Mark Brown <broonie@kernel.org> [160211 03:52]:
+Enjoy!
 
-> > Why, I'm not seeing any dependencies here?  I'd also expect to be seeing
-> > an awful lot more changes like this, this shouldn't be an OMAP thing -
-> > do we need to fix the core API and then roll out the transition in a
-> > different way?
+The following changes since commit 36f90b0a2ddd60823fe193a85e60ff1906c2a9b3:
 
-> Please feel free to pick up this one if you have other fixes
-> lined up, nothing stopping that.
+  Linux 4.5-rc2 (2016-01-31 18:12:16 -0800)
 
-I'll take it myself unless there is a strong reason to merge it as part
-of another series.
+are available in the git repository at:
 
-> There will be likely more fixes like this to make drivers follow
-> the PM runtime API documentation. These were just the initial
-> ones that were obvious.
+  git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git tags/ib-mfd-input-iio-v4.6
 
-This does sound like there's been a change in the interface compared to
-what users are actually doing - is this an actual problem or is it just
-a divergence from docs?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160211/290ead7c/attachment-0001.sig>
+for you to fetch changes up to 4f7ed234f2a5dcc26fc56a6e8324d34bbc9afe23:
+
+  Input: touchscreen: Add imx25 TCQ driver (2016-02-11 15:40:42 +0000)
+
+----------------------------------------------------------------
+Immutable branch between MFD, Input and IIO due for v4.6
+
+----------------------------------------------------------------
+Markus Pargmann (6):
+      mfd: Add DT binding documentation for imx25 ADC/TSC
+      iio: Add binding documentation for imx25 GCQ
+      Input: add binding documentation for imx25 touchscreen controller
+      mfd: fsl-imx25-tsadc: Register touchscreen ADC driver
+      iio: adc: Add imx25-gcq ADC driver
+      Input: touchscreen: Add imx25 TCQ driver
+
+ .../devicetree/bindings/iio/adc/fsl,imx25-gcq.txt  |  58 ++
+ .../bindings/input/touchscreen/fsl-mx25-tcq.txt    |  35 ++
+ .../devicetree/bindings/mfd/fsl-imx25-tsadc.txt    |  47 ++
+ drivers/iio/adc/Kconfig                            |   7 +
+ drivers/iio/adc/Makefile                           |   1 +
+ drivers/iio/adc/fsl-imx25-gcq.c                    | 417 ++++++++++++++
+ drivers/input/touchscreen/Kconfig                  |   9 +
+ drivers/input/touchscreen/Makefile                 |   1 +
+ drivers/input/touchscreen/fsl-imx25-tcq.c          | 596 +++++++++++++++++++++
+ drivers/mfd/Kconfig                                |   9 +
+ drivers/mfd/Makefile                               |   2 +
+ drivers/mfd/fsl-imx25-tsadc.c                      | 203 +++++++
+ include/dt-bindings/iio/adc/fsl-imx25-gcq.h        |  18 +
+ include/linux/mfd/imx25-tsadc.h                    | 140 +++++
+ 14 files changed, 1543 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/iio/adc/fsl,imx25-gcq.txt
+ create mode 100644 Documentation/devicetree/bindings/input/touchscreen/fsl-mx25-tcq.txt
+ create mode 100644 Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt
+ create mode 100644 drivers/iio/adc/fsl-imx25-gcq.c
+ create mode 100644 drivers/input/touchscreen/fsl-imx25-tcq.c
+ create mode 100644 drivers/mfd/fsl-imx25-tsadc.c
+ create mode 100644 include/dt-bindings/iio/adc/fsl-imx25-gcq.h
+ create mode 100644 include/linux/mfd/imx25-tsadc.h
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
