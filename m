@@ -1,34 +1,45 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 11 Feb 2016 07:08:06 -0800
-Subject: [PATCH 3/7] spi: omap2-mcspi: Fix PM regression with deferred
- probe for pm_runtime_reinit
-In-Reply-To: <20160211115128.GF13270@sirena.org.uk>
-References: <1455145370-20301-1-git-send-email-tony@atomide.com>
- <1455145370-20301-4-git-send-email-tony@atomide.com>
- <20160211115128.GF13270@sirena.org.uk>
-Message-ID: <20160211150806.GS19432@atomide.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 11 Feb 2016 15:52:40 +0100
+Subject: [GIT PULL 3/4] rockchip dts64 changes for 4.6
+In-Reply-To: <1734524.3yNt5L3F1F@phil>
+References: <1734524.3yNt5L3F1F@phil>
+Message-ID: <29700148.FpDzERqiyH@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mark Brown <broonie@kernel.org> [160211 03:52]:
-> On Wed, Feb 10, 2016 at 03:02:46PM -0800, Tony Lindgren wrote:
-> 
-> > Mark, I'd like to merge this along with other related fixes via
-> > the ARM SoC tree if no objections, please review and ack if this
-> > look OK to you.
-> 
-> Why, I'm not seeing any dependencies here?  I'd also expect to be seeing
-> an awful lot more changes like this, this shouldn't be an OMAP thing -
-> do we need to fix the core API and then roll out the transition in a
-> different way?
+Hi Arnd, Olof, Kevin,
 
-Please feel free to pick up this one if you have other fixes
-lined up, nothing stopping that.
+some small 64bit devicetree changes for 4.6 that allow mmc tuning and
+use the newer wakeup-source property for the gpio-keys.
 
-There will be likely more fixes like this to make drivers follow
-the PM runtime API documentation. These were just the initial
-ones that were obvious.
 
-Regards,
+Thanks
+Heiko
 
-Tony
+The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
+
+  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.6-rockchip-dts64-1
+
+for you to fetch changes up to e6f49b118f73a769ec51ed28a085e9dccd67f9a1:
+
+  arm64: dts: rockchip: replace gpio-key,wakeup with wakeup-source property (2016-02-10 00:23:24 +0100)
+
+----------------------------------------------------------------
+Define the tuning-related mmc clocks and move from
+gpio-key,wakeup to the more generic wakeup-source property.
+
+----------------------------------------------------------------
+Shawn Lin (1):
+      arm64: dts: rockchip: add rk3368 tuning clk for emmc and sdmmc
+
+Sudeep Holla (1):
+      arm64: dts: rockchip: replace gpio-key,wakeup with wakeup-source property
+
+ arch/arm64/boot/dts/rockchip/rk3368-evb.dtsi |  2 +-
+ arch/arm64/boot/dts/rockchip/rk3368-r88.dts  |  2 +-
+ arch/arm64/boot/dts/rockchip/rk3368.dtsi     | 10 ++++++----
+ 3 files changed, 8 insertions(+), 6 deletions(-)
