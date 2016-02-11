@@ -1,123 +1,92 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 11 Feb 2016 11:18:34 +0100
-Subject: [PATCH 1/7] mmc: omap_hsmmc: Fix PM regression with deferred
- probe for pm_runtime_reinit
-In-Reply-To: <1455145370-20301-2-git-send-email-tony@atomide.com>
-References: <1455145370-20301-1-git-send-email-tony@atomide.com>
- <1455145370-20301-2-git-send-email-tony@atomide.com>
-Message-ID: <CAPDyKFpAcsfLgtu93P45fTEg11MjdGwREcyeGSS7vt6GWbNu_w@mail.gmail.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Thu, 11 Feb 2016 10:26:53 +0000
+Subject: [PATCH V5 11/14] soc: tegra: pmc: Add generic PM domain support
+In-Reply-To: <56BC5EE0.2040804@nvidia.com>
+References: <1453998832-27383-1-git-send-email-jonathanh@nvidia.com>
+ <1453998832-27383-12-git-send-email-jonathanh@nvidia.com>
+ <CAPDyKFpnUJA2pLSUOw8rkjyXLY6b__TM=38jsvYAZVhe+DS=zg@mail.gmail.com>
+ <56BB7AF4.8040708@nvidia.com>
+ <CAPDyKFrZ6tWBsQC0tyWWeChiZja3h_zcbaiX25ak-Zyp4MzqVw@mail.gmail.com>
+ <56BC50C2.7050609@nvidia.com>
+ <CAPDyKFrdmufsMqNL0U7q5gPEUqsg3SrkrNChcziQjEOjvd30Ng@mail.gmail.com>
+ <56BC5EE0.2040804@nvidia.com>
+Message-ID: <56BC61ED.6000201@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 February 2016 at 00:02, Tony Lindgren <tony@atomide.com> wrote:
-> Commit 5de85b9d57ab ("PM / runtime: Re-init runtime PM states at probe
-> error and driver unbind") introduced pm_runtime_reinit() that is used
-> to reinitialize PM runtime after -EPROBE_DEFER. This allows shutting
-> down the device after a failed probe.
->
-> However, for drivers using pm_runtime_use_autosuspend() this can cause
-> a state where suspend callback is never called after -EPROBE_DEFER.
-> On the following device driver probe, hardware state is different from
-> the PM runtime state causing omap_device to produce the following
-> error:
->
-> omap_device_enable() called from invalid state 1
->
-> And with omap_device and omap hardware being picky for PM, this will
-> block any deeper idle states in hardware.
->
-> The solution is to fix the drivers to follow the PM runtime documentation:
->
-> 1. For sections of code that needs the device disabled, use
->    pm_runtime_put_sync_suspend() if pm_runtime_set_autosuspend() has
->    been set.
->
-> 2. For driver exit code, use pm_runtime_dont_use_autosuspend() before
->    pm_runtime_put_sync() if pm_runtime_use_autosuspend() has been
->    set.
->
-> Fixes: 5de85b9d57ab ("PM / runtime: Re-init runtime PM states at probe
-> error and driver unbind")
-> Cc: linux-mmc at vger.kernel.org
-> Cc: Alan Stern <stern@rowland.harvard.edu>
-> Cc: Kevin Hilman <khilman@baylibre.com>
-> Cc: Nishanth Menon <nm@ti.com>
-> Cc: Rafael J. Wysocki <rafael@kernel.org>
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> Cc: Tero Kristo <t-kristo@ti.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> ---
->
-> Ulf, I'd like to merge this along with other related fixes via the
-> ARM SoC tree if no objections, please review and ack if this look OK
-> to you.
 
-I have some other omap_hsmmc patches queued for 4.6, so I prefer to
-send this via my mmc tree.
 
-I guess that's okay as well!?
+On 11/02/16 10:13, Jon Hunter wrote:
+> 
+> On 11/02/16 09:57, Ulf Hansson wrote:
+>> On 11 February 2016 at 10:13, Jon Hunter <jonathanh@nvidia.com> wrote:
+>>>
+>>> On 10/02/16 18:25, Ulf Hansson wrote:
+>>>
+>>> [snip]
+>>>
+>>>>>> Perhaps there's a way to allow the generic PM domain to control this
+>>>>>> by itself. If we for example used the struct device corresponding to
+>>>>>> the powergate driver, genpd could use it to distinguish between
+>>>>>> various instances of genpd structs..!? Maybe it would simplify the way
+>>>>>> to deal with removing domains?
+>>>>>
+>>>>> Yes, that would be ideal. However, would have require changing
+>>>>> genpd_init()? I am not sure how genpd would be able to access the device
+>>>>> struct for the powergate driver because we don't provide this via any
+>>>>> API I am aware of? And I am guessing that you don't wish to expose the
+>>>>> gpd_list to the world either.
+>>>>>
+>>>>> If there is an easy way, I am open to it, but looking at it today, I am
+>>>>> not sure I see a simple way in which we could add a new API to do this.
+>>>>> However, may be I am missing something!
+>>>>
+>>>> If we add a new __pm_genpd_init() API, that could require a struct
+>>>> device to be provided. That API will thus invoke the existing
+>>>> pm_genpd_init() but also deal with the extra things needed here.
+>>>>
+>>>> I would also allow such an API to return an error code.
+>>>>
+>>>> Correspondingly, pm_genpd_remove() could be required to be provided
+>>>> with a struct device.
+>>>>
+>>>> Existing users of pm_genpd_init() can then convert to
+>>>> __pm_genpd_init() whenever suitable.
+>>>>
+>>>> Of course, another option is just to add new member in the genpd
+>>>> struct for the struct *device. The caller of pm_genpd_init() could
+>>>> check it, but allow it to be NULL. Although, the pm_genpd_remove() API
+>>>> would require that pointer to the struct device to be set...
+>>>>
+>>>> What do you think?
+>>>
+>>> Yes, sounds good. May be it is simpler just to add a new member and let
+>>> the platform genpd driver handle it.
+>>>
+>>> I am wondering if in addition to pm_genpd_remove(), we then just have a
+>>> function called pm_genpd_remove_tail(), which allows you to pass the
+>>> struct device pointer and will remove the last pm-domain from the
+>>> gpd_list and return the genpd pointer if successful. Internally, it will
+>>> call pm_genpd_remove(). It seems to me that if there are nested
+>>> pm-domains, then we probably want to remove them starting from the tail
+>>> as opposed to the head.
+>>>
+>>> How does that sound?
+>>
+>> Why not make pm_genpd_remove() to behave as you describe for
+>> pm_genpd_remove_tail()?
+>> That's probably the only sane way to remove genpds anyhow!?
+> 
+> Simply to offer flexibility. I could see that for some devices that have
+> no dependencies between pm-domains and have a static list of pm-domains,
+> they can simply call pm_genpd_remove() for a given pm-domain. However,
+> that said, I can envision a case where a single pm-domain would be
+> removed by itself and so may be there is no benefit?
 
->
-> ---
->  drivers/mmc/host/omap_hsmmc.c | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-> index b6639ea..32bc112 100644
-> --- a/drivers/mmc/host/omap_hsmmc.c
-> +++ b/drivers/mmc/host/omap_hsmmc.c
-> @@ -1247,7 +1247,7 @@ static int omap_hsmmc_switch_opcond(struct omap_hsmmc_host *host, int vdd)
->         int ret;
->
->         /* Disable the clocks */
-> -       pm_runtime_put_sync(host->dev);
-> +       pm_runtime_put_sync_suspend(host->dev);
+By the way, do you think that instead of passing the struct device * to
+pm_genpd_remove(), we should just have a void *dev_id in the same way
+the request_irq()/free_irq() work? In other words, it would allow people
+to use the struct device or struct device_node, etc?
 
-This has no effect.
-
-The mmc core holds a runtime PM usage count for the device anyway, so
-the clock won't be disabled.
-Please remove this change from the patch.
-
->         if (host->dbclk)
->                 clk_disable_unprepare(host->dbclk);
->
-> @@ -2232,6 +2232,7 @@ err_irq:
->                 dma_release_channel(host->tx_chan);
->         if (host->rx_chan)
->                 dma_release_channel(host->rx_chan);
-> +       pm_runtime_dont_use_autosuspend(host->dev);
->         pm_runtime_put_sync(host->dev);
->         pm_runtime_disable(host->dev);
->         if (host->dbclk)
-> @@ -2253,6 +2254,7 @@ static int omap_hsmmc_remove(struct platform_device *pdev)
->         dma_release_channel(host->tx_chan);
->         dma_release_channel(host->rx_chan);
->
-> +       pm_runtime_dont_use_autosuspend(host->dev);
->         pm_runtime_put_sync(host->dev);
->         pm_runtime_disable(host->dev);
->         device_init_wakeup(&pdev->dev, false);
-> @@ -2285,7 +2287,7 @@ static int omap_hsmmc_suspend(struct device *dev)
->         if (host->dbclk)
->                 clk_disable_unprepare(host->dbclk);
->
-> -       pm_runtime_put_sync(host->dev);
-> +       pm_runtime_put_sync_suspend(host->dev);
-
-This has no effect, as the PM core prevents runtime suspend during the
-system PM phase.
-It does so, by increasing the runtime PM usage count
-(pm_runtime_get_noresume()).
-
-Please remove this change from patch.
-
->         return 0;
->  }
->
-> --
-> 2.7.0
->
-
-Kind regards
-Uffe
+Cheers
+Jon
