@@ -1,126 +1,76 @@
-From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Wed, 10 Feb 2016 21:51:11 -0600
-Subject: [PATCH V3 12/12] dtb: amd: Add support for AMD/Linaro 96Boards
- Enterprise Edition Server board
-In-Reply-To: <1455162671-16044-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-References: <1455162671-16044-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <1455162671-16044-13-git-send-email-Suravee.Suthikulpanit@amd.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 10 Feb 2016 19:55:30 -0800
+Subject: [GIT PULL] Renesas ARM Based SoC DT Updates for v4.6
+In-Reply-To: <20160209183921.GA1089@verge.net.au>
+References: <cover.1454595846.git.horms+renesas@verge.net.au>
+ <20160208215130.GJ25468@localhost>
+ <CAMuHMdVWYVEHTvGYEZkEXpEaMzfZ_NfMAb0o8HtVcJM+GDdfmA@mail.gmail.com>
+ <20160209183921.GA1089@verge.net.au>
+Message-ID: <CAOesGMjeyah0qpwWR=RJOF61dVGGqkxmGUJrE0qYNuCOwoPFjQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
+Hi,
 
-Add device tree file for AMD/Linaro 96Boards Enterprise Edition Server
-(Husky) Board. This is based on the AMD Seattle Rev.B0 system
+On Tue, Feb 9, 2016 at 10:39 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Tue, Feb 09, 2016 at 08:39:31AM +0100, Geert Uytterhoeven wrote:
+>> Hi Olof,
+>>
+>> On Mon, Feb 8, 2016 at 10:51 PM, Olof Johansson <olof@lixom.net> wrote:
+>> > On Thu, Feb 04, 2016 at 03:30:02PM +0100, Simon Horman wrote:
+>> >> Please consider these Renesas ARM based SoC DT updates for v4.6.
+>> >>
+>> >>
+>> >> The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
+>> >>
+>> >>   Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+>> >>
+>> >> are available in the git repository at:
+>> >>
+>> >>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-for-v4.6
+>> >>
+>> >> for you to fetch changes up to d7a11140d0a659e5c1f83627792f95b6713030a2:
+>> >>
+>> >>   ARM: dts: silk: Enable SCIF_CLK frequency and pins (2016-02-02 14:02:28 +0100)
+>> >>
+>> >> ----------------------------------------------------------------
+>> >> Renesas ARM Based SoC DT Updates for v4.6
+>> >>
+>> >> * Use SCIF and USBHS fallback compatibility strings
+>> >> * Add Baud Rate Generator (BRG) support for (H)SCIF
+>> >> * Enable SCIF_CLK frequency and pins
+>> >> * Use GIC_* defines
+>> >> * Migrate to generic l2c OF initialization on r8a7740
+>> >> * Enable audio on r8a7793/gose
+>> >> * Enable HDMI vidio out on r8a7793
+>> >> * Enable i2c on r8a7793/gose
+>> >> * Enable QSPI on alt
+>> >> * Enable GPIO keys and leds on gise
+>> >> * Enable audio on porter
+>> >> * Enable DU on porter
+>> >>
+>> >> ----------------------------------------------------------------
+>> >> Geert Uytterhoeven (22):
+>> >>       ARM: shmobile: r8a7740: Migrate to generic l2c OF initialization
+>> >>       ARM: shmobile: r8a7740: Remove mapping of L2 cache controller registers
+>> >
+>> > Hmm. Those aren't DT changes. There's also nothing for r8a7740 to convert
+>> > L2 init to DT earlier in this branch, which makes this look like it's just
+>> > a generic cleanup that should go in independently in your cleanup branch.
+>> >
+>> > Or am I missing some dependency that isn't obvious? If I'm not, then please
+>> > respin this branch and move those to the place they belong (cleanup).
+>>
+>> The dependency is commit 374e70075e58acfe ("ARM: shmobile: r8a7740 dtsi: Add
+>> L2 cache-controller node"), which has already entered mainline in v4.5-rc1.
+>>
+>> So I agree with your comments.
+>
+> Sorry for the mix-up.
+> I'll see about respinning this.
 
-Signed-off-by: Leo Duran <leo.duran@amd.com>
-Signed-off-by: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
----
- arch/arm64/boot/dts/amd/Makefile  |  3 +-
- arch/arm64/boot/dts/amd/husky.dts | 83 +++++++++++++++++++++++++++++++++++++++
- 2 files changed, 85 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/boot/dts/amd/husky.dts
+I've merged the patches, so respinning won't work. Instead, please
+follow up with incremental fixes instead.
 
-diff --git a/arch/arm64/boot/dts/amd/Makefile b/arch/arm64/boot/dts/amd/Makefile
-index db03293..ba84770 100644
---- a/arch/arm64/boot/dts/amd/Makefile
-+++ b/arch/arm64/boot/dts/amd/Makefile
-@@ -1,5 +1,6 @@
- dtb-$(CONFIG_ARCH_SEATTLE) += amd-overdrive.dtb \
--			amd-overdrive-rev-b0.dtb amd-overdrive-rev-b1.dtb
-+			amd-overdrive-rev-b0.dtb amd-overdrive-rev-b1.dtb \
-+			husky.dtb
- 
- always		:= $(dtb-y)
- subdir-y	:= $(dts-dirs)
-diff --git a/arch/arm64/boot/dts/amd/husky.dts b/arch/arm64/boot/dts/amd/husky.dts
-new file mode 100644
-index 0000000..1381d4b
---- /dev/null
-+++ b/arch/arm64/boot/dts/amd/husky.dts
-@@ -0,0 +1,83 @@
-+/*
-+ * DTS file for AMD/Linaro 96Boards Enterprise Edition Server (Husky) Board
-+ * Note: Based-on AMD Seattle Rev.B0
-+ *
-+ * Copyright (C) 2015 Advanced Micro Devices, Inc.
-+ */
-+
-+/dts-v1/;
-+
-+/include/ "amd-seattle-soc.dtsi"
-+
-+/ {
-+	model = "Linaro 96Boards Enterprise Edition Server (Husky) Board";
-+	compatible = "amd,seattle-overdrive", "amd,seattle";
-+
-+	chosen {
-+		stdout-path = &serial0;
-+	};
-+
-+	psci {
-+		compatible   = "arm,psci-0.2";
-+		method       = "smc";
-+	};
-+};
-+
-+&ccp0 {
-+	status = "ok";
-+	amd,zlib-support = <1>;
-+};
-+
-+/**
-+ * NOTE: In Rev.B, gpio0 is reserved.
-+ */
-+&gpio1 {
-+	status = "ok";
-+};
-+
-+&gpio2 {
-+	status = "ok";
-+};
-+
-+&gpio3 {
-+	status = "ok";
-+};
-+
-+&gpio4 {
-+	status = "ok";
-+};
-+
-+&i2c0 {
-+	status = "ok";
-+};
-+
-+&i2c1 {
-+	status = "ok";
-+};
-+
-+&pcie0 {
-+	status = "ok";
-+};
-+
-+&spi0 {
-+	status = "ok";
-+};
-+
-+&spi1 {
-+	status = "ok";
-+	sdcard0: sdcard at 0 {
-+		compatible = "mmc-spi-slot";
-+		reg = <0>;
-+		spi-max-frequency = <20000000>;
-+		voltage-ranges = <3200 3400>;
-+		pl022,hierarchy = <0>;
-+		pl022,interface = <0>;
-+		pl022,com-mode = <0x0>;
-+		pl022,rx-level-trig = <0>;
-+		pl022,tx-level-trig = <0>;
-+	};
-+};
-+
-+&smb0 {
-+	/include/ "amd-seattle-xgbe-b.dtsi"
-+};
--- 
-2.5.0
+
+-Olof
