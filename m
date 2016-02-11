@@ -1,44 +1,36 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 11 Feb 2016 17:06:34 -0600
-Subject: [PATCH] ARM: boot: Add an implementation of strnlen for libfdt
-Message-ID: <1455231994-12048-1-git-send-email-robh@kernel.org>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 12 Feb 2016 00:14:14 +0100
+Subject: [PATCH v2 5/6] serial: 8250/mediatek: fix building with
+ SERIAL_8250=m
+In-Reply-To: <1455205297-1021302-6-git-send-email-arnd@arndb.de>
+References: <1455205297-1021302-1-git-send-email-arnd@arndb.de>
+ <1455205297-1021302-6-git-send-email-arnd@arndb.de>
+Message-ID: <56BD15C6.6040006@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Recent versions of libfdt add a dependency on strnlen. Copy the
-implementation in lib/string.c here, so we can update libfdt.
 
-Signed-off-by: Rob Herring <robh@kernel.org>
----
-Russell,
 
-I have a pending libfdt update, so I'd like to take this thru the DT 
-tree with your ack.
+On 11/02/16 16:41, Arnd Bergmann wrote:
+> The Mediatek 8250 driver has a 'bool' Kconfig symbol, but that
+> breaks when SERIAL_8250 is a loadable module:
+>
+> drivers/tty/built-in.o: In function `mtk8250_set_termios':
+> :(.text+0x1bee8): undefined reference to `serial8250_do_set_termios'
+> :(.text+0x1bf10): undefined reference to `uart_get_baud_rate'
+> :(.text+0x1c09c): undefined reference to `uart_get_divisor'
+> drivers/tty/built-in.o: In function `mtk8250_do_pm':
+> :(.text+0x1c0d0): undefined reference to `serial8250_do_pm'
+> drivers/tty/built-in.o: In function `mtk8250_probe':
+> :(.text+0x1c2e4): undefined reference to `serial8250_register_8250_port'
+> serial/8250/8250_mtk.c:287:242: error: data definition has no type or storage class [-Werror]
+> serial/8250/8250_mtk.c:287:122: error: 'mtk8250_platform_driver_init' defined but not used [-Werror=unused-function]
+>
+> This changes the symbol to a 'tristate', so the dependency on
+> SERIAL_8250 also works when that is set to 'm'.
+> To actually build the driver, we also need to include <linux/module.h>.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
 
-Rob
-
- arch/arm/boot/compressed/string.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
-
-diff --git a/arch/arm/boot/compressed/string.c b/arch/arm/boot/compressed/string.c
-index 36e53ef..6894674 100644
---- a/arch/arm/boot/compressed/string.c
-+++ b/arch/arm/boot/compressed/string.c
-@@ -65,6 +65,15 @@ size_t strlen(const char *s)
- 	return sc - s;
- }
- 
-+size_t strnlen(const char *s, size_t count)
-+{
-+	const char *sc;
-+
-+	for (sc = s; count-- && *sc != '\0'; ++sc)
-+		/* nothing */;
-+	return sc - s;
-+}
-+
- int memcmp(const void *cs, const void *ct, size_t count)
- {
- 	const unsigned char *su1 = cs, *su2 = ct, *end = su1 + count;
--- 
-2.5.0
+Acked-by: Matthias Brugger <matthias.bgg@gmail.com>
