@@ -1,75 +1,65 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 11 Feb 2016 18:39:46 +0000
-Subject: [PATCH v4 05/23] arm64: Add ARM64_HAS_VIRT_HOST_EXTN feature
-In-Reply-To: <1455216004-19499-1-git-send-email-marc.zyngier@arm.com>
-References: <1455216004-19499-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1455216004-19499-6-git-send-email-marc.zyngier@arm.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Thu, 11 Feb 2016 19:39:12 +0100
+Subject: [PATCH V4 22/23] arm64, pci, acpi: Assign legacy IRQs once device
+ is enable.
+In-Reply-To: <20160211171700.GB25235@red-moon>
+References: <1454606941-9523-1-git-send-email-tn@semihalf.com>
+ <1454606941-9523-23-git-send-email-tn@semihalf.com>
+ <20160211115843.GA24136@red-moon> <20160211171700.GB25235@red-moon>
+Message-ID: <56BCD550.2050601@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a new ARM64_HAS_VIRT_HOST_EXTN features to indicate that the
-CPU has the ARMv8.1 VHE capability.
+On 11.02.2016 18:17, Lorenzo Pieralisi wrote:
+> Here (on top of your series), ready for flak.
+>
+> Lorenzo
+>
+> -- >8 --
+> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+> index 0b53262..26ee291 100644
+> --- a/arch/arm64/kernel/pci.c
+> +++ b/arch/arm64/kernel/pci.c
+> @@ -45,28 +45,23 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+>    */
+>   int pcibios_enable_device(struct pci_dev *dev, int mask)
+>   {
+> -	int ret;
+> -
+>   	if (pci_has_flag(PCI_PROBE_ONLY))
+>   		return 0;
+>
+> -	ret = pci_enable_resources(dev, mask);
+> -	if (ret < 0)
+> -		return ret;
+> -
+> -#ifdef CONFIG_ACPI
+> -	if (!pci_dev_msi_enabled(dev))
+> -		return acpi_pci_irq_enable(dev);
+> -#endif
+> -	return 0;
+> +	return pci_enable_resources(dev, mask);
+>   }
+>
+>   /*
+> - * Try to assign the IRQ number from DT when adding a new device
+> + * Try to assign the IRQ number when probing a new device
+>    */
+> -int pcibios_add_device(struct pci_dev *dev)
+> +int pcibios_alloc_irq(struct pci_dev *dev)
+>   {
+> -	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
+> +	if (acpi_disabled)
+> +		dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
+> +#ifdef CONFIG_ACPI
+> +	else
+> +		return acpi_pci_irq_enable(dev);
+> +#endif
+>
+>   	return 0;
+>   }
 
-This will be used to trigger kernel patching in KVM.
+I miss that way of solving the problem. OK lets try this way. I will 
+integrate it.
 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/include/asm/cpufeature.h |  3 ++-
- arch/arm64/kernel/cpufeature.c      | 11 +++++++++++
- 2 files changed, 13 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index 8f271b8..c705d6a 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -30,8 +30,9 @@
- #define ARM64_HAS_LSE_ATOMICS			5
- #define ARM64_WORKAROUND_CAVIUM_23154		6
- #define ARM64_WORKAROUND_834220			7
-+#define ARM64_HAS_VIRT_HOST_EXTN		8
- 
--#define ARM64_NCAPS				8
-+#define ARM64_NCAPS				9
- 
- #ifndef __ASSEMBLY__
- 
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 5c90aa4..ba74519 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -26,6 +26,7 @@
- #include <asm/cpu_ops.h>
- #include <asm/processor.h>
- #include <asm/sysreg.h>
-+#include <asm/virt.h>
- 
- unsigned long elf_hwcap __read_mostly;
- EXPORT_SYMBOL_GPL(elf_hwcap);
-@@ -621,6 +622,11 @@ static bool has_useable_gicv3_cpuif(const struct arm64_cpu_capabilities *entry)
- 	return has_sre;
- }
- 
-+static bool runs_at_el2(const struct arm64_cpu_capabilities *entry)
-+{
-+	return is_kernel_in_hyp_mode();
-+}
-+
- static const struct arm64_cpu_capabilities arm64_features[] = {
- 	{
- 		.desc = "GIC system register CPU interface",
-@@ -651,6 +657,11 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
- 		.min_field_value = 2,
- 	},
- #endif /* CONFIG_AS_LSE && CONFIG_ARM64_LSE_ATOMICS */
-+	{
-+		.desc = "Virtualization Host Extensions",
-+		.capability = ARM64_HAS_VIRT_HOST_EXTN,
-+		.matches = runs_at_el2,
-+	},
- 	{},
- };
- 
--- 
-2.1.4
+Tomasz
