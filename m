@@ -1,37 +1,22 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 10 Feb 2016 17:08:18 -0800
-Subject: N900 sleep mode (in 4.5-rc0, if that matters)
-In-Reply-To: <20160209172403.GK19432@atomide.com>
-References: <20160126140010.GA29723@amd> <20160126172527.GY3500@atomide.com>
- <20160130200244.GA30429@amd> <20160130201452.GC30429@amd>
- <20160130221509.GA28644@amd> <20160201181316.GM19432@atomide.com>
- <20160201211736.GA11283@amd> <20160201221111.GP19432@atomide.com>
- <20160207212316.GA6147@amd> <20160209172403.GK19432@atomide.com>
-Message-ID: <20160211010818.GQ19432@atomide.com>
+From: martin.petersen@oracle.com (Martin K. Petersen)
+Date: Wed, 10 Feb 2016 20:24:21 -0500
+Subject: [PATCH 0/7] SCSI bug fixes for 4.6
+In-Reply-To: <1453910247-3447628-1-git-send-email-arnd@arndb.de> (Arnd
+ Bergmann's message of "Wed, 27 Jan 2016 16:57:16 +0100")
+References: <1453910247-3447628-1-git-send-email-arnd@arndb.de>
+Message-ID: <yq1si1082ey.fsf@sermon.lab.mkp.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [160209 09:26]:
-> * Pavel Machek <pavel@ucw.cz> [160207 13:24]:
-> 
-> > ffdffebd 48004a20 (fa004a20) cm_idlest1_core blocking bits: 00200042
-> > 0000000d 48004a28 (fa004a28) cm_idlest3_core
-> 
-> Bit 21 in cm_idlest1_core is for MCSPI4 so WLAN. Does that go
-> down if do sleep 5; cat /sys/kernel/debug/pm_debug/count ?
-> 
-> If not, the're PM runtime missing or broken somewhere.
+>>>>> "Arnd" == Arnd Bergmann <arnd@arndb.de> writes:
 
-Just tested n900 wlan here and it's working for me with Emil's
-patch from the "" thread and the PM runtime regression fix for
-hsmmc I posted earlier today. Looks like n900 is hitting off
-mode just fine with wlan0 configured.
+Arnd> Here are a bunch of fixes for harmless bugs I found during ARM
+Arnd> randconfig testing. It would be nice to get them mered in 4.6, but
+Arnd> there is no need to have them in 4.5 as no incorrect behavior
+Arnd> results from the current code, and the warnings are all hard to
+Arnd> trigger.
 
-It does not wake up to pings from outside from off mode though
-until the system wakes up.
+Applied to 4.6/scsi-queue.
 
-I'll take a look and send a patch for that separately.
-
-Regards,
-
-Tony
+-- 
+Martin K. Petersen	Oracle Linux Engineering
