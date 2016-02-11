@@ -1,111 +1,138 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 11 Feb 2016 18:39:41 +0000
-Subject: [PATCH v4 00/23] arm64: Virtualization Host Extension support
-Message-ID: <1455216004-19499-1-git-send-email-marc.zyngier@arm.com>
+Date: Thu, 11 Feb 2016 18:39:53 +0000
+Subject: [PATCH v4 12/23] arm64: KVM: VHE: Use unified system register
+ accessors
+In-Reply-To: <1455216004-19499-1-git-send-email-marc.zyngier@arm.com>
+References: <1455216004-19499-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1455216004-19499-13-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARMv8.1 comes with the "Virtualization Host Extension" (VHE for
-short), which enables simpler support of Type-2 hypervisors.
+Use the recently introduced unified system register accessors for
+those sysregs that behave differently depending on VHE being in
+use or not.
 
-This extension allows the kernel to directly run at EL2, and
-significantly reduces the number of system registers shared between
-host and guest, reducing the overhead of virtualization.
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/kvm/hyp/sysreg-sr.c | 84 +++++++++++++++++++++---------------------
+ 1 file changed, 42 insertions(+), 42 deletions(-)
 
-In order to have the same kernel binary running on all versions of the
-architecture, this series makes heavy use of runtime code patching.
-
-The first 22 patches massage the KVM code to deal with VHE and enable
-Linux to run at EL2. The last patch catches an ugly case when VHE
-capable CPUs are paired with some of their less capable siblings. This
-should never happen, but hey...
-
-I have deliberately left out some of the more "advanced"
-optimizations, as they are likely to distract the reviewer from the
-core infrastructure, which is what I care about at the moment.
-
-Note: GDB is currently busted on VHE systems, as it checks for version
-      6 on the debug architecture, while VHE is version 7. The
-      binutils people are on the case.
-
-This has been tested on the FVP_Base_SLV-V8-A model, and based on
-v4.5-rc3 + kvmarm/master. I've put a branch out on:
-
-git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/vhe
-
-* From v3:
-  - Cleaned debug handling after comments from Catalin
-  - Added missing barriers in the panic patch
-  - Collected Rb and Acks from Christoffer and Catalin
-
-* From v2:
-  - Added support for perf to count kernel events in EL2
-  - Added support for EL2 breakpoints
-  - Moved the VTCR_EL2 setup from assembly to C
-  - Made the fault handling easier to understand (hopefuly)
-  - Plenty of smaller fixups
-
-* From v1:
-  - Full rewrite now that the World Switch is written in C code.
-  - Dropped the "early IRQ handling" for the moment.
-
-Marc Zyngier (23):
-  arm/arm64: KVM: Add hook for C-based stage2 init
-  arm64: KVM: Switch to C-based stage2 init
-  arm/arm64: Add new is_kernel_in_hyp_mode predicate
-  arm64: Allow the arch timer to use the HYP timer
-  arm64: Add ARM64_HAS_VIRT_HOST_EXTN feature
-  arm64: KVM: Skip HYP setup when already running in HYP
-  arm64: KVM: VHE: Patch out use of HVC
-  arm64: KVM: VHE: Patch out kern_hyp_va
-  arm64: KVM: VHE: Introduce unified system register accessors
-  arm64: KVM: VHE: Differenciate host/guest sysreg save/restore
-  arm64: KVM: VHE: Split save/restore of registers shared between guest
-    and host
-  arm64: KVM: VHE: Use unified system register accessors
-  arm64: KVM: VHE: Enable minimal sysreg save/restore
-  arm64: KVM: VHE: Make __fpsimd_enabled VHE aware
-  arm64: KVM: VHE: Implement VHE activate/deactivate_traps
-  arm64: KVM: VHE: Use unified sysreg accessors for timer
-  arm64: KVM: VHE: Add fpsimd enabling on guest access
-  arm64: KVM: VHE: Add alternative panic handling
-  arm64: KVM: Move most of the fault decoding to C
-  arm64: perf: Count EL2 events if the kernel is running in HYP
-  arm64: hw_breakpoint: Allow EL2 breakpoints if running in HYP
-  arm64: VHE: Add support for running Linux in EL2 mode
-  arm64: Panic when VHE and non VHE CPUs coexist
-
- arch/arm/include/asm/kvm_host.h        |   4 +
- arch/arm/include/asm/virt.h            |   5 +
- arch/arm/kvm/arm.c                     | 174 ++++++++++++++++++----------
- arch/arm/kvm/mmu.c                     |   7 ++
- arch/arm64/Kconfig                     |  13 +++
- arch/arm64/include/asm/cpufeature.h    |   3 +-
- arch/arm64/include/asm/hw_breakpoint.h |  49 +++++---
- arch/arm64/include/asm/kvm_arm.h       |   6 +-
- arch/arm64/include/asm/kvm_asm.h       |   2 +
- arch/arm64/include/asm/kvm_emulate.h   |   3 +
- arch/arm64/include/asm/kvm_host.h      |   6 +
- arch/arm64/include/asm/kvm_mmu.h       |  12 +-
- arch/arm64/include/asm/virt.h          |  27 +++++
- arch/arm64/kernel/asm-offsets.c        |   3 -
- arch/arm64/kernel/cpufeature.c         |  11 ++
- arch/arm64/kernel/head.S               |  50 +++++++-
- arch/arm64/kernel/perf_event.c         |  14 ++-
- arch/arm64/kernel/smp.c                |   3 +
- arch/arm64/kvm/hyp-init.S              |  18 ---
- arch/arm64/kvm/hyp.S                   |   7 ++
- arch/arm64/kvm/hyp/Makefile            |   1 +
- arch/arm64/kvm/hyp/entry.S             |   6 +
- arch/arm64/kvm/hyp/hyp-entry.S         | 109 ++++++------------
- arch/arm64/kvm/hyp/hyp.h               | 108 ++++++++++++++++--
- arch/arm64/kvm/hyp/s2-setup.c          |  44 +++++++
- arch/arm64/kvm/hyp/switch.c            | 202 +++++++++++++++++++++++++++++----
- arch/arm64/kvm/hyp/sysreg-sr.c         | 147 ++++++++++++++++--------
- arch/arm64/kvm/hyp/timer-sr.c          |  10 +-
- drivers/clocksource/arm_arch_timer.c   |  96 ++++++++++------
- 29 files changed, 842 insertions(+), 298 deletions(-)
- create mode 100644 arch/arm64/kvm/hyp/s2-setup.c
-
+diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
+index 61bad17..7d7d757 100644
+--- a/arch/arm64/kvm/hyp/sysreg-sr.c
++++ b/arch/arm64/kvm/hyp/sysreg-sr.c
+@@ -37,34 +37,34 @@ static void __hyp_text __sysreg_save_common_state(struct kvm_cpu_context *ctxt)
+ 	ctxt->sys_regs[TPIDRRO_EL0]	= read_sysreg(tpidrro_el0);
+ 	ctxt->sys_regs[TPIDR_EL1]	= read_sysreg(tpidr_el1);
+ 	ctxt->gp_regs.regs.sp		= read_sysreg(sp_el0);
+-	ctxt->gp_regs.regs.pc		= read_sysreg(elr_el2);
+-	ctxt->gp_regs.regs.pstate	= read_sysreg(spsr_el2);
++	ctxt->gp_regs.regs.pc		= read_sysreg_el2(elr);
++	ctxt->gp_regs.regs.pstate	= read_sysreg_el2(spsr);
+ }
+ 
+ static void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
+ {
+ 	ctxt->sys_regs[MPIDR_EL1]	= read_sysreg(vmpidr_el2);
+ 	ctxt->sys_regs[CSSELR_EL1]	= read_sysreg(csselr_el1);
+-	ctxt->sys_regs[SCTLR_EL1]	= read_sysreg(sctlr_el1);
+-	ctxt->sys_regs[CPACR_EL1]	= read_sysreg(cpacr_el1);
+-	ctxt->sys_regs[TTBR0_EL1]	= read_sysreg(ttbr0_el1);
+-	ctxt->sys_regs[TTBR1_EL1]	= read_sysreg(ttbr1_el1);
+-	ctxt->sys_regs[TCR_EL1]		= read_sysreg(tcr_el1);
+-	ctxt->sys_regs[ESR_EL1]		= read_sysreg(esr_el1);
+-	ctxt->sys_regs[AFSR0_EL1]	= read_sysreg(afsr0_el1);
+-	ctxt->sys_regs[AFSR1_EL1]	= read_sysreg(afsr1_el1);
+-	ctxt->sys_regs[FAR_EL1]		= read_sysreg(far_el1);
+-	ctxt->sys_regs[MAIR_EL1]	= read_sysreg(mair_el1);
+-	ctxt->sys_regs[VBAR_EL1]	= read_sysreg(vbar_el1);
+-	ctxt->sys_regs[CONTEXTIDR_EL1]	= read_sysreg(contextidr_el1);
+-	ctxt->sys_regs[AMAIR_EL1]	= read_sysreg(amair_el1);
+-	ctxt->sys_regs[CNTKCTL_EL1]	= read_sysreg(cntkctl_el1);
++	ctxt->sys_regs[SCTLR_EL1]	= read_sysreg_el1(sctlr);
++	ctxt->sys_regs[CPACR_EL1]	= read_sysreg_el1(cpacr);
++	ctxt->sys_regs[TTBR0_EL1]	= read_sysreg_el1(ttbr0);
++	ctxt->sys_regs[TTBR1_EL1]	= read_sysreg_el1(ttbr1);
++	ctxt->sys_regs[TCR_EL1]		= read_sysreg_el1(tcr);
++	ctxt->sys_regs[ESR_EL1]		= read_sysreg_el1(esr);
++	ctxt->sys_regs[AFSR0_EL1]	= read_sysreg_el1(afsr0);
++	ctxt->sys_regs[AFSR1_EL1]	= read_sysreg_el1(afsr1);
++	ctxt->sys_regs[FAR_EL1]		= read_sysreg_el1(far);
++	ctxt->sys_regs[MAIR_EL1]	= read_sysreg_el1(mair);
++	ctxt->sys_regs[VBAR_EL1]	= read_sysreg_el1(vbar);
++	ctxt->sys_regs[CONTEXTIDR_EL1]	= read_sysreg_el1(contextidr);
++	ctxt->sys_regs[AMAIR_EL1]	= read_sysreg_el1(amair);
++	ctxt->sys_regs[CNTKCTL_EL1]	= read_sysreg_el1(cntkctl);
+ 	ctxt->sys_regs[PAR_EL1]		= read_sysreg(par_el1);
+ 	ctxt->sys_regs[MDSCR_EL1]	= read_sysreg(mdscr_el1);
+ 
+ 	ctxt->gp_regs.sp_el1		= read_sysreg(sp_el1);
+-	ctxt->gp_regs.elr_el1		= read_sysreg(elr_el1);
+-	ctxt->gp_regs.spsr[KVM_SPSR_EL1]= read_sysreg(spsr_el1);
++	ctxt->gp_regs.elr_el1		= read_sysreg_el1(elr);
++	ctxt->gp_regs.spsr[KVM_SPSR_EL1]= read_sysreg_el1(spsr);
+ }
+ 
+ void __hyp_text __sysreg_save_host_state(struct kvm_cpu_context *ctxt)
+@@ -86,34 +86,34 @@ static void __hyp_text __sysreg_restore_common_state(struct kvm_cpu_context *ctx
+ 	write_sysreg(ctxt->sys_regs[TPIDRRO_EL0], tpidrro_el0);
+ 	write_sysreg(ctxt->sys_regs[TPIDR_EL1],	  tpidr_el1);
+ 	write_sysreg(ctxt->gp_regs.regs.sp,	  sp_el0);
+-	write_sysreg(ctxt->gp_regs.regs.pc,	  elr_el2);
+-	write_sysreg(ctxt->gp_regs.regs.pstate,	  spsr_el2);
++	write_sysreg_el2(ctxt->gp_regs.regs.pc,	  elr);
++	write_sysreg_el2(ctxt->gp_regs.regs.pstate, spsr);
+ }
+ 
+ static void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
+ {
+-	write_sysreg(ctxt->sys_regs[MPIDR_EL1],	  vmpidr_el2);
+-	write_sysreg(ctxt->sys_regs[CSSELR_EL1],  csselr_el1);
+-	write_sysreg(ctxt->sys_regs[SCTLR_EL1],	  sctlr_el1);
+-	write_sysreg(ctxt->sys_regs[CPACR_EL1],	  cpacr_el1);
+-	write_sysreg(ctxt->sys_regs[TTBR0_EL1],	  ttbr0_el1);
+-	write_sysreg(ctxt->sys_regs[TTBR1_EL1],	  ttbr1_el1);
+-	write_sysreg(ctxt->sys_regs[TCR_EL1],	  tcr_el1);
+-	write_sysreg(ctxt->sys_regs[ESR_EL1],	  esr_el1);
+-	write_sysreg(ctxt->sys_regs[AFSR0_EL1],	  afsr0_el1);
+-	write_sysreg(ctxt->sys_regs[AFSR1_EL1],	  afsr1_el1);
+-	write_sysreg(ctxt->sys_regs[FAR_EL1],	  far_el1);
+-	write_sysreg(ctxt->sys_regs[MAIR_EL1],	  mair_el1);
+-	write_sysreg(ctxt->sys_regs[VBAR_EL1],	  vbar_el1);
+-	write_sysreg(ctxt->sys_regs[CONTEXTIDR_EL1], contextidr_el1);
+-	write_sysreg(ctxt->sys_regs[AMAIR_EL1],	  amair_el1);
+-	write_sysreg(ctxt->sys_regs[CNTKCTL_EL1], cntkctl_el1);
+-	write_sysreg(ctxt->sys_regs[PAR_EL1],	  par_el1);
+-	write_sysreg(ctxt->sys_regs[MDSCR_EL1],	  mdscr_el1);
+-
+-	write_sysreg(ctxt->gp_regs.sp_el1,	sp_el1);
+-	write_sysreg(ctxt->gp_regs.elr_el1,	elr_el1);
+-	write_sysreg(ctxt->gp_regs.spsr[KVM_SPSR_EL1], spsr_el1);
++	write_sysreg(ctxt->sys_regs[MPIDR_EL1],		vmpidr_el2);
++	write_sysreg(ctxt->sys_regs[CSSELR_EL1],	csselr_el1);
++	write_sysreg_el1(ctxt->sys_regs[SCTLR_EL1],	sctlr);
++	write_sysreg_el1(ctxt->sys_regs[CPACR_EL1],	cpacr);
++	write_sysreg_el1(ctxt->sys_regs[TTBR0_EL1],	ttbr0);
++	write_sysreg_el1(ctxt->sys_regs[TTBR1_EL1],	ttbr1);
++	write_sysreg_el1(ctxt->sys_regs[TCR_EL1],	tcr);
++	write_sysreg_el1(ctxt->sys_regs[ESR_EL1],	esr);
++	write_sysreg_el1(ctxt->sys_regs[AFSR0_EL1],	afsr0);
++	write_sysreg_el1(ctxt->sys_regs[AFSR1_EL1],	afsr1);
++	write_sysreg_el1(ctxt->sys_regs[FAR_EL1],	far);
++	write_sysreg_el1(ctxt->sys_regs[MAIR_EL1],	mair);
++	write_sysreg_el1(ctxt->sys_regs[VBAR_EL1],	vbar);
++	write_sysreg_el1(ctxt->sys_regs[CONTEXTIDR_EL1],contextidr);
++	write_sysreg_el1(ctxt->sys_regs[AMAIR_EL1],	amair);
++	write_sysreg_el1(ctxt->sys_regs[CNTKCTL_EL1], 	cntkctl);
++	write_sysreg(ctxt->sys_regs[PAR_EL1],		par_el1);
++	write_sysreg(ctxt->sys_regs[MDSCR_EL1],		mdscr_el1);
++
++	write_sysreg(ctxt->gp_regs.sp_el1,		sp_el1);
++	write_sysreg_el1(ctxt->gp_regs.elr_el1,		elr);
++	write_sysreg_el1(ctxt->gp_regs.spsr[KVM_SPSR_EL1],spsr);
+ }
+ 
+ void __hyp_text __sysreg_restore_host_state(struct kvm_cpu_context *ctxt)
 -- 
 2.1.4
