@@ -1,27 +1,22 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 11 Feb 2016 12:59:03 +0100
-Subject: [PATCH V5 06/11] soc: mediatek: PMIC wrap: SPI_WRITE needs a
- different bitmask for MT2701/7623
-In-Reply-To: <1454841778-35529-7-git-send-email-blogic@openwrt.org>
-References: <1454841778-35529-1-git-send-email-blogic@openwrt.org>
- <1454841778-35529-7-git-send-email-blogic@openwrt.org>
-Message-ID: <56BC7787.8070308@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 11 Feb 2016 12:59:47 +0100
+Subject: [PATCH 01/14] pinctrl: sunxi: Add A83T R_PIO controller support
+In-Reply-To: <1454203266-4450-2-git-send-email-vishnupatekar0510@gmail.com>
+References: <1454203266-4450-1-git-send-email-vishnupatekar0510@gmail.com>
+ <1454203266-4450-2-git-send-email-vishnupatekar0510@gmail.com>
+Message-ID: <CACRpkdbCgOBQw28d=qc1fAURY3x8UdoWqiMtXMZ=uWLaQj-nbg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sun, Jan 31, 2016 at 2:20 AM, Vishnu Patekar
+<vishnupatekar0510@gmail.com> wrote:
 
-
-On 07/02/16 11:42, John Crispin wrote:
-> MT2701 and MT7623 use a different bitmask for the SPI_WRITE command.
+> The A83T has R_PIO pin controller, it's same as A23, execpt A83T
+> interrupt bit is 6th and A83T has one extra pin PL12.
 >
+> Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
 
-Something like:
-Different SoCs will use different bitmask for the SPI_WRITE command. 
-This patch defines the bitmask in the pmic_wrapper_type to allow an easy 
-addition.
+Maxime, can you look at this patch?
 
-Well you are the native speaker, so maybe it's not the best to just use 
-my version ;)
-
-Regards,
-Matthias
+Yours,
+Linus Walleij
