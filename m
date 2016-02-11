@@ -1,23 +1,21 @@
 From: julien.grall@arm.com (Julien Grall)
-Date: Thu, 11 Feb 2016 15:33:19 +0000
-Subject: [PATCH v2 1/6] KVM: arm/arm64: arch_timer: Gather KVM specific
- information in a structure
+Date: Thu, 11 Feb 2016 15:33:20 +0000
+Subject: [PATCH v2 2/6] KVM: arm/arm64: arch_timer: Rely on the arch timer to
+ parse the firmware tables
 In-Reply-To: <1455204804-31830-1-git-send-email-julien.grall@arm.com>
 References: <1455204804-31830-1-git-send-email-julien.grall@arm.com>
-Message-ID: <1455204804-31830-2-git-send-email-julien.grall@arm.com>
+Message-ID: <1455204804-31830-3-git-send-email-julien.grall@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce a structure which are filled up by the arch timer driver and
-used by the virtual timer in KVM.
+The firmware table is currently parsed by the virt timer code in order
+to retrieve the virtual interrupt. However, this is already done by the
+arch timer driver and therefore make the parsing code duplicated twice.
 
-The first member of this structure will be the timecounter. More members
-will be added later.
+Introduce an helper to get the virtual interrupt number and use it in
+the virtual timer code.
 
-This is also dropping arch_timer_get_timecounter as it was only used by
-the KVM code. Furthermore, a stub for the new helper hasn't been
-introduced because KVM is requiring the arch timer for both ARM64 and
-ARM32.
+With this changes, the support for ACPI is coming free.
 
 Signed-off-by: Julien Grall <julien.grall@arm.com>
 
@@ -29,92 +27,115 @@ Cc: Marc Zyngier <marc.zyngier@arm.com>
 Cc: Gleb Natapov <gleb@kernel.org>
 Cc: Paolo Bonzini <pbonzini@redhat.com>
 ---
- drivers/clocksource/arm_arch_timer.c |  9 +++++----
- include/clocksource/arm_arch_timer.h | 12 ++++++------
- virt/kvm/arm/arch_timer.c            |  6 +++---
- 3 files changed, 14 insertions(+), 13 deletions(-)
+ drivers/clocksource/arm_arch_timer.c |  2 ++
+ include/clocksource/arm_arch_timer.h |  1 +
+ virt/kvm/arm/arch_timer.c            | 33 +++++++--------------------------
+ 3 files changed, 10 insertions(+), 26 deletions(-)
 
 diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index c64d543..6eb2c5d 100644
+index 6eb2c5d..3cdbefd 100644
 --- a/drivers/clocksource/arm_arch_timer.c
 +++ b/drivers/clocksource/arm_arch_timer.c
-@@ -447,11 +447,11 @@ static struct cyclecounter cyclecounter = {
- 	.mask	= CLOCKSOURCE_MASK(56),
- };
+@@ -451,6 +451,8 @@ static struct arch_timer_kvm_info arch_timer_kvm_info;
  
--static struct timecounter timecounter;
-+static struct arch_timer_kvm_info arch_timer_kvm_info;
- 
--struct timecounter *arch_timer_get_timecounter(void)
-+struct arch_timer_kvm_info *arch_timer_get_kvm_info(void)
+ struct arch_timer_kvm_info *arch_timer_get_kvm_info(void)
  {
--	return &timecounter;
-+	return &arch_timer_kvm_info;
++	arch_timer_kvm_info.virtual_irq = arch_timer_ppi[VIRT_PPI];
++
+ 	return &arch_timer_kvm_info;
  }
  
- static void __init arch_counter_register(unsigned type)
-@@ -479,7 +479,8 @@ static void __init arch_counter_register(unsigned type)
- 	clocksource_register_hz(&clocksource_counter, arch_timer_rate);
- 	cyclecounter.mult = clocksource_counter.mult;
- 	cyclecounter.shift = clocksource_counter.shift;
--	timecounter_init(&timecounter, &cyclecounter, start_count);
-+	timecounter_init(&arch_timer_kvm_info.timecounter,
-+			 &cyclecounter, start_count);
- 
- 	/* 56 bits minimum, so we assume worst case rollover */
- 	sched_clock_register(arch_timer_read_counter, 56, arch_timer_rate);
 diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
-index 25d0914..4d487f8 100644
+index 4d487f8..8890552 100644
 --- a/include/clocksource/arm_arch_timer.h
 +++ b/include/clocksource/arm_arch_timer.h
-@@ -49,11 +49,16 @@ enum arch_timer_reg {
+@@ -51,6 +51,7 @@ enum arch_timer_reg {
  
- #define ARCH_TIMER_EVT_STREAM_FREQ	10000	/* 100us */
+ struct arch_timer_kvm_info {
+ 	struct timecounter timecounter;
++	int virtual_irq;
+ };
  
-+struct arch_timer_kvm_info {
-+	struct timecounter timecounter;
-+};
-+
  #ifdef CONFIG_ARM_ARCH_TIMER
- 
- extern u32 arch_timer_get_rate(void);
- extern u64 (*arch_timer_read_counter)(void);
--extern struct timecounter *arch_timer_get_timecounter(void);
-+
-+extern struct arch_timer_kvm_info *arch_timer_get_kvm_info(void);
- 
- #else
- 
-@@ -67,11 +72,6 @@ static inline u64 arch_timer_read_counter(void)
- 	return 0;
- }
- 
--static inline struct timecounter *arch_timer_get_timecounter(void)
--{
--	return NULL;
--}
--
- #endif
- 
- #endif
 diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 69bca18..a669c6a 100644
+index a669c6a..e4de549 100644
 --- a/virt/kvm/arm/arch_timer.c
 +++ b/virt/kvm/arm/arch_timer.c
-@@ -385,11 +385,11 @@ int kvm_timer_hyp_init(void)
+@@ -17,7 +17,6 @@
+  */
+ 
+ #include <linux/cpu.h>
+-#include <linux/of_irq.h>
+ #include <linux/kvm.h>
+ #include <linux/kvm_host.h>
+ #include <linux/interrupt.h>
+@@ -375,45 +374,28 @@ static struct notifier_block kvm_timer_cpu_nb = {
+ 	.notifier_call = kvm_timer_cpu_notify,
+ };
+ 
+-static const struct of_device_id arch_timer_of_match[] = {
+-	{ .compatible	= "arm,armv7-timer",	},
+-	{ .compatible	= "arm,armv8-timer",	},
+-	{},
+-};
+-
+ int kvm_timer_hyp_init(void)
  {
- 	struct device_node *np;
- 	unsigned int ppi;
-+	struct arch_timer_kvm_info *info;
+-	struct device_node *np;
+-	unsigned int ppi;
+ 	struct arch_timer_kvm_info *info;
  	int err;
  
--	timecounter = arch_timer_get_timecounter();
--	if (!timecounter)
--		return -ENODEV;
-+	info = arch_timer_get_kvm_info();
-+	timecounter = &info->timecounter;
+ 	info = arch_timer_get_kvm_info();
+ 	timecounter = &info->timecounter;
  
- 	np = of_find_matching_node(NULL, arch_timer_of_match);
- 	if (!np) {
+-	np = of_find_matching_node(NULL, arch_timer_of_match);
+-	if (!np) {
+-		kvm_err("kvm_arch_timer: can't find DT node\n");
++	host_vtimer_irq = info->virtual_irq;
++	if (host_vtimer_irq <= 0) {
++		kvm_err("kvm_arch_timer: can't find virtual timer info or config virtual timer interrupt\n");
+ 		return -ENODEV;
+ 	}
+ 
+-	ppi = irq_of_parse_and_map(np, 2);
+-	if (!ppi) {
+-		kvm_err("kvm_arch_timer: no virtual timer interrupt\n");
+-		err = -EINVAL;
+-		goto out;
+-	}
+-
+-	err = request_percpu_irq(ppi, kvm_arch_timer_handler,
++	err = request_percpu_irq(host_vtimer_irq, kvm_arch_timer_handler,
+ 				 "kvm guest timer", kvm_get_running_vcpus());
+ 	if (err) {
+ 		kvm_err("kvm_arch_timer: can't request interrupt %d (%d)\n",
+-			ppi, err);
++			host_vtimer_irq, err);
+ 		goto out;
+ 	}
+ 
+-	host_vtimer_irq = ppi;
+-
+ 	err = __register_cpu_notifier(&kvm_timer_cpu_nb);
+ 	if (err) {
+ 		kvm_err("Cannot register timer CPU notifier\n");
+@@ -426,14 +408,13 @@ int kvm_timer_hyp_init(void)
+ 		goto out_free;
+ 	}
+ 
+-	kvm_info("%s IRQ%d\n", np->name, ppi);
++	kvm_info("vtimer IRQ%d\n", host_vtimer_irq);
+ 	on_each_cpu(kvm_timer_init_interrupt, NULL, 1);
+ 
+ 	goto out;
+ out_free:
+-	free_percpu_irq(ppi, kvm_get_running_vcpus());
++	free_percpu_irq(host_vtimer_irq, kvm_get_running_vcpus());
+ out:
+-	of_node_put(np);
+ 	return err;
+ }
+ 
 -- 
 1.9.1
