@@ -1,45 +1,25 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 11 Feb 2016 15:52:40 +0100
-Subject: [GIT PULL 3/4] rockchip dts64 changes for 4.6
-In-Reply-To: <1734524.3yNt5L3F1F@phil>
-References: <1734524.3yNt5L3F1F@phil>
-Message-ID: <29700148.FpDzERqiyH@phil>
+From: tj@kernel.org (Tejun Heo)
+Date: Thu, 11 Feb 2016 10:10:30 -0500
+Subject: [PATCH] libata: fix HDIO_GET_32BIT ioctl
+In-Reply-To: <1455196595-3466120-1-git-send-email-arnd@arndb.de>
+References: <1455196595-3466120-1-git-send-email-arnd@arndb.de>
+Message-ID: <20160211151030.GW3741@mtj.duckdns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof, Kevin,
+On Thu, Feb 11, 2016 at 02:16:27PM +0100, Arnd Bergmann wrote:
+> As reported by Soohoon Lee, the HDIO_GET_32BIT ioctl does not
+> work correctly in compat mode with libata.
+> 
+> I have investigated the issue further and found multiple problems
+> that all appeared with the same commit that originally introduced
+> HDIO_GET_32BIT handling in libata back in linux-2.6.8 and presumably
+> also linux-2.4, as the code uses "copy_to_user(arg, &val, 1)" to copy
+> a 'long' variable containing either 0 or 1 to user space.
 
-some small 64bit devicetree changes for 4.6 that allow mmc tuning and
-use the newer wakeup-source property for the gpio-keys.
+Applied to libata/for-4.5-fixes.
 
+Thanks a lot!
 
-Thanks
-Heiko
-
-The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
-
-  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.6-rockchip-dts64-1
-
-for you to fetch changes up to e6f49b118f73a769ec51ed28a085e9dccd67f9a1:
-
-  arm64: dts: rockchip: replace gpio-key,wakeup with wakeup-source property (2016-02-10 00:23:24 +0100)
-
-----------------------------------------------------------------
-Define the tuning-related mmc clocks and move from
-gpio-key,wakeup to the more generic wakeup-source property.
-
-----------------------------------------------------------------
-Shawn Lin (1):
-      arm64: dts: rockchip: add rk3368 tuning clk for emmc and sdmmc
-
-Sudeep Holla (1):
-      arm64: dts: rockchip: replace gpio-key,wakeup with wakeup-source property
-
- arch/arm64/boot/dts/rockchip/rk3368-evb.dtsi |  2 +-
- arch/arm64/boot/dts/rockchip/rk3368-r88.dts  |  2 +-
- arch/arm64/boot/dts/rockchip/rk3368.dtsi     | 10 ++++++----
- 3 files changed, 8 insertions(+), 6 deletions(-)
+-- 
+tejun
