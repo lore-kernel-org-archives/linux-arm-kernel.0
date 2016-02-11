@@ -1,34 +1,138 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 11 Feb 2016 14:40:24 +0000
-Subject: [PATCH v2 0/2] Misc ARM optimizations
-In-Reply-To: <1453980229-5678-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1453980229-5678-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20160211144023.GI32084@arm.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 11 Feb 2016 15:41:21 +0100
+Subject: [PATCH] arm64: KVM: Configure TCR_EL2.PS at runtime
+In-Reply-To: <56BC92C1.8060201@arm.com>
+References: <1455130013-28644-1-git-send-email-tchalamarla@caviumnetworks.com>
+ <20160211132708.GU5171@cbox> <20160211133401.GV5171@cbox>
+ <56BC92C1.8060201@arm.com>
+Message-ID: <20160211144121.GA5750@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 28, 2016 at 12:23:47PM +0100, Thomas Petazzoni wrote:
-> Here is a set of two patches that I already sent on March 2015 (first
-> patch) and June 2015 (second patch).
+On Thu, Feb 11, 2016 at 01:55:13PM +0000, Marc Zyngier wrote:
+> On 11/02/16 13:34, Christoffer Dall wrote:
+> > On Thu, Feb 11, 2016 at 02:27:08PM +0100, Christoffer Dall wrote:
+> >> On Wed, Feb 10, 2016 at 10:46:53AM -0800, tchalamarla at caviumnetworks.com wrote:
+> >>> From: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
+> >>>
+> >>> Setting TCR_EL2.PS to 40 bits is wrong on systems with PS size is
+> >>> less than 40 bits. and with systems where RAM is at higher address,
+> >>> this will break KVM.
+> >>>
+> >>> This patch sets TCR_EL2.PS at runtime similar to VTCR_EL2.PS
+> >>>
+> >>> changes form V2:
+> >>> 	- Modified subject line and commit message.
+> >>> 	- Removed TCR_EL2_FLAGS.
+> >>>
+> >>> changes from V1:
+> >>>         - Moved to dynamic configuration.
+> >>>
+> >>> Signed-off-by: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
+> >>> ---
+> >>>  arch/arm64/include/asm/kvm_arm.h |  2 --
+> >>>  arch/arm64/kvm/hyp-init.S        | 12 +++++++-----
+> >>>  2 files changed, 7 insertions(+), 7 deletions(-)
+> >>>
+> >>> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+> >>> index 738a95f..3776db0 100644
+> >>> --- a/arch/arm64/include/asm/kvm_arm.h
+> >>> +++ b/arch/arm64/include/asm/kvm_arm.h
+> >>> @@ -107,8 +107,6 @@
+> >>>  #define TCR_EL2_MASK	(TCR_EL2_TG0 | TCR_EL2_SH0 | \
+> >>>  			 TCR_EL2_ORGN0 | TCR_EL2_IRGN0 | TCR_EL2_T0SZ)
+> >>>  
+> >>> -#define TCR_EL2_FLAGS	(TCR_EL2_RES1 | TCR_EL2_PS_40B)
+> >>> -
+> >>>  /* VTCR_EL2 Registers bits */
+> >>>  #define VTCR_EL2_RES1		(1 << 31)
+> >>>  #define VTCR_EL2_PS_MASK	(7 << 16)
+> >>> diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
+> >>> index 3e568dc..b5ab1b0 100644
+> >>> --- a/arch/arm64/kvm/hyp-init.S
+> >>> +++ b/arch/arm64/kvm/hyp-init.S
+> >>> @@ -64,7 +64,7 @@ __do_hyp_init:
+> >>>  	mrs	x4, tcr_el1
+> >>>  	ldr	x5, =TCR_EL2_MASK
+> >>>  	and	x4, x4, x5
+> >>> -	ldr	x5, =TCR_EL2_FLAGS
+> >>> +	ldr	x5, =TCR_EL2_RES1
+> >>>  	orr	x4, x4, x5
+> >>>  
+> >>>  #ifndef CONFIG_ARM64_VA_BITS_48
+> >>> @@ -85,15 +85,17 @@ __do_hyp_init:
+> >>>  	ldr_l	x5, idmap_t0sz
+> >>>  	bfi	x4, x5, TCR_T0SZ_OFFSET, TCR_TxSZ_WIDTH
+> >>>  #endif
+> >>> -	msr	tcr_el2, x4
+> >>> -
+> >>> -	ldr	x4, =VTCR_EL2_FLAGS
+> >>>  	/*
+> >>>  	 * Read the PARange bits from ID_AA64MMFR0_EL1 and set the PS bits in
+> >>> -	 * VTCR_EL2.
+> >>> +	 * TCR_EL2 and VTCR_EL2.
+> >>>  	 */
+> >>>  	mrs	x5, ID_AA64MMFR0_EL1
+> >>>  	bfi	x4, x5, #16, #3
+> >>> +
+> >>> +	msr	tcr_el2, x4
+> >>> +
+> >>> +	ldr	x4, =VTCR_EL2_FLAGS
+> >>> +	bfi	x4, x5, #16, #3
+> >>>  	/*
+> >>>  	 * Read the VMIDBits bits from ID_AA64MMFR1_EL1 and set the VS bit in
+> >>>  	 * VTCR_EL2.
+> >>> -- 
+> >>> 2.1.0
+> >>>
+> >>
+> >> This looks reasonable enough for me.  Did we limit Linux to PS=40 bits
+> >> in the past and have lifted this restriction, or why did we have this
+> >> limitation for EL2 translations in the past?
+> >>
+> > Hmm, just went back and looked at my comments [1] on Suzuki's 16K page
+> > series, and regarding our stage-2 page table configuration I wrote this:
+> > 
+> > <quote>
+> > ... the constraints of
+> > this whole thing is, and make sure we agree on this:
+> > 
+> > 1. We fix the IPA max width to 40 bits
+> > 2. We don't support systems with a PARange smaller than 40 bits (do we
+> >    check this anywhere or document this anywhere?)
+> >    3. We always assume we are running on a system with PARange of 40
+> >    bits
+> >       and we are therefore constrained to use concatination.
+> > </quote>
+> > 
+> > So this change is actually making a bit nervous...  Marc, did you check
+> > if all the stuff in arch/arm64/include/asm/kvm_mmu.h still holds after
+> > we relax this?
 > 
-> The first patch hasn't gotten any feedback.
+> I believe this still works for the following reasons:
 > 
-> The second patch received some feedback: Russell said he would like
-> this to be merged at the beginning of a cycle, to give it enough time
-> for testing. And we are precisely at the beginning of a cycle :-) Rob
-> Herring had some comments, which I also addressed in a reply.
+> - This only affects the output address of EL2 Stage-1, and basically
+> only allows EL2 to reach the same memory as the rest of the host kernel.
 > 
-> Would it be possible to either get those patches merged, or a decision
-> be taken that they are not acceptable, so that I can stop worrying
-> about them ? :-)
+> - Stage-2 translation already does the same thing, for similar reasons.
+> 
+> - We enforce 40bit IPA by not providing page tables above 40 bits (by
+> setting T0SZ to 64-40=24). This has the effect of denying accesses above
+> 40bit IPA to the guest.
+> 
+> So I'm quite confident that we're safe here.
+> 
+> Thoughts?
+> 
 
-There's a PL310 erratum [(729806) Speculative reads from the Cortex-A9
-MPCore processor can cause deadlock] that requires both speculative
-linefills and L1 prefetch to be disabled, otherwise there is scope for
-deadlock.
+This patch is indeed harmless as it only touches the EL2 translation
+regime to be in line with the rest of the kernel, so we can merge this
+patch.
 
-So, these need to be predicated on a Kconfig option if nothing else,
-otherwise we may run into nasty regressions on things like OMAP4 (and
-anything else with PL310 r3p0 afaict).
+I'm more concerned about the assumptions we had for the Stage-2 page
+table not being valid anymore and therefore deserving a second look.
 
-Will
+But we can have a review of that whole thing some other day.
+
+Thanks,
+-Christoffer
