@@ -1,52 +1,43 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Thu, 11 Feb 2016 19:58:19 +0100
-Subject: [PATCH 3/3] ARM64: zynqmp: Use 64bit size cell format
-In-Reply-To: <CAL_JsqK0=LaXqJyr_rGKCzGgt5kFy79-4ARocTGpKved3JU-Ug@mail.gmail.com>
-References: <2f160e012080d5d6de11238ade239bb0bb224f64.1455193571.git.michal.simek@xilinx.com>
- <36fb9c4c9b2019b854e84dc0a9a01252a6de2337.1455193571.git.michal.simek@xilinx.com>
- <CAL_JsqK0=LaXqJyr_rGKCzGgt5kFy79-4ARocTGpKved3JU-Ug@mail.gmail.com>
-Message-ID: <56BCD9CB.9030803@monstr.eu>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 11 Feb 2016 20:07:01 +0100
+Subject: [PATCH v4 00/23] arm64: Virtualization Host Extension support
+In-Reply-To: <1455216004-19499-1-git-send-email-marc.zyngier@arm.com>
+References: <1455216004-19499-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20160211190701.GA4842@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
-
-On 11.2.2016 17:13, Rob Herring wrote:
-> On Thu, Feb 11, 2016 at 6:26 AM, Michal Simek <michal.simek@xilinx.com> wrote:
->> Use 64bit size cell format instead of 32bit for memory
->> description. Change 64bit sizes also for all others IPs.
+On Thu, Feb 11, 2016 at 06:39:41PM +0000, Marc Zyngier wrote:
+> ARMv8.1 comes with the "Virtualization Host Extension" (VHE for
+> short), which enables simpler support of Type-2 hypervisors.
 > 
-> Why? As is, this change is completely pointless because nothing needs
-> a >4GB size. Do you have peripherals with >4GB size?
+> This extension allows the kernel to directly run at EL2, and
+> significantly reduces the number of system registers shared between
+> host and guest, reducing the overhead of virtualization.
+> 
+> In order to have the same kernel binary running on all versions of the
+> architecture, this series makes heavy use of runtime code patching.
+> 
+> The first 22 patches massage the KVM code to deal with VHE and enable
+> Linux to run at EL2. The last patch catches an ugly case when VHE
+> capable CPUs are paired with some of their less capable siblings. This
+> should never happen, but hey...
+> 
+> I have deliberately left out some of the more "advanced"
+> optimizations, as they are likely to distract the reviewer from the
+> core infrastructure, which is what I care about at the moment.
+> 
+> Note: GDB is currently busted on VHE systems, as it checks for version
+>       6 on the debug architecture, while VHE is version 7. The
+>       binutils people are on the case.
+> 
+> This has been tested on the FVP_Base_SLV-V8-A model, and based on
+> v4.5-rc3 + kvmarm/master. I've put a branch out on:
+> 
+> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/vhe
 
-The change I need to do is to support more than 4GB memory. Memory space
-is divided to some parts. 2GB connected to hard part below 4GB. There
-there is 1GB connected to PL part below. Then 32GB hard part above of
-4GB and a lot of space for PL part (~230GB).
-
-PCIe can also address more than 256GB.
-
-That's why I stand before decision. Change size-cell for all IPs which
-are currently listed. Or just change it for memory node which is listed
-in mainline.
-I am not quite sure how PCIe description will look like and if there is
-any other IP which will required on current buses use sizes more that
-4GB. That's why I have change all sizes to support more than 4GB.
-
-But definitely current need is to support more than 4GB memory size and
-I have no problem to use not empty ranges property and keep there
-#size-cells = <1>;
-
-Both solution works for me. Definitely thank you for your comments.
+I'm happy with this series as it stands, we just need someone to take a
+look at that debug patch and be happy with it.
 
 Thanks,
-Michal
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160211/4e1ce5ef/attachment.sig>
+-Christoffer
