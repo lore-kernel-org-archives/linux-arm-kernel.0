@@ -1,43 +1,30 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 11 Feb 2016 14:50:43 +0100
-Subject: [linux-sunxi] Re: [PATCH v2 5/5] pinctrl: sunxi: Use pin number
- when calling sunxi_pmx_set
-In-Reply-To: <20160211132054.GC19622@box2.japko.eu>
-References: <1454448113-18810-1-git-send-email-k@japko.eu>
- <1454448113-18810-6-git-send-email-k@japko.eu>
- <CACRpkdbc0SfKiCGwUGA2fAPPsUhGv=qGV607Lht6ByYKKgTHjA@mail.gmail.com>
- <20160211132054.GC19622@box2.japko.eu>
-Message-ID: <CACRpkdZ889rktgaR3o--9cSsouORocV8TeBRGVkiwHpK3VNSGw@mail.gmail.com>
+Date: Thu, 11 Feb 2016 14:52:42 +0100
+Subject: [PATCH v3 2/2] dt-bindings: rockchip-pinctrl: Support the RK3399
+ SoCs compatible
+In-Reply-To: <14543443.RsRWh5K5Uv@phil>
+References: <1451997055-47655-1-git-send-email-wdc@rock-chips.com>
+ <1454153517-52969-1-git-send-email-david.wu@rock-chips.com>
+ <1454153517-52969-3-git-send-email-david.wu@rock-chips.com>
+ <14543443.RsRWh5K5Uv@phil>
+Message-ID: <CACRpkdZvS2RY2LqFQ1dMz8vecMgG7zmxw8JEj5KLTiqYCSsJ=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 11, 2016 at 2:20 PM, Krzysztof Adamski <k@japko.eu> wrote:
-> On Thu, Feb 11, 2016 at 02:17:41PM +0100, Linus Walleij wrote:
->>
->> On Tue, Feb 2, 2016 at 10:21 PM, Krzysztof Adamski <k@japko.eu> wrote:
->>
->>> sunxi_pmx_set accepts pin number and then calculates offset by
->>> subtracting pin_base from it. sunxi_pinctrl_gpio_get, on the other hand,
->>> gets offset so we have to convert it to pin number so we won't get
->>> negative value in sunxi_pmx_set.
->>>
->>> This was only used on A10 so far, where there is only one GPIO chip with
->>> pin_base set to 0 so it didn't matter. However H3 also requires this
->>> workaround but have two pinmux sections, triggering problem for PL port.
->>>
->>> Signed-off-by: Krzysztof Adamski <k@japko.eu>
->>
->>
->> Waiting for Maxime to review this. I guess this patch can be merged
->> independently of the other patches?
+On Sat, Jan 30, 2016 at 1:16 PM, Heiko Stuebner <heiko@sntech.de> wrote:
+> Hi David,
 >
-> Yes it can but it won't have any effect, as stated in the commit message,
-> since other SoCs either don't use this flag or have only one port so theri
-> pin_base=0.
+> Am Samstag, 30. Januar 2016, 19:31:57 schrieb David Wu:
+>> Change-Id: Ic1bdb3dc358837e97d7b48dd58be2f8d9d08d766
+>
+> please no Change-Id, it's missing the Signed-off, and as Linus Walleij said,
+> the compatible addition to the documentation can maybe stay in the pinctrl-
+> patch itself.
+>
+> I think both Linus and me overlooked that the binding-doc-addition was
+> already correctly included in your v2 patch at the top :-)
 
-Who cares as long as it will be used eventually.
-
-Merged v4 as stated earlier.
+Yeah I merged that now anyways so the string is there.
 
 Yours,
 Linus Walleij
