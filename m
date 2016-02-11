@@ -1,126 +1,123 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 11 Feb 2016 11:16:21 +0100
-Subject: breaking DT compatibility
-In-Reply-To: <56BB61EA.1030805@arm.com>
-References: <1454358000-13594-1-git-send-email-maxime.ripard@free-electrons.com>
- <56B4E2FB.3050703@arm.com> <56BB2D79.6090402@arm.com>
- <CABGGiswOKztmRT40w4t_7BD729WgM8ueLtOD-UF_wgMbmcg4cg@mail.gmail.com>
- <20160210143755.GE31506@lukather> <56BB61EA.1030805@arm.com>
-Message-ID: <20160211101621.GL31506@lukather>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 11 Feb 2016 11:18:34 +0100
+Subject: [PATCH 1/7] mmc: omap_hsmmc: Fix PM regression with deferred
+ probe for pm_runtime_reinit
+In-Reply-To: <1455145370-20301-2-git-send-email-tony@atomide.com>
+References: <1455145370-20301-1-git-send-email-tony@atomide.com>
+ <1455145370-20301-2-git-send-email-tony@atomide.com>
+Message-ID: <CAPDyKFpAcsfLgtu93P45fTEg11MjdGwREcyeGSS7vt6GWbNu_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 10, 2016 at 04:14:34PM +0000, Andre Przywara wrote:
-> > On Wed, Feb 10, 2016 at 07:42:02AM -0600, Rob Herring wrote:
-> >> On Wed, Feb 10, 2016 at 6:30 AM, Andre Przywara <andre.przywara@arm.com> wrote:
-> >>> Hi,
-> >>>
-> >>> just a ping:
-> >>>
-> >>> Are we really OK with breaking existing DTs in 4.6? (per the code in
-> >>> -next: f7d372ba54ea04d528a291b8dbe34716507bb60b, which is this patch).
-> >>
-> >> I only warn and make sure people are aware of the issue. I leave that
-> >> up to platform maintainers to decide. It depends on the maturity of
-> >> the platform and users.
-> > 
-> > The impacted SoCs support is really partial. For the most supported
-> > one, big things like display or sound are totally missing, and we
-> > still update them on a regular basis to add support for new
-> > devices. As such, users are very likely to upgrade the DT from one
-> > version to another just because there's new devices available to
-> > them. And the newest SoC impacted just got introduced in 4.5, and only
-> > has the UART and MMC devices available.
-> 
-> But I still don't see why we have to break things - can't we just
-> improve support _without_ breaking compatibility? For instance keeping
-> the old behaviour around? I can dig out my old x86 hat and find a
-> _compatible_ solution for this, if you prefer ;-)
-> Actually doesn't Jean-Francois' patch fixes the PLL8 issue without
-> breaking anything?
+On 11 February 2016 at 00:02, Tony Lindgren <tony@atomide.com> wrote:
+> Commit 5de85b9d57ab ("PM / runtime: Re-init runtime PM states at probe
+> error and driver unbind") introduced pm_runtime_reinit() that is used
+> to reinitialize PM runtime after -EPROBE_DEFER. This allows shutting
+> down the device after a failed probe.
+>
+> However, for drivers using pm_runtime_use_autosuspend() this can cause
+> a state where suspend callback is never called after -EPROBE_DEFER.
+> On the following device driver probe, hardware state is different from
+> the PM runtime state causing omap_device to produce the following
+> error:
+>
+> omap_device_enable() called from invalid state 1
+>
+> And with omap_device and omap hardware being picky for PM, this will
+> block any deeper idle states in hardware.
+>
+> The solution is to fix the drivers to follow the PM runtime documentation:
+>
+> 1. For sections of code that needs the device disabled, use
+>    pm_runtime_put_sync_suspend() if pm_runtime_set_autosuspend() has
+>    been set.
+>
+> 2. For driver exit code, use pm_runtime_dont_use_autosuspend() before
+>    pm_runtime_put_sync() if pm_runtime_use_autosuspend() has been
+>    set.
+>
+> Fixes: 5de85b9d57ab ("PM / runtime: Re-init runtime PM states at probe
+> error and driver unbind")
+> Cc: linux-mmc at vger.kernel.org
+> Cc: Alan Stern <stern@rowland.harvard.edu>
+> Cc: Kevin Hilman <khilman@baylibre.com>
+> Cc: Nishanth Menon <nm@ti.com>
+> Cc: Rafael J. Wysocki <rafael@kernel.org>
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Cc: Tero Kristo <t-kristo@ti.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+>
+> Ulf, I'd like to merge this along with other related fixes via the
+> ARM SoC tree if no objections, please review and ack if this look OK
+> to you.
 
-Are you convinced that merging code that is not going to be used or
-tested (and thus maintained) by anyone is a good idea?
+I have some other omap_hsmmc patches queued for 4.6, so I prefer to
+send this via my mmc tree.
 
-Using X86 as an example is quite funny, since I remember on a few
-occasions having to reflash my BIOS/UEFI to fix some issues in Linux
-(and as it turns out, the last occurence was two weeks ago).
+I guess that's okay as well!?
 
-> Also were do you want to draw the line for "partial support"? The
-> sun6i-a31.dtsi is around since 3.12, which was released more than 2
-> years ago.
-> If we want to wait for "stabilization", we will probably wait forever. I
-> find discussions about DT stabilization going back to the very beginning
-> of DT for ARM - as well as the request for moving the DT bindings out of
-> the kernel (which I think we should really eventually do now).
+>
+> ---
+>  drivers/mmc/host/omap_hsmmc.c | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+> index b6639ea..32bc112 100644
+> --- a/drivers/mmc/host/omap_hsmmc.c
+> +++ b/drivers/mmc/host/omap_hsmmc.c
+> @@ -1247,7 +1247,7 @@ static int omap_hsmmc_switch_opcond(struct omap_hsmmc_host *host, int vdd)
+>         int ret;
+>
+>         /* Disable the clocks */
+> -       pm_runtime_put_sync(host->dev);
+> +       pm_runtime_put_sync_suspend(host->dev);
 
-I'd say when we have merged everything that makes it work as it was
-intented to?
+This has no effect.
 
-In this case, it's a multimedia SoCs. So I'd draw the line at once we
-had display, sound and VPU. Display is coming, sound seems to be
-gaining traction lately, so that doesn't sound that far off.
+The mmc core holds a runtime PM usage count for the device anyway, so
+the clock won't be disabled.
+Please remove this change from the patch.
 
-> Frankly I don't care so much about these particular boards, but just
-> want avoid to set a bad example for the future - in particular sneaking
-> this behaviour into the arm64 world, where DTs _really_ come with the
-> board or are even generated by the (UEFI-)firmware.
+>         if (host->dbclk)
+>                 clk_disable_unprepare(host->dbclk);
+>
+> @@ -2232,6 +2232,7 @@ err_irq:
+>                 dma_release_channel(host->tx_chan);
+>         if (host->rx_chan)
+>                 dma_release_channel(host->rx_chan);
+> +       pm_runtime_dont_use_autosuspend(host->dev);
+>         pm_runtime_put_sync(host->dev);
+>         pm_runtime_disable(host->dev);
+>         if (host->dbclk)
+> @@ -2253,6 +2254,7 @@ static int omap_hsmmc_remove(struct platform_device *pdev)
+>         dma_release_channel(host->tx_chan);
+>         dma_release_channel(host->rx_chan);
+>
+> +       pm_runtime_dont_use_autosuspend(host->dev);
+>         pm_runtime_put_sync(host->dev);
+>         pm_runtime_disable(host->dev);
+>         device_init_wakeup(&pdev->dev, false);
+> @@ -2285,7 +2287,7 @@ static int omap_hsmmc_suspend(struct device *dev)
+>         if (host->dbclk)
+>                 clk_disable_unprepare(host->dbclk);
+>
+> -       pm_runtime_put_sync(host->dev);
+> +       pm_runtime_put_sync_suspend(host->dev);
 
-Ok, that's a good thing to know, and we'll make sure it won't
-happen. What's the policy when the provided DT comes from a vendor in
-that case?
+This has no effect, as the PM core prevents runtime suspend during the
+system PM phase.
+It does so, by increasing the runtime PM usage count
+(pm_runtime_get_noresume()).
 
-> U-Boot already can embed a device tree, sounds like a perfect place to
-> have it stored for me - as long as there is _one_ best version of it.
+Please remove this change from patch.
 
-So far, they've been using their own, with some custom properties that
-were rejected last time they were submitted.
+>         return 0;
+>  }
+>
+> --
+> 2.7.0
+>
 
-http://lists.infradead.org/pipermail/linux-rpi-kernel/2015-August/002122.html
-
-So I'm a bit pessimistic about that.
-
-> >> If people complain about it then it's their mess. For platforms
-> >> supported in distros such as debian or fedora, I would strongly
-> >> recommend against breaking compatibility.
-> > 
-> > None of them are officially supported:
-> > https://www.debian.org/releases/stable/armhf/ch02s01.html.en
-> > https://fedoraproject.org/wiki/Architectures/ARM#Fedora_23
-> > 
-> > Only the older one are, and they are not affected by this patch.
-> > 
-> >> They do ship dtbs, but it's a chicken and egg problem. If dtbs were
-> >> stable and provided by firmware, then they wouldn't have to provide
-> >> them. If dtbs are unstable, then they have no choice.
-> > 
-> > And while it might work great on platforms that have all the needed
-> > documentation, or a perfect one, which is our case. Almost each
-> > release, we discover that something is not working as it was
-> > documented, when it was documented in the first place.
-> 
-> I understand that it's not an ideal situation for those Allwinner
-> chips - but nevertheless I would like us to at least _try_ to comply
-> with this idea. As said before: this patch is a nice rework/cleanup
-> - but definitely not a good reason to break compatibility.
-
-To be fair, I really want to tend to keep a DT ABI as stable as
-possible. I just don't want to commit to it. If it comes in the way of
-a nice rework/cleanup, then it shouldn't matter.
-
-But that doesn't make me want to break everything every kernel release
-either.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160211/02d8c8a3/attachment.sig>
+Kind regards
+Uffe
