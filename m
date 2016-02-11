@@ -1,120 +1,84 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 11 Feb 2016 02:33:30 +0200
-Subject: [PATCH v3 6/8] dmaengine: rcar-dmac: add iommu support for slave
- transfers
-In-Reply-To: <1455065878-11906-7-git-send-email-niklas.soderlund+renesas@ragnatech.se>
-References: <1455065878-11906-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
- <1455065878-11906-7-git-send-email-niklas.soderlund+renesas@ragnatech.se>
-Message-ID: <7836168.xWoq7RJUyE@avalon>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Wed, 10 Feb 2016 16:38:30 -0800
+Subject: [PATCH 3/3] clk: Provide OF helper to mark clocks as CRITICAL
+In-Reply-To: <20160201082245.GV3368@x1>
+References: <1453127331-20616-1-git-send-email-lee.jones@linaro.org>
+ <1453127331-20616-4-git-send-email-lee.jones@linaro.org>
+ <56A95811.8010200@arm.com> <20160201063256.GE32462@lukather>
+ <20160201082245.GV3368@x1>
+Message-ID: <20160211003830.26445.88202@quark.deferred.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Niklas,
-
-Thank you for the patch.
-
-On Wednesday 10 February 2016 01:57:56 Niklas S?derlund wrote:
-> Enable slave transfers to devices behind IPMMU:s by mapping the slave
-> addresses using the dma-mapping API.
+Quoting Lee Jones (2016-02-01 00:22:45)
+> On Mon, 01 Feb 2016, Maxime Ripard wrote:
+> > On Wed, Jan 27, 2016 at 11:51:45PM +0000, Andr? Przywara wrote:
+> > > Hi,
+> > > 
+> > > On 18/01/16 14:28, Lee Jones wrote:
+> > > > This call matches clocks which have been marked as critical in DT
+> > > > and sets the appropriate flag.  These flags can then be used to
+> > > > mark the clock core flags appropriately prior to registration.
+> > > 
+> > > I like the idea of having a generic property very much. Also this solves
+> > > a problem I have in a very elegant way.
+> > 
+> > Not really. It has a significant set of drawbacks that we already
+> > detailed in the initial thread, which are mostly related to the fact
+> > that the clocks are to be left on is something that totally depends on
+> > the software support in the kernel. Some clocks should be reported as
+> > critical because they are simply missing a driver for it, some should
+> > be because the driver for it as not been compiled, some should because
+> > we don't have the proper clocks drivers yet for one of their
+> > downstream clocks.
 > 
-> Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
-> ---
->  drivers/dma/sh/rcar-dmac.c | 57 +++++++++++++++++++++++++++++++++++++++----
->  1 file changed, 52 insertions(+), 5 deletions(-)
+> Exactly.  This is a not a CLK_DRIVER_NOT_{AUTHORED|UPSTREAM} or
+> CLK_DRIVER_NOT_ENABLED implementation, it's for CLK_CRITICALs.
+> Critical clocks must _never_ be turned off, no matter what, else
+> something really bad will happen.  In our use-case, if the clocks are
+> turned of, it will be catastrophic to the running system.
 > 
-> diff --git a/drivers/dma/sh/rcar-dmac.c b/drivers/dma/sh/rcar-dmac.c
-> index 743873c..268407c 100644
-> --- a/drivers/dma/sh/rcar-dmac.c
-> +++ b/drivers/dma/sh/rcar-dmac.c
-> @@ -1106,21 +1106,68 @@ rcar_dmac_prep_dma_cyclic(struct dma_chan *chan,
-> dma_addr_t buf_addr, return desc;
->  }
-> 
-> +static int rcar_dmac_set_slave_addr(struct dma_chan *chan,
-> +				     struct rcar_dmac_chan_slave *slave,
-> +				     phys_addr_t addr, size_t size)
-> +{
-> +	struct dma_attrs attrs;
-> +	enum dma_data_direction dir;
-> +
-> +	init_dma_attrs(&attrs);
-> +	dma_set_attr(DMA_ATTR_NO_KERNEL_MAPPING, &attrs);
-> +	dma_set_attr(DMA_ATTR_SKIP_CPU_SYNC, &attrs);
-> +
-> +	/*
-> +	 * We can't know the direction at this time, see documentation for
-> +	 * 'direction' in struct dma_slave_config.
-> +	 */
-> +	dir = DMA_BIDIRECTIONAL;
-> +
-> +	if (slave->xfer_size) {
-> +		dma_unmap_resource(chan->device->dev, slave->slave_addr,
-> +				slave->xfer_size, dir, &attrs);
+> > Basically, it all boils down to this: some clocks should never ever be
+> > shutdown because <hardware reason>, and I believe it's the case Lee is
+> > in. But most of the current code that would use it might, and might
+> > even need at some point to shut down such a clock.
 
-Nitpicking, you can align slave with chan on the previous line.
+Handoff clocks solved both the handoff clock problem (which Rhyland's
+thread[0] brings back up) and the critical clock problem entirely except
+for a single corner case: if a *critical* clk is enabled at boot via the
+HANDOFF flag and then a driver get's that clk and enables/disables it.
+Then we lose the refcount and the critical clock (which must never be
+gated) will be gated.
 
-> +		slave->slave_addr = 0;
-> +		slave->xfer_size = 0;
-> +	}
-> +
-> +	if (size) {
-> +		slave->slave_addr = dma_map_resource(chan->device->dev, addr,
-> +				size, dir, &attrs);
-> +
-> +		if (dma_mapping_error(chan->device->dev, slave->slave_addr)) {
-> +			struct rcar_dmac_chan *rchan = to_rcar_dmac_chan(chan);
-> +
-> +			dev_err(chan->device->dev,
-> +					"chan%u: failed to map %zx@%pap",
-> +					rchan->index, size, &addr);
+That is the executive summary of my discussion with Lee last year. I'm
+fine to merge both critical clocks and handoff clocks into the clk core
+to cover all corner cases.
 
-Indentation looks weird to me.
+I'll post a series combining both sets of patches later today for
+review.
 
-> +			return -EIO;
-> +		}
-> +
-> +		slave->xfer_size = size;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
->  static int rcar_dmac_device_config(struct dma_chan *chan,
->  				   struct dma_slave_config *cfg)
->  {
->  	struct rcar_dmac_chan *rchan = to_rcar_dmac_chan(chan);
-> +	int ret;
-> 
->  	/*
->  	 * We could lock this, but you shouldn't be configuring the
->  	 * channel, while using it...
->  	 */
-> -	rchan->src.slave_addr = cfg->src_addr;
-> -	rchan->dst.slave_addr = cfg->dst_addr;
-> -	rchan->src.xfer_size = cfg->src_addr_width;
-> -	rchan->dst.xfer_size = cfg->dst_addr_width;
-> 
-> -	return 0;
-> +	ret = rcar_dmac_set_slave_addr(chan, &rchan->src, cfg->src_addr,
-> +			cfg->src_addr_width);
-> +	if (ret)
-> +		return ret;
-> +
-> +	ret = rcar_dmac_set_slave_addr(chan, &rchan->dst, cfg->dst_addr,
-> +			cfg->dst_addr_width);
+> > 
+> > Mike's solution with the flags + handover was solving all this, I'm
+> > not sure why he's not pushed it forward.
 
-You could align cfg with chan on the previous line (twice).
+Because I was super busy. I'm still super busy but now I will ignore
+other important things and catch up on clk land. ;-)
 
-With this fixed and the attributes removed as explained by Robin,
+[0] https://lkml.org/lkml/2016/2/9/817
 
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-
-> +	return ret;
->  }
-> 
->  static int rcar_dmac_chan_terminate_all(struct dma_chan *chan)
-
--- 
 Regards,
+Mike
 
-Laurent Pinchart
+> 
+> Right, but I think you are missing part of the conversation.  Mike and
+> I had a face-to-face meeting in San Francisco last year.  The
+> conclusion was that the CLK_CRITICAL and CLK_HANDOVER solutions should
+> be separated.  Different handling, different code.  This submission
+> only solves the former problem.  I believe Mike was going to submit
+> and follow-up on the CLK_HANDOVER solution separately.
+> 
+> -- 
+> Lee Jones
+> Linaro STMicroelectronics Landing Team Lead
+> Linaro.org ? Open source software for ARM SoCs
+> Follow Linaro: Facebook | Twitter | Blog
