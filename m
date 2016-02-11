@@ -1,9 +1,9 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 11 Feb 2016 11:00:47 +0200
-Subject: [PATCH] dmaengine: omap-dma: Implement device_synchronize callback
-In-Reply-To: <1455180894-2672-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1455180894-2672-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <56BC4DBF.8080605@ti.com>
+Date: Thu, 11 Feb 2016 11:00:57 +0200
+Subject: [PATCH] dmaengine: edma: Implement device_synchronize callback
+In-Reply-To: <1455180872-2620-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1455180872-2620-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <56BC4DC9.6000309@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,37 +13,46 @@ On 02/11/2016 10:54 AM, Peter Ujfalusi wrote:
 I have made some typos and I only compiled the kernel after sending the patch..
 Resending.
 
+> 
 > Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 > ---
->  drivers/dma/omap-dma.c | 8 ++++++++
->  1 file changed, 8 insertions(+)
+>  drivers/dma/edma.c | 9 +++++++++
+>  1 file changed, 9 insertions(+)
 > 
-> diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
-> index e691f48f9d73..7c6a300b6b57 100644
-> --- a/drivers/dma/omap-dma.c
-> +++ b/drivers/dma/omap-dma.c
-> @@ -1007,6 +1007,13 @@ static int omap_dma_terminate_all(struct dma_chan *chan)
+> diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+> index 2dac314a2d7a..ea0d919a3318 100644
+> --- a/drivers/dma/edma.c
+> +++ b/drivers/dma/edma.c
+> @@ -869,6 +869,13 @@ static int edma_terminate_all(struct dma_chan *chan)
 >  	return 0;
 >  }
 >  
-> +static void omap_dma_synchronize(struct dma_chan *c)
+> +static void edma_synchronize(struct dma_chan *c)
 > +{
-> +	struct omap_chan *c = to_omap_dma_chan(chan);
+> +	struct edma_chan *echan = to_edma_chan(chan);
 > +
-> +	vchan_synchronize(&c->vc);
+> +	vchan_synchronize(&echan->vchan);
 > +}
 > +
->  static int omap_dma_pause(struct dma_chan *chan)
+>  static int edma_slave_config(struct dma_chan *chan,
+>  	struct dma_slave_config *cfg)
 >  {
->  	struct omap_chan *c = to_omap_dma_chan(chan);
-> @@ -1110,6 +1117,7 @@ static int omap_dma_probe(struct platform_device *pdev)
->  	od->ddev.device_pause = omap_dma_pause;
->  	od->ddev.device_resume = omap_dma_resume;
->  	od->ddev.device_terminate_all = omap_dma_terminate_all;
-> +	od-ddev.device_synchronize = omap_dma_synchronize;
->  	od->ddev.src_addr_widths = OMAP_DMA_BUSWIDTHS;
->  	od->ddev.dst_addr_widths = OMAP_DMA_BUSWIDTHS;
->  	od->ddev.directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
+> @@ -1808,6 +1815,7 @@ static void edma_dma_init(struct edma_cc *ecc, bool legacy_mode)
+>  	s_ddev->device_pause = edma_dma_pause;
+>  	s_ddev->device_resume = edma_dma_resume;
+>  	s_ddev->device_terminate_all = edma_terminate_all;
+> +	s_ddev->device_synchronize = edma_synchronize;
+>  
+>  	s_ddev->src_addr_widths = EDMA_DMA_BUSWIDTHS;
+>  	s_ddev->dst_addr_widths = EDMA_DMA_BUSWIDTHS;
+> @@ -1833,6 +1841,7 @@ static void edma_dma_init(struct edma_cc *ecc, bool legacy_mode)
+>  		m_ddev->device_pause = edma_dma_pause;
+>  		m_ddev->device_resume = edma_dma_resume;
+>  		m_ddev->device_terminate_all = edma_terminate_all;
+> +		m_ddev->device_synchronize = edma_synchronize;
+>  
+>  		m_ddev->src_addr_widths = EDMA_DMA_BUSWIDTHS;
+>  		m_ddev->dst_addr_widths = EDMA_DMA_BUSWIDTHS;
 > 
 
 
