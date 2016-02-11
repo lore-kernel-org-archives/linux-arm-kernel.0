@@ -1,42 +1,31 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 11 Feb 2016 13:36:48 +0100
-Subject: [PATCH 01/14] pinctrl: sunxi: Add A83T R_PIO controller support
-In-Reply-To: <CACRpkdbCgOBQw28d=qc1fAURY3x8UdoWqiMtXMZ=uWLaQj-nbg@mail.gmail.com>
-References: <1454203266-4450-1-git-send-email-vishnupatekar0510@gmail.com>
- <1454203266-4450-2-git-send-email-vishnupatekar0510@gmail.com>
- <CACRpkdbCgOBQw28d=qc1fAURY3x8UdoWqiMtXMZ=uWLaQj-nbg@mail.gmail.com>
-Message-ID: <20160211123648.GN31506@lukather>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 11 Feb 2016 12:50:04 +0000
+Subject: [PATCH] coresight: etb: Remove simple announcement message
+Message-ID: <1455195004-30214-1-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+It's generally preferred that drivers not print initialisation messages on
+startup that don't contain information gained at runtime such as specific
+hardware revision information. This provides a small speedup on systems
+with serial consoles and keeps the boot less noisy.
 
-On Thu, Feb 11, 2016 at 12:59:47PM +0100, Linus Walleij wrote:
-> On Sun, Jan 31, 2016 at 2:20 AM, Vishnu Patekar
-> <vishnupatekar0510@gmail.com> wrote:
-> 
-> > The A83T has R_PIO pin controller, it's same as A23, execpt A83T
-> > interrupt bit is 6th and A83T has one extra pin PL12.
-> >
-> > Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
-> 
-> Maxime, can you look at this patch?
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ drivers/hwtracing/coresight/coresight-etb10.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-Chen-Yu had one minor comment on it, and he's also the Allwinner
-maintainer now, so you can trust his Acked-by just like you would
-trust mine ;)
-
-Thanks!
-Maxime
-
+diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
+index 92969dae739d..18c55d1c428c 100644
+--- a/drivers/hwtracing/coresight/coresight-etb10.c
++++ b/drivers/hwtracing/coresight/coresight-etb10.c
+@@ -481,7 +481,6 @@ static int etb_probe(struct amba_device *adev, const struct amba_id *id)
+ 	if (ret)
+ 		goto err_misc_register;
+ 
+-	dev_info(dev, "ETB initialized\n");
+ 	return 0;
+ 
+ err_misc_register:
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160211/f0fd5ef1/attachment.sig>
+2.7.0
