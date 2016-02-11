@@ -1,39 +1,92 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 11 Feb 2016 15:17:30 +0100
-Subject: [PATCH v2 0/8] arm: Add Artpec-6 SoC
-In-Reply-To: <cover.1455198819.git.larper@axis.com>
-References: <cover.1455198819.git.larper@axis.com>
-Message-ID: <13460858.PmVpFaRWcp@wuerfel>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 11 Feb 2016 15:19:20 +0100
+Subject: [kernel-hardening] [PATCH] arm64: vdso: Mark vDSO code as
+ read-only
+In-Reply-To: <1455141142-6838-1-git-send-email-david.brown@linaro.org>
+References: <1455141142-6838-1-git-send-email-david.brown@linaro.org>
+Message-ID: <CAKv+Gu8ArOYqxDGKb=Tv3NsiB2qWWCdD_zMx55m6+hEwLJR4CA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 11 February 2016 15:04:34 Lars Persson wrote:
-> Basic support for the Axis Artpec-6 ARM SoC. Timers, interrupts, UARTs and
-> ethernet are wired up.
-> 
-> Changes since v1:
-> - Corrected bindings for axis,artpec6-pll1-clock.
-> - Moved the uart aliases to the board dts.
-> - Kconfig cleanup.
-> - Added a device tree binding for the dma configuration.
-> - Added CONFIG_SYNOPSYS_DWC_ETH_QOS to multi_v7_defconfig.
-> - Added binding documentation for axis,artpec6-dev-board.
-> 
-> Lars Persson (8):
->   clk: add device tree binding for artpec-6 pll1 clock
->   clk: add artpec-6 pll1 clock driver
->   arm: add device-tree SoC bindings for Axis Artpec-6
->   arm: dts: add Artpec-6 SoC dtsi file
->   arm: dts: add Artpec-6 development board dts
->   arm: initial machine port for artpec-6 SoC
->   arm: multi_v7_defconfig: add MACH_ARTPEC6
->   arm: mach-artpec: add entry to MAINTAINERS
+Hi David,
 
-Looks good except for the one issue I pointed out in patch 3 (and also 6).
-Once that is resolved, please submit the new platform for inclusion by sending
-it to arm at kernel.org.
+Nice find!
 
-The first two patches should get merged through the drivers/clk maintainer tree,
-please submit them separately there.
+On 10 February 2016 at 22:52, David Brown <david.brown@linaro.org> wrote:
+> Although the arm64 vDSO is cleanly separated by code/data with the
+> code being read-only in userspace mappings, the code page is still
+> writable from the kernel.  There have been exploits (such as
+> http://itszn.com/blog/?p=21) that take advantage of this on x86 to go
+> from a bad kernel write to full root.
+>
+> Prevent this specific exploit on arm64 by putting the vDSO code page
+> in read-only memory as well.
+>
+> Before the change:
+> [    3.138366] vdso: 2 pages (1 code @ ffffffc000a71000, 1 data @ ffffffc000a70000)
+> ---[ Kernel Mapping ]---
+> 0xffffffc000000000-0xffffffc000082000         520K     RW NX SHD AF            UXN MEM/NORMAL
+> 0xffffffc000082000-0xffffffc000200000        1528K     ro x  SHD AF            UXN MEM/NORMAL
+> 0xffffffc000200000-0xffffffc000800000           6M     ro x  SHD AF        BLK UXN MEM/NORMAL
+> 0xffffffc000800000-0xffffffc0009b6000        1752K     ro x  SHD AF            UXN MEM/NORMAL
+> 0xffffffc0009b6000-0xffffffc000c00000        2344K     RW NX SHD AF            UXN MEM/NORMAL
+> 0xffffffc000c00000-0xffffffc008000000         116M     RW NX SHD AF        BLK UXN MEM/NORMAL
+> 0xffffffc00c000000-0xffffffc07f000000        1840M     RW NX SHD AF        BLK UXN MEM/NORMAL
+> 0xffffffc800000000-0xffffffc840000000           1G     RW NX SHD AF        BLK UXN MEM/NORMAL
+> 0xffffffc840000000-0xffffffc87ae00000         942M     RW NX SHD AF        BLK UXN MEM/NORMAL
+> 0xffffffc87ae00000-0xffffffc87ae70000         448K     RW NX SHD AF            UXN MEM/NORMAL
+> 0xffffffc87af80000-0xffffffc87af8a000          40K     RW NX SHD AF            UXN MEM/NORMAL
+> 0xffffffc87af8b000-0xffffffc87b000000         468K     RW NX SHD AF            UXN MEM/NORMAL
+> 0xffffffc87b000000-0xffffffc87fe00000          78M     RW NX SHD AF        BLK UXN MEM/NORMAL
+> 0xffffffc87fe00000-0xffffffc87ff50000        1344K     RW NX SHD AF            UXN MEM/NORMAL
+> 0xffffffc87ff90000-0xffffffc87ffa0000          64K     RW NX SHD AF            UXN MEM/NORMAL
+> 0xffffffc87fff0000-0xffffffc880000000          64K     RW NX SHD AF            UXN MEM/NORMAL
+>
+> After:
+> [    3.138368] vdso: 2 pages (1 code @ ffffffc0006de000, 1 data @ ffffffc000a74000)
+> ---[ Kernel Mapping ]---
+> 0xffffffc000000000-0xffffffc000082000         520K     RW NX SHD AF            UXN MEM/NORMAL
+> 0xffffffc000082000-0xffffffc000200000        1528K     ro x  SHD AF            UXN MEM/NORMAL
+> 0xffffffc000200000-0xffffffc000800000           6M     ro x  SHD AF        BLK UXN MEM/NORMAL
+> 0xffffffc000800000-0xffffffc0009b8000        1760K     ro x  SHD AF            UXN MEM/NORMAL
+> 0xffffffc0009b8000-0xffffffc000c00000        2336K     RW NX SHD AF            UXN MEM/NORMAL
+> 0xffffffc000c00000-0xffffffc008000000         116M     RW NX SHD AF        BLK UXN MEM/NORMAL
+> 0xffffffc00c000000-0xffffffc07f000000        1840M     RW NX SHD AF        BLK UXN MEM/NORMAL
+> 0xffffffc800000000-0xffffffc840000000           1G     RW NX SHD AF        BLK UXN MEM/NORMAL
+> 0xffffffc840000000-0xffffffc87ae00000         942M     RW NX SHD AF        BLK UXN MEM/NORMAL
+> 0xffffffc87ae00000-0xffffffc87ae70000         448K     RW NX SHD AF            UXN MEM/NORMAL
+> 0xffffffc87af80000-0xffffffc87af8a000          40K     RW NX SHD AF            UXN MEM/NORMAL
+> 0xffffffc87af8b000-0xffffffc87b000000         468K     RW NX SHD AF            UXN MEM/NORMAL
+> 0xffffffc87b000000-0xffffffc87fe00000          78M     RW NX SHD AF        BLK UXN MEM/NORMAL
+> 0xffffffc87fe00000-0xffffffc87ff50000        1344K     RW NX SHD AF            UXN MEM/NORMAL
+> 0xffffffc87ff90000-0xffffffc87ffa0000          64K     RW NX SHD AF            UXN MEM/NORMAL
+> 0xffffffc87fff0000-0xffffffc880000000          64K     RW NX SHD AF            UXN MEM/NORMAL
+>
+> Inspired by https://lkml.org/lkml/2016/1/19/494 based on work by the
+> PaX Team, Brad Spengler, and Kees Cook.
+>
+> Signed-off-by: David Brown <david.brown@linaro.org>
+> ---
+>  arch/arm64/kernel/vdso/vdso.S | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm64/kernel/vdso/vdso.S b/arch/arm64/kernel/vdso/vdso.S
+> index 60c1db5..db7c0f2 100644
+> --- a/arch/arm64/kernel/vdso/vdso.S
+> +++ b/arch/arm64/kernel/vdso/vdso.S
+> @@ -24,6 +24,7 @@
+>         __PAGE_ALIGNED_DATA
 
-	Arnd
+^^ You can get rid of this now as well
+
+Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+
+>
+>         .globl vdso_start, vdso_end
+> +       .section .rodata
+>         .balign PAGE_SIZE
+>  vdso_start:
+>         .incbin "arch/arm64/kernel/vdso/vdso.so"
+> --
+> 2.7.1
+>
