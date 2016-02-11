@@ -1,35 +1,88 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 11 Feb 2016 13:41:48 +0000
-Subject: [PATCH v2 0/7] irqchip: introduce the Alpine MSIX driver
-In-Reply-To: <1455110583-19515-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1455110583-19515-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <56BC8F9C.3060505@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 11 Feb 2016 13:47:03 +0000
+Subject: [PATCH] arm64: vdso: Mark vDSO code as read-only
+In-Reply-To: <1455141142-6838-1-git-send-email-david.brown@linaro.org>
+References: <1455141142-6838-1-git-send-email-david.brown@linaro.org>
+Message-ID: <20160211134702.GE32084@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Antoine,
-
-On 10/02/16 13:22, Antoine Tenart wrote:
-> Hi all,
+On Wed, Feb 10, 2016 at 01:52:22PM -0800, David Brown wrote:
+> Although the arm64 vDSO is cleanly separated by code/data with the
+> code being read-only in userspace mappings, the code page is still
+> writable from the kernel.  There have been exploits (such as
+> http://itszn.com/blog/?p=21) that take advantage of this on x86 to go
+> from a bad kernel write to full root.
 > 
-> This series introduce the Alpine MSIX driver, and enables it in both
-> the Alpine v1 and Alpine v2 device trees.
+> Prevent this specific exploit on arm64 by putting the vDSO code page
+> in read-only memory as well.
 > 
-> This series depends on "[PATCH v2 0/3] arm64: introduce the Alpine support":
-> https://lkml.org/lkml/2016/2/10/83
+> Before the change:
+> [    3.138366] vdso: 2 pages (1 code @ ffffffc000a71000, 1 data @ ffffffc000a70000)
+> ---[ Kernel Mapping ]---
+> 0xffffffc000000000-0xffffffc000082000         520K     RW NX SHD AF            UXN MEM/NORMAL
+> 0xffffffc000082000-0xffffffc000200000        1528K     ro x  SHD AF            UXN MEM/NORMAL
+> 0xffffffc000200000-0xffffffc000800000           6M     ro x  SHD AF        BLK UXN MEM/NORMAL
+> 0xffffffc000800000-0xffffffc0009b6000        1752K     ro x  SHD AF            UXN MEM/NORMAL
+> 0xffffffc0009b6000-0xffffffc000c00000        2344K     RW NX SHD AF            UXN MEM/NORMAL
+> 0xffffffc000c00000-0xffffffc008000000         116M     RW NX SHD AF        BLK UXN MEM/NORMAL
+> 0xffffffc00c000000-0xffffffc07f000000        1840M     RW NX SHD AF        BLK UXN MEM/NORMAL
+> 0xffffffc800000000-0xffffffc840000000           1G     RW NX SHD AF        BLK UXN MEM/NORMAL
+> 0xffffffc840000000-0xffffffc87ae00000         942M     RW NX SHD AF        BLK UXN MEM/NORMAL
+> 0xffffffc87ae00000-0xffffffc87ae70000         448K     RW NX SHD AF            UXN MEM/NORMAL
+> 0xffffffc87af80000-0xffffffc87af8a000          40K     RW NX SHD AF            UXN MEM/NORMAL
+> 0xffffffc87af8b000-0xffffffc87b000000         468K     RW NX SHD AF            UXN MEM/NORMAL
+> 0xffffffc87b000000-0xffffffc87fe00000          78M     RW NX SHD AF        BLK UXN MEM/NORMAL
+> 0xffffffc87fe00000-0xffffffc87ff50000        1344K     RW NX SHD AF            UXN MEM/NORMAL
+> 0xffffffc87ff90000-0xffffffc87ffa0000          64K     RW NX SHD AF            UXN MEM/NORMAL
+> 0xffffffc87fff0000-0xffffffc880000000          64K     RW NX SHD AF            UXN MEM/NORMAL
 > 
-> You can find the series at:
-> https://github.com/atenart/linux.git 4.5-rc1/alpinev2-msix
+> After:
+> [    3.138368] vdso: 2 pages (1 code @ ffffffc0006de000, 1 data @ ffffffc000a74000)
+> ---[ Kernel Mapping ]---
+> 0xffffffc000000000-0xffffffc000082000         520K     RW NX SHD AF            UXN MEM/NORMAL
+> 0xffffffc000082000-0xffffffc000200000        1528K     ro x  SHD AF            UXN MEM/NORMAL
+> 0xffffffc000200000-0xffffffc000800000           6M     ro x  SHD AF        BLK UXN MEM/NORMAL
+> 0xffffffc000800000-0xffffffc0009b8000        1760K     ro x  SHD AF            UXN MEM/NORMAL
+> 0xffffffc0009b8000-0xffffffc000c00000        2336K     RW NX SHD AF            UXN MEM/NORMAL
+> 0xffffffc000c00000-0xffffffc008000000         116M     RW NX SHD AF        BLK UXN MEM/NORMAL
+> 0xffffffc00c000000-0xffffffc07f000000        1840M     RW NX SHD AF        BLK UXN MEM/NORMAL
+> 0xffffffc800000000-0xffffffc840000000           1G     RW NX SHD AF        BLK UXN MEM/NORMAL
+> 0xffffffc840000000-0xffffffc87ae00000         942M     RW NX SHD AF        BLK UXN MEM/NORMAL
+> 0xffffffc87ae00000-0xffffffc87ae70000         448K     RW NX SHD AF            UXN MEM/NORMAL
+> 0xffffffc87af80000-0xffffffc87af8a000          40K     RW NX SHD AF            UXN MEM/NORMAL
+> 0xffffffc87af8b000-0xffffffc87b000000         468K     RW NX SHD AF            UXN MEM/NORMAL
+> 0xffffffc87b000000-0xffffffc87fe00000          78M     RW NX SHD AF        BLK UXN MEM/NORMAL
+> 0xffffffc87fe00000-0xffffffc87ff50000        1344K     RW NX SHD AF            UXN MEM/NORMAL
+> 0xffffffc87ff90000-0xffffffc87ffa0000          64K     RW NX SHD AF            UXN MEM/NORMAL
+> 0xffffffc87fff0000-0xffffffc880000000          64K     RW NX SHD AF            UXN MEM/NORMAL
+> 
+> Inspired by https://lkml.org/lkml/2016/1/19/494 based on work by the
+> PaX Team, Brad Spengler, and Kees Cook.
+> 
+> Signed-off-by: David Brown <david.brown@linaro.org>
+> ---
+>  arch/arm64/kernel/vdso/vdso.S | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm64/kernel/vdso/vdso.S b/arch/arm64/kernel/vdso/vdso.S
+> index 60c1db5..db7c0f2 100644
+> --- a/arch/arm64/kernel/vdso/vdso.S
+> +++ b/arch/arm64/kernel/vdso/vdso.S
+> @@ -24,6 +24,7 @@
+>  	__PAGE_ALIGNED_DATA
+>  
+>  	.globl vdso_start, vdso_end
+> +	.section .rodata
+>  	.balign PAGE_SIZE
+>  vdso_start:
+>  	.incbin "arch/arm64/kernel/vdso/vdso.so"
 
-So I'm quite happy with this as it is (modulo the documentation fix on
-patch 3). I can take the first 3 patches through my GIC tree, but the
-last 4 patches depend on your other series.
+Nice, I wish I'd thought of that!
 
-Would it be a problem to get these 4 patches merged after 4.6-rc1, so
-that all the code can be merged before?
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-Thanks,
+As an aside, I wonder whether we should be printing the code/data
+addresses out in dmesg at all.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Will
