@@ -1,84 +1,42 @@
 From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
-Date: Thu, 11 Feb 2016 21:58:10 +0530
-Subject: [PATCH V4 4/5] PCI: xilinx: Updating Zynq PCI binding documentation
- with Microblaze node.
+Date: Thu, 11 Feb 2016 21:58:09 +0530
+Subject: [PATCH V4 3/5] PCI: xilinx: Modifying AXI PCIe Host Bridge driver to
+ work on both Zynq and Microblaze
 In-Reply-To: <1455208091-15556-1-git-send-email-bharatku@xilinx.com>
 References: <1455208091-15556-1-git-send-email-bharatku@xilinx.com>
-Message-ID: <1455208091-15556-5-git-send-email-bharatku@xilinx.com>
+Message-ID: <1455208091-15556-4-git-send-email-bharatku@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Updated Zynq PCI binding documentation with Microblaze node.
+Modifying Xilinx AXI PCIe Host Bridge Soft IP driver to work on both
+Zynq and Microblaze Architectures.
+With these modifications drivers/pci/host/pcie-xilinx.c, will
+work on both Zynq and Microblaze Architectures.
 
 Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
 Signed-off-by: Ravi Kiran Gummaluri <rgummal@xilinx.com>
 
-Acked-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Arnd Bergmann <arnd@arndb.de>
 ---
 Changes:
-Adding Microblaze device tree node Documnetation.
+Added #ifdef to pci_fixup_irqs which is ARM specific API.
 ---
- .../devicetree/bindings/pci/xilinx-pcie.txt        | 32 ++++++++++++++++++++--
- 1 file changed, 29 insertions(+), 3 deletions(-)
+ drivers/pci/host/pcie-xilinx.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/pci/xilinx-pcie.txt b/Documentation/devicetree/bindings/pci/xilinx-pcie.txt
-index 02f979a..ad7c7bf 100644
---- a/Documentation/devicetree/bindings/pci/xilinx-pcie.txt
-+++ b/Documentation/devicetree/bindings/pci/xilinx-pcie.txt
-@@ -17,7 +17,7 @@ Required properties:
- 	Please refer to the standard PCI bus binding document for a more
- 	detailed explanation
+diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
+index 13fec35..8ad50fe 100644
+--- a/drivers/pci/host/pcie-xilinx.c
++++ b/drivers/pci/host/pcie-xilinx.c
+@@ -704,7 +704,9 @@ static int xilinx_pcie_probe(struct platform_device *pdev)
+ #endif
+ 	pci_scan_child_bus(bus);
+ 	pci_assign_unassigned_bus_resources(bus);
++#ifndef CONFIG_MICROBLAZE
+ 	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
++#endif
+ 	pci_bus_add_devices(bus);
+ 	platform_set_drvdata(pdev, port);
  
--Optional properties:
-+Optional properties for Zynq/Microblaze:
- - bus-range: PCI bus numbers covered
- 
- Interrupt controller child node
-@@ -38,13 +38,13 @@ the four INTx interrupts in ISR and route them to this domain.
- 
- Example:
- ++++++++
--
-+Zynq:
- 	pci_express: axi-pcie at 50000000 {
- 		#address-cells = <3>;
- 		#size-cells = <2>;
- 		#interrupt-cells = <1>;
- 		compatible = "xlnx,axi-pcie-host-1.00.a";
--		reg = < 0x50000000 0x10000000 >;
-+		reg = < 0x50000000 0x1000000 >;
- 		device_type = "pci";
- 		interrupts = < 0 52 4 >;
- 		interrupt-map-mask = <0 0 0 7>;
-@@ -60,3 +60,29 @@ Example:
- 			#interrupt-cells = <1>;
- 		};
- 	};
-+
-+
-+Microblaze:
-+	pci_express: axi-pcie at 10000000 {
-+		#address-cells = <3>;
-+		#size-cells = <2>;
-+		#interrupt-cells = <1>;
-+		compatible = "xlnx,axi-pcie-host-1.00.a";
-+		reg = <0x10000000 0x4000000>;
-+		device_type = "pci";
-+		interrupt-parent = <&microbalze_0_intc>;
-+		interrupts = <1 2>;
-+		interrupt-map-mask = <0 0 0 7>;
-+		interrupt-map = <0 0 0 1 &pcie_intc 1>,
-+				<0 0 0 2 &pcie_intc 2>,
-+				<0 0 0 3 &pcie_intc 3>,
-+				<0 0 0 4 &pcie_intc 4>;
-+		ranges = <0x02000000 0x00000000 0x80000000 0x80000000 0x00000000 0x10000000>;
-+
-+		pcie_intc: interrupt-controller {
-+			interrupt-controller;
-+			#address-cells = <0>;
-+			#interrupt-cells = <1>;
-+		};
-+
-+	};
 -- 
 2.1.1
