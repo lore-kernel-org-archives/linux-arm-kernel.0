@@ -1,128 +1,41 @@
-From: kernel@martin.sperl.org (Martin Sperl)
-Date: Thu, 11 Feb 2016 19:06:43 +0100
-Subject: [PATCH 3/4] spi: bcm2835aux: set up spi-mode before asserting
- cs-gpio
-In-Reply-To: <1455041435-8015-4-git-send-email-stephanolbrich@gmx.de>
-References: <1455041435-8015-1-git-send-email-stephanolbrich@gmx.de>
- <1455041435-8015-4-git-send-email-stephanolbrich@gmx.de>
-Message-ID: <F75D5360-5D55-453F-89A7-7BB4B07427C5@martin.sperl.org>
+From: frowand.list@gmail.com (Frank Rowand)
+Date: Thu, 11 Feb 2016 10:10:49 -0800
+Subject: [PATCH] of/irq: Fix msi-map calculation for nonzero rid-base
+In-Reply-To: <56BC6ABA.5020605@arm.com>
+References: <9f6845195d03b0e0b0d187bb510fbf7bd497e836.1455015344.git.robin.murphy@arm.com>
+ <56BC6ABA.5020605@arm.com>
+Message-ID: <56BCCEA9.4050509@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 2/11/2016 3:04 AM, Marc Zyngier wrote:
+> On 09/02/16 11:04, Robin Murphy wrote:
+>> The existing msi-map code is fine for shifting the entire RID space
+>> upwards, but attempting finer-grained remapping reveals a bug. It turns
+>> out that we are mistakenly treating the msi-base part as an offset, not
+>> as a new base to remap onto, so things get squiffy when rid-base is
+>> nonzero. Fix this, and at the same time add a sanity check against
+>> having msi-map-mask clash with a nonzero rid-base, as that's another
+>> thing one can easily get wrong.
+>>
+>> CC: <stable@vger.kernel.org>
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> 
+> Rob, Frank,
+> 
+> Are you willing to take this one through the OF tree? Or should we route
+> it through the IRQ tree? It'd be good if it make it into 4.5.
+> 
+> Thanks,
+> 
+> 	M.
+> 
 
-> On 09.02.2016, at 19:10, stephanolbrich at gmx.de wrote:
-> 
-> From: Stephan Olbrich <stephanolbrich@gmx.de>
-> 
-> When using reverse polarity for clock (spi-cpol) on a device
-> the clock line gets altered after chip-select has been asserted
-> resulting in an additional clock beat, which confuses hardware.
-> 
-> To avoid this situation this patch moves the setup of polarity
-> (spi-cpol and spi-cpha) outside of the chip-select into
-> prepare_message, which is run prior to asserting chip-select.
-> 
-> Signed-off-by: Stephan Olbrich <stephanolbrich@gmx.de>
-> ---
-> drivers/spi/spi-bcm2835aux.c | 54 +++++++++++++++++++++++++++++++-------------
-> 1 file changed, 38 insertions(+), 16 deletions(-)
-> 
-> diff --git a/drivers/spi/spi-bcm2835aux.c b/drivers/spi/spi-bcm2835aux.c
-> index d2f0067..b90aa34 100644
-> --- a/drivers/spi/spi-bcm2835aux.c
-> +++ b/drivers/spi/spi-bcm2835aux.c
-> @@ -218,9 +218,9 @@ static irqreturn_t bcm2835aux_spi_interrupt(int irq, void *dev_id)
-> 			BCM2835_AUX_SPI_CNTL1_IDLE);
-> 	}
-> 
-> -	/* and if rx_len is 0 then wake up completion and disable spi */
-> +	/* and if rx_len is 0 then disable interrupts and wake up completion */
-> 	if (!bs->rx_len) {
-> -		bcm2835aux_spi_reset_hw(bs);
-> +		bcm2835aux_wr(bs, BCM2835_AUX_SPI_CNTL1, bs->cntl[1]);
-> 		complete(&master->xfer_completion);
-> 	}
-> 
-> @@ -313,9 +313,6 @@ static int bcm2835aux_spi_transfer_one_poll(struct spi_master *master,
-> 		}
-> 	}
-> 
-> -	/* Transfer complete - reset SPI HW */
-> -	bcm2835aux_spi_reset_hw(bs);
-> -
-> 	/* and return without waiting for completion */
-> 	return 0;
-> }
-> @@ -336,10 +333,6 @@ static int bcm2835aux_spi_transfer_one(struct spi_master *master,
-> 	 * resulting (potentially) in more interrupts when transferring
-> 	 * more than 12 bytes
-> 	 */
-> -	bs->cntl[0] = BCM2835_AUX_SPI_CNTL0_ENABLE |
-> -		      BCM2835_AUX_SPI_CNTL0_VAR_WIDTH |
-> -		      BCM2835_AUX_SPI_CNTL0_MSBF_OUT;
-> -	bs->cntl[1] = BCM2835_AUX_SPI_CNTL1_MSBF_IN;
-> 
-> 	/* set clock */
-> 	spi_hz = tfr->speed_hz;
-> @@ -358,13 +351,6 @@ static int bcm2835aux_spi_transfer_one(struct spi_master *master,
-Note that here you need to explicitly mask out the clock!
-otherwise spi messages with different clock speeds will fill up the 
-bitfield of the clock divider with the wrong values.
+Just to be picky, I would like the patch to be split in two for easier
+bisecting, but if Rob is happy with a single patch I'm ok with that.
 
-This has not happened before because the values were re-computed every time
-now we defer it to prepare
+Rob, will you pick this up?
 
-@@ -348,17 +345,12 @@ static int bcm2835aux_spi_transfer_one(struct spi_master *
-        } else { /* the slowest we can go */
-                speed = BCM2835_AUX_SPI_CNTL0_SPEED_MAX;
-        }
-+	/* mask out old speed from previous spi_transfer */
-+       bs->cntl[0] &= ~BCM2835_AUX_SPI_CNTL0_SPEED;
-+	/* set the new speed */
-        bs->cntl[0] |= speed << BCM2835_AUX_SPI_CNTL0_SPEED_SHIFT;
+Acked-by: Frank Rowand <frank.rowand@sonymobile.com>
 
-> 
-> 	spi_used_hz = clk_hz / (2 * (speed + 1));
-> 
-> -	/* handle all the modes */
-> -	if (spi->mode & SPI_CPOL)
-> -		bs->cntl[0] |= BCM2835_AUX_SPI_CNTL0_CPOL;
-> -	if (spi->mode & SPI_CPHA)
-> -		bs->cntl[0] |= BCM2835_AUX_SPI_CNTL0_CPHA_OUT |
-> -			       BCM2835_AUX_SPI_CNTL0_CPHA_IN;
-> -
-> 	/* set transmit buffers and length */
-> 	bs->tx_buf = tfr->tx_buf;
-> 	bs->rx_buf = tfr->rx_buf;
-
-
-
-> @@ -388,6 +374,40 @@ static int bcm2835aux_spi_transfer_one(struct spi_master *master,
-> 	return bcm2835aux_spi_transfer_one_irq(master, spi, tfr);
-> }
-> 
-> +
-> +static int bcm2835aux_spi_unprepare_message(struct spi_master *master,
-> +					    struct spi_message *msg)
-> +{
-> +	struct bcm2835aux_spi *bs = spi_master_get_devdata(master);
-> +
-> +	bcm2835aux_spi_reset_hw(bs);
-> +
-> +	return 0;
-> +}
-> +
-
-I was wondering a long time why we would need this - but after
-some experimentation it became clear: with auxspi disabled driving
-the gates so they go into their default states (low) before GPIO-cs
-is de-asserted.
-
-It may be worth mentioning that fact - others might wonder as
-well later later.
-
-With the above in place:
-Reviewed-by: Martin Sperl <kernel@martin.sperl.org>
-Tested-by: Martin Sperl <kernel@martin.sperl.org>
-
-Martin
+-Frank
