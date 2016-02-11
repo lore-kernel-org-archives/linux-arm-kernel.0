@@ -1,149 +1,72 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 11 Feb 2016 18:39:43 +0000
-Subject: [PATCH v4 02/23] arm64: KVM: Switch to C-based stage2 init
+Date: Thu, 11 Feb 2016 18:39:44 +0000
+Subject: [PATCH v4 03/23] arm/arm64: Add new is_kernel_in_hyp_mode predicate
 In-Reply-To: <1455216004-19499-1-git-send-email-marc.zyngier@arm.com>
 References: <1455216004-19499-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1455216004-19499-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1455216004-19499-4-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no real need to leave the stage2 initialization as part
-of the early HYP bootstrap, and we can easily postpone it to
-the point where we can safely run C code.
+With ARMv8.1 VHE extension, it will be possible to run the kernel
+at EL2 (aka HYP mode). In order for the kernel to easily find out
+where it is running, add a new predicate that returns whether or
+not the kernel is in HYP mode.
 
-This will help VHE, which doesn't need any of this bootstrap.
+For completeness, the 32bit code also get such a predicate (always
+returning false) so that code common to both architecture (timers,
+KVM) can use it transparently.
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/kvm_asm.h  |  2 ++
- arch/arm64/include/asm/kvm_host.h |  2 ++
- arch/arm64/kvm/hyp-init.S         | 18 ----------------
- arch/arm64/kvm/hyp/Makefile       |  1 +
- arch/arm64/kvm/hyp/s2-setup.c     | 44 +++++++++++++++++++++++++++++++++++++++
- 5 files changed, 49 insertions(+), 18 deletions(-)
- create mode 100644 arch/arm64/kvm/hyp/s2-setup.c
+ arch/arm/include/asm/virt.h   |  5 +++++
+ arch/arm64/include/asm/virt.h | 10 ++++++++++
+ 2 files changed, 15 insertions(+)
 
-diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-index 52b777b..67ac580 100644
---- a/arch/arm64/include/asm/kvm_asm.h
-+++ b/arch/arm64/include/asm/kvm_asm.h
-@@ -48,6 +48,8 @@ extern u64 __vgic_v3_get_ich_vtr_el2(void);
- 
- extern u32 __kvm_get_mdcr_el2(void);
- 
-+extern void __init_stage2_translation(void);
+diff --git a/arch/arm/include/asm/virt.h b/arch/arm/include/asm/virt.h
+index 4371f45..b6a3cef 100644
+--- a/arch/arm/include/asm/virt.h
++++ b/arch/arm/include/asm/virt.h
+@@ -74,6 +74,11 @@ static inline bool is_hyp_mode_mismatched(void)
+ {
+ 	return !!(__boot_cpu_mode & BOOT_CPU_MODE_MISMATCH);
+ }
 +
++static inline bool is_kernel_in_hyp_mode(void)
++{
++	return false;
++}
  #endif
  
- #endif /* __ARM_KVM_ASM_H__ */
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index fe86cf9..43688d9 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -25,6 +25,7 @@
- #include <linux/types.h>
- #include <linux/kvm_types.h>
- #include <asm/kvm.h>
-+#include <asm/kvm_asm.h>
- #include <asm/kvm_mmio.h>
+ #endif /* __ASSEMBLY__ */
+diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
+index 7a5df52..9f22dd6 100644
+--- a/arch/arm64/include/asm/virt.h
++++ b/arch/arm64/include/asm/virt.h
+@@ -23,6 +23,8 @@
  
- #define __KVM_HAVE_ARCH_INTC_INITIALIZED
-@@ -334,6 +335,7 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
+ #ifndef __ASSEMBLY__
  
- static inline void __cpu_init_stage2(void)
- {
-+	kvm_call_hyp(__init_stage2_translation);
++#include <asm/ptrace.h>
++
+ /*
+  * __boot_cpu_mode records what mode CPUs were booted in.
+  * A correctly-implemented bootloader must start all CPUs in the same mode:
+@@ -50,6 +52,14 @@ static inline bool is_hyp_mode_mismatched(void)
+ 	return __boot_cpu_mode[0] != __boot_cpu_mode[1];
  }
  
- static inline void kvm_arch_hardware_disable(void) {}
-diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
-index 3e568dc..80fda7e 100644
---- a/arch/arm64/kvm/hyp-init.S
-+++ b/arch/arm64/kvm/hyp-init.S
-@@ -87,24 +87,6 @@ __do_hyp_init:
- #endif
- 	msr	tcr_el2, x4
- 
--	ldr	x4, =VTCR_EL2_FLAGS
--	/*
--	 * Read the PARange bits from ID_AA64MMFR0_EL1 and set the PS bits in
--	 * VTCR_EL2.
--	 */
--	mrs	x5, ID_AA64MMFR0_EL1
--	bfi	x4, x5, #16, #3
--	/*
--	 * Read the VMIDBits bits from ID_AA64MMFR1_EL1 and set the VS bit in
--	 * VTCR_EL2.
--	 */
--	mrs	x5, ID_AA64MMFR1_EL1
--	ubfx	x5, x5, #5, #1
--	lsl	x5, x5, #VTCR_EL2_VS
--	orr	x4, x4, x5
--
--	msr	vtcr_el2, x4
--
- 	mrs	x4, mair_el1
- 	msr	mair_el2, x4
- 	isb
-diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
-index 826032b..5326e66 100644
---- a/arch/arm64/kvm/hyp/Makefile
-+++ b/arch/arm64/kvm/hyp/Makefile
-@@ -12,3 +12,4 @@ obj-$(CONFIG_KVM_ARM_HOST) += switch.o
- obj-$(CONFIG_KVM_ARM_HOST) += fpsimd.o
- obj-$(CONFIG_KVM_ARM_HOST) += tlb.o
- obj-$(CONFIG_KVM_ARM_HOST) += hyp-entry.o
-+obj-$(CONFIG_KVM_ARM_HOST) += s2-setup.o
-diff --git a/arch/arm64/kvm/hyp/s2-setup.c b/arch/arm64/kvm/hyp/s2-setup.c
-new file mode 100644
-index 0000000..17e8cc0
---- /dev/null
-+++ b/arch/arm64/kvm/hyp/s2-setup.c
-@@ -0,0 +1,44 @@
-+/*
-+ * Copyright (C) 2016 - ARM Ltd
-+ * Author: Marc Zyngier <marc.zyngier@arm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/types.h>
-+#include <asm/kvm_arm.h>
-+#include <asm/kvm_asm.h>
-+
-+#include "hyp.h"
-+
-+void __hyp_text __init_stage2_translation(void)
++static inline bool is_kernel_in_hyp_mode(void)
 +{
-+	u64 val = VTCR_EL2_FLAGS;
-+	u64 tmp;
++	u64 el;
 +
-+	/*
-+	 * Read the PARange bits from ID_AA64MMFR0_EL1 and set the PS
-+	 * bits in VTCR_EL2. Amusingly, the PARange is 4 bits, while
-+	 * PS is only 3. Fortunately, bit 19 is RES0 in VTCR_EL2...
-+	 */
-+	val |= (read_sysreg(id_aa64mmfr0_el1) & 7) << 16;
-+
-+	/*
-+	 * Read the VMIDBits bits from ID_AA64MMFR1_EL1 and set the VS
-+	 * bit in VTCR_EL2.
-+	 */
-+	tmp = (read_sysreg(id_aa64mmfr1_el1) >> 4) & 0xf;
-+	val |= (tmp == 2) ? VTCR_EL2_VS : 0;
-+
-+	write_sysreg(val, vtcr_el2);
++	asm("mrs %0, CurrentEL" : "=r" (el));
++	return el == CurrentEL_EL2;
 +}
++
+ /* The section containing the hypervisor text */
+ extern char __hyp_text_start[];
+ extern char __hyp_text_end[];
 -- 
 2.1.4
