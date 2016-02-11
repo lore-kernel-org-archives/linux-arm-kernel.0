@@ -1,98 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 11 Feb 2016 14:16:27 +0100
-Subject: [PATCH] libata: fix HDIO_GET_32BIT ioctl
-Message-ID: <1455196595-3466120-1-git-send-email-arnd@arndb.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 11 Feb 2016 14:17:41 +0100
+Subject: [PATCH v2 5/5] pinctrl: sunxi: Use pin number when calling
+ sunxi_pmx_set
+In-Reply-To: <1454448113-18810-6-git-send-email-k@japko.eu>
+References: <1454448113-18810-1-git-send-email-k@japko.eu>
+ <1454448113-18810-6-git-send-email-k@japko.eu>
+Message-ID: <CACRpkdbc0SfKiCGwUGA2fAPPsUhGv=qGV607Lht6ByYKKgTHjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As reported by Soohoon Lee, the HDIO_GET_32BIT ioctl does not
-work correctly in compat mode with libata.
+On Tue, Feb 2, 2016 at 10:21 PM, Krzysztof Adamski <k@japko.eu> wrote:
 
-I have investigated the issue further and found multiple problems
-that all appeared with the same commit that originally introduced
-HDIO_GET_32BIT handling in libata back in linux-2.6.8 and presumably
-also linux-2.4, as the code uses "copy_to_user(arg, &val, 1)" to copy
-a 'long' variable containing either 0 or 1 to user space.
+> sunxi_pmx_set accepts pin number and then calculates offset by
+> subtracting pin_base from it. sunxi_pinctrl_gpio_get, on the other hand,
+> gets offset so we have to convert it to pin number so we won't get
+> negative value in sunxi_pmx_set.
+>
+> This was only used on A10 so far, where there is only one GPIO chip with
+> pin_base set to 0 so it didn't matter. However H3 also requires this
+> workaround but have two pinmux sections, triggering problem for PL port.
+>
+> Signed-off-by: Krzysztof Adamski <k@japko.eu>
 
-The problems with this are:
+Waiting for Maxime to review this. I guess this patch can be merged
+independently of the other patches?
 
-* On big-endian machines, this will always write a zero because it
-  stores the wrong byte into user space.
-
-* In compat mode, the upper three bytes of the variable are updated
-  by the compat_hdio_ioctl() function, but they now contain
-  uninitialized stack data.
-
-* The hdparm tool calling this ioctl uses a 'static long' variable
-  to store the result. This means at least the upper bytes are
-  initialized to zero, but calling another ioctl like HDIO_GET_MULTCOUNT
-  would fill them with data that remains stale when the low byte
-  is overwritten. Fortunately libata doesn't implement any of the
-  affected ioctl commands, so this would only happen when we query
-  both an IDE and an ATA device in the same command such as
-  "hdparm -N -c /dev/hda /dev/sda"
-
-* The libata code for unknown reasons started using ATA_IOC_GET_IO32
-  and ATA_IOC_SET_IO32 as aliases for HDIO_GET_32BIT and HDIO_SET_32BIT,
-  while the ioctl commands that were added later use the normal
-  HDIO_* names. This is harmless but rather confusing.
-
-This addresses all four issues by changing the code to use put_user()
-on an 'unsigned long' variable in HDIO_GET_32BIT, like the IDE subsystem
-does, and by clarifying the names of the ioctl commands.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Reported-by: Soohoon Lee <Soohoon.Lee@f5.com>
-Tested-by: Soohoon Lee <Soohoon.Lee@f5.com>
-Cc: stable at vger.kernel.org
----
- drivers/ata/libata-scsi.c | 11 +++++------
- include/linux/ata.h       |  4 ++--
- 2 files changed, 7 insertions(+), 8 deletions(-)
-
-diff --git a/drivers/ata/libata-scsi.c b/drivers/ata/libata-scsi.c
-index 7e959f90c020..e417e1a1d02c 100644
---- a/drivers/ata/libata-scsi.c
-+++ b/drivers/ata/libata-scsi.c
-@@ -675,19 +675,18 @@ static int ata_ioc32(struct ata_port *ap)
- int ata_sas_scsi_ioctl(struct ata_port *ap, struct scsi_device *scsidev,
- 		     int cmd, void __user *arg)
- {
--	int val = -EINVAL, rc = -EINVAL;
-+	unsigned long val;
-+	int rc = -EINVAL;
- 	unsigned long flags;
- 
- 	switch (cmd) {
--	case ATA_IOC_GET_IO32:
-+	case HDIO_GET_32BIT:
- 		spin_lock_irqsave(ap->lock, flags);
- 		val = ata_ioc32(ap);
- 		spin_unlock_irqrestore(ap->lock, flags);
--		if (copy_to_user(arg, &val, 1))
--			return -EFAULT;
--		return 0;
-+		return put_user(val, (unsigned long __user *)arg);
- 
--	case ATA_IOC_SET_IO32:
-+	case HDIO_SET_32BIT:
- 		val = (unsigned long) arg;
- 		rc = 0;
- 		spin_lock_irqsave(ap->lock, flags);
-diff --git a/include/linux/ata.h b/include/linux/ata.h
-index d2992bfa1706..c1a2f345cbe6 100644
---- a/include/linux/ata.h
-+++ b/include/linux/ata.h
-@@ -487,8 +487,8 @@ enum ata_tf_protocols {
- };
- 
- enum ata_ioctls {
--	ATA_IOC_GET_IO32	= 0x309,
--	ATA_IOC_SET_IO32	= 0x324,
-+	ATA_IOC_GET_IO32	= 0x309, /* HDIO_GET_32BIT */
-+	ATA_IOC_SET_IO32	= 0x324, /* HDIO_SET_32BIT */
- };
- 
- /* core structures */
--- 
-2.7.0
+Yours,
+Linus Walleij
