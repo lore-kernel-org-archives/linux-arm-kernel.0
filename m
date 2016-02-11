@@ -1,37 +1,89 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Thu, 11 Feb 2016 14:22:05 +0100
-Subject: [GIT PULL] STM32 SoC updates for v4.6 #1
-Message-ID: <56BC8AFD.7000800@gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 11 Feb 2016 14:27:08 +0100
+Subject: [PATCH] arm64: KVM: Configure TCR_EL2.PS at runtime
+In-Reply-To: <1455130013-28644-1-git-send-email-tchalamarla@caviumnetworks.com>
+References: <1455130013-28644-1-git-send-email-tchalamarla@caviumnetworks.com>
+Message-ID: <20160211132708.GU5171@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Arnd and Kevin,
+On Wed, Feb 10, 2016 at 10:46:53AM -0800, tchalamarla at caviumnetworks.com wrote:
+> From: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
+> 
+> Setting TCR_EL2.PS to 40 bits is wrong on systems with PS size is
+> less than 40 bits. and with systems where RAM is at higher address,
+> this will break KVM.
+> 
+> This patch sets TCR_EL2.PS at runtime similar to VTCR_EL2.PS
+> 
+> changes form V2:
+> 	- Modified subject line and commit message.
+> 	- Removed TCR_EL2_FLAGS.
+> 
+> changes from V1:
+>         - Moved to dynamic configuration.
+> 
+> Signed-off-by: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
+> ---
+>  arch/arm64/include/asm/kvm_arm.h |  2 --
+>  arch/arm64/kvm/hyp-init.S        | 12 +++++++-----
+>  2 files changed, 7 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+> index 738a95f..3776db0 100644
+> --- a/arch/arm64/include/asm/kvm_arm.h
+> +++ b/arch/arm64/include/asm/kvm_arm.h
+> @@ -107,8 +107,6 @@
+>  #define TCR_EL2_MASK	(TCR_EL2_TG0 | TCR_EL2_SH0 | \
+>  			 TCR_EL2_ORGN0 | TCR_EL2_IRGN0 | TCR_EL2_T0SZ)
+>  
+> -#define TCR_EL2_FLAGS	(TCR_EL2_RES1 | TCR_EL2_PS_40B)
+> -
+>  /* VTCR_EL2 Registers bits */
+>  #define VTCR_EL2_RES1		(1 << 31)
+>  #define VTCR_EL2_PS_MASK	(7 << 16)
+> diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
+> index 3e568dc..b5ab1b0 100644
+> --- a/arch/arm64/kvm/hyp-init.S
+> +++ b/arch/arm64/kvm/hyp-init.S
+> @@ -64,7 +64,7 @@ __do_hyp_init:
+>  	mrs	x4, tcr_el1
+>  	ldr	x5, =TCR_EL2_MASK
+>  	and	x4, x4, x5
+> -	ldr	x5, =TCR_EL2_FLAGS
+> +	ldr	x5, =TCR_EL2_RES1
+>  	orr	x4, x4, x5
+>  
+>  #ifndef CONFIG_ARM64_VA_BITS_48
+> @@ -85,15 +85,17 @@ __do_hyp_init:
+>  	ldr_l	x5, idmap_t0sz
+>  	bfi	x4, x5, TCR_T0SZ_OFFSET, TCR_TxSZ_WIDTH
+>  #endif
+> -	msr	tcr_el2, x4
+> -
+> -	ldr	x4, =VTCR_EL2_FLAGS
+>  	/*
+>  	 * Read the PARange bits from ID_AA64MMFR0_EL1 and set the PS bits in
+> -	 * VTCR_EL2.
+> +	 * TCR_EL2 and VTCR_EL2.
+>  	 */
+>  	mrs	x5, ID_AA64MMFR0_EL1
+>  	bfi	x4, x5, #16, #3
+> +
+> +	msr	tcr_el2, x4
+> +
+> +	ldr	x4, =VTCR_EL2_FLAGS
+> +	bfi	x4, x5, #16, #3
+>  	/*
+>  	 * Read the VMIDBits bits from ID_AA64MMFR1_EL1 and set the VS bit in
+>  	 * VTCR_EL2.
+> -- 
+> 2.1.0
+> 
 
-Please consider this first round of STM32 SoC updates for v4.6:
+This looks reasonable enough for me.  Did we limit Linux to PS=40 bits
+in the past and have lifted this restriction, or why did we have this
+limitation for EL2 translations in the past?
 
-The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
-
-   Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
-
-are available in the git repository at:
-
-   git://git.kernel.org/pub/scm/linux/kernel/git/mcoquelin/stm32.git 
-tags/stm32-soc-for-v4.6-1
-
-for you to fetch changes up to f64e980450027e15dce5e9ec4ee19bab98aee4c5:
-
-   ARM: mach-stm32: Select pinctrl (2016-01-27 19:45:57 +0100)
-
-----------------------------------------------------------------
-Highlights:
------------
-  - Make STM32 to select PINCTRL
-  - Introduce MACH_STM32F429 flag
-
-----------------------------------------------------------------
-Maxime Coquelin (2):
-       ARM: Kconfig: Introduce MACH_STM32F429 flag
-       ARM: mach-stm32: Select pinctrl
-
-  arch/arm/Kconfig | 6 ++++++
-  1 file changed, 6 insertions(+
+Thanks,
+-Christoffer
