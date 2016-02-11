@@ -1,164 +1,95 @@
-From: rdunlap@infradead.org (Randy Dunlap)
-Date: Thu, 11 Feb 2016 13:08:30 -0800
-Subject: [PATCH v8 4/4] Documentation: tee subsystem and op-tee driver
-In-Reply-To: <1455210877-15748-5-git-send-email-jens.wiklander@linaro.org>
-References: <1455210877-15748-1-git-send-email-jens.wiklander@linaro.org>
- <1455210877-15748-5-git-send-email-jens.wiklander@linaro.org>
-Message-ID: <56BCF84E.50808@infradead.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 11 Feb 2016 13:22:20 -0800
+Subject: [GIT PULL] Renesas ARM Based SoC DT Updates for v4.6
+In-Reply-To: <20160211172218.GD12080@verge.net.au>
+References: <cover.1454595846.git.horms+renesas@verge.net.au>
+ <20160208215130.GJ25468@localhost>
+ <CAMuHMdVWYVEHTvGYEZkEXpEaMzfZ_NfMAb0o8HtVcJM+GDdfmA@mail.gmail.com>
+ <20160209183921.GA1089@verge.net.au>
+ <CAOesGMjeyah0qpwWR=RJOF61dVGGqkxmGUJrE0qYNuCOwoPFjQ@mail.gmail.com>
+ <20160211172218.GD12080@verge.net.au>
+Message-ID: <CAOesGMhs=tN705VPB2CDvRKsahpKA6R8xoyjL+TPjSOEJLM0cQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/11/16 09:14, Jens Wiklander wrote:
-> Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
-> ---
->  Documentation/00-INDEX |   2 +
->  Documentation/tee.txt  | 117 +++++++++++++++++++++++++++++++++++++++++++++++++
->  MAINTAINERS            |   1 +
->  3 files changed, 120 insertions(+)
->  create mode 100644 Documentation/tee.txt
-
-> diff --git a/Documentation/tee.txt b/Documentation/tee.txt
-> new file mode 100644
-> index 0000000..4ac91d2
-> --- /dev/null
-> +++ b/Documentation/tee.txt
-> @@ -0,0 +1,117 @@
-> +TEE subsystem
-> +This document describes the TEE subsystem in Linux
-
-                                                Linux.
-
-> +
-> +A TEE (Trusted Execution Environment) is a trusted OS running in some
-> +secure environment, for example, TrustZone on ARM CPUs, or a separate
-> +secure co-processor etc. A TEE driver handles the details needed to
-> +communicate with the TEE.
-> +
-> +This subsystem deals with:
-> +
-> +- Registration of TEE drivers
-> +
-> +- Managing shared memory between Linux and the TEE
-> +
-> +- Providing a generic API to the TEE
-> +
-> +The TEE interface
-> +=================
-> +
-> +include/uapi/linux/tee.h defines the generic interface to a TEE.
-> +
-> +User space (the client) connects to the driver by opening /dev/tee[0-9]* or
-> +/dev/teepriv[0-9]*.
-> +
-> +- TEE_IOC_SHM_ALLOC allocates shared memory and returns a file descriptor which
-> +  user space can mmap. When user space doesn't need the file descriptor anymore
-
-                                                                           any more,
-
-> +  it should be closed. When shared memory isn't needed any longer it should be
-> +  unmapped with munmap() to allow the reuse of memory.
-> +
-> +- TEE_IOC_VERSION lets user space know which TEE this driver handles and
-> +  the its capabilities.
-> +
-> +- TEE_IOC_OPEN_SESSION opens a new session to a Trusted Application
-
-end with '.'
-
-> +
-> +- TEE_IOC_INVOKE invokes a function in a Trusted Application
-
-ditto
-
-> +
-> +- TEE_IOC_CANCEL may cancel an ongoing TEE_IOC_OPEN_SESSION or TEE_IOC_INVOKE
-
-ditto
-
-> +
-> +- TEE_IOC_CLOSE_SESSION closes a session to a Trusted Application
-
-ditto
-
-> +
-> +There are two classes of clients, normal clients and supplicants. The latter is
-> +a helper process for the TEE to access resources in Linux, for example file
-> +system access. A normal client opens /dev/tee[0-9]* and a supplicant opens
-> +/dev/teepriv[0-9].
-> +
-> +Much of the communication between clients and the TEE is opaque to the
-> +driver. The main job for the driver is to receive requests from the
-> +clients, forward them to the TEE and send back the results. In the case of
-> +supplicants the communication goes in the other direction, the TEE sends
-> +requests to the supplicant which then sends back the result.
-> +
-> +OP-TEE driver
-> +=============
-> +
-> +The OP-TEE driver handles OP-TEE [1] based TEEs. Currently it is only the ARM
-> +TrustZone based OP-TEE solution that is supported.
-> +
-> +Lowest level of communication with OP-TEE builds on ARM SMC Calling
-> +Convention (SMCCC) [2], which is the foundation for OP-TEE's SMC interface
-> +[3] used internally by the driver. Stacked on top of that is OP-TEE Message
-> +Protocol [4].
-> +
-> +OP-TEE SMC interface provides the basic functions required by SMCCC and some
-> +additional functions specific for OP-TEE. The most interesting functions are:
-> +
-> +- OPTEE_SMC_FUNCID_CALLS_UID (part of SMCCC) returns the version information
-> +  which is then returned by TEE_IOC_VERSION
-> +
-> +- OPTEE_SMC_CALL_GET_OS_UUID returns the particular OP-TEE implementation, used
-> +  to tell, for instance, a TrustZone OP-TEE apart from an OP-TEE running on a
-> +  separate secure co-processor.
-> +
-> +- OPTEE_SMC_CALL_WITH_ARG drives the OP-TEE message protocol
-> +
-> +- OPTEE_SMC_GET_SHM_CONFIG lets the driver and OP-TEE agree on which memory
-> +  range to used for shared memory between Linux and OP-TEE.
-> +
-> +The GlobalPlatform TEE Client API [5] is implemented on top of the generic
-> +TEE API.
-> +
-> +Picture of the relationship between the different components in the
-> +OP-TEE architecture.
-> +
-> +    User space                  Kernel                   Secure world
-> +    ~~~~~~~~~~                  ~~~~~~                   ~~~~~~~~~~~~
-> + +--------+                                             +-------------+
-> + | Client |                                             | Trusted     |
-> + +--------+                                             | Application |
-> +    /\                                                  +-------------+
-> +    || +----------+                                           /\
-> +    || |tee-      |                                           ||
-> +    || |supplicant|                                           \/
-> +    || +----------+                                     +-------------+
-> +    \/      /\                                          | TEE Internal|
-> + +-------+  ||                                          | API         |
-> + + TEE   |  ||            +--------+--------+           +-------------+
-> + | Client|  ||            | TEE    | OP-TEE |           | OP-TEE      |
-> + | API   |  \/            | subsys | driver |           | Trusted OS  |
-> + +-------+----------------+----+-------+----+-----------+-------------+
-> + |      Generic TEE API        |       |     OP-TEE MSG               |
-> + |      IOCTL (TEE_IOC_*)      |       |     SMCCC (OPTEE_SMC_CALL_*) |
-> + +-----------------------------+       +------------------------------+
-> +
-> +RPC (Remote Procedure Call) are requests from secure world to kernel driver
-> +or tee-supplicant. An RPC is identified by a special range of SMCCC return
-> +values from OPTEE_SMC_CALL_WITH_ARG. RPC messages which are intended for the
-> +kernel are handled by the kernel driver. Other RPC messages will be forwarded to
-> +tee-supplicant without further involvement of the driver, except switching
-> +shared memory buffer representation.
-> +
-> +References:
-> +[1] https://github.com/OP-TEE/optee_os
-> +[2] http://infocenter.arm.com/help/topic/com.arm.doc.den0028a/index.html
-> +[3] drivers/tee/optee/optee_smc.h
-> +[4] drivers/tee/optee/optee_msg.h
-> +[5] http://www.globalplatform.org/specificationsdevice.asp look for
-> +    "TEE Client API Specification v1.0" and click download.
+Simon,
 
 
--- 
-~Randy
+On Thu, Feb 11, 2016 at 9:22 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Wed, Feb 10, 2016 at 07:55:30PM -0800, Olof Johansson wrote:
+>> Hi,
+>>
+>> On Tue, Feb 9, 2016 at 10:39 AM, Simon Horman <horms@verge.net.au> wrote:
+>> > On Tue, Feb 09, 2016 at 08:39:31AM +0100, Geert Uytterhoeven wrote:
+>> >> Hi Olof,
+>> >>
+>> >> On Mon, Feb 8, 2016 at 10:51 PM, Olof Johansson <olof@lixom.net> wrote:
+>> >> > On Thu, Feb 04, 2016 at 03:30:02PM +0100, Simon Horman wrote:
+>> >> >> Please consider these Renesas ARM based SoC DT updates for v4.6.
+>> >> >>
+>> >> >>
+>> >> >> The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
+>> >> >>
+>> >> >>   Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+>> >> >>
+>> >> >> are available in the git repository at:
+>> >> >>
+>> >> >>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-for-v4.6
+>> >> >>
+>> >> >> for you to fetch changes up to d7a11140d0a659e5c1f83627792f95b6713030a2:
+>> >> >>
+>> >> >>   ARM: dts: silk: Enable SCIF_CLK frequency and pins (2016-02-02 14:02:28 +0100)
+>> >> >>
+>> >> >> ----------------------------------------------------------------
+>> >> >> Renesas ARM Based SoC DT Updates for v4.6
+>> >> >>
+>> >> >> * Use SCIF and USBHS fallback compatibility strings
+>> >> >> * Add Baud Rate Generator (BRG) support for (H)SCIF
+>> >> >> * Enable SCIF_CLK frequency and pins
+>> >> >> * Use GIC_* defines
+>> >> >> * Migrate to generic l2c OF initialization on r8a7740
+>> >> >> * Enable audio on r8a7793/gose
+>> >> >> * Enable HDMI vidio out on r8a7793
+>> >> >> * Enable i2c on r8a7793/gose
+>> >> >> * Enable QSPI on alt
+>> >> >> * Enable GPIO keys and leds on gise
+>> >> >> * Enable audio on porter
+>> >> >> * Enable DU on porter
+>> >> >>
+>> >> >> ----------------------------------------------------------------
+>> >> >> Geert Uytterhoeven (22):
+>> >> >>       ARM: shmobile: r8a7740: Migrate to generic l2c OF initialization
+>> >> >>       ARM: shmobile: r8a7740: Remove mapping of L2 cache controller registers
+>> >> >
+>> >> > Hmm. Those aren't DT changes. There's also nothing for r8a7740 to convert
+>> >> > L2 init to DT earlier in this branch, which makes this look like it's just
+>> >> > a generic cleanup that should go in independently in your cleanup branch.
+>> >> >
+>> >> > Or am I missing some dependency that isn't obvious? If I'm not, then please
+>> >> > respin this branch and move those to the place they belong (cleanup).
+>> >>
+>> >> The dependency is commit 374e70075e58acfe ("ARM: shmobile: r8a7740 dtsi: Add
+>> >> L2 cache-controller node"), which has already entered mainline in v4.5-rc1.
+>> >>
+>> >> So I agree with your comments.
+>> >
+>> > Sorry for the mix-up.
+>> > I'll see about respinning this.
+>>
+>> I've merged the patches, so respinning won't work. Instead, please
+>> follow up with incremental fixes instead.
+>
+> Hi Olof,
+>
+> sorry once again for the mix-up.
+>
+> If you have already pulled this pull request then I am happy.
+> However, I don't see it in the arm-soc tree and if you haven't pulled it
+> and it isn't too much trouble I would like to re-spin as I have a further
+> r8a7740 cleanup in the pipeline.
+
+Sorry for the confusion, my reply went to the wrong thread somehow.
+
+
+
+-Olof
