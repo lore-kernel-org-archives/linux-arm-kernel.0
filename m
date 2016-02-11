@@ -1,96 +1,55 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 11 Feb 2016 19:27:07 +0000 (UTC)
-Subject: [PATCH v3 3/3] pci: dra7xx: use pdata callbacks to perform reset
-In-Reply-To: <56BACCDB.2070507@ti.com>
-References: <1452780672-14339-1-git-send-email-kishon@ti.com>
- <1452780672-14339-4-git-send-email-kishon@ti.com>
- <20160127173104.GQ19432@atomide.com> <56A90971.4020409@ti.com>
- <20160127185649.GV19432@atomide.com> <56A94FB7.6020903@ti.com>
- <20160128183156.GH19432@atomide.com> <56B087AD.4000505@ti.com>
- <alpine.DEB.2.02.1602080208070.2182@utopia.booyaka.com>
- <56B900E9.9040306@ti.com>
- <alpine.DEB.2.02.1602090846480.2906@utopia.booyaka.com>
- <56BA2495.9020407@ti.com>
- <alpine.DEB.2.02.1602091932160.2906@utopia.booyaka.com>
- <56BA958A.1020503@ti.com> <56BACCDB.2070507@ti.com>
-Message-ID: <alpine.DEB.2.02.1602111921090.20757@utopia.booyaka.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Thu, 11 Feb 2016 13:49:58 -0600
+Subject: [PATCH 3/3] ARM64: zynqmp: Use 64bit size cell format
+In-Reply-To: <56BCD9CB.9030803@monstr.eu>
+References: <2f160e012080d5d6de11238ade239bb0bb224f64.1455193571.git.michal.simek@xilinx.com>
+ <36fb9c4c9b2019b854e84dc0a9a01252a6de2337.1455193571.git.michal.simek@xilinx.com>
+ <CAL_JsqK0=LaXqJyr_rGKCzGgt5kFy79-4ARocTGpKved3JU-Ug@mail.gmail.com>
+ <56BCD9CB.9030803@monstr.eu>
+Message-ID: <CAL_JsqJPXvz_9GFtNyN024+GD=iBHARCb=VdSi_36GjMWe=CnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon, Suman,
+On Thu, Feb 11, 2016 at 12:58 PM, Michal Simek <monstr@monstr.eu> wrote:
+> Hi Rob,
+>
+> On 11.2.2016 17:13, Rob Herring wrote:
+>> On Thu, Feb 11, 2016 at 6:26 AM, Michal Simek <michal.simek@xilinx.com> wrote:
+>>> Use 64bit size cell format instead of 32bit for memory
+>>> description. Change 64bit sizes also for all others IPs.
+>>
+>> Why? As is, this change is completely pointless because nothing needs
+>> a >4GB size. Do you have peripherals with >4GB size?
+>
+> The change I need to do is to support more than 4GB memory. Memory space
+> is divided to some parts. 2GB connected to hard part below 4GB. There
+> there is 1GB connected to PL part below. Then 32GB hard part above of
+> 4GB and a lot of space for PL part (~230GB).
+>
+> PCIe can also address more than 256GB.
 
-On Wed, 10 Feb 2016, Kishon Vijay Abraham I wrote:
+So I would expect some amount of the bus structure to be reflected in
+the DT. For example, hard and PL IP are probably in separate address
+ranges. I'd guess PL bus has additional logic to enable/disable it for
+reprogramming, so you'd need a different bus node anyway. For PCIe,
+it's probably its own bus too.
 
-> On Wednesday 10 February 2016 07:12 AM, Suman Anna wrote:
-> > On 02/09/2016 01:36 PM, Paul Walmsley wrote:
-> >> On Tue, 9 Feb 2016, Suman Anna wrote:
-> >>> On 02/09/2016 02:49 AM, Paul Walmsley wrote:
-> >>>> On Mon, 8 Feb 2016, Suman Anna wrote:
-> >>>>> On 02/07/2016 08:48 PM, Paul Walmsley wrote:
-> >>>>>> On Tue, 2 Feb 2016, Kishon Vijay Abraham I wrote:
-> >>>>>>
-> >>>>>>> Paul, what do you think is the best way forward to perform reset?
-> >>>>>>
-> >>>>>> Many of the IP blocks with PRM hardreset lines are processor IP blocks. 
-> >>>>>> Those often need special reset handling to ensure that WFI/HLT-like 
-> >>>>>> instructions are executed after reset.  This special handling ensures that 
-> >>>>>> the IP blocks' bus initiator interfaces indicate that they are in standby 
-> >>>>>> to the PRCM - thus allowing power management for the rest of the chip to 
-> >>>>>> work correctly.
-> >>>>>>
-> >>>>>> But that doesn't seem to be the case with PCIe - and maybe others - 
-> >>>>>> possibly some of the MMUs?  
-> >>>>>
-> >>>>> Yeah, the sequencing between clocks and resets would still be the same
-> >>>>> for MMUs, so, adding the custom flags for MMUs is fine.
-> >>>>
-> >>>> I'm curious as to whether HWMOD_CUSTOM_HARDRESET is needed for the MMUs.  
-> >>>> We've stated that the main point of the custom hardreset code is to handle 
-> >>>> processors that need to be placed into WFI/HLT, but it doesn't seem like 
-> >>>> there would be an equivalent for MMUs.  Thoughts?
-> >>>
-> >>> The current OMAP IOMMU code already leverages the pdata ops for
-> >>> performing the resets, so not adding the flags would also require
-> >>> additional changes in the driver.
-> >>>
-> >>> Also, the reset lines controlling the MMUs actually also manage the
-> >>> reset for all the other sub-modules other than the processor cores
-> >>> within the sub-systems. We have currently different issues (see [1] for
-> >>> eg. around the IPU sub-system entering RET in between), so from a PM
-> >>> point of view, we do prefer to place the MMUs also in reset when we are
-> >>> runtime suspended.
-> >>
-> >> Should we reassert hardreset in _idle() for IP blocks that don't have 
-> >> HWMOD_CUSTOM_HARDRESET set on them?  Would that allow us to use this 
-> >> mechanism for the uncore hardreset lines, or are there other quirks?
-> >>
-> >> Also - would that address the potential issue that you mentioned with the 
-> >> PCIe block, or is that a different issue?
-> > 
-> > Yeah, I think that would address the PCIe block issue in terms of reset
-> > state balancing between pm_runtime_get_sync() and pm_runtime_put()
-> > calls. Right now, they are unbalanced. The PCIe block is using these
-> > only in probe and remove, so it should work for that IP.
-> 
-> As I mentioned before this would result in undesired behavior during
-> suspend/resume cycle in PCIe. (This should be okay for the current mainline
-> code but would break once we add suspend/resume support for PCIe).
+> That's why I stand before decision. Change size-cell for all IPs which
+> are currently listed. Or just change it for memory node which is listed
+> in mainline.
+> I am not quite sure how PCIe description will look like and if there is
+> any other IP which will required on current buses use sizes more that
+> 4GB. That's why I have change all sizes to support more than 4GB.
+>
+> But definitely current need is to support more than 4GB memory size and
+> I have no problem to use not empty ranges property and keep there
+> #size-cells = <1>;
 
-I'd like to understand where we're currently at here.  It looks like we're 
-waiting for testing from Suman, and we're waiting for Kishon to try using 
-the bind/unbind driver model hook to see if that wedges PCIe?  Does this 
-match your collective understanding of the status here?
+Then why aren't you adding to the memory? (the bootloader sets the
+actual size is a valid answer)
 
-Thinking about the question of what to do about hardreset assertion in 
-idle, if we need it, we could add a hwmod flag to control that mode.  I 
-would consider it a temporary workaround until we have the hwmod code 
-moved into a bus driver and the bus driver/hwmod code can hook into the 
-LDM .remove operation (and connect it to .shutdown, etc.)  Suman/Kishon: 
-is it your understanding that we could remove the existing hardreset 
-control in the IOMMU drivers and the PCIe driver if we had these options 
-in the hwmod code? 
+> Both solution works for me. Definitely thank you for your comments.
 
-Dave, any further comments here?
+Either way, I'd change this when you actually need the change, not by itself.
 
-
-- Paul
+Rob
