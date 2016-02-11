@@ -1,22 +1,19 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 11 Feb 2016 12:59:47 +0100
-Subject: [PATCH 01/14] pinctrl: sunxi: Add A83T R_PIO controller support
-In-Reply-To: <1454203266-4450-2-git-send-email-vishnupatekar0510@gmail.com>
-References: <1454203266-4450-1-git-send-email-vishnupatekar0510@gmail.com>
- <1454203266-4450-2-git-send-email-vishnupatekar0510@gmail.com>
-Message-ID: <CACRpkdbCgOBQw28d=qc1fAURY3x8UdoWqiMtXMZ=uWLaQj-nbg@mail.gmail.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 11 Feb 2016 13:00:41 +0100
+Subject: [PATCH V5 07/11] soc: mediatek: PMIC wrap: move wdt_src into the
+ pmic_wrapper_type struct
+In-Reply-To: <1454841778-35529-8-git-send-email-blogic@openwrt.org>
+References: <1454841778-35529-1-git-send-email-blogic@openwrt.org>
+ <1454841778-35529-8-git-send-email-blogic@openwrt.org>
+Message-ID: <56BC77E9.2080403@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 31, 2016 at 2:20 AM, Vishnu Patekar
-<vishnupatekar0510@gmail.com> wrote:
 
-> The A83T has R_PIO pin controller, it's same as A23, execpt A83T
-> interrupt bit is 6th and A83T has one extra pin PL12.
+
+On 07/02/16 11:42, John Crispin wrote:
+> Make the handling of wdt_src consitent with the rest of the code.
 >
-> Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
 
-Maxime, can you look at this patch?
-
-Yours,
-Linus Walleij
+Same here, please explain what the patch is doing. Or just squash 6 and 
+7, as you like.
