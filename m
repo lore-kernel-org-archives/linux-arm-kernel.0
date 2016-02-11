@@ -1,125 +1,120 @@
-From: robert.richter@caviumnetworks.com (Robert Richter)
-Date: Thu, 11 Feb 2016 12:42:04 +0100
-Subject: [PATCH v4 0/6] arm64 UEFI early FDT handling
-In-Reply-To: <CAKv+Gu-osoi53cpikDtZitJJX2gtZyhOMuvYf=cfeZi8zJ-LDg@mail.gmail.com>
-References: <1455026026-11571-1-git-send-email-rrichter@caviumnetworks.com>
- <CAKv+Gu-osoi53cpikDtZitJJX2gtZyhOMuvYf=cfeZi8zJ-LDg@mail.gmail.com>
-Message-ID: <20160211114204.GO24726@rric.localdomain>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 11 Feb 2016 11:44:10 +0000
+Subject: breaking DT compatibility (was: Re: [PATCH v4] clk: sunxi:
+ Refactor A31 PLL6 so that it can be reused)
+In-Reply-To: <20160211100048.GK31506@lukather>
+References: <1454358000-13594-1-git-send-email-maxime.ripard@free-electrons.com>
+ <56B4E2FB.3050703@arm.com> <56BB2D79.6090402@arm.com>
+ <CABGGiswOKztmRT40w4t_7BD729WgM8ueLtOD-UF_wgMbmcg4cg@mail.gmail.com>
+ <20160210143755.GE31506@lukather>
+ <20160210163001.GG2632@leverpostej>
+ <20160211100048.GK31506@lukather>
+Message-ID: <20160211114410.GA32535@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(+RobH and MarkR)
+On Thu, Feb 11, 2016 at 11:00:48AM +0100, Maxime Ripard wrote:
+> On Wed, Feb 10, 2016 at 04:30:01PM +0000, Mark Rutland wrote:
+> > On Wed, Feb 10, 2016 at 03:37:55PM +0100, Maxime Ripard wrote:
+> > > Hi Rob,
+> > > 
+> > > On Wed, Feb 10, 2016 at 07:42:02AM -0600, Rob Herring wrote:
+> > > > On Wed, Feb 10, 2016 at 6:30 AM, Andre Przywara <andre.przywara@arm.com> wrote:
+> > > > > Hi,
+> > > > >
+> > > > > just a ping:
+> > > > >
+> > > > > Are we really OK with breaking existing DTs in 4.6? (per the code in
+> > > > > -next: f7d372ba54ea04d528a291b8dbe34716507bb60b, which is this patch).
+> > > > 
+> > > > I only warn and make sure people are aware of the issue. I leave that
+> > > > up to platform maintainers to decide. It depends on the maturity of
+> > > > the platform and users.
+> > > 
+> > > The impacted SoCs support is really partial. For the most supported
+> > > one, big things like display or sound are totally missing, and we
+> > > still update them on a regular basis to add support for new
+> > > devices. As such, users are very likely to upgrade the DT from one
+> > > version to another just because there's new devices available to
+> > > them. And the newest SoC impacted just got introduced in 4.5, and only
+> > > has the UART and MMC devices available.
+> > > 
+> > > > If people complain about it then it's their mess. For platforms
+> > > > supported in distros such as debian or fedora, I would strongly
+> > > > recommend against breaking compatibility.
+> > > 
+> > > None of them are officially supported:
+> > > https://www.debian.org/releases/stable/armhf/ch02s01.html.en
+> > > https://fedoraproject.org/wiki/Architectures/ARM#Fedora_23
+> > > 
+> > > Only the older one are, and they are not affected by this patch.
+> > > 
+> > > > They do ship dtbs, but it's a chicken and egg problem. If dtbs were
+> > > > stable and provided by firmware, then they wouldn't have to provide
+> > > > them. If dtbs are unstable, then they have no choice.
+> > > 
+> > > And while it might work great on platforms that have all the needed
+> > > documentation, or a perfect one, which is our case. Almost each
+> > > release, we discover that something is not working as it was
+> > > documented, when it was documented in the first place.
+> > > 
+> > > It also seems that even on well documented platforms, supported by the
+> > > vendors, the stable ABI dream is not going to happen:
+> > > https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/arm/Atmel/README#n105
+> > > https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/devicetree/bindings/arm/marvell,berlin.txt#n4
+> > 
+> > To be quite frank, I completely disagree with that stance.
+> > 
+> > It seems like the only reason DT bindings aren't remaining stable is
+> > because people are deliberately ignoring the requirement and reasoning
+> > for doing so.
+> 
+> And for DT maintainers saying on multiple occasions that it's bad but
+> ok to break it and / or that they never actually said that it was a
+> stable ABI...
 
-On 09.02.16 15:35:42, Ard Biesheuvel wrote:
-> (+ Grant)
-> 
-> On 9 February 2016 at 14:53, Robert Richter <rrichter@caviumnetworks.com> wrote:
-> > From: Robert Richter <rrichter@cavium.com>
-> >
-> > Reposting an updated version of this patches ported to 4.5-rc1. It is
-> > a followup to the version 3 from:
-> >
-> >  http://lkml.kernel.org/r/1442881288-13962-1-git-send-email-ard.biesheuvel at linaro.org
-> >
-> > The series is essential for NUMA on arm64. Early FDT handling is
-> > required to make system topology data from firmware, esp. for cpus and
-> > memory available to the early boot process. Ganapat's numa patches
-> > depend on it. This series has been tested with his series v10 posted
-> > here:
-> >
-> >  http://lkml.kernel.org/r/1454407763-1017-1-git-send-email-gkulkarni at caviumnetworks.com
-> >
-> 
-> Hello Robert,
-> 
-> This series does not reflect anymore what we think is the best way to
-> deal with memory nodes and memreserves on UEFI systems.
-> Please refer to this thread:
-> http://thread.gmane.org/gmane.linux.kernel.efi/6464
-> 
-> As far as the memory nodes are concerned, if it is the best place to
-> store these NUMA annotations, then we should indeed preserve them, but
-> I think the discussion stalled without any conclusion having been
-> reached. As far as the /reserved-memory node is concerned, that one we
-> should really keep, so at least patch 6/6 of this series should be
-> replaced with something based on the series above.
+Evidently there is a communication failure. Generally, the statement has
+been that old DTBs should continue to work. That's even documented, as
+Andre pointed out:
 
-Ard,
+Documentation/devicetree/bindings/ABI.txt
 
-Mark R and Rob have agreed for numa dt binding for mem nodes. So do
-you think we can at least reuse parts of this series to solve the NUMA
-issue and try to find a solution for patch #6 which aligns with your
-alternative approach?
+There are obviously shades of grey, and _rarely_ it might be necessary
+to deliberately break a binding. However, that should be the rare
+last-resort case, rather than a crutch for development.
+
+Saying "bad but ok" underplays the "bad" and overplays the "ok".
+
+> I'm guessing it could be a stable ABI if there was bindings
+> reviews. Rob actually started to review a significant amount of
+> bindings lately, and that's really appreciated, but if you don't
+> review all the bindings, then we're going to make mistakes.
+
+I agree that it is unfortunate that we cannot provide the level of
+review that we want to.
+
+Mistakes will happen even with review; that doesn't necessitate removing
+support for a binding.
+
+> > I agree that it can be painful, and that we cannot predict the future.
+> > There will always be bugs.
+> 
+> In our case, we can't even predict the present.
+> 
+> > Having code in mainline comes with responsibilities. One of those is to
+> > keep said code working for existing users. Otherwise, why bother having
+> > it in mainline at all?
+> 
+> None of our existing users ever complained.
+
+I believe that in this case, Andre was complaining about this particular
+breakage, unless I have misunderstood.
+
+To be clear, I'm arguing for the strategy going forward. If no-one has
+complained about the stuff broken up to this point, let's not waste time
+restoring that.
+
+Going forward we need to keep old DTBs supported.
 
 Thanks,
-
--Robert
-
-> 
-> Thanks,
-> Ard.
-> 
-> 
-> > A number of minor issues exist in the early UEFI/FDT handling path, such as:
-> > - when booting via UEFI, memreserve entries are removed from the device tree but
-> >   the /reserved-memory node is not
-> > - memory nodes are removed from the device tree in a way that is not officially
-> >   supported by the libfdt API (i.e., you cannot delete nodes while traversing
-> >   the tree)
-> > - removal of memory nodes may discard annotations (such as NUMA topology) that
-> >   should ideally be retained, or may corrupt the tree by discarding nodes
-> >   referenced by phandles.
-> >
-> > Patches #1 and #2 introduce an arm64 specific version of
-> > early_init_dt_add_memory_arch() so that we can modify it later to ignore DT
-> > memory nodes if booting via UEFI.
-> >
-> > Patch #3 moves some UEFI+FDT init code around before making changes to it.
-> >
-> > Patch #4 moves the UEFI initialization to before the early FDT scanning so we
-> > know at that point whether we are booting via UEFI or not.
-> >
-> > Patch #5 changes the UEFI init code so that memory nodes are simply ignored, so
-> > that they don't have to be removed by the stub anymore.
-> >
-> > Patch #6 does the same as #5, but for memreserves and the /reserved-memory
-> > node.
-> >
-> > Changes since v3:
-> > - prorted to v4.5-rc1
-> >
-> > Changes since v2:
-> > - instead of copying the generic implementation, turn
-> >   early_init_dt_add_memory_arch() into a weak alias so that it is still
-> >   accessible to overrides
-> >
-> > Changes since v1:
-> > - dropped first two patches, they have been merged into v4.2-rc1
-> > - dropped last patch regarding FDT placement by the stub, this is not entirely
-> >   relevant to the primary issue targeted by this series
-> > - rebased onto for-next/core (arm64) as of today
-> >
-> > Ard Biesheuvel (6):
-> >   of/fdt: make generic early_init_dt_add_memory_arch() a weak alias
-> >   arm64: override generic version of early_init_dt_add_memory_arch()
-> >   efi: move FDT handling to separate object file
-> >   arm64/efi: move EFI /chosen node parsing before early FDT processing
-> >   arm64/efi: ignore DT memory nodes instead of removing them
-> >   arm64/efi: ignore DT memreserve entries instead of removing them
-> >
-> >  arch/arm64/include/asm/efi.h       |  2 +
-> >  arch/arm64/kernel/setup.c          |  3 ++
-> >  arch/arm64/mm/init.c               | 12 +++++-
-> >  drivers/firmware/efi/Makefile      |  1 +
-> >  drivers/firmware/efi/arm-init.c    | 36 ++++++++++------
-> >  drivers/firmware/efi/efi-fdt.c     | 73 +++++++++++++++++++++++++++++++++
-> >  drivers/firmware/efi/efi.c         | 84 --------------------------------------
-> >  drivers/firmware/efi/libstub/fdt.c | 33 +--------------
-> >  drivers/of/fdt.c                   |  7 +++-
-> >  include/linux/efi.h                |  2 +-
-> >  include/linux/of_fdt.h             |  1 +
-> >  11 files changed, 121 insertions(+), 133 deletions(-)
-> >  create mode 100644 drivers/firmware/efi/efi-fdt.c
-> >
-> > --
-> > 2.7.0.rc3
+Mark.
