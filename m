@@ -1,162 +1,261 @@
 From: lars.persson@axis.com (Lars Persson)
-Date: Thu, 11 Feb 2016 17:06:19 +0100
-Subject: [PATCH v3 4/6] arm: initial machine port for artpec-6 SoC
+Date: Thu, 11 Feb 2016 17:06:17 +0100
+Subject: [PATCH v3 2/6] arm: dts: add Artpec-6 SoC dtsi file
 In-Reply-To: <cover.1455205057.git.larper@axis.com>
 References: <cover.1455205057.git.larper@axis.com>
-Message-ID: <3c22d68c2d091990c0f54df76344e1e7c16dd408.1455205057.git.larper@axis.com>
+Message-ID: <9d3b8e80eeb56ca0808aae62eabd82af23ddb5c5.1455205057.git.larper@axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Basic machine port for the Artpec-6 SoC from Axis
-Communications.
+Initial device tree for the Artpec-6 SoC.
 
 Signed-off-by: Lars Persson <larper@axis.com>
 ---
- arch/arm/Kconfig                     |  2 +
- arch/arm/Makefile                    |  1 +
- arch/arm/mach-artpec/Kconfig         | 20 ++++++++++
- arch/arm/mach-artpec/Makefile        |  1 +
- arch/arm/mach-artpec/board-artpec6.c | 72 ++++++++++++++++++++++++++++++++++++
- 5 files changed, 96 insertions(+)
- create mode 100644 arch/arm/mach-artpec/Kconfig
- create mode 100644 arch/arm/mach-artpec/Makefile
- create mode 100644 arch/arm/mach-artpec/board-artpec6.c
+ arch/arm/boot/dts/artpec6.dtsi | 236 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 236 insertions(+)
+ create mode 100644 arch/arm/boot/dts/artpec6.dtsi
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 4f799e5..e1565dd 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -724,6 +724,8 @@ source "arch/arm/mach-mvebu/Kconfig"
- 
- source "arch/arm/mach-alpine/Kconfig"
- 
-+source "arch/arm/mach-artpec/Kconfig"
-+
- source "arch/arm/mach-asm9260/Kconfig"
- 
- source "arch/arm/mach-at91/Kconfig"
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index fe25410..4eb24c6 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -154,6 +154,7 @@ textofs-$(CONFIG_ARCH_AXXIA) := 0x00308000
- # Machine directory name.  This list is sorted alphanumerically
- # by CONFIG_* macro name.
- machine-$(CONFIG_ARCH_ALPINE)		+= alpine
-+machine-$(CONFIG_ARCH_ARTPEC)		+= artpec
- machine-$(CONFIG_ARCH_AT91)		+= at91
- machine-$(CONFIG_ARCH_AXXIA)		+= axxia
- machine-$(CONFIG_ARCH_BCM)		+= bcm
-diff --git a/arch/arm/mach-artpec/Kconfig b/arch/arm/mach-artpec/Kconfig
+diff --git a/arch/arm/boot/dts/artpec6.dtsi b/arch/arm/boot/dts/artpec6.dtsi
 new file mode 100644
-index 0000000..6cbe5a2
+index 0000000..f2a7e4a
 --- /dev/null
-+++ b/arch/arm/mach-artpec/Kconfig
-@@ -0,0 +1,20 @@
-+menuconfig ARCH_ARTPEC
-+	bool "Axis Communications ARM based ARTPEC SoCs"
-+	depends on ARCH_MULTI_V7
-+
-+if ARCH_ARTPEC
-+
-+config MACH_ARTPEC6
-+	bool "Axis ARTPEC-6 ARM Cortex A9 Platform"
-+	depends on ARCH_MULTI_V7
-+	select ARM_AMBA
-+	select ARM_GIC
-+	select ARM_GLOBAL_TIMER
-+	select ARM_PSCI
-+	select HAVE_ARM_ARCH_TIMER
-+	select HAVE_ARM_SCU
-+	select HAVE_ARM_TWD if SMP
-+	help
-+	  Support for Axis ARTPEC-6 ARM Cortex A9 Platform
-+
-+endif
-diff --git a/arch/arm/mach-artpec/Makefile b/arch/arm/mach-artpec/Makefile
-new file mode 100644
-index 0000000..78325f0
---- /dev/null
-+++ b/arch/arm/mach-artpec/Makefile
-@@ -0,0 +1 @@
-+obj-$(CONFIG_MACH_ARTPEC6)		:= board-artpec6.o
-diff --git a/arch/arm/mach-artpec/board-artpec6.c b/arch/arm/mach-artpec/board-artpec6.c
-new file mode 100644
-index 0000000..71513df
---- /dev/null
-+++ b/arch/arm/mach-artpec/board-artpec6.c
-@@ -0,0 +1,72 @@
++++ b/arch/arm/boot/dts/artpec6.dtsi
+@@ -0,0 +1,236 @@
 +/*
-+ * ARTPEC-6 device support.
++ * Device Tree Source for the Axis ARTPEC-6 SoC
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
 + */
 +
-+#include <linux/amba/bus.h>
-+#include <linux/clocksource.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/io.h>
-+#include <linux/irqchip.h>
-+#include <linux/irqchip/arm-gic.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/of_platform.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/clk-provider.h>
-+#include <linux/regmap.h>
-+#include <linux/smp.h>
-+#include <asm/smp_scu.h>
-+#include <asm/mach/arch.h>
-+#include <asm/mach/map.h>
-+#include <asm/psci.h>
-+#include <linux/arm-smccc.h>
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++#include "skeleton.dtsi"
 +
++/ {
++	compatible = "axis,artpec6";
++	interrupt-parent = <&intc>;
 +
-+#define ARTPEC6_DMACFG_REGNUM 0x10
-+#define ARTPEC6_DMACFG_UARTS_BURST 0xff
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
 +
-+#define SECURE_OP_L2C_WRITEREG 0xb4000001
++		cpu0: cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			reg = <0>;
++			next-level-cache = <&pl310>;
++		};
 +
-+static void __init artpec6_init_machine(void)
-+{
-+	struct regmap *regmap;
-+
-+	regmap = syscon_regmap_lookup_by_compatible("axis,artpec6-syscon");
-+
-+	if (!IS_ERR(regmap)) {
-+		/* Use PL011 DMA Burst Request signal instead of DMA
-+		 *  Single Request
-+		 */
-+		regmap_write(regmap, ARTPEC6_DMACFG_REGNUM,
-+			     ARTPEC6_DMACFG_UARTS_BURST);
++		cpu1: cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			reg = <1>;
++			next-level-cache = <&pl310>;
++		};
 +	};
 +
-+	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-+}
++	syscon {
++		compatible = "axis,artpec6-syscon", "syscon";
++		reg = <0xf8000000 0x48>;
++	};
 +
-+static void artpec6_l2c310_write_sec(unsigned long val, unsigned reg)
-+{
-+	struct arm_smccc_res res;
++	psci {
++		compatible = "arm,psci-0.2", "arm,psci";
++		method = "smc";
++		psci_version = <0x84000000>;
++		cpu_on = <0x84000003>;
++		system_reset = <0x84000009>;
++	};
 +
-+	arm_smccc_smc(SECURE_OP_L2C_WRITEREG, reg, val, 0,
-+		      0, 0, 0, 0, &res);
++	scu at faf00000 {
++		compatible = "arm,cortex-a9-scu";
++		reg = <0xfaf00000 0x58>;
++	};
 +
-+	WARN_ON(res.a0);
-+}
++	/* Main external clock driving CPU and peripherals */
++	ext_clk: ext_clk {
++		#clock-cells = <0>;
++		compatible = "fixed-clock";
++		clock-frequency = <50000000>;
++	};
 +
-+static const char * const artpec6_dt_match[] = {
-+	"axis,artpec6",
-+	NULL
++	/* PLL1 is used by CPU and some peripherals */
++	pll1_clk: pll1_clk at f8000000 {
++		#clock-cells = <0>;
++		compatible = "axis,artpec6-pll1-clock";
++		reg = <0xf8000000 4>;
++		clocks = <&ext_clk>;
++	};
++
++	cpu_clk: cpu_clk {
++		#clock-cells = <0>;
++		compatible = "fixed-factor-clock";
++		clock-div = <1>;
++		clock-mult = <1>;
++		clocks = <&pll1_clk>;
++		clock-output-names = "cpu_clk";
++	};
++
++	cpu_clkdiv2: cpu_clkdiv2 {
++		#clock-cells = <0>;
++		compatible = "fixed-factor-clock";
++		clock-div = <2>;
++		clock-mult = <1>;
++		clocks = <&cpu_clk>;
++	};
++
++	cpu_clkdiv4: cpu_clkdiv4 {
++		#clock-cells = <0>;
++		compatible = "fixed-factor-clock";
++		clock-div = <4>;
++		clock-mult = <1>;
++		clocks = <&cpu_clk>;
++	};
++
++	apb_pclk: apb_pclk {
++		#clock-cells = <0>;
++		compatible = "fixed-factor-clock";
++		clock-div = <8>;
++		clock-mult = <1>;
++		clocks = <&cpu_clk>;
++		clock-output-names = "apb_pclk";
++	};
++
++	/* PLL2 is used by a number of peripherals, including UDL */
++	pll2: pll2 {
++		#clock-cells = <0>;
++		compatible = "fixed-factor-clock";
++		clock-div = <1>;
++		clock-mult = <24>;
++		clocks = <&ext_clk>;
++	};
++
++	/* PLL2DIV2 is used by the Fractional Clock Divider, for i2s */
++	pll2div2: pll2div2 {
++		#clock-cells = <0>;
++		compatible = "fixed-factor-clock";
++		clock-div = <2>;
++		clock-mult = <1>;
++		clocks = <&pll2>;
++	};
++
++	pll2div12: pll2div12 {
++		#clock-cells = <0>;
++		compatible = "fixed-factor-clock";
++		clock-div = <12>;
++		clock-mult = <1>;
++		clocks = <&pll2>;
++	};
++
++	pll2div24: pll2div24 {
++		#clock-cells = <0>;
++		compatible = "fixed-factor-clock";
++		clock-div = <24>;
++		clock-mult = <1>;
++		clocks = <&pll2>;
++		clock-output-names = "uart_clk";
++	};
++
++
++	gtimer at faf00200 {
++		compatible = "arm,cortex-a9-global-timer";
++		reg = <0xfaf00200 0x20>;
++		interrupts = <GIC_PPI 11 0xf01>;
++		clocks = <&cpu_clkdiv2>;
++	};
++
++	timer at faf00600 {
++		compatible = "arm,cortex-a9-twd-timer";
++		reg = <0xfaf00600 0x20>;
++		interrupts = <GIC_PPI 13 0xf04>;
++		clocks = <&cpu_clkdiv2>;
++		status = "disabled";
++	};
++
++	intc: interrupt-controller at faf01000 {
++		interrupt-controller;
++		compatible = "arm,cortex-a9-gic";
++		#interrupt-cells = <3>;
++		reg = < 0xfaf01000 0x1000 >, < 0xfaf00100 0x0100 >;
++	};
++
++	pl310: cache-controller at faf10000 {
++		compatible = "arm,pl310-cache";
++		cache-unified;
++		cache-level = <2>;
++		reg = <0xfaf10000 0x1000>;
++		interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
++		arm,data-latency = <1 1 1>;
++		arm,tag-latency = <1 1 1>;
++		arm,filter-ranges = <0x0 0x80000000>;
++	};
++
++	pmu {
++		compatible = "arm,cortex-a9-pmu";
++		interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>,
++			<GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-parent = <&intc>;
++	};
++
++	amba at 0 {
++		compatible = "simple-bus";
++		#address-cells = <0x1>;
++		#size-cells = <0x1>;
++		interrupt-parent = <&intc>;
++		ranges;
++		dma-ranges = <0x80000000 0x00000000 0x40000000>;
++		dma-coherent;
++
++		ethernet: ethernet at f8010000 {
++			clock-names = "phy_ref_clk", "apb_pclk";
++			clocks = <&ext_clk>, <&apb_pclk>;
++			compatible = "snps,dwc-qos-ethernet-4.10";
++			interrupt-parent = <&intc>;
++			interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>;
++			reg = <0xf8010000 0x4000>;
++
++			snps,write-requests = <2>;
++			snps,read-requests = <16>;
++			snps,txpbl = <8>;
++			snps,rxpbl = <2>;
++
++			status = "disabled";
++		};
++
++		uart0: serial at f8036000 {
++			compatible = "arm,pl011", "arm,primecell";
++			reg = <0xf8036000 0x1000>;
++			interrupts = <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&pll2div24>, <&apb_pclk>;
++			clock-names = "uart_clk", "apb_pclk";
++			status = "disabled";
++		};
++		uart1: serial at f8037000 {
++			compatible = "arm,pl011", "arm,primecell";
++			reg = <0xf8037000 0x1000>;
++			interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&pll2div24>, <&apb_pclk>;
++			clock-names = "uart_clk", "apb_pclk";
++			status = "disabled";
++		};
++		uart2: serial at f8038000 {
++			compatible = "arm,pl011", "arm,primecell";
++			reg = <0xf8038000 0x1000>;
++			interrupts = <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&pll2div24>, <&apb_pclk>;
++			clock-names = "uart_clk", "apb_pclk";
++			status = "disabled";
++		};
++		uart3: serial at f8039000 {
++			compatible = "arm,pl011", "arm,primecell";
++			reg = <0xf8039000 0x1000>;
++			interrupts = <GIC_SPI 129 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&pll2div24>, <&apb_pclk>;
++			clock-names = "uart_clk", "apb_pclk";
++			status = "disabled";
++		};
++	};
 +};
-+
-+DT_MACHINE_START(ARTPEC6, "Axis ARTPEC-6 Platform")
-+	.l2c_aux_val	= 0x0C000000,
-+	.l2c_aux_mask	= 0xF3FFFFFF,
-+	.l2c_write_sec  = artpec6_l2c310_write_sec,
-+	.init_machine	= artpec6_init_machine,
-+	.dt_compat	= artpec6_dt_match,
-+MACHINE_END
 -- 
 2.1.4
