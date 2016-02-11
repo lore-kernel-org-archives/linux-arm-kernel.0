@@ -1,48 +1,34 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Thu, 11 Feb 2016 22:23:14 +0100
-Subject: [PATCH 0/4] Fix pxa dma requestor lines
-Message-ID: <1455225798-9510-1-git-send-email-robert.jarzmik@free.fr>
+Date: Thu, 11 Feb 2016 22:23:15 +0100
+Subject: [PATCH 1/4] dma: mmp_pdma: Add the #requestors DT property
+ documentation
+In-Reply-To: <1455225798-9510-1-git-send-email-robert.jarzmik@free.fr>
+References: <1455225798-9510-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <1455225798-9510-2-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This serie aims at fixing a bug which arose in the pxa_dma driver, which needs
-to know the number of requestor lines which are connected to the DMA IP.
+For pxa based platforms, the number of requestor lines should be
+specified, so that the driver can check if the flow control should be
+activated (when a requestor line is asked for) or not.
 
-The current implementation of pxa_dma is limited to 32 lines, which pxa27x has
-75 lines and pxa3xx has 100 of them. As a consequence, DMA clients with a
-requestor greater that 32 are not working, namely the pxa_camera driver.
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+---
+ Documentation/devicetree/bindings/dma/mmp-dma.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-The proposed fix by Vinod is to make the driver aware of the number of lines,
-which is done by this patchset.
-
-I'd like to have this reviewed and then taken through the PXA tree. For this
-I'll need :
- - Rob/Grant/Kumar/Ian ack on patch 1/4
- - Haojian's ack on patch 2/4
- - Vinod's ack on patch 4/4
-
-Thanks in advance.
-
---
-Robert
-
-Robert Jarzmik (4):
-  dma: mmp_pdma: Add the #requestors DT property documentation
-  dmaengine: mmp-pdma: add number of requestors
-  ARM: pxa: add the number of DMA requestor lines
-  dmaengine: pxa_dma: fix the maximum requestor line
-
- Documentation/devicetree/bindings/dma/mmp-dma.txt |  2 ++
- arch/arm/boot/dts/pxa27x.dtsi                     |  1 +
- arch/arm/boot/dts/pxa3xx.dtsi                     |  1 +
- arch/arm/mach-pxa/devices.c                       |  3 ++-
- arch/arm/mach-pxa/pxa25x.c                        |  2 +-
- arch/arm/mach-pxa/pxa27x.c                        |  2 +-
- arch/arm/mach-pxa/pxa3xx.c                        |  2 +-
- arch/arm/plat-pxa/include/plat/dma.h              |  2 +-
- drivers/dma/pxa_dma.c                             | 33 +++++++++++++++--------
- include/linux/platform_data/mmp_dma.h             |  1 +
- 10 files changed, 33 insertions(+), 16 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/dma/mmp-dma.txt b/Documentation/devicetree/bindings/dma/mmp-dma.txt
+index 7a802f64e5bd..716b70338a15 100644
+--- a/Documentation/devicetree/bindings/dma/mmp-dma.txt
++++ b/Documentation/devicetree/bindings/dma/mmp-dma.txt
+@@ -12,6 +12,8 @@ Required properties:
+ Optional properties:
+ - #dma-channels: Number of DMA channels supported by the controller (defaults
+   to 32 when not specified)
++- #requestors: Number of DMA requestor lines supported by the controller
++  (defaults to 0 when not specified)
+ 
+ "marvell,pdma-1.0"
+ Used platforms: pxa25x, pxa27x, pxa3xx, pxa93x, pxa168, pxa910, pxa688.
 -- 
 2.1.4
