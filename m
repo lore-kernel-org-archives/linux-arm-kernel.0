@@ -1,64 +1,94 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 11 Feb 2016 15:56:33 +0000
-Subject: [GIT PULL] Immutable branch between MFD, Input and IIO
-In-Reply-To: <1450101234-2191-1-git-send-email-mpa@pengutronix.de>
-References: <1450101234-2191-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <20160211155633.GB20693@x1>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 11 Feb 2016 15:57:26 +0000
+Subject: [PATCH v3 1/8] iommu: Add MMIO mapping type
+In-Reply-To: <13740597.5lZXKsEG19@avalon>
+References: <1455065878-11906-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+ <1455065878-11906-2-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+ <13740597.5lZXKsEG19@avalon>
+Message-ID: <56BCAF66.8010206@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enjoy!
+On 11/02/16 00:02, Laurent Pinchart wrote:
+> Hi Niklas,
+>
+> Thank you for the patch.
+>
+> On Wednesday 10 February 2016 01:57:51 Niklas S?derlund wrote:
+>> From: Robin Murphy <robin.murphy@arm.com>
+>>
+>> On some platforms, MMIO regions might need slightly different treatment
+>> compared to mapping regular memory; add the notion of MMIO mappings to
+>> the IOMMU API's memory type flags, so that callers can let the IOMMU
+>> drivers know to do the right thing.
+>>
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+>
+> Answering the question from the cover letter, yes, it's totally fine to pick
+> the ack, that's actually expected.
+>
+>> ---
+>>   drivers/iommu/io-pgtable-arm.c | 4 +++-
+>>   include/linux/iommu.h          | 1 +
+>
+> You might be asked to split this patch in two.
 
-The following changes since commit 36f90b0a2ddd60823fe193a85e60ff1906c2a9b3:
+Worse than that, you might also be asked to fix it up when the silly 
+author remembers that he did this on a stage-2-only ARM SMMU, and the 
+attributes for the stage 1 tables that the IPMMU uses are in a different 
+code path:
 
-  Linux 4.5-rc2 (2016-01-31 18:12:16 -0800)
+--->8---
+diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
+index 5b5c299..7622c6e 100644
+--- a/drivers/iommu/io-pgtable-arm.c
++++ b/drivers/iommu/io-pgtable-arm.c
+@@ -354,7 +354,10 @@ static arm_lpae_iopte arm_lpae_prot_to_pte(struct 
+arm_lpae_io_pgtable *data,
+                 if (!(prot & IOMMU_WRITE) && (prot & IOMMU_READ))
+                         pte |= ARM_LPAE_PTE_AP_RDONLY;
 
-are available in the git repository at:
+-               if (prot & IOMMU_CACHE)
++               if (prot & IOMMU_MMIO)
++                       pte |= (ARM_LPAE_MAIR_ATTR_IDX_DEV
++                               << ARM_LPAE_PTE_ATTRINDX_SHIFT);
++               else if (prot & IOMMU_CACHE)
+                         pte |= (ARM_LPAE_MAIR_ATTR_IDX_CACHE
+                                 << ARM_LPAE_PTE_ATTRINDX_SHIFT);
+         } else {
+--->8---
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git tags/ib-mfd-input-iio-v4.6
+Sorry for the bother,
+Robin.
 
-for you to fetch changes up to 4f7ed234f2a5dcc26fc56a6e8324d34bbc9afe23:
-
-  Input: touchscreen: Add imx25 TCQ driver (2016-02-11 15:40:42 +0000)
-
-----------------------------------------------------------------
-Immutable branch between MFD, Input and IIO due for v4.6
-
-----------------------------------------------------------------
-Markus Pargmann (6):
-      mfd: Add DT binding documentation for imx25 ADC/TSC
-      iio: Add binding documentation for imx25 GCQ
-      Input: add binding documentation for imx25 touchscreen controller
-      mfd: fsl-imx25-tsadc: Register touchscreen ADC driver
-      iio: adc: Add imx25-gcq ADC driver
-      Input: touchscreen: Add imx25 TCQ driver
-
- .../devicetree/bindings/iio/adc/fsl,imx25-gcq.txt  |  58 ++
- .../bindings/input/touchscreen/fsl-mx25-tcq.txt    |  35 ++
- .../devicetree/bindings/mfd/fsl-imx25-tsadc.txt    |  47 ++
- drivers/iio/adc/Kconfig                            |   7 +
- drivers/iio/adc/Makefile                           |   1 +
- drivers/iio/adc/fsl-imx25-gcq.c                    | 417 ++++++++++++++
- drivers/input/touchscreen/Kconfig                  |   9 +
- drivers/input/touchscreen/Makefile                 |   1 +
- drivers/input/touchscreen/fsl-imx25-tcq.c          | 596 +++++++++++++++++++++
- drivers/mfd/Kconfig                                |   9 +
- drivers/mfd/Makefile                               |   2 +
- drivers/mfd/fsl-imx25-tsadc.c                      | 203 +++++++
- include/dt-bindings/iio/adc/fsl-imx25-gcq.h        |  18 +
- include/linux/mfd/imx25-tsadc.h                    | 140 +++++
- 14 files changed, 1543 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/iio/adc/fsl,imx25-gcq.txt
- create mode 100644 Documentation/devicetree/bindings/input/touchscreen/fsl-mx25-tcq.txt
- create mode 100644 Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt
- create mode 100644 drivers/iio/adc/fsl-imx25-gcq.c
- create mode 100644 drivers/input/touchscreen/fsl-imx25-tcq.c
- create mode 100644 drivers/mfd/fsl-imx25-tsadc.c
- create mode 100644 include/dt-bindings/iio/adc/fsl-imx25-gcq.h
- create mode 100644 include/linux/mfd/imx25-tsadc.h
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+>>   2 files changed, 4 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
+>> index 381ca5a..3ff4f87 100644
+>> --- a/drivers/iommu/io-pgtable-arm.c
+>> +++ b/drivers/iommu/io-pgtable-arm.c
+>> @@ -364,7 +364,9 @@ static arm_lpae_iopte arm_lpae_prot_to_pte(struct
+>> arm_lpae_io_pgtable *data, pte |= ARM_LPAE_PTE_HAP_READ;
+>>   		if (prot & IOMMU_WRITE)
+>>   			pte |= ARM_LPAE_PTE_HAP_WRITE;
+>> -		if (prot & IOMMU_CACHE)
+>> +		if (prot & IOMMU_MMIO)
+>> +			pte |= ARM_LPAE_PTE_MEMATTR_DEV;
+>> +		else if (prot & IOMMU_CACHE)
+>>   			pte |= ARM_LPAE_PTE_MEMATTR_OIWB;
+>>   		else
+>>   			pte |= ARM_LPAE_PTE_MEMATTR_NC;
+>> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+>> index a5c539f..34b6432 100644
+>> --- a/include/linux/iommu.h
+>> +++ b/include/linux/iommu.h
+>> @@ -30,6 +30,7 @@
+>>   #define IOMMU_WRITE	(1 << 1)
+>>   #define IOMMU_CACHE	(1 << 2) /* DMA cache coherency */
+>>   #define IOMMU_NOEXEC	(1 << 3)
+>> +#define IOMMU_MMIO	(1 << 4) /* e.g. things like MSI doorbells */
+>>
+>>   struct iommu_ops;
+>>   struct iommu_group;
+>
