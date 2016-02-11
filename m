@@ -1,25 +1,79 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 11 Feb 2016 13:01:36 +0100
-Subject: [PATCH V5 08/11] soc: mediatek: PMIC wrap: remove
- pwrap_is_mt8135() and pwrap_is_mt8173()
-In-Reply-To: <1454841778-35529-9-git-send-email-blogic@openwrt.org>
-References: <1454841778-35529-1-git-send-email-blogic@openwrt.org>
- <1454841778-35529-9-git-send-email-blogic@openwrt.org>
-Message-ID: <56BC7820.6040203@gmail.com>
+Date: Thu, 11 Feb 2016 13:07:01 +0100
+Subject: [PATCH] 8250: mediatek: mark PM functions as __maybe_unused
+In-Reply-To: <1454938591-2743892-1-git-send-email-arnd@arndb.de>
+References: <1454938591-2743892-1-git-send-email-arnd@arndb.de>
+Message-ID: <56BC7965.90404@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 07/02/16 11:42, John Crispin wrote:
-> With more SoCs being added the list of helper functions like these would
-> grow. While at it also add a new flag "has_bridge" and use that instead of
-> pwrap_is_mt8173() where appropriate.
+On 08/02/16 14:36, Arnd Bergmann wrote:
+> The mtk8250_runtime_suspend function is not used when runtime PM is
+> disabled, so we get a warning about an unused function:
 >
-> Signed-off-by: John Crispin <blogic@openwrt.org>
+> drivers/tty/serial/8250/8250_mtk.c:119:12: error: 'mtk8250_runtime_suspend' defined but not used [-Werror=unused-function]
+>   static int mtk8250_runtime_suspend(struct device *dev)
+>
+> This marks all the PM functions as __maybe_unused to avoid the warning,
+> and removes the #ifdef around the PM_SLEEP functions for consistency.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > ---
 
-Same here, please explain better what the code does.
+Acked-by: Matthias Brugger <matthias.bgg@gmail.com>
 
-Thanks.
-Matthias
+>   drivers/tty/serial/8250/8250_mtk.c | 10 ++++------
+>   1 file changed, 4 insertions(+), 6 deletions(-)
+>
+> diff --git a/drivers/tty/serial/8250/8250_mtk.c b/drivers/tty/serial/8250/8250_mtk.c
+> index 0e590b233f03..9038843cadc7 100644
+> --- a/drivers/tty/serial/8250/8250_mtk.c
+> +++ b/drivers/tty/serial/8250/8250_mtk.c
+> @@ -116,7 +116,7 @@ mtk8250_set_termios(struct uart_port *port, struct ktermios *termios,
+>   		tty_termios_encode_baud_rate(termios, baud, baud);
+>   }
+>
+> -static int mtk8250_runtime_suspend(struct device *dev)
+> +static int __maybe_unused mtk8250_runtime_suspend(struct device *dev)
+>   {
+>   	struct mtk8250_data *data = dev_get_drvdata(dev);
+>
+> @@ -126,7 +126,7 @@ static int mtk8250_runtime_suspend(struct device *dev)
+>   	return 0;
+>   }
+>
+> -static int mtk8250_runtime_resume(struct device *dev)
+> +static int __maybe_unused mtk8250_runtime_resume(struct device *dev)
+>   {
+>   	struct mtk8250_data *data = dev_get_drvdata(dev);
+>   	int err;
+> @@ -245,8 +245,7 @@ static int mtk8250_probe(struct platform_device *pdev)
+>   	return 0;
+>   }
+>
+> -#ifdef CONFIG_PM_SLEEP
+> -static int mtk8250_suspend(struct device *dev)
+> +static int __maybe_unused mtk8250_suspend(struct device *dev)
+>   {
+>   	struct mtk8250_data *data = dev_get_drvdata(dev);
+>
+> @@ -255,7 +254,7 @@ static int mtk8250_suspend(struct device *dev)
+>   	return 0;
+>   }
+>
+> -static int mtk8250_resume(struct device *dev)
+> +static int __maybe_unused mtk8250_resume(struct device *dev)
+>   {
+>   	struct mtk8250_data *data = dev_get_drvdata(dev);
+>
+> @@ -263,7 +262,6 @@ static int mtk8250_resume(struct device *dev)
+>
+>   	return 0;
+>   }
+> -#endif /* CONFIG_PM_SLEEP */
+>
+>   static const struct dev_pm_ops mtk8250_pm_ops = {
+>   	SET_SYSTEM_SLEEP_PM_OPS(mtk8250_suspend, mtk8250_resume)
+>
