@@ -1,100 +1,67 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Thu, 11 Feb 2016 07:45:11 +0100
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Thu, 11 Feb 2016 08:50:57 +0200
 Subject: [PATCH] tty/serial: digicolor: Fix bad usage of IS_ERR_VALUE
-In-Reply-To: <56BC022B.7030004@roeck-us.net>
+In-Reply-To: <1455030539-10798-1-git-send-email-linux@roeck-us.net>
 References: <1455030539-10798-1-git-send-email-linux@roeck-us.net>
- <4571887.rTPndCnv20@wuerfel> <56BAA27A.9050605@roeck-us.net>
- <2606061.l722KO95iI@wuerfel> <56BC022B.7030004@roeck-us.net>
-Message-ID: <56BC2DF7.20803@samsung.com>
+Message-ID: <20160211065057.GA17047@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/11/2016 04:38 AM, Guenter Roeck wrote:
-> On 02/10/2016 07:21 AM, Arnd Bergmann wrote:
->> On Tuesday 09 February 2016 18:37:46 Guenter Roeck wrote:
->>> On 02/09/2016 07:26 AM, Arnd Bergmann wrote:
->>>> On Tuesday 09 February 2016 07:08:59 Guenter Roeck wrote:
->>>>> IS_ERR_VALUE() assumes that its parameter is an unsigned long.
->>>>> It can not be used to check if an unsigned int reflects an error.
->>>>> Doing so can result in the following build warning.
->>>>>
->>>>> drivers/tty/serial/digicolor-usart.c: In function ?digicolor_uart_probe?:
->>>>> include/linux/err.h:21:38: warning:
->>>>>           comparison is always false due to limited range of data type
->>>>> drivers/tty/serial/digicolor-usart.c:485:6: note:
->>>>>           in expansion of macro ?IS_ERR_VALUE?
->>>>>
->>>>> If that warning is seen, an error return from platform_get_irq() is missed.
->>>>>
->>>>>
->>>> The patch looks correct to me, but what compiler version and which kernel
->>>> tree is it that triggered the warning?
->>>>
->>>> Andrzej Hajda just modified the definition of IS_ERR_VALUE(), and the
->>>> changes are still under discussion, but I don't see that warning with
->>>> any of the versions.
->>>>
->>> I see it with gcc 5.1 and 5.2 (and W=1). I did not see / notice Andrzej's patch.
->>>
->>> I agree that fixing the problem in IS_ERR_VALUE() is preferrable.
->>>
->>>
->> Ah, W=1 explains it. We are still debating about the proper solution. Al Viro
->> pointed out that most users of IS_ERR_VALUE() shouldn't be using it at all,
->> so your patch is probably best here after all.
->>
-> Yes, after looking into it some more I agree. Coccinelle should be able to handle
-> most of the conversions automatically. I actually tried to write a script, just
-> for the fun of it, but it misses some of the problem cases in patch mode.
-> Maybe I get it working tonight.
->
-> Guenter
->
+Hi Guenter,
 
-Maybe it can be helpful. The script which classifies all IS_ERR_VALUE
-usages as
-correct, signed, incorrect and unknown (cocci was not able to detect type).
-Adding patch mode should be quite simple.
+On Tue, Feb 09, 2016 at 07:08:59AM -0800, Guenter Roeck wrote:
+> IS_ERR_VALUE() assumes that its parameter is an unsigned long.
+> It can not be used to check if an unsigned int reflects an error.
+> Doing so can result in the following build warning.
+> 
+> drivers/tty/serial/digicolor-usart.c: In function ?digicolor_uart_probe?:
+> include/linux/err.h:21:38: warning:
+> 	comparison is always false due to limited range of data type
+> drivers/tty/serial/digicolor-usart.c:485:6: note:
+> 	in expansion of macro ?IS_ERR_VALUE?
+> 
+> If that warning is seen, an error return from platform_get_irq() is missed.
+> 
+> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 
-// Options: --all-includes --include
-include/uapi/linux/netfilter_ipv6/ip6_tables.h --include
-include/uapi/linux/netfilter_ipv4/ip_tables.h --include
-include/uapi/linux/netfilter_arp/arp_tables.h --include
-include/uapi/linux/netfilter/x_tables.h --include include/linux/mm_types.h
+Acked-by: Baruch Siach <baruch@tkos.co.il>
 
-virtual context
-virtual report
+Thanks,
+baruch
 
-@r@
-typedef bool, u8, u16, u32, u64, s8, s16, s32, s64, __u64, dma_addr_t,
-Elf32_Addr, Elf64_Addr;
-{unsigned long, size_t} ev;
-{short, int, long, s16, s32, ssize_t} ew;
-{char, unsigned char, unsigned short, unsigned int, long long, unsigned
-long long, bool, u8, u16, u32, u64, s64, __u64, dma_addr_t, Elf32_Addr,
-Elf64_Addr} ei;
-expression eu;
-position p;
-@@
+> ---
+>  drivers/tty/serial/digicolor-usart.c | 9 +++++----
+>  1 file changed, 5 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/digicolor-usart.c b/drivers/tty/serial/digicolor-usart.c
+> index a80cdad114f3..02ad6953b167 100644
+> --- a/drivers/tty/serial/digicolor-usart.c
+> +++ b/drivers/tty/serial/digicolor-usart.c
+> @@ -453,7 +453,7 @@ static struct uart_driver digicolor_uart = {
+>  static int digicolor_uart_probe(struct platform_device *pdev)
+>  {
+>  	struct device_node *np = pdev->dev.of_node;
+> -	int ret, index;
+> +	int irq, ret, index;
+>  	struct digicolor_port *dp;
+>  	struct resource *res;
+>  	struct clk *uart_clk;
+> @@ -481,9 +481,10 @@ static int digicolor_uart_probe(struct platform_device *pdev)
+>  	if (IS_ERR(dp->port.membase))
+>  		return PTR_ERR(dp->port.membase);
+>  
+> -	dp->port.irq = platform_get_irq(pdev, 0);
+> -	if (IS_ERR_VALUE(dp->port.irq))
+> -		return dp->port.irq;
+> +	irq = platform_get_irq(pdev, 0);
+> +	if (irq < 0)
+> +		return irq;
+> +	dp->port.irq = irq;
+>  
+>  	dp->port.iotype = UPIO_MEM;
+>  	dp->port.uartclk = clk_get_rate(uart_clk);
 
-IS_ERR_VALUE(\(ev \| ew \| ei \| eu \))@p
-
-@script:python depends on report@
-p << r.p = [];
-ev << r.ev = "";
-ew << r.ew = "";
-ei << r.ei = "";
-eu << r.eu = "";
-@@
-
-t = ""
-if ev: t = "correct"
-if ew: t = "signed"
-if ei: t = "incorrect"
-if eu: t = "unknown"
-
-
-e = ev + ew + ei + eu;
-if t:
-    msg = "WARNING: %s argument type in IS_ERR_VALUE(%s)" % (t, e)
-    coccilib.report.print_report(p[0], msg)
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
