@@ -1,50 +1,35 @@
-From: ashoks@broadcom.com (Ashok Kumar)
-Date: Thu, 11 Feb 2016 05:38:53 -0800
-Subject: [PATCH] irqchip/gic-v3-its: Fix double EOIR write for LPI in
- EOImode==1
-Message-ID: <1455197933-26141-1-git-send-email-ashoks@broadcom.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 11 Feb 2016 13:41:48 +0000
+Subject: [PATCH v2 0/7] irqchip: introduce the Alpine MSIX driver
+In-Reply-To: <1455110583-19515-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1455110583-19515-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <56BC8F9C.3060505@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CPU receives SError exception EOI1_NO_INTS_ACTIVE when EOIR
-is written twice in gic_handle_irq and in its_eoi_irq for a
-single LPI in EOImode == 1.
+Antoine,
 
-Now irq_eoi of its_irq_chip calls parent irqchip's(gic_eoimode1_chip/gic_chip)
-irq_eoi handler which handles EOImode 0 and 1 separately.
+On 10/02/16 13:22, Antoine Tenart wrote:
+> Hi all,
+> 
+> This series introduce the Alpine MSIX driver, and enables it in both
+> the Alpine v1 and Alpine v2 device trees.
+> 
+> This series depends on "[PATCH v2 0/3] arm64: introduce the Alpine support":
+> https://lkml.org/lkml/2016/2/10/83
+> 
+> You can find the series at:
+> https://github.com/atenart/linux.git 4.5-rc1/alpinev2-msix
 
-This is introduced by
-commit 0b996fd35957a ("irqchip/GICv3: Convert to EOImode == 1")
+So I'm quite happy with this as it is (modulo the documentation fix on
+patch 3). I can take the first 3 patches through my GIC tree, but the
+last 4 patches depend on your other series.
 
-Signed-off-by: Ashok Kumar <ashoks@broadcom.com>
----
- drivers/irqchip/irq-gic-v3-its.c | 7 +------
- 1 file changed, 1 insertion(+), 6 deletions(-)
+Would it be a problem to get these 4 patches merged after 4.6-rc1, so
+that all the code can be merged before?
 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index e23d1d1..a159529f 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -597,11 +597,6 @@ static void its_unmask_irq(struct irq_data *d)
- 	lpi_set_config(d, true);
- }
- 
--static void its_eoi_irq(struct irq_data *d)
--{
--	gic_write_eoir(d->hwirq);
--}
--
- static int its_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
- 			    bool force)
- {
-@@ -638,7 +633,7 @@ static struct irq_chip its_irq_chip = {
- 	.name			= "ITS",
- 	.irq_mask		= its_mask_irq,
- 	.irq_unmask		= its_unmask_irq,
--	.irq_eoi		= its_eoi_irq,
-+	.irq_eoi		= irq_chip_eoi_parent,
- 	.irq_set_affinity	= its_set_affinity,
- 	.irq_compose_msi_msg	= its_irq_compose_msi_msg,
- };
+Thanks,
+
+	M.
 -- 
-2.1.0
+Jazz is not dead. It just smells funny...
