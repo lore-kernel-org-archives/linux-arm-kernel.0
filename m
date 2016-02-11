@@ -1,71 +1,54 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 11 Feb 2016 11:32:30 +0100
-Subject: [PATCH 11/11] arm64: dts: add Pine64 support
-In-Reply-To: <56B47391.1040709@arm.com>
-References: <1454348370-3816-1-git-send-email-andre.przywara@arm.com>
- <1454348370-3816-12-git-send-email-andre.przywara@arm.com>
- <20160205090337.GB1139@lukather> <56B47391.1040709@arm.com>
-Message-ID: <20160211103230.GM31506@lukather>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 11 Feb 2016 18:36:02 +0800
+Subject: [PATCH] dmaengine: edma: Implement device_synchronize callback
+In-Reply-To: <1455180872-2620-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <201602111850.mRht8PrT%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andre,
+Hi Peter,
 
-On Fri, Feb 05, 2016 at 10:04:01AM +0000, Andre Przywara wrote:
-> >> +&uart0 {
-> >> +	pinctrl-names = "default";
-> >> +	pinctrl-0 = <&uart0_pins_a>;
-> >> +	status = "okay";
-> >> +};
-> >> +
-> >> +&uart2 {
-> >> +	pinctrl-names = "default";
-> >> +	pinctrl-0 = <&uart2_pins>;
-> >> +	status = "okay";
-> >> +};
-> >> +
-> >> +&uart3 {
-> >> +	pinctrl-names = "default";
-> >> +	pinctrl-0 = <&uart3_pins_a>;
-> >> +	status = "okay";
-> >> +};
-> >> +
-> >> +&uart4 {
-> >> +	pinctrl-names = "default";
-> >> +	pinctrl-0 = <&uart4_pins>;
-> >> +	status = "okay";
-> >> +};
-> > 
-> > Our policy for boards with "open" pin headers the user can plug
-> > anything he wants is that unless the pin is explicitly dedicated to
-> > that usage, we simply leave them aside so that we don't enforce
-> > anything.
-> 
-> Makes sense, I just wonder what a user is expected to do if she wants to
-> use the serial ports?
-> Hack the DT?
-> Use U-Boot to create those nodes on the fly?
-> Use overlays?
-> Directly setup serial ports from userland? (thinking of this bloody
-> mechanism x86 (used to?) have)
+[auto build test ERROR on slave-dma/next]
+[also build test ERROR on v4.5-rc3 next-20160211]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 
-Until we have a configfs overlay interface, then yeah, we have to hack
-the DT.
+url:    https://github.com/0day-ci/linux/commits/Peter-Ujfalusi/dmaengine-edma-Implement-device_synchronize-callback/20160211-170011
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/vkoul/slave-dma.git next
+config: arm-multi_v7_defconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-That's not very much different than what you'd have to do if you
-wanted some other bus exposed on those pins though.
+All errors (new ones prefixed by >>):
 
-Thanks!
-Maxime
+   drivers/dma/edma.c: In function 'edma_synchronize':
+>> drivers/dma/edma.c:874:41: error: 'chan' undeclared (first use in this function)
+     struct edma_chan *echan = to_edma_chan(chan);
+                                            ^
+   drivers/dma/edma.c:874:41: note: each undeclared identifier is reported only once for each function it appears in
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+vim +/chan +874 drivers/dma/edma.c
+
+   868	
+   869		return 0;
+   870	}
+   871	
+   872	static void edma_synchronize(struct dma_chan *c)
+   873	{
+ > 874		struct edma_chan *echan = to_edma_chan(chan);
+   875	
+   876		vchan_synchronize(&echan->vchan);
+   877	}
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160211/c788c0f6/attachment.sig>
+Name: .config.gz
+Type: application/octet-stream
+Size: 36561 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160211/f59a88ae/attachment-0001.obj>
