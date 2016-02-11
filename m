@@ -1,159 +1,115 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Thu, 11 Feb 2016 22:23:18 +0100
-Subject: [PATCH 4/4] dmaengine: pxa_dma: fix the maximum requestor line
-In-Reply-To: <1455225798-9510-1-git-send-email-robert.jarzmik@free.fr>
-References: <1455225798-9510-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <1455225798-9510-5-git-send-email-robert.jarzmik@free.fr>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Thu, 11 Feb 2016 13:35:42 -0800
+Subject: [PATCH v6 7/7] clk: mediatek: Enable critical clocks for MT2701
+In-Reply-To: <1454665050-37776-8-git-send-email-jamesjj.liao@mediatek.com>
+References: <1454665050-37776-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1454665050-37776-8-git-send-email-jamesjj.liao@mediatek.com>
+Message-ID: <20160211213542.26445.82983@quark.deferred.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current number of requestor lines is limited to 31. This was an
-error of a previous commit, as this number is platform dependent, and is
-actually :
- - for pxa25x: 40 requestor lines
- - for pxa27x: 75 requestor lines
- - for pxa3xx: 100 requestor lines
+Hi James,
 
-The previous testing did not reveal the faulty constant as on pxa[23]xx
-platforms, only camera, MSL and USB are above requestor 32, and in these
-only the camera has a driver using dma.
+Quoting James Liao (2016-02-05 01:37:30)
+> Some system clocks should be turned on by default on MT2701.
+> This patch enable these clocks when related clocks have
+> been registered.
+> 
+> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+> ---
+>  drivers/clk/mediatek/clk-mt2701.c | 23 +++++++++++++++++++++--
+>  1 file changed, 21 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/clk/mediatek/clk-mt2701.c b/drivers/clk/mediatek/clk-mt2701.c
+> index 01722e0..f7b4d52 100644
+> --- a/drivers/clk/mediatek/clk-mt2701.c
+> +++ b/drivers/clk/mediatek/clk-mt2701.c
+> @@ -573,6 +573,21 @@ static const struct mtk_gate top_clks[] __initconst = {
+>         GATE_TOP_AUD(CLK_TOP_AUD_I2S6_MCLK, "aud_i2s6_mclk", "aud_k6_src_div", 28),
+>  };
+>  
+> +static struct clk_onecell_data *top_clk_data __initdata;
+> +static struct clk_onecell_data *pll_clk_data __initdata;
+> +
+> +static void __init mtk_clk_enable_critical(void)
+> +{
+> +       if (!top_clk_data || !pll_clk_data)
+> +               return;
+> +
+> +       clk_prepare_enable(pll_clk_data->clks[CLK_APMIXED_ARMPLL]);
+> +       clk_prepare_enable(top_clk_data->clks[CLK_TOP_AXI_SEL]);
+> +       clk_prepare_enable(top_clk_data->clks[CLK_TOP_MEM_SEL]);
+> +       clk_prepare_enable(top_clk_data->clks[CLK_TOP_DDRPHYCFG_SEL]);
+> +       clk_prepare_enable(top_clk_data->clks[CLK_TOP_RTC_SEL]);
+> +}
 
-Fixes: e87ffbdf0697 ("dmaengine: pxa_dma: fix the no-requestor case")
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
----
- drivers/dma/pxa_dma.c | 33 ++++++++++++++++++++++-----------
- 1 file changed, 22 insertions(+), 11 deletions(-)
+I think we're close to having a better solution. Please see this patch
+series[0] and let me know if it provides a better way for you to enable
+these critical clocks instead of the open-coded solution.
 
-diff --git a/drivers/dma/pxa_dma.c b/drivers/dma/pxa_dma.c
-index ca6c088edc8a..bc51d6271373 100644
---- a/drivers/dma/pxa_dma.c
-+++ b/drivers/dma/pxa_dma.c
-@@ -122,6 +122,7 @@ struct pxad_chan {
- struct pxad_device {
- 	struct dma_device		slave;
- 	int				nr_chans;
-+	int				nr_requestors;
- 	void __iomem			*base;
- 	struct pxad_phy			*phys;
- 	spinlock_t			phy_lock;	/* Phy association */
-@@ -473,7 +474,7 @@ static void pxad_free_phy(struct pxad_chan *chan)
- 		return;
- 
- 	/* clear the channel mapping in DRCMR */
--	if (chan->drcmr <= DRCMR_CHLNUM) {
-+	if (chan->drcmr <= pdev->nr_requestors) {
- 		reg = pxad_drcmr(chan->drcmr);
- 		writel_relaxed(0, chan->phy->base + reg);
- 	}
-@@ -509,6 +510,7 @@ static bool is_running_chan_misaligned(struct pxad_chan *chan)
- 
- static void phy_enable(struct pxad_phy *phy, bool misaligned)
- {
-+	struct pxad_device *pdev;
- 	u32 reg, dalgn;
- 
- 	if (!phy->vchan)
-@@ -518,7 +520,8 @@ static void phy_enable(struct pxad_phy *phy, bool misaligned)
- 		"%s(); phy=%p(%d) misaligned=%d\n", __func__,
- 		phy, phy->idx, misaligned);
- 
--	if (phy->vchan->drcmr <= DRCMR_CHLNUM) {
-+	pdev = to_pxad_dev(phy->vchan->vc.chan.device);
-+	if (phy->vchan->drcmr <= pdev->nr_requestors) {
- 		reg = pxad_drcmr(phy->vchan->drcmr);
- 		writel_relaxed(DRCMR_MAPVLD | phy->idx, phy->base + reg);
- 	}
-@@ -914,6 +917,7 @@ static void pxad_get_config(struct pxad_chan *chan,
- {
- 	u32 maxburst = 0, dev_addr = 0;
- 	enum dma_slave_buswidth width = DMA_SLAVE_BUSWIDTH_UNDEFINED;
-+	struct pxad_device *pdev = to_pxad_dev(chan->vc.chan.device);
- 
- 	*dcmd = 0;
- 	if (dir == DMA_DEV_TO_MEM) {
-@@ -922,7 +926,7 @@ static void pxad_get_config(struct pxad_chan *chan,
- 		dev_addr = chan->cfg.src_addr;
- 		*dev_src = dev_addr;
- 		*dcmd |= PXA_DCMD_INCTRGADDR;
--		if (chan->drcmr <= DRCMR_CHLNUM)
-+		if (chan->drcmr <= pdev->nr_requestors)
- 			*dcmd |= PXA_DCMD_FLOWSRC;
- 	}
- 	if (dir == DMA_MEM_TO_DEV) {
-@@ -931,7 +935,7 @@ static void pxad_get_config(struct pxad_chan *chan,
- 		dev_addr = chan->cfg.dst_addr;
- 		*dev_dst = dev_addr;
- 		*dcmd |= PXA_DCMD_INCSRCADDR;
--		if (chan->drcmr <= DRCMR_CHLNUM)
-+		if (chan->drcmr <= pdev->nr_requestors)
- 			*dcmd |= PXA_DCMD_FLOWTRG;
- 	}
- 	if (dir == DMA_MEM_TO_MEM)
-@@ -1341,13 +1345,15 @@ static struct dma_chan *pxad_dma_xlate(struct of_phandle_args *dma_spec,
- 
- static int pxad_init_dmadev(struct platform_device *op,
- 			    struct pxad_device *pdev,
--			    unsigned int nr_phy_chans)
-+			    unsigned int nr_phy_chans,
-+			    unsigned int nr_requestors)
- {
- 	int ret;
- 	unsigned int i;
- 	struct pxad_chan *c;
- 
- 	pdev->nr_chans = nr_phy_chans;
-+	pdev->nr_requestors = nr_requestors;
- 	INIT_LIST_HEAD(&pdev->slave.channels);
- 	pdev->slave.device_alloc_chan_resources = pxad_alloc_chan_resources;
- 	pdev->slave.device_free_chan_resources = pxad_free_chan_resources;
-@@ -1382,7 +1388,7 @@ static int pxad_probe(struct platform_device *op)
- 	const struct of_device_id *of_id;
- 	struct mmp_dma_platdata *pdata = dev_get_platdata(&op->dev);
- 	struct resource *iores;
--	int ret, dma_channels = 0;
-+	int ret, dma_channels = 0, nb_requestors = 0;
- 	const enum dma_slave_buswidth widths =
- 		DMA_SLAVE_BUSWIDTH_1_BYTE   | DMA_SLAVE_BUSWIDTH_2_BYTES |
- 		DMA_SLAVE_BUSWIDTH_4_BYTES;
-@@ -1399,13 +1405,17 @@ static int pxad_probe(struct platform_device *op)
- 		return PTR_ERR(pdev->base);
- 
- 	of_id = of_match_device(pxad_dt_ids, &op->dev);
--	if (of_id)
-+	if (of_id) {
- 		of_property_read_u32(op->dev.of_node, "#dma-channels",
- 				     &dma_channels);
--	else if (pdata && pdata->dma_channels)
-+		of_property_read_u32(op->dev.of_node, "#requestors",
-+				     &nb_requestors);
-+	} else if (pdata && pdata->dma_channels) {
- 		dma_channels = pdata->dma_channels;
--	else
-+		nb_requestors = pdata->nb_requestors;
-+	} else {
- 		dma_channels = 32;	/* default 32 channel */
-+	}
- 
- 	dma_cap_set(DMA_SLAVE, pdev->slave.cap_mask);
- 	dma_cap_set(DMA_MEMCPY, pdev->slave.cap_mask);
-@@ -1423,7 +1433,7 @@ static int pxad_probe(struct platform_device *op)
- 	pdev->slave.descriptor_reuse = true;
- 
- 	pdev->slave.dev = &op->dev;
--	ret = pxad_init_dmadev(op, pdev, dma_channels);
-+	ret = pxad_init_dmadev(op, pdev, dma_channels, nb_requestors);
- 	if (ret) {
- 		dev_err(pdev->slave.dev, "unable to register\n");
- 		return ret;
-@@ -1442,7 +1452,8 @@ static int pxad_probe(struct platform_device *op)
- 
- 	platform_set_drvdata(op, pdev);
- 	pxad_init_debugfs(pdev);
--	dev_info(pdev->slave.dev, "initialized %d channels\n", dma_channels);
-+	dev_info(pdev->slave.dev, "initialized %d channels on %d requestors\n",
-+		 dma_channels, nb_requestors);
- 	return 0;
- }
- 
--- 
-2.1.4
+[0] http://lkml.kernel.org/r/<1455225554-13267-1-git-send-email-mturquette@baylibre.com>
+
+Regards,
+Mike
+
+> +
+>  static void __init mtk_topckgen_init(struct device_node *node)
+>  {
+>         struct clk_onecell_data *clk_data;
+> @@ -585,7 +600,7 @@ static void __init mtk_topckgen_init(struct device_node *node)
+>                 return;
+>         }
+>  
+> -       clk_data = mtk_alloc_clk_data(CLK_TOP_NR);
+> +       top_clk_data = clk_data = mtk_alloc_clk_data(CLK_TOP_NR);
+>  
+>         mtk_clk_register_fixed_clks(top_fixed_clks, ARRAY_SIZE(top_fixed_clks),
+>                                                                 clk_data);
+> @@ -606,6 +621,8 @@ static void __init mtk_topckgen_init(struct device_node *node)
+>         if (r)
+>                 pr_err("%s(): could not register clock provider: %d\n",
+>                         __func__, r);
+> +
+> +       mtk_clk_enable_critical();
+
+So you call the function here, and ...
+>  }
+>  CLK_OF_DECLARE(mtk_topckgen, "mediatek,mt2701-topckgen", mtk_topckgen_init);
+>  
+> @@ -1201,7 +1218,7 @@ static void __init mtk_apmixedsys_init(struct device_node *node)
+>         struct clk_onecell_data *clk_data;
+>         int r;
+>  
+> -       clk_data = mtk_alloc_clk_data(ARRAY_SIZE(apmixed_plls));
+> +       pll_clk_data = clk_data = mtk_alloc_clk_data(ARRAY_SIZE(apmixed_plls));
+>         if (!clk_data)
+>                 return;
+>  
+> @@ -1212,6 +1229,8 @@ static void __init mtk_apmixedsys_init(struct device_node *node)
+>         if (r)
+>                 pr_err("%s(): could not register clock provider: %d\n",
+>                         __func__, r);
+> +
+> +       mtk_clk_enable_critical();
+
+... here as well. So the prepare_count and enable_count will be 2? I'm
+not sure that this makes sense. If you have different clocks that need
+to be enabled at different times (due to the split registration scheme
+that you employ in this driver) then why not pass an array of those
+clocks into mtk_clk_enable_critical?
+
+Anyways, like I mentioned above I think we're close to a solution to
+handle this in the framework.
+
+One question: do you ever want these critical clocks to be gated by a
+driver, or do you want them always on, forever?
+
+Regards,
+Mike
+
+>  }
+>  CLK_OF_DECLARE(mtk_apmixedsys, "mediatek,mt2701-apmixedsys",
+>                                                         mtk_apmixedsys_init);
+> -- 
+> 1.9.1
+> 
