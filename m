@@ -1,78 +1,52 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 10 Feb 2016 16:22:47 -0800
-Subject: [PATCH] ARM: dts: am335x/am57xx: replace gpio-key,wakeup with
- wakeup-source property
-In-Reply-To: <1454968553-12088-1-git-send-email-sudeep.holla@arm.com>
-References: <1454968553-12088-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <20160211002247.GO19432@atomide.com>
+Date: Wed, 10 Feb 2016 16:25:58 -0800
+Subject: [PATCH] ARM: DTS: am57xx-beagle-x15: Select SYS_CLK2 for audio
+ clocks
+In-Reply-To: <1455018417-2608-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1455018417-2608-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20160211002558.GP19432@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sudeep Holla <sudeep.holla@arm.com> [160208 13:57]:
-> Commit 3efda00129bd ("ARM: dts: am335x: replace gpio-key,wakeup with
-> wakeup-source property") replaces all the legacy "gpio-key,wakeup" with
-> the unified  "wakeup-source" property to prevent any further copy-paste
-> duplication.
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [160209 03:48]:
+> The tlv320aic3104 codec's master clock is coming from the SoC's CLKOUT2.
+> Select the SYS_CLK2 (via divider) as parent clock for CLKOUT2 and select
+> the same clock (SYS_CLK2) for McASP3 AHCLKX clock as well.
+> SYS_CLK2 is sourced from an external oscillator running 22.5792MHz and it
+> is coming in to the SoC via the X1_OSC1.
 > 
-> However couple of use of these legacy property sneaked in during the
-> merge window. This patch replaces them too.
-> 
-> Cc: "Beno?t Cousson" <bcousson@baylibre.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: linux-omap at vger.kernel.org
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> ---
->  arch/arm/boot/dts/am335x-shc.dts          | 4 ++--
->  arch/arm/boot/dts/am57xx-cl-som-am57x.dts | 2 +-
->  2 files changed, 3 insertions(+), 3 deletions(-)
-> 
-> Hi Tony,
-> 
-> I see these files got introduced during v4.5 merge window and we could
-> not stop the copy-paste from the earlier versions files from which they
-> were copied.
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 
-OK thanks for checking, applying this into omap-for-v4.5/fixes.
-
-Regards,
+Applying into omap-for-v4.5/fixes thanks.
 
 Tony
 
-> diff --git a/arch/arm/boot/dts/am335x-shc.dts b/arch/arm/boot/dts/am335x-shc.dts
-> index 1b5b044fcd91..865de8500f1c 100644
-> --- a/arch/arm/boot/dts/am335x-shc.dts
-> +++ b/arch/arm/boot/dts/am335x-shc.dts
-> @@ -46,7 +46,7 @@
->  			gpios = <&gpio1 29 GPIO_ACTIVE_HIGH>;
->  			linux,code = <KEY_BACK>;
->  			debounce-interval = <1000>;
-> -			gpio-key,wakeup;
-> +			wakeup-source;
->  		};
+> ---
+>  arch/arm/boot/dts/am57xx-beagle-x15.dts | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15.dts
+> index c37a5193f199..592e65c3a4e0 100644
+> --- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
+> +++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
+> @@ -173,6 +173,8 @@
 >  
->  		front_button {
-> @@ -54,7 +54,7 @@
->  			gpios = <&gpio1 25 GPIO_ACTIVE_HIGH>;
->  			linux,code = <KEY_FRONT>;
->  			debounce-interval = <1000>;
-> -			gpio-key,wakeup;
-> +			wakeup-source;
+>  		sound0_master: simple-audio-card,codec {
+>  			sound-dai = <&tlv320aic3104>;
+> +			assigned-clocks = <&clkoutmux2_clk_mux>;
+> +			assigned-clock-parents = <&sys_clk2_dclk_div>;
+>  			clocks = <&clkout2_clk>;
 >  		};
 >  	};
+> @@ -795,6 +797,8 @@
+>  	pinctrl-names = "default", "sleep";
+>  	pinctrl-0 = <&mcasp3_pins_default>;
+>  	pinctrl-1 = <&mcasp3_pins_sleep>;
+> +	assigned-clocks = <&mcasp3_ahclkx_mux>;
+> +	assigned-clock-parents = <&sys_clkin2>;
+>  	status = "okay";
 >  
-> diff --git a/arch/arm/boot/dts/am57xx-cl-som-am57x.dts b/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
-> index c53882643ae9..497eb07ced19 100644
-> --- a/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
-> +++ b/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
-> @@ -545,7 +545,7 @@
->  		ti,debounce-tol = /bits/ 16 <10>;
->  		ti,debounce-rep = /bits/ 16 <1>;
->  
-> -		linux,wakeup;
-> +		wakeup-source;
->  	};
->  };
->  
+>  	op-mode = <0>;	/* MCASP_IIS_MODE */
 > -- 
-> 1.9.1
+> 2.7.1
 > 
