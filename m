@@ -1,84 +1,110 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 11 Feb 2016 18:22:18 +0100
-Subject: [GIT PULL] Renesas ARM Based SoC DT Updates for v4.6
-In-Reply-To: <CAOesGMjeyah0qpwWR=RJOF61dVGGqkxmGUJrE0qYNuCOwoPFjQ@mail.gmail.com>
-References: <cover.1454595846.git.horms+renesas@verge.net.au>
- <20160208215130.GJ25468@localhost>
- <CAMuHMdVWYVEHTvGYEZkEXpEaMzfZ_NfMAb0o8HtVcJM+GDdfmA@mail.gmail.com>
- <20160209183921.GA1089@verge.net.au>
- <CAOesGMjeyah0qpwWR=RJOF61dVGGqkxmGUJrE0qYNuCOwoPFjQ@mail.gmail.com>
-Message-ID: <20160211172218.GD12080@verge.net.au>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 11 Feb 2016 09:26:32 -0800
+Subject: [PATCH 1/7] mmc: omap_hsmmc: Fix PM regression with deferred
+ probe for pm_runtime_reinit
+In-Reply-To: <CAPDyKFo4Jyjwyvr3P5VHfDhQ87K9mnR01N-NtKz-yx2ycnfOLg@mail.gmail.com>
+References: <1455145370-20301-1-git-send-email-tony@atomide.com>
+ <1455145370-20301-2-git-send-email-tony@atomide.com>
+ <CAPDyKFpAcsfLgtu93P45fTEg11MjdGwREcyeGSS7vt6GWbNu_w@mail.gmail.com>
+ <20160211150240.GR19432@atomide.com>
+ <CAPDyKFo4Jyjwyvr3P5VHfDhQ87K9mnR01N-NtKz-yx2ycnfOLg@mail.gmail.com>
+Message-ID: <20160211172632.GT19432@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 10, 2016 at 07:55:30PM -0800, Olof Johansson wrote:
-> Hi,
-> 
-> On Tue, Feb 9, 2016 at 10:39 AM, Simon Horman <horms@verge.net.au> wrote:
-> > On Tue, Feb 09, 2016 at 08:39:31AM +0100, Geert Uytterhoeven wrote:
-> >> Hi Olof,
-> >>
-> >> On Mon, Feb 8, 2016 at 10:51 PM, Olof Johansson <olof@lixom.net> wrote:
-> >> > On Thu, Feb 04, 2016 at 03:30:02PM +0100, Simon Horman wrote:
-> >> >> Please consider these Renesas ARM based SoC DT updates for v4.6.
-> >> >>
-> >> >>
-> >> >> The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
-> >> >>
-> >> >>   Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
-> >> >>
-> >> >> are available in the git repository at:
-> >> >>
-> >> >>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-for-v4.6
-> >> >>
-> >> >> for you to fetch changes up to d7a11140d0a659e5c1f83627792f95b6713030a2:
-> >> >>
-> >> >>   ARM: dts: silk: Enable SCIF_CLK frequency and pins (2016-02-02 14:02:28 +0100)
-> >> >>
-> >> >> ----------------------------------------------------------------
-> >> >> Renesas ARM Based SoC DT Updates for v4.6
-> >> >>
-> >> >> * Use SCIF and USBHS fallback compatibility strings
-> >> >> * Add Baud Rate Generator (BRG) support for (H)SCIF
-> >> >> * Enable SCIF_CLK frequency and pins
-> >> >> * Use GIC_* defines
-> >> >> * Migrate to generic l2c OF initialization on r8a7740
-> >> >> * Enable audio on r8a7793/gose
-> >> >> * Enable HDMI vidio out on r8a7793
-> >> >> * Enable i2c on r8a7793/gose
-> >> >> * Enable QSPI on alt
-> >> >> * Enable GPIO keys and leds on gise
-> >> >> * Enable audio on porter
-> >> >> * Enable DU on porter
-> >> >>
-> >> >> ----------------------------------------------------------------
-> >> >> Geert Uytterhoeven (22):
-> >> >>       ARM: shmobile: r8a7740: Migrate to generic l2c OF initialization
-> >> >>       ARM: shmobile: r8a7740: Remove mapping of L2 cache controller registers
+* Ulf Hansson <ulf.hansson@linaro.org> [160211 07:14]:
+> On 11 February 2016 at 16:02, Tony Lindgren <tony@atomide.com> wrote:
+> > * Ulf Hansson <ulf.hansson@linaro.org> [160211 02:19]:
+> >> On 11 February 2016 at 00:02, Tony Lindgren <tony@atomide.com> wrote:
 > >> >
-> >> > Hmm. Those aren't DT changes. There's also nothing for r8a7740 to convert
-> >> > L2 init to DT earlier in this branch, which makes this look like it's just
-> >> > a generic cleanup that should go in independently in your cleanup branch.
-> >> >
-> >> > Or am I missing some dependency that isn't obvious? If I'm not, then please
-> >> > respin this branch and move those to the place they belong (cleanup).
+> >> > Ulf, I'd like to merge this along with other related fixes via the
+> >> > ARM SoC tree if no objections, please review and ack if this look OK
+> >> > to you.
 > >>
-> >> The dependency is commit 374e70075e58acfe ("ARM: shmobile: r8a7740 dtsi: Add
-> >> L2 cache-controller node"), which has already entered mainline in v4.5-rc1.
+> >> I have some other omap_hsmmc patches queued for 4.6, so I prefer to
+> >> send this via my mmc tree.
 > >>
-> >> So I agree with your comments.
+> >> I guess that's okay as well!?
 > >
-> > Sorry for the mix-up.
-> > I'll see about respinning this.
+> > Naturally yes, please go ahead thanks!
 > 
-> I've merged the patches, so respinning won't work. Instead, please
-> follow up with incremental fixes instead.
+> Okay!
+> 
+> BTW, did you notice my other comments to the patch?
+> 
+> I can fix them before applying, unless you want to send a v2?
 
-Hi Olof,
+Oh sorry, no I missed the rest of your comments again, I really
+need to recalibrate my reading habits obviously if I keep
+missing comments on regular basis..
 
-sorry once again for the mix-up.
+You comments make sense to me. Below is the patch with only
+minimal changes. Seems to work just fine and hit off mode for
+suspend too.
 
-If you have already pulled this pull request then I am happy.
-However, I don't see it in the arm-soc tree and if you haven't pulled it
-and it isn't too much trouble I would like to re-spin as I have a further
-r8a7740 cleanup in the pipeline.
+Regards,
+
+Tony
+
+8< -------------------
+>From eb3c93421f01fb6198f76127262a92b527dd214c Mon Sep 17 00:00:00 2001
+From: Tony Lindgren <tony@atomide.com>
+Date: Tue, 9 Feb 2016 09:31:10 -0800
+Subject: [PATCH] mmc: omap_hsmmc: Fix PM regression with deferred probe for
+ pm_runtime_reinit
+
+Commit 5de85b9d57ab ("PM / runtime: Re-init runtime PM states at probe
+error and driver unbind") introduced pm_runtime_reinit() that is used
+to reinitialize PM runtime after -EPROBE_DEFER. This allows shutting
+down the device after a failed probe.
+
+However, for drivers using pm_runtime_use_autosuspend() this can cause
+a state where suspend callback is never called after -EPROBE_DEFER.
+On the following device driver probe, hardware state is different from
+the PM runtime state causing omap_device to produce the following
+error:
+
+omap_device_enable() called from invalid state 1
+
+And with omap_device and omap hardware being picky for PM, this will
+block any deeper idle states in hardware.
+
+The solution is to fix the drivers to follow the PM runtime documentation:
+
+1. For sections of code that needs the device disabled, use
+   pm_runtime_put_sync_suspend() if pm_runtime_set_autosuspend() has
+   been set.
+
+2. For driver exit code, use pm_runtime_dont_use_autosuspend() before
+   pm_runtime_put_sync() if pm_runtime_use_autosuspend() has been
+   set.
+
+Fixes: 5de85b9d57ab ("PM / runtime: Re-init runtime PM states at probe
+error and driver unbind")
+Cc: linux-mmc at vger.kernel.org
+Cc: Alan Stern <stern@rowland.harvard.edu>
+Cc: Kevin Hilman <khilman@baylibre.com>
+Cc: Nishanth Menon <nm@ti.com>
+Cc: Rafael J. Wysocki <rafael@kernel.org>
+Cc: Ulf Hansson <ulf.hansson@linaro.org>
+Cc: Tero Kristo <t-kristo@ti.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+--- a/drivers/mmc/host/omap_hsmmc.c
++++ b/drivers/mmc/host/omap_hsmmc.c
+@@ -2232,6 +2232,7 @@ err_irq:
+ 		dma_release_channel(host->tx_chan);
+ 	if (host->rx_chan)
+ 		dma_release_channel(host->rx_chan);
++	pm_runtime_dont_use_autosuspend(host->dev);
+ 	pm_runtime_put_sync(host->dev);
+ 	pm_runtime_disable(host->dev);
+ 	if (host->dbclk)
+@@ -2253,6 +2254,7 @@ static int omap_hsmmc_remove(struct platform_device *pdev)
+ 	dma_release_channel(host->tx_chan);
+ 	dma_release_channel(host->rx_chan);
+ 
++	pm_runtime_dont_use_autosuspend(host->dev);
+ 	pm_runtime_put_sync(host->dev);
+ 	pm_runtime_disable(host->dev);
+ 	device_init_wakeup(&pdev->dev, false);
