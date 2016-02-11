@@ -1,32 +1,50 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Thu, 11 Feb 2016 08:55:45 +0000
-Subject: [PATCH V3] ARM64: tegra: Add support for Google Pixel C
-In-Reply-To: <CAAVeFuJt+VdJb4S3PC-RXVFYhLnq7yF+dV_w5or=0ebG+LnnGw@mail.gmail.com>
-References: <1454949199-27050-1-git-send-email-jonathanh@nvidia.com>
- <1455020809-17531-1-git-send-email-jonathanh@nvidia.com>
- <CAAVeFuJt+VdJb4S3PC-RXVFYhLnq7yF+dV_w5or=0ebG+LnnGw@mail.gmail.com>
-Message-ID: <56BC4C91.6070409@nvidia.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 11 Feb 2016 10:54:32 +0200
+Subject: [PATCH] dmaengine: edma: Implement device_synchronize callback
+Message-ID: <1455180872-2620-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+We need the callback to support the dmaengine_terminate_sync().
 
-On 11/02/16 08:32, Alexandre Courbot wrote:
-> On Tue, Feb 9, 2016 at 9:26 PM, Jon Hunter <jonathanh@nvidia.com> wrote:
->> Add initial device-tree support for Google Pixel C (a.k.a. Smaug) based
->> upon Tegra210 SoC with 3 GiB of LPDDR4 RAM.
->>
->> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
-> 
-> I need to add "clk_ignore_unused=1" to the bootargs in order to avoid
-> a hang during boot, but otherwise can reach a serial console.
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+---
+ drivers/dma/edma.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-Were you testing on -next? If so, you should not need that. Otherwise,
-please make sure you have this patch [0]. Thierry has included this in a
-clock fixes series that should turn up in main soon.
-
-> Tested-by: Alexandre Courbot <acourbot@nvidia.com>
-
-Thanks
-Jon
-
-[0] https://lkml.org/lkml/2015/12/18/390
+diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+index 2dac314a2d7a..ea0d919a3318 100644
+--- a/drivers/dma/edma.c
++++ b/drivers/dma/edma.c
+@@ -869,6 +869,13 @@ static int edma_terminate_all(struct dma_chan *chan)
+ 	return 0;
+ }
+ 
++static void edma_synchronize(struct dma_chan *c)
++{
++	struct edma_chan *echan = to_edma_chan(chan);
++
++	vchan_synchronize(&echan->vchan);
++}
++
+ static int edma_slave_config(struct dma_chan *chan,
+ 	struct dma_slave_config *cfg)
+ {
+@@ -1808,6 +1815,7 @@ static void edma_dma_init(struct edma_cc *ecc, bool legacy_mode)
+ 	s_ddev->device_pause = edma_dma_pause;
+ 	s_ddev->device_resume = edma_dma_resume;
+ 	s_ddev->device_terminate_all = edma_terminate_all;
++	s_ddev->device_synchronize = edma_synchronize;
+ 
+ 	s_ddev->src_addr_widths = EDMA_DMA_BUSWIDTHS;
+ 	s_ddev->dst_addr_widths = EDMA_DMA_BUSWIDTHS;
+@@ -1833,6 +1841,7 @@ static void edma_dma_init(struct edma_cc *ecc, bool legacy_mode)
+ 		m_ddev->device_pause = edma_dma_pause;
+ 		m_ddev->device_resume = edma_dma_resume;
+ 		m_ddev->device_terminate_all = edma_terminate_all;
++		m_ddev->device_synchronize = edma_synchronize;
+ 
+ 		m_ddev->src_addr_widths = EDMA_DMA_BUSWIDTHS;
+ 		m_ddev->dst_addr_widths = EDMA_DMA_BUSWIDTHS;
+-- 
+2.7.1
