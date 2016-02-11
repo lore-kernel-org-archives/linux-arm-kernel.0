@@ -1,41 +1,128 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 11 Feb 2016 18:00:32 +0000
-Subject: [PATCH v2] ARM: mm: mark section-aligned portion of rodata NX
-In-Reply-To: <CAGXu5jLDK8eVO2kUD1cB3TArL8k8pF=igc3O04Fa40QgQ2pwNw@mail.gmail.com>
-References: <20151207223534.GA13722@www.outflux.net>
- <CAKv+Gu9EeKQk7GOAPV2cvff10=kD49u+oP-yEiOrJBPOF=QNtw@mail.gmail.com>
- <CAGXu5j+Pc7ucC4tmxHyDW7aW88pwQvMejuR2Ehdxp=vY+pv-5w@mail.gmail.com>
- <CAGXu5jLDK8eVO2kUD1cB3TArL8k8pF=igc3O04Fa40QgQ2pwNw@mail.gmail.com>
-Message-ID: <20160211180032.GY10826@n2100.arm.linux.org.uk>
+From: kernel@martin.sperl.org (Martin Sperl)
+Date: Thu, 11 Feb 2016 19:06:43 +0100
+Subject: [PATCH 3/4] spi: bcm2835aux: set up spi-mode before asserting
+ cs-gpio
+In-Reply-To: <1455041435-8015-4-git-send-email-stephanolbrich@gmx.de>
+References: <1455041435-8015-1-git-send-email-stephanolbrich@gmx.de>
+ <1455041435-8015-4-git-send-email-stephanolbrich@gmx.de>
+Message-ID: <F75D5360-5D55-453F-89A7-7BB4B07427C5@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 22, 2016 at 01:19:03PM -0800, Kees Cook wrote:
-> On Tue, Dec 8, 2015 at 10:38 AM, Kees Cook <keescook@chromium.org> wrote:
-> > On Mon, Dec 7, 2015 at 11:47 PM, Ard Biesheuvel
-> > <ard.biesheuvel@linaro.org> wrote:
-> >> On 7 December 2015 at 23:35, Kees Cook <keescook@chromium.org> wrote:
-> >>>  /*
-> >>> + * Without CONFIG_DEBUG_ALIGN_RODATA, __start_rodata_section_aligned will
-> >>> + * be the first section-aligned location after __start_rodata. Otherwise,
-> >>> + * it will be equal to __start_rodata.
-> >>> + */
-> >>> +__start_rodata_section_aligned = ALIGN(__start_rodata, 1 << SECTION_SHIFT);
-...
 
-I'm afraid this causes build errors on two configurations:
+> On 09.02.2016, at 19:10, stephanolbrich at gmx.de wrote:
+> 
+> From: Stephan Olbrich <stephanolbrich@gmx.de>
+> 
+> When using reverse polarity for clock (spi-cpol) on a device
+> the clock line gets altered after chip-select has been asserted
+> resulting in an additional clock beat, which confuses hardware.
+> 
+> To avoid this situation this patch moves the setup of polarity
+> (spi-cpol and spi-cpha) outside of the chip-select into
+> prepare_message, which is run prior to asserting chip-select.
+> 
+> Signed-off-by: Stephan Olbrich <stephanolbrich@gmx.de>
+> ---
+> drivers/spi/spi-bcm2835aux.c | 54 +++++++++++++++++++++++++++++++-------------
+> 1 file changed, 38 insertions(+), 16 deletions(-)
+> 
+> diff --git a/drivers/spi/spi-bcm2835aux.c b/drivers/spi/spi-bcm2835aux.c
+> index d2f0067..b90aa34 100644
+> --- a/drivers/spi/spi-bcm2835aux.c
+> +++ b/drivers/spi/spi-bcm2835aux.c
+> @@ -218,9 +218,9 @@ static irqreturn_t bcm2835aux_spi_interrupt(int irq, void *dev_id)
+> 			BCM2835_AUX_SPI_CNTL1_IDLE);
+> 	}
+> 
+> -	/* and if rx_len is 0 then wake up completion and disable spi */
+> +	/* and if rx_len is 0 then disable interrupts and wake up completion */
+> 	if (!bs->rx_len) {
+> -		bcm2835aux_spi_reset_hw(bs);
+> +		bcm2835aux_wr(bs, BCM2835_AUX_SPI_CNTL1, bs->cntl[1]);
+> 		complete(&master->xfer_completion);
+> 	}
+> 
+> @@ -313,9 +313,6 @@ static int bcm2835aux_spi_transfer_one_poll(struct spi_master *master,
+> 		}
+> 	}
+> 
+> -	/* Transfer complete - reset SPI HW */
+> -	bcm2835aux_spi_reset_hw(bs);
+> -
+> 	/* and return without waiting for completion */
+> 	return 0;
+> }
+> @@ -336,10 +333,6 @@ static int bcm2835aux_spi_transfer_one(struct spi_master *master,
+> 	 * resulting (potentially) in more interrupts when transferring
+> 	 * more than 12 bytes
+> 	 */
+> -	bs->cntl[0] = BCM2835_AUX_SPI_CNTL0_ENABLE |
+> -		      BCM2835_AUX_SPI_CNTL0_VAR_WIDTH |
+> -		      BCM2835_AUX_SPI_CNTL0_MSBF_OUT;
+> -	bs->cntl[1] = BCM2835_AUX_SPI_CNTL1_MSBF_IN;
+> 
+> 	/* set clock */
+> 	spi_hz = tfr->speed_hz;
+> @@ -358,13 +351,6 @@ static int bcm2835aux_spi_transfer_one(struct spi_master *master,
+Note that here you need to explicitly mask out the clock!
+otherwise spi messages with different clock speeds will fill up the 
+bitfield of the clock divider with the wrong values.
 
-./arch/arm/kernel/vmlinux.lds:701: undefined symbol `SECTION_SHIFT' referenced in expression
+This has not happened before because the values were re-computed every time
+now we defer it to prepare
 
-which I think is down to the new __start_rodata_section_aligned line.
+@@ -348,17 +345,12 @@ static int bcm2835aux_spi_transfer_one(struct spi_master *
+        } else { /* the slowest we can go */
+                speed = BCM2835_AUX_SPI_CNTL0_SPEED_MAX;
+        }
++	/* mask out old speed from previous spi_transfer */
++       bs->cntl[0] &= ~BCM2835_AUX_SPI_CNTL0_SPEED;
++	/* set the new speed */
+        bs->cntl[0] |= speed << BCM2835_AUX_SPI_CNTL0_SPEED_SHIFT;
 
-Olof's builder errored out with this for both allnoconfig and
-lpc18xx_defconfig builds.  Both probably due to CONFIG_MMU being
-unset, and hence no definition for SECTION_SHIFT.
+> 
+> 	spi_used_hz = clk_hz / (2 * (speed + 1));
+> 
+> -	/* handle all the modes */
+> -	if (spi->mode & SPI_CPOL)
+> -		bs->cntl[0] |= BCM2835_AUX_SPI_CNTL0_CPOL;
+> -	if (spi->mode & SPI_CPHA)
+> -		bs->cntl[0] |= BCM2835_AUX_SPI_CNTL0_CPHA_OUT |
+> -			       BCM2835_AUX_SPI_CNTL0_CPHA_IN;
+> -
+> 	/* set transmit buffers and length */
+> 	bs->tx_buf = tfr->tx_buf;
+> 	bs->rx_buf = tfr->rx_buf;
 
-I think you need to make this conditional on CONFIG_MMU.
 
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently@9.6Mbps down 400kbps up
-according to speedtest.net.
+
+> @@ -388,6 +374,40 @@ static int bcm2835aux_spi_transfer_one(struct spi_master *master,
+> 	return bcm2835aux_spi_transfer_one_irq(master, spi, tfr);
+> }
+> 
+> +
+> +static int bcm2835aux_spi_unprepare_message(struct spi_master *master,
+> +					    struct spi_message *msg)
+> +{
+> +	struct bcm2835aux_spi *bs = spi_master_get_devdata(master);
+> +
+> +	bcm2835aux_spi_reset_hw(bs);
+> +
+> +	return 0;
+> +}
+> +
+
+I was wondering a long time why we would need this - but after
+some experimentation it became clear: with auxspi disabled driving
+the gates so they go into their default states (low) before GPIO-cs
+is de-asserted.
+
+It may be worth mentioning that fact - others might wonder as
+well later later.
+
+With the above in place:
+Reviewed-by: Martin Sperl <kernel@martin.sperl.org>
+Tested-by: Martin Sperl <kernel@martin.sperl.org>
+
+Martin
