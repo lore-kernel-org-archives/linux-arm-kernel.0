@@ -1,45 +1,63 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 11 Feb 2016 10:44:18 +0000
-Subject: [PULL] GIC fixes for 4.5-rc4
-Message-ID: <1455187458-28775-1-git-send-email-marc.zyngier@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 11 Feb 2016 10:46:50 +0000
+Subject: [PATCH] tty/serial: digicolor: Fix bad usage of IS_ERR_VALUE
+In-Reply-To: <56BAA27A.9050605@roeck-us.net>
+References: <1455030539-10798-1-git-send-email-linux@roeck-us.net>
+ <4571887.rTPndCnv20@wuerfel> <56BAA27A.9050605@roeck-us.net>
+Message-ID: <20160211104650.GU10826@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On Tue, Feb 09, 2016 at 06:37:46PM -0800, Guenter Roeck wrote:
+> On 02/09/2016 07:26 AM, Arnd Bergmann wrote:
+> >On Tuesday 09 February 2016 07:08:59 Guenter Roeck wrote:
+> >>IS_ERR_VALUE() assumes that its parameter is an unsigned long.
+> >>It can not be used to check if an unsigned int reflects an error.
+> >>Doing so can result in the following build warning.
+> >>
+> >>drivers/tty/serial/digicolor-usart.c: In function ?digicolor_uart_probe?:
+> >>include/linux/err.h:21:38: warning:
+> >>         comparison is always false due to limited range of data type
+> >>drivers/tty/serial/digicolor-usart.c:485:6: note:
+> >>         in expansion of macro ?IS_ERR_VALUE?
+> >>
+> >>If that warning is seen, an error return from platform_get_irq() is missed.
+> >>
+> >>
+> >
+> >The patch looks correct to me, but what compiler version and which kernel
+> >tree is it that triggered the warning?
+> >
+> >Andrzej Hajda just modified the definition of IS_ERR_VALUE(), and the
+> >changes are still under discussion, but I don't see that warning with
+> >any of the versions.
+> >
+> I see it with gcc 5.1 and 5.2 (and W=1). I did not see / notice Andrzej's patch.
+> 
+> I agree that fixing the problem in IS_ERR_VALUE() is preferrable.
 
-Please find below a pull request for a few GIC fixes that have been on
-the list recently, and that I'd like to go in 4.5-rc4.
+I disagree.  What happens if (eg) you decide to do this:
 
-Thanks,
+	u8 irq;
 
-	M.
+	irq = platform_get_irq(...);
+	if (IS_ERR_VALUE(irq))
+		...
 
-The following changes since commit 1a485f4d2e28efd77075b2952926683d6c245633:
+is that the fault of IS_ERR_VALUE() that it will never be true?  No, it's
+a programming error in the caller, because the caller is using the wrong
+type here - in fact, you can't do anything in IS_ERR_VALUE() to correct
+that.
 
-  irqchip/gicv3-its: Fix memory leak in its_free_tables() (2016-02-04 15:14:50 +0100)
+The same is true if you assign an error value to an unsigned int: the
+problem is in the caller, not in IS_ERR_VALUE().
 
-are available in the git repository at:
+What would be preferable is if there was some way IS_ERR_VALUE() could
+detect if it's used on something that isn't at least a short, and is
+signed, but I suspect coccinelle can do that much better than trying to
+work out some way to get the C compiler to check that.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git tags/gic-fixes-4.5-rc4
-
-for you to fetch changes up to 1a1ebd5fb1e203ee8cc73508cc7a38ac4b804596:
-
-  irqchip/gic-v3: Make sure read from ICC_IAR1_EL1 is visible on redestributor (2016-02-11 10:20:02 +0000)
-
-----------------------------------------------------------------
-GIC fixes for 4.5-rc4:
-
-- Two fixes addressing cascaded GICv1/GICv2 (affinity setting, EOImode)
-- One fix addressing possible missed interrupts on GICv3
-
-----------------------------------------------------------------
-Jon Hunter (2):
-      irqchip/gic: Only populate set_affinity for the root controller
-      irqchip/gic: Only set the EOImodeNS bit for the root controller
-
-Tirumalesh Chalamarla (1):
-      irqchip/gic-v3: Make sure read from ICC_IAR1_EL1 is visible on redestributor
-
- arch/arm64/include/asm/arch_gicv3.h |  1 +
- drivers/irqchip/irq-gic.c           | 13 ++++++-------
- 2 files changed, 7 insertions(+), 7 deletions(-)
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
