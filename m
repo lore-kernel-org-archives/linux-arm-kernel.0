@@ -1,100 +1,164 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Thu, 11 Feb 2016 14:43:02 -0600
-Subject: [PATCH v3 3/3] pci: dra7xx: use pdata callbacks to perform reset
-In-Reply-To: <56BACCDB.2070507@ti.com>
-References: <1452780672-14339-1-git-send-email-kishon@ti.com>
- <1452780672-14339-4-git-send-email-kishon@ti.com>
- <20160127173104.GQ19432@atomide.com> <56A90971.4020409@ti.com>
- <20160127185649.GV19432@atomide.com> <56A94FB7.6020903@ti.com>
- <20160128183156.GH19432@atomide.com> <56B087AD.4000505@ti.com>
- <alpine.DEB.2.02.1602080208070.2182@utopia.booyaka.com>
- <56B900E9.9040306@ti.com>
- <alpine.DEB.2.02.1602090846480.2906@utopia.booyaka.com>
- <56BA2495.9020407@ti.com>
- <alpine.DEB.2.02.1602091932160.2906@utopia.booyaka.com>
- <56BA958A.1020503@ti.com> <56BACCDB.2070507@ti.com>
-Message-ID: <56BCF256.8010903@ti.com>
+From: rdunlap@infradead.org (Randy Dunlap)
+Date: Thu, 11 Feb 2016 13:08:30 -0800
+Subject: [PATCH v8 4/4] Documentation: tee subsystem and op-tee driver
+In-Reply-To: <1455210877-15748-5-git-send-email-jens.wiklander@linaro.org>
+References: <1455210877-15748-1-git-send-email-jens.wiklander@linaro.org>
+ <1455210877-15748-5-git-send-email-jens.wiklander@linaro.org>
+Message-ID: <56BCF84E.50808@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/09/2016 11:38 PM, Kishon Vijay Abraham I wrote:
-> Hi,
-> 
-> On Wednesday 10 February 2016 07:12 AM, Suman Anna wrote:
->> Hi Paul,
->>
->> On 02/09/2016 01:36 PM, Paul Walmsley wrote:
->>> Hi Suman 
->>>
->>> On Tue, 9 Feb 2016, Suman Anna wrote:
->>>
->>>> On 02/09/2016 02:49 AM, Paul Walmsley wrote:
->>>>> On Mon, 8 Feb 2016, Suman Anna wrote:
->>>>>> On 02/07/2016 08:48 PM, Paul Walmsley wrote:
->>>>>>> On Tue, 2 Feb 2016, Kishon Vijay Abraham I wrote:
->>>>>>>
->>>>>>>> Paul, what do you think is the best way forward to perform reset?
->>>>>>>
->>>>>>> Many of the IP blocks with PRM hardreset lines are processor IP blocks. 
->>>>>>> Those often need special reset handling to ensure that WFI/HLT-like 
->>>>>>> instructions are executed after reset.  This special handling ensures that 
->>>>>>> the IP blocks' bus initiator interfaces indicate that they are in standby 
->>>>>>> to the PRCM - thus allowing power management for the rest of the chip to 
->>>>>>> work correctly.
->>>>>>>
->>>>>>> But that doesn't seem to be the case with PCIe - and maybe others - 
->>>>>>> possibly some of the MMUs?  
->>>>>>
->>>>>> Yeah, the sequencing between clocks and resets would still be the same
->>>>>> for MMUs, so, adding the custom flags for MMUs is fine.
->>>>>
->>>>> I'm curious as to whether HWMOD_CUSTOM_HARDRESET is needed for the MMUs.  
->>>>> We've stated that the main point of the custom hardreset code is to handle 
->>>>> processors that need to be placed into WFI/HLT, but it doesn't seem like 
->>>>> there would be an equivalent for MMUs.  Thoughts?
->>>>
->>>> The current OMAP IOMMU code already leverages the pdata ops for
->>>> performing the resets, so not adding the flags would also require
->>>> additional changes in the driver.
->>>>
->>>> Also, the reset lines controlling the MMUs actually also manage the
->>>> reset for all the other sub-modules other than the processor cores
->>>> within the sub-systems. We have currently different issues (see [1] for
->>>> eg. around the IPU sub-system entering RET in between), so from a PM
->>>> point of view, we do prefer to place the MMUs also in reset when we are
->>>> runtime suspended.
->>>
->>> Should we reassert hardreset in _idle() for IP blocks that don't have 
->>> HWMOD_CUSTOM_HARDRESET set on them?  Would that allow us to use this 
->>> mechanism for the uncore hardreset lines, or are there other quirks?
->>>
->>> Also - would that address the potential issue that you mentioned with the 
->>> PCIe block, or is that a different issue?
->>
->> Yeah, I think that would address the PCIe block issue in terms of reset
->> state balancing between pm_runtime_get_sync() and pm_runtime_put()
->> calls. Right now, they are unbalanced. The PCIe block is using these
->> only in probe and remove, so it should work for that IP.
-> 
-> As I mentioned before this would result in undesired behavior during
-> suspend/resume cycle in PCIe. (This should be okay for the current mainline
-> code but would break once we add suspend/resume support for PCIe).
+On 02/11/16 09:14, Jens Wiklander wrote:
+> Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
+> ---
+>  Documentation/00-INDEX |   2 +
+>  Documentation/tee.txt  | 117 +++++++++++++++++++++++++++++++++++++++++++++++++
+>  MAINTAINERS            |   1 +
+>  3 files changed, 120 insertions(+)
+>  create mode 100644 Documentation/tee.txt
 
-Yeah, I was wondering if some peripheral would want only the clock to be
-controlled during _idle() and not reset. Even then for the PCIe case
-that you are talking about, going through a pm_runtime_get_sync(),
-pm_runtime_put_sync()/pm_runtime_put() deasserts the resets everytime
-_enable() is called. Right now, the code block has ignored the return
-value from the _hardreset_deassert(), but if you check it and bail out,
-then your get_sync() would start failing from the second invocation.
+> diff --git a/Documentation/tee.txt b/Documentation/tee.txt
+> new file mode 100644
+> index 0000000..4ac91d2
+> --- /dev/null
+> +++ b/Documentation/tee.txt
+> @@ -0,0 +1,117 @@
+> +TEE subsystem
+> +This document describes the TEE subsystem in Linux
 
-Can you elaborate more on what kind of issues you will see on
-suspend/resume cycle with PCIe? Do note that _idle() gets called through
-_od_suspend_no_irq() in omap_device.c if your runtime status is not
-suspended. I had to manage the runtime status in the IPU/DSP
-suspend/resume code to deal with the reset
-(omap_device_assert_hardreset) and clock sequences in
-_idle()/omap_device_idle()
+                                                Linux.
 
-regards
-Suman
+> +
+> +A TEE (Trusted Execution Environment) is a trusted OS running in some
+> +secure environment, for example, TrustZone on ARM CPUs, or a separate
+> +secure co-processor etc. A TEE driver handles the details needed to
+> +communicate with the TEE.
+> +
+> +This subsystem deals with:
+> +
+> +- Registration of TEE drivers
+> +
+> +- Managing shared memory between Linux and the TEE
+> +
+> +- Providing a generic API to the TEE
+> +
+> +The TEE interface
+> +=================
+> +
+> +include/uapi/linux/tee.h defines the generic interface to a TEE.
+> +
+> +User space (the client) connects to the driver by opening /dev/tee[0-9]* or
+> +/dev/teepriv[0-9]*.
+> +
+> +- TEE_IOC_SHM_ALLOC allocates shared memory and returns a file descriptor which
+> +  user space can mmap. When user space doesn't need the file descriptor anymore
+
+                                                                           any more,
+
+> +  it should be closed. When shared memory isn't needed any longer it should be
+> +  unmapped with munmap() to allow the reuse of memory.
+> +
+> +- TEE_IOC_VERSION lets user space know which TEE this driver handles and
+> +  the its capabilities.
+> +
+> +- TEE_IOC_OPEN_SESSION opens a new session to a Trusted Application
+
+end with '.'
+
+> +
+> +- TEE_IOC_INVOKE invokes a function in a Trusted Application
+
+ditto
+
+> +
+> +- TEE_IOC_CANCEL may cancel an ongoing TEE_IOC_OPEN_SESSION or TEE_IOC_INVOKE
+
+ditto
+
+> +
+> +- TEE_IOC_CLOSE_SESSION closes a session to a Trusted Application
+
+ditto
+
+> +
+> +There are two classes of clients, normal clients and supplicants. The latter is
+> +a helper process for the TEE to access resources in Linux, for example file
+> +system access. A normal client opens /dev/tee[0-9]* and a supplicant opens
+> +/dev/teepriv[0-9].
+> +
+> +Much of the communication between clients and the TEE is opaque to the
+> +driver. The main job for the driver is to receive requests from the
+> +clients, forward them to the TEE and send back the results. In the case of
+> +supplicants the communication goes in the other direction, the TEE sends
+> +requests to the supplicant which then sends back the result.
+> +
+> +OP-TEE driver
+> +=============
+> +
+> +The OP-TEE driver handles OP-TEE [1] based TEEs. Currently it is only the ARM
+> +TrustZone based OP-TEE solution that is supported.
+> +
+> +Lowest level of communication with OP-TEE builds on ARM SMC Calling
+> +Convention (SMCCC) [2], which is the foundation for OP-TEE's SMC interface
+> +[3] used internally by the driver. Stacked on top of that is OP-TEE Message
+> +Protocol [4].
+> +
+> +OP-TEE SMC interface provides the basic functions required by SMCCC and some
+> +additional functions specific for OP-TEE. The most interesting functions are:
+> +
+> +- OPTEE_SMC_FUNCID_CALLS_UID (part of SMCCC) returns the version information
+> +  which is then returned by TEE_IOC_VERSION
+> +
+> +- OPTEE_SMC_CALL_GET_OS_UUID returns the particular OP-TEE implementation, used
+> +  to tell, for instance, a TrustZone OP-TEE apart from an OP-TEE running on a
+> +  separate secure co-processor.
+> +
+> +- OPTEE_SMC_CALL_WITH_ARG drives the OP-TEE message protocol
+> +
+> +- OPTEE_SMC_GET_SHM_CONFIG lets the driver and OP-TEE agree on which memory
+> +  range to used for shared memory between Linux and OP-TEE.
+> +
+> +The GlobalPlatform TEE Client API [5] is implemented on top of the generic
+> +TEE API.
+> +
+> +Picture of the relationship between the different components in the
+> +OP-TEE architecture.
+> +
+> +    User space                  Kernel                   Secure world
+> +    ~~~~~~~~~~                  ~~~~~~                   ~~~~~~~~~~~~
+> + +--------+                                             +-------------+
+> + | Client |                                             | Trusted     |
+> + +--------+                                             | Application |
+> +    /\                                                  +-------------+
+> +    || +----------+                                           /\
+> +    || |tee-      |                                           ||
+> +    || |supplicant|                                           \/
+> +    || +----------+                                     +-------------+
+> +    \/      /\                                          | TEE Internal|
+> + +-------+  ||                                          | API         |
+> + + TEE   |  ||            +--------+--------+           +-------------+
+> + | Client|  ||            | TEE    | OP-TEE |           | OP-TEE      |
+> + | API   |  \/            | subsys | driver |           | Trusted OS  |
+> + +-------+----------------+----+-------+----+-----------+-------------+
+> + |      Generic TEE API        |       |     OP-TEE MSG               |
+> + |      IOCTL (TEE_IOC_*)      |       |     SMCCC (OPTEE_SMC_CALL_*) |
+> + +-----------------------------+       +------------------------------+
+> +
+> +RPC (Remote Procedure Call) are requests from secure world to kernel driver
+> +or tee-supplicant. An RPC is identified by a special range of SMCCC return
+> +values from OPTEE_SMC_CALL_WITH_ARG. RPC messages which are intended for the
+> +kernel are handled by the kernel driver. Other RPC messages will be forwarded to
+> +tee-supplicant without further involvement of the driver, except switching
+> +shared memory buffer representation.
+> +
+> +References:
+> +[1] https://github.com/OP-TEE/optee_os
+> +[2] http://infocenter.arm.com/help/topic/com.arm.doc.den0028a/index.html
+> +[3] drivers/tee/optee/optee_smc.h
+> +[4] drivers/tee/optee/optee_msg.h
+> +[5] http://www.globalplatform.org/specificationsdevice.asp look for
+> +    "TEE Client API Specification v1.0" and click download.
+
+
+-- 
+~Randy
