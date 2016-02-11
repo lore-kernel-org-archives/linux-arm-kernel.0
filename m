@@ -1,104 +1,111 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 11 Feb 2016 18:40:03 +0000
-Subject: [PATCH v4 22/23] arm64: VHE: Add support for running Linux in EL2 mode
-In-Reply-To: <1455216004-19499-1-git-send-email-marc.zyngier@arm.com>
-References: <1455216004-19499-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1455216004-19499-23-git-send-email-marc.zyngier@arm.com>
+Date: Thu, 11 Feb 2016 18:39:41 +0000
+Subject: [PATCH v4 00/23] arm64: Virtualization Host Extension support
+Message-ID: <1455216004-19499-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With ARMv8.1 VHE, the architecture is able to (almost) transparently
-run the kernel at EL2, despite being written for EL1.
+ARMv8.1 comes with the "Virtualization Host Extension" (VHE for
+short), which enables simpler support of Type-2 hypervisors.
 
-This patch takes care of the "almost" part, mostly preventing the kernel
-from dropping from EL2 to EL1, and setting up the HYP configuration.
+This extension allows the kernel to directly run at EL2, and
+significantly reduces the number of system registers shared between
+host and guest, reducing the overhead of virtualization.
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/Kconfig       | 13 +++++++++++++
- arch/arm64/kernel/head.S | 28 +++++++++++++++++++++++++++-
- 2 files changed, 40 insertions(+), 1 deletion(-)
+In order to have the same kernel binary running on all versions of the
+architecture, this series makes heavy use of runtime code patching.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 8cc6228..cf118d9 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -750,6 +750,19 @@ config ARM64_LSE_ATOMICS
- 	  not support these instructions and requires the kernel to be
- 	  built with binutils >= 2.25.
- 
-+config ARM64_VHE
-+	bool "Enable support for Virtualization Host Extensions (VHE)"
-+	default y
-+	help
-+	  Virtualization Host Extensions (VHE) allow the kernel to run
-+	  directly at EL2 (instead of EL1) on processors that support
-+	  it. This leads to better performance for KVM, as they reduce
-+	  the cost of the world switch.
-+
-+	  Selecting this option allows the VHE feature to be detected
-+	  at runtime, and does not affect processors that do not
-+	  implement this feature.
-+
- endmenu
- 
- endmenu
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 917d981..6f2f377 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -30,6 +30,7 @@
- #include <asm/cache.h>
- #include <asm/cputype.h>
- #include <asm/kernel-pgtable.h>
-+#include <asm/kvm_arm.h>
- #include <asm/memory.h>
- #include <asm/pgtable-hwdef.h>
- #include <asm/pgtable.h>
-@@ -464,9 +465,27 @@ CPU_LE(	bic	x0, x0, #(3 << 24)	)	// Clear the EE and E0E bits for EL1
- 	isb
- 	ret
- 
-+2:
-+#ifdef CONFIG_ARM64_VHE
-+	/*
-+	 * Check for VHE being present. For the rest of the EL2 setup,
-+	 * x2 being non-zero indicates that we do have VHE, and that the
-+	 * kernel is intended to run@EL2.
-+	 */
-+	mrs	x2, id_aa64mmfr1_el1
-+	ubfx	x2, x2, #8, #4
-+#else
-+	mov	x2, xzr
-+#endif
-+
- 	/* Hyp configuration. */
--2:	mov	x0, #(1 << 31)			// 64-bit EL1
-+	mov	x0, #HCR_RW			// 64-bit EL1
-+	cbz	x2, set_hcr
-+	orr	x0, x0, #HCR_TGE		// Enable Host Extensions
-+	orr	x0, x0, #HCR_E2H
-+set_hcr:
- 	msr	hcr_el2, x0
-+	isb
- 
- 	/* Generic timers. */
- 	mrs	x0, cnthctl_el2
-@@ -526,6 +545,13 @@ CPU_LE(	movk	x0, #0x30d0, lsl #16	)	// Clear EE and E0E on LE systems
- 	/* Stage-2 translation */
- 	msr	vttbr_el2, xzr
- 
-+	cbz	x2, install_el2_stub
-+
-+	mov	w20, #BOOT_CPU_MODE_EL2		// This CPU booted in EL2
-+	isb
-+	ret
-+
-+install_el2_stub:
- 	/* Hypervisor stub */
- 	adrp	x0, __hyp_stub_vectors
- 	add	x0, x0, #:lo12:__hyp_stub_vectors
+The first 22 patches massage the KVM code to deal with VHE and enable
+Linux to run at EL2. The last patch catches an ugly case when VHE
+capable CPUs are paired with some of their less capable siblings. This
+should never happen, but hey...
+
+I have deliberately left out some of the more "advanced"
+optimizations, as they are likely to distract the reviewer from the
+core infrastructure, which is what I care about at the moment.
+
+Note: GDB is currently busted on VHE systems, as it checks for version
+      6 on the debug architecture, while VHE is version 7. The
+      binutils people are on the case.
+
+This has been tested on the FVP_Base_SLV-V8-A model, and based on
+v4.5-rc3 + kvmarm/master. I've put a branch out on:
+
+git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/vhe
+
+* From v3:
+  - Cleaned debug handling after comments from Catalin
+  - Added missing barriers in the panic patch
+  - Collected Rb and Acks from Christoffer and Catalin
+
+* From v2:
+  - Added support for perf to count kernel events in EL2
+  - Added support for EL2 breakpoints
+  - Moved the VTCR_EL2 setup from assembly to C
+  - Made the fault handling easier to understand (hopefuly)
+  - Plenty of smaller fixups
+
+* From v1:
+  - Full rewrite now that the World Switch is written in C code.
+  - Dropped the "early IRQ handling" for the moment.
+
+Marc Zyngier (23):
+  arm/arm64: KVM: Add hook for C-based stage2 init
+  arm64: KVM: Switch to C-based stage2 init
+  arm/arm64: Add new is_kernel_in_hyp_mode predicate
+  arm64: Allow the arch timer to use the HYP timer
+  arm64: Add ARM64_HAS_VIRT_HOST_EXTN feature
+  arm64: KVM: Skip HYP setup when already running in HYP
+  arm64: KVM: VHE: Patch out use of HVC
+  arm64: KVM: VHE: Patch out kern_hyp_va
+  arm64: KVM: VHE: Introduce unified system register accessors
+  arm64: KVM: VHE: Differenciate host/guest sysreg save/restore
+  arm64: KVM: VHE: Split save/restore of registers shared between guest
+    and host
+  arm64: KVM: VHE: Use unified system register accessors
+  arm64: KVM: VHE: Enable minimal sysreg save/restore
+  arm64: KVM: VHE: Make __fpsimd_enabled VHE aware
+  arm64: KVM: VHE: Implement VHE activate/deactivate_traps
+  arm64: KVM: VHE: Use unified sysreg accessors for timer
+  arm64: KVM: VHE: Add fpsimd enabling on guest access
+  arm64: KVM: VHE: Add alternative panic handling
+  arm64: KVM: Move most of the fault decoding to C
+  arm64: perf: Count EL2 events if the kernel is running in HYP
+  arm64: hw_breakpoint: Allow EL2 breakpoints if running in HYP
+  arm64: VHE: Add support for running Linux in EL2 mode
+  arm64: Panic when VHE and non VHE CPUs coexist
+
+ arch/arm/include/asm/kvm_host.h        |   4 +
+ arch/arm/include/asm/virt.h            |   5 +
+ arch/arm/kvm/arm.c                     | 174 ++++++++++++++++++----------
+ arch/arm/kvm/mmu.c                     |   7 ++
+ arch/arm64/Kconfig                     |  13 +++
+ arch/arm64/include/asm/cpufeature.h    |   3 +-
+ arch/arm64/include/asm/hw_breakpoint.h |  49 +++++---
+ arch/arm64/include/asm/kvm_arm.h       |   6 +-
+ arch/arm64/include/asm/kvm_asm.h       |   2 +
+ arch/arm64/include/asm/kvm_emulate.h   |   3 +
+ arch/arm64/include/asm/kvm_host.h      |   6 +
+ arch/arm64/include/asm/kvm_mmu.h       |  12 +-
+ arch/arm64/include/asm/virt.h          |  27 +++++
+ arch/arm64/kernel/asm-offsets.c        |   3 -
+ arch/arm64/kernel/cpufeature.c         |  11 ++
+ arch/arm64/kernel/head.S               |  50 +++++++-
+ arch/arm64/kernel/perf_event.c         |  14 ++-
+ arch/arm64/kernel/smp.c                |   3 +
+ arch/arm64/kvm/hyp-init.S              |  18 ---
+ arch/arm64/kvm/hyp.S                   |   7 ++
+ arch/arm64/kvm/hyp/Makefile            |   1 +
+ arch/arm64/kvm/hyp/entry.S             |   6 +
+ arch/arm64/kvm/hyp/hyp-entry.S         | 109 ++++++------------
+ arch/arm64/kvm/hyp/hyp.h               | 108 ++++++++++++++++--
+ arch/arm64/kvm/hyp/s2-setup.c          |  44 +++++++
+ arch/arm64/kvm/hyp/switch.c            | 202 +++++++++++++++++++++++++++++----
+ arch/arm64/kvm/hyp/sysreg-sr.c         | 147 ++++++++++++++++--------
+ arch/arm64/kvm/hyp/timer-sr.c          |  10 +-
+ drivers/clocksource/arm_arch_timer.c   |  96 ++++++++++------
+ 29 files changed, 842 insertions(+), 298 deletions(-)
+ create mode 100644 arch/arm64/kvm/hyp/s2-setup.c
+
 -- 
 2.1.4
