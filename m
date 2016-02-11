@@ -1,59 +1,48 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 11 Feb 2016 13:12:20 +0200
-Subject: [PATCH v2] dmaengine: edma: Implement device_synchronize callback
-In-Reply-To: <56BC5759.80000@metafoo.de>
-References: <1455181722-32099-1-git-send-email-peter.ujfalusi@ti.com>
- <56BC5759.80000@metafoo.de>
-Message-ID: <56BC6C94.1060409@ti.com>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 11 Feb 2016 06:15:27 -0500 (EST)
+Subject: [PATCH net-next V2 0/8] net: fec: cleanup/fixes
+In-Reply-To: <1454709170-19527-1-git-send-email-troy.kisky@boundarydevices.com>
+References: <1454709170-19527-1-git-send-email-troy.kisky@boundarydevices.com>
+Message-ID: <20160211.061527.2243215315106334340.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/11/2016 11:41 AM, Lars-Peter Clausen wrote:
-> On 02/11/2016 10:08 AM, Peter Ujfalusi wrote:
->> We need the callback to support the dmaengine_terminate_sync().
->>
->> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+From: Troy Kisky <troy.kisky@boundarydevices.com>
+Date: Fri,  5 Feb 2016 14:52:42 -0700
+
 > 
-> Looks good, but I noticed a slight race condition in
-> edma_completion_handler(). You need to fetch echan->desc while holding the
-> vchan.lock. Otherwise this can race against terminate_all() and the callback
-> might get scheduled even though terminate_all() completed and then there is
-> a race where the synchronize() operation could be called before the callback
-> gets scheduled, which means it doesn't do its intended job. Highly unlikely
-> to happen, but theoretically possible.
+> V2 is a rebase on top of johannes endian-safe patch and
+> is only the 1st eight patches.
+> The testing for this series was done on a nitrogen6x.
+> The base commit was
+> commit b45efa30a626e915192a6c548cd8642379cd47cc
+>     Merge git://git.kernel.org/pub/scm/linux/kernel/git/davem/net
+> 
+> Testing showed no change in performance.
+> Testing used imx_v6_v7_defconfig + CONFIG_MICREL_PHY.
+> The processor was running at 996Mhz.
+> The following commands were used to get the transfer rates.
+> 
+> On an x86 ubunto system,
+> iperf -s -i.5 -u
+> 
+> 
+> On a nitrogen6x board, running via SD Card.
+> I first stopped some background processes
+> 
+> stop cron
+> stop upstart-file-bridge
+> stop upstart-socket-bridge
+> stop upstart-udev-bridge
+> stop rsyslog
+> stop dbus
+> killall dhclient
+> echo performance >/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+> 
+> taskset 0x2 iperf -c 192.168.0.201 -u -t60 -b500M -r
+> 
+> There is a branch available on github with this series, and the rest of
+> my fec patches, for those who would like to test it.
+> https://github.com:boundarydevices/linux-imx6.git branch net-next_master
 
-Right, actually I had (have) another series fixing the very same race in a
-different way - patching the terminate_all (series attached).
-We have seen race with RT kernel on uniprocessor setup.
-
-The tasklet_kill after the terminate_all will execute the scheduled task
-unconditionally, so the vchan_complete() will run after we have terminated the
-channel, which might be not what we want.
-I have also seen a race condition as explained in the first patch. The only
-way I was able to fix that by using the attached patches. Unfortunately I can
-not test RT with mainline yet, so I'm not 100% sure if by using the
-dmaengine_terminate_sync() in drivers will fix the issue.
-
--- 
-P?ter
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-dmaengine-virt-dma-Support-for-ignoring-callback-aft.patch
-Type: text/x-patch
-Size: 4081 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160211/26d818cd/attachment-0003.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0002-dmaengine-omap-dma-Prevent-race-between-vchan_comple.patch
-Type: text/x-patch
-Size: 1215 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160211/26d818cd/attachment-0004.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0003-dmaengine-edma-Prevent-race-between-vchan_complete-a.patch
-Type: text/x-patch
-Size: 1230 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160211/26d818cd/attachment-0005.bin>
+Series applied, thanks.
