@@ -1,23 +1,25 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 11 Feb 2016 13:01:32 +0100
-Subject: [PATCH] pinctrl: sunxi: H3 requires irq_read_needs_mux
-In-Reply-To: <20160202100217.GA7483@box2.japko.eu>
-References: <20160202100217.GA7483@box2.japko.eu>
-Message-ID: <CACRpkdbp2J5eVwsJpuyxkjv72mB4ojcauXoDn1_iei7XB0yzxg@mail.gmail.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 11 Feb 2016 13:01:36 +0100
+Subject: [PATCH V5 08/11] soc: mediatek: PMIC wrap: remove
+ pwrap_is_mt8135() and pwrap_is_mt8173()
+In-Reply-To: <1454841778-35529-9-git-send-email-blogic@openwrt.org>
+References: <1454841778-35529-1-git-send-email-blogic@openwrt.org>
+ <1454841778-35529-9-git-send-email-blogic@openwrt.org>
+Message-ID: <56BC7820.6040203@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 2, 2016 at 11:03 AM, Krzysztof Adamski
-<krzysztof.adamski@sonymobile.com> wrote:
 
-> It seems that on H3, just like on A10, when GPIOs are configured as
-> external interrupt data registers does not contain their value.  When
-> value is read, GPIO function must be temporary switched to input for
-> reads.
+
+On 07/02/16 11:42, John Crispin wrote:
+> With more SoCs being added the list of helper functions like these would
+> grow. While at it also add a new flag "has_bridge" and use that instead of
+> pwrap_is_mt8173() where appropriate.
 >
-> Signed-off-by: Krzysztof Adamski <k@japko.eu>
+> Signed-off-by: John Crispin <blogic@openwrt.org>
+> ---
 
-Patch applied for fixes with Maxime's ACK.
+Same here, please explain better what the code does.
 
-Yours,
-Linus Walleij
+Thanks.
+Matthias
