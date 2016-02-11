@@ -1,58 +1,119 @@
 From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
-Date: Thu, 11 Feb 2016 05:37:04 +0000
-Subject: [PATCH V3 3/5] PCI: xilinx: Modifying AXI PCIe Host Bridge
- driver to work on both  Zynq and Microblaze
-In-Reply-To: <2818168.2fmZIs86hN@wuerfel>
-References: <1455014518-8708-1-git-send-email-bharatku@xilinx.com>
- <8520D5D51A55D047800579B09414719825881780@XAP-PVEXMBX01.xlnx.xilinx.com>
- <20160210172707.GA29590@NP-P-BURTON> <2818168.2fmZIs86hN@wuerfel>
-Message-ID: <8520D5D51A55D047800579B09414719825881ACE@XAP-PVEXMBX01.xlnx.xilinx.com>
+Date: Thu, 11 Feb 2016 05:42:30 +0000
+Subject: [PATCH v3 2/6] PCI: xilinx: Unify INTx & MSI interrupt FIFO decode
+In-Reply-To: <1454602213-967-3-git-send-email-paul.burton@imgtec.com>
+References: <1454602213-967-1-git-send-email-paul.burton@imgtec.com>
+ <1454602213-967-3-git-send-email-paul.burton@imgtec.com>
+Message-ID: <8520D5D51A55D047800579B09414719825881ADE@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Subject: Re: [PATCH V3 3/5] PCI: xilinx: Modifying AXI PCIe Host Bridge driver
-> to work on both Zynq and Microblaze
+> Subject: [PATCH v3 2/6] PCI: xilinx: Unify INTx & MSI interrupt FIFO decode
 > 
-> On Wednesday 10 February 2016 09:27:07 Paul Burton wrote:
-> > On Wed, Feb 10, 2016 at 05:55:51AM +0000, Bharat Kumar Gogada wrote:
-> > > > On Tue, Feb 09, 2016 at 04:11:56PM +0530, Bharat Kumar Gogada
-> wrote:
-> > > > > Modifying Xilinx AXI PCIe Host Bridge Soft IP driver to work on
-> > > > > both Zynq and Microblaze Architectures.
-> > > > > With these modifications drivers/pci/host/pcie-xilinx.c, will
-> > > > > work on both Zynq and Microblaze Architectures.
-> > > > >
-> > > > > Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
-> > > > > Signed-off-by: Ravi Kiran Gummaluri <rgummal@xilinx.com>
-> > > > > ---
-> > > > > Changes:
-> > > > > Removed unneccessary architecture dependent number of MSI's.
-> > > > > Added #ifdef to pci_fixup_irqs which is ARM specific API.
-> > > >
-> > > > Hi Bharat,
-> > > >
-> > > > Why do you say pci_fixup_irqs is ARM-specific? It's declared in
-> > > > include/linux/pci.h, defined in drivers/pci/setup-irq.c & used by
-> > > > multiple architectures (alpha, arm, m68k, mips, sh, sparc, tile,
-> > > > unicore32 from a quick grep).
-> > > >
-> > > > Will you not break INTX-style interrupts by removing this?
-> > > >
-> > > I meant to say ARM specific w.r.t Microblaze architecture, which is
-> > > what this patch series are for. This has been already discussed in
-> > > my previous patch by  Arnd Bergmann and Lorenzo Pieralisi .
-> > > (https://lkml.org/lkml/2016/1/12/707)
-> >
-> > Hi Bharat,
-> >
-> > Ok, so you don't need it for microblaze but do need it for zynq/ARM.
-> > We also need it for MIPS, where my recent patches enable this driver.
-> > So if #ifdef'ing this is the current way forwards could you please
-> > invert the condition to #ifndef CONFIG_MICROBLAZE?
+> When decoding either an INTx or MSI interrupt, the driver has no way to
+> know which it will pull out of the interrupt FIFO. If both were pending then
+> this would lead to either the interrupt being handled incorrectly (MSI
+> interrupt treated as INTx) or not at all (INTx interrupt dropped by MSI path).
+> Unify the reading of the interrupt FIFO & act according to the type of
+> interrupt actually read.
 > 
-> I think we are getting to the point where we should try much harder to make
-> sure nobody needs that hack and it all works out of the box.
+> Signed-off-by: Paul Burton <paul.burton@imgtec.com>
+> Fixes: 8961def56845 ("PCI: xilinx: Add Xilinx AXI PCIe Host Bridge IP driver")
+> 
+> ---
+> 
+> Changes in v3:
+> - Split out from Boston patchset.
+> 
+> Changes in v2:
+> - Add Fixes tag.
+> 
+>  drivers/pci/host/pcie-xilinx.c | 47 +++++++++++++-----------------------------
+>  1 file changed, 14 insertions(+), 33 deletions(-)
+> 
+> diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c index
+> 1490bd1..afdfb09 100644
+> --- a/drivers/pci/host/pcie-xilinx.c
+> +++ b/drivers/pci/host/pcie-xilinx.c
+> @@ -397,7 +397,7 @@ static const struct irq_domain_ops intx_domain_ops
+> = {  static irqreturn_t xilinx_pcie_intr_handler(int irq, void *data)  {
+>  	struct xilinx_pcie_port *port = (struct xilinx_pcie_port *)data;
+> -	u32 val, mask, status, msi_data;
+> +	u32 val, mask, status;
+> 
+>  	/* Read interrupt decode and mask registers */
+>  	val = pcie_read(port, XILINX_PCIE_REG_IDR); @@ -437,8 +437,8 @@
+> static irqreturn_t xilinx_pcie_intr_handler(int irq, void *data)
+>  		xilinx_pcie_clear_err_interrupts(port);
+>  	}
+> 
+> -	if (status & XILINX_PCIE_INTR_INTX) {
+> -		/* INTx interrupt received */
+> +	if (status & (XILINX_PCIE_INTR_INTX | XILINX_PCIE_INTR_MSI)) {
+> +		/* Interrupt received */
+>  		val = pcie_read(port, XILINX_PCIE_REG_RPIFR1);
+> 
+>  		/* Check whether interrupt valid */
+> @@ -447,41 +447,22 @@ static irqreturn_t xilinx_pcie_intr_handler(int irq,
+> void *data)
+>  			return IRQ_HANDLED;
+>  		}
+> 
+> -		if (!(val & XILINX_PCIE_RPIFR1_MSI_INTR)) {
+> -			/* Clear interrupt FIFO register 1 */
+> -			pcie_write(port, XILINX_PCIE_RPIFR1_ALL_MASK,
+> -				   XILINX_PCIE_REG_RPIFR1);
+> -
+> -			/* Handle INTx Interrupt */
+> +		if (val & XILINX_PCIE_RPIFR1_MSI_INTR) {
+> +			irq = pcie_read(port, XILINX_PCIE_REG_RPIFR2) &
+> +				XILINX_PCIE_RPIFR2_MSG_DATA;
+> +		} else {
+>  			val = ((val & XILINX_PCIE_RPIFR1_INTR_MASK) >>
+>  				XILINX_PCIE_RPIFR1_INTR_SHIFT) + 1;
+> -			generic_handle_irq(irq_find_mapping(port-
+> >irq_domain,
+> -							    val));
+> +			irq = irq_find_mapping(port->irq_domain, val);
+>  		}
+> -	}
+> 
+> -	if (status & XILINX_PCIE_INTR_MSI) {
+> -		/* MSI Interrupt */
+> -		val = pcie_read(port, XILINX_PCIE_REG_RPIFR1);
+> +		/* Clear interrupt FIFO register 1 */
+> +		pcie_write(port, XILINX_PCIE_RPIFR1_ALL_MASK,
+> +			   XILINX_PCIE_REG_RPIFR1);
+> 
+> -		if (!(val & XILINX_PCIE_RPIFR1_INTR_VALID)) {
+> -			dev_warn(port->dev, "RP Intr FIFO1 read error\n");
+> -			return IRQ_HANDLED;
+> -		}
+> -
+> -		if (val & XILINX_PCIE_RPIFR1_MSI_INTR) {
+> -			msi_data = pcie_read(port,
+> XILINX_PCIE_REG_RPIFR2) &
+> -				   XILINX_PCIE_RPIFR2_MSG_DATA;
+> -
+> -			/* Clear interrupt FIFO register 1 */
+> -			pcie_write(port, XILINX_PCIE_RPIFR1_ALL_MASK,
+> -				   XILINX_PCIE_REG_RPIFR1);
+> -
+> -			if (IS_ENABLED(CONFIG_PCI_MSI)) {
+> -				/* Handle MSI Interrupt */
+> -				generic_handle_irq(msi_data);
+> -			}
+> -		}
+> +		if (IS_ENABLED(CONFIG_PCI_MSI) ||
+> +			!(val & XILINX_PCIE_RPIFR1_MSI_INTR))
+> +			generic_handle_irq(irq);
+>  	}
+> 
+>  	if (status & XILINX_PCIE_INTR_SLV_UNSUPP)
+> --
 
-Ok I will invert to this condition and resend the patches.
+Hi Paul,
+
+Even with above condition you are still missing either MSI or legacy interrupt handling, when both MSI and legacy interrupts occurred.
 
 Bharat
