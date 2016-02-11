@@ -1,110 +1,32 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 11 Feb 2016 09:43:47 +0100
-Subject: [PATCH] arm/arm64: KVM: Handle out-of-RAM cache maintenance as a
- NOP
-In-Reply-To: <1454942245-18452-1-git-send-email-marc.zyngier@arm.com>
-References: <1454942245-18452-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20160211084347.GT5171@cbox>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Thu, 11 Feb 2016 08:55:45 +0000
+Subject: [PATCH V3] ARM64: tegra: Add support for Google Pixel C
+In-Reply-To: <CAAVeFuJt+VdJb4S3PC-RXVFYhLnq7yF+dV_w5or=0ebG+LnnGw@mail.gmail.com>
+References: <1454949199-27050-1-git-send-email-jonathanh@nvidia.com>
+ <1455020809-17531-1-git-send-email-jonathanh@nvidia.com>
+ <CAAVeFuJt+VdJb4S3PC-RXVFYhLnq7yF+dV_w5or=0ebG+LnnGw@mail.gmail.com>
+Message-ID: <56BC4C91.6070409@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 08, 2016 at 02:37:25PM +0000, Marc Zyngier wrote:
-> So far, our handling of cache maintenance by VA has been pretty
-> simple: Either the access is in the guest RAM and generates a S2
-> fault, which results in the page being mapped RW, or we go down
-> the io_mem_abort() path, and nuke the guest.
+
+On 11/02/16 08:32, Alexandre Courbot wrote:
+> On Tue, Feb 9, 2016 at 9:26 PM, Jon Hunter <jonathanh@nvidia.com> wrote:
+>> Add initial device-tree support for Google Pixel C (a.k.a. Smaug) based
+>> upon Tegra210 SoC with 3 GiB of LPDDR4 RAM.
+>>
+>> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
 > 
-> The first one is fine, but the second one is extremely weird.
-> Treating the CM as an I/O is wrong, and nothing in the ARM ARM
-> indicates that we should generate a fault for something that
-> cannot end-up in the cache anyway (even if the guest maps it,
-> it will keep on faulting at stage-2 for emulation).
-> 
-> So let's just skip this instruction, and let the guest get away
-> with it.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/include/asm/kvm_emulate.h   |  5 +++++
->  arch/arm/kvm/mmu.c                   | 17 +++++++++++++++++
->  arch/arm64/include/asm/kvm_emulate.h |  5 +++++
->  3 files changed, 27 insertions(+)
-> 
-> diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
-> index 3095df0..f768797 100644
-> --- a/arch/arm/include/asm/kvm_emulate.h
-> +++ b/arch/arm/include/asm/kvm_emulate.h
-> @@ -143,6 +143,11 @@ static inline bool kvm_vcpu_dabt_iss1tw(struct kvm_vcpu *vcpu)
->  	return kvm_vcpu_get_hsr(vcpu) & HSR_DABT_S1PTW;
->  }
->  
-> +static inline bool kvm_vcpu_dabt_iscm(struct kvm_vcpu *vcpu)
-> +{
-> +	return !!(kvm_vcpu_get_hsr(vcpu) & HSR_DABT_CM);
-> +}
-> +
->  /* Get Access Size from a data abort */
->  static inline int kvm_vcpu_dabt_get_as(struct kvm_vcpu *vcpu)
->  {
-> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> index aba61fd..1a5f2ea 100644
-> --- a/arch/arm/kvm/mmu.c
-> +++ b/arch/arm/kvm/mmu.c
-> @@ -1431,6 +1431,23 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  		}
->  
->  		/*
-> +		 * Check for a cache maintenance operation. Since we
-> +		 * ended-up here, we know it is outside of any memory
-> +		 * slot. But we can't find out if that is for a device,
-> +		 * or if the guest is just being stupid (going all the
-> +		 * way to userspace is not an option - what would you
-> +		 * write?).
+> I need to add "clk_ignore_unused=1" to the bootargs in order to avoid
+> a hang during boot, but otherwise can reach a serial console.
 
-I'm not sure what the stuff about "what would you write?" means, I'm
-assuming it means that the ISV bit is clear.
+Were you testing on -next? If so, you should not need that. Otherwise,
+please make sure you have this patch [0]. Thierry has included this in a
+clock fixes series that should turn up in main soon.
 
-I think the point is more that if there's no S2 mapping, then there
-could never be any cache entries as a result of memory accesses using
-the GVA in question, so there's nothing to invalidate (like you state in
-your commit message).
+> Tested-by: Alexandre Courbot <acourbot@nvidia.com>
 
-> +		 *
-> +		 * So let's assume that the guest is just being
-> +		 * cautious, and skip the instruction.
-> +		 */
-> +		if (kvm_vcpu_dabt_iscm(vcpu)) {
-> +			kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
-> +			ret = 1;
-> +			goto out_unlock;
-> +		}
-> +
-> +		/*
->  		 * The IPA is reported as [MAX:12], so we need to
->  		 * complement it with the bottom 12 bits from the
->  		 * faulting VA. This is always 12 bits, irrespective
-> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-> index 3066328..01cdf5f 100644
-> --- a/arch/arm64/include/asm/kvm_emulate.h
-> +++ b/arch/arm64/include/asm/kvm_emulate.h
-> @@ -185,6 +185,11 @@ static inline bool kvm_vcpu_dabt_iss1tw(const struct kvm_vcpu *vcpu)
->  	return !!(kvm_vcpu_get_hsr(vcpu) & ESR_ELx_S1PTW);
->  }
->  
-> +static inline bool kvm_vcpu_dabt_iscm(const struct kvm_vcpu *vcpu)
-> +{
-> +	return !!(kvm_vcpu_get_hsr(vcpu) & ESR_ELx_CM);
-> +}
-> +
->  static inline int kvm_vcpu_dabt_get_as(const struct kvm_vcpu *vcpu)
->  {
->  	return 1 << ((kvm_vcpu_get_hsr(vcpu) & ESR_ELx_SAS) >> ESR_ELx_SAS_SHIFT);
-> -- 
-> 2.1.4
-> 
+Thanks
+Jon
 
-some nitpicking: if you modify anything here, I think is_cm is more clear than iscm.
-
-But besides the cosmetics:
-
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+[0] https://lkml.org/lkml/2015/12/18/390
