@@ -1,50 +1,47 @@
-From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
-Date: Thu, 11 Feb 2016 21:28:01 +0530
-Subject: [PATCH v10 3/8] dt, numa: adding numa dt binding implementation.
-In-Reply-To: <20160211153255.GR24726@rric.localdomain>
-References: <1454407763-1017-1-git-send-email-gkulkarni@caviumnetworks.com>
- <1454407763-1017-4-git-send-email-gkulkarni@caviumnetworks.com>
- <CAL_JsqK5HV9yzBE+ANnTw26eVR7Dy+B8OkwQ-7WF8KDa86Fd9g@mail.gmail.com>
- <20160211153255.GR24726@rric.localdomain>
-Message-ID: <CAFpQJXU+fon8DY--qhyZV=JDv9omqs=c9eSX34g1J2w2uudNKA@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 11 Feb 2016 15:59:44 +0000
+Subject: [PULL] KVM/ARM fixes for 4.5-rc4
+Message-ID: <1455206386-24997-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hi Paolo,
 
-On Thu, Feb 11, 2016 at 9:02 PM, Robert Richter
-<robert.richter@caviumnetworks.com> wrote:
-> On 11.02.16 08:50:41, Rob Herring wrote:
->> On Tue, Feb 2, 2016 at 4:09 AM, Ganapatrao Kulkarni
->> <gkulkarni@caviumnetworks.com> wrote:
->> > dt node parsing for numa topology is done using device property
->> > numa-node-id and device node distance-map.
->>
->> How is it that powerpc doesn't need flat DT parsing for NUMA? Both
->> arches are memblock based and the binding is similar IIRC, so you
->> should be able to find a way to do this with the unflattened tree.
->> Ideally, there should be some common code shared as well.
+Please find below the KVM/ARM updates for 4.5-rc4. One fix for the
+timer, and another for the HYP MMU setup.
 
-powerpc has implemented numa binding using property named
-"ibm,associativity", we too started adding using the same binding[
-refer version V6]
-however had discussion/review with Mark R about mapping and we could not map to
-some of the topology like mesh and ring topology.
+Please pull!
 
-So we have defined and implemented this new binding which is simple
-and scalable.
-This binding is very much aligned to ACPI NUMA specification.
+Thanks,
 
->>
->> Do you have a git tree with this series?
->
-> I have pushed it here for you:
->
->  https://git.kernel.org/cgit/linux/kernel/git/rric/linux.git/log/?h=thunder/numa-v10
+	M.
 
-thanks Robert.
->
-> -Robert
+The following changes since commit 6327f35a2010c06a3bc2bfb14202a38764fb9920:
 
-thanks
-Ganapat
+  arm64: KVM: Fix guest dead loop when register accessor returns false (2016-01-24 21:56:01 +0000)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-4.5-rc4
+
+for you to fetch changes up to 3c5b1d92b3b02be07873d611a27950addff544d3:
+
+  arm64: KVM: Configure TCR_EL2.PS at runtime (2016-02-11 13:16:47 +0000)
+
+----------------------------------------------------------------
+KVM/ARM fixes for 4.5-rc4
+
+- Fix for an unpleasant crash when the VM is created without a timer
+- Allow HYP mode to access the full PA space, and not only 40bit
+
+----------------------------------------------------------------
+Andre Przywara (1):
+      KVM: arm/arm64: Fix reference to uninitialised VGIC
+
+Tirumalesh Chalamarla (1):
+      arm64: KVM: Configure TCR_EL2.PS at runtime
+
+ arch/arm64/include/asm/kvm_arm.h |  2 --
+ arch/arm64/kvm/hyp-init.S        | 12 +++++++-----
+ virt/kvm/arm/arch_timer.c        |  9 ++++++---
+ 3 files changed, 13 insertions(+), 10 deletions(-)
