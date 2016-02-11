@@ -1,35 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 11 Feb 2016 10:10:00 +0100
-Subject: [PATCH] drm/msm: remove unused variable
-Message-ID: <1455181810-3910161-1-git-send-email-arnd@arndb.de>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 11 Feb 2016 11:08:42 +0200
+Subject: [PATCH v2] dmaengine: edma: Implement device_synchronize callback
+Message-ID: <1455181722-32099-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After the drm_device_is_unplugged() was removed, the 'dev' variable is now
-unused, and we get a warning for that:
+We need the callback to support the dmaengine_terminate_sync().
 
-drivers/gpu/drm/msm/msm_fbdev.c: In function 'msm_fbdev_mmap':
-drivers/gpu/drm/msm/msm_fbdev.c:65:21: error: unused variable 'dev' [-Werror=unused-variable]
-
-This removes the variable as well.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: e9f8250f2f92 ("drm/msm: remove the drm_device_is_unplugged check")
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- drivers/gpu/drm/msm/msm_fbdev.c | 1 -
- 1 file changed, 1 deletion(-)
+ drivers/dma/edma.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/drivers/gpu/drm/msm/msm_fbdev.c b/drivers/gpu/drm/msm/msm_fbdev.c
-index e119c2979509..d9759bf3482e 100644
---- a/drivers/gpu/drm/msm/msm_fbdev.c
-+++ b/drivers/gpu/drm/msm/msm_fbdev.c
-@@ -62,7 +62,6 @@ static int msm_fbdev_mmap(struct fb_info *info, struct vm_area_struct *vma)
- 	struct drm_fb_helper *helper = (struct drm_fb_helper *)info->par;
- 	struct msm_fbdev *fbdev = to_msm_fbdev(helper);
- 	struct drm_gem_object *drm_obj = fbdev->bo;
--	struct drm_device *dev = helper->dev;
- 	int ret = 0;
+diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+index 2dac314a2d7a..290e1a721c5b 100644
+--- a/drivers/dma/edma.c
++++ b/drivers/dma/edma.c
+@@ -869,6 +869,13 @@ static int edma_terminate_all(struct dma_chan *chan)
+ 	return 0;
+ }
  
- 	ret = drm_gem_mmap_obj(drm_obj, drm_obj->size, vma);
++static void edma_synchronize(struct dma_chan *chan)
++{
++	struct edma_chan *echan = to_edma_chan(chan);
++
++	vchan_synchronize(&echan->vchan);
++}
++
+ static int edma_slave_config(struct dma_chan *chan,
+ 	struct dma_slave_config *cfg)
+ {
+@@ -1808,6 +1815,7 @@ static void edma_dma_init(struct edma_cc *ecc, bool legacy_mode)
+ 	s_ddev->device_pause = edma_dma_pause;
+ 	s_ddev->device_resume = edma_dma_resume;
+ 	s_ddev->device_terminate_all = edma_terminate_all;
++	s_ddev->device_synchronize = edma_synchronize;
+ 
+ 	s_ddev->src_addr_widths = EDMA_DMA_BUSWIDTHS;
+ 	s_ddev->dst_addr_widths = EDMA_DMA_BUSWIDTHS;
+@@ -1833,6 +1841,7 @@ static void edma_dma_init(struct edma_cc *ecc, bool legacy_mode)
+ 		m_ddev->device_pause = edma_dma_pause;
+ 		m_ddev->device_resume = edma_dma_resume;
+ 		m_ddev->device_terminate_all = edma_terminate_all;
++		m_ddev->device_synchronize = edma_synchronize;
+ 
+ 		m_ddev->src_addr_widths = EDMA_DMA_BUSWIDTHS;
+ 		m_ddev->dst_addr_widths = EDMA_DMA_BUSWIDTHS;
 -- 
-2.7.0
+2.7.1
