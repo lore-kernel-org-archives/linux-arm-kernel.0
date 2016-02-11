@@ -1,61 +1,39 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Thu, 11 Feb 2016 22:47:13 +0100
-Subject: [PULL] KVM/ARM fixes for 4.5-rc4
-In-Reply-To: <1455206386-24997-1-git-send-email-marc.zyngier@arm.com>
-References: <1455206386-24997-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <56BD0161.6060003@redhat.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 12 Feb 2016 00:49:52 +0300
+Subject: [PATCH] ARM: dts: porter: fix JP3 jumper description
+In-Reply-To: <1674850.BZpGW9kEud@wasted.cogentembedded.com>
+References: <1674850.BZpGW9kEud@wasted.cogentembedded.com>
+Message-ID: <1655804.y4T36KvG5v@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+When finishing the Porter sound support patch, I managed to call the JP3
+jumper SW3 in the comment.  Fix this  along with (also miscalled) jumper
+positions...
 
+Fixes: 493b4da7c10c ("ARM: dts: porter: add sound support")
+Reported-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-On 11/02/2016 16:59, Marc Zyngier wrote:
-> Hi Paolo,
-> 
-> Please find below the KVM/ARM updates for 4.5-rc4. One fix for the
-> timer, and another for the HYP MMU setup.
-> 
-> Please pull!
-> 
-> Thanks,
-> 
-> 	M.
-> 
-> The following changes since commit 6327f35a2010c06a3bc2bfb14202a38764fb9920:
-> 
->   arm64: KVM: Fix guest dead loop when register accessor returns false (2016-01-24 21:56:01 +0000)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-4.5-rc4
-> 
-> for you to fetch changes up to 3c5b1d92b3b02be07873d611a27950addff544d3:
-> 
->   arm64: KVM: Configure TCR_EL2.PS at runtime (2016-02-11 13:16:47 +0000)
-> 
-> ----------------------------------------------------------------
-> KVM/ARM fixes for 4.5-rc4
-> 
-> - Fix for an unpleasant crash when the VM is created without a timer
-> - Allow HYP mode to access the full PA space, and not only 40bit
-> 
-> ----------------------------------------------------------------
-> Andre Przywara (1):
->       KVM: arm/arm64: Fix reference to uninitialised VGIC
-> 
-> Tirumalesh Chalamarla (1):
->       arm64: KVM: Configure TCR_EL2.PS at runtime
-> 
->  arch/arm64/include/asm/kvm_arm.h |  2 --
->  arch/arm64/kvm/hyp-init.S        | 12 +++++++-----
->  virt/kvm/arm/arch_timer.c        |  9 ++++++---
->  3 files changed, 13 insertions(+), 10 deletions(-)
-> --
-> To unsubscribe from this list: send the line "unsubscribe kvm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+---
+This patch is against the 'renesas-devel-20160209-v4.5-rc3' tag of Simon
+Horman's 'renesas.git' repo.
 
-Pulled, thanks (but I'll probably delay it to rc5).
+arch/arm/boot/dts/r8a7791-porter.dts |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Paolo
+Index: renesas/arch/arm/boot/dts/r8a7791-porter.dts
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/r8a7791-porter.dts
++++ renesas/arch/arm/boot/dts/r8a7791-porter.dts
+@@ -11,8 +11,8 @@
+ /*
+  * SSI-AK4642
+  *
+- * SW3: 1: AK4642
+- *      3: ADV7511
++ * JP3: 2-1: AK4642
++ *      2-3: ADV7511
+  *
+  * This command is required before playback/capture:
+  *
