@@ -1,136 +1,136 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 11 Feb 2016 23:26:38 +0300
-Subject: [PATCH] ARM: dts: silk: add sound support
-In-Reply-To: <1674850.BZpGW9kEud@wasted.cogentembedded.com>
-References: <1674850.BZpGW9kEud@wasted.cogentembedded.com>
-Message-ID: <4246644.0ZLx3MiCIL@wasted.cogentembedded.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 11 Feb 2016 22:39:03 +0200
+Subject: [PATCH 4/3] iommu/io-pgtable: Rationalise quirk handling
+In-Reply-To: <ea1f3d3feec0dc9c18d43393678370b50b1275f5.1455206840.git.robin.murphy@arm.com>
+References: <cover.1453723096.git.robin.murphy@arm.com>
+ <20160210154815.GO1052@arm.com>
+ <ea1f3d3feec0dc9c18d43393678370b50b1275f5.1455206840.git.robin.murphy@arm.com>
+Message-ID: <8742562.HTCU9VW42O@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the SILK board dependent part of the R8A7794 sound  device node.
-Add device node for Asahi Kasei AK4643 stereo codec to the I2C1 bus.
-Add the "simple-audio-card" device node to interconnect the SoC sound
-device  and the codec.
+Hi Robin,
 
-This patch is based on the commit 493b4da7c10c ("ARM: dts: porter: add
-sound support").
+Thank you for the patch.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+On Thursday 11 February 2016 16:13:45 Robin Murphy wrote:
+> As the number of io-pgtable implementations grows beyond 1, it's time
+> to rationalise the quirks mechanism before things have a chance to
+> start getting really ugly and out-of-hand.
+> 
+> To that end:
+> - Indicate exactly which quirks each format can/does support.
+> - Fail creating a table if a caller wants unsupported quirks.
+> - Properly document where each quirk applies and why.
+> 
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 
----
-This patch is against the 'renesas-devel-20160209-v4.5-rc3' tag of Simon
-Horman's 'renesas.git' repo. It depends on the 5 R8A7794 sound support patches
-in posted earlier this week  in order to build and the R8A7794 PFC driver
-patches posted yesterday in  order  for  the pins to be properly configured
-(but works without the pins  configured  too)...
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
- arch/arm/boot/dts/r8a7794-silk.dts |   71 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 71 insertions(+)
+> ---
+>  drivers/iommu/io-pgtable-arm-v7s.c |  3 +++
+>  drivers/iommu/io-pgtable-arm.c     |  2 ++
+>  drivers/iommu/io-pgtable.c         |  3 +++
+>  drivers/iommu/io-pgtable.h         | 24 ++++++++++++++++++++----
+>  4 files changed, 28 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/iommu/io-pgtable-arm-v7s.c
+> b/drivers/iommu/io-pgtable-arm-v7s.c index d39a021..9bc607a 100644
+> --- a/drivers/iommu/io-pgtable-arm-v7s.c
+> +++ b/drivers/iommu/io-pgtable-arm-v7s.c
+> @@ -690,6 +690,9 @@ out_free_data:
+>  struct io_pgtable_init_fns io_pgtable_arm_v7s_init_fns = {
+>  	.alloc	= arm_v7s_alloc_pgtable,
+>  	.free	= arm_v7s_free_pgtable,
+> +	.supported_quirks = IO_PGTABLE_QUIRK_ARM_NS |
+> +			    IO_PGTABLE_QUIRK_NO_PERMS |
+> +			    IO_PGTABLE_QUIRK_TLBI_ON_MAP,
+>  };
+> 
+>  #ifdef CONFIG_IOMMU_IO_PGTABLE_ARMV7S_SELFTEST
+> diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
+> index 4095af2..32f94f1 100644
+> --- a/drivers/iommu/io-pgtable-arm.c
+> +++ b/drivers/iommu/io-pgtable-arm.c
+> @@ -863,6 +863,7 @@ arm_32_lpae_alloc_pgtable_s2(struct io_pgtable_cfg *cfg,
+> void *cookie) struct io_pgtable_init_fns io_pgtable_arm_64_lpae_s1_init_fns
+> = { .alloc	= arm_64_lpae_alloc_pgtable_s1,
+>  	.free	= arm_lpae_free_pgtable,
+> +	.supported_quirks = IO_PGTABLE_QUIRK_ARM_NS,
+>  };
+> 
+>  struct io_pgtable_init_fns io_pgtable_arm_64_lpae_s2_init_fns = {
+> @@ -873,6 +874,7 @@ struct io_pgtable_init_fns
+> io_pgtable_arm_64_lpae_s2_init_fns = { struct io_pgtable_init_fns
+> io_pgtable_arm_32_lpae_s1_init_fns = { .alloc	=
+> arm_32_lpae_alloc_pgtable_s1,
+>  	.free	= arm_lpae_free_pgtable,
+> +	.supported_quirks = IO_PGTABLE_QUIRK_ARM_NS,
+>  };
+> 
+>  struct io_pgtable_init_fns io_pgtable_arm_32_lpae_s2_init_fns = {
+> diff --git a/drivers/iommu/io-pgtable.c b/drivers/iommu/io-pgtable.c
+> index 876f6a7..0f57a45 100644
+> --- a/drivers/iommu/io-pgtable.c
+> +++ b/drivers/iommu/io-pgtable.c
+> @@ -52,6 +52,9 @@ struct io_pgtable_ops *alloc_io_pgtable_ops(enum
+> io_pgtable_fmt fmt, if (!fns)
+>  		return NULL;
+> 
+> +	if (cfg->quirks & ~fns->supported_quirks)
+> +		return NULL;
+> +
+>  	iop = fns->alloc(cfg, cookie);
+>  	if (!iop)
+>  		return NULL;
+> diff --git a/drivers/iommu/io-pgtable.h b/drivers/iommu/io-pgtable.h
+> index 4faee7d..6e7f11e 100644
+> --- a/drivers/iommu/io-pgtable.h
+> +++ b/drivers/iommu/io-pgtable.h
+> @@ -47,10 +47,24 @@ struct iommu_gather_ops {
+>   *                 page table walker.
+>   */
+>  struct io_pgtable_cfg {
+> -	#define IO_PGTABLE_QUIRK_ARM_NS		BIT(0) /* Set NS bit in PTEs */
+> -	#define IO_PGTABLE_QUIRK_NO_PERMS	BIT(1) /* No AP/XN bits */
+> -	#define IO_PGTABLE_QUIRK_TLBI_ON_MAP	BIT(2) /* TLB Inv. on map */
+> -	int				quirks;
+> +	/*
+> +	 * IO_PGTABLE_QUIRK_ARM_NS: (ARM formats) Set NS and NSTABLE bits in
+> +	 *	stage 1 PTEs, for hardware which insists on validating them
+> +	 *	even in	non-secure state where they should normally be ignored.
+> +	 *
+> +	 * IO_PGTABLE_QUIRK_NO_PERMS: Ignore the IOMMU_READ, IOMMU_WRITE and
+> +	 *	IOMMU_NOEXEC flags and map everything with full access, for
+> +	 *	hardware which does not implement the permissions of a given
+> +	 *	format, and/or requires some format-specific default value.
+> +	 *
+> +	 * IO_PGTABLE_QUIRK_TLBI_ON_MAP: If the format forbids caching invalid
+> +	 *	(unmapped) entries but the hardware might do so anyway, perform
+> +	 *	TLB maintenance when mapping as well as when unmapping.
+> +	 */
+> +	#define IO_PGTABLE_QUIRK_ARM_NS		BIT(0)
+> +	#define IO_PGTABLE_QUIRK_NO_PERMS	BIT(1)
+> +	#define IO_PGTABLE_QUIRK_TLBI_ON_MAP	BIT(2)
+> +	unsigned int			quirks;
+>  	unsigned long			pgsize_bitmap;
+>  	unsigned int			ias;
+>  	unsigned int			oas;
+> @@ -173,10 +187,12 @@ static inline void io_pgtable_tlb_sync(struct
+> io_pgtable *iop) *
+>   * @alloc: Allocate a set of page tables described by cfg.
+>   * @free:  Free the page tables associated with iop.
+> + * @supported_quirks: Bitmap of quirks supported by the format.
+>   */
+>  struct io_pgtable_init_fns {
+>  	struct io_pgtable *(*alloc)(struct io_pgtable_cfg *cfg, void *cookie);
+>  	void (*free)(struct io_pgtable *iop);
+> +	unsigned int supported_quirks;
+>  };
+> 
+>  extern struct io_pgtable_init_fns io_pgtable_arm_32_lpae_s1_init_fns;
 
-Index: renesas/arch/arm/boot/dts/r8a7794-silk.dts
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7794-silk.dts
-+++ renesas/arch/arm/boot/dts/r8a7794-silk.dts
-@@ -10,6 +10,17 @@
-  * kind, whether express or implied.
-  */
- 
-+/*
-+ * SSI-AK4643
-+ *
-+ * SW1: 2-1: AK4643
-+ *      2-3: ADV7511
-+ *
-+ * This command is required before playback/capture:
-+ *
-+ *	amixer set "LINEOUT Mixer DACL" on
-+ */
-+
- /dts-v1/;
- #include "r8a7794.dtsi"
- #include <dt-bindings/gpio/gpio.h>
-@@ -119,6 +130,30 @@
- 		#clock-cells = <0>;
- 		clock-frequency = <74250000>;
- 	};
-+
-+	x9_clk: x9-clock {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <12288000>;
-+		clock-output-names = "audio_clock";
-+	};
-+
-+	sound {
-+		compatible = "simple-audio-card";
-+
-+		simple-audio-card,format = "left_j";
-+		simple-audio-card,bitclock-master = <&soundcodec>;
-+		simple-audio-card,frame-master = <&soundcodec>;
-+
-+		simple-audio-card,cpu {
-+			sound-dai = <&rcar_sound>;
-+		};
-+
-+		soundcodec: simple-audio-card,codec {
-+			sound-dai = <&ak4643>;
-+			clocks = <&x9_clk>;
-+		};
-+	};
- };
- 
- &extal_clk {
-@@ -183,6 +218,16 @@
- 		renesas,groups = "usb1";
- 		renesas,function = "usb1";
- 	};
-+
-+	ssi_pins: sound {
-+		renesas,groups = "ssi0129_ctrl", "ssi0_data", "ssi1_data";
-+		renesas,function = "ssi";
-+	};
-+
-+	audio_clk_pins: audio_clk {
-+		renesas,groups = "audio_clkc";
-+		renesas,function = "audio_clk";
-+	};
- };
- 
- &scif2 {
-@@ -220,6 +265,12 @@
- 	status = "okay";
- 	clock-frequency = <400000>;
- 
-+	ak4643: codec at 12 {
-+		compatible = "asahi-kasei,ak4643";
-+		#sound-dai-cells = <0>;
-+		reg = <0x12>;
-+	};
-+
- 	composite-in at 20 {
- 		compatible = "adi,adv7180";
- 		reg = <0x20>;
-@@ -380,3 +431,23 @@
- 		};
- 	};
- };
-+
-+&rcar_sound {
-+	pinctrl-0 = <&ssi_pins &audio_clk_pins>;
-+	pinctrl-names = "default";
-+	status = "okay";
-+
-+	/* Single DAI */
-+	#sound-dai-cells = <0>;
-+
-+	rcar_sound,dai {
-+		dai0 {
-+			playback = <&ssi0>;
-+			capture  = <&ssi1>;
-+		};
-+	};
-+};
-+
-+&ssi1 {
-+	shared-pin;
-+};
+-- 
+Regards,
+
+Laurent Pinchart
