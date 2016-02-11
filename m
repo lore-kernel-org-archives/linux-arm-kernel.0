@@ -1,37 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 11 Feb 2016 15:14:56 +0100
-Subject: [PATCH v2 3/8] arm: add device-tree SoC bindings for Axis Artpec-6
-In-Reply-To: <0f096d1ad277cf94032ca274ced0cb35cb5d967c.1455198819.git.larper@axis.com>
-References: <cover.1455198819.git.larper@axis.com>
- <0f096d1ad277cf94032ca274ced0cb35cb5d967c.1455198819.git.larper@axis.com>
-Message-ID: <7242985.WgQduhPVkk@wuerfel>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 11 Feb 2016 15:14:59 +0100
+Subject: [PATCH] MAINTAINERS: mmc: Add Adrian Hunter as the maintainer for
+ SDHCI
+Message-ID: <1455200099-5306-1-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 11 February 2016 15:04:37 Lars Persson wrote:
-> +
-> +The DMA configuration unit muxes dma request lines between single and burst
-> +alternatives.
-> +
-> +Required properties:
-> +- compatible: axis,artpec6-dmacfg
-> +- reg: Address and length of DMACFG register.
-> +
-> +Example:
-> +       dmacfg {
-> +               compatible = "axis,artpec6-dmacfg";
-> +               reg = <0xf8000010 4>;
-> +       };
-> +
+>From discussions on linux-mmc I have been encouraging someone to pick
+up the maintainer role for SDHCI. I am very pleased that Adrian Hunter
+volunteered and accepted the challenge!
 
+The SDHCI code is currently in quite poor quality, but we have agreed on
+a way forward to try to reach a point where the SDHCI core becomes more of
+a set of library functions. Each SDHCI driver variant can then decide
+which functions to use and allows it to implement variant specific code,
+without needing to also change SDHCI core code.
 
-This method looks better than before, but putting a single register
-into DT looks wrong. I can almost guarantee that there are more
-registers at 0xf8000000-0xf8000fff (or more) that belong to either
-some system controller or a DMA controller.
+In the end we aim to get better optimized and maintainable code.
 
-Whatever it is, please describe it in the DT in a sensible way based
-on what the hardware does and what other resources it uses (interrupts
-etc) rather than what today's kernel happens to need.
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
+ MAINTAINERS | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-	Arnd
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 30aca4a..5511069 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -9706,10 +9706,11 @@ S:	Maintained
+ F:	drivers/mmc/host/sdricoh_cs.c
+ 
+ SECURE DIGITAL HOST CONTROLLER INTERFACE (SDHCI) DRIVER
++M:	Adrian Hunter <adrian.hunter@intel.com>
+ L:	linux-mmc at vger.kernel.org
+-S:	Orphan
+-F:	drivers/mmc/host/sdhci.*
+-F:	drivers/mmc/host/sdhci-pltfm.[ch]
++S:	Maintained
++F:	drivers/mmc/host/sdhci*
++F:	include/linux/mmc/sdhci*
+ 
+ SECURE COMPUTING
+ M:	Kees Cook <keescook@chromium.org>
+-- 
+1.9.1
