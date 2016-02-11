@@ -1,60 +1,49 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 11 Feb 2016 11:00:57 +0200
-Subject: [PATCH] dmaengine: edma: Implement device_synchronize callback
-In-Reply-To: <1455180872-2620-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1455180872-2620-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <56BC4DC9.6000309@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 11 Feb 2016 09:09:46 +0000
+Subject: [PATCH 01/14] mfd: intel_quark_i2c_gpio: Use clkdev_create()
+In-Reply-To: <20160210183504.GG30978@codeaurora.org>
+References: <1454982341-22715-1-git-send-email-sboyd@codeaurora.org>
+ <1454982341-22715-2-git-send-email-sboyd@codeaurora.org>
+ <20160210162349.GJ3782@x1> <20160210183504.GG30978@codeaurora.org>
+Message-ID: <20160211090946.GY3782@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/11/2016 10:54 AM, Peter Ujfalusi wrote:
-> We need the callback to support the dmaengine_terminate_sync().
+On Wed, 10 Feb 2016, Stephen Boyd wrote:
 
-I have made some typos and I only compiled the kernel after sending the patch..
-Resending.
+> On 02/10, Lee Jones wrote:
+> > On Mon, 08 Feb 2016, Stephen Boyd wrote:
+> > 
+> > > Convert this driver to use clkdev_create() instead of
+> > > clk_register_clkdevs(). The latter API is only used by this driver,
+> > > although this driver only allocates one clk to add anyway.
+> > > Furthermore, this driver allocates the clk_lookup structure with
+> > > devm, but clkdev_drop() will free that structure when passed,
+> > > leading to a double free when this driver is removed. Clean it
+> > > all up and pave the way for the removal of clk_register_clkdevs().
+> > > 
+> > > Cc: Lee Jones <lee.jones@linaro.org>
+> > > Cc: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+> > > Cc: Russell King <linux@arm.linux.org.uk>
+> > > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> > > ---
+> > >  drivers/mfd/intel_quark_i2c_gpio.c | 26 +++++++++-----------------
+> > >  1 file changed, 9 insertions(+), 17 deletions(-)
+> > 
+> > I never much liked this code [0]
+> > 
+> > Glad for it to be simplified.
+> > 
+> > Applied, thanks.
+> > 
+> 
+> Can you please ack the patch instead? I'd like to take it through
+> the clk tree so that I can remove clk_register_clkdevs() as well.
 
-> 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> ---
->  drivers/dma/edma.c | 9 +++++++++
->  1 file changed, 9 insertions(+)
-> 
-> diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-> index 2dac314a2d7a..ea0d919a3318 100644
-> --- a/drivers/dma/edma.c
-> +++ b/drivers/dma/edma.c
-> @@ -869,6 +869,13 @@ static int edma_terminate_all(struct dma_chan *chan)
->  	return 0;
->  }
->  
-> +static void edma_synchronize(struct dma_chan *c)
-> +{
-> +	struct edma_chan *echan = to_edma_chan(chan);
-> +
-> +	vchan_synchronize(&echan->vchan);
-> +}
-> +
->  static int edma_slave_config(struct dma_chan *chan,
->  	struct dma_slave_config *cfg)
->  {
-> @@ -1808,6 +1815,7 @@ static void edma_dma_init(struct edma_cc *ecc, bool legacy_mode)
->  	s_ddev->device_pause = edma_dma_pause;
->  	s_ddev->device_resume = edma_dma_resume;
->  	s_ddev->device_terminate_all = edma_terminate_all;
-> +	s_ddev->device_synchronize = edma_synchronize;
->  
->  	s_ddev->src_addr_widths = EDMA_DMA_BUSWIDTHS;
->  	s_ddev->dst_addr_widths = EDMA_DMA_BUSWIDTHS;
-> @@ -1833,6 +1841,7 @@ static void edma_dma_init(struct edma_cc *ecc, bool legacy_mode)
->  		m_ddev->device_pause = edma_dma_pause;
->  		m_ddev->device_resume = edma_dma_resume;
->  		m_ddev->device_terminate_all = edma_terminate_all;
-> +		m_ddev->device_synchronize = edma_synchronize;
->  
->  		m_ddev->src_addr_widths = EDMA_DMA_BUSWIDTHS;
->  		m_ddev->dst_addr_widths = EDMA_DMA_BUSWIDTHS;
-> 
-
+I'll make a branch you can pull from.
 
 -- 
-P?ter
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
