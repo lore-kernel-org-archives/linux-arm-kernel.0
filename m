@@ -1,36 +1,33 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 12 Feb 2016 00:14:14 +0100
-Subject: [PATCH v2 5/6] serial: 8250/mediatek: fix building with
- SERIAL_8250=m
-In-Reply-To: <1455205297-1021302-6-git-send-email-arnd@arndb.de>
-References: <1455205297-1021302-1-git-send-email-arnd@arndb.de>
- <1455205297-1021302-6-git-send-email-arnd@arndb.de>
-Message-ID: <56BD15C6.6040006@gmail.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Thu, 11 Feb 2016 17:15:27 -0600
+Subject: [PATCH] of/irq: Fix msi-map calculation for nonzero rid-base
+In-Reply-To: <56BC6ABA.5020605@arm.com>
+References: <9f6845195d03b0e0b0d187bb510fbf7bd497e836.1455015344.git.robin.murphy@arm.com>
+ <56BC6ABA.5020605@arm.com>
+Message-ID: <CAL_JsqLScMdfUAtMPDGWphc_PZp4K-c0MfjRZh9G7=A9pLZu9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 11/02/16 16:41, Arnd Bergmann wrote:
-> The Mediatek 8250 driver has a 'bool' Kconfig symbol, but that
-> breaks when SERIAL_8250 is a loadable module:
+On Thu, Feb 11, 2016 at 5:04 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 09/02/16 11:04, Robin Murphy wrote:
+>> The existing msi-map code is fine for shifting the entire RID space
+>> upwards, but attempting finer-grained remapping reveals a bug. It turns
+>> out that we are mistakenly treating the msi-base part as an offset, not
+>> as a new base to remap onto, so things get squiffy when rid-base is
+>> nonzero. Fix this, and at the same time add a sanity check against
+>> having msi-map-mask clash with a nonzero rid-base, as that's another
+>> thing one can easily get wrong.
+>>
+>> CC: <stable@vger.kernel.org>
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 >
-> drivers/tty/built-in.o: In function `mtk8250_set_termios':
-> :(.text+0x1bee8): undefined reference to `serial8250_do_set_termios'
-> :(.text+0x1bf10): undefined reference to `uart_get_baud_rate'
-> :(.text+0x1c09c): undefined reference to `uart_get_divisor'
-> drivers/tty/built-in.o: In function `mtk8250_do_pm':
-> :(.text+0x1c0d0): undefined reference to `serial8250_do_pm'
-> drivers/tty/built-in.o: In function `mtk8250_probe':
-> :(.text+0x1c2e4): undefined reference to `serial8250_register_8250_port'
-> serial/8250/8250_mtk.c:287:242: error: data definition has no type or storage class [-Werror]
-> serial/8250/8250_mtk.c:287:122: error: 'mtk8250_platform_driver_init' defined but not used [-Werror=unused-function]
+> Rob, Frank,
 >
-> This changes the symbol to a 'tristate', so the dependency on
-> SERIAL_8250 also works when that is set to 'm'.
-> To actually build the driver, we also need to include <linux/module.h>.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
+> Are you willing to take this one through the OF tree? Or should we route
+> it through the IRQ tree? It'd be good if it make it into 4.5.
 
-Acked-by: Matthias Brugger <matthias.bgg@gmail.com>
+Applied for 4.5. ATM, I don't have anything else to send to Linus.
+I'll give it a week or so if this is not urgent. Or send me a bunch of
+DT binding fixes and you can get it in sooner. ;)
+
+Rob
