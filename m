@@ -1,110 +1,206 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 11 Feb 2016 09:26:32 -0800
-Subject: [PATCH 1/7] mmc: omap_hsmmc: Fix PM regression with deferred
- probe for pm_runtime_reinit
-In-Reply-To: <CAPDyKFo4Jyjwyvr3P5VHfDhQ87K9mnR01N-NtKz-yx2ycnfOLg@mail.gmail.com>
-References: <1455145370-20301-1-git-send-email-tony@atomide.com>
- <1455145370-20301-2-git-send-email-tony@atomide.com>
- <CAPDyKFpAcsfLgtu93P45fTEg11MjdGwREcyeGSS7vt6GWbNu_w@mail.gmail.com>
- <20160211150240.GR19432@atomide.com>
- <CAPDyKFo4Jyjwyvr3P5VHfDhQ87K9mnR01N-NtKz-yx2ycnfOLg@mail.gmail.com>
-Message-ID: <20160211172632.GT19432@atomide.com>
+From: yang.shi@linaro.org (Shi, Yang)
+Date: Thu, 11 Feb 2016 09:29:57 -0800
+Subject: [PATCH] arm64: reenable interrupt when handling ptrace breakpoint
+In-Reply-To: <20160211135435.GG32084@arm.com>
+References: <5671CD5B.9030907@linaro.org> <20151221104818.GF23092@arm.com>
+ <alpine.DEB.2.11.1512211749180.28591@nanos> <20151221170028.GT23092@arm.com>
+ <56955B3A.5010303@linaro.org> <20160113102622.GC25458@arm.com>
+ <569686BA.6050703@linaro.org> <20160113172303.GH25458@arm.com>
+ <56969312.7070309@linaro.org> <56B5135B.3050801@linaro.org>
+ <20160211135435.GG32084@arm.com>
+Message-ID: <56BCC515.2030107@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ulf Hansson <ulf.hansson@linaro.org> [160211 07:14]:
-> On 11 February 2016 at 16:02, Tony Lindgren <tony@atomide.com> wrote:
-> > * Ulf Hansson <ulf.hansson@linaro.org> [160211 02:19]:
-> >> On 11 February 2016 at 00:02, Tony Lindgren <tony@atomide.com> wrote:
-> >> >
-> >> > Ulf, I'd like to merge this along with other related fixes via the
-> >> > ARM SoC tree if no objections, please review and ack if this look OK
-> >> > to you.
-> >>
-> >> I have some other omap_hsmmc patches queued for 4.6, so I prefer to
-> >> send this via my mmc tree.
-> >>
-> >> I guess that's okay as well!?
-> >
-> > Naturally yes, please go ahead thanks!
-> 
-> Okay!
-> 
-> BTW, did you notice my other comments to the patch?
-> 
-> I can fix them before applying, unless you want to send a v2?
+On 2/11/2016 5:54 AM, Will Deacon wrote:
+> On Fri, Feb 05, 2016 at 01:25:47PM -0800, Shi, Yang wrote:
+>> On 1/13/2016 10:10 AM, Shi, Yang wrote:
+>>> On 1/13/2016 9:23 AM, Will Deacon wrote:
+>>>> On Wed, Jan 13, 2016 at 09:17:46AM -0800, Shi, Yang wrote:
+>>>>> On 1/13/2016 2:26 AM, Will Deacon wrote:
+>>>>>> On Tue, Jan 12, 2016 at 11:59:54AM -0800, Shi, Yang wrote:
+>>>>>>> This might be buried in email storm during the holiday. Just want
+>>>>>>> to double
+>>>>>>> check the status. I'm supposed there is no objection for getting it
+>>>>>>> merged
+>>>>>>> in upstream?
+>>>>>>
+>>>>>> Sorry, when you replied with:
+>>>>>>
+>>>>>>> I think we could just extend the "signal delay send" approach from
+>>>>>>> x86-64
+>>>>>>> to arm64, which is currently used by x86-64 on -rt kernel only.
+>>>>>>
+>>>>>> I understood that you were going to fix -rt, so I dropped this pending
+>>>>>> anything more from you.
+>>>>>>
+>>>>>> What's the plan?
+>>>>>
+>>>>> Sorry for the confusion. The "signal delay send" approach used by
+>>>>> x86-64 -rt
+>>>>> should be not necessary for arm64 right now. Reenabling interrupt is
+>>>>> still
+>>>>> the preferred approach.
+>>>>>
+>>>>> Since x86-64 has per-CPU IST exception stack, so preemption has to be
+>>>>> disabled all the time. However, it is not applicable to other
+>>>>> architectures
+>>>>> for now, including arm64.
+>>>>
+>>>> Actually, we grew support for a separate IRQ stack in the recent merge
+>>>> window. Does that change things here, or are you referring to something
+>>>> else?
+>>>
+>>> Had a quick look at the patches, it looks the irq stack is not nestable
+>>> and it switches back to the original stack as long as irq handler is
+>>> done before preempt happens. So, it sounds it won't change things here.
+>>
+>>
+>> Just had a quick test on 4.5-rc1. It survives with kgdbts, ptrace and ltp.
+>> So, it sounds safe with the "separate IRQ stack" change.
+>
+> I quite liked the sigtrap consolidation in my earlier (broken) approach.
+> Does the following work for you?
 
-Oh sorry, no I missed the rest of your comments again, I really
-need to recalibrate my reading habits obviously if I keep
-missing comments on regular basis..
+Yes, sure. One minor comment below.
 
-You comments make sense to me. Below is the patch with only
-minimal changes. Seems to work just fine and hit off mode for
-suspend too.
+>
+> Will
+>
+> --->8
+>
+>  From e04a28d45ff343b47a4ffc4dee3a3e279e76ddfa Mon Sep 17 00:00:00 2001
+> From: Will Deacon <will.deacon@arm.com>
+> Date: Wed, 10 Feb 2016 16:05:28 +0000
+> Subject: [PATCH] arm64: debug: re-enable irqs before sending breakpoint
+>   SIGTRAP
+>
+> force_sig_info can sleep under an -rt kernel, so attempting to send a
+> breakpoint SIGTRAP with interrupts disabled yields the following BUG:
+>
+>    BUG: sleeping function called from invalid context at
+>    /kernel-source/kernel/locking/rtmutex.c:917
+>    in_atomic(): 0, irqs_disabled(): 128, pid: 551, name: test.sh
+>    CPU: 5 PID: 551 Comm: test.sh Not tainted 4.1.13-rt13 #7
+>    Hardware name: Freescale Layerscape 2085a RDB Board (DT)
+>    Call trace:
+> 	 dump_backtrace+0x0/0x128
+> 	 show_stack+0x24/0x30
+> 	 dump_stack+0x80/0xa0
+> 	 ___might_sleep+0x128/0x1a0
+> 	 rt_spin_lock+0x2c/0x40
+> 	 force_sig_info+0xcc/0x210
+> 	 brk_handler.part.2+0x6c/0x80
+> 	 brk_handler+0xd8/0xe8
+> 	 do_debug_exception+0x58/0xb8
+>
+> This patch fixes the problem by ensuring that interrupts are enabled
+> prior to sending the SIGTRAP if they were already enabled in the user
+> context.
+>
+> Reported-by: Yang Shi <yang.shi@linaro.org>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>   arch/arm64/kernel/debug-monitors.c | 48 +++++++++++++++++---------------------
+>   1 file changed, 22 insertions(+), 26 deletions(-)
+>
+> diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
+> index 8aee3aeec3e6..c536c9e307b9 100644
+> --- a/arch/arm64/kernel/debug-monitors.c
+> +++ b/arch/arm64/kernel/debug-monitors.c
+> @@ -226,11 +226,28 @@ static int call_step_hook(struct pt_regs *regs, unsigned int esr)
+>   	return retval;
+>   }
+>
+> +static void send_user_sigtrap(int si_code)
+> +{
+> +	struct pt_regs *regs = current_pt_regs();
+> +	siginfo_t info = {
+> +		.si_signo	= SIGTRAP,
+> +		.si_errno	= 0,
+> +		.si_code	= si_code,
+> +		.si_addr	= (void __user *)instruction_pointer(regs),
+> +	};
+> +
+> +	if (WARN_ON(!user_mode(regs)))
 
-Regards,
+Maybe BUG_ON should be used here? Since send_user_sigtrap is called only 
+when user_mode is positive, and interrupt is disabled at this point, so 
+if it is not positive, it sounds list a bug.
 
-Tony
+Thanks,
+Yang
 
-8< -------------------
->From eb3c93421f01fb6198f76127262a92b527dd214c Mon Sep 17 00:00:00 2001
-From: Tony Lindgren <tony@atomide.com>
-Date: Tue, 9 Feb 2016 09:31:10 -0800
-Subject: [PATCH] mmc: omap_hsmmc: Fix PM regression with deferred probe for
- pm_runtime_reinit
-
-Commit 5de85b9d57ab ("PM / runtime: Re-init runtime PM states at probe
-error and driver unbind") introduced pm_runtime_reinit() that is used
-to reinitialize PM runtime after -EPROBE_DEFER. This allows shutting
-down the device after a failed probe.
-
-However, for drivers using pm_runtime_use_autosuspend() this can cause
-a state where suspend callback is never called after -EPROBE_DEFER.
-On the following device driver probe, hardware state is different from
-the PM runtime state causing omap_device to produce the following
-error:
-
-omap_device_enable() called from invalid state 1
-
-And with omap_device and omap hardware being picky for PM, this will
-block any deeper idle states in hardware.
-
-The solution is to fix the drivers to follow the PM runtime documentation:
-
-1. For sections of code that needs the device disabled, use
-   pm_runtime_put_sync_suspend() if pm_runtime_set_autosuspend() has
-   been set.
-
-2. For driver exit code, use pm_runtime_dont_use_autosuspend() before
-   pm_runtime_put_sync() if pm_runtime_use_autosuspend() has been
-   set.
-
-Fixes: 5de85b9d57ab ("PM / runtime: Re-init runtime PM states at probe
-error and driver unbind")
-Cc: linux-mmc at vger.kernel.org
-Cc: Alan Stern <stern@rowland.harvard.edu>
-Cc: Kevin Hilman <khilman@baylibre.com>
-Cc: Nishanth Menon <nm@ti.com>
-Cc: Rafael J. Wysocki <rafael@kernel.org>
-Cc: Ulf Hansson <ulf.hansson@linaro.org>
-Cc: Tero Kristo <t-kristo@ti.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
---- a/drivers/mmc/host/omap_hsmmc.c
-+++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -2232,6 +2232,7 @@ err_irq:
- 		dma_release_channel(host->tx_chan);
- 	if (host->rx_chan)
- 		dma_release_channel(host->rx_chan);
-+	pm_runtime_dont_use_autosuspend(host->dev);
- 	pm_runtime_put_sync(host->dev);
- 	pm_runtime_disable(host->dev);
- 	if (host->dbclk)
-@@ -2253,6 +2254,7 @@ static int omap_hsmmc_remove(struct platform_device *pdev)
- 	dma_release_channel(host->tx_chan);
- 	dma_release_channel(host->rx_chan);
- 
-+	pm_runtime_dont_use_autosuspend(host->dev);
- 	pm_runtime_put_sync(host->dev);
- 	pm_runtime_disable(host->dev);
- 	device_init_wakeup(&pdev->dev, false);
+> +		return;
+> +
+> +	if (interrupts_enabled(regs))
+> +		local_irq_enable();
+> +
+> +	force_sig_info(SIGTRAP, &info, current);
+> +}
+> +
+>   static int single_step_handler(unsigned long addr, unsigned int esr,
+>   			       struct pt_regs *regs)
+>   {
+> -	siginfo_t info;
+> -
+>   	/*
+>   	 * If we are stepping a pending breakpoint, call the hw_breakpoint
+>   	 * handler first.
+> @@ -239,11 +256,7 @@ static int single_step_handler(unsigned long addr, unsigned int esr,
+>   		return 0;
+>
+>   	if (user_mode(regs)) {
+> -		info.si_signo = SIGTRAP;
+> -		info.si_errno = 0;
+> -		info.si_code  = TRAP_HWBKPT;
+> -		info.si_addr  = (void __user *)instruction_pointer(regs);
+> -		force_sig_info(SIGTRAP, &info, current);
+> +		send_user_sigtrap(TRAP_HWBKPT);
+>
+>   		/*
+>   		 * ptrace will disable single step unless explicitly
+> @@ -307,17 +320,8 @@ static int call_break_hook(struct pt_regs *regs, unsigned int esr)
+>   static int brk_handler(unsigned long addr, unsigned int esr,
+>   		       struct pt_regs *regs)
+>   {
+> -	siginfo_t info;
+> -
+>   	if (user_mode(regs)) {
+> -		info = (siginfo_t) {
+> -			.si_signo = SIGTRAP,
+> -			.si_errno = 0,
+> -			.si_code  = TRAP_BRKPT,
+> -			.si_addr  = (void __user *)instruction_pointer(regs),
+> -		};
+> -
+> -		force_sig_info(SIGTRAP, &info, current);
+> +		send_user_sigtrap(TRAP_BRKPT);
+>   	} else if (call_break_hook(regs, esr) != DBG_HOOK_HANDLED) {
+>   		pr_warning("Unexpected kernel BRK exception at EL1\n");
+>   		return -EFAULT;
+> @@ -328,7 +332,6 @@ static int brk_handler(unsigned long addr, unsigned int esr,
+>
+>   int aarch32_break_handler(struct pt_regs *regs)
+>   {
+> -	siginfo_t info;
+>   	u32 arm_instr;
+>   	u16 thumb_instr;
+>   	bool bp = false;
+> @@ -359,14 +362,7 @@ int aarch32_break_handler(struct pt_regs *regs)
+>   	if (!bp)
+>   		return -EFAULT;
+>
+> -	info = (siginfo_t) {
+> -		.si_signo = SIGTRAP,
+> -		.si_errno = 0,
+> -		.si_code  = TRAP_BRKPT,
+> -		.si_addr  = pc,
+> -	};
+> -
+> -	force_sig_info(SIGTRAP, &info, current);
+> +	send_user_sigtrap(TRAP_BRKPT);
+>   	return 0;
+>   }
+>
+>
