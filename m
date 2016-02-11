@@ -1,53 +1,67 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 10 Feb 2016 19:38:19 -0800
-Subject: [PATCH] tty/serial: digicolor: Fix bad usage of IS_ERR_VALUE
-In-Reply-To: <2606061.l722KO95iI@wuerfel>
-References: <1455030539-10798-1-git-send-email-linux@roeck-us.net>
- <4571887.rTPndCnv20@wuerfel> <56BAA27A.9050605@roeck-us.net>
- <2606061.l722KO95iI@wuerfel>
-Message-ID: <56BC022B.7030004@roeck-us.net>
+From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
+Date: Wed, 10 Feb 2016 21:50:59 -0600
+Subject: [PATCH V3 00/12] dtb: amd: Miscellaneous Updates for AMD Seattle DTS
+Message-ID: <1455162671-16044-1-git-send-email-Suravee.Suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/10/2016 07:21 AM, Arnd Bergmann wrote:
-> On Tuesday 09 February 2016 18:37:46 Guenter Roeck wrote:
->> On 02/09/2016 07:26 AM, Arnd Bergmann wrote:
->>> On Tuesday 09 February 2016 07:08:59 Guenter Roeck wrote:
->>>> IS_ERR_VALUE() assumes that its parameter is an unsigned long.
->>>> It can not be used to check if an unsigned int reflects an error.
->>>> Doing so can result in the following build warning.
->>>>
->>>> drivers/tty/serial/digicolor-usart.c: In function ?digicolor_uart_probe?:
->>>> include/linux/err.h:21:38: warning:
->>>>           comparison is always false due to limited range of data type
->>>> drivers/tty/serial/digicolor-usart.c:485:6: note:
->>>>           in expansion of macro ?IS_ERR_VALUE?
->>>>
->>>> If that warning is seen, an error return from platform_get_irq() is missed.
->>>>
->>>>
->>>
->>> The patch looks correct to me, but what compiler version and which kernel
->>> tree is it that triggered the warning?
->>>
->>> Andrzej Hajda just modified the definition of IS_ERR_VALUE(), and the
->>> changes are still under discussion, but I don't see that warning with
->>> any of the versions.
->>>
->> I see it with gcc 5.1 and 5.2 (and W=1). I did not see / notice Andrzej's patch.
->>
->> I agree that fixing the problem in IS_ERR_VALUE() is preferrable.
->>
->>
->
-> Ah, W=1 explains it. We are still debating about the proper solution. Al Viro
-> pointed out that most users of IS_ERR_VALUE() shouldn't be using it at all,
-> so your patch is probably best here after all.
->
+From: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
 
-Yes, after looking into it some more I agree. Coccinelle should be able to handle
-most of the conversions automatically. I actually tried to write a script, just
-for the fun of it, but it misses some of the problem cases in patch mode.
-Maybe I get it working tonight.
+This patch series contains several updates for the AMD Seattle SOC DTS files.
+It also adds new board files for newer Overdrive and Linaro 96boards (Husky)
+platforms.
 
-Guenter
+Olof,
+
+You mentioned that you have already applied the V2 of the series
+to next/dt64. Do you think we can just take the V3 instead if we don't
+have any other issues/concerns?
+
+Thanks,
+Suravee
+
+Changes from V2 (https://lkml.org/lkml/2016/2/8/692):
+  * Remove KCS interrupt name (per Arnd's suggestion)
+  * Fix ccn node address (per Arnd's suggestion)
+  * Add more description in git commit message for patch 3/12
+    (per Arnd's suggestion) 
+
+Changes from V1 (https://lkml.org/lkml/2016/1/27/1251):
+  * Fix duplication in MAINTAINERS file (per Martin review comment)
+  * Remove the PCIe SMMU device tree node for now to rework
+    (based on the discussion in the thread).
+
+Brijesh Singh (2):
+  dtb: amd: Fix GICv2 hypervisor and virtual interface sizes
+  dtb: amd: Add KCS device tree node
+
+Suravee Suthikulpanit (9):
+  MAINTAINERS: Adding Maintainers for AMD Seattle Device Tree
+  dtb: amd: Fix DMA ranges of smb0 and pcie0
+  dtb: amd: Fix typo in SPI device nodes
+  dtb: amd: Misc changes for I2C device nodes
+  dtb: amd: Misc changes for SATA device tree nodes
+  dtb: amd: Misc changes for GPIO devices
+  dtb: amd: Add PERF CCN-504 device tree node
+  dtb: amd: Add support for new AMD Overdrive boards
+  dtb: amd: Add support for AMD/Linaro 96Boards Enterprise Edition
+    Server board
+
+Tom Lendacky (1):
+  dtb: amd: Add AMD XGBE device tree file
+
+ MAINTAINERS                                      |   8 ++
+ arch/arm64/boot/dts/amd/Makefile                 |   4 +-
+ arch/arm64/boot/dts/amd/amd-overdrive-rev-b0.dts |  87 +++++++++++++++++
+ arch/arm64/boot/dts/amd/amd-overdrive-rev-b1.dts |  91 ++++++++++++++++++
+ arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi     | 104 +++++++++++++++++---
+ arch/arm64/boot/dts/amd/amd-seattle-xgbe-b.dtsi  | 117 +++++++++++++++++++++++
+ arch/arm64/boot/dts/amd/husky.dts                |  83 ++++++++++++++++
+ 7 files changed, 480 insertions(+), 14 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/amd/amd-overdrive-rev-b0.dts
+ create mode 100644 arch/arm64/boot/dts/amd/amd-overdrive-rev-b1.dts
+ create mode 100644 arch/arm64/boot/dts/amd/amd-seattle-xgbe-b.dtsi
+ create mode 100644 arch/arm64/boot/dts/amd/husky.dts
+
+-- 
+2.5.0
