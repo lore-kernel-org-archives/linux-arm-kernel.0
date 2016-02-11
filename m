@@ -1,42 +1,113 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 11 Feb 2016 16:32:31 +0000
-Subject: [PATCH v2 0/7] ARM/efi minor fixes + stub pre-boot compat checks
-In-Reply-To: <20160211162920.GN4134@codeblueprint.co.uk>
-References: <1454601030-9093-1-git-send-email-ard.biesheuvel@linaro.org>
- <20160211161621.GM4134@codeblueprint.co.uk>
- <CAKv+Gu-kZrcLYhF7i0u8F2TOMqEVKp==jNoBc+Rfk61cwSkDhQ@mail.gmail.com>
- <20160211162920.GN4134@codeblueprint.co.uk>
-Message-ID: <20160211163231.GB20077@arm.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Thu, 11 Feb 2016 16:38:36 +0000
+Subject: [PATCH V5 11/14] soc: tegra: pmc: Add generic PM domain support
+In-Reply-To: <CAPDyKFq_0t4tcvkgMBW8p8ubJDALWMjdhgGM+_Z6auRxEkSPdA@mail.gmail.com>
+References: <1453998832-27383-1-git-send-email-jonathanh@nvidia.com>
+ <1453998832-27383-12-git-send-email-jonathanh@nvidia.com>
+ <CAPDyKFpnUJA2pLSUOw8rkjyXLY6b__TM=38jsvYAZVhe+DS=zg@mail.gmail.com>
+ <56BB7AF4.8040708@nvidia.com>
+ <CAPDyKFrZ6tWBsQC0tyWWeChiZja3h_zcbaiX25ak-Zyp4MzqVw@mail.gmail.com>
+ <56BC50C2.7050609@nvidia.com>
+ <CAPDyKFrdmufsMqNL0U7q5gPEUqsg3SrkrNChcziQjEOjvd30Ng@mail.gmail.com>
+ <56BC5EE0.2040804@nvidia.com>
+ <CAPDyKFq_0t4tcvkgMBW8p8ubJDALWMjdhgGM+_Z6auRxEkSPdA@mail.gmail.com>
+Message-ID: <56BCB90C.8000302@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 11, 2016 at 04:29:20PM +0000, Matt Fleming wrote:
-> On Thu, 11 Feb, at 05:18:12PM, Ard Biesheuvel wrote:
-> > On 11 February 2016 at 17:16, Matt Fleming <matt@codeblueprint.co.uk> wrote:
-> > > On Thu, 04 Feb, at 04:50:23PM, Ard Biesheuvel wrote:
-> > >> I merged two EFI/ARM related series, whose v1's I sent out last week:
-> > >>
-> > >> Changes since v1:
-> > >> - added various tags from various people
-> > >> - new patch #3 to undefine __init
-> > >>
-> > >> @Matt: are you happy with all of this going through the arm64 tree? I don't
-> > >> think it clashes with anything else we've got queued up for v4.6 in tip/efi/core
-> > >
-> > > How come this is going through the arm64 tree? Are there other patch
-> > > series that this depends on or that depend on it?
-> > >
-> > > If it makes the most sense to take it through that tree, then I'm fine
-> > > with it but I'd like to hear a rationale.
-> > 
-> > I simply thought it would be most convenient, since it touches
-> > ARM-specific files only. But if you feel it should go via the EFI tree
-> > instead, that is also fine by me.
+
+On 11/02/16 10:28, Ulf Hansson wrote:
+> On 11 February 2016 at 11:13, Jon Hunter <jonathanh@nvidia.com> wrote:
+>>
+>> On 11/02/16 09:57, Ulf Hansson wrote:
+>>> On 11 February 2016 at 10:13, Jon Hunter <jonathanh@nvidia.com> wrote:
+>>>>
+>>>> On 10/02/16 18:25, Ulf Hansson wrote:
+>>>>
+>>>> [snip]
+>>>>
+>>>>>>> Perhaps there's a way to allow the generic PM domain to control this
+>>>>>>> by itself. If we for example used the struct device corresponding to
+>>>>>>> the powergate driver, genpd could use it to distinguish between
+>>>>>>> various instances of genpd structs..!? Maybe it would simplify the way
+>>>>>>> to deal with removing domains?
+>>>>>>
+>>>>>> Yes, that would be ideal. However, would have require changing
+>>>>>> genpd_init()? I am not sure how genpd would be able to access the device
+>>>>>> struct for the powergate driver because we don't provide this via any
+>>>>>> API I am aware of? And I am guessing that you don't wish to expose the
+>>>>>> gpd_list to the world either.
+>>>>>>
+>>>>>> If there is an easy way, I am open to it, but looking at it today, I am
+>>>>>> not sure I see a simple way in which we could add a new API to do this.
+>>>>>> However, may be I am missing something!
+>>>>>
+>>>>> If we add a new __pm_genpd_init() API, that could require a struct
+>>>>> device to be provided. That API will thus invoke the existing
+>>>>> pm_genpd_init() but also deal with the extra things needed here.
+>>>>>
+>>>>> I would also allow such an API to return an error code.
+>>>>>
+>>>>> Correspondingly, pm_genpd_remove() could be required to be provided
+>>>>> with a struct device.
+>>>>>
+>>>>> Existing users of pm_genpd_init() can then convert to
+>>>>> __pm_genpd_init() whenever suitable.
+>>>>>
+>>>>> Of course, another option is just to add new member in the genpd
+>>>>> struct for the struct *device. The caller of pm_genpd_init() could
+>>>>> check it, but allow it to be NULL. Although, the pm_genpd_remove() API
+>>>>> would require that pointer to the struct device to be set...
+>>>>>
+>>>>> What do you think?
+>>>>
+>>>> Yes, sounds good. May be it is simpler just to add a new member and let
+>>>> the platform genpd driver handle it.
+>>>>
+>>>> I am wondering if in addition to pm_genpd_remove(), we then just have a
+>>>> function called pm_genpd_remove_tail(), which allows you to pass the
+>>>> struct device pointer and will remove the last pm-domain from the
+>>>> gpd_list and return the genpd pointer if successful. Internally, it will
+>>>> call pm_genpd_remove(). It seems to me that if there are nested
+>>>> pm-domains, then we probably want to remove them starting from the tail
+>>>> as opposed to the head.
+>>>>
+>>>> How does that sound?
+>>>
+>>> Why not make pm_genpd_remove() to behave as you describe for
+>>> pm_genpd_remove_tail()?
+>>> That's probably the only sane way to remove genpds anyhow!?
+>>
+>> Simply to offer flexibility. I could see that for some devices that have
+>> no dependencies between pm-domains and have a static list of pm-domains,
+>> they can simply call pm_genpd_remove() for a given pm-domain. However,
+>> that said, I can envision a case where a single pm-domain would be
+>> removed by itself and so may be there is no benefit?
 > 
-> Since the diff stat is heavily weighted towards drivers/firmware/efi I
-> think it should go via the EFI tree. So I'll pick this up (the changes
-> look fine) unless Will or Catalin complain otherwise.
+> If I understand correctly, you agree to try with the most simple
+> approach first and thus without providing too much flexibility.
+> 
+> Anyway, I am looking forward to review your next version of the patchset! :-)
 
-No complaints here (the arm64 bits are all acked).
+So one snag I hit with this, is that in order to remove a pm-domain, I
+first need to check if it is a subdomain of any other domains and if so
+remove it as a subdomain first. Before, this was simple because I called
+pm_genpd_remove_subdomain if the domain had a parent, and then called
+pm_genpd_remove().
 
-Will
+With the proposal we have discussed, I no longer have any knowledge of
+whether the pm-domain is a subdomain or not because pm_genpd_remove()
+would remove the tail and then return it. So this means that I now need
+to handle the removal of the subdomain within pm_genpd_remove(), which
+is ok, but creates more changes as I need to parse the slave_links list,
+etc.
+
+I am wondering if it would be better to add a simple function called
+pm_genpd_list_get_tail(struct device *dev) that would return the last
+pm-domain register for a given device and then simply call
+pm_genpd_remove_subdomain() (if needed) and pm_genpd_remove()?
+
+Let me know what you think.
+
+Cheers
+Jon
