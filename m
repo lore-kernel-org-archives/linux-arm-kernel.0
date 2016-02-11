@@ -1,101 +1,38 @@
 From: lars.persson@axis.com (Lars Persson)
-Date: Thu, 11 Feb 2016 17:06:18 +0100
-Subject: [PATCH v3 3/6] arm: dts: add Artpec-6 development board dts
+Date: Thu, 11 Feb 2016 17:06:21 +0100
+Subject: [PATCH v3 6/6] arm: mach-artpec: add entry to MAINTAINERS
 In-Reply-To: <cover.1455205057.git.larper@axis.com>
 References: <cover.1455205057.git.larper@axis.com>
-Message-ID: <8f47493c9ed0044d17333a99c07e9067861ee96b.1455205057.git.larper@axis.com>
+Message-ID: <164f1c0049b0e1564e133a293ea18920019e3328.1455205057.git.larper@axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Lars Persson <larper@axis.com>
+Signed-off-by: Jesper Nilsson <jesper.nilsson@axis.com>
 ---
- arch/arm/boot/dts/Makefile             |  2 ++
- arch/arm/boot/dts/artpec6-devboard.dts | 64 ++++++++++++++++++++++++++++++++++
- 2 files changed, 66 insertions(+)
- create mode 100644 arch/arm/boot/dts/artpec6-devboard.dts
+ MAINTAINERS | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index a4a6d70..2ebe99c 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -2,6 +2,8 @@ ifeq ($(CONFIG_OF),y)
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 7f1fa4f..d32c1aa 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -932,6 +932,16 @@ M:	Tsahee Zidenberg <tsahee@annapurnalabs.com>
+ S:	Maintained
+ F:	arch/arm/mach-alpine/
  
- dtb-$(CONFIG_ARCH_ALPINE) += \
- 	alpine-db.dtb
-+dtb-$(CONFIG_MACH_ARTPEC6) += \
-+	artpec6-devboard.dtb
- dtb-$(CONFIG_MACH_ASM9260) += \
- 	alphascale-asm9260-devkit.dtb
- # Keep at91 dtb files sorted alphabetically for each SoC
-diff --git a/arch/arm/boot/dts/artpec6-devboard.dts b/arch/arm/boot/dts/artpec6-devboard.dts
-new file mode 100644
-index 0000000..f823ed3
---- /dev/null
-+++ b/arch/arm/boot/dts/artpec6-devboard.dts
-@@ -0,0 +1,64 @@
-+/*
-+ * Axis ARTPEC-6 development board.
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
++ARM/ARTPEC MACHINE SUPPORT
++M:	Jesper Nilsson <jesper.nilsson@axis.com>
++M:	Lars Persson <lars.persson@axis.com>
++M:	Niklas Cassel <niklas.cassel@axis.com>
++S:	Maintained
++L:	linux-arm-kernel at axis.com
++F:	arch/arm/mach-artpec
++F:	arch/arm/boot/dts/artpec6*
++F:	drivers/clk/clk-artpec6.c
 +
-+/dts-v1/;
-+#include "artpec6.dtsi"
-+
-+/ {
-+	model = "ARTPEC-6 development board";
-+	compatible = "axis,artpec6-dev-board", "axis,artpec6";
-+
-+	aliases {
-+		serial0 = &uart0;
-+		serial1 = &uart1;
-+		serial2 = &uart2;
-+		serial3 = &uart3;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial3:115200n8";
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x0 0x10000000>;
-+	};
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	status = "okay";
-+};
-+
-+&uart3 {
-+	status = "okay";
-+};
-+
-+&ethernet {
-+	status = "okay";
-+
-+	phy-handle = <&phy1>;
-+	phy-mode = "gmii";
-+
-+	mdio {
-+		#address-cells = <0x1>;
-+		#size-cells = <0x0>;
-+		phy1: phy at 0 {
-+			compatible = "ethernet-phy-ieee802.3-c22";
-+			device_type = "ethernet-phy";
-+			reg = <0x0>;
-+		};
-+	};
-+};
+ ARM/ATMEL AT91RM9200, AT91SAM9 AND SAMA5 SOC SUPPORT
+ M:	Nicolas Ferre <nicolas.ferre@atmel.com>
+ M:	Alexandre Belloni <alexandre.belloni@free-electrons.com>
 -- 
 2.1.4
