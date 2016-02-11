@@ -1,113 +1,420 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Thu, 11 Feb 2016 16:38:36 +0000
-Subject: [PATCH V5 11/14] soc: tegra: pmc: Add generic PM domain support
-In-Reply-To: <CAPDyKFq_0t4tcvkgMBW8p8ubJDALWMjdhgGM+_Z6auRxEkSPdA@mail.gmail.com>
-References: <1453998832-27383-1-git-send-email-jonathanh@nvidia.com>
- <1453998832-27383-12-git-send-email-jonathanh@nvidia.com>
- <CAPDyKFpnUJA2pLSUOw8rkjyXLY6b__TM=38jsvYAZVhe+DS=zg@mail.gmail.com>
- <56BB7AF4.8040708@nvidia.com>
- <CAPDyKFrZ6tWBsQC0tyWWeChiZja3h_zcbaiX25ak-Zyp4MzqVw@mail.gmail.com>
- <56BC50C2.7050609@nvidia.com>
- <CAPDyKFrdmufsMqNL0U7q5gPEUqsg3SrkrNChcziQjEOjvd30Ng@mail.gmail.com>
- <56BC5EE0.2040804@nvidia.com>
- <CAPDyKFq_0t4tcvkgMBW8p8ubJDALWMjdhgGM+_Z6auRxEkSPdA@mail.gmail.com>
-Message-ID: <56BCB90C.8000302@nvidia.com>
+From: qnguyen@apm.com (Quan Nguyen)
+Date: Thu, 11 Feb 2016 23:35:36 +0700
+Subject: [PATCH v5 1/3] gpio: xgene: Enable X-Gene standby GPIO as
+ interrupt controller
+In-Reply-To: <56BB52B8.4040501@arm.com>
+References: <1454041735-8434-1-git-send-email-qnguyen@apm.com>
+ <1454041735-8434-2-git-send-email-qnguyen@apm.com>
+ <56BB52B8.4040501@arm.com>
+Message-ID: <CAFopSPSDdc4PQwdhkMM=vsGKuDfoObywA7hmQa+B44pSjGKA5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 11/02/16 10:28, Ulf Hansson wrote:
-> On 11 February 2016 at 11:13, Jon Hunter <jonathanh@nvidia.com> wrote:
+On Wed, Feb 10, 2016 at 10:09 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> Quan,
+>
+> This is getting better. Some comments below.
+>
+> On 29/01/16 04:28, Quan Nguyen wrote:
+>> Enable X-Gene standby GPIO controller as interrupt controller to provide
+>> its own resources. This avoids ambiguity where GIC interrupt resource is
+>> use as X-Gene standby GPIO interrupt resource in user driver.
 >>
->> On 11/02/16 09:57, Ulf Hansson wrote:
->>> On 11 February 2016 at 10:13, Jon Hunter <jonathanh@nvidia.com> wrote:
->>>>
->>>> On 10/02/16 18:25, Ulf Hansson wrote:
->>>>
->>>> [snip]
->>>>
->>>>>>> Perhaps there's a way to allow the generic PM domain to control this
->>>>>>> by itself. If we for example used the struct device corresponding to
->>>>>>> the powergate driver, genpd could use it to distinguish between
->>>>>>> various instances of genpd structs..!? Maybe it would simplify the way
->>>>>>> to deal with removing domains?
->>>>>>
->>>>>> Yes, that would be ideal. However, would have require changing
->>>>>> genpd_init()? I am not sure how genpd would be able to access the device
->>>>>> struct for the powergate driver because we don't provide this via any
->>>>>> API I am aware of? And I am guessing that you don't wish to expose the
->>>>>> gpd_list to the world either.
->>>>>>
->>>>>> If there is an easy way, I am open to it, but looking at it today, I am
->>>>>> not sure I see a simple way in which we could add a new API to do this.
->>>>>> However, may be I am missing something!
->>>>>
->>>>> If we add a new __pm_genpd_init() API, that could require a struct
->>>>> device to be provided. That API will thus invoke the existing
->>>>> pm_genpd_init() but also deal with the extra things needed here.
->>>>>
->>>>> I would also allow such an API to return an error code.
->>>>>
->>>>> Correspondingly, pm_genpd_remove() could be required to be provided
->>>>> with a struct device.
->>>>>
->>>>> Existing users of pm_genpd_init() can then convert to
->>>>> __pm_genpd_init() whenever suitable.
->>>>>
->>>>> Of course, another option is just to add new member in the genpd
->>>>> struct for the struct *device. The caller of pm_genpd_init() could
->>>>> check it, but allow it to be NULL. Although, the pm_genpd_remove() API
->>>>> would require that pointer to the struct device to be set...
->>>>>
->>>>> What do you think?
->>>>
->>>> Yes, sounds good. May be it is simpler just to add a new member and let
->>>> the platform genpd driver handle it.
->>>>
->>>> I am wondering if in addition to pm_genpd_remove(), we then just have a
->>>> function called pm_genpd_remove_tail(), which allows you to pass the
->>>> struct device pointer and will remove the last pm-domain from the
->>>> gpd_list and return the genpd pointer if successful. Internally, it will
->>>> call pm_genpd_remove(). It seems to me that if there are nested
->>>> pm-domains, then we probably want to remove them starting from the tail
->>>> as opposed to the head.
->>>>
->>>> How does that sound?
->>>
->>> Why not make pm_genpd_remove() to behave as you describe for
->>> pm_genpd_remove_tail()?
->>> That's probably the only sane way to remove genpds anyhow!?
+>> Signed-off-by: Y Vo <yvo@apm.com>
+>> Signed-off-by: Quan Nguyen <qnguyen@apm.com>
+>> ---
+>>  drivers/gpio/gpio-xgene-sb.c | 275 ++++++++++++++++++++++++++++++++++++++-----
+>>  1 file changed, 243 insertions(+), 32 deletions(-)
 >>
->> Simply to offer flexibility. I could see that for some devices that have
->> no dependencies between pm-domains and have a static list of pm-domains,
->> they can simply call pm_genpd_remove() for a given pm-domain. However,
->> that said, I can envision a case where a single pm-domain would be
->> removed by itself and so may be there is no benefit?
-> 
-> If I understand correctly, you agree to try with the most simple
-> approach first and thus without providing too much flexibility.
-> 
-> Anyway, I am looking forward to review your next version of the patchset! :-)
+>> diff --git a/drivers/gpio/gpio-xgene-sb.c b/drivers/gpio/gpio-xgene-sb.c
+>> index 282004d..026da90 100644
+>> --- a/drivers/gpio/gpio-xgene-sb.c
+>> +++ b/drivers/gpio/gpio-xgene-sb.c
+>> @@ -2,8 +2,9 @@
+>>   * AppliedMicro X-Gene SoC GPIO-Standby Driver
+>>   *
+>>   * Copyright (c) 2014, Applied Micro Circuits Corporation
+>> - * Author:   Tin Huynh <tnhuynh@apm.com>.
+>> - *           Y Vo <yvo@apm.com>.
+>> + * Author:   Tin Huynh <tnhuynh@apm.com>.
+>> + *           Y Vo <yvo@apm.com>.
+>> + *           Quan Nguyen <qnguyen@apm.com>.
+>>   *
+>>   * This program is free software; you can redistribute  it and/or modify it
+>>   * under  the terms of  the GNU General  Public License as published by the
+>> @@ -28,9 +29,14 @@
+>>
+>>  #include "gpiolib.h"
+>>
+>> -#define XGENE_MAX_GPIO_DS            22
+>> -#define XGENE_MAX_GPIO_DS_IRQ                6
+>> +/* Common property names */
+>> +#define XGENE_NIRQ_PROPERTY          "apm,nr-irqs"
+>> +#define XGENE_NGPIO_PROPERTY         "apm,nr-gpios"
+>> +#define XGENE_IRQ_START_PROPERTY     "apm,irq-start"
+>>
+>> +#define XGENE_DFLT_MAX_NGPIO         22
+>> +#define XGENE_DFLT_MAX_NIRQ          6
+>> +#define XGENE_DFLT_IRQ_START_PIN     8
+>>  #define GPIO_MASK(x)                 (1U << ((x) % 32))
+>>
+>>  #define MPA_GPIO_INT_LVL             0x0290
+>> @@ -39,19 +45,32 @@
+>>  #define MPA_GPIO_IN_ADDR             0x02a4
+>>  #define MPA_GPIO_SEL_LO              0x0294
+>>
+>> +#define GPIO_INT_LEVEL_H     0x000001
+>> +#define GPIO_INT_LEVEL_L     0x000000
+>> +
+>>  /**
+>>   * struct xgene_gpio_sb - GPIO-Standby private data structure.
+>>   * @gc:                              memory-mapped GPIO controllers.
+>> - * @irq:                     Mapping GPIO pins and interrupt number
+>> - * nirq:                     Number of GPIO pins that supports interrupt
+>> + * @regs:                    GPIO register base offset
+>> + * @irq_domain:                      GPIO interrupt domain
+>> + * @irq_start:                       GPIO pin that start support interrupt
+>> + * @nirq:                    Number of GPIO pins that supports interrupt
+>> + * @parent_irq_base:         Start parent HWIRQ
+>>   */
+>>  struct xgene_gpio_sb {
+>>       struct gpio_chip        gc;
+>> -     u32 *irq;
+>> -     u32 nirq;
+>> +     void __iomem            *regs;
+>> +     struct irq_domain       *irq_domain;
+>> +     u16                     irq_start;
+>> +     u16                     nirq;
+>> +     u16                     parent_irq_base;
+>>  };
+>>
+>> -static void xgene_gpio_set_bit(struct gpio_chip *gc, void __iomem *reg, u32 gpio, int val)
+>> +#define HWIRQ_TO_GPIO(priv, hwirq) ((hwirq) + (priv)->irq_start)
+>> +#define GPIO_TO_HWIRQ(priv, gpio) ((gpio) - (priv)->irq_start)
+>> +
+>> +static void xgene_gpio_set_bit(struct gpio_chip *gc,
+>> +                             void __iomem *reg, u32 gpio, int val)
+>>  {
+>>       u32 data;
+>>
+>> @@ -63,23 +82,180 @@ static void xgene_gpio_set_bit(struct gpio_chip *gc, void __iomem *reg, u32 gpio
+>>       gc->write_reg(reg, data);
+>>  }
+>>
+>> -static int apm_gpio_sb_to_irq(struct gpio_chip *gc, u32 gpio)
+>> +static int xgene_gpio_sb_irq_set_type(struct irq_data *d, unsigned int type)
+>> +{
+>> +     struct xgene_gpio_sb *priv = irq_data_get_irq_chip_data(d);
+>> +     int gpio = HWIRQ_TO_GPIO(priv, d->hwirq);
+>> +     int lvl_type = GPIO_INT_LEVEL_H;
+>> +
+>> +     switch (type & IRQ_TYPE_SENSE_MASK) {
+>> +     case IRQ_TYPE_EDGE_RISING:
+>> +     case IRQ_TYPE_LEVEL_HIGH:
+>> +             lvl_type = GPIO_INT_LEVEL_H;
+>> +             break;
+>> +     case IRQ_TYPE_EDGE_FALLING:
+>> +     case IRQ_TYPE_LEVEL_LOW:
+>> +             lvl_type = GPIO_INT_LEVEL_L;
+>> +             break;
+>> +     default:
+>> +             break;
+>> +     }
+>> +
+>> +     xgene_gpio_set_bit(&priv->gc, priv->regs + MPA_GPIO_SEL_LO,
+>> +                     gpio * 2, 1);
+>> +     xgene_gpio_set_bit(&priv->gc, priv->regs + MPA_GPIO_INT_LVL,
+>> +                     d->hwirq, lvl_type);
+>> +
+>> +     /* Propagate IRQ type setting to parent */
+>> +     if (type & IRQ_TYPE_EDGE_BOTH)
+>> +             return irq_chip_set_type_parent(d, IRQ_TYPE_EDGE_RISING);
+>> +     else
+>> +             return irq_chip_set_type_parent(d, IRQ_TYPE_LEVEL_HIGH);
+>> +}
+>> +
+>> +static void xgene_gpio_sb_irq_shutdown(struct irq_data *d)
+>> +{
+>> +     struct xgene_gpio_sb *priv = irq_data_get_irq_chip_data(d);
+>> +
+>> +     gpiochip_unlock_as_irq(&priv->gc, HWIRQ_TO_GPIO(priv, d->hwirq));
+>> +}
+>> +
+>> +static struct irq_chip xgene_gpio_sb_irq_chip = {
+>> +     .name           = "sbgpio",
+>> +     .irq_ack        = irq_chip_ack_parent,
+>
+> There is no point calling irq_chip_ack_parent, as the GIC doesn't
+> implement an irq_ack method at all.
+>
 
-So one snag I hit with this, is that in order to remove a pm-domain, I
-first need to check if it is a subdomain of any other domains and if so
-remove it as a subdomain first. Before, this was simple because I called
-pm_genpd_remove_subdomain if the domain had a parent, and then called
-pm_genpd_remove().
+Thanks Marc, let me remove it.
 
-With the proposal we have discussed, I no longer have any knowledge of
-whether the pm-domain is a subdomain or not because pm_genpd_remove()
-would remove the tail and then return it. So this means that I now need
-to handle the removal of the subdomain within pm_genpd_remove(), which
-is ok, but creates more changes as I need to parse the slave_links list,
-etc.
+>> +     .irq_eoi        = irq_chip_eoi_parent,
+>> +     .irq_mask       = irq_chip_mask_parent,
+>> +     .irq_unmask     = irq_chip_unmask_parent,
+>> +     .irq_set_type   = xgene_gpio_sb_irq_set_type,
+>> +     .irq_shutdown   = xgene_gpio_sb_irq_shutdown,
+>> +};
+>> +
+>> +static int xgene_gpio_sb_to_irq(struct gpio_chip *gc, u32 gpio)
+>>  {
+>>       struct xgene_gpio_sb *priv = gpiochip_get_data(gc);
+>> +     struct irq_fwspec fwspec;
+>> +
+>> +     if ((gpio < priv->irq_start) ||
+>> +                     (gpio > HWIRQ_TO_GPIO(priv, priv->nirq)))
+>> +             return -ENXIO;
+>> +
+>> +     if (gc->parent->of_node)
+>> +             fwspec.fwnode = of_node_to_fwnode(gc->parent->of_node);
+>> +     else
+>> +             fwspec.fwnode = gc->parent->fwnode;
+>> +     fwspec.param_count = 2;
+>> +     fwspec.param[0] = GPIO_TO_HWIRQ(priv, gpio);
+>> +     fwspec.param[1] = IRQ_TYPE_NONE;
+>> +     return irq_create_fwspec_mapping(&fwspec);
+>> +}
+>> +
+>> +static void xgene_gpio_sb_domain_activate(struct irq_domain *d,
+>> +             struct irq_data *irq_data)
+>> +{
+>> +     struct xgene_gpio_sb *priv = d->host_data;
+>> +     u32 gpio = HWIRQ_TO_GPIO(priv, irq_data->hwirq);
+>> +
+>> +     if (gpiochip_lock_as_irq(&priv->gc, gpio)) {
+>> +             dev_err(priv->gc.parent,
+>> +             "Unable to configure XGene GPIO standby pin %d as IRQ\n",
+>> +                             gpio);
+>> +             return;
+>> +     }
+>> +
+>> +     xgene_gpio_set_bit(&priv->gc, priv->regs + MPA_GPIO_SEL_LO,
+>> +                     gpio * 2, 1);
+>> +}
+>> +
+>> +static void xgene_gpio_sb_domain_deactivate(struct irq_domain *d,
+>> +             struct irq_data *irq_data)
+>> +{
+>> +     struct xgene_gpio_sb *priv = d->host_data;
+>> +     u32 gpio = HWIRQ_TO_GPIO(priv, irq_data->hwirq);
+>> +
+>> +     gpiochip_unlock_as_irq(&priv->gc, gpio);
+>
+> Is it right to do the unlock both in irq_shutdown and domain_deactivate?
+> This seems a bit odd to me to have such an inbalance. My hunch is that
+> you should either implement irq_startup, do the locking there and drop
+> the unlock drop deactivate, or kill irq_shutdown.
+>
+> Linus, what do you think?
+>
 
-I am wondering if it would be better to add a simple function called
-pm_genpd_list_get_tail(struct device *dev) that would return the last
-pm-domain register for a given device and then simply call
-pm_genpd_remove_subdomain() (if needed) and pm_genpd_remove()?
+I refer to kill irq_shutdown.
 
-Let me know what you think.
+>> +     xgene_gpio_set_bit(&priv->gc, priv->regs + MPA_GPIO_SEL_LO,
+>> +                     gpio * 2, 0);
+>> +}
+>>
+>> -     if (priv->irq[gpio])
+>> -             return priv->irq[gpio];
+>> +static int xgene_gpio_sb_domain_translate(struct irq_domain *d,
+>> +             struct irq_fwspec *fwspec,
+>> +             unsigned long *hwirq,
+>> +             unsigned int *type)
+>> +{
+>> +     struct xgene_gpio_sb *priv = d->host_data;
+>> +
+>> +     if ((fwspec->param_count != 2) ||
+>> +             (fwspec->param[0] >= priv->nirq))
+>> +             return -EINVAL;
+>> +     *hwirq = fwspec->param[0];
+>> +     *type = fwspec->param[1];
+>> +     return 0;
+>> +}
+>> +
+>> +static int xgene_gpio_sb_domain_alloc(struct irq_domain *domain,
+>> +                                     unsigned int virq,
+>> +                                     unsigned int nr_irqs, void *data)
+>> +{
+>> +     struct irq_fwspec *fwspec = data;
+>> +     struct irq_fwspec parent_fwspec;
+>> +     struct xgene_gpio_sb *priv = domain->host_data;
+>> +     irq_hw_number_t hwirq;
+>> +     unsigned int i;
+>> +
+>> +     hwirq = fwspec->param[0];
+>> +     for (i = 0; i < nr_irqs; i++)
+>> +             irq_domain_set_hwirq_and_chip(domain, virq + i, hwirq + i,
+>> +                             &xgene_gpio_sb_irq_chip, priv);
+>> +
+>> +     if (is_of_node(domain->parent->fwnode)) {
+>> +             parent_fwspec.fwnode = domain->parent->fwnode;
+>> +             parent_fwspec.param_count = 3;
+>> +             parent_fwspec.param[0] = 0;/* SPI */
+>> +             /* Skip SGIs and PPIs*/
+>> +             parent_fwspec.param[1] = hwirq + priv->parent_irq_base - 32;
+>> +             parent_fwspec.param[2] = fwspec->param[1];
+>> +     } else if (is_fwnode_irqchip(domain->parent->fwnode)) {
+>> +             parent_fwspec.fwnode = domain->parent->fwnode;
+>
+> nit: You can move this out of the if/else, and always assign the fwnode.
 
-Cheers
-Jon
+Thanks Marc, let me change it.
+
+>
+>> +             parent_fwspec.param_count = 2;
+>> +             parent_fwspec.param[0] = hwirq + priv->parent_irq_base;
+>> +             parent_fwspec.param[1] = fwspec->param[1];
+>> +     } else
+>> +             return -EINVAL;
+>>
+>> -     return -ENXIO;
+>> +     return irq_domain_alloc_irqs_parent(domain, virq, nr_irqs,
+>> +                     &parent_fwspec);
+>>  }
+>>
+>> +static void xgene_gpio_sb_domain_free(struct irq_domain *domain,
+>> +             unsigned int virq,
+>> +             unsigned int nr_irqs)
+>> +{
+>> +     struct irq_data *d;
+>> +     unsigned int i;
+>> +
+>> +     for (i = 0; i < nr_irqs; i++) {
+>> +             d = irq_domain_get_irq_data(domain, virq + i);
+>> +             irq_domain_reset_irq_data(d);
+>> +     }
+>> +}
+>> +
+>> +static const struct irq_domain_ops xgene_gpio_sb_domain_ops = {
+>> +     .translate      = xgene_gpio_sb_domain_translate,
+>> +     .alloc          = xgene_gpio_sb_domain_alloc,
+>> +     .free           = xgene_gpio_sb_domain_free,
+>> +     .activate       = xgene_gpio_sb_domain_activate,
+>> +     .deactivate     = xgene_gpio_sb_domain_deactivate,
+>> +};
+>> +
+>>  static int xgene_gpio_sb_probe(struct platform_device *pdev)
+>>  {
+>>       struct xgene_gpio_sb *priv;
+>> -     u32 ret, i;
+>> -     u32 default_lines[] = {0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D};
+>> +     u32 ret;
+>>       struct resource *res;
+>>       void __iomem *regs;
+>> +     struct irq_domain *parent_domain = NULL;
+>> +     struct fwnode_handle *fwnode;
+>> +     u32 val32;
+>>
+>>       priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
+>>       if (!priv)
+>> @@ -90,6 +266,18 @@ static int xgene_gpio_sb_probe(struct platform_device *pdev)
+>>       if (IS_ERR(regs))
+>>               return PTR_ERR(regs);
+>>
+>> +     priv->regs = regs;
+>> +
+>> +     ret = platform_get_irq(pdev, 0);
+>> +     if (ret > 0) {
+>> +             priv->parent_irq_base = irq_get_irq_data(ret)->hwirq;
+>> +             parent_domain = irq_get_irq_data(ret)->domain;
+>> +     }
+>> +     if (!parent_domain) {
+>> +             dev_err(&pdev->dev, "unable to obtain parent domain\n");
+>> +             return -ENODEV;
+>> +     }
+>> +
+>>       ret = bgpio_init(&priv->gc, &pdev->dev, 4,
+>>                       regs + MPA_GPIO_IN_ADDR,
+>>                       regs + MPA_GPIO_OUT_ADDR, NULL,
+>> @@ -97,30 +285,51 @@ static int xgene_gpio_sb_probe(struct platform_device *pdev)
+>>          if (ret)
+>>                  return ret;
+>>
+>> -     priv->gc.to_irq = apm_gpio_sb_to_irq;
+>> -     priv->gc.ngpio = XGENE_MAX_GPIO_DS;
+>> +     priv->gc.to_irq = xgene_gpio_sb_to_irq;
+>>
+>> -     priv->nirq = XGENE_MAX_GPIO_DS_IRQ;
+>> +     /* Retrieve start irq pin, use default if property not found */
+>> +     priv->irq_start = XGENE_DFLT_IRQ_START_PIN;
+>> +     if (!device_property_read_u32(&pdev->dev,
+>> +                                     XGENE_IRQ_START_PROPERTY, &val32))
+>
+> Is that for ACPI as well?
+>
+
+Yes, Marc.
+
+>> +             priv->irq_start = val32;
+>>
+>> -     priv->irq = devm_kzalloc(&pdev->dev, sizeof(u32) * XGENE_MAX_GPIO_DS,
+>> -                                GFP_KERNEL);
+>> -     if (!priv->irq)
+>> -             return -ENOMEM;
+>> +     /* Retrieve number irqs, use default if property not found */
+>> +     priv->nirq = XGENE_DFLT_MAX_NIRQ;
+>> +     if (!device_property_read_u32(&pdev->dev, XGENE_NIRQ_PROPERTY, &val32))
+>> +             priv->nirq = val32;
+>>
+>> -     for (i = 0; i < priv->nirq; i++) {
+>> -             priv->irq[default_lines[i]] = platform_get_irq(pdev, i);
+>> -             xgene_gpio_set_bit(&priv->gc, regs + MPA_GPIO_SEL_LO,
+>> -                                   default_lines[i] * 2, 1);
+>> -             xgene_gpio_set_bit(&priv->gc, regs + MPA_GPIO_INT_LVL, i, 1);
+>> -     }
+>> +     /* Retrieve number gpio, use default if property not found */
+>> +     priv->gc.ngpio = XGENE_DFLT_MAX_NGPIO;
+>> +     if (!device_property_read_u32(&pdev->dev, XGENE_NGPIO_PROPERTY, &val32))
+>> +             priv->gc.ngpio = val32;
+>> +
+>> +     dev_info(&pdev->dev, "Support %d gpios, %d irqs start from pin %d\n",
+>> +                     priv->gc.ngpio, priv->nirq, priv->irq_start);
+>>
+>>       platform_set_drvdata(pdev, priv);
+>>
+>> -     ret = gpiochip_add_data(&priv->gc, priv);
+>> -     if (ret)
+>> -             dev_err(&pdev->dev, "failed to register X-Gene GPIO Standby driver\n");
+>> +     if (pdev->dev.of_node)
+>> +             fwnode = of_node_to_fwnode(pdev->dev.of_node);
+>>       else
+>> -             dev_info(&pdev->dev, "X-Gene GPIO Standby driver registered\n");
+>> +             fwnode = pdev->dev.fwnode;
+>> +
+>> +     priv->irq_domain = irq_domain_create_hierarchy(parent_domain,
+>> +                                     0, priv->nirq, fwnode,
+>> +                                     &xgene_gpio_sb_domain_ops, priv);
+>> +     if (!priv->irq_domain)
+>> +             return -ENODEV;
+>> +
+>> +     priv->gc.irqdomain = priv->irq_domain;
+>> +
+>> +     ret = gpiochip_add_data(&priv->gc, priv);
+>> +     if (ret) {
+>> +             dev_err(&pdev->dev,
+>> +                     "failed to register X-Gene GPIO Standby driver\n");
+>> +             irq_domain_remove(priv->irq_domain);
+>> +             return ret;
+>> +     }
+>> +
+>> +     dev_info(&pdev->dev, "X-Gene GPIO Standby driver registered\n");
+>>
+>>       if (priv->nirq > 0) {
+>>               /* Register interrupt handlers for gpio signaled acpi events */
+>> @@ -138,6 +347,8 @@ static int xgene_gpio_sb_remove(struct platform_device *pdev)
+>>               acpi_gpiochip_free_interrupts(&priv->gc);
+>>       }
+>>
+>> +     irq_domain_remove(priv->irq_domain);
+>> +
+>>       gpiochip_remove(&priv->gc);
+>>       return 0;
+>>  }
+>>
+>
+> Thanks,
+>
+>         M.
+> --
+> Jazz is not dead. It just smells funny...
