@@ -1,36 +1,106 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Thu, 11 Feb 2016 14:34:21 +0000
-Subject: [RFC v2 14/15] iommu/arm-smmu: do not advertise IOMMU_CAP_INTR_REMAP
+Date: Thu, 11 Feb 2016 14:34:20 +0000
+Subject: [RFC v2 13/15] vfio/type1: also check IRQ remapping capability at msi
+ domain
 In-Reply-To: <1455201262-5259-1-git-send-email-eric.auger@linaro.org>
 References: <1455201262-5259-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1455201262-5259-15-git-send-email-eric.auger@linaro.org>
+Message-ID: <1455201262-5259-14-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Do not advertise IOMMU_CAP_INTR_REMAP for arm-smmu. Indeed the
-irq_remapping capability is abstracted on irqchip side for ARM as
-opposed to Intel IOMMU featuring IRQ remapping HW.
+On x86 IRQ remapping is abstracted by the IOMMU. On ARM this is abstracted
+by the msi controller. vfio_msi_parent_irq_remapping_capable allows to
+check whether interrupts are "safe" for a given device. There are if the device
+does not use MSI or if the device uses MSI and the msi-parent controller
+supports IRQ remapping.
 
-So to check IRQ remmapping capability, the msi domain needs to be
-checked instead.
+Then we check at group level if all devices have safe interrupts: if not
+only allow the group to be attached if allow_unsafe_interrupts is set.
+
+At this point ARM sMMU still advertises IOMMU_CAP_INTR_REMAP. This is
+changed in next patch.
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
 ---
- drivers/iommu/arm-smmu.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/vfio/vfio_iommu_type1.c | 38 ++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 36 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index ae8a97d..9a83285 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -1354,7 +1354,7 @@ static bool arm_smmu_capable(enum iommu_cap cap)
- 		 */
- 		return true;
- 	case IOMMU_CAP_INTR_REMAP:
--		return true; /* MSIs are just memory writes */
-+		return false; /* MSIs are just memory writes */
- 	case IOMMU_CAP_NOEXEC:
- 		return true;
- 	default:
+diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
+index c5d3b48..080321b 100644
+--- a/drivers/vfio/vfio_iommu_type1.c
++++ b/drivers/vfio/vfio_iommu_type1.c
+@@ -36,6 +36,8 @@
+ #include <linux/uaccess.h>
+ #include <linux/vfio.h>
+ #include <linux/workqueue.h>
++#include <linux/irqdomain.h>
++#include <linux/msi.h>
+ 
+ #define DRIVER_VERSION  "0.2"
+ #define DRIVER_AUTHOR   "Alex Williamson <alex.williamson@redhat.com>"
+@@ -754,6 +756,31 @@ static int vfio_bus_type(struct device *dev, void *data)
+ 	return 0;
+ }
+ 
++/**
++ * vfio_msi_parent_irq_remapping_capable: returns whether the device msi-parent
++ * controller supports IRQ remapping, aka interrupt translation
++ *
++ * @dev: device handle
++ * @data: unused
++ * returns 0 if irq remapping is supported or -1 if not supported.
++ */
++static int vfio_msi_parent_irq_remapping_capable(struct device *dev, void *data)
++{
++	struct irq_domain *domain;
++	struct msi_domain_info *info;
++
++	domain = dev_get_msi_domain(dev);
++	if (!domain)
++		return 0;
++
++	info = msi_get_domain_info(domain);
++
++	if (!(info->flags & MSI_FLAG_IRQ_REMAPPING))
++		return -1;
++
++	return 0;
++}
++
+ static int vfio_iommu_replay(struct vfio_iommu *iommu,
+ 			     struct vfio_domain *domain)
+ {
+@@ -848,7 +875,7 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
+ 	struct vfio_group *group, *g;
+ 	struct vfio_domain *domain, *d;
+ 	struct bus_type *bus = NULL;
+-	int ret;
++	int ret, irq_remapping;
+ 
+ 	mutex_lock(&iommu->lock);
+ 
+@@ -871,6 +898,13 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
+ 
+ 	group->iommu_group = iommu_group;
+ 
++	/*
++	 * Determine if all the devices of the group has an MSI-parent that
++	 * supports irq remapping
++	 */
++	irq_remapping = !iommu_group_for_each_dev(iommu_group, &bus,
++				       vfio_msi_parent_irq_remapping_capable);
++
+ 	/* Determine bus_type in order to allocate a domain */
+ 	ret = iommu_group_for_each_dev(iommu_group, &bus, vfio_bus_type);
+ 	if (ret)
+@@ -899,7 +933,7 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
+ 	list_add(&group->next, &domain->group_list);
+ 
+ 	if (!allow_unsafe_interrupts &&
+-	    !iommu_capable(bus, IOMMU_CAP_INTR_REMAP)) {
++	    (!iommu_capable(bus, IOMMU_CAP_INTR_REMAP) && !irq_remapping)) {
+ 		pr_warn("%s: No interrupt remapping support.  Use the module param \"allow_unsafe_interrupts\" to enable VFIO IOMMU support on this platform\n",
+ 		       __func__);
+ 		ret = -EPERM;
 -- 
 1.9.1
