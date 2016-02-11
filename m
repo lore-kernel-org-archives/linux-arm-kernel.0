@@ -1,43 +1,63 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 11 Feb 2016 09:46:23 +0000
-Subject: [PATCH v2] mfd: Provide MACRO to declare commonly defined MFD
- cell attributes
-In-Reply-To: <56BC4DF9.7050402@nvidia.com>
-References: <1455028027-1527-1-git-send-email-lee.jones@linaro.org>
- <20160210153846.GB26950@x1> <56BB7865.3060004@nvidia.com>
- <20160211091036.GZ3782@x1> <56BC4DF9.7050402@nvidia.com>
-Message-ID: <20160211094623.GH3782@x1>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 11 Feb 2016 10:53:15 +0100
+Subject: [PATCH v4] clk: sunxi: Refactor A31 PLL6 so that it can be reused
+In-Reply-To: <20160210180420.0968c2018bf5fbe54a28a505@free.fr>
+References: <1454358000-13594-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20160204120507.GC4270@lukather>
+ <20160204162545.f806fcb64a826d2c3313985b@free.fr>
+ <20160210125333.GC31506@lukather>
+ <20160210180420.0968c2018bf5fbe54a28a505@free.fr>
+Message-ID: <20160211095315.GJ31506@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 11 Feb 2016, Laxman Dewangan wrote:
+Hi,
 
+On Wed, Feb 10, 2016 at 06:04:20PM +0100, Jean-Francois Moine wrote:
+> On Wed, 10 Feb 2016 13:53:33 +0100
+> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 > 
-> On Thursday 11 February 2016 02:40 PM, Lee Jones wrote:
-> >On Wed, 10 Feb 2016, Laxman Dewangan wrote:
-> >
-> >>On Wednesday 10 February 2016 09:08 PM, Lee Jones wrote:
-> >>>mfd: Provide MACRO to declare commonly defined MFD cell attributes
-> >>>Cc: Laxman Dewangan <ldewangan@nvidia.com>
-> >>>Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> >>Build passed with this patch when using it.
-> >>
-> >>Acked-by: Laxman Dewangan <ldewangan@nvidia.com>
-> >>
-> >>Please let me know if you applying this. I am going to use the macro
-> >>from this patch on max77620 series on next spin.
-> >As you are the first user, just submit it as 0/1 of your set.
-> >
+> > > I don't agree:
+> > > - you changed the DTs of many SoCs without any valid reason,
+> > 
+> > I did give you a significant number of reasons [1]. The fact that you
+> > chose to ignore them is up to you.
 > 
-> I saw that it is merged and available in linux-next 20160211.
-> So it is fine to not submit this patch again and modify my patch
-> assuming it is on tree.
+> Sorry, I don't see any reason for changing the DT definition of the pll6.
+> The clock is named "pll6" with "#clock-cells = <1>;" in all DTs,
+> and it works as it is.
+> If you want an other clock as "pll8", with the same HW description,
+> you must add new code for this clock.
 
-I was going to handle that, but as you wish, either way is fine by
-me.
+That's not how it works. If an hardware block is strictly identical,
+then it should use the same compatible.
+
+The PLL8 is exactly the same one than PLL6, therefore it should use
+the same compatible.
+
+> > Except that it doesn't match the hardware and that the parenthood
+> > relationship is inversed. The pll6 output is 24 MHz * n * k / 2, as
+> > seen in any datasheet that uses it. Your clock driver doesn't
+> > represent that fact.
+> 
+> The datasheet says that the pll6x2 output is 24 MHz * n * k, then, if
+> I remember correctly my lessons at primary school, defining pll6 as
+> (pll6x2 / 2) gives 24 MHz * n * k / 2 as the pll6 output. No?
+
+Or, you could keep the same parenting relationship that we had and use
+a simpler model. Ever heard of Occam's razor (and quite literally for
+once)?
+
+Maxime
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160211/3ad2c0ce/attachment.sig>
