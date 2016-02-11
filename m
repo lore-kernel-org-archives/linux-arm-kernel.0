@@ -1,35 +1,98 @@
 From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
-Date: Thu, 11 Feb 2016 21:50:22 +0530
-Subject: [PATCH v2 2/6] net: thunderx: Use napi_schedule_irqoff()
+Date: Thu, 11 Feb 2016 21:50:23 +0530
+Subject: [PATCH v2 3/6] net: thunderx: Assign affinity hints to vf's interrupts
 In-Reply-To: <1455207626-35488-1-git-send-email-sunil.kovvuri@gmail.com>
 References: <1455207626-35488-1-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <1455207626-35488-3-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <1455207626-35488-4-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sunil Goutham <sgoutham@cavium.com>
 
-napi_schedule is being called from hard irq context, hence
-switch to napi_schedule_irqoff which avoids unneeded call
-to local_irq_save and local_irq_restore.
+This affinity hint can be used by user space irqbalance tool to set
+preferred CPU mask for irqs registered by this VF. Irqbalance needs
+to be in 'exact' mode to set irq affinity same as indicated by
+affinity hint.
 
 Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
 ---
- drivers/net/ethernet/cavium/thunder/nicvf_main.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ drivers/net/ethernet/cavium/thunder/nic.h        |    1 +
+ drivers/net/ethernet/cavium/thunder/nicvf_main.c |   37 ++++++++++++++++++++-
+ 2 files changed, 36 insertions(+), 2 deletions(-)
 
+diff --git a/drivers/net/ethernet/cavium/thunder/nic.h b/drivers/net/ethernet/cavium/thunder/nic.h
+index 8af363a..00cc915 100644
+--- a/drivers/net/ethernet/cavium/thunder/nic.h
++++ b/drivers/net/ethernet/cavium/thunder/nic.h
+@@ -309,6 +309,7 @@ struct nicvf {
+ 	struct msix_entry	msix_entries[NIC_VF_MSIX_VECTORS];
+ 	char			irq_name[NIC_VF_MSIX_VECTORS][20];
+ 	bool			irq_allocated[NIC_VF_MSIX_VECTORS];
++	cpumask_var_t		affinity_mask[NIC_VF_MSIX_VECTORS];
+ 
+ 	/* VF <-> PF mailbox communication */
+ 	bool			pf_acked;
 diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_main.c b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-index 95db6b7..c6f146c 100644
+index c6f146c..90ce93e 100644
 --- a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
 +++ b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-@@ -828,7 +828,7 @@ static irqreturn_t nicvf_intr_handler(int irq, void *cq_irq)
- 	nicvf_disable_intr(nic, NICVF_INTR_CQ, qidx);
+@@ -899,6 +899,31 @@ static void nicvf_disable_msix(struct nicvf *nic)
+ 	}
+ }
  
- 	/* Schedule NAPI */
--	napi_schedule(&cq_poll->napi);
-+	napi_schedule_irqoff(&cq_poll->napi);
++static void nicvf_set_irq_affinity(struct nicvf *nic)
++{
++	int vec, cpu;
++	int irqnum;
++
++	for (vec = 0; vec < nic->num_vec; vec++) {
++		if (!nic->irq_allocated[vec])
++			continue;
++
++		if (!zalloc_cpumask_var(&nic->affinity_mask[vec], GFP_KERNEL))
++			return;
++		 /* CQ interrupts */
++		if (vec < NICVF_INTR_ID_SQ)
++			/* Leave CPU0 for RBDR and other interrupts */
++			cpu = nicvf_netdev_qidx(nic, vec) + 1;
++		else
++			cpu = 0;
++
++		cpumask_set_cpu(cpumask_local_spread(cpu, nic->node),
++				nic->affinity_mask[vec]);
++		irqnum = nic->msix_entries[vec].vector;
++		irq_set_affinity_hint(irqnum, nic->affinity_mask[vec]);
++	}
++}
++
+ static int nicvf_register_interrupts(struct nicvf *nic)
+ {
+ 	int irq, ret = 0;
+@@ -944,8 +969,13 @@ static int nicvf_register_interrupts(struct nicvf *nic)
+ 	ret = request_irq(nic->msix_entries[irq].vector,
+ 			  nicvf_qs_err_intr_handler,
+ 			  0, nic->irq_name[irq], nic);
+-	if (!ret)
+-		nic->irq_allocated[irq] = true;
++	if (ret)
++		goto err;
++
++	nic->irq_allocated[irq] = true;
++
++	/* Set IRQ affinities */
++	nicvf_set_irq_affinity(nic);
  
- 	/* Clear interrupt */
- 	nicvf_clear_intr(nic, NICVF_INTR_CQ, qidx);
+ err:
+ 	if (ret)
+@@ -963,6 +993,9 @@ static void nicvf_unregister_interrupts(struct nicvf *nic)
+ 		if (!nic->irq_allocated[irq])
+ 			continue;
+ 
++		irq_set_affinity_hint(nic->msix_entries[irq].vector, NULL);
++		free_cpumask_var(nic->affinity_mask[irq]);
++
+ 		if (irq < NICVF_INTR_ID_SQ)
+ 			free_irq(nic->msix_entries[irq].vector, nic->napi[irq]);
+ 		else
 -- 
 1.7.1
