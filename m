@@ -1,127 +1,54 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 11 Feb 2016 13:55:13 +0000
-Subject: [PATCH] arm64: KVM: Configure TCR_EL2.PS at runtime
-In-Reply-To: <20160211133401.GV5171@cbox>
-References: <1455130013-28644-1-git-send-email-tchalamarla@caviumnetworks.com>
- <20160211132708.GU5171@cbox> <20160211133401.GV5171@cbox>
-Message-ID: <56BC92C1.8060201@arm.com>
+From: lars.persson@axis.com (Lars Persson)
+Date: Thu, 11 Feb 2016 15:04:34 +0100
+Subject: [PATCH v2 0/8] arm: Add Artpec-6 SoC
+Message-ID: <cover.1455198819.git.larper@axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/02/16 13:34, Christoffer Dall wrote:
-> On Thu, Feb 11, 2016 at 02:27:08PM +0100, Christoffer Dall wrote:
->> On Wed, Feb 10, 2016 at 10:46:53AM -0800, tchalamarla at caviumnetworks.com wrote:
->>> From: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
->>>
->>> Setting TCR_EL2.PS to 40 bits is wrong on systems with PS size is
->>> less than 40 bits. and with systems where RAM is at higher address,
->>> this will break KVM.
->>>
->>> This patch sets TCR_EL2.PS at runtime similar to VTCR_EL2.PS
->>>
->>> changes form V2:
->>> 	- Modified subject line and commit message.
->>> 	- Removed TCR_EL2_FLAGS.
->>>
->>> changes from V1:
->>>         - Moved to dynamic configuration.
->>>
->>> Signed-off-by: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
->>> ---
->>>  arch/arm64/include/asm/kvm_arm.h |  2 --
->>>  arch/arm64/kvm/hyp-init.S        | 12 +++++++-----
->>>  2 files changed, 7 insertions(+), 7 deletions(-)
->>>
->>> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
->>> index 738a95f..3776db0 100644
->>> --- a/arch/arm64/include/asm/kvm_arm.h
->>> +++ b/arch/arm64/include/asm/kvm_arm.h
->>> @@ -107,8 +107,6 @@
->>>  #define TCR_EL2_MASK	(TCR_EL2_TG0 | TCR_EL2_SH0 | \
->>>  			 TCR_EL2_ORGN0 | TCR_EL2_IRGN0 | TCR_EL2_T0SZ)
->>>  
->>> -#define TCR_EL2_FLAGS	(TCR_EL2_RES1 | TCR_EL2_PS_40B)
->>> -
->>>  /* VTCR_EL2 Registers bits */
->>>  #define VTCR_EL2_RES1		(1 << 31)
->>>  #define VTCR_EL2_PS_MASK	(7 << 16)
->>> diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
->>> index 3e568dc..b5ab1b0 100644
->>> --- a/arch/arm64/kvm/hyp-init.S
->>> +++ b/arch/arm64/kvm/hyp-init.S
->>> @@ -64,7 +64,7 @@ __do_hyp_init:
->>>  	mrs	x4, tcr_el1
->>>  	ldr	x5, =TCR_EL2_MASK
->>>  	and	x4, x4, x5
->>> -	ldr	x5, =TCR_EL2_FLAGS
->>> +	ldr	x5, =TCR_EL2_RES1
->>>  	orr	x4, x4, x5
->>>  
->>>  #ifndef CONFIG_ARM64_VA_BITS_48
->>> @@ -85,15 +85,17 @@ __do_hyp_init:
->>>  	ldr_l	x5, idmap_t0sz
->>>  	bfi	x4, x5, TCR_T0SZ_OFFSET, TCR_TxSZ_WIDTH
->>>  #endif
->>> -	msr	tcr_el2, x4
->>> -
->>> -	ldr	x4, =VTCR_EL2_FLAGS
->>>  	/*
->>>  	 * Read the PARange bits from ID_AA64MMFR0_EL1 and set the PS bits in
->>> -	 * VTCR_EL2.
->>> +	 * TCR_EL2 and VTCR_EL2.
->>>  	 */
->>>  	mrs	x5, ID_AA64MMFR0_EL1
->>>  	bfi	x4, x5, #16, #3
->>> +
->>> +	msr	tcr_el2, x4
->>> +
->>> +	ldr	x4, =VTCR_EL2_FLAGS
->>> +	bfi	x4, x5, #16, #3
->>>  	/*
->>>  	 * Read the VMIDBits bits from ID_AA64MMFR1_EL1 and set the VS bit in
->>>  	 * VTCR_EL2.
->>> -- 
->>> 2.1.0
->>>
->>
->> This looks reasonable enough for me.  Did we limit Linux to PS=40 bits
->> in the past and have lifted this restriction, or why did we have this
->> limitation for EL2 translations in the past?
->>
-> Hmm, just went back and looked at my comments [1] on Suzuki's 16K page
-> series, and regarding our stage-2 page table configuration I wrote this:
-> 
-> <quote>
-> ... the constraints of
-> this whole thing is, and make sure we agree on this:
-> 
-> 1. We fix the IPA max width to 40 bits
-> 2. We don't support systems with a PARange smaller than 40 bits (do we
->    check this anywhere or document this anywhere?)
->    3. We always assume we are running on a system with PARange of 40
->    bits
->       and we are therefore constrained to use concatination.
-> </quote>
-> 
-> So this change is actually making a bit nervous...  Marc, did you check
-> if all the stuff in arch/arm64/include/asm/kvm_mmu.h still holds after
-> we relax this?
+Basic support for the Axis Artpec-6 ARM SoC. Timers, interrupts, UARTs and
+ethernet are wired up.
 
-I believe this still works for the following reasons:
+Changes since v1:
+- Corrected bindings for axis,artpec6-pll1-clock.
+- Moved the uart aliases to the board dts.
+- Kconfig cleanup.
+- Added a device tree binding for the dma configuration.
+- Added CONFIG_SYNOPSYS_DWC_ETH_QOS to multi_v7_defconfig.
+- Added binding documentation for axis,artpec6-dev-board.
 
-- This only affects the output address of EL2 Stage-1, and basically
-only allows EL2 to reach the same memory as the rest of the host kernel.
+Lars Persson (8):
+  clk: add device tree binding for artpec-6 pll1 clock
+  clk: add artpec-6 pll1 clock driver
+  arm: add device-tree SoC bindings for Axis Artpec-6
+  arm: dts: add Artpec-6 SoC dtsi file
+  arm: dts: add Artpec-6 development board dts
+  arm: initial machine port for artpec-6 SoC
+  arm: multi_v7_defconfig: add MACH_ARTPEC6
+  arm: mach-artpec: add entry to MAINTAINERS
 
-- Stage-2 translation already does the same thing, for similar reasons.
+ Documentation/devicetree/bindings/arm/axis.txt     |  29 +++
+ .../devicetree/bindings/clock/artpec6.txt          |  16 ++
+ MAINTAINERS                                        |  10 +
+ arch/arm/Kconfig                                   |   2 +
+ arch/arm/Makefile                                  |   1 +
+ arch/arm/boot/dts/Makefile                         |   2 +
+ arch/arm/boot/dts/artpec6-devboard.dts             |  64 ++++++
+ arch/arm/boot/dts/artpec6.dtsi                     | 236 +++++++++++++++++++++
+ arch/arm/configs/multi_v7_defconfig                |   3 +
+ arch/arm/mach-artpec/Kconfig                       |  20 ++
+ arch/arm/mach-artpec/Makefile                      |   1 +
+ arch/arm/mach-artpec/board-artpec6.c               |  72 +++++++
+ drivers/clk/Makefile                               |   1 +
+ drivers/clk/clk-artpec6.c                          |  70 ++++++
+ 14 files changed, 527 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/axis.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/artpec6.txt
+ create mode 100644 arch/arm/boot/dts/artpec6-devboard.dts
+ create mode 100644 arch/arm/boot/dts/artpec6.dtsi
+ create mode 100644 arch/arm/mach-artpec/Kconfig
+ create mode 100644 arch/arm/mach-artpec/Makefile
+ create mode 100644 arch/arm/mach-artpec/board-artpec6.c
+ create mode 100644 drivers/clk/clk-artpec6.c
 
-- We enforce 40bit IPA by not providing page tables above 40 bits (by
-setting T0SZ to 64-40=24). This has the effect of denying accesses above
-40bit IPA to the guest.
-
-So I'm quite confident that we're safe here.
-
-Thoughts?
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+2.1.4
