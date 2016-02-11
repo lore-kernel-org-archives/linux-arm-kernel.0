@@ -1,41 +1,38 @@
 From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Wed, 10 Feb 2016 21:51:00 -0600
-Subject: [PATCH V3 01/12] MAINTAINERS: Adding Maintainers for AMD Seattle
- Device Tree
+Date: Wed, 10 Feb 2016 21:51:01 -0600
+Subject: [PATCH V3 02/12] dtb: amd: Fix GICv2 hypervisor and virtual interface
+ sizes
 In-Reply-To: <1455162671-16044-1-git-send-email-Suravee.Suthikulpanit@amd.com>
 References: <1455162671-16044-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <1455162671-16044-2-git-send-email-Suravee.Suthikulpanit@amd.com>
+Message-ID: <1455162671-16044-3-git-send-email-Suravee.Suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
+From: Brijesh Singh <brijeshkumar.singh@amd.com>
 
-Adding maintainers for AMD Seattle device tree.
+This patch fixes incorrect sizes of the GICv2 device tree node.
+This has triggered error message when booting Xen hypervisor.
 
 Signed-off-by: Brijesh Singh <brijeshkumar.singh@amd.com>
 Signed-off-by: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
-Signed-off-by: Tom Lendacky <thomas.lendacky@amd.com>
 ---
- MAINTAINERS | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 7f1fa4f..e349a32 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -673,6 +673,13 @@ F:	drivers/gpu/drm/radeon/radeon_kfd.c
- F:	drivers/gpu/drm/radeon/radeon_kfd.h
- F:	include/uapi/linux/kfd_ioctl.h
- 
-+AMD SEATTLE DEVICE TREE SUPPORT
-+M:	Brijesh Singh <brijeshkumar.singh@amd.com>
-+M:	Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
-+M:	Tom Lendacky <thomas.lendacky@amd.com>
-+S:	Supported
-+F:	arch/arm64/boot/dts/amd/
-+
- AMD XGBE DRIVER
- M:	Tom Lendacky <thomas.lendacky@amd.com>
- L:	netdev at vger.kernel.org
+diff --git a/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi b/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
+index 2874d92..fdd0c96 100644
+--- a/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
++++ b/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
+@@ -18,8 +18,8 @@
+ 		#size-cells = <2>;
+ 		reg = <0x0 0xe1110000 0 0x1000>,
+ 		      <0x0 0xe112f000 0 0x2000>,
+-		      <0x0 0xe1140000 0 0x10000>,
+-		      <0x0 0xe1160000 0 0x10000>;
++		      <0x0 0xe1140000 0 0x2000>,
++		      <0x0 0xe1160000 0 0x2000>;
+ 		interrupts = <1 9 0xf04>;
+ 		ranges = <0 0 0 0xe1100000 0 0x100000>;
+ 		v2m0: v2m at e0080000 {
 -- 
 2.5.0
