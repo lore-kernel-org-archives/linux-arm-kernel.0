@@ -1,157 +1,39 @@
-From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
-Date: Thu, 11 Feb 2016 21:58:11 +0530
-Subject: [PATCH V4 5/5] Microblaze: Modifying microblaze PCI subsytem to
- support generic Xilinx AXI PCIe Host Bridge IP driver
-In-Reply-To: <1455208091-15556-1-git-send-email-bharatku@xilinx.com>
-References: <1455208091-15556-1-git-send-email-bharatku@xilinx.com>
-Message-ID: <1455208091-15556-6-git-send-email-bharatku@xilinx.com>
+From: matt@codeblueprint.co.uk (Matt Fleming)
+Date: Thu, 11 Feb 2016 16:29:20 +0000
+Subject: [PATCH v2 0/7] ARM/efi minor fixes + stub pre-boot compat checks
+In-Reply-To: <CAKv+Gu-kZrcLYhF7i0u8F2TOMqEVKp==jNoBc+Rfk61cwSkDhQ@mail.gmail.com>
+References: <1454601030-9093-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20160211161621.GM4134@codeblueprint.co.uk>
+ <CAKv+Gu-kZrcLYhF7i0u8F2TOMqEVKp==jNoBc+Rfk61cwSkDhQ@mail.gmail.com>
+Message-ID: <20160211162920.GN4134@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch does required modifications to microblaze PCI subsystem, to
-work with generic driver (drivers/pci/host/pcie-xilinx.c) on Microblaze
-and Zynq.
+On Thu, 11 Feb, at 05:18:12PM, Ard Biesheuvel wrote:
+> On 11 February 2016 at 17:16, Matt Fleming <matt@codeblueprint.co.uk> wrote:
+> > On Thu, 04 Feb, at 04:50:23PM, Ard Biesheuvel wrote:
+> >> I merged two EFI/ARM related series, whose v1's I sent out last week:
+> >>
+> >> Changes since v1:
+> >> - added various tags from various people
+> >> - new patch #3 to undefine __init
+> >>
+> >> @Matt: are you happy with all of this going through the arm64 tree? I don't
+> >> think it clashes with anything else we've got queued up for v4.6 in tip/efi/core
+> >
+> > How come this is going through the arm64 tree? Are there other patch
+> > series that this depends on or that depend on it?
+> >
+> > If it makes the most sense to take it through that tree, then I'm fine
+> > with it but I'd like to hear a rationale.
+> 
+> I simply thought it would be most convenient, since it touches
+> ARM-specific files only. But if you feel it should go via the EFI tree
+> instead, that is also fine by me.
 
-Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
-Signed-off-by: Ravi Kiran Gummaluri <rgummal@xilinx.com>
----
-Changes:
-Removed pcibios_get_phb_of_node in pci-common.c, using generic version
-instead.
-Modified pcibios_fixup_bus in pci-common.c, as per generic architecuture.
-Modified pcibios_align_resource in pci-common.c, as per generic
-architecuture, removed temporary variable.
-Removed pci_domain_nr in pci-common.c, instead using generic code.
-Added pcibios_add_device in pci-common.c, as per generic architecuture.
-Adding Kernel configuration in arch/microblaze as required for generic PCI
-domains.
-Added kernel configuration for driver to support Microblaze.
----
- arch/microblaze/Kconfig          |  3 +++
- arch/microblaze/pci/pci-common.c | 56 +++++++---------------------------------
- drivers/pci/host/Kconfig         |  2 +-
- 3 files changed, 14 insertions(+), 47 deletions(-)
+Since the diff stat is heavily weighted towards drivers/firmware/efi I
+think it should go via the EFI tree. So I'll pick this up (the changes
+look fine) unless Will or Catalin complain otherwise.
 
-diff --git a/arch/microblaze/Kconfig b/arch/microblaze/Kconfig
-index 0bce820..c3702b9 100644
---- a/arch/microblaze/Kconfig
-+++ b/arch/microblaze/Kconfig
-@@ -271,6 +271,9 @@ config PCI
- config PCI_DOMAINS
- 	def_bool PCI
- 
-+config PCI_DOMAINS_GENERIC
-+	def_bool PCI_DOMAINS
-+
- config PCI_SYSCALL
- 	def_bool PCI
- 
-diff --git a/arch/microblaze/pci/pci-common.c b/arch/microblaze/pci/pci-common.c
-index ae838ed..35654be 100644
---- a/arch/microblaze/pci/pci-common.c
-+++ b/arch/microblaze/pci/pci-common.c
-@@ -123,17 +123,6 @@ unsigned long pci_address_to_pio(phys_addr_t address)
- }
- EXPORT_SYMBOL_GPL(pci_address_to_pio);
- 
--/*
-- * Return the domain number for this bus.
-- */
--int pci_domain_nr(struct pci_bus *bus)
--{
--	struct pci_controller *hose = pci_bus_to_host(bus);
--
--	return hose->global_number;
--}
--EXPORT_SYMBOL(pci_domain_nr);
--
- /* This routine is meant to be used early during boot, when the
-  * PCI bus numbers have not yet been assigned, and you need to
-  * issue PCI config cycles to an OF device.
-@@ -863,26 +852,10 @@ void pcibios_setup_bus_devices(struct pci_bus *bus)
- 
- void pcibios_fixup_bus(struct pci_bus *bus)
- {
--	/* When called from the generic PCI probe, read PCI<->PCI bridge
--	 * bases. This is -not- called when generating the PCI tree from
--	 * the OF device-tree.
--	 */
--	if (bus->self != NULL)
--		pci_read_bridge_bases(bus);
--
--	/* Now fixup the bus bus */
--	pcibios_setup_bus_self(bus);
--
--	/* Now fixup devices on that bus */
--	pcibios_setup_bus_devices(bus);
-+	/* nothing to do */
- }
- EXPORT_SYMBOL(pcibios_fixup_bus);
- 
--static int skip_isa_ioresource_align(struct pci_dev *dev)
--{
--	return 0;
--}
--
- /*
-  * We need to avoid collisions with `mirrored' VGA ports
-  * and other strange ISA hardware, so we always want the
-@@ -899,20 +872,18 @@ static int skip_isa_ioresource_align(struct pci_dev *dev)
- resource_size_t pcibios_align_resource(void *data, const struct resource *res,
- 				resource_size_t size, resource_size_t align)
- {
--	struct pci_dev *dev = data;
--	resource_size_t start = res->start;
--
--	if (res->flags & IORESOURCE_IO) {
--		if (skip_isa_ioresource_align(dev))
--			return start;
--		if (start & 0x300)
--			start = (start + 0x3ff) & ~0x3ff;
--	}
--
--	return start;
-+	return res->start;
- }
- EXPORT_SYMBOL(pcibios_align_resource);
- 
-+int pcibios_add_device(struct pci_dev *dev)
-+{
-+	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL(pcibios_add_device);
-+
- /*
-  * Reparent resource children of pr that conflict with res
-  * under res, and make res replace those children.
-@@ -1333,13 +1304,6 @@ static void pcibios_setup_phb_resources(struct pci_controller *hose,
- 		 (unsigned long)hose->io_base_virt - _IO_BASE);
- }
- 
--struct device_node *pcibios_get_phb_of_node(struct pci_bus *bus)
--{
--	struct pci_controller *hose = bus->sysdata;
--
--	return of_node_get(hose->dn);
--}
--
- static void pcibios_scan_phb(struct pci_controller *hose)
- {
- 	LIST_HEAD(resources);
-diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-index d5e58ba..7c56c2e 100644
---- a/drivers/pci/host/Kconfig
-+++ b/drivers/pci/host/Kconfig
-@@ -79,7 +79,7 @@ config PCI_KEYSTONE
- 
- config PCIE_XILINX
- 	bool "Xilinx AXI PCIe host bridge support"
--	depends on ARCH_ZYNQ
-+	depends on ARCH_ZYNQ || MICROBLAZE
- 	help
- 	  Say 'Y' here if you want kernel to support the Xilinx AXI PCIe
- 	  Host Bridge driver.
--- 
-2.1.1
+I'm also keen to allay any concerns that the EFI tree is somehow
+x86-specific.
