@@ -1,108 +1,54 @@
-From: stephanolbrich@gmx.de (Stephan Olbrich)
-Date: Thu, 11 Feb 2016 17:05:56 +0100
-Subject: [PATCH 4/4] spi: bcm2835aux: fix CPOL/CPHA setting
-In-Reply-To: <16A848EA-6E08-48C4-B3DD-DF27333B7458@sperl.org>
-References: <1455041435-8015-1-git-send-email-stephanolbrich@gmx.de>
- <87a8n94e3x.fsf@eliezer.anholt.net>
- <16A848EA-6E08-48C4-B3DD-DF27333B7458@sperl.org>
-Message-ID: <10547867.CcbLVQlgyH@chaos-desktop>
+From: lars.persson@axis.com (Lars Persson)
+Date: Thu, 11 Feb 2016 17:06:16 +0100
+Subject: [PATCH v3 1/6] arm: add device-tree SoC bindings for Axis Artpec-6
+In-Reply-To: <cover.1455205057.git.larper@axis.com>
+References: <cover.1455205057.git.larper@axis.com>
+Message-ID: <0a38251ad8ad1895a1744f43a58f6b161676af09.1455205057.git.larper@axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Martin,
+This adds device tree bindings for the Artpec-6 SoC.
 
-Am Thursday 11 February 2016, 16:25:43 schrieb Martin Sperl:
-> > On 10.02.2016, at 01:13, Eric Anholt <eric@anholt.net> wrote:
-> > 
-> > stephanolbrich at gmx.de writes:
-> >> From: Stephan Olbrich <stephanolbrich@gmx.de>
-> >> 
-> >> The auxiliary spi supports only CPHA=0 modes as the first bit is
-> >> always output to the pin before the first clock cycle. In CPHA=1
-> >> modes the first clock edge outputs the second bit hence the slave
-> >> can never read the first bit.
-> >> 
-> >> Also the CPHA registers switch between clocking data in/out on
-> >> rising/falling edge hence depend on the CPOL setting.
-> >> 
-> >> Signed-off-by: Stephan Olbrich <stephanolbrich@gmx.de>
-> >> ---
-> >> drivers/spi/spi-bcm2835aux.c | 10 +++++-----
-> >> 1 file changed, 5 insertions(+), 5 deletions(-)
-> >> 
-> >> diff --git a/drivers/spi/spi-bcm2835aux.c b/drivers/spi/spi-bcm2835aux.c
-> >> index b90aa34..169f521 100644
-> >> --- a/drivers/spi/spi-bcm2835aux.c
-> >> +++ b/drivers/spi/spi-bcm2835aux.c
-> >> @@ -386,12 +386,12 @@ static int bcm2835aux_spi_prepare_message(struct
-> >> spi_master *master,>> 
-> >> 	bs->cntl[1] = BCM2835_AUX_SPI_CNTL1_MSBF_IN;
-> >> 	
-> >> 	/* handle all the modes */
-> >> 
-> >> -	if (spi->mode & SPI_CPOL)
-> >> +	if (spi->mode & SPI_CPOL) {
-> >> 
-> >> 		bs->cntl[0] |= BCM2835_AUX_SPI_CNTL0_CPOL;
-> >> 
-> >> -	if (spi->mode & SPI_CPHA)
-> >> -		bs->cntl[0] |= BCM2835_AUX_SPI_CNTL0_CPHA_OUT |
-> >> -			       BCM2835_AUX_SPI_CNTL0_CPHA_IN;
-> >> -
-> >> +		bs->cntl[0] |= BCM2835_AUX_SPI_CNTL0_CPHA_OUT;
-> >> +	} else {
-> >> +		bs->cntl[0] |= BCM2835_AUX_SPI_CNTL0_CPHA_IN;
-> >> +	}
-> >> 
-> >> 	bcm2835aux_wr(bs, BCM2835_AUX_SPI_CNTL1, bs->cntl[1]);
-> >> 	bcm2835aux_wr(bs, BCM2835_AUX_SPI_CNTL0, bs->cntl[0]);
-> > 
-> > (Note for other readers: A better name for CNTL0_CPHA_* would be
-> > CNTL0_*_RISING).
-> > 
-> > I think you're right about not actually supporting CPHA.  I don't see
-> > wany way to keep bit 1 out lasting through the first full clock cycle.
-> > I think Stefan's right that we should drop CPHA from MODE_BITS
-> > (actually, MODE_BITS would be nicer if we just merged it into its one
-> > user, I think).
-> > 
-> > However, this hunk appears to be correct and would fix the timing of our
-> > data going out in the CPOL=0 case and of sampling IN data for CPOL=1.
-> 
-> Are you sure that CPHA is not working?
-> 
-> I have used the following to test all combinations:
->  for C in "" "-C"; do
->   for O in "" "-O"; do
->    for H in "" "-H"; do
->     spidev_test -vD /dev/*.1 $H $O -p "\x00\x82\x00" -s 1000000;
->    done
->   done
->  done
-> 
-> I have tested with the 4.5-rc3 kernel without any of your patches.
-> 
-> And looked at the logic-analyzer: I see distinct waveform pattern
-> for clk and data for all events!
+Signed-off-by: Lars Persson <larper@axis.com>
+---
+ Documentation/devicetree/bindings/arm/axis.txt | 29 ++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/axis.txt
 
-The problem I see, is not that there is no waveform but that it has the wrong 
-timing.
-I'll make an example:
-Data is 0xAA,0xFF, CPOL=1, CPHA=1
-What happens is this:
-CS goes active and MOSI goes high (first bit in 1)
-After a short time, SCLK goes from low to high and MOSI goes to low (second 
-bit is 0)
-Then SCLK goes low (sampling data)
-Then SCLK goes high and MOSI goes high (third bit is 1) 
-and so on.
-At the end with the last rising edge of SCLK MOSI goes to low and stays there 
-while SCLK goes to low and then CS to inactive.
-
-So the slave has no chance to get the first bit but gets an additional 0 at the 
-end.
-It may not be easy visible with 0x00,0x82,0x00 as data, so could you repeat 
-your test with 0xAA,0xFF if you see the same as I do or not?
-
-Thanks,
-Stephan
+diff --git a/Documentation/devicetree/bindings/arm/axis.txt b/Documentation/devicetree/bindings/arm/axis.txt
+new file mode 100644
+index 0000000..ae345e1
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/axis.txt
+@@ -0,0 +1,29 @@
++Axis Communications AB
++ARTPEC series SoC Device Tree Bindings
++
++ARTPEC-6 ARM SoC
++================
++
++Required root node properties:
++- compatible = "axis,artpec6";
++
++ARTPEC-6 System Controller
++--------------------------
++
++The ARTPEC-6 has a system controller with mixed functions controlling DMA, PCIe
++and resets.
++
++Required properties:
++- compatible: "axis,artpec6-syscon", "syscon"
++- reg: Address and length of the register bank.
++
++Example:
++	syscon {
++		compatible = "axis,artpec6-syscon", "syscon";
++		reg = <0xf8000000 0x48>;
++	};
++
++ARTPEC-6 Development board:
++---------------------------
++Required root node properties:
++- compatible = "axis,artpec6-dev-board", "axis,artpec6";
+-- 
+2.1.4
