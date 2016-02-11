@@ -1,39 +1,49 @@
-From: matt@codeblueprint.co.uk (Matt Fleming)
-Date: Thu, 11 Feb 2016 16:29:20 +0000
-Subject: [PATCH v2 0/7] ARM/efi minor fixes + stub pre-boot compat checks
-In-Reply-To: <CAKv+Gu-kZrcLYhF7i0u8F2TOMqEVKp==jNoBc+Rfk61cwSkDhQ@mail.gmail.com>
-References: <1454601030-9093-1-git-send-email-ard.biesheuvel@linaro.org>
- <20160211161621.GM4134@codeblueprint.co.uk>
- <CAKv+Gu-kZrcLYhF7i0u8F2TOMqEVKp==jNoBc+Rfk61cwSkDhQ@mail.gmail.com>
-Message-ID: <20160211162920.GN4134@codeblueprint.co.uk>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Thu, 11 Feb 2016 11:28:52 -0500
+Subject: [PATCH v2 1/6] Revert "drivers/tty/serial: make 8250/8250_mtk.c
+ explicitly non-modular"
+In-Reply-To: <3873766.I9XIY0R8gT@wuerfel>
+References: <1455205297-1021302-1-git-send-email-arnd@arndb.de>
+ <1455205297-1021302-2-git-send-email-arnd@arndb.de>
+ <20160211160021.GF28452@windriver.com> <3873766.I9XIY0R8gT@wuerfel>
+Message-ID: <20160211162852.GJ28452@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 11 Feb, at 05:18:12PM, Ard Biesheuvel wrote:
-> On 11 February 2016 at 17:16, Matt Fleming <matt@codeblueprint.co.uk> wrote:
-> > On Thu, 04 Feb, at 04:50:23PM, Ard Biesheuvel wrote:
-> >> I merged two EFI/ARM related series, whose v1's I sent out last week:
-> >>
-> >> Changes since v1:
-> >> - added various tags from various people
-> >> - new patch #3 to undefine __init
-> >>
-> >> @Matt: are you happy with all of this going through the arm64 tree? I don't
-> >> think it clashes with anything else we've got queued up for v4.6 in tip/efi/core
-> >
-> > How come this is going through the arm64 tree? Are there other patch
-> > series that this depends on or that depend on it?
-> >
-> > If it makes the most sense to take it through that tree, then I'm fine
-> > with it but I'd like to hear a rationale.
+[Re: [PATCH v2 1/6] Revert "drivers/tty/serial: make 8250/8250_mtk.c explicitly non-modular"] On 11/02/2016 (Thu 17:06) Arnd Bergmann wrote:
+
+> On Thursday 11 February 2016 11:00:22 Paul Gortmaker wrote:
+> > [[PATCH v2 1/6] Revert "drivers/tty/serial: make 8250/8250_mtk.c explicitly non-modular"] On 11/02/2016 (Thu 16:41) Arnd Bergmann wrote:
+> > 
+> > > This reverts commit d72d391c126e, which tried to remove dead code but
+> > > left the driver in a useless state when the main 8250 driver is a
+> > 
+> > Am I misunderstanding something?  The commit didn't cause the driver to
+> > be in a useless state for 8250=m.  But rather isn't that it was a
+> > pre-existing condition, independent of the change to 8250_mtk.c to
+> > remove the dead code in d72d391c126e?
+> > 
+> > Since the commit did not touch Kconfig or Makefile, I can't see how it
+> > could cause some new useless state that did not already exist, and hence
+> > the "Fixes:" tag is invalid as well.
 > 
-> I simply thought it would be most convenient, since it touches
-> ARM-specific files only. But if you feel it should go via the EFI tree
-> instead, that is also fine by me.
+> My wording may have been bad here. What I meant to say is that it
+> was broken before the patch, and still broken after the patch.
 
-Since the diff stat is heavily weighted towards drivers/firmware/efi I
-think it should go via the EFI tree. So I'll pick this up (the changes
-look fine) unless Will or Catalin complain otherwise.
+OK, no problem. I just didn't want Greg/Jiri to think I was sending them
+broken commits.   Will need a v3 to get rid of the extra module.h
+anyway, so that gives you a chance to reword.
 
-I'm also keen to allay any concerns that the EFI tree is somehow
-x86-specific.
+> 
+> The Fixes tag was meant to just be a reference to the commit I'm
+> reverting.
+
+Yeah, but since the stable people trigger off of that, and since the
+revert doesn't really fix anything, that is probably best removed.
+The stable trees don't need the revert.
+
+Thanks,
+Paul.
+--
+> 
+> 	Arnd
