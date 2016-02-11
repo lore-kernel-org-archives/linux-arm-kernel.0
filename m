@@ -1,80 +1,128 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 10 Feb 2016 16:12:21 -0800
-Subject: [PATCH] ARM: OMAP2+: Fix onenand initialization to avoid
- filesystem corruption
-In-Reply-To: <20160210211226.GB1640@darkstar.musicnaut.iki.fi>
-References: <linux-kernel@vger.kernel.org>
- <1454683028-4193-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
- <20160208193644.GU19432@atomide.com>
- <20160210211226.GB1640@darkstar.musicnaut.iki.fi>
-Message-ID: <20160211001220.GM19432@atomide.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 11 Feb 2016 02:14:35 +0200
+Subject: [PATCH v3 5/8] dmaengine: rcar-dmac: group slave configuration
+In-Reply-To: <1455065878-11906-6-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+References: <1455065878-11906-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+ <1455065878-11906-6-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+Message-ID: <2394364.dCGqmLNa8V@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Aaro Koskinen <aaro.koskinen@iki.fi> [160210 13:13]:
-> Hi,
+Hi Niklas,
+
+Thank you for the patch.
+
+On Wednesday 10 February 2016 01:57:55 Niklas S?derlund wrote:
+> Group slave address and transfer size in own structs for source and
+> destination. This is in preparation for hooking up the dma-mapping API
+> to the slave addresses.
 > 
-> On Mon, Feb 08, 2016 at 11:36:45AM -0800, Tony Lindgren wrote:
-> > * Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com> [160205 06:38]:
-> > > Commit <e7b11dc7b77bfce0a351230a5feeadc1d0bba997> ("ARM: OMAP2+: Fix
-> > > onenand rate detection to avoid filesystem corruption") partially fixed
-> > > onenand configuration when GPMC module is reset. Finish the job by also
-> > > providing the correct values in ONENAND_REG_SYS_CFG1 register.
-> > 
-> > OK. So probably the INT or RDY polarity made the ECC not work.
-> > 
-> > Aaro, care to dump out also the nolo configured CFG1 value from
-> > n8x0 and n9(50)?
-> > 
-> > You can do it by adding something like this to the beginning
-> > of set_onenand_cfg():
-> > 
-> > pr_info("CFG1: 0x%04x\n", readw(onenand_base + ONENAND_REG_SYS_CFG1));
-> > 
-> > And presumably the values are the same as on n900. If not, we
-> > should do the legacy file system flash test on all of them
-> > before committing this fix.
+> Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+> ---
+>  drivers/dma/sh/rcar-dmac.c | 37 +++++++++++++++++++++----------------
+>  1 file changed, 21 insertions(+), 16 deletions(-)
 > 
-> I got these (with CONFIG_OMAP_GPMC_DEBUG also enabled):
+> diff --git a/drivers/dma/sh/rcar-dmac.c b/drivers/dma/sh/rcar-dmac.c
+> index 7820d07..743873c 100644
+> --- a/drivers/dma/sh/rcar-dmac.c
+> +++ b/drivers/dma/sh/rcar-dmac.c
+> @@ -118,14 +118,21 @@ struct rcar_dmac_desc_page {
+>  	sizeof(struct rcar_dmac_xfer_chunk))
 > 
-> N800:
-> [    2.803100] CFG1: 0x46c0
-> [    3.150115] CFG1: 0x06c0
+>  /*
+> + * @slave_addr: slave memory address
+> + * @xfer_size: size (in bytes) of hardware transfers
+> + */
+> +struct rcar_dmac_chan_slave {
+> +	dma_addr_t slave_addr;
+> +	unsigned int xfer_size;
+> +};
+> +
+> +/*
+>   * struct rcar_dmac_chan - R-Car Gen2 DMA Controller Channel
+>   * @chan: base DMA channel object
+>   * @iomem: channel I/O memory base
+>   * @index: index of this channel in the controller
+> - * @src_xfer_size: size (in bytes) of hardware transfers on the source side
+> - * @dst_xfer_size: size (in bytes) of hardware transfers on the
+> destination side - * @src_slave_addr: slave source memory address
+> - * @dst_slave_addr: slave destination memory address
+> + * @src: slave memory address and size on the source side
+> + * @dst: slave memory address and size on the destination side
+>   * @mid_rid: hardware MID/RID for the DMA client using this channel
+>   * @lock: protects the channel CHCR register and the desc members
+>   * @desc.free: list of free descriptors
+> @@ -142,10 +149,8 @@ struct rcar_dmac_chan {
+>  	void __iomem *iomem;
+>  	unsigned int index;
 > 
-> N810:
-> [    2.802368] CFG1: 0x46c0
-> [    3.148620] CFG1: 0x06c0
+> -	unsigned int src_xfer_size;
+> -	unsigned int dst_xfer_size;
+> -	dma_addr_t src_slave_addr;
+> -	dma_addr_t dst_slave_addr;
+> +	struct rcar_dmac_chan_slave src;
+> +	struct rcar_dmac_chan_slave dst;
+>  	int mid_rid;
 > 
-> N900:
-> [    4.965576] CFG1: 0x46c0
-> [    5.333740] CFG1: 0x06c0
-
-Thanks, so these all should be fine with Ivaylo's patch.
-
-> N950:
-> [    4.217193] CFG1: 0x66c4
-> [    4.583221] CFG1: 0x06c0
+>  	spinlock_t lock;
+> @@ -793,13 +798,13 @@ static void rcar_dmac_chan_configure_desc(struct
+> rcar_dmac_chan *chan, case DMA_DEV_TO_MEM:
+>  		chcr = RCAR_DMACHCR_DM_INC | RCAR_DMACHCR_SM_FIXED
 > 
-> N9:
-> [    4.212677] CFG1: 0x66c4
-> [    4.578613] CFG1: 0x06c0
+>  		     | RCAR_DMACHCR_RS_DMARS;
+> 
+> -		xfer_size = chan->src_xfer_size;
+> +		xfer_size = chan->src.xfer_size;
+>  		break;
+> 
+>  	case DMA_MEM_TO_DEV:
+>  		chcr = RCAR_DMACHCR_DM_FIXED | RCAR_DMACHCR_SM_INC
+> 
+>  		     | RCAR_DMACHCR_RS_DMARS;
+> 
+> -		xfer_size = chan->dst_xfer_size;
+> +		xfer_size = chan->dst.xfer_size;
+>  		break;
+> 
+>  	case DMA_MEM_TO_MEM:
+> @@ -1038,7 +1043,7 @@ rcar_dmac_prep_slave_sg(struct dma_chan *chan, struct
+> scatterlist *sgl, }
+> 
+>  	dev_addr = dir == DMA_DEV_TO_MEM
+> -		 ? rchan->src_slave_addr : rchan->dst_slave_addr;
+> +		 ? rchan->src.slave_addr : rchan->dst.slave_addr;
+>  	return rcar_dmac_chan_prep_sg(rchan, sgl, sg_len, dev_addr,
+>  				      dir, flags, false);
+>  }
+> @@ -1093,7 +1098,7 @@ rcar_dmac_prep_dma_cyclic(struct dma_chan *chan,
+> dma_addr_t buf_addr, }
+> 
+>  	dev_addr = dir == DMA_DEV_TO_MEM
+> -		 ? rchan->src_slave_addr : rchan->dst_slave_addr;
+> +		 ? rchan->src.slave_addr : rchan->dst.slave_addr;
+>  	desc = rcar_dmac_chan_prep_sg(rchan, sgl, sg_len, dev_addr,
+>  				      dir, flags, true);
+> 
+> @@ -1110,10 +1115,10 @@ static int rcar_dmac_device_config(struct dma_chan
+> *chan, * We could lock this, but you shouldn't be configuring the
+>  	 * channel, while using it...
+>  	 */
+> -	rchan->src_slave_addr = cfg->src_addr;
+> -	rchan->dst_slave_addr = cfg->dst_addr;
+> -	rchan->src_xfer_size = cfg->src_addr_width;
+> -	rchan->dst_xfer_size = cfg->dst_addr_width;
+> +	rchan->src.slave_addr = cfg->src_addr;
+> +	rchan->dst.slave_addr = cfg->dst_addr;
+> +	rchan->src.xfer_size = cfg->src_addr_width;
+> +	rchan->dst.xfer_size = cfg->dst_addr_width;
+> 
+>  	return 0;
+>  }
 
-Aaro, care to do one more test on n9(50) like Ivaylo posted
-earlier:
-
-1. Flash original maemo rootfs
-
-2. Boot mainline kernel with Ivaylo's patch and mount onenand
-
-3. Boot original maemo kernel and check dmesg there's no
-   file corruption
-
-Also.. There's a chance somebody has created a onenand file system
-with recent mainline kernels that did the reset and disabled ECC.
-So with Ivaylo's patch fixing that, those may not mount properly
-any longer. Most likely people just keep their maemo rootfs there
-though with the MMC being available.
-
+-- 
 Regards,
 
-Tony
+Laurent Pinchart
