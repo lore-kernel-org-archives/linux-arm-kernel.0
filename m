@@ -1,26 +1,51 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 11 Feb 2016 18:34:28 +0100
-Subject: [PATCH 2/7] i2c: omap: Fix PM regression with deferred probe for
- pm_runtime_reinit
-In-Reply-To: <1455145370-20301-3-git-send-email-tony@atomide.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 11 Feb 2016 09:36:20 -0800
+Subject: [PATCH 3/7] spi: omap2-mcspi: Fix PM regression with deferred
+ probe for pm_runtime_reinit
+In-Reply-To: <20160211155255.GA1953@sirena.org.uk>
 References: <1455145370-20301-1-git-send-email-tony@atomide.com>
- <1455145370-20301-3-git-send-email-tony@atomide.com>
-Message-ID: <20160211173427.GB1524@katana>
+ <1455145370-20301-4-git-send-email-tony@atomide.com>
+ <20160211115128.GF13270@sirena.org.uk>
+ <20160211150806.GS19432@atomide.com>
+ <20160211155255.GA1953@sirena.org.uk>
+Message-ID: <20160211173620.GU19432@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+* Mark Brown <broonie@kernel.org> [160211 07:54]:
+> On Thu, Feb 11, 2016 at 07:08:06AM -0800, Tony Lindgren wrote:
+> > * Mark Brown <broonie@kernel.org> [160211 03:52]:
+> 
+> > > Why, I'm not seeing any dependencies here?  I'd also expect to be seeing
+> > > an awful lot more changes like this, this shouldn't be an OMAP thing -
+> > > do we need to fix the core API and then roll out the transition in a
+> > > different way?
+> 
+> > Please feel free to pick up this one if you have other fixes
+> > lined up, nothing stopping that.
+> 
+> I'll take it myself unless there is a strong reason to merge it as part
+> of another series.
 
-> Wolfram, I'd like to merge this along with other related fixes via
-> the ARM SoC tree if no objections, please review and ack if this
-> look OK to you.
+OK thanks!
 
-Well, since most patches seem to be picked up individually now, I'd
-prefer to do the same. This is v4.5 material, or?
+> > There will be likely more fixes like this to make drivers follow
+> > the PM runtime API documentation. These were just the initial
+> > ones that were obvious.
+> 
+> This does sound like there's been a change in the interface compared to
+> what users are actually doing - is this an actual problem or is it just
+> a divergence from docs?
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160211/1252e49f/attachment.sig>
+It's an actual problem at least on omaps as the omap_device code
+is very picky about the hardware state.
+
+Depending how the PM runtime is implemented, it may be a problem
+for some other cases too.
+
+For non-omap cases, my guess is that it's mostly a divergence from
+the docs and non-critical.
+
+Regards,
+
+Tony
