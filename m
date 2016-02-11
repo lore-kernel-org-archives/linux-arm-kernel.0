@@ -1,261 +1,34 @@
-From: lars.persson@axis.com (Lars Persson)
-Date: Thu, 11 Feb 2016 17:06:17 +0100
-Subject: [PATCH v3 2/6] arm: dts: add Artpec-6 SoC dtsi file
-In-Reply-To: <cover.1455205057.git.larper@axis.com>
-References: <cover.1455205057.git.larper@axis.com>
-Message-ID: <9d3b8e80eeb56ca0808aae62eabd82af23ddb5c5.1455205057.git.larper@axis.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 11 Feb 2016 17:06:32 +0100
+Subject: [PATCH v2 1/6] Revert "drivers/tty/serial: make 8250/8250_mtk.c
+ explicitly non-modular"
+In-Reply-To: <20160211160021.GF28452@windriver.com>
+References: <1455205297-1021302-1-git-send-email-arnd@arndb.de>
+ <1455205297-1021302-2-git-send-email-arnd@arndb.de>
+ <20160211160021.GF28452@windriver.com>
+Message-ID: <3873766.I9XIY0R8gT@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Initial device tree for the Artpec-6 SoC.
+On Thursday 11 February 2016 11:00:22 Paul Gortmaker wrote:
+> [[PATCH v2 1/6] Revert "drivers/tty/serial: make 8250/8250_mtk.c explicitly non-modular"] On 11/02/2016 (Thu 16:41) Arnd Bergmann wrote:
+> 
+> > This reverts commit d72d391c126e, which tried to remove dead code but
+> > left the driver in a useless state when the main 8250 driver is a
+> 
+> Am I misunderstanding something?  The commit didn't cause the driver to
+> be in a useless state for 8250=m.  But rather isn't that it was a
+> pre-existing condition, independent of the change to 8250_mtk.c to
+> remove the dead code in d72d391c126e?
+> 
+> Since the commit did not touch Kconfig or Makefile, I can't see how it
+> could cause some new useless state that did not already exist, and hence
+> the "Fixes:" tag is invalid as well.
 
-Signed-off-by: Lars Persson <larper@axis.com>
----
- arch/arm/boot/dts/artpec6.dtsi | 236 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 236 insertions(+)
- create mode 100644 arch/arm/boot/dts/artpec6.dtsi
+My wording may have been bad here. What I meant to say is that it
+was broken before the patch, and still broken after the patch.
 
-diff --git a/arch/arm/boot/dts/artpec6.dtsi b/arch/arm/boot/dts/artpec6.dtsi
-new file mode 100644
-index 0000000..f2a7e4a
---- /dev/null
-+++ b/arch/arm/boot/dts/artpec6.dtsi
-@@ -0,0 +1,236 @@
-+/*
-+ * Device Tree Source for the Axis ARTPEC-6 SoC
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
-+
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include "skeleton.dtsi"
-+
-+/ {
-+	compatible = "axis,artpec6";
-+	interrupt-parent = <&intc>;
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu0: cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0>;
-+			next-level-cache = <&pl310>;
-+		};
-+
-+		cpu1: cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <1>;
-+			next-level-cache = <&pl310>;
-+		};
-+	};
-+
-+	syscon {
-+		compatible = "axis,artpec6-syscon", "syscon";
-+		reg = <0xf8000000 0x48>;
-+	};
-+
-+	psci {
-+		compatible = "arm,psci-0.2", "arm,psci";
-+		method = "smc";
-+		psci_version = <0x84000000>;
-+		cpu_on = <0x84000003>;
-+		system_reset = <0x84000009>;
-+	};
-+
-+	scu at faf00000 {
-+		compatible = "arm,cortex-a9-scu";
-+		reg = <0xfaf00000 0x58>;
-+	};
-+
-+	/* Main external clock driving CPU and peripherals */
-+	ext_clk: ext_clk {
-+		#clock-cells = <0>;
-+		compatible = "fixed-clock";
-+		clock-frequency = <50000000>;
-+	};
-+
-+	/* PLL1 is used by CPU and some peripherals */
-+	pll1_clk: pll1_clk at f8000000 {
-+		#clock-cells = <0>;
-+		compatible = "axis,artpec6-pll1-clock";
-+		reg = <0xf8000000 4>;
-+		clocks = <&ext_clk>;
-+	};
-+
-+	cpu_clk: cpu_clk {
-+		#clock-cells = <0>;
-+		compatible = "fixed-factor-clock";
-+		clock-div = <1>;
-+		clock-mult = <1>;
-+		clocks = <&pll1_clk>;
-+		clock-output-names = "cpu_clk";
-+	};
-+
-+	cpu_clkdiv2: cpu_clkdiv2 {
-+		#clock-cells = <0>;
-+		compatible = "fixed-factor-clock";
-+		clock-div = <2>;
-+		clock-mult = <1>;
-+		clocks = <&cpu_clk>;
-+	};
-+
-+	cpu_clkdiv4: cpu_clkdiv4 {
-+		#clock-cells = <0>;
-+		compatible = "fixed-factor-clock";
-+		clock-div = <4>;
-+		clock-mult = <1>;
-+		clocks = <&cpu_clk>;
-+	};
-+
-+	apb_pclk: apb_pclk {
-+		#clock-cells = <0>;
-+		compatible = "fixed-factor-clock";
-+		clock-div = <8>;
-+		clock-mult = <1>;
-+		clocks = <&cpu_clk>;
-+		clock-output-names = "apb_pclk";
-+	};
-+
-+	/* PLL2 is used by a number of peripherals, including UDL */
-+	pll2: pll2 {
-+		#clock-cells = <0>;
-+		compatible = "fixed-factor-clock";
-+		clock-div = <1>;
-+		clock-mult = <24>;
-+		clocks = <&ext_clk>;
-+	};
-+
-+	/* PLL2DIV2 is used by the Fractional Clock Divider, for i2s */
-+	pll2div2: pll2div2 {
-+		#clock-cells = <0>;
-+		compatible = "fixed-factor-clock";
-+		clock-div = <2>;
-+		clock-mult = <1>;
-+		clocks = <&pll2>;
-+	};
-+
-+	pll2div12: pll2div12 {
-+		#clock-cells = <0>;
-+		compatible = "fixed-factor-clock";
-+		clock-div = <12>;
-+		clock-mult = <1>;
-+		clocks = <&pll2>;
-+	};
-+
-+	pll2div24: pll2div24 {
-+		#clock-cells = <0>;
-+		compatible = "fixed-factor-clock";
-+		clock-div = <24>;
-+		clock-mult = <1>;
-+		clocks = <&pll2>;
-+		clock-output-names = "uart_clk";
-+	};
-+
-+
-+	gtimer at faf00200 {
-+		compatible = "arm,cortex-a9-global-timer";
-+		reg = <0xfaf00200 0x20>;
-+		interrupts = <GIC_PPI 11 0xf01>;
-+		clocks = <&cpu_clkdiv2>;
-+	};
-+
-+	timer at faf00600 {
-+		compatible = "arm,cortex-a9-twd-timer";
-+		reg = <0xfaf00600 0x20>;
-+		interrupts = <GIC_PPI 13 0xf04>;
-+		clocks = <&cpu_clkdiv2>;
-+		status = "disabled";
-+	};
-+
-+	intc: interrupt-controller at faf01000 {
-+		interrupt-controller;
-+		compatible = "arm,cortex-a9-gic";
-+		#interrupt-cells = <3>;
-+		reg = < 0xfaf01000 0x1000 >, < 0xfaf00100 0x0100 >;
-+	};
-+
-+	pl310: cache-controller at faf10000 {
-+		compatible = "arm,pl310-cache";
-+		cache-unified;
-+		cache-level = <2>;
-+		reg = <0xfaf10000 0x1000>;
-+		interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
-+		arm,data-latency = <1 1 1>;
-+		arm,tag-latency = <1 1 1>;
-+		arm,filter-ranges = <0x0 0x80000000>;
-+	};
-+
-+	pmu {
-+		compatible = "arm,cortex-a9-pmu";
-+		interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>,
-+			<GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-parent = <&intc>;
-+	};
-+
-+	amba at 0 {
-+		compatible = "simple-bus";
-+		#address-cells = <0x1>;
-+		#size-cells = <0x1>;
-+		interrupt-parent = <&intc>;
-+		ranges;
-+		dma-ranges = <0x80000000 0x00000000 0x40000000>;
-+		dma-coherent;
-+
-+		ethernet: ethernet at f8010000 {
-+			clock-names = "phy_ref_clk", "apb_pclk";
-+			clocks = <&ext_clk>, <&apb_pclk>;
-+			compatible = "snps,dwc-qos-ethernet-4.10";
-+			interrupt-parent = <&intc>;
-+			interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>;
-+			reg = <0xf8010000 0x4000>;
-+
-+			snps,write-requests = <2>;
-+			snps,read-requests = <16>;
-+			snps,txpbl = <8>;
-+			snps,rxpbl = <2>;
-+
-+			status = "disabled";
-+		};
-+
-+		uart0: serial at f8036000 {
-+			compatible = "arm,pl011", "arm,primecell";
-+			reg = <0xf8036000 0x1000>;
-+			interrupts = <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&pll2div24>, <&apb_pclk>;
-+			clock-names = "uart_clk", "apb_pclk";
-+			status = "disabled";
-+		};
-+		uart1: serial at f8037000 {
-+			compatible = "arm,pl011", "arm,primecell";
-+			reg = <0xf8037000 0x1000>;
-+			interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&pll2div24>, <&apb_pclk>;
-+			clock-names = "uart_clk", "apb_pclk";
-+			status = "disabled";
-+		};
-+		uart2: serial at f8038000 {
-+			compatible = "arm,pl011", "arm,primecell";
-+			reg = <0xf8038000 0x1000>;
-+			interrupts = <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&pll2div24>, <&apb_pclk>;
-+			clock-names = "uart_clk", "apb_pclk";
-+			status = "disabled";
-+		};
-+		uart3: serial at f8039000 {
-+			compatible = "arm,pl011", "arm,primecell";
-+			reg = <0xf8039000 0x1000>;
-+			interrupts = <GIC_SPI 129 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&pll2div24>, <&apb_pclk>;
-+			clock-names = "uart_clk", "apb_pclk";
-+			status = "disabled";
-+		};
-+	};
-+};
--- 
-2.1.4
+The Fixes tag was meant to just be a reference to the commit I'm
+reverting.
+
+	Arnd
