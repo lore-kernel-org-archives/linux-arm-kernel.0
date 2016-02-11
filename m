@@ -1,71 +1,110 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 11 Feb 2016 09:40:29 +0100
-Subject: noise issues when recording sound on i.MX28
-In-Reply-To: <CAOMZO5D5H4F90nse9kyW9KvsJStN-sCGktup4FDPw_zTeNfS2g@mail.gmail.com>
-References: <20160127105613.GC13664@pengutronix.de>
- <CAOMZO5BpLen517q2heramSta-R6pdESkjM6w=7FRMZebY6ue-Q@mail.gmail.com>
- <20160127144340.GD13664@pengutronix.de>
- <CAOMZO5AE6HwBYz7kOFORt0HTojJLSb0MYUbkb_HCshDHy=d27g@mail.gmail.com>
- <20160210150315.GC13664@pengutronix.de>
- <CAOMZO5D5H4F90nse9kyW9KvsJStN-sCGktup4FDPw_zTeNfS2g@mail.gmail.com>
-Message-ID: <20160211084029.GE13664@pengutronix.de>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 11 Feb 2016 09:43:47 +0100
+Subject: [PATCH] arm/arm64: KVM: Handle out-of-RAM cache maintenance as a
+ NOP
+In-Reply-To: <1454942245-18452-1-git-send-email-marc.zyngier@arm.com>
+References: <1454942245-18452-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20160211084347.GT5171@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 10, 2016 at 06:10:18PM -0200, Fabio Estevam wrote:
-> Hi Uwe,
+On Mon, Feb 08, 2016 at 02:37:25PM +0000, Marc Zyngier wrote:
+> So far, our handling of cache maintenance by VA has been pretty
+> simple: Either the access is in the guest RAM and generates a S2
+> fault, which results in the page being mapped RW, or we go down
+> the io_mem_abort() path, and nuke the guest.
 > 
-> On Wed, Feb 10, 2016 at 1:03 PM, Uwe Kleine-K?nig
-> <u.kleine-koenig@pengutronix.de> wrote:
-> > Hello Fabio,
-> >
-> > On Tue, Feb 02, 2016 at 11:00:33AM -0200, Fabio Estevam wrote:
-> >> On Wed, Jan 27, 2016 at 12:43 PM, Uwe Kleine-K?nig
-> >> <u.kleine-koenig@pengutronix.de> wrote:
-> >>
-> >> > So you didn't hit the problem that resetting a saif didn't work, right?
-> >>
-> >> No, we haven't seen this reset issue.
-> >>
-> >> > Do you have a few more technical details here? A usecase of my machine
-> >>
-> >> Let me find out as it has been several years I worked on this problem.
-> >> Will let you know.
-> >
-> > Anything new on your end? I know from Lothar that he invested quite some
-> > time to debug his hardware setup, tested the codec instead of the i.MX28
-> > as clock provider and several more things. I also spend some time on
-> > this issue and we both hope that Freescale/NXP can help in better
-> > understanding the issue and hopefully can come up with a recipe to make
-> > concurrent recording and playback on i.MX28 work.
-> >
-> > Lothar is in contact with Freescale, too, but up to now with little
-> > success. The company I'm working for at the moment would also welcome a
-> > solution here.
+> The first one is fine, but the second one is extremely weird.
+> Treating the CM as an I/O is wrong, and nothing in the ARM ARM
+> indicates that we should generate a fault for something that
+> cannot end-up in the cache anyway (even if the guest maps it,
+> it will keep on faulting at stage-2 for emulation).
 > 
-> Sorry for the delay. I have been on holidays.
+> So let's just skip this instruction, and let the guest get away
+> with it.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm/include/asm/kvm_emulate.h   |  5 +++++
+>  arch/arm/kvm/mmu.c                   | 17 +++++++++++++++++
+>  arch/arm64/include/asm/kvm_emulate.h |  5 +++++
+>  3 files changed, 27 insertions(+)
+> 
+> diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
+> index 3095df0..f768797 100644
+> --- a/arch/arm/include/asm/kvm_emulate.h
+> +++ b/arch/arm/include/asm/kvm_emulate.h
+> @@ -143,6 +143,11 @@ static inline bool kvm_vcpu_dabt_iss1tw(struct kvm_vcpu *vcpu)
+>  	return kvm_vcpu_get_hsr(vcpu) & HSR_DABT_S1PTW;
+>  }
+>  
+> +static inline bool kvm_vcpu_dabt_iscm(struct kvm_vcpu *vcpu)
+> +{
+> +	return !!(kvm_vcpu_get_hsr(vcpu) & HSR_DABT_CM);
+> +}
+> +
+>  /* Get Access Size from a data abort */
+>  static inline int kvm_vcpu_dabt_get_as(struct kvm_vcpu *vcpu)
+>  {
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index aba61fd..1a5f2ea 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -1431,6 +1431,23 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  		}
+>  
+>  		/*
+> +		 * Check for a cache maintenance operation. Since we
+> +		 * ended-up here, we know it is outside of any memory
+> +		 * slot. But we can't find out if that is for a device,
+> +		 * or if the guest is just being stupid (going all the
+> +		 * way to userspace is not an option - what would you
+> +		 * write?).
 
-I wonder who granted you to go on holidays given that we have
-problems :-)
+I'm not sure what the stuff about "what would you write?" means, I'm
+assuming it means that the ISV bit is clear.
 
-> Can you confirm you have both SAIF interfaces being clocked from ref_pll?
+I think the point is more that if there's no S2 mapping, then there
+could never be any cache entries as a result of memory accesses using
+the GVA in question, so there's nothing to invalidate (like you state in
+your commit message).
 
-root at hostname:/sys/kernel/debug/clk find -name saif?_sel
-./ref_xtal/pll0/saif0_sel
-./ref_xtal/pll0/saif1_sel
+> +		 *
+> +		 * So let's assume that the guest is just being
+> +		 * cautious, and skip the instruction.
+> +		 */
+> +		if (kvm_vcpu_dabt_iscm(vcpu)) {
+> +			kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
+> +			ret = 1;
+> +			goto out_unlock;
+> +		}
+> +
+> +		/*
+>  		 * The IPA is reported as [MAX:12], so we need to
+>  		 * complement it with the bottom 12 bits from the
+>  		 * faulting VA. This is always 12 bits, irrespective
+> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+> index 3066328..01cdf5f 100644
+> --- a/arch/arm64/include/asm/kvm_emulate.h
+> +++ b/arch/arm64/include/asm/kvm_emulate.h
+> @@ -185,6 +185,11 @@ static inline bool kvm_vcpu_dabt_iss1tw(const struct kvm_vcpu *vcpu)
+>  	return !!(kvm_vcpu_get_hsr(vcpu) & ESR_ELx_S1PTW);
+>  }
+>  
+> +static inline bool kvm_vcpu_dabt_iscm(const struct kvm_vcpu *vcpu)
+> +{
+> +	return !!(kvm_vcpu_get_hsr(vcpu) & ESR_ELx_CM);
+> +}
+> +
+>  static inline int kvm_vcpu_dabt_get_as(const struct kvm_vcpu *vcpu)
+>  {
+>  	return 1 << ((kvm_vcpu_get_hsr(vcpu) & ESR_ELx_SAS) >> ESR_ELx_SAS_SHIFT);
+> -- 
+> 2.1.4
+> 
 
-root at hostname:/sys/kernel/debug/clk cat ./ref_xtal/pll0/saif?_sel/clk_rate 
-480000000
-480000000
+some nitpicking: if you modify anything here, I think is_cm is more clear than iscm.
 
-This is based on 3.10 (but I hope to update soon to 4.4ish). I know that
-Lothar uses 4.4. Also Lothar noticed that disabling one of these
-saif_sel clocks doesn't make an impression on the interfaces, they just
-continue to run. Maybe a clock is routed in a wrong way?
+But besides the cosmetics:
 
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
