@@ -1,33 +1,58 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Thu, 11 Feb 2016 17:15:27 -0600
-Subject: [PATCH] of/irq: Fix msi-map calculation for nonzero rid-base
-In-Reply-To: <56BC6ABA.5020605@arm.com>
-References: <9f6845195d03b0e0b0d187bb510fbf7bd497e836.1455015344.git.robin.murphy@arm.com>
- <56BC6ABA.5020605@arm.com>
-Message-ID: <CAL_JsqLScMdfUAtMPDGWphc_PZp4K-c0MfjRZh9G7=A9pLZu9Q@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 11 Feb 2016 23:24:34 +0000
+Subject: [PATCH] ARM: boot: Add an implementation of strnlen for libfdt
+In-Reply-To: <1455231994-12048-1-git-send-email-robh@kernel.org>
+References: <1455231994-12048-1-git-send-email-robh@kernel.org>
+Message-ID: <20160211232434.GZ10826@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 11, 2016 at 5:04 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 09/02/16 11:04, Robin Murphy wrote:
->> The existing msi-map code is fine for shifting the entire RID space
->> upwards, but attempting finer-grained remapping reveals a bug. It turns
->> out that we are mistakenly treating the msi-base part as an offset, not
->> as a new base to remap onto, so things get squiffy when rid-base is
->> nonzero. Fix this, and at the same time add a sanity check against
->> having msi-map-mask clash with a nonzero rid-base, as that's another
->> thing one can easily get wrong.
->>
->> CC: <stable@vger.kernel.org>
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->
-> Rob, Frank,
->
-> Are you willing to take this one through the OF tree? Or should we route
-> it through the IRQ tree? It'd be good if it make it into 4.5.
+On Thu, Feb 11, 2016 at 05:06:34PM -0600, Rob Herring wrote:
+> Recent versions of libfdt add a dependency on strnlen. Copy the
+> implementation in lib/string.c here, so we can update libfdt.
+> 
+> Signed-off-by: Rob Herring <robh@kernel.org>
 
-Applied for 4.5. ATM, I don't have anything else to send to Linus.
-I'll give it a week or so if this is not urgent. Or send me a bunch of
-DT binding fixes and you can get it in sooner. ;)
+Thanks.
 
-Rob
+Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+
+> ---
+> Russell,
+> 
+> I have a pending libfdt update, so I'd like to take this thru the DT 
+> tree with your ack.
+> 
+> Rob
+> 
+>  arch/arm/boot/compressed/string.c | 9 +++++++++
+>  1 file changed, 9 insertions(+)
+> 
+> diff --git a/arch/arm/boot/compressed/string.c b/arch/arm/boot/compressed/string.c
+> index 36e53ef..6894674 100644
+> --- a/arch/arm/boot/compressed/string.c
+> +++ b/arch/arm/boot/compressed/string.c
+> @@ -65,6 +65,15 @@ size_t strlen(const char *s)
+>  	return sc - s;
+>  }
+>  
+> +size_t strnlen(const char *s, size_t count)
+> +{
+> +	const char *sc;
+> +
+> +	for (sc = s; count-- && *sc != '\0'; ++sc)
+> +		/* nothing */;
+> +	return sc - s;
+> +}
+> +
+>  int memcmp(const void *cs, const void *ct, size_t count)
+>  {
+>  	const unsigned char *su1 = cs, *su2 = ct, *end = su1 + count;
+> -- 
+> 2.5.0
+> 
+
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
