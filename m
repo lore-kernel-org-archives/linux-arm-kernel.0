@@ -1,18 +1,17 @@
 From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Thu, 11 Feb 2016 03:41:58 +0200
-Subject: [GIT PULL] NXP LPC32xx Platform Updates for v4.6 #1
-Message-ID: <56BBE6E6.4080802@mleia.com>
+Date: Thu, 11 Feb 2016 03:42:01 +0200
+Subject: [GIT PULL] NXP LPC32xx DT Updates for v4.6 #1
+Message-ID: <56BBE6E9.1080509@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd, Olof, Kevin,
 
-please consider to include NXP LPC32xx platfrom updates (#1) for v4.6.
+please consider to include NXP LPC32xx DT updates (#1) for v4.6.
 
-The main change is a switchover to a common clock framework driver
-for LPC32xx, this also allows to reuse a shared LPC32xx clockevent
-driver, and hence remove legacy clock and timer drivers from
-arch/arm/mach-lpc32xx.
+The changes add description of clock providers and clock consumers,
+define default irq types of SoC controllers and add PHY3250 board
+regulators.
 
 I'm adding an official LPC32xx maintainer Roland to Cc, however
 he seems to be unresponsive for a quite long time (since 2014).
@@ -25,25 +24,27 @@ The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
 
 are available in the git repository at:
 
-  https://github.com/vzapolskiy/linux.git lpc32xx/soc
+  https://github.com/vzapolskiy/linux.git lpc32xx/dt
 
-for you to fetch changes up to 0ac1a101f5dd28c3894be3c0230ee7ea2e05e8aa:
+for you to fetch changes up to d06670e96267d1f1a771f71f5719c0a2c0092ec1:
 
-  arm: lpc32xx: remove direct control of GPIOs from shared mach file (2016-02-11 02:27:04 +0200)
+  arm: dts: phy3250: add SD fixed regulator (2016-02-11 03:06:36 +0200)
 
 ----------------------------------------------------------------
 
-Vladimir Zapolskiy (3):
-      arm: lpc32xx: switch to common clock framework
-      arm: lpc32xx: remove selected HAVE_IDE
-      arm: lpc32xx: remove direct control of GPIOs from shared mach file
+Vladimir Zapolskiy (9):
+      dt-bindings: create arm/nxp folder and move LPC32xx SoC description to it
+      arm: dts: lpc32xx: add device nodes for external oscillators
+      arm: dts: lpc32xx: add clock controller device node
+      arm: dts: lpc32xx: add clock properties to device nodes
+      arm: dts: lpc32xx: add USB clock controller
+      arm: dts: lpc32xx: remove clock frequency property from UART device nodes
+      arm: dts: lpc32xx: assign interrupt types
+      arm: dts: phy3250: add lcd and backlight fixed regulators
+      arm: dts: phy3250: add SD fixed regulator
 
- arch/arm/Kconfig                |    4 +-
- arch/arm/mach-lpc32xx/Makefile  |    3 +-
- arch/arm/mach-lpc32xx/clock.c   | 1284 ---------------------------------------
- arch/arm/mach-lpc32xx/phy3250.c |   53 --
- arch/arm/mach-lpc32xx/serial.c  |    3 -
- arch/arm/mach-lpc32xx/timer.c   |  144 -----
- 6 files changed, 3 insertions(+), 1488 deletions(-)
- delete mode 100644 arch/arm/mach-lpc32xx/clock.c
- delete mode 100644 arch/arm/mach-lpc32xx/timer.c
+ .../devicetree/bindings/arm/{ => nxp}/lpc32xx.txt  |   0
+ arch/arm/boot/dts/lpc32xx.dtsi                     | 150 ++++++++++++++++-----
+ arch/arm/boot/dts/phy3250.dts                      |  32 +++++
+ 3 files changed, 149 insertions(+), 33 deletions(-)
+ rename Documentation/devicetree/bindings/arm/{ => nxp}/lpc32xx.txt (100%)
