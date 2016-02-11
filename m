@@ -1,53 +1,52 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 11 Feb 2016 10:52:01 -0800
-Subject: [PATCH 3/7] spi: omap2-mcspi: Fix PM regression with deferred
- probe for pm_runtime_reinit
-In-Reply-To: <20160211183640.GB1953@sirena.org.uk>
-References: <1455145370-20301-1-git-send-email-tony@atomide.com>
- <1455145370-20301-4-git-send-email-tony@atomide.com>
- <20160211115128.GF13270@sirena.org.uk>
- <20160211150806.GS19432@atomide.com>
- <20160211155255.GA1953@sirena.org.uk>
- <20160211173620.GU19432@atomide.com>
- <20160211183640.GB1953@sirena.org.uk>
-Message-ID: <20160211185201.GX19432@atomide.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Thu, 11 Feb 2016 19:58:19 +0100
+Subject: [PATCH 3/3] ARM64: zynqmp: Use 64bit size cell format
+In-Reply-To: <CAL_JsqK0=LaXqJyr_rGKCzGgt5kFy79-4ARocTGpKved3JU-Ug@mail.gmail.com>
+References: <2f160e012080d5d6de11238ade239bb0bb224f64.1455193571.git.michal.simek@xilinx.com>
+ <36fb9c4c9b2019b854e84dc0a9a01252a6de2337.1455193571.git.michal.simek@xilinx.com>
+ <CAL_JsqK0=LaXqJyr_rGKCzGgt5kFy79-4ARocTGpKved3JU-Ug@mail.gmail.com>
+Message-ID: <56BCD9CB.9030803@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mark Brown <broonie@kernel.org> [160211 10:38]:
-> On Thu, Feb 11, 2016 at 09:36:20AM -0800, Tony Lindgren wrote:
-> > * Mark Brown <broonie@kernel.org> [160211 07:54]:
+Hi Rob,
+
+On 11.2.2016 17:13, Rob Herring wrote:
+> On Thu, Feb 11, 2016 at 6:26 AM, Michal Simek <michal.simek@xilinx.com> wrote:
+>> Use 64bit size cell format instead of 32bit for memory
+>> description. Change 64bit sizes also for all others IPs.
 > 
-> > > This does sound like there's been a change in the interface compared to
-> > > what users are actually doing - is this an actual problem or is it just
-> > > a divergence from docs?
-> 
-> > It's an actual problem at least on omaps as the omap_device code
-> > is very picky about the hardware state.
-> 
-> > Depending how the PM runtime is implemented, it may be a problem
-> > for some other cases too.
-> 
-> Or people just aren't testing mainline that well (if this is broken in
-> v4.5 that suggests nobody noticed in -next) - do you know when this
-> broke?  It really seems like we may need to spin round on how this is
-> deployed.
+> Why? As is, this change is completely pointless because nothing needs
+> a >4GB size. Do you have peripherals with >4GB size?
 
-I noticed it only with v4.5-rc1 and bisected it to commit 5de85b9d57ab
-("PM / runtime: Re-init runtime PM states at probe error and driver
-unbind") as it broke my PM tests for n900. For Linux next probably
-was also broken for before that for some time.
+The change I need to do is to support more than 4GB memory. Memory space
+is divided to some parts. 2GB connected to hard part below 4GB. There
+there is 1GB connected to PL part below. Then 32GB hard part above of
+4GB and a lot of space for PL part (~230GB).
 
-Unfortunately based on the regressions I'm chasing every merge window
-I'm suspecting that very few people are actually testing PM runtime
-with mainline Linux kernel. Or they don't have the PM runtime fully
-implemented in the mainline kernel for their devices. This is at
-least for the SoC PM use case.
+PCIe can also address more than 256GB.
 
-Ulf is working on a generic PM runtime test driver :) I'm hoping we
-can then use that for basic regression testing on in an arch
-independent way.
+That's why I stand before decision. Change size-cell for all IPs which
+are currently listed. Or just change it for memory node which is listed
+in mainline.
+I am not quite sure how PCIe description will look like and if there is
+any other IP which will required on current buses use sizes more that
+4GB. That's why I have change all sizes to support more than 4GB.
 
-Regards,
+But definitely current need is to support more than 4GB memory size and
+I have no problem to use not empty ranges property and keep there
+#size-cells = <1>;
 
-Tony
+Both solution works for me. Definitely thank you for your comments.
+
+Thanks,
+Michal
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160211/4e1ce5ef/attachment.sig>
