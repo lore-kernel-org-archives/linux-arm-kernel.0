@@ -1,74 +1,102 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 11 Feb 2016 10:57:30 +0100
-Subject: [PATCH V5 11/14] soc: tegra: pmc: Add generic PM domain support
-In-Reply-To: <56BC50C2.7050609@nvidia.com>
-References: <1453998832-27383-1-git-send-email-jonathanh@nvidia.com>
- <1453998832-27383-12-git-send-email-jonathanh@nvidia.com>
- <CAPDyKFpnUJA2pLSUOw8rkjyXLY6b__TM=38jsvYAZVhe+DS=zg@mail.gmail.com>
- <56BB7AF4.8040708@nvidia.com>
- <CAPDyKFrZ6tWBsQC0tyWWeChiZja3h_zcbaiX25ak-Zyp4MzqVw@mail.gmail.com>
- <56BC50C2.7050609@nvidia.com>
-Message-ID: <CAPDyKFrdmufsMqNL0U7q5gPEUqsg3SrkrNChcziQjEOjvd30Ng@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 11 Feb 2016 11:00:48 +0100
+Subject: breaking DT compatibility (was: Re: [PATCH v4] clk: sunxi:
+ Refactor A31 PLL6 so that it can be reused)
+In-Reply-To: <20160210163001.GG2632@leverpostej>
+References: <1454358000-13594-1-git-send-email-maxime.ripard@free-electrons.com>
+ <56B4E2FB.3050703@arm.com> <56BB2D79.6090402@arm.com>
+ <CABGGiswOKztmRT40w4t_7BD729WgM8ueLtOD-UF_wgMbmcg4cg@mail.gmail.com>
+ <20160210143755.GE31506@lukather>
+ <20160210163001.GG2632@leverpostej>
+Message-ID: <20160211100048.GK31506@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 February 2016 at 10:13, Jon Hunter <jonathanh@nvidia.com> wrote:
->
-> On 10/02/16 18:25, Ulf Hansson wrote:
->
-> [snip]
->
->>>> Perhaps there's a way to allow the generic PM domain to control this
->>>> by itself. If we for example used the struct device corresponding to
->>>> the powergate driver, genpd could use it to distinguish between
->>>> various instances of genpd structs..!? Maybe it would simplify the way
->>>> to deal with removing domains?
->>>
->>> Yes, that would be ideal. However, would have require changing
->>> genpd_init()? I am not sure how genpd would be able to access the device
->>> struct for the powergate driver because we don't provide this via any
->>> API I am aware of? And I am guessing that you don't wish to expose the
->>> gpd_list to the world either.
->>>
->>> If there is an easy way, I am open to it, but looking at it today, I am
->>> not sure I see a simple way in which we could add a new API to do this.
->>> However, may be I am missing something!
->>
->> If we add a new __pm_genpd_init() API, that could require a struct
->> device to be provided. That API will thus invoke the existing
->> pm_genpd_init() but also deal with the extra things needed here.
->>
->> I would also allow such an API to return an error code.
->>
->> Correspondingly, pm_genpd_remove() could be required to be provided
->> with a struct device.
->>
->> Existing users of pm_genpd_init() can then convert to
->> __pm_genpd_init() whenever suitable.
->>
->> Of course, another option is just to add new member in the genpd
->> struct for the struct *device. The caller of pm_genpd_init() could
->> check it, but allow it to be NULL. Although, the pm_genpd_remove() API
->> would require that pointer to the struct device to be set...
->>
->> What do you think?
->
-> Yes, sounds good. May be it is simpler just to add a new member and let
-> the platform genpd driver handle it.
->
-> I am wondering if in addition to pm_genpd_remove(), we then just have a
-> function called pm_genpd_remove_tail(), which allows you to pass the
-> struct device pointer and will remove the last pm-domain from the
-> gpd_list and return the genpd pointer if successful. Internally, it will
-> call pm_genpd_remove(). It seems to me that if there are nested
-> pm-domains, then we probably want to remove them starting from the tail
-> as opposed to the head.
->
-> How does that sound?
+On Wed, Feb 10, 2016 at 04:30:01PM +0000, Mark Rutland wrote:
+> On Wed, Feb 10, 2016 at 03:37:55PM +0100, Maxime Ripard wrote:
+> > Hi Rob,
+> > 
+> > On Wed, Feb 10, 2016 at 07:42:02AM -0600, Rob Herring wrote:
+> > > On Wed, Feb 10, 2016 at 6:30 AM, Andre Przywara <andre.przywara@arm.com> wrote:
+> > > > Hi,
+> > > >
+> > > > just a ping:
+> > > >
+> > > > Are we really OK with breaking existing DTs in 4.6? (per the code in
+> > > > -next: f7d372ba54ea04d528a291b8dbe34716507bb60b, which is this patch).
+> > > 
+> > > I only warn and make sure people are aware of the issue. I leave that
+> > > up to platform maintainers to decide. It depends on the maturity of
+> > > the platform and users.
+> > 
+> > The impacted SoCs support is really partial. For the most supported
+> > one, big things like display or sound are totally missing, and we
+> > still update them on a regular basis to add support for new
+> > devices. As such, users are very likely to upgrade the DT from one
+> > version to another just because there's new devices available to
+> > them. And the newest SoC impacted just got introduced in 4.5, and only
+> > has the UART and MMC devices available.
+> > 
+> > > If people complain about it then it's their mess. For platforms
+> > > supported in distros such as debian or fedora, I would strongly
+> > > recommend against breaking compatibility.
+> > 
+> > None of them are officially supported:
+> > https://www.debian.org/releases/stable/armhf/ch02s01.html.en
+> > https://fedoraproject.org/wiki/Architectures/ARM#Fedora_23
+> > 
+> > Only the older one are, and they are not affected by this patch.
+> > 
+> > > They do ship dtbs, but it's a chicken and egg problem. If dtbs were
+> > > stable and provided by firmware, then they wouldn't have to provide
+> > > them. If dtbs are unstable, then they have no choice.
+> > 
+> > And while it might work great on platforms that have all the needed
+> > documentation, or a perfect one, which is our case. Almost each
+> > release, we discover that something is not working as it was
+> > documented, when it was documented in the first place.
+> > 
+> > It also seems that even on well documented platforms, supported by the
+> > vendors, the stable ABI dream is not going to happen:
+> > https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/arm/Atmel/README#n105
+> > https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/devicetree/bindings/arm/marvell,berlin.txt#n4
+> 
+> To be quite frank, I completely disagree with that stance.
+> 
+> It seems like the only reason DT bindings aren't remaining stable is
+> because people are deliberately ignoring the requirement and reasoning
+> for doing so.
 
-Why not make pm_genpd_remove() to behave as you describe for
-pm_genpd_remove_tail()?
-That's probably the only sane way to remove genpds anyhow!?
+And for DT maintainers saying on multiple occasions that it's bad but
+ok to break it and / or that they never actually said that it was a
+stable ABI...
 
-Kind regards
-Uffe
+I'm guessing it could be a stable ABI if there was bindings
+reviews. Rob actually started to review a significant amount of
+bindings lately, and that's really appreciated, but if you don't
+review all the bindings, then we're going to make mistakes.
+
+> I agree that it can be painful, and that we cannot predict the future.
+> There will always be bugs.
+
+In our case, we can't even predict the present.
+
+> Having code in mainline comes with responsibilities. One of those is to
+> keep said code working for existing users. Otherwise, why bother having
+> it in mainline at all?
+
+None of our existing users ever complained.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160211/395efda0/attachment-0001.sig>
