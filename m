@@ -1,143 +1,111 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 11 Feb 2016 18:39:51 +0000
-Subject: [PATCH v4 10/23] arm64: KVM: VHE: Differenciate host/guest sysreg
- save/restore
+Date: Thu, 11 Feb 2016 18:39:48 +0000
+Subject: [PATCH v4 07/23] arm64: KVM: VHE: Patch out use of HVC
 In-Reply-To: <1455216004-19499-1-git-send-email-marc.zyngier@arm.com>
 References: <1455216004-19499-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1455216004-19499-11-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1455216004-19499-8-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With ARMv8, host and guest share the same system register file,
-making the save/restore procedure completely symetrical.
-With VHE, host and guest now have different requirements, as they
-use different sysregs.
+With VHE, the host never issues an HVC instruction to get into the
+KVM code, as we can simply branch there.
 
-In order to prepare for this, add split sysreg save/restore functions
-for both host and guest. No functional changes yet.
+Use runtime code patching to simplify things a bit.
 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/hyp/hyp.h       |  6 ++++--
- arch/arm64/kvm/hyp/switch.c    | 10 +++++-----
- arch/arm64/kvm/hyp/sysreg-sr.c | 24 ++++++++++++++++++++++--
- 3 files changed, 31 insertions(+), 9 deletions(-)
+ arch/arm64/kvm/hyp.S           |  7 +++++++
+ arch/arm64/kvm/hyp/hyp-entry.S | 40 +++++++++++++++++++++++++++++++---------
+ 2 files changed, 38 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
-index 744c919..5dfa883 100644
---- a/arch/arm64/kvm/hyp/hyp.h
-+++ b/arch/arm64/kvm/hyp/hyp.h
-@@ -153,8 +153,10 @@ void __vgic_v3_restore_state(struct kvm_vcpu *vcpu);
- void __timer_save_state(struct kvm_vcpu *vcpu);
- void __timer_restore_state(struct kvm_vcpu *vcpu);
+diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+index 0ccdcbb..0689a74 100644
+--- a/arch/arm64/kvm/hyp.S
++++ b/arch/arm64/kvm/hyp.S
+@@ -17,7 +17,9 @@
  
--void __sysreg_save_state(struct kvm_cpu_context *ctxt);
--void __sysreg_restore_state(struct kvm_cpu_context *ctxt);
-+void __sysreg_save_host_state(struct kvm_cpu_context *ctxt);
-+void __sysreg_restore_host_state(struct kvm_cpu_context *ctxt);
-+void __sysreg_save_guest_state(struct kvm_cpu_context *ctxt);
-+void __sysreg_restore_guest_state(struct kvm_cpu_context *ctxt);
- void __sysreg32_save_state(struct kvm_vcpu *vcpu);
- void __sysreg32_restore_state(struct kvm_vcpu *vcpu);
+ #include <linux/linkage.h>
  
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index f0e7bdf..68f3cba 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -102,7 +102,7 @@ static int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
- 	host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
- 	guest_ctxt = &vcpu->arch.ctxt;
++#include <asm/alternative.h>
+ #include <asm/assembler.h>
++#include <asm/cpufeature.h>
  
--	__sysreg_save_state(host_ctxt);
-+	__sysreg_save_host_state(host_ctxt);
- 	__debug_cond_save_host_state(vcpu);
+ /*
+  * u64 kvm_call_hyp(void *hypfn, ...);
+@@ -38,6 +40,11 @@
+  * arch/arm64/kernel/hyp_stub.S.
+  */
+ ENTRY(kvm_call_hyp)
++alternative_if_not ARM64_HAS_VIRT_HOST_EXTN	
+ 	hvc	#0
+ 	ret
++alternative_else
++	b	__vhe_hyp_call
++	nop
++alternative_endif
+ ENDPROC(kvm_call_hyp)
+diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
+index 93e8d983..1bdeee7 100644
+--- a/arch/arm64/kvm/hyp/hyp-entry.S
++++ b/arch/arm64/kvm/hyp/hyp-entry.S
+@@ -38,6 +38,34 @@
+ 	ldp	x0, x1, [sp], #16
+ .endm
  
- 	__activate_traps(vcpu);
-@@ -116,7 +116,7 @@ static int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
- 	 * to Cortex-A57 erratum #852523.
++.macro do_el2_call
++	/*
++	 * Shuffle the parameters before calling the function
++	 * pointed to in x0. Assumes parameters in x[1,2,3].
++	 */
++	sub	sp, sp, #16
++	str	lr, [sp]
++	mov	lr, x0
++	mov	x0, x1
++	mov	x1, x2
++	mov	x2, x3
++	blr	lr
++	ldr	lr, [sp]
++	add	sp, sp, #16
++.endm
++
++ENTRY(__vhe_hyp_call)
++	do_el2_call
++	/*
++	 * We used to rely on having an exception return to get
++	 * an implicit isb. In the E2H case, we don't have it anymore.
++	 * rather than changing all the leaf functions, just do it here
++	 * before returning to the rest of the kernel.
++	 */
++	isb
++	ret
++ENDPROC(__vhe_hyp_call)
++	
+ el1_sync:				// Guest trapped into EL2
+ 	save_x0_to_x3
+ 
+@@ -58,19 +86,13 @@ el1_sync:				// Guest trapped into EL2
+ 	mrs	x0, vbar_el2
+ 	b	2f
+ 
+-1:	stp	lr, xzr, [sp, #-16]!
+-
++1:
+ 	/*
+-	 * Compute the function address in EL2, and shuffle the parameters.
++	 * Perform the EL2 call
  	 */
- 	__sysreg32_restore_state(vcpu);
--	__sysreg_restore_state(guest_ctxt);
-+	__sysreg_restore_guest_state(guest_ctxt);
- 	__debug_restore_state(vcpu, kern_hyp_va(vcpu->arch.debug_ptr), guest_ctxt);
+ 	kern_hyp_va	x0
+-	mov	lr, x0
+-	mov	x0, x1
+-	mov	x1, x2
+-	mov	x2, x3
+-	blr	lr
++	do_el2_call
  
- 	/* Jump in the fire! */
-@@ -125,7 +125,7 @@ static int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
+-	ldp	lr, xzr, [sp], #16
+ 2:	eret
  
- 	fp_enabled = __fpsimd_enabled();
- 
--	__sysreg_save_state(guest_ctxt);
-+	__sysreg_save_guest_state(guest_ctxt);
- 	__sysreg32_save_state(vcpu);
- 	__timer_save_state(vcpu);
- 	__vgic_save_state(vcpu);
-@@ -133,7 +133,7 @@ static int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
- 	__deactivate_traps(vcpu);
- 	__deactivate_vm(vcpu);
- 
--	__sysreg_restore_state(host_ctxt);
-+	__sysreg_restore_host_state(host_ctxt);
- 
- 	if (fp_enabled) {
- 		__fpsimd_save_state(&guest_ctxt->gp_regs.fp_regs);
-@@ -165,7 +165,7 @@ void __hyp_text __noreturn __hyp_panic(void)
- 		host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
- 		__deactivate_traps(vcpu);
- 		__deactivate_vm(vcpu);
--		__sysreg_restore_state(host_ctxt);
-+		__sysreg_restore_host_state(host_ctxt);
- 	}
- 
- 	/* Call panic for real */
-diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
-index 42563098..bd5b543 100644
---- a/arch/arm64/kvm/hyp/sysreg-sr.c
-+++ b/arch/arm64/kvm/hyp/sysreg-sr.c
-@@ -24,7 +24,7 @@
- #include "hyp.h"
- 
- /* ctxt is already in the HYP VA space */
--void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
-+static void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
- {
- 	ctxt->sys_regs[MPIDR_EL1]	= read_sysreg(vmpidr_el2);
- 	ctxt->sys_regs[CSSELR_EL1]	= read_sysreg(csselr_el1);
-@@ -57,7 +57,17 @@ void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
- 	ctxt->gp_regs.spsr[KVM_SPSR_EL1]= read_sysreg(spsr_el1);
- }
- 
--void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
-+void __hyp_text __sysreg_save_host_state(struct kvm_cpu_context *ctxt)
-+{
-+	__sysreg_save_state(ctxt);
-+}
-+
-+void __hyp_text __sysreg_save_guest_state(struct kvm_cpu_context *ctxt)
-+{
-+	__sysreg_save_state(ctxt);
-+}
-+
-+static void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
- {
- 	write_sysreg(ctxt->sys_regs[MPIDR_EL1],	  vmpidr_el2);
- 	write_sysreg(ctxt->sys_regs[CSSELR_EL1],  csselr_el1);
-@@ -90,6 +100,16 @@ void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
- 	write_sysreg(ctxt->gp_regs.spsr[KVM_SPSR_EL1], spsr_el1);
- }
- 
-+void __hyp_text __sysreg_restore_host_state(struct kvm_cpu_context *ctxt)
-+{
-+	__sysreg_restore_state(ctxt);
-+}
-+
-+void __hyp_text __sysreg_restore_guest_state(struct kvm_cpu_context *ctxt)
-+{
-+	__sysreg_restore_state(ctxt);
-+}
-+
- void __hyp_text __sysreg32_save_state(struct kvm_vcpu *vcpu)
- {
- 	u64 *spsr, *sysreg;
+ el1_trap:
 -- 
 2.1.4
