@@ -1,92 +1,39 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 11 Feb 2016 15:19:20 +0100
-Subject: [kernel-hardening] [PATCH] arm64: vdso: Mark vDSO code as
- read-only
-In-Reply-To: <1455141142-6838-1-git-send-email-david.brown@linaro.org>
-References: <1455141142-6838-1-git-send-email-david.brown@linaro.org>
-Message-ID: <CAKv+Gu8ArOYqxDGKb=Tv3NsiB2qWWCdD_zMx55m6+hEwLJR4CA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 11 Feb 2016 15:23:51 +0100
+Subject: [PATCH] firmware: qemu config needs I/O ports
+Message-ID: <1455200650-4030091-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+Not all machines have PCI style I/O port memory, or they do not allow
+mapping it using the ioport_map() function, whcih results in a
+build error with the newly added qemu firmware code:
 
-Nice find!
+drivers/firmware/built-in.o: In function `fw_cfg_io_cleanup':
+qemu_fw_cfg.c:(.text+0x144): undefined reference to `ioport_unmap'
+drivers/firmware/built-in.o: In function `fw_cfg_sysfs_probe':
+qemu_fw_cfg.c:(.text+0xb18): undefined reference to `ioport_map'
 
-On 10 February 2016 at 22:52, David Brown <david.brown@linaro.org> wrote:
-> Although the arm64 vDSO is cleanly separated by code/data with the
-> code being read-only in userspace mappings, the code page is still
-> writable from the kernel.  There have been exploits (such as
-> http://itszn.com/blog/?p=21) that take advantage of this on x86 to go
-> from a bad kernel write to full root.
->
-> Prevent this specific exploit on arm64 by putting the vDSO code page
-> in read-only memory as well.
->
-> Before the change:
-> [    3.138366] vdso: 2 pages (1 code @ ffffffc000a71000, 1 data @ ffffffc000a70000)
-> ---[ Kernel Mapping ]---
-> 0xffffffc000000000-0xffffffc000082000         520K     RW NX SHD AF            UXN MEM/NORMAL
-> 0xffffffc000082000-0xffffffc000200000        1528K     ro x  SHD AF            UXN MEM/NORMAL
-> 0xffffffc000200000-0xffffffc000800000           6M     ro x  SHD AF        BLK UXN MEM/NORMAL
-> 0xffffffc000800000-0xffffffc0009b6000        1752K     ro x  SHD AF            UXN MEM/NORMAL
-> 0xffffffc0009b6000-0xffffffc000c00000        2344K     RW NX SHD AF            UXN MEM/NORMAL
-> 0xffffffc000c00000-0xffffffc008000000         116M     RW NX SHD AF        BLK UXN MEM/NORMAL
-> 0xffffffc00c000000-0xffffffc07f000000        1840M     RW NX SHD AF        BLK UXN MEM/NORMAL
-> 0xffffffc800000000-0xffffffc840000000           1G     RW NX SHD AF        BLK UXN MEM/NORMAL
-> 0xffffffc840000000-0xffffffc87ae00000         942M     RW NX SHD AF        BLK UXN MEM/NORMAL
-> 0xffffffc87ae00000-0xffffffc87ae70000         448K     RW NX SHD AF            UXN MEM/NORMAL
-> 0xffffffc87af80000-0xffffffc87af8a000          40K     RW NX SHD AF            UXN MEM/NORMAL
-> 0xffffffc87af8b000-0xffffffc87b000000         468K     RW NX SHD AF            UXN MEM/NORMAL
-> 0xffffffc87b000000-0xffffffc87fe00000          78M     RW NX SHD AF        BLK UXN MEM/NORMAL
-> 0xffffffc87fe00000-0xffffffc87ff50000        1344K     RW NX SHD AF            UXN MEM/NORMAL
-> 0xffffffc87ff90000-0xffffffc87ffa0000          64K     RW NX SHD AF            UXN MEM/NORMAL
-> 0xffffffc87fff0000-0xffffffc880000000          64K     RW NX SHD AF            UXN MEM/NORMAL
->
-> After:
-> [    3.138368] vdso: 2 pages (1 code @ ffffffc0006de000, 1 data @ ffffffc000a74000)
-> ---[ Kernel Mapping ]---
-> 0xffffffc000000000-0xffffffc000082000         520K     RW NX SHD AF            UXN MEM/NORMAL
-> 0xffffffc000082000-0xffffffc000200000        1528K     ro x  SHD AF            UXN MEM/NORMAL
-> 0xffffffc000200000-0xffffffc000800000           6M     ro x  SHD AF        BLK UXN MEM/NORMAL
-> 0xffffffc000800000-0xffffffc0009b8000        1760K     ro x  SHD AF            UXN MEM/NORMAL
-> 0xffffffc0009b8000-0xffffffc000c00000        2336K     RW NX SHD AF            UXN MEM/NORMAL
-> 0xffffffc000c00000-0xffffffc008000000         116M     RW NX SHD AF        BLK UXN MEM/NORMAL
-> 0xffffffc00c000000-0xffffffc07f000000        1840M     RW NX SHD AF        BLK UXN MEM/NORMAL
-> 0xffffffc800000000-0xffffffc840000000           1G     RW NX SHD AF        BLK UXN MEM/NORMAL
-> 0xffffffc840000000-0xffffffc87ae00000         942M     RW NX SHD AF        BLK UXN MEM/NORMAL
-> 0xffffffc87ae00000-0xffffffc87ae70000         448K     RW NX SHD AF            UXN MEM/NORMAL
-> 0xffffffc87af80000-0xffffffc87af8a000          40K     RW NX SHD AF            UXN MEM/NORMAL
-> 0xffffffc87af8b000-0xffffffc87b000000         468K     RW NX SHD AF            UXN MEM/NORMAL
-> 0xffffffc87b000000-0xffffffc87fe00000          78M     RW NX SHD AF        BLK UXN MEM/NORMAL
-> 0xffffffc87fe00000-0xffffffc87ff50000        1344K     RW NX SHD AF            UXN MEM/NORMAL
-> 0xffffffc87ff90000-0xffffffc87ffa0000          64K     RW NX SHD AF            UXN MEM/NORMAL
-> 0xffffffc87fff0000-0xffffffc880000000          64K     RW NX SHD AF            UXN MEM/NORMAL
->
-> Inspired by https://lkml.org/lkml/2016/1/19/494 based on work by the
-> PaX Team, Brad Spengler, and Kees Cook.
->
-> Signed-off-by: David Brown <david.brown@linaro.org>
-> ---
->  arch/arm64/kernel/vdso/vdso.S | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm64/kernel/vdso/vdso.S b/arch/arm64/kernel/vdso/vdso.S
-> index 60c1db5..db7c0f2 100644
-> --- a/arch/arm64/kernel/vdso/vdso.S
-> +++ b/arch/arm64/kernel/vdso/vdso.S
-> @@ -24,6 +24,7 @@
->         __PAGE_ALIGNED_DATA
+This adds a Kconfig dependency to ensure the driver can only
+be built on platforms that support it.
 
-^^ You can get rid of this now as well
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 75f3e8e47f38 ("firmware: introduce sysfs driver for QEMU's fw_cfg device")
+---
+ drivers/firmware/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-
->
->         .globl vdso_start, vdso_end
-> +       .section .rodata
->         .balign PAGE_SIZE
->  vdso_start:
->         .incbin "arch/arm64/kernel/vdso/vdso.so"
-> --
-> 2.7.1
->
+diff --git a/drivers/firmware/Kconfig b/drivers/firmware/Kconfig
+index 5130f74ae3bd..6664f1108c7c 100644
+--- a/drivers/firmware/Kconfig
++++ b/drivers/firmware/Kconfig
+@@ -164,6 +164,7 @@ config RASPBERRYPI_FIRMWARE
+ config FW_CFG_SYSFS
+ 	tristate "QEMU fw_cfg device support in sysfs"
+ 	depends on SYSFS && (ARM || ARM64 || PPC_PMAC || SPARC || X86)
++	depends on HAS_IOPORT_MAP
+ 	default n
+ 	help
+ 	  Say Y or M here to enable the exporting of the QEMU firmware
+-- 
+2.7.0
