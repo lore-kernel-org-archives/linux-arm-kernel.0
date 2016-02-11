@@ -1,61 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 11 Feb 2016 16:41:32 +0100
-Subject: [PATCH v2 6/6] serial: 8250/ingenic: fix building with SERIAL_8250=m
-In-Reply-To: <1455205297-1021302-1-git-send-email-arnd@arndb.de>
-References: <1455205297-1021302-1-git-send-email-arnd@arndb.de>
-Message-ID: <1455205297-1021302-7-git-send-email-arnd@arndb.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 11 Feb 2016 15:45:26 +0000
+Subject: [PATCH] irqchip/gic-v3-its: Fix double EOIR write for LPI in
+ EOImode==1
+In-Reply-To: <1455197933-26141-1-git-send-email-ashoks@broadcom.com>
+References: <1455197933-26141-1-git-send-email-ashoks@broadcom.com>
+Message-ID: <56BCAC96.7040509@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Ingenic 8250 driver has a 'bool' Kconfig symbol, but that
-breaks when SERIAL_8250 is a loadable module:
+On 11/02/16 13:38, Ashok Kumar wrote:
+> CPU receives SError exception EOI1_NO_INTS_ACTIVE when EOIR
+> is written twice in gic_handle_irq and in its_eoi_irq for a
+> single LPI in EOImode == 1.
+> 
+> Now irq_eoi of its_irq_chip calls parent irqchip's(gic_eoimode1_chip/gic_chip)
+> irq_eoi handler which handles EOImode 0 and 1 separately.
+> 
+> This is introduced by
+> commit 0b996fd35957a ("irqchip/GICv3: Convert to EOImode == 1")
+> 
+> Signed-off-by: Ashok Kumar <ashoks@broadcom.com>
 
-drivers/tty/built-in.o: In function `ingenic_uart_probe':
-8250_ingenic.c:(.text+0x1c1a0): undefined reference to `serial8250_register_8250_port'
+Ah, really good catch!
 
-This changes the symbol to a 'tristate', plus a dependency on
-SERIAL_8250, which makes it work again. Unlike the other
-soc-specific backends, this one has no dependency on an
-architecture or a platform. I'm adding a dependency on
-MIPS || COMPILE_TEST as well here, to avoid showing the driver
-on architectures that are not interested in it.
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/tty/serial/8250/8250_ingenic.c | 2 +-
- drivers/tty/serial/8250/Kconfig        | 7 ++++---
- 2 files changed, 5 insertions(+), 4 deletions(-)
+I'll try to queue that for -rc4, but it is more likely that it will land
+in -rc5...
 
-diff --git a/drivers/tty/serial/8250/8250_ingenic.c b/drivers/tty/serial/8250/8250_ingenic.c
-index 97b78558caed..b0677f610863 100644
---- a/drivers/tty/serial/8250/8250_ingenic.c
-+++ b/drivers/tty/serial/8250/8250_ingenic.c
-@@ -48,7 +48,7 @@ static const struct of_device_id of_match[];
- #define UART_MCR_MDCE	BIT(7)
- #define UART_MCR_FCM	BIT(6)
- 
--#ifdef CONFIG_SERIAL_EARLYCON
-+#if defined(CONFIG_SERIAL_EARLYCON) && !defined(MODULE)
- static struct earlycon_device *early_device;
- 
- static uint8_t __init early_in(struct uart_port *port, int offset)
-diff --git a/drivers/tty/serial/8250/Kconfig b/drivers/tty/serial/8250/Kconfig
-index 6ae0fae4f796..32df7d5a1733 100644
---- a/drivers/tty/serial/8250/Kconfig
-+++ b/drivers/tty/serial/8250/Kconfig
-@@ -384,9 +384,10 @@ config SERIAL_8250_UNIPHIER
- 	  serial ports, say Y to this option. If unsure, say N.
- 
- config SERIAL_8250_INGENIC
--	bool "Support for Ingenic SoC serial ports"
--	depends on OF_FLATTREE
--	select LIBFDT
-+	tristate "Support for Ingenic SoC serial ports"
-+	depends on SERIAL_8250
-+	depends on (OF_FLATTREE && SERIAL_8250_CONSOLE) || !SERIAL_8250_CONSOLE
-+	depends on MIPS || COMPILE_TEST
- 	help
- 	  If you have a system using an Ingenic SoC and wish to make use of
- 	  its UARTs, say Y to this option. If unsure, say N.
+Thanks,
+
+	M.
 -- 
-2.7.0
+Jazz is not dead. It just smells funny...
