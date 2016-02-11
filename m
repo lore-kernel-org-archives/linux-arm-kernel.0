@@ -1,87 +1,121 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Thu, 11 Feb 2016 15:25:22 +0100
-Subject: noise issues when recording sound on i.MX28
-In-Reply-To: <20160211084029.GE13664@pengutronix.de>
-References: <20160127105613.GC13664@pengutronix.de>
- <CAOMZO5BpLen517q2heramSta-R6pdESkjM6w=7FRMZebY6ue-Q@mail.gmail.com>
- <20160127144340.GD13664@pengutronix.de>
- <CAOMZO5AE6HwBYz7kOFORt0HTojJLSb0MYUbkb_HCshDHy=d27g@mail.gmail.com>
- <20160210150315.GC13664@pengutronix.de>
- <CAOMZO5D5H4F90nse9kyW9KvsJStN-sCGktup4FDPw_zTeNfS2g@mail.gmail.com>
- <20160211084029.GE13664@pengutronix.de>
-Message-ID: <20160211152522.75faf7fa@ipc1.ka-ro>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Thu, 11 Feb 2016 19:56:47 +0530
+Subject: [PATCH v4 0/6] arm64 UEFI early FDT handling
+In-Reply-To: <CAFpQJXX2vGog9q=684uOMhggj3A90G8piUSV9gE5pDJm_AZeNQ@mail.gmail.com>
+References: <1455026026-11571-1-git-send-email-rrichter@caviumnetworks.com>
+ <CAKv+Gu-osoi53cpikDtZitJJX2gtZyhOMuvYf=cfeZi8zJ-LDg@mail.gmail.com>
+ <20160211114204.GO24726@rric.localdomain>
+ <CAKv+Gu-KpasM9QZ8qrZEk_pUJpf3TceaenLYTx_eAHW6AUmutA@mail.gmail.com>
+ <CAFpQJXX2vGog9q=684uOMhggj3A90G8piUSV9gE5pDJm_AZeNQ@mail.gmail.com>
+Message-ID: <CAFpQJXVjZodLfc4C-Rj+jxszOpQ6d9os6NqSACrvqvxDe_TvyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+adding RobH
+(sorry, accidentally dropped Rob id in previous email)
 
-On Thu, 11 Feb 2016 09:40:29 +0100 Uwe Kleine-K?nig wrote:
-> On Wed, Feb 10, 2016 at 06:10:18PM -0200, Fabio Estevam wrote:
-> > Hi Uwe,
-> > 
-> > On Wed, Feb 10, 2016 at 1:03 PM, Uwe Kleine-K?nig
-> > <u.kleine-koenig@pengutronix.de> wrote:
-> > > Hello Fabio,
-> > >
-> > > On Tue, Feb 02, 2016 at 11:00:33AM -0200, Fabio Estevam wrote:
-> > >> On Wed, Jan 27, 2016 at 12:43 PM, Uwe Kleine-K?nig
-> > >> <u.kleine-koenig@pengutronix.de> wrote:
-> > >>
-> > >> > So you didn't hit the problem that resetting a saif didn't work, right?
-> > >>
-> > >> No, we haven't seen this reset issue.
-> > >>
-> > >> > Do you have a few more technical details here? A usecase of my machine
-> > >>
-> > >> Let me find out as it has been several years I worked on this problem.
-> > >> Will let you know.
-> > >
-> > > Anything new on your end? I know from Lothar that he invested quite some
-> > > time to debug his hardware setup, tested the codec instead of the i.MX28
-> > > as clock provider and several more things. I also spend some time on
-> > > this issue and we both hope that Freescale/NXP can help in better
-> > > understanding the issue and hopefully can come up with a recipe to make
-> > > concurrent recording and playback on i.MX28 work.
-> > >
-> > > Lothar is in contact with Freescale, too, but up to now with little
-> > > success. The company I'm working for at the moment would also welcome a
-> > > solution here.
-> > 
-> > Sorry for the delay. I have been on holidays.
-> 
-> I wonder who granted you to go on holidays given that we have
-> problems :-)
-> 
-> > Can you confirm you have both SAIF interfaces being clocked from ref_pll?
-> 
-> root at hostname:/sys/kernel/debug/clk find -name saif?_sel
-> ./ref_xtal/pll0/saif0_sel
-> ./ref_xtal/pll0/saif1_sel
-> 
-> root at hostname:/sys/kernel/debug/clk cat ./ref_xtal/pll0/saif?_sel/clk_rate 
-> 480000000
-> 480000000
-> 
-> This is based on 3.10 (but I hope to update soon to 4.4ish). I know that
-> Lothar uses 4.4. Also Lothar noticed that disabling one of these
-> saif_sel clocks doesn't make an impression on the interfaces, they just
-> continue to run. Maybe a clock is routed in a wrong way?
-> 
-That's obviously some misunderstanding.
-What I observed is, that by selectively disabling and re-enabling one of
-the SAIF clocks in any way (toggling the CLKGATE bit in the
-CLKCTRL_SAIF# register, toggling the RUN bit in the SAIF_CTRL register
-or even toggling the SLAVE_MODE bit in the SAIF_CTRL register) the SAIF
-interfaces get out of sync (if they happened to be in sync in the first
-place) with no way to deterministically get them in sync again.
+On Thu, Feb 11, 2016 at 6:33 PM, Ganapatrao Kulkarni
+<gpkulkarni@gmail.com> wrote:
+> Hi Ard,
+>
+> On Thu, Feb 11, 2016 at 5:44 PM, Ard Biesheuvel
+> <ard.biesheuvel@linaro.org> wrote:
+>> On 11 February 2016 at 12:42, Robert Richter
+>> <robert.richter@caviumnetworks.com> wrote:
+>>> (+RobH and MarkR)
+>>>
+>>> On 09.02.16 15:35:42, Ard Biesheuvel wrote:
+>>>> (+ Grant)
+>>>>
+>>>> On 9 February 2016 at 14:53, Robert Richter <rrichter@caviumnetworks.com> wrote:
+>>>> > From: Robert Richter <rrichter@cavium.com>
+>>>> >
+>>>> > Reposting an updated version of this patches ported to 4.5-rc1. It is
+>>>> > a followup to the version 3 from:
+>>>> >
+>>>> >  http://lkml.kernel.org/r/1442881288-13962-1-git-send-email-ard.biesheuvel at linaro.org
+>>>> >
+>>>> > The series is essential for NUMA on arm64. Early FDT handling is
+>>>> > required to make system topology data from firmware, esp. for cpus and
+>>>> > memory available to the early boot process. Ganapat's numa patches
+>>>> > depend on it. This series has been tested with his series v10 posted
+>>>> > here:
+>>>> >
+>>>> >  http://lkml.kernel.org/r/1454407763-1017-1-git-send-email-gkulkarni at caviumnetworks.com
+>>>> >
+>>>>
+>>>> Hello Robert,
+>>>>
+>>>> This series does not reflect anymore what we think is the best way to
+>>>> deal with memory nodes and memreserves on UEFI systems.
+>>>> Please refer to this thread:
+>>>> http://thread.gmane.org/gmane.linux.kernel.efi/6464
+>>>>
+>>>> As far as the memory nodes are concerned, if it is the best place to
+>>>> store these NUMA annotations, then we should indeed preserve them, but
+>>>> I think the discussion stalled without any conclusion having been
+>>>> reached. As far as the /reserved-memory node is concerned, that one we
+>>>> should really keep, so at least patch 6/6 of this series should be
+>>>> replaced with something based on the series above.
+>>>
+>>> Ard,
+>>>
+>>> Mark R and Rob have agreed for numa dt binding for mem nodes. So do
+>>> you think we can at least reuse parts of this series to solve the NUMA
+>>> issue and try to find a solution for patch #6 which aligns with your
+>>> alternative approach?
+>>>
+>>
+>> OK, if we are all in agreement that NUMA annotations belong in memory
+>> nodes, which are otherwise ignored completely on UEFI systems, I am
+>> fine with this as well.
+>>
+>> However, we have to think about what it means if the memory nodes are
+>> out of sync with the UEFI memory map, both on NUMA and ordinary
+>> systems. I know very little about NUMA, but I could imagine that on
+>> any UEFI system, the UEFI memory map remains authoritative, and memory
+>> nodes are only used to annotate regions that are already known to
+>> exist. Alternatively, some sanity check could be appropriate (such as
+>> the one I proposed for the /reserved-memory node in the link above),
+>> but we need to consider carefully how the firmware is supposed to
+>> produce memory nodes and a UEFI memory map that are mutually
+>> consistent.
+>
+> Yes memory nodes are updated at runtime from the firmware/uefi with
+> actual size and
+> is aligned to efi memory table.
+> in NUMA patches it is taken care to fail, if memory table and memory
+> nodes(also ACPI SRAT table) are not aligned.
+>
+> On thunderx, in uefi,  we do update memory nodes based on actual
+> memory present on each
+> nodes, which is not fixed on every board and varies based on number of
+> DIMMs etc present on board.
+>
+> Same is done for ACPI SRAT table which is updated at runtime from uefi
+> with actual memory size of each node.
+>
+> it is reasonable expectation from firmware to create/update dt or acpi
+> tables at runtime for a server platform.
+>
+> for non-NUMA systems, dummy single node(node 0) numa system is created
+> using all available memory on system.
+> if kernel is compiled with CONFIG_NUMA=y and it dont have any numa bindings.
+>>
+>> I think we can replace 6/6 with the series above, i.e., honour the
+>> allocations after establishing that the fixed allocations are either
+>> still available, or entirely disjoint from what the UEFI memory map
+>> describes.
+>>
+>> --
+>> Ard.
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+> thanks
+> Ganapat
 
-Since the SAIF0 clock is routed to the codec, sampling the data on the
-SAIF1 interface is not in sync with the data sent by the codec.
-
-I also tried tying the BITCLK resp. LRCLK of both SAIFs together and
-selecting the SAIF1 inputs as source via the SAIF_CLKMUX_SEL field in
-the DIGCTL_CTRL register. Even with this setup there is no way to get
-consistent data sampled on the SAIF1 interface.
-
-
-Lothar Wa?mann
+Ganapat
