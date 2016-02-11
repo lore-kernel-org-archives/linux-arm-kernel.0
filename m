@@ -1,72 +1,77 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 10 Feb 2016 16:19:43 -0800
-Subject: [PATCH v1] ARM: RX51: Set system_rev from ATAGS
-In-Reply-To: <1455128582-25669-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
-References: <20160209161659.GJ19432@atomide.com>
- <1455128582-25669-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
-Message-ID: <20160211001942.GN19432@atomide.com>
+Date: Wed, 10 Feb 2016 16:22:47 -0800
+Subject: [PATCH] ARM: dts: am335x/am57xx: replace gpio-key,wakeup with
+ wakeup-source property
+In-Reply-To: <1454968553-12088-1-git-send-email-sudeep.holla@arm.com>
+References: <1454968553-12088-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <20160211002247.GO19432@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com> [160210 10:24]:
-> This fixed a regression with DT boot compared to legacy boot.
+* Sudeep Holla <sudeep.holla@arm.com> [160208 13:57]:
+> Commit 3efda00129bd ("ARM: dts: am335x: replace gpio-key,wakeup with
+> wakeup-source property") replaces all the legacy "gpio-key,wakeup" with
+> the unified  "wakeup-source" property to prevent any further copy-paste
+> duplication.
 > 
-> Signed-off-by: Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com>
+> However couple of use of these legacy property sneaked in during the
+> merge window. This patch replaces them too.
+> 
+> Cc: "Beno?t Cousson" <bcousson@baylibre.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: linux-omap at vger.kernel.org
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> ---
+>  arch/arm/boot/dts/am335x-shc.dts          | 4 ++--
+>  arch/arm/boot/dts/am57xx-cl-som-am57x.dts | 2 +-
+>  2 files changed, 3 insertions(+), 3 deletions(-)
+> 
+> Hi Tony,
+> 
+> I see these files got introduced during v4.5 merge window and we could
+> not stop the copy-paste from the earlier versions files from which they
+> were copied.
 
-Thanks, applying into omap-for-v4.5/fixes with Pali's ack.
+OK thanks for checking, applying this into omap-for-v4.5/fixes.
 
 Regards,
 
 Tony
 
-> ---
->  arch/arm/mach-omap2/board-generic.c | 22 +++++++++++++++++++++-
->  1 file changed, 21 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-> index 8098272..bab814d 100644
-> --- a/arch/arm/mach-omap2/board-generic.c
-> +++ b/arch/arm/mach-omap2/board-generic.c
-> @@ -18,6 +18,7 @@
+> diff --git a/arch/arm/boot/dts/am335x-shc.dts b/arch/arm/boot/dts/am335x-shc.dts
+> index 1b5b044fcd91..865de8500f1c 100644
+> --- a/arch/arm/boot/dts/am335x-shc.dts
+> +++ b/arch/arm/boot/dts/am335x-shc.dts
+> @@ -46,7 +46,7 @@
+>  			gpios = <&gpio1 29 GPIO_ACTIVE_HIGH>;
+>  			linux,code = <KEY_BACK>;
+>  			debounce-interval = <1000>;
+> -			gpio-key,wakeup;
+> +			wakeup-source;
+>  		};
 >  
->  #include <asm/setup.h>
->  #include <asm/mach/arch.h>
-> +#include <asm/system_info.h>
+>  		front_button {
+> @@ -54,7 +54,7 @@
+>  			gpios = <&gpio1 25 GPIO_ACTIVE_HIGH>;
+>  			linux,code = <KEY_FRONT>;
+>  			debounce-interval = <1000>;
+> -			gpio-key,wakeup;
+> +			wakeup-source;
+>  		};
+>  	};
 >  
->  #include "common.h"
+> diff --git a/arch/arm/boot/dts/am57xx-cl-som-am57x.dts b/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
+> index c53882643ae9..497eb07ced19 100644
+> --- a/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
+> +++ b/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
+> @@ -545,7 +545,7 @@
+>  		ti,debounce-tol = /bits/ 16 <10>;
+>  		ti,debounce-rep = /bits/ 16 <1>;
 >  
-> @@ -77,12 +78,31 @@ static const char *const n900_boards_compat[] __initconst = {
->  	NULL,
+> -		linux,wakeup;
+> +		wakeup-source;
+>  	};
 >  };
->  
-> +/* Set system_rev from atags */
-> +static void __init rx51_set_system_rev(const struct tag *tags)
-> +{
-> +	const struct tag *tag;
-> +
-> +	if (tags->hdr.tag != ATAG_CORE)
-> +		return;
-> +
-> +	for_each_tag(tag, tags) {
-> +		if (tag->hdr.tag == ATAG_REVISION) {
-> +			system_rev = tag->u.revision.rev;
-> +			break;
-> +		}
-> +	}
-> +}
-> +
->  /* Legacy userspace on Nokia N900 needs ATAGS exported in /proc/atags,
->   * save them while the data is still not overwritten
->   */
->  static void __init rx51_reserve(void)
->  {
-> -	save_atags((const struct tag *)(PAGE_OFFSET + 0x100));
-> +	const struct tag *tags = (const struct tag *)(PAGE_OFFSET + 0x100);
-> +
-> +	save_atags(tags);
-> +	rx51_set_system_rev(tags);
->  	omap_reserve();
->  }
 >  
 > -- 
 > 1.9.1
