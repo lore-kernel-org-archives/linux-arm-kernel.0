@@ -1,147 +1,208 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 11 Feb 2016 18:08:20 +0100
-Subject: breaking DT compatibility (was: Re: [PATCH v4] clk: sunxi:
- Refactor A31 PLL6 so that it can be reused)
-In-Reply-To: <20160211114410.GA32535@leverpostej>
-References: <1454358000-13594-1-git-send-email-maxime.ripard@free-electrons.com>
- <56B4E2FB.3050703@arm.com> <56BB2D79.6090402@arm.com>
- <CABGGiswOKztmRT40w4t_7BD729WgM8ueLtOD-UF_wgMbmcg4cg@mail.gmail.com>
- <20160210143755.GE31506@lukather>
- <20160210163001.GG2632@leverpostej>
- <20160211100048.GK31506@lukather>
- <20160211114410.GA32535@leverpostej>
-Message-ID: <20160211170820.GP31506@lukather>
+From: jens.wiklander@linaro.org (Jens Wiklander)
+Date: Thu, 11 Feb 2016 18:14:33 +0100
+Subject: [PATCH v8 0/4] generic TEE subsystem
+Message-ID: <1455210877-15748-1-git-send-email-jens.wiklander@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 11, 2016 at 11:44:10AM +0000, Mark Rutland wrote:
-> On Thu, Feb 11, 2016 at 11:00:48AM +0100, Maxime Ripard wrote:
-> > On Wed, Feb 10, 2016 at 04:30:01PM +0000, Mark Rutland wrote:
-> > > On Wed, Feb 10, 2016 at 03:37:55PM +0100, Maxime Ripard wrote:
-> > > > Hi Rob,
-> > > > 
-> > > > On Wed, Feb 10, 2016 at 07:42:02AM -0600, Rob Herring wrote:
-> > > > > On Wed, Feb 10, 2016 at 6:30 AM, Andre Przywara <andre.przywara@arm.com> wrote:
-> > > > > > Hi,
-> > > > > >
-> > > > > > just a ping:
-> > > > > >
-> > > > > > Are we really OK with breaking existing DTs in 4.6? (per the code in
-> > > > > > -next: f7d372ba54ea04d528a291b8dbe34716507bb60b, which is this patch).
-> > > > > 
-> > > > > I only warn and make sure people are aware of the issue. I leave that
-> > > > > up to platform maintainers to decide. It depends on the maturity of
-> > > > > the platform and users.
-> > > > 
-> > > > The impacted SoCs support is really partial. For the most supported
-> > > > one, big things like display or sound are totally missing, and we
-> > > > still update them on a regular basis to add support for new
-> > > > devices. As such, users are very likely to upgrade the DT from one
-> > > > version to another just because there's new devices available to
-> > > > them. And the newest SoC impacted just got introduced in 4.5, and only
-> > > > has the UART and MMC devices available.
-> > > > 
-> > > > > If people complain about it then it's their mess. For platforms
-> > > > > supported in distros such as debian or fedora, I would strongly
-> > > > > recommend against breaking compatibility.
-> > > > 
-> > > > None of them are officially supported:
-> > > > https://www.debian.org/releases/stable/armhf/ch02s01.html.en
-> > > > https://fedoraproject.org/wiki/Architectures/ARM#Fedora_23
-> > > > 
-> > > > Only the older one are, and they are not affected by this patch.
-> > > > 
-> > > > > They do ship dtbs, but it's a chicken and egg problem. If dtbs were
-> > > > > stable and provided by firmware, then they wouldn't have to provide
-> > > > > them. If dtbs are unstable, then they have no choice.
-> > > > 
-> > > > And while it might work great on platforms that have all the needed
-> > > > documentation, or a perfect one, which is our case. Almost each
-> > > > release, we discover that something is not working as it was
-> > > > documented, when it was documented in the first place.
-> > > > 
-> > > > It also seems that even on well documented platforms, supported by the
-> > > > vendors, the stable ABI dream is not going to happen:
-> > > > https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/arm/Atmel/README#n105
-> > > > https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/devicetree/bindings/arm/marvell,berlin.txt#n4
-> > > 
-> > > To be quite frank, I completely disagree with that stance.
-> > > 
-> > > It seems like the only reason DT bindings aren't remaining stable is
-> > > because people are deliberately ignoring the requirement and reasoning
-> > > for doing so.
-> > 
-> > And for DT maintainers saying on multiple occasions that it's bad but
-> > ok to break it and / or that they never actually said that it was a
-> > stable ABI...
-> 
-> Evidently there is a communication failure. Generally, the statement has
-> been that old DTBs should continue to work. That's even documented, as
-> Andre pointed out:
-> 
-> Documentation/devicetree/bindings/ABI.txt
-> 
-> There are obviously shades of grey, and _rarely_ it might be necessary
-> to deliberately break a binding. However, that should be the rare
-> last-resort case, rather than a crutch for development.
-> 
-> Saying "bad but ok" underplays the "bad" and overplays the "ok".
+Hi,
 
-Not all of the DT maintainers have the same position I'm afraid.
+This patch set introduces a generic TEE subsystem. The TEE subsystem will
+contain drivers for various TEE implementations. A TEE (Trusted Execution
+Environment) is a trusted OS running in some secure environment, for
+example, TrustZone on ARM CPUs, or a separate secure co-processor etc.
 
-> > I'm guessing it could be a stable ABI if there was bindings
-> > reviews. Rob actually started to review a significant amount of
-> > bindings lately, and that's really appreciated, but if you don't
-> > review all the bindings, then we're going to make mistakes.
-> 
-> I agree that it is unfortunate that we cannot provide the level of
-> review that we want to.
-> 
-> Mistakes will happen even with review; that doesn't necessitate removing
-> support for a binding.
+Regarding use cases, TrustZone has traditionally been used for
+offloading secure tasks to the secure world. Examples include: 
+- Secure key handling where the OS may or may not have direct access to key
+  material.
+- E-commerce and payment technologies. Credentials, credit card numbers etc
+  could be stored in a more secure environment.
+- Trusted User Interface (TUI) to ensure that no-one can snoop PIN-codes
+  etc.
+- Secure boot to ensure that loaded binaries haven?t been tampered with.
+  It?s not strictly needed for secure boot, but you could enhance security
+  by leveraging a TEE during boot.
+- Digital Rights Management (DRM), the studios provides content with
+  different resolution depending on the security of the device. Higher
+  security means higher resolution.
 
-Yet they will be much more likely to be made if no review is made.
+A TEE could also be used in existing and new technologies. For example IMA
+(Integrity Measurement Architecture) which has been in the kernel for quite
+a while. Today you can enhance security by using a TPM-chip to sign the IMA
+measurement list. This is something that you also could do by leveraging a
+TEE.
 
-> > > I agree that it can be painful, and that we cannot predict the future.
-> > > There will always be bugs.
-> > 
-> > In our case, we can't even predict the present.
-> > 
-> > > Having code in mainline comes with responsibilities. One of those is to
-> > > keep said code working for existing users. Otherwise, why bother having
-> > > it in mainline at all?
-> > 
-> > None of our existing users ever complained.
-> 
-> I believe that in this case, Andre was complaining about this particular
-> breakage, unless I have misunderstood.
-> 
-> To be clear, I'm arguing for the strategy going forward. If no-one has
-> complained about the stuff broken up to this point, let's not waste time
-> restoring that.
-> 
-> Going forward we need to keep old DTBs supported.
+Another example could be in 2-factor authentication which is becoming
+increasingly more important. FIDO (https://fidoalliance.org) for example
+are using public key cryptography in their 2-factor authentication standard
+(U2F). With FIDO, a private and public key pair will be generated for every
+site you visit and the private key should never leave the local device.
+This is an example where you could use secure storage in a TEE for the
+private key.
 
-I find that stand a bit dishonest.
+Today you will find a quite a few different out of tree implementations of
+TEE drivers which tends to fragment the TEE ecosystem and development. We
+think it would be a good idea to have a generic TEE driver integrated in
+the kernel which would serve as a base for several different TEE solutions,
+no matter if they are on-chip like TrustZone or if they are on a separate
+crypto co-processor.
 
-You, DT maintainers, admit that you're not doing your job properly,
-and that burden relies on the platform maintainers? Or should I take
-it as you volunteering to maintain that code?
+To develop this TEE subsystem we have been using the open source TEE called
+OP-TEE (https://github.com/OP-TEE/optee_os) and therefore this would be the
+first TEE solution supported by this new subsystem. OP-TEE is a
+GlobalPlatform compliant TEE, however this TEE subsystem is not limited to
+only GlobalPlatform TEEs, instead we have tried to design it so that it
+should work with other TEE solutions also.
 
-But ok. Let's do that. Make sure that the other platform maintainers
-are aware that this is the rule too though. I surely don't want to be
-alone in that boat.
+"tee: generic TEE subsystem" brings in the generic TEE subsystem which
+helps when writing a driver for a specific TEE, for example, OP-TEE.
 
-Maxime
+"tee: add OP-TEE driver" is an OP-TEE driver which uses the subsystem to do
+its work.
+
+This patch set has been prepared in cooperation with Javier Gonz?lez who
+proposed "Generic TrustZone Driver in Linux Kernel" patches 28 Nov 2014,
+https://lwn.net/Articles/623380/ . We've since then changed the scope to
+TEE instead of TrustZone.
+
+We have discussed the design on tee-dev at lists.linaro.org (archive at
+https://lists.linaro.org/pipermail/tee-dev/) with people from other
+companies, including Valentin Manea <valentin.manea@huawei.com>,
+Emmanuel MICHEL <emmanuel.michel@st.com>,
+Jean-michel DELORME <jean-michel.delorme@st.com>,
+and Joakim Bech <joakim.bech@linaro.org>. Our main concern has been to
+agree on something that is generic enough to support many different
+TEEs while still keeping the interface together.
+
+v8:
+* Rebased on v4.5-rc3
+* dt/bindings: add bindings for optee
+  Acked-by: Rob Herring <robh@kernel.org>
+* Fixes build error for X86
+* Fixes spell error in "dt/bindings: add bindings for optee"
+
+v7:
+* Rebased on v4.5-rc2
+* Moved the ARM SMC Calling Convention support into a separate patch
+  set, which is now merged
+
+v6:
+* Rebased on v4.3-rc7
+* Changed smccc interface to let the compiler marshal most of the
+  parameters
+* Added ARCH64 capability for smccc interface
+* Changed the PSCI firmware calls (both arm and arm64) to use the new
+  generic smccc interface instead instead of own assembly functions.
+* Move optee DT bindings to below arm/firmware
+* Defines method for OP-TEE driver to call secure world in DT, smc or hvc
+* Exposes implementation id of a TEE driver in sysfs
+  to easily spawn corresponding tee-supplicant when device is ready
+* Update OP-TEE Message Protocol to better cope with fragmented physical
+  memory
+* Read time directly from OP-TEE driver instead of forwarding the RPC
+  request to tee-supplicant
+
+v5:
+* Replaced kref reference counting for the device with a size_t instead as
+  the counter is always protected by a mutex
+
+v4:
+* Rebased on 4.1
+* Redesigned the synchronization around entry exit of normal SMC
+* Replaced rwsem on the driver instance with kref and completion since
+  rwsem wasn't intended to be used in this way
+* Expanded the TEE_IOCTL_PARAM_ATTR_TYPE_MASK to make room for
+  future additional parameter types
+* Documents TEE subsystem and OP-TEE driver
+* Replaced TEE_IOC_CMD with TEE_IOC_OPEN_SESSION, TEE_IOC_INVOKE,
+  TEE_IOC_CANCEL and TEE_IOC_CLOSE_SESSION
+* DT bindings in a separate patch
+* Assembly parts moved to arch/arm and arch/arm64 respectively, in a
+  separate patch
+* Redefined/clarified the meaning of OPTEE_SMC_SHM_CACHED
+* Removed CMA usage to limit the scope of the patch set
+
+v3:
+* Rebased on 4.1-rc3 (dma_buf_export() API change)
+* A couple of small sparse fixes
+* Documents bindings for OP-TEE driver
+* Updated MAINTAINERS
+
+v2:
+* Replaced the stubbed OP-TEE driver with a real OP-TEE driver
+* Removed most APIs not needed by OP-TEE in current state
+* Update Documentation/ioctl/ioctl-number.txt with correct path to tee.h
+* Rename tee_shm_pool_alloc_cma() to tee_shm_pool_alloc()
+* Moved tee.h into include/uapi/linux/
+* Redefined tee.h IOCTL macros to be directly based on _IOR and friends
+* Removed version info on the API to user space, a data blob which
+  can contain an UUID is left for user space to be able to tell which
+  protocol to use in TEE_IOC_CMD
+* Changed user space exposed structures to only have types with __ prefix
+* Dropped THIS_MODULE from tee_fops
+* Reworked how the driver is registered and ref counted:
+  - moved from using an embedded struct miscdevice to an embedded struct
+    device.
+  - uses an struct rw_semaphore as synchronization for driver detachment
+  - uses alloc/register pattern from TPM
+
+Thanks,
+Jens
+
+
+
+Jens Wiklander (4):
+  dt/bindings: add bindings for optee
+  tee: generic TEE subsystem
+  tee: add OP-TEE driver
+  Documentation: tee subsystem and op-tee driver
+
+ Documentation/00-INDEX                             |   2 +
+ .../bindings/arm/firmware/linaro,optee-tz.txt      |  31 +
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ Documentation/ioctl/ioctl-number.txt               |   1 +
+ Documentation/tee.txt                              | 117 +++
+ MAINTAINERS                                        |  13 +
+ drivers/Kconfig                                    |   2 +
+ drivers/Makefile                                   |   1 +
+ drivers/tee/Kconfig                                |  19 +
+ drivers/tee/Makefile                               |   4 +
+ drivers/tee/optee/Kconfig                          |   8 +
+ drivers/tee/optee/Makefile                         |   5 +
+ drivers/tee/optee/call.c                           | 400 ++++++++++
+ drivers/tee/optee/core.c                           | 522 ++++++++++++
+ drivers/tee/optee/optee_msg.h                      | 423 ++++++++++
+ drivers/tee/optee/optee_private.h                  | 146 ++++
+ drivers/tee/optee/optee_smc.h                      | 418 ++++++++++
+ drivers/tee/optee/rpc.c                            | 322 ++++++++
+ drivers/tee/optee/supp.c                           | 212 +++++
+ drivers/tee/tee.c                                  | 873 +++++++++++++++++++++
+ drivers/tee/tee_private.h                          |  80 ++
+ drivers/tee/tee_shm.c                              | 324 ++++++++
+ drivers/tee/tee_shm_pool.c                         | 133 ++++
+ include/linux/tee_drv.h                            | 299 +++++++
+ include/uapi/linux/tee.h                           | 383 +++++++++
+ 25 files changed, 4739 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/firmware/linaro,optee-tz.txt
+ create mode 100644 Documentation/tee.txt
+ create mode 100644 drivers/tee/Kconfig
+ create mode 100644 drivers/tee/Makefile
+ create mode 100644 drivers/tee/optee/Kconfig
+ create mode 100644 drivers/tee/optee/Makefile
+ create mode 100644 drivers/tee/optee/call.c
+ create mode 100644 drivers/tee/optee/core.c
+ create mode 100644 drivers/tee/optee/optee_msg.h
+ create mode 100644 drivers/tee/optee/optee_private.h
+ create mode 100644 drivers/tee/optee/optee_smc.h
+ create mode 100644 drivers/tee/optee/rpc.c
+ create mode 100644 drivers/tee/optee/supp.c
+ create mode 100644 drivers/tee/tee.c
+ create mode 100644 drivers/tee/tee_private.h
+ create mode 100644 drivers/tee/tee_shm.c
+ create mode 100644 drivers/tee/tee_shm_pool.c
+ create mode 100644 include/linux/tee_drv.h
+ create mode 100644 include/uapi/linux/tee.h
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160211/4d5b25cc/attachment.sig>
+1.9.1
