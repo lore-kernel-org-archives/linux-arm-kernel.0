@@ -1,83 +1,82 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 11 Feb 2016 16:04:14 +0000
-Subject: [PATCH v4 01/17] Xen: ACPI: Hide UART used by Xen
-In-Reply-To: <44113385.2QnPtvxQx0@vostro.rjw.lan>
-References: <1454641552-12576-1-git-send-email-zhaoshenglong@huawei.com>
- <2213954.ztOe55fprN@vostro.rjw.lan>
- <alpine.DEB.2.02.1602091116240.27008@kaball.uk.xensource.com>
- <44113385.2QnPtvxQx0@vostro.rjw.lan>
-Message-ID: <alpine.DEB.2.02.1602111557430.27008@kaball.uk.xensource.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Thu, 11 Feb 2016 11:04:38 -0500
+Subject: [PATCH v2 5/6] serial: 8250/mediatek: fix building with
+ SERIAL_8250=m
+In-Reply-To: <1455205297-1021302-6-git-send-email-arnd@arndb.de>
+References: <1455205297-1021302-1-git-send-email-arnd@arndb.de>
+ <1455205297-1021302-6-git-send-email-arnd@arndb.de>
+Message-ID: <20160211160438.GH28452@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 10 Feb 2016, Rafael J. Wysocki wrote:
-> On Tuesday, February 09, 2016 11:19:02 AM Stefano Stabellini wrote:
-> > On Mon, 8 Feb 2016, Rafael J. Wysocki wrote:
-> > > On Monday, February 08, 2016 10:57:01 AM Stefano Stabellini wrote:
-> > > > On Sat, 6 Feb 2016, Rafael J. Wysocki wrote:
-> > > > > On Fri, Feb 5, 2016 at 4:05 AM, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
-> > > > > > From: Shannon Zhao <shannon.zhao@linaro.org>
-> > > > > >
-> > > > > > ACPI 6.0 introduces a new table STAO to list the devices which are used
-> > > > > > by Xen and can't be used by Dom0. On Xen virtual platforms, the physical
-> > > > > > UART is used by Xen. So here it hides UART from Dom0.
-> > > > > >
-> > > > > > Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> > > > > > Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > > > > 
-> > > > > Well, this doesn't look right to me.
-> > > > > 
-> > > > > We need to find a nicer way to achieve what you want.
-> > > > 
-> > > > I take that you are talking about how to honor the STAO table in Linux.
-> > > > Do you have any concrete suggestions?
-> > > 
-> > > I do.
-> > > 
-> > > The last hunk of the patch is likely what it needs to be, although I'm
-> > > not sure if the place it is added to is the right one.  That's a minor thing,
-> > > though.
-> > > 
-> > > The other part is problematic.  Not that as it doesn't work, but because of
-> > > how it works.  With these changes the device will be visible to the OS (in
-> > > fact to user space even), but will never be "present".  I'm not sure if
-> > > that's what you want?
-> > > 
-> > > It might be better to add a check to acpi_bus_type_and_status() that will
-> > > evaluate the "should ignore?" thing and return -ENODEV if this is true.  This
-> > > way the device won't be visible at all.
-> > 
-> > Something like below?  Actually your suggestion is better, thank you!
-> > 
-> > diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
-> > index 78d5f02..4778c51 100644
-> > --- a/drivers/acpi/scan.c
-> > +++ b/drivers/acpi/scan.c
-> > @@ -1455,6 +1455,9 @@ static int acpi_bus_type_and_status(acpi_handle handle, int *type,
-> >  	if (ACPI_FAILURE(status))
-> >  		return -ENODEV;
-> >  
-> > +	if (acpi_check_device_is_ignored(handle))
-> > +		return -ENODEV;
-> > +
-> >  	switch (acpi_type) {
-> >  	case ACPI_TYPE_ANY:		/* for ACPI_ROOT_OBJECT */
-> >  	case ACPI_TYPE_DEVICE:
-> > 
+[[PATCH v2 5/6] serial: 8250/mediatek: fix building with SERIAL_8250=m] On 11/02/2016 (Thu 16:41) Arnd Bergmann wrote:
+
+> The Mediatek 8250 driver has a 'bool' Kconfig symbol, but that
+> breaks when SERIAL_8250 is a loadable module:
 > 
-> I thought about doing that under ACPI_TYPE_DEVICE, because it shouldn't be
-> applicable to the other types.  But generally, yes.
+> drivers/tty/built-in.o: In function `mtk8250_set_termios':
+> :(.text+0x1bee8): undefined reference to `serial8250_do_set_termios'
+> :(.text+0x1bf10): undefined reference to `uart_get_baud_rate'
+> :(.text+0x1c09c): undefined reference to `uart_get_divisor'
+> drivers/tty/built-in.o: In function `mtk8250_do_pm':
+> :(.text+0x1c0d0): undefined reference to `serial8250_do_pm'
+> drivers/tty/built-in.o: In function `mtk8250_probe':
+> :(.text+0x1c2e4): undefined reference to `serial8250_register_8250_port'
+> serial/8250/8250_mtk.c:287:242: error: data definition has no type or storage class [-Werror]
+> serial/8250/8250_mtk.c:287:122: error: 'mtk8250_platform_driver_init' defined but not used [-Werror=unused-function]
+> 
+> This changes the symbol to a 'tristate', so the dependency on
+> SERIAL_8250 also works when that is set to 'm'.
+> To actually build the driver, we also need to include <linux/module.h>.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  drivers/tty/serial/8250/8250_mtk.c | 3 ++-
+>  drivers/tty/serial/8250/Kconfig    | 2 +-
+>  2 files changed, 3 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/8250/8250_mtk.c b/drivers/tty/serial/8250/8250_mtk.c
+> index 6ecc6e3e82dc..55be90c1d85e 100644
+> --- a/drivers/tty/serial/8250/8250_mtk.c
+> +++ b/drivers/tty/serial/8250/8250_mtk.c
+> @@ -19,6 +19,7 @@
+>  #include <linux/module.h>
+>  #include <linux/of_irq.h>
+>  #include <linux/of_platform.h>
+> +#include <linux/module.h>
 
-I was pondering about it myself. Maybe an ACPI_TYPE_PROCESSOR object
-could theoretically be hidden with the STAO? I added the check before
-the switch because I thought that there would be no harm in being
-caution about it.
+Something isn't right here ; I can see module.h three lines up in the
+context.  Guessing your addition of the revert makes this addition no
+longer required...
 
+P.
+--
 
-> Plus I'd move the table checks to acpi_scan_init(), so the UART address can
-> be a static variable in scan.c.
->
-> Also maybe rename acpi_check_device_is_ignored() to something like
-> acpi_device_should_be_hidden().
-
-Both make sense. Shannon, are you happy to make these changes?
+>  #include <linux/platform_device.h>
+>  #include <linux/pm_runtime.h>
+>  #include <linux/serial_8250.h>
+> @@ -303,7 +304,7 @@ static struct platform_driver mtk8250_platform_driver = {
+>  };
+>  module_platform_driver(mtk8250_platform_driver);
+>  
+> -#ifdef CONFIG_SERIAL_8250_CONSOLE
+> +#if defined(CONFIG_SERIAL_8250_CONSOLE) && !defined(MODULE)
+>  static int __init early_mtk8250_setup(struct earlycon_device *device,
+>  					const char *options)
+>  {
+> diff --git a/drivers/tty/serial/8250/Kconfig b/drivers/tty/serial/8250/Kconfig
+> index 67ad6b0d595b..6ae0fae4f796 100644
+> --- a/drivers/tty/serial/8250/Kconfig
+> +++ b/drivers/tty/serial/8250/Kconfig
+> @@ -370,7 +370,7 @@ config SERIAL_8250_LPC18XX
+>  	  serial port, say Y to this option. If unsure, say Y.
+>  
+>  config SERIAL_8250_MT6577
+> -	bool "Mediatek serial port support"
+> +	tristate "Mediatek serial port support"
+>  	depends on SERIAL_8250 && ARCH_MEDIATEK
+>  	help
+>  	  If you have a Mediatek based board and want to use the
+> -- 
+> 2.7.0
+> 
