@@ -1,38 +1,110 @@
 From: lars.persson@axis.com (Lars Persson)
-Date: Thu, 11 Feb 2016 15:04:42 +0100
-Subject: [PATCH v2 8/8] arm: mach-artpec: add entry to MAINTAINERS
+Date: Thu, 11 Feb 2016 15:04:36 +0100
+Subject: [PATCH v2 2/8] clk: add artpec-6 pll1 clock driver
 In-Reply-To: <cover.1455198819.git.larper@axis.com>
 References: <cover.1455198819.git.larper@axis.com>
-Message-ID: <b5adeda17294fceb282d14446ab684316fc3028b.1455198819.git.larper@axis.com>
+Message-ID: <6d47cfe5ab7596e91a7fcc5647c5907cc12a4d83.1455198819.git.larper@axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Lars Persson <larper@axis.com>
-Signed-off-by: Jesper Nilsson <jesper.nilsson@axis.com>
----
- MAINTAINERS | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+The PLL1 clock is a fixed-factor clock with factors derived from boot
+mode pins. This driver is a simple wrapper to register the fixed
+factor clock according to the pin settings.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 7f1fa4f..d32c1aa 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -932,6 +932,16 @@ M:	Tsahee Zidenberg <tsahee@annapurnalabs.com>
- S:	Maintained
- F:	arch/arm/mach-alpine/
+Signed-off-by: Lars Persson <larper@axis.com>
+---
+ drivers/clk/Makefile      |  1 +
+ drivers/clk/clk-artpec6.c | 70 +++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 71 insertions(+)
+ create mode 100644 drivers/clk/clk-artpec6.c
+
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index b038e36..388f0cf 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -17,6 +17,7 @@ endif
  
-+ARM/ARTPEC MACHINE SUPPORT
-+M:	Jesper Nilsson <jesper.nilsson@axis.com>
-+M:	Lars Persson <lars.persson@axis.com>
-+M:	Niklas Cassel <niklas.cassel@axis.com>
-+S:	Maintained
-+L:	linux-arm-kernel at axis.com
-+F:	arch/arm/mach-artpec
-+F:	arch/arm/boot/dts/artpec6*
-+F:	drivers/clk/clk-artpec6.c
+ # hardware specific clock types
+ # please keep this section sorted lexicographically by file/directory path name
++obj-$(CONFIG_MACH_ARTPEC6)		+= clk-artpec6.o
+ obj-$(CONFIG_MACH_ASM9260)		+= clk-asm9260.o
+ obj-$(CONFIG_COMMON_CLK_AXI_CLKGEN)	+= clk-axi-clkgen.o
+ obj-$(CONFIG_ARCH_AXXIA)		+= clk-axm5516.o
+diff --git a/drivers/clk/clk-artpec6.c b/drivers/clk/clk-artpec6.c
+new file mode 100644
+index 0000000..3664c44
+--- /dev/null
++++ b/drivers/clk/clk-artpec6.c
+@@ -0,0 +1,70 @@
++/*
++ * ARTPEC-6 clock initialization
++ *
++ * Copyright 2015 Axis Comunications AB.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
 +
- ARM/ATMEL AT91RM9200, AT91SAM9 AND SAMA5 SOC SUPPORT
- M:	Nicolas Ferre <nicolas.ferre@atmel.com>
- M:	Alexandre Belloni <alexandre.belloni@free-electrons.com>
++#include <linux/clk-provider.h>
++#include <linux/clkdev.h>
++#include <linux/io.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++
++static void __init of_artpec6_pll1_setup(struct device_node *np)
++{
++	void __iomem *devstat;
++	struct clk *clk;
++	const char *clk_name = np->name;
++	const char *parent_name;
++	u32 pll_mode, pll_m, pll_n;
++
++	parent_name = of_clk_get_parent_name(np, 0);
++
++	devstat = of_iomap(np, 0);
++	if (devstat == NULL) {
++		pr_err("error to ioremap DEVSTAT\n");
++		return;
++	}
++
++	/* DEVSTAT register contains PLL settings */
++	pll_mode = (readl(devstat) >> 6) & 3;
++	iounmap(devstat);
++
++	/*
++	 * pll1 settings are designed for different DDR speeds using a fixed
++	 * 50MHz external clock. However, a different external clock could be
++	 * used on different boards.
++	 * CPU clock is half the DDR clock.
++	 */
++	switch (pll_mode) {
++	case 0: /* DDR3-2133 mode */
++		pll_m = 4;
++		pll_n = 85;
++		break;
++	case 1: /* DDR3-1866 mode */
++		pll_m = 6;
++		pll_n = 112;
++		break;
++	case 2: /* DDR3-1600 mode */
++		pll_m = 4;
++		pll_n = 64;
++		break;
++	case 3: /* DDR3-1333 mode */
++		pll_m = 8;
++		pll_n = 106;
++		break;
++	}
++	/* ext_clk is defined in device tree */
++	clk = clk_register_fixed_factor(NULL, clk_name, parent_name, 0,
++			pll_n, pll_m);
++	if (IS_ERR(clk)) {
++		pr_err("%s not registered\n", clk_name);
++		return;
++	}
++	of_clk_add_provider(np, of_clk_src_simple_get, clk);
++}
++CLK_OF_DECLARE(artpec6_pll1, "axis,artpec6-pll1-clock", of_artpec6_pll1_setup);
 -- 
 2.1.4
