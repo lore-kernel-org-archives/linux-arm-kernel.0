@@ -1,101 +1,73 @@
-From: lars.persson@axis.com (Lars Persson)
-Date: Thu, 11 Feb 2016 15:04:39 +0100
-Subject: [PATCH v2 5/8] arm: dts: add Artpec-6 development board dts
-In-Reply-To: <cover.1455198819.git.larper@axis.com>
-References: <cover.1455198819.git.larper@axis.com>
-Message-ID: <7cb2fe1c0e188ae9eb478a8ec6ee6aa226491bc6.1455198819.git.larper@axis.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Thu, 11 Feb 2016 15:02:51 +0100
+Subject: [PATCH V3 00/10] Introduce ACPI world to GICv3 & ITS irqchip
+In-Reply-To: <56BC74CA.3020003@arm.com>
+References: <1453209083-3358-1-git-send-email-tn@semihalf.com>
+ <56BC74CA.3020003@arm.com>
+Message-ID: <56BC948B.6030206@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Lars Persson <larper@axis.com>
----
- arch/arm/boot/dts/Makefile             |  2 ++
- arch/arm/boot/dts/artpec6-devboard.dts | 64 ++++++++++++++++++++++++++++++++++
- 2 files changed, 66 insertions(+)
- create mode 100644 arch/arm/boot/dts/artpec6-devboard.dts
+On 11.02.2016 12:47, Marc Zyngier wrote:
+> Thomas, Hanjun,
+>
+> On 19/01/16 13:11, Tomasz Nowicki wrote:
+>> Patches base on Suravee's ACPI GICv2m support:
+>> https://lkml.org/lkml/2015/12/10/475
+>>
+>> The following git branch contains submitted patches along with
+>> the useful patches from the test point of view (mainly ACPI ARM64 PCI support).
+>> https://github.com/semihalf-nowicki-tomasz/linux.git (gicv3-its-acpi-v3)
+>>
+>> Series has been tested on Cavium ThunderX server.
+>>
+>> v2 -> v3
+>> - rebased on top of 4.4
+>> - fixes and improvements for redistributor init via GICC structures
+>> - fixes as per kbuild reports
+>>
+>> v1 -> v2
+>> - rebased on top of 4.4-rc4
+>> - use pci_msi_domain_get_msi_rid for requester ID to device ID translation
+>>
+>> Hanjun Guo (1):
+>>    irqchip / GICv3: remove gic root node in ITS
+>>
+>> Tomasz Nowicki (9):
+>>    irqchip / GICv3: Refactor gic_of_init() for GICv3 driver
+>>    irqchip / GICv3: Add ACPI support for GICv3+ initialization
+>>    irqchip,GICv3,ACPI: Add redistributor support via GICC structures.
+>>    irqchip, gicv3, its: Mark its_init() and its children as __init
+>>    irqchip, GICv3, ITS: Refator ITS dt init code to prepare for ACPI.
+>>    ARM64, ACPI, PCI: I/O Remapping Table (IORT) initial support.
+>>    irqchip, gicv3, its: Probe ITS in the ACPI way.
+>>    acpi, gicv3, msi: Factor out code that might be reused for ACPI
+>>      equivalent.
+>>    acpi, gicv3, its: Use MADT ITS subtable to do PCI/MSI domain
+>>      initialization.
+>>
+>>   drivers/acpi/Kconfig                     |   3 +
+>>   drivers/acpi/Makefile                    |   1 +
+>>   drivers/acpi/iort.c                      | 326 +++++++++++++++++++++++++++++
+>>   drivers/irqchip/Kconfig                  |   1 +
+>>   drivers/irqchip/irq-gic-v3-its-pci-msi.c |  85 ++++++--
+>>   drivers/irqchip/irq-gic-v3-its.c         | 143 +++++++++----
+>>   drivers/irqchip/irq-gic-v3.c             | 344 ++++++++++++++++++++++++++-----
+>>   drivers/pci/msi.c                        |   3 +
+>>   include/linux/iort.h                     |  38 ++++
+>>   include/linux/irqchip/arm-gic-v3.h       |   2 +-
+>>   10 files changed, 845 insertions(+), 101 deletions(-)
+>>   create mode 100644 drivers/acpi/iort.c
+>>   create mode 100644 include/linux/iort.h
+>>
+>
+> I've so far queued the first 5 patches of this series (basic ACPI
+> support for GICv3 and associated cleanups). The rest needs additional
+> discussion (see my comments on patch 10), and requires some form of Ack
+> from the ACPI maintainers (at least for patch 7).
+>
+Thanks Marc!
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index a4a6d70..2ebe99c 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -2,6 +2,8 @@ ifeq ($(CONFIG_OF),y)
- 
- dtb-$(CONFIG_ARCH_ALPINE) += \
- 	alpine-db.dtb
-+dtb-$(CONFIG_MACH_ARTPEC6) += \
-+	artpec6-devboard.dtb
- dtb-$(CONFIG_MACH_ASM9260) += \
- 	alphascale-asm9260-devkit.dtb
- # Keep at91 dtb files sorted alphabetically for each SoC
-diff --git a/arch/arm/boot/dts/artpec6-devboard.dts b/arch/arm/boot/dts/artpec6-devboard.dts
-new file mode 100644
-index 0000000..f823ed3
---- /dev/null
-+++ b/arch/arm/boot/dts/artpec6-devboard.dts
-@@ -0,0 +1,64 @@
-+/*
-+ * Axis ARTPEC-6 development board.
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
-+
-+/dts-v1/;
-+#include "artpec6.dtsi"
-+
-+/ {
-+	model = "ARTPEC-6 development board";
-+	compatible = "axis,artpec6-dev-board", "axis,artpec6";
-+
-+	aliases {
-+		serial0 = &uart0;
-+		serial1 = &uart1;
-+		serial2 = &uart2;
-+		serial3 = &uart3;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial3:115200n8";
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x0 0x10000000>;
-+	};
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	status = "okay";
-+};
-+
-+&uart3 {
-+	status = "okay";
-+};
-+
-+&ethernet {
-+	status = "okay";
-+
-+	phy-handle = <&phy1>;
-+	phy-mode = "gmii";
-+
-+	mdio {
-+		#address-cells = <0x1>;
-+		#size-cells = <0x0>;
-+		phy1: phy at 0 {
-+			compatible = "ethernet-phy-ieee802.3-c22";
-+			device_type = "ethernet-phy";
-+			reg = <0x0>;
-+		};
-+	};
-+};
--- 
-2.1.4
+I will respond to the rest of your comments shortly.
+
+Tomasz
