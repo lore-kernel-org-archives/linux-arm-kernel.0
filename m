@@ -1,21 +1,50 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 11 Feb 2016 14:21:15 +0100
-Subject: [PATCH v2 3/5] pinctrl: sunxi: Add H3 R_PIO controller support
-In-Reply-To: <1454448113-18810-4-git-send-email-k@japko.eu>
-References: <1454448113-18810-1-git-send-email-k@japko.eu>
- <1454448113-18810-4-git-send-email-k@japko.eu>
-Message-ID: <CACRpkdZkSzcb0fmghkvsfRHpsU-SsSGPP6YvstAW7387HS0xJw@mail.gmail.com>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Thu, 11 Feb 2016 14:21:27 +0100
+Subject: [GIT PULL] STM32 DT updates for v4.6 #1
+Message-ID: <56BC8AD7.30607@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 2, 2016 at 10:21 PM, Krzysztof Adamski <k@japko.eu> wrote:
+Hi Olof, Anrd and Kevin,
 
-> H3 has additional PIO controller similar to what we can find on A23.
-> It's a 12 pin port, described in H3 Datasheet rev 1.1, pages 345-350.
->
-> Signed-off-by: Krzysztof Adamski <k@japko.eu>
+Please consider this first round of STM32 DT updates for v4.6:
 
-Patch applied with Maxime's ACK.
+The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
 
-Yours,
-Linus Walleij
+   Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+
+are available in the git repository at:
+
+   git://git.kernel.org/pub/scm/linux/kernel/git/mcoquelin/stm32.git 
+tags/stm32-dt-for-v4.6-1
+
+for you to fetch changes up to b2aa7f7741f511c6a1ea266d62d203662f121ea7:
+
+   ARM: dts: stm32f429: Boost perfs by remapping SDRAM Bank 1 to 0x0 
+(2016-02-11 12:02:59 +0100)
+
+----------------------------------------------------------------
+Highlights:
+-----------
+  - Add DMA controller node to stm32f429 MCU
+  - Add pinctrl & gpio nodes to stm32f429 MCU
+  - Remap stm32429-eval board SD-Ram to 0x0 for performance boost
+
+----------------------------------------------------------------
+M'boumba Cedric Madianga (1):
+       ARM: dts: Add STM32 DMA support for STM32F429 MCU
+
+Maxime Coquelin (5):
+       includes: dt-bindings: Add STM32F429 pinctrl DT bindings
+       ARM: dts: Add pinctrl node to STM32F429
+       ARM: dts: Add USART1 pin config to STM32F429 boards
+       ARM: dts: Add leds support to STM32F429 boards
+       ARM: dts: stm32f429: Boost perfs by remapping SDRAM Bank 1 to 0x0
+
+  arch/arm/boot/dts/stm32429i-eval.dts            |   21 +-
+  arch/arm/boot/dts/stm32f429-disco.dts           |   13 +
+  arch/arm/boot/dts/stm32f429.dtsi                |  143 +++
+  include/dt-bindings/pinctrl/stm32f429-pinfunc.h | 1239 
++++++++++++++++++++++++
+  4 files changed, 1415 insertions(+), 1 deletion(-)
+  create mode 100644 include/dt-bindings/pinctrl/stm32f429-pinfunc.h
