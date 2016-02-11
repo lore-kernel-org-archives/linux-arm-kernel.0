@@ -1,22 +1,49 @@
-From: martin.petersen@oracle.com (Martin K. Petersen)
-Date: Wed, 10 Feb 2016 20:24:21 -0500
-Subject: [PATCH 0/7] SCSI bug fixes for 4.6
-In-Reply-To: <1453910247-3447628-1-git-send-email-arnd@arndb.de> (Arnd
- Bergmann's message of "Wed, 27 Jan 2016 16:57:16 +0100")
-References: <1453910247-3447628-1-git-send-email-arnd@arndb.de>
-Message-ID: <yq1si1082ey.fsf@sermon.lab.mkp.net>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Thu, 11 Feb 2016 03:41:58 +0200
+Subject: [GIT PULL] NXP LPC32xx Platform Updates for v4.6 #1
+Message-ID: <56BBE6E6.4080802@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "Arnd" == Arnd Bergmann <arnd@arndb.de> writes:
+Hi Arnd, Olof, Kevin,
 
-Arnd> Here are a bunch of fixes for harmless bugs I found during ARM
-Arnd> randconfig testing. It would be nice to get them mered in 4.6, but
-Arnd> there is no need to have them in 4.5 as no incorrect behavior
-Arnd> results from the current code, and the warnings are all hard to
-Arnd> trigger.
+please consider to include NXP LPC32xx platfrom updates (#1) for v4.6.
 
-Applied to 4.6/scsi-queue.
+The main change is a switchover to a common clock framework driver
+for LPC32xx, this also allows to reuse a shared LPC32xx clockevent
+driver, and hence remove legacy clock and timer drivers from
+arch/arm/mach-lpc32xx.
 
--- 
-Martin K. Petersen	Oracle Linux Engineering
+I'm adding an official LPC32xx maintainer Roland to Cc, however
+he seems to be unresponsive for a quite long time (since 2014).
+
+----------------------------------------------------------------
+
+The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
+
+  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+
+are available in the git repository at:
+
+  https://github.com/vzapolskiy/linux.git lpc32xx/soc
+
+for you to fetch changes up to 0ac1a101f5dd28c3894be3c0230ee7ea2e05e8aa:
+
+  arm: lpc32xx: remove direct control of GPIOs from shared mach file (2016-02-11 02:27:04 +0200)
+
+----------------------------------------------------------------
+
+Vladimir Zapolskiy (3):
+      arm: lpc32xx: switch to common clock framework
+      arm: lpc32xx: remove selected HAVE_IDE
+      arm: lpc32xx: remove direct control of GPIOs from shared mach file
+
+ arch/arm/Kconfig                |    4 +-
+ arch/arm/mach-lpc32xx/Makefile  |    3 +-
+ arch/arm/mach-lpc32xx/clock.c   | 1284 ---------------------------------------
+ arch/arm/mach-lpc32xx/phy3250.c |   53 --
+ arch/arm/mach-lpc32xx/serial.c  |    3 -
+ arch/arm/mach-lpc32xx/timer.c   |  144 -----
+ 6 files changed, 3 insertions(+), 1488 deletions(-)
+ delete mode 100644 arch/arm/mach-lpc32xx/clock.c
+ delete mode 100644 arch/arm/mach-lpc32xx/timer.c
