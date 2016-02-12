@@ -1,61 +1,64 @@
-From: robert.moore@intel.com (Moore, Robert)
-Date: Fri, 12 Feb 2016 22:47:19 +0000
-Subject: [PATCH v2 6/9] ACPI: add definition of DBG2 subtypes
-In-Reply-To: <1455299022-11641-7-git-send-email-aleksey.makarov@linaro.org>
-References: <1455299022-11641-1-git-send-email-aleksey.makarov@linaro.org>
- <1455299022-11641-7-git-send-email-aleksey.makarov@linaro.org>
-Message-ID: <94F2FBAB4432B54E8AACC7DFDE6C92E37DA9BA10@ORSMSX112.amr.corp.intel.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 12 Feb 2016 14:50:18 -0800
+Subject: [GIT PULL] omap fixes against v4.5-rc3
+Message-ID: <20160212225018.GA3500@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OK, we'll take these for the next release of ACPICA.
-Thanks,
-Bob
+The following changes since commit 388f7b1d6e8ca06762e2454d28d6c3c55ad0fe95:
 
+  Linux 4.5-rc3 (2016-02-07 15:38:30 -0800)
 
-> -----Original Message-----
-> From: Aleksey Makarov [mailto:aleksey.makarov at linaro.org]
-> Sent: Friday, February 12, 2016 9:44 AM
-> To: linux-acpi at vger.kernel.org
-> Cc: linux-serial at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; Aleksey Makarov; Russell King; Greg Kroah-
-> Hartman; Rafael J . Wysocki; Leif Lindholm; Graeme Gregory; Al Stone;
-> Christopher Covington; Moore, Robert; Zheng, Lv; Wysocki, Rafael J; Len
-> Brown; devel at acpica.org
-> Subject: [PATCH v2 6/9] ACPI: add definition of DBG2 subtypes
-> 
-> The recent version of Microsoft Debug Port Table 2 (DBG2) [1] specifies
-> additional serial debug port subtypes.  These constants are also referred
-> by Serial Port Console Redirection Table (SPCR) [2]
-> 
-> Add these constants.
-> 
-> [1] https://msdn.microsoft.com/en-
-> us/library/windows/hardware/dn639131(v=vs.85).aspx
-> [2] https://msdn.microsoft.com/en-
-> us/library/windows/hardware/dn639132(v=vs.85).aspx
-> 
-> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
-> Tested-by: Christopher Covington <cov@codeaurora.org>
-> ---
->  include/acpi/actbl2.h | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/include/acpi/actbl2.h b/include/acpi/actbl2.h index
-> a4ef625..e9930ab 100644
-> --- a/include/acpi/actbl2.h
-> +++ b/include/acpi/actbl2.h
-> @@ -371,6 +371,11 @@ struct acpi_dbg2_device {
-> 
->  #define ACPI_DBG2_16550_COMPATIBLE  0x0000
->  #define ACPI_DBG2_16550_SUBSET      0x0001
-> +#define ACPI_DBG2_ARM_PL011         0x0003
-> +#define ACPI_DBG2_ARM_SBSA_32BIT    0x000d
-> +#define ACPI_DBG2_ARM_SBSA_GENERIC  0x000e
-> +#define ACPI_DBG2_ARM_DCC           0x000f
-> +#define ACPI_DBG2_BCM2835           0x0010
-> 
->  #define ACPI_DBG2_1394_STANDARD     0x0000
-> 
-> --
-> 2.7.0
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.5/fixes-rc3-v2
+
+for you to fetch changes up to cf26f1137333251f3515dea31f95775b99df0fd5:
+
+  ARM: OMAP2+: Fix omap_device for module reload on PM runtime forbid (2016-02-12 08:56:52 -0800)
+
+----------------------------------------------------------------
+Few fixes for omaps against v4.5-rc3:
+
+- Improve omap_device error message to tell driver writers what is
+  wrong after commit 5de85b9d57ab ("PM / runtime: Re-init runtime PM
+  states at probe error and driver unbind"). There will be also a
+  handful of driver related fixes also queued separately. But adding
+  this error message makes it easy to fix any omap_device using
+  drivers suffering from this issue so I think it's important to
+  have.
+
+- Also related to commit 5de85b9d57ab discussion, let's fix a bug
+  where disabling PM runtime via sysfs will also cause the hardware
+  state to be different from PM runtime state.
+
+- Fix audio clocks for beagle-x15.
+
+- Use wakeup-source instead of gpio-key,wakeup for the new entries
+  that sneaked in during the merge window.
+
+- Fix a legacy booting vs device tree based booting regression for
+  n900 where the legacy user space expects to have the device
+  revision available in /proc/atags also when booted with device
+  tree.
+
+----------------------------------------------------------------
+Ivaylo Dimitrov (1):
+      ARM: OMAP2+: Set system_rev from ATAGS for n900
+
+Peter Ujfalusi (1):
+      ARM: DTS: am57xx-beagle-x15: Select SYS_CLK2 for audio clocks
+
+Sudeep Holla (1):
+      ARM: dts: am335x/am57xx: replace gpio-key,wakeup with wakeup-source property
+
+Tony Lindgren (2):
+      ARM: OMAP2+: Improve omap_device error for driver writers
+      ARM: OMAP2+: Fix omap_device for module reload on PM runtime forbid
+
+ arch/arm/boot/dts/am335x-shc.dts          |  4 ++--
+ arch/arm/boot/dts/am57xx-beagle-x15.dts   |  4 ++++
+ arch/arm/boot/dts/am57xx-cl-som-am57x.dts |  2 +-
+ arch/arm/mach-omap2/board-generic.c       | 22 +++++++++++++++++++++-
+ arch/arm/mach-omap2/omap_device.c         | 14 +++++++++++++-
+ 5 files changed, 41 insertions(+), 5 deletions(-)
