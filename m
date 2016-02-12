@@ -1,132 +1,162 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 12 Feb 2016 20:05:09 +0100
-Subject: [PATCH 19/68] ARM: dts: porter: add sound support
+Date: Fri, 12 Feb 2016 20:05:25 +0100
+Subject: [PATCH 35/68] ARM: dts: r8a7793: enable audio DMAC in device tree
 In-Reply-To: <cover.1455303422.git.horms+renesas@verge.net.au>
 References: <cover.1455303422.git.horms+renesas@verge.net.au>
-Message-ID: <493b4da7c10ca647850627849bcf6031c0a80f13.1455303422.git.horms+renesas@verge.net.au>
+Message-ID: <f418cbb69a2f5a481bd5f210bb5c8c5cc9322224.1455303422.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Enable audio DMAC (= rcar-dmac) in r8a7793 device tree.
 
-Define the Porter board dependent part of the R8A7791 sound device node.
-Add device node for Asahi Kasei AK4642 stereo codec  to the I2C2 bus.
-Add the "simple-audio-card" device node to interconnect the SoC sound
-device  and the codec.
+Based on similar work for the r8a7791 by Kuninori Morimoto.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7791-porter.dts | 71 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 71 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7791-porter.dts b/arch/arm/boot/dts/r8a7791-porter.dts
-index fe81fa0e478c..5015eaa0ae50 100644
---- a/arch/arm/boot/dts/r8a7791-porter.dts
-+++ b/arch/arm/boot/dts/r8a7791-porter.dts
-@@ -8,6 +8,17 @@
-  * kind, whether express or implied.
-  */
+---
+v4
+* Use GIC_SPI in interrupts properties
+---
+ arch/arm/boot/dts/r8a7793.dtsi | 91 ++++++++++++++++++++++++++++++++++++------
+ 1 file changed, 79 insertions(+), 12 deletions(-)
+
+diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
+index ddbda9d2c177..6817f14314e2 100644
+--- a/arch/arm/boot/dts/r8a7793.dtsi
++++ b/arch/arm/boot/dts/r8a7793.dtsi
+@@ -1201,52 +1201,119 @@
+ 		status = "disabled";
  
-+/*
-+ * SSI-AK4642
-+ *
-+ * SW3: 1: AK4642
-+ *      3: ADV7511
-+ *
-+ * This command is required before playback/capture:
-+ *
-+ *	amixer set "LINEOUT Mixer DACL" on
-+ */
+ 		rcar_sound,dvc {
+-			dvc0: dvc at 0 { };
+-			dvc1: dvc at 1 { };
++			dvc0: dvc at 0 {
++				dmas = <&audma0 0xbc>;
++				dma-names = "tx";
++			};
++			dvc1: dvc at 1 {
++				dmas = <&audma0 0xbe>;
++				dma-names = "tx";
++			};
+ 		};
 +
- /dts-v1/;
- #include "r8a7791.dtsi"
- #include <dt-bindings/gpio/gpio.h>
-@@ -101,6 +112,30 @@
- 		#clock-cells = <0>;
- 		clock-frequency = <74250000>;
- 	};
-+
-+	x14_clk: x14-clock {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <11289600>;
-+		clock-output-names = "audio_clock";
-+	};
-+
-+	sound {
-+		compatible = "simple-audio-card";
-+
-+		simple-audio-card,format = "left_j";
-+		simple-audio-card,bitclock-master = <&soundcodec>;
-+		simple-audio-card,frame-master = <&soundcodec>;
-+
-+		simple-audio-card,cpu {
-+			sound-dai = <&rcar_sound>;
-+		};
-+
-+		soundcodec: simple-audio-card,codec {
-+			sound-dai = <&ak4642>;
-+			clocks = <&x14_clk>;
-+		};
-+	};
- };
+ 		rcar_sound,src {
+-			src0: src at 0 { };
+-			src1: src at 1 { };
+-			src2: src at 2 { };
+-			src3: src at 3 { };
+-			src4: src at 4 { };
+-			src5: src at 5 { };
+-			src6: src at 6 { };
+-			src7: src at 7 { };
+-			src8: src at 8 { };
+-			src9: src at 9 { };
++			src0: src at 0 {
++				interrupts = <GIC_SPI 352 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x85>, <&audma1 0x9a>;
++				dma-names = "rx", "tx";
++			};
++			src1: src at 1 {
++				interrupts = <GIC_SPI 353 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x87>, <&audma1 0x9c>;
++				dma-names = "rx", "tx";
++			};
++			src2: src at 2 {
++				interrupts = <GIC_SPI 354 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x89>, <&audma1 0x9e>;
++				dma-names = "rx", "tx";
++			};
++			src3: src at 3 {
++				interrupts = <GIC_SPI 355 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x8b>, <&audma1 0xa0>;
++				dma-names = "rx", "tx";
++			};
++			src4: src at 4 {
++				interrupts = <GIC_SPI 356 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x8d>, <&audma1 0xb0>;
++				dma-names = "rx", "tx";
++			};
++			src5: src at 5 {
++				interrupts = <GIC_SPI 357 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x8f>, <&audma1 0xb2>;
++				dma-names = "rx", "tx";
++			};
++			src6: src at 6 {
++				interrupts = <GIC_SPI 358 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x91>, <&audma1 0xb4>;
++				dma-names = "rx", "tx";
++			};
++			src7: src at 7 {
++				interrupts = <GIC_SPI 359 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x93>, <&audma1 0xb6>;
++				dma-names = "rx", "tx";
++			};
++			src8: src at 8 {
++				interrupts = <GIC_SPI 360 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x95>, <&audma1 0xb8>;
++				dma-names = "rx", "tx";
++			};
++			src9: src at 9 {
++				interrupts = <GIC_SPI 361 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x97>, <&audma1 0xba>;
++				dma-names = "rx", "tx";
++			};
+ 		};
  
- &extal_clk {
-@@ -167,6 +202,16 @@
- 		renesas,groups = "du_rgb888", "du_sync", "du_disp", "du_clk_out_0";
- 		renesas,function = "du";
- 	};
-+
-+	ssi_pins: sound {
-+		renesas,groups = "ssi0129_ctrl", "ssi0_data", "ssi1_data";
-+		renesas,function = "ssi";
-+	};
-+
-+	audio_clk_pins: audio_clk {
-+		renesas,groups = "audio_clk_a";
-+		renesas,function = "audio_clk";
-+	};
- };
- 
- &scif0 {
-@@ -257,6 +302,12 @@
- 	status = "okay";
- 	clock-frequency = <400000>;
- 
-+	ak4642: codec at 12 {
-+		compatible = "asahi-kasei,ak4642";
-+		#sound-dai-cells = <0>;
-+		reg = <0x12>;
-+	};
-+
- 	composite-in at 20 {
- 		compatible = "adi,adv7180";
- 		reg = <0x20>;
-@@ -385,3 +436,23 @@
+ 		rcar_sound,ssi {
+ 			ssi0: ssi at 0 {
+ 				interrupts = <GIC_SPI 370 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x01>, <&audma1 0x02>, <&audma0 0x15>, <&audma1 0x16>;
++				dma-names = "rx", "tx", "rxu", "txu";
+ 			};
+ 			ssi1: ssi at 1 {
+ 				 interrupts = <GIC_SPI 371 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x03>, <&audma1 0x04>, <&audma0 0x49>, <&audma1 0x4a>;
++				dma-names = "rx", "tx", "rxu", "txu";
+ 			};
+ 			ssi2: ssi at 2 {
+ 				interrupts = <GIC_SPI 372 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x05>, <&audma1 0x06>, <&audma0 0x63>, <&audma1 0x64>;
++				dma-names = "rx", "tx", "rxu", "txu";
+ 			};
+ 			ssi3: ssi at 3 {
+ 				interrupts = <GIC_SPI 373 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x07>, <&audma1 0x08>, <&audma0 0x6f>, <&audma1 0x70>;
++				dma-names = "rx", "tx", "rxu", "txu";
+ 			};
+ 			ssi4: ssi at 4 {
+ 				interrupts = <GIC_SPI 374 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x09>, <&audma1 0x0a>, <&audma0 0x71>, <&audma1 0x72>;
++				dma-names = "rx", "tx", "rxu", "txu";
+ 			};
+ 			ssi5: ssi at 5 {
+ 				interrupts = <GIC_SPI 375 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x0b>, <&audma1 0x0c>, <&audma0 0x73>, <&audma1 0x74>;
++				dma-names = "rx", "tx", "rxu", "txu";
+ 			};
+ 			ssi6: ssi at 6 {
+ 				interrupts = <GIC_SPI 376 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x0d>, <&audma1 0x0e>, <&audma0 0x75>, <&audma1 0x76>;
++				dma-names = "rx", "tx", "rxu", "txu";
+ 			};
+ 			ssi7: ssi at 7 {
+ 				interrupts = <GIC_SPI 377 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x0f>, <&audma1 0x10>, <&audma0 0x79>, <&audma1 0x7a>;
++				dma-names = "rx", "tx", "rxu", "txu";
+ 			};
+ 			ssi8: ssi at 8 {
+ 				interrupts = <GIC_SPI 378 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x11>, <&audma1 0x12>, <&audma0 0x7b>, <&audma1 0x7c>;
++				dma-names = "rx", "tx", "rxu", "txu";
+ 			};
+ 			ssi9: ssi at 9 {
+ 				interrupts = <GIC_SPI 379 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x13>, <&audma1 0x14>, <&audma0 0x7d>, <&audma1 0x7e>;
++				dma-names = "rx", "tx", "rxu", "txu";
+ 			};
  		};
  	};
- };
-+
-+&rcar_sound {
-+	pinctrl-0 = <&ssi_pins &audio_clk_pins>;
-+	pinctrl-names = "default";
-+	status = "okay";
-+
-+	/* Single DAI */
-+	#sound-dai-cells = <0>;
-+
-+	rcar_sound,dai {
-+		dai0 {
-+			playback = <&ssi0>;
-+			capture  = <&ssi1>;
-+		};
-+	};
-+};
-+
-+&ssi1 {
-+	shared-pin;
-+};
 -- 
 2.7.0.rc3.207.g0ac5344
