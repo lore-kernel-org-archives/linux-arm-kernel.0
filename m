@@ -1,32 +1,44 @@
-From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Fri, 12 Feb 2016 20:43:36 +0300
-Subject: [PATCH v2 5/9] ACPI: enable ACPI_SPCR_TABLE on ARM64
-In-Reply-To: <1455299022-11641-1-git-send-email-aleksey.makarov@linaro.org>
-References: <1455299022-11641-1-git-send-email-aleksey.makarov@linaro.org>
-Message-ID: <1455299022-11641-6-git-send-email-aleksey.makarov@linaro.org>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 12 Feb 2016 17:47:47 +0000
+Subject: [PATCH v5sub1 7/8] arm64: move kernel image to base of vmalloc
+ area
+In-Reply-To: <1454324093-15998-8-git-send-email-ard.biesheuvel@linaro.org>
+References: <1454324093-15998-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1454324093-15998-8-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <56BE1AC3.409@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SBBR mentions SPCR as a mandatory ACPI table.
-So enable it for ARM64
+Hi Ard,
 
-Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
-Tested-by: Christopher Covington <cov@codeaurora.org>
----
- arch/arm64/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+On 01/02/16 10:54, Ard Biesheuvel wrote:
+> This moves the module area to right before the vmalloc area, and
+> moves the kernel image to the base of the vmalloc area. This is
+> an intermediate step towards implementing KASLR, which allows the
+> kernel image to be located anywhere in the vmalloc area.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 6bb21d8..75739cd 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -3,6 +3,7 @@ config ARM64
- 	select ACPI_CCA_REQUIRED if ACPI
- 	select ACPI_GENERIC_GSI if ACPI
- 	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
-+	select ACPI_SPCR_TABLE if ACPI
- 	select ARCH_HAS_DEVMEM_IS_ALLOWED
- 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
- 	select ARCH_HAS_ELF_RANDOMIZE
--- 
-2.7.0
+I've rebased hibernate onto for-next/core, and this patch leads to the hibernate
+core code falling down a kernel shaped hole in the linear map.
+
+The hibernate code assumes that for zones returned by for_each_populated_zone(),
+if pfn_valid() says a page is present, then it is okay to access the page via
+page_address(pfn_to_page(pfn)). But for pfns that correspond to the kernel text,
+this is still returning an address in the linear map, which isn't mapped...
+
+I'm not sure what the correct fix is here.
+Should this sort of walk be valid?
+
+
+>From include/linux/mm.h:
+> static __always_inline void *lowmem_page_address(const struct page *page)
+> {
+>	return __va(PFN_PHYS(page_to_pfn(page)));
+> }
+
+
+Suggestions welcome!
+
+
+Thanks,
+
+James
