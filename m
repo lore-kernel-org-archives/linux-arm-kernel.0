@@ -1,93 +1,63 @@
-From: alexdeucher@gmail.com (Alex Deucher)
-Date: Fri, 12 Feb 2016 11:31:04 -0500
-Subject: [PATCH 04/17] drm/amdgpu: removed optional dummy encoder
- mode_fixup function.
-In-Reply-To: <1455285069-2819-5-git-send-email-palminha@synopsys.com>
-References: <daniel.vetter@ffwll.ch,>
- <1455285069-2819-1-git-send-email-palminha@synopsys.com>
- <1455285069-2819-5-git-send-email-palminha@synopsys.com>
-Message-ID: <CADnq5_N1smWVyhC68fwS4DO_E9NJ=ztSZMaSoZ3YKvSCtaM8Zg@mail.gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Sat, 13 Feb 2016 01:30:46 +0900
+Subject: [PATCH v2] serial: earlycon: rework common framework for earlycon
+ declarations
+In-Reply-To: <56BDF799.1030505@hurleysoftware.com>
+References: <1455273394-27350-1-git-send-email-yamada.masahiro@socionext.com>
+ <56BDF799.1030505@hurleysoftware.com>
+Message-ID: <CAK7LNAS_vietwRRFnH3YhbWSzjRFP4U6rjftYek1KQ3ips2ZSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 12, 2016 at 8:50 AM, Carlos Palminha
-<CARLOS.PALMINHA@synopsys.com> wrote:
-> ---
->  drivers/gpu/drm/amd/amdgpu/dce_v10_0.c | 8 --------
->  drivers/gpu/drm/amd/amdgpu/dce_v11_0.c | 8 --------
->  drivers/gpu/drm/amd/amdgpu/dce_v8_0.c  | 8 --------
->  3 files changed, 24 deletions(-)
+Hi Peter,
 
-Reviewed-by: Alex Deucher <alexander.deucher@amd.com>
+
+2016-02-13 0:17 GMT+09:00 Peter Hurley <peter@hurleysoftware.com>:
+> On 02/12/2016 02:36 AM, Masahiro Yamada wrote:
+>> Commit 71f50c6d9a22 ("of: drop symbols declared by _OF_DECLARE() from
+>> modules") fixed the link error introduced by commit b8d20e06eaad
+>> ("serial: 8250_uniphier: add earlycon support").
+>>
+>> After commit 2eaa790989e0 ("earlycon: Use common framework for
+>> earlycon declarations") was applied, the link error came back
+>> because the commit reworked OF_EARLYCON_DECLARE() to not use
+>> _OF_DECLARE().
+>
+> What link error are you getting?
+
+The combination of CONFIG_SERIAL_8250_CONSOLE=y
+and CONFIG_SERIAL_8250_UNIPHIER=m causes a link error.
+
+
 
 >
-> diff --git a/drivers/gpu/drm/amd/amdgpu/dce_v10_0.c b/drivers/gpu/drm/amd/amdgpu/dce_v10_0.c
-> index 093599a..3483018 100644
-> --- a/drivers/gpu/drm/amd/amdgpu/dce_v10_0.c
-> +++ b/drivers/gpu/drm/amd/amdgpu/dce_v10_0.c
-> @@ -3624,16 +3624,8 @@ dce_v10_0_ext_dpms(struct drm_encoder *encoder, int mode)
+>> This commit reworks OF_EARLYCON_DECLARE() again based on
+>> _OF_DECLARE().  My motivations are:
+>>
+>>  - Fix the link error in a generic way (without patching
+>>    drivers/tty/serial/8250/8250_uniphier.c)
+>>
+>>  - Delete struct earlycon_id.  This struct is re-inventing the wheel;
+>>    the fields "name", "compatible", "setup" can be implemented in
+>>    struct of_device_id as other frameworks do.
 >
->  }
->
-> -static bool dce_v10_0_ext_mode_fixup(struct drm_encoder *encoder,
-> -                                   const struct drm_display_mode *mode,
-> -                                   struct drm_display_mode *adjusted_mode)
-> -{
-> -       return true;
-> -}
-> -
->  static const struct drm_encoder_helper_funcs dce_v10_0_ext_helper_funcs = {
->         .dpms = dce_v10_0_ext_dpms,
-> -       .mode_fixup = dce_v10_0_ext_mode_fixup,
->         .prepare = dce_v10_0_ext_prepare,
->         .mode_set = dce_v10_0_ext_mode_set,
->         .commit = dce_v10_0_ext_commit,
-> diff --git a/drivers/gpu/drm/amd/amdgpu/dce_v11_0.c b/drivers/gpu/drm/amd/amdgpu/dce_v11_0.c
-> index 8e67249..36deea1 100644
-> --- a/drivers/gpu/drm/amd/amdgpu/dce_v11_0.c
-> +++ b/drivers/gpu/drm/amd/amdgpu/dce_v11_0.c
-> @@ -3619,16 +3619,8 @@ dce_v11_0_ext_dpms(struct drm_encoder *encoder, int mode)
->
->  }
->
-> -static bool dce_v11_0_ext_mode_fixup(struct drm_encoder *encoder,
-> -                                   const struct drm_display_mode *mode,
-> -                                   struct drm_display_mode *adjusted_mode)
-> -{
-> -       return true;
-> -}
-> -
->  static const struct drm_encoder_helper_funcs dce_v11_0_ext_helper_funcs = {
->         .dpms = dce_v11_0_ext_dpms,
-> -       .mode_fixup = dce_v11_0_ext_mode_fixup,
->         .prepare = dce_v11_0_ext_prepare,
->         .mode_set = dce_v11_0_ext_mode_set,
->         .commit = dce_v11_0_ext_commit,
-> diff --git a/drivers/gpu/drm/amd/amdgpu/dce_v8_0.c b/drivers/gpu/drm/amd/amdgpu/dce_v8_0.c
-> index d0e128c..25dd8b6 100644
-> --- a/drivers/gpu/drm/amd/amdgpu/dce_v8_0.c
-> +++ b/drivers/gpu/drm/amd/amdgpu/dce_v8_0.c
-> @@ -3554,16 +3554,8 @@ dce_v8_0_ext_dpms(struct drm_encoder *encoder, int mode)
->
->  }
->
-> -static bool dce_v8_0_ext_mode_fixup(struct drm_encoder *encoder,
-> -                                   const struct drm_display_mode *mode,
-> -                                   struct drm_display_mode *adjusted_mode)
-> -{
-> -       return true;
-> -}
-> -
->  static const struct drm_encoder_helper_funcs dce_v8_0_ext_helper_funcs = {
->         .dpms = dce_v8_0_ext_dpms,
-> -       .mode_fixup = dce_v8_0_ext_mode_fixup,
->         .prepare = dce_v8_0_ext_prepare,
->         .mode_set = dce_v8_0_ext_mode_set,
->         .commit = dce_v8_0_ext_commit,
-> --
-> 2.5.0
->
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+> This patch basically reverts the common framework.
+> What happens when not building with OF? Does it still declare the
+> earlycon table?
+
+Ah, I missed this.  (sigh)
+
+Earlycon must still work without OF.
+My way only works with OF.
+
+I really screwed up.  Sorry.
+
+Just disregard this patch.
+
+
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
