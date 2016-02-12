@@ -1,112 +1,49 @@
 From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Fri, 12 Feb 2016 20:43:32 +0300
-Subject: [PATCH v2 1/9] printk: fix name and type of some variables
+Date: Fri, 12 Feb 2016 20:43:33 +0300
+Subject: [PATCH v2 2/9] ACPI: Change __init to __ref for
+ early_acpi_os_unmap_memory()
 In-Reply-To: <1455299022-11641-1-git-send-email-aleksey.makarov@linaro.org>
 References: <1455299022-11641-1-git-send-email-aleksey.makarov@linaro.org>
-Message-ID: <1455299022-11641-2-git-send-email-aleksey.makarov@linaro.org>
+Message-ID: <1455299022-11641-3-git-send-email-aleksey.makarov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The variable preferred_console is used only inside register_console()
-and its semantics is boolean.  It is negative when no console has been
-made preferred.
+early_acpi_os_unmap_memory() is marked as __init because it calls
+__acpi_unmap_table(), but only when acpi_gbl_permanent_mmap is not set.
 
-The variable selected_console holds an index into the console_cmdline
-array, pointing to the console that was made preferred.
+acpi_gbl_permanent_mmap is set in __init acpi_early_init()
+so it is safe to call early_acpi_os_unmap_memory() from anywhere
 
-Rename the variables:
-selected_console -> preferred_console
-preferred_console -> has_preferred
-and make the new has_preferred local static bool.
-
-This is a preparatory patch.  To introduce selection with
-ACPI SPCR table we should decide which value (old) preferred_console
-should hold in the case when the console was set by ACPI.
-
-Renaming was suggested by Peter Hurley
+We need this function to be non-__init because we need access to
+some tables at unpredictable time--it may be before or after
+acpi_gbl_permanent_mmap is set.  For example, SPCR (Serial Port Console
+Redirection) table is needed each time a new console is registered.
+It can be quite early (console_initcall) or when a module is inserted.
+When this table accessed before acpi_gbl_permanent_mmap is set,
+the pointer should be unmapped.  This is exactly what this function
+does.
 
 Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
-Tested-by: Christopher Covington <cov@codeaurora.org>
 ---
- kernel/printk/printk.c | 18 +++++++++---------
- 1 file changed, 9 insertions(+), 9 deletions(-)
+ drivers/acpi/osl.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/kernel/printk/printk.c b/kernel/printk/printk.c
-index c963ba5..0cc9542 100644
---- a/kernel/printk/printk.c
-+++ b/kernel/printk/printk.c
-@@ -143,7 +143,6 @@ static struct console *exclusive_console;
+diff --git a/drivers/acpi/osl.c b/drivers/acpi/osl.c
+index 67da6fb..8a552cd 100644
+--- a/drivers/acpi/osl.c
++++ b/drivers/acpi/osl.c
+@@ -497,7 +497,11 @@ void __ref acpi_os_unmap_memory(void *virt, acpi_size size)
+ }
+ EXPORT_SYMBOL_GPL(acpi_os_unmap_memory);
  
- static struct console_cmdline console_cmdline[MAX_CMDLINECONSOLES];
- 
--static int selected_console = -1;
- static int preferred_console = -1;
- int console_set_on_cmdline;
- EXPORT_SYMBOL(console_set_on_cmdline);
-@@ -1997,14 +1996,14 @@ static int __add_preferred_console(char *name, int idx, char *options,
- 	     i++, c++) {
- 		if (strcmp(c->name, name) == 0 && c->index == idx) {
- 			if (!brl_options)
--				selected_console = i;
-+				preferred_console = i;
- 			return 0;
- 		}
- 	}
- 	if (i == MAX_CMDLINECONSOLES)
- 		return -E2BIG;
- 	if (!brl_options)
--		selected_console = i;
-+		preferred_console = i;
- 	strlcpy(c->name, name, sizeof(c->name));
- 	c->options = options;
- 	braille_set_options(c, brl_options);
-@@ -2490,6 +2489,7 @@ void register_console(struct console *newcon)
- 	unsigned long flags;
- 	struct console *bcon = NULL;
- 	struct console_cmdline *c;
-+	static bool has_preferred;
- 
- 	if (console_drivers)
- 		for_each_console(bcon)
-@@ -2516,15 +2516,15 @@ void register_console(struct console *newcon)
- 	if (console_drivers && console_drivers->flags & CON_BOOT)
- 		bcon = console_drivers;
- 
--	if (preferred_console < 0 || bcon || !console_drivers)
--		preferred_console = selected_console;
-+	if (!has_preferred || bcon || !console_drivers)
-+		has_preferred = preferred_console >= 0;
- 
- 	/*
- 	 *	See if we want to use this console driver. If we
- 	 *	didn't select a console we take the first one
- 	 *	that registers here.
- 	 */
--	if (preferred_console < 0) {
-+	if (!has_preferred) {
- 		if (newcon->index < 0)
- 			newcon->index = 0;
- 		if (newcon->setup == NULL ||
-@@ -2532,7 +2532,7 @@ void register_console(struct console *newcon)
- 			newcon->flags |= CON_ENABLED;
- 			if (newcon->device) {
- 				newcon->flags |= CON_CONSDEV;
--				preferred_console = 0;
-+				has_preferred = true;
- 			}
- 		}
- 	}
-@@ -2565,9 +2565,9 @@ void register_console(struct console *newcon)
- 		}
- 
- 		newcon->flags |= CON_ENABLED;
--		if (i == selected_console) {
-+		if (i == preferred_console) {
- 			newcon->flags |= CON_CONSDEV;
--			preferred_console = selected_console;
-+			has_preferred = true;
- 		}
- 		break;
- 	}
+-void __init early_acpi_os_unmap_memory(void __iomem *virt, acpi_size size)
++/*
++ * acpi_gbl_permanent_mmap is set in __init acpi_early_init()
++ * so it is safe to call early_acpi_os_unmap_memory() from anywhere
++ */
++void __ref early_acpi_os_unmap_memory(void __iomem *virt, acpi_size size)
+ {
+ 	if (!acpi_gbl_permanent_mmap)
+ 		__acpi_unmap_table(virt, size);
 -- 
 2.7.0
