@@ -1,64 +1,25 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 12 Feb 2016 14:50:18 -0800
-Subject: [GIT PULL] omap fixes against v4.5-rc3
-Message-ID: <20160212225018.GA3500@atomide.com>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Sat, 13 Feb 2016 00:07:00 +0100
+Subject: [PATCH v2 3/9] ACPI: introduce acpi_table_parse2()
+In-Reply-To: <1455299022-11641-4-git-send-email-aleksey.makarov@linaro.org>
+References: <1455299022-11641-1-git-send-email-aleksey.makarov@linaro.org>
+ <1455299022-11641-4-git-send-email-aleksey.makarov@linaro.org>
+Message-ID: <CAJZ5v0i2RCEEZwCN+Ran3Qmasn4yEk1rbfWkZ5QbEkUQWvaJ+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 388f7b1d6e8ca06762e2454d28d6c3c55ad0fe95:
+On Fri, Feb 12, 2016 at 6:43 PM, Aleksey Makarov
+<aleksey.makarov@linaro.org> wrote:
+> The function acpi_table_parse() has some problems:
+> 1 It can be called only from __init code
+> 2 It does not pass any data to the handler
+> 3 It just throws out the value returned from the handler
 
-  Linux 4.5-rc3 (2016-02-07 15:38:30 -0800)
+So why are those problems?
 
-are available in the git repository at:
+> These issues are addressed in this patch
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.5/fixes-rc3-v2
+How are they addressed?
 
-for you to fetch changes up to cf26f1137333251f3515dea31f95775b99df0fd5:
-
-  ARM: OMAP2+: Fix omap_device for module reload on PM runtime forbid (2016-02-12 08:56:52 -0800)
-
-----------------------------------------------------------------
-Few fixes for omaps against v4.5-rc3:
-
-- Improve omap_device error message to tell driver writers what is
-  wrong after commit 5de85b9d57ab ("PM / runtime: Re-init runtime PM
-  states at probe error and driver unbind"). There will be also a
-  handful of driver related fixes also queued separately. But adding
-  this error message makes it easy to fix any omap_device using
-  drivers suffering from this issue so I think it's important to
-  have.
-
-- Also related to commit 5de85b9d57ab discussion, let's fix a bug
-  where disabling PM runtime via sysfs will also cause the hardware
-  state to be different from PM runtime state.
-
-- Fix audio clocks for beagle-x15.
-
-- Use wakeup-source instead of gpio-key,wakeup for the new entries
-  that sneaked in during the merge window.
-
-- Fix a legacy booting vs device tree based booting regression for
-  n900 where the legacy user space expects to have the device
-  revision available in /proc/atags also when booted with device
-  tree.
-
-----------------------------------------------------------------
-Ivaylo Dimitrov (1):
-      ARM: OMAP2+: Set system_rev from ATAGS for n900
-
-Peter Ujfalusi (1):
-      ARM: DTS: am57xx-beagle-x15: Select SYS_CLK2 for audio clocks
-
-Sudeep Holla (1):
-      ARM: dts: am335x/am57xx: replace gpio-key,wakeup with wakeup-source property
-
-Tony Lindgren (2):
-      ARM: OMAP2+: Improve omap_device error for driver writers
-      ARM: OMAP2+: Fix omap_device for module reload on PM runtime forbid
-
- arch/arm/boot/dts/am335x-shc.dts          |  4 ++--
- arch/arm/boot/dts/am57xx-beagle-x15.dts   |  4 ++++
- arch/arm/boot/dts/am57xx-cl-som-am57x.dts |  2 +-
- arch/arm/mach-omap2/board-generic.c       | 22 +++++++++++++++++++++-
- arch/arm/mach-omap2/omap_device.c         | 14 +++++++++++++-
- 5 files changed, 41 insertions(+), 5 deletions(-)
+Thanks,
+Rafael
