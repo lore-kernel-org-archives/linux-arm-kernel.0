@@ -1,31 +1,76 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 12 Feb 2016 13:09:50 +0100
-Subject: [PATCH v2 3/3] arm64: prevent __va() translations before
- memstart_addr is assigned
-In-Reply-To: <CAKv+Gu_2xLeN+ySAhEBKh+NByjka_12HunprueV+ykE0njrgsw@mail.gmail.com>
-References: <1455209282-9596-1-git-send-email-ard.biesheuvel@linaro.org>
- <20160212114908.GK25087@arm.com>
- <CAKv+Gu_2xLeN+ySAhEBKh+NByjka_12HunprueV+ykE0njrgsw@mail.gmail.com>
-Message-ID: <2388983.RePUKvokN0@wuerfel>
+From: sebott@linux.vnet.ibm.com (Sebastian Ott)
+Date: Fri, 12 Feb 2016 13:21:46 +0100 (CET)
+Subject: [BUG] random kernel crashes after THP rework on s390 (maybe also
+ on PowerPC and ARM)
+In-Reply-To: <20160211191253.GA8589@black.fi.intel.com>
+References: <20160211192223.4b517057@thinkpad>
+ <20160211190942.GA10244@node.shutemov.name>
+ <20160211191253.GA8589@black.fi.intel.com>
+Message-ID: <alpine.LFD.2.20.1602121318080.1773@schleppi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 12 February 2016 12:51:40 Ard Biesheuvel wrote:
-> >> @@ -133,6 +135,12 @@ extern u64                       kimage_vaddr;
-> >>  /* the offset between the kernel virtual and physical mappings */
-> >>  extern u64                   kimage_voffset;
-> >>
-> >> +static inline void assert_memstart_addr_assigned(void)
-> >> +{
-> >> +     if (unlikely(memstart_addr == (phys_addr_t)-1))
-> >> +             asm("brk #%0" :: "I"(0x800));
-> >
-> > Ok, I'll bite! Why isn't this just a BUG_ON?
-> >
+On Thu, 11 Feb 2016, Kirill A. Shutemov wrote:
+> On Thu, Feb 11, 2016 at 09:09:42PM +0200, Kirill A. Shutemov wrote:
+> > On Thu, Feb 11, 2016 at 07:22:23PM +0100, Gerald Schaefer wrote:
+> > > Hi,
+> > > 
+> > > Sebastian Ott reported random kernel crashes beginning with v4.5-rc1 and
+> > > he also bisected this to commit 61f5d698 "mm: re-enable THP". Further
+> > > review of the THP rework patches, which cannot be bisected, revealed
+> > > commit fecffad "s390, thp: remove infrastructure for handling splitting PMDs"
+> > > (and also similar commits for other archs).
+> > > 
+> > > This commit removes the THP splitting bit and also the architecture
+> > > implementation of pmdp_splitting_flush(), which took care of the IPI for
+> > > fast_gup serialization. The commit message says
+> > > 
+> > >     pmdp_splitting_flush() is not needed too: on splitting PMD we will do
+> > >     pmdp_clear_flush() + set_pte_at().  pmdp_clear_flush() will do IPI as
+> > >     needed for fast_gup
+> > > 
+> > > The assumption that a TLB flush will also produce an IPI is wrong on s390,
+> > > and maybe also on other architectures, and I thought that this was actually
+> > > the main reason for having an arch-specific pmdp_splitting_flush().
+> > > 
+> > > At least PowerPC and ARM also had an individual implementation of
+> > > pmdp_splitting_flush() that used kick_all_cpus_sync() instead of a TLB
+> > > flush to send the IPI, and those were also removed. Putting the arch
+> > > maintainers and mailing lists on cc to verify.
+> > > 
+> > > On s390 this will break the IPI serialization against fast_gup, which
+> > > would certainly explain the random kernel crashes, please revert or fix
+> > > the pmdp_splitting_flush() removal.
+> > 
+> > Sorry for that.
+> > 
+> > I believe, the problem was already addressed for PowerPC:
+> > 
+> > http://lkml.kernel.org/g/454980831-16631-1-git-send-email-aneesh.kumar at linux.vnet.ibm.com
 > 
-> Because circular header dependencies prevent BUG_ON() from being used
-> here, and I was reluctant to move this function into a .c file.
+> Correct link is
+> 
+> http://lkml.kernel.org/g/1454980831-16631-1-git-send-email-aneesh.kumar at linux.vnet.ibm.com
+> 
 
-Maybe it works if you make assert_memstart_addr_assigned() a macro as well?
+Based on your suggestion Gerald provided the following patch but sadly it
+didn't fix the problem.
 
-	Arnd
+Sebastian
+
+
+---
+ arch/s390/include/asm/pgtable.h |    2 ++
+ 1 file changed, 2 insertions(+)
+
+--- a/arch/s390/include/asm/pgtable.h
++++ b/arch/s390/include/asm/pgtable.h
+@@ -1587,6 +1587,8 @@ static inline void pmdp_invalidate(struc
+ 				   unsigned long address, pmd_t *pmdp)
+ {
+ 	pmdp_flush_direct(vma->vm_mm, address, pmdp);
++	/* Serialize against fast_gup with IPI */
++	kick_all_cpus_sync();
+ }
+
+ #define __HAVE_ARCH_PMDP_SET_WRPROTECT
