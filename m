@@ -1,117 +1,116 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 12 Feb 2016 13:59:07 +0100
-Subject: [PATCH 1/7] mmc: omap_hsmmc: Fix PM regression with deferred
- probe for pm_runtime_reinit
-In-Reply-To: <20160211172632.GT19432@atomide.com>
-References: <1455145370-20301-1-git-send-email-tony@atomide.com>
- <1455145370-20301-2-git-send-email-tony@atomide.com>
- <CAPDyKFpAcsfLgtu93P45fTEg11MjdGwREcyeGSS7vt6GWbNu_w@mail.gmail.com>
- <20160211150240.GR19432@atomide.com>
- <CAPDyKFo4Jyjwyvr3P5VHfDhQ87K9mnR01N-NtKz-yx2ycnfOLg@mail.gmail.com>
- <20160211172632.GT19432@atomide.com>
-Message-ID: <CAPDyKFpwGcCW_Vwz07cgh8LxGmxu9=GVch0MVJEpNJ19zoLZ7g@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 12 Feb 2016 13:22:41 +0000
+Subject: [PATCH V3 10/10] acpi, gicv3, its: Use MADT ITS subtable to do
+ PCI/MSI domain initialization.
+In-Reply-To: <56BDCF8F.1080208@semihalf.com>
+References: <1453209083-3358-1-git-send-email-tn@semihalf.com>
+ <1453209083-3358-11-git-send-email-tn@semihalf.com>
+ <56BB26E5.6060703@arm.com> <56BDCF8F.1080208@semihalf.com>
+Message-ID: <56BDDCA1.2090909@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 February 2016 at 18:26, Tony Lindgren <tony@atomide.com> wrote:
-> * Ulf Hansson <ulf.hansson@linaro.org> [160211 07:14]:
->> On 11 February 2016 at 16:02, Tony Lindgren <tony@atomide.com> wrote:
->> > * Ulf Hansson <ulf.hansson@linaro.org> [160211 02:19]:
->> >> On 11 February 2016 at 00:02, Tony Lindgren <tony@atomide.com> wrote:
->> >> >
->> >> > Ulf, I'd like to merge this along with other related fixes via the
->> >> > ARM SoC tree if no objections, please review and ack if this look OK
->> >> > to you.
->> >>
->> >> I have some other omap_hsmmc patches queued for 4.6, so I prefer to
->> >> send this via my mmc tree.
->> >>
->> >> I guess that's okay as well!?
->> >
->> > Naturally yes, please go ahead thanks!
+On 12/02/16 12:26, Tomasz Nowicki wrote:
+> + Charles
+> 
+> On 10.02.2016 13:02, Marc Zyngier wrote:
+>> On 19/01/16 13:11, Tomasz Nowicki wrote:
+>>> After refactoring DT code, we let ACPI to build ITS PCI MSI domain
+>>> and do requester ID to device ID translation using IORT table.
+>>>
+>>> We have now full PCI MSI domain stack, thus we can enable ITS initialization
+>>> from GICv3 core driver for ACPI scenario.
+>>>
+>>> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+>>> ---
+>>>   drivers/irqchip/irq-gic-v3-its-pci-msi.c | 44 +++++++++++++++++++++++++++++++-
+>>>   drivers/irqchip/irq-gic-v3.c             |  3 +--
+>>>   drivers/pci/msi.c                        |  3 +++
+>>>   3 files changed, 47 insertions(+), 3 deletions(-)
+>>>
+>>> diff --git a/drivers/irqchip/irq-gic-v3-its-pci-msi.c b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
+>>> index 06165cb..7f0a958 100644
+>>> --- a/drivers/irqchip/irq-gic-v3-its-pci-msi.c
+>>> +++ b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
+>>> @@ -15,6 +15,8 @@
+>>>    * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>>>    */
+>>>
+>>> +#include <linux/acpi.h>
+>>> +#include <linux/iort.h>
+>>>   #include <linux/msi.h>
+>>>   #include <linux/of.h>
+>>>   #include <linux/of_irq.h>
+>>> @@ -143,10 +145,50 @@ static int __init its_pci_of_msi_init(void)
+>>>   	return 0;
+>>>   }
+>>>
+>>> +#ifdef CONFIG_ACPI
+>>> +
+>>> +static int __init
+>>> +its_pci_msi_parse_madt(struct acpi_subtable_header *header,
+>>> +		    const unsigned long end)
+>>> +{
+>>> +	struct acpi_madt_generic_translator *its_entry;
+>>> +	struct fwnode_handle *domain_handle;
+>>> +
+>>> +	its_entry = (struct acpi_madt_generic_translator *)header;
+>>> +	domain_handle = iort_find_its_domain_token(its_entry->translation_id);
+>>> +	if (!domain_handle) {
+>>> +		pr_err("ITS at 0x%lx: Unable to locate ITS domain handle\n",
+>>> +		       (long)its_entry->base_address);
+>>> +		return 0;
+>>> +	}
+>>> +
+>>> +	if (its_pci_msi_init_one(domain_handle))
+>>> +		return 0;
+>>> +
+>>> +	pci_msi_register_fwnode_provider(&iort_find_pci_domain_token);
 >>
->> Okay!
+>> I'm a bit worried by this. You are registering this for each and every
+>> ITS that gets probed (useless, but why not). But also, you're using a
+>> hook that is designed to work at the bus level, without caring for the
+>> actual PCI devices. That's fine for something like GICv2m, which exposes
+>> a single domain, but I can't picture how this works when you have
+>> devices sitting behind a single RC that talk to different ITSs.
 >>
->> BTW, did you notice my other comments to the patch?
+>> My understanding is that IORT was behaving in a similar way the msi-map
+>> property works, so I'm a bit puzzled here.
 >>
->> I can fix them before applying, unless you want to send a v2?
->
-> Oh sorry, no I missed the rest of your comments again, I really
-> need to recalibrate my reading habits obviously if I keep
-> missing comments on regular basis..
->
-> You comments make sense to me. Below is the patch with only
-> minimal changes. Seems to work just fine and hit off mode for
-> suspend too.
->
-> Regards,
->
-> Tony
->
-> 8< -------------------
-> From eb3c93421f01fb6198f76127262a92b527dd214c Mon Sep 17 00:00:00 2001
-> From: Tony Lindgren <tony@atomide.com>
-> Date: Tue, 9 Feb 2016 09:31:10 -0800
-> Subject: [PATCH] mmc: omap_hsmmc: Fix PM regression with deferred probe for
->  pm_runtime_reinit
->
-> Commit 5de85b9d57ab ("PM / runtime: Re-init runtime PM states at probe
-> error and driver unbind") introduced pm_runtime_reinit() that is used
-> to reinitialize PM runtime after -EPROBE_DEFER. This allows shutting
-> down the device after a failed probe.
->
-> However, for drivers using pm_runtime_use_autosuspend() this can cause
-> a state where suspend callback is never called after -EPROBE_DEFER.
-> On the following device driver probe, hardware state is different from
-> the PM runtime state causing omap_device to produce the following
-> error:
->
-> omap_device_enable() called from invalid state 1
->
-> And with omap_device and omap hardware being picky for PM, this will
-> block any deeper idle states in hardware.
->
-> The solution is to fix the drivers to follow the PM runtime documentation:
->
-> 1. For sections of code that needs the device disabled, use
->    pm_runtime_put_sync_suspend() if pm_runtime_set_autosuspend() has
->    been set.
->
-> 2. For driver exit code, use pm_runtime_dont_use_autosuspend() before
->    pm_runtime_put_sync() if pm_runtime_use_autosuspend() has been
->    set.
->
-> Fixes: 5de85b9d57ab ("PM / runtime: Re-init runtime PM states at probe
-> error and driver unbind")
-> Cc: linux-mmc at vger.kernel.org
-> Cc: Alan Stern <stern@rowland.harvard.edu>
-> Cc: Kevin Hilman <khilman@baylibre.com>
-> Cc: Nishanth Menon <nm@ti.com>
-> Cc: Rafael J. Wysocki <rafael@kernel.org>
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> Cc: Tero Kristo <t-kristo@ti.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
->
-> --- a/drivers/mmc/host/omap_hsmmc.c
-> +++ b/drivers/mmc/host/omap_hsmmc.c
-> @@ -2232,6 +2232,7 @@ err_irq:
->                 dma_release_channel(host->tx_chan);
->         if (host->rx_chan)
->                 dma_release_channel(host->rx_chan);
-> +       pm_runtime_dont_use_autosuspend(host->dev);
->         pm_runtime_put_sync(host->dev);
->         pm_runtime_disable(host->dev);
->         if (host->dbclk)
-> @@ -2253,6 +2254,7 @@ static int omap_hsmmc_remove(struct platform_device *pdev)
->         dma_release_channel(host->tx_chan);
->         dma_release_channel(host->rx_chan);
->
-> +       pm_runtime_dont_use_autosuspend(host->dev);
->         pm_runtime_put_sync(host->dev);
->         pm_runtime_disable(host->dev);
->         device_init_wakeup(&pdev->dev, false);
+>> Can you please shed some light on that?
+>>
+> 
+> I see your point now. It is possible to describe such case in IORT, for 
+> example:
+> 
+> ********************************************
+> RC0 node:
+> ---------------
+> Mapping 0:
+> <input ID range> -> <output ID range>
+> <0:100> -> <0:100>
+> parent -> ITS0
+> ---------------
+> Mapping 1:
+> <input ID range> -> <output ID range>
+> <101:200> -> <101:200>
+> parent -> ITS1
+> ---------------
+> ********************************************
+> 
+> So for this scenario I cannot use pci_host_bridge_acpi_msi_domain() to 
+> find IRQ domain based on bus device (unless there is only one ITS bound 
+> to e.g. RC), I should rather add ACPI implementation to 
+> pci_msi_get_device_domain on per-device MSI basis. Do you agree?
 
-Thanks, applied for fixes!
+That's what I was angling for, having had that in mind when writing that
+particular piece of code (see 54fa97eeb for the rational).
 
-Kind regards
-Uffe
+You should also split the plugging of IORT into the MSI layer from the
+ITS driver (last hunk of this patch).
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
