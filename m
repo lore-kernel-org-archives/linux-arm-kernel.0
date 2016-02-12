@@ -1,169 +1,120 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Fri, 12 Feb 2016 08:13:07 +0000
-Subject: [RFC v3 05/15] iommu/arm-smmu: implement
- alloc/free_reserved_iova_domain
+Date: Fri, 12 Feb 2016 08:13:08 +0000
+Subject: [RFC v3 06/15] iommu/arm-smmu: add a reserved binding RB tree
 In-Reply-To: <1455264797-2334-1-git-send-email-eric.auger@linaro.org>
 References: <1455264797-2334-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1455264797-2334-6-git-send-email-eric.auger@linaro.org>
+Message-ID: <1455264797-2334-7-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement alloc/free_reserved_iova_domain for arm-smmu. we use
-the iova allocator (iova.c). The iova_domain is attached to the
-arm_smmu_domain struct. A mutex is introduced to protect it.
+we will need to track which host physical addresses are mapped to
+reserved IOVA. In that prospect we introduce a new RB tree indexed
+by physical address. This RB tree only is used for reserved IOVA
+bindings.
+
+It is expected this RB tree will contain very few bindings. Those
+generally correspond to single page mapping one MSI frame (GICv2m
+frame or ITS GITS_TRANSLATER frame).
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
 
 ---
-v2 -> v3:
-- select IOMMU_IOVA when ARM_SMMU or ARM_SMMU_V3 is set
-
-v1 -> v2:
-- formerly implemented in vfio_iommu_type1
 ---
- drivers/iommu/Kconfig    |  2 ++
- drivers/iommu/arm-smmu.c | 87 +++++++++++++++++++++++++++++++++++++++---------
- 2 files changed, 74 insertions(+), 15 deletions(-)
+ drivers/iommu/arm-smmu.c | 65 +++++++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 64 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
-index a1e75cb..1106528 100644
---- a/drivers/iommu/Kconfig
-+++ b/drivers/iommu/Kconfig
-@@ -289,6 +289,7 @@ config ARM_SMMU
- 	bool "ARM Ltd. System MMU (SMMU) Support"
- 	depends on (ARM64 || ARM) && MMU
- 	select IOMMU_API
-+	select IOMMU_IOVA
- 	select IOMMU_IO_PGTABLE_LPAE
- 	select ARM_DMA_USE_IOMMU if ARM
- 	help
-@@ -302,6 +303,7 @@ config ARM_SMMU_V3
- 	bool "ARM Ltd. System MMU Version 3 (SMMUv3) Support"
- 	depends on ARM64 && PCI
- 	select IOMMU_API
-+	select IOMMU_IOVA
- 	select IOMMU_IO_PGTABLE_LPAE
- 	select GENERIC_MSI_IRQ_DOMAIN
- 	help
 diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index c8b7e71..f42341d 100644
+index f42341d..729a4c6 100644
 --- a/drivers/iommu/arm-smmu.c
 +++ b/drivers/iommu/arm-smmu.c
-@@ -42,6 +42,7 @@
- #include <linux/platform_device.h>
- #include <linux/slab.h>
- #include <linux/spinlock.h>
-+#include <linux/iova.h>
- 
- #include <linux/amba/bus.h>
- 
-@@ -347,6 +348,9 @@ struct arm_smmu_domain {
- 	enum arm_smmu_domain_stage	stage;
+@@ -349,10 +349,21 @@ struct arm_smmu_domain {
  	struct mutex			init_mutex; /* Protects smmu pointer */
  	struct iommu_domain		domain;
-+	struct iova_domain		*reserved_iova_domain;
-+	/* protects reserved domain manipulation */
-+	struct mutex			reserved_mutex;
+ 	struct iova_domain		*reserved_iova_domain;
+-	/* protects reserved domain manipulation */
++	/* rb tree indexed by PA, for reserved bindings only */
++	struct rb_root			reserved_binding_list;
++	/* protects reserved domain and rbtree manipulation */
+ 	struct mutex			reserved_mutex;
  };
  
++struct arm_smmu_reserved_binding {
++	struct kref		kref;
++	struct rb_node		node;
++	struct arm_smmu_domain	*domain;
++	phys_addr_t		addr;
++	dma_addr_t		iova;
++	size_t			size;
++};
++
  static struct iommu_ops arm_smmu_ops;
-@@ -975,6 +979,7 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
- 		return NULL;
  
- 	mutex_init(&smmu_domain->init_mutex);
-+	mutex_init(&smmu_domain->reserved_mutex);
- 	spin_lock_init(&smmu_domain->pgtbl_lock);
- 
- 	return &smmu_domain->domain;
-@@ -1446,22 +1451,74 @@ out_unlock:
- 	return ret;
+ static DEFINE_SPINLOCK(arm_smmu_devices_lock);
+@@ -400,6 +411,57 @@ static struct device_node *dev_get_dev_node(struct device *dev)
+ 	return dev->of_node;
  }
  
-+static int arm_smmu_alloc_reserved_iova_domain(struct iommu_domain *domain,
-+					       dma_addr_t iova, size_t size,
-+					       unsigned long order)
++/* Reserved binding RB-tree manipulation */
++
++static struct arm_smmu_reserved_binding *find_reserved_binding(
++				    struct arm_smmu_domain *d,
++				    phys_addr_t start, size_t size)
 +{
-+	unsigned long granule, mask;
-+	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
-+	int ret = 0;
++	struct rb_node *node = d->reserved_binding_list.rb_node;
 +
-+	granule = 1UL << order;
-+	mask = granule - 1;
-+	if (iova & mask || (!size) || (size & mask))
-+		return -EINVAL;
++	while (node) {
++		struct arm_smmu_reserved_binding *binding =
++			rb_entry(node, struct arm_smmu_reserved_binding, node);
 +
-+	if (smmu_domain->reserved_iova_domain)
-+		return -EEXIST;
-+
-+	mutex_lock(&smmu_domain->reserved_mutex);
-+
-+	smmu_domain->reserved_iova_domain =
-+		kzalloc(sizeof(struct iova_domain), GFP_KERNEL);
-+	if (!smmu_domain->reserved_iova_domain) {
-+		ret = -ENOMEM;
-+		goto unlock;
++		if (start + size <= binding->addr)
++			node = node->rb_left;
++		else if (start >= binding->addr + binding->size)
++			node = node->rb_right;
++		else
++			return binding;
 +	}
 +
-+	init_iova_domain(smmu_domain->reserved_iova_domain,
-+			 granule, iova >> order, (iova + size - 1) >> order);
-+
-+unlock:
-+	mutex_unlock(&smmu_domain->reserved_mutex);
-+	return ret;
++	return NULL;
 +}
 +
-+static void arm_smmu_free_reserved_iova_domain(struct iommu_domain *domain)
++static void link_reserved_binding(struct arm_smmu_domain *d,
++				  struct arm_smmu_reserved_binding *new)
 +{
-+	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
-+	struct iova_domain *iovad = smmu_domain->reserved_iova_domain;
++	struct rb_node **link = &d->reserved_binding_list.rb_node;
++	struct rb_node *parent = NULL;
++	struct arm_smmu_reserved_binding *binding;
 +
-+	if (!iovad)
-+		return;
++	while (*link) {
++		parent = *link;
++		binding = rb_entry(parent, struct arm_smmu_reserved_binding,
++				   node);
 +
-+	mutex_lock(&smmu_domain->reserved_mutex);
++		if (new->addr + new->size <= binding->addr)
++			link = &(*link)->rb_left;
++		else
++			link = &(*link)->rb_right;
++	}
 +
-+	put_iova_domain(iovad);
-+	kfree(iovad);
-+
-+	mutex_unlock(&smmu_domain->reserved_mutex);
++	rb_link_node(&new->node, parent, link);
++	rb_insert_color(&new->node, &d->reserved_binding_list);
 +}
 +
- static struct iommu_ops arm_smmu_ops = {
--	.capable		= arm_smmu_capable,
--	.domain_alloc		= arm_smmu_domain_alloc,
--	.domain_free		= arm_smmu_domain_free,
--	.attach_dev		= arm_smmu_attach_dev,
--	.detach_dev		= arm_smmu_detach_dev,
--	.map			= arm_smmu_map,
--	.unmap			= arm_smmu_unmap,
--	.map_sg			= default_iommu_map_sg,
--	.iova_to_phys		= arm_smmu_iova_to_phys,
--	.add_device		= arm_smmu_add_device,
--	.remove_device		= arm_smmu_remove_device,
--	.device_group		= arm_smmu_device_group,
--	.domain_get_attr	= arm_smmu_domain_get_attr,
--	.domain_set_attr	= arm_smmu_domain_set_attr,
--	.pgsize_bitmap		= -1UL, /* Restricted during device attach */
-+	.capable			= arm_smmu_capable,
-+	.domain_alloc			= arm_smmu_domain_alloc,
-+	.domain_free			= arm_smmu_domain_free,
-+	.attach_dev			= arm_smmu_attach_dev,
-+	.detach_dev			= arm_smmu_detach_dev,
-+	.map				= arm_smmu_map,
-+	.unmap				= arm_smmu_unmap,
-+	.map_sg				= default_iommu_map_sg,
-+	.iova_to_phys			= arm_smmu_iova_to_phys,
-+	.add_device			= arm_smmu_add_device,
-+	.remove_device			= arm_smmu_remove_device,
-+	.device_group			= arm_smmu_device_group,
-+	.domain_get_attr		= arm_smmu_domain_get_attr,
-+	.domain_set_attr		= arm_smmu_domain_set_attr,
-+	.alloc_reserved_iova_domain	= arm_smmu_alloc_reserved_iova_domain,
-+	.free_reserved_iova_domain	= arm_smmu_free_reserved_iova_domain,
-+	/* Page size bitmap, restricted during device attach */
-+	.pgsize_bitmap			= -1UL,
- };
++static void unlink_reserved_binding(struct arm_smmu_domain *d,
++				    struct arm_smmu_reserved_binding *old)
++{
++	rb_erase(&old->node, &d->reserved_binding_list);
++}
++
+ static struct arm_smmu_master *find_smmu_master(struct arm_smmu_device *smmu,
+ 						struct device_node *dev_node)
+ {
+@@ -981,6 +1043,7 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
+ 	mutex_init(&smmu_domain->init_mutex);
+ 	mutex_init(&smmu_domain->reserved_mutex);
+ 	spin_lock_init(&smmu_domain->pgtbl_lock);
++	smmu_domain->reserved_binding_list = RB_ROOT;
  
- static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
+ 	return &smmu_domain->domain;
+ }
 -- 
 1.9.1
