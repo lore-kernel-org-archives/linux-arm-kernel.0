@@ -1,59 +1,99 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 12 Feb 2016 19:43:36 +0100
-Subject: [PATCH 2/7] i2c: omap: Fix PM regression with deferred probe for
- pm_runtime_reinit
-In-Reply-To: <1455145370-20301-3-git-send-email-tony@atomide.com>
-References: <1455145370-20301-1-git-send-email-tony@atomide.com>
- <1455145370-20301-3-git-send-email-tony@atomide.com>
-Message-ID: <20160212184335.GF1520@katana>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 12 Feb 2016 19:43:43 +0100
+Subject: [PATCH v2 5/5] ARM: dts: r8a7794: add sound support
+In-Reply-To: <56BE0CB1.4070408@cogentembedded.com>
+References: <12033353.rt0nolnBmD@wasted.cogentembedded.com>
+ <2543047.yYrDdYb9v5@wasted.cogentembedded.com>
+ <874mdhtn7d.wl%kuninori.morimoto.gx@renesas.com>
+ <20160210171455.GB17671@verge.net.au>
+ <56BE0CB1.4070408@cogentembedded.com>
+Message-ID: <20160212184343.GA31655@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 10, 2016 at 03:02:45PM -0800, Tony Lindgren wrote:
-> Commit 5de85b9d57ab ("PM / runtime: Re-init runtime PM states at probe
-> error and driver unbind") introduced pm_runtime_reinit() that is used
-> to reinitialize PM runtime after -EPROBE_DEFER. This allows shutting
-> down the device after a failed probe.
+On Fri, Feb 12, 2016 at 07:47:45PM +0300, Sergei Shtylyov wrote:
+> On 02/10/2016 08:14 PM, Simon Horman wrote:
 > 
-> However, for drivers using pm_runtime_use_autosuspend() this can cause
-> a state where suspend callback is never called after -EPROBE_DEFER.
-> On the following device driver probe, hardware state is different from
-> the PM runtime state causing omap_device to produce the following
-> error:
+> >>Sorry for my un-ordered response
+> >>
+> >>>Define the generic R8A7794 part of  the sound device node.
+> >>>This sound device  is a complex one and comprises the Audio Clock Generator
+> >>>(ADG), Sampling Rate Converter Unit (SCU), Serial Sound Interface [Unit]
+> >>>(SSI[U]), and Audio DMAC-Peripheral-Peripheral.
+> >>>It is up  to the board file to enable the device.
+> >>>
+> >>>This patch is based on the R8A7791 sound work by Kuninori Morimoto.
+> >>>
+> >>>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> >>(snip)
+> >>>+		rcar_sound,src {
+> >>>+			src1: src at 1 {
+> >>>+				interrupts = <GIC_SPI 353 IRQ_TYPE_LEVEL_HIGH>;
+> >>>+				dmas = <&audma0 0x87>, <&audma0 0x9c>;
+> >>>+				dma-names = "rx", "tx";
+> >>>+			};
+> >>>+			src2: src at 2 {
+> >>>+				interrupts = <GIC_SPI 354 IRQ_TYPE_LEVEL_HIGH>;
+> >>>+				dmas = <&audma0 0x89>, <&audma0 0x9e>;
+> >>>+				dma-names = "rx", "tx";
+> >>>+			};
+> >>>+			src3: src at 3 {
+> >>>+				interrupts = <GIC_SPI 355 IRQ_TYPE_LEVEL_HIGH>;
+> >>>+				dmas = <&audma0 0x8b>, <&audma0 0xa0>;
+> >>>+				dma-names = "rx", "tx";
+> >>>+			};
+> >>>+			src4: src at 4 {
+> >>>+				interrupts = <GIC_SPI 356 IRQ_TYPE_LEVEL_HIGH>;
+> >>>+				dmas = <&audma0 0x8d>, <&audma0 0xb0>;
+> >>>+				dma-names = "rx", "tx";
+> >>>+			};
+> >>>+			src5: src at 5 {
+> >>>+				interrupts = <GIC_SPI 357 IRQ_TYPE_LEVEL_HIGH>;
+> >>>+				dmas = <&audma0 0x8f>, <&audma0 0xb2>;
+> >>>+				dma-names = "rx", "tx";
+> >>>+			};
+> >>>+			src6: src at 6 {
+> >>>+				interrupts = <GIC_SPI 358 IRQ_TYPE_LEVEL_HIGH>;
+> >>>+				dmas = <&audma0 0x91>, <&audma0 0xb4>;
+> >>>+				dma-names = "rx", "tx";
+> >>>+			};
+> >>>+		};
+> >>
+> >>I think this can't work correctly, because driver is assuming
+> >>DT has all channles (from 0). (see linux/sound/soc/sh/rcar/src.c :: rsnd_src_probe)
+> >>Can you adds dummy src0 with some comments ? or fix src.c driver ?
+> >
+> >I would prefer the driver to be fixed (I had a similar patchset locally
+> >and I found it doesn't work).
 > 
-> omap_device_enable() called from invalid state 1
-> 
-> And with omap_device and omap hardware being picky for PM, this will
-> block any deeper idle states in hardware.
-> 
-> The solution is to fix the drivers to follow the PM runtime documentation:
-> 
-> 1. For sections of code that needs the device disabled, use
->    pm_runtime_put_sync_suspend() if pm_runtime_set_autosuspend() has
->    been set.
-> 
-> 2. For driver exit code, use pm_runtime_dont_use_autosuspend() before
->    pm_runtime_put_sync() if pm_runtime_use_autosuspend() has been
->    set.
-> 
-> Fixes: 5de85b9d57ab ("PM / runtime: Re-init runtime PM states at probe
-> error and driver unbind")
-> Cc: linux-i2c at vger.kernel.org
-> Cc: Alan Stern <stern@rowland.harvard.edu>
-> Cc: Kevin Hilman <khilman@baylibre.com>
-> Cc: Nishanth Menon <nm@ti.com>
-> Cc: Rafael J. Wysocki <rafael@kernel.org>
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> Cc: Tero Kristo <t-kristo@ti.com>
-> Cc: Wolfram Sang <wsa@the-dreams.de>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+>    You mean you had R8A7794 sound patch set too?
 
-Applied to for-current, thanks!
+Yes, I was working on it recently.
+I suppose we should coordinate these things in future to avoid
+duplicated effort.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160212/d994bb7d/attachment.sig>
+> >The reason is that DT should describe
+> >the hardware rather than the current state of the software.
+> 
+>    Yes, of course. Just tell me do I have to fix the driver *before* this
+> patch set is accepted?
+
+I did not entirely get to the bottom of the problem, but I think that at
+the very least something needs to be done about the for_each_rsnd_src()
+loop in rsnd_src_probe.
+
+My, obviously not satisfactory, hack around there being no src0 was as follows.
+
+diff --git a/sound/soc/sh/rcar/src.c b/sound/soc/sh/rcar/src.c
+index 68b439ed22d7..58a447b0785b 100644
+--- a/sound/soc/sh/rcar/src.c
++++ b/sound/soc/sh/rcar/src.c
+@@ -1072,7 +1072,7 @@ int rsnd_src_probe(struct platform_device *pdev,
+ 
+ 	for_each_rsnd_src(src, priv, i) {
+ 		snprintf(name, RSND_SRC_NAME_SIZE, "%s.%d",
+-			 SRC_NAME, i);
++			 SRC_NAME, i + 1);
+ 
+ 		clk = devm_clk_get(dev, name);
+ 		if (IS_ERR(clk))
