@@ -1,180 +1,46 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 12 Feb 2016 15:23:04 +0000
-Subject: [PATCH 4/3] iommu/io-pgtable: Rationalise quirk handling
-In-Reply-To: <4282853.vdxKI5JT5z@avalon>
-References: <cover.1453723096.git.robin.murphy@arm.com>
- <ea1f3d3feec0dc9c18d43393678370b50b1275f5.1455206840.git.robin.murphy@arm.com>
- <20160212120857.GN25087@arm.com> <4282853.vdxKI5JT5z@avalon>
-Message-ID: <56BDF8D8.4010200@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 12 Feb 2016 09:23:06 -0600
+Subject: [PATCH 4/6] dt-bindings: watchdog: Add ARM SP805 DT bindings
+In-Reply-To: <1455084651-29325-5-git-send-email-anup.patel@broadcom.com>
+References: <1455084651-29325-1-git-send-email-anup.patel@broadcom.com>
+ <1455084651-29325-5-git-send-email-anup.patel@broadcom.com>
+Message-ID: <20160212152306.GA29673@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/02/16 12:32, Laurent Pinchart wrote:
-> On Friday 12 February 2016 12:08:58 Will Deacon wrote:
->> On Thu, Feb 11, 2016 at 04:13:45PM +0000, Robin Murphy wrote:
->>> As the number of io-pgtable implementations grows beyond 1, it's time
->>> to rationalise the quirks mechanism before things have a chance to
->>> start getting really ugly and out-of-hand.
->>>
->>> To that end:
->>> - Indicate exactly which quirks each format can/does support.
->>> - Fail creating a table if a caller wants unsupported quirks.
->>> - Properly document where each quirk applies and why.
->>>
->>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->>> ---
->>>
->>>   drivers/iommu/io-pgtable-arm-v7s.c |  3 +++
->>>   drivers/iommu/io-pgtable-arm.c     |  2 ++
->>>   drivers/iommu/io-pgtable.c         |  3 +++
->>>   drivers/iommu/io-pgtable.h         | 24 ++++++++++++++++++++----
->>>   4 files changed, 28 insertions(+), 4 deletions(-)
->>
->> Note that I can't merge this until we've figured out the plan for Yong's
->> driver.
+On Wed, Feb 10, 2016 at 11:40:49AM +0530, Anup Patel wrote:
+> The ARM SP805 DT node is already present in various DTS files.
+> This patch adds missing DT bindings documentation for ARM SP805.
+> 
+> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+> Reviewed-by: Ray Jui <rjui@broadcom.com>
+> Reviewed-by: Vikram Prakash <vikramp@broadcom.com>
+> Reviewed-by: Scott Branden <sbranden@broadcom.com>
+> ---
+>  .../devicetree/bindings/watchdog/arm,sp805.txt          | 17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/watchdog/arm,sp805.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/watchdog/arm,sp805.txt b/Documentation/devicetree/bindings/watchdog/arm,sp805.txt
+> new file mode 100644
+> index 0000000..6ebb77d
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/watchdog/arm,sp805.txt
+> @@ -0,0 +1,17 @@
+> +ARM AMBA Primecell SP805 Watchdog
+> +
+> +Required properties:
+> +- compatible: Should be "arm,sp805" & "arm,primecell"
+> +- reg: Should contain location and length for watchdog timer register.
+> +- interrupts: Should contain the list of watchdog timer interrupts.
+> +- clocks: clocks driving the watchdog timer hardware. This list should be 2
+> +	clocks. With 2 clocks, the order is wdogclk clock, apb_pclk.
+> +
+> +Example:
+> +	wdt at 66090000 {
 
-Indeed (hence 4/3) - it just ended up seeming like a significant enough 
-change to warrant its own patch, but not critical enough to warrant 
-splitting it for the sake of applying the parts touching the existing 
-code right now.
+This should be watchdog at ...
 
->>> diff --git a/drivers/iommu/io-pgtable-arm-v7s.c
->>> b/drivers/iommu/io-pgtable-arm-v7s.c index d39a021..9bc607a 100644
->>> --- a/drivers/iommu/io-pgtable-arm-v7s.c
->>> +++ b/drivers/iommu/io-pgtable-arm-v7s.c
->>>
->>> @@ -690,6 +690,9 @@ out_free_data:
->>>   struct io_pgtable_init_fns io_pgtable_arm_v7s_init_fns = {
->>>
->>>   	.alloc	= arm_v7s_alloc_pgtable,
->>>   	.free	= arm_v7s_free_pgtable,
->>>
->>> +	.supported_quirks = IO_PGTABLE_QUIRK_ARM_NS |
->>> +			    IO_PGTABLE_QUIRK_NO_PERMS |
->>> +			    IO_PGTABLE_QUIRK_TLBI_ON_MAP,
->>>
->>>   };
->>>
->>>   #ifdef CONFIG_IOMMU_IO_PGTABLE_ARMV7S_SELFTEST
->>>
->>> diff --git a/drivers/iommu/io-pgtable-arm.c
->>> b/drivers/iommu/io-pgtable-arm.c index 4095af2..32f94f1 100644
->>> --- a/drivers/iommu/io-pgtable-arm.c
->>> +++ b/drivers/iommu/io-pgtable-arm.c
->>> @@ -863,6 +863,7 @@ arm_32_lpae_alloc_pgtable_s2(struct io_pgtable_cfg
->>> *cfg, void *cookie)>
->>>   struct io_pgtable_init_fns io_pgtable_arm_64_lpae_s1_init_fns = {
->>>
->>>   	.alloc	= arm_64_lpae_alloc_pgtable_s1,
->>>   	.free	= arm_lpae_free_pgtable,
->>>
->>> +	.supported_quirks = IO_PGTABLE_QUIRK_ARM_NS,
->>>
->>>   };
->>>
->>>   struct io_pgtable_init_fns io_pgtable_arm_64_lpae_s2_init_fns = {
->>>
->>> @@ -873,6 +874,7 @@ struct io_pgtable_init_fns
->>> io_pgtable_arm_64_lpae_s2_init_fns = {>
->>>   struct io_pgtable_init_fns io_pgtable_arm_32_lpae_s1_init_fns = {
->>>
->>>   	.alloc	= arm_32_lpae_alloc_pgtable_s1,
->>>   	.free	= arm_lpae_free_pgtable,
->>>
->>> +	.supported_quirks = IO_PGTABLE_QUIRK_ARM_NS,
->>>
->>>   };
->>>
->>>   struct io_pgtable_init_fns io_pgtable_arm_32_lpae_s2_init_fns = {
->>>
->>> diff --git a/drivers/iommu/io-pgtable.c b/drivers/iommu/io-pgtable.c
->>> index 876f6a7..0f57a45 100644
->>> --- a/drivers/iommu/io-pgtable.c
->>> +++ b/drivers/iommu/io-pgtable.c
->>> @@ -52,6 +52,9 @@ struct io_pgtable_ops *alloc_io_pgtable_ops(enum
->>> io_pgtable_fmt fmt,>
->>>   	if (!fns)
->>>   	
->>>   		return NULL;
->>>
->>> +	if (cfg->quirks & ~fns->supported_quirks)
->>> +		return NULL;
->>> +
->>>
->>>   	iop = fns->alloc(cfg, cookie);
->>>   	if (!iop)
->>>   	
->>>   		return NULL;
->>>
->>> diff --git a/drivers/iommu/io-pgtable.h b/drivers/iommu/io-pgtable.h
->>> index 4faee7d..6e7f11e 100644
->>> --- a/drivers/iommu/io-pgtable.h
->>> +++ b/drivers/iommu/io-pgtable.h
->>> @@ -47,10 +47,24 @@ struct iommu_gather_ops {
->>>
->>>    *                 page table walker.
->>>    */
->>>
->>>   struct io_pgtable_cfg {
->>>
->>> -	#define IO_PGTABLE_QUIRK_ARM_NS		BIT(0) /* Set NS bit in PTEs */
->>> -	#define IO_PGTABLE_QUIRK_NO_PERMS	BIT(1) /* No AP/XN bits */
->>> -	#define IO_PGTABLE_QUIRK_TLBI_ON_MAP	BIT(2) /* TLB Inv. on map */
->>> -	int				quirks;
->>> +	/*
->>> +	 * IO_PGTABLE_QUIRK_ARM_NS: (ARM formats) Set NS and NSTABLE bits in
->>> +	 *	stage 1 PTEs, for hardware which insists on validating them
->>> +	 *	even in	non-secure state where they should normally be ignored.
->>> +	 *
->>> +	 * IO_PGTABLE_QUIRK_NO_PERMS: Ignore the IOMMU_READ, IOMMU_WRITE and
->>> +	 *	IOMMU_NOEXEC flags and map everything with full access, for
->>> +	 *	hardware which does not implement the permissions of a given
->>> +	 *	format, and/or requires some format-specific default value.
->>> +	 *
->>> +	 * IO_PGTABLE_QUIRK_TLBI_ON_MAP: If the format forbids caching
-> invalid
->>> +	 *	(unmapped) entries but the hardware might do so anyway, perform
->>> +	 *	TLB maintenance when mapping as well as when unmapping.
->>> +	 */
->>
->> Much better, cheers.
->>
->>> +	#define IO_PGTABLE_QUIRK_ARM_NS		BIT(0)
->>> +	#define IO_PGTABLE_QUIRK_NO_PERMS	BIT(1)
->>> +	#define IO_PGTABLE_QUIRK_TLBI_ON_MAP	BIT(2)
->>> +	unsigned int			quirks;
->>
->> Let's just make this unsigned long.
->>
->>>   	unsigned long			pgsize_bitmap;
->>>   	unsigned int			ias;
->>>   	unsigned int			oas;
->>>
->>> @@ -173,10 +187,12 @@ static inline void io_pgtable_tlb_sync(struct
->>> io_pgtable *iop)
->>>    *
->>>    * @alloc: Allocate a set of page tables described by cfg.
->>>    * @free:  Free the page tables associated with iop.
->>> + * @supported_quirks: Bitmap of quirks supported by the format.
->>>    */
->>>   struct io_pgtable_init_fns {
->>>   	struct io_pgtable *(*alloc)(struct io_pgtable_cfg *cfg, void
-> *cookie);
->>>   	void (*free)(struct io_pgtable *iop);
->>> +	unsigned int supported_quirks;
->>>   };
->>
->> My only gripe here is that this is supposed to be a struct of function
->> pointers... get_supported_quirks() ?
->
-> Can't we instead say it's a struct of function pointers and static data ? :-)
-> A function to retrieve the supported quirks will just contribute to kernel
-> bloat without adding any extra benefit.
+Otherwise:
 
-Bleh - personally I think it's marginally more obvious and readable to 
-have the information looking like data, but I'd much sooner just have a 
-hard-coded "if (cfq->quirks & ..." check in every format's alloc 
-function than introduce a whole new callback. Does that sound like a 
-reasonable compromise?
-
-Robin.
+Acked-by: Rob Herring <robh@kernel.org>
