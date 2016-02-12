@@ -1,20 +1,56 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 12 Feb 2016 10:37:42 -0600
-Subject: [PATCH 1/3] Documentation: devicetree: add Freescale SCC bindings
-In-Reply-To: <1455199485-24458-1-git-send-email-s.trumtrar@pengutronix.de>
-References: <1455199485-24458-1-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <20160212163742.GA6769@rob-hp-laptop>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Sat, 13 Feb 2016 01:37:56 +0900
+Subject: [PATCH v2 4/6] serial: 8250/uniphier: fix modular build
+In-Reply-To: <3557175.oOjJgCHd2P@wuerfel>
+References: <1455205297-1021302-1-git-send-email-arnd@arndb.de>
+ <1455205297-1021302-5-git-send-email-arnd@arndb.de>
+ <CAK7LNAR8fJWPubucjw28gAPpF-4yvVMWZZ0F3j6VN4whGF9Yhw@mail.gmail.com>
+ <3557175.oOjJgCHd2P@wuerfel>
+Message-ID: <CAK7LNAT9DN=zCamO8HYVpj5R4KxoFMH-e3HjjYN6XmxYi3NNuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 11, 2016 at 03:04:43PM +0100, Steffen Trumtrar wrote:
-> Add documentation for the Freescale Security Controller (SCC)
-> found on i.MX25 SoCs.
-> 
-> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> ---
->  .../devicetree/bindings/crypto/fsl-imx-scc.txt          | 17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/crypto/fsl-imx-scc.txt
+Hi Arnd,
 
-Acked-by: Rob Herring <robh@kernel.org>
+
+2016-02-12 19:07 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
+> On Friday 12 February 2016 18:37:08 Masahiro Yamada wrote:
+>> >  };
+>> >
+>> > -#ifdef CONFIG_SERIAL_8250_CONSOLE
+>> > +#if defined(CONFIG_SERIAL_8250_CONSOLE) && !defined(MODULE)
+>> >  static int __init uniphier_early_console_setup(struct earlycon_device *device,
+>> >                                                const char *options)
+>> >  {
+>> > --
+>> > 2.7.0
+>> >
+>>
+>> I noticed commit 2eaa790989e03900298ad24f77f1086dbbc1aebd
+>> revived this link error, but I am not happy with seeing
+>> this patch again and again.
+>>
+>>
+>> Can you check this patch?
+>> https://patchwork.kernel.org/patch/8289231/
+>>
+>>
+>>
+>
+> Yes, I think your patch is nicer than mine. Let's see what the others
+> think, then I can resend my remaining patches on top of yours.
+>
+
+As Peter pointed out, my patch would not work without CONFIG_OF.
+
+I can not suggest any other alternative,
+so I am OK with this patch.
+
+Unfortunately, the "tty-linus" branch is getting dirty with
+apply, revert, apply again.
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
