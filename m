@@ -1,49 +1,130 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 12 Feb 2016 10:02:45 +0800
-Subject: [PATCH v8 08/10] regulator: axp20x: Support new AXP223 PMIC
+Date: Fri, 12 Feb 2016 10:02:46 +0800
+Subject: [PATCH v8 09/10] ARM: dts: sun8i: sinlinx-sina33: Add AXP223 PMIC
+ device and regulator nodes
 In-Reply-To: <1455242567-17880-1-git-send-email-wens@csie.org>
 References: <1455242567-17880-1-git-send-email-wens@csie.org>
-Message-ID: <1455242567-17880-9-git-send-email-wens@csie.org>
+Message-ID: <1455242567-17880-10-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AXP223 is a new PMIC commonly paired with Allwinner A23/A33 SoCs.
-It is functionally identical to AXP221; only the regulator default
-voltage/status and the external host interface are different.
+This board has a X-Powers AXP223 PMIC connected via RSB. Its regulators
+provide power to various parts of the SoC and the board.
+
+Also update the regulator supply phandles.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-Reviewed-by: Mark Brown <broonie@kernel.org>
 ---
- drivers/regulator/axp20x-regulator.c | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts | 76 +++++++++++++++++++++++++-
+ 1 file changed, 73 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
-index f2e1a39ce0f3..e86d1fc2d80b 100644
---- a/drivers/regulator/axp20x-regulator.c
-+++ b/drivers/regulator/axp20x-regulator.c
-@@ -244,6 +244,7 @@ static int axp20x_set_dcdc_freq(struct platform_device *pdev, u32 dcdcfreq)
- 		step = 75;
- 		break;
- 	case AXP221_ID:
-+	case AXP223_ID:
- 		min = 1800;
- 		max = 4050;
- 		def = 3000;
-@@ -322,6 +323,7 @@ static int axp20x_set_dcdc_workmode(struct regulator_dev *rdev, int id, u32 work
- 		break;
+diff --git a/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts b/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
+index bd2a3beb4629..fef6abc0a703 100644
+--- a/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
++++ b/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
+@@ -68,7 +68,7 @@
+ };
  
- 	case AXP221_ID:
-+	case AXP223_ID:
- 		if (id < AXP22X_DCDC1 || id > AXP22X_DCDC5)
- 			return -EINVAL;
+ &lradc {
+-	vref-supply = <&reg_vcc3v0>;
++	vref-supply = <&reg_dcdc1>;
+ 	status = "okay";
  
-@@ -360,6 +362,7 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
- 		nregulators = AXP20X_REG_ID_MAX;
- 		break;
- 	case AXP221_ID:
-+	case AXP223_ID:
- 		regulators = axp22x_regulators;
- 		nregulators = AXP22X_REG_ID_MAX;
- 		break;
+ 	button at 200 {
+@@ -96,7 +96,7 @@
+ &mmc0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_sina33>;
+-	vmmc-supply = <&reg_vcc3v0>;
++	vmmc-supply = <&reg_dcdc1>;
+ 	bus-width = <4>;
+ 	cd-gpios = <&pio 1 4 GPIO_ACTIVE_HIGH>; /* PB4 */
+ 	cd-inverted;
+@@ -106,7 +106,7 @@
+ &mmc2 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc2_8bit_pins>;
+-	vmmc-supply = <&reg_vcc3v0>;
++	vmmc-supply = <&reg_dcdc1>;
+ 	bus-width = <8>;
+ 	non-removable;
+ 	cap-mmc-hw-reset;
+@@ -135,6 +135,76 @@
+ 
+ &r_rsb {
+ 	status = "okay";
++
++	axp22x: pmic at 3a3 {
++		compatible = "x-powers,axp223";
++		reg = <0x3a3>;
++		interrupt-parent = <&nmi_intc>;
++		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
++		eldoin-supply = <&reg_dcdc1>;
++	};
++};
++
++#include "axp22x.dtsi"
++
++&reg_aldo1 {
++	regulator-always-on;
++	regulator-min-microvolt = <3000000>;
++	regulator-max-microvolt = <3000000>;
++	regulator-name = "vcc-io";
++};
++
++&reg_aldo2 {
++	regulator-always-on;
++	regulator-min-microvolt = <2350000>;
++	regulator-max-microvolt = <2650000>;
++	regulator-name = "vdd-dll";
++};
++
++&reg_aldo3 {
++	regulator-always-on;
++	regulator-min-microvolt = <2700000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-pll-avcc";
++};
++
++&reg_dc5ldo {
++	regulator-always-on;
++	regulator-min-microvolt = <900000>;
++	regulator-max-microvolt = <1400000>;
++	regulator-name = "vdd-cpus";
++};
++
++&reg_dcdc1 {
++	regulator-always-on;
++	regulator-min-microvolt = <3000000>;
++	regulator-max-microvolt = <3000000>;
++	regulator-name = "vcc-3v0";
++};
++
++&reg_dcdc2 {
++	regulator-always-on;
++	regulator-min-microvolt = <900000>;
++	regulator-max-microvolt = <1400000>;
++	regulator-name = "vdd-sys";
++};
++
++&reg_dcdc3 {
++	regulator-always-on;
++	regulator-min-microvolt = <900000>;
++	regulator-max-microvolt = <1400000>;
++	regulator-name = "vdd-cpu";
++};
++
++&reg_dcdc5 {
++	regulator-always-on;
++	regulator-min-microvolt = <1500000>;
++	regulator-max-microvolt = <1500000>;
++	regulator-name = "vcc-dram";
++};
++
++&reg_rtc_ldo {
++	regulator-name = "vcc-rtc";
+ };
+ 
+ &uart0 {
 -- 
 2.7.0
