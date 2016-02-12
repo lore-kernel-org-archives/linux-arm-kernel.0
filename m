@@ -1,60 +1,70 @@
 From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Fri, 12 Feb 2016 20:43:38 +0300
-Subject: [PATCH v2 7/9] serial: pl011: add acpi_match
+Date: Fri, 12 Feb 2016 20:43:39 +0300
+Subject: [PATCH v2 8/9] serial: 8250: add acpi_match
 In-Reply-To: <1455299022-11641-1-git-send-email-aleksey.makarov@linaro.org>
 References: <1455299022-11641-1-git-send-email-aleksey.makarov@linaro.org>
-Message-ID: <1455299022-11641-8-git-send-email-aleksey.makarov@linaro.org>
+Message-ID: <1455299022-11641-9-git-send-email-aleksey.makarov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add an implementation of acpi_match() to the pl011 driver.
+From: Mark Salter <msalter@redhat.com>
+
+Add an implementation of acpi_match() to the 8250 driver.
 It allows console to check if it matches the console specified by
 ACPI SPCR table.
 
+Signed-off-by: Mark Salter <msalter@redhat.com>
 Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
-Tested-by: Christopher Covington <cov@codeaurora.org>
 ---
- drivers/tty/serial/amba-pl011.c | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+ drivers/tty/serial/8250/8250_core.c | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index 500232a..f613bff 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -2285,12 +2285,34 @@ static int __init pl011_console_setup(struct console *co, char *options)
- 	return uart_set_options(&uap->port, co, baud, parity, bits, flow);
+diff --git a/drivers/tty/serial/8250/8250_core.c b/drivers/tty/serial/8250/8250_core.c
+index 7775221..059338a 100644
+--- a/drivers/tty/serial/8250/8250_core.c
++++ b/drivers/tty/serial/8250/8250_core.c
+@@ -40,6 +40,7 @@
+ #ifdef CONFIG_SPARC
+ #include <linux/sunserialcore.h>
+ #endif
++#include <linux/acpi.h>
+ 
+ #include <asm/irq.h>
+ 
+@@ -669,12 +670,34 @@ static int univ8250_console_match(struct console *co, char *name, int idx,
+ 	return -ENODEV;
  }
  
-+static int __init pl011_console_acpi_match(struct console *co,
-+					   struct acpi_table_spcr *spcr)
++static int __init univ8250_console_acpi_match(struct console *co,
++					      struct acpi_table_spcr *spcr)
 +{
-+	struct uart_amba_port *uap = amba_ports[co->index < 0 ? 0 : co->index];
++	int index = co->index >= 0 ? co->index : 0;
++	struct uart_port *port = &serial8250_ports[index].port;
 +
-+	if (uap->vendor->access_32b) {
-+		if (spcr->interface_type != ACPI_DBG2_ARM_SBSA_32BIT)
-+			return -ENODEV;
-+	} else {
-+		if (spcr->interface_type != ACPI_DBG2_ARM_PL011 &&
-+		    spcr->interface_type != ACPI_DBG2_ARM_SBSA_GENERIC)
-+			return -ENODEV;
-+	}
-+
-+	if (spcr->serial_port.space_id != ACPI_ADR_SPACE_SYSTEM_MEMORY ||
-+	    spcr->serial_port.address != (u64)uap->port.mapbase)
++	if (spcr->interface_type != ACPI_DBG2_16550_SUBSET &&
++	    spcr->interface_type != ACPI_DBG2_16550_COMPATIBLE)
 +		return -ENODEV;
 +
-+	return 0;
++	if (spcr->serial_port.space_id == ACPI_ADR_SPACE_SYSTEM_MEMORY &&
++	    spcr->serial_port.address == (u64)port->mapbase)
++		return 0;
++
++	if (spcr->serial_port.space_id == ACPI_ADR_SPACE_SYSTEM_IO &&
++	    spcr->serial_port.address == (u64)port->iobase)
++		return 0;
++
++	return -ENODEV;
 +}
 +
- static struct uart_driver amba_reg;
- static struct console amba_console = {
- 	.name		= "ttyAMA",
- 	.write		= pl011_console_write,
+ static struct console univ8250_console = {
+ 	.name		= "ttyS",
+ 	.write		= univ8250_console_write,
  	.device		= uart_console_device,
- 	.setup		= pl011_console_setup,
-+	.acpi_match	= pl011_console_acpi_match,
- 	.flags		= CON_PRINTBUFFER,
+ 	.setup		= univ8250_console_setup,
+ 	.match		= univ8250_console_match,
++	.acpi_match	= univ8250_console_acpi_match,
+ 	.flags		= CON_PRINTBUFFER | CON_ANYTIME,
  	.index		= -1,
- 	.data		= &amba_reg,
+ 	.data		= &serial8250_reg,
 -- 
 2.7.0
