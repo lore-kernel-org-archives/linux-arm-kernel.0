@@ -1,33 +1,56 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 12 Feb 2016 20:04:56 +0100
-Subject: [PATCH 06/68] ARM: dts: r8a7790: use fallback usbhs compatibility
- string
+Date: Fri, 12 Feb 2016 20:05:00 +0100
+Subject: [PATCH 10/68] ARM: dts: gose: add i2c2 bus to device tree
 In-Reply-To: <cover.1455303422.git.horms+renesas@verge.net.au>
 References: <cover.1455303422.git.horms+renesas@verge.net.au>
-Message-ID: <d87ec94aee6dc62ed5db4cad7dba47006c0dd00e.1455303422.git.horms+renesas@verge.net.au>
+Message-ID: <f6890af3ad2b6440d287c8ee97b3f38e18b0674e.1455303422.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use recently added fallback compatibility string in r8a7790 device tree.
+Activate i2c2 bus in r8a7793/gose device tree.
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Based on similar work for the r8a7791/koelsch by Wolfram Sang.
+
 Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7790.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/r8a7793-gose.dts | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index 7dfd393bfc7e..4d9af0f46fab 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -746,7 +746,7 @@
- 	};
+diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
+index 90b587c3c736..987ed03b1e02 100644
+--- a/arch/arm/boot/dts/r8a7793-gose.dts
++++ b/arch/arm/boot/dts/r8a7793-gose.dts
+@@ -136,6 +136,11 @@
+ };
  
- 	hsusb: usb at e6590000 {
--		compatible = "renesas,usbhs-r8a7790";
-+		compatible = "renesas,usbhs-r8a7790", "renesas,rcar-gen2-usbhs";
- 		reg = <0 0xe6590000 0 0x100>;
- 		interrupts = <0 107 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp7_clks R8A7790_CLK_HSUSB>;
+ &pfc {
++	i2c2_pins: i2c2 {
++		renesas,groups = "i2c2";
++		renesas,function = "i2c2";
++	};
++
+ 	scif0_pins: serial0 {
+ 		renesas,groups = "scif0_data_d";
+ 		renesas,function = "scif0";
+@@ -234,3 +239,17 @@
+ 		};
+ 	};
+ };
++
++&i2c2 {
++	pinctrl-0 = <&i2c2_pins>;
++	pinctrl-names = "default";
++
++	status = "okay";
++	clock-frequency = <100000>;
++
++	eeprom at 50 {
++		compatible = "renesas,r1ex24002", "atmel,24c02";
++		reg = <0x50>;
++		pagesize = <16>;
++	};
++};
 -- 
 2.7.0.rc3.207.g0ac5344
