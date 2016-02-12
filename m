@@ -1,155 +1,345 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Fri, 12 Feb 2016 13:50:26 -0700
-Subject: [RFC v2 00/12] PM: SoC idle support using PM domains
-Message-ID: <1455310238-8963-1-git-send-email-lina.iyer@linaro.org>
+Date: Fri, 12 Feb 2016 13:50:27 -0700
+Subject: [RFC v2 01/12] PM / Domains: Abstract genpd locking
+In-Reply-To: <1455310238-8963-1-git-send-email-lina.iyer@linaro.org>
+References: <1455310238-8963-1-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1455310238-8963-2-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Abstract genpd lock/unlock calls, in preparation for domain specific
+locks added in the following patches.
 
-Changes since RFC v1 [1] -
-- genpd lock abstraction using fn ptrs. Sparse is happier.
-- Removed restriction that IRQ-safe domains can only have IRQ safe parents [3]
-- changes in the way CPU domains are initialized, starting from CPU now
-	* cpu-map node dependency removed
-	* platform driver initiate CPU PM domain setup
-- smaller patchset excluding genpd multiple level changes
-	* they were submitted to ML earlier [2]
-- cpuidle runtime PM and hotplug changes
-- PSCI changes to detect if the f/w supports OSI
-- updated documentation
-- this new cover description
+Cc: Ulf Hansson <ulf.hansson@linaro.org>
+Cc: Kevin Hilman <khilman@linaro.org>
+Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
+Cc: Geert Uytterhoeven <geert@linux-m68k.org>
+Cc: Krzysztof Koz?owski <k.kozlowski@samsung.com>
+Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+---
+Changes since RFC v1 -
+- split into two patches. This patch abstracts genpd locking
+- uses function pointer, instead of runtime function determination
 
-This series allows CPU common hardware blocks to enter idle state, when the
-CPUs are in idle. A lightweight but important power saving in a battery powered
-device is power savings when the device is not suspended. While being active,
-the CPUs can save power by entering low power states with the help of cpuidle
-framework, but the hardware supporting these CPU still remain active. This is
-an effort in reducing power on these h/w block around the CPU during cpuidle.
+ drivers/base/power/domain.c | 109 ++++++++++++++++++++++++++++++--------------
+ include/linux/pm_domain.h   |   5 +-
+ 2 files changed, 79 insertions(+), 35 deletions(-)
 
-Every CPU decides for itself the deepest low power mode possible and enters
-that state to be more power effecient. This is unlike coupled states, where
-CPUs have to wait until the last of the CPU is ready to enter the deepest idle.
-The last of the CPU that enters idle decides for the domain, the best idle
-state the domain may enter. This is also a higher level than what MCPM solves.
-In newer SoC's the coherency and other race conditions coming out of warm reset
-are handled in the firmware. This patchset helps Linux make the right power
-decision for other h/w blocks that are dependent on the CPUs.
-
-The idea is that CPU hierarchy (represented in DT) is modelled as regular
-devices attached to their PM domains, which in turn may be attached to its
-parent domain. When cpuidle puts the CPU to sleep, runtime PM for the CPU
-device is notified, which suspends the CPU device. This triggers a reduction in
-genpd domain usage count. When the last device in a domain suspends, the domain
-is powered off as part of the same call. Similarly, the domain resumes before
-the first CPU device resumes from idle. To achieve this the following changes
-are needed -
-	- genpd to support multiple idle states (more than just on/off)
-	- genpd should support suspend/resume from IRQ safe context
-	- CPU devices set up for runtime PM, as IRQ safe devices
-	- cpuidle calls runtime PM ops when idling
-	- the genpd power downs calling into a gov to determine the deepest idle state 
-	- genpd ->power_on()/->power_off() callbacks to be handled by the platform
-
-Patches from Axel [2] allow genpd to define multiple idle states and choose the
-best idle state from them.
-
-These patches build up on top of that -
-
-- Patches [1, 2] - Genpd changes
-Sets up Generic PM domains to be called from cpuidle. Genpd uses mutexes for
-synchronization. This has to be changed to spinlocks for domains that may be
-called from IRQ safe contexts.
-
-- Patch [3] - CPU PM domains
-Parses DT and sets up PM domains for CPUs and builds up the hierarchy of
-domains and devices. These are bunch of helper functions.
-
-- Patch [4] - ARM cpuidle driver
-Enable ARM cpuidle driver to call runtime PM. Even though this has been done
-for ARM, there is nothing architecture specific about this. Currently, all idle
-states other than ARM clock gating calls into runtime PM. This could also be
-state specific i.e call into runtime PM only after a certain state. The changes
-may be made part of cpuidle framework, but needs discussion.
-
-- Patches [5, 6, 7] - PM domain governor for CPUs
-Introduces a new genpd governor that looks into the per-CPU tick device to
-identify the next CPU wakeup and determine the available sleep time for the
-domain. This along with QoS is used to determine the best idle state for the
-domain. A domains' wake up is determined by the first CPU in that domain to
-wake up. A coherency level domain's (parent of a domain containing CPU devices)
-wake up is determined by the first CPU amongst all the CPUs to wake up.
-Identifying the CPUs and their wakeups are the part of these patches.
-
-- Patches [9, 10] - ARM64 PSCI platform driver
-ARM64 PSCI v1.0 specific. PSCI OS initiated mode supports powering off CPU
-clusters (caches etc, by configuring separate power controllers). These patches
-enable Linux to determine if the f/w supports this mode and if so, uses CPU PM
-domain helper functions to create PM domains and handles the power_on/power_off
-callbacks. The resulting cluster state is passed as an argument to the f/w
-along with the CPU state.
-
-- Patches [11, 12] - DTS changes for MSM8916
-QCOM 410c Dragonboard/96Board specific. Enables CPUidle and cluster idle for
-this SoC. A compatible f/w (in the works) is needed for this support.
-
-Testing and results -
-
-This patchset has been tested on a QCOM 410c Dragonboard with a quad ARM v8 A53
-CPU and 512KB L2 cache. Though not accurate, I see a ~20 mA drop in current
-measured at the battery outside the SoC when the SoC idle is enabled. This
-needs to be redone again to get an accurate measurement. I see about ~5 us
-increase before entering idle state to determine the last man down and about
-~20 us while coming out of idle (in Linux) when the cache is flushed and
-powered down.
-
-This was tested on top of 4.5-rc3. My series along with patches from Axel can
-be found at [4]. Note that [5] has not been published on the ML, is needed for
-this series.
-
-Thanks,
-Lina
-
-[1]. http://comments.gmane.org/gmane.linux.ports.arm.msm/16232
-[2]. http://permalink.gmane.org/gmane.linux.power-management.general/71387
-[3]. http://permalink.gmane.org/gmane.linux.ports.arm.msm/17279
-[4]. https://git.linaro.org/people/lina.iyer/linux-next.git/shortlog/refs/heads/genpd-psci-RFC-v2
-[5]. https://git.linaro.org/people/lina.iyer/linux-next.git/commit/1dfec82c8c133b0fbcd245d739dade087a1dd1fc
-
-Lina Iyer (12):
-  PM / Domains: Abstract genpd locking
-  PM / Domains: Support IRQ safe PM domains
-  PM / cpu_domains: Setup PM domains for CPUs/clusters
-  ARM: cpuidle: Add runtime PM support for CPUs
-  timer: Export next wake up of a CPU
-  PM / cpu_domains: Record CPUs that are part of the domain
-  PM / cpu_domains: Add PM Domain governor for CPUs
-  Documentation / cpu_domains: Describe CPU PM domains setup and
-    governor
-  drivers: firmware: psci: Allow OS Initiated suspend mode
-  ARM64: psci: Support cluster idle states for OS-Initiated
-  ARM64: dts: Add PSCI cpuidle support for MSM8916
-  ARM64: dts: Define CPU power domain for MSM8916
-
- Documentation/power/cpu_domains.txt   |  79 ++++++++
- Documentation/power/devices.txt       |  12 +-
- arch/arm64/boot/dts/qcom/msm8916.dtsi |  49 +++++
- arch/arm64/kernel/psci.c              |  46 ++++-
- drivers/base/power/Makefile           |   1 +
- drivers/base/power/cpu_domains.c      | 361 ++++++++++++++++++++++++++++++++++
- drivers/base/power/domain.c           | 217 ++++++++++++++++----
- drivers/cpuidle/cpuidle-arm.c         |  48 +++++
- drivers/firmware/psci.c               |  45 ++++-
- include/linux/cpu_domains.h           |  35 ++++
- include/linux/pm_domain.h             |  14 +-
- include/linux/psci.h                  |   2 +
- include/linux/tick.h                  |  10 +
- include/uapi/linux/psci.h             |   5 +
- kernel/time/tick-sched.c              |  13 ++
- 15 files changed, 889 insertions(+), 47 deletions(-)
- create mode 100644 Documentation/power/cpu_domains.txt
- create mode 100644 drivers/base/power/cpu_domains.c
- create mode 100644 include/linux/cpu_domains.h
-
+diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+index 3ddd05d..8204615 100644
+--- a/drivers/base/power/domain.c
++++ b/drivers/base/power/domain.c
+@@ -40,6 +40,46 @@
+ static LIST_HEAD(gpd_list);
+ static DEFINE_MUTEX(gpd_list_lock);
+ 
++struct genpd_lock_fns {
++	void (*lock)(struct generic_pm_domain *genpd);
++	void (*lock_nested)(struct generic_pm_domain *genpd, int depth);
++	int (*lock_interruptible)(struct generic_pm_domain *genpd);
++	void (*unlock)(struct generic_pm_domain *genpd);
++};
++
++static void genpd_lock_irq(struct generic_pm_domain *genpd)
++{
++	mutex_lock(&genpd->mlock);
++}
++
++static void genpd_lock_irq_nested(struct generic_pm_domain *genpd,
++					int depth)
++{
++	mutex_lock_nested(&genpd->mlock, depth);
++}
++
++static int genpd_lock_interruptible_irq(struct generic_pm_domain *genpd)
++{
++	return mutex_lock_interruptible(&genpd->mlock);
++}
++
++static void genpd_unlock_irq(struct generic_pm_domain *genpd)
++{
++	return mutex_unlock(&genpd->mlock);
++}
++
++static struct genpd_lock_fns irq_lock = {
++	.lock = genpd_lock_irq,
++	.lock_nested = genpd_lock_irq_nested,
++	.lock_interruptible = genpd_lock_interruptible_irq,
++	.unlock = genpd_unlock_irq,
++};
++
++#define genpd_lock(p)			p->lock_fns->lock(p)
++#define genpd_lock_nested(p, d)		p->lock_fns->lock_nested(p, d)
++#define genpd_lock_interruptible(p)	p->lock_fns->lock_interruptible(p)
++#define genpd_unlock(p)			p->lock_fns->unlock(p)
++
+ /*
+  * Get the generic PM domain for a particular struct device.
+  * This validates the struct device pointer, the PM domain pointer,
+@@ -202,9 +242,9 @@ static int genpd_poweron(struct generic_pm_domain *genpd, unsigned int depth)
+ 
+ 		genpd_sd_counter_inc(master);
+ 
+-		mutex_lock_nested(&master->lock, depth + 1);
++		genpd_lock_nested(master, depth + 1);
+ 		ret = genpd_poweron(master, depth + 1);
+-		mutex_unlock(&master->lock);
++		genpd_unlock(master);
+ 
+ 		if (ret) {
+ 			genpd_sd_counter_dec(master);
+@@ -268,9 +308,9 @@ static int genpd_dev_pm_qos_notifier(struct notifier_block *nb,
+ 		spin_unlock_irq(&dev->power.lock);
+ 
+ 		if (!IS_ERR(genpd)) {
+-			mutex_lock(&genpd->lock);
++			genpd_lock(genpd);
+ 			genpd->max_off_time_changed = true;
+-			mutex_unlock(&genpd->lock);
++			genpd_unlock(genpd);
+ 		}
+ 
+ 		dev = dev->parent;
+@@ -367,9 +407,9 @@ static void genpd_power_off_work_fn(struct work_struct *work)
+ 
+ 	genpd = container_of(work, struct generic_pm_domain, power_off_work);
+ 
+-	mutex_lock(&genpd->lock);
++	genpd_lock(genpd);
+ 	genpd_poweroff(genpd, true);
+-	mutex_unlock(&genpd->lock);
++	genpd_unlock(genpd);
+ }
+ 
+ /**
+@@ -439,9 +479,9 @@ static int pm_genpd_runtime_suspend(struct device *dev)
+ 	if (dev->power.irq_safe)
+ 		return 0;
+ 
+-	mutex_lock(&genpd->lock);
++	genpd_lock(genpd);
+ 	genpd_poweroff(genpd, false);
+-	mutex_unlock(&genpd->lock);
++	genpd_unlock(genpd);
+ 
+ 	return 0;
+ }
+@@ -476,9 +516,9 @@ static int pm_genpd_runtime_resume(struct device *dev)
+ 		goto out;
+ 	}
+ 
+-	mutex_lock(&genpd->lock);
++	genpd_lock(genpd);
+ 	ret = genpd_poweron(genpd, 0);
+-	mutex_unlock(&genpd->lock);
++	genpd_unlock(genpd);
+ 
+ 	if (ret)
+ 		return ret;
+@@ -692,14 +732,14 @@ static int pm_genpd_prepare(struct device *dev)
+ 	if (resume_needed(dev, genpd))
+ 		pm_runtime_resume(dev);
+ 
+-	mutex_lock(&genpd->lock);
++	genpd_lock(genpd);
+ 
+ 	if (genpd->prepared_count++ == 0) {
+ 		genpd->suspended_count = 0;
+ 		genpd->suspend_power_off = genpd->status == GPD_STATE_POWER_OFF;
+ 	}
+ 
+-	mutex_unlock(&genpd->lock);
++	genpd_unlock(genpd);
+ 
+ 	if (genpd->suspend_power_off) {
+ 		pm_runtime_put_noidle(dev);
+@@ -717,12 +757,12 @@ static int pm_genpd_prepare(struct device *dev)
+ 
+ 	ret = pm_generic_prepare(dev);
+ 	if (ret) {
+-		mutex_lock(&genpd->lock);
++		genpd_lock(genpd);
+ 
+ 		if (--genpd->prepared_count == 0)
+ 			genpd->suspend_power_off = false;
+ 
+-		mutex_unlock(&genpd->lock);
++		genpd_unlock(genpd);
+ 		pm_runtime_enable(dev);
+ 	}
+ 
+@@ -1080,13 +1120,13 @@ static void pm_genpd_complete(struct device *dev)
+ 	if (IS_ERR(genpd))
+ 		return;
+ 
+-	mutex_lock(&genpd->lock);
++	genpd_lock(genpd);
+ 
+ 	run_complete = !genpd->suspend_power_off;
+ 	if (--genpd->prepared_count == 0)
+ 		genpd->suspend_power_off = false;
+ 
+-	mutex_unlock(&genpd->lock);
++	genpd_unlock(genpd);
+ 
+ 	if (run_complete) {
+ 		pm_generic_complete(dev);
+@@ -1260,7 +1300,7 @@ int __pm_genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
+ 	if (IS_ERR(gpd_data))
+ 		return PTR_ERR(gpd_data);
+ 
+-	mutex_lock(&genpd->lock);
++	genpd_lock(genpd);
+ 
+ 	if (genpd->prepared_count > 0) {
+ 		ret = -EAGAIN;
+@@ -1277,7 +1317,7 @@ int __pm_genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
+ 	list_add_tail(&gpd_data->base.list_node, &genpd->dev_list);
+ 
+  out:
+-	mutex_unlock(&genpd->lock);
++	genpd_unlock(genpd);
+ 
+ 	if (ret)
+ 		genpd_free_dev_data(dev, gpd_data);
+@@ -1310,7 +1350,7 @@ int pm_genpd_remove_device(struct generic_pm_domain *genpd,
+ 	gpd_data = to_gpd_data(pdd);
+ 	dev_pm_qos_remove_notifier(dev, &gpd_data->nb);
+ 
+-	mutex_lock(&genpd->lock);
++	genpd_lock(genpd);
+ 
+ 	if (genpd->prepared_count > 0) {
+ 		ret = -EAGAIN;
+@@ -1325,14 +1365,14 @@ int pm_genpd_remove_device(struct generic_pm_domain *genpd,
+ 
+ 	list_del_init(&pdd->list_node);
+ 
+-	mutex_unlock(&genpd->lock);
++	genpd_unlock(genpd);
+ 
+ 	genpd_free_dev_data(dev, gpd_data);
+ 
+ 	return 0;
+ 
+  out:
+-	mutex_unlock(&genpd->lock);
++	genpd_unlock(genpd);
+ 	dev_pm_qos_add_notifier(dev, &gpd_data->nb);
+ 
+ 	return ret;
+@@ -1358,8 +1398,8 @@ int pm_genpd_add_subdomain(struct generic_pm_domain *genpd,
+ 	if (!link)
+ 		return -ENOMEM;
+ 
+-	mutex_lock(&subdomain->lock);
+-	mutex_lock_nested(&genpd->lock, SINGLE_DEPTH_NESTING);
++	genpd_lock(subdomain);
++	genpd_lock_nested(genpd, SINGLE_DEPTH_NESTING);
+ 
+ 	if (genpd->status == GPD_STATE_POWER_OFF
+ 	    &&  subdomain->status != GPD_STATE_POWER_OFF) {
+@@ -1382,8 +1422,8 @@ int pm_genpd_add_subdomain(struct generic_pm_domain *genpd,
+ 		genpd_sd_counter_inc(genpd);
+ 
+  out:
+-	mutex_unlock(&genpd->lock);
+-	mutex_unlock(&subdomain->lock);
++	genpd_unlock(genpd);
++	genpd_unlock(subdomain);
+ 	if (ret)
+ 		kfree(link);
+ 	return ret;
+@@ -1404,8 +1444,8 @@ int pm_genpd_remove_subdomain(struct generic_pm_domain *genpd,
+ 	if (IS_ERR_OR_NULL(genpd) || IS_ERR_OR_NULL(subdomain))
+ 		return -EINVAL;
+ 
+-	mutex_lock(&subdomain->lock);
+-	mutex_lock_nested(&genpd->lock, SINGLE_DEPTH_NESTING);
++	genpd_lock(subdomain);
++	genpd_lock_nested(genpd, SINGLE_DEPTH_NESTING);
+ 
+ 	if (!list_empty(&subdomain->slave_links) || subdomain->device_count) {
+ 		pr_warn("%s: unable to remove subdomain %s\n", genpd->name,
+@@ -1429,8 +1469,8 @@ int pm_genpd_remove_subdomain(struct generic_pm_domain *genpd,
+ 	}
+ 
+ out:
+-	mutex_unlock(&genpd->lock);
+-	mutex_unlock(&subdomain->lock);
++	genpd_unlock(genpd);
++	genpd_unlock(subdomain);
+ 
+ 	return ret;
+ }
+@@ -1595,7 +1635,8 @@ void pm_genpd_init(struct generic_pm_domain *genpd,
+ 	INIT_LIST_HEAD(&genpd->master_links);
+ 	INIT_LIST_HEAD(&genpd->slave_links);
+ 	INIT_LIST_HEAD(&genpd->dev_list);
+-	mutex_init(&genpd->lock);
++	mutex_init(&genpd->mlock);
++	genpd->lock_fns = &irq_lock;
+ 	genpd->gov = gov;
+ 	INIT_WORK(&genpd->power_off_work, genpd_power_off_work_fn);
+ 	atomic_set(&genpd->sd_count, 0);
+@@ -1952,9 +1993,9 @@ int genpd_dev_pm_attach(struct device *dev)
+ 	dev->pm_domain->detach = genpd_dev_pm_detach;
+ 	dev->pm_domain->sync = genpd_dev_pm_sync;
+ 
+-	mutex_lock(&pd->lock);
++	genpd_lock(pd);
+ 	ret = genpd_poweron(pd, 0);
+-	mutex_unlock(&pd->lock);
++	genpd_unlock(pd);
+ out:
+ 	return ret ? -EPROBE_DEFER : 0;
+ }
+@@ -2011,7 +2052,7 @@ static int pm_genpd_summary_one(struct seq_file *s,
+ 	struct gpd_link *link;
+ 	int ret;
+ 
+-	ret = mutex_lock_interruptible(&genpd->lock);
++	ret = genpd_lock_interruptible(genpd);
+ 	if (ret)
+ 		return -ERESTARTSYS;
+ 
+@@ -2047,7 +2088,7 @@ static int pm_genpd_summary_one(struct seq_file *s,
+ 
+ 	seq_puts(s, "\n");
+ exit:
+-	mutex_unlock(&genpd->lock);
++	genpd_unlock(genpd);
+ 
+ 	return 0;
+ }
+diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+index 376d7fa..ec5523c 100644
+--- a/include/linux/pm_domain.h
++++ b/include/linux/pm_domain.h
+@@ -44,13 +44,14 @@ struct genpd_power_state {
+ 	u32 param;
+ };
+ 
++struct genpd_lock_fns;
++
+ struct generic_pm_domain {
+ 	struct dev_pm_domain domain;	/* PM domain operations */
+ 	struct list_head gpd_list_node;	/* Node in the global PM domains list */
+ 	struct list_head master_links;	/* Links with PM domain as a master */
+ 	struct list_head slave_links;	/* Links with PM domain as a slave */
+ 	struct list_head dev_list;	/* List of devices */
+-	struct mutex lock;
+ 	struct dev_power_governor *gov;
+ 	struct work_struct power_off_work;
+ 	const char *name;
+@@ -74,6 +75,8 @@ struct generic_pm_domain {
+ 	struct genpd_power_state *states;
+ 	unsigned int state_count; /* number of states */
+ 	unsigned int state_idx; /* state that genpd will go to when off */
++	struct genpd_lock_fns *lock_fns;
++	struct mutex mlock;
+ 
+ };
+ 
 -- 
 2.1.4
