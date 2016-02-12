@@ -1,52 +1,61 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 12 Feb 2016 14:41:29 -0800
-Subject: [PATCH] arm: dts: AM57XX: Correct the thermal thresholds
-In-Reply-To: <CAGo_u6r8-LJBWWrew0fV50Q+JnCxDj9PD57+9NoDm5TqCWL=jw@mail.gmail.com>
-References: <1454924705-8382-1-git-send-email-j-keerthy@ti.com>
- <20160209220901.GC28102@localhost.localdomain>
- <56BA6530.4030102@ti.com> <20160212222347.GO19432@atomide.com>
- <CAGo_u6r8-LJBWWrew0fV50Q+JnCxDj9PD57+9NoDm5TqCWL=jw@mail.gmail.com>
-Message-ID: <20160212224129.GP19432@atomide.com>
+From: robert.moore@intel.com (Moore, Robert)
+Date: Fri, 12 Feb 2016 22:47:19 +0000
+Subject: [PATCH v2 6/9] ACPI: add definition of DBG2 subtypes
+In-Reply-To: <1455299022-11641-7-git-send-email-aleksey.makarov@linaro.org>
+References: <1455299022-11641-1-git-send-email-aleksey.makarov@linaro.org>
+ <1455299022-11641-7-git-send-email-aleksey.makarov@linaro.org>
+Message-ID: <94F2FBAB4432B54E8AACC7DFDE6C92E37DA9BA10@ORSMSX112.amr.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nishanth Menon <nm@ti.com> [160212 14:32]:
-> On Fri, Feb 12, 2016 at 4:23 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > * Nishanth Menon <nm@ti.com> [160209 14:17]:
-> >> On 02/09/2016 04:09 PM, Eduardo Valentin wrote:
-> >> > On Mon, Feb 08, 2016 at 03:15:05PM +0530, Keerthy wrote:
-> >> >> The thermal threholds for am57xx are different from that of dra7.
-> >> >> Correcting the thresholds for the same.
-> >> >>
-> >> >> Signed-off-by: Keerthy <j-keerthy@ti.com>
-> >> >> ---
-> >> >>
-> >> >> Depends on: https://lkml.org/lkml/2016/2/8/90
-> >> >>
-> >> >>  arch/arm/boot/dts/am57xx-beagle-x15.dts | 24 ++++++++++++++++++++++++
-> >> >>  1 file changed, 24 insertions(+)
-> >> >>
-> >> >> Index: linux/arch/arm/boot/dts/am57xx-beagle-x15.dts
-> >> >> ===================================================================
-> >> >> --- linux.orig/arch/arm/boot/dts/am57xx-beagle-x15.dts     2016-02-08 14:57:05.514959101 +0530
-> >> >> +++ linux/arch/arm/boot/dts/am57xx-beagle-x15.dts  2016-02-08 14:57:05.510959168 +0530
-> >> >
-> >> > Sorry, did not bother to check, but is this the only user of am57xx?
-> >>
-> >> we will have AM57xx-IDK as well coming down the line. we already have
-> >> arch/arm/boot/dts/am57xx-cl-som-am57x.dts
-> >> arch/arm/boot/dts/am57xx-sbc-am57x.dts - not really sure what grade of
-> >> silicon are used in cl-SOM and sbc boards.
-> >
-> > Hmm can this one wait for v4.6 or is it critical for v4.5-rc
-> > cycle?
+OK, we'll take these for the next release of ACPICA.
+Thanks,
+Bob
+
+
+> -----Original Message-----
+> From: Aleksey Makarov [mailto:aleksey.makarov at linaro.org]
+> Sent: Friday, February 12, 2016 9:44 AM
+> To: linux-acpi at vger.kernel.org
+> Cc: linux-serial at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; Aleksey Makarov; Russell King; Greg Kroah-
+> Hartman; Rafael J . Wysocki; Leif Lindholm; Graeme Gregory; Al Stone;
+> Christopher Covington; Moore, Robert; Zheng, Lv; Wysocki, Rafael J; Len
+> Brown; devel at acpica.org
+> Subject: [PATCH v2 6/9] ACPI: add definition of DBG2 subtypes
 > 
-> personally, I'd like to NAK this patch -> lack of reference
-> documentation, and guidance for various AM57xx boards in a generic
-> patch should probably be followed IMHO.
-
-OK let's wait for that then.
-
-Regards,
-
-Tony
+> The recent version of Microsoft Debug Port Table 2 (DBG2) [1] specifies
+> additional serial debug port subtypes.  These constants are also referred
+> by Serial Port Console Redirection Table (SPCR) [2]
+> 
+> Add these constants.
+> 
+> [1] https://msdn.microsoft.com/en-
+> us/library/windows/hardware/dn639131(v=vs.85).aspx
+> [2] https://msdn.microsoft.com/en-
+> us/library/windows/hardware/dn639132(v=vs.85).aspx
+> 
+> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
+> Tested-by: Christopher Covington <cov@codeaurora.org>
+> ---
+>  include/acpi/actbl2.h | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/include/acpi/actbl2.h b/include/acpi/actbl2.h index
+> a4ef625..e9930ab 100644
+> --- a/include/acpi/actbl2.h
+> +++ b/include/acpi/actbl2.h
+> @@ -371,6 +371,11 @@ struct acpi_dbg2_device {
+> 
+>  #define ACPI_DBG2_16550_COMPATIBLE  0x0000
+>  #define ACPI_DBG2_16550_SUBSET      0x0001
+> +#define ACPI_DBG2_ARM_PL011         0x0003
+> +#define ACPI_DBG2_ARM_SBSA_32BIT    0x000d
+> +#define ACPI_DBG2_ARM_SBSA_GENERIC  0x000e
+> +#define ACPI_DBG2_ARM_DCC           0x000f
+> +#define ACPI_DBG2_BCM2835           0x0010
+> 
+>  #define ACPI_DBG2_1394_STANDARD     0x0000
+> 
+> --
+> 2.7.0
