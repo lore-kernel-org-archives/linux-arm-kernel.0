@@ -1,56 +1,93 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Fri, 12 Feb 2016 18:27:32 +0200
-Subject: [PATCH V2 3/6] stm class: provision for statically assigned
- masterIDs
-In-Reply-To: <CANLsYkw=mG+ch8QzxmbwWs9o+mndVNo1MuqXcrPrNJYj_SQcHQ@mail.gmail.com>
-References: <1454487337-30184-1-git-send-email-zhang.chunyan@linaro.org>
- <1454487337-30184-4-git-send-email-zhang.chunyan@linaro.org>
- <87mvrf5ngl.fsf@ashishki-desk.ger.corp.intel.com>
- <CANLsYky2twQ98u241YyHD=atYRp1N56YVHUQNY2E2Ljsq0cseA@mail.gmail.com>
- <87twlj49k7.fsf@ashishki-desk.ger.corp.intel.com>
- <CANLsYkw=mG+ch8QzxmbwWs9o+mndVNo1MuqXcrPrNJYj_SQcHQ@mail.gmail.com>
-Message-ID: <87r3gh3nd7.fsf@ashishki-desk.ger.corp.intel.com>
+From: alexdeucher@gmail.com (Alex Deucher)
+Date: Fri, 12 Feb 2016 11:31:04 -0500
+Subject: [PATCH 04/17] drm/amdgpu: removed optional dummy encoder
+ mode_fixup function.
+In-Reply-To: <1455285069-2819-5-git-send-email-palminha@synopsys.com>
+References: <daniel.vetter@ffwll.ch,>
+ <1455285069-2819-1-git-send-email-palminha@synopsys.com>
+ <1455285069-2819-5-git-send-email-palminha@synopsys.com>
+Message-ID: <CADnq5_N1smWVyhC68fwS4DO_E9NJ=ztSZMaSoZ3YKvSCtaM8Zg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mathieu Poirier <mathieu.poirier@linaro.org> writes:
+On Fri, Feb 12, 2016 at 8:50 AM, Carlos Palminha
+<CARLOS.PALMINHA@synopsys.com> wrote:
+> ---
+>  drivers/gpu/drm/amd/amdgpu/dce_v10_0.c | 8 --------
+>  drivers/gpu/drm/amd/amdgpu/dce_v11_0.c | 8 --------
+>  drivers/gpu/drm/amd/amdgpu/dce_v8_0.c  | 8 --------
+>  3 files changed, 24 deletions(-)
 
-> On 8 February 2016 at 06:26, Alexander Shishkin
-> <alexander.shishkin@linux.intel.com> wrote:
->> This $end==$start situation itself may be ambiguous and can be
->> interpreted either as having just one *static* master ID fixed for all
->> SW writers (what I assumed from your commit message) or as having a
->> floating master ID, which changes of its own accord and is not
->> controllable by software.
+Reviewed-by: Alex Deucher <alexander.deucher@amd.com>
+
 >
-> Some clarification here.
+> diff --git a/drivers/gpu/drm/amd/amdgpu/dce_v10_0.c b/drivers/gpu/drm/amd/amdgpu/dce_v10_0.c
+> index 093599a..3483018 100644
+> --- a/drivers/gpu/drm/amd/amdgpu/dce_v10_0.c
+> +++ b/drivers/gpu/drm/amd/amdgpu/dce_v10_0.c
+> @@ -3624,16 +3624,8 @@ dce_v10_0_ext_dpms(struct drm_encoder *encoder, int mode)
 >
-> On ARM from a SW point of view $end == $start and that doesn't change
-> (with regards to masterIDs) .  The ambiguity comes from the fact that
-> on other platforms where masterID configuration does change and is
-> important, the condition $end == $start could also be valid.
-
-Yes, that's what I was saying. The thing is, on the system-under-tracing
-side these two situations are not very different from one
-another. Master IDs are really just numbers without any semantics
-attached to them in the sense that they are not covered by the mipi spec
-or any other standard (to my knowledge).
-
-The difference is in the way we map channels to masters. One way is to
-allocate a distinct set of channels for each master (the way Intel Trace
-Hub does it); another way is to share the same set of channels between
-multiple masters. So we can describe this as "hardware implements the
-same set of channels across multiple masters" or something along those
-lines.
-
-Actually, in the latter scheme of things you can also have multiple
-masters, at least theoretically. Say, you have masters [0..15], each
-with distinct set of channels, but depending on hardware state these
-masters actually end up as $state*16+$masterID in the STP stream.
-
-So we might also think about differentiating between the hardware
-masters (0 though 15 in the above example) and STP masters.
-
-Regards,
---
-Alex
+>  }
+>
+> -static bool dce_v10_0_ext_mode_fixup(struct drm_encoder *encoder,
+> -                                   const struct drm_display_mode *mode,
+> -                                   struct drm_display_mode *adjusted_mode)
+> -{
+> -       return true;
+> -}
+> -
+>  static const struct drm_encoder_helper_funcs dce_v10_0_ext_helper_funcs = {
+>         .dpms = dce_v10_0_ext_dpms,
+> -       .mode_fixup = dce_v10_0_ext_mode_fixup,
+>         .prepare = dce_v10_0_ext_prepare,
+>         .mode_set = dce_v10_0_ext_mode_set,
+>         .commit = dce_v10_0_ext_commit,
+> diff --git a/drivers/gpu/drm/amd/amdgpu/dce_v11_0.c b/drivers/gpu/drm/amd/amdgpu/dce_v11_0.c
+> index 8e67249..36deea1 100644
+> --- a/drivers/gpu/drm/amd/amdgpu/dce_v11_0.c
+> +++ b/drivers/gpu/drm/amd/amdgpu/dce_v11_0.c
+> @@ -3619,16 +3619,8 @@ dce_v11_0_ext_dpms(struct drm_encoder *encoder, int mode)
+>
+>  }
+>
+> -static bool dce_v11_0_ext_mode_fixup(struct drm_encoder *encoder,
+> -                                   const struct drm_display_mode *mode,
+> -                                   struct drm_display_mode *adjusted_mode)
+> -{
+> -       return true;
+> -}
+> -
+>  static const struct drm_encoder_helper_funcs dce_v11_0_ext_helper_funcs = {
+>         .dpms = dce_v11_0_ext_dpms,
+> -       .mode_fixup = dce_v11_0_ext_mode_fixup,
+>         .prepare = dce_v11_0_ext_prepare,
+>         .mode_set = dce_v11_0_ext_mode_set,
+>         .commit = dce_v11_0_ext_commit,
+> diff --git a/drivers/gpu/drm/amd/amdgpu/dce_v8_0.c b/drivers/gpu/drm/amd/amdgpu/dce_v8_0.c
+> index d0e128c..25dd8b6 100644
+> --- a/drivers/gpu/drm/amd/amdgpu/dce_v8_0.c
+> +++ b/drivers/gpu/drm/amd/amdgpu/dce_v8_0.c
+> @@ -3554,16 +3554,8 @@ dce_v8_0_ext_dpms(struct drm_encoder *encoder, int mode)
+>
+>  }
+>
+> -static bool dce_v8_0_ext_mode_fixup(struct drm_encoder *encoder,
+> -                                   const struct drm_display_mode *mode,
+> -                                   struct drm_display_mode *adjusted_mode)
+> -{
+> -       return true;
+> -}
+> -
+>  static const struct drm_encoder_helper_funcs dce_v8_0_ext_helper_funcs = {
+>         .dpms = dce_v8_0_ext_dpms,
+> -       .mode_fixup = dce_v8_0_ext_mode_fixup,
+>         .prepare = dce_v8_0_ext_prepare,
+>         .mode_set = dce_v8_0_ext_mode_set,
+>         .commit = dce_v8_0_ext_commit,
+> --
+> 2.5.0
+>
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
