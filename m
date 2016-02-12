@@ -1,74 +1,139 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 12 Feb 2016 15:14:04 -0800
-Subject: [PATCH V5 11/14] soc: tegra: pmc: Add generic PM domain support
-In-Reply-To: <CAPDyKFpnUJA2pLSUOw8rkjyXLY6b__TM=38jsvYAZVhe+DS=zg@mail.gmail.com>
- (Ulf Hansson's message of "Thu, 4 Feb 2016 16:44:59 +0100")
-References: <1453998832-27383-1-git-send-email-jonathanh@nvidia.com>
- <1453998832-27383-12-git-send-email-jonathanh@nvidia.com>
- <CAPDyKFpnUJA2pLSUOw8rkjyXLY6b__TM=38jsvYAZVhe+DS=zg@mail.gmail.com>
-Message-ID: <7hh9hdzflv.fsf@baylibre.com>
+From: kirill@shutemov.name (Kirill A. Shutemov)
+Date: Sat, 13 Feb 2016 01:15:10 +0200
+Subject: [BUG] random kernel crashes after THP rework on s390 (maybe also
+ on PowerPC and ARM)
+In-Reply-To: <20160212181640.4eabb85f@thinkpad>
+References: <20160211192223.4b517057@thinkpad>
+ <20160211190942.GA10244@node.shutemov.name>
+ <20160211205702.24f0d17a@thinkpad>
+ <20160212154116.GA15142@node.shutemov.name>
+ <56BE00E7.1010303@de.ibm.com> <20160212181640.4eabb85f@thinkpad>
+Message-ID: <20160212231510.GB15142@node.shutemov.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ulf Hansson <ulf.hansson@linaro.org> writes:
+On Fri, Feb 12, 2016 at 06:16:40PM +0100, Gerald Schaefer wrote:
+> On Fri, 12 Feb 2016 16:57:27 +0100
+> Christian Borntraeger <borntraeger@de.ibm.com> wrote:
+> 
+> > On 02/12/2016 04:41 PM, Kirill A. Shutemov wrote:
+> > > On Thu, Feb 11, 2016 at 08:57:02PM +0100, Gerald Schaefer wrote:
+> > >> On Thu, 11 Feb 2016 21:09:42 +0200
+> > >> "Kirill A. Shutemov" <kirill@shutemov.name> wrote:
+> > >>
+> > >>> On Thu, Feb 11, 2016 at 07:22:23PM +0100, Gerald Schaefer wrote:
+> > >>>> Hi,
+> > >>>>
+> > >>>> Sebastian Ott reported random kernel crashes beginning with v4.5-rc1 and
+> > >>>> he also bisected this to commit 61f5d698 "mm: re-enable THP". Further
+> > >>>> review of the THP rework patches, which cannot be bisected, revealed
+> > >>>> commit fecffad "s390, thp: remove infrastructure for handling splitting PMDs"
+> > >>>> (and also similar commits for other archs).
+> > >>>>
+> > >>>> This commit removes the THP splitting bit and also the architecture
+> > >>>> implementation of pmdp_splitting_flush(), which took care of the IPI for
+> > >>>> fast_gup serialization. The commit message says
+> > >>>>
+> > >>>>     pmdp_splitting_flush() is not needed too: on splitting PMD we will do
+> > >>>>     pmdp_clear_flush() + set_pte_at().  pmdp_clear_flush() will do IPI as
+> > >>>>     needed for fast_gup
+> > >>>>
+> > >>>> The assumption that a TLB flush will also produce an IPI is wrong on s390,
+> > >>>> and maybe also on other architectures, and I thought that this was actually
+> > >>>> the main reason for having an arch-specific pmdp_splitting_flush().
+> > >>>>
+> > >>>> At least PowerPC and ARM also had an individual implementation of
+> > >>>> pmdp_splitting_flush() that used kick_all_cpus_sync() instead of a TLB
+> > >>>> flush to send the IPI, and those were also removed. Putting the arch
+> > >>>> maintainers and mailing lists on cc to verify.
+> > >>>>
+> > >>>> On s390 this will break the IPI serialization against fast_gup, which
+> > >>>> would certainly explain the random kernel crashes, please revert or fix
+> > >>>> the pmdp_splitting_flush() removal.
+> > >>>
+> > >>> Sorry for that.
+> > >>>
+> > >>> I believe, the problem was already addressed for PowerPC:
+> > >>>
+> > >>> http://lkml.kernel.org/g/454980831-16631-1-git-send-email-aneesh.kumar at linux.vnet.ibm.com
+> > >>>
+> > >>> I think kick_all_cpus_sync() in arch-specific pmdp_invalidate() would do
+> > >>> the trick, right?
+> > >>
+> > >> Hmm, not sure about that. After pmdp_invalidate(), a pmd_none() check in
+> > >> fast_gup will still return false, because the pmd is not empty (at least
+> > >> on s390). So I don't see spontaneously how it will help fast_gup to break
+> > >> out to the slow path in case of THP splitting.
+> > > 
+> > > What pmdp_flush_direct() does in pmdp_invalidate()? It's hard to unwrap for me :-/
+> > > Does it make the pmd !pmd_present()?
+> > 
+> > It uses the idte instruction, which in an atomic fashion flushes the associated
+> > TLB entry and changes the value of the pmd entry to invalid. This comes from the
+> > HW requirement to not  change a PTE/PMD that might be still in use, other than 
+> > with special instructions that does the tlb handling and the invalidation together.
+> 
+> Correct, and it does _not_ make the pmd !pmd_present(), that would only be the
+> case after a _clear_flush(). It only marks the pmd as invalid and flushes,
+> so that it cannot generate a new TLB entry before the following pmd_populate(),
+> but it keeps its other content. This is to fulfill the requirements outlined in
+> the comment in mm/huge_memory.c before the call to pmdp_invalidate(). And
+> independent from that comment, we would need such an _invalidate() or
+> _clear_flush() on s390 before the pmd_populate() because of the HW details
+> that Christian described.
+> 
+> Reading the comment again, I do now notice that it also says "mark the current
+> pmd notpresent", which we cannot do w/o losing the huge and (formerly) splitting
+> bits, but it also shouldn't be needed to provide the "single TLB guarantee" that
+> is required from the comment. So, a pmd_present() check on s390 in this state
+> would still return true. Not sure yet if this is a problem, need more thinking,
+> this behavior was already present before the THP rework but maybe it was OK
+> before and is not OK now.
+> 
+> At least for fast_gup this should not be a problem though.
 
-> On 28 January 2016 at 17:33, Jon Hunter <jonathanh@nvidia.com> wrote:
->> Adds generic PM support to the PMC driver where the PM domains are
->> populated from device-tree and the PM domain consumer devices are
->> bound to their relevant PM domains via device-tree as well.
->>
->> Update the tegra_powergate_sequence_power_up() API so that internally
->> it calls the same tegra_powergate_xxx functions that are used by the
->> tegra generic power domain code for consistency.
->>
->> This is based upon work by Thierry Reding <treding@nvidia.com>
->> and Vince Hsu <vinceh@nvidia.com>.
->>
->> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+I'm trying to wrap my head around the issue and I don't think missing
+serialization with gup_fast is the cause -- we just don't need it
+anymore.
 
-[...]
+Previously, __split_huge_page_splitting() required serialization against
+gup_fast to make sure nobody can obtain new reference to the page after
+__split_huge_page_splitting() returns. This was a way to stabilize page
+references before starting to distribute them from head page to tail
+pages.
 
->> +static void tegra_powergate_disable_clocks(struct tegra_powergate *pg)
->> +{
->> +       unsigned int i;
->> +
->> +       for (i = 0; i < pg->num_clks; i++)
->> +               clk_disable_unprepare(pg->clks[i]);
->> +}
->> +
->> +static int tegra_powergate_enable_clocks(struct tegra_powergate *pg)
->> +{
->> +       unsigned int i;
->> +       int err;
->> +
->> +       for (i = 0; i < pg->num_clks; i++) {
->> +               err = clk_prepare_enable(pg->clks[i]);
->> +               if (err)
->> +                       goto out;
->> +       }
->> +
->> +       return 0;
->> +
->> +out:
->> +       while (i--)
->> +               clk_disable_unprepare(pg->clks[i]);
->> +
->> +       return err;
->> +}
->
-> I have seen similar code around in other PM domains, dealing with
-> enabling/disabling a *list* of clocks.
-> Perhaps we should invent a new clock API that helps with this to
-> prevents code duplication!?
+With new refcounting, we don't care about this. Splitting PMD is now
+decoupled from splitting underlying compound page. It's okay to get new
+pins after split_huge_pmd(). To stabilize page references during
+split_huge_page() we rely on setting up migration entries once all
+pmds are split into page table entries.
 
-What about the pm_clk_* API which was built for tracking clocks
-associated with devices for runtime PM.
+The theory that serialization against gup_fast is not a root cause of the
+crashes is consistent no crashes on arm64. Problem is somewhere else.
+ 
+> > (It also does some some other magic to the attach_count, which might hold off
+> > finish_arch_post_lock_switch while some flushing is happening, but this should
+> > be unrelated here)
+> > 
+> > 
+> > > I'm also confused by pmd_none() is equal to !pmd_present() on s390. Hm?
+> > 
+> > Don't know, Gerald or Martin?
+> 
+> The implementation frequently changes depending on how many new bits Martin
+> needs to squeeze out :-)
 
-IOW, you could pm_clk_add(pg->pmc->dev, pg->clks[i]) and then your
-_enable_clocks() would become pm_clk_suspend() an dyour
-_disable_clocks() would become pm_clk_resume().
+One bit was freed up by the commit you've pointed to as a cause.
+I wounder If it's possible that screw up something while removing it? I
+don't see it, but who knows.
 
-I might not be following the mapping between PMC and PGs though so not
-sure pg->pmc->dev is the right struct device, but you get the idea.
+Could you check if revert of fecffad25458 helps?
 
-Kevin
+And could you share how crashes looks like? I haven't seen backtraces yet.
+
+> We don't have a _PAGE_PRESENT bit for pmds, so pmd_present() just checks if the
+> entry is not empty. pmd_none() of course does the opposite, it checks if it is
+> empty.
+
+-- 
+ Kirill A. Shutemov
