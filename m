@@ -1,21 +1,30 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 12 Feb 2016 20:23:34 +0100
-Subject: [PATCH] i2c: uniphier: fix typos in error messages
-In-Reply-To: <1453799361-21910-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1453799361-21910-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20160212192334.GO1520@katana>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Fri, 12 Feb 2016 11:24:38 -0800
+Subject: [PATCH linux-next v2 01/14] mtd: spi-nor: remove
+ micron_quad_enable()
+In-Reply-To: <56B1E1A5.9060902@atmel.com>
+References: <A765B125120D1346A63912DDE6D8B6310BF57A75@NTXXIAMBX02.xacn.micron.com>
+ <56B1E1A5.9060902@atmel.com>
+Message-ID: <20160212192438.GD21465@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 26, 2016 at 06:09:21PM +0900, Masahiro Yamada wrote:
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+On Wed, Feb 03, 2016 at 12:16:53PM +0100, Cyrille Pitchen wrote:
 
-Applied to for-current, thanks!
+> So in its current state, micron_quad_enable() prevents us from using Micron
+> memories for Quad SPI operations. Some code is missing to make it work.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160212/d4ac609d/attachment-0001.sig>
+TL;DR: the original code adding micron_quad_enable() was broken and
+should never have been merged (sorry, my bad). Next time, please test
+your changes Bean.
+
+> As I said in the patch description, using the SPI 4-4-4 protocol is not
+> relevant for MTD usage. It would be worth for XIP operations but this is not the
+> purpose of the spi-nor driver.
+
+I'm not completely opposed to using it, if someone can support it well,
+test it, and prove it actually provides real benefits. But none of the
+above have been satisfied yet.
+
+Regards,
+Brian
