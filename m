@@ -1,41 +1,57 @@
 From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Thu, 11 Feb 2016 19:15:51 -0800
-Subject: [PATCH v8 2/4] tee: generic TEE subsystem
-In-Reply-To: <1455210877-15748-3-git-send-email-jens.wiklander@linaro.org>
-References: <1455210877-15748-1-git-send-email-jens.wiklander@linaro.org>
- <1455210877-15748-3-git-send-email-jens.wiklander@linaro.org>
-Message-ID: <20160212031551.GA10157@kroah.com>
+Date: Thu, 11 Feb 2016 19:17:13 -0800
+Subject: [PATCH 4/7] serial: 8250_omap: Fix PM regression with deferred
+ probe for pm_runtime_reinit
+In-Reply-To: <1455145370-20301-5-git-send-email-tony@atomide.com>
+References: <1455145370-20301-1-git-send-email-tony@atomide.com>
+ <1455145370-20301-5-git-send-email-tony@atomide.com>
+Message-ID: <20160212031713.GB10157@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 11, 2016 at 06:14:35PM +0100, Jens Wiklander wrote:
-> Initial patch for generic TEE subsystem.
-> This subsystem provides:
-> * Registration/un-registration of TEE drivers.
-> * Shared memory between normal world and secure world.
-> * Ioctl interface for interaction with user space.
-> * Sysfs implementation_id of TEE driver
+On Wed, Feb 10, 2016 at 03:02:47PM -0800, Tony Lindgren wrote:
+> Commit 5de85b9d57ab ("PM / runtime: Re-init runtime PM states at probe
+> error and driver unbind") introduced pm_runtime_reinit() that is used
+> to reinitialize PM runtime after -EPROBE_DEFER. This allows shutting
+> down the device after a failed probe.
 > 
-> A TEE (Trusted Execution Environment) driver is a driver that interfaces
-> with a trusted OS running in some secure environment, for example,
-> TrustZone on ARM cpus, or a separate secure co-processor etc.
+> However, for drivers using pm_runtime_use_autosuspend() this can cause
+> a state where suspend callback is never called after -EPROBE_DEFER.
+> On the following device driver probe, hardware state is different from
+> the PM runtime state causing omap_device to produce the following
+> error:
 > 
-> The TEE subsystem can serve a TEE driver for a Global Platform compliant
-> TEE, but it's not limited to only Global Platform TEEs.
+> omap_device_enable() called from invalid state 1
 > 
-> This patch builds on other similar implementations trying to solve
-> the same problem:
-> * "optee_linuxdriver" by among others
->   Jean-michel DELORME<jean-michel.delorme@st.com> and
->   Emmanuel MICHEL <emmanuel.michel@st.com>
-> * "Generic TrustZone Driver" by Javier Gonz?lez <javier@javigon.com>
+> And with omap_device and omap hardware being picky for PM, this will
+> block any deeper idle states in hardware.
 > 
-> Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
+> The solution is to fix the drivers to follow the PM runtime documentation:
+> 
+> 1. For sections of code that needs the device disabled, use
+>    pm_runtime_put_sync_suspend() if pm_runtime_set_autosuspend() has
+>    been set.
+> 
+> 2. For driver exit code, use pm_runtime_dont_use_autosuspend() before
+>    pm_runtime_put_sync() if pm_runtime_use_autosuspend() has been
+>    set.
+> 
+> Fixes: 5de85b9d57ab ("PM / runtime: Re-init runtime PM states at probe
+> error and driver unbind")
+> Cc: linux-serial at vger.kernel.org
+> Cc: Alan Stern <stern@rowland.harvard.edu>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Kevin Hilman <khilman@baylibre.com>
+> Cc: Nishanth Menon <nm@ti.com>
+> Cc: Peter Hurley <peter@hurleysoftware.com>
+> Cc: Rafael J. Wysocki <rafael@kernel.org>
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Cc: Tero Kristo <t-kristo@ti.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+> 
+> Greg & Peter, I'd like to merge this along with other related fixes
+> via the ARM SoC tree if no objections, please review and ack if this
+> look OK to you.
 
-I need you to get other people to review this before I can accept this
-series.  Please do that, surely someone else cares about this code
-becides you?
-
-thanks,
-
-greg k-h
+Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
