@@ -1,62 +1,115 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 12 Feb 2016 19:01:49 +0100
-Subject: [PATCH v5sub1 7/8] arm64: move kernel image to base of vmalloc
- area
-In-Reply-To: <56BE1AC3.409@arm.com>
-References: <1454324093-15998-1-git-send-email-ard.biesheuvel@linaro.org>
- <1454324093-15998-8-git-send-email-ard.biesheuvel@linaro.org>
- <56BE1AC3.409@arm.com>
-Message-ID: <CAKv+Gu9evDuU_4seC2SVhFkzu_u5cUUaP0_cTk9po035mjaCzw@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 12 Feb 2016 19:04:26 +0100
+Subject: [PATCH net-next 03/10] net: mvneta: bm: add support for hardware
+ buffer management
+In-Reply-To: <CAPv3WKeEXUmH4gqBm7=gkNYwjhR1YybCBZJND_Vidj+Q6U_8=g@mail.gmail.com>
+ (Marcin Wojtas's message of "Tue, 12 Jan 2016 21:12:25 +0100")
+References: <1452625834-22166-1-git-send-email-gregory.clement@free-electrons.com>
+ <1452625834-22166-4-git-send-email-gregory.clement@free-electrons.com>
+ <CAPv3WKeEXUmH4gqBm7=gkNYwjhR1YybCBZJND_Vidj+Q6U_8=g@mail.gmail.com>
+Message-ID: <87a8n5x0t1.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 February 2016 at 18:47, James Morse <james.morse@arm.com> wrote:
-> Hi Ard,
->
-> On 01/02/16 10:54, Ard Biesheuvel wrote:
->> This moves the module area to right before the vmalloc area, and
->> moves the kernel image to the base of the vmalloc area. This is
->> an intermediate step towards implementing KASLR, which allows the
->> kernel image to be located anywhere in the vmalloc area.
->
-> I've rebased hibernate onto for-next/core, and this patch leads to the hibernate
-> core code falling down a kernel shaped hole in the linear map.
->
-> The hibernate code assumes that for zones returned by for_each_populated_zone(),
-> if pfn_valid() says a page is present, then it is okay to access the page via
-> page_address(pfn_to_page(pfn)). But for pfns that correspond to the kernel text,
-> this is still returning an address in the linear map, which isn't mapped...
->
-> I'm not sure what the correct fix is here.
-> Should this sort of walk be valid?
->
+Hi Marcin,
+ 
+ On mar., janv. 12 2016, Marcin Wojtas <mw@semihalf.com> wrote:
 
-I think the correct fix would be to mark the [_stext, _etext] interval
-as NOMAP. That will also simplify the mapping routine where I now
-check manually whether a memblock intersects that interval. And it
-should make this particular piece of code behave.
+> Hi Gregory,
+>
+> I have two remarks to my own code. Please let me know before patch v2,
+> I will provide you with corrected version (I already did it locally).
 
-However, you would still need to preserve the contents of the
-interval, since the generic hibernate routines will not do that
-anymore after this change.
+I resumled my work on the subject yestaerdy, and I just remebered this
+email now.
 
-I will experiment with this on Monday, and report back.
+Could you provide the correct version of your patches?
 
-Thanks,
-Ard.
-
+Thanks!
 
 >
-> From include/linux/mm.h:
->> static __always_inline void *lowmem_page_address(const struct page *page)
->> {
->>       return __va(PFN_PHYS(page_to_pfn(page)));
->> }
+>> @@ -1556,17 +1777,20 @@ static void mvneta_rxq_drop_pkts(struct mvneta_port *pp,
+>>         int rx_done, i;
+>>
+>>         rx_done = mvneta_rxq_busy_desc_num_get(pp, rxq);
+>> +       if (rx_done)
+>> +               mvneta_rxq_desc_num_update(pp, rxq, rx_done, rx_done);
+>> +
+>> +       if (pp->bm_priv)
+>> +               return;
+>> +
 >
+> This is wrong - buffers that are supposed to be dropped should return
+> to bm_pool.
 >
-> Suggestions welcome!
+>> @@ -1587,23 +1812,35 @@ static int mvneta_rx(struct mvneta_port *pp, int rx_todo,
+>>
+>>         rx_done = 0;
+>>
+>> +       bm_in_use = pp->bm_priv ? true : false;
+>> +
+>>         /* Fairness NAPI loop */
+>>         while (rx_done < rx_todo) {
+>>                 struct mvneta_rx_desc *rx_desc = mvneta_rxq_next_desc_get(rxq);
+>> +               struct mvneta_bm_pool *bm_pool = NULL;
+>>                 struct sk_buff *skb;
+>>                 unsigned char *data;
+>>                 dma_addr_t phys_addr;
+>> -               u32 rx_status;
+>> +               u32 rx_status, frag_size;
+>>                 int rx_bytes, err;
+>> +               u8 pool_id;
+>>
+>>                 rx_done++;
+>>                 rx_status = rx_desc->status;
+>>                 rx_bytes = rx_desc->data_size - (ETH_FCS_LEN + MVNETA_MH_SIZE);
+>>                 data = (unsigned char *)rx_desc->buf_cookie;
+>>                 phys_addr = rx_desc->buf_phys_addr;
+>> +               if (bm_in_use) {
+>> +                       pool_id = MVNETA_RX_GET_BM_POOL_ID(rx_desc);
+>> +                       bm_pool = &pp->bm_priv->bm_pools[pool_id];
+>> +               }
+>>
+>>                 if (!mvneta_rxq_desc_is_first_last(rx_status) ||
+>>                     (rx_status & MVNETA_RXD_ERR_SUMMARY)) {
+>> +                       /* Return the buffer to the pool */
+>> +                       if (bm_in_use)
+>> +                               mvneta_bm_pool_put_bp(pp->bm_priv, bm_pool,
+>> +                                                     rx_desc->buf_phys_addr);
+>>                 err_drop_frame:
+>>                         dev->stats.rx_errors++;
+>>                         mvneta_rx_error(pp, rx_desc);
+>> @@ -1633,25 +1870,38 @@ static int mvneta_rx(struct mvneta_port *pp, int rx_todo,
+>>                         rcvd_pkts++;
+>>                         rcvd_bytes += rx_bytes;
+>>
+>> +                       /* Return the buffer to the pool */
+>> +                       if (bm_in_use)
+>> +                               mvneta_bm_pool_put_bp(pp->bm_priv, bm_pool,
+>> +                                                     rx_desc->buf_phys_addr);
+>> +
+>>                         /* leave the descriptor and buffer untouched */
+>>                         continue;
+>>                 }
+>>
+>>                 /* Refill processing */
+>> -               err = mvneta_rx_refill(pp, rx_desc);
+>> +               err = bm_in_use ? mvneta_bm_pool_refill(pp->bm_priv, bm_pool) :
+>> +                                 mvneta_rx_refill(pp, rx_desc);
+>>                 if (err) {
+>>                         netdev_err(dev, "Linux processing - Can't refill\n");
+>>                         rxq->missed++;
+>>                         goto err_drop_frame;
 >
+> Wrong - on refill fail, original buffer should be returned to bm_pool.
+> Same case is, when netdev_alloc_skb_ip_align fail inside copybreak
+> (this should also be fixed).
 >
-> Thanks,
->
-> James
+> Best regards,
+> Marcin
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
