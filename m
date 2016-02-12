@@ -1,171 +1,92 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 12 Feb 2016 14:32:43 +0200
-Subject: [PATCH 4/3] iommu/io-pgtable: Rationalise quirk handling
-In-Reply-To: <20160212120857.GN25087@arm.com>
-References: <cover.1453723096.git.robin.murphy@arm.com>
- <ea1f3d3feec0dc9c18d43393678370b50b1275f5.1455206840.git.robin.murphy@arm.com>
- <20160212120857.GN25087@arm.com>
-Message-ID: <4282853.vdxKI5JT5z@avalon>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 12 Feb 2016 13:50:37 +0100
+Subject: [PATCH 2/7] i2c: omap: Fix PM regression with deferred probe for
+ pm_runtime_reinit
+In-Reply-To: <1455145370-20301-3-git-send-email-tony@atomide.com>
+References: <1455145370-20301-1-git-send-email-tony@atomide.com>
+ <1455145370-20301-3-git-send-email-tony@atomide.com>
+Message-ID: <CAPDyKFqGAhWefDtFMPwYAv2m1J8tPPUNOdznRtAPVpTbwnAN1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 12 February 2016 12:08:58 Will Deacon wrote:
-> On Thu, Feb 11, 2016 at 04:13:45PM +0000, Robin Murphy wrote:
-> > As the number of io-pgtable implementations grows beyond 1, it's time
-> > to rationalise the quirks mechanism before things have a chance to
-> > start getting really ugly and out-of-hand.
-> > 
-> > To that end:
-> > - Indicate exactly which quirks each format can/does support.
-> > - Fail creating a table if a caller wants unsupported quirks.
-> > - Properly document where each quirk applies and why.
-> > 
-> > Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> > ---
-> > 
-> >  drivers/iommu/io-pgtable-arm-v7s.c |  3 +++
-> >  drivers/iommu/io-pgtable-arm.c     |  2 ++
-> >  drivers/iommu/io-pgtable.c         |  3 +++
-> >  drivers/iommu/io-pgtable.h         | 24 ++++++++++++++++++++----
-> >  4 files changed, 28 insertions(+), 4 deletions(-)
-> 
-> Note that I can't merge this until we've figured out the plan for Yong's
-> driver.
-> 
-> > diff --git a/drivers/iommu/io-pgtable-arm-v7s.c
-> > b/drivers/iommu/io-pgtable-arm-v7s.c index d39a021..9bc607a 100644
-> > --- a/drivers/iommu/io-pgtable-arm-v7s.c
-> > +++ b/drivers/iommu/io-pgtable-arm-v7s.c
-> > 
-> > @@ -690,6 +690,9 @@ out_free_data:
-> >  struct io_pgtable_init_fns io_pgtable_arm_v7s_init_fns = {
-> >  
-> >  	.alloc	= arm_v7s_alloc_pgtable,
-> >  	.free	= arm_v7s_free_pgtable,
-> > 
-> > +	.supported_quirks = IO_PGTABLE_QUIRK_ARM_NS |
-> > +			    IO_PGTABLE_QUIRK_NO_PERMS |
-> > +			    IO_PGTABLE_QUIRK_TLBI_ON_MAP,
-> > 
-> >  };
-> >  
-> >  #ifdef CONFIG_IOMMU_IO_PGTABLE_ARMV7S_SELFTEST
-> > 
-> > diff --git a/drivers/iommu/io-pgtable-arm.c
-> > b/drivers/iommu/io-pgtable-arm.c index 4095af2..32f94f1 100644
-> > --- a/drivers/iommu/io-pgtable-arm.c
-> > +++ b/drivers/iommu/io-pgtable-arm.c
-> > @@ -863,6 +863,7 @@ arm_32_lpae_alloc_pgtable_s2(struct io_pgtable_cfg
-> > *cfg, void *cookie)> 
-> >  struct io_pgtable_init_fns io_pgtable_arm_64_lpae_s1_init_fns = {
-> >  
-> >  	.alloc	= arm_64_lpae_alloc_pgtable_s1,
-> >  	.free	= arm_lpae_free_pgtable,
-> > 
-> > +	.supported_quirks = IO_PGTABLE_QUIRK_ARM_NS,
-> > 
-> >  };
-> >  
-> >  struct io_pgtable_init_fns io_pgtable_arm_64_lpae_s2_init_fns = {
-> > 
-> > @@ -873,6 +874,7 @@ struct io_pgtable_init_fns
-> > io_pgtable_arm_64_lpae_s2_init_fns = {> 
-> >  struct io_pgtable_init_fns io_pgtable_arm_32_lpae_s1_init_fns = {
-> >  
-> >  	.alloc	= arm_32_lpae_alloc_pgtable_s1,
-> >  	.free	= arm_lpae_free_pgtable,
-> > 
-> > +	.supported_quirks = IO_PGTABLE_QUIRK_ARM_NS,
-> > 
-> >  };
-> >  
-> >  struct io_pgtable_init_fns io_pgtable_arm_32_lpae_s2_init_fns = {
-> > 
-> > diff --git a/drivers/iommu/io-pgtable.c b/drivers/iommu/io-pgtable.c
-> > index 876f6a7..0f57a45 100644
-> > --- a/drivers/iommu/io-pgtable.c
-> > +++ b/drivers/iommu/io-pgtable.c
-> > @@ -52,6 +52,9 @@ struct io_pgtable_ops *alloc_io_pgtable_ops(enum
-> > io_pgtable_fmt fmt,> 
-> >  	if (!fns)
-> >  	
-> >  		return NULL;
-> > 
-> > +	if (cfg->quirks & ~fns->supported_quirks)
-> > +		return NULL;
-> > +
-> > 
-> >  	iop = fns->alloc(cfg, cookie);
-> >  	if (!iop)
-> >  	
-> >  		return NULL;
-> > 
-> > diff --git a/drivers/iommu/io-pgtable.h b/drivers/iommu/io-pgtable.h
-> > index 4faee7d..6e7f11e 100644
-> > --- a/drivers/iommu/io-pgtable.h
-> > +++ b/drivers/iommu/io-pgtable.h
-> > @@ -47,10 +47,24 @@ struct iommu_gather_ops {
-> > 
-> >   *                 page table walker.
-> >   */
-> >  
-> >  struct io_pgtable_cfg {
-> > 
-> > -	#define IO_PGTABLE_QUIRK_ARM_NS		BIT(0) /* Set NS bit in PTEs */
-> > -	#define IO_PGTABLE_QUIRK_NO_PERMS	BIT(1) /* No AP/XN bits */
-> > -	#define IO_PGTABLE_QUIRK_TLBI_ON_MAP	BIT(2) /* TLB Inv. on map */
-> > -	int				quirks;
-> > +	/*
-> > +	 * IO_PGTABLE_QUIRK_ARM_NS: (ARM formats) Set NS and NSTABLE bits in
-> > +	 *	stage 1 PTEs, for hardware which insists on validating them
-> > +	 *	even in	non-secure state where they should normally be ignored.
-> > +	 *
-> > +	 * IO_PGTABLE_QUIRK_NO_PERMS: Ignore the IOMMU_READ, IOMMU_WRITE and
-> > +	 *	IOMMU_NOEXEC flags and map everything with full access, for
-> > +	 *	hardware which does not implement the permissions of a given
-> > +	 *	format, and/or requires some format-specific default value.
-> > +	 *
-> > +	 * IO_PGTABLE_QUIRK_TLBI_ON_MAP: If the format forbids caching 
-invalid
-> > +	 *	(unmapped) entries but the hardware might do so anyway, perform
-> > +	 *	TLB maintenance when mapping as well as when unmapping.
-> > +	 */
-> 
-> Much better, cheers.
-> 
-> > +	#define IO_PGTABLE_QUIRK_ARM_NS		BIT(0)
-> > +	#define IO_PGTABLE_QUIRK_NO_PERMS	BIT(1)
-> > +	#define IO_PGTABLE_QUIRK_TLBI_ON_MAP	BIT(2)
-> > +	unsigned int			quirks;
-> 
-> Let's just make this unsigned long.
-> 
-> >  	unsigned long			pgsize_bitmap;
-> >  	unsigned int			ias;
-> >  	unsigned int			oas;
-> > 
-> > @@ -173,10 +187,12 @@ static inline void io_pgtable_tlb_sync(struct
-> > io_pgtable *iop)
-> >   *
-> >   * @alloc: Allocate a set of page tables described by cfg.
-> >   * @free:  Free the page tables associated with iop.
-> > + * @supported_quirks: Bitmap of quirks supported by the format.
-> >   */
-> >  struct io_pgtable_init_fns {
-> >  	struct io_pgtable *(*alloc)(struct io_pgtable_cfg *cfg, void 
-*cookie);
-> >  	void (*free)(struct io_pgtable *iop);
-> > +	unsigned int supported_quirks;
-> >  };
-> 
-> My only gripe here is that this is supposed to be a struct of function
-> pointers... get_supported_quirks() ?
+On 11 February 2016 at 00:02, Tony Lindgren <tony@atomide.com> wrote:
+> Commit 5de85b9d57ab ("PM / runtime: Re-init runtime PM states at probe
+> error and driver unbind") introduced pm_runtime_reinit() that is used
+> to reinitialize PM runtime after -EPROBE_DEFER. This allows shutting
+> down the device after a failed probe.
+>
+> However, for drivers using pm_runtime_use_autosuspend() this can cause
+> a state where suspend callback is never called after -EPROBE_DEFER.
+> On the following device driver probe, hardware state is different from
+> the PM runtime state causing omap_device to produce the following
+> error:
+>
+> omap_device_enable() called from invalid state 1
+>
+> And with omap_device and omap hardware being picky for PM, this will
+> block any deeper idle states in hardware.
+>
+> The solution is to fix the drivers to follow the PM runtime documentation:
+>
+> 1. For sections of code that needs the device disabled, use
+>    pm_runtime_put_sync_suspend() if pm_runtime_set_autosuspend() has
+>    been set.
+>
+> 2. For driver exit code, use pm_runtime_dont_use_autosuspend() before
+>    pm_runtime_put_sync() if pm_runtime_use_autosuspend() has been
+>    set.
+>
+> Fixes: 5de85b9d57ab ("PM / runtime: Re-init runtime PM states at probe
+> error and driver unbind")
+> Cc: linux-i2c at vger.kernel.org
+> Cc: Alan Stern <stern@rowland.harvard.edu>
+> Cc: Kevin Hilman <khilman@baylibre.com>
+> Cc: Nishanth Menon <nm@ti.com>
+> Cc: Rafael J. Wysocki <rafael@kernel.org>
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Cc: Tero Kristo <t-kristo@ti.com>
+> Cc: Wolfram Sang <wsa@the-dreams.de>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-Can't we instead say it's a struct of function pointers and static data ? :-) 
-A function to retrieve the supported quirks will just contribute to kernel 
-bloat without adding any extra benefit.
+Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
 
--- 
-Regards,
+Kind regards
+Uffe
 
-Laurent Pinchart
+> ---
+>
+> Wolfram, I'd like to merge this along with other related fixes via
+> the ARM SoC tree if no objections, please review and ack if this
+> look OK to you.
+>
+>
+> ---
+>
+>  drivers/i2c/busses/i2c-omap.c | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+> index 08d26ba..13c4529 100644
+> --- a/drivers/i2c/busses/i2c-omap.c
+> +++ b/drivers/i2c/busses/i2c-omap.c
+> @@ -1450,7 +1450,8 @@ omap_i2c_probe(struct platform_device *pdev)
+>
+>  err_unuse_clocks:
+>         omap_i2c_write_reg(omap, OMAP_I2C_CON_REG, 0);
+> -       pm_runtime_put(omap->dev);
+> +       pm_runtime_dont_use_autosuspend(omap->dev);
+> +       pm_runtime_put_sync(omap->dev);
+>         pm_runtime_disable(&pdev->dev);
+>  err_free_mem:
+>
+> @@ -1468,6 +1469,7 @@ static int omap_i2c_remove(struct platform_device *pdev)
+>                 return ret;
+>
+>         omap_i2c_write_reg(omap, OMAP_I2C_CON_REG, 0);
+> +       pm_runtime_dont_use_autosuspend(&pdev->dev);
+>         pm_runtime_put_sync(&pdev->dev);
+>         pm_runtime_disable(&pdev->dev);
+>         return 0;
+> --
+> 2.7.0
+>
