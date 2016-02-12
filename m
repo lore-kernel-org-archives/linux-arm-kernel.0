@@ -1,39 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 12 Feb 2016 11:42:34 +0100
-Subject: [PATCH] net: phy: spi_ks8995: include linux/gpio/consumer.h
-Message-ID: <1455273762-161477-1-git-send-email-arnd@arndb.de>
+From: kernel@martin.sperl.org (kernel at martin.sperl.org)
+Date: Fri, 12 Feb 2016 11:14:25 +0000
+Subject: [PATCH] ARM: bcm2835: add bcm2835-aux-uart support to DT
+Message-ID: <1455275666-15806-1-git-send-email-kernel@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ks8995 phy driver just started using gpiod_* functions, which are
-declared in linux/gpio/consumer.h, not linux/gpio.h, resulting in a
-build failure in randconfig builds that do not have CONFIG_GPIOLIB
-enabled:
+From: Martin Sperl <kernel@martin.sperl.org>
 
-drivers/net/phy/spi_ks8995.c: In function 'ks8995_probe':
-drivers/net/phy/spi_ks8995.c:477:3: error: implicit declaration of function 'gpiod_set_value' [-Werror=implicit-function-declaration]
+Add bcm2835-aux-uart support to the device tree.
 
-This changes the header inclusion so it builds in all configurations.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: cd6f288cbaab ("net: phy: spi_ks8995: add support for resetting switch using GPIO")
+Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
 ---
- drivers/net/phy/spi_ks8995.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/bcm283x.dtsi |    8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/drivers/net/phy/spi_ks8995.c b/drivers/net/phy/spi_ks8995.c
-index 5e7340f6b37c..b5d50d458728 100644
---- a/drivers/net/phy/spi_ks8995.c
-+++ b/drivers/net/phy/spi_ks8995.c
-@@ -18,8 +18,8 @@
- #include <linux/module.h>
- #include <linux/delay.h>
- #include <linux/device.h>
-+#include <linux/gpio/consumer.h>
- #include <linux/of.h>
--#include <linux/gpio.h>
- #include <linux/of_gpio.h>
+diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
+index 05ff5ce..8aaf193 100644
+--- a/arch/arm/boot/dts/bcm283x.dtsi
++++ b/arch/arm/boot/dts/bcm283x.dtsi
+@@ -160,6 +160,14 @@
+ 			clocks = <&clocks BCM2835_CLOCK_VPU>;
+ 		};
  
- #include <linux/spi/spi.h>
++		uart1: serial at 7e215040 {
++			compatible = "brcm,bcm2835-aux-uart";
++			reg = <0x7e215040 0x40>;
++			interrupts = <1 29>;
++			clocks = <&aux BCM2835_AUX_CLOCK_UART>;
++			status = "disabled";
++		};
++
+ 		spi1: spi at 7e215080 {
+ 			compatible = "brcm,bcm2835-aux-spi";
+ 			reg = <0x7e215080 0x40>;
 -- 
-2.7.0
+1.7.10.4
