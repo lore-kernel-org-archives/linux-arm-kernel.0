@@ -1,49 +1,37 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 12 Feb 2016 21:54:28 +0000
-Subject: [PATCH] coresight: etb: Remove simple announcement message
-In-Reply-To: <CANLsYkwVn4FgBST-0MeOa38qCkH78-z32_CXewcCF78CnvbxeQ@mail.gmail.com>
-References: <1455195004-30214-1-git-send-email-broonie@kernel.org>
- <CANLsYkwVn4FgBST-0MeOa38qCkH78-z32_CXewcCF78CnvbxeQ@mail.gmail.com>
-Message-ID: <20160212215428.GB18988@sirena.org.uk>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 12 Feb 2016 14:04:54 -0800
+Subject: [PATCH] Revert "ASoC: qcom: Specify LE device endianness"
+In-Reply-To: <20160212212600.GA18872@sirena.org.uk>
+References: <1455298217-15744-1-git-send-email-sboyd@codeaurora.org>
+ <20160212212600.GA18872@sirena.org.uk>
+Message-ID: <20160212220454.GF4847@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 12, 2016 at 01:44:31PM -0700, Mathieu Poirier wrote:
-> On 11 February 2016 at 05:50, Mark Brown <broonie@kernel.org> wrote:
+On 02/12, Mark Brown wrote:
+> On Fri, Feb 12, 2016 at 09:30:17AM -0800, Stephen Boyd wrote:
+> > This reverts commit 18560a4e3b07438113b50589e78532d95f907029.
+> > 
+> > The commit that caused us to specify LE device endianness here,
+> > 29bb45f25ff3 (regmap-mmio: Use native endianness for read/write,
+> > 2015-10-29), has been reverted in mainline so now when we specify
+> 
+> So, I applied this to -next as that's where it applies but it seems that
+> you're trying to revert a commit that's in Linus' tree so should go as a
+> fix to him.  Can you send a fix against Linus' tree too please?
 
-> > -       dev_info(dev, "ETB initialized\n");
-> >         return 0;
+Did you want me to send the fix directly to Linus? The patch
+applies to both -next and Linus' tree, although you're right I
+generated this patch against -next. If I apply it to Linus' tree
+and then git format-patch it's exactly the same except for the
+commit hash:
 
-> Didn't we touch base on that topic before?  I'm not against moving
+$ diff linus next
+1c1
+< From 4f7c654bfcd159b3068b01e3b522e8af88069cb9 Mon Sep 17 00:00:00 2001
+---
+> From 798212b523668d5a37a977c660554827aa0d89ed Mon Sep 17 00:00:00 2001
 
-We did and you said that there was a patch pending which would change it
-to print something useful but the patch still applies so I guess that
-didn't happen.
-
-> forward with this but it has to be all or nothing - whether we remove
-> all the CS boot log message or they all stay.  Otherwise people could
-> mistakenly come to the conclusion that some of the CS components did
-> not boot properly.
-
-> ETB, funnel and TMCs don't output any useful HW related information
-> but tracers (ETMv3, PTM and ETMv4) actually do.
-
-I think people are familiar enough with the general policy on this stuff
-to be able to cope with this, it's certainly not something that's ever
-come up with ASoC where we do have a similar multi-device structure.
-
-> People concerned about boot time will definitely set their loglevel
-> accordingly on the kernel cmd line.  Otherwise we are likely talking
-> about developers interested in knowing what happened when their kernel
-> booted.
-
-That applies equally to all drivers so from that point of view we should
-be doing something in the driver core - there is actually some logging
-there that can be enabled, though it's not that widely used.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160212/4aa128c5/attachment.sig>
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
