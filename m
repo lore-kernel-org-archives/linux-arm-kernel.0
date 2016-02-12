@@ -1,61 +1,73 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 12 Feb 2016 17:06:18 +0100
-Subject: [PATCH 1/5] Kbuild: change CC_OPTIMIZE_FOR_SIZE definition
-In-Reply-To: <1455293187-179811-1-git-send-email-arnd@arndb.de>
-References: <1455293187-179811-1-git-send-email-arnd@arndb.de>
-Message-ID: <1455293187-179811-2-git-send-email-arnd@arndb.de>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Fri, 12 Feb 2016 10:06:47 -0600
+Subject: [PATCH 1/2] arm64: mm: Enable CONT_SIZE aligned sections for 64k page
+ kernels.
+In-Reply-To: <1455293208-6763-1-git-send-email-jeremy.linton@arm.com>
+References: <1455293208-6763-1-git-send-email-jeremy.linton@arm.com>
+Message-ID: <1455293208-6763-2-git-send-email-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CC_OPTIMIZE_FOR_SIZE disables the often useful -Wmaybe-unused warning,
-because that causes a ridiculous amount of false positives when combined
-with -Os.
+This change allows ALIGN_RODATA for 16k and 64k kernels.
+In the case of 64k kernels it actually aligns to the CONT_SIZE
+rather than the SECTION_SIZE (which is 512M). This makes it generally
+more useful, especially for CONT enabled kernels.
 
-This means a lot of warnings don't show up in testing by the developers
-that should see them with an 'allmodconfig' kernel that has
-CC_OPTIMIZE_FOR_SIZE enabled, but only later in randconfig builds
-that don't.
-
-This changes the Kconfig logic around CC_OPTIMIZE_FOR_SIZE to make
-it a 'choice' statement defaulting to CC_OPTIMIZE_FOR_PERFORMANCE
-that gets added for this purpose. The allmodconfig and allyesconfig
-kernels now default to -O2 with the maybe-unused warning enabled.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
 ---
- init/Kconfig | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm64/Kconfig.debug        | 12 ++++++------
+ arch/arm64/kernel/vmlinux.lds.S | 11 ++++++-----
+ 2 files changed, 12 insertions(+), 11 deletions(-)
 
-diff --git a/init/Kconfig b/init/Kconfig
-index 651ec15ecddb..159a542ef3fc 100644
---- a/init/Kconfig
-+++ b/init/Kconfig
-@@ -1305,6 +1305,17 @@ source "usr/Kconfig"
+diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
+index e13c4bf..65705ee 100644
+--- a/arch/arm64/Kconfig.debug
++++ b/arch/arm64/Kconfig.debug
+@@ -59,15 +59,15 @@ config DEBUG_RODATA
+           If in doubt, say Y
  
- endif
- 
-+choice
-+	prompt "Compiler optimization level"
-+	default CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE
-+
-+config CC_OPTIMIZE_FOR_PERFORMANCE
-+	bool "Optimize for performance"
-+	help
-+	  This is the default optimization level for the kernel, building
-+	  with the "-O2" compiler flag for best performance and most
-+	  helpful compile-time warnings.
-+
- config CC_OPTIMIZE_FOR_SIZE
- 	bool "Optimize for size"
+ config DEBUG_ALIGN_RODATA
+-	depends on DEBUG_RODATA && ARM64_4K_PAGES
++	depends on DEBUG_RODATA
+ 	bool "Align linker sections up to SECTION_SIZE"
  	help
-@@ -1313,6 +1324,8 @@ config CC_OPTIMIZE_FOR_SIZE
+ 	  If this option is enabled, sections that may potentially be marked as
+-	  read only or non-executable will be aligned up to the section size of
+-	  the kernel. This prevents sections from being split into pages and
+-	  avoids a potential TLB penalty. The downside is an increase in
+-	  alignment and potentially wasted space. Turn on this option if
+-	  performance is more important than memory pressure.
++	  read only or non-executable will be aligned up to the section size
++	  or contiguous hint size of the kernel. This prevents sections from
++	  being split into pages and avoids a potential TLB penalty. The downside
++	  is an increase in alignment and potentially wasted space. Turn on
++	  this option if performance is more important than memory pressure.
  
- 	  If unsure, say N.
+ 	  If in doubt, say N
  
-+endchoice
-+
- config SYSCTL
- 	bool
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index b78a3c7..ab4e436 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -63,13 +63,14 @@ PECOFF_FILE_ALIGNMENT = 0x200;
+ #endif
+ 
+ #if defined(CONFIG_DEBUG_ALIGN_RODATA)
+-#define ALIGN_DEBUG_RO			. = ALIGN(1<<SECTION_SHIFT);
+-#define ALIGN_DEBUG_RO_MIN(min)		ALIGN_DEBUG_RO
++#if defined(CONFIG_ARM64_64K_PAGES)
++#define ALIGN_DEBUG_RO_MIN(min)		. = ALIGN(CONT_SIZE);
++#else
++#define ALIGN_DEBUG_RO_MIN(min)		. = ALIGN(SECTION_SIZE);
++#endif
+ #elif defined(CONFIG_DEBUG_RODATA)
+-#define ALIGN_DEBUG_RO			. = ALIGN(1<<PAGE_SHIFT);
+-#define ALIGN_DEBUG_RO_MIN(min)		ALIGN_DEBUG_RO
++#define ALIGN_DEBUG_RO_MIN(min)		. = ALIGN(PAGE_SIZE);
+ #else
+-#define ALIGN_DEBUG_RO
+ #define ALIGN_DEBUG_RO_MIN(min)		. = ALIGN(min);
+ #endif
  
 -- 
-2.7.0
+2.4.3
