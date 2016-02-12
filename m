@@ -1,356 +1,424 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 12 Feb 2016 20:05:11 +0100
-Subject: [PATCH 21/68] ARM: dts: r8a7740: use GIC_* defines
+Date: Fri, 12 Feb 2016 20:05:10 +0100
+Subject: [PATCH 20/68] ARM: dts: r8a73a4: use GIC_* defines
 In-Reply-To: <cover.1455303422.git.horms+renesas@verge.net.au>
 References: <cover.1455303422.git.horms+renesas@verge.net.au>
-Message-ID: <e1e7b6fa83f0d8372392662ebdffdd79c71ba6a3.1455303422.git.horms+renesas@verge.net.au>
+Message-ID: <4d5746a3ec3a705028aeb81b34fbca70e523668a.1455303422.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use GIC_* defines for GIC interrupt cells in r8a7740 device tree.
+Use GIC_* defines for GIC interrupt cells in r8a73a4 device tree.
 
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7740.dtsi | 143 +++++++++++++++++++++--------------------
- 1 file changed, 72 insertions(+), 71 deletions(-)
+ arch/arm/boot/dts/r8a73a4.dtsi | 212 ++++++++++++++++++++---------------------
+ 1 file changed, 106 insertions(+), 106 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
-index 6ef954766eef..36bcb39cca03 100644
---- a/arch/arm/boot/dts/r8a7740.dtsi
-+++ b/arch/arm/boot/dts/r8a7740.dtsi
-@@ -11,6 +11,7 @@
- /include/ "skeleton.dtsi"
+diff --git a/arch/arm/boot/dts/r8a73a4.dtsi b/arch/arm/boot/dts/r8a73a4.dtsi
+index cb4f7b2798fe..64f3efcd7ba5 100644
+--- a/arch/arm/boot/dts/r8a73a4.dtsi
++++ b/arch/arm/boot/dts/r8a73a4.dtsi
+@@ -39,10 +39,10 @@
  
- #include <dt-bindings/clock/r8a7740-clock.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- 
- / {
-@@ -41,7 +42,7 @@
- 	L2: cache-controller {
- 		compatible = "arm,pl310-cache";
- 		reg = <0xf0100000 0x1000>;
--		interrupts = <0 84 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
- 		power-domains = <&pd_a3sm>;
- 		arm,data-latency = <3 3 3>;
- 		arm,tag-latency = <2 2 2>;
-@@ -58,7 +59,7 @@
- 
- 	pmu {
- 		compatible = "arm,cortex-a9-pmu";
--		interrupts = <0 83 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>;
+ 	timer {
+ 		compatible = "arm,armv7-timer";
+-		interrupts = <1 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+-			     <1 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+-			     <1 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+-			     <1 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
++		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
  	};
  
- 	ptm {
-@@ -69,7 +70,7 @@
- 	cmt1: timer at e6138000 {
- 		compatible = "renesas,cmt-48-r8a7740", "renesas,cmt-48";
- 		reg = <0xe6138000 0x170>;
--		interrupts = <0 58 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp3_clks R8A7740_CLK_CMT1>;
+ 	dbsc1: memory-controller at e6790000 {
+@@ -69,27 +69,27 @@
+ 		dma0: dma-controller at e6700020 {
+ 			compatible = "renesas,shdma-r8a73a4";
+ 			reg = <0 0xe6700020 0 0x89e0>;
+-			interrupts = <0 220 IRQ_TYPE_LEVEL_HIGH
+-					0 200 IRQ_TYPE_LEVEL_HIGH
+-					0 201 IRQ_TYPE_LEVEL_HIGH
+-					0 202 IRQ_TYPE_LEVEL_HIGH
+-					0 203 IRQ_TYPE_LEVEL_HIGH
+-					0 204 IRQ_TYPE_LEVEL_HIGH
+-					0 205 IRQ_TYPE_LEVEL_HIGH
+-					0 206 IRQ_TYPE_LEVEL_HIGH
+-					0 207 IRQ_TYPE_LEVEL_HIGH
+-					0 208 IRQ_TYPE_LEVEL_HIGH
+-					0 209 IRQ_TYPE_LEVEL_HIGH
+-					0 210 IRQ_TYPE_LEVEL_HIGH
+-					0 211 IRQ_TYPE_LEVEL_HIGH
+-					0 212 IRQ_TYPE_LEVEL_HIGH
+-					0 213 IRQ_TYPE_LEVEL_HIGH
+-					0 214 IRQ_TYPE_LEVEL_HIGH
+-					0 215 IRQ_TYPE_LEVEL_HIGH
+-					0 216 IRQ_TYPE_LEVEL_HIGH
+-					0 217 IRQ_TYPE_LEVEL_HIGH
+-					0 218 IRQ_TYPE_LEVEL_HIGH
+-					0 219 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 220 IRQ_TYPE_LEVEL_HIGH
++					GIC_SPI 200 IRQ_TYPE_LEVEL_HIGH
++					GIC_SPI 201 IRQ_TYPE_LEVEL_HIGH
++					GIC_SPI 202 IRQ_TYPE_LEVEL_HIGH
++					GIC_SPI 203 IRQ_TYPE_LEVEL_HIGH
++					GIC_SPI 204 IRQ_TYPE_LEVEL_HIGH
++					GIC_SPI 205 IRQ_TYPE_LEVEL_HIGH
++					GIC_SPI 206 IRQ_TYPE_LEVEL_HIGH
++					GIC_SPI 207 IRQ_TYPE_LEVEL_HIGH
++					GIC_SPI 208 IRQ_TYPE_LEVEL_HIGH
++					GIC_SPI 209 IRQ_TYPE_LEVEL_HIGH
++					GIC_SPI 210 IRQ_TYPE_LEVEL_HIGH
++					GIC_SPI 211 IRQ_TYPE_LEVEL_HIGH
++					GIC_SPI 212 IRQ_TYPE_LEVEL_HIGH
++					GIC_SPI 213 IRQ_TYPE_LEVEL_HIGH
++					GIC_SPI 214 IRQ_TYPE_LEVEL_HIGH
++					GIC_SPI 215 IRQ_TYPE_LEVEL_HIGH
++					GIC_SPI 216 IRQ_TYPE_LEVEL_HIGH
++					GIC_SPI 217 IRQ_TYPE_LEVEL_HIGH
++					GIC_SPI 218 IRQ_TYPE_LEVEL_HIGH
++					GIC_SPI 219 IRQ_TYPE_LEVEL_HIGH>;
+ 			interrupt-names = "error",
+ 					"ch0", "ch1", "ch2", "ch3",
+ 					"ch4", "ch5", "ch6", "ch7",
+@@ -106,7 +106,7 @@
+ 		#size-cells = <0>;
+ 		compatible = "renesas,iic-r8a73a4", "renesas,rmobile-iic";
+ 		reg = <0 0xe60b0000 0 0x428>;
+-		interrupts = <0 179 IRQ_TYPE_LEVEL_HIGH>;
++		interrupts = <GIC_SPI 179 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp4_clks R8A73A4_CLK_IIC5>;
+ 		power-domains = <&pd_a3sp>;
+ 
+@@ -116,7 +116,7 @@
+ 	cmt1: timer at e6130000 {
+ 		compatible = "renesas,cmt-48-r8a73a4", "renesas,cmt-48-gen2";
+ 		reg = <0 0xe6130000 0 0x1004>;
+-		interrupts = <0 120 IRQ_TYPE_LEVEL_HIGH>;
++		interrupts = <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp3_clks R8A73A4_CLK_CMT1>;
  		clock-names = "fck";
  		power-domains = <&pd_c5>;
-@@ -89,14 +90,14 @@
- 			<0xe6900020 1>,
- 			<0xe6900040 1>,
- 			<0xe6900060 1>;
--		interrupts = <0 149 IRQ_TYPE_LEVEL_HIGH
--			      0 149 IRQ_TYPE_LEVEL_HIGH
--			      0 149 IRQ_TYPE_LEVEL_HIGH
--			      0 149 IRQ_TYPE_LEVEL_HIGH
--			      0 149 IRQ_TYPE_LEVEL_HIGH
--			      0 149 IRQ_TYPE_LEVEL_HIGH
--			      0 149 IRQ_TYPE_LEVEL_HIGH
--			      0 149 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp2_clks R8A7740_CLK_INTCA>;
- 		power-domains = <&pd_a4s>;
+@@ -131,38 +131,38 @@
+ 		#interrupt-cells = <2>;
+ 		interrupt-controller;
+ 		reg = <0 0xe61c0000 0 0x200>;
+-		interrupts = <0 0 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 1 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 2 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 3 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 4 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 5 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 6 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 7 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 8 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 9 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 10 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 11 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 12 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 13 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 14 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 15 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 16 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 17 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 18 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 19 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 20 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 21 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 22 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 23 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 24 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 25 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 26 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 27 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 28 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 29 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 30 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 31 IRQ_TYPE_LEVEL_HIGH>;
++		interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp4_clks R8A73A4_CLK_IRQC>;
+ 		power-domains = <&pd_c4>;
  	};
-@@ -111,14 +112,14 @@
- 			<0xe6900024 1>,
- 			<0xe6900044 1>,
- 			<0xe6900064 1>;
--		interrupts = <0 149 IRQ_TYPE_LEVEL_HIGH
--			      0 149 IRQ_TYPE_LEVEL_HIGH
--			      0 149 IRQ_TYPE_LEVEL_HIGH
--			      0 149 IRQ_TYPE_LEVEL_HIGH
--			      0 149 IRQ_TYPE_LEVEL_HIGH
--			      0 149 IRQ_TYPE_LEVEL_HIGH
--			      0 149 IRQ_TYPE_LEVEL_HIGH
--			      0 149 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp2_clks R8A7740_CLK_INTCA>;
- 		power-domains = <&pd_a4s>;
+@@ -172,32 +172,32 @@
+ 		#interrupt-cells = <2>;
+ 		interrupt-controller;
+ 		reg = <0 0xe61c0200 0 0x200>;
+-		interrupts = <0 32 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 33 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 34 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 35 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 36 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 37 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 38 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 39 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 40 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 41 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 42 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 43 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 44 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 45 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 46 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 47 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 48 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 49 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 50 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 51 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 52 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 53 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 54 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 55 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 56 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 57 IRQ_TYPE_LEVEL_HIGH>;
++		interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp4_clks R8A73A4_CLK_IRQC>;
+ 		power-domains = <&pd_c4>;
  	};
-@@ -133,14 +134,14 @@
- 			<0xe6900028 1>,
- 			<0xe6900048 1>,
- 			<0xe6900068 1>;
--		interrupts = <0 149 IRQ_TYPE_LEVEL_HIGH
--			      0 149 IRQ_TYPE_LEVEL_HIGH
--			      0 149 IRQ_TYPE_LEVEL_HIGH
--			      0 149 IRQ_TYPE_LEVEL_HIGH
--			      0 149 IRQ_TYPE_LEVEL_HIGH
--			      0 149 IRQ_TYPE_LEVEL_HIGH
--			      0 149 IRQ_TYPE_LEVEL_HIGH
--			      0 149 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp2_clks R8A7740_CLK_INTCA>;
- 		power-domains = <&pd_a4s>;
+@@ -237,7 +237,7 @@
+ 		compatible = "renesas,thermal-r8a73a4", "renesas,rcar-thermal";
+ 		reg = <0 0xe61f0000 0 0x14>, <0 0xe61f0100 0 0x38>,
+ 			 <0 0xe61f0200 0 0x38>, <0 0xe61f0300 0 0x38>;
+-		interrupts = <0 69 IRQ_TYPE_LEVEL_HIGH>;
++		interrupts = <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp5_clks R8A73A4_CLK_THERMAL>;
+ 		power-domains = <&pd_c5>;
  	};
-@@ -155,14 +156,14 @@
- 			<0xe690002c 1>,
- 			<0xe690004c 1>,
- 			<0xe690006c 1>;
--		interrupts = <0 149 IRQ_TYPE_LEVEL_HIGH
--			      0 149 IRQ_TYPE_LEVEL_HIGH
--			      0 149 IRQ_TYPE_LEVEL_HIGH
--			      0 149 IRQ_TYPE_LEVEL_HIGH
--			      0 149 IRQ_TYPE_LEVEL_HIGH
--			      0 149 IRQ_TYPE_LEVEL_HIGH
--			      0 149 IRQ_TYPE_LEVEL_HIGH
--			      0 149 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp2_clks R8A7740_CLK_INTCA>;
- 		power-domains = <&pd_a4s>;
- 	};
-@@ -171,7 +172,7 @@
- 		compatible = "renesas,gether-r8a7740";
- 		reg = <0xe9a00000 0x800>,
- 		      <0xe9a01800 0x800>;
--		interrupts = <0 110 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 110 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp3_clks R8A7740_CLK_GETHER>;
- 		power-domains = <&pd_a4s>;
- 		phy-mode = "mii";
-@@ -185,10 +186,10 @@
+@@ -247,7 +247,7 @@
  		#size-cells = <0>;
- 		compatible = "renesas,iic-r8a7740", "renesas,rmobile-iic";
- 		reg = <0xfff20000 0x425>;
--		interrupts = <0 201 IRQ_TYPE_LEVEL_HIGH
--			      0 202 IRQ_TYPE_LEVEL_HIGH
--			      0 203 IRQ_TYPE_LEVEL_HIGH
--			      0 204 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 201 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 202 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 203 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 204 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp1_clks R8A7740_CLK_IIC0>;
- 		power-domains = <&pd_a4r>;
- 		status = "disabled";
-@@ -199,10 +200,10 @@
- 		#size-cells = <0>;
- 		compatible = "renesas,iic-r8a7740", "renesas,rmobile-iic";
- 		reg = <0xe6c20000 0x425>;
--		interrupts = <0 70 IRQ_TYPE_LEVEL_HIGH
--			      0 71 IRQ_TYPE_LEVEL_HIGH
--			      0 72 IRQ_TYPE_LEVEL_HIGH
--			      0 73 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp3_clks R8A7740_CLK_IIC1>;
+ 		compatible = "renesas,iic-r8a73a4", "renesas,rmobile-iic";
+ 		reg = <0 0xe6500000 0 0x428>;
+-		interrupts = <0 174 IRQ_TYPE_LEVEL_HIGH>;
++		interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp3_clks R8A73A4_CLK_IIC0>;
  		power-domains = <&pd_a3sp>;
  		status = "disabled";
-@@ -211,7 +212,7 @@
+@@ -258,7 +258,7 @@
+ 		#size-cells = <0>;
+ 		compatible = "renesas,iic-r8a73a4", "renesas,rmobile-iic";
+ 		reg = <0 0xe6510000 0 0x428>;
+-		interrupts = <0 175 IRQ_TYPE_LEVEL_HIGH>;
++		interrupts = <GIC_SPI 175 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp3_clks R8A73A4_CLK_IIC1>;
+ 		power-domains = <&pd_a3sp>;
+ 		status = "disabled";
+@@ -269,7 +269,7 @@
+ 		#size-cells = <0>;
+ 		compatible = "renesas,iic-r8a73a4", "renesas,rmobile-iic";
+ 		reg = <0 0xe6520000 0 0x428>;
+-		interrupts = <0 176 IRQ_TYPE_LEVEL_HIGH>;
++		interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp3_clks R8A73A4_CLK_IIC2>;
+ 		power-domains = <&pd_a3sp>;
+ 		status = "disabled";
+@@ -280,7 +280,7 @@
+ 		#size-cells = <0>;
+ 		compatible = "renesas,iic-r8a73a4", "renesas,rmobile-iic";
+ 		reg = <0 0xe6530000 0 0x428>;
+-		interrupts = <0 177 IRQ_TYPE_LEVEL_HIGH>;
++		interrupts = <GIC_SPI 177 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp4_clks R8A73A4_CLK_IIC3>;
+ 		power-domains = <&pd_a3sp>;
+ 		status = "disabled";
+@@ -291,7 +291,7 @@
+ 		#size-cells = <0>;
+ 		compatible = "renesas,iic-r8a73a4", "renesas,rmobile-iic";
+ 		reg = <0 0xe6540000 0 0x428>;
+-		interrupts = <0 178 IRQ_TYPE_LEVEL_HIGH>;
++		interrupts = <GIC_SPI 178 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp4_clks R8A73A4_CLK_IIC4>;
+ 		power-domains = <&pd_a3sp>;
+ 		status = "disabled";
+@@ -302,7 +302,7 @@
+ 		#size-cells = <0>;
+ 		compatible = "renesas,iic-r8a73a4", "renesas,rmobile-iic";
+ 		reg = <0 0xe6550000 0 0x428>;
+-		interrupts = <0 184 IRQ_TYPE_LEVEL_HIGH>;
++		interrupts = <GIC_SPI 184 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp3_clks R8A73A4_CLK_IIC6>;
+ 		power-domains = <&pd_a3sp>;
+ 		status = "disabled";
+@@ -313,7 +313,7 @@
+ 		#size-cells = <0>;
+ 		compatible = "renesas,iic-r8a73a4", "renesas,rmobile-iic";
+ 		reg = <0 0xe6560000 0 0x428>;
+-		interrupts = <0 185 IRQ_TYPE_LEVEL_HIGH>;
++		interrupts = <GIC_SPI 185 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp3_clks R8A73A4_CLK_IIC7>;
+ 		power-domains = <&pd_a3sp>;
+ 		status = "disabled";
+@@ -324,7 +324,7 @@
+ 		#size-cells = <0>;
+ 		compatible = "renesas,iic-r8a73a4", "renesas,rmobile-iic";
+ 		reg = <0 0xe6570000 0 0x428>;
+-		interrupts = <0 173 IRQ_TYPE_LEVEL_HIGH>;
++		interrupts = <GIC_SPI 173 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp5_clks R8A73A4_CLK_IIC8>;
+ 		power-domains = <&pd_a3sp>;
+ 		status = "disabled";
+@@ -333,7 +333,7 @@
+ 	scifb0: serial at e6c20000 {
+ 		compatible = "renesas,scifb-r8a73a4", "renesas,scifb";
+ 		reg = <0 0xe6c20000 0 0x100>;
+-		interrupts = <0 148 IRQ_TYPE_LEVEL_HIGH>;
++		interrupts = <GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp2_clks R8A73A4_CLK_SCIFB0>;
+ 		clock-names = "sci_ick";
+ 		power-domains = <&pd_a3sp>;
+@@ -343,7 +343,7 @@
+ 	scifb1: serial at e6c30000 {
+ 		compatible = "renesas,scifb-r8a73a4", "renesas,scifb";
+ 		reg = <0 0xe6c30000 0 0x100>;
+-		interrupts = <0 149 IRQ_TYPE_LEVEL_HIGH>;
++		interrupts = <GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp2_clks R8A73A4_CLK_SCIFB1>;
+ 		clock-names = "sci_ick";
+ 		power-domains = <&pd_a3sp>;
+@@ -353,7 +353,7 @@
  	scifa0: serial at e6c40000 {
- 		compatible = "renesas,scifa-r8a7740", "renesas,scifa";
- 		reg = <0xe6c40000 0x100>;
--		interrupts = <0 100 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp2_clks R8A7740_CLK_SCIFA0>;
+ 		compatible = "renesas,scifa-r8a73a4", "renesas,scifa";
+ 		reg = <0 0xe6c40000 0 0x100>;
+-		interrupts = <0 144 IRQ_TYPE_LEVEL_HIGH>;
++		interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp2_clks R8A73A4_CLK_SCIFA0>;
  		clock-names = "sci_ick";
  		power-domains = <&pd_a3sp>;
-@@ -221,7 +222,7 @@
+@@ -363,7 +363,7 @@
  	scifa1: serial at e6c50000 {
- 		compatible = "renesas,scifa-r8a7740", "renesas,scifa";
- 		reg = <0xe6c50000 0x100>;
--		interrupts = <0 101 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp2_clks R8A7740_CLK_SCIFA1>;
+ 		compatible = "renesas,scifa-r8a73a4", "renesas,scifa";
+ 		reg = <0 0xe6c50000 0 0x100>;
+-		interrupts = <0 145 IRQ_TYPE_LEVEL_HIGH>;
++		interrupts = <GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp2_clks R8A73A4_CLK_SCIFA1>;
  		clock-names = "sci_ick";
  		power-domains = <&pd_a3sp>;
-@@ -231,7 +232,7 @@
- 	scifa2: serial at e6c60000 {
- 		compatible = "renesas,scifa-r8a7740", "renesas,scifa";
- 		reg = <0xe6c60000 0x100>;
--		interrupts = <0 102 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp2_clks R8A7740_CLK_SCIFA2>;
+@@ -373,7 +373,7 @@
+ 	scifb2: serial at e6ce0000 {
+ 		compatible = "renesas,scifb-r8a73a4", "renesas,scifb";
+ 		reg = <0 0xe6ce0000 0 0x100>;
+-		interrupts = <0 150 IRQ_TYPE_LEVEL_HIGH>;
++		interrupts = <GIC_SPI 150 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp2_clks R8A73A4_CLK_SCIFB2>;
  		clock-names = "sci_ick";
  		power-domains = <&pd_a3sp>;
-@@ -241,7 +242,7 @@
- 	scifa3: serial at e6c70000 {
- 		compatible = "renesas,scifa-r8a7740", "renesas,scifa";
- 		reg = <0xe6c70000 0x100>;
--		interrupts = <0 103 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp2_clks R8A7740_CLK_SCIFA3>;
+@@ -383,7 +383,7 @@
+ 	scifb3: serial at e6cf0000 {
+ 		compatible = "renesas,scifb-r8a73a4", "renesas,scifb";
+ 		reg = <0 0xe6cf0000 0 0x100>;
+-		interrupts = <0 151 IRQ_TYPE_LEVEL_HIGH>;
++		interrupts = <GIC_SPI 151 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp2_clks R8A73A4_CLK_SCIFB3>;
  		clock-names = "sci_ick";
- 		power-domains = <&pd_a3sp>;
-@@ -251,7 +252,7 @@
- 	scifa4: serial at e6c80000 {
- 		compatible = "renesas,scifa-r8a7740", "renesas,scifa";
- 		reg = <0xe6c80000 0x100>;
--		interrupts = <0 104 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 104 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp2_clks R8A7740_CLK_SCIFA4>;
- 		clock-names = "sci_ick";
- 		power-domains = <&pd_a3sp>;
-@@ -261,7 +262,7 @@
- 	scifa5: serial at e6cb0000 {
- 		compatible = "renesas,scifa-r8a7740", "renesas,scifa";
- 		reg = <0xe6cb0000 0x100>;
--		interrupts = <0 105 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp2_clks R8A7740_CLK_SCIFA5>;
- 		clock-names = "sci_ick";
- 		power-domains = <&pd_a3sp>;
-@@ -271,7 +272,7 @@
- 	scifa6: serial at e6cc0000 {
- 		compatible = "renesas,scifa-r8a7740", "renesas,scifa";
- 		reg = <0xe6cc0000 0x100>;
--		interrupts = <0 106 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp2_clks R8A7740_CLK_SCIFA6>;
- 		clock-names = "sci_ick";
- 		power-domains = <&pd_a3sp>;
-@@ -281,7 +282,7 @@
- 	scifa7: serial at e6cd0000 {
- 		compatible = "renesas,scifa-r8a7740", "renesas,scifa";
- 		reg = <0xe6cd0000 0x100>;
--		interrupts = <0 107 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 107 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp2_clks R8A7740_CLK_SCIFA7>;
- 		clock-names = "sci_ick";
- 		power-domains = <&pd_a3sp>;
-@@ -291,7 +292,7 @@
- 	scifb: serial at e6c30000 {
- 		compatible = "renesas,scifb-r8a7740", "renesas,scifb";
- 		reg = <0xe6c30000 0x100>;
--		interrupts = <0 108 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp2_clks R8A7740_CLK_SCIFB>;
- 		clock-names = "sci_ick";
- 		power-domains = <&pd_a3sp>;
-@@ -329,8 +330,8 @@
- 	mmcif0: mmc at e6bd0000 {
- 		compatible = "renesas,mmcif-r8a7740", "renesas,sh-mmcif";
- 		reg = <0xe6bd0000 0x100>;
--		interrupts = <0 56 IRQ_TYPE_LEVEL_HIGH
--			      0 57 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp3_clks R8A7740_CLK_MMC>;
- 		power-domains = <&pd_a3sp>;
- 		status = "disabled";
-@@ -339,9 +340,9 @@
- 	sdhi0: sd at e6850000 {
- 		compatible = "renesas,sdhi-r8a7740";
- 		reg = <0xe6850000 0x100>;
--		interrupts = <0 117 IRQ_TYPE_LEVEL_HIGH
--			      0 118 IRQ_TYPE_LEVEL_HIGH
--			      0 119 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 117 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 119 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp3_clks R8A7740_CLK_SDHI0>;
+ 		power-domains = <&pd_c4>;
+@@ -393,7 +393,7 @@
+ 	sdhi0: sd at ee100000 {
+ 		compatible = "renesas,sdhi-r8a73a4";
+ 		reg = <0 0xee100000 0 0x100>;
+-		interrupts = <0 165 IRQ_TYPE_LEVEL_HIGH>;
++		interrupts = <GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp3_clks R8A73A4_CLK_SDHI0>;
  		power-domains = <&pd_a3sp>;
  		cap-sd-highspeed;
-@@ -352,9 +353,9 @@
- 	sdhi1: sd at e6860000 {
- 		compatible = "renesas,sdhi-r8a7740";
- 		reg = <0xe6860000 0x100>;
--		interrupts = <0 121 IRQ_TYPE_LEVEL_HIGH
--			      0 122 IRQ_TYPE_LEVEL_HIGH
--			      0 123 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp3_clks R8A7740_CLK_SDHI1>;
+@@ -403,7 +403,7 @@
+ 	sdhi1: sd at ee120000 {
+ 		compatible = "renesas,sdhi-r8a73a4";
+ 		reg = <0 0xee120000 0 0x100>;
+-		interrupts = <0 166 IRQ_TYPE_LEVEL_HIGH>;
++		interrupts = <GIC_SPI 166 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp3_clks R8A73A4_CLK_SDHI1>;
  		power-domains = <&pd_a3sp>;
  		cap-sd-highspeed;
-@@ -365,9 +366,9 @@
- 	sdhi2: sd at e6870000 {
- 		compatible = "renesas,sdhi-r8a7740";
- 		reg = <0xe6870000 0x100>;
--		interrupts = <0 125 IRQ_TYPE_LEVEL_HIGH
--			      0 126 IRQ_TYPE_LEVEL_HIGH
--			      0 127 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 125 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 126 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 127 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp4_clks R8A7740_CLK_SDHI2>;
+@@ -413,7 +413,7 @@
+ 	sdhi2: sd at ee140000 {
+ 		compatible = "renesas,sdhi-r8a73a4";
+ 		reg = <0 0xee140000 0 0x100>;
+-		interrupts = <0 167 IRQ_TYPE_LEVEL_HIGH>;
++		interrupts = <GIC_SPI 167 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp3_clks R8A73A4_CLK_SDHI2>;
  		power-domains = <&pd_a3sp>;
  		cap-sd-highspeed;
-@@ -379,7 +380,7 @@
- 		#sound-dai-cells = <1>;
- 		compatible = "renesas,fsi2-r8a7740", "renesas,sh_fsi2";
- 		reg = <0xfe1f0000 0x400>;
--		interrupts = <0 9 0x4>;
-+		interrupts = <GIC_SPI 9 0x4>;
- 		clocks = <&mstp3_clks R8A7740_CLK_FSI>;
- 		power-domains = <&pd_a4mp>;
- 		status = "disabled";
-@@ -388,9 +389,9 @@
- 	tmu0: timer at fff80000 {
- 		compatible = "renesas,tmu-r8a7740", "renesas,tmu";
- 		reg = <0xfff80000 0x2c>;
--		interrupts = <0 198 IRQ_TYPE_LEVEL_HIGH>,
--			     <0 199 IRQ_TYPE_LEVEL_HIGH>,
--			     <0 200 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 198 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 199 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 200 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp1_clks R8A7740_CLK_TMU0>;
- 		clock-names = "fck";
- 		power-domains = <&pd_a4r>;
-@@ -403,9 +404,9 @@
- 	tmu1: timer at fff90000 {
- 		compatible = "renesas,tmu-r8a7740", "renesas,tmu";
- 		reg = <0xfff90000 0x2c>;
--		interrupts = <0 170 IRQ_TYPE_LEVEL_HIGH>,
--			     <0 171 IRQ_TYPE_LEVEL_HIGH>,
--			     <0 172 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 171 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 172 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp1_clks R8A7740_CLK_TMU1>;
- 		clock-names = "fck";
- 		power-domains = <&pd_a4r>;
+@@ -423,7 +423,7 @@
+ 	mmcif0: mmc at ee200000 {
+ 		compatible = "renesas,sh-mmcif";
+ 		reg = <0 0xee200000 0 0x80>;
+-		interrupts = <0 169 IRQ_TYPE_LEVEL_HIGH>;
++		interrupts = <GIC_SPI 169 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp3_clks R8A73A4_CLK_MMCIF0>;
+ 		power-domains = <&pd_a3sp>;
+ 		reg-io-width = <4>;
+@@ -433,7 +433,7 @@
+ 	mmcif1: mmc at ee220000 {
+ 		compatible = "renesas,sh-mmcif";
+ 		reg = <0 0xee220000 0 0x80>;
+-		interrupts = <0 170 IRQ_TYPE_LEVEL_HIGH>;
++		interrupts = <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp3_clks R8A73A4_CLK_MMCIF1>;
+ 		power-domains = <&pd_a3sp>;
+ 		reg-io-width = <4>;
+@@ -449,7 +449,7 @@
+ 			<0 0xf1002000 0 0x1000>,
+ 			<0 0xf1004000 0 0x2000>,
+ 			<0 0xf1006000 0 0x2000>;
+-		interrupts = <1 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
++		interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+ 	};
+ 
+ 	bsc: bus at fec10000 {
 -- 
 2.7.0.rc3.207.g0ac5344
