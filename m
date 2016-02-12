@@ -1,102 +1,92 @@
-From: gerald.schaefer@de.ibm.com (Gerald Schaefer)
-Date: Fri, 12 Feb 2016 12:59:43 +0100
-Subject: [BUG] random kernel crashes after THP rework on s390 (maybe
- also on PowerPC and ARM)
-In-Reply-To: <87a8n6shf2.fsf@linux.vnet.ibm.com>
-References: <20160211192223.4b517057@thinkpad>
- <20160211190942.GA10244@node.shutemov.name>
- <20160211205702.24f0d17a@thinkpad>
- <87a8n6shf2.fsf@linux.vnet.ibm.com>
-Message-ID: <20160212125943.1eb2ca9d@thinkpad>
+From: codekipper@gmail.com (Code Kipper)
+Date: Fri, 12 Feb 2016 13:00:18 +0100
+Subject: [linux-sunxi][PATCH] ARM: dts: sun4i: Enable USB DRC on the MK8082
+In-Reply-To: <1455278071-22339-1-git-send-email-codekipper@gmail.com>
+References: <1455278071-22339-1-git-send-email-codekipper@gmail.com>
+Message-ID: <CAEKpxBkVmxLdm1VKosSyCtgghoV2ba-jyxxaz-TmccSpziAF9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 12 Feb 2016 09:34:33 +0530
-"Aneesh Kumar K.V" <aneesh.kumar@linux.vnet.ibm.com> wrote:
+NAK...doohhh got the name of the device wrong in both subject and
+description. V2 sent.
 
-> Gerald Schaefer <gerald.schaefer@de.ibm.com> writes:
-> 
-> > On Thu, 11 Feb 2016 21:09:42 +0200
-> > "Kirill A. Shutemov" <kirill@shutemov.name> wrote:
-> >
-> >> On Thu, Feb 11, 2016 at 07:22:23PM +0100, Gerald Schaefer wrote:
-> >> > Hi,
-> >> > 
-> >> > Sebastian Ott reported random kernel crashes beginning with v4.5-rc1 and
-> >> > he also bisected this to commit 61f5d698 "mm: re-enable THP". Further
-> >> > review of the THP rework patches, which cannot be bisected, revealed
-> >> > commit fecffad "s390, thp: remove infrastructure for handling splitting PMDs"
-> >> > (and also similar commits for other archs).
-> >> > 
-> >> > This commit removes the THP splitting bit and also the architecture
-> >> > implementation of pmdp_splitting_flush(), which took care of the IPI for
-> >> > fast_gup serialization. The commit message says
-> >> > 
-> >> >     pmdp_splitting_flush() is not needed too: on splitting PMD we will do
-> >> >     pmdp_clear_flush() + set_pte_at().  pmdp_clear_flush() will do IPI as
-> >> >     needed for fast_gup
-> >> > 
-> >> > The assumption that a TLB flush will also produce an IPI is wrong on s390,
-> >> > and maybe also on other architectures, and I thought that this was actually
-> >> > the main reason for having an arch-specific pmdp_splitting_flush().
-> >> > 
-> >> > At least PowerPC and ARM also had an individual implementation of
-> >> > pmdp_splitting_flush() that used kick_all_cpus_sync() instead of a TLB
-> >> > flush to send the IPI, and those were also removed. Putting the arch
-> >> > maintainers and mailing lists on cc to verify.
-> >> > 
-> >> > On s390 this will break the IPI serialization against fast_gup, which
-> >> > would certainly explain the random kernel crashes, please revert or fix
-> >> > the pmdp_splitting_flush() removal.
-> >> 
-> >> Sorry for that.
-> >> 
-> >> I believe, the problem was already addressed for PowerPC:
-> >> 
-> >> http://lkml.kernel.org/g/454980831-16631-1-git-send-email-aneesh.kumar at linux.vnet.ibm.com
-> >> 
-> >> I think kick_all_cpus_sync() in arch-specific pmdp_invalidate() would do
-> >> the trick, right?
-> >
-> > Hmm, not sure about that. After pmdp_invalidate(), a pmd_none() check in
-> > fast_gup will still return false, because the pmd is not empty (at least
-> > on s390).
-> 
-> Why can't we do this ? I did this for ppc64.
-> 
->  void pmdp_invalidate(struct vm_area_struct *vma, unsigned long address,
->  		     pmd_t *pmdp)
->  {
-> -	pmd_hugepage_update(vma->vm_mm, address, pmdp, _PAGE_PRESENT, 0);
-> +	pmd_hugepage_update(vma->vm_mm, address, pmdp, ~0UL, 0);
-> 
-
-Wouldn't that semantically change what pmdp_invalidate() was supposed to
-do? The comment before the call says "the pmd_trans_huge and
-pmd_trans_splitting must remain set at all times on the pmd". So, after
-removing pmd_trans_splitting, it seems to be necessary to at least keep
-pmd_trans_huge set.
-
-In your case, the pmd would be completely cleared, which may help to find
-it in fast_gup with pmd_none(), but I'm not sure if this would open up
-other problems, e.g. with concurrent page faults. But I must also admit that
-my THP overview got a little rusty.
-
-> >So I don't see spontaneously how it will help fast_gup to break
-> > out to the slow path in case of THP splitting.
-> >
-> >> 
-> >> If yes, I'll prepare patch tomorrow (some sleep required).
-> >> 
-> >
-> > We'll check if adding kick_all_cpus_sync() to pmdp_invalidate() helps.
-> > It would also be good if Martin has a look at this, he'll return on
-> > Monday.
-> 
-> -aneesh
-> 
+On 12 February 2016 at 12:54,  <codekipper@gmail.com> wrote:
+> From: Marcus Cooper <codekipper@gmail.com>
+>
+> Enable the otg/drc usb controller on the MK8082.
+>
+> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+> ---
+>  arch/arm/boot/dts/sun4i-a10-mk802.dts | 33 +++++++++++++++++++++++++++++++++
+>  1 file changed, 33 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sun4i-a10-mk802.dts b/arch/arm/boot/dts/sun4i-a10-mk802.dts
+> index ddf0683..ee46ea8 100644
+> --- a/arch/arm/boot/dts/sun4i-a10-mk802.dts
+> +++ b/arch/arm/boot/dts/sun4i-a10-mk802.dts
+> @@ -44,6 +44,7 @@
+>  #include "sun4i-a10.dtsi"
+>  #include "sunxi-common-regulators.dtsi"
+>  #include <dt-bindings/gpio/gpio.h>
+> +#include <dt-bindings/pinctrl/sun4i-a10.h>
+>
+>  / {
+>         model = "MK802";
+> @@ -84,7 +85,25 @@
+>         status = "okay";
+>  };
+>
+> +&otg_sram {
+> +       status = "okay";
+> +};
+> +
+>  &pio {
+> +       usb0_id_detect_pin: usb0_id_detect_pin at 0 {
+> +               allwinner,pins = "PH4";
+> +               allwinner,function = "gpio_in";
+> +               allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +               allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> +       };
+> +
+> +       usb0_vbus_detect_pin: usb0_vbus_detect_pin at 0 {
+> +               allwinner,pins = "PH5";
+> +               allwinner,function = "gpio_in";
+> +               allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +               allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> +       };
+> +
+>         usb2_vbus_pin_mk802: usb2_vbus_pin at 0 {
+>                 allwinner,pins = "PH12";
+>                 allwinner,function = "gpio_out";
+> @@ -93,6 +112,10 @@
+>         };
+>  };
+>
+> +&reg_usb0_vbus {
+> +       status = "okay";
+> +};
+> +
+>  &reg_usb1_vbus {
+>         status = "okay";
+>  };
+> @@ -109,7 +132,17 @@
+>         status = "okay";
+>  };
+>
+> +&usb_otg {
+> +       dr_mode = "otg";
+> +       status = "okay";
+> +};
+> +
+>  &usbphy {
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&usb0_id_detect_pin>, <&usb0_vbus_detect_pin>;
+> +       usb0_id_det-gpios = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
+> +       usb0_vbus_det-gpios = <&pio 7 5 GPIO_ACTIVE_HIGH>; /* PH5 */
+> +       usb0_vbus-supply = <&reg_usb0_vbus>;
+>         usb1_vbus-supply = <&reg_usb1_vbus>;
+>         usb2_vbus-supply = <&reg_usb2_vbus>;
+>         status = "okay";
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-s390" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+> 2.7.1
+>
