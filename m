@@ -1,80 +1,73 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 12 Feb 2016 15:57:24 +0100
-Subject: [PATCH v3 2/4] arm64: defer __va translation of initrd_start and
- initrd_end
+Date: Fri, 12 Feb 2016 15:57:25 +0100
+Subject: [PATCH v3 3/4] arm64: prevent potential circular header dependencies
+ in asm/bug.h
 In-Reply-To: <1455289046-21321-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1455289046-21321-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1455289046-21321-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1455289046-21321-4-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 66f51676a095 ("arm64: allow kernel Image to be loaded anywhere in
-physical memory") defers the assignment of memstart_addr to the point where
-all memory has been discovered and possibly clipped based on the size of
-the linear region and the presence of a mem= command line parameter.
+Currently, using BUG_ON() in header files is cumbersome, due to the fact
+that asm/bug.h transitively includes a lot of other header files, resulting
+in the actual BUG_ON() invocation appearing before its definition in the
+preprocessor input. So let's reverse the #include dependency between
+asm/bug.h and asm/debug-monitors.h, by moving the definition of BUG_BRK_IMM
+from the latter to the former. Also fix up one user of asm/debug-monitors.h
+which relied on a transitive include.
 
-However, this results in __va() translations that have been performed up
-to this point to have been carried out with a preliminary, incorrect value
-of memstart_addr, and these values need to be fixed up. So wire up the
-generic support to declare the initrd addresses, and implement it without
-__va() translations, and perform the translation after memstart_addr has
-been assigned.
-
+Cc: Dave Martin <Dave.Martin@arm.com>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/include/asm/memory.h |  8 ++++++++
- arch/arm64/mm/init.c            | 13 +++++++++----
- 2 files changed, 17 insertions(+), 4 deletions(-)
+ arch/arm64/include/asm/bug.h            | 2 +-
+ arch/arm64/include/asm/debug-monitors.h | 2 +-
+ arch/arm64/kvm/hyp/debug-sr.c           | 1 +
+ 3 files changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index 083361531a61..c900883a3119 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -121,6 +121,14 @@
- #define IOREMAP_MAX_ORDER	(PMD_SHIFT)
- #endif
+diff --git a/arch/arm64/include/asm/bug.h b/arch/arm64/include/asm/bug.h
+index 4a748ce9ba1a..679d49221998 100644
+--- a/arch/arm64/include/asm/bug.h
++++ b/arch/arm64/include/asm/bug.h
+@@ -18,7 +18,7 @@
+ #ifndef _ARCH_ARM64_ASM_BUG_H
+ #define _ARCH_ARM64_ASM_BUG_H
  
-+#ifdef CONFIG_BLK_DEV_INITRD
-+#define __early_init_dt_declare_initrd(__start, __end)			\
-+	do {								\
-+		initrd_start = (__start);				\
-+		initrd_end = (__end);					\
-+	} while (0)
-+#endif
-+
- #ifndef __ASSEMBLY__
+-#include <asm/debug-monitors.h>
++#define BUG_BRK_IMM			0x800
  
- extern phys_addr_t		memstart_addr;
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 3a9fc46cbf80..ed85778b32e5 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -61,8 +61,8 @@ static int __init early_initrd(char *p)
- 	if (*endp == ',') {
- 		size = memparse(endp + 1, NULL);
+ #ifdef CONFIG_GENERIC_BUG
+ #define HAVE_ARCH_BUG
+diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
+index 279c85b5ec09..e893a1fca9c2 100644
+--- a/arch/arm64/include/asm/debug-monitors.h
++++ b/arch/arm64/include/asm/debug-monitors.h
+@@ -20,6 +20,7 @@
  
--		initrd_start = (unsigned long)__va(start);
--		initrd_end = (unsigned long)__va(start + size);
-+		initrd_start = start;
-+		initrd_end = start + size;
- 	}
- 	return 0;
- }
-@@ -213,8 +213,13 @@ void __init arm64_memblock_init(void)
- 	 */
- 	memblock_reserve(__pa(_text), _end - _text);
- #ifdef CONFIG_BLK_DEV_INITRD
--	if (initrd_start)
--		memblock_reserve(__virt_to_phys(initrd_start), initrd_end - initrd_start);
-+	if (initrd_start) {
-+		memblock_reserve(initrd_start, initrd_end - initrd_start);
-+
-+		/* the generic initrd code expects virtual addresses */
-+		initrd_start = __phys_to_virt(initrd_start);
-+		initrd_end = __phys_to_virt(initrd_end);
-+	}
- #endif
+ #include <linux/errno.h>
+ #include <linux/types.h>
++#include <asm/bug.h>
+ #include <asm/esr.h>
+ #include <asm/insn.h>
+ #include <asm/ptrace.h>
+@@ -57,7 +58,6 @@
+ #define FAULT_BRK_IMM			0x100
+ #define KGDB_DYN_DBG_BRK_IMM		0x400
+ #define KGDB_COMPILED_DBG_BRK_IMM	0x401
+-#define BUG_BRK_IMM			0x800
  
- 	early_init_fdt_scan_reserved_mem();
+ /*
+  * BRK instruction encoding
+diff --git a/arch/arm64/kvm/hyp/debug-sr.c b/arch/arm64/kvm/hyp/debug-sr.c
+index c9c1e97501a9..2f8bca8af295 100644
+--- a/arch/arm64/kvm/hyp/debug-sr.c
++++ b/arch/arm64/kvm/hyp/debug-sr.c
+@@ -18,6 +18,7 @@
+ #include <linux/compiler.h>
+ #include <linux/kvm_host.h>
+ 
++#include <asm/debug-monitors.h>
+ #include <asm/kvm_asm.h>
+ #include <asm/kvm_mmu.h>
+ 
 -- 
 2.5.0
