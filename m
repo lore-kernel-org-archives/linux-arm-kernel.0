@@ -1,27 +1,50 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 12 Feb 2016 21:28:56 +0000
-Subject: [PATCH] Revert "ASoC: qcom: Specify LE device endianness"
-In-Reply-To: <4609707.AR30v8FONr@wuerfel>
-References: <1455298217-15744-1-git-send-email-sboyd@codeaurora.org>
- <2686474.cvCA6vY47l@wuerfel> <20160212200311.GB11402@sirena.org.uk>
- <4609707.AR30v8FONr@wuerfel>
-Message-ID: <20160212212856.GA18988@sirena.org.uk>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 12 Feb 2016 16:38:53 -0500 (EST)
+Subject: [PATCH] [media] zl10353: use div_u64 instead of do_div
+In-Reply-To: <6737272.LXr2g355Yt@wuerfel>
+References: <1455287246-3540549-1-git-send-email-arnd@arndb.de>
+ <2712691.b9gkR7KMX7@wuerfel>
+ <alpine.LFD.2.20.1602121305180.13632@knanqh.ubzr>
+ <6737272.LXr2g355Yt@wuerfel>
+Message-ID: <alpine.LFD.2.20.1602121634040.13632@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 12, 2016 at 09:35:26PM +0100, Arnd Bergmann wrote:
+On Fri, 12 Feb 2016, Arnd Bergmann wrote:
 
-> syscon is probably fine because it only sets that flag based on the
-> "little-endian" DT property and I don't see anything setting that
-> (except the one platform that did so incorrectly).
+> On Friday 12 February 2016 13:21:33 Nicolas Pitre wrote:
+> > This is all related to the gcc bug for which I produced a test case 
+> > here:
+> > 
+> > http://article.gmane.org/gmane.linux.kernel.cross-arch/29801
+> > 
+> > Do you know if this is fixed in recent gcc?
+> 
+> I have a fairly recent gcc, but I also never got around to submit
+> it properly.
+> 
+> However, I did stumble over an older patch I did now, which I could
+> not remember what it was good for. It does fix the problem, and
+> it seems to be a better solution.
 
-Though it should be able to remove that as the regmap code will also
-parse the property.  Probably worth double checking that works as
-intended though.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160212/d83d1fdb/attachment.sig>
+WTF?
+
+Hmmm... it apparently doesn't fix it if I apply this change to the gcc 
+test case.
+
+
+> diff --git a/include/linux/compiler.h b/include/linux/compiler.h
+> index b5acbb404854..b5ff9881bef8 100644
+> --- a/include/linux/compiler.h
+> +++ b/include/linux/compiler.h
+> @@ -148,7 +148,7 @@ void ftrace_likely_update(struct ftrace_branch_data *f, int val, int expect);
+>   */
+>  #define if(cond, ...) __trace_if( (cond , ## __VA_ARGS__) )
+>  #define __trace_if(cond) \
+> -	if (__builtin_constant_p((cond)) ? !!(cond) :			\
+> +	if (__builtin_constant_p(!!(cond)) ? !!(cond) :			\
+>  	({								\
+>  		int ______r;						\
+>  		static struct ftrace_branch_data			\
+> 
+> 
