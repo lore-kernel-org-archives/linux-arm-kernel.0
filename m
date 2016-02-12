@@ -1,67 +1,58 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Thu, 11 Feb 2016 17:13:37 -0800
-Subject: [PATCH 7/7] ARM: OMAP2+: Fix omap_device for module reload on PM
- runtime forbid
-In-Reply-To: <1455145370-20301-8-git-send-email-tony@atomide.com> (Tony
- Lindgren's message of "Wed, 10 Feb 2016 15:02:50 -0800")
-References: <1455145370-20301-1-git-send-email-tony@atomide.com>
- <1455145370-20301-8-git-send-email-tony@atomide.com>
-Message-ID: <7hbn7m688u.fsf@baylibre.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 12 Feb 2016 10:02:39 +0800
+Subject: [PATCH v8 02/10] mfd: axp20x: Remove second struct device * parameter
+ for axp20x_match_device()
+In-Reply-To: <1455242567-17880-1-git-send-email-wens@csie.org>
+References: <1455242567-17880-1-git-send-email-wens@csie.org>
+Message-ID: <1455242567-17880-3-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren <tony@atomide.com> writes:
+The first argument passed to axp20x_match_device(), struct axp20x_dev *,
+already contains a pointer to the device. By rearranging some code,
+moving the assignment of the pointer before axp20x_match_device() is
+called, we can eliminate the second parameter.
 
-> If a driver PM runtime is disabled via sysfs, and the module is
-> unloaded, PM runtime can't do anything to disable the device. Let's
-> let the interconnect disable the device on BUS_NOTIFY_UNBOUND_DRIVER.
->
-> Otherwise omap_device will produce and error on the following module
-> reload. This can be easily tested with something like:
->
-> # modprobe omap_hsmmc
-> # echo on > /sys/devices/platform/68000000.ocp/4809c000.mmc/power/control
-> # rmmod omap_hsmmc
-> # modprobe omap_hsmmc
->
-> Cc: Alan Stern <stern@rowland.harvard.edu>
-> Cc: Kevin Hilman <khilman@baylibre.com>
-> Cc: Nishanth Menon <nm@ti.com>
-> Cc: Rafael J. Wysocki <rafael@kernel.org>
-> Cc: Tero Kristo <t-kristo@ti.com>
-> Reported-by: Ulf Hansson <ulf.hansson@linaro.org>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+Suggested-by: Andy Shevchenko <andy.shevchenko@gmail.com>
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Acked-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/mfd/axp20x.c | 11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
 
-Acked-by: Kevin Hilman <khilman@baylibre.com>
-
-> ---
->  arch/arm/mach-omap2/omap_device.c | 10 ++++++++++
->  1 file changed, 10 insertions(+)
->
-> diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
-> index ebd8369..f7ff3b9 100644
-> --- a/arch/arm/mach-omap2/omap_device.c
-> +++ b/arch/arm/mach-omap2/omap_device.c
-> @@ -191,12 +191,22 @@ static int _omap_device_notifier_call(struct notifier_block *nb,
->  {
->  	struct platform_device *pdev = to_platform_device(dev);
->  	struct omap_device *od;
-> +	int err;
->  
->  	switch (event) {
->  	case BUS_NOTIFY_DEL_DEVICE:
->  		if (pdev->archdata.od)
->  			omap_device_delete(pdev->archdata.od);
->  		break;
-> +	case BUS_NOTIFY_UNBOUND_DRIVER:
-> +		od = to_omap_device(pdev);
-> +		if (od && (od->_state == OMAP_DEVICE_STATE_ENABLED)) {
-> +			dev_info(dev, "enabled after unload, idling\n");
-> +			err = omap_device_idle(pdev);
-> +			if (err)
-> +				dev_err(dev, "failed to idle\n");
-> +		}
-> +		break;
->  	case BUS_NOTIFY_ADD_DEVICE:
->  		if (pdev->dev.of_node)
->  			omap_device_build_from_dt(pdev);
+diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+index 9842199e2e6c..685a78614f83 100644
+--- a/drivers/mfd/axp20x.c
++++ b/drivers/mfd/axp20x.c
+@@ -606,8 +606,9 @@ static void axp20x_power_off(void)
+ 		     AXP20X_OFF);
+ }
+ 
+-static int axp20x_match_device(struct axp20x_dev *axp20x, struct device *dev)
++static int axp20x_match_device(struct axp20x_dev *axp20x)
+ {
++	struct device *dev = axp20x->dev;
+ 	const struct acpi_device_id *acpi_id;
+ 	const struct of_device_id *of_id;
+ 
+@@ -673,14 +674,14 @@ static int axp20x_i2c_probe(struct i2c_client *i2c,
+ 	if (!axp20x)
+ 		return -ENOMEM;
+ 
+-	ret = axp20x_match_device(axp20x, &i2c->dev);
+-	if (ret)
+-		return ret;
+-
+ 	axp20x->i2c_client = i2c;
+ 	axp20x->dev = &i2c->dev;
+ 	dev_set_drvdata(axp20x->dev, axp20x);
+ 
++	ret = axp20x_match_device(axp20x);
++	if (ret)
++		return ret;
++
+ 	axp20x->regmap = devm_regmap_init_i2c(i2c, axp20x->regmap_cfg);
+ 	if (IS_ERR(axp20x->regmap)) {
+ 		ret = PTR_ERR(axp20x->regmap);
+-- 
+2.7.0
