@@ -1,76 +1,125 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Fri, 12 Feb 2016 10:56:33 -0800
-Subject: [PATCH v2 8/9] serial: 8250: add acpi_match
-In-Reply-To: <1455299022-11641-9-git-send-email-aleksey.makarov@linaro.org>
-References: <1455299022-11641-1-git-send-email-aleksey.makarov@linaro.org>
- <1455299022-11641-9-git-send-email-aleksey.makarov@linaro.org>
-Message-ID: <20160212185633.GC10095@kroah.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Fri, 12 Feb 2016 12:02:27 -0700
+Subject: [PATCH V3 6/6] coresight-stm: adding driver for CoreSight STM
+ component
+In-Reply-To: <87y4aq2bjj.fsf@ashishki-desk.ger.corp.intel.com>
+References: <1454756672-12790-1-git-send-email-zhang.chunyan@linaro.org>
+ <1454756672-12790-7-git-send-email-zhang.chunyan@linaro.org>
+ <87y4aq2bjj.fsf@ashishki-desk.ger.corp.intel.com>
+Message-ID: <CANLsYkxTiwbE9WM4yR0hThPopv5ESJM0_B0+Qcay=aiTvaeJ0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 12, 2016 at 08:43:39PM +0300, Aleksey Makarov wrote:
-> From: Mark Salter <msalter@redhat.com>
-> 
-> Add an implementation of acpi_match() to the 8250 driver.
-> It allows console to check if it matches the console specified by
-> ACPI SPCR table.
-> 
-> Signed-off-by: Mark Salter <msalter@redhat.com>
-> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
-> ---
->  drivers/tty/serial/8250/8250_core.c | 23 +++++++++++++++++++++++
->  1 file changed, 23 insertions(+)
-> 
-> diff --git a/drivers/tty/serial/8250/8250_core.c b/drivers/tty/serial/8250/8250_core.c
-> index 7775221..059338a 100644
-> --- a/drivers/tty/serial/8250/8250_core.c
-> +++ b/drivers/tty/serial/8250/8250_core.c
-> @@ -40,6 +40,7 @@
->  #ifdef CONFIG_SPARC
->  #include <linux/sunserialcore.h>
->  #endif
-> +#include <linux/acpi.h>
->  
->  #include <asm/irq.h>
->  
-> @@ -669,12 +670,34 @@ static int univ8250_console_match(struct console *co, char *name, int idx,
->  	return -ENODEV;
->  }
->  
-> +static int __init univ8250_console_acpi_match(struct console *co,
-> +					      struct acpi_table_spcr *spcr)
-> +{
-> +	int index = co->index >= 0 ? co->index : 0;
-> +	struct uart_port *port = &serial8250_ports[index].port;
-> +
-> +	if (spcr->interface_type != ACPI_DBG2_16550_SUBSET &&
-> +	    spcr->interface_type != ACPI_DBG2_16550_COMPATIBLE)
-> +		return -ENODEV;
-> +
-> +	if (spcr->serial_port.space_id == ACPI_ADR_SPACE_SYSTEM_MEMORY &&
-> +	    spcr->serial_port.address == (u64)port->mapbase)
-> +		return 0;
-> +
-> +	if (spcr->serial_port.space_id == ACPI_ADR_SPACE_SYSTEM_IO &&
-> +	    spcr->serial_port.address == (u64)port->iobase)
-> +		return 0;
-> +
-> +	return -ENODEV;
-> +}
+On 12 February 2016 at 08:28, Alexander Shishkin
+<alexander.shishkin@linux.intel.com> wrote:
+> Chunyan Zhang <zhang.chunyan@linaro.org> writes:
+>
+>> +static long stm_generic_set_options(struct stm_data *stm_data,
+>> +                                 unsigned int master,
+>> +                                 unsigned int channel,
+>> +                                 unsigned int nr_chans,
+>> +                                 unsigned long options)
+>> +{
+>> +     struct stm_drvdata *drvdata = container_of(stm_data,
+>> +                                                struct stm_drvdata, stm);
+>> +     if (!(drvdata && drvdata->enable))
+>> +             return -EINVAL;
+>> +
+>> +     if (channel >= drvdata->numsp)
+>> +             return -EINVAL;
+>> +
+>> +     switch (options) {
+>> +     case STM_OPTION_GUARANTEED:
+>> +             set_bit(channel, drvdata->chs.guaranteed);
+>> +             break;
+>> +
+>> +     case STM_OPTION_INVARIANT:
+>> +             clear_bit(channel, drvdata->chs.guaranteed);
+>> +             break;
+>
+> This is a bad interface. Firstly, neither option is described
+> anywhere. Secondly, I'm pretty sure "invariant" does not mean "not
+> guaranteed" in english, although this function seems to imply this.
 
-Ick, I don't like this, you are doing almost the same thing that
-univ8250_console_match does, yet you have to know the internals of the
-acpi_table_spcr structure, which is insane (again, do you want to do
-this for every firmware type?)
+Regardless of the semantic associated to the word "invariant" in the
+English language, the documentation characterises a channel configured
+in best effort delivery mode as "invariant".  This is also the
+opposite of the "guaranteed" mode where packets are guaranteed to be
+delivered.  Adding a few comments here is probably a good idea.
 
-Isn't this something that resources are supposed to handle for us?  What
-happened to getting this type of information from the firmware in a
-non-firmware-specific way to pass to the drivers?  Please work on that
-instead, then you don't have to modify each and every single driver you
-want to work with your system, they will all "just work" automagically.
+>
+>> +
+>> +     default:
+>> +             return -EINVAL;
+>> +     }
+>> +
+>> +     return 0;
+>> +}
+>> +
+>> +static long stm_generic_get_options(struct stm_data *stm_data,
+>> +                                 unsigned int master,
+>> +                                 unsigned int channel,
+>> +                                 unsigned int nr_chans,
+>> +                                 u64 *options)
+>> +{
+>> +     struct stm_drvdata *drvdata = container_of(stm_data,
+>> +                                                struct stm_drvdata, stm);
+>> +     if (!(drvdata && drvdata->enable))
+>> +             return -EINVAL;
+>> +
+>> +     if (channel >= drvdata->numsp)
+>> +             return -EINVAL;
+>> +
+>> +     switch (*options) {
+>> +     case STM_OPTION_GUARANTEED:
+>> +             *options = test_bit(channel, drvdata->chs.guaranteed);
+>> +             break;
+>
+> This just doesn't work. @options here is an on-stack variable in
+> stm_char_ioctl(), hitherto uninitialized. The get_options ioctl command
+> as you implemented it doesn't fetch @options from userspace either, it
+> just passes a pointer to it to this callback, expecting that the
+> callback will set it so that it can be copy_to_user()ed back to the
+> user.
 
-Please redo this series, as it is, I don't like it at all.
+Yes, that was the intended behaviour - to allow user space to see in
+what mode channels are configured (guaranteed/invariant).
 
-thanks,
+>
+> Then, when we figure this out, there is again the question of what
+> should one make of STM_OPTION_{GUARANTEED,INVARIANT} and how do they fit
+> into *options.
 
-greg k-h
+The interface asks if the channel is configured in "guaranteed" mode.
+If not and because there isn't another mode available, it is
+automatically in "invariant" mode.
+
+But as I pointed out in my earlier email this may no longer needed.
+One has to issue a system call anyway, might as well just go ahead
+with the configuration request.
+
+Thanks,
+Mathieu
+
+>
+> The idea behind set_options ioctl is that the user specifies a bit mask
+> of options that he/she wants to set.
+>
+> [snip]
+>
+>> +#ifndef __UAPI_CORESIGHT_STM_H_
+>> +#define __UAPI_CORESIGHT_STM_H_
+>> +
+>> +#define STM_FLAG_TIMESTAMPED   BIT(3)
+>> +#define STM_FLAG_GUARANTEED    BIT(7)
+>> +
+>> +enum {
+>> +     STM_OPTION_GUARANTEED = 0,
+>> +     STM_OPTION_INVARIANT,
+>> +};
+>
+> Each of these guys could also use an explanation.
+>
+> Regards,
+> --
+> Alex
