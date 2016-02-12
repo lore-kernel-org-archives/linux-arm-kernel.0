@@ -1,98 +1,117 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Fri, 12 Feb 2016 13:57:44 +0100
-Subject: [PATCH v4 01/17] Xen: ACPI: Hide UART used by Xen
-In-Reply-To: <alpine.DEB.2.02.1602121138090.27008@kaball.uk.xensource.com>
-References: <1454641552-12576-1-git-send-email-zhaoshenglong@huawei.com>
- <44113385.2QnPtvxQx0@vostro.rjw.lan>
- <alpine.DEB.2.02.1602111557430.27008@kaball.uk.xensource.com>
- <1667812.hY9vsC2epc@vostro.rjw.lan>
- <alpine.DEB.2.02.1602121138090.27008@kaball.uk.xensource.com>
-Message-ID: <CAJZ5v0j7Vv5B-+CYt=ZAvO+YTj6-0Cm0Bi=1AjG5JbTeNLW3EQ@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 12 Feb 2016 13:59:07 +0100
+Subject: [PATCH 1/7] mmc: omap_hsmmc: Fix PM regression with deferred
+ probe for pm_runtime_reinit
+In-Reply-To: <20160211172632.GT19432@atomide.com>
+References: <1455145370-20301-1-git-send-email-tony@atomide.com>
+ <1455145370-20301-2-git-send-email-tony@atomide.com>
+ <CAPDyKFpAcsfLgtu93P45fTEg11MjdGwREcyeGSS7vt6GWbNu_w@mail.gmail.com>
+ <20160211150240.GR19432@atomide.com>
+ <CAPDyKFo4Jyjwyvr3P5VHfDhQ87K9mnR01N-NtKz-yx2ycnfOLg@mail.gmail.com>
+ <20160211172632.GT19432@atomide.com>
+Message-ID: <CAPDyKFpwGcCW_Vwz07cgh8LxGmxu9=GVch0MVJEpNJ19zoLZ7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 12, 2016 at 12:50 PM, Stefano Stabellini
-<stefano.stabellini@eu.citrix.com> wrote:
-> On Thu, 11 Feb 2016, Rafael J. Wysocki wrote:
->> On Thursday, February 11, 2016 04:04:14 PM Stefano Stabellini wrote:
->> > On Wed, 10 Feb 2016, Rafael J. Wysocki wrote:
->> > > On Tuesday, February 09, 2016 11:19:02 AM Stefano Stabellini wrote:
->> > > > On Mon, 8 Feb 2016, Rafael J. Wysocki wrote:
->> > > > > On Monday, February 08, 2016 10:57:01 AM Stefano Stabellini wrote:
->> > > > > > On Sat, 6 Feb 2016, Rafael J. Wysocki wrote:
->> > > > > > > On Fri, Feb 5, 2016 at 4:05 AM, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
->> > > > > > > > From: Shannon Zhao <shannon.zhao@linaro.org>
->> > > > > > > >
->> > > > > > > > ACPI 6.0 introduces a new table STAO to list the devices which are used
->> > > > > > > > by Xen and can't be used by Dom0. On Xen virtual platforms, the physical
->> > > > > > > > UART is used by Xen. So here it hides UART from Dom0.
->> > > > > > > >
->> > > > > > > > Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
->> > > > > > > > Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
->> > > > > > >
->> > > > > > > Well, this doesn't look right to me.
->> > > > > > >
->> > > > > > > We need to find a nicer way to achieve what you want.
->> > > > > >
->> > > > > > I take that you are talking about how to honor the STAO table in Linux.
->> > > > > > Do you have any concrete suggestions?
->> > > > >
->> > > > > I do.
->> > > > >
->> > > > > The last hunk of the patch is likely what it needs to be, although I'm
->> > > > > not sure if the place it is added to is the right one.  That's a minor thing,
->> > > > > though.
->> > > > >
->> > > > > The other part is problematic.  Not that as it doesn't work, but because of
->> > > > > how it works.  With these changes the device will be visible to the OS (in
->> > > > > fact to user space even), but will never be "present".  I'm not sure if
->> > > > > that's what you want?
->> > > > >
->> > > > > It might be better to add a check to acpi_bus_type_and_status() that will
->> > > > > evaluate the "should ignore?" thing and return -ENODEV if this is true.  This
->> > > > > way the device won't be visible at all.
->> > > >
->> > > > Something like below?  Actually your suggestion is better, thank you!
->> > > >
->> > > > diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
->> > > > index 78d5f02..4778c51 100644
->> > > > --- a/drivers/acpi/scan.c
->> > > > +++ b/drivers/acpi/scan.c
->> > > > @@ -1455,6 +1455,9 @@ static int acpi_bus_type_and_status(acpi_handle handle, int *type,
->> > > >         if (ACPI_FAILURE(status))
->> > > >                 return -ENODEV;
->> > > >
->> > > > +       if (acpi_check_device_is_ignored(handle))
->> > > > +               return -ENODEV;
->> > > > +
->> > > >         switch (acpi_type) {
->> > > >         case ACPI_TYPE_ANY:             /* for ACPI_ROOT_OBJECT */
->> > > >         case ACPI_TYPE_DEVICE:
->> > > >
->> > >
->> > > I thought about doing that under ACPI_TYPE_DEVICE, because it shouldn't be
->> > > applicable to the other types.  But generally, yes.
+On 11 February 2016 at 18:26, Tony Lindgren <tony@atomide.com> wrote:
+> * Ulf Hansson <ulf.hansson@linaro.org> [160211 07:14]:
+>> On 11 February 2016 at 16:02, Tony Lindgren <tony@atomide.com> wrote:
+>> > * Ulf Hansson <ulf.hansson@linaro.org> [160211 02:19]:
+>> >> On 11 February 2016 at 00:02, Tony Lindgren <tony@atomide.com> wrote:
+>> >> >
+>> >> > Ulf, I'd like to merge this along with other related fixes via the
+>> >> > ARM SoC tree if no objections, please review and ack if this look OK
+>> >> > to you.
+>> >>
+>> >> I have some other omap_hsmmc patches queued for 4.6, so I prefer to
+>> >> send this via my mmc tree.
+>> >>
+>> >> I guess that's okay as well!?
 >> >
->> > I was pondering about it myself. Maybe an ACPI_TYPE_PROCESSOR object
->> > could theoretically be hidden with the STAO?
+>> > Naturally yes, please go ahead thanks!
 >>
->> But this patch won't check for it anyway, will it?
+>> Okay!
 >>
->> It seems to be only checking against the UART address or have I missed
->> anything?
+>> BTW, did you notice my other comments to the patch?
+>>
+>> I can fix them before applying, unless you want to send a v2?
 >
-> You are right, this patch only checks for the UART address, which is
-> critical.
+> Oh sorry, no I missed the rest of your comments again, I really
+> need to recalibrate my reading habits obviously if I keep
+> missing comments on regular basis..
 >
-> However the STAO also has a "Name List" field with a list of paths in
-> ACPI namespace to hide. If not implementing proper "Name List" support,
-> at least, as part of this patch, it would be nice to check for the
-> presence of the Name List field in the table, and print a warning such
-> as "STAO Name List not yet supported" when the field is present.
+> You comments make sense to me. Below is the patch with only
+> minimal changes. Seems to work just fine and hit off mode for
+> suspend too.
+>
+> Regards,
+>
+> Tony
+>
+> 8< -------------------
+> From eb3c93421f01fb6198f76127262a92b527dd214c Mon Sep 17 00:00:00 2001
+> From: Tony Lindgren <tony@atomide.com>
+> Date: Tue, 9 Feb 2016 09:31:10 -0800
+> Subject: [PATCH] mmc: omap_hsmmc: Fix PM regression with deferred probe for
+>  pm_runtime_reinit
+>
+> Commit 5de85b9d57ab ("PM / runtime: Re-init runtime PM states at probe
+> error and driver unbind") introduced pm_runtime_reinit() that is used
+> to reinitialize PM runtime after -EPROBE_DEFER. This allows shutting
+> down the device after a failed probe.
+>
+> However, for drivers using pm_runtime_use_autosuspend() this can cause
+> a state where suspend callback is never called after -EPROBE_DEFER.
+> On the following device driver probe, hardware state is different from
+> the PM runtime state causing omap_device to produce the following
+> error:
+>
+> omap_device_enable() called from invalid state 1
+>
+> And with omap_device and omap hardware being picky for PM, this will
+> block any deeper idle states in hardware.
+>
+> The solution is to fix the drivers to follow the PM runtime documentation:
+>
+> 1. For sections of code that needs the device disabled, use
+>    pm_runtime_put_sync_suspend() if pm_runtime_set_autosuspend() has
+>    been set.
+>
+> 2. For driver exit code, use pm_runtime_dont_use_autosuspend() before
+>    pm_runtime_put_sync() if pm_runtime_use_autosuspend() has been
+>    set.
+>
+> Fixes: 5de85b9d57ab ("PM / runtime: Re-init runtime PM states at probe
+> error and driver unbind")
+> Cc: linux-mmc at vger.kernel.org
+> Cc: Alan Stern <stern@rowland.harvard.edu>
+> Cc: Kevin Hilman <khilman@baylibre.com>
+> Cc: Nishanth Menon <nm@ti.com>
+> Cc: Rafael J. Wysocki <rafael@kernel.org>
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Cc: Tero Kristo <t-kristo@ti.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+>
+> --- a/drivers/mmc/host/omap_hsmmc.c
+> +++ b/drivers/mmc/host/omap_hsmmc.c
+> @@ -2232,6 +2232,7 @@ err_irq:
+>                 dma_release_channel(host->tx_chan);
+>         if (host->rx_chan)
+>                 dma_release_channel(host->rx_chan);
+> +       pm_runtime_dont_use_autosuspend(host->dev);
+>         pm_runtime_put_sync(host->dev);
+>         pm_runtime_disable(host->dev);
+>         if (host->dbclk)
+> @@ -2253,6 +2254,7 @@ static int omap_hsmmc_remove(struct platform_device *pdev)
+>         dma_release_channel(host->tx_chan);
+>         dma_release_channel(host->rx_chan);
+>
+> +       pm_runtime_dont_use_autosuspend(host->dev);
+>         pm_runtime_put_sync(host->dev);
+>         pm_runtime_disable(host->dev);
+>         device_init_wakeup(&pdev->dev, false);
 
-That would be fine, but anyway it belongs to the table parsing part IMO.
+Thanks, applied for fixes!
 
-And the check can be moved when adding proper support for the name list part.
-
-Thanks,
-Rafael
+Kind regards
+Uffe
