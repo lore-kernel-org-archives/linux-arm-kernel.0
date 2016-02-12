@@ -1,167 +1,113 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Fri, 12 Feb 2016 08:13:12 +0000
-Subject: [RFC v3 10/15] vfio: allow the user to register reserved iova range
- for MSI mapping
+Date: Fri, 12 Feb 2016 08:13:15 +0000
+Subject: [RFC v3 13/15] vfio/type1: also check IRQ remapping capability at msi
+ domain
 In-Reply-To: <1455264797-2334-1-git-send-email-eric.auger@linaro.org>
 References: <1455264797-2334-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1455264797-2334-11-git-send-email-eric.auger@linaro.org>
+Message-ID: <1455264797-2334-14-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The user is allowed to register a reserved IOVA range by using the
-DMA MAP API and setting the new flag: VFIO_DMA_MAP_FLAG_MSI_RESERVED_IOVA.
-It provides the base address and the size. This region is stored in the
-vfio_dma rb tree. At that point the iova range is not mapped to any target
-address yet. The host kernel will use those iova when needed, typically
-when the VFIO-PCI device allocates its MSI's.
+On x86 IRQ remapping is abstracted by the IOMMU. On ARM this is abstracted
+by the msi controller. vfio_msi_parent_irq_remapping_capable allows to
+check whether interrupts are "safe" for a given device. There are if the device
+does not use MSI or if the device uses MSI and the msi-parent controller
+supports IRQ remapping.
 
-This patch also handles the destruction of the reserved binding RB-tree and
-domain's iova_domains.
+Then we check at group level if all devices have safe interrupts: if not
+only allow the group to be attached if allow_unsafe_interrupts is set.
+
+At this point ARM sMMU still advertises IOMMU_CAP_INTR_REMAP. This is
+changed in next patch.
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
-Signed-off-by: Bharat Bhushan <Bharat.Bhushan@freescale.com>
 
 ---
 
-v1 -> v2:
-- set returned value according to alloc_reserved_iova_domain result
-- free the iova domains in case any error occurs
-
-RFC v1 -> v1:
-- takes into account Alex comments, based on
-  [RFC PATCH 1/6] vfio: Add interface for add/del reserved iova region:
-- use the existing dma map/unmap ioctl interface with a flag to register
-  a reserved IOVA range. A single reserved iova region is allowed.
+v2 -> v3:
+- protect vfio_msi_parent_irq_remapping_capable with
+  CONFIG_GENERIC_MSI_IRQ_DOMAIN
 ---
- drivers/vfio/vfio_iommu_type1.c | 75 ++++++++++++++++++++++++++++++++++++++++-
- include/uapi/linux/vfio.h       |  9 +++++
- 2 files changed, 83 insertions(+), 1 deletion(-)
+ drivers/vfio/vfio_iommu_type1.c | 39 +++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 37 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
-index b9326c9..c5d3b48 100644
+index c5d3b48..3afb815 100644
 --- a/drivers/vfio/vfio_iommu_type1.c
 +++ b/drivers/vfio/vfio_iommu_type1.c
-@@ -673,6 +673,75 @@ static int vfio_dma_do_map(struct vfio_iommu *iommu,
- 	return ret;
+@@ -36,6 +36,8 @@
+ #include <linux/uaccess.h>
+ #include <linux/vfio.h>
+ #include <linux/workqueue.h>
++#include <linux/irqdomain.h>
++#include <linux/msi.h>
+ 
+ #define DRIVER_VERSION  "0.2"
+ #define DRIVER_AUTHOR   "Alex Williamson <alex.williamson@redhat.com>"
+@@ -754,6 +756,32 @@ static int vfio_bus_type(struct device *dev, void *data)
+ 	return 0;
  }
  
-+static int vfio_register_reserved_iova_range(struct vfio_iommu *iommu,
-+			   struct vfio_iommu_type1_dma_map *map)
++/**
++ * vfio_msi_parent_irq_remapping_capable: returns whether the device msi-parent
++ * controller supports IRQ remapping, aka interrupt translation
++ *
++ * @dev: device handle
++ * @data: unused
++ * returns 0 if irq remapping is supported or -1 if not supported.
++ */
++static int vfio_msi_parent_irq_remapping_capable(struct device *dev, void *data)
 +{
-+	dma_addr_t iova = map->iova;
-+	size_t size = map->size;
-+	uint64_t mask;
-+	struct vfio_dma *dma;
-+	int ret = 0;
-+	struct vfio_domain *d;
-+	unsigned long order;
++#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
++	struct irq_domain *domain;
++	struct msi_domain_info *info;
 +
-+	/* Verify that none of our __u64 fields overflow */
-+	if (map->size != size || map->iova != iova)
-+		return -EINVAL;
++	domain = dev_get_msi_domain(dev);
++	if (!domain)
++		return 0;
 +
-+	order =  __ffs(vfio_pgsize_bitmap(iommu));
-+	mask = ((uint64_t)1 << order) - 1;
++	info = msi_get_domain_info(domain);
 +
-+	WARN_ON(mask & PAGE_MASK);
-+
-+	/* we currently only support MSI_RESERVED_IOVA */
-+	if (!(map->flags & VFIO_DMA_MAP_FLAG_MSI_RESERVED_IOVA))
-+		return -EINVAL;
-+
-+	if (!size || (size | iova) & mask)
-+		return -EINVAL;
-+
-+	/* Don't allow IOVA address wrap */
-+	if (iova + size - 1 < iova)
-+		return -EINVAL;
-+
-+	mutex_lock(&iommu->lock);
-+
-+	/* check if the iova domain has not been instantiated already*/
-+	d = list_first_entry(&iommu->domain_list,
-+				  struct vfio_domain, next);
-+
-+	if (vfio_find_dma(iommu, iova, size)) {
-+		ret =  -EEXIST;
-+		goto out;
-+	}
-+
-+	dma = kzalloc(sizeof(*dma), GFP_KERNEL);
-+	if (!dma) {
-+		ret = -ENOMEM;
-+		goto out;
-+	}
-+
-+	dma->iova = iova;
-+	dma->size = size;
-+	dma->type = VFIO_IOVA_RESERVED;
-+
-+	list_for_each_entry(d, &iommu->domain_list, next)
-+		ret |= iommu_alloc_reserved_iova_domain(d->domain, iova,
-+							size, order);
-+
-+	if (ret) {
-+		list_for_each_entry(d, &iommu->domain_list, next)
-+			iommu_free_reserved_iova_domain(d->domain);
-+		goto out;
-+	}
-+
-+	vfio_link_dma(iommu, dma);
-+
-+out:
-+	mutex_unlock(&iommu->lock);
-+	return ret;
++	if (!(info->flags & MSI_FLAG_IRQ_REMAPPING))
++		return -1;
++#endif
++	return 0;
 +}
 +
- static int vfio_bus_type(struct device *dev, void *data)
+ static int vfio_iommu_replay(struct vfio_iommu *iommu,
+ 			     struct vfio_domain *domain)
  {
- 	struct bus_type **bus = data;
-@@ -1045,7 +1114,8 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
- 	} else if (cmd == VFIO_IOMMU_MAP_DMA) {
- 		struct vfio_iommu_type1_dma_map map;
- 		uint32_t mask = VFIO_DMA_MAP_FLAG_READ |
--				VFIO_DMA_MAP_FLAG_WRITE;
-+				VFIO_DMA_MAP_FLAG_WRITE |
-+				VFIO_DMA_MAP_FLAG_MSI_RESERVED_IOVA;
+@@ -848,7 +876,7 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
+ 	struct vfio_group *group, *g;
+ 	struct vfio_domain *domain, *d;
+ 	struct bus_type *bus = NULL;
+-	int ret;
++	int ret, irq_remapping;
  
- 		minsz = offsetofend(struct vfio_iommu_type1_dma_map, size);
+ 	mutex_lock(&iommu->lock);
  
-@@ -1055,6 +1125,9 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
- 		if (map.argsz < minsz || map.flags & ~mask)
- 			return -EINVAL;
+@@ -871,6 +899,13 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
  
-+		if (map.flags & VFIO_DMA_MAP_FLAG_MSI_RESERVED_IOVA)
-+			return vfio_register_reserved_iova_range(iommu, &map);
+ 	group->iommu_group = iommu_group;
+ 
++	/*
++	 * Determine if all the devices of the group has an MSI-parent that
++	 * supports irq remapping
++	 */
++	irq_remapping = !iommu_group_for_each_dev(iommu_group, &bus,
++				       vfio_msi_parent_irq_remapping_capable);
 +
- 		return vfio_dma_do_map(iommu, &map);
+ 	/* Determine bus_type in order to allocate a domain */
+ 	ret = iommu_group_for_each_dev(iommu_group, &bus, vfio_bus_type);
+ 	if (ret)
+@@ -899,7 +934,7 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
+ 	list_add(&group->next, &domain->group_list);
  
- 	} else if (cmd == VFIO_IOMMU_UNMAP_DMA) {
-diff --git a/include/uapi/linux/vfio.h b/include/uapi/linux/vfio.h
-index 43e183b..982e326 100644
---- a/include/uapi/linux/vfio.h
-+++ b/include/uapi/linux/vfio.h
-@@ -411,12 +411,21 @@ struct vfio_iommu_type1_info {
-  *
-  * Map process virtual addresses to IO virtual addresses using the
-  * provided struct vfio_dma_map. Caller sets argsz. READ &/ WRITE required.
-+ *
-+ * In case MSI_RESERVED_IOVA is set, the API only aims@registering an IOVA
-+ * region which will be used on some platforms to map the host MSI frame.
-+ * in that specific case, vaddr and prot are ignored. The requirement for
-+ * provisioning such IOVA range can be checked by calling VFIO_IOMMU_GET_INFO
-+ * with the VFIO_IOMMU_INFO_REQUIRE_MSI_MAP attribute. A single
-+ * MSI_RESERVED_IOVA region can be registered
-  */
- struct vfio_iommu_type1_dma_map {
- 	__u32	argsz;
- 	__u32	flags;
- #define VFIO_DMA_MAP_FLAG_READ (1 << 0)		/* readable from device */
- #define VFIO_DMA_MAP_FLAG_WRITE (1 << 1)	/* writable from device */
-+/* reserved iova for MSI vectors*/
-+#define VFIO_DMA_MAP_FLAG_MSI_RESERVED_IOVA (1 << 2)
- 	__u64	vaddr;				/* Process virtual address */
- 	__u64	iova;				/* IO virtual address */
- 	__u64	size;				/* Size of mapping (bytes) */
+ 	if (!allow_unsafe_interrupts &&
+-	    !iommu_capable(bus, IOMMU_CAP_INTR_REMAP)) {
++	    (!iommu_capable(bus, IOMMU_CAP_INTR_REMAP) && !irq_remapping)) {
+ 		pr_warn("%s: No interrupt remapping support.  Use the module param \"allow_unsafe_interrupts\" to enable VFIO IOMMU support on this platform\n",
+ 		       __func__);
+ 		ret = -EPERM;
 -- 
 1.9.1
