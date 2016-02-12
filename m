@@ -1,91 +1,135 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 12 Feb 2016 20:05:18 +0100
-Subject: [PATCH 28/68] ARM: dts: r8a7793: add audio DMAC to device tree
+Date: Fri, 12 Feb 2016 20:05:20 +0100
+Subject: [PATCH 30/68] ARM: dts: gose: Enable sound PIO support in device tree
 In-Reply-To: <cover.1455303422.git.horms+renesas@verge.net.au>
 References: <cover.1455303422.git.horms+renesas@verge.net.au>
-Message-ID: <6708eb73183e226ddd73dae128239e76b3807390.1455303422.git.horms+renesas@verge.net.au>
+Message-ID: <f8905ce841deb22b43c6cc1f2ef47638e61bbec6.1455303422.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instantiate the two Audio DMA controllers in the r8a7791 device tree.
+Enable sound PIO support in the r8a7793/gose device tree.
 
-Based on similar work for the r8a7791 by Kuninori Morimoto.
+Based on similar work for the r8a7791/koelsch by Kuninori Morimoto.
 
 Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7793.dtsi | 58 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 58 insertions(+)
+ arch/arm/boot/dts/r8a7793-gose.dts | 77 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 77 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
-index cb6251e71ef9..2c9ab9f18b41 100644
---- a/arch/arm/boot/dts/r8a7793.dtsi
-+++ b/arch/arm/boot/dts/r8a7793.dtsi
-@@ -301,6 +301,64 @@
- 		dma-channels = <15>;
+diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
+index 0b4cc8d99390..395ea63746ac 100644
+--- a/arch/arm/boot/dts/r8a7793-gose.dts
++++ b/arch/arm/boot/dts/r8a7793-gose.dts
+@@ -8,6 +8,17 @@
+  * kind, whether express or implied.
+  */
+ 
++/*
++ * SSI-AK4643
++ *
++ * SW1: 1: AK4643
++ *      2: CN22
++ *      3: ADV7511
++ *
++ * This command is required when Playback/Capture
++ *
++ *	amixer set "LINEOUT Mixer DACL" on
++ */
+ /dts-v1/;
+ #include "r8a7793.dtsi"
+ #include <dt-bindings/gpio/gpio.h>
+@@ -130,6 +141,30 @@
+ 		};
  	};
  
-+	audma0: dma-controller at ec700000 {
-+		compatible = "renesas,dmac-r8a7793", "renesas,rcar-dmac";
-+		reg = <0 0xec700000 0 0x10000>;
-+		interrupts = <GIC_SPI 346 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 320 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 321 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 322 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 323 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 324 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 325 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 326 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 327 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 328 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 329 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 330 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 331 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 332 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-names = "error",
-+				"ch0", "ch1", "ch2", "ch3",
-+				"ch4", "ch5", "ch6", "ch7",
-+				"ch8", "ch9", "ch10", "ch11",
-+				"ch12";
-+		clocks = <&mstp5_clks R8A7793_CLK_AUDIO_DMAC0>;
-+		clock-names = "fck";
-+		power-domains = <&cpg_clocks>;
-+		#dma-cells = <1>;
-+		dma-channels = <13>;
++	audio_clock: clock {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <11289600>;
++		clock-output-names = "audio_clock";
 +	};
 +
-+	audma1: dma-controller at ec720000 {
-+		compatible = "renesas,dmac-r8a7793", "renesas,rcar-dmac";
-+		reg = <0 0xec720000 0 0x10000>;
-+		interrupts = <GIC_SPI 347 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 333 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 334 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 335 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 336 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 337 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 338 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 339 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 340 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 341 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 342 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 343 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 344 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 345 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-names = "error",
-+				"ch0", "ch1", "ch2", "ch3",
-+				"ch4", "ch5", "ch6", "ch7",
-+				"ch8", "ch9", "ch10", "ch11",
-+				"ch12";
-+		clocks = <&mstp5_clks R8A7793_CLK_AUDIO_DMAC1>;
-+		clock-names = "fck";
-+		power-domains = <&cpg_clocks>;
-+		#dma-cells = <1>;
-+		dma-channels = <13>;
++	rsnd_ak4643: sound {
++		compatible = "simple-audio-card";
++
++		simple-audio-card,format = "left_j";
++		simple-audio-card,bitclock-master = <&sndcodec>;
++		simple-audio-card,frame-master = <&sndcodec>;
++
++		sndcpu: simple-audio-card,cpu {
++			sound-dai = <&rcar_sound>;
++		};
++
++		sndcodec: simple-audio-card,codec {
++			sound-dai = <&ak4643>;
++			clocks = <&audio_clock>;
++		};
 +	};
 +
- 	/* The memory map in the User's Manual maps the cores to bus numbers */
- 	i2c0: i2c at e6508000 {
- 		#address-cells = <1>;
+ 	hdmi-out {
+ 		compatible = "hdmi-connector";
+ 		type = "a";
+@@ -218,6 +253,16 @@
+ 		renesas,groups = "qspi_ctrl", "qspi_data4";
+ 		renesas,function = "qspi";
+ 	};
++
++	sound_pins: sound {
++		renesas,groups = "ssi0129_ctrl", "ssi0_data", "ssi1_data";
++		renesas,function = "ssi";
++	};
++
++	sound_clk_pins: sound_clk {
++		renesas,groups = "audio_clk_a";
++		renesas,function = "audio_clk";
++	};
+ };
+ 
+ &ether {
+@@ -300,6 +345,12 @@
+ 	status = "okay";
+ 	clock-frequency = <100000>;
+ 
++	ak4643: codec at 12 {
++		compatible = "asahi-kasei,ak4643";
++		#sound-dai-cells = <0>;
++		reg = <0x12>;
++	};
++
+ 	hdmi at 39 {
+ 		compatible = "adi,adv7511w";
+ 		reg = <0x39>;
+@@ -338,3 +389,29 @@
+ 		pagesize = <16>;
+ 	};
+ };
++
++&rcar_sound {
++	pinctrl-0 = <&sound_pins &sound_clk_pins>;
++	pinctrl-names = "default";
++
++	/* Single DAI */
++	#sound-dai-cells = <0>;
++
++	status = "okay";
++
++	rcar_sound,dai {
++		dai0 {
++			playback = <&ssi0>;
++			capture  = <&ssi1>;
++		};
++	};
++};
++
++&ssi0 {
++	pio-transfer;
++};
++
++&ssi1 {
++	pio-transfer;
++	shared-pin;
++};
 -- 
 2.7.0.rc3.207.g0ac5344
