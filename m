@@ -1,35 +1,82 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 12 Feb 2016 22:28:19 +0800
-Subject: [PATCH 1/4] net: ethernet: dwmac: add Ethernet glue logic for
- stm32 chip
-In-Reply-To: <1454511275-9791-2-git-send-email-alexandre.torgue@gmail.com>
-Message-ID: <201602122254.EsWZQE5Z%fengguang.wu@intel.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 12 Feb 2016 08:36:16 -0600
+Subject: [PATCH v5 2/3] Documentation: gpio: Update description for
+ X-Gene standby GPIO controller DTS binding
+In-Reply-To: <CAFopSPQBjXQZwG-Phfc+xJ5Kn6dXPakT6Hg5qT-ByXG06p8wgg@mail.gmail.com>
+References: <1454041735-8434-1-git-send-email-qnguyen@apm.com>
+ <1454041735-8434-3-git-send-email-qnguyen@apm.com>
+ <20160201153502.GA19725@rob-hp-laptop>
+ <CAFopSPQBjXQZwG-Phfc+xJ5Kn6dXPakT6Hg5qT-ByXG06p8wgg@mail.gmail.com>
+Message-ID: <20160212143616.GA1603@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandre,
+On Tue, Feb 02, 2016 at 08:46:25AM +0700, Quan Nguyen wrote:
+> On Mon, Feb 1, 2016 at 10:35 PM, Rob Herring <robh@kernel.org> wrote:
+> > On Fri, Jan 29, 2016 at 11:28:54AM +0700, Quan Nguyen wrote:
+> >> Update description for X-Gene standby GPIO controller DTS binding to
+> >> support GPIO line configuration as input, output or external IRQ pin.
+> >>
+> >> Signed-off-by: Y Vo <yvo@apm.com>
+> >> Signed-off-by: Quan Nguyen <qnguyen@apm.com>
+> >> ---
+> >>  .../devicetree/bindings/gpio/gpio-xgene-sb.txt     | 47 ++++++++++++++++++----
+> >>  1 file changed, 40 insertions(+), 7 deletions(-)
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/gpio/gpio-xgene-sb.txt b/Documentation/devicetree/bindings/gpio/gpio-xgene-sb.txt
+> >> index dae1300..7b8b4cb 100644
+> >> --- a/Documentation/devicetree/bindings/gpio/gpio-xgene-sb.txt
+> >> +++ b/Documentation/devicetree/bindings/gpio/gpio-xgene-sb.txt
+> >> @@ -1,10 +1,20 @@
+> >>  APM X-Gene Standby GPIO controller bindings
+> >>
+> >> -This is a gpio controller in the standby domain.
+> >> -
+> >> -There are 20 GPIO pins from 0..21. There is no GPIO_DS14 or GPIO_DS15,
+> >> -only GPIO_DS8..GPIO_DS13 support interrupts. The IRQ mapping
+> >> -is currently 1-to-1 on interrupts 0x28 thru 0x2d.
+> >> +This is a gpio controller in the standby domain. It also supports interrupt in
+> >> +some particular pins which are sourced to its parent interrupt controller
+> >> +as diagram below:
+> >> +                           +-----------------+
+> >> +                           | X-Gene standby  |
+> >> +                           | GPIO controller +--------- GPIO_0
+> >> ++------------+             |                 | ...
+> >> +| Parent IRQ |             |                 +--------- GPIO_8/EXT_INT_0
+> >> +| controller |  EXT_INT_0  |                 | ...
+> >> +| (GICv2)    +-------------+                 +--------- GPIO_[N+8]/EXT_INT_N
+> >> +|            |  ...        |                 |
+> >> +|            |  EXT_INT_N  |                 +--------- GPIO_[N+9]
+> >> +|            +-------------+                 | ...
+> >> +|            |             |                 +--------- GPIO_MAX
+> >> ++------------+             +-----------------+
+> >>
+> >>  Required properties:
+> >>  - compatible: "apm,xgene-gpio-sb" for the X-Gene Standby GPIO controller
+> >> @@ -15,10 +25,18 @@ Required properties:
+> >>               0 = active high
+> >>               1 = active low
+> >>  - gpio-controller: Marks the device node as a GPIO controller.
+> >> -- interrupts: Shall contain exactly 6 interrupts.
+> >> +- interrupts: The EXT_INT_0 parent interrupt resource must be listed first.
+> >> +- interrupt-parent: Phandle of the parent interrupt controller.
+> >> +- interrupt-cells: Should be two.
+> >> +       - first cell is 0-N coresponding for EXT_INT_0 to EXT_INT_N.
+> >> +       - second cell is used to specify flags.
+> >> +- interrupt-controller: Marks the device node as an interrupt controller.
+> >> +- apm,nr-gpios: Optional, specify number of gpios pin.
+> >> +- apm,nr-irqs: Optional, specify number of interrupt pins.
+> >
+> > When is this not 6?
+> >
+> Hi Rob,  by default, this should be 6, but I think this property can
+> help in cases:
+> + Used only 5(or less) first pin as interrupt.
+> + For similar device which has different interrupt pins (8 for example).
+> My idea is to make it a bit more generic by using this optional property.
 
-[auto build test WARNING on net/master]
-[also build test WARNING on v4.5-rc3 next-20160212]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+What is similar device? Another SoC? board? Is 6 fixed in the SoC? I 
+think you need more specific compatible string with the SoC name in it 
+to determine these setting rather than trying to do something generic.
 
-url:    https://github.com/0day-ci/linux/commits/Alexandre-TORGUE/Add-Ethernet-support-on-STM32F429/20160203-225940
-config: um-allyesconfig (attached as .config)
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=um 
-
-All warnings (new ones prefixed by >>):
-
-warning: (ST_IRQCHIP && HIP04_ETH && STMMAC_PLATFORM && DWMAC_IPQ806X && DWMAC_LPC18XX && DWMAC_ROCKCHIP && DWMAC_SOCFPGA && DWMAC_STI && DWMAC_STM32 && TI_CPSW && PINCTRL_ROCKCHIP && PINCTRL_DOVE && POWER_RESET_KEYSTONE && POWER_RESET_SYSCON && POWER_RESET_SYSCON_POWEROFF && S3C2410_WATCHDOG && VIDEO_OMAP3 && VIDEO_S5P_FIMC && USB_XHCI_MTK && RTC_DRV_AT91SAM9 && LPC18XX_DMAMUX && VIDEO_OMAP4 && HWSPINLOCK_QCOM && ATMEL_ST && QCOM_GSBI && PHY_HI6220_USB) selects MFD_SYSCON which has unmet direct dependencies (HAS_IOMEM)
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 17523 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160212/d3544f93/attachment-0001.obj>
+Rob
