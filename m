@@ -1,64 +1,147 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 12 Feb 2016 20:06:24 +0100
-Subject: [PATCH 6/8] ARM: shmobile: r8a7740: Remove legacy
- machine_desc.map_io() callback
+Date: Fri, 12 Feb 2016 20:06:23 +0100
+Subject: [PATCH 5/8] ARM: shmobile: Consolidate SCU mapping code
 In-Reply-To: <cover.1455303757.git.horms+renesas@verge.net.au>
 References: <cover.1455303757.git.horms+renesas@verge.net.au>
-Message-ID: <a0827317f5f351c303ed91f0272f10b1394bdab1.1455303757.git.horms+renesas@verge.net.au>
+Message-ID: <4a7680695f5d9d219cfb16123d71013be92da75f.1455303757.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Commit 37201ba5c99d0be8 ("ARM: shmobile: r8a7740: Migrate to generic l2c
-OF initialization") removed the last user of the legacy "IOMEM()" macro
-on r8a7740-based systems. Hence there's no longer a need to set up a
-transparent mapping of system I/O registers. Remove the mapping and the
-legacy machine_desc.map_io() callback.
+Currently the SCU registers are mapped in SoC-specific code, using
+different methods, all involving the static mapping set up from
+machine_desc.map_io():
+  - On emev2, a static (non-identity) mapping is used, with ioremap().
+    As the static mapping uses the MT_DEVICE type, ioremap() reuses it,
+    and the returned virtual address is suitable for passing to
+    shmobile_smp_hook(),
+  - On sh73a0 and r8a7779, a static identity mapping is used, with the
+    legacy IOMEM() macro.
+    As the static mapping uses the MT_DEVICE_NONSHARED type, replacing
+    IOMEM() by ioremap() would create a new mapping, whose virtual
+    address cannot be passed to shmobile_smp_hook().
+
+Move the mapping of the SCU registers from SoC-specific code to common
+code, always using ioremap(). To work in the absence of a static
+mapping, this requires passing the physical SCU base address to
+shmobile_smp_hook().
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/setup-r8a7740.c | 20 --------------------
- 1 file changed, 20 deletions(-)
+ arch/arm/mach-shmobile/common.h      |  5 ++---
+ arch/arm/mach-shmobile/platsmp-scu.c | 10 +++++++---
+ arch/arm/mach-shmobile/smp-emev2.c   |  3 +--
+ arch/arm/mach-shmobile/smp-r8a7779.c |  3 +--
+ arch/arm/mach-shmobile/smp-sh73a0.c  |  3 +--
+ 5 files changed, 12 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
-index 3e71cd4168dd..db6dbfbaf9f1 100644
---- a/arch/arm/mach-shmobile/setup-r8a7740.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7740.c
-@@ -26,25 +26,6 @@
+diff --git a/arch/arm/mach-shmobile/common.h b/arch/arm/mach-shmobile/common.h
+index 9cb11215ceba..225c12bb3de9 100644
+--- a/arch/arm/mach-shmobile/common.h
++++ b/arch/arm/mach-shmobile/common.h
+@@ -12,7 +12,8 @@ extern void shmobile_smp_hook(unsigned int cpu, unsigned long fn,
+ 			      unsigned long arg);
+ extern bool shmobile_smp_cpu_can_disable(unsigned int cpu);
+ extern void shmobile_boot_scu(void);
+-extern void shmobile_smp_scu_prepare_cpus(unsigned int max_cpus);
++extern void shmobile_smp_scu_prepare_cpus(phys_addr_t scu_base_phys,
++					  unsigned int max_cpus);
+ extern void shmobile_smp_scu_cpu_die(unsigned int cpu);
+ extern int shmobile_smp_scu_cpu_kill(unsigned int cpu);
+ extern struct platform_suspend_ops shmobile_suspend_ops;
+@@ -31,8 +32,6 @@ int shmobile_cpufreq_init(void);
+ static inline int shmobile_cpufreq_init(void) { return 0; }
+ #endif
  
+-extern void __iomem *shmobile_scu_base;
+-
+ static inline void __init shmobile_init_late(void)
+ {
+ 	shmobile_suspend_init();
+diff --git a/arch/arm/mach-shmobile/platsmp-scu.c b/arch/arm/mach-shmobile/platsmp-scu.c
+index f2198c9c7435..4c7d2caf3730 100644
+--- a/arch/arm/mach-shmobile/platsmp-scu.c
++++ b/arch/arm/mach-shmobile/platsmp-scu.c
+@@ -18,7 +18,8 @@
  #include "common.h"
  
--static struct map_desc r8a7740_io_desc[] __initdata = {
--	 /*
--	  * for CPGA/INTC/PFC
--	  * 0xe6000000-0xefffffff -> 0xe6000000-0xefffffff
--	  */
--	{
--		.virtual	= 0xe6000000,
--		.pfn		= __phys_to_pfn(0xe6000000),
--		.length		= 160 << 20,
--		.type		= MT_DEVICE_NONSHARED
--	},
--};
--
--static void __init r8a7740_map_io(void)
--{
--	debug_ll_io_init();
--	iotable_init(r8a7740_io_desc, ARRAY_SIZE(r8a7740_io_desc));
--}
--
- /*
-  * r8a7740 chip has lasting errata on MERAM buffer.
-  * this is work-around for it.
-@@ -108,7 +89,6 @@ static const char *const r8a7740_boards_compat_dt[] __initconst = {
- DT_MACHINE_START(R8A7740_DT, "Generic R8A7740 (Flattened Device Tree)")
- 	.l2c_aux_val	= 0,
- 	.l2c_aux_mask	= ~0,
--	.map_io		= r8a7740_map_io,
- 	.init_early	= shmobile_init_delay,
- 	.init_irq	= r8a7740_init_irq_of,
- 	.init_machine	= r8a7740_generic_init,
+ 
+-void __iomem *shmobile_scu_base;
++static phys_addr_t shmobile_scu_base_phys;
++static void __iomem *shmobile_scu_base;
+ 
+ static int shmobile_smp_scu_notifier_call(struct notifier_block *nfb,
+ 					  unsigned long action, void *hcpu)
+@@ -29,7 +30,7 @@ static int shmobile_smp_scu_notifier_call(struct notifier_block *nfb,
+ 	case CPU_UP_PREPARE:
+ 		/* For this particular CPU register SCU SMP boot vector */
+ 		shmobile_smp_hook(cpu, virt_to_phys(shmobile_boot_scu),
+-				  (unsigned long)shmobile_scu_base);
++				  shmobile_scu_base_phys);
+ 		break;
+ 	};
+ 
+@@ -40,13 +41,16 @@ static struct notifier_block shmobile_smp_scu_notifier = {
+ 	.notifier_call = shmobile_smp_scu_notifier_call,
+ };
+ 
+-void __init shmobile_smp_scu_prepare_cpus(unsigned int max_cpus)
++void __init shmobile_smp_scu_prepare_cpus(phys_addr_t scu_base_phys,
++					  unsigned int max_cpus)
+ {
+ 	/* install boot code shared by all CPUs */
+ 	shmobile_boot_fn = virt_to_phys(shmobile_smp_boot);
+ 	shmobile_boot_arg = MPIDR_HWID_BITMASK;
+ 
+ 	/* enable SCU and cache coherency on booting CPU */
++	shmobile_scu_base_phys = scu_base_phys;
++	shmobile_scu_base = ioremap(scu_base_phys, PAGE_SIZE);
+ 	scu_enable(shmobile_scu_base);
+ 	scu_power_mode(shmobile_scu_base, SCU_PM_NORMAL);
+ 
+diff --git a/arch/arm/mach-shmobile/smp-emev2.c b/arch/arm/mach-shmobile/smp-emev2.c
+index adbac6963f2b..4dfafd845452 100644
+--- a/arch/arm/mach-shmobile/smp-emev2.c
++++ b/arch/arm/mach-shmobile/smp-emev2.c
+@@ -45,8 +45,7 @@ static void __init emev2_smp_prepare_cpus(unsigned int max_cpus)
+ 	}
+ 
+ 	/* setup EMEV2 specific SCU bits */
+-	shmobile_scu_base = ioremap(EMEV2_SCU_BASE, PAGE_SIZE);
+-	shmobile_smp_scu_prepare_cpus(max_cpus);
++	shmobile_smp_scu_prepare_cpus(EMEV2_SCU_BASE, max_cpus);
+ }
+ 
+ const struct smp_operations emev2_smp_ops __initconst = {
+diff --git a/arch/arm/mach-shmobile/smp-r8a7779.c b/arch/arm/mach-shmobile/smp-r8a7779.c
+index 0b024a9dbd43..f5c31fbc10b2 100644
+--- a/arch/arm/mach-shmobile/smp-r8a7779.c
++++ b/arch/arm/mach-shmobile/smp-r8a7779.c
+@@ -94,8 +94,7 @@ static void __init r8a7779_smp_prepare_cpus(unsigned int max_cpus)
+ 	__raw_writel(__pa(shmobile_boot_vector), AVECR);
+ 
+ 	/* setup r8a7779 specific SCU bits */
+-	shmobile_scu_base = IOMEM(R8A7779_SCU_BASE);
+-	shmobile_smp_scu_prepare_cpus(max_cpus);
++	shmobile_smp_scu_prepare_cpus(R8A7779_SCU_BASE, max_cpus);
+ 
+ 	r8a7779_pm_init();
+ 
+diff --git a/arch/arm/mach-shmobile/smp-sh73a0.c b/arch/arm/mach-shmobile/smp-sh73a0.c
+index ee1a4b70604b..41137404382e 100644
+--- a/arch/arm/mach-shmobile/smp-sh73a0.c
++++ b/arch/arm/mach-shmobile/smp-sh73a0.c
+@@ -52,8 +52,7 @@ static void __init sh73a0_smp_prepare_cpus(unsigned int max_cpus)
+ 	__raw_writel(__pa(shmobile_boot_vector), SBAR);
+ 
+ 	/* setup sh73a0 specific SCU bits */
+-	shmobile_scu_base = IOMEM(SH73A0_SCU_BASE);
+-	shmobile_smp_scu_prepare_cpus(max_cpus);
++	shmobile_smp_scu_prepare_cpus(SH73A0_SCU_BASE, max_cpus);
+ }
+ 
+ const struct smp_operations sh73a0_smp_ops __initconst = {
 -- 
 2.7.0.rc3.207.g0ac5344
