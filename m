@@ -1,76 +1,99 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 12 Feb 2016 16:28:13 +0100
-Subject: mt1873-evb: MMC failing with linux-next
-In-Reply-To: <56BDF937.60208@gmail.com>
-References: <7hegcmadfk.fsf@baylibre.com> <56BDF937.60208@gmail.com>
-Message-ID: <56BDFA0D.5080806@gmail.com>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Fri, 12 Feb 2016 17:28:16 +0200
+Subject: [PATCH V3 6/6] coresight-stm: adding driver for CoreSight STM
+ component
+In-Reply-To: <1454756672-12790-7-git-send-email-zhang.chunyan@linaro.org>
+References: <1454756672-12790-1-git-send-email-zhang.chunyan@linaro.org>
+ <1454756672-12790-7-git-send-email-zhang.chunyan@linaro.org>
+Message-ID: <87y4aq2bjj.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Chunyan Zhang <zhang.chunyan@linaro.org> writes:
 
-I just resend as the attachment was to too big for linux-arm-kernel.
+> +static long stm_generic_set_options(struct stm_data *stm_data,
+> +				    unsigned int master,
+> +				    unsigned int channel,
+> +				    unsigned int nr_chans,
+> +				    unsigned long options)
+> +{
+> +	struct stm_drvdata *drvdata = container_of(stm_data,
+> +						   struct stm_drvdata, stm);
+> +	if (!(drvdata && drvdata->enable))
+> +		return -EINVAL;
+> +
+> +	if (channel >= drvdata->numsp)
+> +		return -EINVAL;
+> +
+> +	switch (options) {
+> +	case STM_OPTION_GUARANTEED:
+> +		set_bit(channel, drvdata->chs.guaranteed);
+> +		break;
+> +
+> +	case STM_OPTION_INVARIANT:
+> +		clear_bit(channel, drvdata->chs.guaranteed);
+> +		break;
 
-On 12/02/16 16:24, Matthias Brugger wrote:
-> Hi Kevin,
->
-> On 09/02/16 02:18, Kevin Hilman wrote:
->> Hello,
->>
->> I tried getting MMC working with linux-next (next-20160208) on
->> mt8173-evb by enabling a few options[1] on top of the default defconfig,
->> and this results in a kernel that hangs as soon as it starts userspace.
->>
->> The MMC driver seems to start, though has some regulator issues:
->>
->> [    0.526380] sdhci: Secure Digital Host Controller Interface driver
->> [    0.527176] sdhci: Copyright(c) Pierre Ossman
->> [    0.528835] vio18: unsupportable voltage range: 3300000-1980000uV
->> [    0.529610] mtk-msdc 11230000.mmc: Regulator set error -22:
->> 3300000 - 3300000
->> [    0.563731] mtk-msdc 11240000.mmc: Got CD GPIO
->>
->> The driver appears to be attempting to set 3.3V but using a 1.8V
->> regulator (vio18), which is failing.
->>
->> Then, the kernel hangs after freeing unused memory:
->>
->> [    0.616386] hctosys: unable to open rtc device (rtc0)
->> [    0.624118] usb_vbus: disabling
->> [    0.624547] vusb: disabling
->> [    0.624929] vgp6: disabling
->> [    0.625635] ALSA device list:
->> [    0.626009]   No soundcards found.
->> [    0.626963] Freeing unused kernel memory: 724K (ffffffc000977000 -
->> ffffffc000a2c000)
->>
->> And nothing further here.
->>
->
-> I can see the warning from the mmc regulator access, but after that my
-> board boots just fine.
-> I'm using linux-next as of today (20160212).
-> I attached my config, it should be defconfig plus the config options you
-> mentioned (and an initramfs).
->
+This is a bad interface. Firstly, neither option is described
+anywhere. Secondly, I'm pretty sure "invariant" does not mean "not
+guaranteed" in english, although this function seems to imply this.
 
-Instead of attaching my config, you can find it here:
-http://pastebin.com/5uhXtSHj
+> +
+> +	default:
+> +		return -EINVAL;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static long stm_generic_get_options(struct stm_data *stm_data,
+> +				    unsigned int master,
+> +				    unsigned int channel,
+> +				    unsigned int nr_chans,
+> +				    u64 *options)
+> +{
+> +	struct stm_drvdata *drvdata = container_of(stm_data,
+> +						   struct stm_drvdata, stm);
+> +	if (!(drvdata && drvdata->enable))
+> +		return -EINVAL;
+> +
+> +	if (channel >= drvdata->numsp)
+> +		return -EINVAL;
+> +
+> +	switch (*options) {
+> +	case STM_OPTION_GUARANTEED:
+> +		*options = test_bit(channel, drvdata->chs.guaranteed);
+> +		break;
 
-> Is this the configuration you have?
->
-> Regards,
-> Matthias
->
->> It boots fine when disabling the MMC driver (CONFIG_MMC_MTK=n).
->>
->> Any ideas?
->>
->> Kevin
->>
->> [1]
->> CONFIG_MMC_MTK=y
->> CONFIG_MFD_MT6397=y
->> CONFIG_REGULATOR_MT6397=y
->> CONFIG_MTK_PMIC_WRAP=y
->>
+This just doesn't work. @options here is an on-stack variable in
+stm_char_ioctl(), hitherto uninitialized. The get_options ioctl command
+as you implemented it doesn't fetch @options from userspace either, it
+just passes a pointer to it to this callback, expecting that the
+callback will set it so that it can be copy_to_user()ed back to the
+user.
+
+Then, when we figure this out, there is again the question of what
+should one make of STM_OPTION_{GUARANTEED,INVARIANT} and how do they fit
+into *options.
+
+The idea behind set_options ioctl is that the user specifies a bit mask
+of options that he/she wants to set.
+
+[snip]
+
+> +#ifndef __UAPI_CORESIGHT_STM_H_
+> +#define __UAPI_CORESIGHT_STM_H_
+> +
+> +#define STM_FLAG_TIMESTAMPED   BIT(3)
+> +#define STM_FLAG_GUARANTEED    BIT(7)
+> +
+> +enum {
+> +	STM_OPTION_GUARANTEED = 0,
+> +	STM_OPTION_INVARIANT,
+> +};
+
+Each of these guys could also use an explanation.
+
+Regards,
+--
+Alex
