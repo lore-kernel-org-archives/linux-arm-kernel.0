@@ -1,37 +1,50 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Fri, 12 Feb 2016 14:53:51 +0000
-Subject: [PATCHv2] arm64: Rework valid_user_regs
-In-Reply-To: <1455285858-11757-1-git-send-email-mark.rutland@arm.com>
-References: <1455285858-11757-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <CAFEAcA_XGrPB=2GnQwW4Jr8eE9UqbTAgRb86qCkX+rw25u4yNg@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 12 Feb 2016 15:57:22 +0100
+Subject: [PATCH v3 0/4] arm64: avoid early __va translations
+Message-ID: <1455289046-21321-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 February 2016 at 14:04, Mark Rutland <mark.rutland@arm.com> wrote:
-> We validate pstate using PSR_MODE32_BIT, which is part of the
-> user-provided pstate (and cannot be trusted). Also, we conflate
-> validation of AArch32 and AArch64 pstate values, making the code
-> difficult to reason about.
->
-> Instead, validate the pstate value based on the associated task. The
-> task may or may not be current (e.g. when using ptrace), so this must be
-> passed explicitly by callers. To avoid circular header dependencies via
-> sched.h, is_compat_task is pulled out of asm/ptrace.h.
->
-> To make the code possible to reason about, the AArch64 and AArch32
-> validation is split into separate functions. Software must respect the
-> RES0 policy for SPSR bits, and thus the kernel mirrors the hardware
-> policy (RAZ/WI) for bits as-yet unallocated. When these acquire an
-> architected meaning writes may be permitted (potentially with additional
-> validation).
+This is a somewhat cleaner approach for dealing with the issue that the
+early FDT performs __va() translations before the linear mapping has been
+set up. Being able to defer the assignment of memstart_addr until after we
+have discovered all of memory is an important piece of functionality, not
+only for KASLR but also for mapping the linear region as efficiently as
+possible.
 
-> +       /* Force PSR to a valid 32-bit EL0t */
-> +       regs->pstate |= PSR_MODE32_BIT;
-> +       regs->pstate &= PSR_f | PSR_s | (PSR_x & ~COMPAT_PSR_A_BIT) | \
-> +                       COMPAT_PSR_T_BIT;
-> +
+Changes since v2:
+- replace __weak function in patches #1 and #2 with a preprocessor macro
+- add patch to address the circular header dependency when including
+  asm/bug.h in asm/memory.h
+- turned the hack that adds the BUG_ON() into a proper patch
 
-I think the consensus from the v1 review was to drop these PSR_[fsx] masks?
+Patch #1 refactors the early FDT code so that the actual assignment of
+initrd_start and initrd_end (which is where the __va() translations are
+performed) can be overridden in architecture specific code.
 
-thanks
--- PMM
+Patch #2 performs the override, and only records the physical addresses
+as they are found in the /chosen node, or on the command line, and defers
+the __va() translation until after memstart_addr has been assigned.
+
+Patch #3 reshuffles some #includes and #defines so that asm/bug.h can be
+included (and used) in asm/memory.h
+
+Patch #4 implements a BUG_ON() check to ensure that no references to
+memstart_addr are made before it has been assigned.
+
+Ard Biesheuvel (4):
+  of/fdt: factor out assignment of initrd_start/initrd_end
+  arm64: defer __va translation of initrd_start and initrd_end
+  arm64: prevent potential circular header dependencies in asm/bug.h
+  arm64: prevent __va() translations before memstart_addr is assigned
+
+ arch/arm64/include/asm/bug.h            |  2 +-
+ arch/arm64/include/asm/debug-monitors.h |  2 +-
+ arch/arm64/include/asm/memory.h         | 12 ++++++++++-
+ arch/arm64/kvm/hyp/debug-sr.c           |  1 +
+ arch/arm64/mm/init.c                    | 21 +++++++++++++++-----
+ drivers/of/fdt.c                        | 14 ++++++++++---
+ 6 files changed, 41 insertions(+), 11 deletions(-)
+
+-- 
+2.5.0
