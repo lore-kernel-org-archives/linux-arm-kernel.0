@@ -1,114 +1,134 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 12 Feb 2016 20:04:51 +0100
-Subject: [PATCH 01/68] ARM: dts: gose: Add GPIO keys to DT
+Date: Fri, 12 Feb 2016 20:04:53 +0100
+Subject: [PATCH 03/68] ARM: dts: porter: add DU DT support
 In-Reply-To: <cover.1455303422.git.horms+renesas@verge.net.au>
 References: <cover.1455303422.git.horms+renesas@verge.net.au>
-Message-ID: <d7d5974b156e2ef7436483de00ccada5987c9d31.1455303422.git.horms+renesas@verge.net.au>
+Message-ID: <c5af8a4248d3cb01078d2a20df28081dd588b0e3.1455303422.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instantiate the GPIO keys in the gose device tree.
+From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Based on similar work for the koelsch board by Laurent Pinchart.
+Define  the Porter board dependent part of the DU device node.
+Add the device node  for Analog Devices ADV7511W  HDMI transmitter to I2C2
+bus and the HDMI connector. Add the necessary subnodes to interconnect  DU
+and HDMI devices.
 
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Tested-by: Magnus Damm <damm+renesas@opensource.se>
 ---
- arch/arm/boot/dts/r8a7793-gose.dts | 82 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 82 insertions(+)
+ arch/arm/boot/dts/r8a7791-porter.dts | 81 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 81 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
-index baa59fe84298..ccbc1c66cc6c 100644
---- a/arch/arm/boot/dts/r8a7793-gose.dts
-+++ b/arch/arm/boot/dts/r8a7793-gose.dts
-@@ -31,6 +31,88 @@
- 		device_type = "memory";
- 		reg = <0 0x40000000 0 0x40000000>;
+diff --git a/arch/arm/boot/dts/r8a7791-porter.dts b/arch/arm/boot/dts/r8a7791-porter.dts
+index 6713b1ea732b..fe81fa0e478c 100644
+--- a/arch/arm/boot/dts/r8a7791-porter.dts
++++ b/arch/arm/boot/dts/r8a7791-porter.dts
+@@ -78,6 +78,29 @@
+ 		states = <3300000 1
+ 			  1800000 0>;
  	};
 +
-+	gpio-keys {
-+		compatible = "gpio-keys";
++	hdmi-out {
++		compatible = "hdmi-connector";
++		type = "a";
 +
-+		key-1 {
-+		        gpios = <&gpio5 0 GPIO_ACTIVE_LOW>;
-+		        linux,code = <KEY_1>;
-+		        label = "SW2-1";
-+		        gpio-key,wakeup;
-+		        debounce-interval = <20>;
++		port {
++			hdmi_con: endpoint {
++				remote-endpoint = <&adv7511_out>;
++			};
 +		};
-+		key-2 {
-+		        gpios = <&gpio5 1 GPIO_ACTIVE_LOW>;
-+		        linux,code = <KEY_2>;
-+		        label = "SW2-2";
-+		        gpio-key,wakeup;
-+		        debounce-interval = <20>;
-+		};
-+		key-3 {
-+		        gpios = <&gpio5 2 GPIO_ACTIVE_LOW>;
-+		        linux,code = <KEY_3>;
-+		        label = "SW2-3";
-+		        gpio-key,wakeup;
-+		        debounce-interval = <20>;
-+		};
-+		key-4 {
-+		        gpios = <&gpio5 3 GPIO_ACTIVE_LOW>;
-+		        linux,code = <KEY_4>;
-+		        label = "SW2-4";
-+		        gpio-key,wakeup;
-+		        debounce-interval = <20>;
-+		};
-+		key-a {
-+		        gpios = <&gpio7 0 GPIO_ACTIVE_LOW>;
-+		        linux,code = <KEY_A>;
-+		        label = "SW30";
-+		        gpio-key,wakeup;
-+		        debounce-interval = <20>;
-+		};
-+		key-b {
-+		        gpios = <&gpio7 1 GPIO_ACTIVE_LOW>;
-+		        linux,code = <KEY_B>;
-+		        label = "SW31";
-+		        gpio-key,wakeup;
-+		        debounce-interval = <20>;
-+		};
-+		key-c {
-+		        gpios = <&gpio7 2 GPIO_ACTIVE_LOW>;
-+		        linux,code = <KEY_C>;
-+		        label = "SW32";
-+		        gpio-key,wakeup;
-+		        debounce-interval = <20>;
-+		};
-+		key-d {
-+		        gpios = <&gpio7 3 GPIO_ACTIVE_LOW>;
-+		        linux,code = <KEY_D>;
-+		        label = "SW33";
-+		        gpio-key,wakeup;
-+		        debounce-interval = <20>;
-+		};
-+		key-e {
-+		        gpios = <&gpio7 4 GPIO_ACTIVE_LOW>;
-+		        linux,code = <KEY_E>;
-+		        label = "SW34";
-+		        gpio-key,wakeup;
-+		        debounce-interval = <20>;
-+		};
-+		key-f {
-+		        gpios = <&gpio7 5 GPIO_ACTIVE_LOW>;
-+		        linux,code = <KEY_F>;
-+		        label = "SW35";
-+		        gpio-key,wakeup;
-+		        debounce-interval = <20>;
-+		};
-+		key-g {
-+		        gpios = <&gpio7 6 GPIO_ACTIVE_LOW>;
-+		        linux,code = <KEY_G>;
-+		        label = "SW36";
-+		        gpio-key,wakeup;
-+		        debounce-interval = <20>;
-+		};
++	};
++
++	x3_clk: x3-clock {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <148500000>;
++	};
++
++	x16_clk: x16-clock {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <74250000>;
 +	};
  };
  
  &extal_clk {
+@@ -139,6 +162,11 @@
+ 		renesas,groups = "can0_data";
+ 		renesas,function = "can0";
+ 	};
++
++	du_pins: du {
++		renesas,groups = "du_rgb888", "du_sync", "du_disp", "du_clk_out_0";
++		renesas,function = "du";
++	};
+ };
+ 
+ &scif0 {
+@@ -241,6 +269,38 @@
+ 			};
+ 		};
+ 	};
++
++	hdmi at 39 {
++		compatible = "adi,adv7511w";
++		reg = <0x39>;
++		interrupt-parent = <&gpio3>;
++		interrupts = <29 IRQ_TYPE_LEVEL_LOW>;
++
++		adi,input-depth = <8>;
++		adi,input-colorspace = "rgb";
++		adi,input-clock = "1x";
++		adi,input-style = <1>;
++		adi,input-justification = "evenly";
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
++				reg = <0>;
++				adv7511_in: endpoint {
++					remote-endpoint = <&du_out_rgb>;
++				};
++			};
++
++			port at 1 {
++				reg = <1>;
++				adv7511_out: endpoint {
++					remote-endpoint = <&hdmi_con>;
++				};
++			};
++		};
++	};
+ };
+ 
+ &sata0 {
+@@ -304,3 +364,24 @@
+ 
+ 	status = "okay";
+ };
++
++&du {
++	pinctrl-0 = <&du_pins>;
++	pinctrl-names = "default";
++	status = "okay";
++
++	clocks = <&mstp7_clks R8A7791_CLK_DU0>,
++		 <&mstp7_clks R8A7791_CLK_DU1>,
++		 <&mstp7_clks R8A7791_CLK_LVDS0>,
++		 <&x3_clk>, <&x16_clk>;
++	clock-names = "du.0", "du.1", "lvds.0",
++		      "dclkin.0", "dclkin.1";
++
++	ports {
++		port at 1 {
++			endpoint {
++				remote-endpoint = <&adv7511_in>;
++			};
++		};
++	};
++};
 -- 
 2.7.0.rc3.207.g0ac5344
