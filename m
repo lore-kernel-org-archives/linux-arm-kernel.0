@@ -1,54 +1,38 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 12 Feb 2016 11:05:55 +0100
-Subject: [PATCH] earlycon: rework common framework for earlycon
- declarations
-In-Reply-To: <1455269296-5009-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1455269296-5009-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <4230998.Zt9XrE8YSr@wuerfel>
+Date: Fri, 12 Feb 2016 11:07:11 +0100
+Subject: [PATCH v2 4/6] serial: 8250/uniphier: fix modular build
+In-Reply-To: <CAK7LNAR8fJWPubucjw28gAPpF-4yvVMWZZ0F3j6VN4whGF9Yhw@mail.gmail.com>
+References: <1455205297-1021302-1-git-send-email-arnd@arndb.de>
+ <1455205297-1021302-5-git-send-email-arnd@arndb.de>
+ <CAK7LNAR8fJWPubucjw28gAPpF-4yvVMWZZ0F3j6VN4whGF9Yhw@mail.gmail.com>
+Message-ID: <3557175.oOjJgCHd2P@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 12 February 2016 18:28:16 Masahiro Yamada wrote:
-> Commit 71f50c6d9a22 ("of: drop symbols declared by _OF_DECLARE() from
-> modules") fixed the link error introduced by commit b8d20e06eaad
-> ("serial: 8250_uniphier: add earlycon support").
+On Friday 12 February 2016 18:37:08 Masahiro Yamada wrote:
+> >  };
+> >
+> > -#ifdef CONFIG_SERIAL_8250_CONSOLE
+> > +#if defined(CONFIG_SERIAL_8250_CONSOLE) && !defined(MODULE)
+> >  static int __init uniphier_early_console_setup(struct earlycon_device *device,
+> >                                                const char *options)
+> >  {
+> > --
+> > 2.7.0
+> >
 > 
-> After commit 2eaa790989e0 ("earlycon: Use common framework for
-> earlycon declarations") was applied, the link error came back
-> because the commit reworked OF_EARLYCON_DECLARE() to not use
-> _OF_DECLARE().
+> I noticed commit 2eaa790989e03900298ad24f77f1086dbbc1aebd
+> revived this link error, but I am not happy with seeing
+> this patch again and again.
 > 
-> This commit reworks OF_EARLYCON_DECLARE() again based on
-> _OF_DECLARE().  My motivations are:
 > 
->  - Fix the link error in a generic way (without patching
->    drivers/tty/serial/8250/8250_uniphier.c)
+> Can you check this patch?
+> https://patchwork.kernel.org/patch/8289231/
 > 
->  - Delete struct earlycon_id.  This struct is re-inventing the wheel;
->    the fields "name", "compatible", "setup" can be implemented in
->    struct of_device_id as other framework do.
 > 
-> The difference between OF_EARLYCON_DECLARE() and other users of
-> _OF_DECLARE is that OF_EARLYCON_DECLARE() needs to fill the "name"
-> field of struct of_device_id.  To make it easier, a new macro
-> _OF_DECLARE_WITH_NAME() has been added.  It fills the name field
-> with the given argument.  On the other hand, _OF_DECLARE() sets the
-> "name" field to a null string; this is the same behavior as before.
 > 
-> Fixes: 2eaa790989e0 ("earlycon: Use common framework for earlycon declarations")
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
-> 
-> I confirmed this patch can apply onto "next-20160212" tag of linux-next.
-> 
-> In order to apply it onto the "tty-next" branch of TTY subsytem,
-> Grag will have to pull v4.5-rc3 in.
 
-I think this is the right approach, and I can include it in my 8250
-series when I resend it, and rebase the other patches on top of it
-to simplify them.
-
-Peter, since you did the change "earlycon: Use common framework for
-earlycon declarations", are you ok with the new version?
+Yes, I think your patch is nicer than mine. Let's see what the others
+think, then I can resend my remaining patches on top of yours.
 
 	Arnd
