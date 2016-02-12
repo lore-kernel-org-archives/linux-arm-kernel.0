@@ -1,41 +1,68 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 12 Feb 2016 15:11:50 +0000
-Subject: [PATCH 0/3] clk: sunxi: error checking on clock setup
-Message-ID: <1455289913-29514-1-git-send-email-andre.przywara@arm.com>
+Date: Fri, 12 Feb 2016 15:11:53 +0000
+Subject: [PATCH 3/3] clk: sunxi: Improve divs_clk error handling and reporting
+In-Reply-To: <1455289913-29514-1-git-send-email-andre.przywara@arm.com>
+References: <1455289913-29514-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <1455289913-29514-4-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since I promised to do this some days ago:
+We catch errors in the base clock registration, failure to ioremap
+and failures in the final of_clk_add_provider() call.
+Also we unmap the registers when we need to rollback.
 
-Setting up the clocks properly is quite critical to the system's
-operation, but currently our error handling is not very verbose.
-This series adds error handling and reporting to the sunxi clocks,
-so that any errors are correctly detected and reported. Also previous
-actions are rolled back in case something went wrong.
-This proves to be helpful in debugging clock tree issues,
-especially when adding support for new SoCs.
-I tested this on a BananaPi by deliberately misspelling
-"clock-output-names". The resulting kernel crash in
-sun4i_timer_interrupt is totally misleading, but now there is a line
-in the dmesg before saying:
-=======
-sunxi_divider_clk_setup: could not read clock-output-names for "apb0"
-=======
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+---
+ drivers/clk/sunxi/clk-sunxi.c | 16 +++++++++++++---
+ 1 file changed, 13 insertions(+), 3 deletions(-)
 
-This applies on top of Maxime's sunxi/for-next branch.
-
-Please have a look (and apply, if you like it).
-
-Cheers,
-Andre.
-
-Andre Przywara (3):
-  clk: sunxi: improve mux_clk error handling and reporting
-  clk: sunxi: improve divider_clk error handling and reporting
-  clk: sunxi: Improve divs_clk error handling and reporting
-
- drivers/clk/sunxi/clk-sunxi.c | 68 +++++++++++++++++++++++++++++++++++--------
- 1 file changed, 56 insertions(+), 12 deletions(-)
-
+diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+index 1ac6c9e0..48ed81d 100644
+--- a/drivers/clk/sunxi/clk-sunxi.c
++++ b/drivers/clk/sunxi/clk-sunxi.c
+@@ -987,13 +987,20 @@ static struct clk ** __init sunxi_divs_clk_setup(struct device_node *node,
+ 
+ 	/* Set up factor clock that we will be dividing */
+ 	pclk = sunxi_factors_clk_setup(node, data->factors);
++	if (!pclk)
++		return NULL;
+ 	parent = __clk_get_name(pclk);
+ 
+ 	reg = of_iomap(node, 0);
++	if (!reg) {
++		pr_err("Could not map registers for divs-clk: %s\n",
++		       node->name);
++		return NULL;
++	}
+ 
+ 	clk_data = kmalloc(sizeof(struct clk_onecell_data), GFP_KERNEL);
+ 	if (!clk_data)
+-		return NULL;
++		goto out_unmap;
+ 
+ 	clks = kcalloc(ndivs, sizeof(*clks), GFP_KERNEL);
+ 	if (!clks)
+@@ -1076,9 +1083,10 @@ static struct clk ** __init sunxi_divs_clk_setup(struct device_node *node,
+ 	/* Adjust to the real max */
+ 	clk_data->clk_num = i;
+ 
+-	of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
++	if (!of_clk_add_provider(node, of_clk_src_onecell_get, clk_data))
++		return clks;
+ 
+-	return clks;
++	pr_err("%s: failed to add clock provider for %s\n", __func__, clk_name);
+ 
+ free_gate:
+ 	kfree(gate);
+@@ -1086,6 +1094,8 @@ free_clks:
+ 	kfree(clks);
+ free_clkdata:
+ 	kfree(clk_data);
++out_unmap:
++	iounmap(reg);
+ 	return NULL;
+ }
+ 
 -- 
 2.6.4
