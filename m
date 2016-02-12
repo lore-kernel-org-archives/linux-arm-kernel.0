@@ -1,53 +1,29 @@
-From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Fri, 12 Feb 2016 07:20:43 +0700
-Subject: [PATCH] dtb: amd: Fix-up for ccn504 and kcs nodes
-Message-ID: <1455236443-23949-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Thu, 11 Feb 2016 16:40:14 -0800
+Subject: [PATCH] ARM: socfpga_defconfig: enable support for
+ initramfs/initrd support
+In-Reply-To: <4776059.MG11XzgNhU@wuerfel> (Arnd Bergmann's message of "Fri, 12
+ Feb 2016 00:01:18 +0100")
+References: <1455230856-19648-1-git-send-email-dinguyen@opensource.altera.com>
+ <4776059.MG11XzgNhU@wuerfel>
+Message-ID: <7hwpqaoj69.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
+Arnd Bergmann <arnd@arndb.de> writes:
 
-This is a fix-up patch based on the review comment from
-Arnd regarding:
-    * fix ccn504 address in the node name
-    * remove kcs interrupt-name
+> On Thursday 11 February 2016 16:47:36 dinguyen at opensource.altera.com wrote:
+>> From: Dinh Nguyen <dinguyen@opensource.altera.com>
+>> 
+>> Enable CONFIG_BLK_DEV_INITRD.
+>> 
+>> Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
+>
+> What for?
+>
 
-Signed-off-by: Brijesh Singh <brijesh.singh@amd.com>
-Signed-off-by: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
----
+So the board farms doing boot testing can do so with an initramfs.
 
-Hi Olof,
+Acked-by: Kevin Hilman <khilman@baylibre.com>
 
-Here are the changes from the V3 that I sent earlier. Sorry for confusion.
-Would you please pull this into the next tree?
-
-Thank you,
-Suravee
-
- arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
-
-diff --git a/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi b/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
-index a7fc059..bd3adea 100644
---- a/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
-+++ b/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
-@@ -231,7 +231,7 @@
- 		};
- 
- 		/* Perf CCN504 PMU */
--		ccn: ccn at 0xe8000000 {
-+		ccn: ccn at e8000000 {
- 			compatible = "arm,ccn-504";
- 			reg = <0x0 0xe8000000 0 0x1000000>;
- 			interrupts = <0 380 4>;
-@@ -243,7 +243,6 @@
- 			device_type = "ipmi";
- 			reg = <0x0 0xe0010000 0 0x8>;
- 			interrupts = <0 389 4>;
--			interrupt-names = "ipmi_kcs";
- 			reg-size = <1>;
- 			reg-spacing = <4>;
- 		};
--- 
-2.5.0
+Kevin
