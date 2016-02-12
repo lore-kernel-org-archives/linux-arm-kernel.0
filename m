@@ -1,83 +1,60 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 12 Feb 2016 17:11:50 +0100
-Subject: [PATCH 1/2] arm64: mm: Enable CONT_SIZE aligned sections for 64k
- page kernels.
-In-Reply-To: <1455293208-6763-2-git-send-email-jeremy.linton@arm.com>
-References: <1455293208-6763-1-git-send-email-jeremy.linton@arm.com>
- <1455293208-6763-2-git-send-email-jeremy.linton@arm.com>
-Message-ID: <CAKv+Gu_ViEAVN1GEDMWpJ5OYjg6BVSLTEtdus6vCCXchQ1BOjw@mail.gmail.com>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Fri, 12 Feb 2016 10:13:19 -0600
+Subject: [PATCH] arm64: mm: Mark .rodata as RO
+Message-ID: <1455293599-6974-1-git-send-email-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jeremy,
+Currently the .rodata section is actually still executable when DEBUG_RODATA
+is enabled. This changes that so the .rodata is actually read only, no execute.
 
-Question below:
+Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+---
+ arch/arm64/kernel/vmlinux.lds.S |  5 +++--
+ arch/arm64/mm/mmu.c             | 14 +++++++++++---
+ 2 files changed, 14 insertions(+), 5 deletions(-)
 
-On 12 February 2016 at 17:06, Jeremy Linton <jeremy.linton@arm.com> wrote:
-> This change allows ALIGN_RODATA for 16k and 64k kernels.
-> In the case of 64k kernels it actually aligns to the CONT_SIZE
-> rather than the SECTION_SIZE (which is 512M). This makes it generally
-> more useful, especially for CONT enabled kernels.
->
-> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
-> ---
->  arch/arm64/Kconfig.debug        | 12 ++++++------
->  arch/arm64/kernel/vmlinux.lds.S | 11 ++++++-----
->  2 files changed, 12 insertions(+), 11 deletions(-)
->
-> diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
-> index e13c4bf..65705ee 100644
-> --- a/arch/arm64/Kconfig.debug
-> +++ b/arch/arm64/Kconfig.debug
-> @@ -59,15 +59,15 @@ config DEBUG_RODATA
->            If in doubt, say Y
->
->  config DEBUG_ALIGN_RODATA
-> -       depends on DEBUG_RODATA && ARM64_4K_PAGES
-> +       depends on DEBUG_RODATA
->         bool "Align linker sections up to SECTION_SIZE"
->         help
->           If this option is enabled, sections that may potentially be marked as
-> -         read only or non-executable will be aligned up to the section size of
-> -         the kernel. This prevents sections from being split into pages and
-> -         avoids a potential TLB penalty. The downside is an increase in
-> -         alignment and potentially wasted space. Turn on this option if
-> -         performance is more important than memory pressure.
-> +         read only or non-executable will be aligned up to the section size
-> +         or contiguous hint size of the kernel. This prevents sections from
-> +         being split into pages and avoids a potential TLB penalty. The downside
-> +         is an increase in alignment and potentially wasted space. Turn on
-> +         this option if performance is more important than memory pressure.
->
->           If in doubt, say N
->
-> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-> index b78a3c7..ab4e436 100644
-> --- a/arch/arm64/kernel/vmlinux.lds.S
-> +++ b/arch/arm64/kernel/vmlinux.lds.S
-> @@ -63,13 +63,14 @@ PECOFF_FILE_ALIGNMENT = 0x200;
->  #endif
->
->  #if defined(CONFIG_DEBUG_ALIGN_RODATA)
-> -#define ALIGN_DEBUG_RO                 . = ALIGN(1<<SECTION_SHIFT);
-> -#define ALIGN_DEBUG_RO_MIN(min)                ALIGN_DEBUG_RO
-> +#if defined(CONFIG_ARM64_64K_PAGES)
-> +#define ALIGN_DEBUG_RO_MIN(min)                . = ALIGN(CONT_SIZE);
-> +#else
-> +#define ALIGN_DEBUG_RO_MIN(min)                . = ALIGN(SECTION_SIZE);
-
-Doesn't this align to 32 MB on 16k pages kernels?
-
-> +#endif
->  #elif defined(CONFIG_DEBUG_RODATA)
-> -#define ALIGN_DEBUG_RO                 . = ALIGN(1<<PAGE_SHIFT);
-> -#define ALIGN_DEBUG_RO_MIN(min)                ALIGN_DEBUG_RO
-> +#define ALIGN_DEBUG_RO_MIN(min)                . = ALIGN(PAGE_SIZE);
->  #else
-> -#define ALIGN_DEBUG_RO
->  #define ALIGN_DEBUG_RO_MIN(min)                . = ALIGN(min);
->  #endif
->
-> --
-> 2.4.3
->
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index ab4e436..2e2c053 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -114,8 +114,9 @@ SECTIONS
+ 		*(.got)			/* Global offset table		*/
+ 	}
+ 
+-	RO_DATA(PAGE_SIZE)
+-	EXCEPTION_TABLE(8)
++	ALIGN_DEBUG_RO_MIN(0)
++	RO_DATA(PAGE_SIZE)		/* everything from this point to */
++	EXCEPTION_TABLE(8)		/* _etext will be marked RO NX   */
+ 	NOTES
+ 
+ 	ALIGN_DEBUG_RO_MIN(PAGE_SIZE)
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index ab69a99..a3f4112 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -453,10 +453,18 @@ static void __init map_mem(pgd_t *pgd)
+ #ifdef CONFIG_DEBUG_RODATA
+ void mark_rodata_ro(void)
+ {
+-	create_mapping_late(__pa(_stext), (unsigned long)_stext,
+-				(unsigned long)_etext - (unsigned long)_stext,
+-				PAGE_KERNEL_ROX);
++	unsigned long section_size;
+ 
++	section_size = (unsigned long)__start_rodata - (unsigned long)_stext;
++	create_mapping_late(__pa(_stext), (unsigned long)_stext,
++			    section_size, PAGE_KERNEL_ROX);
++	/*
++	 * mark .rodata as read only. Use _etext rather than __end_rodata to
++	 * cover NOTES and EXCEPTION_TABLE.
++	 */
++	section_size = (unsigned long)_etext - (unsigned long)__start_rodata;
++	create_mapping_late(__pa(__start_rodata), (unsigned long)__start_rodata,
++			    section_size, PAGE_KERNEL_RO);
+ }
+ #endif
+ 
+-- 
+2.4.3
