@@ -1,125 +1,143 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 12 Feb 2016 12:02:27 -0700
-Subject: [PATCH V3 6/6] coresight-stm: adding driver for CoreSight STM
- component
-In-Reply-To: <87y4aq2bjj.fsf@ashishki-desk.ger.corp.intel.com>
-References: <1454756672-12790-1-git-send-email-zhang.chunyan@linaro.org>
- <1454756672-12790-7-git-send-email-zhang.chunyan@linaro.org>
- <87y4aq2bjj.fsf@ashishki-desk.ger.corp.intel.com>
-Message-ID: <CANLsYkxTiwbE9WM4yR0hThPopv5ESJM0_B0+Qcay=aiTvaeJ0g@mail.gmail.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 12 Feb 2016 20:05:46 +0100
+Subject: [GIT PULL v2] Renesas ARM Based SoC DT Updates for v4.6
+Message-ID: <cover.1455303422.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 February 2016 at 08:28, Alexander Shishkin
-<alexander.shishkin@linux.intel.com> wrote:
-> Chunyan Zhang <zhang.chunyan@linaro.org> writes:
->
->> +static long stm_generic_set_options(struct stm_data *stm_data,
->> +                                 unsigned int master,
->> +                                 unsigned int channel,
->> +                                 unsigned int nr_chans,
->> +                                 unsigned long options)
->> +{
->> +     struct stm_drvdata *drvdata = container_of(stm_data,
->> +                                                struct stm_drvdata, stm);
->> +     if (!(drvdata && drvdata->enable))
->> +             return -EINVAL;
->> +
->> +     if (channel >= drvdata->numsp)
->> +             return -EINVAL;
->> +
->> +     switch (options) {
->> +     case STM_OPTION_GUARANTEED:
->> +             set_bit(channel, drvdata->chs.guaranteed);
->> +             break;
->> +
->> +     case STM_OPTION_INVARIANT:
->> +             clear_bit(channel, drvdata->chs.guaranteed);
->> +             break;
->
-> This is a bad interface. Firstly, neither option is described
-> anywhere. Secondly, I'm pretty sure "invariant" does not mean "not
-> guaranteed" in english, although this function seems to imply this.
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Regardless of the semantic associated to the word "invariant" in the
-English language, the documentation characterises a channel configured
-in best effort delivery mode as "invariant".  This is also the
-opposite of the "guaranteed" mode where packets are guaranteed to be
-delivered.  Adding a few comments here is probably a good idea.
+Please consider these Renesas ARM based SoC DT updates for v4.6.
 
->
->> +
->> +     default:
->> +             return -EINVAL;
->> +     }
->> +
->> +     return 0;
->> +}
->> +
->> +static long stm_generic_get_options(struct stm_data *stm_data,
->> +                                 unsigned int master,
->> +                                 unsigned int channel,
->> +                                 unsigned int nr_chans,
->> +                                 u64 *options)
->> +{
->> +     struct stm_drvdata *drvdata = container_of(stm_data,
->> +                                                struct stm_drvdata, stm);
->> +     if (!(drvdata && drvdata->enable))
->> +             return -EINVAL;
->> +
->> +     if (channel >= drvdata->numsp)
->> +             return -EINVAL;
->> +
->> +     switch (*options) {
->> +     case STM_OPTION_GUARANTEED:
->> +             *options = test_bit(channel, drvdata->chs.guaranteed);
->> +             break;
->
-> This just doesn't work. @options here is an on-stack variable in
-> stm_char_ioctl(), hitherto uninitialized. The get_options ioctl command
-> as you implemented it doesn't fetch @options from userspace either, it
-> just passes a pointer to it to this callback, expecting that the
-> callback will set it so that it can be copy_to_user()ed back to the
-> user.
 
-Yes, that was the intended behaviour - to allow user space to see in
-what mode channels are configured (guaranteed/invariant).
+Changes since v1 of this pull-request:
+* Drop two non-DT patches
 
->
-> Then, when we figure this out, there is again the question of what
-> should one make of STM_OPTION_{GUARANTEED,INVARIANT} and how do they fit
-> into *options.
 
-The interface asks if the channel is configured in "guaranteed" mode.
-If not and because there isn't another mode available, it is
-automatically in "invariant" mode.
+The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
 
-But as I pointed out in my earlier email this may no longer needed.
-One has to issue a system call anyway, might as well just go ahead
-with the configuration request.
+  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
 
-Thanks,
-Mathieu
+are available in the git repository at:
 
->
-> The idea behind set_options ioctl is that the user specifies a bit mask
-> of options that he/she wants to set.
->
-> [snip]
->
->> +#ifndef __UAPI_CORESIGHT_STM_H_
->> +#define __UAPI_CORESIGHT_STM_H_
->> +
->> +#define STM_FLAG_TIMESTAMPED   BIT(3)
->> +#define STM_FLAG_GUARANTEED    BIT(7)
->> +
->> +enum {
->> +     STM_OPTION_GUARANTEED = 0,
->> +     STM_OPTION_INVARIANT,
->> +};
->
-> Each of these guys could also use an explanation.
->
-> Regards,
-> --
-> Alex
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-for-v4.6
+
+for you to fetch changes up to c3373b09ba0391bcd9e992b0a2ce52d48d33e47b:
+
+  ARM: dts: silk: Enable SCIF_CLK frequency and pins (2016-02-09 19:43:28 +0100)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC DT Updates for v4.6
+
+* Use SCIF and USBHS fallback compatibility strings
+* Add Baud Rate Generator (BRG) support for (H)SCIF
+* Enable SCIF_CLK frequency and pins
+* Use GIC_* defines
+* Enable audio on r8a7793/gose
+* Enable HDMI vidio out on r8a7793
+* Enable i2c on r8a7793/gose
+* Enable QSPI on alt
+* Enable GPIO keys and leds on gise
+* Enable audio on porter
+* Enable DU on porter
+
+----------------------------------------------------------------
+Geert Uytterhoeven (20):
+      ARM: dts: r8a7778: Add SCIF fallback compatibility strings
+      ARM: dts: r8a7779: Add SCIF fallback compatibility strings
+      ARM: dts: r8a7790: Add SCIF fallback compatibility strings
+      ARM: dts: r8a7791: Add SCIF fallback compatibility strings
+      ARM: dts: r8a7793: Add SCIF fallback compatibility strings
+      ARM: dts: r8a7794: Add SCIF fallback compatibility strings
+      ARM: dts: r8a7778: Add BRG support for SCIF
+      ARM: dts: r8a7779: Add BRG support for SCIF
+      ARM: dts: r8a7790: Add BRG support for (H)SCIF
+      ARM: dts: r8a7791: Add BRG support for (H)SCIF
+      ARM: dts: r8a7793: Add BRG support for SCIF
+      ARM: dts: r8a7794: Add BRG support for (H)SCIF
+      ARM: dts: alt: Enable SCIF_CLK frequency and pins
+      ARM: dts: bockw: Enable SCIF_CLK frequency and pins
+      ARM: dts: gose: Enable SCIF_CLK frequency and pins
+      ARM: dts: koelsch: Enable SCIF_CLK frequency and pins
+      ARM: dts: lager: Enable SCIF_CLK frequency and pins
+      ARM: dts: marzen: Enable SCIF_CLK frequency and pins
+      ARM: dts: porter: Enable SCIF_CLK frequency and pins
+      ARM: dts: silk: Enable SCIF_CLK frequency and pins
+
+Laurent Pinchart (11):
+      ARM: dts: r8a7793: Add I2C master nodes to DT
+      ARM: dts: sh73a0: Rename the serial port clock to fck
+      ARM: dts: r7s72100: Rename the serial port clock to fck
+      ARM: dts: r8a73a4: Rename the serial port clock to fck
+      ARM: dts: r8a7740: Rename the serial port clock to fck
+      ARM: dts: r8a7778: Rename the serial port clock to fck
+      ARM: dts: r8a7779: Rename the serial port clock to fck
+      ARM: dts: r8a7790: Rename the serial port clock to fck
+      ARM: dts: r8a7791: Rename the serial port clock to fck
+      ARM: dts: r8a7793: Rename the serial port clock to fck
+      ARM: dts: r8a7794: Rename the serial port clock to fck
+
+Magnus Damm (1):
+      ARM: dts: r8a7793: gose: Add HDMI video out support
+
+Sergei Shtylyov (3):
+      ARM: dts: porter: add DU DT support
+      ARM: dts: silk: add DU DT support
+      ARM: dts: porter: add sound support
+
+Simon Horman (33):
+      ARM: dts: gose: Add GPIO keys to DT
+      ARM: dts: gose: Add GPIO leds to DT
+      ARM: dts: alt: Add QSPI device to DT
+      ARM: dts: r8a7790: use fallback usbhs compatibility string
+      ARM: dts: r8a7791: use fallback usbhs compatibility string
+      ARM: dts: r8a7794: use fallback usbhs compatibility string
+      ARM: dts: r8a7793: move dmac nodes
+      ARM: dts: gose: add i2c2 bus to device tree
+      ARM: dts: r8a7790: use GIC_* defines
+      ARM: dts: r8a7791: use GIC_* defines
+      ARM: dts: r8a7793: use GIC_* defines
+      ARM: dts: r8a7794: use GIC_* defines
+      ARM: dts: r8a7778: use GIC_* defines
+      ARM: dts: r8a7779: use GIC_* defines
+      ARM: dts: r8a73a4: use GIC_* defines
+      ARM: dts: r8a7740: use GIC_* defines
+      ARM: dts: r8a7793: add MSTP10 clocks to device tree
+      ARM: dts: r8a7793: add audio clock to device tree
+      ARM: dts: r8a7793: add m2 clock to device tree
+      ARM: dts: r8a7793: add R-Car sound support to device tree
+      ARM: dts: r8a7793: add DVC support to device tree
+      ARM: dts: r8a7793: add audio DMAC clocks to device tree
+      ARM: dts: r8a7793: add audio DMAC to device tree
+      ARM: dts: r8a7793: enable Audio DMAC peri peri via sound driver
+      ARM: dts: gose: Enable sound PIO support in device tree
+      ARM: dts: gose: enable sound DMA support in device tree
+      ARM: dts: gose: enable sound DMA support via BUSIF in device tree
+      ARM: dts: gose: enable sound DMA support via SRC in device tree
+      ARM: dts: gose: enable sound DMA support via DVC in device tree
+      ARM: dts: r8a7793: enable audio DMAC in device tree
+      ARM: dts: r7s72100: use GIC_* defines
+      ARM: dts: sh73a0: use GIC_* defines
+      ARM: dts: emev2: use GIC_* defines
+
+ arch/arm/boot/dts/emev2.dtsi              |  39 +-
+ arch/arm/boot/dts/r7s72100.dtsi           | 177 +++----
+ arch/arm/boot/dts/r8a73a4.dtsi            | 224 ++++-----
+ arch/arm/boot/dts/r8a7740.dtsi            | 161 +++----
+ arch/arm/boot/dts/r8a7778-bockw.dts       |  13 +
+ arch/arm/boot/dts/r8a7778.dtsi            | 144 +++---
+ arch/arm/boot/dts/r8a7779-marzen.dts      |  13 +
+ arch/arm/boot/dts/r8a7779.dtsi            | 135 +++---
+ arch/arm/boot/dts/r8a7790-lager.dts       |  13 +
+ arch/arm/boot/dts/r8a7790.dtsi            | 441 +++++++++--------
+ arch/arm/boot/dts/r8a7791-koelsch.dts     |  13 +
+ arch/arm/boot/dts/r8a7791-porter.dts      | 165 +++++++
+ arch/arm/boot/dts/r8a7791.dtsi            | 514 ++++++++++----------
+ arch/arm/boot/dts/r8a7793-gose.dts        | 304 ++++++++++++
+ arch/arm/boot/dts/r8a7793.dtsi            | 758 ++++++++++++++++++++++++------
+ arch/arm/boot/dts/r8a7794-alt.dts         |  59 +++
+ arch/arm/boot/dts/r8a7794-silk.dts        | 122 +++++
+ arch/arm/boot/dts/r8a7794.dtsi            | 362 +++++++-------
+ arch/arm/boot/dts/sh73a0.dtsi             | 186 ++++----
+ include/dt-bindings/clock/r8a7793-clock.h |   2 +
+ 20 files changed, 2569 insertions(+), 1276 deletions(-)
