@@ -1,167 +1,75 @@
-From: contact@paulk.fr (Paul Kocialkowski)
-Date: Fri, 12 Feb 2016 19:25:32 +0100
-Subject: [PATCH v2 2/4] regulator: lp872x: Add enable GPIO pin support
-In-Reply-To: <56BD23ED.8010207@ti.com>
-References: <1454697741-8687-1-git-send-email-contact@paulk.fr>
- <1454697741-8687-3-git-send-email-contact@paulk.fr>
- <56BD23ED.8010207@ti.com>
-Message-ID: <1455301532.2760.1.camel@collins>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 12 Feb 2016 18:25:27 +0000
+Subject: [PATCH] arm64: mm: Mark .rodata as RO
+In-Reply-To: <1455293599-6974-1-git-send-email-jeremy.linton@arm.com>
+References: <1455293599-6974-1-git-send-email-jeremy.linton@arm.com>
+Message-ID: <20160212182527.GG20262@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-Le vendredi 12 f?vrier 2016 ? 09:14 +0900, Kim, Milo a ?crit :
-> Thanks for the patch. Please see my comments below.
-
-Thanks for the review!
-
-> On 2/6/2016 3:42 AM, Paul Kocialkowski wrote:
-> > LP872x regulators are made active via the EN pin, which might be hooked to a
-> > GPIO. This adds support for driving the GPIO high when the driver is in use.
-> >
-> > Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
-> > ---
-> >   .../devicetree/bindings/regulator/lp872x.txt       |  1 +
-> >   drivers/regulator/lp872x.c                         | 34 ++++++++++++++++++++++
-> >   include/linux/regulator/lp872x.h                   |  5 ++++
-> >   3 files changed, 40 insertions(+)
-> >
-> > diff --git a/Documentation/devicetree/bindings/regulator/lp872x.txt b/Documentation/devicetree/bindings/regulator/lp872x.txt
-> > index 7818318..ca58a68 100644
-> > --- a/Documentation/devicetree/bindings/regulator/lp872x.txt
-> > +++ b/Documentation/devicetree/bindings/regulator/lp872x.txt
-> > @@ -28,6 +28,7 @@ Optional properties:
-> >     - ti,dvs-gpio: GPIO specifier for external DVS pin control of LP872x devices.
-> >     - ti,dvs-vsel: DVS selector. 0 = SEL_V1, 1 = SEL_V2.
-> >     - ti,dvs-state: initial DVS pin state. 0 = DVS_LOW, 1 = DVS_HIGH.
-> > +  - enable-gpios: GPIO specifier for EN pin control of LP872x devices.
-> >
-> >     Sub nodes for regulator_init_data
-> >       LP8720 has maximum 6 nodes. (child name: ldo1 ~ 5 and buck)
-> > diff --git a/drivers/regulator/lp872x.c b/drivers/regulator/lp872x.c
-> > index 21c49d8..3899211 100644
-> > --- a/drivers/regulator/lp872x.c
-> > +++ b/drivers/regulator/lp872x.c
-> > @@ -15,6 +15,7 @@
-> >   #include <linux/regmap.h>
-> >   #include <linux/err.h>
-> >   #include <linux/gpio.h>
-> > +#include <linux/delay.h>
-> >   #include <linux/regulator/lp872x.h>
-> >   #include <linux/regulator/driver.h>
-> >   #include <linux/platform_device.h>
-> > @@ -757,6 +758,33 @@ set_default_dvs_mode:
-> >   				default_dvs_mode[lp->chipid]);
-> >   }
-> >
-> > +static int lp872x_hw_enable(struct lp872x *lp)
-> > +{
-> > +	int ret, gpio;
-> > +
-> > +	if (!lp->pdata)
-> > +		return -EINVAL;
-> > +
-> > +	gpio = lp->pdata->enable_gpio;
-> > +	if (!gpio_is_valid(gpio))
-> > +		return 0;
+On Fri, Feb 12, 2016 at 10:13:19AM -0600, Jeremy Linton wrote:
+> Currently the .rodata section is actually still executable when DEBUG_RODATA
+> is enabled. This changes that so the .rodata is actually read only, no execute.
 > 
-> It seems gpio is always 0 when it starts from DT. 'enable_gpio' is 
-> updated in lp872x_config() but lp872x_hw_enable() is called first.
-
-Actually, enable_gpio is updated in lp872x_populate_pdata_from_dt.
-
-> > +
-> > +	/* Always set enable GPIO high. */
-> > +	ret = devm_gpio_request_one(lp->dev, gpio, GPIOF_OUT_INIT_HIGH, "LP872X EN");
-> > +	if (ret) {
-> > +		dev_err(lp->dev, "gpio request err: %d\n", ret);
-> > +		return ret;
-> > +	}
-> > +
-> > +	/* Each chip has a different enable delay. */
-> > +	if (lp->chipid == LP8720)
-> > +		usleep_range(LP8720_ENABLE_DELAY, 1.5 * LP8720_ENABLE_DELAY);
-> > +	else
-> > +		usleep_range(LP8725_ENABLE_DELAY, 1.5 * LP8725_ENABLE_DELAY);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> >   static int lp872x_config(struct lp872x *lp)
-> >   {
-> >   	struct lp872x_platform_data *pdata = lp->pdata;
-> > @@ -875,6 +903,8 @@ static struct lp872x_platform_data
-> >   	of_property_read_u8(np, "ti,dvs-state", &dvs_state);
-> >   	pdata->dvs->init_state = dvs_state ? DVS_HIGH : DVS_LOW;
-> >
-> > +	pdata->enable_gpio = of_get_named_gpio(np, "enable-gpios", 0);
+> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+> ---
+>  arch/arm64/kernel/vmlinux.lds.S |  5 +++--
+>  arch/arm64/mm/mmu.c             | 14 +++++++++++---
+>  2 files changed, 14 insertions(+), 5 deletions(-)
 > 
-> Please move this code to lp872x_populate_pdata_from_dt().
+> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+> index ab4e436..2e2c053 100644
+> --- a/arch/arm64/kernel/vmlinux.lds.S
+> +++ b/arch/arm64/kernel/vmlinux.lds.S
+> @@ -114,8 +114,9 @@ SECTIONS
+>  		*(.got)			/* Global offset table		*/
+>  	}
+>  
+> -	RO_DATA(PAGE_SIZE)
+> -	EXCEPTION_TABLE(8)
+> +	ALIGN_DEBUG_RO_MIN(0)
+> +	RO_DATA(PAGE_SIZE)		/* everything from this point to */
+> +	EXCEPTION_TABLE(8)		/* _etext will be marked RO NX   */
+>  	NOTES
+>  
+>  	ALIGN_DEBUG_RO_MIN(PAGE_SIZE)
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index ab69a99..a3f4112 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -453,10 +453,18 @@ static void __init map_mem(pgd_t *pgd)
+>  #ifdef CONFIG_DEBUG_RODATA
+>  void mark_rodata_ro(void)
+>  {
+> -	create_mapping_late(__pa(_stext), (unsigned long)_stext,
+> -				(unsigned long)_etext - (unsigned long)_stext,
+> -				PAGE_KERNEL_ROX);
+> +	unsigned long section_size;
+>  
+> +	section_size = (unsigned long)__start_rodata - (unsigned long)_stext;
+> +	create_mapping_late(__pa(_stext), (unsigned long)_stext,
+> +			    section_size, PAGE_KERNEL_ROX);
+> +	/*
+> +	 * mark .rodata as read only. Use _etext rather than __end_rodata to
+> +	 * cover NOTES and EXCEPTION_TABLE.
+> +	 */
+> +	section_size = (unsigned long)_etext - (unsigned long)__start_rodata;
+> +	create_mapping_late(__pa(__start_rodata), (unsigned long)__start_rodata,
+> +			    section_size, PAGE_KERNEL_RO);
+>  }
 
-This already adds it in lp872x_populate_pdata_from_dt (see the context
-around the insertion).
+As you pointed out in the other thread, we'll also need to update
+map_kernel to use equivalent chunks for .text and .rodata.
 
-I don't know why the diff makes it seem like it's added in
-lp872x_config. It's really not.
+I think we can probably make .rodata RO from the outset in map_kernel,
+too.
 
-> lp872x_hw_enable() is called prior to lp872x_config(), so enable_gpio 
-> should be set on parsing the DT properties.
+Could you please update mem_init to log .text and .rodata separately?
 
-Of course.
+It looks like some core code makes assumptions about _etext, so I guess
+that has to cover .rodata regardless.
 
-> > +
-> >   	if (of_get_child_count(np) == 0)
-> >   		goto out;
-> >
-> > @@ -948,6 +978,10 @@ static int lp872x_probe(struct i2c_client *cl, const struct i2c_device_id *id)
-> >   	lp->chipid = id->driver_data;
-> >   	i2c_set_clientdata(cl, lp);
-> >
-> > +	ret = lp872x_hw_enable(lp);
-> > +	if (ret)
-> > +		return ret;
-> > +
-> >   	ret = lp872x_config(lp);
-> >   	if (ret)
-> >   		return ret;
-> > diff --git a/include/linux/regulator/lp872x.h b/include/linux/regulator/lp872x.h
-> > index 132e05c..6029279 100644
-> > --- a/include/linux/regulator/lp872x.h
-> > +++ b/include/linux/regulator/lp872x.h
-> > @@ -18,6 +18,9 @@
-> >
-> >   #define LP872X_MAX_REGULATORS		9
-> >
-> > +#define LP8720_ENABLE_DELAY		200
-> > +#define LP8725_ENABLE_DELAY		30000
-> > +
-> >   enum lp872x_regulator_id {
-> >   	LP8720_ID_BASE,
-> >   	LP8720_ID_LDO1 = LP8720_ID_BASE,
-> > @@ -79,12 +82,14 @@ struct lp872x_regulator_data {
-> >    * @update_config     : if LP872X_GENERAL_CFG register is updated, set true
-> >    * @regulator_data    : platform regulator id and init data
-> >    * @dvs               : dvs data for buck voltage control
-> > + * @enable_gpio       : gpio pin number for enable control
-> >    */
-> >   struct lp872x_platform_data {
-> >   	u8 general_config;
-> >   	bool update_config;
-> >   	struct lp872x_regulator_data regulator_data[LP872X_MAX_REGULATORS];
-> >   	struct lp872x_dvs *dvs;
-> > +	int enable_gpio;
-> >   };
-> >
-> >   #endif
-> >
-> 
-> Best regards,
-> Milo
+Otherwise, looks good!
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160212/25a0e415/attachment.sig>
+Thanks,
+Mark.
