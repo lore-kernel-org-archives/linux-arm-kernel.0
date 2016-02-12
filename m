@@ -1,74 +1,75 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 12 Feb 2016 17:46:50 +0100
-Subject: [PATCH 1/2] arm64: mm: Enable CONT_SIZE aligned sections for 64k
- page kernels.
-In-Reply-To: <56BE0BAB.7060502@arm.com>
-References: <1455293208-6763-1-git-send-email-jeremy.linton@arm.com>
- <1455293208-6763-2-git-send-email-jeremy.linton@arm.com>
- <CAKv+Gu_ViEAVN1GEDMWpJ5OYjg6BVSLTEtdus6vCCXchQ1BOjw@mail.gmail.com>
- <56BE0698.10506@arm.com>
- <CAKv+Gu--05Wn6oWEiy=43nzujNgG0=DpOB9b1zs9_jfddYXWwQ@mail.gmail.com>
- <56BE0BAB.7060502@arm.com>
-Message-ID: <CAKv+Gu-CYxr9jk=U-NrfRkyBhi0M2_9G+Mqx8fYeEEkRL8GnVw@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 12 Feb 2016 19:47:45 +0300
+Subject: [PATCH v2 5/5] ARM: dts: r8a7794: add sound support
+In-Reply-To: <20160210171455.GB17671@verge.net.au>
+References: <12033353.rt0nolnBmD@wasted.cogentembedded.com>
+ <2543047.yYrDdYb9v5@wasted.cogentembedded.com>
+ <874mdhtn7d.wl%kuninori.morimoto.gx@renesas.com>
+ <20160210171455.GB17671@verge.net.au>
+Message-ID: <56BE0CB1.4070408@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 February 2016 at 17:43, Jeremy Linton <jeremy.linton@arm.com> wrote:
-> On 02/12/2016 10:28 AM, Ard Biesheuvel wrote:
->>
->> On 12 February 2016 at 17:21, Jeremy Linton <jeremy.linton@arm.com> wrote:
->>>
->>> On 02/12/2016 10:11 AM, Ard Biesheuvel wrote:
->>>>
->>>>
->>>> On 12 February 2016 at 17:06, Jeremy Linton <jeremy.linton@arm.com>
->>>> wrote:
->>>
->>>
->>> (trimming)
->>>>>
->>>>>
->>>>>    #if defined(CONFIG_DEBUG_ALIGN_RODATA)
->>>>> -#define ALIGN_DEBUG_RO                 . = ALIGN(1<<SECTION_SHIFT);
->>>>> -#define ALIGN_DEBUG_RO_MIN(min)                ALIGN_DEBUG_RO
->>>>> +#if defined(CONFIG_ARM64_64K_PAGES)
->>>>> +#define ALIGN_DEBUG_RO_MIN(min)                . = ALIGN(CONT_SIZE);
->>>>> +#else
->>>>> +#define ALIGN_DEBUG_RO_MIN(min)                . =
->>>>> ALIGN(SECTION_SIZE);
->>>>
->>>>
->>>>
->>>> Doesn't this align to 32 MB on 16k pages kernels?
->>>
->>>
->>>
->>> Yes, I considered whether it was more appropriate to use CONT_SIZE for
->>> 16k
->>> as well.
->>>
->>> Opinions?
->>>
->>
->> Looking at vmlinux.lds.S, I see that that would put _stext and
->> __init_begin at 32 MB aligned boundaries. making the size of the
->> kernel at least 64 MB. If I take your .rodata patch into account,
->> which adds a third instance of ALIGN_DEBUG_RO_MIN, the Image footprint
->> will rise to ~100 MB. Or am I missing something?
->>
->
-> No, I think your correct. But, its an option, and it sort of depends on use
-> case. In a system with 100+GB of RAM it might be useful. Not so much on a
-> phone or small embedded system. I don't really see those people enabling
-> ALIGN_RODATA anyway. Worse, I expect the loss of RAM efficiently going from
-> 4k-16k pages in a RAM constrained system to be a pretty big hit too.
->
-> I don't have any hard data one way or the other, and I don't have a strong
-> opinion. Although, I suspect at the moment the potential users of 16k pages
-> may tend toward the small side.
->
+On 02/10/2016 08:14 PM, Simon Horman wrote:
 
-Well, the thing is, if you only use 2 MB of each 32 MB on average, you
-gain nothing by going from contiguous pages to proper sections, since
-the TLB footprint is the same. So my opinion would be to use CONT_SIZE
-for 16k pages as well.
+>> Sorry for my un-ordered response
+>>
+>>> Define the generic R8A7794 part of  the sound device node.
+>>> This sound device  is a complex one and comprises the Audio Clock Generator
+>>> (ADG), Sampling Rate Converter Unit (SCU), Serial Sound Interface [Unit]
+>>> (SSI[U]), and Audio DMAC-Peripheral-Peripheral.
+>>> It is up  to the board file to enable the device.
+>>>
+>>> This patch is based on the R8A7791 sound work by Kuninori Morimoto.
+>>>
+>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>> (snip)
+>>> +		rcar_sound,src {
+>>> +			src1: src at 1 {
+>>> +				interrupts = <GIC_SPI 353 IRQ_TYPE_LEVEL_HIGH>;
+>>> +				dmas = <&audma0 0x87>, <&audma0 0x9c>;
+>>> +				dma-names = "rx", "tx";
+>>> +			};
+>>> +			src2: src at 2 {
+>>> +				interrupts = <GIC_SPI 354 IRQ_TYPE_LEVEL_HIGH>;
+>>> +				dmas = <&audma0 0x89>, <&audma0 0x9e>;
+>>> +				dma-names = "rx", "tx";
+>>> +			};
+>>> +			src3: src at 3 {
+>>> +				interrupts = <GIC_SPI 355 IRQ_TYPE_LEVEL_HIGH>;
+>>> +				dmas = <&audma0 0x8b>, <&audma0 0xa0>;
+>>> +				dma-names = "rx", "tx";
+>>> +			};
+>>> +			src4: src at 4 {
+>>> +				interrupts = <GIC_SPI 356 IRQ_TYPE_LEVEL_HIGH>;
+>>> +				dmas = <&audma0 0x8d>, <&audma0 0xb0>;
+>>> +				dma-names = "rx", "tx";
+>>> +			};
+>>> +			src5: src at 5 {
+>>> +				interrupts = <GIC_SPI 357 IRQ_TYPE_LEVEL_HIGH>;
+>>> +				dmas = <&audma0 0x8f>, <&audma0 0xb2>;
+>>> +				dma-names = "rx", "tx";
+>>> +			};
+>>> +			src6: src at 6 {
+>>> +				interrupts = <GIC_SPI 358 IRQ_TYPE_LEVEL_HIGH>;
+>>> +				dmas = <&audma0 0x91>, <&audma0 0xb4>;
+>>> +				dma-names = "rx", "tx";
+>>> +			};
+>>> +		};
+>>
+>> I think this can't work correctly, because driver is assuming
+>> DT has all channles (from 0). (see linux/sound/soc/sh/rcar/src.c :: rsnd_src_probe)
+>> Can you adds dummy src0 with some comments ? or fix src.c driver ?
+>
+> I would prefer the driver to be fixed (I had a similar patchset locally
+> and I found it doesn't work).
+
+    You mean you had R8A7794 sound patch set too?
+
+> The reason is that DT should describe
+> the hardware rather than the current state of the software.
+
+    Yes, of course. Just tell me do I have to fix the driver *before* this 
+patch set is accepted?
+
+MBR, Sergei
