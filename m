@@ -1,67 +1,77 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 12 Feb 2016 16:57:07 +0000
-Subject: [PATCH 2/2] arm64: Mark kernel page ranges contiguous
-In-Reply-To: <1455293208-6763-3-git-send-email-jeremy.linton@arm.com>
-References: <1455293208-6763-1-git-send-email-jeremy.linton@arm.com>
- <1455293208-6763-3-git-send-email-jeremy.linton@arm.com>
-Message-ID: <20160212165707.GB20262@leverpostej>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 12 Feb 2016 18:00:01 +0100
+Subject: [PATCH] arm/arm64/crypto: assure that ECB modes don't require an
+ IV
+In-Reply-To: <1455292072-5236-1-git-send-email-jeremy.linton@arm.com>
+References: <1455292072-5236-1-git-send-email-jeremy.linton@arm.com>
+Message-ID: <CAKv+Gu8_Z5=0dTeBsVgx_BT0c+_O5PNUCyKFjuDf9x470bxHOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Fri, Feb 12, 2016 at 10:06:48AM -0600, Jeremy Linton wrote:
-> With 64k pages, the next larger segment size is 512M. The linux
-> kernel also uses different protection flags to cover its code and data.
-> Because of this requirement, the vast majority of the kernel code and
-> data structures end up being mapped with 64k pages instead of the larger
-> pages common with a 4k page kernel.
-> 
-> Recent ARM processors support a contiguous bit in the
-> page tables which allows the a TLB to cover a range larger than a
-> single PTE if that range is mapped into physically contiguous
-> ram.
-> 
-> So, for the kernel its a good idea to set this flag. Some basic
-> micro benchmarks show it can significantly reduce the number of
-> L1 dTLB refills.
-> 
+On 12 February 2016 at 16:47, Jeremy Linton <jeremy.linton@arm.com> wrote:
+> ECB modes don't use an initialization vector. The kernel
+> /proc/crypto interface doesn't reflect this properly.
+>
 > Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+
+Thanks for spotting that!
+
+Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+
 > ---
->  arch/arm64/mm/mmu.c | 64 ++++++++++++++++++++++++++++++++++++++++++++++++-----
->  1 file changed, 58 insertions(+), 6 deletions(-)
-
-This generally looks good.
-
-As a heads-up, I have one concern:
-
-> +static void clear_cont_pte_range(pte_t *pte, unsigned long addr)
-> +{
-> +	int i;
-> +
-> +	pte -= CONT_RANGE_OFFSET(addr);
-> +	for (i = 0; i < CONT_PTES; i++) {
-> +		if (pte_cont(*pte))
-> +			set_pte(pte, pte_mknoncont(*pte));
-> +		pte++;
-> +	}
-> +	flush_tlb_all();
-> +}
-
-As far as I can tell, "splitting" contiguous entries comes with the same
-caveats as splitting sections. In the absence of a BBM sequence we might
-end up with conflicting TLB entries.
-
-However, I think we're OK for now.
-
-The way we consistently map/unmap/modify image/linear "chunks" should
-prevent us from trying to split those, and if/when we do this for the
-EFI runtime page tables thy aren't live.
-
-It would be good to figure out how to get rid of the splitting entirely.
-
-Otherwise, this looks good to me; I'll try to give this a spin next
-week.
-
-Thanks,
-Mark.
+>  arch/arm/crypto/aes-ce-glue.c | 4 ++--
+>  arch/arm64/crypto/aes-glue.c  | 4 ++--
+>  2 files changed, 4 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm/crypto/aes-ce-glue.c b/arch/arm/crypto/aes-ce-glue.c
+> index b445a5d..89a3a3e 100644
+> --- a/arch/arm/crypto/aes-ce-glue.c
+> +++ b/arch/arm/crypto/aes-ce-glue.c
+> @@ -364,7 +364,7 @@ static struct crypto_alg aes_algs[] = { {
+>         .cra_blkcipher = {
+>                 .min_keysize    = AES_MIN_KEY_SIZE,
+>                 .max_keysize    = AES_MAX_KEY_SIZE,
+> -               .ivsize         = AES_BLOCK_SIZE,
+> +               .ivsize         = 0,
+>                 .setkey         = ce_aes_setkey,
+>                 .encrypt        = ecb_encrypt,
+>                 .decrypt        = ecb_decrypt,
+> @@ -441,7 +441,7 @@ static struct crypto_alg aes_algs[] = { {
+>         .cra_ablkcipher = {
+>                 .min_keysize    = AES_MIN_KEY_SIZE,
+>                 .max_keysize    = AES_MAX_KEY_SIZE,
+> -               .ivsize         = AES_BLOCK_SIZE,
+> +               .ivsize         = 0,
+>                 .setkey         = ablk_set_key,
+>                 .encrypt        = ablk_encrypt,
+>                 .decrypt        = ablk_decrypt,
+> diff --git a/arch/arm64/crypto/aes-glue.c b/arch/arm64/crypto/aes-glue.c
+> index 05d9e16..7a3d22a 100644
+> --- a/arch/arm64/crypto/aes-glue.c
+> +++ b/arch/arm64/crypto/aes-glue.c
+> @@ -294,7 +294,7 @@ static struct crypto_alg aes_algs[] = { {
+>         .cra_blkcipher = {
+>                 .min_keysize    = AES_MIN_KEY_SIZE,
+>                 .max_keysize    = AES_MAX_KEY_SIZE,
+> -               .ivsize         = AES_BLOCK_SIZE,
+> +               .ivsize         = 0,
+>                 .setkey         = aes_setkey,
+>                 .encrypt        = ecb_encrypt,
+>                 .decrypt        = ecb_decrypt,
+> @@ -371,7 +371,7 @@ static struct crypto_alg aes_algs[] = { {
+>         .cra_ablkcipher = {
+>                 .min_keysize    = AES_MIN_KEY_SIZE,
+>                 .max_keysize    = AES_MAX_KEY_SIZE,
+> -               .ivsize         = AES_BLOCK_SIZE,
+> +               .ivsize         = 0,
+>                 .setkey         = ablk_set_key,
+>                 .encrypt        = ablk_encrypt,
+>                 .decrypt        = ablk_decrypt,
+> --
+> 2.4.3
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
