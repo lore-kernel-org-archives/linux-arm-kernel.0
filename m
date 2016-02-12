@@ -1,92 +1,47 @@
-From: codekipper@gmail.com (Code Kipper)
-Date: Fri, 12 Feb 2016 13:00:18 +0100
-Subject: [linux-sunxi][PATCH] ARM: dts: sun4i: Enable USB DRC on the MK8082
-In-Reply-To: <1455278071-22339-1-git-send-email-codekipper@gmail.com>
-References: <1455278071-22339-1-git-send-email-codekipper@gmail.com>
-Message-ID: <CAEKpxBkVmxLdm1VKosSyCtgghoV2ba-jyxxaz-TmccSpziAF9Q@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 12 Feb 2016 13:06:43 +0100
+Subject: [PATCH v2] ARM: vmlinux-xip.lds: assert that ROM and RAM don't overlap
+Message-ID: <1455278803-27679-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-NAK...doohhh got the name of the device wrong in both subject and
-description. V2 sent.
+When building an XIP kernel, the linker produces two disjoint VMA regions,
+where the first is mapped onto ROM and the second onto RAM. For this reason,
+the linker output pointer '.' is updated halfway through the linker script,
+and set to a value that corresponds with the start of the RAM region.
 
-On 12 February 2016 at 12:54,  <codekipper@gmail.com> wrote:
-> From: Marcus Cooper <codekipper@gmail.com>
->
-> Enable the otg/drc usb controller on the MK8082.
->
-> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
-> ---
->  arch/arm/boot/dts/sun4i-a10-mk802.dts | 33 +++++++++++++++++++++++++++++++++
->  1 file changed, 33 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/sun4i-a10-mk802.dts b/arch/arm/boot/dts/sun4i-a10-mk802.dts
-> index ddf0683..ee46ea8 100644
-> --- a/arch/arm/boot/dts/sun4i-a10-mk802.dts
-> +++ b/arch/arm/boot/dts/sun4i-a10-mk802.dts
-> @@ -44,6 +44,7 @@
->  #include "sun4i-a10.dtsi"
->  #include "sunxi-common-regulators.dtsi"
->  #include <dt-bindings/gpio/gpio.h>
-> +#include <dt-bindings/pinctrl/sun4i-a10.h>
->
->  / {
->         model = "MK802";
-> @@ -84,7 +85,25 @@
->         status = "okay";
->  };
->
-> +&otg_sram {
-> +       status = "okay";
-> +};
-> +
->  &pio {
-> +       usb0_id_detect_pin: usb0_id_detect_pin at 0 {
-> +               allwinner,pins = "PH4";
-> +               allwinner,function = "gpio_in";
-> +               allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> +               allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-> +       };
-> +
-> +       usb0_vbus_detect_pin: usb0_vbus_detect_pin at 0 {
-> +               allwinner,pins = "PH5";
-> +               allwinner,function = "gpio_in";
-> +               allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> +               allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-> +       };
-> +
->         usb2_vbus_pin_mk802: usb2_vbus_pin at 0 {
->                 allwinner,pins = "PH12";
->                 allwinner,function = "gpio_out";
-> @@ -93,6 +112,10 @@
->         };
->  };
->
-> +&reg_usb0_vbus {
-> +       status = "okay";
-> +};
-> +
->  &reg_usb1_vbus {
->         status = "okay";
->  };
-> @@ -109,7 +132,17 @@
->         status = "okay";
->  };
->
-> +&usb_otg {
-> +       dr_mode = "otg";
-> +       status = "okay";
-> +};
-> +
->  &usbphy {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&usb0_id_detect_pin>, <&usb0_vbus_detect_pin>;
-> +       usb0_id_det-gpios = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
-> +       usb0_vbus_det-gpios = <&pio 7 5 GPIO_ACTIVE_HIGH>; /* PH5 */
-> +       usb0_vbus-supply = <&reg_usb0_vbus>;
->         usb1_vbus-supply = <&reg_usb1_vbus>;
->         usb2_vbus-supply = <&reg_usb2_vbus>;
->         status = "okay";
-> --
-> 2.7.1
->
+However, in some cases, the ROM region exceeds the expected size, and the
+assignment of the output pointer results in a decrement rather than an
+increment, causing the virtual addresses of the .data region to clash with
+the .text region. Such a kernel cannot boot normally, but it also confuses
+the hell out of kallsyms, since .data symbols may appear inside the
+[_stext, _etext] or [_sinittext, _einittext] intervals in the first pass,
+but not in the second (or vice versa), resulting in inconsistent kallsyms
+data.
+
+So let's make sure that the output pointer only advances, and never jumps
+back into the ROM region.
+
+Cc: Chris Brandt <Chris.Brandt@renesas.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+v2: rebased onto the split off XIP linker script
+
+ arch/arm/kernel/vmlinux-xip.lds.S | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/kernel/vmlinux-xip.lds.S b/arch/arm/kernel/vmlinux-xip.lds.S
+index 40bc4cadb959..07c642cff50e 100644
+--- a/arch/arm/kernel/vmlinux-xip.lds.S
++++ b/arch/arm/kernel/vmlinux-xip.lds.S
+@@ -213,6 +213,7 @@ SECTIONS
+ 
+ 	_exiprom = .;			/* End of XIP ROM area */
+ 	__data_loc = ALIGN(4);		/* location in binary */
++	ASSERT(. < PAGE_OFFSET + TEXT_OFFSET, "XIP_KERNEL: ROM and RAM overlap")
+ 	. = PAGE_OFFSET + TEXT_OFFSET;
+ 
+ 	.data : AT(__data_loc) {
+-- 
+2.5.0
