@@ -1,37 +1,43 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 12 Feb 2016 14:04:54 -0800
-Subject: [PATCH] Revert "ASoC: qcom: Specify LE device endianness"
-In-Reply-To: <20160212212600.GA18872@sirena.org.uk>
-References: <1455298217-15744-1-git-send-email-sboyd@codeaurora.org>
- <20160212212600.GA18872@sirena.org.uk>
-Message-ID: <20160212220454.GF4847@codeaurora.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 12 Feb 2016 14:07:18 -0800
+Subject: [PATCH 2/2] ARM: dts: am33xx: add support for Ka-Ro electronics
+ TX48-7020 module
+In-Reply-To: <CAOCHtYhHiQmueqdxcvA48iC64eqq+Ey2gKNuwZjxaMYKeWPB-Q@mail.gmail.com>
+References: <1453292992-1788-1-git-send-email-LW@KARO-electronics.de>
+ <1453292992-1788-3-git-send-email-LW@KARO-electronics.de>
+ <CAOCHtYhHiQmueqdxcvA48iC64eqq+Ey2gKNuwZjxaMYKeWPB-Q@mail.gmail.com>
+Message-ID: <20160212220718.GK19432@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/12, Mark Brown wrote:
-> On Fri, Feb 12, 2016 at 09:30:17AM -0800, Stephen Boyd wrote:
-> > This reverts commit 18560a4e3b07438113b50589e78532d95f907029.
-> > 
-> > The commit that caused us to specify LE device endianness here,
-> > 29bb45f25ff3 (regmap-mmio: Use native endianness for read/write,
-> > 2015-10-29), has been reverted in mainline so now when we specify
+* Robert Nelson <robertcnelson@gmail.com> [160120 08:34]:
+> > +
+> > +&am33xx_pinmux {
+> > +       cpsw_default: cpsw_default {
+> > +               pinctrl-single,pins = <
+> > +                       /* Slave 1 */
+> > +                       0x10c (PIN_INPUT_PULLDOWN | MUX_MODE1)  /* mii1_crs.rmii1_crs_dv */
+> > +                       0x110 (PIN_INPUT_PULLDOWN | MUX_MODE1)  /* mii1_rxerr.rmii1_rxerr */
+> > +                       0x114 (PIN_OUTPUT_PULLDOWN | MUX_MODE1) /* mii1_txen.rmii1_txen */
+> > +                       0x124 (PIN_OUTPUT_PULLDOWN | MUX_MODE1) /* mii1_txd1.rmii1_txd1 */
+> > +                       0x128 (PIN_OUTPUT_PULLDOWN | MUX_MODE1) /* mii1_txd0.rmii1_txd0 */
+> > +                       0x13c (PIN_INPUT_PULLDOWN | MUX_MODE1)  /* mii1_rxd1.rmii1_rxd1 */
+> > +                       0x140 (PIN_INPUT_PULLDOWN | MUX_MODE1)  /* mii1_rxd0.rmii1_rxd0 */
+> > +                       0x144 (PIN_INPUT | SLEWCTRL_FAST | MUX_MODE0)   /* rmii1_ref_clk.rmii1_refclk */
+> > +                       0x1e4 (PIN_INPUT_PULLUP | MUX_MODE7)    /* emu0.gpio3_7 */
+> > +                       0x1e8 (PIN_OUTPUT_PULLDOWN | MUX_MODE7) /* emu1.gpio3_8 */
 > 
-> So, I applied this to -next as that's where it applies but it seems that
-> you're trying to revert a commit that's in Linus' tree so should go as a
-> fix to him.  Can you send a fix against Linus' tree too please?
+> please go thru and convert these all to use the AM33XX_IOPAD macro..
+> 
+> All the boards have been converted for the 4.5.0-rc0 merge..
+> 
+> example:
+> 
+> https://git.kernel.org/cgit/linux/kernel/git/tmlind/linux-omap.git/commit/?h=for-next&id=df10eadfce3510c2814e95d9f3d2d5d2c64eb26b
 
-Did you want me to send the fix directly to Linus? The patch
-applies to both -next and Linus' tree, although you're right I
-generated this patch against -next. If I apply it to Linus' tree
-and then git format-patch it's exactly the same except for the
-commit hash:
+Yes and please send this separately from the regulator changes
+if no dependency.
 
-$ diff linus next
-1c1
-< From 4f7c654bfcd159b3068b01e3b522e8af88069cb9 Mon Sep 17 00:00:00 2001
----
-> From 798212b523668d5a37a977c660554827aa0d89ed Mon Sep 17 00:00:00 2001
+Regards,
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Tony
