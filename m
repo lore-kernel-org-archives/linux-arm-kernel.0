@@ -1,121 +1,40 @@
 From: CARLOS.PALMINHA@synopsys.com (Carlos Palminha)
-Date: Fri, 12 Feb 2016 13:55:01 +0000
-Subject: [PATCH 10/17] drm/imx: removed optional dummy encoder mode_fixup
+Date: Fri, 12 Feb 2016 13:56:02 +0000
+Subject: [PATCH 15/17] drm/rockchip: removed optional dummy encoder mode_fixup
  function.
-Message-ID: <1455285301-3214-1-git-send-email-palminha@synopsys.com>
+Message-ID: <1455285362-3450-1-git-send-email-palminha@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 ---
- drivers/gpu/drm/imx/dw_hdmi-imx.c      | 8 --------
- drivers/gpu/drm/imx/imx-ldb.c          | 8 --------
- drivers/gpu/drm/imx/imx-tve.c          | 8 --------
- drivers/gpu/drm/imx/parallel-display.c | 8 --------
- 4 files changed, 32 deletions(-)
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 8 --------
+ 1 file changed, 8 deletions(-)
 
-diff --git a/drivers/gpu/drm/imx/dw_hdmi-imx.c b/drivers/gpu/drm/imx/dw_hdmi-imx.c
-index 063825f..21d6158 100644
---- a/drivers/gpu/drm/imx/dw_hdmi-imx.c
-+++ b/drivers/gpu/drm/imx/dw_hdmi-imx.c
-@@ -109,13 +109,6 @@ static void dw_hdmi_imx_encoder_disable(struct drm_encoder *encoder)
- {
+diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+index f8f8f29..7766206 100644
+--- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
++++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+@@ -875,13 +875,6 @@ static void dw_mipi_dsi_encoder_disable(struct drm_encoder *encoder)
+ 	clk_disable_unprepare(dsi->pclk);
  }
  
--static bool dw_hdmi_imx_encoder_mode_fixup(struct drm_encoder *encoder,
--					   const struct drm_display_mode *mode,
--					   struct drm_display_mode *adj_mode)
+-static bool dw_mipi_dsi_encoder_mode_fixup(struct drm_encoder *encoder,
+-					const struct drm_display_mode *mode,
+-					struct drm_display_mode *adjusted_mode)
 -{
 -	return true;
 -}
 -
- static void dw_hdmi_imx_encoder_mode_set(struct drm_encoder *encoder,
- 					 struct drm_display_mode *mode,
- 					 struct drm_display_mode *adj_mode)
-@@ -138,7 +131,6 @@ static void dw_hdmi_imx_encoder_prepare(struct drm_encoder *encoder)
- }
- 
- static const struct drm_encoder_helper_funcs dw_hdmi_imx_encoder_helper_funcs = {
--	.mode_fixup = dw_hdmi_imx_encoder_mode_fixup,
- 	.mode_set   = dw_hdmi_imx_encoder_mode_set,
- 	.prepare    = dw_hdmi_imx_encoder_prepare,
- 	.commit     = dw_hdmi_imx_encoder_commit,
-diff --git a/drivers/gpu/drm/imx/imx-ldb.c b/drivers/gpu/drm/imx/imx-ldb.c
-index 22ac482..024d613 100644
---- a/drivers/gpu/drm/imx/imx-ldb.c
-+++ b/drivers/gpu/drm/imx/imx-ldb.c
-@@ -139,13 +139,6 @@ static void imx_ldb_encoder_dpms(struct drm_encoder *encoder, int mode)
+ static void dw_mipi_dsi_encoder_commit(struct drm_encoder *encoder)
  {
- }
+ 	struct dw_mipi_dsi *dsi = encoder_to_dsi(encoder);
+@@ -931,7 +924,6 @@ static void dw_mipi_dsi_encoder_commit(struct drm_encoder *encoder)
  
--static bool imx_ldb_encoder_mode_fixup(struct drm_encoder *encoder,
--			   const struct drm_display_mode *mode,
--			   struct drm_display_mode *adjusted_mode)
--{
--	return true;
--}
--
- static void imx_ldb_set_clock(struct imx_ldb *ldb, int mux, int chno,
- 		unsigned long serial_clk, unsigned long di_clk)
- {
-@@ -376,7 +369,6 @@ static const struct drm_encoder_funcs imx_ldb_encoder_funcs = {
- 
- static const struct drm_encoder_helper_funcs imx_ldb_encoder_helper_funcs = {
- 	.dpms = imx_ldb_encoder_dpms,
--	.mode_fixup = imx_ldb_encoder_mode_fixup,
- 	.prepare = imx_ldb_encoder_prepare,
- 	.commit = imx_ldb_encoder_commit,
- 	.mode_set = imx_ldb_encoder_mode_set,
-diff --git a/drivers/gpu/drm/imx/imx-tve.c b/drivers/gpu/drm/imx/imx-tve.c
-index 292349f..ae7a9fb 100644
---- a/drivers/gpu/drm/imx/imx-tve.c
-+++ b/drivers/gpu/drm/imx/imx-tve.c
-@@ -286,13 +286,6 @@ static void imx_tve_encoder_dpms(struct drm_encoder *encoder, int mode)
- 		dev_err(tve->dev, "failed to disable TVOUT: %d\n", ret);
- }
- 
--static bool imx_tve_encoder_mode_fixup(struct drm_encoder *encoder,
--				       const struct drm_display_mode *mode,
--				       struct drm_display_mode *adjusted_mode)
--{
--	return true;
--}
--
- static void imx_tve_encoder_prepare(struct drm_encoder *encoder)
- {
- 	struct imx_tve *tve = enc_to_tve(encoder);
-@@ -379,7 +372,6 @@ static const struct drm_encoder_funcs imx_tve_encoder_funcs = {
- 
- static const struct drm_encoder_helper_funcs imx_tve_encoder_helper_funcs = {
- 	.dpms = imx_tve_encoder_dpms,
--	.mode_fixup = imx_tve_encoder_mode_fixup,
- 	.prepare = imx_tve_encoder_prepare,
- 	.mode_set = imx_tve_encoder_mode_set,
- 	.commit = imx_tve_encoder_commit,
-diff --git a/drivers/gpu/drm/imx/parallel-display.c b/drivers/gpu/drm/imx/parallel-display.c
-index 0ffef17..363e2c7 100644
---- a/drivers/gpu/drm/imx/parallel-display.c
-+++ b/drivers/gpu/drm/imx/parallel-display.c
-@@ -112,13 +112,6 @@ static void imx_pd_encoder_dpms(struct drm_encoder *encoder, int mode)
- 		drm_panel_enable(imxpd->panel);
- }
- 
--static bool imx_pd_encoder_mode_fixup(struct drm_encoder *encoder,
--			   const struct drm_display_mode *mode,
--			   struct drm_display_mode *adjusted_mode)
--{
--	return true;
--}
--
- static void imx_pd_encoder_prepare(struct drm_encoder *encoder)
- {
- 	struct imx_parallel_display *imxpd = enc_to_imxpd(encoder);
-@@ -166,7 +159,6 @@ static const struct drm_encoder_funcs imx_pd_encoder_funcs = {
- 
- static const struct drm_encoder_helper_funcs imx_pd_encoder_helper_funcs = {
- 	.dpms = imx_pd_encoder_dpms,
--	.mode_fixup = imx_pd_encoder_mode_fixup,
- 	.prepare = imx_pd_encoder_prepare,
- 	.commit = imx_pd_encoder_commit,
- 	.mode_set = imx_pd_encoder_mode_set,
+ static struct drm_encoder_helper_funcs
+ dw_mipi_dsi_encoder_helper_funcs = {
+-	.mode_fixup = dw_mipi_dsi_encoder_mode_fixup,
+ 	.commit = dw_mipi_dsi_encoder_commit,
+ 	.mode_set = dw_mipi_dsi_encoder_mode_set,
+ 	.disable = dw_mipi_dsi_encoder_disable,
 -- 
 2.5.0
