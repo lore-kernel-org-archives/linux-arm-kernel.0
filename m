@@ -1,9 +1,9 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 12 Feb 2016 20:05:55 +0100
-Subject: [PATCH 65/68] ARM: dts: lager: Enable SCIF_CLK frequency and pins
+Date: Fri, 12 Feb 2016 20:05:57 +0100
+Subject: [PATCH 67/68] ARM: dts: porter: Enable SCIF_CLK frequency and pins
 In-Reply-To: <cover.1455303422.git.horms+renesas@verge.net.au>
 References: <cover.1455303422.git.horms+renesas@verge.net.au>
-Message-ID: <1781460c9accb106b0887985754b63be1b4c63f8.1455303422.git.horms+renesas@verge.net.au>
+Message-ID: <19417bd9c5112f58ea63e97ba72edabd5e1cc0fe.1455303422.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,24 +17,22 @@ This increases the range and accuracy of supported baud rates.
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7790-lager.dts | 13 +++++++++++++
+ arch/arm/boot/dts/r8a7791-porter.dts | 13 +++++++++++++
  1 file changed, 13 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
-index 052dcee4790d..cdc0414f5f07 100644
---- a/arch/arm/boot/dts/r8a7790-lager.dts
-+++ b/arch/arm/boot/dts/r8a7790-lager.dts
-@@ -291,6 +291,9 @@
+diff --git a/arch/arm/boot/dts/r8a7791-porter.dts b/arch/arm/boot/dts/r8a7791-porter.dts
+index 5015eaa0ae50..ed1f6f884e2b 100644
+--- a/arch/arm/boot/dts/r8a7791-porter.dts
++++ b/arch/arm/boot/dts/r8a7791-porter.dts
+@@ -143,11 +143,19 @@
  };
  
  &pfc {
 +	pinctrl-0 = <&scif_clk_pins>;
 +	pinctrl-names = "default";
 +
- 	du_pins: du {
- 		renesas,groups = "du_rgb666", "du_sync_1", "du_clk_out_0";
- 		renesas,function = "du";
-@@ -301,6 +304,11 @@
+ 	scif0_pins: serial0 {
+ 		renesas,groups = "scif0_data_d";
  		renesas,function = "scif0";
  	};
  
@@ -46,7 +44,7 @@ index 052dcee4790d..cdc0414f5f07 100644
  	ether_pins: ether {
  		renesas,groups = "eth_link", "eth_mdio", "eth_rmii";
  		renesas,function = "eth";
-@@ -485,6 +493,11 @@
+@@ -221,6 +229,11 @@
  	status = "okay";
  };
  
@@ -55,8 +53,8 @@ index 052dcee4790d..cdc0414f5f07 100644
 +	status = "okay";
 +};
 +
- &msiof1 {
- 	pinctrl-0 = <&msiof1_pins>;
+ &ether {
+ 	pinctrl-0 = <&ether_pins &phy1_pins>;
  	pinctrl-names = "default";
 -- 
 2.7.0.rc3.207.g0ac5344
