@@ -1,116 +1,127 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 13 Feb 2016 00:43:27 +0800
-Subject: [PATCH 10/14] ARM: dts: sun8i-a83t: Add PRCM related clocks and
- resets
-In-Reply-To: <CAEzqOZtsdHC2tCgjC=Bj5q3RFip2Uyni8bFC16u03PRLCra5KA@mail.gmail.com>
-References: <1454203266-4450-1-git-send-email-vishnupatekar0510@gmail.com>
- <1454203266-4450-11-git-send-email-vishnupatekar0510@gmail.com>
- <CAGb2v67iO-816KaLttWRRPL2f7hpfgJ1--p69tD_oOrewmOjCA@mail.gmail.com>
- <CAEzqOZtsdHC2tCgjC=Bj5q3RFip2Uyni8bFC16u03PRLCra5KA@mail.gmail.com>
-Message-ID: <CAGb2v65cfG=cJ91+9G5uS5XcUh0nx6-7ZnMr7RjSGqXPHjyxpQ@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 12 Feb 2016 17:44:13 +0100
+Subject: [PATCH v5sub1 7/8] arm64: move kernel image to base of vmalloc
+ area
+In-Reply-To: <20160212160652.GL31665@e104818-lin.cambridge.arm.com>
+References: <1454324093-15998-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1454324093-15998-8-git-send-email-ard.biesheuvel@linaro.org>
+ <20160212145844.GI31665@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu-x6QPorWsPDP8bqAkmbasqzhqmP39HS=qprfGB4r8JLw@mail.gmail.com>
+ <20160212151006.GJ31665@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu84mVP=YjbLhWoGj9AEUD8m8+Lq8kTCniCHwxJwMWaZtA@mail.gmail.com>
+ <20160212152641.GK31665@e104818-lin.cambridge.arm.com>
+ <56BDFC86.5010705@arm.com>
+ <20160212160652.GL31665@e104818-lin.cambridge.arm.com>
+Message-ID: <CAKv+Gu_bKeJiS0Ctd8QU2M7_SKfpDrA5hksqZgfPUwYqO_KrjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 13, 2016 at 12:06 AM, Vishnu Patekar
-<vishnupatekar0510@gmail.com> wrote:
-> Hello Wens,
+On 12 February 2016 at 17:06, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Fri, Feb 12, 2016 at 03:38:46PM +0000, Sudeep Holla wrote:
+>>
+>> On 12/02/16 15:26, Catalin Marinas wrote:
+>> >On Fri, Feb 12, 2016 at 04:17:09PM +0100, Ard Biesheuvel wrote:
+>> >>On 12 February 2016 at 16:10, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>> >>>On Fri, Feb 12, 2016 at 04:02:58PM +0100, Ard Biesheuvel wrote:
+>> >>>>On 12 February 2016 at 15:58, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>> >>>>>On Mon, Feb 01, 2016 at 11:54:52AM +0100, Ard Biesheuvel wrote:
+>> >>>>>>This moves the module area to right before the vmalloc area, and
+>> >>>>>>moves the kernel image to the base of the vmalloc area. This is
+>> >>>>>>an intermediate step towards implementing KASLR, which allows the
+>> >>>>>>kernel image to be located anywhere in the vmalloc area.
+>> >>>>>>
+>> >>>>>>Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> >>>>>
+>> >>>>>This patch is causing lots of KASAN warnings on Juno (interestingly, it
+>> >>>>>doesn't seem to trigger on Seattle, though we only tried for-next/core).
+>> >>>>>I pushed the branch that I'm currently using here:
+>> >>>>>
+>> >>>>>git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux for-next/kernmap
+>> >>>>>
+>> >>>>>
+>> >>>>>A typical error (though its place varies based on the config options,
+>> >>>>>kernel layout):
+>> >>>>>
+>> >>>>>BUG: KASAN: stack-out-of-bounds in clockevents_program_event+0x28/0x1b0 at addr ffffffc936257cc8
+>> >>>>
+>> >>>>Can you confirm that these are stack accesses? I was having similar
+>> >>>>errors before, and I ended up creating the kasan zero page patch
+>> >>>>because it turned out the kasan shadow page in question was aliased
+>> >>>>and the stack writes were occurring elsewhere.
+>> >>>
+>> >>>It's possible, we are looking into this. Is there any other patch I miss on
+>> >>>the above branch?
+>> >>
+>> >>I don't think so but I will check
+>> >
+>> >Commit 7b1af9795773 ("arm64: kasan: ensure that the KASAN zero page is
+>> >mapped read-only") was merged in -rc2 while the branch above is based on
+>> >-rc1. Anyway, I merged it into -rc2 and the errors are similar.
+>> >
+>>
+>> Sorry to add more confusion, but I observed similar KASAN warning
+>> with latest mainline(v4.5-rc3+, commit c05235d50f68) with below diff.
 >
+> I can reproduce this with UBSAN enabled (log below for the record).
 >
-> On Tue, Feb 2, 2016 at 2:44 PM, Chen-Yu Tsai <wens@csie.org> wrote:
->> On Sun, Jan 31, 2016 at 9:21 AM, Vishnu Patekar
->> <vishnupatekar0510@gmail.com> wrote:
->>> This adds A83T PRCM related clocks, clock resets.
->>>
->>> As a83t apb0 gates clock support is added earlier, this enables it.
->>> Apart from apb0 gates, other added clocks are compatible with
->>> earlier sun8i socs.
->>>
->>> Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
->>> ---
->>>  arch/arm/boot/dts/sun8i-a83t.dtsi | 44 +++++++++++++++++++++++++++++++++++++++
->>>  1 file changed, 44 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
->>> index ac96aa1..5ea20ff 100644
->>> --- a/arch/arm/boot/dts/sun8i-a83t.dtsi
->>> +++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
->>> @@ -268,6 +268,44 @@
->>>                                              "mmc2_output",
->>>                                              "mmc2_sample";
->>>                 };
->>> +
->>> +               cpus_clk: clk at 01f01400 {
->>> +                       compatible = "allwinner,sun9i-a80-cpus-clk";
->>> +                       reg = <0x01f01400 0x4>;
->>> +                       #clock-cells = <0>;
->>> +                       clocks = <&osc16Md512>, <&osc24M>, <&pll6>, <&osc16M>;
->>> +                       clock-output-names = "cpus";
->>> +               };
->>> +
->>> +               ahb0: ahb0_clk {
->>> +                       compatible = "fixed-factor-clock";
->>> +                       #clock-cells = <0>;
->>> +                       clock-div = <1>;
->>> +                       clock-mult = <1>;
->>> +                       clocks = <&cpus_clk>;
->>> +                       clock-output-names = "ahb0";
->>> +               };
->>> +
->>> +               apb0: clk at 01f0140c {
->>> +                       compatible = "allwinner,sun8i-a23-apb0-clk";
->>
->> This is actually wrong, as it is wrong in sun9i-a80.dtsi.
->> I've sent a patch series for it.
-> A83T apb0 is different from A80, and it's same as A23, so this should
-> be correct.
-> Please correct me in case I'm missing something.
+> So far, we have:
+>
+> KASAN+for-next/kernmap goes wrong
+> KASAN+UBSAN goes wrong
+>
+> Enabled individually, KASAN, UBSAN and for-next/kernmap seem fine. I may
+> have to trim for-next/core down until we figure out where the problem
+> is.
+>
 
-My user manual (v1.5.1) says A83T apb0 dividers (page. 246) are
-/1, /2, /3, /4, while the A23 is /1, /2, /4, /8.
+I haven't managed to reproduce this yet on QEMU, Seattle or FVP, but I
+did notice something that may or may not be related:
+without my changes the memory map show this:
 
-ChenYu
+    kasan   : 0xffffff8000000000 - 0xffffff9000000000   (    64 GB)
+    vmalloc : 0xffffff9000010000 - 0xffffffbdbfff0000   (   182 GB)
 
->> Also the drivers for "allwinner,sun9i-a80-cpus-clk" and
->> "allwinner,sun9i-a80-apbs-clk"
->> are only compiled for CONFIG_MACH_SUN9I. Please add a patch to address this.
-> Okie.
->>
->> Regards
->> ChenYu
->>
->>> +                       reg = <0x01f0140c 0x4>;
->>> +                       #clock-cells = <0>;
->>> +                       clocks = <&ahb0>;
->>> +                       clock-output-names = "apb0";
->>> +               };
->>> +
->>> +               apb0_gates: clk at 01f01428 {
->>> +                       compatible = "allwinner,sun8i-a83t-apb0-gates-clk";
->>> +                       reg = <0x01f01428 0x4>;
->>> +                       #clock-cells = <1>;
->>> +                       clocks = <&apb0>;
->>> +                       clock-indices = <0>, <1>,
->>> +                                       <2>, <3>,
->>> +                                       <4>, <6>, <7>;
->>> +                       clock-output-names = "apb0_pio", "apb0_ir",
->>> +                                       "apb0_timer", "apb0_rsb",
->>> +                                       "apb0_uart", "apb0_i2c0", "apb0_twd";
->>> +               };
->>>         };
->>>
->>>         soc {
->>> @@ -434,5 +472,11 @@
->>>                         #interrupt-cells = <3>;
->>>                         interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_HIGH)>;
->>>                 };
->>> +
->>> +               apb0_reset: reset at 01f014b0 {
->>> +                       reg = <0x01f014b0 0x4>;
->>> +                       compatible = "allwinner,sun6i-a31-clock-reset";
->>> +                       #reset-cells = <1>;
->>> +               };
->>>         };
->>>  };
->>> --
->>> 1.9.1
->>>
+i.e., there is a 64 KB guard region between the shadow region and the
+vmalloc region. I am not sure what it is for, but I realize now that I
+accidentally removed it in my patch:
+
+    kasan   : 0xffffff8000000000 - 0xffffff9000000000   (    64 GB)
+    modules : 0xffffff9000000000 - 0xffffff9004000000   (    64 MB)
+    vmalloc : 0xffffff9004000000 - 0xffffffbdbfff0000   (   182 GB)
+
+
+
+>
+> BUG: KASAN: stack-out-of-bounds in find_busiest_group+0x164/0x16a0 at addr ffffffc93665bc8c
+> Read of size 4 by task swapper/3/0
+> page:ffffffbde6d996c0 count:0 mapcount:0 mapping:          (null) index:0x0
+> flags: 0x4000000000000000()
+> page dumped because: kasan: bad access detected
+> CPU: 3 PID: 0 Comm: swapper/3 Not tainted 4.5.0-rc3+ #134
+> Hardware name: Juno (DT)
+> Call trace:
+> [<ffffffc00008f8f0>] dump_backtrace+0x0/0x358
+> [<ffffffc00008fc5c>] show_stack+0x14/0x20
+> [<ffffffc00069d0a8>] dump_stack+0x108/0x150
+> [<ffffffc0003077f8>] kasan_report_error+0x690/0x970
+> [<ffffffc0003082c0>] kasan_report+0x60/0xc0
+> [<ffffffc00030634c>] __asan_load4+0x64/0x80
+> [<ffffffc00015f714>] find_busiest_group+0x164/0x16a0
+> [<ffffffc000160ea0>] load_balance+0x250/0x1450
+> [<ffffffc0001630c0>] pick_next_task_fair+0x5d0/0xb40
+> [<ffffffc000f08090>] __schedule+0x460/0xbc8
+> [<ffffffc000f08870>] schedule+0x78/0x208
+> [<ffffffc000f092d4>] schedule_preempt_disabled+0x3c/0xd8
+> [<ffffffc000172208>] cpu_startup_entry+0x160/0x4c8
+> [<ffffffc0000985b8>] secondary_start_kernel+0x280/0x428
+> [<0000000080082e2c>] 0x80082e2c
+> Memory state around the buggy address:
+>  ffffffc93665bb80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+>  ffffffc93665bc00: f1 f1 f1 f1 00 f4 f4 f4 f2 f2 f2 f2 00 00 f1 f1
+>>ffffffc93665bc80: f1 f1 00 00 00 00 f3 f3 00 f4 f4 f4 f3 f3 f3 f3
+>                       ^
+>  ffffffc93665bd00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+>  ffffffc93665bd80: 00 00 00 00 00 00 00 00 f1 f1 f1 f1 04 f4 f4 f4
+>
+> --
+> Catalin
