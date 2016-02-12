@@ -1,37 +1,37 @@
-From: kernel@martin.sperl.org (kernel at martin.sperl.org)
-Date: Fri, 12 Feb 2016 11:14:25 +0000
-Subject: [PATCH] ARM: bcm2835: add bcm2835-aux-uart support to DT
-Message-ID: <1455275666-15806-1-git-send-email-kernel@martin.sperl.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 12 Feb 2016 12:15:29 +0100
+Subject: [PATCH] iio: adc/imx25-gcq: move incorrect do_div
+Message-ID: <1455275748-999115-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Martin Sperl <kernel@martin.sperl.org>
+The newly added driver uses do_div() to device a 32-bit number, which now
+provokes a warning:
 
-Add bcm2835-aux-uart support to the device tree.
+drivers/iio/adc/fsl-imx25-gcq.c: In function 'mx25_gcq_setup_cfgs':
+include/asm-generic/div64.h:207:28: warning: comparison of distinct pointer types lacks a cast
+  (void)(((typeof((n)) *)0) == ((uint64_t *)0)); \
 
-Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+This replaces the do_div() call with a straight division operator.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 6df2e98c3ea5 ("iio: adc: Add imx25-gcq ADC driver")
 ---
- arch/arm/boot/dts/bcm283x.dtsi |    8 ++++++++
- 1 file changed, 8 insertions(+)
+ drivers/iio/adc/fsl-imx25-gcq.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
-index 05ff5ce..8aaf193 100644
---- a/arch/arm/boot/dts/bcm283x.dtsi
-+++ b/arch/arm/boot/dts/bcm283x.dtsi
-@@ -160,6 +160,14 @@
- 			clocks = <&clocks BCM2835_CLOCK_VPU>;
- 		};
- 
-+		uart1: serial at 7e215040 {
-+			compatible = "brcm,bcm2835-aux-uart";
-+			reg = <0x7e215040 0x40>;
-+			interrupts = <1 29>;
-+			clocks = <&aux BCM2835_AUX_CLOCK_UART>;
-+			status = "disabled";
-+		};
-+
- 		spi1: spi at 7e215080 {
- 			compatible = "brcm,bcm2835-aux-spi";
- 			reg = <0x7e215080 0x40>;
+diff --git a/drivers/iio/adc/fsl-imx25-gcq.c b/drivers/iio/adc/fsl-imx25-gcq.c
+index 2fd192735d5b..72b32c1ab257 100644
+--- a/drivers/iio/adc/fsl-imx25-gcq.c
++++ b/drivers/iio/adc/fsl-imx25-gcq.c
+@@ -233,7 +233,7 @@ static int mx25_gcq_setup_cfgs(struct platform_device *pdev,
+ 			priv->channel_vref_mv[reg] =
+ 				regulator_get_voltage(priv->vref[refp]);
+ 			/* Conversion from uV to mV */
+-			do_div(priv->channel_vref_mv[reg], 1000);
++			priv->channel_vref_mv[reg] /= 1000;
+ 			break;
+ 		case MX25_ADC_REFP_INT:
+ 			priv->channel_vref_mv[reg] = 2500;
 -- 
-1.7.10.4
+2.7.0
