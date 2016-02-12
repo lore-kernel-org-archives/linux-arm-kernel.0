@@ -1,71 +1,45 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri, 12 Feb 2016 18:43:05 +0900
-Subject: [PATCH v2 5/6] serial: 8250/mediatek: fix building with
- SERIAL_8250=m
-In-Reply-To: <1455205297-1021302-6-git-send-email-arnd@arndb.de>
-References: <1455205297-1021302-1-git-send-email-arnd@arndb.de>
- <1455205297-1021302-6-git-send-email-arnd@arndb.de>
-Message-ID: <CAK7LNAS5oNd8hdjS6+mYoPhNVTaGzAjc4SvnSmP1f_pDeHTFDg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 12 Feb 2016 10:45:55 +0100
+Subject: [PATCH v2] ARM: mm: mark section-aligned portion of rodata NX
+In-Reply-To: <20160211180032.GY10826@n2100.arm.linux.org.uk>
+References: <20151207223534.GA13722@www.outflux.net>
+ <CAGXu5jLDK8eVO2kUD1cB3TArL8k8pF=igc3O04Fa40QgQ2pwNw@mail.gmail.com>
+ <20160211180032.GY10826@n2100.arm.linux.org.uk>
+Message-ID: <4300378.sBT9DdB2Gc@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Thursday 11 February 2016 18:00:32 Russell King - ARM Linux wrote:
+> On Fri, Jan 22, 2016 at 01:19:03PM -0800, Kees Cook wrote:
+> > On Tue, Dec 8, 2015 at 10:38 AM, Kees Cook <keescook@chromium.org> wrote:
+> > > On Mon, Dec 7, 2015 at 11:47 PM, Ard Biesheuvel
+> > > <ard.biesheuvel@linaro.org> wrote:
+> > >> On 7 December 2015 at 23:35, Kees Cook <keescook@chromium.org> wrote:
+> > >>>  /*
+> > >>> + * Without CONFIG_DEBUG_ALIGN_RODATA, __start_rodata_section_aligned will
+> > >>> + * be the first section-aligned location after __start_rodata. Otherwise,
+> > >>> + * it will be equal to __start_rodata.
+> > >>> + */
+> > >>> +__start_rodata_section_aligned = ALIGN(__start_rodata, 1 << SECTION_SHIFT);
+> ...
+> 
+> I'm afraid this causes build errors on two configurations:
+> 
+> ./arch/arm/kernel/vmlinux.lds:701: undefined symbol `SECTION_SHIFT' referenced in expression
+> 
+> which I think is down to the new __start_rodata_section_aligned line.
+> 
+> Olof's builder errored out with this for both allnoconfig and
+> lpc18xx_defconfig builds.  Both probably due to CONFIG_MMU being
+> unset, and hence no definition for SECTION_SHIFT.
+> 
+> I think you need to make this conditional on CONFIG_MMU.
 
+I've hit another problem with this patch, when using XIP_KERNEL, I now see
 
-2016-02-12 0:41 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
-> The Mediatek 8250 driver has a 'bool' Kconfig symbol, but that
-> breaks when SERIAL_8250 is a loadable module:
->
-> drivers/tty/built-in.o: In function `mtk8250_set_termios':
-> :(.text+0x1bee8): undefined reference to `serial8250_do_set_termios'
-> :(.text+0x1bf10): undefined reference to `uart_get_baud_rate'
-> :(.text+0x1c09c): undefined reference to `uart_get_divisor'
-> drivers/tty/built-in.o: In function `mtk8250_do_pm':
-> :(.text+0x1c0d0): undefined reference to `serial8250_do_pm'
-> drivers/tty/built-in.o: In function `mtk8250_probe':
-> :(.text+0x1c2e4): undefined reference to `serial8250_register_8250_port'
-> serial/8250/8250_mtk.c:287:242: error: data definition has no type or storage class [-Werror]
-> serial/8250/8250_mtk.c:287:122: error: 'mtk8250_platform_driver_init' defined but not used [-Werror=unused-function]
->
-> This changes the symbol to a 'tristate', so the dependency on
-> SERIAL_8250 also works when that is set to 'm'.
-> To actually build the driver, we also need to include <linux/module.h>.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  drivers/tty/serial/8250/8250_mtk.c | 3 ++-
->  drivers/tty/serial/8250/Kconfig    | 2 +-
->  2 files changed, 3 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/tty/serial/8250/8250_mtk.c b/drivers/tty/serial/8250/8250_mtk.c
-> index 6ecc6e3e82dc..55be90c1d85e 100644
-> --- a/drivers/tty/serial/8250/8250_mtk.c
-> +++ b/drivers/tty/serial/8250/8250_mtk.c
-> @@ -19,6 +19,7 @@
->  #include <linux/module.h>
->  #include <linux/of_irq.h>
->  #include <linux/of_platform.h>
-> +#include <linux/module.h>
->  #include <linux/platform_device.h>
->  #include <linux/pm_runtime.h>
->  #include <linux/serial_8250.h>
-> @@ -303,7 +304,7 @@ static struct platform_driver mtk8250_platform_driver = {
->  };
->  module_platform_driver(mtk8250_platform_driver);
->
-> -#ifdef CONFIG_SERIAL_8250_CONSOLE
-> +#if defined(CONFIG_SERIAL_8250_CONSOLE) && !defined(MODULE)
->  static int __init early_mtk8250_setup(struct earlycon_device *device,
->                                         const char *options)
->  {
+arch/arm/mm/built-in.o:(.data+0x4bc): undefined reference to `__start_rodata_section_aligned'
 
+in linux-next, apparently because of the combination with "ARM: 8513/1: xip: Move
+XIP linking to a separate file".
 
-As mentioned in 4/6, this hunk might become unneeded if
-https://patchwork.kernel.org/patch/8289231/
-is accepted.
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+	Arnd
