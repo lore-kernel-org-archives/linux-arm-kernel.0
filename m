@@ -1,50 +1,126 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 12 Feb 2016 18:04:31 +0100
-Subject: [PATCH] [media] zl10353: use div_u64 instead of do_div
-In-Reply-To: <20160212143220.5a440e66@recife.lan>
-References: <1455287246-3540549-1-git-send-email-arnd@arndb.de>
- <20160212143220.5a440e66@recife.lan>
-Message-ID: <2712691.b9gkR7KMX7@wuerfel>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 12 Feb 2016 17:09:46 +0000
+Subject: [PATCH v2] iommu/io-pgtable: Rationalise quirk handling
+In-Reply-To: <cover.1453723096.git.robin.murphy@arm.com>
+References: <cover.1453723096.git.robin.murphy@arm.com>
+Message-ID: <62860b753f304beef7b4b6f1e13d7094252f2f37.1455294748.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 12 February 2016 14:32:20 Mauro Carvalho Chehab wrote:
-> Em Fri, 12 Feb 2016 15:27:18 +0100
-> Arnd Bergmann <arnd@arndb.de> escreveu:
-> 
-> > I noticed a build error in some randconfig builds in the zl10353 driver:
-> > 
-> > dvb-frontends/zl10353.c:138: undefined reference to `____ilog2_NaN'
-> > dvb-frontends/zl10353.c:138: undefined reference to `__aeabi_uldivmod'
-> > 
-> > The problem can be tracked down to the use of -fprofile-arcs (using
-> > CONFIG_GCOV_PROFILE_ALL) in combination with CONFIG_PROFILE_ALL_BRANCHES
-> > on gcc version 4.9 or higher, when it fails to reliably optimize
-> > constant expressions.
-> > 
-> > Using div_u64() instead of do_div() makes the code slightly more
-> > readable by both humans and by gcc, which gives the compiler enough
-> > of a break to figure it all out.
-> 
-> I'm not against this patch, but we have 94 occurrences of do_div() 
-> just at the media subsystem. If this is failing here, it would likely
-> fail with other drivers. So, I guess we should either fix do_div() or
-> convert all such occurrences to do_div64().
+As the number of io-pgtable implementations grows beyond 1, it's time
+to rationalise the quirks mechanism before things have a chance to
+start getting really ugly and out-of-hand.
 
-I agree that it's possible that the same problem exists elsewhere, but this is
-the only one that I ever saw (in five ranconfig builds out of 8035 last week).
+To that end:
+- Indicate exactly which quirks each format can/does support.
+- Fail creating a table if a caller wants unsupported quirks.
+- Properly document where each quirk applies and why.
 
-I also tried changing do_div() to be an inline function with just a small
-macro wrapper around it for the odd calling conventions, which also made this
-error go away. I would assume that Nico had a good reason for doing do_div()
-the way he did. In some other files, I saw the object code grow by a few
-instructions, but the examples I looked at were otherwise identical.
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
 
-I can imagine that there might be cases where the constant-argument optimization
-of do_div fails when we go through an inline function in some combination
-of Kconfig options and compiler version, though I don't think that was
-the case here.
+Just to allay any confusion, I intend this as a followup to the
+short-descriptor[1] and Mediatek IOMMU[2] patches, rather than a
+crucial addition, so it can either get picked up along with those
+or wait 'til later.
 
-Nico, any other thoughts on this?
+v2:
+- Use unsigned long for the bitmap.
+- Do format-specific checks inline.
+- Enough of a difference that I don't feel comfortable putting
+  Laurent's reviewed-by from v1 on it...
 
-	Arnd
+Robin.
+
+[1]:http://thread.gmane.org/gmane.linux.kernel.iommu/12007
+[2]:http://thread.gmane.org/gmane.linux.kernel.iommu/11974
+
+ drivers/iommu/io-pgtable-arm-v7s.c |  5 +++++
+ drivers/iommu/io-pgtable-arm.c     | 13 +++++++++++--
+ drivers/iommu/io-pgtable.h         | 22 ++++++++++++++++++----
+ 3 files changed, 34 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/iommu/io-pgtable-arm-v7s.c b/drivers/iommu/io-pgtable-arm-v7s.c
+index d39a021..9fcceb1 100644
+--- a/drivers/iommu/io-pgtable-arm-v7s.c
++++ b/drivers/iommu/io-pgtable-arm-v7s.c
+@@ -623,6 +623,11 @@ static struct io_pgtable *arm_v7s_alloc_pgtable(struct io_pgtable_cfg *cfg,
+ 	if (cfg->ias > ARM_V7S_ADDR_BITS || cfg->oas > ARM_V7S_ADDR_BITS)
+ 		return NULL;
+ 
++	if (cfg->quirks & ~(IO_PGTABLE_QUIRK_ARM_NS |
++			    IO_PGTABLE_QUIRK_NO_PERMS |
++			    IO_PGTABLE_QUIRK_TLBI_ON_MAP))
++		return NULL;
++
+ 	data = kmalloc(sizeof(*data), GFP_KERNEL);
+ 	if (!data)
+ 		return NULL;
+diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
+index 4095af2..debdf04 100644
+--- a/drivers/iommu/io-pgtable-arm.c
++++ b/drivers/iommu/io-pgtable-arm.c
+@@ -658,8 +658,12 @@ static struct io_pgtable *
+ arm_64_lpae_alloc_pgtable_s1(struct io_pgtable_cfg *cfg, void *cookie)
+ {
+ 	u64 reg;
+-	struct arm_lpae_io_pgtable *data = arm_lpae_alloc_pgtable(cfg);
++	struct arm_lpae_io_pgtable *data;
+ 
++	if (cfg->quirks & ~IO_PGTABLE_QUIRK_ARM_NS)
++		return NULL;
++
++	data = arm_lpae_alloc_pgtable(cfg);
+ 	if (!data)
+ 		return NULL;
+ 
+@@ -742,8 +746,13 @@ static struct io_pgtable *
+ arm_64_lpae_alloc_pgtable_s2(struct io_pgtable_cfg *cfg, void *cookie)
+ {
+ 	u64 reg, sl;
+-	struct arm_lpae_io_pgtable *data = arm_lpae_alloc_pgtable(cfg);
++	struct arm_lpae_io_pgtable *data;
+ 
++	/* The NS quirk doesn't apply at stage 2 */
++	if (cfg->quirks)
++		return NULL;
++
++	data = arm_lpae_alloc_pgtable(cfg);
+ 	if (!data)
+ 		return NULL;
+ 
+diff --git a/drivers/iommu/io-pgtable.h b/drivers/iommu/io-pgtable.h
+index 4faee7d..d4f5027 100644
+--- a/drivers/iommu/io-pgtable.h
++++ b/drivers/iommu/io-pgtable.h
+@@ -47,10 +47,24 @@ struct iommu_gather_ops {
+  *                 page table walker.
+  */
+ struct io_pgtable_cfg {
+-	#define IO_PGTABLE_QUIRK_ARM_NS		BIT(0) /* Set NS bit in PTEs */
+-	#define IO_PGTABLE_QUIRK_NO_PERMS	BIT(1) /* No AP/XN bits */
+-	#define IO_PGTABLE_QUIRK_TLBI_ON_MAP	BIT(2) /* TLB Inv. on map */
+-	int				quirks;
++	/*
++	 * IO_PGTABLE_QUIRK_ARM_NS: (ARM formats) Set NS and NSTABLE bits in
++	 *	stage 1 PTEs, for hardware which insists on validating them
++	 *	even in	non-secure state where they should normally be ignored.
++	 *
++	 * IO_PGTABLE_QUIRK_NO_PERMS: Ignore the IOMMU_READ, IOMMU_WRITE and
++	 *	IOMMU_NOEXEC flags and map everything with full access, for
++	 *	hardware which does not implement the permissions of a given
++	 *	format, and/or requires some format-specific default value.
++	 *
++	 * IO_PGTABLE_QUIRK_TLBI_ON_MAP: If the format forbids caching invalid
++	 *	(unmapped) entries but the hardware might do so anyway, perform
++	 *	TLB maintenance when mapping as well as when unmapping.
++	 */
++	#define IO_PGTABLE_QUIRK_ARM_NS		BIT(0)
++	#define IO_PGTABLE_QUIRK_NO_PERMS	BIT(1)
++	#define IO_PGTABLE_QUIRK_TLBI_ON_MAP	BIT(2)
++	unsigned long			quirks;
+ 	unsigned long			pgsize_bitmap;
+ 	unsigned int			ias;
+ 	unsigned int			oas;
+-- 
+2.7.0.25.gfc10eb5.dirty
