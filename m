@@ -1,100 +1,131 @@
-From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Fri, 12 Feb 2016 20:43:40 +0300
-Subject: [PATCH v2 9/9] serial: pl011: use SPCR to setup 32-bit access
-In-Reply-To: <1455299022-11641-1-git-send-email-aleksey.makarov@linaro.org>
-References: <1455299022-11641-1-git-send-email-aleksey.makarov@linaro.org>
-Message-ID: <1455299022-11641-10-git-send-email-aleksey.makarov@linaro.org>
+From: yang.shi@linaro.org (Shi, Yang)
+Date: Fri, 12 Feb 2016 09:54:27 -0800
+Subject: [PATCH] arm64: make irq_stack_ptr more robust
+In-Reply-To: <56BE18AB.4090902@linaro.org>
+References: <1455227590-9837-1-git-send-email-yang.shi@linaro.org>
+ <56BDE260.20504@arm.com> <56BE18AB.4090902@linaro.org>
+Message-ID: <56BE1C53.8070605@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some implementations of ARM SBSA serial port hardware require that access
-to the registers should be 32-bit.  Unfortunately, the only way for
-the driver to tell if it's the case is to use the data from ACPI SPCR/DBG2
-tables.  In this case the value of the 'Interface Type' field of the SPCR
-table is ACPI_DBG2_ARM_SBSA_32BIT.
+On 2/12/2016 9:38 AM, Shi, Yang wrote:
+> On 2/12/2016 5:47 AM, James Morse wrote:
+>> Hi!
+>>
+>> On 11/02/16 21:53, Yang Shi wrote:
+>>> Switching between stacks is only valid if we are tracing ourselves
+>>> while on the
+>>> irq_stack, so it is only valid when in current and non-preemptible
+>>> context,
+>>> otherwise is is just zeroed off.
+>>
+>> Given it was picked up with CONFIG_DEBUG_PREEMPT:
+>>
+>> Fixes: 132cd887b5c5 ("arm64: Modify stack trace and dump for use with
+>> irq_stack")
+>
+> Wii add in v2.
+>
+>>
+>>
+>>> Signed-off-by: Yang Shi <yang.shi@linaro.org>
+>>> ---
+>>>   arch/arm64/kernel/stacktrace.c | 13 ++++++-------
+>>>   arch/arm64/kernel/traps.c      | 11 ++++++++++-
+>>>   2 files changed, 16 insertions(+), 8 deletions(-)
+>>>
+>>> diff --git a/arch/arm64/kernel/stacktrace.c
+>>> b/arch/arm64/kernel/stacktrace.c
+>>> index 12a18cb..d9751a4 100644
+>>> --- a/arch/arm64/kernel/stacktrace.c
+>>> +++ b/arch/arm64/kernel/stacktrace.c
+>>> @@ -44,14 +44,13 @@ int notrace unwind_frame(struct task_struct *tsk,
+>>> struct stackframe *frame)
+>>>       unsigned long irq_stack_ptr;
+>>>
+>>>       /*
+>>> -     * Use raw_smp_processor_id() to avoid false-positives from
+>>> -     * CONFIG_DEBUG_PREEMPT. get_wchan() calls unwind_frame() on
+>>> sleeping
+>>> -     * task stacks, we can be pre-empted in this case, so
+>>> -     * {raw_,}smp_processor_id() may give us the wrong value. Sleeping
+>>> -     * tasks can't ever be on an interrupt stack, so regardless of cpu,
+>>> -     * the checks will always fail.
+>>> +     * Switching between stacks is valid when tracing current and in
+>>> +     * non-preemptible context.
+>>>        */
+>>> -    irq_stack_ptr = IRQ_STACK_PTR(raw_smp_processor_id());
+>>> +    if (tsk == current && !preemptible())
+>>> +        irq_stack_ptr = IRQ_STACK_PTR(smp_processor_id());
+>>> +    else
+>>> +        irq_stack_ptr = 0;
+>>>
+>>>       low  = frame->sp;
+>>>       /* irq stacks are not THREAD_SIZE aligned */
+>>> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+>>> index cbedd72..7d8db3a 100644
+>>> --- a/arch/arm64/kernel/traps.c
+>>> +++ b/arch/arm64/kernel/traps.c
+>>> @@ -146,9 +146,18 @@ static void dump_instr(const char *lvl, struct
+>>> pt_regs *regs)
+>>>   static void dump_backtrace(struct pt_regs *regs, struct task_struct
+>>> *tsk)
+>>>   {
+>>>       struct stackframe frame;
+>>> -    unsigned long irq_stack_ptr = IRQ_STACK_PTR(smp_processor_id());
+>>> +    unsigned long irq_stack_ptr;
+>>>       int skip;
+>>>
+>>> +    /*
+>>> +     * Switching between  stacks is valid when tracing current and in
+>>
+>> Nit: Two spaces: "between[ ][ ]stacks"
+>
+> Will fix in v2.
+>
+>>
+>>
+>>> +     * non-preemptible context.
+>>> +     */
+>>> +    if (tsk == current && !preemptible())
+>>> +        irq_stack_ptr = IRQ_STACK_PTR(smp_processor_id());
+>>> +    else
+>>> +        irq_stack_ptr = 0;
+>>> +
+>>>       pr_debug("%s(regs = %p tsk = %p)\n", __func__, regs, tsk);
+>>>
+>>>       if (!tsk)
+>>>
+>>
+>> Neither file includes 'linux/preempt.h' for the definition of
+>> preemptible().
+>> (I can't talk: I should have included smp.h for smp_processor_id())
+>
+> I tried to build the kernel with preempt and without preempt, both
+> works. And, I saw arch/arm64/include/asm/Kbuild has:
+>
+> generic-y += preempt.h
+>
+> So, it sounds preempt.h has been included by default.
 
-How this value is described in the DBG2 spec:
-"(deprecated) ARM SBSA (2.x only) Generic UART supporting only
-32-bit accesses"
+In addition, linux/sched.h, which is included by both traps.c and 
+stacktrace.c, includes preempt.h already.
 
-Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
-Tested-by: Christopher Covington <cov@codeaurora.org>
----
- drivers/acpi/spcr.c             | 29 +++++++++++++++++++++++++++++
- drivers/tty/serial/amba-pl011.c |  2 ++
- include/linux/console.h         |  5 +++++
- 3 files changed, 36 insertions(+)
+Yang
 
-diff --git a/drivers/acpi/spcr.c b/drivers/acpi/spcr.c
-index 0475840..df1741f 100644
---- a/drivers/acpi/spcr.c
-+++ b/drivers/acpi/spcr.c
-@@ -75,3 +75,32 @@ int acpi_console_match(struct console *console, char **options)
- 
- 	return acpi_table_parse2(ACPI_SIG_SPCR, spcr_table_handler_match, &d);
- }
-+
-+static int spcr_table_handler_32_bit(struct acpi_table_header *t,
-+				     void *data)
-+{
-+	struct acpi_table_spcr *table = (struct acpi_table_spcr *)t;
-+
-+	return table->interface_type == ACPI_DBG2_ARM_SBSA_32BIT;
-+}
-+
-+/**
-+ * acpi_console_sbsa_32bit - Tell if SPCR specifies 32-bit SBSA.
-+ *
-+ * Some implementations of ARM SBSA serial port hardware require that access
-+ * to the registers should be 32-bit.  Unfortunately, the only way for
-+ * the driver to tell if it's the case is to use the data from ACPI SPCR/DBG2
-+ * tables.  In this case the value of the 'Interface Type' field of the SPCR
-+ * table is ACPI_DBG2_ARM_SBSA_32BIT.
-+ *
-+ * Return: true if access should be 32-bit wide.
-+ */
-+bool acpi_console_sbsa_32bit(void)
-+{
-+	if (acpi_disabled)
-+		return false;
-+
-+	return acpi_table_parse2(ACPI_SIG_SPCR,
-+				 spcr_table_handler_32_bit, NULL) > 0;
-+}
-+EXPORT_SYMBOL(acpi_console_sbsa_32bit);
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index f613bff..699a3ce 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -2563,6 +2563,8 @@ static int sbsa_uart_probe(struct platform_device *pdev)
- 		baudrate = 115200;
- 	}
- 
-+	vendor_sbsa.access_32b = acpi_console_sbsa_32bit();
-+
- 	portnr = pl011_find_free_port();
- 	if (portnr < 0)
- 		return portnr;
-diff --git a/include/linux/console.h b/include/linux/console.h
-index dcc2b59..027ef50 100644
---- a/include/linux/console.h
-+++ b/include/linux/console.h
-@@ -137,11 +137,16 @@ struct console {
- 
- #ifdef CONFIG_ACPI_SPCR_TABLE
- int acpi_console_match(struct console *c, char **options);
-+bool acpi_console_sbsa_32bit(void);
- #else
- static inline int acpi_console_match(struct console *c, char **options)
- {
- 	return -ENODEV;
- }
-+static inline bool acpi_console_sbsa_32bit(void)
-+{
-+	return false;
-+}
- #endif
- 
- /*
--- 
-2.7.0
+>
+> Thanks,
+> Yang
+>
+>>
+>>
+>> Acked-by: James Morse <james.morse@arm.com>
+>> Tested-by: James Morse <james.morse@arm.com>
+>>
+>>
+>> Thanks!
+>>
+>> James
+>>
+>>
+>
