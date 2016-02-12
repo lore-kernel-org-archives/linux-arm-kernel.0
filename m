@@ -1,47 +1,46 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 12 Feb 2016 13:06:43 +0100
-Subject: [PATCH v2] ARM: vmlinux-xip.lds: assert that ROM and RAM don't overlap
-Message-ID: <1455278803-27679-1-git-send-email-ard.biesheuvel@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 12 Feb 2016 13:04:40 +0100
+Subject: [PATCH] xen kconfig: clarify INPUT_XEN_KBDDEV_FRONTEND select
+Message-ID: <1455278707-2008263-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When building an XIP kernel, the linker produces two disjoint VMA regions,
-where the first is mapped onto ROM and the second onto RAM. For this reason,
-the linker output pointer '.' is updated halfway through the linker script,
-and set to a value that corresponds with the start of the RAM region.
+The Xen framebuffer driver selects the xen keyboard driver, so the latter
+will be built-in if XEN_FBDEV_FRONTEND=y. However, when CONFIG_INPUT
+is a loadable module, this configuration cannot work. On mainline kernels,
+the symbol will be enabled but not used, while in combination with
+a patch I have to detect such useless configurations, we get the
+expected link failure:
 
-However, in some cases, the ROM region exceeds the expected size, and the
-assignment of the output pointer results in a decrement rather than an
-increment, causing the virtual addresses of the .data region to clash with
-the .text region. Such a kernel cannot boot normally, but it also confuses
-the hell out of kallsyms, since .data symbols may appear inside the
-[_stext, _etext] or [_sinittext, _einittext] intervals in the first pass,
-but not in the second (or vice versa), resulting in inconsistent kallsyms
-data.
+drivers/input/built-in.o: In function `xenkbd_remove':
+xen-kbdfront.c:(.text+0x2f0): undefined reference to `input_unregister_device'
+xen-kbdfront.c:(.text+0x30e): undefined reference to `input_unregister_device'
 
-So let's make sure that the output pointer only advances, and never jumps
-back into the ROM region.
+This changes the dependencies of XEN_FBDEV_FRONTEND so it cannot be
+built-in if CONFIG_INPUT=m && CONFIG_INPUT_MISC=y, as that would result
+in the broken select.
 
-Cc: Chris Brandt <Chris.Brandt@renesas.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+As usual, we would be much better off without the 'select', but removing
+it now would likely break existing user configurations that depend on
+it, so this adds another hack on top to get it working.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 36c1132e34bd ("xen kconfig: fix select INPUT_XEN_KBDDEV_FRONTEND")
 ---
-v2: rebased onto the split off XIP linker script
-
- arch/arm/kernel/vmlinux-xip.lds.S | 1 +
+ drivers/video/fbdev/Kconfig | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/kernel/vmlinux-xip.lds.S b/arch/arm/kernel/vmlinux-xip.lds.S
-index 40bc4cadb959..07c642cff50e 100644
---- a/arch/arm/kernel/vmlinux-xip.lds.S
-+++ b/arch/arm/kernel/vmlinux-xip.lds.S
-@@ -213,6 +213,7 @@ SECTIONS
- 
- 	_exiprom = .;			/* End of XIP ROM area */
- 	__data_loc = ALIGN(4);		/* location in binary */
-+	ASSERT(. < PAGE_OFFSET + TEXT_OFFSET, "XIP_KERNEL: ROM and RAM overlap")
- 	. = PAGE_OFFSET + TEXT_OFFSET;
- 
- 	.data : AT(__data_loc) {
+diff --git a/drivers/video/fbdev/Kconfig b/drivers/video/fbdev/Kconfig
+index 8ea45a5cd806..fd3d6fd290a9 100644
+--- a/drivers/video/fbdev/Kconfig
++++ b/drivers/video/fbdev/Kconfig
+@@ -2241,6 +2241,7 @@ config FB_VIRTUAL
+ config XEN_FBDEV_FRONTEND
+ 	tristate "Xen virtual frame buffer support"
+ 	depends on FB && XEN
++	depends on INPUT || !INPUT_MISC
+ 	select FB_SYS_FILLRECT
+ 	select FB_SYS_COPYAREA
+ 	select FB_SYS_IMAGEBLIT
 -- 
-2.5.0
+2.7.0
