@@ -1,107 +1,204 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 12 Feb 2016 12:25:49 +0530
-Subject: [PATCH v3 3/3] pci: dra7xx: use pdata callbacks to perform reset
-In-Reply-To: <56BCF256.8010903@ti.com>
-References: <1452780672-14339-1-git-send-email-kishon@ti.com>
- <1452780672-14339-4-git-send-email-kishon@ti.com>
- <20160127173104.GQ19432@atomide.com> <56A90971.4020409@ti.com>
- <20160127185649.GV19432@atomide.com> <56A94FB7.6020903@ti.com>
- <20160128183156.GH19432@atomide.com> <56B087AD.4000505@ti.com>
- <alpine.DEB.2.02.1602080208070.2182@utopia.booyaka.com>
- <56B900E9.9040306@ti.com>
- <alpine.DEB.2.02.1602090846480.2906@utopia.booyaka.com>
- <56BA2495.9020407@ti.com>
- <alpine.DEB.2.02.1602091932160.2906@utopia.booyaka.com>
- <56BA958A.1020503@ti.com> <56BACCDB.2070507@ti.com> <56BCF256.8010903@ti.com>
-Message-ID: <56BD81F5.8090404@ti.com>
+From: shaun.ren@linux.com (Shaun Ren)
+Date: Thu, 11 Feb 2016 22:56:08 -0800
+Subject: [PATCH v5 2/8] Staging: rts5208: rtsx_transport.c: Align to open
+ parenthesis
+In-Reply-To: <1455251535.13149.7.camel@perches.com>
+References: <1455251535.13149.7.camel@perches.com>
+Message-ID: <1455260168-16980-1-git-send-email-shaun.ren@linux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suman,
+This patch fixes the alignment issue reported by checkpatch.pl:
 
-On Friday 12 February 2016 02:13 AM, Suman Anna wrote:
-> On 02/09/2016 11:38 PM, Kishon Vijay Abraham I wrote:
->> Hi,
->>
->> On Wednesday 10 February 2016 07:12 AM, Suman Anna wrote:
->>> Hi Paul,
->>>
->>> On 02/09/2016 01:36 PM, Paul Walmsley wrote:
->>>> Hi Suman 
->>>>
->>>> On Tue, 9 Feb 2016, Suman Anna wrote:
->>>>
->>>>> On 02/09/2016 02:49 AM, Paul Walmsley wrote:
->>>>>> On Mon, 8 Feb 2016, Suman Anna wrote:
->>>>>>> On 02/07/2016 08:48 PM, Paul Walmsley wrote:
->>>>>>>> On Tue, 2 Feb 2016, Kishon Vijay Abraham I wrote:
->>>>>>>>
->>>>>>>>> Paul, what do you think is the best way forward to perform reset?
->>>>>>>>
->>>>>>>> Many of the IP blocks with PRM hardreset lines are processor IP blocks. 
->>>>>>>> Those often need special reset handling to ensure that WFI/HLT-like 
->>>>>>>> instructions are executed after reset.  This special handling ensures that 
->>>>>>>> the IP blocks' bus initiator interfaces indicate that they are in standby 
->>>>>>>> to the PRCM - thus allowing power management for the rest of the chip to 
->>>>>>>> work correctly.
->>>>>>>>
->>>>>>>> But that doesn't seem to be the case with PCIe - and maybe others - 
->>>>>>>> possibly some of the MMUs?  
->>>>>>>
->>>>>>> Yeah, the sequencing between clocks and resets would still be the same
->>>>>>> for MMUs, so, adding the custom flags for MMUs is fine.
->>>>>>
->>>>>> I'm curious as to whether HWMOD_CUSTOM_HARDRESET is needed for the MMUs.  
->>>>>> We've stated that the main point of the custom hardreset code is to handle 
->>>>>> processors that need to be placed into WFI/HLT, but it doesn't seem like 
->>>>>> there would be an equivalent for MMUs.  Thoughts?
->>>>>
->>>>> The current OMAP IOMMU code already leverages the pdata ops for
->>>>> performing the resets, so not adding the flags would also require
->>>>> additional changes in the driver.
->>>>>
->>>>> Also, the reset lines controlling the MMUs actually also manage the
->>>>> reset for all the other sub-modules other than the processor cores
->>>>> within the sub-systems. We have currently different issues (see [1] for
->>>>> eg. around the IPU sub-system entering RET in between), so from a PM
->>>>> point of view, we do prefer to place the MMUs also in reset when we are
->>>>> runtime suspended.
->>>>
->>>> Should we reassert hardreset in _idle() for IP blocks that don't have 
->>>> HWMOD_CUSTOM_HARDRESET set on them?  Would that allow us to use this 
->>>> mechanism for the uncore hardreset lines, or are there other quirks?
->>>>
->>>> Also - would that address the potential issue that you mentioned with the 
->>>> PCIe block, or is that a different issue?
->>>
->>> Yeah, I think that would address the PCIe block issue in terms of reset
->>> state balancing between pm_runtime_get_sync() and pm_runtime_put()
->>> calls. Right now, they are unbalanced. The PCIe block is using these
->>> only in probe and remove, so it should work for that IP.
->>
->> As I mentioned before this would result in undesired behavior during
->> suspend/resume cycle in PCIe. (This should be okay for the current mainline
->> code but would break once we add suspend/resume support for PCIe).
-> 
-> Yeah, I was wondering if some peripheral would want only the clock to be
-> controlled during _idle() and not reset. Even then for the PCIe case
-> that you are talking about, going through a pm_runtime_get_sync(),
-> pm_runtime_put_sync()/pm_runtime_put() deasserts the resets everytime
+CHECK: Alignment should match open parenthesis
 
-right. But it'll deassert a line which is already deasserted. So it actually
-doesn't do a reset again.
-> _enable() is called. Right now, the code block has ignored the return
-> value from the _hardreset_deassert(), but if you check it and bail out,
-> then your get_sync() would start failing from the second invocation.
+Add a unsigned char *sgbuffer in rtsx_stor_access_xfer_buffer to make the
+following memcpy logic easier to read.
 
-hmm.. yeah.
-> 
-> Can you elaborate more on what kind of issues you will see on
-> suspend/resume cycle with PCIe? Do note that _idle() gets called through
+Add a struct scatterlist *sg in the use_sg branch of
+rtsx_transfer_data_partial to make the parameters of the
+rtsx_transfer_sglist_adma_partial call fit in 80 character lines after
+aligning them to the open parenthesis.
 
-At this point there are other issues w.r.t suspend/resume in PCI-dra7xx but as
-such reset of the controller is not desired during suspend/resume cycle and
-it'll result in the register contents being reset (haven't tested it though).
+Refactor memcpy logic in rtsx_stor_access_xfer_buf to make it more legible.
 
-Thanks
-Kishon
+Signed-off-by: Shaun Ren <shaun.ren@linux.com>
+---
+ drivers/staging/rts5208/rtsx_transport.c | 69 +++++++++++++++++++-------------
+Changes since v3
+  * Fixed misalignment of the last parameter of rtsx_stor_access_xfer_buf()
+  * Refactored memcpy in rtsx_stor_access_xfer_buf() for legibility
+
+ 1 file changed, 41 insertions(+), 28 deletions(-)
+
+diff --git a/drivers/staging/rts5208/rtsx_transport.c b/drivers/staging/rts5208/rtsx_transport.c
+index 91fdccf..b6de93f 100644
+--- a/drivers/staging/rts5208/rtsx_transport.c
++++ b/drivers/staging/rts5208/rtsx_transport.c
+@@ -42,22 +42,28 @@
+  */
+ 
+ unsigned int rtsx_stor_access_xfer_buf(unsigned char *buffer,
+-	unsigned int buflen, struct scsi_cmnd *srb, unsigned int *index,
+-	unsigned int *offset, enum xfer_buf_dir dir)
++				       unsigned int buflen,
++				       struct scsi_cmnd *srb,
++				       unsigned int *index,
++				       unsigned int *offset,
++				       enum xfer_buf_dir dir)
+ {
+ 	unsigned int cnt;
+ 
+ 	/* If not using scatter-gather, just transfer the data directly. */
+ 	if (scsi_sg_count(srb) == 0) {
++		unsigned char *sgbuffer;
++
+ 		if (*offset >= scsi_bufflen(srb))
+ 			return 0;
+ 		cnt = min(buflen, scsi_bufflen(srb) - *offset);
++
++		sgbuffer = (unsigned char *)scsi_sglist(srb) + *offset;
++
+ 		if (dir == TO_XFER_BUF)
+-			memcpy((unsigned char *) scsi_sglist(srb) + *offset,
+-					buffer, cnt);
++			memcpy(sgbuffer, buffer, cnt);
+ 		else
+-			memcpy(buffer, (unsigned char *) scsi_sglist(srb) +
+-					*offset, cnt);
++			memcpy(buffer, sgbuffer, cnt);
+ 		*offset += cnt;
+ 
+ 	/*
+@@ -126,7 +132,7 @@ unsigned int rtsx_stor_access_xfer_buf(unsigned char *buffer,
+  * SCSI residue.
+  */
+ void rtsx_stor_set_xfer_buf(unsigned char *buffer,
+-	unsigned int buflen, struct scsi_cmnd *srb)
++			    unsigned int buflen, struct scsi_cmnd *srb)
+ {
+ 	unsigned int index = 0, offset = 0;
+ 
+@@ -137,7 +143,7 @@ void rtsx_stor_set_xfer_buf(unsigned char *buffer,
+ }
+ 
+ void rtsx_stor_get_xfer_buf(unsigned char *buffer,
+-	unsigned int buflen, struct scsi_cmnd *srb)
++			    unsigned int buflen, struct scsi_cmnd *srb)
+ {
+ 	unsigned int index = 0, offset = 0;
+ 
+@@ -191,8 +197,8 @@ void rtsx_invoke_transport(struct scsi_cmnd *srb, struct rtsx_chip *chip)
+ 		/* set the result so the higher layers expect this data */
+ 		srb->result = SAM_STAT_CHECK_CONDITION;
+ 		memcpy(srb->sense_buffer,
+-			(unsigned char *)&(chip->sense_buffer[SCSI_LUN(srb)]),
+-			sizeof(struct sense_data_t));
++		       (unsigned char *)&(chip->sense_buffer[SCSI_LUN(srb)]),
++		       sizeof(struct sense_data_t));
+ 	}
+ 
+ 	return;
+@@ -202,7 +208,7 @@ Handle_Errors:
+ }
+ 
+ void rtsx_add_cmd(struct rtsx_chip *chip,
+-		u8 cmd_type, u16 reg_addr, u8 mask, u8 data)
++		  u8 cmd_type, u16 reg_addr, u8 mask, u8 data)
+ {
+ 	u32 *cb = (u32 *)(chip->host_cmds_ptr);
+ 	u32 val = 0;
+@@ -321,9 +327,11 @@ static inline void rtsx_add_sg_tbl(
+ }
+ 
+ static int rtsx_transfer_sglist_adma_partial(struct rtsx_chip *chip, u8 card,
+-		struct scatterlist *sg, int num_sg, unsigned int *index,
+-		unsigned int *offset, int size,
+-		enum dma_data_direction dma_dir, int timeout)
++					     struct scatterlist *sg, int num_sg,
++					     unsigned int *index,
++					     unsigned int *offset, int size,
++					     enum dma_data_direction dma_dir,
++					     int timeout)
+ {
+ 	struct rtsx_dev *rtsx = chip->rtsx;
+ 	struct completion trans_done;
+@@ -486,8 +494,9 @@ out:
+ }
+ 
+ static int rtsx_transfer_sglist_adma(struct rtsx_chip *chip, u8 card,
+-		struct scatterlist *sg, int num_sg,
+-		enum dma_data_direction dma_dir, int timeout)
++				     struct scatterlist *sg, int num_sg,
++				     enum dma_data_direction dma_dir,
++				     int timeout)
+ {
+ 	struct rtsx_dev *rtsx = chip->rtsx;
+ 	struct completion trans_done;
+@@ -633,7 +642,8 @@ out:
+ }
+ 
+ static int rtsx_transfer_buf(struct rtsx_chip *chip, u8 card, void *buf,
+-		size_t len, enum dma_data_direction dma_dir, int timeout)
++			     size_t len, enum dma_data_direction dma_dir,
++			     int timeout)
+ {
+ 	struct rtsx_dev *rtsx = chip->rtsx;
+ 	struct completion trans_done;
+@@ -716,9 +726,9 @@ out:
+ }
+ 
+ int rtsx_transfer_data_partial(struct rtsx_chip *chip, u8 card,
+-		void *buf, size_t len, int use_sg, unsigned int *index,
+-		unsigned int *offset, enum dma_data_direction dma_dir,
+-		int timeout)
++			       void *buf, size_t len, int use_sg,
++			       unsigned int *index, unsigned int *offset,
++			       enum dma_data_direction dma_dir, int timeout)
+ {
+ 	int err = 0;
+ 
+@@ -726,13 +736,16 @@ int rtsx_transfer_data_partial(struct rtsx_chip *chip, u8 card,
+ 	if (rtsx_chk_stat(chip, RTSX_STAT_ABORT))
+ 		return -EIO;
+ 
+-	if (use_sg)
+-		err = rtsx_transfer_sglist_adma_partial(chip, card,
+-				(struct scatterlist *)buf, use_sg,
+-				index, offset, (int)len, dma_dir, timeout);
+-	else
++	if (use_sg) {
++		struct scatterlist *sg = (struct scatterlist *)buf;
++
++		err = rtsx_transfer_sglist_adma_partial(chip, card, sg, use_sg,
++							index, offset, (int)len,
++							dma_dir, timeout);
++	} else {
+ 		err = rtsx_transfer_buf(chip, card,
+ 					buf, len, dma_dir, timeout);
++	}
+ 	if (err < 0) {
+ 		if (RTSX_TST_DELINK(chip)) {
+ 			RTSX_CLR_DELINK(chip);
+@@ -745,7 +758,7 @@ int rtsx_transfer_data_partial(struct rtsx_chip *chip, u8 card,
+ }
+ 
+ int rtsx_transfer_data(struct rtsx_chip *chip, u8 card, void *buf, size_t len,
+-		int use_sg, enum dma_data_direction dma_dir, int timeout)
++		       int use_sg, enum dma_data_direction dma_dir, int timeout)
+ {
+ 	int err = 0;
+ 
+@@ -757,8 +770,8 @@ int rtsx_transfer_data(struct rtsx_chip *chip, u8 card, void *buf, size_t len,
+ 
+ 	if (use_sg) {
+ 		err = rtsx_transfer_sglist_adma(chip, card,
+-				(struct scatterlist *)buf,
+-				use_sg, dma_dir, timeout);
++						(struct scatterlist *)buf,
++						use_sg, dma_dir, timeout);
+ 	} else {
+ 		err = rtsx_transfer_buf(chip, card, buf, len, dma_dir, timeout);
+ 	}
+-- 
+2.7.0
