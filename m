@@ -1,170 +1,203 @@
 From: shaun.ren@linux.com (Shaun Ren)
-Date: Thu, 11 Feb 2016 20:07:53 -0800
-Subject: [PATCH v4 1/8] Staging: rts5208: rtsx_transport.c: Cleanup comments
+Date: Thu, 11 Feb 2016 20:07:54 -0800
+Subject: [PATCH v4 2/8] Staging: rts5208: rtsx_transport.c: Align to open
+ parenthesis
 In-Reply-To: <1455250080-9897-1-git-send-email-shaun.ren@linux.com>
 References: <1455072328-7033-1-git-send-email-shaun.ren@linux.com>
  <1455250080-9897-1-git-send-email-shaun.ren@linux.com>
-Message-ID: <1455250080-9897-2-git-send-email-shaun.ren@linux.com>
+Message-ID: <1455250080-9897-3-git-send-email-shaun.ren@linux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes all multiline comments to conform to the coding style,
-which states that multiline comments should start with "/*" and end
-with "*/" on a separate line.
+This patch fixes the alignment issue reported by checkpatch.pl:
 
-Also cleans up some comments to make them more clear and/or reflect what
-the code is doing.
+CHECK: Alignment should match open parenthesis
+
+Add a unsigned char *sgbuffer in rtsx_stor_access_xfer_buffer to make the
+following memcpy logic easier to read.
+
+Add a struct scatterlist *sg in the use_sg branch of
+rtsx_transfer_data_partial to make the parameters of the
+rtsx_transfer_sglist_adma_partial call fit in 80 character lines after
+aligning them to the open parenthesis.
+
+Refactor memcpy logic in rtsx_stor_access_xfer_buf to make it more legible.
 
 Signed-off-by: Shaun Ren <shaun.ren@linux.com>
 ---
 Changes since v3
- * Removed the extraneous SCSI comment in the first patch in
-   rtsx_stor_access_xfer_buf()
+  * Fixed misalignment of the last parameter of rtsx_stor_access_xfer_buf()
+  * Refactored memcpy in rtsx_stor_access_xfer_buf() for legibility
 
-Changes since v2
- * Cleaned up comments as per Joshua Clayton's suggestions
-
- drivers/staging/rts5208/rtsx_transport.c | 53 ++++++++++++++++----------------
- 1 file changed, 27 insertions(+), 26 deletions(-)
+ drivers/staging/rts5208/rtsx_transport.c | 68 +++++++++++++++++++-------------
+ 1 file changed, 40 insertions(+), 28 deletions(-)
 
 diff --git a/drivers/staging/rts5208/rtsx_transport.c b/drivers/staging/rts5208/rtsx_transport.c
-index f2eb18e..91fdccf 100644
+index 91fdccf..1a4da89 100644
 --- a/drivers/staging/rts5208/rtsx_transport.c
 +++ b/drivers/staging/rts5208/rtsx_transport.c
-@@ -1,4 +1,5 @@
--/* Driver for Realtek PCI-Express card reader
-+/*
-+ * Driver for Realtek PCI-Express card reader
-  *
-  * Copyright(c) 2009-2013 Realtek Semiconductor Corp. All rights reserved.
-  *
-@@ -30,13 +31,15 @@
-  * Scatter-gather transfer buffer access routines
-  ***********************************************************************/
- 
--/* Copy a buffer of length buflen to/from the srb's transfer buffer.
-+/*
-+ * Copy a buffer of length buflen to/from the srb's transfer buffer.
-  * (Note: for scatter-gather transfers (srb->use_sg > 0), srb->request_buffer
-  * points to a list of s-g entries and we ignore srb->request_bufflen.
-  * For non-scatter-gather transfers, srb->request_buffer points to the
-  * transfer buffer itself and srb->request_bufflen is the buffer's length.)
-  * Update the *index and *offset variables so that the next copy will
-- * pick up from where this one left off. */
-+ * pick up from where this one left off.
-+ */
+@@ -42,8 +42,11 @@
+  */
  
  unsigned int rtsx_stor_access_xfer_buf(unsigned char *buffer,
- 	unsigned int buflen, struct scsi_cmnd *srb, unsigned int *index,
-@@ -44,8 +47,7 @@ unsigned int rtsx_stor_access_xfer_buf(unsigned char *buffer,
+-	unsigned int buflen, struct scsi_cmnd *srb, unsigned int *index,
+-	unsigned int *offset, enum xfer_buf_dir dir)
++				       unsigned int buflen,
++				       struct scsi_cmnd *srb,
++				       unsigned int *index,
++				       unsigned int *offset,
++				       enum xfer_buf_dir dir)
  {
  	unsigned int cnt;
  
--	/* If not using scatter-gather, just transfer the data directly.
--	 * Make certain it will fit in the available buffer space. */
-+	/* If not using scatter-gather, just transfer the data directly. */
- 	if (scsi_sg_count(srb) == 0) {
+@@ -52,12 +55,14 @@ unsigned int rtsx_stor_access_xfer_buf(unsigned char *buffer,
  		if (*offset >= scsi_bufflen(srb))
  			return 0;
-@@ -58,22 +60,22 @@ unsigned int rtsx_stor_access_xfer_buf(unsigned char *buffer,
- 					*offset, cnt);
+ 		cnt = min(buflen, scsi_bufflen(srb) - *offset);
++
++		unsigned char *sgbuffer = (unsigned char *)scsi_sglist(srb) +
++			*offset;
++
+ 		if (dir == TO_XFER_BUF)
+-			memcpy((unsigned char *) scsi_sglist(srb) + *offset,
+-					buffer, cnt);
++			memcpy(sgbuffer, buffer, cnt);
+ 		else
+-			memcpy(buffer, (unsigned char *) scsi_sglist(srb) +
+-					*offset, cnt);
++			memcpy(buffer, sgbuffer, cnt);
  		*offset += cnt;
  
--	/* Using scatter-gather.  We have to go through the list one entry
-+	/*
-+	 * Using scatter-gather.  We have to go through the list one entry
- 	 * at a time.  Each s-g entry contains some number of pages, and
--	 * each page has to be kmap()'ed separately.  If the page is already
--	 * in kernel-addressable memory then kmap() will return its address.
--	 * If the page is not directly accessible -- such as a user buffer
--	 * located in high memory -- then kmap() will map it to a temporary
--	 * position in the kernel's virtual address space. */
-+	 * each page has to be kmap()'ed separately.
-+	 */
- 	} else {
- 		struct scatterlist *sg =
- 				(struct scatterlist *) scsi_sglist(srb)
- 				+ *index;
- 
--		/* This loop handles a single s-g list entry, which may
-+		/*
-+		 * This loop handles a single s-g list entry, which may
- 		 * include multiple pages.  Find the initial page structure
- 		 * and the starting offset within the page, and update
--		 * the *offset and *index values for the next loop. */
-+		 * the *offset and *index values for the next loop.
-+		 */
- 		cnt = 0;
- 		while (cnt < buflen && *index < scsi_sg_count(srb)) {
- 			struct page *page = sg_page(sg) +
-@@ -95,9 +97,6 @@ unsigned int rtsx_stor_access_xfer_buf(unsigned char *buffer,
- 				++sg;
- 			}
- 
--			/* Transfer the data for all the pages in this
--			 * s-g entry.  For each page: call kmap(), do the
--			 * transfer, and call kunmap() immediately after. */
- 			while (sglen > 0) {
- 				unsigned int plen = min(sglen, (unsigned int)
- 						PAGE_SIZE - poff);
-@@ -122,8 +121,10 @@ unsigned int rtsx_stor_access_xfer_buf(unsigned char *buffer,
- 	return cnt;
- }
- 
--/* Store the contents of buffer into srb's transfer buffer and set the
--* SCSI residue. */
-+/*
-+ * Store the contents of buffer into srb's transfer buffer and set the
-+ * SCSI residue.
-+ */
- void rtsx_stor_set_xfer_buf(unsigned char *buffer,
- 	unsigned int buflen, struct scsi_cmnd *srb)
- {
-@@ -151,7 +152,8 @@ void rtsx_stor_get_xfer_buf(unsigned char *buffer,
-  * Transport routines
-  ***********************************************************************/
- 
--/* Invoke the transport and basic error-handling/recovery methods
-+/*
-+ * Invoke the transport and basic error-handling/recovery methods
-  *
-  * This is used to send the message to the device and receive the response.
+ 	/*
+@@ -126,7 +131,7 @@ unsigned int rtsx_stor_access_xfer_buf(unsigned char *buffer,
+  * SCSI residue.
   */
-@@ -161,8 +163,9 @@ void rtsx_invoke_transport(struct scsi_cmnd *srb, struct rtsx_chip *chip)
+ void rtsx_stor_set_xfer_buf(unsigned char *buffer,
+-	unsigned int buflen, struct scsi_cmnd *srb)
++			    unsigned int buflen, struct scsi_cmnd *srb)
+ {
+ 	unsigned int index = 0, offset = 0;
  
- 	result = rtsx_scsi_handler(srb, chip);
- 
--	/* if the command gets aborted by the higher layers, we need to
--	 * short-circuit all other processing
-+	/*
-+	 * if the command gets aborted by the higher layers, we need to
-+	 * short-circuit all other processing.
- 	 */
- 	if (rtsx_chk_stat(chip, RTSX_STAT_ABORT)) {
- 		dev_dbg(rtsx_dev(chip), "-- command was aborted\n");
-@@ -194,9 +197,6 @@ void rtsx_invoke_transport(struct scsi_cmnd *srb, struct rtsx_chip *chip)
- 
- 	return;
- 
--	/* Error and abort processing: try to resynchronize with the device
--	 * by issuing a port reset.  If that fails, try a class-specific
--	 * device reset. */
- Handle_Errors:
- 	return;
+@@ -137,7 +142,7 @@ void rtsx_stor_set_xfer_buf(unsigned char *buffer,
  }
-@@ -368,10 +368,11 @@ static int rtsx_transfer_sglist_adma_partial(struct rtsx_chip *chip, u8 card,
- 	resid = size;
- 	sg_ptr = sg;
- 	chip->sgi = 0;
--	/* Usually the next entry will be @sg@ + 1, but if this sg element
-+	/*
-+	 * Usually the next entry will be @sg@ + 1, but if this sg element
- 	 * is part of a chained scatterlist, it could jump to the start of
- 	 * a new scatterlist array. So here we use sg_next to move to
--	 * the proper sg
-+	 * the proper sg.
- 	 */
- 	for (i = 0; i < *index; i++)
- 		sg_ptr = sg_next(sg_ptr);
+ 
+ void rtsx_stor_get_xfer_buf(unsigned char *buffer,
+-	unsigned int buflen, struct scsi_cmnd *srb)
++			    unsigned int buflen, struct scsi_cmnd *srb)
+ {
+ 	unsigned int index = 0, offset = 0;
+ 
+@@ -191,8 +196,8 @@ void rtsx_invoke_transport(struct scsi_cmnd *srb, struct rtsx_chip *chip)
+ 		/* set the result so the higher layers expect this data */
+ 		srb->result = SAM_STAT_CHECK_CONDITION;
+ 		memcpy(srb->sense_buffer,
+-			(unsigned char *)&(chip->sense_buffer[SCSI_LUN(srb)]),
+-			sizeof(struct sense_data_t));
++		       (unsigned char *)&(chip->sense_buffer[SCSI_LUN(srb)]),
++		       sizeof(struct sense_data_t));
+ 	}
+ 
+ 	return;
+@@ -202,7 +207,7 @@ Handle_Errors:
+ }
+ 
+ void rtsx_add_cmd(struct rtsx_chip *chip,
+-		u8 cmd_type, u16 reg_addr, u8 mask, u8 data)
++		  u8 cmd_type, u16 reg_addr, u8 mask, u8 data)
+ {
+ 	u32 *cb = (u32 *)(chip->host_cmds_ptr);
+ 	u32 val = 0;
+@@ -321,9 +326,11 @@ static inline void rtsx_add_sg_tbl(
+ }
+ 
+ static int rtsx_transfer_sglist_adma_partial(struct rtsx_chip *chip, u8 card,
+-		struct scatterlist *sg, int num_sg, unsigned int *index,
+-		unsigned int *offset, int size,
+-		enum dma_data_direction dma_dir, int timeout)
++					     struct scatterlist *sg, int num_sg,
++					     unsigned int *index,
++					     unsigned int *offset, int size,
++					     enum dma_data_direction dma_dir,
++					     int timeout)
+ {
+ 	struct rtsx_dev *rtsx = chip->rtsx;
+ 	struct completion trans_done;
+@@ -486,8 +493,9 @@ out:
+ }
+ 
+ static int rtsx_transfer_sglist_adma(struct rtsx_chip *chip, u8 card,
+-		struct scatterlist *sg, int num_sg,
+-		enum dma_data_direction dma_dir, int timeout)
++				     struct scatterlist *sg, int num_sg,
++				     enum dma_data_direction dma_dir,
++				     int timeout)
+ {
+ 	struct rtsx_dev *rtsx = chip->rtsx;
+ 	struct completion trans_done;
+@@ -633,7 +641,8 @@ out:
+ }
+ 
+ static int rtsx_transfer_buf(struct rtsx_chip *chip, u8 card, void *buf,
+-		size_t len, enum dma_data_direction dma_dir, int timeout)
++			     size_t len, enum dma_data_direction dma_dir,
++			     int timeout)
+ {
+ 	struct rtsx_dev *rtsx = chip->rtsx;
+ 	struct completion trans_done;
+@@ -716,9 +725,9 @@ out:
+ }
+ 
+ int rtsx_transfer_data_partial(struct rtsx_chip *chip, u8 card,
+-		void *buf, size_t len, int use_sg, unsigned int *index,
+-		unsigned int *offset, enum dma_data_direction dma_dir,
+-		int timeout)
++			       void *buf, size_t len, int use_sg,
++			       unsigned int *index, unsigned int *offset,
++			       enum dma_data_direction dma_dir, int timeout)
+ {
+ 	int err = 0;
+ 
+@@ -726,13 +735,16 @@ int rtsx_transfer_data_partial(struct rtsx_chip *chip, u8 card,
+ 	if (rtsx_chk_stat(chip, RTSX_STAT_ABORT))
+ 		return -EIO;
+ 
+-	if (use_sg)
+-		err = rtsx_transfer_sglist_adma_partial(chip, card,
+-				(struct scatterlist *)buf, use_sg,
+-				index, offset, (int)len, dma_dir, timeout);
+-	else
++	if (use_sg) {
++		struct scatterlist *sg = (struct scatterlist *)buf;
++
++		err = rtsx_transfer_sglist_adma_partial(chip, card, sg, use_sg,
++							index, offset, (int)len,
++							dma_dir, timeout);
++	} else {
+ 		err = rtsx_transfer_buf(chip, card,
+ 					buf, len, dma_dir, timeout);
++	}
+ 	if (err < 0) {
+ 		if (RTSX_TST_DELINK(chip)) {
+ 			RTSX_CLR_DELINK(chip);
+@@ -745,7 +757,7 @@ int rtsx_transfer_data_partial(struct rtsx_chip *chip, u8 card,
+ }
+ 
+ int rtsx_transfer_data(struct rtsx_chip *chip, u8 card, void *buf, size_t len,
+-		int use_sg, enum dma_data_direction dma_dir, int timeout)
++		       int use_sg, enum dma_data_direction dma_dir, int timeout)
+ {
+ 	int err = 0;
+ 
+@@ -757,8 +769,8 @@ int rtsx_transfer_data(struct rtsx_chip *chip, u8 card, void *buf, size_t len,
+ 
+ 	if (use_sg) {
+ 		err = rtsx_transfer_sglist_adma(chip, card,
+-				(struct scatterlist *)buf,
+-				use_sg, dma_dir, timeout);
++						(struct scatterlist *)buf,
++						use_sg, dma_dir, timeout);
+ 	} else {
+ 		err = rtsx_transfer_buf(chip, card, buf, len, dma_dir, timeout);
+ 	}
 -- 
 2.7.0
