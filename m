@@ -1,204 +1,44 @@
-From: shaun.ren@linux.com (Shaun Ren)
-Date: Thu, 11 Feb 2016 22:56:08 -0800
-Subject: [PATCH v5 2/8] Staging: rts5208: rtsx_transport.c: Align to open
- parenthesis
-In-Reply-To: <1455251535.13149.7.camel@perches.com>
-References: <1455251535.13149.7.camel@perches.com>
-Message-ID: <1455260168-16980-1-git-send-email-shaun.ren@linux.com>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Fri, 12 Feb 2016 08:11:33 +0100
+Subject: [PATCH] ARM: imx: Do L2 errata only if the L2 cache isn't enabled
+Message-ID: <1455261093-11849-1-git-send-email-dirk.behme@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the alignment issue reported by checkpatch.pl:
+All the generic L2 cache handling code is encapsulated by a
+check if the L2 cache is enabled. If it's enabled already, the code
+is skipped.
 
-CHECK: Alignment should match open parenthesis
+For the i.MX6 specific L2 cache handling we missed this check.
+Add it.
 
-Add a unsigned char *sgbuffer in rtsx_stor_access_xfer_buffer to make the
-following memcpy logic easier to read.
-
-Add a struct scatterlist *sg in the use_sg branch of
-rtsx_transfer_data_partial to make the parameters of the
-rtsx_transfer_sglist_adma_partial call fit in 80 character lines after
-aligning them to the open parenthesis.
-
-Refactor memcpy logic in rtsx_stor_access_xfer_buf to make it more legible.
-
-Signed-off-by: Shaun Ren <shaun.ren@linux.com>
+Signed-off-by: Marcel Grosshans <MarcelViktor.Grosshans@de.bosch.com>
+Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
 ---
- drivers/staging/rts5208/rtsx_transport.c | 69 +++++++++++++++++++-------------
-Changes since v3
-  * Fixed misalignment of the last parameter of rtsx_stor_access_xfer_buf()
-  * Refactored memcpy in rtsx_stor_access_xfer_buf() for legibility
+ arch/arm/mach-imx/system.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
- 1 file changed, 41 insertions(+), 28 deletions(-)
-
-diff --git a/drivers/staging/rts5208/rtsx_transport.c b/drivers/staging/rts5208/rtsx_transport.c
-index 91fdccf..b6de93f 100644
---- a/drivers/staging/rts5208/rtsx_transport.c
-+++ b/drivers/staging/rts5208/rtsx_transport.c
-@@ -42,22 +42,28 @@
-  */
- 
- unsigned int rtsx_stor_access_xfer_buf(unsigned char *buffer,
--	unsigned int buflen, struct scsi_cmnd *srb, unsigned int *index,
--	unsigned int *offset, enum xfer_buf_dir dir)
-+				       unsigned int buflen,
-+				       struct scsi_cmnd *srb,
-+				       unsigned int *index,
-+				       unsigned int *offset,
-+				       enum xfer_buf_dir dir)
- {
- 	unsigned int cnt;
- 
- 	/* If not using scatter-gather, just transfer the data directly. */
- 	if (scsi_sg_count(srb) == 0) {
-+		unsigned char *sgbuffer;
-+
- 		if (*offset >= scsi_bufflen(srb))
- 			return 0;
- 		cnt = min(buflen, scsi_bufflen(srb) - *offset);
-+
-+		sgbuffer = (unsigned char *)scsi_sglist(srb) + *offset;
-+
- 		if (dir == TO_XFER_BUF)
--			memcpy((unsigned char *) scsi_sglist(srb) + *offset,
--					buffer, cnt);
-+			memcpy(sgbuffer, buffer, cnt);
- 		else
--			memcpy(buffer, (unsigned char *) scsi_sglist(srb) +
--					*offset, cnt);
-+			memcpy(buffer, sgbuffer, cnt);
- 		*offset += cnt;
- 
- 	/*
-@@ -126,7 +132,7 @@ unsigned int rtsx_stor_access_xfer_buf(unsigned char *buffer,
-  * SCSI residue.
-  */
- void rtsx_stor_set_xfer_buf(unsigned char *buffer,
--	unsigned int buflen, struct scsi_cmnd *srb)
-+			    unsigned int buflen, struct scsi_cmnd *srb)
- {
- 	unsigned int index = 0, offset = 0;
- 
-@@ -137,7 +143,7 @@ void rtsx_stor_set_xfer_buf(unsigned char *buffer,
- }
- 
- void rtsx_stor_get_xfer_buf(unsigned char *buffer,
--	unsigned int buflen, struct scsi_cmnd *srb)
-+			    unsigned int buflen, struct scsi_cmnd *srb)
- {
- 	unsigned int index = 0, offset = 0;
- 
-@@ -191,8 +197,8 @@ void rtsx_invoke_transport(struct scsi_cmnd *srb, struct rtsx_chip *chip)
- 		/* set the result so the higher layers expect this data */
- 		srb->result = SAM_STAT_CHECK_CONDITION;
- 		memcpy(srb->sense_buffer,
--			(unsigned char *)&(chip->sense_buffer[SCSI_LUN(srb)]),
--			sizeof(struct sense_data_t));
-+		       (unsigned char *)&(chip->sense_buffer[SCSI_LUN(srb)]),
-+		       sizeof(struct sense_data_t));
+diff --git a/arch/arm/mach-imx/system.c b/arch/arm/mach-imx/system.c
+index 51c3501..a600bd7 100644
+--- a/arch/arm/mach-imx/system.c
++++ b/arch/arm/mach-imx/system.c
+@@ -106,6 +106,9 @@ void __init imx_init_l2cache(void)
+ 		goto out;
  	}
  
- 	return;
-@@ -202,7 +208,7 @@ Handle_Errors:
- }
- 
- void rtsx_add_cmd(struct rtsx_chip *chip,
--		u8 cmd_type, u16 reg_addr, u8 mask, u8 data)
-+		  u8 cmd_type, u16 reg_addr, u8 mask, u8 data)
- {
- 	u32 *cb = (u32 *)(chip->host_cmds_ptr);
- 	u32 val = 0;
-@@ -321,9 +327,11 @@ static inline void rtsx_add_sg_tbl(
- }
- 
- static int rtsx_transfer_sglist_adma_partial(struct rtsx_chip *chip, u8 card,
--		struct scatterlist *sg, int num_sg, unsigned int *index,
--		unsigned int *offset, int size,
--		enum dma_data_direction dma_dir, int timeout)
-+					     struct scatterlist *sg, int num_sg,
-+					     unsigned int *index,
-+					     unsigned int *offset, int size,
-+					     enum dma_data_direction dma_dir,
-+					     int timeout)
- {
- 	struct rtsx_dev *rtsx = chip->rtsx;
- 	struct completion trans_done;
-@@ -486,8 +494,9 @@ out:
- }
- 
- static int rtsx_transfer_sglist_adma(struct rtsx_chip *chip, u8 card,
--		struct scatterlist *sg, int num_sg,
--		enum dma_data_direction dma_dir, int timeout)
-+				     struct scatterlist *sg, int num_sg,
-+				     enum dma_data_direction dma_dir,
-+				     int timeout)
- {
- 	struct rtsx_dev *rtsx = chip->rtsx;
- 	struct completion trans_done;
-@@ -633,7 +642,8 @@ out:
- }
- 
- static int rtsx_transfer_buf(struct rtsx_chip *chip, u8 card, void *buf,
--		size_t len, enum dma_data_direction dma_dir, int timeout)
-+			     size_t len, enum dma_data_direction dma_dir,
-+			     int timeout)
- {
- 	struct rtsx_dev *rtsx = chip->rtsx;
- 	struct completion trans_done;
-@@ -716,9 +726,9 @@ out:
- }
- 
- int rtsx_transfer_data_partial(struct rtsx_chip *chip, u8 card,
--		void *buf, size_t len, int use_sg, unsigned int *index,
--		unsigned int *offset, enum dma_data_direction dma_dir,
--		int timeout)
-+			       void *buf, size_t len, int use_sg,
-+			       unsigned int *index, unsigned int *offset,
-+			       enum dma_data_direction dma_dir, int timeout)
- {
- 	int err = 0;
- 
-@@ -726,13 +736,16 @@ int rtsx_transfer_data_partial(struct rtsx_chip *chip, u8 card,
- 	if (rtsx_chk_stat(chip, RTSX_STAT_ABORT))
- 		return -EIO;
- 
--	if (use_sg)
--		err = rtsx_transfer_sglist_adma_partial(chip, card,
--				(struct scatterlist *)buf, use_sg,
--				index, offset, (int)len, dma_dir, timeout);
--	else
-+	if (use_sg) {
-+		struct scatterlist *sg = (struct scatterlist *)buf;
++	if (readl_relaxed(l2x0_base + L2X0_CTRL) & L2X0_CTRL_EN)
++		goto skip_if_enabled;
 +
-+		err = rtsx_transfer_sglist_adma_partial(chip, card, sg, use_sg,
-+							index, offset, (int)len,
-+							dma_dir, timeout);
-+	} else {
- 		err = rtsx_transfer_buf(chip, card,
- 					buf, len, dma_dir, timeout);
-+	}
- 	if (err < 0) {
- 		if (RTSX_TST_DELINK(chip)) {
- 			RTSX_CLR_DELINK(chip);
-@@ -745,7 +758,7 @@ int rtsx_transfer_data_partial(struct rtsx_chip *chip, u8 card,
- }
+ 	/* Configure the L2 PREFETCH and POWER registers */
+ 	val = readl_relaxed(l2x0_base + L310_PREFETCH_CTRL);
+ 	val |= 0x70800000;
+@@ -122,6 +125,7 @@ void __init imx_init_l2cache(void)
+ 		val &= ~(1 << 30 | 1 << 23);
+ 	writel_relaxed(val, l2x0_base + L310_PREFETCH_CTRL);
  
- int rtsx_transfer_data(struct rtsx_chip *chip, u8 card, void *buf, size_t len,
--		int use_sg, enum dma_data_direction dma_dir, int timeout)
-+		       int use_sg, enum dma_data_direction dma_dir, int timeout)
- {
- 	int err = 0;
++skip_if_enabled:
+ 	iounmap(l2x0_base);
+ 	of_node_put(np);
  
-@@ -757,8 +770,8 @@ int rtsx_transfer_data(struct rtsx_chip *chip, u8 card, void *buf, size_t len,
- 
- 	if (use_sg) {
- 		err = rtsx_transfer_sglist_adma(chip, card,
--				(struct scatterlist *)buf,
--				use_sg, dma_dir, timeout);
-+						(struct scatterlist *)buf,
-+						use_sg, dma_dir, timeout);
- 	} else {
- 		err = rtsx_transfer_buf(chip, card, buf, len, dma_dir, timeout);
- 	}
 -- 
-2.7.0
+2.5.0
