@@ -1,457 +1,67 @@
-From: jglauber@cavium.com (Jan Glauber)
-Date: Fri, 12 Feb 2016 17:55:12 +0100
-Subject: [RFC PATCH 7/7] arm64/perf: Cavium ThunderX OCX TLK uncore support
-In-Reply-To: <cover.1455295032.git.jglauber@cavium.com>
-References: <cover.1455295032.git.jglauber@cavium.com>
-Message-ID: <662156d87b85c7f9bc76c6490297b63edd23ca29.1455295032.git.jglauber@cavium.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 12 Feb 2016 16:57:07 +0000
+Subject: [PATCH 2/2] arm64: Mark kernel page ranges contiguous
+In-Reply-To: <1455293208-6763-3-git-send-email-jeremy.linton@arm.com>
+References: <1455293208-6763-1-git-send-email-jeremy.linton@arm.com>
+ <1455293208-6763-3-git-send-email-jeremy.linton@arm.com>
+Message-ID: <20160212165707.GB20262@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support for the OCX transmit link counters.
+Hi,
 
-Signed-off-by: Jan Glauber <jglauber@cavium.com>
----
- arch/arm64/kernel/uncore/Makefile                |   3 +-
- arch/arm64/kernel/uncore/uncore_cavium.c         |   3 +
- arch/arm64/kernel/uncore/uncore_cavium.h         |   4 +
- arch/arm64/kernel/uncore/uncore_cavium_ocx_tlk.c | 366 +++++++++++++++++++++++
- 4 files changed, 375 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/kernel/uncore/uncore_cavium_ocx_tlk.c
+On Fri, Feb 12, 2016 at 10:06:48AM -0600, Jeremy Linton wrote:
+> With 64k pages, the next larger segment size is 512M. The linux
+> kernel also uses different protection flags to cover its code and data.
+> Because of this requirement, the vast majority of the kernel code and
+> data structures end up being mapped with 64k pages instead of the larger
+> pages common with a 4k page kernel.
+> 
+> Recent ARM processors support a contiguous bit in the
+> page tables which allows the a TLB to cover a range larger than a
+> single PTE if that range is mapped into physically contiguous
+> ram.
+> 
+> So, for the kernel its a good idea to set this flag. Some basic
+> micro benchmarks show it can significantly reduce the number of
+> L1 dTLB refills.
+> 
+> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+> ---
+>  arch/arm64/mm/mmu.c | 64 ++++++++++++++++++++++++++++++++++++++++++++++++-----
+>  1 file changed, 58 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/kernel/uncore/Makefile b/arch/arm64/kernel/uncore/Makefile
-index 752af39..a267800 100644
---- a/arch/arm64/kernel/uncore/Makefile
-+++ b/arch/arm64/kernel/uncore/Makefile
-@@ -3,4 +3,5 @@ obj-$(CONFIG_ARCH_THUNDER) += uncore_cavium.o		\
- 			      uncore_cavium_l2c_cbc.o	\
- 			      uncore_cavium_lmc.o	\
- 			      uncore_cavium_ocx_lne.o	\
--			      uncore_cavium_ocx_frc.o
-+			      uncore_cavium_ocx_frc.o	\
-+			      uncore_cavium_ocx_tlk.o
-diff --git a/arch/arm64/kernel/uncore/uncore_cavium.c b/arch/arm64/kernel/uncore/uncore_cavium.c
-index 9fed1d6..e2edb7a4 100644
---- a/arch/arm64/kernel/uncore/uncore_cavium.c
-+++ b/arch/arm64/kernel/uncore/uncore_cavium.c
-@@ -32,6 +32,8 @@ struct thunder_uncore *event_to_thunder_uncore(struct perf_event *event)
- 		return thunder_uncore_ocx_lne;
- 	else if (event->pmu->type == thunder_ocx_frc_pmu.type)
- 		return thunder_uncore_ocx_frc;
-+	else if (event->pmu->type == thunder_ocx_tlk_pmu.type)
-+		return thunder_uncore_ocx_tlk;
- 	else
- 		return NULL;
- }
-@@ -221,6 +223,7 @@ static int __init thunder_uncore_init(void)
- 	thunder_uncore_lmc_setup();
- 	thunder_uncore_ocx_lne_setup();
- 	thunder_uncore_ocx_frc_setup();
-+	thunder_uncore_ocx_tlk_setup();
- 	return 0;
- }
- late_initcall(thunder_uncore_init);
-diff --git a/arch/arm64/kernel/uncore/uncore_cavium.h b/arch/arm64/kernel/uncore/uncore_cavium.h
-index 07bd4f4..f312d41 100644
---- a/arch/arm64/kernel/uncore/uncore_cavium.h
-+++ b/arch/arm64/kernel/uncore/uncore_cavium.h
-@@ -18,6 +18,7 @@ enum uncore_type {
- 	LMC_TYPE,
- 	OCX_LNE_TYPE,
- 	OCX_FRC_TYPE,
-+	OCX_TLK_TYPE,
- };
- 
- extern int thunder_uncore_version;
-@@ -68,11 +69,13 @@ extern struct thunder_uncore *thunder_uncore_l2c_cbc;
- extern struct thunder_uncore *thunder_uncore_lmc;
- extern struct thunder_uncore *thunder_uncore_ocx_lne;
- extern struct thunder_uncore *thunder_uncore_ocx_frc;
-+extern struct thunder_uncore *thunder_uncore_ocx_tlk;
- extern struct pmu thunder_l2c_tad_pmu;
- extern struct pmu thunder_l2c_cbc_pmu;
- extern struct pmu thunder_lmc_pmu;
- extern struct pmu thunder_ocx_lne_pmu;
- extern struct pmu thunder_ocx_frc_pmu;
-+extern struct pmu thunder_ocx_tlk_pmu;
- 
- /* Prototypes */
- struct thunder_uncore *event_to_thunder_uncore(struct perf_event *event);
-@@ -91,3 +94,4 @@ int thunder_uncore_l2c_cbc_setup(void);
- int thunder_uncore_lmc_setup(void);
- int thunder_uncore_ocx_lne_setup(void);
- int thunder_uncore_ocx_frc_setup(void);
-+int thunder_uncore_ocx_tlk_setup(void);
-diff --git a/arch/arm64/kernel/uncore/uncore_cavium_ocx_tlk.c b/arch/arm64/kernel/uncore/uncore_cavium_ocx_tlk.c
-new file mode 100644
-index 0000000..71ef3ae
---- /dev/null
-+++ b/arch/arm64/kernel/uncore/uncore_cavium_ocx_tlk.c
-@@ -0,0 +1,366 @@
-+/*
-+ * Cavium Thunder uncore PMU support, OCX TLK counters.
-+ *
-+ * Copyright 2016 Cavium Inc.
-+ * Author: Jan Glauber <jan.glauber@cavium.com>
-+ */
-+
-+#include <linux/types.h>
-+#include <linux/slab.h>
-+#include <linux/init.h>
-+#include <linux/cpu.h>
-+#include <linux/io.h>
-+#include <linux/perf_event.h>
-+#include <linux/pci.h>
-+
-+#include <asm/cpufeature.h>
-+#include <asm/cputype.h>
-+
-+#include "uncore_cavium.h"
-+
-+#ifndef PCI_DEVICE_ID_THUNDER_OCX
-+#define PCI_DEVICE_ID_THUNDER_OCX		0xa013
-+#endif
-+
-+#define OCX_TLK_NR_UNITS			3
-+#define OCX_TLK_UNIT_OFFSET			0x2000
-+#define OCX_TLK_CONTROL_OFFSET			0x10040
-+#define OCX_TLK_COUNTER_OFFSET			0x10400
-+
-+#define OCX_TLK_STAT_DISABLE			0
-+#define OCX_TLK_STAT_ENABLE			1
-+
-+/* OCX TLK event list */
-+#define OCX_TLK_EVENT_STAT_IDLE_CNT		0x00
-+#define OCX_TLK_EVENT_STAT_DATA_CNT		0x01
-+#define OCX_TLK_EVENT_STAT_SYNC_CNT		0x02
-+#define OCX_TLK_EVENT_STAT_RETRY_CNT		0x03
-+#define OCX_TLK_EVENT_STAT_ERR_CNT		0x04
-+
-+#define OCX_TLK_EVENT_STAT_MAT0_CNT		0x08
-+#define OCX_TLK_EVENT_STAT_MAT1_CNT		0x09
-+#define OCX_TLK_EVENT_STAT_MAT2_CNT		0x0a
-+#define OCX_TLK_EVENT_STAT_MAT3_CNT		0x0b
-+
-+#define OCX_TLK_EVENT_STAT_VC0_CMD		0x10
-+#define OCX_TLK_EVENT_STAT_VC1_CMD		0x11
-+#define OCX_TLK_EVENT_STAT_VC2_CMD		0x12
-+#define OCX_TLK_EVENT_STAT_VC3_CMD		0x13
-+#define OCX_TLK_EVENT_STAT_VC4_CMD		0x14
-+#define OCX_TLK_EVENT_STAT_VC5_CMD		0x15
-+
-+#define OCX_TLK_EVENT_STAT_VC0_PKT		0x20
-+#define OCX_TLK_EVENT_STAT_VC1_PKT		0x21
-+#define OCX_TLK_EVENT_STAT_VC2_PKT		0x22
-+#define OCX_TLK_EVENT_STAT_VC3_PKT		0x23
-+#define OCX_TLK_EVENT_STAT_VC4_PKT		0x24
-+#define OCX_TLK_EVENT_STAT_VC5_PKT		0x25
-+#define OCX_TLK_EVENT_STAT_VC6_PKT		0x26
-+#define OCX_TLK_EVENT_STAT_VC7_PKT		0x27
-+#define OCX_TLK_EVENT_STAT_VC8_PKT		0x28
-+#define OCX_TLK_EVENT_STAT_VC9_PKT		0x29
-+#define OCX_TLK_EVENT_STAT_VC10_PKT		0x2a
-+#define OCX_TLK_EVENT_STAT_VC11_PKT		0x2b
-+#define OCX_TLK_EVENT_STAT_VC12_PKT		0x2c
-+#define OCX_TLK_EVENT_STAT_VC13_PKT		0x2d
-+
-+#define OCX_TLK_EVENT_STAT_VC0_CON		0x30
-+#define OCX_TLK_EVENT_STAT_VC1_CON		0x31
-+#define OCX_TLK_EVENT_STAT_VC2_CON		0x32
-+#define OCX_TLK_EVENT_STAT_VC3_CON		0x33
-+#define OCX_TLK_EVENT_STAT_VC4_CON		0x34
-+#define OCX_TLK_EVENT_STAT_VC5_CON		0x35
-+#define OCX_TLK_EVENT_STAT_VC6_CON		0x36
-+#define OCX_TLK_EVENT_STAT_VC7_CON		0x37
-+#define OCX_TLK_EVENT_STAT_VC8_CON		0x38
-+#define OCX_TLK_EVENT_STAT_VC9_CON		0x39
-+#define OCX_TLK_EVENT_STAT_VC10_CON		0x3a
-+#define OCX_TLK_EVENT_STAT_VC11_CON		0x3b
-+#define OCX_TLK_EVENT_STAT_VC12_CON		0x3c
-+#define OCX_TLK_EVENT_STAT_VC13_CON		0x3d
-+
-+#define OCX_TLK_MAX_COUNTER			OCX_TLK_EVENT_STAT_VC13_CON
-+#define OCX_TLK_NR_COUNTERS			OCX_TLK_MAX_COUNTER
-+
-+struct thunder_uncore *thunder_uncore_ocx_tlk;
-+
-+static inline void __iomem *map_offset_ocx_tlk(unsigned long addr,
-+				struct thunder_uncore *uncore, int unit)
-+{
-+	return (void __iomem *) (addr +
-+				 uncore->pdevs[0].map +
-+				 unit * OCX_TLK_UNIT_OFFSET);
-+}
-+
-+/*
-+ * Summarize counters across all TLK's. Different from the other uncore
-+ * PMUs because all TLK's are on one PCI device.
-+ */
-+static void thunder_uncore_read_ocx_tlk(struct perf_event *event)
-+{
-+	struct thunder_uncore *uncore = event_to_thunder_uncore(event);
-+	struct hw_perf_event *hwc = &event->hw;
-+	u64 prev, new = 0;
-+	s64 delta;
-+	int i;
-+
-+	/*
-+	 * since we do not enable counter overflow interrupts,
-+	 * we do not have to worry about prev_count changing on us
-+	 */
-+
-+	prev = local64_read(&hwc->prev_count);
-+
-+	/* read counter values from all units */
-+	for (i = 0; i < OCX_TLK_NR_UNITS; i++)
-+		new += readq(map_offset_ocx_tlk(hwc->event_base, uncore, i));
-+
-+	local64_set(&hwc->prev_count, new);
-+	delta = new - prev;
-+	local64_add(delta, &event->count);
-+}
-+
-+static void thunder_uncore_start(struct perf_event *event, int flags)
-+{
-+	struct thunder_uncore *uncore = event_to_thunder_uncore(event);
-+	struct hw_perf_event *hwc = &event->hw;
-+	int i;
-+
-+	hwc->state = 0;
-+
-+	/* enable counters on all units */
-+	for (i = 0; i < OCX_TLK_NR_UNITS; i++)
-+		writeb(OCX_TLK_STAT_ENABLE,
-+		       map_offset_ocx_tlk(hwc->config_base, uncore, i));
-+
-+	perf_event_update_userpage(event);
-+}
-+
-+static void thunder_uncore_stop(struct perf_event *event, int flags)
-+{
-+	struct thunder_uncore *uncore = event_to_thunder_uncore(event);
-+	struct hw_perf_event *hwc = &event->hw;
-+	int i;
-+
-+	/* disable counters on all units */
-+	for (i = 0; i < OCX_TLK_NR_UNITS; i++)
-+		writeb(OCX_TLK_STAT_DISABLE,
-+		       map_offset_ocx_tlk(hwc->config_base, uncore, i));
-+	hwc->state |= PERF_HES_STOPPED;
-+
-+	if ((flags & PERF_EF_UPDATE) && !(hwc->state & PERF_HES_UPTODATE)) {
-+		thunder_uncore_read_ocx_tlk(event);
-+		hwc->state |= PERF_HES_UPTODATE;
-+	}
-+}
-+
-+static int thunder_uncore_add(struct perf_event *event, int flags)
-+	{
-+	struct thunder_uncore *uncore = event_to_thunder_uncore(event);
-+	struct hw_perf_event *hwc = &event->hw;
-+	int i;
-+
-+	WARN_ON_ONCE(!uncore);
-+
-+	/* are we already assigned? */
-+	if (hwc->idx != -1 && uncore->events[hwc->idx] == event)
-+		goto out;
-+
-+	for (i = 0; i < uncore->num_counters; i++) {
-+		if (uncore->events[i] == event) {
-+			hwc->idx = i;
-+			goto out;
-+		}
-+	}
-+
-+	/* counters are 1:1 */
-+	hwc->idx = -1;
-+	if (cmpxchg(&uncore->events[hwc->config], NULL, event) == NULL)
-+		hwc->idx = hwc->config;
-+
-+out:
-+	if (hwc->idx == -1)
-+		return -EBUSY;
-+
-+	hwc->config_base = 0;
-+	hwc->event_base = OCX_TLK_COUNTER_OFFSET - OCX_TLK_CONTROL_OFFSET +
-+			hwc->idx * sizeof(unsigned long long);
-+	hwc->state = PERF_HES_UPTODATE | PERF_HES_STOPPED;
-+
-+	if (flags & PERF_EF_START)
-+		thunder_uncore_start(event, PERF_EF_RELOAD);
-+
-+	return 0;
-+}
-+
-+PMU_FORMAT_ATTR(event, "config:0-5");
-+
-+static struct attribute *thunder_ocx_tlk_format_attr[] = {
-+	&format_attr_event.attr,
-+	NULL,
-+};
-+
-+static struct attribute_group thunder_ocx_tlk_format_group = {
-+	.name = "format",
-+	.attrs = thunder_ocx_tlk_format_attr,
-+};
-+
-+EVENT_ATTR(idle_cnt,	OCX_TLK_EVENT_STAT_IDLE_CNT);
-+EVENT_ATTR(data_cnt,	OCX_TLK_EVENT_STAT_DATA_CNT);
-+EVENT_ATTR(sync_cnt,	OCX_TLK_EVENT_STAT_SYNC_CNT);
-+EVENT_ATTR(retry_cnt,	OCX_TLK_EVENT_STAT_RETRY_CNT);
-+EVENT_ATTR(err_cnt,	OCX_TLK_EVENT_STAT_ERR_CNT);
-+EVENT_ATTR(mat0_cnt,	OCX_TLK_EVENT_STAT_MAT0_CNT);
-+EVENT_ATTR(mat1_cnt,	OCX_TLK_EVENT_STAT_MAT1_CNT);
-+EVENT_ATTR(mat2_cnt,	OCX_TLK_EVENT_STAT_MAT2_CNT);
-+EVENT_ATTR(mat3_cnt,	OCX_TLK_EVENT_STAT_MAT3_CNT);
-+EVENT_ATTR(vc0_cmd,	OCX_TLK_EVENT_STAT_VC0_CMD);
-+EVENT_ATTR(vc1_cmd,	OCX_TLK_EVENT_STAT_VC1_CMD);
-+EVENT_ATTR(vc2_cmd,	OCX_TLK_EVENT_STAT_VC2_CMD);
-+EVENT_ATTR(vc3_cmd,	OCX_TLK_EVENT_STAT_VC3_CMD);
-+EVENT_ATTR(vc4_cmd,	OCX_TLK_EVENT_STAT_VC4_CMD);
-+EVENT_ATTR(vc5_cmd,	OCX_TLK_EVENT_STAT_VC5_CMD);
-+EVENT_ATTR(vc0_pkt,	OCX_TLK_EVENT_STAT_VC0_PKT);
-+EVENT_ATTR(vc1_pkt,	OCX_TLK_EVENT_STAT_VC1_PKT);
-+EVENT_ATTR(vc2_pkt,	OCX_TLK_EVENT_STAT_VC2_PKT);
-+EVENT_ATTR(vc3_pkt,	OCX_TLK_EVENT_STAT_VC3_PKT);
-+EVENT_ATTR(vc4_pkt,	OCX_TLK_EVENT_STAT_VC4_PKT);
-+EVENT_ATTR(vc5_pkt,	OCX_TLK_EVENT_STAT_VC5_PKT);
-+EVENT_ATTR(vc6_pkt,	OCX_TLK_EVENT_STAT_VC6_PKT);
-+EVENT_ATTR(vc7_pkt,	OCX_TLK_EVENT_STAT_VC7_PKT);
-+EVENT_ATTR(vc8_pkt,	OCX_TLK_EVENT_STAT_VC8_PKT);
-+EVENT_ATTR(vc9_pkt,	OCX_TLK_EVENT_STAT_VC9_PKT);
-+EVENT_ATTR(vc10_pkt,	OCX_TLK_EVENT_STAT_VC10_PKT);
-+EVENT_ATTR(vc11_pkt,	OCX_TLK_EVENT_STAT_VC11_PKT);
-+EVENT_ATTR(vc12_pkt,	OCX_TLK_EVENT_STAT_VC12_PKT);
-+EVENT_ATTR(vc13_pkt,	OCX_TLK_EVENT_STAT_VC13_PKT);
-+EVENT_ATTR(vc0_con,	OCX_TLK_EVENT_STAT_VC0_CON);
-+EVENT_ATTR(vc1_con,	OCX_TLK_EVENT_STAT_VC1_CON);
-+EVENT_ATTR(vc2_con,	OCX_TLK_EVENT_STAT_VC2_CON);
-+EVENT_ATTR(vc3_con,	OCX_TLK_EVENT_STAT_VC3_CON);
-+EVENT_ATTR(vc4_con,	OCX_TLK_EVENT_STAT_VC4_CON);
-+EVENT_ATTR(vc5_con,	OCX_TLK_EVENT_STAT_VC5_CON);
-+EVENT_ATTR(vc6_con,	OCX_TLK_EVENT_STAT_VC6_CON);
-+EVENT_ATTR(vc7_con,	OCX_TLK_EVENT_STAT_VC7_CON);
-+EVENT_ATTR(vc8_con,	OCX_TLK_EVENT_STAT_VC8_CON);
-+EVENT_ATTR(vc9_con,	OCX_TLK_EVENT_STAT_VC9_CON);
-+EVENT_ATTR(vc10_con,	OCX_TLK_EVENT_STAT_VC10_CON);
-+EVENT_ATTR(vc11_con,	OCX_TLK_EVENT_STAT_VC11_CON);
-+EVENT_ATTR(vc12_con,	OCX_TLK_EVENT_STAT_VC12_CON);
-+EVENT_ATTR(vc13_con,	OCX_TLK_EVENT_STAT_VC13_CON);
-+
-+static struct attribute *thunder_ocx_tlk_events_attr[] = {
-+	EVENT_PTR(idle_cnt),
-+	EVENT_PTR(data_cnt),
-+	EVENT_PTR(sync_cnt),
-+	EVENT_PTR(retry_cnt),
-+	EVENT_PTR(err_cnt),
-+	EVENT_PTR(mat0_cnt),
-+	EVENT_PTR(mat1_cnt),
-+	EVENT_PTR(mat2_cnt),
-+	EVENT_PTR(mat3_cnt),
-+	EVENT_PTR(vc0_cmd),
-+	EVENT_PTR(vc1_cmd),
-+	EVENT_PTR(vc2_cmd),
-+	EVENT_PTR(vc3_cmd),
-+	EVENT_PTR(vc4_cmd),
-+	EVENT_PTR(vc5_cmd),
-+	EVENT_PTR(vc0_pkt),
-+	EVENT_PTR(vc1_pkt),
-+	EVENT_PTR(vc2_pkt),
-+	EVENT_PTR(vc3_pkt),
-+	EVENT_PTR(vc4_pkt),
-+	EVENT_PTR(vc5_pkt),
-+	EVENT_PTR(vc6_pkt),
-+	EVENT_PTR(vc7_pkt),
-+	EVENT_PTR(vc8_pkt),
-+	EVENT_PTR(vc9_pkt),
-+	EVENT_PTR(vc10_pkt),
-+	EVENT_PTR(vc11_pkt),
-+	EVENT_PTR(vc12_pkt),
-+	EVENT_PTR(vc13_pkt),
-+	EVENT_PTR(vc0_con),
-+	EVENT_PTR(vc1_con),
-+	EVENT_PTR(vc2_con),
-+	EVENT_PTR(vc3_con),
-+	EVENT_PTR(vc4_con),
-+	EVENT_PTR(vc5_con),
-+	EVENT_PTR(vc6_con),
-+	EVENT_PTR(vc7_con),
-+	EVENT_PTR(vc8_con),
-+	EVENT_PTR(vc9_con),
-+	EVENT_PTR(vc10_con),
-+	EVENT_PTR(vc11_con),
-+	EVENT_PTR(vc12_con),
-+	EVENT_PTR(vc13_con),
-+	NULL,
-+};
-+
-+static struct attribute_group thunder_ocx_tlk_events_group = {
-+	.name = "events",
-+	.attrs = thunder_ocx_tlk_events_attr,
-+};
-+
-+static const struct attribute_group *thunder_ocx_tlk_attr_groups[] = {
-+	&thunder_uncore_attr_group,
-+	&thunder_ocx_tlk_format_group,
-+	&thunder_ocx_tlk_events_group,
-+	NULL,
-+};
-+
-+struct pmu thunder_ocx_tlk_pmu = {
-+	.attr_groups	= thunder_ocx_tlk_attr_groups,
-+	.name		= "thunder_ocx_tlk",
-+	.event_init	= thunder_uncore_event_init,
-+	.add		= thunder_uncore_add,
-+	.del		= thunder_uncore_del,
-+	.start		= thunder_uncore_start,
-+	.stop		= thunder_uncore_stop,
-+	.read		= thunder_uncore_read_ocx_tlk,
-+};
-+
-+static int event_valid(u64 config)
-+{
-+	if (config <= OCX_TLK_EVENT_STAT_ERR_CNT ||
-+	    (config >= OCX_TLK_EVENT_STAT_MAT0_CNT &&
-+	     config <= OCX_TLK_EVENT_STAT_MAT3_CNT) ||
-+	    (config >= OCX_TLK_EVENT_STAT_VC0_CMD &&
-+	     config <= OCX_TLK_EVENT_STAT_VC5_CMD) ||
-+	    (config >= OCX_TLK_EVENT_STAT_VC0_PKT &&
-+	     config <= OCX_TLK_EVENT_STAT_VC13_PKT) ||
-+	    (config >= OCX_TLK_EVENT_STAT_VC0_CON &&
-+	     config <= OCX_TLK_EVENT_STAT_VC13_CON))
-+		return 1;
-+	else
-+		return 0;
-+}
-+
-+int __init thunder_uncore_ocx_tlk_setup(void)
-+{
-+	int ret;
-+
-+	thunder_uncore_ocx_tlk = kzalloc(sizeof(struct thunder_uncore),
-+					 GFP_KERNEL);
-+	if (!thunder_uncore_ocx_tlk) {
-+		ret = -ENOMEM;
-+		goto fail_nomem;
-+	}
-+
-+	ret = thunder_uncore_setup(thunder_uncore_ocx_tlk,
-+				   PCI_DEVICE_ID_THUNDER_OCX,
-+				   OCX_TLK_CONTROL_OFFSET,
-+				   OCX_TLK_UNIT_OFFSET * OCX_TLK_NR_UNITS,
-+				   &thunder_ocx_tlk_pmu);
-+	if (ret)
-+		goto fail;
-+
-+	thunder_uncore_ocx_tlk->type = OCX_TLK_TYPE;
-+	thunder_uncore_ocx_tlk->num_counters = OCX_TLK_NR_COUNTERS;
-+	thunder_uncore_ocx_tlk->event_valid = event_valid;
-+	return 0;
-+
-+fail:
-+	kfree(thunder_uncore_ocx_tlk);
-+fail_nomem:
-+	return ret;
-+}
--- 
-1.9.1
+This generally looks good.
+
+As a heads-up, I have one concern:
+
+> +static void clear_cont_pte_range(pte_t *pte, unsigned long addr)
+> +{
+> +	int i;
+> +
+> +	pte -= CONT_RANGE_OFFSET(addr);
+> +	for (i = 0; i < CONT_PTES; i++) {
+> +		if (pte_cont(*pte))
+> +			set_pte(pte, pte_mknoncont(*pte));
+> +		pte++;
+> +	}
+> +	flush_tlb_all();
+> +}
+
+As far as I can tell, "splitting" contiguous entries comes with the same
+caveats as splitting sections. In the absence of a BBM sequence we might
+end up with conflicting TLB entries.
+
+However, I think we're OK for now.
+
+The way we consistently map/unmap/modify image/linear "chunks" should
+prevent us from trying to split those, and if/when we do this for the
+EFI runtime page tables thy aren't live.
+
+It would be good to figure out how to get rid of the splitting entirely.
+
+Otherwise, this looks good to me; I'll try to give this a spin next
+week.
+
+Thanks,
+Mark.
