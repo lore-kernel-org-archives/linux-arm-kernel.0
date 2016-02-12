@@ -1,38 +1,32 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 12 Feb 2016 14:08:16 -0800
-Subject: [PATCH] Revert "ASoC: qcom: Specify LE device endianness"
-In-Reply-To: <2686474.cvCA6vY47l@wuerfel>
-References: <1455298217-15744-1-git-send-email-sboyd@codeaurora.org>
- <2686474.cvCA6vY47l@wuerfel>
-Message-ID: <20160212220816.GG4847@codeaurora.org>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Fri, 12 Feb 2016 17:12:37 -0500
+Subject: [PATCH] branch tracer: fix freak link error
+In-Reply-To: <6132207.AQ6oOdTfsj@wuerfel>
+References: <1455312410-1058841-1-git-send-email-arnd@arndb.de>
+ <alpine.LFD.2.20.1602121639340.13632@knanqh.ubzr>
+ <3016048.Uym15Ei2Bs@wuerfel> <6132207.AQ6oOdTfsj@wuerfel>
+Message-ID: <20160212171237.22d2d93e@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/12, Arnd Bergmann wrote:
+On Fri, 12 Feb 2016 22:52:10 +0100
+Arnd Bergmann <arnd@arndb.de> wrote:
+
+> On Friday 12 February 2016 22:49:07 Arnd Bergmann wrote:
+> > Now I have to check if it does anything to the spurious "maybe-uninitialized"
+> > warnings that I saw creeping in with PROFILE_ALL_BRANCHES. My guess is
+> > that it doesn't fix them (I submitted a patch to turn off those
+> > warnings today when PROFILE_ALL_BRANCHES is set), but I'll try anyway.   
 > 
-> drivers/clk/qcom/gcc-apq8084.c: .val_format_endian = REGMAP_ENDIAN_LITTLE,
-> drivers/clk/qcom/gcc-ipq806x.c: .val_format_endian = REGMAP_ENDIAN_LITTLE,
-> drivers/clk/qcom/gcc-msm8660.c: .val_format_endian = REGMAP_ENDIAN_LITTLE,
-> drivers/clk/qcom/gcc-msm8916.c: .val_format_endian = REGMAP_ENDIAN_LITTLE,
-> drivers/clk/qcom/gcc-msm8960.c: .val_format_endian = REGMAP_ENDIAN_LITTLE,
-> drivers/clk/qcom/gcc-msm8960.c: .val_format_endian = REGMAP_ENDIAN_LITTLE,
-> drivers/clk/qcom/gcc-msm8974.c: .val_format_endian = REGMAP_ENDIAN_LITTLE,
-> drivers/clk/qcom/lcc-ipq806x.c: .val_format_endian = REGMAP_ENDIAN_LITTLE,
-> drivers/clk/qcom/lcc-msm8960.c: .val_format_endian = REGMAP_ENDIAN_LITTLE,
-> drivers/clk/qcom/mmcc-apq8084.c:        .val_format_endian = REGMAP_ENDIAN_LITTLE,
-> drivers/clk/qcom/mmcc-msm8960.c:        .val_format_endian = REGMAP_ENDIAN_LITTLE,
-> drivers/clk/qcom/mmcc-msm8960.c:        .val_format_endian = REGMAP_ENDIAN_LITTLE,
-> drivers/clk/qcom/mmcc-msm8974.c:        .val_format_endian = REGMAP_ENDIAN_LITTLE,
+> Ok, that was easy: they are all still there, so we still need to
+> pass -Wno-maybe-uninitialized when using PROFILE_ALL_BRANCHES to
+> avoid flooding the log with useless warnings.
 
-These are taken care of.
+Yeah, those warnings were the reason I turned PROFILE_ALL_BRANCHES into
+a tristate and not a boolean, otherwise a make allmodconfig or
+allyesconfig would enable it and spam the compile with those warnings.
 
-> 
-> drivers/nvmem/qfprom.c: .val_format_endian = REGMAP_ENDIAN_LITTLE,
+I simply ignore them, so adding a way to turn them off when that is
+enabled is probably a good idea.
 
-I don't plan on reverting this one because it's only in -next. It
-is redundant, but it's not actively breaking anything when the
-driver tree and the regmap tree are merged together.
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+-- Steve
