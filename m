@@ -1,90 +1,54 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Fri, 12 Feb 2016 09:56:54 +0100
-Subject: [PATCH V4 15/23] acpi, mcfg: Implement two calls that might be
- used to inject/remove MCFG region.
-In-Reply-To: <20160210140602.GB25060@red-moon>
-References: <1454606941-9523-1-git-send-email-tn@semihalf.com>
- <1454606941-9523-16-git-send-email-tn@semihalf.com>
- <20160210140602.GB25060@red-moon>
-Message-ID: <56BD9E56.5070805@semihalf.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 12 Feb 2016 09:00:33 +0000
+Subject: [GIT PULL] Immutable branch between MFD and Regulator
+In-Reply-To: <1455242567-17880-1-git-send-email-wens@csie.org>
+References: <1455242567-17880-1-git-send-email-wens@csie.org>
+Message-ID: <20160212090033.GN20693@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10.02.2016 15:06, Lorenzo Pieralisi wrote:
-> On Thu, Feb 04, 2016 at 06:28:53PM +0100, Tomasz Nowicki wrote:
->> >Lets abstract two calls which allow to inject and remove MCFG regions
->> >which may come from DSDT table. These calls will be used for x86 and ARM64
->> >PCI host bridge driver in the later patches.
->> >
->> >Signed-off-by: Tomasz Nowicki<tn@semihalf.com>
->> >Tested-by: Duc Dang<dhdang@apm.com>
->> >Tested-by: Dongdong Liu<liudongdong3@huawei.com>
->> >Tested-by: Hanjun Guo<hanjun.guo@linaro.org>
->> >Tested-by: Graeme Gregory<graeme.gregory@linaro.org>
->> >Tested-by: Sinan Kaya<okaya@codeaurora.org>
->> >---
->> >  drivers/acpi/mcfg.c      | 38 ++++++++++++++++++++++++++++++++++++++
->> >  include/linux/pci-acpi.h |  9 +++++++++
->> >  2 files changed, 47 insertions(+)
->> >
->> >diff --git a/drivers/acpi/mcfg.c b/drivers/acpi/mcfg.c
->> >index 3e1e7be..dca4c4e 100644
->> >--- a/drivers/acpi/mcfg.c
->> >+++ b/drivers/acpi/mcfg.c
->> >@@ -10,6 +10,7 @@
->> >  #include <linux/acpi.h>
->> >  #include <linux/ecam.h>
->> >  #include <linux/pci.h>
->> >+#include <linux/pci-acpi.h>
->> >
->> >  #define	PREFIX	"MCFG: "
->> >
->> >@@ -77,6 +78,43 @@ int __init acpi_parse_mcfg(struct acpi_table_header *header)
->> >  	return 0;
->> >  }
->> >
->> >+int pci_mmcfg_setup_map(struct acpi_pci_root_info *ci)
->> >+{
->> >+	struct pci_mmcfg_region *cfg;
->> >+	struct acpi_pci_root *root;
->> >+	int seg, start, end, err;
->> >+
->> >+	root = ci->root;
->> >+	seg = root->segment;
->> >+	start = root->secondary.start;
->> >+	end = root->secondary.end;
->> >+
->> >+	cfg = pci_mmconfig_lookup(seg, start);
->> >+	if (cfg)
->> >+		return 0;
->> >+
->> >+	cfg = pci_mmconfig_alloc(seg, start, end, root->mcfg_addr);
->> >+	if (!cfg)
->> >+		return -ENOMEM;
->> >+
->> >+	err = pci_mmconfig_inject(cfg);
->> >+	return err;
-> When you integrate Jayachandran's patch this whole function will
-> become a pci_mmconfig_insert() and that's where hot_added should
-> be set.
->
->> >+}
->> >+
->> >+void pci_mmcfg_teardown_map(struct acpi_pci_root_info *ci)
->> >+{
->> >+	struct acpi_pci_root *root = ci->root;
->> >+	struct pci_mmcfg_region *cfg;
->> >+
->> >+	cfg = pci_mmconfig_lookup(root->segment, root->secondary.start);
->> >+	if (!cfg)
->> >+		return;
->> >+
->> >+	if (cfg->hot_added)
-> Move the hot_added check in pci_mmconfig_delete() (that does the look
-> up again), we do not want to carry out pci_mmconfig_lookup only to
-> check that flag here (and we miss rcu locking for the look-up BTW).
+Enjoy!
 
-Makes sense to me, I will follow your suggestion.
+The following changes since commit 36f90b0a2ddd60823fe193a85e60ff1906c2a9b3:
 
-Thanks,
-Tomasz
+  Linux 4.5-rc2 (2016-01-31 18:12:16 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git tags/ib-mfd-regulator-v4.6
+
+for you to fetch changes up to 04e0981c67e6a7ba8aacac731d925f4ff21b67fb:
+
+  regulator: axp20x: Support new AXP223 PMIC (2016-02-12 08:55:34 +0000)
+
+----------------------------------------------------------------
+Immutable branch between MFD and Regulator
+
+----------------------------------------------------------------
+Chen-Yu Tsai (8):
+      mfd: axp20x: Add AXP223 to list of supported PMICs in DT bindings
+      mfd: axp20x: Remove second struct device * parameter for axp20x_match_device()
+      mfd: axp20x: Use dev->driver->of_match_table in axp20x_match_device()
+      mfd: axp20x: Add missing copyright notice
+      mfd: axp20x: Split the driver into core and i2c bits
+      mfd: axp20x: Whitespace, open parenthesis alignment code style fixes
+      mfd: axp20x: Add support for RSB based AXP223 PMIC
+      regulator: axp20x: Support new AXP223 PMIC
+
+ Documentation/devicetree/bindings/mfd/axp20x.txt |   7 +-
+ drivers/mfd/Kconfig                              |  25 ++++--
+ drivers/mfd/Makefile                             |   2 +
+ drivers/mfd/axp20x-i2c.c                         | 104 ++++++++++++++++++++++
+ drivers/mfd/axp20x-rsb.c                         |  80 +++++++++++++++++
+ drivers/mfd/axp20x.c                             | 105 ++++++-----------------
+ drivers/regulator/axp20x-regulator.c             |   3 +
+ include/linux/mfd/axp20x.h                       |  34 +++++++-
+ 8 files changed, 271 insertions(+), 89 deletions(-)
+ create mode 100644 drivers/mfd/axp20x-i2c.c
+ create mode 100644 drivers/mfd/axp20x-rsb.c
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
