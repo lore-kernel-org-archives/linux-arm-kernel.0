@@ -1,114 +1,169 @@
-From: gerald.schaefer@de.ibm.com (Gerald Schaefer)
-Date: Fri, 12 Feb 2016 18:16:40 +0100
-Subject: [BUG] random kernel crashes after THP rework on s390 (maybe
- also on PowerPC and ARM)
-In-Reply-To: <56BE00E7.1010303@de.ibm.com>
-References: <20160211192223.4b517057@thinkpad>
- <20160211190942.GA10244@node.shutemov.name>
- <20160211205702.24f0d17a@thinkpad>
- <20160212154116.GA15142@node.shutemov.name>
- <56BE00E7.1010303@de.ibm.com>
-Message-ID: <20160212181640.4eabb85f@thinkpad>
+From: s-anna@ti.com (Suman Anna)
+Date: Fri, 12 Feb 2016 11:20:20 -0600
+Subject: [PATCH v3 3/3] pci: dra7xx: use pdata callbacks to perform reset
+In-Reply-To: <56BD8091.4090007@ti.com>
+References: <1452780672-14339-1-git-send-email-kishon@ti.com>
+ <1452780672-14339-4-git-send-email-kishon@ti.com>
+ <20160127173104.GQ19432@atomide.com> <56A90971.4020409@ti.com>
+ <20160127185649.GV19432@atomide.com> <56A94FB7.6020903@ti.com>
+ <20160128183156.GH19432@atomide.com> <56B087AD.4000505@ti.com>
+ <alpine.DEB.2.02.1602080208070.2182@utopia.booyaka.com>
+ <56B900E9.9040306@ti.com>
+ <alpine.DEB.2.02.1602090846480.2906@utopia.booyaka.com>
+ <56BA2495.9020407@ti.com>
+ <alpine.DEB.2.02.1602091932160.2906@utopia.booyaka.com>
+ <56BA958A.1020503@ti.com> <56BACCDB.2070507@ti.com>
+ <alpine.DEB.2.02.1602111921090.20757@utopia.booyaka.com>
+ <56BD8091.4090007@ti.com>
+Message-ID: <56BE1454.3030002@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 12 Feb 2016 16:57:27 +0100
-Christian Borntraeger <borntraeger@de.ibm.com> wrote:
+Kishon,
 
-> On 02/12/2016 04:41 PM, Kirill A. Shutemov wrote:
-> > On Thu, Feb 11, 2016 at 08:57:02PM +0100, Gerald Schaefer wrote:
-> >> On Thu, 11 Feb 2016 21:09:42 +0200
-> >> "Kirill A. Shutemov" <kirill@shutemov.name> wrote:
-> >>
-> >>> On Thu, Feb 11, 2016 at 07:22:23PM +0100, Gerald Schaefer wrote:
-> >>>> Hi,
-> >>>>
-> >>>> Sebastian Ott reported random kernel crashes beginning with v4.5-rc1 and
-> >>>> he also bisected this to commit 61f5d698 "mm: re-enable THP". Further
-> >>>> review of the THP rework patches, which cannot be bisected, revealed
-> >>>> commit fecffad "s390, thp: remove infrastructure for handling splitting PMDs"
-> >>>> (and also similar commits for other archs).
-> >>>>
-> >>>> This commit removes the THP splitting bit and also the architecture
-> >>>> implementation of pmdp_splitting_flush(), which took care of the IPI for
-> >>>> fast_gup serialization. The commit message says
-> >>>>
-> >>>>     pmdp_splitting_flush() is not needed too: on splitting PMD we will do
-> >>>>     pmdp_clear_flush() + set_pte_at().  pmdp_clear_flush() will do IPI as
-> >>>>     needed for fast_gup
-> >>>>
-> >>>> The assumption that a TLB flush will also produce an IPI is wrong on s390,
-> >>>> and maybe also on other architectures, and I thought that this was actually
-> >>>> the main reason for having an arch-specific pmdp_splitting_flush().
-> >>>>
-> >>>> At least PowerPC and ARM also had an individual implementation of
-> >>>> pmdp_splitting_flush() that used kick_all_cpus_sync() instead of a TLB
-> >>>> flush to send the IPI, and those were also removed. Putting the arch
-> >>>> maintainers and mailing lists on cc to verify.
-> >>>>
-> >>>> On s390 this will break the IPI serialization against fast_gup, which
-> >>>> would certainly explain the random kernel crashes, please revert or fix
-> >>>> the pmdp_splitting_flush() removal.
-> >>>
-> >>> Sorry for that.
-> >>>
-> >>> I believe, the problem was already addressed for PowerPC:
-> >>>
-> >>> http://lkml.kernel.org/g/454980831-16631-1-git-send-email-aneesh.kumar at linux.vnet.ibm.com
-> >>>
-> >>> I think kick_all_cpus_sync() in arch-specific pmdp_invalidate() would do
-> >>> the trick, right?
-> >>
-> >> Hmm, not sure about that. After pmdp_invalidate(), a pmd_none() check in
-> >> fast_gup will still return false, because the pmd is not empty (at least
-> >> on s390). So I don't see spontaneously how it will help fast_gup to break
-> >> out to the slow path in case of THP splitting.
-> > 
-> > What pmdp_flush_direct() does in pmdp_invalidate()? It's hard to unwrap for me :-/
-> > Does it make the pmd !pmd_present()?
+On 02/12/2016 12:49 AM, Kishon Vijay Abraham I wrote:
+> Hi,
 > 
-> It uses the idte instruction, which in an atomic fashion flushes the associated
-> TLB entry and changes the value of the pmd entry to invalid. This comes from the
-> HW requirement to not  change a PTE/PMD that might be still in use, other than 
-> with special instructions that does the tlb handling and the invalidation together.
-
-Correct, and it does _not_ make the pmd !pmd_present(), that would only be the
-case after a _clear_flush(). It only marks the pmd as invalid and flushes,
-so that it cannot generate a new TLB entry before the following pmd_populate(),
-but it keeps its other content. This is to fulfill the requirements outlined in
-the comment in mm/huge_memory.c before the call to pmdp_invalidate(). And
-independent from that comment, we would need such an _invalidate() or
-_clear_flush() on s390 before the pmd_populate() because of the HW details
-that Christian described.
-
-Reading the comment again, I do now notice that it also says "mark the current
-pmd notpresent", which we cannot do w/o losing the huge and (formerly) splitting
-bits, but it also shouldn't be needed to provide the "single TLB guarantee" that
-is required from the comment. So, a pmd_present() check on s390 in this state
-would still return true. Not sure yet if this is a problem, need more thinking,
-this behavior was already present before the THP rework but maybe it was OK
-before and is not OK now.
-
-At least for fast_gup this should not be a problem though.
-
-> (It also does some some other magic to the attach_count, which might hold off
-> finish_arch_post_lock_switch while some flushing is happening, but this should
-> be unrelated here)
+> On Friday 12 February 2016 12:57 AM, Paul Walmsley wrote:
+>> Hi Kishon, Suman,
+>>
+>> On Wed, 10 Feb 2016, Kishon Vijay Abraham I wrote:
+>>
+>>> On Wednesday 10 February 2016 07:12 AM, Suman Anna wrote:
+>>>> On 02/09/2016 01:36 PM, Paul Walmsley wrote:
+>>>>> On Tue, 9 Feb 2016, Suman Anna wrote:
+>>>>>> On 02/09/2016 02:49 AM, Paul Walmsley wrote:
+>>>>>>> On Mon, 8 Feb 2016, Suman Anna wrote:
+>>>>>>>> On 02/07/2016 08:48 PM, Paul Walmsley wrote:
+>>>>>>>>> On Tue, 2 Feb 2016, Kishon Vijay Abraham I wrote:
+>>>>>>>>>
+>>>>>>>>>> Paul, what do you think is the best way forward to perform reset?
+>>>>>>>>>
+>>>>>>>>> Many of the IP blocks with PRM hardreset lines are processor IP blocks. 
+>>>>>>>>> Those often need special reset handling to ensure that WFI/HLT-like 
+>>>>>>>>> instructions are executed after reset.  This special handling ensures that 
+>>>>>>>>> the IP blocks' bus initiator interfaces indicate that they are in standby 
+>>>>>>>>> to the PRCM - thus allowing power management for the rest of the chip to 
+>>>>>>>>> work correctly.
+>>>>>>>>>
+>>>>>>>>> But that doesn't seem to be the case with PCIe - and maybe others - 
+>>>>>>>>> possibly some of the MMUs?  
+>>>>>>>>
+>>>>>>>> Yeah, the sequencing between clocks and resets would still be the same
+>>>>>>>> for MMUs, so, adding the custom flags for MMUs is fine.
+>>>>>>>
+>>>>>>> I'm curious as to whether HWMOD_CUSTOM_HARDRESET is needed for the MMUs.  
+>>>>>>> We've stated that the main point of the custom hardreset code is to handle 
+>>>>>>> processors that need to be placed into WFI/HLT, but it doesn't seem like 
+>>>>>>> there would be an equivalent for MMUs.  Thoughts?
+>>>>>>
+>>>>>> The current OMAP IOMMU code already leverages the pdata ops for
+>>>>>> performing the resets, so not adding the flags would also require
+>>>>>> additional changes in the driver.
+>>>>>>
+>>>>>> Also, the reset lines controlling the MMUs actually also manage the
+>>>>>> reset for all the other sub-modules other than the processor cores
+>>>>>> within the sub-systems. We have currently different issues (see [1] for
+>>>>>> eg. around the IPU sub-system entering RET in between), so from a PM
+>>>>>> point of view, we do prefer to place the MMUs also in reset when we are
+>>>>>> runtime suspended.
+>>>>>
+>>>>> Should we reassert hardreset in _idle() for IP blocks that don't have 
+>>>>> HWMOD_CUSTOM_HARDRESET set on them?  Would that allow us to use this 
+>>>>> mechanism for the uncore hardreset lines, or are there other quirks?
+>>>>>
+>>>>> Also - would that address the potential issue that you mentioned with the 
+>>>>> PCIe block, or is that a different issue?
+>>>>
+>>>> Yeah, I think that would address the PCIe block issue in terms of reset
+>>>> state balancing between pm_runtime_get_sync() and pm_runtime_put()
+>>>> calls. Right now, they are unbalanced. The PCIe block is using these
+>>>> only in probe and remove, so it should work for that IP.
+>>>
+>>> As I mentioned before this would result in undesired behavior during
+>>> suspend/resume cycle in PCIe. (This should be okay for the current mainline
+>>> code but would break once we add suspend/resume support for PCIe).
+>>
+>> I'd like to understand where we're currently at here.  It looks like we're 
+>> waiting for testing from Suman, and we're waiting for Kishon to try using 
+>> the bind/unbind driver model hook to see if that wedges PCIe?  Does this 
+>> match your collective understanding of the status here?
 > 
+> I got to try this and looks like even without this series there are other PM
+> issues possible introduced by Commit 5de85b9d57ab ("PM / runtime: Re-init
+> runtime PM states at probe error and driver unbind").
 > 
-> > I'm also confused by pmd_none() is equal to !pmd_present() on s390. Hm?
+> Now I get this error if I tried to modprobe after rmmod pci-dra7xx.
+> [   54.352860] dra7-pcie 51000000.pcie: omap_device: omap_device_enable()
+> called from invalid state 1
+> [   54.362318] dra7-pcie 51000000.pcie: pm_runtime_get_sync failed
+> [   54.368624] dra7-pcie: probe of 51000000.pcie failed with error -22
 > 
-> Don't know, Gerald or Martin?
+> From the thread that fixes this issue [1], looks like drivers that use
+> *_autosuspend() get this issue. However I don't use *_autosuspend() in
+> pci-dra7xx. Maybe pci core has this? This has to be debugged further. But I
+> feel this is not related to the problem that we are trying to solve right now
+> (dra7 hangs if PCI driver is enabled) and given the fact that pci-dra7xx driver
+> is now modeled as built-in driver, this can be deferred.
+> 
+> [1] -> http://www.spinics.net/lists/arm-kernel/msg481845.html
+> 
+>>
+>> Thinking about the question of what to do about hardreset assertion in 
+>> idle, if we need it, we could add a hwmod flag to control that mode.  I 
+>> would consider it a temporary workaround until we have the hwmod code 
+>> moved into a bus driver and the bus driver/hwmod code can hook into the 
+>> LDM .remove operation (and connect it to .shutdown, etc.)  Suman/Kishon: 
+>> is it your understanding that we could remove the existing hardreset 
+>> control in the IOMMU drivers and the PCIe driver if we had these options 
+>> in the hwmod code? 
+> 
+> Yeah, that's my understanding. And since this series solves the PCIe problem,
+> it's proven that hardreset control can be moved to hwmod code.
+> 
+> For PCIe, it's even okay to do deassert in _reset, but I'm not sure if it'll
+> have side effects with other modules.
+> 
+> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+> index e9f65fe..24cafd9 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+> @@ -1966,8 +1966,11 @@ static int _reset(struct omap_hwmod *oh)
+>  		r = oh->class->reset(oh);
+>  	} else {
+>  		if (oh->rst_lines_cnt > 0) {
+> -			for (i = 0; i < oh->rst_lines_cnt; i++)
+> +			for (i = 0; i < oh->rst_lines_cnt; i++) {
+>  				_assert_hardreset(oh, oh->rst_lines[i].name);
+> +				if (!(oh->flags & HWMOD_CUSTOM_HARDRESET))
+> +					_deassert_hardreset(oh, oh->rst_lines[i].name);
+> +			}
 
-The implementation frequently changes depending on how many new bits Martin
-needs to squeeze out :-)
-We don't have a _PAGE_PRESENT bit for pmds, so pmd_present() just checks if the
-entry is not empty. pmd_none() of course does the opposite, it checks if it is
-empty.
+Better yet, just add this specific  _deassert_hardreset logic to a DRA7
+PCIe-specific class->reset function. You won't need adding the
+HWMOD_CUSTOM_HARDRESET flags either and will satisfy your suspend/resume
+dilemma, and it won't affect other paths. If that can work for you, that
+would be simplest patch for this -rc cycle.
 
+>  			return 0;
+>  		} else {
+>  			r = _ocp_softreset(oh);
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-s390" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Thanks
+> Kishon
 > 
+> P.S. I'll be on vacation till end of next week with no email access till then.
+> So email response will be delayed. Sorry about that.
+
+Sekhar,
+Will you be following up with above suggestion since Kishon is gonna be out?
+
+regards
+Suman
+
+>>
+>> Dave, any further comments here?
+>>
+>>
+>> - Paul
+>>
