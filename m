@@ -1,58 +1,34 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 12 Feb 2016 10:02:39 +0800
-Subject: [PATCH v8 02/10] mfd: axp20x: Remove second struct device * parameter
- for axp20x_match_device()
+Date: Fri, 12 Feb 2016 10:02:41 +0800
+Subject: [PATCH v8 04/10] mfd: axp20x: Add missing copyright notice
 In-Reply-To: <1455242567-17880-1-git-send-email-wens@csie.org>
 References: <1455242567-17880-1-git-send-email-wens@csie.org>
-Message-ID: <1455242567-17880-3-git-send-email-wens@csie.org>
+Message-ID: <1455242567-17880-5-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The first argument passed to axp20x_match_device(), struct axp20x_dev *,
-already contains a pointer to the device. By rearranging some code,
-moving the assignment of the pointer before axp20x_match_device() is
-called, we can eliminate the second parameter.
+Supply a backdated copyright notice.
 
-Suggested-by: Andy Shevchenko <andy.shevchenko@gmail.com>
+Cc: Carlo Caione <carlo@caione.org>
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Acked-by: Carlo Caione <carlo@caione.org>
 Acked-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mfd/axp20x.c | 11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
+ drivers/mfd/axp20x.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
 diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-index 9842199e2e6c..685a78614f83 100644
+index 3e186f2dcac3..cec51e689d1d 100644
 --- a/drivers/mfd/axp20x.c
 +++ b/drivers/mfd/axp20x.c
-@@ -606,8 +606,9 @@ static void axp20x_power_off(void)
- 		     AXP20X_OFF);
- }
- 
--static int axp20x_match_device(struct axp20x_dev *axp20x, struct device *dev)
-+static int axp20x_match_device(struct axp20x_dev *axp20x)
- {
-+	struct device *dev = axp20x->dev;
- 	const struct acpi_device_id *acpi_id;
- 	const struct of_device_id *of_id;
- 
-@@ -673,14 +674,14 @@ static int axp20x_i2c_probe(struct i2c_client *i2c,
- 	if (!axp20x)
- 		return -ENOMEM;
- 
--	ret = axp20x_match_device(axp20x, &i2c->dev);
--	if (ret)
--		return ret;
--
- 	axp20x->i2c_client = i2c;
- 	axp20x->dev = &i2c->dev;
- 	dev_set_drvdata(axp20x->dev, axp20x);
- 
-+	ret = axp20x_match_device(axp20x);
-+	if (ret)
-+		return ret;
-+
- 	axp20x->regmap = devm_regmap_init_i2c(i2c, axp20x->regmap_cfg);
- 	if (IS_ERR(axp20x->regmap)) {
- 		ret = PTR_ERR(axp20x->regmap);
+@@ -5,6 +5,8 @@
+  * converters, LDOs, multiple 12-bit ADCs of voltage, current and temperature
+  * as well as configurable GPIOs.
+  *
++ * Copyright (C) 2014 Carlo Caione
++ *
+  * Author: Carlo Caione <carlo@caione.org>
+  *
+  * This program is free software; you can redistribute it and/or modify
 -- 
 2.7.0
