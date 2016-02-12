@@ -1,112 +1,293 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 12 Feb 2016 16:17:09 +0100
-Subject: [PATCH v5sub1 7/8] arm64: move kernel image to base of vmalloc
- area
-In-Reply-To: <20160212151006.GJ31665@e104818-lin.cambridge.arm.com>
-References: <1454324093-15998-1-git-send-email-ard.biesheuvel@linaro.org>
- <1454324093-15998-8-git-send-email-ard.biesheuvel@linaro.org>
- <20160212145844.GI31665@e104818-lin.cambridge.arm.com>
- <CAKv+Gu-x6QPorWsPDP8bqAkmbasqzhqmP39HS=qprfGB4r8JLw@mail.gmail.com>
- <20160212151006.GJ31665@e104818-lin.cambridge.arm.com>
-Message-ID: <CAKv+Gu84mVP=YjbLhWoGj9AEUD8m8+Lq8kTCniCHwxJwMWaZtA@mail.gmail.com>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Fri, 12 Feb 2016 07:17:45 -0800
+Subject: [PATCH v2] serial: earlycon: rework common framework for earlycon
+ declarations
+In-Reply-To: <1455273394-27350-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1455273394-27350-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <56BDF799.1030505@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 February 2016 at 16:10, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Fri, Feb 12, 2016 at 04:02:58PM +0100, Ard Biesheuvel wrote:
->> On 12 February 2016 at 15:58, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> > Hi Ard,
->> >
->> > On Mon, Feb 01, 2016 at 11:54:52AM +0100, Ard Biesheuvel wrote:
->> >> This moves the module area to right before the vmalloc area, and
->> >> moves the kernel image to the base of the vmalloc area. This is
->> >> an intermediate step towards implementing KASLR, which allows the
->> >> kernel image to be located anywhere in the vmalloc area.
->> >>
->> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> >
->> > This patch is causing lots of KASAN warnings on Juno (interestingly, it
->> > doesn't seem to trigger on Seattle, though we only tried for-next/core).
->> > I pushed the branch that I'm currently using here:
->> >
->> > git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux for-next/kernmap
->> >
->> >
->> > A typical error (though its place varies based on the config options,
->> > kernel layout):
->> >
->> > BUG: KASAN: stack-out-of-bounds in clockevents_program_event+0x28/0x1b0 at addr ffffffc936257cc8
->>
->> Can you confirm that these are stack accesses? I was having similar
->> errors before, and I ended up creating the kasan zero page patch
->> because it turned out the kasan shadow page in question was aliased
->> and the stack writes were occurring elsewhere.
->
-> It's possible, we are looking into this. Is there any other patch I miss on
-> the above branch?
->
+On 02/12/2016 02:36 AM, Masahiro Yamada wrote:
+> Commit 71f50c6d9a22 ("of: drop symbols declared by _OF_DECLARE() from
+> modules") fixed the link error introduced by commit b8d20e06eaad
+> ("serial: 8250_uniphier: add earlycon support").
+> 
+> After commit 2eaa790989e0 ("earlycon: Use common framework for
+> earlycon declarations") was applied, the link error came back
+> because the commit reworked OF_EARLYCON_DECLARE() to not use
+> _OF_DECLARE().
 
-I don't think so but I will check
-
-> BTW, disabling CPU_IDLE, I get other errors:
->
-> WARNING: at /work/Linux/linux-2.6-aarch64/mm/vmalloc.c:135
-> Modules linked in:
->
-
-Since this occurs in kasan_module_alloc(), I think this may be a
-symptom of the same underlying issue, where the kernel VA space and
-the projection onto the Kasan shadow area are somehow out of sync.
-
-I will try to reproduce with the branch above.
+What link error are you getting?
 
 
+> This commit reworks OF_EARLYCON_DECLARE() again based on
+> _OF_DECLARE().  My motivations are:
+> 
+>  - Fix the link error in a generic way (without patching
+>    drivers/tty/serial/8250/8250_uniphier.c)
+> 
+>  - Delete struct earlycon_id.  This struct is re-inventing the wheel;
+>    the fields "name", "compatible", "setup" can be implemented in
+>    struct of_device_id as other frameworks do.
 
-> CPU: 2 PID: 973 Comm: systemd-modules Tainted: G        W       4.5.0-rc1+ #131
-> Hardware name: Juno (DT)
-> task: ffffffc93448e200 ti: ffffffc9346ac000 task.ti: ffffffc9346ac000
-> PC is at vmap_page_range_noflush+0x240/0x2e8
-> LR is at vmap_page_range_noflush+0x16c/0x2e8
-> pc : [<ffffff90041fef78>] lr : [<ffffff90041feea4>] pstate: 20000145
-> sp : ffffffc9346af9b0
-> x29: ffffffc9346af9b0 x28: ffffff90050da000
-> x27: ffffffc001438008 x26: ffffffbde6d16440
-> x25: 0000004240000000 x24: ffffffc97ff3a000
-> x23: 0000000000000041 x22: ffffffc078e9e600
-> x21: ffffff8200002000 x20: ffffff8200001000
-> x19: 0000000000000000 x18: 00000000f3294c2f
-> x17: 00000000f7dc90fb x16: 0000000087b402ce
-> x15: ffffffffffffffff x14: ffffff0000000000
-> x13: ffffffffffffffff x12: 0000000000000028
-> x11: 0101010101010101 x10: 00000001801a001a
-> x9 : 0000000000000000 x8 : ffffff89268b2400
-> x7 : 0000000000000000 x6 : 000000000000003f
-> x5 : 0000000000000040 x4 : 0000000000000000
-> x3 : 0000000000000000 x2 : 1ffffff800287001
-> x1 : dfffff9000000000 x0 : 00e8000081439713
->
-> ---[ end trace 8a78d7ad8d08d2a9 ]---
-> Call trace:
-> Exception stack(0xffffffc9346af790 to 0xffffffc9346af8b0)
-> f780:                                   0000000000000000 ffffff8200001000
-> f7a0: ffffffc9346af9b0 ffffff90041fef78 0000000020000145 000000000000003d
-> f7c0: 0000004240000000 ffffffc078e9f600 0000000041b58ab3 ffffff9004f0c370
-> f7e0: ffffff9004082608 ffffffc078e9f620 00000000024080c2 0000000000400000
-> f800: ffffffc9346afe70 ffffffc9346afe50 ffffffc9346af9b0 ffffffc93448e200
-> f820: ffffffc9346af830 ffffff900408b1b0 ffffffc9346af900 ffffff900408b228
-> f840: ffffffc9346ac000 ffffffc9346af9b0 ffffffc9346ac000 ffffffc078e9e600
-> f860: 0000000041b58ab3 ffffff9004f0c8a8 ffffff900408b080 000000010010000e
-> f880: ffffffc9346af9b0 0000000000000000 00e8000081439713 dfffff9000000000
-> f8a0: 1ffffff800287001 0000000000000000
-> [<ffffff90041fef78>] vmap_page_range_noflush+0x240/0x2e8
-> [<ffffff90041ff078>] map_vm_area+0x58/0x88
-> [<ffffff9004200400>] __vmalloc_node_range+0x2b8/0x350
-> [<ffffff9004224394>] kasan_module_alloc+0x64/0xb8
-> [<ffffff90040943f4>] module_alloc+0x5c/0xa0
-> [<ffffff9004169460>] load_module+0x1798/0x3098
-> [<ffffff900416b020>] SyS_finit_module+0xf8/0x108
-> [<ffffff9004085d30>] el0_svc_naked+0x24/0x28
-> vmalloc: allocation failure, allocated 4096 of 4096 bytes
->
-> --
-> Catalin
+This patch basically reverts the common framework.
+What happens when not building with OF? Does it still declare the
+earlycon table?
+
+
+> The difference between OF_EARLYCON_DECLARE() and other users of
+> _OF_DECLARE is that OF_EARLYCON_DECLARE() needs to fill the "name"
+> field of struct of_device_id.  To make it easier, a new macro
+> _OF_DECLARE_WITH_NAME() has been added.  It fills the "name" field
+> with the given argument.  On the other hand, _OF_DECLARE() sets it
+> to a null string; this is the same behavior as before.
+> 
+> Fixes: 2eaa790989e0 ("earlycon: Use common framework for earlycon declarations")
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
+> 
+> I confirmed this patch can apply onto "next-20160212" tag of linux-next.
+> 
+> In order to apply it onto the "tty-next" branch of TTY subsytem,
+> Greg will have to pull v4.5-rc3 in.
+> 
+> 
+> Changes in v2:
+>   Minor updates of git-log
+>    - fix a typo framework/frameworks/).
+>    - s/Grag/Greg/   (Sorry!)
+> 
+>  drivers/of/fdt.c                  |  7 ++-----
+>  drivers/tty/serial/earlycon.c     | 19 +++++++++++++------
+>  include/asm-generic/vmlinux.lds.h | 12 ++----------
+>  include/linux/of.h                | 22 +++++++++++++++-------
+>  include/linux/serial_core.h       | 23 +++++++----------------
+>  5 files changed, 39 insertions(+), 44 deletions(-)
+> 
+> diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+> index e2295b2..ad262e9 100644
+> --- a/drivers/of/fdt.c
+> +++ b/drivers/of/fdt.c
+> @@ -802,7 +802,7 @@ static int __init early_init_dt_scan_chosen_serial(void)
+>  	int offset;
+>  	const char *p, *q, *options = NULL;
+>  	int l;
+> -	const struct earlycon_id *match;
+> +	const struct of_device_id *match;
+>  	const void *fdt = initial_boot_params;
+>  
+>  	offset = fdt_path_offset(fdt, "/chosen");
+> @@ -829,10 +829,7 @@ static int __init early_init_dt_scan_chosen_serial(void)
+>  		return 0;
+>  	}
+>  
+> -	for (match = __earlycon_table; match < __earlycon_table_end; match++) {
+> -		if (!match->compatible[0])
+> -			continue;
+> -
+> +	for (match = __earlycon_of_table; match->compatible[0]; match++) {
+>  		if (fdt_node_check_compatible(fdt, offset, match->compatible))
+>  			continue;
+>  
+> diff --git a/drivers/tty/serial/earlycon.c b/drivers/tty/serial/earlycon.c
+> index 067783f..4888ced 100644
+> --- a/drivers/tty/serial/earlycon.c
+> +++ b/drivers/tty/serial/earlycon.c
+> @@ -38,6 +38,9 @@ static struct earlycon_device early_console_dev = {
+>  	.con = &early_con,
+>  };
+>  
+> +static const struct of_device_id __earlycon_of_table_sentinel
+> +	__used __section(__earlycon_of_table_end);
+> +
+>  static void __iomem * __init earlycon_map(unsigned long paddr, size_t size)
+>  {
+>  	void __iomem *base;
+> @@ -127,9 +130,10 @@ static int __init parse_options(struct earlycon_device *device, char *options)
+>  	return 0;
+>  }
+>  
+> -static int __init register_earlycon(char *buf, const struct earlycon_id *match)
+> +static int __init register_earlycon(char *buf, const struct of_device_id *match)
+>  {
+>  	int err;
+> +	int (*setup)(struct earlycon_device *, const char *options);
+>  	struct uart_port *port = &early_console_dev.port;
+>  
+>  	/* On parsing error, pass the options buf to the setup function */
+> @@ -142,7 +146,8 @@ static int __init register_earlycon(char *buf, const struct earlycon_id *match)
+>  		port->membase = earlycon_map(port->mapbase, 64);
+>  
+>  	earlycon_init(&early_console_dev, match->name);
+> -	err = match->setup(&early_console_dev, buf);
+> +	setup = match->data;
+> +	err = setup(&early_console_dev, buf);
+>  	if (err < 0)
+>  		return err;
+>  	if (!early_console_dev.con->write)
+> @@ -172,7 +177,7 @@ static int __init register_earlycon(char *buf, const struct earlycon_id *match)
+>   */
+>  int __init setup_earlycon(char *buf)
+>  {
+> -	const struct earlycon_id *match;
+> +	const struct of_device_id *match;
+>  
+>  	if (!buf || !buf[0])
+>  		return -EINVAL;
+> @@ -180,7 +185,7 @@ int __init setup_earlycon(char *buf)
+>  	if (early_con.flags & CON_ENABLED)
+>  		return -EALREADY;
+>  
+> -	for (match = __earlycon_table; match < __earlycon_table_end; match++) {
+> +	for (match = __earlycon_of_table; match->name[0]; match++) {
+>  		size_t len = strlen(match->name);
+>  
+>  		if (strncmp(buf, match->name, len))
+> @@ -220,12 +225,13 @@ early_param("earlycon", param_setup_earlycon);
+>  
+>  #ifdef CONFIG_OF_EARLY_FLATTREE
+>  
+> -int __init of_setup_earlycon(const struct earlycon_id *match,
+> +int __init of_setup_earlycon(const struct of_device_id *match,
+>  			     unsigned long node,
+>  			     const char *options)
+>  {
+>  	int err;
+>  	struct uart_port *port = &early_console_dev.port;
+> +	int (*setup)(struct earlycon_device *, const char *options);
+>  	const __be32 *val;
+>  	bool big_endian;
+>  	u64 addr;
+> @@ -273,7 +279,8 @@ int __init of_setup_earlycon(const struct earlycon_id *match,
+>  			sizeof(early_console_dev.options));
+>  	}
+>  	earlycon_init(&early_console_dev, match->name);
+> -	err = match->setup(&early_console_dev, options);
+> +	setup = match->data;
+> +	err = setup(&early_console_dev, options);
+>  	if (err < 0)
+>  		return err;
+>  	if (!early_console_dev.con->write)
+> diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
+> index e9a81a6..699f4a5 100644
+> --- a/include/asm-generic/vmlinux.lds.h
+> +++ b/include/asm-generic/vmlinux.lds.h
+> @@ -153,15 +153,6 @@
+>  #define TRACE_SYSCALLS()
+>  #endif
+>  
+> -#ifdef CONFIG_SERIAL_EARLYCON
+> -#define EARLYCON_TABLE() STRUCT_ALIGN();			\
+> -			 VMLINUX_SYMBOL(__earlycon_table) = .;	\
+> -			 *(__earlycon_table)			\
+> -			 VMLINUX_SYMBOL(__earlycon_table_end) = .;
+> -#else
+> -#define EARLYCON_TABLE()
+> -#endif
+> -
+>  #define ___OF_TABLE(cfg, name)	_OF_TABLE_##cfg(name)
+>  #define __OF_TABLE(cfg, name)	___OF_TABLE(cfg, name)
+>  #define OF_TABLE(cfg, name)	__OF_TABLE(config_enabled(cfg), name)
+> @@ -179,6 +170,7 @@
+>  #define RESERVEDMEM_OF_TABLES()	OF_TABLE(CONFIG_OF_RESERVED_MEM, reservedmem)
+>  #define CPU_METHOD_OF_TABLES()	OF_TABLE(CONFIG_SMP, cpu_method)
+>  #define CPUIDLE_METHOD_OF_TABLES() OF_TABLE(CONFIG_CPU_IDLE, cpuidle_method)
+> +#define EARLYCON_OF_TABLES()	OF_TABLE(CONFIG_SERIAL_EARLYCON, earlycon)
+>  
+>  #ifdef CONFIG_ACPI
+>  #define ACPI_PROBE_TABLE(name)						\
+> @@ -525,7 +517,7 @@
+>  	IRQCHIP_OF_MATCH_TABLE()					\
+>  	ACPI_PROBE_TABLE(irqchip)					\
+>  	ACPI_PROBE_TABLE(clksrc)					\
+> -	EARLYCON_TABLE()
+> +	EARLYCON_OF_TABLES()
+>  
+>  #define INIT_TEXT							\
+>  	*(.init.text)							\
+> diff --git a/include/linux/of.h b/include/linux/of.h
+> index dc6e396..6e57245 100644
+> --- a/include/linux/of.h
+> +++ b/include/linux/of.h
+> @@ -930,19 +930,27 @@ static inline int of_get_available_child_count(const struct device_node *np)
+>  }
+>  
+>  #if defined(CONFIG_OF) && !defined(MODULE)
+> -#define _OF_DECLARE(table, name, compat, fn, fn_type)			\
+> -	static const struct of_device_id __of_table_##name		\
+> +#define __OF_DECLARE(table, name1, name2, compat, fn, fn_type)		\
+> +	static const struct of_device_id __UNIQUE_ID(__of_table_##name1)\
+>  		__used __section(__##table##_of_table)			\
+> -		 = { .compatible = compat,				\
+> +		 = { .name = name2,					\
+> +		     .compatible = compat,				\
+>  		     .data = (fn == (fn_type)NULL) ? fn : fn  }
+>  #else
+> -#define _OF_DECLARE(table, name, compat, fn, fn_type)			\
+> -	static const struct of_device_id __of_table_##name		\
+> +#define __OF_DECLARE(table, name1, name2, compat, fn, fn_type)		\
+> +	static const struct of_device_id __UNIQUE_ID(__of_table_##name1)\
+>  		__attribute__((unused))					\
+> -		 = { .compatible = compat,				\
+> -		     .data = (fn == (fn_type)NULL) ? fn : fn }
+> +		 = { .name = name2,					\
+> +		     .compatible = compat,				\
+> +		     .data = (fn == (fn_type)NULL) ? fn : fn  }
+>  #endif
+>  
+> +#define _OF_DECLARE(table, name, compat, fn, fn_type)	\
+> +	__OF_DECLARE(table, name, "", compat, fn, fn_type)
+> +
+> +#define _OF_DECLARE_WITH_NAME(table, name, compat, fn, fn_type)	\
+> +	__OF_DECLARE(table, name, __stringify(name), compat, fn, fn_type)
+> +
+>  typedef int (*of_init_fn_2)(struct device_node *, struct device_node *);
+>  typedef void (*of_init_fn_1)(struct device_node *);
+>  
+> diff --git a/include/linux/serial_core.h b/include/linux/serial_core.h
+> index cbfcf38..0f13160 100644
+> --- a/include/linux/serial_core.h
+> +++ b/include/linux/serial_core.h
+> @@ -24,6 +24,7 @@
+>  #include <linux/compiler.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/circ_buf.h>
+> +#include <linux/mod_devicetable.h>
+>  #include <linux/spinlock.h>
+>  #include <linux/sched.h>
+>  #include <linux/tty.h>
+> @@ -340,26 +341,16 @@ struct earlycon_device {
+>  	unsigned int baud;
+>  };
+>  
+> -struct earlycon_id {
+> -	char	name[16];
+> -	char	compatible[128];
+> -	int	(*setup)(struct earlycon_device *, const char *options);
+> -} __aligned(32);
+> +extern const struct of_device_id __earlycon_of_table[];
+>  
+> -extern const struct earlycon_id __earlycon_table[];
+> -extern const struct earlycon_id __earlycon_table_end[];
+> +#define OF_EARLYCON_DECLARE(name, compat, fn)				\
+> +	_OF_DECLARE_WITH_NAME(earlycon, name, compat, fn, void *)
+>  
+> -#define OF_EARLYCON_DECLARE(_name, compat, fn)				\
+> -	static const struct earlycon_id __UNIQUE_ID(__earlycon_##_name)	\
+> -	     __used __section(__earlycon_table)				\
+> -		= { .name = __stringify(_name),				\
+> -		    .compatible = compat,				\
+> -		    .setup = fn  }
+> -
+> -#define EARLYCON_DECLARE(_name, fn)	OF_EARLYCON_DECLARE(_name, "", fn)
+> +#define EARLYCON_DECLARE(_name, fn)	\
+> +	OF_EARLYCON_DECLARE(_name, "-earlycon-dummy-compat-string-", fn)
+>  
+>  extern int setup_earlycon(char *buf);
+> -extern int of_setup_earlycon(const struct earlycon_id *match,
+> +extern int of_setup_earlycon(const struct of_device_id *match,
+>  			     unsigned long node,
+>  			     const char *options);
+>  
+> 
