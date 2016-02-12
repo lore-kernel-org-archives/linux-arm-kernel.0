@@ -1,39 +1,80 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 12 Feb 2016 09:30:17 -0800
-Subject: [PATCH] Revert "ASoC: qcom: Specify LE device endianness"
-Message-ID: <1455298217-15744-1-git-send-email-sboyd@codeaurora.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 12 Feb 2016 18:32:31 +0100
+Subject: [PATCH 1/2] arm64: mm: Enable CONT_SIZE aligned sections for 64k
+ page kernels.
+In-Reply-To: <CAKv+Gu-CYxr9jk=U-NrfRkyBhi0M2_9G+Mqx8fYeEEkRL8GnVw@mail.gmail.com>
+References: <1455293208-6763-1-git-send-email-jeremy.linton@arm.com>
+ <1455293208-6763-2-git-send-email-jeremy.linton@arm.com>
+ <CAKv+Gu_ViEAVN1GEDMWpJ5OYjg6BVSLTEtdus6vCCXchQ1BOjw@mail.gmail.com>
+ <56BE0698.10506@arm.com>
+ <CAKv+Gu--05Wn6oWEiy=43nzujNgG0=DpOB9b1zs9_jfddYXWwQ@mail.gmail.com>
+ <56BE0BAB.7060502@arm.com>
+ <CAKv+Gu-CYxr9jk=U-NrfRkyBhi0M2_9G+Mqx8fYeEEkRL8GnVw@mail.gmail.com>
+Message-ID: <CAKv+Gu-ukreZPCJ6S-fdNwgjPvJZPWsWKanhri37ZR2bbmoZfg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit 18560a4e3b07438113b50589e78532d95f907029.
+On 12 February 2016 at 17:46, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> On 12 February 2016 at 17:43, Jeremy Linton <jeremy.linton@arm.com> wrote:
+>> On 02/12/2016 10:28 AM, Ard Biesheuvel wrote:
+>>>
+>>> On 12 February 2016 at 17:21, Jeremy Linton <jeremy.linton@arm.com> wrote:
+>>>>
+>>>> On 02/12/2016 10:11 AM, Ard Biesheuvel wrote:
+>>>>>
+>>>>>
+>>>>> On 12 February 2016 at 17:06, Jeremy Linton <jeremy.linton@arm.com>
+>>>>> wrote:
+>>>>
+>>>>
+>>>> (trimming)
+>>>>>>
+>>>>>>
+>>>>>>    #if defined(CONFIG_DEBUG_ALIGN_RODATA)
+>>>>>> -#define ALIGN_DEBUG_RO                 . = ALIGN(1<<SECTION_SHIFT);
+>>>>>> -#define ALIGN_DEBUG_RO_MIN(min)                ALIGN_DEBUG_RO
+>>>>>> +#if defined(CONFIG_ARM64_64K_PAGES)
+>>>>>> +#define ALIGN_DEBUG_RO_MIN(min)                . = ALIGN(CONT_SIZE);
+>>>>>> +#else
+>>>>>> +#define ALIGN_DEBUG_RO_MIN(min)                . =
+>>>>>> ALIGN(SECTION_SIZE);
+>>>>>
+>>>>>
+>>>>>
+>>>>> Doesn't this align to 32 MB on 16k pages kernels?
+>>>>
+>>>>
+>>>>
+>>>> Yes, I considered whether it was more appropriate to use CONT_SIZE for
+>>>> 16k
+>>>> as well.
+>>>>
+>>>> Opinions?
+>>>>
+>>>
+>>> Looking at vmlinux.lds.S, I see that that would put _stext and
+>>> __init_begin at 32 MB aligned boundaries. making the size of the
+>>> kernel at least 64 MB. If I take your .rodata patch into account,
+>>> which adds a third instance of ALIGN_DEBUG_RO_MIN, the Image footprint
+>>> will rise to ~100 MB. Or am I missing something?
+>>>
+>>
+>> No, I think your correct. But, its an option, and it sort of depends on use
+>> case. In a system with 100+GB of RAM it might be useful. Not so much on a
+>> phone or small embedded system. I don't really see those people enabling
+>> ALIGN_RODATA anyway. Worse, I expect the loss of RAM efficiently going from
+>> 4k-16k pages in a RAM constrained system to be a pretty big hit too.
+>>
+>> I don't have any hard data one way or the other, and I don't have a strong
+>> opinion. Although, I suspect at the moment the potential users of 16k pages
+>> may tend toward the small side.
+>>
+>
+> Well, the thing is, if you only use 2 MB of each 32 MB on average, you
+> gain nothing by going from contiguous pages to proper sections, since
+> the TLB footprint is the same. So my opinion would be to use CONT_SIZE
+> for 16k pages as well.
 
-The commit that caused us to specify LE device endianness here,
-29bb45f25ff3 (regmap-mmio: Use native endianness for read/write,
-2015-10-29), has been reverted in mainline so now when we specify
-LE it actively breaks big endian kernels because the byte
-swapping in regmap-mmio is incorrect. Let's revert this change
-because it will 1) fix the big endian kernels and 2) be redundant
-to specify LE because that will become the default soon.
-
-Cc: Kenneth Westfield <kwestfie@codeaurora.org>
-Cc: Kevin Hilman <khilman@linaro.org>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- sound/soc/qcom/lpass-cpu.c | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/sound/soc/qcom/lpass-cpu.c b/sound/soc/qcom/lpass-cpu.c
-index 00b6c9d039cf..e5101e0d2d37 100644
---- a/sound/soc/qcom/lpass-cpu.c
-+++ b/sound/soc/qcom/lpass-cpu.c
-@@ -355,7 +355,6 @@ static struct regmap_config lpass_cpu_regmap_config = {
- 	.readable_reg = lpass_cpu_regmap_readable,
- 	.volatile_reg = lpass_cpu_regmap_volatile,
- 	.cache_type = REGCACHE_FLAT,
--	.val_format_endian = REGMAP_ENDIAN_LITTLE,
- };
- 
- int asoc_qcom_lpass_cpu_platform_probe(struct platform_device *pdev)
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Actually, none of this matters, since the physical alignment is not
+guaranteed to be 32 MB. So anything beyond 2 MB is not really
+meaningful imo
