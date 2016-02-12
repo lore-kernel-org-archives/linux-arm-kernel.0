@@ -1,62 +1,33 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Fri, 12 Feb 2016 09:47:52 -0600
-Subject: [PATCH] arm/arm64/crypto: assure that ECB modes don't require an IV
-Message-ID: <1455292072-5236-1-git-send-email-jeremy.linton@arm.com>
+From: dirk.behme@gmail.com (Dirk Behme)
+Date: Fri, 12 Feb 2016 16:51:00 +0100
+Subject: [PATCH] ARM: imx: Do L2 errata only if the L2 cache isn't enabled
+In-Reply-To: <20160212141654.GA10826@n2100.arm.linux.org.uk>
+References: <1455261093-11849-1-git-send-email-dirk.behme@de.bosch.com>
+ <20160212141654.GA10826@n2100.arm.linux.org.uk>
+Message-ID: <56BDFF64.9090701@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ECB modes don't use an initialization vector. The kernel
-/proc/crypto interface doesn't reflect this properly.
+On 12.02.2016 15:16, Russell King - ARM Linux wrote:
+> On Fri, Feb 12, 2016 at 08:11:33AM +0100, Dirk Behme wrote:
+>> All the generic L2 cache handling code is encapsulated by a
+>> check if the L2 cache is enabled. If it's enabled already, the code
+>> is skipped.
+>>
+>> For the i.MX6 specific L2 cache handling we missed this check.
+>> Add it.
+>
+> What's the reasoning behind this?  The prefetch register is writable
+> while the L2 cache is enabled, unlike the auxiliary control register.
 
-Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
----
- arch/arm/crypto/aes-ce-glue.c | 4 ++--
- arch/arm64/crypto/aes-glue.c  | 4 ++--
- 2 files changed, 4 insertions(+), 4 deletions(-)
+ From an internal log I have the following info:
 
-diff --git a/arch/arm/crypto/aes-ce-glue.c b/arch/arm/crypto/aes-ce-glue.c
-index b445a5d..89a3a3e 100644
---- a/arch/arm/crypto/aes-ce-glue.c
-+++ b/arch/arm/crypto/aes-ce-glue.c
-@@ -364,7 +364,7 @@ static struct crypto_alg aes_algs[] = { {
- 	.cra_blkcipher = {
- 		.min_keysize	= AES_MIN_KEY_SIZE,
- 		.max_keysize	= AES_MAX_KEY_SIZE,
--		.ivsize		= AES_BLOCK_SIZE,
-+		.ivsize		= 0,
- 		.setkey		= ce_aes_setkey,
- 		.encrypt	= ecb_encrypt,
- 		.decrypt	= ecb_decrypt,
-@@ -441,7 +441,7 @@ static struct crypto_alg aes_algs[] = { {
- 	.cra_ablkcipher = {
- 		.min_keysize	= AES_MIN_KEY_SIZE,
- 		.max_keysize	= AES_MAX_KEY_SIZE,
--		.ivsize		= AES_BLOCK_SIZE,
-+		.ivsize		= 0,
- 		.setkey		= ablk_set_key,
- 		.encrypt	= ablk_encrypt,
- 		.decrypt	= ablk_decrypt,
-diff --git a/arch/arm64/crypto/aes-glue.c b/arch/arm64/crypto/aes-glue.c
-index 05d9e16..7a3d22a 100644
---- a/arch/arm64/crypto/aes-glue.c
-+++ b/arch/arm64/crypto/aes-glue.c
-@@ -294,7 +294,7 @@ static struct crypto_alg aes_algs[] = { {
- 	.cra_blkcipher = {
- 		.min_keysize	= AES_MIN_KEY_SIZE,
- 		.max_keysize	= AES_MAX_KEY_SIZE,
--		.ivsize		= AES_BLOCK_SIZE,
-+		.ivsize		= 0,
- 		.setkey		= aes_setkey,
- 		.encrypt	= ecb_encrypt,
- 		.decrypt	= ecb_decrypt,
-@@ -371,7 +371,7 @@ static struct crypto_alg aes_algs[] = { {
- 	.cra_ablkcipher = {
- 		.min_keysize	= AES_MIN_KEY_SIZE,
- 		.max_keysize	= AES_MAX_KEY_SIZE,
--		.ivsize		= AES_BLOCK_SIZE,
-+		.ivsize		= 0,
- 		.setkey		= ablk_set_key,
- 		.encrypt	= ablk_encrypt,
- 		.decrypt	= ablk_decrypt,
--- 
-2.4.3
+The write to the L2-Cache controller from non-secure world causes an 
+imprecise
+external abort. If Linux runs from normal world the cache controller 
+is already
+enabled and thus no configuration is needed by Linux.
+
+Best regards
+
+Dirk
