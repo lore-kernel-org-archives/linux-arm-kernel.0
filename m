@@ -1,42 +1,71 @@
 From: CARLOS.PALMINHA@synopsys.com (Carlos Palminha)
-Date: Fri, 12 Feb 2016 13:50:02 +0000
-Subject: [PATCH 02/17] drm/udl: removed optional dummy encoder mode_fixup
- function.
-In-Reply-To: <1455285017-2771-1-git-send-email-palminha@synopsys.com>
-References: <1455285017-2771-1-git-send-email-palminha@synopsys.com>
-Message-ID: <1455285017-2771-3-git-send-email-palminha@synopsys.com>
+Date: Fri, 12 Feb 2016 13:50:00 +0000
+Subject: [PATCH 00/17] drm encoders cleanup: nuke optional dummy encoder
+ mode_fixup function.
+Message-ID: <1455285017-2771-1-git-send-email-palminha@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
----
- drivers/gpu/drm/udl/udl_encoder.c | 8 --------
- 1 file changed, 8 deletions(-)
+mode_fixup function for encoder drivers became optional with patch
+http://patchwork.freedesktop.org/patch/msgid/1455106522-32307-1-git-send-email-palminha at synopsys.com
 
-diff --git a/drivers/gpu/drm/udl/udl_encoder.c b/drivers/gpu/drm/udl/udl_encoder.c
-index a181a64..59a4b34 100644
---- a/drivers/gpu/drm/udl/udl_encoder.c
-+++ b/drivers/gpu/drm/udl/udl_encoder.c
-@@ -26,13 +26,6 @@ static void udl_encoder_disable(struct drm_encoder *encoder)
- {
- }
- 
--static bool udl_mode_fixup(struct drm_encoder *encoder,
--			   const struct drm_display_mode *mode,
--			   struct drm_display_mode *adjusted_mode)
--{
--	return true;
--}
--
- static void udl_encoder_prepare(struct drm_encoder *encoder)
- {
- }
-@@ -54,7 +47,6 @@ udl_encoder_dpms(struct drm_encoder *encoder, int mode)
- 
- static const struct drm_encoder_helper_funcs udl_helper_funcs = {
- 	.dpms = udl_encoder_dpms,
--	.mode_fixup = udl_mode_fixup,
- 	.prepare = udl_encoder_prepare,
- 	.mode_set = udl_encoder_mode_set,
- 	.commit = udl_encoder_commit,
+This patch set nukes all the dummy mode_fixup implementations.
+
+(made on top of Daniel topic/drm-misc branch)
+
+Carlos Palminha (17):
+  drm/virtio: removed optional dummy encoder mode_fixup function.
+  drm/udl: removed optional dummy encoder mode_fixup function.
+  drm/exynos: removed optional dummy encoder mode_fixup function.
+  drm/amdgpu: removed optional dummy encoder mode_fixup function.
+  drm/ast: removed optional dummy encoder mode_fixup function.
+  drm/bochs: removed optional dummy encoder mode_fixup function.
+  drm/cirrus: removed optional dummy encoder mode_fixup function.
+  drm/exynos: removed optional dummy encoder mode_fixup function.
+  drm/gma500: removed optional dummy encoder mode_fixup function.
+  drm/imx: removed optional dummy encoder mode_fixup function.
+  drm/msm/mdp: removed optional dummy encoder mode_fixup function.
+  drm/mgag200: removed optional dummy encoder mode_fixup function.
+  drm/qxl: removed optional dummy encoder mode_fixup function.
+  drm/radeon: removed optional dummy encoder mode_fixup function.
+  drm/rockchip: removed optional dummy encoder mode_fixup function.
+  drm/sti: removed optional dummy encoder mode_fixup function.
+  drm/tilcdc: removed optional dummy encoder mode_fixup function.
+
+ drivers/gpu/drm/amd/amdgpu/dce_v10_0.c           |  8 --------
+ drivers/gpu/drm/amd/amdgpu/dce_v11_0.c           |  8 --------
+ drivers/gpu/drm/amd/amdgpu/dce_v8_0.c            |  8 --------
+ drivers/gpu/drm/ast/ast_mode.c                   |  8 --------
+ drivers/gpu/drm/bochs/bochs_kms.c                |  8 --------
+ drivers/gpu/drm/cirrus/cirrus_mode.c             |  9 ---------
+ drivers/gpu/drm/exynos/exynos_dp_core.c          |  8 --------
+ drivers/gpu/drm/exynos/exynos_drm_dpi.c          |  8 --------
+ drivers/gpu/drm/exynos/exynos_drm_dsi.c          |  8 --------
+ drivers/gpu/drm/exynos/exynos_drm_vidi.c         |  8 --------
+ drivers/gpu/drm/gma500/cdv_intel_crt.c           |  1 -
+ drivers/gpu/drm/gma500/cdv_intel_hdmi.c          |  1 -
+ drivers/gpu/drm/gma500/gma_display.c             |  7 -------
+ drivers/gpu/drm/gma500/gma_display.h             |  3 ---
+ drivers/gpu/drm/gma500/oaktrail_hdmi.c           |  1 -
+ drivers/gpu/drm/imx/dw_hdmi-imx.c                |  8 --------
+ drivers/gpu/drm/imx/imx-ldb.c                    |  8 --------
+ drivers/gpu/drm/imx/imx-tve.c                    |  8 --------
+ drivers/gpu/drm/imx/parallel-display.c           |  8 --------
+ drivers/gpu/drm/mgag200/mgag200_mode.c           |  8 --------
+ drivers/gpu/drm/msm/mdp/mdp4/mdp4_dsi_encoder.c  |  8 --------
+ drivers/gpu/drm/msm/mdp/mdp4/mdp4_dtv_encoder.c  |  8 --------
+ drivers/gpu/drm/msm/mdp/mdp4/mdp4_lcdc_encoder.c |  8 --------
+ drivers/gpu/drm/msm/mdp/mdp5/mdp5_cmd_encoder.c  |  9 ---------
+ drivers/gpu/drm/msm/mdp/mdp5/mdp5_encoder.c      |  8 --------
+ drivers/gpu/drm/qxl/qxl_display.c                |  9 ---------
+ drivers/gpu/drm/radeon/atombios_encoders.c       |  8 --------
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c           |  8 --------
+ drivers/gpu/drm/sti/sti_tvout.c                  | 10 ----------
+ drivers/gpu/drm/tilcdc/tilcdc_panel.c            |  9 ---------
+ drivers/gpu/drm/tilcdc/tilcdc_tfp410.c           |  9 ---------
+ drivers/gpu/drm/udl/udl_encoder.c                |  8 --------
+ drivers/gpu/drm/virtio/virtgpu_display.c         |  8 --------
+ 33 files changed, 244 deletions(-)
+
 -- 
 2.5.0
