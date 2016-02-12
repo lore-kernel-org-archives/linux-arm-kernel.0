@@ -1,35 +1,61 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Thu, 11 Feb 2016 19:19:07 -0800
-Subject: [PATCH v5 RESEND 3/5] driver core: handle -EPROBE_DEFER from
- bus_type.match()
-In-Reply-To: <1455101250-11327-4-git-send-email-m.szyprowski@samsung.com>
-References: <1455101250-11327-1-git-send-email-m.szyprowski@samsung.com>
- <1455101250-11327-4-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20160212031907.GD10157@kroah.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 11 Feb 2016 19:46:42 -0800
+Subject: [GIT PULL] bcm2835 DT changes for 4.6
+In-Reply-To: <87d1s42yb8.fsf@eliezer.anholt.net>
+References: <1454977978-17491-1-git-send-email-eric@anholt.net>
+ <DDFB1D8B-805B-488F-9582-796EBCEF287B@sperl.org>
+ <87d1s42yb8.fsf@eliezer.anholt.net>
+Message-ID: <56BD55A2.20104@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 10, 2016 at 11:47:28AM +0100, Marek Szyprowski wrote:
-> From: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+On 10/02/2016 10:51, Eric Anholt wrote:
+> Martin Sperl <martin@sperl.org> writes:
 > 
-> Allow implementations of the match() callback in struct bus_type to
-> return errors and if it's -EPROBE_DEFER then queue the device for
-> deferred probing.
+>>> On 09.02.2016, at 01:32, Eric Anholt <eric@anholt.net> wrote:
+>>>
+>>> Hi Florian.  Here's the first set of patches for bcm2835 for 4.6.
+>>> We've got more DT patches that are going to happen for new boards,
+>>> too, but they're still getting polished.
+>>>
+>>> The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
+>>>
+>>>  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+>>>
+>>> are available in the git repository at:
+>>>
+>>>  git at github.com:anholt/linux.git tags/bcm2835-dt-next-2016-02-04
+>>>
+>>> for you to fetch changes up to 5ec6f2cd8ec4bcd38ba199ea8711a5ec906d85e7:
+>>>
+>>>  ARM: bcm2835: Add the Raspberry Pi power domain driver to the DT. (2016-02-02 20:02:45 -0800)
+>>>
+>>> ----------------------------------------------------------------
+>>> This pull request covers mostly DT changes that didn't make it into
+>>> 4.5 because required header files went through other trees.
+>>>
+>>> ----------------------------------------------------------------
+>>> Alexander Aring (1):
+>>>      ARM: bcm2835: Add the Raspberry Pi power domain driver to the DT.
+>>>
+>>> Lubomir Rintel (1):
+>>>      ARM: bcm2835: dt: Add Raspberry Pi Model A
+>>>
+>>> Martin Sperl (2):
+>>>      ARM: bcm2835: add the auxiliary spi1 and spi2 to the device tree
+>>>      ARM: bcm2835: follow dt uart node-naming convention
+>>
+>> Do you want me to resend a rebased version of:
+>>      ARM: bcm2835: add bcm2835-aux-uart support to default DT
+>>
+>> The corresponding driver has been added to tty/tty-next.
 > 
-> This is useful to buses such as AMBA in which devices are registered
-> before their matching information can be retrieved from the HW
-> (typically because a clock driver hasn't probed yet).
-> 
-> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-> [changed if-else code structure, adjusted documentation to match the code,
-> extended comments]
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
-> ---
->  Documentation/driver-model/porting.txt |  6 ++++--
->  drivers/base/dd.c                      | 24 ++++++++++++++++++++++--
->  include/linux/device.h                 |  7 +++++--
->  3 files changed, 31 insertions(+), 6 deletions(-)
+> It hadn't landed last time I checked.  A rebased version that you've
+> tested would be great!
 
+OK, please submit this in the next week or so at most, so we can get
+this pull request merged, thanks!
 
-Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Eric, do you have other changes outside of Device Tree?
+--
+Florian
