@@ -1,52 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 12 Feb 2016 15:27:18 +0100
-Subject: [PATCH] [media] zl10353: use div_u64 instead of do_div
-Message-ID: <1455287246-3540549-1-git-send-email-arnd@arndb.de>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 12 Feb 2016 22:28:19 +0800
+Subject: [PATCH 1/4] net: ethernet: dwmac: add Ethernet glue logic for
+ stm32 chip
+In-Reply-To: <1454511275-9791-2-git-send-email-alexandre.torgue@gmail.com>
+Message-ID: <201602122254.EsWZQE5Z%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I noticed a build error in some randconfig builds in the zl10353 driver:
+Hi Alexandre,
 
-dvb-frontends/zl10353.c:138: undefined reference to `____ilog2_NaN'
-dvb-frontends/zl10353.c:138: undefined reference to `__aeabi_uldivmod'
+[auto build test WARNING on net/master]
+[also build test WARNING on v4.5-rc3 next-20160212]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 
-The problem can be tracked down to the use of -fprofile-arcs (using
-CONFIG_GCOV_PROFILE_ALL) in combination with CONFIG_PROFILE_ALL_BRANCHES
-on gcc version 4.9 or higher, when it fails to reliably optimize
-constant expressions.
+url:    https://github.com/0day-ci/linux/commits/Alexandre-TORGUE/Add-Ethernet-support-on-STM32F429/20160203-225940
+config: um-allyesconfig (attached as .config)
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=um 
 
-Using div_u64() instead of do_div() makes the code slightly more
-readable by both humans and by gcc, which gives the compiler enough
-of a break to figure it all out.
+All warnings (new ones prefixed by >>):
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+warning: (ST_IRQCHIP && HIP04_ETH && STMMAC_PLATFORM && DWMAC_IPQ806X && DWMAC_LPC18XX && DWMAC_ROCKCHIP && DWMAC_SOCFPGA && DWMAC_STI && DWMAC_STM32 && TI_CPSW && PINCTRL_ROCKCHIP && PINCTRL_DOVE && POWER_RESET_KEYSTONE && POWER_RESET_SYSCON && POWER_RESET_SYSCON_POWEROFF && S3C2410_WATCHDOG && VIDEO_OMAP3 && VIDEO_S5P_FIMC && USB_XHCI_MTK && RTC_DRV_AT91SAM9 && LPC18XX_DMAMUX && VIDEO_OMAP4 && HWSPINLOCK_QCOM && ATMEL_ST && QCOM_GSBI && PHY_HI6220_USB) selects MFD_SYSCON which has unmet direct dependencies (HAS_IOMEM)
+
 ---
- drivers/media/dvb-frontends/zl10353.c | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/media/dvb-frontends/zl10353.c b/drivers/media/dvb-frontends/zl10353.c
-index ef9764a02d4c..160c88710553 100644
---- a/drivers/media/dvb-frontends/zl10353.c
-+++ b/drivers/media/dvb-frontends/zl10353.c
-@@ -135,8 +135,7 @@ static void zl10353_calc_nominal_rate(struct dvb_frontend *fe,
- 
- 	value = (u64)10 * (1 << 23) / 7 * 125;
- 	value = (bw * value) + adc_clock / 2;
--	do_div(value, adc_clock);
--	*nominal_rate = value;
-+	*nominal_rate = div_u64(value, adc_clock);
- 
- 	dprintk("%s: bw %d, adc_clock %d => 0x%x\n",
- 		__func__, bw, adc_clock, *nominal_rate);
-@@ -163,8 +162,7 @@ static void zl10353_calc_input_freq(struct dvb_frontend *fe,
- 		if (ife > adc_clock / 2)
- 			ife = adc_clock - ife;
- 	}
--	value = (u64)65536 * ife + adc_clock / 2;
--	do_div(value, adc_clock);
-+	value = div_u64((u64)65536 * ife + adc_clock / 2, adc_clock);
- 	*input_freq = -value;
- 
- 	dprintk("%s: if2 %d, ife %d, adc_clock %d => %d / 0x%x\n",
--- 
-2.7.0
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 17523 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160212/d3544f93/attachment-0001.obj>
