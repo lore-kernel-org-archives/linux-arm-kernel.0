@@ -1,47 +1,61 @@
-From: alexdeucher@gmail.com (Alex Deucher)
-Date: Fri, 12 Feb 2016 11:31:19 -0500
-Subject: [PATCH 14/17] drm/radeon: removed optional dummy encoder
- mode_fixup function.
-In-Reply-To: <1455285350-3403-1-git-send-email-palminha@synopsys.com>
-References: <1455285350-3403-1-git-send-email-palminha@synopsys.com>
-Message-ID: <CADnq5_PchtK9bYHSAYjf6mnJ77+O9VzvbNxsoSLcafqYrhBF3A@mail.gmail.com>
+From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
+Date: Fri, 12 Feb 2016 14:32:20 -0200
+Subject: [PATCH] [media] zl10353: use div_u64 instead of do_div
+In-Reply-To: <1455287246-3540549-1-git-send-email-arnd@arndb.de>
+References: <1455287246-3540549-1-git-send-email-arnd@arndb.de>
+Message-ID: <20160212143220.5a440e66@recife.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 12, 2016 at 8:55 AM, Carlos Palminha
-<CARLOS.PALMINHA@synopsys.com> wrote:
+Em Fri, 12 Feb 2016 15:27:18 +0100
+Arnd Bergmann <arnd@arndb.de> escreveu:
+
+> I noticed a build error in some randconfig builds in the zl10353 driver:
+> 
+> dvb-frontends/zl10353.c:138: undefined reference to `____ilog2_NaN'
+> dvb-frontends/zl10353.c:138: undefined reference to `__aeabi_uldivmod'
+> 
+> The problem can be tracked down to the use of -fprofile-arcs (using
+> CONFIG_GCOV_PROFILE_ALL) in combination with CONFIG_PROFILE_ALL_BRANCHES
+> on gcc version 4.9 or higher, when it fails to reliably optimize
+> constant expressions.
+> 
+> Using div_u64() instead of do_div() makes the code slightly more
+> readable by both humans and by gcc, which gives the compiler enough
+> of a break to figure it all out.
+
+I'm not against this patch, but we have 94 occurrences of do_div() 
+just at the media subsystem. If this is failing here, it would likely
+fail with other drivers. So, I guess we should either fix do_div() or
+convert all such occurrences to do_div64().
+
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > ---
->  drivers/gpu/drm/radeon/atombios_encoders.c | 8 --------
->  1 file changed, 8 deletions(-)
-
-Reviewed-by: Alex Deucher <alexander.deucher@amd.com>
-
->
-> diff --git a/drivers/gpu/drm/radeon/atombios_encoders.c b/drivers/gpu/drm/radeon/atombios_encoders.c
-> index 01b20e1..1603751 100644
-> --- a/drivers/gpu/drm/radeon/atombios_encoders.c
-> +++ b/drivers/gpu/drm/radeon/atombios_encoders.c
-> @@ -2623,16 +2623,8 @@ radeon_atom_ext_dpms(struct drm_encoder *encoder, int mode)
->
->  }
->
-> -static bool radeon_atom_ext_mode_fixup(struct drm_encoder *encoder,
-> -                                      const struct drm_display_mode *mode,
-> -                                      struct drm_display_mode *adjusted_mode)
-> -{
-> -       return true;
-> -}
-> -
->  static const struct drm_encoder_helper_funcs radeon_atom_ext_helper_funcs = {
->         .dpms = radeon_atom_ext_dpms,
-> -       .mode_fixup = radeon_atom_ext_mode_fixup,
->         .prepare = radeon_atom_ext_prepare,
->         .mode_set = radeon_atom_ext_mode_set,
->         .commit = radeon_atom_ext_commit,
-> --
-> 2.5.0
->
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+>  drivers/media/dvb-frontends/zl10353.c | 6 ++----
+>  1 file changed, 2 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/media/dvb-frontends/zl10353.c b/drivers/media/dvb-frontends/zl10353.c
+> index ef9764a02d4c..160c88710553 100644
+> --- a/drivers/media/dvb-frontends/zl10353.c
+> +++ b/drivers/media/dvb-frontends/zl10353.c
+> @@ -135,8 +135,7 @@ static void zl10353_calc_nominal_rate(struct dvb_frontend *fe,
+>  
+>  	value = (u64)10 * (1 << 23) / 7 * 125;
+>  	value = (bw * value) + adc_clock / 2;
+> -	do_div(value, adc_clock);
+> -	*nominal_rate = value;
+> +	*nominal_rate = div_u64(value, adc_clock);
+>  
+>  	dprintk("%s: bw %d, adc_clock %d => 0x%x\n",
+>  		__func__, bw, adc_clock, *nominal_rate);
+> @@ -163,8 +162,7 @@ static void zl10353_calc_input_freq(struct dvb_frontend *fe,
+>  		if (ife > adc_clock / 2)
+>  			ife = adc_clock - ife;
+>  	}
+> -	value = (u64)65536 * ife + adc_clock / 2;
+> -	do_div(value, adc_clock);
+> +	value = div_u64((u64)65536 * ife + adc_clock / 2, adc_clock);
+>  	*input_freq = -value;
+>  
+>  	dprintk("%s: if2 %d, ife %d, adc_clock %d => %d / 0x%x\n",
