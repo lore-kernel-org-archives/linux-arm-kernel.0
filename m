@@ -1,69 +1,55 @@
-From: CARLOS.PALMINHA@synopsys.com (Carlos Palminha)
-Date: Fri, 12 Feb 2016 13:56:26 +0000
-Subject: [PATCH 17/17] drm/tilcdc: removed optional dummy encoder mode_fixup
- function.
-Message-ID: <1455285386-3547-1-git-send-email-palminha@synopsys.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Fri, 12 Feb 2016 14:56:45 +0100
+Subject: [PATCH] xen kconfig: clarify INPUT_XEN_KBDDEV_FRONTEND select
+In-Reply-To: <1455278707-2008263-1-git-send-email-arnd@arndb.de>
+References: <1455278707-2008263-1-git-send-email-arnd@arndb.de>
+Message-ID: <20160212135645.ouppx4ijselfomjy@hawk.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
----
- drivers/gpu/drm/tilcdc/tilcdc_panel.c  | 9 ---------
- drivers/gpu/drm/tilcdc/tilcdc_tfp410.c | 9 ---------
- 2 files changed, 18 deletions(-)
+On Fri, Feb 12, 2016 at 01:04:40PM +0100, Arnd Bergmann wrote:
+> The Xen framebuffer driver selects the xen keyboard driver, so the latter
+> will be built-in if XEN_FBDEV_FRONTEND=y. However, when CONFIG_INPUT
+> is a loadable module, this configuration cannot work. On mainline kernels,
+> the symbol will be enabled but not used, while in combination with
+> a patch I have to detect such useless configurations, we get the
+> expected link failure:
+> 
+> drivers/input/built-in.o: In function `xenkbd_remove':
+> xen-kbdfront.c:(.text+0x2f0): undefined reference to `input_unregister_device'
+> xen-kbdfront.c:(.text+0x30e): undefined reference to `input_unregister_device'
+> 
+> This changes the dependencies of XEN_FBDEV_FRONTEND so it cannot be
+> built-in if CONFIG_INPUT=m && CONFIG_INPUT_MISC=y, as that would result
+> in the broken select.
+> 
+> As usual, we would be much better off without the 'select', but removing
+> it now would likely break existing user configurations that depend on
+> it, so this adds another hack on top to get it working.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 36c1132e34bd ("xen kconfig: fix select INPUT_XEN_KBDDEV_FRONTEND")
+> ---
+>  drivers/video/fbdev/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/video/fbdev/Kconfig b/drivers/video/fbdev/Kconfig
+> index 8ea45a5cd806..fd3d6fd290a9 100644
+> --- a/drivers/video/fbdev/Kconfig
+> +++ b/drivers/video/fbdev/Kconfig
+> @@ -2241,6 +2241,7 @@ config FB_VIRTUAL
+>  config XEN_FBDEV_FRONTEND
+>  	tristate "Xen virtual frame buffer support"
+>  	depends on FB && XEN
+> +	depends on INPUT || !INPUT_MISC
+>  	select FB_SYS_FILLRECT
+>  	select FB_SYS_COPYAREA
+>  	select FB_SYS_IMAGEBLIT
+> -- 
+> 2.7.0
+>
 
-diff --git a/drivers/gpu/drm/tilcdc/tilcdc_panel.c b/drivers/gpu/drm/tilcdc/tilcdc_panel.c
-index 4dda6e2..8dcf02a 100644
---- a/drivers/gpu/drm/tilcdc/tilcdc_panel.c
-+++ b/drivers/gpu/drm/tilcdc/tilcdc_panel.c
-@@ -70,14 +70,6 @@ static void panel_encoder_dpms(struct drm_encoder *encoder, int mode)
- 					 mode == DRM_MODE_DPMS_ON ? 1 : 0);
- }
- 
--static bool panel_encoder_mode_fixup(struct drm_encoder *encoder,
--		const struct drm_display_mode *mode,
--		struct drm_display_mode *adjusted_mode)
--{
--	/* nothing needed */
--	return true;
--}
--
- static void panel_encoder_prepare(struct drm_encoder *encoder)
- {
- 	struct panel_encoder *panel_encoder = to_panel_encoder(encoder);
-@@ -103,7 +95,6 @@ static const struct drm_encoder_funcs panel_encoder_funcs = {
- 
- static const struct drm_encoder_helper_funcs panel_encoder_helper_funcs = {
- 		.dpms           = panel_encoder_dpms,
--		.mode_fixup     = panel_encoder_mode_fixup,
- 		.prepare        = panel_encoder_prepare,
- 		.commit         = panel_encoder_commit,
- 		.mode_set       = panel_encoder_mode_set,
-diff --git a/drivers/gpu/drm/tilcdc/tilcdc_tfp410.c b/drivers/gpu/drm/tilcdc/tilcdc_tfp410.c
-index 5052a8a..1c23017 100644
---- a/drivers/gpu/drm/tilcdc/tilcdc_tfp410.c
-+++ b/drivers/gpu/drm/tilcdc/tilcdc_tfp410.c
-@@ -80,14 +80,6 @@ static void tfp410_encoder_dpms(struct drm_encoder *encoder, int mode)
- 	tfp410_encoder->dpms = mode;
- }
- 
--static bool tfp410_encoder_mode_fixup(struct drm_encoder *encoder,
--		const struct drm_display_mode *mode,
--		struct drm_display_mode *adjusted_mode)
--{
--	/* nothing needed */
--	return true;
--}
--
- static void tfp410_encoder_prepare(struct drm_encoder *encoder)
- {
- 	tfp410_encoder_dpms(encoder, DRM_MODE_DPMS_OFF);
-@@ -112,7 +104,6 @@ static const struct drm_encoder_funcs tfp410_encoder_funcs = {
- 
- static const struct drm_encoder_helper_funcs tfp410_encoder_helper_funcs = {
- 		.dpms           = tfp410_encoder_dpms,
--		.mode_fixup     = tfp410_encoder_mode_fixup,
- 		.prepare        = tfp410_encoder_prepare,
- 		.commit         = tfp410_encoder_commit,
- 		.mode_set       = tfp410_encoder_mode_set,
--- 
-2.5.0
+Reviewed-by: Andrew Jones <drjones@redhat.com>
+
+Thanks,
+drew 
