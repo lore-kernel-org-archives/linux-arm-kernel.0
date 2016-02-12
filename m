@@ -1,166 +1,85 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 12 Feb 2016 21:10:29 +0100
-Subject: [PATCH v5sub1 0/8] arm64: split linear and kernel mappings
-In-Reply-To: <CAKv+Gu9Qw=DSe1fZT=Dv=iKaKqzsf5ARK9dzwCWPk_0uRECm1w@mail.gmail.com>
-References: <1454324093-15998-1-git-send-email-ard.biesheuvel@linaro.org>
- <56BE3645.3030403@gmail.com>
- <CAKv+Gu9Qw=DSe1fZT=Dv=iKaKqzsf5ARK9dzwCWPk_0uRECm1w@mail.gmail.com>
-Message-ID: <56BE3C35.7070608@gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Fri, 12 Feb 2016 13:33:58 -0700
+Subject: [PATCH V2 3/6] stm class: provision for statically assigned
+ masterIDs
+In-Reply-To: <87r3gh3nd7.fsf@ashishki-desk.ger.corp.intel.com>
+References: <1454487337-30184-1-git-send-email-zhang.chunyan@linaro.org>
+ <1454487337-30184-4-git-send-email-zhang.chunyan@linaro.org>
+ <87mvrf5ngl.fsf@ashishki-desk.ger.corp.intel.com>
+ <CANLsYky2twQ98u241YyHD=atYRp1N56YVHUQNY2E2Ljsq0cseA@mail.gmail.com>
+ <87twlj49k7.fsf@ashishki-desk.ger.corp.intel.com>
+ <CANLsYkw=mG+ch8QzxmbwWs9o+mndVNo1MuqXcrPrNJYj_SQcHQ@mail.gmail.com>
+ <87r3gh3nd7.fsf@ashishki-desk.ger.corp.intel.com>
+Message-ID: <CANLsYkz1nNYdcTXrkZ+HAMHexNandm93EpM7auvYE4CY43hy6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 12/02/16 20:47, Ard Biesheuvel wrote:
-> On 12 February 2016 at 20:45, Matthias Brugger <matthias.bgg@gmail.com> wrote:
->> Hi Ard,
->>
->>
->> On 01/02/16 11:54, Ard Biesheuvel wrote:
->>>
->>> At the request of Catalin, this series has been split off from my series
->>> 'arm64: implement support for KASLR v4' [1]. This sub-series deals with
->>> moving the kernel out of the linear mapping into the vmalloc area. This
->>> is a prerequisite for independent physical and virtual randomization of
->>> the kernel image. On top of that, considering that these changes allow
->>> the linear mapping to start at an arbitrary offset above PAGE_OFFSET, it
->>> should be an improvement in itself due to the fact that we can now choose
->>> PAGE_OFFSET such that RAM can be mapped using large block sizes.
->>>
->>> For instance, on my Seattle A0 box, the kernel is loaded 16 MB into the
->>> lowest GB of RAM, which means __pa(PAGE_OFFSET) is not 1 GB aligned, and
->>> the entire 16 GB of RAM will be mapping using 2 MB blocks. (Similarly,
->>> for 64 KB granule kernels, the entire 16 GB of RAM will be mapped using
->>> pages since __pa(PAGE_OFFSET) is not 512 MB aligned). With these changes
->>>    __pa(PAGE_OFFSET) will always be chosen such that it is aligned to a
->>> quantity that allows efficient mapping.
->>>
->>> Note that of the entire KASLR series, this sub-series is the most likely
->>> to
->>> cause problems, and hence requires the most careful review and testing.
->>> This
->>> is due to the fact that, with these changes, the invariant __va(__pa(x))
->>> == x
->>> no longer holds, and any code that is based on that assumption needs to be
->>> updated.
->>>
->>> Changes since v4:
->>> - added Marc's ack to patch #6
->>> - round the kasan zero shadow region around the kernel image to swapper
->>> block
->>>     size (#7)
->>> - ensure that we don't clip the kernel image when clipping RAM to the
->>> linear
->>>     region size (#8)
->>>
->>> Patch #1 allows the low mark of memblocks discovered from the FDT to be
->>> overridden by the architecture.
->>>
->>> Patch #2 enables the huge-vmap generic feature for arm64. This should be
->>> an
->>> improvement in itself, but the significance for this series is that it
->>> allows
->>> unmap_kernel_range() to be called on the [__init_begin, __init_end)
->>> region,
->>> which may be partially mapped using block mappings.
->>>
->>> Patch #3 introduces KIMAGE_VADDR as a separate, preparatory step towards
->>> decoupling the kernel placement from PAGE_OFFSET
->>>
->>> Patch #4 implements some translation table accessors that operate on
->>> statically
->>> allocate translation tables before the linear mapping is up.
->>>
->>> Patch #5 decouples the fixmap initialization from the linear mapping, by
->>> using
->>> the accessors implemented by patch #4
->>>
->>> Patch #6 removes assumptions made my KVM regarding the placement of the
->>> kernel
->>> image inside the linear mapping.
->>>
->>> Patch #7 moves the kernel image from the base of the linear mapping to the
->>> base
->>> of the vmalloc area. The modules area, which sits right below the kernel
->>> image,
->>> is moved along and is put right before the start of the vmalloc area.
->>>
->>> Patch #8 decouples PHYS_OFFSET from PAGE_OFFSET, which allows the linear
->>> mapping
->>> to cover all discovered memory, regardless of where the kernel image is
->>> located
->>> in it. This effectively allows the kernel to be loaded at any physical
->>> address
->>> (provided that the correct alignment is used)
->>>
->>> [1] http://thread.gmane.org/gmane.linux.kernel/2135931
->>>
->>> Ard Biesheuvel (8):
->>>     of/fdt: make memblock minimum physical address arch configurable
->>>     arm64: add support for ioremap() block mappings
->>>     arm64: introduce KIMAGE_VADDR as the virtual base of the kernel region
->>>     arm64: pgtable: implement static [pte|pmd|pud]_offset variants
->>>     arm64: decouple early fixmap init from linear mapping
->>>     arm64: kvm: deal with kernel symbols outside of linear mapping
->>>     arm64: move kernel image to base of vmalloc area
->>>     arm64: allow kernel Image to be loaded anywhere in physical memory
->>>
->>
->> I bisected linux-next (20160212) with the following error on booting with an
->> initramfs:
->>   Failed to execute /init (error -8)
->>   request_module: runaway loop modprobe binfmt-464c
->>   Starting init: /sbin/init exists but couldn't execute it (error -8)
->>   request_module: runaway loop modprobe binfmt-464c
->>   Starting init: /bin/sh exists but couldn't execute it (error -8)
->>   Kernel panic - not syncing: No working init found.  Try passing init=
->> option to kernel. See Linux Documentation/init..
->>
->> I tracked down the error to patch 7 of this series. But I realized that
->> patch 7 does not compile, but from patch 8 onwards I observe the error.
->>
->> I use defconfig with an initramfs.cpio created with buildroot.
->> I tested this on my mt8173 eval board, but I suppose this can be reproduced
->> easily on other machines as well.
->>
+On 12 February 2016 at 09:27, Alexander Shishkin
+<alexander.shishkin@linux.intel.com> wrote:
+> Mathieu Poirier <mathieu.poirier@linaro.org> writes:
 >
-> Thanks for the report. Does this help at all?
+>> On 8 February 2016 at 06:26, Alexander Shishkin
+>> <alexander.shishkin@linux.intel.com> wrote:
+>>> This $end==$start situation itself may be ambiguous and can be
+>>> interpreted either as having just one *static* master ID fixed for all
+>>> SW writers (what I assumed from your commit message) or as having a
+>>> floating master ID, which changes of its own accord and is not
+>>> controllable by software.
+>>
+>> Some clarification here.
+>>
+>> On ARM from a SW point of view $end == $start and that doesn't change
+>> (with regards to masterIDs) .  The ambiguity comes from the fact that
+>> on other platforms where masterID configuration does change and is
+>> important, the condition $end == $start could also be valid.
 >
-> http://thread.gmane.org/gmane.linux.ports.arm.kernel/477645
->
+> Yes, that's what I was saying. The thing is, on the system-under-tracing
+> side these two situations are not very different from one
+> another. Master IDs are really just numbers without any semantics
+> attached to them in the sense that they are not covered by the mipi spec
+> or any other standard (to my knowledge).
 
-I applied them on top of linux-next and this fixed the problem.
+We are definitely on the same page here, just using slightly different terms.
+
+>
+> The difference is in the way we map channels to masters. One way is to
+> allocate a distinct set of channels for each master (the way Intel Trace
+> Hub does it); another way is to share the same set of channels between
+> multiple masters.
+
+We are in total agreement.
+
+> So we can describe this as "hardware implements the
+> same set of channels across multiple masters" or something along those
+> lines.
+
+I suggest "Shared channels"?  In the end, that's really what it is...
+
+The outstanding issue is still how to represent these to different way
+of mapping things in the STM core.  I suggested a flag, called
+"mstatic" (but that can be changed), and a representation of '-1' in
+for masterIDs sysFS.  Whether we stick with that or not is irrelevant,
+I'd be fine with another mechanism.  What I am keen on is that from
+sysFS users can quickly tell which heuristic is enacted on that
+specific architecture.
+
+>
+> Actually, in the latter scheme of things you can also have multiple
+> masters, at least theoretically. Say, you have masters [0..15], each
+> with distinct set of channels, but depending on hardware state these
+> masters actually end up as $state*16+$masterID in the STP stream.
+>
+> So we might also think about differentiating between the hardware
+> masters (0 though 15 in the above example) and STP masters.
+
+I'm not sure I get what you mean here.  On ARM the masterIDs assigned
+in HW, which will depend on the state, will show up in the STP stream.
+But again, I might be missing your point.
 
 Thanks,
-Matthias
+Mathieu
 
->> Regards,
->> Matthias
->>
->>
->>>    Documentation/arm64/booting.txt                      |  20 ++-
->>>    Documentation/features/vm/huge-vmap/arch-support.txt |   2 +-
->>>    arch/arm/include/asm/kvm_asm.h                       |   2 +
->>>    arch/arm/kvm/arm.c                                   |   8 +-
->>>    arch/arm64/Kconfig                                   |   1 +
->>>    arch/arm64/include/asm/boot.h                        |   6 +
->>>    arch/arm64/include/asm/kasan.h                       |   2 +-
->>>    arch/arm64/include/asm/kernel-pgtable.h              |  12 ++
->>>    arch/arm64/include/asm/kvm_asm.h                     |   2 +
->>>    arch/arm64/include/asm/kvm_host.h                    |   8 +-
->>>    arch/arm64/include/asm/memory.h                      |  44 ++++--
->>>    arch/arm64/include/asm/pgtable.h                     |  23 ++-
->>>    arch/arm64/kernel/head.S                             |   8 +-
->>>    arch/arm64/kernel/image.h                            |  13 +-
->>>    arch/arm64/kernel/vmlinux.lds.S                      |   4 +-
->>>    arch/arm64/kvm/hyp.S                                 |   6 +-
->>>    arch/arm64/mm/dump.c                                 |  12 +-
->>>    arch/arm64/mm/init.c                                 | 123
->>> ++++++++++++++--
->>>    arch/arm64/mm/kasan_init.c                           |  31 +++-
->>>    arch/arm64/mm/mmu.c                                  | 155
->>> +++++++++++++++-----
->>>    drivers/of/fdt.c                                     |   5 +-
->>>    21 files changed, 378 insertions(+), 109 deletions(-)
->>>
->>
+>
+> Regards,
+> --
+> Alex
