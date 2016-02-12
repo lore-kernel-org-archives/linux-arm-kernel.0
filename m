@@ -1,61 +1,56 @@
-From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
-Date: Fri, 12 Feb 2016 14:32:20 -0200
-Subject: [PATCH] [media] zl10353: use div_u64 instead of do_div
-In-Reply-To: <1455287246-3540549-1-git-send-email-arnd@arndb.de>
-References: <1455287246-3540549-1-git-send-email-arnd@arndb.de>
-Message-ID: <20160212143220.5a440e66@recife.lan>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 12 Feb 2016 17:35:17 +0100
+Subject: [PATCH 0/3] ARM: mvebu: Add driver for the Zyxel NSA3XX hwmon MCU
+In-Reply-To: <1455147224-6742-1-git-send-email-linux@baker-net.org.uk> (Adam
+ Baker's message of "Wed, 10 Feb 2016 23:33:41 +0000")
+References: <1455147224-6742-1-git-send-email-linux@baker-net.org.uk>
+Message-ID: <87mvr5x4xm.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Fri, 12 Feb 2016 15:27:18 +0100
-Arnd Bergmann <arnd@arndb.de> escreveu:
+Hi Adam,
+ 
+ On jeu., f?vr. 11 2016, Adam Baker <linux@baker-net.org.uk> wrote:
 
-> I noticed a build error in some randconfig builds in the zl10353 driver:
-> 
-> dvb-frontends/zl10353.c:138: undefined reference to `____ilog2_NaN'
-> dvb-frontends/zl10353.c:138: undefined reference to `__aeabi_uldivmod'
-> 
-> The problem can be tracked down to the use of -fprofile-arcs (using
-> CONFIG_GCOV_PROFILE_ALL) in combination with CONFIG_PROFILE_ALL_BRANCHES
-> on gcc version 4.9 or higher, when it fails to reliably optimize
-> constant expressions.
-> 
-> Using div_u64() instead of do_div() makes the code slightly more
-> readable by both humans and by gcc, which gives the compiler enough
-> of a break to figure it all out.
+> This patch series adds a driver to support the hardware monitoring MCU
+> that is present in some models of the Zyxel NSA3xx series of NAS units.
+>
+> A patch is included to add it to the device tree for the NSA320 model,
+> patches to the other device trees will be included if testers come
+> forward (I already have a possible tester for NSA325).
+>
+> There are no dependencies between the patches so I guess the first two
+> should go via the hardware monitoring maintainers and the third via
+> the ARM mvebu maintainers.
 
-I'm not against this patch, but we have 94 occurrences of do_div() 
-just at the media subsystem. If this is failing here, it would likely
-fail with other drivers. So, I guess we should either fix do_div() or
-convert all such occurrences to do_div64().
+You are right. However the first tow patch are misnamed, they better
+should be called:
+hwmn: Define binding for the nsa3xx-hwmon driver
+hwmn: Create a driver to support the hardware monitoring chip
 
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  drivers/media/dvb-frontends/zl10353.c | 6 ++----
->  1 file changed, 2 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/media/dvb-frontends/zl10353.c b/drivers/media/dvb-frontends/zl10353.c
-> index ef9764a02d4c..160c88710553 100644
-> --- a/drivers/media/dvb-frontends/zl10353.c
-> +++ b/drivers/media/dvb-frontends/zl10353.c
-> @@ -135,8 +135,7 @@ static void zl10353_calc_nominal_rate(struct dvb_frontend *fe,
->  
->  	value = (u64)10 * (1 << 23) / 7 * 125;
->  	value = (bw * value) + adc_clock / 2;
-> -	do_div(value, adc_clock);
-> -	*nominal_rate = value;
-> +	*nominal_rate = div_u64(value, adc_clock);
->  
->  	dprintk("%s: bw %d, adc_clock %d => 0x%x\n",
->  		__func__, bw, adc_clock, *nominal_rate);
-> @@ -163,8 +162,7 @@ static void zl10353_calc_input_freq(struct dvb_frontend *fe,
->  		if (ife > adc_clock / 2)
->  			ife = adc_clock - ife;
->  	}
-> -	value = (u64)65536 * ife + adc_clock / 2;
-> -	do_div(value, adc_clock);
-> +	value = div_u64((u64)65536 * ife + adc_clock / 2, adc_clock);
->  	*input_freq = -value;
->  
->  	dprintk("%s: if2 %d, ife %d, adc_clock %d => %d / 0x%x\n",
+The last patch seems OK for me, and the binding has been approved. So
+when you will get a review from the hwmon maintainer, I will apply the
+last patch in the mvebu tree.
+
+Thanks,
+
+Gregory
+
+>
+>  [PATCH 1/3] Define a binding for the hardware monitoring chip present
+>  [PATCH 2/3] Create a driver to support the hardware monitoring chip
+>  [PATCH 3/3] Add an entry for the hardware monitoring MCU
+>
+>  Documentation/devicetree/bindings/hwmon/nsa320-mcu.txt |  21 ++++++++
+>  arch/arm/boot/dts/kirkwood-nsa320.dts                  |  13 ++++-
+>  drivers/hwmon/Kconfig                                  |  13 +++++
+>  drivers/hwmon/Makefile                                 |   1 +
+>  drivers/hwmon/nsa3xx-hwmon.c | 223
+> +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+>  5 files changed, 269 insertions(+), 2 deletions(-)
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
