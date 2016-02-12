@@ -1,126 +1,114 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 12 Feb 2016 17:09:46 +0000
-Subject: [PATCH v2] iommu/io-pgtable: Rationalise quirk handling
-In-Reply-To: <cover.1453723096.git.robin.murphy@arm.com>
-References: <cover.1453723096.git.robin.murphy@arm.com>
-Message-ID: <62860b753f304beef7b4b6f1e13d7094252f2f37.1455294748.git.robin.murphy@arm.com>
+From: gerald.schaefer@de.ibm.com (Gerald Schaefer)
+Date: Fri, 12 Feb 2016 18:16:40 +0100
+Subject: [BUG] random kernel crashes after THP rework on s390 (maybe
+ also on PowerPC and ARM)
+In-Reply-To: <56BE00E7.1010303@de.ibm.com>
+References: <20160211192223.4b517057@thinkpad>
+ <20160211190942.GA10244@node.shutemov.name>
+ <20160211205702.24f0d17a@thinkpad>
+ <20160212154116.GA15142@node.shutemov.name>
+ <56BE00E7.1010303@de.ibm.com>
+Message-ID: <20160212181640.4eabb85f@thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the number of io-pgtable implementations grows beyond 1, it's time
-to rationalise the quirks mechanism before things have a chance to
-start getting really ugly and out-of-hand.
+On Fri, 12 Feb 2016 16:57:27 +0100
+Christian Borntraeger <borntraeger@de.ibm.com> wrote:
 
-To that end:
-- Indicate exactly which quirks each format can/does support.
-- Fail creating a table if a caller wants unsupported quirks.
-- Properly document where each quirk applies and why.
+> On 02/12/2016 04:41 PM, Kirill A. Shutemov wrote:
+> > On Thu, Feb 11, 2016 at 08:57:02PM +0100, Gerald Schaefer wrote:
+> >> On Thu, 11 Feb 2016 21:09:42 +0200
+> >> "Kirill A. Shutemov" <kirill@shutemov.name> wrote:
+> >>
+> >>> On Thu, Feb 11, 2016 at 07:22:23PM +0100, Gerald Schaefer wrote:
+> >>>> Hi,
+> >>>>
+> >>>> Sebastian Ott reported random kernel crashes beginning with v4.5-rc1 and
+> >>>> he also bisected this to commit 61f5d698 "mm: re-enable THP". Further
+> >>>> review of the THP rework patches, which cannot be bisected, revealed
+> >>>> commit fecffad "s390, thp: remove infrastructure for handling splitting PMDs"
+> >>>> (and also similar commits for other archs).
+> >>>>
+> >>>> This commit removes the THP splitting bit and also the architecture
+> >>>> implementation of pmdp_splitting_flush(), which took care of the IPI for
+> >>>> fast_gup serialization. The commit message says
+> >>>>
+> >>>>     pmdp_splitting_flush() is not needed too: on splitting PMD we will do
+> >>>>     pmdp_clear_flush() + set_pte_at().  pmdp_clear_flush() will do IPI as
+> >>>>     needed for fast_gup
+> >>>>
+> >>>> The assumption that a TLB flush will also produce an IPI is wrong on s390,
+> >>>> and maybe also on other architectures, and I thought that this was actually
+> >>>> the main reason for having an arch-specific pmdp_splitting_flush().
+> >>>>
+> >>>> At least PowerPC and ARM also had an individual implementation of
+> >>>> pmdp_splitting_flush() that used kick_all_cpus_sync() instead of a TLB
+> >>>> flush to send the IPI, and those were also removed. Putting the arch
+> >>>> maintainers and mailing lists on cc to verify.
+> >>>>
+> >>>> On s390 this will break the IPI serialization against fast_gup, which
+> >>>> would certainly explain the random kernel crashes, please revert or fix
+> >>>> the pmdp_splitting_flush() removal.
+> >>>
+> >>> Sorry for that.
+> >>>
+> >>> I believe, the problem was already addressed for PowerPC:
+> >>>
+> >>> http://lkml.kernel.org/g/454980831-16631-1-git-send-email-aneesh.kumar at linux.vnet.ibm.com
+> >>>
+> >>> I think kick_all_cpus_sync() in arch-specific pmdp_invalidate() would do
+> >>> the trick, right?
+> >>
+> >> Hmm, not sure about that. After pmdp_invalidate(), a pmd_none() check in
+> >> fast_gup will still return false, because the pmd is not empty (at least
+> >> on s390). So I don't see spontaneously how it will help fast_gup to break
+> >> out to the slow path in case of THP splitting.
+> > 
+> > What pmdp_flush_direct() does in pmdp_invalidate()? It's hard to unwrap for me :-/
+> > Does it make the pmd !pmd_present()?
+> 
+> It uses the idte instruction, which in an atomic fashion flushes the associated
+> TLB entry and changes the value of the pmd entry to invalid. This comes from the
+> HW requirement to not  change a PTE/PMD that might be still in use, other than 
+> with special instructions that does the tlb handling and the invalidation together.
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
+Correct, and it does _not_ make the pmd !pmd_present(), that would only be the
+case after a _clear_flush(). It only marks the pmd as invalid and flushes,
+so that it cannot generate a new TLB entry before the following pmd_populate(),
+but it keeps its other content. This is to fulfill the requirements outlined in
+the comment in mm/huge_memory.c before the call to pmdp_invalidate(). And
+independent from that comment, we would need such an _invalidate() or
+_clear_flush() on s390 before the pmd_populate() because of the HW details
+that Christian described.
 
-Just to allay any confusion, I intend this as a followup to the
-short-descriptor[1] and Mediatek IOMMU[2] patches, rather than a
-crucial addition, so it can either get picked up along with those
-or wait 'til later.
+Reading the comment again, I do now notice that it also says "mark the current
+pmd notpresent", which we cannot do w/o losing the huge and (formerly) splitting
+bits, but it also shouldn't be needed to provide the "single TLB guarantee" that
+is required from the comment. So, a pmd_present() check on s390 in this state
+would still return true. Not sure yet if this is a problem, need more thinking,
+this behavior was already present before the THP rework but maybe it was OK
+before and is not OK now.
 
-v2:
-- Use unsigned long for the bitmap.
-- Do format-specific checks inline.
-- Enough of a difference that I don't feel comfortable putting
-  Laurent's reviewed-by from v1 on it...
+At least for fast_gup this should not be a problem though.
 
-Robin.
+> (It also does some some other magic to the attach_count, which might hold off
+> finish_arch_post_lock_switch while some flushing is happening, but this should
+> be unrelated here)
+> 
+> 
+> > I'm also confused by pmd_none() is equal to !pmd_present() on s390. Hm?
+> 
+> Don't know, Gerald or Martin?
 
-[1]:http://thread.gmane.org/gmane.linux.kernel.iommu/12007
-[2]:http://thread.gmane.org/gmane.linux.kernel.iommu/11974
+The implementation frequently changes depending on how many new bits Martin
+needs to squeeze out :-)
+We don't have a _PAGE_PRESENT bit for pmds, so pmd_present() just checks if the
+entry is not empty. pmd_none() of course does the opposite, it checks if it is
+empty.
 
- drivers/iommu/io-pgtable-arm-v7s.c |  5 +++++
- drivers/iommu/io-pgtable-arm.c     | 13 +++++++++++--
- drivers/iommu/io-pgtable.h         | 22 ++++++++++++++++++----
- 3 files changed, 34 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/iommu/io-pgtable-arm-v7s.c b/drivers/iommu/io-pgtable-arm-v7s.c
-index d39a021..9fcceb1 100644
---- a/drivers/iommu/io-pgtable-arm-v7s.c
-+++ b/drivers/iommu/io-pgtable-arm-v7s.c
-@@ -623,6 +623,11 @@ static struct io_pgtable *arm_v7s_alloc_pgtable(struct io_pgtable_cfg *cfg,
- 	if (cfg->ias > ARM_V7S_ADDR_BITS || cfg->oas > ARM_V7S_ADDR_BITS)
- 		return NULL;
- 
-+	if (cfg->quirks & ~(IO_PGTABLE_QUIRK_ARM_NS |
-+			    IO_PGTABLE_QUIRK_NO_PERMS |
-+			    IO_PGTABLE_QUIRK_TLBI_ON_MAP))
-+		return NULL;
-+
- 	data = kmalloc(sizeof(*data), GFP_KERNEL);
- 	if (!data)
- 		return NULL;
-diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
-index 4095af2..debdf04 100644
---- a/drivers/iommu/io-pgtable-arm.c
-+++ b/drivers/iommu/io-pgtable-arm.c
-@@ -658,8 +658,12 @@ static struct io_pgtable *
- arm_64_lpae_alloc_pgtable_s1(struct io_pgtable_cfg *cfg, void *cookie)
- {
- 	u64 reg;
--	struct arm_lpae_io_pgtable *data = arm_lpae_alloc_pgtable(cfg);
-+	struct arm_lpae_io_pgtable *data;
- 
-+	if (cfg->quirks & ~IO_PGTABLE_QUIRK_ARM_NS)
-+		return NULL;
-+
-+	data = arm_lpae_alloc_pgtable(cfg);
- 	if (!data)
- 		return NULL;
- 
-@@ -742,8 +746,13 @@ static struct io_pgtable *
- arm_64_lpae_alloc_pgtable_s2(struct io_pgtable_cfg *cfg, void *cookie)
- {
- 	u64 reg, sl;
--	struct arm_lpae_io_pgtable *data = arm_lpae_alloc_pgtable(cfg);
-+	struct arm_lpae_io_pgtable *data;
- 
-+	/* The NS quirk doesn't apply at stage 2 */
-+	if (cfg->quirks)
-+		return NULL;
-+
-+	data = arm_lpae_alloc_pgtable(cfg);
- 	if (!data)
- 		return NULL;
- 
-diff --git a/drivers/iommu/io-pgtable.h b/drivers/iommu/io-pgtable.h
-index 4faee7d..d4f5027 100644
---- a/drivers/iommu/io-pgtable.h
-+++ b/drivers/iommu/io-pgtable.h
-@@ -47,10 +47,24 @@ struct iommu_gather_ops {
-  *                 page table walker.
-  */
- struct io_pgtable_cfg {
--	#define IO_PGTABLE_QUIRK_ARM_NS		BIT(0) /* Set NS bit in PTEs */
--	#define IO_PGTABLE_QUIRK_NO_PERMS	BIT(1) /* No AP/XN bits */
--	#define IO_PGTABLE_QUIRK_TLBI_ON_MAP	BIT(2) /* TLB Inv. on map */
--	int				quirks;
-+	/*
-+	 * IO_PGTABLE_QUIRK_ARM_NS: (ARM formats) Set NS and NSTABLE bits in
-+	 *	stage 1 PTEs, for hardware which insists on validating them
-+	 *	even in	non-secure state where they should normally be ignored.
-+	 *
-+	 * IO_PGTABLE_QUIRK_NO_PERMS: Ignore the IOMMU_READ, IOMMU_WRITE and
-+	 *	IOMMU_NOEXEC flags and map everything with full access, for
-+	 *	hardware which does not implement the permissions of a given
-+	 *	format, and/or requires some format-specific default value.
-+	 *
-+	 * IO_PGTABLE_QUIRK_TLBI_ON_MAP: If the format forbids caching invalid
-+	 *	(unmapped) entries but the hardware might do so anyway, perform
-+	 *	TLB maintenance when mapping as well as when unmapping.
-+	 */
-+	#define IO_PGTABLE_QUIRK_ARM_NS		BIT(0)
-+	#define IO_PGTABLE_QUIRK_NO_PERMS	BIT(1)
-+	#define IO_PGTABLE_QUIRK_TLBI_ON_MAP	BIT(2)
-+	unsigned long			quirks;
- 	unsigned long			pgsize_bitmap;
- 	unsigned int			ias;
- 	unsigned int			oas;
--- 
-2.7.0.25.gfc10eb5.dirty
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-s390" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
