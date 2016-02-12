@@ -1,52 +1,39 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri, 12 Feb 2016 19:38:42 +0900
-Subject: [PATCH v2 4/6] serial: 8250/uniphier: fix modular build
-In-Reply-To: <3557175.oOjJgCHd2P@wuerfel>
-References: <1455205297-1021302-1-git-send-email-arnd@arndb.de>
- <1455205297-1021302-5-git-send-email-arnd@arndb.de>
- <CAK7LNAR8fJWPubucjw28gAPpF-4yvVMWZZ0F3j6VN4whGF9Yhw@mail.gmail.com>
- <3557175.oOjJgCHd2P@wuerfel>
-Message-ID: <CAK7LNATEhZuqkMaEONu7tDBzWnTqS527c0N0vuOKRJuPeeQSDA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 12 Feb 2016 11:42:34 +0100
+Subject: [PATCH] net: phy: spi_ks8995: include linux/gpio/consumer.h
+Message-ID: <1455273762-161477-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+The ks8995 phy driver just started using gpiod_* functions, which are
+declared in linux/gpio/consumer.h, not linux/gpio.h, resulting in a
+build failure in randconfig builds that do not have CONFIG_GPIOLIB
+enabled:
 
+drivers/net/phy/spi_ks8995.c: In function 'ks8995_probe':
+drivers/net/phy/spi_ks8995.c:477:3: error: implicit declaration of function 'gpiod_set_value' [-Werror=implicit-function-declaration]
 
-2016-02-12 19:07 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
-> On Friday 12 February 2016 18:37:08 Masahiro Yamada wrote:
->> >  };
->> >
->> > -#ifdef CONFIG_SERIAL_8250_CONSOLE
->> > +#if defined(CONFIG_SERIAL_8250_CONSOLE) && !defined(MODULE)
->> >  static int __init uniphier_early_console_setup(struct earlycon_device *device,
->> >                                                const char *options)
->> >  {
->> > --
->> > 2.7.0
->> >
->>
->> I noticed commit 2eaa790989e03900298ad24f77f1086dbbc1aebd
->> revived this link error, but I am not happy with seeing
->> this patch again and again.
->>
->>
->> Can you check this patch?
->> https://patchwork.kernel.org/patch/8289231/
->>
->>
->>
->
-> Yes, I think your patch is nicer than mine. Let's see what the others
-> think, then I can resend my remaining patches on top of yours.
+This changes the header inclusion so it builds in all configurations.
 
-OK, thanks!
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: cd6f288cbaab ("net: phy: spi_ks8995: add support for resetting switch using GPIO")
+---
+ drivers/net/phy/spi_ks8995.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I noticed some typos, so I've posted v2.
-(no change in code-diff).
-
-
-
+diff --git a/drivers/net/phy/spi_ks8995.c b/drivers/net/phy/spi_ks8995.c
+index 5e7340f6b37c..b5d50d458728 100644
+--- a/drivers/net/phy/spi_ks8995.c
++++ b/drivers/net/phy/spi_ks8995.c
+@@ -18,8 +18,8 @@
+ #include <linux/module.h>
+ #include <linux/delay.h>
+ #include <linux/device.h>
++#include <linux/gpio/consumer.h>
+ #include <linux/of.h>
+-#include <linux/gpio.h>
+ #include <linux/of_gpio.h>
+ 
+ #include <linux/spi/spi.h>
 -- 
-Best Regards
-Masahiro Yamada
+2.7.0
