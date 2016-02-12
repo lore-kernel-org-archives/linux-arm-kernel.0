@@ -1,99 +1,52 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 12 Feb 2016 19:43:43 +0100
-Subject: [PATCH v2 5/5] ARM: dts: r8a7794: add sound support
-In-Reply-To: <56BE0CB1.4070408@cogentembedded.com>
-References: <12033353.rt0nolnBmD@wasted.cogentembedded.com>
- <2543047.yYrDdYb9v5@wasted.cogentembedded.com>
- <874mdhtn7d.wl%kuninori.morimoto.gx@renesas.com>
- <20160210171455.GB17671@verge.net.au>
- <56BE0CB1.4070408@cogentembedded.com>
-Message-ID: <20160212184343.GA31655@verge.net.au>
+From: lkp@intel.com (kbuild test robot)
+Date: Sat, 13 Feb 2016 02:44:16 +0800
+Subject: [PATCH v2 3/9] ACPI: introduce acpi_table_parse2()
+In-Reply-To: <1455299022-11641-4-git-send-email-aleksey.makarov@linaro.org>
+Message-ID: <201602130210.rOqbMzRs%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 12, 2016 at 07:47:45PM +0300, Sergei Shtylyov wrote:
-> On 02/10/2016 08:14 PM, Simon Horman wrote:
-> 
-> >>Sorry for my un-ordered response
-> >>
-> >>>Define the generic R8A7794 part of  the sound device node.
-> >>>This sound device  is a complex one and comprises the Audio Clock Generator
-> >>>(ADG), Sampling Rate Converter Unit (SCU), Serial Sound Interface [Unit]
-> >>>(SSI[U]), and Audio DMAC-Peripheral-Peripheral.
-> >>>It is up  to the board file to enable the device.
-> >>>
-> >>>This patch is based on the R8A7791 sound work by Kuninori Morimoto.
-> >>>
-> >>>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> >>(snip)
-> >>>+		rcar_sound,src {
-> >>>+			src1: src at 1 {
-> >>>+				interrupts = <GIC_SPI 353 IRQ_TYPE_LEVEL_HIGH>;
-> >>>+				dmas = <&audma0 0x87>, <&audma0 0x9c>;
-> >>>+				dma-names = "rx", "tx";
-> >>>+			};
-> >>>+			src2: src at 2 {
-> >>>+				interrupts = <GIC_SPI 354 IRQ_TYPE_LEVEL_HIGH>;
-> >>>+				dmas = <&audma0 0x89>, <&audma0 0x9e>;
-> >>>+				dma-names = "rx", "tx";
-> >>>+			};
-> >>>+			src3: src at 3 {
-> >>>+				interrupts = <GIC_SPI 355 IRQ_TYPE_LEVEL_HIGH>;
-> >>>+				dmas = <&audma0 0x8b>, <&audma0 0xa0>;
-> >>>+				dma-names = "rx", "tx";
-> >>>+			};
-> >>>+			src4: src at 4 {
-> >>>+				interrupts = <GIC_SPI 356 IRQ_TYPE_LEVEL_HIGH>;
-> >>>+				dmas = <&audma0 0x8d>, <&audma0 0xb0>;
-> >>>+				dma-names = "rx", "tx";
-> >>>+			};
-> >>>+			src5: src at 5 {
-> >>>+				interrupts = <GIC_SPI 357 IRQ_TYPE_LEVEL_HIGH>;
-> >>>+				dmas = <&audma0 0x8f>, <&audma0 0xb2>;
-> >>>+				dma-names = "rx", "tx";
-> >>>+			};
-> >>>+			src6: src at 6 {
-> >>>+				interrupts = <GIC_SPI 358 IRQ_TYPE_LEVEL_HIGH>;
-> >>>+				dmas = <&audma0 0x91>, <&audma0 0xb4>;
-> >>>+				dma-names = "rx", "tx";
-> >>>+			};
-> >>>+		};
-> >>
-> >>I think this can't work correctly, because driver is assuming
-> >>DT has all channles (from 0). (see linux/sound/soc/sh/rcar/src.c :: rsnd_src_probe)
-> >>Can you adds dummy src0 with some comments ? or fix src.c driver ?
-> >
-> >I would prefer the driver to be fixed (I had a similar patchset locally
-> >and I found it doesn't work).
-> 
->    You mean you had R8A7794 sound patch set too?
+Hi Aleksey,
 
-Yes, I was working on it recently.
-I suppose we should coordinate these things in future to avoid
-duplicated effort.
+[auto build test ERROR on pm/linux-next]
+[also build test ERROR on v4.5-rc3 next-20160212]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 
-> >The reason is that DT should describe
-> >the hardware rather than the current state of the software.
-> 
->    Yes, of course. Just tell me do I have to fix the driver *before* this
-> patch set is accepted?
+url:    https://github.com/0day-ci/linux/commits/Aleksey-Makarov/ACPI-parse-the-SPCR-table/20160213-015350
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git linux-next
+config: i386-tinyconfig (attached as .config)
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-I did not entirely get to the bottom of the problem, but I think that at
-the very least something needs to be done about the for_each_rsnd_src()
-loop in rsnd_src_probe.
+All errors (new ones prefixed by >>):
 
-My, obviously not satisfactory, hack around there being no src0 was as follows.
+   arch/x86/kernel/i8259.o: In function `acpi_table_parse2':
+>> i8259.c:(.text+0x2c4): multiple definition of `acpi_table_parse2'
+   arch/x86/kernel/setup.o:setup.c:(.text+0x3): first defined here
+   arch/x86/kernel/irqinit.o: In function `acpi_table_parse2':
+   irqinit.c:(.text+0x0): multiple definition of `acpi_table_parse2'
+   arch/x86/kernel/setup.o:setup.c:(.text+0x3): first defined here
+   arch/x86/kernel/bootflag.o: In function `acpi_table_parse2':
+   bootflag.c:(.text+0x0): multiple definition of `acpi_table_parse2'
+   arch/x86/kernel/setup.o:setup.c:(.text+0x3): first defined here
+   arch/x86/kernel/e820.o: In function `acpi_table_parse2':
+   e820.c:(.text+0x0): multiple definition of `acpi_table_parse2'
+   arch/x86/kernel/setup.o:setup.c:(.text+0x3): first defined here
+   arch/x86/kernel/pci-dma.o: In function `acpi_table_parse2':
+   pci-dma.c:(.text+0x0): multiple definition of `acpi_table_parse2'
+   arch/x86/kernel/setup.o:setup.c:(.text+0x3): first defined here
+   arch/x86/kernel/rtc.o: In function `acpi_table_parse2':
+   rtc.c:(.text+0x43): multiple definition of `acpi_table_parse2'
+   arch/x86/kernel/setup.o:setup.c:(.text+0x3): first defined here
 
-diff --git a/sound/soc/sh/rcar/src.c b/sound/soc/sh/rcar/src.c
-index 68b439ed22d7..58a447b0785b 100644
---- a/sound/soc/sh/rcar/src.c
-+++ b/sound/soc/sh/rcar/src.c
-@@ -1072,7 +1072,7 @@ int rsnd_src_probe(struct platform_device *pdev,
- 
- 	for_each_rsnd_src(src, priv, i) {
- 		snprintf(name, RSND_SRC_NAME_SIZE, "%s.%d",
--			 SRC_NAME, i);
-+			 SRC_NAME, i + 1);
- 
- 		clk = devm_clk_get(dev, name);
- 		if (IS_ERR(clk))
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 6205 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160213/0cb21c2c/attachment-0001.obj>
