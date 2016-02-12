@@ -1,124 +1,25 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 12 Feb 2016 17:50:53 +0100
-Subject: [PATCH v2 2/2] ARM: mvebu: add NAND description to Armada 370 DB
- and Armada XP DB
-In-Reply-To: <1455121756-20804-2-git-send-email-thomas.petazzoni@free-electrons.com>
- (Thomas Petazzoni's message of "Wed, 10 Feb 2016 17:29:16 +0100")
-References: <1455121756-20804-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1455121756-20804-2-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <87egchx47m.fsf@free-electrons.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 12 Feb 2016 10:52:21 -0600
+Subject: [PATCH v2 1/2] clk: sunxi: Add support for A80 APBS clock
+In-Reply-To: <1455269475-8180-2-git-send-email-wens@csie.org>
+References: <1455269475-8180-1-git-send-email-wens@csie.org>
+ <1455269475-8180-2-git-send-email-wens@csie.org>
+Message-ID: <20160212165221.GA14697@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
- 
- On mer., f?vr. 10 2016, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
-
-> This commit adds the Device Tree description for the 1GB NAND flash
-> present in the Armada 370 DB and Armada XP DB evaluation boards from
-> Marvell.
->
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-
-Applied on mvebu/dt, I renamed the patch to: "ARM: dts: mvebu: add NAND
-description to Armada 370 DB and Armada XP DB" to unify the way we label
-the dt related patch. I also added the reviewed-by tag from Andrew.
-
-Thanks,
-
-Gregory
+On Fri, Feb 12, 2016 at 05:31:14PM +0800, Chen-Yu Tsai wrote:
+> A80's APBS clock is not the same as the APB0 clock on A23. The A80's
+> is a zero-based divider, while the A23's is a power-of-two divider.
+> 
+> Replace the CLK_OF_DECLARE version of sun8i-a23-apb0. This also extends
+> the common setup function to take div clk flags.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 > ---
-> Changes since v1:
->  - Use the new MTD partitions DT binding, with all partitions grouped
->    into a 'partitions' subnode. Suggested by Andrew Lunn.
-> ---
->  arch/arm/boot/dts/armada-370-db.dts | 27 +++++++++++++++++++++++++++
->  arch/arm/boot/dts/armada-xp-db.dts  | 28 ++++++++++++++++++++++++++++
->  2 files changed, 55 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/armada-370-db.dts b/arch/arm/boot/dts/armada-370-db.dts
-> index bb280de..2364fc5 100644
-> --- a/arch/arm/boot/dts/armada-370-db.dts
-> +++ b/arch/arm/boot/dts/armada-370-db.dts
-> @@ -168,6 +168,33 @@
->  					spi-max-frequency = <50000000>;
->  				};
->  			};
-> +
-> +			nand at d0000 {
-> +				status = "okay";
-> +				num-cs = <1>;
-> +				marvell,nand-keep-config;
-> +				marvell,nand-enable-arbiter;
-> +				nand-on-flash-bbt;
-> +
-> +				partitions {
-> +					compatible = "fixed-partitions";
-> +					#address-cells = <1>;
-> +					#size-cells = <1>;
-> +
-> +					partition at 0 {
-> +						label = "U-Boot";
-> +						reg = <0 0x800000>;
-> +					};
-> +					partition at 800000 {
-> +						label = "Linux";
-> +						reg = <0x800000 0x800000>;
-> +					};
-> +					partition at 1000000 {
-> +						label = "Filesystem";
-> +						reg = <0x1000000 0x3f000000>;
-> +					};
-> +				};
-> +			};
->  		};
->  
->  		pcie-controller {
-> diff --git a/arch/arm/boot/dts/armada-xp-db.dts b/arch/arm/boot/dts/armada-xp-db.dts
-> index f774101..96aaaed 100644
-> --- a/arch/arm/boot/dts/armada-xp-db.dts
-> +++ b/arch/arm/boot/dts/armada-xp-db.dts
-> @@ -229,6 +229,34 @@
->  					spi-max-frequency = <20000000>;
->  				};
->  			};
-> +
-> +			nand at d0000 {
-> +				status = "okay";
-> +				num-cs = <1>;
-> +				marvell,nand-keep-config;
-> +				marvell,nand-enable-arbiter;
-> +				nand-on-flash-bbt;
-> +
-> +				partitions {
-> +					compatible = "fixed-partitions";
-> +					#address-cells = <1>;
-> +					#size-cells = <1>;
-> +
-> +					partition at 0 {
-> +						label = "U-Boot";
-> +						reg = <0 0x800000>;
-> +					};
-> +					partition at 800000 {
-> +						label = "Linux";
-> +						reg = <0x800000 0x800000>;
-> +					};
-> +					partition at 1000000 {
-> +						label = "Filesystem";
-> +						reg = <0x1000000 0x3f000000>;
-> +
-> +					};
-> +				};
-> +			};
->  		};
->  	};
->  };
-> -- 
-> 2.6.4
->
+>  Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Acked-by: Rob Herring <robh@kernel.org>
+
+>  drivers/clk/sunxi/clk-sun8i-apb0.c                | 23 ++++++++---------------
+>  2 files changed, 9 insertions(+), 15 deletions(-)
