@@ -1,103 +1,77 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 12 Feb 2016 16:59:45 +0100
-Subject: [linux-sunxi][PATCH v2] ARM: dts: sun4i: Enable USB DRC on the
- MK802
-In-Reply-To: <1455278359-22451-1-git-send-email-codekipper@gmail.com>
-References: <1455278359-22451-1-git-send-email-codekipper@gmail.com>
-Message-ID: <56BE0171.9040305@redhat.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 12 Feb 2016 17:01:26 +0100
+Subject: mt1873-evb: MMC failing with linux-next
+In-Reply-To: <56BDF937.60208@gmail.com>
+References: <7hegcmadfk.fsf@baylibre.com> <56BDF937.60208@gmail.com>
+Message-ID: <56BE01D6.40908@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On 12-02-16 12:59, codekipper at gmail.com wrote:
-> From: Marcus Cooper <codekipper@gmail.com>
+
+On 12/02/16 16:24, Matthias Brugger wrote:
+> Hi Kevin,
 >
-> Enable the otg/drc usb controller on the MK802.
+> On 09/02/16 02:18, Kevin Hilman wrote:
+>> Hello,
+>>
+>> I tried getting MMC working with linux-next (next-20160208) on
+>> mt8173-evb by enabling a few options[1] on top of the default defconfig,
+>> and this results in a kernel that hangs as soon as it starts userspace.
+>>
+>> The MMC driver seems to start, though has some regulator issues:
+>>
+>> [    0.526380] sdhci: Secure Digital Host Controller Interface driver
+>> [    0.527176] sdhci: Copyright(c) Pierre Ossman
+>> [    0.528835] vio18: unsupportable voltage range: 3300000-1980000uV
+>> [    0.529610] mtk-msdc 11230000.mmc: Regulator set error -22:
+>> 3300000 - 3300000
+>> [    0.563731] mtk-msdc 11240000.mmc: Got CD GPIO
+>>
+>> The driver appears to be attempting to set 3.3V but using a 1.8V
+>> regulator (vio18), which is failing.
+>>
+>> Then, the kernel hangs after freeing unused memory:
+>>
+>> [    0.616386] hctosys: unable to open rtc device (rtc0)
+>> [    0.624118] usb_vbus: disabling
+>> [    0.624547] vusb: disabling
+>> [    0.624929] vgp6: disabling
+>> [    0.625635] ALSA device list:
+>> [    0.626009]   No soundcards found.
+>> [    0.626963] Freeing unused kernel memory: 724K (ffffffc000977000 -
+>> ffffffc000a2c000)
+>>
+>> And nothing further here.
+>>
 >
-> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
-> ---
-> Changes since v1:
-> - Corrected name of the device in subject & description.
+> I can see the warning from the mmc regulator access, but after that my
+> board boots just fine.
+> I'm using linux-next as of today (20160212).
+> I attached my config, it should be defconfig plus the config options you
+> mentioned (and an initramfs).
+>
+> Is this the configuration you have?
 
-Looks good to me:
-
-Reviewed-by: Hans de Goede <hdegoede@redhat.com>
+I spotted an error in my scripts to build the kernel. After fixing this 
+I can reproduce your error.
 
 Regards,
+Matthias
 
-Hans
-
-
-> ---
->   arch/arm/boot/dts/sun4i-a10-mk802.dts | 33 +++++++++++++++++++++++++++++++++
->   1 file changed, 33 insertions(+)
 >
-> diff --git a/arch/arm/boot/dts/sun4i-a10-mk802.dts b/arch/arm/boot/dts/sun4i-a10-mk802.dts
-> index ddf0683..ee46ea8 100644
-> --- a/arch/arm/boot/dts/sun4i-a10-mk802.dts
-> +++ b/arch/arm/boot/dts/sun4i-a10-mk802.dts
-> @@ -44,6 +44,7 @@
->   #include "sun4i-a10.dtsi"
->   #include "sunxi-common-regulators.dtsi"
->   #include <dt-bindings/gpio/gpio.h>
-> +#include <dt-bindings/pinctrl/sun4i-a10.h>
+> Regards,
+> Matthias
 >
->   / {
->   	model = "MK802";
-> @@ -84,7 +85,25 @@
->   	status = "okay";
->   };
->
-> +&otg_sram {
-> +	status = "okay";
-> +};
-> +
->   &pio {
-> +	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
-> +		allwinner,pins = "PH4";
-> +		allwinner,function = "gpio_in";
-> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-> +	};
-> +
-> +	usb0_vbus_detect_pin: usb0_vbus_detect_pin at 0 {
-> +		allwinner,pins = "PH5";
-> +		allwinner,function = "gpio_in";
-> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-> +	};
-> +
->   	usb2_vbus_pin_mk802: usb2_vbus_pin at 0 {
->   		allwinner,pins = "PH12";
->   		allwinner,function = "gpio_out";
-> @@ -93,6 +112,10 @@
->   	};
->   };
->
-> +&reg_usb0_vbus {
-> +	status = "okay";
-> +};
-> +
->   &reg_usb1_vbus {
->   	status = "okay";
->   };
-> @@ -109,7 +132,17 @@
->   	status = "okay";
->   };
->
-> +&usb_otg {
-> +	dr_mode = "otg";
-> +	status = "okay";
-> +};
-> +
->   &usbphy {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&usb0_id_detect_pin>, <&usb0_vbus_detect_pin>;
-> +	usb0_id_det-gpios = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
-> +	usb0_vbus_det-gpios = <&pio 7 5 GPIO_ACTIVE_HIGH>; /* PH5 */
-> +	usb0_vbus-supply = <&reg_usb0_vbus>;
->   	usb1_vbus-supply = <&reg_usb1_vbus>;
->   	usb2_vbus-supply = <&reg_usb2_vbus>;
->   	status = "okay";
->
+>> It boots fine when disabling the MMC driver (CONFIG_MMC_MTK=n).
+>>
+>> Any ideas?
+>>
+>> Kevin
+>>
+>> [1]
+>> CONFIG_MMC_MTK=y
+>> CONFIG_MFD_MT6397=y
+>> CONFIG_REGULATOR_MT6397=y
+>> CONFIG_MTK_PMIC_WRAP=y
+>>
