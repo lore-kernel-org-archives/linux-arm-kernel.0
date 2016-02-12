@@ -1,32 +1,72 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 12 Feb 2016 11:01:24 +0100
-Subject: [PATCH] ARM: socfpga_defconfig: enable support for
- initramfs/initrd support
-In-Reply-To: <7hwpqaoj69.fsf@baylibre.com>
-References: <1455230856-19648-1-git-send-email-dinguyen@opensource.altera.com>
- <4776059.MG11XzgNhU@wuerfel> <7hwpqaoj69.fsf@baylibre.com>
-Message-ID: <3329414.HcXjecCDpd@wuerfel>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 12 Feb 2016 10:01:37 +0000
+Subject: [BUG] random kernel crashes after THP rework on s390 (maybe also
+ on PowerPC and ARM)
+In-Reply-To: <20160211205702.24f0d17a@thinkpad>
+References: <20160211192223.4b517057@thinkpad>
+ <20160211190942.GA10244@node.shutemov.name>
+ <20160211205702.24f0d17a@thinkpad>
+Message-ID: <20160212100137.GE25087@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 11 February 2016 16:40:14 Kevin Hilman wrote:
-> Arnd Bergmann <arnd@arndb.de> writes:
+On Thu, Feb 11, 2016 at 08:57:02PM +0100, Gerald Schaefer wrote:
+> On Thu, 11 Feb 2016 21:09:42 +0200
+> "Kirill A. Shutemov" <kirill@shutemov.name> wrote:
+> > On Thu, Feb 11, 2016 at 07:22:23PM +0100, Gerald Schaefer wrote:
+> > > Sebastian Ott reported random kernel crashes beginning with v4.5-rc1 and
+> > > he also bisected this to commit 61f5d698 "mm: re-enable THP". Further
+> > > review of the THP rework patches, which cannot be bisected, revealed
+> > > commit fecffad "s390, thp: remove infrastructure for handling splitting PMDs"
+> > > (and also similar commits for other archs).
+> > > 
+> > > This commit removes the THP splitting bit and also the architecture
+> > > implementation of pmdp_splitting_flush(), which took care of the IPI for
+> > > fast_gup serialization. The commit message says
+> > > 
+> > >     pmdp_splitting_flush() is not needed too: on splitting PMD we will do
+> > >     pmdp_clear_flush() + set_pte_at().  pmdp_clear_flush() will do IPI as
+> > >     needed for fast_gup
+> > > 
+> > > The assumption that a TLB flush will also produce an IPI is wrong on s390,
+> > > and maybe also on other architectures, and I thought that this was actually
+> > > the main reason for having an arch-specific pmdp_splitting_flush().
+> > > 
+> > > At least PowerPC and ARM also had an individual implementation of
+> > > pmdp_splitting_flush() that used kick_all_cpus_sync() instead of a TLB
+> > > flush to send the IPI, and those were also removed. Putting the arch
+> > > maintainers and mailing lists on cc to verify.
+> > > 
+> > > On s390 this will break the IPI serialization against fast_gup, which
+> > > would certainly explain the random kernel crashes, please revert or fix
+> > > the pmdp_splitting_flush() removal.
+> > 
+> > Sorry for that.
+> > 
+> > I believe, the problem was already addressed for PowerPC:
+> > 
+> > http://lkml.kernel.org/g/454980831-16631-1-git-send-email-aneesh.kumar at linux.vnet.ibm.com
+> > 
+> > I think kick_all_cpus_sync() in arch-specific pmdp_invalidate() would do
+> > the trick, right?
 > 
-> > On Thursday 11 February 2016 16:47:36 dinguyen at opensource.altera.com wrote:
-> >> From: Dinh Nguyen <dinguyen@opensource.altera.com>
-> >> 
-> >> Enable CONFIG_BLK_DEV_INITRD.
-> >> 
-> >> Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
-> >
-> > What for?
-> >
+> Hmm, not sure about that. After pmdp_invalidate(), a pmd_none() check in
+> fast_gup will still return false, because the pmd is not empty (at least
+> on s390). So I don't see spontaneously how it will help fast_gup to break
+> out to the slow path in case of THP splitting.
 > 
-> So the board farms doing boot testing can do so with an initramfs.
+> > 
+> > If yes, I'll prepare patch tomorrow (some sleep required).
+> > 
 > 
-> Acked-by: Kevin Hilman <khilman@baylibre.com>
+> We'll check if adding kick_all_cpus_sync() to pmdp_invalidate() helps.
+> It would also be good if Martin has a look at this, he'll return on
+> Monday.
 
-Ah, got it. I thought this was just the option for the old-style blockdev
-based initrd, not the new-style initramfs.
+Do you have a reliable way to trigger the "random kernel crashes"? We've not
+seen anything reported on arm64, but I don't see why we wouldn't be affected
+by the same bug and it would be good to confirm and validate a fix.
 
-	Arnd
+Cheers,
+
+Will
