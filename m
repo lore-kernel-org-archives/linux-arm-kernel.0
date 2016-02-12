@@ -1,77 +1,108 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 12 Feb 2016 17:01:26 +0100
-Subject: mt1873-evb: MMC failing with linux-next
-In-Reply-To: <56BDF937.60208@gmail.com>
-References: <7hegcmadfk.fsf@baylibre.com> <56BDF937.60208@gmail.com>
-Message-ID: <56BE01D6.40908@gmail.com>
+From: vishnupatekar0510@gmail.com (Vishnu Patekar)
+Date: Sat, 13 Feb 2016 00:06:00 +0800
+Subject: [PATCH 10/14] ARM: dts: sun8i-a83t: Add PRCM related clocks and
+ resets
+In-Reply-To: <CAGb2v67iO-816KaLttWRRPL2f7hpfgJ1--p69tD_oOrewmOjCA@mail.gmail.com>
+References: <1454203266-4450-1-git-send-email-vishnupatekar0510@gmail.com>
+ <1454203266-4450-11-git-send-email-vishnupatekar0510@gmail.com>
+ <CAGb2v67iO-816KaLttWRRPL2f7hpfgJ1--p69tD_oOrewmOjCA@mail.gmail.com>
+Message-ID: <CAEzqOZtsdHC2tCgjC=Bj5q3RFip2Uyni8bFC16u03PRLCra5KA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello Wens,
 
 
-On 12/02/16 16:24, Matthias Brugger wrote:
-> Hi Kevin,
+On Tue, Feb 2, 2016 at 2:44 PM, Chen-Yu Tsai <wens@csie.org> wrote:
+> On Sun, Jan 31, 2016 at 9:21 AM, Vishnu Patekar
+> <vishnupatekar0510@gmail.com> wrote:
+>> This adds A83T PRCM related clocks, clock resets.
+>>
+>> As a83t apb0 gates clock support is added earlier, this enables it.
+>> Apart from apb0 gates, other added clocks are compatible with
+>> earlier sun8i socs.
+>>
+>> Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
+>> ---
+>>  arch/arm/boot/dts/sun8i-a83t.dtsi | 44 +++++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 44 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
+>> index ac96aa1..5ea20ff 100644
+>> --- a/arch/arm/boot/dts/sun8i-a83t.dtsi
+>> +++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
+>> @@ -268,6 +268,44 @@
+>>                                              "mmc2_output",
+>>                                              "mmc2_sample";
+>>                 };
+>> +
+>> +               cpus_clk: clk at 01f01400 {
+>> +                       compatible = "allwinner,sun9i-a80-cpus-clk";
+>> +                       reg = <0x01f01400 0x4>;
+>> +                       #clock-cells = <0>;
+>> +                       clocks = <&osc16Md512>, <&osc24M>, <&pll6>, <&osc16M>;
+>> +                       clock-output-names = "cpus";
+>> +               };
+>> +
+>> +               ahb0: ahb0_clk {
+>> +                       compatible = "fixed-factor-clock";
+>> +                       #clock-cells = <0>;
+>> +                       clock-div = <1>;
+>> +                       clock-mult = <1>;
+>> +                       clocks = <&cpus_clk>;
+>> +                       clock-output-names = "ahb0";
+>> +               };
+>> +
+>> +               apb0: clk at 01f0140c {
+>> +                       compatible = "allwinner,sun8i-a23-apb0-clk";
 >
-> On 09/02/16 02:18, Kevin Hilman wrote:
->> Hello,
->>
->> I tried getting MMC working with linux-next (next-20160208) on
->> mt8173-evb by enabling a few options[1] on top of the default defconfig,
->> and this results in a kernel that hangs as soon as it starts userspace.
->>
->> The MMC driver seems to start, though has some regulator issues:
->>
->> [    0.526380] sdhci: Secure Digital Host Controller Interface driver
->> [    0.527176] sdhci: Copyright(c) Pierre Ossman
->> [    0.528835] vio18: unsupportable voltage range: 3300000-1980000uV
->> [    0.529610] mtk-msdc 11230000.mmc: Regulator set error -22:
->> 3300000 - 3300000
->> [    0.563731] mtk-msdc 11240000.mmc: Got CD GPIO
->>
->> The driver appears to be attempting to set 3.3V but using a 1.8V
->> regulator (vio18), which is failing.
->>
->> Then, the kernel hangs after freeing unused memory:
->>
->> [    0.616386] hctosys: unable to open rtc device (rtc0)
->> [    0.624118] usb_vbus: disabling
->> [    0.624547] vusb: disabling
->> [    0.624929] vgp6: disabling
->> [    0.625635] ALSA device list:
->> [    0.626009]   No soundcards found.
->> [    0.626963] Freeing unused kernel memory: 724K (ffffffc000977000 -
->> ffffffc000a2c000)
->>
->> And nothing further here.
->>
->
-> I can see the warning from the mmc regulator access, but after that my
-> board boots just fine.
-> I'm using linux-next as of today (20160212).
-> I attached my config, it should be defconfig plus the config options you
-> mentioned (and an initramfs).
->
-> Is this the configuration you have?
+> This is actually wrong, as it is wrong in sun9i-a80.dtsi.
+> I've sent a patch series for it.
+A83T apb0 is different from A80, and it's same as A23, so this should
+be correct.
+Please correct me in case I'm missing something.
 
-I spotted an error in my scripts to build the kernel. After fixing this 
-I can reproduce your error.
-
-Regards,
-Matthias
-
+> Also the drivers for "allwinner,sun9i-a80-cpus-clk" and
+> "allwinner,sun9i-a80-apbs-clk"
+> are only compiled for CONFIG_MACH_SUN9I. Please add a patch to address this.
+Okie.
 >
-> Regards,
-> Matthias
+> Regards
+> ChenYu
 >
->> It boots fine when disabling the MMC driver (CONFIG_MMC_MTK=n).
+>> +                       reg = <0x01f0140c 0x4>;
+>> +                       #clock-cells = <0>;
+>> +                       clocks = <&ahb0>;
+>> +                       clock-output-names = "apb0";
+>> +               };
+>> +
+>> +               apb0_gates: clk at 01f01428 {
+>> +                       compatible = "allwinner,sun8i-a83t-apb0-gates-clk";
+>> +                       reg = <0x01f01428 0x4>;
+>> +                       #clock-cells = <1>;
+>> +                       clocks = <&apb0>;
+>> +                       clock-indices = <0>, <1>,
+>> +                                       <2>, <3>,
+>> +                                       <4>, <6>, <7>;
+>> +                       clock-output-names = "apb0_pio", "apb0_ir",
+>> +                                       "apb0_timer", "apb0_rsb",
+>> +                                       "apb0_uart", "apb0_i2c0", "apb0_twd";
+>> +               };
+>>         };
 >>
->> Any ideas?
->>
->> Kevin
->>
->> [1]
->> CONFIG_MMC_MTK=y
->> CONFIG_MFD_MT6397=y
->> CONFIG_REGULATOR_MT6397=y
->> CONFIG_MTK_PMIC_WRAP=y
+>>         soc {
+>> @@ -434,5 +472,11 @@
+>>                         #interrupt-cells = <3>;
+>>                         interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_HIGH)>;
+>>                 };
+>> +
+>> +               apb0_reset: reset at 01f014b0 {
+>> +                       reg = <0x01f014b0 0x4>;
+>> +                       compatible = "allwinner,sun6i-a31-clock-reset";
+>> +                       #reset-cells = <1>;
+>> +               };
+>>         };
+>>  };
+>> --
+>> 1.9.1
 >>
