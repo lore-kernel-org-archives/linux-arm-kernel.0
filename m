@@ -1,76 +1,59 @@
-From: sebott@linux.vnet.ibm.com (Sebastian Ott)
-Date: Fri, 12 Feb 2016 13:21:46 +0100 (CET)
-Subject: [BUG] random kernel crashes after THP rework on s390 (maybe also
- on PowerPC and ARM)
-In-Reply-To: <20160211191253.GA8589@black.fi.intel.com>
-References: <20160211192223.4b517057@thinkpad>
- <20160211190942.GA10244@node.shutemov.name>
- <20160211191253.GA8589@black.fi.intel.com>
-Message-ID: <alpine.LFD.2.20.1602121318080.1773@schleppi>
+From: maitysanchayan@gmail.com (Sanchayan Maity)
+Date: Fri, 12 Feb 2016 17:53:00 +0530
+Subject: [PATCH v2] ARM: dts: vfxxx: Add iio_hwmon node for ADC temperature
+ channel
+Message-ID: <cd32f1664a04b38b8a025414d039bd015cb9a5ff.1455278754.git.maitysanchayan@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 11 Feb 2016, Kirill A. Shutemov wrote:
-> On Thu, Feb 11, 2016 at 09:09:42PM +0200, Kirill A. Shutemov wrote:
-> > On Thu, Feb 11, 2016 at 07:22:23PM +0100, Gerald Schaefer wrote:
-> > > Hi,
-> > > 
-> > > Sebastian Ott reported random kernel crashes beginning with v4.5-rc1 and
-> > > he also bisected this to commit 61f5d698 "mm: re-enable THP". Further
-> > > review of the THP rework patches, which cannot be bisected, revealed
-> > > commit fecffad "s390, thp: remove infrastructure for handling splitting PMDs"
-> > > (and also similar commits for other archs).
-> > > 
-> > > This commit removes the THP splitting bit and also the architecture
-> > > implementation of pmdp_splitting_flush(), which took care of the IPI for
-> > > fast_gup serialization. The commit message says
-> > > 
-> > >     pmdp_splitting_flush() is not needed too: on splitting PMD we will do
-> > >     pmdp_clear_flush() + set_pte_at().  pmdp_clear_flush() will do IPI as
-> > >     needed for fast_gup
-> > > 
-> > > The assumption that a TLB flush will also produce an IPI is wrong on s390,
-> > > and maybe also on other architectures, and I thought that this was actually
-> > > the main reason for having an arch-specific pmdp_splitting_flush().
-> > > 
-> > > At least PowerPC and ARM also had an individual implementation of
-> > > pmdp_splitting_flush() that used kick_all_cpus_sync() instead of a TLB
-> > > flush to send the IPI, and those were also removed. Putting the arch
-> > > maintainers and mailing lists on cc to verify.
-> > > 
-> > > On s390 this will break the IPI serialization against fast_gup, which
-> > > would certainly explain the random kernel crashes, please revert or fix
-> > > the pmdp_splitting_flush() removal.
-> > 
-> > Sorry for that.
-> > 
-> > I believe, the problem was already addressed for PowerPC:
-> > 
-> > http://lkml.kernel.org/g/454980831-16631-1-git-send-email-aneesh.kumar at linux.vnet.ibm.com
-> 
-> Correct link is
-> 
-> http://lkml.kernel.org/g/1454980831-16631-1-git-send-email-aneesh.kumar at linux.vnet.ibm.com
-> 
+Add iio_hwmon node to expose the temperature channel on Vybrid as
+hardware monitor device using the iio_hwmon driver.
 
-Based on your suggestion Gerald provided the following patch but sadly it
-didn't fix the problem.
-
-Sebastian
-
-
+Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
 ---
- arch/s390/include/asm/pgtable.h |    2 ++
- 1 file changed, 2 insertions(+)
 
---- a/arch/s390/include/asm/pgtable.h
-+++ b/arch/s390/include/asm/pgtable.h
-@@ -1587,6 +1587,8 @@ static inline void pmdp_invalidate(struc
- 				   unsigned long address, pmd_t *pmdp)
- {
- 	pmdp_flush_direct(vma->vm_mm, address, pmdp);
-+	/* Serialize against fast_gup with IPI */
-+	kick_all_cpus_sync();
- }
+Hello,
 
- #define __HAVE_ARCH_PMDP_SET_WRPROTECT
+The first version of the patch was send quite a while ago.
+https://lkml.org/lkml/2015/9/16/932
+
+Shawn you had requested that hyphen rather than underscore should
+be used in node name. I looked into that.
+
+The iio_hwmon driver calls hwmon_device register_with_groups inside
+hwmon.c and this
+http://lxr.free-electrons.com/source/drivers/hwmon/hwmon.c#L103
+
+does not allow hyphen in hwmon name attribute. I was not aware of
+this but while trying to test the change, the device probe failed
+with EINVAL. I think we should stick to the existing use of the
+bindings or we need to change the hwmon code as well along with the
+existing device tree files and binding documentation.
+
+Changes since v1:
+1. Expose ADC1 temperature channel as well
+2. Move the entry outside of the aips1 bus node
+
+Best Regards,
+Sanchayan Maity.
+---
+ arch/arm/boot/dts/vfxxx.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
+index a5f07e3..8ed8e47 100644
+--- a/arch/arm/boot/dts/vfxxx.dtsi
++++ b/arch/arm/boot/dts/vfxxx.dtsi
+@@ -673,5 +673,10 @@
+ 				status = "disabled";
+ 			};
+ 		};
++
++		iio_hwmon {
++			compatible = "iio-hwmon";
++			io-channels = <&adc0 16>, <&adc1 16>;
++		};
+ 	};
+ };
+-- 
+2.7.1
