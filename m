@@ -1,98 +1,151 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Fri, 12 Feb 2016 07:38:51 +0100
-Subject: [PATCH] tty/serial: digicolor: Fix bad usage of IS_ERR_VALUE
-In-Reply-To: <20160211153243.GA3076@roeck-us.net>
-References: <1455030539-10798-1-git-send-email-linux@roeck-us.net>
- <4571887.rTPndCnv20@wuerfel> <56BAA27A.9050605@roeck-us.net>
- <2606061.l722KO95iI@wuerfel> <56BC022B.7030004@roeck-us.net>
- <56BC2DF7.20803@samsung.com> <20160211153243.GA3076@roeck-us.net>
-Message-ID: <56BD7DFB.10608@samsung.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 12 Feb 2016 12:19:53 +0530
+Subject: [PATCH v3 3/3] pci: dra7xx: use pdata callbacks to perform reset
+In-Reply-To: <alpine.DEB.2.02.1602111921090.20757@utopia.booyaka.com>
+References: <1452780672-14339-1-git-send-email-kishon@ti.com>
+ <1452780672-14339-4-git-send-email-kishon@ti.com>
+ <20160127173104.GQ19432@atomide.com> <56A90971.4020409@ti.com>
+ <20160127185649.GV19432@atomide.com> <56A94FB7.6020903@ti.com>
+ <20160128183156.GH19432@atomide.com> <56B087AD.4000505@ti.com>
+ <alpine.DEB.2.02.1602080208070.2182@utopia.booyaka.com>
+ <56B900E9.9040306@ti.com>
+ <alpine.DEB.2.02.1602090846480.2906@utopia.booyaka.com>
+ <56BA2495.9020407@ti.com>
+ <alpine.DEB.2.02.1602091932160.2906@utopia.booyaka.com>
+ <56BA958A.1020503@ti.com> <56BACCDB.2070507@ti.com>
+ <alpine.DEB.2.02.1602111921090.20757@utopia.booyaka.com>
+Message-ID: <56BD8091.4090007@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/11/2016 04:32 PM, Guenter Roeck wrote:
-> On Thu, Feb 11, 2016 at 07:45:11AM +0100, Andrzej Hajda wrote:
->> On 02/11/2016 04:38 AM, Guenter Roeck wrote:
->>> On 02/10/2016 07:21 AM, Arnd Bergmann wrote:
->>>> On Tuesday 09 February 2016 18:37:46 Guenter Roeck wrote:
->>>>> On 02/09/2016 07:26 AM, Arnd Bergmann wrote:
->>>>>> On Tuesday 09 February 2016 07:08:59 Guenter Roeck wrote:
->>>>>>> IS_ERR_VALUE() assumes that its parameter is an unsigned long.
->>>>>>> It can not be used to check if an unsigned int reflects an error.
->>>>>>> Doing so can result in the following build warning.
+Hi,
+
+On Friday 12 February 2016 12:57 AM, Paul Walmsley wrote:
+> Hi Kishon, Suman,
+> 
+> On Wed, 10 Feb 2016, Kishon Vijay Abraham I wrote:
+> 
+>> On Wednesday 10 February 2016 07:12 AM, Suman Anna wrote:
+>>> On 02/09/2016 01:36 PM, Paul Walmsley wrote:
+>>>> On Tue, 9 Feb 2016, Suman Anna wrote:
+>>>>> On 02/09/2016 02:49 AM, Paul Walmsley wrote:
+>>>>>> On Mon, 8 Feb 2016, Suman Anna wrote:
+>>>>>>> On 02/07/2016 08:48 PM, Paul Walmsley wrote:
+>>>>>>>> On Tue, 2 Feb 2016, Kishon Vijay Abraham I wrote:
+>>>>>>>>
+>>>>>>>>> Paul, what do you think is the best way forward to perform reset?
+>>>>>>>>
+>>>>>>>> Many of the IP blocks with PRM hardreset lines are processor IP blocks. 
+>>>>>>>> Those often need special reset handling to ensure that WFI/HLT-like 
+>>>>>>>> instructions are executed after reset.  This special handling ensures that 
+>>>>>>>> the IP blocks' bus initiator interfaces indicate that they are in standby 
+>>>>>>>> to the PRCM - thus allowing power management for the rest of the chip to 
+>>>>>>>> work correctly.
+>>>>>>>>
+>>>>>>>> But that doesn't seem to be the case with PCIe - and maybe others - 
+>>>>>>>> possibly some of the MMUs?  
 >>>>>>>
->>>>>>> drivers/tty/serial/digicolor-usart.c: In function ?digicolor_uart_probe?:
->>>>>>> include/linux/err.h:21:38: warning:
->>>>>>>           comparison is always false due to limited range of data type
->>>>>>> drivers/tty/serial/digicolor-usart.c:485:6: note:
->>>>>>>           in expansion of macro ?IS_ERR_VALUE?
->>>>>>>
->>>>>>> If that warning is seen, an error return from platform_get_irq() is missed.
->>>>>>>
->>>>>>>
->>>>>> The patch looks correct to me, but what compiler version and which kernel
->>>>>> tree is it that triggered the warning?
+>>>>>>> Yeah, the sequencing between clocks and resets would still be the same
+>>>>>>> for MMUs, so, adding the custom flags for MMUs is fine.
 >>>>>>
->>>>>> Andrzej Hajda just modified the definition of IS_ERR_VALUE(), and the
->>>>>> changes are still under discussion, but I don't see that warning with
->>>>>> any of the versions.
->>>>>>
->>>>> I see it with gcc 5.1 and 5.2 (and W=1). I did not see / notice Andrzej's patch.
+>>>>>> I'm curious as to whether HWMOD_CUSTOM_HARDRESET is needed for the MMUs.  
+>>>>>> We've stated that the main point of the custom hardreset code is to handle 
+>>>>>> processors that need to be placed into WFI/HLT, but it doesn't seem like 
+>>>>>> there would be an equivalent for MMUs.  Thoughts?
 >>>>>
->>>>> I agree that fixing the problem in IS_ERR_VALUE() is preferrable.
+>>>>> The current OMAP IOMMU code already leverages the pdata ops for
+>>>>> performing the resets, so not adding the flags would also require
+>>>>> additional changes in the driver.
 >>>>>
->>>>>
->>>> Ah, W=1 explains it. We are still debating about the proper solution. Al Viro
->>>> pointed out that most users of IS_ERR_VALUE() shouldn't be using it at all,
->>>> so your patch is probably best here after all.
+>>>>> Also, the reset lines controlling the MMUs actually also manage the
+>>>>> reset for all the other sub-modules other than the processor cores
+>>>>> within the sub-systems. We have currently different issues (see [1] for
+>>>>> eg. around the IPU sub-system entering RET in between), so from a PM
+>>>>> point of view, we do prefer to place the MMUs also in reset when we are
+>>>>> runtime suspended.
 >>>>
->>> Yes, after looking into it some more I agree. Coccinelle should be able to handle
->>> most of the conversions automatically. I actually tried to write a script, just
->>> for the fun of it, but it misses some of the problem cases in patch mode.
->>> Maybe I get it working tonight.
+>>>> Should we reassert hardreset in _idle() for IP blocks that don't have 
+>>>> HWMOD_CUSTOM_HARDRESET set on them?  Would that allow us to use this 
+>>>> mechanism for the uncore hardreset lines, or are there other quirks?
+>>>>
+>>>> Also - would that address the potential issue that you mentioned with the 
+>>>> PCIe block, or is that a different issue?
 >>>
->>> Guenter
->>>
->> Maybe it can be helpful. The script which classifies all IS_ERR_VALUE
->> usages as
->> correct, signed, incorrect and unknown (cocci was not able to detect type).
->> Adding patch mode should be quite simple.
+>>> Yeah, I think that would address the PCIe block issue in terms of reset
+>>> state balancing between pm_runtime_get_sync() and pm_runtime_put()
+>>> calls. Right now, they are unbalanced. The PCIe block is using these
+>>> only in probe and remove, so it should work for that IP.
 >>
->> // Options: --all-includes --include
->> include/uapi/linux/netfilter_ipv6/ip6_tables.h --include
->> include/uapi/linux/netfilter_ipv4/ip_tables.h --include
->> include/uapi/linux/netfilter_arp/arp_tables.h --include
->> include/uapi/linux/netfilter/x_tables.h --include include/linux/mm_types.h
->>
->> virtual context
->> virtual report
->>
->> @r@
->> typedef bool, u8, u16, u32, u64, s8, s16, s32, s64, __u64, dma_addr_t,
->> Elf32_Addr, Elf64_Addr;
->> {unsigned long, size_t} ev;
->> {short, int, long, s16, s32, ssize_t} ew;
->> {char, unsigned char, unsigned short, unsigned int, long long, unsigned
->> long long, bool, u8, u16, u32, u64, s64, __u64, dma_addr_t, Elf32_Addr,
->> Elf64_Addr} ei;
->> expression eu;
->> position p;
->> @@
->>
->> IS_ERR_VALUE(\(ev \| ew \| ei \| eu \))@p
->>
->> @script:python depends on report@
->> p << r.p = [];
->> ev << r.ev = "";
->> ew << r.ew = "";
->> ei << r.ei = "";
->> eu << r.eu = "";
-> This doesn't work for me; it bails out at the assignments. If I remove
-> the assignments, it does not report anything.
->
-> Any idea what might be wrong ?
+>> As I mentioned before this would result in undesired behavior during
+>> suspend/resume cycle in PCIe. (This should be okay for the current mainline
+>> code but would break once we add suspend/resume support for PCIe).
+> 
+> I'd like to understand where we're currently at here.  It looks like we're 
+> waiting for testing from Suman, and we're waiting for Kishon to try using 
+> the bind/unbind driver model hook to see if that wedges PCIe?  Does this 
+> match your collective understanding of the status here?
 
-Old version of spatch. Default values are supported since 1.0.3.
+I got to try this and looks like even without this series there are other PM
+issues possible introduced by Commit 5de85b9d57ab ("PM / runtime: Re-init
+runtime PM states at probe error and driver unbind").
 
-Regards
-Andrzej
+Now I get this error if I tried to modprobe after rmmod pci-dra7xx.
+[   54.352860] dra7-pcie 51000000.pcie: omap_device: omap_device_enable()
+called from invalid state 1
+[   54.362318] dra7-pcie 51000000.pcie: pm_runtime_get_sync failed
+[   54.368624] dra7-pcie: probe of 51000000.pcie failed with error -22
+
+>From the thread that fixes this issue [1], looks like drivers that use
+*_autosuspend() get this issue. However I don't use *_autosuspend() in
+pci-dra7xx. Maybe pci core has this? This has to be debugged further. But I
+feel this is not related to the problem that we are trying to solve right now
+(dra7 hangs if PCI driver is enabled) and given the fact that pci-dra7xx driver
+is now modeled as built-in driver, this can be deferred.
+
+[1] -> http://www.spinics.net/lists/arm-kernel/msg481845.html
+
+> 
+> Thinking about the question of what to do about hardreset assertion in 
+> idle, if we need it, we could add a hwmod flag to control that mode.  I 
+> would consider it a temporary workaround until we have the hwmod code 
+> moved into a bus driver and the bus driver/hwmod code can hook into the 
+> LDM .remove operation (and connect it to .shutdown, etc.)  Suman/Kishon: 
+> is it your understanding that we could remove the existing hardreset 
+> control in the IOMMU drivers and the PCIe driver if we had these options 
+> in the hwmod code? 
+
+Yeah, that's my understanding. And since this series solves the PCIe problem,
+it's proven that hardreset control can be moved to hwmod code.
+
+For PCIe, it's even okay to do deassert in _reset, but I'm not sure if it'll
+have side effects with other modules.
+
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index e9f65fe..24cafd9 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -1966,8 +1966,11 @@ static int _reset(struct omap_hwmod *oh)
+ 		r = oh->class->reset(oh);
+ 	} else {
+ 		if (oh->rst_lines_cnt > 0) {
+-			for (i = 0; i < oh->rst_lines_cnt; i++)
++			for (i = 0; i < oh->rst_lines_cnt; i++) {
+ 				_assert_hardreset(oh, oh->rst_lines[i].name);
++				if (!(oh->flags & HWMOD_CUSTOM_HARDRESET))
++					_deassert_hardreset(oh, oh->rst_lines[i].name);
++			}
+ 			return 0;
+ 		} else {
+ 			r = _ocp_softreset(oh);
+
+Thanks
+Kishon
+
+P.S. I'll be on vacation till end of next week with no email access till then.
+So email response will be delayed. Sorry about that.
+> 
+> Dave, any further comments here?
+> 
+> 
+> - Paul
+> 
