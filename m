@@ -1,58 +1,93 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Fri, 12 Feb 2016 13:00:55 -0800
-Subject: [PATCH v3 01/14] mtd: spi-nor: remove micron_quad_enable()
-In-Reply-To: <2904a1d704670a9ef57b09370782e198fab6b1f4.1454505161.git.cyrille.pitchen@atmel.com>
-References: <cover.1454505161.git.cyrille.pitchen@atmel.com>
- <2904a1d704670a9ef57b09370782e198fab6b1f4.1454505161.git.cyrille.pitchen@atmel.com>
-Message-ID: <20160212210055.GG21465@google.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 12 Feb 2016 22:01:01 +0100
+Subject: [PATCH] [media] zl10353: use div_u64 instead of do_div
+In-Reply-To: <alpine.LFD.2.20.1602121305180.13632@knanqh.ubzr>
+References: <1455287246-3540549-1-git-send-email-arnd@arndb.de>
+ <2712691.b9gkR7KMX7@wuerfel>
+ <alpine.LFD.2.20.1602121305180.13632@knanqh.ubzr>
+Message-ID: <6737272.LXr2g355Yt@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 03, 2016 at 02:26:46PM +0100, Cyrille Pitchen wrote:
-> This patch remove the micron_quad_enable() function which force the Quad
-> SPI mode. However, once this mode is enabled, the Micron memory expect ALL
-> commands to use the SPI 4-4-4 protocol. Hence a failure does occur when
-> calling spi_nor_wait_till_ready() right after the update of the Enhanced
-> Volatile Configuration Register (EVCR) in the micron_quad_enable() as
-> the SPI controller driver is not aware about the protocol change.
+On Friday 12 February 2016 13:21:33 Nicolas Pitre wrote:
+> On Fri, 12 Feb 2016, Arnd Bergmann wrote:
 > 
-> Since there is almost no performance increase using Fast Read 4-4-4
-> commands instead of Fast Read 1-1-4 commands, we rather keep on using the
-> Extended SPI mode than enabling the Quad SPI mode.
+> > On Friday 12 February 2016 14:32:20 Mauro Carvalho Chehab wrote:
+> > > Em Fri, 12 Feb 2016 15:27:18 +0100
+> > > Arnd Bergmann <arnd@arndb.de> escreveu:
+> > > 
+> > > > I noticed a build error in some randconfig builds in the zl10353 driver:
+> > > > 
+> > > > dvb-frontends/zl10353.c:138: undefined reference to `____ilog2_NaN'
+> > > > dvb-frontends/zl10353.c:138: undefined reference to `__aeabi_uldivmod'
+> > > > 
+> > > > The problem can be tracked down to the use of -fprofile-arcs (using
+> > > > CONFIG_GCOV_PROFILE_ALL) in combination with CONFIG_PROFILE_ALL_BRANCHES
+> > > > on gcc version 4.9 or higher, when it fails to reliably optimize
+> > > > constant expressions.
+> > > > 
+> > > > Using div_u64() instead of do_div() makes the code slightly more
+> > > > readable by both humans and by gcc, which gives the compiler enough
+> > > > of a break to figure it all out.
+> > > 
+> > > I'm not against this patch, but we have 94 occurrences of do_div() 
+> > > just at the media subsystem. If this is failing here, it would likely
+> > > fail with other drivers. So, I guess we should either fix do_div() or
+> > > convert all such occurrences to do_div64().
+> > 
+> > I agree that it's possible that the same problem exists elsewhere, but this is
+> > the only one that I ever saw (in five ranconfig builds out of 8035 last week).
+> > 
+> > I also tried changing do_div() to be an inline function with just a small
+> > macro wrapper around it for the odd calling conventions, which also made this
+> > error go away. I would assume that Nico had a good reason for doing do_div()
+> > the way he did.
 > 
-> Let's take the example of the pretty standard use of 8 dummy cycles during
-> Fast Read operations on 64KB erase sectors:
+> The do_div() calling convention predates my work on it.  I assume it was 
+> originally done this way to better map onto the x86 instruction.
+
+Right, this goes back to the dawn of time.
+
+> > In some other files, I saw the object code grow by a few
+> > instructions, but the examples I looked at were otherwise identical.
+> > 
+> > I can imagine that there might be cases where the constant-argument optimization
+> > of do_div fails when we go through an inline function in some combination
+> > of Kconfig options and compiler version, though I don't think that was
+> > the case here.
 > 
-> Fast Read 1-1-4 requires 8 cycles for the command, then 24 cycles for the
-> 3byte address followed by 8 dummy clock cycles and finally 65536*2 cycles
-> for the read data; so 131112 clock cycles.
+> What could be tried is to turn __div64_const32() into a static inline 
+> and see if that makes a difference with those gcc versions we currently 
+> accept.
 > 
-> On the other hand the Fast Read 4-4-4 would require 2 cycles for the
-> command, then 6 cycles for the 3byte address followed by 8 dummy clock
-> cycles and finally 65536*2 cycles for the read data. So 131088 clock
-> cycles. The theorical bandwidth increase is 0.0%.
-
-The assumption of whole-block reads is not always realistic. There are
-some controllers that might not handle that length properly, and there
-are also use cases that don't need to read that much at once.
-
-> Now using Fast Read operations on 512byte pages:
-> Fast Read 1-1-4 needs 8+24+8+(512*2) = 1064 clock cycles whereas Fast
-> Read 4-4-4 would requires 2+6+8+(512*2) = 1040 clock cycles. Hence the
-> theorical bandwidth increase is 2.3%.
-
-This computation is probably more of a reasonable comparison.
-
-> Consecutive reads for non sequential pages is not a relevant use case so
-> The Quad SPI mode is not worth it.
-
-So, I still agree with the conclusion.
-
-Applied this patch to l2-mtd.git.
-
-Brian
-
-> mtd_speedtest seems to confirm these figures.
+> > Nico, any other thoughts on this?
 > 
-> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
-> Fixes: 548cd3ab54da ("mtd: spi-nor: Add quad I/O support for Micron SPI NOR")
+> This is all related to the gcc bug for which I produced a test case 
+> here:
+> 
+> http://article.gmane.org/gmane.linux.kernel.cross-arch/29801
+> 
+> Do you know if this is fixed in recent gcc?
+
+I have a fairly recent gcc, but I also never got around to submit
+it properly.
+
+However, I did stumble over an older patch I did now, which I could
+not remember what it was good for. It does fix the problem, and
+it seems to be a better solution.
+
+	Arnd
+
+diff --git a/include/linux/compiler.h b/include/linux/compiler.h
+index b5acbb404854..b5ff9881bef8 100644
+--- a/include/linux/compiler.h
++++ b/include/linux/compiler.h
+@@ -148,7 +148,7 @@ void ftrace_likely_update(struct ftrace_branch_data *f, int val, int expect);
+  */
+ #define if(cond, ...) __trace_if( (cond , ## __VA_ARGS__) )
+ #define __trace_if(cond) \
+-	if (__builtin_constant_p((cond)) ? !!(cond) :			\
++	if (__builtin_constant_p(!!(cond)) ? !!(cond) :			\
+ 	({								\
+ 		int ______r;						\
+ 		static struct ftrace_branch_data			\
