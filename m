@@ -1,24 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 12 Feb 2016 14:16:54 +0000
-Subject: [PATCH] ARM: imx: Do L2 errata only if the L2 cache isn't enabled
-In-Reply-To: <1455261093-11849-1-git-send-email-dirk.behme@de.bosch.com>
-References: <1455261093-11849-1-git-send-email-dirk.behme@de.bosch.com>
-Message-ID: <20160212141654.GA10826@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 12 Feb 2016 15:27:18 +0100
+Subject: [PATCH] [media] zl10353: use div_u64 instead of do_div
+Message-ID: <1455287246-3540549-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 12, 2016 at 08:11:33AM +0100, Dirk Behme wrote:
-> All the generic L2 cache handling code is encapsulated by a
-> check if the L2 cache is enabled. If it's enabled already, the code
-> is skipped.
-> 
-> For the i.MX6 specific L2 cache handling we missed this check.
-> Add it.
+I noticed a build error in some randconfig builds in the zl10353 driver:
 
-What's the reasoning behind this?  The prefetch register is writable
-while the L2 cache is enabled, unlike the auxiliary control register.
+dvb-frontends/zl10353.c:138: undefined reference to `____ilog2_NaN'
+dvb-frontends/zl10353.c:138: undefined reference to `__aeabi_uldivmod'
 
+The problem can be tracked down to the use of -fprofile-arcs (using
+CONFIG_GCOV_PROFILE_ALL) in combination with CONFIG_PROFILE_ALL_BRANCHES
+on gcc version 4.9 or higher, when it fails to reliably optimize
+constant expressions.
+
+Using div_u64() instead of do_div() makes the code slightly more
+readable by both humans and by gcc, which gives the compiler enough
+of a break to figure it all out.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/media/dvb-frontends/zl10353.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/media/dvb-frontends/zl10353.c b/drivers/media/dvb-frontends/zl10353.c
+index ef9764a02d4c..160c88710553 100644
+--- a/drivers/media/dvb-frontends/zl10353.c
++++ b/drivers/media/dvb-frontends/zl10353.c
+@@ -135,8 +135,7 @@ static void zl10353_calc_nominal_rate(struct dvb_frontend *fe,
+ 
+ 	value = (u64)10 * (1 << 23) / 7 * 125;
+ 	value = (bw * value) + adc_clock / 2;
+-	do_div(value, adc_clock);
+-	*nominal_rate = value;
++	*nominal_rate = div_u64(value, adc_clock);
+ 
+ 	dprintk("%s: bw %d, adc_clock %d => 0x%x\n",
+ 		__func__, bw, adc_clock, *nominal_rate);
+@@ -163,8 +162,7 @@ static void zl10353_calc_input_freq(struct dvb_frontend *fe,
+ 		if (ife > adc_clock / 2)
+ 			ife = adc_clock - ife;
+ 	}
+-	value = (u64)65536 * ife + adc_clock / 2;
+-	do_div(value, adc_clock);
++	value = div_u64((u64)65536 * ife + adc_clock / 2, adc_clock);
+ 	*input_freq = -value;
+ 
+ 	dprintk("%s: if2 %d, ife %d, adc_clock %d => %d / 0x%x\n",
 -- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.7.0
