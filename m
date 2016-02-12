@@ -1,95 +1,51 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Fri, 12 Feb 2016 08:13:11 +0000
-Subject: [RFC v3 09/15] iommu/arm-smmu: relinquish reserved resources on
- domain deletion
+Date: Fri, 12 Feb 2016 08:13:13 +0000
+Subject: [RFC v3 11/15] msi: Add a new MSI_FLAG_IRQ_REMAPPING flag
 In-Reply-To: <1455264797-2334-1-git-send-email-eric.auger@linaro.org>
 References: <1455264797-2334-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1455264797-2334-10-git-send-email-eric.auger@linaro.org>
+Message-ID: <1455264797-2334-12-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arm_smmu_unmap_reserved releases all reserved binding resources:
-destroy all bindings, free iova, free iova_domain. This happens
-on domain deletion.
+Let's introduce a new msi_domain_info flag value, MSI_FLAG_IRQ_REMAPPING
+meant to tell the domain supports IRQ REMAPPING, also known as Interrupt
+Translation Service. On Intel HW this capability is abstracted on IOMMU
+side while on ARM it is abstracted on MSI controller side.
+
+GICv3 ITS HW is the first HW advertising that feature.
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
 ---
- drivers/iommu/arm-smmu.c | 34 +++++++++++++++++++++++++++++-----
- 1 file changed, 29 insertions(+), 5 deletions(-)
+ drivers/irqchip/irq-gic-v3-its-pci-msi.c | 3 ++-
+ include/linux/msi.h                      | 2 ++
+ 2 files changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 9961bfd..ae8a97d 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -363,6 +363,7 @@ struct arm_smmu_reserved_binding {
- 	dma_addr_t		iova;
- 	size_t			size;
+diff --git a/drivers/irqchip/irq-gic-v3-its-pci-msi.c b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
+index aee60ed..8223765 100644
+--- a/drivers/irqchip/irq-gic-v3-its-pci-msi.c
++++ b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
+@@ -96,7 +96,8 @@ static struct msi_domain_ops its_pci_msi_ops = {
+ 
+ static struct msi_domain_info its_pci_msi_domain_info = {
+ 	.flags	= (MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
+-		   MSI_FLAG_MULTI_PCI_MSI | MSI_FLAG_PCI_MSIX),
++		   MSI_FLAG_MULTI_PCI_MSI | MSI_FLAG_PCI_MSIX |
++		   MSI_FLAG_IRQ_REMAPPING),
+ 	.ops	= &its_pci_msi_ops,
+ 	.chip	= &its_msi_irq_chip,
  };
-+static void arm_smmu_unmap_reserved(struct iommu_domain *domain);
+diff --git a/include/linux/msi.h b/include/linux/msi.h
+index a2a0068..03eda72 100644
+--- a/include/linux/msi.h
++++ b/include/linux/msi.h
+@@ -261,6 +261,8 @@ enum {
+ 	MSI_FLAG_MULTI_PCI_MSI		= (1 << 3),
+ 	/* Support PCI MSIX interrupts */
+ 	MSI_FLAG_PCI_MSIX		= (1 << 4),
++	/* Support MSI IRQ remapping service */
++	MSI_FLAG_IRQ_REMAPPING		= (1 << 5),
+ };
  
- static struct iommu_ops arm_smmu_ops;
- 
-@@ -1057,6 +1058,7 @@ static void arm_smmu_domain_free(struct iommu_domain *domain)
- 	 * already been detached.
- 	 */
- 	arm_smmu_destroy_domain_context(domain);
-+	arm_smmu_unmap_reserved(domain);
- 	kfree(smmu_domain);
- }
- 
-@@ -1547,19 +1549,23 @@ unlock:
- 	return ret;
- }
- 
--static void arm_smmu_free_reserved_iova_domain(struct iommu_domain *domain)
-+static void __arm_smmu_free_reserved_iova_domain(struct arm_smmu_domain *sd)
- {
--	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
--	struct iova_domain *iovad = smmu_domain->reserved_iova_domain;
-+	struct iova_domain *iovad = sd->reserved_iova_domain;
- 
- 	if (!iovad)
- 		return;
- 
--	mutex_lock(&smmu_domain->reserved_mutex);
--
- 	put_iova_domain(iovad);
- 	kfree(iovad);
-+}
- 
-+static void arm_smmu_free_reserved_iova_domain(struct iommu_domain *domain)
-+{
-+	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
-+
-+	mutex_lock(&smmu_domain->reserved_mutex);
-+	__arm_smmu_free_reserved_iova_domain(smmu_domain);
- 	mutex_unlock(&smmu_domain->reserved_mutex);
- }
- 
-@@ -1675,6 +1681,24 @@ unlock:
- 	mutex_unlock(&smmu_domain->reserved_mutex);
- }
- 
-+static void arm_smmu_unmap_reserved(struct iommu_domain *domain)
-+{
-+	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
-+	struct rb_node *node;
-+
-+	mutex_lock(&smmu_domain->reserved_mutex);
-+	while ((node = rb_first(&smmu_domain->reserved_binding_list))) {
-+		struct arm_smmu_reserved_binding *b =
-+			rb_entry(node, struct arm_smmu_reserved_binding, node);
-+
-+		while (!kref_put(&b->kref, reserved_binding_release))
-+			;
-+	}
-+	smmu_domain->reserved_binding_list = RB_ROOT;
-+	__arm_smmu_free_reserved_iova_domain(smmu_domain);
-+	mutex_unlock(&smmu_domain->reserved_mutex);
-+}
-+
- static struct iommu_ops arm_smmu_ops = {
- 	.capable			= arm_smmu_capable,
- 	.domain_alloc			= arm_smmu_domain_alloc,
+ int msi_domain_set_affinity(struct irq_data *data, const struct cpumask *mask,
 -- 
 1.9.1
