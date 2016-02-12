@@ -1,47 +1,53 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 12 Feb 2016 20:06:21 +0100
-Subject: [PATCH 3/8] ARM: shmobile: r8a7740: Remove mapping of L2 cache
- controller registers
+Date: Fri, 12 Feb 2016 20:06:22 +0100
+Subject: [PATCH 4/8] ARM: shmobile: Move shmobile_scu_base from .text to .data
 In-Reply-To: <cover.1455303757.git.horms+renesas@verge.net.au>
 References: <cover.1455303757.git.horms+renesas@verge.net.au>
-Message-ID: <fb9ac297db2a9d3753f24e7ae295aa2efaa30a27.1455303757.git.horms+renesas@verge.net.au>
+Message-ID: <797eff54b22b76d9f356074ff3c7ed25d9742e54.1455303757.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Now all r8a7740-based platforms have been migrated to the generic l2c OF
-initialization, it's no longer needed to map the L2 cache controller
-registers from .map_io().
+shmobile_scu_base is being written to, so it doesn't belong in the .text
+section. Fix this by moving it from asm .text to C .data, as it's no
+longer used from asm code since commit 4f6da36f7edd5790 ("ARM: shmobile:
+Remove old SCU boot code").
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/setup-r8a7740.c | 12 ------------
- 1 file changed, 12 deletions(-)
+ arch/arm/mach-shmobile/headsmp-scu.S | 6 ------
+ arch/arm/mach-shmobile/platsmp-scu.c | 3 +++
+ 2 files changed, 3 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
-index bf221e05c8dc..3e71cd4168dd 100644
---- a/arch/arm/mach-shmobile/setup-r8a7740.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7740.c
-@@ -37,18 +37,6 @@ static struct map_desc r8a7740_io_desc[] __initdata = {
- 		.length		= 160 << 20,
- 		.type		= MT_DEVICE_NONSHARED
- 	},
--#ifdef CONFIG_CACHE_L2X0
--	/*
--	 * for l2x0_init()
--	 * 0xf0100000-0xf0101000 -> 0xf0002000-0xf0003000
--	 */
--	{
--		.virtual	= 0xf0002000,
--		.pfn		= __phys_to_pfn(0xf0100000),
--		.length		= PAGE_SIZE,
--		.type		= MT_DEVICE_NONSHARED
--	},
--#endif
- };
+diff --git a/arch/arm/mach-shmobile/headsmp-scu.S b/arch/arm/mach-shmobile/headsmp-scu.S
+index c0008a5aa4ca..936d7011c314 100644
+--- a/arch/arm/mach-shmobile/headsmp-scu.S
++++ b/arch/arm/mach-shmobile/headsmp-scu.S
+@@ -38,9 +38,3 @@ ENTRY(shmobile_boot_scu)
  
- static void __init r8a7740_map_io(void)
+ 	b	secondary_startup
+ ENDPROC(shmobile_boot_scu)
+-
+-	.text
+-	.align	2
+-	.globl	shmobile_scu_base
+-shmobile_scu_base:
+-	.space	4
+diff --git a/arch/arm/mach-shmobile/platsmp-scu.c b/arch/arm/mach-shmobile/platsmp-scu.c
+index 64663110ab6c..f2198c9c7435 100644
+--- a/arch/arm/mach-shmobile/platsmp-scu.c
++++ b/arch/arm/mach-shmobile/platsmp-scu.c
+@@ -17,6 +17,9 @@
+ #include <asm/smp_scu.h>
+ #include "common.h"
+ 
++
++void __iomem *shmobile_scu_base;
++
+ static int shmobile_smp_scu_notifier_call(struct notifier_block *nfb,
+ 					  unsigned long action, void *hcpu)
+ {
 -- 
 2.7.0.rc3.207.g0ac5344
