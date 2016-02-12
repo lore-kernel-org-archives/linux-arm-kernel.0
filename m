@@ -1,88 +1,166 @@
-From: kernel@martin.sperl.org (Martin Sperl)
-Date: Fri, 12 Feb 2016 20:44:25 +0100
-Subject: serial: clk: bcm2835: Strange effects when using aux-uart in
- console
-In-Reply-To: <F7A2533A-D64C-4187-ABD4-416C446D1637@martin.sperl.org>
-References: <A5F427B7-9B78-4892-9722-69418C4D0C10@martin.sperl.org>
- <56BC895E.2010108@sperl.org>
- <1617009200.323700.219000a8-c162-4594-aacc-a7e9894518b2.open-xchange@email.1und1.de>
- <662D2FB2-B088-4CFC-8416-A4F35BBAD7DD@sperl.org>
- <F7A2533A-D64C-4187-ABD4-416C446D1637@martin.sperl.org>
-Message-ID: <6CD3FC59-BA17-43D9-897C-A2D122D26EF8@martin.sperl.org>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 12 Feb 2016 21:10:29 +0100
+Subject: [PATCH v5sub1 0/8] arm64: split linear and kernel mappings
+In-Reply-To: <CAKv+Gu9Qw=DSe1fZT=Dv=iKaKqzsf5ARK9dzwCWPk_0uRECm1w@mail.gmail.com>
+References: <1454324093-15998-1-git-send-email-ard.biesheuvel@linaro.org>
+ <56BE3645.3030403@gmail.com>
+ <CAKv+Gu9Qw=DSe1fZT=Dv=iKaKqzsf5ARK9dzwCWPk_0uRECm1w@mail.gmail.com>
+Message-ID: <56BE3C35.7070608@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-> On 12.02.2016, at 18:34, Martin Sperl <kernel@martin.sperl.org> wrote:
-> 
-> The screen is still blinking and UART does not work.
-> Maybe the driver is not able to handle the ?remapping?
-> of registers to a different range and is touching ram
-> used by the FW?
-> 
-> The only solution that I found is using fixed clocks
-> in the device-tree (which is not what we intended:
-> / {
->                clk_uart0: clock at 3 {
->                        compatible = "fixed-clock";
->                        reg = <3>;
->                        #clock-cells = <0>;
->                        clock-output-names = "uart0_pclk";
->                        clock-frequency = <3000000>;
->                };
-> 
->                clk_apb_p: clock at 4 {
->                        compatible = "fixed-clock";
->                        reg = <4>;
->                        #clock-cells = <0>;
->                        clock-output-names = "apb_pclk";
->                        clock-frequency = <126000000>;
->                };
-> };
-> &uart0 {
->        clocks = <&clk_uart0 &clk_apb_p>;
-> };
-> 
-> (so I have ruled out that the amba-pl011 writes to
-> the wrong addresses).
-> 
-> So as far as I can tell it is only clock related
-> and when the new clock-framework is used it fails...
 
-So the issue is triggered as soon as the plld_per
-pll divider gets disabled/reenabled.
+On 12/02/16 20:47, Ard Biesheuvel wrote:
+> On 12 February 2016 at 20:45, Matthias Brugger <matthias.bgg@gmail.com> wrote:
+>> Hi Ard,
+>>
+>>
+>> On 01/02/16 11:54, Ard Biesheuvel wrote:
+>>>
+>>> At the request of Catalin, this series has been split off from my series
+>>> 'arm64: implement support for KASLR v4' [1]. This sub-series deals with
+>>> moving the kernel out of the linear mapping into the vmalloc area. This
+>>> is a prerequisite for independent physical and virtual randomization of
+>>> the kernel image. On top of that, considering that these changes allow
+>>> the linear mapping to start at an arbitrary offset above PAGE_OFFSET, it
+>>> should be an improvement in itself due to the fact that we can now choose
+>>> PAGE_OFFSET such that RAM can be mapped using large block sizes.
+>>>
+>>> For instance, on my Seattle A0 box, the kernel is loaded 16 MB into the
+>>> lowest GB of RAM, which means __pa(PAGE_OFFSET) is not 1 GB aligned, and
+>>> the entire 16 GB of RAM will be mapping using 2 MB blocks. (Similarly,
+>>> for 64 KB granule kernels, the entire 16 GB of RAM will be mapped using
+>>> pages since __pa(PAGE_OFFSET) is not 512 MB aligned). With these changes
+>>>    __pa(PAGE_OFFSET) will always be chosen such that it is aligned to a
+>>> quantity that allows efficient mapping.
+>>>
+>>> Note that of the entire KASLR series, this sub-series is the most likely
+>>> to
+>>> cause problems, and hence requires the most careful review and testing.
+>>> This
+>>> is due to the fact that, with these changes, the invariant __va(__pa(x))
+>>> == x
+>>> no longer holds, and any code that is based on that assumption needs to be
+>>> updated.
+>>>
+>>> Changes since v4:
+>>> - added Marc's ack to patch #6
+>>> - round the kasan zero shadow region around the kernel image to swapper
+>>> block
+>>>     size (#7)
+>>> - ensure that we don't clip the kernel image when clipping RAM to the
+>>> linear
+>>>     region size (#8)
+>>>
+>>> Patch #1 allows the low mark of memblocks discovered from the FDT to be
+>>> overridden by the architecture.
+>>>
+>>> Patch #2 enables the huge-vmap generic feature for arm64. This should be
+>>> an
+>>> improvement in itself, but the significance for this series is that it
+>>> allows
+>>> unmap_kernel_range() to be called on the [__init_begin, __init_end)
+>>> region,
+>>> which may be partially mapped using block mappings.
+>>>
+>>> Patch #3 introduces KIMAGE_VADDR as a separate, preparatory step towards
+>>> decoupling the kernel placement from PAGE_OFFSET
+>>>
+>>> Patch #4 implements some translation table accessors that operate on
+>>> statically
+>>> allocate translation tables before the linear mapping is up.
+>>>
+>>> Patch #5 decouples the fixmap initialization from the linear mapping, by
+>>> using
+>>> the accessors implemented by patch #4
+>>>
+>>> Patch #6 removes assumptions made my KVM regarding the placement of the
+>>> kernel
+>>> image inside the linear mapping.
+>>>
+>>> Patch #7 moves the kernel image from the base of the linear mapping to the
+>>> base
+>>> of the vmalloc area. The modules area, which sits right below the kernel
+>>> image,
+>>> is moved along and is put right before the start of the vmalloc area.
+>>>
+>>> Patch #8 decouples PHYS_OFFSET from PAGE_OFFSET, which allows the linear
+>>> mapping
+>>> to cover all discovered memory, regardless of where the kernel image is
+>>> located
+>>> in it. This effectively allows the kernel to be loaded at any physical
+>>> address
+>>> (provided that the correct alignment is used)
+>>>
+>>> [1] http://thread.gmane.org/gmane.linux.kernel/2135931
+>>>
+>>> Ard Biesheuvel (8):
+>>>     of/fdt: make memblock minimum physical address arch configurable
+>>>     arm64: add support for ioremap() block mappings
+>>>     arm64: introduce KIMAGE_VADDR as the virtual base of the kernel region
+>>>     arm64: pgtable: implement static [pte|pmd|pud]_offset variants
+>>>     arm64: decouple early fixmap init from linear mapping
+>>>     arm64: kvm: deal with kernel symbols outside of linear mapping
+>>>     arm64: move kernel image to base of vmalloc area
+>>>     arm64: allow kernel Image to be loaded anywhere in physical memory
+>>>
+>>
+>> I bisected linux-next (20160212) with the following error on booting with an
+>> initramfs:
+>>   Failed to execute /init (error -8)
+>>   request_module: runaway loop modprobe binfmt-464c
+>>   Starting init: /sbin/init exists but couldn't execute it (error -8)
+>>   request_module: runaway loop modprobe binfmt-464c
+>>   Starting init: /bin/sh exists but couldn't execute it (error -8)
+>>   Kernel panic - not syncing: No working init found.  Try passing init=
+>> option to kernel. See Linux Documentation/init..
+>>
+>> I tracked down the error to patch 7 of this series. But I realized that
+>> patch 7 does not compile, but from patch 8 onwards I observe the error.
+>>
+>> I use defconfig with an initramfs.cpio created with buildroot.
+>> I tested this on my mt8173 eval board, but I suppose this can be reproduced
+>> easily on other machines as well.
+>>
+>
+> Thanks for the report. Does this help at all?
+>
+> http://thread.gmane.org/gmane.linux.ports.arm.kernel/477645
+>
 
-This happens because the clk_hw.core.prepare_count
-drops down to 0 and then unprepare is called.
-
-So we need to increase the ref-count for the pll
-and pll_dividers to at least 1 so that these never
-get disabled - at least for now until we can come
-up with a better contract with the firmware.
-
-Obviously this may impact other drivers as well
-where a pll is used for the first time - if nothing
-else uses it and the clock gets released, then
-the clock would trigger a unprepare of the whole
-branch of the clock tree.
-
-The question is: how can we solve it in an acceptable
-manner?
-
-Do we need a driver that just holds a reference to
-those clocks? Or should we just prepare the clock
-after registering it in clk-bcm2835.c?
-
-As for why does this not show up when compiled in?
-It seems that in that case the amba_pl011 driver
-never gets removed and then probed again.
-
-This is possibly related to the optional use of DMA,
-with the amba-pl011 driver that retries the install,
-which is not supported on the bcm2835 - at least that
-is what the datasheet says. And DMA is (probably) not
-enabled during the early boot stages, so it does not
-fail once when it tries to register DMA.
+I applied them on top of linux-next and this fixed the problem.
 
 Thanks,
-	Martin
+Matthias
+
+>> Regards,
+>> Matthias
+>>
+>>
+>>>    Documentation/arm64/booting.txt                      |  20 ++-
+>>>    Documentation/features/vm/huge-vmap/arch-support.txt |   2 +-
+>>>    arch/arm/include/asm/kvm_asm.h                       |   2 +
+>>>    arch/arm/kvm/arm.c                                   |   8 +-
+>>>    arch/arm64/Kconfig                                   |   1 +
+>>>    arch/arm64/include/asm/boot.h                        |   6 +
+>>>    arch/arm64/include/asm/kasan.h                       |   2 +-
+>>>    arch/arm64/include/asm/kernel-pgtable.h              |  12 ++
+>>>    arch/arm64/include/asm/kvm_asm.h                     |   2 +
+>>>    arch/arm64/include/asm/kvm_host.h                    |   8 +-
+>>>    arch/arm64/include/asm/memory.h                      |  44 ++++--
+>>>    arch/arm64/include/asm/pgtable.h                     |  23 ++-
+>>>    arch/arm64/kernel/head.S                             |   8 +-
+>>>    arch/arm64/kernel/image.h                            |  13 +-
+>>>    arch/arm64/kernel/vmlinux.lds.S                      |   4 +-
+>>>    arch/arm64/kvm/hyp.S                                 |   6 +-
+>>>    arch/arm64/mm/dump.c                                 |  12 +-
+>>>    arch/arm64/mm/init.c                                 | 123
+>>> ++++++++++++++--
+>>>    arch/arm64/mm/kasan_init.c                           |  31 +++-
+>>>    arch/arm64/mm/mmu.c                                  | 155
+>>> +++++++++++++++-----
+>>>    drivers/of/fdt.c                                     |   5 +-
+>>>    21 files changed, 378 insertions(+), 109 deletions(-)
+>>>
+>>
