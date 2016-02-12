@@ -1,73 +1,90 @@
 From: jglauber@cavium.com (Jan Glauber)
-Date: Fri, 12 Feb 2016 17:55:06 +0100
-Subject: [RFC PATCH 1/7] arm64/perf: Basic uncore counter support for Cavium
- ThunderX
+Date: Fri, 12 Feb 2016 17:55:08 +0100
+Subject: [RFC PATCH 3/7] arm64/perf: Cavium ThunderX L2C CBC uncore support
 In-Reply-To: <cover.1455295032.git.jglauber@cavium.com>
 References: <cover.1455295032.git.jglauber@cavium.com>
-Message-ID: <8bd93a25e069ed6428bc6c21fc53270962ccafcc.1455295032.git.jglauber@cavium.com>
+Message-ID: <c3cf1244e1d635fa84ddb830f7dbb29bc6f88eea.1455295032.git.jglauber@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide uncore facilities for non-CPU performance counter units.
-Based on Intel/AMD uncore pmu support.
-
-The uncore PMUs can be found under /sys/bus/event_source/devices.
-All counters are exported via sysfs in the corresponding events
-files under the PMU directory so the perf tool can list the event names.
-
-There are 2 points that are special in this implementation:
-
-1) The PMU detection solely relies on PCI device detection. If a
-   matching PCI device is found the PMU is created. The code can deal
-   with multiple units of the same type, e.g. more than one memory
-   controller.
-
-2) Counters are summarized across the different units of the same type,
-   e.g. L2C TAD 0..7 is presented as a single counter (adding the
-   values from TAD 0 to 7). Although losing the ability to read a
-   single value the merged values are easier to use and yield
-   enough information.
+Support counters of the L2 cache crossbar connect.
 
 Signed-off-by: Jan Glauber <jglauber@cavium.com>
 ---
- arch/arm64/kernel/Makefile               |   1 +
- arch/arm64/kernel/uncore/Makefile        |   1 +
- arch/arm64/kernel/uncore/uncore_cavium.c | 210 +++++++++++++++++++++++++++++++
- arch/arm64/kernel/uncore/uncore_cavium.h |  73 +++++++++++
- 4 files changed, 285 insertions(+)
- create mode 100644 arch/arm64/kernel/uncore/Makefile
- create mode 100644 arch/arm64/kernel/uncore/uncore_cavium.c
- create mode 100644 arch/arm64/kernel/uncore/uncore_cavium.h
+ arch/arm64/kernel/uncore/Makefile                |   3 +-
+ arch/arm64/kernel/uncore/uncore_cavium.c         |   3 +
+ arch/arm64/kernel/uncore/uncore_cavium.h         |   4 +
+ arch/arm64/kernel/uncore/uncore_cavium_l2c_cbc.c | 239 +++++++++++++++++++++++
+ 4 files changed, 248 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/kernel/uncore/uncore_cavium_l2c_cbc.c
 
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 83cd7e6..c2d2810 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -42,6 +42,7 @@ arm64-obj-$(CONFIG_PCI)			+= pci.o
- arm64-obj-$(CONFIG_ARMV8_DEPRECATED)	+= armv8_deprecated.o
- arm64-obj-$(CONFIG_ACPI)		+= acpi.o
- arm64-obj-$(CONFIG_PARAVIRT)		+= paravirt.o
-+arm64-obj-$(CONFIG_ARCH_THUNDER)	+= uncore/
- 
- obj-y					+= $(arm64-obj-y) vdso/
- obj-m					+= $(arm64-obj-m)
 diff --git a/arch/arm64/kernel/uncore/Makefile b/arch/arm64/kernel/uncore/Makefile
-new file mode 100644
-index 0000000..b9c72c2
---- /dev/null
+index 6a16caf..d52ecc9 100644
+--- a/arch/arm64/kernel/uncore/Makefile
 +++ b/arch/arm64/kernel/uncore/Makefile
-@@ -0,0 +1 @@
-+obj-$(CONFIG_ARCH_THUNDER) += uncore_cavium.o
+@@ -1,2 +1,3 @@
+ obj-$(CONFIG_ARCH_THUNDER) += uncore_cavium.o		\
+-			      uncore_cavium_l2c_tad.o
++			      uncore_cavium_l2c_tad.o	\
++			      uncore_cavium_l2c_cbc.o
 diff --git a/arch/arm64/kernel/uncore/uncore_cavium.c b/arch/arm64/kernel/uncore/uncore_cavium.c
-new file mode 100644
-index 0000000..0cfcc83
---- /dev/null
+index b625caf..0304c60 100644
+--- a/arch/arm64/kernel/uncore/uncore_cavium.c
 +++ b/arch/arm64/kernel/uncore/uncore_cavium.c
-@@ -0,0 +1,210 @@
+@@ -24,6 +24,8 @@ struct thunder_uncore *event_to_thunder_uncore(struct perf_event *event)
+ {
+ 	if (event->pmu->type == thunder_l2c_tad_pmu.type)
+ 		return thunder_uncore_l2c_tad;
++	else if (event->pmu->type == thunder_l2c_cbc_pmu.type)
++		return thunder_uncore_l2c_cbc;
+ 	else
+ 		return NULL;
+ }
+@@ -209,6 +211,7 @@ static int __init thunder_uncore_init(void)
+ 	pr_info("PMU version: %d\n", thunder_uncore_version);
+ 
+ 	thunder_uncore_l2c_tad_setup();
++	thunder_uncore_l2c_cbc_setup();
+ 	return 0;
+ }
+ late_initcall(thunder_uncore_init);
+diff --git a/arch/arm64/kernel/uncore/uncore_cavium.h b/arch/arm64/kernel/uncore/uncore_cavium.h
+index 90e6a2d..74f44d7 100644
+--- a/arch/arm64/kernel/uncore/uncore_cavium.h
++++ b/arch/arm64/kernel/uncore/uncore_cavium.h
+@@ -14,6 +14,7 @@
+ 
+ enum uncore_type {
+ 	L2C_TAD_TYPE,
++	L2C_CBC_TYPE,
+ };
+ 
+ extern int thunder_uncore_version;
+@@ -60,7 +61,9 @@ static inline void __iomem *map_offset(unsigned long addr,
+ 
+ extern struct attribute_group thunder_uncore_attr_group;
+ extern struct thunder_uncore *thunder_uncore_l2c_tad;
++extern struct thunder_uncore *thunder_uncore_l2c_cbc;
+ extern struct pmu thunder_l2c_tad_pmu;
++extern struct pmu thunder_l2c_cbc_pmu;
+ 
+ /* Prototypes */
+ struct thunder_uncore *event_to_thunder_uncore(struct perf_event *event);
+@@ -75,3 +78,4 @@ ssize_t thunder_events_sysfs_show(struct device *dev,
+ 				  char *page);
+ 
+ int thunder_uncore_l2c_tad_setup(void);
++int thunder_uncore_l2c_cbc_setup(void);
+diff --git a/arch/arm64/kernel/uncore/uncore_cavium_l2c_cbc.c b/arch/arm64/kernel/uncore/uncore_cavium_l2c_cbc.c
+new file mode 100644
+index 0000000..f1ba9be
+--- /dev/null
++++ b/arch/arm64/kernel/uncore/uncore_cavium_l2c_cbc.c
+@@ -0,0 +1,239 @@
 +/*
-+ * Cavium Thunder uncore PMU support. Derived from Intel and AMD uncore code.
++ * Cavium Thunder uncore PMU support, L2C CBC counters.
 + *
-+ * Copyright (C) 2015,2016 Cavium Inc.
++ * Copyright 2016 Cavium Inc.
 + * Author: Jan Glauber <jan.glauber@cavium.com>
 + */
 +
@@ -84,274 +101,224 @@ index 0000000..0cfcc83
 +
 +#include "uncore_cavium.h"
 +
-+int thunder_uncore_version;
++#ifndef PCI_DEVICE_ID_THUNDER_L2C_CBC
++#define PCI_DEVICE_ID_THUNDER_L2C_CBC	0xa02f
++#endif
 +
-+struct thunder_uncore *event_to_thunder_uncore(struct perf_event *event)
-+{
-+	return NULL;
-+}
++#define L2C_CBC_NR_COUNTERS             16
 +
-+void thunder_uncore_read(struct perf_event *event)
++/* L2C CBC event list */
++#define L2C_CBC_EVENT_XMC0		0x00
++#define L2C_CBC_EVENT_XMD0		0x01
++#define L2C_CBC_EVENT_RSC0		0x02
++#define L2C_CBC_EVENT_RSD0		0x03
++#define L2C_CBC_EVENT_INV0		0x04
++#define L2C_CBC_EVENT_IOC0		0x05
++#define L2C_CBC_EVENT_IOR0		0x06
++
++#define L2C_CBC_EVENT_XMC1		0x08	/* 0x40 */
++#define L2C_CBC_EVENT_XMD1		0x09
++#define L2C_CBC_EVENT_RSC1		0x0a
++#define L2C_CBC_EVENT_RSD1		0x0b
++#define L2C_CBC_EVENT_INV1		0x0c
++
++#define L2C_CBC_EVENT_XMC2		0x10	/* 0x80 */
++#define L2C_CBC_EVENT_XMD2		0x11
++#define L2C_CBC_EVENT_RSC2		0x12
++#define L2C_CBC_EVENT_RSD2		0x13
++
++struct thunder_uncore *thunder_uncore_l2c_cbc;
++
++int l2c_cbc_events[L2C_CBC_NR_COUNTERS] = {
++	0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
++	0x08, 0x09, 0x0a, 0x0b, 0x0c,
++	0x10, 0x11, 0x12, 0x13
++};
++
++static void thunder_uncore_start(struct perf_event *event, int flags)
 +{
 +	struct thunder_uncore *uncore = event_to_thunder_uncore(event);
 +	struct hw_perf_event *hwc = &event->hw;
-+	u64 prev, new = 0;
-+	s64 delta;
++	u64 prev;
 +	int i;
 +
-+	/*
-+	 * since we do not enable counter overflow interrupts,
-+	 * we do not have to worry about prev_count changing on us
-+	 */
++	/* restore counter value divided by units into all counters */
++	if (flags & PERF_EF_RELOAD) {
++		prev = local64_read(&hwc->prev_count);
++		prev = prev / uncore->nr_units;
++		for (i = 0; i < uncore->nr_units; i++)
++			writeq(prev, map_offset(hwc->event_base, uncore, i));
++	}
 +
-+	prev = local64_read(&hwc->prev_count);
-+
-+	/* read counter values from all units */
-+	for (i = 0; i < uncore->nr_units; i++)
-+		new += readq(map_offset(hwc->event_base, uncore, i));
-+
-+	local64_set(&hwc->prev_count, new);
-+	delta = new - prev;
-+	local64_add(delta, &event->count);
++	hwc->state = 0;
++	perf_event_update_userpage(event);
 +}
 +
-+void thunder_uncore_del(struct perf_event *event, int flags)
++static void thunder_uncore_stop(struct perf_event *event, int flags)
 +{
++	struct hw_perf_event *hwc = &event->hw;
++
++	if ((flags & PERF_EF_UPDATE) && !(hwc->state & PERF_HES_UPTODATE)) {
++		thunder_uncore_read(event);
++		hwc->state |= PERF_HES_UPTODATE;
++	}
++}
++
++static int thunder_uncore_add(struct perf_event *event, int flags)
++	{
 +	struct thunder_uncore *uncore = event_to_thunder_uncore(event);
 +	struct hw_perf_event *hwc = &event->hw;
 +	int i;
 +
-+	event->pmu->stop(event, PERF_EF_UPDATE);
++	WARN_ON_ONCE(!uncore);
++
++	/* are we already assigned? */
++	if (hwc->idx != -1 && uncore->events[hwc->idx] == event)
++		goto out;
 +
 +	for (i = 0; i < uncore->num_counters; i++) {
-+		if (cmpxchg(&uncore->events[i], event, NULL) == event)
-+			break;
++		if (uncore->events[i] == event) {
++			hwc->idx = i;
++			goto out;
++		}
 +	}
++
++	/* these counters are self-sustained so idx must match the counter! */
 +	hwc->idx = -1;
-+}
++	for (i = 0; i < uncore->num_counters; i++) {
++		if (l2c_cbc_events[i] == hwc->config) {
++			if (cmpxchg(&uncore->events[i], NULL, event) == NULL) {
++				hwc->idx = i;
++				break;
++			}
++		}
++	}
 +
-+int thunder_uncore_event_init(struct perf_event *event)
-+{
-+	struct hw_perf_event *hwc = &event->hw;
-+	struct thunder_uncore *uncore;
++out:
++	if (hwc->idx == -1)
++		return -EBUSY;
 +
-+	if (event->attr.type != event->pmu->type)
-+		return -ENOENT;
++	hwc->event_base = hwc->config * sizeof(unsigned long long);
 +
-+	/* we do not support sampling */
-+	if (is_sampling_event(event))
-+		return -EINVAL;
++	/* counter is not stoppable so avoiding PERF_HES_STOPPED */
++	hwc->state = PERF_HES_UPTODATE;
 +
-+	/* counters do not have these bits */
-+	if (event->attr.exclude_user	||
-+	    event->attr.exclude_kernel	||
-+	    event->attr.exclude_host	||
-+	    event->attr.exclude_guest	||
-+	    event->attr.exclude_hv	||
-+	    event->attr.exclude_idle)
-+		return -EINVAL;
-+
-+	/* and we do not enable counter overflow interrupts */
-+
-+	uncore = event_to_thunder_uncore(event);
-+	if (!uncore)
-+		return -ENODEV;
-+	if (!uncore->event_valid(event->attr.config))
-+		return -EINVAL;
-+
-+	hwc->config = event->attr.config;
-+	hwc->idx = -1;
-+
-+	/* and we don't care about CPU */
++	if (flags & PERF_EF_START)
++		thunder_uncore_start(event, 0);
 +
 +	return 0;
 +}
 +
-+static cpumask_t thunder_active_mask;
++PMU_FORMAT_ATTR(event, "config:0-4");
 +
-+static ssize_t thunder_uncore_attr_show_cpumask(struct device *dev,
-+						struct device_attribute *attr,
-+						char *buf)
-+{
-+	cpumask_t *active_mask = &thunder_active_mask;
-+
-+	/*
-+	 * Thunder uncore events are independent from CPUs. Provide a cpumask
-+	 * nevertheless to prevent perf from adding the event per-cpu and just
-+	 * set the mask to one online CPU.
-+	 */
-+	cpumask_set_cpu(cpumask_first(cpu_online_mask), active_mask);
-+
-+	return cpumap_print_to_pagebuf(true, buf, active_mask);
-+}
-+static DEVICE_ATTR(cpumask, S_IRUGO, thunder_uncore_attr_show_cpumask, NULL);
-+
-+static struct attribute *thunder_uncore_attrs[] = {
-+	&dev_attr_cpumask.attr,
++static struct attribute *thunder_l2c_cbc_format_attr[] = {
++	&format_attr_event.attr,
 +	NULL,
 +};
 +
-+struct attribute_group thunder_uncore_attr_group = {
-+	.attrs = thunder_uncore_attrs,
++static struct attribute_group thunder_l2c_cbc_format_group = {
++	.name = "format",
++	.attrs = thunder_l2c_cbc_format_attr,
 +};
 +
-+ssize_t thunder_events_sysfs_show(struct device *dev,
-+				  struct device_attribute *attr,
-+				  char *page)
++EVENT_ATTR(xmc0,	L2C_CBC_EVENT_XMC0);
++EVENT_ATTR(xmd0,	L2C_CBC_EVENT_XMD0);
++EVENT_ATTR(rsc0,	L2C_CBC_EVENT_RSC0);
++EVENT_ATTR(rsd0,	L2C_CBC_EVENT_RSD0);
++EVENT_ATTR(inv0,	L2C_CBC_EVENT_INV0);
++EVENT_ATTR(ioc0,	L2C_CBC_EVENT_IOC0);
++EVENT_ATTR(ior0,	L2C_CBC_EVENT_IOR0);
++EVENT_ATTR(xmc1,	L2C_CBC_EVENT_XMC1);
++EVENT_ATTR(xmd1,	L2C_CBC_EVENT_XMD1);
++EVENT_ATTR(rsc1,	L2C_CBC_EVENT_RSC1);
++EVENT_ATTR(rsd1,	L2C_CBC_EVENT_RSD1);
++EVENT_ATTR(inv1,	L2C_CBC_EVENT_INV1);
++EVENT_ATTR(xmc2,	L2C_CBC_EVENT_XMC2);
++EVENT_ATTR(xmd2,	L2C_CBC_EVENT_XMD2);
++EVENT_ATTR(rsc2,	L2C_CBC_EVENT_RSC2);
++EVENT_ATTR(rsd2,	L2C_CBC_EVENT_RSD2);
++
++static struct attribute *thunder_l2c_cbc_events_attr[] = {
++	EVENT_PTR(xmc0),
++	EVENT_PTR(xmd0),
++	EVENT_PTR(rsc0),
++	EVENT_PTR(rsd0),
++	EVENT_PTR(inv0),
++	EVENT_PTR(ioc0),
++	EVENT_PTR(ior0),
++	EVENT_PTR(xmc1),
++	EVENT_PTR(xmd1),
++	EVENT_PTR(rsc1),
++	EVENT_PTR(rsd1),
++	EVENT_PTR(inv1),
++	EVENT_PTR(xmc2),
++	EVENT_PTR(xmd2),
++	EVENT_PTR(rsc2),
++	EVENT_PTR(rsd2),
++	NULL,
++};
++
++static struct attribute_group thunder_l2c_cbc_events_group = {
++	.name = "events",
++	.attrs = thunder_l2c_cbc_events_attr,
++};
++
++static const struct attribute_group *thunder_l2c_cbc_attr_groups[] = {
++	&thunder_uncore_attr_group,
++	&thunder_l2c_cbc_format_group,
++	&thunder_l2c_cbc_events_group,
++	NULL,
++};
++
++struct pmu thunder_l2c_cbc_pmu = {
++	.attr_groups	= thunder_l2c_cbc_attr_groups,
++	.name		= "thunder_l2c_cbc",
++	.event_init	= thunder_uncore_event_init,
++	.add		= thunder_uncore_add,
++	.del		= thunder_uncore_del,
++	.start		= thunder_uncore_start,
++	.stop		= thunder_uncore_stop,
++	.read		= thunder_uncore_read,
++};
++
++static int event_valid(u64 config)
 +{
-+	struct perf_pmu_events_attr *pmu_attr =
-+		container_of(attr, struct perf_pmu_events_attr, attr);
-+
-+	if (pmu_attr->event_str)
-+		return sprintf(page, "%s", pmu_attr->event_str);
-+
-+	return 0;
++	if (config <= L2C_CBC_EVENT_IOR0 ||
++	    (config >= L2C_CBC_EVENT_XMC1 && config <= L2C_CBC_EVENT_INV1) ||
++	    (config >= L2C_CBC_EVENT_XMC2 && config <= L2C_CBC_EVENT_RSD2))
++		return 1;
++	else
++		return 0;
 +}
 +
-+int __init thunder_uncore_setup(struct thunder_uncore *uncore, int id,
-+			 unsigned long offset, unsigned long size,
-+			 struct pmu *pmu)
++int __init thunder_uncore_l2c_cbc_setup(void)
 +{
-+	struct pci_dev *pdev = NULL;
-+	pci_bus_addr_t start;
-+	int ret, node = 0;
++	int ret;
 +
-+	/* detect PCI devices */
-+	do {
-+		pdev = pci_get_device(PCI_VENDOR_ID_CAVIUM, id, pdev);
-+		if (!pdev)
-+			break;
-+		start = pci_resource_start(pdev, 0);
-+		uncore->pdevs[node].pdev = pdev;
-+		uncore->pdevs[node].base = start;
-+		uncore->pdevs[node].map = ioremap(start + offset, size);
-+		node++;
-+		if (node >= MAX_NR_UNCORE_PDEVS) {
-+			pr_err("reached pdev limit\n");
-+			break;
-+		}
-+	} while (1);
++	thunder_uncore_l2c_cbc = kzalloc(sizeof(struct thunder_uncore),
++					 GFP_KERNEL);
++	if (!thunder_uncore_l2c_cbc) {
++		ret = -ENOMEM;
++		goto fail_nomem;
++	}
 +
-+	if (!node)
-+		return -ENODEV;
-+
-+	uncore->nr_units = node;
-+
-+	ret = perf_pmu_register(pmu, pmu->name, -1);
++	ret = thunder_uncore_setup(thunder_uncore_l2c_cbc,
++				   PCI_DEVICE_ID_THUNDER_L2C_CBC,
++				   0,
++				   0x100,
++				   &thunder_l2c_cbc_pmu);
 +	if (ret)
 +		goto fail;
 +
-+	uncore->pmu = pmu;
++	thunder_uncore_l2c_cbc->type = L2C_CBC_TYPE;
++	thunder_uncore_l2c_cbc->num_counters = L2C_CBC_NR_COUNTERS;
++	thunder_uncore_l2c_cbc->event_valid = event_valid;
 +	return 0;
 +
 +fail:
-+	for (node = 0; node < MAX_NR_UNCORE_PDEVS; node++) {
-+		pdev = uncore->pdevs[node].pdev;
-+		if (!pdev)
-+			break;
-+		iounmap(uncore->pdevs[node].map);
-+		pci_dev_put(pdev);
-+	}
++	kfree(thunder_uncore_l2c_cbc);
++fail_nomem:
 +	return ret;
 +}
-+
-+static int __init thunder_uncore_init(void)
-+{
-+	unsigned long implementor = read_cpuid_implementor();
-+	unsigned long part_number = read_cpuid_part_number();
-+	u32 variant;
-+
-+	if (implementor != ARM_CPU_IMP_CAVIUM ||
-+	    part_number != CAVIUM_CPU_PART_THUNDERX)
-+		return -ENODEV;
-+
-+	/* detect pass2 which contains different counters */
-+	variant = MIDR_VARIANT(read_cpuid_id());
-+	if (variant == 1)
-+		thunder_uncore_version = 1;
-+	pr_info("PMU version: %d\n", thunder_uncore_version);
-+
-+	return 0;
-+}
-+late_initcall(thunder_uncore_init);
-diff --git a/arch/arm64/kernel/uncore/uncore_cavium.h b/arch/arm64/kernel/uncore/uncore_cavium.h
-new file mode 100644
-index 0000000..acd121d
---- /dev/null
-+++ b/arch/arm64/kernel/uncore/uncore_cavium.h
-@@ -0,0 +1,73 @@
-+#include <linux/types.h>
-+#include <linux/slab.h>
-+#include <linux/init.h>
-+#include <linux/cpu.h>
-+#include <linux/io.h>
-+#include <linux/perf_event.h>
-+#include <linux/pci.h>
-+
-+#include <asm/cpufeature.h>
-+#include <asm/cputype.h>
-+
-+#undef pr_fmt
-+#define pr_fmt(fmt)     "thunderx_uncore: " fmt
-+
-+enum uncore_type {
-+	NOP_TYPE,
-+};
-+
-+extern int thunder_uncore_version;
-+
-+#define MAX_NR_UNCORE_PDEVS		16
-+
-+/* maximum number of parallel hardware counters for all uncore parts */
-+#define MAX_COUNTERS			64
-+
-+/* generic uncore struct for different pmu types */
-+struct thunder_uncore {
-+	int num_counters;
-+	int nr_units;
-+	int type;
-+	struct pmu *pmu;
-+	int (*event_valid)(u64);
-+	struct {
-+		unsigned long base;
-+		void __iomem *map;
-+		struct pci_dev *pdev;
-+	} pdevs[MAX_NR_UNCORE_PDEVS];
-+	struct perf_event *events[MAX_COUNTERS];
-+};
-+
-+#define EVENT_PTR(_id) (&event_attr_##_id.attr.attr)
-+
-+#define EVENT_ATTR(_name, _val)						   \
-+static struct perf_pmu_events_attr event_attr_##_name = {		   \
-+	.attr	   = __ATTR(_name, 0444, thunder_events_sysfs_show, NULL), \
-+	.event_str = "event=" __stringify(_val),			   \
-+};
-+
-+#define EVENT_ATTR_STR(_name, _str)					   \
-+static struct perf_pmu_events_attr event_attr_##_name = {		   \
-+	.attr	   = __ATTR(_name, 0444, thunder_events_sysfs_show, NULL), \
-+	.event_str = _str,						   \
-+};
-+
-+static inline void __iomem *map_offset(unsigned long addr,
-+				struct thunder_uncore *uncore, int unit)
-+{
-+	return (void __iomem *) (addr + uncore->pdevs[unit].map);
-+}
-+
-+extern struct attribute_group thunder_uncore_attr_group;
-+
-+/* Prototypes */
-+struct thunder_uncore *event_to_thunder_uncore(struct perf_event *event);
-+void thunder_uncore_del(struct perf_event *event, int flags);
-+int thunder_uncore_event_init(struct perf_event *event);
-+void thunder_uncore_read(struct perf_event *event);
-+int thunder_uncore_setup(struct thunder_uncore *uncore, int id,
-+			 unsigned long offset, unsigned long size,
-+			 struct pmu *pmu);
-+ssize_t thunder_events_sysfs_show(struct device *dev,
-+				  struct device_attribute *attr,
-+				  char *page);
 -- 
 1.9.1
