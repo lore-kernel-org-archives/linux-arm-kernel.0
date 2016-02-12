@@ -1,147 +1,112 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Fri, 12 Feb 2016 13:50:30 -0700
-Subject: [RFC v2 04/12] ARM: cpuidle: Add runtime PM support for CPUs
+Date: Fri, 12 Feb 2016 13:50:34 -0700
+Subject: [RFC v2 08/12] Documentation / cpu_domains: Describe CPU PM domains
+ setup and governor
 In-Reply-To: <1455310238-8963-1-git-send-email-lina.iyer@linaro.org>
 References: <1455310238-8963-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1455310238-8963-5-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1455310238-8963-9-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Notify runtime PM when the CPU is going to be powered off in the idle
-state. This allows for runtime PM suspend/resume of the CPU as well as
-its PM domain.
+A generic CPU PM domain functionality is provided by
+drivers/base/power/cpu_domains.c. This document describes the generic
+usecase of CPU's PM domains, the setup of such domains and a CPU
+specific genpd governor.
 
-We do not call into runtime PM for ARM WFI to keep the default state
-simple and faster.
-
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 ---
 Changes since RFC v1 -
-- runtime PM initialization is now done as part of this file
-- hotplug and its runtime PM invocation is done here
+- a patch of its own 
+- updated documentation
 
- drivers/cpuidle/cpuidle-arm.c | 48 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 48 insertions(+)
+ Documentation/power/cpu_domains.txt | 79 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 79 insertions(+)
+ create mode 100644 Documentation/power/cpu_domains.txt
 
-diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
-index 545069d..bf7a80c 100644
---- a/drivers/cpuidle/cpuidle-arm.c
-+++ b/drivers/cpuidle/cpuidle-arm.c
-@@ -11,12 +11,14 @@
- 
- #define pr_fmt(fmt) "CPUidle arm: " fmt
- 
-+#include <linux/cpu.h>
- #include <linux/cpuidle.h>
- #include <linux/cpumask.h>
- #include <linux/cpu_pm.h>
- #include <linux/kernel.h>
- #include <linux/module.h>
- #include <linux/of.h>
-+#include <linux/pm_runtime.h>
- #include <linux/slab.h>
- 
- #include <asm/cpuidle.h>
-@@ -37,6 +39,7 @@ static int arm_enter_idle_state(struct cpuidle_device *dev,
- 				struct cpuidle_driver *drv, int idx)
- {
- 	int ret;
-+	struct device *cpu_dev = get_cpu_device(dev->cpu);
- 
- 	if (!idx) {
- 		cpu_do_idle();
-@@ -45,6 +48,8 @@ static int arm_enter_idle_state(struct cpuidle_device *dev,
- 
- 	ret = cpu_pm_enter();
- 	if (!ret) {
-+		RCU_NONIDLE(pm_runtime_put_sync_suspend(cpu_dev));
+diff --git a/Documentation/power/cpu_domains.txt b/Documentation/power/cpu_domains.txt
+new file mode 100644
+index 0000000..5fdc66d
+--- /dev/null
++++ b/Documentation/power/cpu_domains.txt
+@@ -0,0 +1,79 @@
++CPU PM domains
++==============
 +
- 		/*
- 		 * Pass idle state index to cpu_suspend which in turn will
- 		 * call the CPU ops suspend protocol with idle index as a
-@@ -52,6 +57,7 @@ static int arm_enter_idle_state(struct cpuidle_device *dev,
- 		 */
- 		arm_cpuidle_suspend(idx);
- 
-+		RCU_NONIDLE(pm_runtime_get_sync(cpu_dev));
- 		cpu_pm_exit();
- 	}
- 
-@@ -84,6 +90,30 @@ static const struct of_device_id arm_idle_state_match[] __initconst = {
- 	{ },
- };
- 
-+#ifdef CONFIG_HOTPLUG_CPU
-+static int cpu_hotplug(struct notifier_block *nb,
-+			unsigned long action, void *data)
-+{
-+	struct device *cpu_dev = get_cpu_device(smp_processor_id());
++Newer CPUs are grouped in SoCs as clusters. A cluster in addition to the CPUs
++may have caches, VFP and architecture specific power controller that share the
++resources when any of the CPUs are active. When the CPUs are in idle, some of
++these cluster components may also idle. A cluster may also be nested inside
++another cluster that provides common coherency interfaces to share data
++between the clusters. The organization of such clusters and CPU may be
++descibed in DT, since they are SoC specific.
 +
-+	/* Execute CPU runtime PM on that CPU */
-+	switch (action) {
-+	case CPU_DYING:
-+	case CPU_DYING_FROZEN:
-+		RCU_NONIDLE(pm_runtime_put_sync_suspend(cpu_dev));
-+		break;
-+	case CPU_STARTING:
-+	case CPU_STARTING_FROZEN:
-+		RCU_NONIDLE(pm_runtime_get_sync(cpu_dev));
-+		break;
-+	default:
-+		break;
-+	}
++CPUIdle framework enables the CPUs to determine the sleep time and enter low
++power state to save power during periods of idle. CPUs in a cluster may enter
++and exit idle state independently of each other. During the time when all the
++CPUs are in idle state, the cluster may safely put some of the shared
++resources in their idle state. The time between the last CPU to enter idle and
++the first CPU to wake up is the time available for the cluster to enter its
++idle state.
 +
-+	return NOTIFY_OK;
-+}
-+#endif
++When SoCs power down the CPU during cpuidle, they generally have supplemental
++hardware that can handshake with the CPU with a signal that indicates that the
++CPU has stopped execution. The hardware is also responsible for warm booting
++the CPU on receiving an interrupt. With cluster architecture, common resources
++that are shared by the cluster may also be powered down by an external
++microcontroller or a processor. The microcontroller may be programmed in
++advance to put the hardware blocks in a low power state, when the last active
++CPU sends the idle signal. When the signal is received, the microcontroller
++may trigger the hardware blocks to enter their low power state. When an
++interrupt to wakeup the processor is received, the microcontroller is
++responsible for bringing up the hardware blocks to its active state, before
++waking up the CPU. The timelines for such operations should be in the
++acceptable range for the for CPU idle to get power benefits.
 +
- /*
-  * arm_idle_init
-  *
-@@ -96,6 +126,7 @@ static int __init arm_idle_init(void)
- 	int cpu, ret;
- 	struct cpuidle_driver *drv = &arm_idle_driver;
- 	struct cpuidle_device *dev;
-+	struct device *cpu_dev;
- 
- 	/*
- 	 * Initialize idle states data, starting at index 1.
-@@ -118,6 +149,16 @@ static int __init arm_idle_init(void)
- 	 * idle states suspend back-end specific data
- 	 */
- 	for_each_possible_cpu(cpu) {
++CPU PM Domain Setup
++-------------------
 +
-+		/* Initialize Runtime PM for the CPU */
-+		cpu_dev = get_cpu_device(cpu);
-+		pm_runtime_irq_safe(cpu_dev);
-+		pm_runtime_enable(cpu_dev);
-+		if (cpu_online(cpu)) {
-+			pm_runtime_get_noresume(cpu_dev);
-+			pm_runtime_set_active(cpu_dev);
-+		}
++PM domains  are represented in the DT as domain consumers and providers. A
++device may have a domain provider and a domain provider may support multiple
++domain consumers. Domains like clusters, may also be nested inside one
++another. A domain that has no active consumer, may be powered off and any
++resuming consumer would trigger the domain back to active. Parent domains may
++be powered off when the child domains are powered off. The CPU cluster can be
++fashioned as a PM domain. When the CPU devices are powered off, the PM domain
++may be powered off.
 +
- 		ret = arm_cpuidle_init(cpu);
- 
- 		/*
-@@ -148,10 +189,17 @@ static int __init arm_idle_init(void)
- 		}
- 	}
- 
-+#ifdef CONFIG_HOTPLUG_CPU
-+	/* Register for hotplug notifications for runtime PM */
-+	hotcpu_notifier(cpu_hotplug, 0);
-+#endif
++Device idle is reference counted by runtime PM. When there is no active need
++for the device, runtime PM invokes callbacks to suspend the parent domain.
++Generic PM domain (genpd) handles the hierarchy of devices, domains and the
++reference counting of objects leading to last man down and first man up in the
++domain. The CPU domains helper functions defines PM domains for each CPU
++cluster and attaches the CPU devices to the respective PM domains.
 +
- 	return 0;
- out_fail:
- 	while (--cpu >= 0) {
- 		dev = per_cpu(cpuidle_devices, cpu);
-+		cpu_dev = get_cpu_device(cpu);
-+		__pm_runtime_disable(cpu_dev, false);
- 		cpuidle_unregister_device(dev);
- 		kfree(dev);
- 	}
++Platform drivers may use the following API to register their CPU PM domains.
++
++of_setup_cpu_pd() -
++Provides a single step registration of the CPU PM domain and attach CPUs to
++the genpd. Platform drivers may additionally register callbacks for power_on
++and power_off operations for the PM domain.
++
++of_setup_cpu_pd_single() -
++Define PM domain for a single CPU and attach the CPU to its domain.
++
++
++CPU PM Domain governor
++----------------------
++
++CPUs have an unique ability to determine their next wakeup. CPUs may wake up
++for known timer interrupts and unknown interrupts from idle. Prediction
++algorithms and heuristic based algorithms like the Menu governor for cpuidle
++can determine the next wakeup of the CPU. However, determining the wakeup
++across a group of CPUs is a tough problem to solve.
++
++A simplistic approach would be to resort to known wakeups of the CPUs in
++determining the next wakeup of any CPU in the cluster. The CPU PM domain
++governor does just that. By looking into the tick device of the CPUs, the
++governor can determine the sleep time between the last CPU and the first
++scheduled wakeup of any CPU in that domain. This combined with the PM QoS
++requirement for CPU_DMA_LATENCY can be used to determine the deepest possible
++idle state of the CPU domain.
 -- 
 2.1.4
