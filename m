@@ -1,60 +1,56 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 12 Feb 2016 20:06:25 +0100
-Subject: [PATCH 7/8] ARM: shmobile: emev2: Remove legacy machine_desc.map_io()
- callback
-In-Reply-To: <cover.1455303757.git.horms+renesas@verge.net.au>
-References: <cover.1455303757.git.horms+renesas@verge.net.au>
-Message-ID: <77621efa3544e5597892274de4fcff55294fffc8.1455303757.git.horms+renesas@verge.net.au>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 12 Feb 2016 20:48:58 +0100
+Subject: [PATCH] Revert "ASoC: qcom: Specify LE device endianness"
+In-Reply-To: <1455298217-15744-1-git-send-email-sboyd@codeaurora.org>
+References: <1455298217-15744-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <2686474.cvCA6vY47l@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+On Friday 12 February 2016 09:30:17 Stephen Boyd wrote:
+> This reverts commit 18560a4e3b07438113b50589e78532d95f907029.
+> 
+> The commit that caused us to specify LE device endianness here,
+> 29bb45f25ff3 (regmap-mmio: Use native endianness for read/write,
+> 2015-10-29), has been reverted in mainline so now when we specify
+> LE it actively breaks big endian kernels because the byte
+> swapping in regmap-mmio is incorrect. Let's revert this change
+> because it will 1) fix the big endian kernels and 2) be redundant
+> to specify LE because that will become the default soon.
+> 
+> Cc: Kenneth Westfield <kwestfie@codeaurora.org>
+> Cc: Kevin Hilman <khilman@linaro.org>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-Commit FIXME ("ARM: shmobile: Consolidate SCU mapping code") removed the
-last user of the static mapping on emev2-based systems.  Remove the
-mapping and the legacy machine_desc.map_io() callback.
+Ah, too bad to have to revert a correct change until the infrastructure
+is fixed properly, but I guess it's the easier way out here.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/setup-emev2.c | 18 ------------------
- 1 file changed, 18 deletions(-)
+What about the other uses of REGMAP_ENDIAN_LITTLE in the kernel?
+In particular I see 
 
-diff --git a/arch/arm/mach-shmobile/setup-emev2.c b/arch/arm/mach-shmobile/setup-emev2.c
-index 10b7cb5dcb3a..0829d0215c38 100644
---- a/arch/arm/mach-shmobile/setup-emev2.c
-+++ b/arch/arm/mach-shmobile/setup-emev2.c
-@@ -20,23 +20,6 @@
- #include <asm/mach/map.h>
- #include "common.h"
- 
--static struct map_desc emev2_io_desc[] __initdata = {
--#ifdef CONFIG_SMP
--	/* 2M mapping for SCU + L2 controller */
--	{
--		.virtual	= 0xf0000000,
--		.pfn		= __phys_to_pfn(0x1e000000),
--		.length		= SZ_2M,
--		.type		= MT_DEVICE
--	},
--#endif
--};
--
--static void __init emev2_map_io(void)
--{
--	iotable_init(emev2_io_desc, ARRAY_SIZE(emev2_io_desc));
--}
--
- static const char *const emev2_boards_compat_dt[] __initconst = {
- 	"renesas,emev2",
- 	NULL,
-@@ -46,7 +29,6 @@ extern const struct smp_operations emev2_smp_ops;
- 
- DT_MACHINE_START(EMEV2_DT, "Generic Emma Mobile EV2 (Flattened Device Tree)")
- 	.smp		= smp_ops(emev2_smp_ops),
--	.map_io		= emev2_map_io,
- 	.init_early	= shmobile_init_delay,
- 	.init_late	= shmobile_init_late,
- 	.dt_compat	= emev2_boards_compat_dt,
--- 
-2.7.0.rc3.207.g0ac5344
+drivers/clk/nxp/clk-lpc32xx.c:  .val_format_endian = REGMAP_ENDIAN_LITTLE,
+
+drivers/clk/qcom/gcc-apq8084.c: .val_format_endian = REGMAP_ENDIAN_LITTLE,
+drivers/clk/qcom/gcc-ipq806x.c: .val_format_endian = REGMAP_ENDIAN_LITTLE,
+drivers/clk/qcom/gcc-msm8660.c: .val_format_endian = REGMAP_ENDIAN_LITTLE,
+drivers/clk/qcom/gcc-msm8916.c: .val_format_endian = REGMAP_ENDIAN_LITTLE,
+drivers/clk/qcom/gcc-msm8960.c: .val_format_endian = REGMAP_ENDIAN_LITTLE,
+drivers/clk/qcom/gcc-msm8960.c: .val_format_endian = REGMAP_ENDIAN_LITTLE,
+drivers/clk/qcom/gcc-msm8974.c: .val_format_endian = REGMAP_ENDIAN_LITTLE,
+drivers/clk/qcom/lcc-ipq806x.c: .val_format_endian = REGMAP_ENDIAN_LITTLE,
+drivers/clk/qcom/lcc-msm8960.c: .val_format_endian = REGMAP_ENDIAN_LITTLE,
+drivers/clk/qcom/mmcc-apq8084.c:        .val_format_endian = REGMAP_ENDIAN_LITTLE,
+drivers/clk/qcom/mmcc-msm8960.c:        .val_format_endian = REGMAP_ENDIAN_LITTLE,
+drivers/clk/qcom/mmcc-msm8960.c:        .val_format_endian = REGMAP_ENDIAN_LITTLE,
+drivers/clk/qcom/mmcc-msm8974.c:        .val_format_endian = REGMAP_ENDIAN_LITTLE,
+
+drivers/nvmem/qfprom.c: .val_format_endian = REGMAP_ENDIAN_LITTLE,
+
+and of course
+
+drivers/mfd/syscon.c:   syscon_config.val_format_endian = REGMAP_ENDIAN_LITTLE;
+
+which all look like they are regmap_mmio users as well. Do they 
+suffer from the same problem?
+
+	Arnd
