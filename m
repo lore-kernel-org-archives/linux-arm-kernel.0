@@ -1,63 +1,47 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sat, 13 Feb 2016 01:30:46 +0900
-Subject: [PATCH v2] serial: earlycon: rework common framework for earlycon
- declarations
-In-Reply-To: <56BDF799.1030505@hurleysoftware.com>
-References: <1455273394-27350-1-git-send-email-yamada.masahiro@socionext.com>
- <56BDF799.1030505@hurleysoftware.com>
-Message-ID: <CAK7LNAS_vietwRRFnH3YhbWSzjRFP4U6rjftYek1KQ3ips2ZSQ@mail.gmail.com>
+From: alexdeucher@gmail.com (Alex Deucher)
+Date: Fri, 12 Feb 2016 11:31:19 -0500
+Subject: [PATCH 14/17] drm/radeon: removed optional dummy encoder
+ mode_fixup function.
+In-Reply-To: <1455285350-3403-1-git-send-email-palminha@synopsys.com>
+References: <1455285350-3403-1-git-send-email-palminha@synopsys.com>
+Message-ID: <CADnq5_PchtK9bYHSAYjf6mnJ77+O9VzvbNxsoSLcafqYrhBF3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+On Fri, Feb 12, 2016 at 8:55 AM, Carlos Palminha
+<CARLOS.PALMINHA@synopsys.com> wrote:
+> ---
+>  drivers/gpu/drm/radeon/atombios_encoders.c | 8 --------
+>  1 file changed, 8 deletions(-)
 
-
-2016-02-13 0:17 GMT+09:00 Peter Hurley <peter@hurleysoftware.com>:
-> On 02/12/2016 02:36 AM, Masahiro Yamada wrote:
->> Commit 71f50c6d9a22 ("of: drop symbols declared by _OF_DECLARE() from
->> modules") fixed the link error introduced by commit b8d20e06eaad
->> ("serial: 8250_uniphier: add earlycon support").
->>
->> After commit 2eaa790989e0 ("earlycon: Use common framework for
->> earlycon declarations") was applied, the link error came back
->> because the commit reworked OF_EARLYCON_DECLARE() to not use
->> _OF_DECLARE().
->
-> What link error are you getting?
-
-The combination of CONFIG_SERIAL_8250_CONSOLE=y
-and CONFIG_SERIAL_8250_UNIPHIER=m causes a link error.
-
-
+Reviewed-by: Alex Deucher <alexander.deucher@amd.com>
 
 >
->> This commit reworks OF_EARLYCON_DECLARE() again based on
->> _OF_DECLARE().  My motivations are:
->>
->>  - Fix the link error in a generic way (without patching
->>    drivers/tty/serial/8250/8250_uniphier.c)
->>
->>  - Delete struct earlycon_id.  This struct is re-inventing the wheel;
->>    the fields "name", "compatible", "setup" can be implemented in
->>    struct of_device_id as other frameworks do.
+> diff --git a/drivers/gpu/drm/radeon/atombios_encoders.c b/drivers/gpu/drm/radeon/atombios_encoders.c
+> index 01b20e1..1603751 100644
+> --- a/drivers/gpu/drm/radeon/atombios_encoders.c
+> +++ b/drivers/gpu/drm/radeon/atombios_encoders.c
+> @@ -2623,16 +2623,8 @@ radeon_atom_ext_dpms(struct drm_encoder *encoder, int mode)
 >
-> This patch basically reverts the common framework.
-> What happens when not building with OF? Does it still declare the
-> earlycon table?
-
-Ah, I missed this.  (sigh)
-
-Earlycon must still work without OF.
-My way only works with OF.
-
-I really screwed up.  Sorry.
-
-Just disregard this patch.
-
-
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+>  }
+>
+> -static bool radeon_atom_ext_mode_fixup(struct drm_encoder *encoder,
+> -                                      const struct drm_display_mode *mode,
+> -                                      struct drm_display_mode *adjusted_mode)
+> -{
+> -       return true;
+> -}
+> -
+>  static const struct drm_encoder_helper_funcs radeon_atom_ext_helper_funcs = {
+>         .dpms = radeon_atom_ext_dpms,
+> -       .mode_fixup = radeon_atom_ext_mode_fixup,
+>         .prepare = radeon_atom_ext_prepare,
+>         .mode_set = radeon_atom_ext_mode_set,
+>         .commit = radeon_atom_ext_commit,
+> --
+> 2.5.0
+>
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
