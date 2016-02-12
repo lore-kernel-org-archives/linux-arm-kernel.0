@@ -1,52 +1,40 @@
-From: shaun.ren@linux.com (Shaun Ren)
-Date: Thu, 11 Feb 2016 20:08:00 -0800
-Subject: [PATCH v4 8/8] Staging: rts5208: rtsx_transport.c: Fix comparisons to
- NULL
-In-Reply-To: <1455250080-9897-1-git-send-email-shaun.ren@linux.com>
+From: joe@perches.com (Joe Perches)
+Date: Thu, 11 Feb 2016 20:32:15 -0800
+Subject: [PATCH v4 2/8] Staging: rts5208: rtsx_transport.c: Align to
+ open parenthesis
+In-Reply-To: <1455250080-9897-3-git-send-email-shaun.ren@linux.com>
 References: <1455072328-7033-1-git-send-email-shaun.ren@linux.com>
  <1455250080-9897-1-git-send-email-shaun.ren@linux.com>
-Message-ID: <1455250080-9897-9-git-send-email-shaun.ren@linux.com>
+ <1455250080-9897-3-git-send-email-shaun.ren@linux.com>
+Message-ID: <1455251535.13149.7.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch changes all comparsions to NULL with !..., as reported by
-checkpatch.pl.
+On Thu, 2016-02-11 at 20:07 -0800, Shaun Ren wrote:
+> This patch fixes the alignment issue reported by checkpatch.pl:
+> 
+> CHECK: Alignment should match open parenthesis
+[]
+> diff --git a/drivers/staging/rts5208/rtsx_transport.c b/drivers/staging/rts5208/rtsx_transport.c
+[]
+> @@ -52,12 +55,14 @@ unsigned int rtsx_stor_access_xfer_buf(unsigned char *buffer,
+> ?		if (*offset >= scsi_bufflen(srb))
+> ?			return 0;
+> ?		cnt = min(buflen, scsi_bufflen(srb) - *offset);
+> +
+> +		unsigned char *sgbuffer = (unsigned char *)scsi_sglist(srb) +
+> +			*offset;
 
-Signed-off-by: Shaun Ren <shaun.ren@linux.com>
----
- drivers/staging/rts5208/rtsx_transport.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+Please don't declare variables in the middle of functions.
+Variable declarations are only done at the beginning of functions.
 
-diff --git a/drivers/staging/rts5208/rtsx_transport.c b/drivers/staging/rts5208/rtsx_transport.c
-index be3423a..73e50ec 100644
---- a/drivers/staging/rts5208/rtsx_transport.c
-+++ b/drivers/staging/rts5208/rtsx_transport.c
-@@ -338,7 +338,7 @@ static int rtsx_transfer_sglist_adma_partial(struct rtsx_chip *chip, u8 card,
- 	struct scatterlist *sg_ptr;
- 	u32 val = TRIG_DMA;
- 
--	if ((sg == NULL) || (num_sg <= 0) || !offset || !index)
-+	if (!sg || (num_sg <= 0) || !offset || !index)
- 		return -EIO;
- 
- 	if (dma_dir == DMA_TO_DEVICE)
-@@ -502,7 +502,7 @@ static int rtsx_transfer_sglist_adma(struct rtsx_chip *chip, u8 card,
- 	long timeleft;
- 	struct scatterlist *sg_ptr;
- 
--	if ((sg == NULL) || (num_sg <= 0))
-+	if (!sg || (num_sg <= 0))
- 		return -EIO;
- 
- 	if (dma_dir == DMA_TO_DEVICE)
-@@ -649,7 +649,7 @@ static int rtsx_transfer_buf(struct rtsx_chip *chip, u8 card, void *buf,
- 	u32 val = 1 << 31;
- 	long timeleft;
- 
--	if ((buf == NULL) || (len <= 0))
-+	if (!buf || (len <= 0))
- 		return -EIO;
- 
- 	if (dma_dir == DMA_TO_DEVICE)
--- 
-2.7.0
+> +
+> ?		if (dir == TO_XFER_BUF)
+> -			memcpy((unsigned char *) scsi_sglist(srb) + *offset,
+> -					buffer, cnt);
+> +			memcpy(sgbuffer, buffer, cnt);
+> ?		else
+> -			memcpy(buffer, (unsigned char *) scsi_sglist(srb) +
+> -					*offset, cnt);
+> +			memcpy(buffer, sgbuffer, cnt);
+> ?		*offset += cnt;
