@@ -1,46 +1,136 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 12 Feb 2016 13:04:40 +0100
-Subject: [PATCH] xen kconfig: clarify INPUT_XEN_KBDDEV_FRONTEND select
-Message-ID: <1455278707-2008263-1-git-send-email-arnd@arndb.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 12 Feb 2016 12:08:58 +0000
+Subject: [PATCH 4/3] iommu/io-pgtable: Rationalise quirk handling
+In-Reply-To: <ea1f3d3feec0dc9c18d43393678370b50b1275f5.1455206840.git.robin.murphy@arm.com>
+References: <cover.1453723096.git.robin.murphy@arm.com>
+ <066c4af0e29c9cc658bd5e48edc5e2d7ba7140a1.1453723096.git.robin.murphy@arm.com>
+ <20160210154815.GO1052@arm.com>
+ <ea1f3d3feec0dc9c18d43393678370b50b1275f5.1455206840.git.robin.murphy@arm.com>
+Message-ID: <20160212120857.GN25087@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Xen framebuffer driver selects the xen keyboard driver, so the latter
-will be built-in if XEN_FBDEV_FRONTEND=y. However, when CONFIG_INPUT
-is a loadable module, this configuration cannot work. On mainline kernels,
-the symbol will be enabled but not used, while in combination with
-a patch I have to detect such useless configurations, we get the
-expected link failure:
+On Thu, Feb 11, 2016 at 04:13:45PM +0000, Robin Murphy wrote:
+> As the number of io-pgtable implementations grows beyond 1, it's time
+> to rationalise the quirks mechanism before things have a chance to
+> start getting really ugly and out-of-hand.
+> 
+> To that end:
+> - Indicate exactly which quirks each format can/does support.
+> - Fail creating a table if a caller wants unsupported quirks.
+> - Properly document where each quirk applies and why.
+> 
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+>  drivers/iommu/io-pgtable-arm-v7s.c |  3 +++
+>  drivers/iommu/io-pgtable-arm.c     |  2 ++
+>  drivers/iommu/io-pgtable.c         |  3 +++
+>  drivers/iommu/io-pgtable.h         | 24 ++++++++++++++++++++----
+>  4 files changed, 28 insertions(+), 4 deletions(-)
 
-drivers/input/built-in.o: In function `xenkbd_remove':
-xen-kbdfront.c:(.text+0x2f0): undefined reference to `input_unregister_device'
-xen-kbdfront.c:(.text+0x30e): undefined reference to `input_unregister_device'
+Note that I can't merge this until we've figured out the plan for Yong's
+driver.
 
-This changes the dependencies of XEN_FBDEV_FRONTEND so it cannot be
-built-in if CONFIG_INPUT=m && CONFIG_INPUT_MISC=y, as that would result
-in the broken select.
+> diff --git a/drivers/iommu/io-pgtable-arm-v7s.c b/drivers/iommu/io-pgtable-arm-v7s.c
+> index d39a021..9bc607a 100644
+> --- a/drivers/iommu/io-pgtable-arm-v7s.c
+> +++ b/drivers/iommu/io-pgtable-arm-v7s.c
+> @@ -690,6 +690,9 @@ out_free_data:
+>  struct io_pgtable_init_fns io_pgtable_arm_v7s_init_fns = {
+>  	.alloc	= arm_v7s_alloc_pgtable,
+>  	.free	= arm_v7s_free_pgtable,
+> +	.supported_quirks = IO_PGTABLE_QUIRK_ARM_NS |
+> +			    IO_PGTABLE_QUIRK_NO_PERMS |
+> +			    IO_PGTABLE_QUIRK_TLBI_ON_MAP,
+>  };
+>  
+>  #ifdef CONFIG_IOMMU_IO_PGTABLE_ARMV7S_SELFTEST
+> diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
+> index 4095af2..32f94f1 100644
+> --- a/drivers/iommu/io-pgtable-arm.c
+> +++ b/drivers/iommu/io-pgtable-arm.c
+> @@ -863,6 +863,7 @@ arm_32_lpae_alloc_pgtable_s2(struct io_pgtable_cfg *cfg, void *cookie)
+>  struct io_pgtable_init_fns io_pgtable_arm_64_lpae_s1_init_fns = {
+>  	.alloc	= arm_64_lpae_alloc_pgtable_s1,
+>  	.free	= arm_lpae_free_pgtable,
+> +	.supported_quirks = IO_PGTABLE_QUIRK_ARM_NS,
+>  };
+>  
+>  struct io_pgtable_init_fns io_pgtable_arm_64_lpae_s2_init_fns = {
+> @@ -873,6 +874,7 @@ struct io_pgtable_init_fns io_pgtable_arm_64_lpae_s2_init_fns = {
+>  struct io_pgtable_init_fns io_pgtable_arm_32_lpae_s1_init_fns = {
+>  	.alloc	= arm_32_lpae_alloc_pgtable_s1,
+>  	.free	= arm_lpae_free_pgtable,
+> +	.supported_quirks = IO_PGTABLE_QUIRK_ARM_NS,
+>  };
+>  
+>  struct io_pgtable_init_fns io_pgtable_arm_32_lpae_s2_init_fns = {
+> diff --git a/drivers/iommu/io-pgtable.c b/drivers/iommu/io-pgtable.c
+> index 876f6a7..0f57a45 100644
+> --- a/drivers/iommu/io-pgtable.c
+> +++ b/drivers/iommu/io-pgtable.c
+> @@ -52,6 +52,9 @@ struct io_pgtable_ops *alloc_io_pgtable_ops(enum io_pgtable_fmt fmt,
+>  	if (!fns)
+>  		return NULL;
+>  
+> +	if (cfg->quirks & ~fns->supported_quirks)
+> +		return NULL;
+> +
+>  	iop = fns->alloc(cfg, cookie);
+>  	if (!iop)
+>  		return NULL;
+> diff --git a/drivers/iommu/io-pgtable.h b/drivers/iommu/io-pgtable.h
+> index 4faee7d..6e7f11e 100644
+> --- a/drivers/iommu/io-pgtable.h
+> +++ b/drivers/iommu/io-pgtable.h
+> @@ -47,10 +47,24 @@ struct iommu_gather_ops {
+>   *                 page table walker.
+>   */
+>  struct io_pgtable_cfg {
+> -	#define IO_PGTABLE_QUIRK_ARM_NS		BIT(0) /* Set NS bit in PTEs */
+> -	#define IO_PGTABLE_QUIRK_NO_PERMS	BIT(1) /* No AP/XN bits */
+> -	#define IO_PGTABLE_QUIRK_TLBI_ON_MAP	BIT(2) /* TLB Inv. on map */
+> -	int				quirks;
+> +	/*
+> +	 * IO_PGTABLE_QUIRK_ARM_NS: (ARM formats) Set NS and NSTABLE bits in
+> +	 *	stage 1 PTEs, for hardware which insists on validating them
+> +	 *	even in	non-secure state where they should normally be ignored.
+> +	 *
+> +	 * IO_PGTABLE_QUIRK_NO_PERMS: Ignore the IOMMU_READ, IOMMU_WRITE and
+> +	 *	IOMMU_NOEXEC flags and map everything with full access, for
+> +	 *	hardware which does not implement the permissions of a given
+> +	 *	format, and/or requires some format-specific default value.
+> +	 *
+> +	 * IO_PGTABLE_QUIRK_TLBI_ON_MAP: If the format forbids caching invalid
+> +	 *	(unmapped) entries but the hardware might do so anyway, perform
+> +	 *	TLB maintenance when mapping as well as when unmapping.
+> +	 */
 
-As usual, we would be much better off without the 'select', but removing
-it now would likely break existing user configurations that depend on
-it, so this adds another hack on top to get it working.
+Much better, cheers.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 36c1132e34bd ("xen kconfig: fix select INPUT_XEN_KBDDEV_FRONTEND")
----
- drivers/video/fbdev/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+> +	#define IO_PGTABLE_QUIRK_ARM_NS		BIT(0)
+> +	#define IO_PGTABLE_QUIRK_NO_PERMS	BIT(1)
+> +	#define IO_PGTABLE_QUIRK_TLBI_ON_MAP	BIT(2)
+> +	unsigned int			quirks;
 
-diff --git a/drivers/video/fbdev/Kconfig b/drivers/video/fbdev/Kconfig
-index 8ea45a5cd806..fd3d6fd290a9 100644
---- a/drivers/video/fbdev/Kconfig
-+++ b/drivers/video/fbdev/Kconfig
-@@ -2241,6 +2241,7 @@ config FB_VIRTUAL
- config XEN_FBDEV_FRONTEND
- 	tristate "Xen virtual frame buffer support"
- 	depends on FB && XEN
-+	depends on INPUT || !INPUT_MISC
- 	select FB_SYS_FILLRECT
- 	select FB_SYS_COPYAREA
- 	select FB_SYS_IMAGEBLIT
--- 
-2.7.0
+Let's just make this unsigned long.
+
+>  	unsigned long			pgsize_bitmap;
+>  	unsigned int			ias;
+>  	unsigned int			oas;
+> @@ -173,10 +187,12 @@ static inline void io_pgtable_tlb_sync(struct io_pgtable *iop)
+>   *
+>   * @alloc: Allocate a set of page tables described by cfg.
+>   * @free:  Free the page tables associated with iop.
+> + * @supported_quirks: Bitmap of quirks supported by the format.
+>   */
+>  struct io_pgtable_init_fns {
+>  	struct io_pgtable *(*alloc)(struct io_pgtable_cfg *cfg, void *cookie);
+>  	void (*free)(struct io_pgtable *iop);
+> +	unsigned int supported_quirks;
+>  };
+
+My only gripe here is that this is supposed to be a struct of function
+pointers... get_supported_quirks() ?
+
+Will
