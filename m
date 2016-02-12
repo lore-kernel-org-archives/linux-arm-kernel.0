@@ -1,50 +1,64 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 12 Feb 2016 16:38:53 -0500 (EST)
-Subject: [PATCH] [media] zl10353: use div_u64 instead of do_div
-In-Reply-To: <6737272.LXr2g355Yt@wuerfel>
-References: <1455287246-3540549-1-git-send-email-arnd@arndb.de>
- <2712691.b9gkR7KMX7@wuerfel>
- <alpine.LFD.2.20.1602121305180.13632@knanqh.ubzr>
- <6737272.LXr2g355Yt@wuerfel>
-Message-ID: <alpine.LFD.2.20.1602121634040.13632@knanqh.ubzr>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri, 12 Feb 2016 13:42:50 -0800
+Subject: mt1873-evb: MMC failing with linux-next
+In-Reply-To: <56BE01D6.40908@gmail.com> (Matthias Brugger's message of "Fri,
+ 12 Feb 2016 17:01:26 +0100")
+References: <7hegcmadfk.fsf@baylibre.com> <56BDF937.60208@gmail.com>
+ <56BE01D6.40908@gmail.com>
+Message-ID: <7h37sx1u79.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 12 Feb 2016, Arnd Bergmann wrote:
+Matthias Brugger <matthias.bgg@gmail.com> writes:
 
-> On Friday 12 February 2016 13:21:33 Nicolas Pitre wrote:
-> > This is all related to the gcc bug for which I produced a test case 
-> > here:
-> > 
-> > http://article.gmane.org/gmane.linux.kernel.cross-arch/29801
-> > 
-> > Do you know if this is fixed in recent gcc?
-> 
-> I have a fairly recent gcc, but I also never got around to submit
-> it properly.
-> 
-> However, I did stumble over an older patch I did now, which I could
-> not remember what it was good for. It does fix the problem, and
-> it seems to be a better solution.
+> On 12/02/16 16:24, Matthias Brugger wrote:
+>> Hi Kevin,
+>>
+>> On 09/02/16 02:18, Kevin Hilman wrote:
+>>> Hello,
+>>>
+>>> I tried getting MMC working with linux-next (next-20160208) on
+>>> mt8173-evb by enabling a few options[1] on top of the default defconfig,
+>>> and this results in a kernel that hangs as soon as it starts userspace.
+>>>
+>>> The MMC driver seems to start, though has some regulator issues:
+>>>
+>>> [    0.526380] sdhci: Secure Digital Host Controller Interface driver
+>>> [    0.527176] sdhci: Copyright(c) Pierre Ossman
+>>> [    0.528835] vio18: unsupportable voltage range: 3300000-1980000uV
+>>> [    0.529610] mtk-msdc 11230000.mmc: Regulator set error -22:
+>>> 3300000 - 3300000
+>>> [    0.563731] mtk-msdc 11240000.mmc: Got CD GPIO
+>>>
+>>> The driver appears to be attempting to set 3.3V but using a 1.8V
+>>> regulator (vio18), which is failing.
+>>>
+>>> Then, the kernel hangs after freeing unused memory:
+>>>
+>>> [    0.616386] hctosys: unable to open rtc device (rtc0)
+>>> [    0.624118] usb_vbus: disabling
+>>> [    0.624547] vusb: disabling
+>>> [    0.624929] vgp6: disabling
+>>> [    0.625635] ALSA device list:
+>>> [    0.626009]   No soundcards found.
+>>> [    0.626963] Freeing unused kernel memory: 724K (ffffffc000977000 -
+>>> ffffffc000a2c000)
+>>>
+>>> And nothing further here.
+>>>
+>>
+>> I can see the warning from the mmc regulator access, but after that my
+>> board boots just fine.
+>> I'm using linux-next as of today (20160212).
+>> I attached my config, it should be defconfig plus the config options you
+>> mentioned (and an initramfs).
+>>
+>> Is this the configuration you have?
+>
+> I spotted an error in my scripts to build the kernel. After fixing
+> this I can reproduce your error.
 
-WTF?
+OK, let me know if you need anything else to help debug, or want me to
+test anything further.  Otherwise I'll leave it in your capable hands.
 
-Hmmm... it apparently doesn't fix it if I apply this change to the gcc 
-test case.
-
-
-> diff --git a/include/linux/compiler.h b/include/linux/compiler.h
-> index b5acbb404854..b5ff9881bef8 100644
-> --- a/include/linux/compiler.h
-> +++ b/include/linux/compiler.h
-> @@ -148,7 +148,7 @@ void ftrace_likely_update(struct ftrace_branch_data *f, int val, int expect);
->   */
->  #define if(cond, ...) __trace_if( (cond , ## __VA_ARGS__) )
->  #define __trace_if(cond) \
-> -	if (__builtin_constant_p((cond)) ? !!(cond) :			\
-> +	if (__builtin_constant_p(!!(cond)) ? !!(cond) :			\
->  	({								\
->  		int ______r;						\
->  		static struct ftrace_branch_data			\
-> 
-> 
+Kevin
