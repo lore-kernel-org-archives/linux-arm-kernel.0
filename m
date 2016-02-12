@@ -1,50 +1,55 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 12 Feb 2016 09:01:39 +0000
-Subject: [PATCH v8 00/10] mfd: axp20x: Add support for RSB based AXP223
-In-Reply-To: <1455242567-17880-1-git-send-email-wens@csie.org>
-References: <1455242567-17880-1-git-send-email-wens@csie.org>
-Message-ID: <20160212090139.GO20693@x1>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Fri, 12 Feb 2016 11:18:01 +0200
+Subject: [PATCH] MAINTAINERS: mmc: Add Adrian Hunter as the maintainer for
+ SDHCI
+In-Reply-To: <1455200099-5306-1-git-send-email-ulf.hansson@linaro.org>
+References: <1455200099-5306-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <56BDA349.1040009@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 12 Feb 2016, Chen-Yu Tsai wrote:
-
-[...]
-
-> Chen-Yu Tsai (10):
->   mfd: axp20x: Add AXP223 to list of supported PMICs in DT bindings
->   mfd: axp20x: Remove second struct device * parameter for
->     axp20x_match_device()
->   mfd: axp20x: use dev->driver->of_match_table in axp20x_match_device()
->   mfd: axp20x: Add missing copyright notice
->   mfd: axp20x: Split the driver into core and i2c bits
->   mfd: axp20x: Whitespace, open parenthesis alignment code style fixes
->   mfd: axp20x: Add support for RSB based AXP223 PMIC
->   regulator: axp20x: Support new AXP223 PMIC
->   ARM: dts: sun8i: sinlinx-sina33: Add AXP223 PMIC device and regulator
->     nodes
->   ARM: dts: sun8i: q8-common: Add AXP223 PMIC device and regulator nodes
+On 11/02/16 16:14, Ulf Hansson wrote:
+>>From discussions on linux-mmc I have been encouraging someone to pick
+> up the maintainer role for SDHCI. I am very pleased that Adrian Hunter
+> volunteered and accepted the challenge!
 > 
->  Documentation/devicetree/bindings/mfd/axp20x.txt |   7 +-
->  arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts   |  76 +++++++++++++++-
->  arch/arm/boot/dts/sun8i-q8-common.dtsi           |  83 +++++++++++++++++-
->  drivers/mfd/Kconfig                              |  25 ++++--
->  drivers/mfd/Makefile                             |   2 +
->  drivers/mfd/axp20x-i2c.c                         | 104 ++++++++++++++++++++++
->  drivers/mfd/axp20x-rsb.c                         |  80 +++++++++++++++++
->  drivers/mfd/axp20x.c                             | 105 ++++++-----------------
->  drivers/regulator/axp20x-regulator.c             |   3 +
->  include/linux/mfd/axp20x.h                       |  34 +++++++-
->  10 files changed, 425 insertions(+), 94 deletions(-)
->  create mode 100644 drivers/mfd/axp20x-i2c.c
->  create mode 100644 drivers/mfd/axp20x-rsb.c
+> The SDHCI code is currently in quite poor quality, but we have agreed on
+> a way forward to try to reach a point where the SDHCI core becomes more of
+> a set of library functions. Each SDHCI driver variant can then decide
+> which functions to use and allows it to implement variant specific code,
+> without needing to also change SDHCI core code.
+> 
+> In the end we aim to get better optimized and maintainable code.
+> 
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> ---
+>  MAINTAINERS | 7 ++++---
+>  1 file changed, 4 insertions(+), 3 deletions(-)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 30aca4a..5511069 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -9706,10 +9706,11 @@ S:	Maintained
+>  F:	drivers/mmc/host/sdricoh_cs.c
+>  
+>  SECURE DIGITAL HOST CONTROLLER INTERFACE (SDHCI) DRIVER
+> +M:	Adrian Hunter <adrian.hunter@intel.com>
+>  L:	linux-mmc at vger.kernel.org
+> -S:	Orphan
+> -F:	drivers/mmc/host/sdhci.*
+> -F:	drivers/mmc/host/sdhci-pltfm.[ch]
+> +S:	Maintained
 
-Right, I've applied the MFD and Regulator patches and sent out the
-required pull-request.  You just need to have the arch/arm/ patches
-taken care off and you're all set.
++T: git git://git.infradead.org/users/ahunter/linux-sdhci.git
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> +F:	drivers/mmc/host/sdhci*
+> +F:	include/linux/mmc/sdhci*
+>  
+>  SECURE COMPUTING
+>  M:	Kees Cook <keescook@chromium.org>
+> 
+
+Sorry, I hadn't got round to doing this myself.
+
+Acked-by: Adrian Hunter <adrian.hunter@intel.com>
