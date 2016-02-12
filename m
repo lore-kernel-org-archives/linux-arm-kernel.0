@@ -1,40 +1,41 @@
 From: CARLOS.PALMINHA@synopsys.com (Carlos Palminha)
-Date: Fri, 12 Feb 2016 13:55:25 +0000
-Subject: [PATCH 12/17] drm/mgag200: removed optional dummy encoder mode_fixup
+Date: Fri, 12 Feb 2016 13:55:37 +0000
+Subject: [PATCH 13/17] drm/qxl: removed optional dummy encoder mode_fixup
  function.
-Message-ID: <1455285325-3308-1-git-send-email-palminha@synopsys.com>
+Message-ID: <1455285337-3356-1-git-send-email-palminha@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 ---
- drivers/gpu/drm/mgag200/mgag200_mode.c | 8 --------
- 1 file changed, 8 deletions(-)
+ drivers/gpu/drm/qxl/qxl_display.c | 9 ---------
+ 1 file changed, 9 deletions(-)
 
-diff --git a/drivers/gpu/drm/mgag200/mgag200_mode.c b/drivers/gpu/drm/mgag200/mgag200_mode.c
-index dc13c48..af8b4c1 100644
---- a/drivers/gpu/drm/mgag200/mgag200_mode.c
-+++ b/drivers/gpu/drm/mgag200/mgag200_mode.c
-@@ -1479,13 +1479,6 @@ void mga_crtc_fb_gamma_get(struct drm_crtc *crtc, u16 *red, u16 *green,
-  * These functions are analagous to those in the CRTC code, but are intended
-  * to handle any encoder-specific limitations
-  */
--static bool mga_encoder_mode_fixup(struct drm_encoder *encoder,
--				   const struct drm_display_mode *mode,
--				   struct drm_display_mode *adjusted_mode)
+diff --git a/drivers/gpu/drm/qxl/qxl_display.c b/drivers/gpu/drm/qxl/qxl_display.c
+index 8627651..43e5f50 100644
+--- a/drivers/gpu/drm/qxl/qxl_display.c
++++ b/drivers/gpu/drm/qxl/qxl_display.c
+@@ -734,14 +734,6 @@ static void qxl_enc_dpms(struct drm_encoder *encoder, int mode)
+ 	DRM_DEBUG("\n");
+ }
+ 
+-static bool qxl_enc_mode_fixup(struct drm_encoder *encoder,
+-			       const struct drm_display_mode *mode,
+-			       struct drm_display_mode *adjusted_mode)
 -{
+-	DRM_DEBUG("\n");
 -	return true;
 -}
 -
- static void mga_encoder_mode_set(struct drm_encoder *encoder,
- 				struct drm_display_mode *mode,
- 				struct drm_display_mode *adjusted_mode)
-@@ -1515,7 +1508,6 @@ static void mga_encoder_destroy(struct drm_encoder *encoder)
+ static void qxl_enc_prepare(struct drm_encoder *encoder)
+ {
+ 	DRM_DEBUG("\n");
+@@ -864,7 +856,6 @@ static struct drm_encoder *qxl_best_encoder(struct drm_connector *connector)
  
- static const struct drm_encoder_helper_funcs mga_encoder_helper_funcs = {
- 	.dpms = mga_encoder_dpms,
--	.mode_fixup = mga_encoder_mode_fixup,
- 	.mode_set = mga_encoder_mode_set,
- 	.prepare = mga_encoder_prepare,
- 	.commit = mga_encoder_commit,
+ static const struct drm_encoder_helper_funcs qxl_enc_helper_funcs = {
+ 	.dpms = qxl_enc_dpms,
+-	.mode_fixup = qxl_enc_mode_fixup,
+ 	.prepare = qxl_enc_prepare,
+ 	.mode_set = qxl_enc_mode_set,
+ 	.commit = qxl_enc_commit,
 -- 
 2.5.0
