@@ -1,39 +1,62 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 12 Feb 2016 18:00:00 +0000
-Subject: [RFC PATCH 4/4] DT: Allwinner H3: fix PLL8 clock
-In-Reply-To: <1455300000-18723-1-git-send-email-andre.przywara@arm.com>
-References: <1455300000-18723-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1455300000-18723-5-git-send-email-andre.przywara@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 12 Feb 2016 19:01:49 +0100
+Subject: [PATCH v5sub1 7/8] arm64: move kernel image to base of vmalloc
+ area
+In-Reply-To: <56BE1AC3.409@arm.com>
+References: <1454324093-15998-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1454324093-15998-8-git-send-email-ard.biesheuvel@linaro.org>
+ <56BE1AC3.409@arm.com>
+Message-ID: <CAKv+Gu9evDuU_4seC2SVhFkzu_u5cUUaP0_cTk9po035mjaCzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the new generic a31-pll clock driver in place, we can use it to
-properly describe the PLL8 clock.
+On 12 February 2016 at 18:47, James Morse <james.morse@arm.com> wrote:
+> Hi Ard,
+>
+> On 01/02/16 10:54, Ard Biesheuvel wrote:
+>> This moves the module area to right before the vmalloc area, and
+>> moves the kernel image to the base of the vmalloc area. This is
+>> an intermediate step towards implementing KASLR, which allows the
+>> kernel image to be located anywhere in the vmalloc area.
+>
+> I've rebased hibernate onto for-next/core, and this patch leads to the hibernate
+> core code falling down a kernel shaped hole in the linear map.
+>
+> The hibernate code assumes that for zones returned by for_each_populated_zone(),
+> if pfn_valid() says a page is present, then it is okay to access the page via
+> page_address(pfn_to_page(pfn)). But for pfns that correspond to the kernel text,
+> this is still returning an address in the linear map, which isn't mapped...
+>
+> I'm not sure what the correct fix is here.
+> Should this sort of walk be valid?
+>
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
- arch/arm/boot/dts/sun8i-h3.dtsi | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+I think the correct fix would be to mark the [_stext, _etext] interval
+as NOMAP. That will also simplify the mapping routine where I now
+check manually whether a memblock intersects that interval. And it
+should make this particular piece of code behave.
 
-diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-index 1524130e..1b2eb20 100644
---- a/arch/arm/boot/dts/sun8i-h3.dtsi
-+++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-@@ -137,11 +137,11 @@
- 			clock-output-names = "pll6d2";
- 		};
- 
--		/* dummy clock until pll6 can be reused */
--		pll8: pll8_clk {
-+		pll8: clk at 01c20044 {
- 			#clock-cells = <0>;
--			compatible = "fixed-clock";
--			clock-frequency = <1>;
-+			compatible = "allwinner,sun6i-a31-pll-clk";
-+			reg = <0x01c20044 0x4>;
-+			clocks = <&osc24M>;
- 			clock-output-names = "pll8";
- 		};
- 
--- 
-2.6.4
+However, you would still need to preserve the contents of the
+interval, since the generic hibernate routines will not do that
+anymore after this change.
+
+I will experiment with this on Monday, and report back.
+
+Thanks,
+Ard.
+
+
+>
+> From include/linux/mm.h:
+>> static __always_inline void *lowmem_page_address(const struct page *page)
+>> {
+>>       return __va(PFN_PHYS(page_to_pfn(page)));
+>> }
+>
+>
+> Suggestions welcome!
+>
+>
+> Thanks,
+>
+> James
