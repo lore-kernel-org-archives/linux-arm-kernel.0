@@ -1,57 +1,85 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 12 Feb 2016 12:51:40 +0100
-Subject: [PATCH v2 3/3] arm64: prevent __va() translations before
- memstart_addr is assigned
-In-Reply-To: <20160212114908.GK25087@arm.com>
-References: <1455209282-9596-1-git-send-email-ard.biesheuvel@linaro.org>
- <1455209282-9596-4-git-send-email-ard.biesheuvel@linaro.org>
- <20160212114908.GK25087@arm.com>
-Message-ID: <CAKv+Gu_2xLeN+ySAhEBKh+NByjka_12HunprueV+ykE0njrgsw@mail.gmail.com>
+From: codekipper@gmail.com (codekipper at gmail.com)
+Date: Fri, 12 Feb 2016 12:54:31 +0100
+Subject: [linux-sunxi][PATCH] ARM: dts: sun4i: Enable USB DRC on the MK8082
+Message-ID: <1455278071-22339-1-git-send-email-codekipper@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 February 2016 at 12:49, Will Deacon <will.deacon@arm.com> wrote:
-> On Thu, Feb 11, 2016 at 05:48:02PM +0100, Ard Biesheuvel wrote:
->> Just a hack to check whether all early __va() calls are gone.
->> ---
->>  arch/arm64/include/asm/memory.h | 10 +++++++++-
->>  arch/arm64/mm/init.c            |  2 +-
->>  2 files changed, 10 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
->> index 083361531a61..0d4d1b3b9695 100644
->> --- a/arch/arm64/include/asm/memory.h
->> +++ b/arch/arm64/include/asm/memory.h
->> @@ -90,7 +90,9 @@
->>       __x >= PAGE_OFFSET ? (__x - PAGE_OFFSET + PHYS_OFFSET) :        \
->>                            (__x - kimage_voffset); })
->>
->> -#define __phys_to_virt(x)    ((unsigned long)((x) - PHYS_OFFSET + PAGE_OFFSET))
->> +#define __phys_to_virt(x) ({                                         \
->> +     assert_memstart_addr_assigned();                                \
->> +     (unsigned long)((x) - PHYS_OFFSET + PAGE_OFFSET); })
->>  #define __phys_to_kimg(x)    ((unsigned long)((x) + kimage_voffset))
->>
->>  /*
->> @@ -133,6 +135,12 @@ extern u64                       kimage_vaddr;
->>  /* the offset between the kernel virtual and physical mappings */
->>  extern u64                   kimage_voffset;
->>
->> +static inline void assert_memstart_addr_assigned(void)
->> +{
->> +     if (unlikely(memstart_addr == (phys_addr_t)-1))
->> +             asm("brk #%0" :: "I"(0x800));
->
-> Ok, I'll bite! Why isn't this just a BUG_ON?
->
+From: Marcus Cooper <codekipper@gmail.com>
 
-Because circular header dependencies prevent BUG_ON() from being used
-here, and I was reluctant to move this function into a .c file.
+Enable the otg/drc usb controller on the MK8082.
 
-Note that I am not necessarily suggesting that this patch be merged,
-but I included it since it's the code I used to confirm that no other
-early instance of __va() remain. I can try and clean it up if we want
-to keep it.
+Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+---
+ arch/arm/boot/dts/sun4i-a10-mk802.dts | 33 +++++++++++++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
 
+diff --git a/arch/arm/boot/dts/sun4i-a10-mk802.dts b/arch/arm/boot/dts/sun4i-a10-mk802.dts
+index ddf0683..ee46ea8 100644
+--- a/arch/arm/boot/dts/sun4i-a10-mk802.dts
++++ b/arch/arm/boot/dts/sun4i-a10-mk802.dts
+@@ -44,6 +44,7 @@
+ #include "sun4i-a10.dtsi"
+ #include "sunxi-common-regulators.dtsi"
+ #include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/pinctrl/sun4i-a10.h>
+ 
+ / {
+ 	model = "MK802";
+@@ -84,7 +85,25 @@
+ 	status = "okay";
+ };
+ 
++&otg_sram {
++	status = "okay";
++};
++
+ &pio {
++	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
++		allwinner,pins = "PH4";
++		allwinner,function = "gpio_in";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++
++	usb0_vbus_detect_pin: usb0_vbus_detect_pin at 0 {
++		allwinner,pins = "PH5";
++		allwinner,function = "gpio_in";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++
+ 	usb2_vbus_pin_mk802: usb2_vbus_pin at 0 {
+ 		allwinner,pins = "PH12";
+ 		allwinner,function = "gpio_out";
+@@ -93,6 +112,10 @@
+ 	};
+ };
+ 
++&reg_usb0_vbus {
++	status = "okay";
++};
++
+ &reg_usb1_vbus {
+ 	status = "okay";
+ };
+@@ -109,7 +132,17 @@
+ 	status = "okay";
+ };
+ 
++&usb_otg {
++	dr_mode = "otg";
++	status = "okay";
++};
++
+ &usbphy {
++	pinctrl-names = "default";
++	pinctrl-0 = <&usb0_id_detect_pin>, <&usb0_vbus_detect_pin>;
++	usb0_id_det-gpios = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
++	usb0_vbus_det-gpios = <&pio 7 5 GPIO_ACTIVE_HIGH>; /* PH5 */
++	usb0_vbus-supply = <&reg_usb0_vbus>;
+ 	usb1_vbus-supply = <&reg_usb1_vbus>;
+ 	usb2_vbus-supply = <&reg_usb2_vbus>;
+ 	status = "okay";
 -- 
-Ard.
+2.7.1
