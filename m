@@ -1,345 +1,381 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Fri, 12 Feb 2016 13:50:27 -0700
-Subject: [RFC v2 01/12] PM / Domains: Abstract genpd locking
+Date: Fri, 12 Feb 2016 13:50:29 -0700
+Subject: [RFC v2 03/12] PM / cpu_domains: Setup PM domains for CPUs/clusters
 In-Reply-To: <1455310238-8963-1-git-send-email-lina.iyer@linaro.org>
 References: <1455310238-8963-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1455310238-8963-2-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1455310238-8963-4-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Abstract genpd lock/unlock calls, in preparation for domain specific
-locks added in the following patches.
+Define and add Generic PM domains (genpd) for CPU clusters. Many new
+SoCs group CPUs as clusters. Clusters share common resources like power
+rails, caches, VFP, Coresight etc. When all CPUs in the cluster are
+idle, these shared resources may also be put in their idle state.
+
+CPUs may be associated with their domain providers in DT. The domains in
+turn may be associated with their providers. This is clean way to model
+the cluster hierarchy like that of ARM's big.little architecture.
+
+For each CPU in the DT, we identify the domain provider; initialize and
+register the PM domain if isn't already registered and attach all the
+CPU devices to the domain. Usually, when there are multiple clusters of
+CPUs, there is a top level coherency domain that is dependent on these
+individual domains. All domains thus created are marked IRQ safe
+automatically and therefore may be powered down when the CPUs in the
+domain are powered down by cpuidle.
+
+Reading DT, initializing Generic PM domains, attaching CPUs to it
+domains are common functionalities across ARM SoCs. Provide a common set
+of APIs to setup PM domains for CPU clusters and its parents. The
+platform drivers may just call of_setup_cpu_pd() to do a single step
+setup of CPU domains.
 
 Cc: Ulf Hansson <ulf.hansson@linaro.org>
-Cc: Kevin Hilman <khilman@linaro.org>
-Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
-Cc: Geert Uytterhoeven <geert@linux-m68k.org>
-Cc: Krzysztof Koz?owski <k.kozlowski@samsung.com>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Suggested-by: Kevin Hilman <khilman@linaro.org>
 Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 ---
 Changes since RFC v1 -
-- split into two patches. This patch abstracts genpd locking
-- uses function pointer, instead of runtime function determination
+- Initialize down up, start with CPUs, identify and create domains
+- Clean up of the API
+- Two simple API for setting up CPU PM domains
+- File name change: cpu-pd.[ch] ->cpu_domains.[ch]
+- Depends on CONFIG_PM_GENERIC_DOMAINS_OF only
+- cpu_pd_ops abstracts generic pm domains
+- platform code does not know about genpd object used inside
+- simplification and bug fixes
 
- drivers/base/power/domain.c | 109 ++++++++++++++++++++++++++++++--------------
- include/linux/pm_domain.h   |   5 +-
- 2 files changed, 79 insertions(+), 35 deletions(-)
+ drivers/base/power/Makefile      |   1 +
+ drivers/base/power/cpu_domains.c | 267 +++++++++++++++++++++++++++++++++++++++
+ include/linux/cpu_domains.h      |  33 +++++
+ 3 files changed, 301 insertions(+)
+ create mode 100644 drivers/base/power/cpu_domains.c
+ create mode 100644 include/linux/cpu_domains.h
 
-diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-index 3ddd05d..8204615 100644
---- a/drivers/base/power/domain.c
-+++ b/drivers/base/power/domain.c
-@@ -40,6 +40,46 @@
- static LIST_HEAD(gpd_list);
- static DEFINE_MUTEX(gpd_list_lock);
+diff --git a/drivers/base/power/Makefile b/drivers/base/power/Makefile
+index 5998c53..9883e89 100644
+--- a/drivers/base/power/Makefile
++++ b/drivers/base/power/Makefile
+@@ -3,6 +3,7 @@ obj-$(CONFIG_PM_SLEEP)	+= main.o wakeup.o
+ obj-$(CONFIG_PM_TRACE_RTC)	+= trace.o
+ obj-$(CONFIG_PM_OPP)	+= opp/
+ obj-$(CONFIG_PM_GENERIC_DOMAINS)	+=  domain.o domain_governor.o
++obj-$(CONFIG_PM_GENERIC_DOMAINS_OF)	+= cpu_domains.o
+ obj-$(CONFIG_HAVE_CLK)	+= clock_ops.o
  
-+struct genpd_lock_fns {
-+	void (*lock)(struct generic_pm_domain *genpd);
-+	void (*lock_nested)(struct generic_pm_domain *genpd, int depth);
-+	int (*lock_interruptible)(struct generic_pm_domain *genpd);
-+	void (*unlock)(struct generic_pm_domain *genpd);
+ ccflags-$(CONFIG_DEBUG_DRIVER) := -DDEBUG
+diff --git a/drivers/base/power/cpu_domains.c b/drivers/base/power/cpu_domains.c
+new file mode 100644
+index 0000000..981592f
+--- /dev/null
++++ b/drivers/base/power/cpu_domains.c
+@@ -0,0 +1,267 @@
++/*
++ * drivers/base/power/cpu_domains.c - Helper functions to create CPU PM domains.
++ *
++ * Copyright (C) 2016 Linaro Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/cpu.h>
++#include <linux/cpu_domains.h>
++#include <linux/cpu_pm.h>
++#include <linux/device.h>
++#include <linux/kernel.h>
++#include <linux/list.h>
++#include <linux/of.h>
++#include <linux/pm_domain.h>
++#include <linux/rculist.h>
++#include <linux/rcupdate.h>
++#include <linux/slab.h>
++
++#define CPU_PD_NAME_MAX 36
++
++struct cpu_pm_domain {
++	struct list_head link;
++	struct cpu_pd_ops ops;
++	struct generic_pm_domain *genpd;
++	struct cpu_pm_domain *parent;
 +};
 +
-+static void genpd_lock_irq(struct generic_pm_domain *genpd)
++/* List of CPU PM domains we care about */
++static LIST_HEAD(of_cpu_pd_list);
++static DEFINE_SPINLOCK(cpu_pd_list_lock);
++
++static inline
++struct cpu_pm_domain *to_cpu_pd(struct generic_pm_domain *d)
 +{
-+	mutex_lock(&genpd->mlock);
++	struct cpu_pm_domain *pd;
++	struct cpu_pm_domain *res = NULL;
++
++	rcu_read_lock();
++	list_for_each_entry_rcu(pd, &of_cpu_pd_list, link)
++		if (pd->genpd == d) {
++			res = pd;
++			break;
++		}
++	rcu_read_unlock();
++
++	return res;
 +}
 +
-+static void genpd_lock_irq_nested(struct generic_pm_domain *genpd,
-+					int depth)
++static int cpu_pd_attach_cpu(int cpu)
 +{
-+	mutex_lock_nested(&genpd->mlock, depth);
++	int ret;
++	struct device *cpu_dev;
++
++	cpu_dev = get_cpu_device(cpu);
++	if (!cpu_dev) {
++		pr_warn("%s: Unable to get device for CPU%d\n",
++				__func__, cpu);
++		return -ENODEV;
++	}
++
++	ret = genpd_dev_pm_attach(cpu_dev);
++	if (ret)
++		dev_warn(cpu_dev,
++			"%s: Unable to attach to power-domain: %d\n",
++			__func__, ret);
++	else
++		dev_dbg(cpu_dev, "Attached to domain\n");
++
++	return ret;
 +}
 +
-+static int genpd_lock_interruptible_irq(struct generic_pm_domain *genpd)
++static int cpu_pd_power_on(struct generic_pm_domain *genpd)
 +{
-+	return mutex_lock_interruptible(&genpd->mlock);
++	struct cpu_pm_domain *pd = to_cpu_pd(genpd);
++
++	return pd->ops.power_on();
 +}
 +
-+static void genpd_unlock_irq(struct generic_pm_domain *genpd)
++static int cpu_pd_power_off(struct generic_pm_domain *genpd)
 +{
-+	return mutex_unlock(&genpd->mlock);
++	struct cpu_pm_domain *pd = to_cpu_pd(genpd);
++
++	return pd->ops.power_off(genpd->state_idx,
++			genpd->states[genpd->state_idx].param);
 +}
 +
-+static struct genpd_lock_fns irq_lock = {
-+	.lock = genpd_lock_irq,
-+	.lock_nested = genpd_lock_irq_nested,
-+	.lock_interruptible = genpd_lock_interruptible_irq,
-+	.unlock = genpd_unlock_irq,
++/**
++ * of_init_cpu_pm_domain() - Initialize a CPU PM domain from a device node
++ *
++ * @dn: The domain provider's device node
++ * @ops: The power_on/_off callbacks for the domain
++ *
++ * Returns the generic_pm_domain (genpd) pointer to the domain on success
++ */
++static struct generic_pm_domain *of_init_cpu_pm_domain(struct device_node *dn,
++				const struct cpu_pd_ops *ops)
++{
++	struct cpu_pm_domain *pd = NULL;
++	struct generic_pm_domain *genpd = NULL;
++	int ret = -ENOMEM;
++
++	if (!of_device_is_available(dn))
++		return ERR_PTR(-ENODEV);
++
++	genpd = kzalloc(sizeof(*(genpd)), GFP_KERNEL);
++	if (!genpd)
++		goto fail;
++
++	genpd->name = kstrndup(dn->full_name, CPU_PD_NAME_MAX, GFP_KERNEL);
++	if (!genpd->name)
++		goto fail;
++
++	pd = kzalloc(sizeof(*pd), GFP_KERNEL);
++	if (!pd)
++		goto fail;
++
++	pd->genpd = genpd;
++	pd->genpd->power_off = cpu_pd_power_off;
++	pd->genpd->power_on = cpu_pd_power_on;
++	pd->genpd->flags |= GENPD_FLAG_IRQ_SAFE;
++	pd->ops.power_on = ops->power_on;
++	pd->ops.power_off = ops->power_off;
++
++	INIT_LIST_HEAD_RCU(&pd->link);
++	spin_lock(&cpu_pd_list_lock);
++	list_add_rcu(&pd->link, &of_cpu_pd_list);
++	spin_unlock(&cpu_pd_list_lock);
++
++	/* Register the CPU genpd */
++	pr_debug("adding %s as CPU PM domain.\n", pd->genpd->name);
++	ret = of_pm_genpd_init(dn, pd->genpd, &simple_qos_governor, false);
++	if (ret) {
++		pr_err("Unable to initialize domain %s\n", dn->full_name);
++		goto fail;
++	}
++
++	ret = of_genpd_add_provider_simple(dn, pd->genpd);
++	if (ret)
++		pr_warn("Unable to add genpd %s as provider\n",
++				pd->genpd->name);
++
++	return pd->genpd;
++fail:
++
++	kfree(genpd);
++	kfree(genpd->name);
++	kfree(pd);
++	return ERR_PTR(ret);
++}
++
++static struct generic_pm_domain *of_get_cpu_domain(struct device_node *dn,
++		const struct cpu_pd_ops *ops, int cpu)
++{
++	struct of_phandle_args args;
++	struct generic_pm_domain *genpd, *parent;
++	int ret;
++
++	/* Do we have this domain? If not, create the domain */
++	args.np = dn;
++	args.args_count = 0;
++
++	genpd = of_genpd_get_from_provider(&args);
++	if (!IS_ERR(genpd))
++		goto skip_parent;
++
++	genpd = of_init_cpu_pm_domain(dn, ops);
++	if (IS_ERR(genpd))
++		return genpd;
++
++	/* Is there a domain provider for this domain? */
++	ret = of_parse_phandle_with_args(dn, "power-domains",
++			"#power-domain-cells", 0, &args);
++	of_node_put(dn);
++	if (ret < 0)
++		goto skip_parent;
++
++	/* Find its parent and attach this domain to it, recursively */
++	parent = of_get_cpu_domain(args.np, ops, cpu);
++	if (IS_ERR(parent)) {
++		struct cpu_pm_domain *cpu_pd, *parent_cpu_pd;
++
++		ret = pm_genpd_add_subdomain(genpd, parent);
++		if (ret) {
++			pr_err("%s: Unable to add sub-domain (%s) to parent (%s)\n err: %d",
++					__func__, genpd->name, parent->name,
++					ret);
++			return ERR_PTR(ret);
++		}
++
++		/*
++		 * Reference parent domain for easy access.
++		 * Note: We could be attached to a domain that is not a
++		 * CPU PM domain in that case dont reference the parent.
++		 */
++		cpu_pd = to_cpu_pd(genpd);
++		parent_cpu_pd = to_cpu_pd(parent);
++
++		if (cpu_pd && parent_cpu_pd)
++			cpu_pd->parent = parent_cpu_pd;
++	}
++
++skip_parent:
++	return genpd;
++}
++
++/**
++ * of_setup_cpu_pd_single() - Setup the PM domains for a CPU
++ *
++ * @cpu: The CPU for which the PM domain is to be set up.
++ * @ops: The PM domain suspend/resume ops for the CPU's domain
++ *
++ * If the CPU PM domain exists already, then the CPU is attached to
++ * that CPU PD. If it doesn't, the domain is created, the @ops are
++ * set for power_on/power_off callbacks and then the CPU is attached
++ * to that domain. If the domain was created outside this framework,
++ * then we do not attach the CPU to the domain.
++ */
++int of_setup_cpu_pd_single(int cpu, const struct cpu_pd_ops *ops)
++{
++
++	struct device_node *dn;
++	struct generic_pm_domain *genpd;
++
++	dn = of_get_cpu_node(cpu, NULL);
++	if (!dn)
++		return -ENODEV;
++
++	dn = of_parse_phandle(dn, "power-domains", 0);
++	if (!dn)
++		return -ENODEV;
++	of_node_put(dn);
++
++	/* Find the genpd for this CPU, create if not found */
++	genpd = of_get_cpu_domain(dn, ops, cpu);
++	if (IS_ERR(genpd))
++		return PTR_ERR(genpd);
++
++	return cpu_pd_attach_cpu(cpu);
++}
++EXPORT_SYMBOL(of_setup_cpu_pd_single);
++
++/**
++ * of_setup_cpu_pd() - Setup the PM domains for all CPUs
++ *
++ * @ops: The PM domain suspend/resume ops for all the domains
++ *
++ * Setup the CPU PM domain and attach all possible CPUs to their respective
++ * domains. The domains are created if not already and then attached.
++ */
++int of_setup_cpu_pd(const struct cpu_pd_ops *ops)
++{
++	int cpu;
++	int ret;
++
++	for_each_possible_cpu(cpu) {
++		ret = of_setup_cpu_pd_single(cpu, ops);
++		if (ret)
++			break;
++	}
++
++	return ret;
++}
++EXPORT_SYMBOL(of_setup_cpu_pd);
+diff --git a/include/linux/cpu_domains.h b/include/linux/cpu_domains.h
+new file mode 100644
+index 0000000..bab4846
+--- /dev/null
++++ b/include/linux/cpu_domains.h
+@@ -0,0 +1,33 @@
++/*
++ * include/linux/cpu_domains.h
++ *
++ * Copyright (C) 2016 Linaro Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef __CPU_DOMAINS_H__
++#define __CPU_DOMAINS_H__
++
++struct cpu_pd_ops {
++	int (*power_off)(u32 state_idx, u32 param);
++	int (*power_on)(void);
 +};
 +
-+#define genpd_lock(p)			p->lock_fns->lock(p)
-+#define genpd_lock_nested(p, d)		p->lock_fns->lock_nested(p, d)
-+#define genpd_lock_interruptible(p)	p->lock_fns->lock_interruptible(p)
-+#define genpd_unlock(p)			p->lock_fns->unlock(p)
++#ifdef CONFIG_PM_GENERIC_DOMAINS_OF
++int of_setup_cpu_pd_single(int cpu, const struct cpu_pd_ops *ops);
++int of_setup_cpu_pd(const struct cpu_pd_ops *ops);
++#else
++static inline int of_setup_cpu_pd_single(int cpu, const struct cpu_pd_ops *ops)
++{
++	return -ENODEV;
++}
++static inline int of_setup_cpu_pd(const struct cpu_pd_ops *ops)
++{
++	return -ENODEV;
++}
++#endif /* CONFIG_PM_GENERIC_DOMAINS_OF */
 +
- /*
-  * Get the generic PM domain for a particular struct device.
-  * This validates the struct device pointer, the PM domain pointer,
-@@ -202,9 +242,9 @@ static int genpd_poweron(struct generic_pm_domain *genpd, unsigned int depth)
- 
- 		genpd_sd_counter_inc(master);
- 
--		mutex_lock_nested(&master->lock, depth + 1);
-+		genpd_lock_nested(master, depth + 1);
- 		ret = genpd_poweron(master, depth + 1);
--		mutex_unlock(&master->lock);
-+		genpd_unlock(master);
- 
- 		if (ret) {
- 			genpd_sd_counter_dec(master);
-@@ -268,9 +308,9 @@ static int genpd_dev_pm_qos_notifier(struct notifier_block *nb,
- 		spin_unlock_irq(&dev->power.lock);
- 
- 		if (!IS_ERR(genpd)) {
--			mutex_lock(&genpd->lock);
-+			genpd_lock(genpd);
- 			genpd->max_off_time_changed = true;
--			mutex_unlock(&genpd->lock);
-+			genpd_unlock(genpd);
- 		}
- 
- 		dev = dev->parent;
-@@ -367,9 +407,9 @@ static void genpd_power_off_work_fn(struct work_struct *work)
- 
- 	genpd = container_of(work, struct generic_pm_domain, power_off_work);
- 
--	mutex_lock(&genpd->lock);
-+	genpd_lock(genpd);
- 	genpd_poweroff(genpd, true);
--	mutex_unlock(&genpd->lock);
-+	genpd_unlock(genpd);
- }
- 
- /**
-@@ -439,9 +479,9 @@ static int pm_genpd_runtime_suspend(struct device *dev)
- 	if (dev->power.irq_safe)
- 		return 0;
- 
--	mutex_lock(&genpd->lock);
-+	genpd_lock(genpd);
- 	genpd_poweroff(genpd, false);
--	mutex_unlock(&genpd->lock);
-+	genpd_unlock(genpd);
- 
- 	return 0;
- }
-@@ -476,9 +516,9 @@ static int pm_genpd_runtime_resume(struct device *dev)
- 		goto out;
- 	}
- 
--	mutex_lock(&genpd->lock);
-+	genpd_lock(genpd);
- 	ret = genpd_poweron(genpd, 0);
--	mutex_unlock(&genpd->lock);
-+	genpd_unlock(genpd);
- 
- 	if (ret)
- 		return ret;
-@@ -692,14 +732,14 @@ static int pm_genpd_prepare(struct device *dev)
- 	if (resume_needed(dev, genpd))
- 		pm_runtime_resume(dev);
- 
--	mutex_lock(&genpd->lock);
-+	genpd_lock(genpd);
- 
- 	if (genpd->prepared_count++ == 0) {
- 		genpd->suspended_count = 0;
- 		genpd->suspend_power_off = genpd->status == GPD_STATE_POWER_OFF;
- 	}
- 
--	mutex_unlock(&genpd->lock);
-+	genpd_unlock(genpd);
- 
- 	if (genpd->suspend_power_off) {
- 		pm_runtime_put_noidle(dev);
-@@ -717,12 +757,12 @@ static int pm_genpd_prepare(struct device *dev)
- 
- 	ret = pm_generic_prepare(dev);
- 	if (ret) {
--		mutex_lock(&genpd->lock);
-+		genpd_lock(genpd);
- 
- 		if (--genpd->prepared_count == 0)
- 			genpd->suspend_power_off = false;
- 
--		mutex_unlock(&genpd->lock);
-+		genpd_unlock(genpd);
- 		pm_runtime_enable(dev);
- 	}
- 
-@@ -1080,13 +1120,13 @@ static void pm_genpd_complete(struct device *dev)
- 	if (IS_ERR(genpd))
- 		return;
- 
--	mutex_lock(&genpd->lock);
-+	genpd_lock(genpd);
- 
- 	run_complete = !genpd->suspend_power_off;
- 	if (--genpd->prepared_count == 0)
- 		genpd->suspend_power_off = false;
- 
--	mutex_unlock(&genpd->lock);
-+	genpd_unlock(genpd);
- 
- 	if (run_complete) {
- 		pm_generic_complete(dev);
-@@ -1260,7 +1300,7 @@ int __pm_genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
- 	if (IS_ERR(gpd_data))
- 		return PTR_ERR(gpd_data);
- 
--	mutex_lock(&genpd->lock);
-+	genpd_lock(genpd);
- 
- 	if (genpd->prepared_count > 0) {
- 		ret = -EAGAIN;
-@@ -1277,7 +1317,7 @@ int __pm_genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
- 	list_add_tail(&gpd_data->base.list_node, &genpd->dev_list);
- 
-  out:
--	mutex_unlock(&genpd->lock);
-+	genpd_unlock(genpd);
- 
- 	if (ret)
- 		genpd_free_dev_data(dev, gpd_data);
-@@ -1310,7 +1350,7 @@ int pm_genpd_remove_device(struct generic_pm_domain *genpd,
- 	gpd_data = to_gpd_data(pdd);
- 	dev_pm_qos_remove_notifier(dev, &gpd_data->nb);
- 
--	mutex_lock(&genpd->lock);
-+	genpd_lock(genpd);
- 
- 	if (genpd->prepared_count > 0) {
- 		ret = -EAGAIN;
-@@ -1325,14 +1365,14 @@ int pm_genpd_remove_device(struct generic_pm_domain *genpd,
- 
- 	list_del_init(&pdd->list_node);
- 
--	mutex_unlock(&genpd->lock);
-+	genpd_unlock(genpd);
- 
- 	genpd_free_dev_data(dev, gpd_data);
- 
- 	return 0;
- 
-  out:
--	mutex_unlock(&genpd->lock);
-+	genpd_unlock(genpd);
- 	dev_pm_qos_add_notifier(dev, &gpd_data->nb);
- 
- 	return ret;
-@@ -1358,8 +1398,8 @@ int pm_genpd_add_subdomain(struct generic_pm_domain *genpd,
- 	if (!link)
- 		return -ENOMEM;
- 
--	mutex_lock(&subdomain->lock);
--	mutex_lock_nested(&genpd->lock, SINGLE_DEPTH_NESTING);
-+	genpd_lock(subdomain);
-+	genpd_lock_nested(genpd, SINGLE_DEPTH_NESTING);
- 
- 	if (genpd->status == GPD_STATE_POWER_OFF
- 	    &&  subdomain->status != GPD_STATE_POWER_OFF) {
-@@ -1382,8 +1422,8 @@ int pm_genpd_add_subdomain(struct generic_pm_domain *genpd,
- 		genpd_sd_counter_inc(genpd);
- 
-  out:
--	mutex_unlock(&genpd->lock);
--	mutex_unlock(&subdomain->lock);
-+	genpd_unlock(genpd);
-+	genpd_unlock(subdomain);
- 	if (ret)
- 		kfree(link);
- 	return ret;
-@@ -1404,8 +1444,8 @@ int pm_genpd_remove_subdomain(struct generic_pm_domain *genpd,
- 	if (IS_ERR_OR_NULL(genpd) || IS_ERR_OR_NULL(subdomain))
- 		return -EINVAL;
- 
--	mutex_lock(&subdomain->lock);
--	mutex_lock_nested(&genpd->lock, SINGLE_DEPTH_NESTING);
-+	genpd_lock(subdomain);
-+	genpd_lock_nested(genpd, SINGLE_DEPTH_NESTING);
- 
- 	if (!list_empty(&subdomain->slave_links) || subdomain->device_count) {
- 		pr_warn("%s: unable to remove subdomain %s\n", genpd->name,
-@@ -1429,8 +1469,8 @@ int pm_genpd_remove_subdomain(struct generic_pm_domain *genpd,
- 	}
- 
- out:
--	mutex_unlock(&genpd->lock);
--	mutex_unlock(&subdomain->lock);
-+	genpd_unlock(genpd);
-+	genpd_unlock(subdomain);
- 
- 	return ret;
- }
-@@ -1595,7 +1635,8 @@ void pm_genpd_init(struct generic_pm_domain *genpd,
- 	INIT_LIST_HEAD(&genpd->master_links);
- 	INIT_LIST_HEAD(&genpd->slave_links);
- 	INIT_LIST_HEAD(&genpd->dev_list);
--	mutex_init(&genpd->lock);
-+	mutex_init(&genpd->mlock);
-+	genpd->lock_fns = &irq_lock;
- 	genpd->gov = gov;
- 	INIT_WORK(&genpd->power_off_work, genpd_power_off_work_fn);
- 	atomic_set(&genpd->sd_count, 0);
-@@ -1952,9 +1993,9 @@ int genpd_dev_pm_attach(struct device *dev)
- 	dev->pm_domain->detach = genpd_dev_pm_detach;
- 	dev->pm_domain->sync = genpd_dev_pm_sync;
- 
--	mutex_lock(&pd->lock);
-+	genpd_lock(pd);
- 	ret = genpd_poweron(pd, 0);
--	mutex_unlock(&pd->lock);
-+	genpd_unlock(pd);
- out:
- 	return ret ? -EPROBE_DEFER : 0;
- }
-@@ -2011,7 +2052,7 @@ static int pm_genpd_summary_one(struct seq_file *s,
- 	struct gpd_link *link;
- 	int ret;
- 
--	ret = mutex_lock_interruptible(&genpd->lock);
-+	ret = genpd_lock_interruptible(genpd);
- 	if (ret)
- 		return -ERESTARTSYS;
- 
-@@ -2047,7 +2088,7 @@ static int pm_genpd_summary_one(struct seq_file *s,
- 
- 	seq_puts(s, "\n");
- exit:
--	mutex_unlock(&genpd->lock);
-+	genpd_unlock(genpd);
- 
- 	return 0;
- }
-diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-index 376d7fa..ec5523c 100644
---- a/include/linux/pm_domain.h
-+++ b/include/linux/pm_domain.h
-@@ -44,13 +44,14 @@ struct genpd_power_state {
- 	u32 param;
- };
- 
-+struct genpd_lock_fns;
-+
- struct generic_pm_domain {
- 	struct dev_pm_domain domain;	/* PM domain operations */
- 	struct list_head gpd_list_node;	/* Node in the global PM domains list */
- 	struct list_head master_links;	/* Links with PM domain as a master */
- 	struct list_head slave_links;	/* Links with PM domain as a slave */
- 	struct list_head dev_list;	/* List of devices */
--	struct mutex lock;
- 	struct dev_power_governor *gov;
- 	struct work_struct power_off_work;
- 	const char *name;
-@@ -74,6 +75,8 @@ struct generic_pm_domain {
- 	struct genpd_power_state *states;
- 	unsigned int state_count; /* number of states */
- 	unsigned int state_idx; /* state that genpd will go to when off */
-+	struct genpd_lock_fns *lock_fns;
-+	struct mutex mlock;
- 
- };
- 
++#endif /* __CPU_DOMAINS_H__ */
 -- 
 2.1.4
