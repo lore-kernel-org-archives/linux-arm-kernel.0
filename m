@@ -1,42 +1,57 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 12 Feb 2016 16:42:18 +0000
-Subject: [PATCHv2] arm64: Rework valid_user_regs
-In-Reply-To: <CAFEAcA_XGrPB=2GnQwW4Jr8eE9UqbTAgRb86qCkX+rw25u4yNg@mail.gmail.com>
-References: <1455285858-11757-1-git-send-email-mark.rutland@arm.com>
- <CAFEAcA_XGrPB=2GnQwW4Jr8eE9UqbTAgRb86qCkX+rw25u4yNg@mail.gmail.com>
-Message-ID: <20160212164218.GC17901@arm.com>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Fri, 12 Feb 2016 10:43:23 -0600
+Subject: [PATCH 1/2] arm64: mm: Enable CONT_SIZE aligned sections for 64k
+ page kernels.
+In-Reply-To: <CAKv+Gu--05Wn6oWEiy=43nzujNgG0=DpOB9b1zs9_jfddYXWwQ@mail.gmail.com>
+References: <1455293208-6763-1-git-send-email-jeremy.linton@arm.com>
+ <1455293208-6763-2-git-send-email-jeremy.linton@arm.com>
+ <CAKv+Gu_ViEAVN1GEDMWpJ5OYjg6BVSLTEtdus6vCCXchQ1BOjw@mail.gmail.com>
+ <56BE0698.10506@arm.com>
+ <CAKv+Gu--05Wn6oWEiy=43nzujNgG0=DpOB9b1zs9_jfddYXWwQ@mail.gmail.com>
+Message-ID: <56BE0BAB.7060502@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 12, 2016 at 02:53:51PM +0000, Peter Maydell wrote:
-> On 12 February 2016 at 14:04, Mark Rutland <mark.rutland@arm.com> wrote:
-> > We validate pstate using PSR_MODE32_BIT, which is part of the
-> > user-provided pstate (and cannot be trusted). Also, we conflate
-> > validation of AArch32 and AArch64 pstate values, making the code
-> > difficult to reason about.
-> >
-> > Instead, validate the pstate value based on the associated task. The
-> > task may or may not be current (e.g. when using ptrace), so this must be
-> > passed explicitly by callers. To avoid circular header dependencies via
-> > sched.h, is_compat_task is pulled out of asm/ptrace.h.
-> >
-> > To make the code possible to reason about, the AArch64 and AArch32
-> > validation is split into separate functions. Software must respect the
-> > RES0 policy for SPSR bits, and thus the kernel mirrors the hardware
-> > policy (RAZ/WI) for bits as-yet unallocated. When these acquire an
-> > architected meaning writes may be permitted (potentially with additional
-> > validation).
-> 
-> > +       /* Force PSR to a valid 32-bit EL0t */
-> > +       regs->pstate |= PSR_MODE32_BIT;
-> > +       regs->pstate &= PSR_f | PSR_s | (PSR_x & ~COMPAT_PSR_A_BIT) | \
-> > +                       COMPAT_PSR_T_BIT;
-> > +
-> 
-> I think the consensus from the v1 review was to drop these PSR_[fsx] masks?
+On 02/12/2016 10:28 AM, Ard Biesheuvel wrote:
+> On 12 February 2016 at 17:21, Jeremy Linton <jeremy.linton@arm.com> wrote:
+>> On 02/12/2016 10:11 AM, Ard Biesheuvel wrote:
+>>>
+>>> On 12 February 2016 at 17:06, Jeremy Linton <jeremy.linton@arm.com> wrote:
+>>
+>> (trimming)
+>>>>
+>>>>    #if defined(CONFIG_DEBUG_ALIGN_RODATA)
+>>>> -#define ALIGN_DEBUG_RO                 . = ALIGN(1<<SECTION_SHIFT);
+>>>> -#define ALIGN_DEBUG_RO_MIN(min)                ALIGN_DEBUG_RO
+>>>> +#if defined(CONFIG_ARM64_64K_PAGES)
+>>>> +#define ALIGN_DEBUG_RO_MIN(min)                . = ALIGN(CONT_SIZE);
+>>>> +#else
+>>>> +#define ALIGN_DEBUG_RO_MIN(min)                . = ALIGN(SECTION_SIZE);
+>>>
+>>>
+>>> Doesn't this align to 32 MB on 16k pages kernels?
+>>
+>>
+>> Yes, I considered whether it was more appropriate to use CONT_SIZE for 16k
+>> as well.
+>>
+>> Opinions?
+>>
+>
+> Looking at vmlinux.lds.S, I see that that would put _stext and
+> __init_begin at 32 MB aligned boundaries. making the size of the
+> kernel at least 64 MB. If I take your .rodata patch into account,
+> which adds a third instance of ALIGN_DEBUG_RO_MIN, the Image footprint
+> will rise to ~100 MB. Or am I missing something?
+>
 
-Yup. Mark, if you respin with that change then I can take this as a fix.
+No, I think your correct. But, its an option, and it sort of depends on 
+use case. In a system with 100+GB of RAM it might be useful. Not so much 
+on a phone or small embedded system. I don't really see those people 
+enabling ALIGN_RODATA anyway. Worse, I expect the loss of RAM 
+efficiently going from 4k-16k pages in a RAM constrained system to be a 
+pretty big hit too.
 
-Thanks,
-
-Will
+I don't have any hard data one way or the other, and I don't have a 
+strong opinion. Although, I suspect at the moment the potential users of 
+16k pages may tend toward the small side.
