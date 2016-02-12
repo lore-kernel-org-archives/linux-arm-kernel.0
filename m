@@ -1,75 +1,38 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 12 Feb 2016 18:25:27 +0000
-Subject: [PATCH] arm64: mm: Mark .rodata as RO
-In-Reply-To: <1455293599-6974-1-git-send-email-jeremy.linton@arm.com>
-References: <1455293599-6974-1-git-send-email-jeremy.linton@arm.com>
-Message-ID: <20160212182527.GG20262@leverpostej>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Fri, 12 Feb 2016 11:33:17 -0700
+Subject: [PATCH V3 1/6] stm class: Add ioctl get_options interface
+In-Reply-To: <87ziv62bzb.fsf@ashishki-desk.ger.corp.intel.com>
+References: <1454756672-12790-1-git-send-email-zhang.chunyan@linaro.org>
+ <1454756672-12790-2-git-send-email-zhang.chunyan@linaro.org>
+ <87ziv62bzb.fsf@ashishki-desk.ger.corp.intel.com>
+Message-ID: <CANLsYkzQTjROVX3K3NEE=GNg6QVKXLA9QDLVDe+W9eeDVwbgGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 12, 2016 at 10:13:19AM -0600, Jeremy Linton wrote:
-> Currently the .rodata section is actually still executable when DEBUG_RODATA
-> is enabled. This changes that so the .rodata is actually read only, no execute.
-> 
-> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
-> ---
->  arch/arm64/kernel/vmlinux.lds.S |  5 +++--
->  arch/arm64/mm/mmu.c             | 14 +++++++++++---
->  2 files changed, 14 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-> index ab4e436..2e2c053 100644
-> --- a/arch/arm64/kernel/vmlinux.lds.S
-> +++ b/arch/arm64/kernel/vmlinux.lds.S
-> @@ -114,8 +114,9 @@ SECTIONS
->  		*(.got)			/* Global offset table		*/
->  	}
->  
-> -	RO_DATA(PAGE_SIZE)
-> -	EXCEPTION_TABLE(8)
-> +	ALIGN_DEBUG_RO_MIN(0)
-> +	RO_DATA(PAGE_SIZE)		/* everything from this point to */
-> +	EXCEPTION_TABLE(8)		/* _etext will be marked RO NX   */
->  	NOTES
->  
->  	ALIGN_DEBUG_RO_MIN(PAGE_SIZE)
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index ab69a99..a3f4112 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -453,10 +453,18 @@ static void __init map_mem(pgd_t *pgd)
->  #ifdef CONFIG_DEBUG_RODATA
->  void mark_rodata_ro(void)
->  {
-> -	create_mapping_late(__pa(_stext), (unsigned long)_stext,
-> -				(unsigned long)_etext - (unsigned long)_stext,
-> -				PAGE_KERNEL_ROX);
-> +	unsigned long section_size;
->  
-> +	section_size = (unsigned long)__start_rodata - (unsigned long)_stext;
-> +	create_mapping_late(__pa(_stext), (unsigned long)_stext,
-> +			    section_size, PAGE_KERNEL_ROX);
-> +	/*
-> +	 * mark .rodata as read only. Use _etext rather than __end_rodata to
-> +	 * cover NOTES and EXCEPTION_TABLE.
-> +	 */
-> +	section_size = (unsigned long)_etext - (unsigned long)__start_rodata;
-> +	create_mapping_late(__pa(__start_rodata), (unsigned long)__start_rodata,
-> +			    section_size, PAGE_KERNEL_RO);
->  }
+On 12 February 2016 at 08:18, Alexander Shishkin
+<alexander.shishkin@linux.intel.com> wrote:
+> Chunyan Zhang <zhang.chunyan@linaro.org> writes:
+>
+>> There is already an interface of set_options, but no get_options yet.
+>> Before setting any options, one would may want to see the current
+>> status of that option by means of get_options interface. This
+>> interface has been used in CoreSight STM driver.
+>
+> I'm not sure I understand the reasoning behind this. If a userspace
+> program opens a communication channel and wants to configure certain
+> features on it, why does its choice depend on what has been configured
+> for this channel previously? It can be anything at all. Most likely,
+> it's either unconfigured or configured to its default values, but why
+> does this matter for a new writer?
 
-As you pointed out in the other thread, we'll also need to update
-map_kernel to use equivalent chunks for .text and .rodata.
+A client may wish to change the settings (invariant/guaranteed) it has
+on a specific channel - it may even want to so do multiple times.  The
+idea behind introducing a get_options() was to probe the specific
+settings of a channel before going a head with a new configuration.
+In hindsight it may not be needed as a client should simply go ahead
+and push down the configuration it wants.
 
-I think we can probably make .rodata RO from the outset in map_kernel,
-too.
-
-Could you please update mem_init to log .text and .rodata separately?
-
-It looks like some core code makes assumptions about _etext, so I guess
-that has to cover .rodata regardless.
-
-Otherwise, looks good!
-
-Thanks,
-Mark.
+>
+> Regards,
+> --
+> Alex
