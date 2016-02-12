@@ -1,72 +1,98 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 12 Feb 2016 13:54:21 +0100
-Subject: [PATCH 7/7] ARM: OMAP2+: Fix omap_device for module reload on PM
- runtime forbid
-In-Reply-To: <1455145370-20301-8-git-send-email-tony@atomide.com>
-References: <1455145370-20301-1-git-send-email-tony@atomide.com>
- <1455145370-20301-8-git-send-email-tony@atomide.com>
-Message-ID: <CAPDyKFoJHw73xi0GE8YqtHcAjArrUkisXLTnF_kypSjAAtG0Eg@mail.gmail.com>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Fri, 12 Feb 2016 13:57:44 +0100
+Subject: [PATCH v4 01/17] Xen: ACPI: Hide UART used by Xen
+In-Reply-To: <alpine.DEB.2.02.1602121138090.27008@kaball.uk.xensource.com>
+References: <1454641552-12576-1-git-send-email-zhaoshenglong@huawei.com>
+ <44113385.2QnPtvxQx0@vostro.rjw.lan>
+ <alpine.DEB.2.02.1602111557430.27008@kaball.uk.xensource.com>
+ <1667812.hY9vsC2epc@vostro.rjw.lan>
+ <alpine.DEB.2.02.1602121138090.27008@kaball.uk.xensource.com>
+Message-ID: <CAJZ5v0j7Vv5B-+CYt=ZAvO+YTj6-0Cm0Bi=1AjG5JbTeNLW3EQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 February 2016 at 00:02, Tony Lindgren <tony@atomide.com> wrote:
-> If a driver PM runtime is disabled via sysfs, and the module is
-> unloaded, PM runtime can't do anything to disable the device. Let's
-> let the interconnect disable the device on BUS_NOTIFY_UNBOUND_DRIVER.
+On Fri, Feb 12, 2016 at 12:50 PM, Stefano Stabellini
+<stefano.stabellini@eu.citrix.com> wrote:
+> On Thu, 11 Feb 2016, Rafael J. Wysocki wrote:
+>> On Thursday, February 11, 2016 04:04:14 PM Stefano Stabellini wrote:
+>> > On Wed, 10 Feb 2016, Rafael J. Wysocki wrote:
+>> > > On Tuesday, February 09, 2016 11:19:02 AM Stefano Stabellini wrote:
+>> > > > On Mon, 8 Feb 2016, Rafael J. Wysocki wrote:
+>> > > > > On Monday, February 08, 2016 10:57:01 AM Stefano Stabellini wrote:
+>> > > > > > On Sat, 6 Feb 2016, Rafael J. Wysocki wrote:
+>> > > > > > > On Fri, Feb 5, 2016 at 4:05 AM, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
+>> > > > > > > > From: Shannon Zhao <shannon.zhao@linaro.org>
+>> > > > > > > >
+>> > > > > > > > ACPI 6.0 introduces a new table STAO to list the devices which are used
+>> > > > > > > > by Xen and can't be used by Dom0. On Xen virtual platforms, the physical
+>> > > > > > > > UART is used by Xen. So here it hides UART from Dom0.
+>> > > > > > > >
+>> > > > > > > > Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+>> > > > > > > > Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+>> > > > > > >
+>> > > > > > > Well, this doesn't look right to me.
+>> > > > > > >
+>> > > > > > > We need to find a nicer way to achieve what you want.
+>> > > > > >
+>> > > > > > I take that you are talking about how to honor the STAO table in Linux.
+>> > > > > > Do you have any concrete suggestions?
+>> > > > >
+>> > > > > I do.
+>> > > > >
+>> > > > > The last hunk of the patch is likely what it needs to be, although I'm
+>> > > > > not sure if the place it is added to is the right one.  That's a minor thing,
+>> > > > > though.
+>> > > > >
+>> > > > > The other part is problematic.  Not that as it doesn't work, but because of
+>> > > > > how it works.  With these changes the device will be visible to the OS (in
+>> > > > > fact to user space even), but will never be "present".  I'm not sure if
+>> > > > > that's what you want?
+>> > > > >
+>> > > > > It might be better to add a check to acpi_bus_type_and_status() that will
+>> > > > > evaluate the "should ignore?" thing and return -ENODEV if this is true.  This
+>> > > > > way the device won't be visible at all.
+>> > > >
+>> > > > Something like below?  Actually your suggestion is better, thank you!
+>> > > >
+>> > > > diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
+>> > > > index 78d5f02..4778c51 100644
+>> > > > --- a/drivers/acpi/scan.c
+>> > > > +++ b/drivers/acpi/scan.c
+>> > > > @@ -1455,6 +1455,9 @@ static int acpi_bus_type_and_status(acpi_handle handle, int *type,
+>> > > >         if (ACPI_FAILURE(status))
+>> > > >                 return -ENODEV;
+>> > > >
+>> > > > +       if (acpi_check_device_is_ignored(handle))
+>> > > > +               return -ENODEV;
+>> > > > +
+>> > > >         switch (acpi_type) {
+>> > > >         case ACPI_TYPE_ANY:             /* for ACPI_ROOT_OBJECT */
+>> > > >         case ACPI_TYPE_DEVICE:
+>> > > >
+>> > >
+>> > > I thought about doing that under ACPI_TYPE_DEVICE, because it shouldn't be
+>> > > applicable to the other types.  But generally, yes.
+>> >
+>> > I was pondering about it myself. Maybe an ACPI_TYPE_PROCESSOR object
+>> > could theoretically be hidden with the STAO?
+>>
+>> But this patch won't check for it anyway, will it?
+>>
+>> It seems to be only checking against the UART address or have I missed
+>> anything?
 >
-> Otherwise omap_device will produce and error on the following module
-> reload. This can be easily tested with something like:
+> You are right, this patch only checks for the UART address, which is
+> critical.
 >
-> # modprobe omap_hsmmc
-> # echo on > /sys/devices/platform/68000000.ocp/4809c000.mmc/power/control
-> # rmmod omap_hsmmc
-> # modprobe omap_hsmmc
->
-> Cc: Alan Stern <stern@rowland.harvard.edu>
-> Cc: Kevin Hilman <khilman@baylibre.com>
-> Cc: Nishanth Menon <nm@ti.com>
-> Cc: Rafael J. Wysocki <rafael@kernel.org>
-> Cc: Tero Kristo <t-kristo@ti.com>
-> Reported-by: Ulf Hansson <ulf.hansson@linaro.org>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> However the STAO also has a "Name List" field with a list of paths in
+> ACPI namespace to hide. If not implementing proper "Name List" support,
+> at least, as part of this patch, it would be nice to check for the
+> presence of the Name List field in the table, and print a warning such
+> as "STAO Name List not yet supported" when the field is present.
 
-Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+That would be fine, but anyway it belongs to the table parsing part IMO.
 
-Kind regards
-Uffe
+And the check can be moved when adding proper support for the name list part.
 
-
-> ---
->  arch/arm/mach-omap2/omap_device.c | 10 ++++++++++
->  1 file changed, 10 insertions(+)
->
-> diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
-> index ebd8369..f7ff3b9 100644
-> --- a/arch/arm/mach-omap2/omap_device.c
-> +++ b/arch/arm/mach-omap2/omap_device.c
-> @@ -191,12 +191,22 @@ static int _omap_device_notifier_call(struct notifier_block *nb,
->  {
->         struct platform_device *pdev = to_platform_device(dev);
->         struct omap_device *od;
-> +       int err;
->
->         switch (event) {
->         case BUS_NOTIFY_DEL_DEVICE:
->                 if (pdev->archdata.od)
->                         omap_device_delete(pdev->archdata.od);
->                 break;
-> +       case BUS_NOTIFY_UNBOUND_DRIVER:
-> +               od = to_omap_device(pdev);
-> +               if (od && (od->_state == OMAP_DEVICE_STATE_ENABLED)) {
-> +                       dev_info(dev, "enabled after unload, idling\n");
-> +                       err = omap_device_idle(pdev);
-> +                       if (err)
-> +                               dev_err(dev, "failed to idle\n");
-> +               }
-> +               break;
->         case BUS_NOTIFY_ADD_DEVICE:
->                 if (pdev->dev.of_node)
->                         omap_device_build_from_dt(pdev);
-> --
-> 2.7.0
->
+Thanks,
+Rafael
