@@ -1,9 +1,9 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 12 Feb 2016 20:05:52 +0100
-Subject: [PATCH 62/68] ARM: dts: bockw: Enable SCIF_CLK frequency and pins
+Date: Fri, 12 Feb 2016 20:05:53 +0100
+Subject: [PATCH 63/68] ARM: dts: gose: Enable SCIF_CLK frequency and pins
 In-Reply-To: <cover.1455303422.git.horms+renesas@verge.net.au>
 References: <cover.1455303422.git.horms+renesas@verge.net.au>
-Message-ID: <33ef9688ae45d19bf11c75a7c403a4f20804720d.1455303422.git.horms+renesas@verge.net.au>
+Message-ID: <81a81ba9412c2c29309abd8752bcf771c22335a1.1455303422.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,23 +17,25 @@ This increases the range and accuracy of supported baud rates.
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7778-bockw.dts | 13 +++++++++++++
+ arch/arm/boot/dts/r8a7793-gose.dts | 13 +++++++++++++
  1 file changed, 13 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7778-bockw.dts b/arch/arm/boot/dts/r8a7778-bockw.dts
-index a52b359e2ae2..21e3b9dda2da 100644
---- a/arch/arm/boot/dts/r8a7778-bockw.dts
-+++ b/arch/arm/boot/dts/r8a7778-bockw.dts
-@@ -126,11 +126,19 @@
+diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
+index 2fa052036dbc..cfe142c2ba38 100644
+--- a/arch/arm/boot/dts/r8a7793-gose.dts
++++ b/arch/arm/boot/dts/r8a7793-gose.dts
+@@ -236,6 +236,9 @@
  };
  
  &pfc {
 +	pinctrl-0 = <&scif_clk_pins>;
 +	pinctrl-names = "default";
 +
- 	scif0_pins: serial0 {
- 		renesas,groups = "scif0_data_a", "scif0_ctrl";
- 		renesas,function = "scif0";
+ 	i2c2_pins: i2c2 {
+ 		renesas,groups = "i2c2";
+ 		renesas,function = "i2c2";
+@@ -256,6 +259,11 @@
+ 		renesas,function = "scif1";
  	};
  
 +	scif_clk_pins: scif_clk {
@@ -41,17 +43,20 @@ index a52b359e2ae2..21e3b9dda2da 100644
 +		renesas,function = "scif_clk";
 +	};
 +
- 	mmc_pins: mmc {
- 		renesas,groups = "mmc_data8", "mmc_ctrl";
- 		renesas,function = "mmc";
-@@ -217,3 +225,8 @@
- 
+ 	ether_pins: ether {
+ 		renesas,groups = "eth_link", "eth_mdio", "eth_rmii";
+ 		renesas,function = "eth";
+@@ -316,6 +324,11 @@
  	status = "okay";
  };
-+
+ 
 +&scif_clk {
 +	clock-frequency = <14745600>;
 +	status = "okay";
 +};
++
+ &qspi {
+ 	pinctrl-0 = <&qspi_pins>;
+ 	pinctrl-names = "default";
 -- 
 2.7.0.rc3.207.g0ac5344
