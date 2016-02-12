@@ -1,50 +1,55 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 12 Feb 2016 15:57:22 +0100
-Subject: [PATCH v3 0/4] arm64: avoid early __va translations
-Message-ID: <1455289046-21321-1-git-send-email-ard.biesheuvel@linaro.org>
+Date: Fri, 12 Feb 2016 15:57:23 +0100
+Subject: [PATCH v3 1/4] of/fdt: factor out assignment of
+ initrd_start/initrd_end
+In-Reply-To: <1455289046-21321-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1455289046-21321-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1455289046-21321-2-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a somewhat cleaner approach for dealing with the issue that the
-early FDT performs __va() translations before the linear mapping has been
-set up. Being able to defer the assignment of memstart_addr until after we
-have discovered all of memory is an important piece of functionality, not
-only for KASLR but also for mapping the linear region as efficiently as
-possible.
+Since architectures may not yet have their linear mapping up and running
+when the initrd address is discovered from the DT, factor out the
+assignment of initrd_start and initrd_end, so that an architecture can
+override it and use the translation it needs.
 
-Changes since v2:
-- replace __weak function in patches #1 and #2 with a preprocessor macro
-- add patch to address the circular header dependency when including
-  asm/bug.h in asm/memory.h
-- turned the hack that adds the BUG_ON() into a proper patch
+Cc: Rob Herring <robh@kernel.org>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ drivers/of/fdt.c | 14 +++++++++++---
+ 1 file changed, 11 insertions(+), 3 deletions(-)
 
-Patch #1 refactors the early FDT code so that the actual assignment of
-initrd_start and initrd_end (which is where the __va() translations are
-performed) can be overridden in architecture specific code.
-
-Patch #2 performs the override, and only records the physical addresses
-as they are found in the /chosen node, or on the command line, and defers
-the __va() translation until after memstart_addr has been assigned.
-
-Patch #3 reshuffles some #includes and #defines so that asm/bug.h can be
-included (and used) in asm/memory.h
-
-Patch #4 implements a BUG_ON() check to ensure that no references to
-memstart_addr are made before it has been assigned.
-
-Ard Biesheuvel (4):
-  of/fdt: factor out assignment of initrd_start/initrd_end
-  arm64: defer __va translation of initrd_start and initrd_end
-  arm64: prevent potential circular header dependencies in asm/bug.h
-  arm64: prevent __va() translations before memstart_addr is assigned
-
- arch/arm64/include/asm/bug.h            |  2 +-
- arch/arm64/include/asm/debug-monitors.h |  2 +-
- arch/arm64/include/asm/memory.h         | 12 ++++++++++-
- arch/arm64/kvm/hyp/debug-sr.c           |  1 +
- arch/arm64/mm/init.c                    | 21 +++++++++++++++-----
- drivers/of/fdt.c                        | 14 ++++++++++---
- 6 files changed, 41 insertions(+), 11 deletions(-)
-
+diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+index 1f98156f8996..3e90bce70545 100644
+--- a/drivers/of/fdt.c
++++ b/drivers/of/fdt.c
+@@ -760,6 +760,16 @@ const void * __init of_flat_dt_match_machine(const void *default_match,
+ }
+ 
+ #ifdef CONFIG_BLK_DEV_INITRD
++#ifndef __early_init_dt_declare_initrd
++static void __early_init_dt_declare_initrd(unsigned long start,
++					   unsigned long end)
++{
++	initrd_start = (unsigned long)__va(start);
++	initrd_end = (unsigned long)__va(end);
++	initrd_below_start_ok = 1;
++}
++#endif
++
+ /**
+  * early_init_dt_check_for_initrd - Decode initrd location from flat tree
+  * @node: reference to node containing initrd location ('chosen')
+@@ -782,9 +792,7 @@ static void __init early_init_dt_check_for_initrd(unsigned long node)
+ 		return;
+ 	end = of_read_number(prop, len/4);
+ 
+-	initrd_start = (unsigned long)__va(start);
+-	initrd_end = (unsigned long)__va(end);
+-	initrd_below_start_ok = 1;
++	__early_init_dt_declare_initrd(start, end);
+ 
+ 	pr_debug("initrd_start=0x%llx  initrd_end=0x%llx\n",
+ 		 (unsigned long long)start, (unsigned long long)end);
 -- 
 2.5.0
