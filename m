@@ -1,75 +1,67 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 12 Feb 2016 19:47:45 +0300
-Subject: [PATCH v2 5/5] ARM: dts: r8a7794: add sound support
-In-Reply-To: <20160210171455.GB17671@verge.net.au>
-References: <12033353.rt0nolnBmD@wasted.cogentembedded.com>
- <2543047.yYrDdYb9v5@wasted.cogentembedded.com>
- <874mdhtn7d.wl%kuninori.morimoto.gx@renesas.com>
- <20160210171455.GB17671@verge.net.au>
-Message-ID: <56BE0CB1.4070408@cogentembedded.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 12 Feb 2016 17:49:00 +0100
+Subject: [PATCH v2 1/2] ARM: mvebu: use armada-370-sata for SATA on Armada
+ 375
+In-Reply-To: <1455121756-20804-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ (Thomas Petazzoni's message of "Wed, 10 Feb 2016 17:29:15 +0100")
+References: <1455121756-20804-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <87io1tx4ar.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/10/2016 08:14 PM, Simon Horman wrote:
+Hi Thomas,
+ 
+ On mer., f?vr. 10 2016, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
 
->> Sorry for my un-ordered response
->>
->>> Define the generic R8A7794 part of  the sound device node.
->>> This sound device  is a complex one and comprises the Audio Clock Generator
->>> (ADG), Sampling Rate Converter Unit (SCU), Serial Sound Interface [Unit]
->>> (SSI[U]), and Audio DMAC-Peripheral-Peripheral.
->>> It is up  to the board file to enable the device.
->>>
->>> This patch is based on the R8A7791 sound work by Kuninori Morimoto.
->>>
->>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->> (snip)
->>> +		rcar_sound,src {
->>> +			src1: src at 1 {
->>> +				interrupts = <GIC_SPI 353 IRQ_TYPE_LEVEL_HIGH>;
->>> +				dmas = <&audma0 0x87>, <&audma0 0x9c>;
->>> +				dma-names = "rx", "tx";
->>> +			};
->>> +			src2: src at 2 {
->>> +				interrupts = <GIC_SPI 354 IRQ_TYPE_LEVEL_HIGH>;
->>> +				dmas = <&audma0 0x89>, <&audma0 0x9e>;
->>> +				dma-names = "rx", "tx";
->>> +			};
->>> +			src3: src at 3 {
->>> +				interrupts = <GIC_SPI 355 IRQ_TYPE_LEVEL_HIGH>;
->>> +				dmas = <&audma0 0x8b>, <&audma0 0xa0>;
->>> +				dma-names = "rx", "tx";
->>> +			};
->>> +			src4: src at 4 {
->>> +				interrupts = <GIC_SPI 356 IRQ_TYPE_LEVEL_HIGH>;
->>> +				dmas = <&audma0 0x8d>, <&audma0 0xb0>;
->>> +				dma-names = "rx", "tx";
->>> +			};
->>> +			src5: src at 5 {
->>> +				interrupts = <GIC_SPI 357 IRQ_TYPE_LEVEL_HIGH>;
->>> +				dmas = <&audma0 0x8f>, <&audma0 0xb2>;
->>> +				dma-names = "rx", "tx";
->>> +			};
->>> +			src6: src at 6 {
->>> +				interrupts = <GIC_SPI 358 IRQ_TYPE_LEVEL_HIGH>;
->>> +				dmas = <&audma0 0x91>, <&audma0 0xb4>;
->>> +				dma-names = "rx", "tx";
->>> +			};
->>> +		};
->>
->> I think this can't work correctly, because driver is assuming
->> DT has all channles (from 0). (see linux/sound/soc/sh/rcar/src.c :: rsnd_src_probe)
->> Can you adds dummy src0 with some comments ? or fix src.c driver ?
+> From: Lior Amsalem <alior@marvell.com>
 >
-> I would prefer the driver to be fixed (I had a similar patchset locally
-> and I found it doesn't work).
+> The Armada 375 has the same SATA IP as Armada 370 and Armada XP, which
+> requires the PHY speed to be set in the LP_PHY_CTL register for SATA
+> hotplug to work.
+>
+> Therefore, this commit updates the compatible string used to describe
+> the SATA IP in Armada 375 from marvell,orion-sata to
+> marvell,armada-370-sata.
+>
+> Fixes: 4de59085091f753d08c8429d756b46756ab94665 ("ARM: mvebu: add Device Tree description of the Armada 375 SoC")
+> Cc: <stable@vger.kernel.org>
+> Signed-off-by: Lior Amsalem <alior@marvell.com>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-    You mean you had R8A7794 sound patch set too?
+Applied on mvebu/dt, I renamed the patch to: " ARM: dts: armada-375: use
+armada-370-sata for SATA" to unify the way we labl the dt related patch.
+I also adde the reviwed-by tag from Andrew.
 
-> The reason is that DT should describe
-> the hardware rather than the current state of the software.
+Thanks,
 
-    Yes, of course. Just tell me do I have to fix the driver *before* this 
-patch set is accepted?
+Gregory
 
-MBR, Sergei
+> ---
+> Changes since v1:
+>  - Add Fixes: tag, and add stable@ in Cc, as suggested by Andrew Lunn.
+> ---
+>  arch/arm/boot/dts/armada-375.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
+> index 7ccce75..cc952cf 100644
+> --- a/arch/arm/boot/dts/armada-375.dtsi
+> +++ b/arch/arm/boot/dts/armada-375.dtsi
+> @@ -529,7 +529,7 @@
+>  			};
+>  
+>  			sata at a0000 {
+> -				compatible = "marvell,orion-sata";
+> +				compatible = "marvell,armada-370-sata";
+>  				reg = <0xa0000 0x5000>;
+>  				interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
+>  				clocks = <&gateclk 14>, <&gateclk 20>;
+> -- 
+> 2.6.4
+>
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
