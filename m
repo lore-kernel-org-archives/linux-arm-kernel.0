@@ -1,26 +1,37 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 12 Feb 2016 08:51:00 -0600
-Subject: [PATCH v1 2/2] iio: dac: vf610_dac: Add IIO DAC driver for
- Vybrid SoC
-In-Reply-To: <5a699d45c89d239f3e49fa83d16a9b467016e219.1454939346.git.maitysanchayan@gmail.com>
-References: <cover.1454939346.git.maitysanchayan@gmail.com>
- <5a699d45c89d239f3e49fa83d16a9b467016e219.1454939346.git.maitysanchayan@gmail.com>
-Message-ID: <20160212145100.GA12514@rob-hp-laptop>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Fri, 12 Feb 2016 14:53:51 +0000
+Subject: [PATCHv2] arm64: Rework valid_user_regs
+In-Reply-To: <1455285858-11757-1-git-send-email-mark.rutland@arm.com>
+References: <1455285858-11757-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <CAFEAcA_XGrPB=2GnQwW4Jr8eE9UqbTAgRb86qCkX+rw25u4yNg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 09, 2016 at 10:56:06AM +0530, Sanchayan Maity wrote:
-> Add driver support for DAC peripheral on Vybrid SoC.
-> 
-> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
-> ---
->  .../devicetree/bindings/iio/dac/vf610-dac.txt      |  20 ++
+On 12 February 2016 at 14:04, Mark Rutland <mark.rutland@arm.com> wrote:
+> We validate pstate using PSR_MODE32_BIT, which is part of the
+> user-provided pstate (and cannot be trusted). Also, we conflate
+> validation of AArch32 and AArch64 pstate values, making the code
+> difficult to reason about.
+>
+> Instead, validate the pstate value based on the associated task. The
+> task may or may not be current (e.g. when using ptrace), so this must be
+> passed explicitly by callers. To avoid circular header dependencies via
+> sched.h, is_compat_task is pulled out of asm/ptrace.h.
+>
+> To make the code possible to reason about, the AArch64 and AArch32
+> validation is split into separate functions. Software must respect the
+> RES0 policy for SPSR bits, and thus the kernel mirrors the hardware
+> policy (RAZ/WI) for bits as-yet unallocated. When these acquire an
+> architected meaning writes may be permitted (potentially with additional
+> validation).
 
-Acked-by: Rob Herring <robh@kernel.org>
+> +       /* Force PSR to a valid 32-bit EL0t */
+> +       regs->pstate |= PSR_MODE32_BIT;
+> +       regs->pstate &= PSR_f | PSR_s | (PSR_x & ~COMPAT_PSR_A_BIT) | \
+> +                       COMPAT_PSR_T_BIT;
+> +
 
->  drivers/iio/dac/Kconfig                            |   8 +
->  drivers/iio/dac/Makefile                           |   1 +
->  drivers/iio/dac/vf610_dac.c                        | 302 +++++++++++++++++++++
->  4 files changed, 331 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/iio/dac/vf610-dac.txt
->  create mode 100644 drivers/iio/dac/vf610_dac.c
+I think the consensus from the v1 review was to drop these PSR_[fsx] masks?
+
+thanks
+-- PMM
