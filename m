@@ -1,53 +1,53 @@
-From: milo.kim@ti.com (Kim, Milo)
-Date: Fri, 12 Feb 2016 09:14:20 +0900
-Subject: [PATCH v2 1/4] regulator: lp872x: Remove warning about invalid
- DVS GPIO
-In-Reply-To: <1454697741-8687-2-git-send-email-contact@paulk.fr>
-References: <1454697741-8687-1-git-send-email-contact@paulk.fr>
- <1454697741-8687-2-git-send-email-contact@paulk.fr>
-Message-ID: <56BD23DC.30901@ti.com>
+From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
+Date: Fri, 12 Feb 2016 07:20:43 +0700
+Subject: [PATCH] dtb: amd: Fix-up for ccn504 and kcs nodes
+Message-ID: <1455236443-23949-1-git-send-email-Suravee.Suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/6/2016 3:42 AM, Paul Kocialkowski wrote:
-> Some devices don't hook the DVS pin to a GPIO but to ground or VCC.
-> In those cases, it is not a problem to have no DVS GPIO provided, as the current
-> code will already switch to software-only DVS selection:
->
-> When the DVS GPIO is invalid, lp872x_init_dvs jumps to the set_default_dvs_mode
-> label, which instructs the chip not to use the DVS pin at all and do it all in
-> software instead (by clearing the LP8720_EXT_DVS_M bit in the
-> LP872X_GENERAL_CFG register).
->
-> That is reflected later in the code, when setting the bucks (the DVS pin only
-> applies to the bucks) by checking for the LP8720_EXT_DVS_M bit on the
-> LP872X_GENERAL_CFG register (in lp872x_select_buck_vout_addr) to decide whether
-> to use software or hardware DVS selection.
->
-> Thus, there is no need to print a warning when the DVS GPIO is invalid.
->
-> Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+From: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
 
-Acked-by: Milo Kim <milo.kim@ti.com>
+This is a fix-up patch based on the review comment from
+Arnd regarding:
+    * fix ccn504 address in the node name
+    * remove kcs interrupt-name
 
-> ---
->   drivers/regulator/lp872x.c | 4 +---
->   1 file changed, 1 insertion(+), 3 deletions(-)
->
-> diff --git a/drivers/regulator/lp872x.c b/drivers/regulator/lp872x.c
-> index 19d7584..21c49d8 100644
-> --- a/drivers/regulator/lp872x.c
-> +++ b/drivers/regulator/lp872x.c
-> @@ -738,10 +738,8 @@ static int lp872x_init_dvs(struct lp872x *lp)
->   		goto set_default_dvs_mode;
->
->   	gpio = dvs->gpio;
-> -	if (!gpio_is_valid(gpio)) {
-> -		dev_warn(lp->dev, "invalid gpio: %d\n", gpio);
-> +	if (!gpio_is_valid(gpio))
->   		goto set_default_dvs_mode;
-> -	}
->
->   	pinstate = dvs->init_state;
->   	ret = devm_gpio_request_one(lp->dev, gpio, pinstate, "LP872X DVS");
->
+Signed-off-by: Brijesh Singh <brijesh.singh@amd.com>
+Signed-off-by: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+---
+
+Hi Olof,
+
+Here are the changes from the V3 that I sent earlier. Sorry for confusion.
+Would you please pull this into the next tree?
+
+Thank you,
+Suravee
+
+ arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi b/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
+index a7fc059..bd3adea 100644
+--- a/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
++++ b/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
+@@ -231,7 +231,7 @@
+ 		};
+ 
+ 		/* Perf CCN504 PMU */
+-		ccn: ccn at 0xe8000000 {
++		ccn: ccn at e8000000 {
+ 			compatible = "arm,ccn-504";
+ 			reg = <0x0 0xe8000000 0 0x1000000>;
+ 			interrupts = <0 380 4>;
+@@ -243,7 +243,6 @@
+ 			device_type = "ipmi";
+ 			reg = <0x0 0xe0010000 0 0x8>;
+ 			interrupts = <0 389 4>;
+-			interrupt-names = "ipmi_kcs";
+ 			reg-size = <1>;
+ 			reg-spacing = <4>;
+ 		};
+-- 
+2.5.0
