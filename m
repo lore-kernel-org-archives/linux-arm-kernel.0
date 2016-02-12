@@ -1,46 +1,83 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 12 Feb 2016 17:06:21 +0100
-Subject: [PATCH 4/5] gcov: disable tree-loop-im to reduce stack usage
-In-Reply-To: <1455293187-179811-1-git-send-email-arnd@arndb.de>
-References: <1455293187-179811-1-git-send-email-arnd@arndb.de>
-Message-ID: <1455293187-179811-5-git-send-email-arnd@arndb.de>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 12 Feb 2016 17:11:50 +0100
+Subject: [PATCH 1/2] arm64: mm: Enable CONT_SIZE aligned sections for 64k
+ page kernels.
+In-Reply-To: <1455293208-6763-2-git-send-email-jeremy.linton@arm.com>
+References: <1455293208-6763-1-git-send-email-jeremy.linton@arm.com>
+ <1455293208-6763-2-git-send-email-jeremy.linton@arm.com>
+Message-ID: <CAKv+Gu_ViEAVN1GEDMWpJ5OYjg6BVSLTEtdus6vCCXchQ1BOjw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enabling CONFIG_GCOV_PROFILE_ALL produces us a lot of warnings like
+Hi Jeremy,
 
-lib/lz4/lz4hc_compress.c: In function 'lz4_compresshcctx':
-lib/lz4/lz4hc_compress.c:514:1: warning: the frame size of 1504 bytes is larger than 1024 bytes [-Wframe-larger-than=]
+Question below:
 
-After some investigation, I found that this behavior started with gcc-4.9,
-and opened https://gcc.gnu.org/bugzilla/show_bug.cgi?id=69702.
-A suggested workaround for it is to use the -fno-tree-loop-im
-flag that turns off one of the optimization stages in gcc, so the
-code runs a little slower but does not use excessive amounts
-of stack.
+On 12 February 2016 at 17:06, Jeremy Linton <jeremy.linton@arm.com> wrote:
+> This change allows ALIGN_RODATA for 16k and 64k kernels.
+> In the case of 64k kernels it actually aligns to the CONT_SIZE
+> rather than the SECTION_SIZE (which is 512M). This makes it generally
+> more useful, especially for CONT enabled kernels.
+>
+> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+> ---
+>  arch/arm64/Kconfig.debug        | 12 ++++++------
+>  arch/arm64/kernel/vmlinux.lds.S | 11 ++++++-----
+>  2 files changed, 12 insertions(+), 11 deletions(-)
+>
+> diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
+> index e13c4bf..65705ee 100644
+> --- a/arch/arm64/Kconfig.debug
+> +++ b/arch/arm64/Kconfig.debug
+> @@ -59,15 +59,15 @@ config DEBUG_RODATA
+>            If in doubt, say Y
+>
+>  config DEBUG_ALIGN_RODATA
+> -       depends on DEBUG_RODATA && ARM64_4K_PAGES
+> +       depends on DEBUG_RODATA
+>         bool "Align linker sections up to SECTION_SIZE"
+>         help
+>           If this option is enabled, sections that may potentially be marked as
+> -         read only or non-executable will be aligned up to the section size of
+> -         the kernel. This prevents sections from being split into pages and
+> -         avoids a potential TLB penalty. The downside is an increase in
+> -         alignment and potentially wasted space. Turn on this option if
+> -         performance is more important than memory pressure.
+> +         read only or non-executable will be aligned up to the section size
+> +         or contiguous hint size of the kernel. This prevents sections from
+> +         being split into pages and avoids a potential TLB penalty. The downside
+> +         is an increase in alignment and potentially wasted space. Turn on
+> +         this option if performance is more important than memory pressure.
+>
+>           If in doubt, say N
+>
+> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+> index b78a3c7..ab4e436 100644
+> --- a/arch/arm64/kernel/vmlinux.lds.S
+> +++ b/arch/arm64/kernel/vmlinux.lds.S
+> @@ -63,13 +63,14 @@ PECOFF_FILE_ALIGNMENT = 0x200;
+>  #endif
+>
+>  #if defined(CONFIG_DEBUG_ALIGN_RODATA)
+> -#define ALIGN_DEBUG_RO                 . = ALIGN(1<<SECTION_SHIFT);
+> -#define ALIGN_DEBUG_RO_MIN(min)                ALIGN_DEBUG_RO
+> +#if defined(CONFIG_ARM64_64K_PAGES)
+> +#define ALIGN_DEBUG_RO_MIN(min)                . = ALIGN(CONT_SIZE);
+> +#else
+> +#define ALIGN_DEBUG_RO_MIN(min)                . = ALIGN(SECTION_SIZE);
 
-We could make this conditional on the gcc version, but I could not
-find an easy way to do this in Kbuild and the benefit would be
-fairly small, given that most of the gcc version in production are
-affected now.
+Doesn't this align to 32 MB on 16k pages kernels?
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- Makefile | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/Makefile b/Makefile
-index 352f55ccc54e..6bb89728a9d1 100644
---- a/Makefile
-+++ b/Makefile
-@@ -364,7 +364,7 @@ AFLAGS_MODULE   =
- LDFLAGS_MODULE  =
- CFLAGS_KERNEL	=
- AFLAGS_KERNEL	=
--CFLAGS_GCOV	= -fprofile-arcs -ftest-coverage
-+CFLAGS_GCOV	= -fprofile-arcs -ftest-coverage -fno-tree-loop-im
- CFLAGS_KCOV	= -fsanitize-coverage=trace-pc
- 
- 
--- 
-2.7.0
+> +#endif
+>  #elif defined(CONFIG_DEBUG_RODATA)
+> -#define ALIGN_DEBUG_RO                 . = ALIGN(1<<PAGE_SHIFT);
+> -#define ALIGN_DEBUG_RO_MIN(min)                ALIGN_DEBUG_RO
+> +#define ALIGN_DEBUG_RO_MIN(min)                . = ALIGN(PAGE_SIZE);
+>  #else
+> -#define ALIGN_DEBUG_RO
+>  #define ALIGN_DEBUG_RO_MIN(min)                . = ALIGN(min);
+>  #endif
+>
+> --
+> 2.4.3
+>
