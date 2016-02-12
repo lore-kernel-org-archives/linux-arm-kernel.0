@@ -1,45 +1,90 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 12 Feb 2016 08:32:12 +0000
-Subject: [PATCH] of/irq: Fix msi-map calculation for nonzero rid-base
-In-Reply-To: <CAL_JsqLScMdfUAtMPDGWphc_PZp4K-c0MfjRZh9G7=A9pLZu9Q@mail.gmail.com>
-References: <9f6845195d03b0e0b0d187bb510fbf7bd497e836.1455015344.git.robin.murphy@arm.com>
- <56BC6ABA.5020605@arm.com>
- <CAL_JsqLScMdfUAtMPDGWphc_PZp4K-c0MfjRZh9G7=A9pLZu9Q@mail.gmail.com>
-Message-ID: <56BD988C.6090909@arm.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Fri, 12 Feb 2016 09:56:54 +0100
+Subject: [PATCH V4 15/23] acpi, mcfg: Implement two calls that might be
+ used to inject/remove MCFG region.
+In-Reply-To: <20160210140602.GB25060@red-moon>
+References: <1454606941-9523-1-git-send-email-tn@semihalf.com>
+ <1454606941-9523-16-git-send-email-tn@semihalf.com>
+ <20160210140602.GB25060@red-moon>
+Message-ID: <56BD9E56.5070805@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/02/16 23:15, Rob Herring wrote:
-> On Thu, Feb 11, 2016 at 5:04 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> On 09/02/16 11:04, Robin Murphy wrote:
->>> The existing msi-map code is fine for shifting the entire RID space
->>> upwards, but attempting finer-grained remapping reveals a bug. It turns
->>> out that we are mistakenly treating the msi-base part as an offset, not
->>> as a new base to remap onto, so things get squiffy when rid-base is
->>> nonzero. Fix this, and at the same time add a sanity check against
->>> having msi-map-mask clash with a nonzero rid-base, as that's another
->>> thing one can easily get wrong.
->>>
->>> CC: <stable@vger.kernel.org>
->>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->>
->> Rob, Frank,
->>
->> Are you willing to take this one through the OF tree? Or should we route
->> it through the IRQ tree? It'd be good if it make it into 4.5.
-> 
-> Applied for 4.5. ATM, I don't have anything else to send to Linus.
-> I'll give it a week or so if this is not urgent. Or send me a bunch of
-> DT binding fixes and you can get it in sooner. ;)
+On 10.02.2016 15:06, Lorenzo Pieralisi wrote:
+> On Thu, Feb 04, 2016 at 06:28:53PM +0100, Tomasz Nowicki wrote:
+>> >Lets abstract two calls which allow to inject and remove MCFG regions
+>> >which may come from DSDT table. These calls will be used for x86 and ARM64
+>> >PCI host bridge driver in the later patches.
+>> >
+>> >Signed-off-by: Tomasz Nowicki<tn@semihalf.com>
+>> >Tested-by: Duc Dang<dhdang@apm.com>
+>> >Tested-by: Dongdong Liu<liudongdong3@huawei.com>
+>> >Tested-by: Hanjun Guo<hanjun.guo@linaro.org>
+>> >Tested-by: Graeme Gregory<graeme.gregory@linaro.org>
+>> >Tested-by: Sinan Kaya<okaya@codeaurora.org>
+>> >---
+>> >  drivers/acpi/mcfg.c      | 38 ++++++++++++++++++++++++++++++++++++++
+>> >  include/linux/pci-acpi.h |  9 +++++++++
+>> >  2 files changed, 47 insertions(+)
+>> >
+>> >diff --git a/drivers/acpi/mcfg.c b/drivers/acpi/mcfg.c
+>> >index 3e1e7be..dca4c4e 100644
+>> >--- a/drivers/acpi/mcfg.c
+>> >+++ b/drivers/acpi/mcfg.c
+>> >@@ -10,6 +10,7 @@
+>> >  #include <linux/acpi.h>
+>> >  #include <linux/ecam.h>
+>> >  #include <linux/pci.h>
+>> >+#include <linux/pci-acpi.h>
+>> >
+>> >  #define	PREFIX	"MCFG: "
+>> >
+>> >@@ -77,6 +78,43 @@ int __init acpi_parse_mcfg(struct acpi_table_header *header)
+>> >  	return 0;
+>> >  }
+>> >
+>> >+int pci_mmcfg_setup_map(struct acpi_pci_root_info *ci)
+>> >+{
+>> >+	struct pci_mmcfg_region *cfg;
+>> >+	struct acpi_pci_root *root;
+>> >+	int seg, start, end, err;
+>> >+
+>> >+	root = ci->root;
+>> >+	seg = root->segment;
+>> >+	start = root->secondary.start;
+>> >+	end = root->secondary.end;
+>> >+
+>> >+	cfg = pci_mmconfig_lookup(seg, start);
+>> >+	if (cfg)
+>> >+		return 0;
+>> >+
+>> >+	cfg = pci_mmconfig_alloc(seg, start, end, root->mcfg_addr);
+>> >+	if (!cfg)
+>> >+		return -ENOMEM;
+>> >+
+>> >+	err = pci_mmconfig_inject(cfg);
+>> >+	return err;
+> When you integrate Jayachandran's patch this whole function will
+> become a pci_mmconfig_insert() and that's where hot_added should
+> be set.
+>
+>> >+}
+>> >+
+>> >+void pci_mmcfg_teardown_map(struct acpi_pci_root_info *ci)
+>> >+{
+>> >+	struct acpi_pci_root *root = ci->root;
+>> >+	struct pci_mmcfg_region *cfg;
+>> >+
+>> >+	cfg = pci_mmconfig_lookup(root->segment, root->secondary.start);
+>> >+	if (!cfg)
+>> >+		return;
+>> >+
+>> >+	if (cfg->hot_added)
+> Move the hot_added check in pci_mmconfig_delete() (that does the look
+> up again), we do not want to carry out pci_mmconfig_lookup only to
+> check that flag here (and we miss rcu locking for the look-up BTW).
 
-Doesn't really qualify as "a bunch", but how about this one:
-
-https://patchwork.ozlabs.org/patch/578268/
-
-I had it in mind for 4.6, but the sooner the better!
+Makes sense to me, I will follow your suggestion.
 
 Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Tomasz
