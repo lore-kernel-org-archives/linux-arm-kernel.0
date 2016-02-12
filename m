@@ -1,72 +1,54 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 12 Feb 2016 10:01:37 +0000
-Subject: [BUG] random kernel crashes after THP rework on s390 (maybe also
- on PowerPC and ARM)
-In-Reply-To: <20160211205702.24f0d17a@thinkpad>
-References: <20160211192223.4b517057@thinkpad>
- <20160211190942.GA10244@node.shutemov.name>
- <20160211205702.24f0d17a@thinkpad>
-Message-ID: <20160212100137.GE25087@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 12 Feb 2016 11:05:55 +0100
+Subject: [PATCH] earlycon: rework common framework for earlycon
+ declarations
+In-Reply-To: <1455269296-5009-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1455269296-5009-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <4230998.Zt9XrE8YSr@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 11, 2016 at 08:57:02PM +0100, Gerald Schaefer wrote:
-> On Thu, 11 Feb 2016 21:09:42 +0200
-> "Kirill A. Shutemov" <kirill@shutemov.name> wrote:
-> > On Thu, Feb 11, 2016 at 07:22:23PM +0100, Gerald Schaefer wrote:
-> > > Sebastian Ott reported random kernel crashes beginning with v4.5-rc1 and
-> > > he also bisected this to commit 61f5d698 "mm: re-enable THP". Further
-> > > review of the THP rework patches, which cannot be bisected, revealed
-> > > commit fecffad "s390, thp: remove infrastructure for handling splitting PMDs"
-> > > (and also similar commits for other archs).
-> > > 
-> > > This commit removes the THP splitting bit and also the architecture
-> > > implementation of pmdp_splitting_flush(), which took care of the IPI for
-> > > fast_gup serialization. The commit message says
-> > > 
-> > >     pmdp_splitting_flush() is not needed too: on splitting PMD we will do
-> > >     pmdp_clear_flush() + set_pte_at().  pmdp_clear_flush() will do IPI as
-> > >     needed for fast_gup
-> > > 
-> > > The assumption that a TLB flush will also produce an IPI is wrong on s390,
-> > > and maybe also on other architectures, and I thought that this was actually
-> > > the main reason for having an arch-specific pmdp_splitting_flush().
-> > > 
-> > > At least PowerPC and ARM also had an individual implementation of
-> > > pmdp_splitting_flush() that used kick_all_cpus_sync() instead of a TLB
-> > > flush to send the IPI, and those were also removed. Putting the arch
-> > > maintainers and mailing lists on cc to verify.
-> > > 
-> > > On s390 this will break the IPI serialization against fast_gup, which
-> > > would certainly explain the random kernel crashes, please revert or fix
-> > > the pmdp_splitting_flush() removal.
-> > 
-> > Sorry for that.
-> > 
-> > I believe, the problem was already addressed for PowerPC:
-> > 
-> > http://lkml.kernel.org/g/454980831-16631-1-git-send-email-aneesh.kumar at linux.vnet.ibm.com
-> > 
-> > I think kick_all_cpus_sync() in arch-specific pmdp_invalidate() would do
-> > the trick, right?
+On Friday 12 February 2016 18:28:16 Masahiro Yamada wrote:
+> Commit 71f50c6d9a22 ("of: drop symbols declared by _OF_DECLARE() from
+> modules") fixed the link error introduced by commit b8d20e06eaad
+> ("serial: 8250_uniphier: add earlycon support").
 > 
-> Hmm, not sure about that. After pmdp_invalidate(), a pmd_none() check in
-> fast_gup will still return false, because the pmd is not empty (at least
-> on s390). So I don't see spontaneously how it will help fast_gup to break
-> out to the slow path in case of THP splitting.
+> After commit 2eaa790989e0 ("earlycon: Use common framework for
+> earlycon declarations") was applied, the link error came back
+> because the commit reworked OF_EARLYCON_DECLARE() to not use
+> _OF_DECLARE().
 > 
-> > 
-> > If yes, I'll prepare patch tomorrow (some sleep required).
-> > 
+> This commit reworks OF_EARLYCON_DECLARE() again based on
+> _OF_DECLARE().  My motivations are:
 > 
-> We'll check if adding kick_all_cpus_sync() to pmdp_invalidate() helps.
-> It would also be good if Martin has a look at this, he'll return on
-> Monday.
+>  - Fix the link error in a generic way (without patching
+>    drivers/tty/serial/8250/8250_uniphier.c)
+> 
+>  - Delete struct earlycon_id.  This struct is re-inventing the wheel;
+>    the fields "name", "compatible", "setup" can be implemented in
+>    struct of_device_id as other framework do.
+> 
+> The difference between OF_EARLYCON_DECLARE() and other users of
+> _OF_DECLARE is that OF_EARLYCON_DECLARE() needs to fill the "name"
+> field of struct of_device_id.  To make it easier, a new macro
+> _OF_DECLARE_WITH_NAME() has been added.  It fills the name field
+> with the given argument.  On the other hand, _OF_DECLARE() sets the
+> "name" field to a null string; this is the same behavior as before.
+> 
+> Fixes: 2eaa790989e0 ("earlycon: Use common framework for earlycon declarations")
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
+> 
+> I confirmed this patch can apply onto "next-20160212" tag of linux-next.
+> 
+> In order to apply it onto the "tty-next" branch of TTY subsytem,
+> Grag will have to pull v4.5-rc3 in.
 
-Do you have a reliable way to trigger the "random kernel crashes"? We've not
-seen anything reported on arm64, but I don't see why we wouldn't be affected
-by the same bug and it would be good to confirm and validate a fix.
+I think this is the right approach, and I can include it in my 8250
+series when I resend it, and rebase the other patches on top of it
+to simplify them.
 
-Cheers,
+Peter, since you did the change "earlycon: Use common framework for
+earlycon declarations", are you ok with the new version?
 
-Will
+	Arnd
