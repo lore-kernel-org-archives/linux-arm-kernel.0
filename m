@@ -1,53 +1,52 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Sat, 13 Feb 2016 21:23:47 +0100
-Subject: [PATCH 01/68] ARM: dts: gose: Add GPIO keys to DT
-In-Reply-To: <d7d5974b156e2ef7436483de00ccada5987c9d31.1455303422.git.horms+renesas@verge.net.au>
-References: <cover.1455303422.git.horms+renesas@verge.net.au>
- <d7d5974b156e2ef7436483de00ccada5987c9d31.1455303422.git.horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdVefum3YbaxhMX_0hHrmTFYU-pWYZTwSUveQDLFArLdYw@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Sat, 13 Feb 2016 16:57:41 -0500 (EST)
+Subject: [PATCH] [media] zl10353: use div_u64 instead of do_div
+In-Reply-To: <CAKv+Gu8dFz28tGgQTv+WYAvKpeiFXaj8JANUFtOJwKPRsB8F5A@mail.gmail.com>
+References: <1455287246-3540549-1-git-send-email-arnd@arndb.de>
+ <2712691.b9gkR7KMX7@wuerfel>
+ <alpine.LFD.2.20.1602121305180.13632@knanqh.ubzr>
+ <6737272.LXr2g355Yt@wuerfel>
+ <CAKv+Gu8dFz28tGgQTv+WYAvKpeiFXaj8JANUFtOJwKPRsB8F5A@mail.gmail.com>
+Message-ID: <alpine.LFD.2.20.1602131652560.13632@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 12, 2016 at 8:04 PM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> Instantiate the GPIO keys in the gose device tree.
->
-> Based on similar work for the koelsch board by Laurent Pinchart.
->
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> Tested-by: Magnus Damm <damm+renesas@opensource.se>
-> ---
->  arch/arm/boot/dts/r8a7793-gose.dts | 82 ++++++++++++++++++++++++++++++++++++++
->  1 file changed, 82 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
-> index baa59fe84298..ccbc1c66cc6c 100644
-> --- a/arch/arm/boot/dts/r8a7793-gose.dts
-> +++ b/arch/arm/boot/dts/r8a7793-gose.dts
-> @@ -31,6 +31,88 @@
->                 device_type = "memory";
->                 reg = <0 0x40000000 0 0x40000000>;
->         };
-> +
-> +       gpio-keys {
-> +               compatible = "gpio-keys";
-> +
-> +               key-1 {
-> +                       gpios = <&gpio5 0 GPIO_ACTIVE_LOW>;
-> +                       linux,code = <KEY_1>;
-> +                       label = "SW2-1";
-> +                       gpio-key,wakeup;
+On Sat, 13 Feb 2016, Ard Biesheuvel wrote:
 
-In the mean time, "gpio-key,wakeup" has been deprecated in favor of
-"wakeup-source".
+> On 12 February 2016 at 22:01, Arnd Bergmann <arnd@arndb.de> wrote:
+> > However, I did stumble over an older patch I did now, which I could
+> > not remember what it was good for. It does fix the problem, and
+> > it seems to be a better solution.
+> >
+> >         Arnd
+> >
+> > diff --git a/include/linux/compiler.h b/include/linux/compiler.h
+> > index b5acbb404854..b5ff9881bef8 100644
+> > --- a/include/linux/compiler.h
+> > +++ b/include/linux/compiler.h
+> > @@ -148,7 +148,7 @@ void ftrace_likely_update(struct ftrace_branch_data *f, int val, int expect);
+> >   */
+> >  #define if(cond, ...) __trace_if( (cond , ## __VA_ARGS__) )
+> >  #define __trace_if(cond) \
+> > -       if (__builtin_constant_p((cond)) ? !!(cond) :                   \
+> > +       if (__builtin_constant_p(!!(cond)) ? !!(cond) :                 \
+> >         ({                                                              \
+> >                 int ______r;                                            \
+> >                 static struct ftrace_branch_data                        \
+> >
+> 
+> I remember seeing this patch, but I don't remember the exact context.
+> But when you think about it, !!cond can be a build time constant even
+> if cond is not, as long as you can prove statically that cond != 0. So
 
-Gr{oetje,eeting}s,
+You're right.  I just tested it and to my surprise gcc is smart enough 
+to figure that case out.
 
-                        Geert
+> I think this change is obviously correct, and an improvement since it
+> will remove the profiling overhead of branches that are not true
+> branches in the first place.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+Indeed.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+
+Nicolas
