@@ -1,82 +1,56 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Sat, 13 Feb 2016 14:10:08 +0100
-Subject: [PATCH v2 3/3] clocksource/drivers/lpc32xx: Support timer-based
- ARM delay
-In-Reply-To: <1455069267-4784-4-git-send-email-ezequiel@vanguardiasur.com.ar>
-References: <1455069267-4784-1-git-send-email-ezequiel@vanguardiasur.com.ar>
- <1455069267-4784-4-git-send-email-ezequiel@vanguardiasur.com.ar>
-Message-ID: <CAGhQ9Vx9AMJfdbNL_kuLTivm52bGZeRrvoYE0fKRA52G4Epv0Q@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat, 13 Feb 2016 14:19:40 +0100
+Subject: [PATCH 2/6] mtd: physmap_of: add a hook for Versatile write
+ protection
+In-Reply-To: <1453806725-4880-3-git-send-email-linus.walleij@linaro.org>
+References: <1453806725-4880-1-git-send-email-linus.walleij@linaro.org>
+ <1453806725-4880-3-git-send-email-linus.walleij@linaro.org>
+Message-ID: <CACRpkdY4fNfQWaKAZcak0yzJ2B17hbrqdU=Q4=NiwiWRNv_0yQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 February 2016 at 02:54, Ezequiel Garcia
-<ezequiel@vanguardiasur.com.ar> wrote:
-> This commit implements the ARM timer-based delay timer for the
-> LPC32xx, LPC18xx, LPC43xx family of SoCs.
->
-> Also, add a dependency to restrict compiling this driver for
-> the ARM architecture.
->
-> Signed-off-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
-> ---
->  drivers/clocksource/Kconfig        |  1 +
->  drivers/clocksource/time-lpc32xx.c | 12 ++++++++++++
->  2 files changed, 13 insertions(+)
->
-> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-> index 33db7406c0e2..c346be650892 100644
-> --- a/drivers/clocksource/Kconfig
-> +++ b/drivers/clocksource/Kconfig
-> @@ -160,6 +160,7 @@ config CLKSRC_EFM32
->  config CLKSRC_LPC32XX
->         bool "Clocksource for LPC32XX" if COMPILE_TEST
->         depends on GENERIC_CLOCKEVENTS && HAS_IOMEM
-> +       depends on ARM
->         select CLKSRC_MMIO
->         select CLKSRC_OF
->         help
-> diff --git a/drivers/clocksource/time-lpc32xx.c b/drivers/clocksource/time-lpc32xx.c
-> index 5694eddade15..daae61e8c820 100644
-> --- a/drivers/clocksource/time-lpc32xx.c
-> +++ b/drivers/clocksource/time-lpc32xx.c
-> @@ -18,6 +18,7 @@
->  #include <linux/clk.h>
->  #include <linux/clockchips.h>
->  #include <linux/clocksource.h>
-> +#include <linux/delay.h>
->  #include <linux/interrupt.h>
->  #include <linux/irq.h>
->  #include <linux/kernel.h>
-> @@ -54,6 +55,15 @@ static u64 notrace lpc32xx_read_sched_clock(void)
->         return readl(clocksource_timer_counter);
->  }
->
-> +static unsigned long lpc32xx_delay_timer_read(void)
-> +{
-> +       return readl(clocksource_timer_counter);
-> +}
-> +
-> +static struct delay_timer lpc32xx_delay_timer = {
-> +       .read_current_timer = lpc32xx_delay_timer_read,
-> +};
-> +
->  static int lpc32xx_clkevt_next_event(unsigned long delta,
->                                      struct clock_event_device *evtdev)
->  {
-> @@ -192,6 +202,8 @@ static int __init lpc32xx_clocksource_init(struct device_node *np)
->         }
->
->         clocksource_timer_counter = base + LPC32XX_TIMER_TC;
-> +       lpc32xx_delay_timer.freq = rate;
-> +       register_current_timer_delay(&lpc32xx_delay_timer);
->         sched_clock_register(lpc32xx_read_sched_clock, 32, rate);
->
->         return 0;
+Hey MTD folks,
 
-Reviewed-by: Joachim Eastwood <manabian@gmail.com>
-Tested-by: Joachim Eastwood <manabian@gmail.com>
+On Tue, Jan 26, 2016 at 12:12 PM, Linus Walleij
+<linus.walleij@linaro.org> wrote:
 
-Boot tested on EA4357.
+> In order to support device tree probing of Versatile NOR flash
+> chips, there must be a way to add the VPP (write protection)
+> enable/disable callback. The register in question is in the
+> system controllers of these machines. Apart from this quirk,
+> the ARM flash chips are standard CFI flash chips from various
+> vendors.
+>
+> Additionally, the Integrator/AP require you to set up the external
+> bus interface (EBI) to allow writes to the chip select where the
+> flash memory is connected.
+>
+> Solve this by looking for the arm,versatile-flash compatible
+> string in the flash device tree node. In the driver,
+> add a special hook to check for the various Versatile syscons and
+> register a callback for .set_vpp() if this compatible is present.
+>
+> Provide a special Kconfig entry for the addon hook so it will
+> not be compiled in if the Versatile boards are not supported.
+> Stubs in the header file make sure the impact will be zero on
+> other platforms. (Compilers optimze this out.)
+>
+> With this patch, a large slew of ARM board file code can be
+> removed.
+>
+> Cc: Grant Likely <grant.likely@linaro.org>
+> Cc: Rob Herring <robh@kernel.org>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-regards,
-Joachim Eastwood
+Do you think my reply to this about reference counting and
+subsequent (accepted) patch to update the documentation
+to reflect 876fe76d793d03077
+"mtd: maps: physmap: Add reference counter to set_vpp()"
+is enough to warrant merging of this?
+
+If you want the code developed in any special direction
+just tell me.
+
+Yours,
+Linus Walleij
