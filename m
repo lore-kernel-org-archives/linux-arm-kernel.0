@@ -1,52 +1,38 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Sat, 13 Feb 2016 16:57:41 -0500 (EST)
-Subject: [PATCH] [media] zl10353: use div_u64 instead of do_div
-In-Reply-To: <CAKv+Gu8dFz28tGgQTv+WYAvKpeiFXaj8JANUFtOJwKPRsB8F5A@mail.gmail.com>
-References: <1455287246-3540549-1-git-send-email-arnd@arndb.de>
- <2712691.b9gkR7KMX7@wuerfel>
- <alpine.LFD.2.20.1602121305180.13632@knanqh.ubzr>
- <6737272.LXr2g355Yt@wuerfel>
- <CAKv+Gu8dFz28tGgQTv+WYAvKpeiFXaj8JANUFtOJwKPRsB8F5A@mail.gmail.com>
-Message-ID: <alpine.LFD.2.20.1602131652560.13632@knanqh.ubzr>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sun, 14 Feb 2016 01:26:34 +0300
+Subject: [PATCH] ARM: dts: porter: remove enable prop from HS-USB device node
+In-Reply-To: <1674850.BZpGW9kEud@wasted.cogentembedded.com>
+References: <1674850.BZpGW9kEud@wasted.cogentembedded.com>
+Message-ID: <2684686.0L09MeB6pA@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 13 Feb 2016, Ard Biesheuvel wrote:
+In  the final versions of the Porter board (called "PORTER_C") Renesas
+decided to get rid  of the Maxim Integrated MAX3355 OTG chip and didn't
+add any other provision to differ the host/gadget mode, so we'll have to
+remove  no longer valid "renesas,enable-gpio" property from the HS-USB
+device node.  Hopefully, the earlier revisions of the board were never
+seen in the wild...
 
-> On 12 February 2016 at 22:01, Arnd Bergmann <arnd@arndb.de> wrote:
-> > However, I did stumble over an older patch I did now, which I could
-> > not remember what it was good for. It does fix the problem, and
-> > it seems to be a better solution.
-> >
-> >         Arnd
-> >
-> > diff --git a/include/linux/compiler.h b/include/linux/compiler.h
-> > index b5acbb404854..b5ff9881bef8 100644
-> > --- a/include/linux/compiler.h
-> > +++ b/include/linux/compiler.h
-> > @@ -148,7 +148,7 @@ void ftrace_likely_update(struct ftrace_branch_data *f, int val, int expect);
-> >   */
-> >  #define if(cond, ...) __trace_if( (cond , ## __VA_ARGS__) )
-> >  #define __trace_if(cond) \
-> > -       if (__builtin_constant_p((cond)) ? !!(cond) :                   \
-> > +       if (__builtin_constant_p(!!(cond)) ? !!(cond) :                 \
-> >         ({                                                              \
-> >                 int ______r;                                            \
-> >                 static struct ftrace_branch_data                        \
-> >
-> 
-> I remember seeing this patch, but I don't remember the exact context.
-> But when you think about it, !!cond can be a build time constant even
-> if cond is not, as long as you can prove statically that cond != 0. So
+Fixes: c794f6a09a25 ("ARM: shmobile: porter: add HS-USB DT support")
+Reported-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-You're right.  I just tested it and to my surprise gcc is smart enough 
-to figure that case out.
+---
+This patch is against the 'master' branch of Simon Horman's 'renesas.git' repo.
 
-> I think this change is obviously correct, and an improvement since it
-> will remove the profiling overhead of branches that are not true
-> branches in the first place.
+ arch/arm/boot/dts/r8a7791-porter.dts |    1 -
+ 1 file changed, 1 deletion(-)
 
-Indeed.
-
-
-Nicolas
+Index: renesas/arch/arm/boot/dts/r8a7791-porter.dts
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/r8a7791-porter.dts
++++ renesas/arch/arm/boot/dts/r8a7791-porter.dts
+@@ -283,7 +283,6 @@
+ 	pinctrl-names = "default";
+ 
+ 	status = "okay";
+-	renesas,enable-gpio = <&gpio5 31 GPIO_ACTIVE_HIGH>;
+ };
+ 
+ &usbphy {
