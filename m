@@ -1,76 +1,70 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 12 Feb 2016 20:00:23 -0800
-Subject: [GIT PULL] bcm2835 DT changes for 4.6
-In-Reply-To: <877fi92zxb.fsf@eliezer.anholt.net>
-References: <1454977978-17491-1-git-send-email-eric@anholt.net>
- <DDFB1D8B-805B-488F-9582-796EBCEF287B@sperl.org>
- <87d1s42yb8.fsf@eliezer.anholt.net> <56BD55A2.20104@gmail.com>
- <877fi92zxb.fsf@eliezer.anholt.net>
-Message-ID: <56BEAA57.3050600@gmail.com>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Sat, 13 Feb 2016 12:28:50 +0530
+Subject: [PATCH V7 4/6] i2c: qup: Add bam dma capabilities
+In-Reply-To: <20160212183737.GA1520@katana>
+References: <1453197766-18976-1-git-send-email-sricharan@codeaurora.org>
+ <1453197766-18976-5-git-send-email-sricharan@codeaurora.org>
+ <20160212183737.GA1520@katana>
+Message-ID: <002e01d1662c$0579d640$106d82c0$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/02/2016 16:53, Eric Anholt wrote:
-> Florian Fainelli <f.fainelli@gmail.com> writes:
-> 
->> On 10/02/2016 10:51, Eric Anholt wrote:
->>> Martin Sperl <martin@sperl.org> writes:
->>>
->>>>> On 09.02.2016, at 01:32, Eric Anholt <eric@anholt.net> wrote:
->>>>>
->>>>> Hi Florian.  Here's the first set of patches for bcm2835 for 4.6.
->>>>> We've got more DT patches that are going to happen for new boards,
->>>>> too, but they're still getting polished.
->>>>>
->>>>> The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
->>>>>
->>>>>  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
->>>>>
->>>>> are available in the git repository at:
->>>>>
->>>>>  git at github.com:anholt/linux.git tags/bcm2835-dt-next-2016-02-04
->>>>>
->>>>> for you to fetch changes up to 5ec6f2cd8ec4bcd38ba199ea8711a5ec906d85e7:
->>>>>
->>>>>  ARM: bcm2835: Add the Raspberry Pi power domain driver to the DT. (2016-02-02 20:02:45 -0800)
->>>>>
->>>>> ----------------------------------------------------------------
->>>>> This pull request covers mostly DT changes that didn't make it into
->>>>> 4.5 because required header files went through other trees.
->>>>>
->>>>> ----------------------------------------------------------------
->>>>> Alexander Aring (1):
->>>>>      ARM: bcm2835: Add the Raspberry Pi power domain driver to the DT.
->>>>>
->>>>> Lubomir Rintel (1):
->>>>>      ARM: bcm2835: dt: Add Raspberry Pi Model A
->>>>>
->>>>> Martin Sperl (2):
->>>>>      ARM: bcm2835: add the auxiliary spi1 and spi2 to the device tree
->>>>>      ARM: bcm2835: follow dt uart node-naming convention
->>>>
->>>> Do you want me to resend a rebased version of:
->>>>      ARM: bcm2835: add bcm2835-aux-uart support to default DT
->>>>
->>>> The corresponding driver has been added to tty/tty-next.
->>>
->>> It hadn't landed last time I checked.  A rebased version that you've
->>> tested would be great!
->>
->> OK, please submit this in the next week or so at most, so we can get
->> this pull request merged, thanks!
->>
->> Eric, do you have other changes outside of Device Tree?
-> 
-> We've got bcm2835_defconfig changes that I need to test and tag.
+Hi Wolfram,
 
-Ok, so that one needs to be a pull request.
-
+> -----Original Message-----
+> From: Wolfram Sang [mailto:wsa at the-dreams.de]
+> Sent: Saturday, February 13, 2016 12:08 AM
+> To: Sricharan R
+> Cc: devicetree at vger.kernel.org; linux-arm-msm at vger.kernel.org;
+> agross at codeaurora.org; linux-kernel at vger.kernel.org; linux-
+> i2c at vger.kernel.org; iivanov at mm-sol.com; galak at codeaurora.org;
+> dmaengine at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> andy.gross at linaro.org; ntelkar at codeaurora.org; architt at codeaurora.org
+> Subject: Re: [PATCH V7 4/6] i2c: qup: Add bam dma capabilities
 > 
-> There are also the multi_v7_defconfig updates to enable bcm2835.  Would
-> I be pulling those, or someone above me?
+> On Tue, Jan 19, 2016 at 03:32:44PM +0530, Sricharan R wrote:
+> > QUP cores can be attached to a BAM module, which acts as a dma engine
+> > for the QUP core. When DMA with BAM is enabled, the BAM consumer
+> pipe
+> > transmitted data is written to the output FIFO and the BAM producer
+> > pipe received data is read from the input FIFO.
+> >
+> > With BAM capabilities, qup-i2c core can transfer more than
+> > 256 bytes, without a 'stop' which is not possible otherwise.
+> >
+> > Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+> > Reviewed-by: Andy Gross <andy.gross@linaro.org>
+> > Tested-by: Archit Taneja <architt@codeaurora.org>
+> > Tested-by: Telkar Nagender <ntelkar@codeaurora.org>
+> 
+> My code checkers found some issues:
+> 
+>     SPARSE
+> drivers/i2c/busses/i2c-qup.c:555:6: warning: symbol 'qup_sg_set_buf' was
+> not declared. Should it be static?
+> drivers/i2c/busses/i2c-qup.c:1243:50: warning: dubious: !x & !y
+>     SMATCH
+> drivers/i2c/busses/i2c-qup.c:165 qup_sg_set_buf warn: unused return: s =
+> sg_next()
+> drivers/i2c/busses/i2c-qup.c:165 qup_sg_set_buf warn: unused return: s =
+> sg_next()
+> drivers/i2c/busses/i2c-qup.c:1243 qup_i2c_xfer_v2() warn: add some
+> parenthesis here?
+>     CPPCHECK
+> drivers/i2c/busses/i2c-qup.c:1243: style: Boolean result is used in
+bitwise
+> operation. Clarify expression with parentheses.
+>     SPATCH
+> drivers/i2c/busses/i2c-qup.c:1380:2-13: WARNING: Assignment of bool to 0/1
+> drivers/i2c/busses/i2c-qup.c:1481:1-13: WARNING: Assignment of bool to 0/1
+>   CC      drivers/i2c/busses/i2c-qup.o
+> drivers/i2c/busses/i2c-qup.c:555:6: warning: no previous prototype for
+> 'qup_sg_set_buf' [-Wmissing-prototypes]  void qup_sg_set_buf(struct
+> scatterlist *sg, void *buf, struct qup_i2c_tag *tg,
+> 
+> Can you fix them and resend??
 
-This one could too, or it could be an individual patch that the arm-soc
-maintainers take directly, either way is fine AFAIR.
---
-Florian
+    Sorry on this , will resend this patch.
+
+Regards,
+ Sricharan
