@@ -1,60 +1,73 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 12 Feb 2016 16:49:35 -0800
-Subject: GPIO regression in Linux next caused by syscon change
-In-Reply-To: <20160213002643.GQ19432@atomide.com>
-References: <20160213002643.GQ19432@atomide.com>
-Message-ID: <20160213004935.GR19432@atomide.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Fri, 12 Feb 2016 16:53:52 -0800
+Subject: [GIT PULL] bcm2835 DT changes for 4.6
+In-Reply-To: <56BD55A2.20104@gmail.com>
+References: <1454977978-17491-1-git-send-email-eric@anholt.net>
+ <DDFB1D8B-805B-488F-9582-796EBCEF287B@sperl.org>
+ <87d1s42yb8.fsf@eliezer.anholt.net> <56BD55A2.20104@gmail.com>
+Message-ID: <877fi92zxb.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [160212 16:31]:
-> Hi,
-> 
-> Looks like commit effe02710335 ("mfd: syscon: Set regmap max_register
-> in of_syscon_register") somehow breaks smsc911x GPIO interrupt for
-> me at least on omap3:
-> 
-> irq 241: nobody cared (try booting with the "irqpoll" option)
-> CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.5.0-rc3-next-20160212 #864
-> Hardware name: Generic OMAP36xx (Flattened Device Tree)
-> [<c010fd44>] (unwind_backtrace) from [<c010c094>] (show_stack+0x10/0x14)
-> [<c010c094>] (show_stack) from [<c045f24c>] (dump_stack+0xb0/0xe4)
-> [<c045f24c>] (dump_stack) from [<c01998e8>] (__report_bad_irq+0x24/0xc0)
-> [<c01998e8>] (__report_bad_irq) from [<c0199ce4>] (note_interrupt+0x27c/0x2dc)
-> [<c0199ce4>] (note_interrupt) from [<c0197220>] (handle_irq_event_percpu+0x184/0x200)
-> [<c0197220>] (handle_irq_event_percpu) from [<c01972d4>] (handle_irq_event+0x38/0x5c)
-> [<c01972d4>] (handle_irq_event) from [<c019a3d8>] (handle_level_irq+0xc0/0x154)
-> [<c019a3d8>] (handle_level_irq) from [<c0196784>] (generic_handle_irq+0x20/0x34)
-> [<c0196784>] (generic_handle_irq) from [<c049b690>] (omap_gpio_irq_handler+0x120/0x160)
-> [<c049b690>] (omap_gpio_irq_handler) from [<c01970f0>] (handle_irq_event_percpu+0x54/0x200)
-> [<c01970f0>] (handle_irq_event_percpu) from [<c01972d4>] (handle_irq_event+0x38/0x5c)
-> [<c01972d4>] (handle_irq_event) from [<c019a3d8>] (handle_level_irq+0xc0/0x154)
-> [<c019a3d8>] (handle_level_irq) from [<c0196784>] (generic_handle_irq+0x20/0x34)
-> [<c0196784>] (generic_handle_irq) from [<c0196a78>] (__handle_domain_irq+0x64/0xe0)
-> [<c0196a78>] (__handle_domain_irq) from [<c076f038>] (__irq_svc+0x58/0x78)
-> [<c076f038>] (__irq_svc) from [<c076e93c>] (_raw_spin_unlock_irqrestore+0x34/0x44)
-> [<c076e93c>] (_raw_spin_unlock_irqrestore) from [<c019900c>] (__setup_irq+0x40c/0x5e0)
-> [<c019900c>] (__setup_irq) from [<c0199330>] (request_threaded_irq+0xc0/0x158)
-> [<c0199330>] (request_threaded_irq) from [<c05a4038>] (smsc911x_drv_probe+0x588/0xfec)
-> [<c05a4038>] (smsc911x_drv_probe) from [<c04fc1b4>] (platform_drv_probe+0x4c/0xb0)
-> [<c04fc1b4>] (platform_drv_probe) from [<c04fa89c>] (driver_probe_device+0x208/0x2c0)
-> [<c04fa89c>] (driver_probe_device) from [<c04fa9e8>] (__driver_attach+0x94/0x98)
-> [<c04fa9e8>] (__driver_attach) from [<c04f8bc4>] (bus_for_each_dev+0x6c/0xa0)
-> [<c04f8bc4>] (bus_for_each_dev) from [<c04f9d28>] (bus_add_driver+0x18c/0x214)
-> [<c04f9d28>] (bus_add_driver) from [<c04fb22c>] (driver_register+0x78/0xf8)
-> [<c04fb22c>] (driver_register) from [<c010180c>] (do_one_initcall+0x80/0x1dc)
-> [<c010180c>] (do_one_initcall) from [<c0b00ef0>] (kernel_init_freeable+0x218/0x2ec)
-> [<c0b00ef0>] (kernel_init_freeable) from [<c0768360>] (kernel_init+0x8/0xf4)
-> [<c0768360>] (kernel_init) from [<c01078d0>] (ret_from_fork+0x14/0x24)
-> handlers:
-> [<c05a26d8>] smsc911x_irqhandler
-> Disabling IRQ #241
-> libphy: smsc911x-mdio: probed
-> 
-> I'm not seeing the connection between regmap and  GPIO, so no
-> idea what goes wrong here.
+Florian Fainelli <f.fainelli@gmail.com> writes:
 
-The only regmap here is the scm_conf in omap3.dtsi. Probably some
-resource size calculation issue causing an overlap?
+> On 10/02/2016 10:51, Eric Anholt wrote:
+>> Martin Sperl <martin@sperl.org> writes:
+>> 
+>>>> On 09.02.2016, at 01:32, Eric Anholt <eric@anholt.net> wrote:
+>>>>
+>>>> Hi Florian.  Here's the first set of patches for bcm2835 for 4.6.
+>>>> We've got more DT patches that are going to happen for new boards,
+>>>> too, but they're still getting polished.
+>>>>
+>>>> The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
+>>>>
+>>>>  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+>>>>
+>>>> are available in the git repository at:
+>>>>
+>>>>  git at github.com:anholt/linux.git tags/bcm2835-dt-next-2016-02-04
+>>>>
+>>>> for you to fetch changes up to 5ec6f2cd8ec4bcd38ba199ea8711a5ec906d85e7:
+>>>>
+>>>>  ARM: bcm2835: Add the Raspberry Pi power domain driver to the DT. (2016-02-02 20:02:45 -0800)
+>>>>
+>>>> ----------------------------------------------------------------
+>>>> This pull request covers mostly DT changes that didn't make it into
+>>>> 4.5 because required header files went through other trees.
+>>>>
+>>>> ----------------------------------------------------------------
+>>>> Alexander Aring (1):
+>>>>      ARM: bcm2835: Add the Raspberry Pi power domain driver to the DT.
+>>>>
+>>>> Lubomir Rintel (1):
+>>>>      ARM: bcm2835: dt: Add Raspberry Pi Model A
+>>>>
+>>>> Martin Sperl (2):
+>>>>      ARM: bcm2835: add the auxiliary spi1 and spi2 to the device tree
+>>>>      ARM: bcm2835: follow dt uart node-naming convention
+>>>
+>>> Do you want me to resend a rebased version of:
+>>>      ARM: bcm2835: add bcm2835-aux-uart support to default DT
+>>>
+>>> The corresponding driver has been added to tty/tty-next.
+>> 
+>> It hadn't landed last time I checked.  A rebased version that you've
+>> tested would be great!
+>
+> OK, please submit this in the next week or so at most, so we can get
+> this pull request merged, thanks!
+>
+> Eric, do you have other changes outside of Device Tree?
 
-Tony
+We've got bcm2835_defconfig changes that I need to test and tag.
+
+There are also the multi_v7_defconfig updates to enable bcm2835.  Would
+I be pulling those, or someone above me?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160212/ec6b7db7/attachment-0001.sig>
