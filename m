@@ -1,56 +1,75 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 12 Feb 2016 16:26:43 -0800
-Subject: GPIO regression in Linux next caused by syscon change
-Message-ID: <20160213002643.GQ19432@atomide.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Fri, 12 Feb 2016 16:28:54 -0800
+Subject: [PATCH V4 1/7] clk: bcm2835: the minimum clock divider is 2
+In-Reply-To: <56B86DDF.7060904@martin.sperl.org>
+References: <1452867667-2447-1-git-send-email-kernel@martin.sperl.org>
+ <1452867667-2447-2-git-send-email-kernel@martin.sperl.org>
+ <87oac03tuz.fsf@eliezer.anholt.net> <56B86DDF.7060904@martin.sperl.org>
+Message-ID: <871t8h312x.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Martin Sperl <kernel@martin.sperl.org> writes:
 
-Looks like commit effe02710335 ("mfd: syscon: Set regmap max_register
-in of_syscon_register") somehow breaks smsc911x GPIO interrupt for
-me at least on omap3:
+> On 02.02.2016 00:15, Eric Anholt wrote:
+>> kernel at martin.sperl.org writes:
+>>
+>>> From: Martin Sperl <kernel@martin.sperl.org>
+>>>
+>>> Testing with different clock divider values has shown
+>>> that (at least for the PCM clock) the clock divider
+>>> has to be at least 2, otherwise the clock will not
+>>> output a signal.
+>>
+>> For a MASH clock (PWM, PCM, SLIMBUS, but not the others), the minimum
+>> integer component of the divider is:
+>>
+>> mash 0: 1
+>> mash 1: 2
+>> mash 2: 3
+>> mash 3: 5
+>>
+>
+> I know that that is what the datasheet says - see also the errata:
+> http://elinux.org/BCM2835_datasheet_errata#p105_table.
+>
+> Experimentation has show that a divider between 1 and 1 + 4095 / 4096
+> does not provide any output PCM clock - only 2 and above does work for
+> mash = 0, 1, 2 or 3.
+>
+> Example: Requesting 12288000Hz (=192kHz at 64bit) with the 19.2Mhz
+> oscillator results in a divider of: 1 + 2304 / 4096 and this does not
+> give a clock output.
+>
+> See the report by hiassoft here:
+> https://github.com/raspberrypi/linux/issues/1231#issuecomment-171003182
+> (note that it also applies to mash = 0, but there may be no comment on
+> this fact in this thread)
+>
+> Note that there is patch 7 that implements the above "mash" limits
+> for a divider and downgrades to a lower mash level if the divider
+> does not qualify.
 
-irq 241: nobody cared (try booting with the "irqpoll" option)
-CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.5.0-rc3-next-20160212 #864
-Hardware name: Generic OMAP36xx (Flattened Device Tree)
-[<c010fd44>] (unwind_backtrace) from [<c010c094>] (show_stack+0x10/0x14)
-[<c010c094>] (show_stack) from [<c045f24c>] (dump_stack+0xb0/0xe4)
-[<c045f24c>] (dump_stack) from [<c01998e8>] (__report_bad_irq+0x24/0xc0)
-[<c01998e8>] (__report_bad_irq) from [<c0199ce4>] (note_interrupt+0x27c/0x2dc)
-[<c0199ce4>] (note_interrupt) from [<c0197220>] (handle_irq_event_percpu+0x184/0x200)
-[<c0197220>] (handle_irq_event_percpu) from [<c01972d4>] (handle_irq_event+0x38/0x5c)
-[<c01972d4>] (handle_irq_event) from [<c019a3d8>] (handle_level_irq+0xc0/0x154)
-[<c019a3d8>] (handle_level_irq) from [<c0196784>] (generic_handle_irq+0x20/0x34)
-[<c0196784>] (generic_handle_irq) from [<c049b690>] (omap_gpio_irq_handler+0x120/0x160)
-[<c049b690>] (omap_gpio_irq_handler) from [<c01970f0>] (handle_irq_event_percpu+0x54/0x200)
-[<c01970f0>] (handle_irq_event_percpu) from [<c01972d4>] (handle_irq_event+0x38/0x5c)
-[<c01972d4>] (handle_irq_event) from [<c019a3d8>] (handle_level_irq+0xc0/0x154)
-[<c019a3d8>] (handle_level_irq) from [<c0196784>] (generic_handle_irq+0x20/0x34)
-[<c0196784>] (generic_handle_irq) from [<c0196a78>] (__handle_domain_irq+0x64/0xe0)
-[<c0196a78>] (__handle_domain_irq) from [<c076f038>] (__irq_svc+0x58/0x78)
-[<c076f038>] (__irq_svc) from [<c076e93c>] (_raw_spin_unlock_irqrestore+0x34/0x44)
-[<c076e93c>] (_raw_spin_unlock_irqrestore) from [<c019900c>] (__setup_irq+0x40c/0x5e0)
-[<c019900c>] (__setup_irq) from [<c0199330>] (request_threaded_irq+0xc0/0x158)
-[<c0199330>] (request_threaded_irq) from [<c05a4038>] (smsc911x_drv_probe+0x588/0xfec)
-[<c05a4038>] (smsc911x_drv_probe) from [<c04fc1b4>] (platform_drv_probe+0x4c/0xb0)
-[<c04fc1b4>] (platform_drv_probe) from [<c04fa89c>] (driver_probe_device+0x208/0x2c0)
-[<c04fa89c>] (driver_probe_device) from [<c04fa9e8>] (__driver_attach+0x94/0x98)
-[<c04fa9e8>] (__driver_attach) from [<c04f8bc4>] (bus_for_each_dev+0x6c/0xa0)
-[<c04f8bc4>] (bus_for_each_dev) from [<c04f9d28>] (bus_add_driver+0x18c/0x214)
-[<c04f9d28>] (bus_add_driver) from [<c04fb22c>] (driver_register+0x78/0xf8)
-[<c04fb22c>] (driver_register) from [<c010180c>] (do_one_initcall+0x80/0x1dc)
-[<c010180c>] (do_one_initcall) from [<c0b00ef0>] (kernel_init_freeable+0x218/0x2ec)
-[<c0b00ef0>] (kernel_init_freeable) from [<c0768360>] (kernel_init+0x8/0xf4)
-[<c0768360>] (kernel_init) from [<c01078d0>] (ret_from_fork+0x14/0x24)
-handlers:
-[<c05a26d8>] smsc911x_irqhandler
-Disabling IRQ #241
-libphy: smsc911x-mdio: probed
+I do see "2, 2, 3, 5" being used as the minimum dividers used for mash
+clocks in the firmware's clock setup.  So, as long as you limit this to
+the MASH clocks, I think you're right.
 
-I'm not seeing the connection between regmap and  GPIO, so no
-idea what goes wrong here.
+What I'd expect of this series as a respin:
 
-Regards,
+1) Fix setup of existing MASH clocks
+- Mark the few existing MASH clocks as being MASH.
+- Apply MASH integer divider limits to MASH clocks.
+- Set the MASH field on MASH clocks.
 
-Tony
+2) Add PCM clock
+
+If you want to add some other clocks that are definitely the same kinds
+of clock generators and where we have known parents for them, that's
+fine with me.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160212/c593ef2b/attachment.sig>
