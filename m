@@ -1,31 +1,39 @@
 From: jchandra@broadcom.com (Jayachandran C)
-Date: Sun, 14 Feb 2016 00:16:34 +0530
-Subject: [PATCH 3/4] arm64: defconfig: Add Broadcom Vulcan to defconfig
+Date: Sun, 14 Feb 2016 00:16:35 +0530
+Subject: [PATCH 4/4] arm64: cputype info for Broadcom Vulcan
 In-Reply-To: <1455389195-31870-1-git-send-email-jchandra@broadcom.com>
 References: <1455389195-31870-1-git-send-email-jchandra@broadcom.com>
-Message-ID: <1455389195-31870-4-git-send-email-jchandra@broadcom.com>
+Message-ID: <1455389195-31870-5-git-send-email-jchandra@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable Broadcom Vulcan support in arm64 default configuration. This will
-build the device tree needed to boot on a Broadcom Vulcan board.
+Add Broadcom Vulcan implementor ID and part ID in cputype.h. This is
+to document the values.
 
 Signed-off-by: Jayachandran C <jchandra@broadcom.com>
 ---
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/include/asm/cputype.h | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 86581f7..6c1b3a6 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -47,6 +47,7 @@ CONFIG_ARCH_SPRD=y
- CONFIG_ARCH_THUNDER=y
- CONFIG_ARCH_UNIPHIER=y
- CONFIG_ARCH_VEXPRESS=y
-+CONFIG_ARCH_VULCAN=y
- CONFIG_ARCH_XGENE=y
- CONFIG_ARCH_ZYNQMP=y
- CONFIG_PCI=y
+diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+index 1a59493..3725d59 100644
+--- a/arch/arm64/include/asm/cputype.h
++++ b/arch/arm64/include/asm/cputype.h
+@@ -65,6 +65,7 @@
+ #define ARM_CPU_IMP_ARM			0x41
+ #define ARM_CPU_IMP_APM			0x50
+ #define ARM_CPU_IMP_CAVIUM		0x43
++#define ARM_CPU_IMP_BRCM		0x42
+ 
+ #define ARM_CPU_PART_AEM_V8		0xD0F
+ #define ARM_CPU_PART_FOUNDATION		0xD00
+@@ -74,6 +75,7 @@
+ #define APM_CPU_PART_POTENZA		0x000
+ 
+ #define CAVIUM_CPU_PART_THUNDERX	0x0A1
++#define BRCM_CPU_PART_VULCAN		0x516
+ 
+ #ifndef __ASSEMBLY__
+ 
 -- 
 1.9.1
