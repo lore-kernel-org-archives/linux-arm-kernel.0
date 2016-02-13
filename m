@@ -1,38 +1,53 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 13 Feb 2016 20:07:02 +0100
-Subject: [PATCH 2/2] dt-bindings: Add TPO TPG110 binding
-In-Reply-To: <20160202162833.GB4918@ulmo>
-References: <1454316643-3931-1-git-send-email-linus.walleij@linaro.org>
- <20160202162833.GB4918@ulmo>
-Message-ID: <CACRpkdY77MsH5ArGo7Wh8qhUNYJhWHLOZRN4j=4YQKYsvVbnmQ@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Sat, 13 Feb 2016 21:23:47 +0100
+Subject: [PATCH 01/68] ARM: dts: gose: Add GPIO keys to DT
+In-Reply-To: <d7d5974b156e2ef7436483de00ccada5987c9d31.1455303422.git.horms+renesas@verge.net.au>
+References: <cover.1455303422.git.horms+renesas@verge.net.au>
+ <d7d5974b156e2ef7436483de00ccada5987c9d31.1455303422.git.horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdVefum3YbaxhMX_0hHrmTFYU-pWYZTwSUveQDLFArLdYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 2, 2016 at 5:28 PM, Thierry Reding <thierry.reding@gmail.com> wrote:
-> On Mon, Feb 01, 2016 at 09:50:43AM +0100, Linus Walleij wrote:
-
->> +This binding builds on the DPI bindings, adding a few properties
->> +as a superset of a DPI. See panel-dpi.txt for the required DPI
->> +bindings.
+On Fri, Feb 12, 2016 at 8:04 PM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Instantiate the GPIO keys in the gose device tree.
 >
-> It is unfortunate that we have these two types of bindings, one used by
-> some of the legacy fbdev drivers and the other by DRM/KMS drivers. There
-> isn't really much we can do about it, though, as far as I can see.
+> Based on similar work for the koelsch board by Laurent Pinchart.
+>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> Tested-by: Magnus Damm <damm+renesas@opensource.se>
+> ---
+>  arch/arm/boot/dts/r8a7793-gose.dts | 82 ++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 82 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
+> index baa59fe84298..ccbc1c66cc6c 100644
+> --- a/arch/arm/boot/dts/r8a7793-gose.dts
+> +++ b/arch/arm/boot/dts/r8a7793-gose.dts
+> @@ -31,6 +31,88 @@
+>                 device_type = "memory";
+>                 reg = <0 0x40000000 0 0x40000000>;
+>         };
+> +
+> +       gpio-keys {
+> +               compatible = "gpio-keys";
+> +
+> +               key-1 {
+> +                       gpios = <&gpio5 0 GPIO_ACTIVE_LOW>;
+> +                       linux,code = <KEY_1>;
+> +                       label = "SW2-1";
+> +                       gpio-key,wakeup;
 
-I wasn't aware that they were any different. Where is the equivalent
-binding for DRM/KMS panels?
+In the mean time, "gpio-key,wakeup" has been deprecated in favor of
+"wakeup-source".
 
-I guess one must have been merged first and the second one screwed
-up by not reusing the first one :(
+Gr{oetje,eeting}s,
 
-> This panel is used with an fbdev driver, right?
+                        Geert
 
-Yes.
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-I don't know if I will be able to convert the AMBA CLCD driver from
-fbdev to DRM/KMS but I was hoping I would not have to change the
-DT to redescribe the same hardware for that, but now it sounds
-like that is a consequence...
-
-Yours,
-Linus Walleij
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
