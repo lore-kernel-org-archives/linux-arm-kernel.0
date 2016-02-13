@@ -1,34 +1,25 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sat, 13 Feb 2016 10:00:56 +0100
-Subject: [kernel-hardening] [PATCH] arm64: vdso: Mark vDSO code as
- read-only
-In-Reply-To: <20160213003147.GA12074@davidb.org>
-References: <1455141142-6838-1-git-send-email-david.brown@linaro.org>
- <CAKv+Gu8ArOYqxDGKb=Tv3NsiB2qWWCdD_zMx55m6+hEwLJR4CA@mail.gmail.com>
- <20160213003147.GA12074@davidb.org>
-Message-ID: <CAKv+Gu-5OdN7C_SvDytsoSn2QFkVZmonv2ffjpiuEXJA8tc0GA@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Sat, 13 Feb 2016 06:03:14 -0500 (EST)
+Subject: [PATCH v3 net 0/7] mvneta fixes for SMP
+In-Reply-To: <1454620169-8156-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1454620169-8156-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20160213.060314.257506721983765240.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 February 2016 at 01:31, David Brown <david.brown@linaro.org> wrote:
-> On Thu, Feb 11, 2016 at 03:19:20PM +0100, Ard Biesheuvel wrote:
->
->>> diff --git a/arch/arm64/kernel/vdso/vdso.S
->>> b/arch/arm64/kernel/vdso/vdso.S
->>> index 60c1db5..db7c0f2 100644
->>> --- a/arch/arm64/kernel/vdso/vdso.S
->>> +++ b/arch/arm64/kernel/vdso/vdso.S
->>> @@ -24,6 +24,7 @@
->>>         __PAGE_ALIGNED_DATA
->>
->>
->> ^^ You can get rid of this now as well
->
->
-> Can we?  The page is getting mapped to userspace, and if we didn't
-> page align it, we could leak kernel read-only data to every userspace
-> process.
->
+From: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Date: Thu,  4 Feb 2016 22:09:22 +0100
 
-That's what the .balign is for. __PAGE_ALIGNED_DATA only sets the
-section, and you're overriding that right after.
+> Following this bug report:
+> http://thread.gmane.org/gmane.linux.ports.arm.kernel/468173 and the
+> suggestions from Russell King, I reviewed all the code involving
+> multi-CPU. It ended with this series of patches which should improve
+> the stability of the driver.
+> 
+> During my test I found another bug which is fixed by new patch (the
+> second one of this new version of the series)
+> 
+> The two first patches fix real bugs, the others fix potential issues
+> in the driver.
+
+Series applied, thanks.
