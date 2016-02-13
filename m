@@ -1,143 +1,65 @@
-From: ddaney.cavm@gmail.com (David Daney)
-Date: Fri, 12 Feb 2016 17:47:25 -0800
-Subject: [RFC PATCH 1/7] arm64/perf: Basic uncore counter support for
- Cavium ThunderX
-In-Reply-To: <20160212173658.GD20262@leverpostej>
-References: <cover.1455295032.git.jglauber@cavium.com>
- <8bd93a25e069ed6428bc6c21fc53270962ccafcc.1455295032.git.jglauber@cavium.com>
- <20160212173658.GD20262@leverpostej>
-Message-ID: <56BE8B2D.1000001@gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat, 13 Feb 2016 10:28:51 +0800
+Subject: [PATCH v2 0/2] clk: sunxi: Fix APBS clock for Allwinner A80
+In-Reply-To: <1455269475-8180-1-git-send-email-wens@csie.org>
+References: <1455269475-8180-1-git-send-email-wens@csie.org>
+Message-ID: <CAGb2v65FT-Kn4C3hno_FDcvbTkpow3FAnLLEUPz3y===d5YebQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/12/2016 09:36 AM, Mark Rutland wrote:
-> On Fri, Feb 12, 2016 at 05:55:06PM +0100, Jan Glauber wrote:
-[...]
->> 2) Counters are summarized across the different units of the same type,
->>     e.g. L2C TAD 0..7 is presented as a single counter (adding the
->>     values from TAD 0 to 7). Although losing the ability to read a
->>     single value the merged values are easier to use and yield
->>     enough information.
->
-> I'm not sure I follow this. What is easier? What are you doing, and what
-> are you comparing that with to say that your approach is easier?
->
-> It sounds like it should be possible to handle multiple counters like
-> this, so I don't follow why you want to amalgamate them in-kernel.
->
+Hi,
 
-The values of the individual counters are close to meaningless.  The 
-only thing that is meaningful to someone reading the counters is the 
-aggregate sum of all the counts.
+On Fri, Feb 12, 2016 at 5:31 PM, Chen-Yu Tsai <wens@csie.org> wrote:
+> Hi everyone,
+>
+> This is v2 of the A80 APBS clock fixes series.
+>
+> When I did the A80 PRCM support, I failed to notice the A80's APBS clock
+> was not the same as the A23's APB0 clock. The former is a zero-based
+> divider, while the latter is a power-of-two divider. But the lowest 2
+> dividers are the same.
 
+It turns out that clk-sun8i-a23-apb0 was wrong. It's a zero-based divider,
+not a power-of-two divider as the driver says. Thanks to Vishnu for pointing
+it out. So NACK on this series.
 
-> [...]
->
->> +#include <asm/cpufeature.h>
->> +#include <asm/cputype.h>
->
-> I don't see why you should need these two if this is truly an uncore
-> device probed solely from PCI.
->
->> +void thunder_uncore_read(struct perf_event *event)
->> +{
->> +	struct thunder_uncore *uncore = event_to_thunder_uncore(event);
->> +	struct hw_perf_event *hwc = &event->hw;
->> +	u64 prev, new = 0;
->> +	s64 delta;
->> +	int i;
->> +
->> +	/*
->> +	 * since we do not enable counter overflow interrupts,
->> +	 * we do not have to worry about prev_count changing on us
->> +	 */
->
-> Without overflow interrupts, how do you ensure that you account for
-> overflow in a reasonable time window (i.e. before the counter runs past
-> its initial value)?
+I'll send a patch fixing this, but what should we do for old kernels?
+I don't think backporting the CLK_OF_DECLARE changes is acceptable.
+Maybe a stable patch based on the fix?
 
-Two reasons:
+Sorry for the noise.
 
-   1) There are no interrupts.
+ChenYu
 
-   2) The counters are 64-bit, they never overflow.
-
+> The hardware defaults to the lowest setting, or a /1 divider. Since the
+> child gates do not propagate clk_set_rate up, and no consumers here do
+> clk_set_rate, this actually works.
 >
->> +
->> +	prev = local64_read(&hwc->prev_count);
->> +
->> +	/* read counter values from all units */
->> +	for (i = 0; i < uncore->nr_units; i++)
->> +		new += readq(map_offset(hwc->event_base, uncore, i));
+> I realized my mistake while reviewing the A83T's PRCM patches. The A83T
+> shares the same PRCM clocks as the A80.
 >
-> There's no bit to determine whether an overflow occurred?
-
-No.
-
-
+> Maxime, since this was introduced in 4.5-rc1, please apply this series
+> for 4.5 so we fix it before the release.
 >
->> +
->> +	local64_set(&hwc->prev_count, new);
->> +	delta = new - prev;
->> +	local64_add(delta, &event->count);
->> +}
->> +
->> +void thunder_uncore_del(struct perf_event *event, int flags)
->> +{
->> +	struct thunder_uncore *uncore = event_to_thunder_uncore(event);
->> +	struct hw_perf_event *hwc = &event->hw;
->> +	int i;
->> +
->> +	event->pmu->stop(event, PERF_EF_UPDATE);
->> +
->> +	for (i = 0; i < uncore->num_counters; i++) {
->> +		if (cmpxchg(&uncore->events[i], event, NULL) == event)
->> +			break;
->> +	}
->> +	hwc->idx = -1;
->> +}
 >
-> Why not just place the event at uncode->events[hwc->idx] ?
+> Changes since v1:
 >
-> Theat way removing the event is trivial.
+>   - Replace the CLK_OF_DECLARE version of sun8i-a23-apb0-clk with the
+>     A80 APBS version, instead of writing a new driver.
 >
->> +int thunder_uncore_event_init(struct perf_event *event)
->> +{
->> +	struct hw_perf_event *hwc = &event->hw;
->> +	struct thunder_uncore *uncore;
->> +
->> +	if (event->attr.type != event->pmu->type)
->> +		return -ENOENT;
->> +
->> +	/* we do not support sampling */
->> +	if (is_sampling_event(event))
->> +		return -EINVAL;
->> +
->> +	/* counters do not have these bits */
->> +	if (event->attr.exclude_user	||
->> +	    event->attr.exclude_kernel	||
->> +	    event->attr.exclude_host	||
->> +	    event->attr.exclude_guest	||
->> +	    event->attr.exclude_hv	||
->> +	    event->attr.exclude_idle)
->> +		return -EINVAL;
+> Regards
+> ChenYu
 >
-> We should _really_ make these features opt-in at the core level. It's
-> crazy that each and every PMU drivers has to explicitly test and reject
-> things it doesn't support.
 >
->> +
->> +	/* and we do not enable counter overflow interrupts */
+> Chen-Yu Tsai (2):
+>   clk: sunxi: Add support for A80 APBS clock
+>   ARM: dts: sun9i: Fix apbs clock compatible
 >
-> That statement raises far more questions than it answers.
+>  Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
+>  arch/arm/boot/dts/sun9i-a80.dtsi                  |  2 +-
+>  drivers/clk/sunxi/clk-sun8i-apb0.c                | 23 ++++++++---------------
+>  3 files changed, 10 insertions(+), 16 deletions(-)
 >
-> _why_ do we not user overflow interrupts?
-
-As stated above, there are *no* overflow interrupts.
-
-The events we are counting cannot be attributed to any one (or even any) 
-CPU, they run asynchronous to the CPU, so even if there were interrupts, 
-they would be meaningless.
-
-
-David Daney
+> --
+> 2.7.0
+>
