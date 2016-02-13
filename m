@@ -1,38 +1,34 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sun, 14 Feb 2016 01:26:34 +0300
-Subject: [PATCH] ARM: dts: porter: remove enable prop from HS-USB device node
-In-Reply-To: <1674850.BZpGW9kEud@wasted.cogentembedded.com>
-References: <1674850.BZpGW9kEud@wasted.cogentembedded.com>
-Message-ID: <2684686.0L09MeB6pA@wasted.cogentembedded.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat, 13 Feb 2016 23:52:42 +0100
+Subject: [PATCH v2] pinctrl: mvebu: fix num_settings in mpp group
+ assignment
+In-Reply-To: <1454366903-7038-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1453844952-28292-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1454366903-7038-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <CACRpkdaPwbood17LBS-PGQsDSe24jZnT_u8ySuJWWkSiUQNMmQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In  the final versions of the Porter board (called "PORTER_C") Renesas
-decided to get rid  of the Maxim Integrated MAX3355 OTG chip and didn't
-add any other provision to differ the host/gadget mode, so we'll have to
-remove  no longer valid "renesas,enable-gpio" property from the HS-USB
-device node.  Hopefully, the earlier revisions of the board were never
-seen in the wild...
+On Mon, Feb 1, 2016 at 11:48 PM, Sebastian Hesselbarth
+<sebastian.hesselbarth@gmail.com> wrote:
 
-Fixes: c794f6a09a25 ("ARM: shmobile: porter: add HS-USB DT support")
-Reported-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> When assigning mpp settings from static mpp modes to mpp groups,
+> we do not want any groups that have no supported setting for a
+> specific Kirkwood variant. However, when there is at least a
+> single supported setting, we need to assign the number of all
+> settings in this mode to grp->num_settings as we are reusing
+> the static modes table.
+>
+> Fixes: 0581b16b1840 ("pinctrl: mvebu: complain about missing group after checking variant")
+> Reported-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> --
+> Changelog:
+> v1->v2:
+> - Chose a less intrusive fix by adding supp_settings variable
+>   instead of looping over the settings twice.
 
----
-This patch is against the 'master' branch of Simon Horman's 'renesas.git' repo.
+Patch applied with Aaro's Test tag.
 
- arch/arm/boot/dts/r8a7791-porter.dts |    1 -
- 1 file changed, 1 deletion(-)
-
-Index: renesas/arch/arm/boot/dts/r8a7791-porter.dts
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7791-porter.dts
-+++ renesas/arch/arm/boot/dts/r8a7791-porter.dts
-@@ -283,7 +283,6 @@
- 	pinctrl-names = "default";
- 
- 	status = "okay";
--	renesas,enable-gpio = <&gpio5 31 GPIO_ACTIVE_HIGH>;
- };
- 
- &usbphy {
+Yours,
+Linus Walleij
