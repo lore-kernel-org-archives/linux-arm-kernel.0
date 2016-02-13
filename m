@@ -1,29 +1,42 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 13 Feb 2016 15:42:20 +0100
-Subject: [PATCH 0/3] OMAP/pinmux: remove misuse of IRQF_NO_SUSPEND flag
-In-Reply-To: <1454351299-27440-1-git-send-email-sudeep.holla@arm.com>
-References: <1454351299-27440-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <CACRpkdYzJ9Hy0sH6gK6RzpLE6juS4WfPjbt7nh43vR9YTuGZWA@mail.gmail.com>
+Date: Sat, 13 Feb 2016 15:48:11 +0100
+Subject: [PATCH v4 4/9] pinctrl: Add STM32 MCUs support
+In-Reply-To: <56AF4AEB.40109@st.com>
+References: <1452773795-24216-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1452773795-24216-5-git-send-email-mcoquelin.stm32@gmail.com>
+ <CACRpkdaBcP6fC5Oxn+d1WPdHq1FtwMkf8Ap5VDLQFg-5UwEBAw@mail.gmail.com>
+ <2151471.Wut3mQ9SS7@wuerfel>
+ <CALszF6DTpcU8jFwA0HL8LpkxfO5ZOdFmpHBUxA7WfYgAj_uFhg@mail.gmail.com>
+ <56AF4AEB.40109@st.com>
+Message-ID: <CACRpkdY1E9rLwG-aXWSB7d32rhvmng+4QbVX7E0WR6aqP0oFaw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 1, 2016 at 7:28 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+On Mon, Feb 1, 2016 at 1:09 PM, Maxime Coquelin <maxime.coquelin@st.com> wrote:
+> On 02/01/2016 11:39 AM, Maxime Coquelin wrote:
+>> 2016-02-01 11:21 GMT+01:00 Arnd Bergmann <arnd@arndb.de>:
 
->   pinctrl: single: Use a separate lockdep class
->   pinctrl: single: remove misuse of IRQF_NO_SUSPEND flag
->   ARM: OMAP2+: remove misuse of IRQF_NO_SUSPEND flag
+>>> drivers/pinctrl/stm32/pinctrl-stm32.c:26:47: fatal error:
+>>> dt-bindings/pinctrl/pinctrl-stm32.h: No such file or directory
+>>
+>> Right, I missed to notify this dependency to Linus, sorry about that.
+>> This dependency is no more needed, so I could just move the macros to
+>> the driver side.
+>>
+>> Note that I also noticed a breakage at build time due to field
+>> renaming in gpio_chip structure (dev -> parent).
+>>
+>> I propose to rebase the series and move the defines into the driver.
+>> Is it ok for you?
+>>
+> I have rebased the series, taking care to fix the mentioned problems.
 >
->  arch/arm/mach-omap2/mux.c        |  4 ++--
->  arch/arm/mach-omap2/pm34xx.c     |  9 ++++-----
->  arch/arm/mach-omap2/prm_common.c |  1 +
->  drivers/pinctrl/pinctrl-single.c | 15 ++++++++++++---
+> Linus, do you confirm you will revert STM32 pinctrl patches from your tree?
 
-Are these patches orthogonal so I can merge the pinctrl patch independently
-of the OMAP patches if Tony ACKs this?
+I guess the other fixes removes the need to do this.
 
-If not: should it be merged by me or through ARM SoC/Tony?
-
-Anyways waiting for maintainer feedback, but the above is good to know.
+Sorry for not staying on top of this issue, I was swamped with mail
+and had a hard time prioritizing :(
 
 Yours,
 Linus Walleij
