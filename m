@@ -1,45 +1,17 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Sat, 13 Feb 2016 17:35:19 -0800
-Subject: [PATCH] MAINTAINERS: Add co-maintainer for remoteproc subsystems
-Message-ID: <1455413719-22412-1-git-send-email-bjorn.andersson@linaro.org>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Sun, 14 Feb 2016 09:57:24 +0800
+Subject: [PATCH v10 7/8] ARM: dts: imx25: Add TSC and ADC support
+In-Reply-To: <1450101234-2191-8-git-send-email-mpa@pengutronix.de>
+References: <1450101234-2191-1-git-send-email-mpa@pengutronix.de>
+ <1450101234-2191-8-git-send-email-mpa@pengutronix.de>
+Message-ID: <20160214015724.GA6756@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add myself as co-maintainer for the remote processor related subsystems,
-as agreed with Ohad.
+On Mon, Dec 14, 2015 at 02:53:53PM +0100, Markus Pargmann wrote:
+> From: Denis Carikli <denis@eukrea.com>
+> 
+> Signed-off-by: Denis Carikli <denis@eukrea.com>
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 
-Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
----
- MAINTAINERS | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 4ebe2e886d36..f51056b02fcd 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -4989,6 +4989,7 @@ F:	include/linux/hw_random.h
- 
- HARDWARE SPINLOCK CORE
- M:	Ohad Ben-Cohen <ohad@wizery.com>
-+M:	Bjorn Andersson <bjorn.andersson@linaro.org>
- S:	Maintained
- T:	git git://git.kernel.org/pub/scm/linux/kernel/git/ohad/hwspinlock.git
- F:	Documentation/hwspinlock.txt
-@@ -9170,6 +9171,7 @@ F:	include/linux/regmap.h
- 
- REMOTE PROCESSOR (REMOTEPROC) SUBSYSTEM
- M:	Ohad Ben-Cohen <ohad@wizery.com>
-+M:	Bjorn Andersson <bjorn.andersson@linaro.org>
- T:	git git://git.kernel.org/pub/scm/linux/kernel/git/ohad/remoteproc.git
- S:	Maintained
- F:	drivers/remoteproc/
-@@ -9178,6 +9180,7 @@ F:	include/linux/remoteproc.h
- 
- REMOTE PROCESSOR MESSAGING (RPMSG) SUBSYSTEM
- M:	Ohad Ben-Cohen <ohad@wizery.com>
-+M:	Bjorn Andersson <bjorn.andersson@linaro.org>
- T:	git git://git.kernel.org/pub/scm/linux/kernel/git/ohad/rpmsg.git
- S:	Maintained
- F:	drivers/rpmsg/
--- 
-2.5.0
+Applied #7 and #8, thanks.
