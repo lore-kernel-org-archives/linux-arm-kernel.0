@@ -1,79 +1,40 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Sun, 14 Feb 2016 15:32:45 -0500
-Subject: [PATCH 0/5] xen: avoid module usage in non-modular code
-Message-ID: <1455481970-15239-1-git-send-email-paul.gortmaker@windriver.com>
+From: blogic@openwrt.org (John Crispin)
+Date: Sun, 14 Feb 2016 22:01:38 +0100
+Subject: [PATCH V5 04/11] soc: mediatek: PMIC wrap: split SoC specific
+ init into callback
+In-Reply-To: <56BC7674.9030706@gmail.com>
+References: <1454841778-35529-1-git-send-email-blogic@openwrt.org>
+ <1454841778-35529-5-git-send-email-blogic@openwrt.org>
+ <56BC7674.9030706@gmail.com>
+Message-ID: <56C0EB32.4080701@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series of commits is a part of a larger project to ensure
-people don't reference modular support functions in non-modular
-code.  Overall there was roughly 5k lines of dead code in the
-kernel due to this.  So far we've fixed several areas, like tty,
-x86, net, ... and we continue to work on other areas.
 
-There are several reasons to not use module support for code that
-can never be built as a module, but the big ones are:
 
- (1) it is easy to accidentally write unused module_exit and remove code
- (2) it can be misleading when reading the source, thinking it can be
-      modular when the Makefile and/or Kconfig prohibit it
- (3) it requires the include of the module.h header file which in turn
-     includes nearly everything else.
- (4) it gets copied/replicated into other code and spreads like weeds.
+On 11/02/2016 12:54, Matthias Brugger wrote:
+>> diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c
+>> b/drivers/soc/mediatek/mtk-pmic-wrap.c
+>> index b22b664..e3bbee5 100644
+>> --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
+>> +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
+>> @@ -372,6 +372,7 @@ struct pmic_wrapper_type {
+>>       enum pwrap_type type;
+>>       u32 arb_en_all;
+>>       int (*init_reg_clock)(struct pmic_wrapper *wrp);
+>> +    int (*init_special)(struct pmic_wrapper *wrp);
+> 
+> Nit:
+> I wonder if we can find a better name for the callback, as init_special
+> sounds quite generic to me.
+> 
+> Thanks,
+> Matthias
 
-For the xen subsystem, there are just five commits:
+Hi,
 
-First, we get rid of "include <linux/module.h>" instances that are
-completely unnecessary.
+At first I considered enable_wrapper as the mt8135/8173 code seems to do
+just that. however mt2701 does an init of the ADC. So how about using
+init_soc_specific ?
 
-Then #2 and #3 and #5 are basically trivial remapping to the
-appropriate non-modular counterparts, meaning that there is no
-runtime change here either.
-
-The fourth hypervisor commit is similar, but also has removal of
-some dead code associated with the module_exit function that will
-never be called.  So the runtime should be the same, but the object
-file will be different (reduced in size).
-
-Patches created on linux-next and build tested for x86-64 and ARM64
-allmodconfig.
-
----
-
-Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
-Cc: David Vrabel <david.vrabel@citrix.com>
-Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Cc: xen-devel at lists.xenproject.org
-
-Paul Gortmaker (5):
-  xen: audit usages of module.h ; remove unnecessary instances
-  drivers/xen: make [xen-]ballon explicitly non-modular
-  drivers/xen: make xenbus_dev_[front/back]end explicitly non-modular
-  drivers/xen: make sys-hypervisor.c explicitly non-modular
-  drivers/xen: make platform-pci.c explicitly non-modular
-
- arch/arm/include/asm/xen/hypercall.h     |  2 ++
- drivers/xen/balloon.c                    |  4 ----
- drivers/xen/events/events_2l.c           |  1 -
- drivers/xen/events/events_base.c         |  2 +-
- drivers/xen/events/events_fifo.c         |  1 -
- drivers/xen/features.c                   |  2 +-
- drivers/xen/grant-table.c                |  1 -
- drivers/xen/platform-pci.c               | 16 ++++++----------
- drivers/xen/sys-hypervisor.c             | 31 ++++---------------------------
- drivers/xen/xen-balloon.c                | 14 +++-----------
- drivers/xen/xen-pciback/conf_space.c     |  2 +-
- drivers/xen/xen-pciback/pciback_ops.c    |  2 +-
- drivers/xen/xen-pciback/xenbus.c         |  2 +-
- drivers/xen/xen-selfballoon.c            |  1 -
- drivers/xen/xenbus/xenbus_dev_backend.c  | 13 ++-----------
- drivers/xen/xenbus/xenbus_dev_frontend.c | 13 ++-----------
- drivers/xen/xenbus/xenbus_xs.c           |  1 -
- drivers/xen/xenfs/xensyms.c              |  1 -
- 18 files changed, 24 insertions(+), 85 deletions(-)
-
--- 
-2.6.1
+	John
