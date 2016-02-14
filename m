@@ -1,51 +1,54 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Sun, 14 Feb 2016 15:55:57 +0800
-Subject: [PATCH 1/3] Documentation: devicetree: add Freescale SCC bindings
-In-Reply-To: <1455199485-24458-1-git-send-email-s.trumtrar@pengutronix.de>
-References: <1455199485-24458-1-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <20160214075557.GP6756@tiger>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sun, 14 Feb 2016 08:57:36 +0100
+Subject: [PATCH] [media] zl10353: use div_u64 instead of do_div
+In-Reply-To: <alpine.LFD.2.20.1602131652560.13632@knanqh.ubzr>
+References: <1455287246-3540549-1-git-send-email-arnd@arndb.de>
+ <2712691.b9gkR7KMX7@wuerfel>
+ <alpine.LFD.2.20.1602121305180.13632@knanqh.ubzr>
+ <6737272.LXr2g355Yt@wuerfel>
+ <CAKv+Gu8dFz28tGgQTv+WYAvKpeiFXaj8JANUFtOJwKPRsB8F5A@mail.gmail.com>
+ <alpine.LFD.2.20.1602131652560.13632@knanqh.ubzr>
+Message-ID: <CAKv+Gu9YWEkArjssR9Urh0_MOR3duNOo2UNiV=tXoQNgFtDngQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 11, 2016 at 03:04:43PM +0100, Steffen Trumtrar wrote:
-> Add documentation for the Freescale Security Controller (SCC)
-> found on i.MX25 SoCs.
-> 
-> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> ---
->  .../devicetree/bindings/crypto/fsl-imx-scc.txt          | 17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/crypto/fsl-imx-scc.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/crypto/fsl-imx-scc.txt b/Documentation/devicetree/bindings/crypto/fsl-imx-scc.txt
-> new file mode 100644
-> index 000000000000..9a15ab8da94f
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/crypto/fsl-imx-scc.txt
-> @@ -0,0 +1,17 @@
-> +Freescale Security Controller (SCC)
-> +
-> +Required properties:
-> +- compatible : Should be "fsl,imx25-scc".
-> +- reg : Should contain register location and length.
-> +- interrupts : Should contain interrupt numbers for SCM IRQ and SMN IRQ.
-> +
-> +Example:
-> +
-> +	scc: crypto at 53fac000 {
-> +		compatible = "fsl,imx25-scc";
-> +		reg = <0x53fac000 0x4000>;
-> +		clocks = <&clks 111>;
-> +		clock-names = "ipg";
+On 13 February 2016 at 22:57, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> On Sat, 13 Feb 2016, Ard Biesheuvel wrote:
+>
+>> On 12 February 2016 at 22:01, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > However, I did stumble over an older patch I did now, which I could
+>> > not remember what it was good for. It does fix the problem, and
+>> > it seems to be a better solution.
+>> >
+>> >         Arnd
+>> >
+>> > diff --git a/include/linux/compiler.h b/include/linux/compiler.h
+>> > index b5acbb404854..b5ff9881bef8 100644
+>> > --- a/include/linux/compiler.h
+>> > +++ b/include/linux/compiler.h
+>> > @@ -148,7 +148,7 @@ void ftrace_likely_update(struct ftrace_branch_data *f, int val, int expect);
+>> >   */
+>> >  #define if(cond, ...) __trace_if( (cond , ## __VA_ARGS__) )
+>> >  #define __trace_if(cond) \
+>> > -       if (__builtin_constant_p((cond)) ? !!(cond) :                   \
+>> > +       if (__builtin_constant_p(!!(cond)) ? !!(cond) :                 \
+>> >         ({                                                              \
+>> >                 int ______r;                                            \
+>> >                 static struct ftrace_branch_data                        \
+>> >
+>>
+>> I remember seeing this patch, but I don't remember the exact context.
+>> But when you think about it, !!cond can be a build time constant even
+>> if cond is not, as long as you can prove statically that cond != 0. So
+>
+> You're right.  I just tested it and to my surprise gcc is smart enough
+> to figure that case out.
+>
+>> I think this change is obviously correct, and an improvement since it
+>> will remove the profiling overhead of branches that are not true
+>> branches in the first place.
+>
+> Indeed.
+>
 
-Shouldn't these two be mentioned in properties list above too?
-
-Shawn
-
-> +		interrupts = <49>, <50>;
-> +		interrupt-names = "scm", "smn";
-> +	};
-> -- 
-> 2.7.0.rc3
-> 
-> 
+... and perhaps we should not evaluate cond twice either?
