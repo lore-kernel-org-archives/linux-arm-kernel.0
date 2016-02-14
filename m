@@ -1,28 +1,22 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Sun, 14 Feb 2016 11:21:03 +0800
-Subject: [PATCH V3 1/5] clk: imx: Add clock support for imx6qp
-In-Reply-To: <1454407298-15545-1-git-send-email-ping.bai@nxp.com>
-References: <1454407298-15545-1-git-send-email-ping.bai@nxp.com>
-Message-ID: <20160214032103.GD6756@tiger>
+Date: Sun, 14 Feb 2016 11:24:33 +0800
+Subject: [PATCH v2] ARM: mx25: Add basic suspend/resume support
+In-Reply-To: <1454449538-7620-1-git-send-email-festevam@gmail.com>
+References: <1454449538-7620-1-git-send-email-festevam@gmail.com>
+Message-ID: <20160214032433.GE6756@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 02, 2016 at 06:01:34PM +0800, Bai Ping wrote:
-> most of the clock tree structures on i.MX6 Quad Plus are
-> same as on i.MX6Q. there still some differences between
-> these two SOCs. compared to the i.XM6Q, the differents of
-> clocks on i.MX6QP is mainly on:
+On Tue, Feb 02, 2016 at 07:45:38PM -0200, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@nxp.com>
 > 
-> 1. New clock gate added to support the PRE and PRG modules
-> 2. 24MHz OSC clock option added to the UART, IPG, ECSPI, and
->    CAN clock roots.
-> 3. MMDC channel 1 clock gate is now controllable.
-> 4. clock gating added to the LDB_DIx_IPU clocks on i.MX6QP
-> 5. EMI clock root divider fix
-> 6. other updates fo CSCMRx, CSCDRx and CS2CDR registers.
+> Tested basic suspend/resume on a mx25pdk:
 > 
-> detailed infomation, please refer to the i.MX6QP RM.
+> $ echo enabled > /sys/class/tty/ttymxc0/power/wakeup
+> $ echo mem > /sys/power/state
 > 
-> Signed-off-by: Bai Ping <ping.bai@nxp.com>
+> Then press any key in the serial console and the system wakes up.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-Applied all, thanks.
+Applied, thanks.
