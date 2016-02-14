@@ -1,202 +1,184 @@
 From: majun258@huawei.com (MaJun)
-Date: Sun, 14 Feb 2016 10:16:30 +0800
-Subject: [PATCH 4/5] irqchip:create irq domain for each mbigen device
+Date: Sun, 14 Feb 2016 10:16:28 +0800
+Subject: [PATCH 2/5] dt-binding:Rename the mbigen binding file name
 In-Reply-To: <1455416191-23616-1-git-send-email-majun258@huawei.com>
 References: <1455416191-23616-1-git-send-email-majun258@huawei.com>
-Message-ID: <1455416191-23616-5-git-send-email-majun258@huawei.com>
+Message-ID: <1455416191-23616-3-git-send-email-majun258@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ma Jun <majun258@huawei.com>
 
-For peripheral devices which connect to mbigen,mbigen is a interrupt
-controller. So, we create irq domain for each mbigen device and add
-mbigen irq domain into irq hierarchy structure.
+Because added the mbigen-v1 compatible string, the origin name is
+not suitable any more. So,I remove the version number from file name.
 
 Signed-off-by: Ma Jun <majun258@huawei.com>
 ---
- drivers/irqchip/irq-mbigen-v1.c |  144 +++++++++++++++++++++++++++++++++++++++
- 1 files changed, 144 insertions(+), 0 deletions(-)
+ .../interrupt-controller/hisilicon,mbigen-v2.txt   |   74 --------------------
+ .../interrupt-controller/hisilicon,mbigen.txt      |   74 ++++++++++++++++++++
+ 2 files changed, 74 insertions(+), 74 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/interrupt-controller/hisilicon,mbigen-v2.txt
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/hisilicon,mbigen.txt
 
-diff --git a/drivers/irqchip/irq-mbigen-v1.c b/drivers/irqchip/irq-mbigen-v1.c
-index 9445658..6bbb82a 100644
---- a/drivers/irqchip/irq-mbigen-v1.c
-+++ b/drivers/irqchip/irq-mbigen-v1.c
-@@ -16,11 +16,30 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
-+#include <linux/interrupt.h>
-+#include <linux/irqchip.h>
- #include <linux/module.h>
-+#include <linux/msi.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
- #include <linux/of_platform.h>
- #include <linux/platform_device.h>
- #include <linux/slab.h>
- 
-+/* The maximum IRQ pin number of mbigen chip(start from 0) */
-+#define MAXIMUM_IRQ_PIN_NUM		640
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/hisilicon,mbigen-v2.txt b/Documentation/devicetree/bindings/interrupt-controller/hisilicon,mbigen-v2.txt
+deleted file mode 100644
+index bdd1dea..0000000
+--- a/Documentation/devicetree/bindings/interrupt-controller/hisilicon,mbigen-v2.txt
++++ /dev/null
+@@ -1,74 +0,0 @@
+-Hisilicon mbigen device tree bindings.
+-=======================================
+-
+-Mbigen means: message based interrupt generator.
+-
+-MBI is kind of msi interrupt only used on Non-PCI devices.
+-
+-To reduce the wired interrupt number connected to GIC,
+-Hisilicon designed mbigen to collect and generate interrupt.
+-
+-
+-Non-pci devices can connect to mbigen and generate the
+-interrupt by writing ITS register.
+-
+-The mbigen chip and devices connect to mbigen have the following properties:
+-
+-Mbigen main node required properties:
+--------------------------------------------
+-- compatible: Should be "hisilicon,mbigen-v2" or "hisilicon,mbigen-v1"
+-
+-- reg: Specifies the base physical address and size of the Mbigen
+-  registers.
+-
+-- interrupt controller: Identifies the node as an interrupt controller
+-
+-- msi-parent: Specifies the MSI controller this mbigen use.
+-  For more detail information,please refer to the generic msi-parent binding in
+-  Documentation/devicetree/bindings/interrupt-controller/msi.txt.
+-
+-- num-pins: the total number of pins implemented in this Mbigen
+-  instance.
+-
+-- #interrupt-cells : Specifies the number of cells needed to encode an
+-  interrupt source. The value must be 2.
+-
+-  The 1st cell is hardware pin number of the interrupt.This number is local to
+-  each mbigen chip and in the range from 0 to the maximum interrupts number
+-  of the mbigen.
+-
+-  The 2nd cell is the interrupt trigger type.
+-	The value of this cell should be:
+-	1: rising edge triggered
+-	or
+-	4: high level triggered
+-
+-Examples:
+-
+-	mbigen_device_gmac:intc {
+-			compatible = "hisilicon,mbigen-v2";
+-			reg = <0x0 0xc0080000 0x0 0x10000>;
+-			interrupt-controller;
+-			msi-parent = <&its_dsa 0x40b1c>;
+-			num-pins = <9>;
+-			#interrupt-cells = <2>;
+-	};
+-
+-Devices connect to mbigen required properties:
+-----------------------------------------------------
+--interrupt-parent: Specifies the mbigen device node which device connected.
+-
+--interrupts:Specifies the interrupt source.
+- For the specific information of each cell in this property,please refer to
+- the "interrupt-cells" description mentioned above.
+-
+-Examples:
+-	gmac0: ethernet at c2080000 {
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-		reg = <0 0xc2080000 0 0x20000>,
+-		      <0 0xc0000000 0 0x1000>;
+-		interrupt-parent  = <&mbigen_device_gmac>;
+-		interrupts =	<656 1>,
+-				<657 1>;
+-	};
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/hisilicon,mbigen.txt b/Documentation/devicetree/bindings/interrupt-controller/hisilicon,mbigen.txt
+new file mode 100644
+index 0000000..bdd1dea
+--- /dev/null
++++ b/Documentation/devicetree/bindings/interrupt-controller/hisilicon,mbigen.txt
+@@ -0,0 +1,74 @@
++Hisilicon mbigen device tree bindings.
++=======================================
 +
-+/**
-+ * In mbigen vector register
-+ * bit[31:16]:	device id
-+ * bit[15:0]:	event id value
-+ */
-+#define IRQ_EVENT_ID_MASK		0xffff
++Mbigen means: message based interrupt generator.
 +
-+/* offset of vector register in mbigen node */
-+#define REG_MBIGEN_VEC_OFFSET		0x300
-+#define REG_MBIGEN_EXT_VEC_OFFSET		0x320
++MBI is kind of msi interrupt only used on Non-PCI devices.
 +
- /**
-  * struct mbigen_device - holds the information of mbigen device.
-  *
-@@ -32,10 +51,120 @@ struct mbigen_device {
- 	void __iomem		*base;
- };
- 
-+static int get_mbigen_nid(unsigned int offset)
-+{
-+	int nid = 0;
++To reduce the wired interrupt number connected to GIC,
++Hisilicon designed mbigen to collect and generate interrupt.
 +
-+	if (offset < 256)
-+		nid = offset / 64;
-+	else if (offset < 384)
-+		nid = 4;
-+	else if (offset < 640)
-+		nid = 5;
 +
-+	return nid;
-+}
++Non-pci devices can connect to mbigen and generate the
++interrupt by writing ITS register.
 +
-+static inline unsigned int get_mbigen_vec_reg(irq_hw_number_t hwirq)
-+{
-+	unsigned int nid;
++The mbigen chip and devices connect to mbigen have the following properties:
 +
-+	nid = get_mbigen_nid(hwirq);
++Mbigen main node required properties:
++-------------------------------------------
++- compatible: Should be "hisilicon,mbigen-v2" or "hisilicon,mbigen-v1"
 +
-+	if (nid < 4)
-+		return (nid * 4) + REG_MBIGEN_VEC_OFFSET;
-+	else
-+		return (nid - 4) * 4 + REG_MBIGEN_EXT_VEC_OFFSET;
-+}
++- reg: Specifies the base physical address and size of the Mbigen
++  registers.
 +
-+static struct irq_chip mbigen_irq_chip = {
-+	.name =			"mbigen-v1",
-+};
++- interrupt controller: Identifies the node as an interrupt controller
 +
-+static void mbigen_write_msg(struct msi_desc *desc, struct msi_msg *msg)
-+{
-+	struct irq_data *d = irq_get_irq_data(desc->irq);
-+	void __iomem *base = d->chip_data;
-+	u32 val;
++- msi-parent: Specifies the MSI controller this mbigen use.
++  For more detail information,please refer to the generic msi-parent binding in
++  Documentation/devicetree/bindings/interrupt-controller/msi.txt.
 +
-+	base += get_mbigen_vec_reg(d->hwirq);
-+	val = readl_relaxed(base);
++- num-pins: the total number of pins implemented in this Mbigen
++  instance.
 +
-+	val &= ~IRQ_EVENT_ID_MASK;
-+	val |= msg->data;
++- #interrupt-cells : Specifies the number of cells needed to encode an
++  interrupt source. The value must be 2.
 +
-+	/* The address of doorbell is encoded in mbigen register by default
-+	 * So,we don't need to program the doorbell address at here
-+	 */
-+	writel_relaxed(val, base);
-+}
++  The 1st cell is hardware pin number of the interrupt.This number is local to
++  each mbigen chip and in the range from 0 to the maximum interrupts number
++  of the mbigen.
 +
-+static int mbigen_domain_translate(struct irq_domain *d,
-+				    struct irq_fwspec *fwspec,
-+				    unsigned long *hwirq,
-+				    unsigned int *type)
-+{
-+	if (is_of_node(fwspec->fwnode)) {
-+		if (fwspec->param_count != 2)
-+			return -EINVAL;
++  The 2nd cell is the interrupt trigger type.
++	The value of this cell should be:
++	1: rising edge triggered
++	or
++	4: high level triggered
 +
-+		if (fwspec->param[0] > MAXIMUM_IRQ_PIN_NUM)
-+			return -EINVAL;
++Examples:
 +
-+		*hwirq = fwspec->param[0];
++	mbigen_device_gmac:intc {
++			compatible = "hisilicon,mbigen-v2";
++			reg = <0x0 0xc0080000 0x0 0x10000>;
++			interrupt-controller;
++			msi-parent = <&its_dsa 0x40b1c>;
++			num-pins = <9>;
++			#interrupt-cells = <2>;
++	};
 +
-+		/* If there is no valid irq type, just use the default type */
-+		if ((fwspec->param[1] == IRQ_TYPE_EDGE_RISING) ||
-+			(fwspec->param[1] == IRQ_TYPE_LEVEL_HIGH))
-+			*type = fwspec->param[1];
-+		else
-+			return -EINVAL;
++Devices connect to mbigen required properties:
++----------------------------------------------------
++-interrupt-parent: Specifies the mbigen device node which device connected.
 +
-+		return 0;
-+	}
-+	return -EINVAL;
-+}
++-interrupts:Specifies the interrupt source.
++ For the specific information of each cell in this property,please refer to
++ the "interrupt-cells" description mentioned above.
 +
-+static int mbigen_irq_domain_alloc(struct irq_domain *domain,
-+					unsigned int virq,
-+					unsigned int nr_irqs,
-+					void *args)
-+{
-+	struct irq_fwspec *fwspec = args;
-+	irq_hw_number_t hwirq;
-+	unsigned int type;
-+	struct mbigen_device *mgn_chip;
-+	int i, err;
-+
-+	err = mbigen_domain_translate(domain, fwspec, &hwirq, &type);
-+	if (err)
-+		return err;
-+
-+	err = platform_msi_domain_alloc(domain, virq, nr_irqs);
-+	if (err)
-+		return err;
-+
-+	mgn_chip = platform_msi_get_host_data(domain);
-+
-+	for (i = 0; i < nr_irqs; i++)
-+		irq_domain_set_hwirq_and_chip(domain, virq + i, hwirq + i,
-+				      &mbigen_irq_chip, mgn_chip->base);
-+
-+	return 0;
-+}
-+
-+static struct irq_domain_ops mbigen_domain_ops = {
-+	.translate	= mbigen_domain_translate,
-+	.alloc		= mbigen_irq_domain_alloc,
-+	.free		= irq_domain_free_irqs_common,
-+};
-+
- static int mbigen_device_probe(struct platform_device *pdev)
- {
- 	struct mbigen_device *mgn_chip;
- 	struct resource *res;
-+	struct irq_domain *domain;
-+	u32 num_pins;
- 
- 	mgn_chip = devm_kzalloc(&pdev->dev, sizeof(*mgn_chip), GFP_KERNEL);
- 	if (!mgn_chip)
-@@ -48,8 +177,23 @@ static int mbigen_device_probe(struct platform_device *pdev)
- 	if (IS_ERR(mgn_chip->base))
- 		return PTR_ERR(mgn_chip->base);
- 
-+	if (of_property_read_u32(pdev->dev.of_node, "num-pins", &num_pins) < 0) {
-+		dev_err(&pdev->dev, "No num-pins property\n");
-+		return -EINVAL;
-+	}
-+
-+	domain = platform_msi_create_device_domain(&pdev->dev, num_pins,
-+							mbigen_write_msg,
-+							&mbigen_domain_ops,
-+							mgn_chip);
-+
-+	if (!domain)
-+		return -ENOMEM;
-+
- 	platform_set_drvdata(pdev, mgn_chip);
- 
-+	dev_info(&pdev->dev, "Allocated %d MSIs\n", num_pins);
-+
- 	return 0;
- }
- 
++Examples:
++	gmac0: ethernet at c2080000 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		reg = <0 0xc2080000 0 0x20000>,
++		      <0 0xc0000000 0 0x1000>;
++		interrupt-parent  = <&mbigen_device_gmac>;
++		interrupts =	<656 1>,
++				<657 1>;
++	};
 -- 
 1.7.1
