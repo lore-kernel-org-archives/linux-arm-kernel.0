@@ -1,25 +1,39 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 16 Feb 2016 11:47:19 +0800
-Subject: [PATCH v2 05/10] regulator: axp20x: support AXP809 variant
-In-Reply-To: <20160215200439.GC18327@sirena.org.uk>
-References: <1455532288-30870-1-git-send-email-wens@csie.org>
- <1455532288-30870-6-git-send-email-wens@csie.org>
- <20160215200439.GC18327@sirena.org.uk>
-Message-ID: <CAGb2v671L47bCKowPF7BcjZWGbewLKzg-r+FtFYt3J11YE4KjA@mail.gmail.com>
+From: stephanolbrich@gmx.de (Stephan Olbrich)
+Date: Sun, 14 Feb 2016 11:04:27 +0100
+Subject: [PATCH v2 0/2] spi: bcm2835aux: auxiliary spi improvements
+Message-ID: <1455444269-4797-1-git-send-email-stephanolbrich@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 16, 2016 at 4:04 AM, Mark Brown <broonie@kernel.org> wrote:
-> On Mon, Feb 15, 2016 at 06:31:23PM +0800, Chen-Yu Tsai wrote:
->> The X-Powers AXP809 PMIC has a similar set of regulators as the AXP221,
->> though a few LDOs were removed, and a new switch output added. Like the
->> AXP221, AXP809 also has DC1SW and DC5LDO, which are internally chained
->> to DCDC1 and DCDC5, respectively.
->
-> This doesn't apply against current code, please check and resend.
+From: Stephan Olbrich <stephanolbrich@gmx.de>
 
-This requires mfd/ib-mfd-regulator-4.6 from Lee's tree to apply cleanly,
-and "mfd: axp20x: Add support for AXP809 PMIC", which isn't merged yet,
-to compile.
+This patch series has some improvements and fixes for the auxiliary spi.
 
-ChenYu
+since v1:
+- the first two patches "fix bitmask defines" and "disable tx fifo empty irq"
+  were picked up by Mark Brown and applied to his spi tree so I don't post
+  them again.
+- speed bits are now reset before setting the new speed in case the speed
+  changes between transfers
+- remove CPHA from master->mode_bits
+- rename CPHA bit mask to RISING to make it more clear why things are done
+  that way
+
+1. set up spi-mode before asserting cs-gpio
+ As Martin Sperl suggested this is done in the same way as in spi-bcm2835.c
+ acace73df2c1913a526c1b41e4741a4a6704c863
+
+2. fix CPOL/CPHA setting
+ From what I've seen in the documentation [1] and seen on the scope this chip
+ doesn't support modes with CPHA=1. With this patch spi mode 0 and 2 should
+ work correctly whereas mode 1 and 3 are not supported. 
+                                                                                                                                                                                                            
+Stephan Olbrich (2):
+  spi: bcm2835aux: set up spi-mode before asserting cs-gpio
+  spi: bcm2835aux: fix CPOL/CPHA setting
+
+ drivers/spi/spi-bcm2835aux.c | 66 +++++++++++++++++++++++++++++---------------
+ 1 file changed, 44 insertions(+), 22 deletions(-)
+
+-- 
+2.5.0
