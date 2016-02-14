@@ -1,22 +1,28 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Sun, 14 Feb 2016 15:49:16 +0800
-Subject: [PATCH 1/2] ARM: dts: vf610twr: assign Ethernet clock explicitly
-In-Reply-To: <1455148946-26903-1-git-send-email-stefan@agner.ch>
-References: <1455148946-26903-1-git-send-email-stefan@agner.ch>
-Message-ID: <20160214074916.GN6756@tiger>
+Date: Sun, 14 Feb 2016 15:53:08 +0800
+Subject: [PATCH] ARM: imx_v6_v7_defconfig: enable useful configurations
+ for Vybrid
+In-Reply-To: <1455156498-29949-1-git-send-email-stefan@agner.ch>
+References: <1455156498-29949-1-git-send-email-stefan@agner.ch>
+Message-ID: <20160214075308.GO6756@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 10, 2016 at 04:02:25PM -0800, Stefan Agner wrote:
-> Assign Ethernet clock parents explicitly. The VF610 Tower Board
-> uses the external Ethernet clock input which is connected to
-> a 50MHz clock.
+On Wed, Feb 10, 2016 at 06:08:18PM -0800, Stefan Agner wrote:
+> Enable configuration options useful for Vybrid:
+> - NFC NAND driver
+> - USB dual-role controller support
+> - FTM PWM driver
+> - DSPI SPI driver
+> - Colibri VF50 Touchscreen support.
 > 
-> The Vybrid SoC has two ethernet interfaces (fec0 and fec1) which
-> use the same clock source (VF610_CLK_ENET). Therefore this parent
-> configuration affects multiple consumer devices and need to be
-> specified in the clock provider node.
+> Beside that, enable useful configurations such as IIO hwmon support
+> (used in i.MX 23/28, patch pending for Vybrid), PWM LED support and
+> CPU idle support.
+> 
+> Regenerated config using savedefconfig (which removes some configs
+> which are now enabled by default).
 > 
 > Signed-off-by: Stefan Agner <stefan@agner.ch>
 
-Applied both, thanks.
+Applied, thanks.
