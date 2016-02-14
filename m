@@ -1,53 +1,59 @@
-From: k.kozlowski.k@gmail.com (Krzysztof Kozlowski)
-Date: Sun, 14 Feb 2016 15:06:27 +0900
-Subject: [next] Odroid XU3 easily over-heats
-Message-ID: <56C01963.3080106@gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Sun, 14 Feb 2016 14:09:11 +0800
+Subject: [PATCH 3/5] irqchip: add platform device driver for mbigen device
+In-Reply-To: <1455416191-23616-4-git-send-email-majun258@huawei.com>
+Message-ID: <201602141423.fn5CCDUC%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Hi Ma,
 
-With recent addition of cpufreq-dt support to Exynos5422
-it is very easy to over-heat the Odroid XU3 leading to critical shutdown:
-[  132.622032] thermal thermal_zone3: critical temperature reached(121 C),shutting down
+[auto build test ERROR on tip/irq/core]
+[also build test ERROR on v4.5-rc3 next-20160212]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 
+url:    https://github.com/0day-ci/linux/commits/MaJun/irqchip-Add-support-for-Hisilicon-mbigen-v1-chip/20160214-101957
+config: arm64-defconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
 
-Reproduction:
-0. next-20160212 (with recent fix for OPP from Viresh)
-1. multi_v7 (on exynos defconfig there is no cpufreq for Exynos5422)
-2. Run following test script:
-https://github.com/krzk/tools/blob/master/tests/odroid-xu3-cpu-mmc-stress.sh
+Note: the linux-review/MaJun/irqchip-Add-support-for-Hisilicon-mbigen-v1-chip/20160214-101957 HEAD 9acb433456cd9671c97c0eeb1ccca8cc3b986081 builds fine.
+      It only hurts bisectibility.
 
-(the script essentially does only "cat /dev/mmcblk0p2 | gzip -c > /dev/null" for each CPU)
+All error/warnings (new ones prefixed by >>):
 
-Observe, just before shutdown:
-/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq:1300000
-/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_min_freq:200000
-/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_transition_latency:154000
-/sys/devices/system/cpu/cpu0/cpufreq/related_cpus:0 1 2 3
-/sys/devices/system/cpu/cpu0/cpufreq/scaling_available_frequencies:200000 300000 400000 500000 600000 700000 800000 900000 1000000 1100000 1200000 1300000 
-/sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors:ondemand performance 
-/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq:1300000
-/sys/devices/system/cpu/cpu0/cpufreq/scaling_driver:cpufreq-dt
-/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor:ondemand
-/sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq:1300000
-/sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq:200000
-/sys/devices/system/cpu/cpu0/cpufreq/scaling_setspeed:<unsupported>
+   drivers/irqchip/irq-mbigen-v1.c: In function 'mbigen_device_probe':
+>> drivers/irqchip/irq-mbigen-v1.c:47:2: error: implicit declaration of function 'devm_ioremap' [-Werror=implicit-function-declaration]
+     mgn_chip->base = devm_ioremap(&pdev->dev, res->start, resource_size(res));
+     ^
+>> drivers/irqchip/irq-mbigen-v1.c:47:17: warning: assignment makes pointer from integer without a cast
+     mgn_chip->base = devm_ioremap(&pdev->dev, res->start, resource_size(res));
+                    ^
+   cc1: some warnings being treated as errors
 
-/sys/class/thermal/thermal_zone0/temp:90000
-/sys/class/thermal/thermal_zone1/temp:98000
-/sys/class/thermal/thermal_zone2/temp:113000
-/sys/class/thermal/thermal_zone3/temp:119000
-/sys/class/thermal/thermal_zone4/temp:81000
+vim +/devm_ioremap +47 drivers/irqchip/irq-mbigen-v1.c
 
-/sys/class/thermal/cooling_device0/cur_state:3
-/sys/class/thermal/cooling_device0/max_state:3
-/sys/class/thermal/cooling_device0/type:pwm-fan
+    41		if (!mgn_chip)
+    42			return -ENOMEM;
+    43	
+    44		mgn_chip->pdev = pdev;
+    45	
+    46		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+  > 47		mgn_chip->base = devm_ioremap(&pdev->dev, res->start, resource_size(res));
+    48		if (IS_ERR(mgn_chip->base))
+    49			return PTR_ERR(mgn_chip->base);
+    50	
 
-Fan is working but shutdown is immediate.
-
-What about cpufreq as cooling device? Probably that part
-is missing now, right?
-
-Best regards,
-Krzysztof
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 21180 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160214/d5d583fd/attachment-0001.obj>
