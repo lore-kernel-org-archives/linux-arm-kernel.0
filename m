@@ -1,91 +1,38 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Sun, 14 Feb 2016 16:06:23 +0800
-Subject: [PATCH V3 06/10] irqchip, GICv3, ITS: Refator ITS dt init code to
- prepare for ACPI.
-In-Reply-To: <56BB1548.5050402@arm.com>
-References: <1453209083-3358-1-git-send-email-tn@semihalf.com>
- <1453209083-3358-7-git-send-email-tn@semihalf.com> <56BB1548.5050402@arm.com>
-Message-ID: <56C0357F.9010904@linaro.org>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Sun, 14 Feb 2016 16:18:57 +0800
+Subject: [PATCH] ARM: imx: Do L2 errata only if the L2 cache isn't enabled
+In-Reply-To: <56BDFF64.9090701@gmail.com>
+References: <1455261093-11849-1-git-send-email-dirk.behme@de.bosch.com>
+ <20160212141654.GA10826@n2100.arm.linux.org.uk>
+ <56BDFF64.9090701@gmail.com>
+Message-ID: <20160214081857.GQ6756@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/2/10 18:47, Marc Zyngier wrote:
-> On 19/01/16 13:11, Tomasz Nowicki wrote:
->> Similarly to GICv3 core, we need to extract common code before adding
->> ACPI support. No functional changes.
->>
->> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
->> ---
->>   drivers/irqchip/irq-gic-v3-its.c   | 82 +++++++++++++++++++++++---------------
->>   drivers/irqchip/irq-gic-v3.c       |  6 +--
->>   include/linux/irqchip/arm-gic-v3.h |  2 +-
->>   3 files changed, 52 insertions(+), 38 deletions(-)
->>
->> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
->> index 2bbed18..fecb7a6 100644
->> --- a/drivers/irqchip/irq-gic-v3-its.c
->> +++ b/drivers/irqchip/irq-gic-v3-its.c
->> @@ -813,7 +813,7 @@ static void its_free_tables(struct its_node *its)
->>   	}
->>   }
->>
->> -static int its_alloc_tables(const char *node_name, struct its_node *its)
->> +static int its_alloc_tables(struct its_node *its)
->>   {
->>   	int err;
->>   	int i;
->> @@ -868,8 +868,8 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
->>   				    order);
->>   			if (order >= MAX_ORDER) {
->>   				order = MAX_ORDER - 1;
->> -				pr_warn("%s: Device Table too large, reduce its page order to %u\n",
->> -					node_name, order);
->> +				pr_warn("ITS at 0x%lx: Device Table too large, reduce its page order to %u\n",
->> +					its->phys_base, order);
->>   			}
->>   		}
->>
->> @@ -878,8 +878,8 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
->>   		if (alloc_pages > GITS_BASER_PAGES_MAX) {
->>   			alloc_pages = GITS_BASER_PAGES_MAX;
->>   			order = get_order(GITS_BASER_PAGES_MAX * psz);
->> -			pr_warn("%s: Device Table too large, reduce its page order to %u (%u pages)\n",
->> -				node_name, order, alloc_pages);
->> +			pr_warn("ITS at 0x%lx: Device Table too large, reduce its page order to %u (%u pages)\n",
->> +				its->phys_base, order, alloc_pages);
->>   		}
->>
->>   		base = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, order);
->> @@ -948,8 +948,8 @@ retry_baser:
->>   		}
->>
->>   		if (val != tmp) {
->> -			pr_err("ITS: %s: GITS_BASER%d doesn't stick: %lx %lx\n",
->> -			       node_name, i,
->> +			pr_err("ITS at 0x%lx: GITS_BASER%d doesn't stick: %lx %lx\n",
->> +			       its->phys_base, i,
->>   			       (unsigned long) val, (unsigned long) tmp);
->>   			err = -ENXIO;
->>   			goto out_free;
->> @@ -1424,10 +1424,11 @@ static void its_enable_quirks(struct its_node *its)
->>   	gic_enable_quirks(iidr, its_quirks, its);
->>   }
->>
->> -static int __init its_probe(struct device_node *node,
->> -			    struct irq_domain *parent)
->> +static int __init its_probe_one(phys_addr_t phys_base, unsigned long size,
->> +				struct irq_domain *parent,
->> +				bool is_msi_controller,
->
-> I really question the fact that you are keeping this msi_controller
-> thing. Let's face it: if this is not an MSI controller, then the whole
-> thing is absolutely pointless.
->
-> So I'd rather you simplify the whole in a separate patch, and just don't
-> bother initializing the ITS if it cannot be used for MSIs.
+On Fri, Feb 12, 2016 at 04:51:00PM +0100, Dirk Behme wrote:
+> On 12.02.2016 15:16, Russell King - ARM Linux wrote:
+> >On Fri, Feb 12, 2016 at 08:11:33AM +0100, Dirk Behme wrote:
+> >>All the generic L2 cache handling code is encapsulated by a
+> >>check if the L2 cache is enabled. If it's enabled already, the code
+> >>is skipped.
+> >>
+> >>For the i.MX6 specific L2 cache handling we missed this check.
+> >>Add it.
+> >
+> >What's the reasoning behind this?  The prefetch register is writable
+> >while the L2 cache is enabled, unlike the auxiliary control register.
+> 
+> From an internal log I have the following info:
+> 
+> The write to the L2-Cache controller from non-secure world causes an
+> imprecise
+> external abort. If Linux runs from normal world the cache controller
+> is already
+> enabled and thus no configuration is needed by Linux.
 
-Agree, that will simplify the code a lot.
+Dirk,
 
-Thanks
-Hanjun
+Do you have a real use case of this, i.e. running Linux on i.MX6 in
+non-secure world?
+
+Shawn
