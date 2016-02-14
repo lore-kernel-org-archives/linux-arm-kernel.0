@@ -1,19 +1,17 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Sun, 14 Feb 2016 15:20:40 +0800
-Subject: [PATCH 1/4] ARM: dts: imx6q-tbs2910: add SATA PHY configuration
-In-Reply-To: <1454870073-6506-1-git-send-email-smoch@web.de>
-References: <1454870073-6506-1-git-send-email-smoch@web.de>
-Message-ID: <20160214072039.GJ6756@tiger>
+Date: Sun, 14 Feb 2016 15:23:15 +0800
+Subject: [PATCH] ARM: imx_v6_v7_defconfig: Select CONFIG_CRYPTO_DEV_SAHARA
+In-Reply-To: <1454962073-22401-1-git-send-email-festevam@gmail.com>
+References: <1454962073-22401-1-git-send-email-festevam@gmail.com>
+Message-ID: <20160214072315.GK6756@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 07, 2016 at 07:34:30PM +0100, Soeren Moch wrote:
-> Configure SATA PHY transmit level, boost, attenuation and equalizer
-> parameters for long wire connections. TBS2910 contains a standard SATA
-> connector, so devices are typically connected with (longer) SATA cables.
-> And explicitly configuring these parameters avoids complaints about
-> "not specified" values in boot messages.
+On Mon, Feb 08, 2016 at 06:07:53PM -0200, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@nxp.com>
 > 
-> Signed-off-by: Soeren Moch <smoch@web.de>
+> Select the sahara crypto driver that is used on i.MX53.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-Applied all, thanks.
+Applied, thanks.
