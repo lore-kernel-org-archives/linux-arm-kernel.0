@@ -1,45 +1,76 @@
-From: dirk.behme@gmail.com (Dirk Behme)
-Date: Sun, 14 Feb 2016 09:30:06 +0100
-Subject: [PATCH] ARM: imx: Do L2 errata only if the L2 cache isn't enabled
-In-Reply-To: <20160214081857.GQ6756@tiger>
-References: <1455261093-11849-1-git-send-email-dirk.behme@de.bosch.com>
- <20160212141654.GA10826@n2100.arm.linux.org.uk> <56BDFF64.9090701@gmail.com>
- <20160214081857.GQ6756@tiger>
-Message-ID: <56C03B0E.9000809@gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Sun, 14 Feb 2016 16:33:49 +0800
+Subject: [PATCH v2] ARM: dts: vfxxx: Add iio_hwmon node for ADC
+ temperature channel
+In-Reply-To: <cd32f1664a04b38b8a025414d039bd015cb9a5ff.1455278754.git.maitysanchayan@gmail.com>
+References: <cd32f1664a04b38b8a025414d039bd015cb9a5ff.1455278754.git.maitysanchayan@gmail.com>
+Message-ID: <20160214083349.GR6756@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14.02.2016 09:18, Shawn Guo wrote:
-> On Fri, Feb 12, 2016 at 04:51:00PM +0100, Dirk Behme wrote:
->> On 12.02.2016 15:16, Russell King - ARM Linux wrote:
->>> On Fri, Feb 12, 2016 at 08:11:33AM +0100, Dirk Behme wrote:
->>>> All the generic L2 cache handling code is encapsulated by a
->>>> check if the L2 cache is enabled. If it's enabled already, the code
->>>> is skipped.
->>>>
->>>> For the i.MX6 specific L2 cache handling we missed this check.
->>>> Add it.
->>>
->>> What's the reasoning behind this?  The prefetch register is writable
->>> while the L2 cache is enabled, unlike the auxiliary control register.
->>
->>  From an internal log I have the following info:
->>
->> The write to the L2-Cache controller from non-secure world causes an
->> imprecise
->> external abort. If Linux runs from normal world the cache controller
->> is already
->> enabled and thus no configuration is needed by Linux.
->
-> Dirk,
->
-> Do you have a real use case of this, i.e. running Linux on i.MX6 in
-> non-secure world?
+On Fri, Feb 12, 2016 at 05:53:00PM +0530, Sanchayan Maity wrote:
+> Add iio_hwmon node to expose the temperature channel on Vybrid as
+> hardware monitor device using the iio_hwmon driver.
+> 
+> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+> ---
+> 
+> Hello,
+> 
+> The first version of the patch was send quite a while ago.
+> https://lkml.org/lkml/2015/9/16/932
+> 
+> Shawn you had requested that hyphen rather than underscore should
+> be used in node name. I looked into that.
+> 
+> The iio_hwmon driver calls hwmon_device register_with_groups inside
+> hwmon.c and this
+> http://lxr.free-electrons.com/source/drivers/hwmon/hwmon.c#L103
+> 
+> does not allow hyphen in hwmon name attribute. I was not aware of
+> this but while trying to test the change, the device probe failed
+> with EINVAL. I think we should stick to the existing use of the
+> bindings or we need to change the hwmon code as well along with the
+> existing device tree files and binding documentation.
 
+I disagree.
 
-Yes, in a scenario where one of the cores runs a RTOS.
+If hyphen is invalid to be part of hwmon name attribute, the following
+code in iio_hwmon_probe() is plain wrong, because hyphen is very valid
+to be part of node names in device tree.
 
+        if (dev->of_node && dev->of_node->name)
+                name = dev->of_node->name;
 
-Best regards
+Shawn
 
-Dirk
+> 
+> Changes since v1:
+> 1. Expose ADC1 temperature channel as well
+> 2. Move the entry outside of the aips1 bus node
+> 
+> Best Regards,
+> Sanchayan Maity.
+> ---
+>  arch/arm/boot/dts/vfxxx.dtsi | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
+> index a5f07e3..8ed8e47 100644
+> --- a/arch/arm/boot/dts/vfxxx.dtsi
+> +++ b/arch/arm/boot/dts/vfxxx.dtsi
+> @@ -673,5 +673,10 @@
+>  				status = "disabled";
+>  			};
+>  		};
+> +
+> +		iio_hwmon {
+> +			compatible = "iio-hwmon";
+> +			io-channels = <&adc0 16>, <&adc1 16>;
+> +		};
+>  	};
+>  };
+> -- 
+> 2.7.1
+> 
+> 
