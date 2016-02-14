@@ -1,76 +1,51 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Sun, 14 Feb 2016 16:33:49 +0800
-Subject: [PATCH v2] ARM: dts: vfxxx: Add iio_hwmon node for ADC
- temperature channel
-In-Reply-To: <cd32f1664a04b38b8a025414d039bd015cb9a5ff.1455278754.git.maitysanchayan@gmail.com>
-References: <cd32f1664a04b38b8a025414d039bd015cb9a5ff.1455278754.git.maitysanchayan@gmail.com>
-Message-ID: <20160214083349.GR6756@tiger>
+Date: Sun, 14 Feb 2016 16:47:14 +0800
+Subject: [PATCH] ARM: dts: ls2080a: Add quirk for Erratum A009116
+In-Reply-To: <1455059287-2500-1-git-send-email-Lijun.Pan@freescale.com>
+References: <1455059287-2500-1-git-send-email-Lijun.Pan@freescale.com>
+Message-ID: <20160214084714.GS6756@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 12, 2016 at 05:53:00PM +0530, Sanchayan Maity wrote:
-> Add iio_hwmon node to expose the temperature channel on Vybrid as
-> hardware monitor device using the iio_hwmon driver.
+On Tue, Feb 09, 2016 at 05:08:07PM -0600, Lijun Pan wrote:
+> Add "snps,quirk-frame-length-adjustment" property to
+> USB3 node for erratum A009116. This property provides
+> value of GFLADJ_30MHZ for post silicon frame length
+> adjustment.
 > 
-> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+> Signed-off-by: Lijun Pan <Lijun.Pan@freescale.com>
 > ---
-> 
-> Hello,
-> 
-> The first version of the patch was send quite a while ago.
-> https://lkml.org/lkml/2015/9/16/932
-> 
-> Shawn you had requested that hyphen rather than underscore should
-> be used in node name. I looked into that.
-> 
-> The iio_hwmon driver calls hwmon_device register_with_groups inside
-> hwmon.c and this
-> http://lxr.free-electrons.com/source/drivers/hwmon/hwmon.c#L103
-> 
-> does not allow hyphen in hwmon name attribute. I was not aware of
-> this but while trying to test the change, the device probe failed
-> with EINVAL. I think we should stick to the existing use of the
-> bindings or we need to change the hwmon code as well along with the
-> existing device tree files and binding documentation.
+>  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi |    2 ++
+>  1 file changed, 2 insertions(+)
 
-I disagree.
-
-If hyphen is invalid to be part of hwmon name attribute, the following
-code in iio_hwmon_probe() is plain wrong, because hyphen is very valid
-to be part of node names in device tree.
-
-        if (dev->of_node && dev->of_node->name)
-                name = dev->of_node->name;
+Forgot to mention that arm64 patches use a different subject prefix from
+ARM ones.  I changed the patch subject to "arm64: dts: ..." when
+applying.
 
 Shawn
 
 > 
-> Changes since v1:
-> 1. Expose ADC1 temperature channel as well
-> 2. Move the entry outside of the aips1 bus node
-> 
-> Best Regards,
-> Sanchayan Maity.
-> ---
->  arch/arm/boot/dts/vfxxx.dtsi | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
-> index a5f07e3..8ed8e47 100644
-> --- a/arch/arm/boot/dts/vfxxx.dtsi
-> +++ b/arch/arm/boot/dts/vfxxx.dtsi
-> @@ -673,5 +673,10 @@
->  				status = "disabled";
->  			};
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+> index 6e9e033..fa506f5 100644
+> --- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+> +++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+> @@ -501,6 +501,7 @@
+>  			reg = <0x0 0x3100000 0x0 0x10000>;
+>  			interrupts = <0 80 0x4>; /* Level high type */
+>  			dr_mode = "host";
+> +			snps,quirk-frame-length-adjustment = <0x20>;
 >  		};
-> +
-> +		iio_hwmon {
-> +			compatible = "iio-hwmon";
-> +			io-channels = <&adc0 16>, <&adc1 16>;
-> +		};
->  	};
->  };
+>  
+>  		usb1: usb3 at 3110000 {
+> @@ -509,6 +510,7 @@
+>  			reg = <0x0 0x3110000 0x0 0x10000>;
+>  			interrupts = <0 81 0x4>; /* Level high type */
+>  			dr_mode = "host";
+> +			snps,quirk-frame-length-adjustment = <0x20>;
+>  		};
+>  
+>  		ccn at 4000000 {
 > -- 
-> 2.7.1
+> 1.7.9.5
 > 
 > 
