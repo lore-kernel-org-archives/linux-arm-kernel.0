@@ -1,115 +1,118 @@
 From: majun258@huawei.com (MaJun)
-Date: Sun, 14 Feb 2016 10:16:31 +0800
-Subject: [PATCH 5/5] irqchip:implement the mbigen irq chip operation functions
+Date: Sun, 14 Feb 2016 10:16:29 +0800
+Subject: [PATCH 3/5] irqchip: add platform device driver for mbigen device
 In-Reply-To: <1455416191-23616-1-git-send-email-majun258@huawei.com>
 References: <1455416191-23616-1-git-send-email-majun258@huawei.com>
-Message-ID: <1455416191-23616-6-git-send-email-majun258@huawei.com>
+Message-ID: <1455416191-23616-4-git-send-email-majun258@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ma Jun <majun258@huawei.com>
 
-Add the interrupt controller chip operation functions of mbigen chip.
+Add the platform device driver for mbigen chip v1.
+This patch just same as mbigen v2.
 
 Signed-off-by: Ma Jun <majun258@huawei.com>
 ---
- drivers/irqchip/irq-mbigen-v1.c |   75 +++++++++++++++++++++++++++++++++++++++
- 1 files changed, 75 insertions(+), 0 deletions(-)
+ drivers/irqchip/Makefile        |    2 +-
+ drivers/irqchip/irq-mbigen-v1.c |   76 +++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 77 insertions(+), 1 deletions(-)
+ create mode 100644 drivers/irqchip/irq-mbigen-v1.c
 
+diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+index 83d1fce..3152450 100644
+--- a/drivers/irqchip/Makefile
++++ b/drivers/irqchip/Makefile
+@@ -25,7 +25,7 @@ obj-$(CONFIG_REALVIEW_DT)		+= irq-gic-realview.o
+ obj-$(CONFIG_ARM_GIC_V2M)		+= irq-gic-v2m.o
+ obj-$(CONFIG_ARM_GIC_V3)		+= irq-gic-v3.o irq-gic-common.o
+ obj-$(CONFIG_ARM_GIC_V3_ITS)		+= irq-gic-v3-its.o irq-gic-v3-its-pci-msi.o irq-gic-v3-its-platform-msi.o
+-obj-$(CONFIG_HISILICON_IRQ_MBIGEN)	+= irq-mbigen.o
++obj-$(CONFIG_HISILICON_IRQ_MBIGEN)	+= irq-mbigen.o irq-mbigen-v1.o
+ obj-$(CONFIG_ARM_NVIC)			+= irq-nvic.o
+ obj-$(CONFIG_ARM_VIC)			+= irq-vic.o
+ obj-$(CONFIG_ATMEL_AIC_IRQ)		+= irq-atmel-aic-common.o irq-atmel-aic.o
 diff --git a/drivers/irqchip/irq-mbigen-v1.c b/drivers/irqchip/irq-mbigen-v1.c
-index 6bbb82a..8291a47 100644
---- a/drivers/irqchip/irq-mbigen-v1.c
+new file mode 100644
+index 0000000..9445658
+--- /dev/null
 +++ b/drivers/irqchip/irq-mbigen-v1.c
-@@ -41,6 +41,20 @@
- #define REG_MBIGEN_EXT_VEC_OFFSET		0x320
- 
- /**
-+ * offset of clear register in mbigen node
-+ * This register is used to clear the status
-+ * of interrupt
+@@ -0,0 +1,76 @@
++/*
++ * Copyright (C) 2015 Hisilicon Limited, All Rights Reserved.
++ * Author: Jun Ma <majun258@huawei.com>
++ * Author: Yun Wu <wuyun.wu@huawei.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
-+#define REG_MBIGEN_CLEAR_OFFSET		0x100
++
++#include <linux/module.h>
++#include <linux/of_platform.h>
++#include <linux/platform_device.h>
++#include <linux/slab.h>
 +
 +/**
-+ * offset of interrupt type register
-+ * This register is used to configure interrupt
-+ * trigger type
++ * struct mbigen_device - holds the information of mbigen device.
++ *
++ * @pdev:		pointer to the platform device structure of mbigen chip.
++ * @base:		mapped address of this mbigen chip.
 + */
-+#define REG_MBIGEN_TYPE_OFFSET		0x0
++struct mbigen_device {
++	struct platform_device	*pdev;
++	void __iomem		*base;
++};
 +
-+/**
-  * struct mbigen_device - holds the information of mbigen device.
-  *
-  * @pdev:		pointer to the platform device structure of mbigen chip.
-@@ -77,8 +91,69 @@ static inline unsigned int get_mbigen_vec_reg(irq_hw_number_t hwirq)
- 		return (nid - 4) * 4 + REG_MBIGEN_EXT_VEC_OFFSET;
- }
- 
-+static inline void get_mbigen_type_reg(irq_hw_number_t hwirq,
-+					u32 *mask, u32 *addr)
++static int mbigen_device_probe(struct platform_device *pdev)
 +{
-+	int ofst;
++	struct mbigen_device *mgn_chip;
++	struct resource *res;
 +
-+	ofst = hwirq / 32 * 4;
-+	*mask = 1 << (hwirq % 32);
++	mgn_chip = devm_kzalloc(&pdev->dev, sizeof(*mgn_chip), GFP_KERNEL);
++	if (!mgn_chip)
++		return -ENOMEM;
 +
-+	*addr = ofst + REG_MBIGEN_TYPE_OFFSET;
-+}
++	mgn_chip->pdev = pdev;
 +
-+static inline void get_mbigen_clear_reg(irq_hw_number_t hwirq,
-+					u32 *mask, u32 *addr)
-+{
-+	unsigned int ofst;
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	mgn_chip->base = devm_ioremap(&pdev->dev, res->start, resource_size(res));
++	if (IS_ERR(mgn_chip->base))
++		return PTR_ERR(mgn_chip->base);
 +
-+	ofst = hwirq / 32 * 4;
-+
-+	*mask = 1 << (hwirq % 32);
-+	*addr = ofst + REG_MBIGEN_CLEAR_OFFSET;
-+}
-+
-+static void mbigen_eoi_irq(struct irq_data *data)
-+{
-+	void __iomem *base = data->chip_data;
-+	u32 mask, addr;
-+
-+	get_mbigen_clear_reg(data->hwirq, &mask, &addr);
-+
-+	writel_relaxed(mask, base + addr);
-+
-+	irq_chip_eoi_parent(data);
-+}
-+
-+static int mbigen_set_type(struct irq_data *data, unsigned int type)
-+{
-+	void __iomem *base = data->chip_data;
-+	u32 mask, addr, val;
-+
-+	if (type != IRQ_TYPE_LEVEL_HIGH && type != IRQ_TYPE_EDGE_RISING)
-+		return -EINVAL;
-+
-+	get_mbigen_type_reg(data->hwirq, &mask, &addr);
-+
-+	val = readl_relaxed(base + addr);
-+
-+	if (type == IRQ_TYPE_LEVEL_HIGH)
-+		val |= mask;
-+	else
-+		val &= ~mask;
-+
-+	writel_relaxed(val, base + addr);
++	platform_set_drvdata(pdev, mgn_chip);
 +
 +	return 0;
 +}
 +
- static struct irq_chip mbigen_irq_chip = {
- 	.name =			"mbigen-v1",
-+	.irq_mask =		irq_chip_mask_parent,
-+	.irq_unmask =		irq_chip_unmask_parent,
-+	.irq_eoi =		mbigen_eoi_irq,
-+	.irq_set_type =		mbigen_set_type,
-+	.irq_set_affinity =	irq_chip_set_affinity_parent,
- };
- 
- static void mbigen_write_msg(struct msi_desc *desc, struct msi_msg *msg)
++static const struct of_device_id mbigen_of_match[] = {
++	{ .compatible = "hisilicon,mbigen-v1" },
++	{ /* END */ }
++};
++MODULE_DEVICE_TABLE(of, mbigen_of_match);
++
++static struct platform_driver mbigen_platform_driver = {
++	.driver = {
++		.name		= "Hisilicon MBIGEN-V1",
++		.owner		= THIS_MODULE,
++		.of_match_table	= mbigen_of_match,
++	},
++	.probe			= mbigen_device_probe,
++};
++
++module_platform_driver(mbigen_platform_driver);
++
++MODULE_AUTHOR("Jun Ma <majun258@huawei.com>");
++MODULE_AUTHOR("Yun Wu <wuyun.wu@huawei.com>");
++MODULE_LICENSE("GPL");
++MODULE_DESCRIPTION("Hisilicon MBI Generator driver");
 -- 
 1.7.1
