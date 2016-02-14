@@ -1,184 +1,41 @@
-From: majun258@huawei.com (MaJun)
-Date: Sun, 14 Feb 2016 10:16:28 +0800
-Subject: [PATCH 2/5] dt-binding:Rename the mbigen binding file name
-In-Reply-To: <1455416191-23616-1-git-send-email-majun258@huawei.com>
-References: <1455416191-23616-1-git-send-email-majun258@huawei.com>
-Message-ID: <1455416191-23616-3-git-send-email-majun258@huawei.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Sun, 14 Feb 2016 10:19:29 +0800
+Subject: [PATCH v7 4/7] ARM: dts: imx: Add support for Advantech/GE Bx50v3
+In-Reply-To: <56B3E578.2080209@timesys.com>
+References: <1454109558-22800-1-git-send-email-akshay.bhat@timesys.com>
+ <1454109558-22800-5-git-send-email-akshay.bhat@timesys.com>
+ <20160203145256.GR8307@tiger> <56B3E578.2080209@timesys.com>
+Message-ID: <20160214021929.GC6756@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ma Jun <majun258@huawei.com>
+On Thu, Feb 04, 2016 at 06:57:44PM -0500, Akshay Bhat wrote:
+> >>+/ {
+> >>+	clocks {
+> >>+		#address-cells = <1>;
+> >>+		#size-cells = <0>;
+> >
+> >These are already specified in imx6qdl.dtsi.
+> >
+> 
+> Will fix this. Once it is removed, should I have a new line before
+> the child node?
+> eg:
+> 
+> clocks {
+> 
 
-Because added the mbigen-v1 compatible string, the origin name is
-not suitable any more. So,I remove the version number from file name.
+No, this new line is not needed.
 
-Signed-off-by: Ma Jun <majun258@huawei.com>
----
- .../interrupt-controller/hisilicon,mbigen-v2.txt   |   74 --------------------
- .../interrupt-controller/hisilicon,mbigen.txt      |   74 ++++++++++++++++++++
- 2 files changed, 74 insertions(+), 74 deletions(-)
- delete mode 100644 Documentation/devicetree/bindings/interrupt-controller/hisilicon,mbigen-v2.txt
- create mode 100644 Documentation/devicetree/bindings/interrupt-controller/hisilicon,mbigen.txt
+Shawn
 
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/hisilicon,mbigen-v2.txt b/Documentation/devicetree/bindings/interrupt-controller/hisilicon,mbigen-v2.txt
-deleted file mode 100644
-index bdd1dea..0000000
---- a/Documentation/devicetree/bindings/interrupt-controller/hisilicon,mbigen-v2.txt
-+++ /dev/null
-@@ -1,74 +0,0 @@
--Hisilicon mbigen device tree bindings.
--=======================================
--
--Mbigen means: message based interrupt generator.
--
--MBI is kind of msi interrupt only used on Non-PCI devices.
--
--To reduce the wired interrupt number connected to GIC,
--Hisilicon designed mbigen to collect and generate interrupt.
--
--
--Non-pci devices can connect to mbigen and generate the
--interrupt by writing ITS register.
--
--The mbigen chip and devices connect to mbigen have the following properties:
--
--Mbigen main node required properties:
---------------------------------------------
--- compatible: Should be "hisilicon,mbigen-v2" or "hisilicon,mbigen-v1"
--
--- reg: Specifies the base physical address and size of the Mbigen
--  registers.
--
--- interrupt controller: Identifies the node as an interrupt controller
--
--- msi-parent: Specifies the MSI controller this mbigen use.
--  For more detail information,please refer to the generic msi-parent binding in
--  Documentation/devicetree/bindings/interrupt-controller/msi.txt.
--
--- num-pins: the total number of pins implemented in this Mbigen
--  instance.
--
--- #interrupt-cells : Specifies the number of cells needed to encode an
--  interrupt source. The value must be 2.
--
--  The 1st cell is hardware pin number of the interrupt.This number is local to
--  each mbigen chip and in the range from 0 to the maximum interrupts number
--  of the mbigen.
--
--  The 2nd cell is the interrupt trigger type.
--	The value of this cell should be:
--	1: rising edge triggered
--	or
--	4: high level triggered
--
--Examples:
--
--	mbigen_device_gmac:intc {
--			compatible = "hisilicon,mbigen-v2";
--			reg = <0x0 0xc0080000 0x0 0x10000>;
--			interrupt-controller;
--			msi-parent = <&its_dsa 0x40b1c>;
--			num-pins = <9>;
--			#interrupt-cells = <2>;
--	};
--
--Devices connect to mbigen required properties:
------------------------------------------------------
---interrupt-parent: Specifies the mbigen device node which device connected.
--
---interrupts:Specifies the interrupt source.
-- For the specific information of each cell in this property,please refer to
-- the "interrupt-cells" description mentioned above.
--
--Examples:
--	gmac0: ethernet at c2080000 {
--		#address-cells = <1>;
--		#size-cells = <0>;
--		reg = <0 0xc2080000 0 0x20000>,
--		      <0 0xc0000000 0 0x1000>;
--		interrupt-parent  = <&mbigen_device_gmac>;
--		interrupts =	<656 1>,
--				<657 1>;
--	};
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/hisilicon,mbigen.txt b/Documentation/devicetree/bindings/interrupt-controller/hisilicon,mbigen.txt
-new file mode 100644
-index 0000000..bdd1dea
---- /dev/null
-+++ b/Documentation/devicetree/bindings/interrupt-controller/hisilicon,mbigen.txt
-@@ -0,0 +1,74 @@
-+Hisilicon mbigen device tree bindings.
-+=======================================
-+
-+Mbigen means: message based interrupt generator.
-+
-+MBI is kind of msi interrupt only used on Non-PCI devices.
-+
-+To reduce the wired interrupt number connected to GIC,
-+Hisilicon designed mbigen to collect and generate interrupt.
-+
-+
-+Non-pci devices can connect to mbigen and generate the
-+interrupt by writing ITS register.
-+
-+The mbigen chip and devices connect to mbigen have the following properties:
-+
-+Mbigen main node required properties:
-+-------------------------------------------
-+- compatible: Should be "hisilicon,mbigen-v2" or "hisilicon,mbigen-v1"
-+
-+- reg: Specifies the base physical address and size of the Mbigen
-+  registers.
-+
-+- interrupt controller: Identifies the node as an interrupt controller
-+
-+- msi-parent: Specifies the MSI controller this mbigen use.
-+  For more detail information,please refer to the generic msi-parent binding in
-+  Documentation/devicetree/bindings/interrupt-controller/msi.txt.
-+
-+- num-pins: the total number of pins implemented in this Mbigen
-+  instance.
-+
-+- #interrupt-cells : Specifies the number of cells needed to encode an
-+  interrupt source. The value must be 2.
-+
-+  The 1st cell is hardware pin number of the interrupt.This number is local to
-+  each mbigen chip and in the range from 0 to the maximum interrupts number
-+  of the mbigen.
-+
-+  The 2nd cell is the interrupt trigger type.
-+	The value of this cell should be:
-+	1: rising edge triggered
-+	or
-+	4: high level triggered
-+
-+Examples:
-+
-+	mbigen_device_gmac:intc {
-+			compatible = "hisilicon,mbigen-v2";
-+			reg = <0x0 0xc0080000 0x0 0x10000>;
-+			interrupt-controller;
-+			msi-parent = <&its_dsa 0x40b1c>;
-+			num-pins = <9>;
-+			#interrupt-cells = <2>;
-+	};
-+
-+Devices connect to mbigen required properties:
-+----------------------------------------------------
-+-interrupt-parent: Specifies the mbigen device node which device connected.
-+
-+-interrupts:Specifies the interrupt source.
-+ For the specific information of each cell in this property,please refer to
-+ the "interrupt-cells" description mentioned above.
-+
-+Examples:
-+	gmac0: ethernet at c2080000 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		reg = <0 0xc2080000 0 0x20000>,
-+		      <0 0xc0000000 0 0x1000>;
-+		interrupt-parent  = <&mbigen_device_gmac>;
-+		interrupts =	<656 1>,
-+				<657 1>;
-+	};
--- 
-1.7.1
+> 	mclk: clock at 0 {
+> 		compatible = "fixed-clock";
+> >>+
+> >>+		mclk: clock at 0 {
+> >>+			compatible = "fixed-clock";
+> >>+			reg = <0>;
+> >>+			#clock-cells = <0>;
+> >>+			clock-frequency = <22000000>;
+> >>+		};
+> >>+	};
