@@ -1,68 +1,65 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Sun, 14 Feb 2016 19:25:08 +0100
-Subject: [PATCH 01/17] drm/virtio: removed optional dummy encoder
- mode_fixup function.
-In-Reply-To: <1455285069-2819-2-git-send-email-palminha@synopsys.com>
-References: <daniel.vetter@ffwll.ch,>
- <1455285069-2819-1-git-send-email-palminha@synopsys.com>
- <1455285069-2819-2-git-send-email-palminha@synopsys.com>
-Message-ID: <20160214182508.GF11240@phenom.ffwll.local>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sun, 14 Feb 2016 20:06:10 +0100
+Subject: [PATCH] [media] zl10353: use div_u64 instead of do_div
+In-Reply-To: <alpine.LFD.2.20.1602141139110.13632@knanqh.ubzr>
+References: <1455287246-3540549-1-git-send-email-arnd@arndb.de>
+ <2712691.b9gkR7KMX7@wuerfel>
+ <alpine.LFD.2.20.1602121305180.13632@knanqh.ubzr>
+ <6737272.LXr2g355Yt@wuerfel>
+ <CAKv+Gu8dFz28tGgQTv+WYAvKpeiFXaj8JANUFtOJwKPRsB8F5A@mail.gmail.com>
+ <alpine.LFD.2.20.1602131652560.13632@knanqh.ubzr>
+ <CAKv+Gu9YWEkArjssR9Urh0_MOR3duNOo2UNiV=tXoQNgFtDngQ@mail.gmail.com>
+ <alpine.LFD.2.20.1602141139110.13632@knanqh.ubzr>
+Message-ID: <CAKv+Gu_z0xeQx-n7PPaWYUNjV8xWPXwTrGS3RnyByW8xw3Yf+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 12, 2016 at 01:50:53PM +0000, Carlos Palminha wrote:
+On 14 February 2016 at 17:52, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> On Sun, 14 Feb 2016, Ard Biesheuvel wrote:
+>
+>> On 13 February 2016 at 22:57, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+>> > On Sat, 13 Feb 2016, Ard Biesheuvel wrote:
+>> >
+>> >> On 12 February 2016 at 22:01, Arnd Bergmann <arnd@arndb.de> wrote:
+>> >> > However, I did stumble over an older patch I did now, which I could
+>> >> > not remember what it was good for. It does fix the problem, and
+>> >> > it seems to be a better solution.
+>> >> >
+>> >> >         Arnd
+>> >> >
+>> >> > diff --git a/include/linux/compiler.h b/include/linux/compiler.h
+>> >> > index b5acbb404854..b5ff9881bef8 100644
+>> >> > --- a/include/linux/compiler.h
+>> >> > +++ b/include/linux/compiler.h
+>> >> > @@ -148,7 +148,7 @@ void ftrace_likely_update(struct ftrace_branch_data *f, int val, int expect);
+>> >> >   */
+>> >> >  #define if(cond, ...) __trace_if( (cond , ## __VA_ARGS__) )
+>> >> >  #define __trace_if(cond) \
+>> >> > -       if (__builtin_constant_p((cond)) ? !!(cond) :                   \
+>> >> > +       if (__builtin_constant_p(!!(cond)) ? !!(cond) :                 \
+>> >> >         ({                                                              \
+>> >> >                 int ______r;                                            \
+>> >> >                 static struct ftrace_branch_data                        \
+>> >> >
+>> >>
+>> >> I remember seeing this patch, but I don't remember the exact context.
+>> >> But when you think about it, !!cond can be a build time constant even
+>> >> if cond is not, as long as you can prove statically that cond != 0. So
+>> >
+>> > You're right.  I just tested it and to my surprise gcc is smart enough
+>> > to figure that case out.
+>> >
+>> >> I think this change is obviously correct, and an improvement since it
+>> >> will remove the profiling overhead of branches that are not true
+>> >> branches in the first place.
+>> >
+>> > Indeed.
+>> >
+>>
+>> ... and perhaps we should not evaluate cond twice either?
+>
+> It is not. The value of the argument to __builtin_constant_p() is not
+> itself evaluated and therefore does not produce side effects.
+>
 
-Sob-line from you is missing on all patches, I can't merge them. Also
-please copypaste a default blurb to all patches that this is only recently
-no longer needed. And dunno what happened to your patch series, the
-threading is somehow broken. In case your mail server doesn't accept a big
-patch series you can first format .patch files using git format-patch with
-threading enabled (should be the default) and then send them out in
-chunks.
-
-When resending please also add the r-b tag from Alex for amdgpu/radoen.
-
-Thanks, Daniel
-
-> ---
->  drivers/gpu/drm/virtio/virtgpu_display.c | 8 --------
->  1 file changed, 8 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/virtio/virtgpu_display.c b/drivers/gpu/drm/virtio/virtgpu_display.c
-> index a165f03..429aa31 100644
-> --- a/drivers/gpu/drm/virtio/virtgpu_display.c
-> +++ b/drivers/gpu/drm/virtio/virtgpu_display.c
-> @@ -282,13 +282,6 @@ static const struct drm_crtc_helper_funcs virtio_gpu_crtc_helper_funcs = {
->  	.atomic_check  = virtio_gpu_crtc_atomic_check,
->  };
->  
-> -static bool virtio_gpu_enc_mode_fixup(struct drm_encoder *encoder,
-> -				      const struct drm_display_mode *mode,
-> -				      struct drm_display_mode *adjusted_mode)
-> -{
-> -	return true;
-> -}
-> -
->  static void virtio_gpu_enc_mode_set(struct drm_encoder *encoder,
->  				    struct drm_display_mode *mode,
->  				    struct drm_display_mode *adjusted_mode)
-> @@ -362,7 +355,6 @@ virtio_gpu_best_encoder(struct drm_connector *connector)
->  }
->  
->  static const struct drm_encoder_helper_funcs virtio_gpu_enc_helper_funcs = {
-> -	.mode_fixup = virtio_gpu_enc_mode_fixup,
->  	.mode_set   = virtio_gpu_enc_mode_set,
->  	.enable     = virtio_gpu_enc_enable,
->  	.disable    = virtio_gpu_enc_disable,
-> -- 
-> 2.5.0
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
-
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+Interesting, thanks for clarifying.
