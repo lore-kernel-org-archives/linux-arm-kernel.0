@@ -1,59 +1,123 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sun, 14 Feb 2016 14:09:11 +0800
-Subject: [PATCH 3/5] irqchip: add platform device driver for mbigen device
-In-Reply-To: <1455416191-23616-4-git-send-email-majun258@huawei.com>
-Message-ID: <201602141423.fn5CCDUC%fengguang.wu@intel.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Sun, 14 Feb 2016 15:44:53 +0900
+Subject: [PATCH] ARM: dts: Move syscon reboot/poweroff to common dtsi for
+ Exynos
+In-Reply-To: <1455042606-10075-1-git-send-email-javier@osg.samsung.com>
+References: <1455042606-10075-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <56C02265.40103@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ma,
+W dniu 10.02.2016 o 03:30, Javier Martinez Canillas pisze:
+> All Exynos SoCs have the same syscon reboot and poweroff device nodes so
+> there is no need to duplicate the same on each SoC dtsi and can be moved
+> to a common dtsi that can be included by all the SoCs dtsi files.
+> 
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> 
+> ---
+> Hello,
+> 
+> The patch was tested on an Exynos5800 Peach Pi Chromebook and an
+> Exynos5422 Odroid XU4 board. Reboot and poweroff worked for both.
+> 
+> But testing on Exynos3 and Exynos4 will be highly appreciated.
 
-[auto build test ERROR on tip/irq/core]
-[also build test ERROR on v4.5-rc3 next-20160212]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+Would you be so kind and add my suggested-by (since it comes from
+https://wiki.tizen.org/wiki/Exynos_Mainline_Kernel_TODO :) )
 
-url:    https://github.com/0day-ci/linux/commits/MaJun/irqchip-Add-support-for-Hisilicon-mbigen-v1-chip/20160214-101957
-config: arm64-defconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+I'll test it on Exynos4 at work and then apply... but few comments below:
 
-Note: the linux-review/MaJun/irqchip-Add-support-for-Hisilicon-mbigen-v1-chip/20160214-101957 HEAD 9acb433456cd9671c97c0eeb1ccca8cc3b986081 builds fine.
-      It only hurts bisectibility.
+> 
+> Best regards,
+> Javier
+> 
+>  arch/arm/boot/dts/exynos-syscon-restart.dtsi | 23 +++++++++++++++++++++++
+>  arch/arm/boot/dts/exynos3250.dtsi            | 15 +--------------
+>  arch/arm/boot/dts/exynos4.dtsi               | 15 +--------------
+>  arch/arm/boot/dts/exynos5.dtsi               | 15 +--------------
+>  arch/arm/boot/dts/exynos5410.dtsi            | 15 +--------------
+>  5 files changed, 27 insertions(+), 56 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/exynos-syscon-restart.dtsi
+> 
+> diff --git a/arch/arm/boot/dts/exynos-syscon-restart.dtsi b/arch/arm/boot/dts/exynos-syscon-restart.dtsi
+> new file mode 100644
+> index 000000000000..2b8acf554881
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/exynos-syscon-restart.dtsi
+> @@ -0,0 +1,23 @@
+> +/*
+> + * Samsung's Exynos SoC syscon reboot/poweroff nodes common definition.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +/ {
 
-All error/warnings (new ones prefixed by >>):
+In some of the DTSI this was under "soc" node, not at top-level.
+Unfortunately we do not have consistency here - some DTSI have "soc",
+some not. Anyway I think we should move to "soc" version.
 
-   drivers/irqchip/irq-mbigen-v1.c: In function 'mbigen_device_probe':
->> drivers/irqchip/irq-mbigen-v1.c:47:2: error: implicit declaration of function 'devm_ioremap' [-Werror=implicit-function-declaration]
-     mgn_chip->base = devm_ioremap(&pdev->dev, res->start, resource_size(res));
-     ^
->> drivers/irqchip/irq-mbigen-v1.c:47:17: warning: assignment makes pointer from integer without a cast
-     mgn_chip->base = devm_ioremap(&pdev->dev, res->start, resource_size(res));
-                    ^
-   cc1: some warnings being treated as errors
+> +	poweroff: syscon-poweroff {
+> +		compatible = "syscon-poweroff";
+> +		regmap = <&pmu_system_controller>;
+> +		offset = <0x330C>; /* PS_HOLD_CONTROL */
+> +		mask = <0x5200>; /* reset value */
+> +	};
+> +
+> +	reboot: syscon-reboot {
+> +		compatible = "syscon-reboot";
+> +		regmap = <&pmu_system_controller>;
+> +		offset = <0x0400>; /* SWRESET */
+> +		mask = <0x1>;
+> +	};
+> +};
+> diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
+> index 18e3deffbf48..d9c221517935 100644
+> --- a/arch/arm/boot/dts/exynos3250.dtsi
+> +++ b/arch/arm/boot/dts/exynos3250.dtsi
+> @@ -19,6 +19,7 @@
+>  
+>  #include "skeleton.dtsi"
+>  #include "exynos4-cpu-thermal.dtsi"
+> +#include "exynos-syscon-restart.dtsi"
+>  #include <dt-bindings/clock/exynos3250.h>
+>  
+>  / {
+> @@ -152,20 +153,6 @@
+>  			interrupt-parent = <&gic>;
+>  		};
+>  
+> -		poweroff: syscon-poweroff {
+> -			compatible = "syscon-poweroff";
+> -			regmap = <&pmu_system_controller>;
+> -			offset = <0x330C>; /* PS_HOLD_CONTROL */
+> -			mask = <0x5200>; /* Reset value */
+> -		};
+> -
+> -		reboot: syscon-reboot {
+> -			compatible = "syscon-reboot";
+> -			regmap = <&pmu_system_controller>;
+> -			offset = <0x0400>; /* SWRESET */
+> -			mask = <0x1>;
+> -		};
+> -
+>  		mipi_phy: video-phy at 10020710 {
+>  			compatible = "samsung,s5pv210-mipi-video-phy";
+>  			#phy-cells = <1>;
+> diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+> index ca621a92319e..e6f6939ccdfa 100644
+> --- a/arch/arm/boot/dts/exynos4.dtsi
+> +++ b/arch/arm/boot/dts/exynos4.dtsi
+> @@ -21,6 +21,7 @@
+>  
+>  #include <dt-bindings/clock/exynos4.h>
+>  #include <dt-bindings/clock/exynos-audss-clk.h>
+> +#include "exynos-syscon-restart.dtsi"
 
-vim +/devm_ioremap +47 drivers/irqchip/irq-mbigen-v1.c
+Just to keep it consistent and logic - include after skeleton.
 
-    41		if (!mgn_chip)
-    42			return -ENOMEM;
-    43	
-    44		mgn_chip->pdev = pdev;
-    45	
-    46		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-  > 47		mgn_chip->base = devm_ioremap(&pdev->dev, res->start, resource_size(res));
-    48		if (IS_ERR(mgn_chip->base))
-    49			return PTR_ERR(mgn_chip->base);
-    50	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 21180 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160214/d5d583fd/attachment-0001.obj>
+Best regards,
+Krzysztof
