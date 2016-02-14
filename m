@@ -1,40 +1,75 @@
-From: blogic@openwrt.org (John Crispin)
-Date: Sun, 14 Feb 2016 22:01:38 +0100
-Subject: [PATCH V5 04/11] soc: mediatek: PMIC wrap: split SoC specific
- init into callback
-In-Reply-To: <56BC7674.9030706@gmail.com>
-References: <1454841778-35529-1-git-send-email-blogic@openwrt.org>
- <1454841778-35529-5-git-send-email-blogic@openwrt.org>
- <56BC7674.9030706@gmail.com>
-Message-ID: <56C0EB32.4080701@openwrt.org>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Sun, 14 Feb 2016 13:08:42 -0800
+Subject: arm qemu test failures due to 'driver-core: platform: probe
+ of-devices only using list of compatibles'
+In-Reply-To: <20160214195501.GA12289@pengutronix.de>
+References: <20160214165010.GA3189@roeck-us.net>
+ <20160214195501.GA12289@pengutronix.de>
+Message-ID: <56C0ECDA.1000203@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 02/14/2016 11:55 AM, Uwe Kleine-K?nig wrote:
+> [adding lakml and rmk to Cc]
+>
+> Hello Guenter,
+>
+> On Sun, Feb 14, 2016 at 08:50:10AM -0800, Guenter Roeck wrote:
+>> Uwe,
+>>
+>> Your patch 'driver-core: platform: probe of-devices only using list of
+>> compatibles' causes the following qemu tests to crash in -next.
+>>
+>> arm:vexpress-a9:vexpress_defconfig:vexpress-v2p-ca9
+>> arm:vexpress-a15:vexpress_defconfig:vexpress-v2p-ca15-tc1
+>> arm:vexpress-a9:multi_v7_defconfig:vexpress-v2p-ca9
+>> arm:vexpress-a15:multi_v7_defconfig:vexpress-v2p-ca15-tc1
+>>
+>> Crash log:
+>>
+>> VFS: Cannot open root device "mmcblk0" or unknown-block(0,0): error -6
+>> Please append a correct "root=" boot option; here are the available partitions:
+>> 1f00          131072 mtdblock0  (driver?)
+>> 1f01           32768 mtdblock1  (driver?)
+>> Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(0,0)
+>>
+>> ie the mmc driver no longer instantiates. Reverting the patch fixes the problem.
+>
+> The driver is drivers/mmc/host/mmci.c, right? and the relevant device
+> tree snippet is:
+>
+> 	mmci at 05000 {
+> 		compatible = "arm,pl180", "arm,primecell";
+> 		...
+> 	};
+>
 
+Yes, I think so, or one of the many other similar mmc entries.
 
-On 11/02/2016 12:54, Matthias Brugger wrote:
->> diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c
->> b/drivers/soc/mediatek/mtk-pmic-wrap.c
->> index b22b664..e3bbee5 100644
->> --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
->> +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
->> @@ -372,6 +372,7 @@ struct pmic_wrapper_type {
->>       enum pwrap_type type;
->>       u32 arb_en_all;
->>       int (*init_reg_clock)(struct pmic_wrapper *wrp);
->> +    int (*init_special)(struct pmic_wrapper *wrp);
-> 
-> Nit:
-> I wonder if we can find a better name for the callback, as init_special
-> sounds quite generic to me.
-> 
-> Thanks,
-> Matthias
+> ? So the unexpected abnormality here is that even though this device is
+> instantiated by dt, the driver doesn't provide any compatibles.
+> Either my expectation is wrong, then 67d02a1bbb33455 should be reverted
+> (or handle this case in a different way), or the mmci driver should
+> declare compatibles (but then it needs to be a platform driver and not
+> an amba driver?).
+>
 
-Hi,
+No idea what the correct solution would be. I do see
 
-At first I considered enable_wrapper as the mt8135/8173 code seems to do
-just that. however mt2701 does an init of the ADC. So how about using
-init_soc_specific ?
+         if (of_device_is_compatible(bus, "arm,primecell")) {
+                 /*
+                  * Don't return an error here to keep compatibility with older
+                  * device tree files.
+                  */
+                 of_amba_device_create(bus, bus_id, platform_data, parent);
+                 return 0;
+         }
 
-	John
+in drivers/of/platform.c, which suggests some special handling for amba
+devices. No idea if and how that is related, but I do have some concern
+that fixing the problem for mmc alone might not fix it for all the other
+devices instantiated with "arm,primecell". After all, my boot tests are
+really rudimentary (it boots, therefore it works).
+
+Thanks,
+Guenter
