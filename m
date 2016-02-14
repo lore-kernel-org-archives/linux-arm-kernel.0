@@ -1,66 +1,53 @@
 From: k.kozlowski.k@gmail.com (Krzysztof Kozlowski)
-Date: Sun, 14 Feb 2016 14:47:40 +0900
-Subject: [next] Odroid XU3 boot fail after cpufreq: dt: Use
- dev_pm_opp_set_rate() to switch frequency
-In-Reply-To: <20160214052228.GA18226@vireshk-i7>
-References: <56C008F2.3080807@gmail.com> <20160214052228.GA18226@vireshk-i7>
-Message-ID: <56C014FC.8060009@gmail.com>
+Date: Sun, 14 Feb 2016 15:06:27 +0900
+Subject: [next] Odroid XU3 easily over-heats
+Message-ID: <56C01963.3080106@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-W dniu 14.02.2016 o 14:22, Viresh Kumar pisze:
-> On 14-02-16, 13:56, Krzysztof Kozlowski wrote:
->> Hi all,
->>
->> Recently Odroid XU3 failed to boot on linux-next
->> on multi_v7 defconfig. exynos defconfig boots fine.
->>
->> Probably the "cpufreq: dt: Use dev_pm_opp_set_rate() to
->> switch frequency" is important here:
->> commit 78c3ba5df96c875b1668e1cd3ee0a69e62454f32
->> Author: Viresh Kumar <viresh.kumar@linaro.org>
->> Date:   Tue Feb 9 10:30:46 2016 +0530
->>
->>     cpufreq: dt: Use dev_pm_opp_set_rate() to switch frequency
->>     
->>     OPP core supports frequency/voltage changes based on the target
->>     frequency now, use that instead of open coding the same in cpufreq-dt
->>     driver.
->>     
->>     Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
->>     Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
->>     Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-> 
-> Can you please try the below untested patch please ?
+Hi all,
 
-Thanks for quick reply. The patch fixed the problem.
+With recent addition of cpufreq-dt support to Exynos5422
+it is very easy to over-heat the Odroid XU3 leading to critical shutdown:
+[  132.622032] thermal thermal_zone3: critical temperature reached(121 C),shutting down
 
-Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+
+Reproduction:
+0. next-20160212 (with recent fix for OPP from Viresh)
+1. multi_v7 (on exynos defconfig there is no cpufreq for Exynos5422)
+2. Run following test script:
+https://github.com/krzk/tools/blob/master/tests/odroid-xu3-cpu-mmc-stress.sh
+
+(the script essentially does only "cat /dev/mmcblk0p2 | gzip -c > /dev/null" for each CPU)
+
+Observe, just before shutdown:
+/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq:1300000
+/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_min_freq:200000
+/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_transition_latency:154000
+/sys/devices/system/cpu/cpu0/cpufreq/related_cpus:0 1 2 3
+/sys/devices/system/cpu/cpu0/cpufreq/scaling_available_frequencies:200000 300000 400000 500000 600000 700000 800000 900000 1000000 1100000 1200000 1300000 
+/sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors:ondemand performance 
+/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq:1300000
+/sys/devices/system/cpu/cpu0/cpufreq/scaling_driver:cpufreq-dt
+/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor:ondemand
+/sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq:1300000
+/sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq:200000
+/sys/devices/system/cpu/cpu0/cpufreq/scaling_setspeed:<unsupported>
+
+/sys/class/thermal/thermal_zone0/temp:90000
+/sys/class/thermal/thermal_zone1/temp:98000
+/sys/class/thermal/thermal_zone2/temp:113000
+/sys/class/thermal/thermal_zone3/temp:119000
+/sys/class/thermal/thermal_zone4/temp:81000
+
+/sys/class/thermal/cooling_device0/cur_state:3
+/sys/class/thermal/cooling_device0/max_state:3
+/sys/class/thermal/cooling_device0/type:pwm-fan
+
+Fan is working but shutdown is immediate.
+
+What about cpufreq as cooling device? Probably that part
+is missing now, right?
 
 Best regards,
 Krzysztof
-
-> diff --git a/drivers/base/power/opp/core.c b/drivers/base/power/opp/core.c
-> index d7cd4e265766..a97b333036c9 100644
-> --- a/drivers/base/power/opp/core.c
-> +++ b/drivers/base/power/opp/core.c
-> @@ -1156,9 +1156,15 @@ static int opp_parse_supplies(struct dev_pm_opp *opp, struct device *dev,
->  		return -EINVAL;
->  	}
->  
-> -	opp->u_volt = microvolt[0];
-> -	opp->u_volt_min = microvolt[1];
-> -	opp->u_volt_max = microvolt[2];
-> +	if (count == 1) {
-> +		opp->u_volt = microvolt[0];
-> +		opp->u_volt_min = opp->u_volt;
-> +		opp->u_volt_max = opp->u_volt;
-> +	} else {
-> +		opp->u_volt = microvolt[0];
-> +		opp->u_volt_min = microvolt[1];
-> +		opp->u_volt_max = microvolt[2];
-> +	}
->  
->  	/* Search for "opp-microamp-<name>" */
->  	prop = NULL;
-> 
