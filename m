@@ -1,77 +1,56 @@
-From: philipp.zabel@gmail.com (Philipp Zabel)
-Date: Sun, 14 Feb 2016 20:22:58 +0100
-Subject: GPIO regression in Linux next caused by syscon change
-In-Reply-To: <20160213004935.GR19432@atomide.com>
-References: <20160213002643.GQ19432@atomide.com>
- <20160213004935.GR19432@atomide.com>
-Message-ID: <CA+gwMccZeYimupmGsMX8YbNH9eEA6=Xi=rupciubBwzktfjvBA@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Sun, 14 Feb 2016 20:55:01 +0100
+Subject: arm qemu test failures due to 'driver-core: platform: probe
+ of-devices only using list of compatibles'
+In-Reply-To: <20160214165010.GA3189@roeck-us.net>
+References: <20160214165010.GA3189@roeck-us.net>
+Message-ID: <20160214195501.GA12289@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've just replaced the of_iomap() call with an open coded version,
-calling of_address_to_resource() and ioremap() directly. That was
-needed so I can use the struct resource returned by
-of_address_to_resource() to set the syscon_config.max_register. I
-don't see where this could cause resource overlap. Does just setting
-syscon_config.max_register to zero again make the problem disappear?
+[adding lakml and rmk to Cc]
 
-regards
-Philipp
+Hello Guenter,
 
-On Sat, Feb 13, 2016 at 1:49 AM, Tony Lindgren <tony@atomide.com> wrote:
-> * Tony Lindgren <tony@atomide.com> [160212 16:31]:
->> Hi,
->>
->> Looks like commit effe02710335 ("mfd: syscon: Set regmap max_register
->> in of_syscon_register") somehow breaks smsc911x GPIO interrupt for
->> me at least on omap3:
->>
->> irq 241: nobody cared (try booting with the "irqpoll" option)
->> CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.5.0-rc3-next-20160212 #864
->> Hardware name: Generic OMAP36xx (Flattened Device Tree)
->> [<c010fd44>] (unwind_backtrace) from [<c010c094>] (show_stack+0x10/0x14)
->> [<c010c094>] (show_stack) from [<c045f24c>] (dump_stack+0xb0/0xe4)
->> [<c045f24c>] (dump_stack) from [<c01998e8>] (__report_bad_irq+0x24/0xc0)
->> [<c01998e8>] (__report_bad_irq) from [<c0199ce4>] (note_interrupt+0x27c/0x2dc)
->> [<c0199ce4>] (note_interrupt) from [<c0197220>] (handle_irq_event_percpu+0x184/0x200)
->> [<c0197220>] (handle_irq_event_percpu) from [<c01972d4>] (handle_irq_event+0x38/0x5c)
->> [<c01972d4>] (handle_irq_event) from [<c019a3d8>] (handle_level_irq+0xc0/0x154)
->> [<c019a3d8>] (handle_level_irq) from [<c0196784>] (generic_handle_irq+0x20/0x34)
->> [<c0196784>] (generic_handle_irq) from [<c049b690>] (omap_gpio_irq_handler+0x120/0x160)
->> [<c049b690>] (omap_gpio_irq_handler) from [<c01970f0>] (handle_irq_event_percpu+0x54/0x200)
->> [<c01970f0>] (handle_irq_event_percpu) from [<c01972d4>] (handle_irq_event+0x38/0x5c)
->> [<c01972d4>] (handle_irq_event) from [<c019a3d8>] (handle_level_irq+0xc0/0x154)
->> [<c019a3d8>] (handle_level_irq) from [<c0196784>] (generic_handle_irq+0x20/0x34)
->> [<c0196784>] (generic_handle_irq) from [<c0196a78>] (__handle_domain_irq+0x64/0xe0)
->> [<c0196a78>] (__handle_domain_irq) from [<c076f038>] (__irq_svc+0x58/0x78)
->> [<c076f038>] (__irq_svc) from [<c076e93c>] (_raw_spin_unlock_irqrestore+0x34/0x44)
->> [<c076e93c>] (_raw_spin_unlock_irqrestore) from [<c019900c>] (__setup_irq+0x40c/0x5e0)
->> [<c019900c>] (__setup_irq) from [<c0199330>] (request_threaded_irq+0xc0/0x158)
->> [<c0199330>] (request_threaded_irq) from [<c05a4038>] (smsc911x_drv_probe+0x588/0xfec)
->> [<c05a4038>] (smsc911x_drv_probe) from [<c04fc1b4>] (platform_drv_probe+0x4c/0xb0)
->> [<c04fc1b4>] (platform_drv_probe) from [<c04fa89c>] (driver_probe_device+0x208/0x2c0)
->> [<c04fa89c>] (driver_probe_device) from [<c04fa9e8>] (__driver_attach+0x94/0x98)
->> [<c04fa9e8>] (__driver_attach) from [<c04f8bc4>] (bus_for_each_dev+0x6c/0xa0)
->> [<c04f8bc4>] (bus_for_each_dev) from [<c04f9d28>] (bus_add_driver+0x18c/0x214)
->> [<c04f9d28>] (bus_add_driver) from [<c04fb22c>] (driver_register+0x78/0xf8)
->> [<c04fb22c>] (driver_register) from [<c010180c>] (do_one_initcall+0x80/0x1dc)
->> [<c010180c>] (do_one_initcall) from [<c0b00ef0>] (kernel_init_freeable+0x218/0x2ec)
->> [<c0b00ef0>] (kernel_init_freeable) from [<c0768360>] (kernel_init+0x8/0xf4)
->> [<c0768360>] (kernel_init) from [<c01078d0>] (ret_from_fork+0x14/0x24)
->> handlers:
->> [<c05a26d8>] smsc911x_irqhandler
->> Disabling IRQ #241
->> libphy: smsc911x-mdio: probed
->>
->> I'm not seeing the connection between regmap and  GPIO, so no
->> idea what goes wrong here.
->
-> The only regmap here is the scm_conf in omap3.dtsi. Probably some
-> resource size calculation issue causing an overlap?
->
-> Tony
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+On Sun, Feb 14, 2016 at 08:50:10AM -0800, Guenter Roeck wrote:
+> Uwe,
+> 
+> Your patch 'driver-core: platform: probe of-devices only using list of
+> compatibles' causes the following qemu tests to crash in -next.
+> 
+> arm:vexpress-a9:vexpress_defconfig:vexpress-v2p-ca9
+> arm:vexpress-a15:vexpress_defconfig:vexpress-v2p-ca15-tc1
+> arm:vexpress-a9:multi_v7_defconfig:vexpress-v2p-ca9
+> arm:vexpress-a15:multi_v7_defconfig:vexpress-v2p-ca15-tc1
+> 
+> Crash log:
+> 
+> VFS: Cannot open root device "mmcblk0" or unknown-block(0,0): error -6
+> Please append a correct "root=" boot option; here are the available partitions:
+> 1f00          131072 mtdblock0  (driver?)
+> 1f01           32768 mtdblock1  (driver?)
+> Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(0,0)
+> 
+> ie the mmc driver no longer instantiates. Reverting the patch fixes the problem.
+
+The driver is drivers/mmc/host/mmci.c, right? and the relevant device
+tree snippet is:
+
+	mmci at 05000 {
+		compatible = "arm,pl180", "arm,primecell";
+		...
+	};
+
+? So the unexpected abnormality here is that even though this device is
+instantiated by dt, the driver doesn't provide any compatibles.
+Either my expectation is wrong, then 67d02a1bbb33455 should be reverted
+(or handle this case in a different way), or the mmci driver should
+declare compatibles (but then it needs to be a platform driver and not
+an amba driver?).
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
