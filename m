@@ -1,38 +1,31 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Mon, 15 Feb 2016 23:03:34 +0100
-Subject: [PATCH] MAINTAINERS: Extend info, add wiki and ml for meson arch
-Message-ID: <1455573814-13378-1-git-send-email-carlo@caione.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 15 Feb 2016 23:04:26 +0100
+Subject: [PATCH] pinctrl: sunxi: set pin function as input on export
+In-Reply-To: <1454942242-25690-1-git-send-email-krzysztof.adamski@tieto.com>
+References: <1454942242-25690-1-git-send-email-krzysztof.adamski@tieto.com>
+Message-ID: <CACRpkdbd4f3yj2MnR6PU5SuhV5Tj4HzWLc0UX8jQkcJp7MoTig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Carlo Caione <carlo@endlessm.com>
+On Mon, Feb 8, 2016 at 3:37 PM, Krzysztof Adamski
+<krzysztof.adamski@tieto.com> wrote:
 
-Update the maintainers info with wiki and mailing list for the meson
-platform. Fix a wrong file attribution and add maintainership for
-meson8b.
+> Default function of a pin in sunxi SoCs is "disabled". By default gpios
+> exported by sysfs are set as input and indeed, when reading "direction"
+> file you will get "in". The "value" pin won't return proper value,
+> though, confusing user of this interface.
+>
+> This patch sets direction of a GPIO as input when exporting it.
+>
+> Signed-off-by: Krzysztof Adamski <krzysztof.adamski@tieto.com>
 
-Signed-off-by: Carlo Caione <carlo@endlessm.com>
----
- MAINTAINERS | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+As maxime says it's not a sunxi problem.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 28eb61b..6e08d2a 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -923,9 +923,11 @@ F:	drivers/clk/sunxi/
- ARM/Amlogic MesonX SoC support
- M:	Carlo Caione <carlo@caione.org>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+L:	linux-meson at googlegroups.com
-+W:	http://linux-meson.com/
- S:	Maintained
--F:	drivers/media/rc/meson-ir.c
--N:	meson[x68]
-+F:	arch/arm/mach-meson/
-+N:	meson[x68b]
- 
- ARM/Annapurna Labs ALPINE ARCHITECTURE
- M:	Tsahee Zidenberg <tsahee@annapurnalabs.com>
--- 
-1.9.1
+So maybe it is wrong to set pins to either input or output when
+exporting them, I suspect they should be exported as is.
+
+Also: the sysfs ABI is deprecated. I suggest you invest your time
+in working on the new chardev ABI.
+
+Yours,
+Linus Walleij
