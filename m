@@ -1,75 +1,65 @@
-From: eun.taik.lee@samsung.com (EunTaik Lee)
-Date: Mon, 15 Feb 2016 08:58:32 +0000 (GMT)
-Subject: [PATCH RESEND] arm64: add alignment fault hanling
-Message-ID: <2039801453.916991455526707908.JavaMail.weblogic@epmlwas09b>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 15 Feb 2016 10:07:38 +0100
+Subject: [GIT PULL] Versatile family DT cleanups step 1
+Message-ID: <CACRpkdYR-_41Ay7b_X4hJkPY7dUR2qAsfsjn-MzpahVWqEiVPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Userspace memory is mapped as below:
-F2A7F000--F2A7FFFF Normal Memory
-F2A80000--F2A80FFF Device nGnRnE
+Hi ARM SoC folks,
 
-And that userspace application makes a system call
-as below:
+this is a first pull request for my cleanups for the Versatile, as the
+finished stuff should not be sitting in my tree but in ARM SoC.
+This completes the ARM RealView PB1176 and PB11MPCore
+device trees, and moves the Versatile to use power/reset.
 
--009 |do_strncpy_from_user(inline)
--009 |strncpy_from_user()
--010 |getname_flags()
--011 |user_path_at_empty()
--012 |user_path_at()
--013 |SYSC_faccessat(inline)
--013 |sys_faccessat()
--014 |__sys_trace(asm)
---> |exception
+The idea is to keep working on this cleanup branch and send
+additional patches on top of this one as the prerequisites are
+merged into the MTD and FBDEV subsystems. So please create
+a special versatile cleanup branch (or suggest another approach).
 
-The string spans from 0xF2A7FFC1 to 0xF2A7FFFB.
+As it happens, board files and device trees need to change at the
+same time to make logical sense, especially for Versatile where
+auxdata is replaced with DT entries, such as when reset is moved
+in the last patch in this set. The MTD and CLCD changes will share
+this characteristic.
 
-When do_strncpy_from_user() reads the last (unsigned long)
-value, the alignement fault is triggered. The 8 byte
-from 0xF2A7FFC1 spans to the next page that is mapped as
-Device nGnRnE, which does not allow an unaligned access,
-causes the abort.
+Please pull it in!
 
-The instruction which caused the alignment fault is registered
-in the fixup table but the exception handler does not reach there.
+Yours,
+Linus Walleij
 
-This patch registers a alignment fault handler and fixes up the
-pc if appropriate.
+The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
 
-Signed-off-by: Eun Taik Lee 
----
-arch/arm64/mm/fault.c | 12 +++++++++++-
-1 file changed, 11 insertions(+), 1 deletion(-)
+  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
 
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 19211c4..8257d4f 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -371,6 +371,16 @@ static int __kprobes do_translation_fault(unsigned long addr,
-return 0;
-}
+are available in the git repository at:
 
-+static int __kprobes do_alignment_fault(unsigned long addr,
-+   unsigned int esr,
-+   struct pt_regs *regs)
-+{
-+ if (addr >= TASK_SIZE && fixup_exception(regs))
-+ return 0;
-+
-+ return 1;
-+}
-+
-/*
-  * This abort handler always returns "fault".
-  */
-@@ -418,7 +428,7 @@ static struct fault_info {
-{ do_bad, SIGBUS,  0, "synchronous parity error (translation table walk" },
-{ do_bad, SIGBUS,  0, "synchronous parity error (translation table walk" },
-{ do_bad, SIGBUS,  0, "unknown 32" },
-- { do_bad, SIGBUS,  BUS_ADRALN, "alignment fault" },
-+ { do_alignment_fault, SIGBUS,  BUS_ADRALN, "alignment fault" },
-{ do_bad, SIGBUS,  0, "debug event" },
-{ do_bad, SIGBUS,  0, "unknown 35" },
-{ do_bad, SIGBUS,  0, "unknown 36" },
--- 
-1.9.1
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
+tags/versatile-dt-cleanup-1
+
+for you to fetch changes up to 1c6e288da6cc3c72579ff0062b5a5684fb9ef90e:
+
+  ARM: versatile: move restart to the device tree (2016-02-15 09:58:08 +0100)
+
+----------------------------------------------------------------
+Versatile family cleanups step 1:
+- Finalize RealView the PB1176 and PB11MPCore device trees
+- Move Versatile to use the power/reset driver instead of a
+  custom restart hook
+
+----------------------------------------------------------------
+Linus Walleij (8):
+      ARM: realview: add flash devices to the PB1176 DTS
+      ARM: realview: fix up PB11MP flash compat strings
+      ARM: pb1176: add ICST307 clocks to the device tree
+      ARM: pb1176: add AACI to the device tree
+      ARM: pb1176: add ISP1761 USB OTG host controller
+      ARM: pb1176: add ethernet to devicetree
+      ARM: realview: add the DS1338 RTC to PB1176 DT
+      ARM: versatile: move restart to the device tree
+
+ arch/arm/boot/dts/arm-realview-pb1176.dts | 118 ++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/arm-realview-pb11mp.dts |   4 +-
+ arch/arm/mach-versatile/Kconfig           |   3 +
+ arch/arm/mach-versatile/versatile_dt.c    |  15 ----
+ 4 files changed, 123 insertions(+), 17 deletions(-)
