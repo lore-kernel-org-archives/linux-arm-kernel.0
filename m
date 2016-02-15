@@ -1,26 +1,41 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Mon, 15 Feb 2016 17:01:09 +0100
-Subject: [PATCH 1/4] gpio: remove broken irq_to_gpio() interface
-In-Reply-To: <1455551208-2825510-2-git-send-email-arnd@arndb.de>
-References: <20160202194831.10827.63244.stgit@bhelgaas-glaptop2.roam.corp.google.com>
- <1455551208-2825510-1-git-send-email-arnd@arndb.de>
- <1455551208-2825510-2-git-send-email-arnd@arndb.de>
-Message-ID: <56C1F645.1070405@metafoo.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 15 Feb 2016 16:10:46 +0000
+Subject: [PATCH v4 05/23] arm64: Add ARM64_HAS_VIRT_HOST_EXTN feature
+In-Reply-To: <1455216004-19499-6-git-send-email-marc.zyngier@arm.com>
+References: <1455216004-19499-1-git-send-email-marc.zyngier@arm.com>
+ <1455216004-19499-6-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20160215161045.GH6298@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/15/2016 04:46 PM, Arnd Bergmann wrote:
-> +static inline __deprecated int irq_to_gpio(unsigned int irq)
-> +{
-> +	/* this has clearly not worked for a long time */
-> +	return -EINVAL;
-> +}
-> +
->  #define IRQ_TO_BIT(irq) BIT(irq_to_gpio(irq) & 0x1f)
+On Thu, Feb 11, 2016 at 06:39:46PM +0000, Marc Zyngier wrote:
+> Add a new ARM64_HAS_VIRT_HOST_EXTN features to indicate that the
+> CPU has the ARMv8.1 VHE capability.
+> 
+> This will be used to trigger kernel patching in KVM.
+> 
+> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/include/asm/cpufeature.h |  3 ++-
+>  arch/arm64/kernel/cpufeature.c      | 11 +++++++++++
+>  2 files changed, 13 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+> index 8f271b8..c705d6a 100644
+> --- a/arch/arm64/include/asm/cpufeature.h
+> +++ b/arch/arm64/include/asm/cpufeature.h
+> @@ -30,8 +30,9 @@
+>  #define ARM64_HAS_LSE_ATOMICS			5
+>  #define ARM64_WORKAROUND_CAVIUM_23154		6
+>  #define ARM64_WORKAROUND_834220			7
+> +#define ARM64_HAS_VIRT_HOST_EXTN		8
+>  
+> -#define ARM64_NCAPS				8
+> +#define ARM64_NCAPS				9
 
-The issue seems to be a fallout from commit 832f5dacfa0b ("MIPS: Remove all
-the uses of custom gpio.h").
+Just a heads up, but this conflicts with the for-next/core branch, where
+I used cap 8 to identify the absence of a h/w prefetcher.
 
-The irq_to_gpio() should be replaced with "(irq - JZ4740_IRQ_GPIO(0))".
-
-- Lars
+Will
