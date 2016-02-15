@@ -1,47 +1,36 @@
 From: linux@baker-net.org.uk (Adam Baker)
-Date: Mon, 15 Feb 2016 23:25:02 +0000
-Subject: [PATCH v2 1/3] hwmon: Define binding for the nsa320-hwmon driver
-In-Reply-To: <1455578705-10531-1-git-send-email-linux@baker-net.org.uk>
-References: <1455578705-10531-1-git-send-email-linux@baker-net.org.uk>
-Message-ID: <1455578705-10531-2-git-send-email-linux@baker-net.org.uk>
+Date: Mon, 15 Feb 2016 23:25:01 +0000
+Subject: [PATCH v2] A driver for the hardware monitoring chip in the Zyxel
+ NSA320
+Message-ID: <1455578705-10531-1-git-send-email-linux@baker-net.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define a binding for the hardware monitoring chip present in the Zyxel
-NSA-320 and some of the other Zyxel NAS devices.
+This patch series adds a driver to support the hardware monitoring MCU
+that is present in the Zyxel NSA320. It is believed that this is
+identical to the one used in the NSA325 and some variants of the NSA310.
 
-Signed-off-by: Adam Baker <linux@baker-net.org.uk>
----
- .../devicetree/bindings/hwmon/nsa320-mcu.txt        | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/hwmon/nsa320-mcu.txt
+ Documentation/devicetree/bindings/hwmon/nsa320-mcu.txt |  21 ++++++++
+ arch/arm/boot/dts/kirkwood-nsa320.dts                  |  13 ++++-
+ drivers/hwmon/Kconfig                                  |  15 ++++++
+ drivers/hwmon/Makefile                                 |   1 +
+ drivers/hwmon/nsa320-hwmon.c                           | 215 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 263 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/hwmon/nsa320-mcu.txt b/Documentation/devicetree/bindings/hwmon/nsa320-mcu.txt
-new file mode 100644
-index 0000000..7b346d4
---- /dev/null
-+++ b/Documentation/devicetree/bindings/hwmon/nsa320-mcu.txt
-@@ -0,0 +1,21 @@
-+Bindings for the fan / temperature monitor microcontroller used on
-+the Zyxel NSA 320 and several subsequent models.
-+
-+Required properties:
-+- compatible	: "zyxel,nsa320-mcu"
-+- data-gpios	: The GPIO pin connected to the data line on the MCU
-+- clk-gpios	: The GPIO pin connected to the clock line on the MCU
-+- act-gpios	: The GPIO pin connected to the active line on the MCU
-+
-+Example:
-+
-+	hwmon {
-+		compatible = "zyxel,nsa320-mcu";
-+		pinctrl-0 = <&pmx_mcu_data &pmx_mcu_clk &pmx_mcu_act>;
-+		pinctrl-names = "default";
-+
-+		data-gpios = <&gpio0 14 GPIO_ACTIVE_HIGH>;
-+		clk-gpios = <&gpio0 16 GPIO_ACTIVE_HIGH>;
-+		act-gpios = <&gpio0 17 GPIO_ACTIVE_LOW>;
-+	};
-+
--- 
-2.1.4
+
+Changes since v1
+Update to reflect review comments from Guenter Roeck,
+mainly changing it to be nsa320, not nsa3xx but also making it
+return an errno on failure and various other tidy ups.
+
+I'm not sure what protocol is with regard to adding tags to a patch
+when updating it, in v1
+
+patch 1 received
+Acked-by: Rob Herring <robh@kernel.org>
+
+patch 2 was reviewed by Guenter Roeck but does the reviewed by tag
+only get added if he agrees with the changes?
+
+Sebastian Hesselbarth reviewed an early draft before it was posted
+publicly.
