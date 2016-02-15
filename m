@@ -1,28 +1,37 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 15 Feb 2016 20:06:13 +0000
-Subject: [PATCH v3 1/5] arm64/perf: Rename Cortex A57 events
-In-Reply-To: <20160215194037.GU6298@arm.com>
-References: <cover.1454516082.git.jglauber@cavium.com>
- <e0ecaaaffb64cc0b2ecfd8852f718a3f1d642b5c.1454516082.git.jglauber@cavium.com>
- <20160215194037.GU6298@arm.com>
-Message-ID: <20160215200613.GY6298@arm.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 15 Feb 2016 12:09:44 -0800
+Subject: Crashes in arm qemu emulations due to 'cpufreq: governor: Replace
+ timers with utilization ...'
+In-Reply-To: <20160215195839.GA19432@atomide.com>
+References: <20160215170527.GA24453@roeck-us.net>
+ <CAJZ5v0gLankSuziQq25qTCyNqeOX43yD9jnJu_XXwbdyajfmKg@mail.gmail.com>
+ <20160215190116.GX19432@atomide.com> <56C229A5.8020901@roeck-us.net>
+ <20160215195839.GA19432@atomide.com>
+Message-ID: <56C23088.8050400@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 15, 2016 at 07:40:37PM +0000, Will Deacon wrote:
-> On Wed, Feb 03, 2016 at 06:11:56PM +0100, Jan Glauber wrote:
-> > The implemented Cortex A57 events are not A57 specific.
-> > They are recommended by ARM and can be found on other
-> > ARMv8 SOCs like Cavium ThunderX too. Therefore move
-> > these events to the common PMUv3 table.
-> 
-> I can't find anything in the architecture that suggests these event
-> numbers are necessarily portable between implementations. Am I missing
-> something?
+On 02/15/2016 11:58 AM, Tony Lindgren wrote:
+> * Guenter Roeck <linux@roeck-us.net> [160215 11:41]:
+>> On 02/15/2016 11:01 AM, Tony Lindgren wrote:
+>>>
+>>> https://kernelci.org/boot/all/job/next/kernel/next-20160215/
+>>>
+>>> The SMP ones seem to fail with some regulator issues?
+>>>
+>>
+>> There is another problem, introduced with 6a0712f6f199e ("PM / OPP: Add
+>> dev_pm_opp_set_rate()"). The kernelci boot log for next-20160212:omap3-overo-tobi
+>> and others experience that problem.
+>>
+>> Essentially, the code now assumes that a CPU clock always has a voltage
+>> regulator attached to it, which is not correct. I sent out a patch to fix
+>> that problem a minute ago.
+>
+> Yes that fixed it thanks.
+>
 
-Aha, I just noticed appendix K3.1 (silly me for missing it...).
+Confirmed. With this patch plus mine, all arm qemu tests are again passing for me.
 
-Lemme check whether or not that mandates that those encodings can't be
-used for wildly different things.
-
-Will
+Thanks,
+Guenter
