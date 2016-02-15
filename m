@@ -1,40 +1,38 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 15 Feb 2016 11:25:38 -0600
-Subject: [PATCH] arm: dts: AM57XX: Correct the thermal thresholds
-In-Reply-To: <56C1F92A.1020803@ti.com>
-References: <1454924705-8382-1-git-send-email-j-keerthy@ti.com>
- <20160209220901.GC28102@localhost.localdomain> <56BA6530.4030102@ti.com>
- <20160212222347.GO19432@atomide.com>
- <CAGo_u6r8-LJBWWrew0fV50Q+JnCxDj9PD57+9NoDm5TqCWL=jw@mail.gmail.com>
- <20160212224129.GP19432@atomide.com> <56C153A3.3030508@ti.com>
- <56C1F3A1.4080709@ti.com> <56C1F92A.1020803@ti.com>
-Message-ID: <56C20A12.8080305@ti.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 15 Feb 2016 23:00:53 +0530
+Subject: [PATCH] dmaengine: use phys_addr_t for slave configuration
+In-Reply-To: <20160209225724.GA1522@katana>
+References: <1366967214-20776-1-git-send-email-linus.walleij@linaro.org>
+ <CAMuHMdUTzTBT8DyRb5WN048U5DbVsFnhJB0c5tjHBnA4rfetJg@mail.gmail.com>
+ <20150710081411.GF836@localhost>
+ <CAMuHMdV8a1W1MyJPanUNBzaiNsL96JYzetBVSiZoC3=eKXzo1Q@mail.gmail.com>
+ <20151215172649.GK1854@localhost>
+ <CAMuHMdXe8i2JbhOP2sWkVkqHEeBnW4AfVBbRaoZW=Kg0s_9m3g@mail.gmail.com>
+ <20160209225724.GA1522@katana>
+Message-ID: <20160215173053.GM19598@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/15/2016 10:13 AM, Keerthy wrote:
-[...]
->>
->> This data is in the AM572x datasheet:
->> http://www.ti.com/lit/ds/symlink/am5728.pdf
->>
->> Table 5-3 in the current version contains the maximum junction
->> temperatures.
->>
->> this indicates that there are "Commercial" and "extended" -> we may
->> need to introduce just 2 dtsis -> am57xx-commercial and
->> am57xx-extended and reuse those based on the part on the board. just a
->> suggestion..
+On Tue, Feb 09, 2016 at 11:57:24PM +0100, Wolfram Sang wrote:
 > 
-> Or use the minimum of the 2 to be on the safer side if we have to deal 
-> with one dtsi?
+> > This is a dependency for adding iommu support to the rcar-dmac driver, cfr.
+> > "[PATCH v2 0/5] dmaengine: rcar-dmac: add iommu support for slave transfers".
+> > http://www.spinics.net/lists/linux-renesas-soc/msg00066.html
+> > https://www.mail-archive.com/linux-renesas-soc at vger.kernel.org/msg00108.html
+> > 
+> > Thank you for applying!
+> 
+> Yup, we really need it. Anything we can do to help?
 
-Why would we want to throttle earlier on customer platforms or other
-boards using extended? at the very least -> if all upstream boards
-have only commercial grade, then just introduce
-am57xx-commercial-thermal.dtsi ..
-
+I have done this change and discussing wider changes
+I will send CFT hopefully before EOW, pls test :)
 
 -- 
-Regards,
-Nishanth Menon
+~Vinod
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160215/f4513e05/attachment.sig>
