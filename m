@@ -1,35 +1,85 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 15 Feb 2016 21:27:44 +0100
-Subject: [PATCH v2 1/4] dma: mmp_pdma: Add the #dma-requests DT property
- documentation
-Message-ID: <1455568067-20203-1-git-send-email-robert.jarzmik@free.fr>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Mon, 15 Feb 2016 12:35:12 -0800
+Subject: Writes, smp_wmb(), and transitivity?
+In-Reply-To: <20160215185832.GQ6298@arm.com>
+References: <20160215175825.GA15878@linux.vnet.ibm.com>
+ <20160215185832.GQ6298@arm.com>
+Message-ID: <20160215203512.GL6719@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For pxa based platforms, the number of requestor lines should be
-specified, so that the driver can check if the flow control should be
-activated (when a requestor line is asked for) or not.
+On Mon, Feb 15, 2016 at 06:58:32PM +0000, Will Deacon wrote:
+> On Mon, Feb 15, 2016 at 09:58:25AM -0800, Paul E. McKenney wrote:
+> > Hello!
+> 
+> Hi Paul,
+> 
+> > Some architectures provide local transitivity for a chain of threads doing
+> > writes separated by smp_wmb(), as exemplified by the litmus tests below.
+> > The pattern is that each thread writes to a its own variable, does an
+> > smp_wmb(), then writes a different value to the next thread's variable.
+> > 
+> > I don't know of a use of this, but if everyone supports it, it might
+> > be good to mandate it.  Status quo is that smp_wmb() is non-transitive,
+> > so it currently isn't supported.
+> > 
+> > Anyone know of any architectures that do -not- support this?
+> > 
+> > Assuming all architectures -do- support this, any arguments -against-
+> > officially supporting it in Linux?
+> > 
+> > 							Thanx, Paul
+> > 
+> > ------------------------------------------------------------------------
+> > 
+> > Two threads:
+> > 
+> > 	int a, b;
+> > 
+> > 	void thread0(void)
+> > 	{
+> > 		WRITE_ONCE(a, 1);
+> > 		smp_wmb();
+> > 		WRITE_ONCE(b, 2);
+> > 	}
+> > 
+> > 	void thread1(void)
+> > 	{
+> > 		WRITE_ONCE(b, 1);
+> > 		smp_wmb();
+> > 		WRITE_ONCE(a, 2);
+> > 	}
+> > 
+> > 	/* After all threads have completed and the dust has settled... */
+> > 
+> > 	BUG_ON(a == 1 && b == 1);
+> 
+> My understanding is that this test, and the generalisation to n threads,
+> is forbidden on ARM. However, the transitivity of DMB ST (used to
+> construct smp_wmb()) has been the subject of long debates, because we
+> allow the following test:
+> 
+> 
+> P0:
+> Wx = 1
+> 
+> P1:
+> Rx == 1
+> DMB ST
+> Wy = 1
+> 
+> P2:
+> Ry == 1
+> <addr dep>
+> Rx == 0
+> 
+> 
+> so I'd be uneasy about saying "it's all transitive".
 
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
----
-Since v1: rename of property to #dma-requests
-      	  modify default value to 32 as suggested by Vinod
----
- Documentation/devicetree/bindings/dma/mmp-dma.txt | 2 ++
- 1 file changed, 2 insertions(+)
+Agreed!  For one thing, doesn't DMB ST need writes on both sides?
 
-diff --git a/Documentation/devicetree/bindings/dma/mmp-dma.txt b/Documentation/devicetree/bindings/dma/mmp-dma.txt
-index 7a802f64e5bd..8f7364a7b349 100644
---- a/Documentation/devicetree/bindings/dma/mmp-dma.txt
-+++ b/Documentation/devicetree/bindings/dma/mmp-dma.txt
-@@ -12,6 +12,8 @@ Required properties:
- Optional properties:
- - #dma-channels: Number of DMA channels supported by the controller (defaults
-   to 32 when not specified)
-+- #dma-requests: Number of DMA requestor lines supported by the controller
-+  (defaults to 32 when not specified)
- 
- "marvell,pdma-1.0"
- Used platforms: pxa25x, pxa27x, pxa3xx, pxa93x, pxa168, pxa910, pxa688.
--- 
-2.1.4
+But that is one reason that I am only semi-enthusiastic about this.
+The potentially locally transitive case is -very- restrictive, applying
+only to situations where -all- accesses are writes.
+
+							Thanx, Paul
