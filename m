@@ -1,57 +1,50 @@
-From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Mon, 15 Feb 2016 15:51:52 +0300
-Subject: [PATCH v2 3/9] ACPI: introduce acpi_table_parse2()
-In-Reply-To: <CAJZ5v0i2RCEEZwCN+Ran3Qmasn4yEk1rbfWkZ5QbEkUQWvaJ+g@mail.gmail.com>
-References: <1455299022-11641-1-git-send-email-aleksey.makarov@linaro.org>
- <1455299022-11641-4-git-send-email-aleksey.makarov@linaro.org>
- <CAJZ5v0i2RCEEZwCN+Ran3Qmasn4yEk1rbfWkZ5QbEkUQWvaJ+g@mail.gmail.com>
-Message-ID: <56C1C9E8.2050300@linaro.org>
+From: CARLOS.PALMINHA@synopsys.com (Carlos Palminha)
+Date: Mon, 15 Feb 2016 12:57:38 +0000
+Subject: [PATCH v2 01/17] drm/virtio: removed optional dummy encoder
+ mode_fixup function.
+In-Reply-To: <cover.1455540137.git.palminha@synopsys.com>
+References: <cover.1455540137.git.palminha@synopsys.com>
+Message-ID: <85230bc1356eb52257aaa1e1965adae2f00db5cd.1455540137.git.palminha@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+mode_fixup function for encoder drivers became optional with patch
+http://patchwork.freedesktop.org/patch/msgid/1455106522-32307-1-git-send-email-palminha at synopsys.com
 
+This patch set nukes all the dummy mode_fixup implementations.
 
-On 02/13/2016 02:07 AM, Rafael J. Wysocki wrote:
-> On Fri, Feb 12, 2016 at 6:43 PM, Aleksey Makarov
-> <aleksey.makarov@linaro.org> wrote:
->> The function acpi_table_parse() has some problems:
->> 1 It can be called only from __init code
->> 2 It does not pass any data to the handler
->> 3 It just throws out the value returned from the handler
-> 
-> So why are those problems?
+(made on top of Daniel topic/drm-misc branch)
 
-1.  We need this function to be non-__init because we need access to
-some tables at unpredictable time--it may be before or after
-the init functions are removed.  For example, SPCR (Serial Port Console
-Redirection) table is needed each time a new console is registered.
-It can be quite early (console_initcall) or when a module is inserted.
+Signed-off-by: Carlos Palminha <palminha@synopsys.com>
+---
+ drivers/gpu/drm/virtio/virtgpu_display.c | 8 --------
+ 1 file changed, 8 deletions(-)
 
-2. Having an additional pointer to void is very useful because it allows
-drivers to pass (local) data to the handler.  Without this, we would need 
-to have global data and a mutex as it was done in drivers/acpi/scan.c
-(vars ape, acpi_probe_count, acpi_probe_lock).
-
-3. Passing the value returned from the callback is less important as it 
-could be modelled by having a (return) field in the data passed to 
-the handler.  It is very convenient though.
-
-I use these three properties in my next patch of this series.
-
->> These issues are addressed in this patch
-> 
-> How are they addressed?
-
-A new function acpi_table_parse2() has been created that is just 
-the old acpi_table_parse() without __init, taking the handler with 
-additional data pointer and respecting the value returned from 
-the handler.  The old acpi_table_parse() was implemented witht this 
-new function.  Dropping __init was made possible by the previous 
-patch where the attribute of the function early_acpi_os_unmap_memory()
-was changed from __init to __ref and by dropping __init from 
-acpi_apic_instance.
-
-I understand why this approach is not good and I am going to fix it.
-
-Thank you
-Aleksey Makarov
+diff --git a/drivers/gpu/drm/virtio/virtgpu_display.c b/drivers/gpu/drm/virtio/virtgpu_display.c
+index a165f03..429aa31 100644
+--- a/drivers/gpu/drm/virtio/virtgpu_display.c
++++ b/drivers/gpu/drm/virtio/virtgpu_display.c
+@@ -282,13 +282,6 @@ static const struct drm_crtc_helper_funcs virtio_gpu_crtc_helper_funcs = {
+ 	.atomic_check  = virtio_gpu_crtc_atomic_check,
+ };
+ 
+-static bool virtio_gpu_enc_mode_fixup(struct drm_encoder *encoder,
+-				      const struct drm_display_mode *mode,
+-				      struct drm_display_mode *adjusted_mode)
+-{
+-	return true;
+-}
+-
+ static void virtio_gpu_enc_mode_set(struct drm_encoder *encoder,
+ 				    struct drm_display_mode *mode,
+ 				    struct drm_display_mode *adjusted_mode)
+@@ -362,7 +355,6 @@ virtio_gpu_best_encoder(struct drm_connector *connector)
+ }
+ 
+ static const struct drm_encoder_helper_funcs virtio_gpu_enc_helper_funcs = {
+-	.mode_fixup = virtio_gpu_enc_mode_fixup,
+ 	.mode_set   = virtio_gpu_enc_mode_set,
+ 	.enable     = virtio_gpu_enc_enable,
+ 	.disable    = virtio_gpu_enc_disable,
+-- 
+2.5.0
