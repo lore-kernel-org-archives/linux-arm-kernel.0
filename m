@@ -1,46 +1,48 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 15 Feb 2016 10:24:29 +0100
-Subject: [PATCH 0/5] arm64: Initial support for Marvell Armada 7K/8K
-In-Reply-To: <1455526065-7307-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1455526065-7307-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <2808783.Lm9AZL1OAe@wuerfel>
+Date: Mon, 15 Feb 2016 10:19:04 +0100
+Subject: [PATCH] iio: health/afe4404: mark suspend/resume functions
+ __maybe_unused
+Message-ID: <1455527958-2647084-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 15 February 2016 09:47:40 Thomas Petazzoni wrote:
-> Hello,
-> 
-> This series adds initial support for the new Armada 7K and 8K Marvell
-> 64 bits processors. Details about those processors based on the
-> Cortex-A72 can be found at:
-> 
->   http://www.marvell.com/embedded-processors/armada-70xx/
->   http://www.marvell.com/embedded-processors/armada-80xx/
-> 
-> One characteristic of those processors is that internally they are
-> built from several components:
-> 
->  - One "AP", which contains the processor itself and a few core IP
->    blocks. The AP in 7K and 8K is called AP806, and is available on
->    two variants: dual Cortex-A72 and quad Cortex-A72.
-> 
->  - Or or two "CP", which contains most of the I/Os (SATA, PCIe,
->    etc.). The CP in 7K and 8K is called CP110. One CP110 is available
->    in the 7K family, while two CP110 are available in the 8K family,
->    doubling the number of I/O interfaces.
-> 
-> The support added in this series only brings minimal support for the
-> AP side (and not yet all IP blocks, obviously). Support for the CP
-> part will come in the future.
-> 
-> Since the series touches similar files as the Armada 3700 series from
-> Gregory Clement, it is based on it.
+The newly added afe4404 driver implements suspend/resume using the
+SIMPLE_DEV_PM_OPS() macro, which leaves out references to the actual
+functions when CONFIG_PM is disabled, causing a harmless warning:
 
-The new code looks ok, but I think I need to resubmit my cleanup of the
-Documentation/arm/Marvell/README fiel that I submitted a while ago,
-which now conflicts with the changes you did in patch 3.
+health/afe4404.c:509:12: error: 'afe4404_suspend' defined but not used
+health/afe4404.c:530:12: error: 'afe4404_resume' defined but not used
 
-If you don't mind, can you add my patch to your series to resolve
-the conflict? I'll resend in a minute.
+This marks the functions as __maybe_unused so we don't get those
+warnings.
 
-	Arnd
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 87aec56e27ef ("iio: health: Add driver for the TI AFE4404 heart monitor")
+---
+ drivers/iio/health/afe4404.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/iio/health/afe4404.c b/drivers/iio/health/afe4404.c
+index 0759268f37e0..5096a4643784 100644
+--- a/drivers/iio/health/afe4404.c
++++ b/drivers/iio/health/afe4404.c
+@@ -477,7 +477,7 @@ static const struct of_device_id afe4404_of_match[] = {
+ MODULE_DEVICE_TABLE(of, afe4404_of_match);
+ #endif
+ 
+-static int afe4404_suspend(struct device *dev)
++static int __maybe_unused afe4404_suspend(struct device *dev)
+ {
+ 	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
+ 	struct afe4404_data *afe = iio_priv(indio_dev);
+@@ -498,7 +498,7 @@ static int afe4404_suspend(struct device *dev)
+ 	return 0;
+ }
+ 
+-static int afe4404_resume(struct device *dev)
++static int __maybe_unused afe4404_resume(struct device *dev)
+ {
+ 	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
+ 	struct afe4404_data *afe = iio_priv(indio_dev);
+-- 
+2.7.0
