@@ -1,97 +1,103 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 15 Feb 2016 08:34:58 +0100
-Subject: [PATCH 3/3] clk: mvebu: add AP806 ring clock driver
+Date: Mon, 15 Feb 2016 08:34:57 +0100
+Subject: [PATCH 2/3] clk: mvebu: add AP806 core clock driver
 In-Reply-To: <1455521698-7905-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1455521698-7905-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1455521698-7905-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1455521698-7905-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds a new driver to handle the ring clocks found in the
+This commit adds a new driver to handle the core clocks found in the
 AP806 HW block, which is the core block of all Armada 7K and 8K
-Marvell 64-bits processors. Those ring clocks are derived from the
-core ring clock handled by the AP806 core clock driver. The ring
-clocks are used by various peripherals inside the AP806.
+Marvell 64-bits processors. This core clock driver reads the
+Sample-At-Reset register to determine the frequencies of several core
+clocks: DDR, Ring and CPU clocks.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- .../clock/mvebu-armada-ap806-ring-clock.txt        | 32 +++++++++++
- drivers/clk/mvebu/Kconfig                          |  3 +
- drivers/clk/mvebu/Makefile                         |  1 +
- drivers/clk/mvebu/ap806-ring.c                     | 65 ++++++++++++++++++++++
- 4 files changed, 101 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/mvebu-armada-ap806-ring-clock.txt
- create mode 100644 drivers/clk/mvebu/ap806-ring.c
+ .../clock/mvebu-armada-ap806-core-clock.txt        |  33 ++++++
+ drivers/clk/mvebu/Kconfig                          |   3 +
+ drivers/clk/mvebu/Makefile                         |   2 +-
+ drivers/clk/mvebu/ap806-core.c                     | 112 +++++++++++++++++++++
+ 4 files changed, 149 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/mvebu-armada-ap806-core-clock.txt
+ create mode 100644 drivers/clk/mvebu/ap806-core.c
 
-diff --git a/Documentation/devicetree/bindings/clock/mvebu-armada-ap806-ring-clock.txt b/Documentation/devicetree/bindings/clock/mvebu-armada-ap806-ring-clock.txt
+diff --git a/Documentation/devicetree/bindings/clock/mvebu-armada-ap806-core-clock.txt b/Documentation/devicetree/bindings/clock/mvebu-armada-ap806-core-clock.txt
 new file mode 100644
-index 0000000..5602bdc
+index 0000000..b2131bb
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/mvebu-armada-ap806-ring-clock.txt
-@@ -0,0 +1,32 @@
-+* Clock bindings for Marvell MVEBU AP806 Ring clocks
++++ b/Documentation/devicetree/bindings/clock/mvebu-armada-ap806-core-clock.txt
+@@ -0,0 +1,33 @@
++* Clock bindings for Marvell MVEBU AP806 Core clocks
 +
 +The Marvell MVEBU Armada 7K/8K SoCs contain a block called AP806,
 +hosting the CPU and other core components of the CPU. This Device Tree
-+binding allows to describe the ring clocks of the AP806, which are
-+derived from the Ring Core clock, after a dividing factor.
++binding allows to describe the core clocks of the AP806, whose
++frequencies are determined by reading the Sample-At-Reset (SAR)
++register.
 +
-+The following is a list of provided IDs and clock names on Armada
-+AP806 RING dividers:
++Clock consumers must specify the desired clock by having the clock ID
++in its "clocks" phandle cell.
 +
-+ 0 = Ring 0
-+ 1 = Ring 2
-+ 2 = Ring 3
-+ 3 = Ring 4
-+ 4 = Ring 5
++The following is a list of provided IDs and clock names for the core
++Armada AP806 clocks:
++
++ 0 = DDR
++ 1 = Ring
++ 2 = CPU
 +
 +Required properties:
-+- compatible: must be one of the following:
-+	"marvell,armada-ap806-ring-clock"
-+- reg: must be the register holding the divider values for ring clocks
-+- #clock-cells : from common clock binding; shall be set to 1
++- compatible: must be be one of the following:
++	"marvell,armada-ap806-core-clock"
++- reg: must be the register address of the Sample-At-Reset (SAR) register
++- #clock-cells: from common clock binding; shall be set to 1
 +- clock-output-names: name of the output clocks
 +
 +Example:
 +
-+	ringclk: clk at 0x6F8250 {
-+		compatible = "marvell,armada-ap806-ring-clock";
-+		reg = <0x6F8250 0x04>;
++	coreclk: clk at 0x6F8204 {
++		compatible = "marvell,armada-ap806-core-clock";
++		reg = <0x6F8204 0x04>;
 +		#clock-cells = <1>;
-+		clock-output-names = "ring-0", "ring-2", "ring-3", "ring-4", "ring-5";
-+		clocks = <&coreclk 1>;
++		clock-output-names = "ddr", "ring", "cpu";
 +	};
 diff --git a/drivers/clk/mvebu/Kconfig b/drivers/clk/mvebu/Kconfig
-index fd84172..5d30aac 100644
+index 2769625..fd84172 100644
 --- a/drivers/clk/mvebu/Kconfig
 +++ b/drivers/clk/mvebu/Kconfig
-@@ -45,3 +45,6 @@ config ORION_CLK
- 
- config ARMADA_AP806_CORE_CLK
+@@ -42,3 +42,6 @@ config KIRKWOOD_CLK
+ config ORION_CLK
  	bool
+ 	select MVEBU_CLK_COMMON
 +
-+config ARMADA_AP806_RING_CLK
++config ARMADA_AP806_CORE_CLK
 +	bool
 diff --git a/drivers/clk/mvebu/Makefile b/drivers/clk/mvebu/Makefile
-index db5c28c..48ca2d3 100644
+index 8866115..db5c28c 100644
 --- a/drivers/clk/mvebu/Makefile
 +++ b/drivers/clk/mvebu/Makefile
-@@ -6,6 +6,7 @@ obj-$(CONFIG_ARMADA_375_CLK)	+= armada-375.o
+@@ -1,11 +1,11 @@
+ obj-$(CONFIG_MVEBU_CLK_COMMON)	+= common.o
+ obj-$(CONFIG_MVEBU_CLK_CPU) 	+= clk-cpu.o
+ obj-$(CONFIG_MVEBU_CLK_COREDIV)	+= clk-corediv.o
+-
+ obj-$(CONFIG_ARMADA_370_CLK)	+= armada-370.o
+ obj-$(CONFIG_ARMADA_375_CLK)	+= armada-375.o
  obj-$(CONFIG_ARMADA_38X_CLK)	+= armada-38x.o
  obj-$(CONFIG_ARMADA_39X_CLK)	+= armada-39x.o
- obj-$(CONFIG_ARMADA_AP806_CORE_CLK) += ap806-core.o
-+obj-$(CONFIG_ARMADA_AP806_RING_CLK) += ap806-ring.o
++obj-$(CONFIG_ARMADA_AP806_CORE_CLK) += ap806-core.o
  obj-$(CONFIG_ARMADA_XP_CLK)	+= armada-xp.o
  obj-$(CONFIG_DOVE_CLK)		+= dove.o dove-divider.o
  obj-$(CONFIG_KIRKWOOD_CLK)	+= kirkwood.o
-diff --git a/drivers/clk/mvebu/ap806-ring.c b/drivers/clk/mvebu/ap806-ring.c
+diff --git a/drivers/clk/mvebu/ap806-core.c b/drivers/clk/mvebu/ap806-core.c
 new file mode 100644
-index 0000000..154ee55
+index 0000000..56c81cd
 --- /dev/null
-+++ b/drivers/clk/mvebu/ap806-ring.c
-@@ -0,0 +1,65 @@
++++ b/drivers/clk/mvebu/ap806-core.c
+@@ -0,0 +1,112 @@
 +/*
-+ * Marvell Armada AP806 ring clocks
++ * Marvell Armada AP806 core clocks
 + *
 + * Copyright (C) 2016 Marvell
 + *
@@ -109,19 +115,68 @@ index 0000000..154ee55
 +#include <linux/of.h>
 +#include <linux/of_address.h>
 +
-+#define AP806_RING_DIV_NUM	5
++/*
++ * AP806 PLLs:
++ *   0 - DDR
++ *   1 - Ring
++ *   2 - CPU
++ */
 +
-+static struct clk *ap806_ring_clks[AP806_RING_DIV_NUM];
++#define AP806_PLL_NUM	3
++#define AP806_PLL_FREQ  7
 +
-+static struct clk_onecell_data ap806_ring_clk_data = {
-+	.clks = ap806_ring_clks,
-+	.clk_num = AP806_RING_DIV_NUM,
++/* SAR parameters to get the PLL data */
++struct apclk_sar {
++	int mask;
++	int offset;
++	const char *name;
 +};
 +
-+static void __init ap806_ring_clk_init(struct device_node *np)
++static const struct apclk_sar
++ap806_core_clk_sar[AP806_PLL_NUM]  __initconst = {
++	{ .mask = 0x7,	.offset = 21 },
++	{ .mask = 0x7,	.offset = 18 },
++	{ .mask = 0x7,	.offset = 15 },
++};
++
++static struct clk *ap806_core_clks[AP806_PLL_NUM];
++
++static struct clk_onecell_data ap806_core_clk_data = {
++	.clks = ap806_core_clks,
++	.clk_num = AP806_PLL_NUM,
++};
++
++/* mapping between SAR value to frequency */
++static const u32
++ap806_core_clk_freq[AP806_PLL_NUM][AP806_PLL_FREQ] __initconst = {
++	{ 2400000000, 2100000000, 1800000000,
++	  1600000000, 1300000000, 1300000000,
++	  1300000000 },
++	{ 2000000000, 1800000000, 1600000000,
++	  1400000000, 1200000000, 1200000000,
++	  1200000000 },
++	{ 2500000000, 2200000000, 2000000000,
++	  1700000000, 1600000000, 1200000000,
++	  1200000000 },
++};
++
++static unsigned long __init ap806_core_clk_get_freq(u32 reg, int clk_idx)
++{
++	int freq_idx;
++	const struct apclk_sar *clk_info;
++
++	clk_info = &ap806_core_clk_sar[clk_idx];
++
++	freq_idx = (reg >> clk_info->offset) & clk_info->mask;
++	if (WARN_ON(freq_idx > AP806_PLL_FREQ))
++		return 0;
++	else
++		return ap806_core_clk_freq[clk_idx][freq_idx];
++}
++
++static void __init ap806_core_clk_init(struct device_node *np)
 +{
 +	void __iomem *base;
-+	const char *parent;
 +	u32 reg;
 +	int i;
 +
@@ -133,27 +188,25 @@ index 0000000..154ee55
 +
 +	iounmap(base);
 +
-+	parent = of_clk_get_parent_name(np, 0);
-+
-+	for (i = 0; i < AP806_RING_DIV_NUM; i++) {
-+		unsigned long divider;
++	for (i = 0; i < AP806_PLL_NUM; i++) {
++		unsigned long freq;
 +		const char *name;
 +
-+		/* Each clock is represented by 6 bits */
-+		divider = (reg >> (6 * i)) & 0x3f;
++		freq = ap806_core_clk_get_freq(reg, i);
 +
 +		of_property_read_string_index(np, "clock-output-names",
 +					      i, &name);
 +
-+		ap806_ring_clks[i] =
-+			clk_register_fixed_factor(NULL, name, parent,
-+						  0, 1, divider);
++		ap806_core_clks[i] =
++			clk_register_fixed_rate(NULL, name, NULL,
++						CLK_IS_ROOT, freq);
 +	}
 +
-+	of_clk_add_provider(np, of_clk_src_onecell_get, &ap806_ring_clk_data);
++	of_clk_add_provider(np, of_clk_src_onecell_get,
++			    &ap806_core_clk_data);
 +}
 +
-+CLK_OF_DECLARE(ap806_ring_clk, "marvell,armada-ap806-ring-clock",
-+	       ap806_ring_clk_init);
++CLK_OF_DECLARE(ap806_core_clk, "marvell,armada-ap806-core-clock",
++	       ap806_core_clk_init);
 -- 
 2.6.4
