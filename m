@@ -1,40 +1,100 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 15 Feb 2016 19:08:32 +0100
-Subject: Build regressions/improvements in v4.5-rc4
-In-Reply-To: <1455559593-26369-1-git-send-email-geert@linux-m68k.org>
-References: <1455559593-26369-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <CAMuHMdVDyep0cPPB-Mh5CfRSt4Do_F_j6WMkwzjRfz_jDZLLeQ@mail.gmail.com>
+From: aleksey.makarov@linaro.org (Aleksey Makarov)
+Date: Mon, 15 Feb 2016 21:05:24 +0300
+Subject: [PATCH v3 0/5] ACPI: parse the SPCR table
+Message-ID: <1455559532-8305-1-git-send-email-aleksey.makarov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 15, 2016 at 7:06 PM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> JFYI, when comparing v4.5-rc4[1] to v4.5-rc3[3], the summaries are:
->   - build errors: +17/-11
+This patchset is based on the patchset by Leif Lindholm [1]
 
-  + /home/kisskb/slave/src/arch/arm/include/asm/div64.h: error: 'asm'
-operand has impossible constraints:  => 93:3, 111:3
-  + /home/kisskb/slave/src/arch/arm/include/asm/div64.h: error: can't
-find a register in class 'GENERAL_REGS' while reloading 'asm':  =>
-111:3
+'ARM Server Base Boot Requirements' [2] mentions SPCR (Serial Port
+Console Redirection Table) [3] as a mandatory ACPI table that
+specifies the configuration of serial console.
 
-arm-randconfig
+SPCR support is included in QEMU's ARM mach-virt since 2.4 release.
 
-  + error: initramfs.c: undefined reference to `__stack_chk_guard':
-=> .init.text+0x373c)
+Introduce a new function acpi_console_check().  At the uart port
+registration, this function checks if the ACPI SPCR table specifies
+its argument of type struct uart_port to be a console
+and if so calls add_preferred_console().
 
-i386-randconfig
+Use SPCR to tell if SBSA serial driver should use 32-bit access to registers.
 
-> [1] http://kisskb.ellerman.id.au/kisskb/head/9916/ (all 262 configs)
-> [3] http://kisskb.ellerman.id.au/kisskb/head/9888/ (all 262 configs)
+To be able to access SPCR table each time any console is registered
+change __init to __ref for early_acpi_os_unmap_memory().
 
-Gr{oetje,eeting}s,
+The patchset should be applied to tty-next.
 
-                        Geert
+v3:
+Greg Kroah-Hartman did not like v2 so I have rewritten this patchset:
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+- drop acpi_match() member of struct console
+- drop implementations of this member for pl011 and 8250
+- drop the patch that renames some vars in printk.c as it is not needed anymore
+- drpo patch that introduces system wide acpi_table_parse2().
+  Instead introduce a custom acpi_table_parse_spcr() in spcr.c
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Instead of introducing a new match_acpi() member of struct console,
+this patchset introduces a new function acpi_console_check().
+This function is called when a new uart is registered at serial_core.c
+the same way OF code checks for console.  If the registered uart is the
+console specified by SPCR table, this function calls add_preferred_console()
+
+The restrictions of this approach are:
+
+- only serial consoles can be set up
+- only consoles specified by the memory/io address can be set up
+  (SPCR can specify devices by PCI id/PCI address)
+
+v2:
+https://lkml.kernel.org/g/1455299022-11641-1-git-send-email-aleksey.makarov at linaro.org
+- don't use SPCR if user specified console in command line
+- fix initialization order of newcon->index = 0
+- rename some variables at printk.c (Joe Perches, Peter Hurley)
+- enable ACPI_SPCR_TABLE in a separate patch (Andy Shevchenko)
+- remove the retry loop for console registering (Peter Hurley).
+  Instead, obtain SPCR with acpi_get_table().  That works after
+  call to acpi_early_init() i. e. in any *_initcall()
+- describe design decision behind introducing acpi_match() (Peter Hurley)
+- fix compilation for x86 + ACPI (Graeme Gregory)
+- introduce DBG2 constants in a separate patch (Andy Shevchenko)
+- fix a typo in DBG2 constants (Andy Shevchenko)
+- add ACPI_DBG2_ARM_SBSA_32BIT constant (Christopher Covington)
+- add support for ACPI_DBG2_ARM_SBSA_* consoles (Christopher Covington)
+- add documentation for functions
+- add a patch that uses SPCR to find if SBSA serial driver should use 32-bit
+  accessor functions (Christopher Covington)
+- change __init to __ref for early_acpi_os_unmap_memory() in a separate patch
+- introduce acpi_table_parse2() in a separate patch
+- fix fetching the SPCR table early (Mark Salter)
+- add a patch from Mark Salter that introduces support for matching 8250-based
+  consoles
+
+v1:
+https://lkml.kernel.org/g/1453722324-22407-1-git-send-email-aleksey.makarov at linaro.org
+
+[1] https://lkml.kernel.org/g/1441716217-23786-1-git-send-email-leif.lindholm at linaro.org
+[2] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0044a/index.html
+[3] https://msdn.microsoft.com/en-us/library/windows/hardware/dn639132(v=vs.85).aspx
+
+Aleksey Makarov (5):
+  ACPI: change __init to __ref for early_acpi_os_unmap_memory()
+  ACPI: parse SPCR and enable matching console
+  ACPI: enable ACPI_SPCR_TABLE on ARM64
+  ACPI: add definition of DBG2 subtypes
+  serial: pl011: use SPCR to setup 32-bit access
+
+ arch/arm64/Kconfig               |   1 +
+ drivers/acpi/Kconfig             |   3 +
+ drivers/acpi/Makefile            |   1 +
+ drivers/acpi/osl.c               |   6 +-
+ drivers/acpi/spcr.c              | 122 +++++++++++++++++++++++++++++++++++++++
+ drivers/tty/serial/amba-pl011.c  |   2 +
+ drivers/tty/serial/serial_core.c |  14 ++++-
+ include/acpi/actbl2.h            |   5 ++
+ include/linux/acpi.h             |  15 +++++
+ 9 files changed, 166 insertions(+), 3 deletions(-)
+ create mode 100644 drivers/acpi/spcr.c
+
+-- 
+2.7.1
