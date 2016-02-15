@@ -1,89 +1,46 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 15 Feb 2016 09:59:27 +0000
-Subject: [PATCH] dma: mv_xor_v2: new driver
-In-Reply-To: <20160215105008.74aa7869@free-electrons.com>
-References: <1455523083-25506-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <201602151735.BaFwBMOn%fengguang.wu@intel.com>
- <20160215105008.74aa7869@free-electrons.com>
-Message-ID: <56C1A17F.9030206@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 15 Feb 2016 10:01:34 +0000
+Subject: [PATCH 0/3] OMAP/pinmux: remove misuse of IRQF_NO_SUSPEND flag
+In-Reply-To: <CACRpkdYzJ9Hy0sH6gK6RzpLE6juS4WfPjbt7nh43vR9YTuGZWA@mail.gmail.com>
+References: <1454351299-27440-1-git-send-email-sudeep.holla@arm.com>
+ <CACRpkdYzJ9Hy0sH6gK6RzpLE6juS4WfPjbt7nh43vR9YTuGZWA@mail.gmail.com>
+Message-ID: <56C1A1FE.3080403@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Hi Linus,
 
-On 15/02/16 09:50, Thomas Petazzoni wrote:
-> Marc,
-> 
-> This doesn't seem to be an issue introduced by my patch itself, but
-> rather a problem with the MSI subsystem itself. Is this already a known
-> issue (possibly already fixed), or should I investigate?
+On 13/02/16 14:42, Linus Walleij wrote:
+> On Mon, Feb 1, 2016 at 7:28 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>
+>>    pinctrl: single: Use a separate lockdep class
+>>    pinctrl: single: remove misuse of IRQF_NO_SUSPEND flag
+>>    ARM: OMAP2+: remove misuse of IRQF_NO_SUSPEND flag
+>>
+>>   arch/arm/mach-omap2/mux.c        |  4 ++--
+>>   arch/arm/mach-omap2/pm34xx.c     |  9 ++++-----
+>>   arch/arm/mach-omap2/prm_common.c |  1 +
+>>   drivers/pinctrl/pinctrl-single.c | 15 ++++++++++++---
+>
+> Are these patches orthogonal so I can merge the pinctrl patch independently
+> of the OMAP patches if Tony ACKs this?
+>
 
-Seems like something is selecting GENERIC_MSI_IRQ_DOMAIN on a system
-that doesn't implement the required bits.
+Thanks for the follow up.
+IIUC they are dependent and remember Tony/Grygorii wanted them to be
+merged together(at-least for bisectibility)
 
-It may be that we need to implement something like
-HAS_GENERIC_MSI_IRQ_DOMAIN, and make GENERIC_MSI_IRQ_DOMAIN conditional
-on that. Or just whitelist the architectures that do implement this.
+> If not: should it be merged by me or through ARM SoC/Tony?
+>
 
-Any chance you could have a closer look?
+I think so.
 
-Thanks,
+> Anyways waiting for maintainer feedback, but the above is good to know.
+>
 
-	M.
-
-> 
-> Thanks!
-> 
-> Thomas
-> 
-> On Mon, 15 Feb 2016 17:09:27 +0800, kbuild test robot wrote:
->> Hi Thomas,
->>
->> [auto build test ERROR on robh/for-next]
->> [also build test ERROR on v4.5-rc4 next-20160215]
->> [if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
->>
->> url:    https://github.com/0day-ci/linux/commits/Thomas-Petazzoni/dma-mv_xor_v2-new-driver/20160215-160120
->> base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux for-next
->> config: openrisc-allyesconfig (attached as .config)
->> reproduce:
->>         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
->>         chmod +x ~/bin/make.cross
->>         # save the attached .config to linux build tree
->>         make.cross ARCH=openrisc 
->>
->> All errors (new ones prefixed by >>):
->>
->>    In file included from kernel/irq/chip.c:14:0:
->>>> include/linux/msi.h:174:21: fatal error: asm/msi.h: No such file or directory
->>    compilation terminated.
->>
->> vim +174 include/linux/msi.h
->>
->> c2791b80 Yijing Wang    2014-11-11  168  	void (*teardown_irq)(struct msi_controller *chip, unsigned int irq);
->> 0cbdcfcf Thierry Reding 2013-08-09  169  };
->> 0cbdcfcf Thierry Reding 2013-08-09  170  
->> f3cf8bb0 Jiang Liu      2014-11-12  171  #ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
->> d9109698 Jiang Liu      2014-11-15  172  
->> aeeb5965 Jiang Liu      2014-11-15  173  #include <linux/irqhandler.h>
->> d9109698 Jiang Liu      2014-11-15 @174  #include <asm/msi.h>
->> d9109698 Jiang Liu      2014-11-15  175  
->> f3cf8bb0 Jiang Liu      2014-11-12  176  struct irq_domain;
->> 552c494a Marc Zyngier   2015-11-23  177  struct irq_domain_ops;
->>
->> :::::: The code at line 174 was first introduced by commit
->> :::::: d9109698be6e7439e6082aa00d79d4556114739b genirq: Introduce msi_domain_alloc/free_irqs()
->>
->> :::::: TO: Jiang Liu <jiang.liu@linux.intel.com>
->> :::::: CC: Thomas Gleixner <tglx@linutronix.de>
->>
->> ---
->> 0-DAY kernel test infrastructure                Open Source Technology Center
->> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
-> 
-> 
-> 
-
+Grygorii was still not sure if this works and he couldn't give it a
+test. He was traveling and may need more time to get back on this.
 
 -- 
-Jazz is not dead. It just smells funny...
+Regards,
+Sudeep
