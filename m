@@ -1,54 +1,49 @@
-From: oberpar@linux.vnet.ibm.com (Peter Oberparleiter)
-Date: Mon, 15 Feb 2016 15:35:21 +0100
-Subject: [PATCH 5/5] gcov: disable -Wmaybe-uninitialized warning
-In-Reply-To: <1455293187-179811-6-git-send-email-arnd@arndb.de>
-References: <1455293187-179811-1-git-send-email-arnd@arndb.de>
- <1455293187-179811-6-git-send-email-arnd@arndb.de>
-Message-ID: <56C1E229.4050308@linux.vnet.ibm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 15 Feb 2016 14:35:09 +0000
+Subject: [PATCH v5sub1 7/8] arm64: move kernel image to base of vmalloc
+ area
+In-Reply-To: <56C1E072.2090909@virtuozzo.com>
+References: <1454324093-15998-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1454324093-15998-8-git-send-email-ard.biesheuvel@linaro.org>
+ <20160212145844.GI31665@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu-x6QPorWsPDP8bqAkmbasqzhqmP39HS=qprfGB4r8JLw@mail.gmail.com>
+ <20160212151006.GJ31665@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu84mVP=YjbLhWoGj9AEUD8m8+Lq8kTCniCHwxJwMWaZtA@mail.gmail.com>
+ <20160212152641.GK31665@e104818-lin.cambridge.arm.com>
+ <56BDFC86.5010705@arm.com>
+ <20160212160652.GL31665@e104818-lin.cambridge.arm.com>
+ <56C1E072.2090909@virtuozzo.com>
+Message-ID: <20160215143509.GE9732@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12.02.2016 17:06, Arnd Bergmann wrote:
-> When gcov profiling is enabled, we see a lot of spurious warnings about
-> possibly uninitialized variables being used:
+On Mon, Feb 15, 2016 at 05:28:02PM +0300, Andrey Ryabinin wrote:
 > 
-> arch/arm/mm/dma-mapping.c: In function 'arm_coherent_iommu_map_page':
-> arch/arm/mm/dma-mapping.c:1085:16: warning: 'start' may be used uninitialized in this function [-Wmaybe-uninitialized]
-> drivers/clk/st/clk-flexgen.c: In function 'st_of_flexgen_setup':
-> drivers/clk/st/clk-flexgen.c:323:9: warning: 'num_parents' may be used uninitialized in this function [-Wmaybe-uninitialized]
-> kernel/cgroup.c: In function 'cgroup_mount':
-> kernel/cgroup.c:2119:11: warning: 'root' may be used uninitialized in this function [-Wmaybe-uninitialized]
 > 
-> All of these are false positives, so it seems better to just disable
-> the warnings whenever GCOV is enabled. Most users don't enable GCOV,
-> and based on a prior patch, it is now also disabled for 'allmodconfig'
-> builds, so there should be no downsides of doing this.
+> On 02/12/2016 07:06 PM, Catalin Marinas wrote:
+> > So far, we have:
+> > 
+> > KASAN+for-next/kernmap goes wrong
+> > KASAN+UBSAN goes wrong
+> > 
+> > Enabled individually, KASAN, UBSAN and for-next/kernmap seem fine. I may
+> > have to trim for-next/core down until we figure out where the problem
+> > is.
+> > 
+> > BUG: KASAN: stack-out-of-bounds in find_busiest_group+0x164/0x16a0 at addr ffffffc93665bc8c
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Can it be related to TLB conflicts, which supposed to be fixed in "arm64: kasan: avoid TLB conflicts" patch
+> from "arm64: mm: rework page table creation" series ?
 
-Sounds sane.
+Currently I don't believe this is a TLB issue. We've been seeing issues
+even with those patches in for-next/core with that patch included. It's
+also incredibly reliable to trigger.
 
-Acked-by: Peter Oberparleiter <oberpar@linux.vnet.ibm.com>
+It seems that issues are more likely the larger the kernel image, so my
+suspicion is that at some boundary condition we create the page tables
+for the shadow region incorrectly. I'm only able to trigger this on a
+particular machine, so the physical memory layout may also matter.
 
-> ---
->  Makefile | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/Makefile b/Makefile
-> index 6bb89728a9d1..7b6900931a47 100644
-> --- a/Makefile
-> +++ b/Makefile
-> @@ -364,7 +364,7 @@ AFLAGS_MODULE   =
->  LDFLAGS_MODULE  =
->  CFLAGS_KERNEL	=
->  AFLAGS_KERNEL	=
-> -CFLAGS_GCOV	= -fprofile-arcs -ftest-coverage -fno-tree-loop-im
-> +CFLAGS_GCOV	= -fprofile-arcs -ftest-coverage -fno-tree-loop-im -Wno-maybe-uninitialized
->  CFLAGS_KCOV	= -fsanitize-coverage=trace-pc
-> 
-> 
+I'm currently looking into that.
 
-
--- 
-Peter Oberparleiter
-Linux on z Systems Development - IBM Germany
+Mark.
