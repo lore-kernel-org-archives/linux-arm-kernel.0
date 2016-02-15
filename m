@@ -1,45 +1,159 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 15 Feb 2016 08:34:55 +0100
-Subject: [PATCH 0/3] clk: mvebu: initial support for AP806 clocks
-Message-ID: <1455521698-7905-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Mon, 15 Feb 2016 08:34:58 +0100
+Subject: [PATCH 3/3] clk: mvebu: add AP806 ring clock driver
+In-Reply-To: <1455521698-7905-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1455521698-7905-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1455521698-7905-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This commit adds a new driver to handle the ring clocks found in the
+AP806 HW block, which is the core block of all Armada 7K and 8K
+Marvell 64-bits processors. Those ring clocks are derived from the
+core ring clock handled by the AP806 core clock driver. The ring
+clocks are used by various peripherals inside the AP806.
 
-The following set of patches add initial support for the main clocks
-found in the AP806 hardware block, which is the central block used in
-the newest Marvell 7K and 8K 64-bits processors.
-
-Two new drivers are added, one for the so-called "core" clocks and one
-for the "ring" clocks. The latter are child clocks from one of the
-core clocks. The "core" clocks are fixed rate clocks, but their rate
-is calculated from values in the Sample At Reset register.
-
-The support for the Marvell 7K/8K platform (Device Tree, etc.) will be
-submitted as a separate patch series.
-
-Thanks!
-
-Thomas
-
-Thomas Petazzoni (3):
-  clk: unconditionally recurse into clk/mvebu/
-  clk: mvebu: add AP806 core clock driver
-  clk: mvebu: add AP806 ring clock driver
-
- .../clock/mvebu-armada-ap806-core-clock.txt        |  33 ++++++
- .../clock/mvebu-armada-ap806-ring-clock.txt        |  32 ++++++
- drivers/clk/Makefile                               |   2 +-
- drivers/clk/mvebu/Kconfig                          |   6 ++
- drivers/clk/mvebu/Makefile                         |   3 +-
- drivers/clk/mvebu/ap806-core.c                     | 112 +++++++++++++++++++++
- drivers/clk/mvebu/ap806-ring.c                     |  65 ++++++++++++
- 7 files changed, 251 insertions(+), 2 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/mvebu-armada-ap806-core-clock.txt
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ .../clock/mvebu-armada-ap806-ring-clock.txt        | 32 +++++++++++
+ drivers/clk/mvebu/Kconfig                          |  3 +
+ drivers/clk/mvebu/Makefile                         |  1 +
+ drivers/clk/mvebu/ap806-ring.c                     | 65 ++++++++++++++++++++++
+ 4 files changed, 101 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/clock/mvebu-armada-ap806-ring-clock.txt
- create mode 100644 drivers/clk/mvebu/ap806-core.c
  create mode 100644 drivers/clk/mvebu/ap806-ring.c
 
+diff --git a/Documentation/devicetree/bindings/clock/mvebu-armada-ap806-ring-clock.txt b/Documentation/devicetree/bindings/clock/mvebu-armada-ap806-ring-clock.txt
+new file mode 100644
+index 0000000..5602bdc
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/mvebu-armada-ap806-ring-clock.txt
+@@ -0,0 +1,32 @@
++* Clock bindings for Marvell MVEBU AP806 Ring clocks
++
++The Marvell MVEBU Armada 7K/8K SoCs contain a block called AP806,
++hosting the CPU and other core components of the CPU. This Device Tree
++binding allows to describe the ring clocks of the AP806, which are
++derived from the Ring Core clock, after a dividing factor.
++
++The following is a list of provided IDs and clock names on Armada
++AP806 RING dividers:
++
++ 0 = Ring 0
++ 1 = Ring 2
++ 2 = Ring 3
++ 3 = Ring 4
++ 4 = Ring 5
++
++Required properties:
++- compatible: must be one of the following:
++	"marvell,armada-ap806-ring-clock"
++- reg: must be the register holding the divider values for ring clocks
++- #clock-cells : from common clock binding; shall be set to 1
++- clock-output-names: name of the output clocks
++
++Example:
++
++	ringclk: clk at 0x6F8250 {
++		compatible = "marvell,armada-ap806-ring-clock";
++		reg = <0x6F8250 0x04>;
++		#clock-cells = <1>;
++		clock-output-names = "ring-0", "ring-2", "ring-3", "ring-4", "ring-5";
++		clocks = <&coreclk 1>;
++	};
+diff --git a/drivers/clk/mvebu/Kconfig b/drivers/clk/mvebu/Kconfig
+index fd84172..5d30aac 100644
+--- a/drivers/clk/mvebu/Kconfig
++++ b/drivers/clk/mvebu/Kconfig
+@@ -45,3 +45,6 @@ config ORION_CLK
+ 
+ config ARMADA_AP806_CORE_CLK
+ 	bool
++
++config ARMADA_AP806_RING_CLK
++	bool
+diff --git a/drivers/clk/mvebu/Makefile b/drivers/clk/mvebu/Makefile
+index db5c28c..48ca2d3 100644
+--- a/drivers/clk/mvebu/Makefile
++++ b/drivers/clk/mvebu/Makefile
+@@ -6,6 +6,7 @@ obj-$(CONFIG_ARMADA_375_CLK)	+= armada-375.o
+ obj-$(CONFIG_ARMADA_38X_CLK)	+= armada-38x.o
+ obj-$(CONFIG_ARMADA_39X_CLK)	+= armada-39x.o
+ obj-$(CONFIG_ARMADA_AP806_CORE_CLK) += ap806-core.o
++obj-$(CONFIG_ARMADA_AP806_RING_CLK) += ap806-ring.o
+ obj-$(CONFIG_ARMADA_XP_CLK)	+= armada-xp.o
+ obj-$(CONFIG_DOVE_CLK)		+= dove.o dove-divider.o
+ obj-$(CONFIG_KIRKWOOD_CLK)	+= kirkwood.o
+diff --git a/drivers/clk/mvebu/ap806-ring.c b/drivers/clk/mvebu/ap806-ring.c
+new file mode 100644
+index 0000000..154ee55
+--- /dev/null
++++ b/drivers/clk/mvebu/ap806-ring.c
+@@ -0,0 +1,65 @@
++/*
++ * Marvell Armada AP806 ring clocks
++ *
++ * Copyright (C) 2016 Marvell
++ *
++ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/kernel.h>
++#include <linux/clk.h>
++#include <linux/clk-provider.h>
++#include <linux/io.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++
++#define AP806_RING_DIV_NUM	5
++
++static struct clk *ap806_ring_clks[AP806_RING_DIV_NUM];
++
++static struct clk_onecell_data ap806_ring_clk_data = {
++	.clks = ap806_ring_clks,
++	.clk_num = AP806_RING_DIV_NUM,
++};
++
++static void __init ap806_ring_clk_init(struct device_node *np)
++{
++	void __iomem *base;
++	const char *parent;
++	u32 reg;
++	int i;
++
++	base = of_iomap(np, 0);
++	if (WARN_ON(!base))
++		return;
++
++	reg = readl(base);
++
++	iounmap(base);
++
++	parent = of_clk_get_parent_name(np, 0);
++
++	for (i = 0; i < AP806_RING_DIV_NUM; i++) {
++		unsigned long divider;
++		const char *name;
++
++		/* Each clock is represented by 6 bits */
++		divider = (reg >> (6 * i)) & 0x3f;
++
++		of_property_read_string_index(np, "clock-output-names",
++					      i, &name);
++
++		ap806_ring_clks[i] =
++			clk_register_fixed_factor(NULL, name, parent,
++						  0, 1, divider);
++	}
++
++	of_clk_add_provider(np, of_clk_src_onecell_get, &ap806_ring_clk_data);
++}
++
++CLK_OF_DECLARE(ap806_ring_clk, "marvell,armada-ap806-ring-clock",
++	       ap806_ring_clk_init);
 -- 
 2.6.4
