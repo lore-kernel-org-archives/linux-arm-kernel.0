@@ -1,44 +1,88 @@
-From: jamesjj.liao@mediatek.com (James Liao)
-Date: Mon, 15 Feb 2016 17:19:42 +0800
-Subject: [PATCH v6 4/7] clk: mediatek: Add MT2701 clock support
-In-Reply-To: <20160210200853.26445.15165@quark.deferred.io>
-References: <1454665050-37776-1-git-send-email-jamesjj.liao@mediatek.com>
- <1454665050-37776-5-git-send-email-jamesjj.liao@mediatek.com>
- <20160210200853.26445.15165@quark.deferred.io>
-Message-ID: <1455527982.29688.8.camel@mtksdaap41>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Mon, 15 Feb 2016 10:25:27 +0100
+Subject: [PATCH v10 4/8] mfd: fsl imx25 Touchscreen ADC driver
+In-Reply-To: <20160209103513.GC24522@x1>
+References: <1450101234-2191-1-git-send-email-mpa@pengutronix.de>
+ <6151166.y0HMDdqtvF@adelgunde> <20160209103513.GC24522@x1>
+Message-ID: <6071608.sYYGeTKS0i@adelgunde>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
-
-On Wed, 2016-02-10 at 12:08 -0800, Michael Turquette wrote:
-> Quoting James Liao (2016-02-05 01:37:27)
-> > +CLK_OF_DECLARE(mtk_topckgen, "mediatek,mt2701-topckgen", mtk_topckgen_init);
-> > +CLK_OF_DECLARE(mtk_infrasys, "mediatek,mt2701-infracfg", mtk_infrasys_init);
-> > +CLK_OF_DECLARE(mtk_pericfg, "mediatek,mt2701-pericfg", mtk_pericfg_init);
-> > +CLK_OF_DECLARE(mtk_mmsys, "mediatek,mt2701-mmsys", mtk_mmsys_init);
-> > +CLK_OF_DECLARE(mtk_imgsys, "mediatek,mt2701-imgsys", mtk_imgsys_init);
-> > +CLK_OF_DECLARE(mtk_vdecsys, "mediatek,mt2701-vdecsys", mtk_vdecsys_init);
-> > +CLK_OF_DECLARE(mtk_hifsys, "mediatek,mt2701-hifsys", mtk_hifsys_init);
-> > +CLK_OF_DECLARE(mtk_ethsys, "mediatek,mt2701-ethsys", mtk_ethsys_init);
-> > +CLK_OF_DECLARE(mtk_bdpsys, "mediatek,mt2701-bdpsys", mtk_bdpsys_init);
-> > +CLK_OF_DECLARE(mtk_apmixedsys, "mediatek,mt2701-apmixedsys",
+On Tuesday, February 09, 2016 10:35:13 AM Lee Jones wrote:
+> On Tue, 02 Feb 2016, Markus Pargmann wrote:
 > 
-> :-/
+> > Hi,
+> > 
+> > On Monday, January 11, 2016 06:54:41 AM Lee Jones wrote:
+> > > On Mon, 14 Dec 2015, Markus Pargmann wrote:
+> > > 
+> > > > This is the core driver for imx25 touchscreen/adc driver. The module
+> > > > has one shared ADC and two different conversion queues which use the
+> > > > ADC. The two queues are identical. Both can be used for general purpose
+> > > > ADC but one is meant to be used for touchscreens.
+> > > > 
+> > > > This driver is the core which manages the central components and
+> > > > registers of the TSC/ADC unit. It manages the IRQs and forwards them to
+> > > > the correct components.
+> > > > 
+> > > > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> > > > Signed-off-by: Denis Carikli <denis@eukrea.com>
+> > > > 
+> > > > [ensure correct ADC clock depending on the IPG clock]
+> > > > Signed-off-by: Juergen Borleis <jbe@pengutronix.de>
+> > > > Acked-by: Jonathan Cameron <jic23@kernel.org>
+> > > > ---
+> > > > 
+> > > > Notes:
+> > > >     Changes in v7:
+> > > >      - Cleanup bit defines in header files to be more readable
+> > > >      - Fix irq check to return with an error for irq <= 0
+> > > >      - Add COMPILE_TEST in Kconfig file
+> > > >     
+> > > >     Changes in v5:
+> > > >      - Remove ifdef CONFIG_OF as this driver is only for DT usage
+> > > >      - Remove module owner
+> > > >      - Add Kconfig dependencies ARCH_MX25 and OF
+> > > > 
+> > > >  drivers/mfd/Kconfig             |   9 ++
+> > > >  drivers/mfd/Makefile            |   2 +
+> > > >  drivers/mfd/fsl-imx25-tsadc.c   | 203 ++++++++++++++++++++++++++++++++++++++++
+> > > >  include/linux/mfd/imx25-tsadc.h | 140 +++++++++++++++++++++++++++
+> > > >  4 files changed, 354 insertions(+)
+> > > >  create mode 100644 drivers/mfd/fsl-imx25-tsadc.c
+> > > >  create mode 100644 include/linux/mfd/imx25-tsadc.h
+> > > 
+> > > For my own reference:
+> > >   Acked-by: Lee Jones <lee.jones@linaro.org>
+> > > 
+> > > I will apply this and sent out pull-requests to the relevant
+> > > maintainers once -rc1 is out.
+> > 
+> > Thanks. Do you mean just this patch or the whole series?
 > 
-> This is way too much CLK_OF_DECLARE and not enough Linux Driver Model.
+> I will take all of the /driver patches.  The ARM patches need to go in
+> through ARM-SoC via the relevant sub-arch maintainer(s).
 > 
-> I understand that some platforms really must initialize some clocks very
-> early, but can we please separate those into one table and call
-> CLK_OF_DECLARE on only that set, and then register the rest through a
-> platform_driver later on?
+> > Shall I resend the whole series to fix the commit title of the first
+> > patch?
+> 
+> No, that's fine.  I'll handle that *this time*.
 
-I know CLK_OF_DECLARE is much earlier than platform_driver, so it can
-ensure all drivers lookup their clocks successfully during
-platform_driver probe. Is there anything different to init these clock
-providers in CLK_OF_DECLARE and platform_driver?
+Thank you.
 
+Best Regards,
 
-Best regards,
+Markus
 
-James
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160215/95cb73e1/attachment.sig>
