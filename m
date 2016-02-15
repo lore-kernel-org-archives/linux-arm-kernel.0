@@ -1,26 +1,38 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Mon, 15 Feb 2016 14:28:23 +0530
-Subject: [PATCH v7 0/4] mailbox: hisilicon: add Hi6220 mailbox driver
-In-Reply-To: <1454599500-15600-1-git-send-email-leo.yan@linaro.org>
-References: <1454599500-15600-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <CABb+yY2_4p6wu0qo0p8S3enD-EO=B4LXmC0569Z7tSj0zdjQHQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 15 Feb 2016 08:58:18 +0000
+Subject: arm qemu test failures due to 'driver-core: platform: probe
+ of-devices only using list of compatibles'
+In-Reply-To: <20160215081750.GD12289@pengutronix.de>
+References: <20160214165010.GA3189@roeck-us.net>
+ <20160214195501.GA12289@pengutronix.de>
+ <20160214200755.GB10826@n2100.arm.linux.org.uk>
+ <20160215081750.GD12289@pengutronix.de>
+Message-ID: <20160215085818.GC10826@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 4, 2016 at 8:54 PM, Leo Yan <leo.yan@linaro.org> wrote:
-> Hi6220 mailbox supports up to 32 channels. Each channel is unidirectional
-> with a maximum message size of 8 words. I/O is performed using register
-> access (there is no DMA) and the cell raises an interrupt when messages
-> are received.
->
-> This patch series is to implement Hi6220 mailbox driver. It registers
-> two channels into framework for communication with MCU, one is tx channel
-> and another is rx channel. Now mailbox driver is used to send message to
-> MCU to control dynamic voltage and frequency scaling for CPU, GPU and DDR.
->
-> Changes from v6:
-> * Fix to use lowercase for hexadecimal value in DT binding document
->
-Looks ok, but please rebase over mailbox-for-next and resend.
+On Mon, Feb 15, 2016 at 09:17:50AM +0100, Uwe Kleine-K?nig wrote:
+> Hello Russell,
+> 
+> On Sun, Feb 14, 2016 at 08:07:55PM +0000, Russell King - ARM Linux wrote:
+> > On Sun, Feb 14, 2016 at 08:55:01PM +0100, Uwe Kleine-K?nig wrote:
+> > > So the unexpected abnormality here is that even though this device is
+> > > instantiated by dt, the driver doesn't provide any compatibles.
+> > > Either my expectation is wrong, then 67d02a1bbb33455 should be reverted
+> > 
+> > Your expectation is wrong.  AMBA primecell devices have hardware IDs
+> > and are matched to their drivers by those IDs.  Just like PCI.
+> 
+> pci devices don't appear in dt, do they? I don't see the connection
+> between amba devices and platform devices, see my other mail in this
+> thread for some more details.
 
-Thanks.
+They both have hardware IDs, and they are both matched via those hardware
+IDs.
+
+Your change has introduced a regression and is therefore wrong.
+
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
