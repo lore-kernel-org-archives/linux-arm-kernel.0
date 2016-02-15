@@ -1,56 +1,62 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 15 Feb 2016 13:40:09 +0000
-Subject: [PATCH v5sub1 0/8] arm64: split linear and kernel mappings
-In-Reply-To: <56C1D2CF.1010108@gmail.com>
-References: <1454324093-15998-1-git-send-email-ard.biesheuvel@linaro.org>
- <56BE3645.3030403@gmail.com>
- <CAKv+Gu9Qw=DSe1fZT=Dv=iKaKqzsf5ARK9dzwCWPk_0uRECm1w@mail.gmail.com>
- <56BE3C35.7070608@gmail.com>
- <CAKv+Gu_29SjYgg+P3fyGFcaRVxjapVzMs85Y2frd7_f51mPv-A@mail.gmail.com>
- <56C1D2CF.1010108@gmail.com>
-Message-ID: <20160215134009.GB6298@arm.com>
+From: patrik.r.jakobsson@gmail.com (Patrik Jakobsson)
+Date: Mon, 15 Feb 2016 14:49:09 +0100
+Subject: [PATCH v2 03/17] drm/exynos: removed optional dummy encoder
+ mode_fixup function.
+In-Reply-To: <3768b670931572de51fca1102efa18d20dd770ee.1455540137.git.palminha@synopsys.com>
+References: <cover.1455540137.git.palminha@synopsys.com>
+ <3768b670931572de51fca1102efa18d20dd770ee.1455540137.git.palminha@synopsys.com>
+Message-ID: <CAMeQTsZLdMOnk7-isneoUyFBbQdiRUsGH6+EhD8W1LNB=80LVQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 15, 2016 at 02:29:51PM +0100, Matthias Brugger wrote:
-> >On 12 February 2016 at 21:10, Matthias Brugger <matthias.bgg@gmail.com> wrote:
-> >>On 12/02/16 20:47, Ard Biesheuvel wrote:
-> >>>On 12 February 2016 at 20:45, Matthias Brugger <matthias.bgg@gmail.com>
-> >>>>I bisected linux-next (20160212) with the following error on booting with
-> >>>>an
-> >>>>initramfs:
-> >>>>   Failed to execute /init (error -8)
-> >>>>   request_module: runaway loop modprobe binfmt-464c
-> >>>>   Starting init: /sbin/init exists but couldn't execute it (error -8)
-> >>>>   request_module: runaway loop modprobe binfmt-464c
-> >>>>   Starting init: /bin/sh exists but couldn't execute it (error -8)
-> >>>>   Kernel panic - not syncing: No working init found.  Try passing init=
-> >>>>option to kernel. See Linux Documentation/init..
-> >>>>
-> >>>>I tracked down the error to patch 7 of this series. But I realized that
-> >>>>patch 7 does not compile, but from patch 8 onwards I observe the error.
-> >>>>
-> >
-> >As far as this failure is concerned, I managed to reproduce an error
-> >with patch #7 and not #8 applied, involving out of range kvm symbols
-> >at link time. This is reproducible with GCC 4.8 but not GCC 4.9 or
-> >later. Is this what you were seeing as well? Or is there another
-> >problem?
-> >
-> 
-> I realized that I used " aarch64-linux-gnu-gcc (Linaro GCC 2014.11) 4.9.3
-> 20141031 (prerelease)"  which gave me errors like:
-> 
-> arch/arm64/kvm/built-in.o: In function `__cpu_init_hyp_mode':
-> /home/mbrugger/src/linux-next/./arch/arm64/include/asm/kvm_host.h:331:(.text+0x73b4):
-> relocation truncated to fit: R_AARCH64_ADR_PREL_PG_HI21 against symbol
-> `__kvm_hyp_vector' defined in .hyp.text section in arch/arm64/kvm/built-in.o
-> 
-> So it was time to update my toolchain to "aarch64-linux-gnu-gcc (Linaro GCC
-> 5.1-2015.08) 5.1.1 20150608" which fixed the problem for me.
+Hi Carlos
 
-FWIW, I've also been seeing a bunch of reloc errors with allmodconfig,
-for-next/core and GCC 4.9. loops_per_jiffy was one of the problematic
-symbols, iirc, but upgrading to GCC 6 (devel) fixed the issue.
+Any particular reason why this patch isn't squashed with patch 8/17?
 
-Will
+Thanks
+Patrik
+
+
+On Mon, Feb 15, 2016 at 1:58 PM, Carlos Palminha
+<CARLOS.PALMINHA@synopsys.com> wrote:
+> mode_fixup function for encoder drivers became optional with patch
+> http://patchwork.freedesktop.org/patch/msgid/1455106522-32307-1-git-send-email-palminha at synopsys.com
+>
+> This patch set nukes all the dummy mode_fixup implementations.
+>
+> (made on top of Daniel topic/drm-misc branch)
+>
+> Signed-off-by: Carlos Palminha <palminha@synopsys.com>
+> ---
+>  drivers/gpu/drm/exynos/exynos_drm_dsi.c | 8 --------
+>  1 file changed, 8 deletions(-)
+>
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+> index e977a81..736115c 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+> @@ -1597,13 +1597,6 @@ static int exynos_dsi_create_connector(struct drm_encoder *encoder)
+>         return 0;
+>  }
+>
+> -static bool exynos_dsi_mode_fixup(struct drm_encoder *encoder,
+> -                                 const struct drm_display_mode *mode,
+> -                                 struct drm_display_mode *adjusted_mode)
+> -{
+> -       return true;
+> -}
+> -
+>  static void exynos_dsi_mode_set(struct drm_encoder *encoder,
+>                                 struct drm_display_mode *mode,
+>                                 struct drm_display_mode *adjusted_mode)
+> @@ -1623,7 +1616,6 @@ static void exynos_dsi_mode_set(struct drm_encoder *encoder,
+>  }
+>
+>  static const struct drm_encoder_helper_funcs exynos_dsi_encoder_helper_funcs = {
+> -       .mode_fixup = exynos_dsi_mode_fixup,
+>         .mode_set = exynos_dsi_mode_set,
+>         .enable = exynos_dsi_enable,
+>         .disable = exynos_dsi_disable,
+> --
+> 2.5.0
+>
