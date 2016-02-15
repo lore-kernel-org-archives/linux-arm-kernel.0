@@ -1,69 +1,44 @@
-From: daniel.baluta@gmail.com (Daniel Baluta)
-Date: Mon, 15 Feb 2016 11:18:20 +0200
-Subject: [PATCH] iio: health/afe4403: mark suspend/resume functions
- __maybe_unused
-In-Reply-To: <1455526993-2132098-1-git-send-email-arnd@arndb.de>
-References: <1455526993-2132098-1-git-send-email-arnd@arndb.de>
-Message-ID: <CAEnQRZBSYy2inu0mUtXEdhEKWQj5i-YUFDL61prvC_8P_L0adQ@mail.gmail.com>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Mon, 15 Feb 2016 17:19:42 +0800
+Subject: [PATCH v6 4/7] clk: mediatek: Add MT2701 clock support
+In-Reply-To: <20160210200853.26445.15165@quark.deferred.io>
+References: <1454665050-37776-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1454665050-37776-5-git-send-email-jamesjj.liao@mediatek.com>
+ <20160210200853.26445.15165@quark.deferred.io>
+Message-ID: <1455527982.29688.8.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 15, 2016 at 11:02 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> The newly added afe4403 driver implements suspend/resume using the
-> SIMPLE_DEV_PM_OPS() macro, which leaves out references to the actual
-> functions when CONFIG_PM is disabled, causing a harmless warning:
->
-> health/afe4403.c:509:12: error: 'afe4403_suspend' defined but not used
-> health/afe4403.c:530:12: error: 'afe4403_resume' defined but not used
->
-> This marks the functions as __maybe_unused so we don't get those
-> warnings.
->
-Or we could put _suspend and _resume under CONFIG_PM_SLEEP.
+Hi Mike,
 
-We have:
+On Wed, 2016-02-10 at 12:08 -0800, Michael Turquette wrote:
+> Quoting James Liao (2016-02-05 01:37:27)
+> > +CLK_OF_DECLARE(mtk_topckgen, "mediatek,mt2701-topckgen", mtk_topckgen_init);
+> > +CLK_OF_DECLARE(mtk_infrasys, "mediatek,mt2701-infracfg", mtk_infrasys_init);
+> > +CLK_OF_DECLARE(mtk_pericfg, "mediatek,mt2701-pericfg", mtk_pericfg_init);
+> > +CLK_OF_DECLARE(mtk_mmsys, "mediatek,mt2701-mmsys", mtk_mmsys_init);
+> > +CLK_OF_DECLARE(mtk_imgsys, "mediatek,mt2701-imgsys", mtk_imgsys_init);
+> > +CLK_OF_DECLARE(mtk_vdecsys, "mediatek,mt2701-vdecsys", mtk_vdecsys_init);
+> > +CLK_OF_DECLARE(mtk_hifsys, "mediatek,mt2701-hifsys", mtk_hifsys_init);
+> > +CLK_OF_DECLARE(mtk_ethsys, "mediatek,mt2701-ethsys", mtk_ethsys_init);
+> > +CLK_OF_DECLARE(mtk_bdpsys, "mediatek,mt2701-bdpsys", mtk_bdpsys_init);
+> > +CLK_OF_DECLARE(mtk_apmixedsys, "mediatek,mt2701-apmixedsys",
+> 
+> :-/
+> 
+> This is way too much CLK_OF_DECLARE and not enough Linux Driver Model.
+> 
+> I understand that some platforms really must initialize some clocks very
+> early, but can we please separate those into one table and call
+> CLK_OF_DECLARE on only that set, and then register the rest through a
+> platform_driver later on?
 
-:~/w/iio/drivers/iio$ ack-grep SIMPLE_DEV_PM_OPS | wc -l
-31
+I know CLK_OF_DECLARE is much earlier than platform_driver, so it can
+ensure all drivers lookup their clocks successfully during
+platform_driver probe. Is there anything different to init these clock
+providers in CLK_OF_DECLARE and platform_driver?
 
-and only 2 drivers using __maybe_unused.
 
-:~/w/iio/drivers/iio$ ack-grep maybe_unused
-gyro/itg3200_core.c
-354:static int __maybe_unused itg3200_suspend(struct device *dev)
-365:static int __maybe_unused itg3200_resume(struct device *dev)
+Best regards,
 
-adc/imx7d_adc.c
-553:static int __maybe_unused imx7d_adc_suspend(struct device *dev)
-566:static int __maybe_unused imx7d_adc_resume(struct device *dev)
-
-For consistency, we should use CONFIG_PM_SLEEP and get rid of __maybe_unused.
-
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: eec96d1e2d31 ("iio: health: Add driver for the TI AFE4403 heart monitor")
-> ---
->  drivers/iio/health/afe4403.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/iio/health/afe4403.c b/drivers/iio/health/afe4403.c
-> index 91c046e40d2f..88e43f87b926 100644
-> --- a/drivers/iio/health/afe4403.c
-> +++ b/drivers/iio/health/afe4403.c
-> @@ -506,7 +506,7 @@ static const struct of_device_id afe4403_of_match[] = {
->  MODULE_DEVICE_TABLE(of, afe4403_of_match);
->  #endif
->
-> -static int afe4403_suspend(struct device *dev)
-> +static int __maybe_unused afe4403_suspend(struct device *dev)
->  {
->         struct iio_dev *indio_dev = dev_to_iio_dev(dev);
->         struct afe4403_data *afe = iio_priv(indio_dev);
-> @@ -527,7 +527,7 @@ static int afe4403_suspend(struct device *dev)
->         return 0;
->  }
->
-> -static int afe4403_resume(struct device *dev)
-> +static int __maybe_unused afe4403_resume(struct device *dev)
->  {
->         struct iio_dev *indio_dev = dev_to_iio_dev(dev);
->         struct afe4403_data *afe = iio_priv(indio_dev);
+James
