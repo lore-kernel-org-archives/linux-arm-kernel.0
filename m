@@ -1,38 +1,43 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 15 Feb 2016 23:00:53 +0530
-Subject: [PATCH] dmaengine: use phys_addr_t for slave configuration
-In-Reply-To: <20160209225724.GA1522@katana>
-References: <1366967214-20776-1-git-send-email-linus.walleij@linaro.org>
- <CAMuHMdUTzTBT8DyRb5WN048U5DbVsFnhJB0c5tjHBnA4rfetJg@mail.gmail.com>
- <20150710081411.GF836@localhost>
- <CAMuHMdV8a1W1MyJPanUNBzaiNsL96JYzetBVSiZoC3=eKXzo1Q@mail.gmail.com>
- <20151215172649.GK1854@localhost>
- <CAMuHMdXe8i2JbhOP2sWkVkqHEeBnW4AfVBbRaoZW=Kg0s_9m3g@mail.gmail.com>
- <20160209225724.GA1522@katana>
-Message-ID: <20160215173053.GM19598@localhost>
+Date: Mon, 15 Feb 2016 23:03:00 +0530
+Subject: [PATCH 4/4] dmaengine: pxa_dma: fix the maximum requestor line
+In-Reply-To: <87fuwt28eu.fsf@belgarion.home>
+References: <1455225798-9510-1-git-send-email-robert.jarzmik@free.fr>
+ <1455225798-9510-5-git-send-email-robert.jarzmik@free.fr>
+ <20160215163524.GI19598@localhost> <87fuwt28eu.fsf@belgarion.home>
+Message-ID: <20160215173300.GN19598@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 09, 2016 at 11:57:24PM +0100, Wolfram Sang wrote:
+On Mon, Feb 15, 2016 at 06:24:57PM +0100, Robert Jarzmik wrote:
+> Vinod Koul <vinod.koul@intel.com> writes:
 > 
-> > This is a dependency for adding iommu support to the rcar-dmac driver, cfr.
-> > "[PATCH v2 0/5] dmaengine: rcar-dmac: add iommu support for slave transfers".
-> > http://www.spinics.net/lists/linux-renesas-soc/msg00066.html
-> > https://www.mail-archive.com/linux-renesas-soc at vger.kernel.org/msg00108.html
-> > 
-> > Thank you for applying!
+> > On Thu, Feb 11, 2016 at 10:23:18PM +0100, Robert Jarzmik wrote:
+> >> @@ -1399,13 +1405,17 @@ static int pxad_probe(struct platform_device *op)
+> >>  		return PTR_ERR(pdev->base);
+> >>  
+> >>  	of_id = of_match_device(pxad_dt_ids, &op->dev);
+> >> -	if (of_id)
+> >> +	if (of_id) {
+> >>  		of_property_read_u32(op->dev.of_node, "#dma-channels",
+> >>  				     &dma_channels);
+> >> -	else if (pdata && pdata->dma_channels)
+> >> +		of_property_read_u32(op->dev.of_node, "#requestors",
+> >> +				     &nb_requestors);
+> >
+> > I think we should check the return value here. This might be err in case
+> > when we have older DT on platform, but still should work with default in
+> > that case
 > 
-> Yup, we really need it. Anything we can do to help?
+> Okay, but how should the code react to the err case, more specifically to
+> -EINVAL or -ENODATA ? As this property is optional as per the device-tree
+> description, the current code leaves nb_requestors = 0, as is specified in the
+> description, and fits the mmp_pdma case.
+> 
+> What do you think should be done ? A warning message ? Something else ?
 
-I have done this change and discussing wider changes
-I will send CFT hopefully before EOW, pls test :)
+Message is fine, but in order for not to regress we should set this to 32
+(IIRC default before this, right) and not zero.
 
 -- 
 ~Vinod
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160215/f4513e05/attachment.sig>
