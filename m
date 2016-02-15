@@ -1,48 +1,66 @@
-From: tchalamarla@caviumnetworks.com (Tirumalesh Chalamarla)
-Date: Sun, 14 Feb 2016 19:36:18 -0800
-Subject: [PATCH V2] AHCI: Workaround for ThunderX Errata#22536
-In-Reply-To: <20160214170152.GC3965@htj.duckdns.org>
-References: <1455319230-30201-1-git-send-email-tchalamarla@caviumnetworks.com>
- <20160214170152.GC3965@htj.duckdns.org>
-Message-ID: <56C147B2.9010303@caviumnetworks.com>
+From: caesar.upstream@gmail.com (Caesar Wang)
+Date: Mon, 15 Feb 2016 11:36:36 +0800
+Subject: [PATCH v4 09/10] arm64: dts: Add main Thermal info to rk3368.dtsi
+In-Reply-To: <42802946.20XC68fnyM@phil>
+References: <1447044542-30859-1-git-send-email-wxt@rock-chips.com>
+ <1447044542-30859-10-git-send-email-wxt@rock-chips.com>
+ <42802946.20XC68fnyM@phil>
+Message-ID: <56C147C4.20704@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 02/14/2016 09:01 AM, Tejun Heo wrote:
-> Hello,
+? 2016?02?09? 16:30, Heiko Stuebner ??:
+> Hi Caesar,
 >
-> On Fri, Feb 12, 2016 at 03:20:30PM -0800, tchalamarla at caviumnetworks.com wrote:
->> diff --git a/drivers/ata/ahci.c b/drivers/ata/ahci.c
->> index 546a369..76e310e 100644
->> --- a/drivers/ata/ahci.c
->> +++ b/drivers/ata/ahci.c
->> @@ -1560,6 +1560,9 @@ static int ahci_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
->>   	if (ahci_broken_devslp(pdev))
->>   		hpriv->flags |= AHCI_HFLAG_NO_DEVSLP;
+> Am Montag, 9. November 2015, 12:49:01 schrieb Caesar Wang:
+>> This patch add the thermal needed info on RK3368.
+>> Meanwhile, support the trips to throttle for thermal.
 >>
->> +	if (pdev->vendor == 0x177d && pdev->device == 0xa01c)
->> +		ahci_thunderx_init(&pdev->dev, hpriv);
+>> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+>> Acked-by: Eduardo Valentin <edubezval@gmail.com>
+> [...]
 >
-> So, this would make ahci fail to build if thunderx is not configured.
-> Maybe we should add an additional callback to update hpriv.
->
->>   	/* save initial config */
->>   	ahci_pci_save_initial_config(pdev, hpriv);
+>> @@ -829,6 +855,16 @@
+>>   			};
+>>   		};
 >>
->> diff --git a/drivers/ata/ahci_thunderx.c b/drivers/ata/ahci_thunderx.c
+>> +		tsadc {
+>> +			otp_gpio: otp-gpio {
+>> +				rockchip,pins = <0 10 RK_FUNC_GPIO &pcfg_pull_none>;
+>> +			};
+>> +
+>> +			otp_out: otp-out {
+>> +				rockchip,pins = <0 10 RK_FUNC_1 &pcfg_pull_none>;
+>> +			};
+>> +		};
+>> +
+>>   		uart0 {
+>>   			uart0_xfer: uart0-xfer {
+>>   				rockchip,pins = <2 24 RK_FUNC_1 &pcfg_pull_up>,
+> As it came up just now, these pinctrl settings seem strange. I.e. according
+> to the TRM gpio0b2 [= gpio0 10] func_1 is sc_rst, which seems to be the
+> smartcard controller?
 >
-> This driver isn't upstream yet, right?  Maybe just fold this change
-> together?
->
-There is no need for special Driver, AHCI is sufficient for ThunderX, 
-the file only contains this interrupt handler,
-is it preferable if this interrupt handler in libahci.c with others, 
-instead of separate file?
+> It came up because it seems the Tronsmart R68 board seems to use this pin
+> for controlling the vcc_host regulator instead.
 
+Yep, that's the incorrect over-temperature protection pin. :-(
+
+Fixed in https://patchwork.kernel.org/patch/8308831/
+
+Thanks Heiko.
+
+>
+> Heiko
+>
+> _______________________________________________
+> Linux-rockchip mailing list
+> Linux-rockchip at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+
+
+-- 
 Thanks,
-Tirumalesh.
-
-> Thanks.
->
+Caesar
