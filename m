@@ -1,79 +1,52 @@
-From: CARLOS.PALMINHA@synopsys.com (Carlos Palminha)
-Date: Mon, 15 Feb 2016 13:01:35 +0000
-Subject: [PATCH v2 17/17] drm/tilcdc: removed optional dummy encoder
- mode_fixup function.
-In-Reply-To: <cover.1455540137.git.palminha@synopsys.com>
-References: <cover.1455540137.git.palminha@synopsys.com>
-Message-ID: <4d838f580cf81068a4df2500a096d66f06f3ad37.1455540137.git.palminha@synopsys.com>
+From: aleksey.makarov@linaro.org (Aleksey Makarov)
+Date: Mon, 15 Feb 2016 15:57:33 +0300
+Subject: [PATCH v2 3/9] ACPI: introduce acpi_table_parse2()
+In-Reply-To: <CAJZ5v0ji3rR3HkC7BjygkqXxOrEn3qSKA42i1Rj9tBqZ71Dh+w@mail.gmail.com>
+References: <1455299022-11641-1-git-send-email-aleksey.makarov@linaro.org>
+ <1455299022-11641-4-git-send-email-aleksey.makarov@linaro.org>
+ <20160212185130.GA10095@kroah.com>
+ <CAJZ5v0ji3rR3HkC7BjygkqXxOrEn3qSKA42i1Rj9tBqZ71Dh+w@mail.gmail.com>
+Message-ID: <56C1CB3D.6070906@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mode_fixup function for encoder drivers became optional with patch
-http://patchwork.freedesktop.org/patch/msgid/1455106522-32307-1-git-send-email-palminha at synopsys.com
+Hi Rafael, 
 
-This patch set nukes all the dummy mode_fixup implementations.
+Thank you for review.
 
-(made on top of Daniel topic/drm-misc branch)
+On 02/13/2016 02:08 AM, Rafael J. Wysocki wrote:
+> On Fri, Feb 12, 2016 at 7:51 PM, Greg Kroah-Hartman
+> <gregkh@linuxfoundation.org> wrote:
+>> On Fri, Feb 12, 2016 at 08:43:34PM +0300, Aleksey Makarov wrote:
+>>> The function acpi_table_parse() has some problems:
+>>> 1 It can be called only from __init code
+>>> 2 It does not pass any data to the handler
+>>> 3 It just throws out the value returned from the handler
+>>>
+>>> These issues are addressed in this patch
+>>
+>> Why not just fix acpi_table_parse(), like you have, and not add a new
+>> API call with a "2" at the end of it.  That seems crazy to try to
+>> maintain that level of apis.
+>>
+>> But I'm not the acpi maintainer(s), so it's their call...
+> 
+> The ACPI maintainer agrees.
 
-Signed-off-by: Carlos Palminha <palminha@synopsys.com>
----
- drivers/gpu/drm/tilcdc/tilcdc_panel.c  | 9 ---------
- drivers/gpu/drm/tilcdc/tilcdc_tfp410.c | 9 ---------
- 2 files changed, 18 deletions(-)
+I see. 
 
-diff --git a/drivers/gpu/drm/tilcdc/tilcdc_panel.c b/drivers/gpu/drm/tilcdc/tilcdc_panel.c
-index 4dda6e2..8dcf02a 100644
---- a/drivers/gpu/drm/tilcdc/tilcdc_panel.c
-+++ b/drivers/gpu/drm/tilcdc/tilcdc_panel.c
-@@ -70,14 +70,6 @@ static void panel_encoder_dpms(struct drm_encoder *encoder, int mode)
- 					 mode == DRM_MODE_DPMS_ON ? 1 : 0);
- }
- 
--static bool panel_encoder_mode_fixup(struct drm_encoder *encoder,
--		const struct drm_display_mode *mode,
--		struct drm_display_mode *adjusted_mode)
--{
--	/* nothing needed */
--	return true;
--}
--
- static void panel_encoder_prepare(struct drm_encoder *encoder)
- {
- 	struct panel_encoder *panel_encoder = to_panel_encoder(encoder);
-@@ -103,7 +95,6 @@ static const struct drm_encoder_funcs panel_encoder_funcs = {
- 
- static const struct drm_encoder_helper_funcs panel_encoder_helper_funcs = {
- 		.dpms           = panel_encoder_dpms,
--		.mode_fixup     = panel_encoder_mode_fixup,
- 		.prepare        = panel_encoder_prepare,
- 		.commit         = panel_encoder_commit,
- 		.mode_set       = panel_encoder_mode_set,
-diff --git a/drivers/gpu/drm/tilcdc/tilcdc_tfp410.c b/drivers/gpu/drm/tilcdc/tilcdc_tfp410.c
-index 5052a8a..1c23017 100644
---- a/drivers/gpu/drm/tilcdc/tilcdc_tfp410.c
-+++ b/drivers/gpu/drm/tilcdc/tilcdc_tfp410.c
-@@ -80,14 +80,6 @@ static void tfp410_encoder_dpms(struct drm_encoder *encoder, int mode)
- 	tfp410_encoder->dpms = mode;
- }
- 
--static bool tfp410_encoder_mode_fixup(struct drm_encoder *encoder,
--		const struct drm_display_mode *mode,
--		struct drm_display_mode *adjusted_mode)
--{
--	/* nothing needed */
--	return true;
--}
--
- static void tfp410_encoder_prepare(struct drm_encoder *encoder)
- {
- 	tfp410_encoder_dpms(encoder, DRM_MODE_DPMS_OFF);
-@@ -112,7 +104,6 @@ static const struct drm_encoder_funcs tfp410_encoder_funcs = {
- 
- static const struct drm_encoder_helper_funcs tfp410_encoder_helper_funcs = {
- 		.dpms           = tfp410_encoder_dpms,
--		.mode_fixup     = tfp410_encoder_mode_fixup,
- 		.prepare        = tfp410_encoder_prepare,
- 		.commit         = tfp410_encoder_commit,
- 		.mode_set       = tfp410_encoder_mode_set,
--- 
-2.5.0
+How would you prefer it to be fixed:
+
+1. Change the signature/implementation of acpi_table_parse(). 
+CON: It would require extensive changes through all the kernel,
+which I am not sure I will be able to test (but these changes are
+just adding an unused arg to the handler + checking that the 
+return value is consistent)
+
+OR
+
+2. Have a local implementation of the function like acpi_table_parse2()
+CON: A bit of code duplication.
+
+Thank you
+Aleksey Makarov
