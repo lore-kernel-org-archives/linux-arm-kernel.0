@@ -1,115 +1,52 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Mon, 15 Feb 2016 09:58:25 -0800
-Subject: Writes, smp_wmb(), and transitivity?
-Message-ID: <20160215175825.GA15878@linux.vnet.ibm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 15 Feb 2016 18:03:33 +0000
+Subject: arm qemu test failures due to 'driver-core: platform: probe
+ of-devices only using list of compatibles'
+In-Reply-To: <56C20DD6.8050604@arm.com>
+References: <20160214165010.GA3189@roeck-us.net>
+ <20160215105909.GH12289@pengutronix.de>
+ <56C1F19F.8090100@roeck-us.net> <56C20DD6.8050604@arm.com>
+Message-ID: <20160215180333.GK10826@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello!
+On Mon, Feb 15, 2016 at 05:41:42PM +0000, Sudeep Holla wrote:
+> Sorry for missing this earlier, I could reproduce this on my TC2.
+> The issue is with card-detect gpio probing. It's not related to AMBA
+> probing as discussed on the mail thread.
+> 
+> mfd_add_device adds devices with of_node when cell->of_compatible is
+> matched, but the device created is expected to be matched based on name
+> which the patch under discussion clearly breaks.
 
-Some architectures provide local transitivity for a chain of threads doing
-writes separated by smp_wmb(), as exemplified by the litmus tests below.
-The pattern is that each thread writes to a its own variable, does an
-smp_wmb(), then writes a different value to the next thread's variable.
+If I'm understanding you correctly, you're saying that MFD re-adds
+platform devices with the of_node of a new platform device pointing
+to an existing of_node, but expects this new platform device to
+match a _different_ driver?
 
-I don't know of a use of this, but if everyone supports it, it might
-be good to mandate it.  Status quo is that smp_wmb() is non-transitive,
-so it currently isn't supported.
+Sounds like MFD needs fixing.  I've said this before: of_node's must
+_never_ be copied between different device structures, especially
+when they are on the _same_ bus - quite simply because the driver
+core _can_ match using the DT compatible.
 
-Anyone know of any architectures that do -not- support this?
+For example... let's say you have a platform device called "1234.foo"
+created by DT with compatible of "example,foo".  You have two platform
+drivers.  One of them matches compatible "example,foo" and the other
+matches against platform devices with a name of "bar".
 
-Assuming all architectures -do- support this, any arguments -against-
-officially supporting it in Linux?
+The "example,foo" device driver is matched against "1234.foo".  It
+creates a platform device with a name of "bar" and bus ID "bar.0",
+setting the of_node to the same as "1234.foo".
 
-							Thanx, Paul
+When scanning for a matching driver, if the "example,foo" driver is
+found first, "bar.0" will be matched to this driver, and its probe
+method called.  If it accepts this device, it will repeat its action,
+creating "bar.1".  Repeat until you run out of memory.
 
-------------------------------------------------------------------------
+If it instead finds the "bar" driver first, this driver will be used
+and everything appears to work correctly.
 
-Two threads:
-
-	int a, b;
-
-	void thread0(void)
-	{
-		WRITE_ONCE(a, 1);
-		smp_wmb();
-		WRITE_ONCE(b, 2);
-	}
-
-	void thread1(void)
-	{
-		WRITE_ONCE(b, 1);
-		smp_wmb();
-		WRITE_ONCE(a, 2);
-	}
-
-	/* After all threads have completed and the dust has settled... */
-
-	BUG_ON(a == 1 && b == 1);
-
-Three threads:
-
-	int a, b, c;
-
-	void thread0(void)
-	{
-		WRITE_ONCE(a, 1);
-		smp_wmb();
-		WRITE_ONCE(b, 2);
-	}
-
-	void thread1(void)
-	{
-		WRITE_ONCE(b, 1);
-		smp_wmb();
-		WRITE_ONCE(c, 2);
-	}
-
-	void thread2(void)
-	{
-		WRITE_ONCE(c, 1);
-		smp_wmb();
-		WRITE_ONCE(a, 2);
-	}
-
-	/* After all threads have completed and the dust has settled... */
-
-	BUG_ON(a == 1 && b == 1 && c == 1);
-
-Four threads:
-
-	int a, b, c, d;
-
-	void thread0(void)
-	{
-		WRITE_ONCE(a, 1);
-		smp_wmb();
-		WRITE_ONCE(b, 2);
-	}
-
-	void thread1(void)
-	{
-		WRITE_ONCE(b, 1);
-		smp_wmb();
-		WRITE_ONCE(c, 2);
-	}
-
-	void thread2(void)
-	{
-		WRITE_ONCE(c, 1);
-		smp_wmb();
-		WRITE_ONCE(d, 2);
-	}
-
-	void thread3(void)
-	{
-		WRITE_ONCE(d, 1);
-		smp_wmb();
-		WRITE_ONCE(a, 2);
-	}
-
-	/* After all threads have completed and the dust has settled... */
-
-	BUG_ON(a == 1 && b == 1 && c == 1 && d == 1);
-
-And so on...
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
