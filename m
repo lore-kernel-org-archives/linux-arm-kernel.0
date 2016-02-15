@@ -1,32 +1,185 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 16 Feb 2016 08:04:34 +0900
-Subject: [PATCH] ARM: dts: Move syscon reboot/poweroff to common dtsi for
- Exynos
-In-Reply-To: <56C1D4D1.2050108@osg.samsung.com>
-References: <1455042606-10075-1-git-send-email-javier@osg.samsung.com>
- <56C02265.40103@samsung.com> <56C1D4D1.2050108@osg.samsung.com>
-Message-ID: <56C25982.4020301@samsung.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 16 Feb 2016 01:08:18 +0200
+Subject: [PATCH/RFC v2 01/11] PM / Domains: Add DT bindings for the R-Car
+ System Controller
+In-Reply-To: <1455571020-18968-2-git-send-email-geert+renesas@glider.be>
+References: <1455571020-18968-1-git-send-email-geert+renesas@glider.be>
+ <1455571020-18968-2-git-send-email-geert+renesas@glider.be>
+Message-ID: <1720075.YOPnCQ3mE1@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15.02.2016 22:38, Javier Martinez Canillas wrote:
->>
->> In some of the DTSI this was under "soc" node, not at top-level.
->> Unfortunately we do not have consistency here - some DTSI have "soc",
-> 
-> Yes, I noticed this but as you said not all DTSI have a soc node
-> and that's why I made it top level in the DTSI.
-> 
->> some not. Anyway I think we should move to "soc" version.
->>
-> 
-> Not sure I'm following, did you mean to do it as a follow up or
-> to add a soc node for the missing DTSI as a part of this series?
+Hi Geert,
 
-I meant to send a v2 with this under "soc" node even though on some DTS
-we do not have the "soc". Optional follow up would be to make DTS
-consistent and move nodes under "soc"... but that would be also a lot of
-churn.
+Thank you for the patch.
 
-Best regards,
-Krzysztof
+On Monday 15 February 2016 22:16:50 Geert Uytterhoeven wrote:
+> The Renesas R-Car System Controller provides power management for the
+> CPU cores and various coprocessors, following the generic PM domain
+> bindings in Documentation/devicetree/bindings/power/power_domain.txt.
+> 
+> This supports R-Car Gen1, Gen2, and Gen3.
+> 
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+> Alternatives I considered:
+> 
+>   - Using a single node per power register block, even if it contains
+>     multiple domains, e.g.:
+> 
+> 	    pd_ca15_scu: ca15_scu at 180 {
+> 		    reg = <0x180 0x20>;
+> 		    #address-cells = <1>;
+> 		    #size-cells = <0>;
+> 		    #power-domain-cells = <0>;
+> 		    renesas,interrupt-bits = <12>;
+> 
+> 		    pd_ca15_cpu: ca15_cpu at 40 {
+> 			    reg = <0x40 0x20>;
+> 			    #power-domain-cells = <1>;
+> 			    renesas,pm-domain-indices = <0 1>;
+> 			    renesas,pm-domain-names =
+> 				    "ca15_cpu0", "ca15_cpu1";
+> 			    renesas,interrupt-bits = <0 1>;
+> 		    };
+> 	    };
+> 
+>     Notes:
+>       - You cannot just have a property with the number of domains, as
+> 	index 0 is not used on R-Car H1. Hence the need for
+> 	"renesas,pm-domain-indices" and "renesas,interrupt-bits",
+>       - "#power-domain-cells = <1>" for nodes with multiple domains,
+> 	which allows typos in "power-domains = <&pd_ca15_cpu n>", using
+> 	an invalid value of "n".
+> 
+>   - Using a linear description in DT:
+>       - Needs parent links for subdomains,
+>       - More complicated to parse (lesson learned from R-Mobile PM
+> 	Domain support).
+> 
+>   - Keeping the power register block offset and the bit number as separate
+>     "reg" cells, increasing "#address-cells" from 2 to 3,
+>
+>   - Merging the interrupt bit (which needs only 5 bits) in the other "reg"
+>     cell, decreasing "#address-cells" from 2 to 1.
+> 
+> v2:
+>   - Add R-Car H3 (r8a7795) support,
+>   - Use "renesas,<type>-sysc" instead of "renesas,sysc-<type>",
+>   - Add fallback compatibility strings for R-Car Gen2 and Gen3.
+> ---
+>  .../bindings/power/renesas,sysc-rcar.txt           | 87 +++++++++++++++++++
+>  1 file changed, 87 insertions(+) create mode 100644
+> Documentation/devicetree/bindings/power/renesas,sysc-rcar.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/power/renesas,sysc-rcar.txt
+> b/Documentation/devicetree/bindings/power/renesas,sysc-rcar.txt new file
+> mode 100644
+> index 0000000000000000..92ddc0da7b755215
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/power/renesas,sysc-rcar.txt
+> @@ -0,0 +1,87 @@
+> +DT bindings for the Renesas R-Car System Controller
+> +
+> +== System Controller Node ==
+> +
+> +The R-Car System Controller provides power management for the CPU cores and
+> +various coprocessors.
+> +
+> +Required properties:
+> +  - compatible: Must contain one or more of the following:
+> +      - "renesas,r8a7779-sysc" (R-Car H1)
+> +      - "renesas,r8a7790-sysc" (R-Car H2)
+> +      - "renesas,r8a7791-sysc" (R-Car M2-W)
+> +      - "renesas,r8a7792-sysc" (R-Car V2H)
+> +      - "renesas,r8a7793-sysc" (R-Car M2-N)
+> +      - "renesas,r8a7794-sysc" (R-Car E2)
+> +      - "renesas,r8a7795-sysc" (R-Car H3)
+> +      - "renesas,rcar-gen2-sysc" (Generic R-Car Gen2)
+> +      - "renesas,rcar-gen3-sysc" (Generic R-Car Gen3)
+> +    When compatible with the generic version, nodes must list the
+> SoC-specific
+> +    version corresponding to the platform first, followed by the generic
+> +    version.
+> +  - reg: Address start and address range for the device.
+
+This isn't correct. I'll refrain from saying we abuse the reg property, as 
+using the first cell as a power domain number should be fine (the second cell 
+feels a bit more of an abuse to me though, but I won't complain too much), but 
+the bindings document should describe what the reg cells contain.
+
+> +  - pm-domains: This node contains a hierarchy of PM Domain Nodes.
+
+Can't it be an issue that the node happens to have the same name as the 
+standard pm-domains property ?
+
+> +    Dependencies (e.g. parent SCUs should not be powered off while child
+> CPUs
+> +    are on) should be reflected using subnodes.
+> +
+> +
+> +== PM Domain Nodes ==
+> +
+> +Each of the PM domain nodes represents a PM domain, as documented by the
+> +generic PM domain bindings in
+> +Documentation/devicetree/bindings/power/power_domain.txt.
+> +
+> +Required properties:
+> +  - #power-domain-cells: Must be 0.
+> +  - reg: This property must contain 2 values:
+> +	   - The first value is the number of the interrupt bit representing
+> +	     the power area in the various Interrupt Registers (e.g. SYSCISR,
+> +	     Interrupt Status Register),
+> +	   - The second value encodes the power register block offset (which is
+> +	     a multiple of 64), and the number of the bit representing the
+> +	     power area in the various Power Control Registers (e.g. PWROFFSR,
+> +	     Power Shutoff Status Register). This value is created by ORing
+> +	     these two numbers.
+> +	 The parent's node must contain the following two properties:
+> +	   - #address-cells: Must be 2,
+> +	   - #size-cells: Must be 0.
+> +
+> +
+> +Example:
+> +
+> +	sysc: system-controller at e6180000 {
+> +		compatible = "renesas,r8a7791-sysc", "renesas,rcar-gen2-sysc";
+> +		reg = <0 0xe6180000 0 0x0200>;
+> +
+> +		pm-domains {
+> +			#address-cells = <2>;
+> +			#size-cells = <0>;
+> +
+> +			pd_ca15_scu: scu at 12 {
+> +				reg = <12 0x180>;
+> +				#address-cells = <2>;
+> +				#size-cells = <0>;
+> +				#power-domain-cells = <0>;
+> +
+> +				pd_ca15_cpu0: cpu at 0 {
+> +					reg = <0 0x40>;
+> +					#power-domain-cells = <0>;
+> +				};
+> +
+> +				pd_ca15_cpu1: cpu at 1 {
+> +					reg = <1 0x41>;
+> +					#power-domain-cells = <0>;
+> +				};
+> +			};
+> +
+> +			pd_sh: sh at 16 {
+> +				reg = <16 0x80>;
+> +				#power-domain-cells = <0>;
+> +			};
+> +
+> +			pd_sgx: sgx at 20 {
+> +				reg = <20 0xc0>;
+> +				#power-domain-cells = <0>;
+> +			};
+> +		};
+> +	};
+
+-- 
+Regards,
+
+Laurent Pinchart
