@@ -1,65 +1,137 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 15 Feb 2016 10:07:38 +0100
-Subject: [GIT PULL] Versatile family DT cleanups step 1
-Message-ID: <CACRpkdYR-_41Ay7b_X4hJkPY7dUR2qAsfsjn-MzpahVWqEiVPQ@mail.gmail.com>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Mon, 15 Feb 2016 17:09:19 +0800
+Subject: [PATCH v4 1/4] soc: mediatek: Refine scpsys to support multiple
+ platform
+In-Reply-To: <56B1C19F.9070300@gmail.com>
+References: <1453270097-53853-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1453270097-53853-2-git-send-email-jamesjj.liao@mediatek.com>
+ <56ADF556.6070402@gmail.com> <1454396212.2847.15.camel@mtksdaap41>
+ <56B0889A.1010305@gmail.com> <1454476968.2847.59.camel@mtksdaap41>
+ <56B1C19F.9070300@gmail.com>
+Message-ID: <1455527359.29688.1.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC folks,
+Hi Matthias,
 
-this is a first pull request for my cleanups for the Versatile, as the
-finished stuff should not be sitting in my tree but in ARM SoC.
-This completes the ARM RealView PB1176 and PB11MPCore
-device trees, and moves the Versatile to use power/reset.
+On Wed, 2016-02-03 at 10:00 +0100, Matthias Brugger wrote:
+> On 03/02/16 06:22, James Liao wrote:
+> > On Tue, 2016-02-02 at 11:44 +0100, Matthias Brugger wrote:
+> >> On 02/02/16 07:56, James Liao wrote:
+> >>> On Sun, 2016-01-31 at 12:51 +0100, Matthias Brugger wrote:
+> >>>>> On 20/01/16 07:08, James Liao wrote:
+> >>>>>>> Refine scpsys driver common code to support multiple SoC / platform.
+> >>>>>>>
+> >>>>>>> Signed-off-by: James Liao<jamesjj.liao@mediatek.com>
+> >>>>>>> ---
+> >>>>>>>    drivers/soc/mediatek/mtk-scpsys.c | 418 ++++++++++++++++++++------------------
+> >>>>>>>    drivers/soc/mediatek/mtk-scpsys.h |  55 +++++
+> >>>>>>>    2 files changed, 270 insertions(+), 203 deletions(-)
+> >>>>>>>    create mode 100644 drivers/soc/mediatek/mtk-scpsys.h
+> >>>>>
+> >>>>> In general this approach looks fine to me, comments below.
+> >>>>>
+> >>>>>>>
+> >>>>>>> diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
+> >>>>>>> index 0221387..339adfc 100644
+> >>>>>>> --- a/drivers/soc/mediatek/mtk-scpsys.c
+> >>>>>>> +++ b/drivers/soc/mediatek/mtk-scpsys.c
+> >>>>>>> @@ -11,29 +11,17 @@
+> >>>>>>>     * GNU General Public License for more details.
+> >>>>>>>     */
+> >>>>>>>    #include <linux/clk.h>
+> >>>>>>> -#include <linux/delay.h>
+> >>>>>>> +#include <linux/init.h>
+> >>>>>>>    #include <linux/io.h>
+> >>>>>>> -#include <linux/kernel.h>
+> >>>>>>>    #include <linux/mfd/syscon.h>
+> >>>>>
+> >>>>> When at it, do we need this include?
+> >>> syscon_regmap_lookup_by_phandle() is declared in this head file.
+> >>>
+> >>>>>>> -#include <linux/init.h>
+> >>>>>>>    #include <linux/of_device.h>
+> >>>>>>>    #include <linux/platform_device.h>
+> >>>>>>>    #include <linux/pm_domain.h>
+> >>>>>>> -#include <linux/regmap.h>
+> >>>>>>> -#include <linux/soc/mediatek/infracfg.h>
+> >>>>>>>    #include <linux/regulator/consumer.h>
+> >>>>>>> -#include <dt-bindings/power/mt8173-power.h>
+> >>>>>>> +#include <linux/soc/mediatek/infracfg.h>
+> >>>>>>> +
+> >>>>>>> +#include "mtk-scpsys.h"
+> >>>>>>>
+> >>>>>>> -#define SPM_VDE_PWR_CON			0x0210
+> >>>>>>> -#define SPM_MFG_PWR_CON			0x0214
+> >>>>>>> -#define SPM_VEN_PWR_CON			0x0230
+> >>>>>>> -#define SPM_ISP_PWR_CON			0x0238
+> >>>>>>> -#define SPM_DIS_PWR_CON			0x023c
+> >>>>>>> -#define SPM_VEN2_PWR_CON		0x0298
+> >>>>>>> -#define SPM_AUDIO_PWR_CON		0x029c
+> >>>>>>> -#define SPM_MFG_2D_PWR_CON		0x02c0
+> >>>>>>> -#define SPM_MFG_ASYNC_PWR_CON		0x02c4
+> >>>>>>> -#define SPM_USB_PWR_CON			0x02cc
+> >>>>>
+> >>>>> I would prefer to keep this defines and declare SoC specific ones where
+> >>>>> necessary. It makes the code more readable.
+> >>> Some register address may be reused by other modules among SoCs, so it's
+> >>> not easy to maintain the defines when we implement multiple SoC drivers
+> >>> in the same file. For example, offset 0x0298 is VEN2_PWR_CON on MT8173,
+> >>> but it is MJC_PWR_CON on other chips.
+> >>>
+> >>
+> >> So that sounds as if 0x0298 offset is MT8173 specific.
+> >> I checked [VDE, MFG, VEN, IFR, ISP, DIS, DPY]_PWR_CON on mt8173, mt8135
+> >> and mt6589 and they all have the same offset. So it doesn't seem as if
+> >> the offset randomly changes for every SoC.
+> >>
+> >>> Furthermore, these register offsets are only used in scp_domain_data[],
+> >>> and each element has its own power domain name. So I think it's enough
+> >>> to know which power domain are using these registers and status bits.
+> >>>
+> >>
+> >> Yes that's true, but it will make it easier for another person to
+> >> understand the driver, especially if he want's to implement the driver
+> >> for a new SoC.
+> >
+> > There are two kinds of conflicts may happen:
+> >
+> > 1. Different modules use the same register address.
+> > 2. Different register addresses are used by the same module (on
+> > different IC).
+> >
+> > Type 1. for example:
+> >
+> > 	#define SPM_BDP_PWR_CON			0x029c /* 2701 */
+> > 	#define SPM_AUDIO_PWR_CON		0x029c /* 8173 */
+> >
+> > We can resolve this conflict easily, such as define these two register
+> > name to the same register address.
+> >
+> > Type 2. for example:
+> >
+> > 	#define SPM_VDE_PWR_CON			0x0300 /* 6755 */
+> > 	#define SPM_VDE_PWR_CON			0x0210 /* 8173 */
+> >
+> > We can not reuse the register defines in this case. We may need to name
+> > the registers with its IC name, such as MT8173_SPM_VDE_PWR_CON and
+> > MT6755_VDE_PWR_CON. But it will increase the maintain effort. That's why
+> > I prefer to remove register defines if we implement multiple SoC's
+> > scpsys in a single file.
+> >
+> >
+> 
+> Well type 2 for me is no problem at all. As stated in my last mail, 
+> mt6755 would get the SoC name in the define (as a postfix preferably).
+> I don't think that this will make a lot of pain regarding maintaining 
+> it. Even less if we have the defines in alphabetic order.
+> 
+> I we see in the future that this converts to a mess, we always can get 
+> rid of the defines quite easily.
 
-The idea is to keep working on this cleanup branch and send
-additional patches on top of this one as the prerequisites are
-merged into the MTD and FBDEV subsystems. So please create
-a special versatile cleanup branch (or suggest another approach).
+OK, I'll add register names back in next patch.
 
-As it happens, board files and device trees need to change at the
-same time to make logical sense, especially for Versatile where
-auxdata is replaced with DT entries, such as when reset is moved
-in the last patch in this set. The MTD and CLCD changes will share
-this characteristic.
 
-Please pull it in!
+Best regards,
 
-Yours,
-Linus Walleij
-
-The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
-
-  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
-tags/versatile-dt-cleanup-1
-
-for you to fetch changes up to 1c6e288da6cc3c72579ff0062b5a5684fb9ef90e:
-
-  ARM: versatile: move restart to the device tree (2016-02-15 09:58:08 +0100)
-
-----------------------------------------------------------------
-Versatile family cleanups step 1:
-- Finalize RealView the PB1176 and PB11MPCore device trees
-- Move Versatile to use the power/reset driver instead of a
-  custom restart hook
-
-----------------------------------------------------------------
-Linus Walleij (8):
-      ARM: realview: add flash devices to the PB1176 DTS
-      ARM: realview: fix up PB11MP flash compat strings
-      ARM: pb1176: add ICST307 clocks to the device tree
-      ARM: pb1176: add AACI to the device tree
-      ARM: pb1176: add ISP1761 USB OTG host controller
-      ARM: pb1176: add ethernet to devicetree
-      ARM: realview: add the DS1338 RTC to PB1176 DT
-      ARM: versatile: move restart to the device tree
-
- arch/arm/boot/dts/arm-realview-pb1176.dts | 118 ++++++++++++++++++++++++++++++
- arch/arm/boot/dts/arm-realview-pb11mp.dts |   4 +-
- arch/arm/mach-versatile/Kconfig           |   3 +
- arch/arm/mach-versatile/versatile_dt.c    |  15 ----
- 4 files changed, 123 insertions(+), 17 deletions(-)
+James
