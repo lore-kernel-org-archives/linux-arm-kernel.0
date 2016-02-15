@@ -1,39 +1,69 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 15 Feb 2016 10:17:23 +0100
-Subject: [linux-sunxi] Re: [PATCH v2 3/5] pinctrl: sunxi: Add H3 R_PIO
- controller support
-In-Reply-To: <20160215080816.GA6426@box2.japko.eu>
-References: <1454448113-18810-1-git-send-email-k@japko.eu>
- <1454448113-18810-4-git-send-email-k@japko.eu>
- <CACRpkdZkSzcb0fmghkvsfRHpsU-SsSGPP6YvstAW7387HS0xJw@mail.gmail.com>
- <20160215080816.GA6426@box2.japko.eu>
-Message-ID: <CACRpkdbfNeh7_=3ReQtJc7OxkkQEn+BUhZ0O0SKnFsRD=WZiUQ@mail.gmail.com>
+From: daniel.baluta@gmail.com (Daniel Baluta)
+Date: Mon, 15 Feb 2016 11:18:20 +0200
+Subject: [PATCH] iio: health/afe4403: mark suspend/resume functions
+ __maybe_unused
+In-Reply-To: <1455526993-2132098-1-git-send-email-arnd@arndb.de>
+References: <1455526993-2132098-1-git-send-email-arnd@arndb.de>
+Message-ID: <CAEnQRZBSYy2inu0mUtXEdhEKWQj5i-YUFDL61prvC_8P_L0adQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 15, 2016 at 9:08 AM, Krzysztof Adamski <k@japko.eu> wrote:
-> On Thu, Feb 11, 2016 at 02:21:15PM +0100, Linus Walleij wrote:
->>
->> On Tue, Feb 2, 2016 at 10:21 PM, Krzysztof Adamski <k@japko.eu> wrote:
->>
->>> H3 has additional PIO controller similar to what we can find on A23.
->>> It's a 12 pin port, described in H3 Datasheet rev 1.1, pages 345-350.
->>>
->>> Signed-off-by: Krzysztof Adamski <k@japko.eu>
->>
->>
->> Patch applied with Maxime's ACK.
+On Mon, Feb 15, 2016 at 11:02 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> The newly added afe4403 driver implements suspend/resume using the
+> SIMPLE_DEV_PM_OPS() macro, which leaves out references to the actual
+> functions when CONFIG_PM is disabled, causing a harmless warning:
 >
+> health/afe4403.c:509:12: error: 'afe4403_suspend' defined but not used
+> health/afe4403.c:530:12: error: 'afe4403_resume' defined but not used
 >
-> Hi Linus,
+> This marks the functions as __maybe_unused so we don't get those
+> warnings.
 >
-> You took v2 which does not add documentation for
-> allwinner,sun8i-h3-r-pinctrl compatible that is added in this patch.  This
-> was fixed in v3. Should I prepare a patch for you that only adds this to the
-> documentation or you can handle this by taking v3/v4 instead of this patch?
+Or we could put _suspend and _resume under CONFIG_PM_SLEEP.
 
-Ooops please send a fixup patch, I don't like to rebase the
-tree if possible. Sorry for the mess and thanks for your help.
+We have:
 
-Yours,
-Linus Walleij
+:~/w/iio/drivers/iio$ ack-grep SIMPLE_DEV_PM_OPS | wc -l
+31
+
+and only 2 drivers using __maybe_unused.
+
+:~/w/iio/drivers/iio$ ack-grep maybe_unused
+gyro/itg3200_core.c
+354:static int __maybe_unused itg3200_suspend(struct device *dev)
+365:static int __maybe_unused itg3200_resume(struct device *dev)
+
+adc/imx7d_adc.c
+553:static int __maybe_unused imx7d_adc_suspend(struct device *dev)
+566:static int __maybe_unused imx7d_adc_resume(struct device *dev)
+
+For consistency, we should use CONFIG_PM_SLEEP and get rid of __maybe_unused.
+
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: eec96d1e2d31 ("iio: health: Add driver for the TI AFE4403 heart monitor")
+> ---
+>  drivers/iio/health/afe4403.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/iio/health/afe4403.c b/drivers/iio/health/afe4403.c
+> index 91c046e40d2f..88e43f87b926 100644
+> --- a/drivers/iio/health/afe4403.c
+> +++ b/drivers/iio/health/afe4403.c
+> @@ -506,7 +506,7 @@ static const struct of_device_id afe4403_of_match[] = {
+>  MODULE_DEVICE_TABLE(of, afe4403_of_match);
+>  #endif
+>
+> -static int afe4403_suspend(struct device *dev)
+> +static int __maybe_unused afe4403_suspend(struct device *dev)
+>  {
+>         struct iio_dev *indio_dev = dev_to_iio_dev(dev);
+>         struct afe4403_data *afe = iio_priv(indio_dev);
+> @@ -527,7 +527,7 @@ static int afe4403_suspend(struct device *dev)
+>         return 0;
+>  }
+>
+> -static int afe4403_resume(struct device *dev)
+> +static int __maybe_unused afe4403_resume(struct device *dev)
+>  {
+>         struct iio_dev *indio_dev = dev_to_iio_dev(dev);
+>         struct afe4403_data *afe = iio_priv(indio_dev);
