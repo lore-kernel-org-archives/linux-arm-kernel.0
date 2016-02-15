@@ -1,80 +1,49 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Mon, 15 Feb 2016 16:22:04 +0800
-Subject: [PATCH v9 2/2] power: add documentation for ACT8945A's charger DT
- bindings
-In-Reply-To: <1455524524-9359-1-git-send-email-wenyou.yang@atmel.com>
-References: <1455524524-9359-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1455524524-9359-3-git-send-email-wenyou.yang@atmel.com>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Mon, 15 Feb 2016 09:33:26 +0100
+Subject: [PATCH 1/3] clk: unconditionally recurse into clk/mvebu/
+In-Reply-To: <1455521698-7905-2-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1455521698-7905-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1455521698-7905-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <CAPv3WKdnFg6AYNGexyEvMEjKmHadj4+CH5avnd=5d_HEKCTc2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds documentation for the DT bindings of the charger
-subdevice of ACT8945A MFD.
+Hi Thomas,
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
 
-Changes in v9: None
-Changes in v8:
- - due the mfd cell .of_compatible removal, update the compatibe
-   description and example.
 
-Changes in v7: None
-Changes in v6: None
-Changes in v5:
- - collect Reviewed-by from Krzysztof.
+2016-02-15 8:34 GMT+01:00 Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com>:
+> The drivers/clk/mvebu directory is only being built when
+> CONFIG_PLAT_ORION=y. As we are going to support additional mvebu
+> platforms in drivers/clk/mvebu, which don't have CONFIG_PLAT_ORION=y,
+> we need to recurse into this directory regardless of the value of
+> CONFIG_PLAT_ORION.
+>
+> Since all files in drivers/clk/mvebu/ are already conditionally
+> compiled depending on various Kconfig options, we can recurse
+> unconditionally into drivers/clk/mvebu without any other change.
+>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  drivers/clk/Makefile | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+> index b038e36..e08bb0e 100644
+> --- a/drivers/clk/Makefile
+> +++ b/drivers/clk/Makefile
+> @@ -61,7 +61,7 @@ obj-$(CONFIG_ARCH_MEDIATEK)           += mediatek/
+>  ifeq ($(CONFIG_COMMON_CLK), y)
+>  obj-$(CONFIG_ARCH_MMP)                 += mmp/
+>  endif
+> -obj-$(CONFIG_PLAT_ORION)               += mvebu/
+> +obj-y                                  += mvebu/
 
-Changes in v4:
- - change the properties with more legible name, clearer description.
+I know it works with obj-y, but how about using
+obj-$(CONFIG_ARCH_MVEBU)? A person editing this Kconfig in future
+wouldn't have to run git blame in order to ensure with your commit
+log, that he doesn't compile anything more than planned.
 
-Changes in v3: None
-Changes in v2: None
-
- .../devicetree/bindings/power/act8945a-charger.txt |   35 ++++++++++++++++++++
- 1 file changed, 35 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/power/act8945a-charger.txt
-
-diff --git a/Documentation/devicetree/bindings/power/act8945a-charger.txt b/Documentation/devicetree/bindings/power/act8945a-charger.txt
-new file mode 100644
-index 0000000..bea254c
---- /dev/null
-+++ b/Documentation/devicetree/bindings/power/act8945a-charger.txt
-@@ -0,0 +1,35 @@
-+Device-Tree bindings for charger of Active-semi ACT8945A Multi-Function Device
-+
-+Required properties:
-+ - compatible: "active-semi,act8945a", please refer to ../mfd/act8945a.txt.
-+ - active-semi,chglev-gpios: charge current level phandle with args
-+   as described in ../gpio/gpio.txt.
-+
-+Optional properties:
-+ - active-semi,check-battery-temperature: boolean to check the battery
-+   temperature or not.
-+ - active-semi,input-voltage-threshold-microvolt: unit: mV;
-+   Specifies the charger's input over-voltage threshold value;
-+   The value can be: 6600, 7000, 7500, 8000; default: 6600
-+ - active-semi,precondition-timeout: unit: minutes;
-+   Specifies the charger's PRECONDITION safety timer setting value;
-+   The value can be: 40, 60, 80, 0; If 0, it means to disable this timer;
-+   default: 40.
-+ - active-semi,total-timeout: unit: hours;
-+   Specifies the charger's total safety timer setting value;
-+   The value can be: 3, 4, 5, 0; If 0, it means to disable this timer;
-+   default: 3.
-+
-+Example:
-+	pmic at 5b {
-+		compatible = "active-semi,act8945a";
-+		reg = <0x5b>;
-+		status = "okay";
-+
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_charger_chglev>;
-+		active-semi,chglev-gpios = <&pioA 12 GPIO_ACTIVE_HIGH>;
-+		active-semi,input-voltage-threshold-microvolt = <6600>;
-+		active-semi,precondition-timeout = <40>;
-+		active-semi,total-timeout = <3>;
-+	};
--- 
-1.7.9.5
+Best regards,
+Marcin
