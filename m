@@ -1,44 +1,66 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 15 Feb 2016 09:47:44 +0100
-Subject: [PATCH 4/5] arm64: update ARCH_MVEBU for Marvell Armada 7K/8K support
+Date: Mon, 15 Feb 2016 09:47:43 +0100
+Subject: [PATCH 3/5] Documentation: arm: improve Marvell EBU Armada
+ documentation
 In-Reply-To: <1455526065-7307-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1455526065-7307-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1455526065-7307-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1455526065-7307-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit updates the ARCH_MVEBU Kconfig option introduced for
-Armada 3700 to also be used for the Armada 7K and 8K platforms, by:
+This commit improves the Marvell EBU Armada documentation by:
 
- - Selecting the appropriate clock and irqchip drivers
- - Updating the help text to mention Armada 7K and 8K
+ - Clarifying which core is used by each SoC. Indeed, the Armada 370
+   and XP use a Marvell ARMv7 compatible core, while Armada 375, 38x
+   and 39x use the ARM Cortex-A9 core.
+
+ - Adding a link to the web form that allows to get the Armada 38x
+   Functional Specifications.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm64/Kconfig.platforms | 11 ++++++++---
- 1 file changed, 8 insertions(+), 3 deletions(-)
+ Documentation/arm/Marvell/README | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index d6fee5c..cadb7ff 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -2,9 +2,14 @@ menu "Platform selection"
+diff --git a/Documentation/arm/Marvell/README b/Documentation/arm/Marvell/README
+index 74f7ce3..57f8293 100644
+--- a/Documentation/arm/Marvell/README
++++ b/Documentation/arm/Marvell/README
+@@ -86,20 +86,25 @@ EBU Armada family
+     Product Brief:   http://www.marvell.com/embedded-processors/armada-300/assets/Marvell_ARMADA_370_SoC.pdf
+     Hardware Spec:   http://www.marvell.com/embedded-processors/armada-300/assets/ARMADA370-datasheet.pdf
+     Functional Spec: http://www.marvell.com/embedded-processors/armada-300/assets/ARMADA370-FunctionalSpec-datasheet.pdf
++    Core:            Marvell PJ4B, ARMv7 compatible
  
- config ARCH_MVEBU
- 	bool "Marvell EBU SoC Family"
--	help
--	  This enables support for Marvell EBU familly such as the
--	  Armada 3700 SoC Family.
-+	select ARMADA_AP806_CORE_CLK
-+	select ARMADA_AP806_RING_CLK
-+	select MVEBU_ODMI
-+	help
-+	  This enables support for Marvell EBU familly, including:
-+	   - Armada 3700 SoC Family
-+	   - Armada 7K SoC Family
-+	   - Armada 8K SoC Family
+   Armada 375 Flavors:
+ 	88F6720
+     Product Brief: http://www.marvell.com/embedded-processors/armada-300/assets/ARMADA_375_SoC-01_product_brief.pdf
++    Core:          ARM Cortex-A9
  
- config ARCH_BCM_IPROC
- 	bool "Broadcom iProc SoC Family"
+   Armada 380/385 Flavors:
+ 	88F6810
+ 	88F6820
+ 	88F6828
++    Functional spec: https://marvellcorp.wufoo.com/forms/marvell-armada-38x-functional-specifications/
++    Core:          ARM Cortex-A9
+ 
+   Armada 390/398 Flavors:
+ 	88F6920
+ 	88F6928
+     Product infos: http://www.marvell.com/embedded-processors/armada-39x/
++    Core:          ARM Cortex-A9
+ 
+   Armada XP Flavors:
+         MV78230
+@@ -112,8 +117,7 @@ EBU Armada family
+       http://www.marvell.com/embedded-processors/armada-xp/assets/HW_MV78230_OS.PDF
+       http://www.marvell.com/embedded-processors/armada-xp/assets/HW_MV78260_OS.PDF
+       http://www.marvell.com/embedded-processors/armada-xp/assets/HW_MV78460_OS.PDF
+-
+-  Core: Sheeva ARMv7 compatible
++    Core: Marvell PJ4B-MP, ARMv7 compatible
+ 
+   Linux kernel mach directory: arch/arm/mach-mvebu
+   Linux kernel plat directory: none
 -- 
 2.6.4
