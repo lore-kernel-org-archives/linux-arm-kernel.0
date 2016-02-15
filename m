@@ -1,101 +1,47 @@
-From: maitysanchayan@gmail.com (maitysanchayan at gmail.com)
-Date: Mon, 15 Feb 2016 10:12:15 +0530
-Subject: [PATCH v2] ARM: dts: vfxxx: Add iio_hwmon node for ADC
- temperature channel
-In-Reply-To: <20160214083349.GR6756@tiger>
-References: <cd32f1664a04b38b8a025414d039bd015cb9a5ff.1455278754.git.maitysanchayan@gmail.com>
- <20160214083349.GR6756@tiger>
-Message-ID: <20160215044214.GA5545@Sanchayan-Arch.toradex.int>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Mon, 15 Feb 2016 04:50:17 +0000
+Subject: [PATCH] ARM: dts: porter: fix JP3 jumper description
+In-Reply-To: <1655804.y4T36KvG5v@wasted.cogentembedded.com>
+References: <1674850.BZpGW9kEud@wasted.cogentembedded.com>
+ <1655804.y4T36KvG5v@wasted.cogentembedded.com>
+Message-ID: <87fuwuinsh.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Shawn,
 
-On 16-02-14 16:33:49, Shawn Guo wrote:
-> On Fri, Feb 12, 2016 at 05:53:00PM +0530, Sanchayan Maity wrote:
-> > Add iio_hwmon node to expose the temperature channel on Vybrid as
-> > hardware monitor device using the iio_hwmon driver.
-> > 
-> > Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
-> > ---
-> > 
-> > Hello,
-> > 
-> > The first version of the patch was send quite a while ago.
-> > https://lkml.org/lkml/2015/9/16/932
-> > 
-> > Shawn you had requested that hyphen rather than underscore should
-> > be used in node name. I looked into that.
-> > 
-> > The iio_hwmon driver calls hwmon_device register_with_groups inside
-> > hwmon.c and this
-> > http://lxr.free-electrons.com/source/drivers/hwmon/hwmon.c#L103
-> > 
-> > does not allow hyphen in hwmon name attribute. I was not aware of
-> > this but while trying to test the change, the device probe failed
-> > with EINVAL. I think we should stick to the existing use of the
-> > bindings or we need to change the hwmon code as well along with the
-> > existing device tree files and binding documentation.
+Hi
+
+> When finishing the Porter sound support patch, I managed to call the JP3
+> jumper SW3 in the comment.  Fix this  along with (also miscalled) jumper
+> positions...
 > 
-> I disagree.
-> 
-> If hyphen is invalid to be part of hwmon name attribute, the following
-> code in iio_hwmon_probe() is plain wrong, because hyphen is very valid
-> to be part of node names in device tree.
-> 
->         if (dev->of_node && dev->of_node->name)
->                 name = dev->of_node->name;
+> Fixes: 493b4da7c10c ("ARM: dts: porter: add sound support")
+> Reported-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-@Shawn
-I agree with what you state here, however as you can see the hwmon_device_
-register_with_groups does check for hypen with strpbrk and returns EINVAL.
-Changing to hyphen instead of currently present underscore in iio_hwmon
-node name causes probe failure.
-
-If the node name needs to have hyphen, then the check for hyphen as an invalid
-character in hwmon name attribute needs to be changed. I am CC'ing the hwmon
-subsystem maintainers Jean Delvare ands Guenter Roeck as well as hwmon list to
-check.
-
-@Jean & Guenter
-Can you please comment if the change to hwmon_device_register_with_groups
-to accept hyphen as a valid character in hwmon name attribute will be acceptable?
-Sorry if this is sudden andfor bringing you late into the discussion Jean and
-Guenter.
-
-Thanks & Regards,
-Sanchayan.
+Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
 > 
-> Shawn
+> ---
+> This patch is against the 'renesas-devel-20160209-v4.5-rc3' tag of Simon
+> Horman's 'renesas.git' repo.
 > 
-> > 
-> > Changes since v1:
-> > 1. Expose ADC1 temperature channel as well
-> > 2. Move the entry outside of the aips1 bus node
-> > 
-> > Best Regards,
-> > Sanchayan Maity.
-> > ---
-> >  arch/arm/boot/dts/vfxxx.dtsi | 5 +++++
-> >  1 file changed, 5 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
-> > index a5f07e3..8ed8e47 100644
-> > --- a/arch/arm/boot/dts/vfxxx.dtsi
-> > +++ b/arch/arm/boot/dts/vfxxx.dtsi
-> > @@ -673,5 +673,10 @@
-> >  				status = "disabled";
-> >  			};
-> >  		};
-> > +
-> > +		iio_hwmon {
-> > +			compatible = "iio-hwmon";
-> > +			io-channels = <&adc0 16>, <&adc1 16>;
-> > +		};
-> >  	};
-> >  };
-> > -- 
-> > 2.7.1
-> > 
-> > 
+> arch/arm/boot/dts/r8a7791-porter.dts |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> Index: renesas/arch/arm/boot/dts/r8a7791-porter.dts
+> ===================================================================
+> --- renesas.orig/arch/arm/boot/dts/r8a7791-porter.dts
+> +++ renesas/arch/arm/boot/dts/r8a7791-porter.dts
+> @@ -11,8 +11,8 @@
+>  /*
+>   * SSI-AK4642
+>   *
+> - * SW3: 1: AK4642
+> - *      3: ADV7511
+> + * JP3: 2-1: AK4642
+> + *      2-3: ADV7511
+>   *
+>   * This command is required before playback/capture:
+>   *
+> 
