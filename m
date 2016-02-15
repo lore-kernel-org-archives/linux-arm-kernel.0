@@ -1,63 +1,89 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 15 Feb 2016 10:59:05 +0100
-Subject: [PATCH] iio: adc/imx25-gcq: move incorrect do_div
-In-Reply-To: <1455275748-999115-1-git-send-email-arnd@arndb.de>
-References: <1455275748-999115-1-git-send-email-arnd@arndb.de>
-Message-ID: <2144249.hzmN2uUoLT@adelgunde>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 15 Feb 2016 09:59:27 +0000
+Subject: [PATCH] dma: mv_xor_v2: new driver
+In-Reply-To: <20160215105008.74aa7869@free-electrons.com>
+References: <1455523083-25506-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201602151735.BaFwBMOn%fengguang.wu@intel.com>
+ <20160215105008.74aa7869@free-electrons.com>
+Message-ID: <56C1A17F.9030206@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Thomas,
 
-On Friday, February 12, 2016 12:15:29 PM Arnd Bergmann wrote:
-> The newly added driver uses do_div() to device a 32-bit number, which now
-> provokes a warning:
+On 15/02/16 09:50, Thomas Petazzoni wrote:
+> Marc,
 > 
-> drivers/iio/adc/fsl-imx25-gcq.c: In function 'mx25_gcq_setup_cfgs':
-> include/asm-generic/div64.h:207:28: warning: comparison of distinct pointer types lacks a cast
->   (void)(((typeof((n)) *)0) == ((uint64_t *)0)); \
+> This doesn't seem to be an issue introduced by my patch itself, but
+> rather a problem with the MSI subsystem itself. Is this already a known
+> issue (possibly already fixed), or should I investigate?
+
+Seems like something is selecting GENERIC_MSI_IRQ_DOMAIN on a system
+that doesn't implement the required bits.
+
+It may be that we need to implement something like
+HAS_GENERIC_MSI_IRQ_DOMAIN, and make GENERIC_MSI_IRQ_DOMAIN conditional
+on that. Or just whitelist the architectures that do implement this.
+
+Any chance you could have a closer look?
+
+Thanks,
+
+	M.
+
 > 
-> This replaces the do_div() call with a straight division operator.
+> Thanks!
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 6df2e98c3ea5 ("iio: adc: Add imx25-gcq ADC driver")
-
-Thanks for fixing this.
-
-Reviewed-by: Markus Pargmann <mpa@pengutronix.de>
-
-Best Regards,
-
-Markus
-
-> ---
->  drivers/iio/adc/fsl-imx25-gcq.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> Thomas
 > 
-> diff --git a/drivers/iio/adc/fsl-imx25-gcq.c b/drivers/iio/adc/fsl-imx25-gcq.c
-> index 2fd192735d5b..72b32c1ab257 100644
-> --- a/drivers/iio/adc/fsl-imx25-gcq.c
-> +++ b/drivers/iio/adc/fsl-imx25-gcq.c
-> @@ -233,7 +233,7 @@ static int mx25_gcq_setup_cfgs(struct platform_device *pdev,
->  			priv->channel_vref_mv[reg] =
->  				regulator_get_voltage(priv->vref[refp]);
->  			/* Conversion from uV to mV */
-> -			do_div(priv->channel_vref_mv[reg], 1000);
-> +			priv->channel_vref_mv[reg] /= 1000;
->  			break;
->  		case MX25_ADC_REFP_INT:
->  			priv->channel_vref_mv[reg] = 2500;
+> On Mon, 15 Feb 2016 17:09:27 +0800, kbuild test robot wrote:
+>> Hi Thomas,
+>>
+>> [auto build test ERROR on robh/for-next]
+>> [also build test ERROR on v4.5-rc4 next-20160215]
+>> [if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+>>
+>> url:    https://github.com/0day-ci/linux/commits/Thomas-Petazzoni/dma-mv_xor_v2-new-driver/20160215-160120
+>> base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux for-next
+>> config: openrisc-allyesconfig (attached as .config)
+>> reproduce:
+>>         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+>>         chmod +x ~/bin/make.cross
+>>         # save the attached .config to linux build tree
+>>         make.cross ARCH=openrisc 
+>>
+>> All errors (new ones prefixed by >>):
+>>
+>>    In file included from kernel/irq/chip.c:14:0:
+>>>> include/linux/msi.h:174:21: fatal error: asm/msi.h: No such file or directory
+>>    compilation terminated.
+>>
+>> vim +174 include/linux/msi.h
+>>
+>> c2791b80 Yijing Wang    2014-11-11  168  	void (*teardown_irq)(struct msi_controller *chip, unsigned int irq);
+>> 0cbdcfcf Thierry Reding 2013-08-09  169  };
+>> 0cbdcfcf Thierry Reding 2013-08-09  170  
+>> f3cf8bb0 Jiang Liu      2014-11-12  171  #ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
+>> d9109698 Jiang Liu      2014-11-15  172  
+>> aeeb5965 Jiang Liu      2014-11-15  173  #include <linux/irqhandler.h>
+>> d9109698 Jiang Liu      2014-11-15 @174  #include <asm/msi.h>
+>> d9109698 Jiang Liu      2014-11-15  175  
+>> f3cf8bb0 Jiang Liu      2014-11-12  176  struct irq_domain;
+>> 552c494a Marc Zyngier   2015-11-23  177  struct irq_domain_ops;
+>>
+>> :::::: The code at line 174 was first introduced by commit
+>> :::::: d9109698be6e7439e6082aa00d79d4556114739b genirq: Introduce msi_domain_alloc/free_irqs()
+>>
+>> :::::: TO: Jiang Liu <jiang.liu@linux.intel.com>
+>> :::::: CC: Thomas Gleixner <tglx@linutronix.de>
+>>
+>> ---
+>> 0-DAY kernel test infrastructure                Open Source Technology Center
+>> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 > 
+> 
+> 
+
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160215/834da2a4/attachment.sig>
+Jazz is not dead. It just smells funny...
