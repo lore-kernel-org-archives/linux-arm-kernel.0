@@ -1,83 +1,163 @@
-From: aryabinin@virtuozzo.com (Andrey Ryabinin)
-Date: Mon, 15 Feb 2016 17:28:02 +0300
-Subject: [PATCH v5sub1 7/8] arm64: move kernel image to base of vmalloc
- area
-In-Reply-To: <20160212160652.GL31665@e104818-lin.cambridge.arm.com>
-References: <1454324093-15998-1-git-send-email-ard.biesheuvel@linaro.org>
- <1454324093-15998-8-git-send-email-ard.biesheuvel@linaro.org>
- <20160212145844.GI31665@e104818-lin.cambridge.arm.com>
- <CAKv+Gu-x6QPorWsPDP8bqAkmbasqzhqmP39HS=qprfGB4r8JLw@mail.gmail.com>
- <20160212151006.GJ31665@e104818-lin.cambridge.arm.com>
- <CAKv+Gu84mVP=YjbLhWoGj9AEUD8m8+Lq8kTCniCHwxJwMWaZtA@mail.gmail.com>
- <20160212152641.GK31665@e104818-lin.cambridge.arm.com>
- <56BDFC86.5010705@arm.com>
- <20160212160652.GL31665@e104818-lin.cambridge.arm.com>
-Message-ID: <56C1E072.2090909@virtuozzo.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 15 Feb 2016 14:27:27 +0000
+Subject: [RFC PATCH 1/7] arm64/perf: Basic uncore counter support for
+ Cavium ThunderX
+In-Reply-To: <20160215140720.GA4053@hardcore>
+References: <cover.1455295032.git.jglauber@cavium.com>
+ <8bd93a25e069ed6428bc6c21fc53270962ccafcc.1455295032.git.jglauber@cavium.com>
+ <20160212173658.GD20262@leverpostej>
+ <20160215140720.GA4053@hardcore>
+Message-ID: <20160215142726.GD9732@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Feb 15, 2016 at 03:07:20PM +0100, Jan Glauber wrote:
+> Hi Mark,
+> 
+> thanks for reviewing! I'll need several mails to address all questions.
+> 
+> On Fri, Feb 12, 2016 at 05:36:59PM +0000, Mark Rutland wrote:
+> > On Fri, Feb 12, 2016 at 05:55:06PM +0100, Jan Glauber wrote:
+> > > Provide uncore facilities for non-CPU performance counter units.
+> > > Based on Intel/AMD uncore pmu support.
+> > > 
+> > > The uncore PMUs can be found under /sys/bus/event_source/devices.
+> > > All counters are exported via sysfs in the corresponding events
+> > > files under the PMU directory so the perf tool can list the event names.
+> > 
+> > It turns out that "uncore" covers quite a lot of things.
+> > 
+> > Where exactly do the see counters live? system, socket, cluster?
+> 
+> Neither cluster nor socket, so I would say system. Where a system may
+> consist of 2 nodes that mostly appear as one system.
+> 
+> > Are there potentially multiple instances of a given PMU in the system?
+> > e.g. might each clutster have an instance of an L2 PMU?
+> 
+> Yes.
+> 
+> > If I turn off a set of CPUs, do any "uncore" PMUs lost context or become
+> > inaccessible?
+> 
+> No, they are not related to CPUs.
 
+Ok. So I should be able to concurrently hotplug random CPUs on/off while
+this driver is running, without issues? No registers might be
+clock-gated or similar?
 
-On 02/12/2016 07:06 PM, Catalin Marinas wrote:
-> On Fri, Feb 12, 2016 at 03:38:46PM +0000, Sudeep Holla wrote:
->>
->> On 12/02/16 15:26, Catalin Marinas wrote:
->>> On Fri, Feb 12, 2016 at 04:17:09PM +0100, Ard Biesheuvel wrote:
->>>> On 12 February 2016 at 16:10, Catalin Marinas <catalin.marinas@arm.com> wrote:
->>>>> On Fri, Feb 12, 2016 at 04:02:58PM +0100, Ard Biesheuvel wrote:
->>>>>> On 12 February 2016 at 15:58, Catalin Marinas <catalin.marinas@arm.com> wrote:
->>>>>>> On Mon, Feb 01, 2016 at 11:54:52AM +0100, Ard Biesheuvel wrote:
->>>>>>>> This moves the module area to right before the vmalloc area, and
->>>>>>>> moves the kernel image to the base of the vmalloc area. This is
->>>>>>>> an intermediate step towards implementing KASLR, which allows the
->>>>>>>> kernel image to be located anywhere in the vmalloc area.
->>>>>>>>
->>>>>>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>>>>>>
->>>>>>> This patch is causing lots of KASAN warnings on Juno (interestingly, it
->>>>>>> doesn't seem to trigger on Seattle, though we only tried for-next/core).
->>>>>>> I pushed the branch that I'm currently using here:
->>>>>>>
->>>>>>> git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux for-next/kernmap
->>>>>>>
->>>>>>>
->>>>>>> A typical error (though its place varies based on the config options,
->>>>>>> kernel layout):
->>>>>>>
->>>>>>> BUG: KASAN: stack-out-of-bounds in clockevents_program_event+0x28/0x1b0 at addr ffffffc936257cc8
->>>>>>
->>>>>> Can you confirm that these are stack accesses? I was having similar
->>>>>> errors before, and I ended up creating the kasan zero page patch
->>>>>> because it turned out the kasan shadow page in question was aliased
->>>>>> and the stack writes were occurring elsewhere.
->>>>>
->>>>> It's possible, we are looking into this. Is there any other patch I miss on
->>>>> the above branch?
->>>>
->>>> I don't think so but I will check
->>>
->>> Commit 7b1af9795773 ("arm64: kasan: ensure that the KASAN zero page is
->>> mapped read-only") was merged in -rc2 while the branch above is based on
->>> -rc1. Anyway, I merged it into -rc2 and the errors are similar.
->>>
->>
->> Sorry to add more confusion, but I observed similar KASAN warning
->> with latest mainline(v4.5-rc3+, commit c05235d50f68) with below diff.
-> 
-> I can reproduce this with UBSAN enabled (log below for the record).
-> 
-> So far, we have:
-> 
-> KASAN+for-next/kernmap goes wrong
-> KASAN+UBSAN goes wrong
-> 
-> Enabled individually, KASAN, UBSAN and for-next/kernmap seem fine. I may
-> have to trim for-next/core down until we figure out where the problem
-> is.
-> 
-> 
-> BUG: KASAN: stack-out-of-bounds in find_busiest_group+0x164/0x16a0 at addr ffffffc93665bc8c
+I appreciate that they are not "related" to particular CPUs as such.
 
+> > > 1) The PMU detection solely relies on PCI device detection. If a
+> > >    matching PCI device is found the PMU is created. The code can deal
+> > >    with multiple units of the same type, e.g. more than one memory
+> > >    controller.
+> > 
+> > I see below that the driver has an initcall that runs regardless of
+> > whether the PCI device exists, and looks at the MIDR. That's clearly not
+> > string PCI device detection.
+> > 
+> > Why is this not a true PCI driver that only gets probed if the PCI
+> > device exists? 
+> 
+> It is not a PCI driver because there are already drivers like edac that
+> will access these PCI devices. The uncore driver only accesses the
+> performance counters, which are not used by the other drivers.
 
-Can it be related to TLB conflicts, which supposed to be fixed in "arm64: kasan: avoid TLB conflicts" patch
-from "arm64: mm: rework page table creation" series ?
+Several drivers are accessing the same device?
+
+That sounds somewhat scary.
+
+> > > +#include <asm/cpufeature.h>
+> > > +#include <asm/cputype.h>
+> > 
+> > I don't see why you should need these two if this is truly an uncore
+> > device probed solely from PCI.
+> 
+> There are several passes of the hardware that have the same PCI device
+> ID. Therefore I need the CPU variant to distinguish them. This could
+> be done _after_ the PCI device is found but I found it easier to
+> implement the check once in the common setup function.
+
+Ok. Please call that out in the commit message.
+
+> > > +int thunder_uncore_event_init(struct perf_event *event)
+> > > +{
+> > > +	struct hw_perf_event *hwc = &event->hw;
+> > > +	struct thunder_uncore *uncore;
+> > > +
+> > > +	if (event->attr.type != event->pmu->type)
+> > > +		return -ENOENT;
+> > > +
+> > > +	/* we do not support sampling */
+> > > +	if (is_sampling_event(event))
+> > > +		return -EINVAL;
+> > > +
+> > > +	/* counters do not have these bits */
+> > > +	if (event->attr.exclude_user	||
+> > > +	    event->attr.exclude_kernel	||
+> > > +	    event->attr.exclude_host	||
+> > > +	    event->attr.exclude_guest	||
+> > > +	    event->attr.exclude_hv	||
+> > > +	    event->attr.exclude_idle)
+> > > +		return -EINVAL;
+> > 
+> > We should _really_ make these features opt-in at the core level. It's
+> > crazy that each and every PMU drivers has to explicitly test and reject
+> > things it doesn't support.
+> 
+> Completely agreed. Also, every sample code I looked at did
+> check for other bits...
+> 
+> [...]
+> 
+> > > +
+> > > +	uncore = event_to_thunder_uncore(event);
+> > > +	if (!uncore)
+> > > +		return -ENODEV;
+> > > +	if (!uncore->event_valid(event->attr.config))
+> > > +		return -EINVAL;
+> > > +
+> > > +	hwc->config = event->attr.config;
+> > > +	hwc->idx = -1;
+> > > +
+> > > +	/* and we don't care about CPU */
+> > 
+> > Actually, you do. You want the perf core to serialize accesses via the
+> > same CPU, so all events _must_ be targetted at the same CPU. Otherwise
+> > there are a tonne of problems you don't even want to think about.
+> 
+> I found that perf added the events on every CPU in the system. Because
+> the uncore events are not CPU related I wanted to avoid this. Setting
+> cpumask to -1 did not work. Therefore I added a single CPU in the
+> cpumask, see thunder_uncore_attr_show_cpumask().
+
+I understand that, which is why I wrote:
+
+> > You _must_ ensure this kernel-side, regardless of what the perf tool
+> > happens to do.
+> > 
+> > See the arm-cci and arm-ccn drivers for an example.
+
+Take a look at drivers/bus/arm-cci.c; specifically, what we do in
+cci_pmu_event_init and cci_pmu_cpu_notifier.
+
+This is the same thing that's done for x86 system PMUs. Take a look at
+uncore_pmu_event_init in arch/x86/kernel/cpu/perf_event_intel_uncore.c.
+
+Otherwise there are a number of situations where userspace might open
+events on different CPUs, and you get some freaky results because the
+perf core expects accesses to a PMU and its related data structures to
+be strictly serialised through _some_ CPU (even if that CPU is
+arbitrarily chosen).
+
+For example, if CPU 0 was offline when one event was opened, then cpu0
+was hotplugged, then a second event was opened, there would be an event
+in the CPU1 context and another in the CPU0 context. Modification to the
+PMU state is done per CPU-context in the core, and these would race
+against each other given the lack of serialisation. Even with sufficient
+locking to prevent outright corruption, things like event rotation would
+race leading to very non-deterministic results.
+
+Thanks,
+Mark.
