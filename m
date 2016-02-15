@@ -1,66 +1,97 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 15 Feb 2016 17:41:42 +0000
-Subject: arm qemu test failures due to 'driver-core: platform: probe
- of-devices only using list of compatibles'
-In-Reply-To: <56C1F19F.8090100@roeck-us.net>
-References: <20160214165010.GA3189@roeck-us.net>
- <20160215105909.GH12289@pengutronix.de> <56C1F19F.8090100@roeck-us.net>
-Message-ID: <56C20DD6.8050604@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 15 Feb 2016 17:46:56 +0000
+Subject: [PATCH v4 21/23] arm64: hw_breakpoint: Allow EL2 breakpoints if
+ running in HYP
+In-Reply-To: <1455216004-19499-22-git-send-email-marc.zyngier@arm.com>
+References: <1455216004-19499-1-git-send-email-marc.zyngier@arm.com>
+ <1455216004-19499-22-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20160215174656.GN6298@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Feb 11, 2016 at 06:40:02PM +0000, Marc Zyngier wrote:
+> With VHE, we place kernel {watch,break}-points at EL2 to get things
+> like kgdb and "perf -e mem:..." working.
+> 
+> This requires a bit of repainting in the low-level encore/decode,
+> but is otherwise pretty simple.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/include/asm/hw_breakpoint.h | 49 +++++++++++++++++++++-------------
+>  1 file changed, 31 insertions(+), 18 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/hw_breakpoint.h b/arch/arm64/include/asm/hw_breakpoint.h
+> index 9732908..4d8d5a8 100644
+> --- a/arch/arm64/include/asm/hw_breakpoint.h
+> +++ b/arch/arm64/include/asm/hw_breakpoint.h
+> @@ -18,6 +18,7 @@
+>  
+>  #include <asm/cputype.h>
+>  #include <asm/cpufeature.h>
+> +#include <asm/virt.h>
+>  
+>  #ifdef __KERNEL__
+>  
+> @@ -35,24 +36,6 @@ struct arch_hw_breakpoint {
+>  	struct arch_hw_breakpoint_ctrl ctrl;
+>  };
+>  
+> -static inline u32 encode_ctrl_reg(struct arch_hw_breakpoint_ctrl ctrl)
+> -{
+> -	return (ctrl.len << 5) | (ctrl.type << 3) | (ctrl.privilege << 1) |
+> -		ctrl.enabled;
+> -}
+> -
+> -static inline void decode_ctrl_reg(u32 reg,
+> -				   struct arch_hw_breakpoint_ctrl *ctrl)
+> -{
+> -	ctrl->enabled	= reg & 0x1;
+> -	reg >>= 1;
+> -	ctrl->privilege	= reg & 0x3;
+> -	reg >>= 2;
+> -	ctrl->type	= reg & 0x3;
+> -	reg >>= 2;
+> -	ctrl->len	= reg & 0xff;
+> -}
+> -
+>  /* Breakpoint */
+>  #define ARM_BREAKPOINT_EXECUTE	0
+>  
+> @@ -62,6 +45,7 @@ static inline void decode_ctrl_reg(u32 reg,
+>  #define AARCH64_ESR_ACCESS_MASK	(1 << 6)
+>  
+>  /* Privilege Levels */
+> +#define AARCH64_BREAKPOINT_EL2	0
+>  #define AARCH64_BREAKPOINT_EL1	1
+>  #define AARCH64_BREAKPOINT_EL0	2
+>  
+> @@ -76,6 +60,35 @@ static inline void decode_ctrl_reg(u32 reg,
+>  #define ARM_KERNEL_STEP_ACTIVE	1
+>  #define ARM_KERNEL_STEP_SUSPEND	2
+>  
+> +#define DBG_HMC_HYP		(1 << 13)
+> +#define DBG_SSC_HYP		(3 << 14)
 
+Why do we need to touch the SSC field@all?
 
-On 15/02/16 15:41, Guenter Roeck wrote:
-> On 02/15/2016 02:59 AM, Uwe Kleine-K?nig wrote:
->> Hello Guenter,
->>
->> On Sun, Feb 14, 2016 at 08:50:10AM -0800, Guenter Roeck wrote:
->>> Uwe,
->>>
->>> Your patch 'driver-core: platform: probe of-devices only using list of
->>> compatibles' causes the following qemu tests to crash in -next.
->>>
->>> arm:vexpress-a9:vexpress_defconfig:vexpress-v2p-ca9
->>> arm:vexpress-a15:vexpress_defconfig:vexpress-v2p-ca15-tc1
->>> arm:vexpress-a9:multi_v7_defconfig:vexpress-v2p-ca9
->>> arm:vexpress-a15:multi_v7_defconfig:vexpress-v2p-ca15-tc1
->>>
->>> Crash log:
->>>
->>> VFS: Cannot open root device "mmcblk0" or unknown-block(0,0): error -6
->>> Please append a correct "root=" boot option; here are the available
->>> partitions:
->>> 1f00          131072 mtdblock0  (driver?)
->>> 1f01           32768 mtdblock1  (driver?)
->>> Kernel panic - not syncing: VFS: Unable to mount root fs on
->>> unknown-block(0,0)
->>
->> Can you provide a complete boot log? This might already reveal which
->> device is failing. It might not be the mmci device but something it
->> depends on (clock, bus parent, irq).
->>
->
-> Sure, something else may be failing, but why does reverting your patch
-> fix the problem ?
->
-> Anyway, complete logs are at http://kerneltests.org/builders.
->
-> http://kerneltests.org/builders/qemu-arm-next/builds/376/steps/qemubuildcommand/logs/stdio
->
->
+> +
+> +static inline u32 encode_ctrl_reg(struct arch_hw_breakpoint_ctrl ctrl)
+> +{
+> +	u32 val = (ctrl.len << 5) | (ctrl.type << 3) | ctrl.enabled;
+> +
+> +	if (is_kernel_in_hyp_mode() && ctrl.privilege == AARCH64_BREAKPOINT_EL1)
+> +		val |= DBG_HMC_HYP | DBG_SSC_HYP | (AARCH64_BREAKPOINT_EL2 << 1);
 
-Sorry for missing this earlier, I could reproduce this on my TC2.
-The issue is with card-detect gpio probing. It's not related to AMBA
-probing as discussed on the mail thread.
+I don't think this is correct. We want to allow, for example, a userspace
+watchpoint to fire thanks to something like put_user, so the encoding
+really needs to build up the PMC field (like we do already), then orr in
+the HMC field.
 
-mfd_add_device adds devices with of_node when cell->of_compatible is
-matched, but the device created is expected to be matched based on name
-which the patch under discussion clearly breaks.
+The "gotcha", which is similar to the PMU stuff, is that you can't have
+HMC==1 (EL2) and PMC==2 (i.e. EL2 and EL0, but not EL1).
 
-One other option I see is to set driver_override for mfd devices
-(something like below) but I am not sure that can be generic.
+I *think* the conclusion is that you need AARCH64_BREAKPOINT_EL2 to look
+like DBG_HMC_HYP | AARCH64_BREAKPOINT_EL1.
 
--- 
-Regards,
-Sudeep
+Will
