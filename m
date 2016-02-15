@@ -1,149 +1,56 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Mon, 15 Feb 2016 10:38:25 -0300
-Subject: [PATCH] ARM: dts: Move syscon reboot/poweroff to common dtsi for
- Exynos
-In-Reply-To: <56C02265.40103@samsung.com>
-References: <1455042606-10075-1-git-send-email-javier@osg.samsung.com>
- <56C02265.40103@samsung.com>
-Message-ID: <56C1D4D1.2050108@osg.samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 15 Feb 2016 13:40:09 +0000
+Subject: [PATCH v5sub1 0/8] arm64: split linear and kernel mappings
+In-Reply-To: <56C1D2CF.1010108@gmail.com>
+References: <1454324093-15998-1-git-send-email-ard.biesheuvel@linaro.org>
+ <56BE3645.3030403@gmail.com>
+ <CAKv+Gu9Qw=DSe1fZT=Dv=iKaKqzsf5ARK9dzwCWPk_0uRECm1w@mail.gmail.com>
+ <56BE3C35.7070608@gmail.com>
+ <CAKv+Gu_29SjYgg+P3fyGFcaRVxjapVzMs85Y2frd7_f51mPv-A@mail.gmail.com>
+ <56C1D2CF.1010108@gmail.com>
+Message-ID: <20160215134009.GB6298@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+On Mon, Feb 15, 2016 at 02:29:51PM +0100, Matthias Brugger wrote:
+> >On 12 February 2016 at 21:10, Matthias Brugger <matthias.bgg@gmail.com> wrote:
+> >>On 12/02/16 20:47, Ard Biesheuvel wrote:
+> >>>On 12 February 2016 at 20:45, Matthias Brugger <matthias.bgg@gmail.com>
+> >>>>I bisected linux-next (20160212) with the following error on booting with
+> >>>>an
+> >>>>initramfs:
+> >>>>   Failed to execute /init (error -8)
+> >>>>   request_module: runaway loop modprobe binfmt-464c
+> >>>>   Starting init: /sbin/init exists but couldn't execute it (error -8)
+> >>>>   request_module: runaway loop modprobe binfmt-464c
+> >>>>   Starting init: /bin/sh exists but couldn't execute it (error -8)
+> >>>>   Kernel panic - not syncing: No working init found.  Try passing init=
+> >>>>option to kernel. See Linux Documentation/init..
+> >>>>
+> >>>>I tracked down the error to patch 7 of this series. But I realized that
+> >>>>patch 7 does not compile, but from patch 8 onwards I observe the error.
+> >>>>
+> >
+> >As far as this failure is concerned, I managed to reproduce an error
+> >with patch #7 and not #8 applied, involving out of range kvm symbols
+> >at link time. This is reproducible with GCC 4.8 but not GCC 4.9 or
+> >later. Is this what you were seeing as well? Or is there another
+> >problem?
+> >
+> 
+> I realized that I used " aarch64-linux-gnu-gcc (Linaro GCC 2014.11) 4.9.3
+> 20141031 (prerelease)"  which gave me errors like:
+> 
+> arch/arm64/kvm/built-in.o: In function `__cpu_init_hyp_mode':
+> /home/mbrugger/src/linux-next/./arch/arm64/include/asm/kvm_host.h:331:(.text+0x73b4):
+> relocation truncated to fit: R_AARCH64_ADR_PREL_PG_HI21 against symbol
+> `__kvm_hyp_vector' defined in .hyp.text section in arch/arm64/kvm/built-in.o
+> 
+> So it was time to update my toolchain to "aarch64-linux-gnu-gcc (Linaro GCC
+> 5.1-2015.08) 5.1.1 20150608" which fixed the problem for me.
 
-On 02/14/2016 03:44 AM, Krzysztof Kozlowski wrote:
-> W dniu 10.02.2016 o 03:30, Javier Martinez Canillas pisze:
->> All Exynos SoCs have the same syscon reboot and poweroff device nodes so
->> there is no need to duplicate the same on each SoC dtsi and can be moved
->> to a common dtsi that can be included by all the SoCs dtsi files.
->>
->> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
->>
->> ---
->> Hello,
->>
->> The patch was tested on an Exynos5800 Peach Pi Chromebook and an
->> Exynos5422 Odroid XU4 board. Reboot and poweroff worked for both.
->>
->> But testing on Exynos3 and Exynos4 will be highly appreciated.
->
-> Would you be so kind and add my suggested-by (since it comes from
-> https://wiki.tizen.org/wiki/Exynos_Mainline_Kernel_TODO :) )
->
+FWIW, I've also been seeing a bunch of reloc errors with allmodconfig,
+for-next/core and GCC 4.9. loops_per_jiffy was one of the problematic
+symbols, iirc, but upgrading to GCC 6 (devel) fixed the issue.
 
-Right, sorry for missing that.
-  
-> I'll test it on Exynos4 at work and then apply... but few comments below:
->
->>
->> Best regards,
->> Javier
->>
->>   arch/arm/boot/dts/exynos-syscon-restart.dtsi | 23 +++++++++++++++++++++++
->>   arch/arm/boot/dts/exynos3250.dtsi            | 15 +--------------
->>   arch/arm/boot/dts/exynos4.dtsi               | 15 +--------------
->>   arch/arm/boot/dts/exynos5.dtsi               | 15 +--------------
->>   arch/arm/boot/dts/exynos5410.dtsi            | 15 +--------------
->>   5 files changed, 27 insertions(+), 56 deletions(-)
->>   create mode 100644 arch/arm/boot/dts/exynos-syscon-restart.dtsi
->>
->> diff --git a/arch/arm/boot/dts/exynos-syscon-restart.dtsi b/arch/arm/boot/dts/exynos-syscon-restart.dtsi
->> new file mode 100644
->> index 000000000000..2b8acf554881
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/exynos-syscon-restart.dtsi
->> @@ -0,0 +1,23 @@
->> +/*
->> + * Samsung's Exynos SoC syscon reboot/poweroff nodes common definition.
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +
->> +/ {
->
-> In some of the DTSI this was under "soc" node, not at top-level.
-> Unfortunately we do not have consistency here - some DTSI have "soc",
-
-Yes, I noticed this but as you said not all DTSI have a soc node
-and that's why I made it top level in the DTSI.
-
-> some not. Anyway I think we should move to "soc" version.
->
-
-Not sure I'm following, did you mean to do it as a follow up or
-to add a soc node for the missing DTSI as a part of this series?
-
->> +	poweroff: syscon-poweroff {
->> +		compatible = "syscon-poweroff";
->> +		regmap = <&pmu_system_controller>;
->> +		offset = <0x330C>; /* PS_HOLD_CONTROL */
->> +		mask = <0x5200>; /* reset value */
->> +	};
->> +
->> +	reboot: syscon-reboot {
->> +		compatible = "syscon-reboot";
->> +		regmap = <&pmu_system_controller>;
->> +		offset = <0x0400>; /* SWRESET */
->> +		mask = <0x1>;
->> +	};
->> +};
->> diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
->> index 18e3deffbf48..d9c221517935 100644
->> --- a/arch/arm/boot/dts/exynos3250.dtsi
->> +++ b/arch/arm/boot/dts/exynos3250.dtsi
->> @@ -19,6 +19,7 @@
->>
->>   #include "skeleton.dtsi"
->>   #include "exynos4-cpu-thermal.dtsi"
->> +#include "exynos-syscon-restart.dtsi"
->>   #include <dt-bindings/clock/exynos3250.h>
->>
->>   / {
->> @@ -152,20 +153,6 @@
->>   			interrupt-parent = <&gic>;
->>   		};
->>
->> -		poweroff: syscon-poweroff {
->> -			compatible = "syscon-poweroff";
->> -			regmap = <&pmu_system_controller>;
->> -			offset = <0x330C>; /* PS_HOLD_CONTROL */
->> -			mask = <0x5200>; /* Reset value */
->> -		};
->> -
->> -		reboot: syscon-reboot {
->> -			compatible = "syscon-reboot";
->> -			regmap = <&pmu_system_controller>;
->> -			offset = <0x0400>; /* SWRESET */
->> -			mask = <0x1>;
->> -		};
->> -
->>   		mipi_phy: video-phy at 10020710 {
->>   			compatible = "samsung,s5pv210-mipi-video-phy";
->>   			#phy-cells = <1>;
->> diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
->> index ca621a92319e..e6f6939ccdfa 100644
->> --- a/arch/arm/boot/dts/exynos4.dtsi
->> +++ b/arch/arm/boot/dts/exynos4.dtsi
->> @@ -21,6 +21,7 @@
->>
->>   #include <dt-bindings/clock/exynos4.h>
->>   #include <dt-bindings/clock/exynos-audss-clk.h>
->> +#include "exynos-syscon-restart.dtsi"
->
-> Just to keep it consistent and logic - include after skeleton.
->
-
-Ok, for include I usually try to keep alphabetically sorted but
-I'll move it after skeleton if you prefer to keep it consistent.
-  
-> Best regards,
-> Krzysztof
->
-
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Will
