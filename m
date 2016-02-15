@@ -1,195 +1,105 @@
-From: jun.nie@linaro.org (Jun Nie)
-Date: Mon, 15 Feb 2016 20:18:32 +0800
-Subject: [PATCH 1/3] serial: amba-pl011: make platform driver generic
-In-Reply-To: <1455538393-7038-1-git-send-email-jun.nie@linaro.org>
-References: <1455538393-7038-1-git-send-email-jun.nie@linaro.org>
-Message-ID: <56C1C218.3050106@linaro.org>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Mon, 15 Feb 2016 13:20:08 +0100
+Subject: [PATCH v3 2/2] ARM: shmobile: Remove shmobile_boot_arg
+In-Reply-To: <1455538808-6816-1-git-send-email-geert+renesas@glider.be>
+References: <1455538808-6816-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1455538808-6816-3-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are only two patches for this PL011 UART changes actually. The 
-third is for platform config and shall not be posted here. Sorry for 
-misleading you by email title.
+CPU boot configuration writes to shmobile_boot_arg, which is located in
+the .text section, and thus should not be written to.
 
-Jun
-> make sbsa uart platform driver more generic so that platform
-> driver code can be reused by ZTE uart platform driver.
->
-> Signed-off-by: Jun Nie <jun.nie@linaro.org>
-> ---
->   drivers/tty/serial/amba-pl011.c | 57 +++++++++++++++++++++++++++--------------
->   1 file changed, 38 insertions(+), 19 deletions(-)
->
-> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-> index 500232a..f52a243 100644
-> --- a/drivers/tty/serial/amba-pl011.c
-> +++ b/drivers/tty/serial/amba-pl011.c
-> @@ -73,6 +73,9 @@
->   #define UART_DR_ERROR		(UART011_DR_OE|UART011_DR_BE|UART011_DR_PE|UART011_DR_FE)
->   #define UART_DUMMY_DR_RX	(1 << 16)
->
-> +static const struct uart_ops amba_pl011_pops;
-> +static const struct uart_ops sbsa_uart_pops;
-> +
->   static u16 pl011_std_offsets[REG_ARRAY_SIZE] = {
->   	[REG_DR] = UART01x_DR,
->   	[REG_FR] = UART01x_FR,
-> @@ -92,6 +95,7 @@ static u16 pl011_std_offsets[REG_ARRAY_SIZE] = {
->   /* There is by now at least one vendor with differing details, so handle it */
->   struct vendor_data {
->   	const u16		*reg_offset;
-> +	const struct uart_ops	*uart_pops;
->   	unsigned int		ifls;
->   	bool			access_32b;
->   	bool			oversampling;
-> @@ -119,13 +123,20 @@ static struct vendor_data vendor_arm = {
->   	.get_fifosize		= get_fifosize_arm,
->   };
->
-> +static unsigned int get_fifosize_sbsa(struct amba_device *dev)
-> +{
-> +	return 32;
-> +}
-> +
->   static struct vendor_data vendor_sbsa = {
->   	.reg_offset		= pl011_std_offsets,
-> +	.uart_pops		= &sbsa_uart_pops,
->   	.oversampling		= false,
->   	.dma_threshold		= false,
->   	.cts_event_workaround	= false,
->   	.always_enabled		= true,
->   	.fixed_options		= true,
-> +	.get_fifosize		= get_fifosize_sbsa,
->   };
->
->   static u16 pl011_st_offsets[REG_ARRAY_SIZE] = {
-> @@ -189,6 +200,7 @@ static const u16 pl011_zte_offsets[REG_ARRAY_SIZE] = {
->
->   static struct vendor_data vendor_zte __maybe_unused = {
->   	.reg_offset		= pl011_zte_offsets,
-> +	.uart_pops		= &amba_pl011_pops,
->   	.access_32b		= true,
->   	.ifls			= UART011_IFLS_RX4_8|UART011_IFLS_TX4_8,
->   	.get_fifosize		= get_fifosize_arm,
-> @@ -2084,7 +2096,7 @@ static int pl011_verify_port(struct uart_port *port, struct serial_struct *ser)
->   	return ret;
->   }
->
-> -static struct uart_ops amba_pl011_pops = {
-> +static const struct uart_ops amba_pl011_pops = {
->   	.tx_empty	= pl011_tx_empty,
->   	.set_mctrl	= pl011_set_mctrl,
->   	.get_mctrl	= pl011_get_mctrl,
-> @@ -2519,10 +2531,12 @@ static int pl011_resume(struct device *dev)
->   #endif
->
->   static SIMPLE_DEV_PM_OPS(pl011_dev_pm_ops, pl011_suspend, pl011_resume);
-> +static const struct of_device_id pl011_uart_plat_of_match[];
->
-> -static int sbsa_uart_probe(struct platform_device *pdev)
-> +static int pl011_uart_plat_probe(struct platform_device *pdev)
->   {
->   	struct uart_amba_port *uap;
-> +	struct vendor_data *vendor;
->   	struct resource *r;
->   	int portnr, ret;
->   	int baudrate;
-> @@ -2533,11 +2547,15 @@ static int sbsa_uart_probe(struct platform_device *pdev)
->   	 */
->   	if (pdev->dev.of_node) {
->   		struct device_node *np = pdev->dev.of_node;
-> +		const struct of_device_id *of_id =
-> +			of_match_device(pl011_uart_plat_of_match, &pdev->dev);
->
->   		ret = of_property_read_u32(np, "current-speed", &baudrate);
->   		if (ret)
->   			return ret;
-> +		vendor = (struct vendor_data *)of_id->data;
->   	} else {
-> +		vendor = &vendor_sbsa;
->   		baudrate = 115200;
->   	}
->
-> @@ -2550,15 +2568,15 @@ static int sbsa_uart_probe(struct platform_device *pdev)
->   	if (!uap)
->   		return -ENOMEM;
->
-> -	uap->reg_offset	= vendor_sbsa.reg_offset;
-> -	uap->vendor	= &vendor_sbsa;
-> -	uap->fifosize	= 32;
-> -	uap->port.iotype = vendor_sbsa.access_32b ? UPIO_MEM32 : UPIO_MEM;
-> +	uap->vendor	= vendor;
-> +	uap->reg_offset	= vendor->reg_offset;
-> +	uap->fifosize	= vendor->get_fifosize(NULL);
-> +	uap->port.iotype = vendor->access_32b ? UPIO_MEM32 : UPIO_MEM;
->   	uap->port.irq	= platform_get_irq(pdev, 0);
-> -	uap->port.ops	= &sbsa_uart_pops;
-> +	uap->port.ops	= vendor->uart_pops;
->   	uap->fixed_baud = baudrate;
->
-> -	snprintf(uap->type, sizeof(uap->type), "SBSA");
-> +	snprintf(uap->type, sizeof(uap->type), "PL011 plat");
->
->   	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->
-> @@ -2571,7 +2589,7 @@ static int sbsa_uart_probe(struct platform_device *pdev)
->   	return pl011_register_port(uap);
->   }
->
-> -static int sbsa_uart_remove(struct platform_device *pdev)
-> +static int pl011_uart_plat_remove(struct platform_device *pdev)
->   {
->   	struct uart_amba_port *uap = platform_get_drvdata(pdev);
->
-> @@ -2580,11 +2598,12 @@ static int sbsa_uart_remove(struct platform_device *pdev)
->   	return 0;
->   }
->
-> -static const struct of_device_id sbsa_uart_of_match[] = {
-> -	{ .compatible = "arm,sbsa-uart", },
-> +static const struct of_device_id pl011_uart_plat_of_match[] = {
-> +	{ .compatible = "arm,sbsa-uart", .data = &vendor_sbsa },
-> +	{ .compatible = "zte,zx296702-uart", .data = &vendor_zte },
->   	{},
->   };
-> -MODULE_DEVICE_TABLE(of, sbsa_uart_of_match);
-> +MODULE_DEVICE_TABLE(of, pl011_uart_plat_of_match);
->
->   static const struct acpi_device_id sbsa_uart_acpi_match[] = {
->   	{ "ARMH0011", 0 },
-> @@ -2592,12 +2611,12 @@ static const struct acpi_device_id sbsa_uart_acpi_match[] = {
->   };
->   MODULE_DEVICE_TABLE(acpi, sbsa_uart_acpi_match);
->
-> -static struct platform_driver arm_sbsa_uart_platform_driver = {
-> -	.probe		= sbsa_uart_probe,
-> -	.remove		= sbsa_uart_remove,
-> +static struct platform_driver pl011_uart_platform_driver = {
-> +	.probe		= pl011_uart_plat_probe,
-> +	.remove		= pl011_uart_plat_remove,
->   	.driver	= {
-> -		.name	= "sbsa-uart",
-> -		.of_match_table = of_match_ptr(sbsa_uart_of_match),
-> +		.name	= "uart-pl011-plat",
-> +		.of_match_table = of_match_ptr(pl011_uart_plat_of_match),
->   		.acpi_match_table = ACPI_PTR(sbsa_uart_acpi_match),
->   	},
->   };
-> @@ -2632,14 +2651,14 @@ static int __init pl011_init(void)
->   {
->   	printk(KERN_INFO "Serial: AMBA PL011 UART driver\n");
->
-> -	if (platform_driver_register(&arm_sbsa_uart_platform_driver))
-> +	if (platform_driver_register(&pl011_uart_platform_driver))
->   		pr_warn("could not register SBSA UART platform driver\n");
->   	return amba_driver_register(&pl011_driver);
->   }
->
->   static void __exit pl011_exit(void)
->   {
-> -	platform_driver_unregister(&arm_sbsa_uart_platform_driver);
-> +	platform_driver_unregister(&pl011_uart_platform_driver);
->   	amba_driver_unregister(&pl011_driver);
->   }
->
->
+As of commit 1d33a354bbb618ba ("ARM: shmobile: Per-CPU SMP boot / sleep
+code for SCU SoCs"), and ignoring accidental remainings,
+shmobile_boot_arg is always set to MPIDR_HWID_BITMASK by C code.
+Hence we can just hardcode this in the assembler code, and remove the
+variable, and thus also remove the need to write to this variable.
+
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-by: Nicolas Pitre <nico@linaro.org>
+---
+v3:
+  - Add Acked-by,
+
+v2:
+  - New.
+---
+ arch/arm/mach-shmobile/common.h       | 1 -
+ arch/arm/mach-shmobile/headsmp.S      | 8 ++------
+ arch/arm/mach-shmobile/platsmp-apmu.c | 1 -
+ arch/arm/mach-shmobile/platsmp-scu.c  | 1 -
+ 4 files changed, 2 insertions(+), 9 deletions(-)
+
+diff --git a/arch/arm/mach-shmobile/common.h b/arch/arm/mach-shmobile/common.h
+index 225c12bb3de91e76..5464b7a75e3028a7 100644
+--- a/arch/arm/mach-shmobile/common.h
++++ b/arch/arm/mach-shmobile/common.h
+@@ -4,7 +4,6 @@
+ extern void shmobile_init_delay(void);
+ extern void shmobile_boot_vector(void);
+ extern unsigned long shmobile_boot_fn;
+-extern unsigned long shmobile_boot_arg;
+ extern unsigned long shmobile_boot_size;
+ extern void shmobile_smp_boot(void);
+ extern void shmobile_smp_sleep(void);
+diff --git a/arch/arm/mach-shmobile/headsmp.S b/arch/arm/mach-shmobile/headsmp.S
+index 94d86ed164144cdf..32e0bf6e3ccb9bd3 100644
+--- a/arch/arm/mach-shmobile/headsmp.S
++++ b/arch/arm/mach-shmobile/headsmp.S
+@@ -24,7 +24,6 @@
+ 	.arm
+ 	.align  12
+ ENTRY(shmobile_boot_vector)
+-	ldr     r0, 2f
+ 	ldr     r1, 1f
+ 	bx	r1
+ 
+@@ -34,9 +33,6 @@ ENDPROC(shmobile_boot_vector)
+ 	.globl	shmobile_boot_fn
+ shmobile_boot_fn:
+ 1:	.space	4
+-	.globl	shmobile_boot_arg
+-shmobile_boot_arg:
+-2:	.space	4
+ 	.globl	shmobile_boot_size
+ shmobile_boot_size:
+ 	.long	. - shmobile_boot_vector
+@@ -46,9 +42,9 @@ shmobile_boot_size:
+  */
+ 
+ ENTRY(shmobile_smp_boot)
+-						@ r0 = MPIDR_HWID_BITMASK
+ 	mrc	p15, 0, r1, c0, c0, 5		@ r1 = MPIDR
+-	and	r0, r1, r0			@ r0 = cpu_logical_map() value
++	and	r0, r1, #0xffffff		@ MPIDR_HWID_BITMASK
++						@ r0 = cpu_logical_map() value
+ 	mov	r1, #0				@ r1 = CPU index
+ 	adr	r2, 1f
+ 	ldmia	r2, {r5, r6, r7}
+diff --git a/arch/arm/mach-shmobile/platsmp-apmu.c b/arch/arm/mach-shmobile/platsmp-apmu.c
+index 911884f7e28b174c..aba75c89f9c1c5eb 100644
+--- a/arch/arm/mach-shmobile/platsmp-apmu.c
++++ b/arch/arm/mach-shmobile/platsmp-apmu.c
+@@ -123,7 +123,6 @@ void __init shmobile_smp_apmu_prepare_cpus(unsigned int max_cpus,
+ {
+ 	/* install boot code shared by all CPUs */
+ 	shmobile_boot_fn = virt_to_phys(shmobile_smp_boot);
+-	shmobile_boot_arg = MPIDR_HWID_BITMASK;
+ 
+ 	/* perform per-cpu setup */
+ 	apmu_parse_cfg(apmu_init_cpu, apmu_config, num);
+diff --git a/arch/arm/mach-shmobile/platsmp-scu.c b/arch/arm/mach-shmobile/platsmp-scu.c
+index 4c7d2caf3730f644..8d478f1da265d55e 100644
+--- a/arch/arm/mach-shmobile/platsmp-scu.c
++++ b/arch/arm/mach-shmobile/platsmp-scu.c
+@@ -46,7 +46,6 @@ void __init shmobile_smp_scu_prepare_cpus(phys_addr_t scu_base_phys,
+ {
+ 	/* install boot code shared by all CPUs */
+ 	shmobile_boot_fn = virt_to_phys(shmobile_smp_boot);
+-	shmobile_boot_arg = MPIDR_HWID_BITMASK;
+ 
+ 	/* enable SCU and cache coherency on booting CPU */
+ 	shmobile_scu_base_phys = scu_base_phys;
+-- 
+1.9.1
