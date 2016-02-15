@@ -1,64 +1,70 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 15 Feb 2016 10:13:50 +0000
-Subject: arm qemu test failures due to 'driver-core: platform: probe
- of-devices only using list of compatibles'
-In-Reply-To: <20160215101014.GG12289@pengutronix.de>
-References: <20160214165010.GA3189@roeck-us.net>
- <20160214195501.GA12289@pengutronix.de>
- <20160214200755.GB10826@n2100.arm.linux.org.uk>
- <20160215081750.GD12289@pengutronix.de>
- <20160215085818.GC10826@n2100.arm.linux.org.uk>
- <20160215091406.GE12289@pengutronix.de>
- <20160215100415.GD10826@n2100.arm.linux.org.uk>
- <20160215101014.GG12289@pengutronix.de>
-Message-ID: <20160215101350.GE10826@n2100.arm.linux.org.uk>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 15 Feb 2016 11:15:16 +0100
+Subject: [PATCH v2 0/6] ARM/arm64 : shmobile/renesas: Add L2
+ cache-controller nodes
+In-Reply-To: <20160215015848.GD14034@verge.net.au>
+References: <1449512659-16688-1-git-send-email-geert+renesas@glider.be>
+ <20160215015848.GD14034@verge.net.au>
+Message-ID: <CAMuHMdVRTJ9nXFNQSz+WGSuUGWho3x08WMNZwPS=B-Q8sdzd4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 15, 2016 at 11:10:14AM +0100, Uwe Kleine-K?nig wrote:
-> Hello Russell,
-> 
-> On Mon, Feb 15, 2016 at 10:04:15AM +0000, Russell King - ARM Linux wrote:
-> > On Mon, Feb 15, 2016 at 10:14:06AM +0100, Uwe Kleine-K?nig wrote:
-> > > On Mon, Feb 15, 2016 at 08:58:18AM +0000, Russell King - ARM Linux wrote:
-> > > > On Mon, Feb 15, 2016 at 09:17:50AM +0100, Uwe Kleine-K?nig wrote:
-> > > > > On Sun, Feb 14, 2016 at 08:07:55PM +0000, Russell King - ARM Linux wrote:
-> > > > > > On Sun, Feb 14, 2016 at 08:55:01PM +0100, Uwe Kleine-K?nig wrote:
-> > > > > > > So the unexpected abnormality here is that even though this device is
-> > > > > > > instantiated by dt, the driver doesn't provide any compatibles.
-> > > > > > > Either my expectation is wrong, then 67d02a1bbb33455 should be reverted
-> > > > > > 
-> > > > > > Your expectation is wrong.  AMBA primecell devices have hardware IDs
-> > > > > > and are matched to their drivers by those IDs.  Just like PCI.
-> > > > > 
-> > > > > pci devices don't appear in dt, do they? I don't see the connection
-> > > > > between amba devices and platform devices, see my other mail in this
-> > > > > thread for some more details.
-> > > > 
-> > > > They both have hardware IDs, and they are both matched via those hardware
-> > > > IDs.
-> > > 
-> > > I changed platform_match which is about matching by dt compatible, acpi
-> > > and/or device name. I don't see how this can affect an amba device given
-> > > they match to a driver by a hardware id.
-> > > 
-> > > > Your change has introduced a regression and is therefore wrong.
-> > > 
-> > > I'd like to understand though why and how my commit is wrong to be able
-> > > to fix it instead of getting it reverted.
-> > 
-> > I don't have the commit, and I haven't seen the patch so I can't
-> > comment further, sorry.
-> 
-> It's in -next. For a quick look:
-> 
-> 	https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/?id=67d02a1bbb33455
+Hi Simon,
 
-Well, if that's only touching the platform device matching, it can't have
-any effect on AMBA bus matching, which uses completely different code.
-The AMBA bus code is entirely separate from platform devices.
+On Mon, Feb 15, 2016 at 2:58 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Mon, Dec 07, 2015 at 07:24:13PM +0100, Geert Uytterhoeven wrote:
+>> This patch series adds the missing L2 cache-controller nodes to the
+>> DTSes for various Renesas ARM-based SoCs, and links the CPU nodes to
+>> them.
+>>
+>> For R-Mobile APE6 (r8a73a4), the L2 cache-controllers are also linked to
+>> the respective (already existing) SYSC Power Domains. Fortunately these
+>> Power Domains were never powered down, as they are parents of the Power
+>> Domains containing CPU cores. This may change in the future.
+>>
+>> For R-Car Gen2 and Gen3 (r8a779x), this serves as a preparatory step for
+>> adding SYSC Power Domain support later.
+>>
+>> Question for the ARM/DT people: What are the DT bindings for
+>> Cortex-A15/A7/A57/A53 L2 cache controllers?
+>> Everybody just seems to use "cache" for the compatible values...
+>>
+>> Patches 2-5 were extracted from series "[PATCH/RFC 00/15]
+>> ARM: shmobile: R-Car: Add SYSC PM Domain DT Support",
+>> (http://lists.infradead.org/pipermail/linux-arm-kernel/2015-June/348742.html)
+>> and received some fixes. You can find more detailed changelogs in the
+>> individual patches).
+>>
+>> This has been tested on r8a73a4/ape6evm, r8a7791/koelsch, and
+>> r8a7795/salvator-x.
+>
+> Sorry for loosing track of this until now.
+>
+> It seems to me that the Gen-2 changes could be applied, is that correct?
 
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+And APE6 :-)
+
+> It also seems to me that there was inconclusive discussion regarding
+> the r8a7795 change, is that also correct.
+
+There was discussion (for all SoCs) about the presence of the arm,data-latency
+and arm,tag-latency properties. Given the mess^H^H^H^H presence or
+absence of virtualization they may or may not be valid...
+
+I think the way forward (keeping the dependency for SYSC PM Domains in mind) is
+to apply the series, after removing the controversial latency properties.
+
+Should I resend, or can/will you handle that?
+
+Thanks!
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
