@@ -1,209 +1,36 @@
 From: shaun.ren@linux.com (Shaun Ren)
-Date: Mon, 15 Feb 2016 10:58:48 -0800
-Subject: [PATCH v5 RESEND 2/8] Staging: rts5208: rtsx_transport.c: Align to
- open parenthesis
+Date: Mon, 15 Feb 2016 10:58:49 -0800
+Subject: [PATCH v5 RESEND 3/8] Staging: rts5208: rtsx_transport.c: Remove
+ spaces after casts
 In-Reply-To: <1455562734-10863-1-git-send-email-shaun.ren@linux.com>
 References: <1455250080-9897-1-git-send-email-shaun.ren@linux.com>
  <1455562734-10863-1-git-send-email-shaun.ren@linux.com>
-Message-ID: <1455562734-10863-3-git-send-email-shaun.ren@linux.com>
+Message-ID: <1455562734-10863-4-git-send-email-shaun.ren@linux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the alignment issue reported by checkpatch.pl:
+This patch removes all spaces after casts in rtsx_transport.c, as reported
+by checkpatch.pl:
 
-CHECK: Alignment should match open parenthesis
-
-Add a unsigned char *sgbuffer in rtsx_stor_access_xfer_buffer to make the
-following memcpy logic easier to read.
-
-Add a struct scatterlist *sg in the use_sg branch of
-rtsx_transfer_data_partial to make the parameters of the
-rtsx_transfer_sglist_adma_partial call fit in 80 character lines after
-aligning them to the open parenthesis.
-
-Refactor memcpy logic in rtsx_stor_access_xfer_buf to make it more legible.
+CHECK: No space is necessary after a cast
 
 Signed-off-by: Shaun Ren <shaun.ren@linux.com>
 ---
-Changes since v4
-  * Moved unsigned char *sgbuffer decleration to the beginning of the if
-    branch in rtsx_stor_access_xfer_buf()
-
-Changes since v3
-  * Fixed misalignment of the last parameter of rtsx_stor_access_xfer_buf()
-  * Refactored memcpy in rtsx_stor_access_xfer_buf() for legibility
-
- drivers/staging/rts5208/rtsx_transport.c | 69 +++++++++++++++++++-------------
- 1 file changed, 41 insertions(+), 28 deletions(-)
+ drivers/staging/rts5208/rtsx_transport.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/staging/rts5208/rtsx_transport.c b/drivers/staging/rts5208/rtsx_transport.c
-index 91fdccf..b6de93f 100644
+index b6de93f..54e2027 100644
 --- a/drivers/staging/rts5208/rtsx_transport.c
 +++ b/drivers/staging/rts5208/rtsx_transport.c
-@@ -42,22 +42,28 @@
-  */
- 
- unsigned int rtsx_stor_access_xfer_buf(unsigned char *buffer,
--	unsigned int buflen, struct scsi_cmnd *srb, unsigned int *index,
--	unsigned int *offset, enum xfer_buf_dir dir)
-+				       unsigned int buflen,
-+				       struct scsi_cmnd *srb,
-+				       unsigned int *index,
-+				       unsigned int *offset,
-+				       enum xfer_buf_dir dir)
- {
- 	unsigned int cnt;
- 
- 	/* If not using scatter-gather, just transfer the data directly. */
- 	if (scsi_sg_count(srb) == 0) {
-+		unsigned char *sgbuffer;
-+
- 		if (*offset >= scsi_bufflen(srb))
- 			return 0;
- 		cnt = min(buflen, scsi_bufflen(srb) - *offset);
-+
-+		sgbuffer = (unsigned char *)scsi_sglist(srb) + *offset;
-+
- 		if (dir == TO_XFER_BUF)
--			memcpy((unsigned char *) scsi_sglist(srb) + *offset,
--					buffer, cnt);
-+			memcpy(sgbuffer, buffer, cnt);
- 		else
--			memcpy(buffer, (unsigned char *) scsi_sglist(srb) +
--					*offset, cnt);
-+			memcpy(buffer, sgbuffer, cnt);
- 		*offset += cnt;
- 
- 	/*
-@@ -126,7 +132,7 @@ unsigned int rtsx_stor_access_xfer_buf(unsigned char *buffer,
-  * SCSI residue.
-  */
- void rtsx_stor_set_xfer_buf(unsigned char *buffer,
--	unsigned int buflen, struct scsi_cmnd *srb)
-+			    unsigned int buflen, struct scsi_cmnd *srb)
- {
- 	unsigned int index = 0, offset = 0;
- 
-@@ -137,7 +143,7 @@ void rtsx_stor_set_xfer_buf(unsigned char *buffer,
- }
- 
- void rtsx_stor_get_xfer_buf(unsigned char *buffer,
--	unsigned int buflen, struct scsi_cmnd *srb)
-+			    unsigned int buflen, struct scsi_cmnd *srb)
- {
- 	unsigned int index = 0, offset = 0;
- 
-@@ -191,8 +197,8 @@ void rtsx_invoke_transport(struct scsi_cmnd *srb, struct rtsx_chip *chip)
- 		/* set the result so the higher layers expect this data */
- 		srb->result = SAM_STAT_CHECK_CONDITION;
- 		memcpy(srb->sense_buffer,
--			(unsigned char *)&(chip->sense_buffer[SCSI_LUN(srb)]),
--			sizeof(struct sense_data_t));
-+		       (unsigned char *)&(chip->sense_buffer[SCSI_LUN(srb)]),
-+		       sizeof(struct sense_data_t));
- 	}
- 
- 	return;
-@@ -202,7 +208,7 @@ Handle_Errors:
- }
- 
- void rtsx_add_cmd(struct rtsx_chip *chip,
--		u8 cmd_type, u16 reg_addr, u8 mask, u8 data)
-+		  u8 cmd_type, u16 reg_addr, u8 mask, u8 data)
- {
- 	u32 *cb = (u32 *)(chip->host_cmds_ptr);
- 	u32 val = 0;
-@@ -321,9 +327,11 @@ static inline void rtsx_add_sg_tbl(
- }
- 
- static int rtsx_transfer_sglist_adma_partial(struct rtsx_chip *chip, u8 card,
--		struct scatterlist *sg, int num_sg, unsigned int *index,
--		unsigned int *offset, int size,
--		enum dma_data_direction dma_dir, int timeout)
-+					     struct scatterlist *sg, int num_sg,
-+					     unsigned int *index,
-+					     unsigned int *offset, int size,
-+					     enum dma_data_direction dma_dir,
-+					     int timeout)
- {
- 	struct rtsx_dev *rtsx = chip->rtsx;
- 	struct completion trans_done;
-@@ -486,8 +494,9 @@ out:
- }
- 
- static int rtsx_transfer_sglist_adma(struct rtsx_chip *chip, u8 card,
--		struct scatterlist *sg, int num_sg,
--		enum dma_data_direction dma_dir, int timeout)
-+				     struct scatterlist *sg, int num_sg,
-+				     enum dma_data_direction dma_dir,
-+				     int timeout)
- {
- 	struct rtsx_dev *rtsx = chip->rtsx;
- 	struct completion trans_done;
-@@ -633,7 +642,8 @@ out:
- }
- 
- static int rtsx_transfer_buf(struct rtsx_chip *chip, u8 card, void *buf,
--		size_t len, enum dma_data_direction dma_dir, int timeout)
-+			     size_t len, enum dma_data_direction dma_dir,
-+			     int timeout)
- {
- 	struct rtsx_dev *rtsx = chip->rtsx;
- 	struct completion trans_done;
-@@ -716,9 +726,9 @@ out:
- }
- 
- int rtsx_transfer_data_partial(struct rtsx_chip *chip, u8 card,
--		void *buf, size_t len, int use_sg, unsigned int *index,
--		unsigned int *offset, enum dma_data_direction dma_dir,
--		int timeout)
-+			       void *buf, size_t len, int use_sg,
-+			       unsigned int *index, unsigned int *offset,
-+			       enum dma_data_direction dma_dir, int timeout)
- {
- 	int err = 0;
- 
-@@ -726,13 +736,16 @@ int rtsx_transfer_data_partial(struct rtsx_chip *chip, u8 card,
- 	if (rtsx_chk_stat(chip, RTSX_STAT_ABORT))
- 		return -EIO;
- 
--	if (use_sg)
--		err = rtsx_transfer_sglist_adma_partial(chip, card,
--				(struct scatterlist *)buf, use_sg,
--				index, offset, (int)len, dma_dir, timeout);
--	else
-+	if (use_sg) {
-+		struct scatterlist *sg = (struct scatterlist *)buf;
-+
-+		err = rtsx_transfer_sglist_adma_partial(chip, card, sg, use_sg,
-+							index, offset, (int)len,
-+							dma_dir, timeout);
-+	} else {
- 		err = rtsx_transfer_buf(chip, card,
- 					buf, len, dma_dir, timeout);
-+	}
- 	if (err < 0) {
- 		if (RTSX_TST_DELINK(chip)) {
- 			RTSX_CLR_DELINK(chip);
-@@ -745,7 +758,7 @@ int rtsx_transfer_data_partial(struct rtsx_chip *chip, u8 card,
- }
- 
- int rtsx_transfer_data(struct rtsx_chip *chip, u8 card, void *buf, size_t len,
--		int use_sg, enum dma_data_direction dma_dir, int timeout)
-+		       int use_sg, enum dma_data_direction dma_dir, int timeout)
- {
- 	int err = 0;
- 
-@@ -757,8 +770,8 @@ int rtsx_transfer_data(struct rtsx_chip *chip, u8 card, void *buf, size_t len,
- 
- 	if (use_sg) {
- 		err = rtsx_transfer_sglist_adma(chip, card,
--				(struct scatterlist *)buf,
--				use_sg, dma_dir, timeout);
-+						(struct scatterlist *)buf,
-+						use_sg, dma_dir, timeout);
+@@ -73,7 +73,7 @@ unsigned int rtsx_stor_access_xfer_buf(unsigned char *buffer,
+ 	 */
  	} else {
- 		err = rtsx_transfer_buf(chip, card, buf, len, dma_dir, timeout);
- 	}
+ 		struct scatterlist *sg =
+-				(struct scatterlist *) scsi_sglist(srb)
++				(struct scatterlist *)scsi_sglist(srb)
+ 				+ *index;
+ 
+ 		/*
 -- 
 2.7.1
