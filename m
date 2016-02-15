@@ -1,85 +1,71 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Mon, 15 Feb 2016 17:16:16 +0200
-Subject: [PATCH 02/14] clkdev: Remove clk_register_clkdevs()
-In-Reply-To: <1454982341-22715-3-git-send-email-sboyd@codeaurora.org>
-References: <1454982341-22715-1-git-send-email-sboyd@codeaurora.org>
- <1454982341-22715-3-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1455549376.31169.127.camel@linux.intel.com>
+From: CARLOS.PALMINHA@synopsys.com (Carlos Palminha)
+Date: Mon, 15 Feb 2016 15:18:34 +0000
+Subject: [PATCH v2 03/17] drm/exynos: removed optional dummy encoder
+ mode_fixup function.
+In-Reply-To: <CAMeQTsZLdMOnk7-isneoUyFBbQdiRUsGH6+EhD8W1LNB=80LVQ@mail.gmail.com>
+References: <cover.1455540137.git.palminha@synopsys.com>
+ <3768b670931572de51fca1102efa18d20dd770ee.1455540137.git.palminha@synopsys.com>
+ <CAMeQTsZLdMOnk7-isneoUyFBbQdiRUsGH6+EhD8W1LNB=80LVQ@mail.gmail.com>
+Message-ID: <56C1EC4A.1000803@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2016-02-08 at 17:45 -0800, Stephen Boyd wrote:
-> Now that we've converted the only caller over to another clkdev
-> API, remove this one.
+Hi Patrik,
+
+No particular reason... i was grepping along the development and probably didn't noticed that exynos was not completely nuked... :)
+
+Regards,
+C.Palminha
+
+On 15-02-2016 13:49, Patrik Jakobsson wrote:
+> Hi Carlos
 > 
-
-This API didn't feel suitable, good we get rid of it eventually.
-
-Reviewed-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>>?
-
-> Cc: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
-> ?drivers/clk/clkdev.c???| 27 ---------------------------
-> ?include/linux/clkdev.h |??1 -
-> ?2 files changed, 28 deletions(-)
+> Any particular reason why this patch isn't squashed with patch 8/17?
 > 
-> diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-> index 779b6ff0c7ad..ae61f2e57048 100644
-> --- a/drivers/clk/clkdev.c
-> +++ b/drivers/clk/clkdev.c
-> @@ -383,30 +383,3 @@ int clk_register_clkdev(struct clk *clk, const
-> char *con_id,
-> ?	return cl ? 0 : -ENOMEM;
-> ?}
-> ?EXPORT_SYMBOL(clk_register_clkdev);
-> -
-> -/**
-> - * clk_register_clkdevs - register a set of clk_lookup for a struct
-> clk
-> - * @clk: struct clk to associate with all clk_lookups
-> - * @cl: array of clk_lookup structures with con_id and dev_id pre-
-> initialized
-> - * @num: number of clk_lookup structures to register
-> - *
-> - * To make things easier for mass registration, we detect error clks
-> - * from a previous clk_register() call, and return the error code
-> for
-> - * those.??This is to permit this function to be called immediately
-> - * after clk_register().
-> - */
-> -int clk_register_clkdevs(struct clk *clk, struct clk_lookup *cl,
-> size_t num)
-> -{
-> -	unsigned i;
-> -
-> -	if (IS_ERR(clk))
-> -		return PTR_ERR(clk);
-> -
-> -	for (i = 0; i < num; i++, cl++) {
-> -		cl->clk_hw = __clk_get_hw(clk);
-> -		__clkdev_add(cl);
-> -	}
-> -
-> -	return 0;
-> -}
-> -EXPORT_SYMBOL(clk_register_clkdevs);
-> diff --git a/include/linux/clkdev.h b/include/linux/clkdev.h
-> index 08bffcc466de..43a8c2e8ac29 100644
-> --- a/include/linux/clkdev.h
-> +++ b/include/linux/clkdev.h
-> @@ -46,7 +46,6 @@ int clk_add_alias(const char *, const char *, const
-> char *, struct device *);
-> ?
-> ?int clk_register_clkdev(struct clk *, const char *, const char *,
-> ...)
-> ?	__printf(3, 4);
-> -int clk_register_clkdevs(struct clk *, struct clk_lookup *, size_t);
-> ?
-> ?#ifdef CONFIG_COMMON_CLK
-> ?int __clk_get(struct clk *clk);
-
--- 
-Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Intel Finland Oy
+> Thanks
+> Patrik
+> 
+> 
+> On Mon, Feb 15, 2016 at 1:58 PM, Carlos Palminha
+> <CARLOS.PALMINHA@synopsys.com> wrote:
+>> mode_fixup function for encoder drivers became optional with patch
+>> http://patchwork.freedesktop.org/patch/msgid/1455106522-32307-1-git-send-email-palminha at synopsys.com
+>>
+>> This patch set nukes all the dummy mode_fixup implementations.
+>>
+>> (made on top of Daniel topic/drm-misc branch)
+>>
+>> Signed-off-by: Carlos Palminha <palminha@synopsys.com>
+>> ---
+>>  drivers/gpu/drm/exynos/exynos_drm_dsi.c | 8 --------
+>>  1 file changed, 8 deletions(-)
+>>
+>> diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+>> index e977a81..736115c 100644
+>> --- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+>> +++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+>> @@ -1597,13 +1597,6 @@ static int exynos_dsi_create_connector(struct drm_encoder *encoder)
+>>         return 0;
+>>  }
+>>
+>> -static bool exynos_dsi_mode_fixup(struct drm_encoder *encoder,
+>> -                                 const struct drm_display_mode *mode,
+>> -                                 struct drm_display_mode *adjusted_mode)
+>> -{
+>> -       return true;
+>> -}
+>> -
+>>  static void exynos_dsi_mode_set(struct drm_encoder *encoder,
+>>                                 struct drm_display_mode *mode,
+>>                                 struct drm_display_mode *adjusted_mode)
+>> @@ -1623,7 +1616,6 @@ static void exynos_dsi_mode_set(struct drm_encoder *encoder,
+>>  }
+>>
+>>  static const struct drm_encoder_helper_funcs exynos_dsi_encoder_helper_funcs = {
+>> -       .mode_fixup = exynos_dsi_mode_fixup,
+>>         .mode_set = exynos_dsi_mode_set,
+>>         .enable = exynos_dsi_enable,
+>>         .disable = exynos_dsi_disable,
+>> --
+>> 2.5.0
+>>
