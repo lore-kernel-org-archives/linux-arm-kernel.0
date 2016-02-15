@@ -1,104 +1,95 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 15 Feb 2016 08:34:57 +0100
-Subject: [PATCH 2/3] clk: mvebu: add AP806 core clock driver
-In-Reply-To: <1455521698-7905-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1455521698-7905-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1455521698-7905-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Mon, 15 Feb 2016 08:42:42 +0100
+Subject: [PATCH] irqchip: irq-mvebu-odmi: new driver
+Message-ID: <1455522162-16425-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds a new driver to handle the core clocks found in the
-AP806 HW block, which is the core block of all Armada 7K and 8K
-Marvell 64-bits processors. This core clock driver reads the
-Sample-At-Reset register to determine the frequencies of several core
-clocks: DDR, Ring and CPU clocks.
+This commits adds a new irqchip driver that handles the ODMI
+controller found on Marvell 7K/8K processors. The ODMI controller
+provide MSI interrupt functionality to on-board peripherals, much like
+the GIC-v2m.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- .../clock/mvebu-armada-ap806-core-clock.txt        |  33 ++++++
- drivers/clk/mvebu/Kconfig                          |   3 +
- drivers/clk/mvebu/Makefile                         |   2 +-
- drivers/clk/mvebu/ap806-core.c                     | 112 +++++++++++++++++++++
- 4 files changed, 149 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/clock/mvebu-armada-ap806-core-clock.txt
- create mode 100644 drivers/clk/mvebu/ap806-core.c
+ .../marvell,odmi-controller.txt                    |  36 +++
+ drivers/irqchip/Kconfig                            |   4 +
+ drivers/irqchip/Makefile                           |   1 +
+ drivers/irqchip/irq-mvebu-odmi.c                   | 270 +++++++++++++++++++++
+ 4 files changed, 311 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/marvell,odmi-controller.txt
+ create mode 100644 drivers/irqchip/irq-mvebu-odmi.c
 
-diff --git a/Documentation/devicetree/bindings/clock/mvebu-armada-ap806-core-clock.txt b/Documentation/devicetree/bindings/clock/mvebu-armada-ap806-core-clock.txt
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/marvell,odmi-controller.txt b/Documentation/devicetree/bindings/interrupt-controller/marvell,odmi-controller.txt
 new file mode 100644
-index 0000000..b2131bb
+index 0000000..a2470af
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/mvebu-armada-ap806-core-clock.txt
-@@ -0,0 +1,33 @@
-+* Clock bindings for Marvell MVEBU AP806 Core clocks
++++ b/Documentation/devicetree/bindings/interrupt-controller/marvell,odmi-controller.txt
+@@ -0,0 +1,36 @@
 +
-+The Marvell MVEBU Armada 7K/8K SoCs contain a block called AP806,
-+hosting the CPU and other core components of the CPU. This Device Tree
-+binding allows to describe the core clocks of the AP806, whose
-+frequencies are determined by reading the Sample-At-Reset (SAR)
-+register.
++* Marvell ODMI for MSI support
 +
-+Clock consumers must specify the desired clock by having the clock ID
-+in its "clocks" phandle cell.
-+
-+The following is a list of provided IDs and clock names for the core
-+Armada AP806 clocks:
-+
-+ 0 = DDR
-+ 1 = Ring
-+ 2 = CPU
++Some Marvell SoCs have an On-Die Message Interrupt (ODMI) controller
++which can be used by on-board peripheral for MSI interrupts.
 +
 +Required properties:
-+- compatible: must be be one of the following:
-+	"marvell,armada-ap806-core-clock"
-+- reg: must be the register address of the Sample-At-Reset (SAR) register
-+- #clock-cells: from common clock binding; shall be set to 1
-+- clock-output-names: name of the output clocks
++
++- compatible	       : The value here should contain "marvell,odmi-controller".
++
++- interrupt,controller : Identifies the node as an interrupt controller.
++
++- msi-controller       : Identifies the node as an MSI controller.
++
++- marvell,odmi-frames  : Number of ODMI frames available. Each frame
++                         provides a number of events.
++
++- reg		       : List of register definitions, one for each
++                         ODMI frame.
++
++- marvell,spi-base     : List of GIC base SPI interrupts, one for each
++                         ODMI frame.
 +
 +Example:
 +
-+	coreclk: clk at 0x6F8204 {
-+		compatible = "marvell,armada-ap806-core-clock";
-+		reg = <0x6F8204 0x04>;
-+		#clock-cells = <1>;
-+		clock-output-names = "ddr", "ring", "cpu";
++	odmi: odmi at 300000 {
++		compatible = "marvell,odmi-controller";
++		interrupt-controller;
++		msi-controller;
++		marvell,odmi-frames = <4>;
++		reg = <0x300000 0x4000>,
++		      <0x304000 0x4000>,
++		      <0x308000 0x4000>,
++		      <0x30C000 0x4000>;
++		marvell,spi-base = <128>, <136>, <144>, <152>;
 +	};
-diff --git a/drivers/clk/mvebu/Kconfig b/drivers/clk/mvebu/Kconfig
-index 2769625..fd84172 100644
---- a/drivers/clk/mvebu/Kconfig
-+++ b/drivers/clk/mvebu/Kconfig
-@@ -42,3 +42,6 @@ config KIRKWOOD_CLK
- config ORION_CLK
- 	bool
- 	select MVEBU_CLK_COMMON
+diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+index 715923d..18bed3c 100644
+--- a/drivers/irqchip/Kconfig
++++ b/drivers/irqchip/Kconfig
+@@ -217,3 +217,7 @@ config IRQ_MXS
+ 	def_bool y if MACH_ASM9260 || ARCH_MXS
+ 	select IRQ_DOMAIN
+ 	select STMP_DEVICE
 +
-+config ARMADA_AP806_CORE_CLK
++config MVEBU_ODMI
 +	bool
-diff --git a/drivers/clk/mvebu/Makefile b/drivers/clk/mvebu/Makefile
-index 8866115..db5c28c 100644
---- a/drivers/clk/mvebu/Makefile
-+++ b/drivers/clk/mvebu/Makefile
-@@ -1,11 +1,11 @@
- obj-$(CONFIG_MVEBU_CLK_COMMON)	+= common.o
- obj-$(CONFIG_MVEBU_CLK_CPU) 	+= clk-cpu.o
- obj-$(CONFIG_MVEBU_CLK_COREDIV)	+= clk-corediv.o
--
- obj-$(CONFIG_ARMADA_370_CLK)	+= armada-370.o
- obj-$(CONFIG_ARMADA_375_CLK)	+= armada-375.o
- obj-$(CONFIG_ARMADA_38X_CLK)	+= armada-38x.o
- obj-$(CONFIG_ARMADA_39X_CLK)	+= armada-39x.o
-+obj-$(CONFIG_ARMADA_AP806_CORE_CLK) += ap806-core.o
- obj-$(CONFIG_ARMADA_XP_CLK)	+= armada-xp.o
- obj-$(CONFIG_DOVE_CLK)		+= dove.o dove-divider.o
- obj-$(CONFIG_KIRKWOOD_CLK)	+= kirkwood.o
-diff --git a/drivers/clk/mvebu/ap806-core.c b/drivers/clk/mvebu/ap806-core.c
++	select GENERIC_MSI_IRQ_DOMAIN
+diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+index 18caacb..29c388f 100644
+--- a/drivers/irqchip/Makefile
++++ b/drivers/irqchip/Makefile
+@@ -59,3 +59,4 @@ obj-$(CONFIG_ARCH_SA1100)		+= irq-sa11x0.o
+ obj-$(CONFIG_INGENIC_IRQ)		+= irq-ingenic.o
+ obj-$(CONFIG_IMX_GPCV2)			+= irq-imx-gpcv2.o
+ obj-$(CONFIG_PIC32_EVIC)		+= irq-pic32-evic.o
++obj-$(CONFIG_MVEBU_ODMI)		+= irq-mvebu-odmi.o
+diff --git a/drivers/irqchip/irq-mvebu-odmi.c b/drivers/irqchip/irq-mvebu-odmi.c
 new file mode 100644
-index 0000000..56c81cd
+index 0000000..c3e00b9
 --- /dev/null
-+++ b/drivers/clk/mvebu/ap806-core.c
-@@ -0,0 +1,112 @@
++++ b/drivers/irqchip/irq-mvebu-odmi.c
+@@ -0,0 +1,270 @@
 +/*
-+ * Marvell Armada AP806 core clocks
-+ *
 + * Copyright (C) 2016 Marvell
 + *
 + * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
@@ -108,105 +99,265 @@ index 0000000..56c81cd
 + * warranty of any kind, whether express or implied.
 + */
 +
++#define pr_fmt(fmt) "GIC-ODMI: " fmt
++
++#include <linux/irq.h>
++#include <linux/irqchip.h>
++#include <linux/irqdomain.h>
 +#include <linux/kernel.h>
-+#include <linux/clk.h>
-+#include <linux/clk-provider.h>
-+#include <linux/io.h>
-+#include <linux/of.h>
++#include <linux/msi.h>
 +#include <linux/of_address.h>
++#include <linux/slab.h>
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++
++#define GICP_ODMIN_SET			0x40
++#define   GICP_ODMI_INT_NUM_SHIFT	12
++#define GICP_ODMIN_GM_EP_R0		0x110
++#define GICP_ODMIN_GM_EP_R1		0x114
++#define GICP_ODMIN_GM_EA_R0		0x108
++#define GICP_ODMIN_GM_EA_R1		0x118
 +
 +/*
-+ * AP806 PLLs:
-+ *   0 - DDR
-+ *   1 - Ring
-+ *   2 - CPU
++ * We don't support the group events, so we simply have 8 interrupts
++ * per frame.
 + */
++#define NODMIS_PER_FRAME 8
 +
-+#define AP806_PLL_NUM	3
-+#define AP806_PLL_FREQ  7
-+
-+/* SAR parameters to get the PLL data */
-+struct apclk_sar {
-+	int mask;
-+	int offset;
-+	const char *name;
++struct odmi_data {
++	struct resource res;
++	void __iomem *base;
++	unsigned int spi_base;
++	unsigned long bm;
 +};
 +
-+static const struct apclk_sar
-+ap806_core_clk_sar[AP806_PLL_NUM]  __initconst = {
-+	{ .mask = 0x7,	.offset = 21 },
-+	{ .mask = 0x7,	.offset = 18 },
-+	{ .mask = 0x7,	.offset = 15 },
-+};
++static struct odmi_data *odmis;
++static unsigned int odmis_count;
 +
-+static struct clk *ap806_core_clks[AP806_PLL_NUM];
++/*
++ * Lock protecting the allocation bitmap embedded in the odmi_data
++ * structure. Only one spinlock is used, since allocation/freeing of
++ * MSI interrupts is infrequent.
++ */
++static DEFINE_SPINLOCK(odmis_lock);
 +
-+static struct clk_onecell_data ap806_core_clk_data = {
-+	.clks = ap806_core_clks,
-+	.clk_num = AP806_PLL_NUM,
-+};
-+
-+/* mapping between SAR value to frequency */
-+static const u32
-+ap806_core_clk_freq[AP806_PLL_NUM][AP806_PLL_FREQ] __initconst = {
-+	{ 2400000000, 2100000000, 1800000000,
-+	  1600000000, 1300000000, 1300000000,
-+	  1300000000 },
-+	{ 2000000000, 1800000000, 1600000000,
-+	  1400000000, 1200000000, 1200000000,
-+	  1200000000 },
-+	{ 2500000000, 2200000000, 2000000000,
-+	  1700000000, 1600000000, 1200000000,
-+	  1200000000 },
-+};
-+
-+static unsigned long __init ap806_core_clk_get_freq(u32 reg, int clk_idx)
++static int odmi_set_affinity(struct irq_data *irq_data,
++			       const struct cpumask *mask, bool force)
 +{
-+	int freq_idx;
-+	const struct apclk_sar *clk_info;
++	int ret;
 +
-+	clk_info = &ap806_core_clk_sar[clk_idx];
++	ret = irq_chip_set_affinity_parent(irq_data, mask, force);
++	if (ret == IRQ_SET_MASK_OK)
++		ret = IRQ_SET_MASK_OK_DONE;
 +
-+	freq_idx = (reg >> clk_info->offset) & clk_info->mask;
-+	if (WARN_ON(freq_idx > AP806_PLL_FREQ))
-+		return 0;
-+	else
-+		return ap806_core_clk_freq[clk_idx][freq_idx];
++	return ret;
 +}
 +
-+static void __init ap806_core_clk_init(struct device_node *np)
++static void odmi_compose_msi_msg(struct irq_data *data, struct msi_msg *msg)
 +{
-+	void __iomem *base;
-+	u32 reg;
-+	int i;
++	struct odmi_data *odmi = NULL;
++	phys_addr_t addr;
++	unsigned int odmi_offset, i;
 +
-+	base = of_iomap(np, 0);
-+	if (WARN_ON(!base))
-+		return;
-+
-+	reg = readl(base);
-+
-+	iounmap(base);
-+
-+	for (i = 0; i < AP806_PLL_NUM; i++) {
-+		unsigned long freq;
-+		const char *name;
-+
-+		freq = ap806_core_clk_get_freq(reg, i);
-+
-+		of_property_read_string_index(np, "clock-output-names",
-+					      i, &name);
-+
-+		ap806_core_clks[i] =
-+			clk_register_fixed_rate(NULL, name, NULL,
-+						CLK_IS_ROOT, freq);
++	/* Search the ODMI frame handling this interrupt */
++	for (i = 0; i < odmis_count; i++) {
++		if (data->hwirq >= odmis[i].spi_base &&
++		    data->hwirq < (odmis[i].spi_base + NODMIS_PER_FRAME)) {
++			odmi = &odmis[i];
++			break;
++		}
 +	}
 +
-+	of_clk_add_provider(np, of_clk_src_onecell_get,
-+			    &ap806_core_clk_data);
++	if (WARN_ON(!odmi))
++		return;
++
++	odmi_offset = (data->hwirq - odmi->spi_base);
++
++	addr = odmi->res.start + GICP_ODMIN_SET;
++
++	msg->address_hi = upper_32_bits(addr);
++	msg->address_lo = lower_32_bits(addr);
++	msg->data = odmi_offset << GICP_ODMI_INT_NUM_SHIFT;
 +}
 +
-+CLK_OF_DECLARE(ap806_core_clk, "marvell,armada-ap806-core-clock",
-+	       ap806_core_clk_init);
++static struct irq_chip odmi_irq_chip = {
++	.name			= "ODMI",
++	.irq_mask		= irq_chip_mask_parent,
++	.irq_unmask		= irq_chip_unmask_parent,
++	.irq_eoi		= irq_chip_eoi_parent,
++	.irq_set_affinity	= odmi_set_affinity,
++	.irq_compose_msi_msg	= odmi_compose_msi_msg,
++};
++
++static int odmi_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
++				 unsigned int nr_irqs, void *args)
++{
++	struct odmi_data *odmi = NULL;
++	struct irq_fwspec fwspec;
++	struct irq_data *d;
++	unsigned int offset, hwirq;
++	int i, ret;
++
++	spin_lock(&odmis_lock);
++	for (i = 0; i < odmis_count; i++) {
++		offset = find_first_zero_bit(&odmis[i].bm, NODMIS_PER_FRAME);
++		if (offset < NODMIS_PER_FRAME) {
++			__set_bit(offset, &odmis[i].bm);
++			odmi = &odmis[i];
++			break;
++		}
++	}
++	spin_unlock(&odmis_lock);
++
++	if (!odmi)
++		return -ENOSPC;
++
++	hwirq = odmi->spi_base + offset;
++
++	fwspec.fwnode = domain->parent->fwnode;
++	fwspec.param_count = 3;
++	fwspec.param[0] = GIC_SPI;
++	fwspec.param[1] = hwirq - 32;
++	fwspec.param[2] = IRQ_TYPE_EDGE_RISING;
++
++	ret = irq_domain_alloc_irqs_parent(domain, virq, 1, &fwspec);
++	if (ret) {
++		pr_err("Cannot allocate parent IRQ\n");
++		spin_lock(&odmis_lock);
++		__clear_bit(offset, &odmi->bm);
++		spin_unlock(&odmis_lock);
++		return ret;
++	}
++
++	/* Configure the interrupt line to be edge */
++	d = irq_domain_get_irq_data(domain->parent, virq);
++	d->chip->irq_set_type(d, IRQ_TYPE_EDGE_RISING);
++
++	irq_domain_set_hwirq_and_chip(domain, virq, hwirq,
++				      &odmi_irq_chip, NULL);
++
++	return 0;
++}
++
++static void odmi_irq_domain_free(struct irq_domain *domain,
++				 unsigned int virq, unsigned int nr_irqs)
++{
++	struct irq_data *d = irq_domain_get_irq_data(domain, virq);
++	struct odmi_data *odmi = NULL;
++	unsigned int offset;
++	int i;
++
++	/*
++	 * Check if the hwirq number is valid, and if so, to which
++	 * ODMI frame it belongs
++	 */
++	spin_lock(&odmis_lock);
++	for (i = 0; i < odmis_count; i++) {
++		if (d->hwirq >= odmis[i].spi_base &&
++		    d->hwirq < (odmis[i].spi_base + NODMIS_PER_FRAME)) {
++			odmi = &odmis[i];
++			offset = d->hwirq - odmis[i].spi_base;
++			break;
++		}
++	}
++	spin_unlock(&odmis_lock);
++
++	if (!odmi) {
++		pr_err("Failed to teardown msi. Invalid hwirq %lu\n", d->hwirq);
++		return;
++	}
++
++	irq_domain_free_irqs_parent(domain, virq, nr_irqs);
++
++	/* Actually free the MSI */
++	spin_lock(&odmis_lock);
++	__clear_bit(offset, &odmi->bm);
++	spin_unlock(&odmis_lock);
++}
++
++static const struct irq_domain_ops odmi_domain_ops = {
++	.alloc	= odmi_irq_domain_alloc,
++	.free	= odmi_irq_domain_free,
++};
++
++static struct irq_chip odmi_msi_irq_chip = {
++	.name	= "ODMI",
++};
++
++static struct msi_domain_ops odmi_msi_ops = {
++};
++
++static struct msi_domain_info odmi_msi_domain_info = {
++	.flags	= (MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS),
++	.ops	= &odmi_msi_ops,
++	.chip	= &odmi_msi_irq_chip,
++};
++
++static int __init mvebu_odmi_init(struct device_node *node,
++				  struct device_node *parent)
++{
++	struct irq_domain *inner_domain, *plat_domain;
++	int ret, i;
++
++	if (of_property_read_u32(node, "marvell,odmi-frames", &odmis_count))
++		return -EINVAL;
++
++	odmis = kcalloc(odmis_count, sizeof(struct odmi_data), GFP_KERNEL);
++	if (!odmis)
++		return -ENOMEM;
++
++	for (i = 0; i < odmis_count; i++) {
++		struct odmi_data *odmi = &odmis[i];
++
++		ret = of_address_to_resource(node, i, &odmi->res);
++		if (ret)
++			goto err_unmap;
++
++		odmi->base = of_io_request_and_map(node, i, "odmi");
++		if (IS_ERR(odmi->base)) {
++			ret = PTR_ERR(odmi->base);
++			goto err_unmap;
++		}
++
++		if (of_property_read_u32_index(node, "marvell,spi-base",
++					       i, &odmi->spi_base)) {
++			ret = -EINVAL;
++			goto err_unmap;
++		}
++	}
++
++	inner_domain = irq_domain_create_linear(of_node_to_fwnode(node),
++						odmis_count * NODMIS_PER_FRAME,
++						&odmi_domain_ops, NULL);
++	if (!inner_domain) {
++		ret = -ENOMEM;
++		goto err_unmap;
++	}
++
++	inner_domain->parent = irq_find_host(parent);
++
++	plat_domain = platform_msi_create_irq_domain(of_node_to_fwnode(node),
++						     &odmi_msi_domain_info,
++						     inner_domain);
++	if (!plat_domain) {
++		ret = -ENOMEM;
++		goto err_remove_inner;
++	}
++
++	return 0;
++
++err_remove_inner:
++	irq_domain_remove(inner_domain);
++err_unmap:
++	for (i = 0; i < odmis_count; i++) {
++		struct odmi_data *odmi = &odmis[i];
++
++		if (odmi->base && !IS_ERR(odmi->base))
++			iounmap(odmis[i].base);
++	}
++	kfree(odmis);
++	return ret;
++}
++
++IRQCHIP_DECLARE(mvebu_odmi, "marvell,odmi-controller", mvebu_odmi_init);
 -- 
 2.6.4
