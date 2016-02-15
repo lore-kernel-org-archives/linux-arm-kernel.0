@@ -1,52 +1,71 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 15 Feb 2016 09:47:42 +0100
-Subject: [PATCH 2/5] Documentation: arm: add Marvell Armada 7K and 8K families
-In-Reply-To: <1455526065-7307-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1455526065-7307-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1455526065-7307-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Mon, 15 Feb 2016 09:47:40 +0100
+Subject: [PATCH 0/5] arm64: Initial support for Marvell Armada 7K/8K
+Message-ID: <1455526065-7307-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we are adding support for the Armada 7K and 8K families, this
-commit adds them to the Marvell documentation listing all supported
-SoCs, together with references to their Product Brief, Homepage and
-Device Tree files.
+Hello,
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- Documentation/arm/Marvell/README | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+This series adds initial support for the new Armada 7K and 8K Marvell
+64 bits processors. Details about those processors based on the
+Cortex-A72 can be found at:
 
-diff --git a/Documentation/arm/Marvell/README b/Documentation/arm/Marvell/README
-index b92ee66..74f7ce3 100644
---- a/Documentation/arm/Marvell/README
-+++ b/Documentation/arm/Marvell/README
-@@ -130,6 +130,26 @@ EBU Armada family ARMv8
- 	Product Brief: http://www.marvell.com/embedded-processors/assets/PB-88F3700-FNL.pdf
- 	Device tree files: arch/arm64/boot/dts/marvell/armada-37*
- 
-+  Armada 7K Flavors:
-+	88F7020 (AP806 Dual + one CP110)
-+	88F7040 (AP806 Quad + one CP110)
-+	Core: ARM Cortex A72
-+
-+	Homepage: http://www.marvell.com/embedded-processors/armada-70xx/
-+	Product Brief: http://www.marvell.com/embedded-processors/assets/Armada7020PB-Jan2016.pdf
-+		       http://www.marvell.com/embedded-processors/assets/Armada7040PB-Jan2016.pdf
-+	Device tree files: arch/arm64/boot/dts/marvell/armada-70*
-+
-+  Armada 8K Flavors:
-+	88F8020 (AP806 Dual + two CP110)
-+	88F8040 (AP806 Quad + two CP110)
-+	Core: ARM Cortex A72
-+
-+	Homepage: http://www.marvell.com/embedded-processors/armada-80xx/
-+	Product Brief: http://www.marvell.com/embedded-processors/assets/Armada8020PB-Jan2016.pdf
-+		       http://www.marvell.com/embedded-processors/assets/Armada8040PB-Jan2016.pdf
-+	Device tree files: arch/arm64/boot/dts/marvell/armada-80*
-+
- Avanta family
- -------------
- 
+  http://www.marvell.com/embedded-processors/armada-70xx/
+  http://www.marvell.com/embedded-processors/armada-80xx/
+
+One characteristic of those processors is that internally they are
+built from several components:
+
+ - One "AP", which contains the processor itself and a few core IP
+   blocks. The AP in 7K and 8K is called AP806, and is available on
+   two variants: dual Cortex-A72 and quad Cortex-A72.
+
+ - Or or two "CP", which contains most of the I/Os (SATA, PCIe,
+   etc.). The CP in 7K and 8K is called CP110. One CP110 is available
+   in the 7K family, while two CP110 are available in the 8K family,
+   doubling the number of I/O interfaces.
+
+The support added in this series only brings minimal support for the
+AP side (and not yet all IP blocks, obviously). Support for the CP
+part will come in the future.
+
+Since the series touches similar files as the Armada 3700 series from
+Gregory Clement, it is based on it.
+
+Best regards,
+
+Thomas
+
+Thomas Petazzoni (5):
+  Documentation: arm: improve Armada 37xx description
+  Documentation: arm: add Marvell Armada 7K and 8K families
+  Documentation: arm: improve Marvell EBU Armada documentation
+  arm64: update ARCH_MVEBU for Marvell Armada 7K/8K support
+  arm64: marvell: add Device Tree files for Armada 7K/8K
+
+ Documentation/arm/Marvell/README                   |  39 +++-
+ .../bindings/arm/marvell/armada-7k-8k.txt          |  24 +++
+ arch/arm64/Kconfig.platforms                       |  11 +-
+ arch/arm64/boot/dts/marvell/Makefile               |   1 +
+ arch/arm64/boot/dts/marvell/armada-7020.dtsi       |  54 +++++
+ arch/arm64/boot/dts/marvell/armada-7040-db.dts     |  92 ++++++++
+ arch/arm64/boot/dts/marvell/armada-7040.dtsi       |  54 +++++
+ arch/arm64/boot/dts/marvell/armada-8020.dtsi       |  54 +++++
+ arch/arm64/boot/dts/marvell/armada-8040.dtsi       |  54 +++++
+ arch/arm64/boot/dts/marvell/armada-ap806-dual.dtsi |  71 +++++++
+ arch/arm64/boot/dts/marvell/armada-ap806-quad.dtsi |  84 ++++++++
+ arch/arm64/boot/dts/marvell/armada-ap806.dtsi      | 235 +++++++++++++++++++++
+ 12 files changed, 762 insertions(+), 11 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/marvell/armada-7k-8k.txt
+ create mode 100644 arch/arm64/boot/dts/marvell/armada-7020.dtsi
+ create mode 100644 arch/arm64/boot/dts/marvell/armada-7040-db.dts
+ create mode 100644 arch/arm64/boot/dts/marvell/armada-7040.dtsi
+ create mode 100644 arch/arm64/boot/dts/marvell/armada-8020.dtsi
+ create mode 100644 arch/arm64/boot/dts/marvell/armada-8040.dtsi
+ create mode 100644 arch/arm64/boot/dts/marvell/armada-ap806-dual.dtsi
+ create mode 100644 arch/arm64/boot/dts/marvell/armada-ap806-quad.dtsi
+ create mode 100644 arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+
 -- 
 2.6.4
