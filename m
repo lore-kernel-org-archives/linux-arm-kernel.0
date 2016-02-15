@@ -1,104 +1,23 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 15 Feb 2016 12:54:06 +0000
-Subject: [PATCH v6 2/3] Documentation: gpio: Update description for X-Gene
- standby GPIO controller DTS binding
-In-Reply-To: <1455512263-18183-3-git-send-email-qnguyen@apm.com>
+Date: Mon, 15 Feb 2016 12:55:30 +0000
+Subject: [PATCH v6 1/3] gpio: xgene: Enable X-Gene standby GPIO as
+ interrupt controller
+In-Reply-To: <1455512263-18183-2-git-send-email-qnguyen@apm.com>
 References: <1455512263-18183-1-git-send-email-qnguyen@apm.com>
- <1455512263-18183-3-git-send-email-qnguyen@apm.com>
-Message-ID: <56C1CA6E.1060606@arm.com>
+ <1455512263-18183-2-git-send-email-qnguyen@apm.com>
+Message-ID: <56C1CAC2.8050709@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 15/02/16 04:57, Quan Nguyen wrote:
-> Update description for X-Gene standby GPIO controller DTS binding to
-> support GPIO line configuration as input, output or external IRQ pin.
+> Enable X-Gene standby GPIO controller as interrupt controller to provide
+> its own resources. This avoids ambiguity where GIC interrupt resource is
+> use as X-Gene standby GPIO interrupt resource in user driver.
 > 
 > Signed-off-by: Y Vo <yvo@apm.com>
 > Signed-off-by: Quan Nguyen <qnguyen@apm.com>
-> ---
->  .../devicetree/bindings/gpio/gpio-xgene-sb.txt     | 47 ++++++++++++++++++----
->  1 file changed, 40 insertions(+), 7 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/gpio/gpio-xgene-sb.txt b/Documentation/devicetree/bindings/gpio/gpio-xgene-sb.txt
-> index dae1300..7b8b4cb 100644
-> --- a/Documentation/devicetree/bindings/gpio/gpio-xgene-sb.txt
-> +++ b/Documentation/devicetree/bindings/gpio/gpio-xgene-sb.txt
-> @@ -1,10 +1,20 @@
->  APM X-Gene Standby GPIO controller bindings
->  
-> -This is a gpio controller in the standby domain.
-> -
-> -There are 20 GPIO pins from 0..21. There is no GPIO_DS14 or GPIO_DS15,
-> -only GPIO_DS8..GPIO_DS13 support interrupts. The IRQ mapping
-> -is currently 1-to-1 on interrupts 0x28 thru 0x2d.
-> +This is a gpio controller in the standby domain. It also supports interrupt in
-> +some particular pins which are sourced to its parent interrupt controller
-> +as diagram below:
-> +                           +-----------------+
-> +                           | X-Gene standby  |
-> +                           | GPIO controller +--------- GPIO_0
-> ++------------+             |                 | ...
-> +| Parent IRQ |             |                 +--------- GPIO_8/EXT_INT_0
-> +| controller |  EXT_INT_0  |                 | ...
-> +| (GICv2)    +-------------+                 +--------- GPIO_[N+8]/EXT_INT_N
-> +|            |  ...        |                 |
-> +|            |  EXT_INT_N  |                 +--------- GPIO_[N+9]
-> +|            +-------------+                 | ...
-> +|            |             |                 +--------- GPIO_MAX
-> ++------------+             +-----------------+
->  
->  Required properties:
->  - compatible: "apm,xgene-gpio-sb" for the X-Gene Standby GPIO controller
-> @@ -15,10 +25,18 @@ Required properties:
->  		0 = active high
->  		1 = active low
->  - gpio-controller: Marks the device node as a GPIO controller.
-> -- interrupts: Shall contain exactly 6 interrupts.
-> +- interrupts: The EXT_INT_0 parent interrupt resource must be listed first.
-> +- interrupt-parent: Phandle of the parent interrupt controller.
-> +- interrupt-cells: Should be two.
-> +       - first cell is 0-N coresponding for EXT_INT_0 to EXT_INT_N.
-> +       - second cell is used to specify flags.
-> +- interrupt-controller: Marks the device node as an interrupt controller.
-> +- apm,nr-gpios: Optional, specify number of gpios pin.
-> +- apm,nr-irqs: Optional, specify number of interrupt pins.
-> +- apm,irq-start: Optional, specify lowest gpio pin support interrupt.
 
-This is quite ambiguous. Is that relative to the GIC? Assuming this is
-the case, you should then document it, specify the type of interrupt
-(SPI?), and whether this is 0- or 32-based (the code seems to indicate
-that is is 0-based).
-
->  
->  Example:
-> -	sbgpio: sbgpio at 17001000 {
-> +	sbgpio: gpio at 17001000{
->  		compatible = "apm,xgene-gpio-sb";
->  		reg = <0x0 0x17001000 0x0 0x400>;
->  		#gpio-cells = <2>;
-> @@ -29,4 +47,19 @@ Example:
->  				<0x0 0x2b 0x1>,
->  				<0x0 0x2c 0x1>,
->  				<0x0 0x2d 0x1>;
-> +		interrupt-parent = <&gic>;
-> +		#interrupt-cells = <2>;
-> +		interrupt-controller;
-> +		apm,nr-gpios = <22>;
-> +		apm,nr-irqs = <6>;
-> +		apm,irq-start = <8>;
-> +	};
-> +
-> +	testuser {
-> +		compatible = "example,testuser";
-> +		/* Use the GPIO_13/EXT_INT_5 line as an active high triggered
-> +		 * level interrupt
-> +		 */
-> +		interrupts = <5 4>;
-> +		interrupt-parent = <&sbgpio>;
->  	};
-> 
-
-Thanks,
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
 	M.
 -- 
