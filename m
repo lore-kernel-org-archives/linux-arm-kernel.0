@@ -1,37 +1,114 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 15 Feb 2016 12:09:44 -0800
-Subject: Crashes in arm qemu emulations due to 'cpufreq: governor: Replace
- timers with utilization ...'
-In-Reply-To: <20160215195839.GA19432@atomide.com>
-References: <20160215170527.GA24453@roeck-us.net>
- <CAJZ5v0gLankSuziQq25qTCyNqeOX43yD9jnJu_XXwbdyajfmKg@mail.gmail.com>
- <20160215190116.GX19432@atomide.com> <56C229A5.8020901@roeck-us.net>
- <20160215195839.GA19432@atomide.com>
-Message-ID: <56C23088.8050400@roeck-us.net>
+From: aford173@gmail.com (Adam Ford)
+Date: Mon, 15 Feb 2016 14:24:17 -0600
+Subject: [PATCH 1/4] pwm: omap-dmtimer: fix inaccurate period/duty_cycle
+ calculation
+In-Reply-To: <56B1D52F.70907@baylibre.com>
+References: <1454128014-22866-1-git-send-email-drivshin.allworx@gmail.com>
+ <1454128014-22866-2-git-send-email-drivshin.allworx@gmail.com>
+ <56B1D52F.70907@baylibre.com>
+Message-ID: <CAHCN7xKfn_o_EmQb3zG5-d3P9vxyLp=MX_R7ATT6pzMrS1cJDQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/15/2016 11:58 AM, Tony Lindgren wrote:
-> * Guenter Roeck <linux@roeck-us.net> [160215 11:41]:
->> On 02/15/2016 11:01 AM, Tony Lindgren wrote:
->>>
->>> https://kernelci.org/boot/all/job/next/kernel/next-20160215/
->>>
->>> The SMP ones seem to fail with some regulator issues?
->>>
->>
->> There is another problem, introduced with 6a0712f6f199e ("PM / OPP: Add
->> dev_pm_opp_set_rate()"). The kernelci boot log for next-20160212:omap3-overo-tobi
->> and others experience that problem.
->>
->> Essentially, the code now assumes that a CPU clock always has a voltage
->> regulator attached to it, which is not correct. I sent out a patch to fix
->> that problem a minute ago.
->
-> Yes that fixed it thanks.
->
+I tested this on a DM3730, Timer 10
 
-Confirmed. With this patch plus mine, all arm qemu tests are again passing for me.
+Tested-by: Adam Ford <aford173@gmail.com>
 
-Thanks,
-Guenter
+On Wed, Feb 3, 2016 at 4:23 AM, Neil Armstrong <narmstrong@baylibre.com> wrote:
+> On 01/30/2016 05:26 AM, David Rivshin (Allworx) wrote:
+>> From: David Rivshin <drivshin@allworx.com>
+>>
+>> Fix the calculation of load_value and match_value. Currently they
+>> are slightly too low, which produces a noticeably wrong PWM rate with
+>> sufficiently short periods (i.e. when 1/period approaches clk_rate/2).
+>>
+>> Example:
+>>  clk_rate=32768Hz, period=122070ns, duty_cycle=61035ns (8192Hz/50% PWM)
+>>  Correct values: load = 0xfffffffc, match = 0xfffffffd
+>>  Current values: load = 0xfffffffa, match = 0xfffffffc
+>>  effective PWM: period=183105ns, duty_cycle=91553ns (5461Hz/50% PWM)
+>>
+>> Fixes: 6604c6556db9 ("pwm: Add PWM driver for OMAP using dual-mode timers")
+>> Signed-off-by: David Rivshin <drivshin@allworx.com>
+>
+> OK for me.
+>
+> Acked-by: Neil Armstrong <narmstrong@baylibre.com>
+>
+> Thanks !
+>
+>> ---
+>>  drivers/pwm/pwm-omap-dmtimer.c | 27 ++++++++++++++++++++-------
+>>  1 file changed, 20 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/drivers/pwm/pwm-omap-dmtimer.c b/drivers/pwm/pwm-omap-dmtimer.c
+>> index 826634e..0083e75 100644
+>> --- a/drivers/pwm/pwm-omap-dmtimer.c
+>> +++ b/drivers/pwm/pwm-omap-dmtimer.c
+>> @@ -31,6 +31,7 @@
+>>  #include <linux/time.h>
+>>
+>>  #define DM_TIMER_LOAD_MIN 0xfffffffe
+>> +#define DM_TIMER_MAX      0xffffffff
+>>
+>>  struct pwm_omap_dmtimer_chip {
+>>       struct pwm_chip chip;
+>> @@ -46,13 +47,13 @@ to_pwm_omap_dmtimer_chip(struct pwm_chip *chip)
+>>       return container_of(chip, struct pwm_omap_dmtimer_chip, chip);
+>>  }
+>>
+>> -static int pwm_omap_dmtimer_calc_value(unsigned long clk_rate, int ns)
+>> +static u32 pwm_omap_dmtimer_get_clock_cycles(unsigned long clk_rate, int ns)
+>>  {
+>>       u64 c = (u64)clk_rate * ns;
+>>
+>>       do_div(c, NSEC_PER_SEC);
+>>
+>> -     return DM_TIMER_LOAD_MIN - c;
+>> +     return c;
+>>  }
+>>
+>>  static void pwm_omap_dmtimer_start(struct pwm_omap_dmtimer_chip *omap)
+>> @@ -99,7 +100,8 @@ static int pwm_omap_dmtimer_config(struct pwm_chip *chip,
+>>                                  int duty_ns, int period_ns)
+>>  {
+>>       struct pwm_omap_dmtimer_chip *omap = to_pwm_omap_dmtimer_chip(chip);
+>> -     int load_value, match_value;
+>> +     u32 period_cycles, duty_cycles;
+>> +     u32 load_value, match_value;
+>>       struct clk *fclk;
+>>       unsigned long clk_rate;
+>>       bool timer_active;
+>> @@ -133,11 +135,22 @@ static int pwm_omap_dmtimer_config(struct pwm_chip *chip,
+>>       /*
+>>        * Calculate the appropriate load and match values based on the
+>>        * specified period and duty cycle. The load value determines the
+>> -      * cycle time and the match value determines the duty cycle.
+>> +      * period time and the match value determines the duty time.
+>> +      *
+>> +      * The period lasts for (DM_TIMER_MAX-load_value+1) clock cycles.
+>> +      * Similarly, the active time lasts (match_value-load_value+1) cycles.
+>> +      * The non-active time is the remainder: (DM_TIMER_MAX-match_value)
+>> +      * clock cycles.
+>> +      *
+>> +      * References:
+>> +      *   OMAP4430/60/70 TRM sections 22.2.4.10 and 22.2.4.11
+>> +      *   AM335x Sitara TRM sections 20.1.3.5 and 20.1.3.6
+>>        */
+>> -     load_value = pwm_omap_dmtimer_calc_value(clk_rate, period_ns);
+>> -     match_value = pwm_omap_dmtimer_calc_value(clk_rate,
+>> -                                               period_ns - duty_ns);
+>> +     period_cycles = pwm_omap_dmtimer_get_clock_cycles(clk_rate, period_ns);
+>> +     duty_cycles = pwm_omap_dmtimer_get_clock_cycles(clk_rate, duty_ns);
+>> +
+>> +     load_value = (DM_TIMER_MAX - period_cycles) + 1;
+>> +     match_value = load_value + duty_cycles - 1;
+>>
+>>       /*
+>>        * We MUST stop the associated dual-mode timer before attempting to
+>>
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
