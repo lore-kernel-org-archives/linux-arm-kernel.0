@@ -1,204 +1,123 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 15 Feb 2016 09:32:08 +0000
-Subject: [PATCH 5/5] arm64: marvell: add Device Tree files for Armada 7K/8K
-In-Reply-To: <1455526065-7307-6-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1455526065-7307-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1455526065-7307-6-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <56C19B18.8090005@arm.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 15 Feb 2016 17:34:18 +0800
+Subject: [PATCH 10/14] ARM: dts: sun8i-a83t: Add PRCM related clocks and
+ resets
+In-Reply-To: <CAGb2v65cfG=cJ91+9G5uS5XcUh0nx6-7ZnMr7RjSGqXPHjyxpQ@mail.gmail.com>
+References: <1454203266-4450-1-git-send-email-vishnupatekar0510@gmail.com>
+ <1454203266-4450-11-git-send-email-vishnupatekar0510@gmail.com>
+ <CAGb2v67iO-816KaLttWRRPL2f7hpfgJ1--p69tD_oOrewmOjCA@mail.gmail.com>
+ <CAEzqOZtsdHC2tCgjC=Bj5q3RFip2Uyni8bFC16u03PRLCra5KA@mail.gmail.com>
+ <CAGb2v65cfG=cJ91+9G5uS5XcUh0nx6-7ZnMr7RjSGqXPHjyxpQ@mail.gmail.com>
+Message-ID: <CAGb2v66L-zKYbA7h56bY3y_Jf8wOzmW_puRc+R8tQmVY6u1DZw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On Sat, Feb 13, 2016 at 12:43 AM, Chen-Yu Tsai <wens@csie.org> wrote:
+> On Sat, Feb 13, 2016 at 12:06 AM, Vishnu Patekar
+> <vishnupatekar0510@gmail.com> wrote:
+>> Hello Wens,
+>>
+>>
+>> On Tue, Feb 2, 2016 at 2:44 PM, Chen-Yu Tsai <wens@csie.org> wrote:
+>>> On Sun, Jan 31, 2016 at 9:21 AM, Vishnu Patekar
+>>> <vishnupatekar0510@gmail.com> wrote:
+>>>> This adds A83T PRCM related clocks, clock resets.
+>>>>
+>>>> As a83t apb0 gates clock support is added earlier, this enables it.
+>>>> Apart from apb0 gates, other added clocks are compatible with
+>>>> earlier sun8i socs.
+>>>>
+>>>> Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
+>>>> ---
+>>>>  arch/arm/boot/dts/sun8i-a83t.dtsi | 44 +++++++++++++++++++++++++++++++++++++++
+>>>>  1 file changed, 44 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
+>>>> index ac96aa1..5ea20ff 100644
+>>>> --- a/arch/arm/boot/dts/sun8i-a83t.dtsi
+>>>> +++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
+>>>> @@ -268,6 +268,44 @@
+>>>>                                              "mmc2_output",
+>>>>                                              "mmc2_sample";
+>>>>                 };
+>>>> +
+>>>> +               cpus_clk: clk at 01f01400 {
+>>>> +                       compatible = "allwinner,sun9i-a80-cpus-clk";
+>>>> +                       reg = <0x01f01400 0x4>;
+>>>> +                       #clock-cells = <0>;
+>>>> +                       clocks = <&osc16Md512>, <&osc24M>, <&pll6>, <&osc16M>;
+>>>> +                       clock-output-names = "cpus";
+>>>> +               };
+>>>> +
+>>>> +               ahb0: ahb0_clk {
+>>>> +                       compatible = "fixed-factor-clock";
+>>>> +                       #clock-cells = <0>;
+>>>> +                       clock-div = <1>;
+>>>> +                       clock-mult = <1>;
+>>>> +                       clocks = <&cpus_clk>;
+>>>> +                       clock-output-names = "ahb0";
+>>>> +               };
+>>>> +
+>>>> +               apb0: clk at 01f0140c {
+>>>> +                       compatible = "allwinner,sun8i-a23-apb0-clk";
+>>>
+>>> This is actually wrong, as it is wrong in sun9i-a80.dtsi.
+>>> I've sent a patch series for it.
+>> A83T apb0 is different from A80, and it's same as A23, so this should
+>> be correct.
+>> Please correct me in case I'm missing something.
+>
+> My user manual (v1.5.1) says A83T apb0 dividers (page. 246) are
+> /1, /2, /3, /4, while the A23 is /1, /2, /4, /8.
 
-On 15/02/16 08:47, Thomas Petazzoni wrote:
-> This commit adds the base Device Tree files for the Armada 7K and 8K
-> SoCs, as well as the Armada 8040 DB board.
-> 
-> The Armada 7020, 7040 (7K family) and 8020, 8040 (8K family) are
-> composed of:
-> 
->  - An AP806 block that contains the CPU core and a few basic
->    peripherals. The AP806 is available in dual core configurations
->    (used in 7020 and 8020) and quad core configurations (used in 8020
->    and 8040).
-> 
->  - One or two CP110 blocks that contain all the high-speed interfaces
->    (SATA, PCIe, Ethernet, etc.). The 7K family chips have one CP110,
->    and the 8K family chips have two CP110, giving them twice the
->    number of HW interfaces.
-> 
-> In order to represent this from a Device Tree point of view, this
-> commit creates the following hierarchy:
-> 
->  * armada-ap806.dtsi - definitions common to dual/quad ap806
->    * armada-ap806-dual.dtsi - description of the two CPUs
->      * armada-7020.dtsi - description of the 7020 SoC
->      * armada-8020.dtsi - description of the 8020 SoC
->    * armada-ap806-quad.dtsi - description of the four CPUs
->      * armada-7040.dtsi - description of the 7040 SoC
->        * armada-7040-db.dts - description of the 7040 board
->      * armada-8040.dtsi - description of the 8040 SoC
-> 
-> The CP110 blocks are not described yet, and will be part of future
-> patch series.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  .../bindings/arm/marvell/armada-7k-8k.txt          |  24 +++
->  arch/arm64/boot/dts/marvell/Makefile               |   1 +
->  arch/arm64/boot/dts/marvell/armada-7020.dtsi       |  54 +++++
->  arch/arm64/boot/dts/marvell/armada-7040-db.dts     |  92 ++++++++
->  arch/arm64/boot/dts/marvell/armada-7040.dtsi       |  54 +++++
->  arch/arm64/boot/dts/marvell/armada-8020.dtsi       |  54 +++++
->  arch/arm64/boot/dts/marvell/armada-8040.dtsi       |  54 +++++
->  arch/arm64/boot/dts/marvell/armada-ap806-dual.dtsi |  71 +++++++
->  arch/arm64/boot/dts/marvell/armada-ap806-quad.dtsi |  84 ++++++++
->  arch/arm64/boot/dts/marvell/armada-ap806.dtsi      | 235 +++++++++++++++++++++
->  10 files changed, 723 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/marvell/armada-7k-8k.txt
->  create mode 100644 arch/arm64/boot/dts/marvell/armada-7020.dtsi
->  create mode 100644 arch/arm64/boot/dts/marvell/armada-7040-db.dts
->  create mode 100644 arch/arm64/boot/dts/marvell/armada-7040.dtsi
->  create mode 100644 arch/arm64/boot/dts/marvell/armada-8020.dtsi
->  create mode 100644 arch/arm64/boot/dts/marvell/armada-8040.dtsi
->  create mode 100644 arch/arm64/boot/dts/marvell/armada-ap806-dual.dtsi
->  create mode 100644 arch/arm64/boot/dts/marvell/armada-ap806-quad.dtsi
->  create mode 100644 arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-> 
+As Vishnu pointed out on IRC, the A23 driver is wrong. They are in fact,
+both one-based dividers. I'll send a patch to fix this.
 
-[...[
+ChenYu
 
-> diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-> new file mode 100644
-> index 0000000..3303db2
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-> @@ -0,0 +1,235 @@
-> +/*
-> + * Copyright (C) 2016 Marvell Technology Group Ltd.
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPLv2 or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This library is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This library is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/*
-> + * Device Tree file for Marvell Armada AP806.
-> + */
-> +
-> +#include <dt-bindings/interrupt-controller/arm-gic.h>
-> +
-> +/dts-v1/;
-> +
-> +/ {
-> +	model = "Marvell Armada AP806";
-> +	compatible = "marvell,armada-ap806";
-> +	#address-cells = <2>;
-> +	#size-cells = <2>;
-> +
-> +	psci {
-> +		compatible = "arm,psci-0.2";
-> +		method = "smc";
-> +	};
-> +
-> +
-> +	ap806 {
-> +		#address-cells = <2>;
-> +		#size-cells = <2>;
-> +		compatible = "simple-bus";
-> +		interrupt-parent = <&gic>;
-> +		ranges;
-> +
-> +		config-space {
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			compatible = "simple-bus";
-> +			ranges = <0x0 0x0 0xf0000000 0x1000000>;
-> +
-> +			gic: interrupt-controller at 210000 {
-> +				compatible = "arm,cortex-a15-gic",
-> +					     "arm,cortex-a9-gic";
-> +				#interrupt-cells = <3>;
-> +				#address-cells = <1>;
-> +				#size-cells = <1>;
-> +				ranges;
-> +				interrupt-controller;
-> +				interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
-> +				reg = <0x210000 0x1000>,
-> +				      <0x220000 0x1000>,
-
-Assuming we do have a GIC400 here (which is extremely likely), the GICC
-block should be at least 8kB to reflect the fact that this is a GICv2.
-
-> +				      <0x240000 0x2000>,
-> +				      <0x260000 0x2000>;
-> +
-> +				gic_v2m0: v2m at 280000 {
-> +					compatible = "arm,gic-v2m-frame";
-> +					msi-controller;
-> +					reg = <0x280000 0x1000>;
-> +					arm,msi-base-spi = <160>;
-> +					arm,msi-num-spis = <32>;
-> +				};
-> +				gic_v2m1: v2m at 290000 {
-> +					compatible = "arm,gic-v2m-frame";
-> +					msi-controller;
-> +					reg = <0x290000 0x1000>;
-> +					arm,msi-base-spi = <192>;
-> +					arm,msi-num-spis = <32>;
-> +				};
-> +				gic_v2m2: v2m at 2a0000 {
-> +					compatible = "arm,gic-v2m-frame";
-> +					msi-controller;
-> +					reg = <0x2a0000 0x1000>;
-> +					arm,msi-base-spi = <224>;
-> +					arm,msi-num-spis = <32>;
-> +				};
-> +				gic_v2m3: v2m at 2b0000 {
-> +					compatible = "arm,gic-v2m-frame";
-> +					msi-controller;
-> +					reg = <0x2b0000 0x1000>;
-> +					arm,msi-base-spi = <256>;
-> +					arm,msi-num-spis = <32>;
-> +				};
-> +			};
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> ChenYu
+>
+>>> Also the drivers for "allwinner,sun9i-a80-cpus-clk" and
+>>> "allwinner,sun9i-a80-apbs-clk"
+>>> are only compiled for CONFIG_MACH_SUN9I. Please add a patch to address this.
+>> Okie.
+>>>
+>>> Regards
+>>> ChenYu
+>>>
+>>>> +                       reg = <0x01f0140c 0x4>;
+>>>> +                       #clock-cells = <0>;
+>>>> +                       clocks = <&ahb0>;
+>>>> +                       clock-output-names = "apb0";
+>>>> +               };
+>>>> +
+>>>> +               apb0_gates: clk at 01f01428 {
+>>>> +                       compatible = "allwinner,sun8i-a83t-apb0-gates-clk";
+>>>> +                       reg = <0x01f01428 0x4>;
+>>>> +                       #clock-cells = <1>;
+>>>> +                       clocks = <&apb0>;
+>>>> +                       clock-indices = <0>, <1>,
+>>>> +                                       <2>, <3>,
+>>>> +                                       <4>, <6>, <7>;
+>>>> +                       clock-output-names = "apb0_pio", "apb0_ir",
+>>>> +                                       "apb0_timer", "apb0_rsb",
+>>>> +                                       "apb0_uart", "apb0_i2c0", "apb0_twd";
+>>>> +               };
+>>>>         };
+>>>>
+>>>>         soc {
+>>>> @@ -434,5 +472,11 @@
+>>>>                         #interrupt-cells = <3>;
+>>>>                         interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_HIGH)>;
+>>>>                 };
+>>>> +
+>>>> +               apb0_reset: reset at 01f014b0 {
+>>>> +                       reg = <0x01f014b0 0x4>;
+>>>> +                       compatible = "allwinner,sun6i-a31-clock-reset";
+>>>> +                       #reset-cells = <1>;
+>>>> +               };
+>>>>         };
+>>>>  };
+>>>> --
+>>>> 1.9.1
+>>>>
