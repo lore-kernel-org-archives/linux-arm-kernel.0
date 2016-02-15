@@ -1,49 +1,79 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 15 Feb 2016 14:35:09 +0000
-Subject: [PATCH v5sub1 7/8] arm64: move kernel image to base of vmalloc
- area
-In-Reply-To: <56C1E072.2090909@virtuozzo.com>
-References: <1454324093-15998-1-git-send-email-ard.biesheuvel@linaro.org>
- <1454324093-15998-8-git-send-email-ard.biesheuvel@linaro.org>
- <20160212145844.GI31665@e104818-lin.cambridge.arm.com>
- <CAKv+Gu-x6QPorWsPDP8bqAkmbasqzhqmP39HS=qprfGB4r8JLw@mail.gmail.com>
- <20160212151006.GJ31665@e104818-lin.cambridge.arm.com>
- <CAKv+Gu84mVP=YjbLhWoGj9AEUD8m8+Lq8kTCniCHwxJwMWaZtA@mail.gmail.com>
- <20160212152641.GK31665@e104818-lin.cambridge.arm.com>
- <56BDFC86.5010705@arm.com>
- <20160212160652.GL31665@e104818-lin.cambridge.arm.com>
- <56C1E072.2090909@virtuozzo.com>
-Message-ID: <20160215143509.GE9732@leverpostej>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 15 Feb 2016 14:36:00 +0000
+Subject: [linux-sunxi] Allwinner A64 MMC support
+In-Reply-To: <CAGb2v65E54mnLEcPzLyycEBSHbvn6tp9JpS+S8gdbDg_e7qFyQ@mail.gmail.com>
+References: <1455300000-18723-1-git-send-email-andre.przywara@arm.com>
+ <56BE29A1.3060107@redhat.com> <56C1A590.6030500@arm.com>
+ <56C1C7BB.1040602@redhat.com> <56C1D9C0.6020601@arm.com>
+ <CAGb2v65E54mnLEcPzLyycEBSHbvn6tp9JpS+S8gdbDg_e7qFyQ@mail.gmail.com>
+Message-ID: <56C1E250.9070301@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 15, 2016 at 05:28:02PM +0300, Andrey Ryabinin wrote:
+Hi Chen-Yu,
+
+On 15/02/16 14:23, Chen-Yu Tsai wrote:
+> On Mon, Feb 15, 2016 at 9:59 PM, Andre Przywara <andre.przywara@arm.com> wrote:
+>> Hi Hans,
+>>
+>> ....
+>>
+>>>
+>>> p.s.
+>>>
+>>> I love the work you've been doing on the A64, I've not had a chance
+>>> to try it out yet though. Have you made any progress with getting
+>>> the mmc slot to work ?  If not maybe I can make some time I've
+>>> prior experience in bringing up the mmc slot on other Allwinner SoCs
+>>
+>> Thanks for that!
+>>
+>> So we made some progress on the weekend (with the help of #linux-sunxi):
+>> 1) The regulator node was stupidly put by me into a separate child node
+>> without putting address and size cells into. So I just moved it into
+>> /soc directly now and that seems to fixed the missing regulator.
+>> 2) The reset node is a allwinner,sun6i-a31-ahb1-reset, which does not
+>> get registered automatically, but by an explicit call from mach-sunxi/.
+>> I wonder why we do this (yes, I saw that comment, but still...) and if
+>> it would work with a normal MODULE_DEVICE_TABLE() declaration.
+>> There is and will be no equivalent to the mach- directory on arm64.
 > 
+> On sun6i, we supported the high resolution timer, which had a reset control.
+> Timers (or clocksources) are registered before device model kicks in, so the
+> reset had to be explicitly registered before the timer, or the system would
+> hang. I think we phased that out though. Maxime should know.
+
+Ah, thanks for that insight!
+So that sounds like we would get away with a normal registration for the
+A64 - and actually many other SoCs as well?
+Shall we guard the explicit sun6i_reset_init with MACH_SUN6I or
+something and do the normal registration otherwise?
+Or do I miss something here?
+
+Cheers,
+Andre
+
+>> 3) As Jens pointed out, the MMC IP block isn't really compatible.
+>> Changing the clocks is easy (done already), but we need to come up with
+>> code to cover the new phase setting registers in the A64 MMC register block.
+>>
+>> Interestingly somehow hacking this (pretending it is compatible) seems
+>> to work, though I got reports from people about mysterious kernel
+>> crashes, so I'm inclined to leave MMC out of the first patch series.
+>>
+>> So if you could take a look at the new registers (starting at offset
+>> 0x140) and work out what we actually need to do here, that would be
+>> great. I have no real clue about what they actually do and how they
+>> relate to the current output and sample clock phase.
+>> To me it looks like we might get away with just triggering the automatic
+>> calibration and the hardware does the rest for us - keep your fingers
+>> crossed ;-)
+>>
+>> Cheers,
+>> Andre.
+>>
+>> --
+>> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+>> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+>> For more options, visit https://groups.google.com/d/optout.
 > 
-> On 02/12/2016 07:06 PM, Catalin Marinas wrote:
-> > So far, we have:
-> > 
-> > KASAN+for-next/kernmap goes wrong
-> > KASAN+UBSAN goes wrong
-> > 
-> > Enabled individually, KASAN, UBSAN and for-next/kernmap seem fine. I may
-> > have to trim for-next/core down until we figure out where the problem
-> > is.
-> > 
-> > BUG: KASAN: stack-out-of-bounds in find_busiest_group+0x164/0x16a0 at addr ffffffc93665bc8c
-> 
-> Can it be related to TLB conflicts, which supposed to be fixed in "arm64: kasan: avoid TLB conflicts" patch
-> from "arm64: mm: rework page table creation" series ?
-
-Currently I don't believe this is a TLB issue. We've been seeing issues
-even with those patches in for-next/core with that patch included. It's
-also incredibly reliable to trigger.
-
-It seems that issues are more likely the larger the kernel image, so my
-suspicion is that at some boundary condition we create the page tables
-for the shadow region incorrectly. I'm only able to trigger this on a
-particular machine, so the physical memory layout may also matter.
-
-I'm currently looking into that.
-
-Mark.
