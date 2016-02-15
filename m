@@ -1,97 +1,34 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 15 Feb 2016 17:46:56 +0000
-Subject: [PATCH v4 21/23] arm64: hw_breakpoint: Allow EL2 breakpoints if
- running in HYP
-In-Reply-To: <1455216004-19499-22-git-send-email-marc.zyngier@arm.com>
-References: <1455216004-19499-1-git-send-email-marc.zyngier@arm.com>
- <1455216004-19499-22-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20160215174656.GN6298@arm.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Mon, 15 Feb 2016 12:47:46 -0500
+Subject: [PATCH] branch tracer: fix freak link error
+In-Reply-To: <1455312410-1058841-1-git-send-email-arnd@arndb.de>
+References: <1455312410-1058841-1-git-send-email-arnd@arndb.de>
+Message-ID: <20160215124746.44e8c2d0@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 11, 2016 at 06:40:02PM +0000, Marc Zyngier wrote:
-> With VHE, we place kernel {watch,break}-points at EL2 to get things
-> like kgdb and "perf -e mem:..." working.
+On Fri, 12 Feb 2016 22:26:42 +0100
+Arnd Bergmann <arnd@arndb.de> wrote:
+
+> In my randconfig tests, I came across a bug that involves several
+> components:
 > 
-> This requires a bit of repainting in the low-level encore/decode,
-> but is otherwise pretty simple.
+>
+
+[..]
+
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/include/asm/hw_breakpoint.h | 49 +++++++++++++++++++++-------------
->  1 file changed, 31 insertions(+), 18 deletions(-)
+> This patch avoids the problem by changing __trace_if() to check
+> whether the condition is known at compile-time to be nonzero, rather
+> than checking whether it is actually a constant.
 > 
-> diff --git a/arch/arm64/include/asm/hw_breakpoint.h b/arch/arm64/include/asm/hw_breakpoint.h
-> index 9732908..4d8d5a8 100644
-> --- a/arch/arm64/include/asm/hw_breakpoint.h
-> +++ b/arch/arm64/include/asm/hw_breakpoint.h
-> @@ -18,6 +18,7 @@
->  
->  #include <asm/cputype.h>
->  #include <asm/cpufeature.h>
-> +#include <asm/virt.h>
->  
->  #ifdef __KERNEL__
->  
-> @@ -35,24 +36,6 @@ struct arch_hw_breakpoint {
->  	struct arch_hw_breakpoint_ctrl ctrl;
->  };
->  
-> -static inline u32 encode_ctrl_reg(struct arch_hw_breakpoint_ctrl ctrl)
-> -{
-> -	return (ctrl.len << 5) | (ctrl.type << 3) | (ctrl.privilege << 1) |
-> -		ctrl.enabled;
-> -}
-> -
-> -static inline void decode_ctrl_reg(u32 reg,
-> -				   struct arch_hw_breakpoint_ctrl *ctrl)
-> -{
-> -	ctrl->enabled	= reg & 0x1;
-> -	reg >>= 1;
-> -	ctrl->privilege	= reg & 0x3;
-> -	reg >>= 2;
-> -	ctrl->type	= reg & 0x3;
-> -	reg >>= 2;
-> -	ctrl->len	= reg & 0xff;
-> -}
-> -
->  /* Breakpoint */
->  #define ARM_BREAKPOINT_EXECUTE	0
->  
-> @@ -62,6 +45,7 @@ static inline void decode_ctrl_reg(u32 reg,
->  #define AARCH64_ESR_ACCESS_MASK	(1 << 6)
->  
->  /* Privilege Levels */
-> +#define AARCH64_BREAKPOINT_EL2	0
->  #define AARCH64_BREAKPOINT_EL1	1
->  #define AARCH64_BREAKPOINT_EL0	2
->  
-> @@ -76,6 +60,35 @@ static inline void decode_ctrl_reg(u32 reg,
->  #define ARM_KERNEL_STEP_ACTIVE	1
->  #define ARM_KERNEL_STEP_SUSPEND	2
->  
-> +#define DBG_HMC_HYP		(1 << 13)
-> +#define DBG_SSC_HYP		(3 << 14)
+> I see this one link error in roughly one out of 1600 randconfig builds
+> on ARM, and the patch fixes all known instances.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: ab3c9c686e22 ("branch tracer, intel-iommu: fix build with CONFIG_BRANCH_TRACER=y")
 
-Why do we need to touch the SSC field@all?
+Want me to pull this into my queue? I have another patch I need to send
+to Linus and I can add this in that pull request.
 
-> +
-> +static inline u32 encode_ctrl_reg(struct arch_hw_breakpoint_ctrl ctrl)
-> +{
-> +	u32 val = (ctrl.len << 5) | (ctrl.type << 3) | ctrl.enabled;
-> +
-> +	if (is_kernel_in_hyp_mode() && ctrl.privilege == AARCH64_BREAKPOINT_EL1)
-> +		val |= DBG_HMC_HYP | DBG_SSC_HYP | (AARCH64_BREAKPOINT_EL2 << 1);
-
-I don't think this is correct. We want to allow, for example, a userspace
-watchpoint to fire thanks to something like put_user, so the encoding
-really needs to build up the PMC field (like we do already), then orr in
-the HMC field.
-
-The "gotcha", which is similar to the PMU stuff, is that you can't have
-HMC==1 (EL2) and PMC==2 (i.e. EL2 and EL0, but not EL1).
-
-I *think* the conclusion is that you need AARCH64_BREAKPOINT_EL2 to look
-like DBG_HMC_HYP | AARCH64_BREAKPOINT_EL1.
-
-Will
+-- Steve
