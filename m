@@ -1,42 +1,39 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 15 Feb 2016 18:24:57 +0100
-Subject: [PATCH 4/4] dmaengine: pxa_dma: fix the maximum requestor line
-In-Reply-To: <20160215163524.GI19598@localhost> (Vinod Koul's message of "Mon,
- 15 Feb 2016 22:05:24 +0530")
-References: <1455225798-9510-1-git-send-email-robert.jarzmik@free.fr>
- <1455225798-9510-5-git-send-email-robert.jarzmik@free.fr>
- <20160215163524.GI19598@localhost>
-Message-ID: <87fuwt28eu.fsf@belgarion.home>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 15 Feb 2016 17:26:53 +0000
+Subject: [PATCH v4 23/23] arm64: Panic when VHE and non VHE CPUs coexist
+In-Reply-To: <1455216004-19499-24-git-send-email-marc.zyngier@arm.com>
+References: <1455216004-19499-1-git-send-email-marc.zyngier@arm.com>
+ <1455216004-19499-24-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20160215172653.GM6298@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vinod Koul <vinod.koul@intel.com> writes:
+On Thu, Feb 11, 2016 at 06:40:04PM +0000, Marc Zyngier wrote:
+> Having both VHE and non-VHE capable CPUs in the same system
+> is likely to be a recipe for disaster.
+> 
+> If the boot CPU has VHE, but a secondary is not, we won't be
+> able to downgrade and run the kernel at EL1. Add CPU hotplug
+> to the mix, and this produces a terrifying mess.
+> 
+> Let's solve the problem once and for all. If you mix VHE and
+> non-VHE CPUs in the same system, you deserve to loose, and this
+> patch makes sure you don't get a chance.
+> 
+> This is implemented by storing the kernel execution level in
+> a global variable. Secondaries will park themselves in a
+> WFI loop if they observe a mismatch. Also, the primary CPU
+> will detect that the secondary CPU has died on a mismatched
+> execution level. Panic will follow.
 
-> On Thu, Feb 11, 2016 at 10:23:18PM +0100, Robert Jarzmik wrote:
->> @@ -1399,13 +1405,17 @@ static int pxad_probe(struct platform_device *op)
->>  		return PTR_ERR(pdev->base);
->>  
->>  	of_id = of_match_device(pxad_dt_ids, &op->dev);
->> -	if (of_id)
->> +	if (of_id) {
->>  		of_property_read_u32(op->dev.of_node, "#dma-channels",
->>  				     &dma_channels);
->> -	else if (pdata && pdata->dma_channels)
->> +		of_property_read_u32(op->dev.of_node, "#requestors",
->> +				     &nb_requestors);
->
-> I think we should check the return value here. This might be err in case
-> when we have older DT on platform, but still should work with default in
-> that case
+This should really be based on Suzuki's series for handling generic
+mismatches:
 
-Okay, but how should the code react to the err case, more specifically to
--EINVAL or -ENODATA ? As this property is optional as per the device-tree
-description, the current code leaves nb_requestors = 0, as is specified in the
-description, and fits the mmp_pdma case.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/401727.html
 
-What do you think should be done ? A warning message ? Something else ?
+To avoid growing a dependency on something that's unlikely to make it
+for 4.6, I'd be inclined to drop your homegrown checks altogether amd
+help Suzuki with his series as a separate activity (i.e. it needn't be
+a blocker imo).
 
-Cheers.
-
---
-Robert
+Will
