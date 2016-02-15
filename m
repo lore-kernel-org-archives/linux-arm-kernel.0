@@ -1,123 +1,40 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 15 Feb 2016 10:06:36 -0800
-Subject: GPIO regression in Linux next caused by syscon change
-In-Reply-To: <20160215164757.GV19432@atomide.com>
-References: <20160213002643.GQ19432@atomide.com>
- <20160213004935.GR19432@atomide.com>
- <CA+gwMccZeYimupmGsMX8YbNH9eEA6=Xi=rupciubBwzktfjvBA@mail.gmail.com>
- <20160215160115.GU19432@atomide.com>
- <1455552961.4899.37.camel@pengutronix.de>
- <20160215164757.GV19432@atomide.com>
-Message-ID: <20160215180635.GW19432@atomide.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 15 Feb 2016 19:08:32 +0100
+Subject: Build regressions/improvements in v4.5-rc4
+In-Reply-To: <1455559593-26369-1-git-send-email-geert@linux-m68k.org>
+References: <1455559593-26369-1-git-send-email-geert@linux-m68k.org>
+Message-ID: <CAMuHMdVDyep0cPPB-Mh5CfRSt4Do_F_j6WMkwzjRfz_jDZLLeQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [160215 08:49]:
-> * Philipp Zabel <p.zabel@pengutronix.de> [160215 08:17]:
-> > Am Montag, den 15.02.2016, 08:01 -0800 schrieb Tony Lindgren:
-> > > * Philipp Zabel <philipp.zabel@gmail.com> [160214 11:24]:
-> > > > I've just replaced the of_iomap() call with an open coded version,
-> > > > calling of_address_to_resource() and ioremap() directly. That was
-> > > > needed so I can use the struct resource returned by
-> > > > of_address_to_resource() to set the syscon_config.max_register. I
-> > > > don't see where this could cause resource overlap. Does just setting
-> > > > syscon_config.max_register to zero again make the problem disappear?
-> > > 
-> > > Yes commenting out the syscon_config.max_register line in your patch
-> > > makes things work again.
-> > > 
-> > > So what does that tell us about the problem?
-> > 
-> > Maybe some out of bounds writes that previously worked are now catched
-> > by the max_register check in regmap_writable and regmap_write returns
-> > -EIO instead of the write being executed.
-> 
-> Hmm weird that something like that would not produce errors?
-> 
-> > Is there any omap_ctrl_write?() call with an offset > 0x32c into
-> > scm_conf?
-> 
-> Indeed, that's where things go wrong. Adding Tero to Cc, something
-> is wrong there.
+On Mon, Feb 15, 2016 at 7:06 PM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+> JFYI, when comparing v4.5-rc4[1] to v4.5-rc3[3], the summaries are:
+>   - build errors: +17/-11
 
-Something like this might fix it? Needs to be tested to see if it
-happens on other omaps.
+  + /home/kisskb/slave/src/arch/arm/include/asm/div64.h: error: 'asm'
+operand has impossible constraints:  => 93:3, 111:3
+  + /home/kisskb/slave/src/arch/arm/include/asm/div64.h: error: can't
+find a register in class 'GENERAL_REGS' while reloading 'asm':  =>
+111:3
 
-Tero, got any better ideas?
+arm-randconfig
 
-Regards,
+  + error: initramfs.c: undefined reference to `__stack_chk_guard':
+=> .init.text+0x373c)
 
-Tony
+i386-randconfig
 
-8< -------------------
---- a/arch/arm/mach-omap2/control.c
-+++ b/arch/arm/mach-omap2/control.c
-@@ -167,15 +167,23 @@ u16 omap_ctrl_readw(u16 offset)
- u32 omap_ctrl_readl(u16 offset)
- {
- 	u32 val;
-+	int err;
- 
- 	offset &= 0xfffc;
--	if (!omap2_ctrl_syscon)
--		val = readl_relaxed(omap2_ctrl_base + offset);
--	else
--		regmap_read(omap2_ctrl_syscon, omap2_ctrl_offset + offset,
--			    &val);
-+	if (omap2_ctrl_syscon) {
-+		err = regmap_read(omap2_ctrl_syscon,
-+				  omap2_ctrl_offset + offset, &val);
-+		if (!err)
-+			return val;
-+	}
-+
-+	if (WARN(!omap2_ctrl_base,
-+		 "syscon out of range for offset 0x%x, no omap2_ctrl_base?\n",
-+		    offset)) {
-+		return 0;
-+	}
- 
--	return val;
-+	return readl_relaxed(omap2_ctrl_base + offset);
- }
- 
- void omap_ctrl_writeb(u8 val, u16 offset)
-@@ -206,12 +214,23 @@ void omap_ctrl_writew(u16 val, u16 offset)
- 
- void omap_ctrl_writel(u32 val, u16 offset)
- {
-+	int err;
-+
- 	offset &= 0xfffc;
--	if (!omap2_ctrl_syscon)
--		writel_relaxed(val, omap2_ctrl_base + offset);
--	else
--		regmap_write(omap2_ctrl_syscon, omap2_ctrl_offset + offset,
--			     val);
-+	if (omap2_ctrl_syscon) {
-+		err = regmap_write(omap2_ctrl_syscon,
-+				   omap2_ctrl_offset + offset, val);
-+		if (!err)
-+			return;
-+	}
-+
-+	if (WARN(!omap2_ctrl_base,
-+		 "syscon out of range for offset 0x%x, no omap2_ctrl_base?\n",
-+		    offset)) {
-+		return;
-+	}
-+
-+	writel_relaxed(val, omap2_ctrl_base + offset);
- }
- 
- #ifdef CONFIG_ARCH_OMAP3
-@@ -724,9 +743,6 @@ int __init omap_control_init(void)
- 				if (ret)
- 					return ret;
- 			}
--
--			iounmap(omap2_ctrl_base);
--			omap2_ctrl_base = NULL;
- 		} else {
- 			/* No scm_conf found, direct access */
- 			ret = omap2_clk_provider_init(np, data->index, NULL,
+> [1] http://kisskb.ellerman.id.au/kisskb/head/9916/ (all 262 configs)
+> [3] http://kisskb.ellerman.id.au/kisskb/head/9888/ (all 262 configs)
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
