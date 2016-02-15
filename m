@@ -1,75 +1,37 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 15 Feb 2016 19:55:29 +0000
-Subject: [PATCH v3 4/5] arm64/perf: Enable PMCR long cycle counter bit
-In-Reply-To: <de7340e1843f7823384551db64b12eadde7eded7.1454516082.git.jglauber@cavium.com>
-References: <cover.1454516082.git.jglauber@cavium.com>
- <de7340e1843f7823384551db64b12eadde7eded7.1454516082.git.jglauber@cavium.com>
-Message-ID: <20160215195529.GW6298@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 15 Feb 2016 11:57:53 -0800
+Subject: Crashes in arm qemu emulations due to 'cpufreq: governor:
+ Replace timers with utilization ...'
+In-Reply-To: <20160215194627.GA25882@roeck-us.net>
+References: <20160215170527.GA24453@roeck-us.net> <56C22105.6050900@arm.com>
+ <CAJZ5v0gXGzzJ7CcbgNNO-ULrtd9Z2hbqHeuXRYJLFLrh+BWVWA@mail.gmail.com>
+ <1508162.Id3YElPxB2@vostro.rjw.lan>
+ <20160215194227.GY19432@atomide.com>
+ <20160215194627.GA25882@roeck-us.net>
+Message-ID: <20160215195752.GZ19432@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 03, 2016 at 06:11:59PM +0100, Jan Glauber wrote:
-> With the long cycle counter bit (LC) disabled the cycle counter is not
-> working on ThunderX SOC (ThunderX only implements Aarch64).
-> Also, according to documentation LC == 0 is deprecated.
-> 
-> To keep the code simple the patch does not introduce 64 bit wide counter
-> functions. Instead writing the cycle counter always sets the upper
-> 32 bits so overflow interrupts are generated as before.
+* Guenter Roeck <linux@roeck-us.net> [160215 11:47]:
+> On Mon, Feb 15, 2016 at 11:42:27AM -0800, Tony Lindgren wrote:
+> > * Rafael J. Wysocki <rjw@rjwysocki.net> [160215 11:28]:
+> > > 
+> > > Guenter, Tony,
+> > > 
+> > > Below is a patch to try, on top of linux-next.
+> > 
+> > Fixes the issue on UP for me:
+> > 
+> > Tested-by: Tony Lindgren <tony@atomide.com>
+> > 
+> > > Please let me know if the problem is still around with that patch applied.
+> > 
+> > It seems we still have another issue with SMP systems, see below.
+> > 
+> Try https://patchwork.kernel.org/patch/8318221
 
-I guess we could look into chained events if we wanted to go the whole
-hog and support 64-bit counters, but this looks fine for now.
+Great, that one fixes the SMP issue for me. So for patchwork
+patch 8318221, here's a cross thread tested-by as looks like
+I was not on Cc for it:
 
-> Original patch from Andrew Pinksi <Andrew.Pinksi@caviumnetworks.com>
-> 
-> Signed-off-by: Jan Glauber <jglauber@cavium.com>
-> ---
->  arch/arm64/kernel/perf_event.c | 21 ++++++++++++++++-----
->  1 file changed, 16 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-> index c038e4e..5e4275e 100644
-> --- a/arch/arm64/kernel/perf_event.c
-> +++ b/arch/arm64/kernel/perf_event.c
-> @@ -405,6 +405,7 @@ static const struct attribute_group *armv8_pmuv3_attr_groups[] = {
->  #define ARMV8_PMCR_D		(1 << 3) /* CCNT counts every 64th cpu cycle */
->  #define ARMV8_PMCR_X		(1 << 4) /* Export to ETM */
->  #define ARMV8_PMCR_DP		(1 << 5) /* Disable CCNT if non-invasive debug*/
-> +#define ARMV8_PMCR_LC		(1 << 6) /* Overflow on 64 bit cycle counter */
->  #define	ARMV8_PMCR_N_SHIFT	11	 /* Number of counters supported */
->  #define	ARMV8_PMCR_N_MASK	0x1f
->  #define	ARMV8_PMCR_MASK		0x3f	 /* Mask for writable bits */
-> @@ -494,9 +495,16 @@ static inline void armv8pmu_write_counter(struct perf_event *event, u32 value)
->  	if (!armv8pmu_counter_valid(cpu_pmu, idx))
->  		pr_err("CPU%u writing wrong counter %d\n",
->  			smp_processor_id(), idx);
-> -	else if (idx == ARMV8_IDX_CYCLE_COUNTER)
-> -		asm volatile("msr pmccntr_el0, %0" :: "r" (value));
-> -	else if (armv8pmu_select_counter(idx) == idx)
-> +	else if (idx == ARMV8_IDX_CYCLE_COUNTER) {
-> +		/*
-> +		 * Set the upper 32bits as this is a 64bit counter but we only
-> +		 * count using the lower 32bits and we want an interrupt when
-> +		 * it overflows.
-> +		 */
-> +		u64 value64 = 0xffffffff00000000ULL | value;
-> +
-> +		asm volatile("msr pmccntr_el0, %0" :: "r" (value64));
-> +	} else if (armv8pmu_select_counter(idx) == idx)
->  		asm volatile("msr pmxevcntr_el0, %0" :: "r" (value));
->  }
->  
-> @@ -768,8 +776,11 @@ static void armv8pmu_reset(void *info)
->  		armv8pmu_disable_intens(idx);
->  	}
->  
-> -	/* Initialize & Reset PMNC: C and P bits. */
-> -	armv8pmu_pmcr_write(ARMV8_PMCR_P | ARMV8_PMCR_C);
-> +	/*
-> +	 * Initialize & Reset PMNC. Request overflow on 64 bit but
-> +	 * cheat in armv8pmu_write_counter().
-
-Can you expand the comment to mention that the 64-bit overflow is only
-for the cycle counter, please?
-
-Will
+Tested-by: Tony Lindgren <tony@atomide.com>
