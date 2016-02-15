@@ -1,72 +1,54 @@
 From: zhangqing@rock-chips.com (Elaine Zhang)
-Date: Mon, 15 Feb 2016 16:38:47 +0800
-Subject: [PATCH v1 2/6] rockchip: power-domain: allow domains only handling
- idle requests
+Date: Mon, 15 Feb 2016 16:38:46 +0800
+Subject: [PATCH v1 1/6] rockchip: power-domain: make idle handling optional
 In-Reply-To: <1455525531-14083-1-git-send-email-zhangqing@rock-chips.com>
 References: <1455525531-14083-1-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <1455525531-14083-3-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <1455525531-14083-2-git-send-email-zhangqing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some Rockchip SoC there exist child-domains only handling their
-idle state with the actual power-state handled by a parent-domain.
-
-So allow such types of domains. For them, we can determine their
-state (on/of) by checking the inverse idle-state instead.
-
-There exist one special case if both idle as well power handling
-were set as not present, but as the domain-data is defined in the
-code itself, we can expect the reasonable developer to define them
-
-So allow such types of domains. For them, we can determine their
-state (on/of) by checking the inverse idle-state instead.
-
-There exist one special case if both idle as well power handling
-were set as not present, but as the domain-data is defined in the
-code itself, we can expect the reasonable developer to define them
-in a correct, without adding more checks.
+Not all new socs need to handle idle states on domain state changes,
+so add the possibility to make them optional.
 
 Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- drivers/soc/rockchip/pm_domains.c | 11 +++++++++--
- 1 file changed, 9 insertions(+), 2 deletions(-)
+ drivers/soc/rockchip/pm_domains.c | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/soc/rockchip/pm_domains.c b/drivers/soc/rockchip/pm_domains.c
-index 3dcc611..350527b 100644
+index 6cdffb1..3dcc611 100644
 --- a/drivers/soc/rockchip/pm_domains.c
 +++ b/drivers/soc/rockchip/pm_domains.c
-@@ -68,8 +68,8 @@ struct rockchip_pmu {
+@@ -63,14 +63,16 @@ struct rockchip_pmu {
+ };
+ 
+ #define to_rockchip_pd(gpd) container_of(gpd, struct rockchip_pm_domain, genpd)
++#define NULL_BIT		-32
++#define OVERFLOW_MASK		32
  
  #define DOMAIN(pwr, status, req, idle, ack)	\
  {						\
--	.pwr_mask = BIT(pwr),			\
--	.status_mask = BIT(status),		\
-+	.pwr_mask = (pwr >= 0) ? BIT(pwr) : OVERFLOW_MASK,		\
-+	.status_mask = (status >= 0) ? BIT(status) : OVERFLOW_MASK,\
- 	.req_mask = (req >= 0) ? BIT(req) : OVERFLOW_MASK,		\
- 	.idle_mask = (idle >= 0) ? BIT(idle) : OVERFLOW_MASK,	\
- 	.ack_mask = (ack >= 0) ? BIT(ack) : OVERFLOW_MASK,		\
-@@ -121,6 +121,10 @@ static bool rockchip_pmu_domain_is_on(struct rockchip_pm_domain *pd)
+ 	.pwr_mask = BIT(pwr),			\
+ 	.status_mask = BIT(status),		\
+-	.req_mask = BIT(req),			\
+-	.idle_mask = BIT(idle),			\
+-	.ack_mask = BIT(ack),			\
++	.req_mask = (req >= 0) ? BIT(req) : OVERFLOW_MASK,		\
++	.idle_mask = (idle >= 0) ? BIT(idle) : OVERFLOW_MASK,	\
++	.ack_mask = (ack >= 0) ? BIT(ack) : OVERFLOW_MASK,		\
+ }
+ 
+ #define DOMAIN_RK3288(pwr, status, req)		\
+@@ -96,6 +98,9 @@ static int rockchip_pmu_set_idle_request(struct rockchip_pm_domain *pd,
  	struct rockchip_pmu *pmu = pd->pmu;
  	unsigned int val;
  
-+	/* check idle status for idle-only domains */
-+	if (pd->info->status_mask >= OVERFLOW_MASK)
-+		return !rockchip_pmu_domain_is_idle(pd);
++	if (pd_info->req_mask >= OVERFLOW_MASK)
++		return 0;
 +
- 	regmap_read(pmu->regmap, pmu->info->status_offset, &val);
- 
- 	/* 1'b0: power on, 1'b1: power off */
-@@ -132,6 +136,9 @@ static void rockchip_do_pmu_set_power_domain(struct rockchip_pm_domain *pd,
- {
- 	struct rockchip_pmu *pmu = pd->pmu;
- 
-+	if (pd->info->pwr_mask >= OVERFLOW_MASK)
-+		return;
-+
- 	regmap_update_bits(pmu->regmap, pmu->info->pwr_offset,
- 			   pd->info->pwr_mask, on ? 0 : -1U);
+ 	regmap_update_bits(pmu->regmap, pmu->info->req_offset,
+ 			   pd_info->req_mask, idle ? -1U : 0);
  
 -- 
 1.9.1
