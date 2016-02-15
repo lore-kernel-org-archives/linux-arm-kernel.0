@@ -1,42 +1,82 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 15 Feb 2016 15:36:18 +0900
-Subject: [next] Odroid XU3 easily over-heats
-In-Reply-To: <20160215052843.GA6334@vireshk-i7>
-References: <56C01963.3080106@gmail.com> <20160215052843.GA6334@vireshk-i7>
-Message-ID: <56C171E2.90306@samsung.com>
+From: hongxing.zhu@nxp.com (Richard Zhu)
+Date: Mon, 15 Feb 2016 06:44:06 +0000
+Subject: [RFC 3/4] ARM: imx: add the platform related rpmsg implementation
+In-Reply-To: <20160215061009.GU6756@tiger>
+References: <1452067604-10466-1-git-send-email-hongxing.zhu@nxp.com>
+ <1452067604-10466-4-git-send-email-hongxing.zhu@nxp.com>
+ <20160128013527.GA9070@tiger>
+ <DBXPR04MB2708826D9E8C16E8EFE492E8CDA0@DBXPR04MB270.eurprd04.prod.outlook.com>
+ <20160215061009.GU6756@tiger>
+Message-ID: <DBXPR04MB27087D6DD453A62CEE368BF8CAC0@DBXPR04MB270.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15.02.2016 14:28, Viresh Kumar wrote:
-> On 14-02-16, 15:06, Krzysztof Kozlowski wrote:
->> Hi all,
->>
->> With recent addition of cpufreq-dt support to Exynos5422
->> it is very easy to over-heat the Odroid XU3 leading to critical shutdown:
+
+> -----Original Message-----
+> From: Shawn Guo [mailto:shawnguo at kernel.org]
+> Sent: Monday, February 15, 2016 2:10 PM
+> To: Richard Zhu
+> Cc: ohad at wizery.com; Stefan Agner; linux-kernel at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [RFC 3/4] ARM: imx: add the platform related rpmsg
+> implementation
 > 
-> How were OPPs passed earlier? I failed to see them in kernel somehow.
-> You must have been using opp-v1 earlier, right?
-
-Till now there was no support for cpufreq for Exynos542x. For some time
-Bartlomiej was developing these patches - using opp-v1 at beginning. I
-don't know whether he encountered this before.
-
+> +LAKML
 > 
-> You used boost-freqs then? You used cpufreq as a cooling device then?
+> On Thu, Jan 28, 2016 at 02:17:21AM +0000, Richard Zhu wrote:
+> > Hi Shawn:
+> > Thanks for your comments.
+> > Further review would copied to Stefan Agner.
 > 
->> What about cpufreq as cooling device? Probably that part
->> is missing now, right?
+> Please do not top-posting.
 > 
-> Maybe, how was that earlier though ?
+> > On Wed, Jan 06, 2016 at 04:06:43PM +0800, Richard Zhu wrote:
+> > > From: Richard Zhu <Richard.Zhu@freescale.com>
+> > >
+> > > - add mu driver support, the irq and 4bytes msg of the mu module are
+> > > as the interaction channel between A# core and the M4 core on imx
+> > > amp platforms.
+> > > - register one notify in isr of the mu's irq used by rpmsg.
+> > > - instance the virtual processor, and fill up the virtio_config_ops
+> > > in the platform related rpmsg implementation codes.
+> > > - hard-code the vring storage shared by A# core and M# core on AMP
+> > > SOCs.
+> > >
+> > > Signed-off-by: Richard Zhu <hongxing.zhu@nxp.com>
+> > > ---
+> > >  arch/arm/mach-imx/Kconfig     |  12 ++
+> > >  arch/arm/mach-imx/Makefile    |   2 +
+> > >  arch/arm/mach-imx/imx_rpmsg.c | 364
+> ++++++++++++++++++++++++++++++++++++++++++
+> > >  arch/arm/mach-imx/mu.c        | 217 +++++++++++++++++++++++++
+> >
+> > I'm not rpmsg expert, but it seems to me that the driver should be put into
+> drivers/rpmsg/ rather than mach-imx.
+> > [Richard] This part rpmsg codes are closed related to the platform. For
+> example, kinds of ops callback functions.
+> > Thus, these codes are placed into arch/arm/mach-imx/ folder. BTW,  so does
+> to omap rpmsg implementation.
+> > http://omappedia.org/wiki/RPMsg_Kernel_Sources
+> 
+> I just took a closer look at this.  What the omappedia page above describes is
+> an OMAP rpmsg implementation in a vendor tree which is in turn based on a
+> relatively old kernel version, i.e. v3.0.
+> 
+> I guess the implementation is a base of what mainline has today on
+> remoteproc/rpmsg support, but they are somehow different.  For example, on
+> mainline kernel today, there is no remoteproc/rpmsg code in arch/arm/plat-
+> omap.  And, instead of handling rpmsg with a platform specific driver,
+> remoteproc encapsulates the rpmsg support.  You can find the details in
+> commit ac8954a41393 (remoteproc: create rpmsg virtio device).
+> 
+> I suggest you look at the mainline code today instead of any old
+> implementation for reference.  And in any case, with device tree support to
+> populate platform device as needed, it's a wrong to put remoteproc/rpmsg
+> related driver code into arch/arm/mach-imx.
+> 
+> Shawn
+[Zhu hongxing]  Thanks a lot for your advice. I would take look into it, and re-organize my
+patch-set.
 
-Bootloader initialized frequency and regulators to some safe defaults. I
-think the voltage set by uboot is 1 V (for big and little) which
-corresponds to ~800 MHz of frequency (I don't know the exact frequency
-because it is hardcoded as divider value...).
-
-However there was no cooling device except fan. This did not change. So
-the only difference seems to be that now at critical shutdown moment it
-operates at 1300 MHz / 1.275 V (little) and 1800 MHz / 1.250 V (big).
-
-Best regards,
-Krzysztof
+Best Regards
+hongxing zhu
