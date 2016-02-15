@@ -1,36 +1,58 @@
-From: chaotian.jing@mediatek.com (Chaotian Jing)
-Date: Mon, 15 Feb 2016 02:31:00 +0800
-Subject: [PATCH] mmc: mediatek: add SD write protect support
-Message-ID: <1455474660-19864-1-git-send-email-chaotian.jing@mediatek.com>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Mon, 15 Feb 2016 11:25:00 +0800
+Subject: [PATCH v13.1 02/19] drm/exynos: dp: rename implementation specific
+ driver part
+In-Reply-To: <1453427614-23053-1-git-send-email-ykk@rock-chips.com>
+References: <1453427614-23053-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <1455506700-31818-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-use mmc core layer's API to support sd write protect
+From: Heiko Stuebner <heiko@sntech.de>
 
-Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+The core functionality now resides in the generic bridge part so the
+exynos-specific implementation details can get a more suitable nameing.
+
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- drivers/mmc/host/mtk-sd.c | 2 ++
- 1 file changed, 2 insertions(+)
+This patch is splited from "[PATCH v13 01/17] drm: bridge: analogix/dp: split
+exynos dp driver to bridge directory".
 
-diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
-index 82a97ac..f01972e 100644
---- a/drivers/mmc/host/mtk-sd.c
-+++ b/drivers/mmc/host/mtk-sd.c
-@@ -35,6 +35,7 @@
- #include <linux/mmc/mmc.h>
- #include <linux/mmc/sd.h>
- #include <linux/mmc/sdio.h>
-+#include <linux/mmc/slot-gpio.h>
- 
- #define MAX_BD_NUM          1024
- 
-@@ -1452,6 +1453,7 @@ static struct mmc_host_ops mt_msdc_ops = {
- 	.pre_req = msdc_pre_req,
- 	.request = msdc_ops_request,
- 	.set_ios = msdc_ops_set_ios,
-+	.get_ro = mmc_gpio_get_ro,
- 	.start_signal_voltage_switch = msdc_ops_switch_volt,
- 	.card_busy = msdc_card_busy,
- 	.execute_tuning = msdc_execute_tuning,
+Changes in v13.1: None
+Changes in v13: None
+Changes in v12: None
+Changes in v11: None
+Changes in v10: None
+Changes in v9: None
+Changes in v8: None
+Changes in v7: None
+Changes in v6: None
+Changes in v5: None
+Changes in v4: None
+Changes in v3: None
+Changes in v2: None
+
+ drivers/gpu/drm/exynos/Makefile                          | 2 +-
+ drivers/gpu/drm/exynos/{exynos_dp_core.c => exynos_dp.c} | 0
+ 2 files changed, 1 insertion(+), 1 deletion(-)
+ rename drivers/gpu/drm/exynos/{exynos_dp_core.c => exynos_dp.c} (100%)
+
+diff --git a/drivers/gpu/drm/exynos/Makefile b/drivers/gpu/drm/exynos/Makefile
+index 18244c5..533151b 100644
+--- a/drivers/gpu/drm/exynos/Makefile
++++ b/drivers/gpu/drm/exynos/Makefile
+@@ -13,7 +13,7 @@ exynosdrm-$(CONFIG_DRM_EXYNOS5433_DECON)	+= exynos5433_drm_decon.o
+ exynosdrm-$(CONFIG_DRM_EXYNOS7_DECON)	+= exynos7_drm_decon.o
+ exynosdrm-$(CONFIG_DRM_EXYNOS_DPI)	+= exynos_drm_dpi.o
+ exynosdrm-$(CONFIG_DRM_EXYNOS_DSI)	+= exynos_drm_dsi.o
+-exynosdrm-$(CONFIG_DRM_EXYNOS_DP)	+= exynos_dp_core.o
++exynosdrm-$(CONFIG_DRM_EXYNOS_DP)	+= exynos_dp.o
+ exynosdrm-$(CONFIG_DRM_EXYNOS_MIXER)	+= exynos_mixer.o
+ exynosdrm-$(CONFIG_DRM_EXYNOS_HDMI)	+= exynos_hdmi.o
+ exynosdrm-$(CONFIG_DRM_EXYNOS_VIDI)	+= exynos_drm_vidi.o
+diff --git a/drivers/gpu/drm/exynos/exynos_dp_core.c b/drivers/gpu/drm/exynos/exynos_dp.c
+similarity index 100%
+rename from drivers/gpu/drm/exynos/exynos_dp_core.c
+rename to drivers/gpu/drm/exynos/exynos_dp.c
 -- 
-1.8.1.1.dirty
+1.9.1
