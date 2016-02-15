@@ -1,73 +1,68 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 15 Feb 2016 09:49:53 -0600
-Subject: [PATCH] arm: dts: AM57XX: Correct the thermal thresholds
-In-Reply-To: <56C153A3.3030508@ti.com>
-References: <1454924705-8382-1-git-send-email-j-keerthy@ti.com>
- <20160209220901.GC28102@localhost.localdomain> <56BA6530.4030102@ti.com>
- <20160212222347.GO19432@atomide.com>
- <CAGo_u6r8-LJBWWrew0fV50Q+JnCxDj9PD57+9NoDm5TqCWL=jw@mail.gmail.com>
- <20160212224129.GP19432@atomide.com> <56C153A3.3030508@ti.com>
-Message-ID: <56C1F3A1.4080709@ti.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 15 Feb 2016 16:52:38 +0100
+Subject: [linux-sunxi] Allwinner A64 MMC support
+In-Reply-To: <56C1D9C0.6020601@arm.com>
+References: <1455300000-18723-1-git-send-email-andre.przywara@arm.com>
+ <56BE29A1.3060107@redhat.com> <56C1A590.6030500@arm.com>
+ <56C1C7BB.1040602@redhat.com> <56C1D9C0.6020601@arm.com>
+Message-ID: <56C1F446.9020801@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/14/2016 10:27 PM, Keerthy wrote:
-> 
-> 
-> On Saturday 13 February 2016 04:11 AM, Tony Lindgren wrote:
->> * Nishanth Menon <nm@ti.com> [160212 14:32]:
->>> On Fri, Feb 12, 2016 at 4:23 PM, Tony Lindgren <tony@atomide.com> wrote:
->>>> * Nishanth Menon <nm@ti.com> [160209 14:17]:
->>>>> On 02/09/2016 04:09 PM, Eduardo Valentin wrote:
->>>>>> On Mon, Feb 08, 2016 at 03:15:05PM +0530, Keerthy wrote:
->>>>>>> The thermal threholds for am57xx are different from that of dra7.
->>>>>>> Correcting the thresholds for the same.
->>>>>>>
->>>>>>> Signed-off-by: Keerthy <j-keerthy@ti.com>
->>>>>>> ---
->>>>>>>
->>>>>>> Depends on: https://lkml.org/lkml/2016/2/8/90
->>>>>>>
->>>>>>>   arch/arm/boot/dts/am57xx-beagle-x15.dts | 24 ++++++++++++++++++++++++
->>>>>>>   1 file changed, 24 insertions(+)
->>>>>>>
->>>>>>> Index: linux/arch/arm/boot/dts/am57xx-beagle-x15.dts
->>>>>>> ===================================================================
->>>>>>> --- linux.orig/arch/arm/boot/dts/am57xx-beagle-x15.dts     2016-02-08 14:57:05.514959101 +0530
->>>>>>> +++ linux/arch/arm/boot/dts/am57xx-beagle-x15.dts  2016-02-08 14:57:05.510959168 +0530
->>>>>>
->>>>>> Sorry, did not bother to check, but is this the only user of am57xx?
->>>>>
->>>>> we will have AM57xx-IDK as well coming down the line. we already have
->>>>> arch/arm/boot/dts/am57xx-cl-som-am57x.dts
->>>>> arch/arm/boot/dts/am57xx-sbc-am57x.dts - not really sure what grade of
->>>>> silicon are used in cl-SOM and sbc boards.
->>>>
->>>> Hmm can this one wait for v4.6 or is it critical for v4.5-rc
->>>> cycle?
->>>
->>> personally, I'd like to NAK this patch -> lack of reference
->>> documentation, and guidance for various AM57xx boards in a generic
->>> patch should probably be followed IMHO.
+Hi,
+
+On 15-02-16 14:59, Andre Przywara wrote:
+> Hi Hans,
+>
+> ....
+>
 >>
->> OK let's wait for that then.
-> 
-> OK. I will send a v2 with better documentation.
+>> p.s.
+>>
+>> I love the work you've been doing on the A64, I've not had a chance
+>> to try it out yet though. Have you made any progress with getting
+>> the mmc slot to work ?  If not maybe I can make some time I've
+>> prior experience in bringing up the mmc slot on other Allwinner SoCs
+>
+> Thanks for that!
+>
+> So we made some progress on the weekend (with the help of #linux-sunxi):
+> 1) The regulator node was stupidly put by me into a separate child node
+> without putting address and size cells into. So I just moved it into
+> /soc directly now and that seems to fixed the missing regulator.
+> 2) The reset node is a allwinner,sun6i-a31-ahb1-reset, which does not
+> get registered automatically, but by an explicit call from mach-sunxi/.
+> I wonder why we do this (yes, I saw that comment, but still...) and if
+> it would work with a normal MODULE_DEVICE_TABLE() declaration.
+> There is and will be no equivalent to the mach- directory on arm64.
+> 3) As Jens pointed out, the MMC IP block isn't really compatible.
+> Changing the clocks is easy (done already), but we need to come up with
+> code to cover the new phase setting registers in the A64 MMC register block.
+>
+> Interestingly somehow hacking this (pretending it is compatible) seems
+> to work, though I got reports from people about mysterious kernel
+> crashes, so I'm inclined to leave MMC out of the first patch series.
+>
+> So if you could take a look at the new registers (starting at offset
+> 0x140) and work out what we actually need to do here, that would be
+> great. I have no real clue about what they actually do and how they
+> relate to the current output and sample clock phase.
+> To me it looks like we might get away with just triggering the automatic
+> calibration and the hardware does the rest for us - keep your fingers
+> crossed ;-)
 
+Just triggering the automatic calibration sounds good, this likely will
+result in better values then the magic values we are currently using for
+older SoCs.
 
+As for the meaning of those registers, what we've been doing with the phase
+registers so far pretty much boils down to look at what Allwinner BSP kernel
+sources do, and then do the same in u-boot / the mainline driver since
+the mmc controller documentation is very limited.
 
-This data is in the AM572x datasheet:
-http://www.ti.com/lit/ds/symlink/am5728.pdf
+Do you have a git tree with your wip mmc support somewhere ? Then I or
+maybe Chen-Yu can take a look when we've time.
 
-Table 5-3 in the current version contains the maximum junction
-temperatures.
-
-this indicates that there are "Commercial" and "extended" -> we may
-need to introduce just 2 dtsis -> am57xx-commercial and
-am57xx-extended and reuse those based on the part on the board. just a
-suggestion..
-
-
--- 
 Regards,
-Nishanth Menon
+
+Hans
