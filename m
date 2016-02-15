@@ -1,97 +1,85 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 15 Feb 2016 19:07:48 +0000
-Subject: [PATCH v4 21/23] arm64: hw_breakpoint: Allow EL2 breakpoints if
- running in HYP
-In-Reply-To: <20160215174656.GN6298@arm.com>
-References: <1455216004-19499-1-git-send-email-marc.zyngier@arm.com>
- <1455216004-19499-22-git-send-email-marc.zyngier@arm.com>
- <20160215174656.GN6298@arm.com>
-Message-ID: <20160215190747.GR6298@arm.com>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Mon, 15 Feb 2016 20:12:33 +0100
+Subject: Crashes in arm qemu emulations due to 'cpufreq: governor: Replace
+ timers with utilization ...'
+In-Reply-To: <56C22105.6050900@arm.com>
+References: <20160215170527.GA24453@roeck-us.net>
+ <CAJZ5v0gLankSuziQq25qTCyNqeOX43yD9jnJu_XXwbdyajfmKg@mail.gmail.com>
+ <56C21DD0.40508@arm.com>
+ <CAJZ5v0gfOVyoWeee5jg7NxLFm-xwdA6-sPQV+cJ=NWJOV-wYzg@mail.gmail.com>
+ <56C22105.6050900@arm.com>
+Message-ID: <CAJZ5v0gXGzzJ7CcbgNNO-ULrtd9Z2hbqHeuXRYJLFLrh+BWVWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 15, 2016 at 05:46:56PM +0000, Will Deacon wrote:
-> On Thu, Feb 11, 2016 at 06:40:02PM +0000, Marc Zyngier wrote:
-> > With VHE, we place kernel {watch,break}-points at EL2 to get things
-> > like kgdb and "perf -e mem:..." working.
-> > 
-> > This requires a bit of repainting in the low-level encore/decode,
-> > but is otherwise pretty simple.
-> > 
-> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> > ---
-> >  arch/arm64/include/asm/hw_breakpoint.h | 49 +++++++++++++++++++++-------------
-> >  1 file changed, 31 insertions(+), 18 deletions(-)
-> > 
-> > diff --git a/arch/arm64/include/asm/hw_breakpoint.h b/arch/arm64/include/asm/hw_breakpoint.h
-> > index 9732908..4d8d5a8 100644
-> > --- a/arch/arm64/include/asm/hw_breakpoint.h
-> > +++ b/arch/arm64/include/asm/hw_breakpoint.h
-> > @@ -18,6 +18,7 @@
-> >  
-> >  #include <asm/cputype.h>
-> >  #include <asm/cpufeature.h>
-> > +#include <asm/virt.h>
-> >  
-> >  #ifdef __KERNEL__
-> >  
-> > @@ -35,24 +36,6 @@ struct arch_hw_breakpoint {
-> >  	struct arch_hw_breakpoint_ctrl ctrl;
-> >  };
-> >  
-> > -static inline u32 encode_ctrl_reg(struct arch_hw_breakpoint_ctrl ctrl)
-> > -{
-> > -	return (ctrl.len << 5) | (ctrl.type << 3) | (ctrl.privilege << 1) |
-> > -		ctrl.enabled;
-> > -}
-> > -
-> > -static inline void decode_ctrl_reg(u32 reg,
-> > -				   struct arch_hw_breakpoint_ctrl *ctrl)
-> > -{
-> > -	ctrl->enabled	= reg & 0x1;
-> > -	reg >>= 1;
-> > -	ctrl->privilege	= reg & 0x3;
-> > -	reg >>= 2;
-> > -	ctrl->type	= reg & 0x3;
-> > -	reg >>= 2;
-> > -	ctrl->len	= reg & 0xff;
-> > -}
-> > -
-> >  /* Breakpoint */
-> >  #define ARM_BREAKPOINT_EXECUTE	0
-> >  
-> > @@ -62,6 +45,7 @@ static inline void decode_ctrl_reg(u32 reg,
-> >  #define AARCH64_ESR_ACCESS_MASK	(1 << 6)
-> >  
-> >  /* Privilege Levels */
-> > +#define AARCH64_BREAKPOINT_EL2	0
-> >  #define AARCH64_BREAKPOINT_EL1	1
-> >  #define AARCH64_BREAKPOINT_EL0	2
-> >  
-> > @@ -76,6 +60,35 @@ static inline void decode_ctrl_reg(u32 reg,
-> >  #define ARM_KERNEL_STEP_ACTIVE	1
-> >  #define ARM_KERNEL_STEP_SUSPEND	2
-> >  
-> > +#define DBG_HMC_HYP		(1 << 13)
-> > +#define DBG_SSC_HYP		(3 << 14)
-> 
-> Why do we need to touch the SSC field at all?
-> 
-> > +
-> > +static inline u32 encode_ctrl_reg(struct arch_hw_breakpoint_ctrl ctrl)
-> > +{
-> > +	u32 val = (ctrl.len << 5) | (ctrl.type << 3) | ctrl.enabled;
-> > +
-> > +	if (is_kernel_in_hyp_mode() && ctrl.privilege == AARCH64_BREAKPOINT_EL1)
-> > +		val |= DBG_HMC_HYP | DBG_SSC_HYP | (AARCH64_BREAKPOINT_EL2 << 1);
-> 
-> I don't think this is correct. We want to allow, for example, a userspace
-> watchpoint to fire thanks to something like put_user, so the encoding
-> really needs to build up the PMC field (like we do already), then orr in
-> the HMC field.
+On Mon, Feb 15, 2016 at 8:03 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 15/02/16 18:54, Rafael J. Wysocki wrote:
+>> On Mon, Feb 15, 2016 at 7:49 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>> On 15/02/16 18:41, Rafael J. Wysocki wrote:
+>>>> On Mon, Feb 15, 2016 at 6:05 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+>>>>> Rafael,
+>>>>
+>>>> Hi,
+>>>>
+>>>> Thanks for the report!
+>>>>
+>>>>> I see crashes in various arm qemu tests due to 'cpufreq: governor: Replace
+>>>>> timers with utilization update callbacks' with next-20160215. An example
+>>>>> crash log and bisect results are attached below.
+>>>>>
+>>>>> Please let me know if there is anything I can do to help tracking down
+>>>>> the problem.
+>>>>
+>>>> It looks like we've uncovered some nastiness in the arch ARM code (see below).
+>>>>
+>>>> [cut]
+>>>>
+>>>>> [    1.340000] Unable to handle kernel NULL pointer dereference at virtual address 00000000
+>>>>> [    1.340000] pgd = c0204000
+>>>>> [    1.340000] [00000000] *pgd=00000000
+>>>>> [    1.340000] Internal error: Oops: 80000005 [#1] SMP ARM
+>>>>> [    1.340000] Modules linked in:
+>>>>> [    1.340000] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.5.0-rc4-next-20160215 #1
+>>>>> [    1.340000] Hardware name: Generic OMAP3-GP (Flattened Device Tree)
+>>>>> [    1.340000] task: cb060000 ti: cb05a000 task.ti: cb05a000
+>>>>> [    1.340000] PC is at 0x0
+>>>>> [    1.340000] LR is at arch_send_call_function_single_ipi+0x34/0x38
+>>>>
+>>>> Since this is ARM, arch_send_call_function_single_ipi() looks like this:
+>>>>
+>>>> void arch_send_call_function_single_ipi(int cpu)
+>>>> {
+>>>>          smp_cross_call(cpumask_of(cpu), IPI_CALL_FUNC_SINGLE);
+>>>> }
+>>>>
+>>>> so I'm not sure how the NULL pointer deref is possible even.
+>>>>
+>>>> The only thing coming to mind would be that cpumask_of(cpu) triggers
+>>>> this, but I'm not sure how exactly that can happen.
+>>>>
+>>>> I need help from somebody who knows how this low-level stuff works on ARM.
+>>>
+>>> Given that OMAP3 is a UP system, there is zero chance that it has
+>>> registered the magic hook that delivers IPIs (its interrupt controller
+>>> is not even capable of doing so).
+>>>
+>>> I don't really know the context, but IPIs on a UP system seem at best odd.
+>>
+>> That would explain it, thanks.
+>>
+>> So it looks like we should always use irq_work_queue() on UP even if
+>> CONFIG_SMP is set, shouldn't we?
+>
+> Something like that, yes. CONFIG_SMP is not an indication of an SMP
+> system anymore (we've even dropped the config option on arm64).
+>
+> Hopefully num_possible_cpus() is reliable enough to let you do the right
+> thing...
 
-Hmm, I got my arm and my arm64 mixed up here. For the latter, we don't
-actually support EL0+EL1 watchpoints, but I still think that the
-{HMC,SSC,PMC} encoding of {1,00,xx} is cleaner.
+Well, in fact I can always use irq_work_queue() in there at least for
+the time being.
 
-Will
+Let me prepare a patch.
+
+Thanks,
+Rafael
