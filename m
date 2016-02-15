@@ -1,31 +1,43 @@
-From: vincent.abriou@st.com (Vincent ABRIOU)
-Date: Mon, 15 Feb 2016 17:44:13 +0100
-Subject: [PATCH v2 16/17] drm/sti: removed optional dummy encoder
- mode_fixup function.
-In-Reply-To: <7f47c6a7b00e4f16af672ebf3a277e31ad117e21.1455540137.git.palminha@synopsys.com>
-References: <cover.1455540137.git.palminha@synopsys.com>
- <7f47c6a7b00e4f16af672ebf3a277e31ad117e21.1455540137.git.palminha@synopsys.com>
-Message-ID: <56C2005D.3020302@st.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 15 Feb 2016 08:47:57 -0800
+Subject: GPIO regression in Linux next caused by syscon change
+In-Reply-To: <1455552961.4899.37.camel@pengutronix.de>
+References: <20160213002643.GQ19432@atomide.com>
+ <20160213004935.GR19432@atomide.com>
+ <CA+gwMccZeYimupmGsMX8YbNH9eEA6=Xi=rupciubBwzktfjvBA@mail.gmail.com>
+ <20160215160115.GU19432@atomide.com>
+ <1455552961.4899.37.camel@pengutronix.de>
+Message-ID: <20160215164757.GV19432@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+* Philipp Zabel <p.zabel@pengutronix.de> [160215 08:17]:
+> Am Montag, den 15.02.2016, 08:01 -0800 schrieb Tony Lindgren:
+> > * Philipp Zabel <philipp.zabel@gmail.com> [160214 11:24]:
+> > > I've just replaced the of_iomap() call with an open coded version,
+> > > calling of_address_to_resource() and ioremap() directly. That was
+> > > needed so I can use the struct resource returned by
+> > > of_address_to_resource() to set the syscon_config.max_register. I
+> > > don't see where this could cause resource overlap. Does just setting
+> > > syscon_config.max_register to zero again make the problem disappear?
+> > 
+> > Yes commenting out the syscon_config.max_register line in your patch
+> > makes things work again.
+> > 
+> > So what does that tell us about the problem?
+> 
+> Maybe some out of bounds writes that previously worked are now catched
+> by the max_register check in regmap_writable and regmap_write returns
+> -EIO instead of the write being executed.
 
+Hmm weird that something like that would not produce errors?
 
-On 02/15/2016 02:01 PM, Carlos Palminha wrote:
-> mode_fixup function for encoder drivers became optional with patch
-> http://patchwork.freedesktop.org/patch/msgid/1455106522-32307-1-git-send-email-palminha at synopsys.com
->
-> This patch set nukes all the dummy mode_fixup implementations.
->
-> (made on top of Daniel topic/drm-misc branch)
->
-> Signed-off-by: Carlos Palminha <palminha@synopsys.com>
-> ---
->   drivers/gpu/drm/sti/sti_tvout.c | 10 ----------
->   1 file changed, 10 deletions(-)
->
+> Is there any omap_ctrl_write?() call with an offset > 0x32c into
+> scm_conf?
 
-Acked-by: Vincent Abriou <vincent.abriou@st.com>
+Indeed, that's where things go wrong. Adding Tero to Cc, something
+is wrong there.
 
-BR
-Vincent
+Regards,
+
+Tony
