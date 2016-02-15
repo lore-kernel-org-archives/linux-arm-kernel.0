@@ -1,47 +1,54 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 15 Feb 2016 16:18:18 +0900
-Subject: [PATCH 01/68] ARM: dts: gose: Add GPIO keys to DT
-In-Reply-To: <CAMuHMdVefum3YbaxhMX_0hHrmTFYU-pWYZTwSUveQDLFArLdYw@mail.gmail.com>
-References: <cover.1455303422.git.horms+renesas@verge.net.au>
- <d7d5974b156e2ef7436483de00ccada5987c9d31.1455303422.git.horms+renesas@verge.net.au>
- <CAMuHMdVefum3YbaxhMX_0hHrmTFYU-pWYZTwSUveQDLFArLdYw@mail.gmail.com>
-Message-ID: <20160215071817.GA4528@verge.net.au>
+From: xinliang.liu@linaro.org (Xinliang Liu)
+Date: Mon, 15 Feb 2016 15:30:10 +0800
+Subject: [PATCH v4 01/11] drm/hisilicon: Add device tree binding for
+ hi6220 display subsystem
+In-Reply-To: <20160208201246.GA17459@rob-hp-laptop>
+References: <1454729098-79807-1-git-send-email-xinliang.liu@linaro.org>
+ <1454729098-79807-2-git-send-email-xinliang.liu@linaro.org>
+ <20160208201246.GA17459@rob-hp-laptop>
+Message-ID: <CAGd==07aNFtr6yEgULxg+7WLbqq7GAAWng4GV=oohSnM5fP45A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 13, 2016 at 09:23:47PM +0100, Geert Uytterhoeven wrote:
-> On Fri, Feb 12, 2016 at 8:04 PM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
-> > Instantiate the GPIO keys in the gose device tree.
-> >
-> > Based on similar work for the koelsch board by Laurent Pinchart.
-> >
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > Tested-by: Magnus Damm <damm+renesas@opensource.se>
-> > ---
-> >  arch/arm/boot/dts/r8a7793-gose.dts | 82 ++++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 82 insertions(+)
-> >
-> > diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
-> > index baa59fe84298..ccbc1c66cc6c 100644
-> > --- a/arch/arm/boot/dts/r8a7793-gose.dts
-> > +++ b/arch/arm/boot/dts/r8a7793-gose.dts
-> > @@ -31,6 +31,88 @@
-> >                 device_type = "memory";
-> >                 reg = <0 0x40000000 0 0x40000000>;
-> >         };
-> > +
-> > +       gpio-keys {
-> > +               compatible = "gpio-keys";
-> > +
-> > +               key-1 {
-> > +                       gpios = <&gpio5 0 GPIO_ACTIVE_LOW>;
-> > +                       linux,code = <KEY_1>;
-> > +                       label = "SW2-1";
-> > +                       gpio-key,wakeup;
-> 
-> In the mean time, "gpio-key,wakeup" has been deprecated in favor of
-> "wakeup-source".
+On 9 February 2016 at 04:12, Rob Herring <robh@kernel.org> wrote:
+> On Sat, Feb 06, 2016 at 11:24:48AM +0800, Xinliang Liu wrote:
+>> Add ADE display controller binding doc.
+>> Add DesignWare DSI Host Controller v1.20a binding doc.
+>
+> One comment, otherwise:
+>
+> Acked-by: Rob Herring <robh@kernel.org>
+>
+>> +Board specific:
+>> +     &dsi {
+>> +             status = "ok";
+>> +
+>> +             ports {
+>> +                     /* 1 for output port */
+>> +                     port at 1 {
+>> +                             #address-cells = <1>;
+>> +                             #size-cells = <0>;
+>> +                             reg = <1>;
+>> +
+>> +                             /* 0 for bridge, other value for panel */
+>
+> The endpoint address would not change based on bridge or panel. So you
+> can drop the unit address here.
 
-Is the change just a matter of s/gpio-key,wakeup/wakeup-source/ ?
-If so I'll sort things out.
+yes, I can drop the unit address, since it only support bridge in the
+DSI code currently, right?
+
+One question: How to distinguish panel and bridge endpoint?  I am
+thinking to support panel now.
+
+Thanks,
+-xinliang
+
+>
+>> +                             dsi_out0: endpoint at 0 {
+>> +                                     reg = <0>;
+>> +                                     remote-endpoint = <&adv7533_in>;
+>> +                             };
+>> +                     };
+>> +             };
+>> +     };
