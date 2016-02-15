@@ -1,60 +1,70 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 15 Feb 2016 11:10:14 +0100
-Subject: arm qemu test failures due to 'driver-core: platform: probe
- of-devices only using list of compatibles'
-In-Reply-To: <20160215100415.GD10826@n2100.arm.linux.org.uk>
-References: <20160214165010.GA3189@roeck-us.net>
- <20160214195501.GA12289@pengutronix.de>
- <20160214200755.GB10826@n2100.arm.linux.org.uk>
- <20160215081750.GD12289@pengutronix.de>
- <20160215085818.GC10826@n2100.arm.linux.org.uk>
- <20160215091406.GE12289@pengutronix.de>
- <20160215100415.GD10826@n2100.arm.linux.org.uk>
-Message-ID: <20160215101014.GG12289@pengutronix.de>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Mon, 15 Feb 2016 11:13:26 +0100
+Subject: [PATCH v4 2/8] [media] VPU: mediatek: support Mediatek VPU
+In-Reply-To: <1454585703-42428-3-git-send-email-tiffany.lin@mediatek.com>
+References: <1454585703-42428-1-git-send-email-tiffany.lin@mediatek.com>
+ <1454585703-42428-2-git-send-email-tiffany.lin@mediatek.com>
+ <1454585703-42428-3-git-send-email-tiffany.lin@mediatek.com>
+Message-ID: <56C1A4C6.7040601@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
-
-On Mon, Feb 15, 2016 at 10:04:15AM +0000, Russell King - ARM Linux wrote:
-> On Mon, Feb 15, 2016 at 10:14:06AM +0100, Uwe Kleine-K?nig wrote:
-> > On Mon, Feb 15, 2016 at 08:58:18AM +0000, Russell King - ARM Linux wrote:
-> > > On Mon, Feb 15, 2016 at 09:17:50AM +0100, Uwe Kleine-K?nig wrote:
-> > > > On Sun, Feb 14, 2016 at 08:07:55PM +0000, Russell King - ARM Linux wrote:
-> > > > > On Sun, Feb 14, 2016 at 08:55:01PM +0100, Uwe Kleine-K?nig wrote:
-> > > > > > So the unexpected abnormality here is that even though this device is
-> > > > > > instantiated by dt, the driver doesn't provide any compatibles.
-> > > > > > Either my expectation is wrong, then 67d02a1bbb33455 should be reverted
-> > > > > 
-> > > > > Your expectation is wrong.  AMBA primecell devices have hardware IDs
-> > > > > and are matched to their drivers by those IDs.  Just like PCI.
-> > > > 
-> > > > pci devices don't appear in dt, do they? I don't see the connection
-> > > > between amba devices and platform devices, see my other mail in this
-> > > > thread for some more details.
-> > > 
-> > > They both have hardware IDs, and they are both matched via those hardware
-> > > IDs.
-> > 
-> > I changed platform_match which is about matching by dt compatible, acpi
-> > and/or device name. I don't see how this can affect an amba device given
-> > they match to a driver by a hardware id.
-> > 
-> > > Your change has introduced a regression and is therefore wrong.
-> > 
-> > I'd like to understand though why and how my commit is wrong to be able
-> > to fix it instead of getting it reverted.
+On 02/04/2016 12:34 PM, Tiffany Lin wrote:
+> The VPU driver for hw video codec embedded in Mediatek's MT8173 SOCs.
+> It is able to handle video decoding/encoding of in a range of formats.
+> The driver provides with VPU firmware download, memory management and
+> the communication interface between CPU and VPU.
+> For VPU initialization, it will create virtual memory for CPU access and
+> IOMMU address for vcodec hw device access. When a decode/encode instance
+> opens a device node, vpu driver will download vpu firmware to the device.
+> A decode/encode instant will decode/encode a frame using VPU
+> interface to interrupt vpu to handle decoding/encoding jobs.
 > 
-> I don't have the commit, and I haven't seen the patch so I can't
-> comment further, sorry.
+> Signed-off-by: Andrew-CT Chen <andrew-ct.chen@mediatek.com>
+> Signed-off-by: Tiffany Lin <tiffany.lin@mediatek.com>
+> ---
+>  drivers/media/platform/Kconfig           |    9 +
+>  drivers/media/platform/Makefile          |    2 +
+>  drivers/media/platform/mtk-vpu/Makefile  |    1 +
+>  drivers/media/platform/mtk-vpu/mtk_vpu.c |  994 ++++++++++++++++++++++++++++++
+>  drivers/media/platform/mtk-vpu/mtk_vpu.h |  167 +++++
+>  5 files changed, 1173 insertions(+)
+>  create mode 100644 drivers/media/platform/mtk-vpu/Makefile
+>  create mode 100644 drivers/media/platform/mtk-vpu/mtk_vpu.c
+>  create mode 100644 drivers/media/platform/mtk-vpu/mtk_vpu.h
+> 
+> diff --git a/drivers/media/platform/Kconfig b/drivers/media/platform/Kconfig
+> index ccbc974..ba812d6 100644
+> --- a/drivers/media/platform/Kconfig
+> +++ b/drivers/media/platform/Kconfig
+> @@ -148,6 +148,15 @@ config VIDEO_CODA
+>  	   Coda is a range of video codec IPs that supports
+>  	   H.264, MPEG-4, and other video formats.
+>  
+> +config VIDEO_MEDIATEK_VPU
+> +	tristate "Mediatek Video Processor Unit"
+> +	depends on VIDEO_DEV && VIDEO_V4L2 && ARCH_MEDIATEK
+> +	---help---
+> +	    This driver provides downloading VPU firmware and
+> +	    communicating with VPU. This driver for hw video
+> +	    codec embedded in new Mediatek's SOCs. It is able
+> +	    to handle video decoding/encoding in a range of formats.
 
-It's in -next. For a quick look:
+Can you be more specific in this text and mention for which Mediatek SoCs
+this driver is for? Just like you did in the commit log.
 
-	https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/?id=67d02a1bbb33455
+Also add something like this:
 
-Best regards
-Uwe
+          To compile this driver as a module, choose M here: the module
+          will be called mtk-vpu.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+I always find it useful if the Kconfig text mentions the module name.
+
+Regards,
+
+	Hans
+
+> +
+>  config VIDEO_MEM2MEM_DEINTERLACE
+>  	tristate "Deinterlace support"
+>  	depends on VIDEO_DEV && VIDEO_V4L2 && DMA_ENGINE
