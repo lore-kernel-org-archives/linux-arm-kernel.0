@@ -1,79 +1,79 @@
-From: zhangqing@rock-chips.com (Elaine Zhang)
-Date: Mon, 15 Feb 2016 16:38:49 +0800
-Subject: [PATCH v1 4/6] dt/bindings: power: add RK3399 SoCs header for
- power-domain
-In-Reply-To: <1455525531-14083-1-git-send-email-zhangqing@rock-chips.com>
-References: <1455525531-14083-1-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <1455525531-14083-5-git-send-email-zhangqing@rock-chips.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 15 Feb 2016 09:46:05 +0100
+Subject: [PATCH v2] ARM: mm: mark section-aligned portion of rodata NX
+In-Reply-To: <4300378.sBT9DdB2Gc@wuerfel>
+References: <20151207223534.GA13722@www.outflux.net>
+ <CAGXu5jLDK8eVO2kUD1cB3TArL8k8pF=igc3O04Fa40QgQ2pwNw@mail.gmail.com>
+ <20160211180032.GY10826@n2100.arm.linux.org.uk>
+ <4300378.sBT9DdB2Gc@wuerfel>
+Message-ID: <CAMuHMdVUXH-_PB+DNuCbTTXD6Zmy4iG9i=-ame4PDVAOKv2tvQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to a description from TRM, add all the power domains
+On Fri, Feb 12, 2016 at 10:45 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 11 February 2016 18:00:32 Russell King - ARM Linux wrote:
+>> On Fri, Jan 22, 2016 at 01:19:03PM -0800, Kees Cook wrote:
+>> > On Tue, Dec 8, 2015 at 10:38 AM, Kees Cook <keescook@chromium.org> wrote:
+>> > > On Mon, Dec 7, 2015 at 11:47 PM, Ard Biesheuvel
+>> > > <ard.biesheuvel@linaro.org> wrote:
+>> > >> On 7 December 2015 at 23:35, Kees Cook <keescook@chromium.org> wrote:
+>> > >>>  /*
+>> > >>> + * Without CONFIG_DEBUG_ALIGN_RODATA, __start_rodata_section_aligned will
+>> > >>> + * be the first section-aligned location after __start_rodata. Otherwise,
+>> > >>> + * it will be equal to __start_rodata.
+>> > >>> + */
+>> > >>> +__start_rodata_section_aligned = ALIGN(__start_rodata, 1 << SECTION_SHIFT);
+>> ...
+>>
+>> I'm afraid this causes build errors on two configurations:
+>>
+>> ./arch/arm/kernel/vmlinux.lds:701: undefined symbol `SECTION_SHIFT' referenced in expression
+>>
+>> which I think is down to the new __start_rodata_section_aligned line.
+>>
+>> Olof's builder errored out with this for both allnoconfig and
+>> lpc18xx_defconfig builds.  Both probably due to CONFIG_MMU being
+>> unset, and hence no definition for SECTION_SHIFT.
+>>
+>> I think you need to make this conditional on CONFIG_MMU.
+>
+> I've hit another problem with this patch, when using XIP_KERNEL, I now see
+>
+> arch/arm/mm/built-in.o:(.data+0x4bc): undefined reference to `__start_rodata_section_aligned'
+>
+> in linux-next, apparently because of the combination with "ARM: 8513/1: xip: Move
+> XIP linking to a separate file".
 
-Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
----
- include/dt-bindings/power/rk3399-power.h | 53 ++++++++++++++++++++++++++++++++
- 1 file changed, 53 insertions(+)
- create mode 100644 include/dt-bindings/power/rk3399-power.h
+Is this due to the copy not taking into account the recent changes to
+vmlinux.lds.S?
 
-diff --git a/include/dt-bindings/power/rk3399-power.h b/include/dt-bindings/power/rk3399-power.h
-new file mode 100644
-index 0000000..69fbd67
---- /dev/null
-+++ b/include/dt-bindings/power/rk3399-power.h
-@@ -0,0 +1,53 @@
-+#ifndef __DT_BINDINGS_POWER_RK3399_POWER_H__
-+#define __DT_BINDINGS_POWER_RK3399_POWER_H__
-+
-+/* VD_CORE_L */
-+#define RK3399_PD_A53_L0	0
-+#define RK3399_PD_A53_L1	1
-+#define RK3399_PD_A53_L2	2
-+#define RK3399_PD_A53_L3	3
-+#define RK3399_PD_SCU_L		4
-+
-+/* VD_CORE_B */
-+#define RK3399_PD_A72_B0	5
-+#define RK3399_PD_A72_B1	6
-+#define RK3399_PD_SCU_B		7
-+
-+/* VD_CENTER */
-+#define RK3399_PD_CENTER	8
-+#define RK3399_PD_VCODEC	9
-+#define RK3399_PD_RGA		10
-+#define RK3399_PD_IEP		11
-+#define RK3399_PD_VDU		12
-+
-+/* VD_LOGIC */
-+#define RK3399_PD_PERILP	13
-+#define RK3399_PD_PERIHP	14
-+#define RK3399_PD_VIO		15
-+#define RK3399_PD_VO		16
-+#define RK3399_PD_VOPB		17
-+#define RK3399_PD_VOPL		18
-+#define RK3399_PD_ISP0		19
-+#define RK3399_PD_ISP1		20
-+#define RK3399_PD_HDCP		21
-+#define RK3399_PD_TCPD0		22
-+#define RK3399_PD_TCPD1		23
-+#define RK3399_PD_GIC		24
-+#define RK3399_PD_ALIVE		25
-+#define RK3399_PD_USB3		26
-+#define RK3399_PD_SD		27
-+#define RK3399_PD_CCI		28
-+#define RK3399_PD_CCI0		29
-+#define RK3399_PD_CCI1		30
-+#define RK3399_PD_GMAC		31
-+#define RK3399_PD_EMMC		32
-+#define RK3399_PD_EDP		33
-+#define RK3399_PD_SDIOAUDIO	34
-+
-+/* VD_GPU */
-+#define RK3399_PD_GPU		35
-+
-+/* VD_PMU */
-+#define RK3399_PD_PMU		36
-+
-+#endif
--- 
-1.9.1
+"git show 538bf4694898b19e" with copy-rename detection shows:
+
+copy from arch/arm/kernel/vmlinux.lds.S
+copy to arch/arm/kernel/vmlinux-xip.lds.S
+index a6e395c53a48e045..6f59ef290289e078 100644
+--- a/arch/arm/kernel/vmlinux.lds.S
++++ b/arch/arm/kernel/vmlinux-xip.lds.S
+
+[...]
+
+@@ -117,7 +114,7 @@ SECTIONS
+                        ARM_CPU_KEEP(PROC_INFO)
+        }
+
+-#ifdef CONFIG_DEBUG_ALIGN_RODATA
++#ifdef CONFIG_DEBUG_RODATA
+        . = ALIGN(1<<SECTION_SHIFT);
+ #endif
+        RO_DATA(PAGE_SIZE)
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert@linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
