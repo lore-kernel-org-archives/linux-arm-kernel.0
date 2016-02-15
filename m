@@ -1,88 +1,103 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 15 Feb 2016 10:25:27 +0100
-Subject: [PATCH v10 4/8] mfd: fsl imx25 Touchscreen ADC driver
-In-Reply-To: <20160209103513.GC24522@x1>
-References: <1450101234-2191-1-git-send-email-mpa@pengutronix.de>
- <6151166.y0HMDdqtvF@adelgunde> <20160209103513.GC24522@x1>
-Message-ID: <6071608.sYYGeTKS0i@adelgunde>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 15 Feb 2016 10:28:32 +0100
+Subject: [PATCH] arm64: mark kernel text segment as MEMBLOCK_NOMAP
+Message-ID: <1455528512-32491-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, February 09, 2016 10:35:13 AM Lee Jones wrote:
-> On Tue, 02 Feb 2016, Markus Pargmann wrote:
-> 
-> > Hi,
-> > 
-> > On Monday, January 11, 2016 06:54:41 AM Lee Jones wrote:
-> > > On Mon, 14 Dec 2015, Markus Pargmann wrote:
-> > > 
-> > > > This is the core driver for imx25 touchscreen/adc driver. The module
-> > > > has one shared ADC and two different conversion queues which use the
-> > > > ADC. The two queues are identical. Both can be used for general purpose
-> > > > ADC but one is meant to be used for touchscreens.
-> > > > 
-> > > > This driver is the core which manages the central components and
-> > > > registers of the TSC/ADC unit. It manages the IRQs and forwards them to
-> > > > the correct components.
-> > > > 
-> > > > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> > > > Signed-off-by: Denis Carikli <denis@eukrea.com>
-> > > > 
-> > > > [ensure correct ADC clock depending on the IPG clock]
-> > > > Signed-off-by: Juergen Borleis <jbe@pengutronix.de>
-> > > > Acked-by: Jonathan Cameron <jic23@kernel.org>
-> > > > ---
-> > > > 
-> > > > Notes:
-> > > >     Changes in v7:
-> > > >      - Cleanup bit defines in header files to be more readable
-> > > >      - Fix irq check to return with an error for irq <= 0
-> > > >      - Add COMPILE_TEST in Kconfig file
-> > > >     
-> > > >     Changes in v5:
-> > > >      - Remove ifdef CONFIG_OF as this driver is only for DT usage
-> > > >      - Remove module owner
-> > > >      - Add Kconfig dependencies ARCH_MX25 and OF
-> > > > 
-> > > >  drivers/mfd/Kconfig             |   9 ++
-> > > >  drivers/mfd/Makefile            |   2 +
-> > > >  drivers/mfd/fsl-imx25-tsadc.c   | 203 ++++++++++++++++++++++++++++++++++++++++
-> > > >  include/linux/mfd/imx25-tsadc.h | 140 +++++++++++++++++++++++++++
-> > > >  4 files changed, 354 insertions(+)
-> > > >  create mode 100644 drivers/mfd/fsl-imx25-tsadc.c
-> > > >  create mode 100644 include/linux/mfd/imx25-tsadc.h
-> > > 
-> > > For my own reference:
-> > >   Acked-by: Lee Jones <lee.jones@linaro.org>
-> > > 
-> > > I will apply this and sent out pull-requests to the relevant
-> > > maintainers once -rc1 is out.
-> > 
-> > Thanks. Do you mean just this patch or the whole series?
-> 
-> I will take all of the /driver patches.  The ARM patches need to go in
-> through ARM-SoC via the relevant sub-arch maintainer(s).
-> 
-> > Shall I resend the whole series to fix the commit title of the first
-> > patch?
-> 
-> No, that's fine.  I'll handle that *this time*.
+Commit 752af28bd711 ("arm64: move kernel image to base of vmalloc area")
+moves the mapping of the kernel text and data segments out of the linear
+region, and takes care not to create a writable alias of the read-only
+kernel text segment by checking each memblock against overlap when the
+memblocks are mapped into the linear mapping.
 
-Thank you.
+However, it is more correct, and much simpler, to mark the [_stext, _etext]
+interval as MEMBLOCK_NOMAP. This will also prevent the interval from being
+omitted from the linear region, but this fact will now also be reflected
+in the output of pfn_valid(), and so code that expects any pfn_valid()
+page to be mapped and accessible (which is a reasonable assumption) does
+not get surprised by the text segment being inaccessible via the linear
+mapping.
 
-Best Regards,
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
 
-Markus
+This should hopefully address the issue reported by James, but I suppose
+more work is required on the hibernate side to ensure the unmapped text
+region is preserved, since it is no longer covered by the linear mapping.
 
+ arch/arm64/mm/init.c |  1 +
+ arch/arm64/mm/mmu.c  | 39 ++------------------
+ 2 files changed, 4 insertions(+), 36 deletions(-)
+
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index 023c41f22b5b..e895fb6ff9dd 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -218,6 +218,7 @@ void __init arm64_memblock_init(void)
+ 	 * pagetables with memblock.
+ 	 */
+ 	memblock_reserve(__pa(_text), _end - _text);
++	memblock_mark_nomap(__pa(_stext), _etext - _stext);
+ #ifdef CONFIG_BLK_DEV_INITRD
+ 	if (initrd_start) {
+ 		memblock_reserve(initrd_start, initrd_end - initrd_start);
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 5d7e0b801ab7..5ca2f315ba9d 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -352,41 +352,6 @@ static void create_mapping_late(phys_addr_t phys, unsigned long virt,
+ 			     late_pgtable_alloc);
+ }
+ 
+-static void __init __map_memblock(pgd_t *pgd, phys_addr_t start, phys_addr_t end)
+-{
+-
+-	unsigned long kernel_start = __pa(_stext);
+-	unsigned long kernel_end = __pa(_etext);
+-
+-	/*
+-	 * Take care not to create a writable alias for the
+-	 * read-only text and rodata sections of the kernel image.
+-	 */
+-
+-	/* No overlap with the kernel text */
+-	if (end < kernel_start || start >= kernel_end) {
+-		__create_pgd_mapping(pgd, start, __phys_to_virt(start),
+-				     end - start, PAGE_KERNEL,
+-				     early_pgtable_alloc);
+-		return;
+-	}
+-
+-	/*
+-	 * This block overlaps the kernel text mapping. Map the portion(s) which
+-	 * don't overlap.
+-	 */
+-	if (start < kernel_start)
+-		__create_pgd_mapping(pgd, start,
+-				     __phys_to_virt(start),
+-				     kernel_start - start, PAGE_KERNEL,
+-				     early_pgtable_alloc);
+-	if (kernel_end < end)
+-		__create_pgd_mapping(pgd, kernel_end,
+-				     __phys_to_virt(kernel_end),
+-				     end - kernel_end, PAGE_KERNEL,
+-				     early_pgtable_alloc);
+-}
+-
+ static void __init map_mem(pgd_t *pgd)
+ {
+ 	struct memblock_region *reg;
+@@ -401,7 +366,9 @@ static void __init map_mem(pgd_t *pgd)
+ 		if (memblock_is_nomap(reg))
+ 			continue;
+ 
+-		__map_memblock(pgd, start, end);
++		__create_pgd_mapping(pgd, start, __phys_to_virt(start),
++				     end - start, PAGE_KERNEL,
++				     early_pgtable_alloc);
+ 	}
+ }
+ 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160215/95cb73e1/attachment.sig>
+2.5.0
