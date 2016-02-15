@@ -1,41 +1,245 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Mon, 15 Feb 2016 23:12:08 +0100
-Subject: [PATCH] MAINTAINERS: Extend info, add wiki and ml for meson arch
-In-Reply-To: <1455573814-13378-1-git-send-email-carlo@caione.org>
-References: <1455573814-13378-1-git-send-email-carlo@caione.org>
-Message-ID: <CAOQ7t2bbv2mgKd8OzNmeOTf0PWL3Br1RP5uX-bq+TQjDwE=Wkg@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 16 Feb 2016 00:12:52 +0200
+Subject: [PATCH/RFC v2 02/11] soc: renesas: Move pm-rcar to
+ drivers/soc/renesas/
+In-Reply-To: <1455571020-18968-3-git-send-email-geert+renesas@glider.be>
+References: <1455571020-18968-1-git-send-email-geert+renesas@glider.be>
+ <1455571020-18968-3-git-send-email-geert+renesas@glider.be>
+Message-ID: <2551067.YVPTHA6AER@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 15, 2016 at 11:03 PM, Carlo Caione <carlo@caione.org> wrote:
-> From: Carlo Caione <carlo@endlessm.com>
->
-> Update the maintainers info with wiki and mailing list for the meson
-> platform. Fix a wrong file attribution and add maintainership for
-> meson8b.
->
-> Signed-off-by: Carlo Caione <carlo@endlessm.com>
-> ---
->  MAINTAINERS | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
->
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 28eb61b..6e08d2a 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -923,9 +923,11 @@ F: drivers/clk/sunxi/
->  ARM/Amlogic MesonX SoC support
->  M:     Carlo Caione <carlo@caione.org>
->  L:     linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> +L:     linux-meson at googlegroups.com
-> +W:     http://linux-meson.com/
->  S:     Maintained
-> -F:     drivers/media/rc/meson-ir.c
-> -N:     meson[x68]
-> +F:     arch/arm/mach-meson/
-> +N:     meson[x68b]
+Hi Geert,
 
-Submitting soon a V2 since this doesn't match meson8b.
+Thank you for the patch.
+
+On Monday 15 February 2016 22:16:51 Geert Uytterhoeven wrote:
+> Move the pm-rcar driver to drivers/soc/renesas/, so it can be shared
+> between arm32 (R-Car H1 and Gen2) and arm64 (R-Car Gen3).
+> 
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+> ---
+> v2:
+>   - New.
+> ---
+> arch/arm/mach-shmobile/Kconfig                                  | 8 ++-----
+> arch/arm/mach-shmobile/Makefile                                 | 1 -
+> arch/arm/mach-shmobile/pm-r8a7779.c                             | 3 ++-
+> arch/arm/mach-shmobile/pm-rcar-gen2.c                           | 2 +-
+> arch/arm/mach-shmobile/smp-r8a7779.c                            | 2 +-
+> arch/arm/mach-shmobile/smp-r8a7790.c                            | 2 +-
+> drivers/soc/Kconfig                                             | 1 +
+> drivers/soc/Makefile                                            | 3 ++-
+> drivers/soc/renesas/Kconfig                                     | 8 ++++++++
+> drivers/soc/renesas/Makefile                                    | 1 +
+> {arch/arm/mach-shmobile => drivers/soc/renesas}/pm-rcar.c       | 2 +-
+> {arch/arm/mach-shmobile => include/linux/soc/renesas}/pm-rcar.h | 2 ++
+> 12 files changed, 22 insertions(+), 13 deletions(-)
+>  create mode 100644 drivers/soc/renesas/Kconfig
+>  create mode 100644 drivers/soc/renesas/Makefile
+>  rename {arch/arm/mach-shmobile => drivers/soc/renesas}/pm-rcar.c (99%)
+>  rename {arch/arm/mach-shmobile => include/linux/soc/renesas}/pm-rcar.h
+> (93%)
+> 
+> diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+> index cd5f171f83ce6420..e45479d5104ea91a 100644
+> --- a/arch/arm/mach-shmobile/Kconfig
+> +++ b/arch/arm/mach-shmobile/Kconfig
+> @@ -4,23 +4,19 @@ config ARCH_SHMOBILE
+>  config ARCH_SHMOBILE_MULTI
+>  	bool
+> 
+> -config PM_RCAR
+> -	bool
+> -	select PM_GENERIC_DOMAINS if PM
+> -
+>  config PM_RMOBILE
+>  	bool
+>  	select PM_GENERIC_DOMAINS
+> 
+>  config ARCH_RCAR_GEN1
+>  	bool
+> -	select PM_RCAR if PM || SMP
+> +	select RENESAS_RCAR_PM if PM || SMP
+>  	select RENESAS_INTC_IRQPIN
+>  	select SYS_SUPPORTS_SH_TMU
+> 
+>  config ARCH_RCAR_GEN2
+>  	bool
+> -	select PM_RCAR if PM || SMP
+> +	select RENESAS_RCAR_PM if PM || SMP
+>  	select RENESAS_IRQC
+>  	select SYS_SUPPORTS_SH_CMT
+>  	select PCI_DOMAINS if PCI
+> diff --git a/arch/arm/mach-shmobile/Makefile
+> b/arch/arm/mach-shmobile/Makefile index a65c80ac9009d51f..ebb909c55b856a58
+> 100644
+> --- a/arch/arm/mach-shmobile/Makefile
+> +++ b/arch/arm/mach-shmobile/Makefile
+> @@ -39,7 +39,6 @@ smp-$(CONFIG_ARCH_EMEV2)	+= smp-emev2.o headsmp-scu.o
+> platsmp-scu.o # PM objects
+>  obj-$(CONFIG_SUSPEND)		+= suspend.o
+>  obj-$(CONFIG_CPU_FREQ)		+= cpufreq.o
+> -obj-$(CONFIG_PM_RCAR)		+= pm-rcar.o
+>  obj-$(CONFIG_PM_RMOBILE)	+= pm-rmobile.o
+>  obj-$(CONFIG_ARCH_RCAR_GEN2)	+= pm-rcar-gen2.o
+> 
+> diff --git a/arch/arm/mach-shmobile/pm-r8a7779.c
+> b/arch/arm/mach-shmobile/pm-r8a7779.c index
+> 14c42a1bdf1ef20d..314cc47738252ae6 100644
+> --- a/arch/arm/mach-shmobile/pm-r8a7779.c
+> +++ b/arch/arm/mach-shmobile/pm-r8a7779.c
+> @@ -9,9 +9,10 @@
+>   * for more details.
+>   */
+> 
+> +#include <linux/soc/renesas/pm-rcar.h>
+> +
+>  #include <asm/io.h>
+> 
+> -#include "pm-rcar.h"
+>  #include "r8a7779.h"
+> 
+>  /* SYSC */
+> diff --git a/arch/arm/mach-shmobile/pm-rcar-gen2.c
+> b/arch/arm/mach-shmobile/pm-rcar-gen2.c index
+> 6815781ad1165ef3..13ef9a8f5bf74090 100644
+> --- a/arch/arm/mach-shmobile/pm-rcar-gen2.c
+> +++ b/arch/arm/mach-shmobile/pm-rcar-gen2.c
+> @@ -13,9 +13,9 @@
+>  #include <linux/kernel.h>
+>  #include <linux/of.h>
+>  #include <linux/smp.h>
+> +#include <linux/soc/renesas/pm-rcar.h>
+>  #include <asm/io.h>
+>  #include "common.h"
+> -#include "pm-rcar.h"
+>  #include "rcar-gen2.h"
+> 
+>  /* RST */
+> diff --git a/arch/arm/mach-shmobile/smp-r8a7779.c
+> b/arch/arm/mach-shmobile/smp-r8a7779.c index
+> f5c31fbc10b2efbf..12e4804a1985012e 100644
+> --- a/arch/arm/mach-shmobile/smp-r8a7779.c
+> +++ b/arch/arm/mach-shmobile/smp-r8a7779.c
+> @@ -19,13 +19,13 @@
+>  #include <linux/spinlock.h>
+>  #include <linux/io.h>
+>  #include <linux/delay.h>
+> +#include <linux/soc/renesas/pm-rcar.h>
+> 
+>  #include <asm/cacheflush.h>
+>  #include <asm/smp_plat.h>
+>  #include <asm/smp_scu.h>
+> 
+>  #include "common.h"
+> -#include "pm-rcar.h"
+>  #include "r8a7779.h"
+> 
+>  #define AVECR IOMEM(0xfe700040)
+> diff --git a/arch/arm/mach-shmobile/smp-r8a7790.c
+> b/arch/arm/mach-shmobile/smp-r8a7790.c index
+> f6426c6fdefcb489..79a0f7b86ce9149a 100644
+> --- a/arch/arm/mach-shmobile/smp-r8a7790.c
+> +++ b/arch/arm/mach-shmobile/smp-r8a7790.c
+> @@ -17,12 +17,12 @@
+>  #include <linux/init.h>
+>  #include <linux/smp.h>
+>  #include <linux/io.h>
+> +#include <linux/soc/renesas/pm-rcar.h>
+> 
+>  #include <asm/smp_plat.h>
+> 
+>  #include "common.h"
+>  #include "platsmp-apmu.h"
+> -#include "pm-rcar.h"
+>  #include "rcar-gen2.h"
+>  #include "r8a7790.h"
+> 
+> diff --git a/drivers/soc/Kconfig b/drivers/soc/Kconfig
+> index 88260205a2614c84..5d76c14ef98cdc26 100644
+> --- a/drivers/soc/Kconfig
+> +++ b/drivers/soc/Kconfig
+> @@ -5,6 +5,7 @@ source "drivers/soc/brcmstb/Kconfig"
+>  source "drivers/soc/fsl/qe/Kconfig"
+>  source "drivers/soc/mediatek/Kconfig"
+>  source "drivers/soc/qcom/Kconfig"
+> +source "drivers/soc/renesas/Kconfig"
+>  source "drivers/soc/rockchip/Kconfig"
+>  source "drivers/soc/sunxi/Kconfig"
+>  source "drivers/soc/tegra/Kconfig"
+> diff --git a/drivers/soc/Makefile b/drivers/soc/Makefile
+> index 2afdc74f7491adf0..298ee4157bb6d9a0 100644
+> --- a/drivers/soc/Makefile
+> +++ b/drivers/soc/Makefile
+> @@ -9,7 +9,8 @@ obj-$(CONFIG_MACH_DOVE)		+= dove/
+>  obj-y				+= fsl/
+>  obj-$(CONFIG_ARCH_MEDIATEK)	+= mediatek/
+>  obj-$(CONFIG_ARCH_QCOM)		+= qcom/
+> -obj-$(CONFIG_ARCH_ROCKCHIP)		+= rockchip/
+> +obj-$(CONFIG_ARCH_RENESAS)	+= renesas/
+> +obj-$(CONFIG_ARCH_ROCKCHIP)	+= rockchip/
+>  obj-$(CONFIG_ARCH_SUNXI)	+= sunxi/
+>  obj-$(CONFIG_ARCH_TEGRA)	+= tegra/
+>  obj-$(CONFIG_SOC_TI)		+= ti/
+> diff --git a/drivers/soc/renesas/Kconfig b/drivers/soc/renesas/Kconfig
+> new file mode 100644
+> index 0000000000000000..b2e4d31555c285f0
+> --- /dev/null
+> +++ b/drivers/soc/renesas/Kconfig
+> @@ -0,0 +1,8 @@
+> +#
+> +# Renesas SoC drivers
+> +#
+> +
+> +config RENESAS_RCAR_PM
+> +	bool
+> +	select PM_GENERIC_DOMAINS if PM
+> +	default y if ARCH_RENESAS && ARM64
+> diff --git a/drivers/soc/renesas/Makefile b/drivers/soc/renesas/Makefile
+> new file mode 100644
+> index 0000000000000000..36b8aedf2ef4195f
+> --- /dev/null
+> +++ b/drivers/soc/renesas/Makefile
+> @@ -0,0 +1 @@
+> +obj-$(CONFIG_RENESAS_RCAR_PM)	+= pm-rcar.o
+> diff --git a/arch/arm/mach-shmobile/pm-rcar.c
+> b/drivers/soc/renesas/pm-rcar.c similarity index 99%
+> rename from arch/arm/mach-shmobile/pm-rcar.c
+> rename to drivers/soc/renesas/pm-rcar.c
+> index 0af05d288b09c3ab..bc605d9fbc6ce79c 100644
+> --- a/arch/arm/mach-shmobile/pm-rcar.c
+> +++ b/drivers/soc/renesas/pm-rcar.c
+> @@ -13,7 +13,7 @@
+>  #include <linux/mm.h>
+>  #include <linux/spinlock.h>
+>  #include <linux/io.h>
+> -#include "pm-rcar.h"
+> +#include <linux/soc/renesas/pm-rcar.h>
+> 
+>  /* SYSC Common */
+>  #define SYSCSR			0x00	/* SYSC Status Register */
+> diff --git a/arch/arm/mach-shmobile/pm-rcar.h
+> b/include/linux/soc/renesas/pm-rcar.h similarity index 93%
+> rename from arch/arm/mach-shmobile/pm-rcar.h
+> rename to include/linux/soc/renesas/pm-rcar.h
+> index 1b901db4a24c4633..bfeb647ffd9d2e12 100644
+> --- a/arch/arm/mach-shmobile/pm-rcar.h
+> +++ b/include/linux/soc/renesas/pm-rcar.h
+> @@ -1,6 +1,8 @@
+>  #ifndef PM_RCAR_H
+>  #define PM_RCAR_H
+> 
+> +#include <linux/types.h>
+> +
+>  struct rcar_sysc_ch {
+>  	u16 chan_offs;
+>  	u8 chan_bit;
 
 -- 
-Carlo Caione
+Regards,
+
+Laurent Pinchart
