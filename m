@@ -1,49 +1,91 @@
-From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
-Date: Mon, 15 Feb 2016 14:51:13 +0100
-Subject: [PATCH 3/7] usb: gadget: pxa25x_udc: use readl/writel for mmio
-In-Reply-To: <2926427.2IOxhm2GZo@wuerfel> (Arnd Bergmann's message of "Mon, 15
- Feb 2016 10:33:08 +0100")
-References: <1453997722-3489596-1-git-send-email-arnd@arndb.de>
- <2202960.HHsdV23CYi@wuerfel> <m3a8n2bf72.fsf@t19.piap.pl>
- <2926427.2IOxhm2GZo@wuerfel>
-Message-ID: <m3y4amqdym.fsf@t19.piap.pl>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Mon, 15 Feb 2016 21:54:26 +0800
+Subject: [PATCH v7 RESEND 0/4] mailbox: hisilicon: add Hi6220 mailbox
+ driver
+In-Reply-To: <1455544226-10094-1-git-send-email-leo.yan@linaro.org>
+References: <1455544226-10094-1-git-send-email-leo.yan@linaro.org>
+Message-ID: <20160215135426.GA10532@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+On Mon, Feb 15, 2016 at 09:50:22PM +0800, Leo Yan wrote:
+> Hi6220 mailbox supports up to 32 channels. Each channel is unidirectional
+> with a maximum message size of 8 words. I/O is performed using register
+> access (there is no DMA) and the cell raises an interrupt when messages
+> are received.
+> 
+> This patch series is to implement Hi6220 mailbox driver. It registers
+> two channels into framework for communication with MCU, one is tx channel
+> and another is rx channel. Now mailbox driver is used to send message to
+> MCU to control dynamic voltage and frequency scaling for CPU, GPU and DDR.
+> 
+> Changes from v6:
+> * Fix to use lowercase for hexadecimal value in DT binding document
 
-> I consider the use of __raw_* accessors a bug, I don't think we should
-> ever do that because it hides how the hardware actually works, it doesn't
-> work with spinlocks, and it can lead to the compiler splitting up accesses
-> into byte sized ones (not on ARM with the current definition, but
-> possible in general).
+Hi Jassi,
 
-Well, then maybe we should fix them, or add another set.
-Why don't they work with spinlocks?
+Per your request, I have rebased patches over mailbox-for-next.
 
-To be honest, I remember this was already discussed a bit years ago.
-I think I proposed back then a set of read_le32 (which would be
-equivalent of current readl(), and could be named pci_readl() as well),
-read_be32, read_host (without swapping).
-The names could be better, though.
+Hi Wei,
 
-> Almost all hardware is fixed-endian, so you have to use swapping accessors
-> when the CPU is the other way, except for device RAM and FIFO registers
-> that are always used to transfer a byte stream (see the definition of
-> readsl() and memcpy_fromio()). When you have hardware that adds byteswaps
-> on the bus interface, you typically end up with MMIO registers requiring
-> no swap (or double swap) and readsl()/memcpy_fromio()) suddenly requiring
-> a swap that is counterintuitive.
+Could you help merge patch 3/4 for Hi6220's DTS?
 
-Sure, but the __raw_* are used just to be sure there is absolutely no
-swapping.
-E.g. for IXP4xx, the registers never require swapping, thus readl() etc.
-are not suitable for this. What is needed here is simple "atomic" 32-bit
-straight to/from register (MM)IO (assuming 4-byte address alignment).
+Thanks,
+Leo Yan
 
-If not __raw_* then what?
--- 
-Krzysztof Halasa
-
-Industrial Research Institute for Automation and Measurements PIAP
-Al. Jerozolimskie 202, 02-486 Warsaw, Poland
+> 
+> Changes from v5:
+> * Refine to use mailbox three specifiers for client driver, so add xlate
+>   callback function in mailbox driver to support these specifiers
+> * Refine document for property "hi6220,mbox-tx-noirq"
+> 
+> Changes from v4:
+> * According to Jassi's suggestion, using DT binding to register channels
+> * Change to use operating-points-v2 to register operating points
+> 
+> Changes from v3:
+> * The patch series for enabling idle state for Hi6220 has reserved memory
+>   regions, so this series will not include it anymore
+> * Refined mailbox driver according to Jassi's suggestion;
+>   Removed kfifo from mailbox driver;
+>   Removed spinlock for ipc registers accessing, due every channel has its
+>   own dedicated bit in ipc register and readl/writel will introduce memory
+>   barrier, so don't need spinlock to protect ipc registers accessing
+> * After mailbox driver is ready, can use patch 4 to enable CPU's OPPs and
+>   stub clock driver; finally can enable CPUFreq driver for CPU frequency
+>   scaling
+> 
+> Changes from v2:
+> * Get rid of unused memory regions from memory node in DT, and don't use
+>   reserved-memory node according to Mark and Leif's suggestion; Haojian also
+>   has updated UEFI for efi memory info
+> 
+> Changes from v1:
+> * Correct lock usage for SMP scenario
+> 
+> Changes from RFC:
+> * According to Jassi's review, totally remove the abstract common driver
+>   layer and only commit driver dedicated for Hi6220
+> * According to Paul Bolle's review, fix typo issue for Kconfig and remove
+>   unnecessary dependency with OF and fix minor for mailbox driver
+> * Refine a little for dts nodes
+> 
+> 
+> Leo Yan (4):
+>   dt-bindings: mailbox: Document Hi6220 mailbox driver
+>   mailbox: Hi6220: add mailbox driver
+>   arm64: dts: add mailbox node for Hi6220
+>   arm64: dts: add Hi6220's stub clock node
+> 
+>  .../bindings/mailbox/hisilicon,hi6220-mailbox.txt  |  74 ++++
+>  arch/arm64/boot/dts/hisilicon/hi6220.dtsi          |  64 ++++
+>  drivers/mailbox/Kconfig                            |   8 +
+>  drivers/mailbox/Makefile                           |   2 +
+>  drivers/mailbox/hi6220-mailbox.c                   | 395 +++++++++++++++++++++
+>  5 files changed, 543 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mailbox/hisilicon,hi6220-mailbox.txt
+>  create mode 100644 drivers/mailbox/hi6220-mailbox.c
+> 
+> -- 
+> 1.9.1
+> 
