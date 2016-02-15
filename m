@@ -1,69 +1,46 @@
-From: CARLOS.PALMINHA@synopsys.com (Carlos Palminha)
-Date: Mon, 15 Feb 2016 12:29:00 +0000
-Subject: [PATCH 01/17] drm/virtio: removed optional dummy encoder
- mode_fixup function.
-In-Reply-To: <20160214182508.GF11240@phenom.ffwll.local>
-References: <daniel.vetter@ffwll.ch,>
- <1455285069-2819-1-git-send-email-palminha@synopsys.com>
- <1455285069-2819-2-git-send-email-palminha@synopsys.com>
- <20160214182508.GF11240@phenom.ffwll.local>
-Message-ID: <56C1C48C.1050006@synopsys.com>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Mon, 15 Feb 2016 13:40:18 +0100
+Subject: [PATCH] arm64: dts: r8a7795: Add GIC-400 virtual interfaces
+In-Reply-To: <87povyh6lq.wl%kuninori.morimoto.gx@renesas.com>
+References: <1455005692-9382-1-git-send-email-dirk.behme@de.bosch.com>
+ <87povyh6lq.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <56C1C732.4050505@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel, thanks for the feedback.
-v2 patch will follow-up. :)
-
-On 14-02-2016 18:25, Daniel Vetter wrote:
-> On Fri, Feb 12, 2016 at 01:50:53PM +0000, Carlos Palminha wrote:
+On 15.02.2016 06:46, Kuninori Morimoto wrote:
 >
-> Sob-line from you is missing on all patches, I can't merge them. Also
-> please copypaste a default blurb to all patches that this is only recently
-> no longer needed. And dunno what happened to your patch series, the
-> threading is somehow broken. In case your mail server doesn't accept a big
-> patch series you can first format .patch files using git format-patch with
-> threading enabled (should be the default) and then send them out in
-> chunks.
+> Hi Dirk
+> Cc Geert
 >
-> When resending please also add the r-b tag from Alex for amdgpu/radoen.
->
-> Thanks, Daniel
->
+>> Besides the distributor and the CPU interface the GIC-400 additionally
+>> supports the virtual interface control blocks and the virtual CPU interfaces.
+>>
+>> Add the physical base addresses and size for these.
+>>
+>> See
+>>
+>> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0471b/index.html
+>> -> 3.2. GIC-400 register map
+>>
+>> and Linux kernel's
+>>
+>> Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt
+>>
+>> for more details.
+>>
+>> Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
 >> ---
->>   drivers/gpu/drm/virtio/virtgpu_display.c | 8 --------
->>   1 file changed, 8 deletions(-)
->>
->> diff --git a/drivers/gpu/drm/virtio/virtgpu_display.c b/drivers/gpu/drm/virtio/virtgpu_display.c
->> index a165f03..429aa31 100644
->> --- a/drivers/gpu/drm/virtio/virtgpu_display.c
->> +++ b/drivers/gpu/drm/virtio/virtgpu_display.c
->> @@ -282,13 +282,6 @@ static const struct drm_crtc_helper_funcs virtio_gpu_crtc_helper_funcs = {
->>   	.atomic_check  = virtio_gpu_crtc_atomic_check,
->>   };
->>
->> -static bool virtio_gpu_enc_mode_fixup(struct drm_encoder *encoder,
->> -				      const struct drm_display_mode *mode,
->> -				      struct drm_display_mode *adjusted_mode)
->> -{
->> -	return true;
->> -}
->> -
->>   static void virtio_gpu_enc_mode_set(struct drm_encoder *encoder,
->>   				    struct drm_display_mode *mode,
->>   				    struct drm_display_mode *adjusted_mode)
->> @@ -362,7 +355,6 @@ virtio_gpu_best_encoder(struct drm_connector *connector)
->>   }
->>
->>   static const struct drm_encoder_helper_funcs virtio_gpu_enc_helper_funcs = {
->> -	.mode_fixup = virtio_gpu_enc_mode_fixup,
->>   	.mode_set   = virtio_gpu_enc_mode_set,
->>   	.enable     = virtio_gpu_enc_enable,
->>   	.disable    = virtio_gpu_enc_disable,
->> --
->> 2.5.0
->>
->> _______________________________________________
->> dri-devel mailing list
->> dri-devel at lists.freedesktop.org
->> https://lists.freedesktop.org/mailman/listinfo/dri-devel
 >
+> Our R-Car chip is out-of-mapping.
+> Geert had indicated it in
+> http://thread.gmane.org/gmane.linux.ports.sh.devel/49751/focus=51544
+> And we have no answer about it I think
+
+
+Could you point us to the code where you think our out-of-mapping 
+doesn't work?
+
+Best regards
+
+Dirk
