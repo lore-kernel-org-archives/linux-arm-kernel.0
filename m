@@ -1,26 +1,35 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Mon, 15 Feb 2016 15:26:39 -0500
-Subject: [PATCH] branch tracer: fix freak link error
-In-Reply-To: <2535125.MjntUgx4sh@wuerfel>
-References: <1455312410-1058841-1-git-send-email-arnd@arndb.de>
- <20160215124746.44e8c2d0@gandalf.local.home>
- <2535125.MjntUgx4sh@wuerfel>
-Message-ID: <20160215152639.7795795c@gandalf.local.home>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 15 Feb 2016 21:27:44 +0100
+Subject: [PATCH v2 1/4] dma: mmp_pdma: Add the #dma-requests DT property
+ documentation
+Message-ID: <1455568067-20203-1-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 15 Feb 2016 21:15:39 +0100
-Arnd Bergmann <arnd@arndb.de> wrote:
+For pxa based platforms, the number of requestor lines should be
+specified, so that the driver can check if the flow control should be
+activated (when a requestor line is asked for) or not.
 
-> Do you also want to add a 'Cc: stable at vger.kernel.org' tag?
-> 
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+---
+Since v1: rename of property to #dma-requests
+      	  modify default value to 32 as suggested by Vinod
+---
+ Documentation/devicetree/bindings/dma/mmp-dma.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-I currently have this in the Tags:
-
-    Acked-by: Nicolas Pitre <nico@linaro.org>
-    Fixes: ab3c9c686e22 ("branch tracer, intel-iommu: fix build with CONFIG_BRANCH_TRACER=y")
-    Cc: stable at vger.kernel.org # v2.6.30+
-    Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-    Signed-off-by: Steven Rostedt <rostedt@goodmis.org>
-
--- Steve
+diff --git a/Documentation/devicetree/bindings/dma/mmp-dma.txt b/Documentation/devicetree/bindings/dma/mmp-dma.txt
+index 7a802f64e5bd..8f7364a7b349 100644
+--- a/Documentation/devicetree/bindings/dma/mmp-dma.txt
++++ b/Documentation/devicetree/bindings/dma/mmp-dma.txt
+@@ -12,6 +12,8 @@ Required properties:
+ Optional properties:
+ - #dma-channels: Number of DMA channels supported by the controller (defaults
+   to 32 when not specified)
++- #dma-requests: Number of DMA requestor lines supported by the controller
++  (defaults to 32 when not specified)
+ 
+ "marvell,pdma-1.0"
+ Used platforms: pxa25x, pxa27x, pxa3xx, pxa93x, pxa168, pxa910, pxa688.
+-- 
+2.1.4
