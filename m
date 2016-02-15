@@ -1,64 +1,115 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Mon, 15 Feb 2016 12:46:06 -0500
-Subject: [PATCH 2/5] Kbuild: disable 'maybe-uninitialized' warning for
- CONFIG_PROFILE_ALL_BRANCHES
-In-Reply-To: <1455293187-179811-3-git-send-email-arnd@arndb.de>
-References: <1455293187-179811-1-git-send-email-arnd@arndb.de>
- <1455293187-179811-3-git-send-email-arnd@arndb.de>
-Message-ID: <20160215174606.GA11406@home.goodmis.org>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Mon, 15 Feb 2016 09:58:25 -0800
+Subject: Writes, smp_wmb(), and transitivity?
+Message-ID: <20160215175825.GA15878@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 12, 2016 at 05:06:19PM +0100, Arnd Bergmann wrote:
-> CONFIG_PROFILE_ALL_BRANCHES confuses gcc-5.x to the degree that it prints
-> incorrect warnings about a lot of variables that it thinks can be used
-> uninitialized, e.g.:
-> 
-> i2c/busses/i2c-diolan-u2c.c: In function 'diolan_usb_xfer':
-> i2c/busses/i2c-diolan-u2c.c:391:16: warning: 'byte' may be used uninitialized in this function
-> iio/gyro/itg3200_core.c: In function 'itg3200_probe':
-> iio/gyro/itg3200_core.c:213:6: warning: 'val' may be used uninitialized in this function
-> leds/leds-lp55xx-common.c: In function 'lp55xx_update_bits':
-> leds/leds-lp55xx-common.c:350:6: warning: 'tmp' may be used uninitialized in this function
-> misc/bmp085.c: In function 'show_pressure':
-> misc/bmp085.c:363:10: warning: 'pressure' may be used uninitialized in this function
-> power/ds2782_battery.c: In function 'ds2786_get_capacity':
-> power/ds2782_battery.c:214:17: warning: 'raw' may be used uninitialized in this function
-> 
-> These are all false positives that either rob someone's time when trying
-> to figure out whether they are real, or they get people to send wrong
-> patches to shut up the warnings.
-> 
-> Nobody normally wants to run a CONFIG_PROFILE_ALL_BRANCHES kernel in
-> production, so disabling the whole class of warnings for this configuration
-> has no serious downsides either.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Hello!
 
-Acked-by: Steven Rostedt <rostedt@goodmis.org>
+Some architectures provide local transitivity for a chain of threads doing
+writes separated by smp_wmb(), as exemplified by the litmus tests below.
+The pattern is that each thread writes to a its own variable, does an
+smp_wmb(), then writes a different value to the next thread's variable.
 
--- Steve
+I don't know of a use of this, but if everyone supports it, it might
+be good to mandate it.  Status quo is that smp_wmb() is non-transitive,
+so it currently isn't supported.
 
-> ---
->  Makefile | 6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Makefile b/Makefile
-> index 9092c16fa6cf..352f55ccc54e 100644
-> --- a/Makefile
-> +++ b/Makefile
-> @@ -617,7 +617,11 @@ KBUILD_CFLAGS	+= $(call cc-option,-fno-delete-null-pointer-checks,)
->  ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
->  KBUILD_CFLAGS	+= -Os $(call cc-disable-warning,maybe-uninitialized,)
->  else
-> -KBUILD_CFLAGS	+= -O2
-> +ifdef CONFIG_PROFILE_ALL_BRANCHES
-> +KBUILD_CFLAGS	+= -O2 $(call cc-disable-warning,maybe-uninitialized,)
-> +else
-> +KBUILD_CFLAGS   += -O2
-> +endif
->  endif
->  
->  # Tell gcc to never replace conditional load with a non-conditional one
-> -- 
-> 2.7.0
+Anyone know of any architectures that do -not- support this?
+
+Assuming all architectures -do- support this, any arguments -against-
+officially supporting it in Linux?
+
+							Thanx, Paul
+
+------------------------------------------------------------------------
+
+Two threads:
+
+	int a, b;
+
+	void thread0(void)
+	{
+		WRITE_ONCE(a, 1);
+		smp_wmb();
+		WRITE_ONCE(b, 2);
+	}
+
+	void thread1(void)
+	{
+		WRITE_ONCE(b, 1);
+		smp_wmb();
+		WRITE_ONCE(a, 2);
+	}
+
+	/* After all threads have completed and the dust has settled... */
+
+	BUG_ON(a == 1 && b == 1);
+
+Three threads:
+
+	int a, b, c;
+
+	void thread0(void)
+	{
+		WRITE_ONCE(a, 1);
+		smp_wmb();
+		WRITE_ONCE(b, 2);
+	}
+
+	void thread1(void)
+	{
+		WRITE_ONCE(b, 1);
+		smp_wmb();
+		WRITE_ONCE(c, 2);
+	}
+
+	void thread2(void)
+	{
+		WRITE_ONCE(c, 1);
+		smp_wmb();
+		WRITE_ONCE(a, 2);
+	}
+
+	/* After all threads have completed and the dust has settled... */
+
+	BUG_ON(a == 1 && b == 1 && c == 1);
+
+Four threads:
+
+	int a, b, c, d;
+
+	void thread0(void)
+	{
+		WRITE_ONCE(a, 1);
+		smp_wmb();
+		WRITE_ONCE(b, 2);
+	}
+
+	void thread1(void)
+	{
+		WRITE_ONCE(b, 1);
+		smp_wmb();
+		WRITE_ONCE(c, 2);
+	}
+
+	void thread2(void)
+	{
+		WRITE_ONCE(c, 1);
+		smp_wmb();
+		WRITE_ONCE(d, 2);
+	}
+
+	void thread3(void)
+	{
+		WRITE_ONCE(d, 1);
+		smp_wmb();
+		WRITE_ONCE(a, 2);
+	}
+
+	/* After all threads have completed and the dust has settled... */
+
+	BUG_ON(a == 1 && b == 1 && c == 1 && d == 1);
+
+And so on...
