@@ -1,79 +1,75 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 15 Feb 2016 14:36:00 +0000
-Subject: [linux-sunxi] Allwinner A64 MMC support
-In-Reply-To: <CAGb2v65E54mnLEcPzLyycEBSHbvn6tp9JpS+S8gdbDg_e7qFyQ@mail.gmail.com>
-References: <1455300000-18723-1-git-send-email-andre.przywara@arm.com>
- <56BE29A1.3060107@redhat.com> <56C1A590.6030500@arm.com>
- <56C1C7BB.1040602@redhat.com> <56C1D9C0.6020601@arm.com>
- <CAGb2v65E54mnLEcPzLyycEBSHbvn6tp9JpS+S8gdbDg_e7qFyQ@mail.gmail.com>
-Message-ID: <56C1E250.9070301@arm.com>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Mon, 15 Feb 2016 15:35:18 +0100
+Subject: [PATCH 0/7] fix IS_ERR_VALUE usage
+Message-ID: <1455546925-22119-1-git-send-email-a.hajda@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chen-Yu,
+Hi,
 
-On 15/02/16 14:23, Chen-Yu Tsai wrote:
-> On Mon, Feb 15, 2016 at 9:59 PM, Andre Przywara <andre.przywara@arm.com> wrote:
->> Hi Hans,
->>
->> ....
->>
->>>
->>> p.s.
->>>
->>> I love the work you've been doing on the A64, I've not had a chance
->>> to try it out yet though. Have you made any progress with getting
->>> the mmc slot to work ?  If not maybe I can make some time I've
->>> prior experience in bringing up the mmc slot on other Allwinner SoCs
->>
->> Thanks for that!
->>
->> So we made some progress on the weekend (with the help of #linux-sunxi):
->> 1) The regulator node was stupidly put by me into a separate child node
->> without putting address and size cells into. So I just moved it into
->> /soc directly now and that seems to fixed the missing regulator.
->> 2) The reset node is a allwinner,sun6i-a31-ahb1-reset, which does not
->> get registered automatically, but by an explicit call from mach-sunxi/.
->> I wonder why we do this (yes, I saw that comment, but still...) and if
->> it would work with a normal MODULE_DEVICE_TABLE() declaration.
->> There is and will be no equivalent to the mach- directory on arm64.
-> 
-> On sun6i, we supported the high resolution timer, which had a reset control.
-> Timers (or clocksources) are registered before device model kicks in, so the
-> reset had to be explicitly registered before the timer, or the system would
-> hang. I think we phased that out though. Maxime should know.
+This small set of independent patches tries to fix incorrect
+IS_ERR_VALUE macro usage. It fixes most usages leading to errors
+as described in [1]. It also follows conclusion from the discussion
+[1][2] - IS_ERR_VALUE should be used only with unsigned long type,
+signed types should use comparison 'ret < 0'.
 
-Ah, thanks for that insight!
-So that sounds like we would get away with a normal registration for the
-A64 - and actually many other SoCs as well?
-Shall we guard the explicit sun6i_reset_init with MACH_SUN6I or
-something and do the normal registration otherwise?
-Or do I miss something here?
+The patchset does not fix errors present in net/ethernet/freescale
+and soc/fsq/qe drivers - these drivers mixes different types:
+dma_addr_t, u32, unsigned long, fixing it properly seems to me more
+challenging, maybe maintainers or brave volunteers can look it.
 
-Cheers,
-Andre
+The list of missing fixes:
+drivers/net/ethernet/freescale/fs_enet/mac-scc.c:149:36-37: WARNING: incorrect argument type in IS_ERR_VALUE(fep -> ring_mem_addr)
+drivers/net/ethernet/freescale/ucc_geth.c:2237:48-49: WARNING: incorrect argument type in IS_ERR_VALUE(ugeth -> tx_bd_ring_offset [ j ])
+drivers/net/ethernet/freescale/ucc_geth.c:2314:48-49: WARNING: incorrect argument type in IS_ERR_VALUE(ugeth -> rx_bd_ring_offset [ j ])
+drivers/net/ethernet/freescale/ucc_geth.c:2524:44-45: WARNING: incorrect argument type in IS_ERR_VALUE(ugeth -> tx_glbl_pram_offset)
+drivers/net/ethernet/freescale/ucc_geth.c:2544:45-46: WARNING: incorrect argument type in IS_ERR_VALUE(ugeth -> thread_dat_tx_offset)
+drivers/net/ethernet/freescale/ucc_geth.c:2571:46-47: WARNING: incorrect argument type in IS_ERR_VALUE(ugeth -> send_q_mem_reg_offset)
+drivers/net/ethernet/freescale/ucc_geth.c:2612:42-43: WARNING: incorrect argument type in IS_ERR_VALUE(ugeth -> scheduler_offset)
+drivers/net/ethernet/freescale/ucc_geth.c:2659:54-55: WARNING: incorrect argument type in IS_ERR_VALUE(ugeth -> tx_fw_statistics_pram_offset)
+drivers/net/ethernet/freescale/ucc_geth.c:2696:44-45: WARNING: incorrect argument type in IS_ERR_VALUE(ugeth -> rx_glbl_pram_offset)
+drivers/net/ethernet/freescale/ucc_geth.c:2715:45-46: WARNING: incorrect argument type in IS_ERR_VALUE(ugeth -> thread_dat_rx_offset)
+drivers/net/ethernet/freescale/ucc_geth.c:2736:54-55: WARNING: incorrect argument type in IS_ERR_VALUE(ugeth -> rx_fw_statistics_pram_offset)
+drivers/net/ethernet/freescale/ucc_geth.c:2756:53-54: WARNING: incorrect argument type in IS_ERR_VALUE(ugeth -> rx_irq_coalescing_tbl_offset)
+drivers/net/ethernet/freescale/ucc_geth.c:2822:44-45: WARNING: incorrect argument type in IS_ERR_VALUE(ugeth -> rx_bd_qs_tbl_offset)
+drivers/net/ethernet/freescale/ucc_geth.c:2908:47-48: WARNING: incorrect argument type in IS_ERR_VALUE(ugeth -> exf_glbl_param_offset)
+drivers/net/ethernet/freescale/ucc_geth.c:292:36-37: WARNING: incorrect argument type in IS_ERR_VALUE(init_enet_offset)
+drivers/net/ethernet/freescale/ucc_geth.c:3042:39-40: WARNING: incorrect argument type in IS_ERR_VALUE(init_enet_pram_offset)
+drivers/soc/fsl/qe/ucc_fast.c:271:60-61: WARNING: incorrect argument type in IS_ERR_VALUE(uccf -> ucc_fast_tx_virtual_fifo_base_offset)
+drivers/soc/fsl/qe/ucc_fast.c:284:60-61: WARNING: incorrect argument type in IS_ERR_VALUE(uccf -> ucc_fast_rx_virtual_fifo_base_offset)
+drivers/soc/fsl/qe/ucc_slow.c:186:38-39: WARNING: incorrect argument type in IS_ERR_VALUE(uccs -> us_pram_offset)
+drivers/soc/fsl/qe/ucc_slow.c:213:38-39: WARNING: incorrect argument type in IS_ERR_VALUE(uccs -> rx_base_offset)
+drivers/soc/fsl/qe/ucc_slow.c:224:38-39: WARNING: incorrect argument type in IS_ERR_VALUE(uccs -> tx_base_offset)
+drivers/net/ethernet/freescale/fs_enet/mac-fcc.c:110:35-36: WARNING: unknown argument type in IS_ERR_VALUE(fpi -> dpram_offset)
 
->> 3) As Jens pointed out, the MMC IP block isn't really compatible.
->> Changing the clocks is easy (done already), but we need to come up with
->> code to cover the new phase setting registers in the A64 MMC register block.
->>
->> Interestingly somehow hacking this (pretending it is compatible) seems
->> to work, though I got reports from people about mysterious kernel
->> crashes, so I'm inclined to leave MMC out of the first patch series.
->>
->> So if you could take a look at the new registers (starting at offset
->> 0x140) and work out what we actually need to do here, that would be
->> great. I have no real clue about what they actually do and how they
->> relate to the current output and sample clock phase.
->> To me it looks like we might get away with just triggering the automatic
->> calibration and the hardware does the rest for us - keep your fingers
->> crossed ;-)
->>
->> Cheers,
->> Andre.
->>
->> --
->> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
->> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
->> For more options, visit https://groups.google.com/d/optout.
-> 
+[1]: http://permalink.gmane.org/gmane.linux.kernel/2120927
+[2]: http://permalink.gmane.org/gmane.linux.kernel/2150581
+
+Regards
+Andrzej
+
+
+Andrzej Hajda (7):
+  netfilter: fix IS_ERR_VALUE usage
+  MIPS: module: fix incorrect IS_ERR_VALUE macro usages
+  drivers: char: mem: fix IS_ERROR_VALUE usage
+  atmel-isi: fix IS_ERR_VALUE usage
+  serial: clps711x: fix IS_ERR_VALUE usage
+  fbdev: exynos: fix IS_ERR_VALUE usage
+  usb: gadget: fsl_qe_udc: fix IS_ERR_VALUE usage
+
+ arch/mips/kernel/module-rela.c                |  2 +-
+ arch/mips/kernel/module.c                     |  2 +-
+ drivers/char/mem.c                            |  2 +-
+ drivers/media/platform/soc_camera/atmel-isi.c |  4 ++--
+ drivers/tty/serial/clps711x.c                 | 14 ++++++++------
+ drivers/usb/gadget/udc/fsl_qe_udc.c           |  2 +-
+ drivers/video/fbdev/exynos/exynos_mipi_dsi.c  |  6 +++---
+ include/linux/netfilter/x_tables.h            |  6 +++---
+ net/ipv4/netfilter/arp_tables.c               | 11 +++++++----
+ net/ipv4/netfilter/ip_tables.c                | 12 ++++++++----
+ net/ipv6/netfilter/ip6_tables.c               | 13 +++++++++----
+ 11 files changed, 44 insertions(+), 30 deletions(-)
+
+-- 
+1.9.1
