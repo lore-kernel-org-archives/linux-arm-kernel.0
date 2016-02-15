@@ -1,41 +1,60 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 15 Feb 2016 16:10:46 +0000
-Subject: [PATCH v4 05/23] arm64: Add ARM64_HAS_VIRT_HOST_EXTN feature
-In-Reply-To: <1455216004-19499-6-git-send-email-marc.zyngier@arm.com>
-References: <1455216004-19499-1-git-send-email-marc.zyngier@arm.com>
- <1455216004-19499-6-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20160215161045.GH6298@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 15 Feb 2016 16:12:28 +0000
+Subject: arm qemu test failures due to 'driver-core: platform: probe
+ of-devices only using list of compatibles'
+In-Reply-To: <56C1F19F.8090100@roeck-us.net>
+References: <20160214165010.GA3189@roeck-us.net>
+ <20160215105909.GH12289@pengutronix.de>
+ <56C1F19F.8090100@roeck-us.net>
+Message-ID: <20160215161228.GH10826@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 11, 2016 at 06:39:46PM +0000, Marc Zyngier wrote:
-> Add a new ARM64_HAS_VIRT_HOST_EXTN features to indicate that the
-> CPU has the ARMv8.1 VHE capability.
+On Mon, Feb 15, 2016 at 07:41:19AM -0800, Guenter Roeck wrote:
+> On 02/15/2016 02:59 AM, Uwe Kleine-K?nig wrote:
+> >Hello Guenter,
+> >
+> >On Sun, Feb 14, 2016 at 08:50:10AM -0800, Guenter Roeck wrote:
+> >>Uwe,
+> >>
+> >>Your patch 'driver-core: platform: probe of-devices only using list of
+> >>compatibles' causes the following qemu tests to crash in -next.
+> >>
+> >>arm:vexpress-a9:vexpress_defconfig:vexpress-v2p-ca9
+> >>arm:vexpress-a15:vexpress_defconfig:vexpress-v2p-ca15-tc1
+> >>arm:vexpress-a9:multi_v7_defconfig:vexpress-v2p-ca9
+> >>arm:vexpress-a15:multi_v7_defconfig:vexpress-v2p-ca15-tc1
+> >>
+> >>Crash log:
+> >>
+> >>VFS: Cannot open root device "mmcblk0" or unknown-block(0,0): error -6
+> >>Please append a correct "root=" boot option; here are the available partitions:
+> >>1f00          131072 mtdblock0  (driver?)
+> >>1f01           32768 mtdblock1  (driver?)
+> >>Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(0,0)
+> >
+> >Can you provide a complete boot log? This might already reveal which
+> >device is failing. It might not be the mmci device but something it
+> >depends on (clock, bus parent, irq).
+> >
 > 
-> This will be used to trigger kernel patching in KVM.
+> Sure, something else may be failing, but why does reverting your patch
+> fix the problem ?
 > 
-> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/include/asm/cpufeature.h |  3 ++-
->  arch/arm64/kernel/cpufeature.c      | 11 +++++++++++
->  2 files changed, 13 insertions(+), 1 deletion(-)
+> Anyway, complete logs are at http://kerneltests.org/builders.
 > 
-> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-> index 8f271b8..c705d6a 100644
-> --- a/arch/arm64/include/asm/cpufeature.h
-> +++ b/arch/arm64/include/asm/cpufeature.h
-> @@ -30,8 +30,9 @@
->  #define ARM64_HAS_LSE_ATOMICS			5
->  #define ARM64_WORKAROUND_CAVIUM_23154		6
->  #define ARM64_WORKAROUND_834220			7
-> +#define ARM64_HAS_VIRT_HOST_EXTN		8
->  
-> -#define ARM64_NCAPS				8
-> +#define ARM64_NCAPS				9
+> http://kerneltests.org/builders/qemu-arm-next/builds/376/steps/qemubuildcommand/logs/stdio
+> 
+> is the most recent log (next-20120215). Look for the vexpress crashes; the overo
+> crash bisected to to 'PM / OPP: Disable OPPs that aren't supported by the regulator',
+> in next-20160212, which I have not fully analyzed yet, and the beagle crashes
+> as well as the 'new' overo crash are brand new.
 
-Just a heads up, but this conflicts with the for-next/core branch, where
-I used cap 8 to identify the absence of a h/w prefetcher.
+Looking at the vexpress-ca9 one, nothing stands out to me apart from the
+lack of messages about a MMC driver.  I don't see anything there which
+indicates why that would be.
 
-Will
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
