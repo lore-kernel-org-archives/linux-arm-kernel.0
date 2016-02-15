@@ -1,52 +1,198 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Mon, 15 Feb 2016 11:50:48 -0300
-Subject: [PATCH] rtc: mt6397: Add platform device ID table
-In-Reply-To: <1455501497.7263.4.camel@mtksdaap41>
-References: <1455016095-13724-1-git-send-email-javier@osg.samsung.com>
- <1455501497.7263.4.camel@mtksdaap41>
-Message-ID: <56C1E5C8.6040007@osg.samsung.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 15 Feb 2016 15:58:05 +0100
+Subject: [PATCH v5sub1 0/8] arm64: split linear and kernel mappings
+In-Reply-To: <56C1D2CF.1010108@gmail.com>
+References: <1454324093-15998-1-git-send-email-ard.biesheuvel@linaro.org>
+ <56BE3645.3030403@gmail.com>
+ <CAKv+Gu9Qw=DSe1fZT=Dv=iKaKqzsf5ARK9dzwCWPk_0uRECm1w@mail.gmail.com>
+ <56BE3C35.7070608@gmail.com>
+ <CAKv+Gu_29SjYgg+P3fyGFcaRVxjapVzMs85Y2frd7_f51mPv-A@mail.gmail.com>
+ <56C1D2CF.1010108@gmail.com>
+Message-ID: <CAKv+Gu-y8wvxUoM++dABxR6v-3U0sKmrZex4yAy5xpJLjD0eAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Eddie,
-
-On 02/14/2016 10:58 PM, Eddie Huang wrote:
-
-[snip]
-
->> @@ -412,6 +418,7 @@ static struct platform_driver mtk_rtc_driver = {
->>   	},
->>   	.probe	= mtk_rtc_probe,
->>   	.remove = mtk_rtc_remove,
->> +	.id_table = mt6397_rtc_id,
->>   };
+On 15 February 2016 at 14:29, Matthias Brugger <matthias.bgg@gmail.com> wrote:
+>
+>
+> On 13/02/16 15:28, Ard Biesheuvel wrote:
 >>
->>   module_platform_driver(mtk_rtc_driver);
->> @@ -419,4 +426,3 @@ module_platform_driver(mtk_rtc_driver);
->>   MODULE_LICENSE("GPL v2");
->>   MODULE_AUTHOR("Tianping Fang <tianping.fang@mediatek.com>");
->>   MODULE_DESCRIPTION("RTC Driver for MediaTek MT6397 PMIC");
->> -MODULE_ALIAS("platform:mt6397-rtc");
+>> On 12 February 2016 at 21:10, Matthias Brugger <matthias.bgg@gmail.com>
+>> wrote:
+>>>
+>>>
+>>>
+>>> On 12/02/16 20:47, Ard Biesheuvel wrote:
+>>>>
+>>>>
+>>>> On 12 February 2016 at 20:45, Matthias Brugger <matthias.bgg@gmail.com>
+>>>> wrote:
+>>>>>
+>>>>>
+>>>>> Hi Ard,
+>>>>>
+>>>>>
+>>>>> On 01/02/16 11:54, Ard Biesheuvel wrote:
+>>>>>>
+>>>>>>
+>>>>>>
+>>>>>> At the request of Catalin, this series has been split off from my
+>>>>>> series
+>>>>>> 'arm64: implement support for KASLR v4' [1]. This sub-series deals
+>>>>>> with
+>>>>>> moving the kernel out of the linear mapping into the vmalloc area.
+>>>>>> This
+>>>>>> is a prerequisite for independent physical and virtual randomization
+>>>>>> of
+>>>>>> the kernel image. On top of that, considering that these changes allow
+>>>>>> the linear mapping to start at an arbitrary offset above PAGE_OFFSET,
+>>>>>> it
+>>>>>> should be an improvement in itself due to the fact that we can now
+>>>>>> choose
+>>>>>> PAGE_OFFSET such that RAM can be mapped using large block sizes.
+>>>>>>
+>>>>>> For instance, on my Seattle A0 box, the kernel is loaded 16 MB into
+>>>>>> the
+>>>>>> lowest GB of RAM, which means __pa(PAGE_OFFSET) is not 1 GB aligned,
+>>>>>> and
+>>>>>> the entire 16 GB of RAM will be mapping using 2 MB blocks. (Similarly,
+>>>>>> for 64 KB granule kernels, the entire 16 GB of RAM will be mapped
+>>>>>> using
+>>>>>> pages since __pa(PAGE_OFFSET) is not 512 MB aligned). With these
+>>>>>> changes
+>>>>>>     __pa(PAGE_OFFSET) will always be chosen such that it is aligned to
+>>>>>> a
+>>>>>> quantity that allows efficient mapping.
+>>>>>>
+>>>>>> Note that of the entire KASLR series, this sub-series is the most
+>>>>>> likely
+>>>>>> to
+>>>>>> cause problems, and hence requires the most careful review and
+>>>>>> testing.
+>>>>>> This
+>>>>>> is due to the fact that, with these changes, the invariant
+>>>>>> __va(__pa(x))
+>>>>>> == x
+>>>>>> no longer holds, and any code that is based on that assumption needs
+>>>>>> to
+>>>>>> be
+>>>>>> updated.
+>>>>>>
+>>>>>> Changes since v4:
+>>>>>> - added Marc's ack to patch #6
+>>>>>> - round the kasan zero shadow region around the kernel image to
+>>>>>> swapper
+>>>>>> block
+>>>>>>      size (#7)
+>>>>>> - ensure that we don't clip the kernel image when clipping RAM to the
+>>>>>> linear
+>>>>>>      region size (#8)
+>>>>>>
+>>>>>> Patch #1 allows the low mark of memblocks discovered from the FDT to
+>>>>>> be
+>>>>>> overridden by the architecture.
+>>>>>>
+>>>>>> Patch #2 enables the huge-vmap generic feature for arm64. This should
+>>>>>> be
+>>>>>> an
+>>>>>> improvement in itself, but the significance for this series is that it
+>>>>>> allows
+>>>>>> unmap_kernel_range() to be called on the [__init_begin, __init_end)
+>>>>>> region,
+>>>>>> which may be partially mapped using block mappings.
+>>>>>>
+>>>>>> Patch #3 introduces KIMAGE_VADDR as a separate, preparatory step
+>>>>>> towards
+>>>>>> decoupling the kernel placement from PAGE_OFFSET
+>>>>>>
+>>>>>> Patch #4 implements some translation table accessors that operate on
+>>>>>> statically
+>>>>>> allocate translation tables before the linear mapping is up.
+>>>>>>
+>>>>>> Patch #5 decouples the fixmap initialization from the linear mapping,
+>>>>>> by
+>>>>>> using
+>>>>>> the accessors implemented by patch #4
+>>>>>>
+>>>>>> Patch #6 removes assumptions made my KVM regarding the placement of
+>>>>>> the
+>>>>>> kernel
+>>>>>> image inside the linear mapping.
+>>>>>>
+>>>>>> Patch #7 moves the kernel image from the base of the linear mapping to
+>>>>>> the
+>>>>>> base
+>>>>>> of the vmalloc area. The modules area, which sits right below the
+>>>>>> kernel
+>>>>>> image,
+>>>>>> is moved along and is put right before the start of the vmalloc area.
+>>>>>>
+>>>>>> Patch #8 decouples PHYS_OFFSET from PAGE_OFFSET, which allows the
+>>>>>> linear
+>>>>>> mapping
+>>>>>> to cover all discovered memory, regardless of where the kernel image
+>>>>>> is
+>>>>>> located
+>>>>>> in it. This effectively allows the kernel to be loaded at any physical
+>>>>>> address
+>>>>>> (provided that the correct alignment is used)
+>>>>>>
+>>>>>> [1] http://thread.gmane.org/gmane.linux.kernel/2135931
+>>>>>>
+>>>>>> Ard Biesheuvel (8):
+>>>>>>      of/fdt: make memblock minimum physical address arch configurable
+>>>>>>      arm64: add support for ioremap() block mappings
+>>>>>>      arm64: introduce KIMAGE_VADDR as the virtual base of the kernel
+>>>>>> region
+>>>>>>      arm64: pgtable: implement static [pte|pmd|pud]_offset variants
+>>>>>>      arm64: decouple early fixmap init from linear mapping
+>>>>>>      arm64: kvm: deal with kernel symbols outside of linear mapping
+>>>>>>      arm64: move kernel image to base of vmalloc area
+>>>>>>      arm64: allow kernel Image to be loaded anywhere in physical
+>>>>>> memory
+>>>>>>
+>>>>>
+>>>>> I bisected linux-next (20160212) with the following error on booting
+>>>>> with
+>>>>> an
+>>>>> initramfs:
+>>>>>    Failed to execute /init (error -8)
+>>>>>    request_module: runaway loop modprobe binfmt-464c
+>>>>>    Starting init: /sbin/init exists but couldn't execute it (error -8)
+>>>>>    request_module: runaway loop modprobe binfmt-464c
+>>>>>    Starting init: /bin/sh exists but couldn't execute it (error -8)
+>>>>>    Kernel panic - not syncing: No working init found.  Try passing
+>>>>> init=
+>>>>> option to kernel. See Linux Documentation/init..
+>>>>>
+>>>>> I tracked down the error to patch 7 of this series. But I realized that
+>>>>> patch 7 does not compile, but from patch 8 onwards I observe the error.
+>>>>>
+>>
+>> As far as this failure is concerned, I managed to reproduce an error
+>> with patch #7 and not #8 applied, involving out of range kvm symbols
+>> at link time. This is reproducible with GCC 4.8 but not GCC 4.9 or
+>> later. Is this what you were seeing as well? Or is there another
+>> problem?
+>>
 >
-> This patch looks good to me, but I am wondering, since we tend to use
-> device tree method to match driver, do we still need support platform
-> device ID ?
+> I realized that I used " aarch64-linux-gnu-gcc (Linaro GCC 2014.11) 4.9.3
+> 20141031 (prerelease)"  which gave me errors like:
+>
+> arch/arm64/kvm/built-in.o: In function `__cpu_init_hyp_mode':
+> /home/mbrugger/src/linux-next/./arch/arm64/include/asm/kvm_host.h:331:(.text+0x73b4):
+> relocation truncated to fit: R_AARCH64_ADR_PREL_PG_HI21 against symbol
+> `__kvm_hyp_vector' defined in .hyp.text section in arch/arm64/kvm/built-in.o
+>
+> So it was time to update my toolchain to "aarch64-linux-gnu-gcc (Linaro GCC
+> 5.1-2015.08) 5.1.1 20150608" which fixed the problem for me.
 >
 
-I'm not familiar with neither this IP block nor the SoC so it is up to
-you. I just noticed this issue when reviewing a regulator driver for a
-similar PMIC posted by someone from mediatek.
+OK, so it's the same issue, but I thought before that 4.9 worked ok,
+which is indeed not the case (I checked)
+This is a transient issue, since the subsequent patch replaces the
+offending expressions, but to maintain bisectability, I will add a
+workaround nonetheless.
 
-I thought platform device was needed since the driver has a MODULE_ALIAS()
-but please let me know what you prefer and I can re-spin the patch and
-just remove the MODULE_ALIAS() if that makes more sense for this platform.
-  
-> Eddie
->
->
-
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Thanks,
+Ard.
