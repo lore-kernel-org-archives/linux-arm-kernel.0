@@ -1,47 +1,121 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 15 Feb 2016 13:36:07 -0800
-Subject: Crashes in arm qemu emulations due to 'cpufreq: governor:
- Replace timers with utilization ...'
-In-Reply-To: <CAJZ5v0hzVB0+H4nuCun3mmrES3UQ3+Rs1uz5YGu5sv4G3XU+nQ@mail.gmail.com>
-References: <20160215170527.GA24453@roeck-us.net>
- <CAJZ5v0gLankSuziQq25qTCyNqeOX43yD9jnJu_XXwbdyajfmKg@mail.gmail.com>
- <20160215190116.GX19432@atomide.com>
- <56C229A5.8020901@roeck-us.net>
- <20160215195839.GA19432@atomide.com>
- <CAJZ5v0hzVB0+H4nuCun3mmrES3UQ3+Rs1uz5YGu5sv4G3XU+nQ@mail.gmail.com>
-Message-ID: <20160215213606.GD19432@atomide.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Tue, 16 Feb 2016 06:48:45 +0900
+Subject: [PATCH] ARM: dts: r8a7794: replace gpio-key,
+ wakeup with wakeup-source property
+Message-ID: <1455572925-27697-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Rafael J. Wysocki <rafael@kernel.org> [160215 12:39]:
-> On Mon, Feb 15, 2016 at 8:58 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > * Guenter Roeck <linux@roeck-us.net> [160215 11:41]:
-> >> On 02/15/2016 11:01 AM, Tony Lindgren wrote:
-> >> >
-> >> >https://kernelci.org/boot/all/job/next/kernel/next-20160215/
-> >> >
-> >> >The SMP ones seem to fail with some regulator issues?
-> >> >
-> >>
-> >> There is another problem, introduced with 6a0712f6f199e ("PM / OPP: Add
-> >> dev_pm_opp_set_rate()"). The kernelci boot log for next-20160212:omap3-overo-tobi
-> >> and others experience that problem.
-> >>
-> >> Essentially, the code now assumes that a CPU clock always has a voltage
-> >> regulator attached to it, which is not correct. I sent out a patch to fix
-> >> that problem a minute ago.
-> >
-> > Yes that fixed it thanks.
-> 
-> Can you please also check if this alternative fix from Viresh works:
-> 
-> https://patchwork.kernel.org/patch/8316611/
+Though the keyboard driver for GPIO buttons(gpio-keys) will continue to
+check for/support the legacy "gpio-key,wakeup" boolean property to
+enable gpio buttons as wakeup source, "wakeup-source" is the new
+standard binding.
 
-Yes that one too seems to fix the issue on SMP systems for
-me:
+This patch replaces the legacy "gpio-key,wakeup" with the unified
+"wakeup-source" property in order to avoid any futher copy-paste
+duplication.
 
-Tested-by: Tony Lindgren <tony@atomide.com>
+Changelog text from a similar patch by Sudeep Holla.
 
-Regards,
+Cc: Sudeep Holla <sudeep.holla@arm.com>
+Reported-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/r8a7793-gose.dts | 22 +++++++++++-----------
+ 1 file changed, 11 insertions(+), 11 deletions(-)
 
-Tony
+diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
+index cfe142c2ba38..87e89ec9dd47 100644
+--- a/arch/arm/boot/dts/r8a7793-gose.dts
++++ b/arch/arm/boot/dts/r8a7793-gose.dts
+@@ -67,77 +67,77 @@
+ 		        gpios = <&gpio5 0 GPIO_ACTIVE_LOW>;
+ 		        linux,code = <KEY_1>;
+ 		        label = "SW2-1";
+-		        gpio-key,wakeup;
++		        wakeup-source;
+ 		        debounce-interval = <20>;
+ 		};
+ 		key-2 {
+ 		        gpios = <&gpio5 1 GPIO_ACTIVE_LOW>;
+ 		        linux,code = <KEY_2>;
+ 		        label = "SW2-2";
+-		        gpio-key,wakeup;
++		        wakeup-source;
+ 		        debounce-interval = <20>;
+ 		};
+ 		key-3 {
+ 		        gpios = <&gpio5 2 GPIO_ACTIVE_LOW>;
+ 		        linux,code = <KEY_3>;
+ 		        label = "SW2-3";
+-		        gpio-key,wakeup;
++		        wakeup-source;
+ 		        debounce-interval = <20>;
+ 		};
+ 		key-4 {
+ 		        gpios = <&gpio5 3 GPIO_ACTIVE_LOW>;
+ 		        linux,code = <KEY_4>;
+ 		        label = "SW2-4";
+-		        gpio-key,wakeup;
++		        wakeup-source;
+ 		        debounce-interval = <20>;
+ 		};
+ 		key-a {
+ 		        gpios = <&gpio7 0 GPIO_ACTIVE_LOW>;
+ 		        linux,code = <KEY_A>;
+ 		        label = "SW30";
+-		        gpio-key,wakeup;
++		        wakeup-source;
+ 		        debounce-interval = <20>;
+ 		};
+ 		key-b {
+ 		        gpios = <&gpio7 1 GPIO_ACTIVE_LOW>;
+ 		        linux,code = <KEY_B>;
+ 		        label = "SW31";
+-		        gpio-key,wakeup;
++		        wakeup-source;
+ 		        debounce-interval = <20>;
+ 		};
+ 		key-c {
+ 		        gpios = <&gpio7 2 GPIO_ACTIVE_LOW>;
+ 		        linux,code = <KEY_C>;
+ 		        label = "SW32";
+-		        gpio-key,wakeup;
++		        wakeup-source;
+ 		        debounce-interval = <20>;
+ 		};
+ 		key-d {
+ 		        gpios = <&gpio7 3 GPIO_ACTIVE_LOW>;
+ 		        linux,code = <KEY_D>;
+ 		        label = "SW33";
+-		        gpio-key,wakeup;
++		        wakeup-source;
+ 		        debounce-interval = <20>;
+ 		};
+ 		key-e {
+ 		        gpios = <&gpio7 4 GPIO_ACTIVE_LOW>;
+ 		        linux,code = <KEY_E>;
+ 		        label = "SW34";
+-		        gpio-key,wakeup;
++		        wakeup-source;
+ 		        debounce-interval = <20>;
+ 		};
+ 		key-f {
+ 		        gpios = <&gpio7 5 GPIO_ACTIVE_LOW>;
+ 		        linux,code = <KEY_F>;
+ 		        label = "SW35";
+-		        gpio-key,wakeup;
++		        wakeup-source;
+ 		        debounce-interval = <20>;
+ 		};
+ 		key-g {
+ 		        gpios = <&gpio7 6 GPIO_ACTIVE_LOW>;
+ 		        linux,code = <KEY_G>;
+ 		        label = "SW36";
+-		        gpio-key,wakeup;
++		        wakeup-source;
+ 		        debounce-interval = <20>;
+ 		};
+ 	};
+-- 
+2.7.0.rc3.207.g0ac5344
