@@ -1,52 +1,39 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 15 Feb 2016 10:15:33 +0100
-Subject: [GIT PULL] plat-versatile clock.c and generic clkdev.h
-Message-ID: <CACRpkdbJPPR8jADF1p++w60jZre3tpCAECsaqkzAk4-Y4+N-SA@mail.gmail.com>
+Date: Mon, 15 Feb 2016 10:17:23 +0100
+Subject: [linux-sunxi] Re: [PATCH v2 3/5] pinctrl: sunxi: Add H3 R_PIO
+ controller support
+In-Reply-To: <20160215080816.GA6426@box2.japko.eu>
+References: <1454448113-18810-1-git-send-email-k@japko.eu>
+ <1454448113-18810-4-git-send-email-k@japko.eu>
+ <CACRpkdZkSzcb0fmghkvsfRHpsU-SsSGPP6YvstAW7387HS0xJw@mail.gmail.com>
+ <20160215080816.GA6426@box2.japko.eu>
+Message-ID: <CACRpkdbfNeh7_=3ReQtJc7OxkkQEn+BUhZ0O0SKnFsRD=WZiUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC folks,
+On Mon, Feb 15, 2016 at 9:08 AM, Krzysztof Adamski <k@japko.eu> wrote:
+> On Thu, Feb 11, 2016 at 02:21:15PM +0100, Linus Walleij wrote:
+>>
+>> On Tue, Feb 2, 2016 at 10:21 PM, Krzysztof Adamski <k@japko.eu> wrote:
+>>
+>>> H3 has additional PIO controller similar to what we can find on A23.
+>>> It's a 12 pin port, described in H3 Datasheet rev 1.1, pages 345-350.
+>>>
+>>> Signed-off-by: Krzysztof Adamski <k@japko.eu>
+>>
+>>
+>> Patch applied with Maxime's ACK.
+>
+>
+> Hi Linus,
+>
+> You took v2 which does not add documentation for
+> allwinner,sun8i-h3-r-pinctrl compatible that is added in this patch.  This
+> was fixed in v3. Should I prepare a patch for you that only adds this to the
+> documentation or you can handle this by taking v3/v4 instead of this patch?
 
-these are Stephen Boyds changes to remove a stale clock implementation
-and move to the generic clkdev.h that I queued at Arnd's request, it turns
-out I will not have any busines changing stuff in arch/arm/plat-versatile
-for this merge window (however a few changes around mach-*) so
-this can be pulled in separately.
-
-Please pull this in!
+Ooops please send a fixup patch, I don't like to rebase the
+tree if possible. Sorry for the mess and thanks for your help.
 
 Yours,
 Linus Walleij
-
-
-The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
-
-  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
-tags/plat-versatile-cleanup
-
-for you to fetch changes up to 34d2f4d3a4d6a6b204ebfd12d1d2c159360d41a4:
-
-  ARM: Use generic clkdev.h header (2016-02-10 09:22:35 +0100)
-
-----------------------------------------------------------------
-plat-versatile cleanup:
-- Removes the clock.c in plat-versatile that is no longer used
-- Move ARM to use the generic clockdev.h header
-
-----------------------------------------------------------------
-Stephen Boyd (2):
-      ARM: plat-versatile: Remove unused clock.c file
-      ARM: Use generic clkdev.h header
-
- arch/arm/include/asm/Kbuild      |  1 +
- arch/arm/include/asm/clkdev.h    | 31 -----------------
- arch/arm/plat-versatile/Kconfig  |  3 --
- arch/arm/plat-versatile/Makefile |  1 -
- arch/arm/plat-versatile/clock.c  | 74 ----------------------------------------
- 5 files changed, 1 insertion(+), 109 deletions(-)
- delete mode 100644 arch/arm/include/asm/clkdev.h
- delete mode 100644 arch/arm/plat-versatile/clock.c
