@@ -1,207 +1,149 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 15 Feb 2016 14:29:51 +0100
-Subject: [PATCH v5sub1 0/8] arm64: split linear and kernel mappings
-In-Reply-To: <CAKv+Gu_29SjYgg+P3fyGFcaRVxjapVzMs85Y2frd7_f51mPv-A@mail.gmail.com>
-References: <1454324093-15998-1-git-send-email-ard.biesheuvel@linaro.org>
- <56BE3645.3030403@gmail.com>
- <CAKv+Gu9Qw=DSe1fZT=Dv=iKaKqzsf5ARK9dzwCWPk_0uRECm1w@mail.gmail.com>
- <56BE3C35.7070608@gmail.com>
- <CAKv+Gu_29SjYgg+P3fyGFcaRVxjapVzMs85Y2frd7_f51mPv-A@mail.gmail.com>
-Message-ID: <56C1D2CF.1010108@gmail.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Mon, 15 Feb 2016 10:38:25 -0300
+Subject: [PATCH] ARM: dts: Move syscon reboot/poweroff to common dtsi for
+ Exynos
+In-Reply-To: <56C02265.40103@samsung.com>
+References: <1455042606-10075-1-git-send-email-javier@osg.samsung.com>
+ <56C02265.40103@samsung.com>
+Message-ID: <56C1D4D1.2050108@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello Krzysztof,
 
-
-On 13/02/16 15:28, Ard Biesheuvel wrote:
-> On 12 February 2016 at 21:10, Matthias Brugger <matthias.bgg@gmail.com> wrote:
+On 02/14/2016 03:44 AM, Krzysztof Kozlowski wrote:
+> W dniu 10.02.2016 o 03:30, Javier Martinez Canillas pisze:
+>> All Exynos SoCs have the same syscon reboot and poweroff device nodes so
+>> there is no need to duplicate the same on each SoC dtsi and can be moved
+>> to a common dtsi that can be included by all the SoCs dtsi files.
 >>
+>> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 >>
->> On 12/02/16 20:47, Ard Biesheuvel wrote:
->>>
->>> On 12 February 2016 at 20:45, Matthias Brugger <matthias.bgg@gmail.com>
->>> wrote:
->>>>
->>>> Hi Ard,
->>>>
->>>>
->>>> On 01/02/16 11:54, Ard Biesheuvel wrote:
->>>>>
->>>>>
->>>>> At the request of Catalin, this series has been split off from my series
->>>>> 'arm64: implement support for KASLR v4' [1]. This sub-series deals with
->>>>> moving the kernel out of the linear mapping into the vmalloc area. This
->>>>> is a prerequisite for independent physical and virtual randomization of
->>>>> the kernel image. On top of that, considering that these changes allow
->>>>> the linear mapping to start at an arbitrary offset above PAGE_OFFSET, it
->>>>> should be an improvement in itself due to the fact that we can now
->>>>> choose
->>>>> PAGE_OFFSET such that RAM can be mapped using large block sizes.
->>>>>
->>>>> For instance, on my Seattle A0 box, the kernel is loaded 16 MB into the
->>>>> lowest GB of RAM, which means __pa(PAGE_OFFSET) is not 1 GB aligned, and
->>>>> the entire 16 GB of RAM will be mapping using 2 MB blocks. (Similarly,
->>>>> for 64 KB granule kernels, the entire 16 GB of RAM will be mapped using
->>>>> pages since __pa(PAGE_OFFSET) is not 512 MB aligned). With these changes
->>>>>     __pa(PAGE_OFFSET) will always be chosen such that it is aligned to a
->>>>> quantity that allows efficient mapping.
->>>>>
->>>>> Note that of the entire KASLR series, this sub-series is the most likely
->>>>> to
->>>>> cause problems, and hence requires the most careful review and testing.
->>>>> This
->>>>> is due to the fact that, with these changes, the invariant __va(__pa(x))
->>>>> == x
->>>>> no longer holds, and any code that is based on that assumption needs to
->>>>> be
->>>>> updated.
->>>>>
->>>>> Changes since v4:
->>>>> - added Marc's ack to patch #6
->>>>> - round the kasan zero shadow region around the kernel image to swapper
->>>>> block
->>>>>      size (#7)
->>>>> - ensure that we don't clip the kernel image when clipping RAM to the
->>>>> linear
->>>>>      region size (#8)
->>>>>
->>>>> Patch #1 allows the low mark of memblocks discovered from the FDT to be
->>>>> overridden by the architecture.
->>>>>
->>>>> Patch #2 enables the huge-vmap generic feature for arm64. This should be
->>>>> an
->>>>> improvement in itself, but the significance for this series is that it
->>>>> allows
->>>>> unmap_kernel_range() to be called on the [__init_begin, __init_end)
->>>>> region,
->>>>> which may be partially mapped using block mappings.
->>>>>
->>>>> Patch #3 introduces KIMAGE_VADDR as a separate, preparatory step towards
->>>>> decoupling the kernel placement from PAGE_OFFSET
->>>>>
->>>>> Patch #4 implements some translation table accessors that operate on
->>>>> statically
->>>>> allocate translation tables before the linear mapping is up.
->>>>>
->>>>> Patch #5 decouples the fixmap initialization from the linear mapping, by
->>>>> using
->>>>> the accessors implemented by patch #4
->>>>>
->>>>> Patch #6 removes assumptions made my KVM regarding the placement of the
->>>>> kernel
->>>>> image inside the linear mapping.
->>>>>
->>>>> Patch #7 moves the kernel image from the base of the linear mapping to
->>>>> the
->>>>> base
->>>>> of the vmalloc area. The modules area, which sits right below the kernel
->>>>> image,
->>>>> is moved along and is put right before the start of the vmalloc area.
->>>>>
->>>>> Patch #8 decouples PHYS_OFFSET from PAGE_OFFSET, which allows the linear
->>>>> mapping
->>>>> to cover all discovered memory, regardless of where the kernel image is
->>>>> located
->>>>> in it. This effectively allows the kernel to be loaded at any physical
->>>>> address
->>>>> (provided that the correct alignment is used)
->>>>>
->>>>> [1] http://thread.gmane.org/gmane.linux.kernel/2135931
->>>>>
->>>>> Ard Biesheuvel (8):
->>>>>      of/fdt: make memblock minimum physical address arch configurable
->>>>>      arm64: add support for ioremap() block mappings
->>>>>      arm64: introduce KIMAGE_VADDR as the virtual base of the kernel
->>>>> region
->>>>>      arm64: pgtable: implement static [pte|pmd|pud]_offset variants
->>>>>      arm64: decouple early fixmap init from linear mapping
->>>>>      arm64: kvm: deal with kernel symbols outside of linear mapping
->>>>>      arm64: move kernel image to base of vmalloc area
->>>>>      arm64: allow kernel Image to be loaded anywhere in physical memory
->>>>>
->>>>
->>>> I bisected linux-next (20160212) with the following error on booting with
->>>> an
->>>> initramfs:
->>>>    Failed to execute /init (error -8)
->>>>    request_module: runaway loop modprobe binfmt-464c
->>>>    Starting init: /sbin/init exists but couldn't execute it (error -8)
->>>>    request_module: runaway loop modprobe binfmt-464c
->>>>    Starting init: /bin/sh exists but couldn't execute it (error -8)
->>>>    Kernel panic - not syncing: No working init found.  Try passing init=
->>>> option to kernel. See Linux Documentation/init..
->>>>
->>>> I tracked down the error to patch 7 of this series. But I realized that
->>>> patch 7 does not compile, but from patch 8 onwards I observe the error.
->>>>
+>> ---
+>> Hello,
+>>
+>> The patch was tested on an Exynos5800 Peach Pi Chromebook and an
+>> Exynos5422 Odroid XU4 board. Reboot and poweroff worked for both.
+>>
+>> But testing on Exynos3 and Exynos4 will be highly appreciated.
 >
-> As far as this failure is concerned, I managed to reproduce an error
-> with patch #7 and not #8 applied, involving out of range kvm symbols
-> at link time. This is reproducible with GCC 4.8 but not GCC 4.9 or
-> later. Is this what you were seeing as well? Or is there another
-> problem?
+> Would you be so kind and add my suggested-by (since it comes from
+> https://wiki.tizen.org/wiki/Exynos_Mainline_Kernel_TODO :) )
 >
 
-I realized that I used " aarch64-linux-gnu-gcc (Linaro GCC 2014.11) 
-4.9.3 20141031 (prerelease)"  which gave me errors like:
-
-arch/arm64/kvm/built-in.o: In function `__cpu_init_hyp_mode':
-/home/mbrugger/src/linux-next/./arch/arm64/include/asm/kvm_host.h:331:(.text+0x73b4): 
-relocation truncated to fit: R_AARCH64_ADR_PREL_PG_HI21 against symbol 
-`__kvm_hyp_vector' defined in .hyp.text section in arch/arm64/kvm/built-in.o
-
-So it was time to update my toolchain to "aarch64-linux-gnu-gcc (Linaro 
-GCC 5.1-2015.08) 5.1.1 20150608" which fixed the problem for me.
-
-Thanks,
-Matthias
-
+Right, sorry for missing that.
+  
+> I'll test it on Exynos4 at work and then apply... but few comments below:
 >
->>>> I use defconfig with an initramfs.cpio created with buildroot.
->>>> I tested this on my mt8173 eval board, but I suppose this can be
->>>> reproduced
->>>> easily on other machines as well.
->>>>
->>>
->>> Thanks for the report. Does this help at all?
->>>
->>> http://thread.gmane.org/gmane.linux.ports.arm.kernel/477645
->>>
 >>
->> I applied them on top of linux-next and this fixed the problem.
+>> Best regards,
+>> Javier
 >>
->> Thanks,
->> Matthias
+>>   arch/arm/boot/dts/exynos-syscon-restart.dtsi | 23 +++++++++++++++++++++++
+>>   arch/arm/boot/dts/exynos3250.dtsi            | 15 +--------------
+>>   arch/arm/boot/dts/exynos4.dtsi               | 15 +--------------
+>>   arch/arm/boot/dts/exynos5.dtsi               | 15 +--------------
+>>   arch/arm/boot/dts/exynos5410.dtsi            | 15 +--------------
+>>   5 files changed, 27 insertions(+), 56 deletions(-)
+>>   create mode 100644 arch/arm/boot/dts/exynos-syscon-restart.dtsi
 >>
+>> diff --git a/arch/arm/boot/dts/exynos-syscon-restart.dtsi b/arch/arm/boot/dts/exynos-syscon-restart.dtsi
+>> new file mode 100644
+>> index 000000000000..2b8acf554881
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/exynos-syscon-restart.dtsi
+>> @@ -0,0 +1,23 @@
+>> +/*
+>> + * Samsung's Exynos SoC syscon reboot/poweroff nodes common definition.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + */
+>> +
+>> +/ {
+>
+> In some of the DTSI this was under "soc" node, not at top-level.
+> Unfortunately we do not have consistency here - some DTSI have "soc",
+
+Yes, I noticed this but as you said not all DTSI have a soc node
+and that's why I made it top level in the DTSI.
+
+> some not. Anyway I think we should move to "soc" version.
+>
+
+Not sure I'm following, did you mean to do it as a follow up or
+to add a soc node for the missing DTSI as a part of this series?
+
+>> +	poweroff: syscon-poweroff {
+>> +		compatible = "syscon-poweroff";
+>> +		regmap = <&pmu_system_controller>;
+>> +		offset = <0x330C>; /* PS_HOLD_CONTROL */
+>> +		mask = <0x5200>; /* reset value */
+>> +	};
+>> +
+>> +	reboot: syscon-reboot {
+>> +		compatible = "syscon-reboot";
+>> +		regmap = <&pmu_system_controller>;
+>> +		offset = <0x0400>; /* SWRESET */
+>> +		mask = <0x1>;
+>> +	};
+>> +};
+>> diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
+>> index 18e3deffbf48..d9c221517935 100644
+>> --- a/arch/arm/boot/dts/exynos3250.dtsi
+>> +++ b/arch/arm/boot/dts/exynos3250.dtsi
+>> @@ -19,6 +19,7 @@
 >>
->>>> Regards,
->>>> Matthias
->>>>
->>>>
->>>>>     Documentation/arm64/booting.txt                      |  20 ++-
->>>>>     Documentation/features/vm/huge-vmap/arch-support.txt |   2 +-
->>>>>     arch/arm/include/asm/kvm_asm.h                       |   2 +
->>>>>     arch/arm/kvm/arm.c                                   |   8 +-
->>>>>     arch/arm64/Kconfig                                   |   1 +
->>>>>     arch/arm64/include/asm/boot.h                        |   6 +
->>>>>     arch/arm64/include/asm/kasan.h                       |   2 +-
->>>>>     arch/arm64/include/asm/kernel-pgtable.h              |  12 ++
->>>>>     arch/arm64/include/asm/kvm_asm.h                     |   2 +
->>>>>     arch/arm64/include/asm/kvm_host.h                    |   8 +-
->>>>>     arch/arm64/include/asm/memory.h                      |  44 ++++--
->>>>>     arch/arm64/include/asm/pgtable.h                     |  23 ++-
->>>>>     arch/arm64/kernel/head.S                             |   8 +-
->>>>>     arch/arm64/kernel/image.h                            |  13 +-
->>>>>     arch/arm64/kernel/vmlinux.lds.S                      |   4 +-
->>>>>     arch/arm64/kvm/hyp.S                                 |   6 +-
->>>>>     arch/arm64/mm/dump.c                                 |  12 +-
->>>>>     arch/arm64/mm/init.c                                 | 123
->>>>> ++++++++++++++--
->>>>>     arch/arm64/mm/kasan_init.c                           |  31 +++-
->>>>>     arch/arm64/mm/mmu.c                                  | 155
->>>>> +++++++++++++++-----
->>>>>     drivers/of/fdt.c                                     |   5 +-
->>>>>     21 files changed, 378 insertions(+), 109 deletions(-)
->>>>>
->>>>
+>>   #include "skeleton.dtsi"
+>>   #include "exynos4-cpu-thermal.dtsi"
+>> +#include "exynos-syscon-restart.dtsi"
+>>   #include <dt-bindings/clock/exynos3250.h>
 >>
+>>   / {
+>> @@ -152,20 +153,6 @@
+>>   			interrupt-parent = <&gic>;
+>>   		};
+>>
+>> -		poweroff: syscon-poweroff {
+>> -			compatible = "syscon-poweroff";
+>> -			regmap = <&pmu_system_controller>;
+>> -			offset = <0x330C>; /* PS_HOLD_CONTROL */
+>> -			mask = <0x5200>; /* Reset value */
+>> -		};
+>> -
+>> -		reboot: syscon-reboot {
+>> -			compatible = "syscon-reboot";
+>> -			regmap = <&pmu_system_controller>;
+>> -			offset = <0x0400>; /* SWRESET */
+>> -			mask = <0x1>;
+>> -		};
+>> -
+>>   		mipi_phy: video-phy at 10020710 {
+>>   			compatible = "samsung,s5pv210-mipi-video-phy";
+>>   			#phy-cells = <1>;
+>> diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+>> index ca621a92319e..e6f6939ccdfa 100644
+>> --- a/arch/arm/boot/dts/exynos4.dtsi
+>> +++ b/arch/arm/boot/dts/exynos4.dtsi
+>> @@ -21,6 +21,7 @@
+>>
+>>   #include <dt-bindings/clock/exynos4.h>
+>>   #include <dt-bindings/clock/exynos-audss-clk.h>
+>> +#include "exynos-syscon-restart.dtsi"
+>
+> Just to keep it consistent and logic - include after skeleton.
+>
+
+Ok, for include I usually try to keep alphabetically sorted but
+I'll move it after skeleton if you prefer to keep it consistent.
+  
+> Best regards,
+> Krzysztof
+>
+
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
