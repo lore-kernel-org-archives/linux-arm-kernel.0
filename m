@@ -1,77 +1,26 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 15 Feb 2016 09:51:49 +0100
-Subject: [PATCH v2] arm64: use local label prefixes for __reg_num symbols
-Message-ID: <1455526309-18519-1-git-send-email-ard.biesheuvel@linaro.org>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Mon, 15 Feb 2016 14:28:23 +0530
+Subject: [PATCH v7 0/4] mailbox: hisilicon: add Hi6220 mailbox driver
+In-Reply-To: <1454599500-15600-1-git-send-email-leo.yan@linaro.org>
+References: <1454599500-15600-1-git-send-email-leo.yan@linaro.org>
+Message-ID: <CABb+yY2_4p6wu0qo0p8S3enD-EO=B4LXmC0569Z7tSj0zdjQHQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The __reg_num_xNN symbols that are used to implement the msr_s and
-mrs_s macros are recorded in the ELF metadata of each object file.
-This does not affect the size of the final binary, but it does clutter
-the output of tools like readelf, i.e.,
+On Thu, Feb 4, 2016 at 8:54 PM, Leo Yan <leo.yan@linaro.org> wrote:
+> Hi6220 mailbox supports up to 32 channels. Each channel is unidirectional
+> with a maximum message size of 8 words. I/O is performed using register
+> access (there is no DMA) and the cell raises an interrupt when messages
+> are received.
+>
+> This patch series is to implement Hi6220 mailbox driver. It registers
+> two channels into framework for communication with MCU, one is tx channel
+> and another is rx channel. Now mailbox driver is used to send message to
+> MCU to control dynamic voltage and frequency scaling for CPU, GPU and DDR.
+>
+> Changes from v6:
+> * Fix to use lowercase for hexadecimal value in DT binding document
+>
+Looks ok, but please rebase over mailbox-for-next and resend.
 
-  $ readelf -a vmlinux |grep -c __reg_num_x
-  50976
-
-So let's use symbols with the .L prefix, these are strictly local,
-and don't end up in the object files.
-
-  $ readelf -a vmlinux |grep -c __reg_num_x
-  0
-
-Acked-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
-v2: updated commit log, added ack
-
- arch/arm64/include/asm/sysreg.h | 16 ++++++++--------
- 1 file changed, 8 insertions(+), 8 deletions(-)
-
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index 4aeebec3d882..7d771ac01289 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -196,16 +196,16 @@
- #ifdef __ASSEMBLY__
- 
- 	.irp	num,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30
--	.equ	__reg_num_x\num, \num
-+	.equ	.L__reg_num_x\num, \num
- 	.endr
--	.equ	__reg_num_xzr, 31
-+	.equ	.L__reg_num_xzr, 31
- 
- 	.macro	mrs_s, rt, sreg
--	.inst	0xd5200000|(\sreg)|(__reg_num_\rt)
-+	.inst	0xd5200000|(\sreg)|(.L__reg_num_\rt)
- 	.endm
- 
- 	.macro	msr_s, sreg, rt
--	.inst	0xd5000000|(\sreg)|(__reg_num_\rt)
-+	.inst	0xd5000000|(\sreg)|(.L__reg_num_\rt)
- 	.endm
- 
- #else
-@@ -214,16 +214,16 @@
- 
- asm(
- "	.irp	num,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30\n"
--"	.equ	__reg_num_x\\num, \\num\n"
-+"	.equ	.L__reg_num_x\\num, \\num\n"
- "	.endr\n"
--"	.equ	__reg_num_xzr, 31\n"
-+"	.equ	.L__reg_num_xzr, 31\n"
- "\n"
- "	.macro	mrs_s, rt, sreg\n"
--"	.inst	0xd5200000|(\\sreg)|(__reg_num_\\rt)\n"
-+"	.inst	0xd5200000|(\\sreg)|(.L__reg_num_\\rt)\n"
- "	.endm\n"
- "\n"
- "	.macro	msr_s, sreg, rt\n"
--"	.inst	0xd5000000|(\\sreg)|(__reg_num_\\rt)\n"
-+"	.inst	0xd5000000|(\\sreg)|(.L__reg_num_\\rt)\n"
- "	.endm\n"
- );
- 
--- 
-2.5.0
+Thanks.
