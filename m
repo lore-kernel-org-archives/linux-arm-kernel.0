@@ -1,127 +1,168 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 15 Feb 2016 21:57:47 +0100
-Subject: [PATCH v2 3/4] ARM: pxa: add the number of DMA requestor lines
+Date: Mon, 15 Feb 2016 21:57:48 +0100
+Subject: [PATCH v2 4/4] dmaengine: pxa_dma: fix the maximum requestor line
 In-Reply-To: <1455569868-25017-1-git-send-email-robert.jarzmik@free.fr>
 References: <1455569868-25017-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <1455569868-25017-3-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <1455569868-25017-4-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Declare the number of DMA requestor lines per platform :
+The current number of requestor lines is limited to 31. This was an
+error of a previous commit, as this number is platform dependent, and is
+actually :
  - for pxa25x: 40 requestor lines
  - for pxa27x: 75 requestor lines
  - for pxa3xx: 100 requestor lines
 
-This information will be used to activate the DMA flow control or not.
+The previous testing did not reveal the faulty constant as on pxa[23]xx
+platforms, only camera, MSL and USB are above requestor 32, and in these
+only the camera has a driver using dma.
 
+Fixes: e87ffbdf0697 ("dmaengine: pxa_dma: fix the no-requestor case")
 Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
 ---
-Since v1: rename of property to #dma-requests
+Since v1: change to #dma-requests the of property name
+      	  default to 32 requestors and warn as suggested by Vinod
 ---
- arch/arm/boot/dts/pxa27x.dtsi        | 1 +
- arch/arm/boot/dts/pxa3xx.dtsi        | 1 +
- arch/arm/mach-pxa/devices.c          | 3 ++-
- arch/arm/mach-pxa/pxa25x.c           | 2 +-
- arch/arm/mach-pxa/pxa27x.c           | 2 +-
- arch/arm/mach-pxa/pxa3xx.c           | 2 +-
- arch/arm/plat-pxa/include/plat/dma.h | 2 +-
- 7 files changed, 8 insertions(+), 5 deletions(-)
+ drivers/dma/pxa_dma.c | 39 ++++++++++++++++++++++++++++-----------
+ 1 file changed, 28 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/boot/dts/pxa27x.dtsi b/arch/arm/boot/dts/pxa27x.dtsi
-index ef366b204c89..aab08a48dbca 100644
---- a/arch/arm/boot/dts/pxa27x.dtsi
-+++ b/arch/arm/boot/dts/pxa27x.dtsi
-@@ -13,6 +13,7 @@
- 			interrupts = <25>;
- 			#dma-channels = <32>;
- 			#dma-cells = <2>;
-+			#dma-requests = <75>;
- 			status = "okay";
- 		};
+diff --git a/drivers/dma/pxa_dma.c b/drivers/dma/pxa_dma.c
+index ca6c088edc8a..8b333601687f 100644
+--- a/drivers/dma/pxa_dma.c
++++ b/drivers/dma/pxa_dma.c
+@@ -122,6 +122,7 @@ struct pxad_chan {
+ struct pxad_device {
+ 	struct dma_device		slave;
+ 	int				nr_chans;
++	int				nr_requestors;
+ 	void __iomem			*base;
+ 	struct pxad_phy			*phys;
+ 	spinlock_t			phy_lock;	/* Phy association */
+@@ -473,7 +474,7 @@ static void pxad_free_phy(struct pxad_chan *chan)
+ 		return;
  
-diff --git a/arch/arm/boot/dts/pxa3xx.dtsi b/arch/arm/boot/dts/pxa3xx.dtsi
-index cf6998a0804d..bea454f50ff9 100644
---- a/arch/arm/boot/dts/pxa3xx.dtsi
-+++ b/arch/arm/boot/dts/pxa3xx.dtsi
-@@ -12,6 +12,7 @@
- 			interrupts = <25>;
- 			#dma-channels = <32>;
- 			#dma-cells = <2>;
-+			#dma-requests = <100>;
- 			status = "okay";
- 		};
+ 	/* clear the channel mapping in DRCMR */
+-	if (chan->drcmr <= DRCMR_CHLNUM) {
++	if (chan->drcmr <= pdev->nr_requestors) {
+ 		reg = pxad_drcmr(chan->drcmr);
+ 		writel_relaxed(0, chan->phy->base + reg);
+ 	}
+@@ -509,6 +510,7 @@ static bool is_running_chan_misaligned(struct pxad_chan *chan)
  
-diff --git a/arch/arm/mach-pxa/devices.c b/arch/arm/mach-pxa/devices.c
-index 6e12c162506f..d9ff6e4dd854 100644
---- a/arch/arm/mach-pxa/devices.c
-+++ b/arch/arm/mach-pxa/devices.c
-@@ -1233,6 +1233,7 @@ void __init pxa2xx_set_spi_info(unsigned id, struct pxa2xx_spi_master *info)
- 
- static struct mmp_dma_platdata pxa_dma_pdata = {
- 	.dma_channels	= 0,
-+	.nb_requestors	= 0,
- };
- 
- static struct resource pxa_dma_resource[] = {
-@@ -1261,7 +1262,7 @@ static struct platform_device pxa2xx_pxa_dma = {
- 	.resource	= pxa_dma_resource,
- };
- 
--void __init pxa2xx_set_dmac_info(int nb_channels)
-+void __init pxa2xx_set_dmac_info(int nb_channels, int nb_requestors)
+ static void phy_enable(struct pxad_phy *phy, bool misaligned)
  {
- 	pxa_dma_pdata.dma_channels = nb_channels;
- 	pxa_register_device(&pxa2xx_pxa_dma, &pxa_dma_pdata);
-diff --git a/arch/arm/mach-pxa/pxa25x.c b/arch/arm/mach-pxa/pxa25x.c
-index a177bf45feef..823504f48f80 100644
---- a/arch/arm/mach-pxa/pxa25x.c
-+++ b/arch/arm/mach-pxa/pxa25x.c
-@@ -206,7 +206,7 @@ static int __init pxa25x_init(void)
- 		register_syscore_ops(&pxa_irq_syscore_ops);
- 		register_syscore_ops(&pxa2xx_mfp_syscore_ops);
++	struct pxad_device *pdev;
+ 	u32 reg, dalgn;
  
--		pxa2xx_set_dmac_info(16);
-+		pxa2xx_set_dmac_info(16, 40);
- 		pxa_register_device(&pxa25x_device_gpio, &pxa25x_gpio_info);
- 		ret = platform_add_devices(pxa25x_devices,
- 					   ARRAY_SIZE(pxa25x_devices));
-diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
-index 73e96270dc53..d84239c89639 100644
---- a/arch/arm/mach-pxa/pxa27x.c
-+++ b/arch/arm/mach-pxa/pxa27x.c
-@@ -310,7 +310,7 @@ static int __init pxa27x_init(void)
- 		if (!of_have_populated_dt()) {
- 			pxa_register_device(&pxa27x_device_gpio,
- 					    &pxa27x_gpio_info);
--			pxa2xx_set_dmac_info(32);
-+			pxa2xx_set_dmac_info(32, 75);
- 			ret = platform_add_devices(devices,
- 						   ARRAY_SIZE(devices));
- 		}
-diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
-index a1c4c888f246..fb0adb669124 100644
---- a/arch/arm/mach-pxa/pxa3xx.c
-+++ b/arch/arm/mach-pxa/pxa3xx.c
-@@ -450,7 +450,7 @@ static int __init pxa3xx_init(void)
- 		if (of_have_populated_dt())
- 			return 0;
+ 	if (!phy->vchan)
+@@ -518,7 +520,8 @@ static void phy_enable(struct pxad_phy *phy, bool misaligned)
+ 		"%s(); phy=%p(%d) misaligned=%d\n", __func__,
+ 		phy, phy->idx, misaligned);
  
--		pxa2xx_set_dmac_info(32);
-+		pxa2xx_set_dmac_info(32, 100);
- 		ret = platform_add_devices(devices, ARRAY_SIZE(devices));
- 		if (ret)
- 			return ret;
-diff --git a/arch/arm/plat-pxa/include/plat/dma.h b/arch/arm/plat-pxa/include/plat/dma.h
-index 28848b344e2d..ceba3e4184fc 100644
---- a/arch/arm/plat-pxa/include/plat/dma.h
-+++ b/arch/arm/plat-pxa/include/plat/dma.h
-@@ -95,6 +95,6 @@ static inline int pxad_toggle_reserved_channel(int legacy_channel)
+-	if (phy->vchan->drcmr <= DRCMR_CHLNUM) {
++	pdev = to_pxad_dev(phy->vchan->vc.chan.device);
++	if (phy->vchan->drcmr <= pdev->nr_requestors) {
+ 		reg = pxad_drcmr(phy->vchan->drcmr);
+ 		writel_relaxed(DRCMR_MAPVLD | phy->idx, phy->base + reg);
+ 	}
+@@ -914,6 +917,7 @@ static void pxad_get_config(struct pxad_chan *chan,
+ {
+ 	u32 maxburst = 0, dev_addr = 0;
+ 	enum dma_slave_buswidth width = DMA_SLAVE_BUSWIDTH_UNDEFINED;
++	struct pxad_device *pdev = to_pxad_dev(chan->vc.chan.device);
+ 
+ 	*dcmd = 0;
+ 	if (dir == DMA_DEV_TO_MEM) {
+@@ -922,7 +926,7 @@ static void pxad_get_config(struct pxad_chan *chan,
+ 		dev_addr = chan->cfg.src_addr;
+ 		*dev_src = dev_addr;
+ 		*dcmd |= PXA_DCMD_INCTRGADDR;
+-		if (chan->drcmr <= DRCMR_CHLNUM)
++		if (chan->drcmr <= pdev->nr_requestors)
+ 			*dcmd |= PXA_DCMD_FLOWSRC;
+ 	}
+ 	if (dir == DMA_MEM_TO_DEV) {
+@@ -931,7 +935,7 @@ static void pxad_get_config(struct pxad_chan *chan,
+ 		dev_addr = chan->cfg.dst_addr;
+ 		*dev_dst = dev_addr;
+ 		*dcmd |= PXA_DCMD_INCSRCADDR;
+-		if (chan->drcmr <= DRCMR_CHLNUM)
++		if (chan->drcmr <= pdev->nr_requestors)
+ 			*dcmd |= PXA_DCMD_FLOWTRG;
+ 	}
+ 	if (dir == DMA_MEM_TO_MEM)
+@@ -1341,13 +1345,15 @@ static struct dma_chan *pxad_dma_xlate(struct of_phandle_args *dma_spec,
+ 
+ static int pxad_init_dmadev(struct platform_device *op,
+ 			    struct pxad_device *pdev,
+-			    unsigned int nr_phy_chans)
++			    unsigned int nr_phy_chans,
++			    unsigned int nr_requestors)
+ {
+ 	int ret;
+ 	unsigned int i;
+ 	struct pxad_chan *c;
+ 
+ 	pdev->nr_chans = nr_phy_chans;
++	pdev->nr_requestors = nr_requestors;
+ 	INIT_LIST_HEAD(&pdev->slave.channels);
+ 	pdev->slave.device_alloc_chan_resources = pxad_alloc_chan_resources;
+ 	pdev->slave.device_free_chan_resources = pxad_free_chan_resources;
+@@ -1382,7 +1388,7 @@ static int pxad_probe(struct platform_device *op)
+ 	const struct of_device_id *of_id;
+ 	struct mmp_dma_platdata *pdata = dev_get_platdata(&op->dev);
+ 	struct resource *iores;
+-	int ret, dma_channels = 0;
++	int ret, dma_channels = 0, nb_requestors = 0;
+ 	const enum dma_slave_buswidth widths =
+ 		DMA_SLAVE_BUSWIDTH_1_BYTE   | DMA_SLAVE_BUSWIDTH_2_BYTES |
+ 		DMA_SLAVE_BUSWIDTH_4_BYTES;
+@@ -1399,13 +1405,23 @@ static int pxad_probe(struct platform_device *op)
+ 		return PTR_ERR(pdev->base);
+ 
+ 	of_id = of_match_device(pxad_dt_ids, &op->dev);
+-	if (of_id)
++	if (of_id) {
+ 		of_property_read_u32(op->dev.of_node, "#dma-channels",
+ 				     &dma_channels);
+-	else if (pdata && pdata->dma_channels)
++		ret = of_property_read_u32(op->dev.of_node, "#dma-requests",
++					   &nb_requestors);
++		if (ret) {
++			dev_warn(pdev->slave.dev,
++				 "#dma-requests set to default 32 as missing in OF: %d",
++				 ret);
++			nb_requestors = 32;
++		};
++	} else if (pdata && pdata->dma_channels) {
+ 		dma_channels = pdata->dma_channels;
+-	else
++		nb_requestors = pdata->nb_requestors;
++	} else {
+ 		dma_channels = 32;	/* default 32 channel */
++	}
+ 
+ 	dma_cap_set(DMA_SLAVE, pdev->slave.cap_mask);
+ 	dma_cap_set(DMA_MEMCPY, pdev->slave.cap_mask);
+@@ -1423,7 +1439,7 @@ static int pxad_probe(struct platform_device *op)
+ 	pdev->slave.descriptor_reuse = true;
+ 
+ 	pdev->slave.dev = &op->dev;
+-	ret = pxad_init_dmadev(op, pdev, dma_channels);
++	ret = pxad_init_dmadev(op, pdev, dma_channels, nb_requestors);
+ 	if (ret) {
+ 		dev_err(pdev->slave.dev, "unable to register\n");
+ 		return ret;
+@@ -1442,7 +1458,8 @@ static int pxad_probe(struct platform_device *op)
+ 
+ 	platform_set_drvdata(op, pdev);
+ 	pxad_init_debugfs(pdev);
+-	dev_info(pdev->slave.dev, "initialized %d channels\n", dma_channels);
++	dev_info(pdev->slave.dev, "initialized %d channels on %d requestors\n",
++		 dma_channels, nb_requestors);
+ 	return 0;
  }
- #endif
  
--extern void __init pxa2xx_set_dmac_info(int nb_channels);
-+extern void __init pxa2xx_set_dmac_info(int nb_channels, int nb_requestors);
- 
- #endif /* __PLAT_DMA_H */
 -- 
 2.1.4
