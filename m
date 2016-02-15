@@ -1,47 +1,52 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 15 Feb 2016 18:17:46 +0100
-Subject: [PATCH] arm64: mark kernel text segment as MEMBLOCK_NOMAP
-In-Reply-To: <20160215120809.GF13683@e104818-lin.cambridge.arm.com>
-References: <1455528512-32491-1-git-send-email-ard.biesheuvel@linaro.org>
- <20160215114505.GE13683@e104818-lin.cambridge.arm.com>
- <CAKv+Gu-Y-k_LAbFZJjiPuHq6ssaFCb3WMG_fVGx3ODrvb+hEUQ@mail.gmail.com>
- <20160215120809.GF13683@e104818-lin.cambridge.arm.com>
-Message-ID: <CAKv+Gu8XJ4br8U0x2=AzzDUxo3he2gK6MtBkMKEsZ=Juds3_=A@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 15 Feb 2016 17:22:47 +0000
+Subject: [PATCH v4 20/23] arm64: perf: Count EL2 events if the kernel is
+ running in HYP
+In-Reply-To: <1455216004-19499-21-git-send-email-marc.zyngier@arm.com>
+References: <1455216004-19499-1-git-send-email-marc.zyngier@arm.com>
+ <1455216004-19499-21-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20160215172247.GL6298@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 February 2016 at 13:08, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Mon, Feb 15, 2016 at 12:53:59PM +0100, Ard Biesheuvel wrote:
->> On 15 February 2016 at 12:45, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> > Ard, I'm about to drop the kernel memory map patches from -next. There
->> > are several issues like KASAN (which may as well be a KASAN bug but I
->> > haven't got to the bottom of it yet), initrd (you have patches but
->> > require additional acks).
->> >
->> > I'll keep your stuff on the for-next/kernmap branch and do further
->> > debugging. If it stabilises in the next 1-2 weeks, I'll merge it into
->> > for-next/core for 4.6, otherwise, it will have to wait. I would really
->> > like these patches merged but it looks like they need wider testing.
-> [...]
->> If you are going to drop it for now anyway, I can do a v6sub1 with
->> this issue and the initrd issue addressed, but also an issue with the
->> KVM ksym ref patch with GCC 4.8. Since these issues affect
->> bisectability, I'd prefer to rebase entirely, and fold all the fixes
->> rather than apply them on top.
->
-> That's fine. I'll push one more patch to the for-next/pgtable branch,
-> converting __set_fixmap_offset() back to a macro as it broke other
-> architectures. Otherwise it is not rebased and I'll merge it into
-> for-next core.
->
+On Thu, Feb 11, 2016 at 06:40:01PM +0000, Marc Zyngier wrote:
+> When the kernel is running in HYP (with VHE), it is necessary to
+> include EL2 events if the user requests counting kernel or
+> hypervisor events.
+> 
+> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/kernel/perf_event.c | 14 ++++++++++----
+>  1 file changed, 10 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+> index f7ab14c..6013a38 100644
+> --- a/arch/arm64/kernel/perf_event.c
+> +++ b/arch/arm64/kernel/perf_event.c
+> @@ -20,6 +20,7 @@
+>   */
+>  
+>  #include <asm/irq_regs.h>
+> +#include <asm/virt.h>
+>  
+>  #include <linux/of.h>
+>  #include <linux/perf/arm_pmu.h>
+> @@ -693,10 +694,15 @@ static int armv8pmu_set_event_filter(struct hw_perf_event *event,
+>  		return -EPERM;
+>  	if (attr->exclude_user)
+>  		config_base |= ARMV8_EXCLUDE_EL0;
+> -	if (attr->exclude_kernel)
+> -		config_base |= ARMV8_EXCLUDE_EL1;
+> -	if (!attr->exclude_hv)
+> -		config_base |= ARMV8_INCLUDE_EL2;
+> +	if (is_kernel_in_hyp_mode()) {
+> +		if (!attr->exclude_kernel || !attr->exclude_hv)
+> +			config_base |= ARMV8_INCLUDE_EL2;
 
-I have identified (and fixed) a Kasan issue in my patches: instead of
-leaving a hole for the 64 MB module window in the Kasan shadow region,
-I populated it with zero mappings, which caused many strange errors,
-and since the vmap() routines don't expect block mappings (which are
-created for the kernel image shadow by vmemmap_populate()), I guess
-false positive kasan warnings (like the ones you were seeing) are also
-a possible symptom of this issue.
+Hmm, so if userspace sets exclude_kernel but not exclude_user and
+exclude_hv, what should we do? I'm slightly tempted to reject the
+filter with -EINVAL...
 
--- 
-Ard.
+Will
