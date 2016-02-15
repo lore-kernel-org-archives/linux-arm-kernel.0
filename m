@@ -1,52 +1,49 @@
-From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Mon, 15 Feb 2016 15:57:33 +0300
-Subject: [PATCH v2 3/9] ACPI: introduce acpi_table_parse2()
-In-Reply-To: <CAJZ5v0ji3rR3HkC7BjygkqXxOrEn3qSKA42i1Rj9tBqZ71Dh+w@mail.gmail.com>
-References: <1455299022-11641-1-git-send-email-aleksey.makarov@linaro.org>
- <1455299022-11641-4-git-send-email-aleksey.makarov@linaro.org>
- <20160212185130.GA10095@kroah.com>
- <CAJZ5v0ji3rR3HkC7BjygkqXxOrEn3qSKA42i1Rj9tBqZ71Dh+w@mail.gmail.com>
-Message-ID: <56C1CB3D.6070906@linaro.org>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 15 Feb 2016 13:11:49 +0000
+Subject: arm qemu test failures due to 'driver-core: platform: probe
+ of-devices only using list of compatibles'
+In-Reply-To: <20160215105909.GH12289@pengutronix.de>
+References: <20160214165010.GA3189@roeck-us.net>
+ <20160215105909.GH12289@pengutronix.de>
+Message-ID: <56C1CE95.6020206@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael, 
-
-Thank you for review.
-
-On 02/13/2016 02:08 AM, Rafael J. Wysocki wrote:
-> On Fri, Feb 12, 2016 at 7:51 PM, Greg Kroah-Hartman
-> <gregkh@linuxfoundation.org> wrote:
->> On Fri, Feb 12, 2016 at 08:43:34PM +0300, Aleksey Makarov wrote:
->>> The function acpi_table_parse() has some problems:
->>> 1 It can be called only from __init code
->>> 2 It does not pass any data to the handler
->>> 3 It just throws out the value returned from the handler
->>>
->>> These issues are addressed in this patch
+On 15/02/16 10:59, Uwe Kleine-K?nig wrote:
+> Hello Guenter,
+>
+> On Sun, Feb 14, 2016 at 08:50:10AM -0800, Guenter Roeck wrote:
+>> Uwe,
 >>
->> Why not just fix acpi_table_parse(), like you have, and not add a new
->> API call with a "2" at the end of it.  That seems crazy to try to
->> maintain that level of apis.
+>> Your patch 'driver-core: platform: probe of-devices only using list of
+>> compatibles' causes the following qemu tests to crash in -next.
 >>
->> But I'm not the acpi maintainer(s), so it's their call...
-> 
-> The ACPI maintainer agrees.
+>> arm:vexpress-a9:vexpress_defconfig:vexpress-v2p-ca9
+>> arm:vexpress-a15:vexpress_defconfig:vexpress-v2p-ca15-tc1
+>> arm:vexpress-a9:multi_v7_defconfig:vexpress-v2p-ca9
+>> arm:vexpress-a15:multi_v7_defconfig:vexpress-v2p-ca15-tc1
+>>
+>> Crash log:
+>>
+>> VFS: Cannot open root device "mmcblk0" or unknown-block(0,0): error -6
+>> Please append a correct "root=" boot option; here are the available partitions:
+>> 1f00          131072 mtdblock0  (driver?)
+>> 1f01           32768 mtdblock1  (driver?)
+>> Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(0,0)
+>
+> Can you provide a complete boot log? This might already reveal which
+> device is failing. It might not be the mmci device but something it
+> depends on (clock, bus parent, irq).
 
-I see. 
+FWIW the PL180 on my Juno still works fine with this patch picked on top 
+of -rc3, so the issue would seem to be something else - From a quick 
+comparison between the DTs I see a slight difference in compatible 
+strings for the clocks, but the more likely-looking suspect is that the 
+VExpress DT references some GPIOs where the Juno DT doesn't.
 
-How would you prefer it to be fixed:
+Robin.
 
-1. Change the signature/implementation of acpi_table_parse(). 
-CON: It would require extensive changes through all the kernel,
-which I am not sure I will be able to test (but these changes are
-just adding an unused arg to the handler + checking that the 
-return value is consistent)
-
-OR
-
-2. Have a local implementation of the function like acpi_table_parse2()
-CON: A bit of code duplication.
-
-Thank you
-Aleksey Makarov
+>
+> Best regards
+> Uwe
+>
