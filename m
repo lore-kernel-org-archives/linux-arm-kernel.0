@@ -1,30 +1,42 @@
-From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Mon, 15 Feb 2016 11:45:59 +0530
-Subject: [PATCH] drivers: net: cpsw-phy-sel: add dev_warn() for
- unsupported PHY mode
-In-Reply-To: <1455324336-3884-1-git-send-email-drivshin.allworx@gmail.com>
-References: <1455324336-3884-1-git-send-email-drivshin.allworx@gmail.com>
-Message-ID: <56C16D1F.7060601@ti.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 15 Feb 2016 15:36:18 +0900
+Subject: [next] Odroid XU3 easily over-heats
+In-Reply-To: <20160215052843.GA6334@vireshk-i7>
+References: <56C01963.3080106@gmail.com> <20160215052843.GA6334@vireshk-i7>
+Message-ID: <56C171E2.90306@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 13 February 2016 06:15 AM, David Rivshin (Allworx) wrote:
-> From: David Rivshin <drivshin@allworx.com>
+On 15.02.2016 14:28, Viresh Kumar wrote:
+> On 14-02-16, 15:06, Krzysztof Kozlowski wrote:
+>> Hi all,
+>>
+>> With recent addition of cpufreq-dt support to Exynos5422
+>> it is very easy to over-heat the Odroid XU3 leading to critical shutdown:
 > 
-> The cpsw-phy-sel driver supports only MII, RMII, and RGMII PHY modes,
-> and silently handled any other values as if MII was specified. In a
-> case where the PHY mode was incorrectly specified, or a bug elsewhere,
-> there would be no indication of a problem. If MII was the correct mode,
-> then this will go unnoticed, otherwise the symptom will be a failure
-> to transmit/receive data over the RMII/RGMII link.
-> 
-> Add a dev_warn() to make this condition obvious and provide a
-> breadcrumb to follow.
-> 
-> Cc: Mugunthan V N <mugunthanvnm@ti.com>
-> Signed-off-by: David Rivshin <drivshin@allworx.com>
+> How were OPPs passed earlier? I failed to see them in kernel somehow.
+> You must have been using opp-v1 earlier, right?
 
-Acked-by: Mugunthan V N <mugunthanvnm@ti.com>
+Till now there was no support for cpufreq for Exynos542x. For some time
+Bartlomiej was developing these patches - using opp-v1 at beginning. I
+don't know whether he encountered this before.
 
-Regards
-Mugunthan V N
+> 
+> You used boost-freqs then? You used cpufreq as a cooling device then?
+> 
+>> What about cpufreq as cooling device? Probably that part
+>> is missing now, right?
+> 
+> Maybe, how was that earlier though ?
+
+Bootloader initialized frequency and regulators to some safe defaults. I
+think the voltage set by uboot is 1 V (for big and little) which
+corresponds to ~800 MHz of frequency (I don't know the exact frequency
+because it is hardcoded as divider value...).
+
+However there was no cooling device except fan. This did not change. So
+the only difference seems to be that now at critical shutdown moment it
+operates at 1300 MHz / 1.275 V (little) and 1800 MHz / 1.250 V (big).
+
+Best regards,
+Krzysztof
