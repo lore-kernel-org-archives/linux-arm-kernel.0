@@ -1,50 +1,25 @@
-From: pjones@redhat.com (Peter Jones)
-Date: Mon, 15 Feb 2016 10:46:30 -0500
-Subject: [PATCH v2 2/2] arm64/efi: esrt: add missing call to
- efi_esrt_init()
-In-Reply-To: <1455535953-5056-3-git-send-email-ard.biesheuvel@linaro.org>
-References: <1455535953-5056-1-git-send-email-ard.biesheuvel@linaro.org>
- <1455535953-5056-3-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160215154629.GB785@redhat.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 15 Feb 2016 15:51:09 +0000
+Subject: [PATCH] arm/arm64/crypto: assure that ECB modes don't require an
+ IV
+In-Reply-To: <CAKv+Gu8_Z5=0dTeBsVgx_BT0c+_O5PNUCyKFjuDf9x470bxHOA@mail.gmail.com>
+References: <1455292072-5236-1-git-send-email-jeremy.linton@arm.com>
+ <CAKv+Gu8_Z5=0dTeBsVgx_BT0c+_O5PNUCyKFjuDf9x470bxHOA@mail.gmail.com>
+Message-ID: <20160215155108.GG6298@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 15, 2016 at 12:32:33PM +0100, Ard Biesheuvel wrote:
-> ESRT support is built by default for all architectures that define
-> CONFIG_EFI. However, this support was not wired up yet for ARM/arm64,
-> since efi_esrt_init() was never called. So add the missing call.
+On Fri, Feb 12, 2016 at 06:00:01PM +0100, Ard Biesheuvel wrote:
+> On 12 February 2016 at 16:47, Jeremy Linton <jeremy.linton@arm.com> wrote:
+> > ECB modes don't use an initialization vector. The kernel
+> > /proc/crypto interface doesn't reflect this properly.
+> >
+> > Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
 > 
-> Since efi_esrt_init() uses efi_mem_desc_lookup(), which in turn relies
-> on efi.memmap having been assigned and populated completetely, add the
-> missing assignments of efi.memmap and efi.memmap->nr_map.
+> Thanks for spotting that!
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Looks correct to me, but I can't test this one:
-Acked-by: Peter Jones <pjones@redhat.com>
+Thanks, I'll queue this for -rc5.
 
-> ---
->  drivers/firmware/efi/arm-init.c | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
-> index 9e15d571b53c..5c5e799bdb50 100644
-> --- a/drivers/firmware/efi/arm-init.c
-> +++ b/drivers/firmware/efi/arm-init.c
-> @@ -197,10 +197,13 @@ void __init efi_init(void)
->  	memmap.map_end = memmap.map + params.mmap_size;
->  	memmap.desc_size = params.desc_size;
->  	memmap.desc_version = params.desc_ver;
-> +	memmap.nr_map = params.mmap_size / params.desc_size;
-> +	efi.memmap = &memmap;
->  
->  	if (uefi_init() < 0)
->  		return;
->  
-> +	efi_esrt_init();
->  	reserve_regions();
->  	early_memunmap(memmap.map, params.mmap_size);
->  	memblock_mark_nomap(params.mmap & PAGE_MASK,
-> -- 
-> 2.5.0
-> 
+Will
