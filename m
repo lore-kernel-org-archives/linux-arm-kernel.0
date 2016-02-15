@@ -1,49 +1,41 @@
-From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
-Date: Mon, 15 Feb 2016 08:33:37 +0100
-Subject: [PATCH 3/7] usb: gadget: pxa25x_udc: use readl/writel for mmio
-In-Reply-To: <2202960.HHsdV23CYi@wuerfel> (Arnd Bergmann's message of "Fri, 29
- Jan 2016 18:06:58 +0100")
-References: <1453997722-3489596-1-git-send-email-arnd@arndb.de>
- <1453997843-3489728-3-git-send-email-arnd@arndb.de>
- <m3a8nogy0u.fsf@t19.piap.pl> <2202960.HHsdV23CYi@wuerfel>
-Message-ID: <m3a8n2bf72.fsf@t19.piap.pl>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Mon, 15 Feb 2016 15:33:26 +0800
+Subject: [RESEND PATCH 1/8] clk: rockchip: add id of the tsadc clock found on
+ rk3228 SoCs
+In-Reply-To: <1455521613-27340-1-git-send-email-wxt@rock-chips.com>
+References: <1455521613-27340-1-git-send-email-wxt@rock-chips.com>
+Message-ID: <1455521613-27340-2-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+This patch adds 'SCLK_TSADC' and 'PCLK_TSADC' id found on rk3228 SoCs.
+That will be needed by TSADC controller.
 
->> Anyway, I think readl()/writel() do the right thing: in BE mode they
->> swap PCI accesses and don't swap normal registers, in LE mode nothing is
->> swapped.
->
-> This seems to be true when CONFIG_IXP4XX_INDIRECT_PCI is set, but
-> not otherwise. For the indirect variant, writel() is a __raw_writel()
-> without barrier or byteswap on non-PCI memory, while with that
-> option disabled, we use the standard implementation that has both
-> a byteswap and a barrier.
->
-> According to your description, that would mean the version without
-> indirect PCI access is broken and it appears to have been that way
-> since before the start of git history in 2.6.12.
->
-> It's possible that nobody cared because all drivers for non-PCI
-> devices on ixp4xx (the on chip ones) just use __raw_readl or
-> direct pointer references.
+Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+---
 
-Well, it is possible. I recall I probably used __raw_* instead of
-readl()/writel() in qmgr/npe/Ethernet drivers for this very reason.
+ include/dt-bindings/clock/rk3228-cru.h | 2 ++
+ 1 file changed, 2 insertions(+)
 
-I think Direct pointer references are only used for locations in RAM
-(DMA buffers), they have their own share of problems because the
-peripherals are always big endian.
-
-I think I still have an early IXP425 board with UDC connector so I will
-try to dig it up and test this code.
-
-I wonder if we should switch the driver to use __raw_*, too. The problem
-is almost nobody uses UDC with this CPU.
+diff --git a/include/dt-bindings/clock/rk3228-cru.h b/include/dt-bindings/clock/rk3228-cru.h
+index a78dd89..cd2e06b 100644
+--- a/include/dt-bindings/clock/rk3228-cru.h
++++ b/include/dt-bindings/clock/rk3228-cru.h
+@@ -29,6 +29,7 @@
+ #define SCLK_SDMMC		68
+ #define SCLK_SDIO		69
+ #define SCLK_EMMC		71
++#define SCLK_TSADC		72
+ #define SCLK_UART0		77
+ #define SCLK_UART1		78
+ #define SCLK_UART2		79
+@@ -68,6 +69,7 @@
+ #define PCLK_UART0		341
+ #define PCLK_UART1		342
+ #define PCLK_UART2		343
++#define PCLK_TSADC		344
+ #define PCLK_PWM		350
+ #define PCLK_TIMER		353
+ #define PCLK_PERI		363
 -- 
-Krzysztof Halasa
-
-Industrial Research Institute for Automation and Measurements PIAP
-Al. Jerozolimskie 202, 02-486 Warsaw, Poland
+1.9.1
