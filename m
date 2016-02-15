@@ -1,70 +1,156 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 15 Feb 2016 11:15:16 +0100
-Subject: [PATCH v2 0/6] ARM/arm64 : shmobile/renesas: Add L2
- cache-controller nodes
-In-Reply-To: <20160215015848.GD14034@verge.net.au>
-References: <1449512659-16688-1-git-send-email-geert+renesas@glider.be>
- <20160215015848.GD14034@verge.net.au>
-Message-ID: <CAMuHMdVRTJ9nXFNQSz+WGSuUGWho3x08WMNZwPS=B-Q8sdzd4w@mail.gmail.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 15 Feb 2016 10:16:48 +0000
+Subject: (Still) breaking DT compatibility (was: [RFC PATCH 0/4] clk: sunxi:
+ fix DT compatibility issues)
+In-Reply-To: <56BE29A1.3060107@redhat.com>
+References: <1455300000-18723-1-git-send-email-andre.przywara@arm.com>
+ <56BE29A1.3060107@redhat.com>
+Message-ID: <56C1A590.6030500@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On 12/02/16 18:51, Hans de Goede wrote:
+> Hi,
+> 
+> So far I've stayed out of this discussion, but now I feel I have to
+> weigh in:
+> 
+> There is no need for this series, device-tree compatibility for
+> sunxi devices is a non issue. No devices ship with dtb files as
+> part of the bootloader / firmware (the vendor kernels do not
+> use dtb at all).
 
-On Mon, Feb 15, 2016 at 2:58 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Mon, Dec 07, 2015 at 07:24:13PM +0100, Geert Uytterhoeven wrote:
->> This patch series adds the missing L2 cache-controller nodes to the
->> DTSes for various Renesas ARM-based SoCs, and links the CPU nodes to
->> them.
+I think you are barking in the wrong thread here.
+I deliberately sent some code to bring this discussion back to a more
+technical level.
+
+But anyway...
+
+> So we always are using a dtb from the kernel tree, and both Fedora
+> and Debian (AFAIK), the 2 distros which ship with more or less official
+> sunxi support package things
+
+Actually I am trying to help that it doesn't need to stay this way. I
+don't see a real reason why a distribution should support a particular
+platform, they certainly don't for x86, for instance.
+I think a stable DT would help to overcome this limited support that we
+see here and would allow distributions to not need to care about sunxi
+in particular.
+
+There should be one good DT for all kernels - it may be updated
+(especially if new features get supported), but should never break.
+Also please note that the DT is not only for Linux, BSDs for instance
+use it too - for instance FreeBSD on ARM64.
+
+> so that each kernel version uses the dtb
+> files compiled from the dts shipped with that exact kernel version,
+> (through the ftddir directive in extlinux.conf, which is per menu
+> entry / kernel version) even if multiple kernel versions are installed.
+
+That there are technical ways to mitigate the problem doesn't count as
+an excuse to break DT.
+
+To make this clear: The original PLL6 clock _binding_ is actually fine:
+it describes the clock as per the manual with two clock outputs.
+It's just the driver that is ignoring the clock-output-names that causes
+the issue.
+So we can happily keep the binding, fix the driver and re-use that very
+binding for PLL8, as well.
+This fix series here was the easiest approach in terms of changed code.
+I can make some patches that implement the proper solution - if you
+promise to not shoot down 0/x again easily.
+
+I see that good DT bindings are not easy to come up with. Yes, we are
+not perfect and especially for sunxi with it's bad original
+documentation we won't create perfect DTs from the beginning.
+But I think we should at least _try_ to make a DT what's is meant:
+describing the hardware, part of the firmware and OS agnostic - which
+implies compatibility.
+
+> So there is no reason, no reason at all to worry too much about dtb
+> compatibility for sunxi devices.
+
+I think this argument has been discussed quite a bit in the
+other thread.
+What I am really worried about is that this now creeps into the arm64 world.
+Yes, I see your point that it was a no-brainer so far, but that doesn't
+mean that it has to stay this way. For the A64 for instance there are
+more devices with eMMC in the pipe (Remix Mini PC and the Olimex board),
+so we can just put our firmware bits and the boot loader on there and
+distributions don't need to ship those.
+
+> As for compatibility with u-boot, u-boot ships with its own embedded
+> dtb copy, which is based on dts files from the kernel (the u-boot copies
+> get synced regularly), and even if this dtb were to somehow be replaced
+> by a new "incompatible" dtb from a newer kernel there would still not
+> be a problem as u-boot does not (currently) use the clk definitions
+> from the dtb. Note I'm the u-boot sunxi custodian and I'm fine with
+> the proposed changes.
+> 
+> TL;DR: NACK for this series.
+
+Seriously?
+
+I would prefer if you would save your NACKs for patches that break
+something instead.
+
+If you are concerned that this fix is too involved, that's mostly due to
+the reason that I couldn't revert the original patch easily due to
+conflicts in subsequent patches, so I did a bit more for the rollback.
+The actual core fix is pretty easy.
+
+So I hope we can come to a conclusion about this one before I prepare
+the next set of patches.
+
+Cheers,
+Andre.
+
+> 
+> On 12-02-16 18:59, Andre Przywara wrote:
+>> Commit f7d372ba54ea ("clk: sunxi: Refactor A31 PLL6 so that it can be
+>> reused") (in -next) made the A31 PLL6 clock driver more generic, so
+>> that it can drive the PLL8 clock in newer SoCs too.
+>> However the patch broke compatibility with older DTs, which this
+>> series tries to fix.
+>> The approach chosen here is to bring back the old driver under its
+>> old name, while letting the new driver using a different name to be
+>> able to tell them apart.
+>> The old driver should be somewhat deprecated and not used in new DTs
+>> anymore.
+>> The slight disadvantage is that there are now two drivers and two
+>> compatible names for the same hardware (the PLL6 clock), I am not
+>> sure if this is frowned upon or can be tolerated since the new driver
+>> is more generic (drives PLL8 as well) and makes the old one obsolete.
+>> We just need to keep it for compatibility.
 >>
->> For R-Mobile APE6 (r8a73a4), the L2 cache-controllers are also linked to
->> the respective (already existing) SYSC Power Domains. Fortunately these
->> Power Domains were never powered down, as they are parents of the Power
->> Domains containing CPU cores. This may change in the future.
+>> The naming for both the functions and compatible names is probably
+>> wrong, I am relying on more sunxi - experienced people here to
+>> suggest better identifiers.
 >>
->> For R-Car Gen2 and Gen3 (r8a779x), this serves as a preparatory step for
->> adding SYSC Power Domain support later.
+>> This is only one possible approach to fix this issues, so I am open
+>> to any kind of discussion.
 >>
->> Question for the ARM/DT people: What are the DT bindings for
->> Cortex-A15/A7/A57/A53 L2 cache controllers?
->> Everybody just seems to use "cache" for the compatible values...
+>> The series is made on top of Maxime's sunxi/for-next branch, so it
+>> somehow reverts the change in question. I am happy to rebase it on
+>> any branch people tell me.
 >>
->> Patches 2-5 were extracted from series "[PATCH/RFC 00/15]
->> ARM: shmobile: R-Car: Add SYSC PM Domain DT Support",
->> (http://lists.infradead.org/pipermail/linux-arm-kernel/2015-June/348742.html)
->> and received some fixes. You can find more detailed changelogs in the
->> individual patches).
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 >>
->> This has been tested on r8a73a4/ape6evm, r8a7791/koelsch, and
->> r8a7795/salvator-x.
->
-> Sorry for loosing track of this until now.
->
-> It seems to me that the Gen-2 changes could be applied, is that correct?
-
-And APE6 :-)
-
-> It also seems to me that there was inconclusive discussion regarding
-> the r8a7795 change, is that also correct.
-
-There was discussion (for all SoCs) about the presence of the arm,data-latency
-and arm,tag-latency properties. Given the mess^H^H^H^H presence or
-absence of virtualization they may or may not be valid...
-
-I think the way forward (keeping the dependency for SYSC PM Domains in mind) is
-to apply the series, after removing the controversial latency properties.
-
-Should I resend, or can/will you handle that?
-
-Thanks!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+>> Andre Przywara (4):
+>>    clk: sunxi: rename new sun6i_a31_pll6 clock to sun6i_a31_pll clock
+>>    clk: sunxi: re-add old sun6i_a31_pll6 clock
+>>    clk: sunxi: revert .dtsi changes for DTs with a sun6i_a31_pll6 clock
+>>    DT: Allwinner H3: fix PLL8 clock
+>>
+>>   Documentation/devicetree/bindings/clock/sunxi.txt |  2 +-
+>>   arch/arm/boot/dts/sun6i-a31.dtsi                  | 36
+>> ++++++++---------
+>>   arch/arm/boot/dts/sun8i-a23-a33.dtsi              | 25 ++++--------
+>>   arch/arm/boot/dts/sun8i-a23.dtsi                  |  2 +-
+>>   arch/arm/boot/dts/sun8i-a33.dtsi                  |  4 +-
+>>   arch/arm/boot/dts/sun8i-h3.dtsi                   | 31 +++++---------
+>>   drivers/clk/sunxi/clk-sunxi.c                     | 49
+>> ++++++++++++++++++++---
+>>   7 files changed, 84 insertions(+), 65 deletions(-)
+>>
+> 
