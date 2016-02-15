@@ -1,54 +1,52 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 15 Feb 2016 14:46:52 +0000
-Subject: [RFC PATCH 1/7] arm64/perf: Basic uncore counter support for
- Cavium ThunderX
-In-Reply-To: <20160215142726.GD9732@leverpostej>
-References: <cover.1455295032.git.jglauber@cavium.com>
- <8bd93a25e069ed6428bc6c21fc53270962ccafcc.1455295032.git.jglauber@cavium.com>
- <20160212173658.GD20262@leverpostej>
- <20160215140720.GA4053@hardcore>
- <20160215142726.GD9732@leverpostej>
-Message-ID: <20160215144652.GF9732@leverpostej>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Mon, 15 Feb 2016 11:50:48 -0300
+Subject: [PATCH] rtc: mt6397: Add platform device ID table
+In-Reply-To: <1455501497.7263.4.camel@mtksdaap41>
+References: <1455016095-13724-1-git-send-email-javier@osg.samsung.com>
+ <1455501497.7263.4.camel@mtksdaap41>
+Message-ID: <56C1E5C8.6040007@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 15, 2016 at 02:27:27PM +0000, Mark Rutland wrote:
-> > > > +	uncore = event_to_thunder_uncore(event);
-> > > > +	if (!uncore)
-> > > > +		return -ENODEV;
-> > > > +	if (!uncore->event_valid(event->attr.config))
-> > > > +		return -EINVAL;
-> > > > +
-> > > > +	hwc->config = event->attr.config;
-> > > > +	hwc->idx = -1;
-> > > > +
-> > > > +	/* and we don't care about CPU */
-> > > 
-> > > Actually, you do. You want the perf core to serialize accesses via the
-> > > same CPU, so all events _must_ be targetted at the same CPU. Otherwise
-> > > there are a tonne of problems you don't even want to think about.
-> > 
-> > I found that perf added the events on every CPU in the system. Because
-> > the uncore events are not CPU related I wanted to avoid this. Setting
-> > cpumask to -1 did not work. Therefore I added a single CPU in the
-> > cpumask, see thunder_uncore_attr_show_cpumask().
-> 
-> I understand that, which is why I wrote:
-> 
-> > > You _must_ ensure this kernel-side, regardless of what the perf tool
-> > > happens to do.
-> > > 
-> > > See the arm-cci and arm-ccn drivers for an example.
-> 
-> Take a look at drivers/bus/arm-cci.c; specifically, what we do in
-> cci_pmu_event_init and cci_pmu_cpu_notifier.
-> 
-> This is the same thing that's done for x86 system PMUs. Take a look at
-> uncore_pmu_event_init in arch/x86/kernel/cpu/perf_event_intel_uncore.c.
+Hello Eddie,
 
-I note that we still have an open TODO rather than a call to
-perf_pmu_migrate_context.
+On 02/14/2016 10:58 PM, Eddie Huang wrote:
 
-The better example is arm_ccn_pmu_cpu_notifier in drivers/bus/arm-ccn.c.
+[snip]
 
-Mark.
+>> @@ -412,6 +418,7 @@ static struct platform_driver mtk_rtc_driver = {
+>>   	},
+>>   	.probe	= mtk_rtc_probe,
+>>   	.remove = mtk_rtc_remove,
+>> +	.id_table = mt6397_rtc_id,
+>>   };
+>>
+>>   module_platform_driver(mtk_rtc_driver);
+>> @@ -419,4 +426,3 @@ module_platform_driver(mtk_rtc_driver);
+>>   MODULE_LICENSE("GPL v2");
+>>   MODULE_AUTHOR("Tianping Fang <tianping.fang@mediatek.com>");
+>>   MODULE_DESCRIPTION("RTC Driver for MediaTek MT6397 PMIC");
+>> -MODULE_ALIAS("platform:mt6397-rtc");
+>
+> This patch looks good to me, but I am wondering, since we tend to use
+> device tree method to match driver, do we still need support platform
+> device ID ?
+>
+
+I'm not familiar with neither this IP block nor the SoC so it is up to
+you. I just noticed this issue when reviewing a regulator driver for a
+similar PMIC posted by someone from mediatek.
+
+I thought platform device was needed since the driver has a MODULE_ALIAS()
+but please let me know what you prefer and I can re-spin the patch and
+just remove the MODULE_ALIAS() if that makes more sense for this platform.
+  
+> Eddie
+>
+>
+
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
