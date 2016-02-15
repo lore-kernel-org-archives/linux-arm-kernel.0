@@ -1,79 +1,111 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 15 Feb 2016 09:46:05 +0100
-Subject: [PATCH v2] ARM: mm: mark section-aligned portion of rodata NX
-In-Reply-To: <4300378.sBT9DdB2Gc@wuerfel>
-References: <20151207223534.GA13722@www.outflux.net>
- <CAGXu5jLDK8eVO2kUD1cB3TArL8k8pF=igc3O04Fa40QgQ2pwNw@mail.gmail.com>
- <20160211180032.GY10826@n2100.arm.linux.org.uk>
- <4300378.sBT9DdB2Gc@wuerfel>
-Message-ID: <CAMuHMdVUXH-_PB+DNuCbTTXD6Zmy4iG9i=-ame4PDVAOKv2tvQ@mail.gmail.com>
+From: zhangqing@rock-chips.com (Elaine Zhang)
+Date: Mon, 15 Feb 2016 16:42:24 +0800
+Subject: [PATCH v1 5/6] rockchip: power-domain: Modify power domain driver for
+ rk3399
+Message-ID: <1455525744-14140-1-git-send-email-zhangqing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 12, 2016 at 10:45 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 11 February 2016 18:00:32 Russell King - ARM Linux wrote:
->> On Fri, Jan 22, 2016 at 01:19:03PM -0800, Kees Cook wrote:
->> > On Tue, Dec 8, 2015 at 10:38 AM, Kees Cook <keescook@chromium.org> wrote:
->> > > On Mon, Dec 7, 2015 at 11:47 PM, Ard Biesheuvel
->> > > <ard.biesheuvel@linaro.org> wrote:
->> > >> On 7 December 2015 at 23:35, Kees Cook <keescook@chromium.org> wrote:
->> > >>>  /*
->> > >>> + * Without CONFIG_DEBUG_ALIGN_RODATA, __start_rodata_section_aligned will
->> > >>> + * be the first section-aligned location after __start_rodata. Otherwise,
->> > >>> + * it will be equal to __start_rodata.
->> > >>> + */
->> > >>> +__start_rodata_section_aligned = ALIGN(__start_rodata, 1 << SECTION_SHIFT);
->> ...
->>
->> I'm afraid this causes build errors on two configurations:
->>
->> ./arch/arm/kernel/vmlinux.lds:701: undefined symbol `SECTION_SHIFT' referenced in expression
->>
->> which I think is down to the new __start_rodata_section_aligned line.
->>
->> Olof's builder errored out with this for both allnoconfig and
->> lpc18xx_defconfig builds.  Both probably due to CONFIG_MMU being
->> unset, and hence no definition for SECTION_SHIFT.
->>
->> I think you need to make this conditional on CONFIG_MMU.
->
-> I've hit another problem with this patch, when using XIP_KERNEL, I now see
->
-> arch/arm/mm/built-in.o:(.data+0x4bc): undefined reference to `__start_rodata_section_aligned'
->
-> in linux-next, apparently because of the combination with "ARM: 8513/1: xip: Move
-> XIP linking to a separate file".
+This driver is modified to support RK3399 SoC.
 
-Is this due to the copy not taking into account the recent changes to
-vmlinux.lds.S?
+Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+---
+ drivers/soc/rockchip/pm_domains.c | 55 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 55 insertions(+)
 
-"git show 538bf4694898b19e" with copy-rename detection shows:
-
-copy from arch/arm/kernel/vmlinux.lds.S
-copy to arch/arm/kernel/vmlinux-xip.lds.S
-index a6e395c53a48e045..6f59ef290289e078 100644
---- a/arch/arm/kernel/vmlinux.lds.S
-+++ b/arch/arm/kernel/vmlinux-xip.lds.S
-
-[...]
-
-@@ -117,7 +114,7 @@ SECTIONS
-                        ARM_CPU_KEEP(PROC_INFO)
-        }
-
--#ifdef CONFIG_DEBUG_ALIGN_RODATA
-+#ifdef CONFIG_DEBUG_RODATA
-        . = ALIGN(1<<SECTION_SHIFT);
- #endif
-        RO_DATA(PAGE_SIZE)
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert@linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/drivers/soc/rockchip/pm_domains.c b/drivers/soc/rockchip/pm_domains.c
+index c4c2aea..9affcec 100644
+--- a/drivers/soc/rockchip/pm_domains.c
++++ b/drivers/soc/rockchip/pm_domains.c
+@@ -19,6 +19,7 @@
+ #include <linux/mfd/syscon.h>
+ #include <dt-bindings/power/rk3288-power.h>
+ #include <dt-bindings/power/rk3368-power.h>
++#include <dt-bindings/power/rk3399-power.h>
+ 
+ struct rockchip_domain_info {
+ 	int pwr_mask;
+@@ -81,6 +82,9 @@ struct rockchip_pmu {
+ #define DOMAIN_RK3368(pwr, status, req)		\
+ 	DOMAIN(pwr, status, req, (req) + 16, req)
+ 
++#define DOMAIN_RK3399(pwr, status, req)                \
++	DOMAIN(pwr, status, req, req, req)
++
+ static bool rockchip_pmu_domain_is_idle(struct rockchip_pm_domain *pd)
+ {
+ 	struct rockchip_pmu *pmu = pd->pmu;
+@@ -519,6 +523,36 @@ static const struct rockchip_domain_info rk3368_pm_domains[] = {
+ 	[RK3368_PD_GPU_1]	= DOMAIN_RK3368(17, 16, 2),
+ };
+ 
++static const struct rockchip_domain_info rk3399_pm_domains[] = {
++	[RK3399_PD_TCPD0]       = DOMAIN_RK3399(8, 8, NULL_BIT),
++	[RK3399_PD_TCPD1]       = DOMAIN_RK3399(9, 9, NULL_BIT),
++	[RK3399_PD_CCI]         = DOMAIN_RK3399(10, 10, NULL_BIT),
++	[RK3399_PD_CCI0]        = DOMAIN_RK3399(NULL_BIT, NULL_BIT, 15),
++	[RK3399_PD_CCI1]        = DOMAIN_RK3399(NULL_BIT, NULL_BIT, 16),
++	[RK3399_PD_PERILP]      = DOMAIN_RK3399(11, 11, 1),
++	[RK3399_PD_PERIHP]      = DOMAIN_RK3399(12, 12, 2),
++	[RK3399_PD_CENTER]      = DOMAIN_RK3399(13, 13, 14),
++	[RK3399_PD_VIO]         = DOMAIN_RK3399(14, 14, 17),
++	[RK3399_PD_GPU]         = DOMAIN_RK3399(15, 15, 0),
++	[RK3399_PD_VCODEC]      = DOMAIN_RK3399(16, 16, 3),
++	[RK3399_PD_VDU]         = DOMAIN_RK3399(17, 17, 4),
++	[RK3399_PD_RGA]         = DOMAIN_RK3399(18, 18, 5),
++	[RK3399_PD_IEP]         = DOMAIN_RK3399(19, 19, 6),
++	[RK3399_PD_VO]          = DOMAIN_RK3399(20, 20, NULL_BIT),
++	[RK3399_PD_VOPB]        = DOMAIN_RK3399(NULL_BIT, NULL_BIT, 7),
++	[RK3399_PD_VOPL]        = DOMAIN_RK3399(NULL_BIT, NULL_BIT, 8),
++	[RK3399_PD_ISP0]        = DOMAIN_RK3399(22, 22, 9),
++	[RK3399_PD_ISP1]        = DOMAIN_RK3399(23, 23, 10),
++	[RK3399_PD_HDCP]        = DOMAIN_RK3399(24, 24, 11),
++	[RK3399_PD_GMAC]        = DOMAIN_RK3399(25, 25, 23),
++	[RK3399_PD_EMMC]        = DOMAIN_RK3399(26, 26, 24),
++	[RK3399_PD_USB3]        = DOMAIN_RK3399(27, 27, 12),
++	[RK3399_PD_EDP]         = DOMAIN_RK3399(28, 28, 22),
++	[RK3399_PD_GIC]         = DOMAIN_RK3399(29, 29, 27),
++	[RK3399_PD_SD]          = DOMAIN_RK3399(30, 30, 28),
++	[RK3399_PD_SDIOAUDIO]   = DOMAIN_RK3399(31, 31, 29),
++};
++
+ static const struct rockchip_pmu_info rk3288_pmu = {
+ 	.pwr_offset = 0x08,
+ 	.status_offset = 0x0c,
+@@ -553,6 +587,23 @@ static const struct rockchip_pmu_info rk3368_pmu = {
+ 	.domain_info = rk3368_pm_domains,
+ };
+ 
++static const struct rockchip_pmu_info rk3399_pmu = {
++	.pwr_offset = 0x14,
++	.status_offset = 0x18,
++	.req_offset = 0x60,
++	.idle_offset = 0x64,
++	.ack_offset = 0x68,
++
++	.core_pwrcnt_offset = 0x9c,
++	.gpu_pwrcnt_offset = 0xa4,
++
++	.core_power_transition_time = 24,
++	.gpu_power_transition_time = 24,
++
++	.num_domains = ARRAY_SIZE(rk3399_pm_domains),
++	.domain_info = rk3399_pm_domains,
++};
++
+ static const struct of_device_id rockchip_pm_domain_dt_match[] = {
+ 	{
+ 		.compatible = "rockchip,rk3288-power-controller",
+@@ -562,6 +613,10 @@ static const struct of_device_id rockchip_pm_domain_dt_match[] = {
+ 		.compatible = "rockchip,rk3368-power-controller",
+ 		.data = (void *)&rk3368_pmu,
+ 	},
++	{
++		.compatible = "rockchip,rk3399-power-controller",
++		.data = (void *)&rk3399_pmu,
++	},
+ 	{ /* sentinel */ },
+ };
+ 
+-- 
+1.9.1
