@@ -1,74 +1,78 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 15 Feb 2016 09:57:33 +0000
-Subject: [GIT PULL] Immutable branch between MFD, Input and IIO
-In-Reply-To: <20160211155633.GB20693@x1>
-References: <1450101234-2191-1-git-send-email-mpa@pengutronix.de>
- <20160211155633.GB20693@x1>
-Message-ID: <20160215095733.GE3455@x1>
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 15 Feb 2016 17:56:31 +0800
+Subject: [PATCH] dma: mv_xor_v2: new driver
+In-Reply-To: <1455523083-25506-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <201602151740.CeSibxZc%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dmitry, Jonathan,
+Hi Thomas,
 
-There as been an fix for one of the IIO drivers.  I'd like to fold the
-fix into the patch and re-send this pull-request.  Is that okay with
-you?
+[auto build test ERROR on robh/for-next]
+[also build test ERROR on v4.5-rc4 next-20160215]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 
-On Thu, 11 Feb 2016, Lee Jones wrote:
+url:    https://github.com/0day-ci/linux/commits/Thomas-Petazzoni/dma-mv_xor_v2-new-driver/20160215-160120
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux for-next
+config: sparc64-allyesconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=sparc64 
 
-> Enjoy!
-> 
-> The following changes since commit 36f90b0a2ddd60823fe193a85e60ff1906c2a9b3:
-> 
->   Linux 4.5-rc2 (2016-01-31 18:12:16 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git tags/ib-mfd-input-iio-v4.6
-> 
-> for you to fetch changes up to 4f7ed234f2a5dcc26fc56a6e8324d34bbc9afe23:
-> 
->   Input: touchscreen: Add imx25 TCQ driver (2016-02-11 15:40:42 +0000)
-> 
-> ----------------------------------------------------------------
-> Immutable branch between MFD, Input and IIO due for v4.6
-> 
-> ----------------------------------------------------------------
-> Markus Pargmann (6):
->       mfd: Add DT binding documentation for imx25 ADC/TSC
->       iio: Add binding documentation for imx25 GCQ
->       Input: add binding documentation for imx25 touchscreen controller
->       mfd: fsl-imx25-tsadc: Register touchscreen ADC driver
->       iio: adc: Add imx25-gcq ADC driver
->       Input: touchscreen: Add imx25 TCQ driver
-> 
->  .../devicetree/bindings/iio/adc/fsl,imx25-gcq.txt  |  58 ++
->  .../bindings/input/touchscreen/fsl-mx25-tcq.txt    |  35 ++
->  .../devicetree/bindings/mfd/fsl-imx25-tsadc.txt    |  47 ++
->  drivers/iio/adc/Kconfig                            |   7 +
->  drivers/iio/adc/Makefile                           |   1 +
->  drivers/iio/adc/fsl-imx25-gcq.c                    | 417 ++++++++++++++
->  drivers/input/touchscreen/Kconfig                  |   9 +
->  drivers/input/touchscreen/Makefile                 |   1 +
->  drivers/input/touchscreen/fsl-imx25-tcq.c          | 596 +++++++++++++++++++++
->  drivers/mfd/Kconfig                                |   9 +
->  drivers/mfd/Makefile                               |   2 +
->  drivers/mfd/fsl-imx25-tsadc.c                      | 203 +++++++
->  include/dt-bindings/iio/adc/fsl-imx25-gcq.h        |  18 +
->  include/linux/mfd/imx25-tsadc.h                    | 140 +++++
->  14 files changed, 1543 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/iio/adc/fsl,imx25-gcq.txt
->  create mode 100644 Documentation/devicetree/bindings/input/touchscreen/fsl-mx25-tcq.txt
->  create mode 100644 Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt
->  create mode 100644 drivers/iio/adc/fsl-imx25-gcq.c
->  create mode 100644 drivers/input/touchscreen/fsl-imx25-tcq.c
->  create mode 100644 drivers/mfd/fsl-imx25-tsadc.c
->  create mode 100644 include/dt-bindings/iio/adc/fsl-imx25-gcq.h
->  create mode 100644 include/linux/mfd/imx25-tsadc.h
-> 
+All errors (new ones prefixed by >>):
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+   In file included from include/linux/of_pci.h:5:0,
+                    from drivers/of/of_pci.c:6:
+>> include/linux/msi.h:203:10: error: unknown type name 'msi_alloc_info_t'
+             msi_alloc_info_t *arg);
+             ^
+   include/linux/msi.h:207:9: error: unknown type name 'msi_alloc_info_t'
+            msi_alloc_info_t *arg);
+            ^
+   include/linux/msi.h:216:12: error: unknown type name 'msi_alloc_info_t'
+               msi_alloc_info_t *arg);
+               ^
+   include/linux/msi.h:217:22: error: unknown type name 'msi_alloc_info_t'
+     void  (*msi_finish)(msi_alloc_info_t *arg, int retval);
+                         ^
+   include/linux/msi.h:218:20: error: unknown type name 'msi_alloc_info_t'
+     void  (*set_desc)(msi_alloc_info_t *arg,
+                       ^
+   include/linux/msi.h:286:18: error: unknown type name 'msi_alloc_info_t'
+           int nvec, msi_alloc_info_t *args);
+                     ^
+   include/linux/msi.h:288:29: error: unknown type name 'msi_alloc_info_t'
+            int virq, int nvec, msi_alloc_info_t *args);
+                                ^
+
+vim +/msi_alloc_info_t +203 include/linux/msi.h
+
+d9109698 Jiang Liu        2014-11-15  197   * @msi_check, @msi_prepare, @msi_finish, @set_desc and @handle_error
+1d1e8cdc Thomas Petazzoni 2015-12-21  198   * are callbacks used by msi_domain_alloc_irqs() and related
+d9109698 Jiang Liu        2014-11-15  199   * interfaces which are based on msi_desc.
+f3cf8bb0 Jiang Liu        2014-11-12  200   */
+f3cf8bb0 Jiang Liu        2014-11-12  201  struct msi_domain_ops {
+aeeb5965 Jiang Liu        2014-11-15  202  	irq_hw_number_t	(*get_hwirq)(struct msi_domain_info *info,
+aeeb5965 Jiang Liu        2014-11-15 @203  				     msi_alloc_info_t *arg);
+f3cf8bb0 Jiang Liu        2014-11-12  204  	int		(*msi_init)(struct irq_domain *domain,
+f3cf8bb0 Jiang Liu        2014-11-12  205  				    struct msi_domain_info *info,
+f3cf8bb0 Jiang Liu        2014-11-12  206  				    unsigned int virq, irq_hw_number_t hwirq,
+
+:::::: The code at line 203 was first introduced by commit
+:::::: aeeb59657c35da64068336c20068da237f41ab76 genirq: Provide default callbacks for msi_domain_ops
+
+:::::: TO: Jiang Liu <jiang.liu@linux.intel.com>
+:::::: CC: Thomas Gleixner <tglx@linutronix.de>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 45116 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160215/fd5e58b0/attachment-0001.obj>
