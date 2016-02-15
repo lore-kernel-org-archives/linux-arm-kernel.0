@@ -1,81 +1,45 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 15 Feb 2016 19:03:33 +0000
-Subject: Crashes in arm qemu emulations due to 'cpufreq: governor: Replace
- timers with utilization ...'
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 15 Feb 2016 19:07:00 +0000
+Subject: Crashes in arm qemu emulations due to 'cpufreq: governor:
+ Replace timers with utilization ...'
 In-Reply-To: <CAJZ5v0gfOVyoWeee5jg7NxLFm-xwdA6-sPQV+cJ=NWJOV-wYzg@mail.gmail.com>
 References: <20160215170527.GA24453@roeck-us.net>
  <CAJZ5v0gLankSuziQq25qTCyNqeOX43yD9jnJu_XXwbdyajfmKg@mail.gmail.com>
  <56C21DD0.40508@arm.com>
  <CAJZ5v0gfOVyoWeee5jg7NxLFm-xwdA6-sPQV+cJ=NWJOV-wYzg@mail.gmail.com>
-Message-ID: <56C22105.6050900@arm.com>
+Message-ID: <20160215190700.GN10826@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/02/16 18:54, Rafael J. Wysocki wrote:
+On Mon, Feb 15, 2016 at 07:54:26PM +0100, Rafael J. Wysocki wrote:
 > On Mon, Feb 15, 2016 at 7:49 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> On 15/02/16 18:41, Rafael J. Wysocki wrote:
->>> On Mon, Feb 15, 2016 at 6:05 PM, Guenter Roeck <linux@roeck-us.net> wrote:
->>>> Rafael,
->>>
->>> Hi,
->>>
->>> Thanks for the report!
->>>
->>>> I see crashes in various arm qemu tests due to 'cpufreq: governor: Replace
->>>> timers with utilization update callbacks' with next-20160215. An example
->>>> crash log and bisect results are attached below.
->>>>
->>>> Please let me know if there is anything I can do to help tracking down
->>>> the problem.
->>>
->>> It looks like we've uncovered some nastiness in the arch ARM code (see below).
->>>
->>> [cut]
->>>
->>>> [    1.340000] Unable to handle kernel NULL pointer dereference at virtual address 00000000
->>>> [    1.340000] pgd = c0204000
->>>> [    1.340000] [00000000] *pgd=00000000
->>>> [    1.340000] Internal error: Oops: 80000005 [#1] SMP ARM
->>>> [    1.340000] Modules linked in:
->>>> [    1.340000] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.5.0-rc4-next-20160215 #1
->>>> [    1.340000] Hardware name: Generic OMAP3-GP (Flattened Device Tree)
->>>> [    1.340000] task: cb060000 ti: cb05a000 task.ti: cb05a000
->>>> [    1.340000] PC is at 0x0
->>>> [    1.340000] LR is at arch_send_call_function_single_ipi+0x34/0x38
->>>
->>> Since this is ARM, arch_send_call_function_single_ipi() looks like this:
->>>
->>> void arch_send_call_function_single_ipi(int cpu)
->>> {
->>>          smp_cross_call(cpumask_of(cpu), IPI_CALL_FUNC_SINGLE);
->>> }
->>>
->>> so I'm not sure how the NULL pointer deref is possible even.
->>>
->>> The only thing coming to mind would be that cpumask_of(cpu) triggers
->>> this, but I'm not sure how exactly that can happen.
->>>
->>> I need help from somebody who knows how this low-level stuff works on ARM.
->>
->> Given that OMAP3 is a UP system, there is zero chance that it has
->> registered the magic hook that delivers IPIs (its interrupt controller
->> is not even capable of doing so).
->>
->> I don't really know the context, but IPIs on a UP system seem at best odd.
+> > Given that OMAP3 is a UP system, there is zero chance that it has
+> > registered the magic hook that delivers IPIs (its interrupt controller
+> > is not even capable of doing so).
+> >
+> > I don't really know the context, but IPIs on a UP system seem at best odd.
 > 
 > That would explain it, thanks.
 > 
 > So it looks like we should always use irq_work_queue() on UP even if
 > CONFIG_SMP is set, shouldn't we?
 
-Something like that, yes. CONFIG_SMP is not an indication of an SMP
-system anymore (we've even dropped the config option on arm64).
+irq_work_queue_on() doesn't check whether 'cpu' is the CPU that we're
+running on.  This is a problem where we want to be able to run a kernel
+built for SMP on a UP system.
 
-Hopefully num_possible_cpus() is reliable enough to let you do the right
-thing...
+I guess the question is whether irq_work_queue_on() is buggy, or whether
+our implementation of arch_send_call_function_single_ipi() is buggy.
+Should arch_send_call_function_single_ipi() do something on UP systems,
+if so what?
 
-Thanks,
+We don't have IPIs on UP systems, so we can't raise any interrupts.
+So, should we call generic_smp_call_function_interrupt() directly
+from it?
 
-	M.
+Some clues would be good...
+
 -- 
-Jazz is not dead. It just smells funny...
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
