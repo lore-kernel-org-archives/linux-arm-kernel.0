@@ -1,89 +1,117 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 15 Feb 2016 17:05:19 +0100
-Subject: [PATCH 3/3] ARM: zynq: Use earlycon instead of earlyprintk
-In-Reply-To: <67c9013fc61f53515934b54847a05df8b8e1504a.1455552315.git.michal.simek@xilinx.com>
-References: <67c9013fc61f53515934b54847a05df8b8e1504a.1455552315.git.michal.simek@xilinx.com>
-Message-ID: <8cd6d86437baf0a7a443f4d288a9c6a9df66ffc3.1455552315.git.michal.simek@xilinx.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 15 Feb 2016 16:08:12 +0000
+Subject: [PATCH v6 2/3] Documentation: gpio: Update description for X-Gene
+ standby GPIO controller DTS binding
+In-Reply-To: <CAFopSPRwd8cHnH8efegYVv52hPVTyk=VW9OrZZtSCj6Szj-K4Q@mail.gmail.com>
+References: <1455512263-18183-1-git-send-email-qnguyen@apm.com>
+ <1455512263-18183-3-git-send-email-qnguyen@apm.com>
+ <56C1CA6E.1060606@arm.com>
+ <CAFopSPRwd8cHnH8efegYVv52hPVTyk=VW9OrZZtSCj6Szj-K4Q@mail.gmail.com>
+Message-ID: <56C1F7EC.3020701@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use early console instead of earlyprintk which is supposed to use for
-very early debugging (DEBUG_LL).
+On 15/02/16 15:31, Quan Nguyen wrote:
+> On Mon, Feb 15, 2016 at 7:54 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> On 15/02/16 04:57, Quan Nguyen wrote:
+>>> Update description for X-Gene standby GPIO controller DTS binding to
+>>> support GPIO line configuration as input, output or external IRQ pin.
+>>>
+>>> Signed-off-by: Y Vo <yvo@apm.com>
+>>> Signed-off-by: Quan Nguyen <qnguyen@apm.com>
+>>> ---
+>>>  .../devicetree/bindings/gpio/gpio-xgene-sb.txt     | 47 ++++++++++++++++++----
+>>>  1 file changed, 40 insertions(+), 7 deletions(-)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/gpio/gpio-xgene-sb.txt b/Documentation/devicetree/bindings/gpio/gpio-xgene-sb.txt
+>>> index dae1300..7b8b4cb 100644
+>>> --- a/Documentation/devicetree/bindings/gpio/gpio-xgene-sb.txt
+>>> +++ b/Documentation/devicetree/bindings/gpio/gpio-xgene-sb.txt
+>>> @@ -1,10 +1,20 @@
+>>>  APM X-Gene Standby GPIO controller bindings
+>>>
+>>> -This is a gpio controller in the standby domain.
+>>> -
+>>> -There are 20 GPIO pins from 0..21. There is no GPIO_DS14 or GPIO_DS15,
+>>> -only GPIO_DS8..GPIO_DS13 support interrupts. The IRQ mapping
+>>> -is currently 1-to-1 on interrupts 0x28 thru 0x2d.
+>>> +This is a gpio controller in the standby domain. It also supports interrupt in
+>>> +some particular pins which are sourced to its parent interrupt controller
+>>> +as diagram below:
+>>> +                           +-----------------+
+>>> +                           | X-Gene standby  |
+>>> +                           | GPIO controller +--------- GPIO_0
+>>> ++------------+             |                 | ...
+>>> +| Parent IRQ |             |                 +--------- GPIO_8/EXT_INT_0
+>>> +| controller |  EXT_INT_0  |                 | ...
+>>> +| (GICv2)    +-------------+                 +--------- GPIO_[N+8]/EXT_INT_N
+>>> +|            |  ...        |                 |
+>>> +|            |  EXT_INT_N  |                 +--------- GPIO_[N+9]
+>>> +|            +-------------+                 | ...
+>>> +|            |             |                 +--------- GPIO_MAX
+>>> ++------------+             +-----------------+
+>>>
+>>>  Required properties:
+>>>  - compatible: "apm,xgene-gpio-sb" for the X-Gene Standby GPIO controller
+>>> @@ -15,10 +25,18 @@ Required properties:
+>>>               0 = active high
+>>>               1 = active low
+>>>  - gpio-controller: Marks the device node as a GPIO controller.
+>>> -- interrupts: Shall contain exactly 6 interrupts.
+>>> +- interrupts: The EXT_INT_0 parent interrupt resource must be listed first.
+>>> +- interrupt-parent: Phandle of the parent interrupt controller.
+>>> +- interrupt-cells: Should be two.
+>>> +       - first cell is 0-N coresponding for EXT_INT_0 to EXT_INT_N.
+>>> +       - second cell is used to specify flags.
+>>> +- interrupt-controller: Marks the device node as an interrupt controller.
+>>> +- apm,nr-gpios: Optional, specify number of gpios pin.
+>>> +- apm,nr-irqs: Optional, specify number of interrupt pins.
+>>> +- apm,irq-start: Optional, specify lowest gpio pin support interrupt.
+>>
+>> This is quite ambiguous. Is that relative to the GIC? Assuming this is
+>> the case, you should then document it, specify the type of interrupt
+>> (SPI?), and whether this is 0- or 32-based (the code seems to indicate
+>> that is is 0-based).
+>>
+> 
+> Hi Marc, Let me explain by diagram below.
+> As you can also see in diagram above, the lowest gpio pin that
+> supports interrupt is GPIO_8 (EXT_INT_0),
+> and hence, apm,irq-start=<8> as default.
+> 
+>                                            +-----------------+
+>                                            | X-Gene standby  |
+>                                            | GPIO controller +--------- GPIO_0
+> +------------+                             |                 | ...
+> | Parent IRQ |                             |
+> +--------- GPIO_[apm,irq-start]/EXT_INT_0
+> | controller |  EXT_INT_0                  |                 | ...
+> | (GICv2)    +-----------------------------+
+> +--------- GPIO_[apm,nr-irqs + apm,irq-start - 1]/EXT_INT_[apm,nr-irqs
+> - 1]
+> |            |  ...                        |                 |
+> |            |  EXT_INT_[apm,nr-irqs - 1]  |
+> +--------- GPIO_[apm,nr-irqs + apm,irq-start]
+> |            +-----------------------------+                 | ...
+> |            |                             |                 +--------- GPIO_MAX
+> +------------+                             +-----------------+
+> 
+> To fix this ambiguity, I'm thinking to change it to:
+> "apm,irq-start: Optional, specify index of first gpio pin
+> corresponding to EXT_INT_0, default is 8."
 
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
----
+I think you are missing the point I'm trying to make. There are two ways
+to refer to an SPI: either by its absolute number (INT32 for example) or
+by its relative number (SPI0). SPI0 and INT32 are the same interrupt.
+Just with a different base.
 
- arch/arm/boot/dts/zynq-parallella.dts | 2 +-
- arch/arm/boot/dts/zynq-zc702.dts      | 2 +-
- arch/arm/boot/dts/zynq-zc706.dts      | 2 +-
- arch/arm/boot/dts/zynq-zed.dts        | 2 +-
- arch/arm/boot/dts/zynq-zybo.dts       | 2 +-
- 5 files changed, 5 insertions(+), 5 deletions(-)
+My question is: which base are you using? By looking at the code, I
+think you're using the absolute version (INTx). And as your controller
+seems to be very GIC specific, you should add a pointer to the GIC
+documentation.
 
-diff --git a/arch/arm/boot/dts/zynq-parallella.dts b/arch/arm/boot/dts/zynq-parallella.dts
-index 9efd16cb2859..307ed201d658 100644
---- a/arch/arm/boot/dts/zynq-parallella.dts
-+++ b/arch/arm/boot/dts/zynq-parallella.dts
-@@ -34,7 +34,7 @@
- 	};
- 
- 	chosen {
--		bootargs = "earlyprintk root=/dev/mmcblk0p2 rootfstype=ext4 rw rootwait";
-+		bootargs = "earlycon root=/dev/mmcblk0p2 rootfstype=ext4 rw rootwait";
- 		stdout-path = "serial0:115200n8";
- 	};
- };
-diff --git a/arch/arm/boot/dts/zynq-zc702.dts b/arch/arm/boot/dts/zynq-zc702.dts
-index cb64209bca08..e96959b2e67a 100644
---- a/arch/arm/boot/dts/zynq-zc702.dts
-+++ b/arch/arm/boot/dts/zynq-zc702.dts
-@@ -30,7 +30,7 @@
- 	};
- 
- 	chosen {
--		bootargs = "earlyprintk";
-+		bootargs = "earlycon";
- 		stdout-path = "serial0:115200n8";
- 	};
- 
-diff --git a/arch/arm/boot/dts/zynq-zc706.dts b/arch/arm/boot/dts/zynq-zc706.dts
-index abf5d238ae04..be6a986bbbd8 100644
---- a/arch/arm/boot/dts/zynq-zc706.dts
-+++ b/arch/arm/boot/dts/zynq-zc706.dts
-@@ -30,7 +30,7 @@
- 	};
- 
- 	chosen {
--		bootargs = "earlyprintk";
-+		bootargs = "earlycon";
- 		stdout-path = "serial0:115200n8";
- 	};
- 
-diff --git a/arch/arm/boot/dts/zynq-zed.dts b/arch/arm/boot/dts/zynq-zed.dts
-index b9f2522012e8..7250c1eac7f9 100644
---- a/arch/arm/boot/dts/zynq-zed.dts
-+++ b/arch/arm/boot/dts/zynq-zed.dts
-@@ -29,7 +29,7 @@
- 	};
- 
- 	chosen {
--		bootargs = "earlyprintk";
-+		bootargs = "earlycon";
- 		stdout-path = "serial0:115200n8";
- 	};
- 
-diff --git a/arch/arm/boot/dts/zynq-zybo.dts b/arch/arm/boot/dts/zynq-zybo.dts
-index 16c9cacd668d..bd992e036aa9 100644
---- a/arch/arm/boot/dts/zynq-zybo.dts
-+++ b/arch/arm/boot/dts/zynq-zybo.dts
-@@ -29,7 +29,7 @@
- 	};
- 
- 	chosen {
--		bootargs = "earlyprintk";
-+		bootargs = "earlycon";
- 		stdout-path = "serial0:115200n8";
- 	};
- 
+Thanks,
+
+	M.
 -- 
-1.9.1
+Jazz is not dead. It just smells funny...
