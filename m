@@ -1,66 +1,47 @@
-From: caesar.upstream@gmail.com (Caesar Wang)
-Date: Mon, 15 Feb 2016 11:36:36 +0800
-Subject: [PATCH v4 09/10] arm64: dts: Add main Thermal info to rk3368.dtsi
-In-Reply-To: <42802946.20XC68fnyM@phil>
-References: <1447044542-30859-1-git-send-email-wxt@rock-chips.com>
- <1447044542-30859-10-git-send-email-wxt@rock-chips.com>
- <42802946.20XC68fnyM@phil>
-Message-ID: <56C147C4.20704@gmail.com>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Mon, 15 Feb 2016 11:40:26 +0800
+Subject: [PATCH v3 0/4] ARM: at91: pm: add ULP1 mode support
+Message-ID: <1455507630-29592-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The ULP1 (Ultra Low-power mode 1) is introduced by SAMA5D2.
 
+In order to achieve the lowest power consumption, in the ULP1 mode,
+all the clocks are shut off, inclusive the embedded 12MHz RC oscillator.
 
-? 2016?02?09? 16:30, Heiko Stuebner ??:
-> Hi Caesar,
->
-> Am Montag, 9. November 2015, 12:49:01 schrieb Caesar Wang:
->> This patch add the thermal needed info on RK3368.
->> Meanwhile, support the trips to throttle for thermal.
->>
->> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
->> Acked-by: Eduardo Valentin <edubezval@gmail.com>
-> [...]
->
->> @@ -829,6 +855,16 @@
->>   			};
->>   		};
->>
->> +		tsadc {
->> +			otp_gpio: otp-gpio {
->> +				rockchip,pins = <0 10 RK_FUNC_GPIO &pcfg_pull_none>;
->> +			};
->> +
->> +			otp_out: otp-out {
->> +				rockchip,pins = <0 10 RK_FUNC_1 &pcfg_pull_none>;
->> +			};
->> +		};
->> +
->>   		uart0 {
->>   			uart0_xfer: uart0-xfer {
->>   				rockchip,pins = <2 24 RK_FUNC_1 &pcfg_pull_up>,
-> As it came up just now, these pinctrl settings seem strange. I.e. according
-> to the TRM gpio0b2 [= gpio0 10] func_1 is sc_rst, which seems to be the
-> smartcard controller?
->
-> It came up because it seems the Tronsmart R68 board seems to use this pin
-> for controlling the vcc_host regulator instead.
+The fast startup signal is used as a wake up source for ULP1 mode.
+As soon as the wake up event is asserted, the embedded 12MHz RC
+oscillator restarts automatically, which fast startup signal
+to trigger the PMC to wake up the system from the ULP1 mode can be
+configured via DT.
 
-Yep, that's the incorrect over-temperature protection pin. :-(
+It is based on the following patch set:
+	http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/390954.html
 
-Fixed in https://patchwork.kernel.org/patch/8308831/
+Changes in v3:
+ - use 0 and 1, not string, to define the trigger active polarity.
+ - update the property description.
 
-Thanks Heiko.
+Changes in v2:
+ - fix label pm_exit to ulp_exit.
+ - shorten the pmc-fast-startup property's name.
+ - use the value property, instead of bool property for high
+   or low triggered.
+ - change the property name and property description.
 
->
-> Heiko
->
-> _______________________________________________
-> Linux-rockchip mailing list
-> Linux-rockchip at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+Wenyou Yang (4):
+  ARM: at91: pm: create a separate procedure for the ULP0 mode
+  ARM: at91: pm: add ULP1 mode support
+  ARM: at91: pm: configure PMC fast startup signals
+  Documentation: atmel-pmc: add DT bindings for fast startup
 
+ .../devicetree/bindings/arm/atmel-pmc.txt          |   63 ++++++++
+ arch/arm/mach-at91/pm.c                            |  130 +++++++++++++++-
+ arch/arm/mach-at91/pm.h                            |    7 +
+ arch/arm/mach-at91/pm_suspend.S                    |  158 +++++++++++++++++---
+ include/linux/clk/at91_pmc.h                       |   36 +++++
+ 5 files changed, 369 insertions(+), 25 deletions(-)
 
 -- 
-Thanks,
-Caesar
+1.7.9.5
