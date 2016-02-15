@@ -1,163 +1,57 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 15 Feb 2016 14:27:27 +0000
-Subject: [RFC PATCH 1/7] arm64/perf: Basic uncore counter support for
- Cavium ThunderX
-In-Reply-To: <20160215140720.GA4053@hardcore>
-References: <cover.1455295032.git.jglauber@cavium.com>
- <8bd93a25e069ed6428bc6c21fc53270962ccafcc.1455295032.git.jglauber@cavium.com>
- <20160212173658.GD20262@leverpostej>
- <20160215140720.GA4053@hardcore>
-Message-ID: <20160215142726.GD9732@leverpostej>
+From: oberpar@linux.vnet.ibm.com (Peter Oberparleiter)
+Date: Mon, 15 Feb 2016 15:34:21 +0100
+Subject: [PATCH 4/5] gcov: disable tree-loop-im to reduce stack usage
+In-Reply-To: <1455293187-179811-5-git-send-email-arnd@arndb.de>
+References: <1455293187-179811-1-git-send-email-arnd@arndb.de>
+ <1455293187-179811-5-git-send-email-arnd@arndb.de>
+Message-ID: <56C1E1ED.1020205@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 15, 2016 at 03:07:20PM +0100, Jan Glauber wrote:
-> Hi Mark,
+On 12.02.2016 17:06, Arnd Bergmann wrote:
+> Enabling CONFIG_GCOV_PROFILE_ALL produces us a lot of warnings like
 > 
-> thanks for reviewing! I'll need several mails to address all questions.
+> lib/lz4/lz4hc_compress.c: In function 'lz4_compresshcctx':
+> lib/lz4/lz4hc_compress.c:514:1: warning: the frame size of 1504 bytes is larger than 1024 bytes [-Wframe-larger-than=]
 > 
-> On Fri, Feb 12, 2016 at 05:36:59PM +0000, Mark Rutland wrote:
-> > On Fri, Feb 12, 2016 at 05:55:06PM +0100, Jan Glauber wrote:
-> > > Provide uncore facilities for non-CPU performance counter units.
-> > > Based on Intel/AMD uncore pmu support.
-> > > 
-> > > The uncore PMUs can be found under /sys/bus/event_source/devices.
-> > > All counters are exported via sysfs in the corresponding events
-> > > files under the PMU directory so the perf tool can list the event names.
-> > 
-> > It turns out that "uncore" covers quite a lot of things.
-> > 
-> > Where exactly do the see counters live? system, socket, cluster?
+> After some investigation, I found that this behavior started with gcc-4.9,
+> and opened https://gcc.gnu.org/bugzilla/show_bug.cgi?id=69702.
+> A suggested workaround for it is to use the -fno-tree-loop-im
+> flag that turns off one of the optimization stages in gcc, so the
+> code runs a little slower but does not use excessive amounts
+> of stack.
 > 
-> Neither cluster nor socket, so I would say system. Where a system may
-> consist of 2 nodes that mostly appear as one system.
+> We could make this conditional on the gcc version, but I could not
+> find an easy way to do this in Kbuild and the benefit would be
+> fairly small, given that most of the gcc version in production are
+> affected now.
 > 
-> > Are there potentially multiple instances of a given PMU in the system?
-> > e.g. might each clutster have an instance of an L2 PMU?
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+-fno-tree-loop-im seems to have been available for long enough in GCC
+(starting with GCC4) to make this part of the default gcov compile flags.
+
+Acked-by: Peter Oberparleiter <oberpar@linux.vnet.ibm.com>
+
+> ---
+>  Makefile | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> Yes.
+> diff --git a/Makefile b/Makefile
+> index 352f55ccc54e..6bb89728a9d1 100644
+> --- a/Makefile
+> +++ b/Makefile
+> @@ -364,7 +364,7 @@ AFLAGS_MODULE   =
+>  LDFLAGS_MODULE  =
+>  CFLAGS_KERNEL	=
+>  AFLAGS_KERNEL	=
+> -CFLAGS_GCOV	= -fprofile-arcs -ftest-coverage
+> +CFLAGS_GCOV	= -fprofile-arcs -ftest-coverage -fno-tree-loop-im
+>  CFLAGS_KCOV	= -fsanitize-coverage=trace-pc
 > 
-> > If I turn off a set of CPUs, do any "uncore" PMUs lost context or become
-> > inaccessible?
 > 
-> No, they are not related to CPUs.
 
-Ok. So I should be able to concurrently hotplug random CPUs on/off while
-this driver is running, without issues? No registers might be
-clock-gated or similar?
 
-I appreciate that they are not "related" to particular CPUs as such.
-
-> > > 1) The PMU detection solely relies on PCI device detection. If a
-> > >    matching PCI device is found the PMU is created. The code can deal
-> > >    with multiple units of the same type, e.g. more than one memory
-> > >    controller.
-> > 
-> > I see below that the driver has an initcall that runs regardless of
-> > whether the PCI device exists, and looks at the MIDR. That's clearly not
-> > string PCI device detection.
-> > 
-> > Why is this not a true PCI driver that only gets probed if the PCI
-> > device exists? 
-> 
-> It is not a PCI driver because there are already drivers like edac that
-> will access these PCI devices. The uncore driver only accesses the
-> performance counters, which are not used by the other drivers.
-
-Several drivers are accessing the same device?
-
-That sounds somewhat scary.
-
-> > > +#include <asm/cpufeature.h>
-> > > +#include <asm/cputype.h>
-> > 
-> > I don't see why you should need these two if this is truly an uncore
-> > device probed solely from PCI.
-> 
-> There are several passes of the hardware that have the same PCI device
-> ID. Therefore I need the CPU variant to distinguish them. This could
-> be done _after_ the PCI device is found but I found it easier to
-> implement the check once in the common setup function.
-
-Ok. Please call that out in the commit message.
-
-> > > +int thunder_uncore_event_init(struct perf_event *event)
-> > > +{
-> > > +	struct hw_perf_event *hwc = &event->hw;
-> > > +	struct thunder_uncore *uncore;
-> > > +
-> > > +	if (event->attr.type != event->pmu->type)
-> > > +		return -ENOENT;
-> > > +
-> > > +	/* we do not support sampling */
-> > > +	if (is_sampling_event(event))
-> > > +		return -EINVAL;
-> > > +
-> > > +	/* counters do not have these bits */
-> > > +	if (event->attr.exclude_user	||
-> > > +	    event->attr.exclude_kernel	||
-> > > +	    event->attr.exclude_host	||
-> > > +	    event->attr.exclude_guest	||
-> > > +	    event->attr.exclude_hv	||
-> > > +	    event->attr.exclude_idle)
-> > > +		return -EINVAL;
-> > 
-> > We should _really_ make these features opt-in at the core level. It's
-> > crazy that each and every PMU drivers has to explicitly test and reject
-> > things it doesn't support.
-> 
-> Completely agreed. Also, every sample code I looked at did
-> check for other bits...
-> 
-> [...]
-> 
-> > > +
-> > > +	uncore = event_to_thunder_uncore(event);
-> > > +	if (!uncore)
-> > > +		return -ENODEV;
-> > > +	if (!uncore->event_valid(event->attr.config))
-> > > +		return -EINVAL;
-> > > +
-> > > +	hwc->config = event->attr.config;
-> > > +	hwc->idx = -1;
-> > > +
-> > > +	/* and we don't care about CPU */
-> > 
-> > Actually, you do. You want the perf core to serialize accesses via the
-> > same CPU, so all events _must_ be targetted at the same CPU. Otherwise
-> > there are a tonne of problems you don't even want to think about.
-> 
-> I found that perf added the events on every CPU in the system. Because
-> the uncore events are not CPU related I wanted to avoid this. Setting
-> cpumask to -1 did not work. Therefore I added a single CPU in the
-> cpumask, see thunder_uncore_attr_show_cpumask().
-
-I understand that, which is why I wrote:
-
-> > You _must_ ensure this kernel-side, regardless of what the perf tool
-> > happens to do.
-> > 
-> > See the arm-cci and arm-ccn drivers for an example.
-
-Take a look at drivers/bus/arm-cci.c; specifically, what we do in
-cci_pmu_event_init and cci_pmu_cpu_notifier.
-
-This is the same thing that's done for x86 system PMUs. Take a look at
-uncore_pmu_event_init in arch/x86/kernel/cpu/perf_event_intel_uncore.c.
-
-Otherwise there are a number of situations where userspace might open
-events on different CPUs, and you get some freaky results because the
-perf core expects accesses to a PMU and its related data structures to
-be strictly serialised through _some_ CPU (even if that CPU is
-arbitrarily chosen).
-
-For example, if CPU 0 was offline when one event was opened, then cpu0
-was hotplugged, then a second event was opened, there would be an event
-in the CPU1 context and another in the CPU0 context. Modification to the
-PMU state is done per CPU-context in the core, and these would race
-against each other given the lack of serialisation. Even with sufficient
-locking to prevent outright corruption, things like event rotation would
-race leading to very non-deterministic results.
-
-Thanks,
-Mark.
+-- 
+Peter Oberparleiter
+Linux on z Systems Development - IBM Germany
