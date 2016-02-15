@@ -1,71 +1,159 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 15 Feb 2016 10:50:08 +0100
-Subject: [PATCH] dma: mv_xor_v2: new driver
-In-Reply-To: <201602151735.BaFwBMOn%fengguang.wu@intel.com>
-References: <1455523083-25506-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <201602151735.BaFwBMOn%fengguang.wu@intel.com>
-Message-ID: <20160215105008.74aa7869@free-electrons.com>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Mon, 15 Feb 2016 17:50:57 +0800
+Subject: [PATCH v6 7/7] clk: mediatek: Enable critical clocks for MT2701
+In-Reply-To: <20160211213542.26445.82983@quark.deferred.io>
+References: <1454665050-37776-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1454665050-37776-8-git-send-email-jamesjj.liao@mediatek.com>
+ <20160211213542.26445.82983@quark.deferred.io>
+Message-ID: <1455529857.29688.36.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc,
+Hi Mike,
 
-This doesn't seem to be an issue introduced by my patch itself, but
-rather a problem with the MSI subsystem itself. Is this already a known
-issue (possibly already fixed), or should I investigate?
+On Thu, 2016-02-11 at 13:35 -0800, Michael Turquette wrote:
+> Hi James,
+> 
+> Quoting James Liao (2016-02-05 01:37:30)
+> > Some system clocks should be turned on by default on MT2701.
+> > This patch enable these clocks when related clocks have
+> > been registered.
+> > 
+> > Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+> > ---
+> >  drivers/clk/mediatek/clk-mt2701.c | 23 +++++++++++++++++++++--
+> >  1 file changed, 21 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/drivers/clk/mediatek/clk-mt2701.c b/drivers/clk/mediatek/clk-mt2701.c
+> > index 01722e0..f7b4d52 100644
+> > --- a/drivers/clk/mediatek/clk-mt2701.c
+> > +++ b/drivers/clk/mediatek/clk-mt2701.c
+> > @@ -573,6 +573,21 @@ static const struct mtk_gate top_clks[] __initconst = {
+> >         GATE_TOP_AUD(CLK_TOP_AUD_I2S6_MCLK, "aud_i2s6_mclk", "aud_k6_src_div", 28),
+> >  };
+> >  
+> > +static struct clk_onecell_data *top_clk_data __initdata;
+> > +static struct clk_onecell_data *pll_clk_data __initdata;
+> > +
+> > +static void __init mtk_clk_enable_critical(void)
+> > +{
+> > +       if (!top_clk_data || !pll_clk_data)
+> > +               return;
+> > +
+> > +       clk_prepare_enable(pll_clk_data->clks[CLK_APMIXED_ARMPLL]);
+> > +       clk_prepare_enable(top_clk_data->clks[CLK_TOP_AXI_SEL]);
+> > +       clk_prepare_enable(top_clk_data->clks[CLK_TOP_MEM_SEL]);
+> > +       clk_prepare_enable(top_clk_data->clks[CLK_TOP_DDRPHYCFG_SEL]);
+> > +       clk_prepare_enable(top_clk_data->clks[CLK_TOP_RTC_SEL]);
+> > +}
+> 
+> I think we're close to having a better solution. Please see this patch
+> series[0] and let me know if it provides a better way for you to enable
+> these critical clocks instead of the open-coded solution.
+> 
+> [0] http://lkml.kernel.org/r/<1455225554-13267-1-git-send-email-mturquette@baylibre.com>
+> 
 
-Thanks!
+I took a quick view of this patchset, CLK_ENABLE_HAND_OFF is not
+suitable for these critical clocks. I'm not sure CLK_IS_CRITICAL
+suitable or not. A clock with CLK_IS_CRITICAL will be prepare_enable
+when it is registered. But if its parent is not registered into CCF, it
+will not be enabled even the parent clock register into CCF later.
 
-Thomas
+> > +
+> >  static void __init mtk_topckgen_init(struct device_node *node)
+> >  {
+> >         struct clk_onecell_data *clk_data;
+> > @@ -585,7 +600,7 @@ static void __init mtk_topckgen_init(struct device_node *node)
+> >                 return;
+> >         }
+> >  
+> > -       clk_data = mtk_alloc_clk_data(CLK_TOP_NR);
+> > +       top_clk_data = clk_data = mtk_alloc_clk_data(CLK_TOP_NR);
+> >  
+> >         mtk_clk_register_fixed_clks(top_fixed_clks, ARRAY_SIZE(top_fixed_clks),
+> >                                                                 clk_data);
+> > @@ -606,6 +621,8 @@ static void __init mtk_topckgen_init(struct device_node *node)
+> >         if (r)
+> >                 pr_err("%s(): could not register clock provider: %d\n",
+> >                         __func__, r);
+> > +
+> > +       mtk_clk_enable_critical();
+> 
+> So you call the function here, and ...
+> >  }
+> >  CLK_OF_DECLARE(mtk_topckgen, "mediatek,mt2701-topckgen", mtk_topckgen_init);
+> >  
+> > @@ -1201,7 +1218,7 @@ static void __init mtk_apmixedsys_init(struct device_node *node)
+> >         struct clk_onecell_data *clk_data;
+> >         int r;
+> >  
+> > -       clk_data = mtk_alloc_clk_data(ARRAY_SIZE(apmixed_plls));
+> > +       pll_clk_data = clk_data = mtk_alloc_clk_data(ARRAY_SIZE(apmixed_plls));
+> >         if (!clk_data)
+> >                 return;
+> >  
+> > @@ -1212,6 +1229,8 @@ static void __init mtk_apmixedsys_init(struct device_node *node)
+> >         if (r)
+> >                 pr_err("%s(): could not register clock provider: %d\n",
+> >                         __func__, r);
+> > +
+> > +       mtk_clk_enable_critical();
+> 
+> ... here as well. So the prepare_count and enable_count will be 2? I'm
+> not sure that this makes sense. If you have different clocks that need
+> to be enabled at different times (due to the split registration scheme
+> that you employ in this driver) then why not pass an array of those
+> clocks into mtk_clk_enable_critical?
 
-On Mon, 15 Feb 2016 17:09:27 +0800, kbuild test robot wrote:
-> Hi Thomas,
+No. After topckgen and apmixedsys initialized, critical clocks'
+reference count will be 1.
+
+There is a guard at the beginning of mtk_clk_enable_critical():
+
+	if (!top_clk_data || !pll_clk_data)
+		return;
+
+So this function will be only executed when topckgen and apmixedsys init
+done.
+
+We need to enable critical clocks:
+
+1. As early as possible.
+2. After critical clocks and their parents are registered into CCF.
+
+We need to wait all necessary clock providers because parents of
+critical clocks must be enabled at the same time. For example,
+CLK_TOP_AXI_SEL may have different parent on different platforms. We
+also need to keep new parent clock on if CLK_TOP_AXI_SEL change its
+parent dynamically.
+
+Because we can't ensure the init ordering of clock providers, we can
+only check all necessary providers are registered or not in each init
+function.
+
+> Anyways, like I mentioned above I think we're close to a solution to
+> handle this in the framework.
 > 
-> [auto build test ERROR on robh/for-next]
-> [also build test ERROR on v4.5-rc4 next-20160215]
-> [if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
-> 
-> url:    https://github.com/0day-ci/linux/commits/Thomas-Petazzoni/dma-mv_xor_v2-new-driver/20160215-160120
-> base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux for-next
-> config: openrisc-allyesconfig (attached as .config)
-> reproduce:
->         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
->         chmod +x ~/bin/make.cross
->         # save the attached .config to linux build tree
->         make.cross ARCH=openrisc 
-> 
-> All errors (new ones prefixed by >>):
-> 
->    In file included from kernel/irq/chip.c:14:0:
-> >> include/linux/msi.h:174:21: fatal error: asm/msi.h: No such file or directory
->    compilation terminated.
-> 
-> vim +174 include/linux/msi.h
-> 
-> c2791b80 Yijing Wang    2014-11-11  168  	void (*teardown_irq)(struct msi_controller *chip, unsigned int irq);
-> 0cbdcfcf Thierry Reding 2013-08-09  169  };
-> 0cbdcfcf Thierry Reding 2013-08-09  170  
-> f3cf8bb0 Jiang Liu      2014-11-12  171  #ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
-> d9109698 Jiang Liu      2014-11-15  172  
-> aeeb5965 Jiang Liu      2014-11-15  173  #include <linux/irqhandler.h>
-> d9109698 Jiang Liu      2014-11-15 @174  #include <asm/msi.h>
-> d9109698 Jiang Liu      2014-11-15  175  
-> f3cf8bb0 Jiang Liu      2014-11-12  176  struct irq_domain;
-> 552c494a Marc Zyngier   2015-11-23  177  struct irq_domain_ops;
-> 
-> :::::: The code at line 174 was first introduced by commit
-> :::::: d9109698be6e7439e6082aa00d79d4556114739b genirq: Introduce msi_domain_alloc/free_irqs()
-> 
-> :::::: TO: Jiang Liu <jiang.liu@linux.intel.com>
-> :::::: CC: Thomas Gleixner <tglx@linutronix.de>
-> 
-> ---
-> 0-DAY kernel test infrastructure                Open Source Technology Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+> One question: do you ever want these critical clocks to be gated by a
+> driver, or do you want them always on, forever?
+
+In this patch, these clocks should be always on (in SW view) even if
+there are other drivers controlling them.
+
+If these is a common way to keep critical clocks and their parents on, I
+would like to use the common way. But the solution in your patch series
+[0] looks not handle parent clocks well. What's your suggestion to
+implement critical clocks base on [0]?
 
 
+Best regards,
 
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+James
+
+> >  }
+> >  CLK_OF_DECLARE(mtk_apmixedsys, "mediatek,mt2701-apmixedsys",
+> >                                                         mtk_apmixedsys_init);
+> > -- 
+> > 1.9.1
+> > 
