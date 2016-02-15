@@ -1,13 +1,14 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon, 15 Feb 2016 13:20:06 +0100
-Subject: [PATCH v3 0/2] ARM: shmobile: Avoid writing to .text
-Message-ID: <1455538808-6816-1-git-send-email-geert+renesas@glider.be>
+Date: Mon, 15 Feb 2016 13:20:07 +0100
+Subject: [PATCH v3 1/2] ARM: shmobile: Move shmobile_smp_{mpidr, fn,
+ arg}[] from .text to .bss
+In-Reply-To: <1455538808-6816-1-git-send-email-geert+renesas@glider.be>
+References: <1455538808-6816-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1455538808-6816-2-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-        Hi Simon, Magnus,
-
-When CONFIG_DEBUG_RODATA=y, the kernel crashes during system suspend:
+If CONFIG_DEBUG_RODATA=y, the kernel crashes during system suspend:
 
     Freezing user space processes ... (elapsed 0.004 seconds) done.
     Freezing remaining freezable tasks ... (elapsed 0.002 seconds)
@@ -20,66 +21,70 @@ When CONFIG_DEBUG_RODATA=y, the kernel crashes during system suspend:
     1014ec ---[ end Kernel panic - not syncing: Attempted to kill the idle task!
     CPU0: stopping
 
-This happens because the shmobile assembler sources have several
-variables that are written to in the .text section, while .text is
-mapped read-only after kernel bootup if CONFIG_DEBUG_RODATA=y.
+This happens because the .text section is marked read-only, while the
+arrays shmobile_smp_mpidr[], shmobile_smp_fn[], and shmobile_smp_arg[]
+are being written to.
 
-This series fixes this by moving variables from .text to .bss, or just
-removing them.
-Note that there's still an issue with shmobile_boot_fn in
-arch/arm/mach-shmobile/headsmp.S.  So far I didn't manage to fix this
-(the code and data are copied to SRAM on some SoCs).  However, currently
-this is mostly harmless, as this is written to during early kernel boot
-up only, before .text is marked read-only. It does matter for XIP
-(anyone using that with SMP?), so we do want to fix that in the long
-run, too.
+Fix this by moving these arrays from the .text to the .bss section.
+This requires accessing them through PC-relative offsets.
 
-These issues were uncovered by "[PATCH v2] ARM: mm: flip priority of
-CONFIG_DEBUG_RODATA". As that patch is already queued in arm/for-next, I
-think all these fixes should be queued for v4.5, to avoid a dependency
-with the arm tree.
-
-Changes compared to v2:
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Reviewed-by: Kees Cook <keescook@chromium.org>
+Reviewed-by: Nicolas Pitre <nico@linaro.org>
+---
+v3:
   - Use .bss instead of .data, as requested by Nicolas Pitre
     <nicolas.pitre@linaro.org>,
-  - Added Acked-by and Reviewed-by.
+  - Add Reviewed-by,
 
-Changes compared to v1:
-  - Dropped "ARM: shmobile: Move shmobile_scu_base from .text to .data",
-    which Simon has applied, and queued in soc-for-v4.6 (should be
-    soc-for-v4.5?),
-  - Added Reviewed-by,
+v2:
+  - Add Reviewed-by,
   - Store offsets instead of pointers, as suggested by Nicolas Pitre
-    <nicolas.pitre@linaro.org>,
-  - Added "ARM: shmobile: Remove shmobile_boot_arg".
+    <nicolas.pitre@linaro.org>.
+---
+ arch/arm/mach-shmobile/headsmp.S | 20 ++++++++++++++------
+ 1 file changed, 14 insertions(+), 6 deletions(-)
 
-Tested hard on sh73a0/kzm9g, r8a7791/koelsch.
-Tested lighter on emev2/kzm9d[*], r8a73a4/ape6evm, r8a7740/armadillo, and
-r8a7779/marzen[*] ([*] = no remote resume).
-
-Thanks!
-
-
-Geert Uytterhoeven (2):
-  ARM: shmobile: Move shmobile_smp_{mpidr,fn,arg}[] from .text to .bss
-  ARM: shmobile: Remove shmobile_boot_arg
-
- arch/arm/mach-shmobile/common.h       |  1 -
- arch/arm/mach-shmobile/headsmp.S      | 28 ++++++++++++++++------------
- arch/arm/mach-shmobile/platsmp-apmu.c |  1 -
- arch/arm/mach-shmobile/platsmp-scu.c  |  1 -
- 4 files changed, 16 insertions(+), 15 deletions(-)
-
+diff --git a/arch/arm/mach-shmobile/headsmp.S b/arch/arm/mach-shmobile/headsmp.S
+index 330c1fc63197df89..94d86ed164144cdf 100644
+--- a/arch/arm/mach-shmobile/headsmp.S
++++ b/arch/arm/mach-shmobile/headsmp.S
+@@ -50,9 +50,11 @@ ENTRY(shmobile_smp_boot)
+ 	mrc	p15, 0, r1, c0, c0, 5		@ r1 = MPIDR
+ 	and	r0, r1, r0			@ r0 = cpu_logical_map() value
+ 	mov	r1, #0				@ r1 = CPU index
+-	adr	r5, 1f				@ array of per-cpu mpidr values
+-	adr	r6, 2f				@ array of per-cpu functions
+-	adr	r7, 3f				@ array of per-cpu arguments
++	adr	r2, 1f
++	ldmia	r2, {r5, r6, r7}
++	add	r5, r5, r2			@ array of per-cpu mpidr values
++	add	r6, r6, r2			@ array of per-cpu functions
++	add	r7, r7, r2			@ array of per-cpu arguments
+ 
+ shmobile_smp_boot_find_mpidr:
+ 	ldr	r8, [r5, r1, lsl #2]
+@@ -80,12 +82,18 @@ ENTRY(shmobile_smp_sleep)
+ 	b	shmobile_smp_boot
+ ENDPROC(shmobile_smp_sleep)
+ 
++	.align	2
++1:	.long	shmobile_smp_mpidr - .
++	.long	shmobile_smp_fn - 1b
++	.long	shmobile_smp_arg - 1b
++
++	.bss
+ 	.globl	shmobile_smp_mpidr
+ shmobile_smp_mpidr:
+-1:	.space	NR_CPUS * 4
++	.space	NR_CPUS * 4
+ 	.globl	shmobile_smp_fn
+ shmobile_smp_fn:
+-2:	.space	NR_CPUS * 4
++	.space	NR_CPUS * 4
+ 	.globl	shmobile_smp_arg
+ shmobile_smp_arg:
+-3:	.space	NR_CPUS * 4
++	.space	NR_CPUS * 4
 -- 
 1.9.1
-
-Gr{oetje,eeting}s,
-
-						Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-							    -- Linus Torvalds
