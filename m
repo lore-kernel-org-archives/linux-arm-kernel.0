@@ -1,80 +1,43 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 15 Feb 2016 17:08:30 +0000
-Subject: [PATCH] xen kconfig: clarify INPUT_XEN_KBDDEV_FRONTEND select
-In-Reply-To: <56C20552.8030305@citrix.com>
-References: <1455278707-2008263-1-git-send-email-arnd@arndb.de>
- <alpine.DEB.2.02.1602151643150.27008@kaball.uk.xensource.com>
- <56C20552.8030305@citrix.com>
-Message-ID: <alpine.DEB.2.02.1602151708110.27008@kaball.uk.xensource.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 15 Feb 2016 18:12:01 +0100
+Subject: arm qemu test failures due to 'driver-core: platform: probe
+ of-devices only using list of compatibles'
+In-Reply-To: <20160215164937.GC25556@kroah.com>
+References: <20160214165010.GA3189@roeck-us.net>
+ <20160215105909.GH12289@pengutronix.de> <56C1CE95.6020206@arm.com>
+ <20160215144344.GF10826@n2100.arm.linux.org.uk>
+ <20160215162753.GI12289@pengutronix.de>
+ <20160215164937.GC25556@kroah.com>
+Message-ID: <20160215171201.GK12289@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 15 Feb 2016, David Vrabel wrote:
-> On 15/02/16 16:51, Stefano Stabellini wrote:
-> > CC'ing a few others.
-> > 
-> > On Fri, 12 Feb 2016, Arnd Bergmann wrote:
-> >> The Xen framebuffer driver selects the xen keyboard driver, so the latter
-> >> will be built-in if XEN_FBDEV_FRONTEND=y. However, when CONFIG_INPUT
-> >> is a loadable module, this configuration cannot work. On mainline kernels,
-> >> the symbol will be enabled but not used, while in combination with
-> >> a patch I have to detect such useless configurations, we get the
-> >> expected link failure:
-> >>
-> >> drivers/input/built-in.o: In function `xenkbd_remove':
-> >> xen-kbdfront.c:(.text+0x2f0): undefined reference to `input_unregister_device'
-> >> xen-kbdfront.c:(.text+0x30e): undefined reference to `input_unregister_device'
-> >>
-> >> This changes the dependencies of XEN_FBDEV_FRONTEND so it cannot be
-> >> built-in if CONFIG_INPUT=m && CONFIG_INPUT_MISC=y, as that would result
-> >> in the broken select.
-> >>
-> >> As usual, we would be much better off without the 'select', but removing
-> >> it now would likely break existing user configurations that depend on
-> >> it, so this adds another hack on top to get it working.
-> 
-> I would remove the select.
-> 
-> Existing configurations with both XEN_FBDEV_FRONTEND and
-> XEN_KBDDEV_FRONTEND will continue to work (since XEN_KBDEV_FRONTEND is
-> already enabled removing the select won't turn it off).
+Hello Greg,
 
-I am happy with that too.
-
- 
-> >> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> >> Fixes: 36c1132e34bd ("xen kconfig: fix select INPUT_XEN_KBDDEV_FRONTEND")
-> >> ---
-> >>  drivers/video/fbdev/Kconfig | 1 +
-> >>  1 file changed, 1 insertion(+)
-> >>
-> >> diff --git a/drivers/video/fbdev/Kconfig b/drivers/video/fbdev/Kconfig
-> >> index 8ea45a5cd806..fd3d6fd290a9 100644
-> >> --- a/drivers/video/fbdev/Kconfig
-> >> +++ b/drivers/video/fbdev/Kconfig
-> >> @@ -2241,6 +2241,7 @@ config FB_VIRTUAL
-> >>  config XEN_FBDEV_FRONTEND
-> >>  	tristate "Xen virtual frame buffer support"
-> >>  	depends on FB && XEN
-> >> +	depends on INPUT || !INPUT_MISC
-> >>  	select FB_SYS_FILLRECT
-> >>  	select FB_SYS_COPYAREA
-> >>  	select FB_SYS_IMAGEBLIT
-> > 
-> > This looks very hackish. Couldn't we just do the following?
-> > 
-> > diff --git a/drivers/video/fbdev/Kconfig b/drivers/video/fbdev/Kconfig
-> > index 8ea45a5..3c15f6d 100644
-> > --- a/drivers/video/fbdev/Kconfig
-> > +++ b/drivers/video/fbdev/Kconfig
-> > @@ -2246,7 +2246,7 @@ config XEN_FBDEV_FRONTEND
-> >  	select FB_SYS_IMAGEBLIT
-> >  	select FB_SYS_FOPS
-> >  	select FB_DEFERRED_IO
-> > -	select INPUT_XEN_KBDDEV_FRONTEND if INPUT_MISC
-> > +	select INPUT_XEN_KBDDEV_FRONTEND if (INPUT && INPUT_MISC)
-> >  	select XEN_XENBUS_FRONTEND
-> >  	default y
-> >  	help
-> > 
+On Mon, Feb 15, 2016 at 08:49:37AM -0800, Greg Kroah-Hartman wrote:
+> On Mon, Feb 15, 2016 at 05:27:53PM +0100, Uwe Kleine-K?nig wrote:
+> > Greg, can you drop this patch, or do you need a proper changelog for a
+> > revert? On top of that I'd then create a new patch which is more
+> > conservative.
 > 
+> A hint as to what the git commit id was would be helpful, I can just
+> revert it based on that.
+
+This is 67d02a1bbb33 ("driver-core: platform: probe of-devices only
+using list of compatibles")
+
+If you need a log, something like:
+
+	Reallow binding of of-devices by name
+
+	It turned out that there are valid reasons (e.g. step by step
+	conversion to device tree probing using auxdata) to bind
+	of-instantiated devices to drivers by name. So revert to the
+	original logic.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
