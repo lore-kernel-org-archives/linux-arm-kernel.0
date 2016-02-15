@@ -1,50 +1,48 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Mon, 15 Feb 2016 15:35:23 +0100
-Subject: [PATCH 5/7] serial: clps711x: fix IS_ERR_VALUE usage
-In-Reply-To: <1455546925-22119-1-git-send-email-a.hajda@samsung.com>
-References: <1455546925-22119-1-git-send-email-a.hajda@samsung.com>
-Message-ID: <1455546925-22119-6-git-send-email-a.hajda@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 15 Feb 2016 14:43:44 +0000
+Subject: arm qemu test failures due to 'driver-core: platform: probe
+ of-devices only using list of compatibles'
+In-Reply-To: <56C1CE95.6020206@arm.com>
+References: <20160214165010.GA3189@roeck-us.net>
+ <20160215105909.GH12289@pengutronix.de> <56C1CE95.6020206@arm.com>
+Message-ID: <20160215144344.GF10826@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IS_ERR_VALUE macro should be used only with unsigned long type.
-For signed types comparison 'ret < 0' should be used.
+On Mon, Feb 15, 2016 at 01:11:49PM +0000, Robin Murphy wrote:
+> FWIW the PL180 on my Juno still works fine with this patch picked on top of
+> -rc3, so the issue would seem to be something else - From a quick comparison
+> between the DTs I see a slight difference in compatible strings for the
+> clocks, but the more likely-looking suspect is that the VExpress DT
+> references some GPIOs where the Juno DT doesn't.
 
-The patch follows conclusion from discussion on LKML [1][2].
+Maybe it would be a good idea that Uwe creates a patch which initially
+warns when a DT platform device falls back to matching via the platform
+strings?
 
-[1]: http://permalink.gmane.org/gmane.linux.kernel/2120927
-[2]: http://permalink.gmane.org/gmane.linux.kernel/2150581
+It's likely that the "basic subsystem" platform drivers are silent when
+they probe, so having notification of a fallback would at least put
+something into the kernel log when that happens - and then later change
+that to be a hard failure (as Uwe is trying to do with his patch.)
 
-Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
----
- drivers/tty/serial/clps711x.c | 14 ++++++++------
- 1 file changed, 8 insertions(+), 6 deletions(-)
+However, I have to bring up another point: is what Uwe is trying to do
+actually the right thing?  The DT platform device code has the ability
+to create standard platform devices from DT, with an of_node, but with
+standard names, and platform data.  It's there for compatibility with
+older systems, and is there to allow systems to be transitioned over.
 
-diff --git a/drivers/tty/serial/clps711x.c b/drivers/tty/serial/clps711x.c
-index b3a4e0c..0096ebe 100644
---- a/drivers/tty/serial/clps711x.c
-+++ b/drivers/tty/serial/clps711x.c
-@@ -467,13 +467,15 @@ static int uart_clps711x_probe(struct platform_device *pdev)
- 	if (IS_ERR(s->port.membase))
- 		return PTR_ERR(s->port.membase);
- 
--	s->port.irq = platform_get_irq(pdev, 0);
--	if (IS_ERR_VALUE(s->port.irq))
--		return s->port.irq;
-+	ret = platform_get_irq(pdev, 0);
-+	if (ret < 0)
-+		return ret;
-+	s->port.irq = ret;
- 
--	s->rx_irq = platform_get_irq(pdev, 1);
--	if (IS_ERR_VALUE(s->rx_irq))
--		return s->rx_irq;
-+	ret = platform_get_irq(pdev, 1);
-+	if (ret < 0)
-+		return ret;
-+	s->rx_irq = ret;
- 
- 	if (!np) {
- 		char syscon_name[9];
+This patch breaks all that: despite the DT code changing the platform
+device bus_id from the address.nodename format to the standard format
+(thus allowing unconverted platform drivers to match), this patch
+means that because the platform device has a of_node attached, this
+will now fail.
+
+Therefore, I think Uwe's patch is just wrong - or, if it's something we
+want, the auxdata table support code needs to _also_ be ripped out of
+the drivers/of/platform.c code, but that then means anyone who wants to
+go through the conversion has a big flag-day change to go through.
+
 -- 
-1.9.1
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
