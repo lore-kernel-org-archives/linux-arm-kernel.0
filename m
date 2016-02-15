@@ -1,114 +1,26 @@
-From: aford173@gmail.com (Adam Ford)
-Date: Mon, 15 Feb 2016 14:24:17 -0600
-Subject: [PATCH 1/4] pwm: omap-dmtimer: fix inaccurate period/duty_cycle
- calculation
-In-Reply-To: <56B1D52F.70907@baylibre.com>
-References: <1454128014-22866-1-git-send-email-drivshin.allworx@gmail.com>
- <1454128014-22866-2-git-send-email-drivshin.allworx@gmail.com>
- <56B1D52F.70907@baylibre.com>
-Message-ID: <CAHCN7xKfn_o_EmQb3zG5-d3P9vxyLp=MX_R7ATT6pzMrS1cJDQ@mail.gmail.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Mon, 15 Feb 2016 15:26:39 -0500
+Subject: [PATCH] branch tracer: fix freak link error
+In-Reply-To: <2535125.MjntUgx4sh@wuerfel>
+References: <1455312410-1058841-1-git-send-email-arnd@arndb.de>
+ <20160215124746.44e8c2d0@gandalf.local.home>
+ <2535125.MjntUgx4sh@wuerfel>
+Message-ID: <20160215152639.7795795c@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I tested this on a DM3730, Timer 10
+On Mon, 15 Feb 2016 21:15:39 +0100
+Arnd Bergmann <arnd@arndb.de> wrote:
 
-Tested-by: Adam Ford <aford173@gmail.com>
+> Do you also want to add a 'Cc: stable at vger.kernel.org' tag?
+> 
 
-On Wed, Feb 3, 2016 at 4:23 AM, Neil Armstrong <narmstrong@baylibre.com> wrote:
-> On 01/30/2016 05:26 AM, David Rivshin (Allworx) wrote:
->> From: David Rivshin <drivshin@allworx.com>
->>
->> Fix the calculation of load_value and match_value. Currently they
->> are slightly too low, which produces a noticeably wrong PWM rate with
->> sufficiently short periods (i.e. when 1/period approaches clk_rate/2).
->>
->> Example:
->>  clk_rate=32768Hz, period=122070ns, duty_cycle=61035ns (8192Hz/50% PWM)
->>  Correct values: load = 0xfffffffc, match = 0xfffffffd
->>  Current values: load = 0xfffffffa, match = 0xfffffffc
->>  effective PWM: period=183105ns, duty_cycle=91553ns (5461Hz/50% PWM)
->>
->> Fixes: 6604c6556db9 ("pwm: Add PWM driver for OMAP using dual-mode timers")
->> Signed-off-by: David Rivshin <drivshin@allworx.com>
->
-> OK for me.
->
-> Acked-by: Neil Armstrong <narmstrong@baylibre.com>
->
-> Thanks !
->
->> ---
->>  drivers/pwm/pwm-omap-dmtimer.c | 27 ++++++++++++++++++++-------
->>  1 file changed, 20 insertions(+), 7 deletions(-)
->>
->> diff --git a/drivers/pwm/pwm-omap-dmtimer.c b/drivers/pwm/pwm-omap-dmtimer.c
->> index 826634e..0083e75 100644
->> --- a/drivers/pwm/pwm-omap-dmtimer.c
->> +++ b/drivers/pwm/pwm-omap-dmtimer.c
->> @@ -31,6 +31,7 @@
->>  #include <linux/time.h>
->>
->>  #define DM_TIMER_LOAD_MIN 0xfffffffe
->> +#define DM_TIMER_MAX      0xffffffff
->>
->>  struct pwm_omap_dmtimer_chip {
->>       struct pwm_chip chip;
->> @@ -46,13 +47,13 @@ to_pwm_omap_dmtimer_chip(struct pwm_chip *chip)
->>       return container_of(chip, struct pwm_omap_dmtimer_chip, chip);
->>  }
->>
->> -static int pwm_omap_dmtimer_calc_value(unsigned long clk_rate, int ns)
->> +static u32 pwm_omap_dmtimer_get_clock_cycles(unsigned long clk_rate, int ns)
->>  {
->>       u64 c = (u64)clk_rate * ns;
->>
->>       do_div(c, NSEC_PER_SEC);
->>
->> -     return DM_TIMER_LOAD_MIN - c;
->> +     return c;
->>  }
->>
->>  static void pwm_omap_dmtimer_start(struct pwm_omap_dmtimer_chip *omap)
->> @@ -99,7 +100,8 @@ static int pwm_omap_dmtimer_config(struct pwm_chip *chip,
->>                                  int duty_ns, int period_ns)
->>  {
->>       struct pwm_omap_dmtimer_chip *omap = to_pwm_omap_dmtimer_chip(chip);
->> -     int load_value, match_value;
->> +     u32 period_cycles, duty_cycles;
->> +     u32 load_value, match_value;
->>       struct clk *fclk;
->>       unsigned long clk_rate;
->>       bool timer_active;
->> @@ -133,11 +135,22 @@ static int pwm_omap_dmtimer_config(struct pwm_chip *chip,
->>       /*
->>        * Calculate the appropriate load and match values based on the
->>        * specified period and duty cycle. The load value determines the
->> -      * cycle time and the match value determines the duty cycle.
->> +      * period time and the match value determines the duty time.
->> +      *
->> +      * The period lasts for (DM_TIMER_MAX-load_value+1) clock cycles.
->> +      * Similarly, the active time lasts (match_value-load_value+1) cycles.
->> +      * The non-active time is the remainder: (DM_TIMER_MAX-match_value)
->> +      * clock cycles.
->> +      *
->> +      * References:
->> +      *   OMAP4430/60/70 TRM sections 22.2.4.10 and 22.2.4.11
->> +      *   AM335x Sitara TRM sections 20.1.3.5 and 20.1.3.6
->>        */
->> -     load_value = pwm_omap_dmtimer_calc_value(clk_rate, period_ns);
->> -     match_value = pwm_omap_dmtimer_calc_value(clk_rate,
->> -                                               period_ns - duty_ns);
->> +     period_cycles = pwm_omap_dmtimer_get_clock_cycles(clk_rate, period_ns);
->> +     duty_cycles = pwm_omap_dmtimer_get_clock_cycles(clk_rate, duty_ns);
->> +
->> +     load_value = (DM_TIMER_MAX - period_cycles) + 1;
->> +     match_value = load_value + duty_cycles - 1;
->>
->>       /*
->>        * We MUST stop the associated dual-mode timer before attempting to
->>
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+I currently have this in the Tags:
+
+    Acked-by: Nicolas Pitre <nico@linaro.org>
+    Fixes: ab3c9c686e22 ("branch tracer, intel-iommu: fix build with CONFIG_BRANCH_TRACER=y")
+    Cc: stable at vger.kernel.org # v2.6.30+
+    Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+    Signed-off-by: Steven Rostedt <rostedt@goodmis.org>
+
+-- Steve
