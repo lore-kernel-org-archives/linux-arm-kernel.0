@@ -1,36 +1,35 @@
-From: linux@baker-net.org.uk (Adam Baker)
-Date: Mon, 15 Feb 2016 23:25:01 +0000
-Subject: [PATCH v2] A driver for the hardware monitoring chip in the Zyxel
- NSA320
-Message-ID: <1455578705-10531-1-git-send-email-linux@baker-net.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 16 Feb 2016 00:26:37 +0100
+Subject: [PATCH v5 1/3] gpio: xgene: Enable X-Gene standby GPIO as
+ interrupt controller
+In-Reply-To: <56BB52B8.4040501@arm.com>
+References: <1454041735-8434-1-git-send-email-qnguyen@apm.com>
+ <1454041735-8434-2-git-send-email-qnguyen@apm.com>
+ <56BB52B8.4040501@arm.com>
+Message-ID: <CACRpkdYg+Z1Y_MSFxaGbJiMiAPjX5EF4_dnWO6q5LCd0m0Fv_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds a driver to support the hardware monitoring MCU
-that is present in the Zyxel NSA320. It is believed that this is
-identical to the one used in the NSA325 and some variants of the NSA310.
+On Wed, Feb 10, 2016 at 4:09 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 29/01/16 04:28, Quan Nguyen wrote:
 
- Documentation/devicetree/bindings/hwmon/nsa320-mcu.txt |  21 ++++++++
- arch/arm/boot/dts/kirkwood-nsa320.dts                  |  13 ++++-
- drivers/hwmon/Kconfig                                  |  15 ++++++
- drivers/hwmon/Makefile                                 |   1 +
- drivers/hwmon/nsa320-hwmon.c                           | 215 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- 5 files changed, 263 insertions(+), 2 deletions(-)
+>> +static void xgene_gpio_sb_domain_deactivate(struct irq_domain *d,
+>> +             struct irq_data *irq_data)
+>> +{
+>> +     struct xgene_gpio_sb *priv = d->host_data;
+>> +     u32 gpio = HWIRQ_TO_GPIO(priv, irq_data->hwirq);
+>> +
+>> +     gpiochip_unlock_as_irq(&priv->gc, gpio);
+>
+> Is it right to do the unlock both in irq_shutdown and domain_deactivate?
+> This seems a bit odd to me to have such an inbalance. My hunch is that
+> you should either implement irq_startup, do the locking there and drop
+> the unlock drop deactivate, or kill irq_shutdown.
+>
+> Linus, what do you think?
 
+Those functions should be called in .irq_alloc/release_resources(), that is
+why Gleixner added those callbacks in the first place.
 
-Changes since v1
-Update to reflect review comments from Guenter Roeck,
-mainly changing it to be nsa320, not nsa3xx but also making it
-return an errno on failure and various other tidy ups.
-
-I'm not sure what protocol is with regard to adding tags to a patch
-when updating it, in v1
-
-patch 1 received
-Acked-by: Rob Herring <robh@kernel.org>
-
-patch 2 was reviewed by Guenter Roeck but does the reviewed by tag
-only get added if he agrees with the changes?
-
-Sebastian Hesselbarth reviewed an early draft before it was posted
-publicly.
+Yours,
+Linus Walleij
