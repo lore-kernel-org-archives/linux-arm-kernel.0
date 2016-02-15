@@ -1,55 +1,65 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 16 Feb 2016 01:33:30 +0200
-Subject: [PATCH/RFC v2 01/11] PM / Domains: Add DT bindings for the R-Car
- System Controller
-In-Reply-To: <1720075.YOPnCQ3mE1@avalon>
-References: <1455571020-18968-1-git-send-email-geert+renesas@glider.be>
- <1455571020-18968-2-git-send-email-geert+renesas@glider.be>
- <1720075.YOPnCQ3mE1@avalon>
-Message-ID: <5091338.oFBh65VqCT@avalon>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Mon, 15 Feb 2016 15:31:02 -0800
+Subject: [PATCH 0/3] clk: mvebu: initial support for AP806 clocks
+In-Reply-To: <1455521698-7905-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1455521698-7905-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20160215233102.2278.88855@quark.deferred.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 16 February 2016 01:08:18 Laurent Pinchart wrote:
-> On Monday 15 February 2016 22:16:50 Geert Uytterhoeven wrote:
-> > The Renesas R-Car System Controller provides power management for the
-> > CPU cores and various coprocessors, following the generic PM domain
-> > bindings in Documentation/devicetree/bindings/power/power_domain.txt.
-> > 
-> > This supports R-Car Gen1, Gen2, and Gen3.
-> > 
-> > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> > ---
+Hi Thomas,
 
-[snip]
-> > 
-> >  .../bindings/power/renesas,sysc-rcar.txt           | 87 +++++++++++++++++
-> >  1 file changed, 87 insertions(+) create mode 100644
-> > 
-> > Documentation/devicetree/bindings/power/renesas,sysc-rcar.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/power/renesas,sysc-rcar.txt
-> > b/Documentation/devicetree/bindings/power/renesas,sysc-rcar.txt new file
-> > mode 100644
-> > index 0000000000000000..92ddc0da7b755215
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/power/renesas,sysc-rcar.txt
-> > @@ -0,0 +1,87 @@
-
-[snip]
-
-> > +  - pm-domains: This node contains a hierarchy of PM Domain Nodes.
+Quoting Thomas Petazzoni (2016-02-14 23:34:55)
+> Hello,
 > 
-> Can't it be an issue that the node happens to have the same name as the
-> standard pm-domains property ?
+> The following set of patches add initial support for the main clocks
+> found in the AP806 hardware block, which is the central block used in
+> the newest Marvell 7K and 8K 64-bits processors.
+> 
+> Two new drivers are added, one for the so-called "core" clocks and one
+> for the "ring" clocks. The latter are child clocks from one of the
+> core clocks. The "core" clocks are fixed rate clocks, but their rate
+> is calculated from values in the Sample At Reset register.
+> 
+> The support for the Marvell 7K/8K platform (Device Tree, etc.) will be
+> submitted as a separate patch series.
 
-Scratch this, it's power-domains, not pm-domains, mybad.
+Yay, new SoC! Just FYI, we worked out an agreement in December[0] that
+the clk git tree can take DT bindings and headers, and we'll always host
+them in an immutable branch by default in case arm-soc (or anyone else)
+needs them. Stephen and I are doing this now.
 
-> > +    Dependencies (e.g. parent SCUs should not be powered off while child
-> > CPUs
-> > +    are on) should be reflected using subnodes.
+It's nice for us to review those bindings at the same time that we
+review the driver.
 
--- 
-Regards,
+[0] http://lkml.kernel.org/r/<20151231001859.19557.99512@quark.deferred.io>
 
-Laurent Pinchart
+Best regards,
+Mike
+
+> 
+> Thanks!
+> 
+> Thomas
+> 
+> Thomas Petazzoni (3):
+>   clk: unconditionally recurse into clk/mvebu/
+>   clk: mvebu: add AP806 core clock driver
+>   clk: mvebu: add AP806 ring clock driver
+> 
+>  .../clock/mvebu-armada-ap806-core-clock.txt        |  33 ++++++
+>  .../clock/mvebu-armada-ap806-ring-clock.txt        |  32 ++++++
+>  drivers/clk/Makefile                               |   2 +-
+>  drivers/clk/mvebu/Kconfig                          |   6 ++
+>  drivers/clk/mvebu/Makefile                         |   3 +-
+>  drivers/clk/mvebu/ap806-core.c                     | 112 +++++++++++++++++++++
+>  drivers/clk/mvebu/ap806-ring.c                     |  65 ++++++++++++
+>  7 files changed, 251 insertions(+), 2 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/clock/mvebu-armada-ap806-core-clock.txt
+>  create mode 100644 Documentation/devicetree/bindings/clock/mvebu-armada-ap806-ring-clock.txt
+>  create mode 100644 drivers/clk/mvebu/ap806-core.c
+>  create mode 100644 drivers/clk/mvebu/ap806-ring.c
+> 
+> -- 
+> 2.6.4
+> 
