@@ -1,31 +1,41 @@
 From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Mon, 15 Feb 2016 21:05:27 +0300
-Subject: [PATCH v3 3/5] ACPI: enable ACPI_SPCR_TABLE on ARM64
+Date: Mon, 15 Feb 2016 21:05:28 +0300
+Subject: [PATCH v3 4/5] ACPI: add definition of DBG2 subtypes
 In-Reply-To: <1455559532-8305-1-git-send-email-aleksey.makarov@linaro.org>
 References: <1455559532-8305-1-git-send-email-aleksey.makarov@linaro.org>
-Message-ID: <1455559532-8305-4-git-send-email-aleksey.makarov@linaro.org>
+Message-ID: <1455559532-8305-5-git-send-email-aleksey.makarov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SBBR mentions SPCR as a mandatory ACPI table.
-So enable it for ARM64
+The recent version of Microsoft Debug Port Table 2 (DBG2) [1]
+specifies additional serial debug port subtypes.  These constants
+are also referred by Serial Port Console Redirection Table (SPCR) [2]
+
+Add these constants.
+
+[1] https://msdn.microsoft.com/en-us/library/windows/hardware/dn639131(v=vs.85).aspx
+[2] https://msdn.microsoft.com/en-us/library/windows/hardware/dn639132(v=vs.85).aspx
 
 Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
 ---
- arch/arm64/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ include/acpi/actbl2.h | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 6bb21d8..75739cd 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -3,6 +3,7 @@ config ARM64
- 	select ACPI_CCA_REQUIRED if ACPI
- 	select ACPI_GENERIC_GSI if ACPI
- 	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
-+	select ACPI_SPCR_TABLE if ACPI
- 	select ARCH_HAS_DEVMEM_IS_ALLOWED
- 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
- 	select ARCH_HAS_ELF_RANDOMIZE
+diff --git a/include/acpi/actbl2.h b/include/acpi/actbl2.h
+index a4ef625..e9930ab 100644
+--- a/include/acpi/actbl2.h
++++ b/include/acpi/actbl2.h
+@@ -371,6 +371,11 @@ struct acpi_dbg2_device {
+ 
+ #define ACPI_DBG2_16550_COMPATIBLE  0x0000
+ #define ACPI_DBG2_16550_SUBSET      0x0001
++#define ACPI_DBG2_ARM_PL011         0x0003
++#define ACPI_DBG2_ARM_SBSA_32BIT    0x000d
++#define ACPI_DBG2_ARM_SBSA_GENERIC  0x000e
++#define ACPI_DBG2_ARM_DCC           0x000f
++#define ACPI_DBG2_BCM2835           0x0010
+ 
+ #define ACPI_DBG2_1394_STANDARD     0x0000
+ 
 -- 
 2.7.1
