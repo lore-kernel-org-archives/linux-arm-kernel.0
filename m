@@ -1,24 +1,77 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 15 Feb 2016 12:55:30 +0000
-Subject: [PATCH v6 1/3] gpio: xgene: Enable X-Gene standby GPIO as
- interrupt controller
-In-Reply-To: <1455512263-18183-2-git-send-email-qnguyen@apm.com>
-References: <1455512263-18183-1-git-send-email-qnguyen@apm.com>
- <1455512263-18183-2-git-send-email-qnguyen@apm.com>
-Message-ID: <56C1CAC2.8050709@arm.com>
+From: CARLOS.PALMINHA@synopsys.com (Carlos Palminha)
+Date: Mon, 15 Feb 2016 12:57:04 +0000
+Subject: [PATCH v2 00/17] drm encoders cleanup: nuke optional dummy encoder
+ mode_fixup function.
+Message-ID: <cover.1455540137.git.palminha@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/02/16 04:57, Quan Nguyen wrote:
-> Enable X-Gene standby GPIO controller as interrupt controller to provide
-> its own resources. This avoids ambiguity where GIC interrupt resource is
-> use as X-Gene standby GPIO interrupt resource in user driver.
-> 
-> Signed-off-by: Y Vo <yvo@apm.com>
-> Signed-off-by: Quan Nguyen <qnguyen@apm.com>
+mode_fixup function for encoder drivers became optional with patch
+http://patchwork.freedesktop.org/patch/msgid/1455106522-32307-1-git-send-email-palminha at synopsys.com
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+This patch set nukes all the dummy mode_fixup implementations.
 
-	M.
+(made on top of Daniel topic/drm-misc branch)
+
+Changes v1->v2: incorporated Daniel comments
+* added signed-off-by line to all patches
+* threading enabled due to e-mail server constraints
+* common blurb lines to all patches
+* add reviewed by Alex, to patches 4 and 14
+
+Carlos Palminha (17):
+  drm/virtio: removed optional dummy encoder mode_fixup function.
+  drm/udl: removed optional dummy encoder mode_fixup function.
+  drm/exynos: removed optional dummy encoder mode_fixup function.
+  drm/amdgpu: removed optional dummy encoder mode_fixup function.
+  drm/ast: removed optional dummy encoder mode_fixup function.
+  drm/bochs: removed optional dummy encoder mode_fixup function.
+  drm/cirrus: removed optional dummy encoder mode_fixup function.
+  drm/exynos: removed optional dummy encoder mode_fixup function.
+  drm/gma500: removed optional dummy encoder mode_fixup function.
+  drm/imx: removed optional dummy encoder mode_fixup function.
+  drm/msm/mdp: removed optional dummy encoder mode_fixup function.
+  drm/mgag200: removed optional dummy encoder mode_fixup function.
+  drm/qxl: removed optional dummy encoder mode_fixup function.
+  drm/radeon: removed optional dummy encoder mode_fixup function.
+  drm/rockchip: removed optional dummy encoder mode_fixup function.
+  drm/sti: removed optional dummy encoder mode_fixup function.
+  drm/tilcdc: removed optional dummy encoder mode_fixup function.
+
+ drivers/gpu/drm/amd/amdgpu/dce_v10_0.c           |  8 --------
+ drivers/gpu/drm/amd/amdgpu/dce_v11_0.c           |  8 --------
+ drivers/gpu/drm/amd/amdgpu/dce_v8_0.c            |  8 --------
+ drivers/gpu/drm/ast/ast_mode.c                   |  8 --------
+ drivers/gpu/drm/bochs/bochs_kms.c                |  8 --------
+ drivers/gpu/drm/cirrus/cirrus_mode.c             |  9 ---------
+ drivers/gpu/drm/exynos/exynos_dp_core.c          |  8 --------
+ drivers/gpu/drm/exynos/exynos_drm_dpi.c          |  8 --------
+ drivers/gpu/drm/exynos/exynos_drm_dsi.c          |  8 --------
+ drivers/gpu/drm/exynos/exynos_drm_vidi.c         |  8 --------
+ drivers/gpu/drm/gma500/cdv_intel_crt.c           |  1 -
+ drivers/gpu/drm/gma500/cdv_intel_hdmi.c          |  1 -
+ drivers/gpu/drm/gma500/gma_display.c             |  7 -------
+ drivers/gpu/drm/gma500/gma_display.h             |  3 ---
+ drivers/gpu/drm/gma500/oaktrail_hdmi.c           |  1 -
+ drivers/gpu/drm/imx/dw_hdmi-imx.c                |  8 --------
+ drivers/gpu/drm/imx/imx-ldb.c                    |  8 --------
+ drivers/gpu/drm/imx/imx-tve.c                    |  8 --------
+ drivers/gpu/drm/imx/parallel-display.c           |  8 --------
+ drivers/gpu/drm/mgag200/mgag200_mode.c           |  8 --------
+ drivers/gpu/drm/msm/mdp/mdp4/mdp4_dsi_encoder.c  |  8 --------
+ drivers/gpu/drm/msm/mdp/mdp4/mdp4_dtv_encoder.c  |  8 --------
+ drivers/gpu/drm/msm/mdp/mdp4/mdp4_lcdc_encoder.c |  8 --------
+ drivers/gpu/drm/msm/mdp/mdp5/mdp5_cmd_encoder.c  |  9 ---------
+ drivers/gpu/drm/msm/mdp/mdp5/mdp5_encoder.c      |  8 --------
+ drivers/gpu/drm/qxl/qxl_display.c                |  9 ---------
+ drivers/gpu/drm/radeon/atombios_encoders.c       |  8 --------
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c           |  8 --------
+ drivers/gpu/drm/sti/sti_tvout.c                  | 10 ----------
+ drivers/gpu/drm/tilcdc/tilcdc_panel.c            |  9 ---------
+ drivers/gpu/drm/tilcdc/tilcdc_tfp410.c           |  9 ---------
+ drivers/gpu/drm/udl/udl_encoder.c                |  8 --------
+ drivers/gpu/drm/virtio/virtgpu_display.c         |  8 --------
+ 33 files changed, 244 deletions(-)
+
 -- 
-Jazz is not dead. It just smells funny...
+2.5.0
