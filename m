@@ -1,111 +1,75 @@
-From: zhangqing@rock-chips.com (Elaine Zhang)
-Date: Mon, 15 Feb 2016 16:42:24 +0800
-Subject: [PATCH v1 5/6] rockchip: power-domain: Modify power domain driver for
- rk3399
-Message-ID: <1455525744-14140-1-git-send-email-zhangqing@rock-chips.com>
+From: eun.taik.lee@samsung.com (EunTaik Lee)
+Date: Mon, 15 Feb 2016 08:46:19 +0000 (GMT)
+Subject: [PATCH] arm64: add alignment fault hanling
+Message-ID: <1891145150.915921455525975284.JavaMail.weblogic@epmlwas09b>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver is modified to support RK3399 SoC.
+Userspace memory is mapped as below:
+F2A7F000--F2A7FFFF Normal Memory
+F2A80000--F2A80FFF Device nGnRnE
 
-Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+And that userspace application makes a system call
+as below:
+
+-009 |do_strncpy_from_user(inline)
+-009 |strncpy_from_user()
+-010 |getname_flags()
+-011 |user_path_at_empty()
+-012 |user_path_at()
+-013 |SYSC_faccessat(inline)
+-013 |sys_faccessat()
+-014 |__sys_trace(asm)
+ --> |exception
+
+The string spans from 0xF2A7FFC1 to 0xF2A7FFFB.
+
+When do_strncpy_from_user() reads the last (unsigned long)
+value, the alignement fault is triggered. The 8 byte
+from 0xF2A7FFC1 spans to the next page that is mapped as
+Device nGnRnE, which does not allow an unaligned access,
+causes the abort.
+
+The instruction which caused the alignment fault is registered
+in the fixup table but the exception handler does not reach there.
+
+This patch registers a alignment fault handler and fixes up the
+pc if appropriate.
+
+Signed-off-by: Eun Taik Lee <eun.taik.lee@samsung.com>
 ---
- drivers/soc/rockchip/pm_domains.c | 55 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 55 insertions(+)
+ arch/arm64/mm/fault.c | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/soc/rockchip/pm_domains.c b/drivers/soc/rockchip/pm_domains.c
-index c4c2aea..9affcec 100644
---- a/drivers/soc/rockchip/pm_domains.c
-+++ b/drivers/soc/rockchip/pm_domains.c
-@@ -19,6 +19,7 @@
- #include <linux/mfd/syscon.h>
- #include <dt-bindings/power/rk3288-power.h>
- #include <dt-bindings/power/rk3368-power.h>
-+#include <dt-bindings/power/rk3399-power.h>
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index 19211c4..8257d4f 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -371,6 +371,16 @@ static int __kprobes do_translation_fault(unsigned long addr,
+ 	return 0;
+ }
  
- struct rockchip_domain_info {
- 	int pwr_mask;
-@@ -81,6 +82,9 @@ struct rockchip_pmu {
- #define DOMAIN_RK3368(pwr, status, req)		\
- 	DOMAIN(pwr, status, req, (req) + 16, req)
- 
-+#define DOMAIN_RK3399(pwr, status, req)                \
-+	DOMAIN(pwr, status, req, req, req)
++static int __kprobes do_alignment_fault(unsigned long addr,
++					  unsigned int esr,
++					  struct pt_regs *regs)
++{
++	if (addr >= TASK_SIZE && fixup_exception(regs))
++		return 0;
 +
- static bool rockchip_pmu_domain_is_idle(struct rockchip_pm_domain *pd)
- {
- 	struct rockchip_pmu *pmu = pd->pmu;
-@@ -519,6 +523,36 @@ static const struct rockchip_domain_info rk3368_pm_domains[] = {
- 	[RK3368_PD_GPU_1]	= DOMAIN_RK3368(17, 16, 2),
- };
- 
-+static const struct rockchip_domain_info rk3399_pm_domains[] = {
-+	[RK3399_PD_TCPD0]       = DOMAIN_RK3399(8, 8, NULL_BIT),
-+	[RK3399_PD_TCPD1]       = DOMAIN_RK3399(9, 9, NULL_BIT),
-+	[RK3399_PD_CCI]         = DOMAIN_RK3399(10, 10, NULL_BIT),
-+	[RK3399_PD_CCI0]        = DOMAIN_RK3399(NULL_BIT, NULL_BIT, 15),
-+	[RK3399_PD_CCI1]        = DOMAIN_RK3399(NULL_BIT, NULL_BIT, 16),
-+	[RK3399_PD_PERILP]      = DOMAIN_RK3399(11, 11, 1),
-+	[RK3399_PD_PERIHP]      = DOMAIN_RK3399(12, 12, 2),
-+	[RK3399_PD_CENTER]      = DOMAIN_RK3399(13, 13, 14),
-+	[RK3399_PD_VIO]         = DOMAIN_RK3399(14, 14, 17),
-+	[RK3399_PD_GPU]         = DOMAIN_RK3399(15, 15, 0),
-+	[RK3399_PD_VCODEC]      = DOMAIN_RK3399(16, 16, 3),
-+	[RK3399_PD_VDU]         = DOMAIN_RK3399(17, 17, 4),
-+	[RK3399_PD_RGA]         = DOMAIN_RK3399(18, 18, 5),
-+	[RK3399_PD_IEP]         = DOMAIN_RK3399(19, 19, 6),
-+	[RK3399_PD_VO]          = DOMAIN_RK3399(20, 20, NULL_BIT),
-+	[RK3399_PD_VOPB]        = DOMAIN_RK3399(NULL_BIT, NULL_BIT, 7),
-+	[RK3399_PD_VOPL]        = DOMAIN_RK3399(NULL_BIT, NULL_BIT, 8),
-+	[RK3399_PD_ISP0]        = DOMAIN_RK3399(22, 22, 9),
-+	[RK3399_PD_ISP1]        = DOMAIN_RK3399(23, 23, 10),
-+	[RK3399_PD_HDCP]        = DOMAIN_RK3399(24, 24, 11),
-+	[RK3399_PD_GMAC]        = DOMAIN_RK3399(25, 25, 23),
-+	[RK3399_PD_EMMC]        = DOMAIN_RK3399(26, 26, 24),
-+	[RK3399_PD_USB3]        = DOMAIN_RK3399(27, 27, 12),
-+	[RK3399_PD_EDP]         = DOMAIN_RK3399(28, 28, 22),
-+	[RK3399_PD_GIC]         = DOMAIN_RK3399(29, 29, 27),
-+	[RK3399_PD_SD]          = DOMAIN_RK3399(30, 30, 28),
-+	[RK3399_PD_SDIOAUDIO]   = DOMAIN_RK3399(31, 31, 29),
-+};
++	return 1;
++}
 +
- static const struct rockchip_pmu_info rk3288_pmu = {
- 	.pwr_offset = 0x08,
- 	.status_offset = 0x0c,
-@@ -553,6 +587,23 @@ static const struct rockchip_pmu_info rk3368_pmu = {
- 	.domain_info = rk3368_pm_domains,
- };
- 
-+static const struct rockchip_pmu_info rk3399_pmu = {
-+	.pwr_offset = 0x14,
-+	.status_offset = 0x18,
-+	.req_offset = 0x60,
-+	.idle_offset = 0x64,
-+	.ack_offset = 0x68,
-+
-+	.core_pwrcnt_offset = 0x9c,
-+	.gpu_pwrcnt_offset = 0xa4,
-+
-+	.core_power_transition_time = 24,
-+	.gpu_power_transition_time = 24,
-+
-+	.num_domains = ARRAY_SIZE(rk3399_pm_domains),
-+	.domain_info = rk3399_pm_domains,
-+};
-+
- static const struct of_device_id rockchip_pm_domain_dt_match[] = {
- 	{
- 		.compatible = "rockchip,rk3288-power-controller",
-@@ -562,6 +613,10 @@ static const struct of_device_id rockchip_pm_domain_dt_match[] = {
- 		.compatible = "rockchip,rk3368-power-controller",
- 		.data = (void *)&rk3368_pmu,
- 	},
-+	{
-+		.compatible = "rockchip,rk3399-power-controller",
-+		.data = (void *)&rk3399_pmu,
-+	},
- 	{ /* sentinel */ },
- };
- 
+ /*
+  * This abort handler always returns "fault".
+  */
+@@ -418,7 +428,7 @@ static struct fault_info {
+ 	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk" },
+ 	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk" },
+ 	{ do_bad,		SIGBUS,  0,		"unknown 32"			},
+-	{ do_bad,		SIGBUS,  BUS_ADRALN,	"alignment fault"		},
++	{ do_alignment_fault,	SIGBUS,  BUS_ADRALN,	"alignment fault"		},
+ 	{ do_bad,		SIGBUS,  0,		"debug event"			},
+ 	{ do_bad,		SIGBUS,  0,		"unknown 35"			},
+ 	{ do_bad,		SIGBUS,  0,		"unknown 36"			},
 -- 
 1.9.1
