@@ -1,24 +1,34 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 15 Feb 2016 20:04:39 +0000
-Subject: [PATCH v2 05/10] regulator: axp20x: support AXP809 variant
-In-Reply-To: <1455532288-30870-6-git-send-email-wens@csie.org>
-References: <1455532288-30870-1-git-send-email-wens@csie.org>
- <1455532288-30870-6-git-send-email-wens@csie.org>
-Message-ID: <20160215200439.GC18327@sirena.org.uk>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 15 Feb 2016 21:57:46 +0100
+Subject: [PATCH v2 2/4] dmaengine: mmp-pdma: add number of requestors
+In-Reply-To: <1455569868-25017-1-git-send-email-robert.jarzmik@free.fr>
+References: <1455569868-25017-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <1455569868-25017-2-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 15, 2016 at 06:31:23PM +0800, Chen-Yu Tsai wrote:
-> The X-Powers AXP809 PMIC has a similar set of regulators as the AXP221,
-> though a few LDOs were removed, and a new switch output added. Like the
-> AXP221, AXP809 also has DC1SW and DC5LDO, which are internally chained
-> to DCDC1 and DCDC5, respectively.
+The DMA chip has a fixed number of requestor lines used for flow
+control. This number is platform dependent. The pxa_dma dma driver will
+use this value to activate or not the flow control.
 
-This doesn't apply against current code, please check and resend.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160215/05c76f90/attachment.sig>
+There won't be any impact on mmp_pdma driver.
+
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+---
+ include/linux/platform_data/mmp_dma.h | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/include/linux/platform_data/mmp_dma.h b/include/linux/platform_data/mmp_dma.h
+index 2a330ec9e2af..d1397c8ed94e 100644
+--- a/include/linux/platform_data/mmp_dma.h
++++ b/include/linux/platform_data/mmp_dma.h
+@@ -14,6 +14,7 @@
+ 
+ struct mmp_dma_platdata {
+ 	int dma_channels;
++	int nb_requestors;
+ };
+ 
+ #endif /* MMP_DMA_H */
+-- 
+2.1.4
