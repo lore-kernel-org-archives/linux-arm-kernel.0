@@ -1,90 +1,69 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon, 15 Feb 2016 13:20:07 +0100
-Subject: [PATCH v3 1/2] ARM: shmobile: Move shmobile_smp_{mpidr, fn,
- arg}[] from .text to .bss
-In-Reply-To: <1455538808-6816-1-git-send-email-geert+renesas@glider.be>
-References: <1455538808-6816-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1455538808-6816-2-git-send-email-geert+renesas@glider.be>
+From: CARLOS.PALMINHA@synopsys.com (Carlos Palminha)
+Date: Mon, 15 Feb 2016 12:29:00 +0000
+Subject: [PATCH 01/17] drm/virtio: removed optional dummy encoder
+ mode_fixup function.
+In-Reply-To: <20160214182508.GF11240@phenom.ffwll.local>
+References: <daniel.vetter@ffwll.ch,>
+ <1455285069-2819-1-git-send-email-palminha@synopsys.com>
+ <1455285069-2819-2-git-send-email-palminha@synopsys.com>
+ <20160214182508.GF11240@phenom.ffwll.local>
+Message-ID: <56C1C48C.1050006@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If CONFIG_DEBUG_RODATA=y, the kernel crashes during system suspend:
+Daniel, thanks for the feedback.
+v2 patch will follow-up. :)
 
-    Freezing user space processes ... (elapsed 0.004 seconds) done.
-    Freezing remaining freezable tasks ... (elapsed 0.002 seconds)
-    done.
-    PM: suspend of devices complete after 111.948 msecs
-    PM: late suspend of devices complete after 1.086 msecs
-    PM: noirq suspend of devices complete after 11.576 msecs
-    Disabling non-boot CPUs ...
-    Kernel panic - not syncing: Attempted to kill the idle task!
-    1014ec ---[ end Kernel panic - not syncing: Attempted to kill the idle task!
-    CPU0: stopping
-
-This happens because the .text section is marked read-only, while the
-arrays shmobile_smp_mpidr[], shmobile_smp_fn[], and shmobile_smp_arg[]
-are being written to.
-
-Fix this by moving these arrays from the .text to the .bss section.
-This requires accessing them through PC-relative offsets.
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Reviewed-by: Kees Cook <keescook@chromium.org>
-Reviewed-by: Nicolas Pitre <nico@linaro.org>
----
-v3:
-  - Use .bss instead of .data, as requested by Nicolas Pitre
-    <nicolas.pitre@linaro.org>,
-  - Add Reviewed-by,
-
-v2:
-  - Add Reviewed-by,
-  - Store offsets instead of pointers, as suggested by Nicolas Pitre
-    <nicolas.pitre@linaro.org>.
----
- arch/arm/mach-shmobile/headsmp.S | 20 ++++++++++++++------
- 1 file changed, 14 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/mach-shmobile/headsmp.S b/arch/arm/mach-shmobile/headsmp.S
-index 330c1fc63197df89..94d86ed164144cdf 100644
---- a/arch/arm/mach-shmobile/headsmp.S
-+++ b/arch/arm/mach-shmobile/headsmp.S
-@@ -50,9 +50,11 @@ ENTRY(shmobile_smp_boot)
- 	mrc	p15, 0, r1, c0, c0, 5		@ r1 = MPIDR
- 	and	r0, r1, r0			@ r0 = cpu_logical_map() value
- 	mov	r1, #0				@ r1 = CPU index
--	adr	r5, 1f				@ array of per-cpu mpidr values
--	adr	r6, 2f				@ array of per-cpu functions
--	adr	r7, 3f				@ array of per-cpu arguments
-+	adr	r2, 1f
-+	ldmia	r2, {r5, r6, r7}
-+	add	r5, r5, r2			@ array of per-cpu mpidr values
-+	add	r6, r6, r2			@ array of per-cpu functions
-+	add	r7, r7, r2			@ array of per-cpu arguments
- 
- shmobile_smp_boot_find_mpidr:
- 	ldr	r8, [r5, r1, lsl #2]
-@@ -80,12 +82,18 @@ ENTRY(shmobile_smp_sleep)
- 	b	shmobile_smp_boot
- ENDPROC(shmobile_smp_sleep)
- 
-+	.align	2
-+1:	.long	shmobile_smp_mpidr - .
-+	.long	shmobile_smp_fn - 1b
-+	.long	shmobile_smp_arg - 1b
-+
-+	.bss
- 	.globl	shmobile_smp_mpidr
- shmobile_smp_mpidr:
--1:	.space	NR_CPUS * 4
-+	.space	NR_CPUS * 4
- 	.globl	shmobile_smp_fn
- shmobile_smp_fn:
--2:	.space	NR_CPUS * 4
-+	.space	NR_CPUS * 4
- 	.globl	shmobile_smp_arg
- shmobile_smp_arg:
--3:	.space	NR_CPUS * 4
-+	.space	NR_CPUS * 4
--- 
-1.9.1
+On 14-02-2016 18:25, Daniel Vetter wrote:
+> On Fri, Feb 12, 2016 at 01:50:53PM +0000, Carlos Palminha wrote:
+>
+> Sob-line from you is missing on all patches, I can't merge them. Also
+> please copypaste a default blurb to all patches that this is only recently
+> no longer needed. And dunno what happened to your patch series, the
+> threading is somehow broken. In case your mail server doesn't accept a big
+> patch series you can first format .patch files using git format-patch with
+> threading enabled (should be the default) and then send them out in
+> chunks.
+>
+> When resending please also add the r-b tag from Alex for amdgpu/radoen.
+>
+> Thanks, Daniel
+>
+>> ---
+>>   drivers/gpu/drm/virtio/virtgpu_display.c | 8 --------
+>>   1 file changed, 8 deletions(-)
+>>
+>> diff --git a/drivers/gpu/drm/virtio/virtgpu_display.c b/drivers/gpu/drm/virtio/virtgpu_display.c
+>> index a165f03..429aa31 100644
+>> --- a/drivers/gpu/drm/virtio/virtgpu_display.c
+>> +++ b/drivers/gpu/drm/virtio/virtgpu_display.c
+>> @@ -282,13 +282,6 @@ static const struct drm_crtc_helper_funcs virtio_gpu_crtc_helper_funcs = {
+>>   	.atomic_check  = virtio_gpu_crtc_atomic_check,
+>>   };
+>>
+>> -static bool virtio_gpu_enc_mode_fixup(struct drm_encoder *encoder,
+>> -				      const struct drm_display_mode *mode,
+>> -				      struct drm_display_mode *adjusted_mode)
+>> -{
+>> -	return true;
+>> -}
+>> -
+>>   static void virtio_gpu_enc_mode_set(struct drm_encoder *encoder,
+>>   				    struct drm_display_mode *mode,
+>>   				    struct drm_display_mode *adjusted_mode)
+>> @@ -362,7 +355,6 @@ virtio_gpu_best_encoder(struct drm_connector *connector)
+>>   }
+>>
+>>   static const struct drm_encoder_helper_funcs virtio_gpu_enc_helper_funcs = {
+>> -	.mode_fixup = virtio_gpu_enc_mode_fixup,
+>>   	.mode_set   = virtio_gpu_enc_mode_set,
+>>   	.enable     = virtio_gpu_enc_enable,
+>>   	.disable    = virtio_gpu_enc_disable,
+>> --
+>> 2.5.0
+>>
+>> _______________________________________________
+>> dri-devel mailing list
+>> dri-devel at lists.freedesktop.org
+>> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+>
