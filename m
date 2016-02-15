@@ -1,85 +1,52 @@
-From: deathsimple@vodafone.de (=?UTF-8?Q?Christian_K=c3=b6nig?=)
-Date: Mon, 15 Feb 2016 15:19:07 +0100
-Subject: [PATCH v2 00/17] drm encoders cleanup: nuke optional dummy
- encoder mode_fixup function.
-In-Reply-To: <cover.1455540137.git.palminha@synopsys.com>
-References: <cover.1455540137.git.palminha@synopsys.com>
-Message-ID: <56C1DE5B.4010909@vodafone.de>
+From: oberpar@linux.vnet.ibm.com (Peter Oberparleiter)
+Date: Mon, 15 Feb 2016 15:23:19 +0100
+Subject: [PATCH 3/5] gcov: disable for COMPILE_TEST
+In-Reply-To: <1455293187-179811-4-git-send-email-arnd@arndb.de>
+References: <1455293187-179811-1-git-send-email-arnd@arndb.de>
+ <1455293187-179811-4-git-send-email-arnd@arndb.de>
+Message-ID: <56C1DF57.50601@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 15.02.2016 um 13:57 schrieb Carlos Palminha:
-> mode_fixup function for encoder drivers became optional with patch
-> http://patchwork.freedesktop.org/patch/msgid/1455106522-32307-1-git-send-email-palminha at synopsys.com
->
-> This patch set nukes all the dummy mode_fixup implementations.
->
-> (made on top of Daniel topic/drm-misc branch)
->
-> Changes v1->v2: incorporated Daniel comments
-> * added signed-off-by line to all patches
-> * threading enabled due to e-mail server constraints
-> * common blurb lines to all patches
-> * add reviewed by Alex, to patches 4 and 14
+On 12.02.2016 17:06, Arnd Bergmann wrote:
+> Enabling gcov is counterproductive to compile testing: it significantly
+> increases the kernel image size, compile time, and it produces lots
+> of false positive "may be used uninitialized" warnings as the result
+> of missed optimizations.
+> 
+> This is in line with how UBSAN_SANITIZE_ALL and PROFILE_ALL_BRANCHES
+> work, both of which have similar problems.
+> 
+> With an ARM allmodconfig kernel, I see the build time drop from
+> 283 minutes CPU time to 225 minutes, and the vmlinux size drops
+> from 43MB to 26MB.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-You can add a Reviewed-by: Christian K?nig <christian.koenig@amd.com> to 
-patch 4 and 14 as well.
+Agreed that COMPILE_TEST + GCOV_PROFILE_ALL is a very exotic combination
+with little added use.
 
-Nice cleanup. Thanks,
-Christian.
+Acked-by: Peter Oberparleiter <oberpar@linux.vnet.ibm.com>
 
->
-> Carlos Palminha (17):
->    drm/virtio: removed optional dummy encoder mode_fixup function.
->    drm/udl: removed optional dummy encoder mode_fixup function.
->    drm/exynos: removed optional dummy encoder mode_fixup function.
->    drm/amdgpu: removed optional dummy encoder mode_fixup function.
->    drm/ast: removed optional dummy encoder mode_fixup function.
->    drm/bochs: removed optional dummy encoder mode_fixup function.
->    drm/cirrus: removed optional dummy encoder mode_fixup function.
->    drm/exynos: removed optional dummy encoder mode_fixup function.
->    drm/gma500: removed optional dummy encoder mode_fixup function.
->    drm/imx: removed optional dummy encoder mode_fixup function.
->    drm/msm/mdp: removed optional dummy encoder mode_fixup function.
->    drm/mgag200: removed optional dummy encoder mode_fixup function.
->    drm/qxl: removed optional dummy encoder mode_fixup function.
->    drm/radeon: removed optional dummy encoder mode_fixup function.
->    drm/rockchip: removed optional dummy encoder mode_fixup function.
->    drm/sti: removed optional dummy encoder mode_fixup function.
->    drm/tilcdc: removed optional dummy encoder mode_fixup function.
->
->   drivers/gpu/drm/amd/amdgpu/dce_v10_0.c           |  8 --------
->   drivers/gpu/drm/amd/amdgpu/dce_v11_0.c           |  8 --------
->   drivers/gpu/drm/amd/amdgpu/dce_v8_0.c            |  8 --------
->   drivers/gpu/drm/ast/ast_mode.c                   |  8 --------
->   drivers/gpu/drm/bochs/bochs_kms.c                |  8 --------
->   drivers/gpu/drm/cirrus/cirrus_mode.c             |  9 ---------
->   drivers/gpu/drm/exynos/exynos_dp_core.c          |  8 --------
->   drivers/gpu/drm/exynos/exynos_drm_dpi.c          |  8 --------
->   drivers/gpu/drm/exynos/exynos_drm_dsi.c          |  8 --------
->   drivers/gpu/drm/exynos/exynos_drm_vidi.c         |  8 --------
->   drivers/gpu/drm/gma500/cdv_intel_crt.c           |  1 -
->   drivers/gpu/drm/gma500/cdv_intel_hdmi.c          |  1 -
->   drivers/gpu/drm/gma500/gma_display.c             |  7 -------
->   drivers/gpu/drm/gma500/gma_display.h             |  3 ---
->   drivers/gpu/drm/gma500/oaktrail_hdmi.c           |  1 -
->   drivers/gpu/drm/imx/dw_hdmi-imx.c                |  8 --------
->   drivers/gpu/drm/imx/imx-ldb.c                    |  8 --------
->   drivers/gpu/drm/imx/imx-tve.c                    |  8 --------
->   drivers/gpu/drm/imx/parallel-display.c           |  8 --------
->   drivers/gpu/drm/mgag200/mgag200_mode.c           |  8 --------
->   drivers/gpu/drm/msm/mdp/mdp4/mdp4_dsi_encoder.c  |  8 --------
->   drivers/gpu/drm/msm/mdp/mdp4/mdp4_dtv_encoder.c  |  8 --------
->   drivers/gpu/drm/msm/mdp/mdp4/mdp4_lcdc_encoder.c |  8 --------
->   drivers/gpu/drm/msm/mdp/mdp5/mdp5_cmd_encoder.c  |  9 ---------
->   drivers/gpu/drm/msm/mdp/mdp5/mdp5_encoder.c      |  8 --------
->   drivers/gpu/drm/qxl/qxl_display.c                |  9 ---------
->   drivers/gpu/drm/radeon/atombios_encoders.c       |  8 --------
->   drivers/gpu/drm/rockchip/dw-mipi-dsi.c           |  8 --------
->   drivers/gpu/drm/sti/sti_tvout.c                  | 10 ----------
->   drivers/gpu/drm/tilcdc/tilcdc_panel.c            |  9 ---------
->   drivers/gpu/drm/tilcdc/tilcdc_tfp410.c           |  9 ---------
->   drivers/gpu/drm/udl/udl_encoder.c                |  8 --------
->   drivers/gpu/drm/virtio/virtgpu_display.c         |  8 --------
->   33 files changed, 244 deletions(-)
->
+> ---
+>  kernel/gcov/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/kernel/gcov/Kconfig b/kernel/gcov/Kconfig
+> index c92e44855ddd..1276aabaab55 100644
+> --- a/kernel/gcov/Kconfig
+> +++ b/kernel/gcov/Kconfig
+> @@ -37,6 +37,7 @@ config ARCH_HAS_GCOV_PROFILE_ALL
+> 
+>  config GCOV_PROFILE_ALL
+>  	bool "Profile entire Kernel"
+> +	depends on !COMPILE_TEST
+>  	depends on GCOV_KERNEL
+>  	depends on ARCH_HAS_GCOV_PROFILE_ALL
+>  	default n
+> 
+
+
+-- 
+Peter Oberparleiter
+Linux on z Systems Development - IBM Germany
