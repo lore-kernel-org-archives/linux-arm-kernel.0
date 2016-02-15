@@ -1,26 +1,25 @@
 From: sre@kernel.org (Sebastian Reichel)
-Date: Mon, 15 Feb 2016 06:01:18 +0100
-Subject: [PATCH 2/2] ARM: versatile: move restart to the device tree
-In-Reply-To: <1453710656-14280-1-git-send-email-linus.walleij@linaro.org>
-References: <1453710656-14280-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20160215050118.GC28626@earth>
+Date: Mon, 15 Feb 2016 06:03:09 +0100
+Subject: [PATCH] power: collie_battery: hide unused variable
+In-Reply-To: <1453736756-1959377-2-git-send-email-arnd@arndb.de>
+References: <1453736756-1959377-2-git-send-email-arnd@arndb.de>
+Message-ID: <20160215050308.GD28626@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Mon, Jan 25, 2016 at 09:30:56AM +0100, Linus Walleij wrote:
-> We have a power/reset driver for the Versatile family
-> in drivers/power/reset so let's just activate that driver
-> and use it and get rid of some non-DT remnants.
+On Mon, Jan 25, 2016 at 04:45:49PM +0100, Arnd Bergmann wrote:
+> The 'wakeup_enabled' variable in this driver is only accessed
+> by the optional power management functions and we get a warning
+> when they are disabled:
 > 
-> Cc: Sebastian Reichel <sre@kernel.org>
-> Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-> Cc: David Woodhouse <dwmw2@infradead.org>
-> Cc: Rob Herring <robh@kernel.org>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> drivers/power/collie_battery.c:29:12: error: 'wakeup_enabled' defined but not used [-Werror=unused-variable]
+> 
+> This moves the definition next to the users inside the same #ifdef,
+> which avoids the warning.
 
-Acked-By: Sebastian Reichel <sre@kernel.org>
+Thanks, queued.
 
 -- Sebastian
 -------------- next part --------------
@@ -29,4 +28,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160215/ac760a53/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160215/07779cfd/attachment.sig>
