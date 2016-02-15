@@ -1,71 +1,78 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 15 Feb 2016 13:59:38 +0300
-Subject: [PATCH] ARM: dts: porter: add MAX3355 support
-In-Reply-To: <20160215014527.GE12997@verge.net.au>
-References: <1674850.BZpGW9kEud@wasted.cogentembedded.com>
- <4506196.xOgpYRO52t@wasted.cogentembedded.com>
- <SG2PR06MB0919D09C1146EAC0681EE109D8DA0@SG2PR06MB0919.apcprd06.prod.outlook.com>
- <56ABCB69.1070800@cogentembedded.com> <56ABD066.7020804@cogentembedded.com>
- <SG2PR06MB0919361DC5805AE3F5B74041D8DE0@SG2PR06MB0919.apcprd06.prod.outlook.com>
- <56AF9BE8.4020002@cogentembedded.com> <56AFAB67.20404@cogentembedded.com>
- <20160215014527.GE12997@verge.net.au>
-Message-ID: <56C1AF9A.5070401@cogentembedded.com>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Mon, 15 Feb 2016 19:01:11 +0800
+Subject: [PATCH 0/2] Add Rockchip display port phy driver support
+Message-ID: <1455534071-31230-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/15/2016 4:45 AM, Simon Horman wrote:
 
->>>>>>>> Now that Maxim Integrated MAX3355 'extcon' driver and device tree bindings
->>>>>>>> are upstream along with the 'extcon' hook  in the Renesas USBHS driver, we
->>>>>>>> can add  MAX3355 device node to  the Porter device tree and properly refer
->>>>>>>> to it from the USBHS node instead of using  "renesas,enable-gpio" property
->>>>>>>> which only allowed checking the USB ID pin  at the driver probe time;  now
->>>>>>>> this  pin's  state can be monitored dynamically!
->>>>>>>>
->>>>>>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->>>>>>>
->>>>>>> I tested this patch on Porter, but interrupt of "usb-otg" didn't happened
->>>>>>> even if I connected/disconnected a usb convert cable (usb micro-ab to A).
->>>>>>> Remarks: I confirmed that the usb convert cable worked correctly on other
->>>>>>> board.
->>>>>>
->>>>>>      I guess I have the same cable
->>>>>
->>>>>      No, I have mini-AB connector here and hence my cable is mini-AB to A.
->>>>
->>>> I checked Porter specification and then I found 2 specifications exist...
->>>
->>>     I've looked thru my schematics files and found 3: Rev. 1.1 Update Version
->>> 2, "PORTER_2" Rev. 3.0 Preliminary, and "PORTER_C" Rev. 3.0 Release version!
->>> I'm not sure which of the last 2 should be considered final...
->>
->>     Now I've found 5 versions of the Porter schematics... :-)
->>
->>>>   Porter "B" : mini AB connecter and Max3355 is on the board.
->>>>   Porter "C" : micro AB connect and Max3355 is not on the board. (Select
->>>> host/peripheral by a jumper.)
->>>
->>>     Yeah, seeing JP13 in the PORTER_C schematics.
->>>
->>>> I guess that your current target is "B".
->>>
->>>     If not earlier. It actually has "Henninger B REV2" printed on it and
->>> "Porter PCB 1 R3" on a pasted sticker.
->>>
->>>> If so, I think this patch is acceptable.
->>>
->>>     I'm not so sure now...
->>
->>     My boss told me PORTER_C is a final version, so this patch isn't needed.
->> But then another patch is needed instead: to remove "renesas,enable-gpio"
->> prop from the HS-USB device node...
->
-> I am marking this patch as "Rejected" in patchwork.
-> If changes are required in this area please either
-> resubmit this patch or post a different one.
+Hi Kison,
 
-    Posted a different one on Saturday.
+This series is splited from Analogix DP DRM thread [0], and Heiko suggest this
+should be an independent thread which may be easy for you to apply.
 
-> Thanks.
+Best regards,
+Yakir
 
-MBR, Sergei
+[0]: https://patchwork.kernel.org/patch/8086571/
+
+
+Changes in v12:
+- Re-order the include headers file alphabetically in phy-rockchip-dp.c (Jingoo)
+
+Changes in v11:
+- Correct the title of this rockchip dp phy document(Rob)
+- Add the ack from Rob Herring
+
+Changes in v10:
+- Fix the wrong macro value of GRF_EDP_REF_CLK_SEL_INTER_HIWORD_MASK
+    BIT(4) -> BIT(20)
+
+Changes in v9:
+- Removed the unused the variable "res" in probe function. (Heiko)
+- Removed the unused head file.
+
+Changes in v8:
+- Fix the mixed spacers on macro definitions. (Heiko)
+- Remove the unnecessary empty line after clk_prepare_enable. (Heiko)
+- Remove the specific address in the example node name. (Heiko)
+
+Changes in v7:
+- Simply the commit message. (Kishon)
+- Symmetrical enable/disbale the phy clock and power. (Kishon)
+- Simplify the commit message. (Kishon)
+
+Changes in v5:
+- Remove "reg" DT property, cause driver could poweron/poweroff phy via
+  the exist "grf" syscon already. And rename the example DT node from
+  "edp_phy: phy at ff770274" to "edp_phy: edp-phy" directly. (Heiko)
+- Add deivce_node at the front of driver, update phy_ops type from "static
+  struct" to "static const struct". And correct the input paramters of
+  devm_phy_create() interfaces. (Heiko)
+- Split binding doc's from driver changes. (Rob)
+- Update the rockchip,grf explain in document, and correct the clock required
+  elemets in document. (Rob & Heiko)
+
+Changes in v4:
+- Add commit message, and remove the redundant rockchip_dp_phy_init()
+  function, move those code to probe() method. And remove driver .owner
+  number. (Kishon)
+
+Changes in v3:
+- Suggest, add rockchip dp phy driver, collect the phy clocks and
+  power control. (Heiko)
+
+Yakir Yang (2):
+  phy: Add driver for rockchip Display Port PHY
+  dt-bindings: add document for rockchip dp phy
+
+ .../devicetree/bindings/phy/rockchip-dp-phy.txt    |  22 +++
+ drivers/phy/Kconfig                                |   7 +
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-rockchip-dp.c                      | 151 +++++++++++++++++++++
+ 4 files changed, 181 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/rockchip-dp-phy.txt
+ create mode 100644 drivers/phy/phy-rockchip-dp.c
+
+-- 
+1.9.1
