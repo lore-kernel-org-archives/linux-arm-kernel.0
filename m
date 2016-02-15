@@ -1,62 +1,74 @@
-From: patrik.r.jakobsson@gmail.com (Patrik Jakobsson)
-Date: Mon, 15 Feb 2016 14:49:09 +0100
-Subject: [PATCH v2 03/17] drm/exynos: removed optional dummy encoder
- mode_fixup function.
-In-Reply-To: <3768b670931572de51fca1102efa18d20dd770ee.1455540137.git.palminha@synopsys.com>
-References: <cover.1455540137.git.palminha@synopsys.com>
- <3768b670931572de51fca1102efa18d20dd770ee.1455540137.git.palminha@synopsys.com>
-Message-ID: <CAMeQTsZLdMOnk7-isneoUyFBbQdiRUsGH6+EhD8W1LNB=80LVQ@mail.gmail.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Mon, 15 Feb 2016 21:50:22 +0800
+Subject: [PATCH v7 RESEND 0/4] mailbox: hisilicon: add Hi6220 mailbox driver
+Message-ID: <1455544226-10094-1-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Carlos
+Hi6220 mailbox supports up to 32 channels. Each channel is unidirectional
+with a maximum message size of 8 words. I/O is performed using register
+access (there is no DMA) and the cell raises an interrupt when messages
+are received.
 
-Any particular reason why this patch isn't squashed with patch 8/17?
+This patch series is to implement Hi6220 mailbox driver. It registers
+two channels into framework for communication with MCU, one is tx channel
+and another is rx channel. Now mailbox driver is used to send message to
+MCU to control dynamic voltage and frequency scaling for CPU, GPU and DDR.
 
-Thanks
-Patrik
+Changes from v6:
+* Fix to use lowercase for hexadecimal value in DT binding document
+
+Changes from v5:
+* Refine to use mailbox three specifiers for client driver, so add xlate
+  callback function in mailbox driver to support these specifiers
+* Refine document for property "hi6220,mbox-tx-noirq"
+
+Changes from v4:
+* According to Jassi's suggestion, using DT binding to register channels
+* Change to use operating-points-v2 to register operating points
+
+Changes from v3:
+* The patch series for enabling idle state for Hi6220 has reserved memory
+  regions, so this series will not include it anymore
+* Refined mailbox driver according to Jassi's suggestion;
+  Removed kfifo from mailbox driver;
+  Removed spinlock for ipc registers accessing, due every channel has its
+  own dedicated bit in ipc register and readl/writel will introduce memory
+  barrier, so don't need spinlock to protect ipc registers accessing
+* After mailbox driver is ready, can use patch 4 to enable CPU's OPPs and
+  stub clock driver; finally can enable CPUFreq driver for CPU frequency
+  scaling
+
+Changes from v2:
+* Get rid of unused memory regions from memory node in DT, and don't use
+  reserved-memory node according to Mark and Leif's suggestion; Haojian also
+  has updated UEFI for efi memory info
+
+Changes from v1:
+* Correct lock usage for SMP scenario
+
+Changes from RFC:
+* According to Jassi's review, totally remove the abstract common driver
+  layer and only commit driver dedicated for Hi6220
+* According to Paul Bolle's review, fix typo issue for Kconfig and remove
+  unnecessary dependency with OF and fix minor for mailbox driver
+* Refine a little for dts nodes
 
 
-On Mon, Feb 15, 2016 at 1:58 PM, Carlos Palminha
-<CARLOS.PALMINHA@synopsys.com> wrote:
-> mode_fixup function for encoder drivers became optional with patch
-> http://patchwork.freedesktop.org/patch/msgid/1455106522-32307-1-git-send-email-palminha at synopsys.com
->
-> This patch set nukes all the dummy mode_fixup implementations.
->
-> (made on top of Daniel topic/drm-misc branch)
->
-> Signed-off-by: Carlos Palminha <palminha@synopsys.com>
-> ---
->  drivers/gpu/drm/exynos/exynos_drm_dsi.c | 8 --------
->  1 file changed, 8 deletions(-)
->
-> diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-> index e977a81..736115c 100644
-> --- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-> +++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-> @@ -1597,13 +1597,6 @@ static int exynos_dsi_create_connector(struct drm_encoder *encoder)
->         return 0;
->  }
->
-> -static bool exynos_dsi_mode_fixup(struct drm_encoder *encoder,
-> -                                 const struct drm_display_mode *mode,
-> -                                 struct drm_display_mode *adjusted_mode)
-> -{
-> -       return true;
-> -}
-> -
->  static void exynos_dsi_mode_set(struct drm_encoder *encoder,
->                                 struct drm_display_mode *mode,
->                                 struct drm_display_mode *adjusted_mode)
-> @@ -1623,7 +1616,6 @@ static void exynos_dsi_mode_set(struct drm_encoder *encoder,
->  }
->
->  static const struct drm_encoder_helper_funcs exynos_dsi_encoder_helper_funcs = {
-> -       .mode_fixup = exynos_dsi_mode_fixup,
->         .mode_set = exynos_dsi_mode_set,
->         .enable = exynos_dsi_enable,
->         .disable = exynos_dsi_disable,
-> --
-> 2.5.0
->
+Leo Yan (4):
+  dt-bindings: mailbox: Document Hi6220 mailbox driver
+  mailbox: Hi6220: add mailbox driver
+  arm64: dts: add mailbox node for Hi6220
+  arm64: dts: add Hi6220's stub clock node
+
+ .../bindings/mailbox/hisilicon,hi6220-mailbox.txt  |  74 ++++
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi          |  64 ++++
+ drivers/mailbox/Kconfig                            |   8 +
+ drivers/mailbox/Makefile                           |   2 +
+ drivers/mailbox/hi6220-mailbox.c                   | 395 +++++++++++++++++++++
+ 5 files changed, 543 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/hisilicon,hi6220-mailbox.txt
+ create mode 100644 drivers/mailbox/hi6220-mailbox.c
+
+-- 
+1.9.1
