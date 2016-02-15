@@ -1,49 +1,47 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Mon, 15 Feb 2016 17:13:02 +0000
-Subject: [PATCH] ARM: dts: imx6*-hummingboard: use proper gpio flags
- definitions
-Message-ID: <E1aVMhq-0001x5-ST@rmk-PC.arm.linux.org.uk>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 15 Feb 2016 18:17:46 +0100
+Subject: [PATCH] arm64: mark kernel text segment as MEMBLOCK_NOMAP
+In-Reply-To: <20160215120809.GF13683@e104818-lin.cambridge.arm.com>
+References: <1455528512-32491-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20160215114505.GE13683@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu-Y-k_LAbFZJjiPuHq6ssaFCb3WMG_fVGx3ODrvb+hEUQ@mail.gmail.com>
+ <20160215120809.GF13683@e104818-lin.cambridge.arm.com>
+Message-ID: <CAKv+Gu8XJ4br8U0x2=AzzDUxo3he2gK6MtBkMKEsZ=Juds3_=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use proper gpio flag definitions for GPIOs rather than using opaque
-uninformative numbers.
+On 15 February 2016 at 13:08, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Mon, Feb 15, 2016 at 12:53:59PM +0100, Ard Biesheuvel wrote:
+>> On 15 February 2016 at 12:45, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>> > Ard, I'm about to drop the kernel memory map patches from -next. There
+>> > are several issues like KASAN (which may as well be a KASAN bug but I
+>> > haven't got to the bottom of it yet), initrd (you have patches but
+>> > require additional acks).
+>> >
+>> > I'll keep your stuff on the for-next/kernmap branch and do further
+>> > debugging. If it stabilises in the next 1-2 weeks, I'll merge it into
+>> > for-next/core for 4.6, otherwise, it will have to wait. I would really
+>> > like these patches merged but it looks like they need wider testing.
+> [...]
+>> If you are going to drop it for now anyway, I can do a v6sub1 with
+>> this issue and the initrd issue addressed, but also an issue with the
+>> KVM ksym ref patch with GCC 4.8. Since these issues affect
+>> bisectability, I'd prefer to rebase entirely, and fold all the fixes
+>> rather than apply them on top.
+>
+> That's fine. I'll push one more patch to the for-next/pgtable branch,
+> converting __set_fixmap_offset() back to a macro as it broke other
+> architectures. Otherwise it is not rebased and I'll merge it into
+> for-next core.
+>
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/boot/dts/imx6qdl-hummingboard.dtsi | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+I have identified (and fixed) a Kasan issue in my patches: instead of
+leaving a hole for the 64 MB module window in the Kasan shadow region,
+I populated it with zero mappings, which caused many strange errors,
+and since the vmap() routines don't expect block mappings (which are
+created for the kernel image shadow by vmemmap_populate()), I guess
+false positive kasan warnings (like the ones you were seeing) are also
+a possible symptom of this issue.
 
-diff --git a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-index 81be050c8d3c..3a06516fe7a9 100644
---- a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-@@ -48,7 +48,7 @@
- 
- 	ir_recv: ir-receiver {
- 		compatible = "gpio-ir-receiver";
--		gpios = <&gpio3 5 1>;
-+		gpios = <&gpio3 5 GPIO_ACTIVE_LOW>;
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_hummingboard_gpio3_5>;
- 	};
-@@ -67,7 +67,7 @@
- 		reg_usbh1_vbus: usb-h1-vbus {
- 			compatible = "regulator-fixed";
- 			enable-active-high;
--			gpio = <&gpio1 0 0>;
-+			gpio = <&gpio1 0 GPIO_ACTIVE_HIGH>;
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&pinctrl_hummingboard_usbh1_vbus>;
- 			regulator-name = "usb_h1_vbus";
-@@ -78,7 +78,7 @@
- 		reg_usbotg_vbus: usb-otg-vbus {
- 			compatible = "regulator-fixed";
- 			enable-active-high;
--			gpio = <&gpio3 22 0>;
-+			gpio = <&gpio3 22 GPIO_ACTIVE_HIGH>;
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&pinctrl_hummingboard_usbotg_vbus>;
- 			regulator-name = "usb_otg_vbus";
 -- 
-2.1.0
+Ard.
