@@ -1,77 +1,57 @@
-From: CARLOS.PALMINHA@synopsys.com (Carlos Palminha)
-Date: Mon, 15 Feb 2016 12:57:04 +0000
-Subject: [PATCH v2 00/17] drm encoders cleanup: nuke optional dummy encoder
- mode_fixup function.
-Message-ID: <cover.1455540137.git.palminha@synopsys.com>
+From: aleksey.makarov@linaro.org (Aleksey Makarov)
+Date: Mon, 15 Feb 2016 15:51:52 +0300
+Subject: [PATCH v2 3/9] ACPI: introduce acpi_table_parse2()
+In-Reply-To: <CAJZ5v0i2RCEEZwCN+Ran3Qmasn4yEk1rbfWkZ5QbEkUQWvaJ+g@mail.gmail.com>
+References: <1455299022-11641-1-git-send-email-aleksey.makarov@linaro.org>
+ <1455299022-11641-4-git-send-email-aleksey.makarov@linaro.org>
+ <CAJZ5v0i2RCEEZwCN+Ran3Qmasn4yEk1rbfWkZ5QbEkUQWvaJ+g@mail.gmail.com>
+Message-ID: <56C1C9E8.2050300@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mode_fixup function for encoder drivers became optional with patch
-http://patchwork.freedesktop.org/patch/msgid/1455106522-32307-1-git-send-email-palminha at synopsys.com
 
-This patch set nukes all the dummy mode_fixup implementations.
 
-(made on top of Daniel topic/drm-misc branch)
+On 02/13/2016 02:07 AM, Rafael J. Wysocki wrote:
+> On Fri, Feb 12, 2016 at 6:43 PM, Aleksey Makarov
+> <aleksey.makarov@linaro.org> wrote:
+>> The function acpi_table_parse() has some problems:
+>> 1 It can be called only from __init code
+>> 2 It does not pass any data to the handler
+>> 3 It just throws out the value returned from the handler
+> 
+> So why are those problems?
 
-Changes v1->v2: incorporated Daniel comments
-* added signed-off-by line to all patches
-* threading enabled due to e-mail server constraints
-* common blurb lines to all patches
-* add reviewed by Alex, to patches 4 and 14
+1.  We need this function to be non-__init because we need access to
+some tables at unpredictable time--it may be before or after
+the init functions are removed.  For example, SPCR (Serial Port Console
+Redirection) table is needed each time a new console is registered.
+It can be quite early (console_initcall) or when a module is inserted.
 
-Carlos Palminha (17):
-  drm/virtio: removed optional dummy encoder mode_fixup function.
-  drm/udl: removed optional dummy encoder mode_fixup function.
-  drm/exynos: removed optional dummy encoder mode_fixup function.
-  drm/amdgpu: removed optional dummy encoder mode_fixup function.
-  drm/ast: removed optional dummy encoder mode_fixup function.
-  drm/bochs: removed optional dummy encoder mode_fixup function.
-  drm/cirrus: removed optional dummy encoder mode_fixup function.
-  drm/exynos: removed optional dummy encoder mode_fixup function.
-  drm/gma500: removed optional dummy encoder mode_fixup function.
-  drm/imx: removed optional dummy encoder mode_fixup function.
-  drm/msm/mdp: removed optional dummy encoder mode_fixup function.
-  drm/mgag200: removed optional dummy encoder mode_fixup function.
-  drm/qxl: removed optional dummy encoder mode_fixup function.
-  drm/radeon: removed optional dummy encoder mode_fixup function.
-  drm/rockchip: removed optional dummy encoder mode_fixup function.
-  drm/sti: removed optional dummy encoder mode_fixup function.
-  drm/tilcdc: removed optional dummy encoder mode_fixup function.
+2. Having an additional pointer to void is very useful because it allows
+drivers to pass (local) data to the handler.  Without this, we would need 
+to have global data and a mutex as it was done in drivers/acpi/scan.c
+(vars ape, acpi_probe_count, acpi_probe_lock).
 
- drivers/gpu/drm/amd/amdgpu/dce_v10_0.c           |  8 --------
- drivers/gpu/drm/amd/amdgpu/dce_v11_0.c           |  8 --------
- drivers/gpu/drm/amd/amdgpu/dce_v8_0.c            |  8 --------
- drivers/gpu/drm/ast/ast_mode.c                   |  8 --------
- drivers/gpu/drm/bochs/bochs_kms.c                |  8 --------
- drivers/gpu/drm/cirrus/cirrus_mode.c             |  9 ---------
- drivers/gpu/drm/exynos/exynos_dp_core.c          |  8 --------
- drivers/gpu/drm/exynos/exynos_drm_dpi.c          |  8 --------
- drivers/gpu/drm/exynos/exynos_drm_dsi.c          |  8 --------
- drivers/gpu/drm/exynos/exynos_drm_vidi.c         |  8 --------
- drivers/gpu/drm/gma500/cdv_intel_crt.c           |  1 -
- drivers/gpu/drm/gma500/cdv_intel_hdmi.c          |  1 -
- drivers/gpu/drm/gma500/gma_display.c             |  7 -------
- drivers/gpu/drm/gma500/gma_display.h             |  3 ---
- drivers/gpu/drm/gma500/oaktrail_hdmi.c           |  1 -
- drivers/gpu/drm/imx/dw_hdmi-imx.c                |  8 --------
- drivers/gpu/drm/imx/imx-ldb.c                    |  8 --------
- drivers/gpu/drm/imx/imx-tve.c                    |  8 --------
- drivers/gpu/drm/imx/parallel-display.c           |  8 --------
- drivers/gpu/drm/mgag200/mgag200_mode.c           |  8 --------
- drivers/gpu/drm/msm/mdp/mdp4/mdp4_dsi_encoder.c  |  8 --------
- drivers/gpu/drm/msm/mdp/mdp4/mdp4_dtv_encoder.c  |  8 --------
- drivers/gpu/drm/msm/mdp/mdp4/mdp4_lcdc_encoder.c |  8 --------
- drivers/gpu/drm/msm/mdp/mdp5/mdp5_cmd_encoder.c  |  9 ---------
- drivers/gpu/drm/msm/mdp/mdp5/mdp5_encoder.c      |  8 --------
- drivers/gpu/drm/qxl/qxl_display.c                |  9 ---------
- drivers/gpu/drm/radeon/atombios_encoders.c       |  8 --------
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c           |  8 --------
- drivers/gpu/drm/sti/sti_tvout.c                  | 10 ----------
- drivers/gpu/drm/tilcdc/tilcdc_panel.c            |  9 ---------
- drivers/gpu/drm/tilcdc/tilcdc_tfp410.c           |  9 ---------
- drivers/gpu/drm/udl/udl_encoder.c                |  8 --------
- drivers/gpu/drm/virtio/virtgpu_display.c         |  8 --------
- 33 files changed, 244 deletions(-)
+3. Passing the value returned from the callback is less important as it 
+could be modelled by having a (return) field in the data passed to 
+the handler.  It is very convenient though.
 
--- 
-2.5.0
+I use these three properties in my next patch of this series.
+
+>> These issues are addressed in this patch
+> 
+> How are they addressed?
+
+A new function acpi_table_parse2() has been created that is just 
+the old acpi_table_parse() without __init, taking the handler with 
+additional data pointer and respecting the value returned from 
+the handler.  The old acpi_table_parse() was implemented witht this 
+new function.  Dropping __init was made possible by the previous 
+patch where the attribute of the function early_acpi_os_unmap_memory()
+was changed from __init to __ref and by dropping __init from 
+acpi_apic_instance.
+
+I understand why this approach is not good and I am going to fix it.
+
+Thank you
+Aleksey Makarov
