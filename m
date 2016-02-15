@@ -1,41 +1,71 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 15 Feb 2016 11:59:09 +0100
-Subject: arm qemu test failures due to 'driver-core: platform: probe
- of-devices only using list of compatibles'
-In-Reply-To: <20160214165010.GA3189@roeck-us.net>
-References: <20160214165010.GA3189@roeck-us.net>
-Message-ID: <20160215105909.GH12289@pengutronix.de>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 15 Feb 2016 13:59:38 +0300
+Subject: [PATCH] ARM: dts: porter: add MAX3355 support
+In-Reply-To: <20160215014527.GE12997@verge.net.au>
+References: <1674850.BZpGW9kEud@wasted.cogentembedded.com>
+ <4506196.xOgpYRO52t@wasted.cogentembedded.com>
+ <SG2PR06MB0919D09C1146EAC0681EE109D8DA0@SG2PR06MB0919.apcprd06.prod.outlook.com>
+ <56ABCB69.1070800@cogentembedded.com> <56ABD066.7020804@cogentembedded.com>
+ <SG2PR06MB0919361DC5805AE3F5B74041D8DE0@SG2PR06MB0919.apcprd06.prod.outlook.com>
+ <56AF9BE8.4020002@cogentembedded.com> <56AFAB67.20404@cogentembedded.com>
+ <20160215014527.GE12997@verge.net.au>
+Message-ID: <56C1AF9A.5070401@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Guenter,
+On 2/15/2016 4:45 AM, Simon Horman wrote:
 
-On Sun, Feb 14, 2016 at 08:50:10AM -0800, Guenter Roeck wrote:
-> Uwe,
-> 
-> Your patch 'driver-core: platform: probe of-devices only using list of
-> compatibles' causes the following qemu tests to crash in -next.
-> 
-> arm:vexpress-a9:vexpress_defconfig:vexpress-v2p-ca9
-> arm:vexpress-a15:vexpress_defconfig:vexpress-v2p-ca15-tc1
-> arm:vexpress-a9:multi_v7_defconfig:vexpress-v2p-ca9
-> arm:vexpress-a15:multi_v7_defconfig:vexpress-v2p-ca15-tc1
-> 
-> Crash log:
-> 
-> VFS: Cannot open root device "mmcblk0" or unknown-block(0,0): error -6
-> Please append a correct "root=" boot option; here are the available partitions:
-> 1f00          131072 mtdblock0  (driver?)
-> 1f01           32768 mtdblock1  (driver?)
-> Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(0,0)
+>>>>>>>> Now that Maxim Integrated MAX3355 'extcon' driver and device tree bindings
+>>>>>>>> are upstream along with the 'extcon' hook  in the Renesas USBHS driver, we
+>>>>>>>> can add  MAX3355 device node to  the Porter device tree and properly refer
+>>>>>>>> to it from the USBHS node instead of using  "renesas,enable-gpio" property
+>>>>>>>> which only allowed checking the USB ID pin  at the driver probe time;  now
+>>>>>>>> this  pin's  state can be monitored dynamically!
+>>>>>>>>
+>>>>>>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>>>>>>>
+>>>>>>> I tested this patch on Porter, but interrupt of "usb-otg" didn't happened
+>>>>>>> even if I connected/disconnected a usb convert cable (usb micro-ab to A).
+>>>>>>> Remarks: I confirmed that the usb convert cable worked correctly on other
+>>>>>>> board.
+>>>>>>
+>>>>>>      I guess I have the same cable
+>>>>>
+>>>>>      No, I have mini-AB connector here and hence my cable is mini-AB to A.
+>>>>
+>>>> I checked Porter specification and then I found 2 specifications exist...
+>>>
+>>>     I've looked thru my schematics files and found 3: Rev. 1.1 Update Version
+>>> 2, "PORTER_2" Rev. 3.0 Preliminary, and "PORTER_C" Rev. 3.0 Release version!
+>>> I'm not sure which of the last 2 should be considered final...
+>>
+>>     Now I've found 5 versions of the Porter schematics... :-)
+>>
+>>>>   Porter "B" : mini AB connecter and Max3355 is on the board.
+>>>>   Porter "C" : micro AB connect and Max3355 is not on the board. (Select
+>>>> host/peripheral by a jumper.)
+>>>
+>>>     Yeah, seeing JP13 in the PORTER_C schematics.
+>>>
+>>>> I guess that your current target is "B".
+>>>
+>>>     If not earlier. It actually has "Henninger B REV2" printed on it and
+>>> "Porter PCB 1 R3" on a pasted sticker.
+>>>
+>>>> If so, I think this patch is acceptable.
+>>>
+>>>     I'm not so sure now...
+>>
+>>     My boss told me PORTER_C is a final version, so this patch isn't needed.
+>> But then another patch is needed instead: to remove "renesas,enable-gpio"
+>> prop from the HS-USB device node...
+>
+> I am marking this patch as "Rejected" in patchwork.
+> If changes are required in this area please either
+> resubmit this patch or post a different one.
 
-Can you provide a complete boot log? This might already reveal which
-device is failing. It might not be the mmci device but something it
-depends on (clock, bus parent, irq).
+    Posted a different one on Saturday.
 
-Best regards
-Uwe
+> Thanks.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+MBR, Sergei
