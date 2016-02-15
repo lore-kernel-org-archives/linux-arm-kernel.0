@@ -1,96 +1,111 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon, 15 Feb 2016 22:16:57 +0100
-Subject: [PATCH/RFC v2 08/11] ARM: dts: r8a7791: Add SYSC PM domains
-In-Reply-To: <1455571020-18968-1-git-send-email-geert+renesas@glider.be>
-References: <1455571020-18968-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1455571020-18968-9-git-send-email-geert+renesas@glider.be>
+Date: Mon, 15 Feb 2016 22:16:49 +0100
+Subject: [PATCH/RFC v2 00/11] ARM/arm64: renesas: Add SYSC PM Domain DT Support
+Message-ID: <1455571020-18968-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a device node for the System Controller, with subnodes that
-represent the hardware power area hierarchy.
-Hook up the Cortex-A15 CPU cores and the Cortex-A15 L2 cache/SCU to
-their respective PM domains.
+	Hi all,
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-v2:
-  - Change one-line summary prefix to match current arm-soc practices,
-  - Update compatible values.
----
- arch/arm/boot/dts/r8a7791.dtsi | 40 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
+The Renesas R-Car System Controller, as found in various Renesas R-Car
+SoCs, provides power management for the CPU cores and various
+coprocessors.
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index a65910ed5884edfd..a194273eb2b7951e 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -51,6 +51,7 @@
- 			voltage-tolerance = <1>; /* 1% */
- 			clocks = <&cpg_clocks R8A7791_CLK_Z>;
- 			clock-latency = <300000>; /* 300 us */
-+			power-domains = <&pd_ca15_cpu0>;
- 			next-level-cache = <&L2_CA15>;
- 
- 			/* kHz - uV - OPPs unknown yet */
-@@ -67,12 +68,14 @@
- 			compatible = "arm,cortex-a15";
- 			reg = <1>;
- 			clock-frequency = <1500000000>;
-+			power-domains = <&pd_ca15_cpu1>;
- 			next-level-cache = <&L2_CA15>;
- 		};
- 	};
- 
- 	L2_CA15: cache-controller at 0 {
- 		compatible = "cache";
-+		power-domains = <&pd_ca15_scu>;
- 		cache-unified;
- 		cache-level = <2>;
- 	};
-@@ -1473,6 +1476,43 @@
- 		};
- 	};
- 
-+	sysc: system-controller at e6180000 {
-+		compatible = "renesas,r8a7791-sysc", "renesas,rcar-gen2-sysc";
-+		reg = <0 0xe6180000 0 0x0200>;
-+
-+		pm-domains {
-+			#address-cells = <2>;
-+			#size-cells = <0>;
-+
-+			pd_ca15_scu: scu at 12 {
-+				reg = <12 0x180>;
-+				#address-cells = <2>;
-+				#size-cells = <0>;
-+				#power-domain-cells = <0>;
-+
-+				pd_ca15_cpu0: cpu at 0 {
-+					reg = <0 0x40>;
-+					#power-domain-cells = <0>;
-+				};
-+
-+				pd_ca15_cpu1: cpu at 1 {
-+					reg = <1 0x41>;
-+					#power-domain-cells = <0>;
-+				};
-+			};
-+
-+			pd_sh: sh at 16 {
-+				reg = <16 0x80>;
-+				#power-domain-cells = <0>;
-+			};
-+
-+			pd_sgx: sgx at 20 {
-+				reg = <20 0xc0>;
-+				#power-domain-cells = <0>;
-+			};
-+		};
-+	};
-+
- 	qspi: spi at e6b10000 {
- 		compatible = "renesas,qspi-r8a7791", "renesas,qspi";
- 		reg = <0 0xe6b10000 0 0x2c>;
+This RFC patch series adds DT support for the R-Car SYSC, using the
+generic PM Domain. It supports R-Car H1, R-Car Gen2, and R-Car H3.
+
+Patches:
+  - Patch 1 adds the DT binding documentation (alternatives I considered
+    below the "---"-line),
+  - Patch 2 moves the existing pm-rcar driver to drivers/soc/renesas, so
+    it can be shared by arm32 and arm64,
+  - Patches 3-5 contain the driver implementation,
+  - Patches 6-11 add the SYSC PM domains themselves to the various dtsi
+    files.
+
+Known issues:
+  - This needs better integration with the PM code in pm-rcar-gen2, the
+    SMP code in smp-r8a7790, and Magnus' DT APMU series,
+  - CPG/MSSR clock domain handling should share more code with the
+    renesas-cpg-mssr driver.
+
+Changes compared to v2 (more details in the individual patches):
+  - Moved pm-rcar from arch/arm/mach-shmobile/ to drivers/soc/renesas/,
+  - Added R-Car H3 (r8a7795) support, incl. support for devices part of
+    a SYSC PM domain and the CPG/MSSR clock domain,
+  - Use "renesas,<type>-sysc" instead of "renesas,sysc-<type>",
+  - Added fallback compatibility strings for R-Car Gen2 and Gen3.
+  - Changed one-line summary prefix to match current arm-soc practices,
+  - The L2 cache-controller patches have been extracted into a separate
+    series ("[PATCH v3 0/7] ARM/arm64: dts: renesas: Add/complete L2
+    cache-controller nodes"),
+  - Minor fixes.
+
+This series is against renesas-devel-20160215-v4.5-rc4, with series
+"[PATCH v3 0/7] ARM/arm64: dts: renesas: Add/complete L2
+cache-controller nodes" applied. It is not yet meant to be applied!
+It's published as-is to ease development of drivers for devices residing
+in a SYSC PM domain on R-Car H3 (e.g. VSP, FCP_V).
+
+This was tested on r8a7779/marzen, r8a7791/koelsch, r8a7794/alt, and
+r8a7795/salvator-x.
+
+For your convenience, I've also pushed this series to
+git://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers.git#topic/rcar-sysc-pd-rfc-v2
+
+Thanks for your comments!
+
+Geert Uytterhoeven (11):
+  PM / Domains: Add DT bindings for the R-Car System Controller
+  soc: renesas: Move pm-rcar to drivers/soc/renesas/
+  soc: renesas: Improve rcar_sysc_power() debug info
+  soc: renesas: rcar: Add DT support for SYSC PM domains
+  soc: renesas: rcar: Handle clock domain devices in SYSC PM domains
+  ARM: dts: r8a7779: Add SYSC PM domains
+  ARM: dts: r8a7790: Add SYSC PM domains
+  ARM: dts: r8a7791: Add SYSC PM domains
+  ARM: dts: r8a7793: Add SYSC PM domains
+  ARM: dts: r8a7794: Add SYSC PM domains
+  arm64: dts: r8a7795: Add SYSC PM domains
+
+ .../bindings/power/renesas,sysc-rcar.txt           |  87 ++++
+ arch/arm/boot/dts/r8a7779.dtsi                     |  48 ++
+ arch/arm/boot/dts/r8a7790.dtsi                     |  89 ++++
+ arch/arm/boot/dts/r8a7791.dtsi                     |  40 ++
+ arch/arm/boot/dts/r8a7793.dtsi                     |  39 ++
+ arch/arm/boot/dts/r8a7794.dtsi                     |  40 ++
+ arch/arm/mach-shmobile/Kconfig                     |   8 +-
+ arch/arm/mach-shmobile/Makefile                    |   1 -
+ arch/arm/mach-shmobile/pm-r8a7779.c                |   3 +-
+ arch/arm/mach-shmobile/pm-rcar-gen2.c              |   2 +-
+ arch/arm/mach-shmobile/pm-rcar.c                   | 164 ------
+ arch/arm/mach-shmobile/smp-r8a7779.c               |   2 +-
+ arch/arm/mach-shmobile/smp-r8a7790.c               |   2 +-
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi           | 142 ++++++
+ drivers/soc/Kconfig                                |   1 +
+ drivers/soc/Makefile                               |   3 +-
+ drivers/soc/renesas/Kconfig                        |   8 +
+ drivers/soc/renesas/Makefile                       |   1 +
+ drivers/soc/renesas/pm-rcar.c                      | 559 +++++++++++++++++++++
+ .../linux/soc/renesas}/pm-rcar.h                   |   2 +
+ 20 files changed, 1065 insertions(+), 176 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/power/renesas,sysc-rcar.txt
+ delete mode 100644 arch/arm/mach-shmobile/pm-rcar.c
+ create mode 100644 drivers/soc/renesas/Kconfig
+ create mode 100644 drivers/soc/renesas/Makefile
+ create mode 100644 drivers/soc/renesas/pm-rcar.c
+ rename {arch/arm/mach-shmobile => include/linux/soc/renesas}/pm-rcar.h (93%)
+
 -- 
 1.9.1
+
+Gr{oetje,eeting}s,
+
+						Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
