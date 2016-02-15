@@ -1,157 +1,49 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Mon, 15 Feb 2016 21:50:26 +0800
-Subject: [PATCH v7 RESEND 4/4] arm64: dts: add Hi6220's stub clock node
-In-Reply-To: <1455544226-10094-1-git-send-email-leo.yan@linaro.org>
-References: <1455544226-10094-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <1455544226-10094-5-git-send-email-leo.yan@linaro.org>
+From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
+Date: Mon, 15 Feb 2016 14:51:13 +0100
+Subject: [PATCH 3/7] usb: gadget: pxa25x_udc: use readl/writel for mmio
+In-Reply-To: <2926427.2IOxhm2GZo@wuerfel> (Arnd Bergmann's message of "Mon, 15
+ Feb 2016 10:33:08 +0100")
+References: <1453997722-3489596-1-git-send-email-arnd@arndb.de>
+ <2202960.HHsdV23CYi@wuerfel> <m3a8n2bf72.fsf@t19.piap.pl>
+ <2926427.2IOxhm2GZo@wuerfel>
+Message-ID: <m3y4amqdym.fsf@t19.piap.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable SRAM node and stub clock node for Hi6220, which uses mailbox
-channel 1 for CPU's frequency change.
+Arnd Bergmann <arnd@arndb.de> writes:
 
-Furthermore, add the CPU clock phandle in CPU's node and using
-operating-points-v2 to register operating points. So can be used by
-cpufreq-dt driver.
+> I consider the use of __raw_* accessors a bug, I don't think we should
+> ever do that because it hides how the hardware actually works, it doesn't
+> work with spinlocks, and it can lead to the compiler splitting up accesses
+> into byte sized ones (not on ARM with the current definition, but
+> possible in general).
 
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
----
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 56 +++++++++++++++++++++++++++++++
- 1 file changed, 56 insertions(+)
+Well, then maybe we should fix them, or add another set.
+Why don't they work with spinlocks?
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-index 23c79e1..f588be9 100644
---- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-@@ -81,6 +81,11 @@
- 			device_type = "cpu";
- 			reg = <0x0 0x0>;
- 			enable-method = "psci";
-+			clocks = <&stub_clock 0>;
-+			operating-points-v2 = <&cpu_opp_table>;
-+			cooling-min-level = <4>;
-+			cooling-max-level = <0>;
-+			#cooling-cells = <2>; /* min followed by max */
- 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
- 		};
- 
-@@ -89,6 +94,7 @@
- 			device_type = "cpu";
- 			reg = <0x0 0x1>;
- 			enable-method = "psci";
-+			operating-points-v2 = <&cpu_opp_table>;
- 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
- 		};
- 
-@@ -97,6 +103,7 @@
- 			device_type = "cpu";
- 			reg = <0x0 0x2>;
- 			enable-method = "psci";
-+			operating-points-v2 = <&cpu_opp_table>;
- 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
- 		};
- 
-@@ -105,6 +112,7 @@
- 			device_type = "cpu";
- 			reg = <0x0 0x3>;
- 			enable-method = "psci";
-+			operating-points-v2 = <&cpu_opp_table>;
- 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
- 		};
- 
-@@ -113,6 +121,7 @@
- 			device_type = "cpu";
- 			reg = <0x0 0x100>;
- 			enable-method = "psci";
-+			operating-points-v2 = <&cpu_opp_table>;
- 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
- 		};
- 
-@@ -121,6 +130,7 @@
- 			device_type = "cpu";
- 			reg = <0x0 0x101>;
- 			enable-method = "psci";
-+			operating-points-v2 = <&cpu_opp_table>;
- 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
- 		};
- 
-@@ -129,6 +139,7 @@
- 			device_type = "cpu";
- 			reg = <0x0 0x102>;
- 			enable-method = "psci";
-+			operating-points-v2 = <&cpu_opp_table>;
- 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
- 		};
- 
-@@ -137,10 +148,42 @@
- 			device_type = "cpu";
- 			reg = <0x0 0x103>;
- 			enable-method = "psci";
-+			operating-points-v2 = <&cpu_opp_table>;
- 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
- 		};
- 	};
- 
-+	cpu_opp_table: cpu_opp_table {
-+		compatible = "operating-points-v2";
-+		opp-shared;
-+
-+		opp00 {
-+			opp-hz = /bits/ 64 <208000000>;
-+			opp-microvolt = <1040000>;
-+			clock-latency-ns = <500000>;
-+		};
-+		opp01 {
-+			opp-hz = /bits/ 64 <432000000>;
-+			opp-microvolt = <1040000>;
-+			clock-latency-ns = <500000>;
-+		};
-+		opp02 {
-+			opp-hz = /bits/ 64 <729000000>;
-+			opp-microvolt = <1090000>;
-+			clock-latency-ns = <500000>;
-+		};
-+		opp03 {
-+			opp-hz = /bits/ 64 <960000000>;
-+			opp-microvolt = <1180000>;
-+			clock-latency-ns = <500000>;
-+		};
-+		opp04 {
-+			opp-hz = /bits/ 64 <1200000000>;
-+			opp-microvolt = <1330000>;
-+			clock-latency-ns = <500000>;
-+		};
-+	};
-+
- 	gic: interrupt-controller at f6801000 {
- 		compatible = "arm,gic-400";
- 		reg = <0x0 0xf6801000 0 0x1000>, /* GICD */
-@@ -168,6 +211,11 @@
- 		#size-cells = <2>;
- 		ranges;
- 
-+		sram: sram at fff80000 {
-+			compatible = "hisilicon,hi6220-sramctrl", "syscon";
-+			reg = <0x0 0xfff80000 0x0 0x12000>;
-+		};
-+
- 		ao_ctrl: ao_ctrl at f7800000 {
- 			compatible = "hisilicon,hi6220-aoctrl", "syscon";
- 			reg = <0x0 0xf7800000 0x0 0x2000>;
-@@ -193,6 +241,14 @@
- 			#clock-cells = <1>;
- 		};
- 
-+		stub_clock: stub_clock {
-+			compatible = "hisilicon,hi6220-stub-clk";
-+			hisilicon,hi6220-clk-sram = <&sram>;
-+			#clock-cells = <1>;
-+			mbox-names = "mbox-tx";
-+			mboxes = <&mailbox 1 0 11>;
-+		};
-+
- 		uart0: uart at f8015000 {	/* console */
- 			compatible = "arm,pl011", "arm,primecell";
- 			reg = <0x0 0xf8015000 0x0 0x1000>;
+To be honest, I remember this was already discussed a bit years ago.
+I think I proposed back then a set of read_le32 (which would be
+equivalent of current readl(), and could be named pci_readl() as well),
+read_be32, read_host (without swapping).
+The names could be better, though.
+
+> Almost all hardware is fixed-endian, so you have to use swapping accessors
+> when the CPU is the other way, except for device RAM and FIFO registers
+> that are always used to transfer a byte stream (see the definition of
+> readsl() and memcpy_fromio()). When you have hardware that adds byteswaps
+> on the bus interface, you typically end up with MMIO registers requiring
+> no swap (or double swap) and readsl()/memcpy_fromio()) suddenly requiring
+> a swap that is counterintuitive.
+
+Sure, but the __raw_* are used just to be sure there is absolutely no
+swapping.
+E.g. for IXP4xx, the registers never require swapping, thus readl() etc.
+are not suitable for this. What is needed here is simple "atomic" 32-bit
+straight to/from register (MM)IO (assuming 4-byte address alignment).
+
+If not __raw_* then what?
 -- 
-1.9.1
+Krzysztof Halasa
+
+Industrial Research Institute for Automation and Measurements PIAP
+Al. Jerozolimskie 202, 02-486 Warsaw, Poland
