@@ -1,52 +1,73 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 15 Feb 2016 10:23:25 +0000
-Subject: [PATCH v4 00/23] arm64: Virtualization Host Extension support
-In-Reply-To: <56BCDCBA.5080202@arm.com>
-References: <1455216004-19499-1-git-send-email-marc.zyngier@arm.com>
- <20160211190701.GA4842@cbox> <56BCDCBA.5080202@arm.com>
-Message-ID: <20160215102324.GD13683@e104818-lin.cambridge.arm.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 15 Feb 2016 18:31:22 +0800
+Subject: [PATCH v2 04/10] regulator: axp20x: Use of_match name as default
+ regulator name
+In-Reply-To: <1455532288-30870-1-git-send-email-wens@csie.org>
+References: <1455532288-30870-1-git-send-email-wens@csie.org>
+Message-ID: <1455532288-30870-5-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 11, 2016 at 07:10:50PM +0000, Marc Zyngier wrote:
-> On 11/02/16 19:07, Christoffer Dall wrote:
-> > On Thu, Feb 11, 2016 at 06:39:41PM +0000, Marc Zyngier wrote:
-> >> ARMv8.1 comes with the "Virtualization Host Extension" (VHE for
-> >> short), which enables simpler support of Type-2 hypervisors.
-> >>
-> >> This extension allows the kernel to directly run at EL2, and
-> >> significantly reduces the number of system registers shared between
-> >> host and guest, reducing the overhead of virtualization.
-> >>
-> >> In order to have the same kernel binary running on all versions of the
-> >> architecture, this series makes heavy use of runtime code patching.
-> >>
-> >> The first 22 patches massage the KVM code to deal with VHE and enable
-> >> Linux to run at EL2. The last patch catches an ugly case when VHE
-> >> capable CPUs are paired with some of their less capable siblings. This
-> >> should never happen, but hey...
-> >>
-> >> I have deliberately left out some of the more "advanced"
-> >> optimizations, as they are likely to distract the reviewer from the
-> >> core infrastructure, which is what I care about at the moment.
-> >>
-> >> Note: GDB is currently busted on VHE systems, as it checks for version
-> >>       6 on the debug architecture, while VHE is version 7. The
-> >>       binutils people are on the case.
-> >>
-> >> This has been tested on the FVP_Base_SLV-V8-A model, and based on
-> >> v4.5-rc3 + kvmarm/master. I've put a branch out on:
-> >>
-> >> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/vhe
-> > 
-> > I'm happy with this series as it stands, we just need someone to take a
-> > look at that debug patch and be happy with it.
-> 
-> I think Will is planning to have a go at it shortly. Once he and Catalin
-> are happy with the thing, I'll throw it into -next for a good shake.
+Originally the helper macros used uppercase regulator names, which
+are primarily used to expand to the regulator ID enum, as the default
+names. This is aestheticly unpleasent.
 
-Fine by me but it would be good for Will to have a look, especially on
-the debug and perf stuff.
+Since the of_match bits are the same, just lowercase, use that as the
+default names instead.
 
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ drivers/regulator/axp20x-regulator.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
+index 81f25383f2d5..40cd894e4df5 100644
+--- a/drivers/regulator/axp20x-regulator.c
++++ b/drivers/regulator/axp20x-regulator.c
+@@ -39,7 +39,7 @@
+ #define AXP_DESC_IO(_family, _id, _match, _supply, _min, _max, _step, _vreg,	\
+ 		    _vmask, _ereg, _emask, _enable_val, _disable_val)		\
+ 	[_family##_##_id] = {							\
+-		.name		= #_id,						\
++		.name		= (_match),					\
+ 		.supply_name	= (_supply),					\
+ 		.of_match	= of_match_ptr(_match),				\
+ 		.regulators_node = of_match_ptr("regulators"),			\
+@@ -61,7 +61,7 @@
+ #define AXP_DESC(_family, _id, _match, _supply, _min, _max, _step, _vreg,	\
+ 		 _vmask, _ereg, _emask) 					\
+ 	[_family##_##_id] = {							\
+-		.name		= #_id,						\
++		.name		= (_match),					\
+ 		.supply_name	= (_supply),					\
+ 		.of_match	= of_match_ptr(_match),				\
+ 		.regulators_node = of_match_ptr("regulators"),			\
+@@ -80,7 +80,7 @@
+ 
+ #define AXP_DESC_SW(_family, _id, _match, _supply, _ereg, _emask)		\
+ 	[_family##_##_id] = {							\
+-		.name		= #_id,						\
++		.name		= (_match),					\
+ 		.supply_name	= (_supply),					\
+ 		.of_match	= of_match_ptr(_match),				\
+ 		.regulators_node = of_match_ptr("regulators"),			\
+@@ -94,7 +94,7 @@
+ 
+ #define AXP_DESC_FIXED(_family, _id, _match, _supply, _volt)			\
+ 	[_family##_##_id] = {							\
+-		.name		= #_id,						\
++		.name		= (_match),					\
+ 		.supply_name	= (_supply),					\
+ 		.of_match	= of_match_ptr(_match),				\
+ 		.regulators_node = of_match_ptr("regulators"),			\
+@@ -109,7 +109,7 @@
+ #define AXP_DESC_RANGES(_family, _id, _match, _supply, _ranges, _n_voltages,	\
+ 			_vreg, _vmask, _ereg, _emask)				\
+ 	[_family##_##_id] = {							\
+-		.name		= #_id,						\
++		.name		= (_match),					\
+ 		.supply_name	= (_supply),					\
+ 		.of_match	= of_match_ptr(_match),				\
+ 		.regulators_node = of_match_ptr("regulators"),			\
 -- 
-Catalin
+2.7.0
