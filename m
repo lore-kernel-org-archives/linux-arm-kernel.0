@@ -1,51 +1,95 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 15 Feb 2016 07:41:19 -0800
-Subject: arm qemu test failures due to 'driver-core: platform: probe
- of-devices only using list of compatibles'
-In-Reply-To: <20160215105909.GH12289@pengutronix.de>
-References: <20160214165010.GA3189@roeck-us.net>
- <20160215105909.GH12289@pengutronix.de>
-Message-ID: <56C1F19F.8090100@roeck-us.net>
+From: pjones@redhat.com (Peter Jones)
+Date: Mon, 15 Feb 2016 10:45:52 -0500
+Subject: [PATCH v2 1/2] efi: esrt: use memremap not ioremap to access
+ ESRT table in memory
+In-Reply-To: <1455535953-5056-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1455535953-5056-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1455535953-5056-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160215154551.GA785@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/15/2016 02:59 AM, Uwe Kleine-K?nig wrote:
-> Hello Guenter,
->
-> On Sun, Feb 14, 2016 at 08:50:10AM -0800, Guenter Roeck wrote:
->> Uwe,
->>
->> Your patch 'driver-core: platform: probe of-devices only using list of
->> compatibles' causes the following qemu tests to crash in -next.
->>
->> arm:vexpress-a9:vexpress_defconfig:vexpress-v2p-ca9
->> arm:vexpress-a15:vexpress_defconfig:vexpress-v2p-ca15-tc1
->> arm:vexpress-a9:multi_v7_defconfig:vexpress-v2p-ca9
->> arm:vexpress-a15:multi_v7_defconfig:vexpress-v2p-ca15-tc1
->>
->> Crash log:
->>
->> VFS: Cannot open root device "mmcblk0" or unknown-block(0,0): error -6
->> Please append a correct "root=" boot option; here are the available partitions:
->> 1f00          131072 mtdblock0  (driver?)
->> 1f01           32768 mtdblock1  (driver?)
->> Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(0,0)
->
-> Can you provide a complete boot log? This might already reveal which
-> device is failing. It might not be the mmci device but something it
-> depends on (clock, bus parent, irq).
->
+On Mon, Feb 15, 2016 at 12:32:32PM +0100, Ard Biesheuvel wrote:
+> On ARM and arm64, ioremap() and memremap() are not interchangeable like
+> on x86, and the use of ioremap() on ordinary RAM is typically flagged
+> as an error if the memory region being mapped is also covered by the
+> linear mapping, since that would lead to aliases with conflicting
+> cacheability attributes.
+> 
+> Since what we are dealing with is not an I/O region with side effects,
+> using ioremap() here is arguably incorrect anyway, so let's replace
+> it with memremap instead. Also add a missing unmap on the success path,
+> and drop a memblock_remove() call which does not belong here, this far
+> into the boot sequence.
+> 
+> Cc: Peter Jones <pjones@redhat.com>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Sure, something else may be failing, but why does reverting your patch
-fix the problem ?
+Works on my test box and appears to be correct:
 
-Anyway, complete logs are at http://kerneltests.org/builders.
+Tested-by: Peter Jones <pjones@redhat.com>
+Acked-by: Peter Jones <pjones@redhat.com>
 
-http://kerneltests.org/builders/qemu-arm-next/builds/376/steps/qemubuildcommand/logs/stdio
-
-is the most recent log (next-20120215). Look for the vexpress crashes; the overo
-crash bisected to to 'PM / OPP: Disable OPPs that aren't supported by the regulator',
-in next-20160212, which I have not fully analyzed yet, and the beagle crashes
-as well as the 'new' overo crash are brand new.
-
-Guenter
+> ---
+>  drivers/firmware/efi/esrt.c | 16 ++++++++--------
+>  1 file changed, 8 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/firmware/efi/esrt.c b/drivers/firmware/efi/esrt.c
+> index 22c5285f7705..f096a0a26dbd 100644
+> --- a/drivers/firmware/efi/esrt.c
+> +++ b/drivers/firmware/efi/esrt.c
+> @@ -16,6 +16,7 @@
+>  #include <linux/device.h>
+>  #include <linux/efi.h>
+>  #include <linux/init.h>
+> +#include <linux/io.h>
+>  #include <linux/kernel.h>
+>  #include <linux/kobject.h>
+>  #include <linux/list.h>
+> @@ -385,15 +386,15 @@ static void cleanup_entry_list(void)
+>  static int __init esrt_sysfs_init(void)
+>  {
+>  	int error;
+> -	struct efi_system_resource_table __iomem *ioesrt;
+> +	struct efi_system_resource_table *memesrt;
+>  
+>  	pr_debug("esrt-sysfs: loading.\n");
+>  	if (!esrt_data || !esrt_data_size)
+>  		return -ENOSYS;
+>  
+> -	ioesrt = ioremap(esrt_data, esrt_data_size);
+> -	if (!ioesrt) {
+> -		pr_err("ioremap(%pa, %zu) failed.\n", &esrt_data,
+> +	memesrt = memremap(esrt_data, esrt_data_size, MEMREMAP_WB);
+> +	if (!memesrt) {
+> +		pr_err("memremap(%pa, %zu, MEMREMAP_WB) failed.\n", &esrt_data,
+>  		       esrt_data_size);
+>  		return -ENOMEM;
+>  	}
+> @@ -401,11 +402,12 @@ static int __init esrt_sysfs_init(void)
+>  	esrt = kmalloc(esrt_data_size, GFP_KERNEL);
+>  	if (!esrt) {
+>  		pr_err("kmalloc failed. (wanted %zu bytes)\n", esrt_data_size);
+> -		iounmap(ioesrt);
+> +		memunmap(memesrt);
+>  		return -ENOMEM;
+>  	}
+>  
+> -	memcpy_fromio(esrt, ioesrt, esrt_data_size);
+> +	memcpy(esrt, memesrt, esrt_data_size);
+> +	memunmap(memesrt);
+>  
+>  	esrt_kobj = kobject_create_and_add("esrt", efi_kobj);
+>  	if (!esrt_kobj) {
+> @@ -432,8 +434,6 @@ static int __init esrt_sysfs_init(void)
+>  	if (error)
+>  		goto err_cleanup_list;
+>  
+> -	memblock_remove(esrt_data, esrt_data_size);
+> -
+>  	pr_debug("esrt-sysfs: loaded.\n");
+>  
+>  	return 0;
+> -- 
+> 2.5.0
+> 
