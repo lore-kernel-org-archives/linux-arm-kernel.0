@@ -1,226 +1,112 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Mon, 15 Feb 2016 19:11:50 +0800
-Subject: [PATCH v14 17/17] drm: bridge: analogix/dp: Fix the possible dead
- lock in bridge disable time
-In-Reply-To: <1455534485-1154-1-git-send-email-ykk@rock-chips.com>
-References: <1455534485-1154-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1455534710-2262-1-git-send-email-ykk@rock-chips.com>
+From: tiffany.lin@mediatek.com (tiffany lin)
+Date: Mon, 15 Feb 2016 19:20:14 +0800
+Subject: [PATCH v4 2/8] [media] VPU: mediatek: support Mediatek VPU
+In-Reply-To: <56C1A36D.6010908@xs4all.nl>
+References: <1454585703-42428-1-git-send-email-tiffany.lin@mediatek.com>
+ <1454585703-42428-2-git-send-email-tiffany.lin@mediatek.com>
+ <1454585703-42428-3-git-send-email-tiffany.lin@mediatek.com>
+ <56C1A36D.6010908@xs4all.nl>
+Message-ID: <1455535214.27088.2.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It may caused a dead lock if we flush the hpd work in bridge disable time.
+Hi Hans,
 
-The normal flow would like:
-  IN --> DRM IOCTL
-        1. Acquire crtc_ww_class_mutex (DRM IOCTL)
-  IN --> analogix_dp_bridge
-        2. Acquire hpd work lock (Flush hpd work)
-        3. HPD work already in idle, no need to run the work function.
-  OUT <-- analogix_dp_bridge
-  OUT <-- DRM IOCTL
+On Mon, 2016-02-15 at 11:07 +0100, Hans Verkuil wrote:
+> Hi Tiffany,
+> 
+> A small review comment below:
+> 
+> On 02/04/2016 12:34 PM, Tiffany Lin wrote:
+> > The VPU driver for hw video codec embedded in Mediatek's MT8173 SOCs.
+> > It is able to handle video decoding/encoding of in a range of formats.
+> > The driver provides with VPU firmware download, memory management and
+> > the communication interface between CPU and VPU.
+> > For VPU initialization, it will create virtual memory for CPU access and
+> > IOMMU address for vcodec hw device access. When a decode/encode instance
+> > opens a device node, vpu driver will download vpu firmware to the device.
+> > A decode/encode instant will decode/encode a frame using VPU
+> > interface to interrupt vpu to handle decoding/encoding jobs.
+> > 
+> > Signed-off-by: Andrew-CT Chen <andrew-ct.chen@mediatek.com>
+> > Signed-off-by: Tiffany Lin <tiffany.lin@mediatek.com>
+> > ---
+> >  drivers/media/platform/Kconfig           |    9 +
+> >  drivers/media/platform/Makefile          |    2 +
+> >  drivers/media/platform/mtk-vpu/Makefile  |    1 +
+> >  drivers/media/platform/mtk-vpu/mtk_vpu.c |  994 ++++++++++++++++++++++++++++++
+> >  drivers/media/platform/mtk-vpu/mtk_vpu.h |  167 +++++
+> >  5 files changed, 1173 insertions(+)
+> >  create mode 100644 drivers/media/platform/mtk-vpu/Makefile
+> >  create mode 100644 drivers/media/platform/mtk-vpu/mtk_vpu.c
+> >  create mode 100644 drivers/media/platform/mtk-vpu/mtk_vpu.h
+> > 
+> 
+> <snip>
+> 
+> > diff --git a/drivers/media/platform/mtk-vpu/mtk_vpu.c b/drivers/media/platform/mtk-vpu/mtk_vpu.c
+> > new file mode 100644
+> > index 0000000..f54fd89
+> > --- /dev/null
+> > +++ b/drivers/media/platform/mtk-vpu/mtk_vpu.c
+> > @@ -0,0 +1,994 @@
+> 
+> <snip>
+> 
+> > +static ssize_t vpu_debug_read(struct file *file, char __user *user_buf,
+> > +			      size_t count, loff_t *ppos)
+> > +{
+> > +	char buf[256];
+> > +	unsigned int len;
+> > +	unsigned int running, pc, vpu_to_host, host_to_vpu, wdt;
+> > +	int ret;
+> > +	struct device *dev = file->private_data;
+> > +	struct mtk_vpu *vpu = dev_get_drvdata(dev);
+> > +
+> > +	ret = vpu_clock_enable(vpu);
+> > +	if (ret) {
+> > +		dev_err(vpu->dev, "[VPU] enable clock failed %d\n", ret);
+> > +		return 0;
+> > +	}
+> > +
+> > +	/* vpu register status */
+> > +	running = vpu_running(vpu);
+> > +	pc = vpu_cfg_readl(vpu, VPU_PC_REG);
+> > +	wdt = vpu_cfg_readl(vpu, VPU_WDT_REG);
+> > +	host_to_vpu = vpu_cfg_readl(vpu, HOST_TO_VPU);
+> > +	vpu_to_host = vpu_cfg_readl(vpu, VPU_TO_HOST);
+> > +	vpu_clock_disable(vpu);
+> > +
+> > +	if (running) {
+> > +		len = sprintf(buf, "VPU is running\n\n"
+> 
+> Please use snprintf.
+> 
+Got it, we will fix this in next version.
 
-The dead lock flow would like:
-  IN --> DRM IOCTL
-        1. Acquire crtc_ww_class_mutex (DRM IOCTL)
-  IN --> analogix_dp_bridge
-        2. Acquire hpd work lock (Flush hpd work)
-  IN --> analogix_dp_hotplug
-  IN --> drm_helper_hpd_irq_event
-        3. Acquire mode_config lock (This lock already have been acquired in previous step 1)
-** Dead Lock Now **
+> > +		"FW Version: %s\n"
+> > +		"PC: 0x%x\n"
+> > +		"WDT: 0x%x\n"
+> > +		"Host to VPU: 0x%x\n"
+> > +		"VPU to Host: 0x%x\n",
+> > +		vpu->run.fw_ver, pc, wdt,
+> > +		host_to_vpu, vpu_to_host);
+> > +	} else {
+> > +		len = sprintf(buf, "VPU not running\n");
+> 
+> Ditto.
+> 
+> sprintf always makes me feel uncomfortable :-)
+> 
+Sorry about that, we will check patch series and remove all sprintf in
+next version.
 
-It's wrong to flush the hpd work in bridge->disable time, I guess the
-original code just want to ensure the delay work must be finish before
-encoder disabled.
-
-The flush work in bridge disable time is try to ensure the HPD event
-won't be missed before display card disabled, actually we can take a
-fast respond way(interrupt thread) to update DRM HPD event to fix the
-delay update and possible dead lock.
-
-Signed-off-by: Yakir Yang <ykk@rock-chips.com>
----
-Changes in v14: None
-Changes in v13: None
-Changes in v12: None
-Changes in v11: None
-Changes in v10: None
-Changes in v9: None
-Changes in v8: None
-Changes in v7: None
-Changes in v6: None
-Changes in v5: None
-Changes in v4: None
-Changes in v3: None
-Changes in v2: None
-
- drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 62 ++++++++++------------
- drivers/gpu/drm/bridge/analogix/analogix_dp_core.h |  3 +-
- drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c  | 26 +++++++++
- 3 files changed, 55 insertions(+), 36 deletions(-)
-
-diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-index 5292b28..7699597 100644
---- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-+++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-@@ -851,47 +851,40 @@ static void analogix_dp_enable_scramble(struct analogix_dp_device *dp,
- 	}
- }
- 
--static irqreturn_t analogix_dp_irq_handler(int irq, void *arg)
-+static irqreturn_t analogix_dp_hardirq(int irq, void *arg)
- {
- 	struct analogix_dp_device *dp = arg;
--
-+	irqreturn_t ret = IRQ_NONE;
- 	enum dp_irq_type irq_type;
- 
- 	irq_type = analogix_dp_get_irq_type(dp);
--	switch (irq_type) {
--	case DP_IRQ_TYPE_HP_CABLE_IN:
--		dev_dbg(dp->dev, "Received irq - cable in\n");
--		schedule_work(&dp->hotplug_work);
--		analogix_dp_clear_hotplug_interrupts(dp);
--		break;
--	case DP_IRQ_TYPE_HP_CABLE_OUT:
--		dev_dbg(dp->dev, "Received irq - cable out\n");
--		analogix_dp_clear_hotplug_interrupts(dp);
--		break;
--	case DP_IRQ_TYPE_HP_CHANGE:
--		/*
--		 * We get these change notifications once in a while, but there
--		 * is nothing we can do with them. Just ignore it for now and
--		 * only handle cable changes.
--		 */
--		dev_dbg(dp->dev, "Received irq - hotplug change; ignoring.\n");
--		analogix_dp_clear_hotplug_interrupts(dp);
--		break;
--	default:
--		dev_err(dp->dev, "Received irq - unknown type!\n");
--		break;
-+	if (irq_type != DP_IRQ_TYPE_UNKNOWN) {
-+		analogix_dp_mute_hpd_interrupt(dp);
-+		ret = IRQ_WAKE_THREAD;
- 	}
--	return IRQ_HANDLED;
-+
-+	return ret;
- }
- 
--static void analogix_dp_hotplug(struct work_struct *work)
-+static irqreturn_t analogix_dp_irq_thread(int irq, void *arg)
- {
--	struct analogix_dp_device *dp;
-+	struct analogix_dp_device *dp = arg;
-+	enum dp_irq_type irq_type;
-+
-+	irq_type = analogix_dp_get_irq_type(dp);
-+	if (irq_type & DP_IRQ_TYPE_HP_CABLE_IN ||
-+	    irq_type & DP_IRQ_TYPE_HP_CABLE_OUT) {
-+		dev_dbg(dp->dev, "Detected cable status changed!\n");
-+		if (dp->drm_dev)
-+			drm_helper_hpd_irq_event(dp->drm_dev);
-+	}
- 
--	dp = container_of(work, struct analogix_dp_device, hotplug_work);
-+	if (irq_type != DP_IRQ_TYPE_UNKNOWN) {
-+		analogix_dp_clear_hotplug_interrupts(dp);
-+		analogix_dp_unmute_hpd_interrupt(dp);
-+	}
- 
--	if (dp->drm_dev)
--		drm_helper_hpd_irq_event(dp->drm_dev);
-+	return IRQ_HANDLED;
- }
- 
- static void analogix_dp_commit(struct analogix_dp_device *dp)
-@@ -1077,7 +1070,6 @@ static void analogix_dp_bridge_disable(struct drm_bridge *bridge)
- 	}
- 
- 	disable_irq(dp->irq);
--	flush_work(&dp->hotplug_work);
- 	phy_power_off(dp->phy);
- 
- 	if (dp->plat_data->power_off)
-@@ -1336,8 +1328,6 @@ int analogix_dp_bind(struct device *dev, struct drm_device *drm_dev,
- 		return -ENODEV;
- 	}
- 
--	INIT_WORK(&dp->hotplug_work, analogix_dp_hotplug);
--
- 	pm_runtime_enable(dev);
- 
- 	phy_power_on(dp->phy);
-@@ -1351,8 +1341,10 @@ int analogix_dp_bind(struct device *dev, struct drm_device *drm_dev,
- 
- 	analogix_dp_init_dp(dp);
- 
--	ret = devm_request_irq(&pdev->dev, dp->irq, analogix_dp_irq_handler,
--			       irq_flags, "analogix-dp", dp);
-+	ret = devm_request_threaded_irq(&pdev->dev, dp->irq,
-+					analogix_dp_hardirq,
-+					analogix_dp_irq_thread,
-+					irq_flags, "analogix-dp", dp);
- 	if (ret) {
- 		dev_err(&pdev->dev, "failed to request irq\n");
- 		goto err_disable_pm_runtime;
-diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
-index 48b4a87..f09275d 100644
---- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
-+++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
-@@ -172,7 +172,6 @@ struct analogix_dp_device {
- 
- 	struct video_info	video_info;
- 	struct link_train	link_train;
--	struct work_struct	hotplug_work;
- 	struct phy		*phy;
- 	int			dpms_mode;
- 	int			hpd_gpio;
-@@ -191,6 +190,8 @@ void analogix_dp_init_interrupt(struct analogix_dp_device *dp);
- void analogix_dp_reset(struct analogix_dp_device *dp);
- void analogix_dp_swreset(struct analogix_dp_device *dp);
- void analogix_dp_config_interrupt(struct analogix_dp_device *dp);
-+void analogix_dp_mute_hpd_interrupt(struct analogix_dp_device *dp);
-+void analogix_dp_unmute_hpd_interrupt(struct analogix_dp_device *dp);
- enum pll_status analogix_dp_get_pll_lock_status(struct analogix_dp_device *dp);
- void analogix_dp_set_pll_power_down(struct analogix_dp_device *dp, bool enable);
- void analogix_dp_set_analog_power_down(struct analogix_dp_device *dp,
-diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-index cba3ffd..49205ef 100644
---- a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-+++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-@@ -185,6 +185,32 @@ void analogix_dp_config_interrupt(struct analogix_dp_device *dp)
- 	writel(reg, dp->reg_base + ANALOGIX_DP_INT_STA_MASK);
- }
- 
-+void analogix_dp_mute_hpd_interrupt(struct analogix_dp_device *dp)
-+{
-+	u32 reg;
-+
-+	/* 0: mask, 1: unmask */
-+	reg = readl(dp->reg_base + ANALOGIX_DP_COMMON_INT_MASK_4);
-+	reg &= ~COMMON_INT_MASK_4;
-+	writel(reg, dp->reg_base + ANALOGIX_DP_COMMON_INT_MASK_4);
-+
-+	reg = readl(dp->reg_base + ANALOGIX_DP_INT_STA_MASK);
-+	reg &= ~INT_STA_MASK;
-+	writel(reg, dp->reg_base + ANALOGIX_DP_INT_STA_MASK);
-+}
-+
-+void analogix_dp_unmute_hpd_interrupt(struct analogix_dp_device *dp)
-+{
-+	u32 reg;
-+
-+	/* 0: mask, 1: unmask */
-+	reg = COMMON_INT_MASK_4;
-+	writel(reg, dp->reg_base + ANALOGIX_DP_COMMON_INT_MASK_4);
-+
-+	reg = INT_STA_MASK;
-+	writel(reg, dp->reg_base + ANALOGIX_DP_INT_STA_MASK);
-+}
-+
- enum pll_status analogix_dp_get_pll_lock_status(struct analogix_dp_device *dp)
- {
- 	u32 reg;
--- 
-1.9.1
+> > +	}
+> > +
+> > +	return simple_read_from_buffer(user_buf, count, ppos, buf, len);
+> > +}
+> 
+> Regards,
+> 
+> 	Hans
+> 
