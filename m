@@ -1,137 +1,58 @@
-From: jamesjj.liao@mediatek.com (James Liao)
-Date: Mon, 15 Feb 2016 17:09:19 +0800
-Subject: [PATCH v4 1/4] soc: mediatek: Refine scpsys to support multiple
- platform
-In-Reply-To: <56B1C19F.9070300@gmail.com>
-References: <1453270097-53853-1-git-send-email-jamesjj.liao@mediatek.com>
- <1453270097-53853-2-git-send-email-jamesjj.liao@mediatek.com>
- <56ADF556.6070402@gmail.com> <1454396212.2847.15.camel@mtksdaap41>
- <56B0889A.1010305@gmail.com> <1454476968.2847.59.camel@mtksdaap41>
- <56B1C19F.9070300@gmail.com>
-Message-ID: <1455527359.29688.1.camel@mtksdaap41>
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 15 Feb 2016 17:09:27 +0800
+Subject: [PATCH] dma: mv_xor_v2: new driver
+In-Reply-To: <1455523083-25506-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <201602151735.BaFwBMOn%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matthias,
+Hi Thomas,
 
-On Wed, 2016-02-03 at 10:00 +0100, Matthias Brugger wrote:
-> On 03/02/16 06:22, James Liao wrote:
-> > On Tue, 2016-02-02 at 11:44 +0100, Matthias Brugger wrote:
-> >> On 02/02/16 07:56, James Liao wrote:
-> >>> On Sun, 2016-01-31 at 12:51 +0100, Matthias Brugger wrote:
-> >>>>> On 20/01/16 07:08, James Liao wrote:
-> >>>>>>> Refine scpsys driver common code to support multiple SoC / platform.
-> >>>>>>>
-> >>>>>>> Signed-off-by: James Liao<jamesjj.liao@mediatek.com>
-> >>>>>>> ---
-> >>>>>>>    drivers/soc/mediatek/mtk-scpsys.c | 418 ++++++++++++++++++++------------------
-> >>>>>>>    drivers/soc/mediatek/mtk-scpsys.h |  55 +++++
-> >>>>>>>    2 files changed, 270 insertions(+), 203 deletions(-)
-> >>>>>>>    create mode 100644 drivers/soc/mediatek/mtk-scpsys.h
-> >>>>>
-> >>>>> In general this approach looks fine to me, comments below.
-> >>>>>
-> >>>>>>>
-> >>>>>>> diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
-> >>>>>>> index 0221387..339adfc 100644
-> >>>>>>> --- a/drivers/soc/mediatek/mtk-scpsys.c
-> >>>>>>> +++ b/drivers/soc/mediatek/mtk-scpsys.c
-> >>>>>>> @@ -11,29 +11,17 @@
-> >>>>>>>     * GNU General Public License for more details.
-> >>>>>>>     */
-> >>>>>>>    #include <linux/clk.h>
-> >>>>>>> -#include <linux/delay.h>
-> >>>>>>> +#include <linux/init.h>
-> >>>>>>>    #include <linux/io.h>
-> >>>>>>> -#include <linux/kernel.h>
-> >>>>>>>    #include <linux/mfd/syscon.h>
-> >>>>>
-> >>>>> When at it, do we need this include?
-> >>> syscon_regmap_lookup_by_phandle() is declared in this head file.
-> >>>
-> >>>>>>> -#include <linux/init.h>
-> >>>>>>>    #include <linux/of_device.h>
-> >>>>>>>    #include <linux/platform_device.h>
-> >>>>>>>    #include <linux/pm_domain.h>
-> >>>>>>> -#include <linux/regmap.h>
-> >>>>>>> -#include <linux/soc/mediatek/infracfg.h>
-> >>>>>>>    #include <linux/regulator/consumer.h>
-> >>>>>>> -#include <dt-bindings/power/mt8173-power.h>
-> >>>>>>> +#include <linux/soc/mediatek/infracfg.h>
-> >>>>>>> +
-> >>>>>>> +#include "mtk-scpsys.h"
-> >>>>>>>
-> >>>>>>> -#define SPM_VDE_PWR_CON			0x0210
-> >>>>>>> -#define SPM_MFG_PWR_CON			0x0214
-> >>>>>>> -#define SPM_VEN_PWR_CON			0x0230
-> >>>>>>> -#define SPM_ISP_PWR_CON			0x0238
-> >>>>>>> -#define SPM_DIS_PWR_CON			0x023c
-> >>>>>>> -#define SPM_VEN2_PWR_CON		0x0298
-> >>>>>>> -#define SPM_AUDIO_PWR_CON		0x029c
-> >>>>>>> -#define SPM_MFG_2D_PWR_CON		0x02c0
-> >>>>>>> -#define SPM_MFG_ASYNC_PWR_CON		0x02c4
-> >>>>>>> -#define SPM_USB_PWR_CON			0x02cc
-> >>>>>
-> >>>>> I would prefer to keep this defines and declare SoC specific ones where
-> >>>>> necessary. It makes the code more readable.
-> >>> Some register address may be reused by other modules among SoCs, so it's
-> >>> not easy to maintain the defines when we implement multiple SoC drivers
-> >>> in the same file. For example, offset 0x0298 is VEN2_PWR_CON on MT8173,
-> >>> but it is MJC_PWR_CON on other chips.
-> >>>
-> >>
-> >> So that sounds as if 0x0298 offset is MT8173 specific.
-> >> I checked [VDE, MFG, VEN, IFR, ISP, DIS, DPY]_PWR_CON on mt8173, mt8135
-> >> and mt6589 and they all have the same offset. So it doesn't seem as if
-> >> the offset randomly changes for every SoC.
-> >>
-> >>> Furthermore, these register offsets are only used in scp_domain_data[],
-> >>> and each element has its own power domain name. So I think it's enough
-> >>> to know which power domain are using these registers and status bits.
-> >>>
-> >>
-> >> Yes that's true, but it will make it easier for another person to
-> >> understand the driver, especially if he want's to implement the driver
-> >> for a new SoC.
-> >
-> > There are two kinds of conflicts may happen:
-> >
-> > 1. Different modules use the same register address.
-> > 2. Different register addresses are used by the same module (on
-> > different IC).
-> >
-> > Type 1. for example:
-> >
-> > 	#define SPM_BDP_PWR_CON			0x029c /* 2701 */
-> > 	#define SPM_AUDIO_PWR_CON		0x029c /* 8173 */
-> >
-> > We can resolve this conflict easily, such as define these two register
-> > name to the same register address.
-> >
-> > Type 2. for example:
-> >
-> > 	#define SPM_VDE_PWR_CON			0x0300 /* 6755 */
-> > 	#define SPM_VDE_PWR_CON			0x0210 /* 8173 */
-> >
-> > We can not reuse the register defines in this case. We may need to name
-> > the registers with its IC name, such as MT8173_SPM_VDE_PWR_CON and
-> > MT6755_VDE_PWR_CON. But it will increase the maintain effort. That's why
-> > I prefer to remove register defines if we implement multiple SoC's
-> > scpsys in a single file.
-> >
-> >
-> 
-> Well type 2 for me is no problem at all. As stated in my last mail, 
-> mt6755 would get the SoC name in the define (as a postfix preferably).
-> I don't think that this will make a lot of pain regarding maintaining 
-> it. Even less if we have the defines in alphabetic order.
-> 
-> I we see in the future that this converts to a mess, we always can get 
-> rid of the defines quite easily.
+[auto build test ERROR on robh/for-next]
+[also build test ERROR on v4.5-rc4 next-20160215]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 
-OK, I'll add register names back in next patch.
+url:    https://github.com/0day-ci/linux/commits/Thomas-Petazzoni/dma-mv_xor_v2-new-driver/20160215-160120
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux for-next
+config: openrisc-allyesconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=openrisc 
 
+All errors (new ones prefixed by >>):
 
-Best regards,
+   In file included from kernel/irq/chip.c:14:0:
+>> include/linux/msi.h:174:21: fatal error: asm/msi.h: No such file or directory
+   compilation terminated.
 
-James
+vim +174 include/linux/msi.h
+
+c2791b80 Yijing Wang    2014-11-11  168  	void (*teardown_irq)(struct msi_controller *chip, unsigned int irq);
+0cbdcfcf Thierry Reding 2013-08-09  169  };
+0cbdcfcf Thierry Reding 2013-08-09  170  
+f3cf8bb0 Jiang Liu      2014-11-12  171  #ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
+d9109698 Jiang Liu      2014-11-15  172  
+aeeb5965 Jiang Liu      2014-11-15  173  #include <linux/irqhandler.h>
+d9109698 Jiang Liu      2014-11-15 @174  #include <asm/msi.h>
+d9109698 Jiang Liu      2014-11-15  175  
+f3cf8bb0 Jiang Liu      2014-11-12  176  struct irq_domain;
+552c494a Marc Zyngier   2015-11-23  177  struct irq_domain_ops;
+
+:::::: The code at line 174 was first introduced by commit
+:::::: d9109698be6e7439e6082aa00d79d4556114739b genirq: Introduce msi_domain_alloc/free_irqs()
+
+:::::: TO: Jiang Liu <jiang.liu@linux.intel.com>
+:::::: CC: Thomas Gleixner <tglx@linutronix.de>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 36865 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160215/c5363463/attachment-0001.obj>
