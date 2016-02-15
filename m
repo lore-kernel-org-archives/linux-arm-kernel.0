@@ -1,52 +1,123 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 15 Feb 2016 18:03:33 +0000
-Subject: arm qemu test failures due to 'driver-core: platform: probe
- of-devices only using list of compatibles'
-In-Reply-To: <56C20DD6.8050604@arm.com>
-References: <20160214165010.GA3189@roeck-us.net>
- <20160215105909.GH12289@pengutronix.de>
- <56C1F19F.8090100@roeck-us.net> <56C20DD6.8050604@arm.com>
-Message-ID: <20160215180333.GK10826@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 15 Feb 2016 10:06:36 -0800
+Subject: GPIO regression in Linux next caused by syscon change
+In-Reply-To: <20160215164757.GV19432@atomide.com>
+References: <20160213002643.GQ19432@atomide.com>
+ <20160213004935.GR19432@atomide.com>
+ <CA+gwMccZeYimupmGsMX8YbNH9eEA6=Xi=rupciubBwzktfjvBA@mail.gmail.com>
+ <20160215160115.GU19432@atomide.com>
+ <1455552961.4899.37.camel@pengutronix.de>
+ <20160215164757.GV19432@atomide.com>
+Message-ID: <20160215180635.GW19432@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 15, 2016 at 05:41:42PM +0000, Sudeep Holla wrote:
-> Sorry for missing this earlier, I could reproduce this on my TC2.
-> The issue is with card-detect gpio probing. It's not related to AMBA
-> probing as discussed on the mail thread.
+* Tony Lindgren <tony@atomide.com> [160215 08:49]:
+> * Philipp Zabel <p.zabel@pengutronix.de> [160215 08:17]:
+> > Am Montag, den 15.02.2016, 08:01 -0800 schrieb Tony Lindgren:
+> > > * Philipp Zabel <philipp.zabel@gmail.com> [160214 11:24]:
+> > > > I've just replaced the of_iomap() call with an open coded version,
+> > > > calling of_address_to_resource() and ioremap() directly. That was
+> > > > needed so I can use the struct resource returned by
+> > > > of_address_to_resource() to set the syscon_config.max_register. I
+> > > > don't see where this could cause resource overlap. Does just setting
+> > > > syscon_config.max_register to zero again make the problem disappear?
+> > > 
+> > > Yes commenting out the syscon_config.max_register line in your patch
+> > > makes things work again.
+> > > 
+> > > So what does that tell us about the problem?
+> > 
+> > Maybe some out of bounds writes that previously worked are now catched
+> > by the max_register check in regmap_writable and regmap_write returns
+> > -EIO instead of the write being executed.
 > 
-> mfd_add_device adds devices with of_node when cell->of_compatible is
-> matched, but the device created is expected to be matched based on name
-> which the patch under discussion clearly breaks.
+> Hmm weird that something like that would not produce errors?
+> 
+> > Is there any omap_ctrl_write?() call with an offset > 0x32c into
+> > scm_conf?
+> 
+> Indeed, that's where things go wrong. Adding Tero to Cc, something
+> is wrong there.
 
-If I'm understanding you correctly, you're saying that MFD re-adds
-platform devices with the of_node of a new platform device pointing
-to an existing of_node, but expects this new platform device to
-match a _different_ driver?
+Something like this might fix it? Needs to be tested to see if it
+happens on other omaps.
 
-Sounds like MFD needs fixing.  I've said this before: of_node's must
-_never_ be copied between different device structures, especially
-when they are on the _same_ bus - quite simply because the driver
-core _can_ match using the DT compatible.
+Tero, got any better ideas?
 
-For example... let's say you have a platform device called "1234.foo"
-created by DT with compatible of "example,foo".  You have two platform
-drivers.  One of them matches compatible "example,foo" and the other
-matches against platform devices with a name of "bar".
+Regards,
 
-The "example,foo" device driver is matched against "1234.foo".  It
-creates a platform device with a name of "bar" and bus ID "bar.0",
-setting the of_node to the same as "1234.foo".
+Tony
 
-When scanning for a matching driver, if the "example,foo" driver is
-found first, "bar.0" will be matched to this driver, and its probe
-method called.  If it accepts this device, it will repeat its action,
-creating "bar.1".  Repeat until you run out of memory.
-
-If it instead finds the "bar" driver first, this driver will be used
-and everything appears to work correctly.
-
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+8< -------------------
+--- a/arch/arm/mach-omap2/control.c
++++ b/arch/arm/mach-omap2/control.c
+@@ -167,15 +167,23 @@ u16 omap_ctrl_readw(u16 offset)
+ u32 omap_ctrl_readl(u16 offset)
+ {
+ 	u32 val;
++	int err;
+ 
+ 	offset &= 0xfffc;
+-	if (!omap2_ctrl_syscon)
+-		val = readl_relaxed(omap2_ctrl_base + offset);
+-	else
+-		regmap_read(omap2_ctrl_syscon, omap2_ctrl_offset + offset,
+-			    &val);
++	if (omap2_ctrl_syscon) {
++		err = regmap_read(omap2_ctrl_syscon,
++				  omap2_ctrl_offset + offset, &val);
++		if (!err)
++			return val;
++	}
++
++	if (WARN(!omap2_ctrl_base,
++		 "syscon out of range for offset 0x%x, no omap2_ctrl_base?\n",
++		    offset)) {
++		return 0;
++	}
+ 
+-	return val;
++	return readl_relaxed(omap2_ctrl_base + offset);
+ }
+ 
+ void omap_ctrl_writeb(u8 val, u16 offset)
+@@ -206,12 +214,23 @@ void omap_ctrl_writew(u16 val, u16 offset)
+ 
+ void omap_ctrl_writel(u32 val, u16 offset)
+ {
++	int err;
++
+ 	offset &= 0xfffc;
+-	if (!omap2_ctrl_syscon)
+-		writel_relaxed(val, omap2_ctrl_base + offset);
+-	else
+-		regmap_write(omap2_ctrl_syscon, omap2_ctrl_offset + offset,
+-			     val);
++	if (omap2_ctrl_syscon) {
++		err = regmap_write(omap2_ctrl_syscon,
++				   omap2_ctrl_offset + offset, val);
++		if (!err)
++			return;
++	}
++
++	if (WARN(!omap2_ctrl_base,
++		 "syscon out of range for offset 0x%x, no omap2_ctrl_base?\n",
++		    offset)) {
++		return;
++	}
++
++	writel_relaxed(val, omap2_ctrl_base + offset);
+ }
+ 
+ #ifdef CONFIG_ARCH_OMAP3
+@@ -724,9 +743,6 @@ int __init omap_control_init(void)
+ 				if (ret)
+ 					return ret;
+ 			}
+-
+-			iounmap(omap2_ctrl_base);
+-			omap2_ctrl_base = NULL;
+ 		} else {
+ 			/* No scm_conf found, direct access */
+ 			ret = omap2_clk_provider_init(np, data->index, NULL,
