@@ -1,75 +1,74 @@
-From: eun.taik.lee@samsung.com (EunTaik Lee)
-Date: Mon, 15 Feb 2016 08:46:19 +0000 (GMT)
-Subject: [PATCH] arm64: add alignment fault hanling
-Message-ID: <1891145150.915921455525975284.JavaMail.weblogic@epmlwas09b>
+From: zhangqing@rock-chips.com (Elaine Zhang)
+Date: Mon, 15 Feb 2016 16:42:58 +0800
+Subject: [PATCH v1 6/6] dt/bindings: rockchip: modify document of Rockchip
+ power domains
+Message-ID: <1455525778-14190-1-git-send-email-zhangqing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Userspace memory is mapped as below:
-F2A7F000--F2A7FFFF Normal Memory
-F2A80000--F2A80FFF Device nGnRnE
+Add binding documentation for the power domains
+found on Rockchip RK3399 SoCs.
 
-And that userspace application makes a system call
-as below:
-
--009 |do_strncpy_from_user(inline)
--009 |strncpy_from_user()
--010 |getname_flags()
--011 |user_path_at_empty()
--012 |user_path_at()
--013 |SYSC_faccessat(inline)
--013 |sys_faccessat()
--014 |__sys_trace(asm)
- --> |exception
-
-The string spans from 0xF2A7FFC1 to 0xF2A7FFFB.
-
-When do_strncpy_from_user() reads the last (unsigned long)
-value, the alignement fault is triggered. The 8 byte
-from 0xF2A7FFC1 spans to the next page that is mapped as
-Device nGnRnE, which does not allow an unaligned access,
-causes the abort.
-
-The instruction which caused the alignment fault is registered
-in the fixup table but the exception handler does not reach there.
-
-This patch registers a alignment fault handler and fixes up the
-pc if appropriate.
-
-Signed-off-by: Eun Taik Lee <eun.taik.lee@samsung.com>
+Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
 ---
- arch/arm64/mm/fault.c | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
+ .../bindings/soc/rockchip/power_domain.txt          | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 19211c4..8257d4f 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -371,6 +371,16 @@ static int __kprobes do_translation_fault(unsigned long addr,
- 	return 0;
- }
+diff --git a/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt b/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
+index 13dc6a3..c65d401 100644
+--- a/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
++++ b/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
+@@ -7,6 +7,7 @@ Required properties for power domain controller:
+ - compatible: Should be one of the following.
+ 	"rockchip,rk3288-power-controller" - for RK3288 SoCs.
+ 	"rockchip,rk3368-power-controller" - for RK3368 SoCs.
++	"rockchip,rk3399-power-controller" - for RK3399 SoCs.
+ - #power-domain-cells: Number of cells in a power-domain specifier.
+ 	Should be 1 for multiple PM domains.
+ - #address-cells: Should be 1.
+@@ -16,6 +17,7 @@ Required properties for power domain sub nodes:
+ - reg: index of the power domain, should use macros in:
+ 	"include/dt-bindings/power/rk3288-power.h" - for RK3288 type power domain.
+ 	"include/dt-bindings/power/rk3368-power.h" - for RK3368 type power domain.
++	"include/dt-bindings/power/rk3399-power.h" - for RK3399 type power domain.
+ - clocks (optional): phandles to clocks which need to be enabled while power domain
+ 	switches state.
  
-+static int __kprobes do_alignment_fault(unsigned long addr,
-+					  unsigned int esr,
-+					  struct pt_regs *regs)
-+{
-+	if (addr >= TASK_SIZE && fixup_exception(regs))
-+		return 0;
+@@ -45,12 +47,25 @@ Example:
+                 };
+         };
+ 
++	power: power-controller {
++		compatible = "rockchip,rk3399-power-controller";
++		#power-domain-cells = <1>;
++		#address-cells = <1>;
++		#size-cells = <0>;
 +
-+	return 1;
-+}
++		pd_gpu {
++			reg = <RK3399_PD_GPU>;
++			clocks = <&cru ACLK_GPU>;
++		};
++	};
 +
- /*
-  * This abort handler always returns "fault".
-  */
-@@ -418,7 +428,7 @@ static struct fault_info {
- 	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk" },
- 	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk" },
- 	{ do_bad,		SIGBUS,  0,		"unknown 32"			},
--	{ do_bad,		SIGBUS,  BUS_ADRALN,	"alignment fault"		},
-+	{ do_alignment_fault,	SIGBUS,  BUS_ADRALN,	"alignment fault"		},
- 	{ do_bad,		SIGBUS,  0,		"debug event"			},
- 	{ do_bad,		SIGBUS,  0,		"unknown 35"			},
- 	{ do_bad,		SIGBUS,  0,		"unknown 36"			},
+ Node of a device using power domains must have a power-domains property,
+ containing a phandle to the power device node and an index specifying which
+ power domain to use.
+ The index should use macros in:
+ 	"include/dt-bindings/power/rk3288-power.h" - for rk3288 type power domain.
+ 	"include/dt-bindings/power/rk3368-power.h" - for rk3368 type power domain.
++	"include/dt-bindings/power/rk3399-power.h" - for rk3399 type power domain.
+ 
+ Example of the node using power domain:
+ 
+@@ -65,3 +80,9 @@ Example of the node using power domain:
+                 power-domains = <&power RK3368_PD_GPU_1>;
+                 /* ... */
+         };
++
++	node {
++		/* ... */
++		power-domains = <&power RK3399_PD_GPU>;
++		/* ... */
++	};
 -- 
 1.9.1
