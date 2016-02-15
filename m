@@ -1,61 +1,79 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Mon, 15 Feb 2016 09:58:17 +0800
-Subject: [PATCH] rtc: mt6397: Add platform device ID table
-In-Reply-To: <1455016095-13724-1-git-send-email-javier@osg.samsung.com>
-References: <1455016095-13724-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <1455501497.7263.4.camel@mtksdaap41>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 15 Feb 2016 10:58:49 +0900
+Subject: [PATCH v2 0/6] ARM/arm64 : shmobile/renesas: Add L2
+ cache-controller nodes
+In-Reply-To: <1449512659-16688-1-git-send-email-geert+renesas@glider.be>
+References: <1449512659-16688-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20160215015848.GD14034@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2016-02-09 at 08:08 -0300, Javier Martinez Canillas wrote:
-> The platform bus_type .match callback attempts to match the platform device
-> name with an entry on the .id_table if provided and fallbacks to match with
-> the driver's name if a table is not provided.
-> 
-> Using a platform device ID to match is more explicit, allows the driver to
-> support more than one device and also the MODULE_DEVICE_TABLE macro can be
-> used to export the module aliases information instead of the MODULE_ALIAS.
-> 
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> 
-> ---
-> 
->  drivers/rtc/rtc-mt6397.c | 8 +++++++-
->  1 file changed, 7 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/rtc/rtc-mt6397.c b/drivers/rtc/rtc-mt6397.c
-> index 06a5c52b292f..46533f11f7fc 100644
-> --- a/drivers/rtc/rtc-mt6397.c
-> +++ b/drivers/rtc/rtc-mt6397.c
-> @@ -404,6 +404,12 @@ static const struct of_device_id mt6397_rtc_of_match[] = {
->  };
->  MODULE_DEVICE_TABLE(of, mt6397_rtc_of_match);
->  
-> +static const struct platform_device_id mt6397_rtc_id[] = {
-> +	{"mt6397-rtc", 0},
-> +	{ /* sentinel */ },
-> +};
-> +MODULE_DEVICE_TABLE(platform, mt6397_rtc_id);
-> +
->  static struct platform_driver mtk_rtc_driver = {
->  	.driver = {
->  		.name = "mt6397-rtc",
-> @@ -412,6 +418,7 @@ static struct platform_driver mtk_rtc_driver = {
->  	},
->  	.probe	= mtk_rtc_probe,
->  	.remove = mtk_rtc_remove,
-> +	.id_table = mt6397_rtc_id,
->  };
->  
->  module_platform_driver(mtk_rtc_driver);
-> @@ -419,4 +426,3 @@ module_platform_driver(mtk_rtc_driver);
->  MODULE_LICENSE("GPL v2");
->  MODULE_AUTHOR("Tianping Fang <tianping.fang@mediatek.com>");
->  MODULE_DESCRIPTION("RTC Driver for MediaTek MT6397 PMIC");
-> -MODULE_ALIAS("platform:mt6397-rtc");
+Hi Geert,
 
-This patch looks good to me, but I am wondering, since we tend to use
-device tree method to match driver, do we still need support platform
-device ID ?
+On Mon, Dec 07, 2015 at 07:24:13PM +0100, Geert Uytterhoeven wrote:
+> 	Hi Simon, Magnus,
+> 
+> This patch series adds the missing L2 cache-controller nodes to the
+> DTSes for various Renesas ARM-based SoCs, and links the CPU nodes to
+> them.
+> 
+> For R-Mobile APE6 (r8a73a4), the L2 cache-controllers are also linked to
+> the respective (already existing) SYSC Power Domains. Fortunately these
+> Power Domains were never powered down, as they are parents of the Power
+> Domains containing CPU cores. This may change in the future.
+> 
+> For R-Car Gen2 and Gen3 (r8a779x), this serves as a preparatory step for
+> adding SYSC Power Domain support later.
+> 
+> Question for the ARM/DT people: What are the DT bindings for
+> Cortex-A15/A7/A57/A53 L2 cache controllers?
+> Everybody just seems to use "cache" for the compatible values...
+> 
+> Patches 2-5 were extracted from series "[PATCH/RFC 00/15]
+> ARM: shmobile: R-Car: Add SYSC PM Domain DT Support",
+> (http://lists.infradead.org/pipermail/linux-arm-kernel/2015-June/348742.html)
+> and received some fixes. You can find more detailed changelogs in the
+> individual patches).
+> 
+> This has been tested on r8a73a4/ape6evm, r8a7791/koelsch, and
+> r8a7795/salvator-x.
 
-Eddie
+Sorry for loosing track of this until now.
+
+It seems to me that the Gen-2 changes could be applied, is that correct?
+It also seems to me that there was inconclusive discussion regarding
+the r8a7795 change, is that also correct.
+
+> 
+> Thanks!
+> 
+> Geert Uytterhoeven (6):
+>   ARM: shmobile: r8a73a4 dtsi: Add L2 cache-controller nodes
+>   ARM: shmobile: r8a7790 dtsi: Add L2 cache-controller nodes
+>   ARM: shmobile: r8a7791 dtsi: Add L2 cache-controller node
+>   ARM: shmobile: r8a7793 dtsi: Add L2 cache-controller node
+>   ARM: shmobile: r8a7794 dtsi: Add L2 cache-controller node
+>   arm64: renesas: r8a7795: Add L2 cache-controller nodes
+> 
+>  arch/arm/boot/dts/r8a73a4.dtsi           | 19 +++++++++++++++++++
+>  arch/arm/boot/dts/r8a7790.dtsi           | 22 ++++++++++++++++++++++
+>  arch/arm/boot/dts/r8a7791.dtsi           | 10 ++++++++++
+>  arch/arm/boot/dts/r8a7793.dtsi           |  9 +++++++++
+>  arch/arm/boot/dts/r8a7794.dtsi           |  8 ++++++++
+>  arch/arm64/boot/dts/renesas/r8a7795.dtsi | 15 +++++++++++++++
+>  6 files changed, 83 insertions(+)
+> 
+> -- 
+> 1.9.1
+> 
+> Gr{oetje,eeting}s,
+> 
+> 						Geert
+> 
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> 
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+> 							    -- Linus Torvalds
+> 
