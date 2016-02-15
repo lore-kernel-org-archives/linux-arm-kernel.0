@@ -1,48 +1,57 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 15 Feb 2016 18:14:25 +0000
-Subject: [PATCH v4 23/23] arm64: Panic when VHE and non VHE CPUs coexist
-In-Reply-To: <20160215172653.GM6298@arm.com>
-References: <1455216004-19499-1-git-send-email-marc.zyngier@arm.com>
- <1455216004-19499-24-git-send-email-marc.zyngier@arm.com>
- <20160215172653.GM6298@arm.com>
-Message-ID: <56C21581.5030003@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 15 Feb 2016 18:15:43 +0000
+Subject: arm qemu test failures due to 'driver-core: platform: probe
+ of-devices only using list of compatibles'
+In-Reply-To: <20160215180333.GK10826@n2100.arm.linux.org.uk>
+References: <20160214165010.GA3189@roeck-us.net>
+ <20160215105909.GH12289@pengutronix.de> <56C1F19F.8090100@roeck-us.net>
+ <56C20DD6.8050604@arm.com> <20160215180333.GK10826@n2100.arm.linux.org.uk>
+Message-ID: <56C215CF.1030509@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/02/16 17:26, Will Deacon wrote:
-> On Thu, Feb 11, 2016 at 06:40:04PM +0000, Marc Zyngier wrote:
->> Having both VHE and non-VHE capable CPUs in the same system
->> is likely to be a recipe for disaster.
->>
->> If the boot CPU has VHE, but a secondary is not, we won't be
->> able to downgrade and run the kernel at EL1. Add CPU hotplug
->> to the mix, and this produces a terrifying mess.
->>
->> Let's solve the problem once and for all. If you mix VHE and
->> non-VHE CPUs in the same system, you deserve to loose, and this
->> patch makes sure you don't get a chance.
->>
->> This is implemented by storing the kernel execution level in
->> a global variable. Secondaries will park themselves in a
->> WFI loop if they observe a mismatch. Also, the primary CPU
->> will detect that the secondary CPU has died on a mismatched
->> execution level. Panic will follow.
-> 
-> This should really be based on Suzuki's series for handling generic
-> mismatches:
-> 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/401727.html
-> 
-> To avoid growing a dependency on something that's unlikely to make it
-> for 4.6, I'd be inclined to drop your homegrown checks altogether amd
-> help Suzuki with his series as a separate activity (i.e. it needn't be
-> a blocker imo).
 
-That's fine, I'll drop that one - we can revisit it and fold it into
-Suzuki's series.
 
-Thanks,
+On 15/02/16 18:03, Russell King - ARM Linux wrote:
+> On Mon, Feb 15, 2016 at 05:41:42PM +0000, Sudeep Holla wrote:
+>> Sorry for missing this earlier, I could reproduce this on my TC2.
+>> The issue is with card-detect gpio probing. It's not related to AMBA
+>> probing as discussed on the mail thread.
+>>
+>> mfd_add_device adds devices with of_node when cell->of_compatible is
+>> matched, but the device created is expected to be matched based on name
+>> which the patch under discussion clearly breaks.
+>
+> If I'm understanding you correctly, you're saying that MFD re-adds
+> platform devices with the of_node of a new platform device pointing
+> to an existing of_node, but expects this new platform device to
+> match a _different_ driver?
+>
 
-	M.
+Sorry if I was not clear.
+
+I don't think it re-adds. IIUC mfd cells are specified inside the
+mfd device DT node. MFD adds devices for it's child nodes with the
+associated device node but with the name specified by MFD cells
+matching the compatible.
+
+> Sounds like MFD needs fixing.  I've said this before: of_node's must
+> _never_ be copied between different device structures, especially
+> when they are on the _same_ bus - quite simply because the driver
+> core _can_ match using the DT compatible.
+>
+
+I don't think that's happening in this case at-least. For example:
+
+Device node compatible: arm,vexpress-sysreg
+Child node compatible: arm,vexpress-sysreg,sys_mci
+
+MFD device is created for above child node with name
+"basic-mmio-gpio.<id>.auto" as it matched the MFD cell of_compatible
+
+Since there's no driver to match "arm,vexpress-sysreg,sys_mci", it fails
+with $subject patch applied which otherwise would do normal name matching
+
 -- 
-Jazz is not dead. It just smells funny...
+Regards,
+Sudeep
