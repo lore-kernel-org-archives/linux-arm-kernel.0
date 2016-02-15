@@ -1,121 +1,121 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Mon, 15 Feb 2016 18:42:48 +0800
-Subject: [PATCH v4 4/8] dt-bindings: Add a binding for Mediatek Video
- Encoder
-In-Reply-To: <CAGS+omDQW+yqhixCWPfQb9eaHeufgiEDscrvXGwBTc05+eDGCQ@mail.gmail.com>
-References: <1454585703-42428-1-git-send-email-tiffany.lin@mediatek.com>
- <1454585703-42428-2-git-send-email-tiffany.lin@mediatek.com>
- <1454585703-42428-3-git-send-email-tiffany.lin@mediatek.com>
- <1454585703-42428-4-git-send-email-tiffany.lin@mediatek.com>
- <1454585703-42428-5-git-send-email-tiffany.lin@mediatek.com>
- <CAGS+omDQW+yqhixCWPfQb9eaHeufgiEDscrvXGwBTc05+eDGCQ@mail.gmail.com>
-Message-ID: <CAGS+omAkM97TOnJX-ahEMeN8zO1R2RO43LWqeFFRDuj7gM5CzA@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 15 Feb 2016 10:55:04 +0000
+Subject: ARM GIC DT binding reg block mismatch? (Re: [PATCH v11 1/8]
+ arm64: renesas: r8a7795: Add Renesas R8A7795 SoC support)
+In-Reply-To: <CAMuHMdVcnbp8YMq9oNurvfe_9iNGOHYUVW=_=DzHY62Y0DLnQg@mail.gmail.com>
+References: <CAMuHMdU-q++XEgthKG=XOgnaq7TY899EsgMFHuWu4Skr5woLZg@mail.gmail.com>
+ <56C19044.6050604@arm.com>
+ <CAMuHMdVcnbp8YMq9oNurvfe_9iNGOHYUVW=_=DzHY62Y0DLnQg@mail.gmail.com>
+Message-ID: <56C1AE88.9050708@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 9, 2016 at 7:29 PM, Daniel Kurtz <djkurtz@chromium.org> wrote:
-> Hi Tiffany,
->
-> On Thu, Feb 4, 2016 at 7:34 PM, Tiffany Lin <tiffany.lin@mediatek.com> wrote:
->> Add a DT binding documentation of Video Encoder for the
->> MT8173 SoC from Mediatek.
+On 15/02/16 10:35, Geert Uytterhoeven wrote:
+> Hi Marc,
+> 
+> On Mon, Feb 15, 2016 at 9:45 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> On 15/02/16 08:16, Geert Uytterhoeven wrote:
+>>> On Wed, Dec 9, 2015 at 9:23 AM, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+>>>> On Tue, Nov 3, 2015 at 3:28 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+>>>>> On Wed, Oct 21, 2015 at 03:34:39PM +0200, Geert Uytterhoeven wrote:
+>>>>>> On Thu, Oct 15, 2015 at 12:58 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+>>>>>>>>> +           gic: interrupt-controller at 0xf1010000 {
+>>>>>>>> +                     compatible = "arm,gic-400";
+>>>>>>>> +                     #interrupt-cells = <3>;
+>>>>>>>> +                     #address-cells = <0>;
+>>>>>>>> +                     interrupt-controller;
+>>>>>>>> +                     reg = <0x0 0xf1010000 0 0x1000>,
+>>>>>>>> +                           <0x0 0xf1020000 0 0x2000>;
+>>>>>>>> +                     interrupts = <GIC_PPI 9
+>>>>>>>> +                                     (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_HIGH)>;
+>>>>>>>> +             };
+>>>>>>>
+>>>>>>> No GICH and GICV?
+>>>>>>
+>>>>>> These seem to be defined in the "arm,gic-v3" DT bindings only, while this is
+>>>>>> an "arm,gic-400" (GICD_IIDR 0x0200043b)?
+>>>>>
+>>>>> See the "GIC virtualization extensions (VGIC)" section in
+>>>>> Documentation/devicetree/bindings/arm/gic.txt
+>>>>
+>>>> DDI0471B_gic400_r0p1_trm.pdf says:
+>>>>
+>>>>     Address range GIC-400 functional block
+>>>>     A. 0x0000 - 0x0FFF Reserved
+>>>>     B. 0x1000 - 0x1FFF Distributor
+>>>>     C. 0x2000 - 0x3FFF CPU interfaces
+>>>>     D. 0x4000 - 0x4FFF Virtual interface control block, for the processor that
+>>>>                        is performing the access
+>>>>     E. 0x5000 - 0x5FFF Virtual interface control block, for the processor
+>>>>                        selected by address bits [11:9]
+>>>>     F. 0x6000 - 0x7FFF Virtual CPU interfaces
+>>>>
+>>>> The DT binding document says:
+>>>>   1. The  first region is the GIC distributor register base and size.
+>>>>   2. The 2nd region is the GIC cpu interface register base and size.
+>>>>   3. The first additional region is the GIC virtual interface control register
+>>>>      base and size.
+>>>>   4. The 2nd additional region is the GIC virtual cpu interface register base
+>>>>      and size.
+>>>>
+>>>> Matching with the example:
+>>>>
+>>>>         interrupt-controller at 2c001000 {
+>>>>                 compatible = "arm,cortex-a15-gic";
+>>>>                 #interrupt-cells = <3>;
+>>>>                 interrupt-controller;
+>>>>                 reg = <0x2c001000 0x1000>,
+>>>>                       <0x2c002000 0x1000>,
+>>>>                       <0x2c004000 0x2000>,
+>>>>                       <0x2c006000 0x2000>;
+>>>>                 interrupts = <1 9 0xf04>;
+>>>>         };
+>>>>
+>>>> This means:
+>>>>   - reg entry 1. covers address range B,
+>>>>   - reg entry 2. covers address range C,
+>>>>   - reg entry 3. covers address ranges D _and_ E,
+>>>>   - reg entry 4. covers address range F.
+>>>>
+>>>> On R-Car Gen3, the base addresses are:
+>>>>
+>>>>     Distributor             : 0xF101_0000
+>>>>     CPU interfaces          : 0xF102_0000
+>>>>     Virtual interfaces      : 0xF104_0000
+>>>>     Virtual interfaces      : 0xF105_0000
+>>>>     Virtual CPU interfaces  : 0xF106_0000
+>>>>
+>>>> Note the additional multiplication factor of 16 in the offsets relative to
+>>>> the base address 0xf1000000 (e.g. 0x50000 instead of 0x5000).
+>>>>
+>>>> As address ranges D and E are merged in a single reg entry, how is the GIC
+>>>> driver supposed to know about this multiplication factor?
 >>
->> Signed-off-by: Tiffany Lin <tiffany.lin@mediatek.com>
->> ---
->>  .../devicetree/bindings/media/mediatek-vcodec.txt  |   59 ++++++++++++++++++++
->>  1 file changed, 59 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/media/mediatek-vcodec.txt
+>> The answer is very simple, the GIC driver doesn't give a damn about the
+>> second part of the GICH region, because it is absolutely unusable for
+>> any realistic use-case. Only the banked version of GICH is of any
+>> relevance (the first 512 bytes, in essence).
 >>
->> diff --git a/Documentation/devicetree/bindings/media/mediatek-vcodec.txt b/Documentation/devicetree/bindings/media/mediatek-vcodec.txt
->> new file mode 100644
->> index 0000000..572bfdd
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/media/mediatek-vcodec.txt
->> @@ -0,0 +1,59 @@
->> +Mediatek Video Codec
->> +
->> +Mediatek Video Codec is the video codec hw present in Mediatek SoCs which
->> +supports high resolution encoding functionalities.
->> +
->> +Required properties:
->> +- compatible : "mediatek,mt8173-vcodec-enc" for encoder
->> +- reg : Physical base address of the video codec registers and length of
->> +  memory mapped region.
->> +- interrupts : interrupt number to the cpu.
->> +- mediatek,larb : must contain the local arbiters in the current Socs.
->> +- clocks : list of clock specifiers, corresponding to entries in
->> +  the clock-names property.
->> +- clock-names: encoder must contain "vencpll_d2", "venc_sel", "univpll1_d2",
->> +  "venc_lt_sel".
->> +- iommus : should point to the respective IOMMU block with master port as
->> +  argument, see Documentation/devicetree/bindings/iommu/mediatek,iommu.txt
->> +  for details.
->> +- mediatek,vpu : the node of video processor unit
->> +
->> +Example:
->> +vcodec_enc: vcodec at 0x18002000 {
->> +    compatible = "mediatek,mt8173-vcodec-enc";
->> +    reg = <0 0x18002000 0 0x1000>,    /*VENC_SYS*/
->> +          <0 0x19002000 0 0x1000>;    /*VENC_LT_SYS*/
->
-> This really looks like two encoder devices combined into a single
-> device tree node.
-> There are two register sets, two irqs, two sets of iommus, and two
-> sets of clocks.
->
-> If possible, please split this node into two, one for each encoder.
+>> Aligning the GIC regions on 64kB boundaries is documented in the SBSA
+>> specification, independently of the GIC400 documentation.
+> 
+> If I understand the SBSA spec correctly (BTW, arm,gic.txt doesn't use the
+> "GICC" terminology, unlike arm,gic-v3.txt), that means reg entry 3 should be
+> "<0xf104f000 0x2000>", so it covers the aliased last 4 KiB of address range D,
+> and the first 4 KiB of address range E. I.e.
+> 
+>                         reg = <0x0 0xf1010000 0 0x1000>,
+>                              <0x0 0xf1020000 0 0x2000>,
+>                              <0x0 0xf104f000 0 0x2000>,
+>                              <0x0 0xf1060000 0 0x2000>;
+> 
+> Is that correct?
 
-I chatted offline with Mediatek.  They explained that there really is
-just one encoder hardware, that happens to support multiple formats.
-The encoder cannot encode with both formats at the same time.  The
-Mediatek HW designers added a new format to an existing encoder by
-adding a second interface (register set, irq, iommus, clocks) without
-modifying the original interface.  However in the hardware itself
-there is really just one encoder device.
+My preference would be to expose the full 128kB of the region - assuming
+your HW actually supports the SBSA aliasing.
 
-So, although this node looks like it is for two encoder devices (one
-for each format), really there is just one device that supports each
-format through its large interface.
+Thanks,
 
-So, I'm fine with this being a single device node.
-
->> +    interrupts = <GIC_SPI 198 IRQ_TYPE_LEVEL_LOW>,
->> +           <GIC_SPI 202 IRQ_TYPE_LEVEL_LOW>;
->> +    mediatek,larb = <&larb3>,
->> +                   <&larb5>;
->> +    iommus = <&iommu M4U_PORT_VENC_RCPU>,
->> +             <&iommu M4U_PORT_VENC_REC>,
->> +             <&iommu M4U_PORT_VENC_BSDMA>,
->> +             <&iommu M4U_PORT_VENC_SV_COMV>,
->> +             <&iommu M4U_PORT_VENC_RD_COMV>,
->> +             <&iommu M4U_PORT_VENC_CUR_LUMA>,
->> +             <&iommu M4U_PORT_VENC_CUR_CHROMA>,
->> +             <&iommu M4U_PORT_VENC_REF_LUMA>,
->> +             <&iommu M4U_PORT_VENC_REF_CHROMA>,
->> +             <&iommu M4U_PORT_VENC_NBM_RDMA>,
->> +             <&iommu M4U_PORT_VENC_NBM_WDMA>,
->> +             <&iommu M4U_PORT_VENC_RCPU_SET2>,
->> +             <&iommu M4U_PORT_VENC_REC_FRM_SET2>,
->> +             <&iommu M4U_PORT_VENC_BSDMA_SET2>,
->> +             <&iommu M4U_PORT_VENC_SV_COMA_SET2>,
->> +             <&iommu M4U_PORT_VENC_RD_COMA_SET2>,
->> +             <&iommu M4U_PORT_VENC_CUR_LUMA_SET2>,
->> +             <&iommu M4U_PORT_VENC_CUR_CHROMA_SET2>,
->> +             <&iommu M4U_PORT_VENC_REF_LUMA_SET2>,
->> +             <&iommu M4U_PORT_VENC_REC_CHROMA_SET2>;
->> +    mediatek,vpu = <&vpu>;
->> +    clocks = <&topckgen CLK_TOP_VENCPLL_D2>,
->> +             <&topckgen CLK_TOP_VENC_SEL>,
->> +             <&topckgen CLK_TOP_UNIVPLL1_D2>,
->> +             <&topckgen CLK_TOP_VENC_LT_SEL>;
->> +    clock-names = "vencpll_d2",
->> +                  "venc_sel",
->> +                  "univpll1_d2",
->> +                  "venc_lt_sel";
->
-> The names of these clocks should be from the perspective of the
-> encoder, not the clock provider.
-
-I still think these clock names should be updated, however.
-
--Dan
+	M.
+-- 
+Jazz is not dead. It just smells funny...
