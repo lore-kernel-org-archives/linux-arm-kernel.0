@@ -1,25 +1,32 @@
-From: milo.kim@ti.com (Kim, Milo)
-Date: Mon, 15 Feb 2016 08:37:47 +0900
-Subject: [PATCH v2 2/4] regulator: lp872x: Add enable GPIO pin support
-In-Reply-To: <1454697741-8687-3-git-send-email-contact@paulk.fr>
-References: <1454697741-8687-1-git-send-email-contact@paulk.fr>
- <1454697741-8687-3-git-send-email-contact@paulk.fr>
-Message-ID: <56C10FCB.5070803@ti.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 15 Feb 2016 09:33:59 +0900
+Subject: [GIT PULL 0/7] ARM: EXYNOS: Pull request for v4.6
+Message-ID: <1455496446-23779-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/6/2016 3:42 AM, Paul Kocialkowski wrote:
-> LP872x regulators are made active via the EN pin, which might be hooked to a
-> GPIO. This adds support for driving the GPIO high when the driver is in use.
->
-> Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
-> ---
->   .../devicetree/bindings/regulator/lp872x.txt       |  1 +
->   drivers/regulator/lp872x.c                         | 34 ++++++++++++++++++++++
->   include/linux/regulator/lp872x.h                   |  5 ++++
->   3 files changed, 40 insertions(+)
+Hi Arnd, Kevin and Olof,
 
-Acked-by: Milo Kim <milo.kim@ti.com>
+This time pull request directly from me (agreed with Kukjin).
 
-Best regards,
-Milo
+
+Stuff for v4.6 with some dependencies, split into
+separate tags. The need for dependency is explained both
+in merge-commit and in description of a tag which is using
+the dependency.
+
+The order goes like (but of course dependencies
+could be pulled all at once at beginning):
+1. tags/samsung-fixes-non-critical-4.6
+2. tags/samsung-dt-srom-4.6 (DT changs needed by soc)
+3. tags/samsung-drivers-soc-srom-pmu-4.6
+4. tags/samsung-soc-4.6
+5. tags/samsung-drivers-4.6
+6. tags/samsung-dt-4.6
+7. tags/samsung-defconfig-4.6 (this will also pull tag from RTC tree)
+
+Please share your comments or just pull.
+
+
+Kind regards,
+Krzysztof
