@@ -1,58 +1,49 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 15 Feb 2016 17:09:27 +0800
-Subject: [PATCH] dma: mv_xor_v2: new driver
-In-Reply-To: <1455523083-25506-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <201602151735.BaFwBMOn%fengguang.wu@intel.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 15 Feb 2016 10:14:06 +0100
+Subject: arm qemu test failures due to 'driver-core: platform: probe
+ of-devices only using list of compatibles'
+In-Reply-To: <20160215085818.GC10826@n2100.arm.linux.org.uk>
+References: <20160214165010.GA3189@roeck-us.net>
+ <20160214195501.GA12289@pengutronix.de>
+ <20160214200755.GB10826@n2100.arm.linux.org.uk>
+ <20160215081750.GD12289@pengutronix.de>
+ <20160215085818.GC10826@n2100.arm.linux.org.uk>
+Message-ID: <20160215091406.GE12289@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Hello Russell,
 
-[auto build test ERROR on robh/for-next]
-[also build test ERROR on v4.5-rc4 next-20160215]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+On Mon, Feb 15, 2016 at 08:58:18AM +0000, Russell King - ARM Linux wrote:
+> On Mon, Feb 15, 2016 at 09:17:50AM +0100, Uwe Kleine-K?nig wrote:
+> > On Sun, Feb 14, 2016 at 08:07:55PM +0000, Russell King - ARM Linux wrote:
+> > > On Sun, Feb 14, 2016 at 08:55:01PM +0100, Uwe Kleine-K?nig wrote:
+> > > > So the unexpected abnormality here is that even though this device is
+> > > > instantiated by dt, the driver doesn't provide any compatibles.
+> > > > Either my expectation is wrong, then 67d02a1bbb33455 should be reverted
+> > > 
+> > > Your expectation is wrong.  AMBA primecell devices have hardware IDs
+> > > and are matched to their drivers by those IDs.  Just like PCI.
+> > 
+> > pci devices don't appear in dt, do they? I don't see the connection
+> > between amba devices and platform devices, see my other mail in this
+> > thread for some more details.
+> 
+> They both have hardware IDs, and they are both matched via those hardware
+> IDs.
 
-url:    https://github.com/0day-ci/linux/commits/Thomas-Petazzoni/dma-mv_xor_v2-new-driver/20160215-160120
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux for-next
-config: openrisc-allyesconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=openrisc 
+I changed platform_match which is about matching by dt compatible, acpi
+and/or device name. I don't see how this can affect an amba device given
+they match to a driver by a hardware id.
 
-All errors (new ones prefixed by >>):
+> Your change has introduced a regression and is therefore wrong.
 
-   In file included from kernel/irq/chip.c:14:0:
->> include/linux/msi.h:174:21: fatal error: asm/msi.h: No such file or directory
-   compilation terminated.
+I'd like to understand though why and how my commit is wrong to be able
+to fix it instead of getting it reverted.
 
-vim +174 include/linux/msi.h
+Best regards
+Uwe
 
-c2791b80 Yijing Wang    2014-11-11  168  	void (*teardown_irq)(struct msi_controller *chip, unsigned int irq);
-0cbdcfcf Thierry Reding 2013-08-09  169  };
-0cbdcfcf Thierry Reding 2013-08-09  170  
-f3cf8bb0 Jiang Liu      2014-11-12  171  #ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
-d9109698 Jiang Liu      2014-11-15  172  
-aeeb5965 Jiang Liu      2014-11-15  173  #include <linux/irqhandler.h>
-d9109698 Jiang Liu      2014-11-15 @174  #include <asm/msi.h>
-d9109698 Jiang Liu      2014-11-15  175  
-f3cf8bb0 Jiang Liu      2014-11-12  176  struct irq_domain;
-552c494a Marc Zyngier   2015-11-23  177  struct irq_domain_ops;
-
-:::::: The code at line 174 was first introduced by commit
-:::::: d9109698be6e7439e6082aa00d79d4556114739b genirq: Introduce msi_domain_alloc/free_irqs()
-
-:::::: TO: Jiang Liu <jiang.liu@linux.intel.com>
-:::::: CC: Thomas Gleixner <tglx@linutronix.de>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 36865 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160215/c5363463/attachment-0001.obj>
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
