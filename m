@@ -1,78 +1,102 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 15 Feb 2016 10:03:19 +0000
-Subject: [PATCH RESEND] arm64: add alignment fault hanling
-In-Reply-To: <2039801453.916991455526707908.JavaMail.weblogic@epmlwas09b>
-References: <2039801453.916991455526707908.JavaMail.weblogic@epmlwas09b>
-Message-ID: <20160215100319.GA13683@e104818-lin.cambridge.arm.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Mon, 15 Feb 2016 11:07:41 +0100
+Subject: [PATCH v4 2/8] [media] VPU: mediatek: support Mediatek VPU
+In-Reply-To: <1454585703-42428-3-git-send-email-tiffany.lin@mediatek.com>
+References: <1454585703-42428-1-git-send-email-tiffany.lin@mediatek.com>
+ <1454585703-42428-2-git-send-email-tiffany.lin@mediatek.com>
+ <1454585703-42428-3-git-send-email-tiffany.lin@mediatek.com>
+Message-ID: <56C1A36D.6010908@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 15, 2016 at 08:58:32AM +0000, EunTaik Lee wrote:
-> Userspace memory is mapped as below:
-> F2A7F000--F2A7FFFF Normal Memory
-> F2A80000--F2A80FFF Device nGnRnE
+Hi Tiffany,
 
-How do you end up with Device nGnRnE in user space? I thought we should
-have got some guard page.
+A small review comment below:
 
-> And that userspace application makes a system call
-> as below:
+On 02/04/2016 12:34 PM, Tiffany Lin wrote:
+> The VPU driver for hw video codec embedded in Mediatek's MT8173 SOCs.
+> It is able to handle video decoding/encoding of in a range of formats.
+> The driver provides with VPU firmware download, memory management and
+> the communication interface between CPU and VPU.
+> For VPU initialization, it will create virtual memory for CPU access and
+> IOMMU address for vcodec hw device access. When a decode/encode instance
+> opens a device node, vpu driver will download vpu firmware to the device.
+> A decode/encode instant will decode/encode a frame using VPU
+> interface to interrupt vpu to handle decoding/encoding jobs.
 > 
-> -009 |do_strncpy_from_user(inline)
-> -009 |strncpy_from_user()
-> -010 |getname_flags()
-> -011 |user_path_at_empty()
-> -012 |user_path_at()
-> -013 |SYSC_faccessat(inline)
-> -013 |sys_faccessat()
-> -014 |__sys_trace(asm)
-> --> |exception
+> Signed-off-by: Andrew-CT Chen <andrew-ct.chen@mediatek.com>
+> Signed-off-by: Tiffany Lin <tiffany.lin@mediatek.com>
+> ---
+>  drivers/media/platform/Kconfig           |    9 +
+>  drivers/media/platform/Makefile          |    2 +
+>  drivers/media/platform/mtk-vpu/Makefile  |    1 +
+>  drivers/media/platform/mtk-vpu/mtk_vpu.c |  994 ++++++++++++++++++++++++++++++
+>  drivers/media/platform/mtk-vpu/mtk_vpu.h |  167 +++++
+>  5 files changed, 1173 insertions(+)
+>  create mode 100644 drivers/media/platform/mtk-vpu/Makefile
+>  create mode 100644 drivers/media/platform/mtk-vpu/mtk_vpu.c
+>  create mode 100644 drivers/media/platform/mtk-vpu/mtk_vpu.h
 > 
-> The string spans from 0xF2A7FFC1 to 0xF2A7FFFB.
-> 
-> When do_strncpy_from_user() reads the last (unsigned long)
-> value, the alignement fault is triggered. The 8 byte
-> from 0xF2A7FFC1 spans to the next page that is mapped as
-> Device nGnRnE, which does not allow an unaligned access,
-> causes the abort.
 
-do_strncpy_from_user() relies on unsafe_get_user() not being able to
-read 8 bytes. The problem now is that it doesn't get a page fault but an
-alignment one is isn't handled.
+<snip>
 
-> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-> index 19211c4..8257d4f 100644
-> --- a/arch/arm64/mm/fault.c
-> +++ b/arch/arm64/mm/fault.c
-> @@ -371,6 +371,16 @@ static int __kprobes do_translation_fault(unsigned long addr,
-> return 0;
-> }
-> 
-> +static int __kprobes do_alignment_fault(unsigned long addr,
-> +   unsigned int esr,
-> +   struct pt_regs *regs)
+> diff --git a/drivers/media/platform/mtk-vpu/mtk_vpu.c b/drivers/media/platform/mtk-vpu/mtk_vpu.c
+> new file mode 100644
+> index 0000000..f54fd89
+> --- /dev/null
+> +++ b/drivers/media/platform/mtk-vpu/mtk_vpu.c
+> @@ -0,0 +1,994 @@
+
+<snip>
+
+> +static ssize_t vpu_debug_read(struct file *file, char __user *user_buf,
+> +			      size_t count, loff_t *ppos)
 > +{
-> + if (addr >= TASK_SIZE && fixup_exception(regs))
-> + return 0;
+> +	char buf[256];
+> +	unsigned int len;
+> +	unsigned int running, pc, vpu_to_host, host_to_vpu, wdt;
+> +	int ret;
+> +	struct device *dev = file->private_data;
+> +	struct mtk_vpu *vpu = dev_get_drvdata(dev);
 > +
-> + return 1;
+> +	ret = vpu_clock_enable(vpu);
+> +	if (ret) {
+> +		dev_err(vpu->dev, "[VPU] enable clock failed %d\n", ret);
+> +		return 0;
+> +	}
+> +
+> +	/* vpu register status */
+> +	running = vpu_running(vpu);
+> +	pc = vpu_cfg_readl(vpu, VPU_PC_REG);
+> +	wdt = vpu_cfg_readl(vpu, VPU_WDT_REG);
+> +	host_to_vpu = vpu_cfg_readl(vpu, HOST_TO_VPU);
+> +	vpu_to_host = vpu_cfg_readl(vpu, VPU_TO_HOST);
+> +	vpu_clock_disable(vpu);
+> +
+> +	if (running) {
+> +		len = sprintf(buf, "VPU is running\n\n"
+
+Please use snprintf.
+
+> +		"FW Version: %s\n"
+> +		"PC: 0x%x\n"
+> +		"WDT: 0x%x\n"
+> +		"Host to VPU: 0x%x\n"
+> +		"VPU to Host: 0x%x\n",
+> +		vpu->run.fw_ver, pc, wdt,
+> +		host_to_vpu, vpu_to_host);
+> +	} else {
+> +		len = sprintf(buf, "VPU not running\n");
+
+Ditto.
+
+sprintf always makes me feel uncomfortable :-)
+
+> +	}
+> +
+> +	return simple_read_from_buffer(user_buf, count, ppos, buf, len);
 > +}
 
-Why addr >= TASK_SIZE? addr here should be the fault address, not pc.
+Regards,
 
-> +
-> /*
->   * This abort handler always returns "fault".
->   */
-> @@ -418,7 +428,7 @@ static struct fault_info {
-> { do_bad, SIGBUS,  0, "synchronous parity error (translation table walk" },
-> { do_bad, SIGBUS,  0, "synchronous parity error (translation table walk" },
-> { do_bad, SIGBUS,  0, "unknown 32" },
-> - { do_bad, SIGBUS,  BUS_ADRALN, "alignment fault" },
-> + { do_alignment_fault, SIGBUS,  BUS_ADRALN, "alignment fault" },
-
-The simplest would be to use do_bad_area() here without any additional
-function.
-
--- 
-Catalin
+	Hans
