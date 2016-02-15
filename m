@@ -1,52 +1,51 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Mon, 15 Feb 2016 17:35:52 +0200
-Subject: Common/typical fractional divider HW API
-In-Reply-To: <56B76B26.4050306@free.fr>
-References: <56B4B67D.2080707@free.fr>
- <1454684758.31169.77.camel@linux.intel.com> <56B4C775.50808@free.fr>
- <1454688729.31169.87.camel@linux.intel.com> <56B4CDEF.3080606@free.fr>
- <1454690599.31169.103.camel@linux.intel.com> <56B76B26.4050306@free.fr>
-Message-ID: <1455550552.31169.135.camel@linux.intel.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 15 Feb 2016 07:41:19 -0800
+Subject: arm qemu test failures due to 'driver-core: platform: probe
+ of-devices only using list of compatibles'
+In-Reply-To: <20160215105909.GH12289@pengutronix.de>
+References: <20160214165010.GA3189@roeck-us.net>
+ <20160215105909.GH12289@pengutronix.de>
+Message-ID: <56C1F19F.8090100@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2016-02-07 at 17:04 +0100, Mason wrote:
-> On 05/02/2016 17:43, Andy Shevchenko wrote:
-> 
-> > There are plenty of implementations of the divider.
-> 
-> I'd be happy to read an overview on the subject, if you have
-> some links to share.
+On 02/15/2016 02:59 AM, Uwe Kleine-K?nig wrote:
+> Hello Guenter,
+>
+> On Sun, Feb 14, 2016 at 08:50:10AM -0800, Guenter Roeck wrote:
+>> Uwe,
+>>
+>> Your patch 'driver-core: platform: probe of-devices only using list of
+>> compatibles' causes the following qemu tests to crash in -next.
+>>
+>> arm:vexpress-a9:vexpress_defconfig:vexpress-v2p-ca9
+>> arm:vexpress-a15:vexpress_defconfig:vexpress-v2p-ca15-tc1
+>> arm:vexpress-a9:multi_v7_defconfig:vexpress-v2p-ca9
+>> arm:vexpress-a15:multi_v7_defconfig:vexpress-v2p-ca15-tc1
+>>
+>> Crash log:
+>>
+>> VFS: Cannot open root device "mmcblk0" or unknown-block(0,0): error -6
+>> Please append a correct "root=" boot option; here are the available partitions:
+>> 1f00          131072 mtdblock0  (driver?)
+>> 1f01           32768 mtdblock1  (driver?)
+>> Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(0,0)
+>
+> Can you provide a complete boot log? This might already reveal which
+> device is failing. It might not be the mmci device but something it
+> depends on (clock, bus parent, irq).
+>
 
-drivers/tty/serial/*
+Sure, something else may be failing, but why does reverting your patch
+fix the problem ?
 
-> 
-> > You might consider to use one than inventing new one
-> 
-> I find it hard to believe that the interface I'm discussing
-> has not been used (several times) in the past. (It's merely
-> a trivial floating point scheme.)
-> 
-> As a matter of fact, the integer divider driver supports
-> "I" and "2^I", so extending 2^I to "2^I * (1 + F/256)"
-> is an obvious step.
+Anyway, complete logs are at http://kerneltests.org/builders.
 
-Just to be simple:
-Why do you have to modify existing clk-fractional-divider.c module?
+http://kerneltests.org/builders/qemu-arm-next/builds/376/steps/qemubuildcommand/logs/stdio
 
-May I suggest to reconsider your design to be fit in the existing CLK
-divider implementations? Also, some of the hardware IPs have inside
-divider registers, like mentioned above UARTs. I already suggested to
-look at them to see how hardware is done.
+is the most recent log (next-20120215). Look for the vexpress crashes; the overo
+crash bisected to to 'PM / OPP: Disable OPPs that aren't supported by the regulator',
+in next-20160212, which I have not fully analyzed yet, and the beagle crashes
+as well as the 'new' overo crash are brand new.
 
-Again, (actually I bored to repeat) I didn't see (yet!) any HW divider
-which has integer part as 2^I. I don't get why you stuck with that
-formula and why 1/256? Who prevents to have 1/32768 in HW (like we have
-in LPSS of Intel SoCs)?
-
-Here I'm giving up this discussion. Perhaps more experienced people
-could correct me.
-
--- 
-Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Intel Finland Oy
+Guenter
