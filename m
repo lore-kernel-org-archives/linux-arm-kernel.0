@@ -1,60 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 15 Feb 2016 16:03:06 +0000
-Subject: [PATCH 4/4] ARM: remove asm/gpio.h
-In-Reply-To: <1455551208-2825510-5-git-send-email-arnd@arndb.de>
-References: <20160202194831.10827.63244.stgit@bhelgaas-glaptop2.roam.corp.google.com>
- <1455551208-2825510-1-git-send-email-arnd@arndb.de>
- <1455551208-2825510-5-git-send-email-arnd@arndb.de>
-Message-ID: <20160215160305.GG10826@n2100.arm.linux.org.uk>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon, 15 Feb 2016 17:05:17 +0100
+Subject: [PATCH 1/3] ARM: zynq: Move early printk virtual address to vmalloc
+ area
+Message-ID: <67c9013fc61f53515934b54847a05df8b8e1504a.1455552315.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 15, 2016 at 04:46:31PM +0100, Arnd Bergmann wrote:
-> -#if CONFIG_ARCH_NR_GPIO > 0
-> -#define ARCH_NR_GPIOS CONFIG_ARCH_NR_GPIO
-> -#endif
-...
-> diff --git a/include/asm-generic/gpio.h b/include/asm-generic/gpio.h
-> index 40ec1433f05d..2d04b321db13 100644
-> --- a/include/asm-generic/gpio.h
-> +++ b/include/asm-generic/gpio.h
-> @@ -26,8 +26,12 @@
->   */
->  
->  #ifndef ARCH_NR_GPIOS
-> +#ifdef CONFIG_ARCH_NR_GPIO
-> +#define ARCH_NR_GPIOS CONFIG_ARCH_NR_GPIO
-> +#else
->  #define ARCH_NR_GPIOS		512
->  #endif
-> +#endif
+The patch
+"ARM: 8432/1: move VMALLOC_END from 0xff000000 to 0xff800000"
+(sha1: 6ff0966052c46efb53980b8a1add2e7b49c9f560)
+has moved also start of VMALLOC area because size didn't change.
+That's why origin location of vmalloc was
+   vmalloc : 0xf0000000 - 0xff000000   ( 240 MB)
+and now is
+   vmalloc : 0xf0800000 - 0xff800000   ( 240 MB)
 
-This really isn't the same thing, especially when you look at:
+That's why uart virtual addresses need to be changed to reflect this new
+memory setup. Starting address should be vmalloc start address.
 
-config ARCH_NR_GPIO
-        int
-        default 1024 if ARCH_BRCMSTB || ARCH_SHMOBILE || ARCH_TEGRA || \
-                ARCH_ZYNQ
-        default 512 if ARCH_EXYNOS || ARCH_KEYSTONE || SOC_OMAP5 || \
-                SOC_DRA7XX || ARCH_S3C24XX || ARCH_S3C64XX || ARCH_S5PV210
-        default 416 if ARCH_SUNXI
-        default 392 if ARCH_U8500
-        default 352 if ARCH_VT8500
-        default 288 if ARCH_ROCKCHIP
-        default 264 if MACH_H4700
-        default 0
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+---
 
-This has the effect of causing anything not mentioned above to end up
-with ARCH_NR_GPIOS set to zero.
+ arch/arm/include/debug/zynq.S | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-You really should _not_ be making these kinds of functional changes
-when moving code around.  Separate the two changes: either first move
-the code, and have a separate patch to make the functional changes, or
-make the functional changes first, and then move the code around.
-
-I'd have thought you would've known this by now...
-
+diff --git a/arch/arm/include/debug/zynq.S b/arch/arm/include/debug/zynq.S
+index de86b9247564..060cb5b49bfd 100644
+--- a/arch/arm/include/debug/zynq.S
++++ b/arch/arm/include/debug/zynq.S
+@@ -20,9 +20,9 @@
+ #define UART_SR_TXEMPTY		0x00000008	/* TX FIFO empty */
+ 
+ #define UART0_PHYS		0xE0000000
+-#define UART0_VIRT		0xF0000000
++#define UART0_VIRT		0xF0800000
+ #define UART1_PHYS		0xE0001000
+-#define UART1_VIRT		0xF0001000
++#define UART1_VIRT		0xF0801000
+ 
+ #if IS_ENABLED(CONFIG_DEBUG_ZYNQ_UART1)
+ # define LL_UART_PADDR		UART1_PHYS
 -- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+1.9.1
