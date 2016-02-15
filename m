@@ -1,139 +1,310 @@
 From: ykk@rock-chips.com (Yakir Yang)
-Date: Mon, 15 Feb 2016 19:11:20 +0800
-Subject: [PATCH v14 14/17] drm: bridge: analogix/dp: move hpd detect to
- connector detect function
+Date: Mon, 15 Feb 2016 19:10:11 +0800
+Subject: [PATCH v14 06/17] drm: bridge: analogix/dp: dynamic parse sync_pol &
+ interlace & dynamic_range
 In-Reply-To: <1455534485-1154-1-git-send-email-ykk@rock-chips.com>
 References: <1455534485-1154-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1455534680-2112-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <1455534611-1738-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This change just make a little clean to make code more like
-drm core expect, move hdp detect code from bridge->enable(),
-and place them into connector->detect().
+Both hsync/vsync polarity and interlace mode can be parsed from
+drm display mode, and dynamic_range and ycbcr_coeff can be judge
+by the video code.
 
-Note: Gustavo Padovan try to remove the controller and phy
-power on function in bind time at bellow commit:
-	drm/exynos: do not start enabling DP at bind() phase
-
-But for now the connector status don't hardcode to connected,
-need to operate dp phy in .detect function, so we need to revert
-parts if Gustavo Padovan's changes, add phy poweron
-function in bind time.
+But presumably Exynos still relies on the DT properties, so take
+good use of mode_fixup() in to achieve the compatibility hacks.
 
 Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
 ---
 Changes in v14: None
 Changes in v13: None
 Changes in v12: None
-Changes in v11:
-- Revert parts of Gustavo Padovan's changes in commit:
-	drm/exynos: do not start enabling DP at bind() phase
-  Add dp phy poweron function in bind time.
-- Move the panel prepare from get_modes time to bind time, and move
-  the panel unprepare from bridge->disable to unbind time. (Heiko)
-
+Changes in v11: None
 Changes in v10: None
 Changes in v9: None
 Changes in v8: None
-Changes in v7: None
+Changes in v7:
+- Back to use the of_property_read_bool() interfacs to provoid backward
+  compatibility of "hsync-active-high" "vsync-active-high" "interlaced"
+  to avoid -EOVERFLOW error (Krzysztof)
+
 Changes in v6: None
-Changes in v5: None
+Changes in v5:
+- Switch video timing type to "u32", so driver could use "of_property_read_u32"
+  to get the backword timing values. Krzysztof suggest me that driver could use
+  the "of_property_read_bool" to get backword timing values, but that interfacs
+  would modify the original drm_display_mode timing directly (whether those
+  properties exists or not).
+
 Changes in v4:
-- Take Jingoo suggest, add commit messages.
+- Provide backword compatibility with samsung. (Krzysztof)
 
 Changes in v3:
-- move dp hpd detect to connector detect function.
+- Dynamic parse video timing info from struct drm_display_mode and
+  struct drm_display_info. (Thierry)
 
 Changes in v2: None
 
- drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 38 ++++++++++++----------
- 1 file changed, 20 insertions(+), 18 deletions(-)
+ drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 148 +++++++++++++--------
+ drivers/gpu/drm/bridge/analogix/analogix_dp_core.h |   2 +-
+ drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c  |  14 +-
+ 3 files changed, 103 insertions(+), 61 deletions(-)
 
 diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-index 13986b7..cfdf695 100644
+index b948636..26359f4 100644
 --- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
 +++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-@@ -904,12 +904,6 @@ static void analogix_dp_commit(struct analogix_dp_device *dp)
- 			DRM_ERROR("failed to disable the panel\n");
+@@ -893,8 +893,8 @@ static void analogix_dp_commit(struct analogix_dp_device *dp)
+ 		return;
  	}
  
--	ret = analogix_dp_detect_hpd(dp);
--	if (ret) {
--		/* Cable has been disconnected, we're done */
--		return;
--	}
--
- 	ret = analogix_dp_handle_edid(dp);
+-	ret = analogix_dp_set_link_train(dp, dp->video_info->lane_count,
+-					 dp->video_info->link_rate);
++	ret = analogix_dp_set_link_train(dp, dp->video_info.lane_count,
++					 dp->video_info.link_rate);
  	if (ret) {
- 		dev_err(dp->dev, "unable to handle edid\n");
-@@ -972,6 +966,11 @@ static const struct drm_connector_helper_funcs analogix_dp_connector_helper_func
- enum drm_connector_status
- analogix_dp_detect(struct drm_connector *connector, bool force)
- {
-+	struct analogix_dp_device *dp = to_dp(connector);
-+
-+	if (analogix_dp_detect_hpd(dp))
-+		return connector_status_disconnected;
-+
- 	return connector_status_connected;
- }
- 
-@@ -1051,13 +1050,6 @@ static void analogix_dp_bridge_enable(struct drm_bridge *bridge)
- 
- 	pm_runtime_get_sync(dp->dev);
- 
--	if (dp->plat_data->panel) {
--		if (drm_panel_prepare(dp->plat_data->panel)) {
--			DRM_ERROR("failed to setup the panel\n");
--			return;
--		}
--	}
--
- 	if (dp->plat_data->power_on)
- 		dp->plat_data->power_on(dp->plat_data);
- 
-@@ -1090,11 +1082,6 @@ static void analogix_dp_bridge_disable(struct drm_bridge *bridge)
- 	if (dp->plat_data->power_off)
- 		dp->plat_data->power_off(dp->plat_data);
- 
--	if (dp->plat_data->panel) {
--		if (drm_panel_unprepare(dp->plat_data->panel))
--			DRM_ERROR("failed to turnoff the panel\n");
--	}
--
- 	pm_runtime_put_sync(dp->dev);
- 
+ 		dev_err(dp->dev, "unable to do link train\n");
+ 		return;
+@@ -1077,6 +1077,85 @@ static void analogix_dp_bridge_disable(struct drm_bridge *bridge)
  	dp->dpms_mode = DRM_MODE_DPMS_OFF;
-@@ -1352,6 +1339,15 @@ int analogix_dp_bind(struct device *dev, struct drm_device *drm_dev,
- 
- 	pm_runtime_enable(dev);
- 
-+	phy_power_on(dp->phy);
-+
-+	if (dp->plat_data->panel) {
-+		if (drm_panel_prepare(dp->plat_data->panel)) {
-+			DRM_ERROR("failed to setup the panel\n");
-+			return -EBUSY;
-+		}
-+	}
-+
- 	ret = devm_request_irq(&pdev->dev, dp->irq, analogix_dp_irq_handler,
- 			       irq_flags, "analogix-dp", dp);
- 	if (ret) {
-@@ -1385,6 +1381,12 @@ void analogix_dp_unbind(struct device *dev, struct device *master,
- 	struct analogix_dp_device *dp = dev_get_drvdata(dev);
- 
- 	analogix_dp_bridge_disable(dp->bridge);
-+
-+	if (dp->plat_data->panel) {
-+		if (drm_panel_unprepare(dp->plat_data->panel))
-+			DRM_ERROR("failed to turnoff the panel\n");
-+	}
-+
- 	pm_runtime_disable(dev);
  }
- EXPORT_SYMBOL_GPL(analogix_dp_unbind);
+ 
++static void analogix_dp_bridge_mode_set(struct drm_bridge *bridge,
++					struct drm_display_mode *orig_mode,
++					struct drm_display_mode *mode)
++{
++	struct analogix_dp_device *dp = bridge->driver_private;
++	struct drm_display_info *display_info = &dp->connector.display_info;
++	struct video_info *video = &dp->video_info;
++	struct device_node *dp_node = dp->dev->of_node;
++	int vic;
++
++	/* Input video interlaces & hsync pol & vsync pol */
++	video->interlaced = !!(mode->flags & DRM_MODE_FLAG_INTERLACE);
++	video->v_sync_polarity = !!(mode->flags & DRM_MODE_FLAG_NVSYNC);
++	video->h_sync_polarity = !!(mode->flags & DRM_MODE_FLAG_NHSYNC);
++
++	/* Input video dynamic_range & colorimetry */
++	vic = drm_match_cea_mode(mode);
++	if ((vic == 6) || (vic == 7) || (vic == 21) || (vic == 22) ||
++	    (vic == 2) || (vic == 3) || (vic == 17) || (vic == 18)) {
++		video->dynamic_range = CEA;
++		video->ycbcr_coeff = COLOR_YCBCR601;
++	} else if (vic) {
++		video->dynamic_range = CEA;
++		video->ycbcr_coeff = COLOR_YCBCR709;
++	} else {
++		video->dynamic_range = VESA;
++		video->ycbcr_coeff = COLOR_YCBCR709;
++	}
++
++	/* Input vide bpc and color_formats */
++	switch (display_info->bpc) {
++	case 12:
++		video->color_depth = COLOR_12;
++		break;
++	case 10:
++		video->color_depth = COLOR_10;
++		break;
++	case 8:
++		video->color_depth = COLOR_8;
++		break;
++	case 6:
++		video->color_depth = COLOR_6;
++		break;
++	default:
++		video->color_depth = COLOR_8;
++		break;
++	}
++	if (display_info->color_formats & DRM_COLOR_FORMAT_YCRCB444)
++		video->color_space = COLOR_YCBCR444;
++	else if (display_info->color_formats & DRM_COLOR_FORMAT_YCRCB422)
++		video->color_space = COLOR_YCBCR422;
++	else if (display_info->color_formats & DRM_COLOR_FORMAT_RGB444)
++		video->color_space = COLOR_RGB;
++	else
++		video->color_space = COLOR_RGB;
++
++	/*
++	 * NOTE: those property parsing code is used for providing backward
++	 * compatibility for samsung platform.
++	 * Due to we used the "of_property_read_u32" interfaces, when this
++	 * property isn't present, the "video_info" can keep the original
++	 * values and wouldn't be modified.
++	 */
++	of_property_read_u32(dp_node, "samsung,color-space",
++			     &video->color_space);
++	of_property_read_u32(dp_node, "samsung,dynamic-range",
++			     &video->dynamic_range);
++	of_property_read_u32(dp_node, "samsung,ycbcr-coeff",
++			     &video->ycbcr_coeff);
++	of_property_read_u32(dp_node, "samsung,color-depth",
++			     &video->color_depth);
++	if (of_property_read_bool(dp_node, "hsync-active-high"))
++		video->h_sync_polarity = true;
++	if (of_property_read_bool(dp_node, "vsync-active-high"))
++		video->v_sync_polarity = true;
++	if (of_property_read_bool(dp_node, "interlaced"))
++		video->interlaced = true;
++}
++
+ static void analogix_dp_bridge_nop(struct drm_bridge *bridge)
+ {
+ 	/* do nothing */
+@@ -1087,6 +1166,7 @@ static const struct drm_bridge_funcs analogix_dp_bridge_funcs = {
+ 	.disable = analogix_dp_bridge_disable,
+ 	.pre_enable = analogix_dp_bridge_nop,
+ 	.post_disable = analogix_dp_bridge_nop,
++	.mode_set = analogix_dp_bridge_mode_set,
+ 	.attach = analogix_dp_bridge_attach,
+ };
+ 
+@@ -1118,62 +1198,24 @@ static int analogix_dp_create_bridge(struct drm_device *drm_dev,
+ 	return 0;
+ }
+ 
+-static struct video_info *analogix_dp_dt_parse_pdata(struct device *dev)
++static int analogix_dp_dt_parse_pdata(struct analogix_dp_device *dp)
+ {
+-	struct device_node *dp_node = dev->of_node;
+-	struct video_info *dp_video_config;
+-
+-	dp_video_config = devm_kzalloc(dev, sizeof(*dp_video_config),
+-				       GFP_KERNEL);
+-	if (!dp_video_config)
+-		return ERR_PTR(-ENOMEM);
+-
+-	dp_video_config->h_sync_polarity =
+-		of_property_read_bool(dp_node, "hsync-active-high");
+-
+-	dp_video_config->v_sync_polarity =
+-		of_property_read_bool(dp_node, "vsync-active-high");
+-
+-	dp_video_config->interlaced =
+-		of_property_read_bool(dp_node, "interlaced");
+-
+-	if (of_property_read_u32(dp_node, "samsung,color-space",
+-				 &dp_video_config->color_space)) {
+-		dev_err(dev, "failed to get color-space\n");
+-		return ERR_PTR(-EINVAL);
+-	}
+-
+-	if (of_property_read_u32(dp_node, "samsung,dynamic-range",
+-				 &dp_video_config->dynamic_range)) {
+-		dev_err(dev, "failed to get dynamic-range\n");
+-		return ERR_PTR(-EINVAL);
+-	}
+-
+-	if (of_property_read_u32(dp_node, "samsung,ycbcr-coeff",
+-				 &dp_video_config->ycbcr_coeff)) {
+-		dev_err(dev, "failed to get ycbcr-coeff\n");
+-		return ERR_PTR(-EINVAL);
+-	}
+-
+-	if (of_property_read_u32(dp_node, "samsung,color-depth",
+-				 &dp_video_config->color_depth)) {
+-		dev_err(dev, "failed to get color-depth\n");
+-		return ERR_PTR(-EINVAL);
+-	}
++	struct device_node *dp_node = dp->dev->of_node;
++	struct video_info *video_info = &dp->video_info;
+ 
+ 	if (of_property_read_u32(dp_node, "samsung,link-rate",
+-				 &dp_video_config->link_rate)) {
+-		dev_err(dev, "failed to get link-rate\n");
+-		return ERR_PTR(-EINVAL);
++				 &video_info->link_rate)) {
++		dev_err(dp->dev, "failed to get link-rate\n");
++		return -EINVAL;
+ 	}
+ 
+ 	if (of_property_read_u32(dp_node, "samsung,lane-count",
+-				 &dp_video_config->lane_count)) {
+-		dev_err(dev, "failed to get lane-count\n");
+-		return ERR_PTR(-EINVAL);
++				 &video_info->lane_count)) {
++		dev_err(dp->dev, "failed to get lane-count\n");
++		return -EINVAL;
+ 	}
+ 
+-	return dp_video_config;
++	return 0;
+ }
+ 
+ int analogix_dp_bind(struct device *dev, struct drm_device *drm_dev,
+@@ -1206,9 +1248,9 @@ int analogix_dp_bind(struct device *dev, struct drm_device *drm_dev,
+ 	 */
+ 	dp->plat_data = plat_data;
+ 
+-	dp->video_info = analogix_dp_dt_parse_pdata(&pdev->dev);
+-	if (IS_ERR(dp->video_info))
+-		return PTR_ERR(dp->video_info);
++	ret = analogix_dp_dt_parse_pdata(dp);
++	if (ret)
++		return ret;
+ 
+ 	dp->phy = devm_phy_get(dp->dev, "dp");
+ 	if (IS_ERR(dp->phy)) {
+diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
+index afb0a53..123030f 100644
+--- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
++++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
+@@ -148,7 +148,7 @@ struct analogix_dp_device {
+ 	unsigned int		irq;
+ 	void __iomem		*reg_base;
+ 
+-	struct video_info	*video_info;
++	struct video_info	video_info;
+ 	struct link_train	link_train;
+ 	struct work_struct	hotplug_work;
+ 	struct phy		*phy;
+diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
+index eb0b63c..3858df5 100644
+--- a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
++++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
+@@ -1084,15 +1084,15 @@ void analogix_dp_set_video_color_format(struct analogix_dp_device *dp)
+ 	u32 reg;
+ 
+ 	/* Configure the input color depth, color space, dynamic range */
+-	reg = (dp->video_info->dynamic_range << IN_D_RANGE_SHIFT) |
+-		(dp->video_info->color_depth << IN_BPC_SHIFT) |
+-		(dp->video_info->color_space << IN_COLOR_F_SHIFT);
++	reg = (dp->video_info.dynamic_range << IN_D_RANGE_SHIFT) |
++		(dp->video_info.color_depth << IN_BPC_SHIFT) |
++		(dp->video_info.color_space << IN_COLOR_F_SHIFT);
+ 	writel(reg, dp->reg_base + ANALOGIX_DP_VIDEO_CTL_2);
+ 
+ 	/* Set Input Color YCbCr Coefficients to ITU601 or ITU709 */
+ 	reg = readl(dp->reg_base + ANALOGIX_DP_VIDEO_CTL_3);
+ 	reg &= ~IN_YC_COEFFI_MASK;
+-	if (dp->video_info->ycbcr_coeff)
++	if (dp->video_info.ycbcr_coeff)
+ 		reg |= IN_YC_COEFFI_ITU709;
+ 	else
+ 		reg |= IN_YC_COEFFI_ITU601;
+@@ -1229,17 +1229,17 @@ void analogix_dp_config_video_slave_mode(struct analogix_dp_device *dp)
+ 
+ 	reg = readl(dp->reg_base + ANALOGIX_DP_VIDEO_CTL_10);
+ 	reg &= ~INTERACE_SCAN_CFG;
+-	reg |= (dp->video_info->interlaced << 2);
++	reg |= (dp->video_info.interlaced << 2);
+ 	writel(reg, dp->reg_base + ANALOGIX_DP_VIDEO_CTL_10);
+ 
+ 	reg = readl(dp->reg_base + ANALOGIX_DP_VIDEO_CTL_10);
+ 	reg &= ~VSYNC_POLARITY_CFG;
+-	reg |= (dp->video_info->v_sync_polarity << 1);
++	reg |= (dp->video_info.v_sync_polarity << 1);
+ 	writel(reg, dp->reg_base + ANALOGIX_DP_VIDEO_CTL_10);
+ 
+ 	reg = readl(dp->reg_base + ANALOGIX_DP_VIDEO_CTL_10);
+ 	reg &= ~HSYNC_POLARITY_CFG;
+-	reg |= (dp->video_info->h_sync_polarity << 0);
++	reg |= (dp->video_info.h_sync_polarity << 0);
+ 	writel(reg, dp->reg_base + ANALOGIX_DP_VIDEO_CTL_10);
+ 
+ 	reg = AUDIO_MODE_SPDIF_MODE | VIDEO_MODE_SLAVE_MODE;
 -- 
 1.9.1
