@@ -1,73 +1,43 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 15 Feb 2016 18:31:22 +0800
-Subject: [PATCH v2 04/10] regulator: axp20x: Use of_match name as default
- regulator name
+Date: Mon, 15 Feb 2016 18:31:19 +0800
+Subject: [PATCH v2 01/10] MAINTAINERS: Add entry for X-Powers AXP family PMIC
+ drivers
 In-Reply-To: <1455532288-30870-1-git-send-email-wens@csie.org>
 References: <1455532288-30870-1-git-send-email-wens@csie.org>
-Message-ID: <1455532288-30870-5-git-send-email-wens@csie.org>
+Message-ID: <1455532288-30870-2-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Originally the helper macros used uppercase regulator names, which
-are primarily used to expand to the regulator ID enum, as the default
-names. This is aestheticly unpleasent.
+Add an entry for X-Powers AXP family PMIC drivers and list myself
+as maintainer.
 
-Since the of_match bits are the same, just lowercase, use that as the
-default names instead.
-
+Cc: Carlo Caione <carlo@caione.org>
+Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+Cc: Ramakrishna Pallala <ramakrishna.pallala@intel.com>
+Cc: Todd Brandt <todd.e.brandt@linux.intel.com>
+Cc: Jacob Pan <jacob.jun.pan@linux.intel.com>
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/regulator/axp20x-regulator.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ MAINTAINERS | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
-index 81f25383f2d5..40cd894e4df5 100644
---- a/drivers/regulator/axp20x-regulator.c
-+++ b/drivers/regulator/axp20x-regulator.c
-@@ -39,7 +39,7 @@
- #define AXP_DESC_IO(_family, _id, _match, _supply, _min, _max, _step, _vreg,	\
- 		    _vmask, _ereg, _emask, _enable_val, _disable_val)		\
- 	[_family##_##_id] = {							\
--		.name		= #_id,						\
-+		.name		= (_match),					\
- 		.supply_name	= (_supply),					\
- 		.of_match	= of_match_ptr(_match),				\
- 		.regulators_node = of_match_ptr("regulators"),			\
-@@ -61,7 +61,7 @@
- #define AXP_DESC(_family, _id, _match, _supply, _min, _max, _step, _vreg,	\
- 		 _vmask, _ereg, _emask) 					\
- 	[_family##_##_id] = {							\
--		.name		= #_id,						\
-+		.name		= (_match),					\
- 		.supply_name	= (_supply),					\
- 		.of_match	= of_match_ptr(_match),				\
- 		.regulators_node = of_match_ptr("regulators"),			\
-@@ -80,7 +80,7 @@
+diff --git a/MAINTAINERS b/MAINTAINERS
+index f678c37107f5..7ea4e54f566a 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -11941,6 +11941,12 @@ F:	include/linux/workqueue.h
+ F:	kernel/workqueue.c
+ F:	Documentation/workqueue.txt
  
- #define AXP_DESC_SW(_family, _id, _match, _supply, _ereg, _emask)		\
- 	[_family##_##_id] = {							\
--		.name		= #_id,						\
-+		.name		= (_match),					\
- 		.supply_name	= (_supply),					\
- 		.of_match	= of_match_ptr(_match),				\
- 		.regulators_node = of_match_ptr("regulators"),			\
-@@ -94,7 +94,7 @@
- 
- #define AXP_DESC_FIXED(_family, _id, _match, _supply, _volt)			\
- 	[_family##_##_id] = {							\
--		.name		= #_id,						\
-+		.name		= (_match),					\
- 		.supply_name	= (_supply),					\
- 		.of_match	= of_match_ptr(_match),				\
- 		.regulators_node = of_match_ptr("regulators"),			\
-@@ -109,7 +109,7 @@
- #define AXP_DESC_RANGES(_family, _id, _match, _supply, _ranges, _n_voltages,	\
- 			_vreg, _vmask, _ereg, _emask)				\
- 	[_family##_##_id] = {							\
--		.name		= #_id,						\
-+		.name		= (_match),					\
- 		.supply_name	= (_supply),					\
- 		.of_match	= of_match_ptr(_match),				\
- 		.regulators_node = of_match_ptr("regulators"),			\
++X-POWERS MULTIFUNCTION PMIC DEVICE DRIVERS
++M:	Chen-Yu Tsai <wens@csie.org>
++L:	linux-kernel at vger.kernel.org
++S:	Maintained
++N:	axp[128]
++
+ X.25 NETWORK LAYER
+ M:	Andrew Hendry <andrew.hendry@gmail.com>
+ L:	linux-x25 at vger.kernel.org
 -- 
 2.7.0
