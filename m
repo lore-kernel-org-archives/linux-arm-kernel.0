@@ -1,25 +1,28 @@
 From: mturquette@baylibre.com (Michael Turquette)
-Date: Mon, 15 Feb 2016 14:13:13 -0800
-Subject: [PATCH 01/14] mfd: intel_quark_i2c_gpio: Use clkdev_create()
-In-Reply-To: <1454982341-22715-2-git-send-email-sboyd@codeaurora.org>
+Date: Mon, 15 Feb 2016 14:13:32 -0800
+Subject: [PATCH 03/14] clk: Add {devm_}clk_hw_{register, unregister}() APIs
+In-Reply-To: <1454982341-22715-4-git-send-email-sboyd@codeaurora.org>
 References: <1454982341-22715-1-git-send-email-sboyd@codeaurora.org>
- <1454982341-22715-2-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20160215221313.2278.40061@quark.deferred.io>
+ <1454982341-22715-4-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20160215221332.2278.64497@quark.deferred.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Stephen Boyd (2016-02-08 17:45:28)
-> Convert this driver to use clkdev_create() instead of
-> clk_register_clkdevs(). The latter API is only used by this driver,
-> although this driver only allocates one clk to add anyway.
-> Furthermore, this driver allocates the clk_lookup structure with
-> devm, but clkdev_drop() will free that structure when passed,
-> leading to a double free when this driver is removed. Clean it
-> all up and pave the way for the removal of clk_register_clkdevs().
+Quoting Stephen Boyd (2016-02-08 17:45:30)
+> We've largely split the clk consumer and provider APIs along
+> struct clk and struct clk_hw, but clk_register() still returns a
+> struct clk pointer for each struct clk_hw that's registered.
+> Eventually we'd like to only allocate struct clks when there's a
+> user, because struct clk is per-user now, so clk_register() needs
+> to change.
 > 
-> Cc: Lee Jones <lee.jones@linaro.org>
-> Cc: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
+> Let's add new APIs to register struct clk_hws, but this time
+> we'll hide the struct clk from the caller by returning an int
+> error code. Also add an unregistration API that takes the clk_hw
+> structure that was passed to the registration API. This way
+> provider drivers never have to deal with a struct clk pointer
+> unless they're using the clk consumer APIs.
+> 
 > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
 Looks good to me.
@@ -28,62 +31,173 @@ Regards,
 Mike
 
 > ---
->  drivers/mfd/intel_quark_i2c_gpio.c | 26 +++++++++-----------------
->  1 file changed, 9 insertions(+), 17 deletions(-)
+>  Documentation/driver-model/devres.txt |  1 +
+>  drivers/clk/clk.c                     | 86 +++++++++++++++++++++++++++++++++++
+>  include/linux/clk-provider.h          |  6 +++
+>  3 files changed, 93 insertions(+)
 > 
-> diff --git a/drivers/mfd/intel_quark_i2c_gpio.c b/drivers/mfd/intel_quark_i2c_gpio.c
-> index 042137465300..bdc5e27222c0 100644
-> --- a/drivers/mfd/intel_quark_i2c_gpio.c
-> +++ b/drivers/mfd/intel_quark_i2c_gpio.c
-> @@ -52,8 +52,6 @@
->  /* The Quark I2C controller source clock */
->  #define INTEL_QUARK_I2C_CLK_HZ 33000000
+> diff --git a/Documentation/driver-model/devres.txt b/Documentation/driver-model/devres.txt
+> index 831a5363f6be..600e30bf52c5 100644
+> --- a/Documentation/driver-model/devres.txt
+> +++ b/Documentation/driver-model/devres.txt
+> @@ -236,6 +236,7 @@ certainly invest a bit more effort into libata core layer).
+>  CLOCK
+>    devm_clk_get()
+>    devm_clk_put()
+> +  devm_clk_hw_register()
 >  
-> -#define INTEL_QUARK_I2C_NCLK   1
-> -
->  struct intel_quark_mfd {
->         struct pci_dev          *pdev;
->         struct clk              *i2c_clk;
-> @@ -128,30 +126,24 @@ MODULE_DEVICE_TABLE(pci, intel_quark_mfd_ids);
->  static int intel_quark_register_i2c_clk(struct intel_quark_mfd *quark_mfd)
+>  DMA
+>    dmam_alloc_coherent()
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index b4db67a446c8..adaaead3639f 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -2613,6 +2613,22 @@ fail_out:
+>  }
+>  EXPORT_SYMBOL_GPL(clk_register);
+>  
+> +/**
+> + * clk_hw_register - register a clk_hw and return an error code
+> + * @dev: device that is registering this clock
+> + * @hw: link to hardware-specific clock data
+> + *
+> + * clk_hw_register is the primary interface for populating the clock tree with
+> + * new clock nodes. It returns an integer equal to zero indicating success or
+> + * less than zero indicating failure. Drivers must test for an error code after
+> + * calling clk_hw_register().
+> + */
+> +int clk_hw_register(struct device *dev, struct clk_hw *hw)
+> +{
+> +       return PTR_ERR_OR_ZERO(clk_register(dev, hw));
+> +}
+> +EXPORT_SYMBOL_GPL(clk_hw_register);
+> +
+>  /* Free memory allocated for a clock. */
+>  static void __clk_release(struct kref *ref)
 >  {
->         struct pci_dev *pdev = quark_mfd->pdev;
-> -       struct clk_lookup *i2c_clk_lookup;
->         struct clk *i2c_clk;
-> -       int ret;
-> -
-> -       i2c_clk_lookup = devm_kcalloc(&pdev->dev, INTEL_QUARK_I2C_NCLK,
-> -                                     sizeof(*i2c_clk_lookup), GFP_KERNEL);
-> -       if (!i2c_clk_lookup)
-> -               return -ENOMEM;
-> -
-> -       i2c_clk_lookup[0].dev_id = INTEL_QUARK_I2C_CONTROLLER_CLK;
+> @@ -2714,11 +2730,26 @@ void clk_unregister(struct clk *clk)
+>  }
+>  EXPORT_SYMBOL_GPL(clk_unregister);
 >  
->         i2c_clk = clk_register_fixed_rate(&pdev->dev,
->                                           INTEL_QUARK_I2C_CONTROLLER_CLK, NULL,
->                                           CLK_IS_ROOT, INTEL_QUARK_I2C_CLK_HZ);
-> +       if (IS_ERR(i2c_clk))
-> +               return PTR_ERR(i2c_clk);
->  
-> -       quark_mfd->i2c_clk_lookup = i2c_clk_lookup;
->         quark_mfd->i2c_clk = i2c_clk;
-> +       quark_mfd->i2c_clk_lookup = clkdev_create(i2c_clk, NULL,
-> +                                               INTEL_QUARK_I2C_CONTROLLER_CLK);
->  
-> -       ret = clk_register_clkdevs(i2c_clk, i2c_clk_lookup,
-> -                                  INTEL_QUARK_I2C_NCLK);
-> -       if (ret)
-> -               dev_err(&pdev->dev, "Fixed clk register failed: %d\n", ret);
-> +       if (!quark_mfd->i2c_clk_lookup) {
-> +               dev_err(&pdev->dev, "Fixed clk register failed\n");
-> +               return -ENOMEM;
-> +       }
->  
-> -       return ret;
-> +       return 0;
+> +/**
+> + * clk_hw_unregister - unregister a currently registered clk_hw
+> + * @hw: hardware-specific clock data to unregister
+> + */
+> +void clk_hw_unregister(struct clk_hw *hw)
+> +{
+> +       clk_unregister(hw->clk);
+> +}
+> +EXPORT_SYMBOL_GPL(clk_hw_unregister);
+> +
+>  static void devm_clk_release(struct device *dev, void *res)
+>  {
+>         clk_unregister(*(struct clk **)res);
 >  }
 >  
->  static void intel_quark_unregister_i2c_clk(struct pci_dev *pdev)
+> +static void devm_clk_hw_release(struct device *dev, void *res)
+> +{
+> +       clk_hw_unregister(*(struct clk_hw **)res);
+> +}
+> +
+>  /**
+>   * devm_clk_register - resource managed clk_register()
+>   * @dev: device that is registering this clock
+> @@ -2749,6 +2780,36 @@ struct clk *devm_clk_register(struct device *dev, struct clk_hw *hw)
+>  }
+>  EXPORT_SYMBOL_GPL(devm_clk_register);
+>  
+> +/**
+> + * devm_clk_hw_register - resource managed clk_hw_register()
+> + * @dev: device that is registering this clock
+> + * @hw: link to hardware-specific clock data
+> + *
+> + * Managed clk_hw_register(). Clocks returned from this function are
+> + * automatically clk_hw_unregister()ed on driver detach. See clk_hw_register()
+> + * for more information.
+> + */
+> +int devm_clk_hw_register(struct device *dev, struct clk_hw *hw)
+> +{
+> +       struct clk_hw **hwp;
+> +       int ret;
+> +
+> +       hwp = devres_alloc(devm_clk_hw_release, sizeof(*hwp), GFP_KERNEL);
+> +       if (!hwp)
+> +               return -ENOMEM;
+> +
+> +       ret = clk_hw_register(dev, hw);
+> +       if (!ret) {
+> +               *hwp = hw;
+> +               devres_add(dev, hwp);
+> +       } else {
+> +               devres_free(hwp);
+> +       }
+> +
+> +       return ret;
+> +}
+> +EXPORT_SYMBOL_GPL(devm_clk_hw_register);
+> +
+>  static int devm_clk_match(struct device *dev, void *res, void *data)
+>  {
+>         struct clk *c = res;
+> @@ -2757,6 +2818,15 @@ static int devm_clk_match(struct device *dev, void *res, void *data)
+>         return c == data;
+>  }
+>  
+> +static int devm_clk_hw_match(struct device *dev, void *res, void *data)
+> +{
+> +       struct clk_hw *hw = res;
+> +
+> +       if (WARN_ON(!hw))
+> +               return 0;
+> +       return hw == data;
+> +}
+> +
+>  /**
+>   * devm_clk_unregister - resource managed clk_unregister()
+>   * @clk: clock to unregister
+> @@ -2771,6 +2841,22 @@ void devm_clk_unregister(struct device *dev, struct clk *clk)
+>  }
+>  EXPORT_SYMBOL_GPL(devm_clk_unregister);
+>  
+> +/**
+> + * devm_clk_hw_unregister - resource managed clk_hw_unregister()
+> + * @dev: device that is unregistering the hardware-specific clock data
+> + * @hw: link to hardware-specific clock data
+> + *
+> + * Unregister a clk_hw registered with devm_clk_hw_register(). Normally
+> + * this function will not need to be called and the resource management
+> + * code will ensure that the resource is freed.
+> + */
+> +void devm_clk_hw_unregister(struct device *dev, struct clk_hw *hw)
+> +{
+> +       WARN_ON(devres_release(dev, devm_clk_hw_release, devm_clk_hw_match,
+> +                               hw));
+> +}
+> +EXPORT_SYMBOL_GPL(devm_clk_hw_unregister);
+> +
+>  /*
+>   * clkdev helpers
+>   */
+> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> index 1143e38555a4..abc16d77fb62 100644
+> --- a/include/linux/clk-provider.h
+> +++ b/include/linux/clk-provider.h
+> @@ -639,9 +639,15 @@ void of_gpio_mux_clk_setup(struct device_node *node);
+>  struct clk *clk_register(struct device *dev, struct clk_hw *hw);
+>  struct clk *devm_clk_register(struct device *dev, struct clk_hw *hw);
+>  
+> +int __must_check clk_hw_register(struct device *dev, struct clk_hw *hw);
+> +int __must_check devm_clk_hw_register(struct device *dev, struct clk_hw *hw);
+> +
+>  void clk_unregister(struct clk *clk);
+>  void devm_clk_unregister(struct device *dev, struct clk *clk);
+>  
+> +void clk_hw_unregister(struct clk_hw *hw);
+> +void devm_clk_hw_unregister(struct device *dev, struct clk_hw *hw);
+> +
+>  /* helper functions */
+>  const char *__clk_get_name(const struct clk *clk);
+>  const char *clk_hw_get_name(const struct clk_hw *hw);
 > -- 
 > The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 > a Linux Foundation Collaborative Project
