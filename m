@@ -1,34 +1,36 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Mon, 15 Feb 2016 12:47:46 -0500
-Subject: [PATCH] branch tracer: fix freak link error
-In-Reply-To: <1455312410-1058841-1-git-send-email-arnd@arndb.de>
-References: <1455312410-1058841-1-git-send-email-arnd@arndb.de>
-Message-ID: <20160215124746.44e8c2d0@gandalf.local.home>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 15 Feb 2016 17:52:50 +0000
+Subject: [PATCH v5 RESEND 4/5] ARM: amba: Move reading of periphid to
+ amba_match()
+In-Reply-To: <1455101250-11327-5-git-send-email-m.szyprowski@samsung.com>
+References: <1455101250-11327-1-git-send-email-m.szyprowski@samsung.com>
+ <1455101250-11327-5-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20160215175250.GJ10826@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 12 Feb 2016 22:26:42 +0100
-Arnd Bergmann <arnd@arndb.de> wrote:
-
-> In my randconfig tests, I came across a bug that involves several
-> components:
+On Wed, Feb 10, 2016 at 11:47:29AM +0100, Marek Szyprowski wrote:
+> From: Tomeu Vizoso <tomeu.vizoso@collabora.com>
 > 
->
-
-[..]
-
+> Reading the periphid when the Primecell device is registered means that
+> the apb pclk must be available by then or the device won't be registered
+> at all.
 > 
-> This patch avoids the problem by changing __trace_if() to check
-> whether the condition is known at compile-time to be nonzero, rather
-> than checking whether it is actually a constant.
-> 
-> I see this one link error in roughly one out of 1600 randconfig builds
-> on ARM, and the patch fixes all known instances.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: ab3c9c686e22 ("branch tracer, intel-iommu: fix build with CONFIG_BRANCH_TRACER=y")
+> By reading the periphid in amba_match() we can return -EPROBE_DEFER if
+> the apb pclk isn't there yet and the device will be retried later.
 
-Want me to pull this into my queue? I have another patch I need to send
-to Linus and I can add this in that pull request.
+I've just realised, we can't do this.  We need to read the peripheral
+ID at registration time, because that's published to userspace via
+(a) a sysfs attribute, and (b) as part of the uevent, which will be
+used by udev to locate the driver module.
 
--- Steve
+So, this will have the side effect of breaking systems which have
+AMBA primecell devices configured as modules.
+
+Sorry, I can't apply this.  We can't regress existing platforms for
+the sake of introducing new platforms to this code.
+
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
