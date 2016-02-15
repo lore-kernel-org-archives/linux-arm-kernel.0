@@ -1,16 +1,20 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon, 15 Feb 2016 21:38:31 +0100
-Subject: [PATCH v3 3/7] ARM: dts: r8a7791: Add L2 cache-controller node
+Date: Mon, 15 Feb 2016 21:38:29 +0100
+Subject: [PATCH v3 1/7] ARM: dts: r8a73a4: Add L2 cache-controller nodes
 In-Reply-To: <1455568715-20880-1-git-send-email-geert+renesas@glider.be>
 References: <1455568715-20880-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1455568715-20880-4-git-send-email-geert+renesas@glider.be>
+Message-ID: <1455568715-20880-2-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a device node for the L2 cache, and link the CPU nodes to it.
+Add device nodes for the L2 caches, and link the CPU node to its L2
+cache node.
 
 The L2 cache for the Cortex-A15 CPU cores is 1 MiB large (organized as
-64 KiB x 16 ways).
+64 KiB x 16 ways), and located in PM domain A3SM.
+
+The L2 cache for the Cortex-A7 CPU cores is 512 KiB large (organized as
+64 KiB x 8 ways), and located in PM domain A3KM.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
@@ -20,43 +24,45 @@ v3:
   - Change one-line summary prefix to match current arm-soc practices,
 
 v2:
-  - Drop (incorrect) optional cache-{size,sets,{block,line}-size}
-    properties, as this information is auto-detected,
-  - Integrate linking CPUs to L2 cache into this patch,
-  - Extracted from series "[PATCH/RFC 00/15] ARM: shmobile: R-Car: Add
-    SYSC PM Domain DT Support".
+  - New.
 ---
- arch/arm/boot/dts/r8a7791.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/r8a73a4.dtsi | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index 8910236e64bf93ed..a65910ed5884edfd 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -51,6 +51,7 @@
- 			voltage-tolerance = <1>; /* 1% */
- 			clocks = <&cpg_clocks R8A7791_CLK_Z>;
- 			clock-latency = <300000>; /* 300 us */
-+			next-level-cache = <&L2_CA15>;
- 
- 			/* kHz - uV - OPPs unknown yet */
- 			operating-points = <1500000 1000000>,
-@@ -66,9 +67,16 @@
- 			compatible = "arm,cortex-a15";
- 			reg = <1>;
+diff --git a/arch/arm/boot/dts/r8a73a4.dtsi b/arch/arm/boot/dts/r8a73a4.dtsi
+index 138414a7d1703781..6583a1dfca1f64c6 100644
+--- a/arch/arm/boot/dts/r8a73a4.dtsi
++++ b/arch/arm/boot/dts/r8a73a4.dtsi
+@@ -29,6 +29,7 @@
+ 			reg = <0>;
  			clock-frequency = <1500000000>;
+ 			power-domains = <&pd_a2sl>;
 +			next-level-cache = <&L2_CA15>;
  		};
  	};
  
+@@ -45,6 +46,22 @@
+ 			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
+ 	};
+ 
 +	L2_CA15: cache-controller at 0 {
 +		compatible = "cache";
++		clocks = <&cpg_clocks R8A73A4_CLK_Z>;
++		power-domains = <&pd_a3sm>;
 +		cache-unified;
 +		cache-level = <2>;
 +	};
 +
- 	gic: interrupt-controller at f1001000 {
- 		compatible = "arm,gic-400";
- 		#interrupt-cells = <3>;
++	L2_CA7: cache-controller at 1 {
++		compatible = "cache";
++		clocks = <&cpg_clocks R8A73A4_CLK_Z2>;
++		power-domains = <&pd_a3km>;
++		cache-unified;
++		cache-level = <2>;
++	};
++
+ 	dbsc1: memory-controller at e6790000 {
+ 		compatible = "renesas,dbsc-r8a73a4";
+ 		reg = <0 0xe6790000 0 0x10000>;
 -- 
 1.9.1
