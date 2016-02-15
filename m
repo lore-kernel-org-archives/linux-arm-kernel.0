@@ -1,52 +1,78 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 15 Feb 2016 10:04:15 +0000
-Subject: arm qemu test failures due to 'driver-core: platform: probe
- of-devices only using list of compatibles'
-In-Reply-To: <20160215091406.GE12289@pengutronix.de>
-References: <20160214165010.GA3189@roeck-us.net>
- <20160214195501.GA12289@pengutronix.de>
- <20160214200755.GB10826@n2100.arm.linux.org.uk>
- <20160215081750.GD12289@pengutronix.de>
- <20160215085818.GC10826@n2100.arm.linux.org.uk>
- <20160215091406.GE12289@pengutronix.de>
-Message-ID: <20160215100415.GD10826@n2100.arm.linux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 15 Feb 2016 10:03:19 +0000
+Subject: [PATCH RESEND] arm64: add alignment fault hanling
+In-Reply-To: <2039801453.916991455526707908.JavaMail.weblogic@epmlwas09b>
+References: <2039801453.916991455526707908.JavaMail.weblogic@epmlwas09b>
+Message-ID: <20160215100319.GA13683@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 15, 2016 at 10:14:06AM +0100, Uwe Kleine-K?nig wrote:
-> Hello Russell,
-> 
-> On Mon, Feb 15, 2016 at 08:58:18AM +0000, Russell King - ARM Linux wrote:
-> > On Mon, Feb 15, 2016 at 09:17:50AM +0100, Uwe Kleine-K?nig wrote:
-> > > On Sun, Feb 14, 2016 at 08:07:55PM +0000, Russell King - ARM Linux wrote:
-> > > > On Sun, Feb 14, 2016 at 08:55:01PM +0100, Uwe Kleine-K?nig wrote:
-> > > > > So the unexpected abnormality here is that even though this device is
-> > > > > instantiated by dt, the driver doesn't provide any compatibles.
-> > > > > Either my expectation is wrong, then 67d02a1bbb33455 should be reverted
-> > > > 
-> > > > Your expectation is wrong.  AMBA primecell devices have hardware IDs
-> > > > and are matched to their drivers by those IDs.  Just like PCI.
-> > > 
-> > > pci devices don't appear in dt, do they? I don't see the connection
-> > > between amba devices and platform devices, see my other mail in this
-> > > thread for some more details.
-> > 
-> > They both have hardware IDs, and they are both matched via those hardware
-> > IDs.
-> 
-> I changed platform_match which is about matching by dt compatible, acpi
-> and/or device name. I don't see how this can affect an amba device given
-> they match to a driver by a hardware id.
-> 
-> > Your change has introduced a regression and is therefore wrong.
-> 
-> I'd like to understand though why and how my commit is wrong to be able
-> to fix it instead of getting it reverted.
+On Mon, Feb 15, 2016 at 08:58:32AM +0000, EunTaik Lee wrote:
+> Userspace memory is mapped as below:
+> F2A7F000--F2A7FFFF Normal Memory
+> F2A80000--F2A80FFF Device nGnRnE
 
-I don't have the commit, and I haven't seen the patch so I can't
-comment further, sorry.
+How do you end up with Device nGnRnE in user space? I thought we should
+have got some guard page.
+
+> And that userspace application makes a system call
+> as below:
+> 
+> -009 |do_strncpy_from_user(inline)
+> -009 |strncpy_from_user()
+> -010 |getname_flags()
+> -011 |user_path_at_empty()
+> -012 |user_path_at()
+> -013 |SYSC_faccessat(inline)
+> -013 |sys_faccessat()
+> -014 |__sys_trace(asm)
+> --> |exception
+> 
+> The string spans from 0xF2A7FFC1 to 0xF2A7FFFB.
+> 
+> When do_strncpy_from_user() reads the last (unsigned long)
+> value, the alignement fault is triggered. The 8 byte
+> from 0xF2A7FFC1 spans to the next page that is mapped as
+> Device nGnRnE, which does not allow an unaligned access,
+> causes the abort.
+
+do_strncpy_from_user() relies on unsafe_get_user() not being able to
+read 8 bytes. The problem now is that it doesn't get a page fault but an
+alignment one is isn't handled.
+
+> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+> index 19211c4..8257d4f 100644
+> --- a/arch/arm64/mm/fault.c
+> +++ b/arch/arm64/mm/fault.c
+> @@ -371,6 +371,16 @@ static int __kprobes do_translation_fault(unsigned long addr,
+> return 0;
+> }
+> 
+> +static int __kprobes do_alignment_fault(unsigned long addr,
+> +   unsigned int esr,
+> +   struct pt_regs *regs)
+> +{
+> + if (addr >= TASK_SIZE && fixup_exception(regs))
+> + return 0;
+> +
+> + return 1;
+> +}
+
+Why addr >= TASK_SIZE? addr here should be the fault address, not pc.
+
+> +
+> /*
+>   * This abort handler always returns "fault".
+>   */
+> @@ -418,7 +428,7 @@ static struct fault_info {
+> { do_bad, SIGBUS,  0, "synchronous parity error (translation table walk" },
+> { do_bad, SIGBUS,  0, "synchronous parity error (translation table walk" },
+> { do_bad, SIGBUS,  0, "unknown 32" },
+> - { do_bad, SIGBUS,  BUS_ADRALN, "alignment fault" },
+> + { do_alignment_fault, SIGBUS,  BUS_ADRALN, "alignment fault" },
+
+The simplest would be to use do_bad_area() here without any additional
+function.
 
 -- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Catalin
