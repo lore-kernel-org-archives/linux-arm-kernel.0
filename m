@@ -1,58 +1,63 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Mon, 15 Feb 2016 05:46:56 +0000
-Subject: [PATCH] arm64: dts: r8a7795: Add GIC-400 virtual interfaces
-In-Reply-To: <1455005692-9382-1-git-send-email-dirk.behme@de.bosch.com>
-References: <1455005692-9382-1-git-send-email-dirk.behme@de.bosch.com>
-Message-ID: <87povyh6lq.wl%kuninori.morimoto.gx@renesas.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 15 Feb 2016 14:10:09 +0800
+Subject: [RFC 3/4] ARM: imx: add the platform related rpmsg implementation
+In-Reply-To: <DBXPR04MB2708826D9E8C16E8EFE492E8CDA0@DBXPR04MB270.eurprd04.prod.outlook.com>
+References: <1452067604-10466-1-git-send-email-hongxing.zhu@nxp.com>
+ <1452067604-10466-4-git-send-email-hongxing.zhu@nxp.com>
+ <20160128013527.GA9070@tiger>
+ <DBXPR04MB2708826D9E8C16E8EFE492E8CDA0@DBXPR04MB270.eurprd04.prod.outlook.com>
+Message-ID: <20160215061009.GU6756@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
++LAKML
 
-Hi Dirk
-Cc Geert
+On Thu, Jan 28, 2016 at 02:17:21AM +0000, Richard Zhu wrote:
+> Hi Shawn:
+> Thanks for your comments.
+> Further review would copied to Stefan Agner.
 
-> Besides the distributor and the CPU interface the GIC-400 additionally
-> supports the virtual interface control blocks and the virtual CPU interfaces.
-> 
-> Add the physical base addresses and size for these.
-> 
-> See
-> 
-> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0471b/index.html
-> -> 3.2. GIC-400 register map
-> 
-> and Linux kernel's
-> 
-> Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt
-> 
-> for more details.
-> 
-> Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
-> ---
+Please do not top-posting.
 
-Our R-Car chip is out-of-mapping.
-Geert had indicated it in
-http://thread.gmane.org/gmane.linux.ports.sh.devel/49751/focus=51544
-And we have no answer about it I think
+> On Wed, Jan 06, 2016 at 04:06:43PM +0800, Richard Zhu wrote:
+> > From: Richard Zhu <Richard.Zhu@freescale.com>
+> > 
+> > - add mu driver support, the irq and 4bytes msg of the mu module are 
+> > as the interaction channel between A# core and the M4 core on imx amp 
+> > platforms.
+> > - register one notify in isr of the mu's irq used by rpmsg.
+> > - instance the virtual processor, and fill up the virtio_config_ops in 
+> > the platform related rpmsg implementation codes.
+> > - hard-code the vring storage shared by A# core and M# core on AMP 
+> > SOCs.
+> > 
+> > Signed-off-by: Richard Zhu <hongxing.zhu@nxp.com>
+> > ---
+> >  arch/arm/mach-imx/Kconfig     |  12 ++
+> >  arch/arm/mach-imx/Makefile    |   2 +
+> >  arch/arm/mach-imx/imx_rpmsg.c | 364 ++++++++++++++++++++++++++++++++++++++++++
+> >  arch/arm/mach-imx/mu.c        | 217 +++++++++++++++++++++++++
+> 
+> I'm not rpmsg expert, but it seems to me that the driver should be put into drivers/rpmsg/ rather than mach-imx.
+> [Richard] This part rpmsg codes are closed related to the platform. For example, kinds of ops callback functions.
+> Thus, these codes are placed into arch/arm/mach-imx/ folder. BTW,  so does to omap rpmsg implementation.
+> http://omappedia.org/wiki/RPMsg_Kernel_Sources
 
->  arch/arm64/boot/dts/renesas/r8a7795.dtsi | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> index 8f1ed23..0163967 100644
-> --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> @@ -130,7 +130,9 @@
->  			#address-cells = <0>;
->  			interrupt-controller;
->  			reg = <0x0 0xf1010000 0 0x1000>,
-> -			      <0x0 0xf1020000 0 0x2000>;
-> +			      <0x0 0xf1020000 0 0x2000>,
-> +			      <0x0 0xf1040000 0 0x2000>,
-> +			      <0x0 0xf1060000 0 0x2000>;
->  			interrupts = <GIC_PPI 9
->  					(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
->  		};
-> -- 
-> 2.5.1
-> 
+I just took a closer look at this.  What the omappedia page above
+describes is an OMAP rpmsg implementation in a vendor tree which is
+in turn based on a relatively old kernel version, i.e. v3.0.
+
+I guess the implementation is a base of what mainline has today on
+remoteproc/rpmsg support, but they are somehow different.  For example,
+on mainline kernel today, there is no remoteproc/rpmsg code in
+arch/arm/plat-omap.  And, instead of handling rpmsg with a platform
+specific driver, remoteproc encapsulates the rpmsg support.  You can
+find the details in commit ac8954a41393 (remoteproc: create rpmsg virtio
+device).
+
+I suggest you look at the mainline code today instead of any old
+implementation for reference.  And in any case, with device tree
+support to populate platform device as needed, it's a wrong to put
+remoteproc/rpmsg related driver code into arch/arm/mach-imx.
+
+Shawn
