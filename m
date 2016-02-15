@@ -1,36 +1,64 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 15 Feb 2016 17:52:50 +0000
-Subject: [PATCH v5 RESEND 4/5] ARM: amba: Move reading of periphid to
- amba_match()
-In-Reply-To: <1455101250-11327-5-git-send-email-m.szyprowski@samsung.com>
-References: <1455101250-11327-1-git-send-email-m.szyprowski@samsung.com>
- <1455101250-11327-5-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20160215175250.GJ10826@n2100.arm.linux.org.uk>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Mon, 15 Feb 2016 12:46:06 -0500
+Subject: [PATCH 2/5] Kbuild: disable 'maybe-uninitialized' warning for
+ CONFIG_PROFILE_ALL_BRANCHES
+In-Reply-To: <1455293187-179811-3-git-send-email-arnd@arndb.de>
+References: <1455293187-179811-1-git-send-email-arnd@arndb.de>
+ <1455293187-179811-3-git-send-email-arnd@arndb.de>
+Message-ID: <20160215174606.GA11406@home.goodmis.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 10, 2016 at 11:47:29AM +0100, Marek Szyprowski wrote:
-> From: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+On Fri, Feb 12, 2016 at 05:06:19PM +0100, Arnd Bergmann wrote:
+> CONFIG_PROFILE_ALL_BRANCHES confuses gcc-5.x to the degree that it prints
+> incorrect warnings about a lot of variables that it thinks can be used
+> uninitialized, e.g.:
 > 
-> Reading the periphid when the Primecell device is registered means that
-> the apb pclk must be available by then or the device won't be registered
-> at all.
+> i2c/busses/i2c-diolan-u2c.c: In function 'diolan_usb_xfer':
+> i2c/busses/i2c-diolan-u2c.c:391:16: warning: 'byte' may be used uninitialized in this function
+> iio/gyro/itg3200_core.c: In function 'itg3200_probe':
+> iio/gyro/itg3200_core.c:213:6: warning: 'val' may be used uninitialized in this function
+> leds/leds-lp55xx-common.c: In function 'lp55xx_update_bits':
+> leds/leds-lp55xx-common.c:350:6: warning: 'tmp' may be used uninitialized in this function
+> misc/bmp085.c: In function 'show_pressure':
+> misc/bmp085.c:363:10: warning: 'pressure' may be used uninitialized in this function
+> power/ds2782_battery.c: In function 'ds2786_get_capacity':
+> power/ds2782_battery.c:214:17: warning: 'raw' may be used uninitialized in this function
 > 
-> By reading the periphid in amba_match() we can return -EPROBE_DEFER if
-> the apb pclk isn't there yet and the device will be retried later.
+> These are all false positives that either rob someone's time when trying
+> to figure out whether they are real, or they get people to send wrong
+> patches to shut up the warnings.
+> 
+> Nobody normally wants to run a CONFIG_PROFILE_ALL_BRANCHES kernel in
+> production, so disabling the whole class of warnings for this configuration
+> has no serious downsides either.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-I've just realised, we can't do this.  We need to read the peripheral
-ID at registration time, because that's published to userspace via
-(a) a sysfs attribute, and (b) as part of the uevent, which will be
-used by udev to locate the driver module.
+Acked-by: Steven Rostedt <rostedt@goodmis.org>
 
-So, this will have the side effect of breaking systems which have
-AMBA primecell devices configured as modules.
+-- Steve
 
-Sorry, I can't apply this.  We can't regress existing platforms for
-the sake of introducing new platforms to this code.
-
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+> ---
+>  Makefile | 6 +++++-
+>  1 file changed, 5 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Makefile b/Makefile
+> index 9092c16fa6cf..352f55ccc54e 100644
+> --- a/Makefile
+> +++ b/Makefile
+> @@ -617,7 +617,11 @@ KBUILD_CFLAGS	+= $(call cc-option,-fno-delete-null-pointer-checks,)
+>  ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
+>  KBUILD_CFLAGS	+= -Os $(call cc-disable-warning,maybe-uninitialized,)
+>  else
+> -KBUILD_CFLAGS	+= -O2
+> +ifdef CONFIG_PROFILE_ALL_BRANCHES
+> +KBUILD_CFLAGS	+= -O2 $(call cc-disable-warning,maybe-uninitialized,)
+> +else
+> +KBUILD_CFLAGS   += -O2
+> +endif
+>  endif
+>  
+>  # Tell gcc to never replace conditional load with a non-conditional one
+> -- 
+> 2.7.0
