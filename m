@@ -1,36 +1,41 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 15 Feb 2016 11:58:34 +0100
-Subject: [PATCH] dma: mv_xor_v2: new driver
-In-Reply-To: <56C1A17F.9030206@arm.com>
-References: <1455523083-25506-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <201602151735.BaFwBMOn%fengguang.wu@intel.com>
- <20160215105008.74aa7869@free-electrons.com>
- <56C1A17F.9030206@arm.com>
-Message-ID: <20160215115834.60f4e559@free-electrons.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 15 Feb 2016 11:59:09 +0100
+Subject: arm qemu test failures due to 'driver-core: platform: probe
+ of-devices only using list of compatibles'
+In-Reply-To: <20160214165010.GA3189@roeck-us.net>
+References: <20160214165010.GA3189@roeck-us.net>
+Message-ID: <20160215105909.GH12289@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hello Guenter,
 
-On Mon, 15 Feb 2016 09:59:27 +0000, Marc Zyngier wrote:
-
-> Seems like something is selecting GENERIC_MSI_IRQ_DOMAIN on a system
-> that doesn't implement the required bits.
+On Sun, Feb 14, 2016 at 08:50:10AM -0800, Guenter Roeck wrote:
+> Uwe,
 > 
-> It may be that we need to implement something like
-> HAS_GENERIC_MSI_IRQ_DOMAIN, and make GENERIC_MSI_IRQ_DOMAIN conditional
-> on that. Or just whitelist the architectures that do implement this.
+> Your patch 'driver-core: platform: probe of-devices only using list of
+> compatibles' causes the following qemu tests to crash in -next.
 > 
-> Any chance you could have a closer look?
+> arm:vexpress-a9:vexpress_defconfig:vexpress-v2p-ca9
+> arm:vexpress-a15:vexpress_defconfig:vexpress-v2p-ca15-tc1
+> arm:vexpress-a9:multi_v7_defconfig:vexpress-v2p-ca9
+> arm:vexpress-a15:multi_v7_defconfig:vexpress-v2p-ca15-tc1
+> 
+> Crash log:
+> 
+> VFS: Cannot open root device "mmcblk0" or unknown-block(0,0): error -6
+> Please append a correct "root=" boot option; here are the available partitions:
+> 1f00          131072 mtdblock0  (driver?)
+> 1f01           32768 mtdblock1  (driver?)
+> Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(0,0)
 
-I'll have a look. However, in the mean time, I will probably make this
-new driver depend on ARM64 so that it does not depend on other patches
-touching the MSI mechanism.
+Can you provide a complete boot log? This might already reveal which
+device is failing. It might not be the mmci device but something it
+depends on (clock, bus parent, irq).
 
-Thanks,
+Best regards
+Uwe
 
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
