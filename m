@@ -1,44 +1,33 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 15 Feb 2016 17:05:17 +0100
-Subject: [PATCH 1/3] ARM: zynq: Move early printk virtual address to vmalloc
- area
-Message-ID: <67c9013fc61f53515934b54847a05df8b8e1504a.1455552315.git.michal.simek@xilinx.com>
+Date: Mon, 15 Feb 2016 17:05:18 +0100
+Subject: [PATCH 2/3] serial: xuartps: Enable OF earlycon support
+In-Reply-To: <67c9013fc61f53515934b54847a05df8b8e1504a.1455552315.git.michal.simek@xilinx.com>
+References: <67c9013fc61f53515934b54847a05df8b8e1504a.1455552315.git.michal.simek@xilinx.com>
+Message-ID: <23ab10a19b21df2ef17a5bb6ce2a70d2d3fd3551.1455552315.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
-"ARM: 8432/1: move VMALLOC_END from 0xff000000 to 0xff800000"
-(sha1: 6ff0966052c46efb53980b8a1add2e7b49c9f560)
-has moved also start of VMALLOC area because size didn't change.
-That's why origin location of vmalloc was
-   vmalloc : 0xf0000000 - 0xff000000   ( 240 MB)
-and now is
-   vmalloc : 0xf0800000 - 0xff800000   ( 240 MB)
-
-That's why uart virtual addresses need to be changed to reflect this new
-memory setup. Starting address should be vmalloc start address.
+Support early console setup via DT for all listed compatible strings.
 
 Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 ---
 
- arch/arm/include/debug/zynq.S | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/tty/serial/xilinx_uartps.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/include/debug/zynq.S b/arch/arm/include/debug/zynq.S
-index de86b9247564..060cb5b49bfd 100644
---- a/arch/arm/include/debug/zynq.S
-+++ b/arch/arm/include/debug/zynq.S
-@@ -20,9 +20,9 @@
- #define UART_SR_TXEMPTY		0x00000008	/* TX FIFO empty */
+diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
+index 009e0dbc12d2..6f5657766815 100644
+--- a/drivers/tty/serial/xilinx_uartps.c
++++ b/drivers/tty/serial/xilinx_uartps.c
+@@ -1094,6 +1094,9 @@ static int __init cdns_early_console_setup(struct earlycon_device *device,
+ 	return 0;
+ }
+ EARLYCON_DECLARE(cdns, cdns_early_console_setup);
++OF_EARLYCON_DECLARE(cdns_a, "xlnx,xuartps", cdns_early_console_setup);
++OF_EARLYCON_DECLARE(cdns_b, "cdns,uart-r1p8", cdns_early_console_setup);
++OF_EARLYCON_DECLARE(cdns_c, "cdns,uart-r1p12", cdns_early_console_setup);
  
- #define UART0_PHYS		0xE0000000
--#define UART0_VIRT		0xF0000000
-+#define UART0_VIRT		0xF0800000
- #define UART1_PHYS		0xE0001000
--#define UART1_VIRT		0xF0001000
-+#define UART1_VIRT		0xF0801000
- 
- #if IS_ENABLED(CONFIG_DEBUG_ZYNQ_UART1)
- # define LL_UART_PADDR		UART1_PHYS
+ /**
+  * cdns_uart_console_write - perform write operation
 -- 
 1.9.1
