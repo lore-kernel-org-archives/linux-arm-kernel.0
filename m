@@ -1,60 +1,101 @@
-From: a0393675@ti.com (Keerthy)
-Date: Mon, 15 Feb 2016 09:57:15 +0530
-Subject: [PATCH] arm: dts: AM57XX: Correct the thermal thresholds
-In-Reply-To: <20160212224129.GP19432@atomide.com>
-References: <1454924705-8382-1-git-send-email-j-keerthy@ti.com>
- <20160209220901.GC28102@localhost.localdomain> <56BA6530.4030102@ti.com>
- <20160212222347.GO19432@atomide.com>
- <CAGo_u6r8-LJBWWrew0fV50Q+JnCxDj9PD57+9NoDm5TqCWL=jw@mail.gmail.com>
- <20160212224129.GP19432@atomide.com>
-Message-ID: <56C153A3.3030508@ti.com>
+From: maitysanchayan@gmail.com (maitysanchayan at gmail.com)
+Date: Mon, 15 Feb 2016 10:12:15 +0530
+Subject: [PATCH v2] ARM: dts: vfxxx: Add iio_hwmon node for ADC
+ temperature channel
+In-Reply-To: <20160214083349.GR6756@tiger>
+References: <cd32f1664a04b38b8a025414d039bd015cb9a5ff.1455278754.git.maitysanchayan@gmail.com>
+ <20160214083349.GR6756@tiger>
+Message-ID: <20160215044214.GA5545@Sanchayan-Arch.toradex.int>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello Shawn,
 
+On 16-02-14 16:33:49, Shawn Guo wrote:
+> On Fri, Feb 12, 2016 at 05:53:00PM +0530, Sanchayan Maity wrote:
+> > Add iio_hwmon node to expose the temperature channel on Vybrid as
+> > hardware monitor device using the iio_hwmon driver.
+> > 
+> > Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+> > ---
+> > 
+> > Hello,
+> > 
+> > The first version of the patch was send quite a while ago.
+> > https://lkml.org/lkml/2015/9/16/932
+> > 
+> > Shawn you had requested that hyphen rather than underscore should
+> > be used in node name. I looked into that.
+> > 
+> > The iio_hwmon driver calls hwmon_device register_with_groups inside
+> > hwmon.c and this
+> > http://lxr.free-electrons.com/source/drivers/hwmon/hwmon.c#L103
+> > 
+> > does not allow hyphen in hwmon name attribute. I was not aware of
+> > this but while trying to test the change, the device probe failed
+> > with EINVAL. I think we should stick to the existing use of the
+> > bindings or we need to change the hwmon code as well along with the
+> > existing device tree files and binding documentation.
+> 
+> I disagree.
+> 
+> If hyphen is invalid to be part of hwmon name attribute, the following
+> code in iio_hwmon_probe() is plain wrong, because hyphen is very valid
+> to be part of node names in device tree.
+> 
+>         if (dev->of_node && dev->of_node->name)
+>                 name = dev->of_node->name;
 
-On Saturday 13 February 2016 04:11 AM, Tony Lindgren wrote:
-> * Nishanth Menon <nm@ti.com> [160212 14:32]:
->> On Fri, Feb 12, 2016 at 4:23 PM, Tony Lindgren <tony@atomide.com> wrote:
->>> * Nishanth Menon <nm@ti.com> [160209 14:17]:
->>>> On 02/09/2016 04:09 PM, Eduardo Valentin wrote:
->>>>> On Mon, Feb 08, 2016 at 03:15:05PM +0530, Keerthy wrote:
->>>>>> The thermal threholds for am57xx are different from that of dra7.
->>>>>> Correcting the thresholds for the same.
->>>>>>
->>>>>> Signed-off-by: Keerthy <j-keerthy@ti.com>
->>>>>> ---
->>>>>>
->>>>>> Depends on: https://lkml.org/lkml/2016/2/8/90
->>>>>>
->>>>>>   arch/arm/boot/dts/am57xx-beagle-x15.dts | 24 ++++++++++++++++++++++++
->>>>>>   1 file changed, 24 insertions(+)
->>>>>>
->>>>>> Index: linux/arch/arm/boot/dts/am57xx-beagle-x15.dts
->>>>>> ===================================================================
->>>>>> --- linux.orig/arch/arm/boot/dts/am57xx-beagle-x15.dts     2016-02-08 14:57:05.514959101 +0530
->>>>>> +++ linux/arch/arm/boot/dts/am57xx-beagle-x15.dts  2016-02-08 14:57:05.510959168 +0530
->>>>>
->>>>> Sorry, did not bother to check, but is this the only user of am57xx?
->>>>
->>>> we will have AM57xx-IDK as well coming down the line. we already have
->>>> arch/arm/boot/dts/am57xx-cl-som-am57x.dts
->>>> arch/arm/boot/dts/am57xx-sbc-am57x.dts - not really sure what grade of
->>>> silicon are used in cl-SOM and sbc boards.
->>>
->>> Hmm can this one wait for v4.6 or is it critical for v4.5-rc
->>> cycle?
->>
->> personally, I'd like to NAK this patch -> lack of reference
->> documentation, and guidance for various AM57xx boards in a generic
->> patch should probably be followed IMHO.
->
-> OK let's wait for that then.
+@Shawn
+I agree with what you state here, however as you can see the hwmon_device_
+register_with_groups does check for hypen with strpbrk and returns EINVAL.
+Changing to hyphen instead of currently present underscore in iio_hwmon
+node name causes probe failure.
 
-OK. I will send a v2 with better documentation.
+If the node name needs to have hyphen, then the check for hyphen as an invalid
+character in hwmon name attribute needs to be changed. I am CC'ing the hwmon
+subsystem maintainers Jean Delvare ands Guenter Roeck as well as hwmon list to
+check.
 
->
-> Regards,
->
-> Tony
->
+@Jean & Guenter
+Can you please comment if the change to hwmon_device_register_with_groups
+to accept hyphen as a valid character in hwmon name attribute will be acceptable?
+Sorry if this is sudden andfor bringing you late into the discussion Jean and
+Guenter.
+
+Thanks & Regards,
+Sanchayan.
+
+> 
+> Shawn
+> 
+> > 
+> > Changes since v1:
+> > 1. Expose ADC1 temperature channel as well
+> > 2. Move the entry outside of the aips1 bus node
+> > 
+> > Best Regards,
+> > Sanchayan Maity.
+> > ---
+> >  arch/arm/boot/dts/vfxxx.dtsi | 5 +++++
+> >  1 file changed, 5 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
+> > index a5f07e3..8ed8e47 100644
+> > --- a/arch/arm/boot/dts/vfxxx.dtsi
+> > +++ b/arch/arm/boot/dts/vfxxx.dtsi
+> > @@ -673,5 +673,10 @@
+> >  				status = "disabled";
+> >  			};
+> >  		};
+> > +
+> > +		iio_hwmon {
+> > +			compatible = "iio-hwmon";
+> > +			io-channels = <&adc0 16>, <&adc1 16>;
+> > +		};
+> >  	};
+> >  };
+> > -- 
+> > 2.7.1
+> > 
+> > 
