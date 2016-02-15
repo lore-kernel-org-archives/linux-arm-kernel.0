@@ -1,30 +1,32 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 16 Feb 2016 00:23:37 +0100
-Subject: [PATCH 01/14] pinctrl: sunxi: Add A83T R_PIO controller support
-In-Reply-To: <20160211151246.GO31506@lukather>
-References: <1454203266-4450-1-git-send-email-vishnupatekar0510@gmail.com>
- <1454203266-4450-2-git-send-email-vishnupatekar0510@gmail.com>
- <CACRpkdbCgOBQw28d=qc1fAURY3x8UdoWqiMtXMZ=uWLaQj-nbg@mail.gmail.com>
- <20160211123648.GN31506@lukather>
- <CACRpkdaGZ4-S1A9zUUaBXXEazyJf_uZ4ESiBhw-CpozXMxfDHg@mail.gmail.com>
- <20160211151246.GO31506@lukather>
-Message-ID: <CACRpkdb7=x2bJP1nXpF2bP3U0t+NUHiuw_aeTAhbR8OXOrHn6A@mail.gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 16 Feb 2016 00:25:39 +0100
+Subject: [RESEND PATCH 0/8] Support and fixes the rk3228 SoCS for thermal
+In-Reply-To: <1455521613-27340-1-git-send-email-wxt@rock-chips.com>
+References: <1455521613-27340-1-git-send-email-wxt@rock-chips.com>
+Message-ID: <3650760.H1YezDtoUE@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 11, 2016 at 4:12 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Thu, Feb 11, 2016 at 02:47:57PM +0100, Linus Walleij wrote:
+Am Montag, 15. Februar 2016, 15:33:25 schrieb Caesar Wang:
+> Hello Eduardo, Heiko, Michael & Stephen:
+> 
+> This series pacthes to support the rk3228 SoCs thermal.
+> 
+> They have the following patches to work on rk3228 SoCs.
+> 
 
->> Can you guys supply a MAINTAINERS entry for the sunxi
->> stuff?
->
-> We have one, and Chen-Yu is listed as co-maintainer:
-> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/MAINTAINERS#n911
+> 1a6f334 clk: rockchip: add id of the tsadc clock found on rk3228 SoCs
+> 8cf2d1b clk: rockchip: add the tsadc clocks found on rk3228 SoCs
+> bdc79c0 ARM: dts: rockchip: add the thermal main info found on rk3228
+> 22ea3c3 ARM: dts: rockchip: enable the tsadc for rk3228 evb
 
-Modified request:
-can you put in F: wildcards there to match the files pertaining to
-the sunxi platform, so that scripts/find-maintainer.pl finds them.
+clk and devicetree patches look good and I'll pick those up once Eduardo is 
+ok with (and has taken) the thermal-specific changes:
 
-Yours,
-Linus Walleij
+> bd2720c thermal: rockchip: fix a impossible condition caused by the
+> warning df9c1bd thermal: rockchip: fix calculation error for code_to_temp
+> fb11fbd thermal: rockchip: the rename compatibles for rockchip SoCs
+> b907b75 thermal: rockchip: fix the tsadc sequence output on rk3228/rk3399
+
+
+Heiko
