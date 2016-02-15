@@ -1,71 +1,111 @@
-From: CARLOS.PALMINHA@synopsys.com (Carlos Palminha)
-Date: Mon, 15 Feb 2016 15:18:34 +0000
-Subject: [PATCH v2 03/17] drm/exynos: removed optional dummy encoder
- mode_fixup function.
-In-Reply-To: <CAMeQTsZLdMOnk7-isneoUyFBbQdiRUsGH6+EhD8W1LNB=80LVQ@mail.gmail.com>
-References: <cover.1455540137.git.palminha@synopsys.com>
- <3768b670931572de51fca1102efa18d20dd770ee.1455540137.git.palminha@synopsys.com>
- <CAMeQTsZLdMOnk7-isneoUyFBbQdiRUsGH6+EhD8W1LNB=80LVQ@mail.gmail.com>
-Message-ID: <56C1EC4A.1000803@synopsys.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 15 Feb 2016 15:22:43 +0000
+Subject: [linux-sunxi] Allwinner A64 MMC support
+In-Reply-To: <CAGb2v67apAN0H_Nz2kQ4oYjtRwRfaM0L3KTv6uXLfp7m7DpnbA@mail.gmail.com>
+References: <1455300000-18723-1-git-send-email-andre.przywara@arm.com>
+ <56BE29A1.3060107@redhat.com> <56C1A590.6030500@arm.com>
+ <56C1C7BB.1040602@redhat.com> <56C1D9C0.6020601@arm.com>
+ <CAGb2v65E54mnLEcPzLyycEBSHbvn6tp9JpS+S8gdbDg_e7qFyQ@mail.gmail.com>
+ <56C1E250.9070301@arm.com>
+ <CAGb2v67apAN0H_Nz2kQ4oYjtRwRfaM0L3KTv6uXLfp7m7DpnbA@mail.gmail.com>
+Message-ID: <56C1ED43.6010504@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Patrik,
+Hi,
 
-No particular reason... i was grepping along the development and probably didn't noticed that exynos was not completely nuked... :)
+On 15/02/16 14:58, Chen-Yu Tsai wrote:
+> On Mon, Feb 15, 2016 at 10:36 PM, Andre Przywara <andre.przywara@arm.com> wrote:
+>> Hi Chen-Yu,
+>>
+>> On 15/02/16 14:23, Chen-Yu Tsai wrote:
+>>> On Mon, Feb 15, 2016 at 9:59 PM, Andre Przywara <andre.przywara@arm.com> wrote:
+>>>> Hi Hans,
+>>>>
+>>>> ....
+>>>>
+>>>>>
+>>>>> p.s.
+>>>>>
+>>>>> I love the work you've been doing on the A64, I've not had a chance
+>>>>> to try it out yet though. Have you made any progress with getting
+>>>>> the mmc slot to work ?  If not maybe I can make some time I've
+>>>>> prior experience in bringing up the mmc slot on other Allwinner SoCs
+>>>>
+>>>> Thanks for that!
+>>>>
+>>>> So we made some progress on the weekend (with the help of #linux-sunxi):
+>>>> 1) The regulator node was stupidly put by me into a separate child node
+>>>> without putting address and size cells into. So I just moved it into
+>>>> /soc directly now and that seems to fixed the missing regulator.
+>>>> 2) The reset node is a allwinner,sun6i-a31-ahb1-reset, which does not
+>>>> get registered automatically, but by an explicit call from mach-sunxi/.
+>>>> I wonder why we do this (yes, I saw that comment, but still...) and if
+>>>> it would work with a normal MODULE_DEVICE_TABLE() declaration.
+>>>> There is and will be no equivalent to the mach- directory on arm64.
+>>>
+>>> On sun6i, we supported the high resolution timer, which had a reset control.
+>>> Timers (or clocksources) are registered before device model kicks in, so the
+>>> reset had to be explicitly registered before the timer, or the system would
+>>> hang. I think we phased that out though. Maxime should know.
+>>
+>> Ah, thanks for that insight!
+>> So that sounds like we would get away with a normal registration for the
+>> A64 - and actually many other SoCs as well?
+>> Shall we guard the explicit sun6i_reset_init with MACH_SUN6I or
+>> something and do the normal registration otherwise?
+>> Or do I miss something here?
+> 
+> You'll notice 2 reset control compatibles, one is
+> "allwinner,sun6i-a31-ahb1-reset",
+> while the other is "allwinner,sun6i-a31-clock-reset". The latter is a
+> proper device
+> model driver. We also don't have the hstimer device node for later
+> SoCs. For A23, it
+> was because the hardware had only 1 timer, while the driver needed 2,
+> and I didn't
+> want to deal with it at the time.
 
-Regards,
-C.Palminha
+Oooh, now I see that those are actually the same driver, just the
+initialization part is separate. Thanks for the hint!
 
-On 15-02-2016 13:49, Patrik Jakobsson wrote:
-> Hi Carlos
-> 
-> Any particular reason why this patch isn't squashed with patch 8/17?
-> 
-> Thanks
-> Patrik
-> 
-> 
-> On Mon, Feb 15, 2016 at 1:58 PM, Carlos Palminha
-> <CARLOS.PALMINHA@synopsys.com> wrote:
->> mode_fixup function for encoder drivers became optional with patch
->> http://patchwork.freedesktop.org/patch/msgid/1455106522-32307-1-git-send-email-palminha at synopsys.com
+> As long as you use "allwinner,sun6i-a31-clock-reset", no special code is needed.
+
+Yeah, great, I will just replace the string in the DT.
+
+Cheers,
+Andre.
+
+>> Cheers,
+>> Andre
 >>
->> This patch set nukes all the dummy mode_fixup implementations.
+>>>> 3) As Jens pointed out, the MMC IP block isn't really compatible.
+>>>> Changing the clocks is easy (done already), but we need to come up with
+>>>> code to cover the new phase setting registers in the A64 MMC register block.
+>>>>
+>>>> Interestingly somehow hacking this (pretending it is compatible) seems
+>>>> to work, though I got reports from people about mysterious kernel
+>>>> crashes, so I'm inclined to leave MMC out of the first patch series.
+>>>>
+>>>> So if you could take a look at the new registers (starting at offset
+>>>> 0x140) and work out what we actually need to do here, that would be
+>>>> great. I have no real clue about what they actually do and how they
+>>>> relate to the current output and sample clock phase.
+>>>> To me it looks like we might get away with just triggering the automatic
+>>>> calibration and the hardware does the rest for us - keep your fingers
+>>>> crossed ;-)
+>>>>
+>>>> Cheers,
+>>>> Andre.
+>>>>
+>>>> --
+>>>> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+>>>> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+>>>> For more options, visit https://groups.google.com/d/optout.
+>>>
 >>
->> (made on top of Daniel topic/drm-misc branch)
->>
->> Signed-off-by: Carlos Palminha <palminha@synopsys.com>
->> ---
->>  drivers/gpu/drm/exynos/exynos_drm_dsi.c | 8 --------
->>  1 file changed, 8 deletions(-)
->>
->> diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
->> index e977a81..736115c 100644
->> --- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
->> +++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
->> @@ -1597,13 +1597,6 @@ static int exynos_dsi_create_connector(struct drm_encoder *encoder)
->>         return 0;
->>  }
->>
->> -static bool exynos_dsi_mode_fixup(struct drm_encoder *encoder,
->> -                                 const struct drm_display_mode *mode,
->> -                                 struct drm_display_mode *adjusted_mode)
->> -{
->> -       return true;
->> -}
->> -
->>  static void exynos_dsi_mode_set(struct drm_encoder *encoder,
->>                                 struct drm_display_mode *mode,
->>                                 struct drm_display_mode *adjusted_mode)
->> @@ -1623,7 +1616,6 @@ static void exynos_dsi_mode_set(struct drm_encoder *encoder,
->>  }
->>
->>  static const struct drm_encoder_helper_funcs exynos_dsi_encoder_helper_funcs = {
->> -       .mode_fixup = exynos_dsi_mode_fixup,
->>         .mode_set = exynos_dsi_mode_set,
->>         .enable = exynos_dsi_enable,
->>         .disable = exynos_dsi_disable,
 >> --
->> 2.5.0
->>
+>> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+>> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+>> For more options, visit https://groups.google.com/d/optout.
+> 
