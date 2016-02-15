@@ -1,85 +1,41 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Mon, 15 Feb 2016 12:35:12 -0800
-Subject: Writes, smp_wmb(), and transitivity?
-In-Reply-To: <20160215185832.GQ6298@arm.com>
-References: <20160215175825.GA15878@linux.vnet.ibm.com>
- <20160215185832.GQ6298@arm.com>
-Message-ID: <20160215203512.GL6719@linux.vnet.ibm.com>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Mon, 15 Feb 2016 21:37:39 +0100
+Subject: Crashes in arm qemu emulations due to 'cpufreq: governor: Replace
+ timers with utilization ...'
+In-Reply-To: <20160215195839.GA19432@atomide.com>
+References: <20160215170527.GA24453@roeck-us.net>
+ <CAJZ5v0gLankSuziQq25qTCyNqeOX43yD9jnJu_XXwbdyajfmKg@mail.gmail.com>
+ <20160215190116.GX19432@atomide.com>
+ <56C229A5.8020901@roeck-us.net>
+ <20160215195839.GA19432@atomide.com>
+Message-ID: <CAJZ5v0hzVB0+H4nuCun3mmrES3UQ3+Rs1uz5YGu5sv4G3XU+nQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 15, 2016 at 06:58:32PM +0000, Will Deacon wrote:
-> On Mon, Feb 15, 2016 at 09:58:25AM -0800, Paul E. McKenney wrote:
-> > Hello!
-> 
-> Hi Paul,
-> 
-> > Some architectures provide local transitivity for a chain of threads doing
-> > writes separated by smp_wmb(), as exemplified by the litmus tests below.
-> > The pattern is that each thread writes to a its own variable, does an
-> > smp_wmb(), then writes a different value to the next thread's variable.
-> > 
-> > I don't know of a use of this, but if everyone supports it, it might
-> > be good to mandate it.  Status quo is that smp_wmb() is non-transitive,
-> > so it currently isn't supported.
-> > 
-> > Anyone know of any architectures that do -not- support this?
-> > 
-> > Assuming all architectures -do- support this, any arguments -against-
-> > officially supporting it in Linux?
-> > 
-> > 							Thanx, Paul
-> > 
-> > ------------------------------------------------------------------------
-> > 
-> > Two threads:
-> > 
-> > 	int a, b;
-> > 
-> > 	void thread0(void)
-> > 	{
-> > 		WRITE_ONCE(a, 1);
-> > 		smp_wmb();
-> > 		WRITE_ONCE(b, 2);
-> > 	}
-> > 
-> > 	void thread1(void)
-> > 	{
-> > 		WRITE_ONCE(b, 1);
-> > 		smp_wmb();
-> > 		WRITE_ONCE(a, 2);
-> > 	}
-> > 
-> > 	/* After all threads have completed and the dust has settled... */
-> > 
-> > 	BUG_ON(a == 1 && b == 1);
-> 
-> My understanding is that this test, and the generalisation to n threads,
-> is forbidden on ARM. However, the transitivity of DMB ST (used to
-> construct smp_wmb()) has been the subject of long debates, because we
-> allow the following test:
-> 
-> 
-> P0:
-> Wx = 1
-> 
-> P1:
-> Rx == 1
-> DMB ST
-> Wy = 1
-> 
-> P2:
-> Ry == 1
-> <addr dep>
-> Rx == 0
-> 
-> 
-> so I'd be uneasy about saying "it's all transitive".
+On Mon, Feb 15, 2016 at 8:58 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Guenter Roeck <linux@roeck-us.net> [160215 11:41]:
+>> On 02/15/2016 11:01 AM, Tony Lindgren wrote:
+>> >
+>> >https://kernelci.org/boot/all/job/next/kernel/next-20160215/
+>> >
+>> >The SMP ones seem to fail with some regulator issues?
+>> >
+>>
+>> There is another problem, introduced with 6a0712f6f199e ("PM / OPP: Add
+>> dev_pm_opp_set_rate()"). The kernelci boot log for next-20160212:omap3-overo-tobi
+>> and others experience that problem.
+>>
+>> Essentially, the code now assumes that a CPU clock always has a voltage
+>> regulator attached to it, which is not correct. I sent out a patch to fix
+>> that problem a minute ago.
+>
+> Yes that fixed it thanks.
 
-Agreed!  For one thing, doesn't DMB ST need writes on both sides?
+Can you please also check if this alternative fix from Viresh works:
 
-But that is one reason that I am only semi-enthusiastic about this.
-The potentially locally transitive case is -very- restrictive, applying
-only to situations where -all- accesses are writes.
+https://patchwork.kernel.org/patch/8316611/
 
-							Thanx, Paul
+?
+
+Thanks,
+Rafael
