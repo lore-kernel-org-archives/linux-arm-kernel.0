@@ -1,56 +1,47 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 15 Feb 2016 08:13:29 +0100
-Subject: linux-next: arm64 no longer boots with initramfs in qemu tests
-In-Reply-To: <20160214221242.GA23489@roeck-us.net>
-References: <20160214221242.GA23489@roeck-us.net>
-Message-ID: <CAKv+Gu-dyLKo2y503Lj7Uc7qwO5-b9LyZNAeV0guse86uuAqxg@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 15 Feb 2016 16:18:18 +0900
+Subject: [PATCH 01/68] ARM: dts: gose: Add GPIO keys to DT
+In-Reply-To: <CAMuHMdVefum3YbaxhMX_0hHrmTFYU-pWYZTwSUveQDLFArLdYw@mail.gmail.com>
+References: <cover.1455303422.git.horms+renesas@verge.net.au>
+ <d7d5974b156e2ef7436483de00ccada5987c9d31.1455303422.git.horms+renesas@verge.net.au>
+ <CAMuHMdVefum3YbaxhMX_0hHrmTFYU-pWYZTwSUveQDLFArLdYw@mail.gmail.com>
+Message-ID: <20160215071817.GA4528@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 February 2016 at 23:12, Guenter Roeck <linux@roeck-us.net> wrote:
-> Hi,
->
-> my qemu tests for arm64 fail to boot in linux-next, starting with next-20160209.
-> Primary error is
->
->   VFS: Cannot open root device "(null)" or unknown-block(0,0): error -6
->   Please append a correct "root=" boot option; here are the available partitions:
->   Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(0,0)
->
-> but that doesn't mean much since I try to boot an initramfs.
->
-> A bisect attempt points to 'arm64: move kernel image to base of vmalloc area',
-> but that doesn't really help since some of the bisect attempts fail to build
-> with linker errors. Just for reference, a bisect log is attached.
->
-> Comparing console logs between 4.5-rc3 and next-20160212, one key difference is
-> that the kernel now displays
->
->   Moving initrd from [88000000-889ae7ff] to [5d251000-5dbff7ff]
->
-> which was not the case before. Turns out RAM ends at 60000000, so the address
-> appears to be a bit odd (4.5-rc3 shows initramfs at a lower address).
-> My qemu test runs with 512MB RAM. If I increase the RAM size to 2G,
-> the "Moving" message is no longer displayed. However, I still get the same
-> error.
->
-> Qemu command line:
->
-> qemu-system-aarch64 -machine virt -cpu cortex-a57 -machine type=virt \
->         -nographic -smp 1 -m 512 -kernel arch/arm64/boot/Image \
->         -initrd rootfs.arm64.cpio -append "console=ttyAMA0"
->
-> Configuration is defconfig. Initramfs can be copied from
->         https://github.com/groeck/linux-build-test/blob/master/rootfs/arm64/rootfs.arm64.cpio
->
-> Please let me know if there is anything I can do to help tracking down
-> the problem.
->
+On Sat, Feb 13, 2016 at 09:23:47PM +0100, Geert Uytterhoeven wrote:
+> On Fri, Feb 12, 2016 at 8:04 PM, Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+> > Instantiate the GPIO keys in the gose device tree.
+> >
+> > Based on similar work for the koelsch board by Laurent Pinchart.
+> >
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > Tested-by: Magnus Damm <damm+renesas@opensource.se>
+> > ---
+> >  arch/arm/boot/dts/r8a7793-gose.dts | 82 ++++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 82 insertions(+)
+> >
+> > diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
+> > index baa59fe84298..ccbc1c66cc6c 100644
+> > --- a/arch/arm/boot/dts/r8a7793-gose.dts
+> > +++ b/arch/arm/boot/dts/r8a7793-gose.dts
+> > @@ -31,6 +31,88 @@
+> >                 device_type = "memory";
+> >                 reg = <0 0x40000000 0 0x40000000>;
+> >         };
+> > +
+> > +       gpio-keys {
+> > +               compatible = "gpio-keys";
+> > +
+> > +               key-1 {
+> > +                       gpios = <&gpio5 0 GPIO_ACTIVE_LOW>;
+> > +                       linux,code = <KEY_1>;
+> > +                       label = "SW2-1";
+> > +                       gpio-key,wakeup;
+> 
+> In the mean time, "gpio-key,wakeup" has been deprecated in favor of
+> "wakeup-source".
 
-Hi Guenter,
-
-Thanks for the detailed analysis. This looks like the same issue I fixed here:
-http://thread.gmane.org/gmane.linux.ports.arm.kernel/477645
-
-Regards,
-Ard.
+Is the change just a matter of s/gpio-key,wakeup/wakeup-source/ ?
+If so I'll sort things out.
