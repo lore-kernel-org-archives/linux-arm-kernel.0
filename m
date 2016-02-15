@@ -1,100 +1,103 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 15 Feb 2016 22:58:08 +0800
-Subject: [linux-sunxi] Allwinner A64 MMC support
-In-Reply-To: <56C1E250.9070301@arm.com>
-References: <1455300000-18723-1-git-send-email-andre.przywara@arm.com>
- <56BE29A1.3060107@redhat.com> <56C1A590.6030500@arm.com>
- <56C1C7BB.1040602@redhat.com> <56C1D9C0.6020601@arm.com>
- <CAGb2v65E54mnLEcPzLyycEBSHbvn6tp9JpS+S8gdbDg_e7qFyQ@mail.gmail.com>
- <56C1E250.9070301@arm.com>
-Message-ID: <CAGb2v67apAN0H_Nz2kQ4oYjtRwRfaM0L3KTv6uXLfp7m7DpnbA@mail.gmail.com>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Mon, 15 Feb 2016 17:14:06 +0200
+Subject: [PATCH 01/14] mfd: intel_quark_i2c_gpio: Use clkdev_create()
+In-Reply-To: <1454982341-22715-2-git-send-email-sboyd@codeaurora.org>
+References: <1454982341-22715-1-git-send-email-sboyd@codeaurora.org>
+ <1454982341-22715-2-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1455549246.31169.125.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 15, 2016 at 10:36 PM, Andre Przywara <andre.przywara@arm.com> wrote:
-> Hi Chen-Yu,
->
-> On 15/02/16 14:23, Chen-Yu Tsai wrote:
->> On Mon, Feb 15, 2016 at 9:59 PM, Andre Przywara <andre.przywara@arm.com> wrote:
->>> Hi Hans,
->>>
->>> ....
->>>
->>>>
->>>> p.s.
->>>>
->>>> I love the work you've been doing on the A64, I've not had a chance
->>>> to try it out yet though. Have you made any progress with getting
->>>> the mmc slot to work ?  If not maybe I can make some time I've
->>>> prior experience in bringing up the mmc slot on other Allwinner SoCs
->>>
->>> Thanks for that!
->>>
->>> So we made some progress on the weekend (with the help of #linux-sunxi):
->>> 1) The regulator node was stupidly put by me into a separate child node
->>> without putting address and size cells into. So I just moved it into
->>> /soc directly now and that seems to fixed the missing regulator.
->>> 2) The reset node is a allwinner,sun6i-a31-ahb1-reset, which does not
->>> get registered automatically, but by an explicit call from mach-sunxi/.
->>> I wonder why we do this (yes, I saw that comment, but still...) and if
->>> it would work with a normal MODULE_DEVICE_TABLE() declaration.
->>> There is and will be no equivalent to the mach- directory on arm64.
->>
->> On sun6i, we supported the high resolution timer, which had a reset control.
->> Timers (or clocksources) are registered before device model kicks in, so the
->> reset had to be explicitly registered before the timer, or the system would
->> hang. I think we phased that out though. Maxime should know.
->
-> Ah, thanks for that insight!
-> So that sounds like we would get away with a normal registration for the
-> A64 - and actually many other SoCs as well?
-> Shall we guard the explicit sun6i_reset_init with MACH_SUN6I or
-> something and do the normal registration otherwise?
-> Or do I miss something here?
+On Mon, 2016-02-08 at 17:45 -0800, Stephen Boyd wrote:
+> Convert this driver to use clkdev_create() instead of
+> clk_register_clkdevs(). The latter API is only used by this driver,
+> although this driver only allocates one clk to add anyway.
+> Furthermore, this driver allocates the clk_lookup structure with
+> devm, but clkdev_drop() will free that structure when passed,
+> leading to a double free when this driver is removed. Clean it
+> all up and pave the way for the removal of clk_register_clkdevs().
 
-You'll notice 2 reset control compatibles, one is
-"allwinner,sun6i-a31-ahb1-reset",
-while the other is "allwinner,sun6i-a31-clock-reset". The latter is a
-proper device
-model driver. We also don't have the hstimer device node for later
-SoCs. For A23, it
-was because the hardware had only 1 timer, while the driver needed 2,
-and I didn't
-want to deal with it at the time.
+Good one.
 
-As long as you use "allwinner,sun6i-a31-clock-reset", no special code is needed.
+I have still in my local tree the fix regarding to this code since I
+found an error in the error path (we don't free clk resources). So, I
+will re-base it, although it will require to go with two patches
+instead of one if we go to stable.
 
-ChenYu
+For this one:
+Acked-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
 
-> Cheers,
-> Andre
->
->>> 3) As Jens pointed out, the MMC IP block isn't really compatible.
->>> Changing the clocks is easy (done already), but we need to come up with
->>> code to cover the new phase setting registers in the A64 MMC register block.
->>>
->>> Interestingly somehow hacking this (pretending it is compatible) seems
->>> to work, though I got reports from people about mysterious kernel
->>> crashes, so I'm inclined to leave MMC out of the first patch series.
->>>
->>> So if you could take a look at the new registers (starting at offset
->>> 0x140) and work out what we actually need to do here, that would be
->>> great. I have no real clue about what they actually do and how they
->>> relate to the current output and sample clock phase.
->>> To me it looks like we might get away with just triggering the automatic
->>> calibration and the hardware does the rest for us - keep your fingers
->>> crossed ;-)
->>>
->>> Cheers,
->>> Andre.
->>>
->>> --
->>> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
->>> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
->>> For more options, visit https://groups.google.com/d/optout.
->>
->
-> --
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+> 
+> Cc: Lee Jones <lee.jones@linaro.org>
+> Cc: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+> ?drivers/mfd/intel_quark_i2c_gpio.c | 26 +++++++++-----------------
+> ?1 file changed, 9 insertions(+), 17 deletions(-)
+> 
+> diff --git a/drivers/mfd/intel_quark_i2c_gpio.c
+> b/drivers/mfd/intel_quark_i2c_gpio.c
+> index 042137465300..bdc5e27222c0 100644
+> --- a/drivers/mfd/intel_quark_i2c_gpio.c
+> +++ b/drivers/mfd/intel_quark_i2c_gpio.c
+> @@ -52,8 +52,6 @@
+> ?/* The Quark I2C controller source clock */
+> ?#define INTEL_QUARK_I2C_CLK_HZ	33000000
+> ?
+> -#define INTEL_QUARK_I2C_NCLK	1
+> -
+> ?struct intel_quark_mfd {
+> ?	struct pci_dev		*pdev;
+> ?	struct clk		*i2c_clk;
+> @@ -128,30 +126,24 @@ MODULE_DEVICE_TABLE(pci, intel_quark_mfd_ids);
+> ?static int intel_quark_register_i2c_clk(struct intel_quark_mfd
+> *quark_mfd)
+> ?{
+> ?	struct pci_dev *pdev = quark_mfd->pdev;
+> -	struct clk_lookup *i2c_clk_lookup;
+> ?	struct clk *i2c_clk;
+> -	int ret;
+> -
+> -	i2c_clk_lookup = devm_kcalloc(&pdev->dev,
+> INTEL_QUARK_I2C_NCLK,
+> -				??????sizeof(*i2c_clk_lookup),
+> GFP_KERNEL);
+> -	if (!i2c_clk_lookup)
+> -		return -ENOMEM;
+> -
+> -	i2c_clk_lookup[0].dev_id = INTEL_QUARK_I2C_CONTROLLER_CLK;
+> ?
+> ?	i2c_clk = clk_register_fixed_rate(&pdev->dev,
+> ?					??INTEL_QUARK_I2C_CONTROLLER
+> _CLK, NULL,
+> ?					??CLK_IS_ROOT,
+> INTEL_QUARK_I2C_CLK_HZ);
+> +	if (IS_ERR(i2c_clk))
+> +		return PTR_ERR(i2c_clk);
+> ?
+> -	quark_mfd->i2c_clk_lookup = i2c_clk_lookup;
+> ?	quark_mfd->i2c_clk = i2c_clk;
+> +	quark_mfd->i2c_clk_lookup = clkdev_create(i2c_clk, NULL,
+> +						INTEL_QUARK_I2C_CONT
+> ROLLER_CLK);
+> ?
+> -	ret = clk_register_clkdevs(i2c_clk, i2c_clk_lookup,
+> -				???INTEL_QUARK_I2C_NCLK);
+> -	if (ret)
+> -		dev_err(&pdev->dev, "Fixed clk register failed:
+> %d\n", ret);
+> +	if (!quark_mfd->i2c_clk_lookup) {
+> +		dev_err(&pdev->dev, "Fixed clk register failed\n");
+> +		return -ENOMEM;
+> +	}
+> ?
+> -	return ret;
+> +	return 0;
+> ?}
+> ?
+> ?static void intel_quark_unregister_i2c_clk(struct pci_dev *pdev)
+
+-- 
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
