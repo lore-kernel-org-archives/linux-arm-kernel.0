@@ -1,31 +1,38 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 15 Feb 2016 23:01:44 +0100
-Subject: linux-4.5-rc3/arch/arm/mach-ux500/cpu-db8500.c:89: statement
- after return ?
-In-Reply-To: <DUB128-W6810AD43780578EF2A48789CD50@phx.gbl>
-References: <DUB128-W6810AD43780578EF2A48789CD50@phx.gbl>
-Message-ID: <CACRpkdbTB9VROfKyiyY4gzWQD-UHio1UnoYu-GuHkzgL5ZgoRw@mail.gmail.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Mon, 15 Feb 2016 23:03:34 +0100
+Subject: [PATCH] MAINTAINERS: Extend info, add wiki and ml for meson arch
+Message-ID: <1455573814-13378-1-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 8, 2016 at 4:50 PM, David Binderman <dcb314@hotmail.com> wrote:
+From: Carlo Caione <carlo@endlessm.com>
 
-> Hello there,
->
-> [linux-4.5-rc3/arch/arm/mach-ux500/cpu-db8500.c:89]: (style) Statements following return, break, continue, goto or throw will never be executed.
->
-> Source code is
->
->     return kasprintf(GFP_KERNEL, "%08x%08x%08x%08x%08x",
->              readl((u32 *)uid+0),
->              readl((u32 *)uid+1), readl((u32 *)uid+2),
->              readl((u32 *)uid+3), readl((u32 *)uid+4));
->     iounmap(uid);
-> }
->
-> This looks like a cut-n-paste error to me. Suggest rework.
+Update the maintainers info with wiki and mailing list for the meson
+platform. Fix a wrong file attribution and add maintainership for
+meson8b.
 
-I sent a patch for this, nice catch.
+Signed-off-by: Carlo Caione <carlo@endlessm.com>
+---
+ MAINTAINERS | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-Yours,
-Linus Walleij
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 28eb61b..6e08d2a 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -923,9 +923,11 @@ F:	drivers/clk/sunxi/
+ ARM/Amlogic MesonX SoC support
+ M:	Carlo Caione <carlo@caione.org>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
++L:	linux-meson at googlegroups.com
++W:	http://linux-meson.com/
+ S:	Maintained
+-F:	drivers/media/rc/meson-ir.c
+-N:	meson[x68]
++F:	arch/arm/mach-meson/
++N:	meson[x68b]
+ 
+ ARM/Annapurna Labs ALPINE ARCHITECTURE
+ M:	Tsahee Zidenberg <tsahee@annapurnalabs.com>
+-- 
+1.9.1
