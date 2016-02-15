@@ -1,40 +1,157 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 15 Feb 2016 17:40:19 +0800
-Subject: [PATCH v3] clk: sunxi: Fix sun8i-a23-apb0-clk divider flags
-Message-ID: <1455529219-30204-1-git-send-email-wens@csie.org>
+From: andy.yan@rock-chips.com (Andy Yan)
+Date: Mon, 15 Feb 2016 17:43:06 +0800
+Subject: [PATCH v3 1/4] dt-bindings: power: reset: add document for
+ reboot-mode driver
+In-Reply-To: <CALAqxLUnbFHjTuJXYXSruV3W0JJ09Fxz=KBe69tZDTd_3_+rxw@mail.gmail.com>
+References: <1454406981-4692-1-git-send-email-andy.yan@rock-chips.com>
+ <1454407151-4751-1-git-send-email-andy.yan@rock-chips.com>
+ <20160204230814.GA4847@rob-hp-laptop>
+ <CALAqxLVyznpLd2MLgGr28TDECpLZ=RpmhxH-SHqntXfBsctcmQ@mail.gmail.com>
+ <20160205043507.GB4847@rob-hp-laptop>
+ <CALAqxLUnbFHjTuJXYXSruV3W0JJ09Fxz=KBe69tZDTd_3_+rxw@mail.gmail.com>
+Message-ID: <56C19DAA.5030602@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The APB0 clock on A23 is a zero-based divider, not a power-of-two based
-divider.
+Hi Rob & John:
 
-Note that this patch does not apply cleanly to kernels before 4.5-rc1,
-which added CLK_OF_DECLARE support to this driver.
-
-Fixes: 57a1fbf28424 ("clk: sunxi: Add A23 APB0 divider clock support")
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
-
-Vishnu pointed out that A23 is in fact a zero-based divider. This
-version corrects the whole driver, now that we know this clock is
-compatible between A23 and A80.
-
----
- drivers/clk/sunxi/clk-sun8i-apb0.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/clk/sunxi/clk-sun8i-apb0.c b/drivers/clk/sunxi/clk-sun8i-apb0.c
-index 7ba61103a6f5..2ea61debffc1 100644
---- a/drivers/clk/sunxi/clk-sun8i-apb0.c
-+++ b/drivers/clk/sunxi/clk-sun8i-apb0.c
-@@ -36,7 +36,7 @@ static struct clk *sun8i_a23_apb0_register(struct device_node *node,
- 
- 	/* The A23 APB0 clock is a standard 2 bit wide divider clock */
- 	clk = clk_register_divider(NULL, clk_name, clk_parent, 0, reg,
--				   0, 2, CLK_DIVIDER_POWER_OF_TWO, NULL);
-+				   0, 2, 0, NULL);
- 	if (IS_ERR(clk))
- 		return clk;
- 
--- 
-2.7.0
+On 2016?02?05? 13:03, John Stultz wrote:
+> On Thu, Feb 4, 2016 at 8:35 PM, Rob Herring <robh@kernel.org> wrote:
+>> On Thu, Feb 04, 2016 at 03:46:15PM -0800, John Stultz wrote:
+>>> On Thu, Feb 4, 2016 at 3:08 PM, Rob Herring <robh@kernel.org> wrote:
+>>>> On Tue, Feb 02, 2016 at 05:59:11PM +0800, Andy Yan wrote:
+>>>>> +Example:
+>>>>> +     reboot-mode {
+>>>>> +             mode-normal = <BOOT_NORMAL>;
+>>>>> +             mode-recovery = <BOOT_RECOVERY>;
+>>>>> +             mode-fastboot = <BOOT_FASTBOOT>;
+>>>> I tend to agree with John on calling this mode-bootloader.
+>>>>
+>>>> OTOH, fastboot is more specific about what the mode is. The name in DT
+>>>> and the userspace name don't necessarily have to be the same.
+>>> Wait. This is a bit confusing. The utility of adding a property name
+>>> and using that name be the reboot command parsed for made sense
+>>> (compared to earlier versions which had command strings) as it made
+>>> the dts more terse.   But it sounds here like you're suggesting we
+>>> should have some logic in the driver that translates "reboot fastboot"
+>>> to mode-bootloader or vice versa.
+>> I said early on the DT names and kernel-userspace names should not
+>> necessarily be linked. They can be, but we shouldn't require that.
+> Sigh. Ok. It seemed it was due to earlier comments (maybe from others,
+> but I thought it was you), that we moved from specifying a command
+> string, to using the label. But if you think the label name and the
+> commands shouldn't be linked, it seems like we should re-introduce
+> that. No?
+>
+> Unless your thinking we need some sort of static in-kernel mapping of
+> commands to label names? But that just seems painfully indirect for
+> little gain ("Its obvious! For that mode, you use this term here, and
+> that different term over there!").
+>
+>> My concern with mode-bootloader is what if you can boot into multiple
+>> bootloader modes. Say USB mass storage is one option. "bootloader" is
+>> not real specific.
+> True. But as I think we agreed below, "bootloader" and "recovery" are
+> basically defacto standards, and I think it would be a bad idea to try
+> to declare all the existing android tooling and docs wrong just
+> because the command is vague, technically.
+>
+>
+>>>>> +             mode-loader = <BOOT_LOADER>;
+>>>> This one needs a better name. Maybe it should be 'rockchip,mode-loader'
+>>>> as it is vendor specific. Either way, loader is vague. Perhaps
+>>>> rockchip,mode-bl-download?
+>>> Hrm. So how what reboot command do you expect to trigger that?
+>> Whatever your OS has defined to map to that.
+>>
+>> We could just decide the kernel will strip <vendor> and 'mode-' and
+>> match commands against what remains.
+> That part sounds sane, although I do think having vendor prefixes are
+> reasonable for actual commands as well.
+>
+>
+>>> I think one of the difficult things here is that there's no real
+>>> standards for all bios/bootloader modes. So they are somewhat
+>>> firmware/bootloader/device specific, and thus we need something that
+>>> is flexible enough to allow lots of different modes to be easily
+>>> specified.  That said, this does expose a userspace interface (though
+>>> one could argue kernel ABI doesn't cross reboots :) so we should try
+>>> to have some consistency so the same userspace can work on various
+>>> devices.
+>> There is: UEFI. Boot mode efivars are standard. But then they are pretty
+>> much PC oriented though. It is more which device to boot off of, but
+>> there is network boot or boot to bios setup.
+> Well, there's a partial standard there.  I'm told for android on x86,
+> there is no UEFI standard way to communicate rebooting to fastboot or
+> recovery. Every device does its own device specific driver.
+>
+>
+>>> I do think the "bootloader" and "recovery" arguments are somewhat
+>>> defacto standards, well established on most android devices.
+>> Yes, otherwise I'd be completely against "mode-bootloader" as the
+>> property.
+> Ok.
+>
+>>> I think here the concern is rockchip probably has some userspace that
+>>> is already using "reboot maskrom" or "reboot loader" for their own
+>>> uses. And its a bit of a pain to ask that userspace to be reworked to
+>> Perhaps those are only for development and change would not be so
+>> painful.
+> Andy: Can you comment here? How critical are the specific commands
+> you've used here for your userspace?
+>
+     Have some discussion with my colleague, we decided remove the" 
+maskrom" mode in next version.
+   Actually, this mode is not so used so often.
+     But "reboot loader" is frequently used  in development by all the 
+rockchip platform related people, even
+some widely used factory tools use this command.So we really hope it can 
+compatible with the existing tools
+and user experience.
+>>> use "reboot rom-download" or "reboot rockchip,rom-download" depending
+>>> on how we try to deal with these.  (Granted, non-upstream interfaces
+>>> aren't official, so that is their risk somewhat, but we avoid being
+>>> smug about that :)
+>> Or vendor specific modes require vendor specific translation in the
+>> kernel.
+> True.
+>
+>
+>> To some extent we need to design what is right and worry about future
+>> devices rather than cater to past devices. There's always some
+>> compromise. What would you design ignoring the existing conditions.
+>> Start there and then figure out how to make it work with current
+>> designs.
+> Fair enough. I just want to make sure we're not getting too caught up
+> with design purity and are willing the meet the world where it is.
+>
+>>> Another part of the issue is there isn't really a way to probe for
+>>> reboot cmd capability here. As much as I'd rather not complicate
+>>> things, one couldn't easily extend existing userspace to work with
+>>> current kernels as well as future kernels, since the reboot with an
+>>> invalid command won't fail. The machine still resets. So you can't try
+>>> one and fallback to the other.
+>> Well, that's nice. Maybe we should change that? Or we're stuck with
+>> that ABI?
+> Maybe? I'm not sure what might have trouble with reboot failing if it
+> sticks any extra noise in the reboot command.
+> I'd probably lean towards sticking with the existing behavior.
+>
+>>> Maybe there needs to be a sysfs entry with the list of the supported commands?
+>> You can just read the DT. Although, the problem then is what happens
+>> when we move to the next firmware interface. We see that some with
+>> devices having userspace dependencies on ATAGS.
+> Heh. I guess. Thought I suspect "Just read the DT to sort out the
+> available reboot modes" is probably not what most userspace wants to
+> hear. :)
+>
+> thanks
+> -john
+>
+> _______________________________________________
+> Linux-rockchip mailing list
+> Linux-rockchip at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+>
+>
+>
