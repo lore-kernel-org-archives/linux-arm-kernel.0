@@ -1,121 +1,26 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 16 Feb 2016 06:48:45 +0900
-Subject: [PATCH] ARM: dts: r8a7794: replace gpio-key,
- wakeup with wakeup-source property
-Message-ID: <1455572925-27697-1-git-send-email-horms+renesas@verge.net.au>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 16 Feb 2016 06:55:12 +0900
+Subject: [PATCH] ARM: dts: porter: fix JP3 jumper description
+In-Reply-To: <87fuwuinsh.wl%kuninori.morimoto.gx@renesas.com>
+References: <1674850.BZpGW9kEud@wasted.cogentembedded.com>
+ <1655804.y4T36KvG5v@wasted.cogentembedded.com>
+ <87fuwuinsh.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <20160215215512.GB15913@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Though the keyboard driver for GPIO buttons(gpio-keys) will continue to
-check for/support the legacy "gpio-key,wakeup" boolean property to
-enable gpio buttons as wakeup source, "wakeup-source" is the new
-standard binding.
+On Mon, Feb 15, 2016 at 04:50:17AM +0000, Kuninori Morimoto wrote:
+> 
+> Hi
+> 
+> > When finishing the Porter sound support patch, I managed to call the JP3
+> > jumper SW3 in the comment.  Fix this  along with (also miscalled) jumper
+> > positions...
+> > 
+> > Fixes: 493b4da7c10c ("ARM: dts: porter: add sound support")
+> > Reported-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> 
+> Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-This patch replaces the legacy "gpio-key,wakeup" with the unified
-"wakeup-source" property in order to avoid any futher copy-paste
-duplication.
-
-Changelog text from a similar patch by Sudeep Holla.
-
-Cc: Sudeep Holla <sudeep.holla@arm.com>
-Reported-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7793-gose.dts | 22 +++++++++++-----------
- 1 file changed, 11 insertions(+), 11 deletions(-)
-
-diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
-index cfe142c2ba38..87e89ec9dd47 100644
---- a/arch/arm/boot/dts/r8a7793-gose.dts
-+++ b/arch/arm/boot/dts/r8a7793-gose.dts
-@@ -67,77 +67,77 @@
- 		        gpios = <&gpio5 0 GPIO_ACTIVE_LOW>;
- 		        linux,code = <KEY_1>;
- 		        label = "SW2-1";
--		        gpio-key,wakeup;
-+		        wakeup-source;
- 		        debounce-interval = <20>;
- 		};
- 		key-2 {
- 		        gpios = <&gpio5 1 GPIO_ACTIVE_LOW>;
- 		        linux,code = <KEY_2>;
- 		        label = "SW2-2";
--		        gpio-key,wakeup;
-+		        wakeup-source;
- 		        debounce-interval = <20>;
- 		};
- 		key-3 {
- 		        gpios = <&gpio5 2 GPIO_ACTIVE_LOW>;
- 		        linux,code = <KEY_3>;
- 		        label = "SW2-3";
--		        gpio-key,wakeup;
-+		        wakeup-source;
- 		        debounce-interval = <20>;
- 		};
- 		key-4 {
- 		        gpios = <&gpio5 3 GPIO_ACTIVE_LOW>;
- 		        linux,code = <KEY_4>;
- 		        label = "SW2-4";
--		        gpio-key,wakeup;
-+		        wakeup-source;
- 		        debounce-interval = <20>;
- 		};
- 		key-a {
- 		        gpios = <&gpio7 0 GPIO_ACTIVE_LOW>;
- 		        linux,code = <KEY_A>;
- 		        label = "SW30";
--		        gpio-key,wakeup;
-+		        wakeup-source;
- 		        debounce-interval = <20>;
- 		};
- 		key-b {
- 		        gpios = <&gpio7 1 GPIO_ACTIVE_LOW>;
- 		        linux,code = <KEY_B>;
- 		        label = "SW31";
--		        gpio-key,wakeup;
-+		        wakeup-source;
- 		        debounce-interval = <20>;
- 		};
- 		key-c {
- 		        gpios = <&gpio7 2 GPIO_ACTIVE_LOW>;
- 		        linux,code = <KEY_C>;
- 		        label = "SW32";
--		        gpio-key,wakeup;
-+		        wakeup-source;
- 		        debounce-interval = <20>;
- 		};
- 		key-d {
- 		        gpios = <&gpio7 3 GPIO_ACTIVE_LOW>;
- 		        linux,code = <KEY_D>;
- 		        label = "SW33";
--		        gpio-key,wakeup;
-+		        wakeup-source;
- 		        debounce-interval = <20>;
- 		};
- 		key-e {
- 		        gpios = <&gpio7 4 GPIO_ACTIVE_LOW>;
- 		        linux,code = <KEY_E>;
- 		        label = "SW34";
--		        gpio-key,wakeup;
-+		        wakeup-source;
- 		        debounce-interval = <20>;
- 		};
- 		key-f {
- 		        gpios = <&gpio7 5 GPIO_ACTIVE_LOW>;
- 		        linux,code = <KEY_F>;
- 		        label = "SW35";
--		        gpio-key,wakeup;
-+		        wakeup-source;
- 		        debounce-interval = <20>;
- 		};
- 		key-g {
- 		        gpios = <&gpio7 6 GPIO_ACTIVE_LOW>;
- 		        linux,code = <KEY_G>;
- 		        label = "SW36";
--		        gpio-key,wakeup;
-+		        wakeup-source;
- 		        debounce-interval = <20>;
- 		};
- 	};
--- 
-2.7.0.rc3.207.g0ac5344
+Thanks, I have queued this up.
