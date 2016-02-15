@@ -1,310 +1,143 @@
 From: ykk@rock-chips.com (Yakir Yang)
-Date: Mon, 15 Feb 2016 19:10:11 +0800
-Subject: [PATCH v14 06/17] drm: bridge: analogix/dp: dynamic parse sync_pol &
- interlace & dynamic_range
+Date: Mon, 15 Feb 2016 19:10:48 +0800
+Subject: [PATCH v14 10/17] dt-bindings: add document for rockchip variant of
+ analogix_dp
 In-Reply-To: <1455534485-1154-1-git-send-email-ykk@rock-chips.com>
 References: <1455534485-1154-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1455534611-1738-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <1455534648-1921-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both hsync/vsync polarity and interlace mode can be parsed from
-drm display mode, and dynamic_range and ycbcr_coeff can be judge
-by the video code.
-
-But presumably Exynos still relies on the DT properties, so take
-good use of mode_fixup() in to achieve the compatibility hacks.
+Rockchip DP driver is a helper driver of analogix_dp coder driver,
+so most of the DT property should be descriped in analogix_dp document.
 
 Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
 ---
 Changes in v14: None
 Changes in v13: None
 Changes in v12: None
 Changes in v11: None
-Changes in v10: None
-Changes in v9: None
-Changes in v8: None
-Changes in v7:
-- Back to use the of_property_read_bool() interfacs to provoid backward
-  compatibility of "hsync-active-high" "vsync-active-high" "interlaced"
-  to avoid -EOVERFLOW error (Krzysztof)
+Changes in v10:
+- Add the ack from Rob Herring
 
+Changes in v9:
+- Document more details for 'ports' property.
+
+Changes in v8:
+- Modify the commit subject name. (Heiko)
+
+Changes in v7: None
 Changes in v6: None
 Changes in v5:
-- Switch video timing type to "u32", so driver could use "of_property_read_u32"
-  to get the backword timing values. Krzysztof suggest me that driver could use
-  the "of_property_read_bool" to get backword timing values, but that interfacs
-  would modify the original drm_display_mode timing directly (whether those
-  properties exists or not).
+- Split binding doc's from driver changes. (Rob)
+- Add eDP hotplug pinctrl property. (Heiko)
 
-Changes in v4:
-- Provide backword compatibility with samsung. (Krzysztof)
-
-Changes in v3:
-- Dynamic parse video timing info from struct drm_display_mode and
-  struct drm_display_info. (Thierry)
-
+Changes in v4: None
+Changes in v3: None
 Changes in v2: None
 
- drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 148 +++++++++++++--------
- drivers/gpu/drm/bridge/analogix/analogix_dp_core.h |   2 +-
- drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c  |  14 +-
- 3 files changed, 103 insertions(+), 61 deletions(-)
+ .../display/rockchip/analogix_dp-rockchip.txt      | 91 ++++++++++++++++++++++
+ 1 file changed, 91 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt
 
-diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-index b948636..26359f4 100644
---- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-+++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-@@ -893,8 +893,8 @@ static void analogix_dp_commit(struct analogix_dp_device *dp)
- 		return;
- 	}
- 
--	ret = analogix_dp_set_link_train(dp, dp->video_info->lane_count,
--					 dp->video_info->link_rate);
-+	ret = analogix_dp_set_link_train(dp, dp->video_info.lane_count,
-+					 dp->video_info.link_rate);
- 	if (ret) {
- 		dev_err(dp->dev, "unable to do link train\n");
- 		return;
-@@ -1077,6 +1077,85 @@ static void analogix_dp_bridge_disable(struct drm_bridge *bridge)
- 	dp->dpms_mode = DRM_MODE_DPMS_OFF;
- }
- 
-+static void analogix_dp_bridge_mode_set(struct drm_bridge *bridge,
-+					struct drm_display_mode *orig_mode,
-+					struct drm_display_mode *mode)
-+{
-+	struct analogix_dp_device *dp = bridge->driver_private;
-+	struct drm_display_info *display_info = &dp->connector.display_info;
-+	struct video_info *video = &dp->video_info;
-+	struct device_node *dp_node = dp->dev->of_node;
-+	int vic;
+diff --git a/Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt
+new file mode 100644
+index 0000000..04d99e3
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt
+@@ -0,0 +1,91 @@
++Rockchip RK3288 specific extensions to the Analogix Display Port
++================================
 +
-+	/* Input video interlaces & hsync pol & vsync pol */
-+	video->interlaced = !!(mode->flags & DRM_MODE_FLAG_INTERLACE);
-+	video->v_sync_polarity = !!(mode->flags & DRM_MODE_FLAG_NVSYNC);
-+	video->h_sync_polarity = !!(mode->flags & DRM_MODE_FLAG_NHSYNC);
++Required properties:
++- compatible: "rockchip,rk3288-edp";
 +
-+	/* Input video dynamic_range & colorimetry */
-+	vic = drm_match_cea_mode(mode);
-+	if ((vic == 6) || (vic == 7) || (vic == 21) || (vic == 22) ||
-+	    (vic == 2) || (vic == 3) || (vic == 17) || (vic == 18)) {
-+		video->dynamic_range = CEA;
-+		video->ycbcr_coeff = COLOR_YCBCR601;
-+	} else if (vic) {
-+		video->dynamic_range = CEA;
-+		video->ycbcr_coeff = COLOR_YCBCR709;
-+	} else {
-+		video->dynamic_range = VESA;
-+		video->ycbcr_coeff = COLOR_YCBCR709;
-+	}
++- reg: physical base address of the controller and length
 +
-+	/* Input vide bpc and color_formats */
-+	switch (display_info->bpc) {
-+	case 12:
-+		video->color_depth = COLOR_12;
-+		break;
-+	case 10:
-+		video->color_depth = COLOR_10;
-+		break;
-+	case 8:
-+		video->color_depth = COLOR_8;
-+		break;
-+	case 6:
-+		video->color_depth = COLOR_6;
-+		break;
-+	default:
-+		video->color_depth = COLOR_8;
-+		break;
-+	}
-+	if (display_info->color_formats & DRM_COLOR_FORMAT_YCRCB444)
-+		video->color_space = COLOR_YCBCR444;
-+	else if (display_info->color_formats & DRM_COLOR_FORMAT_YCRCB422)
-+		video->color_space = COLOR_YCBCR422;
-+	else if (display_info->color_formats & DRM_COLOR_FORMAT_RGB444)
-+		video->color_space = COLOR_RGB;
-+	else
-+		video->color_space = COLOR_RGB;
++- clocks: from common clock binding: handle to dp clock.
++	  of memory mapped region.
 +
-+	/*
-+	 * NOTE: those property parsing code is used for providing backward
-+	 * compatibility for samsung platform.
-+	 * Due to we used the "of_property_read_u32" interfaces, when this
-+	 * property isn't present, the "video_info" can keep the original
-+	 * values and wouldn't be modified.
-+	 */
-+	of_property_read_u32(dp_node, "samsung,color-space",
-+			     &video->color_space);
-+	of_property_read_u32(dp_node, "samsung,dynamic-range",
-+			     &video->dynamic_range);
-+	of_property_read_u32(dp_node, "samsung,ycbcr-coeff",
-+			     &video->ycbcr_coeff);
-+	of_property_read_u32(dp_node, "samsung,color-depth",
-+			     &video->color_depth);
-+	if (of_property_read_bool(dp_node, "hsync-active-high"))
-+		video->h_sync_polarity = true;
-+	if (of_property_read_bool(dp_node, "vsync-active-high"))
-+		video->v_sync_polarity = true;
-+	if (of_property_read_bool(dp_node, "interlaced"))
-+		video->interlaced = true;
-+}
++- clock-names: from common clock binding:
++	       Required elements: "dp" "pclk"
 +
- static void analogix_dp_bridge_nop(struct drm_bridge *bridge)
- {
- 	/* do nothing */
-@@ -1087,6 +1166,7 @@ static const struct drm_bridge_funcs analogix_dp_bridge_funcs = {
- 	.disable = analogix_dp_bridge_disable,
- 	.pre_enable = analogix_dp_bridge_nop,
- 	.post_disable = analogix_dp_bridge_nop,
-+	.mode_set = analogix_dp_bridge_mode_set,
- 	.attach = analogix_dp_bridge_attach,
- };
- 
-@@ -1118,62 +1198,24 @@ static int analogix_dp_create_bridge(struct drm_device *drm_dev,
- 	return 0;
- }
- 
--static struct video_info *analogix_dp_dt_parse_pdata(struct device *dev)
-+static int analogix_dp_dt_parse_pdata(struct analogix_dp_device *dp)
- {
--	struct device_node *dp_node = dev->of_node;
--	struct video_info *dp_video_config;
--
--	dp_video_config = devm_kzalloc(dev, sizeof(*dp_video_config),
--				       GFP_KERNEL);
--	if (!dp_video_config)
--		return ERR_PTR(-ENOMEM);
--
--	dp_video_config->h_sync_polarity =
--		of_property_read_bool(dp_node, "hsync-active-high");
--
--	dp_video_config->v_sync_polarity =
--		of_property_read_bool(dp_node, "vsync-active-high");
--
--	dp_video_config->interlaced =
--		of_property_read_bool(dp_node, "interlaced");
--
--	if (of_property_read_u32(dp_node, "samsung,color-space",
--				 &dp_video_config->color_space)) {
--		dev_err(dev, "failed to get color-space\n");
--		return ERR_PTR(-EINVAL);
--	}
--
--	if (of_property_read_u32(dp_node, "samsung,dynamic-range",
--				 &dp_video_config->dynamic_range)) {
--		dev_err(dev, "failed to get dynamic-range\n");
--		return ERR_PTR(-EINVAL);
--	}
--
--	if (of_property_read_u32(dp_node, "samsung,ycbcr-coeff",
--				 &dp_video_config->ycbcr_coeff)) {
--		dev_err(dev, "failed to get ycbcr-coeff\n");
--		return ERR_PTR(-EINVAL);
--	}
--
--	if (of_property_read_u32(dp_node, "samsung,color-depth",
--				 &dp_video_config->color_depth)) {
--		dev_err(dev, "failed to get color-depth\n");
--		return ERR_PTR(-EINVAL);
--	}
-+	struct device_node *dp_node = dp->dev->of_node;
-+	struct video_info *video_info = &dp->video_info;
- 
- 	if (of_property_read_u32(dp_node, "samsung,link-rate",
--				 &dp_video_config->link_rate)) {
--		dev_err(dev, "failed to get link-rate\n");
--		return ERR_PTR(-EINVAL);
-+				 &video_info->link_rate)) {
-+		dev_err(dp->dev, "failed to get link-rate\n");
-+		return -EINVAL;
- 	}
- 
- 	if (of_property_read_u32(dp_node, "samsung,lane-count",
--				 &dp_video_config->lane_count)) {
--		dev_err(dev, "failed to get lane-count\n");
--		return ERR_PTR(-EINVAL);
-+				 &video_info->lane_count)) {
-+		dev_err(dp->dev, "failed to get lane-count\n");
-+		return -EINVAL;
- 	}
- 
--	return dp_video_config;
-+	return 0;
- }
- 
- int analogix_dp_bind(struct device *dev, struct drm_device *drm_dev,
-@@ -1206,9 +1248,9 @@ int analogix_dp_bind(struct device *dev, struct drm_device *drm_dev,
- 	 */
- 	dp->plat_data = plat_data;
- 
--	dp->video_info = analogix_dp_dt_parse_pdata(&pdev->dev);
--	if (IS_ERR(dp->video_info))
--		return PTR_ERR(dp->video_info);
-+	ret = analogix_dp_dt_parse_pdata(dp);
-+	if (ret)
-+		return ret;
- 
- 	dp->phy = devm_phy_get(dp->dev, "dp");
- 	if (IS_ERR(dp->phy)) {
-diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
-index afb0a53..123030f 100644
---- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
-+++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
-@@ -148,7 +148,7 @@ struct analogix_dp_device {
- 	unsigned int		irq;
- 	void __iomem		*reg_base;
- 
--	struct video_info	*video_info;
-+	struct video_info	video_info;
- 	struct link_train	link_train;
- 	struct work_struct	hotplug_work;
- 	struct phy		*phy;
-diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-index eb0b63c..3858df5 100644
---- a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-+++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-@@ -1084,15 +1084,15 @@ void analogix_dp_set_video_color_format(struct analogix_dp_device *dp)
- 	u32 reg;
- 
- 	/* Configure the input color depth, color space, dynamic range */
--	reg = (dp->video_info->dynamic_range << IN_D_RANGE_SHIFT) |
--		(dp->video_info->color_depth << IN_BPC_SHIFT) |
--		(dp->video_info->color_space << IN_COLOR_F_SHIFT);
-+	reg = (dp->video_info.dynamic_range << IN_D_RANGE_SHIFT) |
-+		(dp->video_info.color_depth << IN_BPC_SHIFT) |
-+		(dp->video_info.color_space << IN_COLOR_F_SHIFT);
- 	writel(reg, dp->reg_base + ANALOGIX_DP_VIDEO_CTL_2);
- 
- 	/* Set Input Color YCbCr Coefficients to ITU601 or ITU709 */
- 	reg = readl(dp->reg_base + ANALOGIX_DP_VIDEO_CTL_3);
- 	reg &= ~IN_YC_COEFFI_MASK;
--	if (dp->video_info->ycbcr_coeff)
-+	if (dp->video_info.ycbcr_coeff)
- 		reg |= IN_YC_COEFFI_ITU709;
- 	else
- 		reg |= IN_YC_COEFFI_ITU601;
-@@ -1229,17 +1229,17 @@ void analogix_dp_config_video_slave_mode(struct analogix_dp_device *dp)
- 
- 	reg = readl(dp->reg_base + ANALOGIX_DP_VIDEO_CTL_10);
- 	reg &= ~INTERACE_SCAN_CFG;
--	reg |= (dp->video_info->interlaced << 2);
-+	reg |= (dp->video_info.interlaced << 2);
- 	writel(reg, dp->reg_base + ANALOGIX_DP_VIDEO_CTL_10);
- 
- 	reg = readl(dp->reg_base + ANALOGIX_DP_VIDEO_CTL_10);
- 	reg &= ~VSYNC_POLARITY_CFG;
--	reg |= (dp->video_info->v_sync_polarity << 1);
-+	reg |= (dp->video_info.v_sync_polarity << 1);
- 	writel(reg, dp->reg_base + ANALOGIX_DP_VIDEO_CTL_10);
- 
- 	reg = readl(dp->reg_base + ANALOGIX_DP_VIDEO_CTL_10);
- 	reg &= ~HSYNC_POLARITY_CFG;
--	reg |= (dp->video_info->h_sync_polarity << 0);
-+	reg |= (dp->video_info.h_sync_polarity << 0);
- 	writel(reg, dp->reg_base + ANALOGIX_DP_VIDEO_CTL_10);
- 
- 	reg = AUDIO_MODE_SPDIF_MODE | VIDEO_MODE_SLAVE_MODE;
++- resets: Must contain an entry for each entry in reset-names.
++	  See ../reset/reset.txt for details.
++
++- pinctrl-names: Names corresponding to the chip hotplug pinctrl states.
++- pinctrl-0: pin-control mode. should be <&edp_hpd>
++
++- reset-names: Must include the name "dp"
++
++- rockchip,grf: this soc should set GRF regs, so need get grf here.
++
++- ports: there are 2 port nodes with endpoint definitions as defined in
++  Documentation/devicetree/bindings/media/video-interfaces.txt.
++    Port 0: contained 2 endpoints, connecting to the output of vop.
++    Port 1: contained 1 endpoint, connecting to the input of panel.
++
++For the below properties, please refer to Analogix DP binding document:
++ * Documentation/devicetree/bindings/drm/bridge/analogix_dp.txt
++- phys (required)
++- phy-names (required)
++- hpd-gpios (optional)
++-------------------------------------------------------------------------------
++
++Example:
++	dp-controller: dp at ff970000 {
++		compatible = "rockchip,rk3288-dp";
++		reg = <0xff970000 0x4000>;
++		interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cru SCLK_EDP>, <&cru PCLK_EDP_CTRL>;
++		clock-names = "dp", "pclk";
++		phys = <&dp_phy>;
++		phy-names = "dp";
++
++		rockchip,grf = <&grf>;
++		resets = <&cru 111>;
++		reset-names = "dp";
++
++		pinctrl-names = "default";
++		pinctrl-0 = <&edp_hpd>;
++
++		status = "disabled";
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			edp_in: port at 0 {
++				reg = <0>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++				edp_in_vopb: endpoint at 0 {
++					reg = <0>;
++					remote-endpoint = <&vopb_out_edp>;
++				};
++				edp_in_vopl: endpoint at 1 {
++					reg = <1>;
++					remote-endpoint = <&vopl_out_edp>;
++				};
++			};
++
++			edp_out: port at 1 {
++				reg = <1>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++				edp_out_panel: endpoint {
++					reg = <0>;
++					remote-endpoint = <&panel_in_edp>
++				};
++			};
++		};
++	};
++
++	pinctrl {
++		edp {
++			edp_hpd: edp-hpd {
++				rockchip,pins = <7 11 RK_FUNC_2 &pcfg_pull_none>;
++			};
++		};
++	};
 -- 
 1.9.1
