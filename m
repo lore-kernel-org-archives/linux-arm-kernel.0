@@ -1,31 +1,61 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 16 Feb 2016 10:32:54 +0000
-Subject: [PATCH v2] arm64/efi: Make strnlen() available to the EFI
- namespace
-In-Reply-To: <1455617791-4791-1-git-send-email-thierry.reding@gmail.com>
-References: <1455563856-1553-1-git-send-email-thierry.reding@gmail.com>
- <1455617791-4791-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <20160216103254.GD14509@arm.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Tue, 16 Feb 2016 12:36:09 +0200
+Subject: [PATCH v3 05/10] serial: mps2-uart: add support for early console
+In-Reply-To: <1455617295-23736-6-git-send-email-vladimir.murzin@arm.com>
+References: <1455617295-23736-1-git-send-email-vladimir.murzin@arm.com>
+ <1455617295-23736-6-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <CAHp75VdugAq0WnzLHmd9CJHCjBOdBwPqCmC3ARSaVF5XMYGoMw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 16, 2016 at 11:16:31AM +0100, Thierry Reding wrote:
-> From: Thierry Reding <treding@nvidia.com>
-> 
-> Changes introduced in the upstream version of libfdt pulled in by commit
-> 91feabc2e224 ("scripts/dtc: Update to upstream commit b06e55c88b9b") use
-> the strnlen() function, which isn't currently available to the EFI name-
-> space. Add it to the EFI namespace to avoid a linker error.
-> 
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Rob Herring <robh@kernel.org>
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
-> ---
-> Changes in v2:
-> - mark strnlen() position independent and refer to __pi_strnlen
+On Tue, Feb 16, 2016 at 12:08 PM, Vladimir Murzin
+<vladimir.murzin@arm.com> wrote:
+> This adds support early console for MPS2 UART which can be enabled via
+> earlycon=mps2,0x40004000
 
-Thanks, I'll queue this on the arm64 fixes branch.
 
-Will
+> --- a/drivers/tty/serial/mps2-uart.c
+> +++ b/drivers/tty/serial/mps2-uart.c
+> @@ -435,6 +435,36 @@ static struct console mps2_uart_console = {
+>
+>  #define MPS2_SERIAL_CONSOLE (&mps2_uart_console)
+>
+> +static void mps2_early_putchar(struct uart_port *port, int ch)
+> +{
+> +
+> +       while (readb(port->membase + UARTn_STATE) & UARTn_STATE_TX_FULL)
+> +               cpu_relax();
+
+Infinite busy loop?
+
+> +
+> +       writeb((unsigned char)ch, port->membase + UARTn_DATA);
+> +}
+> +
+> +
+> +static void mps2_early_write(struct console *con, const char *s, unsigned n)
+> +{
+> +       struct earlycon_device *dev = con->data;
+> +
+> +       uart_console_write(&dev->port, s, n, mps2_early_putchar);
+> +}
+> +
+> +static int __init mps2_early_console_setup(struct earlycon_device *device,
+> +                                          const char *opt)
+> +{
+> +       if (!device->port.membase)
+> +               return -ENODEV;
+> +
+> +       device->con->write = mps2_early_write;
+> +
+> +       return 0;
+> +}
+> +EARLYCON_DECLARE(mps2, mps2_early_console_setup);
+> +OF_EARLYCON_DECLARE(mps2, "arm,mps2-uart", mps2_early_console_setup);
+
+IIRC Peter Hurley mentioned you don't need to put both anymore, OF_
+one is enough.
+
+-- 
+With Best Regards,
+Andy Shevchenko
