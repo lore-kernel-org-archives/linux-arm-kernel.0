@@ -1,53 +1,91 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 16 Feb 2016 14:45:57 +0000
-Subject: [GIT PULL] firmware: SCPI driver updates for v4.6
-Message-ID: <56C33625.5030903@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 16 Feb 2016 14:47:31 +0000
+Subject: [PATCH] KVM: arm/arm64: vgic: ensure bitmaps are long enough
+Message-ID: <1455634051-1860-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM-SoC team,
+When we allocate bitmaps in vgic_vcpu_init_maps, we divide the number of
+bits we need by 8 to figure out how many bytes to allocate. However,
+bitmap elements are always accessed as unsigned longs, and if we didn't
+happen to allocate a size such that size % sizeof(unsigned long) == 0,
+bitmap accesses may go past the end of the allocation.
 
-Here is the set of minor updates to SCPI firmware driver for v4.6
-There's a change in HWMON driver which Guenter Roeck has Acked and
-agreed to take it via arm-soc tree.
+When using KASAN (which does byte-granular access checks), this results
+in a continuous stream of BUGs whenever these bitmaps are accessed:
 
+=============================================================================
+BUG kmalloc-128 (Tainted: G    B          ): kasan: bad access detected
+-----------------------------------------------------------------------------
+
+INFO: Allocated in vgic_init.part.25+0x55c/0x990 age=7493 cpu=3 pid=1730
+INFO: Slab 0xffffffbde6d5da40 objects=16 used=15 fp=0xffffffc935769700 flags=0x4000000000000080
+INFO: Object 0xffffffc935769500 @offset=1280 fp=0x          (null)
+
+Bytes b4 ffffffc9357694f0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+Object ffffffc935769500: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+Object ffffffc935769510: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+Object ffffffc935769520: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+Object ffffffc935769530: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+Object ffffffc935769540: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+Object ffffffc935769550: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+Object ffffffc935769560: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+Object ffffffc935769570: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+Padding ffffffc9357695b0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+Padding ffffffc9357695c0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+Padding ffffffc9357695d0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+Padding ffffffc9357695e0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+Padding ffffffc9357695f0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+CPU: 3 PID: 1740 Comm: kvm-vcpu-0 Tainted: G    B           4.4.0+ #17
+Hardware name: ARM Juno development board (r1) (DT)
+Call trace:
+[<ffffffc00008e770>] dump_backtrace+0x0/0x280
+[<ffffffc00008ea04>] show_stack+0x14/0x20
+[<ffffffc000726360>] dump_stack+0x100/0x188
+[<ffffffc00030d324>] print_trailer+0xfc/0x168
+[<ffffffc000312294>] object_err+0x3c/0x50
+[<ffffffc0003140fc>] kasan_report_error+0x244/0x558
+[<ffffffc000314548>] __asan_report_load8_noabort+0x48/0x50
+[<ffffffc000745688>] __bitmap_or+0xc0/0xc8
+[<ffffffc0000d9e44>] kvm_vgic_flush_hwstate+0x1bc/0x650
+[<ffffffc0000c514c>] kvm_arch_vcpu_ioctl_run+0x2ec/0xa60
+[<ffffffc0000b9a6c>] kvm_vcpu_ioctl+0x474/0xa68
+[<ffffffc00036b7b0>] do_vfs_ioctl+0x5b8/0xcb0
+[<ffffffc00036bf34>] SyS_ioctl+0x8c/0xa0
+[<ffffffc000086cb0>] el0_svc_naked+0x24/0x28
+Memory state around the buggy address:
+ ffffffc935769400: 00 00 fc fc fc fc fc fc fc fc fc fc fc fc fc fc
+ ffffffc935769480: fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc
+>ffffffc935769500: 04 fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc
+                   ^
+ ffffffc935769580: fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc
+ ffffffc935769600: 00 00 00 00 fc fc fc fc fc fc fc fc fc fc fc fc
+==================================================================
+
+Fix the issue by always allocating a multiple of sizeof(unsigned long),
+as we do elsewhere in the vgic code.
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ virt/kvm/arm/vgic.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 7a2f449..5d10f10 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -1875,8 +1875,8 @@ void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu)
+ static int vgic_vcpu_init_maps(struct kvm_vcpu *vcpu, int nr_irqs)
+ {
+ 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+-
+-	int sz = (nr_irqs - VGIC_NR_PRIVATE_IRQS) / 8;
++	int nr_longs = BITS_TO_LONGS(nr_irqs - VGIC_NR_PRIVATE_IRQS);
++	int sz = nr_longs * sizeof(unsigned long);
+ 	vgic_cpu->pending_shared = kzalloc(sz, GFP_KERNEL);
+ 	vgic_cpu->active_shared = kzalloc(sz, GFP_KERNEL);
+ 	vgic_cpu->pend_act_shared = kzalloc(sz, GFP_KERNEL);
 -- 
-Regards,
-Sudeep
-
--->8
-
-The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
-
-   Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
-
-are available in the git repository at:
-
-   git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git 
-tags/scpi-for-v4.6/updates
-
-for you to fetch changes up to fb3b07ef399bd6984f3361a709829618b75e98d8:
-
-   hwmon: (scpi) add energy meter support (2016-02-16 09:26:27 +0000)
-
-----------------------------------------------------------------
-SCPI updates and fixes for v4.6
-
-1. Minor fix to restore functionality in big-endian mode
-
-2. Fix race by decreasing Tx timeout to 20ms
-
-3. Adds support for 64-bit sensor values and energy meter
-
-----------------------------------------------------------------
-Sudeep Holla (4):
-       firmware: arm_scpi: fix send_message and sensor_get_value for 
-big-endian
-       firmware: arm_scpi: decrease Tx timeout to 20ms
-       firmware: arm_scpi: add support for 64-bit sensor values
-       hwmon: (scpi) add energy meter support
-
-  drivers/firmware/arm_scpi.c   | 17 ++++++++++-------
-  drivers/hwmon/scpi-hwmon.c    | 14 +++++++++++---
-  include/linux/scpi_protocol.h |  3 ++-
-  3 files changed, 23 insertions(+), 11 deletions(-)
+1.9.1
