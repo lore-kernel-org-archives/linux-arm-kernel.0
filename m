@@ -1,106 +1,100 @@
-From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
-Date: Tue, 16 Feb 2016 16:29:51 +0530
-Subject: [PATCH 3/3] net: thunderx: Fix receive packet stats
-In-Reply-To: <1455620391-31619-1-git-send-email-sunil.kovvuri@gmail.com>
-References: <1455620391-31619-1-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <1455620391-31619-4-git-send-email-sunil.kovvuri@gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 16 Feb 2016 11:57:36 +0100
+Subject: [PATCH] arm64: mark kernel text segment as MEMBLOCK_NOMAP
+In-Reply-To: <56C2FF07.30205@arm.com>
+References: <1455528512-32491-1-git-send-email-ard.biesheuvel@linaro.org>
+ <56C2FF07.30205@arm.com>
+Message-ID: <CAKv+Gu_yTz-ohFPS0wMX42iCkDNaSwZoZ8Yi-zsZNNu1LNDkZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sunil Goutham <sgoutham@cavium.com>
+On 16 February 2016 at 11:50, James Morse <james.morse@arm.com> wrote:
+> Hi Ard,
+>
+> On 15/02/16 09:28, Ard Biesheuvel wrote:
+>> Commit 752af28bd711 ("arm64: move kernel image to base of vmalloc area")
+>> moves the mapping of the kernel text and data segments out of the linear
+>> region, and takes care not to create a writable alias of the read-only
+>> kernel text segment by checking each memblock against overlap when the
+>> memblocks are mapped into the linear mapping.
+>>
+>> However, it is more correct, and much simpler, to mark the [_stext, _etext]
+>> interval as MEMBLOCK_NOMAP. This will also prevent the interval from being
+>> omitted from the linear region, but this fact will now also be reflected
+>> in the output of pfn_valid(), and so code that expects any pfn_valid()
+>> page to be mapped and accessible (which is a reasonable assumption) does
+>> not get surprised by the text segment being inaccessible via the linear
+>> mapping.
+>>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>
+> With this patch on arm64/for-next/kernmap, I get the following KVM-related boot
+> failure on Juno:
+> -----------------------------%<-----------------------------
+> RPC: Registered named UNIX socket transport module.
+> RPC: Registered udp transport module.
+> RPC: Registered tcp transport module.
+> RPC: Registered tcp NFSv4.1 backchannel transport module.
+> hw perfevents: enabled with armv8_pmuv3 PMU driver, 7 counters available
+> ------------[ cut here ]------------
+> kernel BUG at ../arch/arm64/kvm/../../../arch/arm/kvm/mmu.c:577!
+> Internal error: Oops - BUG: 0 [#1] PREEMPT SMP
+> Modules linked in:
+> CPU: 4 PID: 1 Comm: swapper/0 Not tainted 4.5.0-rc1+ #2022
+> Hardware name: ARM Juno development board (r1) (DT)
+> task: ffffffc976cf8000 ti: ffffffc976d60000 task.ti: ffffffc976d60000
+> PC is at create_hyp_mappings+0x144/0x148
+> LR is at create_hyp_mappings+0x7c/0x148
+>
+> [SNIP]
+>
+> [<ffffff80040abc14>] create_hyp_mappings+0x144/0x148
+> [<ffffff80040a9be8>] kvm_arch_init+0x198/0x53c
+> [<ffffff800409fe24>] kvm_init+0x38/0x290
+> [<ffffff80040a84e4>] arm_init+0x24/0x2c
+> [<ffffff8004082994>] do_one_initcall+0x94/0x198
+> [<ffffff8004a22b10>] kernel_init_freeable+0x148/0x1e8
+> [<ffffff800473e344>] kernel_init+0x20/0xe4
+> [<ffffff8004085cd0>] ret_from_fork+0x10/0x40
+>
+> -----------------------------%<-----------------------------
+>
+> The offending function is:
+> -----------------------------%<-----------------------------
+> static phys_addr_t kvm_kaddr_to_phys(void *kaddr)
+> {
+>         if (!is_vmalloc_addr(kaddr)) {
+>                 BUG_ON(!virt_addr_valid(kaddr));
+>                 return __pa(kaddr);
+>         } else {
+>                 return page_to_phys(vmalloc_to_page(kaddr)) +
+>                        offset_in_page(kaddr);
+>         }
+> }
+> -----------------------------%<-----------------------------
+>
+> When the BUG_ON() fires, kaddr points into the hole in the linear map left by
+> the kernel text.
+>
 
-Counting rx packets for every CQE_RX in CQ irq handler is incorrect.
-Synchronization is missing when multiple queues are receiving packets
-simultaneously. Like transmit packet stats use HW stats here.
+I fixed this in the v6 series I am about to send out. I replaced the
+BUG_ON() condition with 'memblock_is_memory(__pa(kaddr))', so that it
+takes linear addresses pointing into  MEMBLOCK_NOMAP regions into
+account as well.
 
-Also removed unused 'cqe_type' parameter in nicvf_rcv_pkt_handler().
+>
+>> This should hopefully address the issue reported by James, but I suppose
+>> more work is required on the hibernate side to ensure the unmapped text
+>> region is preserved, since it is no longer covered by the linear mapping.
+>
+> It does, now I have to work out how best to fix hibernate!
+>
 
-Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
----
- drivers/net/ethernet/cavium/thunder/nicvf_main.c   |   11 ++++++-----
- drivers/net/ethernet/cavium/thunder/nicvf_queues.c |    8 ++------
- drivers/net/ethernet/cavium/thunder/nicvf_queues.h |    3 +--
- 3 files changed, 9 insertions(+), 13 deletions(-)
+Indeed. The alternative would be to map the [_stext, _etext] interval
+into the linear region as a ro/nx alias of the actual mapping in the
+vmalloc region. That would probably make your life easier, but I am
+not convinced the overall result is better.
 
-diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_main.c b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-index 84c5a33..a009bc3 100644
---- a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-+++ b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-@@ -574,8 +574,7 @@ static inline void nicvf_set_rxhash(struct net_device *netdev,
- 
- static void nicvf_rcv_pkt_handler(struct net_device *netdev,
- 				  struct napi_struct *napi,
--				  struct cmp_queue *cq,
--				  struct cqe_rx_t *cqe_rx, int cqe_type)
-+				  struct cqe_rx_t *cqe_rx)
- {
- 	struct sk_buff *skb;
- 	struct nicvf *nic = netdev_priv(netdev);
-@@ -591,7 +590,7 @@ static void nicvf_rcv_pkt_handler(struct net_device *netdev,
- 	}
- 
- 	/* Check for errors */
--	err = nicvf_check_cqe_rx_errs(nic, cq, cqe_rx);
-+	err = nicvf_check_cqe_rx_errs(nic, cqe_rx);
- 	if (err && !cqe_rx->rb_cnt)
- 		return;
- 
-@@ -682,8 +681,7 @@ loop:
- 			   cq_idx, cq_desc->cqe_type);
- 		switch (cq_desc->cqe_type) {
- 		case CQE_TYPE_RX:
--			nicvf_rcv_pkt_handler(netdev, napi, cq,
--					      cq_desc, CQE_TYPE_RX);
-+			nicvf_rcv_pkt_handler(netdev, napi, cq_desc);
- 			work_done++;
- 		break;
- 		case CQE_TYPE_SEND:
-@@ -1353,6 +1351,9 @@ void nicvf_update_stats(struct nicvf *nic)
- 	drv_stats->tx_frames_ok = stats->tx_ucast_frames_ok +
- 				  stats->tx_bcast_frames_ok +
- 				  stats->tx_mcast_frames_ok;
-+	drv_stats->rx_frames_ok = stats->rx_ucast_frames +
-+				  stats->rx_bcast_frames +
-+				  stats->rx_mcast_frames;
- 	drv_stats->rx_drops = stats->rx_drop_red +
- 			      stats->rx_drop_overrun;
- 	drv_stats->tx_drops = stats->tx_drops;
-diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-index d0d1b54..767347b 100644
---- a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-+++ b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-@@ -1329,16 +1329,12 @@ void nicvf_update_sq_stats(struct nicvf *nic, int sq_idx)
- }
- 
- /* Check for errors in the receive cmp.queue entry */
--int nicvf_check_cqe_rx_errs(struct nicvf *nic,
--			    struct cmp_queue *cq, struct cqe_rx_t *cqe_rx)
-+int nicvf_check_cqe_rx_errs(struct nicvf *nic, struct cqe_rx_t *cqe_rx)
- {
- 	struct nicvf_hw_stats *stats = &nic->hw_stats;
--	struct nicvf_drv_stats *drv_stats = &nic->drv_stats;
- 
--	if (!cqe_rx->err_level && !cqe_rx->err_opcode) {
--		drv_stats->rx_frames_ok++;
-+	if (!cqe_rx->err_level && !cqe_rx->err_opcode)
- 		return 0;
--	}
- 
- 	if (netif_msg_rx_err(nic))
- 		netdev_err(nic->netdev,
-diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_queues.h b/drivers/net/ethernet/cavium/thunder/nicvf_queues.h
-index c5030a7..6673e11 100644
---- a/drivers/net/ethernet/cavium/thunder/nicvf_queues.h
-+++ b/drivers/net/ethernet/cavium/thunder/nicvf_queues.h
-@@ -338,8 +338,7 @@ u64  nicvf_queue_reg_read(struct nicvf *nic,
- /* Stats */
- void nicvf_update_rq_stats(struct nicvf *nic, int rq_idx);
- void nicvf_update_sq_stats(struct nicvf *nic, int sq_idx);
--int nicvf_check_cqe_rx_errs(struct nicvf *nic,
--			    struct cmp_queue *cq, struct cqe_rx_t *cqe_rx);
-+int nicvf_check_cqe_rx_errs(struct nicvf *nic, struct cqe_rx_t *cqe_rx);
- int nicvf_check_cqe_tx_errs(struct nicvf *nic,
- 			    struct cmp_queue *cq, struct cqe_send_t *cqe_tx);
- #endif /* NICVF_QUEUES_H */
 -- 
-1.7.1
+Ard.
