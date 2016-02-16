@@ -1,34 +1,74 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 16 Feb 2016 18:09:11 +0100
-Subject: [PATCH] sound: hdmi: avoid dereferencing uninitialized 'jack'
- pointer
-In-Reply-To: <112888486.mQgaWiH0PI@wuerfel>
-References: <1455634059-1896914-1-git-send-email-arnd@arndb.de>
- <20160216163840.GA7544@sirena.org.uk> <112888486.mQgaWiH0PI@wuerfel>
-Message-ID: <12468747.ft2nGomr6c@wuerfel>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 16 Feb 2016 17:09:25 +0000
+Subject: [PATCH v2] arm64: add alignment fault hanling
+In-Reply-To: <20160216160055.GH14509@arm.com>
+References: <329817481.954581455597874663.JavaMail.weblogic@epmlwas08c>
+ <20160216103104.GC14509@arm.com> <56C300AD.8070505@arm.com>
+ <20160216122153.GD19413@e104818-lin.cambridge.arm.com>
+ <20160216160055.GH14509@arm.com>
+Message-ID: <20160216170924.GA24950@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 16 February 2016 17:59:04 Arnd Bergmann wrote:
-> --- a/sound/pci/hda/hda_jack.c
-> +++ b/sound/pci/hda/hda_jack.c
-> @@ -403,8 +403,10 @@ int snd_hda_jack_add_kctl(struct hda_codec *codec, hda_nid_t nid,
->  
->         jack->phantom_jack = !!phantom_jack;
->         jack->type = type;
-> -       jack->jack->private_data = jack;
-> -       jack->jack->private_free = hda_free_jack_priv;
-> +       if (IS_ENABLED(CONFIG_SND_JACK)) {
-> +               jack->jack->private_data = jack;
-> +               jack->jack->private_free = hda_free_jack_priv;
-> +       }
->         state = snd_hda_jack_detect(codec, nid);
->         snd_jack_report(jack->jack, state ? jack->type : 0);
->  
+On Tue, Feb 16, 2016 at 04:00:55PM +0000, Will Deacon wrote:
+> On Tue, Feb 16, 2016 at 12:21:53PM +0000, Catalin Marinas wrote:
+> > On Tue, Feb 16, 2016 at 10:57:49AM +0000, Robin Murphy wrote:
+> > > On 16/02/16 10:31, Will Deacon wrote:
+> > > >On Tue, Feb 16, 2016 at 04:44:35AM +0000, EunTaik Lee wrote:
+> > > >>Userspace memory is mapped as below:
+> > > >>F2A7F000--F2A7FFFF Normal Memory
+> > > >>F2A80000--F2A80FFF Device nGnRnE
+> > > >>
+> > > >>And that userspace application makes a system call
+> > > >>as below:
+> > > >>
+> > > >>-009 |do_strncpy_from_user(inline)
+> > > >>-009 |strncpy_from_user()
+> > > >>-010 |getname_flags()
+> > > >>-011 |user_path_at_empty()
+> > > >>-012 |user_path_at()
+> > > >>-013 |SYSC_faccessat(inline)
+> > > >>-013 |sys_faccessat()
+> > > >>-014 |__sys_trace(asm)
+> > > >>  --> |exception
+> > > >>
+> > > >>The string spans from 0xF2A7FFC1 to 0xF2A7FFFB.
+> > > >>
+> > > >>When do_strncpy_from_user() reads the last (unsigned long)
+> > > >>value, the alignement fault is triggered. The 8 byte
+> > > >>from 0xF2A7FFC1 spans to the next page that is mapped as
+> > > >>Device nGnRnE, which does not allow an unaligned access,
+> > > >>causes the abort.
+> > > >>
+> > > >>The instruction which caused the alignment fault is registered
+> > > >>in the fixup table but the exception handler does not reach there.
+> > > >>
+> > > >>This patch registers a alignment fault handler and fixes up the
+> > > >>pc if appropriate.
+> > > >
+> > > >As discussed with Catalin previously, we should solve this by adding a
+> > > >guard page rather than handling the fault.
+> > 
+> > I don't think we can trivially add this without implementing an arm64
+> > specific arch_get_unmapped_area().
+> 
+> Even overriding arch_get_unmapped_area doesn't help as much as you might
+> like since, in the case of something like /dev/mem, the memory is remapped
+> using remap_pfn_range later on, so you can't necessarily tell what the
+> final attributes are likely to be when you initially allocate the virtual
+> space.
 
-Or another idea: if we pass private_{data,free} into snd_jack_new()
-as arguments, the snd_jack structure can become private to
-sound/core/jack.c, so we can be sure to never hit this bug
-again.
+This is not about attributes but allowing a guard page on each side of
+the mmap range. So do_mmap() would get an unmapped range via
+get_unmapped_area() and mmap_region() would populate the vma before
+calling file->f_op->mmap(). Of course, we still can't prevent user
+asking for specific addresses via mmap(2), but in this case you can say
+it's the user's fault.
 
-	Arnd
+The do_strncpy_from_user() issue apart, as long as we allow Device
+mappings in user space, we need to allow the kernel to handle unaligned
+accesses via get_user. This means using do_bad_area for the alignment
+fault instead of do_bad.
+
+-- 
+Catalin
