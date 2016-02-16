@@ -1,25 +1,30 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 16 Feb 2016 15:10:33 -0500 (EST)
-Subject: [PATCH] net: am79c961a: avoid %? in inline assembly
-In-Reply-To: <1454942025-2779812-1-git-send-email-arnd@arndb.de>
-References: <1454942025-2779812-1-git-send-email-arnd@arndb.de>
-Message-ID: <20160216.151033.337771595038699408.davem@davemloft.net>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 16 Feb 2016 21:15:57 +0100
+Subject: [PATCH v5 15/15] arm64: hibernate: Prevent resume from a
+ different kernel version
+In-Reply-To: <1455637767-31561-16-git-send-email-james.morse@arm.com>
+References: <1455637767-31561-1-git-send-email-james.morse@arm.com>
+ <1455637767-31561-16-git-send-email-james.morse@arm.com>
+Message-ID: <20160216201557.GA6526@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Mon,  8 Feb 2016 15:33:42 +0100
+On Tue 2016-02-16 15:49:27, James Morse wrote:
+> Resuming using a different kernel version is fragile, while there are
+> sufficient details in the hibernate arch-header to perform the restore,
+> changes in the boot process can have a long-lasting impact on the system.
+> In particular, if the EFI stub causes more memory to be allocated, the
+> amount of memory left for linux is reduced. If we are lucky, this will
+> cause restore to fail with the message:
 
-> The am79c961a.c driver fails to build with clang because of an
-> unusual inline assembly construct:
-> 
-> drivers/net/ethernet/amd/am79c961a.c:53:7: error: invalid % escape in inline assembly string
->  "str%?h        %1, [%2]        @ NET_RAP\n\t"
-> 
-> The same change has been done a decade ago in arch/arm as of
-> 6a39dd6222dd ("[ARM] 3759/2: Remove uses of %?"), but apparently
-> some drivers were missed.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Well, this does not close the door completely. 4.6-rc0 is going to be
+very different from 4.6-rc1. Better solution would be to increase
+version every time EFI stub changes, or maybe record ammount of memory
+reserved for EFI.
 
-Applied, thanks.
+Best regards,
+									Pavel
+									
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
