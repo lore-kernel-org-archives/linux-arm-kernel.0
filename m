@@ -1,82 +1,62 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 16 Feb 2016 13:52:33 -0800
-Subject: [PATCH] ARM: vdso: Mark vDSO code as read-only
-In-Reply-To: <20160216213659.GA47194@davidb.org>
-References: <1453226922-16831-1-git-send-email-keescook@chromium.org>
- <20160216213659.GA47194@davidb.org>
-Message-ID: <CAGXu5j+H63jhcDpHpXK5aWvgUBz=5vB0FK_zRoc+wZEk32B2fg@mail.gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Tue, 16 Feb 2016 22:54:02 +0100
+Subject: [PATCH v2] dmaengine: pxa_dma: fix cyclic transfers
+Message-ID: <1455659642-7746-1-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 16, 2016 at 1:36 PM, David Brown <david.brown@linaro.org> wrote:
-> Although the arm vDSO is cleanly separated by code/data with the code
-> being read-only in userspace mappings, the code page is still writable
-> from the kernel.  There have been exploits (such as
-> http://itszn.com/blog/?p=21) that take advantage of this on x86 to go
-> from a bad kernel write to full root.
->
-> Prevent this specific exploit on arm by putting the vDSO code page in
-> post-init read-only memory as well.
+While testing audio with pxa2xx-ac97, underrun were happening while the
+user application was correctly feeding the music. Debug proved that the
+cyclic transfer is not cyclic, ie. the last descriptor did not loop on
+the first.
 
-Is the vdso dynamically built at init time like on x86, or can this
-just use .rodata directly?
+Another issue is that the descriptor length was always set to 8192,
+because of an trivial operator issue.
 
--Kees
+This was tested on a pxa27x platform.
 
->
-> Before:
-> vdso: 1 text pages at base 80927000
-> root at Vexpress:/ cat /sys/kernel/debug/kernel_page_tables
-> ---[ Modules ]---
-> ---[ Kernel Mapping ]---
-> 0x80000000-0x80100000           1M     RW NX SHD
-> 0x80100000-0x80600000           5M     ro x  SHD
-> 0x80600000-0x80800000           2M     ro NX SHD
-> 0x80800000-0xbe000000         984M     RW NX SHD
->
-> After:
-> vdso: 1 text pages at base 8072b000
-> root at Vexpress:/ cat /sys/kernel/debug/kernel_page_tables
-> ---[ Modules ]---
-> ---[ Kernel Mapping ]---
-> 0x80000000-0x80100000           1M     RW NX SHD
-> 0x80100000-0x80600000           5M     ro x  SHD
-> 0x80600000-0x80800000           2M     ro NX SHD
-> 0x80800000-0xbe000000         984M     RW NX SHD
->
-> Inspired by https://lkml.org/lkml/2016/1/19/494 based on work by the
-> PaX Team, Brad Spengler, and Kees Cook.
->
-> Signed-off-by: David Brown <david.brown@linaro.org>
-> ---
-> This patch depends on Kees Cook's series
-> https://lkml.org/lkml/2016/1/19/497 which adds the ro_after_init
-> section.
->
-> arch/arm/vdso/vdso.S | 3 +--
-> 1 file changed, 1 insertion(+), 2 deletions(-)
->
-> diff --git a/arch/arm/vdso/vdso.S b/arch/arm/vdso/vdso.S
-> index b2b97e3..a62a7b6 100644
-> --- a/arch/arm/vdso/vdso.S
-> +++ b/arch/arm/vdso/vdso.S
-> @@ -23,9 +23,8 @@
-> #include <linux/const.h>
-> #include <asm/page.h>
->
-> -       __PAGE_ALIGNED_DATA
-> -
->         .globl vdso_start, vdso_end
-> +       .section .data..ro_after_init
->         .balign PAGE_SIZE
-> vdso_start:
->         .incbin "arch/arm/vdso/vdso.so"
-> --
-> 2.7.1
->
+Fixes: a57e16cf0333 ("dmaengine: pxa: add pxa dmaengine driver")
+Reported-by: Vasily Khoruzhick <anarsoul@gmail.com>
+Tested-by: Vasily Khoruzhick <anarsoul@gmail.com>
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+---
+Since v1: add the mask fix suggested by Vasily
+---
+ drivers/dma/pxa_dma.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
-
-
+diff --git a/drivers/dma/pxa_dma.c b/drivers/dma/pxa_dma.c
+index 8ab4a53e5660..77c1c44009d8 100644
+--- a/drivers/dma/pxa_dma.c
++++ b/drivers/dma/pxa_dma.c
+@@ -586,6 +586,8 @@ static void set_updater_desc(struct pxad_desc_sw *sw_desc,
+ 		(PXA_DCMD_LENGTH & sizeof(u32));
+ 	if (flags & DMA_PREP_INTERRUPT)
+ 		updater->dcmd |= PXA_DCMD_ENDIRQEN;
++	if (sw_desc->cyclic)
++		sw_desc->hw_desc[sw_desc->nb_desc - 2]->ddadr = sw_desc->first;
+ }
+ 
+ static bool is_desc_completed(struct virt_dma_desc *vd)
+@@ -676,6 +678,10 @@ static irqreturn_t pxad_chan_handler(int irq, void *dev_id)
+ 		dev_dbg(&chan->vc.chan.dev->device,
+ 			"%s(): checking txd %p[%x]: completed=%d\n",
+ 			__func__, vd, vd->tx.cookie, is_desc_completed(vd));
++		if (to_pxad_sw_desc(vd)->cyclic) {
++			vchan_cyclic_callback(vd);
++			break;
++		}
+ 		if (is_desc_completed(vd)) {
+ 			list_del(&vd->node);
+ 			vchan_cookie_complete(vd);
+@@ -1084,7 +1090,7 @@ pxad_prep_dma_cyclic(struct dma_chan *dchan,
+ 		return NULL;
+ 
+ 	pxad_get_config(chan, dir, &dcmd, &dsadr, &dtadr);
+-	dcmd |= PXA_DCMD_ENDIRQEN | (PXA_DCMD_LENGTH | period_len);
++	dcmd |= PXA_DCMD_ENDIRQEN | (PXA_DCMD_LENGTH & period_len);
+ 	dev_dbg(&chan->vc.chan.dev->device,
+ 		"%s(): buf_addr=0x%lx len=%zu period=%zu dir=%d flags=%lx\n",
+ 		__func__, (unsigned long)buf_addr, len, period_len, dir, flags);
 -- 
-Kees Cook
-Chrome OS & Brillo Security
+2.1.4
