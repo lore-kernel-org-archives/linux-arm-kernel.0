@@ -1,43 +1,43 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 16 Feb 2016 16:14:01 +0000
-Subject: [PATCH v3 00/10] Support for Cortex-M Prototyping System
-In-Reply-To: <22011981.Gqc7zXAZ81@wuerfel>
-References: <1455617295-23736-1-git-send-email-vladimir.murzin@arm.com>
- <22011981.Gqc7zXAZ81@wuerfel>
-Message-ID: <56C34AC9.8080509@arm.com>
+From: afd@ti.com (Andrew F. Davis)
+Date: Tue, 16 Feb 2016 10:14:48 -0600
+Subject: [PATCH] iio: health/afe4403: select REGMAP_SPI
+In-Reply-To: <1455637959-3169264-1-git-send-email-arnd@arndb.de>
+References: <1455637959-3169264-1-git-send-email-arnd@arndb.de>
+Message-ID: <56C34AF8.7080104@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/02/16 11:05, Arnd Bergmann wrote:
-> On Tuesday 16 February 2016 10:08:05 Vladimir Murzin wrote:
->> Hi,
->>
->> This patch series provide the basic support for running ucLinux on V2M-MPS2
->> platform.
->>
->> With these patches applied ucLinux can be run on both HW and FVP models
->> with Cortex-M3/M4/M7 configurations.
-> 
-> Looks very nice overall now. I have mentioned a few details that I noticed
-> but no show-stoppers.
-> 
-> Most important question for me is how this is going to be maintained
-> in the long run. Can you add a patch to list the added files in
-> MAINTAINERS?
-> 
-> My preference from the arm-soc perspective would be to get pull requests for
-> this together with vexpress and juno through the existing maintainers
-> (Liviu, Sudeep, Lorenzo), and have you send your patches to them. Does
-> that work for you all?
-> 
+On 02/16/2016 09:52 AM, Arnd Bergmann wrote:
+> The newly added afe4403 driver uses the regmap facility to abstract
+> the I2C and SPI access. However, it fails to ensure that regmap_spi
+> is actually present:
+>
+> drivers/iio/built-in.o: In function `afe4403_probe':
+> :(.text+0x9bf8): undefined reference to `__devm_regmap_init_spi'
+>
+> This adds a Kconfig select statement like the afe4404 I2C driver
+> has.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: eec96d1e2d31 ("iio: health: Add driver for the TI AFE4403 heart monitor")
+> ---
+>   drivers/iio/health/Kconfig | 1 +
+>   1 file changed, 1 insertion(+)
+>
+> diff --git a/drivers/iio/health/Kconfig b/drivers/iio/health/Kconfig
+> index f0c19779ac27..c5f004a8e447 100644
+> --- a/drivers/iio/health/Kconfig
+> +++ b/drivers/iio/health/Kconfig
+> @@ -10,6 +10,7 @@ menu "Heart Rate Monitors"
+>   config AFE4403
+>   	tristate "TI AFE4403 Heart Rate Monitor"
+>   	depends on SPI_MASTER
+> +	select REGMAP_SPI
+>   	select IIO_BUFFER
+>   	select IIO_TRIGGERED_BUFFER
+>   	help
+>
 
-I'm quite happy with either way. I'm not targeting for 4.6, so we have
-some time to sort it out.
+Oversight on my part, thanks for fix.
 
-Thanks
-Vladimir
-
-> 	Arnd
-> 
-> 
-> 
+Acked-by: Andrew F. Davis <afd@ti.com>
