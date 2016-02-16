@@ -1,36 +1,30 @@
-From: jan.glauber@caviumnetworks.com (Jan Glauber)
-Date: Tue, 16 Feb 2016 09:04:24 +0100
-Subject: [PATCH v3 4/5] arm64/perf: Enable PMCR long cycle counter bit
-In-Reply-To: <20160215195529.GW6298@arm.com>
-References: <cover.1454516082.git.jglauber@cavium.com>
- <de7340e1843f7823384551db64b12eadde7eded7.1454516082.git.jglauber@cavium.com>
- <20160215195529.GW6298@arm.com>
-Message-ID: <20160216080424.GB3490@hardcore>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 16 Feb 2016 09:07:32 +0100
+Subject: [PATCH v8 00/10] mfd: axp20x: Add support for RSB based AXP223
+In-Reply-To: <1455242567-17880-1-git-send-email-wens@csie.org>
+References: <1455242567-17880-1-git-send-email-wens@csie.org>
+Message-ID: <20160216080732.GA4344@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 15, 2016 at 07:55:29PM +0000, Will Deacon wrote:
-> On Wed, Feb 03, 2016 at 06:11:59PM +0100, Jan Glauber wrote:
-> > @@ -768,8 +776,11 @@ static void armv8pmu_reset(void *info)
-> >  		armv8pmu_disable_intens(idx);
-> >  	}
-> >  
-> > -	/* Initialize & Reset PMNC: C and P bits. */
-> > -	armv8pmu_pmcr_write(ARMV8_PMCR_P | ARMV8_PMCR_C);
-> > +	/*
-> > +	 * Initialize & Reset PMNC. Request overflow on 64 bit but
-> > +	 * cheat in armv8pmu_write_counter().
+On Fri, Feb 12, 2016 at 10:02:37AM +0800, Chen-Yu Tsai wrote:
+> Hi everyone,
 > 
-> Can you expand the comment to mention that the 64-bit overflow is only
-> for the cycle counter, please?
+> This is v8 of the AXP223 PMIC series. All the driver bits are acked.
+> Lee, please merge the first 8 patches. Once they're in, Maxime can take
+> the DTS patches.
 
-OK, how about:
+Applied 9 and 10. Thanks for your effort on this!
+Maxime
 
-/*
- * Initialize & Reset PMNC. Request overflow interrupt for
- * 64 bit cycle counter but cheat in armv8pmu_write_counter().
- */
-
-Jan
-
-> Will
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160216/852cf182/attachment.sig>
