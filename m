@@ -1,162 +1,72 @@
-From: gkulkarni@caviumnetworks.com (Ganapatrao Kulkarni)
-Date: Tue, 16 Feb 2016 18:41:22 +0530
-Subject: [PATCH v3] irqchip, gicv3-its,
- numa: Workaround for Cavium thunderx erratum 23144
-Message-ID: <1455628282-8939-1-git-send-email-gkulkarni@caviumnetworks.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Tue, 16 Feb 2016 21:08:18 +0800
+Subject: [PATCH v5 00/13] mmc: use sdhci_pltfm_init for private allocation and
+ clean up
+Message-ID: <1455628111-5583-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The erratum fixes the hang of ITS SYNC command by avoiding inter node
-io and collections/cpu mapping on thunderx dual-socket platform.
+These patches are to complete the TODOs in Commit 0e748234293f ("mmc:
+sdhci: Add size for caller in init+register"), I.E:
 
-This is based on NUMA v10 series.
-https://lkml.org/lkml/2016/2/2/134
+- todo: migrate clients to using allocation this way
+- todo: remove priv variable once migration is complete
 
-v3:
-updatated as per Marc Zyngier's review comments.
-http://www.spinics.net/lists/arm-kernel/msg443462.html
+Since v4:
+ - based on Ulf's latest next branch
+ - add Adrian's Ack for all patches, add Thierry's Ack and Test for patch 11
+   add S?ren Ack for patch 5.
 
-v2:
-updatated as per Marc Zyngier's review comments.
+Since v3:
+ - based on v4.5-rc1
+ - add Ludovic's ack for sdhci-of-at91 changes
+ - fix use-after-free in some drivers: some host drivers still needs to
+   access sdhci_pltfm_host->private after sdhci_pltfm_unregister(), but
+   the private should be already freed by sdhci_pltfm_unregister.
+ - add patch5 to fix one clk bug in sdhci_arasan_remove(). IMHO, It's
+   better to add this patch to fixes rather than waiting for next merge
+   window
 
-Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
+Since v2:
+ - based on mmc next tree and remove all priv usage introduced in newly
+   commits in this tree
+ - don't break two lines if sdhci_pltfm_init() call could be put into
+   one line. Thank Ludovic Desroches.
 
----
- arch/arm64/Kconfig               |  9 ++++++++
- drivers/irqchip/irq-gic-v3-its.c | 46 ++++++++++++++++++++++++++++++++++++++--
- 2 files changed, 53 insertions(+), 2 deletions(-)
+Since v1:
+ - add new patch03 to factorise sdhci_msm_pdata outisde of sdhci_msm_host.
+   This is to fix drivers/mmc/host/sdhci-msm.c:440:32: warning: 'msm_host'
+   is used uninitialized in this function [-Wuninitialized]
+ - Add Arnd's Ack for all patches except patch3 which is new in v2
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 8a7c02a..c3ab043 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -434,6 +434,15 @@ config CAVIUM_ERRATUM_23154
- 
- 	  If unsure, say Y.
- 
-+config CAVIUM_ERRATUM_23144
-+	bool "Cavium erratum 23144: ITS SYNC hang on dual socket system"
-+	depends on NUMA
-+	default y
-+	help
-+	  ITS SYNC command hang for cross node io and collections/cpu mapping.
-+
-+	  If unsure, say Y.
-+
- endmenu
- 
- 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index e23d1d1..8999e5e 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -41,6 +41,7 @@
- 
- #define ITS_FLAGS_CMDQ_NEEDS_FLUSHING		(1ULL << 0)
- #define ITS_FLAGS_WORKAROUND_CAVIUM_22375	(1ULL << 1)
-+#define ITS_FLAGS_WORKAROUND_CAVIUM_23144	(1ULL << 2)
- 
- #define RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING	(1 << 0)
- 
-@@ -71,6 +72,7 @@ struct its_node {
- 	struct list_head	its_device_list;
- 	u64			flags;
- 	u32			ite_size;
-+	int			numa_node;
- };
- 
- #define ITS_ITT_ALIGN		SZ_256
-@@ -605,11 +607,21 @@ static void its_eoi_irq(struct irq_data *d)
- static int its_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
- 			    bool force)
- {
--	unsigned int cpu = cpumask_any_and(mask_val, cpu_online_mask);
-+	unsigned int cpu;
-+	const struct cpumask *cpu_mask = cpu_online_mask;
- 	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
- 	struct its_collection *target_col;
- 	u32 id = its_get_event_id(d);
- 
-+       /* lpi cannot be routed to a redistributor that is on a foreign node */
-+	if (its_dev->its->flags & ITS_FLAGS_WORKAROUND_CAVIUM_23144) {
-+		cpu_mask = cpumask_of_node(its_dev->its->numa_node);
-+		if (!cpumask_intersects(mask_val, cpu_mask))
-+			return -EINVAL;
-+	}
-+
-+	cpu = cpumask_any_and(mask_val, cpu_mask);
-+
- 	if (cpu >= nr_cpu_ids)
- 		return -EINVAL;
- 
-@@ -1086,6 +1098,14 @@ static void its_cpu_init_collection(void)
- 	list_for_each_entry(its, &its_nodes, entry) {
- 		u64 target;
- 
-+		/* avoid cross node collections and its mapping */
-+		if (its->flags & ITS_FLAGS_WORKAROUND_CAVIUM_23144) {
-+			struct device_node *cpu_node;
-+			cpu_node = of_get_cpu_node(cpu, NULL);
-+			if (its->numa_node != of_node_to_nid(cpu_node))
-+				continue;
-+		}
-+
- 		/*
- 		 * We now have to bind each collection to its target
- 		 * redistributor.
-@@ -1313,9 +1333,14 @@ static void its_irq_domain_activate(struct irq_domain *domain,
- {
- 	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
- 	u32 event = its_get_event_id(d);
-+	const struct cpumask *cpu_mask = cpu_online_mask;
-+
-+	/* get the cpu_mask of local node */
-+	if (IS_ENABLED(CONFIG_NUMA))
-+		cpu_mask = cpumask_of_node(its_dev->its->numa_node);
- 
- 	/* Bind the LPI to the first possible CPU */
--	its_dev->event_map.col_map[event] = cpumask_first(cpu_online_mask);
-+	its_dev->event_map.col_map[event] = cpumask_first(cpu_mask);
- 
- 	/* Map the GIC IRQ and event to the device */
- 	its_send_mapvi(its_dev, d->hwirq, event);
-@@ -1405,6 +1430,13 @@ static void __maybe_unused its_enable_quirk_cavium_22375(void *data)
- 	its->flags |= ITS_FLAGS_WORKAROUND_CAVIUM_22375;
- }
- 
-+static void __maybe_unused its_enable_quirk_cavium_23144(void *data)
-+{
-+	struct its_node *its = data;
-+
-+	its->flags |= ITS_FLAGS_WORKAROUND_CAVIUM_23144;
-+}
-+
- static const struct gic_quirk its_quirks[] = {
- #ifdef CONFIG_CAVIUM_ERRATUM_22375
- 	{
-@@ -1414,6 +1446,15 @@ static const struct gic_quirk its_quirks[] = {
- 		.init	= its_enable_quirk_cavium_22375,
- 	},
- #endif
-+
-+#ifdef CONFIG_CAVIUM_ERRATUM_23144
-+	{
-+		.desc	= "ITS: Cavium erratum 23144",
-+		.iidr	= 0xa100034c,	/* ThunderX pass 1.x */
-+		.mask	= 0xffff0fff,
-+		.init	= its_enable_quirk_cavium_23144,
-+	},
-+#endif
- 	{
- 	}
- };
-@@ -1475,6 +1516,7 @@ static int its_probe(struct device_node *node, struct irq_domain *parent)
- 	its->base = its_base;
- 	its->phys_base = res.start;
- 	its->ite_size = ((readl_relaxed(its_base + GITS_TYPER) >> 4) & 0xf) + 1;
-+	its->numa_node = of_node_to_nid(node);
- 
- 	its->cmd_base = kzalloc(ITS_CMD_QUEUE_SZ, GFP_KERNEL);
- 	if (!its->cmd_base) {
+
+Jisheng Zhang (13):
+  mmc: sdhci-bcm2835: use sdhci_pltfm_init for private allocation
+  mmc: sdhci-esdhc-imx: use sdhci_pltfm_init for private allocation
+  mmc: sdhci-msm: factorise sdhci_msm_pdata outisde of sdhci_msm_host
+  mmc: sdhci-msm: use sdhci_pltfm_init for private allocation
+  mmc: sdhci-of-arasan: fix clk issue in sdhci_arasan_remove()
+  mmc: sdhci-of-arasan: use sdhci_pltfm_init for private allocation
+  mmc: sdhci-of-at91: use sdhci_pltfm_init for private allocation
+  mmc: sdhci-of-esdhc: use sdhci_pltfm_init for private allocation
+  mmc: sdhci-pxav3: use sdhci_pltfm_init for private allocation
+  mmc: sdhci-st: use sdhci_pltfm_init for private allocation
+  mmc: sdhci-tegra: use sdhci_pltfm_init for private allocation
+  mmc: sdhci-pxav2: remove unnecessary assignment of pltfm_host->priv
+  mmc: sdhci-pltfm: remove priv variable from sdhci_pltfm_host
+
+ drivers/mmc/host/sdhci-bcm2835.c   | 14 +++----------
+ drivers/mmc/host/sdhci-esdhc-imx.c | 38 ++++++++++++++++--------------------
+ drivers/mmc/host/sdhci-msm.c       | 25 +++++++++++-------------
+ drivers/mmc/host/sdhci-of-arasan.c | 33 +++++++++++++++----------------
+ drivers/mmc/host/sdhci-of-at91.c   | 33 ++++++++++++++-----------------
+ drivers/mmc/host/sdhci-of-esdhc.c  | 19 +++++++++---------
+ drivers/mmc/host/sdhci-pltfm.h     |  1 -
+ drivers/mmc/host/sdhci-pxav2.c     |  1 -
+ drivers/mmc/host/sdhci-pxav3.c     | 20 ++++++++-----------
+ drivers/mmc/host/sdhci-st.c        | 40 +++++++++++++++++++-------------------
+ drivers/mmc/host/sdhci-tegra.c     | 21 +++++++-------------
+ 11 files changed, 106 insertions(+), 139 deletions(-)
+
 -- 
-1.8.1.4
+2.7.0
