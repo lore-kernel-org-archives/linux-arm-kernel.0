@@ -1,19 +1,31 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Tue, 16 Feb 2016 11:29:39 +0100
-Subject: [PATCH v4 2/2] s5p-mfc: add the support of
- V4L2_CID_MPEG_VIDEO_FORCE_KEY_FRAME.
-In-Reply-To: <1453187230-97231-3-git-send-email-wuchengli@chromium.org>
-References: <1453187230-97231-1-git-send-email-wuchengli@chromium.org>
- <1453187230-97231-3-git-send-email-wuchengli@chromium.org>
-Message-ID: <56C2FA13.3020106@samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 16 Feb 2016 10:32:54 +0000
+Subject: [PATCH v2] arm64/efi: Make strnlen() available to the EFI
+ namespace
+In-Reply-To: <1455617791-4791-1-git-send-email-thierry.reding@gmail.com>
+References: <1455563856-1553-1-git-send-email-thierry.reding@gmail.com>
+ <1455617791-4791-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <20160216103254.GD14509@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/01/16 08:07, Wu-Cheng Li wrote:
-> There is a new control V4L2_CID_MPEG_VIDEO_FORCE_KEY_FRAME to
-> force an encoder key frame. It is the same as requesting
-> V4L2_MPEG_MFC51_VIDEO_FORCE_FRAME_TYPE_I_FRAME.
+On Tue, Feb 16, 2016 at 11:16:31AM +0100, Thierry Reding wrote:
+> From: Thierry Reding <treding@nvidia.com>
 > 
-> Signed-off-by: Wu-Cheng Li <wuchengli@chromium.org>
+> Changes introduced in the upstream version of libfdt pulled in by commit
+> 91feabc2e224 ("scripts/dtc: Update to upstream commit b06e55c88b9b") use
+> the strnlen() function, which isn't currently available to the EFI name-
+> space. Add it to the EFI namespace to avoid a linker error.
+> 
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Rob Herring <robh@kernel.org>
+> Signed-off-by: Thierry Reding <treding@nvidia.com>
+> ---
+> Changes in v2:
+> - mark strnlen() position independent and refer to __pi_strnlen
 
-Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Thanks, I'll queue this on the arm64 fixes branch.
+
+Will
