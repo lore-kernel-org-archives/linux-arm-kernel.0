@@ -1,61 +1,64 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Tue, 16 Feb 2016 14:53:45 +0100
-Subject: [PATCH V5 15/15] arm64, pci,
- acpi: Start using ACPI based PCI host bridge driver for ARM64.
-In-Reply-To: <1455630825-27253-1-git-send-email-tn@semihalf.com>
-References: <1455630825-27253-1-git-send-email-tn@semihalf.com>
-Message-ID: <1455630825-27253-16-git-send-email-tn@semihalf.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 16 Feb 2016 14:55:43 +0100
+Subject: [PATCH 3/7] usb: gadget: pxa25x_udc: use readl/writel for mmio
+In-Reply-To: <m34md8rdol.fsf@t19.piap.pl>
+References: <1453997722-3489596-1-git-send-email-arnd@arndb.de>
+ <2702068.KRp0Bplb5Q@wuerfel> <m34md8rdol.fsf@t19.piap.pl>
+Message-ID: <3062977.Ya2ztQYFaM@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is perfectly fine to use ACPI_PCI_HOST_GENERIC for ARM64,
-so lets get rid of PCI init empty stub, related ACPI header and
-go with full-blown PCI host controller driver.
+On Tuesday 16 February 2016 14:24:10 Krzysztof Ha?asa wrote:
+> Arnd Bergmann <arnd@arndb.de> writes:
+> 
+> > Both writes leave the CPU core within the spinlock but are not serialized
+> > with anything else, so there is no ordering between the CPUs when they
+> > enter the shared bus, other than having address before data. You'd
+> > expect to see address0, data0, address1, data1, but it could also
+> > be e.g. address0, address1, data1, data0.
+> 
+> Ah, so it's a matter of flushing the write buffers before exiting the
+> spinlock-protected code.
 
-Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-TO: Catalin Marinas <catalin.marinas@arm.com>
-TO: Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
-TO: Will Deacon <will.deacon@arm.com>
-TO: Arnd Bergmann <arnd@arndb.de>
-CC: Liviu Dudau <Liviu.Dudau@arm.com>
-Tested-by: Duc Dang <dhdang@apm.com>
-Tested-by: Dongdong Liu <liudongdong3@huawei.com>
-Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
-Tested-by: Graeme Gregory <graeme.gregory@linaro.org>
-Tested-by: Sinan Kaya <okaya@codeaurora.org>
----
- arch/arm64/Kconfig      | 1 +
- arch/arm64/kernel/pci.c | 9 ---------
- 2 files changed, 1 insertion(+), 9 deletions(-)
+Yes, whatever the specific architecture requires. The normal readl()
+functions are documented to having all the required barriers and
+flushes, the __raw_* variants may (e.g. on x86) or may not have that.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 552e996..09c49ea 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -2,6 +2,7 @@ config ARM64
- 	def_bool y
- 	select ACPI_CCA_REQUIRED if ACPI
- 	select ACPI_GENERIC_GSI if ACPI
-+	select ACPI_PCI_HOST_GENERIC if ACPI
- 	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
- 	select ARCH_HAS_DEVMEM_IS_ALLOWED
- 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
-diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-index 6e77e1b..1de0168 100644
---- a/arch/arm64/kernel/pci.c
-+++ b/arch/arm64/kernel/pci.c
-@@ -65,12 +65,3 @@ int pcibios_alloc_irq(struct pci_dev *dev)
- 
- 	return 0;
- }
--
--#ifdef CONFIG_ACPI
--/* Root bridge scanning */
--struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
--{
--	/* TODO: Should be revisited when implementing PCI on ACPI */
--	return NULL;
--}
--#endif
--- 
-1.9.1
+> > The point is more what the common case is. Almost all machines we support
+> > have fixed-endian devices, and the drivers are correct when using readl()
+> > or in_le32() but are not endian-safe when using __raw_readl().
+> 
+> Sure, e.g. PCI does it this way (eventually swapping the data lanes if
+> needed).
+> 
+> > Using __raw_readl() has the big danger of someone accidentally "fixing"
+> > the driver to work like all the others in order to solve a theoretical
+> > endian problem, while it should really be made obvious that the hardware
+> > actively swaps its data on the bus.
+> 
+> Sure - if this is the case. On-chip IXP4xx peripherals don't swap data
+> at all (i.e., they match CPU endianess) - accessing their registers is
+> like accessing a normal CPU register. That's why they don't use
+> PCI-style readl() etc. - however a better name than __raw_* would
+> probably help here.
+> 
+> Using __raw_* in a PCI driver would be generally wrong.
+
+I was really talking about built-in devices here. There are other platforms
+that have an internal byteswap logic on the bus interface and they also
+use that for PCI, see e.g. arch/sh/include/mach-common/mach/mangle-port.h.
+
+ixp4xx is really special in that it performs hardware swapping for
+internal devices based on CPU endianess but not on PCI devices.
+
+I think some Broadcom MIPS systems are in the same category as IXP4xx,
+but only because they have an extra byteswap on the PCI bus that they
+can turn on, but very few other systems are.
+
+Coming back to the specific pxa25x_udc case: using __raw_* accessors
+in the driver would possibly end up breaking the PXA25x machines in
+the (very unlikely) case that someone wants to make it work with
+big-endian kernels, assuming it does not have the same hardware
+byteswap logic as ixp4xx.
+
+	Arnd
