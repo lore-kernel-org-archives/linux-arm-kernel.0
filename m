@@ -1,45 +1,53 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 16 Feb 2016 16:40:36 +0100
-Subject: [PATCH v2 3/5] gpio: ks8695: remove irq_to_gpio function
+Date: Tue, 16 Feb 2016 16:40:35 +0100
+Subject: [PATCH v2 2/5] gpio: remove broken irq_to_gpio() interface
 In-Reply-To: <1455637261-2920972-1-git-send-email-arnd@arndb.de>
 References: <455637086-2794174-1-git-send-email-arnd@arndb.de>
  <1455637261-2920972-1-git-send-email-arnd@arndb.de>
-Message-ID: <1455637261-2920972-3-git-send-email-arnd@arndb.de>
+Message-ID: <1455637261-2920972-2-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ks8695 gpio driver has its own copy of the irq_to_gpio()
-function. This is completely unused in the mainline kernel
-after we converted all remaining users several years ago,
-so we can remove the definition as well.
+gpiolib has removed the irq_to_gpio() API several years ago,
+but the global header still provided a non-working stub.
+
+To prevent new users of this broken function from showing
+up, let's remove the stubs as well.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/gpio/gpio-ks8695.c | 12 ------------
+ include/linux/gpio.h | 12 ------------
  1 file changed, 12 deletions(-)
 
-diff --git a/drivers/gpio/gpio-ks8695.c b/drivers/gpio/gpio-ks8695.c
-index 9f86ed9c753b..179723d02f55 100644
---- a/drivers/gpio/gpio-ks8695.c
-+++ b/drivers/gpio/gpio-ks8695.c
-@@ -205,18 +205,6 @@ static int ks8695_gpio_to_irq(struct gpio_chip *gc, unsigned int pin)
- 	return gpio_irq[pin];
+diff --git a/include/linux/gpio.h b/include/linux/gpio.h
+index d12b5d566e4b..6fc1c9e74854 100644
+--- a/include/linux/gpio.h
++++ b/include/linux/gpio.h
+@@ -70,11 +70,6 @@ static inline int gpio_to_irq(unsigned int gpio)
+ 	return __gpio_to_irq(gpio);
  }
  
--/*
-- * Map IRQ number to GPIO line.
-- */
--int irq_to_gpio(unsigned int irq)
+-static inline int irq_to_gpio(unsigned int irq)
 -{
--	if ((irq < KS8695_IRQ_EXTERN0) || (irq > KS8695_IRQ_EXTERN3))
--		return -EINVAL;
--
--	return (irq - KS8695_IRQ_EXTERN0);
+-	return -EINVAL;
 -}
--EXPORT_SYMBOL(irq_to_gpio);
 -
- /* GPIOLIB interface */
+ #endif /* ! CONFIG_ARCH_HAVE_CUSTOM_GPIO_H */
  
- static struct gpio_chip ks8695_gpio_chip = {
+ /* CONFIG_GPIOLIB: bindings for managed devices that want to request gpios */
+@@ -222,13 +217,6 @@ static inline void gpiochip_unlock_as_irq(struct gpio_chip *chip,
+ 	WARN_ON(1);
+ }
+ 
+-static inline int irq_to_gpio(unsigned irq)
+-{
+-	/* irq can never have been returned from gpio_to_irq() */
+-	WARN_ON(1);
+-	return -EINVAL;
+-}
+-
+ static inline int
+ gpiochip_add_pin_range(struct gpio_chip *chip, const char *pinctl_name,
+ 		       unsigned int gpio_offset, unsigned int pin_offset,
 -- 
 2.7.0
