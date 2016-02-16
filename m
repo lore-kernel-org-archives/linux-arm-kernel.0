@@ -1,42 +1,67 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 16 Feb 2016 15:47:28 +0100
-Subject: [PATCH] sound: hdmi: avoid dereferencing uninitialized 'jack' pointer
-Message-ID: <1455634059-1896914-1-git-send-email-arnd@arndb.de>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Tue, 16 Feb 2016 14:51:59 +0000
+Subject: [PATCH v3 08/10] ARM: configs: add MPS2 defconfig
+In-Reply-To: <2680417.bULLX3O66Y@wuerfel>
+References: <1455617295-23736-1-git-send-email-vladimir.murzin@arm.com>
+ <1455617295-23736-9-git-send-email-vladimir.murzin@arm.com>
+ <2680417.bULLX3O66Y@wuerfel>
+Message-ID: <56C3378F.2010008@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_SND_JACK is disabled, the hdmi driver tries to create
-a new output jack structure and dereferences it even though
-the pointer is never assigned:
+On 16/02/16 10:58, Arnd Bergmann wrote:
+> On Tuesday 16 February 2016 10:08:13 Vladimir Murzin wrote:
+>> This patch adds a new config for MPS2 platform.
+>>
+>> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+>> ---
+>>  arch/arm/configs/mps2_defconfig |  112 +++++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 112 insertions(+)
+>>  create mode 100644 arch/arm/configs/mps2_defconfig
+>>
+>> diff --git a/arch/arm/configs/mps2_defconfig b/arch/arm/configs/mps2_defconfig
+>> new file mode 100644
+>> index 0000000..c36c519
+>> --- /dev/null
+>> +++ b/arch/arm/configs/mps2_defconfig
+>> @@ -0,0 +1,112 @@
+>> +# CONFIG_USELIB is not set
+>> +CONFIG_NO_HZ_IDLE=y
+>> +CONFIG_HIGH_RES_TIMERS=y
+>> +CONFIG_LOG_BUF_SHIFT=16
+>> +CONFIG_CC_OPTIMIZE_FOR_SIZE=y
+>> +# CONFIG_UID16 is not set
+>> +# CONFIG_BASE_FULL is not set
+>> +# CONFIG_FUTEX is not set
+>> +# CONFIG_EPOLL is not set
+>> +# CONFIG_SIGNALFD is not set
+>> +# CONFIG_EVENTFD is not set
+>> +# CONFIG_AIO is not set
+>> +CONFIG_EMBEDDED=y
+> 
+> Why CONFIG_EMBEDDED? You probably mean CONFIG_EXPERT, but then what do
+> you need that for?
 
-sound/pci/hda/patch_hdmi.c: In function 'generic_hdmi_build_jack':
-sound/pci/hda/patch_hdmi.c:2534:30: error: 'jack' may be used uninitialized in this function [-Werror=maybe-uninitialized]
-sound/pci/hda/patch_hdmi.c:2526:19: note: 'jack' was declared here
+TBH, I have no special requirement for this option to be set and now,
+looking at Kconfig entry for this option, I think that I got it here
+because I stated configuration with allnoconfig.
 
-This uses a compile-time check to avoid calling a nonworking
-snd_jack_new() function, and sets an explicit NULL pointer instead.
+OTOH, I don't see how harmful it can be since description says:
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 788d441a164c ("ALSA: hda - Use component ops for i915 HDMI/DP audio jack handling")
----
- sound/pci/hda/patch_hdmi.c | 5 +++++
- 1 file changed, 5 insertions(+)
+          This option should be enabled if compiling the kernel for
+          an embedded system so certain expert options are available
+          for configuration
 
-diff --git a/sound/pci/hda/patch_hdmi.c b/sound/pci/hda/patch_hdmi.c
-index f4443b5fbf6e..c0872ad80aa0 100644
---- a/sound/pci/hda/patch_hdmi.c
-+++ b/sound/pci/hda/patch_hdmi.c
-@@ -2526,6 +2526,11 @@ static int add_hdmi_jack_kctl(struct hda_codec *codec,
- 	struct snd_jack *jack;
- 	int err;
- 
-+	if (!IS_ENABLED(CONFIG_SND_JACK)) {
-+		spec->pcm_rec[pcm_idx].jack = NULL;
-+		return 0;
-+	}
-+
- 	err = snd_jack_new(codec->card, name, SND_JACK_AVOUT, &jack,
- 			   true, false);
- 	if (err < 0)
--- 
-2.7.0
+yes, it selects CONFIG_EXPERT and that had side effect that, for
+example, CONFIG_NAMESPACE could be compiled out.
+
+Have I missed something around it?
+
+Thanks
+Vladimir
+
+> 
+> 	Arnd
+> 
+> 
+> 
