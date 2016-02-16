@@ -1,89 +1,99 @@
-From: tchalamarla@caviumnetworks.com (Tirumalesh Chalamarla)
-Date: Tue, 16 Feb 2016 15:13:32 -0800
-Subject: [PATCH V2] AHCI: Workaround for ThunderX Errata#22536
-In-Reply-To: <20160216211410.GI25086@rric.localdomain>
-References: <1455319230-30201-1-git-send-email-tchalamarla@caviumnetworks.com>
- <20160214170152.GC3965@htj.duckdns.org> <56C147B2.9010303@caviumnetworks.com>
- <20160215183041.GH3965@htj.duckdns.org>
- <20160216144250.GD31343@rric.localdomain>
- <56C37524.5090000@caviumnetworks.com> <56C37AD3.4030407@caviumnetworks.com>
- <56C37D94.8080403@caviumnetworks.com>
- <20160216211410.GI25086@rric.localdomain>
-Message-ID: <56C3AD1C.2000003@caviumnetworks.com>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Tue, 16 Feb 2016 17:27:14 -0600
+Subject: [PATCH] irqchip/gicv3-its: Avoid cache flush beyond ITS_BASERn
+ memory size
+In-Reply-To: <20160216083549.5c889627@arm.com>
+References: <1455594112-27783-1-git-send-email-shankerd@codeaurora.org>
+ <20160216083549.5c889627@arm.com>
+Message-ID: <56C3B052.3090607@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Marc,
 
+On 02/16/2016 02:35 AM, Marc Zyngier wrote:
+> On Mon, 15 Feb 2016 21:41:52 -0600
+> Shanker Donthineni <shankerd@codeaurora.org> wrote:
+>
+>> Function its_alloc_tables() maintains two local variables, "order" and
+>> and "alloc_size", to hold memory size that has been allocated to
+>> ITS_BASEn. We don't always refresh the variable alloc_size whenever
+>> value of the variable order changes, causing the following two problems.
+>>
+>>    - Cache flush operation with size more than required.
+>>    - Information reported by pr_info is not correct.
+>>
+>> Use a helper macro that converts page order to size in bytes instead of
+>> variable "alloc_size" to fix both the problems.
+>>
+>> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+>> ---
+>>   drivers/irqchip/irq-gic-v3-its.c | 12 +++++++-----
+>>   1 file changed, 7 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+>> index 0a73632..6f717f7 100644
+>> --- a/drivers/irqchip/irq-gic-v3-its.c
+>> +++ b/drivers/irqchip/irq-gic-v3-its.c
+>> @@ -78,6 +78,9 @@ struct its_node {
+>>   
+>>   #define ITS_ITT_ALIGN		SZ_256
+>>   
+>> +/* Convert page order to size in bytes */
+>> +#define PAGE_ORDER_TO_BYTES(o)	(PAGE_SIZE << (o))
+>> +
+> nit: PAGE_ORDER_TO_size() seems more appropriate.
 
-On 02/16/2016 01:14 PM, Robert Richter wrote:
-> On 16.02.16 11:50:44, Tirumalesh Chalamarla wrote:
->>
->>
->> On 02/16/2016 11:38 AM, David Daney wrote:
->>> On 02/16/2016 11:14 AM, Tirumalesh Chalamarla wrote:
->>>>
->>>>
->>>> On 02/16/2016 06:42 AM, Robert Richter wrote:
->>>>> On 15.02.16 13:30:41, Tejun Heo wrote:
->>>>>> On Sun, Feb 14, 2016 at 07:36:18PM -0800, Tirumalesh Chalamarla wrote:
->>>>>>> There is no need for special Driver, AHCI is sufficient for
->>>>>>> ThunderX, the
->>>>>>> file only contains this interrupt handler,
->>>>>>> is it preferable if this interrupt handler in libahci.c with others,
->>>>>>> instead
->>>>>>> of separate file?
->>>>>>
->>>>>> Yeap, just fold it in ahci.c with surrounding #ifdef guard.
->>>>>
->>>>> Yes, please use #ifdef CONFIG_CAVIUM_ERRATUM_22536 ... and add a
->>>>> kconfig entry for this to arch/arm64/Kconfig.
->>>>>
->>>> Are you sure, this is not a workaround that is based on alternative
->>>> framework rather on pci device and vendor
->>>>
->>>> do you think CONFIG_ARCH_THUNDER a good alternative?
->>>
->>> No.  CONFIG_ARCH_THUNDER should be removed all together.
->>>
->>> Grouping a bunch of unrelated features under a single config variable
->>> creates a very brittle system.  What are you going to do when a new
->>> hardware revision is released?  Create CONFIG_ARCH_THUNDER2?  Which one
->>> of these two would you select if building a kernel?  It is a choice that
->>> we don't want to force users (kernel builders) to have to waste mental
->>> energy on.
->>>
->>> Instead, let's try to make things work out of the box without having to
->>> set a bunch of random config variables.
->>>
->>> If a generic arm64 kernel won't get too bloated, I would suggest just
->>> enabling the compilation of the code unconditionally (at least for
->>> arm64).  The use of the code would still be gated by the PCI version
->>> probe that is part of the patch.
->>>
->>
->> exactly, that is my initial choice with v1, and only depends on vendor and
->> device id.
->>
->> but it seems a config is needed. how about ARCH_ARM64 then?
->
-> CONFIG_CAVIUM_ERRATUM_22536 is exactly that you need. It is not only
-> used for core interrupts, e.g. also for gicv3 devices (and now also
-> for ahci). Non-core errata (e.g. CONFIG_CAVIUM_ERRATUM_23144) are not
-> enabled in the arm64 cpu errata framework (not handled in
-> arch/arm64/kernel/cpu_errata.c).
->
-> Thus,
->
-> #ifdef CONFIG_CAVIUM_ERRATUM_22536
-> 	if (pdev->vendor == 0x177d && pdev->device == 0xa01c)
-> 		ahci_thunderx_init(&pdev->dev, hpriv);
-> #endif
->
-> is the correct enablement of the workaround by device id.
->
-> And, CAVIUM_ERRATUM_* is very easy to handle, enable and document.
->
-The code will only run for Thunder and AHCI, becuase its PCI.
+I will change to PAGE_ORDER_TO_SIZE in v2 patch.
 
-> -Robert
+>>   struct event_lpi_map {
+>>   	unsigned long		*lpi_map;
+>>   	u16			*col_map;
+>> @@ -846,7 +849,6 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
+>>   		u64 type = GITS_BASER_TYPE(val);
+>>   		u64 entry_size = GITS_BASER_ENTRY_SIZE(val);
+>>   		int order = get_order(psz);
+>> -		int alloc_size;
+>>   		int alloc_pages;
+>>   		u64 tmp;
+>>   		void *base;
+>> @@ -878,9 +880,8 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
+>>   			}
+>>   		}
+>>   
+>> -		alloc_size = (1 << order) * PAGE_SIZE;
+>>   retry_alloc_baser:
+>> -		alloc_pages = (alloc_size / psz);
+>> +		alloc_pages = (PAGE_ORDER_TO_BYTES(order) / psz);
+>>   		if (alloc_pages > GITS_BASER_PAGES_MAX) {
+>>   			alloc_pages = GITS_BASER_PAGES_MAX;
+>>   			order = get_order(GITS_BASER_PAGES_MAX * psz);
+>> @@ -933,7 +934,8 @@ retry_baser:
+>>   			shr = tmp & GITS_BASER_SHAREABILITY_MASK;
+>>   			if (!shr) {
+>>   				cache = GITS_BASER_nC;
+>> -				__flush_dcache_area(base, alloc_size);
+>> +				__flush_dcache_area(base,
+>> +						    PAGE_ORDER_TO_BYTES(order));
+> Please keep it on the same line. It helps my random grepping...
+
+Sure, I will keep it on the same line in v2 patch.
+
+>>   			}
+>>   			goto retry_baser;
+>>   		}
+>> @@ -966,7 +968,7 @@ retry_baser:
+>>   		}
+>>   
+>>   		pr_info("ITS: allocated %d %s @%lx (psz %dK, shr %d)\n",
+>> -			(int)(alloc_size / entry_size),
+>> +			(int)(PAGE_ORDER_TO_BYTES(order) / entry_size),
+>>   			its_base_type_string[type],
+>>   			(unsigned long)virt_to_phys(base),
+>>   			psz / SZ_1K, (int)shr >> GITS_BASER_SHAREABILITY_SHIFT);
 >
+> Otherwise looks good.
+>
+> Thanks,
+>
+> 	M.
