@@ -1,108 +1,94 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 16 Feb 2016 09:45:57 +0000
-Subject: [PATCH 1/3] clk: sunxi: improve mux_clk error handling and
- reporting
-In-Reply-To: <CAGb2v65hxNiY8XAL=yBbV4qazscJd+six432CKWAm+GfM6bd2Q@mail.gmail.com>
-References: <1455289913-29514-1-git-send-email-andre.przywara@arm.com>
- <1455289913-29514-2-git-send-email-andre.przywara@arm.com>
- <CAGb2v65hxNiY8XAL=yBbV4qazscJd+six432CKWAm+GfM6bd2Q@mail.gmail.com>
-Message-ID: <56C2EFD5.5080604@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 16 Feb 2016 09:53:20 +0000
+Subject: Writes, smp_wmb(), and transitivity?
+In-Reply-To: <20160215203512.GL6719@linux.vnet.ibm.com>
+References: <20160215175825.GA15878@linux.vnet.ibm.com>
+ <20160215185832.GQ6298@arm.com>
+ <20160215203512.GL6719@linux.vnet.ibm.com>
+Message-ID: <20160216095319.GA14509@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chen-Yu,
-
-On 13/02/16 02:44, Chen-Yu Tsai wrote:
-> Hi,
+On Mon, Feb 15, 2016 at 12:35:12PM -0800, Paul E. McKenney wrote:
+> On Mon, Feb 15, 2016 at 06:58:32PM +0000, Will Deacon wrote:
+> > On Mon, Feb 15, 2016 at 09:58:25AM -0800, Paul E. McKenney wrote:
+> > > Some architectures provide local transitivity for a chain of threads doing
+> > > writes separated by smp_wmb(), as exemplified by the litmus tests below.
+> > > The pattern is that each thread writes to a its own variable, does an
+> > > smp_wmb(), then writes a different value to the next thread's variable.
+> > > 
+> > > I don't know of a use of this, but if everyone supports it, it might
+> > > be good to mandate it.  Status quo is that smp_wmb() is non-transitive,
+> > > so it currently isn't supported.
+> > > 
+> > > Anyone know of any architectures that do -not- support this?
+> > > 
+> > > Assuming all architectures -do- support this, any arguments -against-
+> > > officially supporting it in Linux?
+> > > 
+> > > 							Thanx, Paul
+> > > 
+> > > ------------------------------------------------------------------------
+> > > 
+> > > Two threads:
+> > > 
+> > > 	int a, b;
+> > > 
+> > > 	void thread0(void)
+> > > 	{
+> > > 		WRITE_ONCE(a, 1);
+> > > 		smp_wmb();
+> > > 		WRITE_ONCE(b, 2);
+> > > 	}
+> > > 
+> > > 	void thread1(void)
+> > > 	{
+> > > 		WRITE_ONCE(b, 1);
+> > > 		smp_wmb();
+> > > 		WRITE_ONCE(a, 2);
+> > > 	}
+> > > 
+> > > 	/* After all threads have completed and the dust has settled... */
+> > > 
+> > > 	BUG_ON(a == 1 && b == 1);
+> > 
+> > My understanding is that this test, and the generalisation to n threads,
+> > is forbidden on ARM. However, the transitivity of DMB ST (used to
+> > construct smp_wmb()) has been the subject of long debates, because we
+> > allow the following test:
+> > 
+> > 
+> > P0:
+> > Wx = 1
+> > 
+> > P1:
+> > Rx == 1
+> > DMB ST
+> > Wy = 1
+> > 
+> > P2:
+> > Ry == 1
+> > <addr dep>
+> > Rx == 0
+> > 
+> > 
+> > so I'd be uneasy about saying "it's all transitive".
 > 
-> On Fri, Feb 12, 2016 at 11:11 PM, Andre Przywara <andre.przywara@arm.com> wrote:
->> We now catch and report a failing ioremap, also a failure in the final
->> step of the clock registration is now handled and reported.
->> Also warnings are turned into errors.
->>
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->> ---
->>  drivers/clk/sunxi/clk-sunxi.c | 19 +++++++++++++------
->>  1 file changed, 13 insertions(+), 6 deletions(-)
->>
->> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
->> index 49ce283..361f396 100644
->> --- a/drivers/clk/sunxi/clk-sunxi.c
->> +++ b/drivers/clk/sunxi/clk-sunxi.c
->> @@ -690,11 +690,15 @@ static struct clk * __init sunxi_mux_clk_setup(struct device_node *node,
->>         int i;
->>
->>         reg = of_iomap(node, 0);
->> +       if (!reg) {
->> +               pr_err("Could not map registers for mux-clk: %s\n", node->name);
-> 
-> of_node_full_name(node->name) is better. node->name is almost always "clk",
-> which is useless. (Unless someone goes through the dts files to replace all
-> of them.)
+> Agreed!  For one thing, doesn't DMB ST need writes on both sides?
 
-Good point. I both fixed the code here as well as amended the node names
-in the A64 DT.
+Yes, but it's a common trap that people fall into where they think the
+above is forbidden because the DMB ST in P1 should order P0's write
+before its own write of y.
 
-> 
->> +               return NULL;
->> +       }
->>
->>         i = of_clk_parent_fill(node, parents, SUNXI_MAX_PARENTS);
->>         if (of_property_read_string(node, "clock-output-names", &clk_name)) {
->> -               pr_warn("%s: could not read clock-output-names for \"%s\"\n",
->> -                       __func__, clk_name);
->> +               pr_err("%s: could not read clock-output-names for \"%s\"\n",
->> +                      __func__, clk_name);
-> 
-> Same here. clk_name defaults to node->name. If you could, please replace it.
+> But that is one reason that I am only semi-enthusiastic about this.
+> The potentially locally transitive case is -very- restrictive, applying
+> only to situations where -all- accesses are writes.
 
-Really? Isn't clk_name directly from the DT clock-output-names strings here?
+I think that we will confuse people more by trying to describe the
+restricted case where we provide order than if we blanket say that its
+not transitive. I know Linus prefers to be as strong as possible, but
+this doesn't look like a realistic programming paradigm and having a
+straightforward rule that "rmb and wmb are not transitive" is much
+easier for people to deal with in my opinion.
 
->>                 goto out_unmap;
->>         }
->>
->> @@ -704,14 +708,17 @@ static struct clk * __init sunxi_mux_clk_setup(struct device_node *node,
->>                                0, &clk_lock);
->>
->>         if (IS_ERR(clk)) {
->> -               pr_warn("%s: failed to register mux clock %s: %ld\n", __func__,
->> -                       clk_name, PTR_ERR(clk));
->> +               pr_err("%s: failed to register mux clock %s: %ld\n", __func__,
->> +                      clk_name, PTR_ERR(clk));
->>                 goto out_unmap;
->>         }
->>
->> -       of_clk_add_provider(node, of_clk_src_simple_get, clk);
->> +       if (!of_clk_add_provider(node, of_clk_src_simple_get, clk))
->> +               return clk;
->> +
->> +       pr_err("%s: failed to add clock provider for %s\n", __func__, clk_name);
->>
->> -       return clk;
-> 
-> I'd have all the error path in ifs, and have the normal return path
-> here for consistency.
-> But I guess this works as well.
-
-Yeah, I wanted to skip that single goto ;-)
-But I changed it now as you said and it indeed looks more reasonable.
-
-I took the freedom of applying the comments to the other patches too.
-
-Will send out a v2 in a minute.
-
-Thanks for looking!
-Andre.
-
-> 
-> Thanks!
-> ChenYu
-> 
->> +       clk_unregister_divider(clk);
->>
->>  out_unmap:
->>         iounmap(reg);
->> --
->> 2.6.4
->>
-> 
+Will
