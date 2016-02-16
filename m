@@ -1,272 +1,118 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 16 Feb 2016 16:33:37 +0100
-Subject: [PATCH v2 2/8] ARM: dts: armada-38x: enable buffer manager support on
- Armada 38x boards
-In-Reply-To: <1455636823-14470-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1455636823-14470-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1455636823-14470-3-git-send-email-gregory.clement@free-electrons.com>
+From: tiwai@suse.de (Takashi Iwai)
+Date: Tue, 16 Feb 2016 16:49:42 +0100
+Subject: [PATCH] sound: hdmi: avoid dereferencing uninitialized 'jack'
+ pointer
+In-Reply-To: <1455634059-1896914-1-git-send-email-arnd@arndb.de>
+References: <1455634059-1896914-1-git-send-email-arnd@arndb.de>
+Message-ID: <s5hbn7g7izt.wl-tiwai@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marcin Wojtas <mw@semihalf.com>
+On Tue, 16 Feb 2016 15:47:28 +0100,
+Arnd Bergmann wrote:
+> 
+> When CONFIG_SND_JACK is disabled, the hdmi driver tries to create
+> a new output jack structure and dereferences it even though
+> the pointer is never assigned:
+> 
+> sound/pci/hda/patch_hdmi.c: In function 'generic_hdmi_build_jack':
+> sound/pci/hda/patch_hdmi.c:2534:30: error: 'jack' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+> sound/pci/hda/patch_hdmi.c:2526:19: note: 'jack' was declared here
+> 
+> This uses a compile-time check to avoid calling a nonworking
+> snd_jack_new() function, and sets an explicit NULL pointer instead.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 788d441a164c ("ALSA: hda - Use component ops for i915 HDMI/DP audio jack handling")
 
-Since mvneta driver supports using hardware buffer management (BM), in
-order to use it, board files have to be adjusted accordingly. This commit
-enables BM on:
-* A385-DB-AP - each port has its own pool for long and common pool for
-short packets,
-* A388-ClearFog - same as above,
-* A388-DB - to each port unique 'short' and 'long' pools are mapped,
-* A388-GP - same as above.
+Thanks for the patch.  But I think it's cleaner to fix Kconfig.
 
-Moreover appropriate entry is added to 'soc' node ranges, as well as "okay"
-status for 'bm' and 'bm-bppi' (internal SRAM) nodes.
+Thinking more of it, maybe splitting jack stuff as a separate module
+and does reverse-select to CONFIG_INPUT would be better.  Then its
+users can select simply SND_JACK, and everything would fit.
 
-[gregory.clement at free-electrons.com: add suppport for the ClearFog board]
+An untested patch is below.  Mark, what do you think?
 
-Signed-off-by: Marcin Wojtas <mw@semihalf.com>
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
+Takashi
+
 ---
- arch/arm/boot/dts/armada-385-db-ap.dts              | 20 +++++++++++++++++++-
- arch/arm/boot/dts/armada-388-clearfog.dts           |  6 ++++++
- arch/arm/boot/dts/armada-388-db.dts                 | 17 ++++++++++++++++-
- arch/arm/boot/dts/armada-388-gp.dts                 | 17 ++++++++++++++++-
- arch/arm/boot/dts/armada-38x-solidrun-microsom.dtsi | 15 ++++++++++++++-
- 5 files changed, 71 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/boot/dts/armada-385-db-ap.dts b/arch/arm/boot/dts/armada-385-db-ap.dts
-index acd5b1519edb..5f9451be21ff 100644
---- a/arch/arm/boot/dts/armada-385-db-ap.dts
-+++ b/arch/arm/boot/dts/armada-385-db-ap.dts
-@@ -61,7 +61,8 @@
- 		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
- 			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000
- 			  MBUS_ID(0x09, 0x19) 0 0xf1100000 0x10000
--			  MBUS_ID(0x09, 0x15) 0 0xf1110000 0x10000>;
-+			  MBUS_ID(0x09, 0x15) 0 0xf1110000 0x10000
-+			  MBUS_ID(0x0c, 0x04) 0 0xf1200000 0x100000>;
+diff --git a/sound/core/Kconfig b/sound/core/Kconfig
+index a2a1e24becc6..cf4058dde959 100644
+--- a/sound/core/Kconfig
++++ b/sound/core/Kconfig
+@@ -24,11 +24,9 @@ config SND_RAWMIDI
+ config SND_COMPRESS_OFFLOAD
+ 	tristate
  
- 		internal-regs {
- 			spi1: spi at 10680 {
-@@ -138,12 +139,18 @@
- 				status = "okay";
- 				phy = <&phy2>;
- 				phy-mode = "sgmii";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <1>;
-+				bm,pool-short = <3>;
- 			};
+-# To be effective this also requires INPUT - users should say:
+-#    select SND_JACK if INPUT=y || INPUT=SND
+-# to avoid having to force INPUT on.
+ config SND_JACK
+-	bool
++	tristate
++	select INPUT
  
- 			ethernet at 34000 {
- 				status = "okay";
- 				phy = <&phy1>;
- 				phy-mode = "sgmii";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <2>;
-+				bm,pool-short = <3>;
- 			};
- 
- 			ethernet at 70000 {
-@@ -157,6 +164,13 @@
- 				status = "okay";
- 				phy = <&phy0>;
- 				phy-mode = "rgmii-id";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <0>;
-+				bm,pool-short = <3>;
-+			};
+ config SND_SEQUENCER
+ 	tristate "Sequencer support"
+diff --git a/sound/core/Makefile b/sound/core/Makefile
+index 48ab4b8f8279..d16e2b0ba4fb 100644
+--- a/sound/core/Makefile
++++ b/sound/core/Makefile
+@@ -11,7 +11,8 @@ endif
+ snd-$(CONFIG_ISA_DMA_API) += isadma.o
+ snd-$(CONFIG_SND_OSSEMUL) += sound_oss.o
+ snd-$(CONFIG_SND_VMASTER) += vmaster.o
+-snd-$(CONFIG_SND_JACK)	  += ctljack.o jack.o
 +
-+			bm at c8000 {
-+				status = "okay";
- 			};
++snd-jack-objs	:= ctljack.o jack.o
  
- 			nfc: flash at d0000 {
-@@ -178,6 +192,10 @@
- 			};
- 		};
+ snd-pcm-y := pcm.o pcm_native.o pcm_lib.o pcm_misc.o \
+ 		pcm_memory.o memalloc.o
+@@ -41,6 +42,7 @@ obj-$(CONFIG_SND_RTCTIMER)	+= snd-rtctimer.o
+ obj-$(CONFIG_SND_PCM)		+= snd-pcm.o
+ obj-$(CONFIG_SND_DMAENGINE_PCM)	+= snd-pcm-dmaengine.o
+ obj-$(CONFIG_SND_RAWMIDI)	+= snd-rawmidi.o
++obj-$(CONFIG_SND_JACK)		+= snd-jack.o
  
-+		bm-bppi {
-+			status = "okay";
-+		};
-+
- 		pcie-controller {
- 			status = "okay";
+ obj-$(CONFIG_SND_OSSEMUL)	+= oss/
+ obj-$(CONFIG_SND_SEQUENCER)	+= seq/
+diff --git a/sound/pci/Kconfig b/sound/pci/Kconfig
+index 8f6594a7d37f..32151d8c6bb8 100644
+--- a/sound/pci/Kconfig
++++ b/sound/pci/Kconfig
+@@ -866,7 +866,7 @@ config SND_VIRTUOSO
+ 	select SND_OXYGEN_LIB
+ 	select SND_PCM
+ 	select SND_MPU401_UART
+-	select SND_JACK if INPUT=y || INPUT=SND
++	select SND_JACK
+ 	help
+ 	  Say Y here to include support for sound cards based on the
+ 	  Asus AV66/AV100/AV200 chips, i.e., Xonar D1, DX, D2, D2X, DS, DSX,
+diff --git a/sound/pci/hda/Kconfig b/sound/pci/hda/Kconfig
+index e94cfd5c69f7..bb02c2d48fd5 100644
+--- a/sound/pci/hda/Kconfig
++++ b/sound/pci/hda/Kconfig
+@@ -4,7 +4,7 @@ config SND_HDA
+ 	tristate
+ 	select SND_PCM
+ 	select SND_VMASTER
+-	select SND_JACK if INPUT=y || INPUT=SND
++	select SND_JACK
+ 	select SND_HDA_CORE
  
-diff --git a/arch/arm/boot/dts/armada-388-clearfog.dts b/arch/arm/boot/dts/armada-388-clearfog.dts
-index c6e180eb3b11..c60206efb583 100644
---- a/arch/arm/boot/dts/armada-388-clearfog.dts
-+++ b/arch/arm/boot/dts/armada-388-clearfog.dts
-@@ -78,6 +78,9 @@
- 		internal-regs {
- 			ethernet at 30000 {
- 				phy-mode = "sgmii";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <2>;
-+				bm,pool-short = <1>;
- 				status = "okay";
- 
- 				fixed-link {
-@@ -88,6 +91,9 @@
- 
- 			ethernet at 34000 {
- 				phy-mode = "sgmii";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <3>;
-+				bm,pool-short = <1>;
- 				status = "okay";
- 
- 				fixed-link {
-diff --git a/arch/arm/boot/dts/armada-388-db.dts b/arch/arm/boot/dts/armada-388-db.dts
-index ff47af57f091..ea93ed727030 100644
---- a/arch/arm/boot/dts/armada-388-db.dts
-+++ b/arch/arm/boot/dts/armada-388-db.dts
-@@ -66,7 +66,8 @@
- 		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
- 			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000
- 			  MBUS_ID(0x09, 0x19) 0 0xf1100000 0x10000
--			  MBUS_ID(0x09, 0x15) 0 0xf1110000 0x10000>;
-+			  MBUS_ID(0x09, 0x15) 0 0xf1110000 0x10000
-+			  MBUS_ID(0x0c, 0x04) 0 0xf1200000 0x100000>;
- 
- 		internal-regs {
- 			spi at 10600 {
-@@ -99,6 +100,9 @@
- 				status = "okay";
- 				phy = <&phy1>;
- 				phy-mode = "rgmii-id";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <2>;
-+				bm,pool-short = <3>;
- 			};
- 
- 			usb at 58000 {
-@@ -109,6 +113,9 @@
- 				status = "okay";
- 				phy = <&phy0>;
- 				phy-mode = "rgmii-id";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <0>;
-+				bm,pool-short = <1>;
- 			};
- 
- 			mdio at 72004 {
-@@ -129,6 +136,10 @@
- 				status = "okay";
- 			};
- 
-+			bm at c8000 {
-+				status = "okay";
-+			};
-+
- 			flash at d0000 {
- 				status = "okay";
- 				num-cs = <1>;
-@@ -169,6 +180,10 @@
- 			};
- 		};
- 
-+		bm-bppi {
-+			status = "okay";
-+		};
-+
- 		pcie-controller {
- 			status = "okay";
- 			/*
-diff --git a/arch/arm/boot/dts/armada-388-gp.dts b/arch/arm/boot/dts/armada-388-gp.dts
-index cd316021d6ce..466b01eb1038 100644
---- a/arch/arm/boot/dts/armada-388-gp.dts
-+++ b/arch/arm/boot/dts/armada-388-gp.dts
-@@ -60,7 +60,8 @@
- 		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
- 			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000
- 			  MBUS_ID(0x09, 0x19) 0 0xf1100000 0x10000
--			  MBUS_ID(0x09, 0x15) 0 0xf1110000 0x10000>;
-+			  MBUS_ID(0x09, 0x15) 0 0xf1110000 0x10000
-+			  MBUS_ID(0x0c, 0x04) 0 0xf1200000 0x100000>;
- 
- 		internal-regs {
- 			spi at 10600 {
-@@ -133,6 +134,9 @@
- 				status = "okay";
- 				phy = <&phy1>;
- 				phy-mode = "rgmii-id";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <2>;
-+				bm,pool-short = <3>;
- 			};
- 
- 			/* CON4 */
-@@ -152,6 +156,9 @@
- 				status = "okay";
- 				phy = <&phy0>;
- 				phy-mode = "rgmii-id";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <0>;
-+				bm,pool-short = <1>;
- 			};
- 
- 
-@@ -186,6 +193,10 @@
- 				};
- 			};
- 
-+			bm at c8000 {
-+				status = "okay";
-+			};
-+
- 			sata at e0000 {
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&sata2_pins>, <&sata3_pins>;
-@@ -240,6 +251,10 @@
- 			};
- 		};
- 
-+		bm-bppi {
-+			status = "okay";
-+		};
-+
- 		pcie-controller {
- 			status = "okay";
- 			/*
-diff --git a/arch/arm/boot/dts/armada-38x-solidrun-microsom.dtsi b/arch/arm/boot/dts/armada-38x-solidrun-microsom.dtsi
-index 3f792a563c05..8c9842237b60 100644
---- a/arch/arm/boot/dts/armada-38x-solidrun-microsom.dtsi
-+++ b/arch/arm/boot/dts/armada-38x-solidrun-microsom.dtsi
-@@ -58,7 +58,8 @@
- 		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
- 			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000
- 			  MBUS_ID(0x09, 0x19) 0 0xf1100000 0x10000
--			  MBUS_ID(0x09, 0x15) 0 0xf1110000 0x10000>;
-+			  MBUS_ID(0x09, 0x15) 0 0xf1110000 0x10000
-+			  MBUS_ID(0x0c, 0x04) 0 0xf1200000 0x100000>;
- 
- 		internal-regs {
- 			ethernet at 70000 {
-@@ -66,6 +67,9 @@
- 				pinctrl-names = "default";
- 				phy = <&phy_dedicated>;
- 				phy-mode = "rgmii-id";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <0>;
-+				bm,pool-short = <1>;
- 				status = "okay";
- 			};
- 
-@@ -110,6 +114,15 @@
- 				pinctrl-names = "default";
- 				status = "okay";
- 			};
-+
-+			bm at c8000 {
-+				status = "okay";
-+			};
- 		};
-+
-+		bm-bppi {
-+			status = "okay";
-+		};
-+
- 	};
- };
--- 
-2.5.0
+ config SND_HDA_INTEL
+diff --git a/sound/soc/Kconfig b/sound/soc/Kconfig
+index 7ea66ee3653f..182d92efc7c8 100644
+--- a/sound/soc/Kconfig
++++ b/sound/soc/Kconfig
+@@ -6,7 +6,7 @@ menuconfig SND_SOC
+ 	tristate "ALSA for SoC audio support"
+ 	select SND_PCM
+ 	select AC97_BUS if SND_SOC_AC97_BUS
+-	select SND_JACK if INPUT=y || INPUT=SND
++	select SND_JACK
+ 	select REGMAP_I2C if I2C
+ 	select REGMAP_SPI if SPI_MASTER
+ 	---help---
