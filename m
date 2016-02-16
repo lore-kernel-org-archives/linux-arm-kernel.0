@@ -1,59 +1,64 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 16 Feb 2016 19:14:54 +0100
-Subject: [PATCH v4 04/12] ata: ahci_mvebu: add support for Armada 3700 variant
+Date: Tue, 16 Feb 2016 19:14:51 +0100
+Subject: [PATCH v4 01/12] irqchip: armada-370-xp: add Kconfig option for the
+ driver
 In-Reply-To: <1455646502-23834-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1455646502-23834-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1455646502-23834-5-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1455646502-23834-2-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lior Amsalem <alior@marvell.com>
+From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-The main difference in the new Armada 3700 is that no address
-decoding needs to take place in the driver probe.
+Instead of building the irq-armada-370-xp driver directly when
+CONFIG_ARCH_MVEBU is enabled, this commit introduces an intermediate
+CONFIG_ARMADA_370_XP_IRQ hidden Kconfig option.
 
-[gregory.clement at free-electrons.com: reformulate the commit log]
+This allows this option to select other interrupt-related Kconfig
+options (which will be needed in follow-up commits) rather than having
+such selects done from arch/arm/mach-<foo>/.
 
-Signed-off-by: Lior Amsalem <alior@marvell.com>
-Reviewed-by: Nadav Haklai <nadavh@marvell.com>
-Tested-by: Nadav Haklai <nadavh@marvell.com>
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/ata/ahci_mvebu.c | 14 +++++++++-----
- 1 file changed, 9 insertions(+), 5 deletions(-)
+ drivers/irqchip/Kconfig  | 5 +++++
+ drivers/irqchip/Makefile | 2 +-
+ 2 files changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/ata/ahci_mvebu.c b/drivers/ata/ahci_mvebu.c
-index f7a7fa81740e..de7128d81e9c 100644
---- a/drivers/ata/ahci_mvebu.c
-+++ b/drivers/ata/ahci_mvebu.c
-@@ -112,12 +112,15 @@ static int ahci_mvebu_probe(struct platform_device *pdev)
- 	if (rc)
- 		return rc;
+diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+index 715923d5236c..e2cab879d641 100644
+--- a/drivers/irqchip/Kconfig
++++ b/drivers/irqchip/Kconfig
+@@ -60,6 +60,11 @@ config ARM_VIC_NR
+ 	  The maximum number of VICs available in the system, for
+ 	  power management.
  
--	dram = mv_mbus_dram_info();
--	if (!dram)
--		return -ENODEV;
-+	if (of_device_is_compatible(pdev->dev.of_node,
-+				    "marvell,armada-380-ahci")) {
-+		dram = mv_mbus_dram_info();
-+		if (!dram)
-+			return -ENODEV;
- 
--	ahci_mvebu_mbus_config(hpriv, dram);
--	ahci_mvebu_regret_option(hpriv);
-+		ahci_mvebu_mbus_config(hpriv, dram);
-+		ahci_mvebu_regret_option(hpriv);
-+	}
- 
- 	rc = ahci_platform_init_host(pdev, hpriv, &ahci_mvebu_port_info,
- 				     &ahci_platform_sht);
-@@ -133,6 +136,7 @@ disable_resources:
- 
- static const struct of_device_id ahci_mvebu_of_match[] = {
- 	{ .compatible = "marvell,armada-380-ahci", },
-+	{ .compatible = "marvell,armada-3700-ahci", },
- 	{ },
- };
- MODULE_DEVICE_TABLE(of, ahci_mvebu_of_match);
++config ARMADA_370_XP_IRQ
++	bool
++	default y if ARCH_MVEBU
++	select GENERIC_IRQ_CHIP
++
+ config ATMEL_AIC_IRQ
+ 	bool
+ 	select GENERIC_IRQ_CHIP
+diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+index 18caacb60d58..30dba044d0b8 100644
+--- a/drivers/irqchip/Makefile
++++ b/drivers/irqchip/Makefile
+@@ -5,7 +5,6 @@ obj-$(CONFIG_ARCH_BCM2835)		+= irq-bcm2836.o
+ obj-$(CONFIG_ARCH_EXYNOS)		+= exynos-combiner.o
+ obj-$(CONFIG_ARCH_HIP04)		+= irq-hip04.o
+ obj-$(CONFIG_ARCH_MMP)			+= irq-mmp.o
+-obj-$(CONFIG_ARCH_MVEBU)		+= irq-armada-370-xp.o
+ obj-$(CONFIG_IRQ_MXS)			+= irq-mxs.o
+ obj-$(CONFIG_ARCH_TEGRA)		+= irq-tegra.o
+ obj-$(CONFIG_ARCH_S3C24XX)		+= irq-s3c24xx.o
+@@ -28,6 +27,7 @@ obj-$(CONFIG_ARM_GIC_V3_ITS)		+= irq-gic-v3-its.o irq-gic-v3-its-pci-msi.o irq-g
+ obj-$(CONFIG_HISILICON_IRQ_MBIGEN)	+= irq-mbigen.o
+ obj-$(CONFIG_ARM_NVIC)			+= irq-nvic.o
+ obj-$(CONFIG_ARM_VIC)			+= irq-vic.o
++obj-$(CONFIG_ARMADA_370_XP_IRQ)		+= irq-armada-370-xp.o
+ obj-$(CONFIG_ATMEL_AIC_IRQ)		+= irq-atmel-aic-common.o irq-atmel-aic.o
+ obj-$(CONFIG_ATMEL_AIC5_IRQ)	+= irq-atmel-aic-common.o irq-atmel-aic5.o
+ obj-$(CONFIG_I8259)			+= irq-i8259.o
 -- 
 2.5.0
