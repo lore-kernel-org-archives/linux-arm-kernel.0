@@ -1,118 +1,170 @@
-From: tiwai@suse.de (Takashi Iwai)
-Date: Tue, 16 Feb 2016 16:49:42 +0100
-Subject: [PATCH] sound: hdmi: avoid dereferencing uninitialized 'jack'
- pointer
-In-Reply-To: <1455634059-1896914-1-git-send-email-arnd@arndb.de>
-References: <1455634059-1896914-1-git-send-email-arnd@arndb.de>
-Message-ID: <s5hbn7g7izt.wl-tiwai@suse.de>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 16 Feb 2016 16:33:42 +0100
+Subject: [PATCH v2 net-next 7/8] net: add a hardware buffer management helper
+ API
+In-Reply-To: <1455636823-14470-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1455636823-14470-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1455636823-14470-8-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 16 Feb 2016 15:47:28 +0100,
-Arnd Bergmann wrote:
-> 
-> When CONFIG_SND_JACK is disabled, the hdmi driver tries to create
-> a new output jack structure and dereferences it even though
-> the pointer is never assigned:
-> 
-> sound/pci/hda/patch_hdmi.c: In function 'generic_hdmi_build_jack':
-> sound/pci/hda/patch_hdmi.c:2534:30: error: 'jack' may be used uninitialized in this function [-Werror=maybe-uninitialized]
-> sound/pci/hda/patch_hdmi.c:2526:19: note: 'jack' was declared here
-> 
-> This uses a compile-time check to avoid calling a nonworking
-> snd_jack_new() function, and sets an explicit NULL pointer instead.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 788d441a164c ("ALSA: hda - Use component ops for i915 HDMI/DP audio jack handling")
+This basic implementation allows to share code between driver using
+hardware buffer management. As the code is hardware agnostic, there is
+few helpers, most of the optimization brought by the an HW BM has to be
+done at driver level.
 
-Thanks for the patch.  But I think it's cleaner to fix Kconfig.
-
-Thinking more of it, maybe splitting jack stuff as a separate module
-and does reverse-select to CONFIG_INPUT would be better.  Then its
-users can select simply SND_JACK, and everything would fit.
-
-An untested patch is below.  Mark, what do you think?
-
-
-Takashi
-
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
-diff --git a/sound/core/Kconfig b/sound/core/Kconfig
-index a2a1e24becc6..cf4058dde959 100644
---- a/sound/core/Kconfig
-+++ b/sound/core/Kconfig
-@@ -24,11 +24,9 @@ config SND_RAWMIDI
- config SND_COMPRESS_OFFLOAD
- 	tristate
- 
--# To be effective this also requires INPUT - users should say:
--#    select SND_JACK if INPUT=y || INPUT=SND
--# to avoid having to force INPUT on.
- config SND_JACK
--	bool
-+	tristate
-+	select INPUT
- 
- config SND_SEQUENCER
- 	tristate "Sequencer support"
-diff --git a/sound/core/Makefile b/sound/core/Makefile
-index 48ab4b8f8279..d16e2b0ba4fb 100644
---- a/sound/core/Makefile
-+++ b/sound/core/Makefile
-@@ -11,7 +11,8 @@ endif
- snd-$(CONFIG_ISA_DMA_API) += isadma.o
- snd-$(CONFIG_SND_OSSEMUL) += sound_oss.o
- snd-$(CONFIG_SND_VMASTER) += vmaster.o
--snd-$(CONFIG_SND_JACK)	  += ctljack.o jack.o
+ include/net/hwbm.h | 21 +++++++++++++
+ net/Kconfig        |  3 ++
+ net/core/Makefile  |  1 +
+ net/core/hwbm.c    | 87 ++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 112 insertions(+)
+ create mode 100644 include/net/hwbm.h
+ create mode 100644 net/core/hwbm.c
+
+diff --git a/include/net/hwbm.h b/include/net/hwbm.h
+new file mode 100644
+index 000000000000..9ae9449a7eda
+--- /dev/null
++++ b/include/net/hwbm.h
+@@ -0,0 +1,21 @@
++#ifndef _HWBM_H
++#define _HWBM_H
 +
-+snd-jack-objs	:= ctljack.o jack.o
++struct hwbm_pool {
++	/* Size of the buffers managed */
++	int size;
++	/* Number of buffers currently used by this pool */
++	int buf_num;
++	/* constructor called during alocation */
++	int (*construct)(struct hwbm_pool *bm_pool, void *buf);
++	/* protect acces to the buffer counter*/
++	spinlock_t lock;
++	/* private data */
++	void *priv;
++};
++
++void hwbm_buf_free(struct hwbm_pool *bm_pool, void *buf);
++int hwbm_pool_refill(struct hwbm_pool *bm_pool, gfp_t gfp);
++int hwbm_pool_add(struct hwbm_pool *bm_pool, unsigned int buf_num, gfp_t gfp);
++
++#endif /* _HWBM_H */
+diff --git a/net/Kconfig b/net/Kconfig
+index 174354618f8a..f50c8af4308b 100644
+--- a/net/Kconfig
++++ b/net/Kconfig
+@@ -253,6 +253,9 @@ config XPS
+ 	depends on SMP
+ 	default y
  
- snd-pcm-y := pcm.o pcm_native.o pcm_lib.o pcm_misc.o \
- 		pcm_memory.o memalloc.o
-@@ -41,6 +42,7 @@ obj-$(CONFIG_SND_RTCTIMER)	+= snd-rtctimer.o
- obj-$(CONFIG_SND_PCM)		+= snd-pcm.o
- obj-$(CONFIG_SND_DMAENGINE_PCM)	+= snd-pcm-dmaengine.o
- obj-$(CONFIG_SND_RAWMIDI)	+= snd-rawmidi.o
-+obj-$(CONFIG_SND_JACK)		+= snd-jack.o
- 
- obj-$(CONFIG_SND_OSSEMUL)	+= oss/
- obj-$(CONFIG_SND_SEQUENCER)	+= seq/
-diff --git a/sound/pci/Kconfig b/sound/pci/Kconfig
-index 8f6594a7d37f..32151d8c6bb8 100644
---- a/sound/pci/Kconfig
-+++ b/sound/pci/Kconfig
-@@ -866,7 +866,7 @@ config SND_VIRTUOSO
- 	select SND_OXYGEN_LIB
- 	select SND_PCM
- 	select SND_MPU401_UART
--	select SND_JACK if INPUT=y || INPUT=SND
-+	select SND_JACK
- 	help
- 	  Say Y here to include support for sound cards based on the
- 	  Asus AV66/AV100/AV200 chips, i.e., Xonar D1, DX, D2, D2X, DS, DSX,
-diff --git a/sound/pci/hda/Kconfig b/sound/pci/hda/Kconfig
-index e94cfd5c69f7..bb02c2d48fd5 100644
---- a/sound/pci/hda/Kconfig
-+++ b/sound/pci/hda/Kconfig
-@@ -4,7 +4,7 @@ config SND_HDA
- 	tristate
- 	select SND_PCM
- 	select SND_VMASTER
--	select SND_JACK if INPUT=y || INPUT=SND
-+	select SND_JACK
- 	select SND_HDA_CORE
- 
- config SND_HDA_INTEL
-diff --git a/sound/soc/Kconfig b/sound/soc/Kconfig
-index 7ea66ee3653f..182d92efc7c8 100644
---- a/sound/soc/Kconfig
-+++ b/sound/soc/Kconfig
-@@ -6,7 +6,7 @@ menuconfig SND_SOC
- 	tristate "ALSA for SoC audio support"
- 	select SND_PCM
- 	select AC97_BUS if SND_SOC_AC97_BUS
--	select SND_JACK if INPUT=y || INPUT=SND
-+	select SND_JACK
- 	select REGMAP_I2C if I2C
- 	select REGMAP_SPI if SPI_MASTER
- 	---help---
++config HWBM
++       bool
++
+ config SOCK_CGROUP_DATA
+ 	bool
+ 	default n
+diff --git a/net/core/Makefile b/net/core/Makefile
+index 0b835de04de3..57e6dd81c6be 100644
+--- a/net/core/Makefile
++++ b/net/core/Makefile
+@@ -24,3 +24,4 @@ obj-$(CONFIG_NET_PTP_CLASSIFY) += ptp_classifier.o
+ obj-$(CONFIG_CGROUP_NET_PRIO) += netprio_cgroup.o
+ obj-$(CONFIG_CGROUP_NET_CLASSID) += netclassid_cgroup.o
+ obj-$(CONFIG_LWTUNNEL) += lwtunnel.o
++obj-$(CONFIG_HWBM) += hwbm.o
+diff --git a/net/core/hwbm.c b/net/core/hwbm.c
+new file mode 100644
+index 000000000000..a98d2a74ca02
+--- /dev/null
++++ b/net/core/hwbm.c
+@@ -0,0 +1,87 @@
++/* Support for hardware buffer manager.
++ *
++ * Copyright (C) 2016 Marvell
++ *
++ * Gregory CLEMENT <gregory.clement@free-electrons.com>
++ *
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License as published by
++ *  the Free Software Foundation; either version 2 of the License, or
++ *  (at your option) any later version.
++ */
++#include <linux/kernel.h>
++#include <linux/printk.h>
++#include <linux/skbuff.h>
++#include <net/hwbm.h>
++
++void hwbm_buf_free(struct hwbm_pool *bm_pool, void *buf)
++{
++	if (likely(bm_pool->size <= PAGE_SIZE))
++		skb_free_frag(buf);
++	else
++		kfree(buf);
++}
++EXPORT_SYMBOL_GPL(hwbm_buf_free);
++
++/* Refill processing for HW buffer management */
++int hwbm_pool_refill(struct hwbm_pool *bm_pool, gfp_t gfp)
++{
++	int frag_size = bm_pool->size;
++	void *buf;
++
++	if (likely(frag_size <= PAGE_SIZE))
++		buf = netdev_alloc_frag(frag_size);
++	else
++		buf = kmalloc(frag_size, gfp);
++
++	if (!buf)
++		return -ENOMEM;
++
++	if (bm_pool->construct)
++		if (bm_pool->construct(bm_pool, buf)) {
++			hwbm_buf_free(bm_pool, buf);
++			return -ENOMEM;
++		}
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(hwbm_pool_refill);
++
++int hwbm_pool_add(struct hwbm_pool *bm_pool, unsigned int buf_num, gfp_t gfp)
++{
++	int err, i;
++	unsigned long flags;
++
++	spin_lock_irqsave(&bm_pool->lock, flags);
++	if (bm_pool->buf_num == bm_pool->size) {
++		pr_warn("pool already filled\n");
++		return bm_pool->buf_num;
++	}
++
++	if (buf_num + bm_pool->buf_num > bm_pool->size) {
++		pr_warn("cannot allocate %d buffers for pool\n",
++			buf_num);
++		return 0;
++	}
++
++	if ((buf_num + bm_pool->buf_num) < bm_pool->buf_num) {
++		pr_warn("Adding %d buffers to the %d current buffers will overflow\n",
++			buf_num,  bm_pool->buf_num);
++		return 0;
++	}
++
++	for (i = 0; i < buf_num; i++) {
++		err = hwbm_pool_refill(bm_pool, gfp);
++		if (err < 0)
++			break;
++	}
++
++	/* Update BM driver with number of buffers added to pool */
++	bm_pool->buf_num += i;
++
++	pr_debug("hwpm pool: %d of %d buffers added\n", i, buf_num);
++	spin_unlock_irqrestore(&bm_pool->lock, flags);
++
++	return i;
++}
++EXPORT_SYMBOL_GPL(hwbm_pool_add);
+-- 
+2.5.0
