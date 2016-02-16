@@ -1,34 +1,116 @@
 From: majun258@huawei.com (MaJun)
-Date: Tue, 16 Feb 2016 14:37:23 +0800
-Subject: [PATCH v2 0/5] irqchip: Add support for Hisilicon mbigen v1 chip
-Message-ID: <1455604648-20668-1-git-send-email-majun258@huawei.com>
+Date: Tue, 16 Feb 2016 14:37:28 +0800
+Subject: [PATCH v2 5/5] irqchip:implement the mbigen irq chip operation
+ functions
+In-Reply-To: <1455604648-20668-1-git-send-email-majun258@huawei.com>
+References: <1455604648-20668-1-git-send-email-majun258@huawei.com>
+Message-ID: <1455604648-20668-6-git-send-email-majun258@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ma Jun <majun258@huawei.com>
 
-This patch set is used to support the mbigen v1 chip.
-Compared to mbigen v2 chip, the main difference between them is
-register layout(address,format)
+Add the interrupt controller chip operation functions of mbigen chip.
 
-As a sequence of this difference, the functions used to get or calculate
-register address are also changed for this reason.
+Signed-off-by: Ma Jun <majun258@huawei.com>
+---
+ drivers/irqchip/irq-mbigen-v1.c |   75 +++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 75 insertions(+), 0 deletions(-)
 
-Changes in v2:
---- Fixed the build test error when applied patch v1 3/5
-
-Ma Jun (5):
-  dt-binding: Change the mbigen binding file to support the mbigen-v1
-  dt-binding:Rename the mbigen binding file name
-  irqchip: add platform device driver for mbigen device
-  irqchip:create irq domain for each mbigen device
-  irqchip:implement the mbigen irq chip operation functions
-
- .../interrupt-controller/hisilicon,mbigen-v2.txt   |   74 -----
- .../interrupt-controller/hisilicon,mbigen.txt      |   74 +++++
- drivers/irqchip/Makefile                           |    2 +-
- drivers/irqchip/irq-mbigen-v1.c                    |  287 ++++++++++++++++++++
- 4 files changed, 362 insertions(+), 75 deletions(-)
- delete mode 100644 Documentation/devicetree/bindings/interrupt-controller/hisilicon,mbigen-v2.txt
- create mode 100644 Documentation/devicetree/bindings/interrupt-controller/hisilicon,mbigen.txt
- create mode 100644 drivers/irqchip/irq-mbigen-v1.c
+diff --git a/drivers/irqchip/irq-mbigen-v1.c b/drivers/irqchip/irq-mbigen-v1.c
+index 61e7ad0..0636165 100644
+--- a/drivers/irqchip/irq-mbigen-v1.c
++++ b/drivers/irqchip/irq-mbigen-v1.c
+@@ -41,6 +41,20 @@
+ #define REG_MBIGEN_EXT_VEC_OFFSET		0x320
+ 
+ /**
++ * offset of clear register in mbigen node
++ * This register is used to clear the status
++ * of interrupt
++ */
++#define REG_MBIGEN_CLEAR_OFFSET		0x100
++
++/**
++ * offset of interrupt type register
++ * This register is used to configure interrupt
++ * trigger type
++ */
++#define REG_MBIGEN_TYPE_OFFSET		0x0
++
++/**
+  * struct mbigen_device - holds the information of mbigen device.
+  *
+  * @pdev:		pointer to the platform device structure of mbigen chip.
+@@ -77,8 +91,69 @@ static inline unsigned int get_mbigen_vec_reg(irq_hw_number_t hwirq)
+ 		return (nid - 4) * 4 + REG_MBIGEN_EXT_VEC_OFFSET;
+ }
+ 
++static inline void get_mbigen_type_reg(irq_hw_number_t hwirq,
++					u32 *mask, u32 *addr)
++{
++	int ofst;
++
++	ofst = hwirq / 32 * 4;
++	*mask = 1 << (hwirq % 32);
++
++	*addr = ofst + REG_MBIGEN_TYPE_OFFSET;
++}
++
++static inline void get_mbigen_clear_reg(irq_hw_number_t hwirq,
++					u32 *mask, u32 *addr)
++{
++	unsigned int ofst;
++
++	ofst = hwirq / 32 * 4;
++
++	*mask = 1 << (hwirq % 32);
++	*addr = ofst + REG_MBIGEN_CLEAR_OFFSET;
++}
++
++static void mbigen_eoi_irq(struct irq_data *data)
++{
++	void __iomem *base = data->chip_data;
++	u32 mask, addr;
++
++	get_mbigen_clear_reg(data->hwirq, &mask, &addr);
++
++	writel_relaxed(mask, base + addr);
++
++	irq_chip_eoi_parent(data);
++}
++
++static int mbigen_set_type(struct irq_data *data, unsigned int type)
++{
++	void __iomem *base = data->chip_data;
++	u32 mask, addr, val;
++
++	if (type != IRQ_TYPE_LEVEL_HIGH && type != IRQ_TYPE_EDGE_RISING)
++		return -EINVAL;
++
++	get_mbigen_type_reg(data->hwirq, &mask, &addr);
++
++	val = readl_relaxed(base + addr);
++
++	if (type == IRQ_TYPE_LEVEL_HIGH)
++		val |= mask;
++	else
++		val &= ~mask;
++
++	writel_relaxed(val, base + addr);
++
++	return 0;
++}
++
+ static struct irq_chip mbigen_irq_chip = {
+ 	.name =			"mbigen-v1",
++	.irq_mask =		irq_chip_mask_parent,
++	.irq_unmask =		irq_chip_unmask_parent,
++	.irq_eoi =		mbigen_eoi_irq,
++	.irq_set_type =		mbigen_set_type,
++	.irq_set_affinity =	irq_chip_set_affinity_parent,
+ };
+ 
+ static void mbigen_write_msg(struct msi_desc *desc, struct msi_msg *msg)
+-- 
+1.7.1
