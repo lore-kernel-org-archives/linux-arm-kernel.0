@@ -1,386 +1,192 @@
 From: james.morse@arm.com (James Morse)
-Date: Tue, 16 Feb 2016 15:49:17 +0000
-Subject: [PATCH v5 05/15] arm64: kvm: allows kvm cpu hotplug
+Date: Tue, 16 Feb 2016 15:49:15 +0000
+Subject: [PATCH v5 03/15] arm64: Convert hcalls to use HVC immediate value
 In-Reply-To: <1455637767-31561-1-git-send-email-james.morse@arm.com>
 References: <1455637767-31561-1-git-send-email-james.morse@arm.com>
-Message-ID: <1455637767-31561-6-git-send-email-james.morse@arm.com>
+Message-ID: <1455637767-31561-4-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+From: Geoff Levand <geoff@infradead.org>
 
-The current kvm implementation on arm64 does cpu-specific initialization
-at system boot, and has no way to gracefully shutdown a core in terms of
-kvm. This prevents kexec from rebooting the system at EL2.
+The existing arm64 hcall implementations are limited in that they only
+allow for two distinct hcalls; with the x0 register either zero or not
+zero.  Also, the API of the hyp-stub exception vector routines and the
+KVM exception vector routines differ; hyp-stub uses a non-zero value in
+x0 to implement __hyp_set_vectors, whereas KVM uses it to implement
+kvm_call_hyp.
 
-This patch adds a cpu tear-down function and also puts an existing cpu-init
-code into a separate function, kvm_arch_hardware_disable() and
-kvm_arch_hardware_enable() respectively.
-We don't need the arm64 specific cpu hotplug hook any more.
+To allow for additional hcalls to be defined and to make the arm64 hcall
+API more consistent across exception vector routines, change the hcall
+implementations to use the 16 bit immediate value of the HVC instruction
+to specify the hcall type.
 
-Since this patch modifies common code between arm and arm64, one stub
-definition, __cpu_reset_hyp_mode(), is added on arm side to avoid
-compilation errors.
+Define three new preprocessor macros HVC_CALL_HYP, HVC_GET_VECTORS, and
+HVC_SET_VECTORS to be used as hcall type specifiers and convert the
+existing __hyp_get_vectors(), __hyp_set_vectors() and kvm_call_hyp()
+routines to use these new macros when executing an HVC call.  Also,
+change the corresponding hyp-stub and KVM el1_sync exception vector
+routines to use these new macros.
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-[Moved __kvm_hyp_reset() to use kvm_call_hyp(), instead of having its own
- dedicated entry point in el1_sync. Added some comments and a tlbi.]
+Signed-off-by: Geoff Levand <geoff@infradead.org>
 Signed-off-by: James Morse <james.morse@arm.com>
 ---
 This patch comes from v13 of kexec
 
- arch/arm/include/asm/kvm_host.h   | 10 +++-
- arch/arm/include/asm/kvm_mmu.h    |  1 +
- arch/arm/kvm/arm.c                | 98 ++++++++++++++++++++++++---------------
- arch/arm/kvm/mmu.c                |  5 ++
- arch/arm64/include/asm/kvm_host.h |  1 -
- arch/arm64/include/asm/kvm_mmu.h  | 20 ++++++++
- arch/arm64/kvm/hyp-init.S         | 42 +++++++++++++++++
- 7 files changed, 137 insertions(+), 40 deletions(-)
+ arch/arm64/include/asm/virt.h  | 27 +++++++++++++++++++++++++++
+ arch/arm64/kernel/hyp-stub.S   | 32 +++++++++++++++++++++-----------
+ arch/arm64/kvm/hyp.S           |  3 ++-
+ arch/arm64/kvm/hyp/hyp-entry.S |  9 ++++++---
+ 4 files changed, 56 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index f9f27792d8ed..8af531d64771 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -220,6 +220,15 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
- 	kvm_call_hyp((void*)hyp_stack_ptr, vector_ptr, pgd_ptr);
- }
+diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
+index 7a5df5252dd7..eb10368c329e 100644
+--- a/arch/arm64/include/asm/virt.h
++++ b/arch/arm64/include/asm/virt.h
+@@ -18,6 +18,33 @@
+ #ifndef __ASM__VIRT_H
+ #define __ASM__VIRT_H
  
-+static inline void __cpu_reset_hyp_mode(phys_addr_t boot_pgd_ptr,
-+					phys_addr_t phys_idmap_start)
-+{
-+	/*
-+	 * TODO
-+	 * kvm_call_reset(boot_pgd_ptr, phys_idmap_start);
-+	 */
-+}
-+
- static inline int kvm_arch_dev_ioctl_check_extension(long ext)
- {
- 	return 0;
-@@ -232,7 +241,6 @@ void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
- 
- struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
- 
--static inline void kvm_arch_hardware_disable(void) {}
- static inline void kvm_arch_hardware_unsetup(void) {}
- static inline void kvm_arch_sync_events(struct kvm *kvm) {}
- static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index a520b7987a29..4fd9ddb48c0f 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -66,6 +66,7 @@ void kvm_mmu_free_memory_caches(struct kvm_vcpu *vcpu);
- phys_addr_t kvm_mmu_get_httbr(void);
- phys_addr_t kvm_mmu_get_boot_httbr(void);
- phys_addr_t kvm_get_idmap_vector(void);
-+phys_addr_t kvm_get_idmap_start(void);
- int kvm_mmu_init(void);
- void kvm_clear_hyp_idmap(void);
- 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 975da6cfbf59..ee1bee7884a1 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -16,7 +16,6 @@
-  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-  */
- 
--#include <linux/cpu.h>
- #include <linux/cpu_pm.h>
- #include <linux/errno.h>
- #include <linux/err.h>
-@@ -65,6 +64,8 @@ static DEFINE_SPINLOCK(kvm_vmid_lock);
- 
- static bool vgic_present;
- 
-+static DEFINE_PER_CPU(unsigned char, kvm_arm_hardware_enabled);
-+
- static void kvm_arm_set_running_vcpu(struct kvm_vcpu *vcpu)
- {
- 	BUG_ON(preemptible());
-@@ -89,11 +90,6 @@ struct kvm_vcpu * __percpu *kvm_get_running_vcpus(void)
- 	return &kvm_arm_running_vcpu;
- }
- 
--int kvm_arch_hardware_enable(void)
--{
--	return 0;
--}
--
- int kvm_arch_vcpu_should_kick(struct kvm_vcpu *vcpu)
- {
- 	return kvm_vcpu_exiting_guest_mode(vcpu) == IN_GUEST_MODE;
-@@ -585,7 +581,13 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 		/*
- 		 * Re-check atomic conditions
- 		 */
--		if (signal_pending(current)) {
-+		if (unlikely(!__this_cpu_read(kvm_arm_hardware_enabled))) {
-+			/* cpu has been torn down */
-+			ret = 0;
-+			run->exit_reason = KVM_EXIT_FAIL_ENTRY;
-+			run->fail_entry.hardware_entry_failure_reason
-+					= (u64)-ENOEXEC;
-+		} else if (signal_pending(current)) {
- 			ret = -EINTR;
- 			run->exit_reason = KVM_EXIT_INTR;
- 		}
-@@ -967,7 +969,7 @@ long kvm_arch_vm_ioctl(struct file *filp,
- 	}
- }
- 
--static void cpu_init_hyp_mode(void *dummy)
-+static void cpu_init_hyp_mode(void)
- {
- 	phys_addr_t boot_pgd_ptr;
- 	phys_addr_t pgd_ptr;
-@@ -989,36 +991,61 @@ static void cpu_init_hyp_mode(void *dummy)
- 	kvm_arm_init_debug();
- }
- 
--static int hyp_init_cpu_notify(struct notifier_block *self,
--			       unsigned long action, void *cpu)
-+static void cpu_reset_hyp_mode(void)
- {
--	switch (action) {
--	case CPU_STARTING:
--	case CPU_STARTING_FROZEN:
--		if (__hyp_get_vectors() == hyp_default_vectors)
--			cpu_init_hyp_mode(NULL);
--		break;
-+	phys_addr_t boot_pgd_ptr;
-+	phys_addr_t phys_idmap_start;
-+
-+	boot_pgd_ptr = kvm_mmu_get_boot_httbr();
-+	phys_idmap_start = kvm_get_idmap_start();
-+
-+	__cpu_reset_hyp_mode(boot_pgd_ptr, phys_idmap_start);
-+}
-+
-+int kvm_arch_hardware_enable(void)
-+{
-+	if (!__this_cpu_read(kvm_arm_hardware_enabled)) {
-+		cpu_init_hyp_mode();
-+		__this_cpu_write(kvm_arm_hardware_enabled, 1);
- 	}
- 
--	return NOTIFY_OK;
-+	return 0;
- }
- 
--static struct notifier_block hyp_init_cpu_nb = {
--	.notifier_call = hyp_init_cpu_notify,
--};
-+void kvm_arch_hardware_disable(void)
-+{
-+	if (!__this_cpu_read(kvm_arm_hardware_enabled))
-+		return;
-+
-+	cpu_reset_hyp_mode();
-+	__this_cpu_write(kvm_arm_hardware_enabled, 0);
-+}
- 
- #ifdef CONFIG_CPU_PM
- static int hyp_init_cpu_pm_notifier(struct notifier_block *self,
- 				    unsigned long cmd,
- 				    void *v)
- {
--	if (cmd == CPU_PM_EXIT &&
--	    __hyp_get_vectors() == hyp_default_vectors) {
--		cpu_init_hyp_mode(NULL);
-+	/*
-+	 * kvm_arm_hardware_enabled is left with its old value over
-+	 * PM_ENTER->PM_EXIT. It is used to indicate PM_EXIT should
-+	 * re-enable hyp.
-+	 */
-+	switch (cmd) {
-+	case CPU_PM_ENTER:
-+		if (__this_cpu_read(kvm_arm_hardware_enabled))
-+			cpu_reset_hyp_mode();
-+
-+		return NOTIFY_OK;
-+	case CPU_PM_EXIT:
-+		if (__this_cpu_read(kvm_arm_hardware_enabled))
-+			cpu_init_hyp_mode();
-+
- 		return NOTIFY_OK;
--	}
- 
--	return NOTIFY_DONE;
-+	default:
-+		return NOTIFY_DONE;
-+	}
- }
- 
- static struct notifier_block hyp_init_cpu_pm_nb = {
-@@ -1124,14 +1151,20 @@ static int init_hyp_mode(void)
- 	}
- 
- 	/*
--	 * Execute the init code on each CPU.
-+	 * Init this CPU temporarily to execute kvm_hyp_call()
-+	 * during kvm_vgic_hyp_init().
- 	 */
--	on_each_cpu(cpu_init_hyp_mode, NULL, 1);
-+	preempt_disable();
-+	cpu_init_hyp_mode();
- 
- 	/*
- 	 * Init HYP view of VGIC
- 	 */
- 	err = kvm_vgic_hyp_init();
-+
-+	cpu_reset_hyp_mode();
-+	preempt_enable();
-+
- 	switch (err) {
- 	case 0:
- 		vgic_present = true;
-@@ -1215,26 +1248,15 @@ int kvm_arch_init(void *opaque)
- 		}
- 	}
- 
--	cpu_notifier_register_begin();
--
- 	err = init_hyp_mode();
- 	if (err)
- 		goto out_err;
- 
--	err = __register_cpu_notifier(&hyp_init_cpu_nb);
--	if (err) {
--		kvm_err("Cannot register HYP init CPU notifier (%d)\n", err);
--		goto out_err;
--	}
--
--	cpu_notifier_register_done();
--
- 	hyp_cpu_pm_init();
- 
- 	kvm_coproc_table_init();
- 	return 0;
- out_err:
--	cpu_notifier_register_done();
- 	return err;
- }
- 
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index aba61fd3697a..7a3aed62499a 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -1643,6 +1643,11 @@ phys_addr_t kvm_get_idmap_vector(void)
- 	return hyp_idmap_vector;
- }
- 
-+phys_addr_t kvm_get_idmap_start(void)
-+{
-+	return hyp_idmap_start;
-+}
-+
- int kvm_mmu_init(void)
- {
- 	int err;
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index e3d67ff8798b..cdf49ce6c1ea 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -332,7 +332,6 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
- 		       hyp_stack_ptr, vector_ptr);
- }
- 
--static inline void kvm_arch_hardware_disable(void) {}
- static inline void kvm_arch_hardware_unsetup(void) {}
- static inline void kvm_arch_sync_events(struct kvm *kvm) {}
- static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 736433912a1e..1be7703f9de6 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -99,6 +99,7 @@ void kvm_mmu_free_memory_caches(struct kvm_vcpu *vcpu);
- phys_addr_t kvm_mmu_get_httbr(void);
- phys_addr_t kvm_mmu_get_boot_httbr(void);
- phys_addr_t kvm_get_idmap_vector(void);
-+phys_addr_t kvm_get_idmap_start(void);
- int kvm_mmu_init(void);
- void kvm_clear_hyp_idmap(void);
- 
-@@ -310,5 +311,24 @@ static inline unsigned int kvm_get_vmid_bits(void)
- 	return (cpuid_feature_extract_field(reg, ID_AA64MMFR1_VMIDBITS_SHIFT) == 2) ? 16 : 8;
- }
- 
-+void __kvm_hyp_reset(phys_addr_t boot_pgd_ptr, phys_addr_t phys_idmap_start);
++/*
++ * The arm64 hcall implementation uses the ISS field of the ESR_EL2 register to
++ * specify the hcall type.  The exception handlers are allowed to use registers
++ * x17 and x18 in their implementation.  Any routine issuing an hcall must not
++ * expect these registers to be preserved.
++ */
 +
 +/*
-+ * Call reset code, and switch back to stub hyp vectors. We need to execute
-+ * __kvm_hyp_reset() from the trampoline page, we calculate its address here,
-+ * and pass it without kimage_voffset translation.
++ * HVC_CALL_HYP - Execute a hyp routine.
 + */
-+static inline void __cpu_reset_hyp_mode(phys_addr_t boot_pgd_ptr,
-+					phys_addr_t phys_idmap_start)
-+{
-+	unsigned long trampoline_hyp_reset;
 +
-+	trampoline_hyp_reset = TRAMPOLINE_VA +
-+			       ((unsigned long)__kvm_hyp_reset & ~PAGE_MASK);
++#define HVC_CALL_HYP 0
 +
-+	__kvm_call_hyp((void *)trampoline_hyp_reset,
-+		       boot_pgd_ptr, phys_idmap_start);
-+}
++/*
++ * HVC_GET_VECTORS - Return the value of the vbar_el2 register.
++ */
 +
- #endif /* __ASSEMBLY__ */
- #endif /* __ARM64_KVM_MMU_H__ */
-diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
-index dc6335a7353e..d20d86c7f9d8 100644
---- a/arch/arm64/kvm/hyp-init.S
-+++ b/arch/arm64/kvm/hyp-init.S
-@@ -150,6 +150,48 @@ merged:
- 	eret
- ENDPROC(__kvm_hyp_init)
++#define HVC_GET_VECTORS 1
++
++/*
++ * HVC_SET_VECTORS - Set the value of the vbar_el2 register.
++ *
++ * @x0: Physical address of the new vector table.
++ */
++
++#define HVC_SET_VECTORS 2
++
+ #define BOOT_CPU_MODE_EL1	(0xe11)
+ #define BOOT_CPU_MODE_EL2	(0xe12)
  
-+	/*
-+	 * x0: HYP boot pgd
-+	 * x1: HYP phys_idmap_start
-+	 */
-+ENTRY(__kvm_hyp_reset)
-+	/*
-+	 * Retrieve lr from the stack (pushed by el1_sync()), so we can eret
-+	 * from here.
-+	 */
-+	ldp	lr, xzr, [sp], #16
+diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
+index a272f335c289..017ab519aaf1 100644
+--- a/arch/arm64/kernel/hyp-stub.S
++++ b/arch/arm64/kernel/hyp-stub.S
+@@ -22,6 +22,7 @@
+ #include <linux/irqchip/arm-gic-v3.h>
+ 
+ #include <asm/assembler.h>
++#include <asm/kvm_arm.h>
+ #include <asm/ptrace.h>
+ #include <asm/virt.h>
+ 
+@@ -53,14 +54,22 @@ ENDPROC(__hyp_stub_vectors)
+ 	.align 11
+ 
+ el1_sync:
+-	mrs	x1, esr_el2
+-	lsr	x1, x1, #26
+-	cmp	x1, #0x16
++	mrs	x18, esr_el2
++	lsr	x17, x18, #ESR_ELx_EC_SHIFT
++	and	x18, x18, #ESR_ELx_ISS_MASK
 +
-+	/* We're in trampoline code in VA, switch back to boot page tables */
-+	msr	ttbr0_el2, x0
-+	isb
++	cmp	x17, #ESR_ELx_EC_HVC64
+ 	b.ne	2f				// Not an HVC trap
+-	cbz	x0, 1f
+-	msr	vbar_el2, x0			// Set vbar_el2
 +
-+	/* Ensure the PA branch doesn't find a stale tlb entry. */
-+	tlbi	alle2
-+	dsb	sy
++	cmp	x18, #HVC_GET_VECTORS
++	b.ne	1f
++	mrs	x0, vbar_el2
+ 	b	2f
+-1:	mrs	x0, vbar_el2			// Return vbar_el2
 +
-+	/* Branch into PA space */
-+	adr	x0, 1f
-+	bfi	x1, x0, #0, #PAGE_SHIFT
-+	br	x1
-+
-+	/* We're now in idmap, disable MMU */
-+1:	mrs	x0, sctlr_el2
-+	ldr	x1, =SCTLR_ELx_FLAGS
-+	bic	x0, x0, x1		// Clear SCTL_M and etc
-+	msr	sctlr_el2, x0
-+	isb
-+
-+	/* Invalidate the old TLBs */
-+	tlbi	alle2
-+	dsb	sy
-+
-+	/* Install stub vectors */
-+	adr_l	x0, __hyp_stub_vectors
++1:	cmp	x18, #HVC_SET_VECTORS
++	b.ne	2f
 +	msr	vbar_el2, x0
 +
-+	eret
-+ENDPROC(__kvm_hyp_reset)
-+
- 	.ltorg
+ 2:	eret
+ ENDPROC(el1_sync)
  
- 	.popsection
+@@ -100,11 +109,12 @@ ENDPROC(\label)
+  * initialisation entry point.
+  */
+ 
+-ENTRY(__hyp_get_vectors)
+-	mov	x0, xzr
+-	// fall through
+ ENTRY(__hyp_set_vectors)
+-	hvc	#0
++	hvc	#HVC_SET_VECTORS
+ 	ret
+-ENDPROC(__hyp_get_vectors)
+ ENDPROC(__hyp_set_vectors)
++
++ENTRY(__hyp_get_vectors)
++	hvc	#HVC_GET_VECTORS
++	ret
++ENDPROC(__hyp_get_vectors)
+diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+index 870578f84b1c..29e93388ebab 100644
+--- a/arch/arm64/kvm/hyp.S
++++ b/arch/arm64/kvm/hyp.S
+@@ -18,6 +18,7 @@
+ #include <linux/linkage.h>
+ 
+ #include <asm/assembler.h>
++#include <asm/virt.h>
+ 
+ /*
+  * u64 __kvm_call_hyp(void *hypfn, ...);
+@@ -38,6 +39,6 @@
+  * arch/arm64/kernel/hyp_stub.S.
+  */
+ ENTRY(__kvm_call_hyp)
+-	hvc	#0
++	hvc	#HVC_CALL_HYP
+ 	ret
+ ENDPROC(__kvm_call_hyp)
+diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
+index 93e8d983c0bd..a1edf7743df6 100644
+--- a/arch/arm64/kvm/hyp/hyp-entry.S
++++ b/arch/arm64/kvm/hyp/hyp-entry.S
+@@ -43,6 +43,7 @@ el1_sync:				// Guest trapped into EL2
+ 
+ 	mrs	x1, esr_el2
+ 	lsr	x2, x1, #ESR_ELx_EC_SHIFT
++	and	x0, x1, #ESR_ELx_ISS_MASK
+ 
+ 	cmp	x2, #ESR_ELx_EC_HVC64
+ 	b.ne	el1_trap
+@@ -51,14 +52,16 @@ el1_sync:				// Guest trapped into EL2
+ 	cbnz	x3, el1_trap		// called HVC
+ 
+ 	/* Here, we're pretty sure the host called HVC. */
++	mov	x18, x0
+ 	restore_x0_to_x3
+ 
+-	/* Check for __hyp_get_vectors */
+-	cbnz	x0, 1f
++	cmp	x18, #HVC_GET_VECTORS
++	b.ne	1f
+ 	mrs	x0, vbar_el2
+ 	b	2f
+ 
+-1:	stp	lr, xzr, [sp, #-16]!
++1:     /* Default to HVC_CALL_HYP. */
++	push	lr, xzr
+ 
+ 	/*
+ 	 * Compute the function address in EL2, and shuffle the parameters.
 -- 
 2.6.2
