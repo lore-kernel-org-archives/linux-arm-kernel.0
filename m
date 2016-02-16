@@ -1,48 +1,25 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 16 Feb 2016 15:39:12 +0100
-Subject: [PATCH v3 06/10] ARM: mps2: introduce MPS2 platform
-In-Reply-To: <56C333BF.1020108@arm.com>
-References: <1455617295-23736-1-git-send-email-vladimir.murzin@arm.com>
- <29457600.xRDuy0uVjW@wuerfel> <56C333BF.1020108@arm.com>
-Message-ID: <2949036.dUgqHWXoSe@wuerfel>
+From: rric@kernel.org (Robert Richter)
+Date: Tue, 16 Feb 2016 15:42:50 +0100
+Subject: [PATCH V2] AHCI: Workaround for ThunderX Errata#22536
+In-Reply-To: <20160215183041.GH3965@htj.duckdns.org>
+References: <1455319230-30201-1-git-send-email-tchalamarla@caviumnetworks.com>
+ <20160214170152.GC3965@htj.duckdns.org>
+ <56C147B2.9010303@caviumnetworks.com>
+ <20160215183041.GH3965@htj.duckdns.org>
+Message-ID: <20160216144250.GD31343@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 16 February 2016 14:35:43 Vladimir Murzin wrote:
-> On 16/02/16 10:56, Arnd Bergmann wrote:
-> > On Tuesday 16 February 2016 10:08:11 Vladimir Murzin wrote:
-> >> The Cortex-M Prototyping System (or V2M-MPS2) is designed for
-> >> prototyping and evaluation Cortex-M family of processors including the
-> >> latest Cortex-M7
-> >>
-> >> It comes with a range of useful peripherals including 8MB single cycle
-> >> SRAM, 16MB PSRAM, Ethernet, QSVGA touch screen panel, 4bit RGB VGA
-> >> connector, Audio, SPI and GPIO.
-> >>
-> >> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
-> >> ---
-> >>  arch/arm/Kconfig                 |    8 ++++++++
-> >>  arch/arm/Makefile                |    1 +
-> >>  arch/arm/mach-mps2/Makefile      |    1 +
-> >>  arch/arm/mach-mps2/Makefile.boot |    3 +++
-> >>  arch/arm/mach-mps2/dtmachine.c   |   21 +++++++++++++++++++++
-> >>
-> > 
-> > We are in the (slow) process of consolidating the ARM reference platforms
-> > (versatile, integrator, realview, vexpress) into one place.
-> > 
+On 15.02.16 13:30:41, Tejun Heo wrote:
+> On Sun, Feb 14, 2016 at 07:36:18PM -0800, Tirumalesh Chalamarla wrote:
+> > There is no need for special Driver, AHCI is sufficient for ThunderX, the
+> > file only contains this interrupt handler,
+> > is it preferable if this interrupt handler in libahci.c with others, instead
+> > of separate file?
 > 
-> Thanks for information! Sometime ago I saw on a list you had some
-> thoughts on consolidating M-class platforms since most of them follow
-> quite the same pattern (I'm looking at efm32 and stm32). So, shouldn't
-> this platform consider that way?
-> 
+> Yeap, just fold it in ahci.c with surrounding #ifdef guard.
 
-Right, that would be another option. vf610 is in the same category as this
-one I think, it's currently in mach-imx, and we can probably leave it there.
+Yes, please use #ifdef CONFIG_CAVIUM_ERRATUM_22536 ... and add a
+kconfig entry for this to arch/arm64/Kconfig.
 
-Unless someone is going to do the patch to consolidate the cortex-m
-platforms, I'd stay with mach-vexpress here, but I don't have a strong
-opinion.
-
-	Arnd
+-Robert
