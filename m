@@ -1,156 +1,87 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 16 Feb 2016 13:52:39 +0100
-Subject: [PATCH v6sub1 08/11] arm64: kvm: deal with kernel symbols outside of
- linear mapping
+Date: Tue, 16 Feb 2016 13:52:36 +0100
+Subject: [PATCH v6sub1 05/11] arm64: introduce KIMAGE_VADDR as the virtual
+ base of the kernel region
 In-Reply-To: <1455627162-31600-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1455627162-31600-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1455627162-31600-9-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1455627162-31600-6-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-KVM on arm64 uses a fixed offset between the linear mapping at EL1 and
-the HYP mapping at EL2. Before we can move the kernel virtual mapping
-out of the linear mapping, we have to make sure that references to kernel
-symbols that are accessed via the HYP mapping are translated to their
-linear equivalent.
+This introduces the preprocessor symbol KIMAGE_VADDR which will serve as
+the symbolic virtual base of the kernel region, i.e., the kernel's virtual
+offset will be KIMAGE_VADDR + TEXT_OFFSET. For now, we define it as being
+equal to PAGE_OFFSET, but in the future, it will be moved below it once
+we move the kernel virtual mapping out of the linear mapping.
 
 Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm/include/asm/kvm_asm.h    |  2 ++
- arch/arm/kvm/arm.c                |  8 +++++---
- arch/arm64/include/asm/kvm_asm.h  | 17 +++++++++++++++++
- arch/arm64/include/asm/kvm_host.h |  8 +++++---
- arch/arm64/kvm/hyp.S              |  6 +++---
- 5 files changed, 32 insertions(+), 9 deletions(-)
+ arch/arm64/include/asm/memory.h | 10 ++++++++--
+ arch/arm64/kernel/head.S        |  2 +-
+ arch/arm64/kernel/vmlinux.lds.S |  4 ++--
+ 3 files changed, 11 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
-index 194c91b610ff..c35c349da069 100644
---- a/arch/arm/include/asm/kvm_asm.h
-+++ b/arch/arm/include/asm/kvm_asm.h
-@@ -79,6 +79,8 @@
- #define rr_lo_hi(a1, a2) a1, a2
- #endif
- 
-+#define kvm_ksym_ref(kva)	(kva)
+diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+index c65aad7b13dc..aebc739f5a11 100644
+--- a/arch/arm64/include/asm/memory.h
++++ b/arch/arm64/include/asm/memory.h
+@@ -51,7 +51,8 @@
+ #define VA_BITS			(CONFIG_ARM64_VA_BITS)
+ #define VA_START		(UL(0xffffffffffffffff) << VA_BITS)
+ #define PAGE_OFFSET		(UL(0xffffffffffffffff) << (VA_BITS - 1))
+-#define MODULES_END		(PAGE_OFFSET)
++#define KIMAGE_VADDR		(PAGE_OFFSET)
++#define MODULES_END		(KIMAGE_VADDR)
+ #define MODULES_VADDR		(MODULES_END - SZ_64M)
+ #define PCI_IO_END		(MODULES_VADDR - SZ_2M)
+ #define PCI_IO_START		(PCI_IO_END - PCI_IO_SIZE)
+@@ -75,8 +76,13 @@
+  * private definitions which should NOT be used outside memory.h
+  * files.  Use virt_to_phys/phys_to_virt/__pa/__va instead.
+  */
+-#define __virt_to_phys(x)	(((phys_addr_t)(x) - PAGE_OFFSET + PHYS_OFFSET))
++#define __virt_to_phys(x) ({						\
++	phys_addr_t __x = (phys_addr_t)(x);				\
++	__x >= PAGE_OFFSET ? (__x - PAGE_OFFSET + PHYS_OFFSET) :	\
++			     (__x - KIMAGE_VADDR + PHYS_OFFSET); })
 +
- #ifndef __ASSEMBLY__
- struct kvm;
- struct kvm_vcpu;
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index dda1959f0dde..975da6cfbf59 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -982,7 +982,7 @@ static void cpu_init_hyp_mode(void *dummy)
- 	pgd_ptr = kvm_mmu_get_httbr();
- 	stack_page = __this_cpu_read(kvm_arm_hyp_stack_page);
- 	hyp_stack_ptr = stack_page + PAGE_SIZE;
--	vector_ptr = (unsigned long)__kvm_hyp_vector;
-+	vector_ptr = (unsigned long)kvm_ksym_ref(__kvm_hyp_vector);
- 
- 	__cpu_init_hyp_mode(boot_pgd_ptr, pgd_ptr, hyp_stack_ptr, vector_ptr);
- 
-@@ -1074,13 +1074,15 @@ static int init_hyp_mode(void)
- 	/*
- 	 * Map the Hyp-code called directly from the host
- 	 */
--	err = create_hyp_mappings(__kvm_hyp_code_start, __kvm_hyp_code_end);
-+	err = create_hyp_mappings(kvm_ksym_ref(__kvm_hyp_code_start),
-+				  kvm_ksym_ref(__kvm_hyp_code_end));
- 	if (err) {
- 		kvm_err("Cannot map world-switch code\n");
- 		goto out_free_mappings;
- 	}
- 
--	err = create_hyp_mappings(__start_rodata, __end_rodata);
-+	err = create_hyp_mappings(kvm_ksym_ref(__start_rodata),
-+				  kvm_ksym_ref(__end_rodata));
- 	if (err) {
- 		kvm_err("Cannot map rodata section\n");
- 		goto out_free_mappings;
-diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-index 52b777b7d407..31b56008f412 100644
---- a/arch/arm64/include/asm/kvm_asm.h
-+++ b/arch/arm64/include/asm/kvm_asm.h
-@@ -26,7 +26,24 @@
- #define KVM_ARM64_DEBUG_DIRTY_SHIFT	0
- #define KVM_ARM64_DEBUG_DIRTY		(1 << KVM_ARM64_DEBUG_DIRTY_SHIFT)
- 
-+#define kvm_ksym_ref(sym)		((void *)&sym + kvm_ksym_shift)
-+
- #ifndef __ASSEMBLY__
-+#if __GNUC__ > 4
-+#define kvm_ksym_shift			(PAGE_OFFSET - KIMAGE_VADDR)
-+#else
-+/*
-+ * GCC versions 4.9 and older will fold the constant below into the addend of
-+ * the reference to 'sym' above if kvm_ksym_shift is declared static or if the
-+ * constant is used directly. However, since we use the small code model for
-+ * the core kernel, the reference to 'sym' will be emitted as a adrp/add pair,
-+ * with a +/- 4 GB range, resulting in linker relocation errors if the shift
-+ * is sufficiently large. So prevent the compiler from folding the shift into
-+ * the addend, by making the shift a variable with external linkage.
-+ */
-+__weak u64 kvm_ksym_shift = PAGE_OFFSET - KIMAGE_VADDR;
-+#endif
-+
- struct kvm;
- struct kvm_vcpu;
- 
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 689d4c95e12f..e3d67ff8798b 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -307,7 +307,7 @@ static inline void kvm_arch_mmu_notifier_invalidate_page(struct kvm *kvm,
- struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
- struct kvm_vcpu * __percpu *kvm_get_running_vcpus(void);
- 
--u64 kvm_call_hyp(void *hypfn, ...);
-+u64 __kvm_call_hyp(void *hypfn, ...);
- void force_vm_exit(const cpumask_t *mask);
- void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
- 
-@@ -328,8 +328,8 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
- 	 * Call initialization code, and switch to the full blown
- 	 * HYP code.
- 	 */
--	kvm_call_hyp((void *)boot_pgd_ptr, pgd_ptr,
--		     hyp_stack_ptr, vector_ptr);
-+	__kvm_call_hyp((void *)boot_pgd_ptr, pgd_ptr,
-+		       hyp_stack_ptr, vector_ptr);
- }
- 
- static inline void kvm_arch_hardware_disable(void) {}
-@@ -343,4 +343,6 @@ void kvm_arm_setup_debug(struct kvm_vcpu *vcpu);
- void kvm_arm_clear_debug(struct kvm_vcpu *vcpu);
- void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu);
- 
-+#define kvm_call_hyp(f, ...) __kvm_call_hyp(kvm_ksym_ref(f), ##__VA_ARGS__)
-+
- #endif /* __ARM64_KVM_HOST_H__ */
-diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-index 0ccdcbbef3c2..870578f84b1c 100644
---- a/arch/arm64/kvm/hyp.S
-+++ b/arch/arm64/kvm/hyp.S
-@@ -20,7 +20,7 @@
- #include <asm/assembler.h>
+ #define __phys_to_virt(x)	((unsigned long)((x) - PHYS_OFFSET + PAGE_OFFSET))
++#define __phys_to_kimg(x)	((unsigned long)((x) - PHYS_OFFSET + KIMAGE_VADDR))
  
  /*
-- * u64 kvm_call_hyp(void *hypfn, ...);
-+ * u64 __kvm_call_hyp(void *hypfn, ...);
-  *
-  * This is not really a variadic function in the classic C-way and care must
-  * be taken when calling this to ensure parameters are passed in registers
-@@ -37,7 +37,7 @@
-  * used to implement __hyp_get_vectors in the same way as in
-  * arch/arm64/kernel/hyp_stub.S.
+  * Convert a page to/from a physical address
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 53b9f9f128c2..04d38a058b19 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -389,7 +389,7 @@ __create_page_tables:
+ 	 * Map the kernel image (starting with PHYS_OFFSET).
+ 	 */
+ 	mov	x0, x26				// swapper_pg_dir
+-	mov	x5, #PAGE_OFFSET
++	ldr	x5, =KIMAGE_VADDR
+ 	create_pgd_entry x0, x5, x3, x6
+ 	ldr	x6, =KERNEL_END			// __va(KERNEL_END)
+ 	mov	x3, x24				// phys offset
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index b78a3c772294..282e3e64a17e 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -89,7 +89,7 @@ SECTIONS
+ 		*(.discard.*)
+ 	}
+ 
+-	. = PAGE_OFFSET + TEXT_OFFSET;
++	. = KIMAGE_VADDR + TEXT_OFFSET;
+ 
+ 	.head.text : {
+ 		_text = .;
+@@ -186,4 +186,4 @@ ASSERT(__idmap_text_end - (__idmap_text_start & ~(SZ_4K - 1)) <= SZ_4K,
+ /*
+  * If padding is applied before .head.text, virt<->phys conversions will fail.
   */
--ENTRY(kvm_call_hyp)
-+ENTRY(__kvm_call_hyp)
- 	hvc	#0
- 	ret
--ENDPROC(kvm_call_hyp)
-+ENDPROC(__kvm_call_hyp)
+-ASSERT(_text == (PAGE_OFFSET + TEXT_OFFSET), "HEAD is misaligned")
++ASSERT(_text == (KIMAGE_VADDR + TEXT_OFFSET), "HEAD is misaligned")
 -- 
 2.5.0
