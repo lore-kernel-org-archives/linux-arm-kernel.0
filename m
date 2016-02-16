@@ -1,48 +1,34 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 16 Feb 2016 17:05:43 +0100
-Subject: [PATCH 1/2] ARM: mm: DEBUG_RODATA makes no sense with XIP_KERNEL
-In-Reply-To: <1455638631-3326518-1-git-send-email-arnd@arndb.de>
-References: <1455638631-3326518-1-git-send-email-arnd@arndb.de>
-Message-ID: <CAKv+Gu9sMcAxNFPSYmF1y1Go_iZ0zmGwzo1wtEcBu24QjajRMw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 16 Feb 2016 17:09:43 +0100
+Subject: [PATCH] sound: hdmi: avoid dereferencing uninitialized 'jack'
+ pointer
+In-Reply-To: <s5hbn7g7izt.wl-tiwai@suse.de>
+References: <1455634059-1896914-1-git-send-email-arnd@arndb.de>
+ <s5hbn7g7izt.wl-tiwai@suse.de>
+Message-ID: <2573932.AU4HSxN0NE@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 February 2016 at 17:03, Arnd Bergmann <arnd@arndb.de> wrote:
-> When CONFIG_DEBUG_ALIGN_RODATA is set, we get a link error:
->
-> arch/arm/mm/built-in.o:(.data+0x4bc): undefined reference to `__start_rodata_section_aligned'
->
-> However, this combination is useless, as XIP_KERNEL implies that all the
-> RODATA is already marked readonly, so both CONFIG_DEBUG_RODATA and
-> CONFIG_DEBUG_ALIGN_RODATA (which depends on the other) are not
-> needed with XIP_KERNEL, and this patches enforces that using a Kconfig
+On Tuesday 16 February 2016 16:49:42 Takashi Iwai wrote:
+> 
+> Thanks for the patch.  But I think it's cleaner to fix Kconfig.
+> 
+> Thinking more of it, maybe splitting jack stuff as a separate module
+> and does reverse-select to CONFIG_INPUT would be better.  Then its
+> users can select simply SND_JACK, and everything would fit.
+> 
+> 
 
-s/patches/patch/
+Adding 'select INPUT' is rather nasty, I think that can lead to circular
+dependencies, and would likely upset users of small embedded systems
+that want to use audio but don't want to use input.
 
-> dependency.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Generally speaking, I would recommend never using 'select' on a user
+visible Kconfig symbol.
 
-Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Another option might would be to change snd_jack_new() to return
+an error if that SND_JACK is disabled, and then require all users
+to handle the error gracefully, i.e. not fail the probe() function
+but just not use the jack.
 
-> Fixes: 25362dc496ed ("ARM: 8501/1: mm: flip priority of CONFIG_DEBUG_RODATA")
-> ---
->  arch/arm/mm/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-> index fbf2296388ce..8894045caba9 100644
-> --- a/arch/arm/mm/Kconfig
-> +++ b/arch/arm/mm/Kconfig
-> @@ -1039,7 +1039,7 @@ config ARCH_SUPPORTS_BIG_ENDIAN
->
->  config DEBUG_RODATA
->         bool "Make kernel text and rodata read-only"
-> -       depends on MMU
-> +       depends on MMU && !XIP_KERNEL
->         default y if CPU_V7
->         help
->           If this is set, kernel text and rodata memory will be made
-> --
-> 2.7.0
->
+	Arnd
