@@ -1,43 +1,31 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 16 Feb 2016 17:36:33 +0100
-Subject: [PATCH 2/2] ARM: mm: hide __start_rodata_section_aligned for
- non-debug builds
-In-Reply-To: <4716656.D1MJCNd1N6@wuerfel>
-References: <1455638631-3326518-1-git-send-email-arnd@arndb.de>
- <1455638631-3326518-2-git-send-email-arnd@arndb.de>
- <CAKv+Gu8JcWg4BkxZFPqTotkfHFtP744XYdSx6XROJSM_8pmt2w@mail.gmail.com>
- <4716656.D1MJCNd1N6@wuerfel>
-Message-ID: <CAKv+Gu-WAcw1q4s_UgOoM5DGerZ-aM_CToVG6C8-Bt6xzt-LMg@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 16 Feb 2016 16:38:40 +0000
+Subject: [PATCH] sound: hdmi: avoid dereferencing uninitialized 'jack'
+ pointer
+In-Reply-To: <s5h4md87hnu.wl-tiwai@suse.de>
+References: <1455634059-1896914-1-git-send-email-arnd@arndb.de>
+ <s5hbn7g7izt.wl-tiwai@suse.de> <2573932.AU4HSxN0NE@wuerfel>
+ <s5h4md87hnu.wl-tiwai@suse.de>
+Message-ID: <20160216163840.GA7544@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 February 2016 at 17:34, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 16 February 2016 17:12:52 Ard Biesheuvel wrote:
->> > +#ifdef CONFIG_DEBUG_RODATA
->> >  /*
->> >   * Without CONFIG_DEBUG_ALIGN_RODATA, __start_rodata_section_aligned will
->> >   * be the first section-aligned location after __start_rodata. Otherwise,
->> >   * it will be equal to __start_rodata.
->> >   */
->> >  __start_rodata_section_aligned = ALIGN(__start_rodata, 1 << SECTION_SHIFT);
->> > +#endif
->> >
->>
->> Does
->>
->> PROVIDE(__start_rodata_section_aligned = xxx);
->>
->> do the trick as well? If it does, it's a bit cleaner.
->>
->
-> I would assume not, as the problem is that SECTION_SHIFT is a macro that
-> is not defined when the MMU is disabled.
->
+On Tue, Feb 16, 2016 at 05:18:29PM +0100, Takashi Iwai wrote:
+> Arnd Bergmann wrote:
 
-I just tested it myself, and it in fact does work.
+> > Another option might would be to change snd_jack_new() to return
+> > an error if that SND_JACK is disabled, and then require all users
+> > to handle the error gracefully, i.e. not fail the probe() function
+> > but just not use the jack.
 
-PROVIDE() means the expression is evaluated lazily, and SECTION_SHIFT
-is just an undefined identifier in the linker script scope if the
-preprocessor does not define it.
+> Yes, I thought of that, too.  If select is no good option, it's a good
+> alternative, indeed.
 
-Anyway, I don't have a strong preference, so ack either way.
+It's going to be a bunch of work to implement though.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160216/4932162c/attachment.sig>
