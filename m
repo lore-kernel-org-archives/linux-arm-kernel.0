@@ -1,58 +1,56 @@
 From: keescook@chromium.org (Kees Cook)
-Date: Tue, 16 Feb 2016 12:29:57 -0800
-Subject: [PATCH] ARM: drop unused DEBUG_RODATA from XIP_KERNEL
-Message-ID: <20160216202957.GA1826@www.outflux.net>
+Date: Tue, 16 Feb 2016 12:31:16 -0800
+Subject: [PATCH 1/2] ARM: mm: DEBUG_RODATA makes no sense with XIP_KERNEL
+In-Reply-To: <1455638631-3326518-1-git-send-email-arnd@arndb.de>
+References: <1455638631-3326518-1-git-send-email-arnd@arndb.de>
+Message-ID: <CAGXu5jJg4SqrHdJsB-5AzcQbNR-hDZv6YsWayf7LefO+ng4Qhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With CONFIG_DEBUG_RODATA not being sensible under XIP_KERNEL, remove it
-from the XIP linker script.
+On Tue, Feb 16, 2016 at 8:03 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> When CONFIG_DEBUG_ALIGN_RODATA is set, we get a link error:
+>
+> arch/arm/mm/built-in.o:(.data+0x4bc): undefined reference to `__start_rodata_section_aligned'
+>
+> However, this combination is useless, as XIP_KERNEL implies that all the
+> RODATA is already marked readonly, so both CONFIG_DEBUG_RODATA and
+> CONFIG_DEBUG_ALIGN_RODATA (which depends on the other) are not
+> needed with XIP_KERNEL, and this patches enforces that using a Kconfig
+> dependency.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 25362dc496ed ("ARM: 8501/1: mm: flip priority of CONFIG_DEBUG_RODATA")
 
-Signed-off-by: Kees Cook <keescook@chromium.org>
----
-Effectively the patch after Arnd's "ARM: mm: hide
-__start_rodata_section_aligned for non-debug builds"
----
- arch/arm/kernel/vmlinux-xip.lds.S | 10 ----------
- 1 files changed, 0 insertions(+), 10 deletions(-)
+For this and the 2/2 patch:
 
-diff --git a/arch/arm/kernel/vmlinux-xip.lds.S b/arch/arm/kernel/vmlinux-xip.lds.S
-index 40bc4cadb959..cba1ec899a69 100644
---- a/arch/arm/kernel/vmlinux-xip.lds.S
-+++ b/arch/arm/kernel/vmlinux-xip.lds.S
-@@ -8,9 +8,6 @@
- #include <asm/thread_info.h>
- #include <asm/memory.h>
- #include <asm/page.h>
--#ifdef CONFIG_DEBUG_RODATA
--#include <asm/pgtable.h>
--#endif
- 
- #define PROC_INFO							\
- 	. = ALIGN(4);							\
-@@ -92,10 +89,6 @@ SECTIONS
- 		HEAD_TEXT
- 	}
- 
--#ifdef CONFIG_DEBUG_RODATA
--	. = ALIGN(1<<SECTION_SHIFT);
--#endif
--
- 	.text : {			/* Real text segment		*/
- 		_stext = .;		/* Text and read-only data	*/
- 			IDMAP_TEXT
-@@ -115,9 +108,6 @@ SECTIONS
- 			ARM_CPU_KEEP(PROC_INFO)
- 	}
- 
--#ifdef CONFIG_DEBUG_RODATA
--	. = ALIGN(1<<SECTION_SHIFT);
--#endif
- 	RO_DATA(PAGE_SIZE)
- 
- 	. = ALIGN(4);
--- 
-2.6.3
+Acked-by: Kees Cook <keescook@chromium.org>
+
+I've sent follow-up to clean up the XIP linker script too, if you want
+to take that as the 3rd patch in this series of fixes.
+
+-Kees
+
+> ---
+>  arch/arm/mm/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+> index fbf2296388ce..8894045caba9 100644
+> --- a/arch/arm/mm/Kconfig
+> +++ b/arch/arm/mm/Kconfig
+> @@ -1039,7 +1039,7 @@ config ARCH_SUPPORTS_BIG_ENDIAN
+>
+>  config DEBUG_RODATA
+>         bool "Make kernel text and rodata read-only"
+> -       depends on MMU
+> +       depends on MMU && !XIP_KERNEL
+>         default y if CPU_V7
+>         help
+>           If this is set, kernel text and rodata memory will be made
+> --
+> 2.7.0
+>
+
 
 
 -- 
