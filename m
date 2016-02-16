@@ -1,55 +1,60 @@
-From: tbaicar@codeaurora.org (Baicar, Tyler)
-Date: Tue, 16 Feb 2016 13:25:55 -0700
-Subject: [PATCH v2 2/2] arm64/efi: esrt: add missing call to
- efi_esrt_init()
-In-Reply-To: <1455535953-5056-3-git-send-email-ard.biesheuvel@linaro.org>
-References: <1455535953-5056-1-git-send-email-ard.biesheuvel@linaro.org>
- <1455535953-5056-3-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <56C385D3.3090308@codeaurora.org>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 16 Feb 2016 12:29:57 -0800
+Subject: [PATCH] ARM: drop unused DEBUG_RODATA from XIP_KERNEL
+Message-ID: <20160216202957.GA1826@www.outflux.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/15/2016 4:32 AM, Ard Biesheuvel wrote:
-> ESRT support is built by default for all architectures that define
-> CONFIG_EFI. However, this support was not wired up yet for ARM/arm64,
-> since efi_esrt_init() was never called. So add the missing call.
->
-> Since efi_esrt_init() uses efi_mem_desc_lookup(), which in turn relies
-> on efi.memmap having been assigned and populated completetely, add the
-> missing assignments of efi.memmap and efi.memmap->nr_map.
->
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->   drivers/firmware/efi/arm-init.c | 3 +++
->   1 file changed, 3 insertions(+)
->
-> diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
-> index 9e15d571b53c..5c5e799bdb50 100644
-> --- a/drivers/firmware/efi/arm-init.c
-> +++ b/drivers/firmware/efi/arm-init.c
-> @@ -197,10 +197,13 @@ void __init efi_init(void)
->   	memmap.map_end = memmap.map + params.mmap_size;
->   	memmap.desc_size = params.desc_size;
->   	memmap.desc_version = params.desc_ver;
-> +	memmap.nr_map = params.mmap_size / params.desc_size;
-> +	efi.memmap = &memmap;
->   
->   	if (uefi_init() < 0)
->   		return;
->   
-> +	efi_esrt_init();
-This call to efi_esrt_init() is failing because efi.flags does not have 
-EFI_MEMMAP set. This flag gets set at the end of reserve_regions(). I 
-tested moving the set_bit() call from reserve_regions() to just before 
-efi_esrt_init() and also tested moving efi_esrt_init() to just after 
-reserve_regions(). Both of these options worked.
->   	reserve_regions();
->   	early_memunmap(memmap.map, params.mmap_size);
->   	memblock_mark_nomap(params.mmap & PAGE_MASK,
-Thanks,
-Tyler
+With CONFIG_DEBUG_RODATA not being sensible under XIP_KERNEL, remove it
+from the XIP linker script.
+
+Signed-off-by: Kees Cook <keescook@chromium.org>
+---
+Effectively the patch after Arnd's "ARM: mm: hide
+__start_rodata_section_aligned for non-debug builds"
+---
+ arch/arm/kernel/vmlinux-xip.lds.S | 10 ----------
+ 1 files changed, 0 insertions(+), 10 deletions(-)
+
+diff --git a/arch/arm/kernel/vmlinux-xip.lds.S b/arch/arm/kernel/vmlinux-xip.lds.S
+index 40bc4cadb959..cba1ec899a69 100644
+--- a/arch/arm/kernel/vmlinux-xip.lds.S
++++ b/arch/arm/kernel/vmlinux-xip.lds.S
+@@ -8,9 +8,6 @@
+ #include <asm/thread_info.h>
+ #include <asm/memory.h>
+ #include <asm/page.h>
+-#ifdef CONFIG_DEBUG_RODATA
+-#include <asm/pgtable.h>
+-#endif
+ 
+ #define PROC_INFO							\
+ 	. = ALIGN(4);							\
+@@ -92,10 +89,6 @@ SECTIONS
+ 		HEAD_TEXT
+ 	}
+ 
+-#ifdef CONFIG_DEBUG_RODATA
+-	. = ALIGN(1<<SECTION_SHIFT);
+-#endif
+-
+ 	.text : {			/* Real text segment		*/
+ 		_stext = .;		/* Text and read-only data	*/
+ 			IDMAP_TEXT
+@@ -115,9 +108,6 @@ SECTIONS
+ 			ARM_CPU_KEEP(PROC_INFO)
+ 	}
+ 
+-#ifdef CONFIG_DEBUG_RODATA
+-	. = ALIGN(1<<SECTION_SHIFT);
+-#endif
+ 	RO_DATA(PAGE_SIZE)
+ 
+ 	. = ALIGN(4);
+-- 
+2.6.3
+
 
 -- 
-Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Kees Cook
+Chrome OS & Brillo Security
