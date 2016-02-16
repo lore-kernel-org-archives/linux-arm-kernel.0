@@ -1,98 +1,43 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Tue, 16 Feb 2016 17:03:33 -0600
-Subject: [PATCH] irqchip/gicv3-its: Avoid cache flush beyond ITS_BASERn
- memory size
-In-Reply-To: <20160216083549.5c889627@arm.com>
-References: <1455594112-27783-1-git-send-email-shankerd@codeaurora.org>
- <20160216083549.5c889627@arm.com>
-Message-ID: <56C3AAC5.7020300@codeaurora.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 16 Feb 2016 23:04:12 +0000
+Subject: [PATCH v2] arm64: add alignment fault hanling
+In-Reply-To: <56C39538.6090009@linux.intel.com>
+References: <329817481.954581455597874663.JavaMail.weblogic@epmlwas08c>
+ <20160216103104.GC14509@arm.com> <56C300AD.8070505@arm.com>
+ <20160216122153.GD19413@e104818-lin.cambridge.arm.com>
+ <20160216160055.GH14509@arm.com> <20160216170408.GL14509@arm.com>
+ <CA+55aFw-86k4gY46Et=e02HQQSxjUK2Jfz0SJz8tWtk5P8YZFA@mail.gmail.com>
+ <56C39538.6090009@linux.intel.com>
+Message-ID: <20160216230409.GA24379@MBP.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On Tue, Feb 16, 2016 at 01:31:36PM -0800, Arjan van de Ven wrote:
+> On 2/16/2016 10:50 AM, Linus Torvalds wrote:
+> >On Tue, Feb 16, 2016 at 9:04 AM, Will Deacon <will.deacon@arm.com> wrote:
+> >>[replying to self and adding some x86 people]
+> >>
+> >>Background: Euntaik reports a problem where userspace has ended up with
+> >>a memory page mapped adjacent to an MMIO page (e.g. from /dev/mem or a
+> >>PCI memory bar from someplace in /sys). strncpy_from_user happens with
+> >>the word-at-a-time implementation, and we end up reading into the MMIO
+> >>page.
+> 
+> how does this work if the adjacent page is not accessible?
 
-On 02/16/2016 02:35 AM, Marc Zyngier wrote:
-> On Mon, 15 Feb 2016 21:41:52 -0600
-> Shanker Donthineni <shankerd@codeaurora.org> wrote:
->
->> Function its_alloc_tables() maintains two local variables, "order" and
->> and "alloc_size", to hold memory size that has been allocated to
->> ITS_BASEn. We don't always refresh the variable alloc_size whenever
->> value of the variable order changes, causing the following two problems.
->>
->>    - Cache flush operation with size more than required.
->>    - Information reported by pr_info is not correct.
->>
->> Use a helper macro that converts page order to size in bytes instead of
->> variable "alloc_size" to fix both the problems.
->>
->> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
->> ---
->>   drivers/irqchip/irq-gic-v3-its.c | 12 +++++++-----
->>   1 file changed, 7 insertions(+), 5 deletions(-)
->>
->> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
->> index 0a73632..6f717f7 100644
->> --- a/drivers/irqchip/irq-gic-v3-its.c
->> +++ b/drivers/irqchip/irq-gic-v3-its.c
->> @@ -78,6 +78,9 @@ struct its_node {
->>   
->>   #define ITS_ITT_ALIGN		SZ_256
->>   
->> +/* Convert page order to size in bytes */
->> +#define PAGE_ORDER_TO_BYTES(o)	(PAGE_SIZE << (o))
->> +
-> nit: PAGE_ORDER_TO_size() seems more appropriate.
->
-I will change to PAGE_ORDER_TO_SIZE in v2 patch.
+do_strncpy_from_user() assumes by default that it can read a word at a
+time using get_user() but checks its return value in case it failed and
+falls back to byte at a time. What happens on arm64 is that for
+alignment faults we don't have a handler that would search the exception
+table and run the get_user() fixup.
 
->>   struct event_lpi_map {
->>   	unsigned long		*lpi_map;
->>   	u16			*col_map;
->> @@ -846,7 +849,6 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
->>   		u64 type = GITS_BASER_TYPE(val);
->>   		u64 entry_size = GITS_BASER_ENTRY_SIZE(val);
->>   		int order = get_order(psz);
->> -		int alloc_size;
->>   		int alloc_pages;
->>   		u64 tmp;
->>   		void *base;
->> @@ -878,9 +880,8 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
->>   			}
->>   		}
->>   
->> -		alloc_size = (1 << order) * PAGE_SIZE;
->>   retry_alloc_baser:
->> -		alloc_pages = (alloc_size / psz);
->> +		alloc_pages = (PAGE_ORDER_TO_BYTES(order) / psz);
->>   		if (alloc_pages > GITS_BASER_PAGES_MAX) {
->>   			alloc_pages = GITS_BASER_PAGES_MAX;
->>   			order = get_order(GITS_BASER_PAGES_MAX * psz);
->> @@ -933,7 +934,8 @@ retry_baser:
->>   			shr = tmp & GITS_BASER_SHAREABILITY_MASK;
->>   			if (!shr) {
->>   				cache = GITS_BASER_nC;
->> -				__flush_dcache_area(base, alloc_size);
->> +				__flush_dcache_area(base,
->> +						    PAGE_ORDER_TO_BYTES(order));
-> Please keep it on the same line. It helps my random grepping...
-Sure, I will keep it on the same line in v2 patch.
+> isn't the general rule for such basic functions "don't touch memory
+> unless you KNOW it is there"
 
->>   			}
->>   			goto retry_baser;
->>   		}
->> @@ -966,7 +968,7 @@ retry_baser:
->>   		}
->>   
->>   		pr_info("ITS: allocated %d %s @%lx (psz %dK, shr %d)\n",
->> -			(int)(alloc_size / entry_size),
->> +			(int)(PAGE_ORDER_TO_BYTES(order) / entry_size),
->>   			its_base_type_string[type],
->>   			(unsigned long)virt_to_phys(base),
->>   			psz / SZ_1K, (int)shr >> GITS_BASER_SHAREABILITY_SHIFT);
->
-> Otherwise looks good.
->
-> Thanks,
->
-> 	M.
+Well, user access routines are in general safe with this via the
+exception handling + fixup mechanism (which usually returns -EFAULT).
+That's what do_strncpy_from_user() tries to do by optimising away the
+boundary checks.
+
+-- 
+Catalin
