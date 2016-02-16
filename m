@@ -1,31 +1,28 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 16 Feb 2016 14:17:00 +0000
-Subject: [PATCH 2/3] ARM: configs: Add new config fragment to change RAM start
- point
+Date: Tue, 16 Feb 2016 14:17:01 +0000
+Subject: [PATCH 3/3] ARM: stm32: Identify a new board - STM32F469
 In-Reply-To: <1455632221-31834-1-git-send-email-lee.jones@linaro.org>
 References: <1455632221-31834-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1455632221-31834-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <1455632221-31834-4-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rather than duplicate a defconfig for each difference
-between platforms, we can choose to pick a basic defconfig and
-manipulate it at run-time using config fragments.  Here we're
-adding a new fragment to over-ride the RAM start point to 0x0.
-
-Cc: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/configs/dram_0x00000000.config | 1 +
+ arch/arm/mach-stm32/board-dt.c | 1 +
  1 file changed, 1 insertion(+)
- create mode 100644 arch/arm/configs/dram_0x00000000.config
 
-diff --git a/arch/arm/configs/dram_0x00000000.config b/arch/arm/configs/dram_0x00000000.config
-new file mode 100644
-index 0000000..db96dcb
---- /dev/null
-+++ b/arch/arm/configs/dram_0x00000000.config
-@@ -0,0 +1 @@
-+CONFIG_DRAM_BASE=0x00000000
+diff --git a/arch/arm/mach-stm32/board-dt.c b/arch/arm/mach-stm32/board-dt.c
+index f2ad772..ceee477 100644
+--- a/arch/arm/mach-stm32/board-dt.c
++++ b/arch/arm/mach-stm32/board-dt.c
+@@ -10,6 +10,7 @@
+ 
+ static const char *const stm32_compat[] __initconst = {
+ 	"st,stm32f429",
++	"st,stm32f469",
+ 	NULL
+ };
+ 
 -- 
 1.9.1
