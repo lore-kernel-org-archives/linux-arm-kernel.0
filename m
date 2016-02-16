@@ -1,36 +1,59 @@
-From: tchalamarla@caviumnetworks.com (Tirumalesh Chalamarla)
-Date: Tue, 16 Feb 2016 11:14:44 -0800
-Subject: [PATCH V2] AHCI: Workaround for ThunderX Errata#22536
-In-Reply-To: <20160216144250.GD31343@rric.localdomain>
-References: <1455319230-30201-1-git-send-email-tchalamarla@caviumnetworks.com>
- <20160214170152.GC3965@htj.duckdns.org> <56C147B2.9010303@caviumnetworks.com>
- <20160215183041.GH3965@htj.duckdns.org>
- <20160216144250.GD31343@rric.localdomain>
-Message-ID: <56C37524.5090000@caviumnetworks.com>
+From: Chris.Brandt@renesas.com (Chris Brandt)
+Date: Tue, 16 Feb 2016 19:18:51 +0000
+Subject: [PATCH v2] ARM: vmlinux-xip.lds: assert that ROM and RAM don't
+ overlap
+In-Reply-To: <1455278803-27679-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1455278803-27679-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <HK2PR06MB05619656241BFD0A9165B6C28AAD0@HK2PR06MB0561.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 12 Feb 2016, Ard Biesheuvel wrote:
 
+> When building an XIP kernel, the linker produces two disjoint VMA
+> regions, where the first is mapped onto ROM and the second onto RAM.
+> For this reason, the linker output pointer '.' is updated halfway
+> through the linker script, and set to a value that corresponds with
+> the start of the RAM region.
+> 
+> However, in some cases, the ROM region exceeds the expected size, and
+> the assignment of the output pointer results in a decrement rather than
+> an increment, causing the virtual addresses of the .data region to
+> clash with the .text region. Such a kernel cannot boot normally, but it
+> also confuses the hell out of kallsyms, since .data symbols may appear
+> inside the [_stext, _etext] or [_sinittext, _einittext] intervals in
+> the first pass, but not in the second (or vice versa), resulting in
+> inconsistent kallsyms data.
+> 
+> So let's make sure that the output pointer only advances, and never
+> jumps back into the ROM region.
+> 
+> Cc: Chris Brandt <Chris.Brandt@renesas.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+> v2: rebased onto the split off XIP linker script
+> 
+>  arch/arm/kernel/vmlinux-xip.lds.S | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/kernel/vmlinux-xip.lds.S b/arch/arm/kernel/vmlinux-xip.lds.S
+> index 40bc4cadb959..07c642cff50e 100644
+> --- a/arch/arm/kernel/vmlinux-xip.lds.S
+> +++ b/arch/arm/kernel/vmlinux-xip.lds.S
+> @@ -213,6 +213,7 @@ SECTIONS
+>  
+>  	_exiprom = .;			/* End of XIP ROM area */
+>  	__data_loc = ALIGN(4);		/* location in binary */
+> +	ASSERT(. < PAGE_OFFSET + TEXT_OFFSET, "XIP_KERNEL: ROM and RAM 
+> +overlap")
+>  	. = PAGE_OFFSET + TEXT_OFFSET;
+>  
+>  	.data : AT(__data_loc) {
+> --
+> 2.5.0
 
-On 02/16/2016 06:42 AM, Robert Richter wrote:
-> On 15.02.16 13:30:41, Tejun Heo wrote:
->> On Sun, Feb 14, 2016 at 07:36:18PM -0800, Tirumalesh Chalamarla wrote:
->>> There is no need for special Driver, AHCI is sufficient for ThunderX, the
->>> file only contains this interrupt handler,
->>> is it preferable if this interrupt handler in libahci.c with others, instead
->>> of separate file?
->>
->> Yeap, just fold it in ahci.c with surrounding #ifdef guard.
->
-> Yes, please use #ifdef CONFIG_CAVIUM_ERRATUM_22536 ... and add a
-> kconfig entry for this to arch/arm64/Kconfig.
->
-Are you sure, this is not a workaround that is based on alternative 
-framework rather on pci device and vendor
+This looks fine to me. I see no issues with it.
+Of course, this is for systems with a much tighter device memory layout than what I usually use.
 
-do you think CONFIG_ARCH_THUNDER a good alternative?
-
-
-
-> -Robert
->
+Chris
