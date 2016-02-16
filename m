@@ -1,129 +1,73 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 16 Feb 2016 15:56:57 +0100
-Subject: [PATCH 04/11] iommu: exynos: simplify master clock operations
+Date: Tue, 16 Feb 2016 15:57:02 +0100
+Subject: [PATCH 09/11] iommu: exynos: update device tree documentation
 In-Reply-To: <1455634624-18130-1-git-send-email-m.szyprowski@samsung.com>
 References: <1455634624-18130-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1455634624-18130-5-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1455634624-18130-10-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All clock API function can be called on NULL clock, so simplify code avoid
-checking of master clock presence.
+Exynos SYSMMU bindings documentation was merged before generic IOMMU
+binding have been introduced. This patch updates documentation to match
+current state.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/iommu/exynos-iommu.c | 32 ++++++++++++--------------------
- 1 file changed, 12 insertions(+), 20 deletions(-)
+ .../devicetree/bindings/iommu/samsung,sysmmu.txt      | 19 ++++++++-----------
+ 1 file changed, 8 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index 8c8a7f7..bf6b826 100644
---- a/drivers/iommu/exynos-iommu.c
-+++ b/drivers/iommu/exynos-iommu.c
-@@ -333,8 +333,7 @@ static irqreturn_t exynos_sysmmu_irq(int irq, void *dev_id)
+diff --git a/Documentation/devicetree/bindings/iommu/samsung,sysmmu.txt b/Documentation/devicetree/bindings/iommu/samsung,sysmmu.txt
+index bc620fe..f61ca25 100644
+--- a/Documentation/devicetree/bindings/iommu/samsung,sysmmu.txt
++++ b/Documentation/devicetree/bindings/iommu/samsung,sysmmu.txt
+@@ -23,28 +23,23 @@ MMUs.
+   for window 1, 2 and 3.
+ * M2M Scalers and G2D in Exynos5420 has one System MMU on the read channel and
+   the other System MMU on the write channel.
+-The drivers must consider how to handle those System MMUs. One of the idea is
+-to implement child devices or sub-devices which are the client devices of the
+-System MMU.
  
- 	spin_lock(&data->lock);
+-Note:
+-The current DT binding for the Exynos System MMU is incomplete.
+-The following properties can be removed or changed, if found incompatible with
+-the "Generic IOMMU Binding" support for attaching devices to the IOMMU.
++For information on assigning System MMU controller to its peripheral devices,
++see generic IOMMU bindings.
  
--	if (!IS_ERR(data->clk_master))
--		clk_enable(data->clk_master);
-+	clk_enable(data->clk_master);
+ Required properties:
+ - compatible: Should be "samsung,exynos-sysmmu"
+ - reg: A tuple of base address and size of System MMU registers.
++- #iommu-cells: Should be <0>.
+ - interrupt-parent: The phandle of the interrupt controller of System MMU
+ - interrupts: An interrupt specifier for interrupt signal of System MMU,
+ 	      according to the format defined by a particular interrupt
+ 	      controller.
+ - clock-names: Should be "sysmmu" if the System MMU is needed to gate its clock.
+ 	       Optional "master" if the clock to the System MMU is gated by
+-	       another gate clock other than "sysmmu".
+-	       Exynos4 SoCs, there needs no "master" clock.
+-	       Exynos5 SoCs, some System MMUs must have "master" clocks.
+-- clocks: Required if the System MMU is needed to gate its clock.
++	       another gate clock other than "sysmmu" (usually main gate clock
++	       of peripheral device this SYSMMU belongs to).
++- clocks: Phandles for respective clocks described by clock-names.
+ - power-domains: Required if the System MMU is needed to gate its power.
+ 	  Please refer to the following document:
+ 	  Documentation/devicetree/bindings/power/pd-samsung.txt
+@@ -57,6 +52,7 @@ Examples:
+ 		power-domains = <&pd_gsc>;
+ 		clocks = <&clock CLK_GSCL0>;
+ 		clock-names = "gscl";
++		iommus = <&sysmmu_gsc0>;
+ 	};
  
- 	itype = (enum exynos_sysmmu_inttype)
- 		__ffs(__raw_readl(data->sfrbase + REG_INT_STATUS));
-@@ -366,8 +365,7 @@ static irqreturn_t exynos_sysmmu_irq(int irq, void *dev_id)
- 
- 	sysmmu_unblock(data->sfrbase);
- 
--	if (!IS_ERR(data->clk_master))
--		clk_disable(data->clk_master);
-+	clk_disable(data->clk_master);
- 
- 	spin_unlock(&data->lock);
- 
-@@ -376,15 +374,13 @@ static irqreturn_t exynos_sysmmu_irq(int irq, void *dev_id)
- 
- static void __sysmmu_disable_nocount(struct sysmmu_drvdata *data)
- {
--	if (!IS_ERR(data->clk_master))
--		clk_enable(data->clk_master);
-+	clk_enable(data->clk_master);
- 
- 	__raw_writel(CTRL_DISABLE, data->sfrbase + REG_MMU_CTRL);
- 	__raw_writel(0, data->sfrbase + REG_MMU_CFG);
- 
- 	clk_disable(data->clk);
--	if (!IS_ERR(data->clk_master))
--		clk_disable(data->clk_master);
-+	clk_disable(data->clk_master);
- }
- 
- static bool __sysmmu_disable(struct sysmmu_drvdata *data)
-@@ -437,8 +433,7 @@ static void __sysmmu_init_config(struct sysmmu_drvdata *data)
- 
- static void __sysmmu_enable_nocount(struct sysmmu_drvdata *data)
- {
--	if (!IS_ERR(data->clk_master))
--		clk_enable(data->clk_master);
-+	clk_enable(data->clk_master);
- 	clk_enable(data->clk);
- 
- 	__raw_writel(CTRL_BLOCK, data->sfrbase + REG_MMU_CTRL);
-@@ -449,8 +444,7 @@ static void __sysmmu_enable_nocount(struct sysmmu_drvdata *data)
- 
- 	__raw_writel(CTRL_ENABLE, data->sfrbase + REG_MMU_CTRL);
- 
--	if (!IS_ERR(data->clk_master))
--		clk_disable(data->clk_master);
-+	clk_disable(data->clk_master);
- }
- 
- static int __sysmmu_enable(struct sysmmu_drvdata *data, phys_addr_t pgtable,
-@@ -493,16 +487,14 @@ static void sysmmu_tlb_invalidate_flpdcache(struct sysmmu_drvdata *data,
- {
- 	unsigned long flags;
- 
--	if (!IS_ERR(data->clk_master))
--		clk_enable(data->clk_master);
-+	clk_enable(data->clk_master);
- 
- 	spin_lock_irqsave(&data->lock, flags);
- 	if (is_sysmmu_active(data))
- 		__sysmmu_tlb_invalidate_flpdcache(data, iova);
- 	spin_unlock_irqrestore(&data->lock, flags);
- 
--	if (!IS_ERR(data->clk_master))
--		clk_disable(data->clk_master);
-+	clk_disable(data->clk_master);
- }
- 
- static void sysmmu_tlb_invalidate_entry(struct sysmmu_drvdata *data,
-@@ -514,8 +506,7 @@ static void sysmmu_tlb_invalidate_entry(struct sysmmu_drvdata *data,
- 	if (is_sysmmu_active(data)) {
- 		unsigned int num_inv = 1;
- 
--		if (!IS_ERR(data->clk_master))
--			clk_enable(data->clk_master);
-+		clk_enable(data->clk_master);
- 
- 		/*
- 		 * L2TLB invalidation required
-@@ -535,8 +526,7 @@ static void sysmmu_tlb_invalidate_entry(struct sysmmu_drvdata *data,
- 				data->sfrbase, iova, num_inv);
- 			sysmmu_unblock(data->sfrbase);
- 		}
--		if (!IS_ERR(data->clk_master))
--			clk_disable(data->clk_master);
-+		clk_disable(data->clk_master);
- 	} else {
- 		dev_dbg(data->master,
- 			"disabled. Skipping TLB invalidation @ %#x\n", iova);
-@@ -593,6 +583,8 @@ static int __init exynos_sysmmu_probe(struct platform_device *pdev)
- 			dev_err(dev, "Failed to prepare master's clk\n");
- 			return ret;
- 		}
-+	} else {
-+		data->clk_master = NULL;
- 	}
- 
- 	data->sysmmu = dev;
+ 	sysmmu_gsc0: sysmmu at 13E80000 {
+@@ -67,4 +63,5 @@ Examples:
+ 		clock-names = "sysmmu", "master";
+ 		clocks = <&clock CLK_SMMU_GSCL0>, <&clock CLK_GSCL0>;
+ 		power-domains = <&pd_gsc>;
++		#iommu-cells = <0>;
+ 	};
 -- 
 1.9.2
