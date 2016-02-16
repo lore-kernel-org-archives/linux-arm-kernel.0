@@ -1,59 +1,54 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Tue, 16 Feb 2016 11:36:44 -0800
-Subject: Writes, smp_wmb(), and transitivity?
-In-Reply-To: <CA+55aFxaQEvDrzecmZUQ5QfKzU4ei6E-+NpsW5hYp3ouaLP98g@mail.gmail.com>
-References: <20160215175825.GA15878@linux.vnet.ibm.com>
- <CA+55aFxaQEvDrzecmZUQ5QfKzU4ei6E-+NpsW5hYp3ouaLP98g@mail.gmail.com>
-Message-ID: <20160216193644.GV6719@linux.vnet.ibm.com>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Tue, 16 Feb 2016 11:38:59 -0800
+Subject: [PATCH V2] AHCI: Workaround for ThunderX Errata#22536
+In-Reply-To: <56C37524.5090000@caviumnetworks.com>
+References: <1455319230-30201-1-git-send-email-tchalamarla@caviumnetworks.com>
+ <20160214170152.GC3965@htj.duckdns.org> <56C147B2.9010303@caviumnetworks.com>
+ <20160215183041.GH3965@htj.duckdns.org>
+ <20160216144250.GD31343@rric.localdomain>
+ <56C37524.5090000@caviumnetworks.com>
+Message-ID: <56C37AD3.4030407@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 16, 2016 at 10:59:08AM -0800, Linus Torvalds wrote:
-> On Mon, Feb 15, 2016 at 9:58 AM, Paul E. McKenney
-> <paulmck@linux.vnet.ibm.com> wrote:
-> >
-> > Two threads:
-> >
-> >         int a, b;
-> >
-> >         void thread0(void)
-> >         {
-> >                 WRITE_ONCE(a, 1);
-> >                 smp_wmb();
-> >                 WRITE_ONCE(b, 2);
-> >         }
-> >
-> >         void thread1(void)
-> >         {
-> >                 WRITE_ONCE(b, 1);
-> >                 smp_wmb();
-> >                 WRITE_ONCE(a, 2);
-> >         }
-> >
-> >         /* After all threads have completed and the dust has settled... */
-> >
-> >         BUG_ON(a == 1 && b == 1);
-> 
-> So the more I look at that kind of litmus test, the less I think that
-> we should care, because I can't come up with a scenario in where that
-> kind of test makes sense. without even a possibility of any causal
-> relationship between the two, I can't say why we'd ever care about the
-> ordering of the (independent) writes to the individual variables.
-> 
-> If somebody can make up a causal chain, things differ. But as long as
-> all the CPU's are just doing locally ordered writes, I don't think we
-> need to care about a global store ordering.
+On 02/16/2016 11:14 AM, Tirumalesh Chalamarla wrote:
+>
+>
+> On 02/16/2016 06:42 AM, Robert Richter wrote:
+>> On 15.02.16 13:30:41, Tejun Heo wrote:
+>>> On Sun, Feb 14, 2016 at 07:36:18PM -0800, Tirumalesh Chalamarla wrote:
+>>>> There is no need for special Driver, AHCI is sufficient for
+>>>> ThunderX, the
+>>>> file only contains this interrupt handler,
+>>>> is it preferable if this interrupt handler in libahci.c with others,
+>>>> instead
+>>>> of separate file?
+>>>
+>>> Yeap, just fold it in ahci.c with surrounding #ifdef guard.
+>>
+>> Yes, please use #ifdef CONFIG_CAVIUM_ERRATUM_22536 ... and add a
+>> kconfig entry for this to arch/arm64/Kconfig.
+>>
+> Are you sure, this is not a workaround that is based on alternative
+> framework rather on pci device and vendor
+>
+> do you think CONFIG_ARCH_THUNDER a good alternative?
 
-Works for me!  (Yes, I can artificially generate a use case for this
-thing, but all the ones I have come up with have some better and more
-sane way to get the job done.  So I completely agree with your not caring
-about it.)
+No.  CONFIG_ARCH_THUNDER should be removed all together.
 
-So for transitivity, we focus on causal chains, where one task writes
-to some variable that the next task reads.
+Grouping a bunch of unrelated features under a single config variable 
+creates a very brittle system.  What are you going to do when a new 
+hardware revision is released?  Create CONFIG_ARCH_THUNDER2?  Which one 
+of these two would you select if building a kernel?  It is a choice that 
+we don't want to force users (kernel builders) to have to waste mental 
+energy on.
 
-In addition, if all threads use full memory barriers throughout, as in
-smp_mb(), then full ordering is of course provided regardless of the
-pattern of reads and writes.
+Instead, let's try to make things work out of the box without having to 
+set a bunch of random config variables.
 
-							Thanx, Paul
+If a generic arm64 kernel won't get too bloated, I would suggest just 
+enabling the compilation of the code unconditionally (at least for 
+arm64).  The use of the code would still be gated by the PCI version 
+probe that is part of the patch.
+
+David Daney
