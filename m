@@ -1,403 +1,94 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 16 Feb 2016 19:14:59 +0100
-Subject: [PATCH v4 09/12] arm64: dts: add the Marvell Armada 3700 family and a
- development board
-In-Reply-To: <1455646502-23834-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1455646502-23834-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1455646502-23834-10-git-send-email-gregory.clement@free-electrons.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 16 Feb 2016 10:38:09 -0800
+Subject: [PATCH] ARM: fix __start_rodata_section_aligned on XIP
+Message-ID: <20160216183809.GA26069@www.outflux.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add initial dtsi files to support Marvell Armada 3700 SoC with Cortex-A53
-CPUs. There are two members in this family: the Armada 3710 (Single CPU)
-and the Armada 3720 (Dual CPUs).
+This fixes the build for both allnoconfig (!CONFIG_MMU) and with
+XIP_KERNEL (due to missing pieces in the linker script), as seen after
+both "ARM: 8502/1: mm: mark section-aligned portion of rodata NX" and
+"ARM: 8513/1: xip: Move XIP linking to a separate file".
 
-It also adds a dts file for the Marvell Armada 3720 DB board.
-
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Reported-by: Russell King <linux@arm.linux.org.uk>
+Reported-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Kees Cook <keescook@chromium.org>
 ---
- arch/arm64/boot/dts/marvell/Makefile           |   4 +
- arch/arm64/boot/dts/marvell/armada-371x.dtsi   |  53 ++++++++++
- arch/arm64/boot/dts/marvell/armada-3720-db.dts |  86 ++++++++++++++++
- arch/arm64/boot/dts/marvell/armada-372x.dtsi   |  63 ++++++++++++
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi   | 131 +++++++++++++++++++++++++
- 5 files changed, 337 insertions(+)
- create mode 100644 arch/arm64/boot/dts/marvell/armada-371x.dtsi
- create mode 100644 arch/arm64/boot/dts/marvell/armada-3720-db.dts
- create mode 100644 arch/arm64/boot/dts/marvell/armada-372x.dtsi
- create mode 100644 arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+ arch/arm/kernel/vmlinux-xip.lds.S | 18 +++++++++++++++---
+ arch/arm/kernel/vmlinux.lds.S     |  4 ++++
+ 2 files changed, 19 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/marvell/Makefile b/arch/arm64/boot/dts/marvell/Makefile
-index 348f4db4f313..2114af8d312d 100644
---- a/arch/arm64/boot/dts/marvell/Makefile
-+++ b/arch/arm64/boot/dts/marvell/Makefile
-@@ -1,6 +1,10 @@
-+# Berlin SoC Family
- dtb-$(CONFIG_ARCH_BERLIN) += berlin4ct-dmp.dtb
- dtb-$(CONFIG_ARCH_BERLIN) += berlin4ct-stb.dtb
+diff --git a/arch/arm/kernel/vmlinux-xip.lds.S b/arch/arm/kernel/vmlinux-xip.lds.S
+index 40bc4cadb959..2da60cd1b295 100644
+--- a/arch/arm/kernel/vmlinux-xip.lds.S
++++ b/arch/arm/kernel/vmlinux-xip.lds.S
+@@ -8,9 +8,7 @@
+ #include <asm/thread_info.h>
+ #include <asm/memory.h>
+ #include <asm/page.h>
+-#ifdef CONFIG_DEBUG_RODATA
+ #include <asm/pgtable.h>
+-#endif
  
-+# Mvebu SoC Family
-+dtb-$(CONFIG_ARCH_MVEBU) += armada-3720-db.dtb
-+
- always		:= $(dtb-y)
- subdir-y	:= $(dts-dirs)
- clean-files	:= *.dtb
-diff --git a/arch/arm64/boot/dts/marvell/armada-371x.dtsi b/arch/arm64/boot/dts/marvell/armada-371x.dtsi
-new file mode 100644
-index 000000000000..c9e5325b8ac3
---- /dev/null
-+++ b/arch/arm64/boot/dts/marvell/armada-371x.dtsi
-@@ -0,0 +1,53 @@
-+/*
-+ * Device Tree Include file for Marvell Armada 371x family of SoCs
-+ * (also named 88F3710)
-+ *
-+ * Copyright (C) 2016 Marvell
-+ *
-+ * Gregory CLEMENT <gregory.clement@free-electrons.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
+ #define PROC_INFO							\
+ 	. = ALIGN(4);							\
+@@ -115,7 +113,7 @@ SECTIONS
+ 			ARM_CPU_KEEP(PROC_INFO)
+ 	}
+ 
+-#ifdef CONFIG_DEBUG_RODATA
++#ifdef CONFIG_DEBUG_ALIGN_RODATA
+ 	. = ALIGN(1<<SECTION_SHIFT);
+ #endif
+ 	RO_DATA(PAGE_SIZE)
+@@ -148,6 +146,9 @@ SECTIONS
+ 
+ 	NOTES
+ 
++#ifdef CONFIG_DEBUG_RODATA
++	. = ALIGN(1<<SECTION_SHIFT);
++#endif
+ 	_etext = .;			/* End of text and rodata section */
+ 
+ 	/*
+@@ -310,6 +311,17 @@ SECTIONS
+ }
+ 
+ /*
++ * Without CONFIG_DEBUG_ALIGN_RODATA, __start_rodata_section_aligned will
++ * be the first section-aligned location after __start_rodata. Otherwise,
++ * it will be equal to __start_rodata.
 + */
++#ifdef CONFIG_MMU
++__start_rodata_section_aligned = ALIGN(__start_rodata, 1 << SECTION_SHIFT);
++#else
++__start_rodata_section_aligned = __start_rodata;
++#endif
 +
-+#include "armada-37xx.dtsi"
-+
-+/ {
-+	model = "Marvell Armada 3710 SoC";
-+	compatible = "marvell,armada3710", "marvell,armada3700";
-+};
-diff --git a/arch/arm64/boot/dts/marvell/armada-3720-db.dts b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-new file mode 100644
-index 000000000000..359050154511
---- /dev/null
-+++ b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-@@ -0,0 +1,86 @@
 +/*
-+ * Device Tree file for Marvell Armada 3720 development board
-+ * (DB-88F3720-DDR3)
-+ * Copyright (C) 2016 Marvell
-+ *
-+ * Gregory CLEMENT <gregory.clement@free-electrons.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+
-+#include "armada-372x.dtsi"
-+
-+/ {
-+	model = "Marvell Armada 3720 Development Board DB-88F3720-DDR3";
-+	compatible = "marvell,armada-3720-db", "marvell,armada3720", "marvell,armada3710";
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x00000000 0x00000000 0x00000000 0x20000000>;
-+	};
-+
-+	soc {
-+		internal-regs {
-+			/*
-+			* Exported on the micro USB connector CON32
-+			* through an FTDI
-+			*/
-+			uart0: serial at 12000 {
-+				status = "okay";
-+			};
-+
-+			/* CON31 */
-+			usb3 at 58000 {
-+				status = "okay";
-+			};
-+
-+			/* CON3 */
-+			sata at e0000 {
-+			       status = "okay";
-+			};
-+		};
-+	};
-+};
-+
-diff --git a/arch/arm64/boot/dts/marvell/armada-372x.dtsi b/arch/arm64/boot/dts/marvell/armada-372x.dtsi
-new file mode 100644
-index 000000000000..f292a00ce97c
---- /dev/null
-+++ b/arch/arm64/boot/dts/marvell/armada-372x.dtsi
-@@ -0,0 +1,63 @@
-+/*
-+ * Device Tree Include file for Marvell Armada 372x family of SoCs
-+ * (also named 88F3720)
-+ *
-+ * Copyright (C) 2016 Marvell
-+ *
-+ * Gregory CLEMENT <gregory.clement@free-electrons.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+#include "armada-37xx.dtsi"
-+
-+/ {
-+	model = "Marvell Armada 3720 SoC";
-+	compatible = "marvell,armada3720", "marvell,armada3710";
-+
-+	cpus {
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53","arm,armv8";
-+			reg = <0x1>;
-+			enable-method = "psci";
-+		};
-+	};
-+
-+};
-diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-new file mode 100644
-index 000000000000..ba9df7ff2a72
---- /dev/null
-+++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-@@ -0,0 +1,131 @@
-+/*
-+ * Device Tree Include file for Marvell Armada 37xx family of SoCs.
-+ *
-+ * Copyright (C) 2016 Marvell
-+ *
-+ * Gregory CLEMENT <gregory.clement@free-electrons.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+
-+/ {
-+	model = "Marvell Armada 37xx SoC";
-+	compatible = "marvell,armada3700";
-+	interrupt-parent = <&gic>;
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0>;
-+			enable-method = "psci";
-+		};
-+	};
-+
-+	psci {
-+		compatible = "arm,psci-0.2";
-+		method = "smc";
-+	};
-+
-+	timer {
-+		compatible = "arm,armv8-timer";
-+		interrupts = <GIC_PPI 13
-+			(GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>,
-+			     <GIC_PPI 14
-+			(GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>,
-+			     <GIC_PPI 11
-+			(GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>,
-+			     <GIC_PPI 10
-+			(GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
-+	};
-+
-+	soc {
-+		compatible = "simple-bus";
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+
-+		internal-regs {
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			compatible = "simple-bus";
-+			/* 32M internal register @ 0xd000_0000 */
-+			ranges = <0x0 0x0 0xd0000000 0x2000000>;
-+
-+			uart0: serial at 12000 {
-+				compatible = "marvell,armada-3700-uart";
-+				reg = <0x12000 0x400>;
-+				interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
-+				status = "disabled";
-+			};
-+
-+			usb3 at 58000 {
-+				compatible = "generic-xhci";
-+				reg = <0x58000 0x4000>;
-+				interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
-+				status = "disabled";
-+			};
-+
-+			sata at e0000 {
-+				compatible = "marvell,armada-3700-ahci";
-+				reg = <0xe0000 0x2000>;
-+				interrupts = <GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>;
-+				status = "disabled";
-+			};
-+
-+			gic: interrupt-controller at 1d00000 {
-+				compatible = "arm,gic-v3";
-+				#interrupt-cells = <3>;
-+				interrupt-controller;
-+				reg = <0x1d00000 0x10000>, /* GICD */
-+				      <0x1d40000 0x40000>; /* GICR */
-+			};
-+		};
-+	};
-+};
+  * These must never be empty
+  * If you have to comment these two assert statements out, your
+  * binutils is too old (for other reasons as well)
+diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+index 1707b9431761..f13960e44955 100644
+--- a/arch/arm/kernel/vmlinux.lds.S
++++ b/arch/arm/kernel/vmlinux.lds.S
+@@ -328,7 +328,11 @@ SECTIONS
+  * be the first section-aligned location after __start_rodata. Otherwise,
+  * it will be equal to __start_rodata.
+  */
++#ifdef CONFIG_MMU
+ __start_rodata_section_aligned = ALIGN(__start_rodata, 1 << SECTION_SHIFT);
++#else
++__start_rodata_section_aligned = __start_rodata;
++#endif
+ 
+ /*
+  * These must never be empty
 -- 
-2.5.0
+2.6.3
+
+
+-- 
+Kees Cook
+Chrome OS & Brillo Security
