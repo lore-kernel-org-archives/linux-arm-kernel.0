@@ -1,106 +1,37 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 16 Feb 2016 15:11:22 +0000
-Subject: [PATCH] KVM: arm/arm64: vgic: ensure bitmaps are long enough
-In-Reply-To: <1455634051-1860-1-git-send-email-mark.rutland@arm.com>
-References: <1455634051-1860-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <56C33C1A.3090703@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 16 Feb 2016 15:12:53 +0000
+Subject: [PATCH v3 5/5] arm64/perf: Extend event mask for ARMv8.1
+In-Reply-To: <20160216080015.GA3490@hardcore>
+References: <cover.1454516082.git.jglauber@cavium.com>
+ <fa91eaedf581e6a7053899f25b1b08458dbd4b8e.1454516082.git.jglauber@cavium.com>
+ <20160215200404.GX6298@arm.com> <20160216080015.GA3490@hardcore>
+Message-ID: <20160216151252.GG14509@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/02/16 14:47, Mark Rutland wrote:
-> When we allocate bitmaps in vgic_vcpu_init_maps, we divide the number of
-> bits we need by 8 to figure out how many bytes to allocate. However,
-> bitmap elements are always accessed as unsigned longs, and if we didn't
-> happen to allocate a size such that size % sizeof(unsigned long) == 0,
-> bitmap accesses may go past the end of the allocation.
+On Tue, Feb 16, 2016 at 09:00:15AM +0100, Jan Glauber wrote:
+> On Mon, Feb 15, 2016 at 08:04:04PM +0000, Will Deacon wrote:
 > 
-> When using KASAN (which does byte-granular access checks), this results
-> in a continuous stream of BUGs whenever these bitmaps are accessed:
+> [...]
 > 
-> =============================================================================
-> BUG kmalloc-128 (Tainted: G    B          ): kasan: bad access detected
-> -----------------------------------------------------------------------------
+> > On Wed, Feb 03, 2016 at 06:12:00PM +0100, Jan Glauber wrote:
+> > > +		cpu_pmu->event_mask = 0xffff;	/* ARMv8.1 extended events */
+> > > +	else
+> > > +		cpu_pmu->event_mask = ARMV8_EVTYPE_EVENT;
+> > 
+> > ... although can't we just update ARMV8_EVTYPE_EVENT to be 0xffff now?
+> > AFAICT, that just eats into bits that used to be RES0, so we shouldn't
+> > see any problems. That should make your patch *much* simpler!
 > 
-> INFO: Allocated in vgic_init.part.25+0x55c/0x990 age=7493 cpu=3 pid=1730
-> INFO: Slab 0xffffffbde6d5da40 objects=16 used=15 fp=0xffffffc935769700 flags=0x4000000000000080
-> INFO: Object 0xffffffc935769500 @offset=1280 fp=0x          (null)
+> That would of course be easier, but I just can't assess the implications.
 > 
-> Bytes b4 ffffffc9357694f0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
-> Object ffffffc935769500: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
-> Object ffffffc935769510: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
-> Object ffffffc935769520: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
-> Object ffffffc935769530: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
-> Object ffffffc935769540: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
-> Object ffffffc935769550: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
-> Object ffffffc935769560: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
-> Object ffffffc935769570: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
-> Padding ffffffc9357695b0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
-> Padding ffffffc9357695c0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
-> Padding ffffffc9357695d0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
-> Padding ffffffc9357695e0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
-> Padding ffffffc9357695f0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
-> CPU: 3 PID: 1740 Comm: kvm-vcpu-0 Tainted: G    B           4.4.0+ #17
-> Hardware name: ARM Juno development board (r1) (DT)
-> Call trace:
-> [<ffffffc00008e770>] dump_backtrace+0x0/0x280
-> [<ffffffc00008ea04>] show_stack+0x14/0x20
-> [<ffffffc000726360>] dump_stack+0x100/0x188
-> [<ffffffc00030d324>] print_trailer+0xfc/0x168
-> [<ffffffc000312294>] object_err+0x3c/0x50
-> [<ffffffc0003140fc>] kasan_report_error+0x244/0x558
-> [<ffffffc000314548>] __asan_report_load8_noabort+0x48/0x50
-> [<ffffffc000745688>] __bitmap_or+0xc0/0xc8
-> [<ffffffc0000d9e44>] kvm_vgic_flush_hwstate+0x1bc/0x650
-> [<ffffffc0000c514c>] kvm_arch_vcpu_ioctl_run+0x2ec/0xa60
-> [<ffffffc0000b9a6c>] kvm_vcpu_ioctl+0x474/0xa68
-> [<ffffffc00036b7b0>] do_vfs_ioctl+0x5b8/0xcb0
-> [<ffffffc00036bf34>] SyS_ioctl+0x8c/0xa0
-> [<ffffffc000086cb0>] el0_svc_naked+0x24/0x28
-> Memory state around the buggy address:
->  ffffffc935769400: 00 00 fc fc fc fc fc fc fc fc fc fc fc fc fc fc
->  ffffffc935769480: fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc
->> ffffffc935769500: 04 fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc
->                    ^
->  ffffffc935769580: fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc
->  ffffffc935769600: 00 00 00 00 fc fc fc fc fc fc fc fc fc fc fc fc
-> ==================================================================
-> 
-> Fix the issue by always allocating a multiple of sizeof(unsigned long),
-> as we do elsewhere in the vgic code.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->  virt/kvm/arm/vgic.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index 7a2f449..5d10f10 100644
-> --- a/virt/kvm/arm/vgic.c
-> +++ b/virt/kvm/arm/vgic.c
-> @@ -1875,8 +1875,8 @@ void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu)
->  static int vgic_vcpu_init_maps(struct kvm_vcpu *vcpu, int nr_irqs)
->  {
->  	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-> -
-> -	int sz = (nr_irqs - VGIC_NR_PRIVATE_IRQS) / 8;
-> +	int nr_longs = BITS_TO_LONGS(nr_irqs - VGIC_NR_PRIVATE_IRQS);
-> +	int sz = nr_longs * sizeof(unsigned long);
->  	vgic_cpu->pending_shared = kzalloc(sz, GFP_KERNEL);
->  	vgic_cpu->active_shared = kzalloc(sz, GFP_KERNEL);
->  	vgic_cpu->pend_act_shared = kzalloc(sz, GFP_KERNEL);
-> 
+> Probably I'm missing something but to me it looks like the event mask is the
+> only verification we do for the user-space selectable events. Is it safe for
+> implementations that only support 0x3ff events to allow access to the
+> whole 0xffff range? What memory would be accessed for non-existing
+> events?
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Which memory? The worst-case is that we end up writing to some bits in
+a register (e.g. PMXEVTYPER) that are RES0 in ARMv8 afaict.
 
-Worth mentioning:
-
-Fixes: c1bfb577a ("arm/arm64: KVM: vgic: switch to dynamic allocation")
-Cc: stable at vger.kernel.org
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Will
