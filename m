@@ -1,45 +1,105 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 16 Feb 2016 19:14:58 +0100
-Subject: [PATCH v4 08/12] devicetree: bindings: add DT binding for the Marvell
- Armada 3700 SoC family
+Date: Tue, 16 Feb 2016 19:14:57 +0100
+Subject: [PATCH v4 07/12] Documentation: dt: Tidy up the Marvell related files
 In-Reply-To: <1455646502-23834-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1455646502-23834-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1455646502-23834-9-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1455646502-23834-8-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Marvell Armada 3700 is a family of ARMv8 CA53 SoCs. This commit
-introduces the Device Tree binding that documents the top-level
-compatible strings for Armada 3700 based platforms.
+Over the last releases we have added more and more Marvell related binding
+directly in the arm directory. It's time to have our proper directory
+inside it, and move all the files in it.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Acked-by: Rob Herring <robh@kernel.org>
 ---
- .../devicetree/bindings/arm/marvell/armada-37xx.txt      | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt
+ .../devicetree/bindings/arm/{ => marvell}/armada-370-xp-pmsu.txt          | 0
+ Documentation/devicetree/bindings/arm/{ => marvell}/armada-370-xp.txt     | 0
+ Documentation/devicetree/bindings/arm/{ => marvell}/armada-375.txt        | 0
+ .../devicetree/bindings/arm/{ => marvell}/armada-380-mpcore-soc-ctrl.txt  | 0
+ Documentation/devicetree/bindings/arm/{ => marvell}/armada-38x.txt        | 0
+ Documentation/devicetree/bindings/arm/{ => marvell}/armada-39x.txt        | 0
+ Documentation/devicetree/bindings/arm/{ => marvell}/armada-cpu-reset.txt  | 0
+ Documentation/devicetree/bindings/arm/{ => marvell}/coherency-fabric.txt  | 0
+ Documentation/devicetree/bindings/arm/{ => marvell}/kirkwood.txt          | 0
+ Documentation/devicetree/bindings/arm/{ => marvell}/marvell,berlin.txt    | 0
+ Documentation/devicetree/bindings/arm/{ => marvell}/marvell,dove.txt      | 0
+ Documentation/devicetree/bindings/arm/{ => marvell}/marvell,kirkwood.txt  | 0
+ Documentation/devicetree/bindings/arm/{ => marvell}/mvebu-cpu-config.txt  | 0
+ .../devicetree/bindings/arm/{ => marvell}/mvebu-system-controller.txt     | 0
+ 14 files changed, 0 insertions(+), 0 deletions(-)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/armada-370-xp-pmsu.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/armada-370-xp.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/armada-375.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/armada-380-mpcore-soc-ctrl.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/armada-38x.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/armada-39x.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/armada-cpu-reset.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/coherency-fabric.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/kirkwood.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/marvell,berlin.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/marvell,dove.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/marvell,kirkwood.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/mvebu-cpu-config.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/mvebu-system-controller.txt (100%)
 
-diff --git a/Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt b/Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt
-new file mode 100644
-index 000000000000..51336e5fc761
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt
-@@ -0,0 +1,16 @@
-+Marvell Armada 37xx Platforms Device Tree Bindings
-+--------------------------------------------------
-+
-+Boards using a SoC of the Marvell Armada 37xx family must carry the
-+following root node property:
-+
-+ - compatible: must contain "marvell,armada3710"
-+
-+In addition, boards using the Marvell Armada 3720 SoC shall have the
-+following property before the previous one:
-+
-+ - compatible: must contain "marvell,armada3720"
-+
-+Example:
-+
-+compatible = "marvell,armada-3720-db", "marvell,armada3720", "marvell,armada3710";
+diff --git a/Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt b/Documentation/devicetree/bindings/arm/marvell/armada-370-xp-pmsu.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt
+rename to Documentation/devicetree/bindings/arm/marvell/armada-370-xp-pmsu.txt
+diff --git a/Documentation/devicetree/bindings/arm/armada-370-xp.txt b/Documentation/devicetree/bindings/arm/marvell/armada-370-xp.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/arm/armada-370-xp.txt
+rename to Documentation/devicetree/bindings/arm/marvell/armada-370-xp.txt
+diff --git a/Documentation/devicetree/bindings/arm/armada-375.txt b/Documentation/devicetree/bindings/arm/marvell/armada-375.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/arm/armada-375.txt
+rename to Documentation/devicetree/bindings/arm/marvell/armada-375.txt
+diff --git a/Documentation/devicetree/bindings/arm/armada-380-mpcore-soc-ctrl.txt b/Documentation/devicetree/bindings/arm/marvell/armada-380-mpcore-soc-ctrl.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/arm/armada-380-mpcore-soc-ctrl.txt
+rename to Documentation/devicetree/bindings/arm/marvell/armada-380-mpcore-soc-ctrl.txt
+diff --git a/Documentation/devicetree/bindings/arm/armada-38x.txt b/Documentation/devicetree/bindings/arm/marvell/armada-38x.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/arm/armada-38x.txt
+rename to Documentation/devicetree/bindings/arm/marvell/armada-38x.txt
+diff --git a/Documentation/devicetree/bindings/arm/armada-39x.txt b/Documentation/devicetree/bindings/arm/marvell/armada-39x.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/arm/armada-39x.txt
+rename to Documentation/devicetree/bindings/arm/marvell/armada-39x.txt
+diff --git a/Documentation/devicetree/bindings/arm/armada-cpu-reset.txt b/Documentation/devicetree/bindings/arm/marvell/armada-cpu-reset.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/arm/armada-cpu-reset.txt
+rename to Documentation/devicetree/bindings/arm/marvell/armada-cpu-reset.txt
+diff --git a/Documentation/devicetree/bindings/arm/coherency-fabric.txt b/Documentation/devicetree/bindings/arm/marvell/coherency-fabric.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/arm/coherency-fabric.txt
+rename to Documentation/devicetree/bindings/arm/marvell/coherency-fabric.txt
+diff --git a/Documentation/devicetree/bindings/arm/kirkwood.txt b/Documentation/devicetree/bindings/arm/marvell/kirkwood.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/arm/kirkwood.txt
+rename to Documentation/devicetree/bindings/arm/marvell/kirkwood.txt
+diff --git a/Documentation/devicetree/bindings/arm/marvell,berlin.txt b/Documentation/devicetree/bindings/arm/marvell/marvell,berlin.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/arm/marvell,berlin.txt
+rename to Documentation/devicetree/bindings/arm/marvell/marvell,berlin.txt
+diff --git a/Documentation/devicetree/bindings/arm/marvell,dove.txt b/Documentation/devicetree/bindings/arm/marvell/marvell,dove.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/arm/marvell,dove.txt
+rename to Documentation/devicetree/bindings/arm/marvell/marvell,dove.txt
+diff --git a/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt b/Documentation/devicetree/bindings/arm/marvell/marvell,kirkwood.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
+rename to Documentation/devicetree/bindings/arm/marvell/marvell,kirkwood.txt
+diff --git a/Documentation/devicetree/bindings/arm/mvebu-cpu-config.txt b/Documentation/devicetree/bindings/arm/marvell/mvebu-cpu-config.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/arm/mvebu-cpu-config.txt
+rename to Documentation/devicetree/bindings/arm/marvell/mvebu-cpu-config.txt
+diff --git a/Documentation/devicetree/bindings/arm/mvebu-system-controller.txt b/Documentation/devicetree/bindings/arm/marvell/mvebu-system-controller.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/arm/mvebu-system-controller.txt
+rename to Documentation/devicetree/bindings/arm/marvell/mvebu-system-controller.txt
 -- 
 2.5.0
