@@ -1,83 +1,129 @@
-From: hansverk@cisco.com (Hans Verkuil)
-Date: Tue, 16 Feb 2016 14:48:31 +0100
-Subject: [PATCH v4 5/8] [Media] vcodec: mediatek: Add Mediatek V4L2 Video
- Encoder Driver
-In-Reply-To: <1455628805.19396.82.camel@mtksdaap41>
-References: <1454585703-42428-1-git-send-email-tiffany.lin@mediatek.com>
- <1454585703-42428-2-git-send-email-tiffany.lin@mediatek.com>
- <1454585703-42428-3-git-send-email-tiffany.lin@mediatek.com>
- <1454585703-42428-4-git-send-email-tiffany.lin@mediatek.com>
- <1454585703-42428-5-git-send-email-tiffany.lin@mediatek.com>
- <1454585703-42428-6-git-send-email-tiffany.lin@mediatek.com>
- <56C1B4AF.1030207@xs4all.nl> <1455604653.19396.68.camel@mtksdaap41>
- <56C2D371.9090805@xs4all.nl> <1455628805.19396.82.camel@mtksdaap41>
-Message-ID: <56C328AF.5030604@cisco.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Tue, 16 Feb 2016 14:53:30 +0100
+Subject: [PATCH V5 00/15] MMCONFIG refactoring and support for ARM64 PCI
+ hostbridge init based on ACPI
+Message-ID: <1455630825-27253-1-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tiffany,
+>From the functionality point of view this series might be split into the
+following logic parts:
+1. Make MMCONFIG code arch-agnostic which allows all architectures to collect
+   PCI config regions and used when necessary.
+2. Move non-arch specific bits to the core code.
+3. Use MMCONFIG code and implement generic ACPI based PCI host controller driver.
+4. Enable above driver on ARM64
 
->>>>> +int mtk_vcodec_enc_queue_init(void *priv, struct vb2_queue *src_vq,
->>>>> +			   struct vb2_queue *dst_vq)
->>>>> +{
->>>>> +	struct mtk_vcodec_ctx *ctx = priv;
->>>>> +	int ret;
->>>>> +
->>>>> +	src_vq->type		= V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE;
->>>>> +	src_vq->io_modes	= VB2_DMABUF | VB2_MMAP | VB2_USERPTR;
->>>>
->>>> I recomment dropping VB2_USERPTR. That only makes sense for scatter-gather dma,
->>>> and you use physically contiguous DMA.
->>>>
->>> Now our userspace app use VB2_USERPTR. I need to check if we could drop
->>> VB2_USERPTR.
->>> We use src_vq->mem_ops = &vb2_dma_contig_memops;
->>> And there are
->>> 	.get_userptr	= vb2_dc_get_userptr,
->>> 	.put_userptr	= vb2_dc_put_userptr,
->>> I was confused why it only make sense for scatter-gather.
->>> Could you kindly explain more?
->>
->> VB2_USERPTR indicates that the application can use malloc to allocate buffers
->> and pass those to the driver. Since malloc uses virtual memory the physical
->> memory is scattered all over. And the first page typically does not start at
->> the beginning of the page but at a random offset.
->>
->> To support that the DMA generally has to be able to do scatter-gather.
->>
->> Now, where things get ugly is that a hack was added to the USERPTR support where
->> apps could pass a pointer to physically contiguous memory as a user pointer. This
->> was a hack for embedded systems that preallocated a pool of buffers and needed to
->> pass those pointers around somehow. So the dma-contig USERPTR support is for that
->> 'feature'. If you try to pass a malloc()ed buffer to a dma-contig driver it will
->> reject it. One big problem is that this specific hack isn't signaled anywhere, so
->> applications have no way of knowing if the USERPTR support is the proper version
->> or the hack where physically contiguous memory is expected.
->>
->> This hack has been replaced with DMABUF which is the proper way of passing buffers
->> around.
->>
->> New dma-contig drivers should not use that old hack anymore. Use dmabuf to pass
->> external buffers around.
->>
->> How do you use it in your app? With malloc()ed buffers? Or with 'special' pointers
->> to physically contiguous buffers?
->>
-> Understood now. Thanks for your explanation.
-> Now our app use malloc()ed buffers and we hook vb2_dma_contig_memops. 
-> I don't know why that dma-contig driver do not reject it.
-> I will try to figure it out.
+Patches has been built on top of 4.5-rc3 and can be found here:
+git at github.com:semihalf-nowicki-tomasz/linux.git (pci-acpi-v5)
 
-Is there an iommu involved that turns the scatter-gather list into what looks like
-contiguous memory for the DMA?
+NOTE, this patch set depends on Lorenzo's fixes:
+https://patchwork.ozlabs.org/patch/576450/
+which can be found in pci-acpi-v5 branch.
 
-At the end of vb2_dc_get_userptr() in videobuf2-dma-contig.c there is a check
-'if (contig_size < size)' that verifies that the sg DMA is contiguous. This would
-work if there is an iommu involved (if I understand it correctly).
+This has been tested on Cavium ThunderX server, JunoR2, HP RX2660 IA64, x86,
+Hip05, X-Gene and QEMU-aarch64. Any help in reviewing and testing is very appreciated.
 
-If that's the case, then it's OK to keep VB2_USERPTR because you have real sg
-support (although not via the DMA engine, but via iommu mappings).
+v4 -> v5
+- dropped MCFG refactoring group patches 1-6 from series v4 and integrated Jayachandran's patch
+  https://patchwork.ozlabs.org/patch/575525/
+- rewrite PCI legacy IRQs allocation
+- squashed two patches 11 and 12 from series v4, fixed bisection issue
+- changelog improvements
+- rebased to 4.5-rc3
 
-Regards,
+v3 -> v4
+- dropped Jiang's fix http://lkml.iu.edu/hypermail/linux/kernel/1601.1/04318.html
+- added Lorenzo's fix patch 19/24
+- ACPI PCI bus domain number assigning cleanup
+- changed resource management, we now claim and reassign resources
+- improvements for applying quirks
+- dropped Matthew's http://www.spinics.net/lists/linux-pci/msg45950.html dependency
+- rebased to 4.5-rc1
 
-	Hans
+v2 -> v3
+- fix legacy IRQ assigning and IO ports registration
+- remove reference to arch specific companion device for ia64
+- move ACPI PCI host controller driver to pci_root.c
+- drop generic domain assignment for x86 and ia64 as I am not
+  able to run all necessary test variants
+- drop patch which cleaned legacy IRQ assignment since it belongs to
+  Mathew's series:
+  https://patchwork.ozlabs.org/patch/557504/
+- extend MCFG quirk code
+- rebased to 4.4
+
+v1 -> v2
+- moved non-arch specific piece of code to dirver/acpi/ directory
+- fixed IO resource handling
+- introduced PCI config accessors quirks matching
+- moved ACPI_COMPANION_SET to generic code
+
+v1 - https://lkml.org/lkml/2015/10/27/504
+v2 - https://lkml.org/lkml/2015/12/16/246
+v3 - http://lkml.iu.edu/hypermail/linux/kernel/1601.1/04308.html
+v4 - https://lkml.org/lkml/2016/2/4/646
+
+Jayachandran C (1):
+  ACPI: MCFG: Move mmcfg_list management to drivers/acpi
+
+Lorenzo Pieralisi (1):
+  drivers: pci: add generic code to claim bus resources
+
+Tomasz Nowicki (13):
+  acpi, pci, mcfg: Provide default RAW ACPI PCI config space accessors.
+  arm64, acpi: Use MCFG library and empty PCI config space accessors
+    from pci_mcfg.c file.
+  pci, acpi, ecam: Add flag to indicate whether ECAM region was hot
+    added or not.
+  x86, pci: Cleanup platform specific MCFG data by using ECAM hot_added
+    flag.
+  pci, acpi, x86, ia64: Move ACPI host bridge device companion
+    assignment to core code.
+  pci, acpi: Provide generic way to assign bus domain number.
+  x86, ia64: Include acpi_pci_{add|remove}_bus to the default
+    pcibios_{add|remove}_bus implementation.
+  acpi, mcfg: Add default PCI config accessors implementation and
+    initial support for related quirks.
+  pci, of: Move the PCI I/O space management to PCI core code.
+  pci, acpi: Support for ACPI based generic PCI host controller
+    initialization
+  pci, acpi: Match PCI config space accessors against platfrom specific
+    quirks.
+  arm64, pci, acpi: Assign legacy IRQs once device is enable.
+  arm64, pci, acpi: Start using ACPI based PCI host bridge driver for
+    ARM64.
+
+ arch/arm64/Kconfig                 |   5 +
+ arch/arm64/kernel/pci.c            |  35 +---
+ arch/ia64/hp/common/sba_iommu.c    |   2 +-
+ arch/ia64/include/asm/pci.h        |   1 -
+ arch/ia64/pci/pci.c                |  26 ---
+ arch/ia64/sn/kernel/io_acpi_init.c |   4 +-
+ arch/x86/include/asm/pci.h         |   3 -
+ arch/x86/include/asm/pci_x86.h     |  24 +--
+ arch/x86/pci/acpi.c                |  47 +----
+ arch/x86/pci/common.c              |  10 -
+ arch/x86/pci/mmconfig-shared.c     | 269 ++++---------------------
+ arch/x86/pci/mmconfig_32.c         |   1 +
+ arch/x86/pci/mmconfig_64.c         |   1 +
+ arch/x86/pci/numachip.c            |   1 +
+ drivers/acpi/Kconfig               |   7 +
+ drivers/acpi/Makefile              |   1 +
+ drivers/acpi/pci_mcfg.c            | 392 +++++++++++++++++++++++++++++++++++++
+ drivers/acpi/pci_root.c            | 154 ++++++++++++++-
+ drivers/of/address.c               | 116 +----------
+ drivers/pci/pci.c                  | 126 +++++++++++-
+ drivers/pci/probe.c                |   5 +
+ drivers/pci/setup-bus.c            |  63 ++++++
+ drivers/xen/pci.c                  |   5 +-
+ include/acpi/acpi_bus.h            |   1 +
+ include/asm-generic/vmlinux.lds.h  |   7 +
+ include/linux/of_address.h         |   9 -
+ include/linux/pci-acpi.h           |  68 +++++++
+ include/linux/pci.h                |   6 +
+ 28 files changed, 892 insertions(+), 497 deletions(-)
+ create mode 100644 drivers/acpi/pci_mcfg.c
+
+-- 
+1.9.1
