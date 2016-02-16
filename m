@@ -1,41 +1,51 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 16 Feb 2016 17:44:15 +0100
-Subject: [PATCH v2] sound: hdmi: avoid dereferencing uninitialized 'jack'
- pointer
-Message-ID: <1455641066-4014858-1-git-send-email-arnd@arndb.de>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Tue, 16 Feb 2016 16:55:42 +0000
+Subject: [PATCH v2] xen kconfig: don't "select INPUT_XEN_KBDDEV_FRONTEND"
+In-Reply-To: <2479546.WgivMO2bp2@wuerfel>
+References: <1455278707-2008263-1-git-send-email-arnd@arndb.de>
+ <56C20552.8030305@citrix.com>
+ <alpine.DEB.2.02.1602151708110.27008@kaball.uk.xensource.com>
+ <2479546.WgivMO2bp2@wuerfel>
+Message-ID: <alpine.DEB.2.02.1602161655350.27008@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_SND_JACK is disabled, the hdmi driver tries to create
-a new output jack structure and dereferences it even though
-the pointer is never assigned:
+On Tue, 16 Feb 2016, Arnd Bergmann wrote:
+> The Xen framebuffer driver selects the xen keyboard driver, so the latter
+> will be built-in if XEN_FBDEV_FRONTEND=y. However, when CONFIG_INPUT
+> is a loadable module, this configuration cannot work. On mainline kernels,
+> the symbol will be enabled but not used, while in combination with
+> a patch I have to detect such useless configurations, we get the
+> expected link failure:
+> 
+> drivers/input/built-in.o: In function `xenkbd_remove':
+> xen-kbdfront.c:(.text+0x2f0): undefined reference to `input_unregister_device'
+> xen-kbdfront.c:(.text+0x30e): undefined reference to `input_unregister_device'
+> 
+> This removes the extra "select", as it just causes more trouble than
+> it helps. In theory, some defconfig file might break if it has
+> XEN_FBDEV_FRONTEND in it but not INPUT_XEN_KBDDEV_FRONTEND. The Kconfig
+> fragment we ship in the kernel (kernel/configs/xen.config) however
+> already enables both, and anyone using an old .config file would
+> keep having both enabled.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Suggested-by: David Vrabel <david.vrabel@citrix.com>
+> Fixes: 36c1132e34bd ("xen kconfig: fix select INPUT_XEN_KBDDEV_FRONTEND")
 
-sound/pci/hda/patch_hdmi.c: In function 'generic_hdmi_build_jack':
-sound/pci/hda/patch_hdmi.c:2534:30: error: 'jack' may be used uninitialized in this function [-Werror=maybe-uninitialized]
-sound/pci/hda/patch_hdmi.c:2526:19: note: 'jack' was declared here
+Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
-This makes snd_jack_new() return an error when SND_JACK is disabled,
-forcing all users to handle errors gracefully and avoiding the
-problem in all callers that correctly check the return code.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 788d441a164c ("ALSA: hda - Use component ops for i915 HDMI/DP audio jack handling")
----
- include/sound/jack.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/include/sound/jack.h b/include/sound/jack.h
-index 23bede121c78..1e84a2e413f8 100644
---- a/include/sound/jack.h
-+++ b/include/sound/jack.h
-@@ -99,7 +99,7 @@ void snd_jack_report(struct snd_jack *jack, int status);
- static inline int snd_jack_new(struct snd_card *card, const char *id, int type,
- 			       struct snd_jack **jack, bool initial_kctl, bool phantom_jack)
- {
--	return 0;
-+	return -ENXIO;
- }
- 
- static inline int snd_jack_add_new_kctl(struct snd_jack *jack, const char * name, int mask)
--- 
-2.7.0
+> diff --git a/drivers/video/fbdev/Kconfig b/drivers/video/fbdev/Kconfig
+> index 8ea45a5cd806..d889ef2048df 100644
+> --- a/drivers/video/fbdev/Kconfig
+> +++ b/drivers/video/fbdev/Kconfig
+> @@ -2246,7 +2246,6 @@ config XEN_FBDEV_FRONTEND
+>  	select FB_SYS_IMAGEBLIT
+>  	select FB_SYS_FOPS
+>  	select FB_DEFERRED_IO
+> -	select INPUT_XEN_KBDDEV_FRONTEND if INPUT_MISC
+>  	select XEN_XENBUS_FRONTEND
+>  	default y
+>  	help
+> 
