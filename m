@@ -1,38 +1,67 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 16 Feb 2016 22:35:14 +0100
-Subject: [PATCH v4 03/12] serial: mvebu-uart: initial support for
- Armada-3700 serial port
-In-Reply-To: <20160216222706.6b1d3375@free-electrons.com>
-References: <1455646502-23834-1-git-send-email-gregory.clement@free-electrons.com>
- <3647094.zzYms58VAY@wuerfel> <20160216222706.6b1d3375@free-electrons.com>
-Message-ID: <2634634.yW5ZfZDXSz@wuerfel>
+From: david.brown@linaro.org (David Brown)
+Date: Tue, 16 Feb 2016 14:36:59 -0700
+Subject: [PATCH] ARM: vdso: Mark vDSO code as read-only
+In-Reply-To: <1453226922-16831-1-git-send-email-keescook@chromium.org>
+References: <1453226922-16831-1-git-send-email-keescook@chromium.org>
+Message-ID: <20160216213659.GA47194@davidb.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 16 February 2016 22:27:06 Thomas Petazzoni wrote:
-> Arnd,
-> 
-> On Tue, 16 Feb 2016 22:20:51 +0100, Arnd Bergmann wrote:
-> 
-> > > +config SERIAL_MVEBU_CONSOLE
-> > > +       bool "Console on Marvell EBU serial port"
-> > > +       depends on SERIAL_MVEBU_UART
-> > 
-> > then this one must become
-> > 
-> >       depends on SERIAL_MVEBU_UART
-> > 
-> > so it does not get enabled if the driver is not builtin.
-> 
-> Hm, what's the different between "depends on SERIAL_MVEBU_UART" and
-> "depends on SERIAL_MVEBU_UART" ? Is it the late time that causes my
-> eyes to misunderstand what you mean, or some typo on your side ? 
-> 
+Although the arm vDSO is cleanly separated by code/data with the code
+being read-only in userspace mappings, the code page is still writable
+from the kernel.  There have been exploits (such as
+http://itszn.com/blog/?p=21) that take advantage of this on x86 to go
+from a bad kernel write to full root.
 
+Prevent this specific exploit on arm by putting the vDSO code page in
+post-init read-only memory as well.
 
-typo: I meant
+Before:
+vdso: 1 text pages at base 80927000
+root at Vexpress:/ cat /sys/kernel/debug/kernel_page_tables
+---[ Modules ]---
+---[ Kernel Mapping ]---
+0x80000000-0x80100000           1M     RW NX SHD
+0x80100000-0x80600000           5M     ro x  SHD
+0x80600000-0x80800000           2M     ro NX SHD
+0x80800000-0xbe000000         984M     RW NX SHD
 
-	depends on SERIAL_MVEBU_UART=y
+After:
+vdso: 1 text pages at base 8072b000
+root at Vexpress:/ cat /sys/kernel/debug/kernel_page_tables
+---[ Modules ]---
+---[ Kernel Mapping ]---
+0x80000000-0x80100000           1M     RW NX SHD
+0x80100000-0x80600000           5M     ro x  SHD
+0x80600000-0x80800000           2M     ro NX SHD
+0x80800000-0xbe000000         984M     RW NX SHD
 
+Inspired by https://lkml.org/lkml/2016/1/19/494 based on work by the
+PaX Team, Brad Spengler, and Kees Cook.
 
-	Arnd
+Signed-off-by: David Brown <david.brown@linaro.org>
+---
+This patch depends on Kees Cook's series
+https://lkml.org/lkml/2016/1/19/497 which adds the ro_after_init
+section.
+
+ arch/arm/vdso/vdso.S | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/arch/arm/vdso/vdso.S b/arch/arm/vdso/vdso.S
+index b2b97e3..a62a7b6 100644
+--- a/arch/arm/vdso/vdso.S
++++ b/arch/arm/vdso/vdso.S
+@@ -23,9 +23,8 @@
+ #include <linux/const.h>
+ #include <asm/page.h>
+ 
+-	__PAGE_ALIGNED_DATA
+-
+ 	.globl vdso_start, vdso_end
++	.section .data..ro_after_init
+ 	.balign PAGE_SIZE
+ vdso_start:
+ 	.incbin "arch/arm/vdso/vdso.so"
+-- 
+2.7.1
