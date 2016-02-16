@@ -1,112 +1,142 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 16 Feb 2016 12:43:40 +0000
-Subject: [PATCH v3 1/8] iommu: Add MMIO mapping type
-In-Reply-To: <20160216120626.GA26710@bigcity.dyn.berto.se>
-References: <1455065878-11906-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
- <1455065878-11906-2-git-send-email-niklas.soderlund+renesas@ragnatech.se>
- <13740597.5lZXKsEG19@avalon> <56BCAF66.8010206@arm.com>
- <20160216120626.GA26710@bigcity.dyn.berto.se>
-Message-ID: <56C3197C.8090903@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 16 Feb 2016 13:52:31 +0100
+Subject: [PATCH v6sub1 00/11] arm64: split linear and kernel mappings
+Message-ID: <1455627162-31600-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/02/16 12:06, Niklas S?derlund wrote:
-> Hi Robin,
->
-> Thanks for your update patch I will include it in my next version. But
-> I'm sorry I do not understand, is your modification an addition or a
-> substitution to your original patch?
+At the request of Catalin, this series has been split off from my series
+'arm64: implement support for KASLR v4' [1]. This sub-series deals with
+moving the kernel out of the linear mapping into the vmalloc area. This
+is a prerequisite for independent physical and virtual randomization of
+the kernel image. On top of that, considering that these changes allow
+the linear mapping to start at an arbitrary offset above PAGE_OFFSET, it
+should be an improvement in itself due to the fact that we can now choose
+PAGE_OFFSET such that RAM can be mapped using large block sizes.
 
-Apologies for being confusing - that was a diff on top of the existing 
-patch, to be folded in. My original patch was only handling IOMMU_MMIO 
-for stage 2 PTEs, so we also need the extra code to handle the different 
-way of setting the appropriate memory type in stage 1 PTEs.
+For instance, on my Seattle A0 box, the kernel is loaded 16 MB into the
+lowest GB of RAM, which means __pa(PAGE_OFFSET) is not 1 GB aligned, and
+the entire 16 GB of RAM will be mapped using 2 MB blocks. (Similarly,
+for 64 KB granule kernels, the entire 16 GB of RAM will be mapped using
+pages since __pa(PAGE_OFFSET) is not 512 MB aligned). With these changes
+ __pa(PAGE_OFFSET) will always be chosen such that it is aligned to a
+quantity that allows efficient mapping.
 
-Robin.
+Note that of the entire KASLR series, this sub-series is the most likely to
+cause problems, and hence requires the most careful review and testing. This
+is due to the fact that, with these changes, the invariant __va(__pa(x)) == x
+no longer holds, and any code that is based on that assumption needs to be
+updated.
 
-> * Robin Murphy <robin.murphy@arm.com> [2016-02-11 15:57:26 +0000]:
->
->> On 11/02/16 00:02, Laurent Pinchart wrote:
->>> Hi Niklas,
->>>
->>> Thank you for the patch.
->>>
->>> On Wednesday 10 February 2016 01:57:51 Niklas S?derlund wrote:
->>>> From: Robin Murphy <robin.murphy@arm.com>
->>>>
->>>> On some platforms, MMIO regions might need slightly different treatment
->>>> compared to mapping regular memory; add the notion of MMIO mappings to
->>>> the IOMMU API's memory type flags, so that callers can let the IOMMU
->>>> drivers know to do the right thing.
->>>>
->>>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->>>> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
->>>
->>> Answering the question from the cover letter, yes, it's totally fine to pick
->>> the ack, that's actually expected.
->>>
->>>> ---
->>>>   drivers/iommu/io-pgtable-arm.c | 4 +++-
->>>>   include/linux/iommu.h          | 1 +
->>>
->>> You might be asked to split this patch in two.
->>
->> Worse than that, you might also be asked to fix it up when the silly author
->> remembers that he did this on a stage-2-only ARM SMMU, and the attributes
->> for the stage 1 tables that the IPMMU uses are in a different code path:
->>
->> --->8---
->> diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
->> index 5b5c299..7622c6e 100644
->> --- a/drivers/iommu/io-pgtable-arm.c
->> +++ b/drivers/iommu/io-pgtable-arm.c
->> @@ -354,7 +354,10 @@ static arm_lpae_iopte arm_lpae_prot_to_pte(struct
->> arm_lpae_io_pgtable *data,
->>                  if (!(prot & IOMMU_WRITE) && (prot & IOMMU_READ))
->>                          pte |= ARM_LPAE_PTE_AP_RDONLY;
->>
->> -               if (prot & IOMMU_CACHE)
->> +               if (prot & IOMMU_MMIO)
->> +                       pte |= (ARM_LPAE_MAIR_ATTR_IDX_DEV
->> +                               << ARM_LPAE_PTE_ATTRINDX_SHIFT);
->> +               else if (prot & IOMMU_CACHE)
->>                          pte |= (ARM_LPAE_MAIR_ATTR_IDX_CACHE
->>                                  << ARM_LPAE_PTE_ATTRINDX_SHIFT);
->>          } else {
->> --->8---
->>
->> Sorry for the bother,
->> Robin.
->>
->>>>   2 files changed, 4 insertions(+), 1 deletion(-)
->>>>
->>>> diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
->>>> index 381ca5a..3ff4f87 100644
->>>> --- a/drivers/iommu/io-pgtable-arm.c
->>>> +++ b/drivers/iommu/io-pgtable-arm.c
->>>> @@ -364,7 +364,9 @@ static arm_lpae_iopte arm_lpae_prot_to_pte(struct
->>>> arm_lpae_io_pgtable *data, pte |= ARM_LPAE_PTE_HAP_READ;
->>>>   		if (prot & IOMMU_WRITE)
->>>>   			pte |= ARM_LPAE_PTE_HAP_WRITE;
->>>> -		if (prot & IOMMU_CACHE)
->>>> +		if (prot & IOMMU_MMIO)
->>>> +			pte |= ARM_LPAE_PTE_MEMATTR_DEV;
->>>> +		else if (prot & IOMMU_CACHE)
->>>>   			pte |= ARM_LPAE_PTE_MEMATTR_OIWB;
->>>>   		else
->>>>   			pte |= ARM_LPAE_PTE_MEMATTR_NC;
->>>> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
->>>> index a5c539f..34b6432 100644
->>>> --- a/include/linux/iommu.h
->>>> +++ b/include/linux/iommu.h
->>>> @@ -30,6 +30,7 @@
->>>>   #define IOMMU_WRITE	(1 << 1)
->>>>   #define IOMMU_CACHE	(1 << 2) /* DMA cache coherency */
->>>>   #define IOMMU_NOEXEC	(1 << 3)
->>>> +#define IOMMU_MMIO	(1 << 4) /* e.g. things like MSI doorbells */
->>>>
->>>>   struct iommu_ops;
->>>>   struct iommu_group;
->>>
->>
->
+The complete series can be found here:
+https://git.linaro.org/people/ard.biesheuvel/linux-arm.git/shortlog/refs/heads/arm64-kaslr-v6
+
+Changes since v5 [2]:
+- fixed an initrd issue, where __va() was called by the generic early FDT code
+  before memstart_addr is assigned (#2, #10)
+- add patch #3 to fix a circular header dependency so we can use BUG_ON in
+  asm/memory.h
+- BUG() if __va() is called before memstart_addr is assigned (#11)
+- fix a (transient) issue with GCC 4.9 or older in the KVM ksym ref patch  (#8)
+  that affects bisectability (the actual issue surfaces after applying patch #9
+  and disappears again with patch #11)
+- fix a KASAN problem in the previous version of patch #9, where the shadow
+  region of the module area was inadvertently populated with KASAN zero pages;
+  this fixes at least one of the reported KASAN related issues with this series
+- folded __maybe_unused change into patch #9
+- folded change to memblock_add() back the entire kernel image instead of only
+  the init and data segments after clipping for mem=
+- map the linear alias of [_stext, _etext] as read-only/non-executable so its
+  contents are visible to subsystems like hibernate in the expected place (#9)
+- folded patch that removed clip_memory_range() and reverted to the generic
+  memblock_enforce_memory_limit() (#11)
+
+Changes since v4:
+- added Marc's ack to patch #6
+- round the kasan zero shadow region around the kernel image to swapper block
+  size (#7)
+- ensure that we don't clip the kernel image when clipping RAM to the linear
+  region size (#8)
+
+Patch #1 allows the low mark of memblocks discovered from the FDT to be
+overridden by the architecture.
+
+Patch #2 allows the assignment of initrd_start and initrd_end in generic early
+FDT code to be overridden by architecture code.
+
+Patch #3 reverses the #include dependencies between asm/bug.h and another
+header file so that asm/bug.h can be included (and used) in asm/memory.h
+
+Patch #4 enables the huge-vmap generic feature for arm64. This should be an
+improvement in itself, but the significance for this series is that it allows
+unmap_kernel_range() to be called on the [__init_begin, __init_end) region,
+which may be partially mapped using block mappings.
+
+Patch #5 introduces KIMAGE_VADDR as a separate, preparatory step towards
+decoupling the kernel placement from PAGE_OFFSET
+
+Patch #6 implements some translation table accessors that operate on statically
+allocate translation tables before the linear mapping is up.
+
+Patch #7 decouples the fixmap initialization from the linear mapping, by using
+the accessors implemented by patch #6
+
+Patch #8 removes assumptions made my KVM regarding the placement of the kernel
+image inside the linear mapping.
+
+Patch #9 moves the kernel image from the base of the linear mapping to the base
+of the vmalloc area. The modules area, which sits right below the kernel image,
+is moved along and is put right before the start of the vmalloc area.
+
+Patch #10 defers the __va translation of the initrd to after the assignment of
+memstart_addr.
+
+Patch #11 decouples PHYS_OFFSET from PAGE_OFFSET, which allows the linear
+mapping to cover all discovered memory, regardless of where the kernel image is
+located in it. This effectively allows the kernel to be loaded at any physical
+address (provided that the correct alignment is used)
+
+[1] http://thread.gmane.org/gmane.linux.kernel/2135931
+[2] http://thread.gmane.org/gmane.linux.ports.arm.kernel/473894
+
+Ard Biesheuvel (11):
+  of/fdt: make memblock minimum physical address arch configurable
+  of/fdt: factor out assignment of initrd_start/initrd_end
+  arm64: prevent potential circular header dependencies in asm/bug.h
+  arm64: add support for ioremap() block mappings
+  arm64: introduce KIMAGE_VADDR as the virtual base of the kernel region
+  arm64: pgtable: implement static [pte|pmd|pud]_offset variants
+  arm64: decouple early fixmap init from linear mapping
+  arm64: kvm: deal with kernel symbols outside of linear mapping
+  arm64: move kernel image to base of vmalloc area
+  arm64: defer __va translation of initrd_start and initrd_end
+  arm64: allow kernel Image to be loaded anywhere in physical memory
+
+ Documentation/arm64/booting.txt                      |  20 ++-
+ Documentation/features/vm/huge-vmap/arch-support.txt |   2 +-
+ arch/arm/include/asm/kvm_asm.h                       |   2 +
+ arch/arm/kvm/arm.c                                   |   8 +-
+ arch/arm64/Kconfig                                   |   1 +
+ arch/arm64/include/asm/boot.h                        |   6 +
+ arch/arm64/include/asm/bug.h                         |   2 +-
+ arch/arm64/include/asm/debug-monitors.h              |   2 +-
+ arch/arm64/include/asm/kasan.h                       |   2 +-
+ arch/arm64/include/asm/kernel-pgtable.h              |  12 ++
+ arch/arm64/include/asm/kvm_asm.h                     |   2 +
+ arch/arm64/include/asm/kvm_host.h                    |   8 +-
+ arch/arm64/include/asm/memory.h                      |  55 +++++--
+ arch/arm64/include/asm/pgtable.h                     |  23 ++-
+ arch/arm64/kernel/head.S                             |   8 +-
+ arch/arm64/kernel/image.h                            |  13 +-
+ arch/arm64/kernel/vmlinux.lds.S                      |   4 +-
+ arch/arm64/kvm/hyp.S                                 |   6 +-
+ arch/arm64/kvm/hyp/debug-sr.c                        |   1 +
+ arch/arm64/mm/dump.c                                 |  12 +-
+ arch/arm64/mm/init.c                                 |  99 ++++++++++--
+ arch/arm64/mm/kasan_init.c                           |  27 +++-
+ arch/arm64/mm/mmu.c                                  | 168 +++++++++++++++-----
+ drivers/of/fdt.c                                     |  19 ++-
+ 24 files changed, 381 insertions(+), 121 deletions(-)
+
+-- 
+2.5.0
