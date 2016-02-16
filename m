@@ -1,148 +1,50 @@
-From: songjun.wu@atmel.com (Wu, Songjun)
-Date: Tue, 16 Feb 2016 10:54:21 +0800
-Subject: [PATCH] ASoC: atmel_ssc_dai: distinguish the different SSC
-In-Reply-To: <56966852.8050205@atmel.com>
-References: <1452666910-23586-1-git-send-email-songjun.wu@atmel.com>
- <56966852.8050205@atmel.com>
-Message-ID: <56C28F5D.5010000@atmel.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Mon, 15 Feb 2016 19:03:58 -0800
+Subject: [PATCH 2/2] clk: bcm2835: Reuse CLK_DIVIDER_MAX_AT_ZERO for
+ recalc_rate()
+In-Reply-To: <1455591838-22725-1-git-send-email-eric@anholt.net>
+References: <1455591838-22725-1-git-send-email-eric@anholt.net>
+Message-ID: <1455591838-22725-2-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+We were rolling this ourselves, but clk-divider can do it now.
 
-Any comments on this patch?
+Signed-off-by: Eric Anholt <eric@anholt.net>
+---
+ drivers/clk/bcm/clk-bcm2835.c | 13 ++-----------
+ 1 file changed, 2 insertions(+), 11 deletions(-)
 
-On 1/13/2016 23:08, Nicolas Ferre wrote:
-> Le 13/01/2016 07:35, Songjun Wu a ?crit :
->> Cpu_dai id always equals 0, can't distinguish the
->> different SSC. Use platform_device id to record
->> and distinguish the different SSC.
->>
->> Signed-off-by: Songjun Wu <songjun.wu@atmel.com>
->
-> It seems okay:
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->
->> ---
->>
->>   drivers/misc/atmel-ssc.c        |    1 +
->>   sound/soc/atmel/atmel_ssc_dai.c |   27 ++++++++++++++++++---------
->>   2 files changed, 19 insertions(+), 9 deletions(-)
->>
->> diff --git a/drivers/misc/atmel-ssc.c b/drivers/misc/atmel-ssc.c
->> index e11a0bd..0516ecd 100644
->> --- a/drivers/misc/atmel-ssc.c
->> +++ b/drivers/misc/atmel-ssc.c
->> @@ -34,6 +34,7 @@ struct ssc_device *ssc_request(unsigned int ssc_num)
->>   		if (ssc->pdev->dev.of_node) {
->>   			if (of_alias_get_id(ssc->pdev->dev.of_node, "ssc")
->>   				== ssc_num) {
->> +				ssc->pdev->id = ssc_num;
->>   				ssc_valid = 1;
->>   				break;
->>   			}
->> diff --git a/sound/soc/atmel/atmel_ssc_dai.c b/sound/soc/atmel/atmel_ssc_dai.c
->> index ba8def5..2768970 100644
->> --- a/sound/soc/atmel/atmel_ssc_dai.c
->> +++ b/sound/soc/atmel/atmel_ssc_dai.c
->> @@ -285,7 +285,8 @@ static int atmel_ssc_hw_rule_rate(struct snd_pcm_hw_params *params,
->>   static int atmel_ssc_startup(struct snd_pcm_substream *substream,
->>   			     struct snd_soc_dai *dai)
->>   {
->> -	struct atmel_ssc_info *ssc_p = &ssc_info[dai->id];
->> +	struct platform_device *pdev = to_platform_device(dai->dev);
->> +	struct atmel_ssc_info *ssc_p = &ssc_info[pdev->id];
->>   	struct atmel_pcm_dma_params *dma_params;
->>   	int dir, dir_mask;
->>   	int ret;
->> @@ -346,7 +347,8 @@ static int atmel_ssc_startup(struct snd_pcm_substream *substream,
->>   static void atmel_ssc_shutdown(struct snd_pcm_substream *substream,
->>   			       struct snd_soc_dai *dai)
->>   {
->> -	struct atmel_ssc_info *ssc_p = &ssc_info[dai->id];
->> +	struct platform_device *pdev = to_platform_device(dai->dev);
->> +	struct atmel_ssc_info *ssc_p = &ssc_info[pdev->id];
->>   	struct atmel_pcm_dma_params *dma_params;
->>   	int dir, dir_mask;
->>
->> @@ -392,7 +394,8 @@ static void atmel_ssc_shutdown(struct snd_pcm_substream *substream,
->>   static int atmel_ssc_set_dai_fmt(struct snd_soc_dai *cpu_dai,
->>   		unsigned int fmt)
->>   {
->> -	struct atmel_ssc_info *ssc_p = &ssc_info[cpu_dai->id];
->> +	struct platform_device *pdev = to_platform_device(cpu_dai->dev);
->> +	struct atmel_ssc_info *ssc_p = &ssc_info[pdev->id];
->>
->>   	ssc_p->daifmt = fmt;
->>   	return 0;
->> @@ -404,7 +407,8 @@ static int atmel_ssc_set_dai_fmt(struct snd_soc_dai *cpu_dai,
->>   static int atmel_ssc_set_dai_clkdiv(struct snd_soc_dai *cpu_dai,
->>   	int div_id, int div)
->>   {
->> -	struct atmel_ssc_info *ssc_p = &ssc_info[cpu_dai->id];
->> +	struct platform_device *pdev = to_platform_device(cpu_dai->dev);
->> +	struct atmel_ssc_info *ssc_p = &ssc_info[pdev->id];
->>
->>   	switch (div_id) {
->>   	case ATMEL_SSC_CMR_DIV:
->> @@ -445,7 +449,8 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
->>   	struct snd_pcm_hw_params *params,
->>   	struct snd_soc_dai *dai)
->>   {
->> -	int id = dai->id;
->> +	struct platform_device *pdev = to_platform_device(dai->dev);
->> +	int id = pdev->id;
->>   	struct atmel_ssc_info *ssc_p = &ssc_info[id];
->>   	struct ssc_device *ssc = ssc_p->ssc;
->>   	struct atmel_pcm_dma_params *dma_params;
->> @@ -772,7 +777,8 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
->>   static int atmel_ssc_prepare(struct snd_pcm_substream *substream,
->>   			     struct snd_soc_dai *dai)
->>   {
->> -	struct atmel_ssc_info *ssc_p = &ssc_info[dai->id];
->> +	struct platform_device *pdev = to_platform_device(dai->dev);
->> +	struct atmel_ssc_info *ssc_p = &ssc_info[pdev->id];
->>   	struct atmel_pcm_dma_params *dma_params;
->>   	int dir;
->>
->> @@ -795,7 +801,8 @@ static int atmel_ssc_prepare(struct snd_pcm_substream *substream,
->>   static int atmel_ssc_trigger(struct snd_pcm_substream *substream,
->>   			     int cmd, struct snd_soc_dai *dai)
->>   {
->> -	struct atmel_ssc_info *ssc_p = &ssc_info[dai->id];
->> +	struct platform_device *pdev = to_platform_device(dai->dev);
->> +	struct atmel_ssc_info *ssc_p = &ssc_info[pdev->id];
->>   	struct atmel_pcm_dma_params *dma_params;
->>   	int dir;
->>
->> @@ -824,11 +831,12 @@ static int atmel_ssc_trigger(struct snd_pcm_substream *substream,
->>   static int atmel_ssc_suspend(struct snd_soc_dai *cpu_dai)
->>   {
->>   	struct atmel_ssc_info *ssc_p;
->> +	struct platform_device *pdev = to_platform_device(cpu_dai->dev);
->>
->>   	if (!cpu_dai->active)
->>   		return 0;
->>
->> -	ssc_p = &ssc_info[cpu_dai->id];
->> +	ssc_p = &ssc_info[pdev->id];
->>
->>   	/* Save the status register before disabling transmit and receive */
->>   	ssc_p->ssc_state.ssc_sr = ssc_readl(ssc_p->ssc->regs, SR);
->> @@ -852,12 +860,13 @@ static int atmel_ssc_suspend(struct snd_soc_dai *cpu_dai)
->>   static int atmel_ssc_resume(struct snd_soc_dai *cpu_dai)
->>   {
->>   	struct atmel_ssc_info *ssc_p;
->> +	struct platform_device *pdev = to_platform_device(cpu_dai->dev);
->>   	u32 cr;
->>
->>   	if (!cpu_dai->active)
->>   		return 0;
->>
->> -	ssc_p = &ssc_info[cpu_dai->id];
->> +	ssc_p = &ssc_info[pdev->id];
->>
->>   	/* restore SSC register settings */
->>   	ssc_writel(ssc_p->ssc->regs, TFMR, ssc_p->ssc_state.ssc_tfmr);
->>
->
->
+diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
+index 9f4df8f..353e438 100644
+--- a/drivers/clk/bcm/clk-bcm2835.c
++++ b/drivers/clk/bcm/clk-bcm2835.c
+@@ -1060,16 +1060,7 @@ static long bcm2835_pll_divider_round_rate(struct clk_hw *hw,
+ static unsigned long bcm2835_pll_divider_get_rate(struct clk_hw *hw,
+ 						  unsigned long parent_rate)
+ {
+-	struct bcm2835_pll_divider *divider = bcm2835_pll_divider_from_hw(hw);
+-	struct bcm2835_cprman *cprman = divider->cprman;
+-	const struct bcm2835_pll_divider_data *data = divider->data;
+-	u32 div = cprman_read(cprman, data->a2w_reg);
+-
+-	div &= (1 << A2W_PLL_DIV_BITS) - 1;
+-	if (div == 0)
+-		div = 256;
+-
+-	return parent_rate / div;
++	return clk_divider_ops.recalc_rate(hw, parent_rate);
+ }
+ 
+ static void bcm2835_pll_divider_off(struct clk_hw *hw)
+@@ -1430,7 +1421,7 @@ bcm2835_register_pll_divider(struct bcm2835_cprman *cprman,
+ 	divider->div.reg = cprman->regs + data->a2w_reg;
+ 	divider->div.shift = A2W_PLL_DIV_SHIFT;
+ 	divider->div.width = A2W_PLL_DIV_BITS;
+-	divider->div.flags = 0;
++	divider->div.flags = CLK_DIVIDER_MAX_AT_ZERO;
+ 	divider->div.lock = &cprman->regs_lock;
+ 	divider->div.hw.init = &init;
+ 	divider->div.table = NULL;
+-- 
+2.7.0
