@@ -1,96 +1,103 @@
 From: james.morse@arm.com (James Morse)
-Date: Tue, 16 Feb 2016 15:49:16 +0000
-Subject: [PATCH v5 04/15] arm64: Add new hcall HVC_CALL_FUNC
+Date: Tue, 16 Feb 2016 15:49:23 +0000
+Subject: [PATCH v5 11/15] arm64: head.S: Change the register el2_setup()
+ returns its result in x0
 In-Reply-To: <1455637767-31561-1-git-send-email-james.morse@arm.com>
 References: <1455637767-31561-1-git-send-email-james.morse@arm.com>
-Message-ID: <1455637767-31561-5-git-send-email-james.morse@arm.com>
+Message-ID: <1455637767-31561-12-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geoff Levand <geoff@infradead.org>
+Today el2_setup() returns its result in w20. This means we can't call it
+like any normal function. Change this to w0.
 
-Add the new hcall HVC_CALL_FUNC that allows execution of a function at EL2.
-During CPU reset the CPU must be brought to the exception level it had on
-entry to the kernel.  The HVC_CALL_FUNC hcall will provide the mechanism
-needed for this exception level switch.
+All three callers of el2_setup() call set_cpu_boot_mode_flag() immediately
+afterwards, and don't rely on x0 in later code. Boot cpu code calls
+preserve_boot_args() before el2_setup(), so we don't clobber the DT pointer.
 
-To allow the HVC_CALL_FUNC exception vector to work without a stack, which
-is needed to support an hcall at CPU reset, this implementation uses
-register x18 to store the link register across the caller provided
-function.  This dictates that the caller provided function must preserve
-the contents of register x18.
-
-Signed-off-by: Geoff Levand <geoff@infradead.org>
-[Renumbered labels in el1_sync()]
 Signed-off-by: James Morse <james.morse@arm.com>
 ---
-This patch comes from v13 of kexec
+ arch/arm64/include/asm/processor.h |  2 ++
+ arch/arm64/kernel/head.S           | 18 +++++++++---------
+ 2 files changed, 11 insertions(+), 9 deletions(-)
 
- arch/arm64/include/asm/virt.h | 13 +++++++++++++
- arch/arm64/kernel/hyp-stub.S  | 19 +++++++++++++++----
- 2 files changed, 28 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
-index eb10368c329e..30700961f28c 100644
---- a/arch/arm64/include/asm/virt.h
-+++ b/arch/arm64/include/asm/virt.h
-@@ -45,6 +45,19 @@
+diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+index 4acb7ca94fcd..07ac4351538e 100644
+--- a/arch/arm64/include/asm/processor.h
++++ b/arch/arm64/include/asm/processor.h
+@@ -188,4 +188,6 @@ static inline void spin_lock_prefetch(const void *x)
  
- #define HVC_SET_VECTORS 2
+ void cpu_enable_pan(void *__unused);
  
-+/*
-+ * HVC_CALL_FUNC - Execute a function at EL2.
-+ *
-+ * @x0: Physical address of the function to be executed.
-+ * @x1: Passed as the first argument to the function.
-+ * @x2: Passed as the second argument to the function.
-+ * @x3: Passed as the third argument to the function.
-+ *
-+ * The called function must preserve the contents of register x18.
-+ */
++int el2_setup(void);
 +
-+#define HVC_CALL_FUNC 3
-+
- #define BOOT_CPU_MODE_EL1	(0xe11)
- #define BOOT_CPU_MODE_EL2	(0xe12)
+ #endif /* __ASM_PROCESSOR_H */
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 410a2dc04775..5894c7e91e6b 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -206,7 +206,7 @@ section_table:
  
-diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
-index 017ab519aaf1..cfacfe55e3ef 100644
---- a/arch/arm64/kernel/hyp-stub.S
-+++ b/arch/arm64/kernel/hyp-stub.S
-@@ -59,18 +59,29 @@ el1_sync:
- 	and	x18, x18, #ESR_ELx_ISS_MASK
+ ENTRY(stext)
+ 	bl	preserve_boot_args
+-	bl	el2_setup			// Drop to EL1, w20=cpu_boot_mode
++	bl	el2_setup			// Drop to EL1, w0=cpu_boot_mode
+ 	adrp	x24, __PHYS_OFFSET
+ 	bl	set_cpu_boot_mode_flag
+ 	bl	__create_page_tables		// x25=TTBR0, x26=TTBR1
+@@ -446,8 +446,8 @@ ENDPROC(__mmap_switched)
+  * If we're fortunate enough to boot at EL2, ensure that the world is
+  * sane before dropping to EL1.
+  *
+- * Returns either BOOT_CPU_MODE_EL1 or BOOT_CPU_MODE_EL2 in x20 if
+- * booted in EL1 or EL2 respectively.
++ * Returns either BOOT_CPU_MODE_EL1 or BOOT_CPU_MODE_EL2 if booted in
++ * EL1 or EL2 respectively.
+  */
+ ENTRY(el2_setup)
+ 	mrs	x0, CurrentEL
+@@ -462,7 +462,7 @@ CPU_LE(	bic	x0, x0, #(1 << 25)	)	// Clear the EE bit for EL2
+ CPU_BE(	orr	x0, x0, #(3 << 24)	)	// Set the EE and E0E bits for EL1
+ CPU_LE(	bic	x0, x0, #(3 << 24)	)	// Clear the EE and E0E bits for EL1
+ 	msr	sctlr_el1, x0
+-	mov	w20, #BOOT_CPU_MODE_EL1		// This cpu booted in EL1
++	mov	w0, #BOOT_CPU_MODE_EL1		// This cpu booted in EL1
+ 	isb
+ 	ret
  
- 	cmp	x17, #ESR_ELx_EC_HVC64
--	b.ne	2f				// Not an HVC trap
-+	b.ne	9f				// Not an HVC trap
+@@ -538,20 +538,20 @@ CPU_LE(	movk	x0, #0x30d0, lsl #16	)	// Clear EE and E0E on LE systems
+ 		      PSR_MODE_EL1h)
+ 	msr	spsr_el2, x0
+ 	msr	elr_el2, lr
+-	mov	w20, #BOOT_CPU_MODE_EL2		// This CPU booted in EL2
++	mov	w0, #BOOT_CPU_MODE_EL2		// This CPU booted in EL2
+ 	eret
+ ENDPROC(el2_setup)
  
- 	cmp	x18, #HVC_GET_VECTORS
+ /*
+  * Sets the __boot_cpu_mode flag depending on the CPU boot mode passed
+- * in x20. See arch/arm64/include/asm/virt.h for more info.
++ * in w0. See arch/arm64/include/asm/virt.h for more info.
+  */
+ ENTRY(set_cpu_boot_mode_flag)
+ 	adr_l	x1, __boot_cpu_mode
+-	cmp	w20, #BOOT_CPU_MODE_EL2
++	cmp	w0, #BOOT_CPU_MODE_EL2
  	b.ne	1f
- 	mrs	x0, vbar_el2
--	b	2f
-+	b	9f
- 
- 1:	cmp	x18, #HVC_SET_VECTORS
- 	b.ne	2f
- 	msr	vbar_el2, x0
--
--2:	eret
-+	b	9f
-+
-+2:	cmp	x18, #HVC_CALL_FUNC
-+	b.ne	9f
-+	mov	x18, lr
-+	mov	lr, x0
-+	mov	x0, x1
-+	mov	x1, x2
-+	mov	x2, x3
-+	blr	lr
-+	mov	lr, x18
-+
-+9:	eret
- ENDPROC(el1_sync)
- 
- .macro invalid_vector	label
+ 	add	x1, x1, #4
+-1:	str	w20, [x1]			// This CPU has booted in EL1
++1:	str	w0, [x1]			// This CPU has booted in EL1
+ 	dmb	sy
+ 	dc	ivac, x1			// Invalidate potentially stale cache line
+ 	ret
+@@ -576,7 +576,7 @@ ENTRY(__boot_cpu_mode)
+ 	 * cores are held until we're ready for them to initialise.
+ 	 */
+ ENTRY(secondary_holding_pen)
+-	bl	el2_setup			// Drop to EL1, w20=cpu_boot_mode
++	bl	el2_setup			// Drop to EL1, w0=cpu_boot_mode
+ 	bl	set_cpu_boot_mode_flag
+ 	mrs	x0, mpidr_el1
+ 	ldr     x1, =MPIDR_HWID_BITMASK
 -- 
 2.6.2
