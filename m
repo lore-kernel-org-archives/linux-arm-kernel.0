@@ -1,48 +1,63 @@
-From: brian.starkey@arm.com (Brian Starkey)
-Date: Tue, 16 Feb 2016 11:14:26 +0000
-Subject: [RESEND2 PATCH 1/3] memremap: add MEMREMAP_WC flag
-In-Reply-To: <20160209091501.GA23507@e106950-lin.cambridge.arm.com>
-References: <cover.1454950917.git.brian.starkey@arm.com>
- <9085d37fa97a762a46b9d58719c085368682c64f.1454950917.git.brian.starkey@arm.com>
- <20160208183006.GA8429@kroah.com>
- <20160209091501.GA23507@e106950-lin.cambridge.arm.com>
-Message-ID: <20160216111426.GA22133@e106950-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 16 Feb 2016 12:26:23 +0100
+Subject: [PATCH 3/7] usb: gadget: pxa25x_udc: use readl/writel for mmio
+In-Reply-To: <m3d1rxqa4p.fsf@t19.piap.pl>
+References: <1453997722-3489596-1-git-send-email-arnd@arndb.de>
+ <4239208.KBB6rfivoa@wuerfel> <m3d1rxqa4p.fsf@t19.piap.pl>
+Message-ID: <2702068.KRp0Bplb5Q@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+On Tuesday 16 February 2016 10:26:14 Krzysztof Ha?asa wrote:
+> Arnd Bergmann <arnd@arndb.de> writes:
+> 
+> > The barriers on a spinlock synchronize between CPUs but not an external
+> > bus, so (on some architectures) a spinlock protecting an MMIO register
+> > does not guarantee that two CPUs doing
+> >
+> >       spin_lock();
+> >       __raw_writel(address);
+> >       __raw_writel(data);
+> >       spin_unlock();
+> >
+> > would cause pairs of address/data to be seen on the bus.
+> >
+> > Of course this is meaningless on ixp4xx, as there is only one CPU.
+> 
+> I still don't get it. If the spinlocks synchronize between CPUs, there
+> can only be one CPU (or core) doing the pair of raw_writel(), so how
+> would it be possible to not get the address/data pair written out?
+> IOW, how is it different from a system with a single CPU?
 
-Is the documentation OK? Is there any chance of you picking up this
-series?
+Both writes leave the CPU core within the spinlock but are not serialized
+with anything else, so there is no ordering between the CPUs when they
+enter the shared bus, other than having address before data. You'd
+expect to see address0, data0, address1, data1, but it could also
+be e.g. address0, address1, data1, data0.
 
-I can rebase onto -next if that's the right place, but they still apply
-on 4.5-rc4 and fix a panic, so I thought perhaps they could make 4.5.
+> > On powerpc, we have in_le32/in_be32 for SoC-internal register access,
+> > while only PCI devices are allowed to be accessed using readl().
+> 
+> Yeah, this seems like a sane solution.
+> 
+> > I would suggest using an ixp4xx specific set of accessors that comes down
+> > to either readl() or ioread32_be(), depending on whether CONFIG_CPU_BIG_ENDIAN
+> > is set. That makes it clear that there is a magic bus involved and that it
+> > works on this platform but not in portable code.
+> 
+> Hmm. This is actually the opposite - while there may be some magic
+> (swapping) in readl() and friends, there is absolutely no magic in the
+> __raw_readl() etc. They are essentially equivalent to
+> *(volatile u32 *)ptr. This is constant and doesn't depend on endianess,
+> PCI, anything.
 
-Thanks,
-Brian
+The point is more what the common case is. Almost all machines we support
+have fixed-endian devices, and the drivers are correct when using readl()
+or in_le32() but are not endian-safe when using __raw_readl().
 
-On Tue, Feb 09, 2016 at 09:15:02AM +0000, Brian Starkey wrote:
->Hi Greg,
->
->On Mon, Feb 08, 2016 at 10:30:06AM -0800, Greg KH wrote:
->>On Mon, Feb 08, 2016 at 05:30:50PM +0000, Brian Starkey wrote:
->>>diff --git a/include/linux/io.h b/include/linux/io.h
->>>index 32403b5..e2c8419 100644
->>>--- a/include/linux/io.h
->>>+++ b/include/linux/io.h
->>>@@ -135,6 +135,7 @@ enum {
->>> 	/* See memremap() kernel-doc for usage description... */
->>> 	MEMREMAP_WB = 1 << 0,
->>> 	MEMREMAP_WT = 1 << 1,
->>>+	MEMREMAP_WC = 1 << 2,
->>
->>You didn't update the documentation :(
->>
->
->Maybe I missed something, but I don't think there's anything to update
->here? Like the comment says, the flags are documented in the memremap()
->kernel-doc (which I did update - see the next two hunks of this patch).
->
->Thanks,
->
->Brian
+Using __raw_readl() has the big danger of someone accidentally "fixing"
+the driver to work like all the others in order to solve a theoretical
+endian problem, while it should really be made obvious that the hardware
+actively swaps its data on the bus.
+
+	Arnd
