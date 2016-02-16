@@ -1,73 +1,49 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 16 Feb 2016 15:57:02 +0100
-Subject: [PATCH 09/11] iommu: exynos: update device tree documentation
+Date: Tue, 16 Feb 2016 15:57:01 +0100
+Subject: [PATCH 08/11] iommu: exynos: unify code for fldp cache invalidation
 In-Reply-To: <1455634624-18130-1-git-send-email-m.szyprowski@samsung.com>
 References: <1455634624-18130-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1455634624-18130-10-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1455634624-18130-9-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exynos SYSMMU bindings documentation was merged before generic IOMMU
-binding have been introduced. This patch updates documentation to match
-current state.
+This patch simplifies the code for handling of flpdcache invalidation.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- .../devicetree/bindings/iommu/samsung,sysmmu.txt      | 19 ++++++++-----------
- 1 file changed, 8 insertions(+), 11 deletions(-)
+ drivers/iommu/exynos-iommu.c | 13 ++++---------
+ 1 file changed, 4 insertions(+), 9 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/iommu/samsung,sysmmu.txt b/Documentation/devicetree/bindings/iommu/samsung,sysmmu.txt
-index bc620fe..f61ca25 100644
---- a/Documentation/devicetree/bindings/iommu/samsung,sysmmu.txt
-+++ b/Documentation/devicetree/bindings/iommu/samsung,sysmmu.txt
-@@ -23,28 +23,23 @@ MMUs.
-   for window 1, 2 and 3.
- * M2M Scalers and G2D in Exynos5420 has one System MMU on the read channel and
-   the other System MMU on the write channel.
--The drivers must consider how to handle those System MMUs. One of the idea is
--to implement child devices or sub-devices which are the client devices of the
--System MMU.
+diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+index 15787a1..e42a76c 100644
+--- a/drivers/iommu/exynos-iommu.c
++++ b/drivers/iommu/exynos-iommu.c
+@@ -440,13 +440,6 @@ static int __sysmmu_enable(struct sysmmu_drvdata *data, phys_addr_t pgtable,
+ 	return ret;
+ }
  
--Note:
--The current DT binding for the Exynos System MMU is incomplete.
--The following properties can be removed or changed, if found incompatible with
--the "Generic IOMMU Binding" support for attaching devices to the IOMMU.
-+For information on assigning System MMU controller to its peripheral devices,
-+see generic IOMMU bindings.
+-static void __sysmmu_tlb_invalidate_flpdcache(struct sysmmu_drvdata *data,
+-					      sysmmu_iova_t iova)
+-{
+-	if (data->version == MAKE_MMU_VER(3, 3))
+-		__raw_writel(iova | 0x1, data->sfrbase + REG_MMU_FLUSH_ENTRY);
+-}
+-
+ static void sysmmu_tlb_invalidate_flpdcache(struct sysmmu_drvdata *data,
+ 					    sysmmu_iova_t iova)
+ {
+@@ -455,8 +448,10 @@ static void sysmmu_tlb_invalidate_flpdcache(struct sysmmu_drvdata *data,
+ 	clk_enable(data->clk_master);
  
- Required properties:
- - compatible: Should be "samsung,exynos-sysmmu"
- - reg: A tuple of base address and size of System MMU registers.
-+- #iommu-cells: Should be <0>.
- - interrupt-parent: The phandle of the interrupt controller of System MMU
- - interrupts: An interrupt specifier for interrupt signal of System MMU,
- 	      according to the format defined by a particular interrupt
- 	      controller.
- - clock-names: Should be "sysmmu" if the System MMU is needed to gate its clock.
- 	       Optional "master" if the clock to the System MMU is gated by
--	       another gate clock other than "sysmmu".
--	       Exynos4 SoCs, there needs no "master" clock.
--	       Exynos5 SoCs, some System MMUs must have "master" clocks.
--- clocks: Required if the System MMU is needed to gate its clock.
-+	       another gate clock other than "sysmmu" (usually main gate clock
-+	       of peripheral device this SYSMMU belongs to).
-+- clocks: Phandles for respective clocks described by clock-names.
- - power-domains: Required if the System MMU is needed to gate its power.
- 	  Please refer to the following document:
- 	  Documentation/devicetree/bindings/power/pd-samsung.txt
-@@ -57,6 +52,7 @@ Examples:
- 		power-domains = <&pd_gsc>;
- 		clocks = <&clock CLK_GSCL0>;
- 		clock-names = "gscl";
-+		iommus = <&sysmmu_gsc0>;
- 	};
+ 	spin_lock_irqsave(&data->lock, flags);
+-	if (is_sysmmu_active(data))
+-		__sysmmu_tlb_invalidate_flpdcache(data, iova);
++	if (is_sysmmu_active(data)) {
++		if (data->version >= MAKE_MMU_VER(3, 3))
++			__sysmmu_tlb_invalidate_entry(data, iova, 1);
++	}
+ 	spin_unlock_irqrestore(&data->lock, flags);
  
- 	sysmmu_gsc0: sysmmu at 13E80000 {
-@@ -67,4 +63,5 @@ Examples:
- 		clock-names = "sysmmu", "master";
- 		clocks = <&clock CLK_SMMU_GSCL0>, <&clock CLK_GSCL0>;
- 		power-domains = <&pd_gsc>;
-+		#iommu-cells = <0>;
- 	};
+ 	clk_disable(data->clk_master);
 -- 
 1.9.2
