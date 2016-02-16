@@ -1,66 +1,65 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 16 Feb 2016 18:03:14 +0100
-Subject: [PATCH v3 05/12] arm64: add mvebu architecture entry
-In-Reply-To: <20160216141212.00f037e5@xhacker> (Jisheng Zhang's message of
- "Tue, 16 Feb 2016 14:12:12 +0800")
-References: <1454951660-13289-1-git-send-email-gregory.clement@free-electrons.com>
- <1454951660-13289-6-git-send-email-gregory.clement@free-electrons.com>
- <20160216141212.00f037e5@xhacker>
-Message-ID: <87a8n0twod.fsf@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 16 Feb 2016 18:26:09 +0100
+Subject: [PATCH] sound: hdmi: avoid dereferencing uninitialized 'jack'
+ pointer
+In-Reply-To: <s5hr3gc60ph.wl-tiwai@suse.de>
+References: <1455634059-1896914-1-git-send-email-arnd@arndb.de>
+ <112888486.mQgaWiH0PI@wuerfel> <s5hr3gc60ph.wl-tiwai@suse.de>
+Message-ID: <2706488.VpKveMVPGI@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jisheng,
- 
- On mar., f?vr. 16 2016, Jisheng Zhang <jszhang@marvell.com> wrote:
+On Tuesday 16 February 2016 18:10:02 Takashi Iwai wrote:
+> diff --git a/include/sound/jack.h b/include/sound/jack.h
+> index 23bede121c78..a27c253a3207 100644
+> --- a/include/sound/jack.h
+> +++ b/include/sound/jack.h
+> @@ -99,6 +99,7 @@ void snd_jack_report(struct snd_jack *jack, int status);
+>  static inline int snd_jack_new(struct snd_card *card, const char *id, int type,
+>                                struct snd_jack **jack, bool initial_kctl, bool phantom_jack)
+>  {
+> +       *jack = NULL;
+>         return 0;
+>  }
+>  
+> diff --git a/sound/pci/hda/hda_jack.c b/sound/pci/hda/hda_jack.c
+> index a33234e04d4f..babd3a8864a1 100644
+> --- a/sound/pci/hda/hda_jack.c
+> +++ b/sound/pci/hda/hda_jack.c
+> @@ -403,10 +403,12 @@ int snd_hda_jack_add_kctl(struct hda_codec *codec, hda_nid_t nid,
+>  
+>         jack->phantom_jack = !!phantom_jack;
+>         jack->type = type;
+> -       jack->jack->private_data = jack;
+> -       jack->jack->private_free = hda_free_jack_priv;
+> -       state = snd_hda_jack_detect(codec, nid);
+> -       snd_jack_report(jack->jack, state ? jack->type : 0);
+> +       if (jack->jack) {
+> +               jack->jack->private_data = jack;
+> +               jack->jack->private_free = hda_free_jack_priv;
+> +               state = snd_hda_jack_detect(codec, nid);
+> +               snd_jack_report(jack->jack, state ? jack->type : 0);
+> +       }
+>  
+>         return 0;
+>  }
+> diff --git a/sound/pci/hda/patch_hdmi.c b/sound/pci/hda/patch_hdmi.c
+> index 8ee78dbd4c60..34a7b3aaba11 100644
+> --- a/sound/pci/hda/patch_hdmi.c
+> +++ b/sound/pci/hda/patch_hdmi.c
+> @@ -2158,8 +2158,10 @@ static int add_acomp_jack_kctl(struct hda_codec *codec,
+>         if (err < 0)
+>                 return err;
+>         per_pin->acomp_jack = jack;
+> -       jack->private_data = per_pin;
+> -       jack->private_free = free_acomp_jack_priv;
+> +       if (jack) {
+> +               jack->private_data = per_pin;
+> +               jack->private_free = free_acomp_jack_priv;
+> +       }
+>         return 0;
+>  }
+> 
+Looks good to me.
 
-> Dear Gregory,
->
-> On Mon, 8 Feb 2016 18:14:13 +0100 Gregory CLEMENT wrote:
->
->> The Armada 3700 is an mvebu ARM64 SoC using one or two Cortex-A53 cores
->> depending of the variant.
->> 
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->> Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->> ---
->>  arch/arm64/Kconfig.platforms | 6 ++++++
->>  1 file changed, 6 insertions(+)
->> 
->> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
->> index 21074f674bde..c621e69ed170 100644
->> --- a/arch/arm64/Kconfig.platforms
->> +++ b/arch/arm64/Kconfig.platforms
->> @@ -1,5 +1,11 @@
->>  menu "Platform selection"
->>  
->> +config ARCH_MVEBU
->
-> it's better to keep ARCH_YYZZ sorted in alphabetic order
-
-
-Yes I should have move the entry when I renamed it.
-
-I will sent a v4 soon for this point.
-
-Gregory
-
->
-> Thanks,
-> Jisheng
->
->> +	bool "Marvell EBU SoC Family"
->> +	help
->> +	  This enables support for Marvell EBU family such as the
->> +	  Armada 3700 SoC family.
->> +
->>  config ARCH_BCM_IPROC
->>  	bool "Broadcom iProc SoC Family"
->>  	help
->
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Acked-by: Arnd Bergmann <arnd@arndb.de>
