@@ -1,72 +1,152 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 16 Feb 2016 10:55:37 +0100
-Subject: [PATCH v2] arm64: dts: r8a7795: Add GIC-400 virtual interfaces
-In-Reply-To: <1455615802-9083-1-git-send-email-dirk.behme@de.bosch.com>
-References: <1455615802-9083-1-git-send-email-dirk.behme@de.bosch.com>
-Message-ID: <CAMuHMdVP4wA4eXK-fkENndNs=zS2vuUeDww2ZZbXvocfFiOgWQ@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 16 Feb 2016 09:55:41 +0000
+Subject: [PATCH v4 21/23] arm64: hw_breakpoint: Allow EL2 breakpoints if
+ running in HYP
+In-Reply-To: <20160215190747.GR6298@arm.com>
+References: <1455216004-19499-1-git-send-email-marc.zyngier@arm.com>
+ <1455216004-19499-22-git-send-email-marc.zyngier@arm.com>
+ <20160215174656.GN6298@arm.com> <20160215190747.GR6298@arm.com>
+Message-ID: <56C2F21D.90205@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CC Marc
+On 15/02/16 19:07, Will Deacon wrote:
+> On Mon, Feb 15, 2016 at 05:46:56PM +0000, Will Deacon wrote:
+>> On Thu, Feb 11, 2016 at 06:40:02PM +0000, Marc Zyngier wrote:
+>>> With VHE, we place kernel {watch,break}-points at EL2 to get things
+>>> like kgdb and "perf -e mem:..." working.
+>>>
+>>> This requires a bit of repainting in the low-level encore/decode,
+>>> but is otherwise pretty simple.
+>>>
+>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>> ---
+>>>  arch/arm64/include/asm/hw_breakpoint.h | 49 +++++++++++++++++++++-------------
+>>>  1 file changed, 31 insertions(+), 18 deletions(-)
+>>>
+>>> diff --git a/arch/arm64/include/asm/hw_breakpoint.h b/arch/arm64/include/asm/hw_breakpoint.h
+>>> index 9732908..4d8d5a8 100644
+>>> --- a/arch/arm64/include/asm/hw_breakpoint.h
+>>> +++ b/arch/arm64/include/asm/hw_breakpoint.h
+>>> @@ -18,6 +18,7 @@
+>>>  
+>>>  #include <asm/cputype.h>
+>>>  #include <asm/cpufeature.h>
+>>> +#include <asm/virt.h>
+>>>  
+>>>  #ifdef __KERNEL__
+>>>  
+>>> @@ -35,24 +36,6 @@ struct arch_hw_breakpoint {
+>>>  	struct arch_hw_breakpoint_ctrl ctrl;
+>>>  };
+>>>  
+>>> -static inline u32 encode_ctrl_reg(struct arch_hw_breakpoint_ctrl ctrl)
+>>> -{
+>>> -	return (ctrl.len << 5) | (ctrl.type << 3) | (ctrl.privilege << 1) |
+>>> -		ctrl.enabled;
+>>> -}
+>>> -
+>>> -static inline void decode_ctrl_reg(u32 reg,
+>>> -				   struct arch_hw_breakpoint_ctrl *ctrl)
+>>> -{
+>>> -	ctrl->enabled	= reg & 0x1;
+>>> -	reg >>= 1;
+>>> -	ctrl->privilege	= reg & 0x3;
+>>> -	reg >>= 2;
+>>> -	ctrl->type	= reg & 0x3;
+>>> -	reg >>= 2;
+>>> -	ctrl->len	= reg & 0xff;
+>>> -}
+>>> -
+>>>  /* Breakpoint */
+>>>  #define ARM_BREAKPOINT_EXECUTE	0
+>>>  
+>>> @@ -62,6 +45,7 @@ static inline void decode_ctrl_reg(u32 reg,
+>>>  #define AARCH64_ESR_ACCESS_MASK	(1 << 6)
+>>>  
+>>>  /* Privilege Levels */
+>>> +#define AARCH64_BREAKPOINT_EL2	0
+>>>  #define AARCH64_BREAKPOINT_EL1	1
+>>>  #define AARCH64_BREAKPOINT_EL0	2
+>>>  
+>>> @@ -76,6 +60,35 @@ static inline void decode_ctrl_reg(u32 reg,
+>>>  #define ARM_KERNEL_STEP_ACTIVE	1
+>>>  #define ARM_KERNEL_STEP_SUSPEND	2
+>>>  
+>>> +#define DBG_HMC_HYP		(1 << 13)
+>>> +#define DBG_SSC_HYP		(3 << 14)
+>>
+>> Why do we need to touch the SSC field at all?
+>>
+>>> +
+>>> +static inline u32 encode_ctrl_reg(struct arch_hw_breakpoint_ctrl ctrl)
+>>> +{
+>>> +	u32 val = (ctrl.len << 5) | (ctrl.type << 3) | ctrl.enabled;
+>>> +
+>>> +	if (is_kernel_in_hyp_mode() && ctrl.privilege == AARCH64_BREAKPOINT_EL1)
+>>> +		val |= DBG_HMC_HYP | DBG_SSC_HYP | (AARCH64_BREAKPOINT_EL2 << 1);
+>>
+>> I don't think this is correct. We want to allow, for example, a userspace
+>> watchpoint to fire thanks to something like put_user, so the encoding
+>> really needs to build up the PMC field (like we do already), then orr in
+>> the HMC field.
+> 
+> Hmm, I got my arm and my arm64 mixed up here. For the latter, we don't
+> actually support EL0+EL1 watchpoints, but I still think that the
+> {HMC,SSC,PMC} encoding of {1,00,xx} is cleaner.
 
-On Tue, Feb 16, 2016 at 10:43 AM, Dirk Behme <dirk.behme@de.bosch.com> wrote:
-> Besides the distributor and the CPU interface the GIC-400 additionally
-> supports the virtual interface control blocks and the virtual CPU interfaces.
->
-> Add the physical base addresses and size for these.
->
-> See
->
-> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0471b/index.html
-> -> 3.2. GIC-400 register map
->
-> and Linux kernel's
->
-> Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt
->
-> for more details.
->
-> For the at GICH Virtual interface control blocks at 0xf1040000 cover the
-> whole 128kB (0x20000) range. This is done based on the advice from Marc
-> Zyngier http://www.spinics.net/lists/arm-kernel/msg483139.html
->
-> Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
+Indeed. So with that in mind, I ended up with the following patch, which is much simpler than the previous one:
 
-Thanks!
+diff --git a/arch/arm64/include/asm/hw_breakpoint.h b/arch/arm64/include/asm/hw_breakpoint.h
+index 9732908..115ea2a 100644
+--- a/arch/arm64/include/asm/hw_breakpoint.h
++++ b/arch/arm64/include/asm/hw_breakpoint.h
+@@ -18,6 +18,7 @@
+ 
+ #include <asm/cputype.h>
+ #include <asm/cpufeature.h>
++#include <asm/virt.h>
+ 
+ #ifdef __KERNEL__
+ 
+@@ -35,10 +36,21 @@ struct arch_hw_breakpoint {
+ 	struct arch_hw_breakpoint_ctrl ctrl;
+ };
+ 
++/* Privilege Levels */
++#define AARCH64_BREAKPOINT_EL1	1
++#define AARCH64_BREAKPOINT_EL0	2
++
++#define DBG_HMC_HYP		(1 << 13)
++
+ static inline u32 encode_ctrl_reg(struct arch_hw_breakpoint_ctrl ctrl)
+ {
+-	return (ctrl.len << 5) | (ctrl.type << 3) | (ctrl.privilege << 1) |
++	u32 val = (ctrl.len << 5) | (ctrl.type << 3) | (ctrl.privilege << 1) |
+ 		ctrl.enabled;
++
++	if (is_kernel_in_hyp_mode() && ctrl.privilege == AARCH64_BREAKPOINT_EL1)
++		val |= DBG_HMC_HYP;
++
++	return val;
+ }
+ 
+ static inline void decode_ctrl_reg(u32 reg,
+@@ -61,10 +73,6 @@ static inline void decode_ctrl_reg(u32 reg,
+ #define ARM_BREAKPOINT_STORE	2
+ #define AARCH64_ESR_ACCESS_MASK	(1 << 6)
+ 
+-/* Privilege Levels */
+-#define AARCH64_BREAKPOINT_EL1	1
+-#define AARCH64_BREAKPOINT_EL0	2
+-
+ /* Lengths */
+ #define ARM_BREAKPOINT_LEN_1	0x1
+ #define ARM_BREAKPOINT_LEN_2	0x3
 
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-> ---
-> Changes in v2: Extend the GICH size to 128kB.
->
->  arch/arm64/boot/dts/renesas/r8a7795.dtsi | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> index 8f1ed23..65f9cc8 100644
-> --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> @@ -130,7 +130,9 @@
->                         #address-cells = <0>;
->                         interrupt-controller;
->                         reg = <0x0 0xf1010000 0 0x1000>,
-> -                             <0x0 0xf1020000 0 0x2000>;
-> +                             <0x0 0xf1020000 0 0x2000>,
-> +                             <0x0 0xf1040000 0 0x20000>,
-> +                             <0x0 0xf1060000 0 0x2000>;
->                         interrupts = <GIC_PPI 9
->                                         (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
->                 };
-> --
-> 2.5.1
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thanks,
+	
+	M.
+-- 
+Jazz is not dead. It just smells funny...
