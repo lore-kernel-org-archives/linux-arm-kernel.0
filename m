@@ -1,41 +1,83 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 16 Feb 2016 17:11:33 +0000
-Subject: [PATCH v2] arm64: add alignment fault hanling
-In-Reply-To: <329817481.954581455597874663.JavaMail.weblogic@epmlwas08c>
-References: <329817481.954581455597874663.JavaMail.weblogic@epmlwas08c>
-Message-ID: <20160216171133.GB24950@localhost.localdomain>
+From: fu.wei@linaro.org (fu.wei at linaro.org)
+Date: Wed, 17 Feb 2016 01:08:47 +0800
+Subject: [PATCH v13 1/4] Documentation: add sbsa-gwdt driver documentation
+In-Reply-To: <1455642530-19103-1-git-send-email-fu.wei@linaro.org>
+References: <1455642530-19103-1-git-send-email-fu.wei@linaro.org>
+Message-ID: <1455642530-19103-2-git-send-email-fu.wei@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 16, 2016 at 04:44:38AM +0000, EunTaik Lee wrote:
-> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-> index 19211c4..a5ebb99 100644
-> --- a/arch/arm64/mm/fault.c
-> +++ b/arch/arm64/mm/fault.c
-> @@ -371,6 +371,14 @@ static int __kprobes do_translation_fault(unsigned long addr,
->  	return 0;
->  }
->  
-> +static int __kprobes do_alignment_fault(unsigned long addr,
-> +					  unsigned int esr,
-> +					  struct pt_regs *regs)
-> +{
-> +	do_bad_area(addr, esr, regs);
-> +	return 0;
-> +}
-> +
->  /*
->   * This abort handler always returns "fault".
->   */
-> @@ -418,7 +426,7 @@ static struct fault_info {
->  	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk" },
->  	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk" },
->  	{ do_bad,		SIGBUS,  0,		"unknown 32"			},
-> -	{ do_bad,		SIGBUS,  BUS_ADRALN,	"alignment fault"		},
-> +	{ do_alignment_fault,	SIGBUS,  BUS_ADRALN,	"alignment fault"		},
+From: Fu Wei <fu.wei@linaro.org>
 
-Do you need a new function, can you not just add do_bad_area in the
-fault_info array?
+The sbsa-gwdt.txt documentation in devicetree/bindings/watchdog is for
+introducing SBSA(Server Base System Architecture) Generic Watchdog
+device node info into FDT.
 
+Also add sbsa-gwdt introduction in watchdog-parameters.txt
+
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Fu Wei <fu.wei@linaro.org>
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+---
+ .../devicetree/bindings/watchdog/sbsa-gwdt.txt     | 31 ++++++++++++++++++++++
+ Documentation/watchdog/watchdog-parameters.txt     |  7 +++++
+ 2 files changed, 38 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/watchdog/sbsa-gwdt.txt b/Documentation/devicetree/bindings/watchdog/sbsa-gwdt.txt
+new file mode 100644
+index 0000000..6f2d5f9
+--- /dev/null
++++ b/Documentation/devicetree/bindings/watchdog/sbsa-gwdt.txt
+@@ -0,0 +1,31 @@
++* SBSA (Server Base System Architecture) Generic Watchdog
++
++The SBSA Generic Watchdog Timer is used to force a reset of the system
++after two stages of timeout have elapsed.  A detailed definition of the
++watchdog timer can be found in the ARM document: ARM-DEN-0029 - Server
++Base System Architecture (SBSA)
++
++Required properties:
++- compatible: Should at least contain "arm,sbsa-gwdt".
++
++- reg: Each entry specifies the base physical address of a register frame
++  and the length of that frame; currently, two frames must be defined,
++  in this order:
++  1: Watchdog control frame;
++  2: Refresh frame.
++
++- interrupts: Should contain the Watchdog Signal 0 (WS0) SPI (Shared
++  Peripheral Interrupt) number of SBSA Generic Watchdog.
++
++Optional properties
++- timeout-sec: Watchdog timeout values (in seconds).
++
++Example for FVP Foundation Model v8:
++
++watchdog at 2a440000 {
++	compatible = "arm,sbsa-gwdt";
++	reg = <0x0 0x2a440000 0 0x1000>,
++	      <0x0 0x2a450000 0 0x1000>;
++	interrupts = <0 27 4>;
++	timeout-sec = <30>;
++};
+diff --git a/Documentation/watchdog/watchdog-parameters.txt b/Documentation/watchdog/watchdog-parameters.txt
+index 9f9ec9f..ce7ae4e 100644
+--- a/Documentation/watchdog/watchdog-parameters.txt
++++ b/Documentation/watchdog/watchdog-parameters.txt
+@@ -284,6 +284,13 @@ sbc_fitpc2_wdt:
+ margin: Watchdog margin in seconds (default 60s)
+ nowayout: Watchdog cannot be stopped once started
+ -------------------------------------------------
++sbsa_gwdt:
++timeout: Watchdog timeout in seconds. (default 10s)
++action: Watchdog action at the first stage timeout,
++	set to 0 to ignore, 1 to panic. (default=0)
++nowayout: Watchdog cannot be stopped once started
++	(default=kernel config parameter)
++-------------------------------------------------
+ sc1200wdt:
+ isapnp: When set to 0 driver ISA PnP support will be disabled (default=1)
+ io: io port
 -- 
-Catalin
+2.5.0
