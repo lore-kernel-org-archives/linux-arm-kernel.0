@@ -1,64 +1,23 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 16 Feb 2016 11:53:35 +0000
-Subject: [PATCH] arm64: Add support for Half precision floating point
-In-Reply-To: <56C30C7E.1030005@arm.com>
-References: <1453823566-26742-1-git-send-email-suzuki.poulose@arm.com>
- <20160126160257.GB28238@arm.com>
- <20160126161151.GE14823@e104818-lin.cambridge.arm.com>
- <20160128160022.GM775@arm.com> <56C30C7E.1030005@arm.com>
-Message-ID: <20160216115335.GE14509@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 16 Feb 2016 12:54:06 +0100
+Subject: [PATCH 2/3] serial: xuartps: Enable OF earlycon support
+In-Reply-To: <23ab10a19b21df2ef17a5bb6ce2a70d2d3fd3551.1455552315.git.michal.simek@xilinx.com>
+References: <67c9013fc61f53515934b54847a05df8b8e1504a.1455552315.git.michal.simek@xilinx.com>
+ <23ab10a19b21df2ef17a5bb6ce2a70d2d3fd3551.1455552315.git.michal.simek@xilinx.com>
+Message-ID: <7244827.meF4e5ZIpB@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 16, 2016 at 11:48:14AM +0000, Szabolcs Nagy wrote:
-> On 28/01/16 16:00, Will Deacon wrote:
-> > On Tue, Jan 26, 2016 at 04:11:51PM +0000, Catalin Marinas wrote:
-> >> On Tue, Jan 26, 2016 at 04:02:58PM +0000, Will Deacon wrote:
-> >>> On Tue, Jan 26, 2016 at 03:52:46PM +0000, Suzuki K Poulose wrote:
-> >>>> +#define HWCAP_FPHP		(1 << 9)
-> >>>> +#define HWCAP_ASIMDHP		(1 << 10)
-> >>>
-> >>> Where did we get to with the mrs trapping you proposed here?
-> >>>
-> >>>   http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/374609.html
-> >>>
-> >>> At some point, we need to consider whether or not we want to continue
-> >>> adding new HWCAPs or whether your suggestion above is actually useful
-> >>> to userspace.
-> >>
-> >> IMO, even if we merge the MRS emulation, I would still like to see
-> >> HWCAPs exported. We are not short on bits yet (53 to go ;)).
-> > 
-> > I'm less keen. HWCAPs don't align well with the way that the ARM
-> > architecture versions features and we should be encouraging people to
-> > use the MRS emulation if it exists.
-> > 
-> >>> Did the libc guys get anywhere with a prototype? What do we need to do
-> >>> to make progress with it?
-> >>
-> >> This investigation should indeed continue but I think it is orthogonal.
-> > 
-> > Not if its intended to replace HWCAPs in the longterm.
-> > 
+On Monday 15 February 2016 17:05:18 Michal Simek wrote:
+> Support early console setup via DT for all listed compatible strings.
 > 
-> userspace needs HWCAP bits independently of the MIDR emulation.
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> ---
 > 
-> MIDR cannot replace HWCAP:
-> 
-> - MIDR does not map to features in a future-proof way
->   (we don't know which MIDR will indicate fp16 availability)
-> 
-> - MIDR would be useful for more fine-grained uarch specific
->   tuning decisions, HWCAP is for arch extensions like fp16.
-> 
-> - We don't yet know if the proposed MIDR emulation solves
->   all userspace issues we want it to solve. I'll try to
->   investigate that as well as the alternative VDSO based
->   approach (if VDSO can work, that would be better for
->   userspace). There are nasty issues here so the conclusion
->   might take a while, but that should not hold up HWCAPs.
 
-I'm not solely proposing MIDR as an alternative to HWCAP. I'm proposing
-that the feature registers, e.g. ID_AA64MMFR0_EL1 are used instead.
+I'd suggest we take the whole series through arm-soc, as the third patch
+depends on this second one.
 
-Will
+Greg, is this ok for you?
+
+	Arnd
