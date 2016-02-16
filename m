@@ -1,27 +1,59 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 16 Feb 2016 13:01:19 -0200
-Subject: noise issues when recording sound on i.MX28
-In-Reply-To: <20160211084029.GE13664@pengutronix.de>
-References: <20160127105613.GC13664@pengutronix.de>
- <CAOMZO5BpLen517q2heramSta-R6pdESkjM6w=7FRMZebY6ue-Q@mail.gmail.com>
- <20160127144340.GD13664@pengutronix.de>
- <CAOMZO5AE6HwBYz7kOFORt0HTojJLSb0MYUbkb_HCshDHy=d27g@mail.gmail.com>
- <20160210150315.GC13664@pengutronix.de>
- <CAOMZO5D5H4F90nse9kyW9KvsJStN-sCGktup4FDPw_zTeNfS2g@mail.gmail.com>
- <20160211084029.GE13664@pengutronix.de>
-Message-ID: <CAOMZO5BDjkWi+cQK1-J7ag8Z48tY1Uwofi4EkovN-drSC4_reA@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 16 Feb 2016 15:02:21 +0000
+Subject: [PATCH] ARM64: dma-mapping: fix IOMMU-based dma_mmap_atts()
+ implementation
+In-Reply-To: <1455632065-14620-1-git-send-email-m.szyprowski@samsung.com>
+References: <1455632065-14620-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <56C339FD.6040907@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 11, 2016 at 6:40 AM, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
+Hi Marek,
 
-> root at hostname:/sys/kernel/debug/clk find -name saif?_sel
-> ./ref_xtal/pll0/saif0_sel
-> ./ref_xtal/pll0/saif1_sel
+On 16/02/16 14:14, Marek Szyprowski wrote:
+> IOMMU-based DMA-mapping implementation doesn't support
+> dma_declare_coherent() based regions, so there is no point to call
+> dma_mmap_from_coherent() from __iommu_mmap_atts(). This patch removes
+> useless code.
+
+I'm not sure that's the case - AFAICS a device could still have its own 
+local memory despite being behind an IOMMU relative to the rest of the 
+system. If it uses dma_declare_coherent() for that, the .alloc and .free 
+callbacks here might be bypassed by dma_{alloc,free}_attrs() 
+short-circuiting into dma_{alloc,release}_from_coherent(), but in the 
+case of dma_mmap_attrs() it hits the .mmap callback first and only falls 
+back to the from_coherent check in dma_common_mmap() if that isn't 
+implemented.
+
+Maybe the right thing to do would be to move this check (with its 
+associated guards) out from dma_common_mmap() up to dma_mmap_attrs() to 
+be consistent with alloc/free; so that it doesn't need to be 
+reimplemented all over arch/{arm,arm64,mips} at all?
+
+Robin.
+
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>   arch/arm64/mm/dma-mapping.c | 5 -----
+>   1 file changed, 5 deletions(-)
 >
-> root at hostname:/sys/kernel/debug/clk cat ./ref_xtal/pll0/saif?_sel/clk_rate
-> 480000000
-> 480000000
-
-Ok, what about the SAIF0 and SAIF1 sampling rates: are they always the same?
+> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+> index 331c4ca..573b1e6 100644
+> --- a/arch/arm64/mm/dma-mapping.c
+> +++ b/arch/arm64/mm/dma-mapping.c
+> @@ -636,14 +636,9 @@ static int __iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
+>   			      struct dma_attrs *attrs)
+>   {
+>   	struct vm_struct *area;
+> -	int ret;
+>
+>   	vma->vm_page_prot = __get_dma_pgprot(attrs, vma->vm_page_prot,
+>   					     is_device_dma_coherent(dev));
+> -
+> -	if (dma_mmap_from_coherent(dev, vma, cpu_addr, size, &ret))
+> -		return ret;
+> -
+>   	area = find_vm_area(cpu_addr);
+>   	if (WARN_ON(!area || !area->pages))
+>   		return -ENXIO;
+>
