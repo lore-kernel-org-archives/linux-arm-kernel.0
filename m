@@ -1,38 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 16 Feb 2016 23:08:13 +0100
-Subject: [PATCH] sound: hdmi: avoid dereferencing uninitialized 'jack'
- pointer
-In-Reply-To: <2706488.VpKveMVPGI@wuerfel>
-References: <1455634059-1896914-1-git-send-email-arnd@arndb.de>
- <s5hr3gc60ph.wl-tiwai@suse.de> <2706488.VpKveMVPGI@wuerfel>
-Message-ID: <3395859.dhsfOsmVIe@wuerfel>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 16 Feb 2016 23:30:30 +0100
+Subject: [PATCH 00/11] CLCD Nomadik+Versatile support
+In-Reply-To: <56C32456.2030800@ti.com>
+References: <1454594660-7532-1-git-send-email-linus.walleij@linaro.org>
+ <CACRpkda=mgcF8RRymbe0AAKpfCWGZSw_YZP5_6JW2g-mKEt16g@mail.gmail.com>
+ <56C32456.2030800@ti.com>
+Message-ID: <CACRpkdZ-tH++mR2eD8J2-KETKgSW-peh3Xf0XPqHQD3U0T-FUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 16 February 2016 18:26:09 Arnd Bergmann wrote:
-> >                 return err;
-> >         per_pin->acomp_jack = jack;
-> > -       jack->private_data = per_pin;
-> > -       jack->private_free = free_acomp_jack_priv;
-> > +       if (jack) {
-> > +               jack->private_data = per_pin;
-> > +               jack->private_free = free_acomp_jack_priv;
-> > +       }
-> >         return 0;
-> >  }
-> > 
-> Looks good to me.
-> 
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> 
+On Tue, Feb 16, 2016 at 2:29 PM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
+> On 16/02/16 01:34, Linus Walleij wrote:
+>> On Thu, Feb 4, 2016 at 3:04 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>>
+>>> Eventually I would like to have patches 1 thru 8 (those with
+>>> patches to CLCD or the DT bindings) applied through the FBDEV
+>>> subsystem,
+>>
+>> If there are no comments, would the fbdev people consider
+>> patches 1 thru 8?
+>
+> Hmm... Is there a v2 for the 05 patch? I see one in my mailbox, but it's
+> not sent as a reply to this thread, making it a bit unclear.
 
-Actually, on second thought, there is one notable downside
-of this approach: 'jack' is guaranteed to be NULL here, so gcc
-won't produce a warning if another driver makes the same mistake:
+Yeah there is a v2, I sent that separately as I didn't have any other
+patch to follow up on.
 
-By default, we only get a warning for uses of uninitialized
-variables, but not those that are known to be NULL. I think
-some compiler warnings are able to warn about that too, but I
-forgot the details.
+I never figured out how to use in-reply-to sorry... maybe I should
+learn it :/
 
-	Arnd
+If you prefer I can resent the whole 1 thru 8 series, or does it work
+like this too?
+
+Yours,
+Linus Walleij
