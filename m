@@ -1,71 +1,68 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 16 Feb 2016 10:46:08 +0000
-Subject: [PATCH v2 3/3] clk: sunxi: Improve divs_clk error handling and
+Date: Tue, 16 Feb 2016 10:46:06 +0000
+Subject: [PATCH v2 1/3] clk: sunxi: improve mux_clk error handling and
  reporting
 In-Reply-To: <1455619568-1906-1-git-send-email-andre.przywara@arm.com>
 References: <1455619568-1906-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1455619568-1906-4-git-send-email-andre.przywara@arm.com>
+Message-ID: <1455619568-1906-2-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We catch errors in the base clock registration, failure to ioremap
-and failures in the final of_clk_add_provider() call.
-Also we unmap the registers when we need to rollback.
+We now catch and report a failing ioremap, also a failure in the final
+step of the clock registration is now handled and reported.
+Also warnings are turned into errors.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- drivers/clk/sunxi/clk-sunxi.c | 18 +++++++++++++++---
- 1 file changed, 15 insertions(+), 3 deletions(-)
+ drivers/clk/sunxi/clk-sunxi.c | 21 +++++++++++++++------
+ 1 file changed, 15 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index 4bd0917..91de0a0 100644
+index 99f60ef..775e137 100644
 --- a/drivers/clk/sunxi/clk-sunxi.c
 +++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -985,13 +985,20 @@ static struct clk ** __init sunxi_divs_clk_setup(struct device_node *node,
- 
- 	/* Set up factor clock that we will be dividing */
- 	pclk = sunxi_factors_clk_setup(node, data->factors);
-+	if (!pclk)
-+		return NULL;
- 	parent = __clk_get_name(pclk);
+@@ -674,11 +674,16 @@ static struct clk * __init sunxi_mux_clk_setup(struct device_node *node,
+ 	int i;
  
  	reg = of_iomap(node, 0);
 +	if (!reg) {
-+		pr_err("Could not map registers for divs-clk: %s\n",
++		pr_err("Could not map registers for mux-clk: %s\n",
 +		       of_node_full_name(node));
 +		return NULL;
 +	}
  
- 	clk_data = kmalloc(sizeof(struct clk_onecell_data), GFP_KERNEL);
- 	if (!clk_data)
--		return NULL;
-+		goto out_unmap;
+ 	i = of_clk_parent_fill(node, parents, SUNXI_MAX_PARENTS);
+ 	if (of_property_read_string(node, "clock-output-names", &clk_name)) {
+-		pr_warn("%s: could not read clock-output-names for \"%s\"\n",
+-			__func__, clk_name);
++		pr_err("%s: could not read clock-output-names from \"%s\"\n",
++		       __func__, of_node_full_name(node));
+ 		goto out_unmap;
+ 	}
  
- 	clks = kcalloc(ndivs, sizeof(*clks), GFP_KERNEL);
- 	if (!clks)
-@@ -1074,16 +1081,21 @@ static struct clk ** __init sunxi_divs_clk_setup(struct device_node *node,
- 	/* Adjust to the real max */
- 	clk_data->clk_num = i;
+@@ -688,15 +693,19 @@ static struct clk * __init sunxi_mux_clk_setup(struct device_node *node,
+ 			       0, &clk_lock);
  
--	of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
-+	if (of_clk_add_provider(node, of_clk_src_onecell_get, clk_data)) {
+ 	if (IS_ERR(clk)) {
+-		pr_warn("%s: failed to register mux clock %s: %ld\n", __func__,
+-			clk_name, PTR_ERR(clk));
++		pr_err("%s: failed to register mux clock %s: %ld\n", __func__,
++		       clk_name, PTR_ERR(clk));
+ 		goto out_unmap;
+ 	}
+ 
+-	of_clk_add_provider(node, of_clk_src_simple_get, clk);
++	if (of_clk_add_provider(node, of_clk_src_simple_get, clk)) {
 +		pr_err("%s: failed to add clock provider for %s\n",
 +		       __func__, clk_name);
-+		goto free_gate;
++		clk_unregister_divider(clk);
++		goto out_unmap;
 +	}
  
- 	return clks;
+ 	return clk;
 -
- free_gate:
- 	kfree(gate);
- free_clks:
- 	kfree(clks);
- free_clkdata:
- 	kfree(clk_data);
-+out_unmap:
-+	iounmap(reg);
+ out_unmap:
+ 	iounmap(reg);
  	return NULL;
- }
- 
 -- 
 2.6.4
