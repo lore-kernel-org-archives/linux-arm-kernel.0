@@ -1,96 +1,155 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 16 Feb 2016 08:35:49 +0000
-Subject: [PATCH] irqchip/gicv3-its: Avoid cache flush beyond ITS_BASERn
- memory size
-In-Reply-To: <1455594112-27783-1-git-send-email-shankerd@codeaurora.org>
-References: <1455594112-27783-1-git-send-email-shankerd@codeaurora.org>
-Message-ID: <20160216083549.5c889627@arm.com>
+From: fu.wei@linaro.org (fu.wei at linaro.org)
+Date: Tue, 16 Feb 2016 16:36:21 +0800
+Subject: [PATCH v12 0/4] Watchdog: introduce ARM SBSA watchdog driver
+Message-ID: <1455611785-2407-1-git-send-email-fu.wei@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 15 Feb 2016 21:41:52 -0600
-Shanker Donthineni <shankerd@codeaurora.org> wrote:
+From: Fu Wei <fu.wei@linaro.org>
 
-> Function its_alloc_tables() maintains two local variables, "order" and
-> and "alloc_size", to hold memory size that has been allocated to
-> ITS_BASEn. We don't always refresh the variable alloc_size whenever
-> value of the variable order changes, causing the following two problems.
-> 
->   - Cache flush operation with size more than required.
->   - Information reported by pr_info is not correct.
-> 
-> Use a helper macro that converts page order to size in bytes instead of
-> variable "alloc_size" to fix both the problems.
-> 
-> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
-> ---
->  drivers/irqchip/irq-gic-v3-its.c | 12 +++++++-----
->  1 file changed, 7 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> index 0a73632..6f717f7 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -78,6 +78,9 @@ struct its_node {
->  
->  #define ITS_ITT_ALIGN		SZ_256
->  
-> +/* Convert page order to size in bytes */
-> +#define PAGE_ORDER_TO_BYTES(o)	(PAGE_SIZE << (o))
-> +
+This patchset:
+    (1)Introduce Documentation/devicetree/bindings/watchdog/sbsa-gwdt.txt
+    for FDT info of SBSA Generic Watchdog, and give two examples of
+    adding SBSA Generic Watchdog device node into the dts files:
+    foundation-v8.dts and amd-seattle-soc.dtsi.
 
-nit: PAGE_ORDER_TO_size() seems more appropriate.
+    (2)Introduce ARM SBSA watchdog driver:
+        a.Use linux kernel watchdog framework;
+        b.Work with FDT on ARM64;
+        c.Support getting timeout from parameter and FDT at the driver
+          init stage.
+        d.The driver works in two modes:
+          (1) single stage timeout (ignore WS0 interrupt)
+          (2) two stages timeout (register WS0 interrupt, do panic in routine)
+        e.User can config working mode by module parameter "action".
 
->  struct event_lpi_map {
->  	unsigned long		*lpi_map;
->  	u16			*col_map;
-> @@ -846,7 +849,6 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
->  		u64 type = GITS_BASER_TYPE(val);
->  		u64 entry_size = GITS_BASER_ENTRY_SIZE(val);
->  		int order = get_order(psz);
-> -		int alloc_size;
->  		int alloc_pages;
->  		u64 tmp;
->  		void *base;
-> @@ -878,9 +880,8 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
->  			}
->  		}
->  
-> -		alloc_size = (1 << order) * PAGE_SIZE;
->  retry_alloc_baser:
-> -		alloc_pages = (alloc_size / psz);
-> +		alloc_pages = (PAGE_ORDER_TO_BYTES(order) / psz);
->  		if (alloc_pages > GITS_BASER_PAGES_MAX) {
->  			alloc_pages = GITS_BASER_PAGES_MAX;
->  			order = get_order(GITS_BASER_PAGES_MAX * psz);
-> @@ -933,7 +934,8 @@ retry_baser:
->  			shr = tmp & GITS_BASER_SHAREABILITY_MASK;
->  			if (!shr) {
->  				cache = GITS_BASER_nC;
-> -				__flush_dcache_area(base, alloc_size);
-> +				__flush_dcache_area(base,
-> +						    PAGE_ORDER_TO_BYTES(order));
+This patchset has been tested with watchdog daemon
+(ACPI/FDT, module/build-in) on the following platforms:
+    (1)ARM Foundation v8 model
+    (2)AMD Seattle platform
 
-Please keep it on the same line. It helps my random grepping...
+This patchset has been tested with kdump successfully.
 
->  			}
->  			goto retry_baser;
->  		}
-> @@ -966,7 +968,7 @@ retry_baser:
->  		}
->  
->  		pr_info("ITS: allocated %d %s @%lx (psz %dK, shr %d)\n",
-> -			(int)(alloc_size / entry_size),
-> +			(int)(PAGE_ORDER_TO_BYTES(order) / entry_size),
->  			its_base_type_string[type],
->  			(unsigned long)virt_to_phys(base),
->  			psz / SZ_1K, (int)shr >> GITS_BASER_SHAREABILITY_SHIFT);
+Changelog:
+v12:Fix a dev_warn message typo
+    Remove unnecessary "status" in dts
+    Add more *ed-by in commit message.
 
+v11:https://lkml.org/lkml/2016/2/9/577
+    Merge patch 4 and 5.
+    Improve some comments.
+    The driver works in two modes, it's configured by "action"(instead of
+    panic_enabled).
+    Improve the initialization of the timeout limits.
+    Feeding dog by writing "0" to WRR.
 
-Otherwise looks good.
+v10:https://lkml.org/lkml/2016/2/3/817
+    Delete pretimeout support.
+    Separate the driver to two parts:
+        (1) single stage timeout driver(ignore WS0 interrupt);
+        (2) register WS0 interrupt for the half timeout panic.
+    timeout == (enable --> WS1).
 
-Thanks,
+v9: https://lkml.org/lkml/2015/11/9/57
+    Rebase to latest kernel version(4.3).
+    Update the Documentation of sbsa-gwdt device node info of FDT:
+        (1) move some introduction to pretimeout patch
+        (2) delete WS1 value from "interrupts" of binding documentation,
+            since WS1 won't be handled by Linux.
 
-	M.
+v8: https://lkml.org/lkml/2015/10/27/466
+    Rebase to latest kernel version(4.3-rc7).
+    Separate the patches of GTDT support and arm_arch_timer. This
+    clocksource relevant patch will upstreamed in a individual patchset.
+    Update all the default timeout and pretimeout to 30s and 60s.
+    Improve documentation and inline comments.
+    Fix a bug in pretimeout support which makes timeout and pretimeout
+    parameters initialization fail.
+
+v7: https://lkml.org/lkml/2015/8/24/611
+    Rebase to latest kernel version(4.2-rc7).
+    Improve FDT support: geting resource by order, instead of name.
+    According to the FDT support, Update the example dts file, gtdt.c
+    and sbsa_gwdt.c.
+    Pass the sparse test, and fix the warning.
+    Fix the max_pretimeout and max_timeout value overflow bug.
+    Delete the WCV output value.
+    
+
+v6: https://lkml.org/lkml/2015/6/23/359
+    Improve the dtb example files: reduce the register frame size to 4K.
+    Improve pretimeout support:
+        (1) improve watchdog_init_timeouts function
+	(2) rename watchdog_check_min_max_timeouts back to the original name
+        (1) improve watchdog_timeout_invalid/watchdog_pretimeout_invalid
+    Add the new features in the sbsa_gwdt driver:
+	(1) In the second stage, user can feed the dog without cleaning WS0.
+	(2) In the second stage, user can trigger WS1 by setting pretimeout = 0.
+	(3) expand the max value of pretimeout, in case 10 second is not enough
+	    for a kdump kernel reboot in panic.
+
+v5: https://lkml.org/lkml/2015/6/10/357
+    Improve pretimeout support:
+        (1)fix typo in documentation and comments.
+	(2)fix the timeout limits validation bug.
+    Simplify sbsa_gwdt driver:
+	(1)integrate all the registers access functions into caller.
+
+v4: https://lkml.org/lkml/2015/6/2/4
+    Refactor GTDT support code: remove it from arch/arm64/kernel/acpi.c,
+    put it into drivers/acpi/gtdt.c file.
+    Integrate the GTDT code of drivers/clocksource/arm_arch_timer.c into
+    drivers/acpi/gtdt.c.
+    Improve pretimeout support, fix "pretimeout == 0" problem.
+    Simplify sbsa_gwdt driver:
+        (1)timeout/pretimeout limits setup;
+        (2)keepalive function;
+        (3)delete "clk == 0" check;
+        (4)delete WS0 status bit check in interrupt routine;
+        (5)sbsa_gwdt_set_wcv function.
+
+v3: https://lkml.org/lkml/2015/5/25/111
+    Delete "export arch_timer_get_rate" patch.
+    Driver back to use arch_timer_get_cntfrq.
+    Improve watchdog_init_timeouts function and update relevant documentation.
+    Improve watchdog_timeout_invalid and watchdog_pretimeout_invalid.
+    Improve foundation-v8.dts: delete the unnecessary tag of device node.
+    Remove "ARM64 || COMPILE_TEST" from Kconfig.
+    Add comments in arch/arm64/kernel/acpi.c
+    Fix typoes and incorrect comments.
+
+v2: https://lkml.org/lkml/2015/5/21/172
+    Improve watchdog-kernel-api.txt documentation for pretimeout support.
+    Export "arch_timer_get_rate" in arm_arch_timer.c.
+    Add watchdog_init_timeouts API for pretimeout support in framework.
+    Improve suspend and resume foundation in driver
+    Improve timeout/pretimeout values init code in driver.
+    Delete unnecessary items of the sbsa_gwdt struct and #define.
+    Delete all unnecessary debug info in driver.
+    Fix 64bit division bug.
+    Use the arch_timer interface to get watchdog clock rate.
+    Add MODULE_DEVICE_TABLE for platform device id.
+    Fix typoes.
+
+v1: https://lkml.org/lkml/2015/5/15/279
+    The first version upstream patchset to linux mailing list.
+
+Fu Wei (4):
+  Documentation: add sbsa-gwdt driver documentation
+  ARM64: add SBSA Generic Watchdog device node in foundation-v8.dts
+  ARM64: add SBSA Generic Watchdog device node in amd-seattle-soc.dtsi
+  Watchdog: introduce ARM SBSA watchdog driver
+
+ .../devicetree/bindings/watchdog/sbsa-gwdt.txt     |  31 ++
+ Documentation/watchdog/watchdog-parameters.txt     |   7 +
+ arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi       |   8 +
+ arch/arm64/boot/dts/arm/foundation-v8.dts          |   7 +
+ drivers/watchdog/Kconfig                           |  20 +
+ drivers/watchdog/Makefile                          |   1 +
+ drivers/watchdog/sbsa_gwdt.c                       | 403 +++++++++++++++++++++
+ 7 files changed, 477 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/watchdog/sbsa-gwdt.txt
+ create mode 100644 drivers/watchdog/sbsa_gwdt.c
+
 -- 
-Jazz is not dead. It just smells funny.
+2.5.0
