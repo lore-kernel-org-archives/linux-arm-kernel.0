@@ -1,38 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 16 Feb 2016 15:54:24 +0100
-Subject: [PATCH] mfd: fsl-imx25-tsadc: select IRQ_DOMAIN
-Message-ID: <1455634467-2013548-1-git-send-email-arnd@arndb.de>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 16 Feb 2016 15:56:53 +0100
+Subject: [PATCH 00/11] SYSMMU driver update and support for Exynos 5433
+Message-ID: <1455634624-18130-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The newly added tsadc code use irq domains, but it can be enabled
-when they are disabled in Kconfig:
+Hello,
 
-drivers/mfd/fsl-imx25-tsadc.c:41:22: error: implicit declaration of function 'irq_find_mapping' [-Werror=implicit-function-declaration]
-   generic_handle_irq(irq_find_mapping(tsadc->domain, 1));
-drivers/mfd/fsl-imx25-tsadc.c: In function 'mx25_tsadc_setup_irq':
-drivers/mfd/fsl-imx25-tsadc.c:80:18: error: implicit declaration of function 'irq_domain_add_simple' [-Werror=implicit-function-declaration]
+This patchset updates Exynos SYSMMU (IOMMU) driver to make use of the
+new features in the IOMMU core (support for IOMMU_DOMAIN_DMA) and adds
+support for SYSMMU v5 controllers, which are available in Samsung Exynos
+5433 SoCs. The driver has been also updated to compile and work on ARM64
+architecture.
 
-This adds a 'select IRQ_DOMAIN' code, like we have it in all other
-drivers with this requirement.
+Best regards
+Marek Szyprowski
+Samsung R&D Institute Poland
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: e2fccf5c1515 ("mfd: fsl-imx25-tsadc: Register touchscreen ADC driver")
----
- drivers/mfd/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-index aa21dc55eb15..8cab3ecca8fc 100644
---- a/drivers/mfd/Kconfig
-+++ b/drivers/mfd/Kconfig
-@@ -300,6 +300,7 @@ config MFD_MC13XXX_I2C
- config MFD_MX25_TSADC
- 	tristate "Freescale i.MX25 integrated Touchscreen and ADC unit"
- 	select REGMAP_MMIO
-+	select IRQ_DOMAIN
- 	depends on (SOC_IMX25 && OF) || COMPILE_TEST
- 	help
- 	  Enable support for the integrated Touchscreen and ADC unit of the
+Patch summary:
+
+Marek Szyprowski (11):
+  iommu: exynos: rework iommu group initialization
+  iommu: exynos: add support for IOMMU_DOMAIN_DMA domain type
+  iommu: exynos: remove ARM-specific cache flush interface
+  iommu: exynos: simplify master clock operations
+  iommu: exynos: refactor code (no direct register access)
+  iommu: exynos: refactor fault handling code
+  iommu: exynos: refactor init config code
+  iommu: exynos: unify code for fldp cache invalidation
+  iommu: exynos: update device tree documentation
+  iommu: exynos: add support for v5 SYSMMU
+  iommu: exynos: add Maintainers entry for Exynos SYSMMU driver
+
+ .../devicetree/bindings/iommu/samsung,sysmmu.txt   |  22 +-
+ MAINTAINERS                                        |   6 +
+ drivers/iommu/Kconfig                              |   2 +-
+ drivers/iommu/exynos-iommu.c                       | 514 ++++++++++++---------
+ 4 files changed, 318 insertions(+), 226 deletions(-)
+
 -- 
-2.7.0
+1.9.2
