@@ -1,87 +1,80 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 16 Feb 2016 13:52:36 +0100
-Subject: [PATCH v6sub1 05/11] arm64: introduce KIMAGE_VADDR as the virtual
- base of the kernel region
+Date: Tue, 16 Feb 2016 13:52:41 +0100
+Subject: [PATCH v6sub1 10/11] arm64: defer __va translation of initrd_start
+ and initrd_end
 In-Reply-To: <1455627162-31600-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1455627162-31600-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1455627162-31600-6-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1455627162-31600-11-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This introduces the preprocessor symbol KIMAGE_VADDR which will serve as
-the symbolic virtual base of the kernel region, i.e., the kernel's virtual
-offset will be KIMAGE_VADDR + TEXT_OFFSET. For now, we define it as being
-equal to PAGE_OFFSET, but in the future, it will be moved below it once
-we move the kernel virtual mapping out of the linear mapping.
+Before deferring the assignment of memstart_addr in a subsequent patch, to
+the moment where all memory has been discovered and possibly clipped based
+on the size of the linear region and the presence of a mem= command line
+parameter, we need to ensure that memstart_addr is not used to perform __va
+translations before it is assigned.
 
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+One such use is in the generic early DT discovery of the initrd location,
+which is recorded as a virtual address in the globals initrd_start and
+initrd_end. So wire up the generic support to declare the initrd addresses,
+and implement it without __va() translations, and perform the translation
+after memstart_addr has been assigned.
+
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/include/asm/memory.h | 10 ++++++++--
- arch/arm64/kernel/head.S        |  2 +-
- arch/arm64/kernel/vmlinux.lds.S |  4 ++--
- 3 files changed, 11 insertions(+), 5 deletions(-)
+ arch/arm64/include/asm/memory.h |  8 ++++++++
+ arch/arm64/mm/init.c            | 13 +++++++++----
+ 2 files changed, 17 insertions(+), 4 deletions(-)
 
 diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index c65aad7b13dc..aebc739f5a11 100644
+index 4388651d1f0d..18b7e77c7495 100644
 --- a/arch/arm64/include/asm/memory.h
 +++ b/arch/arm64/include/asm/memory.h
-@@ -51,7 +51,8 @@
- #define VA_BITS			(CONFIG_ARM64_VA_BITS)
- #define VA_START		(UL(0xffffffffffffffff) << VA_BITS)
- #define PAGE_OFFSET		(UL(0xffffffffffffffff) << (VA_BITS - 1))
--#define MODULES_END		(PAGE_OFFSET)
-+#define KIMAGE_VADDR		(PAGE_OFFSET)
-+#define MODULES_END		(KIMAGE_VADDR)
- #define MODULES_VADDR		(MODULES_END - SZ_64M)
- #define PCI_IO_END		(MODULES_VADDR - SZ_2M)
- #define PCI_IO_START		(PCI_IO_END - PCI_IO_SIZE)
-@@ -75,8 +76,13 @@
-  * private definitions which should NOT be used outside memory.h
-  * files.  Use virt_to_phys/phys_to_virt/__pa/__va instead.
-  */
--#define __virt_to_phys(x)	(((phys_addr_t)(x) - PAGE_OFFSET + PHYS_OFFSET))
-+#define __virt_to_phys(x) ({						\
-+	phys_addr_t __x = (phys_addr_t)(x);				\
-+	__x >= PAGE_OFFSET ? (__x - PAGE_OFFSET + PHYS_OFFSET) :	\
-+			     (__x - KIMAGE_VADDR + PHYS_OFFSET); })
+@@ -121,6 +121,14 @@
+ #define IOREMAP_MAX_ORDER	(PMD_SHIFT)
+ #endif
+ 
++#ifdef CONFIG_BLK_DEV_INITRD
++#define __early_init_dt_declare_initrd(__start, __end)			\
++	do {								\
++		initrd_start = (__start);				\
++		initrd_end = (__end);					\
++	} while (0)
++#endif
 +
- #define __phys_to_virt(x)	((unsigned long)((x) - PHYS_OFFSET + PAGE_OFFSET))
-+#define __phys_to_kimg(x)	((unsigned long)((x) - PHYS_OFFSET + KIMAGE_VADDR))
+ #ifndef __ASSEMBLY__
  
- /*
-  * Convert a page to/from a physical address
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 53b9f9f128c2..04d38a058b19 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -389,7 +389,7 @@ __create_page_tables:
- 	 * Map the kernel image (starting with PHYS_OFFSET).
- 	 */
- 	mov	x0, x26				// swapper_pg_dir
--	mov	x5, #PAGE_OFFSET
-+	ldr	x5, =KIMAGE_VADDR
- 	create_pgd_entry x0, x5, x3, x6
- 	ldr	x6, =KERNEL_END			// __va(KERNEL_END)
- 	mov	x3, x24				// phys offset
-diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index b78a3c772294..282e3e64a17e 100644
---- a/arch/arm64/kernel/vmlinux.lds.S
-+++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -89,7 +89,7 @@ SECTIONS
- 		*(.discard.*)
+ extern phys_addr_t		memstart_addr;
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index 1d627cd8121c..52d1fc465885 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -59,8 +59,8 @@ static int __init early_initrd(char *p)
+ 	if (*endp == ',') {
+ 		size = memparse(endp + 1, NULL);
+ 
+-		initrd_start = (unsigned long)__va(start);
+-		initrd_end = (unsigned long)__va(start + size);
++		initrd_start = start;
++		initrd_end = start + size;
  	}
+ 	return 0;
+ }
+@@ -168,8 +168,13 @@ void __init arm64_memblock_init(void)
+ 	 */
+ 	memblock_reserve(__pa(_text), _end - _text);
+ #ifdef CONFIG_BLK_DEV_INITRD
+-	if (initrd_start)
+-		memblock_reserve(__virt_to_phys(initrd_start), initrd_end - initrd_start);
++	if (initrd_start) {
++		memblock_reserve(initrd_start, initrd_end - initrd_start);
++
++		/* the generic initrd code expects virtual addresses */
++		initrd_start = __phys_to_virt(initrd_start);
++		initrd_end = __phys_to_virt(initrd_end);
++	}
+ #endif
  
--	. = PAGE_OFFSET + TEXT_OFFSET;
-+	. = KIMAGE_VADDR + TEXT_OFFSET;
- 
- 	.head.text : {
- 		_text = .;
-@@ -186,4 +186,4 @@ ASSERT(__idmap_text_end - (__idmap_text_start & ~(SZ_4K - 1)) <= SZ_4K,
- /*
-  * If padding is applied before .head.text, virt<->phys conversions will fail.
-  */
--ASSERT(_text == (PAGE_OFFSET + TEXT_OFFSET), "HEAD is misaligned")
-+ASSERT(_text == (KIMAGE_VADDR + TEXT_OFFSET), "HEAD is misaligned")
+ 	early_init_fdt_scan_reserved_mem();
 -- 
 2.5.0
