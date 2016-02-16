@@ -1,50 +1,112 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 16 Feb 2016 12:57:30 +0100
-Subject: [PATCH 1/3] ARM: zynq: Move early printk virtual address to
- vmalloc area
-In-Reply-To: <67c9013fc61f53515934b54847a05df8b8e1504a.1455552315.git.michal.simek@xilinx.com>
-References: <67c9013fc61f53515934b54847a05df8b8e1504a.1455552315.git.michal.simek@xilinx.com>
-Message-ID: <4209295.YSuxZXZMPH@wuerfel>
+From: hs.liao@mediatek.com (Horng-Shyang Liao)
+Date: Tue, 16 Feb 2016 20:06:22 +0800
+Subject: [RFC 1/3] dt-bindings: soc: Add documentation for the MediaTek
+ GCE unit
+In-Reply-To: <56B8D5A3.3000506@gmail.com>
+References: <1453266881-16849-1-git-send-email-hs.liao@mediatek.com>
+ <1453266881-16849-2-git-send-email-hs.liao@mediatek.com>
+ <20160120163826.GA23400@rob-hp-laptop>
+ <1453433893.15298.13.camel@mtksdaap41> <56B8D5A3.3000506@gmail.com>
+Message-ID: <1455624382.17318.6.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 15 February 2016 17:05:17 Michal Simek wrote:
-> The patch
-> "ARM: 8432/1: move VMALLOC_END from 0xff000000 to 0xff800000"
-> (sha1: 6ff0966052c46efb53980b8a1add2e7b49c9f560)
-> has moved also start of VMALLOC area because size didn't change.
-> That's why origin location of vmalloc was
->    vmalloc : 0xf0000000 - 0xff000000   ( 240 MB)
-> and now is
->    vmalloc : 0xf0800000 - 0xff800000   ( 240 MB)
+Hi Matthias,
+
+On Mon, 2016-02-08 at 18:51 +0100, Matthias Brugger wrote:
 > 
-> That's why uart virtual addresses need to be changed to reflect this new
-> memory setup. Starting address should be vmalloc start address.
+> On 22/01/16 04:38, Horng-Shyang Liao wrote:
+> > Hi Rob,
+> >
+> > On Wed, 2016-01-20 at 10:38 -0600, Rob Herring wrote:
+> >> On Wed, Jan 20, 2016 at 01:14:38PM +0800, hs.liao at mediatek.com wrote:
+> >>> From: HS Liao <hs.liao@mediatek.com>
+> >>>
+> >>> This adds documentation for the MediaTek Global Command Engine (GCE) unit
+> >>> found in MT8173 SoCs.
+> >>>
+> >>> Signed-off-by: HS Liao <hs.liao@mediatek.com>
+> >>> ---
+> >>>   .../devicetree/bindings/soc/mediatek/gce.txt       |   33 ++++++++++++++++++++
+> >>>   1 file changed, 33 insertions(+)
+> >>>   create mode 100644 Documentation/devicetree/bindings/soc/mediatek/gce.txt
+> >>>
+> >>> diff --git a/Documentation/devicetree/bindings/soc/mediatek/gce.txt b/Documentation/devicetree/bindings/soc/mediatek/gce.txt
+> >>> new file mode 100644
+> >>> index 0000000..878b11e
+> >>> --- /dev/null
+> >>> +++ b/Documentation/devicetree/bindings/soc/mediatek/gce.txt
+> >>> @@ -0,0 +1,33 @@
+> >>> +MediaTek GCE
+> >>> +===============
+> >>> +
+> >>> +The Global Command Engine (GCE) is used to help read/write registers with
+> >>> +critical time limitation, such as updating display configuration during the
+> >>> +vblank. The GCE can be used to implement the Command Queue (CMDQ) driver.
+> >>> +Currently, the GCE only supports display related hardwares, but we expect
+> >>> +it can be extended to other hardwares for future requirements.
+> >>
+> >> That's a hardware limitation or just s/w is only using it for display?
+> >> If the latter, that's not really relevant to this binding and should be
+> >> removed.
+> >
+> > Just s/w is only using it for display.
+> > I will remove it from next patch.
+> >
+> >>> +
+> >>> +Required properties:
+> >>> +- compatible: Must be "mediatek,mt8173-gce"
+> >>> +- reg: Address range of the GCE unit
+> >>> +- interrupts: The interrupt signal from the GCE block
+> >>> +- clock: Clocks according to the common clock binding
+> >>> +- clock-names: Must be "gce" to stand for GCE clock
+> >>> +
+> >>> +Example:
+> >>> +
+> >>> +	gce: gce at 10212000 {
+> >>> +		compatible = "mediatek,mt8173-gce";
+> >>> +		reg = <0 0x10212000 0 0x1000>;
+> >>> +		interrupts = <GIC_SPI 135 IRQ_TYPE_LEVEL_LOW>;
+> >>> +		clocks = <&infracfg CLK_INFRA_GCE>;
+> >>> +		clock-names = "gce";
+> >>> +	};
+> >>> +
+> >>> +	mmsys: clock-controller at 14000000 {
+> >>> +		compatible = "mediatek,mt8173-mmsys", "syscon";
+> >>> +		reg = <0 0x14000000 0 0x1000>;
+> >>> +		power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
+> >>> +		#clock-cells = <1>;
+> >>> +		mediatek,gce = <&gce>;
+> >>
+> >> Not documented.
+> >
+> > It's just an example about how gce is used by display mmsys.
+> > After I discussed with Mediatek display owner,
+> > we think this can be moved to display device tree document.
+> > Do you agree with this suggestion?
+> > If so, I will remove it from next patch, too.
+> >
 > 
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> The problem is that mediatek,gce is not documented, but only 
+> mediatek,mt8173-gce.
 
-All three patches look good to me,
+How about this?
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Required properties for a client device:
+- mediatek,gce: Should point to the respective GCE block
 
-I would like to hear back from Nico on this though: is this an expected
-outcome of your patch, or is it something you had not considered at
-all?
+Example for a client device:
 
-Do we need to audit all platforms for other instances of the same
-problem? I see for instance
+mmsys: clock-controller at 14000000 {
+	compatible = "mediatek,mt8173-mmsys";
+	mediatek,gce = <&gce>;
+	...
+};
 
-static struct map_desc jornada720_io_desc[] __initdata = {
-        {       /* Epson registers */
-                .virtual        = 0xf0000000,
-                .pfn            = __phys_to_pfn(EPSONREGSTART),
-                .length         = EPSONREGLEN,
-                .type           = MT_DEVICE
-        }, {    /* Epson frame buffer */
 
-in arch/arm/mach-sa1100/jornada720.c. Could this have the same problem?
+> 
+> Regards,
+> Matthias
 
-I would guess that only machines with 768MB of RAM (or more) can run
-into the bug.
-
-	Arnd
+Thanks,
+HS Liao
