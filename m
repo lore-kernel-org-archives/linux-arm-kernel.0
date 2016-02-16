@@ -1,23 +1,56 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 16 Feb 2016 13:22:23 +0000
-Subject: [PATCH] spi/rockchip: Add dt-binding for Rockchip rk3399 spi
-In-Reply-To: <1455614538-4415-1-git-send-email-jay.xu@rock-chips.com>
-References: <1455614538-4415-1-git-send-email-jay.xu@rock-chips.com>
-Message-ID: <20160216132223.GM18327@sirena.org.uk>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Tue, 16 Feb 2016 13:38:09 +0000
+Subject: [PATCH v3 05/10] serial: mps2-uart: add support for early console
+In-Reply-To: <CAHp75Vf_4MgdWunQy5hBMH5GGei+OkktFPYY-ZprY0qOEnD=wA@mail.gmail.com>
+References: <1455617295-23736-1-git-send-email-vladimir.murzin@arm.com>	<1455617295-23736-6-git-send-email-vladimir.murzin@arm.com>	<CAHp75VdugAq0WnzLHmd9CJHCjBOdBwPqCmC3ARSaVF5XMYGoMw@mail.gmail.com>	<56C31F9F.10000@arm.com>
+ <CAHp75Vf_4MgdWunQy5hBMH5GGei+OkktFPYY-ZprY0qOEnD=wA@mail.gmail.com>
+Message-ID: <56C32641.4020201@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 16, 2016 at 05:22:18PM +0800, jianqun.xu wrote:
+On 16/02/16 13:13, Andy Shevchenko wrote:
+> On Tue, Feb 16, 2016 at 3:09 PM, Vladimir Murzin
+> <vladimir.murzin@arm.com> wrote:
+>> On 16/02/16 10:36, Andy Shevchenko wrote:
+>>> On Tue, Feb 16, 2016 at 12:08 PM, Vladimir Murzin
+>>> <vladimir.murzin@arm.com> wrote:
+>>>> This adds support early console for MPS2 UART which can be enabled via
+>>>> earlycon=mps2,0x40004000
+> 
+>>>> +static void mps2_early_putchar(struct uart_port *port, int ch)
+>>>> +{
+>>>> +
+>>>> +       while (readb(port->membase + UARTn_STATE) & UARTn_STATE_TX_FULL)
+>>>> +               cpu_relax();
+>>>
+>>> Infinite busy loop?
+>>
+>> In case of broken hw, yes, but I'm quite unsure how we can help to fix
+>> it. Do you have something in mind?
+> 
+> Set sane amount of loops like
+> 
+> int count = 100;
+> ?
+> while (? && --count)
+> 
+> Though I have no idea what to do if count == 0. Perhaps it's a TX overrun state.
 
->  Documentation/devicetree/bindings/spi/spi-rockchip.txt | 1 +
->  1 file changed, 1 insertion(+)
+I thought about counter too, like some of drivers do, but had no idea
+what to do next after counter reaches zero. In case of TX overrun we
+could get it either because of broken hw or because we entered Linux
+with that state already set. In both cases, it looks handy to me to
+attach a debugger and see that we are spinning in this putchar loop.
 
-I'd expect this to be added to both the driver and the binding document
-not just the document.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160216/3631ddb2/attachment.sig>
+If you do insist to have a counter I'll add one, but if you are not
+strong about it I'd prefer to leave it as is.
+
+> 
+> You may try to recover by flushing TX queue in HW (fifo and / or Tx
+> shift register) if HW supports it.
+> 
+
+I'm afraid this is not supported.
+
+Thanks
+Vladimir
