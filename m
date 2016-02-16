@@ -1,38 +1,44 @@
-From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
-Date: Tue, 16 Feb 2016 10:32:17 +0100
-Subject: [PATCH v2 01/15] arm: use of_platform_default_populate() to
- populate default bus
-In-Reply-To: <1453881180-12296-1-git-send-email-wangkefeng.wang@huawei.com>
- (Kefeng Wang's message of "Wed, 27 Jan 2016 15:53:00 +0800")
-References: <1453868872-26300-2-git-send-email-wangkefeng.wang@huawei.com>
- <1453881180-12296-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <m38u2lq9um.fsf@t19.piap.pl>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 16 Feb 2016 10:33:45 +0100
+Subject: Allwinner A64 MMC support
+In-Reply-To: <56C1D9C0.6020601@arm.com>
+References: <1455300000-18723-1-git-send-email-andre.przywara@arm.com>
+ <56BE29A1.3060107@redhat.com> <56C1A590.6030500@arm.com>
+ <56C1C7BB.1040602@redhat.com> <56C1D9C0.6020601@arm.com>
+Message-ID: <20160216093345.GJ4344@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kefeng Wang <wangkefeng.wang@huawei.com> writes:
+Hi Andre,
 
-> Use helper of_platform_default_populate() in linux/of_platform
-> when possible, instead of calling of_platform_populate() with
-> the default match table.
-> --- a/arch/arm/mach-cns3xxx/core.c
-> +++ b/arch/arm/mach-cns3xxx/core.c
-> @@ -395,8 +395,7 @@ static void __init cns3xxx_init(void)
->  
->  	pm_power_off = cns3xxx_power_off;
->  
-> -	of_platform_populate(NULL, of_default_bus_match_table,
-> -                        cns3xxx_auxdata, NULL);
-> +	of_platform_default_populate(NULL, cns3xxx_auxdata, NULL);
->  }
->  
+On Mon, Feb 15, 2016 at 01:59:28PM +0000, Andre Przywara wrote:
+> 2) The reset node is a allwinner,sun6i-a31-ahb1-reset, which does not
+> get registered automatically, but by an explicit call from mach-sunxi/.
+> I wonder why we do this (yes, I saw that comment, but still...) and if
+> it would work with a normal MODULE_DEVICE_TABLE() declaration.
 
-Doesn't look wrong :-)
+Because we need to access the reset controller at the time the timer
+is probed, which is way before the device model is initilized, and the
+"real" reset controller driver is probed.
 
-Acked-by: Krzysztof Halasa <khalasa@piap.pl>
+I'm not really fond of the solution either, but there's no other
+solution, if we set aside "rework the driver / device model so that it
+initializes properly".
+
+> There is and will be no equivalent to the mach- directory on arm64.
+
+Then you cannot use the HS timer.
+
+Maxime
 
 -- 
-Krzysztof Halasa
-
-Industrial Research Institute for Automation and Measurements PIAP
-Al. Jerozolimskie 202, 02-486 Warsaw, Poland
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160216/ed962901/attachment-0001.sig>
