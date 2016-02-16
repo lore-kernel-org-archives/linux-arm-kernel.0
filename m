@@ -1,88 +1,29 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Mon, 15 Feb 2016 15:36:49 -0800
-Subject: [PATCH 0/3] clk: mvebu: initial support for AP806 clocks
-In-Reply-To: <20160215233102.2278.88855@quark.deferred.io>
-References: <1455521698-7905-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20160215233102.2278.88855@quark.deferred.io>
-Message-ID: <CAEG3pNCRa_CQx70aPHfQpG+7jEZ_=_-FxBWDkXVYbgH=j=1rmA@mail.gmail.com>
+From: mark.yao@rock-chips.com (Mark yao)
+Date: Tue, 16 Feb 2016 08:39:09 +0800
+Subject: [PATCH v2 15/17] drm/rockchip: removed optional dummy encoder
+ mode_fixup function.
+In-Reply-To: <cae559aa2c04a906c21ed5ebe4861f92440e6910.1455540137.git.palminha@synopsys.com>
+References: <cover.1455540137.git.palminha@synopsys.com>
+ <cae559aa2c04a906c21ed5ebe4861f92440e6910.1455540137.git.palminha@synopsys.com>
+Message-ID: <56C26FAD.5040102@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas,
-
-On Mon, Feb 15, 2016 at 3:31 PM, Michael Turquette
-<mturquette@baylibre.com> wrote:
-> Hi Thomas,
+On 2016?02?15? 21:01, Carlos Palminha wrote:
+> mode_fixup function for encoder drivers became optional with patch
+> http://patchwork.freedesktop.org/patch/msgid/1455106522-32307-1-git-send-email-palminha at synopsys.com
 >
-> Quoting Thomas Petazzoni (2016-02-14 23:34:55)
->> Hello,
->>
->> The following set of patches add initial support for the main clocks
->> found in the AP806 hardware block, which is the central block used in
->> the newest Marvell 7K and 8K 64-bits processors.
->>
->> Two new drivers are added, one for the so-called "core" clocks and one
->> for the "ring" clocks. The latter are child clocks from one of the
->> core clocks. The "core" clocks are fixed rate clocks, but their rate
->> is calculated from values in the Sample At Reset register.
->>
->> The support for the Marvell 7K/8K platform (Device Tree, etc.) will be
->> submitted as a separate patch series.
+> This patch set nukes all the dummy mode_fixup implementations.
 >
-> Yay, new SoC! Just FYI, we worked out an agreement in December[0] that
-> the clk git tree can take DT bindings and headers, and we'll always host
-> them in an immutable branch by default in case arm-soc (or anyone else)
-> needs them. Stephen and I are doing this now.
-
-Oops, I misunderstood your point (and I should have looked at the
-patches before replying). The patches in this series do indeed have
-the clk DT binding descriptions.
-
-Pardon the noise, nothing to see here, move along ;-)
-
-Regards,
-Mike
-
+> (made on top of Daniel topic/drm-misc branch)
 >
-> It's nice for us to review those bindings at the same time that we
-> review the driver.
+> Signed-off-by: Carlos Palminha <palminha@synopsys.com>
+> ---
+>   drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 8 --------
+>   1 file changed, 8 deletions(-)
 >
-> [0] http://lkml.kernel.org/r/<20151231001859.19557.99512@quark.deferred.io>
 >
-> Best regards,
-> Mike
->
->>
->> Thanks!
->>
->> Thomas
->>
->> Thomas Petazzoni (3):
->>   clk: unconditionally recurse into clk/mvebu/
->>   clk: mvebu: add AP806 core clock driver
->>   clk: mvebu: add AP806 ring clock driver
->>
->>  .../clock/mvebu-armada-ap806-core-clock.txt        |  33 ++++++
->>  .../clock/mvebu-armada-ap806-ring-clock.txt        |  32 ++++++
->>  drivers/clk/Makefile                               |   2 +-
->>  drivers/clk/mvebu/Kconfig                          |   6 ++
->>  drivers/clk/mvebu/Makefile                         |   3 +-
->>  drivers/clk/mvebu/ap806-core.c                     | 112 +++++++++++++++++++++
->>  drivers/clk/mvebu/ap806-ring.c                     |  65 ++++++++++++
->>  7 files changed, 251 insertions(+), 2 deletions(-)
->>  create mode 100644 Documentation/devicetree/bindings/clock/mvebu-armada-ap806-core-clock.txt
->>  create mode 100644 Documentation/devicetree/bindings/clock/mvebu-armada-ap806-ring-clock.txt
->>  create mode 100644 drivers/clk/mvebu/ap806-core.c
->>  create mode 100644 drivers/clk/mvebu/ap806-ring.c
->>
->> --
->> 2.6.4
->>
+Acked-by: Mark Yao <mark.yao@rock-chips.com>
 
-
-
--- 
-Michael Turquette
-CEO
-BayLibre - At the Heart of Embedded Linux
-http://baylibre.com/
+Thanks
+Mark
