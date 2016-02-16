@@ -1,26 +1,49 @@
 From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 16 Feb 2016 02:23:46 +0100
-Subject: [PATCH v6 2/2] ACPI: amba bus probing support
-In-Reply-To: <1453300171-25473-3-git-send-email-aleksey.makarov@linaro.org>
-References: <1453300171-25473-1-git-send-email-aleksey.makarov@linaro.org>
- <1453300171-25473-3-git-send-email-aleksey.makarov@linaro.org>
-Message-ID: <1558867.xs6LSUHIo3@vostro.rjw.lan>
+Date: Tue, 16 Feb 2016 02:27:15 +0100
+Subject: Crashes in arm qemu emulations due to 'cpufreq: governor: Replace
+ timers with utilization ...'
+In-Reply-To: <20160216011335.GI6334@vireshk-i7>
+References: <20160215170527.GA24453@roeck-us.net>
+ <CAJZ5v0gLankSuziQq25qTCyNqeOX43yD9jnJu_XXwbdyajfmKg@mail.gmail.com>
+ <20160216011335.GI6334@vireshk-i7>
+Message-ID: <6826860.yxabWEoz5T@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, January 20, 2016 08:29:27 PM Aleksey Makarov wrote:
-> From: Graeme Gregory <graeme.gregory@linaro.org>
+On Tuesday, February 16, 2016 06:43:35 AM Viresh Kumar wrote:
+> On 15-02-16, 19:41, Rafael J. Wysocki wrote:
+> > On Mon, Feb 15, 2016 at 6:05 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+> > > [    1.340000] [<c0958e78>] (__cpufreq_driver_target) from [<c095ca58>] (dbs_check_cpu+0x1ac/0x1e8)
+> > > [    1.340000] [<c095ca58>] (dbs_check_cpu) from [<c095cd04>] (cpufreq_governor_dbs+0x1fc/0x608)
+> > > [    1.340000] [<c095cd04>] (cpufreq_governor_dbs) from [<c0959c5c>] (__cpufreq_governor+0x1a8/0x204)
+> > > [    1.340000] [<c0959c5c>] (__cpufreq_governor) from [<c095a2dc>] (cpufreq_init_policy+0x60/0x8c)
+> > > [    1.340000] [<c095a2dc>] (cpufreq_init_policy) from [<c095a5f0>] (cpufreq_online+0x2e8/0x708)
+> > > [    1.340000] [<c095a5f0>] (cpufreq_online) from [<c075674c>] (subsys_interface_register+0x80/0xc4)
+> > > [    1.340000] [<c075674c>] (subsys_interface_register) from [<c0959764>] (cpufreq_register_driver+0x144/0x1a0)
+> > 
+> > This is the registration of the cpufreq driver (cpufreq-dt in this case).
+> > 
+> > It does cpufreq_online()->cpufreq_init_policy()->__cpufreq_governor()->cpufreq_governor_dbs()->dbs_check_cpu().
+> > 
+> > The only way that can happen is when cpufreq_set_policy() finds that
+> > the "old" and the "new" policies use the same governor, so it goes and
+> > calls __cpufreq_governor(policy, CPUFREQ_GOV_LIMITS), but I'm not sure
+> > how this is possible during the initialization ATM.
+> > 
+> > Viresh, any ideas?
 > 
-> On ARM64 some devices use the AMBA device and not the platform bus for
-> probing so add support for this. Uses a dummy clock for apb_pclk as ACPI
-> does not have a suitable clock representation and to keep the core
-> AMBA bus code unchanged between probing methods.
+> You misread probably.
 > 
-> Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
-> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
+> During init, policy->gov is NULL and new_policy->gov is set to the
+> default one, probably ondemand/conservative. And in that case, we do:
+> - INIT
+> - START
+> - LIMITS
 
-This one looks OK to me, so please just post an update of the [1/2].
+Yes, that's what we should be doing, but it seemed to me that we didn't.
+
+Or maybe the trace just contained the last one, because that's when the
+crash happened.
 
 Thanks,
 Rafael
