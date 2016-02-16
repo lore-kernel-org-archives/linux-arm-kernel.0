@@ -1,39 +1,36 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 16 Feb 2016 10:02:36 +0200
-Subject: [PATCH/RFC v2 05/11] soc: renesas: rcar: Handle clock domain
- devices in SYSC PM domains
-In-Reply-To: <CAMuHMdUs1cJMZaO8-UkOcBYTy1nd9oR3kLo4q3Z4wxU_t4SDbw@mail.gmail.com>
-References: <1455571020-18968-1-git-send-email-geert+renesas@glider.be>
- <2087210.c20JsV3rp3@avalon>
- <CAMuHMdUs1cJMZaO8-UkOcBYTy1nd9oR3kLo4q3Z4wxU_t4SDbw@mail.gmail.com>
-Message-ID: <2269681.nQFpo1ggiB@avalon>
+From: jan.glauber@caviumnetworks.com (Jan Glauber)
+Date: Tue, 16 Feb 2016 09:04:24 +0100
+Subject: [PATCH v3 4/5] arm64/perf: Enable PMCR long cycle counter bit
+In-Reply-To: <20160215195529.GW6298@arm.com>
+References: <cover.1454516082.git.jglauber@cavium.com>
+ <de7340e1843f7823384551db64b12eadde7eded7.1454516082.git.jglauber@cavium.com>
+ <20160215195529.GW6298@arm.com>
+Message-ID: <20160216080424.GB3490@hardcore>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
-
-On Tuesday 16 February 2016 08:30:03 Geert Uytterhoeven wrote:
-> On Mon, Feb 15, 2016 at 11:08 PM, Laurent Pinchart wrote:
-> > On Monday 15 February 2016 22:16:54 Geert Uytterhoeven wrote:
-> >> R-Car H3 contains some hardware modules (e.g. VSP and FCP_V) that are
-> >> not only located in a power area controlled by the SYSC system
-> >> controller, but that are also part of the generic CPG/MSSR clock domain.
-> >> Make sure both are handled by enabling module clock PM when the device
-> >> for such a hardware module is attached to the SYSC PM Domain.
-> > 
-> > Can't we specify both power domains in the DT power-domains attribute
-> > instead ?
+On Mon, Feb 15, 2016 at 07:55:29PM +0000, Will Deacon wrote:
+> On Wed, Feb 03, 2016 at 06:11:59PM +0100, Jan Glauber wrote:
+> > @@ -768,8 +776,11 @@ static void armv8pmu_reset(void *info)
+> >  		armv8pmu_disable_intens(idx);
+> >  	}
+> >  
+> > -	/* Initialize & Reset PMNC: C and P bits. */
+> > -	armv8pmu_pmcr_write(ARMV8_PMCR_P | ARMV8_PMCR_C);
+> > +	/*
+> > +	 * Initialize & Reset PMNC. Request overflow on 64 bit but
+> > +	 * cheat in armv8pmu_write_counter().
 > 
-> While the DT property is called "power-domains" (plural), only the first
-> entry is parsed by genpd_dev_pm_attach(). Which makes sense for power areas
-> (if there are multiple, they are nested), but indeed can cause problems
-> when mixed with clock domains.
-> 
-> For R-Mobile, I fixed it in a similar way.
+> Can you expand the comment to mention that the 64-bit overflow is only
+> for the cycle counter, please?
 
-Still, shouldn't it be fixed in genpd ?
+OK, how about:
 
--- 
-Regards,
+/*
+ * Initialize & Reset PMNC. Request overflow interrupt for
+ * 64 bit cycle counter but cheat in armv8pmu_write_counter().
+ */
 
-Laurent Pinchart
+Jan
+
+> Will
