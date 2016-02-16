@@ -1,28 +1,96 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 16 Feb 2016 15:37:02 +0100
-Subject: [PATCH] spi/rockchip: Add dt-binding for Rockchip rk3399 spi
-In-Reply-To: <20160216132223.GM18327@sirena.org.uk>
-References: <1455614538-4415-1-git-send-email-jay.xu@rock-chips.com>
- <20160216132223.GM18327@sirena.org.uk>
-Message-ID: <1730751.NYv1NxJVuB@phil>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Tue, 16 Feb 2016 15:38:21 +0100
+Subject: [PATCH v2 00/17] drm encoders cleanup: nuke optional dummy
+ encoder mode_fixup function.
+In-Reply-To: <cover.1455540137.git.palminha@synopsys.com>
+References: <cover.1455540137.git.palminha@synopsys.com>
+Message-ID: <20160216143821.GG32705@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 16. Februar 2016, 13:22:23 schrieb Mark Brown:
-> On Tue, Feb 16, 2016 at 05:22:18PM +0800, jianqun.xu wrote:
-> >  Documentation/devicetree/bindings/spi/spi-rockchip.txt | 1 +
-> >  1 file changed, 1 insertion(+)
+On Mon, Feb 15, 2016 at 12:57:04PM +0000, Carlos Palminha wrote:
+> mode_fixup function for encoder drivers became optional with patch
+> http://patchwork.freedesktop.org/patch/msgid/1455106522-32307-1-git-send-email-palminha at synopsys.com
 > 
-> I'd expect this to be added to both the driver and the binding document
-> not just the document.
+> This patch set nukes all the dummy mode_fixup implementations.
+> 
+> (made on top of Daniel topic/drm-misc branch)
+> 
+> Changes v1->v2: incorporated Daniel comments
+> * added signed-off-by line to all patches
+> * threading enabled due to e-mail server constraints
+> * common blurb lines to all patches
+> * add reviewed by Alex, to patches 4 and 14
 
-It seems the driver can still use the rk3066-variant - aka nobody has found 
-specific issues in the rk3399 IP implementation.
+I've thrown them all into a topic branch for soaking, and plan to merge
+into drm-misc in the next few days.
 
-Having the more specific IP names already in the dts before actually using 
-them was suggested by devicetree people to not have to exchange everything 
-once specific issues were found. 
+Thanks, Daniel
 
-So right now it's using the fallback-mechanism of binding to the rk3066 
-name, but if some obstacle appears it will only take adding the binding in 
-the driver to make it work (even with old devicetrees).
+> 
+> Carlos Palminha (17):
+>   drm/virtio: removed optional dummy encoder mode_fixup function.
+>   drm/udl: removed optional dummy encoder mode_fixup function.
+>   drm/exynos: removed optional dummy encoder mode_fixup function.
+>   drm/amdgpu: removed optional dummy encoder mode_fixup function.
+>   drm/ast: removed optional dummy encoder mode_fixup function.
+>   drm/bochs: removed optional dummy encoder mode_fixup function.
+>   drm/cirrus: removed optional dummy encoder mode_fixup function.
+>   drm/exynos: removed optional dummy encoder mode_fixup function.
+>   drm/gma500: removed optional dummy encoder mode_fixup function.
+>   drm/imx: removed optional dummy encoder mode_fixup function.
+>   drm/msm/mdp: removed optional dummy encoder mode_fixup function.
+>   drm/mgag200: removed optional dummy encoder mode_fixup function.
+>   drm/qxl: removed optional dummy encoder mode_fixup function.
+>   drm/radeon: removed optional dummy encoder mode_fixup function.
+>   drm/rockchip: removed optional dummy encoder mode_fixup function.
+>   drm/sti: removed optional dummy encoder mode_fixup function.
+>   drm/tilcdc: removed optional dummy encoder mode_fixup function.
+> 
+>  drivers/gpu/drm/amd/amdgpu/dce_v10_0.c           |  8 --------
+>  drivers/gpu/drm/amd/amdgpu/dce_v11_0.c           |  8 --------
+>  drivers/gpu/drm/amd/amdgpu/dce_v8_0.c            |  8 --------
+>  drivers/gpu/drm/ast/ast_mode.c                   |  8 --------
+>  drivers/gpu/drm/bochs/bochs_kms.c                |  8 --------
+>  drivers/gpu/drm/cirrus/cirrus_mode.c             |  9 ---------
+>  drivers/gpu/drm/exynos/exynos_dp_core.c          |  8 --------
+>  drivers/gpu/drm/exynos/exynos_drm_dpi.c          |  8 --------
+>  drivers/gpu/drm/exynos/exynos_drm_dsi.c          |  8 --------
+>  drivers/gpu/drm/exynos/exynos_drm_vidi.c         |  8 --------
+>  drivers/gpu/drm/gma500/cdv_intel_crt.c           |  1 -
+>  drivers/gpu/drm/gma500/cdv_intel_hdmi.c          |  1 -
+>  drivers/gpu/drm/gma500/gma_display.c             |  7 -------
+>  drivers/gpu/drm/gma500/gma_display.h             |  3 ---
+>  drivers/gpu/drm/gma500/oaktrail_hdmi.c           |  1 -
+>  drivers/gpu/drm/imx/dw_hdmi-imx.c                |  8 --------
+>  drivers/gpu/drm/imx/imx-ldb.c                    |  8 --------
+>  drivers/gpu/drm/imx/imx-tve.c                    |  8 --------
+>  drivers/gpu/drm/imx/parallel-display.c           |  8 --------
+>  drivers/gpu/drm/mgag200/mgag200_mode.c           |  8 --------
+>  drivers/gpu/drm/msm/mdp/mdp4/mdp4_dsi_encoder.c  |  8 --------
+>  drivers/gpu/drm/msm/mdp/mdp4/mdp4_dtv_encoder.c  |  8 --------
+>  drivers/gpu/drm/msm/mdp/mdp4/mdp4_lcdc_encoder.c |  8 --------
+>  drivers/gpu/drm/msm/mdp/mdp5/mdp5_cmd_encoder.c  |  9 ---------
+>  drivers/gpu/drm/msm/mdp/mdp5/mdp5_encoder.c      |  8 --------
+>  drivers/gpu/drm/qxl/qxl_display.c                |  9 ---------
+>  drivers/gpu/drm/radeon/atombios_encoders.c       |  8 --------
+>  drivers/gpu/drm/rockchip/dw-mipi-dsi.c           |  8 --------
+>  drivers/gpu/drm/sti/sti_tvout.c                  | 10 ----------
+>  drivers/gpu/drm/tilcdc/tilcdc_panel.c            |  9 ---------
+>  drivers/gpu/drm/tilcdc/tilcdc_tfp410.c           |  9 ---------
+>  drivers/gpu/drm/udl/udl_encoder.c                |  8 --------
+>  drivers/gpu/drm/virtio/virtgpu_display.c         |  8 --------
+>  33 files changed, 244 deletions(-)
+> 
+> -- 
+> 2.5.0
+> 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
