@@ -1,69 +1,84 @@
-From: peter@korsgaard.com (Peter Korsgaard)
-Date: Tue, 16 Feb 2016 22:00:04 +0100
-Subject: [PATCH] ARM: dts: sun4i: Enable USB DRC on Hyundai-a7hd
-Message-ID: <1455656404-31191-1-git-send-email-peter@korsgaard.com>
+From: rric@kernel.org (Robert Richter)
+Date: Tue, 16 Feb 2016 22:14:10 +0100
+Subject: [PATCH V2] AHCI: Workaround for ThunderX Errata#22536
+In-Reply-To: <56C37D94.8080403@caviumnetworks.com>
+References: <1455319230-30201-1-git-send-email-tchalamarla@caviumnetworks.com>
+ <20160214170152.GC3965@htj.duckdns.org>
+ <56C147B2.9010303@caviumnetworks.com>
+ <20160215183041.GH3965@htj.duckdns.org>
+ <20160216144250.GD31343@rric.localdomain>
+ <56C37524.5090000@caviumnetworks.com>
+ <56C37AD3.4030407@caviumnetworks.com>
+ <56C37D94.8080403@caviumnetworks.com>
+Message-ID: <20160216211410.GI25086@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the OTG USB controller on the A7HD.
+On 16.02.16 11:50:44, Tirumalesh Chalamarla wrote:
+> 
+> 
+> On 02/16/2016 11:38 AM, David Daney wrote:
+> >On 02/16/2016 11:14 AM, Tirumalesh Chalamarla wrote:
+> >>
+> >>
+> >>On 02/16/2016 06:42 AM, Robert Richter wrote:
+> >>>On 15.02.16 13:30:41, Tejun Heo wrote:
+> >>>>On Sun, Feb 14, 2016 at 07:36:18PM -0800, Tirumalesh Chalamarla wrote:
+> >>>>>There is no need for special Driver, AHCI is sufficient for
+> >>>>>ThunderX, the
+> >>>>>file only contains this interrupt handler,
+> >>>>>is it preferable if this interrupt handler in libahci.c with others,
+> >>>>>instead
+> >>>>>of separate file?
+> >>>>
+> >>>>Yeap, just fold it in ahci.c with surrounding #ifdef guard.
+> >>>
+> >>>Yes, please use #ifdef CONFIG_CAVIUM_ERRATUM_22536 ... and add a
+> >>>kconfig entry for this to arch/arm64/Kconfig.
+> >>>
+> >>Are you sure, this is not a workaround that is based on alternative
+> >>framework rather on pci device and vendor
+> >>
+> >>do you think CONFIG_ARCH_THUNDER a good alternative?
+> >
+> >No.  CONFIG_ARCH_THUNDER should be removed all together.
+> >
+> >Grouping a bunch of unrelated features under a single config variable
+> >creates a very brittle system.  What are you going to do when a new
+> >hardware revision is released?  Create CONFIG_ARCH_THUNDER2?  Which one
+> >of these two would you select if building a kernel?  It is a choice that
+> >we don't want to force users (kernel builders) to have to waste mental
+> >energy on.
+> >
+> >Instead, let's try to make things work out of the box without having to
+> >set a bunch of random config variables.
+> >
+> >If a generic arm64 kernel won't get too bloated, I would suggest just
+> >enabling the compilation of the code unconditionally (at least for
+> >arm64).  The use of the code would still be gated by the PCI version
+> >probe that is part of the patch.
+> >
+> 
+> exactly, that is my initial choice with v1, and only depends on vendor and
+> device id.
+> 
+> but it seems a config is needed. how about ARCH_ARM64 then?
 
-Signed-off-by: Peter Korsgaard <peter@korsgaard.com>
----
- arch/arm/boot/dts/sun4i-a10-hyundai-a7hd.dts | 34 ++++++++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
+CONFIG_CAVIUM_ERRATUM_22536 is exactly that you need. It is not only
+used for core interrupts, e.g. also for gicv3 devices (and now also
+for ahci). Non-core errata (e.g. CONFIG_CAVIUM_ERRATUM_23144) are not
+enabled in the arm64 cpu errata framework (not handled in
+arch/arm64/kernel/cpu_errata.c).
 
-diff --git a/arch/arm/boot/dts/sun4i-a10-hyundai-a7hd.dts b/arch/arm/boot/dts/sun4i-a10-hyundai-a7hd.dts
-index 43f58fb..9103864 100644
---- a/arch/arm/boot/dts/sun4i-a10-hyundai-a7hd.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-hyundai-a7hd.dts
-@@ -87,6 +87,30 @@
- 	status = "okay";
- };
- 
-+&otg_sram {
-+	status = "okay";
-+};
-+
-+&pio {
-+	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
-+		allwinner,pins = "PH4";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-+	};
-+
-+	usb0_vbus_detect_pin: usb0_vbus_detect_pin at 0 {
-+		allwinner,pins = "PH5";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_PULL_DOWN>;
-+	};
-+};
-+
-+&reg_usb0_vbus {
-+	status = "okay";
-+};
-+
- &reg_usb2_vbus {
- 	gpio = <&pio 7 6 GPIO_ACTIVE_HIGH>; /* PH6 */
- 	status = "okay";
-@@ -102,7 +126,17 @@
- 	allwinner,pins = "PH6";
- };
- 
-+&usb_otg {
-+	dr_mode = "otg";
-+	status = "okay";
-+};
-+
- &usbphy {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&usb0_id_detect_pin>, <&usb0_vbus_detect_pin>;
-+	usb0_id_det-gpio = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
-+	usb0_vbus_det-gpio = <&pio 7 5 GPIO_ACTIVE_HIGH>; /* PH5 */
-+	usb0_vbus-supply = <&reg_usb0_vbus>;
- 	usb2_vbus-supply = <&reg_usb2_vbus>;
- 	status = "okay";
- };
--- 
-2.1.4
+Thus,
+
+#ifdef CONFIG_CAVIUM_ERRATUM_22536
+	if (pdev->vendor == 0x177d && pdev->device == 0xa01c)
+		ahci_thunderx_init(&pdev->dev, hpriv);
+#endif
+
+is the correct enablement of the workaround by device id.
+
+And, CAVIUM_ERRATUM_* is very easy to handle, enable and document.
+
+-Robert
