@@ -1,62 +1,84 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Tue, 16 Feb 2016 22:54:02 +0100
-Subject: [PATCH v2] dmaengine: pxa_dma: fix cyclic transfers
-Message-ID: <1455659642-7746-1-git-send-email-robert.jarzmik@free.fr>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 16 Feb 2016 13:55:40 -0800
+Subject: [PATCH] ARM: drop unused DEBUG_RODATA from XIP_KERNEL
+In-Reply-To: <alpine.LFD.2.20.1602161539550.13632@knanqh.ubzr>
+References: <20160216202957.GA1826@www.outflux.net>
+ <alpine.LFD.2.20.1602161539550.13632@knanqh.ubzr>
+Message-ID: <CAGXu5jJAzrkoNxj48NRQmfUh2Ej1DOfjZETz2wFJQnO_OxJy-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While testing audio with pxa2xx-ac97, underrun were happening while the
-user application was correctly feeding the music. Debug proved that the
-cyclic transfer is not cyclic, ie. the last descriptor did not loop on
-the first.
+On Tue, Feb 16, 2016 at 12:41 PM, Nicolas Pitre
+<nicolas.pitre@linaro.org> wrote:
+> On Tue, 16 Feb 2016, Kees Cook wrote:
+>
+>> With CONFIG_DEBUG_RODATA not being sensible under XIP_KERNEL, remove it
+>> from the XIP linker script.
+>
+> If so you should also make DEBUG_RODATA depend on !XIP_KERNEL in Kconfig
+> to avoid offering a config option that does nothing.
 
-Another issue is that the descriptor length was always set to 8192,
-because of an trivial operator issue.
+Yeah, that's what Arnd's other patch does. This is intended to follow
+his cleanups that do this.
 
-This was tested on a pxa27x platform.
+-Kees
 
-Fixes: a57e16cf0333 ("dmaengine: pxa: add pxa dmaengine driver")
-Reported-by: Vasily Khoruzhick <anarsoul@gmail.com>
-Tested-by: Vasily Khoruzhick <anarsoul@gmail.com>
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
----
-Since v1: add the mask fix suggested by Vasily
----
- drivers/dma/pxa_dma.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+>
+>> Signed-off-by: Kees Cook <keescook@chromium.org>
+>> ---
+>> Effectively the patch after Arnd's "ARM: mm: hide
+>> __start_rodata_section_aligned for non-debug builds"
+>> ---
+>>  arch/arm/kernel/vmlinux-xip.lds.S | 10 ----------
+>>  1 files changed, 0 insertions(+), 10 deletions(-)
+>>
+>> diff --git a/arch/arm/kernel/vmlinux-xip.lds.S b/arch/arm/kernel/vmlinux-xip.lds.S
+>> index 40bc4cadb959..cba1ec899a69 100644
+>> --- a/arch/arm/kernel/vmlinux-xip.lds.S
+>> +++ b/arch/arm/kernel/vmlinux-xip.lds.S
+>> @@ -8,9 +8,6 @@
+>>  #include <asm/thread_info.h>
+>>  #include <asm/memory.h>
+>>  #include <asm/page.h>
+>> -#ifdef CONFIG_DEBUG_RODATA
+>> -#include <asm/pgtable.h>
+>> -#endif
+>>
+>>  #define PROC_INFO                                                    \
+>>       . = ALIGN(4);                                                   \
+>> @@ -92,10 +89,6 @@ SECTIONS
+>>               HEAD_TEXT
+>>       }
+>>
+>> -#ifdef CONFIG_DEBUG_RODATA
+>> -     . = ALIGN(1<<SECTION_SHIFT);
+>> -#endif
+>> -
+>>       .text : {                       /* Real text segment            */
+>>               _stext = .;             /* Text and read-only data      */
+>>                       IDMAP_TEXT
+>> @@ -115,9 +108,6 @@ SECTIONS
+>>                       ARM_CPU_KEEP(PROC_INFO)
+>>       }
+>>
+>> -#ifdef CONFIG_DEBUG_RODATA
+>> -     . = ALIGN(1<<SECTION_SHIFT);
+>> -#endif
+>>       RO_DATA(PAGE_SIZE)
+>>
+>>       . = ALIGN(4);
+>> --
+>> 2.6.3
+>>
+>>
+>> --
+>> Kees Cook
+>> Chrome OS & Brillo Security
+>>
+>>
 
-diff --git a/drivers/dma/pxa_dma.c b/drivers/dma/pxa_dma.c
-index 8ab4a53e5660..77c1c44009d8 100644
---- a/drivers/dma/pxa_dma.c
-+++ b/drivers/dma/pxa_dma.c
-@@ -586,6 +586,8 @@ static void set_updater_desc(struct pxad_desc_sw *sw_desc,
- 		(PXA_DCMD_LENGTH & sizeof(u32));
- 	if (flags & DMA_PREP_INTERRUPT)
- 		updater->dcmd |= PXA_DCMD_ENDIRQEN;
-+	if (sw_desc->cyclic)
-+		sw_desc->hw_desc[sw_desc->nb_desc - 2]->ddadr = sw_desc->first;
- }
- 
- static bool is_desc_completed(struct virt_dma_desc *vd)
-@@ -676,6 +678,10 @@ static irqreturn_t pxad_chan_handler(int irq, void *dev_id)
- 		dev_dbg(&chan->vc.chan.dev->device,
- 			"%s(): checking txd %p[%x]: completed=%d\n",
- 			__func__, vd, vd->tx.cookie, is_desc_completed(vd));
-+		if (to_pxad_sw_desc(vd)->cyclic) {
-+			vchan_cyclic_callback(vd);
-+			break;
-+		}
- 		if (is_desc_completed(vd)) {
- 			list_del(&vd->node);
- 			vchan_cookie_complete(vd);
-@@ -1084,7 +1090,7 @@ pxad_prep_dma_cyclic(struct dma_chan *dchan,
- 		return NULL;
- 
- 	pxad_get_config(chan, dir, &dcmd, &dsadr, &dtadr);
--	dcmd |= PXA_DCMD_ENDIRQEN | (PXA_DCMD_LENGTH | period_len);
-+	dcmd |= PXA_DCMD_ENDIRQEN | (PXA_DCMD_LENGTH & period_len);
- 	dev_dbg(&chan->vc.chan.dev->device,
- 		"%s(): buf_addr=0x%lx len=%zu period=%zu dir=%d flags=%lx\n",
- 		__func__, (unsigned long)buf_addr, len, period_len, dir, flags);
+
+
 -- 
-2.1.4
+Kees Cook
+Chrome OS & Brillo Security
