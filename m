@@ -1,43 +1,80 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 16 Feb 2016 15:56:53 +0100
-Subject: [PATCH 00/11] SYSMMU driver update and support for Exynos 5433
-Message-ID: <1455634624-18130-1-git-send-email-m.szyprowski@samsung.com>
+Date: Tue, 16 Feb 2016 15:56:55 +0100
+Subject: [PATCH 02/11] iommu: exynos: add support for IOMMU_DOMAIN_DMA domain
+ type
+In-Reply-To: <1455634624-18130-1-git-send-email-m.szyprowski@samsung.com>
+References: <1455634624-18130-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1455634624-18130-3-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This patch adds support for DMA domain type. Such domain have DMA cookie
+prepared and can be used by generic DMA-IOMMU glue layer.
 
-This patchset updates Exynos SYSMMU (IOMMU) driver to make use of the
-new features in the IOMMU core (support for IOMMU_DOMAIN_DMA) and adds
-support for SYSMMU v5 controllers, which are available in Samsung Exynos
-5433 SoCs. The driver has been also updated to compile and work on ARM64
-architecture.
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+ drivers/iommu/exynos-iommu.c | 19 +++++++++++++++----
+ 1 file changed, 15 insertions(+), 4 deletions(-)
 
-Best regards
-Marek Szyprowski
-Samsung R&D Institute Poland
-
-
-Patch summary:
-
-Marek Szyprowski (11):
-  iommu: exynos: rework iommu group initialization
-  iommu: exynos: add support for IOMMU_DOMAIN_DMA domain type
-  iommu: exynos: remove ARM-specific cache flush interface
-  iommu: exynos: simplify master clock operations
-  iommu: exynos: refactor code (no direct register access)
-  iommu: exynos: refactor fault handling code
-  iommu: exynos: refactor init config code
-  iommu: exynos: unify code for fldp cache invalidation
-  iommu: exynos: update device tree documentation
-  iommu: exynos: add support for v5 SYSMMU
-  iommu: exynos: add Maintainers entry for Exynos SYSMMU driver
-
- .../devicetree/bindings/iommu/samsung,sysmmu.txt   |  22 +-
- MAINTAINERS                                        |   6 +
- drivers/iommu/Kconfig                              |   2 +-
- drivers/iommu/exynos-iommu.c                       | 514 ++++++++++++---------
- 4 files changed, 318 insertions(+), 226 deletions(-)
-
+diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+index 4fc0790..595e0da 100644
+--- a/drivers/iommu/exynos-iommu.c
++++ b/drivers/iommu/exynos-iommu.c
+@@ -25,9 +25,9 @@
+ #include <linux/platform_device.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/slab.h>
++#include <linux/dma-iommu.h>
+ 
+ #include <asm/cacheflush.h>
+-#include <asm/dma-iommu.h>
+ #include <asm/pgtable.h>
+ 
+ typedef u32 sysmmu_iova_t;
+@@ -662,16 +662,21 @@ static struct iommu_domain *exynos_iommu_domain_alloc(unsigned type)
+ 	struct exynos_iommu_domain *domain;
+ 	int i;
+ 
+-	if (type != IOMMU_DOMAIN_UNMANAGED)
+-		return NULL;
+ 
+ 	domain = kzalloc(sizeof(*domain), GFP_KERNEL);
+ 	if (!domain)
+ 		return NULL;
+ 
++	if (type == IOMMU_DOMAIN_DMA) {
++		if (iommu_get_dma_cookie(&domain->domain) != 0)
++			goto err_pgtable;
++	} else if (type != IOMMU_DOMAIN_UNMANAGED) {
++		goto err_pgtable;
++	}
++
+ 	domain->pgtable = (sysmmu_pte_t *)__get_free_pages(GFP_KERNEL, 2);
+ 	if (!domain->pgtable)
+-		goto err_pgtable;
++		goto err_dma_cookie;
+ 
+ 	domain->lv2entcnt = (short *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, 1);
+ 	if (!domain->lv2entcnt)
+@@ -703,6 +708,9 @@ static struct iommu_domain *exynos_iommu_domain_alloc(unsigned type)
+ 
+ err_counter:
+ 	free_pages((unsigned long)domain->pgtable, 2);
++err_dma_cookie:
++	if (type == IOMMU_DOMAIN_DMA)
++		iommu_put_dma_cookie(&domain->domain);
+ err_pgtable:
+ 	kfree(domain);
+ 	return NULL;
+@@ -727,6 +735,9 @@ static void exynos_iommu_domain_free(struct iommu_domain *iommu_domain)
+ 
+ 	spin_unlock_irqrestore(&domain->lock, flags);
+ 
++	if (iommu_domain->type == IOMMU_DOMAIN_DMA)
++		iommu_put_dma_cookie(iommu_domain);
++
+ 	for (i = 0; i < NUM_LV1ENTRIES; i++)
+ 		if (lv1ent_page(domain->pgtable + i))
+ 			kmem_cache_free(lv2table_kmem_cache,
 -- 
 1.9.2
