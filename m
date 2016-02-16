@@ -1,78 +1,78 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 16 Feb 2016 13:52:37 +0100
-Subject: [PATCH v6sub1 06/11] arm64: pgtable: implement static
- [pte|pmd|pud]_offset variants
+Date: Tue, 16 Feb 2016 13:52:38 +0100
+Subject: [PATCH v6sub1 07/11] arm64: decouple early fixmap init from linear
+ mapping
 In-Reply-To: <1455627162-31600-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1455627162-31600-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1455627162-31600-7-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1455627162-31600-8-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The page table accessors pte_offset(), pud_offset() and pmd_offset()
-rely on __va translations, so they can only be used after the linear
-mapping has been installed. For the early fixmap and kasan init routines,
-whose page tables are allocated statically in the kernel image, these
-functions will return bogus values. So implement pte_offset_kimg(),
-pmd_offset_kimg() and pud_offset_kimg(), which can be used instead
-before any page tables have been allocated dynamically.
+Since the early fixmap page tables are populated using pages that are
+part of the static footprint of the kernel, they are covered by the
+initial kernel mapping, and we can refer to them without using __va/__pa
+translations, which are tied to the linear mapping.
+
+Since the fixmap page tables are disjoint from the kernel mapping up
+to the top level pgd entry, we can refer to bm_pte[] directly, and there
+is no need to walk the page tables and perform __pa()/__va() translations
+at each step.
 
 Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/include/asm/pgtable.h | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm64/mm/mmu.c | 16 ++++++----------
+ 1 file changed, 6 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index 4229f75fd145..87355408d448 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -445,6 +445,9 @@ static inline phys_addr_t pmd_page_paddr(pmd_t pmd)
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 73383019f212..b84915723ea0 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -583,7 +583,7 @@ static inline pud_t * fixmap_pud(unsigned long addr)
  
- #define pmd_page(pmd)		pfn_to_page(__phys_to_pfn(pmd_val(pmd) & PHYS_MASK))
+ 	BUG_ON(pgd_none(*pgd) || pgd_bad(*pgd));
  
-+/* use ONLY for statically allocated translation tables */
-+#define pte_offset_kimg(dir,addr)	((pte_t *)__phys_to_kimg(pte_offset_phys((dir), (addr))))
-+
- /*
-  * Conversion functions: convert a page and protection to a page entry,
-  * and a page entry and page directory to the page they refer to.
-@@ -488,6 +491,9 @@ static inline phys_addr_t pud_page_paddr(pud_t pud)
+-	return pud_offset(pgd, addr);
++	return pud_offset_kimg(pgd, addr);
+ }
  
- #define pud_page(pud)		pfn_to_page(__phys_to_pfn(pud_val(pud) & PHYS_MASK))
+ static inline pmd_t * fixmap_pmd(unsigned long addr)
+@@ -592,16 +592,12 @@ static inline pmd_t * fixmap_pmd(unsigned long addr)
  
-+/* use ONLY for statically allocated translation tables */
-+#define pmd_offset_kimg(dir,addr)	((pmd_t *)__phys_to_kimg(pmd_offset_phys((dir), (addr))))
-+
- #else
+ 	BUG_ON(pud_none(*pud) || pud_bad(*pud));
  
- #define pud_page_paddr(pud)	({ BUILD_BUG(); 0; })
-@@ -497,6 +503,8 @@ static inline phys_addr_t pud_page_paddr(pud_t pud)
- #define pmd_set_fixmap_offset(pudp, addr)	((pmd_t *)pudp)
- #define pmd_clear_fixmap()
+-	return pmd_offset(pud, addr);
++	return pmd_offset_kimg(pud, addr);
+ }
  
-+#define pmd_offset_kimg(dir,addr)	((pmd_t *)dir)
-+
- #endif	/* CONFIG_PGTABLE_LEVELS > 2 */
+ static inline pte_t * fixmap_pte(unsigned long addr)
+ {
+-	pmd_t *pmd = fixmap_pmd(addr);
+-
+-	BUG_ON(pmd_none(*pmd) || pmd_bad(*pmd));
+-
+-	return pte_offset_kernel(pmd, addr);
++	return &bm_pte[pte_index(addr)];
+ }
  
- #if CONFIG_PGTABLE_LEVELS > 3
-@@ -535,6 +543,9 @@ static inline phys_addr_t pgd_page_paddr(pgd_t pgd)
+ void __init early_fixmap_init(void)
+@@ -613,14 +609,14 @@ void __init early_fixmap_init(void)
  
- #define pgd_page(pgd)		pfn_to_page(__phys_to_pfn(pgd_val(pgd) & PHYS_MASK))
+ 	pgd = pgd_offset_k(addr);
+ 	pgd_populate(&init_mm, pgd, bm_pud);
+-	pud = pud_offset(pgd, addr);
++	pud = fixmap_pud(addr);
+ 	pud_populate(&init_mm, pud, bm_pmd);
+-	pmd = pmd_offset(pud, addr);
++	pmd = fixmap_pmd(addr);
+ 	pmd_populate_kernel(&init_mm, pmd, bm_pte);
  
-+/* use ONLY for statically allocated translation tables */
-+#define pud_offset_kimg(dir,addr)	((pud_t *)__phys_to_kimg(pud_offset_phys((dir), (addr))))
-+
- #else
- 
- #define pgd_page_paddr(pgd)	({ BUILD_BUG(); 0;})
-@@ -544,6 +555,8 @@ static inline phys_addr_t pgd_page_paddr(pgd_t pgd)
- #define pud_set_fixmap_offset(pgdp, addr)	((pud_t *)pgdp)
- #define pud_clear_fixmap()
- 
-+#define pud_offset_kimg(dir,addr)	((pud_t *)dir)
-+
- #endif  /* CONFIG_PGTABLE_LEVELS > 3 */
- 
- #define pgd_ERROR(pgd)		__pgd_error(__FILE__, __LINE__, pgd_val(pgd))
+ 	/*
+ 	 * The boot-ioremap range spans multiple pmds, for which
+-	 * we are not preparted:
++	 * we are not prepared:
+ 	 */
+ 	BUILD_BUG_ON((__fix_to_virt(FIX_BTMAP_BEGIN) >> PMD_SHIFT)
+ 		     != (__fix_to_virt(FIX_BTMAP_END) >> PMD_SHIFT));
 -- 
 2.5.0
