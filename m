@@ -1,35 +1,53 @@
-From: jan.glauber@caviumnetworks.com (Jan Glauber)
-Date: Tue, 16 Feb 2016 09:00:15 +0100
-Subject: [PATCH v3 5/5] arm64/perf: Extend event mask for ARMv8.1
-In-Reply-To: <20160215200404.GX6298@arm.com>
-References: <cover.1454516082.git.jglauber@cavium.com>
- <fa91eaedf581e6a7053899f25b1b08458dbd4b8e.1454516082.git.jglauber@cavium.com>
- <20160215200404.GX6298@arm.com>
-Message-ID: <20160216080015.GA3490@hardcore>
+From: krzysztof.adamski@tieto.com (Krzysztof Adamski)
+Date: Tue, 16 Feb 2016 09:00:05 +0100
+Subject: [PATCH] pinctrl: sunxi: set pin function as input on export
+In-Reply-To: <CACRpkdbd4f3yj2MnR6PU5SuhV5Tj4HzWLc0UX8jQkcJp7MoTig@mail.gmail.com>
+References: <1454942242-25690-1-git-send-email-krzysztof.adamski@tieto.com>
+ <CACRpkdbd4f3yj2MnR6PU5SuhV5Tj4HzWLc0UX8jQkcJp7MoTig@mail.gmail.com>
+Message-ID: <20160216080004.GA24625@box2.japko.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 15, 2016 at 08:04:04PM +0000, Will Deacon wrote:
+On Mon, Feb 15, 2016 at 11:04:26PM +0100, Linus Walleij wrote:
+>On Mon, Feb 8, 2016 at 3:37 PM, Krzysztof Adamski
+><krzysztof.adamski@tieto.com> wrote:
+>
+>> Default function of a pin in sunxi SoCs is "disabled". By default gpios
+>> exported by sysfs are set as input and indeed, when reading "direction"
+>> file you will get "in". The "value" pin won't return proper value,
+>> though, confusing user of this interface.
+>>
+>> This patch sets direction of a GPIO as input when exporting it.
+>>
+>> Signed-off-by: Krzysztof Adamski <krzysztof.adamski@tieto.com>
+>
+>As maxime says it's not a sunxi problem.
+>
+>So maybe it is wrong to set pins to either input or output when
+>exporting them, I suspect they should be exported as is.
+>
+>Also: the sysfs ABI is deprecated. I suggest you invest your time
+>in working on the new chardev ABI.
 
-[...]
+While sysfs API may be very limited it does have it's strengths too. One 
+of them is that it's trivially scriptable even from bash or other 
+scripting languages and the other one is that it's there for so long 
+that it's very popular and it will take much time before all the 
+tutorials and existing applications are updated. So, well, I still find 
+it useful to have good support for it.
 
-> On Wed, Feb 03, 2016 at 06:12:00PM +0100, Jan Glauber wrote:
-> > +		cpu_pmu->event_mask = 0xffff;	/* ARMv8.1 extended events */
-> > +	else
-> > +		cpu_pmu->event_mask = ARMV8_EVTYPE_EVENT;
-> 
-> ... although can't we just update ARMV8_EVTYPE_EVENT to be 0xffff now?
-> AFAICT, that just eats into bits that used to be RES0, so we shouldn't
-> see any problems. That should make your patch *much* simpler!
+I find current behaviour of sysfs interface broken (it says that GPIO is 
+in input mode when in reality it isn't) and still think it's a good idea 
+to fix it. But putting sysfs issue aside, wouldn't it be safer to set 
+some well known state of the pin when requesting it instead of leaving 
+it at whatever was set before? The same question goes for freeing, 
+actually, shouldn't the pin be disabled when we call gpio_free instead 
+of leaving it at its last state?
 
-That would of course be easier, but I just can't assess the implications.
+There are existing drivers that set gpio direction to input when 
+requesting the pin (for example pinctrl-plgpio.c, pinctrl-sirf.c) so 
+sunxi wouldn't be the only driver to do this. This does also show that 
+indeed the problem is not sunxi specific, though.
 
-Probably I'm missing something but to me it looks like the event mask is the
-only verification we do for the user-space selectable events. Is it safe for
-implementations that only support 0x3ff events to allow access to the
-whole 0xffff range? What memory would be accessed for non-existing
-events?
-
-Jan
-
-> Will
+Best regards,
+Krzysztof Adamski
