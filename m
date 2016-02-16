@@ -1,98 +1,109 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 16 Feb 2016 16:33:35 +0100
-Subject: [PATCH v2 net-next 0/8] API set for HW Buffer management
-Message-ID: <1455636823-14470-1-git-send-email-gregory.clement@free-electrons.com>
+Date: Tue, 16 Feb 2016 16:33:40 +0100
+Subject: [PATCH v2 net-next 5/8] bus: mvebu-mbus: provide api for obtaining IO
+ and DRAM window information
+In-Reply-To: <1455636823-14470-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1455636823-14470-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1455636823-14470-6-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Marcin Wojtas <mw@semihalf.com>
 
-A few weeks ago I sent a proposal for a API set for HW Buffer
-management, to have a better view of the motivation for this API see
-the cover letter of this proposal:
-http://thread.gmane.org/gmane.linux.kernel/2125152
+This commit enables finding appropriate mbus window and obtaining its
+target id and attribute for given physical address in two separate
+routines, both for IO and DRAM windows. This functionality
+is needed for Armada XP/38x Network Controller's Buffer Manager and
+PnC configuration.
 
-Since this version I took into account the review from Florian:
-- The hardware buffer management helpers are no more built by default
-  and now depend on a hidden config symbol which has to be selected
-  by the driver if needed
-- The hwbm_pool_refill() and hwbm_pool_add() now receive a gfp_t as
-  argument allowing the caller to specify the flag it needs.
-- buf_num is now tested to ensure there is no wrapping
-- A spinlock has been added to protect the hwbm_pool_add() function in
-  SMP or irq context.
+[gregory.clement at free-electrons.com: Fix size test for
+mvebu_mbus_get_dram_win_info]
 
-I also used pr_warn instead of pr_debug in case of errors.
+Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+[DRAM window information reference in LKv3.10]
+Signed-off-by: Evan Wang <xswang@marvell.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ drivers/bus/mvebu-mbus.c | 52 ++++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/mbus.h     |  3 +++
+ 2 files changed, 55 insertions(+)
 
-I fixed the mvneta implementation by returning the buffer to the pool
-at various place instead of ignoring it.
-
-About the series itself I tried to make this series easier to merge:
-- Squashed "bus: mvenus-mbus: Fix size test for
-   mvebu_mbus_get_dram_win_info" into bus: mvebu-mbus: provide api for
-   obtaining IO and DRAM window information.
-- Added my signed-otf-by on all the patches as submitter of the series.
-- Renamed the dts patches with the pattern "ARM: dts: platform:"
-- Removed the patch "ARM: mvebu: enable SRAM support in
-  mvebu_v7_defconfig" of this series and already applied it
-- Rodified the order of the patches.
-
-In order to ease the test the branch mvneta-BM-framework-v2 is
-available at git at github.com:MISL-EBU-System-SW/mainline-public.git.
-
-David,
-
-I would like to merge the 4 first patches myself once you will have
-take the 4 last patches of the series. Patch 5 do not modify files in
-the net subsystem, but as there is a build dependency it is better if
-you merge it in the same time as the 3 other ones.
-
-Thanks,
-
-Gregory
-
-Gregory CLEMENT (2):
-  net: add a hardware buffer management helper API
-  net: mvneta: Use the new hwbm framework
-
-Marcin Wojtas (6):
-  ARM: dts: armada-38x: add buffer manager nodes
-  ARM: dts: armada-38x: enable buffer manager support on Armada 38x
-    boards
-  ARM: dts: armada-xp: add buffer manager nodes
-  ARM: dts: armada-xp: enable buffer manager support on Armada XP boards
-  bus: mvebu-mbus: provide api for obtaining IO and DRAM window
-    information
-  net: mvneta: bm: add support for hardware buffer management
-
- .../bindings/net/marvell-armada-370-neta.txt       |  19 +-
- .../devicetree/bindings/net/marvell-neta-bm.txt    |  49 +++
- arch/arm/boot/dts/armada-385-db-ap.dts             |  20 +-
- arch/arm/boot/dts/armada-388-clearfog.dts          |   6 +
- arch/arm/boot/dts/armada-388-db.dts                |  17 +-
- arch/arm/boot/dts/armada-388-gp.dts                |  17 +-
- .../arm/boot/dts/armada-38x-solidrun-microsom.dtsi |  15 +-
- arch/arm/boot/dts/armada-38x.dtsi                  |  18 +
- arch/arm/boot/dts/armada-xp-db.dts                 |  19 +-
- arch/arm/boot/dts/armada-xp-gp.dts                 |  19 +-
- arch/arm/boot/dts/armada-xp.dtsi                   |  18 +
- drivers/bus/mvebu-mbus.c                           |  51 +++
- drivers/net/ethernet/marvell/Kconfig               |  15 +
- drivers/net/ethernet/marvell/Makefile              |   1 +
- drivers/net/ethernet/marvell/mvneta.c              | 430 +++++++++++++++---
- drivers/net/ethernet/marvell/mvneta_bm.c           | 486 +++++++++++++++++++++
- drivers/net/ethernet/marvell/mvneta_bm.h           | 162 +++++++
- include/linux/mbus.h                               |   3 +
- include/net/hwbm.h                                 |  21 +
- net/Kconfig                                        |   3 +
- net/core/Makefile                                  |   1 +
- net/core/hwbm.c                                    |  87 ++++
- 22 files changed, 1415 insertions(+), 62 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/net/marvell-neta-bm.txt
- create mode 100644 drivers/net/ethernet/marvell/mvneta_bm.c
- create mode 100644 drivers/net/ethernet/marvell/mvneta_bm.h
- create mode 100644 include/net/hwbm.h
- create mode 100644 net/core/hwbm.c
-
+diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
+index c43c3d2baf73..c2e52864bb03 100644
+--- a/drivers/bus/mvebu-mbus.c
++++ b/drivers/bus/mvebu-mbus.c
+@@ -948,6 +948,58 @@ void mvebu_mbus_get_pcie_io_aperture(struct resource *res)
+ 	*res = mbus_state.pcie_io_aperture;
+ }
+ 
++int mvebu_mbus_get_dram_win_info(phys_addr_t phyaddr, u8 *target, u8 *attr)
++{
++	const struct mbus_dram_target_info *dram;
++	int i;
++
++	/* Get dram info */
++	dram = mv_mbus_dram_info();
++	if (!dram) {
++		pr_err("missing DRAM information\n");
++		return -ENODEV;
++	}
++
++	/* Try to find matching DRAM window for phyaddr */
++	for (i = 0; i < dram->num_cs; i++) {
++		const struct mbus_dram_window *cs = dram->cs + i;
++
++		if (cs->base <= phyaddr &&
++			phyaddr <= (cs->base + cs->size - 1)) {
++			*target = dram->mbus_dram_target_id;
++			*attr = cs->mbus_attr;
++			return 0;
++		}
++	}
++
++	pr_err("invalid dram address 0x%x\n", phyaddr);
++	return -EINVAL;
++}
++EXPORT_SYMBOL_GPL(mvebu_mbus_get_dram_win_info);
++
++int mvebu_mbus_get_io_win_info(phys_addr_t phyaddr, u32 *size, u8 *target,
++			       u8 *attr)
++{
++	int win;
++
++	for (win = 0; win < mbus_state.soc->num_wins; win++) {
++		u64 wbase;
++		int enabled;
++
++		mvebu_mbus_read_window(&mbus_state, win, &enabled, &wbase,
++				       size, target, attr, NULL);
++
++		if (!enabled)
++			continue;
++
++		if (wbase <= phyaddr && phyaddr <= wbase + *size)
++			return win;
++	}
++
++	return -EINVAL;
++}
++EXPORT_SYMBOL_GPL(mvebu_mbus_get_io_win_info);
++
+ static __init int mvebu_mbus_debugfs_init(void)
+ {
+ 	struct mvebu_mbus_state *s = &mbus_state;
+diff --git a/include/linux/mbus.h b/include/linux/mbus.h
+index 1f7bc630d225..ea34a867caa0 100644
+--- a/include/linux/mbus.h
++++ b/include/linux/mbus.h
+@@ -69,6 +69,9 @@ static inline const struct mbus_dram_target_info *mv_mbus_dram_info_nooverlap(vo
+ int mvebu_mbus_save_cpu_target(u32 *store_addr);
+ void mvebu_mbus_get_pcie_mem_aperture(struct resource *res);
+ void mvebu_mbus_get_pcie_io_aperture(struct resource *res);
++int mvebu_mbus_get_dram_win_info(phys_addr_t phyaddr, u8 *target, u8 *attr);
++int mvebu_mbus_get_io_win_info(phys_addr_t phyaddr, u32 *size, u8 *target,
++			       u8 *attr);
+ int mvebu_mbus_add_window_remap_by_id(unsigned int target,
+ 				      unsigned int attribute,
+ 				      phys_addr_t base, size_t size,
 -- 
 2.5.0
