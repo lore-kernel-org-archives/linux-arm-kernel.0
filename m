@@ -1,24 +1,51 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 16 Feb 2016 07:06:28 +0530
-Subject: Crashes in arm qemu emulations due to 'cpufreq: governor:
- Replace timers with utilization ...'
-In-Reply-To: <6826860.yxabWEoz5T@vostro.rjw.lan>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 15 Feb 2016 17:38:06 -0800
+Subject: Crashes in arm qemu emulations due to 'cpufreq: governor: Replace
+ timers with utilization ...'
+In-Reply-To: <20160215213606.GD19432@atomide.com>
 References: <20160215170527.GA24453@roeck-us.net>
  <CAJZ5v0gLankSuziQq25qTCyNqeOX43yD9jnJu_XXwbdyajfmKg@mail.gmail.com>
- <20160216011335.GI6334@vireshk-i7>
- <6826860.yxabWEoz5T@vostro.rjw.lan>
-Message-ID: <20160216013628.GK6334@vireshk-i7>
+ <20160215190116.GX19432@atomide.com> <56C229A5.8020901@roeck-us.net>
+ <20160215195839.GA19432@atomide.com>
+ <CAJZ5v0hzVB0+H4nuCun3mmrES3UQ3+Rs1uz5YGu5sv4G3XU+nQ@mail.gmail.com>
+ <20160215213606.GD19432@atomide.com>
+Message-ID: <56C27D7E.4060603@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16-02-16, 02:27, Rafael J. Wysocki wrote:
-> Yes, that's what we should be doing, but it seemed to me that we didn't.
-> 
-> Or maybe the trace just contained the last one, because that's when the
-> crash happened.
+On 02/15/2016 01:36 PM, Tony Lindgren wrote:
+> * Rafael J. Wysocki <rafael@kernel.org> [160215 12:39]:
+>> On Mon, Feb 15, 2016 at 8:58 PM, Tony Lindgren <tony@atomide.com> wrote:
+>>> * Guenter Roeck <linux@roeck-us.net> [160215 11:41]:
+>>>> On 02/15/2016 11:01 AM, Tony Lindgren wrote:
+>>>>>
+>>>>> https://kernelci.org/boot/all/job/next/kernel/next-20160215/
+>>>>>
+>>>>> The SMP ones seem to fail with some regulator issues?
+>>>>>
+>>>>
+>>>> There is another problem, introduced with 6a0712f6f199e ("PM / OPP: Add
+>>>> dev_pm_opp_set_rate()"). The kernelci boot log for next-20160212:omap3-overo-tobi
+>>>> and others experience that problem.
+>>>>
+>>>> Essentially, the code now assumes that a CPU clock always has a voltage
+>>>> regulator attached to it, which is not correct. I sent out a patch to fix
+>>>> that problem a minute ago.
+>>>
+>>> Yes that fixed it thanks.
+>>
+>> Can you please also check if this alternative fix from Viresh works:
+>>
+>> https://patchwork.kernel.org/patch/8316611/
+>
+> Yes that one too seems to fix the issue on SMP systems for
+> me:
+>
+> Tested-by: Tony Lindgren <tony@atomide.com>
+>
 
-Ofcourse, it wouldn't mention the function calls that have already
-finished :)
+Same here.
 
--- 
-viresh
+Tested-by: Guenter Roeck <linux@roeck-us.net>
+
+Guenter
