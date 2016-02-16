@@ -1,75 +1,84 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 16 Feb 2016 17:04:09 +0000
-Subject: [PATCH v2] arm64: add alignment fault hanling
-In-Reply-To: <20160216160055.GH14509@arm.com>
-References: <329817481.954581455597874663.JavaMail.weblogic@epmlwas08c>
- <20160216103104.GC14509@arm.com> <56C300AD.8070505@arm.com>
- <20160216122153.GD19413@e104818-lin.cambridge.arm.com>
- <20160216160055.GH14509@arm.com>
-Message-ID: <20160216170408.GL14509@arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 16 Feb 2016 17:38:40 +0100
+Subject: [PATCH 5/5] arm64: marvell: add Device Tree files for Armada 7K/8K
+In-Reply-To: <20160216134219.00045b5b@xhacker>
+References: <1455526065-7307-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1455526065-7307-6-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20160216134219.00045b5b@xhacker>
+Message-ID: <20160216173840.7f93896f@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[replying to self and adding some x86 people]
+Hello,
 
-Background: Euntaik reports a problem where userspace has ended up with
-a memory page mapped adjacent to an MMIO page (e.g. from /dev/mem or a
-PCI memory bar from someplace in /sys). strncpy_from_user happens with
-the word-at-a-time implementation, and we end up reading into the MMIO
-page.
+On Tue, 16 Feb 2016 13:42:19 +0800, Jisheng Zhang wrote:
 
-Question: Does x86 guarantee that this faults? (Arjan reckoned no, but
-wasn't 100%).
-
-On Tue, Feb 16, 2016 at 04:00:55PM +0000, Will Deacon wrote:
-> On Tue, Feb 16, 2016 at 12:21:53PM +0000, Catalin Marinas wrote:
-> > On Tue, Feb 16, 2016 at 10:57:49AM +0000, Robin Murphy wrote:
-> > > On 16/02/16 10:31, Will Deacon wrote:
-> > > >On Tue, Feb 16, 2016 at 04:44:35AM +0000, EunTaik Lee wrote:
-> > > >>Userspace memory is mapped as below:
-> > > >>F2A7F000--F2A7FFFF Normal Memory
-> > > >>F2A80000--F2A80FFF Device nGnRnE
-> > > >>
-> > > >>And that userspace application makes a system call
-> > > >>as below:
-> > > >>
-> > > >>-009 |do_strncpy_from_user(inline)
-> > > >>-009 |strncpy_from_user()
-> > > >>-010 |getname_flags()
-> > > >>-011 |user_path_at_empty()
-> > > >>-012 |user_path_at()
-> > > >>-013 |SYSC_faccessat(inline)
-> > > >>-013 |sys_faccessat()
-> > > >>-014 |__sys_trace(asm)
-> > > >>  --> |exception
-> > > >>
-> > > >>The string spans from 0xF2A7FFC1 to 0xF2A7FFFB.
-> > > >>
-> > > >>When do_strncpy_from_user() reads the last (unsigned long)
-> > > >>value, the alignement fault is triggered. The 8 byte
-> > > >>from 0xF2A7FFC1 spans to the next page that is mapped as
-> > > >>Device nGnRnE, which does not allow an unaligned access,
-> > > >>causes the abort.
-> > > >>
-> > > >>The instruction which caused the alignment fault is registered
-> > > >>in the fixup table but the exception handler does not reach there.
-> > > >>
-> > > >>This patch registers a alignment fault handler and fixes up the
-> > > >>pc if appropriate.
-> > > >
-> > > >As discussed with Catalin previously, we should solve this by adding a
-> > > >guard page rather than handling the fault.
-> > 
-> > I don't think we can trivially add this without implementing an arm64
-> > specific arch_get_unmapped_area().
+> > +/ {
+> > +	model = "Marvell Armada AP806";
+> > +	compatible = "marvell,armada-ap806";
+> > +	#address-cells = <2>;
+> > +	#size-cells = <2>;
+> > +
+> > +	psci {
+> > +		compatible = "arm,psci-0.2";
 > 
-> Even overriding arch_get_unmapped_area doesn't help as much as you might
-> like since, in the case of something like /dev/mem, the memory is remapped
-> using remap_pfn_range later on, so you can't necessarily tell what the
-> final attributes are likely to be when you initially allocate the virtual
-> space.
+> I guess the firmware is also psci-1.0 compatible.
 
-Thinking more about this, we could spit out a guard page between every
-VMA, but it's likely to hamper any VMA merging.
+At boot time, the kernel queries the PSCI firmware, and it says:
 
-Will
+[    0.000000] psci: probing for conduit method from DT.
+[    0.000000] psci: PSCIv0.2 detected in firmware.
+[    0.000000] psci: Using standard PSCI v0.2 function IDs
+
+So I think psci-0.2 is correct here. Should this change for the
+production revision of the chip, we'll send an update to the Device
+Tree accordingly.
+
+> > +	ap806 {
+> > +		#address-cells = <2>;
+> > +		#size-cells = <2>;
+> > +		compatible = "simple-bus";
+> > +		interrupt-parent = <&gic>;
+> > +		ranges;
+> > +
+> > +		config-space {
+> > +			#address-cells = <1>;
+> > +			#size-cells = <1>;
+> > +			compatible = "simple-bus";
+> > +			ranges = <0x0 0x0 0xf0000000 0x1000000>;
+> > +
+> > +			gic: interrupt-controller at 210000 {
+> > +				compatible = "arm,cortex-a15-gic",
+> > +					     "arm,cortex-a9-gic";
+> 
+> I guess the GIC is neither the one in cortex-a15 or cortex-a9. 
+
+What makes you think this?
+
+The GIC is a GIC400, which is GICv2 compliant, and arm-cortex-a15-gic /
+arm-cortex-a9-gic are valid compatible strings to identify a GICv2
+compliant interrupt controller.
+
+See:
+
+arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi:              compatible = "arm,gic-400", "arm,cortex-a15-gic";
+arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi:           compatible = "arm,gic-400", "arm,cortex-a15-gic";
+arch/arm64/boot/dts/apm/apm-shadowcat.dtsi:             compatible = "arm,cortex-a15-gic";
+arch/arm64/boot/dts/apm/apm-storm.dtsi:         compatible = "arm,cortex-a15-gic";
+arch/arm64/boot/dts/arm/foundation-v8.dts:              compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
+arch/arm64/boot/dts/arm/juno-base.dtsi:         compatible = "arm,gic-400", "arm,cortex-a15-gic";
+arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts:             compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
+arch/arm64/boot/dts/marvell/armada-ap806.dtsi:                          compatible = "arm,cortex-a15-gic",
+arch/arm64/boot/dts/nvidia/tegra132.dtsi:               compatible = "arm,cortex-a15-gic";
+arch/arm64/boot/dts/xilinx/zynqmp.dtsi:                 compatible = "arm,gic-400", "arm,cortex-a15-gic";
+
+Or do you have a more specific reason to think that this compatible
+string is wrong?
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
