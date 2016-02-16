@@ -1,62 +1,37 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 16 Feb 2016 15:37:31 +0000
-Subject: [PATCH v3 09/10] ARM: dts: introduce MPS2 AN385/AN386
-In-Reply-To: <CACRpkdafDhT=1uJssVNAW+g05eXbRC1xUL+O0+SxcpdczUX0vQ@mail.gmail.com>
-References: <1455617295-23736-1-git-send-email-vladimir.murzin@arm.com>	<1455617295-23736-10-git-send-email-vladimir.murzin@arm.com>
- <CACRpkdafDhT=1uJssVNAW+g05eXbRC1xUL+O0+SxcpdczUX0vQ@mail.gmail.com>
-Message-ID: <56C3423B.5070307@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 16 Feb 2016 16:37:59 +0100
+Subject: [PATCH v2 0/5] gpio: clean up irq_to_gpio and ARCH_NR_GPIOS
+In-Reply-To: <20160202194831.10827.63244.stgit@bhelgaas-glaptop2.roam.corp.google.com>
+References: <20160202194831.10827.63244.stgit@bhelgaas-glaptop2.roam.corp.google.com>
+Message-ID: <1455637086-2794174-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/02/16 15:17, Linus Walleij wrote:
-> On Tue, Feb 16, 2016 at 11:08 AM, Vladimir Murzin
-> <vladimir.murzin@arm.com> wrote:
-> 
->> Application Notes 385 and 386 shares the same memory map and features
->> except the CPU is used. AN385 is supplied with Cortex-M3 CPU and AN386
->> is supplied with Cortex-M4.
->>
->> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
-> (...)
->> +               fpgaio {
->> +                       compatible = "syscon", "simple-mfd";
->> +                       reg = <0x40028000 0x10>;
->> +
->> +                       led at 0 {
->> +                               compatible = "register-bit-led";
->> +                               offset = <0x0>;
->> +                               mask = <0x01>;
->> +                               label = "userled:0";
->> +                               linux,default-trigger = "heartbeat";
->> +                               default-state = "on";
->> +                       };
->> +
->> +                       led at 1 {
->> +                               compatible = "register-bit-led";
->> +                               offset = <0x0>;
->> +                               mask = <0x02>;
->> +                               label = "userled:1";
->> +                               linux,default-trigger = "usr";
->> +                               default-state = "off";
->> +                       };
->> +               };
-> 
-> Thanks for using this. I worked hard to massage this into the
-> core.
-> 
+I noticed that arch/arm/include/asm/gpio.h can almost be removed,
+after we have already removed the file for most other architectures
+now.
 
-Thank you for pushing it, it cost me couple of minutes to make these
-tiny leds alive :)
+When I removed it, I ran into problems with irq_to_gpio(), which
+we had already killed off in ARM, but it survived (barely) in the
+global headers and accidentally gained an invalid user
 
-> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
-> 
+This kills it off some more.
 
-Cheers!
+The first patch should go as a bugfix into the MIPS tree, the
+other ones should only get merged later, but I think that's fine
+if they get submitted for 4.6. I left them as a series of five
+patches to clarify the build-time dependency. Merging patch
+2 before 1 turns the MIPS runtime error into a compiletime
+error.
 
-Vladimir
+changes in v2:
 
-> Yours,
-> Linus Walleij
-> 
-> 
-> 
+* the MIPS change should now correctly fix the bug, thanks
+  to Lars-Peter.
+
+* I left out the ARM specific change for now, and just adapted
+  the generic file so we don't need that any more.
+
+*  Fixed the bug that Russell pointed out
+
+	Arnd
