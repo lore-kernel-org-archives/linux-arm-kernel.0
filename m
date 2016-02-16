@@ -1,96 +1,103 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Tue, 16 Feb 2016 14:53:39 +0100
-Subject: [PATCH V5 09/15] acpi,
- mcfg: Add default PCI config accessors implementation and initial
- support for related quirks.
+Date: Tue, 16 Feb 2016 14:53:38 +0100
+Subject: [PATCH V5 08/15] x86,
+ ia64: Include acpi_pci_{add|remove}_bus to the default
+ pcibios_{add|remove}_bus implementation.
 In-Reply-To: <1455630825-27253-1-git-send-email-tn@semihalf.com>
 References: <1455630825-27253-1-git-send-email-tn@semihalf.com>
-Message-ID: <1455630825-27253-10-git-send-email-tn@semihalf.com>
+Message-ID: <1455630825-27253-9-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We use generic accessors from access.c by default. However, we already
-know platforms that need special handling while accessing to PCI config
-space. These platforms will need different accessors set matched against
-platform ID, domain, bus touple. Therefore we are going to add (in future)
-DECLARE_ACPI_MCFG_FIXUP which will register platform specific custom
-accessors. For now, we let pci_mcfg_get_ops to take acpi_pci_root structure
-as an arguments and left some space for quirk matching algorithm.
+x86 and ia64 are the only arches that implement pcibios_{add|remove}_bus hooks
+and implement them in the same way. Moreover ARM64 is going to do the same.
+So it seems that acpi_pci_{add|remove}_bus is generic enough to be default
+option for pcibios_{add|remove}_bus hooks. Also, it is always safe to run
+acpi_pci_{add|remove}_bus as they have empty stubs for !ACPI case and
+return if ACPI has been switched off in run time.
+
+After all we can remove x86 and ia64 pcibios_{add|remove}_bus
+implementation.
 
 Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Tested-by: Duc Dang <dhdang@apm.com>
 Tested-by: Dongdong Liu <liudongdong3@huawei.com>
 Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
 Tested-by: Graeme Gregory <graeme.gregory@linaro.org>
 Tested-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/acpi/pci_mcfg.c  | 30 ++++++++++++++++++++++++++++++
- include/linux/pci-acpi.h | 12 ++++++++++++
- 2 files changed, 42 insertions(+)
+ arch/ia64/pci/pci.c   | 10 ----------
+ arch/x86/pci/common.c | 10 ----------
+ drivers/pci/probe.c   |  3 +++
+ 3 files changed, 3 insertions(+), 20 deletions(-)
 
-diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
-index 3282f2a..0062257 100644
---- a/drivers/acpi/pci_mcfg.c
-+++ b/drivers/acpi/pci_mcfg.c
-@@ -41,6 +41,36 @@ int __weak raw_pci_write(unsigned int domain, unsigned int bus,
- 	return PCIBIOS_DEVICE_NOT_FOUND;
+diff --git a/arch/ia64/pci/pci.c b/arch/ia64/pci/pci.c
+index 978d6af..be4c9ef 100644
+--- a/arch/ia64/pci/pci.c
++++ b/arch/ia64/pci/pci.c
+@@ -358,16 +358,6 @@ void pcibios_fixup_bus(struct pci_bus *b)
+ 	platform_pci_fixup_bus(b);
  }
  
-+void __iomem *
-+pci_mcfg_dev_base(struct pci_bus *bus, unsigned int devfn, int offset)
-+{
-+	struct pci_mmcfg_region *cfg;
-+
-+	cfg = pci_mmconfig_lookup(pci_domain_nr(bus), bus->number);
-+	if (cfg && cfg->virt)
-+		return cfg->virt +
-+			(PCI_MMCFG_BUS_OFFSET(bus->number) | (devfn << 12)) +
-+			offset;
-+	return NULL;
-+}
-+
-+/* Default generic PCI config accessors */
-+static struct pci_ops default_pci_mcfg_ops = {
-+	.map_bus = pci_mcfg_dev_base,
-+	.read = pci_generic_config_read,
-+	.write = pci_generic_config_write,
-+};
-+
-+struct pci_ops *pci_mcfg_get_ops(struct acpi_pci_root *root)
-+{
-+	/*
-+	 * TODO: Match against platform specific quirks and return
-+	 * corresponding PCI config space accessor set.
-+	 */
-+
-+	return &default_pci_mcfg_ops;
-+}
-+
- static void list_add_sorted(struct pci_mmcfg_region *new)
+-void pcibios_add_bus(struct pci_bus *bus)
+-{
+-	acpi_pci_add_bus(bus);
+-}
+-
+-void pcibios_remove_bus(struct pci_bus *bus)
+-{
+-	acpi_pci_remove_bus(bus);
+-}
+-
+ void pcibios_set_master (struct pci_dev *dev)
  {
- 	struct pci_mmcfg_region *cfg;
-diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
-index b4f87ba9..3dc6a8c 100644
---- a/include/linux/pci-acpi.h
-+++ b/include/linux/pci-acpi.h
-@@ -141,6 +141,18 @@ extern struct list_head pci_mmcfg_list;
- #define PCI_MMCFG_BUS_OFFSET(bus)      ((bus) << 20)
- #define PCI_MMCFG_OFFSET(bus, devfn)   ((bus) << 20 | (devfn) << 12)
+ 	/* No special bus mastering setup handling */
+diff --git a/arch/x86/pci/common.c b/arch/x86/pci/common.c
+index 2879efc..5aa25f1 100644
+--- a/arch/x86/pci/common.c
++++ b/arch/x86/pci/common.c
+@@ -171,16 +171,6 @@ void pcibios_fixup_bus(struct pci_bus *b)
+ 		pcibios_fixup_device_resources(dev);
+ }
  
-+#ifdef	CONFIG_PCI_MMCONFIG
-+extern struct pci_ops *pci_mcfg_get_ops(struct acpi_pci_root *root);
-+extern void __iomem *pci_mcfg_dev_base(struct pci_bus *bus, unsigned int devfn,
-+				       int offset);
-+#else
-+static inline struct pci_ops *pci_mcfg_get_ops(struct acpi_pci_root *root)
-+{ return NULL; }
-+static inline void __iomem *pci_mcfg_dev_base(struct pci_bus *bus,
-+					      unsigned int devfn, int offset)
-+{ return NULL; }
-+#endif
-+
- #else	/* CONFIG_ACPI */
- static inline void acpi_pci_add_bus(struct pci_bus *bus) { }
- static inline void acpi_pci_remove_bus(struct pci_bus *bus) { }
+-void pcibios_add_bus(struct pci_bus *bus)
+-{
+-	acpi_pci_add_bus(bus);
+-}
+-
+-void pcibios_remove_bus(struct pci_bus *bus)
+-{
+-	acpi_pci_remove_bus(bus);
+-}
+-
+ /*
+  * Only use DMI information to set this if nothing was passed
+  * on the kernel command line (which was parsed earlier).
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index 88a4734..9859b12 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -12,6 +12,7 @@
+ #include <linux/slab.h>
+ #include <linux/module.h>
+ #include <linux/cpumask.h>
++#include <linux/pci-acpi.h>
+ #include <linux/pci-aspm.h>
+ #include <linux/aer.h>
+ #include <linux/acpi.h>
+@@ -2060,10 +2061,12 @@ int __weak pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
+ 
+ void __weak pcibios_add_bus(struct pci_bus *bus)
+ {
++	acpi_pci_add_bus(bus);
+ }
+ 
+ void __weak pcibios_remove_bus(struct pci_bus *bus)
+ {
++	acpi_pci_remove_bus(bus);
+ }
+ 
+ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
 -- 
 1.9.1
