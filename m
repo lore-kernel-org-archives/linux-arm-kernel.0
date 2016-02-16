@@ -1,100 +1,60 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 16 Feb 2016 11:57:36 +0100
-Subject: [PATCH] arm64: mark kernel text segment as MEMBLOCK_NOMAP
-In-Reply-To: <56C2FF07.30205@arm.com>
-References: <1455528512-32491-1-git-send-email-ard.biesheuvel@linaro.org>
- <56C2FF07.30205@arm.com>
-Message-ID: <CAKv+Gu_yTz-ohFPS0wMX42iCkDNaSwZoZ8Yi-zsZNNu1LNDkZQ@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 16 Feb 2016 10:57:49 +0000
+Subject: [PATCH v2] arm64: add alignment fault hanling
+In-Reply-To: <20160216103104.GC14509@arm.com>
+References: <329817481.954581455597874663.JavaMail.weblogic@epmlwas08c>
+ <20160216103104.GC14509@arm.com>
+Message-ID: <56C300AD.8070505@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 February 2016 at 11:50, James Morse <james.morse@arm.com> wrote:
-> Hi Ard,
->
-> On 15/02/16 09:28, Ard Biesheuvel wrote:
->> Commit 752af28bd711 ("arm64: move kernel image to base of vmalloc area")
->> moves the mapping of the kernel text and data segments out of the linear
->> region, and takes care not to create a writable alias of the read-only
->> kernel text segment by checking each memblock against overlap when the
->> memblocks are mapped into the linear mapping.
+On 16/02/16 10:31, Will Deacon wrote:
+> On Tue, Feb 16, 2016 at 04:44:35AM +0000, EunTaik Lee wrote:
+>> Userspace memory is mapped as below:
+>> F2A7F000--F2A7FFFF Normal Memory
+>> F2A80000--F2A80FFF Device nGnRnE
 >>
->> However, it is more correct, and much simpler, to mark the [_stext, _etext]
->> interval as MEMBLOCK_NOMAP. This will also prevent the interval from being
->> omitted from the linear region, but this fact will now also be reflected
->> in the output of pfn_valid(), and so code that expects any pfn_valid()
->> page to be mapped and accessible (which is a reasonable assumption) does
->> not get surprised by the text segment being inaccessible via the linear
->> mapping.
+>> And that userspace application makes a system call
+>> as below:
 >>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
+>> -009 |do_strncpy_from_user(inline)
+>> -009 |strncpy_from_user()
+>> -010 |getname_flags()
+>> -011 |user_path_at_empty()
+>> -012 |user_path_at()
+>> -013 |SYSC_faccessat(inline)
+>> -013 |sys_faccessat()
+>> -014 |__sys_trace(asm)
+>>   --> |exception
+>>
+>> The string spans from 0xF2A7FFC1 to 0xF2A7FFFB.
+>>
+>> When do_strncpy_from_user() reads the last (unsigned long)
+>> value, the alignement fault is triggered. The 8 byte
+>> from 0xF2A7FFC1 spans to the next page that is mapped as
+>> Device nGnRnE, which does not allow an unaligned access,
+>> causes the abort.
+>>
+>> The instruction which caused the alignment fault is registered
+>> in the fixup table but the exception handler does not reach there.
+>>
+>> This patch registers a alignment fault handler and fixes up the
+>> pc if appropriate.
 >
-> With this patch on arm64/for-next/kernmap, I get the following KVM-related boot
-> failure on Juno:
-> -----------------------------%<-----------------------------
-> RPC: Registered named UNIX socket transport module.
-> RPC: Registered udp transport module.
-> RPC: Registered tcp transport module.
-> RPC: Registered tcp NFSv4.1 backchannel transport module.
-> hw perfevents: enabled with armv8_pmuv3 PMU driver, 7 counters available
-> ------------[ cut here ]------------
-> kernel BUG at ../arch/arm64/kvm/../../../arch/arm/kvm/mmu.c:577!
-> Internal error: Oops - BUG: 0 [#1] PREEMPT SMP
-> Modules linked in:
-> CPU: 4 PID: 1 Comm: swapper/0 Not tainted 4.5.0-rc1+ #2022
-> Hardware name: ARM Juno development board (r1) (DT)
-> task: ffffffc976cf8000 ti: ffffffc976d60000 task.ti: ffffffc976d60000
-> PC is at create_hyp_mappings+0x144/0x148
-> LR is at create_hyp_mappings+0x7c/0x148
->
-> [SNIP]
->
-> [<ffffff80040abc14>] create_hyp_mappings+0x144/0x148
-> [<ffffff80040a9be8>] kvm_arch_init+0x198/0x53c
-> [<ffffff800409fe24>] kvm_init+0x38/0x290
-> [<ffffff80040a84e4>] arm_init+0x24/0x2c
-> [<ffffff8004082994>] do_one_initcall+0x94/0x198
-> [<ffffff8004a22b10>] kernel_init_freeable+0x148/0x1e8
-> [<ffffff800473e344>] kernel_init+0x20/0xe4
-> [<ffffff8004085cd0>] ret_from_fork+0x10/0x40
->
-> -----------------------------%<-----------------------------
->
-> The offending function is:
-> -----------------------------%<-----------------------------
-> static phys_addr_t kvm_kaddr_to_phys(void *kaddr)
-> {
->         if (!is_vmalloc_addr(kaddr)) {
->                 BUG_ON(!virt_addr_valid(kaddr));
->                 return __pa(kaddr);
->         } else {
->                 return page_to_phys(vmalloc_to_page(kaddr)) +
->                        offset_in_page(kaddr);
->         }
-> }
-> -----------------------------%<-----------------------------
->
-> When the BUG_ON() fires, kaddr points into the hole in the linear map left by
-> the kernel text.
->
+> As discussed with Catalin previously, we should solve this by adding a
+> guard page rather than handling the fault.
 
-I fixed this in the v6 series I am about to send out. I replaced the
-BUG_ON() condition with 'memblock_is_memory(__pa(kaddr))', so that it
-takes linear addresses pointing into  MEMBLOCK_NOMAP regions into
-account as well.
+...especially since we may not even get a fault. See "Crossing a page 
+boundary with different memory types or Shareability attributes" in the 
+UNPREDICTABLE spec (K1.2.10 in the latest ARMv8 ARM).
+
+Robin.
 
 >
->> This should hopefully address the issue reported by James, but I suppose
->> more work is required on the hibernate side to ensure the unmapped text
->> region is preserved, since it is no longer covered by the linear mapping.
+> Will
 >
-> It does, now I have to work out how best to fix hibernate!
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 >
-
-Indeed. The alternative would be to map the [_stext, _etext] interval
-into the linear region as a ro/nx alias of the actual mapping in the
-vmalloc region. That would probably make your life easier, but I am
-not convinced the overall result is better.
-
--- 
-Ard.
