@@ -1,56 +1,83 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 16 Feb 2016 13:38:09 +0000
-Subject: [PATCH v3 05/10] serial: mps2-uart: add support for early console
-In-Reply-To: <CAHp75Vf_4MgdWunQy5hBMH5GGei+OkktFPYY-ZprY0qOEnD=wA@mail.gmail.com>
-References: <1455617295-23736-1-git-send-email-vladimir.murzin@arm.com>	<1455617295-23736-6-git-send-email-vladimir.murzin@arm.com>	<CAHp75VdugAq0WnzLHmd9CJHCjBOdBwPqCmC3ARSaVF5XMYGoMw@mail.gmail.com>	<56C31F9F.10000@arm.com>
- <CAHp75Vf_4MgdWunQy5hBMH5GGei+OkktFPYY-ZprY0qOEnD=wA@mail.gmail.com>
-Message-ID: <56C32641.4020201@arm.com>
+From: hansverk@cisco.com (Hans Verkuil)
+Date: Tue, 16 Feb 2016 14:48:31 +0100
+Subject: [PATCH v4 5/8] [Media] vcodec: mediatek: Add Mediatek V4L2 Video
+ Encoder Driver
+In-Reply-To: <1455628805.19396.82.camel@mtksdaap41>
+References: <1454585703-42428-1-git-send-email-tiffany.lin@mediatek.com>
+ <1454585703-42428-2-git-send-email-tiffany.lin@mediatek.com>
+ <1454585703-42428-3-git-send-email-tiffany.lin@mediatek.com>
+ <1454585703-42428-4-git-send-email-tiffany.lin@mediatek.com>
+ <1454585703-42428-5-git-send-email-tiffany.lin@mediatek.com>
+ <1454585703-42428-6-git-send-email-tiffany.lin@mediatek.com>
+ <56C1B4AF.1030207@xs4all.nl> <1455604653.19396.68.camel@mtksdaap41>
+ <56C2D371.9090805@xs4all.nl> <1455628805.19396.82.camel@mtksdaap41>
+Message-ID: <56C328AF.5030604@cisco.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/02/16 13:13, Andy Shevchenko wrote:
-> On Tue, Feb 16, 2016 at 3:09 PM, Vladimir Murzin
-> <vladimir.murzin@arm.com> wrote:
->> On 16/02/16 10:36, Andy Shevchenko wrote:
->>> On Tue, Feb 16, 2016 at 12:08 PM, Vladimir Murzin
->>> <vladimir.murzin@arm.com> wrote:
->>>> This adds support early console for MPS2 UART which can be enabled via
->>>> earlycon=mps2,0x40004000
-> 
->>>> +static void mps2_early_putchar(struct uart_port *port, int ch)
->>>> +{
->>>> +
->>>> +       while (readb(port->membase + UARTn_STATE) & UARTn_STATE_TX_FULL)
->>>> +               cpu_relax();
->>>
->>> Infinite busy loop?
+Hi Tiffany,
+
+>>>>> +int mtk_vcodec_enc_queue_init(void *priv, struct vb2_queue *src_vq,
+>>>>> +			   struct vb2_queue *dst_vq)
+>>>>> +{
+>>>>> +	struct mtk_vcodec_ctx *ctx = priv;
+>>>>> +	int ret;
+>>>>> +
+>>>>> +	src_vq->type		= V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE;
+>>>>> +	src_vq->io_modes	= VB2_DMABUF | VB2_MMAP | VB2_USERPTR;
+>>>>
+>>>> I recomment dropping VB2_USERPTR. That only makes sense for scatter-gather dma,
+>>>> and you use physically contiguous DMA.
+>>>>
+>>> Now our userspace app use VB2_USERPTR. I need to check if we could drop
+>>> VB2_USERPTR.
+>>> We use src_vq->mem_ops = &vb2_dma_contig_memops;
+>>> And there are
+>>> 	.get_userptr	= vb2_dc_get_userptr,
+>>> 	.put_userptr	= vb2_dc_put_userptr,
+>>> I was confused why it only make sense for scatter-gather.
+>>> Could you kindly explain more?
 >>
->> In case of broken hw, yes, but I'm quite unsure how we can help to fix
->> it. Do you have something in mind?
-> 
-> Set sane amount of loops like
-> 
-> int count = 100;
-> ?
-> while (? && --count)
-> 
-> Though I have no idea what to do if count == 0. Perhaps it's a TX overrun state.
+>> VB2_USERPTR indicates that the application can use malloc to allocate buffers
+>> and pass those to the driver. Since malloc uses virtual memory the physical
+>> memory is scattered all over. And the first page typically does not start at
+>> the beginning of the page but at a random offset.
+>>
+>> To support that the DMA generally has to be able to do scatter-gather.
+>>
+>> Now, where things get ugly is that a hack was added to the USERPTR support where
+>> apps could pass a pointer to physically contiguous memory as a user pointer. This
+>> was a hack for embedded systems that preallocated a pool of buffers and needed to
+>> pass those pointers around somehow. So the dma-contig USERPTR support is for that
+>> 'feature'. If you try to pass a malloc()ed buffer to a dma-contig driver it will
+>> reject it. One big problem is that this specific hack isn't signaled anywhere, so
+>> applications have no way of knowing if the USERPTR support is the proper version
+>> or the hack where physically contiguous memory is expected.
+>>
+>> This hack has been replaced with DMABUF which is the proper way of passing buffers
+>> around.
+>>
+>> New dma-contig drivers should not use that old hack anymore. Use dmabuf to pass
+>> external buffers around.
+>>
+>> How do you use it in your app? With malloc()ed buffers? Or with 'special' pointers
+>> to physically contiguous buffers?
+>>
+> Understood now. Thanks for your explanation.
+> Now our app use malloc()ed buffers and we hook vb2_dma_contig_memops. 
+> I don't know why that dma-contig driver do not reject it.
+> I will try to figure it out.
 
-I thought about counter too, like some of drivers do, but had no idea
-what to do next after counter reaches zero. In case of TX overrun we
-could get it either because of broken hw or because we entered Linux
-with that state already set. In both cases, it looks handy to me to
-attach a debugger and see that we are spinning in this putchar loop.
+Is there an iommu involved that turns the scatter-gather list into what looks like
+contiguous memory for the DMA?
 
-If you do insist to have a counter I'll add one, but if you are not
-strong about it I'd prefer to leave it as is.
+At the end of vb2_dc_get_userptr() in videobuf2-dma-contig.c there is a check
+'if (contig_size < size)' that verifies that the sg DMA is contiguous. This would
+work if there is an iommu involved (if I understand it correctly).
 
-> 
-> You may try to recover by flushing TX queue in HW (fifo and / or Tx
-> shift register) if HW supports it.
-> 
+If that's the case, then it's OK to keep VB2_USERPTR because you have real sg
+support (although not via the DMA engine, but via iommu mappings).
 
-I'm afraid this is not supported.
+Regards,
 
-Thanks
-Vladimir
+	Hans
