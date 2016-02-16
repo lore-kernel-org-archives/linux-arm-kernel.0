@@ -1,67 +1,54 @@
-From: tchalamarla@caviumnetworks.com (Tirumalesh Chalamarla)
-Date: Tue, 16 Feb 2016 11:50:44 -0800
-Subject: [PATCH V2] AHCI: Workaround for ThunderX Errata#22536
-In-Reply-To: <56C37AD3.4030407@caviumnetworks.com>
-References: <1455319230-30201-1-git-send-email-tchalamarla@caviumnetworks.com>
- <20160214170152.GC3965@htj.duckdns.org> <56C147B2.9010303@caviumnetworks.com>
- <20160215183041.GH3965@htj.duckdns.org>
- <20160216144250.GD31343@rric.localdomain>
- <56C37524.5090000@caviumnetworks.com> <56C37AD3.4030407@caviumnetworks.com>
-Message-ID: <56C37D94.8080403@caviumnetworks.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 16 Feb 2016 20:05:29 +0000
+Subject: [PATCH 0/8] KVM/ARM: Guest Entry/Exit optimizations
+In-Reply-To: <20160210204012.GS5171@cbox>
+References: <1454931622-14902-1-git-send-email-marc.zyngier@arm.com>
+ <20160210204012.GS5171@cbox>
+Message-ID: <56C38109.3020501@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 02/16/2016 11:38 AM, David Daney wrote:
-> On 02/16/2016 11:14 AM, Tirumalesh Chalamarla wrote:
+On 10/02/16 20:40, Christoffer Dall wrote:
+> On Mon, Feb 08, 2016 at 11:40:14AM +0000, Marc Zyngier wrote:
+>> I've recently been looking at our entry/exit costs, and profiling
+>> figures did show some very low hanging fruits.
 >>
+>> The most obvious cost is that accessing the GIC HW is slow. As in
+>> "deadly slow", specially when GICv2 is involved. So not hammering the
+>> HW when there is nothing to write is immediately beneficial, as this
+>> is the most common cases (whatever people seem to think, interrupts
+>> are a *rare* event).
 >>
->> On 02/16/2016 06:42 AM, Robert Richter wrote:
->>> On 15.02.16 13:30:41, Tejun Heo wrote:
->>>> On Sun, Feb 14, 2016 at 07:36:18PM -0800, Tirumalesh Chalamarla wrote:
->>>>> There is no need for special Driver, AHCI is sufficient for
->>>>> ThunderX, the
->>>>> file only contains this interrupt handler,
->>>>> is it preferable if this interrupt handler in libahci.c with others,
->>>>> instead
->>>>> of separate file?
->>>>
->>>> Yeap, just fold it in ahci.c with surrounding #ifdef guard.
->>>
->>> Yes, please use #ifdef CONFIG_CAVIUM_ERRATUM_22536 ... and add a
->>> kconfig entry for this to arch/arm64/Kconfig.
->>>
->> Are you sure, this is not a workaround that is based on alternative
->> framework rather on pci device and vendor
+>> Another easy thing to fix is the way we handle trapped system
+>> registers. We do insist on (mostly) sorting them, but we do perform a
+>> linear search on trap. We can switch to a binary search for free, and
+>> get immediate benefits (the PMU code, being extremely trap-happy,
+>> benefits immediately from this).
 >>
->> do you think CONFIG_ARCH_THUNDER a good alternative?
->
-> No.  CONFIG_ARCH_THUNDER should be removed all together.
->
-> Grouping a bunch of unrelated features under a single config variable
-> creates a very brittle system.  What are you going to do when a new
-> hardware revision is released?  Create CONFIG_ARCH_THUNDER2?  Which one
-> of these two would you select if building a kernel?  It is a choice that
-> we don't want to force users (kernel builders) to have to waste mental
-> energy on.
->
-> Instead, let's try to make things work out of the box without having to
-> set a bunch of random config variables.
->
-> If a generic arm64 kernel won't get too bloated, I would suggest just
-> enabling the compilation of the code unconditionally (at least for
-> arm64).  The use of the code would still be gated by the PCI version
-> probe that is part of the patch.
->
+>> With these in place, I see an improvement of 20 to 30% (depending on
+>> the platform) on our world-switch cycle count when running a set of
+>> hand-crafted guests that are designed to only perform traps.
+>>
+> 
+> By the way, I took this whole stack of changes (wsinc, vhe, and
+> optimizations) and ran it on Mustang and fired up UEFI and did a reboot
+> and things seem to work, so that's a small shallow
+> 'tested-by-something-else-than-a-linux-guest' statement from me.
 
-exactly, that is my initial choice with v1, and only depends on vendor 
-and device id.
+I've ran a slightly heavier set of tests, and the infamous reboot loop
+broke, thanks to patch #7.
 
-but it seems a config is needed. how about ARCH_ARM64 then?
+Notice how we fail to wipe the vgic_apr copy on the "light" exit path?
+If you're unlucky (and odds are that you will be), you will inject an
+interrupt while its active priority bit is set, and the new interrupt
+won't be delivered. Bah.
+
+With that fixed, the reboot loop has been going strong for a few hours.
+I'll leave my Seattle cooking overnight and if everything looks good in
+the morning, I'll repost a new set of patches.
 
 Thanks,
-Tirumalesh.
 
-> David Daney
->
+	M.
+-- 
+Jazz is not dead. It just smells funny...
