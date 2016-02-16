@@ -1,51 +1,49 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 16 Feb 2016 12:35:26 +0100
-Subject: [PATCH] xen kconfig: clarify INPUT_XEN_KBDDEV_FRONTEND select
-In-Reply-To: <alpine.DEB.2.02.1602151643150.27008@kaball.uk.xensource.com>
-References: <1455278707-2008263-1-git-send-email-arnd@arndb.de>
- <alpine.DEB.2.02.1602151643150.27008@kaball.uk.xensource.com>
-Message-ID: <2801550.oZPkqjv8nW@wuerfel>
+Date: Tue, 16 Feb 2016 12:37:57 +0100
+Subject: [PATCH] rtc: mt6397: Add platform device ID table
+In-Reply-To: <56C1E5C8.6040007@osg.samsung.com>
+References: <1455016095-13724-1-git-send-email-javier@osg.samsung.com>
+ <1455501497.7263.4.camel@mtksdaap41> <56C1E5C8.6040007@osg.samsung.com>
+Message-ID: <2416670.q30ahHlzPm@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 15 February 2016 16:51:08 Stefano Stabellini wrote:
-> > 
-> > diff --git a/drivers/video/fbdev/Kconfig b/drivers/video/fbdev/Kconfig
-> > index 8ea45a5cd806..fd3d6fd290a9 100644
-> > --- a/drivers/video/fbdev/Kconfig
-> > +++ b/drivers/video/fbdev/Kconfig
-> > @@ -2241,6 +2241,7 @@ config FB_VIRTUAL
-> >  config XEN_FBDEV_FRONTEND
-> >       tristate "Xen virtual frame buffer support"
-> >       depends on FB && XEN
-> > +     depends on INPUT || !INPUT_MISC
-> >       select FB_SYS_FILLRECT
-> >       select FB_SYS_COPYAREA
-> >       select FB_SYS_IMAGEBLIT
+On Monday 15 February 2016 11:50:48 Javier Martinez Canillas wrote:
 > 
-> This looks very hackish. Couldn't we just do the following?
+> On 02/14/2016 10:58 PM, Eddie Huang wrote:
 > 
-> diff --git a/drivers/video/fbdev/Kconfig b/drivers/video/fbdev/Kconfig
-> index 8ea45a5..3c15f6d 100644
-> --- a/drivers/video/fbdev/Kconfig
-> +++ b/drivers/video/fbdev/Kconfig
-> @@ -2246,7 +2246,7 @@ config XEN_FBDEV_FRONTEND
->         select FB_SYS_IMAGEBLIT
->         select FB_SYS_FOPS
->         select FB_DEFERRED_IO
-> -       select INPUT_XEN_KBDDEV_FRONTEND if INPUT_MISC
-> +       select INPUT_XEN_KBDDEV_FRONTEND if (INPUT && INPUT_MISC)
->         select XEN_XENBUS_FRONTEND
->         default y
->         help
+> [snip]
+> 
+> >> @@ -412,6 +418,7 @@ static struct platform_driver mtk_rtc_driver = {
+> >>      },
+> >>      .probe  = mtk_rtc_probe,
+> >>      .remove = mtk_rtc_remove,
+> >> +    .id_table = mt6397_rtc_id,
+> >>   };
+> >>
+> >>   module_platform_driver(mtk_rtc_driver);
+> >> @@ -419,4 +426,3 @@ module_platform_driver(mtk_rtc_driver);
+> >>   MODULE_LICENSE("GPL v2");
+> >>   MODULE_AUTHOR("Tianping Fang <tianping.fang@mediatek.com>");
+> >>   MODULE_DESCRIPTION("RTC Driver for MediaTek MT6397 PMIC");
+> >> -MODULE_ALIAS("platform:mt6397-rtc");
+> >
+> > This patch looks good to me, but I am wondering, since we tend to use
+> > device tree method to match driver, do we still need support platform
+> > device ID ?
+> >
+> 
+> I'm not familiar with neither this IP block nor the SoC so it is up to
+> you. I just noticed this issue when reviewing a regulator driver for a
+> similar PMIC posted by someone from mediatek.
+> 
+> I thought platform device was needed since the driver has a MODULE_ALIAS()
+> but please let me know what you prefer and I can re-spin the patch and
+> just remove the MODULE_ALIAS() if that makes more sense for this platform.
+>   
 > 
 
-No, that doesn't solve the problem:
-
-If XEN_FBDEV_FRONTEND=y, INPUT=m and INPUT_MISC=y, we would still
-get INPUT_XEN_KBDDEV_FRONTEND=y, which cannot work because of INPUT=m.
-
-INPUT_MISC already depends on INPUT, so your change has no effect
-at all.
+I agree. We can alway add a MODULE_DEVICE_TABLE() if we get multiple
+users of this driver on architectures that don't use devicetree yet.
 
 	Arnd
