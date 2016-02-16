@@ -1,50 +1,38 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 16 Feb 2016 16:05:20 +0100
-Subject: [PATCH] xen kconfig: clarify INPUT_XEN_KBDDEV_FRONTEND select
-In-Reply-To: <alpine.DEB.2.02.1602161156160.27008@kaball.uk.xensource.com>
-References: <1455278707-2008263-1-git-send-email-arnd@arndb.de>
- <2801550.oZPkqjv8nW@wuerfel>
- <alpine.DEB.2.02.1602161156160.27008@kaball.uk.xensource.com>
-Message-ID: <2697712.W9djLKoMG1@wuerfel>
+Date: Tue, 16 Feb 2016 16:08:34 +0100
+Subject: [PATCH v3 08/10] ARM: configs: add MPS2 defconfig
+In-Reply-To: <56C3378F.2010008@arm.com>
+References: <1455617295-23736-1-git-send-email-vladimir.murzin@arm.com>
+ <2680417.bULLX3O66Y@wuerfel> <56C3378F.2010008@arm.com>
+Message-ID: <11778979.HbWgmZUCnF@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 16 February 2016 12:14:14 Stefano Stabellini wrote:
-> > at all.
+On Tuesday 16 February 2016 14:51:59 Vladimir Murzin wrote:
+> > 
+> > Why CONFIG_EMBEDDED? You probably mean CONFIG_EXPERT, but then what do
+> > you need that for?
 > 
-> Please correct me if I am wrong, but the difference is that with this
-> change if INPUT=m, then the build system would ask the user whether she
-> wants to select INPUT_XEN_KBDDEV_FRONTEND as m or y, instead of
-> unconditionally set INPUT_XEN_KBDDEV_FRONTEND=y.
+> TBH, I have no special requirement for this option to be set and now,
+> looking at Kconfig entry for this option, I think that I got it here
+> because I stated configuration with allnoconfig.
+> 
+> OTOH, I don't see how harmful it can be since description says:
+> 
+>           This option should be enabled if compiling the kernel for
+>           an embedded system so certain expert options are available
+>           for configuration
+> 
+> yes, it selects CONFIG_EXPERT and that had side effect that, for
+> example, CONFIG_NAMESPACE could be compiled out.
+> 
+> Have I missed something around it?
 
-INPUT_XEN_KBDDEV_FRONTEND cannot be set by the user to 'y' if
-INPUT=m, because of an implied dependency around the input/misc/Kconfig
-file.
+Just the history behind this symbol. We removed it a while ago in
+favor if CONFIG_EXPERT, assuming that it makes it clearer that it's
+not just for embedded systems, or for systems with small memory.
 
-> However it is true that if the users chooses
-> INPUT_XEN_KBDDEV_FRONTEND=y, then the problem persists.
-> Maybe we also need:
-> 
-> diff --git a/drivers/input/misc/Kconfig b/drivers/input/misc/Kconfig
-> index 1f2337a..303df24 100644
-> --- a/drivers/input/misc/Kconfig
-> +++ b/drivers/input/misc/Kconfig
-> @@ -721,7 +721,7 @@ config INPUT_CMA3000_I2C
->  
->  config INPUT_XEN_KBDDEV_FRONTEND
->         tristate "Xen virtual keyboard and mouse support"
-> -       depends on XEN
-> +       depends on XEN && INPUT
->         default y
->         select XEN_XENBUS_FRONTEND
->         help
-> 
-> 
-> Do you have a kernel config with INPUT=m that I can use to test with?
-
-You can easily set that in any config if you disable CONFIG_VT. I don't
-think it's worth spending more time on that, as everyone seems to be
-happy with just removing the 'select', and I've sent a replacement
-patch to do that.
+It's  basically a zombie symbol that nobody should use directly
+(independent of what the documentation says...).
 
 	Arnd
