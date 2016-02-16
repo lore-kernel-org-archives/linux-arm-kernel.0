@@ -1,211 +1,62 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 16 Feb 2016 14:16:27 +0800
-Subject: [PATCH v3 09/12] arm64: dts: add the Marvell Armada 3700 family
- and a development board
-In-Reply-To: <1454951660-13289-10-git-send-email-gregory.clement@free-electrons.com>
-References: <1454951660-13289-1-git-send-email-gregory.clement@free-electrons.com>
- <1454951660-13289-10-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20160216141627.78ec94bd@xhacker>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 16 Feb 2016 15:20:29 +0900
+Subject: [PATCH v5 0/3] arm64/clk: EXYNOS: Consolidate Exynos7 symbol
+Message-ID: <1455603632-11158-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Gregory,
-On Mon, 8 Feb 2016 18:14:17 +0100 Gregory CLEMENT wrote:
+Hi,
 
-> Add initial dtsi files to support Marvell Armada 3700 SoC with Cortex-A53
-> CPUs. There are two members in this family: the Armada 3710 (Single CPU)
-> and the Armada 3720 (Dual CPUs).
-> 
-> It also adds a dts file for the Marvell Armada 3720 DB board.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  arch/arm64/boot/dts/marvell/Makefile           |   4 +
->  arch/arm64/boot/dts/marvell/armada-371x.dtsi   |  53 ++++++++++
->  arch/arm64/boot/dts/marvell/armada-3720-db.dts |  86 ++++++++++++++++
->  arch/arm64/boot/dts/marvell/armada-372x.dtsi   |  63 ++++++++++++
->  arch/arm64/boot/dts/marvell/armada-37xx.dtsi   | 131 +++++++++++++++++++++++++
->  5 files changed, 337 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/marvell/armada-371x.dtsi
->  create mode 100644 arch/arm64/boot/dts/marvell/armada-3720-db.dts
->  create mode 100644 arch/arm64/boot/dts/marvell/armada-372x.dtsi
->  create mode 100644 arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-> 
-> diff --git a/arch/arm64/boot/dts/marvell/Makefile b/arch/arm64/boot/dts/marvell/Makefile
-> index 348f4db4f313..2114af8d312d 100644
-> --- a/arch/arm64/boot/dts/marvell/Makefile
-> +++ b/arch/arm64/boot/dts/marvell/Makefile
-> @@ -1,6 +1,10 @@
-> +# Berlin SoC Family
->  dtb-$(CONFIG_ARCH_BERLIN) += berlin4ct-dmp.dtb
->  dtb-$(CONFIG_ARCH_BERLIN) += berlin4ct-stb.dtb
->  
-> +# Mvebu SoC Family
-> +dtb-$(CONFIG_ARCH_MVEBU) += armada-3720-db.dtb
-> +
->  always		:= $(dtb-y)
->  subdir-y	:= $(dts-dirs)
->  clean-files	:= *.dtb
-> diff --git a/arch/arm64/boot/dts/marvell/armada-371x.dtsi b/arch/arm64/boot/dts/marvell/armada-371x.dtsi
-> new file mode 100644
-> index 000000000000..c9e5325b8ac3
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/marvell/armada-371x.dtsi
-> @@ -0,0 +1,53 @@
-> +/*
-> + * Device Tree Include file for Marvell Armada 371x family of SoCs
-> + * (also named 88F3710)
-> + *
-> + * Copyright (C) 2016 Marvell
+Patchset attempts to remove the ARCH_EXYNOS7 symbol.
 
-Is it better to Add full Marvell company name, eg. Marvell Technology Group Ltd.
+I rebased this on top of James':
+ - clk: Move vendor's Kconfig into CCF menu section
+   http://www.spinics.net/lists/devicetree/msg111953.html
 
-> + *
-> + * Gregory CLEMENT <gregory.clement@free-electrons.com>
+The third patch depends on previous ones so one way of merging this
+would be to prepare a tag from clk tree with first two patches
+and the dependency. The last third patch would go through arm-soc.
 
-What does this mean? in copyright holder list or just author? Is it better
-to add "Author:" prefix or something else?
+Changes since v4:
+=================
+1. Rebased on "clk: Move vendor's Kconfig into CCF menu section"
+   existing in clock tree.
+2. Re-work patch 2/3 (see specific changelog).
+
+Changes since v3:
+=================
+1. Rebase on next-20160127 (s3c64xx became multiplatform).
+
+Changes since v2:
+=================
+1. Follow Arnd's advice about not enabling silently the newly added
+   EXYNOS_ARM64_COMMON_CLK, when COMPILE_TEST is enabled. This was
+   also a trigger for some changes in placement of Samsung clocks
+   Kconfig entries...
+2. ... which lead to introducing patch 1.
 
 
-[...]
+Rationale:
+==========
+We don't need ARCH_EXYNOS7 symbol because all ARMv8 platforms should
+fall under generic ARCH_EXYNOS. In the same time there is no sense
+in building clocks for these ARMv8 SoCs on ARMv7 builds.
 
-> diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-> new file mode 100644
-> index 000000000000..ba9df7ff2a72
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-> @@ -0,0 +1,131 @@
-> +/*
-> + * Device Tree Include file for Marvell Armada 37xx family of SoCs.
-> + *
-> + * Copyright (C) 2016 Marvell
-> + *
-> + * Gregory CLEMENT <gregory.clement@free-electrons.com>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +#include <dt-bindings/interrupt-controller/arm-gic.h>
-> +
-> +/ {
-> +	model = "Marvell Armada 37xx SoC";
-> +	compatible = "marvell,armada3700";
-> +	interrupt-parent = <&gic>;
-> +	#address-cells = <2>;
-> +	#size-cells = <2>;
-> +
-> +	aliases {
-> +		serial0 = &uart0;
-> +	};
-> +
-> +	cpus {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		cpu at 0 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a53", "arm,armv8";
-> +			reg = <0>;
-> +			enable-method = "psci";
-> +		};
-> +	};
-> +
-> +	psci {
-> +		compatible = "arm,psci-0.2";
-> +		method = "smc";
-> +	};
-> +
-> +	timer {
-> +		compatible = "arm,armv8-timer";
-> +		interrupts = <GIC_PPI 13
-> +			(GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>,
-> +			     <GIC_PPI 14
-> +			(GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>,
-> +			     <GIC_PPI 11
-> +			(GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>,
-> +			     <GIC_PPI 10
-> +			(GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
-> +	};
-> +
-> +	soc {
-> +		compatible = "simple-bus";
-> +		#address-cells = <2>;
-> +		#size-cells = <2>;
-> +		ranges;
-> +
-> +		internal-regs {
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			compatible = "simple-bus";
-> +			/* 32M internal register @ 0xd000_0000 */
-> +			ranges = <0x0 0x0 0xd0000000 0x2000000>;
-> +
-> +			uart0: serial at 12000 {
-> +				compatible = "marvell,armada-3700-uart";
-> +				reg = <0x12000 0x400>;
-> +				interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
-> +				status = "disabled";
-> +			};
-> +
-> +			usb3 at 58000 {
-> +				compatible = "generic-xhci";
-> +				reg = <0x58000 0x4000>;
-> +				interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
-> +				status = "disabled";
-> +			};
-> +
-> +			sata at e0000 {
-> +				compatible = "marvell,armada-3700-ahci";
-> +				reg = <0xe0000 0x2000>;
-> +				interrupts = <GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>;
-> +				status = "disabled";
-> +			};
-> +
-> +			gic: interrupt-controller at 1d00000 {
-> +				compatible = "arm,gic-v3";
-> +				#interrupt-cells = <3>;
-> +				interrupt-controller;
-> +				reg = <0x1d00000 0x10000>, /* GICD */
-> +				      <0x1d40000 0x40000>; /* GICR */
 
-There's no GICC, GICV, GICH?
+Best regards,
+Krzysztof
 
-> +			};
-> +		};
-> +	};
-> +};
+Krzysztof Kozlowski (3):
+  clk: samsung: Enable COMPILE_TEST for Samsung clocks
+  clk: samsung: Don't build ARMv8 clock drivers on ARMv7
+  arm64: EXYNOS: Consolidate ARCH_EXYNOS7 symbol into ARCH_EXYNOS
+
+ arch/arm64/Kconfig.platforms        | 11 ++---------
+ arch/arm64/boot/dts/exynos/Makefile |  2 +-
+ arch/arm64/configs/defconfig        |  2 +-
+ drivers/clk/samsung/Kconfig         | 18 +++++++++++++-----
+ drivers/clk/samsung/Makefile        |  4 ++--
+ 5 files changed, 19 insertions(+), 18 deletions(-)
+
+-- 
+2.5.0
