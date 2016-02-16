@@ -1,59 +1,45 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 16 Feb 2016 15:02:21 +0000
-Subject: [PATCH] ARM64: dma-mapping: fix IOMMU-based dma_mmap_atts()
- implementation
-In-Reply-To: <1455632065-14620-1-git-send-email-m.szyprowski@samsung.com>
-References: <1455632065-14620-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <56C339FD.6040907@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 16 Feb 2016 16:03:23 +0100
+Subject: [PATCH v2] xen kconfig: don't "select INPUT_XEN_KBDDEV_FRONTEND"
+In-Reply-To: <alpine.DEB.2.02.1602151708110.27008@kaball.uk.xensource.com>
+References: <1455278707-2008263-1-git-send-email-arnd@arndb.de>
+ <56C20552.8030305@citrix.com>
+ <alpine.DEB.2.02.1602151708110.27008@kaball.uk.xensource.com>
+Message-ID: <2479546.WgivMO2bp2@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+The Xen framebuffer driver selects the xen keyboard driver, so the latter
+will be built-in if XEN_FBDEV_FRONTEND=y. However, when CONFIG_INPUT
+is a loadable module, this configuration cannot work. On mainline kernels,
+the symbol will be enabled but not used, while in combination with
+a patch I have to detect such useless configurations, we get the
+expected link failure:
 
-On 16/02/16 14:14, Marek Szyprowski wrote:
-> IOMMU-based DMA-mapping implementation doesn't support
-> dma_declare_coherent() based regions, so there is no point to call
-> dma_mmap_from_coherent() from __iommu_mmap_atts(). This patch removes
-> useless code.
+drivers/input/built-in.o: In function `xenkbd_remove':
+xen-kbdfront.c:(.text+0x2f0): undefined reference to `input_unregister_device'
+xen-kbdfront.c:(.text+0x30e): undefined reference to `input_unregister_device'
 
-I'm not sure that's the case - AFAICS a device could still have its own 
-local memory despite being behind an IOMMU relative to the rest of the 
-system. If it uses dma_declare_coherent() for that, the .alloc and .free 
-callbacks here might be bypassed by dma_{alloc,free}_attrs() 
-short-circuiting into dma_{alloc,release}_from_coherent(), but in the 
-case of dma_mmap_attrs() it hits the .mmap callback first and only falls 
-back to the from_coherent check in dma_common_mmap() if that isn't 
-implemented.
+This removes the extra "select", as it just causes more trouble than
+it helps. In theory, some defconfig file might break if it has
+XEN_FBDEV_FRONTEND in it but not INPUT_XEN_KBDDEV_FRONTEND. The Kconfig
+fragment we ship in the kernel (kernel/configs/xen.config) however
+already enables both, and anyone using an old .config file would
+keep having both enabled.
 
-Maybe the right thing to do would be to move this check (with its 
-associated guards) out from dma_common_mmap() up to dma_mmap_attrs() to 
-be consistent with alloc/free; so that it doesn't need to be 
-reimplemented all over arch/{arm,arm64,mips} at all?
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Suggested-by: David Vrabel <david.vrabel@citrix.com>
+Fixes: 36c1132e34bd ("xen kconfig: fix select INPUT_XEN_KBDDEV_FRONTEND")
 
-Robin.
-
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->   arch/arm64/mm/dma-mapping.c | 5 -----
->   1 file changed, 5 deletions(-)
->
-> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-> index 331c4ca..573b1e6 100644
-> --- a/arch/arm64/mm/dma-mapping.c
-> +++ b/arch/arm64/mm/dma-mapping.c
-> @@ -636,14 +636,9 @@ static int __iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
->   			      struct dma_attrs *attrs)
->   {
->   	struct vm_struct *area;
-> -	int ret;
->
->   	vma->vm_page_prot = __get_dma_pgprot(attrs, vma->vm_page_prot,
->   					     is_device_dma_coherent(dev));
-> -
-> -	if (dma_mmap_from_coherent(dev, vma, cpu_addr, size, &ret))
-> -		return ret;
-> -
->   	area = find_vm_area(cpu_addr);
->   	if (WARN_ON(!area || !area->pages))
->   		return -ENXIO;
->
+diff --git a/drivers/video/fbdev/Kconfig b/drivers/video/fbdev/Kconfig
+index 8ea45a5cd806..d889ef2048df 100644
+--- a/drivers/video/fbdev/Kconfig
++++ b/drivers/video/fbdev/Kconfig
+@@ -2246,7 +2246,6 @@ config XEN_FBDEV_FRONTEND
+ 	select FB_SYS_IMAGEBLIT
+ 	select FB_SYS_FOPS
+ 	select FB_DEFERRED_IO
+-	select INPUT_XEN_KBDDEV_FRONTEND if INPUT_MISC
+ 	select XEN_XENBUS_FRONTEND
+ 	default y
+ 	help
