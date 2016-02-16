@@ -1,84 +1,46 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 16 Feb 2016 17:38:40 +0100
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 16 Feb 2016 17:06:00 +0000
 Subject: [PATCH 5/5] arm64: marvell: add Device Tree files for Armada 7K/8K
-In-Reply-To: <20160216134219.00045b5b@xhacker>
+In-Reply-To: <20160216173155.4f832646@free-electrons.com>
 References: <1455526065-7307-1-git-send-email-thomas.petazzoni@free-electrons.com>
  <1455526065-7307-6-git-send-email-thomas.petazzoni@free-electrons.com>
- <20160216134219.00045b5b@xhacker>
-Message-ID: <20160216173840.7f93896f@free-electrons.com>
+ <56C19B18.8090005@arm.com> <20160216173155.4f832646@free-electrons.com>
+Message-ID: <56C356F8.8080105@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Tue, 16 Feb 2016 13:42:19 +0800, Jisheng Zhang wrote:
-
-> > +/ {
-> > +	model = "Marvell Armada AP806";
-> > +	compatible = "marvell,armada-ap806";
-> > +	#address-cells = <2>;
-> > +	#size-cells = <2>;
-> > +
-> > +	psci {
-> > +		compatible = "arm,psci-0.2";
+On 16/02/16 16:31, Thomas Petazzoni wrote:
+> Marc,
 > 
-> I guess the firmware is also psci-1.0 compatible.
-
-At boot time, the kernel queries the PSCI firmware, and it says:
-
-[    0.000000] psci: probing for conduit method from DT.
-[    0.000000] psci: PSCIv0.2 detected in firmware.
-[    0.000000] psci: Using standard PSCI v0.2 function IDs
-
-So I think psci-0.2 is correct here. Should this change for the
-production revision of the chip, we'll send an update to the Device
-Tree accordingly.
-
-> > +	ap806 {
-> > +		#address-cells = <2>;
-> > +		#size-cells = <2>;
-> > +		compatible = "simple-bus";
-> > +		interrupt-parent = <&gic>;
-> > +		ranges;
-> > +
-> > +		config-space {
-> > +			#address-cells = <1>;
-> > +			#size-cells = <1>;
-> > +			compatible = "simple-bus";
-> > +			ranges = <0x0 0x0 0xf0000000 0x1000000>;
-> > +
-> > +			gic: interrupt-controller at 210000 {
-> > +				compatible = "arm,cortex-a15-gic",
-> > +					     "arm,cortex-a9-gic";
+> Thanks for the review!
 > 
-> I guess the GIC is neither the one in cortex-a15 or cortex-a9. 
+> On Mon, 15 Feb 2016 09:32:08 +0000, Marc Zyngier wrote:
+> 
+>>> +				interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+>>> +				reg = <0x210000 0x1000>,
+>>> +				      <0x220000 0x1000>,
+>>
+>> Assuming we do have a GIC400 here (which is extremely likely), the GICC
+>> block should be at least 8kB to reflect the fact that this is a GICv2.
+> 
+> According to the datasheet I have, the GICD, GICC, GICV and GICH blocks
+> are all 0x10000 in size. Not sure the entire 0x10000 is actually used,
+> but th memory map is pretty clear.
 
-What makes you think this?
+No, that's just a way to make sure that you can give the GICV block to a
+guest while using 64k pages.
 
-The GIC is a GIC400, which is GICv2 compliant, and arm-cortex-a15-gic /
-arm-cortex-a9-gic are valid compatible strings to identify a GICv2
-compliant interrupt controller.
+Talking about GICV: are you sure it is 0x10000 and not 0x20000? SBSA
+recommends to have the first 4kB GICV page aliased over 64kB, and the
+second 4kB page over the second 64kB block. That is to ensure that a
+hypervisor can trap access to GICV_DIR register independently of the
+rest of the virtual CPU interface.
 
-See:
+But hey, almost everybody got it wrong so far, so I wouldn't be
+surprised if that was broken on this platform as well...
 
-arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi:              compatible = "arm,gic-400", "arm,cortex-a15-gic";
-arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi:           compatible = "arm,gic-400", "arm,cortex-a15-gic";
-arch/arm64/boot/dts/apm/apm-shadowcat.dtsi:             compatible = "arm,cortex-a15-gic";
-arch/arm64/boot/dts/apm/apm-storm.dtsi:         compatible = "arm,cortex-a15-gic";
-arch/arm64/boot/dts/arm/foundation-v8.dts:              compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
-arch/arm64/boot/dts/arm/juno-base.dtsi:         compatible = "arm,gic-400", "arm,cortex-a15-gic";
-arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts:             compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
-arch/arm64/boot/dts/marvell/armada-ap806.dtsi:                          compatible = "arm,cortex-a15-gic",
-arch/arm64/boot/dts/nvidia/tegra132.dtsi:               compatible = "arm,cortex-a15-gic";
-arch/arm64/boot/dts/xilinx/zynqmp.dtsi:                 compatible = "arm,gic-400", "arm,cortex-a15-gic";
+Thanks,
 
-Or do you have a more specific reason to think that this compatible
-string is wrong?
-
-Best regards,
-
-Thomas
+	M.
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Jazz is not dead. It just smells funny...
