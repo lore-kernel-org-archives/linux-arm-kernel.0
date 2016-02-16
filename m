@@ -1,27 +1,28 @@
-From: borntraeger@de.ibm.com (Christian Borntraeger)
-Date: Tue, 16 Feb 2016 19:46:03 +0100
-Subject: [BUG] random kernel crashes after THP rework on s390 (maybe also
- on PowerPC and ARM)
-In-Reply-To: <20160215213526.GA9766@node.shutemov.name>
-References: <20160211192223.4b517057@thinkpad>
- <20160211190942.GA10244@node.shutemov.name>
- <20160211205702.24f0d17a@thinkpad>
- <20160212154116.GA15142@node.shutemov.name> <56BE00E7.1010303@de.ibm.com>
- <20160212181640.4eabb85f@thinkpad>
- <20160212231510.GB15142@node.shutemov.name>
- <alpine.LFD.2.20.1602131238260.1910@schleppi>
- <20160215113159.GA28832@node.shutemov.name>
- <20160215193702.4a15ed5e@thinkpad> <20160215213526.GA9766@node.shutemov.name>
-Message-ID: <56C36E6B.70009@de.ibm.com>
+From: laura@labbott.name (Laura Abbott)
+Date: Tue, 16 Feb 2016 10:48:31 -0800
+Subject: [PATCH] arm64: mm: Mark .rodata as RO
+In-Reply-To: <CAGXu5jLpj=ue49_N+LOYvtZcU3rpFR5=WTG15ySDOWprvRzFUA@mail.gmail.com>
+References: <1455293599-6974-1-git-send-email-jeremy.linton@arm.com>
+ <20160212182527.GG20262@leverpostej>
+ <CAGXu5jLpj=ue49_N+LOYvtZcU3rpFR5=WTG15ySDOWprvRzFUA@mail.gmail.com>
+Message-ID: <56C36EFF.9060900@labbott.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/15/2016 10:35 PM, Kirill A. Shutemov wrote:
-> 
-> Is there any chance that I'll be able to trigger the bug using QEMU?
-> Does anybody have an QEMU image I can use?
+On 2/16/16 10:10 AM, Kees Cook wrote:
+> On Fri, Feb 12, 2016 at 10:25 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+>> On Fri, Feb 12, 2016 at 10:13:19AM -0600, Jeremy Linton wrote:
+>>> Currently the .rodata section is actually still executable when DEBUG_RODATA
+>>> is enabled. This changes that so the .rodata is actually read only, no execute.
+>>>
+>>> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+>
+> Yikes, good catch. Is anyone running the lkdtm tests that check these things?
+>
 
-qemu/TCG on s390 does neither provide SMP nor large pages (only QEMU/KVM does)
-so this will probably not help you here. 
-
-Christian
+I don't think the current lkdtm test would have caught this since the exec
+test is using rw data and not ro data. That test could be expanded though
+to include a rodata buffer as well.
+  
+Thanks,
+Laura
