@@ -1,51 +1,25 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 16 Feb 2016 21:09:09 +0100
-Subject: [PATCH v3 0/6] irqchip: irq-armada-370-xp: generic MSI
- infrastructure and assorted fixes
-In-Reply-To: <20160216174937.GF5183@io.lakedaemon.net>
-References: <1455115621-22846-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20160216174937.GF5183@io.lakedaemon.net>
-Message-ID: <20160216210909.09f7f685@free-electrons.com>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 16 Feb 2016 15:10:33 -0500 (EST)
+Subject: [PATCH] net: am79c961a: avoid %? in inline assembly
+In-Reply-To: <1454942025-2779812-1-git-send-email-arnd@arndb.de>
+References: <1454942025-2779812-1-git-send-email-arnd@arndb.de>
+Message-ID: <20160216.151033.337771595038699408.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Mon,  8 Feb 2016 15:33:42 +0100
 
-On Tue, 16 Feb 2016 17:49:37 +0000, Jason Cooper wrote:
+> The am79c961a.c driver fails to build with clang because of an
+> unusual inline assembly construct:
+> 
+> drivers/net/ethernet/amd/am79c961a.c:53:7: error: invalid % escape in inline assembly string
+>  "str%?h        %1, [%2]        @ NET_RAP\n\t"
+> 
+> The same change has been done a decade ago in arch/arm as of
+> 6a39dd6222dd ("[ARM] 3759/2: Remove uses of %?"), but apparently
+> some drivers were missed.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-> > Note that this patch series depends on the patch series from Marc
-> > Zyngier for proper operation, which have already been merged in
-> > tip.git by Thomas Gleixner:
-> > 
-> >   http://git.kernel.org/cgit/linux/kernel/git/tip/tip.git/commit/?id=530cbe100ef7587aa5b5ac3a4b670cda4d50e598
-> >   http://git.kernel.org/cgit/linux/kernel/git/tip/tip.git/commit/?id=14a0db3cdd114da757197193f66786e63649c91e
-> 
-> When based against v4.5-rc1, I encountered:
-> 
-> drivers/irqchip/irq-armada-370-xp.c:584:41: error: 'DOMAIN_BUS_WIRED' undeclared (first use in this function)
-> 
-> Rebased the branch against v4.5-rc2 to pick up:
-> 
->   530cbe100ef7 irqdomain: Allow domain lookup with DOMAIN_BUS_WIRED token
-> 
-> Which builds without warning.
-
-Indeed. See above where I was mentioning which commits I was depending
-on.
-
-> >  arch/arm/mach-mvebu/Kconfig         |   6 +-
-> >  drivers/irqchip/Kconfig             |   6 ++
-> >  drivers/irqchip/Makefile            |   2 +-
-> >  drivers/irqchip/irq-armada-370-xp.c | 156 +++++++++++++++---------------------
-> >  4 files changed, 78 insertions(+), 92 deletions(-)
-> 
-> Whole series applied to irqchip/mvebu which will not be rebased.  I'll
-> only append to it if you send me a patch to add.  ;-)
-
-Thanks for the merge!
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Applied, thanks.
