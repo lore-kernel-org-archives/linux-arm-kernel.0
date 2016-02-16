@@ -1,49 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 16 Feb 2016 12:37:57 +0100
-Subject: [PATCH] rtc: mt6397: Add platform device ID table
-In-Reply-To: <56C1E5C8.6040007@osg.samsung.com>
-References: <1455016095-13724-1-git-send-email-javier@osg.samsung.com>
- <1455501497.7263.4.camel@mtksdaap41> <56C1E5C8.6040007@osg.samsung.com>
-Message-ID: <2416670.q30ahHlzPm@wuerfel>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 16 Feb 2016 11:42:25 +0000
+Subject: [PATCH] clocksource: arm_global_timer: register delay timer
+In-Reply-To: <20160216112841.GA26773@axis.com>
+References: <1439991818-31989-1-git-send-email-rabin.vincent@axis.com>
+ <55D62468.4050404@linaro.org> <20160216112841.GA26773@axis.com>
+Message-ID: <56C30B21.4000707@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 15 February 2016 11:50:48 Javier Martinez Canillas wrote:
-> 
-> On 02/14/2016 10:58 PM, Eddie Huang wrote:
-> 
-> [snip]
-> 
-> >> @@ -412,6 +418,7 @@ static struct platform_driver mtk_rtc_driver = {
-> >>      },
-> >>      .probe  = mtk_rtc_probe,
-> >>      .remove = mtk_rtc_remove,
-> >> +    .id_table = mt6397_rtc_id,
-> >>   };
-> >>
-> >>   module_platform_driver(mtk_rtc_driver);
-> >> @@ -419,4 +426,3 @@ module_platform_driver(mtk_rtc_driver);
-> >>   MODULE_LICENSE("GPL v2");
-> >>   MODULE_AUTHOR("Tianping Fang <tianping.fang@mediatek.com>");
-> >>   MODULE_DESCRIPTION("RTC Driver for MediaTek MT6397 PMIC");
-> >> -MODULE_ALIAS("platform:mt6397-rtc");
-> >
-> > This patch looks good to me, but I am wondering, since we tend to use
-> > device tree method to match driver, do we still need support platform
-> > device ID ?
-> >
-> 
-> I'm not familiar with neither this IP block nor the SoC so it is up to
-> you. I just noticed this issue when reviewing a regulator driver for a
-> similar PMIC posted by someone from mediatek.
-> 
-> I thought platform device was needed since the driver has a MODULE_ALIAS()
-> but please let me know what you prefer and I can re-spin the patch and
-> just remove the MODULE_ALIAS() if that makes more sense for this platform.
->   
-> 
+On 02/16/2016 11:28 AM, Rabin Vincent wrote:
+> On Thu, Aug 20, 2015 at 09:03:04PM +0200, Daniel Lezcano wrote:
+>> On 08/19/2015 03:43 PM, Rabin Vincent wrote:
+>>> Provide a delay timer using the lower 32-bits of the global timer so
+>>> that we can use that instead of having to calibrating delays.
+>>>
+>>> Signed-off-by: Rabin Vincent <rabin.vincent@axis.com>
+>>
+>> Applied to my tree for 4.4
+>
+> This seems to have got lost?  I don't see it in v4.4 or current mainline
+> (v4.5-rc4).  It still applies cleanly.
 
-I agree. We can alway add a MODULE_DEVICE_TABLE() if we get multiple
-users of this driver on architectures that don't use devicetree yet.
+Oops, right.
 
-	Arnd
+Fixed now [1]. Thanks for the heads up.
+
+   -- Daniel
+
+[1] 
+https://git.linaro.org/people/daniel.lezcano/linux.git/commit/23cb25d0f407e83be10747258092843e8e20d535
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
