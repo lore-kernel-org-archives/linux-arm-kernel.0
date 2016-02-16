@@ -1,77 +1,21 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Tue, 16 Feb 2016 15:31:28 +0100
-Subject: [PATCH v2 03/17] drm/exynos: removed optional dummy encoder
- mode_fixup function.
-In-Reply-To: <CAMeQTsZLdMOnk7-isneoUyFBbQdiRUsGH6+EhD8W1LNB=80LVQ@mail.gmail.com>
-References: <cover.1455540137.git.palminha@synopsys.com>
- <3768b670931572de51fca1102efa18d20dd770ee.1455540137.git.palminha@synopsys.com>
- <CAMeQTsZLdMOnk7-isneoUyFBbQdiRUsGH6+EhD8W1LNB=80LVQ@mail.gmail.com>
-Message-ID: <20160216143128.GE32705@phenom.ffwll.local>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 16 Feb 2016 15:35:07 +0100
+Subject: [PATCH v8 0/2] Add Rockchip Inno-HDMI driver
+In-Reply-To: <56C270F9.9030707@rock-chips.com>
+References: <1454049768-30872-1-git-send-email-ykk@rock-chips.com>
+ <56C270F9.9030707@rock-chips.com>
+Message-ID: <1519836.S7OnrkT0mU@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 15, 2016 at 02:49:09PM +0100, Patrik Jakobsson wrote:
-> Hi Carlos
-> 
-> Any particular reason why this patch isn't squashed with patch 8/17?
+Hi Mark,
 
-I've squashed them while applying.
--Daniel
+Am Dienstag, 16. Februar 2016, 08:44:41 schrieb Mark yao:
+> Ping, it seems inno hdmi driver is ready, So I'd like to merge it into
+> drm/rockchip if there is no doubt these days.
 
-> 
-> Thanks
-> Patrik
-> 
-> 
-> On Mon, Feb 15, 2016 at 1:58 PM, Carlos Palminha
-> <CARLOS.PALMINHA@synopsys.com> wrote:
-> > mode_fixup function for encoder drivers became optional with patch
-> > http://patchwork.freedesktop.org/patch/msgid/1455106522-32307-1-git-send-email-palminha at synopsys.com
-> >
-> > This patch set nukes all the dummy mode_fixup implementations.
-> >
-> > (made on top of Daniel topic/drm-misc branch)
-> >
-> > Signed-off-by: Carlos Palminha <palminha@synopsys.com>
-> > ---
-> >  drivers/gpu/drm/exynos/exynos_drm_dsi.c | 8 --------
-> >  1 file changed, 8 deletions(-)
-> >
-> > diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-> > index e977a81..736115c 100644
-> > --- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-> > +++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-> > @@ -1597,13 +1597,6 @@ static int exynos_dsi_create_connector(struct drm_encoder *encoder)
-> >         return 0;
-> >  }
-> >
-> > -static bool exynos_dsi_mode_fixup(struct drm_encoder *encoder,
-> > -                                 const struct drm_display_mode *mode,
-> > -                                 struct drm_display_mode *adjusted_mode)
-> > -{
-> > -       return true;
-> > -}
-> > -
-> >  static void exynos_dsi_mode_set(struct drm_encoder *encoder,
-> >                                 struct drm_display_mode *mode,
-> >                                 struct drm_display_mode *adjusted_mode)
-> > @@ -1623,7 +1616,6 @@ static void exynos_dsi_mode_set(struct drm_encoder *encoder,
-> >  }
-> >
-> >  static const struct drm_encoder_helper_funcs exynos_dsi_encoder_helper_funcs = {
-> > -       .mode_fixup = exynos_dsi_mode_fixup,
-> >         .mode_set = exynos_dsi_mode_set,
-> >         .enable = exynos_dsi_enable,
-> >         .disable = exynos_dsi_disable,
-> > --
-> > 2.5.0
-> >
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+I think you can just go ahead  with picking them up, I think they have 
+ripened enough :-)
 
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+
+Heiko
