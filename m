@@ -1,70 +1,72 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Tue, 16 Feb 2016 10:55:19 +0100
-Subject: [PATCH v3 6/7] arm64: dts: r8a7795: Add missing properties to
- CA57 L2 cache node
-In-Reply-To: <56C2EF47.4080809@arm.com>
-References: <1455568715-20880-1-git-send-email-geert+renesas@glider.be>
- <1455568715-20880-7-git-send-email-geert+renesas@glider.be>
- <56C2C471.80000@de.bosch.com> <56C2EF47.4080809@arm.com>
-Message-ID: <56C2F207.2080703@de.bosch.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 16 Feb 2016 10:55:37 +0100
+Subject: [PATCH v2] arm64: dts: r8a7795: Add GIC-400 virtual interfaces
+In-Reply-To: <1455615802-9083-1-git-send-email-dirk.behme@de.bosch.com>
+References: <1455615802-9083-1-git-send-email-dirk.behme@de.bosch.com>
+Message-ID: <CAMuHMdVP4wA4eXK-fkENndNs=zS2vuUeDww2ZZbXvocfFiOgWQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16.02.2016 10:43, Sudeep Holla wrote:
+CC Marc
+
+On Tue, Feb 16, 2016 at 10:43 AM, Dirk Behme <dirk.behme@de.bosch.com> wrote:
+> Besides the distributor and the CPU interface the GIC-400 additionally
+> supports the virtual interface control blocks and the virtual CPU interfaces.
 >
+> Add the physical base addresses and size for these.
 >
-> On 16/02/16 06:40, Dirk Behme wrote:
->> On 15.02.2016 21:38, Geert Uytterhoeven wrote:
->>> Add the missing "cache-unified" and "cache-level" properties to the
->>> Cortex-A57 cache-controller node.
->>>
->>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
->>> ---
->>> v3:
->>>    - Remaining part of "[PATCH v2 6/6] arm64: renesas: r8a7795: Add L2
->>>      cache-controller nodes", after dropping the "arm,data-latency" and
->>>      "arm,tag-latency" properties.
->>> ---
->>>   arch/arm64/boot/dts/renesas/r8a7795.dtsi | 2 ++
->>>   1 file changed, 2 insertions(+)
->>>
->>> diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
->>> b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
->>> index b5e46e4ff72ad003..c07f4e83b988ba42 100644
->>> --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
->>> +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
->>> @@ -68,6 +68,8 @@
->>>
->>>       L2_CA57: cache-controller at 0 {
->>>           compatible = "cache";
->>> +        cache-unified;
->>> +        cache-level = <2>;
->>
->>
->> As this is completely unused on ARMv8 I don't think that we want to have
->> these unused entries in the DT.
->>
->> Sudeep: What do you think?
->>
+> See
 >
-> I am fine with that, I don't see any issue having them as they are
-> static values and highly unlikely to change and hence no threat to
-> backward compatibility.
+> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0471b/index.html
+> -> 3.2. GIC-400 register map
 >
-> The main concern I had with latency values is that it's currently not
-> used anywhere but if we decide to use say in secure software, having the
-> untested/early values in DT might cause compatibility issues in future
-> as they were added much before the actual understanding of it's usage.
-> So I prefer to defer them until then.
+> and Linux kernel's
+>
+> Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt
+>
+> for more details.
+>
+> For the at GICH Virtual interface control blocks at 0xf1040000 cover the
+> whole 128kB (0x20000) range. This is done based on the advice from Marc
+> Zyngier http://www.spinics.net/lists/arm-kernel/msg483139.html
+>
+> Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
 
+Thanks!
 
-Fine with me, thanks! :)
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-With this clarification:
+> ---
+> Changes in v2: Extend the GICH size to 128kB.
+>
+>  arch/arm64/boot/dts/renesas/r8a7795.dtsi | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+> index 8f1ed23..65f9cc8 100644
+> --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+> +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+> @@ -130,7 +130,9 @@
+>                         #address-cells = <0>;
+>                         interrupt-controller;
+>                         reg = <0x0 0xf1010000 0 0x1000>,
+> -                             <0x0 0xf1020000 0 0x2000>;
+> +                             <0x0 0xf1020000 0 0x2000>,
+> +                             <0x0 0xf1040000 0 0x20000>,
+> +                             <0x0 0xf1060000 0 0x2000>;
+>                         interrupts = <GIC_PPI 9
+>                                         (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+>                 };
+> --
+> 2.5.1
 
-Acked-by: Dirk Behme <dirk.behme@de.bosch.com>
+Gr{oetje,eeting}s,
 
+                        Geert
 
-Thanks again and best regards
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-Dirk
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
