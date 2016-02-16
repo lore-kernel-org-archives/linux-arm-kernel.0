@@ -1,499 +1,237 @@
-From: fu.wei@linaro.org (fu.wei at linaro.org)
-Date: Wed, 17 Feb 2016 01:08:50 +0800
-Subject: [PATCH v13 4/4] Watchdog: introduce ARM SBSA watchdog driver
-In-Reply-To: <1455642530-19103-1-git-send-email-fu.wei@linaro.org>
-References: <1455642530-19103-1-git-send-email-fu.wei@linaro.org>
-Message-ID: <1455642530-19103-5-git-send-email-fu.wei@linaro.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 16 Feb 2016 18:02:05 +0100
+Subject: [PATCH v3 09/12] arm64: dts: add the Marvell Armada 3700 family
+ and a development board
+In-Reply-To: <20160216141627.78ec94bd@xhacker> (Jisheng Zhang's message of
+ "Tue, 16 Feb 2016 14:16:27 +0800")
+References: <1454951660-13289-1-git-send-email-gregory.clement@free-electrons.com>
+ <1454951660-13289-10-git-send-email-gregory.clement@free-electrons.com>
+ <20160216141627.78ec94bd@xhacker>
+Message-ID: <87egcctwqa.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fu Wei <fu.wei@linaro.org>
-
-According to Server Base System Architecture (SBSA) specification,
-the SBSA Generic Watchdog has two stage timeouts: the first signal (WS0)
-is for alerting the system by interrupt, the second one (WS1) is a real
-hardware reset.
-More details about the hardware specification of this device:
-ARM DEN0029B - Server Base System Architecture (SBSA)
-
-This driver can operate ARM SBSA Generic Watchdog as a single stage watchdog
-or a two stages watchdog, it's set up by the module parameter "action".
-In the single stage mode, when the timeout is reached, your system
-will be reset by WS1. The first signal (WS0) is ignored.
-In the two stages mode, when the timeout is reached, the first signal (WS0)
-will trigger panic. If the system is getting into trouble and cannot be reset
-by panic or restart properly by the kdump kernel(if supported), then the
-second stage (as long as the first stage) will be reached, system will be
-reset by WS1. This function can help administrator to backup the system
-context info by panic console output or kdump.
-
-This driver bases on linux kernel watchdog framework, so it can get
-timeout from module parameter and FDT at the driver init stage.
-
-Signed-off-by: Fu Wei <fu.wei@linaro.org>
-Reviewed-by: Graeme Gregory <graeme.gregory@linaro.org>
-Tested-by: Pratyush Anand <panand@redhat.com>
-Acked-by: Timur Tabi <timur@codeaurora.org>
-Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-Tested-by: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
----
- drivers/watchdog/Kconfig     |  20 +++
- drivers/watchdog/Makefile    |   1 +
- drivers/watchdog/sbsa_gwdt.c | 404 +++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 425 insertions(+)
-
-diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-index 0f6d851..38a7f5c 100644
---- a/drivers/watchdog/Kconfig
-+++ b/drivers/watchdog/Kconfig
-@@ -202,6 +202,26 @@ config ARM_SP805_WATCHDOG
- 	  ARM Primecell SP805 Watchdog timer. This will reboot your system when
- 	  the timeout is reached.
+Hi Jisheng,
  
-+config ARM_SBSA_WATCHDOG
-+	tristate "ARM SBSA Generic Watchdog"
-+	depends on ARM64
-+	depends on ARM_ARCH_TIMER
-+	select WATCHDOG_CORE
-+	help
-+	  ARM SBSA Generic Watchdog has two stage timeouts:
-+	  the first signal (WS0) is for alerting the system by interrupt,
-+	  the second one (WS1) is a real hardware reset.
-+	  More details: ARM DEN0029B - Server Base System Architecture (SBSA)
-+
-+	  This driver can operate ARM SBSA Generic Watchdog as a single stage
-+	  or a two stages watchdog, it depends on the module parameter "action".
-+
-+	  Note: the maximum timeout in the two stages mode is half of that in
-+	  the single stage mode.
-+
-+	  To compile this driver as module, choose M here: The module
-+	  will be called sbsa_gwdt.
-+
- config ASM9260_WATCHDOG
- 	tristate "Alphascale ASM9260 watchdog"
- 	depends on MACH_ASM9260
-diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
-index f566753..f9826d4 100644
---- a/drivers/watchdog/Makefile
-+++ b/drivers/watchdog/Makefile
-@@ -30,6 +30,7 @@ obj-$(CONFIG_USBPCWATCHDOG) += pcwd_usb.o
- 
- # ARM Architecture
- obj-$(CONFIG_ARM_SP805_WATCHDOG) += sp805_wdt.o
-+obj-$(CONFIG_ARM_SBSA_WATCHDOG) += sbsa_gwdt.o
- obj-$(CONFIG_ASM9260_WATCHDOG) += asm9260_wdt.o
- obj-$(CONFIG_AT91RM9200_WATCHDOG) += at91rm9200_wdt.o
- obj-$(CONFIG_AT91SAM9X_WATCHDOG) += at91sam9_wdt.o
-diff --git a/drivers/watchdog/sbsa_gwdt.c b/drivers/watchdog/sbsa_gwdt.c
-new file mode 100644
-index 0000000..4a5260f
---- /dev/null
-+++ b/drivers/watchdog/sbsa_gwdt.c
-@@ -0,0 +1,404 @@
-+/*
-+ * SBSA(Server Base System Architecture) Generic Watchdog driver
-+ *
-+ * Copyright (c) 2015, Linaro Ltd.
-+ * Author: Fu Wei <fu.wei@linaro.org>
-+ *         Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-+ *         Al Stone <al.stone@linaro.org>
-+ *         Timur Tabi <timur@codeaurora.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License 2 as published
-+ * by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * ARM SBSA Generic Watchdog has two stage timeouts:
-+ * the first signal (WS0) is for alerting the system by interrupt,
-+ * the second one (WS1) is a real hardware reset.
-+ * More details about the hardware specification of this device:
-+ * ARM DEN0029B - Server Base System Architecture (SBSA)
-+ *
-+ * This driver can operate ARM SBSA Generic Watchdog as a single stage watchdog
-+ * or a two stages watchdog, it's set up by the module parameter "action".
-+ * In the single stage mode, when the timeout is reached, your system
-+ * will be reset by WS1. The first signal (WS0) is ignored.
-+ * In the two stages mode, when the timeout is reached, the first signal (WS0)
-+ * will trigger panic. If the system is getting into trouble and cannot be reset
-+ * by panic or restart properly by the kdump kernel(if supported), then the
-+ * second stage (as long as the first stage) will be reached, system will be
-+ * reset by WS1. This function can help administrator to backup the system
-+ * context info by panic console output or kdump.
-+ *
-+ * SBSA GWDT:
-+ * if action is 1 (the two stages mode):
-+ * |--------WOR-------WS0--------WOR-------WS1
-+ * |----timeout-----(panic)----timeout-----reset
-+ *
-+ * if action is 0 (the single stage mode):
-+ * |------WOR-----WS0(ignored)-----WOR------WS1
-+ * |--------------timeout-------------------reset
-+ *
-+ * Note: Since this watchdog timer has two stages, and each stage is determined
-+ * by WOR, in the single stage mode, the timeout is (WOR * 2); in the two
-+ * stages mode, the timeout is WOR. The maximum timeout in the two stages mode
-+ * is half of that in the single stage mode.
-+ *
-+ */
-+
-+#include <linux/io.h>
-+#include <linux/interrupt.h>
-+#include <linux/module.h>
-+#include <linux/moduleparam.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
-+#include <linux/uaccess.h>
-+#include <linux/watchdog.h>
-+#include <asm/arch_timer.h>
-+
-+/* SBSA Generic Watchdog register definitions */
-+/* refresh frame */
-+#define SBSA_GWDT_WRR				0x000
-+
-+/* control frame */
-+#define SBSA_GWDT_WCS				0x000
-+#define SBSA_GWDT_WOR				0x008
-+#define SBSA_GWDT_WCV				0x010
-+
-+/* refresh/control frame */
-+#define SBSA_GWDT_W_IIDR			0xfcc
-+#define SBSA_GWDT_IDR				0xfd0
-+
-+/* Watchdog Control and Status Register */
-+#define SBSA_GWDT_WCS_EN			BIT(0)
-+#define SBSA_GWDT_WCS_WS0			BIT(1)
-+#define SBSA_GWDT_WCS_WS1			BIT(2)
-+
-+/**
-+ * struct sbsa_gwdt - Internal representation of the SBSA GWDT
-+ * @wdd:		kernel watchdog_device structure
-+ * @clk:		store the System Counter clock frequency, in Hz.
-+ * @refresh_base:	Virtual address of the watchdog refresh frame
-+ * @control_base:	Virtual address of the watchdog control frame
-+ */
-+struct sbsa_gwdt {
-+	struct watchdog_device	wdd;
-+	u32			clk;
-+	void __iomem		*refresh_base;
-+	void __iomem		*control_base;
-+};
-+
-+#define to_sbsa_gwdt(e) container_of(e, struct sbsa_gwdt, wdd)
-+
-+#define DEFAULT_TIMEOUT		10 /* seconds, the 1st + 2nd watch periods*/
-+
-+static unsigned int timeout;
-+module_param(timeout, uint, 0);
-+MODULE_PARM_DESC(timeout,
-+		 "Watchdog timeout in seconds. (>=0, default="
-+		 __MODULE_STRING(DEFAULT_TIMEOUT) ")");
-+
-+/*
-+ * action refers to action taken when watchdog gets WS0
-+ * 0 = skip
-+ * 1 = panic
-+ * defaults to skip (0)
-+ */
-+static int action;
-+module_param(action, int, 0);
-+MODULE_PARM_DESC(action, "after watchdog gets WS0 interrupt, do: "
-+		 "0 = skip(*)  1 = panic");
-+
-+static bool nowayout = WATCHDOG_NOWAYOUT;
-+module_param(nowayout, bool, S_IRUGO);
-+MODULE_PARM_DESC(nowayout,
-+		 "Watchdog cannot be stopped once started (default="
-+		 __MODULE_STRING(WATCHDOG_NOWAYOUT) ")");
-+
-+/*
-+ * watchdog operation functions
-+ */
-+static int sbsa_gwdt_set_timeout(struct watchdog_device *wdd,
-+				 unsigned int timeout)
-+{
-+	struct sbsa_gwdt *gwdt = to_sbsa_gwdt(wdd);
-+
-+	wdd->timeout = timeout;
-+
-+	if (action)
-+		writel(gwdt->clk * timeout,
-+		       gwdt->control_base + SBSA_GWDT_WOR);
-+	else
-+		/*
-+		 * In the single stage mode, The first signal (WS0) is ignored,
-+		 * the timeout is (WOR * 2), so the WOR should be configured
-+		 * to half value of timeout.
-+		 */
-+		writel(gwdt->clk / 2 * timeout,
-+		       gwdt->control_base + SBSA_GWDT_WOR);
-+
-+	return 0;
-+}
-+
-+static unsigned int sbsa_gwdt_get_timeleft(struct watchdog_device *wdd)
-+{
-+	struct sbsa_gwdt *gwdt = to_sbsa_gwdt(wdd);
-+	u64 timeleft = 0;
-+
-+	/*
-+	 * In the single stage mode, if WS0 is deasserted
-+	 * (watchdog is in the first stage),
-+	 * timeleft = WOR + (WCV - system counter)
-+	 */
-+	if (!action &&
-+	    !(readl(gwdt->control_base + SBSA_GWDT_WCS) & SBSA_GWDT_WCS_WS0))
-+		timeleft += readl(gwdt->control_base + SBSA_GWDT_WOR);
-+
-+	timeleft += readq(gwdt->control_base + SBSA_GWDT_WCV) -
-+		    arch_counter_get_cntvct();
-+
-+	do_div(timeleft, gwdt->clk);
-+
-+	return timeleft;
-+}
-+
-+static int sbsa_gwdt_keepalive(struct watchdog_device *wdd)
-+{
-+	struct sbsa_gwdt *gwdt = to_sbsa_gwdt(wdd);
-+
-+	/*
-+	* Writing WRR for an explicit watchdog refresh.
-+	* You can write anyting (like 0).
-+	*/
-+	writel(0, gwdt->refresh_base + SBSA_GWDT_WRR);
-+
-+	return 0;
-+}
-+
-+static unsigned int sbsa_gwdt_status(struct watchdog_device *wdd)
-+{
-+	struct sbsa_gwdt *gwdt = to_sbsa_gwdt(wdd);
-+	u32 status = readl(gwdt->control_base + SBSA_GWDT_WCS);
-+
-+	/* is the watchdog timer running? */
-+	return (status & SBSA_GWDT_WCS_EN) << WDOG_ACTIVE;
-+}
-+
-+static int sbsa_gwdt_start(struct watchdog_device *wdd)
-+{
-+	struct sbsa_gwdt *gwdt = to_sbsa_gwdt(wdd);
-+
-+	/* writing WCS will cause an explicit watchdog refresh */
-+	writel(SBSA_GWDT_WCS_EN, gwdt->control_base + SBSA_GWDT_WCS);
-+
-+	return sbsa_gwdt_keepalive(wdd);
-+}
-+
-+static int sbsa_gwdt_stop(struct watchdog_device *wdd)
-+{
-+	struct sbsa_gwdt *gwdt = to_sbsa_gwdt(wdd);
-+
-+	/* Simply write 0 to WCS to clean WCS_EN bit */
-+	writel(0, gwdt->control_base + SBSA_GWDT_WCS);
-+
-+	return 0;
-+}
-+
-+static irqreturn_t sbsa_gwdt_interrupt(int irq, void *dev_id)
-+{
-+	panic("SBSA Watchdog timeout");
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static struct watchdog_info sbsa_gwdt_info = {
-+	.identity	= "SBSA Generic Watchdog",
-+	.options	= WDIOF_SETTIMEOUT |
-+			  WDIOF_KEEPALIVEPING |
-+			  WDIOF_MAGICCLOSE |
-+			  WDIOF_CARDRESET,
-+};
-+
-+static struct watchdog_ops sbsa_gwdt_ops = {
-+	.owner		= THIS_MODULE,
-+	.start		= sbsa_gwdt_start,
-+	.stop		= sbsa_gwdt_stop,
-+	.status		= sbsa_gwdt_status,
-+	.ping		= sbsa_gwdt_keepalive,
-+	.set_timeout	= sbsa_gwdt_set_timeout,
-+	.get_timeleft	= sbsa_gwdt_get_timeleft,
-+};
-+
-+static int sbsa_gwdt_probe(struct platform_device *pdev)
-+{
-+	void __iomem *rf_base, *cf_base;
-+	struct device *dev = &pdev->dev;
-+	struct watchdog_device *wdd;
-+	struct sbsa_gwdt *gwdt;
-+	struct resource *res;
-+	int ret, irq;
-+	u32 status;
-+
-+	gwdt = devm_kzalloc(dev, sizeof(*gwdt), GFP_KERNEL);
-+	if (!gwdt)
-+		return -ENOMEM;
-+	platform_set_drvdata(pdev, gwdt);
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	cf_base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(cf_base))
-+		return PTR_ERR(cf_base);
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-+	rf_base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(rf_base))
-+		return PTR_ERR(rf_base);
-+
-+	if (action) {
-+		irq = platform_get_irq(pdev, 0);
-+		if (irq < 0) {
-+			action = 0;
-+			dev_warn(dev, "unable to get ws0 interrupt.\n");
-+		} else {
-+			if (devm_request_irq(dev, irq, sbsa_gwdt_interrupt, 0,
-+					     pdev->name, gwdt)) {
-+				action = 0;
-+				dev_warn(dev, "unable to request IRQ %d.\n",
-+					 irq);
-+			}
-+		}
-+		if (!action)
-+			dev_warn(dev, "falling back to single stage mode.\n");
-+	}
-+
-+	/*
-+	 * Get the frequency of system counter from the cp15 interface of ARM
-+	 * Generic timer. We don't need to check it, because if it returns "0",
-+	 * system would panic in very early stage.
-+	 */
-+	gwdt->clk = arch_timer_get_cntfrq();
-+	gwdt->refresh_base = rf_base;
-+	gwdt->control_base = cf_base;
-+
-+	wdd = &gwdt->wdd;
-+	wdd->parent = dev;
-+	wdd->info = &sbsa_gwdt_info;
-+	wdd->ops = &sbsa_gwdt_ops;
-+	watchdog_set_drvdata(wdd, gwdt);
-+	watchdog_set_nowayout(wdd, nowayout);
-+
-+	wdd->min_timeout = 1;
-+	wdd->max_timeout = U32_MAX / gwdt->clk;
-+	/*
-+	 * In the single stage mode, The first signal (WS0) is ignored,
-+	 * the timeout is (WOR * 2), so the maximum timeout should be double.
-+	 */
-+	if (!action)
-+		wdd->max_timeout *= 2;
-+
-+	wdd->timeout = DEFAULT_TIMEOUT;
-+	watchdog_init_timeout(wdd, timeout, dev);
-+
-+	status = readl(gwdt->control_base + SBSA_GWDT_WCS);
-+	if (status & SBSA_GWDT_WCS_WS1) {
-+		dev_warn(dev, "System reset by WDT.\n");
-+		wdd->bootstatus |= WDIOF_CARDRESET;
-+	}
-+
-+	ret = watchdog_register_device(wdd);
-+	if (ret)
-+		return ret;
-+
-+	/*
-+	 * Update timeout to WOR.
-+	 * Because of the explicit watchdog refresh mechanism,
-+	 * it's also a ping, if watchdog is enabled.
-+	 */
-+	sbsa_gwdt_set_timeout(wdd, wdd->timeout);
-+
-+	dev_info(dev, "Initialized with %ds timeout @ %u Hz, action=%d.%s\n",
-+		 wdd->timeout, gwdt->clk, action,
-+		 status & SBSA_GWDT_WCS_EN ? " [enabled]" : "");
-+
-+	return 0;
-+}
-+
-+static void sbsa_gwdt_shutdown(struct platform_device *pdev)
-+{
-+	struct sbsa_gwdt *gwdt = platform_get_drvdata(pdev);
-+
-+	sbsa_gwdt_stop(&gwdt->wdd);
-+}
-+
-+static int sbsa_gwdt_remove(struct platform_device *pdev)
-+{
-+	struct sbsa_gwdt *gwdt = platform_get_drvdata(pdev);
-+
-+	watchdog_unregister_device(&gwdt->wdd);
-+
-+	return 0;
-+}
-+
-+/* Disable watchdog if it is active during suspend */
-+static int __maybe_unused sbsa_gwdt_suspend(struct device *dev)
-+{
-+	struct sbsa_gwdt *gwdt = dev_get_drvdata(dev);
-+
-+	if (watchdog_active(&gwdt->wdd))
-+		sbsa_gwdt_stop(&gwdt->wdd);
-+
-+	return 0;
-+}
-+
-+/* Enable watchdog and configure it if necessary */
-+static int __maybe_unused sbsa_gwdt_resume(struct device *dev)
-+{
-+	struct sbsa_gwdt *gwdt = dev_get_drvdata(dev);
-+
-+	if (watchdog_active(&gwdt->wdd))
-+		sbsa_gwdt_start(&gwdt->wdd);
-+
-+	return 0;
-+}
-+
-+static const struct dev_pm_ops sbsa_gwdt_pm_ops = {
-+	SET_SYSTEM_SLEEP_PM_OPS(sbsa_gwdt_suspend, sbsa_gwdt_resume)
-+};
-+
-+static const struct of_device_id sbsa_gwdt_of_match[] = {
-+	{ .compatible = "arm,sbsa-gwdt", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, sbsa_gwdt_of_match);
-+
-+static const struct platform_device_id sbsa_gwdt_pdev_match[] = {
-+	{ .name = "sbsa-gwdt", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(platform, sbsa_gwdt_pdev_match);
-+
-+static struct platform_driver sbsa_gwdt_driver = {
-+	.driver = {
-+		.name = "sbsa-gwdt",
-+		.pm = &sbsa_gwdt_pm_ops,
-+		.of_match_table = sbsa_gwdt_of_match,
-+	},
-+	.probe = sbsa_gwdt_probe,
-+	.remove = sbsa_gwdt_remove,
-+	.shutdown = sbsa_gwdt_shutdown,
-+	.id_table = sbsa_gwdt_pdev_match,
-+};
-+
-+module_platform_driver(sbsa_gwdt_driver);
-+
-+MODULE_DESCRIPTION("SBSA Generic Watchdog Driver");
-+MODULE_AUTHOR("Fu Wei <fu.wei@linaro.org>");
-+MODULE_AUTHOR("Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>");
-+MODULE_AUTHOR("Al Stone <al.stone@linaro.org>");
-+MODULE_AUTHOR("Timur Tabi <timur@codeaurora.org>");
-+MODULE_LICENSE("GPL v2");
-+MODULE_ALIAS("platform:sbsa-gwdt");
+ On mar., f?vr. 16 2016, Jisheng Zhang <jszhang@marvell.com> wrote:
+
+> Dear Gregory,
+> On Mon, 8 Feb 2016 18:14:17 +0100 Gregory CLEMENT wrote:
+>
+>> Add initial dtsi files to support Marvell Armada 3700 SoC with Cortex-A53
+>> CPUs. There are two members in this family: the Armada 3710 (Single CPU)
+>> and the Armada 3720 (Dual CPUs).
+>> 
+>> It also adds a dts file for the Marvell Armada 3720 DB board.
+>> 
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> ---
+>>  arch/arm64/boot/dts/marvell/Makefile           |   4 +
+>>  arch/arm64/boot/dts/marvell/armada-371x.dtsi   |  53 ++++++++++
+>>  arch/arm64/boot/dts/marvell/armada-3720-db.dts |  86 ++++++++++++++++
+>>  arch/arm64/boot/dts/marvell/armada-372x.dtsi   |  63 ++++++++++++
+>>  arch/arm64/boot/dts/marvell/armada-37xx.dtsi   | 131 +++++++++++++++++++++++++
+>>  5 files changed, 337 insertions(+)
+>>  create mode 100644 arch/arm64/boot/dts/marvell/armada-371x.dtsi
+>>  create mode 100644 arch/arm64/boot/dts/marvell/armada-3720-db.dts
+>>  create mode 100644 arch/arm64/boot/dts/marvell/armada-372x.dtsi
+>>  create mode 100644 arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+>> 
+>> diff --git a/arch/arm64/boot/dts/marvell/Makefile b/arch/arm64/boot/dts/marvell/Makefile
+>> index 348f4db4f313..2114af8d312d 100644
+>> --- a/arch/arm64/boot/dts/marvell/Makefile
+>> +++ b/arch/arm64/boot/dts/marvell/Makefile
+>> @@ -1,6 +1,10 @@
+>> +# Berlin SoC Family
+>>  dtb-$(CONFIG_ARCH_BERLIN) += berlin4ct-dmp.dtb
+>>  dtb-$(CONFIG_ARCH_BERLIN) += berlin4ct-stb.dtb
+>>  
+>> +# Mvebu SoC Family
+>> +dtb-$(CONFIG_ARCH_MVEBU) += armada-3720-db.dtb
+>> +
+>>  always		:= $(dtb-y)
+>>  subdir-y	:= $(dts-dirs)
+>>  clean-files	:= *.dtb
+>> diff --git a/arch/arm64/boot/dts/marvell/armada-371x.dtsi b/arch/arm64/boot/dts/marvell/armada-371x.dtsi
+>> new file mode 100644
+>> index 000000000000..c9e5325b8ac3
+>> --- /dev/null
+>> +++ b/arch/arm64/boot/dts/marvell/armada-371x.dtsi
+>> @@ -0,0 +1,53 @@
+>> +/*
+>> + * Device Tree Include file for Marvell Armada 371x family of SoCs
+>> + * (also named 88F3710)
+>> + *
+>> + * Copyright (C) 2016 Marvell
+>
+> Is it better to Add full Marvell company name, eg. Marvell Technology Group Ltd.
+>
+
+Well for mvebu I also saw "Marvell International Ltd." and "Marvell
+Semiconductors". So at least Marvell is the common pattern.
+
+>> + *
+>> + * Gregory CLEMENT <gregory.clement@free-electrons.com>
+>
+> What does this mean? in copyright holder list or just author? Is it better
+> to add "Author:" prefix or something else?
+>
+>
+
+I don't know the subtilitis between copyright holder list and author...
+
+> [...]
+>
+>> diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+>> new file mode 100644
+>> index 000000000000..ba9df7ff2a72
+>> --- /dev/null
+>> +++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+>> @@ -0,0 +1,131 @@
+>> +/*
+>> + * Device Tree Include file for Marvell Armada 37xx family of SoCs.
+>> + *
+>> + * Copyright (C) 2016 Marvell
+>> + *
+>> + * Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> + *
+>> + * This file is dual-licensed: you can use it either under the terms
+>> + * of the GPL or the X11 license, at your option. Note that this dual
+>> + * licensing only applies to this file, and not this project as a
+>> + * whole.
+>> + *
+>> + *  a) This file is free software; you can redistribute it and/or
+>> + *     modify it under the terms of the GNU General Public License as
+>> + *     published by the Free Software Foundation; either version 2 of the
+>> + *     License, or (at your option) any later version.
+>> + *
+>> + *     This file is distributed in the hope that it will be useful
+>> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + *     GNU General Public License for more details.
+>> + *
+>> + * Or, alternatively
+>> + *
+>> + *  b) Permission is hereby granted, free of charge, to any person
+>> + *     obtaining a copy of this software and associated documentation
+>> + *     files (the "Software"), to deal in the Software without
+>> + *     restriction, including without limitation the rights to use
+>> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+>> + *     sell copies of the Software, and to permit persons to whom the
+>> + *     Software is furnished to do so, subject to the following
+>> + *     conditions:
+>> + *
+>> + *     The above copyright notice and this permission notice shall be
+>> + *     included in all copies or substantial portions of the Software.
+>> + *
+>> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
+>> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+>> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+>> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+>> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
+>> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+>> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+>> + *     OTHER DEALINGS IN THE SOFTWARE.
+>> + */
+>> +
+>> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+>> +
+>> +/ {
+>> +	model = "Marvell Armada 37xx SoC";
+>> +	compatible = "marvell,armada3700";
+>> +	interrupt-parent = <&gic>;
+>> +	#address-cells = <2>;
+>> +	#size-cells = <2>;
+>> +
+>> +	aliases {
+>> +		serial0 = &uart0;
+>> +	};
+>> +
+>> +	cpus {
+>> +		#address-cells = <1>;
+>> +		#size-cells = <0>;
+>> +		cpu at 0 {
+>> +			device_type = "cpu";
+>> +			compatible = "arm,cortex-a53", "arm,armv8";
+>> +			reg = <0>;
+>> +			enable-method = "psci";
+>> +		};
+>> +	};
+>> +
+>> +	psci {
+>> +		compatible = "arm,psci-0.2";
+>> +		method = "smc";
+>> +	};
+>> +
+>> +	timer {
+>> +		compatible = "arm,armv8-timer";
+>> +		interrupts = <GIC_PPI 13
+>> +			(GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>,
+>> +			     <GIC_PPI 14
+>> +			(GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>,
+>> +			     <GIC_PPI 11
+>> +			(GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>,
+>> +			     <GIC_PPI 10
+>> +			(GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
+>> +	};
+>> +
+>> +	soc {
+>> +		compatible = "simple-bus";
+>> +		#address-cells = <2>;
+>> +		#size-cells = <2>;
+>> +		ranges;
+>> +
+>> +		internal-regs {
+>> +			#address-cells = <1>;
+>> +			#size-cells = <1>;
+>> +			compatible = "simple-bus";
+>> +			/* 32M internal register @ 0xd000_0000 */
+>> +			ranges = <0x0 0x0 0xd0000000 0x2000000>;
+>> +
+>> +			uart0: serial at 12000 {
+>> +				compatible = "marvell,armada-3700-uart";
+>> +				reg = <0x12000 0x400>;
+>> +				interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
+>> +				status = "disabled";
+>> +			};
+>> +
+>> +			usb3 at 58000 {
+>> +				compatible = "generic-xhci";
+>> +				reg = <0x58000 0x4000>;
+>> +				interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
+>> +				status = "disabled";
+>> +			};
+>> +
+>> +			sata at e0000 {
+>> +				compatible = "marvell,armada-3700-ahci";
+>> +				reg = <0xe0000 0x2000>;
+>> +				interrupts = <GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>;
+>> +				status = "disabled";
+>> +			};
+>> +
+>> +			gic: interrupt-controller at 1d00000 {
+>> +				compatible = "arm,gic-v3";
+>> +				#interrupt-cells = <3>;
+>> +				interrupt-controller;
+>> +				reg = <0x1d00000 0x10000>, /* GICD */
+>> +				      <0x1d40000 0x40000>; /* GICR */
+>
+> There's no GICC, GICV, GICH?
+
+As far as I know, there is only GICD and GICR.
+
+Gregory
+
+
+>
+>> +			};
+>> +		};
+>> +	};
+>> +};
+>
+
 -- 
-2.5.0
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
