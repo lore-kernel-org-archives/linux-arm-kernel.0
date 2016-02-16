@@ -1,50 +1,48 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Mon, 15 Feb 2016 19:03:58 -0800
-Subject: [PATCH 2/2] clk: bcm2835: Reuse CLK_DIVIDER_MAX_AT_ZERO for
- recalc_rate()
-In-Reply-To: <1455591838-22725-1-git-send-email-eric@anholt.net>
-References: <1455591838-22725-1-git-send-email-eric@anholt.net>
-Message-ID: <1455591838-22725-2-git-send-email-eric@anholt.net>
+Date: Mon, 15 Feb 2016 19:03:57 -0800
+Subject: [PATCH 1/2] clk: bcm2835: Fix setting of PLL divider clock rates
+Message-ID: <1455591838-22725-1-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We were rolling this ourselves, but clk-divider can do it now.
+Our dividers weren't being set successfully because CM_PASSWORD wasn't
+included in the register write.  It looks easier to just compute the
+divider to write ourselves than to update clk-divider for the ability
+to OR in some arbitrary bits on write.
 
+Fixes about half of the video modes on my HDMI monitor (everything
+except 720x400).
+
+Cc: stable at vger.kernel.org
 Signed-off-by: Eric Anholt <eric@anholt.net>
 ---
- drivers/clk/bcm/clk-bcm2835.c | 13 ++-----------
- 1 file changed, 2 insertions(+), 11 deletions(-)
+ drivers/clk/bcm/clk-bcm2835.c | 12 +++++++-----
+ 1 file changed, 7 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
-index 9f4df8f..353e438 100644
+index 015e687..9f4df8f 100644
 --- a/drivers/clk/bcm/clk-bcm2835.c
 +++ b/drivers/clk/bcm/clk-bcm2835.c
-@@ -1060,16 +1060,7 @@ static long bcm2835_pll_divider_round_rate(struct clk_hw *hw,
- static unsigned long bcm2835_pll_divider_get_rate(struct clk_hw *hw,
- 						  unsigned long parent_rate)
- {
--	struct bcm2835_pll_divider *divider = bcm2835_pll_divider_from_hw(hw);
--	struct bcm2835_cprman *cprman = divider->cprman;
--	const struct bcm2835_pll_divider_data *data = divider->data;
--	u32 div = cprman_read(cprman, data->a2w_reg);
--
--	div &= (1 << A2W_PLL_DIV_BITS) - 1;
--	if (div == 0)
--		div = 256;
--
--	return parent_rate / div;
-+	return clk_divider_ops.recalc_rate(hw, parent_rate);
- }
+@@ -1107,13 +1107,15 @@ static int bcm2835_pll_divider_set_rate(struct clk_hw *hw,
+ 	struct bcm2835_pll_divider *divider = bcm2835_pll_divider_from_hw(hw);
+ 	struct bcm2835_cprman *cprman = divider->cprman;
+ 	const struct bcm2835_pll_divider_data *data = divider->data;
+-	u32 cm;
+-	int ret;
++	u32 cm, div, max_div = 1 << A2W_PLL_DIV_BITS;
  
- static void bcm2835_pll_divider_off(struct clk_hw *hw)
-@@ -1430,7 +1421,7 @@ bcm2835_register_pll_divider(struct bcm2835_cprman *cprman,
- 	divider->div.reg = cprman->regs + data->a2w_reg;
- 	divider->div.shift = A2W_PLL_DIV_SHIFT;
- 	divider->div.width = A2W_PLL_DIV_BITS;
--	divider->div.flags = 0;
-+	divider->div.flags = CLK_DIVIDER_MAX_AT_ZERO;
- 	divider->div.lock = &cprman->regs_lock;
- 	divider->div.hw.init = &init;
- 	divider->div.table = NULL;
+-	ret = clk_divider_ops.set_rate(hw, rate, parent_rate);
+-	if (ret)
+-		return ret;
++	div = DIV_ROUND_UP_ULL(parent_rate, rate);
++
++	div = min(div, max_div);
++	if (div == max_div)
++		div = 0;
+ 
++	cprman_write(cprman, data->a2w_reg, div);
+ 	cm = cprman_read(cprman, data->cm_reg);
+ 	cprman_write(cprman, data->cm_reg, cm | data->load_mask);
+ 	cprman_write(cprman, data->cm_reg, cm & ~data->load_mask);
 -- 
 2.7.0
