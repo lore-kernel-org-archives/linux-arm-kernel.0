@@ -1,47 +1,61 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 16 Feb 2016 07:31:36 -0800
-Subject: [PATCH v12 3/4] ARM64: add SBSA Generic Watchdog device node in
- amd-seattle-soc.dtsi
-In-Reply-To: <1455611785-2407-4-git-send-email-fu.wei@linaro.org>
-References: <1455611785-2407-1-git-send-email-fu.wei@linaro.org>
- <1455611785-2407-4-git-send-email-fu.wei@linaro.org>
-Message-ID: <56C340D8.2050302@roeck-us.net>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Tue, 16 Feb 2016 16:31:51 +0100
+Subject: [PATCH 3/4] drivers: sh: Stop using the legacy clock domain on ARM
+In-Reply-To: <1455636712-3040-1-git-send-email-geert+renesas@glider.be>
+References: <1455636712-3040-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1455636712-3040-4-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/16/2016 12:36 AM, fu.wei at linaro.org wrote:
-> From: Fu Wei <fu.wei@linaro.org>
->
-> This can be a example of adding SBSA Generic Watchdog device node
-> into some dts files for the Soc which contains SBSA Generic Watchdog.
->
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> Signed-off-by: Fu Wei <fu.wei@linaro.org>
+Now CONFIG_PM and CONFIG_PM_GENERIC_DOMAINS are enabled unconditionally
+for Renesas ARM-based SoCs, the legacy clock domain is no longer used on
+these SoCs.
+Remove the related support code, and stop entering drivers/sh/ on ARM.
 
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+Notes:
+  - This does break booting R-Car Gen2 boards using pre-v4.3 DTSes that
+    don't have power-domains properties,
+  - This may unbreak SuperH-based ARCH_SHMOBILE platforms, which were
+    probably broken since v4.4 by commit 0ba58de231066e47 ("drivers: sh:
+    Get rid of CONFIG_ARCH_SHMOBILE_MULTI").
+---
+ drivers/Makefile        | 1 -
+ drivers/sh/pm_runtime.c | 9 ---------
+ 2 files changed, 10 deletions(-)
 
-> ---
->   arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi | 8 ++++++++
->   1 file changed, 8 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi b/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
-> index 2874d92..0a8ca1d 100644
-> --- a/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
-> +++ b/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
-> @@ -84,6 +84,14 @@
->   			clock-names = "uartclk", "apb_pclk";
->   		};
->
-> +		watchdog0: watchdog at e0bb0000 {
-> +			compatible = "arm,sbsa-gwdt";
-> +			reg = <0x0 0xe0bc0000 0 0x1000>,
-> +				<0x0 0xe0bb0000 0 0x1000>;
-> +			interrupts = <0 337 4>;
-> +			timeout-sec = <15>;
-> +		};
-> +
->   		spi0: ssp at e1020000 {
->   			status = "disabled";
->   			compatible = "arm,pl022", "arm,primecell";
->
+diff --git a/drivers/Makefile b/drivers/Makefile
+index 8f5d076baeb0e832..6afdb78e21382538 100644
+--- a/drivers/Makefile
++++ b/drivers/Makefile
+@@ -127,7 +127,6 @@ obj-$(CONFIG_SGI_SN)		+= sn/
+ obj-y				+= firmware/
+ obj-$(CONFIG_CRYPTO)		+= crypto/
+ obj-$(CONFIG_SUPERH)		+= sh/
+-obj-$(CONFIG_ARCH_SHMOBILE)	+= sh/
+ ifndef CONFIG_ARCH_USES_GETTIMEOFFSET
+ obj-y				+= clocksource/
+ endif
+diff --git a/drivers/sh/pm_runtime.c b/drivers/sh/pm_runtime.c
+index 91a003011acfacb2..c887ecdaf19b7c10 100644
+--- a/drivers/sh/pm_runtime.c
++++ b/drivers/sh/pm_runtime.c
+@@ -34,15 +34,6 @@ static struct pm_clk_notifier_block platform_bus_notifier = {
+ 
+ static int __init sh_pm_runtime_init(void)
+ {
+-	if (IS_ENABLED(CONFIG_ARCH_SHMOBILE)) {
+-		if (!of_find_compatible_node(NULL, NULL,
+-					     "renesas,cpg-mstp-clocks"))
+-			return 0;
+-		if (IS_ENABLED(CONFIG_PM_GENERIC_DOMAINS_OF) &&
+-		    of_find_node_with_property(NULL, "#power-domain-cells"))
+-			return 0;
+-	}
+-
+ 	pm_clk_add_notifier(&platform_bus_type, &platform_bus_notifier);
+ 	return 0;
+ }
+-- 
+1.9.1
