@@ -1,38 +1,50 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Tue, 16 Feb 2016 09:50:08 -0800
-Subject: [PATCH v3 3/3] ARM: dts: vfxxx: Add iio_hwmon node for ADC
- temperature channel
-In-Reply-To: <88b677c3ab62d965b70846618fe566523f95c9bb.1455597464.git.maitysanchayan@gmail.com>
-References: <cover.1455597464.git.maitysanchayan@gmail.com>
- <88b677c3ab62d965b70846618fe566523f95c9bb.1455597464.git.maitysanchayan@gmail.com>
-Message-ID: <06aa0e2a7958c81fb6d3ab9c23164156@agner.ch>
+From: daniel.baluta@intel.com (Daniel Baluta)
+Date: Tue, 16 Feb 2016 20:03:29 +0200
+Subject: [PATCH] iio: pressure: ms5611: select IIO_BUFFER
+In-Reply-To: <1455634525-2023774-1-git-send-email-arnd@arndb.de>
+References: <1455634525-2023774-1-git-send-email-arnd@arndb.de>
+Message-ID: <CAEnQRZBk0R-A5VEEd_D+kLKnyhc3nhrm0tv2JOkv0iqywGFtuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-02-15 21:00, Sanchayan Maity wrote:
-> Add iio-hwmon node to expose the temperature channel on Vybrid as
-> hardware monitor device using the iio_hwmon driver.
-> 
-> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+On Tue, Feb 16, 2016 at 4:55 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> The ms5611 driver started using the IIO_TRIGGERED_BUFFER infrastructure
+> which in turn depend on IIO_BUFFER, and it produces a build error now
+> if that is not enabled:
+>
+> warning: (... && MS5611 && ...) selects IIO_TRIGGERED_BUFFER which has unmet direct dependencies (IIO && IIO_BUFFER)
+> buffer/industrialio-triggered-buffer.c: In function 'iio_triggered_buffer_setup':
+> buffer/industrialio-triggered-buffer.c:58:2: error: implicit declaration of function 'iio_device_attach_buffer' [-Werror=implicit-function-declaration]
+> pressure/ms5611_core.c: In function 'ms5611_trigger_handler':
+> pressure/ms5611_core.c:193:2: error: implicit declaration of function 'iio_push_to_buffers_with_timestamp' [-Werror=implicit-function-declaration]
+>
+> This adds the second select.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 713bbb4efb9d ("iio: pressure: ms5611: Add triggered buffer support")
 
-Acked-by: Stefan Agner <stefan@agner.ch>
+Acked-by: Daniel Baluta <daniel.baluta@intel.com>
 
 > ---
->  arch/arm/boot/dts/vfxxx.dtsi | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
-> index a5f07e3..24ac5b1 100644
-> --- a/arch/arm/boot/dts/vfxxx.dtsi
-> +++ b/arch/arm/boot/dts/vfxxx.dtsi
-> @@ -673,5 +673,10 @@
->  				status = "disabled";
->  			};
->  		};
-> +
-> +		iio-hwmon {
-> +			compatible = "iio-hwmon";
-> +			io-channels = <&adc0 16>, <&adc1 16>;
-> +		};
->  	};
->  };
+>  drivers/iio/pressure/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/drivers/iio/pressure/Kconfig b/drivers/iio/pressure/Kconfig
+> index f15f66d6f527..31c0e1fd2202 100644
+> --- a/drivers/iio/pressure/Kconfig
+> +++ b/drivers/iio/pressure/Kconfig
+> @@ -69,6 +69,7 @@ config MPL3115
+>
+>  config MS5611
+>         tristate "Measurement Specialties MS5611 pressure sensor driver"
+> +       select IIO_BUFFER
+>         select IIO_TRIGGERED_BUFFER
+>         help
+>           Say Y here to build support for the Measurement Specialties
+> --
+> 2.7.0
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
