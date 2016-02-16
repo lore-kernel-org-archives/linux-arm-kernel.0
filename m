@@ -1,38 +1,59 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 16 Feb 2016 17:03:26 +0100
-Subject: [PATCH 1/2] ARM: mm: DEBUG_RODATA makes no sense with XIP_KERNEL
-Message-ID: <1455638631-3326518-1-git-send-email-arnd@arndb.de>
+From: ralf@linux-mips.org (Ralf Baechle)
+Date: Tue, 16 Feb 2016 17:06:09 +0100
+Subject: [PATCH v2 1/5] MIPS: jz4740: remove broken irq_to_gpio() call
+In-Reply-To: <1455637261-2920972-1-git-send-email-arnd@arndb.de>
+References: <455637086-2794174-1-git-send-email-arnd@arndb.de>
+ <1455637261-2920972-1-git-send-email-arnd@arndb.de>
+Message-ID: <20160216160609.GA15268@linux-mips.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_DEBUG_ALIGN_RODATA is set, we get a link error:
+On Tue, Feb 16, 2016 at 04:40:34PM +0100, Arnd Bergmann wrote:
+> Date:   Tue, 16 Feb 2016 16:40:34 +0100
+> From: Arnd Bergmann <arnd@arndb.de>
+> To: Linus Walleij <linus.walleij@linaro.org>
+> Cc: linux-arm-kernel at lists.infradead.org, Arnd Bergmann <arnd@arndb.de>,
+>  Russell King <rmk+kernel@arm.linux.org.uk>, Bjorn Helgaas
+>  <bhelgaas@google.com>, Alexandre Courbot <gnurou@gmail.com>,
+>  linux-gpio at vger.kernel.org, linux-kernel at vger.kernel.org, Lars-Peter
+>  Clausen <lars@metafoo.de>, Ralf Baechle <ralf@linux-mips.org>,
+>  linux-mips at linux-mips.org, "# v4 . 3+" <stable@vger.kernel.org>, Alban
+>  Bedel <albeu@free.fr>, Thomas Gleixner <tglx@linutronix.de>, Paul Burton
+>  <paul.burton@imgtec.com>
+> Subject: [PATCH v2 1/5] MIPS: jz4740: remove broken irq_to_gpio() call
+> 
+> gpiolib has removed the irq_to_gpio() API several years ago,
+> but the global header still provided a non-working stub.
+> 
+> With a MIPS-wide change to use the generic header file, the jz4740
+> platform is now using the wrong stub implementation of irq_to_gpio(),
+> which cannot work.
+> 
+> This uses an open-coded implementation in the only line it
+> is used in.
+> 
+> Suggested-by: Lars-Peter Clausen <lars@metafoo.de>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: <stable@vger.kernel.org> # v4.3+
+> Fixes: 832f5dacfa0b ("MIPS: Remove all the uses of custom gpio.h").
+> ---
+>  arch/mips/jz4740/gpio.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/mips/jz4740/gpio.c b/arch/mips/jz4740/gpio.c
+> index 8c6d76c9b2d6..d9907e57e9b9 100644
+> --- a/arch/mips/jz4740/gpio.c
+> +++ b/arch/mips/jz4740/gpio.c
+> @@ -270,7 +270,7 @@ uint32_t jz_gpio_port_get_value(int port, uint32_t mask)
+>  }
+>  EXPORT_SYMBOL(jz_gpio_port_get_value);
+>  
+> -#define IRQ_TO_BIT(irq) BIT(irq_to_gpio(irq) & 0x1f)
+> +#define IRQ_TO_BIT(irq) BIT((irq - JZ4740_IRQ_GPIO(0)) & 0x1f)
+>  
+>  static void jz_gpio_check_trigger_both(struct jz_gpio_chip *chip, unsigned int irq)
+>  {
 
-arch/arm/mm/built-in.o:(.data+0x4bc): undefined reference to `__start_rodata_section_aligned'
+I've already committed an identical fix locally.
 
-However, this combination is useless, as XIP_KERNEL implies that all the
-RODATA is already marked readonly, so both CONFIG_DEBUG_RODATA and
-CONFIG_DEBUG_ALIGN_RODATA (which depends on the other) are not
-needed with XIP_KERNEL, and this patches enforces that using a Kconfig
-dependency.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 25362dc496ed ("ARM: 8501/1: mm: flip priority of CONFIG_DEBUG_RODATA")
----
- arch/arm/mm/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index fbf2296388ce..8894045caba9 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -1039,7 +1039,7 @@ config ARCH_SUPPORTS_BIG_ENDIAN
- 
- config DEBUG_RODATA
- 	bool "Make kernel text and rodata read-only"
--	depends on MMU
-+	depends on MMU && !XIP_KERNEL
- 	default y if CPU_V7
- 	help
- 	  If this is set, kernel text and rodata memory will be made
--- 
-2.7.0
+  Ralf
