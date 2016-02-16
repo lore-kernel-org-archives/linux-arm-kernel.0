@@ -1,57 +1,27 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 16 Feb 2016 10:41:09 -0800
-Subject: [PATCH 1/2] ARM: mm: DEBUG_RODATA makes no sense with XIP_KERNEL
-In-Reply-To: <1455638631-3326518-1-git-send-email-arnd@arndb.de>
-References: <1455638631-3326518-1-git-send-email-arnd@arndb.de>
-Message-ID: <CAGXu5jJ84FupuH2Zq8TVKNTS3zMTYZiBaSbjWZWWZ1ApBzBtwg@mail.gmail.com>
+From: borntraeger@de.ibm.com (Christian Borntraeger)
+Date: Tue, 16 Feb 2016 19:46:03 +0100
+Subject: [BUG] random kernel crashes after THP rework on s390 (maybe also
+ on PowerPC and ARM)
+In-Reply-To: <20160215213526.GA9766@node.shutemov.name>
+References: <20160211192223.4b517057@thinkpad>
+ <20160211190942.GA10244@node.shutemov.name>
+ <20160211205702.24f0d17a@thinkpad>
+ <20160212154116.GA15142@node.shutemov.name> <56BE00E7.1010303@de.ibm.com>
+ <20160212181640.4eabb85f@thinkpad>
+ <20160212231510.GB15142@node.shutemov.name>
+ <alpine.LFD.2.20.1602131238260.1910@schleppi>
+ <20160215113159.GA28832@node.shutemov.name>
+ <20160215193702.4a15ed5e@thinkpad> <20160215213526.GA9766@node.shutemov.name>
+Message-ID: <56C36E6B.70009@de.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 16, 2016 at 8:03 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> When CONFIG_DEBUG_ALIGN_RODATA is set, we get a link error:
->
-> arch/arm/mm/built-in.o:(.data+0x4bc): undefined reference to `__start_rodata_section_aligned'
->
-> However, this combination is useless, as XIP_KERNEL implies that all the
-> RODATA is already marked readonly, so both CONFIG_DEBUG_RODATA and
-> CONFIG_DEBUG_ALIGN_RODATA (which depends on the other) are not
-> needed with XIP_KERNEL, and this patches enforces that using a Kconfig
-> dependency.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 25362dc496ed ("ARM: 8501/1: mm: flip priority of CONFIG_DEBUG_RODATA")
+On 02/15/2016 10:35 PM, Kirill A. Shutemov wrote:
+> 
+> Is there any chance that I'll be able to trigger the bug using QEMU?
+> Does anybody have an QEMU image I can use?
 
-Oh, hm, I didn't see this before sending my fix for the rodata start issue.
+qemu/TCG on s390 does neither provide SMP nor large pages (only QEMU/KVM does)
+so this will probably not help you here. 
 
-> ---
->  arch/arm/mm/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-> index fbf2296388ce..8894045caba9 100644
-> --- a/arch/arm/mm/Kconfig
-> +++ b/arch/arm/mm/Kconfig
-> @@ -1039,7 +1039,7 @@ config ARCH_SUPPORTS_BIG_ENDIAN
->
->  config DEBUG_RODATA
->         bool "Make kernel text and rodata read-only"
-> -       depends on MMU
-> +       depends on MMU && !XIP_KERNEL
-
-If we do this, we need to probably clean up the xip linker script to
-remove all the references to DEBUG_*RODATA too.
-
--Kees
-
->         default y if CPU_V7
->         help
->           If this is set, kernel text and rodata memory will be made
-> --
-> 2.7.0
->
-
-
-
--- 
-Kees Cook
-Chrome OS & Brillo Security
+Christian
