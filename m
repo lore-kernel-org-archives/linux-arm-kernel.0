@@ -1,51 +1,116 @@
 From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 15 Feb 2016 17:38:06 -0800
-Subject: Crashes in arm qemu emulations due to 'cpufreq: governor: Replace
- timers with utilization ...'
-In-Reply-To: <20160215213606.GD19432@atomide.com>
-References: <20160215170527.GA24453@roeck-us.net>
- <CAJZ5v0gLankSuziQq25qTCyNqeOX43yD9jnJu_XXwbdyajfmKg@mail.gmail.com>
- <20160215190116.GX19432@atomide.com> <56C229A5.8020901@roeck-us.net>
- <20160215195839.GA19432@atomide.com>
- <CAJZ5v0hzVB0+H4nuCun3mmrES3UQ3+Rs1uz5YGu5sv4G3XU+nQ@mail.gmail.com>
- <20160215213606.GD19432@atomide.com>
-Message-ID: <56C27D7E.4060603@roeck-us.net>
+Date: Mon, 15 Feb 2016 17:40:27 -0800
+Subject: [PATCH 1/2] firmware: arm_scpi: add support for 64-bit sensor
+ values
+In-Reply-To: <1455028377-12728-1-git-send-email-sudeep.holla@arm.com>
+References: <1455028377-12728-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <56C27E0B.5070600@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/15/2016 01:36 PM, Tony Lindgren wrote:
-> * Rafael J. Wysocki <rafael@kernel.org> [160215 12:39]:
->> On Mon, Feb 15, 2016 at 8:58 PM, Tony Lindgren <tony@atomide.com> wrote:
->>> * Guenter Roeck <linux@roeck-us.net> [160215 11:41]:
->>>> On 02/15/2016 11:01 AM, Tony Lindgren wrote:
->>>>>
->>>>> https://kernelci.org/boot/all/job/next/kernel/next-20160215/
->>>>>
->>>>> The SMP ones seem to fail with some regulator issues?
->>>>>
->>>>
->>>> There is another problem, introduced with 6a0712f6f199e ("PM / OPP: Add
->>>> dev_pm_opp_set_rate()"). The kernelci boot log for next-20160212:omap3-overo-tobi
->>>> and others experience that problem.
->>>>
->>>> Essentially, the code now assumes that a CPU clock always has a voltage
->>>> regulator attached to it, which is not correct. I sent out a patch to fix
->>>> that problem a minute ago.
->>>
->>> Yes that fixed it thanks.
->>
->> Can you please also check if this alternative fix from Viresh works:
->>
->> https://patchwork.kernel.org/patch/8316611/
+On 02/09/2016 06:32 AM, Sudeep Holla wrote:
+> SCPI specification version 1.1 extended the sensor from 32-bit to 64-bit
+> values in order to accommodate new sensor class with 64-bit requirements
 >
-> Yes that one too seems to fix the issue on SMP systems for
-> me:
+> Since the SCPI driver sets the higher 32-bit for older protocol version
+> to zeros, there's no need to explicitly check the SCPI protocol version
+> and the backward compatibility is maintainted.
 >
-> Tested-by: Tony Lindgren <tony@atomide.com>
+> Cc: Punit Agrawal <punit.agrawal@arm.com>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+
+Acked-by: Guenter Roeck <linux@roeck-us.net>
+
+> ---
+>   drivers/firmware/arm_scpi.c   | 8 +++++---
+>   drivers/hwmon/scpi-hwmon.c    | 6 +++---
+>   include/linux/scpi_protocol.h | 2 +-
+>   3 files changed, 9 insertions(+), 7 deletions(-)
 >
-
-Same here.
-
-Tested-by: Guenter Roeck <linux@roeck-us.net>
-
-Guenter
+> Hi Guenter,
+>
+> Since I have couple of other fixes for SCPI driver, if you can provide
+> your ACKs to this couple of patches after your review, I can take all of
+> them together via ARM-SoC if that's fine with you.
+>
+> Regards,
+> Sudeep
+>
+> diff --git a/drivers/firmware/arm_scpi.c b/drivers/firmware/arm_scpi.c
+> index c32ac6e61ba2..7e3e595c9f30 100644
+> --- a/drivers/firmware/arm_scpi.c
+> +++ b/drivers/firmware/arm_scpi.c
+> @@ -231,7 +231,8 @@ struct _scpi_sensor_info {
+>   };
+>
+>   struct sensor_value {
+> -	__le32 val;
+> +	__le32 lo_val;
+> +	__le32 hi_val;
+>   } __packed;
+>
+>   static struct scpi_drvinfo *scpi_info;
+> @@ -525,7 +526,7 @@ static int scpi_sensor_get_info(u16 sensor_id, struct scpi_sensor_info *info)
+>   	return ret;
+>   }
+>
+> -int scpi_sensor_get_value(u16 sensor, u32 *val)
+> +int scpi_sensor_get_value(u16 sensor, u64 *val)
+>   {
+>   	__le16 id = cpu_to_le16(sensor);
+>   	struct sensor_value buf;
+> @@ -534,7 +535,8 @@ int scpi_sensor_get_value(u16 sensor, u32 *val)
+>   	ret = scpi_send_message(SCPI_CMD_SENSOR_VALUE, &id, sizeof(id),
+>   				&buf, sizeof(buf));
+>   	if (!ret)
+> -		*val = le32_to_cpu(buf.val);
+> +		*val = (u64)le32_to_cpu(buf.hi_val) << 32 |
+> +			le32_to_cpu(buf.lo_val);
+>
+>   	return ret;
+>   }
+> diff --git a/drivers/hwmon/scpi-hwmon.c b/drivers/hwmon/scpi-hwmon.c
+> index 7e20567bc369..7101b14b5137 100644
+> --- a/drivers/hwmon/scpi-hwmon.c
+> +++ b/drivers/hwmon/scpi-hwmon.c
+> @@ -52,7 +52,7 @@ static int scpi_read_temp(void *dev, int *temp)
+>   	struct scpi_sensors *scpi_sensors = zone->scpi_sensors;
+>   	struct scpi_ops *scpi_ops = scpi_sensors->scpi_ops;
+>   	struct sensor_data *sensor = &scpi_sensors->data[zone->sensor_id];
+> -	u32 value;
+> +	u64 value;
+>   	int ret;
+>
+>   	ret = scpi_ops->sensor_get_value(sensor->info.sensor_id, &value);
+> @@ -70,7 +70,7 @@ scpi_show_sensor(struct device *dev, struct device_attribute *attr, char *buf)
+>   	struct scpi_sensors *scpi_sensors = dev_get_drvdata(dev);
+>   	struct scpi_ops *scpi_ops = scpi_sensors->scpi_ops;
+>   	struct sensor_data *sensor;
+> -	u32 value;
+> +	u64 value;
+>   	int ret;
+>
+>   	sensor = container_of(attr, struct sensor_data, dev_attr_input);
+> @@ -79,7 +79,7 @@ scpi_show_sensor(struct device *dev, struct device_attribute *attr, char *buf)
+>   	if (ret)
+>   		return ret;
+>
+> -	return sprintf(buf, "%u\n", value);
+> +	return sprintf(buf, "%llu\n", value);
+>   }
+>
+>   static ssize_t
+> diff --git a/include/linux/scpi_protocol.h b/include/linux/scpi_protocol.h
+> index 72ce932c69b2..ecd248d46281 100644
+> --- a/include/linux/scpi_protocol.h
+> +++ b/include/linux/scpi_protocol.h
+> @@ -68,7 +68,7 @@ struct scpi_ops {
+>   	struct scpi_dvfs_info *(*dvfs_get_info)(u8);
+>   	int (*sensor_get_capability)(u16 *sensors);
+>   	int (*sensor_get_info)(u16 sensor_id, struct scpi_sensor_info *);
+> -	int (*sensor_get_value)(u16, u32 *);
+> +	int (*sensor_get_value)(u16, u64 *);
+>   };
+>
+>   #if IS_REACHABLE(CONFIG_ARM_SCPI_PROTOCOL)
+>
