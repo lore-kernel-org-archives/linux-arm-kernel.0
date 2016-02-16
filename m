@@ -1,77 +1,156 @@
-From: szabolcs.nagy@arm.com (Szabolcs Nagy)
-Date: Tue, 16 Feb 2016 12:57:26 +0000
-Subject: [PATCH] arm64: Add support for Half precision floating point
-In-Reply-To: <20160216115335.GE14509@arm.com>
-References: <1453823566-26742-1-git-send-email-suzuki.poulose@arm.com>
- <20160126160257.GB28238@arm.com>
- <20160126161151.GE14823@e104818-lin.cambridge.arm.com>
- <20160128160022.GM775@arm.com> <56C30C7E.1030005@arm.com>
- <20160216115335.GE14509@arm.com>
-Message-ID: <56C31CB6.7090901@arm.com>
+From: aryabinin@virtuozzo.com (Andrey Ryabinin)
+Date: Tue, 16 Feb 2016 15:59:09 +0300
+Subject: [PATCH v5sub1 7/8] arm64: move kernel image to base of vmalloc
+ area
+In-Reply-To: <20160215185957.GB19413@e104818-lin.cambridge.arm.com>
+References: <1454324093-15998-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1454324093-15998-8-git-send-email-ard.biesheuvel@linaro.org>
+ <20160212145844.GI31665@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu-x6QPorWsPDP8bqAkmbasqzhqmP39HS=qprfGB4r8JLw@mail.gmail.com>
+ <20160212151006.GJ31665@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu84mVP=YjbLhWoGj9AEUD8m8+Lq8kTCniCHwxJwMWaZtA@mail.gmail.com>
+ <20160212152641.GK31665@e104818-lin.cambridge.arm.com>
+ <56BDFC86.5010705@arm.com>
+ <20160212160652.GL31665@e104818-lin.cambridge.arm.com>
+ <56C1E072.2090909@virtuozzo.com>
+ <20160215185957.GB19413@e104818-lin.cambridge.arm.com>
+Message-ID: <56C31D1D.50708@virtuozzo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/02/16 11:53, Will Deacon wrote:
-> On Tue, Feb 16, 2016 at 11:48:14AM +0000, Szabolcs Nagy wrote:
->> On 28/01/16 16:00, Will Deacon wrote:
->>> On Tue, Jan 26, 2016 at 04:11:51PM +0000, Catalin Marinas wrote:
->>>> On Tue, Jan 26, 2016 at 04:02:58PM +0000, Will Deacon wrote:
->>>>> On Tue, Jan 26, 2016 at 03:52:46PM +0000, Suzuki K Poulose wrote:
->>>>>> +#define HWCAP_FPHP		(1 << 9)
->>>>>> +#define HWCAP_ASIMDHP		(1 << 10)
->>>>>
->>>>> Where did we get to with the mrs trapping you proposed here?
->>>>>
->>>>>   http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/374609.html
->>>>>
->>>>> At some point, we need to consider whether or not we want to continue
->>>>> adding new HWCAPs or whether your suggestion above is actually useful
->>>>> to userspace.
->>>>
->>>> IMO, even if we merge the MRS emulation, I would still like to see
->>>> HWCAPs exported. We are not short on bits yet (53 to go ;)).
+
+
+On 02/15/2016 09:59 PM, Catalin Marinas wrote:
+> On Mon, Feb 15, 2016 at 05:28:02PM +0300, Andrey Ryabinin wrote:
+>> On 02/12/2016 07:06 PM, Catalin Marinas wrote:
+>>> So far, we have:
 >>>
->>> I'm less keen. HWCAPs don't align well with the way that the ARM
->>> architecture versions features and we should be encouraging people to
->>> use the MRS emulation if it exists.
+>>> KASAN+for-next/kernmap goes wrong
+>>> KASAN+UBSAN goes wrong
 >>>
->>>>> Did the libc guys get anywhere with a prototype? What do we need to do
->>>>> to make progress with it?
->>>>
->>>> This investigation should indeed continue but I think it is orthogonal.
+>>> Enabled individually, KASAN, UBSAN and for-next/kernmap seem fine. I may
+>>> have to trim for-next/core down until we figure out where the problem
+>>> is.
 >>>
->>> Not if its intended to replace HWCAPs in the longterm.
->>>
+>>> BUG: KASAN: stack-out-of-bounds in find_busiest_group+0x164/0x16a0 at addr ffffffc93665bc8c
 >>
->> userspace needs HWCAP bits independently of the MIDR emulation.
->>
->> MIDR cannot replace HWCAP:
->>
->> - MIDR does not map to features in a future-proof way
->>   (we don't know which MIDR will indicate fp16 availability)
->>
->> - MIDR would be useful for more fine-grained uarch specific
->>   tuning decisions, HWCAP is for arch extensions like fp16.
->>
->> - We don't yet know if the proposed MIDR emulation solves
->>   all userspace issues we want it to solve. I'll try to
->>   investigate that as well as the alternative VDSO based
->>   approach (if VDSO can work, that would be better for
->>   userspace). There are nasty issues here so the conclusion
->>   might take a while, but that should not hold up HWCAPs.
+>> Can it be related to TLB conflicts, which supposed to be fixed in
+>> "arm64: kasan: avoid TLB conflicts" patch from "arm64: mm: rework page
+>> table creation" series ?
 > 
-> I'm not solely proposing MIDR as an alternative to HWCAP. I'm proposing
-> that the feature registers, e.g. ID_AA64MMFR0_EL1 are used instead.
+> I can very easily reproduce this with a vanilla 4.5-rc1 series by
+> enabling inline instrumentation (maybe Mark's theory is true w.r.t.
+> image size).
 > 
+> Some information, maybe you can shed some light on this. It seems to
+> happen only for secondary CPUs on the swapper stack (I think allocated
+> via fork_idle()). The code generated looks sane to me, so KASAN should
+> not complain but maybe there is some uninitialised shadow, hence the
+> error.
+> 
+> The report:
+>
 
-if the ID_* system registers are made available to userspace
-(with fixup for heterogeneous systems), that works too.
+Actually, the first report is a bit more useful. It shows that shadow memory was corrupted:
 
-hwcap is still more accessible in userspace:
+  ffffffc93665bc00: f1 f1 f1 f1 00 f4 f4 f4 f2 f2 f2 f2 00 00 f1 f1
+> ffffffc93665bc80: f1 f1 00 00 00 00 f3 f3 00 f4 f4 f4 f3 f3 f3 f3
+                      ^
+F1 - left redzone, it indicates start of stack frame
+F3 - right redzone, it should be the end of stack frame.
 
-- libc gets it without additional syscall/trap
-- user code can get it with getauxval(AT_HWCAP)
-- ifunc resolvers take a hwcap argument.
-- HWCAP_ bits are already exposed in uapi headers.
+But here we have the second set of F1s without F3s which should close the first set of F1s.
+Also those two F3s in the middle cannot be right.
 
-i'm not familiar with the ID_ regs though.
+So shadow is corrupted.
+Some hypotheses:
+
+1) We share stack between several tasks (e.g. stack overflow, somehow corrupted SP).
+    But this probably should cause kernel crash later, after kasan reports.
+
+2) Shadow memory wasn't cleared. GCC poison memory on function entrance and unpoisons it before return.
+     If we use some tricky way to exit from function this could cause false-positives like that.
+     E.g. some hand-written assembly return code.
+
+3) Screwed shadow mapping. I think the patch below should uncover such problem.
+It boot-tested on qemu and didn't show any problem
+
+
+---
+ arch/arm64/mm/kasan_init.c | 55 ++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 55 insertions(+)
+
+diff --git a/arch/arm64/mm/kasan_init.c b/arch/arm64/mm/kasan_init.c
+index cf038c7..25d685c 100644
+--- a/arch/arm64/mm/kasan_init.c
++++ b/arch/arm64/mm/kasan_init.c
+@@ -117,6 +117,59 @@ static void __init cpu_set_ttbr1(unsigned long ttbr1)
+ 	: "r" (ttbr1));
+ }
+ 
++static void verify_shadow(void)
++{
++	struct memblock_region *reg;
++	int i = 0;
++
++	for_each_memblock(memory, reg) {
++		void *start = (void *)__phys_to_virt(reg->base);
++		void *end = (void *)__phys_to_virt(reg->base + reg->size);
++		int *shadow_start, *shadow_end;
++
++		if (start >= end)
++			break;
++		shadow_start = (int *)((unsigned long)kasan_mem_to_shadow(start) & ~(PAGE_SIZE - 1));
++		shadow_end =  (int *)kasan_mem_to_shadow(end);
++		for (; shadow_start < shadow_end; shadow_start += PAGE_SIZE/sizeof(int)) {
++			*shadow_start = i;
++			i++;
++		}
++	}
++
++	i = 0;
++	for_each_memblock(memory, reg) {
++		void *start = (void *)__phys_to_virt(reg->base);
++		void *end = (void *)__phys_to_virt(reg->base + reg->size);
++		int *shadow_start, *shadow_end;
++
++		if (start >= end)
++			break;
++		shadow_start = (int *)((unsigned long)kasan_mem_to_shadow(start) & ~(PAGE_SIZE - 1));
++		shadow_end =  (int *)kasan_mem_to_shadow(end);
++		for (; shadow_start < shadow_end; shadow_start += PAGE_SIZE/sizeof(int)) {
++			if (*shadow_start != i) {
++				pr_err("screwed shadow mapping %d, %d\n", *shadow_start, i);
++				goto clear;
++			}
++			i++;
++		}
++	}
++clear:
++	for_each_memblock(memory, reg) {
++		void *start = (void *)__phys_to_virt(reg->base);
++		void *end = (void *)__phys_to_virt(reg->base + reg->size);
++		unsigned long shadow_start, shadow_end;
++
++		if (start >= end)
++			break;
++		shadow_start =  ((unsigned long)kasan_mem_to_shadow(start) & ~(PAGE_SIZE - 1));
++		shadow_end =  (unsigned long)kasan_mem_to_shadow(end);
++		memset((void *)shadow_start, 0, shadow_end - shadow_start);
++	}
++
++}
++
+ void __init kasan_init(void)
+ {
+ 	struct memblock_region *reg;
+@@ -159,6 +212,8 @@ void __init kasan_init(void)
+ 	cpu_set_ttbr1(__pa(swapper_pg_dir));
+ 	flush_tlb_all();
+ 
++	verify_shadow();
++
+ 	/* At this point kasan is fully initialized. Enable error messages */
+ 	init_task.kasan_depth = 0;
+ 	pr_info("KernelAddressSanitizer initialized\n");
+-- 
