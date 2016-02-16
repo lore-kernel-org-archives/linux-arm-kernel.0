@@ -1,135 +1,50 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Wed, 17 Feb 2016 00:33:24 +0800
-Subject: [PATCH v12 4/4] Watchdog: introduce ARM SBSA watchdog driver
-In-Reply-To: <CADyBb7vDuZjjy92WkV_jML2Ji13LvtuqkKszAetzvoM47CaY7Q@mail.gmail.com>
-References: <1455611785-2407-1-git-send-email-fu.wei@linaro.org>
- <1455611785-2407-5-git-send-email-fu.wei@linaro.org>
- <56C34076.1020206@roeck-us.net>
- <CADyBb7vDuZjjy92WkV_jML2Ji13LvtuqkKszAetzvoM47CaY7Q@mail.gmail.com>
-Message-ID: <CADyBb7s0mf9MLxXeR54wBCPnTBSC7hiNw08C-5vc9EhkORGZww@mail.gmail.com>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Tue, 16 Feb 2016 08:33:41 -0800
+Subject: [PATCH 2/3] serial: xuartps: Enable OF earlycon support
+In-Reply-To: <23ab10a19b21df2ef17a5bb6ce2a70d2d3fd3551.1455552315.git.michal.simek@xilinx.com>
+References: <67c9013fc61f53515934b54847a05df8b8e1504a.1455552315.git.michal.simek@xilinx.com>
+ <23ab10a19b21df2ef17a5bb6ce2a70d2d3fd3551.1455552315.git.michal.simek@xilinx.com>
+Message-ID: <56C34F65.1040506@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 February 2016 at 23:54, Fu Wei <fu.wei@linaro.org> wrote:
-> On 16 February 2016 at 23:29, Guenter Roeck <linux@roeck-us.net> wrote:
->> On 02/16/2016 12:36 AM, fu.wei at linaro.org wrote:
->>>
->>> From: Fu Wei <fu.wei@linaro.org>
->>>
->>> According to Server Base System Architecture (SBSA) specification,
->>> the SBSA Generic Watchdog has two stage timeouts: the first signal (WS0)
->>> is for alerting the system by interrupt, the second one (WS1) is a real
->>> hardware reset.
->>> More details about the hardware specification of this device:
->>> ARM DEN0029B - Server Base System Architecture (SBSA)
->>>
->>> This driver can operate ARM SBSA Generic Watchdog as a single stage
->>> watchdog
->>> or a two stages watchdog, it's set up by the module parameter "action".
->>> In the single stage mode, when the timeout is reached, your system
->>> will be reset by WS1. The first signal (WS0) is ignored.
->>> In the two stages mode, when the timeout is reached, the first signal
->>> (WS0)
->>> will trigger panic. If the system is getting into trouble and cannot be
->>> reset
->>> by panic or restart properly by the kdump kernel(if supported), then the
->>> second stage (as long as the first stage) will be reached, system will be
->>> reset by WS1. This function can help administrator to backup the system
->>> context info by panic console output or kdump.
->>>
->>> This driver bases on linux kernel watchdog framework, so it can get
->>> timeout from module parameter and FDT at the driver init stage.
->>>
->>> Signed-off-by: Fu Wei <fu.wei@linaro.org>
->>> Reviewed-by: Graeme Gregory <graeme.gregory@linaro.org>
->>> Tested-by: Pratyush Anand <panand@redhat.com>
->>> Acked-by: Timur Tabi <timur@codeaurora.org>
->>> Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
->>> ---
->>>   drivers/watchdog/Kconfig     |  20 +++
->>>   drivers/watchdog/Makefile    |   1 +
->>>   drivers/watchdog/sbsa_gwdt.c | 403
->>> +++++++++++++++++++++++++++++++++++++++++++
->>>   3 files changed, 424 insertions(+)
->>>
->>> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
->>> index 0f6d851..ed9a5cb 100644
->>> --- a/drivers/watchdog/Kconfig
->>> +++ b/drivers/watchdog/Kconfig
->>
->>
->> [ ... ]
->>
->>> +
->>> +static int sbsa_gwdt_probe(struct platform_device *pdev)
->>> +{
->>
->>
->> [ ... ]
->>
->>> +               if (!action)
->>> +                       dev_warn(dev, "falling back to signle stage
->>> mode.\n");
->>
->>
->> Still:
->>
->> s/signle/single/
->
-> sorry, my bad, will fix it
->
->>
->> [ ... ]
->>
->>> +
->>> +MODULE_DESCRIPTION("SBSA Generic Watchdog Driver");
->>> +MODULE_AUTHOR("Fu Wei <fu.wei@linaro.org>");
->>> +MODULE_AUTHOR("Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>");
->>> +MODULE_AUTHOR("Al Stone <al.stone@linaro.org>");
->>> +MODULE_AUTHOR("Timur Tabi <timur@codeaurora.org>");
->>> +MODULE_LICENSE("GPL v2");
->>>
->> Do you need a MODULE_ALIAS ?
->
-> For now, I thinks we don't need it, Hope I didn't miss something :-)
-> Because this module can be mounted automatically with dtb or ACPI(if
-> apply my GTDT patch).
-> Do you have any suggestion or concern? :-)
+Hi Michal,
 
-re-think  about that , will add
-MODULE_ALIAS("platform:sbsa-gwdt");
+On 02/15/2016 08:05 AM, Michal Simek wrote:
+> Support early console setup via DT for all listed compatible strings.
+> 
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> ---
+> 
+>  drivers/tty/serial/xilinx_uartps.c | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
+> index 009e0dbc12d2..6f5657766815 100644
+> --- a/drivers/tty/serial/xilinx_uartps.c
+> +++ b/drivers/tty/serial/xilinx_uartps.c
+> @@ -1094,6 +1094,9 @@ static int __init cdns_early_console_setup(struct earlycon_device *device,
+>  	return 0;
+>  }
+>  EARLYCON_DECLARE(cdns, cdns_early_console_setup);
+> +OF_EARLYCON_DECLARE(cdns_a, "xlnx,xuartps", cdns_early_console_setup);
+> +OF_EARLYCON_DECLARE(cdns_b, "cdns,uart-r1p8", cdns_early_console_setup);
+> +OF_EARLYCON_DECLARE(cdns_c, "cdns,uart-r1p12", cdns_early_console_setup);
 
-Do you agree ?  :-)
+Earlycon now shares a common framework in linux-next.
 
->
->>
->> Guenter
->>
->
->
->
-> --
-> Best regards,
->
-> Fu Wei
-> Software Engineer
-> Red Hat Software (Beijing) Co.,Ltd.Shanghai Branch
-> Ph: +86 21 61221326(direct)
-> Ph: +86 186 2020 4684 (mobile)
-> Room 1512, Regus One Corporate Avenue,Level 15,
-> One Corporate Avenue,222 Hubin Road,Huangpu District,
-> Shanghai,China 200021
+The EARLYCON_DECLARE() can be deleted and the OF_EARLYCON_DECLARE()
+can all share the same earlycon name. iow,
+
+-EARLYCON_DECLARE(cdns, cdns_early_console_setup);
++OF_EARLYCON_DECLARE(cdns, "xlnx,xuartps", cdns_early_console_setup);
++OF_EARLYCON_DECLARE(cdns, "cdns,uart-r1p8", cdns_early_console_setup);
++OF_EARLYCON_DECLARE(cdns, "cdns,uart-r1p12", cdns_early_console_setup);
+
+Regards,
+Peter Hurley
 
 
-
--- 
-Best regards,
-
-Fu Wei
-Software Engineer
-Red Hat Software (Beijing) Co.,Ltd.Shanghai Branch
-Ph: +86 21 61221326(direct)
-Ph: +86 186 2020 4684 (mobile)
-Room 1512, Regus One Corporate Avenue,Level 15,
-One Corporate Avenue,222 Hubin Road,Huangpu District,
-Shanghai,China 200021
+>  /**
+>   * cdns_uart_console_write - perform write operation
+> 
