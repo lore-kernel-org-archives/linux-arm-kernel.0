@@ -1,235 +1,189 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Tue, 16 Feb 2016 14:53:42 +0100
-Subject: [PATCH V5 12/15] pci,
- acpi: Support for ACPI based generic PCI host controller
- initialization
+Date: Tue, 16 Feb 2016 14:53:43 +0100
+Subject: [PATCH V5 13/15] pci,
+ acpi: Match PCI config space accessors against platfrom specific
+ quirks.
 In-Reply-To: <1455630825-27253-1-git-send-email-tn@semihalf.com>
 References: <1455630825-27253-1-git-send-email-tn@semihalf.com>
-Message-ID: <1455630825-27253-13-git-send-email-tn@semihalf.com>
+Message-ID: <1455630825-27253-14-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is going to implement generic PCI host controller for
-ACPI world, similar to what pci-host-generic.c driver does for DT world.
+Some platforms may not be fully compliant with generic set of PCI config
+accessors. For these cases we implement the way to overwrite accessors
+set prior to PCI buses enumeration. Algorithm traverses available quirk
+list, matches against <platform ID (DMI), domain, bus number> tuple and
+returns corresponding accessors. All quirks can be defined using:
+DECLARE_ACPI_MCFG_FIXUP() and kept self contained. Example,
 
-All such drivers, which we have seen so far, were implemented within
-arch/ directory since they had some arch assumptions (x86 and ia64).
-However, they all are doing similar thing, so it makes sense to find
-some common code and abstract it into the generic driver.
+static const struct dmi_system_id foo_dmi[] = {
+        {
+                .ident = "<Platform ident string>",
+                .callback = <handler>,
+                .matches = {
+                        DMI_MATCH(DMI_SYS_VENDOR, "<system vendor>"),
+                        DMI_MATCH(DMI_PRODUCT_NAME, "<product name>"),
+                        DMI_MATCH(DMI_PRODUCT_VERSION, "product version"),
+                },
+        },
+        { }
+};
 
-This driver aims to initialize PCI host controller without architecture
-assumptions. It uses MCFG library to manage PCI config space regions properly.
-Also, it parses _CRS content to find out host bridge's resources (i.e. MEM/IO).
-As mentioned in Kconfig help section, ACPI_PCI_HOST_GENERIC choice should be
-made on a per-architecture basis.
+static struct pci_ops foo_ecam_pci_ops = {
+        .map_bus = pci_mcfg_dev_base,
+        .read = foo_ecam_config_read,
+        .write = foo_ecam_config_write,
+};
+DECLARE_ACPI_MCFG_FIXUP(foo_dmi, NULL, &foo_ecam_pci_ops, <domain_nr>, <bus_nr>);
+
+More custom (non-DMI) matching can be done via an extra call.
+Note that there is possibility to assign quirk related private data to
+root->sysdata which will be available along read/wriate accessor, example:
+
+static int boo_match(struct pci_mcfg_fixup *fixup, struct acpi_pci_root *root)
+{
+        return [condition] ? 1 : 0;
+}
+
+int boo_ecam_config_read(struct pci_bus *bus, unsigned int devfn,
+                          int where, int size, u32 *val)
+{
+        struct acpi_pci_root *root = bus->sysdata;
+        struct boo_priv_data *boo_data = root->sysdata;
+
+        [..]
+}
+
+static struct pci_ops boo_ecam_pci_ops = {
+	.map_bus = pci_mcfg_dev_base,
+	.read = boo_ecam_config_read,
+	.write = boo_ecam_config_write,
+};
+DECLARE_ACPI_MCFG_FIXUP(NULL, boo_match, &boo_ecam_pci_ops, <domain_nr>, <bus_nr>);
 
 Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-Signed-off-by: Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
-TO: Bjorn Helgaas <helgaas@kernel.org>
-TO: Rafael J. Wysocki <rafael@kernel.org>
-Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-Tested-by: Jeremy Linton <jeremy.linton@arm.com>
 Tested-by: Duc Dang <dhdang@apm.com>
 Tested-by: Dongdong Liu <liudongdong3@huawei.com>
 Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
 Tested-by: Graeme Gregory <graeme.gregory@linaro.org>
 Tested-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/acpi/Kconfig     |   7 +++
- drivers/acpi/pci_root.c  | 128 +++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/pci-acpi.h |  10 ++--
- 3 files changed, 141 insertions(+), 4 deletions(-)
+ drivers/acpi/pci_mcfg.c           | 32 ++++++++++++++++++++++++++++++--
+ include/acpi/acpi_bus.h           |  1 +
+ include/asm-generic/vmlinux.lds.h |  7 +++++++
+ include/linux/pci-acpi.h          | 18 ++++++++++++++++++
+ 4 files changed, 56 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-index 183ffa3..1c7f57bd 100644
---- a/drivers/acpi/Kconfig
-+++ b/drivers/acpi/Kconfig
-@@ -346,6 +346,13 @@ config ACPI_PCI_SLOT
- 	  i.e., segment/bus/device/function tuples, with physical slots in
- 	  the system.  If you are unsure, say N.
- 
-+config ACPI_PCI_HOST_GENERIC
-+	bool
-+	help
-+	  Select this config option from the architecture Kconfig,
-+	  if it is preferred to enable ACPI PCI host controller driver which
-+	  has no arch-specific assumptions.
-+
- config X86_PM_TIMER
- 	bool "Power Management Timer Support" if EXPERT
- 	depends on X86
-diff --git a/drivers/acpi/pci_root.c b/drivers/acpi/pci_root.c
-index 3b284dc..02fd690 100644
---- a/drivers/acpi/pci_root.c
-+++ b/drivers/acpi/pci_root.c
-@@ -532,6 +532,134 @@ static void negotiate_os_control(struct acpi_pci_root *root, int *no_aspm)
- 	}
+diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
+index 0062257..b343547 100644
+--- a/drivers/acpi/pci_mcfg.c
++++ b/drivers/acpi/pci_mcfg.c
+@@ -41,6 +41,29 @@ int __weak raw_pci_write(unsigned int domain, unsigned int bus,
+ 	return PCIBIOS_DEVICE_NOT_FOUND;
  }
  
-+#ifdef CONFIG_ACPI_PCI_HOST_GENERIC
-+static int pci_acpi_setup_mcfg_map(struct acpi_pci_root_info *ci)
++extern struct pci_mcfg_fixup __start_acpi_mcfg_fixups[];
++extern struct pci_mcfg_fixup __end_acpi_mcfg_fixups[];
++
++static struct pci_ops *pci_mcfg_check_quirks(struct acpi_pci_root *root)
 +{
-+	struct acpi_pci_root *root = ci->root;
-+	int ret;
-+
-+	ret = pci_mmconfig_insert(&ci->bridge->dev, root->segment,
-+				   root->secondary.start, root->secondary.end,
-+				   root->mcfg_addr);
-+	if (ret == -EEXIST)
-+		ret = 0;
-+
-+	return ret;
-+}
-+
-+static void pci_acpi_teardown_mcfg_map(struct acpi_pci_root_info *ci)
-+{
-+	struct acpi_pci_root *root = ci->root;
-+
-+	pci_mmconfig_delete(root->segment, root->secondary.start,
-+			    root->secondary.end);
-+	kfree(ci);
-+}
-+
-+static int pci_acpi_root_prepare_resources(struct acpi_pci_root_info *ci)
-+{
-+	struct list_head *list = &ci->resources;
-+	struct acpi_device *device = ci->bridge;
-+	struct resource_entry *entry, *tmp;
-+	unsigned long flags;
-+	int ret;
-+
-+	flags = IORESOURCE_IO | IORESOURCE_MEM;
-+	ret = acpi_dev_get_resources(device, list,
-+				     acpi_dev_filter_resource_type_cb,
-+				     (void *)flags);
-+	if (ret < 0) {
-+		dev_warn(&device->dev,
-+			 "failed to parse _CRS method, error code %d\n", ret);
-+		return ret;
-+	} else if (ret == 0)
-+		dev_dbg(&device->dev,
-+			"no IO and memory resources present in _CRS\n");
-+
-+	resource_list_for_each_entry_safe(entry, tmp, &ci->resources) {
-+		struct resource *res = entry->res;
-+
-+		if (entry->res->flags & IORESOURCE_DISABLED)
-+			resource_list_destroy_entry(entry);
-+		else
-+			res->name = ci->name;
-+
-+		if (res->flags & IORESOURCE_IO) {
-+			resource_size_t cpu_addr = res->start;
-+			resource_size_t pci_addr = cpu_addr - entry->offset;
-+			resource_size_t length = resource_size(res);
-+			unsigned long port;
-+
-+			if (pci_register_io_range(cpu_addr, length)) {
-+				resource_list_destroy_entry(entry);
-+				continue;
-+			}
-+
-+			port = pci_address_to_pio(cpu_addr);
-+			if (port == (unsigned long)-1) {
-+				resource_list_destroy_entry(entry);
-+				continue;
-+			}
-+
-+			res->start = port;
-+			res->end = port + length - 1;
-+			entry->offset = port - pci_addr;
-+
-+			if (pci_remap_iospace(res, cpu_addr) < 0)
-+				resource_list_destroy_entry(entry);
-+		}
-+	}
-+	return ret;
-+}
-+
-+static struct acpi_pci_root_ops acpi_pci_root_ops = {
-+	.init_info = pci_acpi_setup_mcfg_map,
-+	.release_info = pci_acpi_teardown_mcfg_map,
-+	.prepare_resources = pci_acpi_root_prepare_resources,
-+};
-+
-+/* Root bridge scanning */
-+struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
-+{
-+	int node = acpi_get_node(root->device->handle);
++	struct pci_mcfg_fixup *f;
++	int bus_num = root->secondary.start;
 +	int domain = root->segment;
-+	int busnum = root->secondary.start;
-+	struct acpi_pci_root_info *info;
-+	struct pci_bus *bus, *child;
-+
-+	if (domain && !pci_domains_supported) {
-+		pr_warn("PCI %04x:%02x: multiple domains not supported.\n",
-+			domain, busnum);
-+		return NULL;
-+	}
-+
-+	info = kzalloc_node(sizeof(*info), GFP_KERNEL, node);
-+	if (!info) {
-+		dev_err(&root->device->dev,
-+			"pci_bus %04x:%02x: ignored (out of memory)\n",
-+			domain, busnum);
-+		return NULL;
-+	}
-+
-+	acpi_pci_root_ops.pci_ops = pci_mcfg_get_ops(root);
-+	bus = acpi_pci_root_create(root, &acpi_pci_root_ops, info, root);
-+	if (!bus)
-+		return NULL;
-+
-+	pci_bus_claim_resources(bus);
-+	pci_assign_unassigned_bus_resources(bus);
 +
 +	/*
-+	 * After the PCI-E bus has been walked and all devices discovered,
-+	 * configure any settings of the fabric that might be necessary.
++	 * First match against PCI topology <domain:bus> then use DMI or
++	 * custom match handler.
 +	 */
-+	list_for_each_entry(child, &bus->children, node)
-+		pcie_bus_configure_settings(child);
-+
-+	return bus;
++	for (f = __start_acpi_mcfg_fixups; f < __end_acpi_mcfg_fixups; f++) {
++		if ((f->domain == domain || f->domain == PCI_MCFG_DOMAIN_ANY) &&
++		    (f->bus_num == bus_num || f->bus_num == PCI_MCFG_BUS_ANY) &&
++		    (f->system ? dmi_check_system(f->system) : 1 &&
++		     f->match ? f->match(f, root) : 1))
++			return f->ops;
++	}
++	return NULL;
 +}
-+#endif /* CONFIG_ACPI_PCI_HOST_GENERIC */
 +
- static int acpi_pci_root_add(struct acpi_device *device,
- 			     const struct acpi_device_id *not_used)
+ void __iomem *
+ pci_mcfg_dev_base(struct pci_bus *bus, unsigned int devfn, int offset)
  {
+@@ -63,10 +86,15 @@ static struct pci_ops default_pci_mcfg_ops = {
+ 
+ struct pci_ops *pci_mcfg_get_ops(struct acpi_pci_root *root)
+ {
++	struct pci_ops *pci_mcfg_ops_quirk;
++
+ 	/*
+-	 * TODO: Match against platform specific quirks and return
+-	 * corresponding PCI config space accessor set.
++	 * Match against platform specific quirks and return corresponding
++	 * PCI config space accessor set.
+ 	 */
++	pci_mcfg_ops_quirk = pci_mcfg_check_quirks(root);
++	if (pci_mcfg_ops_quirk)
++		return pci_mcfg_ops_quirk;
+ 
+ 	return &default_pci_mcfg_ops;
+ }
+diff --git a/include/acpi/acpi_bus.h b/include/acpi/acpi_bus.h
+index 14362a8..0fc6f13 100644
+--- a/include/acpi/acpi_bus.h
++++ b/include/acpi/acpi_bus.h
+@@ -556,6 +556,7 @@ struct acpi_pci_root {
+ 	struct pci_bus *bus;
+ 	u16 segment;
+ 	struct resource secondary;	/* downstream bus range */
++	void *sysdata;
+ 
+ 	u32 osc_support_set;	/* _OSC state of support bits */
+ 	u32 osc_control_set;	/* _OSC state of control bits */
+diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
+index c4bd0e2..c93fc97 100644
+--- a/include/asm-generic/vmlinux.lds.h
++++ b/include/asm-generic/vmlinux.lds.h
+@@ -298,6 +298,13 @@
+ 		VMLINUX_SYMBOL(__end_pci_fixups_suspend_late) = .;	\
+ 	}								\
+ 									\
++	/* ACPI MCFG quirks */						\
++	.acpi_fixup        : AT(ADDR(.acpi_fixup) - LOAD_OFFSET) {	\
++		VMLINUX_SYMBOL(__start_acpi_mcfg_fixups) = .;		\
++		*(.acpi_fixup_mcfg)					\
++		VMLINUX_SYMBOL(__end_acpi_mcfg_fixups) = .;		\
++	}								\
++									\
+ 	/* Built-in firmware blobs */					\
+ 	.builtin_fw        : AT(ADDR(.builtin_fw) - LOAD_OFFSET) {	\
+ 		VMLINUX_SYMBOL(__start_builtin_fw) = .;			\
 diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
-index 3dc6a8c..93feb04 100644
+index 93feb04..9e1bedd 100644
 --- a/include/linux/pci-acpi.h
 +++ b/include/linux/pci-acpi.h
-@@ -123,10 +123,6 @@ struct pci_mmcfg_region {
+@@ -123,6 +123,24 @@ struct pci_mmcfg_region {
  	bool hot_added;
  };
  
--extern int pci_mmconfig_insert(struct device *dev, u16 seg, u8 start, u8 end,
--			       phys_addr_t addr);
--extern int pci_mmconfig_delete(u16 seg, u8 start, u8 end);
--
++struct pci_mcfg_fixup {
++	const struct dmi_system_id *system;
++	int (*match)(struct pci_mcfg_fixup *, struct acpi_pci_root *);
++	struct pci_ops *ops;
++	int domain;
++	int bus_num;
++};
++
++#define PCI_MCFG_DOMAIN_ANY	-1
++#define PCI_MCFG_BUS_ANY	-1
++
++/* Designate a routine to fix up buggy MCFG */
++#define DECLARE_ACPI_MCFG_FIXUP(system, match, ops, dom, bus)		\
++	static const struct pci_mcfg_fixup __mcfg_fixup_##system##dom##bus\
++	 __used	__attribute__((__section__(".acpi_fixup_mcfg"),		\
++				aligned((sizeof(void *))))) =		\
++	{ system, match, ops, dom, bus };
++
  extern struct pci_mmcfg_region *pci_mmconfig_lookup(int segment, int bus);
  extern struct pci_mmcfg_region *pci_mmconfig_add(int segment, int start,
  							int end, u64 addr);
-@@ -142,10 +138,16 @@ extern struct list_head pci_mmcfg_list;
- #define PCI_MMCFG_OFFSET(bus, devfn)   ((bus) << 20 | (devfn) << 12)
- 
- #ifdef	CONFIG_PCI_MMCONFIG
-+extern int pci_mmconfig_insert(struct device *dev, u16 seg, u8 start, u8 end,
-+			       phys_addr_t addr);
-+extern int pci_mmconfig_delete(u16 seg, u8 start, u8 end);
- extern struct pci_ops *pci_mcfg_get_ops(struct acpi_pci_root *root);
- extern void __iomem *pci_mcfg_dev_base(struct pci_bus *bus, unsigned int devfn,
- 				       int offset);
- #else
-+static inline int pci_mmconfig_insert(struct device *dev, u16 seg, u8 start,
-+				      u8 end, phys_addr_t addr) { return 0; }
-+static inline int pci_mmconfig_delete(u16 seg, u8 start, u8 end) { return 0; }
- static inline struct pci_ops *pci_mcfg_get_ops(struct acpi_pci_root *root)
- { return NULL; }
- static inline void __iomem *pci_mcfg_dev_base(struct pci_bus *bus,
 -- 
 1.9.1
