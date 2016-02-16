@@ -1,63 +1,56 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 16 Feb 2016 08:12:22 +0100
-Subject: [PATCH v3 7/7] arm64: dts: r8a7795: Add CA53 L2 cache-controller
- node
-In-Reply-To: <56C2C534.30704@de.bosch.com>
-References: <1455568715-20880-1-git-send-email-geert+renesas@glider.be>
- <1455568715-20880-8-git-send-email-geert+renesas@glider.be>
- <56C2C534.30704@de.bosch.com>
-Message-ID: <CAMuHMdX=Kgb-i+QpP=yNO2e6nw7sXuCutXPoK0U9NwK-OyANFA@mail.gmail.com>
+Date: Tue, 16 Feb 2016 08:15:40 +0100
+Subject: [PATCH/RFC v2 01/11] PM / Domains: Add DT bindings for the R-Car
+ System Controller
+In-Reply-To: <1720075.YOPnCQ3mE1@avalon>
+References: <1455571020-18968-1-git-send-email-geert+renesas@glider.be>
+ <1455571020-18968-2-git-send-email-geert+renesas@glider.be>
+ <1720075.YOPnCQ3mE1@avalon>
+Message-ID: <CAMuHMdXJYjde1cqWyqzDL9Cgb-3cWSvJmrG61H6Jf6EOu0-=Fw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dirk,
+Hi Laurent,
 
-On Tue, Feb 16, 2016 at 7:44 AM, Dirk Behme <dirk.behme@de.bosch.com> wrote:
-> On 15.02.2016 21:38, Geert Uytterhoeven wrote:
->> Add a device node for the Cortex-A53 L2 cache-controller.
->>
->> The L2 cache for the Cortex-A53 CPU cores is 512 KiB large (organized as
->> 32 KiB x 16 ways).
->>
->> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
->> ---
->> v3:
->>    - Remaining part of "[PATCH v2 6/6] arm64: renesas: r8a7795: Add L2
->>      cache-controller nodes".
->> ---
->>   arch/arm64/boot/dts/renesas/r8a7795.dtsi | 6 ++++++
->>   1 file changed, 6 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
->> b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
->> index c07f4e83b988ba42..c572527afec3403a 100644
->> --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
->> +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
->> @@ -72,6 +72,12 @@
->>                 cache-level = <2>;
->>         };
->>
->> +       L2_CA53: cache-controller at 1 {
->> +               compatible = "cache";
->> +               cache-unified;
->> +               cache-level = <2>;
->> +       };
+On Tue, Feb 16, 2016 at 12:08 AM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/power/renesas,sysc-rcar.txt
+>> @@ -0,0 +1,87 @@
+>> +DT bindings for the Renesas R-Car System Controller
 >> +
->
-> As we don't have any CA53 in the device tree yet, and it was rejected to add
-> it, I'd think that we don't want these unused entries at the moment.
+>> +== System Controller Node ==
+>> +
+>> +The R-Car System Controller provides power management for the CPU cores and
+>> +various coprocessors.
+>> +
+>> +Required properties:
+>> +  - compatible: Must contain one or more of the following:
+>> +      - "renesas,r8a7779-sysc" (R-Car H1)
+>> +      - "renesas,r8a7790-sysc" (R-Car H2)
+>> +      - "renesas,r8a7791-sysc" (R-Car M2-W)
+>> +      - "renesas,r8a7792-sysc" (R-Car V2H)
+>> +      - "renesas,r8a7793-sysc" (R-Car M2-N)
+>> +      - "renesas,r8a7794-sysc" (R-Car E2)
+>> +      - "renesas,r8a7795-sysc" (R-Car H3)
+>> +      - "renesas,rcar-gen2-sysc" (Generic R-Car Gen2)
+>> +      - "renesas,rcar-gen3-sysc" (Generic R-Car Gen3)
+>> +    When compatible with the generic version, nodes must list the
+>> SoC-specific
+>> +    version corresponding to the platform first, followed by the generic
+>> +    version.
+>> +  - reg: Address start and address range for the device.
 
-This is a preparatory step for adding the SYSC PM Domains.
+You're quoting the description of the "reg" property for the SYSC device node...
 
-> I'd propose to add the CA53 entries, first. And then add their L2 cache
-> entries.
->
-> Based on the outcome of the discussion for the CA57 we have to see if we
-> want to add the unused cache-unified and cache-level, then, too.
+> This isn't correct. I'll refrain from saying we abuse the reg property, as
+> using the first cell as a power domain number should be fine (the second cell
+> feels a bit more of an abuse to me though, but I won't complain too much), but
+> the bindings document should describe what the reg cells contain.
 
-These are specified by ePAPR, as I said before.
-Remember, DT describes the hardware, not what Linux (or any other OS) is
-using.
+... while the two cell format is for the PM domain nodes, not for the
+SYSC device
+node. Please check the other "reg" description.
 
 Gr{oetje,eeting}s,
 
