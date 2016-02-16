@@ -1,54 +1,90 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 16 Feb 2016 20:05:29 +0000
-Subject: [PATCH 0/8] KVM/ARM: Guest Entry/Exit optimizations
-In-Reply-To: <20160210204012.GS5171@cbox>
-References: <1454931622-14902-1-git-send-email-marc.zyngier@arm.com>
- <20160210204012.GS5171@cbox>
-Message-ID: <56C38109.3020501@arm.com>
+From: tchalamarla@caviumnetworks.com (tchalamarla at caviumnetworks.com)
+Date: Tue, 16 Feb 2016 12:08:49 -0800
+Subject: [PATCH V3] AHCI: Workaround for ThunderX Errata#22536
+Message-ID: <1455653329-4934-1-git-send-email-tchalamarla@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/02/16 20:40, Christoffer Dall wrote:
-> On Mon, Feb 08, 2016 at 11:40:14AM +0000, Marc Zyngier wrote:
->> I've recently been looking at our entry/exit costs, and profiling
->> figures did show some very low hanging fruits.
->>
->> The most obvious cost is that accessing the GIC HW is slow. As in
->> "deadly slow", specially when GICv2 is involved. So not hammering the
->> HW when there is nothing to write is immediately beneficial, as this
->> is the most common cases (whatever people seem to think, interrupts
->> are a *rare* event).
->>
->> Another easy thing to fix is the way we handle trapped system
->> registers. We do insist on (mostly) sorting them, but we do perform a
->> linear search on trap. We can switch to a binary search for free, and
->> get immediate benefits (the PMU code, being extremely trap-happy,
->> benefits immediately from this).
->>
->> With these in place, I see an improvement of 20 to 30% (depending on
->> the platform) on our world-switch cycle count when running a set of
->> hand-crafted guests that are designed to only perform traps.
->>
-> 
-> By the way, I took this whole stack of changes (wsinc, vhe, and
-> optimizations) and ran it on Mustang and fired up UEFI and did a reboot
-> and things seem to work, so that's a small shallow
-> 'tested-by-something-else-than-a-linux-guest' statement from me.
+From: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
 
-I've ran a slightly heavier set of tests, and the infamous reboot loop
-broke, thanks to patch #7.
+Due to Errata in ThunderX, HOST_IRQ_STAT should be
+cleared before leaving the interrupt handler.
+The patch attempts to satisfy the need.
 
-Notice how we fail to wipe the vgic_apr copy on the "light" exit path?
-If you're unlucky (and odds are that you will be), you will inject an
-interrupt while its active priority bit is set, and the new interrupt
-won't be delivered. Bah.
+Changes from V2:
+	- removed newfile
+	- code is now under CONFIG_ARM64
 
-With that fixed, the reboot loop has been going strong for a few hours.
-I'll leave my Seattle cooking overnight and if everything looks good in
-the morning, I'll repost a new set of patches.
+Changes from V1:
+	- Rebased on top of libata/for-4.6
+        - Moved ThunderX intr handler to new file
 
-Thanks,
+Signed-off-by: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
+---
+ drivers/ata/ahci.c | 44 ++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
 
-	M.
+diff --git a/drivers/ata/ahci.c b/drivers/ata/ahci.c
+index 546a369..c8496fc 100644
+--- a/drivers/ata/ahci.c
++++ b/drivers/ata/ahci.c
+@@ -1325,6 +1325,44 @@ static inline void ahci_gtf_filter_workaround(struct ata_host *host)
+ {}
+ #endif
+ 
++#ifdef CONFIG_ARM64
++/* Due to ERRATA#22536, ThunderX need to handle
++ * HOST_IRQ_STAT differently.
++ * Work around is to make sure all pending IRQs
++ * are served before leaving handler
++ */
++static irqreturn_t ahci_thunderx_irq_handler(int irq, void *dev_instance)
++{
++	struct ata_host *host = dev_instance;
++	struct ahci_host_priv *hpriv;
++	unsigned int rc = 0;
++	void __iomem *mmio;
++	u32 irq_stat, irq_masked;
++	unsigned int handled = 1;
++
++	VPRINTK("ENTER\n");
++	hpriv = host->private_data;
++	mmio = hpriv->mmio;
++	irq_stat = readl(mmio + HOST_IRQ_STAT);
++	if (!irq_stat)
++		return IRQ_NONE;
++
++	do {
++		irq_masked = irq_stat & hpriv->port_map;
++		spin_lock(&host->lock);
++		rc = ahci_handle_port_intr(host, irq_masked);
++		if (!rc)
++			handled = 0;
++		writel(irq_stat, mmio + HOST_IRQ_STAT);
++		irq_stat = readl(mmio + HOST_IRQ_STAT);
++		spin_unlock(&host->lock);
++	} while (irq_stat);
++	VPRINTK("EXIT\n");
++
++	return IRQ_RETVAL(handled);
++}
++#endif
++
+ /*
+  * ahci_init_msix() - optionally enable per-port MSI-X otherwise defer
+  * to single msi.
+@@ -1560,6 +1598,12 @@ static int ahci_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
+ 	if (ahci_broken_devslp(pdev))
+ 		hpriv->flags |= AHCI_HFLAG_NO_DEVSLP;
+ 
++#ifdef CONFIG_ARM64
++	/* this should be done before save config*/
++	if (pdev->vendor == 0x177d && pdev->device == 0xa01c)
++		hpriv->irq_handler = ahci_thunderx_irq_handler;
++#endif
++
+ 	/* save initial config */
+ 	ahci_pci_save_initial_config(pdev, hpriv);
+ 
 -- 
-Jazz is not dead. It just smells funny...
+2.1.0
