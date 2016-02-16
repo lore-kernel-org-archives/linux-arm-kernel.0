@@ -1,33 +1,131 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 16 Feb 2016 18:16:58 +0000
-Subject: [PATCH v3 02/12] irqchip: armada-370-xp: do not enable it by
- default when ARCH_MVEBU is selected
-In-Reply-To: <1454951660-13289-3-git-send-email-gregory.clement@free-electrons.com>
-References: <1454951660-13289-1-git-send-email-gregory.clement@free-electrons.com>
- <1454951660-13289-3-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20160216181658.GH5183@io.lakedaemon.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 16 Feb 2016 18:20:05 +0000
+Subject: [PATCHv3] arm64: Rework valid_user_regs
+In-Reply-To: <1455646517-22903-1-git-send-email-mark.rutland@arm.com>
+References: <1455646517-22903-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <20160216182005.GN14509@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Gregory,
-
-On Mon, Feb 08, 2016 at 06:14:10PM +0100, Gregory CLEMENT wrote:
-> The irq-armada-370-xp driver can only be built for ARM 32 bits. The mvebu
-> family had grown with a new ARM64 SoC which will also select the
-> ARCH_MEVBU configuration. Since "ARM: mvebu: use the ARMADA_370_XP_IRQ
-> option", the ARM32 mvebu SoC directly select this new option. Selecting
-> it by default when ARCH_MEVBU is selected is no more needed.
+On Tue, Feb 16, 2016 at 06:15:17PM +0000, Mark Rutland wrote:
+> We validate pstate using PSR_MODE32_BIT, which is part of the
+> user-provided pstate (and cannot be trusted). Also, we conflate
+> validation of AArch32 and AArch64 pstate values, making the code
+> difficult to reason about.
 > 
-> This patch removes this dependency, thanks to this, a kernel for ARM64
-> mvebu SoC can be built without error due this driver.
+> Instead, validate the pstate value based on the associated task. The
+> task may or may not be current (e.g. when using ptrace), so this must be
+> passed explicitly by callers. To avoid circular header dependencies via
+> sched.h, is_compat_task is pulled out of asm/ptrace.h.
 > 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> To make the code possible to reason about, the AArch64 and AArch32
+> validation is split into separate functions. Software must respect the
+> RES0 policy for SPSR bits, and thus the kernel mirrors the hardware
+> policy (RAZ/WI) for bits as-yet unallocated. When these acquire an
+> architected meaning writes may be permitted (potentially with additional
+> validation).
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Dave Martin <dave.martin@arm.com>
+> Cc: James Morse <james.morse@arm.com>
+> Cc: Peter Maydell <peter.maydell@linaro.org>
+> Cc: Will Deacon <will.deacon@arm.com>
 > ---
->  drivers/irqchip/Kconfig | 1 -
->  1 file changed, 1 deletion(-)
+>  arch/arm64/include/asm/ptrace.h | 33 +++---------------
+>  arch/arm64/kernel/ptrace.c      | 77 +++++++++++++++++++++++++++++++++++++++--
+>  arch/arm64/kernel/signal.c      |  4 +--
+>  arch/arm64/kernel/signal32.c    |  2 +-
+>  4 files changed, 82 insertions(+), 34 deletions(-)
 
-Applied to irqchip/mvebu
+[...]
 
-thx,
+> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+> index ff7f132..5026ffb 100644
+> --- a/arch/arm64/kernel/ptrace.c
+> +++ b/arch/arm64/kernel/ptrace.c
+> @@ -500,7 +500,7 @@ static int gpr_set(struct task_struct *target, const struct user_regset *regset,
+>  	if (ret)
+>  		return ret;
+>  
+> -	if (!valid_user_regs(&newregs))
+> +	if (!valid_user_regs(&newregs, target))
+>  		return -EINVAL;
+>  
+>  	task_pt_regs(target)->user_regs = newregs;
+> @@ -770,7 +770,7 @@ static int compat_gpr_set(struct task_struct *target,
+>  
+>  	}
+>  
+> -	if (valid_user_regs(&newregs.user_regs))
+> +	if (valid_user_regs(&newregs.user_regs, target))
+>  		*task_pt_regs(target) = newregs;
+>  	else
+>  		ret = -EINVAL;
+> @@ -1272,3 +1272,76 @@ asmlinkage void syscall_trace_exit(struct pt_regs *regs)
+>  	if (test_thread_flag(TIF_SYSCALL_TRACE))
+>  		tracehook_report_syscall(regs, PTRACE_SYSCALL_EXIT);
+>  }
+> +
+> +/*
+> + * Bits which are always architecturally RES0 per ARM DDI 0487A.h
+> + * Userspace cannot use these until they have an architectural meaning.
+> + * We also reserve IL for the kernel; SS is handled dynamically.
+> + */
+> +#define SPSR_EL1_AARCH64_RES0_BITS \
+> +	(GENMASK_ULL(63,32) | GENMASK_ULL(27, 22) | GENMASK_ULL(20, 10) | \
+> +	 GENMASK_ULL(5, 5))
+> +#define SPSR_EL1_AARCH32_RES0_BITS \
+> +	(GENMASK_ULL(63,32) | GENMASK_ULL(24, 22) | GENMASK_ULL(20,20))
+> +
+> +static int valid_compat_regs(struct user_pt_regs *regs)
+> +{
+> +	regs->pstate &= ~SPSR_EL1_AARCH32_RES0_BITS;
+> +
+> +	if (!system_supports_mixed_endian_el0()) {
+> +		if (IS_ENABLED(CONFIG_CPU_BIG_ENDIAN))
+> +			regs->pstate |= COMPAT_PSR_E_BIT;
+> +		else
+> +			regs->pstate &= ~COMPAT_PSR_E_BIT;
+> +	}
+> +
+> +	if (user_mode(regs) && (regs->pstate & PSR_MODE32_BIT) &&
+> +	    (regs->pstate & COMPAT_PSR_A_BIT) == 0 &&
+> +	    (regs->pstate & COMPAT_PSR_I_BIT) == 0 &&
+> +	    (regs->pstate & COMPAT_PSR_F_BIT) == 0) {
+> +		return 1;
+> +	}
+> +
+> +	/* Force PSR to a valid 32-bit EL0t */
+> +	regs->pstate &= COMPAT_PSR_N_BIT | COMPAT_PSR_Z_BIT |
+> +			COMPAT_PSR_C_BIT | COMPAT_PSR_V_BIT |
+> +			COMPAT_PSR_Q_BIT | COMPAT_PSR_IT_MASK |
+> +			COMPAT_PSR_GE_MASK | COMPAT_PSR_E_BIT |
+> +			COMPAT_PSR_T_BIT;
+> +	regs->pstate |= PSR_MODE32_BIT;
 
-Jason.
+Might be worth an explicit comment to say that we're mirroring arch/arm/
+behaviour here.
+
+> +
+> +	return 0;
+> +}
+> +
+> +static int valid_native_regs(struct user_pt_regs *regs)
+> +{
+> +	regs->pstate &= ~SPSR_EL1_AARCH64_RES0_BITS;
+> +
+> +	if (user_mode(regs) && !(regs->pstate & PSR_MODE32_BIT) &&
+> +	    (regs->pstate & PSR_D_BIT) == 0 &&
+> +	    (regs->pstate & PSR_A_BIT) == 0 &&
+> +	    (regs->pstate & PSR_I_BIT) == 0 &&
+> +	    (regs->pstate & PSR_F_BIT) == 0) {
+> +		return 1;
+> +	}
+> +
+> +	/* Force PSR to a valid 64-bit EL0t */
+> +	regs->pstate &= PSR_N_BIT | PSR_Z_BIT | PSR_C_BIT | PSR_V_BIT;
+
+Can we not just zap the pstate to PSR_MODE_EL0t and be done with it?
+
+Will
