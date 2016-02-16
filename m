@@ -1,59 +1,38 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 16 Feb 2016 16:00:55 +0000
-Subject: [PATCH v2] arm64: add alignment fault hanling
-In-Reply-To: <20160216122153.GD19413@e104818-lin.cambridge.arm.com>
-References: <329817481.954581455597874663.JavaMail.weblogic@epmlwas08c>
- <20160216103104.GC14509@arm.com> <56C300AD.8070505@arm.com>
- <20160216122153.GD19413@e104818-lin.cambridge.arm.com>
-Message-ID: <20160216160055.GH14509@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 16 Feb 2016 17:03:26 +0100
+Subject: [PATCH 1/2] ARM: mm: DEBUG_RODATA makes no sense with XIP_KERNEL
+Message-ID: <1455638631-3326518-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 16, 2016 at 12:21:53PM +0000, Catalin Marinas wrote:
-> On Tue, Feb 16, 2016 at 10:57:49AM +0000, Robin Murphy wrote:
-> > On 16/02/16 10:31, Will Deacon wrote:
-> > >On Tue, Feb 16, 2016 at 04:44:35AM +0000, EunTaik Lee wrote:
-> > >>Userspace memory is mapped as below:
-> > >>F2A7F000--F2A7FFFF Normal Memory
-> > >>F2A80000--F2A80FFF Device nGnRnE
-> > >>
-> > >>And that userspace application makes a system call
-> > >>as below:
-> > >>
-> > >>-009 |do_strncpy_from_user(inline)
-> > >>-009 |strncpy_from_user()
-> > >>-010 |getname_flags()
-> > >>-011 |user_path_at_empty()
-> > >>-012 |user_path_at()
-> > >>-013 |SYSC_faccessat(inline)
-> > >>-013 |sys_faccessat()
-> > >>-014 |__sys_trace(asm)
-> > >>  --> |exception
-> > >>
-> > >>The string spans from 0xF2A7FFC1 to 0xF2A7FFFB.
-> > >>
-> > >>When do_strncpy_from_user() reads the last (unsigned long)
-> > >>value, the alignement fault is triggered. The 8 byte
-> > >>from 0xF2A7FFC1 spans to the next page that is mapped as
-> > >>Device nGnRnE, which does not allow an unaligned access,
-> > >>causes the abort.
-> > >>
-> > >>The instruction which caused the alignment fault is registered
-> > >>in the fixup table but the exception handler does not reach there.
-> > >>
-> > >>This patch registers a alignment fault handler and fixes up the
-> > >>pc if appropriate.
-> > >
-> > >As discussed with Catalin previously, we should solve this by adding a
-> > >guard page rather than handling the fault.
-> 
-> I don't think we can trivially add this without implementing an arm64
-> specific arch_get_unmapped_area().
+When CONFIG_DEBUG_ALIGN_RODATA is set, we get a link error:
 
-Even overriding arch_get_unmapped_area doesn't help as much as you might
-like since, in the case of something like /dev/mem, the memory is remapped
-using remap_pfn_range later on, so you can't necessarily tell what the
-final attributes are likely to be when you initially allocate the virtual
-space.
+arch/arm/mm/built-in.o:(.data+0x4bc): undefined reference to `__start_rodata_section_aligned'
 
-Will
+However, this combination is useless, as XIP_KERNEL implies that all the
+RODATA is already marked readonly, so both CONFIG_DEBUG_RODATA and
+CONFIG_DEBUG_ALIGN_RODATA (which depends on the other) are not
+needed with XIP_KERNEL, and this patches enforces that using a Kconfig
+dependency.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 25362dc496ed ("ARM: 8501/1: mm: flip priority of CONFIG_DEBUG_RODATA")
+---
+ arch/arm/mm/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index fbf2296388ce..8894045caba9 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -1039,7 +1039,7 @@ config ARCH_SUPPORTS_BIG_ENDIAN
+ 
+ config DEBUG_RODATA
+ 	bool "Make kernel text and rodata read-only"
+-	depends on MMU
++	depends on MMU && !XIP_KERNEL
+ 	default y if CPU_V7
+ 	help
+ 	  If this is set, kernel text and rodata memory will be made
+-- 
+2.7.0
