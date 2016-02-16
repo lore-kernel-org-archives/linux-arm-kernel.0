@@ -1,94 +1,69 @@
-From: niklas.soderlund+renesas@ragnatech.se (=?UTF-8?q?Niklas=20S=C3=B6derlund?=)
-Date: Tue, 16 Feb 2016 21:39:42 +0100
-Subject: [PATCH v4 6/8] dmaengine: rcar-dmac: add iommu support for slave
- transfers
-In-Reply-To: <1455655184-14478-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
-References: <1455655184-14478-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
-Message-ID: <1455655184-14478-7-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 16 Feb 2016 15:41:41 -0500 (EST)
+Subject: [PATCH] ARM: drop unused DEBUG_RODATA from XIP_KERNEL
+In-Reply-To: <20160216202957.GA1826@www.outflux.net>
+References: <20160216202957.GA1826@www.outflux.net>
+Message-ID: <alpine.LFD.2.20.1602161539550.13632@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable slave transfers to devices behind IPMMU:s by mapping the slave
-addresses using the dma-mapping API.
+On Tue, 16 Feb 2016, Kees Cook wrote:
 
-Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
----
- drivers/dma/sh/rcar-dmac.c | 52 +++++++++++++++++++++++++++++++++++++++++-----
- 1 file changed, 47 insertions(+), 5 deletions(-)
+> With CONFIG_DEBUG_RODATA not being sensible under XIP_KERNEL, remove it
+> from the XIP linker script.
 
-diff --git a/drivers/dma/sh/rcar-dmac.c b/drivers/dma/sh/rcar-dmac.c
-index 743873c..6a24847 100644
---- a/drivers/dma/sh/rcar-dmac.c
-+++ b/drivers/dma/sh/rcar-dmac.c
-@@ -1106,21 +1106,63 @@ rcar_dmac_prep_dma_cyclic(struct dma_chan *chan, dma_addr_t buf_addr,
- 	return desc;
- }
- 
-+static int rcar_dmac_set_slave_addr(struct dma_chan *chan,
-+				     struct rcar_dmac_chan_slave *slave,
-+				     phys_addr_t addr, size_t size)
-+{
-+	enum dma_data_direction dir;
-+
-+	/*
-+	 * We can't know the direction at this time, see documentation for
-+	 * 'direction' in struct dma_slave_config.
-+	 */
-+	dir = DMA_BIDIRECTIONAL;
-+
-+	if (slave->xfer_size) {
-+		dma_unmap_resource(chan->device->dev, slave->slave_addr,
-+				   slave->xfer_size, dir, NULL);
-+		slave->slave_addr = 0;
-+		slave->xfer_size = 0;
-+	}
-+
-+	if (size) {
-+		slave->slave_addr = dma_map_resource(chan->device->dev, addr,
-+				size, dir, NULL);
-+
-+		if (dma_mapping_error(chan->device->dev, slave->slave_addr)) {
-+			struct rcar_dmac_chan *rchan = to_rcar_dmac_chan(chan);
-+
-+			dev_err(chan->device->dev,
-+				"chan%u: failed to map %zx@%pap", rchan->index,
-+				size, &addr);
-+			return -EIO;
-+		}
-+
-+		slave->xfer_size = size;
-+	}
-+
-+	return 0;
-+}
-+
- static int rcar_dmac_device_config(struct dma_chan *chan,
- 				   struct dma_slave_config *cfg)
- {
- 	struct rcar_dmac_chan *rchan = to_rcar_dmac_chan(chan);
-+	int ret;
- 
- 	/*
- 	 * We could lock this, but you shouldn't be configuring the
- 	 * channel, while using it...
- 	 */
--	rchan->src.slave_addr = cfg->src_addr;
--	rchan->dst.slave_addr = cfg->dst_addr;
--	rchan->src.xfer_size = cfg->src_addr_width;
--	rchan->dst.xfer_size = cfg->dst_addr_width;
- 
--	return 0;
-+	ret = rcar_dmac_set_slave_addr(chan, &rchan->src, cfg->src_addr,
-+				       cfg->src_addr_width);
-+	if (ret)
-+		return ret;
-+
-+	ret = rcar_dmac_set_slave_addr(chan, &rchan->dst, cfg->dst_addr,
-+				       cfg->dst_addr_width);
-+	return ret;
- }
- 
- static int rcar_dmac_chan_terminate_all(struct dma_chan *chan)
--- 
-2.7.1
+If so you should also make DEBUG_RODATA depend on !XIP_KERNEL in Kconfig 
+to avoid offering a config option that does nothing.
+
+> Signed-off-by: Kees Cook <keescook@chromium.org>
+> ---
+> Effectively the patch after Arnd's "ARM: mm: hide
+> __start_rodata_section_aligned for non-debug builds"
+> ---
+>  arch/arm/kernel/vmlinux-xip.lds.S | 10 ----------
+>  1 files changed, 0 insertions(+), 10 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/vmlinux-xip.lds.S b/arch/arm/kernel/vmlinux-xip.lds.S
+> index 40bc4cadb959..cba1ec899a69 100644
+> --- a/arch/arm/kernel/vmlinux-xip.lds.S
+> +++ b/arch/arm/kernel/vmlinux-xip.lds.S
+> @@ -8,9 +8,6 @@
+>  #include <asm/thread_info.h>
+>  #include <asm/memory.h>
+>  #include <asm/page.h>
+> -#ifdef CONFIG_DEBUG_RODATA
+> -#include <asm/pgtable.h>
+> -#endif
+>  
+>  #define PROC_INFO							\
+>  	. = ALIGN(4);							\
+> @@ -92,10 +89,6 @@ SECTIONS
+>  		HEAD_TEXT
+>  	}
+>  
+> -#ifdef CONFIG_DEBUG_RODATA
+> -	. = ALIGN(1<<SECTION_SHIFT);
+> -#endif
+> -
+>  	.text : {			/* Real text segment		*/
+>  		_stext = .;		/* Text and read-only data	*/
+>  			IDMAP_TEXT
+> @@ -115,9 +108,6 @@ SECTIONS
+>  			ARM_CPU_KEEP(PROC_INFO)
+>  	}
+>  
+> -#ifdef CONFIG_DEBUG_RODATA
+> -	. = ALIGN(1<<SECTION_SHIFT);
+> -#endif
+>  	RO_DATA(PAGE_SIZE)
+>  
+>  	. = ALIGN(4);
+> -- 
+> 2.6.3
+> 
+> 
+> -- 
+> Kees Cook
+> Chrome OS & Brillo Security
+> 
+> 
