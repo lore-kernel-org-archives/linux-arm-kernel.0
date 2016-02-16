@@ -1,29 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 16 Feb 2016 10:17:52 +0100
-Subject: [PATCH] branch tracer: fix freak link error
-In-Reply-To: <20160215152639.7795795c@gandalf.local.home>
-References: <1455312410-1058841-1-git-send-email-arnd@arndb.de>
- <2535125.MjntUgx4sh@wuerfel> <20160215152639.7795795c@gandalf.local.home>
-Message-ID: <3821446.rAiXri9yEZ@wuerfel>
+From: jay.xu@rock-chips.com (jianqun.xu)
+Date: Tue, 16 Feb 2016 17:22:18 +0800
+Subject: [PATCH] spi/rockchip: Add dt-binding for Rockchip rk3399 spi
+Message-ID: <1455614538-4415-1-git-send-email-jay.xu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 15 February 2016 15:26:39 Steven Rostedt wrote:
-> On Mon, 15 Feb 2016 21:15:39 +0100
-> Arnd Bergmann <arnd@arndb.de> wrote:
-> 
-> > Do you also want to add a 'Cc: stable at vger.kernel.org' tag?
-> > 
-> 
-> I currently have this in the Tags:
-> 
->     Acked-by: Nicolas Pitre <nico@linaro.org>
->     Fixes: ab3c9c686e22 ("branch tracer, intel-iommu: fix build with CONFIG_BRANCH_TRACER=y")
->     Cc: stable at vger.kernel.org # v2.6.30+
->     Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->     Signed-off-by: Steven Rostedt <rostedt@goodmis.org>
-> 
+From: Xu Jianqun <jay.xu@rock-chips.com>
 
-Looks good, thanks!
+Add compatible support for Rockchip rk3399 spi.
 
-	Arnd
+Signed-off-by: Xu Jianqun <jay.xu@rock-chips.com>
+---
+ Documentation/devicetree/bindings/spi/spi-rockchip.txt | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/Documentation/devicetree/bindings/spi/spi-rockchip.txt b/Documentation/devicetree/bindings/spi/spi-rockchip.txt
+index 0c491bd..1b14d69 100644
+--- a/Documentation/devicetree/bindings/spi/spi-rockchip.txt
++++ b/Documentation/devicetree/bindings/spi/spi-rockchip.txt
+@@ -9,6 +9,7 @@ Required Properties:
+     "rockchip,rk3066-spi" for rk3066.
+     "rockchip,rk3188-spi", "rockchip,rk3066-spi" for rk3188.
+     "rockchip,rk3288-spi", "rockchip,rk3066-spi" for rk3288.
++    "rockchip,rk3399-spi", "rockchip,rk3066-spi" for rk3399.
+ - reg: physical base address of the controller and length of memory mapped
+        region.
+ - interrupts: The interrupt number to the cpu. The interrupt specifier format
+-- 
+1.9.1
