@@ -1,43 +1,29 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 16 Feb 2016 12:35:42 -0800
-Subject: [PATCH] arm64: mm: Mark .rodata as RO
-In-Reply-To: <56C36EFF.9060900@labbott.name>
-References: <1455293599-6974-1-git-send-email-jeremy.linton@arm.com>
- <20160212182527.GG20262@leverpostej>
- <CAGXu5jLpj=ue49_N+LOYvtZcU3rpFR5=WTG15ySDOWprvRzFUA@mail.gmail.com>
- <56C36EFF.9060900@labbott.name>
-Message-ID: <CAGXu5j+4uYjTjULw7hzdaYhN+JGqtybEpyT2Cihuj-2gXe=saA@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 16 Feb 2016 15:37:58 -0500 (EST)
+Subject: [PATCH] bridge: mdb: avoid uninitialized variable warning
+In-Reply-To: <1455116946-2948649-1-git-send-email-arnd@arndb.de>
+References: <1455116946-2948649-1-git-send-email-arnd@arndb.de>
+Message-ID: <20160216.153758.1508523820142527071.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 16, 2016 at 10:48 AM, Laura Abbott <laura@labbott.name> wrote:
-> On 2/16/16 10:10 AM, Kees Cook wrote:
->>
->> On Fri, Feb 12, 2016 at 10:25 AM, Mark Rutland <mark.rutland@arm.com>
->> wrote:
->>>
->>> On Fri, Feb 12, 2016 at 10:13:19AM -0600, Jeremy Linton wrote:
->>>>
->>>> Currently the .rodata section is actually still executable when
->>>> DEBUG_RODATA
->>>> is enabled. This changes that so the .rodata is actually read only, no
->>>> execute.
->>>>
->>>> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
->>
->>
->> Yikes, good catch. Is anyone running the lkdtm tests that check these
->> things?
->>
->
-> I don't think the current lkdtm test would have caught this since the exec
-> test is using rw data and not ro data. That test could be expanded though
-> to include a rodata buffer as well.
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Wed, 10 Feb 2016 16:09:02 +0100
 
-Oh, yeah, excellent point. I'll send a patch.
+> A recent change to the mdb code confused the compiler to the point
+> where it did not realize that the port-group returned from
+> br_mdb_add_group() is always valid when the function returns a nonzero
+> return value, so we get a spurious warning:
+> 
+> net/bridge/br_mdb.c: In function 'br_mdb_add':
+> net/bridge/br_mdb.c:542:4: error: 'pg' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+>     __br_mdb_notify(dev, entry, RTM_NEWMDB, pg);
+> 
+> Slightly rearranging the code in br_mdb_add_group() makes the problem
+> go away, as gcc is clever enough to see that both functions check
+> for 'ret != 0'.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 9e8430f8d60d ("bridge: mdb: Passing the port-group pointer to br_mdb module")
 
--Kees
-
--- 
-Kees Cook
-Chrome OS & Brillo Security
+Applied, thanks Arnd.
