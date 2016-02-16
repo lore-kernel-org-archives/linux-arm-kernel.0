@@ -1,24 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 16 Feb 2016 15:36:03 +0100
-Subject: [PATCH 0/3] ARM: stm32: Introduce support for STM32F469
-In-Reply-To: <1455632221-31834-1-git-send-email-lee.jones@linaro.org>
-References: <1455632221-31834-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <8086636.p5SR2hZz49@wuerfel>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 16 Feb 2016 15:37:02 +0100
+Subject: [PATCH] spi/rockchip: Add dt-binding for Rockchip rk3399 spi
+In-Reply-To: <20160216132223.GM18327@sirena.org.uk>
+References: <1455614538-4415-1-git-send-email-jay.xu@rock-chips.com>
+ <20160216132223.GM18327@sirena.org.uk>
+Message-ID: <1730751.NYv1NxJVuB@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 16 February 2016 14:16:58 Lee Jones wrote:
-> Simple set using the STM32F429 infrastructure as a foundation.
-> There will be more changes to the DTS files and a requirement for
-> added hierarchical layering as more differences become apparent.
+Am Dienstag, 16. Februar 2016, 13:22:23 schrieb Mark Brown:
+> On Tue, Feb 16, 2016 at 05:22:18PM +0800, jianqun.xu wrote:
+> >  Documentation/devicetree/bindings/spi/spi-rockchip.txt | 1 +
+> >  1 file changed, 1 insertion(+)
 > 
-> Lee Jones (3):
->   ARM: stm32: Supply a DTS file for the STM32F469 Discovery board
->   ARM: configs: Add new config fragment to change RAM start point
->   ARM: stm32: Identify a new board - STM32F469
-> 
+> I'd expect this to be added to both the driver and the binding document
+> not just the document.
 
-Looks good to me. It's the first use of Kconfig fragments we have on ARM,
-but it seems justified.
+It seems the driver can still use the rk3066-variant - aka nobody has found 
+specific issues in the rk3399 IP implementation.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de
+Having the more specific IP names already in the dts before actually using 
+them was suggested by devicetree people to not have to exchange everything 
+once specific issues were found. 
+
+So right now it's using the fallback-mechanism of binding to the rk3066 
+name, but if some obstacle appears it will only take adding the binding in 
+the driver to make it work (even with old devicetrees).
