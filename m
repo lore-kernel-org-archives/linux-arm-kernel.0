@@ -1,43 +1,43 @@
-From: afd@ti.com (Andrew F. Davis)
-Date: Tue, 16 Feb 2016 10:14:48 -0600
-Subject: [PATCH] iio: health/afe4403: select REGMAP_SPI
-In-Reply-To: <1455637959-3169264-1-git-send-email-arnd@arndb.de>
-References: <1455637959-3169264-1-git-send-email-arnd@arndb.de>
-Message-ID: <56C34AF8.7080104@ti.com>
+From: tiwai@suse.de (Takashi Iwai)
+Date: Tue, 16 Feb 2016 17:18:29 +0100
+Subject: [PATCH] sound: hdmi: avoid dereferencing uninitialized 'jack'
+ pointer
+In-Reply-To: <2573932.AU4HSxN0NE@wuerfel>
+References: <1455634059-1896914-1-git-send-email-arnd@arndb.de>
+ <s5hbn7g7izt.wl-tiwai@suse.de> <2573932.AU4HSxN0NE@wuerfel>
+Message-ID: <s5h4md87hnu.wl-tiwai@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/16/2016 09:52 AM, Arnd Bergmann wrote:
-> The newly added afe4403 driver uses the regmap facility to abstract
-> the I2C and SPI access. However, it fails to ensure that regmap_spi
-> is actually present:
->
-> drivers/iio/built-in.o: In function `afe4403_probe':
-> :(.text+0x9bf8): undefined reference to `__devm_regmap_init_spi'
->
-> This adds a Kconfig select statement like the afe4404 I2C driver
-> has.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: eec96d1e2d31 ("iio: health: Add driver for the TI AFE4403 heart monitor")
-> ---
->   drivers/iio/health/Kconfig | 1 +
->   1 file changed, 1 insertion(+)
->
-> diff --git a/drivers/iio/health/Kconfig b/drivers/iio/health/Kconfig
-> index f0c19779ac27..c5f004a8e447 100644
-> --- a/drivers/iio/health/Kconfig
-> +++ b/drivers/iio/health/Kconfig
-> @@ -10,6 +10,7 @@ menu "Heart Rate Monitors"
->   config AFE4403
->   	tristate "TI AFE4403 Heart Rate Monitor"
->   	depends on SPI_MASTER
-> +	select REGMAP_SPI
->   	select IIO_BUFFER
->   	select IIO_TRIGGERED_BUFFER
->   	help
->
+On Tue, 16 Feb 2016 17:09:43 +0100,
+Arnd Bergmann wrote:
+> 
+> On Tuesday 16 February 2016 16:49:42 Takashi Iwai wrote:
+> > 
+> > Thanks for the patch.  But I think it's cleaner to fix Kconfig.
+> > 
+> > Thinking more of it, maybe splitting jack stuff as a separate module
+> > and does reverse-select to CONFIG_INPUT would be better.  Then its
+> > users can select simply SND_JACK, and everything would fit.
+> > 
+> > 
+> 
+> Adding 'select INPUT' is rather nasty, I think that can lead to circular
+> dependencies, and would likely upset users of small embedded systems
+> that want to use audio but don't want to use input.
 
-Oversight on my part, thanks for fix.
+Fair enough.
 
-Acked-by: Andrew F. Davis <afd@ti.com>
+> Generally speaking, I would recommend never using 'select' on a user
+> visible Kconfig symbol.
+>
+> Another option might would be to change snd_jack_new() to return
+> an error if that SND_JACK is disabled, and then require all users
+> to handle the error gracefully, i.e. not fail the probe() function
+> but just not use the jack.
+
+Yes, I thought of that, too.  If select is no good option, it's a good
+alternative, indeed.
+
+
+Takashi
