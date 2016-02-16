@@ -1,50 +1,59 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Tue, 16 Feb 2016 08:33:41 -0800
-Subject: [PATCH 2/3] serial: xuartps: Enable OF earlycon support
-In-Reply-To: <23ab10a19b21df2ef17a5bb6ce2a70d2d3fd3551.1455552315.git.michal.simek@xilinx.com>
-References: <67c9013fc61f53515934b54847a05df8b8e1504a.1455552315.git.michal.simek@xilinx.com>
- <23ab10a19b21df2ef17a5bb6ce2a70d2d3fd3551.1455552315.git.michal.simek@xilinx.com>
-Message-ID: <56C34F65.1040506@hurleysoftware.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 16 Feb 2016 17:33:18 +0100
+Subject: [PATCH] net: igmp: use IS_ENABLED(CONFIG_IP_MULTICAST) instead of
+ ifdef
+In-Reply-To: <56C34A0C.9040207@kyup.com>
+References: <1455638393-3269483-1-git-send-email-arnd@arndb.de>
+ <56C34A0C.9040207@kyup.com>
+Message-ID: <13046365.7R7s0XiHQi@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michal,
-
-On 02/15/2016 08:05 AM, Michal Simek wrote:
-> Support early console setup via DT for all listed compatible strings.
+On Tuesday 16 February 2016 18:10:52 Nikolay Borisov wrote:
+> On 02/16/2016 05:59 PM, Arnd Bergmann wrote:
+> > @@ -1821,17 +1807,15 @@ static int ip_mc_del_src(struct in_device *in_dev, __be32 *pmca, int sfmode,
+> >  		if (!err && rv < 0)
+> >  			err = rv;
+> >  	}
+> > -	if (pmc->sfmode == MCAST_EXCLUDE &&
+> > +	if (IS_ENABLED(CONFIG_IP_MULTICAST) &&
+> > +	    pmc->sfmode == MCAST_EXCLUDE &&
+> >  	    pmc->sfcount[MCAST_EXCLUDE] == 0 &&
+> >  	    pmc->sfcount[MCAST_INCLUDE]) {
+> > -#ifdef CONFIG_IP_MULTICAST
+> >  		struct ip_sf_list *psf;
+> >  		struct net *net = dev_net(in_dev->dev);
+> > -#endif
+> >  
+> >  		/* filter mode change */
+> >  		pmc->sfmode = MCAST_INCLUDE;
 > 
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-> ---
+> The above line was always executed, whereas now it wouldn't execute
+> unless IS_ENABLED passes.
+
+This was not intentional, I've sent a v2 patch to fix it up now, and
+tried to simplify it a little further, making the logic the
+same for  ip_mc_del_src and ip_mc_add_src.
+
+> >  /*
+> >   * Add multicast source filter list to the interface list
+> > @@ -1977,9 +1961,7 @@ static int ip_mc_add_src(struct in_device *in_dev, __be32 *pmca, int sfmode,
+> >  	spin_lock_bh(&pmc->lock);
+> >  	rcu_read_unlock();
+> >  
+> > -#ifdef CONFIG_IP_MULTICAST
+> >  	sf_markstate(pmc);
+> > -#endif
 > 
->  drivers/tty/serial/xilinx_uartps.c | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
-> index 009e0dbc12d2..6f5657766815 100644
-> --- a/drivers/tty/serial/xilinx_uartps.c
-> +++ b/drivers/tty/serial/xilinx_uartps.c
-> @@ -1094,6 +1094,9 @@ static int __init cdns_early_console_setup(struct earlycon_device *device,
->  	return 0;
->  }
->  EARLYCON_DECLARE(cdns, cdns_early_console_setup);
-> +OF_EARLYCON_DECLARE(cdns_a, "xlnx,xuartps", cdns_early_console_setup);
-> +OF_EARLYCON_DECLARE(cdns_b, "cdns,uart-r1p8", cdns_early_console_setup);
-> +OF_EARLYCON_DECLARE(cdns_c, "cdns,uart-r1p12", cdns_early_console_setup);
+> This would be executed unconditionally, which is contrary to the
+> original intention. Dunno if it makes a difference though.
 
-Earlycon now shares a common framework in linux-next.
+This was intentional, I have changed sf_markstate() to do nothing when
+IP_MULTICAST is disabled. However, there was another caller where
+I should have done the same thing rather than adding an if().
 
-The EARLYCON_DECLARE() can be deleted and the OF_EARLYCON_DECLARE()
-can all share the same earlycon name. iow,
+> Reviewed-by: Nikolay Borisov <kernel@kyup.com>
 
--EARLYCON_DECLARE(cdns, cdns_early_console_setup);
-+OF_EARLYCON_DECLARE(cdns, "xlnx,xuartps", cdns_early_console_setup);
-+OF_EARLYCON_DECLARE(cdns, "cdns,uart-r1p8", cdns_early_console_setup);
-+OF_EARLYCON_DECLARE(cdns, "cdns,uart-r1p12", cdns_early_console_setup);
+Thanks!
 
-Regards,
-Peter Hurley
-
-
->  /**
->   * cdns_uart_console_write - perform write operation
-> 
+	Arnd
