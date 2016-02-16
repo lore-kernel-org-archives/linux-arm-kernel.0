@@ -1,80 +1,75 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 16 Feb 2016 15:56:55 +0100
-Subject: [PATCH 02/11] iommu: exynos: add support for IOMMU_DOMAIN_DMA domain
- type
+Date: Tue, 16 Feb 2016 15:56:54 +0100
+Subject: [PATCH 01/11] iommu: exynos: rework iommu group initialization
 In-Reply-To: <1455634624-18130-1-git-send-email-m.szyprowski@samsung.com>
 References: <1455634624-18130-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1455634624-18130-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1455634624-18130-2-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for DMA domain type. Such domain have DMA cookie
-prepared and can be used by generic DMA-IOMMU glue layer.
+This patch replaces custom code in add_device implementation with
+iommu_group_get_for_dev() call and provides the needed callback.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/iommu/exynos-iommu.c | 19 +++++++++++++++----
- 1 file changed, 15 insertions(+), 4 deletions(-)
+ drivers/iommu/exynos-iommu.c | 27 ++++++++++++++++-----------
+ 1 file changed, 16 insertions(+), 11 deletions(-)
 
 diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index 4fc0790..595e0da 100644
+index 97c41b8..4fc0790 100644
 --- a/drivers/iommu/exynos-iommu.c
 +++ b/drivers/iommu/exynos-iommu.c
-@@ -25,9 +25,9 @@
- #include <linux/platform_device.h>
- #include <linux/pm_runtime.h>
- #include <linux/slab.h>
-+#include <linux/dma-iommu.h>
+@@ -1114,28 +1114,32 @@ static phys_addr_t exynos_iommu_iova_to_phys(struct iommu_domain *iommu_domain,
+ 	return phys;
+ }
  
- #include <asm/cacheflush.h>
--#include <asm/dma-iommu.h>
- #include <asm/pgtable.h>
- 
- typedef u32 sysmmu_iova_t;
-@@ -662,16 +662,21 @@ static struct iommu_domain *exynos_iommu_domain_alloc(unsigned type)
- 	struct exynos_iommu_domain *domain;
- 	int i;
- 
--	if (type != IOMMU_DOMAIN_UNMANAGED)
--		return NULL;
- 
- 	domain = kzalloc(sizeof(*domain), GFP_KERNEL);
- 	if (!domain)
- 		return NULL;
- 
-+	if (type == IOMMU_DOMAIN_DMA) {
-+		if (iommu_get_dma_cookie(&domain->domain) != 0)
-+			goto err_pgtable;
-+	} else if (type != IOMMU_DOMAIN_UNMANAGED) {
-+		goto err_pgtable;
-+	}
++static struct iommu_group *get_device_iommu_group(struct device *dev)
++{
++	struct iommu_group *group;
 +
- 	domain->pgtable = (sysmmu_pte_t *)__get_free_pages(GFP_KERNEL, 2);
- 	if (!domain->pgtable)
--		goto err_pgtable;
-+		goto err_dma_cookie;
- 
- 	domain->lv2entcnt = (short *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, 1);
- 	if (!domain->lv2entcnt)
-@@ -703,6 +708,9 @@ static struct iommu_domain *exynos_iommu_domain_alloc(unsigned type)
- 
- err_counter:
- 	free_pages((unsigned long)domain->pgtable, 2);
-+err_dma_cookie:
-+	if (type == IOMMU_DOMAIN_DMA)
-+		iommu_put_dma_cookie(&domain->domain);
- err_pgtable:
- 	kfree(domain);
- 	return NULL;
-@@ -727,6 +735,9 @@ static void exynos_iommu_domain_free(struct iommu_domain *iommu_domain)
- 
- 	spin_unlock_irqrestore(&domain->lock, flags);
- 
-+	if (iommu_domain->type == IOMMU_DOMAIN_DMA)
-+		iommu_put_dma_cookie(iommu_domain);
++	group = iommu_group_get(dev);
++	if (!group)
++		group = iommu_group_alloc();
 +
- 	for (i = 0; i < NUM_LV1ENTRIES; i++)
- 		if (lv1ent_page(domain->pgtable + i))
- 			kmem_cache_free(lv2table_kmem_cache,
++	return group;
++}
++
+ static int exynos_iommu_add_device(struct device *dev)
+ {
+ 	struct iommu_group *group;
+-	int ret;
+ 
+ 	if (!has_sysmmu(dev))
+ 		return -ENODEV;
+ 
+-	group = iommu_group_get(dev);
++	group = iommu_group_get_for_dev(dev);
+ 
+-	if (!group) {
+-		group = iommu_group_alloc();
+-		if (IS_ERR(group)) {
+-			dev_err(dev, "Failed to allocate IOMMU group\n");
+-			return PTR_ERR(group);
+-		}
+-	}
++	if (IS_ERR(group))
++		return PTR_ERR(group);
+ 
+-	ret = iommu_group_add_device(group, dev);
+ 	iommu_group_put(group);
+ 
+-	return ret;
++	return 0;
+ }
+ 
+ static void exynos_iommu_remove_device(struct device *dev)
+@@ -1182,6 +1186,7 @@ static struct iommu_ops exynos_iommu_ops = {
+ 	.unmap = exynos_iommu_unmap,
+ 	.map_sg = default_iommu_map_sg,
+ 	.iova_to_phys = exynos_iommu_iova_to_phys,
++	.device_group = get_device_iommu_group,
+ 	.add_device = exynos_iommu_add_device,
+ 	.remove_device = exynos_iommu_remove_device,
+ 	.pgsize_bitmap = SECT_SIZE | LPAGE_SIZE | SPAGE_SIZE,
 -- 
 1.9.2
