@@ -1,31 +1,50 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 16 Feb 2016 16:38:40 +0000
-Subject: [PATCH] sound: hdmi: avoid dereferencing uninitialized 'jack'
- pointer
-In-Reply-To: <s5h4md87hnu.wl-tiwai@suse.de>
-References: <1455634059-1896914-1-git-send-email-arnd@arndb.de>
- <s5hbn7g7izt.wl-tiwai@suse.de> <2573932.AU4HSxN0NE@wuerfel>
- <s5h4md87hnu.wl-tiwai@suse.de>
-Message-ID: <20160216163840.GA7544@sirena.org.uk>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 16 Feb 2016 17:18:52 +0100
+Subject: [PATCH net-next 08/10] bus: mvenus-mbus: Fix size test for
+ mvebu_mbus_get_dram_win_info
+In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6D1CCC5C65@AcuExch.aculab.com>
+ (David Laight's message of "Thu, 14 Jan 2016 14:00:21 +0000")
+References: <1452625834-22166-1-git-send-email-gregory.clement@free-electrons.com>
+ <1452625834-22166-9-git-send-email-gregory.clement@free-electrons.com>
+ <063D6719AE5E284EB5DD2968C1650D6D1CCC5C65@AcuExch.aculab.com>
+Message-ID: <87mvr0tyqb.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 16, 2016 at 05:18:29PM +0100, Takashi Iwai wrote:
-> Arnd Bergmann wrote:
+Hi David,
+ 
+ On jeu., janv. 14 2016, David Laight <David.Laight@ACULAB.COM> wrote:
 
-> > Another option might would be to change snd_jack_new() to return
-> > an error if that SND_JACK is disabled, and then require all users
-> > to handle the error gracefully, i.e. not fail the probe() function
-> > but just not use the jack.
+> From: Gregory CLEMENT
+>> Sent: 12 January 2016 19:11
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> ---
+>>  drivers/bus/mvebu-mbus.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>> 
+>> diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
+>> index 3d1c0c3880ec..214bb964165b 100644
+>> --- a/drivers/bus/mvebu-mbus.c
+>> +++ b/drivers/bus/mvebu-mbus.c
+>> @@ -964,7 +964,7 @@ int mvebu_mbus_get_dram_win_info(phys_addr_t phyaddr, u8 *target, u8 *attr)
+>>  	for (i = 0; i < dram->num_cs; i++) {
+>>  		const struct mbus_dram_window *cs = dram->cs + i;
+>> 
+>> -		if (cs->base <= phyaddr && phyaddr <= (cs->base + cs->size)) {
+>> +		if (cs->base <= phyaddr && phyaddr <= (cs->base + cs->size - 1)) {
+>
+> Wouldn't it be better to change the line to:
+>> +		if (cs->base <= phyaddr && phyaddr < (cs->base +
+>cs->size)) {
 
-> Yes, I thought of that, too.  If select is no good option, it's a good
-> alternative, indeed.
+It doesn't work if there is 4GB of memory in this case we can have
+cs->base + cs->size which wrap to 0 and the test fails. It was exactly
+what happened on Armada XP GP board.
 
-It's going to be a bunch of work to implement though.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160216/4932162c/attachment.sig>
+Gregory
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
