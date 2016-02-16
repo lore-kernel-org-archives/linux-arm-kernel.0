@@ -1,34 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 16 Feb 2016 16:45:28 +0100
-Subject: [PATCH 1/4] gpio: remove broken irq_to_gpio() interface
-In-Reply-To: <CACRpkdaQN9_qoTn4_riZGvi4BKRLEVkRRL4CWzKj8e_di7Q2Xg@mail.gmail.com>
-References: <20160202194831.10827.63244.stgit@bhelgaas-glaptop2.roam.corp.google.com>
- <1455551208-2825510-2-git-send-email-arnd@arndb.de>
- <CACRpkdaQN9_qoTn4_riZGvi4BKRLEVkRRL4CWzKj8e_di7Q2Xg@mail.gmail.com>
-Message-ID: <2646870.5L1En4yxph@wuerfel>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Tue, 16 Feb 2016 16:47:37 +0100
+Subject: [PATCH v2 1/5] MIPS: jz4740: remove broken irq_to_gpio() call
+In-Reply-To: <1455637261-2920972-1-git-send-email-arnd@arndb.de>
+References: <455637086-2794174-1-git-send-email-arnd@arndb.de>
+ <1455637261-2920972-1-git-send-email-arnd@arndb.de>
+Message-ID: <56C34499.5010704@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 16 February 2016 16:42:18 Linus Walleij wrote:
-> On Mon, Feb 15, 2016 at 4:46 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+On 02/16/2016 04:40 PM, Arnd Bergmann wrote:
+> gpiolib has removed the irq_to_gpio() API several years ago,
+> but the global header still provided a non-working stub.
 > 
-> > gpiolib has removed the irq_to_gpio() API several years ago,
-> > but the global header still provided a non-working stub.
-> >
-> > Apparently one new user has shown up in arch/mips, so this patch
-> > moves the broken definition to where it is used, ensuring that
-> > we get new users but not changing the current behavior on jz4740.
-> >
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> With a MIPS-wide change to use the generic header file, the jz4740
+> platform is now using the wrong stub implementation of irq_to_gpio(),
+> which cannot work.
 > 
-> Patch applied.
+> This uses an open-coded implementation in the only line it
+> is used in.
 > 
-> I expect the driver maintainer to deal with the resulting
-> deprecation fallout.
-> 
+> Suggested-by: Lars-Peter Clausen <lars@metafoo.de>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: <stable@vger.kernel.org> # v4.3+
+> Fixes: 832f5dacfa0b ("MIPS: Remove all the uses of custom gpio.h").
 
-I've just sent v2 of the series, with a separate patch for MIPS
-that now conflicts with this one. Can you pick up the new patch
-instead?
+Acked-by: Lars-Peter Clausen <lars@metafoo.de>
 
-	Arnd
+Thanks.
+
+> ---
+>  arch/mips/jz4740/gpio.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/mips/jz4740/gpio.c b/arch/mips/jz4740/gpio.c
+> index 8c6d76c9b2d6..d9907e57e9b9 100644
+> --- a/arch/mips/jz4740/gpio.c
+> +++ b/arch/mips/jz4740/gpio.c
+> @@ -270,7 +270,7 @@ uint32_t jz_gpio_port_get_value(int port, uint32_t mask)
+>  }
+>  EXPORT_SYMBOL(jz_gpio_port_get_value);
+>  
+> -#define IRQ_TO_BIT(irq) BIT(irq_to_gpio(irq) & 0x1f)
+> +#define IRQ_TO_BIT(irq) BIT((irq - JZ4740_IRQ_GPIO(0)) & 0x1f)
+>  
+>  static void jz_gpio_check_trigger_both(struct jz_gpio_chip *chip, unsigned int irq)
+>  {
+> 
