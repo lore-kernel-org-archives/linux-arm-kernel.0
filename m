@@ -1,25 +1,53 @@
-From: rric@kernel.org (Robert Richter)
-Date: Tue, 16 Feb 2016 15:42:50 +0100
-Subject: [PATCH V2] AHCI: Workaround for ThunderX Errata#22536
-In-Reply-To: <20160215183041.GH3965@htj.duckdns.org>
-References: <1455319230-30201-1-git-send-email-tchalamarla@caviumnetworks.com>
- <20160214170152.GC3965@htj.duckdns.org>
- <56C147B2.9010303@caviumnetworks.com>
- <20160215183041.GH3965@htj.duckdns.org>
-Message-ID: <20160216144250.GD31343@rric.localdomain>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 16 Feb 2016 14:45:57 +0000
+Subject: [GIT PULL] firmware: SCPI driver updates for v4.6
+Message-ID: <56C33625.5030903@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15.02.16 13:30:41, Tejun Heo wrote:
-> On Sun, Feb 14, 2016 at 07:36:18PM -0800, Tirumalesh Chalamarla wrote:
-> > There is no need for special Driver, AHCI is sufficient for ThunderX, the
-> > file only contains this interrupt handler,
-> > is it preferable if this interrupt handler in libahci.c with others, instead
-> > of separate file?
-> 
-> Yeap, just fold it in ahci.c with surrounding #ifdef guard.
+Hi ARM-SoC team,
 
-Yes, please use #ifdef CONFIG_CAVIUM_ERRATUM_22536 ... and add a
-kconfig entry for this to arch/arm64/Kconfig.
+Here is the set of minor updates to SCPI firmware driver for v4.6
+There's a change in HWMON driver which Guenter Roeck has Acked and
+agreed to take it via arm-soc tree.
 
--Robert
+-- 
+Regards,
+Sudeep
+
+-->8
+
+The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
+
+   Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+
+are available in the git repository at:
+
+   git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git 
+tags/scpi-for-v4.6/updates
+
+for you to fetch changes up to fb3b07ef399bd6984f3361a709829618b75e98d8:
+
+   hwmon: (scpi) add energy meter support (2016-02-16 09:26:27 +0000)
+
+----------------------------------------------------------------
+SCPI updates and fixes for v4.6
+
+1. Minor fix to restore functionality in big-endian mode
+
+2. Fix race by decreasing Tx timeout to 20ms
+
+3. Adds support for 64-bit sensor values and energy meter
+
+----------------------------------------------------------------
+Sudeep Holla (4):
+       firmware: arm_scpi: fix send_message and sensor_get_value for 
+big-endian
+       firmware: arm_scpi: decrease Tx timeout to 20ms
+       firmware: arm_scpi: add support for 64-bit sensor values
+       hwmon: (scpi) add energy meter support
+
+  drivers/firmware/arm_scpi.c   | 17 ++++++++++-------
+  drivers/hwmon/scpi-hwmon.c    | 14 +++++++++++---
+  include/linux/scpi_protocol.h |  3 ++-
+  3 files changed, 23 insertions(+), 11 deletions(-)
