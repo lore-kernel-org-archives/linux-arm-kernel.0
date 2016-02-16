@@ -1,87 +1,51 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 16 Feb 2016 20:29:16 +0100 (CET)
-Subject: serial: clk: bcm2835: Strange effects when using aux-uart in
- console
-In-Reply-To: <D4D8C3EE-7BDC-44F4-A54F-A6861FE0A174@martin.sperl.org>
-References: <A5F427B7-9B78-4892-9722-69418C4D0C10@martin.sperl.org>
- <56BC895E.2010108@sperl.org>
- <1617009200.323700.219000a8-c162-4594-aacc-a7e9894518b2.open-xchange@email.1und1.de>
- <662D2FB2-B088-4CFC-8416-A4F35BBAD7DD@sperl.org>
- <F7A2533A-D64C-4187-ABD4-416C446D1637@martin.sperl.org>
- <6CD3FC59-BA17-43D9-897C-A2D122D26EF8@martin.sperl.org>
- <470852136.382408.76a8faee-9235-4ee0-9fd1-e25a1e9f0bb3.open-xchange@email.1und1.de>
- <EE05C090-EB8A-41E8-B9C3-8CCC79F15FE9@martin.sperl.org>
- <359843746.379810.6eb6c2f5-8282-417a-83d1-1fa79425ff73.open-xchange@email.1und1.de>
- <D4D8C3EE-7BDC-44F4-A54F-A6861FE0A174@martin.sperl.org>
-Message-ID: <43491797.472221.74f5f000-03c2-453a-a849-faa85305b11d.open-xchange@email.1und1.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 16 Feb 2016 20:35:35 +0100
+Subject: noise issues when recording sound on i.MX28
+In-Reply-To: <CAOMZO5BDjkWi+cQK1-J7ag8Z48tY1Uwofi4EkovN-drSC4_reA@mail.gmail.com>
+References: <20160127105613.GC13664@pengutronix.de>
+ <CAOMZO5BpLen517q2heramSta-R6pdESkjM6w=7FRMZebY6ue-Q@mail.gmail.com>
+ <20160127144340.GD13664@pengutronix.de>
+ <CAOMZO5AE6HwBYz7kOFORt0HTojJLSb0MYUbkb_HCshDHy=d27g@mail.gmail.com>
+ <20160210150315.GC13664@pengutronix.de>
+ <CAOMZO5D5H4F90nse9kyW9KvsJStN-sCGktup4FDPw_zTeNfS2g@mail.gmail.com>
+ <20160211084029.GE13664@pengutronix.de>
+ <CAOMZO5BDjkWi+cQK1-J7ag8Z48tY1Uwofi4EkovN-drSC4_reA@mail.gmail.com>
+Message-ID: <20160216193535.GB32169@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Martin,
+Hello Fabio,
 
-> Martin Sperl <kernel@martin.sperl.org> hat am 16. Februar 2016 um 17:31
-> geschrieben:
->
->
->
-> > On 13.02.2016, at 21:45, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+On Tue, Feb 16, 2016 at 01:01:19PM -0200, Fabio Estevam wrote:
+> On Thu, Feb 11, 2016 at 6:40 AM, Uwe Kleine-K?nig
+> <u.kleine-koenig@pengutronix.de> wrote:
+> 
+> > root at hostname:/sys/kernel/debug/clk find -name saif?_sel
+> > ./ref_xtal/pll0/saif0_sel
+> > ./ref_xtal/pll0/saif1_sel
 > >
-> >
-> > According to the datasheet busy bit shouldn't be set while changing the
-> > clock.
-> > So this isn't good. I hope this could be fixed, too.
-> >
->
-> I had hoped that the patch by Eric:
-> "clk: bcm2835: Fix setting of PLL divider clock rates"
-> would fix the issue, but that was unfortunately not the case.
->
-> Some more investigation using the debugfs patch I had posted,
-> which exposes the registers showed that:
-> plld_per_a2w had a value of 4 before starting getty
-> and a value of 0 after starting getty.
->
-> That made me investigate why this value was changed and I found
-> the culprit in the form of:
-> @@ -1167,7 +1171,9 @@ static void bcm2835_pll_divider_off(struct clk_hw *hw)
-> cprman_write(cprman, data->cm_reg,
-> (cprman_read(cprman, data->cm_reg) &
-> ~data->load_mask) | data->hold_mask);
-> - cprman_write(cprman, data->a2w_reg, A2W_PLL_CHANNEL_DISABLE);
-> + cprman_write(cprman, data->a2w_reg,
-> + cprman_read(cprman, data->a2w_reg) |
-> + A2W_PLL_CHANNEL_DISABLE);
-> }
+> > root at hostname:/sys/kernel/debug/clk cat ./ref_xtal/pll0/saif?_sel/clk_rate
+> > 480000000
+> > 480000000
+> 
+> Ok, what about the SAIF0 and SAIF1 sampling rates: are they always the same?
 
-good job. This change make sense because the divider value shouldn't be zero.
+Lothar found a recipe to reproduce. I didn't try, but it's something
+along the lines of (Lothar please correct if I'm wrong):
 
-But maybe we should protect the RMW by a lock like in bcm2835_clock_off?
+ - start a recording on one SAIF
+ - start playback on the other SAIF
+ - using direct access to the registers stop and restart the playback
+   SAIF via the RUN bit.
 
->
-> after that (with plld itself marked as ?prepared? during probe) everything is
-> working fine.
->
-> bcm2835_pll_off shows a similar pattern, but patching that
-> the same way:
-> @@ -955,8 +955,12 @@ static void bcm2835_pll_off(struct clk_hw *hw)
-> struct bcm2835_cprman *cprman = pll->cprman;
-> const struct bcm2835_pll_data *data = pll->data;
->
-> - cprman_write(cprman, data->cm_ctrl_reg, CM_PLL_ANARST);
-> - cprman_write(cprman, data->a2w_ctrl_reg, A2W_PLL_CTRL_PWRDN);
-> + cprman_write(cprman, data->cm_ctrl_reg,
-> + cprman_read(cprman, data->cm_ctrl_reg) |
-> + CM_PLL_ANARST);
-> + cprman_write(cprman, data->a2w_ctrl_reg,
-> + cprman_read(cprman, data->a2w_ctrl_reg) |
-> + A2W_PLL_CTRL_PWRDN);
-> }
->
-> does not resolve the issue - the system crashes - but without he pll
-> lock message?
+The program I have doesn't provide a reliable reproduction recipe, it
+runs in a loop and sometimes need several (>1000) iterations to trigger.
+In my setup the sampling rates don't change. The values of
+BITCLK_MULT_RATE differ however in my setup, I don't see why though.
 
-Without the knowledge about the registers it's hard to say what exactly causes
-the crash.
+Best regards
+Uwe
 
-Regards
-Stefan
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
