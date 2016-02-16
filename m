@@ -1,61 +1,56 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Tue, 16 Feb 2016 12:36:09 +0200
-Subject: [PATCH v3 05/10] serial: mps2-uart: add support for early console
-In-Reply-To: <1455617295-23736-6-git-send-email-vladimir.murzin@arm.com>
-References: <1455617295-23736-1-git-send-email-vladimir.murzin@arm.com>
- <1455617295-23736-6-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <CAHp75VdugAq0WnzLHmd9CJHCjBOdBwPqCmC3ARSaVF5XMYGoMw@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 16 Feb 2016 11:37:57 +0100
+Subject: [PATCH] ARM: dts: tegra: replace legacy *,wakeup property with
+ wakeup-source
+In-Reply-To: <1454968543-12035-1-git-send-email-sudeep.holla@arm.com>
+References: <1454968543-12035-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <20160216103757.GA9979@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 16, 2016 at 12:08 PM, Vladimir Murzin
-<vladimir.murzin@arm.com> wrote:
-> This adds support early console for MPS2 UART which can be enabled via
-> earlycon=mps2,0x40004000
+On Mon, Feb 08, 2016 at 09:55:43PM +0000, Sudeep Holla wrote:
+> Though the keyboard and other driver will continue to support the legacy
+> "gpio-key,wakeup", "nvidia,wakeup-source" boolean property to enable the
+> wakeup source, "wakeup-source" is the new standard binding.
+> 
+> This patch replaces all the legacy wakeup properties with the unified
+> "wakeup-source" property in order to avoid any further copy-paste
+> duplication.
+> 
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Thierry Reding <thierry.reding@gmail.com>
+> Cc: Alexandre Courbot <gnurou@gmail.com>
+> Cc: linux-tegra at vger.kernel.org
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> ---
+>  arch/arm/boot/dts/tegra114-dalmore.dts         | 2 +-
+>  arch/arm/boot/dts/tegra114-roth.dts            | 2 +-
+>  arch/arm/boot/dts/tegra114-tn7.dts             | 2 +-
+>  arch/arm/boot/dts/tegra124-jetson-tk1.dts      | 2 +-
+>  arch/arm/boot/dts/tegra124-nyan.dtsi           | 4 ++--
+>  arch/arm/boot/dts/tegra124-venice2.dts         | 2 +-
+>  arch/arm/boot/dts/tegra20-harmony.dts          | 2 +-
+>  arch/arm/boot/dts/tegra20-paz00.dts            | 2 +-
+>  arch/arm/boot/dts/tegra20-seaboard.dts         | 4 ++--
+>  arch/arm/boot/dts/tegra20-trimslice.dts        | 2 +-
+>  arch/arm/boot/dts/tegra20-ventana.dts          | 2 +-
+>  arch/arm/boot/dts/tegra20-whistler.dts         | 2 +-
+>  arch/arm/boot/dts/tegra30-apalis-eval.dts      | 2 +-
+>  arch/arm/boot/dts/tegra30-cardhu.dtsi          | 2 +-
+>  arch/arm/boot/dts/tegra30-colibri-eval-v3.dts  | 2 +-
+>  arch/arm64/boot/dts/nvidia/tegra132-norrin.dts | 4 ++--
+>  16 files changed, 19 insertions(+), 19 deletions(-)
 
+I've applied this for 4.6, though I took the liberty of splitting this
+up into ARM and arm64 patches, since the ARM SoC maintainers prefer it
+that way.
 
-> --- a/drivers/tty/serial/mps2-uart.c
-> +++ b/drivers/tty/serial/mps2-uart.c
-> @@ -435,6 +435,36 @@ static struct console mps2_uart_console = {
->
->  #define MPS2_SERIAL_CONSOLE (&mps2_uart_console)
->
-> +static void mps2_early_putchar(struct uart_port *port, int ch)
-> +{
-> +
-> +       while (readb(port->membase + UARTn_STATE) & UARTn_STATE_TX_FULL)
-> +               cpu_relax();
-
-Infinite busy loop?
-
-> +
-> +       writeb((unsigned char)ch, port->membase + UARTn_DATA);
-> +}
-> +
-> +
-> +static void mps2_early_write(struct console *con, const char *s, unsigned n)
-> +{
-> +       struct earlycon_device *dev = con->data;
-> +
-> +       uart_console_write(&dev->port, s, n, mps2_early_putchar);
-> +}
-> +
-> +static int __init mps2_early_console_setup(struct earlycon_device *device,
-> +                                          const char *opt)
-> +{
-> +       if (!device->port.membase)
-> +               return -ENODEV;
-> +
-> +       device->con->write = mps2_early_write;
-> +
-> +       return 0;
-> +}
-> +EARLYCON_DECLARE(mps2, mps2_early_console_setup);
-> +OF_EARLYCON_DECLARE(mps2, "arm,mps2-uart", mps2_early_console_setup);
-
-IIRC Peter Hurley mentioned you don't need to put both anymore, OF_
-one is enough.
-
--- 
-With Best Regards,
-Andy Shevchenko
+Thanks,
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160216/bddd51d9/attachment.sig>
