@@ -1,77 +1,60 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 16 Feb 2016 21:08:21 +0800
-Subject: [PATCH v5 03/13] mmc: sdhci-msm: factorise sdhci_msm_pdata outisde of
- sdhci_msm_host
+Date: Tue, 16 Feb 2016 21:08:19 +0800
+Subject: [PATCH v5 01/13] mmc: sdhci-bcm2835: use sdhci_pltfm_init for private
+ allocation
 In-Reply-To: <1455628111-5583-1-git-send-email-jszhang@marvell.com>
 References: <1455628111-5583-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1455628111-5583-4-git-send-email-jszhang@marvell.com>
+Message-ID: <1455628111-5583-2-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's no need to allocate one sdhci_msm_pdata for each sdhci_msm_host.
-This patch removes the sdhci_msm_pdata member from sdhci_msm_host and
-uses one static global sdhci_msm_pdata for all sdhci msm hosts. It also
-marks sdhci_msm_ops as const.
+Commit 0e748234293f ("mmc: sdhci: Add size for caller in init+register")
+allows users of sdhci_pltfm to allocate private space in calls to
+sdhci_pltfm_init+sdhci_pltfm_register. This patch migrates sdhci-bcm2835
+to this allocation.
 
 Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 Acked-by: Adrian Hunter <adrian.hunter@intel.com>
 ---
- drivers/mmc/host/sdhci-msm.c | 15 ++++++++-------
- 1 file changed, 8 insertions(+), 7 deletions(-)
+ drivers/mmc/host/sdhci-bcm2835.c | 14 +++-----------
+ 1 file changed, 3 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/mmc/host/sdhci-msm.c b/drivers/mmc/host/sdhci-msm.c
-index 4695bee..ffac9b4 100644
---- a/drivers/mmc/host/sdhci-msm.c
-+++ b/drivers/mmc/host/sdhci-msm.c
-@@ -60,7 +60,6 @@ struct sdhci_msm_host {
- 	struct clk *pclk;	/* SDHC peripheral bus clock */
- 	struct clk *bus_clk;	/* SDHC bus voter clock */
- 	struct mmc_host *mmc;
--	struct sdhci_pltfm_data sdhci_msm_pdata;
- };
- 
- /* Platform specific tuning */
-@@ -418,7 +417,7 @@ static const struct of_device_id sdhci_msm_dt_match[] = {
- 
- MODULE_DEVICE_TABLE(of, sdhci_msm_dt_match);
- 
--static struct sdhci_ops sdhci_msm_ops = {
-+static const struct sdhci_ops sdhci_msm_ops = {
- 	.platform_execute_tuning = sdhci_msm_execute_tuning,
- 	.reset = sdhci_reset,
- 	.set_clock = sdhci_set_clock,
-@@ -426,6 +425,12 @@ static struct sdhci_ops sdhci_msm_ops = {
- 	.set_uhs_signaling = sdhci_set_uhs_signaling,
- };
- 
-+static const struct sdhci_pltfm_data sdhci_msm_pdata = {
-+	.quirks = SDHCI_QUIRK_BROKEN_CARD_DETECTION |
-+		  SDHCI_QUIRK_SINGLE_POWER_WRITE,
-+	.ops = &sdhci_msm_ops,
-+};
-+
- static int sdhci_msm_probe(struct platform_device *pdev)
+diff --git a/drivers/mmc/host/sdhci-bcm2835.c b/drivers/mmc/host/sdhci-bcm2835.c
+index 1c65d46..4a6a1d1 100644
+--- a/drivers/mmc/host/sdhci-bcm2835.c
++++ b/drivers/mmc/host/sdhci-bcm2835.c
+@@ -74,7 +74,7 @@ static inline u32 bcm2835_sdhci_readl(struct sdhci_host *host, int reg)
+ static void bcm2835_sdhci_writew(struct sdhci_host *host, u16 val, int reg)
  {
- 	struct sdhci_host *host;
-@@ -441,8 +446,7 @@ static int sdhci_msm_probe(struct platform_device *pdev)
- 	if (!msm_host)
- 		return -ENOMEM;
+ 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+-	struct bcm2835_sdhci *bcm2835_host = pltfm_host->priv;
++	struct bcm2835_sdhci *bcm2835_host = sdhci_pltfm_priv(pltfm_host);
+ 	u32 oldval = (reg == SDHCI_COMMAND) ? bcm2835_host->shadow :
+ 		bcm2835_sdhci_readl(host, reg & ~3);
+ 	u32 word_num = (reg >> 1) & 1;
+@@ -152,20 +152,12 @@ static int bcm2835_sdhci_probe(struct platform_device *pdev)
+ 	struct sdhci_pltfm_host *pltfm_host;
+ 	int ret;
  
--	msm_host->sdhci_msm_pdata.ops = &sdhci_msm_ops;
--	host = sdhci_pltfm_init(pdev, &msm_host->sdhci_msm_pdata, 0);
-+	host = sdhci_pltfm_init(pdev, &sdhci_msm_pdata, 0);
+-	host = sdhci_pltfm_init(pdev, &bcm2835_sdhci_pdata, 0);
++	host = sdhci_pltfm_init(pdev, &bcm2835_sdhci_pdata,
++				sizeof(*bcm2835_host));
  	if (IS_ERR(host))
  		return PTR_ERR(host);
  
-@@ -522,9 +526,6 @@ static int sdhci_msm_probe(struct platform_device *pdev)
- 	/* Set HC_MODE_EN bit in HC_MODE register */
- 	writel_relaxed(HC_MODE_EN, (msm_host->core_mem + CORE_HC_MODE));
- 
--	host->quirks |= SDHCI_QUIRK_BROKEN_CARD_DETECTION;
--	host->quirks |= SDHCI_QUIRK_SINGLE_POWER_WRITE;
+-	bcm2835_host = devm_kzalloc(&pdev->dev, sizeof(*bcm2835_host),
+-					GFP_KERNEL);
+-	if (!bcm2835_host) {
+-		dev_err(mmc_dev(host->mmc),
+-			"failed to allocate bcm2835_sdhci\n");
+-		return -ENOMEM;
+-	}
 -
- 	host_version = readw_relaxed((host->ioaddr + SDHCI_HOST_VERSION));
- 	dev_dbg(&pdev->dev, "Host Version: 0x%x Vendor Version 0x%x\n",
- 		host_version, ((host_version & SDHCI_VENDOR_VER_MASK) >>
+ 	pltfm_host = sdhci_priv(host);
+-	pltfm_host->priv = bcm2835_host;
+ 
+ 	pltfm_host->clk = devm_clk_get(&pdev->dev, NULL);
+ 	if (IS_ERR(pltfm_host->clk)) {
 -- 
 2.7.0
