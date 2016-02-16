@@ -1,60 +1,38 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 16 Feb 2016 17:49:37 +0000
-Subject: [PATCH v3 0/6] irqchip: irq-armada-370-xp: generic MSI
- infrastructure and assorted fixes
-In-Reply-To: <1455115621-22846-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1455115621-22846-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20160216174937.GF5183@io.lakedaemon.net>
+From: stefan@agner.ch (Stefan Agner)
+Date: Tue, 16 Feb 2016 09:50:08 -0800
+Subject: [PATCH v3 3/3] ARM: dts: vfxxx: Add iio_hwmon node for ADC
+ temperature channel
+In-Reply-To: <88b677c3ab62d965b70846618fe566523f95c9bb.1455597464.git.maitysanchayan@gmail.com>
+References: <cover.1455597464.git.maitysanchayan@gmail.com>
+ <88b677c3ab62d965b70846618fe566523f95c9bb.1455597464.git.maitysanchayan@gmail.com>
+Message-ID: <06aa0e2a7958c81fb6d3ab9c23164156@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Thomas,
-
-On Wed, Feb 10, 2016 at 03:46:55PM +0100, Thomas Petazzoni wrote:
-> This patch series converts the Armada 370/XP irqchip driver (also used
-> on Armada 375, 38x and 39x) to the new MSI infrastructure put in place
-> by Marc. It doesn't bring any functional difference other than using
-> the right, modern, MSI mechanism, which might ultimately allow Marc to
-> remove the old way of implementing MSI support.
+On 2016-02-15 21:00, Sanchayan Maity wrote:
+> Add iio-hwmon node to expose the temperature channel on Vybrid as
+> hardware monitor device using the iio_hwmon driver.
 > 
-> It has been tested on Armada 38x and Armada XP with an Intel e1000e
-> NIC and an Intel IGB NIC, both of which use MSI interrupts.
+> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+
+Acked-by: Stefan Agner <stefan@agner.ch>
+
+> ---
+>  arch/arm/boot/dts/vfxxx.dtsi | 5 +++++
+>  1 file changed, 5 insertions(+)
 > 
-> Note that this patch series depends on the patch series from Marc
-> Zyngier for proper operation, which have already been merged in
-> tip.git by Thomas Gleixner:
-> 
->   http://git.kernel.org/cgit/linux/kernel/git/tip/tip.git/commit/?id=530cbe100ef7587aa5b5ac3a4b670cda4d50e598
->   http://git.kernel.org/cgit/linux/kernel/git/tip/tip.git/commit/?id=14a0db3cdd114da757197193f66786e63649c91e
-
-When based against v4.5-rc1, I encountered:
-
-drivers/irqchip/irq-armada-370-xp.c:584:41: error: 'DOMAIN_BUS_WIRED' undeclared (first use in this function)
-
-Rebased the branch against v4.5-rc2 to pick up:
-
-  530cbe100ef7 irqdomain: Allow domain lookup with DOMAIN_BUS_WIRED token
-
-Which builds without warning.
-
-> Thomas Petazzoni (6):
->   irqchip: irq-armada-370-xp: add Kconfig option for the driver
->   irqchip: irq-armada-370-xp: use the generic MSI infrastructure
->   irqchip: irq-armada-370-xp: use PCI_MSI_DOORBELL_START where
->     appropriate
->   irqchip: irq-armada-370-xp: use shorter names for irq_chip
->   irqchip: irq-armada-370-xp: allow allocation of multiple MSIs
->   ARM: mvebu: use the ARMADA_370_XP_IRQ option
-> 
->  arch/arm/mach-mvebu/Kconfig         |   6 +-
->  drivers/irqchip/Kconfig             |   6 ++
->  drivers/irqchip/Makefile            |   2 +-
->  drivers/irqchip/irq-armada-370-xp.c | 156 +++++++++++++++---------------------
->  4 files changed, 78 insertions(+), 92 deletions(-)
-
-Whole series applied to irqchip/mvebu which will not be rebased.  I'll
-only append to it if you send me a patch to add.  ;-)
-
-thx,
-
-Jason.
+> diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
+> index a5f07e3..24ac5b1 100644
+> --- a/arch/arm/boot/dts/vfxxx.dtsi
+> +++ b/arch/arm/boot/dts/vfxxx.dtsi
+> @@ -673,5 +673,10 @@
+>  				status = "disabled";
+>  			};
+>  		};
+> +
+> +		iio-hwmon {
+> +			compatible = "iio-hwmon";
+> +			io-channels = <&adc0 16>, <&adc1 16>;
+> +		};
+>  	};
+>  };
