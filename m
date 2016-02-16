@@ -1,31 +1,148 @@
-From: wuninsu@gmail.com (Insu Yun)
-Date: Mon, 15 Feb 2016 21:46:37 -0500
-Subject: [PATCH] s5p_mfc: handling failed allocation for workqueue
-Message-ID: <1455590797-8522-1-git-send-email-wuninsu@gmail.com>
+From: songjun.wu@atmel.com (Wu, Songjun)
+Date: Tue, 16 Feb 2016 10:54:21 +0800
+Subject: [PATCH] ASoC: atmel_ssc_dai: distinguish the different SSC
+In-Reply-To: <56966852.8050205@atmel.com>
+References: <1452666910-23586-1-git-send-email-songjun.wu@atmel.com>
+ <56966852.8050205@atmel.com>
+Message-ID: <56C28F5D.5010000@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-create_singlethread_workqueue() can be failed in memory pressure.
 
-Signed-off-by: Insu Yun <wuninsu@gmail.com>
----
- drivers/media/platform/s5p-mfc/s5p_mfc.c | 4 ++++
- 1 file changed, 4 insertions(+)
+Any comments on this patch?
 
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-index 927ab49..631aea814 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-@@ -1239,6 +1239,10 @@ static int s5p_mfc_probe(struct platform_device *pdev)
- 
- 	dev->hw_lock = 0;
- 	dev->watchdog_workqueue = create_singlethread_workqueue(S5P_MFC_NAME);
-+	if (!dev->watchdog_workqueue) {
-+		ret = -ENOMEM;
-+		goto err_enc_reg;
-+	}
- 	INIT_WORK(&dev->watchdog_work, s5p_mfc_watchdog_worker);
- 	atomic_set(&dev->watchdog_cnt, 0);
- 	init_timer(&dev->watchdog_timer);
--- 
-1.9.1
+On 1/13/2016 23:08, Nicolas Ferre wrote:
+> Le 13/01/2016 07:35, Songjun Wu a ?crit :
+>> Cpu_dai id always equals 0, can't distinguish the
+>> different SSC. Use platform_device id to record
+>> and distinguish the different SSC.
+>>
+>> Signed-off-by: Songjun Wu <songjun.wu@atmel.com>
+>
+> It seems okay:
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>
+>> ---
+>>
+>>   drivers/misc/atmel-ssc.c        |    1 +
+>>   sound/soc/atmel/atmel_ssc_dai.c |   27 ++++++++++++++++++---------
+>>   2 files changed, 19 insertions(+), 9 deletions(-)
+>>
+>> diff --git a/drivers/misc/atmel-ssc.c b/drivers/misc/atmel-ssc.c
+>> index e11a0bd..0516ecd 100644
+>> --- a/drivers/misc/atmel-ssc.c
+>> +++ b/drivers/misc/atmel-ssc.c
+>> @@ -34,6 +34,7 @@ struct ssc_device *ssc_request(unsigned int ssc_num)
+>>   		if (ssc->pdev->dev.of_node) {
+>>   			if (of_alias_get_id(ssc->pdev->dev.of_node, "ssc")
+>>   				== ssc_num) {
+>> +				ssc->pdev->id = ssc_num;
+>>   				ssc_valid = 1;
+>>   				break;
+>>   			}
+>> diff --git a/sound/soc/atmel/atmel_ssc_dai.c b/sound/soc/atmel/atmel_ssc_dai.c
+>> index ba8def5..2768970 100644
+>> --- a/sound/soc/atmel/atmel_ssc_dai.c
+>> +++ b/sound/soc/atmel/atmel_ssc_dai.c
+>> @@ -285,7 +285,8 @@ static int atmel_ssc_hw_rule_rate(struct snd_pcm_hw_params *params,
+>>   static int atmel_ssc_startup(struct snd_pcm_substream *substream,
+>>   			     struct snd_soc_dai *dai)
+>>   {
+>> -	struct atmel_ssc_info *ssc_p = &ssc_info[dai->id];
+>> +	struct platform_device *pdev = to_platform_device(dai->dev);
+>> +	struct atmel_ssc_info *ssc_p = &ssc_info[pdev->id];
+>>   	struct atmel_pcm_dma_params *dma_params;
+>>   	int dir, dir_mask;
+>>   	int ret;
+>> @@ -346,7 +347,8 @@ static int atmel_ssc_startup(struct snd_pcm_substream *substream,
+>>   static void atmel_ssc_shutdown(struct snd_pcm_substream *substream,
+>>   			       struct snd_soc_dai *dai)
+>>   {
+>> -	struct atmel_ssc_info *ssc_p = &ssc_info[dai->id];
+>> +	struct platform_device *pdev = to_platform_device(dai->dev);
+>> +	struct atmel_ssc_info *ssc_p = &ssc_info[pdev->id];
+>>   	struct atmel_pcm_dma_params *dma_params;
+>>   	int dir, dir_mask;
+>>
+>> @@ -392,7 +394,8 @@ static void atmel_ssc_shutdown(struct snd_pcm_substream *substream,
+>>   static int atmel_ssc_set_dai_fmt(struct snd_soc_dai *cpu_dai,
+>>   		unsigned int fmt)
+>>   {
+>> -	struct atmel_ssc_info *ssc_p = &ssc_info[cpu_dai->id];
+>> +	struct platform_device *pdev = to_platform_device(cpu_dai->dev);
+>> +	struct atmel_ssc_info *ssc_p = &ssc_info[pdev->id];
+>>
+>>   	ssc_p->daifmt = fmt;
+>>   	return 0;
+>> @@ -404,7 +407,8 @@ static int atmel_ssc_set_dai_fmt(struct snd_soc_dai *cpu_dai,
+>>   static int atmel_ssc_set_dai_clkdiv(struct snd_soc_dai *cpu_dai,
+>>   	int div_id, int div)
+>>   {
+>> -	struct atmel_ssc_info *ssc_p = &ssc_info[cpu_dai->id];
+>> +	struct platform_device *pdev = to_platform_device(cpu_dai->dev);
+>> +	struct atmel_ssc_info *ssc_p = &ssc_info[pdev->id];
+>>
+>>   	switch (div_id) {
+>>   	case ATMEL_SSC_CMR_DIV:
+>> @@ -445,7 +449,8 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
+>>   	struct snd_pcm_hw_params *params,
+>>   	struct snd_soc_dai *dai)
+>>   {
+>> -	int id = dai->id;
+>> +	struct platform_device *pdev = to_platform_device(dai->dev);
+>> +	int id = pdev->id;
+>>   	struct atmel_ssc_info *ssc_p = &ssc_info[id];
+>>   	struct ssc_device *ssc = ssc_p->ssc;
+>>   	struct atmel_pcm_dma_params *dma_params;
+>> @@ -772,7 +777,8 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
+>>   static int atmel_ssc_prepare(struct snd_pcm_substream *substream,
+>>   			     struct snd_soc_dai *dai)
+>>   {
+>> -	struct atmel_ssc_info *ssc_p = &ssc_info[dai->id];
+>> +	struct platform_device *pdev = to_platform_device(dai->dev);
+>> +	struct atmel_ssc_info *ssc_p = &ssc_info[pdev->id];
+>>   	struct atmel_pcm_dma_params *dma_params;
+>>   	int dir;
+>>
+>> @@ -795,7 +801,8 @@ static int atmel_ssc_prepare(struct snd_pcm_substream *substream,
+>>   static int atmel_ssc_trigger(struct snd_pcm_substream *substream,
+>>   			     int cmd, struct snd_soc_dai *dai)
+>>   {
+>> -	struct atmel_ssc_info *ssc_p = &ssc_info[dai->id];
+>> +	struct platform_device *pdev = to_platform_device(dai->dev);
+>> +	struct atmel_ssc_info *ssc_p = &ssc_info[pdev->id];
+>>   	struct atmel_pcm_dma_params *dma_params;
+>>   	int dir;
+>>
+>> @@ -824,11 +831,12 @@ static int atmel_ssc_trigger(struct snd_pcm_substream *substream,
+>>   static int atmel_ssc_suspend(struct snd_soc_dai *cpu_dai)
+>>   {
+>>   	struct atmel_ssc_info *ssc_p;
+>> +	struct platform_device *pdev = to_platform_device(cpu_dai->dev);
+>>
+>>   	if (!cpu_dai->active)
+>>   		return 0;
+>>
+>> -	ssc_p = &ssc_info[cpu_dai->id];
+>> +	ssc_p = &ssc_info[pdev->id];
+>>
+>>   	/* Save the status register before disabling transmit and receive */
+>>   	ssc_p->ssc_state.ssc_sr = ssc_readl(ssc_p->ssc->regs, SR);
+>> @@ -852,12 +860,13 @@ static int atmel_ssc_suspend(struct snd_soc_dai *cpu_dai)
+>>   static int atmel_ssc_resume(struct snd_soc_dai *cpu_dai)
+>>   {
+>>   	struct atmel_ssc_info *ssc_p;
+>> +	struct platform_device *pdev = to_platform_device(cpu_dai->dev);
+>>   	u32 cr;
+>>
+>>   	if (!cpu_dai->active)
+>>   		return 0;
+>>
+>> -	ssc_p = &ssc_info[cpu_dai->id];
+>> +	ssc_p = &ssc_info[pdev->id];
+>>
+>>   	/* restore SSC register settings */
+>>   	ssc_writel(ssc_p->ssc->regs, TFMR, ssc_p->ssc_state.ssc_tfmr);
+>>
+>
+>
