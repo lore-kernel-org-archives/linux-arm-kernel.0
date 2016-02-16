@@ -1,67 +1,67 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 16 Feb 2016 14:51:59 +0000
-Subject: [PATCH v3 08/10] ARM: configs: add MPS2 defconfig
-In-Reply-To: <2680417.bULLX3O66Y@wuerfel>
-References: <1455617295-23736-1-git-send-email-vladimir.murzin@arm.com>
- <1455617295-23736-9-git-send-email-vladimir.murzin@arm.com>
- <2680417.bULLX3O66Y@wuerfel>
-Message-ID: <56C3378F.2010008@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 16 Feb 2016 15:53:11 +0100
+Subject: [PATCH] regulator: s5m8767: fix get_register() error handling
+Message-ID: <1455634402-1997203-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/02/16 10:58, Arnd Bergmann wrote:
-> On Tuesday 16 February 2016 10:08:13 Vladimir Murzin wrote:
->> This patch adds a new config for MPS2 platform.
->>
->> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
->> ---
->>  arch/arm/configs/mps2_defconfig |  112 +++++++++++++++++++++++++++++++++++++++
->>  1 file changed, 112 insertions(+)
->>  create mode 100644 arch/arm/configs/mps2_defconfig
->>
->> diff --git a/arch/arm/configs/mps2_defconfig b/arch/arm/configs/mps2_defconfig
->> new file mode 100644
->> index 0000000..c36c519
->> --- /dev/null
->> +++ b/arch/arm/configs/mps2_defconfig
->> @@ -0,0 +1,112 @@
->> +# CONFIG_USELIB is not set
->> +CONFIG_NO_HZ_IDLE=y
->> +CONFIG_HIGH_RES_TIMERS=y
->> +CONFIG_LOG_BUF_SHIFT=16
->> +CONFIG_CC_OPTIMIZE_FOR_SIZE=y
->> +# CONFIG_UID16 is not set
->> +# CONFIG_BASE_FULL is not set
->> +# CONFIG_FUTEX is not set
->> +# CONFIG_EPOLL is not set
->> +# CONFIG_SIGNALFD is not set
->> +# CONFIG_EVENTFD is not set
->> +# CONFIG_AIO is not set
->> +CONFIG_EMBEDDED=y
-> 
-> Why CONFIG_EMBEDDED? You probably mean CONFIG_EXPERT, but then what do
-> you need that for?
+The s5m8767_pmic_probe() function calls s5m8767_get_register() to
+read data without checking the return code, which produces a compile-time
+warning when that data is accessed:
 
-TBH, I have no special requirement for this option to be set and now,
-looking at Kconfig entry for this option, I think that I got it here
-because I stated configuration with allnoconfig.
+drivers/regulator/s5m8767.c: In function 's5m8767_pmic_probe':
+drivers/regulator/s5m8767.c:924:7: error: 'enable_reg' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+drivers/regulator/s5m8767.c:944:30: error: 'enable_val' may be used uninitialized in this function [-Werror=maybe-uninitialized]
 
-OTOH, I don't see how harmful it can be since description says:
+This changes the s5m8767_get_register() function to return a -EINVAL
+not just for an invalid register number but also for an invalid
+regulator number, as both would result in returning uninitialized
+data. The s5m8767_pmic_probe() function is then changed accordingly
+to fail on a read error, as all the other callers of s5m8767_get_register()
+already do.
 
-          This option should be enabled if compiling the kernel for
-          an embedded system so certain expert options are available
-          for configuration
+In practice this probably cannot happen, as we don't call
+s5m8767_get_register() with invalid arguments, but the gcc
+warning seems valid in principle, in terms writing safe
+error checking.
 
-yes, it selects CONFIG_EXPERT and that had side effect that, for
-example, CONFIG_NAMESPACE could be compiled out.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 9c4c60554acf ("regulator: s5m8767: Convert to use regulator_[enable|disable|is_enabled]_regmap")
+---
+ drivers/regulator/s5m8767.c | 13 +++++++++----
+ 1 file changed, 9 insertions(+), 4 deletions(-)
 
-Have I missed something around it?
-
-Thanks
-Vladimir
-
-> 
-> 	Arnd
-> 
-> 
-> 
+diff --git a/drivers/regulator/s5m8767.c b/drivers/regulator/s5m8767.c
+index 58f5d3b8e981..27343e1c43ef 100644
+--- a/drivers/regulator/s5m8767.c
++++ b/drivers/regulator/s5m8767.c
+@@ -202,9 +202,10 @@ static int s5m8767_get_register(struct s5m8767_info *s5m8767, int reg_id,
+ 		}
+ 	}
+ 
+-	if (i < s5m8767->num_regulators)
+-		*enable_ctrl =
+-		s5m8767_opmode_reg[reg_id][mode] << S5M8767_ENCTRL_SHIFT;
++	if (i >= s5m8767->num_regulators)
++		return -EINVAL;
++
++	*enable_ctrl = s5m8767_opmode_reg[reg_id][mode] << S5M8767_ENCTRL_SHIFT;
+ 
+ 	return 0;
+ }
+@@ -937,8 +938,12 @@ static int s5m8767_pmic_probe(struct platform_device *pdev)
+ 			else
+ 				regulators[id].vsel_mask = 0xff;
+ 
+-			s5m8767_get_register(s5m8767, id, &enable_reg,
++			ret = s5m8767_get_register(s5m8767, id, &enable_reg,
+ 					     &enable_val);
++			if (ret) {
++				dev_err(s5m8767->dev, "error reading registers\n");
++				return ret;
++			}
+ 			regulators[id].enable_reg = enable_reg;
+ 			regulators[id].enable_mask = S5M8767_ENCTRL_MASK;
+ 			regulators[id].enable_val = enable_val;
+-- 
+2.7.0
