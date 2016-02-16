@@ -1,40 +1,52 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 15 Feb 2016 21:15:39 +0100
-Subject: [PATCH] branch tracer: fix freak link error
-In-Reply-To: <20160215124746.44e8c2d0@gandalf.local.home>
-References: <1455312410-1058841-1-git-send-email-arnd@arndb.de>
- <20160215124746.44e8c2d0@gandalf.local.home>
-Message-ID: <2535125.MjntUgx4sh@wuerfel>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 15 Feb 2016 19:19:20 -0800
+Subject: [PATCH] ARM: don't print missing L2 cache as error
+In-Reply-To: <1453944439-1070-1-git-send-email-stefan@agner.ch>
+References: <1453944439-1070-1-git-send-email-stefan@agner.ch>
+Message-ID: <d67716f9edf83700b18532eb66980316@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 15 February 2016 12:47:46 Steven Rostedt wrote:
-> On Fri, 12 Feb 2016 22:26:42 +0100
-> Arnd Bergmann <arnd@arndb.de> wrote:
-> 
-> > In my randconfig tests, I came across a bug that involves several
-> > components:
-> > 
-> >
-> 
-> [..]
-> 
-> > 
-> > This patch avoids the problem by changing __trace_if() to check
-> > whether the condition is known at compile-time to be nonzero, rather
-> > than checking whether it is actually a constant.
-> > 
-> > I see this one link error in roughly one out of 1600 randconfig builds
-> > on ARM, and the patch fixes all known instances.
-> > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > Fixes: ab3c9c686e22 ("branch tracer, intel-iommu: fix build with CONFIG_BRANCH_TRACER=y")
-> 
-> Want me to pull this into my queue? I have another patch I need to send
-> to Linus and I can add this in that pull request.
+Hi Russel,
 
-That would be nice, yes.
+Any comment to this? Currently the kernel prints an error message as
+follows on the platform at hand:
+[    0.000000] L2C: failed to init: -19
 
-Do you also want to add a 'Cc: stable at vger.kernel.org' tag?
+--
+Stefan
 
-	Arnd
+
+On 2016-01-27 17:27, Stefan Agner wrote:
+> Not having a L2 cache controller is a shame, but not an error. Avoid
+> printing an error message if L2 controller initialization returns
+> with ENODEV.
+> 
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
+> Hi Russel,
+> 
+> We use a multiplatform kernel for two similar SoC's, one with L2
+> cache the other without. Maybe silently ignore -ENODEV would be
+> an option too, not sure what is preferred here.
+> 
+> --
+> Stefan
+> 
+>  arch/arm/kernel/irq.c | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
+> index 1d45320e..f80c480 100644
+> --- a/arch/arm/kernel/irq.c
+> +++ b/arch/arm/kernel/irq.c
+> @@ -95,7 +95,9 @@ void __init init_IRQ(void)
+>  			outer_cache.write_sec = machine_desc->l2c_write_sec;
+>  		ret = l2x0_of_init(machine_desc->l2c_aux_val,
+>  				   machine_desc->l2c_aux_mask);
+> -		if (ret)
+> +		if (ret == -ENODEV)
+> +			pr_info("L2C: no device found\n");
+> +		else if (ret)
+>  			pr_err("L2C: failed to init: %d\n", ret);
+>  	}
