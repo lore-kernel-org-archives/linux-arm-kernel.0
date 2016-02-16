@@ -1,88 +1,42 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 16 Feb 2016 13:28:52 +0100
-Subject: [PATCH 1/2] pinctrl: mediatek: fix direction control issue
-In-Reply-To: <1455612869.11448.22.camel@mtksdaap41>
-References: <1454462686-770-1-git-send-email-biao.huang@mediatek.com>
- <1454462686-770-2-git-send-email-biao.huang@mediatek.com>
- <1454555015.4618.10.camel@mussux00>
- <CACRpkdZb2-TX1eY7eyK5qCqOg66MP1e4+OO287roJdP=RB6-Fg@mail.gmail.com>
- <1455242831.35628.15.camel@mussux00>
- <1455612869.11448.22.camel@mtksdaap41>
-Message-ID: <CACRpkdb1pVQY0UG-_Z5ivyG6rPZq5YibYcRhzdnDMghfH8jMjA@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 16 Feb 2016 12:38:54 +0000
+Subject: [PATCH v5 3/5] mtd: devices: m25p80: add support for mmap read
+ request
+In-Reply-To: <56C2D731.6050306@ti.com>
+References: <1449807000-6457-1-git-send-email-vigneshr@ti.com>
+ <1449807000-6457-4-git-send-email-vigneshr@ti.com>
+ <20160209193616.GN13270@sirena.org.uk> <56BC1D3E.5020203@ti.com>
+ <20160212223711.GD18988@sirena.org.uk> <56C2D731.6050306@ti.com>
+Message-ID: <20160216123854.GJ18327@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 16, 2016 at 9:54 AM, Yingjoe Chen <yingjoe.chen@mediatek.com> wrote:
+On Tue, Feb 16, 2016 at 01:30:49PM +0530, Vignesh R wrote:
+> On 02/13/2016 04:07 AM, Mark Brown wrote:
+> > On Thu, Feb 11, 2016 at 11:03:50AM +0530, Vignesh R wrote:
+> >> On 02/10/2016 01:06 AM, Mark Brown wrote:
 
-> To make it more clear, for a GPIO pin to get input on MTK chip, we must:
->
-> - Enable input for the pad (input-enable)
+> >>> Looking at this I can't help but think that spi_flash_read() ought to
+> >>> have the stub in rather than the caller.  But given that we're pretty
+> >>> much only ever expecting one user I'm not 100% sure it actually matters.
 
-This should be done by the pin control portions of the driver in
-response to the PIN_CONFIG_INPUT_ENABLE generic pin
-config setting.
+> >> Well, my initial patch set passed long list of arguments to
+> >> spi_flash_read(), but Brian suggested to use struct[1] in order to avoid
+> >> unnecessary churn when things need changed in the API.
 
-Possibly *also* by just writing the hardware registers
-from the callbacks right below here:
+> > I don't see what that has to do with my point?
 
-> - Set mux to GPIO mode
+> AFAIU, your previous comment was to move initialization of
+> spi_flash_read_message struct to spi_flash_read(). This would mean
 
-This should be done by just writing the hardware registers
-in these callbacks from struct pinmux_ops:
-
-        int (*gpio_request_enable) (struct pinctrl_dev *pctldev,
-                                    struct pinctrl_gpio_range *range,
-                                    unsigned offset);
-        void (*gpio_disable_free) (struct pinctrl_dev *pctldev,
-                                   struct pinctrl_gpio_range *range,
-                                   unsigned offset);
-        int (*gpio_set_direction) (struct pinctrl_dev *pctldev,
-                                   struct pinctrl_gpio_range *range,
-                                   unsigned offset,
-                                   bool input);
-
-In respons to these functions being called from the corresponding
-GPIO driver:
-
-extern int pinctrl_request_gpio(unsigned gpio);
-extern void pinctrl_free_gpio(unsigned gpio);
-extern int pinctrl_gpio_direction_input(unsigned gpio);
-extern int pinctrl_gpio_direction_output(unsigned gpio);
-
-> - Set GPIO direction to input
-
-This should be done in these callbacks from struct gpio_chip:
-
-        int                     (*direction_input)(struct gpio_chip *chip,
-                                                unsigned offset);
-        int                     (*direction_output)(struct gpio_chip *chip,
-                                                unsigned offset, int value);
-
-By just writing the hardware registers.
-
-> Currently user need to add a dts node to set pinmux to GPIO mode with
-> input-enable property, the driver need to call gpio_direction_input to
-> set direction.
-
-It seems like:
-
-- Your GPIO driver is not calling the pinctrl_request_gpio/
-  pinctrl_gpio_direction_* etc.
-
-- Your pinmux driver is not implementing the GPIO-specifif
-  .gpio_* functions
-
-> Since input-enable and GPIO direction are 2 different things, we now
-> think this patch is inappropriate. Instead, user should not required to
-> add pinmux node in dts if all he want is use it as plain GPIO input.
-
-If you sort out the above callbacks (also read
-Documentation/pinctrl.txt about GPIO) I think it is
-clear what you need to do.
-
-Usually you should only need a special pinmux/pinconf node
-for a GPIO line if you need to specify pull-up or similar electronic
-things for that GPIO.
-
-Yours,
-Linus Walleij
+No, not at all.  I'm talking about how we handle the case where we don't
+have hardware support for this and need to implement it in software -
+currently that's in a separate place to the place where we call the
+driver.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160216/b4c89e33/attachment.sig>
