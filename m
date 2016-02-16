@@ -1,31 +1,34 @@
-From: niklas.soderlund@ragnatech.se (Niklas =?iso-8859-1?Q?S=F6derlund?=)
-Date: Tue, 16 Feb 2016 21:42:32 +0100
-Subject: [PATCH] dmaengine: use phys_addr_t for slave configuration
-In-Reply-To: <20160215173053.GM19598@localhost>
-References: <1366967214-20776-1-git-send-email-linus.walleij@linaro.org>
- <CAMuHMdUTzTBT8DyRb5WN048U5DbVsFnhJB0c5tjHBnA4rfetJg@mail.gmail.com>
- <20150710081411.GF836@localhost>
- <CAMuHMdV8a1W1MyJPanUNBzaiNsL96JYzetBVSiZoC3=eKXzo1Q@mail.gmail.com>
- <20151215172649.GK1854@localhost>
- <CAMuHMdXe8i2JbhOP2sWkVkqHEeBnW4AfVBbRaoZW=Kg0s_9m3g@mail.gmail.com>
- <20160209225724.GA1522@katana> <20160215173053.GM19598@localhost>
-Message-ID: <20160216204232.GB5268@bigcity.dyn.berto.se>
+From: mmcclint@codeaurora.org (Matthew McClintock)
+Date: Tue, 16 Feb 2016 14:43:18 -0600
+Subject: [PATCH v3 5/6] dts: ipq4019: Add support for IPQ4019 DK01 board
+In-Reply-To: <20160208224328.GB10791@codeaurora.org>
+References: <1447975173-29485-1-git-send-email-mmcclint@qca.qualcomm.com>
+ <1447975173-29485-6-git-send-email-mmcclint@qca.qualcomm.com>
+ <20160208224328.GB10791@codeaurora.org>
+Message-ID: <59152C1B-683F-417D-9C23-C6E3F53D7096@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-02-15 23:00:53 +0530, Vinod Koul wrote:
-> On Tue, Feb 09, 2016 at 11:57:24PM +0100, Wolfram Sang wrote:
-> >
-> > > This is a dependency for adding iommu support to the rcar-dmac driver, cfr.
-> > > "[PATCH v2 0/5] dmaengine: rcar-dmac: add iommu support for slave transfers".
-> > > http://www.spinics.net/lists/linux-renesas-soc/msg00066.html
-> > > https://www.mail-archive.com/linux-renesas-soc at vger.kernel.org/msg00108.html
-> > >
-> > > Thank you for applying!
-> >
-> > Yup, we really need it. Anything we can do to help?
->
-> I have done this change and discussing wider changes
-> I will send CFT hopefully before EOW, pls test :)
+On Feb 8, 2016, at 4:43 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> 
+> On 11/19, Matthew McClintock wrote:
+>> +
+>> +/ {
+>> +	model = "Qualcomm Technologies, Inc. IPQ4019/AP-DK01.1";
+>> +	compatible = "qcom,ipq4019";
+>> +
+>> +	clocks {
+>> +                xo: xo {
+>> +                        compatible = "fixed-clock";
+>> +                        clock-frequency = <48000000>;
+>> +                        #clock-cells = <0>;
+>> +                };
+>> +	};
+> 
+> Is there a reason the xo is here and the sleep clk is in the SoC
+> dtsi file? Both are board clocks so I would think they would be
+> added in the same place.
 
-Thanks Vinod for looking at this!
+I?m a little bit confused and I wanted to confirm. I can see the xo clock is on the board itself. However, the sleep_clk is not, can you clarify why they would both be in the same place?
+
+-M
