@@ -1,39 +1,33 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 16 Feb 2016 07:37:00 +0100
-Subject: [PATCH] ARM: dts: r8a7794: replace gpio-key,wakeup with
- wakeup-source property
-In-Reply-To: <1455572925-27697-1-git-send-email-horms+renesas@verge.net.au>
-References: <1455572925-27697-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdWo-tRQCRfDRrceAPaHMBMtPe15tPnMH1yjkhjpDwTSaA@mail.gmail.com>
+From: majun258@huawei.com (MaJun)
+Date: Tue, 16 Feb 2016 14:37:24 +0800
+Subject: [PATCH v2 1/5] dt-binding: Change the mbigen binding file to support
+ the mbigen-v1
+In-Reply-To: <1455604648-20668-1-git-send-email-majun258@huawei.com>
+References: <1455604648-20668-1-git-send-email-majun258@huawei.com>
+Message-ID: <1455604648-20668-2-git-send-email-majun258@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 15, 2016 at 10:48 PM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> Though the keyboard driver for GPIO buttons(gpio-keys) will continue to
-> check for/support the legacy "gpio-key,wakeup" boolean property to
-> enable gpio buttons as wakeup source, "wakeup-source" is the new
-> standard binding.
->
-> This patch replaces the legacy "gpio-key,wakeup" with the unified
-> "wakeup-source" property in order to avoid any futher copy-paste
-> duplication.
->
-> Changelog text from a similar patch by Sudeep Holla.
->
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> Reported-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+From: Ma Jun <majun258@huawei.com>
 
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Add the "hisilicon,mbigen-v1" string in binding file.
+Signed-off-by: Ma Jun <majun258@huawei.com>
+---
+ .../interrupt-controller/hisilicon,mbigen-v2.txt   |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/hisilicon,mbigen-v2.txt b/Documentation/devicetree/bindings/interrupt-controller/hisilicon,mbigen-v2.txt
+index 720f7c9..bdd1dea 100644
+--- a/Documentation/devicetree/bindings/interrupt-controller/hisilicon,mbigen-v2.txt
++++ b/Documentation/devicetree/bindings/interrupt-controller/hisilicon,mbigen-v2.txt
+@@ -16,7 +16,7 @@ The mbigen chip and devices connect to mbigen have the following properties:
+ 
+ Mbigen main node required properties:
+ -------------------------------------------
+-- compatible: Should be "hisilicon,mbigen-v2"
++- compatible: Should be "hisilicon,mbigen-v2" or "hisilicon,mbigen-v1"
+ 
+ - reg: Specifies the base physical address and size of the Mbigen
+   registers.
+-- 
+1.7.1
