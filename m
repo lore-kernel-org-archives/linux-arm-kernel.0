@@ -1,21 +1,18 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Tue, 16 Feb 2016 14:53:34 +0100
-Subject: [PATCH V5 04/15] pci, acpi,
- ecam: Add flag to indicate whether ECAM region was hot added or not.
+Date: Tue, 16 Feb 2016 14:53:33 +0100
+Subject: [PATCH V5 03/15] arm64,
+ acpi: Use MCFG library and empty PCI config space accessors from
+ pci_mcfg.c file.
 In-Reply-To: <1455630825-27253-1-git-send-email-tn@semihalf.com>
 References: <1455630825-27253-1-git-send-email-tn@semihalf.com>
-Message-ID: <1455630825-27253-5-git-send-email-tn@semihalf.com>
+Message-ID: <1455630825-27253-4-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are two ways we can get ECAM (aka MCFG) regions using ACPI,
-first from MCFG static table and second from _CBA method. We cannot remove
-static regions, however regions coming from _CBA should be removed while
-removing bridge device.
-
-In the light of above we need flag to mark hot added ECAM entries
-and user to call pci_mmconfig_insert while adding regions from _CBA method.
-Similarly pci_mmconfig_delete while removing hot added regions.
+We can now enable MCFG library. Currently, there is no ARM64 use case for
+RAW pci config accessors, so lets use empty ones for now.
+At the same time, we can cleanup the old implementation of RAW accessors
+from arch/arm64/kernel/pci.c
 
 Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
 Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
@@ -26,50 +23,50 @@ Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
 Tested-by: Graeme Gregory <graeme.gregory@linaro.org>
 Tested-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/acpi/pci_mcfg.c  | 4 +++-
- include/linux/pci-acpi.h | 1 +
- 2 files changed, 4 insertions(+), 1 deletion(-)
+ arch/arm64/Kconfig      |  4 ++++
+ arch/arm64/kernel/pci.c | 15 ---------------
+ 2 files changed, 4 insertions(+), 15 deletions(-)
 
-diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
-index 0467b00..3282f2a 100644
---- a/drivers/acpi/pci_mcfg.c
-+++ b/drivers/acpi/pci_mcfg.c
-@@ -74,6 +74,7 @@ static struct pci_mmcfg_region *pci_mmconfig_alloc(int segment, int start,
- 	new->segment = segment;
- 	new->start_bus = start;
- 	new->end_bus = end;
-+	new->hot_added = false;
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 8cc6228..552e996 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -238,6 +238,10 @@ source "drivers/pci/Kconfig"
+ source "drivers/pci/pcie/Kconfig"
+ source "drivers/pci/hotplug/Kconfig"
  
- 	res = &new->res;
- 	res->start = addr + PCI_MMCFG_BUS_OFFSET(start);
-@@ -205,6 +206,7 @@ int pci_mmconfig_insert(struct device *dev, u16 seg, u8 start, u8 end,
- 	}
- 	rc = pci_mmconfig_map_resource(dev, cfg);
- 	if (!rc) {
-+		cfg->hot_added = true;
- 		list_add_sorted(cfg);
- 		dev_info(dev, "MMCONFIG at %pR (base %#lx)\n",
- 				 &cfg->res, (unsigned long)addr);
-@@ -228,7 +230,7 @@ int pci_mmconfig_delete(u16 seg, u8 start, u8 end)
- 	mutex_lock(&pci_mmcfg_lock);
- 	list_for_each_entry_rcu(cfg, &pci_mmcfg_list, list)
- 		if (cfg->segment == seg && cfg->start_bus == start &&
--		    cfg->end_bus == end) {
-+		    cfg->end_bus == end && cfg->hot_added) {
- 			list_del_rcu(&cfg->list);
- 			synchronize_rcu();
- 			pci_mmconfig_unmap_resource(cfg);
-diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
-index e9450ef..94d8f38 100644
---- a/include/linux/pci-acpi.h
-+++ b/include/linux/pci-acpi.h
-@@ -119,6 +119,7 @@ struct pci_mmcfg_region {
- 	u8 start_bus;
- 	u8 end_bus;
- 	char name[PCI_MMCFG_RESOURCE_NAME_LEN];
-+	bool hot_added;
- };
++config PCI_MMCONFIG
++	def_bool y
++	depends on ACPI
++
+ endmenu
  
- extern int pci_mmconfig_insert(struct device *dev, u16 seg, u8 start, u8 end,
+ menu "Kernel Features"
+diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+index b3d098b..023b983 100644
+--- a/arch/arm64/kernel/pci.c
++++ b/arch/arm64/kernel/pci.c
+@@ -61,21 +61,6 @@ int pcibios_add_device(struct pci_dev *dev)
+ 	return 0;
+ }
+ 
+-/*
+- * raw_pci_read/write - Platform-specific PCI config space access.
+- */
+-int raw_pci_read(unsigned int domain, unsigned int bus,
+-		  unsigned int devfn, int reg, int len, u32 *val)
+-{
+-	return -ENXIO;
+-}
+-
+-int raw_pci_write(unsigned int domain, unsigned int bus,
+-		unsigned int devfn, int reg, int len, u32 val)
+-{
+-	return -ENXIO;
+-}
+-
+ #ifdef CONFIG_ACPI
+ /* Root bridge scanning */
+ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
 -- 
 1.9.1
