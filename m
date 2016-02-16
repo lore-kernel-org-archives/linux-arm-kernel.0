@@ -1,69 +1,162 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 16 Feb 2016 13:09:51 +0000
-Subject: [PATCH v3 05/10] serial: mps2-uart: add support for early console
-In-Reply-To: <CAHp75VdugAq0WnzLHmd9CJHCjBOdBwPqCmC3ARSaVF5XMYGoMw@mail.gmail.com>
-References: <1455617295-23736-1-git-send-email-vladimir.murzin@arm.com>	<1455617295-23736-6-git-send-email-vladimir.murzin@arm.com>
- <CAHp75VdugAq0WnzLHmd9CJHCjBOdBwPqCmC3ARSaVF5XMYGoMw@mail.gmail.com>
-Message-ID: <56C31F9F.10000@arm.com>
+From: gkulkarni@caviumnetworks.com (Ganapatrao Kulkarni)
+Date: Tue, 16 Feb 2016 18:41:22 +0530
+Subject: [PATCH v3] irqchip, gicv3-its,
+ numa: Workaround for Cavium thunderx erratum 23144
+Message-ID: <1455628282-8939-1-git-send-email-gkulkarni@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/02/16 10:36, Andy Shevchenko wrote:
-> On Tue, Feb 16, 2016 at 12:08 PM, Vladimir Murzin
-> <vladimir.murzin@arm.com> wrote:
->> This adds support early console for MPS2 UART which can be enabled via
->> earlycon=mps2,0x40004000
-> 
-> 
->> --- a/drivers/tty/serial/mps2-uart.c
->> +++ b/drivers/tty/serial/mps2-uart.c
->> @@ -435,6 +435,36 @@ static struct console mps2_uart_console = {
->>
->>  #define MPS2_SERIAL_CONSOLE (&mps2_uart_console)
->>
->> +static void mps2_early_putchar(struct uart_port *port, int ch)
->> +{
->> +
->> +       while (readb(port->membase + UARTn_STATE) & UARTn_STATE_TX_FULL)
->> +               cpu_relax();
-> 
-> Infinite busy loop?
+The erratum fixes the hang of ITS SYNC command by avoiding inter node
+io and collections/cpu mapping on thunderx dual-socket platform.
 
-In case of broken hw, yes, but I'm quite unsure how we can help to fix
-it. Do you have something in mind?
+This is based on NUMA v10 series.
+https://lkml.org/lkml/2016/2/2/134
 
-> 
->> +
->> +       writeb((unsigned char)ch, port->membase + UARTn_DATA);
->> +}
->> +
->> +
->> +static void mps2_early_write(struct console *con, const char *s, unsigned n)
->> +{
->> +       struct earlycon_device *dev = con->data;
->> +
->> +       uart_console_write(&dev->port, s, n, mps2_early_putchar);
->> +}
->> +
->> +static int __init mps2_early_console_setup(struct earlycon_device *device,
->> +                                          const char *opt)
->> +{
->> +       if (!device->port.membase)
->> +               return -ENODEV;
->> +
->> +       device->con->write = mps2_early_write;
->> +
->> +       return 0;
->> +}
->> +EARLYCON_DECLARE(mps2, mps2_early_console_setup);
->> +OF_EARLYCON_DECLARE(mps2, "arm,mps2-uart", mps2_early_console_setup);
-> 
-> IIRC Peter Hurley mentioned you don't need to put both anymore, OF_
-> one is enough.
-> 
+v3:
+updatated as per Marc Zyngier's review comments.
+http://www.spinics.net/lists/arm-kernel/msg443462.html
 
-I've just tried with OF_ only and seems it works fine. Thanks for
-pointing at it!
+v2:
+updatated as per Marc Zyngier's review comments.
 
-Cheers
-Vladimir
+Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
+
+---
+ arch/arm64/Kconfig               |  9 ++++++++
+ drivers/irqchip/irq-gic-v3-its.c | 46 ++++++++++++++++++++++++++++++++++++++--
+ 2 files changed, 53 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 8a7c02a..c3ab043 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -434,6 +434,15 @@ config CAVIUM_ERRATUM_23154
+ 
+ 	  If unsure, say Y.
+ 
++config CAVIUM_ERRATUM_23144
++	bool "Cavium erratum 23144: ITS SYNC hang on dual socket system"
++	depends on NUMA
++	default y
++	help
++	  ITS SYNC command hang for cross node io and collections/cpu mapping.
++
++	  If unsure, say Y.
++
+ endmenu
+ 
+ 
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index e23d1d1..8999e5e 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -41,6 +41,7 @@
+ 
+ #define ITS_FLAGS_CMDQ_NEEDS_FLUSHING		(1ULL << 0)
+ #define ITS_FLAGS_WORKAROUND_CAVIUM_22375	(1ULL << 1)
++#define ITS_FLAGS_WORKAROUND_CAVIUM_23144	(1ULL << 2)
+ 
+ #define RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING	(1 << 0)
+ 
+@@ -71,6 +72,7 @@ struct its_node {
+ 	struct list_head	its_device_list;
+ 	u64			flags;
+ 	u32			ite_size;
++	int			numa_node;
+ };
+ 
+ #define ITS_ITT_ALIGN		SZ_256
+@@ -605,11 +607,21 @@ static void its_eoi_irq(struct irq_data *d)
+ static int its_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+ 			    bool force)
+ {
+-	unsigned int cpu = cpumask_any_and(mask_val, cpu_online_mask);
++	unsigned int cpu;
++	const struct cpumask *cpu_mask = cpu_online_mask;
+ 	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
+ 	struct its_collection *target_col;
+ 	u32 id = its_get_event_id(d);
+ 
++       /* lpi cannot be routed to a redistributor that is on a foreign node */
++	if (its_dev->its->flags & ITS_FLAGS_WORKAROUND_CAVIUM_23144) {
++		cpu_mask = cpumask_of_node(its_dev->its->numa_node);
++		if (!cpumask_intersects(mask_val, cpu_mask))
++			return -EINVAL;
++	}
++
++	cpu = cpumask_any_and(mask_val, cpu_mask);
++
+ 	if (cpu >= nr_cpu_ids)
+ 		return -EINVAL;
+ 
+@@ -1086,6 +1098,14 @@ static void its_cpu_init_collection(void)
+ 	list_for_each_entry(its, &its_nodes, entry) {
+ 		u64 target;
+ 
++		/* avoid cross node collections and its mapping */
++		if (its->flags & ITS_FLAGS_WORKAROUND_CAVIUM_23144) {
++			struct device_node *cpu_node;
++			cpu_node = of_get_cpu_node(cpu, NULL);
++			if (its->numa_node != of_node_to_nid(cpu_node))
++				continue;
++		}
++
+ 		/*
+ 		 * We now have to bind each collection to its target
+ 		 * redistributor.
+@@ -1313,9 +1333,14 @@ static void its_irq_domain_activate(struct irq_domain *domain,
+ {
+ 	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
+ 	u32 event = its_get_event_id(d);
++	const struct cpumask *cpu_mask = cpu_online_mask;
++
++	/* get the cpu_mask of local node */
++	if (IS_ENABLED(CONFIG_NUMA))
++		cpu_mask = cpumask_of_node(its_dev->its->numa_node);
+ 
+ 	/* Bind the LPI to the first possible CPU */
+-	its_dev->event_map.col_map[event] = cpumask_first(cpu_online_mask);
++	its_dev->event_map.col_map[event] = cpumask_first(cpu_mask);
+ 
+ 	/* Map the GIC IRQ and event to the device */
+ 	its_send_mapvi(its_dev, d->hwirq, event);
+@@ -1405,6 +1430,13 @@ static void __maybe_unused its_enable_quirk_cavium_22375(void *data)
+ 	its->flags |= ITS_FLAGS_WORKAROUND_CAVIUM_22375;
+ }
+ 
++static void __maybe_unused its_enable_quirk_cavium_23144(void *data)
++{
++	struct its_node *its = data;
++
++	its->flags |= ITS_FLAGS_WORKAROUND_CAVIUM_23144;
++}
++
+ static const struct gic_quirk its_quirks[] = {
+ #ifdef CONFIG_CAVIUM_ERRATUM_22375
+ 	{
+@@ -1414,6 +1446,15 @@ static const struct gic_quirk its_quirks[] = {
+ 		.init	= its_enable_quirk_cavium_22375,
+ 	},
+ #endif
++
++#ifdef CONFIG_CAVIUM_ERRATUM_23144
++	{
++		.desc	= "ITS: Cavium erratum 23144",
++		.iidr	= 0xa100034c,	/* ThunderX pass 1.x */
++		.mask	= 0xffff0fff,
++		.init	= its_enable_quirk_cavium_23144,
++	},
++#endif
+ 	{
+ 	}
+ };
+@@ -1475,6 +1516,7 @@ static int its_probe(struct device_node *node, struct irq_domain *parent)
+ 	its->base = its_base;
+ 	its->phys_base = res.start;
+ 	its->ite_size = ((readl_relaxed(its_base + GITS_TYPER) >> 4) & 0xf) + 1;
++	its->numa_node = of_node_to_nid(node);
+ 
+ 	its->cmd_base = kzalloc(ITS_CMD_QUEUE_SZ, GFP_KERNEL);
+ 	if (!its->cmd_base) {
+-- 
+1.8.1.4
