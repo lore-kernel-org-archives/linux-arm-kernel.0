@@ -1,94 +1,24 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 16 Feb 2016 09:53:20 +0000
-Subject: Writes, smp_wmb(), and transitivity?
-In-Reply-To: <20160215203512.GL6719@linux.vnet.ibm.com>
-References: <20160215175825.GA15878@linux.vnet.ibm.com>
- <20160215185832.GQ6298@arm.com>
- <20160215203512.GL6719@linux.vnet.ibm.com>
-Message-ID: <20160216095319.GA14509@arm.com>
+From: sebott@linux.vnet.ibm.com (Sebastian Ott)
+Date: Tue, 16 Feb 2016 10:54:23 +0100 (CET)
+Subject: [BUG] random kernel crashes after THP rework on s390 (maybe also
+ on PowerPC and ARM)
+In-Reply-To: <20160215213526.GA9766@node.shutemov.name>
+References: <20160211192223.4b517057@thinkpad>
+ <20160211190942.GA10244@node.shutemov.name>
+ <20160211205702.24f0d17a@thinkpad>
+ <20160212154116.GA15142@node.shutemov.name> <56BE00E7.1010303@de.ibm.com>
+ <20160212181640.4eabb85f@thinkpad>
+ <20160212231510.GB15142@node.shutemov.name>
+ <alpine.LFD.2.20.1602131238260.1910@schleppi>
+ <20160215113159.GA28832@node.shutemov.name>
+ <20160215193702.4a15ed5e@thinkpad> <20160215213526.GA9766@node.shutemov.name>
+Message-ID: <alpine.LFD.2.20.1602161053410.1762@schleppi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 15, 2016 at 12:35:12PM -0800, Paul E. McKenney wrote:
-> On Mon, Feb 15, 2016 at 06:58:32PM +0000, Will Deacon wrote:
-> > On Mon, Feb 15, 2016 at 09:58:25AM -0800, Paul E. McKenney wrote:
-> > > Some architectures provide local transitivity for a chain of threads doing
-> > > writes separated by smp_wmb(), as exemplified by the litmus tests below.
-> > > The pattern is that each thread writes to a its own variable, does an
-> > > smp_wmb(), then writes a different value to the next thread's variable.
-> > > 
-> > > I don't know of a use of this, but if everyone supports it, it might
-> > > be good to mandate it.  Status quo is that smp_wmb() is non-transitive,
-> > > so it currently isn't supported.
-> > > 
-> > > Anyone know of any architectures that do -not- support this?
-> > > 
-> > > Assuming all architectures -do- support this, any arguments -against-
-> > > officially supporting it in Linux?
-> > > 
-> > > 							Thanx, Paul
-> > > 
-> > > ------------------------------------------------------------------------
-> > > 
-> > > Two threads:
-> > > 
-> > > 	int a, b;
-> > > 
-> > > 	void thread0(void)
-> > > 	{
-> > > 		WRITE_ONCE(a, 1);
-> > > 		smp_wmb();
-> > > 		WRITE_ONCE(b, 2);
-> > > 	}
-> > > 
-> > > 	void thread1(void)
-> > > 	{
-> > > 		WRITE_ONCE(b, 1);
-> > > 		smp_wmb();
-> > > 		WRITE_ONCE(a, 2);
-> > > 	}
-> > > 
-> > > 	/* After all threads have completed and the dust has settled... */
-> > > 
-> > > 	BUG_ON(a == 1 && b == 1);
-> > 
-> > My understanding is that this test, and the generalisation to n threads,
-> > is forbidden on ARM. However, the transitivity of DMB ST (used to
-> > construct smp_wmb()) has been the subject of long debates, because we
-> > allow the following test:
-> > 
-> > 
-> > P0:
-> > Wx = 1
-> > 
-> > P1:
-> > Rx == 1
-> > DMB ST
-> > Wy = 1
-> > 
-> > P2:
-> > Ry == 1
-> > <addr dep>
-> > Rx == 0
-> > 
-> > 
-> > so I'd be uneasy about saying "it's all transitive".
-> 
-> Agreed!  For one thing, doesn't DMB ST need writes on both sides?
 
-Yes, but it's a common trap that people fall into where they think the
-above is forbidden because the DMB ST in P1 should order P0's write
-before its own write of y.
+On Mon, 15 Feb 2016, Kirill A. Shutemov wrote:
+> Just to make sure: commit 122afea9626a is fine, commit 61f5d698cc97
+> crashes. Correct?
 
-> But that is one reason that I am only semi-enthusiastic about this.
-> The potentially locally transitive case is -very- restrictive, applying
-> only to situations where -all- accesses are writes.
-
-I think that we will confuse people more by trying to describe the
-restricted case where we provide order than if we blanket say that its
-not transitive. I know Linus prefers to be as strong as possible, but
-this doesn't look like a realistic programming paradigm and having a
-straightforward rule that "rmb and wmb are not transitive" is much
-easier for people to deal with in my opinion.
-
-Will
+Correct.
