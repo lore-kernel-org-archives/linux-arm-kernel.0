@@ -1,35 +1,21 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 16 Feb 2016 11:56:08 +0100
-Subject: [PATCH v3 06/10] ARM: mps2: introduce MPS2 platform
-In-Reply-To: <1455617295-23736-7-git-send-email-vladimir.murzin@arm.com>
-References: <1455617295-23736-1-git-send-email-vladimir.murzin@arm.com>
- <1455617295-23736-7-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <29457600.xRDuy0uVjW@wuerfel>
+From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
+Date: Tue, 16 Feb 2016 16:29:48 +0530
+Subject: [PATCH 0/3] net: thunderx: Miscellaneous fixes
+Message-ID: <1455620391-31619-1-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 16 February 2016 10:08:11 Vladimir Murzin wrote:
-> The Cortex-M Prototyping System (or V2M-MPS2) is designed for
-> prototyping and evaluation Cortex-M family of processors including the
-> latest Cortex-M7
-> 
-> It comes with a range of useful peripherals including 8MB single cycle
-> SRAM, 16MB PSRAM, Ethernet, QSVGA touch screen panel, 4bit RGB VGA
-> connector, Audio, SPI and GPIO.
-> 
-> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
-> ---
->  arch/arm/Kconfig                 |    8 ++++++++
->  arch/arm/Makefile                |    1 +
->  arch/arm/mach-mps2/Makefile      |    1 +
->  arch/arm/mach-mps2/Makefile.boot |    3 +++
->  arch/arm/mach-mps2/dtmachine.c   |   21 +++++++++++++++++++++
-> 
+From: Sunil Goutham <sgoutham@cavium.com>
 
-We are in the (slow) process of consolidating the ARM reference platforms
-(versatile, integrator, realview, vexpress) into one place.
+This patch series fixes couple of issues w.r.t multiqset mode
+and receive packet statastics.
 
-I'd suggest adding all this to the mach-vexpress directory rather than
-a new directory, so we don't have another one to consolidate.
+Sunil Goutham (3):
+  net: thunderx: Fix for multiqset not configured upon interface toggle
+  net: thunderx: Fix for HW TSO not enabled for secondary qsets
+  net: thunderx: Fix receive packet stats
 
-	Arnd
+ drivers/net/ethernet/cavium/thunder/nicvf_main.c   |   18 +++++++++---------
+ drivers/net/ethernet/cavium/thunder/nicvf_queues.c |    8 ++------
+ drivers/net/ethernet/cavium/thunder/nicvf_queues.h |    3 +--
+ 3 files changed, 12 insertions(+), 17 deletions(-)
