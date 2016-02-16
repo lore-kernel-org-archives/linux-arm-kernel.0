@@ -1,65 +1,24 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 16 Feb 2016 18:26:09 +0100
-Subject: [PATCH] sound: hdmi: avoid dereferencing uninitialized 'jack'
- pointer
-In-Reply-To: <s5hr3gc60ph.wl-tiwai@suse.de>
-References: <1455634059-1896914-1-git-send-email-arnd@arndb.de>
- <112888486.mQgaWiH0PI@wuerfel> <s5hr3gc60ph.wl-tiwai@suse.de>
-Message-ID: <2706488.VpKveMVPGI@wuerfel>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 16 Feb 2016 11:28:07 -0600
+Subject: [PATCH v6sub1 02/11] of/fdt: factor out assignment of
+ initrd_start/initrd_end
+In-Reply-To: <1455627162-31600-3-git-send-email-ard.biesheuvel@linaro.org>
+References: <1455627162-31600-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1455627162-31600-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <CAL_JsqJEZ+O-VCAYyAbZD4LygRYKyfM4Xh+qMpx5a8-o-OX_Fw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 16 February 2016 18:10:02 Takashi Iwai wrote:
-> diff --git a/include/sound/jack.h b/include/sound/jack.h
-> index 23bede121c78..a27c253a3207 100644
-> --- a/include/sound/jack.h
-> +++ b/include/sound/jack.h
-> @@ -99,6 +99,7 @@ void snd_jack_report(struct snd_jack *jack, int status);
->  static inline int snd_jack_new(struct snd_card *card, const char *id, int type,
->                                struct snd_jack **jack, bool initial_kctl, bool phantom_jack)
->  {
-> +       *jack = NULL;
->         return 0;
->  }
->  
-> diff --git a/sound/pci/hda/hda_jack.c b/sound/pci/hda/hda_jack.c
-> index a33234e04d4f..babd3a8864a1 100644
-> --- a/sound/pci/hda/hda_jack.c
-> +++ b/sound/pci/hda/hda_jack.c
-> @@ -403,10 +403,12 @@ int snd_hda_jack_add_kctl(struct hda_codec *codec, hda_nid_t nid,
->  
->         jack->phantom_jack = !!phantom_jack;
->         jack->type = type;
-> -       jack->jack->private_data = jack;
-> -       jack->jack->private_free = hda_free_jack_priv;
-> -       state = snd_hda_jack_detect(codec, nid);
-> -       snd_jack_report(jack->jack, state ? jack->type : 0);
-> +       if (jack->jack) {
-> +               jack->jack->private_data = jack;
-> +               jack->jack->private_free = hda_free_jack_priv;
-> +               state = snd_hda_jack_detect(codec, nid);
-> +               snd_jack_report(jack->jack, state ? jack->type : 0);
-> +       }
->  
->         return 0;
->  }
-> diff --git a/sound/pci/hda/patch_hdmi.c b/sound/pci/hda/patch_hdmi.c
-> index 8ee78dbd4c60..34a7b3aaba11 100644
-> --- a/sound/pci/hda/patch_hdmi.c
-> +++ b/sound/pci/hda/patch_hdmi.c
-> @@ -2158,8 +2158,10 @@ static int add_acomp_jack_kctl(struct hda_codec *codec,
->         if (err < 0)
->                 return err;
->         per_pin->acomp_jack = jack;
-> -       jack->private_data = per_pin;
-> -       jack->private_free = free_acomp_jack_priv;
-> +       if (jack) {
-> +               jack->private_data = per_pin;
-> +               jack->private_free = free_acomp_jack_priv;
-> +       }
->         return 0;
->  }
-> 
-Looks good to me.
+On Tue, Feb 16, 2016 at 6:52 AM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> Since architectures may not yet have their linear mapping up and running
+> when the initrd address is discovered from the DT, factor out the
+> assignment of initrd_start and initrd_end, so that an architecture can
+> override it and use the translation it needs.
+>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  drivers/of/fdt.c | 14 +++++++++++---
+>  1 file changed, 11 insertions(+), 3 deletions(-)
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Rob Herring <robh@kernel.org>
