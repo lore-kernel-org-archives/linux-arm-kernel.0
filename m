@@ -1,152 +1,33 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 16 Feb 2016 09:55:41 +0000
-Subject: [PATCH v4 21/23] arm64: hw_breakpoint: Allow EL2 breakpoints if
- running in HYP
-In-Reply-To: <20160215190747.GR6298@arm.com>
-References: <1455216004-19499-1-git-send-email-marc.zyngier@arm.com>
- <1455216004-19499-22-git-send-email-marc.zyngier@arm.com>
- <20160215174656.GN6298@arm.com> <20160215190747.GR6298@arm.com>
-Message-ID: <56C2F21D.90205@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 16 Feb 2016 09:56:54 +0000
+Subject: [PATCH] ARM: dts: r8a7794: replace gpio-key,wakeup with
+ wakeup-source property
+In-Reply-To: <1455572925-27697-1-git-send-email-horms+renesas@verge.net.au>
+References: <1455572925-27697-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <56C2F266.5030709@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/02/16 19:07, Will Deacon wrote:
-> On Mon, Feb 15, 2016 at 05:46:56PM +0000, Will Deacon wrote:
->> On Thu, Feb 11, 2016 at 06:40:02PM +0000, Marc Zyngier wrote:
->>> With VHE, we place kernel {watch,break}-points at EL2 to get things
->>> like kgdb and "perf -e mem:..." working.
->>>
->>> This requires a bit of repainting in the low-level encore/decode,
->>> but is otherwise pretty simple.
->>>
->>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>> ---
->>>  arch/arm64/include/asm/hw_breakpoint.h | 49 +++++++++++++++++++++-------------
->>>  1 file changed, 31 insertions(+), 18 deletions(-)
->>>
->>> diff --git a/arch/arm64/include/asm/hw_breakpoint.h b/arch/arm64/include/asm/hw_breakpoint.h
->>> index 9732908..4d8d5a8 100644
->>> --- a/arch/arm64/include/asm/hw_breakpoint.h
->>> +++ b/arch/arm64/include/asm/hw_breakpoint.h
->>> @@ -18,6 +18,7 @@
->>>  
->>>  #include <asm/cputype.h>
->>>  #include <asm/cpufeature.h>
->>> +#include <asm/virt.h>
->>>  
->>>  #ifdef __KERNEL__
->>>  
->>> @@ -35,24 +36,6 @@ struct arch_hw_breakpoint {
->>>  	struct arch_hw_breakpoint_ctrl ctrl;
->>>  };
->>>  
->>> -static inline u32 encode_ctrl_reg(struct arch_hw_breakpoint_ctrl ctrl)
->>> -{
->>> -	return (ctrl.len << 5) | (ctrl.type << 3) | (ctrl.privilege << 1) |
->>> -		ctrl.enabled;
->>> -}
->>> -
->>> -static inline void decode_ctrl_reg(u32 reg,
->>> -				   struct arch_hw_breakpoint_ctrl *ctrl)
->>> -{
->>> -	ctrl->enabled	= reg & 0x1;
->>> -	reg >>= 1;
->>> -	ctrl->privilege	= reg & 0x3;
->>> -	reg >>= 2;
->>> -	ctrl->type	= reg & 0x3;
->>> -	reg >>= 2;
->>> -	ctrl->len	= reg & 0xff;
->>> -}
->>> -
->>>  /* Breakpoint */
->>>  #define ARM_BREAKPOINT_EXECUTE	0
->>>  
->>> @@ -62,6 +45,7 @@ static inline void decode_ctrl_reg(u32 reg,
->>>  #define AARCH64_ESR_ACCESS_MASK	(1 << 6)
->>>  
->>>  /* Privilege Levels */
->>> +#define AARCH64_BREAKPOINT_EL2	0
->>>  #define AARCH64_BREAKPOINT_EL1	1
->>>  #define AARCH64_BREAKPOINT_EL0	2
->>>  
->>> @@ -76,6 +60,35 @@ static inline void decode_ctrl_reg(u32 reg,
->>>  #define ARM_KERNEL_STEP_ACTIVE	1
->>>  #define ARM_KERNEL_STEP_SUSPEND	2
->>>  
->>> +#define DBG_HMC_HYP		(1 << 13)
->>> +#define DBG_SSC_HYP		(3 << 14)
->>
->> Why do we need to touch the SSC field at all?
->>
->>> +
->>> +static inline u32 encode_ctrl_reg(struct arch_hw_breakpoint_ctrl ctrl)
->>> +{
->>> +	u32 val = (ctrl.len << 5) | (ctrl.type << 3) | ctrl.enabled;
->>> +
->>> +	if (is_kernel_in_hyp_mode() && ctrl.privilege == AARCH64_BREAKPOINT_EL1)
->>> +		val |= DBG_HMC_HYP | DBG_SSC_HYP | (AARCH64_BREAKPOINT_EL2 << 1);
->>
->> I don't think this is correct. We want to allow, for example, a userspace
->> watchpoint to fire thanks to something like put_user, so the encoding
->> really needs to build up the PMC field (like we do already), then orr in
->> the HMC field.
-> 
-> Hmm, I got my arm and my arm64 mixed up here. For the latter, we don't
-> actually support EL0+EL1 watchpoints, but I still think that the
-> {HMC,SSC,PMC} encoding of {1,00,xx} is cleaner.
-
-Indeed. So with that in mind, I ended up with the following patch, which is much simpler than the previous one:
-
-diff --git a/arch/arm64/include/asm/hw_breakpoint.h b/arch/arm64/include/asm/hw_breakpoint.h
-index 9732908..115ea2a 100644
---- a/arch/arm64/include/asm/hw_breakpoint.h
-+++ b/arch/arm64/include/asm/hw_breakpoint.h
-@@ -18,6 +18,7 @@
- 
- #include <asm/cputype.h>
- #include <asm/cpufeature.h>
-+#include <asm/virt.h>
- 
- #ifdef __KERNEL__
- 
-@@ -35,10 +36,21 @@ struct arch_hw_breakpoint {
- 	struct arch_hw_breakpoint_ctrl ctrl;
- };
- 
-+/* Privilege Levels */
-+#define AARCH64_BREAKPOINT_EL1	1
-+#define AARCH64_BREAKPOINT_EL0	2
-+
-+#define DBG_HMC_HYP		(1 << 13)
-+
- static inline u32 encode_ctrl_reg(struct arch_hw_breakpoint_ctrl ctrl)
- {
--	return (ctrl.len << 5) | (ctrl.type << 3) | (ctrl.privilege << 1) |
-+	u32 val = (ctrl.len << 5) | (ctrl.type << 3) | (ctrl.privilege << 1) |
- 		ctrl.enabled;
-+
-+	if (is_kernel_in_hyp_mode() && ctrl.privilege == AARCH64_BREAKPOINT_EL1)
-+		val |= DBG_HMC_HYP;
-+
-+	return val;
- }
- 
- static inline void decode_ctrl_reg(u32 reg,
-@@ -61,10 +73,6 @@ static inline void decode_ctrl_reg(u32 reg,
- #define ARM_BREAKPOINT_STORE	2
- #define AARCH64_ESR_ACCESS_MASK	(1 << 6)
- 
--/* Privilege Levels */
--#define AARCH64_BREAKPOINT_EL1	1
--#define AARCH64_BREAKPOINT_EL0	2
--
- /* Lengths */
- #define ARM_BREAKPOINT_LEN_1	0x1
- #define ARM_BREAKPOINT_LEN_2	0x3
 
 
-Thanks,
-	
-	M.
+On 15/02/16 21:48, Simon Horman wrote:
+> Though the keyboard driver for GPIO buttons(gpio-keys) will continue to
+> check for/support the legacy "gpio-key,wakeup" boolean property to
+> enable gpio buttons as wakeup source, "wakeup-source" is the new
+> standard binding.
+>
+> This patch replaces the legacy "gpio-key,wakeup" with the unified
+> "wakeup-source" property in order to avoid any futher copy-paste
+> duplication.
+>
+> Changelog text from a similar patch by Sudeep Holla.
+>
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
+
+Thanks for doing this, not sure how I missed it, was this merged in v4.5?
+
+Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+
 -- 
-Jazz is not dead. It just smells funny...
+Regards,
+Sudeep
