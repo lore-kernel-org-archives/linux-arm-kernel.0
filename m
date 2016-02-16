@@ -1,51 +1,49 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 16 Feb 2016 15:49:27 +0000
-Subject: [PATCH v5 15/15] arm64: hibernate: Prevent resume from a different
- kernel version
-In-Reply-To: <1455637767-31561-1-git-send-email-james.morse@arm.com>
-References: <1455637767-31561-1-git-send-email-james.morse@arm.com>
-Message-ID: <1455637767-31561-16-git-send-email-james.morse@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 16 Feb 2016 16:51:57 +0100
+Subject: [PATCH 3/4] gpio: ep93xx: remove private irq_to_gpio function
+In-Reply-To: <1455551208-2825510-4-git-send-email-arnd@arndb.de>
+References: <20160202194831.10827.63244.stgit@bhelgaas-glaptop2.roam.corp.google.com>
+ <1455551208-2825510-1-git-send-email-arnd@arndb.de>
+ <1455551208-2825510-4-git-send-email-arnd@arndb.de>
+Message-ID: <CACRpkdb3nKTEDCvafURhKRPJipJ=K_y1oyE_kKc=-T8E=Bai0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Resuming using a different kernel version is fragile, while there are
-sufficient details in the hibernate arch-header to perform the restore,
-changes in the boot process can have a long-lasting impact on the system.
-In particular, if the EFI stub causes more memory to be allocated, the
-amount of memory left for linux is reduced. If we are lucky, this will
-cause restore to fail with the message:
-> PM: Image mismatch: memory size
-If we are unlucky, the system will explode sometime later when an EFI
-runtime services call is made.
+On Mon, Feb 15, 2016 at 4:46 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-Prevent resuming with a different kernel version, by making
-HIBERNATE_VERSION the current kernel version.
+> The ep93xx goes through its own back-and-forth dance every time
+> it wants to know the gpio number for an irq line, when it really
+> just hardcodes a fixed offset in ep93xx_gpio_to_irq().
+>
+> This removes the pointless macro and replaces the conversion inside
+> of the driver with simple add/subtract operations, using an
+> explicit macro.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+(...)
 
-Signed-off-by: James Morse <james.morse@arm.com>
----
- arch/arm64/kernel/hibernate.c | 9 ++-------
- 1 file changed, 2 insertions(+), 7 deletions(-)
+> -#include <linux/gpio/driver.h>
+> -/* FIXME: this is here for gpio_to_irq() - get rid of this! */
+>  #include <linux/gpio.h>
 
-diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
-index fd2faca358f6..99ebdbb06e85 100644
---- a/arch/arm64/kernel/hibernate.c
-+++ b/arch/arm64/kernel/hibernate.c
-@@ -56,14 +56,9 @@ extern int in_suspend;
- 
- /*
-  * This value is written to the hibernate arch header, and prevents resuming
-- * from a hibernate image produced by an incompatible kernel. If you change
-- * a value that isn't saved/restored by hibernate, you should change this value.
-- *
-- * For example, if the mair_el1 values used by the kernel are changed, you
-- * should prevent resuming from a kernel with incompatible attributes, as these
-- * aren't saved/restored.
-+ * from a hibernate image produced by a different kernel version.
-  */
--#define HIBERNATE_VERSION	KERNEL_VERSION(4, 6, 0)
-+#define HIBERNATE_VERSION	LINUX_VERSION_CODE
- 
- /*
-  * Start/end of the hibernate exit code, this must be copied to a 'safe'
--- 
-2.6.2
+No, what you want to get rid of is the #include <linux/gpio.h> not the
+<linux/gpio/driver.h>, we want to be more specific. Sorry for putting the
+comment wrong.
+
+> @@ -35,6 +31,7 @@ void __iomem *ep93xx_gpio_base; /* FIXME: put this into irq_data */
+>  #define EP93XX_GPIO_LINE_MAX           63
+>
+>  /* maximum value for irq capable line identifiers */
+> +#define EP93XX_GPIO_IRQ_BASE           64
+>  #define EP93XX_GPIO_LINE_MAX_IRQ       23
+
+This doesn't apply to my tree :O
+
+My EP93XX_GPIO_LINE_MAX_IRQ is in
+arch/arm/mach-ep93xx/include/mach/gpio-ep93xx.h
+
+So I think you must be having another patch somewhere in the ARM SoC
+tree. (I can take it, just send it along with an update of this one.)
+
+Yours,
+Linus Walleij
