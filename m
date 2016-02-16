@@ -1,40 +1,48 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 16 Feb 2016 11:13:05 +0000
-Subject: [PATCH] arm64: mark kernel text segment as MEMBLOCK_NOMAP
-In-Reply-To: <CAKv+Gu_yTz-ohFPS0wMX42iCkDNaSwZoZ8Yi-zsZNNu1LNDkZQ@mail.gmail.com>
-References: <1455528512-32491-1-git-send-email-ard.biesheuvel@linaro.org>	<56C2FF07.30205@arm.com>
- <CAKv+Gu_yTz-ohFPS0wMX42iCkDNaSwZoZ8Yi-zsZNNu1LNDkZQ@mail.gmail.com>
-Message-ID: <56C30441.1080003@arm.com>
+From: brian.starkey@arm.com (Brian Starkey)
+Date: Tue, 16 Feb 2016 11:14:26 +0000
+Subject: [RESEND2 PATCH 1/3] memremap: add MEMREMAP_WC flag
+In-Reply-To: <20160209091501.GA23507@e106950-lin.cambridge.arm.com>
+References: <cover.1454950917.git.brian.starkey@arm.com>
+ <9085d37fa97a762a46b9d58719c085368682c64f.1454950917.git.brian.starkey@arm.com>
+ <20160208183006.GA8429@kroah.com>
+ <20160209091501.GA23507@e106950-lin.cambridge.arm.com>
+Message-ID: <20160216111426.GA22133@e106950-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/02/16 10:57, Ard Biesheuvel wrote:
-> On 16 February 2016 at 11:50, James Morse <james.morse@arm.com> wrote:
->> On 15/02/16 09:28, Ard Biesheuvel wrote:
->>> This should hopefully address the issue reported by James, but I suppose
->>> more work is required on the hibernate side to ensure the unmapped text
->>> region is preserved, since it is no longer covered by the linear mapping.
+Hi Greg,
+
+Is the documentation OK? Is there any chance of you picking up this
+series?
+
+I can rebase onto -next if that's the right place, but they still apply
+on 4.5-rc4 and fix a panic, so I thought perhaps they could make 4.5.
+
+Thanks,
+Brian
+
+On Tue, Feb 09, 2016 at 09:15:02AM +0000, Brian Starkey wrote:
+>Hi Greg,
+>
+>On Mon, Feb 08, 2016 at 10:30:06AM -0800, Greg KH wrote:
+>>On Mon, Feb 08, 2016 at 05:30:50PM +0000, Brian Starkey wrote:
+>>>diff --git a/include/linux/io.h b/include/linux/io.h
+>>>index 32403b5..e2c8419 100644
+>>>--- a/include/linux/io.h
+>>>+++ b/include/linux/io.h
+>>>@@ -135,6 +135,7 @@ enum {
+>>> 	/* See memremap() kernel-doc for usage description... */
+>>> 	MEMREMAP_WB = 1 << 0,
+>>> 	MEMREMAP_WT = 1 << 1,
+>>>+	MEMREMAP_WC = 1 << 2,
 >>
->> It does, now I have to work out how best to fix hibernate!
+>>You didn't update the documentation :(
 >>
-> 
-> Indeed. The alternative would be to map the [_stext, _etext] interval
-> into the linear region as a ro/nx alias of the actual mapping in the
-> vmalloc region. That would probably make your life easier, but I am
-> not convinced the overall result is better.
-
-I assumed you would NACK any approach that looked like that:
-It could be done temporarily while the memory snapshot is being taken, only
-swsusp_save() would see this mapping, it can be removed again afterwards. But
-pfn_valid() will still say those pages aren't there, and there is no
-memblock_clear_nomap() to change this.
-
-
-The current approach involves copying the kernel text into pages that are saved,
-and having two lists of pages that need restoring. (wheels within wheels!)
-Pretty unpleasant, and requires another patch in the core code, so likely won't
-be possible for v4.6. I should have the patches out for review later today.
-
-
-
-James
+>
+>Maybe I missed something, but I don't think there's anything to update
+>here? Like the comment says, the flags are documented in the memremap()
+>kernel-doc (which I did update - see the next two hunks of this patch).
+>
+>Thanks,
+>
+>Brian
