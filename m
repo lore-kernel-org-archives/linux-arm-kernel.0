@@ -1,36 +1,77 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 16 Feb 2016 23:30:30 +0100
-Subject: [PATCH 00/11] CLCD Nomadik+Versatile support
-In-Reply-To: <56C32456.2030800@ti.com>
-References: <1454594660-7532-1-git-send-email-linus.walleij@linaro.org>
- <CACRpkda=mgcF8RRymbe0AAKpfCWGZSw_YZP5_6JW2g-mKEt16g@mail.gmail.com>
- <56C32456.2030800@ti.com>
-Message-ID: <CACRpkdZ-tH++mR2eD8J2-KETKgSW-peh3Xf0XPqHQD3U0T-FUw@mail.gmail.com>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Tue, 16 Feb 2016 14:31:58 -0800
+Subject: [PATCH v5 0/3] arm64/clk: EXYNOS: Consolidate Exynos7 symbol
+In-Reply-To: <1455603632-11158-1-git-send-email-k.kozlowski@samsung.com>
+References: <1455603632-11158-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <20160216223158.2278.48998@quark.deferred.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 16, 2016 at 2:29 PM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
-> On 16/02/16 01:34, Linus Walleij wrote:
->> On Thu, Feb 4, 2016 at 3:04 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
->>
->>> Eventually I would like to have patches 1 thru 8 (those with
->>> patches to CLCD or the DT bindings) applied through the FBDEV
->>> subsystem,
->>
->> If there are no comments, would the fbdev people consider
->> patches 1 thru 8?
->
-> Hmm... Is there a v2 for the 05 patch? I see one in my mailbox, but it's
-> not sent as a reply to this thread, making it a bit unclear.
+Quoting Krzysztof Kozlowski (2016-02-15 22:20:29)
+> Hi,
+> 
+> Patchset attempts to remove the ARCH_EXYNOS7 symbol.
+> 
+> I rebased this on top of James':
+>  - clk: Move vendor's Kconfig into CCF menu section
+>    http://www.spinics.net/lists/devicetree/msg111953.html
+> 
+> The third patch depends on previous ones so one way of merging this
+> would be to prepare a tag from clk tree with first two patches
+> and the dependency. The last third patch would go through arm-soc.
 
-Yeah there is a v2, I sent that separately as I didn't have any other
-patch to follow up on.
+I've done this locally and things look good. I'm just waiting for Acks
+to patch #2 and I'll merge patches #1 and #2 and provide a stable tag
+named clk-samsung-kconfig, based on v4.5-rc1.
 
-I never figured out how to use in-reply-to sorry... maybe I should
-learn it :/
+These patches were not based on -rc1, but the fixups were trivial so I'm
+fine with them.
 
-If you prefer I can resent the whole 1 thru 8 series, or does it work
-like this too?
+Regards,
+Mike
 
-Yours,
-Linus Walleij
+> 
+> Changes since v4:
+> =================
+> 1. Rebased on "clk: Move vendor's Kconfig into CCF menu section"
+>    existing in clock tree.
+> 2. Re-work patch 2/3 (see specific changelog).
+> 
+> Changes since v3:
+> =================
+> 1. Rebase on next-20160127 (s3c64xx became multiplatform).
+> 
+> Changes since v2:
+> =================
+> 1. Follow Arnd's advice about not enabling silently the newly added
+>    EXYNOS_ARM64_COMMON_CLK, when COMPILE_TEST is enabled. This was
+>    also a trigger for some changes in placement of Samsung clocks
+>    Kconfig entries...
+> 2. ... which lead to introducing patch 1.
+> 
+> 
+> Rationale:
+> ==========
+> We don't need ARCH_EXYNOS7 symbol because all ARMv8 platforms should
+> fall under generic ARCH_EXYNOS. In the same time there is no sense
+> in building clocks for these ARMv8 SoCs on ARMv7 builds.
+> 
+> 
+> Best regards,
+> Krzysztof
+> 
+> Krzysztof Kozlowski (3):
+>   clk: samsung: Enable COMPILE_TEST for Samsung clocks
+>   clk: samsung: Don't build ARMv8 clock drivers on ARMv7
+>   arm64: EXYNOS: Consolidate ARCH_EXYNOS7 symbol into ARCH_EXYNOS
+> 
+>  arch/arm64/Kconfig.platforms        | 11 ++---------
+>  arch/arm64/boot/dts/exynos/Makefile |  2 +-
+>  arch/arm64/configs/defconfig        |  2 +-
+>  drivers/clk/samsung/Kconfig         | 18 +++++++++++++-----
+>  drivers/clk/samsung/Makefile        |  4 ++--
+>  5 files changed, 19 insertions(+), 18 deletions(-)
+> 
+> -- 
+> 2.5.0
+> 
