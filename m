@@ -1,96 +1,74 @@
-From: tbaicar@codeaurora.org (Baicar, Tyler)
-Date: Tue, 16 Feb 2016 12:19:47 -0700
-Subject: [PATCH v2 1/2] efi: esrt: use memremap not ioremap to access ESRT
- table in memory
-In-Reply-To: <1455535953-5056-2-git-send-email-ard.biesheuvel@linaro.org>
-References: <1455535953-5056-1-git-send-email-ard.biesheuvel@linaro.org>
- <1455535953-5056-2-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <56C37653.9060807@codeaurora.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 16 Feb 2016 20:20:50 +0100
+Subject: [PATCH] ARM: fix __start_rodata_section_aligned on XIP
+In-Reply-To: <20160216183809.GA26069@www.outflux.net>
+References: <20160216183809.GA26069@www.outflux.net>
+Message-ID: <CAMuHMdXuAkXqZ_09iF3ZCksPtWB-pm-9YtAOqw+E3KpFnoegug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/15/2016 4:32 AM, Ard Biesheuvel wrote:
-> On ARM and arm64, ioremap() and memremap() are not interchangeable like
-> on x86, and the use of ioremap() on ordinary RAM is typically flagged
-> as an error if the memory region being mapped is also covered by the
-> linear mapping, since that would lead to aliases with conflicting
-> cacheability attributes.
->
-> Since what we are dealing with is not an I/O region with side effects,
-> using ioremap() here is arguably incorrect anyway, so let's replace
-> it with memremap instead. Also add a missing unmap on the success path,
-> and drop a memblock_remove() call which does not belong here, this far
-> into the boot sequence.
->
-> Cc: Peter Jones <pjones@redhat.com>
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Hi Kees,
 
-Tested-by: Tyler Baicar<tbaicar@codeaurora.org>
-
-> ---
->   drivers/firmware/efi/esrt.c | 16 ++++++++--------
->   1 file changed, 8 insertions(+), 8 deletions(-)
+On Tue, Feb 16, 2016 at 7:38 PM, Kees Cook <keescook@chromium.org> wrote:
+> This fixes the build for both allnoconfig (!CONFIG_MMU) and with
+> XIP_KERNEL (due to missing pieces in the linker script), as seen after
+> both "ARM: 8502/1: mm: mark section-aligned portion of rodata NX" and
+> "ARM: 8513/1: xip: Move XIP linking to a separate file".
 >
-> diff --git a/drivers/firmware/efi/esrt.c b/drivers/firmware/efi/esrt.c
-> index 22c5285f7705..f096a0a26dbd 100644
-> --- a/drivers/firmware/efi/esrt.c
-> +++ b/drivers/firmware/efi/esrt.c
-> @@ -16,6 +16,7 @@
->   #include <linux/device.h>
->   #include <linux/efi.h>
->   #include <linux/init.h>
-> +#include <linux/io.h>
->   #include <linux/kernel.h>
->   #include <linux/kobject.h>
->   #include <linux/list.h>
-> @@ -385,15 +386,15 @@ static void cleanup_entry_list(void)
->   static int __init esrt_sysfs_init(void)
->   {
->   	int error;
-> -	struct efi_system_resource_table __iomem *ioesrt;
-> +	struct efi_system_resource_table *memesrt;
->   
->   	pr_debug("esrt-sysfs: loading.\n");
->   	if (!esrt_data || !esrt_data_size)
->   		return -ENOSYS;
->   
-> -	ioesrt = ioremap(esrt_data, esrt_data_size);
-> -	if (!ioesrt) {
-> -		pr_err("ioremap(%pa, %zu) failed.\n", &esrt_data,
-> +	memesrt = memremap(esrt_data, esrt_data_size, MEMREMAP_WB);
-> +	if (!memesrt) {
-> +		pr_err("memremap(%pa, %zu, MEMREMAP_WB) failed.\n", &esrt_data,
->   		       esrt_data_size);
->   		return -ENOMEM;
->   	}
-> @@ -401,11 +402,12 @@ static int __init esrt_sysfs_init(void)
->   	esrt = kmalloc(esrt_data_size, GFP_KERNEL);
->   	if (!esrt) {
->   		pr_err("kmalloc failed. (wanted %zu bytes)\n", esrt_data_size);
-> -		iounmap(ioesrt);
-> +		memunmap(memesrt);
->   		return -ENOMEM;
->   	}
->   
-> -	memcpy_fromio(esrt, ioesrt, esrt_data_size);
-> +	memcpy(esrt, memesrt, esrt_data_size);
-> +	memunmap(memesrt);
->   
->   	esrt_kobj = kobject_create_and_add("esrt", efi_kobj);
->   	if (!esrt_kobj) {
-> @@ -432,8 +434,6 @@ static int __init esrt_sysfs_init(void)
->   	if (error)
->   		goto err_cleanup_list;
->   
-> -	memblock_remove(esrt_data, esrt_data_size);
-> -
->   	pr_debug("esrt-sysfs: loaded.\n");
->   
->   	return 0;
-Thanks,
-Tyler
+> Reported-by: Russell King <linux@arm.linux.org.uk>
+> Reported-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Kees Cook <keescook@chromium.org>
 
--- 
-Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> diff --git a/arch/arm/kernel/vmlinux-xip.lds.S b/arch/arm/kernel/vmlinux-xip.lds.S
+> index 40bc4cadb959..2da60cd1b295 100644
+> --- a/arch/arm/kernel/vmlinux-xip.lds.S
+> +++ b/arch/arm/kernel/vmlinux-xip.lds.S
+
+> @@ -310,6 +311,17 @@ SECTIONS
+>  }
+>
+>  /*
+> + * Without CONFIG_DEBUG_ALIGN_RODATA, __start_rodata_section_aligned will
+> + * be the first section-aligned location after __start_rodata. Otherwise,
+> + * it will be equal to __start_rodata.
+> + */
+> +#ifdef CONFIG_MMU
+
+CONFIG_DEBUG_ALIGN_RODATA or CONFIG_MMU?
+
+> +__start_rodata_section_aligned = ALIGN(__start_rodata, 1 << SECTION_SHIFT);
+> +#else
+> +__start_rodata_section_aligned = __start_rodata;
+> +#endif
+> +
+> +/*
+>   * These must never be empty
+>   * If you have to comment these two assert statements out, your
+>   * binutils is too old (for other reasons as well)
+> diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+> index 1707b9431761..f13960e44955 100644
+> --- a/arch/arm/kernel/vmlinux.lds.S
+> +++ b/arch/arm/kernel/vmlinux.lds.S
+> @@ -328,7 +328,11 @@ SECTIONS
+>   * be the first section-aligned location after __start_rodata. Otherwise,
+>   * it will be equal to __start_rodata.
+>   */
+> +#ifdef CONFIG_MMU
+
+Likewise (the out-of-scope comment says CONFIG_DEBUG_ALIGN_RODATA)?
+
+>  __start_rodata_section_aligned = ALIGN(__start_rodata, 1 << SECTION_SHIFT);
+> +#else
+> +__start_rodata_section_aligned = __start_rodata;
+> +#endif
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
