@@ -1,30 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 16 Feb 2016 12:01:16 +0100
-Subject: [PATCH v3 09/10] ARM: dts: introduce MPS2 AN385/AN386
-In-Reply-To: <1455617295-23736-10-git-send-email-vladimir.murzin@arm.com>
+From: gnomes@lxorguk.ukuu.org.uk (One Thousand Gnomes)
+Date: Tue, 16 Feb 2016 11:02:17 +0000
+Subject: [PATCH v3 04/10] serial: mps2-uart: add MPS2 UART driver
+In-Reply-To: <1455617295-23736-5-git-send-email-vladimir.murzin@arm.com>
 References: <1455617295-23736-1-git-send-email-vladimir.murzin@arm.com>
- <1455617295-23736-10-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <7562697.iiO7rmWd7c@wuerfel>
+ <1455617295-23736-5-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <20160216110217.3de7c007@lxorguk.ukuu.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 16 February 2016 10:08:14 Vladimir Murzin wrote:
-> +
-> +       ethernet at 40200000 {
-> +               compatible = "smsc,lan9220", "smsc,lan9115";
-> +               reg = <0x40200000 0x10000>;
-> +               interrupts = <13>;
-> +               interrupt-parent = <&nvic>;
-> +               smsc,irq-active-high;
-> +       };
-> +};
-> +
-> 
 
-This node seems slightly misplaced. Is there some external bus interface
-that this is connected to? The address suggests that it should be somewhere
-below the /soc node, and you probably want to list the external bus
-interface with a "ranges" property that identifies the addresses visibile
-there, and put the external chip under there.
+> +static void mps2_uart_set_termios(struct uart_port *port,
+> +	struct ktermios *new, struct ktermios *old)
 
-	Arnd
+Not that I care much but you might not want to call it "new". People get
+upset when their syntax aware editors get confused by C++ keywords 8)
+
+> +{
+> +	unsigned long flags;
+> +	unsigned int baud, bauddiv;
+> +
+> +	new->c_cflag &= ~(CRTSCTS | CMSPAR);
+> +	new->c_cflag &= ~CSIZE;
+> +	new->c_cflag |= CS8;
+> +	new->c_cflag &= ~PARENB;
+> +	new->c_cflag &= ~CSTOPB;
+> +
+> +	baud = uart_get_baud_rate(port, new, old,
+> +			DIV_ROUND_CLOSEST(port->uartclk, UARTn_BAUDDIV_MASK),
+> +			DIV_ROUND_CLOSEST(port->uartclk, 16));
+> +
+> +	bauddiv = DIV_ROUND_CLOSEST(port->uartclk, baud);
+> +
+> +	spin_lock_irqsave(&port->lock, flags);
+> +
+> +	uart_update_timeout(port, new->c_cflag, baud);
+> +	mps2_uart_write32(port, bauddiv, UARTn_BAUDDIV);
+
+This should also set the baud bits back in the termios struct
+accordingly. 
+
+	if (tty_termios_baud_rate(new))
+		tty_termios_encode_baud_rate(new, baud, baud);
+
+
+Not a big deal and could certainly be a follow up patch after it's merged.
+
+Alan
