@@ -1,127 +1,96 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Tue, 16 Feb 2016 14:53:41 +0100
-Subject: [PATCH V5 11/15] drivers: pci: add generic code to claim bus resources
+Date: Tue, 16 Feb 2016 14:53:39 +0100
+Subject: [PATCH V5 09/15] acpi,
+ mcfg: Add default PCI config accessors implementation and initial
+ support for related quirks.
 In-Reply-To: <1455630825-27253-1-git-send-email-tn@semihalf.com>
 References: <1455630825-27253-1-git-send-email-tn@semihalf.com>
-Message-ID: <1455630825-27253-12-git-send-email-tn@semihalf.com>
+Message-ID: <1455630825-27253-10-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
+We use generic accessors from access.c by default. However, we already
+know platforms that need special handling while accessing to PCI config
+space. These platforms will need different accessors set matched against
+platform ID, domain, bus touple. Therefore we are going to add (in future)
+DECLARE_ACPI_MCFG_FIXUP which will register platform specific custom
+accessors. For now, we let pci_mcfg_get_ops to take acpi_pci_root structure
+as an arguments and left some space for quirk matching algorithm.
 
-PCI core code contains a set of functions, eg:
-
-pci_assign_unassigned_bus_resources()
-
-that allow to assign the PCI resources for a given bus after
-enumeration.
-
-On systems where the PCI BARs are immutable (ie they must not and can
-not be assigned), PCI resources must be claimed in order to be
-validated and inserted in the PCI resources tree, but there is no generic
-PCI kernel function for that purpose and the resource claiming is
-implemented in an arch specific fashion which resulted in arches
-implementations that contain duplicated code.
-
-This patch, based on the ia64 resource claiming arch implementation,
-implements a set of functions in core PCI code that provides a PCI core
-interface for resources claiming for a given PCI bus hierarchy, paving
-the way for further resource claiming consolidation across architectures.
-
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Yinghai Lu <yinghai@kernel.org>
+Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+Tested-by: Duc Dang <dhdang@apm.com>
+Tested-by: Dongdong Liu <liudongdong3@huawei.com>
+Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
+Tested-by: Graeme Gregory <graeme.gregory@linaro.org>
+Tested-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/pci/setup-bus.c | 63 +++++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/pci.h     |  1 +
- 2 files changed, 64 insertions(+)
+ drivers/acpi/pci_mcfg.c  | 30 ++++++++++++++++++++++++++++++
+ include/linux/pci-acpi.h | 12 ++++++++++++
+ 2 files changed, 42 insertions(+)
 
-diff --git a/drivers/pci/setup-bus.c b/drivers/pci/setup-bus.c
-index 7796d0a..c959398 100644
---- a/drivers/pci/setup-bus.c
-+++ b/drivers/pci/setup-bus.c
-@@ -1424,6 +1424,69 @@ void pci_bus_assign_resources(const struct pci_bus *bus)
+diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
+index 3282f2a..0062257 100644
+--- a/drivers/acpi/pci_mcfg.c
++++ b/drivers/acpi/pci_mcfg.c
+@@ -41,6 +41,36 @@ int __weak raw_pci_write(unsigned int domain, unsigned int bus,
+ 	return PCIBIOS_DEVICE_NOT_FOUND;
  }
- EXPORT_SYMBOL(pci_bus_assign_resources);
  
-+static void pci_claim_device_resources(struct pci_dev *dev)
++void __iomem *
++pci_mcfg_dev_base(struct pci_bus *bus, unsigned int devfn, int offset)
 +{
-+	int i;
++	struct pci_mmcfg_region *cfg;
 +
-+	for (i = 0; i < PCI_BRIDGE_RESOURCES; i++) {
-+		struct resource *r = &dev->resource[i];
-+
-+		if (!r->flags || r->parent)
-+			continue;
-+
-+		pci_claim_resource(dev, i);
-+	}
++	cfg = pci_mmconfig_lookup(pci_domain_nr(bus), bus->number);
++	if (cfg && cfg->virt)
++		return cfg->virt +
++			(PCI_MMCFG_BUS_OFFSET(bus->number) | (devfn << 12)) +
++			offset;
++	return NULL;
 +}
 +
-+static void pci_claim_bridge_resources(struct pci_dev *dev)
++/* Default generic PCI config accessors */
++static struct pci_ops default_pci_mcfg_ops = {
++	.map_bus = pci_mcfg_dev_base,
++	.read = pci_generic_config_read,
++	.write = pci_generic_config_write,
++};
++
++struct pci_ops *pci_mcfg_get_ops(struct acpi_pci_root *root)
 +{
-+	int i;
++	/*
++	 * TODO: Match against platform specific quirks and return
++	 * corresponding PCI config space accessor set.
++	 */
 +
-+	for (i = PCI_BRIDGE_RESOURCES; i < PCI_NUM_RESOURCES; i++) {
-+		struct resource *r = &dev->resource[i];
-+
-+		if (!r->flags || r->parent)
-+			continue;
-+
-+		pci_claim_bridge_resource(dev, i);
-+	}
++	return &default_pci_mcfg_ops;
 +}
 +
-+static void pci_bus_allocate_dev_resources(struct pci_bus *b)
-+{
-+	struct pci_dev *dev;
-+	struct pci_bus *child;
+ static void list_add_sorted(struct pci_mmcfg_region *new)
+ {
+ 	struct pci_mmcfg_region *cfg;
+diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
+index b4f87ba9..3dc6a8c 100644
+--- a/include/linux/pci-acpi.h
++++ b/include/linux/pci-acpi.h
+@@ -141,6 +141,18 @@ extern struct list_head pci_mmcfg_list;
+ #define PCI_MMCFG_BUS_OFFSET(bus)      ((bus) << 20)
+ #define PCI_MMCFG_OFFSET(bus, devfn)   ((bus) << 20 | (devfn) << 12)
+ 
++#ifdef	CONFIG_PCI_MMCONFIG
++extern struct pci_ops *pci_mcfg_get_ops(struct acpi_pci_root *root);
++extern void __iomem *pci_mcfg_dev_base(struct pci_bus *bus, unsigned int devfn,
++				       int offset);
++#else
++static inline struct pci_ops *pci_mcfg_get_ops(struct acpi_pci_root *root)
++{ return NULL; }
++static inline void __iomem *pci_mcfg_dev_base(struct pci_bus *bus,
++					      unsigned int devfn, int offset)
++{ return NULL; }
++#endif
 +
-+	list_for_each_entry(dev, &b->devices, bus_list) {
-+		pci_claim_device_resources(dev);
-+
-+		child = dev->subordinate;
-+		if (child)
-+			pci_bus_allocate_dev_resources(child);
-+	}
-+}
-+
-+static void pci_bus_allocate_resources(struct pci_bus *b)
-+{
-+	struct pci_bus *child;
-+
-+	/* Depth-First Search on bus tree */
-+	if (b->self) {
-+		pci_read_bridge_bases(b);
-+		pci_claim_bridge_resources(b->self);
-+	}
-+
-+	list_for_each_entry(child, &b->children, node)
-+		pci_bus_allocate_resources(child);
-+}
-+
-+void pci_bus_claim_resources(struct pci_bus *b)
-+{
-+	pci_bus_allocate_resources(b);
-+	pci_bus_allocate_dev_resources(b);
-+}
-+EXPORT_SYMBOL(pci_bus_claim_resources);
-+
- static void __pci_bridge_assign_resources(const struct pci_dev *bridge,
- 					  struct list_head *add_head,
- 					  struct list_head *fail_head)
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index dac677c..6faf994 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -1119,6 +1119,7 @@ ssize_t pci_write_vpd(struct pci_dev *dev, loff_t pos, size_t count, const void
- /* Helper functions for low-level code (drivers/pci/setup-[bus,res].c) */
- resource_size_t pcibios_retrieve_fw_addr(struct pci_dev *dev, int idx);
- void pci_bus_assign_resources(const struct pci_bus *bus);
-+void pci_bus_claim_resources(struct pci_bus *bus);
- void pci_bus_size_bridges(struct pci_bus *bus);
- int pci_claim_resource(struct pci_dev *, int);
- int pci_claim_bridge_resource(struct pci_dev *bridge, int i);
+ #else	/* CONFIG_ACPI */
+ static inline void acpi_pci_add_bus(struct pci_bus *bus) { }
+ static inline void acpi_pci_remove_bus(struct pci_bus *bus) { }
 -- 
 1.9.1
