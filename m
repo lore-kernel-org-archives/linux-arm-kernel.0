@@ -1,25 +1,43 @@
-From: gnomes@lxorguk.ukuu.org.uk (One Thousand Gnomes)
-Date: Tue, 16 Feb 2016 16:12:56 +0000
-Subject: [PATCH v3 05/10] serial: mps2-uart: add support for early console
-In-Reply-To: <CAHp75VecjR3sBcGmRHFwZPwUjXhPwV-2z4hYYJ7Y+iCOxi8_EA@mail.gmail.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Tue, 16 Feb 2016 16:14:01 +0000
+Subject: [PATCH v3 00/10] Support for Cortex-M Prototyping System
+In-Reply-To: <22011981.Gqc7zXAZ81@wuerfel>
 References: <1455617295-23736-1-git-send-email-vladimir.murzin@arm.com>
- <1455617295-23736-6-git-send-email-vladimir.murzin@arm.com>
- <CAHp75VdugAq0WnzLHmd9CJHCjBOdBwPqCmC3ARSaVF5XMYGoMw@mail.gmail.com>
- <56C31F9F.10000@arm.com>
- <CAHp75Vf_4MgdWunQy5hBMH5GGei+OkktFPYY-ZprY0qOEnD=wA@mail.gmail.com>
- <56C32641.4020201@arm.com>
- <CAHp75VecjR3sBcGmRHFwZPwUjXhPwV-2z4hYYJ7Y+iCOxi8_EA@mail.gmail.com>
-Message-ID: <20160216161256.234a2be8@lxorguk.ukuu.org.uk>
+ <22011981.Gqc7zXAZ81@wuerfel>
+Message-ID: <56C34AC9.8080509@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > If you do insist to have a counter I'll add one, but if you are not
-> > strong about it I'd prefer to leave it as is.  
+On 16/02/16 11:05, Arnd Bergmann wrote:
+> On Tuesday 16 February 2016 10:08:05 Vladimir Murzin wrote:
+>> Hi,
+>>
+>> This patch series provide the basic support for running ucLinux on V2M-MPS2
+>> platform.
+>>
+>> With these patches applied ucLinux can be run on both HW and FVP models
+>> with Cortex-M3/M4/M7 configurations.
 > 
-> I would wait for Peter Hurley, Alan, or other experienced guys to talk.
+> Looks very nice overall now. I have mentioned a few details that I noticed
+> but no show-stoppers.
+> 
+> Most important question for me is how this is going to be maintained
+> in the long run. Can you add a patch to list the added files in
+> MAINTAINERS?
+> 
+> My preference from the arm-soc perspective would be to get pull requests for
+> this together with vexpress and juno through the existing maintainers
+> (Liviu, Sudeep, Lorenzo), and have you send your patches to them. Does
+> that work for you all?
+> 
 
-I would leave it. Some of the drivers have defensive code of this form,
-but mostly because they can be hot unplugged and we don't want to spin
-into oblivion because the user ejected a serial card adapter.
+I'm quite happy with either way. I'm not targeting for 4.6, so we have
+some time to sort it out.
 
-Alan
+Thanks
+Vladimir
+
+> 	Arnd
+> 
+> 
+> 
