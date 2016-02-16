@@ -1,38 +1,68 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 16 Feb 2016 16:08:34 +0100
-Subject: [PATCH v3 08/10] ARM: configs: add MPS2 defconfig
-In-Reply-To: <56C3378F.2010008@arm.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Tue, 16 Feb 2016 15:09:58 +0000
+Subject: [PATCH v3 04/10] serial: mps2-uart: add MPS2 UART driver
+In-Reply-To: <20160216110217.3de7c007@lxorguk.ukuu.org.uk>
 References: <1455617295-23736-1-git-send-email-vladimir.murzin@arm.com>
- <2680417.bULLX3O66Y@wuerfel> <56C3378F.2010008@arm.com>
-Message-ID: <11778979.HbWgmZUCnF@wuerfel>
+ <1455617295-23736-5-git-send-email-vladimir.murzin@arm.com>
+ <20160216110217.3de7c007@lxorguk.ukuu.org.uk>
+Message-ID: <56C33BC6.1040801@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 16 February 2016 14:51:59 Vladimir Murzin wrote:
-> > 
-> > Why CONFIG_EMBEDDED? You probably mean CONFIG_EXPERT, but then what do
-> > you need that for?
+On 16/02/16 11:02, One Thousand Gnomes wrote:
 > 
-> TBH, I have no special requirement for this option to be set and now,
-> looking at Kconfig entry for this option, I think that I got it here
-> because I stated configuration with allnoconfig.
+>> +static void mps2_uart_set_termios(struct uart_port *port,
+>> +	struct ktermios *new, struct ktermios *old)
 > 
-> OTOH, I don't see how harmful it can be since description says:
-> 
->           This option should be enabled if compiling the kernel for
->           an embedded system so certain expert options are available
->           for configuration
-> 
-> yes, it selects CONFIG_EXPERT and that had side effect that, for
-> example, CONFIG_NAMESPACE could be compiled out.
-> 
-> Have I missed something around it?
+> Not that I care much but you might not want to call it "new". People get
+> upset when their syntax aware editors get confused by C++ keywords 8)
 
-Just the history behind this symbol. We removed it a while ago in
-favor if CONFIG_EXPERT, assuming that it makes it clearer that it's
-not just for embedded systems, or for systems with small memory.
+Just renamed it to have cpp suffix and looks like my editor falls under
+that category :)
 
-It's  basically a zombie symbol that nobody should use directly
-(independent of what the documentation says...).
+> 
+>> +{
+>> +	unsigned long flags;
+>> +	unsigned int baud, bauddiv;
+>> +
+>> +	new->c_cflag &= ~(CRTSCTS | CMSPAR);
+>> +	new->c_cflag &= ~CSIZE;
+>> +	new->c_cflag |= CS8;
+>> +	new->c_cflag &= ~PARENB;
+>> +	new->c_cflag &= ~CSTOPB;
+>> +
+>> +	baud = uart_get_baud_rate(port, new, old,
+>> +			DIV_ROUND_CLOSEST(port->uartclk, UARTn_BAUDDIV_MASK),
+>> +			DIV_ROUND_CLOSEST(port->uartclk, 16));
+>> +
+>> +	bauddiv = DIV_ROUND_CLOSEST(port->uartclk, baud);
+>> +
+>> +	spin_lock_irqsave(&port->lock, flags);
+>> +
+>> +	uart_update_timeout(port, new->c_cflag, baud);
+>> +	mps2_uart_write32(port, bauddiv, UARTn_BAUDDIV);
+> 
+> This should also set the baud bits back in the termios struct
+> accordingly. 
+> 
+> 	if (tty_termios_baud_rate(new))
+> 		tty_termios_encode_baud_rate(new, baud, baud);
+> 
+> 
+> Not a big deal and could certainly be a follow up patch after it's merged.
 
-	Arnd
+I'll fold it in the next version.
+
+Thanks
+Vladimir
+
+> 
+> Alan
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> 
+> 
