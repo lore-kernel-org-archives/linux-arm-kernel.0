@@ -1,45 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 16 Feb 2016 17:03:27 +0100
-Subject: [PATCH 2/2] ARM: mm: hide __start_rodata_section_aligned for
- non-debug builds
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 16 Feb 2016 17:05:43 +0100
+Subject: [PATCH 1/2] ARM: mm: DEBUG_RODATA makes no sense with XIP_KERNEL
 In-Reply-To: <1455638631-3326518-1-git-send-email-arnd@arndb.de>
 References: <1455638631-3326518-1-git-send-email-arnd@arndb.de>
-Message-ID: <1455638631-3326518-2-git-send-email-arnd@arndb.de>
+Message-ID: <CAKv+Gu9sMcAxNFPSYmF1y1Go_iZ0zmGwzo1wtEcBu24QjajRMw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The __start_rodata_section_aligned is only referenced by the
-DEBUG_RODATA code, which is only used when the MMU is enabled,
-but the definition fails on !MMU builds:
+On 16 February 2016 at 17:03, Arnd Bergmann <arnd@arndb.de> wrote:
+> When CONFIG_DEBUG_ALIGN_RODATA is set, we get a link error:
+>
+> arch/arm/mm/built-in.o:(.data+0x4bc): undefined reference to `__start_rodata_section_aligned'
+>
+> However, this combination is useless, as XIP_KERNEL implies that all the
+> RODATA is already marked readonly, so both CONFIG_DEBUG_RODATA and
+> CONFIG_DEBUG_ALIGN_RODATA (which depends on the other) are not
+> needed with XIP_KERNEL, and this patches enforces that using a Kconfig
 
-arch/arm/kernel/vmlinux.lds:702: undefined symbol `SECTION_SHIFT' referenced in expression
+s/patches/patch/
 
-This hides the symbol whenever DEBUG_RODATA is disabled.
+> dependency.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 64ac2e74f0b2 ("ARM: 8502/1: mm: mark section-aligned portion of rodata NX")
----
- arch/arm/kernel/vmlinux.lds.S | 2 ++
- 1 file changed, 2 insertions(+)
+Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-index 2d7085ae1c2f..bb12933aee22 100644
---- a/arch/arm/kernel/vmlinux.lds.S
-+++ b/arch/arm/kernel/vmlinux.lds.S
-@@ -322,12 +322,14 @@ SECTIONS
- 	STABS_DEBUG
- }
- 
-+#ifdef CONFIG_DEBUG_RODATA
- /*
-  * Without CONFIG_DEBUG_ALIGN_RODATA, __start_rodata_section_aligned will
-  * be the first section-aligned location after __start_rodata. Otherwise,
-  * it will be equal to __start_rodata.
-  */
- __start_rodata_section_aligned = ALIGN(__start_rodata, 1 << SECTION_SHIFT);
-+#endif
- 
- /*
-  * These must never be empty
--- 
-2.7.0
+> Fixes: 25362dc496ed ("ARM: 8501/1: mm: flip priority of CONFIG_DEBUG_RODATA")
+> ---
+>  arch/arm/mm/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+> index fbf2296388ce..8894045caba9 100644
+> --- a/arch/arm/mm/Kconfig
+> +++ b/arch/arm/mm/Kconfig
+> @@ -1039,7 +1039,7 @@ config ARCH_SUPPORTS_BIG_ENDIAN
+>
+>  config DEBUG_RODATA
+>         bool "Make kernel text and rodata read-only"
+> -       depends on MMU
+> +       depends on MMU && !XIP_KERNEL
+>         default y if CPU_V7
+>         help
+>           If this is set, kernel text and rodata memory will be made
+> --
+> 2.7.0
+>
