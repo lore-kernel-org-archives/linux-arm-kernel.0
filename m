@@ -1,53 +1,42 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 16 Feb 2016 16:40:35 +0100
-Subject: [PATCH v2 2/5] gpio: remove broken irq_to_gpio() interface
-In-Reply-To: <1455637261-2920972-1-git-send-email-arnd@arndb.de>
+Date: Tue, 16 Feb 2016 16:40:34 +0100
+Subject: [PATCH v2 1/5] MIPS: jz4740: remove broken irq_to_gpio() call
+In-Reply-To: <455637086-2794174-1-git-send-email-arnd@arndb.de>
 References: <455637086-2794174-1-git-send-email-arnd@arndb.de>
- <1455637261-2920972-1-git-send-email-arnd@arndb.de>
-Message-ID: <1455637261-2920972-2-git-send-email-arnd@arndb.de>
+Message-ID: <1455637261-2920972-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 gpiolib has removed the irq_to_gpio() API several years ago,
 but the global header still provided a non-working stub.
 
-To prevent new users of this broken function from showing
-up, let's remove the stubs as well.
+With a MIPS-wide change to use the generic header file, the jz4740
+platform is now using the wrong stub implementation of irq_to_gpio(),
+which cannot work.
 
+This uses an open-coded implementation in the only line it
+is used in.
+
+Suggested-by: Lars-Peter Clausen <lars@metafoo.de>
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: <stable@vger.kernel.org> # v4.3+
+Fixes: 832f5dacfa0b ("MIPS: Remove all the uses of custom gpio.h").
 ---
- include/linux/gpio.h | 12 ------------
- 1 file changed, 12 deletions(-)
+ arch/mips/jz4740/gpio.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/include/linux/gpio.h b/include/linux/gpio.h
-index d12b5d566e4b..6fc1c9e74854 100644
---- a/include/linux/gpio.h
-+++ b/include/linux/gpio.h
-@@ -70,11 +70,6 @@ static inline int gpio_to_irq(unsigned int gpio)
- 	return __gpio_to_irq(gpio);
+diff --git a/arch/mips/jz4740/gpio.c b/arch/mips/jz4740/gpio.c
+index 8c6d76c9b2d6..d9907e57e9b9 100644
+--- a/arch/mips/jz4740/gpio.c
++++ b/arch/mips/jz4740/gpio.c
+@@ -270,7 +270,7 @@ uint32_t jz_gpio_port_get_value(int port, uint32_t mask)
  }
+ EXPORT_SYMBOL(jz_gpio_port_get_value);
  
--static inline int irq_to_gpio(unsigned int irq)
--{
--	return -EINVAL;
--}
--
- #endif /* ! CONFIG_ARCH_HAVE_CUSTOM_GPIO_H */
+-#define IRQ_TO_BIT(irq) BIT(irq_to_gpio(irq) & 0x1f)
++#define IRQ_TO_BIT(irq) BIT((irq - JZ4740_IRQ_GPIO(0)) & 0x1f)
  
- /* CONFIG_GPIOLIB: bindings for managed devices that want to request gpios */
-@@ -222,13 +217,6 @@ static inline void gpiochip_unlock_as_irq(struct gpio_chip *chip,
- 	WARN_ON(1);
- }
- 
--static inline int irq_to_gpio(unsigned irq)
--{
--	/* irq can never have been returned from gpio_to_irq() */
--	WARN_ON(1);
--	return -EINVAL;
--}
--
- static inline int
- gpiochip_add_pin_range(struct gpio_chip *chip, const char *pinctl_name,
- 		       unsigned int gpio_offset, unsigned int pin_offset,
+ static void jz_gpio_check_trigger_both(struct jz_gpio_chip *chip, unsigned int irq)
+ {
 -- 
 2.7.0
