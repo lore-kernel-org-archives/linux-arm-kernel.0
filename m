@@ -1,65 +1,88 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 16 Feb 2016 12:21:53 +0000
-Subject: [PATCH v2] arm64: add alignment fault hanling
-In-Reply-To: <56C300AD.8070505@arm.com>
-References: <329817481.954581455597874663.JavaMail.weblogic@epmlwas08c>
- <20160216103104.GC14509@arm.com> <56C300AD.8070505@arm.com>
-Message-ID: <20160216122153.GD19413@e104818-lin.cambridge.arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 16 Feb 2016 13:28:52 +0100
+Subject: [PATCH 1/2] pinctrl: mediatek: fix direction control issue
+In-Reply-To: <1455612869.11448.22.camel@mtksdaap41>
+References: <1454462686-770-1-git-send-email-biao.huang@mediatek.com>
+ <1454462686-770-2-git-send-email-biao.huang@mediatek.com>
+ <1454555015.4618.10.camel@mussux00>
+ <CACRpkdZb2-TX1eY7eyK5qCqOg66MP1e4+OO287roJdP=RB6-Fg@mail.gmail.com>
+ <1455242831.35628.15.camel@mussux00>
+ <1455612869.11448.22.camel@mtksdaap41>
+Message-ID: <CACRpkdb1pVQY0UG-_Z5ivyG6rPZq5YibYcRhzdnDMghfH8jMjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 16, 2016 at 10:57:49AM +0000, Robin Murphy wrote:
-> On 16/02/16 10:31, Will Deacon wrote:
-> >On Tue, Feb 16, 2016 at 04:44:35AM +0000, EunTaik Lee wrote:
-> >>Userspace memory is mapped as below:
-> >>F2A7F000--F2A7FFFF Normal Memory
-> >>F2A80000--F2A80FFF Device nGnRnE
-> >>
-> >>And that userspace application makes a system call
-> >>as below:
-> >>
-> >>-009 |do_strncpy_from_user(inline)
-> >>-009 |strncpy_from_user()
-> >>-010 |getname_flags()
-> >>-011 |user_path_at_empty()
-> >>-012 |user_path_at()
-> >>-013 |SYSC_faccessat(inline)
-> >>-013 |sys_faccessat()
-> >>-014 |__sys_trace(asm)
-> >>  --> |exception
-> >>
-> >>The string spans from 0xF2A7FFC1 to 0xF2A7FFFB.
-> >>
-> >>When do_strncpy_from_user() reads the last (unsigned long)
-> >>value, the alignement fault is triggered. The 8 byte
-> >>from 0xF2A7FFC1 spans to the next page that is mapped as
-> >>Device nGnRnE, which does not allow an unaligned access,
-> >>causes the abort.
-> >>
-> >>The instruction which caused the alignment fault is registered
-> >>in the fixup table but the exception handler does not reach there.
-> >>
-> >>This patch registers a alignment fault handler and fixes up the
-> >>pc if appropriate.
-> >
-> >As discussed with Catalin previously, we should solve this by adding a
-> >guard page rather than handling the fault.
+On Tue, Feb 16, 2016 at 9:54 AM, Yingjoe Chen <yingjoe.chen@mediatek.com> wrote:
 
-I don't think we can trivially add this without implementing an arm64
-specific arch_get_unmapped_area().
+> To make it more clear, for a GPIO pin to get input on MTK chip, we must:
+>
+> - Enable input for the pad (input-enable)
 
-> ...especially since we may not even get a fault. See "Crossing a page
-> boundary with different memory types or Shareability attributes" in the
-> UNPREDICTABLE spec (K1.2.10 in the latest ARMv8 ARM).
+This should be done by the pin control portions of the driver in
+response to the PIN_CONFIG_INPUT_ENABLE generic pin
+config setting.
 
-While this is CONSTRAINED UNPREDICTABLE, it still doesn't sound good. If
-you end up with such adjacent mappings in user space, you can claim it's
-the user's responsibility not to do unpredictable accesses across such
-boundary. But in this case, it's the kernel do_strncpy_from_user()
-assuming that it can freely go across boundaries and patch the fault
-afterwards.
+Possibly *also* by just writing the hardware registers
+from the callbacks right below here:
 
-Still digging into this but I think we have a bug.
+> - Set mux to GPIO mode
 
--- 
-Catalin
+This should be done by just writing the hardware registers
+in these callbacks from struct pinmux_ops:
+
+        int (*gpio_request_enable) (struct pinctrl_dev *pctldev,
+                                    struct pinctrl_gpio_range *range,
+                                    unsigned offset);
+        void (*gpio_disable_free) (struct pinctrl_dev *pctldev,
+                                   struct pinctrl_gpio_range *range,
+                                   unsigned offset);
+        int (*gpio_set_direction) (struct pinctrl_dev *pctldev,
+                                   struct pinctrl_gpio_range *range,
+                                   unsigned offset,
+                                   bool input);
+
+In respons to these functions being called from the corresponding
+GPIO driver:
+
+extern int pinctrl_request_gpio(unsigned gpio);
+extern void pinctrl_free_gpio(unsigned gpio);
+extern int pinctrl_gpio_direction_input(unsigned gpio);
+extern int pinctrl_gpio_direction_output(unsigned gpio);
+
+> - Set GPIO direction to input
+
+This should be done in these callbacks from struct gpio_chip:
+
+        int                     (*direction_input)(struct gpio_chip *chip,
+                                                unsigned offset);
+        int                     (*direction_output)(struct gpio_chip *chip,
+                                                unsigned offset, int value);
+
+By just writing the hardware registers.
+
+> Currently user need to add a dts node to set pinmux to GPIO mode with
+> input-enable property, the driver need to call gpio_direction_input to
+> set direction.
+
+It seems like:
+
+- Your GPIO driver is not calling the pinctrl_request_gpio/
+  pinctrl_gpio_direction_* etc.
+
+- Your pinmux driver is not implementing the GPIO-specifif
+  .gpio_* functions
+
+> Since input-enable and GPIO direction are 2 different things, we now
+> think this patch is inappropriate. Instead, user should not required to
+> add pinmux node in dts if all he want is use it as plain GPIO input.
+
+If you sort out the above callbacks (also read
+Documentation/pinctrl.txt about GPIO) I think it is
+clear what you need to do.
+
+Usually you should only need a special pinmux/pinconf node
+for a GPIO line if you need to specify pull-up or similar electronic
+things for that GPIO.
+
+Yours,
+Linus Walleij
