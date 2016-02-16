@@ -1,51 +1,59 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 16 Feb 2016 20:35:35 +0100
-Subject: noise issues when recording sound on i.MX28
-In-Reply-To: <CAOMZO5BDjkWi+cQK1-J7ag8Z48tY1Uwofi4EkovN-drSC4_reA@mail.gmail.com>
-References: <20160127105613.GC13664@pengutronix.de>
- <CAOMZO5BpLen517q2heramSta-R6pdESkjM6w=7FRMZebY6ue-Q@mail.gmail.com>
- <20160127144340.GD13664@pengutronix.de>
- <CAOMZO5AE6HwBYz7kOFORt0HTojJLSb0MYUbkb_HCshDHy=d27g@mail.gmail.com>
- <20160210150315.GC13664@pengutronix.de>
- <CAOMZO5D5H4F90nse9kyW9KvsJStN-sCGktup4FDPw_zTeNfS2g@mail.gmail.com>
- <20160211084029.GE13664@pengutronix.de>
- <CAOMZO5BDjkWi+cQK1-J7ag8Z48tY1Uwofi4EkovN-drSC4_reA@mail.gmail.com>
-Message-ID: <20160216193535.GB32169@pengutronix.de>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Tue, 16 Feb 2016 11:36:44 -0800
+Subject: Writes, smp_wmb(), and transitivity?
+In-Reply-To: <CA+55aFxaQEvDrzecmZUQ5QfKzU4ei6E-+NpsW5hYp3ouaLP98g@mail.gmail.com>
+References: <20160215175825.GA15878@linux.vnet.ibm.com>
+ <CA+55aFxaQEvDrzecmZUQ5QfKzU4ei6E-+NpsW5hYp3ouaLP98g@mail.gmail.com>
+Message-ID: <20160216193644.GV6719@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Fabio,
-
-On Tue, Feb 16, 2016 at 01:01:19PM -0200, Fabio Estevam wrote:
-> On Thu, Feb 11, 2016 at 6:40 AM, Uwe Kleine-K?nig
-> <u.kleine-koenig@pengutronix.de> wrote:
-> 
-> > root at hostname:/sys/kernel/debug/clk find -name saif?_sel
-> > ./ref_xtal/pll0/saif0_sel
-> > ./ref_xtal/pll0/saif1_sel
+On Tue, Feb 16, 2016 at 10:59:08AM -0800, Linus Torvalds wrote:
+> On Mon, Feb 15, 2016 at 9:58 AM, Paul E. McKenney
+> <paulmck@linux.vnet.ibm.com> wrote:
 > >
-> > root at hostname:/sys/kernel/debug/clk cat ./ref_xtal/pll0/saif?_sel/clk_rate
-> > 480000000
-> > 480000000
+> > Two threads:
+> >
+> >         int a, b;
+> >
+> >         void thread0(void)
+> >         {
+> >                 WRITE_ONCE(a, 1);
+> >                 smp_wmb();
+> >                 WRITE_ONCE(b, 2);
+> >         }
+> >
+> >         void thread1(void)
+> >         {
+> >                 WRITE_ONCE(b, 1);
+> >                 smp_wmb();
+> >                 WRITE_ONCE(a, 2);
+> >         }
+> >
+> >         /* After all threads have completed and the dust has settled... */
+> >
+> >         BUG_ON(a == 1 && b == 1);
 > 
-> Ok, what about the SAIF0 and SAIF1 sampling rates: are they always the same?
+> So the more I look at that kind of litmus test, the less I think that
+> we should care, because I can't come up with a scenario in where that
+> kind of test makes sense. without even a possibility of any causal
+> relationship between the two, I can't say why we'd ever care about the
+> ordering of the (independent) writes to the individual variables.
+> 
+> If somebody can make up a causal chain, things differ. But as long as
+> all the CPU's are just doing locally ordered writes, I don't think we
+> need to care about a global store ordering.
 
-Lothar found a recipe to reproduce. I didn't try, but it's something
-along the lines of (Lothar please correct if I'm wrong):
+Works for me!  (Yes, I can artificially generate a use case for this
+thing, but all the ones I have come up with have some better and more
+sane way to get the job done.  So I completely agree with your not caring
+about it.)
 
- - start a recording on one SAIF
- - start playback on the other SAIF
- - using direct access to the registers stop and restart the playback
-   SAIF via the RUN bit.
+So for transitivity, we focus on causal chains, where one task writes
+to some variable that the next task reads.
 
-The program I have doesn't provide a reliable reproduction recipe, it
-runs in a loop and sometimes need several (>1000) iterations to trigger.
-In my setup the sampling rates don't change. The values of
-BITCLK_MULT_RATE differ however in my setup, I don't see why though.
+In addition, if all threads use full memory barriers throughout, as in
+smp_mb(), then full ordering is of course provided regardless of the
+pattern of reads and writes.
 
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+							Thanx, Paul
