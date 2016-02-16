@@ -1,48 +1,54 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 16 Feb 2016 13:52:32 +0100
-Subject: [PATCH v6sub1 01/11] of/fdt: make memblock minimum physical address
- arch configurable
+Date: Tue, 16 Feb 2016 13:52:33 +0100
+Subject: [PATCH v6sub1 02/11] of/fdt: factor out assignment of
+ initrd_start/initrd_end
 In-Reply-To: <1455627162-31600-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1455627162-31600-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1455627162-31600-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1455627162-31600-3-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-By default, early_init_dt_add_memory_arch() ignores memory below
-the base of the kernel image since it won't be addressable via the
-linear mapping. However, this is not appropriate anymore once we
-decouple the kernel text mapping from the linear mapping, so archs
-may want to drop the low limit entirely. So allow the minimum to be
-overridden by setting MIN_MEMBLOCK_ADDR.
+Since architectures may not yet have their linear mapping up and running
+when the initrd address is discovered from the DT, factor out the
+assignment of initrd_start and initrd_end, so that an architecture can
+override it and use the translation it needs.
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- drivers/of/fdt.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ drivers/of/fdt.c | 14 +++++++++++---
+ 1 file changed, 11 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
-index 655f79db7899..1f98156f8996 100644
+index 1f98156f8996..3e90bce70545 100644
 --- a/drivers/of/fdt.c
 +++ b/drivers/of/fdt.c
-@@ -976,13 +976,16 @@ int __init early_init_dt_scan_chosen(unsigned long node, const char *uname,
+@@ -760,6 +760,16 @@ const void * __init of_flat_dt_match_machine(const void *default_match,
  }
  
- #ifdef CONFIG_HAVE_MEMBLOCK
-+#ifndef MIN_MEMBLOCK_ADDR
-+#define MIN_MEMBLOCK_ADDR	__pa(PAGE_OFFSET)
+ #ifdef CONFIG_BLK_DEV_INITRD
++#ifndef __early_init_dt_declare_initrd
++static void __early_init_dt_declare_initrd(unsigned long start,
++					   unsigned long end)
++{
++	initrd_start = (unsigned long)__va(start);
++	initrd_end = (unsigned long)__va(end);
++	initrd_below_start_ok = 1;
++}
 +#endif
- #ifndef MAX_MEMBLOCK_ADDR
- #define MAX_MEMBLOCK_ADDR	((phys_addr_t)~0)
- #endif
++
+ /**
+  * early_init_dt_check_for_initrd - Decode initrd location from flat tree
+  * @node: reference to node containing initrd location ('chosen')
+@@ -782,9 +792,7 @@ static void __init early_init_dt_check_for_initrd(unsigned long node)
+ 		return;
+ 	end = of_read_number(prop, len/4);
  
- void __init __weak early_init_dt_add_memory_arch(u64 base, u64 size)
- {
--	const u64 phys_offset = __pa(PAGE_OFFSET);
-+	const u64 phys_offset = MIN_MEMBLOCK_ADDR;
+-	initrd_start = (unsigned long)__va(start);
+-	initrd_end = (unsigned long)__va(end);
+-	initrd_below_start_ok = 1;
++	__early_init_dt_declare_initrd(start, end);
  
- 	if (!PAGE_ALIGNED(base)) {
- 		if (size < PAGE_SIZE - (base & ~PAGE_MASK)) {
+ 	pr_debug("initrd_start=0x%llx  initrd_end=0x%llx\n",
+ 		 (unsigned long long)start, (unsigned long long)end);
 -- 
 2.5.0
