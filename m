@@ -1,45 +1,50 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 16 Feb 2016 16:03:23 +0100
-Subject: [PATCH v2] xen kconfig: don't "select INPUT_XEN_KBDDEV_FRONTEND"
-In-Reply-To: <alpine.DEB.2.02.1602151708110.27008@kaball.uk.xensource.com>
+Date: Tue, 16 Feb 2016 16:05:20 +0100
+Subject: [PATCH] xen kconfig: clarify INPUT_XEN_KBDDEV_FRONTEND select
+In-Reply-To: <alpine.DEB.2.02.1602161156160.27008@kaball.uk.xensource.com>
 References: <1455278707-2008263-1-git-send-email-arnd@arndb.de>
- <56C20552.8030305@citrix.com>
- <alpine.DEB.2.02.1602151708110.27008@kaball.uk.xensource.com>
-Message-ID: <2479546.WgivMO2bp2@wuerfel>
+ <2801550.oZPkqjv8nW@wuerfel>
+ <alpine.DEB.2.02.1602161156160.27008@kaball.uk.xensource.com>
+Message-ID: <2697712.W9djLKoMG1@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Xen framebuffer driver selects the xen keyboard driver, so the latter
-will be built-in if XEN_FBDEV_FRONTEND=y. However, when CONFIG_INPUT
-is a loadable module, this configuration cannot work. On mainline kernels,
-the symbol will be enabled but not used, while in combination with
-a patch I have to detect such useless configurations, we get the
-expected link failure:
+On Tuesday 16 February 2016 12:14:14 Stefano Stabellini wrote:
+> > at all.
+> 
+> Please correct me if I am wrong, but the difference is that with this
+> change if INPUT=m, then the build system would ask the user whether she
+> wants to select INPUT_XEN_KBDDEV_FRONTEND as m or y, instead of
+> unconditionally set INPUT_XEN_KBDDEV_FRONTEND=y.
 
-drivers/input/built-in.o: In function `xenkbd_remove':
-xen-kbdfront.c:(.text+0x2f0): undefined reference to `input_unregister_device'
-xen-kbdfront.c:(.text+0x30e): undefined reference to `input_unregister_device'
+INPUT_XEN_KBDDEV_FRONTEND cannot be set by the user to 'y' if
+INPUT=m, because of an implied dependency around the input/misc/Kconfig
+file.
 
-This removes the extra "select", as it just causes more trouble than
-it helps. In theory, some defconfig file might break if it has
-XEN_FBDEV_FRONTEND in it but not INPUT_XEN_KBDDEV_FRONTEND. The Kconfig
-fragment we ship in the kernel (kernel/configs/xen.config) however
-already enables both, and anyone using an old .config file would
-keep having both enabled.
+> However it is true that if the users chooses
+> INPUT_XEN_KBDDEV_FRONTEND=y, then the problem persists.
+> Maybe we also need:
+> 
+> diff --git a/drivers/input/misc/Kconfig b/drivers/input/misc/Kconfig
+> index 1f2337a..303df24 100644
+> --- a/drivers/input/misc/Kconfig
+> +++ b/drivers/input/misc/Kconfig
+> @@ -721,7 +721,7 @@ config INPUT_CMA3000_I2C
+>  
+>  config INPUT_XEN_KBDDEV_FRONTEND
+>         tristate "Xen virtual keyboard and mouse support"
+> -       depends on XEN
+> +       depends on XEN && INPUT
+>         default y
+>         select XEN_XENBUS_FRONTEND
+>         help
+> 
+> 
+> Do you have a kernel config with INPUT=m that I can use to test with?
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Suggested-by: David Vrabel <david.vrabel@citrix.com>
-Fixes: 36c1132e34bd ("xen kconfig: fix select INPUT_XEN_KBDDEV_FRONTEND")
+You can easily set that in any config if you disable CONFIG_VT. I don't
+think it's worth spending more time on that, as everyone seems to be
+happy with just removing the 'select', and I've sent a replacement
+patch to do that.
 
-diff --git a/drivers/video/fbdev/Kconfig b/drivers/video/fbdev/Kconfig
-index 8ea45a5cd806..d889ef2048df 100644
---- a/drivers/video/fbdev/Kconfig
-+++ b/drivers/video/fbdev/Kconfig
-@@ -2246,7 +2246,6 @@ config XEN_FBDEV_FRONTEND
- 	select FB_SYS_IMAGEBLIT
- 	select FB_SYS_FOPS
- 	select FB_DEFERRED_IO
--	select INPUT_XEN_KBDDEV_FRONTEND if INPUT_MISC
- 	select XEN_XENBUS_FRONTEND
- 	default y
- 	help
+	Arnd
