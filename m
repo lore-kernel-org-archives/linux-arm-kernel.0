@@ -1,84 +1,58 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 16 Feb 2016 13:55:40 -0800
-Subject: [PATCH] ARM: drop unused DEBUG_RODATA from XIP_KERNEL
-In-Reply-To: <alpine.LFD.2.20.1602161539550.13632@knanqh.ubzr>
-References: <20160216202957.GA1826@www.outflux.net>
- <alpine.LFD.2.20.1602161539550.13632@knanqh.ubzr>
-Message-ID: <CAGXu5jJAzrkoNxj48NRQmfUh2Ej1DOfjZETz2wFJQnO_OxJy-Q@mail.gmail.com>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Tue, 16 Feb 2016 13:44:57 -0800
+Subject: [PATCH 1/2] clk: bcm2835: Fix setting of PLL divider clock rates
+In-Reply-To: <1455591838-22725-1-git-send-email-eric@anholt.net>
+References: <1455591838-22725-1-git-send-email-eric@anholt.net>
+Message-ID: <20160216214457.2278.13701@quark.deferred.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 16, 2016 at 12:41 PM, Nicolas Pitre
-<nicolas.pitre@linaro.org> wrote:
-> On Tue, 16 Feb 2016, Kees Cook wrote:
->
->> With CONFIG_DEBUG_RODATA not being sensible under XIP_KERNEL, remove it
->> from the XIP linker script.
->
-> If so you should also make DEBUG_RODATA depend on !XIP_KERNEL in Kconfig
-> to avoid offering a config option that does nothing.
+Quoting Eric Anholt (2016-02-15 19:03:57)
+> Our dividers weren't being set successfully because CM_PASSWORD wasn't
+> included in the register write.  It looks easier to just compute the
+> divider to write ourselves than to update clk-divider for the ability
+> to OR in some arbitrary bits on write.
+> 
+> Fixes about half of the video modes on my HDMI monitor (everything
+> except 720x400).
+> 
+> Cc: stable at vger.kernel.org
+> Signed-off-by: Eric Anholt <eric@anholt.net>
 
-Yeah, that's what Arnd's other patch does. This is intended to follow
-his cleanups that do this.
+Applied to clk-next.
 
--Kees
+Regards,
+Mike
 
->
->> Signed-off-by: Kees Cook <keescook@chromium.org>
->> ---
->> Effectively the patch after Arnd's "ARM: mm: hide
->> __start_rodata_section_aligned for non-debug builds"
->> ---
->>  arch/arm/kernel/vmlinux-xip.lds.S | 10 ----------
->>  1 files changed, 0 insertions(+), 10 deletions(-)
->>
->> diff --git a/arch/arm/kernel/vmlinux-xip.lds.S b/arch/arm/kernel/vmlinux-xip.lds.S
->> index 40bc4cadb959..cba1ec899a69 100644
->> --- a/arch/arm/kernel/vmlinux-xip.lds.S
->> +++ b/arch/arm/kernel/vmlinux-xip.lds.S
->> @@ -8,9 +8,6 @@
->>  #include <asm/thread_info.h>
->>  #include <asm/memory.h>
->>  #include <asm/page.h>
->> -#ifdef CONFIG_DEBUG_RODATA
->> -#include <asm/pgtable.h>
->> -#endif
->>
->>  #define PROC_INFO                                                    \
->>       . = ALIGN(4);                                                   \
->> @@ -92,10 +89,6 @@ SECTIONS
->>               HEAD_TEXT
->>       }
->>
->> -#ifdef CONFIG_DEBUG_RODATA
->> -     . = ALIGN(1<<SECTION_SHIFT);
->> -#endif
->> -
->>       .text : {                       /* Real text segment            */
->>               _stext = .;             /* Text and read-only data      */
->>                       IDMAP_TEXT
->> @@ -115,9 +108,6 @@ SECTIONS
->>                       ARM_CPU_KEEP(PROC_INFO)
->>       }
->>
->> -#ifdef CONFIG_DEBUG_RODATA
->> -     . = ALIGN(1<<SECTION_SHIFT);
->> -#endif
->>       RO_DATA(PAGE_SIZE)
->>
->>       . = ALIGN(4);
->> --
->> 2.6.3
->>
->>
->> --
->> Kees Cook
->> Chrome OS & Brillo Security
->>
->>
-
-
-
--- 
-Kees Cook
-Chrome OS & Brillo Security
+> ---
+>  drivers/clk/bcm/clk-bcm2835.c | 12 +++++++-----
+>  1 file changed, 7 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
+> index 015e687..9f4df8f 100644
+> --- a/drivers/clk/bcm/clk-bcm2835.c
+> +++ b/drivers/clk/bcm/clk-bcm2835.c
+> @@ -1107,13 +1107,15 @@ static int bcm2835_pll_divider_set_rate(struct clk_hw *hw,
+>         struct bcm2835_pll_divider *divider = bcm2835_pll_divider_from_hw(hw);
+>         struct bcm2835_cprman *cprman = divider->cprman;
+>         const struct bcm2835_pll_divider_data *data = divider->data;
+> -       u32 cm;
+> -       int ret;
+> +       u32 cm, div, max_div = 1 << A2W_PLL_DIV_BITS;
+>  
+> -       ret = clk_divider_ops.set_rate(hw, rate, parent_rate);
+> -       if (ret)
+> -               return ret;
+> +       div = DIV_ROUND_UP_ULL(parent_rate, rate);
+> +
+> +       div = min(div, max_div);
+> +       if (div == max_div)
+> +               div = 0;
+>  
+> +       cprman_write(cprman, data->a2w_reg, div);
+>         cm = cprman_read(cprman, data->cm_reg);
+>         cprman_write(cprman, data->cm_reg, cm | data->load_mask);
+>         cprman_write(cprman, data->cm_reg, cm & ~data->load_mask);
+> -- 
+> 2.7.0
+> 
