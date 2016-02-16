@@ -1,45 +1,64 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Tue, 16 Feb 2016 10:58:20 -0300
-Subject: [PATCH] ARM: dts: Move syscon reboot/poweroff to common dtsi for
- Exynos
-In-Reply-To: <56C25982.4020301@samsung.com>
-References: <1455042606-10075-1-git-send-email-javier@osg.samsung.com>
- <56C02265.40103@samsung.com> <56C1D4D1.2050108@osg.samsung.com>
- <56C25982.4020301@samsung.com>
-Message-ID: <56C32AFC.6030905@osg.samsung.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Tue, 16 Feb 2016 16:00:20 +0200
+Subject: [PATCH v3 05/10] serial: mps2-uart: add support for early console
+In-Reply-To: <56C32641.4020201@arm.com>
+References: <1455617295-23736-1-git-send-email-vladimir.murzin@arm.com>
+ <1455617295-23736-6-git-send-email-vladimir.murzin@arm.com>
+ <CAHp75VdugAq0WnzLHmd9CJHCjBOdBwPqCmC3ARSaVF5XMYGoMw@mail.gmail.com>
+ <56C31F9F.10000@arm.com>
+ <CAHp75Vf_4MgdWunQy5hBMH5GGei+OkktFPYY-ZprY0qOEnD=wA@mail.gmail.com>
+ <56C32641.4020201@arm.com>
+Message-ID: <CAHp75VecjR3sBcGmRHFwZPwUjXhPwV-2z4hYYJ7Y+iCOxi8_EA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+On Tue, Feb 16, 2016 at 3:38 PM, Vladimir Murzin
+<vladimir.murzin@arm.com> wrote:
+> On 16/02/16 13:13, Andy Shevchenko wrote:
+>> On Tue, Feb 16, 2016 at 3:09 PM, Vladimir Murzin
+>> <vladimir.murzin@arm.com> wrote:
+>>> On 16/02/16 10:36, Andy Shevchenko wrote:
+>>>> On Tue, Feb 16, 2016 at 12:08 PM, Vladimir Murzin
+>>>> <vladimir.murzin@arm.com> wrote:
 
-On 02/15/2016 08:04 PM, Krzysztof Kozlowski wrote:
-> On 15.02.2016 22:38, Javier Martinez Canillas wrote:
+>>>>> +static void mps2_early_putchar(struct uart_port *port, int ch)
+>>>>> +{
+>>>>> +
+>>>>> +       while (readb(port->membase + UARTn_STATE) & UARTn_STATE_TX_FULL)
+>>>>> +               cpu_relax();
+>>>>
+>>>> Infinite busy loop?
 >>>
->>> In some of the DTSI this was under "soc" node, not at top-level.
->>> Unfortunately we do not have consistency here - some DTSI have "soc",
+>>> In case of broken hw, yes, but I'm quite unsure how we can help to fix
+>>> it. Do you have something in mind?
 >>
->> Yes, I noticed this but as you said not all DTSI have a soc node
->> and that's why I made it top level in the DTSI.
+>> Set sane amount of loops like
 >>
->>> some not. Anyway I think we should move to "soc" version.
->>>
+>> int count = 100;
+>> ?
+>> while (? && --count)
 >>
->> Not sure I'm following, did you mean to do it as a follow up or
->> to add a soc node for the missing DTSI as a part of this series?
+>> Though I have no idea what to do if count == 0. Perhaps it's a TX overrun state.
 >
-> I meant to send a v2 with this under "soc" node even though on some DTS
-> we do not have the "soc". Optional follow up would be to make DTS
-> consistent and move nodes under "soc"... but that would be also a lot of
-> churn.
+> I thought about counter too, like some of drivers do, but had no idea
+> what to do next after counter reaches zero. In case of TX overrun we
+> could get it either because of broken hw or because we entered Linux
+> with that state already set. In both cases, it looks handy to me to
+> attach a debugger and see that we are spinning in this putchar loop.
 >
+> If you do insist to have a counter I'll add one, but if you are not
+> strong about it I'd prefer to leave it as is.
 
-Thanks for the clarification. I'll post a v2 then moving under a soc node.
-  
-> Best regards,
-> Krzysztof
+I would wait for Peter Hurley, Alan, or other experienced guys to talk.
 
-Best regards,
+>> You may try to recover by flushing TX queue in HW (fifo and / or Tx
+>> shift register) if HW supports it.
+>>
+>
+> I'm afraid this is not supported.
+
+Maybe soft reset? Anyway, see above.
+
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+With Best Regards,
+Andy Shevchenko
