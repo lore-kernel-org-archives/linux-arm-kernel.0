@@ -1,54 +1,64 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 16 Feb 2016 15:32:11 +0000
-Subject: [PATCH v8 3/5] memory: mediatek: Add SMI driver
-In-Reply-To: <20160216141059.GT18805@8bytes.org>
-References: <1453781562-23556-1-git-send-email-yong.wu@mediatek.com>
- <1453781562-23556-4-git-send-email-yong.wu@mediatek.com>
- <56ADE959.2050309@gmail.com> <20160216141059.GT18805@8bytes.org>
-Message-ID: <56C340FB.1050607@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 16 Feb 2016 16:33:36 +0100
+Subject: [PATCH v2 1/8] ARM: dts: armada-38x: add buffer manager nodes
+In-Reply-To: <1455636823-14470-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1455636823-14470-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1455636823-14470-2-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
+From: Marcin Wojtas <mw@semihalf.com>
 
-On 16/02/16 14:11, Joerg Roedel wrote:
-> On Sun, Jan 31, 2016 at 12:00:41PM +0100, Matthias Brugger wrote:
->>
->>
->> On 26/01/16 05:12, Yong Wu wrote:
->>> This patch add SMI(Smart Multimedia Interface) driver. This driver
->>> is responsible to enable/disable iommu and control the power domain
->>> and clocks of each local arbiter.
->>>
->>> Signed-off-by: Yong Wu <yong.wu@mediatek.com>
->>> Tested-by: Philipp Zabel <p.zabel@pengutronix.de>
->>> ---
->>
->> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
->>
->> Joerg would you mind to take this through your branch?
->
-> Hmm, I somehow missed the patch-set, at least I can't find the v8
-> patches in my inbox.
->
-> Yong, can you please re-send with all Acks and other tags added?
+Armada 38x network controller supports hardware buffer management (BM).
+Since it is now enabled in mvneta driver, appropriate nodes can be added
+to armada-38x.dtsi - for the actual common BM unit (bm at c8000) and its
+internal SRAM (bm-bppi), which is used for indirect access to buffer
+pointer ring residing in DRAM.
 
-Just to note patch 4 of this series also depends on the v3 io-pgtable 
-short-descriptor series posted separately[1] - is that on your radar 
-already or would you like that resent as well?
+Pools - ports mapping, bm-bppi entry in 'soc' node's ranges and optional
+parameters are supposed to be set in board files.
 
-Robin.
+Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm/boot/dts/armada-38x.dtsi | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-[1]:http://thread.gmane.org/gmane.linux.kernel.iommu/12007
-
->
->
-> Thanks,
->
-> 	Joerg
->
-> _______________________________________________
-> iommu mailing list
-> iommu at lists.linux-foundation.org
-> https://lists.linuxfoundation.org/mailman/listinfo/iommu
->
+diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+index e8b7f6726772..1b7d690d8e10 100644
+--- a/arch/arm/boot/dts/armada-38x.dtsi
++++ b/arch/arm/boot/dts/armada-38x.dtsi
+@@ -540,6 +540,14 @@
+ 				status = "disabled";
+ 			};
+ 
++			bm: bm at c8000 {
++				compatible = "marvell,armada-380-neta-bm";
++				reg = <0xc8000 0xac>;
++				clocks = <&gateclk 13>;
++				internal-mem = <&bm_bppi>;
++				status = "disabled";
++			};
++
+ 			sata at e0000 {
+ 				compatible = "marvell,armada-380-ahci";
+ 				reg = <0xe0000 0x2000>;
+@@ -618,6 +626,16 @@
+ 			#size-cells = <1>;
+ 			ranges = <0 MBUS_ID(0x09, 0x15) 0 0x800>;
+ 		};
++
++		bm_bppi: bm-bppi {
++			compatible = "mmio-sram";
++			reg = <MBUS_ID(0x0c, 0x04) 0 0x100000>;
++			ranges = <0 MBUS_ID(0x0c, 0x04) 0 0x100000>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			clocks = <&gateclk 13>;
++			status = "disabled";
++		};
+ 	};
+ 
+ 	clocks {
+-- 
+2.5.0
