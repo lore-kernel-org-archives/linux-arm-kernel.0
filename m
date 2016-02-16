@@ -1,141 +1,88 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Tue, 16 Feb 2016 12:48:16 +0200
-Subject: [PATCH v3 04/10] serial: mps2-uart: add MPS2 UART driver
-In-Reply-To: <1455617295-23736-5-git-send-email-vladimir.murzin@arm.com>
-References: <1455617295-23736-1-git-send-email-vladimir.murzin@arm.com>
- <1455617295-23736-5-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <CAHp75Vcx_xAY2A4XNgQ1ea_U5mUnD1+6=2FxCM3KzsRSpxgRuw@mail.gmail.com>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 16 Feb 2016 10:50:47 +0000
+Subject: [PATCH] arm64: mark kernel text segment as MEMBLOCK_NOMAP
+In-Reply-To: <1455528512-32491-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1455528512-32491-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <56C2FF07.30205@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 16, 2016 at 12:08 PM, Vladimir Murzin
-<vladimir.murzin@arm.com> wrote:
-> This driver adds support to the UART controller found on ARM MPS2
-> platform.
+Hi Ard,
+
+On 15/02/16 09:28, Ard Biesheuvel wrote:
+> Commit 752af28bd711 ("arm64: move kernel image to base of vmalloc area")
+> moves the mapping of the kernel text and data segments out of the linear
+> region, and takes care not to create a writable alias of the read-only
+> kernel text segment by checking each memblock against overlap when the
+> memblocks are mapped into the linear mapping.
+> 
+> However, it is more correct, and much simpler, to mark the [_stext, _etext]
+> interval as MEMBLOCK_NOMAP. This will also prevent the interval from being
+> omitted from the linear region, but this fact will now also be reflected
+> in the output of pfn_valid(), and so code that expects any pfn_valid()
+> page to be mapped and accessible (which is a reasonable assumption) does
+> not get surprised by the text segment being inaccessible via the linear
+> mapping.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+
+With this patch on arm64/for-next/kernmap, I get the following KVM-related boot
+failure on Juno:
+-----------------------------%<-----------------------------
+RPC: Registered named UNIX socket transport module.
+RPC: Registered udp transport module.
+RPC: Registered tcp transport module.
+RPC: Registered tcp NFSv4.1 backchannel transport module.
+hw perfevents: enabled with armv8_pmuv3 PMU driver, 7 counters available
+------------[ cut here ]------------
+kernel BUG at ../arch/arm64/kvm/../../../arch/arm/kvm/mmu.c:577!
+Internal error: Oops - BUG: 0 [#1] PREEMPT SMP
+Modules linked in:
+CPU: 4 PID: 1 Comm: swapper/0 Not tainted 4.5.0-rc1+ #2022
+Hardware name: ARM Juno development board (r1) (DT)
+task: ffffffc976cf8000 ti: ffffffc976d60000 task.ti: ffffffc976d60000
+PC is at create_hyp_mappings+0x144/0x148
+LR is@create_hyp_mappings+0x7c/0x148
+
+[SNIP]
+
+[<ffffff80040abc14>] create_hyp_mappings+0x144/0x148
+[<ffffff80040a9be8>] kvm_arch_init+0x198/0x53c
+[<ffffff800409fe24>] kvm_init+0x38/0x290
+[<ffffff80040a84e4>] arm_init+0x24/0x2c
+[<ffffff8004082994>] do_one_initcall+0x94/0x198
+[<ffffff8004a22b10>] kernel_init_freeable+0x148/0x1e8
+[<ffffff800473e344>] kernel_init+0x20/0xe4
+[<ffffff8004085cd0>] ret_from_fork+0x10/0x40
+
+-----------------------------%<-----------------------------
+
+The offending function is:
+-----------------------------%<-----------------------------
+static phys_addr_t kvm_kaddr_to_phys(void *kaddr)
+{
+	if (!is_vmalloc_addr(kaddr)) {
+		BUG_ON(!virt_addr_valid(kaddr));
+		return __pa(kaddr);
+	} else {
+		return page_to_phys(vmalloc_to_page(kaddr)) +
+		       offset_in_page(kaddr);
+	}
+}
+-----------------------------%<-----------------------------
+
+When the BUG_ON() fires, kaddr points into the hole in the linear map left by
+the kernel text.
 
 
-> +static irqreturn_t mps2_uart_oerrirq(int irq, void *data)
-> +{
-> +       irqreturn_t handled = IRQ_NONE;
-> +       struct uart_port *port = data;
-> +       u8 irqflag = mps2_uart_read8(port, UARTn_INT);
-> +
-> +       spin_lock(&port->lock);
-> +
-> +       if (irqflag & UARTn_INT_RX_OVERRUN) {
-> +               struct tty_port *tport = &port->state->port;
-> +
-> +               mps2_uart_write8(port, UARTn_INT_RX_OVERRUN, UARTn_INT);
-> +               tty_insert_flip_char(tport, 0, TTY_OVERRUN);
-> +               port->icount.overrun++;
-> +               handled = IRQ_HANDLED;
-> +       }
-> +
-> +       /*
-> +        * It's never been seen in practice and it never *should* happen since
-> +        * we check if there is enough room in TX buffer before sending data.
-> +        * So we keep this check in case something suspicious has happened.
-> +        */
-> +       if (irqflag & UARTn_INT_TX_OVERRUN) {
-> +               mps2_uart_write8(port, UARTn_INT_TX_OVERRUN, UARTn_INT);
+> This should hopefully address the issue reported by James, but I suppose
+> more work is required on the hibernate side to ensure the unmapped text
+> region is preserved, since it is no longer covered by the linear mapping.
 
-> +               dev_warn(port->dev, "unexpected overrun interrupt\n");
-
-I'm not sure there is no dead lock if this happens on the same port
-which is used as console.
-
-> +               handled = IRQ_HANDLED;
-> +       }
-> +
-> +       spin_unlock(&port->lock);
-> +
-> +       return handled;
-> +}
-> +
-> +static int mps2_uart_startup(struct uart_port *port)
-> +{
-> +       struct mps2_uart_port *mps_port = to_mps2_port(port);
-> +       u8 control = mps2_uart_read8(port, UARTn_CTRL);
-> +       int ret;
-> +
-> +       control &= ~(UARTn_CTRL_RX_GRP | UARTn_CTRL_TX_GRP);
-> +
-> +       mps2_uart_write8(port, control, UARTn_CTRL);
-> +
-> +       ret = request_irq(mps_port->rx_irq, mps2_uart_rxirq, 0,
-> +                         MAKE_NAME(-rx), mps_port);
-> +       if (ret) {
-> +               dev_err(port->dev, "failed to register rxirq (%d)\n", ret);
-> +               goto err_no_rxirq;
-
-It should be below, here just a plain return.
-
-> +       }
-> +
-> +       ret = request_irq(mps_port->tx_irq, mps2_uart_txirq, 0,
-> +                         MAKE_NAME(-tx), mps_port);
-> +       if (ret) {
-> +               dev_err(port->dev, "failed to register txirq (%d)\n", ret);
-> +               goto err_no_txirq;
-
-goto err_free_rxirq;
-
-> +       }
-> +
-> +       ret = request_irq(port->irq, mps2_uart_oerrirq, IRQF_SHARED,
-> +                         MAKE_NAME(-overrun), mps_port);
-> +
-> +       if (ret) {
-> +               dev_err(port->dev, "failed to register oerrirq (%d)\n", ret);
-
-Why not goto pattern here as well?
-
-goto err_free_txirq;
-
-> +       } else {
-
-?and remove this else.
-
-> +               control |= UARTn_CTRL_RX_GRP | UARTn_CTRL_TX_GRP;
-> +
-> +               mps2_uart_write8(port, control, UARTn_CTRL);
-> +
-> +               return 0;
-> +       }
-> +
-> +       free_irq(mps_port->tx_irq, mps_port);
-> +err_no_txirq:
-> +       free_irq(mps_port->rx_irq, mps_port);
-> +err_no_rxirq:
-> +       return ret;
-> +}
+It does, now I have to work out how best to fix hibernate!
 
 
-> +static struct mps2_uart_port mps2_uart_ports[MPS2_MAX_PORTS];
-> +
-> +#ifdef CONFIG_SERIAL_MPS2_UART_CONSOLE
-> +static void mps2_uart_console_putchar(struct uart_port *port, int ch)
-> +{
-> +       while (mps2_uart_read8(port, UARTn_STATE) & UARTn_STATE_TX_FULL)
-> +               cpu_relax();
+Thanks,
 
-Infinite?
-
-> +
-> +       mps2_uart_write8(port, ch, UARTn_DATA);
-> +}
-
-> +static int mps2_init_port(struct mps2_uart_port *mps_port,
-> +                       struct platform_device *pdev)
-> +{
-> +       int ret;
-> +       struct resource *res;
-
-Maybe:
-       struct resource *res;
-       int ret;
-?
-
--- 
-With Best Regards,
-Andy Shevchenko
+James
