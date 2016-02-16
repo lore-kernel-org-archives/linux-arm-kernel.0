@@ -1,111 +1,95 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 16 Feb 2016 08:50:24 +0000
-Subject: [PATCH v2 4/5] irqchip:create irq domain for each mbigen device
-In-Reply-To: <1455604648-20668-5-git-send-email-majun258@huawei.com>
-References: <1455604648-20668-1-git-send-email-majun258@huawei.com>
- <1455604648-20668-5-git-send-email-majun258@huawei.com>
-Message-ID: <20160216085024.3f573f40@arm.com>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Tue, 16 Feb 2016 16:54:29 +0800
+Subject: [PATCH 1/2] pinctrl: mediatek: fix direction control issue
+In-Reply-To: <1455242831.35628.15.camel@mussux00>
+References: <1454462686-770-1-git-send-email-biao.huang@mediatek.com>
+ <1454462686-770-2-git-send-email-biao.huang@mediatek.com>
+ <1454555015.4618.10.camel@mussux00>
+ <CACRpkdZb2-TX1eY7eyK5qCqOg66MP1e4+OO287roJdP=RB6-Fg@mail.gmail.com>
+ <1455242831.35628.15.camel@mussux00>
+Message-ID: <1455612869.11448.22.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 16 Feb 2016 14:37:27 +0800
-MaJun <majun258@huawei.com> wrote:
-
-> From: Ma Jun <majun258@huawei.com>
+On Thu, 2016-02-11 at 18:07 -0800, Hongzhou Yang wrote:
+> On Fri, 2016-02-05 at 14:52 +0100, Linus Walleij wrote:
+> > On Thu, Feb 4, 2016 at 4:03 AM, Hongzhou Yang
+> > <hongzhou.yang@mediatek.com> wrote:
+> > > On Wed, 2016-02-03 at 09:24 +0800, Biao Huang wrote:
+> > >> Since input-enable/disable and input-schmitt-enable/disable are
+> > >> workable when gpio direction is input, so add direction setting
+> > >> when do input-enable/disable and input-schmitt-enable/disable
+> > >> properties.
+> > >>
+> > >> Signed-off-by: Biao Huang <biao.huang@mediatek.com>
+> > >> ---
+> > >>  drivers/pinctrl/mediatek/pinctrl-mtk-common.c |    2 ++
+> > >>  1 file changed, 2 insertions(+)
+> > >>
+> > >> diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+> > >> index 8cac73d..6eb01c9 100644
+> > >> --- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+> > >> +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+> > >> @@ -352,6 +352,7 @@ static int mtk_pconf_parse_conf(struct pinctrl_dev *pctldev,
+> > >>               ret = mtk_pconf_set_pull_select(pctl, pin, true, false, arg);
+> > >>               break;
+> > >>       case PIN_CONFIG_INPUT_ENABLE:
+> > >> +             mtk_pmx_gpio_set_direction(pctldev, NULL, pin, true);
+> > >>               ret = mtk_pconf_set_ies_smt(pctl, pin, arg, param);
+> > >
+> > > Hi Linus,
+> > >
+> > > From pinctrl-bindings.txt, 'input-enable' property defined as following:
+> > > input-enable        - enable input on pin (no effect on output)
+> > >
+> > > Since input enable and input direction are two different settings on our
+> > > SOC,
+> > 
+> > What does this mean? How can input have a "direction"?
+> > 
+> > Isn't the direction of an input always inbound, into the SoC?
+> > 
+> > Please elaborate.
 > 
-> For peripheral devices which connect to mbigen,mbigen is a interrupt
-> controller. So, we create irq domain for each mbigen device and add
-> mbigen irq domain into irq hierarchy structure.
+> Sorry for the late reply.
+> There are two conditions if external device input data into SOC.
+> 1. Change GPIO direction to input.
+> 2. Switch on input.
 > 
-> Signed-off-by: Ma Jun <majun258@huawei.com>
-> ---
->  drivers/irqchip/irq-mbigen-v1.c |  136 +++++++++++++++++++++++++++++++++++++++
->  1 files changed, 136 insertions(+), 0 deletions(-)
 > 
-> diff --git a/drivers/irqchip/irq-mbigen-v1.c b/drivers/irqchip/irq-mbigen-v1.c
-> index 9445658..61e7ad0 100644
-> --- a/drivers/irqchip/irq-mbigen-v1.c
-> +++ b/drivers/irqchip/irq-mbigen-v1.c
-> @@ -16,11 +16,30 @@
->   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->   */
->  
-> +#include <linux/interrupt.h>
-> +#include <linux/irqchip.h>
->  #include <linux/module.h>
-> +#include <linux/msi.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_irq.h>
->  #include <linux/of_platform.h>
->  #include <linux/platform_device.h>
->  #include <linux/slab.h>
->  
-> +/* The maximum IRQ pin number of mbigen chip(start from 0) */
-> +#define MAXIMUM_IRQ_PIN_NUM		640
-> +
-> +/**
-> + * In mbigen vector register
-> + * bit[31:16]:	device id
-> + * bit[15:0]:	event id value
-> + */
-> +#define IRQ_EVENT_ID_MASK		0xffff
-> +
-> +/* offset of vector register in mbigen node */
-> +#define REG_MBIGEN_VEC_OFFSET		0x300
-> +#define REG_MBIGEN_EXT_VEC_OFFSET		0x320
-> +
->  /**
->   * struct mbigen_device - holds the information of mbigen device.
->   *
-> @@ -32,10 +51,112 @@ struct mbigen_device {
->  	void __iomem		*base;
->  };
->  
-> +static int get_mbigen_nid(unsigned int offset)
-> +{
-> +	int nid = 0;
-> +
-> +	if (offset < 256)
-> +		nid = offset / 64;
-> +	else if (offset < 384)
-> +		nid = 4;
-> +	else if (offset < 640)
-> +		nid = 5;
-> +
-> +	return nid;
-> +}
-> +
-> +static inline unsigned int get_mbigen_vec_reg(irq_hw_number_t hwirq)
-> +{
-> +	unsigned int nid;
-> +
-> +	nid = get_mbigen_nid(hwirq);
-> +
-> +	if (nid < 4)
-> +		return (nid * 4) + REG_MBIGEN_VEC_OFFSET;
-> +	else
-> +		return (nid - 4) * 4 + REG_MBIGEN_EXT_VEC_OFFSET;
-> +}
-> +
-> +static struct irq_chip mbigen_irq_chip = {
-> +	.name =			"mbigen-v1",
-> +};
-> +
-> +static void mbigen_write_msg(struct msi_desc *desc, struct msi_msg *msg)
-> +{
-> +	/* The address of doorbell is encoded in mbigen register by default
-> +	 * So,we don't need to program the doorbell address at here
-> +	 * Besides, the event ID is decided by the hardware pin number,
-> +	 * we can't change it in software.So, we don't need to encode the
-> +	 * event ID in mbigen register.
-> +	 */
+> > > could you tell me the exact meaning of this property? Input enable
+> > > only? Or set input direction at the same time?
+> > 
+> > This was added in commit 8ba3f4d00078e7a49c60c0bd6298f29402c3a0a0
+> > "pinctrl: Adds slew-rate, input-enable/disable"
+> > by Sherman Yin so let's ask him first.
+> 
+> Thanks for this info.
+> From Sherman's comment, PIN_CONFIG_INPUT_ENABLE seems only to stand for
+> the condition 2.
+> 
+> * @PIN_CONFIG_INPUT_ENABLE: enable the pin's input.  Note that this does
+> not affect the pin's ability to drive output.  1 enables input, 0
+> disables input.
+> 
+> Then I get confuse if we can change direction under this property.
 
-Really? What if tomorrow I decide to change the EventID allocation
-policy in the ITS driver? Have your HW engineers really baked the
-behaviour of the Linux driver into the device?
+Hi,
 
-I'm puzzled.
+To make it more clear, for a GPIO pin to get input on MTK chip, we must:
 
-	M.
--- 
-Jazz is not dead. It just smells funny.
+- Enable input for the pad (input-enable)
+- Set mux to GPIO mode
+- Set GPIO direction to input
+
+Currently user need to add a dts node to set pinmux to GPIO mode with
+input-enable property, the driver need to call gpio_direction_input to
+set direction.
+
+Since input-enable and GPIO direction are 2 different things, we now
+think this patch is inappropriate. Instead, user should not required to
+add pinmux node in dts if all he want is use it as plain GPIO input.
+Patch [2/2] remove the need to set it to GPIO mode, Biao will send a new
+patch to remove the need for input-enable.
+
+Joe.C
