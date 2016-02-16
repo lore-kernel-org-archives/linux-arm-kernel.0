@@ -1,60 +1,101 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 16 Feb 2016 21:08:19 +0800
-Subject: [PATCH v5 01/13] mmc: sdhci-bcm2835: use sdhci_pltfm_init for private
+Date: Tue, 16 Feb 2016 21:08:27 +0800
+Subject: [PATCH v5 09/13] mmc: sdhci-pxav3: use sdhci_pltfm_init for private
  allocation
 In-Reply-To: <1455628111-5583-1-git-send-email-jszhang@marvell.com>
 References: <1455628111-5583-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1455628111-5583-2-git-send-email-jszhang@marvell.com>
+Message-ID: <1455628111-5583-10-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Commit 0e748234293f ("mmc: sdhci: Add size for caller in init+register")
 allows users of sdhci_pltfm to allocate private space in calls to
-sdhci_pltfm_init+sdhci_pltfm_register. This patch migrates sdhci-bcm2835
+sdhci_pltfm_init+sdhci_pltfm_register. This patch migrates sdhci-pxav3
 to this allocation.
 
 Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 Acked-by: Arnd Bergmann <arnd@arndb.de>
 Acked-by: Adrian Hunter <adrian.hunter@intel.com>
 ---
- drivers/mmc/host/sdhci-bcm2835.c | 14 +++-----------
- 1 file changed, 3 insertions(+), 11 deletions(-)
+ drivers/mmc/host/sdhci-pxav3.c | 20 ++++++++------------
+ 1 file changed, 8 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/mmc/host/sdhci-bcm2835.c b/drivers/mmc/host/sdhci-bcm2835.c
-index 1c65d46..4a6a1d1 100644
---- a/drivers/mmc/host/sdhci-bcm2835.c
-+++ b/drivers/mmc/host/sdhci-bcm2835.c
-@@ -74,7 +74,7 @@ static inline u32 bcm2835_sdhci_readl(struct sdhci_host *host, int reg)
- static void bcm2835_sdhci_writew(struct sdhci_host *host, u16 val, int reg)
+diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
+index f5edf9d..c88d2ba 100644
+--- a/drivers/mmc/host/sdhci-pxav3.c
++++ b/drivers/mmc/host/sdhci-pxav3.c
+@@ -132,7 +132,7 @@ static int armada_38x_quirks(struct platform_device *pdev,
+ {
+ 	struct device_node *np = pdev->dev.of_node;
+ 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+-	struct sdhci_pxa *pxa = pltfm_host->priv;
++	struct sdhci_pxa *pxa = sdhci_pltfm_priv(pltfm_host);
+ 	struct resource *res;
+ 
+ 	host->quirks &= ~SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN;
+@@ -201,7 +201,7 @@ static void pxav3_reset(struct sdhci_host *host, u8 mask)
+ static void pxav3_gen_init_74_clocks(struct sdhci_host *host, u8 power_mode)
  {
  	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
--	struct bcm2835_sdhci *bcm2835_host = pltfm_host->priv;
-+	struct bcm2835_sdhci *bcm2835_host = sdhci_pltfm_priv(pltfm_host);
- 	u32 oldval = (reg == SDHCI_COMMAND) ? bcm2835_host->shadow :
- 		bcm2835_sdhci_readl(host, reg & ~3);
- 	u32 word_num = (reg >> 1) & 1;
-@@ -152,20 +152,12 @@ static int bcm2835_sdhci_probe(struct platform_device *pdev)
- 	struct sdhci_pltfm_host *pltfm_host;
+-	struct sdhci_pxa *pxa = pltfm_host->priv;
++	struct sdhci_pxa *pxa = sdhci_pltfm_priv(pltfm_host);
+ 	u16 tmp;
+ 	int count;
+ 
+@@ -250,7 +250,7 @@ static void pxav3_gen_init_74_clocks(struct sdhci_host *host, u8 power_mode)
+ static void pxav3_set_uhs_signaling(struct sdhci_host *host, unsigned int uhs)
+ {
+ 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+-	struct sdhci_pxa *pxa = pltfm_host->priv;
++	struct sdhci_pxa *pxa = sdhci_pltfm_priv(pltfm_host);
+ 	u16 ctrl_2;
+ 
+ 	/*
+@@ -370,16 +370,12 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
+ 	const struct of_device_id *match;
  	int ret;
  
--	host = sdhci_pltfm_init(pdev, &bcm2835_sdhci_pdata, 0);
-+	host = sdhci_pltfm_init(pdev, &bcm2835_sdhci_pdata,
-+				sizeof(*bcm2835_host));
+-	pxa = devm_kzalloc(&pdev->dev, sizeof(struct sdhci_pxa), GFP_KERNEL);
+-	if (!pxa)
+-		return -ENOMEM;
+-
+-	host = sdhci_pltfm_init(pdev, &sdhci_pxav3_pdata, 0);
++	host = sdhci_pltfm_init(pdev, &sdhci_pxav3_pdata, sizeof(*pxa));
  	if (IS_ERR(host))
  		return PTR_ERR(host);
  
--	bcm2835_host = devm_kzalloc(&pdev->dev, sizeof(*bcm2835_host),
--					GFP_KERNEL);
--	if (!bcm2835_host) {
--		dev_err(mmc_dev(host->mmc),
--			"failed to allocate bcm2835_sdhci\n");
--		return -ENOMEM;
--	}
--
  	pltfm_host = sdhci_priv(host);
--	pltfm_host->priv = bcm2835_host;
+-	pltfm_host->priv = pxa;
++	pxa = sdhci_pltfm_priv(pltfm_host);
  
- 	pltfm_host->clk = devm_clk_get(&pdev->dev, NULL);
- 	if (IS_ERR(pltfm_host->clk)) {
+ 	pxa->clk_io = devm_clk_get(dev, "io");
+ 	if (IS_ERR(pxa->clk_io))
+@@ -486,7 +482,7 @@ static int sdhci_pxav3_remove(struct platform_device *pdev)
+ {
+ 	struct sdhci_host *host = platform_get_drvdata(pdev);
+ 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+-	struct sdhci_pxa *pxa = pltfm_host->priv;
++	struct sdhci_pxa *pxa = sdhci_pltfm_priv(pltfm_host);
+ 
+ 	pm_runtime_get_sync(&pdev->dev);
+ 	pm_runtime_disable(&pdev->dev);
+@@ -535,7 +531,7 @@ static int sdhci_pxav3_runtime_suspend(struct device *dev)
+ {
+ 	struct sdhci_host *host = dev_get_drvdata(dev);
+ 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+-	struct sdhci_pxa *pxa = pltfm_host->priv;
++	struct sdhci_pxa *pxa = sdhci_pltfm_priv(pltfm_host);
+ 	int ret;
+ 
+ 	ret = sdhci_runtime_suspend_host(host);
+@@ -553,7 +549,7 @@ static int sdhci_pxav3_runtime_resume(struct device *dev)
+ {
+ 	struct sdhci_host *host = dev_get_drvdata(dev);
+ 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+-	struct sdhci_pxa *pxa = pltfm_host->priv;
++	struct sdhci_pxa *pxa = sdhci_pltfm_priv(pltfm_host);
+ 
+ 	clk_prepare_enable(pxa->clk_io);
+ 	if (!IS_ERR(pxa->clk_core))
 -- 
 2.7.0
