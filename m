@@ -1,42 +1,41 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 16 Feb 2016 16:40:34 +0100
-Subject: [PATCH v2 1/5] MIPS: jz4740: remove broken irq_to_gpio() call
-In-Reply-To: <455637086-2794174-1-git-send-email-arnd@arndb.de>
+Date: Tue, 16 Feb 2016 16:40:38 +0100
+Subject: [PATCH v2 5/5] gpio: allow setting ARCH_NR_GPIOS from Kconfig
+In-Reply-To: <1455637261-2920972-1-git-send-email-arnd@arndb.de>
 References: <455637086-2794174-1-git-send-email-arnd@arndb.de>
-Message-ID: <1455637261-2920972-1-git-send-email-arnd@arndb.de>
+ <1455637261-2920972-1-git-send-email-arnd@arndb.de>
+Message-ID: <1455637261-2920972-5-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-gpiolib has removed the irq_to_gpio() API several years ago,
-but the global header still provided a non-working stub.
+The ARM version of asm/gpio.h basically just contains the same definitions
+as the gpiolib version, with the exception of ARCH_NR_GPIOS.
 
-With a MIPS-wide change to use the generic header file, the jz4740
-platform is now using the wrong stub implementation of irq_to_gpio(),
-which cannot work.
+This adds the option for overriding the constant through Kconfig to
+the architecture-independent header, so we can remove the ARM specific
+file later.
 
-This uses an open-coded implementation in the only line it
-is used in.
-
-Suggested-by: Lars-Peter Clausen <lars@metafoo.de>
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: <stable@vger.kernel.org> # v4.3+
-Fixes: 832f5dacfa0b ("MIPS: Remove all the uses of custom gpio.h").
 ---
- arch/mips/jz4740/gpio.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ include/asm-generic/gpio.h | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/mips/jz4740/gpio.c b/arch/mips/jz4740/gpio.c
-index 8c6d76c9b2d6..d9907e57e9b9 100644
---- a/arch/mips/jz4740/gpio.c
-+++ b/arch/mips/jz4740/gpio.c
-@@ -270,7 +270,7 @@ uint32_t jz_gpio_port_get_value(int port, uint32_t mask)
- }
- EXPORT_SYMBOL(jz_gpio_port_get_value);
+diff --git a/include/asm-generic/gpio.h b/include/asm-generic/gpio.h
+index 40ec1433f05d..8ca627dcea11 100644
+--- a/include/asm-generic/gpio.h
++++ b/include/asm-generic/gpio.h
+@@ -26,8 +26,12 @@
+  */
  
--#define IRQ_TO_BIT(irq) BIT(irq_to_gpio(irq) & 0x1f)
-+#define IRQ_TO_BIT(irq) BIT((irq - JZ4740_IRQ_GPIO(0)) & 0x1f)
+ #ifndef ARCH_NR_GPIOS
++#if defined(CONFIG_ARCH_NR_GPIO) && CONFIG_ARCH_NR_GPIO > 0
++#define ARCH_NR_GPIOS CONFIG_ARCH_NR_GPIO
++#else
+ #define ARCH_NR_GPIOS		512
+ #endif
++#endif
  
- static void jz_gpio_check_trigger_both(struct jz_gpio_chip *chip, unsigned int irq)
- {
+ /*
+  * "valid" GPIO numbers are nonnegative and may be passed to
 -- 
 2.7.0
