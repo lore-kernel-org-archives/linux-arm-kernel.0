@@ -1,103 +1,60 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 16 Feb 2016 17:32:26 +0000
-Subject: [PATCH v2] ARM: proc-v7.S: Adjust stack address when XIP_KERNEL
-In-Reply-To: <alpine.LFD.2.20.1602011613360.32766@knanqh.ubzr>
-References: <1454105474-3009-1-git-send-email-chris.brandt@renesas.com>
- <1454335736-10084-1-git-send-email-chris.brandt@renesas.com>
- <alpine.LFD.2.20.1602011613360.32766@knanqh.ubzr>
-Message-ID: <20160216173225.GE19428@n2100.arm.linux.org.uk>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 16 Feb 2016 17:49:37 +0000
+Subject: [PATCH v3 0/6] irqchip: irq-armada-370-xp: generic MSI
+ infrastructure and assorted fixes
+In-Reply-To: <1455115621-22846-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1455115621-22846-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20160216174937.GF5183@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 01, 2016 at 04:15:38PM -0500, Nicolas Pitre wrote:
-> On Mon, 1 Feb 2016, Chris Brandt wrote:
+Hey Thomas,
+
+On Wed, Feb 10, 2016 at 03:46:55PM +0100, Thomas Petazzoni wrote:
+> This patch series converts the Armada 370/XP irqchip driver (also used
+> on Armada 375, 38x and 39x) to the new MSI infrastructure put in place
+> by Marc. It doesn't bring any functional difference other than using
+> the right, modern, MSI mechanism, which might ultimately allow Marc to
+> remove the old way of implementing MSI support.
 > 
-> > From: Nicolas Pitre <nico@linaro.org>
-> > 
-> > When XIP_KERNEL is enabled, the virt to phys address translation for RAM
-> > is not the same as the virt to phys address translation for .text.
-> > The only way to know where physical RAM is located is to use
-> > PLAT_PHYS_OFFSET.
-> > The MACRO will be useful for other places where there is a similar problem.
-> > 
-> > Signed-off-by: Nicolas Pitre <nico@linaro.org>
-> > Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
+> It has been tested on Armada 38x and Armada XP with an Intel e1000e
+> NIC and an Intel IGB NIC, both of which use MSI interrupts.
 > 
-> Looks fine.  You may submit it here:
-...
-> > +#ifdef CONFIG_XIP_KERNEL
-> > +#define PHYS_OFFSET_FIXUP \
-> > +	( XIP_VIRT_ADDR(CONFIG_XIP_PHYS_ADDR) - PAGE_OFFSET + \
-> > +	  PLAT_PHYS_OFFSET - CONFIG_XIP_PHYS_ADDR )
-> > +#else
-> > +#define PHYS_OFFSET_FIXUP 0
-> > +#endif
-> > +
-> >  #ifndef __ASSEMBLY__
-> >  
-> >  /*
-> > diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-> > index 0f92d57..1595fb2 100644
-> > --- a/arch/arm/mm/proc-v7.S
-> > +++ b/arch/arm/mm/proc-v7.S
-> > @@ -487,7 +487,7 @@ __errata_finish:
-> >  
-> >  	.align	2
-> >  __v7_setup_stack_ptr:
-> > -	.word	__v7_setup_stack - .
-> > +	.word	__v7_setup_stack - . + PHYS_OFFSET_FIXUP
+> Note that this patch series depends on the patch series from Marc
+> Zyngier for proper operation, which have already been merged in
+> tip.git by Thomas Gleixner:
+> 
+>   http://git.kernel.org/cgit/linux/kernel/git/tip/tip.git/commit/?id=530cbe100ef7587aa5b5ac3a4b670cda4d50e598
+>   http://git.kernel.org/cgit/linux/kernel/git/tip/tip.git/commit/?id=14a0db3cdd114da757197193f66786e63649c91e
 
-I keep looking at this patch, and I really find that I detest this
-PHYS_OFFSET_FIXUP thing - it's really not obvious what's going on
-here.  It's taken a _long_ time to work this out, which _really_
-isn't good going forward.
+When based against v4.5-rc1, I encountered:
 
-Let's instead change things to make it much more obvious - see the
-patch below.
+drivers/irqchip/irq-armada-370-xp.c:584:41: error: 'DOMAIN_BUS_WIRED' undeclared (first use in this function)
 
-diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index ebdaaf7dd19f..593e5613184d 100644
---- a/arch/arm/include/asm/memory.h
-+++ b/arch/arm/include/asm/memory.h
-@@ -135,11 +135,18 @@
- #define PLAT_PHYS_OFFSET	UL(CONFIG_PHYS_OFFSET)
- 
- #ifdef CONFIG_XIP_KERNEL
--#define PHYS_OFFSET_FIXUP \
--	( XIP_VIRT_ADDR(CONFIG_XIP_PHYS_ADDR) - PAGE_OFFSET + \
--	  PLAT_PHYS_OFFSET - CONFIG_XIP_PHYS_ADDR )
-+/*
-+ * When referencing data in RAM from the XIP region in a relative manner
-+ * with the MMU off, we need the relative offset between the two physical
-+ * addresses.  The macro below achieves this, which is:
-+ *    __pa(v_data) - __xip_pa(v_text)
-+ */
-+#define PHYS_RELATIVE(v_data, v_text) \
-+	(((v_data) - PAGE_OFFSET + PLAT_PHYS_OFFSET) - \
-+	 ((v_text) - XIP_VIRT_ADDR(CONFIG_XIP_PHYS_ADDR) + \
-+          CONFIG_XIP_PHYS_ADDR))
- #else
--#define PHYS_OFFSET_FIXUP 0
-+#define PHYS_RELATIVE(v_data, v_text) (v_data) - (v_text)
- #endif
- 
- #ifndef __ASSEMBLY__
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index 1595fb29ec12..0f8963a7e7d9 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -487,7 +487,7 @@ __errata_finish:
- 
- 	.align	2
- __v7_setup_stack_ptr:
--	.word	__v7_setup_stack - . + PHYS_OFFSET_FIXUP
-+	.word	PHYS_RELATIVE(__v7_setup_stack, .)
- ENDPROC(__v7_setup)
- 
- 	.bss
+Rebased the branch against v4.5-rc2 to pick up:
 
+  530cbe100ef7 irqdomain: Allow domain lookup with DOMAIN_BUS_WIRED token
 
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Which builds without warning.
+
+> Thomas Petazzoni (6):
+>   irqchip: irq-armada-370-xp: add Kconfig option for the driver
+>   irqchip: irq-armada-370-xp: use the generic MSI infrastructure
+>   irqchip: irq-armada-370-xp: use PCI_MSI_DOORBELL_START where
+>     appropriate
+>   irqchip: irq-armada-370-xp: use shorter names for irq_chip
+>   irqchip: irq-armada-370-xp: allow allocation of multiple MSIs
+>   ARM: mvebu: use the ARMADA_370_XP_IRQ option
+> 
+>  arch/arm/mach-mvebu/Kconfig         |   6 +-
+>  drivers/irqchip/Kconfig             |   6 ++
+>  drivers/irqchip/Makefile            |   2 +-
+>  drivers/irqchip/irq-armada-370-xp.c | 156 +++++++++++++++---------------------
+>  4 files changed, 78 insertions(+), 92 deletions(-)
+
+Whole series applied to irqchip/mvebu which will not be rebased.  I'll
+only append to it if you send me a patch to add.  ;-)
+
+thx,
+
+Jason.
