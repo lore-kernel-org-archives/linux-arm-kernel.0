@@ -1,37 +1,49 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 16 Feb 2016 15:12:53 +0000
-Subject: [PATCH v3 5/5] arm64/perf: Extend event mask for ARMv8.1
-In-Reply-To: <20160216080015.GA3490@hardcore>
-References: <cover.1454516082.git.jglauber@cavium.com>
- <fa91eaedf581e6a7053899f25b1b08458dbd4b8e.1454516082.git.jglauber@cavium.com>
- <20160215200404.GX6298@arm.com> <20160216080015.GA3490@hardcore>
-Message-ID: <20160216151252.GG14509@arm.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Tue, 16 Feb 2016 15:14:14 +0000
+Subject: [PATCH v3 08/10] ARM: configs: add MPS2 defconfig
+In-Reply-To: <11778979.HbWgmZUCnF@wuerfel>
+References: <1455617295-23736-1-git-send-email-vladimir.murzin@arm.com>
+ <2680417.bULLX3O66Y@wuerfel> <56C3378F.2010008@arm.com>
+ <11778979.HbWgmZUCnF@wuerfel>
+Message-ID: <56C33CC6.4030509@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 16, 2016 at 09:00:15AM +0100, Jan Glauber wrote:
-> On Mon, Feb 15, 2016 at 08:04:04PM +0000, Will Deacon wrote:
+On 16/02/16 15:08, Arnd Bergmann wrote:
+> On Tuesday 16 February 2016 14:51:59 Vladimir Murzin wrote:
+>>>
+>>> Why CONFIG_EMBEDDED? You probably mean CONFIG_EXPERT, but then what do
+>>> you need that for?
+>>
+>> TBH, I have no special requirement for this option to be set and now,
+>> looking at Kconfig entry for this option, I think that I got it here
+>> because I stated configuration with allnoconfig.
+>>
+>> OTOH, I don't see how harmful it can be since description says:
+>>
+>>           This option should be enabled if compiling the kernel for
+>>           an embedded system so certain expert options are available
+>>           for configuration
+>>
+>> yes, it selects CONFIG_EXPERT and that had side effect that, for
+>> example, CONFIG_NAMESPACE could be compiled out.
+>>
+>> Have I missed something around it?
 > 
-> [...]
+> Just the history behind this symbol. We removed it a while ago in
+> favor if CONFIG_EXPERT, assuming that it makes it clearer that it's
+> not just for embedded systems, or for systems with small memory.
 > 
-> > On Wed, Feb 03, 2016 at 06:12:00PM +0100, Jan Glauber wrote:
-> > > +		cpu_pmu->event_mask = 0xffff;	/* ARMv8.1 extended events */
-> > > +	else
-> > > +		cpu_pmu->event_mask = ARMV8_EVTYPE_EVENT;
-> > 
-> > ... although can't we just update ARMV8_EVTYPE_EVENT to be 0xffff now?
-> > AFAICT, that just eats into bits that used to be RES0, so we shouldn't
-> > see any problems. That should make your patch *much* simpler!
-> 
-> That would of course be easier, but I just can't assess the implications.
-> 
-> Probably I'm missing something but to me it looks like the event mask is the
-> only verification we do for the user-space selectable events. Is it safe for
-> implementations that only support 0x3ff events to allow access to the
-> whole 0xffff range? What memory would be accessed for non-existing
-> events?
+> It's  basically a zombie symbol that nobody should use directly
+> (independent of what the documentation says...).
 
-Which memory? The worst-case is that we end up writing to some bits in
-a register (e.g. PMXEVTYPER) that are RES0 in ARMv8 afaict.
+Good to know! I'll drop it then.
 
-Will
+Thanks
+Vladimir
+
+> 
+> 	Arnd
+> 
+> 
+> 
