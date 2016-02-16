@@ -1,101 +1,40 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Tue, 16 Feb 2016 03:13:40 -0800
-Subject: Writes, smp_wmb(), and transitivity?
-In-Reply-To: <20160216095319.GA14509@arm.com>
-References: <20160215175825.GA15878@linux.vnet.ibm.com>
- <20160215185832.GQ6298@arm.com>
- <20160215203512.GL6719@linux.vnet.ibm.com>
- <20160216095319.GA14509@arm.com>
-Message-ID: <20160216111340.GS6719@linux.vnet.ibm.com>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 16 Feb 2016 11:13:05 +0000
+Subject: [PATCH] arm64: mark kernel text segment as MEMBLOCK_NOMAP
+In-Reply-To: <CAKv+Gu_yTz-ohFPS0wMX42iCkDNaSwZoZ8Yi-zsZNNu1LNDkZQ@mail.gmail.com>
+References: <1455528512-32491-1-git-send-email-ard.biesheuvel@linaro.org>	<56C2FF07.30205@arm.com>
+ <CAKv+Gu_yTz-ohFPS0wMX42iCkDNaSwZoZ8Yi-zsZNNu1LNDkZQ@mail.gmail.com>
+Message-ID: <56C30441.1080003@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 16, 2016 at 09:53:20AM +0000, Will Deacon wrote:
-> On Mon, Feb 15, 2016 at 12:35:12PM -0800, Paul E. McKenney wrote:
-> > On Mon, Feb 15, 2016 at 06:58:32PM +0000, Will Deacon wrote:
-> > > On Mon, Feb 15, 2016 at 09:58:25AM -0800, Paul E. McKenney wrote:
-> > > > Some architectures provide local transitivity for a chain of threads doing
-> > > > writes separated by smp_wmb(), as exemplified by the litmus tests below.
-> > > > The pattern is that each thread writes to a its own variable, does an
-> > > > smp_wmb(), then writes a different value to the next thread's variable.
-> > > > 
-> > > > I don't know of a use of this, but if everyone supports it, it might
-> > > > be good to mandate it.  Status quo is that smp_wmb() is non-transitive,
-> > > > so it currently isn't supported.
-> > > > 
-> > > > Anyone know of any architectures that do -not- support this?
-> > > > 
-> > > > Assuming all architectures -do- support this, any arguments -against-
-> > > > officially supporting it in Linux?
-> > > > 
-> > > > 							Thanx, Paul
-> > > > 
-> > > > ------------------------------------------------------------------------
-> > > > 
-> > > > Two threads:
-> > > > 
-> > > > 	int a, b;
-> > > > 
-> > > > 	void thread0(void)
-> > > > 	{
-> > > > 		WRITE_ONCE(a, 1);
-> > > > 		smp_wmb();
-> > > > 		WRITE_ONCE(b, 2);
-> > > > 	}
-> > > > 
-> > > > 	void thread1(void)
-> > > > 	{
-> > > > 		WRITE_ONCE(b, 1);
-> > > > 		smp_wmb();
-> > > > 		WRITE_ONCE(a, 2);
-> > > > 	}
-> > > > 
-> > > > 	/* After all threads have completed and the dust has settled... */
-> > > > 
-> > > > 	BUG_ON(a == 1 && b == 1);
-> > > 
-> > > My understanding is that this test, and the generalisation to n threads,
-> > > is forbidden on ARM. However, the transitivity of DMB ST (used to
-> > > construct smp_wmb()) has been the subject of long debates, because we
-> > > allow the following test:
-> > > 
-> > > 
-> > > P0:
-> > > Wx = 1
-> > > 
-> > > P1:
-> > > Rx == 1
-> > > DMB ST
-> > > Wy = 1
-> > > 
-> > > P2:
-> > > Ry == 1
-> > > <addr dep>
-> > > Rx == 0
-> > > 
-> > > 
-> > > so I'd be uneasy about saying "it's all transitive".
-> > 
-> > Agreed!  For one thing, doesn't DMB ST need writes on both sides?
+On 16/02/16 10:57, Ard Biesheuvel wrote:
+> On 16 February 2016 at 11:50, James Morse <james.morse@arm.com> wrote:
+>> On 15/02/16 09:28, Ard Biesheuvel wrote:
+>>> This should hopefully address the issue reported by James, but I suppose
+>>> more work is required on the hibernate side to ensure the unmapped text
+>>> region is preserved, since it is no longer covered by the linear mapping.
+>>
+>> It does, now I have to work out how best to fix hibernate!
+>>
 > 
-> Yes, but it's a common trap that people fall into where they think the
-> above is forbidden because the DMB ST in P1 should order P0's write
-> before its own write of y.
+> Indeed. The alternative would be to map the [_stext, _etext] interval
+> into the linear region as a ro/nx alias of the actual mapping in the
+> vmalloc region. That would probably make your life easier, but I am
+> not convinced the overall result is better.
 
-True enough.
+I assumed you would NACK any approach that looked like that:
+It could be done temporarily while the memory snapshot is being taken, only
+swsusp_save() would see this mapping, it can be removed again afterwards. But
+pfn_valid() will still say those pages aren't there, and there is no
+memblock_clear_nomap() to change this.
 
-> > But that is one reason that I am only semi-enthusiastic about this.
-> > The potentially locally transitive case is -very- restrictive, applying
-> > only to situations where -all- accesses are writes.
-> 
-> I think that we will confuse people more by trying to describe the
-> restricted case where we provide order than if we blanket say that its
-> not transitive. I know Linus prefers to be as strong as possible, but
-> this doesn't look like a realistic programming paradigm and having a
-> straightforward rule that "rmb and wmb are not transitive" is much
-> easier for people to deal with in my opinion.
 
-That is a good explanation of why I am only semi-enthusiastic about
-this.  ;-)
+The current approach involves copying the kernel text into pages that are saved,
+and having two lists of pages that need restoring. (wheels within wheels!)
+Pretty unpleasant, and requires another patch in the core code, so likely won't
+be possible for v4.6. I should have the patches out for review later today.
 
-							Thanx, Paul
+
+
+James
