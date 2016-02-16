@@ -1,36 +1,41 @@
-From: tiwai@suse.de (Takashi Iwai)
-Date: Tue, 16 Feb 2016 17:43:24 +0100
-Subject: [PATCH] sound: hdmi: avoid dereferencing uninitialized 'jack'
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 16 Feb 2016 17:44:15 +0100
+Subject: [PATCH v2] sound: hdmi: avoid dereferencing uninitialized 'jack'
  pointer
-In-Reply-To: <20160216163840.GA7544@sirena.org.uk>
-References: <1455634059-1896914-1-git-send-email-arnd@arndb.de>
- <s5hbn7g7izt.wl-tiwai@suse.de> <2573932.AU4HSxN0NE@wuerfel>
- <s5h4md87hnu.wl-tiwai@suse.de>
- <20160216163840.GA7544@sirena.org.uk>
-Message-ID: <s5hy4ak61xv.wl-tiwai@suse.de>
+Message-ID: <1455641066-4014858-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 16 Feb 2016 17:38:40 +0100,
-Mark Brown wrote:
-> 
-> On Tue, Feb 16, 2016 at 05:18:29PM +0100, Takashi Iwai wrote:
-> > Arnd Bergmann wrote:
-> 
-> > > Another option might would be to change snd_jack_new() to return
-> > > an error if that SND_JACK is disabled, and then require all users
-> > > to handle the error gracefully, i.e. not fail the probe() function
-> > > but just not use the jack.
-> 
-> > Yes, I thought of that, too.  If select is no good option, it's a good
-> > alternative, indeed.
-> 
-> It's going to be a bunch of work to implement though.
+When CONFIG_SND_JACK is disabled, the hdmi driver tries to create
+a new output jack structure and dereferences it even though
+the pointer is never assigned:
 
-Is it?  Which driver would be broken?  Many ASoC drivers just ignore
-the return error completely.  Some treats as a fatal error, and the
-behavior would change, yes.  But I don't think that such a driver
-would work without CONFIG_SND_JACK properly in anyway.
+sound/pci/hda/patch_hdmi.c: In function 'generic_hdmi_build_jack':
+sound/pci/hda/patch_hdmi.c:2534:30: error: 'jack' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+sound/pci/hda/patch_hdmi.c:2526:19: note: 'jack' was declared here
 
+This makes snd_jack_new() return an error when SND_JACK is disabled,
+forcing all users to handle errors gracefully and avoiding the
+problem in all callers that correctly check the return code.
 
-Takashi
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 788d441a164c ("ALSA: hda - Use component ops for i915 HDMI/DP audio jack handling")
+---
+ include/sound/jack.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/include/sound/jack.h b/include/sound/jack.h
+index 23bede121c78..1e84a2e413f8 100644
+--- a/include/sound/jack.h
++++ b/include/sound/jack.h
+@@ -99,7 +99,7 @@ void snd_jack_report(struct snd_jack *jack, int status);
+ static inline int snd_jack_new(struct snd_card *card, const char *id, int type,
+ 			       struct snd_jack **jack, bool initial_kctl, bool phantom_jack)
+ {
+-	return 0;
++	return -ENXIO;
+ }
+ 
+ static inline int snd_jack_add_new_kctl(struct snd_jack *jack, const char * name, int mask)
+-- 
+2.7.0
