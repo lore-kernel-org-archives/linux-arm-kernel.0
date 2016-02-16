@@ -1,44 +1,146 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 16 Feb 2016 06:43:35 +0530
-Subject: Crashes in arm qemu emulations due to 'cpufreq: governor:
- Replace timers with utilization ...'
-In-Reply-To: <CAJZ5v0gLankSuziQq25qTCyNqeOX43yD9jnJu_XXwbdyajfmKg@mail.gmail.com>
-References: <20160215170527.GA24453@roeck-us.net>
- <CAJZ5v0gLankSuziQq25qTCyNqeOX43yD9jnJu_XXwbdyajfmKg@mail.gmail.com>
-Message-ID: <20160216011335.GI6334@vireshk-i7>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Tue, 16 Feb 2016 02:20:36 +0100
+Subject: [PATCH v6 1/2] ACPI: introduce a function to find the first
+ physical device
+In-Reply-To: <1453300171-25473-2-git-send-email-aleksey.makarov@linaro.org>
+References: <1453300171-25473-1-git-send-email-aleksey.makarov@linaro.org>
+ <1453300171-25473-2-git-send-email-aleksey.makarov@linaro.org>
+Message-ID: <2019009.4Y5n3ZF6bK@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15-02-16, 19:41, Rafael J. Wysocki wrote:
-> On Mon, Feb 15, 2016 at 6:05 PM, Guenter Roeck <linux@roeck-us.net> wrote:
-> > [    1.340000] [<c0958e78>] (__cpufreq_driver_target) from [<c095ca58>] (dbs_check_cpu+0x1ac/0x1e8)
-> > [    1.340000] [<c095ca58>] (dbs_check_cpu) from [<c095cd04>] (cpufreq_governor_dbs+0x1fc/0x608)
-> > [    1.340000] [<c095cd04>] (cpufreq_governor_dbs) from [<c0959c5c>] (__cpufreq_governor+0x1a8/0x204)
-> > [    1.340000] [<c0959c5c>] (__cpufreq_governor) from [<c095a2dc>] (cpufreq_init_policy+0x60/0x8c)
-> > [    1.340000] [<c095a2dc>] (cpufreq_init_policy) from [<c095a5f0>] (cpufreq_online+0x2e8/0x708)
-> > [    1.340000] [<c095a5f0>] (cpufreq_online) from [<c075674c>] (subsys_interface_register+0x80/0xc4)
-> > [    1.340000] [<c075674c>] (subsys_interface_register) from [<c0959764>] (cpufreq_register_driver+0x144/0x1a0)
+On Wednesday, January 20, 2016 08:29:26 PM Aleksey Makarov wrote:
+> Factor out the code that finds the first physical device
+> of a given ACPI device.  It is used in several places.
 > 
-> This is the registration of the cpufreq driver (cpufreq-dt in this case).
+> Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
+
+I guess the above doesn't apply any more, does it?
+
+> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
+> ---
+>  drivers/acpi/acpi_platform.c | 19 ++-----------------
+>  drivers/acpi/bus.c           | 33 ++++++++++++++++++++++-----------
+>  drivers/acpi/internal.h      |  1 +
+>  3 files changed, 25 insertions(+), 28 deletions(-)
 > 
-> It does cpufreq_online()->cpufreq_init_policy()->__cpufreq_governor()->cpufreq_governor_dbs()->dbs_check_cpu().
+> diff --git a/drivers/acpi/acpi_platform.c b/drivers/acpi/acpi_platform.c
+> index 296b7a1..c3af108 100644
+> --- a/drivers/acpi/acpi_platform.c
+> +++ b/drivers/acpi/acpi_platform.c
+> @@ -43,7 +43,6 @@ static const struct acpi_device_id forbidden_id_list[] = {
+>  struct platform_device *acpi_create_platform_device(struct acpi_device *adev)
+>  {
+>  	struct platform_device *pdev = NULL;
+> -	struct acpi_device *acpi_parent;
+>  	struct platform_device_info pdevinfo;
+>  	struct resource_entry *rentry;
+>  	struct list_head resource_list;
+> @@ -82,22 +81,8 @@ struct platform_device *acpi_create_platform_device(struct acpi_device *adev)
+>  	 * attached to it, that physical device should be the parent of the
+>  	 * platform device we are about to create.
+>  	 */
+> -	pdevinfo.parent = NULL;
+> -	acpi_parent = adev->parent;
+> -	if (acpi_parent) {
+> -		struct acpi_device_physical_node *entry;
+> -		struct list_head *list;
+> -
+> -		mutex_lock(&acpi_parent->physical_node_lock);
+> -		list = &acpi_parent->physical_node_list;
+> -		if (!list_empty(list)) {
+> -			entry = list_first_entry(list,
+> -					struct acpi_device_physical_node,
+> -					node);
+> -			pdevinfo.parent = entry->dev;
+> -		}
+> -		mutex_unlock(&acpi_parent->physical_node_lock);
+> -	}
+> +	pdevinfo.parent = adev->parent ?
+> +		acpi_get_first_physical_node(adev->parent) : NULL;
+>  	pdevinfo.name = dev_name(&adev->dev);
+>  	pdevinfo.id = -1;
+>  	pdevinfo.res = resources;
+> diff --git a/drivers/acpi/bus.c b/drivers/acpi/bus.c
+> index a212cef..832b26d 100644
+> --- a/drivers/acpi/bus.c
+> +++ b/drivers/acpi/bus.c
+> @@ -478,24 +478,35 @@ static void acpi_device_remove_notify_handler(struct acpi_device *device)
+>                               Device Matching
+>     -------------------------------------------------------------------------- */
+>  
+> -static struct acpi_device *acpi_primary_dev_companion(struct acpi_device *adev,
+> -						      const struct device *dev)
+> +/**
+> + * acpi_device_fix_parent - Get first physical node of an ACPI device
+
+Please fix the function name here.
+
+> + * @adev: ACPI device in question
+> + */
+> +struct device *acpi_get_first_physical_node(struct acpi_device *adev)
+>  {
+>  	struct mutex *physical_node_lock = &adev->physical_node_lock;
+> +	struct device *node = NULL;
+>  
+>  	mutex_lock(physical_node_lock);
+> -	if (list_empty(&adev->physical_node_list)) {
+> -		adev = NULL;
+> -	} else {
+> -		const struct acpi_device_physical_node *node;
+>  
+> +	if (!list_empty(&adev->physical_node_list))
+>  		node = list_first_entry(&adev->physical_node_list,
+> -					struct acpi_device_physical_node, node);
+> -		if (node->dev != dev)
+> -			adev = NULL;
+> -	}
+> +				struct acpi_device_physical_node, node)->dev;
+> +
+
+No, you don't have to change all that code.
+
+Exercise: rework this function with as few lines of code changed as you possibly can.
+
+>  	mutex_unlock(physical_node_lock);
+> -	return adev;
+> +
+> +	return node;
+> +}
+> +
+> +static struct acpi_device *acpi_primary_dev_companion(struct acpi_device *adev,
+> +						      const struct device *dev)
+> +{
+> +	const struct device *node = acpi_get_first_physical_node(adev);
+
+s/node/phys_dev/ ?
+
+> +
+> +	if (node && node == dev)
+> +		return adev;
+> +
+> +	return NULL;
+
+return phys_dev && phys_dev == dev ? adev : NULL;
+
+One line of code instead of 4.
+
+>  }
+>  
+>  /**
+> diff --git a/drivers/acpi/internal.h b/drivers/acpi/internal.h
+> index 11d87bf..ee9312ba 100644
+> --- a/drivers/acpi/internal.h
+> +++ b/drivers/acpi/internal.h
+> @@ -98,6 +98,7 @@ bool acpi_device_is_present(struct acpi_device *adev);
+>  bool acpi_device_is_battery(struct acpi_device *adev);
+>  bool acpi_device_is_first_physical_node(struct acpi_device *adev,
+>  					const struct device *dev);
+> +struct device *acpi_get_first_physical_node(struct acpi_device *adev);
+>  
+>  /* --------------------------------------------------------------------------
+>                       Device Matching and Notification
 > 
-> The only way that can happen is when cpufreq_set_policy() finds that
-> the "old" and the "new" policies use the same governor, so it goes and
-> calls __cpufreq_governor(policy, CPUFREQ_GOV_LIMITS), but I'm not sure
-> how this is possible during the initialization ATM.
-> 
-> Viresh, any ideas?
 
-You misread probably.
-
-During init, policy->gov is NULL and new_policy->gov is set to the
-default one, probably ondemand/conservative. And in that case, we do:
-- INIT
-- START
-- LIMITS
-
-So above sequence is guaranteed to happen rather.
-
--- 
-viresh
+Thanks,
+Rafael
