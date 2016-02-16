@@ -1,77 +1,47 @@
 From: mturquette@baylibre.com (Michael Turquette)
-Date: Tue, 16 Feb 2016 14:31:58 -0800
-Subject: [PATCH v5 0/3] arm64/clk: EXYNOS: Consolidate Exynos7 symbol
-In-Reply-To: <1455603632-11158-1-git-send-email-k.kozlowski@samsung.com>
-References: <1455603632-11158-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20160216223158.2278.48998@quark.deferred.io>
+Date: Tue, 16 Feb 2016 14:43:01 -0800
+Subject: [RESEND PATCH 1/8] clk: rockchip: add id of the tsadc clock found
+ on rk3228 SoCs
+In-Reply-To: <1455521613-27340-2-git-send-email-wxt@rock-chips.com>
+References: <1455521613-27340-1-git-send-email-wxt@rock-chips.com>
+ <1455521613-27340-2-git-send-email-wxt@rock-chips.com>
+Message-ID: <20160216224301.2278.88600@quark.deferred.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Krzysztof Kozlowski (2016-02-15 22:20:29)
-> Hi,
+Quoting Caesar Wang (2016-02-14 23:33:26)
+> This patch adds 'SCLK_TSADC' and 'PCLK_TSADC' id found on rk3228 SoCs.
+> That will be needed by TSADC controller.
 > 
-> Patchset attempts to remove the ARCH_EXYNOS7 symbol.
-> 
-> I rebased this on top of James':
->  - clk: Move vendor's Kconfig into CCF menu section
->    http://www.spinics.net/lists/devicetree/msg111953.html
-> 
-> The third patch depends on previous ones so one way of merging this
-> would be to prepare a tag from clk tree with first two patches
-> and the dependency. The last third patch would go through arm-soc.
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 
-I've done this locally and things look good. I'm just waiting for Acks
-to patch #2 and I'll merge patches #1 and #2 and provide a stable tag
-named clk-samsung-kconfig, based on v4.5-rc1.
+Acked-by: Michael Turquette <mturquette@baylibre.com>
 
-These patches were not based on -rc1, but the fixups were trivial so I'm
-fine with them.
-
-Regards,
-Mike
-
+> ---
 > 
-> Changes since v4:
-> =================
-> 1. Rebased on "clk: Move vendor's Kconfig into CCF menu section"
->    existing in clock tree.
-> 2. Re-work patch 2/3 (see specific changelog).
+>  include/dt-bindings/clock/rk3228-cru.h | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> Changes since v3:
-> =================
-> 1. Rebase on next-20160127 (s3c64xx became multiplatform).
-> 
-> Changes since v2:
-> =================
-> 1. Follow Arnd's advice about not enabling silently the newly added
->    EXYNOS_ARM64_COMMON_CLK, when COMPILE_TEST is enabled. This was
->    also a trigger for some changes in placement of Samsung clocks
->    Kconfig entries...
-> 2. ... which lead to introducing patch 1.
-> 
-> 
-> Rationale:
-> ==========
-> We don't need ARCH_EXYNOS7 symbol because all ARMv8 platforms should
-> fall under generic ARCH_EXYNOS. In the same time there is no sense
-> in building clocks for these ARMv8 SoCs on ARMv7 builds.
-> 
-> 
-> Best regards,
-> Krzysztof
-> 
-> Krzysztof Kozlowski (3):
->   clk: samsung: Enable COMPILE_TEST for Samsung clocks
->   clk: samsung: Don't build ARMv8 clock drivers on ARMv7
->   arm64: EXYNOS: Consolidate ARCH_EXYNOS7 symbol into ARCH_EXYNOS
-> 
->  arch/arm64/Kconfig.platforms        | 11 ++---------
->  arch/arm64/boot/dts/exynos/Makefile |  2 +-
->  arch/arm64/configs/defconfig        |  2 +-
->  drivers/clk/samsung/Kconfig         | 18 +++++++++++++-----
->  drivers/clk/samsung/Makefile        |  4 ++--
->  5 files changed, 19 insertions(+), 18 deletions(-)
-> 
+> diff --git a/include/dt-bindings/clock/rk3228-cru.h b/include/dt-bindings/clock/rk3228-cru.h
+> index a78dd89..cd2e06b 100644
+> --- a/include/dt-bindings/clock/rk3228-cru.h
+> +++ b/include/dt-bindings/clock/rk3228-cru.h
+> @@ -29,6 +29,7 @@
+>  #define SCLK_SDMMC             68
+>  #define SCLK_SDIO              69
+>  #define SCLK_EMMC              71
+> +#define SCLK_TSADC             72
+>  #define SCLK_UART0             77
+>  #define SCLK_UART1             78
+>  #define SCLK_UART2             79
+> @@ -68,6 +69,7 @@
+>  #define PCLK_UART0             341
+>  #define PCLK_UART1             342
+>  #define PCLK_UART2             343
+> +#define PCLK_TSADC             344
+>  #define PCLK_PWM               350
+>  #define PCLK_TIMER             353
+>  #define PCLK_PERI              363
 > -- 
-> 2.5.0
+> 1.9.1
 > 
