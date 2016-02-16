@@ -1,40 +1,160 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 16 Feb 2016 11:15:08 +0900
-Subject: [PATCH 6/9] ARM: dts: uniphier: enable I2C channel 2 of ProXstream2
- Gentil board
+Date: Tue, 16 Feb 2016 11:15:03 +0900
+Subject: [PATCH 1/9] ARM: dts: uniphier: factor out ranges property of support
+ card
 In-Reply-To: <1455588911-9827-1-git-send-email-yamada.masahiro@socionext.com>
 References: <1455588911-9827-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1455588911-9827-7-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1455588911-9827-2-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is used for on-board inter-connection.
+This property is used in common by several boards.  Move it to the
+common place (uniphier-support-card.dtsi).  If necessary, each board
+can still override the property.
 
 Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
 
- arch/arm/boot/dts/uniphier-proxstream2-gentil.dts | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts              | 8 --------
+ arch/arm/boot/dts/uniphier-ph1-ld6b-ref.dts             | 8 --------
+ arch/arm/boot/dts/uniphier-ph1-pro4-ref.dts             | 8 --------
+ arch/arm/boot/dts/uniphier-ph1-sld3-ref.dts             | 8 --------
+ arch/arm/boot/dts/uniphier-ph1-sld8-ref.dts             | 8 --------
+ arch/arm/boot/dts/uniphier-support-card.dtsi            | 3 +++
+ arch/arm64/boot/dts/socionext/uniphier-ph1-ld10-ref.dts | 8 --------
+ 7 files changed, 3 insertions(+), 48 deletions(-)
 
-diff --git a/arch/arm/boot/dts/uniphier-proxstream2-gentil.dts b/arch/arm/boot/dts/uniphier-proxstream2-gentil.dts
-index 0da3018..bf2619e 100644
---- a/arch/arm/boot/dts/uniphier-proxstream2-gentil.dts
-+++ b/arch/arm/boot/dts/uniphier-proxstream2-gentil.dts
-@@ -63,6 +63,7 @@
- 		serial1 = &serial1;
- 		serial2 = &serial2;
- 		i2c0 = &i2c0;
-+		i2c2 = &i2c2;
- 		i2c4 = &i2c4;
- 		i2c5 = &i2c5;
- 		i2c6 = &i2c6;
-@@ -81,3 +82,7 @@
- 		reg = <0x54>;
+diff --git a/arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts b/arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts
+index f1e9d40..ec94b7a 100644
+--- a/arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts
++++ b/arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts
+@@ -72,14 +72,6 @@
  	};
  };
+ 
+-&extbus {
+-	ranges = <1 0x00000000 0x42000000 0x02000000>;
+-};
+-
+-&support_card {
+-	ranges = <0x00000000 1 0x01f00000 0x00100000>;
+-};
+-
+ &ethsc {
+ 	interrupts = <0 49 4>;
+ };
+diff --git a/arch/arm/boot/dts/uniphier-ph1-ld6b-ref.dts b/arch/arm/boot/dts/uniphier-ph1-ld6b-ref.dts
+index 5baa9fc..b8134c6 100644
+--- a/arch/arm/boot/dts/uniphier-ph1-ld6b-ref.dts
++++ b/arch/arm/boot/dts/uniphier-ph1-ld6b-ref.dts
+@@ -74,14 +74,6 @@
+ 	};
+ };
+ 
+-&extbus {
+-	ranges = <1 0x00000000 0x42000000 0x02000000>;
+-};
+-
+-&support_card {
+-	ranges = <0x00000000 1 0x01f00000 0x00100000>;
+-};
+-
+ &ethsc {
+ 	interrupts = <0 52 4>;
+ };
+diff --git a/arch/arm/boot/dts/uniphier-ph1-pro4-ref.dts b/arch/arm/boot/dts/uniphier-ph1-pro4-ref.dts
+index 2462668..95f631a 100644
+--- a/arch/arm/boot/dts/uniphier-ph1-pro4-ref.dts
++++ b/arch/arm/boot/dts/uniphier-ph1-pro4-ref.dts
+@@ -74,14 +74,6 @@
+ 	};
+ };
+ 
+-&extbus {
+-	ranges = <1 0x00000000 0x42000000 0x02000000>;
+-};
+-
+-&support_card {
+-	ranges = <0x00000000 1 0x01f00000 0x00100000>;
+-};
+-
+ &ethsc {
+ 	interrupts = <0 50 4>;
+ };
+diff --git a/arch/arm/boot/dts/uniphier-ph1-sld3-ref.dts b/arch/arm/boot/dts/uniphier-ph1-sld3-ref.dts
+index b7a03215..acb4204 100644
+--- a/arch/arm/boot/dts/uniphier-ph1-sld3-ref.dts
++++ b/arch/arm/boot/dts/uniphier-ph1-sld3-ref.dts
+@@ -73,14 +73,6 @@
+ 	};
+ };
+ 
+-&extbus {
+-	ranges = <1 0x00000000 0x42000000 0x02000000>;
+-};
+-
+-&support_card {
+-	ranges = <0x00000000 1 0x01f00000 0x00100000>;
+-};
+-
+ &ethsc {
+ 	interrupts = <0 49 4>;
+ };
+diff --git a/arch/arm/boot/dts/uniphier-ph1-sld8-ref.dts b/arch/arm/boot/dts/uniphier-ph1-sld8-ref.dts
+index fc7250c..d594f40 100644
+--- a/arch/arm/boot/dts/uniphier-ph1-sld8-ref.dts
++++ b/arch/arm/boot/dts/uniphier-ph1-sld8-ref.dts
+@@ -72,14 +72,6 @@
+ 	};
+ };
+ 
+-&extbus {
+-	ranges = <1 0x00000000 0x42000000 0x02000000>;
+-};
+-
+-&support_card {
+-	ranges = <0x00000000 1 0x01f00000 0x00100000>;
+-};
+-
+ &ethsc {
+ 	interrupts = <0 48 4>;
+ };
+diff --git a/arch/arm/boot/dts/uniphier-support-card.dtsi b/arch/arm/boot/dts/uniphier-support-card.dtsi
+index da271e3..fa807e8 100644
+--- a/arch/arm/boot/dts/uniphier-support-card.dtsi
++++ b/arch/arm/boot/dts/uniphier-support-card.dtsi
+@@ -43,10 +43,13 @@
+  */
+ 
+ &extbus {
++	ranges = <1 0x00000000 0x42000000 0x02000000>;
 +
-+&i2c2 {
-+	status = "okay";
-+};
+ 	support_card: support_card {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
++		ranges = <0x00000000 1 0x01f00000 0x00100000>;
+ 
+ 		ethsc: ethernet at 00000000 {
+ 			compatible = "smsc,lan9118", "smsc,lan9115";
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-ph1-ld10-ref.dts b/arch/arm64/boot/dts/socionext/uniphier-ph1-ld10-ref.dts
+index 3e53317..e5c8a20 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-ph1-ld10-ref.dts
++++ b/arch/arm64/boot/dts/socionext/uniphier-ph1-ld10-ref.dts
+@@ -74,14 +74,6 @@
+ 	};
+ };
+ 
+-&extbus {
+-	ranges = <1 0x00000000 0x42000000 0x02000000>;
+-};
+-
+-&support_card {
+-	ranges = <0x00000000 1 0x01f00000 0x00100000>;
+-};
+-
+ &ethsc {
+ 	interrupts = <0 48 4>;
+ };
 -- 
 1.9.1
