@@ -1,64 +1,36 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Tue, 16 Feb 2016 16:00:20 +0200
-Subject: [PATCH v3 05/10] serial: mps2-uart: add support for early console
-In-Reply-To: <56C32641.4020201@arm.com>
-References: <1455617295-23736-1-git-send-email-vladimir.murzin@arm.com>
- <1455617295-23736-6-git-send-email-vladimir.murzin@arm.com>
- <CAHp75VdugAq0WnzLHmd9CJHCjBOdBwPqCmC3ARSaVF5XMYGoMw@mail.gmail.com>
- <56C31F9F.10000@arm.com>
- <CAHp75Vf_4MgdWunQy5hBMH5GGei+OkktFPYY-ZprY0qOEnD=wA@mail.gmail.com>
- <56C32641.4020201@arm.com>
-Message-ID: <CAHp75VecjR3sBcGmRHFwZPwUjXhPwV-2z4hYYJ7Y+iCOxi8_EA@mail.gmail.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Tue, 16 Feb 2016 15:11:00 +0100
+Subject: [PATCH v8 3/5] memory: mediatek: Add SMI driver
+In-Reply-To: <56ADE959.2050309@gmail.com>
+References: <1453781562-23556-1-git-send-email-yong.wu@mediatek.com>
+ <1453781562-23556-4-git-send-email-yong.wu@mediatek.com>
+ <56ADE959.2050309@gmail.com>
+Message-ID: <20160216141059.GT18805@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 16, 2016 at 3:38 PM, Vladimir Murzin
-<vladimir.murzin@arm.com> wrote:
-> On 16/02/16 13:13, Andy Shevchenko wrote:
->> On Tue, Feb 16, 2016 at 3:09 PM, Vladimir Murzin
->> <vladimir.murzin@arm.com> wrote:
->>> On 16/02/16 10:36, Andy Shevchenko wrote:
->>>> On Tue, Feb 16, 2016 at 12:08 PM, Vladimir Murzin
->>>> <vladimir.murzin@arm.com> wrote:
+On Sun, Jan 31, 2016 at 12:00:41PM +0100, Matthias Brugger wrote:
+> 
+> 
+> On 26/01/16 05:12, Yong Wu wrote:
+> >This patch add SMI(Smart Multimedia Interface) driver. This driver
+> >is responsible to enable/disable iommu and control the power domain
+> >and clocks of each local arbiter.
+> >
+> >Signed-off-by: Yong Wu <yong.wu@mediatek.com>
+> >Tested-by: Philipp Zabel <p.zabel@pengutronix.de>
+> >---
+> 
+> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+> 
+> Joerg would you mind to take this through your branch?
 
->>>>> +static void mps2_early_putchar(struct uart_port *port, int ch)
->>>>> +{
->>>>> +
->>>>> +       while (readb(port->membase + UARTn_STATE) & UARTn_STATE_TX_FULL)
->>>>> +               cpu_relax();
->>>>
->>>> Infinite busy loop?
->>>
->>> In case of broken hw, yes, but I'm quite unsure how we can help to fix
->>> it. Do you have something in mind?
->>
->> Set sane amount of loops like
->>
->> int count = 100;
->> ?
->> while (? && --count)
->>
->> Though I have no idea what to do if count == 0. Perhaps it's a TX overrun state.
->
-> I thought about counter too, like some of drivers do, but had no idea
-> what to do next after counter reaches zero. In case of TX overrun we
-> could get it either because of broken hw or because we entered Linux
-> with that state already set. In both cases, it looks handy to me to
-> attach a debugger and see that we are spinning in this putchar loop.
->
-> If you do insist to have a counter I'll add one, but if you are not
-> strong about it I'd prefer to leave it as is.
+Hmm, I somehow missed the patch-set, at least I can't find the v8
+patches in my inbox.
 
-I would wait for Peter Hurley, Alan, or other experienced guys to talk.
+Yong, can you please re-send with all Acks and other tags added?
 
->> You may try to recover by flushing TX queue in HW (fifo and / or Tx
->> shift register) if HW supports it.
->>
->
-> I'm afraid this is not supported.
 
-Maybe soft reset? Anyway, see above.
+Thanks,
 
--- 
-With Best Regards,
-Andy Shevchenko
+	Joerg
