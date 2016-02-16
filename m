@@ -1,50 +1,92 @@
-From: daniel.baluta@intel.com (Daniel Baluta)
-Date: Tue, 16 Feb 2016 20:03:29 +0200
-Subject: [PATCH] iio: pressure: ms5611: select IIO_BUFFER
-In-Reply-To: <1455634525-2023774-1-git-send-email-arnd@arndb.de>
-References: <1455634525-2023774-1-git-send-email-arnd@arndb.de>
-Message-ID: <CAEnQRZBk0R-A5VEEd_D+kLKnyhc3nhrm0tv2JOkv0iqywGFtuw@mail.gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 16 Feb 2016 10:10:01 -0800
+Subject: [PATCH] arm64: mm: Mark .rodata as RO
+In-Reply-To: <20160212182527.GG20262@leverpostej>
+References: <1455293599-6974-1-git-send-email-jeremy.linton@arm.com>
+ <20160212182527.GG20262@leverpostej>
+Message-ID: <CAGXu5jLpj=ue49_N+LOYvtZcU3rpFR5=WTG15ySDOWprvRzFUA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 16, 2016 at 4:55 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> The ms5611 driver started using the IIO_TRIGGERED_BUFFER infrastructure
-> which in turn depend on IIO_BUFFER, and it produces a build error now
-> if that is not enabled:
->
-> warning: (... && MS5611 && ...) selects IIO_TRIGGERED_BUFFER which has unmet direct dependencies (IIO && IIO_BUFFER)
-> buffer/industrialio-triggered-buffer.c: In function 'iio_triggered_buffer_setup':
-> buffer/industrialio-triggered-buffer.c:58:2: error: implicit declaration of function 'iio_device_attach_buffer' [-Werror=implicit-function-declaration]
-> pressure/ms5611_core.c: In function 'ms5611_trigger_handler':
-> pressure/ms5611_core.c:193:2: error: implicit declaration of function 'iio_push_to_buffers_with_timestamp' [-Werror=implicit-function-declaration]
->
-> This adds the second select.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 713bbb4efb9d ("iio: pressure: ms5611: Add triggered buffer support")
+On Fri, Feb 12, 2016 at 10:25 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Fri, Feb 12, 2016 at 10:13:19AM -0600, Jeremy Linton wrote:
+>> Currently the .rodata section is actually still executable when DEBUG_RODATA
+>> is enabled. This changes that so the .rodata is actually read only, no execute.
+>>
+>> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
 
-Acked-by: Daniel Baluta <daniel.baluta@intel.com>
+Yikes, good catch. Is anyone running the lkdtm tests that check these things?
 
-> ---
->  drivers/iio/pressure/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
+Reviewed-by: Kees Cook <keescook@chromium.org>
+
+>> ---
+>>  arch/arm64/kernel/vmlinux.lds.S |  5 +++--
+>>  arch/arm64/mm/mmu.c             | 14 +++++++++++---
+>>  2 files changed, 14 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+>> index ab4e436..2e2c053 100644
+>> --- a/arch/arm64/kernel/vmlinux.lds.S
+>> +++ b/arch/arm64/kernel/vmlinux.lds.S
+>> @@ -114,8 +114,9 @@ SECTIONS
+>>               *(.got)                 /* Global offset table          */
+>>       }
+>>
+>> -     RO_DATA(PAGE_SIZE)
+>> -     EXCEPTION_TABLE(8)
+>> +     ALIGN_DEBUG_RO_MIN(0)
+>> +     RO_DATA(PAGE_SIZE)              /* everything from this point to */
+>> +     EXCEPTION_TABLE(8)              /* _etext will be marked RO NX   */
+>>       NOTES
+>>
+>>       ALIGN_DEBUG_RO_MIN(PAGE_SIZE)
+>> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+>> index ab69a99..a3f4112 100644
+>> --- a/arch/arm64/mm/mmu.c
+>> +++ b/arch/arm64/mm/mmu.c
+>> @@ -453,10 +453,18 @@ static void __init map_mem(pgd_t *pgd)
+>>  #ifdef CONFIG_DEBUG_RODATA
+>>  void mark_rodata_ro(void)
+>>  {
+>> -     create_mapping_late(__pa(_stext), (unsigned long)_stext,
+>> -                             (unsigned long)_etext - (unsigned long)_stext,
+>> -                             PAGE_KERNEL_ROX);
+>> +     unsigned long section_size;
+>>
+>> +     section_size = (unsigned long)__start_rodata - (unsigned long)_stext;
+>> +     create_mapping_late(__pa(_stext), (unsigned long)_stext,
+>> +                         section_size, PAGE_KERNEL_ROX);
+>> +     /*
+>> +      * mark .rodata as read only. Use _etext rather than __end_rodata to
+>> +      * cover NOTES and EXCEPTION_TABLE.
+>> +      */
+>> +     section_size = (unsigned long)_etext - (unsigned long)__start_rodata;
+>> +     create_mapping_late(__pa(__start_rodata), (unsigned long)__start_rodata,
+>> +                         section_size, PAGE_KERNEL_RO);
+>>  }
 >
-> diff --git a/drivers/iio/pressure/Kconfig b/drivers/iio/pressure/Kconfig
-> index f15f66d6f527..31c0e1fd2202 100644
-> --- a/drivers/iio/pressure/Kconfig
-> +++ b/drivers/iio/pressure/Kconfig
-> @@ -69,6 +69,7 @@ config MPL3115
+> As you pointed out in the other thread, we'll also need to update
+> map_kernel to use equivalent chunks for .text and .rodata.
 >
->  config MS5611
->         tristate "Measurement Specialties MS5611 pressure sensor driver"
-> +       select IIO_BUFFER
->         select IIO_TRIGGERED_BUFFER
->         help
->           Say Y here to build support for the Measurement Specialties
-> --
-> 2.7.0
+> I think we can probably make .rodata RO from the outset in map_kernel,
+> too.
+
+There's a benefit to marking it late in that .rodata can live in the
+same (upcoming) section as .data..ro_after_init, which is marked ro
+after mark_rodata_ro() to help constify more things.
+
+> Could you please update mem_init to log .text and .rodata separately?
 >
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> It looks like some core code makes assumptions about _etext, so I guess
+> that has to cover .rodata regardless.
+>
+> Otherwise, looks good!
+>
+> Thanks,
+> Mark.
+
+-Kees
+
+-- 
+Kees Cook
+Chrome OS & Brillo Security
