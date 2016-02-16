@@ -1,103 +1,54 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Tue, 16 Feb 2016 14:53:38 +0100
-Subject: [PATCH V5 08/15] x86,
- ia64: Include acpi_pci_{add|remove}_bus to the default
- pcibios_{add|remove}_bus implementation.
+Date: Tue, 16 Feb 2016 14:53:44 +0100
+Subject: [PATCH V5 14/15] arm64, pci,
+ acpi: Assign legacy IRQs once device is enable.
 In-Reply-To: <1455630825-27253-1-git-send-email-tn@semihalf.com>
 References: <1455630825-27253-1-git-send-email-tn@semihalf.com>
-Message-ID: <1455630825-27253-9-git-send-email-tn@semihalf.com>
+Message-ID: <1455630825-27253-15-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-x86 and ia64 are the only arches that implement pcibios_{add|remove}_bus hooks
-and implement them in the same way. Moreover ARM64 is going to do the same.
-So it seems that acpi_pci_{add|remove}_bus is generic enough to be default
-option for pcibios_{add|remove}_bus hooks. Also, it is always safe to run
-acpi_pci_{add|remove}_bus as they have empty stubs for !ACPI case and
-return if ACPI has been switched off in run time.
+This is the last step before enabling generic ACPI PCI host controller
+for ARM64. We need to take care of legacy IRQ mapping for non-MSI(X)
+PCI devices. pcibios_alloc_irq() evaluation is not sensitive to
+ACPI device enumeration order, so it is the best place to assign
+device's IRQs for ACPI boot method. Also, it does not hurt DT to be
+initialized form the same place.
 
-After all we can remove x86 and ia64 pcibios_{add|remove}_bus
-implementation.
+NOTE: *This is going to be temporary solution*. There is ongoing work
+which aims for cleaning legacy IRQ allocation from arch specific code.
+We can consider this patch as the necessary evil which will be removed
+once cleanup series lands in mailnline in the near future.
 
 Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Tested-by: Duc Dang <dhdang@apm.com>
-Tested-by: Dongdong Liu <liudongdong3@huawei.com>
-Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
-Tested-by: Graeme Gregory <graeme.gregory@linaro.org>
-Tested-by: Sinan Kaya <okaya@codeaurora.org>
+Suggested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 ---
- arch/ia64/pci/pci.c   | 10 ----------
- arch/x86/pci/common.c | 10 ----------
- drivers/pci/probe.c   |  3 +++
- 3 files changed, 3 insertions(+), 20 deletions(-)
+ arch/arm64/kernel/pci.c | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
 
-diff --git a/arch/ia64/pci/pci.c b/arch/ia64/pci/pci.c
-index 978d6af..be4c9ef 100644
---- a/arch/ia64/pci/pci.c
-+++ b/arch/ia64/pci/pci.c
-@@ -358,16 +358,6 @@ void pcibios_fixup_bus(struct pci_bus *b)
- 	platform_pci_fixup_bus(b);
+diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+index 023b983..6e77e1b 100644
+--- a/arch/arm64/kernel/pci.c
++++ b/arch/arm64/kernel/pci.c
+@@ -52,11 +52,16 @@ int pcibios_enable_device(struct pci_dev *dev, int mask)
  }
  
--void pcibios_add_bus(struct pci_bus *bus)
--{
--	acpi_pci_add_bus(bus);
--}
--
--void pcibios_remove_bus(struct pci_bus *bus)
--{
--	acpi_pci_remove_bus(bus);
--}
--
- void pcibios_set_master (struct pci_dev *dev)
- {
- 	/* No special bus mastering setup handling */
-diff --git a/arch/x86/pci/common.c b/arch/x86/pci/common.c
-index 2879efc..5aa25f1 100644
---- a/arch/x86/pci/common.c
-+++ b/arch/x86/pci/common.c
-@@ -171,16 +171,6 @@ void pcibios_fixup_bus(struct pci_bus *b)
- 		pcibios_fixup_device_resources(dev);
- }
- 
--void pcibios_add_bus(struct pci_bus *bus)
--{
--	acpi_pci_add_bus(bus);
--}
--
--void pcibios_remove_bus(struct pci_bus *bus)
--{
--	acpi_pci_remove_bus(bus);
--}
--
  /*
-  * Only use DMI information to set this if nothing was passed
-  * on the kernel command line (which was parsed earlier).
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index 88a4734..9859b12 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -12,6 +12,7 @@
- #include <linux/slab.h>
- #include <linux/module.h>
- #include <linux/cpumask.h>
-+#include <linux/pci-acpi.h>
- #include <linux/pci-aspm.h>
- #include <linux/aer.h>
- #include <linux/acpi.h>
-@@ -2060,10 +2061,12 @@ int __weak pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
- 
- void __weak pcibios_add_bus(struct pci_bus *bus)
+- * Try to assign the IRQ number from DT when adding a new device
++ * Try to assign the IRQ number when probing a new device
+  */
+-int pcibios_add_device(struct pci_dev *dev)
++int pcibios_alloc_irq(struct pci_dev *dev)
  {
-+	acpi_pci_add_bus(bus);
- }
+-	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
++	if (acpi_disabled)
++		dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
++#ifdef CONFIG_ACPI
++	else
++		return acpi_pci_irq_enable(dev);
++#endif
  
- void __weak pcibios_remove_bus(struct pci_bus *bus)
- {
-+	acpi_pci_remove_bus(bus);
+ 	return 0;
  }
- 
- struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
 -- 
 1.9.1
