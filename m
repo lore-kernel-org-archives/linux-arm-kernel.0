@@ -1,78 +1,44 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Tue, 16 Feb 2016 08:44:41 +0800
-Subject: [PATCH v8 0/2] Add Rockchip Inno-HDMI driver
-In-Reply-To: <1454049768-30872-1-git-send-email-ykk@rock-chips.com>
-References: <1454049768-30872-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <56C270F9.9030707@rock-chips.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 16 Feb 2016 06:43:35 +0530
+Subject: Crashes in arm qemu emulations due to 'cpufreq: governor:
+ Replace timers with utilization ...'
+In-Reply-To: <CAJZ5v0gLankSuziQq25qTCyNqeOX43yD9jnJu_XXwbdyajfmKg@mail.gmail.com>
+References: <20160215170527.GA24453@roeck-us.net>
+ <CAJZ5v0gLankSuziQq25qTCyNqeOX43yD9jnJu_XXwbdyajfmKg@mail.gmail.com>
+Message-ID: <20160216011335.GI6334@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On 15-02-16, 19:41, Rafael J. Wysocki wrote:
+> On Mon, Feb 15, 2016 at 6:05 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+> > [    1.340000] [<c0958e78>] (__cpufreq_driver_target) from [<c095ca58>] (dbs_check_cpu+0x1ac/0x1e8)
+> > [    1.340000] [<c095ca58>] (dbs_check_cpu) from [<c095cd04>] (cpufreq_governor_dbs+0x1fc/0x608)
+> > [    1.340000] [<c095cd04>] (cpufreq_governor_dbs) from [<c0959c5c>] (__cpufreq_governor+0x1a8/0x204)
+> > [    1.340000] [<c0959c5c>] (__cpufreq_governor) from [<c095a2dc>] (cpufreq_init_policy+0x60/0x8c)
+> > [    1.340000] [<c095a2dc>] (cpufreq_init_policy) from [<c095a5f0>] (cpufreq_online+0x2e8/0x708)
+> > [    1.340000] [<c095a5f0>] (cpufreq_online) from [<c075674c>] (subsys_interface_register+0x80/0xc4)
+> > [    1.340000] [<c075674c>] (subsys_interface_register) from [<c0959764>] (cpufreq_register_driver+0x144/0x1a0)
+> 
+> This is the registration of the cpufreq driver (cpufreq-dt in this case).
+> 
+> It does cpufreq_online()->cpufreq_init_policy()->__cpufreq_governor()->cpufreq_governor_dbs()->dbs_check_cpu().
+> 
+> The only way that can happen is when cpufreq_set_policy() finds that
+> the "old" and the "new" policies use the same governor, so it goes and
+> calls __cpufreq_governor(policy, CPUFREQ_GOV_LIMITS), but I'm not sure
+> how this is possible during the initialization ATM.
+> 
+> Viresh, any ideas?
 
-Ping, it seems inno hdmi driver is ready, So I'd like to merge it into 
-drm/rockchip if there is no doubt these days.
+You misread probably.
 
-Thanks.
-Mark
-On 2016?01?29? 14:42, Yakir Yang wrote:
-> Here are a brief introduction to Innosilicon HDMI IP:
->    - Support HDMI 1.4a, HDCP 1.2 and DVI 1.0 standard compliant transmitter
->    - Support HDMI1.4 a/b 3D function defined in HDMI 1.4 a/b spec
->    - Digital video interface supports a pixel size of 24, 30, 36, 48bits color depth in RGB
->    - S/PDIF output supports PCM, Dolby Digital, DTS digital audio transmission
->      (32-192kHz Fs) using IEC60958 and IEC 61937
->    - The EDID and CEC function are also supported by Innosilicon HDMI Transmitter Controlle
->
-> Changes in v8:
-> - Don't check whether encoder output format is RGB colorspace, cause driver
->    default configure the output colorspace to RGB. (ZhengYang)
-> - Correct the check condition in inno_hdmi_config_video_csc() (ZhengYang)
->      - if (data->enc_out_format == data->enc_out_format) {
->      + if (data->enc_in_format == data->enc_out_format) {
->
-> Changes in v7:
-> - Correct the module licnese statement (Paul)
->       - MODULE_LICENSE("GPL");
->       + MODULE_LICENSE("GPLv2");
-> - Start indentation with tabs and fix the misspell in Kconfig (Paul)
-> - Carry the lost device-binding document (Heiko)
->
-> Changes in v6:
-> - Rebase the Makefile/Kconfig files which add by Chris's rockchip-mipi driver (Caeser)
->
-> Changes in v5:
-> - Use hdmi_infoframe helper functions to packed the infoframe (Russell)
-> - Remove the unused double wait_for_completion_timeout for ddc transfer (Russell)
-> - Remove the unused local variable in "inno_hdmi_i2c_write()" function (Russell)
->
-> Changes in v4:
-> - Modify the commit title "drm/rockchip: hdmi: ..." (Mark)
-> - Correct the "DKMS" to "DPMS" (Mark)
-> - Fix over 80 characters problems (Mark)
-> - Remove encoder .prepare/.commit helper functions, and move the vop mode
-> configure function into encoder .enable helper functions. (Mark)
->
-> Changes in v3:
-> - Use encoder enable/disable function, and remove the encoder DPMS function
-> - Keep HDMI PLL power on in standby mode
->
-> Changes in v2:
-> - Using DRM atomic helper functions for connector init (Mark)
-> - Remove "hdmi->connector.encoder = encoder;" (Mark)
-> - Add the Acked-by tags from Rob
-> - Correct the misspell "rk3036-dw-hdmi" (Heiko)
->
-> Yakir Yang (2):
->    drm/rockchip: hdmi: add Innosilicon HDMI support
->    dt-bindings: add document for Innosilicon HDMI on Rockchip platform
->
->   .../display/rockchip/inno_hdmi-rockchip.txt        |  50 ++
->   drivers/gpu/drm/rockchip/Kconfig                   |   8 +
->   drivers/gpu/drm/rockchip/Makefile                  |   1 +
->   drivers/gpu/drm/rockchip/inno_hdmi.c               | 939 +++++++++++++++++++++
->   drivers/gpu/drm/rockchip/inno_hdmi.h               | 362 ++++++++
->   5 files changed, 1360 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/display/rockchip/inno_hdmi-rockchip.txt
->   create mode 100644 drivers/gpu/drm/rockchip/inno_hdmi.c
->   create mode 100644 drivers/gpu/drm/rockchip/inno_hdmi.h
->
+During init, policy->gov is NULL and new_policy->gov is set to the
+default one, probably ondemand/conservative. And in that case, we do:
+- INIT
+- START
+- LIMITS
+
+So above sequence is guaranteed to happen rather.
+
+-- 
+viresh
