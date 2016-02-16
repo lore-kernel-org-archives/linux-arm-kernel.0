@@ -1,48 +1,67 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Tue, 16 Feb 2016 20:40:21 +0100
-Subject: [PATCH] dmaengine: pxa_dma: fix cyclic transfers
-Message-ID: <1455651621-3990-1-git-send-email-robert.jarzmik@free.fr>
+From: tchalamarla@caviumnetworks.com (Tirumalesh Chalamarla)
+Date: Tue, 16 Feb 2016 11:50:44 -0800
+Subject: [PATCH V2] AHCI: Workaround for ThunderX Errata#22536
+In-Reply-To: <56C37AD3.4030407@caviumnetworks.com>
+References: <1455319230-30201-1-git-send-email-tchalamarla@caviumnetworks.com>
+ <20160214170152.GC3965@htj.duckdns.org> <56C147B2.9010303@caviumnetworks.com>
+ <20160215183041.GH3965@htj.duckdns.org>
+ <20160216144250.GD31343@rric.localdomain>
+ <56C37524.5090000@caviumnetworks.com> <56C37AD3.4030407@caviumnetworks.com>
+Message-ID: <56C37D94.8080403@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While testing audio with pxa2xx-ac97, underrun were happening while the
-user application was correctly feeding the music. Debug proved that the
-cyclic transfer is not cyclic, ie. the last descriptor did not loop on
-the first.
 
-This was tested on a pxa27x platform.
 
-Fixes: a57e16cf0333 ("dmaengine: pxa: add pxa dmaengine driver")
-Reported-by: Vasily Khoruzhick <anarsoul@gmail.com> 
-Tested-by: Vasily Khoruzhick <anarsoul@gmail.com> 
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
----
- drivers/dma/pxa_dma.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+On 02/16/2016 11:38 AM, David Daney wrote:
+> On 02/16/2016 11:14 AM, Tirumalesh Chalamarla wrote:
+>>
+>>
+>> On 02/16/2016 06:42 AM, Robert Richter wrote:
+>>> On 15.02.16 13:30:41, Tejun Heo wrote:
+>>>> On Sun, Feb 14, 2016 at 07:36:18PM -0800, Tirumalesh Chalamarla wrote:
+>>>>> There is no need for special Driver, AHCI is sufficient for
+>>>>> ThunderX, the
+>>>>> file only contains this interrupt handler,
+>>>>> is it preferable if this interrupt handler in libahci.c with others,
+>>>>> instead
+>>>>> of separate file?
+>>>>
+>>>> Yeap, just fold it in ahci.c with surrounding #ifdef guard.
+>>>
+>>> Yes, please use #ifdef CONFIG_CAVIUM_ERRATUM_22536 ... and add a
+>>> kconfig entry for this to arch/arm64/Kconfig.
+>>>
+>> Are you sure, this is not a workaround that is based on alternative
+>> framework rather on pci device and vendor
+>>
+>> do you think CONFIG_ARCH_THUNDER a good alternative?
+>
+> No.  CONFIG_ARCH_THUNDER should be removed all together.
+>
+> Grouping a bunch of unrelated features under a single config variable
+> creates a very brittle system.  What are you going to do when a new
+> hardware revision is released?  Create CONFIG_ARCH_THUNDER2?  Which one
+> of these two would you select if building a kernel?  It is a choice that
+> we don't want to force users (kernel builders) to have to waste mental
+> energy on.
+>
+> Instead, let's try to make things work out of the box without having to
+> set a bunch of random config variables.
+>
+> If a generic arm64 kernel won't get too bloated, I would suggest just
+> enabling the compilation of the code unconditionally (at least for
+> arm64).  The use of the code would still be gated by the PCI version
+> probe that is part of the patch.
+>
 
-diff --git a/drivers/dma/pxa_dma.c b/drivers/dma/pxa_dma.c
-index f2a0310ae771..ca6c088edc8a 100644
---- a/drivers/dma/pxa_dma.c
-+++ b/drivers/dma/pxa_dma.c
-@@ -583,6 +583,8 @@ static void set_updater_desc(struct pxad_desc_sw *sw_desc,
- 		(PXA_DCMD_LENGTH & sizeof(u32));
- 	if (flags & DMA_PREP_INTERRUPT)
- 		updater->dcmd |= PXA_DCMD_ENDIRQEN;
-+	if (sw_desc->cyclic)
-+		sw_desc->hw_desc[sw_desc->nb_desc - 2]->ddadr = sw_desc->first;
- }
- 
- static bool is_desc_completed(struct virt_dma_desc *vd)
-@@ -673,6 +675,10 @@ static irqreturn_t pxad_chan_handler(int irq, void *dev_id)
- 		dev_dbg(&chan->vc.chan.dev->device,
- 			"%s(): checking txd %p[%x]: completed=%d\n",
- 			__func__, vd, vd->tx.cookie, is_desc_completed(vd));
-+		if (to_pxad_sw_desc(vd)->cyclic) {
-+			vchan_cyclic_callback(vd);
-+			break;
-+		}
- 		if (is_desc_completed(vd)) {
- 			list_del(&vd->node);
- 			vchan_cookie_complete(vd);
--- 
-2.1.4
+exactly, that is my initial choice with v1, and only depends on vendor 
+and device id.
+
+but it seems a config is needed. how about ARCH_ARM64 then?
+
+Thanks,
+Tirumalesh.
+
+> David Daney
+>
