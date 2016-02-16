@@ -1,57 +1,42 @@
 From: keescook@chromium.org (Kees Cook)
-Date: Tue, 16 Feb 2016 12:31:16 -0800
-Subject: [PATCH 1/2] ARM: mm: DEBUG_RODATA makes no sense with XIP_KERNEL
-In-Reply-To: <1455638631-3326518-1-git-send-email-arnd@arndb.de>
-References: <1455638631-3326518-1-git-send-email-arnd@arndb.de>
-Message-ID: <CAGXu5jJg4SqrHdJsB-5AzcQbNR-hDZv6YsWayf7LefO+ng4Qhg@mail.gmail.com>
+Date: Tue, 16 Feb 2016 12:35:42 -0800
+Subject: [PATCH] arm64: mm: Mark .rodata as RO
+In-Reply-To: <56C36EFF.9060900@labbott.name>
+References: <1455293599-6974-1-git-send-email-jeremy.linton@arm.com>
+ <20160212182527.GG20262@leverpostej>
+ <CAGXu5jLpj=ue49_N+LOYvtZcU3rpFR5=WTG15ySDOWprvRzFUA@mail.gmail.com>
+ <56C36EFF.9060900@labbott.name>
+Message-ID: <CAGXu5j+4uYjTjULw7hzdaYhN+JGqtybEpyT2Cihuj-2gXe=saA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 16, 2016 at 8:03 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> When CONFIG_DEBUG_ALIGN_RODATA is set, we get a link error:
+On Tue, Feb 16, 2016 at 10:48 AM, Laura Abbott <laura@labbott.name> wrote:
+> On 2/16/16 10:10 AM, Kees Cook wrote:
+>>
+>> On Fri, Feb 12, 2016 at 10:25 AM, Mark Rutland <mark.rutland@arm.com>
+>> wrote:
+>>>
+>>> On Fri, Feb 12, 2016 at 10:13:19AM -0600, Jeremy Linton wrote:
+>>>>
+>>>> Currently the .rodata section is actually still executable when
+>>>> DEBUG_RODATA
+>>>> is enabled. This changes that so the .rodata is actually read only, no
+>>>> execute.
+>>>>
+>>>> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+>>
+>>
+>> Yikes, good catch. Is anyone running the lkdtm tests that check these
+>> things?
+>>
 >
-> arch/arm/mm/built-in.o:(.data+0x4bc): undefined reference to `__start_rodata_section_aligned'
->
-> However, this combination is useless, as XIP_KERNEL implies that all the
-> RODATA is already marked readonly, so both CONFIG_DEBUG_RODATA and
-> CONFIG_DEBUG_ALIGN_RODATA (which depends on the other) are not
-> needed with XIP_KERNEL, and this patches enforces that using a Kconfig
-> dependency.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 25362dc496ed ("ARM: 8501/1: mm: flip priority of CONFIG_DEBUG_RODATA")
+> I don't think the current lkdtm test would have caught this since the exec
+> test is using rw data and not ro data. That test could be expanded though
+> to include a rodata buffer as well.
 
-For this and the 2/2 patch:
-
-Acked-by: Kees Cook <keescook@chromium.org>
-
-I've sent follow-up to clean up the XIP linker script too, if you want
-to take that as the 3rd patch in this series of fixes.
+Oh, yeah, excellent point. I'll send a patch.
 
 -Kees
-
-> ---
->  arch/arm/mm/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-> index fbf2296388ce..8894045caba9 100644
-> --- a/arch/arm/mm/Kconfig
-> +++ b/arch/arm/mm/Kconfig
-> @@ -1039,7 +1039,7 @@ config ARCH_SUPPORTS_BIG_ENDIAN
->
->  config DEBUG_RODATA
->         bool "Make kernel text and rodata read-only"
-> -       depends on MMU
-> +       depends on MMU && !XIP_KERNEL
->         default y if CPU_V7
->         help
->           If this is set, kernel text and rodata memory will be made
-> --
-> 2.7.0
->
-
-
 
 -- 
 Kees Cook
