@@ -1,72 +1,77 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 16 Feb 2016 21:08:18 +0800
-Subject: [PATCH v5 00/13] mmc: use sdhci_pltfm_init for private allocation and
- clean up
-Message-ID: <1455628111-5583-1-git-send-email-jszhang@marvell.com>
+Date: Tue, 16 Feb 2016 21:08:21 +0800
+Subject: [PATCH v5 03/13] mmc: sdhci-msm: factorise sdhci_msm_pdata outisde of
+ sdhci_msm_host
+In-Reply-To: <1455628111-5583-1-git-send-email-jszhang@marvell.com>
+References: <1455628111-5583-1-git-send-email-jszhang@marvell.com>
+Message-ID: <1455628111-5583-4-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These patches are to complete the TODOs in Commit 0e748234293f ("mmc:
-sdhci: Add size for caller in init+register"), I.E:
+There's no need to allocate one sdhci_msm_pdata for each sdhci_msm_host.
+This patch removes the sdhci_msm_pdata member from sdhci_msm_host and
+uses one static global sdhci_msm_pdata for all sdhci msm hosts. It also
+marks sdhci_msm_ops as const.
 
-- todo: migrate clients to using allocation this way
-- todo: remove priv variable once migration is complete
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+Acked-by: Adrian Hunter <adrian.hunter@intel.com>
+---
+ drivers/mmc/host/sdhci-msm.c | 15 ++++++++-------
+ 1 file changed, 8 insertions(+), 7 deletions(-)
 
-Since v4:
- - based on Ulf's latest next branch
- - add Adrian's Ack for all patches, add Thierry's Ack and Test for patch 11
-   add S?ren Ack for patch 5.
-
-Since v3:
- - based on v4.5-rc1
- - add Ludovic's ack for sdhci-of-at91 changes
- - fix use-after-free in some drivers: some host drivers still needs to
-   access sdhci_pltfm_host->private after sdhci_pltfm_unregister(), but
-   the private should be already freed by sdhci_pltfm_unregister.
- - add patch5 to fix one clk bug in sdhci_arasan_remove(). IMHO, It's
-   better to add this patch to fixes rather than waiting for next merge
-   window
-
-Since v2:
- - based on mmc next tree and remove all priv usage introduced in newly
-   commits in this tree
- - don't break two lines if sdhci_pltfm_init() call could be put into
-   one line. Thank Ludovic Desroches.
-
-Since v1:
- - add new patch03 to factorise sdhci_msm_pdata outisde of sdhci_msm_host.
-   This is to fix drivers/mmc/host/sdhci-msm.c:440:32: warning: 'msm_host'
-   is used uninitialized in this function [-Wuninitialized]
- - Add Arnd's Ack for all patches except patch3 which is new in v2
-
-
-Jisheng Zhang (13):
-  mmc: sdhci-bcm2835: use sdhci_pltfm_init for private allocation
-  mmc: sdhci-esdhc-imx: use sdhci_pltfm_init for private allocation
-  mmc: sdhci-msm: factorise sdhci_msm_pdata outisde of sdhci_msm_host
-  mmc: sdhci-msm: use sdhci_pltfm_init for private allocation
-  mmc: sdhci-of-arasan: fix clk issue in sdhci_arasan_remove()
-  mmc: sdhci-of-arasan: use sdhci_pltfm_init for private allocation
-  mmc: sdhci-of-at91: use sdhci_pltfm_init for private allocation
-  mmc: sdhci-of-esdhc: use sdhci_pltfm_init for private allocation
-  mmc: sdhci-pxav3: use sdhci_pltfm_init for private allocation
-  mmc: sdhci-st: use sdhci_pltfm_init for private allocation
-  mmc: sdhci-tegra: use sdhci_pltfm_init for private allocation
-  mmc: sdhci-pxav2: remove unnecessary assignment of pltfm_host->priv
-  mmc: sdhci-pltfm: remove priv variable from sdhci_pltfm_host
-
- drivers/mmc/host/sdhci-bcm2835.c   | 14 +++----------
- drivers/mmc/host/sdhci-esdhc-imx.c | 38 ++++++++++++++++--------------------
- drivers/mmc/host/sdhci-msm.c       | 25 +++++++++++-------------
- drivers/mmc/host/sdhci-of-arasan.c | 33 +++++++++++++++----------------
- drivers/mmc/host/sdhci-of-at91.c   | 33 ++++++++++++++-----------------
- drivers/mmc/host/sdhci-of-esdhc.c  | 19 +++++++++---------
- drivers/mmc/host/sdhci-pltfm.h     |  1 -
- drivers/mmc/host/sdhci-pxav2.c     |  1 -
- drivers/mmc/host/sdhci-pxav3.c     | 20 ++++++++-----------
- drivers/mmc/host/sdhci-st.c        | 40 +++++++++++++++++++-------------------
- drivers/mmc/host/sdhci-tegra.c     | 21 +++++++-------------
- 11 files changed, 106 insertions(+), 139 deletions(-)
-
+diff --git a/drivers/mmc/host/sdhci-msm.c b/drivers/mmc/host/sdhci-msm.c
+index 4695bee..ffac9b4 100644
+--- a/drivers/mmc/host/sdhci-msm.c
++++ b/drivers/mmc/host/sdhci-msm.c
+@@ -60,7 +60,6 @@ struct sdhci_msm_host {
+ 	struct clk *pclk;	/* SDHC peripheral bus clock */
+ 	struct clk *bus_clk;	/* SDHC bus voter clock */
+ 	struct mmc_host *mmc;
+-	struct sdhci_pltfm_data sdhci_msm_pdata;
+ };
+ 
+ /* Platform specific tuning */
+@@ -418,7 +417,7 @@ static const struct of_device_id sdhci_msm_dt_match[] = {
+ 
+ MODULE_DEVICE_TABLE(of, sdhci_msm_dt_match);
+ 
+-static struct sdhci_ops sdhci_msm_ops = {
++static const struct sdhci_ops sdhci_msm_ops = {
+ 	.platform_execute_tuning = sdhci_msm_execute_tuning,
+ 	.reset = sdhci_reset,
+ 	.set_clock = sdhci_set_clock,
+@@ -426,6 +425,12 @@ static struct sdhci_ops sdhci_msm_ops = {
+ 	.set_uhs_signaling = sdhci_set_uhs_signaling,
+ };
+ 
++static const struct sdhci_pltfm_data sdhci_msm_pdata = {
++	.quirks = SDHCI_QUIRK_BROKEN_CARD_DETECTION |
++		  SDHCI_QUIRK_SINGLE_POWER_WRITE,
++	.ops = &sdhci_msm_ops,
++};
++
+ static int sdhci_msm_probe(struct platform_device *pdev)
+ {
+ 	struct sdhci_host *host;
+@@ -441,8 +446,7 @@ static int sdhci_msm_probe(struct platform_device *pdev)
+ 	if (!msm_host)
+ 		return -ENOMEM;
+ 
+-	msm_host->sdhci_msm_pdata.ops = &sdhci_msm_ops;
+-	host = sdhci_pltfm_init(pdev, &msm_host->sdhci_msm_pdata, 0);
++	host = sdhci_pltfm_init(pdev, &sdhci_msm_pdata, 0);
+ 	if (IS_ERR(host))
+ 		return PTR_ERR(host);
+ 
+@@ -522,9 +526,6 @@ static int sdhci_msm_probe(struct platform_device *pdev)
+ 	/* Set HC_MODE_EN bit in HC_MODE register */
+ 	writel_relaxed(HC_MODE_EN, (msm_host->core_mem + CORE_HC_MODE));
+ 
+-	host->quirks |= SDHCI_QUIRK_BROKEN_CARD_DETECTION;
+-	host->quirks |= SDHCI_QUIRK_SINGLE_POWER_WRITE;
+-
+ 	host_version = readw_relaxed((host->ioaddr + SDHCI_HOST_VERSION));
+ 	dev_dbg(&pdev->dev, "Host Version: 0x%x Vendor Version 0x%x\n",
+ 		host_version, ((host_version & SDHCI_VENDOR_VER_MASK) >>
 -- 
 2.7.0
