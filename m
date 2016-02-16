@@ -1,45 +1,43 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Tue, 16 Feb 2016 10:59:08 -0800
-Subject: Writes, smp_wmb(), and transitivity?
-In-Reply-To: <20160215175825.GA15878@linux.vnet.ibm.com>
-References: <20160215175825.GA15878@linux.vnet.ibm.com>
-Message-ID: <CA+55aFxaQEvDrzecmZUQ5QfKzU4ei6E-+NpsW5hYp3ouaLP98g@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 16 Feb 2016 19:05:59 +0000
+Subject: [PATCH] ARM64: dma-mapping: fix handling of devices registered
+ before arch_initcall
+In-Reply-To: <1455632084-14666-1-git-send-email-m.szyprowski@samsung.com>
+References: <1455632084-14666-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <56C37317.9020104@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 15, 2016 at 9:58 AM, Paul E. McKenney
-<paulmck@linux.vnet.ibm.com> wrote:
+On 16/02/16 14:14, Marek Szyprowski wrote:
+> This patch ensures that devices, which got registered before arch_initcall
+> will be handled correctly by IOMMU-based DMA-mapping code.
 >
-> Two threads:
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>   arch/arm64/mm/dma-mapping.c | 4 ++++
+>   1 file changed, 4 insertions(+)
 >
->         int a, b;
->
->         void thread0(void)
->         {
->                 WRITE_ONCE(a, 1);
->                 smp_wmb();
->                 WRITE_ONCE(b, 2);
->         }
->
->         void thread1(void)
->         {
->                 WRITE_ONCE(b, 1);
->                 smp_wmb();
->                 WRITE_ONCE(a, 2);
->         }
->
->         /* After all threads have completed and the dust has settled... */
->
->         BUG_ON(a == 1 && b == 1);
+> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+> index 573b1e6..ce6019f 100644
+> --- a/arch/arm64/mm/dma-mapping.c
+> +++ b/arch/arm64/mm/dma-mapping.c
+> @@ -928,6 +928,10 @@ static int __init __iommu_dma_init(void)
+>   		ret = register_iommu_dma_ops_notifier(&platform_bus_type);
+>   	if (!ret)
+>   		ret = register_iommu_dma_ops_notifier(&amba_bustype);
+> +
+> +	/* handle devices queued before this arch_initcall */
+> +	if (!ret)
+> +		__iommu_attach_notifier(NULL, BUS_NOTIFY_ADD_DEVICE, NULL);
 
-So the more I look at that kind of litmus test, the less I think that
-we should care, because I can't come up with a scenario in where that
-kind of test makes sense. without even a possibility of any causal
-relationship between the two, I can't say why we'd ever care about the
-ordering of the (independent) writes to the individual variables.
+Hmm, surely unless *all* the devices on the relevant buses are created 
+before arch_initcall level, then the next one is going to kick off the 
+notifier to walk the whole list anyway. Have you seen this being a 
+problem in practice?
 
-If somebody can make up a causal chain, things differ. But as long as
-all the CPU's are just doing locally ordered writes, I don't think we
-need to care about a global store ordering.
+Robin.
 
-              Linus
+>   	return ret;
+>   }
+>   arch_initcall(__iommu_dma_init);
+>
