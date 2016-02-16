@@ -1,102 +1,39 @@
-From: anup.patel@broadcom.com (Anup Patel)
-Date: Tue, 16 Feb 2016 12:03:40 +0530
-Subject: [PATCH 5/5] arm64: dts: Add SATA3 AHCI and SATA3 PHY DT nodes for NS2
-In-Reply-To: <1455604420-11300-1-git-send-email-anup.patel@broadcom.com>
-References: <1455604420-11300-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <1455604420-11300-6-git-send-email-anup.patel@broadcom.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 16 Feb 2016 07:37:00 +0100
+Subject: [PATCH] ARM: dts: r8a7794: replace gpio-key,wakeup with
+ wakeup-source property
+In-Reply-To: <1455572925-27697-1-git-send-email-horms+renesas@verge.net.au>
+References: <1455572925-27697-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdWo-tRQCRfDRrceAPaHMBMtPe15tPnMH1yjkhjpDwTSaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We have one dual-port SATA3 AHCI controller present in
-NS2 SoC.
+On Mon, Feb 15, 2016 at 10:48 PM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Though the keyboard driver for GPIO buttons(gpio-keys) will continue to
+> check for/support the legacy "gpio-key,wakeup" boolean property to
+> enable gpio buttons as wakeup source, "wakeup-source" is the new
+> standard binding.
+>
+> This patch replaces the legacy "gpio-key,wakeup" with the unified
+> "wakeup-source" property in order to avoid any futher copy-paste
+> duplication.
+>
+> Changelog text from a similar patch by Sudeep Holla.
+>
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> Reported-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-This patch enables SATA3 AHCI controller and SATA3 PHY
-for NS2 SoC in NS2 DT.
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Signed-off-by: Anup Patel <anup.patel@broadcom.com>
-Reviewed-by: Ray Jui <rjui@broadcom.com>
-Reviewed-by: Scott Branden <sbranden@broadcom.com>
----
- arch/arm64/boot/dts/broadcom/ns2-svk.dts | 12 +++++++++
- arch/arm64/boot/dts/broadcom/ns2.dtsi    | 43 ++++++++++++++++++++++++++++++++
- 2 files changed, 55 insertions(+)
+Gr{oetje,eeting}s,
 
-diff --git a/arch/arm64/boot/dts/broadcom/ns2-svk.dts b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
-index ce0ab84..06cf9c5 100644
---- a/arch/arm64/boot/dts/broadcom/ns2-svk.dts
-+++ b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
-@@ -72,6 +72,18 @@
- 	status = "ok";
- };
- 
-+&sata_phy0 {
-+	status = "ok";
-+};
-+
-+&sata_phy1 {
-+	status = "ok";
-+};
-+
-+&sata {
-+	status = "ok";
-+};
-+
- &sdio0 {
- 	status = "ok";
- };
-diff --git a/arch/arm64/boot/dts/broadcom/ns2.dtsi b/arch/arm64/boot/dts/broadcom/ns2.dtsi
-index 6f81c9d..c8dccf8 100644
---- a/arch/arm64/boot/dts/broadcom/ns2.dtsi
-+++ b/arch/arm64/boot/dts/broadcom/ns2.dtsi
-@@ -413,6 +413,49 @@
- 			reg = <0x66220000 0x28>;
- 		};
- 
-+		sata_phy: sata_phy at 663f0100 {
-+			compatible = "brcm,iproc-ns2-sata-phy";
-+			reg = <0x663f0100 0x1f00>,
-+			      <0x663f004c 0x10>;
-+			reg-names = "phy", "phy-ctrl";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			sata_phy0: sata-phy at 0 {
-+				reg = <0>;
-+				#phy-cells = <0>;
-+				status = "disabled";
-+			};
-+
-+			sata_phy1: sata-phy at 1 {
-+				reg = <1>;
-+				#phy-cells = <0>;
-+				status = "disabled";
-+			};
-+		};
-+
-+		sata: ahci at 663f2000 {
-+			compatible = "brcm,iproc-ahci", "generic-ahci";
-+			reg = <0x663f2000 0x1000>;
-+			reg-names = "ahci";
-+			interrupts = <GIC_SPI 438 IRQ_TYPE_LEVEL_HIGH>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+
-+			sata0: sata-port at 0 {
-+				reg = <0>;
-+				phys = <&sata_phy0>;
-+				phy-names = "sata-phy";
-+			};
-+
-+			sata1: sata-port at 1 {
-+				reg = <1>;
-+				phys = <&sata_phy1>;
-+				phy-names = "sata-phy";
-+			};
-+		};
-+
- 		sdio0: sdhci at 66420000 {
- 			compatible = "brcm,sdhci-iproc-cygnus";
- 			reg = <0x66420000 0x100>;
--- 
-1.9.1
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
