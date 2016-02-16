@@ -1,38 +1,26 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 16 Feb 2016 11:42:25 +0000
-Subject: [PATCH] clocksource: arm_global_timer: register delay timer
-In-Reply-To: <20160216112841.GA26773@axis.com>
-References: <1439991818-31989-1-git-send-email-rabin.vincent@axis.com>
- <55D62468.4050404@linaro.org> <20160216112841.GA26773@axis.com>
-Message-ID: <56C30B21.4000707@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 16 Feb 2016 11:47:33 +0000
+Subject: [PATCH] ARM: don't print missing L2 cache as error
+In-Reply-To: <d67716f9edf83700b18532eb66980316@agner.ch>
+References: <1453944439-1070-1-git-send-email-stefan@agner.ch>
+ <d67716f9edf83700b18532eb66980316@agner.ch>
+Message-ID: <20160216114733.GC19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/16/2016 11:28 AM, Rabin Vincent wrote:
-> On Thu, Aug 20, 2015 at 09:03:04PM +0200, Daniel Lezcano wrote:
->> On 08/19/2015 03:43 PM, Rabin Vincent wrote:
->>> Provide a delay timer using the lower 32-bits of the global timer so
->>> that we can use that instead of having to calibrating delays.
->>>
->>> Signed-off-by: Rabin Vincent <rabin.vincent@axis.com>
->>
->> Applied to my tree for 4.4
->
-> This seems to have got lost?  I don't see it in v4.4 or current mainline
-> (v4.5-rc4).  It still applies cleanly.
+On Mon, Feb 15, 2016 at 07:19:20PM -0800, Stefan Agner wrote:
+> Hi Russel,
+> 
+> Any comment to this? Currently the kernel prints an error message as
+> follows on the platform at hand:
+> [    0.000000] L2C: failed to init: -19
 
-Oops, right.
+An alternative patch (8499/1) is queued for the next merge window, as it
+isn't a regression and isn't a bug per se.
 
-Fixed now [1]. Thanks for the heads up.
-
-   -- Daniel
-
-[1] 
-https://git.linaro.org/people/daniel.lezcano/linux.git/commit/23cb25d0f407e83be10747258092843e8e20d535
+Thanks.
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
