@@ -1,49 +1,187 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 16 Feb 2016 15:14:14 +0000
-Subject: [PATCH v3 08/10] ARM: configs: add MPS2 defconfig
-In-Reply-To: <11778979.HbWgmZUCnF@wuerfel>
-References: <1455617295-23736-1-git-send-email-vladimir.murzin@arm.com>
- <2680417.bULLX3O66Y@wuerfel> <56C3378F.2010008@arm.com>
- <11778979.HbWgmZUCnF@wuerfel>
-Message-ID: <56C33CC6.4030509@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 16 Feb 2016 16:17:40 +0100
+Subject: [PATCH v5sub1 7/8] arm64: move kernel image to base of vmalloc
+ area
+In-Reply-To: <56C31D1D.50708@virtuozzo.com>
+References: <1454324093-15998-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1454324093-15998-8-git-send-email-ard.biesheuvel@linaro.org>
+ <20160212145844.GI31665@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu-x6QPorWsPDP8bqAkmbasqzhqmP39HS=qprfGB4r8JLw@mail.gmail.com>
+ <20160212151006.GJ31665@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu84mVP=YjbLhWoGj9AEUD8m8+Lq8kTCniCHwxJwMWaZtA@mail.gmail.com>
+ <20160212152641.GK31665@e104818-lin.cambridge.arm.com>
+ <56BDFC86.5010705@arm.com>
+ <20160212160652.GL31665@e104818-lin.cambridge.arm.com>
+ <56C1E072.2090909@virtuozzo.com>
+ <20160215185957.GB19413@e104818-lin.cambridge.arm.com>
+ <56C31D1D.50708@virtuozzo.com>
+Message-ID: <CAKv+Gu8WE=fTZF0Pou24FKDocgshWu8dJRbaC5SJ11E-6T=2Hw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/02/16 15:08, Arnd Bergmann wrote:
-> On Tuesday 16 February 2016 14:51:59 Vladimir Murzin wrote:
+On 16 February 2016 at 13:59, Andrey Ryabinin <aryabinin@virtuozzo.com> wrote:
+>
+>
+> On 02/15/2016 09:59 PM, Catalin Marinas wrote:
+>> On Mon, Feb 15, 2016 at 05:28:02PM +0300, Andrey Ryabinin wrote:
+>>> On 02/12/2016 07:06 PM, Catalin Marinas wrote:
+>>>> So far, we have:
+>>>>
+>>>> KASAN+for-next/kernmap goes wrong
+>>>> KASAN+UBSAN goes wrong
+>>>>
+>>>> Enabled individually, KASAN, UBSAN and for-next/kernmap seem fine. I may
+>>>> have to trim for-next/core down until we figure out where the problem
+>>>> is.
+>>>>
+>>>> BUG: KASAN: stack-out-of-bounds in find_busiest_group+0x164/0x16a0 at addr ffffffc93665bc8c
 >>>
->>> Why CONFIG_EMBEDDED? You probably mean CONFIG_EXPERT, but then what do
->>> you need that for?
+>>> Can it be related to TLB conflicts, which supposed to be fixed in
+>>> "arm64: kasan: avoid TLB conflicts" patch from "arm64: mm: rework page
+>>> table creation" series ?
 >>
->> TBH, I have no special requirement for this option to be set and now,
->> looking at Kconfig entry for this option, I think that I got it here
->> because I stated configuration with allnoconfig.
+>> I can very easily reproduce this with a vanilla 4.5-rc1 series by
+>> enabling inline instrumentation (maybe Mark's theory is true w.r.t.
+>> image size).
 >>
->> OTOH, I don't see how harmful it can be since description says:
+>> Some information, maybe you can shed some light on this. It seems to
+>> happen only for secondary CPUs on the swapper stack (I think allocated
+>> via fork_idle()). The code generated looks sane to me, so KASAN should
+>> not complain but maybe there is some uninitialised shadow, hence the
+>> error.
 >>
->>           This option should be enabled if compiling the kernel for
->>           an embedded system so certain expert options are available
->>           for configuration
+>> The report:
 >>
->> yes, it selects CONFIG_EXPERT and that had side effect that, for
->> example, CONFIG_NAMESPACE could be compiled out.
->>
->> Have I missed something around it?
-> 
-> Just the history behind this symbol. We removed it a while ago in
-> favor if CONFIG_EXPERT, assuming that it makes it clearer that it's
-> not just for embedded systems, or for systems with small memory.
-> 
-> It's  basically a zombie symbol that nobody should use directly
-> (independent of what the documentation says...).
+>
+> Actually, the first report is a bit more useful. It shows that shadow memory was corrupted:
+>
+>   ffffffc93665bc00: f1 f1 f1 f1 00 f4 f4 f4 f2 f2 f2 f2 00 00 f1 f1
+>> ffffffc93665bc80: f1 f1 00 00 00 00 f3 f3 00 f4 f4 f4 f3 f3 f3 f3
+>                       ^
+> F1 - left redzone, it indicates start of stack frame
+> F3 - right redzone, it should be the end of stack frame.
+>
+> But here we have the second set of F1s without F3s which should close the first set of F1s.
+> Also those two F3s in the middle cannot be right.
+>
+> So shadow is corrupted.
+> Some hypotheses:
+>
+> 1) We share stack between several tasks (e.g. stack overflow, somehow corrupted SP).
+>     But this probably should cause kernel crash later, after kasan reports.
+>
+> 2) Shadow memory wasn't cleared. GCC poison memory on function entrance and unpoisons it before return.
+>      If we use some tricky way to exit from function this could cause false-positives like that.
+>      E.g. some hand-written assembly return code.
+>
+> 3) Screwed shadow mapping. I think the patch below should uncover such problem.
+> It boot-tested on qemu and didn't show any problem
+>
 
-Good to know! I'll drop it then.
+I think this patch gives false positive warnings in some cases:
 
-Thanks
-Vladimir
+>
+> ---
+>  arch/arm64/mm/kasan_init.c | 55 ++++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 55 insertions(+)
+>
+> diff --git a/arch/arm64/mm/kasan_init.c b/arch/arm64/mm/kasan_init.c
+> index cf038c7..25d685c 100644
+> --- a/arch/arm64/mm/kasan_init.c
+> +++ b/arch/arm64/mm/kasan_init.c
+> @@ -117,6 +117,59 @@ static void __init cpu_set_ttbr1(unsigned long ttbr1)
+>         : "r" (ttbr1));
+>  }
+>
+> +static void verify_shadow(void)
+> +{
+> +       struct memblock_region *reg;
+> +       int i = 0;
+> +
+> +       for_each_memblock(memory, reg) {
+> +               void *start = (void *)__phys_to_virt(reg->base);
+> +               void *end = (void *)__phys_to_virt(reg->base + reg->size);
+> +               int *shadow_start, *shadow_end;
+> +
+> +               if (start >= end)
+> +                       break;
+> +               shadow_start = (int *)((unsigned long)kasan_mem_to_shadow(start) & ~(PAGE_SIZE - 1));
+> +               shadow_end =  (int *)kasan_mem_to_shadow(end);
 
-> 
-> 	Arnd
-> 
-> 
-> 
+shadow_start and shadow_end can refer to the same page as in the
+previous iteration. For instance, I have these two regions
+
+  0x00006e090000-0x00006e0adfff [Conventional Memory|   |  |  |  |  |
+|   |WB|WT|WC|UC]
+  0x00006e0ae000-0x00006e0affff [Loader Data        |   |  |  |  |  |
+|   |WB|WT|WC|UC]
+
+which are covered by different memblocks since the second one is
+marked as MEMBLOCK_NOMAP, due to the fact that it contains the UEFI
+memory map.
+
+I get the following output
+
+kasan: screwed shadow mapping 23575, 23573
+
+which I think is simply a result from the fact the shadow_start refers
+to the same page as in the previous iteration(s)
+
+
+> +               for (; shadow_start < shadow_end; shadow_start += PAGE_SIZE/sizeof(int)) {
+> +                       *shadow_start = i;
+> +                       i++;
+> +               }
+> +       }
+> +
+> +       i = 0;
+> +       for_each_memblock(memory, reg) {
+> +               void *start = (void *)__phys_to_virt(reg->base);
+> +               void *end = (void *)__phys_to_virt(reg->base + reg->size);
+> +               int *shadow_start, *shadow_end;
+> +
+> +               if (start >= end)
+> +                       break;
+> +               shadow_start = (int *)((unsigned long)kasan_mem_to_shadow(start) & ~(PAGE_SIZE - 1));
+> +               shadow_end =  (int *)kasan_mem_to_shadow(end);
+> +               for (; shadow_start < shadow_end; shadow_start += PAGE_SIZE/sizeof(int)) {
+> +                       if (*shadow_start != i) {
+> +                               pr_err("screwed shadow mapping %d, %d\n", *shadow_start, i);
+> +                               goto clear;
+> +                       }
+> +                       i++;
+> +               }
+> +       }
+> +clear:
+> +       for_each_memblock(memory, reg) {
+> +               void *start = (void *)__phys_to_virt(reg->base);
+> +               void *end = (void *)__phys_to_virt(reg->base + reg->size);
+> +               unsigned long shadow_start, shadow_end;
+> +
+> +               if (start >= end)
+> +                       break;
+> +               shadow_start =  ((unsigned long)kasan_mem_to_shadow(start) & ~(PAGE_SIZE - 1));
+> +               shadow_end =  (unsigned long)kasan_mem_to_shadow(end);
+> +               memset((void *)shadow_start, 0, shadow_end - shadow_start);
+> +       }
+> +
+> +}
+> +
+>  void __init kasan_init(void)
+>  {
+>         struct memblock_region *reg;
+> @@ -159,6 +212,8 @@ void __init kasan_init(void)
+>         cpu_set_ttbr1(__pa(swapper_pg_dir));
+>         flush_tlb_all();
+>
+> +       verify_shadow();
+> +
+>         /* At this point kasan is fully initialized. Enable error messages */
+>         init_task.kasan_depth = 0;
+>         pr_info("KernelAddressSanitizer initialized\n");
+> --
+>
+>
+>
+>
+>
