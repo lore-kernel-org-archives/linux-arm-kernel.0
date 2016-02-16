@@ -1,67 +1,39 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 16 Feb 2016 15:53:11 +0100
-Subject: [PATCH] regulator: s5m8767: fix get_register() error handling
-Message-ID: <1455634402-1997203-1-git-send-email-arnd@arndb.de>
+Date: Tue, 16 Feb 2016 15:55:07 +0100
+Subject: [PATCH] iio: pressure: ms5611: select IIO_BUFFER
+Message-ID: <1455634525-2023774-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The s5m8767_pmic_probe() function calls s5m8767_get_register() to
-read data without checking the return code, which produces a compile-time
-warning when that data is accessed:
+The ms5611 driver started using the IIO_TRIGGERED_BUFFER infrastructure
+which in turn depend on IIO_BUFFER, and it produces a build error now
+if that is not enabled:
 
-drivers/regulator/s5m8767.c: In function 's5m8767_pmic_probe':
-drivers/regulator/s5m8767.c:924:7: error: 'enable_reg' may be used uninitialized in this function [-Werror=maybe-uninitialized]
-drivers/regulator/s5m8767.c:944:30: error: 'enable_val' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+warning: (... && MS5611 && ...) selects IIO_TRIGGERED_BUFFER which has unmet direct dependencies (IIO && IIO_BUFFER)
+buffer/industrialio-triggered-buffer.c: In function 'iio_triggered_buffer_setup':
+buffer/industrialio-triggered-buffer.c:58:2: error: implicit declaration of function 'iio_device_attach_buffer' [-Werror=implicit-function-declaration]
+pressure/ms5611_core.c: In function 'ms5611_trigger_handler':
+pressure/ms5611_core.c:193:2: error: implicit declaration of function 'iio_push_to_buffers_with_timestamp' [-Werror=implicit-function-declaration]
 
-This changes the s5m8767_get_register() function to return a -EINVAL
-not just for an invalid register number but also for an invalid
-regulator number, as both would result in returning uninitialized
-data. The s5m8767_pmic_probe() function is then changed accordingly
-to fail on a read error, as all the other callers of s5m8767_get_register()
-already do.
-
-In practice this probably cannot happen, as we don't call
-s5m8767_get_register() with invalid arguments, but the gcc
-warning seems valid in principle, in terms writing safe
-error checking.
+This adds the second select.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 9c4c60554acf ("regulator: s5m8767: Convert to use regulator_[enable|disable|is_enabled]_regmap")
+Fixes: 713bbb4efb9d ("iio: pressure: ms5611: Add triggered buffer support")
 ---
- drivers/regulator/s5m8767.c | 13 +++++++++----
- 1 file changed, 9 insertions(+), 4 deletions(-)
+ drivers/iio/pressure/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/regulator/s5m8767.c b/drivers/regulator/s5m8767.c
-index 58f5d3b8e981..27343e1c43ef 100644
---- a/drivers/regulator/s5m8767.c
-+++ b/drivers/regulator/s5m8767.c
-@@ -202,9 +202,10 @@ static int s5m8767_get_register(struct s5m8767_info *s5m8767, int reg_id,
- 		}
- 	}
+diff --git a/drivers/iio/pressure/Kconfig b/drivers/iio/pressure/Kconfig
+index f15f66d6f527..31c0e1fd2202 100644
+--- a/drivers/iio/pressure/Kconfig
++++ b/drivers/iio/pressure/Kconfig
+@@ -69,6 +69,7 @@ config MPL3115
  
--	if (i < s5m8767->num_regulators)
--		*enable_ctrl =
--		s5m8767_opmode_reg[reg_id][mode] << S5M8767_ENCTRL_SHIFT;
-+	if (i >= s5m8767->num_regulators)
-+		return -EINVAL;
-+
-+	*enable_ctrl = s5m8767_opmode_reg[reg_id][mode] << S5M8767_ENCTRL_SHIFT;
- 
- 	return 0;
- }
-@@ -937,8 +938,12 @@ static int s5m8767_pmic_probe(struct platform_device *pdev)
- 			else
- 				regulators[id].vsel_mask = 0xff;
- 
--			s5m8767_get_register(s5m8767, id, &enable_reg,
-+			ret = s5m8767_get_register(s5m8767, id, &enable_reg,
- 					     &enable_val);
-+			if (ret) {
-+				dev_err(s5m8767->dev, "error reading registers\n");
-+				return ret;
-+			}
- 			regulators[id].enable_reg = enable_reg;
- 			regulators[id].enable_mask = S5M8767_ENCTRL_MASK;
- 			regulators[id].enable_val = enable_val;
+ config MS5611
+ 	tristate "Measurement Specialties MS5611 pressure sensor driver"
++	select IIO_BUFFER
+ 	select IIO_TRIGGERED_BUFFER
+ 	help
+ 	  Say Y here to build support for the Measurement Specialties
 -- 
 2.7.0
