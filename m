@@ -1,160 +1,155 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 16 Feb 2016 11:15:03 +0900
-Subject: [PATCH 1/9] ARM: dts: uniphier: factor out ranges property of support
- card
+Date: Tue, 16 Feb 2016 11:15:09 +0900
+Subject: [PATCH 7/9] ARM: dts: uniphier: add PH1-Pro4 Ace board support
 In-Reply-To: <1455588911-9827-1-git-send-email-yamada.masahiro@socionext.com>
 References: <1455588911-9827-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1455588911-9827-2-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1455588911-9827-8-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This property is used in common by several boards.  Move it to the
-common place (uniphier-support-card.dtsi).  If necessary, each board
-can still override the property.
+Initial commit for PH1-Pro4 Ace board support.
+
+Note:
+There are two variants for the amount of DDR memory; 1GB or 2GB.
 
 Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
 
- arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts              | 8 --------
- arch/arm/boot/dts/uniphier-ph1-ld6b-ref.dts             | 8 --------
- arch/arm/boot/dts/uniphier-ph1-pro4-ref.dts             | 8 --------
- arch/arm/boot/dts/uniphier-ph1-sld3-ref.dts             | 8 --------
- arch/arm/boot/dts/uniphier-ph1-sld8-ref.dts             | 8 --------
- arch/arm/boot/dts/uniphier-support-card.dtsi            | 3 +++
- arch/arm64/boot/dts/socionext/uniphier-ph1-ld10-ref.dts | 8 --------
- 7 files changed, 3 insertions(+), 48 deletions(-)
+ arch/arm/boot/dts/Makefile                  |   1 +
+ arch/arm/boot/dts/uniphier-ph1-pro4-ace.dts | 113 ++++++++++++++++++++++++++++
+ 2 files changed, 114 insertions(+)
+ create mode 100644 arch/arm/boot/dts/uniphier-ph1-pro4-ace.dts
 
-diff --git a/arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts b/arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts
-index f1e9d40..ec94b7a 100644
---- a/arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts
-+++ b/arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts
-@@ -72,14 +72,6 @@
- 	};
- };
- 
--&extbus {
--	ranges = <1 0x00000000 0x42000000 0x02000000>;
--};
--
--&support_card {
--	ranges = <0x00000000 1 0x01f00000 0x00100000>;
--};
--
- &ethsc {
- 	interrupts = <0 49 4>;
- };
-diff --git a/arch/arm/boot/dts/uniphier-ph1-ld6b-ref.dts b/arch/arm/boot/dts/uniphier-ph1-ld6b-ref.dts
-index 5baa9fc..b8134c6 100644
---- a/arch/arm/boot/dts/uniphier-ph1-ld6b-ref.dts
-+++ b/arch/arm/boot/dts/uniphier-ph1-ld6b-ref.dts
-@@ -74,14 +74,6 @@
- 	};
- };
- 
--&extbus {
--	ranges = <1 0x00000000 0x42000000 0x02000000>;
--};
--
--&support_card {
--	ranges = <0x00000000 1 0x01f00000 0x00100000>;
--};
--
- &ethsc {
- 	interrupts = <0 52 4>;
- };
-diff --git a/arch/arm/boot/dts/uniphier-ph1-pro4-ref.dts b/arch/arm/boot/dts/uniphier-ph1-pro4-ref.dts
-index 2462668..95f631a 100644
---- a/arch/arm/boot/dts/uniphier-ph1-pro4-ref.dts
-+++ b/arch/arm/boot/dts/uniphier-ph1-pro4-ref.dts
-@@ -74,14 +74,6 @@
- 	};
- };
- 
--&extbus {
--	ranges = <1 0x00000000 0x42000000 0x02000000>;
--};
--
--&support_card {
--	ranges = <0x00000000 1 0x01f00000 0x00100000>;
--};
--
- &ethsc {
- 	interrupts = <0 50 4>;
- };
-diff --git a/arch/arm/boot/dts/uniphier-ph1-sld3-ref.dts b/arch/arm/boot/dts/uniphier-ph1-sld3-ref.dts
-index b7a03215..acb4204 100644
---- a/arch/arm/boot/dts/uniphier-ph1-sld3-ref.dts
-+++ b/arch/arm/boot/dts/uniphier-ph1-sld3-ref.dts
-@@ -73,14 +73,6 @@
- 	};
- };
- 
--&extbus {
--	ranges = <1 0x00000000 0x42000000 0x02000000>;
--};
--
--&support_card {
--	ranges = <0x00000000 1 0x01f00000 0x00100000>;
--};
--
- &ethsc {
- 	interrupts = <0 49 4>;
- };
-diff --git a/arch/arm/boot/dts/uniphier-ph1-sld8-ref.dts b/arch/arm/boot/dts/uniphier-ph1-sld8-ref.dts
-index fc7250c..d594f40 100644
---- a/arch/arm/boot/dts/uniphier-ph1-sld8-ref.dts
-+++ b/arch/arm/boot/dts/uniphier-ph1-sld8-ref.dts
-@@ -72,14 +72,6 @@
- 	};
- };
- 
--&extbus {
--	ranges = <1 0x00000000 0x42000000 0x02000000>;
--};
--
--&support_card {
--	ranges = <0x00000000 1 0x01f00000 0x00100000>;
--};
--
- &ethsc {
- 	interrupts = <0 48 4>;
- };
-diff --git a/arch/arm/boot/dts/uniphier-support-card.dtsi b/arch/arm/boot/dts/uniphier-support-card.dtsi
-index da271e3..fa807e8 100644
---- a/arch/arm/boot/dts/uniphier-support-card.dtsi
-+++ b/arch/arm/boot/dts/uniphier-support-card.dtsi
-@@ -43,10 +43,13 @@
-  */
- 
- &extbus {
-+	ranges = <1 0x00000000 0x42000000 0x02000000>;
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index a4a6d70..d9d899f 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -736,6 +736,7 @@ dtb-$(CONFIG_ARCH_U8500) += \
+ dtb-$(CONFIG_ARCH_UNIPHIER) += \
+ 	uniphier-ph1-ld4-ref.dtb \
+ 	uniphier-ph1-ld6b-ref.dtb \
++	uniphier-ph1-pro4-ace.dtb \
+ 	uniphier-ph1-pro4-ref.dtb \
+ 	uniphier-ph1-sld3-ref.dtb \
+ 	uniphier-ph1-sld8-ref.dtb \
+diff --git a/arch/arm/boot/dts/uniphier-ph1-pro4-ace.dts b/arch/arm/boot/dts/uniphier-ph1-pro4-ace.dts
+new file mode 100644
+index 0000000..d343586
+--- /dev/null
++++ b/arch/arm/boot/dts/uniphier-ph1-pro4-ace.dts
+@@ -0,0 +1,113 @@
++/*
++ * Device Tree Source for UniPhier PH1-Pro4 Ace Board
++ *
++ * Copyright (C) 2016 Masahiro Yamada <yamada.masahiro@socionext.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
 +
- 	support_card: support_card {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
- 		#size-cells = <1>;
-+		ranges = <0x00000000 1 0x01f00000 0x00100000>;
- 
- 		ethsc: ethernet at 00000000 {
- 			compatible = "smsc,lan9118", "smsc,lan9115";
-diff --git a/arch/arm64/boot/dts/socionext/uniphier-ph1-ld10-ref.dts b/arch/arm64/boot/dts/socionext/uniphier-ph1-ld10-ref.dts
-index 3e53317..e5c8a20 100644
---- a/arch/arm64/boot/dts/socionext/uniphier-ph1-ld10-ref.dts
-+++ b/arch/arm64/boot/dts/socionext/uniphier-ph1-ld10-ref.dts
-@@ -74,14 +74,6 @@
- 	};
- };
- 
--&extbus {
--	ranges = <1 0x00000000 0x42000000 0x02000000>;
--};
--
--&support_card {
--	ranges = <0x00000000 1 0x01f00000 0x00100000>;
--};
--
- &ethsc {
- 	interrupts = <0 48 4>;
- };
++/dts-v1/;
++/include/ "uniphier-ph1-pro4.dtsi"
++
++/ {
++	model = "UniPhier PH1-Pro4 Ace Board";
++	compatible = "socionext,ph1-pro4-ace", "socionext,ph1-pro4";
++
++	memory {
++		device_type = "memory";
++		reg = <0x80000000 0x40000000>;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	aliases {
++		serial0 = &serial0;
++		serial1 = &serial1;
++		serial2 = &serial2;
++		i2c0 = &i2c0;
++		i2c1 = &i2c1;
++		i2c2 = &i2c2;
++		i2c3 = &i2c3;
++		i2c5 = &i2c5;
++		i2c6 = &i2c6;
++	};
++};
++
++&serial0 {
++	status = "okay";
++};
++
++&serial1 {
++	status = "okay";
++};
++
++&serial2 {
++	status = "okay";
++};
++
++&i2c0 {
++	status = "okay";
++
++	eeprom at 54 {
++		compatible = "st,24c64";
++		reg = <0x54>;
++	};
++};
++
++&i2c1 {
++	status = "okay";
++};
++
++&i2c2 {
++	status = "okay";
++};
++
++&i2c3 {
++	status = "okay";
++};
++
++&usb2 {
++	status = "okay";
++};
++
++&usb3 {
++	status = "okay";
++};
 -- 
 1.9.1
