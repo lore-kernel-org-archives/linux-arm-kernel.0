@@ -1,41 +1,63 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 16 Feb 2016 13:59:14 +0900
-Subject: [PATCH v2] clk: Move vendor's Kconfig into CCF menu section
-In-Reply-To: <1453971537-5510-1-git-send-email-jamesjj.liao@mediatek.com>
-References: <1453971537-5510-1-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <CAJKOXPdA1VeGUmgAtObueXbY5S_X0acrF5m_QnEygzaMOeWPUw@mail.gmail.com>
+From: maitysanchayan@gmail.com (Sanchayan Maity)
+Date: Tue, 16 Feb 2016 10:30:52 +0530
+Subject: [PATCH v3 0/3] Allow iio_hwmon to accept hypen in node names
+Message-ID: <cover.1455597464.git.maitysanchayan@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-01-28 17:58 GMT+09:00 James Liao <jamesjj.liao@mediatek.com>:
-> Move all vendor's Kconfig into CCF menu section to prevent
-> new drivers putting their Kconfig files in a wrong place.
->
-> Some Kconigs need to modify at the same time to avoid build
-> warnings.
->
-> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
-> ---
-> This patch is based on v4.5-rc1.
->
-> changes since v1:
-> - Modify s3c24xx and samsung's Kconfig to avoid build warngings.
->
->  arch/arm/mach-s3c24xx/Kconfig | 1 +
->  drivers/clk/Kconfig           | 8 +++-----
->  drivers/clk/samsung/Kconfig   | 1 -
->  3 files changed, 4 insertions(+), 6 deletions(-)
->
+Hello,
 
-I wish you had used scripts/get_maintainer.pl to get list of people to CC...
-Kukjin Kim <kgene@kernel.org> (maintainer:ARM/SAMSUNG EXYNOS ARM ARCHITECTURES)
-Krzysztof Kozlowski <k.kozlowski@samsung.com> (maintainer:ARM/SAMSUNG
-EXYNOS ARM ARCHITECTURES)
-linux-samsung-soc at vger.kernel.org (moderated list:ARM/SAMSUNG EXYNOS
-ARM ARCHITECTURES)
+Initial versions of the patchset intended to introduce the use of
+iio_hwmon for Vybrid SoC's. Currently the iio_hwmon driver has two
+users and as per the binding documentation, the node names use the
+underscore. Use of hypen in device tree node names is acceptable,
+however currently the hwmon core code rejects it due to perhaps user
+space not liking the hypen and getting confused.
 
-Beside the fact that it is just nice and welcomed... it would help me
-to avoid some of duplicated work...
+As per Guenter Roeck's suggestion, the first patch looks for a hypen
+and replaces it with a underscore in the probe call of iio_hwmon driver
+before calling hwmon_device_register_with_groups for registration. Any
+users of iio_hwmon driver can now use hypen in the node name.
 
-Best regards,
-Krzysztof
+As per Shawn's suggestion, the existing users have been changed to use
+the hypen instead of the underscore and the iio-bindings document
+updated. Third patch introduces the usage for Vybrid itself.
+
+Patchset is based on top of shawn's for-next branch.
+
+Feedbacks and comments most welcome. Thank you for feedbacks.
+
+@Guenter
+I hope I understood and implemented correctly what you had in mind.
+
+Sample Output from Toradex Colibri VF50 module
+root at colibri-vf:/sys/class/hwmon/hwmon0# ls
+device       name         of_node      power        subsystem    temp1_input  temp2_input  uevent
+root at colibri-vf:/sys/class/hwmon/hwmon0# cat name
+iio_hwmon
+root at colibri-vf:/sys/class/hwmon/hwmon0# uname -a
+Linux colibri-vf 4.5.0-rc1-12868-g88b677c #48 SMP Tue Feb 16 10:05:28 IST 2016 armv7l GNU/Linux
+
+v1:
+https://lkml.org/lkml/2015/9/16/932
+
+v2:
+https://lkml.org/lkml/2016/2/12/168
+
+Thanks & Regards,
+Sanchayan Maity.
+
+Sanchayan Maity (3):
+  hwmon: iio_hwmon: Allow the driver to accept hypen in device tree node names
+  ARM: dts: Change iio_hwmon nodes to use hypen in node names
+  ARM: dts: vfxxx: Add iio_hwmon node for ADC temperature channel
+
+ Documentation/devicetree/bindings/iio/iio-bindings.txt |  2 +-
+ arch/arm/boot/dts/imx23.dtsi                           |  2 +-
+ arch/arm/boot/dts/imx28.dtsi                           |  2 +-
+ arch/arm/boot/dts/vfxxx.dtsi                           |  5 +++++
+ drivers/hwmon/iio_hwmon.c                              | 11 ++++++++++-
+ 5 files changed, 18 insertions(+), 4 deletions(-)
+
+-- 
+2.7.1
