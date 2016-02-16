@@ -1,77 +1,41 @@
-From: eun.taik.lee@samsung.com (EunTaik Lee)
-Date: Tue, 16 Feb 2016 04:44:38 +0000 (GMT)
-Subject: [PATCH v2] arm64: add alignment fault hanling
-Message-ID: <329817481.954581455597874663.JavaMail.weblogic@epmlwas08c>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 16 Feb 2016 13:59:14 +0900
+Subject: [PATCH v2] clk: Move vendor's Kconfig into CCF menu section
+In-Reply-To: <1453971537-5510-1-git-send-email-jamesjj.liao@mediatek.com>
+References: <1453971537-5510-1-git-send-email-jamesjj.liao@mediatek.com>
+Message-ID: <CAJKOXPdA1VeGUmgAtObueXbY5S_X0acrF5m_QnEygzaMOeWPUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Userspace memory is mapped as below:
-F2A7F000--F2A7FFFF Normal Memory
-F2A80000--F2A80FFF Device nGnRnE
+2016-01-28 17:58 GMT+09:00 James Liao <jamesjj.liao@mediatek.com>:
+> Move all vendor's Kconfig into CCF menu section to prevent
+> new drivers putting their Kconfig files in a wrong place.
+>
+> Some Kconigs need to modify at the same time to avoid build
+> warnings.
+>
+> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+> ---
+> This patch is based on v4.5-rc1.
+>
+> changes since v1:
+> - Modify s3c24xx and samsung's Kconfig to avoid build warngings.
+>
+>  arch/arm/mach-s3c24xx/Kconfig | 1 +
+>  drivers/clk/Kconfig           | 8 +++-----
+>  drivers/clk/samsung/Kconfig   | 1 -
+>  3 files changed, 4 insertions(+), 6 deletions(-)
+>
 
-And that userspace application makes a system call
-as below:
+I wish you had used scripts/get_maintainer.pl to get list of people to CC...
+Kukjin Kim <kgene@kernel.org> (maintainer:ARM/SAMSUNG EXYNOS ARM ARCHITECTURES)
+Krzysztof Kozlowski <k.kozlowski@samsung.com> (maintainer:ARM/SAMSUNG
+EXYNOS ARM ARCHITECTURES)
+linux-samsung-soc at vger.kernel.org (moderated list:ARM/SAMSUNG EXYNOS
+ARM ARCHITECTURES)
 
--009 |do_strncpy_from_user(inline)
--009 |strncpy_from_user()
--010 |getname_flags()
--011 |user_path_at_empty()
--012 |user_path_at()
--013 |SYSC_faccessat(inline)
--013 |sys_faccessat()
--014 |__sys_trace(asm)
- --> |exception
+Beside the fact that it is just nice and welcomed... it would help me
+to avoid some of duplicated work...
 
-The string spans from 0xF2A7FFC1 to 0xF2A7FFFB.
-
-When do_strncpy_from_user() reads the last (unsigned long)
-value, the alignement fault is triggered. The 8 byte
-from 0xF2A7FFC1 spans to the next page that is mapped as
-Device nGnRnE, which does not allow an unaligned access,
-causes the abort.
-
-The instruction which caused the alignment fault is registered
-in the fixup table but the exception handler does not reach there.
-
-This patch registers a alignment fault handler and fixes up the
-pc if appropriate.
-
-Signed-off-by: Eun Taik Lee <eun.taik.lee@samsung.com>
----
-
-changes in v2 : call do_bad_area() instead of calling
- fix_up_exception directly.
-
- arch/arm64/mm/fault.c | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 19211c4..a5ebb99 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -371,6 +371,14 @@ static int __kprobes do_translation_fault(unsigned long addr,
- 	return 0;
- }
- 
-+static int __kprobes do_alignment_fault(unsigned long addr,
-+					  unsigned int esr,
-+					  struct pt_regs *regs)
-+{
-+	do_bad_area(addr, esr, regs);
-+	return 0;
-+}
-+
- /*
-  * This abort handler always returns "fault".
-  */
-@@ -418,7 +426,7 @@ static struct fault_info {
- 	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk" },
- 	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk" },
- 	{ do_bad,		SIGBUS,  0,		"unknown 32"			},
--	{ do_bad,		SIGBUS,  BUS_ADRALN,	"alignment fault"		},
-+	{ do_alignment_fault,	SIGBUS,  BUS_ADRALN,	"alignment fault"		},
- 	{ do_bad,		SIGBUS,  0,		"debug event"			},
- 	{ do_bad,		SIGBUS,  0,		"unknown 35"			},
- 	{ do_bad,		SIGBUS,  0,		"unknown 36"			},
--- 
-1.9.1
+Best regards,
+Krzysztof
