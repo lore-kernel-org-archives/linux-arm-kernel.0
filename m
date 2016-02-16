@@ -1,94 +1,66 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 16 Feb 2016 12:16:30 -0800
-Subject: [PATCH] ARM: fix __start_rodata_section_aligned on XIP
-In-Reply-To: <CAMuHMdXuAkXqZ_09iF3ZCksPtWB-pm-9YtAOqw+E3KpFnoegug@mail.gmail.com>
-References: <20160216183809.GA26069@www.outflux.net>
- <CAMuHMdXuAkXqZ_09iF3ZCksPtWB-pm-9YtAOqw+E3KpFnoegug@mail.gmail.com>
-Message-ID: <CAGXu5j+8LtBjxBms1qjWHSvyVc_2ajp8QxGOc_Ca+gze7ib=Rg@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 16 Feb 2016 15:16:35 -0500 (EST)
+Subject: [PATCH v2] ARM: proc-v7.S: Adjust stack address when
+ XIP_KERNEL
+In-Reply-To: <20160216173225.GE19428@n2100.arm.linux.org.uk>
+References: <1454105474-3009-1-git-send-email-chris.brandt@renesas.com>
+ <1454335736-10084-1-git-send-email-chris.brandt@renesas.com>
+ <alpine.LFD.2.20.1602011613360.32766@knanqh.ubzr>
+ <20160216173225.GE19428@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.20.1602161504400.13632@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 16, 2016 at 11:20 AM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> Hi Kees,
->
-> On Tue, Feb 16, 2016 at 7:38 PM, Kees Cook <keescook@chromium.org> wrote:
->> This fixes the build for both allnoconfig (!CONFIG_MMU) and with
->> XIP_KERNEL (due to missing pieces in the linker script), as seen after
->> both "ARM: 8502/1: mm: mark section-aligned portion of rodata NX" and
->> "ARM: 8513/1: xip: Move XIP linking to a separate file".
->>
->> Reported-by: Russell King <linux@arm.linux.org.uk>
->> Reported-by: Arnd Bergmann <arnd@arndb.de>
->> Signed-off-by: Kees Cook <keescook@chromium.org>
->
->> diff --git a/arch/arm/kernel/vmlinux-xip.lds.S b/arch/arm/kernel/vmlinux-xip.lds.S
->> index 40bc4cadb959..2da60cd1b295 100644
->> --- a/arch/arm/kernel/vmlinux-xip.lds.S
->> +++ b/arch/arm/kernel/vmlinux-xip.lds.S
->
->> @@ -310,6 +311,17 @@ SECTIONS
->>  }
->>
->>  /*
->> + * Without CONFIG_DEBUG_ALIGN_RODATA, __start_rodata_section_aligned will
->> + * be the first section-aligned location after __start_rodata. Otherwise,
->> + * it will be equal to __start_rodata.
->> + */
->> +#ifdef CONFIG_MMU
->
-> CONFIG_DEBUG_ALIGN_RODATA or CONFIG_MMU?
->
->> +__start_rodata_section_aligned = ALIGN(__start_rodata, 1 << SECTION_SHIFT);
+On Tue, 16 Feb 2016, Russell King - ARM Linux wrote:
 
-CONFIG_MMU controls the availability of SECTION_SHIFT, so I used that.
-Either will work, since without CONFIG_DEBUG_ALIGN_RODATA, the values
-will end up being identical, as in the #else.
+> > > index 0f92d57..1595fb2 100644
+> > > --- a/arch/arm/mm/proc-v7.S
+> > > +++ b/arch/arm/mm/proc-v7.S
+> > > @@ -487,7 +487,7 @@ __errata_finish:
+> > >  
+> > >  	.align	2
+> > >  __v7_setup_stack_ptr:
+> > > -	.word	__v7_setup_stack - .
+> > > +	.word	__v7_setup_stack - . + PHYS_OFFSET_FIXUP
+> 
+> I keep looking at this patch, and I really find that I detest this
+> PHYS_OFFSET_FIXUP thing - it's really not obvious what's going on
+> here.  It's taken a _long_ time to work this out, which _really_
+> isn't good going forward.
+> 
+> Let's instead change things to make it much more obvious - see the
+> patch below.
+> 
+> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+> index ebdaaf7dd19f..593e5613184d 100644
+> --- a/arch/arm/include/asm/memory.h
+> +++ b/arch/arm/include/asm/memory.h
+> @@ -135,11 +135,18 @@
+>  #define PLAT_PHYS_OFFSET	UL(CONFIG_PHYS_OFFSET)
+>  
+>  #ifdef CONFIG_XIP_KERNEL
+> -#define PHYS_OFFSET_FIXUP \
+> -	( XIP_VIRT_ADDR(CONFIG_XIP_PHYS_ADDR) - PAGE_OFFSET + \
+> -	  PLAT_PHYS_OFFSET - CONFIG_XIP_PHYS_ADDR )
+> +/*
+> + * When referencing data in RAM from the XIP region in a relative manner
+> + * with the MMU off, we need the relative offset between the two physical
+> + * addresses.  The macro below achieves this, which is:
+> + *    __pa(v_data) - __xip_pa(v_text)
+> + */
+> +#define PHYS_RELATIVE(v_data, v_text) \
+> +	(((v_data) - PAGE_OFFSET + PLAT_PHYS_OFFSET) - \
+> +	 ((v_text) - XIP_VIRT_ADDR(CONFIG_XIP_PHYS_ADDR) + \
+> +          CONFIG_XIP_PHYS_ADDR))
 
-Though it looks like XIP_KERNEL should kill all of the
-CONFIG_DEBUG_*RODATA defines anyway. I think we need a different
-version of this combined with the patch from Ard...
+Sure, this is less opaque.
 
--Kees
+>  #else
+> -#define PHYS_OFFSET_FIXUP 0
+> +#define PHYS_RELATIVE(v_data, v_text) (v_data) - (v_text)
 
->> +#else
->> +__start_rodata_section_aligned = __start_rodata;
->> +#endif
->> +
->> +/*
->>   * These must never be empty
->>   * If you have to comment these two assert statements out, your
->>   * binutils is too old (for other reasons as well)
->> diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
->> index 1707b9431761..f13960e44955 100644
->> --- a/arch/arm/kernel/vmlinux.lds.S
->> +++ b/arch/arm/kernel/vmlinux.lds.S
->> @@ -328,7 +328,11 @@ SECTIONS
->>   * be the first section-aligned location after __start_rodata. Otherwise,
->>   * it will be equal to __start_rodata.
->>   */
->> +#ifdef CONFIG_MMU
->
-> Likewise (the out-of-scope comment says CONFIG_DEBUG_ALIGN_RODATA)?
->
->>  __start_rodata_section_aligned = ALIGN(__start_rodata, 1 << SECTION_SHIFT);
->> +#else
->> +__start_rodata_section_aligned = __start_rodata;
->> +#endif
->
-> Gr{oetje,eeting}s,
->
->                         Geert
->
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
->
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                 -- Linus Torvalds
+You should probably surround the whole thing with parents in case this 
+gets used in some other computations.
 
 
-
--- 
-Kees Cook
-Chrome OS & Brillo Security
+Nicolas
