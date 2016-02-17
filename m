@@ -1,15 +1,38 @@
-From: viro@ZenIV.linux.org.uk (Al Viro)
-Date: Wed, 17 Feb 2016 02:33:44 +0000
-Subject: [PATCH 5/7] serial: clps711x: fix IS_ERR_VALUE usage
-In-Reply-To: <1455546925-22119-6-git-send-email-a.hajda@samsung.com>
-References: <1455546925-22119-1-git-send-email-a.hajda@samsung.com>
- <1455546925-22119-6-git-send-email-a.hajda@samsung.com>
-Message-ID: <20160217023344.GJ17997@ZenIV.linux.org.uk>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Tue, 16 Feb 2016 21:36:10 -0500
+Subject: [PATCH v3 0/5] ACPI: parse the SPCR table
+In-Reply-To: <1455559532-8305-1-git-send-email-aleksey.makarov@linaro.org>
+References: <1455559532-8305-1-git-send-email-aleksey.makarov@linaro.org>
+Message-ID: <FD7CEA09-FFB5-4707-A4AE-7F721491C327@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 15, 2016 at 03:35:23PM +0100, Andrzej Hajda wrote:
-> IS_ERR_VALUE macro should be used only with unsigned long type.
-> For signed types comparison 'ret < 0' should be used.
 
-ACK
+
+On February 15, 2016 1:05:24 PM EST, Aleksey Makarov <aleksey.makarov@linaro.org> wrote:
+>This patchset is based on the patchset by Leif Lindholm [1]
+>
+>'ARM Server Base Boot Requirements' [2] mentions SPCR (Serial Port
+>Console Redirection Table) [3] as a mandatory ACPI table that
+>specifies the configuration of serial console.
+>
+>SPCR support is included in QEMU's ARM mach-virt since 2.4 release.
+>
+>Introduce a new function acpi_console_check().  At the uart port
+>registration, this function checks if the ACPI SPCR table specifies
+>its argument of type struct uart_port to be a console
+>and if so calls add_preferred_console().
+>
+>Use SPCR to tell if SBSA serial driver should use 32-bit access to
+>registers.
+
+On QDF2432:
+
+Tested-by: Christopher Covington <cov@codeaurora.org>
+
+-- 
+Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
+
+Sent from my Snapdragon powered Android device with K-9 Mail. Please excuse my brevity.
