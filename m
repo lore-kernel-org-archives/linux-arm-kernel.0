@@ -1,104 +1,87 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 17 Feb 2016 09:39:49 -0800
-Subject: [PATCH 2/2] clk: ti: Add support for dm814x ADPLL
-In-Reply-To: <20160217011930.2278.38316@quark.deferred.io>
-References: <1455312009-808-1-git-send-email-tony@atomide.com>
- <1455312009-808-3-git-send-email-tony@atomide.com>
- <20160217011930.2278.38316@quark.deferred.io>
-Message-ID: <20160217173949.GB21202@atomide.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 17 Feb 2016 17:45:16 +0000
+Subject: [PATCH V5 07/15] pci, acpi: Provide generic way to assign bus
+ domain number.
+In-Reply-To: <56C49342.1070308@semihalf.com>
+References: <1455630825-27253-1-git-send-email-tn@semihalf.com>
+ <1455630825-27253-8-git-send-email-tn@semihalf.com>
+ <CAKc_7PU+i2AwOVCyW2VNt4BZCWw=KBMAbV8v9DVQ2Ess3WE=kw@mail.gmail.com>
+ <56C47E9A.5010901@semihalf.com>
+ <CAKc_7PUiLQhUuJjR8wcuRm7KJdxBYjb+ZBd_cLTtjNPbEro6wA@mail.gmail.com>
+ <56C48C45.7050203@semihalf.com>
+ <CAKc_7PV=p7kHt73c673L+v=KCaFV8RzoaSHwcH2gd1g-fWGq5w@mail.gmail.com>
+ <56C49342.1070308@semihalf.com>
+Message-ID: <20160217174516.GA11132@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Michael Turquette <mturquette@baylibre.com> [160216 17:32]:
-> Quoting Tony Lindgren (2016-02-12 13:20:09)
-> > 
-> > - Split the device tree binding into a separate patch as requested
-> >   by Mike for his conditional ack of the binding
+Guys,
+
+On Wed, Feb 17, 2016 at 04:35:30PM +0100, Tomasz Nowicki wrote:
+
+[...]
+
+> >>>>>In my patchset, I had a slightly different and I think better approach
+> >>>>>for
+> >>>>>this without calling the _SEG method again. Please see
+> >>>>>http://www.spinics.net/lists/arm-kernel/msg478167.html
+> >>>>>at the last part
+> >>>>>ofhttp://www.spinics.net/lists/arm-kernel/msg478169.html
+> >>>>
+> >>>>
+> >>>>Relying on NULL parent device to make decision on boot method is really
+> >>>>ugly
+> >>>>way. This may hit us again once we want to obtain another firmware
+> >>>>specific
+> >>>>info e.g. numa node. IMO we need to fix it this way.
+> >>>
+> >>>
+> >>>I am not relying on NULL there, in the current code parent is NULL
+> >>>in case of ACPI, and the check is needed not to crash (unless that
+> >>>has changed).
+> >>
+> >>
+> >>This series passes down valid parent, see [PATCH V5 06/15].
+> >>
+> >>>
+> >>>The main part was the macro acpi_pci_get_segment() and the use
+> >>>of acpi_pci_root_info from sysdata to do this.
+> >>
+> >>
+> >>Since we can obtain related firmware specific data from valid parent device
+> >>(without defining another accessors), I do not see the point to use sysdata.
+> >>Let me know your opinion.
+> >
+> >In the patch, you use the parent info and call _SEG method again.
+> >The segment information is available in the ->root->segment of
+> >acpi_pci_root_info if you setup the sysdata like in my patch
 > 
-> Just to make life fun for you, the clk tree is once more merging DT
-> bindings descriptions and headers. You don't need to merge the patches,
-> it doesn't matter to me, but just as a heads up for the future.
+> I know it is in sysdata->root->segment, but the way it is passed
+> down is wrong. sysdata is the pointer to unknown content (void *) so
+> we need to validate it before we can use it. If we merge this patch
+> we can remove first _SEG call.
 
-OK :)
+I personally do not think there is such a significant difference, both
+solutions have pros and cons, it is worth keeping in mind though
+that reading _SEG again to set the bus domain number works only if
+the value we stash in acpi_pci_root.segment is not overridden, if it
+is (ie see x86 - agreed that's to fix a FW bug) we have a disconnect.
 
-> > --- /dev/null
-> > +++ b/drivers/clk/ti/Kconfig
-> > @@ -0,0 +1,6 @@
-> > +config COMMON_CLK_TI_ADPLL
-> > +       tristate "Clock driver for dm814x ADPLL"
-> > +       depends on ARCH_OMAP2PLUS
-> > +       default y if SOC_TI81XX
-> 
-> Can we add COMPILE_TEST here?
+On the other hand Tomasz's code allows removing some IA64 code in the
+process (code that sets the bridge companion, so part of the patch
+should be kept regardless).
 
-Good idea, will add.
+So, there are two things to do:
 
-> > +static int ti_adpll_init_inputs(struct ti_adpll_data *d)
-> > +{
-> > +       const char *error = "need at least %i inputs";
-> > +       struct clk *clock;
-> > +       int nr_inputs;
-> > +
-> > +       nr_inputs = of_clk_get_parent_count(d->np);
-> > +       if (nr_inputs < d->c->nr_max_inputs) {
-> > +               dev_err(d->dev, error, nr_inputs);
-> > +               return -EINVAL;
-> > +       }
-> > +       of_clk_parent_fill(d->np, d->parent_names, nr_inputs);
-> > +
-> > +       clock = devm_clk_get(d->dev, d->parent_names[0]);
-> > +       if (IS_ERR(clock)) {
-> > +               dev_err(d->dev, "could not get clkinp\n");
-> > +               return PTR_ERR(clock);
-> > +       }
-> > +       d->parent_clocks[TI_ADPLL_CLKINP] = clock;
-> > +
-> > +       clock = devm_clk_get(d->dev, d->parent_names[1]);
-> > +       if (IS_ERR(clock)) {
-> > +               dev_err(d->dev, "could not get clkinpulow clock\n");
-> > +               return PTR_ERR(clock);
-> > +       }
-> > +       d->parent_clocks[TI_ADPLL_CLKINPULOW] = clock;
-> 
-> Are the clock parents known at compile-time? Can we just put that data
-> in C instead of whatever is going on here?
+- Assign the bridge companion in PCI core code
+- Decide where to get the domain number from (acpi_pci_root.segment vs
+  calling _SEG again). At present they are equivalent so I do not see
+  any compelling reason to change this patch.
 
-No they can be board specific depending how the inputs for
-clkin, clkinpulow and clkinphif are wired.
+Side note: there is already a function (pci_domain_nr()) that you
+can implement in ACPI PCI host generic (by deselecting
+PCI_DOMAINS_GENERIC if ACPI) so there is no need for acpi_pci_get_segment()
+in case we have to override _SEG value in the future, at present
+there is no need, comments appreciated.
 
-> ...
-> > +int __init dm814x_adpll_enable_init_clocks(void)
-> > +{
-> > +       int i, err;
-> > +
-> > +       if (!timer_clocks_initialized)
-> > +               return -ENODEV;
-> > +
-> > +       for (i = 0; i < ARRAY_SIZE(init_clocks); i++) {
-> > +               struct clk *clock;
-> > +
-> > +               clock = clk_get(NULL, init_clocks[i]);
-> > +               if (WARN(IS_ERR(clock), "could not find init clock %s\n",
-> > +                        init_clocks[i]))
-> > +                       continue;
-> > +               err = clk_prepare_enable(clock);
-> > +               if (WARN(err, "could not enable init clock %s\n",
-> > +                        init_clocks[i]))
-> > +                       continue;
-> 
-> We have a shiny new series that provides a standard way to do this:
-> 
-> http://lkml.kernel.org/r/<1455225554-13267-1-git-send-email-mturquette@baylibre.com>
-
-OK nice, so tagging the MPU and DDR clocks with CLK_IS_CRITICAL or
-"clock-critical" should allow removing this code. I think in this
-case I still need to set CLK_IS_CRITICAL as the clock is output 1
-of the dts defined clock and does not have a separate dts node.
-
-I can update when those patches hit Linux next, or I can do a
-follow-up patch later on if we want to avoid the dependency
-here. Which do you prefer?
-
-Regards,
-
-Tony
+Lorenzo
