@@ -1,56 +1,54 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Wed, 17 Feb 2016 16:05:41 +0100
-Subject: [PATCH V5 07/15] pci, acpi: Provide generic way to assign bus
- domain number.
-In-Reply-To: <CAKc_7PUiLQhUuJjR8wcuRm7KJdxBYjb+ZBd_cLTtjNPbEro6wA@mail.gmail.com>
-References: <1455630825-27253-1-git-send-email-tn@semihalf.com>
- <1455630825-27253-8-git-send-email-tn@semihalf.com>
- <CAKc_7PU+i2AwOVCyW2VNt4BZCWw=KBMAbV8v9DVQ2Ess3WE=kw@mail.gmail.com>
- <56C47E9A.5010901@semihalf.com>
- <CAKc_7PUiLQhUuJjR8wcuRm7KJdxBYjb+ZBd_cLTtjNPbEro6wA@mail.gmail.com>
-Message-ID: <56C48C45.7050203@semihalf.com>
+From: balbi@kernel.org (Felipe Balbi)
+Date: Wed, 17 Feb 2016 17:08:27 +0200
+Subject: [PATCH 1/7] usb: gadget: pxa25x_udc: move register definitions
+ from arch
+In-Reply-To: <1453997843-3489728-1-git-send-email-arnd@arndb.de>
+References: <1453997722-3489596-1-git-send-email-arnd@arndb.de>
+ <1453997843-3489728-1-git-send-email-arnd@arndb.de>
+Message-ID: <87oabfgys4.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17.02.2016 15:21, Jayachandran Chandrashekaran Nair wrote:
-> On Wed, Feb 17, 2016 at 7:37 PM, Tomasz Nowicki <tn@semihalf.com> wrote:
->> On 17.02.2016 14:44, Jayachandran Chandrashekaran Nair wrote:
->>>
->>> Tomasz, Lorenzo,
->>>
->>> On Tue, Feb 16, 2016 at 7:23 PM, Tomasz Nowicki<tn@semihalf.com>  wrote:
->>>>
->>>>> As we now have valid PCI host bridge device reference we can
->>>>> introduce code that is going to find its bus domain number using
->>>>> ACPI _SEG method.
->>>>>
->>>>> Note that _SEG method is optional, therefore _SEG absence means
->>>>> that all PCI buses belong to domain 0.
->>>>>
->>>>> While at it, for the sake of code clarity we put ACPI and DT domain
->>>>> assign methods into the corresponding helpers.
->>>
->>> In my patchset, I had a slightly different and I think better approach for
->>> this without calling the _SEG method again. Please see
->>> http://www.spinics.net/lists/arm-kernel/msg478167.html
->>> at the last part ofhttp://www.spinics.net/lists/arm-kernel/msg478169.html
->>
->> Relying on NULL parent device to make decision on boot method is really ugly
->> way. This may hit us again once we want to obtain another firmware specific
->> info e.g. numa node. IMO we need to fix it this way.
+
+Hi,
+
+Arnd Bergmann <arnd@arndb.de> writes:
+> ixp4xx and pxa25x both use this driver and provide a slightly
+> different set of register definitions for it. Aside from that,
+> the definition in the ixp4xx-regs.h header conflicts with the
+> on in the pxa27x device driver when compile-testing that:
 >
-> I am not relying on NULL there, in the current code parent is NULL
-> in case of ACPI, and the check is needed not to crash (unless that
-> has changed).
-
-This series passes down valid parent, see [PATCH V5 06/15].
-
+> In file included from ../drivers/usb/gadget/udc/pxa27x_udc.c:37:0:
+> ../drivers/usb/gadget/udc/pxa27x_udc.h:26:0: warning: "UDCCR" redefined
+>  #define UDCCR  0x0000  /* UDC Control Register */
+>  ^
+> In file included from ../arch/arm/mach-ixp4xx/include/mach/hardware.h:27:0,
+>                  from ../arch/arm/mach-ixp4xx/include/mach/io.h:18,
+>                  from ../arch/arm/include/asm/io.h:194,
+>                  from ../include/linux/io.h:25,
+>                  from ../include/linux/irq.h:24,
+>                  from ../drivers/usb/gadget/udc/pxa27x_udc.c:23:
+> ../arch/arm/mach-ixp4xx/include/mach/ixp4xx-regs.h:415:0: note: this is the location of the previous definition
+>  #define UDCCR  IXP4XX_USB_REG(IXP4XX_USB_BASE_VIRT+0x0000)
 >
-> The main part was the macro acpi_pci_get_segment() and the use
-> of acpi_pci_root_info from sysdata to do this.
+> This addresses both issues by moving all the definitions into the
+> pxa25x_udc driver itself. It turns out the only difference between
+> them was 'UDCCS_IO_ROF', and that could well be a mistake when it
+> was incorrectly copied from pxa25x to ixp4xx.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Since we can obtain related firmware specific data from valid parent 
-device (without defining another accessors), I do not see the point to 
-use sysdata. Let me know your opinion.
+FYI, this series now sits in my testing/next. If you could just check
+that I didn't mess anything up, I'd be glad.
 
-Tomasz
+Thanks
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160217/03af8ac6/attachment.sig>
