@@ -1,148 +1,80 @@
-From: yong.wu@mediatek.com (Yong Wu)
-Date: Wed, 17 Feb 2016 08:46:14 +0800
-Subject: [PATCH v9 5/5] dts: mt8173: Add iommu/smi nodes for mt8173
-In-Reply-To: <1455669974-1527-1-git-send-email-yong.wu@mediatek.com>
-References: <1455669974-1527-1-git-send-email-yong.wu@mediatek.com>
-Message-ID: <1455669974-1527-6-git-send-email-yong.wu@mediatek.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 17 Feb 2016 09:55:33 +0100
+Subject: [PATCH] ARM64: dma-mapping: fix IOMMU-based dma_mmap_atts()
+ implementation
+In-Reply-To: <56C339FD.6040907@arm.com>
+References: <1455632065-14620-1-git-send-email-m.szyprowski@samsung.com>
+ <56C339FD.6040907@arm.com>
+Message-ID: <56C43585.9030502@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add the iommu/larbs nodes for mt8173
+Hello,
 
-Signed-off-by: Yong Wu <yong.wu@mediatek.com>
-Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
----
- arch/arm64/boot/dts/mediatek/mt8173.dtsi | 81 ++++++++++++++++++++++++++++++++
- 1 file changed, 81 insertions(+)
+On 2016-02-16 16:02, Robin Murphy wrote:
+> Hi Marek,
+>
+> On 16/02/16 14:14, Marek Szyprowski wrote:
+>> IOMMU-based DMA-mapping implementation doesn't support
+>> dma_declare_coherent() based regions, so there is no point to call
+>> dma_mmap_from_coherent() from __iommu_mmap_atts(). This patch removes
+>> useless code.
+>
+> I'm not sure that's the case - AFAICS a device could still have its 
+> own local memory despite being behind an IOMMU relative to the rest of 
+> the system. If it uses dma_declare_coherent() for that, the .alloc and 
+> .free callbacks here might be bypassed by dma_{alloc,free}_attrs() 
+> short-circuiting into dma_{alloc,release}_from_coherent(), but in the 
+> case of dma_mmap_attrs() it hits the .mmap callback first and only 
+> falls back to the from_coherent check in dma_common_mmap() if that 
+> isn't implemented.
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-index ec135ea..8048811 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-@@ -14,6 +14,7 @@
- #include <dt-bindings/clock/mt8173-clk.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/memory/mt8173-larb-port.h>
- #include <dt-bindings/phy/phy.h>
- #include <dt-bindings/power/mt8173-power.h>
- #include <dt-bindings/reset/mt8173-resets.h>
-@@ -277,6 +278,17 @@
- 			reg = <0 0x10200620 0 0x20>;
- 		};
- 
-+		iommu: iommu at 10205000 {
-+			compatible = "mediatek,mt8173-m4u";
-+			reg = <0 0x10205000 0 0x1000>;
-+			interrupts = <GIC_SPI 139 IRQ_TYPE_LEVEL_LOW>;
-+			clocks = <&infracfg CLK_INFRA_M4U>;
-+			clock-names = "bclk";
-+			mediatek,larbs = <&larb0 &larb1 &larb2
-+					  &larb3 &larb4 &larb5>;
-+			#iommu-cells = <1>;
-+		};
-+
- 		apmixedsys: clock-controller at 10209000 {
- 			compatible = "mediatek,mt8173-apmixedsys";
- 			reg = <0 0x10209000 0 0x1000>;
-@@ -589,29 +601,98 @@
- 			status = "disabled";
- 		};
- 
-+		larb0: larb at 14021000 {
-+			compatible = "mediatek,mt8173-smi-larb";
-+			reg = <0 0x14021000 0 0x1000>;
-+			mediatek,smi = <&smi_common>;
-+			power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-+			clocks = <&mmsys CLK_MM_SMI_LARB0>,
-+				 <&mmsys CLK_MM_SMI_LARB0>;
-+			clock-names = "apb", "smi";
-+		};
-+
-+		smi_common: smi at 14022000 {
-+			compatible = "mediatek,mt8173-smi-common";
-+			reg = <0 0x14022000 0 0x1000>;
-+			power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-+			clocks = <&mmsys CLK_MM_SMI_COMMON>,
-+				 <&mmsys CLK_MM_SMI_COMMON>;
-+			clock-names = "apb", "smi";
-+		};
-+
-+		larb4: larb at 14027000 {
-+			compatible = "mediatek,mt8173-smi-larb";
-+			reg = <0 0x14027000 0 0x1000>;
-+			mediatek,smi = <&smi_common>;
-+			power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-+			clocks = <&mmsys CLK_MM_SMI_LARB4>,
-+				 <&mmsys CLK_MM_SMI_LARB4>;
-+			clock-names = "apb", "smi";
-+		};
-+
- 		imgsys: clock-controller at 15000000 {
- 			compatible = "mediatek,mt8173-imgsys", "syscon";
- 			reg = <0 0x15000000 0 0x1000>;
- 			#clock-cells = <1>;
- 		};
- 
-+		larb2: larb at 15001000 {
-+			compatible = "mediatek,mt8173-smi-larb";
-+			reg = <0 0x15001000 0 0x1000>;
-+			mediatek,smi = <&smi_common>;
-+			power-domains = <&scpsys MT8173_POWER_DOMAIN_ISP>;
-+			clocks = <&imgsys CLK_IMG_LARB2_SMI>,
-+				 <&imgsys CLK_IMG_LARB2_SMI>;
-+			clock-names = "apb", "smi";
-+		};
-+
- 		vdecsys: clock-controller at 16000000 {
- 			compatible = "mediatek,mt8173-vdecsys", "syscon";
- 			reg = <0 0x16000000 0 0x1000>;
- 			#clock-cells = <1>;
- 		};
- 
-+		larb1: larb at 16010000 {
-+			compatible = "mediatek,mt8173-smi-larb";
-+			reg = <0 0x16010000 0 0x1000>;
-+			mediatek,smi = <&smi_common>;
-+			power-domains = <&scpsys MT8173_POWER_DOMAIN_VDEC>;
-+			clocks = <&vdecsys CLK_VDEC_CKEN>,
-+				 <&vdecsys CLK_VDEC_LARB_CKEN>;
-+			clock-names = "apb", "smi";
-+		};
-+
- 		vencsys: clock-controller at 18000000 {
- 			compatible = "mediatek,mt8173-vencsys", "syscon";
- 			reg = <0 0x18000000 0 0x1000>;
- 			#clock-cells = <1>;
- 		};
- 
-+		larb3: larb at 18001000 {
-+			compatible = "mediatek,mt8173-smi-larb";
-+			reg = <0 0x18001000 0 0x1000>;
-+			mediatek,smi = <&smi_common>;
-+			power-domains = <&scpsys MT8173_POWER_DOMAIN_VENC>;
-+			clocks = <&vencsys CLK_VENC_CKE1>,
-+				 <&vencsys CLK_VENC_CKE0>;
-+			clock-names = "apb", "smi";
-+		};
-+
- 		vencltsys: clock-controller at 19000000 {
- 			compatible = "mediatek,mt8173-vencltsys", "syscon";
- 			reg = <0 0x19000000 0 0x1000>;
- 			#clock-cells = <1>;
- 		};
-+
-+		larb5: larb at 19001000 {
-+			compatible = "mediatek,mt8173-smi-larb";
-+			reg = <0 0x19001000 0 0x1000>;
-+			mediatek,smi = <&smi_common>;
-+			power-domains = <&scpsys MT8173_POWER_DOMAIN_VENC_LT>;
-+			clocks = <&vencltsys CLK_VENCLT_CKE1>,
-+				 <&vencltsys CLK_VENCLT_CKE0>;
-+			clock-names = "apb", "smi";
-+		};
- 	};
- };
- 
+Okay, I've missed that alloc/free_from_coherent is handled in generic
+include/linux/dma-mapping.h. It is still a bit strange case with no real
+user, but if this code is already there, then let it be.
+
+>
+> Maybe the right thing to do would be to move this check (with its 
+> associated guards) out from dma_common_mmap() up to dma_mmap_attrs() 
+> to be consistent with alloc/free; so that it doesn't need to be 
+> reimplemented all over arch/{arm,arm64,mips} at all?
+>
+
+That might be a good idea, although I'm not sure how portable is
+pgprot_dmacoherent(), which will be needed by such common code.
+
+Please ignore my patch then.
+
+> Robin.
+>
+>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>> ---
+>>   arch/arm64/mm/dma-mapping.c | 5 -----
+>>   1 file changed, 5 deletions(-)
+>>
+>> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+>> index 331c4ca..573b1e6 100644
+>> --- a/arch/arm64/mm/dma-mapping.c
+>> +++ b/arch/arm64/mm/dma-mapping.c
+>> @@ -636,14 +636,9 @@ static int __iommu_mmap_attrs(struct device 
+>> *dev, struct vm_area_struct *vma,
+>>                     struct dma_attrs *attrs)
+>>   {
+>>       struct vm_struct *area;
+>> -    int ret;
+>>
+>>       vma->vm_page_prot = __get_dma_pgprot(attrs, vma->vm_page_prot,
+>>                            is_device_dma_coherent(dev));
+>> -
+>> -    if (dma_mmap_from_coherent(dev, vma, cpu_addr, size, &ret))
+>> -        return ret;
+>> -
+>>       area = find_vm_area(cpu_addr);
+>>       if (WARN_ON(!area || !area->pages))
+>>           return -ENXIO;
+>
+
+Best regards
 -- 
-1.8.1.1.dirty
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
