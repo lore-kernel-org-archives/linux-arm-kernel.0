@@ -1,98 +1,162 @@
-From: Jean-Philippe.Brucker@arm.com (Jean-Philippe Brucker)
-Date: Wed, 17 Feb 2016 19:51:28 +0000
-Subject: [arm:for-next 24/31] arch/arm/kernel/hyp-stub.S:168: Error:
- selected processor does not support ARM mode `ubfx r7,r7,#28,#4'
-In-Reply-To: <201602180044.PcvJbrb9%fengguang.wu@intel.com>
-References: <201602180044.PcvJbrb9%fengguang.wu@intel.com>
-Message-ID: <20160217195127.GA4566@e106794-lin.cambridge.arm.com>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Thu, 18 Feb 2016 01:23:14 +0530
+Subject: [RFC 3/3] ARM: dts: Don't overheat the Odroid XU3-Lite on high
+ load
+In-Reply-To: <1455692128-28504-4-git-send-email-k.kozlowski@samsung.com>
+References: <1455692128-28504-1-git-send-email-k.kozlowski@samsung.com>
+ <1455692128-28504-4-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <CANAwSgQHiJGSYB7Qhq066Mqfskwrr_3SDQGXH-WN=Wt3SEF-QA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 18, 2016 at 12:26:46AM +0800, kbuild test robot wrote:
-> tree:   http://repo.or.cz/linux-2.6/linux-2.6-arm.git for-next
-> head:   5aeac3b523644cbc300f17d67c8fce73df9060c0
-> commit: e59941b9b3817c9b1dd6662d903150fe3f3c3b0b [24/31] ARM: 8527/1: virt: enable GICv3 system registers
-> config: arm-allmodconfig (attached as .config)
-> reproduce:
->         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
->         chmod +x ~/bin/make.cross
->         git checkout e59941b9b3817c9b1dd6662d903150fe3f3c3b0b
->         # save the attached .config to linux build tree
->         make.cross ARCH=arm 
-> 
-> All errors (new ones prefixed by >>):
-> 
->    arch/arm/kernel/hyp-stub.S: Assembler messages:
-> >> arch/arm/kernel/hyp-stub.S:168: Error: selected processor does not support ARM mode `ubfx r7,r7,#28,#4'
-> >> arch/arm/kernel/hyp-stub.S:176: Error: selected processor does not support ARM mode `isb'
+Hi Krzysztof,
 
-Selected processor being arm1136j-s, it doesn't make sense to build
-hyp-stub.S at all, in my opinion. We should select ARM_VIRT_EXT only
-when CPU_32v6 and lower are deselected (as with LPAE). I realize such a
-change might be too invasive for a fix, so I attached a version of my
-patch that builds for older architectures. If there is no objection, it
-will supersede the previous one.
+On 17 February 2016 at 12:25, Krzysztof Kozlowski
+<k.kozlowski@samsung.com> wrote:
+> After adding cpufreq-dt support to Exynos542x, the Odroid XU3-Lite can
+> be easily overheated when launching eight CPU-intensive tasks:
+>         thermal thermal_zone3: critical temperature reached(121 C),shutting down
+>
+> This seems to be specific to Odroid XU3-Lite board which officially
+> supports lower frequencies than regular XU3 or XU4. When working at
+> maximum CPU speed (1800 MHz big and 1300 MHz LITTLE) in warmer place for
+> longer time, the fan fails to cool down the board and it reaches
+> critical temperature.
+>
+> Add CPU cooling to Exynos5422/5800 to fix this issue. When reaching 95
+> degrees of Celsius, the board will slow down by 3 steps (around
+> 1400/1000 MHz). When reaching 110 degrees of Celsius go to 600 MHz.
+>
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos5422-cpu-thermal.dtsi | 41 +++++++++++++++++++++++++++
+>  1 file changed, 41 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/exynos5422-cpu-thermal.dtsi b/arch/arm/boot/dts/exynos5422-cpu-thermal.dtsi
+> index 2b289d7c0d13..66073ce29aee 100644
+> --- a/arch/arm/boot/dts/exynos5422-cpu-thermal.dtsi
+> +++ b/arch/arm/boot/dts/exynos5422-cpu-thermal.dtsi
+> @@ -34,6 +34,16 @@
+>                                         hysteresis = <5000>; /* millicelsius */
+>                                         type = "active";
+>                                 };
+> +                               cpu_alert3: cpu-alert-3 {
+> +                                       temperature = <95000>; /* millicelsius */
+> +                                       hysteresis = <5000>; /* millicelsius */
+> +                                       type = "passive";
+> +                               };
+> +                               cpu_alert4: cpu-alert-4 {
+> +                                       temperature = <110000>; /* millicelsius */
+> +                                       hysteresis = <5000>; /* millicelsius */
+> +                                       type = "passive";
+> +                               };
+>                                 cpu_crit0: cpu-crit-0 {
+>                                         temperature = <120000>; /* millicelsius */
+>                                         hysteresis = <0>; /* millicelsius */
+> @@ -53,6 +63,37 @@
+>                                      trip = <&cpu_alert2>;
+>                                      cooling-device = <&fan0 2 3>;
+>                                 };
+> +
+> +                               /*
+> +                                * When reaching cpu_alert3, reduce CPU
+> +                                * by 3 steps. On Exynos5422/5800 that would
+> +                                * be: 1400 MHz and 1000 MHz.
+> +                                */
+> +                               map3 {
+> +                                    trip = <&cpu_alert3>;
+> +                                    cooling-device = <&cpu0 3 3>;
+> +                               };
+> +                               map4 {
+> +                                    trip = <&cpu_alert3>;
+> +                                    cooling-device = <&cpu4 3 3>;
+> +                               };
+> +
+> +                               /*
+> +                                * When reaching cpu_alert4, reduce CPU
+> +                                * to 600 MHz (11 steps for big, 7 steps for
+> +                                * LITTLE).
+> +                                * Exynos5420 has less OPPs and reversed
+> +                                * numbering of CPUs (big/LITTLE) so this
+> +                                * would not match.
+> +                                */
+> +                               map5 {
+> +                                    trip = <&cpu_alert4>;
+> +                                    cooling-device = <&cpu0 7 7>;
+> +                               };
+> +                               map6 {
+> +                                    trip = <&cpu_alert4>;
+> +                                    cooling-device = <&cpu4 11 11>;
+> +                               };
+>                         };
+>                 };
+>         };
+> --
+> 2.5.0
+>
 
-Thanks,
-Jean-Philippe
+could you append this patch with following changes.
 
+diff --git a/arch/arm/boot/dts/exynos5422-cpu-thermal.dtsi
+b/arch/arm/boot/dts/exynos5422-cpu-thermal.dtsi
+index 66073ce..4e72637 100644
+--- a/arch/arm/boot/dts/exynos5422-cpu-thermal.dtsi
++++ b/arch/arm/boot/dts/exynos5422-cpu-thermal.dtsi
+@@ -16,8 +16,8 @@
+        thermal-zones {
+                cpu0_thermal: cpu0-thermal {
+                        thermal-sensors = <&tmu_cpu0 0>;
+-                       polling-delay-passive = <0>;
+-                       polling-delay = <0>;
++                       polling-delay-passive = <250>; /* milliseconds */
++                       polling-delay = <500>; /* milliseconds */
+                        trips {
+                                cpu_alert0: cpu-alert-0 {
+                                        temperature = <50000>; /*
+millicelsius */
 ---
->From 2e188d870dcfeff0db5098d9c6ad3eaa139a7ddd Mon Sep 17 00:00:00 2001
-From: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
-Date: Tue, 22 Sep 2015 09:27:17 +0100
-Subject: [PATCH v2] ARM: virt: enable GICv3 system registers
+On running linaro pm-qa diagnostic tool
+----------------------------------------------------------
 
-ARMv8 introduces system registers for the Generic Interrupt Controller's
-CPU and virtual interfaces.
-When GICv3 is implemented, EL2 needs to allow the kernel to use those
-registers, by changing the value of ICC_HSRE.
+thermal_01.28: checking 'thermal_zone2'/'trip_point_2_temp' ='110000'...    Ok
+thermal_01.29: checking 'cdev0_trip_point' exists in
+'/sys/devices/virtual/thermal/thermal_zone0'... Ok
+thermal_01.30: checking 'thermal_zone0/cdev0_trip_point' valid binding...   Ok
+thermal_01.31: checking 'cdev4_trip_point' exists in
+'/sys/devices/virtual/thermal/thermal_zone0'... Ok
+thermal_01.32: checking 'thermal_zone0/cdev4_trip_point' valid binding...   Err
+thermal_01.33: checking 'cdev4_trip_point' exists in
+'/sys/devices/virtual/thermal/thermal_zone0'... Ok
+thermal_01.34: checking 'thermal_zone0/cdev4_trip_point' valid binding...   Err
+thermal_01.35: checking 'cdev4_trip_point' exists in
+'/sys/devices/virtual/thermal/thermal_zone0'... Ok
+thermal_01.36: checking 'thermal_zone0/cdev4_trip_point' valid binding...   Err
+thermal_01.37: checking 'cdev4_trip_point' exists in
+'/sys/devices/virtual/thermal/thermal_zone0'... Ok
+thermal_01.38: checking 'thermal_zone0/cdev4_trip_point' valid binding...   Err
 
-Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
----
- arch/arm/kernel/hyp-stub.S |   24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+thermal_01: fail
+-------------------------------------------------------
+I also got lot's of error.
 
-diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
-index 2a55373..6c98210 100644
---- a/arch/arm/kernel/hyp-stub.S
-+++ b/arch/arm/kernel/hyp-stub.S
-@@ -17,6 +17,7 @@
-  */
- 
- #include <linux/init.h>
-+#include <linux/irqchip/arm-gic-v3.h>
- #include <linux/linkage.h>
- #include <asm/assembler.h>
- #include <asm/virt.h>
-@@ -161,6 +162,29 @@ ARM_BE8(orr	r7, r7, #(1 << 25))     @ HSCTLR.EE
- 1:
- #endif
- 
-+#ifdef CONFIG_ARM_GIC_V3
-+	@ Check whether GICv3 system registers are available
-+	mrc	p15, 0, r7, c0, c1, 1	@ ID_PFR1
-+	lsr	r7, r7, #28
-+	cmp	r7, #1
-+	bne	2f
-+
-+	@ Enable system register accesses
-+	mrc	p15, 4, r7, c12, c9, 5	@ ICC_HSRE
-+	orr	r7, r7, #(ICC_SRE_EL2_ENABLE | ICC_SRE_EL2_SRE)
-+	mcr	p15, 4, r7, c12, c9, 5	@ ICC_HSRE
-+	instr_sync
-+
-+	@ SRE bit could be forced to 0 by firmware.
-+	@ Check whether it sticks before accessing any other sysreg
-+	mrc	p15, 4, r7, c12, c9, 5	@ ICC_HSRE
-+	tst	r7, #ICC_SRE_EL2_SRE
-+	beq	2f
-+	mov	r7, #0
-+	mcr	p15, 4, r7, c12, c11, 0	@ ICH_HCR
-+2:
-+#endif
-+
- 	bx	lr			@ The boot CPU mode is left in r4.
- ENDPROC(__hyp_stub_install_secondary)
- 
--- 
-1.7.9.5
+root at odroidxu4l:~# cpu[ 3050.847663] cpu cpu4: Failed to find dev_opp: -19
+[ 3171.640836] cpu cpu4: device_opp_debug_create_link: Failed to create link
+[ 3171.646197] cpu cpu4: _add_list_dev: Failed to register opp debugfs (-12)
+[ 3171.653574] cpu cpu7: device_opp_debug_create_link: Failed to create link
+[ 3171.659752] cpu cpu7: _add_list_dev: Failed to register opp debugfs (-12)
+[ 3171.697011] cpu cpu5: cpufreq_init: failed to get clk: -2
+[ 3171.732505] cpu cpu6: cpufreq_init: failed to get clk: -2
+[ 3171.768160] cpu cpu7: cpufreq_init: failed to get clk: -2
+
+Tested on Odroid-XU4
+
+Reviewed-by: Anand Moon <linux.amoon@gmail.com>
+Tested-by: Anand Moon <linux.amoon@gmail.com>
+
+Best Regards
+-Anand Moon
+
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
