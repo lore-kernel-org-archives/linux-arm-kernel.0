@@ -1,51 +1,49 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 17 Feb 2016 16:05:55 +0900
-Subject: [RFC 1/3] ARM: dts: Add cooling levels for CPUs on exynos5420
-In-Reply-To: <20160217070105.GK2454@vireshk-i7>
-References: <1455692128-28504-1-git-send-email-k.kozlowski@samsung.com>
- <1455692128-28504-2-git-send-email-k.kozlowski@samsung.com>
- <20160217070105.GK2454@vireshk-i7>
-Message-ID: <56C41BD3.3060202@samsung.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 17 Feb 2016 08:06:14 +0100
+Subject: [PATCH] ARM64: dma-mapping: fix handling of devices registered
+ before arch_initcall
+In-Reply-To: <56C37317.9020104@arm.com>
+References: <1455632084-14666-1-git-send-email-m.szyprowski@samsung.com>
+ <56C37317.9020104@arm.com>
+Message-ID: <56C41BE6.5000203@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17.02.2016 16:01, Viresh Kumar wrote:
-> On 17-02-16, 15:55, Krzysztof Kozlowski wrote:
->> On Exynos5420 we support 8 cpufreq steps (600-1300 MHz) for LITTLE and
->> 12 steps for big core (700-1800 MHz). Add respective cooling cells.
+Hello,
+
+On 2016-02-16 20:05, Robin Murphy wrote:
+> On 16/02/16 14:14, Marek Szyprowski wrote:
+>> This patch ensures that devices, which got registered before 
+>> arch_initcall
+>> will be handled correctly by IOMMU-based DMA-mapping code.
 >>
->> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 >> ---
->>  arch/arm/boot/dts/exynos5420-cpus.dtsi | 6 ++++++
->>  1 file changed, 6 insertions(+)
+>>   arch/arm64/mm/dma-mapping.c | 4 ++++
+>>   1 file changed, 4 insertions(+)
 >>
->> diff --git a/arch/arm/boot/dts/exynos5420-cpus.dtsi b/arch/arm/boot/dts/exynos5420-cpus.dtsi
->> index 261d25173f61..498ae82e1cb2 100644
->> --- a/arch/arm/boot/dts/exynos5420-cpus.dtsi
->> +++ b/arch/arm/boot/dts/exynos5420-cpus.dtsi
->> @@ -33,6 +33,9 @@
->>  			clock-frequency = <1800000000>;
->>  			cci-control-port = <&cci_control1>;
->>  			operating-points-v2 = <&cluster_a15_opp_table>;
->> +			cooling-min-level = <0>;
->> +			cooling-max-level = <11>;
->> +			#cooling-cells = <2>; /* min followed by max */
->>  		};
->>  
->>  		cpu1: cpu at 1 {
->> @@ -70,6 +73,9 @@
->>  			clock-frequency = <1000000000>;
->>  			cci-control-port = <&cci_control0>;
->>  			operating-points-v2 = <&cluster_a7_opp_table>;
->> +			cooling-min-level = <0>;
->> +			cooling-max-level = <7>;
->> +			#cooling-cells = <2>; /* min followed by max */
->>  		};
-> 
-> Though it wouldn't matter (for the issue you are getting), but this should be
-> added for all the CPUs in case some other CPU is booted first.
+>> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+>> index 573b1e6..ce6019f 100644
+>> --- a/arch/arm64/mm/dma-mapping.c
+>> +++ b/arch/arm64/mm/dma-mapping.c
+>> @@ -928,6 +928,10 @@ static int __init __iommu_dma_init(void)
+>>           ret = register_iommu_dma_ops_notifier(&platform_bus_type);
+>>       if (!ret)
+>>           ret = register_iommu_dma_ops_notifier(&amba_bustype);
+>> +
+>> +    /* handle devices queued before this arch_initcall */
+>> +    if (!ret)
+>> +        __iommu_attach_notifier(NULL, BUS_NOTIFY_ADD_DEVICE, NULL);
+>
+> Hmm, surely unless *all* the devices on the relevant buses are created 
+> before arch_initcall level, then the next one is going to kick off the 
+> notifier to walk the whole list anyway. Have you seen this being a 
+> problem in practice?
 
-Thanks! I'll fix it also for patch 2/3.
+Yes, I've observed such situation, that's why I've posted this patch. I was
+really surprised that this code doesn't handle all cases.
 
-Best regards,
-Krzysztof
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
