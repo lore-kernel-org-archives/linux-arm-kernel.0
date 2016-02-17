@@ -1,53 +1,82 @@
-From: robert.richter@caviumnetworks.com (Robert Richter)
-Date: Wed, 17 Feb 2016 13:16:05 +0100
-Subject: [PATCH v3] irqchip, gicv3-its, numa: Workaround for Cavium
- thunderx erratum 23144
-In-Reply-To: <1455628282-8939-1-git-send-email-gkulkarni@caviumnetworks.com>
-References: <1455628282-8939-1-git-send-email-gkulkarni@caviumnetworks.com>
-Message-ID: <20160217121605.GE24726@rric.localdomain>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 17 Feb 2016 21:18:41 +0900
+Subject: [PATCH 0/4] Enable PM and PM_GENERIC_DOMAINS for SoCs with PM
+ Domains
+In-Reply-To: <1455636712-3040-1-git-send-email-geert+renesas@glider.be>
+References: <1455636712-3040-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20160217121840.GC346@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16.02.16 18:41:22, Ganapatrao Kulkarni wrote:
-> The erratum fixes the hang of ITS SYNC command by avoiding inter node
-> io and collections/cpu mapping on thunderx dual-socket platform.
+On Tue, Feb 16, 2016 at 04:31:48PM +0100, Geert Uytterhoeven wrote:
+> 	Hi Simon, Magnus,
 > 
-> This is based on NUMA v10 series.
-> https://lkml.org/lkml/2016/2/2/134
+> All supported Renesas ARM SoCs (except for Emma Mobile EV2) have clock
+> domains. Some SoCs also have power domains. To ensure proper operation
+> of on-SoC modules, module clocks must be ungated, and power domains must
+> be powered up when needed.
 > 
-> v3:
-> updatated as per Marc Zyngier's review comments.
-> http://www.spinics.net/lists/arm-kernel/msg443462.html
+> Currently the user can choose to build a kernel with power management
+> enabled or disabled:
+>   - If CONFIG_PM=y, power domains and/or module clocks are handled
+>     dynamically by Runtime PM and the generic power domain.
+>   - If CONFIG_PM=n, power domains are assumed to be powered up by reset
+>     state or by the boot loader, and module clocks are handled by the
+>     legacy clock domain on driver (un)bind.
+>     The latter is implemented using a platform bus notifier, which
+>     applies not only to all on-SoC devices, but to all platform devices
+>     present in the system.
 > 
-> v2:
-> updatated as per Marc Zyngier's review comments.
+> To remove the dependency on implicit assumptions, and to get rid of the
+> peculiarities of the legacy clock domain, enable CONFIG_PM and
+> CONFIG_PM_GENERIC_DOMAINS unconditionally, for all Renesas ARM SoCs with
+> clock and/or power domains.
 > 
-> Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
+> Patches:
+>   - Patches 1 and 2 enable PM and PM_GENERIC_DOMAINS,
+>   - Patch 3 removes the now unused legacy clock domain code for Renesas
+>     ARM SoCs,
+>   - Patch 4 relieves you from maintaining drivers/sh/, which is no
+>     longer used on Renesas ARM SoCs, and returns it to the SuperH
+>     people.
 > 
-> ---
->  arch/arm64/Kconfig               |  9 ++++++++
->  drivers/irqchip/irq-gic-v3-its.c | 46 ++++++++++++++++++++++++++++++++++++++--
->  2 files changed, 53 insertions(+), 2 deletions(-)
+> Notes:
+>   - This does cause an increase in kernel size.  Given bloat-o-meter
+>     reports a modest increase of 26 KiB for an RZ/A1H kernel, this
+>     should not be a problem, even when used on RZ/A1H with XIP and
+>     internal RAM only.
+>   - Patch 3 does break booting R-Car Gen2 boards using pre-v4.3 DTSes
+>     that don't have power-domains properties,
+>   - Patch 3 may unbreak SuperH-based ARCH_SHMOBILE platforms, which were
+>     probably broken since v4.4 by commit 0ba58de231066e47 ("drivers: sh:
+>     Get rid of CONFIG_ARCH_SHMOBILE_MULTI"),
+>   - Currently CONFIG_PM=n doesn't work anyway on r8a7795 as "drivers:
+>     sh: Handle PM_GENERIC_DOMAINS_OF=n with new r8a7795 CPG/MSSR
+>     driver" isn't upstream.
+> 
+> For your convenience, I've also pushed this series to
+> git://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers.git#topic/mandatory-pm-v1
+> 
+> Thanks for your comments!
+> 
+> Geert Uytterhoeven (4):
+>   ARM: shmobile: Enable PM and PM_GENERIC_DOMAINS for SoCs with PM
+>     Domains
+>   arm64: renesas: Enable PM and PM_GENERIC_DOMAINS for SoCs with PM
+>     Domains
 
-> @@ -1086,6 +1098,14 @@ static void its_cpu_init_collection(void)
->  	list_for_each_entry(its, &its_nodes, entry) {
->  		u64 target;
->  
-> +		/* avoid cross node collections and its mapping */
-> +		if (its->flags & ITS_FLAGS_WORKAROUND_CAVIUM_23144) {
-> +			struct device_node *cpu_node;
-> +			cpu_node = of_get_cpu_node(cpu, NULL);
-> +			if (its->numa_node != of_node_to_nid(cpu_node))
-> +				continue;
+Thanks, I have tentatively queued up the above two patches for v4.6.
 
-I think you may not continue in case of its->numa_node ==
-NUMA_NO_NODE. This is the case if no numa node info is provided and
-thus ITS is systemwide. So the check needs to be extended accordingly.
+With regards to the remaining two patches, I propose deferring them
+for a few releases so that we can shake out any regressions that
+may occur before making a compatibility change.
 
--Robert
-
-> +		}
-> +
->  		/*
->  		 * We now have to bind each collection to its target
->  		 * redistributor.
+>   drivers: sh: Stop using the legacy clock domain on ARM
+>   MAINTAINERS: Drop drivers/sh/ for Renesas ARM
+> 
+>  MAINTAINERS                    |  1 -
+>  arch/arm/mach-shmobile/Kconfig | 13 ++++++++-----
+>  arch/arm64/Kconfig.platforms   |  3 ++-
+>  drivers/Makefile               |  1 -
+>  drivers/sh/pm_runtime.c        |  9 ---------
+>  5 files changed, 10 insertions(+), 17 deletions(-)
