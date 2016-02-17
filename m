@@ -1,16 +1,20 @@
 From: xhnjupt@gmail.com (Han Xu)
-Date: Thu, 18 Feb 2016 01:16:27 +0800
-Subject: [PATCH v4 6/7] dts/ls2080a: update the DTS for QSPI and DSPI
- support
-In-Reply-To: <1453793041-35868-6-git-send-email-yao.yuan@freescale.com>
+Date: Thu, 18 Feb 2016 01:16:52 +0800
+Subject: [PATCH v4 7/7] Documentation: fsl-quadspi: Add optional properties
+In-Reply-To: <1453793041-35868-7-git-send-email-yao.yuan@freescale.com>
 References: <1453793041-35868-1-git-send-email-yao.yuan@freescale.com>
- <1453793041-35868-6-git-send-email-yao.yuan@freescale.com>
-Message-ID: <20160217171627.GG16812@shlinux2>
+ <1453793041-35868-7-git-send-email-yao.yuan@freescale.com>
+Message-ID: <20160217171652.GH16812@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 26, 2016 at 03:24:00PM +0800, Yuan Yao wrote:
+On Tue, Jan 26, 2016 at 03:24:01PM +0800, Yuan Yao wrote:
+> Add optional properties for QSPI:
+> big-endian
+> if the register is big endian on this platform.
+> 
 > Signed-off-by: Yuan Yao <yao.yuan@nxp.com>
+> Acked-by: Rob Herring <robh@kernel.org>
 > ---
 > Changed in v4:
 > No changes.
@@ -21,52 +25,21 @@ On Tue, Jan 26, 2016 at 03:24:00PM +0800, Yuan Yao wrote:
 > Changed in v2:
 > Update my email to <yao.yuan@nxp.com>
 > ---
->  arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts | 9 ++++++++-
->  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi    | 4 ++--
->  2 files changed, 10 insertions(+), 3 deletions(-)
+>  Documentation/devicetree/bindings/mtd/fsl-quadspi.txt | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts
-> index 4cb996d..e8801fa 100644
-> --- a/arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts
-> +++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts
-> @@ -178,7 +178,14 @@
+> diff --git a/Documentation/devicetree/bindings/mtd/fsl-quadspi.txt b/Documentation/devicetree/bindings/mtd/fsl-quadspi.txt
+> index 0df2f3a..0333ec8 100644
+> --- a/Documentation/devicetree/bindings/mtd/fsl-quadspi.txt
+> +++ b/Documentation/devicetree/bindings/mtd/fsl-quadspi.txt
+> @@ -21,6 +21,7 @@ Optional properties:
+>  			      But if there are two NOR flashes connected to the
+>  			      bus, you should enable this property.
+>  			      (Please check the board's schematic.)
+> +  - big-endian : That means the IP register is big endian
 >  
->  &qspi {
->  	status = "okay";
-> -	qflash0: s25fl008k {
-> +	flash0: s25fl256s1 at 0 {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		compatible = "st,m25p80";
-> +		spi-max-frequency = <20000000>;
-> +		reg = <0>;
-> +	};
-> +	flash2: s25fl256s1 at 2 {
->  		#address-cells = <1>;
->  		#size-cells = <1>;
->  		compatible = "st,m25p80";
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-> index 2b23d03..65e612a 100644
-> --- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-> +++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-> @@ -318,7 +318,7 @@
+>  Example:
 >  
->  		dspi: dspi at 2100000 {
->  			status = "disabled";
-> -			compatible = "fsl,vf610-dspi";
-> +			compatible = "fsl,ls2080a-dspi", "fsl,ls2085a-dspi";
->  			#address-cells = <1>;
->  			#size-cells = <0>;
->  			reg = <0x0 0x2100000 0x0 0x10000>;
-> @@ -444,7 +444,7 @@
->  
->  		qspi: quadspi at 20c0000 {
->  			status = "disabled";
-> -			compatible = "fsl,vf610-qspi";
-> +			compatible = "fsl,ls2080a-qspi", "fsl,ls1021a-qspi";
->  			#address-cells = <1>;
->  			#size-cells = <0>;
->  			reg = <0x0 0x20c0000 0x0 0x10000>,
 > -- 
 > 2.1.0.27.g96db324
 > 
