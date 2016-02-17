@@ -1,69 +1,147 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 17 Feb 2016 17:58:43 +0000
-Subject: [PATCH v4.1] arm64: hw_breakpoint: Allow EL2 breakpoints if running
- in HYP
-In-Reply-To: <1455216004-19499-23-git-send-email-marc.zyngier@arm.com>
-References: <1455216004-19499-23-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1455731923-26768-1-git-send-email-marc.zyngier@arm.com>
+From: ray.jui@broadcom.com (Ray Jui)
+Date: Wed, 17 Feb 2016 10:10:46 -0800
+Subject: [02/11] video: ARM CLCD: support DT signal inversion flags
+In-Reply-To: <1454594660-7532-3-git-send-email-linus.walleij@linaro.org>
+References: <1454594660-7532-3-git-send-email-linus.walleij@linaro.org>
+Message-ID: <0cebf93a-ee0a-3637-3242-8aed266df091@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With VHE, we place kernel {watch,break}-points at EL2 to get things
-like kgdb and "perf -e mem:..." working.
+Hi Linus,
 
-This requires a bit of repainting in the low-level encore/decode,
-but is otherwise pretty simple.
+A somewhat related question, how do you see the CLKSEL bit in the TIM2 
+register will be supported in the future? There are some cases where the 
+CLKSEL bit needs to be set, and therefore the "CLCDCLK" instead of 
+"HCLK" reference clock source is selected.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/include/asm/hw_breakpoint.h | 18 +++++++++++++-----
- 1 file changed, 13 insertions(+), 5 deletions(-)
+Thanks!
 
-diff --git a/arch/arm64/include/asm/hw_breakpoint.h b/arch/arm64/include/asm/hw_breakpoint.h
-index 9732908..115ea2a 100644
---- a/arch/arm64/include/asm/hw_breakpoint.h
-+++ b/arch/arm64/include/asm/hw_breakpoint.h
-@@ -18,6 +18,7 @@
- 
- #include <asm/cputype.h>
- #include <asm/cpufeature.h>
-+#include <asm/virt.h>
- 
- #ifdef __KERNEL__
- 
-@@ -35,10 +36,21 @@ struct arch_hw_breakpoint {
- 	struct arch_hw_breakpoint_ctrl ctrl;
- };
- 
-+/* Privilege Levels */
-+#define AARCH64_BREAKPOINT_EL1	1
-+#define AARCH64_BREAKPOINT_EL0	2
-+
-+#define DBG_HMC_HYP		(1 << 13)
-+
- static inline u32 encode_ctrl_reg(struct arch_hw_breakpoint_ctrl ctrl)
- {
--	return (ctrl.len << 5) | (ctrl.type << 3) | (ctrl.privilege << 1) |
-+	u32 val = (ctrl.len << 5) | (ctrl.type << 3) | (ctrl.privilege << 1) |
- 		ctrl.enabled;
-+
-+	if (is_kernel_in_hyp_mode() && ctrl.privilege == AARCH64_BREAKPOINT_EL1)
-+		val |= DBG_HMC_HYP;
-+
-+	return val;
- }
- 
- static inline void decode_ctrl_reg(u32 reg,
-@@ -61,10 +73,6 @@ static inline void decode_ctrl_reg(u32 reg,
- #define ARM_BREAKPOINT_STORE	2
- #define AARCH64_ESR_ACCESS_MASK	(1 << 6)
- 
--/* Privilege Levels */
--#define AARCH64_BREAKPOINT_EL1	1
--#define AARCH64_BREAKPOINT_EL0	2
--
- /* Lengths */
- #define ARM_BREAKPOINT_LEN_1	0x1
- #define ARM_BREAKPOINT_LEN_2	0x3
--- 
-2.1.4
+Ray
+
+On 2/4/2016 6:04 AM, Linus Walleij wrote:
+> The device tree bindings from display-timing.txt allows us to
+> specify if data enable, hsync, vsync or the pixed clock should be
+> inverted on the way to the display. The driver does not currently
+> handle this so add support for those flags as it is needed for
+> the Versatile Sanyo LCD display.
+>
+> Note that the previous behaviour was to invert the pixel clock
+> for all displays, so unless the pixel clock polarity is
+> explicitly defined in the device tree (i.e. the timings node
+> has the "pixelclk-active" property) we fall back to inverting
+> the pixel clock. This needs some extra compatibility code.
+>
+> Since the timing flags have to be set up inside the struct
+> clcd_panel, we need to refactor the code a bit to pass around
+> the panel rather than just the mode.
+>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Rob Herring <robh@kernel.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>
+> ---
+> drivers/video/fbdev/amba-clcd.c | 41 ++++++++++++++++++++++++++++++++++-------
+>  1 file changed, 34 insertions(+), 7 deletions(-)
+>
+> diff --git a/drivers/video/fbdev/amba-clcd.c b/drivers/video/fbdev/amba-clcd.c
+> index c5d1e9ca81ab..8903a42c4122 100644
+> --- a/drivers/video/fbdev/amba-clcd.c
+> +++ b/drivers/video/fbdev/amba-clcd.c
+> @@ -567,10 +567,11 @@ static int clcdfb_register(struct clcd_fb *fb)
+>
+>  #ifdef CONFIG_OF
+>  static int clcdfb_of_get_dpi_panel_mode(struct device_node *node,
+> -		struct fb_videomode *mode)
+> +		struct clcd_panel *clcd_panel)
+>  {
+>  	int err;
+>  	struct display_timing timing;
+> +	struct device_node *timnp;
+>  	struct videomode video;
+>
+>  	err = of_get_display_timing(node, "panel-timing", &timing);
+> @@ -579,10 +580,34 @@ static int clcdfb_of_get_dpi_panel_mode(struct device_node *node,
+>
+>  	videomode_from_timing(&timing, &video);
+>
+> -	err = fb_videomode_from_videomode(&video, mode);
+> +	err = fb_videomode_from_videomode(&video, &clcd_panel->mode);
+>  	if (err)
+>  		return err;
+>
+> +	/* Set up some inversion flags */
+> +	timnp = of_get_child_by_name(node, "panel-timing");
+> +	if (timnp && of_property_read_bool(timnp, "pixelclk-active")) {
+> +		if (timing.flags & DISPLAY_FLAGS_PIXDATA_NEGEDGE)
+> +			clcd_panel->tim2 |= TIM2_IPC;
+> +	} else {
+> +		/*
+> +		 * To preserve backwards compatibility, the IPC (inverted
+> +		 * pixel clock) flag needs to be set on any display that
+> +		 * doesn't explicitly specify that the pixel clock is
+> +		 * active on the negative edge.
+> +		 */
+> +		clcd_panel->tim2 |= TIM2_IPC;
+> +	}
+> +
+> +	if (timing.flags & DISPLAY_FLAGS_HSYNC_LOW)
+> +		clcd_panel->tim2 |= TIM2_IHS;
+> +
+> +	if (timing.flags & DISPLAY_FLAGS_VSYNC_LOW)
+> +		clcd_panel->tim2 |= TIM2_IVS;
+> +
+> +	if (timing.flags & DISPLAY_FLAGS_DE_LOW)
+> +		clcd_panel->tim2 |= TIM2_IOE;
+> +
+>  	return 0;
+>  }
+>
+> @@ -615,10 +640,11 @@ static int clcdfb_of_get_backlight(struct device_node *endpoint,
+>  }
+>
+>  static int clcdfb_of_get_mode(struct device *dev, struct device_node *endpoint,
+> -		struct fb_videomode *mode)
+> +		struct clcd_panel *clcd_panel)
+>  {
+>  	int err;
+>  	struct device_node *panel;
+> +	struct fb_videomode *mode;
+>  	char *name;
+>  	int len;
+>
+> @@ -628,11 +654,12 @@ static int clcdfb_of_get_mode(struct device *dev, struct device_node *endpoint,
+>
+>  	/* Only directly connected DPI panels supported for now */
+>  	if (of_device_is_compatible(panel, "panel-dpi"))
+> -		err = clcdfb_of_get_dpi_panel_mode(panel, mode);
+> +		err = clcdfb_of_get_dpi_panel_mode(panel, clcd_panel);
+>  	else
+>  		err = -ENOENT;
+>  	if (err)
+>  		return err;
+> +	mode = &clcd_panel->mode;
+>
+>  	len = clcdfb_snprintf_mode(NULL, 0, mode);
+>  	name = devm_kzalloc(dev, len + 1, GFP_KERNEL);
+> @@ -663,8 +690,8 @@ static int clcdfb_of_init_tft_panel(struct clcd_fb *fb, u32 r0, u32 g0, u32 b0)
+>  	};
+>  	int i;
+>
+> -	/* Bypass pixel clock divider, data output on the falling edge */
+> -	fb->panel->tim2 = TIM2_BCD | TIM2_IPC;
+> +	/* Bypass pixel clock divider */
+> +	fb->panel->tim2 |= TIM2_BCD;
+>
+>  	/* TFT display, vert. comp. interrupt at the start of the back porch */
+>  	fb->panel->cntl |= CNTL_LCDTFT | CNTL_LCDVCOMP(1);
+> @@ -704,7 +731,7 @@ static int clcdfb_of_init_display(struct clcd_fb *fb)
+>  	if (err)
+>  		return err;
+>
+> -	err = clcdfb_of_get_mode(&fb->dev->dev, endpoint, &fb->panel->mode);
+> +	err = clcdfb_of_get_mode(&fb->dev->dev, endpoint, fb->panel);
+>  	if (err)
+>  		return err;
+>
+>
