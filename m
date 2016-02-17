@@ -1,45 +1,27 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 17 Feb 2016 17:03:15 +0100
-Subject: [PATCH v4 00/12] Add support for the Armada 3700 SoC an mvebu
- ARM64 based
-In-Reply-To: <2699923.cugyhCaCQy@wuerfel> (Arnd Bergmann's message of "Tue, 16
- Feb 2016 22:22:11 +0100")
-References: <1455646502-23834-1-git-send-email-gregory.clement@free-electrons.com>
- <2699923.cugyhCaCQy@wuerfel>
-Message-ID: <87a8mzs4sc.fsf@free-electrons.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 17 Feb 2016 16:05:35 +0000
+Subject: [PATCH 01/13] spi: imx: allow only WML aligned transfers to use
+ DMA
+In-Reply-To: <20160217150146.GC3939@pengutronix.de>
+References: <1455715739-25161-1-git-send-email-s.hauer@pengutronix.de>
+ <1455715739-25161-2-git-send-email-s.hauer@pengutronix.de>
+ <20160217141619.GR7544@sirena.org.uk>
+ <20160217150146.GC3939@pengutronix.de>
+Message-ID: <20160217160535.GW7544@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
- 
- On mar., f?vr. 16 2016, Arnd Bergmann <arnd@arndb.de> wrote:
+On Wed, Feb 17, 2016 at 04:01:46PM +0100, Sascha Hauer wrote:
 
-> On Tuesday 16 February 2016 19:14:50 Gregory CLEMENT wrote:
->> This series introduce the support of the Armada 3700 family: it is the
->> first ARM64 SoC of the mvebu family submitted to the mainline!
->> 
->> Currently there are two members of the Armada 3700 family, the only
->> difference is the number of core: the Armada 3710 comes with one
->> Cortex-A53 whereas the Armada 3720 comes with 2 Cortex-A53. In this
->> series we enabled only the minimum to boot, pinctrl and clock tree
->> will come soon.
->> 
->
-> Whole series
->
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> You seem to have a template for this, I remember having read the same
+> text before ;)
 
-Great!
-
-I am going to do a first pull requests for the mvebu arm64. Let me know
-if I do it correctly.
-
-Thanks,
-
-Gregory
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+I do, but even before I had a template I'd always end up typing the same
+thing by hand anyway.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160217/c79057ee/attachment-0001.sig>
