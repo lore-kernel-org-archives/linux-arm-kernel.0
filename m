@@ -1,146 +1,40 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Wed, 17 Feb 2016 14:09:02 +0100
-Subject: Using i.MX6 quad's IPU#1/DI#1 to drive parallel port #1 failed
-In-Reply-To: <201602171210.14545.jbe@pengutronix.de>
-References: <201602171210.14545.jbe@pengutronix.de>
-Message-ID: <20160217140902.5e24c074@ipc1.ka-ro>
+From: qnguyen@apm.com (Quan Nguyen)
+Date: Wed, 17 Feb 2016 20:15:06 +0700
+Subject: [PATCH v7 0/3] Enable X-Gene standby GPIO as interrupt controller
+Message-ID: <1455714909-3027-1-git-send-email-qnguyen@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+V7 Changes:
+	- Update Documentation
+V6 Changes:
+        - Remove redundant irq_ack and irq_shutdown entries
+V5 Changes:
+        - Add optional properties to describe HW specifics
+        - Use irq_create_fwspec_mapping() instead of low level functions
+        - Move gpiochip_lock_as_irq() to activate method
+        - Remove redundant checks
+        - Add optional HW properties description to DT binding document
+        - Update "interrupts" property description in DT binding document.
+V4 Changes:
+        - Convert to hierarchical irq domain
+V3 Changes:
+        - Picking up from version 2 of "Y Vo <yvo@apm.com>"
+        - Get HW resource information from DT
+        - Avoid keeping parent IRQ controller
+V2 Changes:
+        - Support X-Gene standby GPIO as an interrupt controller.
 
-On Wed, 17 Feb 2016 12:10:14 +0100 Juergen Borleis wrote:
-> Hi,
-> 
-> someone here who has a working display (or similar) connected to i.MX6 quad's 
-> parallel port #1 and driven by IPU#1/DI#1? It seems there is currently no user 
-> in the mainline supported boards.
-> 
-I've got a working configuration with two DVI adapters connected to the
-DI0 and DI1 ports on an i.MX6Q board.
+Quan Nguyen (3):
+  gpio: xgene: Enable X-Gene standby GPIO as interrupt controller
+  Documentation: gpio: Update description for X-Gene standby GPIO
+    controller DTS binding
+  arm64: dts: Update X-Gene standby GPIO controller DTS entries
 
-The relevant portion of the .dts file looks like this:
-	ipu1_disp0: display at di0 {
-		compatible = "fsl,imx-parallel-display";
-		pinctrl-names = "default";
-		pinctrl-0 = <&pinctrl_disp0_1>;
-		interface-pix-fmt = "rgb24";
-		status = "okay";
+ .../devicetree/bindings/gpio/gpio-xgene-sb.txt     |  47 +++-
+ arch/arm64/boot/dts/apm/apm-storm.dtsi             |   3 +
+ drivers/gpio/gpio-xgene-sb.c                       | 265 ++++++++++++++++++---
+ 3 files changed, 276 insertions(+), 39 deletions(-)
 
-		display-timings {
-			native-mode = <&vga0>;
-
-			full-hd {
-				clock-frequency = <138500000>;
-				hactive = <1920>;
-				vactive = <1080>;
-				hback-porch = <88>;
-				hsync-len = <128>;
-				hfront-porch = <40>;
-				vback-porch = <33>;
-				vsync-len = <2>;
-				vfront-porch = <10>;
-				hsync-active = <0>;
-				vsync-active = <0>;
-				de-active = <1>;
-				pixelclk-active = <1>;
-			};
-
-			vga0: VGA {
-				clock-frequency = <25200000>;
-				hactive = <640>;
-				vactive = <480>;
-				hback-porch = <48>;
-				hsync-len = <96>;
-				hfront-porch = <16>;
-				vback-porch = <31>;
-				vsync-len = <2>;
-				vfront-porch = <12>;
-				hsync-active = <0>;
-				vsync-active = <0>;
-				de-active = <1>;
-				pixelclk-active = <0>;
-			};
-		};
-
-		port {
-			display0_in: endpoint {
-				remote-endpoint = <&ipu1_di0_disp0>;
-			};
-		};
-	};
-
-	ipu1_disp1: display at di1 {
-		compatible = "fsl,imx-parallel-display";
-		interface-pix-fmt = "rgb24";
-		pinctrl-names = "default";
-		pinctrl-0 = <&pinctrl_disp1>;
-		status = "okay";
-
-		display-timings {
-			native-mode = <&vga1>;
-
-			full-hd {
-				clock-frequency = <138500000>;
-				hactive = <1920>;
-				vactive = <1080>;
-				hback-porch = <88>;
-				hsync-len = <128>;
-				hfront-porch = <40>;
-				vback-porch = <33>;
-				vsync-len = <2>;
-				vfront-porch = <10>;
-				hsync-active = <0>;
-				vsync-active = <0>;
-				de-active = <1>;
-				pixelclk-active = <1>;
-			};
-
-			vga1: VGA {
-				clock-frequency = <25200000>;
-				hactive = <640>;
-				vactive = <480>;
-				hback-porch = <48>;
-				hsync-len = <96>;
-				hfront-porch = <16>;
-				vback-porch = <31>;
-				vsync-len = <2>;
-				vfront-porch = <12>;
-				hsync-active = <0>;
-				vsync-active = <0>;
-				de-active = <1>;
-				pixelclk-active = <0>;
-			};
-		};
-
-		port {
-			display1_in: endpoint {
-				remote-endpoint = <&ipu1_di0_disp1>;
-			};
-		};
-	};
-
-	lcd0_panel: panel0 {
-		compatible = "auo,b133htn01", "simple-panel";
-		power-supply = <&reg_lcd1_pwr>;
-		ddc-i2c-bus = <&i2c2>;
-	};
-
-	lcd1_panel: lcd-panel {
-		compatible = "auo,b133htn01", "simple-panel";
-		power-supply = <&reg_lcd1_pwr>;
-		ddc-i2c-bus = <&i2c1>;
-	};
-
-
-Lothar Wa?mann
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+1.7.12.4
