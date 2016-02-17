@@ -1,34 +1,27 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 17 Feb 2016 10:16:43 +0900
-Subject: [clk:clk-samsung-kconfig 1/2] drivers/clk/samsung/clk.h:29:26:
- error: field 'clk_data' has incomplete type
-In-Reply-To: <201602170850.V9nmoMr3%fengguang.wu@intel.com>
-References: <201602170850.V9nmoMr3%fengguang.wu@intel.com>
-Message-ID: <56C3C9FB.8090301@samsung.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 16 Feb 2016 17:16:04 -0800
+Subject: [PATCH 4/4] arm64: cputype info for Broadcom Vulcan
+In-Reply-To: <20160215101235.GA1748@arm.com>
+References: <1455389195-31870-1-git-send-email-jchandra@broadcom.com>
+ <1455389195-31870-5-git-send-email-jchandra@broadcom.com>
+ <20160215101235.GA1748@arm.com>
+Message-ID: <56C3C9D4.4020506@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17.02.2016 09:01, kbuild test robot wrote:
-> tree:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-samsung-kconfig
-> head:   e83cb468452c25597e868d1ed778fa73fdaeca4c
-> commit: 89e08b1b13374a336dfd1d500ebc70aa545579ab [1/2] clk: samsung: Enable COMPILE_TEST for Samsung clocks
-> config: ia64-allmodconfig (attached as .config)
-> reproduce:
->         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
->         chmod +x ~/bin/make.cross
->         git checkout 89e08b1b13374a336dfd1d500ebc70aa545579ab
->         # save the attached .config to linux build tree
->         make.cross ARCH=ia64 
+On 15/02/16 02:12, Will Deacon wrote:
+> On Sun, Feb 14, 2016 at 12:16:35AM +0530, Jayachandran C wrote:
+>> Add Broadcom Vulcan implementor ID and part ID in cputype.h. This is
+>> to document the values.
+>>
+>> Signed-off-by: Jayachandran C <jchandra@broadcom.com>
+>> ---
+>>  arch/arm64/include/asm/cputype.h | 2 ++
+>>  1 file changed, 2 insertions(+)
 > 
+> Acked-by: Will Deacon <will.deacon@arm.com>
 
-I think the error is a result of missing one patch in the branch - the
-"clk: Move vendor's Kconfig into CCF menu section":
-https://git.kernel.org/cgit/linux/kernel/git/clk/linux.git/commit/?h=clk-next&id=b9e65ebc654dffeb77d8ef878bd6b2da30c55a94
-
-With mentioned patch these Samsung clocks depends on COMMON_CLK so they
-should not be selectable on IA64.
-
-However I don't have IA64 cross compiler to verify this.
-
-Best regards,
-Krzysztof
+Would this be picked by Calatin, or should this be sent along with the
+ARM/ARM64 SoC changes pull requests (just wondering?), thanks!
+-- 
+Florian
