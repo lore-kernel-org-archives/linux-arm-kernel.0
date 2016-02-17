@@ -1,47 +1,273 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 17 Feb 2016 11:29:32 +0000
-Subject: [PATCH V2] AHCI: Workaround for ThunderX Errata#22536
-In-Reply-To: <56C3AD1C.2000003@caviumnetworks.com>
-References: <1455319230-30201-1-git-send-email-tchalamarla@caviumnetworks.com>
- <20160214170152.GC3965@htj.duckdns.org>
- <56C147B2.9010303@caviumnetworks.com>
- <20160215183041.GH3965@htj.duckdns.org>
- <20160216144250.GD31343@rric.localdomain>
- <56C37524.5090000@caviumnetworks.com>
- <56C37AD3.4030407@caviumnetworks.com>
- <56C37D94.8080403@caviumnetworks.com>
- <20160216211410.GI25086@rric.localdomain>
- <56C3AD1C.2000003@caviumnetworks.com>
-Message-ID: <20160217112931.GB31970@arm.com>
+From: blogic@openwrt.org (John Crispin)
+Date: Wed, 17 Feb 2016 12:37:35 +0100
+Subject: [PATCH V6 1/2] regulator: Add document for MT6323 regulator
+Message-ID: <1455709056-50510-1-git-send-email-blogic@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 16, 2016 at 03:13:32PM -0800, Tirumalesh Chalamarla wrote:
-> On 02/16/2016 01:14 PM, Robert Richter wrote:
-> >CONFIG_CAVIUM_ERRATUM_22536 is exactly that you need. It is not only
-> >used for core interrupts, e.g. also for gicv3 devices (and now also
-> >for ahci). Non-core errata (e.g. CONFIG_CAVIUM_ERRATUM_23144) are not
-> >enabled in the arm64 cpu errata framework (not handled in
-> >arch/arm64/kernel/cpu_errata.c).
-> >
-> >Thus,
-> >
-> >#ifdef CONFIG_CAVIUM_ERRATUM_22536
-> >	if (pdev->vendor == 0x177d && pdev->device == 0xa01c)
-> >		ahci_thunderx_init(&pdev->dev, hpriv);
-> >#endif
-> >
-> >is the correct enablement of the workaround by device id.
-> >
-> >And, CAVIUM_ERRATUM_* is very easy to handle, enable and document.
-> >
-> The code will only run for Thunder and AHCI, becuase its PCI.
+Signed-off-by: John Crispin <blogic@openwrt.org>
+Cc: devicetree at vger.kernel.org
 
-Well, the guards also serve as documentation for exactly why we're having
-to do something special here, so I'd say go ahead and add
-CONFIG_CAVIUM_ERRATUM_22536 and update
-Documentation/arm64/silicon-errata.txt accordingly.
+---
+Changes in V6
+* remove the compatible string
 
+Changes in V5
+* regulator vs regulators
 
+Changes in V4
+* regulator is a subnode and not a property
 
-Will
+ .../bindings/regulator/mt6323-regulator.txt        |  241 ++++++++++++++++++++
+ 1 file changed, 241 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/regulator/mt6323-regulator.txt
+
+diff --git a/Documentation/devicetree/bindings/regulator/mt6323-regulator.txt b/Documentation/devicetree/bindings/regulator/mt6323-regulator.txt
+new file mode 100644
+index 0000000..67c0780
+--- /dev/null
++++ b/Documentation/devicetree/bindings/regulator/mt6323-regulator.txt
+@@ -0,0 +1,241 @@
++Mediatek MT6323 Regulator Driver
++
++All voltage regulators are defined as subnodes of the regulators node. A list
++of regulators provided by this controller are defined as subnodes of the
++drivers node. Each regulator is named according to its regulator type,
++buck_<name> and ldo_<name>. The definition for each of these nodes is defined
++using the standard binding for regulators at
++Documentation/devicetree/bindings/regulator/regulator.txt.
++
++The valid names for regulators are::
++BUCK:
++  buck_vproc, buck_vsys, buck_vpa
++LDO:
++  ldo_vtcxo, ldo_vcn28, ldo_vcn33_bt, ldo_vcn33_wifi, ldo_va, ldo_vcama,
++  ldo_vio28, ldo_vusb, ldo_vmc, ldo_vmch, ldo_vemc3v3, ldo_vgp1, ldo_vgp2,
++  ldo_vgp3, ldo_vcn18, ldo_vsim1, ldo_vsim2, ldo_vrtc, ldo_vcamaf, ldo_vibr,
++  ldo_vrf18, ldo_vm, ldo_vio18, ldo_vcamd, ldo_vcamio
++
++Example:
++
++	pmic: mt6323 {
++		compatible = "mediatek,mt6323";
++
++		mt6323regulator: regulators {
++			compatible = "mediatek,mt6323-regulator";
++
++			mt6323_vproc_reg: buck_vproc{
++				regulator-name = "vproc";
++				regulator-min-microvolt = < 700000>;
++				regulator-max-microvolt = <1350000>;
++				regulator-ramp-delay = <12500>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			mt6323_vsys_reg: buck_vsys{
++				regulator-name = "vsys";
++				regulator-min-microvolt = <1400000>;
++				regulator-max-microvolt = <2987500>;
++				regulator-ramp-delay = <25000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			mt6323_vpa_reg: buck_vpa{
++				regulator-name = "vpa";
++				regulator-min-microvolt = < 500000>;
++				regulator-max-microvolt = <3650000>;
++			};
++
++			mt6323_vtcxo_reg: ldo_vtcxo{
++				regulator-name = "vtcxo";
++				regulator-min-microvolt = <2800000>;
++				regulator-max-microvolt = <2800000>;
++				regulator-enable-ramp-delay = <90>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			mt6323_vcn28_reg: ldo_vcn28{
++				regulator-name = "vcn28";
++				regulator-min-microvolt = <2800000>;
++				regulator-max-microvolt = <2800000>;
++				regulator-enable-ramp-delay = <185>;
++			};
++
++			mt6323_vcn33_bt_reg: ldo_vcn33_bt{
++				regulator-name = "vcn33_bt";
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3600000>;
++				regulator-enable-ramp-delay = <185>;
++			};
++
++			mt6323_vcn33_wifi_reg: ldo_vcn33_wifi{
++				regulator-name = "vcn33_wifi";
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3600000>;
++				regulator-enable-ramp-delay = <185>;
++			};
++
++			mt6323_va_reg: ldo_va{
++				regulator-name = "va";
++				regulator-min-microvolt = <2800000>;
++				regulator-max-microvolt = <2800000>;
++				regulator-enable-ramp-delay = <216>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			mt6323_vcama_reg: ldo_vcama{
++				regulator-name = "vcama";
++				regulator-min-microvolt = <1500000>;
++				regulator-max-microvolt = <2800000>;
++				regulator-enable-ramp-delay = <216>;
++			};
++
++			mt6323_vio28_reg: ldo_vio28{
++				regulator-name = "vio28";
++				regulator-min-microvolt = <2800000>;
++				regulator-max-microvolt = <2800000>;
++				regulator-enable-ramp-delay = <216>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			mt6323_vusb_reg: ldo_vusb{
++				regulator-name = "vusb";
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-enable-ramp-delay = <216>;
++				regulator-boot-on;
++			};
++
++			mt6323_vmc_reg: ldo_vmc{
++				regulator-name = "vmc";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-enable-ramp-delay = <36>;
++				regulator-boot-on;
++			};
++
++			mt6323_vmch_reg: ldo_vmch{
++				regulator-name = "vmch";
++				regulator-min-microvolt = <3000000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-enable-ramp-delay = <36>;
++				regulator-boot-on;
++			};
++
++			mt6323_vemc3v3_reg: ldo_vemc3v3{
++				regulator-name = "vemc3v3";
++				regulator-min-microvolt = <3000000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-enable-ramp-delay = <36>;
++				regulator-boot-on;
++			};
++
++			mt6323_vgp1_reg: ldo_vgp1{
++				regulator-name = "vgp1";
++				regulator-min-microvolt = <1200000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-enable-ramp-delay = <216>;
++			};
++
++			mt6323_vgp2_reg: ldo_vgp2{
++				regulator-name = "vgp2";
++				regulator-min-microvolt = <1200000>;
++				regulator-max-microvolt = <3000000>;
++				regulator-enable-ramp-delay = <216>;
++			};
++
++			mt6323_vgp3_reg: ldo_vgp3{
++				regulator-name = "vgp3";
++				regulator-min-microvolt = <1200000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-enable-ramp-delay = <216>;
++			};
++
++			mt6323_vcn18_reg: ldo_vcn18{
++				regulator-name = "vcn18";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-enable-ramp-delay = <216>;
++			};
++
++			mt6323_vsim1_reg: ldo_vsim1{
++				regulator-name = "vsim1";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3000000>;
++				regulator-enable-ramp-delay = <216>;
++			};
++
++			mt6323_vsim2_reg: ldo_vsim2{
++				regulator-name = "vsim2";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3000000>;
++				regulator-enable-ramp-delay = <216>;
++			};
++
++			mt6323_vrtc_reg: ldo_vrtc{
++				regulator-name = "vrtc";
++				regulator-min-microvolt = <2800000>;
++				regulator-max-microvolt = <2800000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			mt6323_vcamaf_reg: ldo_vcamaf{
++				regulator-name = "vcamaf";
++				regulator-min-microvolt = <1200000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-enable-ramp-delay = <216>;
++			};
++
++			mt6323_vibr_reg: ldo_vibr{
++				regulator-name = "vibr";
++				regulator-min-microvolt = <1200000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-enable-ramp-delay = <36>;
++			};
++
++			mt6323_vrf18_reg: ldo_vrf18{
++				regulator-name = "vrf18";
++				regulator-min-microvolt = <1825000>;
++				regulator-max-microvolt = <1825000>;
++				regulator-enable-ramp-delay = <187>;
++			};
++
++			mt6323_vm_reg: ldo_vm{
++				regulator-name = "vm";
++				regulator-min-microvolt = <1200000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-enable-ramp-delay = <216>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			mt6323_vio18_reg: ldo_vio18{
++				regulator-name = "vio18";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-enable-ramp-delay = <216>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			mt6323_vcamd_reg: ldo_vcamd{
++				regulator-name = "vcamd";
++				regulator-min-microvolt = <1200000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-enable-ramp-delay = <216>;
++			};
++
++			mt6323_vcamio_reg: ldo_vcamio{
++				regulator-name = "vcamio";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-enable-ramp-delay = <216>;
++			};
++		};
++	};
+-- 
+1.7.10.4
