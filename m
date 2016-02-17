@@ -1,77 +1,64 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 17 Feb 2016 14:39:51 +0000
-Subject: [PATCH v5sub1 7/8] arm64: move kernel image to base of vmalloc
- area
-In-Reply-To: <56C31D1D.50708@virtuozzo.com>
-References: <20160212145844.GI31665@e104818-lin.cambridge.arm.com>
- <CAKv+Gu-x6QPorWsPDP8bqAkmbasqzhqmP39HS=qprfGB4r8JLw@mail.gmail.com>
- <20160212151006.GJ31665@e104818-lin.cambridge.arm.com>
- <CAKv+Gu84mVP=YjbLhWoGj9AEUD8m8+Lq8kTCniCHwxJwMWaZtA@mail.gmail.com>
- <20160212152641.GK31665@e104818-lin.cambridge.arm.com>
- <56BDFC86.5010705@arm.com>
- <20160212160652.GL31665@e104818-lin.cambridge.arm.com>
- <56C1E072.2090909@virtuozzo.com>
- <20160215185957.GB19413@e104818-lin.cambridge.arm.com>
- <56C31D1D.50708@virtuozzo.com>
-Message-ID: <20160217143950.GC32647@leverpostej>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Wed, 17 Feb 2016 15:58:14 +0100
+Subject: Using i.MX6 quad's IPU#1/DI#1 to drive parallel port #1 failed
+In-Reply-To: <201602171523.55881.jbe@pengutronix.de>
+References: <201602171210.14545.jbe@pengutronix.de>
+ <20160217140902.5e24c074@ipc1.ka-ro>
+ <201602171523.55881.jbe@pengutronix.de>
+Message-ID: <20160217155814.7f7132aa@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 16, 2016 at 03:59:09PM +0300, Andrey Ryabinin wrote:
-> Actually, the first report is a bit more useful. It shows that shadow memory was corrupted:
+Hi,
+
+On Wed, 17 Feb 2016 15:23:55 +0100 Juergen Borleis wrote:
+> Hi Lothar,
 > 
->   ffffffc93665bc00: f1 f1 f1 f1 00 f4 f4 f4 f2 f2 f2 f2 00 00 f1 f1
-> > ffffffc93665bc80: f1 f1 00 00 00 00 f3 f3 00 f4 f4 f4 f3 f3 f3 f3
->                       ^
-> F1 - left redzone, it indicates start of stack frame
-> F3 - right redzone, it should be the end of stack frame.
+> thank you for your answer. Can you also send me your "pinctrl_disp1" 
+> definition, please?
 > 
-> But here we have the second set of F1s without F3s which should close the first set of F1s.
-> Also those two F3s in the middle cannot be right.
-> 
-> So shadow is corrupted.
-> Some hypotheses:
+		pinctrl_disp1: disp1grp {
+			fsl,pins = <
+				MX6QDL_PAD_EIM_A16__IPU1_DI1_DISP_CLK	0x10
+				MX6QDL_PAD_EIM_DA10__IPU1_DI1_PIN15	0x10
+				MX6QDL_PAD_EIM_DA11__IPU1_DI1_PIN02	0x10
+				MX6QDL_PAD_EIM_DA12__IPU1_DI1_PIN03	0x10
+				MX6QDL_PAD_EIM_DA9__IPU1_DISP1_DATA00	0x10
+				MX6QDL_PAD_EIM_DA8__IPU1_DISP1_DATA01	0x10
+				MX6QDL_PAD_EIM_DA7__IPU1_DISP1_DATA02	0x10
+				MX6QDL_PAD_EIM_DA6__IPU1_DISP1_DATA03	0x10
+				MX6QDL_PAD_EIM_DA5__IPU1_DISP1_DATA04	0x10
+				MX6QDL_PAD_EIM_DA4__IPU1_DISP1_DATA05	0x10
+				MX6QDL_PAD_EIM_DA3__IPU1_DISP1_DATA06	0x10
+				MX6QDL_PAD_EIM_DA2__IPU1_DISP1_DATA07	0x10
+				MX6QDL_PAD_EIM_DA1__IPU1_DISP1_DATA08	0x10
+				MX6QDL_PAD_EIM_DA0__IPU1_DISP1_DATA09	0x10
+				MX6QDL_PAD_EIM_EB1__IPU1_DISP1_DATA10	0x10
+				MX6QDL_PAD_EIM_EB0__IPU1_DISP1_DATA11	0x10
+				MX6QDL_PAD_EIM_A17__IPU1_DISP1_DATA12	0x10
+				MX6QDL_PAD_EIM_A18__IPU1_DISP1_DATA13	0x10
+				MX6QDL_PAD_EIM_A19__IPU1_DISP1_DATA14	0x10
+				MX6QDL_PAD_EIM_A20__IPU1_DISP1_DATA15	0x10
+				MX6QDL_PAD_EIM_A21__IPU1_DISP1_DATA16	0x10
+				MX6QDL_PAD_EIM_A22__IPU1_DISP1_DATA17	0x10
+				MX6QDL_PAD_EIM_A23__IPU1_DISP1_DATA18	0x10
+				MX6QDL_PAD_EIM_A24__IPU1_DISP1_DATA19	0x10
+				MX6QDL_PAD_EIM_D31__IPU1_DISP1_DATA20	0x10
+				MX6QDL_PAD_EIM_D30__IPU1_DISP1_DATA21	0x10
+				MX6QDL_PAD_EIM_D26__IPU1_DISP1_DATA22	0x10
+				MX6QDL_PAD_EIM_D27__IPU1_DISP1_DATA23	0x10
+			>;
+		};
 
-> 2) Shadow memory wasn't cleared. GCC poison memory on function entrance and unpoisons it before return.
->      If we use some tricky way to exit from function this could cause false-positives like that.
->      E.g. some hand-written assembly return code.
 
-I think this is what's happenening, at least for the idle case.
+Lothar Wa?mann
+-- 
+___________________________________________________________
 
-A second attempt at bisecting led me to commit e679660dbb8347f2 ("ARM:
-8481/2: drivers: psci: replace psci firmware calls"). Reverting that
-makes v4.5-rc1 boot without KASAN splats.
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
 
-That patch turned __invoke_psci_fn_{smc,hvc} into (ASAN-instrumented) C
-functions. Prior to that commit, __invoke_psci_fn_{smc,hvc} were
-pure assembly functions which used no stack.
-
-When we go down for idle, in __cpu_suspend_enter we stash some context
-to the stack (in assembly). The CPU may return from a cold state via
-cpu_resume, where we restore context from the stack.
-
-However, after storing the context we call psci_suspend_finisher, which
-calls psci_cpu_suspend, which calls invoke_psci_fn_*. As
-psci_cpu_suspend and invoke_psci_fn_* are instrumented, they poison
-memory on function entrance, but we never perform the unpoisoning.
-
-That was always the case for psci_suspend_finisher, so there was a
-latent issue that we were somehow avoiding. Perhaps we got luck with
-stack layout and never hit the poison.
-
-I'm not sure how we fix that, as invoke_psci_fn_* may or may not return
-for arbitrary reasons (e.g. a CPU_SUSPEND_CALL may or may not return
-depending on whether an interrupt comes in at the right time).
-
-Perhaps the simplest option is to not instrument invoke_psci_fn_* and
-psci_suspend_finisher. Do we have a per-function annotation to avoid
-KASAN instrumentation, like notrace? I need to investigate, but we may
-also need notrace for similar reasons.
-
-Andrey, on a tangential note, what do we do around hotplug? I assume
-that we must unpooison the shadow region for the stack of a dead CPU,
-but I wasn't able to figure out where we do that. Hopefuly we're not
-just getting lucky?
-
-Thanks,
-Mark.
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
