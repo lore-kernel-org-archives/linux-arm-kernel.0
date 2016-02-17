@@ -1,50 +1,103 @@
-From: xhnjupt@gmail.com (Han Xu)
-Date: Thu, 18 Feb 2016 01:15:02 +0800
-Subject: [PATCH v4 3/7] mtd: spi-nor: fsl-quadspi: add support for
- layerscape
-In-Reply-To: <1453793041-35868-3-git-send-email-yao.yuan@freescale.com>
-References: <1453793041-35868-1-git-send-email-yao.yuan@freescale.com>
- <1453793041-35868-3-git-send-email-yao.yuan@freescale.com>
-Message-ID: <20160217171502.GD16812@shlinux2>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Wed, 17 Feb 2016 18:19:01 +0100
+Subject: [PATCH v3 1/5] Revert "drivers/tty/serial: make 8250/8250_mtk.c
+ explicitly non-modular"
+In-Reply-To: <1455721357-4008289-2-git-send-email-arnd@arndb.de>
+References: <1455721357-4008289-1-git-send-email-arnd@arndb.de>
+ <1455721357-4008289-2-git-send-email-arnd@arndb.de>
+Message-ID: <56C4AB85.7010708@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 26, 2016 at 03:23:57PM +0800, Yuan Yao wrote:
-> LS1043a and LS2080A in the Layerscape family also support Freescale Quad
-> SPI, make Quad SPI selectable for these hardwares.
-> 
-> Signed-off-by: Yuan Yao <yao.yuan@nxp.com>
+
+
+On 17/02/16 16:02, Arnd Bergmann wrote:
+> This reverts commit d72d391c126e ("drivers/tty/serial: make
+> 8250/8250_mtk.c explicitly non-modular"), which intended to remove dead
+> code but did not have the desired effect when the main 8250 driver was
+> a module itself.
+>
+> This would normally result in a link error, but as the entire
+> drivers/tty/serial/8250/ directory is only entered when CONFIG_SERIAL_8250
+> is set, we never notice that the driver does not get built in this
+> configuration.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > ---
-> Changed in v4:
-> No changes.
-> 
-> Changed in v3:
-> No changes.
-> 
-> Changed in v2:
-> Update my email to <yao.yuan@nxp.com>
-> ---
->  drivers/mtd/spi-nor/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/mtd/spi-nor/Kconfig b/drivers/mtd/spi-nor/Kconfig
-> index a28c278..6b53deb 100644
-> --- a/drivers/mtd/spi-nor/Kconfig
-> +++ b/drivers/mtd/spi-nor/Kconfig
-> @@ -30,7 +30,7 @@ config MTD_SPI_NOR_USE_4K_SECTORS
->  
->  config SPI_FSL_QUADSPI
->  	tristate "Freescale Quad SPI controller"
-> -	depends on ARCH_MXC || SOC_LS1021A || COMPILE_TEST
-> +	depends on ARCH_MXC || SOC_LS1021A || ARCH_LAYERSCAPE || COMPILE_TEST
->  	depends on HAS_IOMEM
->  	help
->  	  This enables support for the Quad SPI controller in master mode.
-> -- 
-> 2.1.0.27.g96db324
-> 
-> 
-Acked-by: Han xu <han.xu@nxp.com>
-> ______________________________________________________
-> Linux MTD discussion mailing list
-> http://lists.infradead.org/mailman/listinfo/linux-mtd/
+
+Acked-by: Matthias Brugger <matthias.bgg@gmail.com>
+
+>   drivers/tty/serial/8250/8250_mtk.c | 35 ++++++++++++++++++++++++++++-------
+>   1 file changed, 28 insertions(+), 7 deletions(-)
+>
+> diff --git a/drivers/tty/serial/8250/8250_mtk.c b/drivers/tty/serial/8250/8250_mtk.c
+> index 9038843cadc7..6ecc6e3e82dc 100644
+> --- a/drivers/tty/serial/8250/8250_mtk.c
+> +++ b/drivers/tty/serial/8250/8250_mtk.c
+> @@ -16,7 +16,7 @@
+>    */
+>   #include <linux/clk.h>
+>   #include <linux/io.h>
+> -#include <linux/init.h>
+> +#include <linux/module.h>
+>   #include <linux/of_irq.h>
+>   #include <linux/of_platform.h>
+>   #include <linux/platform_device.h>
+> @@ -245,6 +245,23 @@ static int mtk8250_probe(struct platform_device *pdev)
+>   	return 0;
+>   }
+>
+> +static int mtk8250_remove(struct platform_device *pdev)
+> +{
+> +	struct mtk8250_data *data = platform_get_drvdata(pdev);
+> +
+> +	pm_runtime_get_sync(&pdev->dev);
+> +
+> +	serial8250_unregister_port(data->line);
+> +
+> +	pm_runtime_disable(&pdev->dev);
+> +	pm_runtime_put_noidle(&pdev->dev);
+> +
+> +	if (!pm_runtime_status_suspended(&pdev->dev))
+> +		mtk8250_runtime_suspend(&pdev->dev);
+> +
+> +	return 0;
+> +}
+> +
+>   static int __maybe_unused mtk8250_suspend(struct device *dev)
+>   {
+>   	struct mtk8250_data *data = dev_get_drvdata(dev);
+> @@ -273,18 +290,18 @@ static const struct of_device_id mtk8250_of_match[] = {
+>   	{ .compatible = "mediatek,mt6577-uart" },
+>   	{ /* Sentinel */ }
+>   };
+> +MODULE_DEVICE_TABLE(of, mtk8250_of_match);
+>
+>   static struct platform_driver mtk8250_platform_driver = {
+>   	.driver = {
+> -		.name			= "mt6577-uart",
+> -		.pm			= &mtk8250_pm_ops,
+> -		.of_match_table		= mtk8250_of_match,
+> -		.suppress_bind_attrs	= true,
+> -
+> +		.name		= "mt6577-uart",
+> +		.pm		= &mtk8250_pm_ops,
+> +		.of_match_table	= mtk8250_of_match,
+>   	},
+>   	.probe			= mtk8250_probe,
+> +	.remove			= mtk8250_remove,
+>   };
+> -builtin_platform_driver(mtk8250_platform_driver);
+> +module_platform_driver(mtk8250_platform_driver);
+>
+>   #ifdef CONFIG_SERIAL_8250_CONSOLE
+>   static int __init early_mtk8250_setup(struct earlycon_device *device,
+> @@ -300,3 +317,7 @@ static int __init early_mtk8250_setup(struct earlycon_device *device,
+>
+>   OF_EARLYCON_DECLARE(mtk8250, "mediatek,mt6577-uart", early_mtk8250_setup);
+>   #endif
+> +
+> +MODULE_AUTHOR("Matthias Brugger");
+> +MODULE_LICENSE("GPL");
+> +MODULE_DESCRIPTION("Mediatek 8250 serial port driver");
+>
