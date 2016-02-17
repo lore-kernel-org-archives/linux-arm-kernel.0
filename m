@@ -1,52 +1,39 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 17 Feb 2016 21:25:51 +0000
-Subject: [arm:for-next 24/31] arch/arm/kernel/hyp-stub.S:168: Error:
- selected processor does not support ARM mode `ubfx r7,r7,#28,#4'
-In-Reply-To: <20160217195127.GA4566@e106794-lin.cambridge.arm.com>
-References: <201602180044.PcvJbrb9%fengguang.wu@intel.com>
- <20160217195127.GA4566@e106794-lin.cambridge.arm.com>
-Message-ID: <20160217212551.GJ19428@n2100.arm.linux.org.uk>
+Date: Wed, 17 Feb 2016 21:32:50 +0000
+Subject: [PATCH 11/11] ARM: versatile: move CLCD configuration to device
+ tree
+In-Reply-To: <CACRpkdZ+G17hmVP8AejL7NTqg7k0SBC5kgF55ASjD+kfuGFJhQ@mail.gmail.com>
+References: <1454594660-7532-1-git-send-email-linus.walleij@linaro.org>
+ <1454594660-7532-12-git-send-email-linus.walleij@linaro.org>
+ <56C438DA.5040109@ti.com>
+ <CACRpkdZ+G17hmVP8AejL7NTqg7k0SBC5kgF55ASjD+kfuGFJhQ@mail.gmail.com>
+Message-ID: <20160217213250.GK19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 17, 2016 at 07:51:28PM +0000, Jean-Philippe Brucker wrote:
-> On Thu, Feb 18, 2016 at 12:26:46AM +0800, kbuild test robot wrote:
-> > tree:   http://repo.or.cz/linux-2.6/linux-2.6-arm.git for-next
-> > head:   5aeac3b523644cbc300f17d67c8fce73df9060c0
-> > commit: e59941b9b3817c9b1dd6662d903150fe3f3c3b0b [24/31] ARM: 8527/1: virt: enable GICv3 system registers
-> > config: arm-allmodconfig (attached as .config)
-> > reproduce:
-> >         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-> >         chmod +x ~/bin/make.cross
-> >         git checkout e59941b9b3817c9b1dd6662d903150fe3f3c3b0b
-> >         # save the attached .config to linux build tree
-> >         make.cross ARCH=arm 
-> > 
-> > All errors (new ones prefixed by >>):
-> > 
-> >    arch/arm/kernel/hyp-stub.S: Assembler messages:
-> > >> arch/arm/kernel/hyp-stub.S:168: Error: selected processor does not support ARM mode `ubfx r7,r7,#28,#4'
-> > >> arch/arm/kernel/hyp-stub.S:176: Error: selected processor does not support ARM mode `isb'
+On Wed, Feb 17, 2016 at 05:17:33PM +0100, Linus Walleij wrote:
+> As Russell points out: it's a register that contains a number saying what
+> panel is connected.
 > 
-> Selected processor being arm1136j-s, it doesn't make sense to build
-> hyp-stub.S at all, in my opinion. We should select ARM_VIRT_EXT only
-> when CPU_32v6 and lower are deselected (as with LPAE). I realize such a
-> change might be too invasive for a fix, so I attached a version of my
-> patch that builds for older architectures. If there is no objection, it
-> will supersede the previous one.
+> So it is plug-n-play and I want to preserve this in the patch.
+> 
+> The alternative is to make one DTS per display type connected, but that is
+> loosing all the nice plug'n'play :(
 
-Well, in order to get to the ubfx instruction, you need the CPU to be
-in HYP mode, which these older CPUs aren't going to be.  So, it's safe
-to use ubfx here.
+That's totally insane: we're talking about what's plugged in through
+an external connector.  It's not an "internal" device connector.
+These displays are external separate boxes to the board.
 
-The solution to this is to add:
+We don't have separate DT files just because we plugged in a USB device
+to a board., or a SDIO card, or an external HDD.
 
-AFLAGS_hyp-stub.o		:=-Wa,-march=armv7
+> But if an overlay can do the same, I'm game for it.
 
-to the makefile so the toolchain will build it for ARMv7 even though
-older CPUs are selected.
-
-Thanks.
+That's rather eww, because that means you need to either build the
+overlay into the kernel (which IIRC then ties the base DT file to
+that exact kernel) or it needs to sit in userland, which means no
+LCD display until userland is up and running.  It doesn't sound very
+satisfactory, IMHO.
 
 -- 
 RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
