@@ -1,42 +1,51 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Wed, 17 Feb 2016 10:41:14 -0600
-Subject: [PATCH v2 2/2] arm64/mm: Add .rodata to kernel virtual memory boot
- notice
-In-Reply-To: <1455727274-16328-1-git-send-email-jeremy.linton@arm.com>
-References: <1455727274-16328-1-git-send-email-jeremy.linton@arm.com>
-Message-ID: <1455727274-16328-3-git-send-email-jeremy.linton@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 17 Feb 2016 16:40:43 +0000
+Subject: [PATCH v2 11/17] arm64: KVM: vgic-v2: Only wipe LRs on vcpu exit
+In-Reply-To: <1455727249-24752-1-git-send-email-marc.zyngier@arm.com>
+References: <1455727249-24752-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1455727249-24752-12-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that .rodata has differing permissions from .text
-display it in the mem_init banner as a seperate memory range.
+So far, we're always writing all possible LRs, setting the empty
+ones with a zero value. This is obvious doing a low of work for
+nothing, and we're better off clearing those we've actually
+dirtied on the exit path (it is very rare to inject more than one
+interrupt at a time anyway).
 
-Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/mm/init.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ arch/arm64/kvm/hyp/vgic-v2-sr.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 5dd0831..41be7db 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -325,6 +325,7 @@ void __init mem_init(void)
- 		  "    memory  : 0x%16lx - 0x%16lx   (%6ld MB)\n"
- 		  "      .init : 0x%p" " - 0x%p" "   (%6ld KB)\n"
- 		  "      .text : 0x%p" " - 0x%p" "   (%6ld KB)\n"
-+		  "    .rodata : 0x%p" " - 0x%p" "   (%6ld KB)\n"
- 		  "      .data : 0x%p" " - 0x%p" "   (%6ld KB)\n",
- #ifdef CONFIG_KASAN
- 		  MLG(KASAN_SHADOW_START, KASAN_SHADOW_END),
-@@ -341,7 +342,8 @@ void __init mem_init(void)
- 		  MLM(MODULES_VADDR, MODULES_END),
- 		  MLM(PAGE_OFFSET, (unsigned long)high_memory),
- 		  MLK_ROUNDUP(__init_begin, __init_end),
--		  MLK_ROUNDUP(_text, _etext),
-+		  MLK_ROUNDUP(_text, __start_rodata),
-+		  MLK_ROUNDUP(__start_rodata, _etext),
- 		  MLK_ROUNDUP(_sdata, _edata));
+diff --git a/arch/arm64/kvm/hyp/vgic-v2-sr.c b/arch/arm64/kvm/hyp/vgic-v2-sr.c
+index 3dbbc6b..e53f131 100644
+--- a/arch/arm64/kvm/hyp/vgic-v2-sr.c
++++ b/arch/arm64/kvm/hyp/vgic-v2-sr.c
+@@ -101,6 +101,7 @@ static void __hyp_text save_lrs(struct kvm_vcpu *vcpu, void __iomem *base)
+ 		}
  
- #undef MLK
+ 		cpu_if->vgic_lr[i] = readl_relaxed(base + GICH_LR0 + (i * 4));
++		writel_relaxed(0, base + GICH_LR0 + (i * 4));
+ 	}
+ }
+ 
+@@ -158,12 +159,11 @@ void __hyp_text __vgic_v2_restore_state(struct kvm_vcpu *vcpu)
+ 		writel_relaxed(cpu_if->vgic_hcr, base + GICH_HCR);
+ 		writel_relaxed(cpu_if->vgic_apr, base + GICH_APR);
+ 		for (i = 0; i < nr_lr; i++) {
+-			u32 val = 0;
+-
+-			if (live_lrs & (1UL << i))
+-				val = cpu_if->vgic_lr[i];
++			if (!(live_lrs & (1UL << i)))
++				continue;
+ 
+-			writel_relaxed(val, base + GICH_LR0 + (i * 4));
++			writel_relaxed(cpu_if->vgic_lr[i],
++				       base + GICH_LR0 + (i * 4));
+ 		}
+ 	}
+ 
 -- 
-2.4.3
+2.1.4
