@@ -1,52 +1,186 @@
-From: zlim.lnx@gmail.com (Zi Shen Lim)
-Date: Tue, 16 Feb 2016 23:32:57 -0800
-Subject: [PATCH 4/4] arm64: cputype info for Broadcom Vulcan
-In-Reply-To: <1455389195-31870-5-git-send-email-jchandra@broadcom.com>
-References: <1455389195-31870-1-git-send-email-jchandra@broadcom.com>
- <1455389195-31870-5-git-send-email-jchandra@broadcom.com>
-Message-ID: <CAMDttNc-L0_zg_skNg9CyVT8mGgyZQZTLgCdMMGExxwqhSSPDQ@mail.gmail.com>
+From: alison.wang@nxp.com (Huan Wang)
+Date: Wed, 17 Feb 2016 07:39:06 +0000
+Subject: [PATCH] dts: ls102xa: ifc: Add the partition for NOR flash
+In-Reply-To: <20160214034444.GG6756@tiger>
+References: <1454487404-330-1-git-send-email-b18965@freescale.com>
+ <20160214034444.GG6756@tiger>
+Message-ID: <VI1PR04MB16006272AA234EA44F8A2EC9F4AE0@VI1PR04MB1600.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 13, 2016 at 10:46 AM, Jayachandran C <jchandra@broadcom.com> wrote:
+> On Wed, Feb 03, 2016 at 04:16:44PM +0800, Alison Wang wrote:
+> > According to the new mapping table, the partition for NOR flash is
+> > added.
+> 
+> How do you know that everyone using the board wants the NOR flash to be
+> partitioned this way?  It's really a matter of software configuration
+> and may vary from system to system.
 >
-> Add Broadcom Vulcan implementor ID and part ID in cputype.h. This is
-> to document the values.
->
-> Signed-off-by: Jayachandran C <jchandra@broadcom.com>
-> ---
->  arch/arm64/include/asm/cputype.h | 2 ++
->  1 file changed, 2 insertions(+)
->
-> diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
-> index 1a59493..3725d59 100644
-> --- a/arch/arm64/include/asm/cputype.h
-> +++ b/arch/arm64/include/asm/cputype.h
-> @@ -65,6 +65,7 @@
->  #define ARM_CPU_IMP_ARM                        0x41
->  #define ARM_CPU_IMP_APM                        0x50
->  #define ARM_CPU_IMP_CAVIUM             0x43
-> +#define ARM_CPU_IMP_BRCM               0x42
+[Alison Wang] Yes, the different partition could be used too. I just want to
+provide one partition way.
 
-It's probably not a big deal... guessing this list is chronologically
-ordered and should remain so?
-
->
->  #define ARM_CPU_PART_AEM_V8            0xD0F
->  #define ARM_CPU_PART_FOUNDATION                0xD00
-> @@ -74,6 +75,7 @@
->  #define APM_CPU_PART_POTENZA           0x000
->
->  #define CAVIUM_CPU_PART_THUNDERX       0x0A1
-> +#define BRCM_CPU_PART_VULCAN           0x516
->
->  #ifndef __ASSEMBLY__
->
-> --
-> 1.9.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Best Regards,
+Alison Wang
+> 
+> >
+> > Signed-off-by: Alison Wang <alison.wang@nxp.com>
+> > ---
+> >  arch/arm/boot/dts/ls1021a-qds.dts | 60
+> > +++++++++++++++++++++++++++++++++++++++
+> >  arch/arm/boot/dts/ls1021a-twr.dts | 60
+> > +++++++++++++++++++++++++++++++++++++++
+> >  2 files changed, 120 insertions(+)
+> >
+> > diff --git a/arch/arm/boot/dts/ls1021a-qds.dts
+> > b/arch/arm/boot/dts/ls1021a-qds.dts
+> > index 9408753..904ee09 100644
+> > --- a/arch/arm/boot/dts/ls1021a-qds.dts
+> > +++ b/arch/arm/boot/dts/ls1021a-qds.dts
+> > @@ -237,6 +237,66 @@
+> >  		reg = <0x0 0x0 0x8000000>;
+> >  		bank-width = <2>;
+> >  		device-width = <1>;
+> > +
+> > +		partition at 0 {
+> > +			/* 128KB for bank0 RCW */
+> > +			reg = <0x00000000 0x00020000>;
+> > +			label = "NOR bank0 RCW Image";
+> > +		};
+> > +
+> > +		partition at 100000 {
+> > +			/* 1MB for bank0 u-boot Image */
+> > +			reg = <0x00100000 0x00100000>;
+> > +			label = "NOR bank0 u-boot Image";
+> > +		};
+> > +
+> > +		partition at 200000 {
+> > +			/* 1MB for bank0 DTB */
+> > +			reg = <0x00200000 0x00100000>;
+> > +			label = "NOR bank0 DTB Image";
+> > +		};
+> > +
+> > +		partition at 300000 {
+> > +			/* 7MB for bank0 Linux Kernel */
+> > +			reg = <0x00300000 0x00700000>;
+> > +			label = "NOR bank0 Linux Kernel Image";
+> > +		};
+> > +
+> > +		partition at a00000 {
+> > +			/* 54MB for bank0 Ramdisk Root File System */
+> > +			reg = <0x00a00000 0x03600000>;
+> > +			label = "NOR bank0 Ramdisk Root File System Image";
+> > +		};
+> > +
+> > +		partition at 4000000 {
+> > +			/* 128KB for bank4 RCW */
+> > +			reg = <0x04000000 0x00020000>;
+> > +			label = "NOR bank4 RCW Image";
+> > +		};
+> > +
+> > +		partition at 4100000 {
+> > +			/* 1MB for bank4 u-boot Image */
+> > +			reg = <0x04100000 0x00100000>;
+> > +			label = "NOR bank4 u-boot Image";
+> > +		};
+> > +
+> > +		partition at 4200000 {
+> > +			/* 1MB for bank4 DTB */
+> > +			reg = <0x04200000 0x00100000>;
+> > +			label = "NOR bank4 DTB Image";
+> > +		};
+> > +
+> > +		partition at 4300000 {
+> > +			/* 7MB for bank4 Linux Kernel */
+> > +			reg = <0x04300000 0x00700000>;
+> > +			label = "NOR bank4 Linux Kernel Image";
+> > +		};
+> > +
+> > +		partition at 4a00000 {
+> > +			/* 54MB for bank4 Ramdisk Root File System */
+> > +			reg = <0x04a00000 0x03600000>;
+> > +			label = "NOR bank4 Ramdisk Root File System Image";
+> > +		};
+> >  	};
+> >
+> >  	fpga: board-control at 3,0 {
+> > diff --git a/arch/arm/boot/dts/ls1021a-twr.dts
+> > b/arch/arm/boot/dts/ls1021a-twr.dts
+> > index 75ecaed..f5e9616 100644
+> > --- a/arch/arm/boot/dts/ls1021a-twr.dts
+> > +++ b/arch/arm/boot/dts/ls1021a-twr.dts
+> > @@ -194,6 +194,66 @@
+> >  		reg = <0x0 0x0 0x8000000>;
+> >  		bank-width = <2>;
+> >  		device-width = <1>;
+> > +
+> > +		partition at 0 {
+> > +			/* 128KB for bank0 RCW */
+> > +			reg = <0x00000000 0x00020000>;
+> > +			label = "NOR bank0 RCW Image";
+> > +		};
+> > +
+> > +		partition at 100000 {
+> > +			/* 1MB for bank0 u-boot Image */
+> > +			reg = <0x00100000 0x00100000>;
+> > +			label = "NOR bank0 u-boot Image";
+> > +		};
+> > +
+> > +		partition at 200000 {
+> > +			/* 1MB for bank0 DTB */
+> > +			reg = <0x00200000 0x00100000>;
+> > +			label = "NOR bank0 DTB Image";
+> > +		};
+> > +
+> > +		partition at 300000 {
+> > +			/* 7MB for bank0 Linux Kernel */
+> > +			reg = <0x00300000 0x00700000>;
+> > +			label = "NOR bank0 Linux Kernel Image";
+> > +		};
+> > +
+> > +		partition at a00000 {
+> > +			/* 54MB for bank0 Ramdisk Root File System */
+> > +			reg = <0x00a00000 0x03600000>;
+> > +			label = "NOR bank0 Ramdisk Root File System Image";
+> > +		};
+> > +
+> > +		partition at 4000000 {
+> > +			/* 128KB for bank4 RCW */
+> > +			reg = <0x04000000 0x00020000>;
+> > +			label = "NOR bank4 RCW Image";
+> > +		};
+> > +
+> > +		partition at 4100000 {
+> > +			/* 1MB for bank4 u-boot Image */
+> > +			reg = <0x04100000 0x00100000>;
+> > +			label = "NOR bank4 u-boot Image";
+> > +		};
+> > +
+> > +		partition at 4200000 {
+> > +			/* 1MB for bank4 DTB */
+> > +			reg = <0x04200000 0x00100000>;
+> > +			label = "NOR bank4 DTB Image";
+> > +		};
+> > +
+> > +		partition at 4300000 {
+> > +			/* 7MB for bank4 Linux Kernel */
+> > +			reg = <0x04300000 0x00700000>;
+> > +			label = "NOR bank4 Linux Kernel Image";
+> > +		};
+> > +
+> > +		partition at 4a00000 {
+> > +			/* 54MB for bank4 Ramdisk Root File System */
+> > +			reg = <0x04a00000 0x03600000>;
+> > +			label = "NOR bank4 Ramdisk Root File System Image";
+> > +		};
+> >  	};
+> >  };
+> >
+> > --
+> > 2.1.0.27.g96db324
+> >
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> >
