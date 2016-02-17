@@ -1,68 +1,82 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 17 Feb 2016 09:32:51 +0100
-Subject: [PATCH v2 2/2] arm64/efi: esrt: add missing call to
- efi_esrt_init()
-In-Reply-To: <56C385D3.3090308@codeaurora.org>
-References: <1455535953-5056-1-git-send-email-ard.biesheuvel@linaro.org>
- <1455535953-5056-3-git-send-email-ard.biesheuvel@linaro.org>
- <56C385D3.3090308@codeaurora.org>
-Message-ID: <CAKv+Gu9YoUujk2mA7wLyiWZ9=v3XTMkDT6vzgOq5a=FtCcHZwQ@mail.gmail.com>
+From: tiffany.lin@mediatek.com (tiffany lin)
+Date: Wed, 17 Feb 2016 16:33:12 +0800
+Subject: [PATCH v4 5/8] [Media] vcodec: mediatek: Add Mediatek V4L2
+ Video Encoder Driver
+In-Reply-To: <56C425A0.6080005@xs4all.nl>
+References: <1454585703-42428-1-git-send-email-tiffany.lin@mediatek.com>
+ <1454585703-42428-2-git-send-email-tiffany.lin@mediatek.com>
+ <1454585703-42428-3-git-send-email-tiffany.lin@mediatek.com>
+ <1454585703-42428-4-git-send-email-tiffany.lin@mediatek.com>
+ <1454585703-42428-5-git-send-email-tiffany.lin@mediatek.com>
+ <1454585703-42428-6-git-send-email-tiffany.lin@mediatek.com>
+ <56C1B4AF.1030207@xs4all.nl> <1455604653.19396.68.camel@mtksdaap41>
+ <56C425A0.6080005@xs4all.nl>
+Message-ID: <1455697992.26202.13.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 February 2016 at 21:25, Baicar, Tyler <tbaicar@codeaurora.org> wrote:
-> On 2/15/2016 4:32 AM, Ard Biesheuvel wrote:
->>
->> ESRT support is built by default for all architectures that define
->> CONFIG_EFI. However, this support was not wired up yet for ARM/arm64,
->> since efi_esrt_init() was never called. So add the missing call.
->>
->> Since efi_esrt_init() uses efi_mem_desc_lookup(), which in turn relies
->> on efi.memmap having been assigned and populated completetely, add the
->> missing assignments of efi.memmap and efi.memmap->nr_map.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>   drivers/firmware/efi/arm-init.c | 3 +++
->>   1 file changed, 3 insertions(+)
->>
->> diff --git a/drivers/firmware/efi/arm-init.c
->> b/drivers/firmware/efi/arm-init.c
->> index 9e15d571b53c..5c5e799bdb50 100644
->> --- a/drivers/firmware/efi/arm-init.c
->> +++ b/drivers/firmware/efi/arm-init.c
->> @@ -197,10 +197,13 @@ void __init efi_init(void)
->>         memmap.map_end = memmap.map + params.mmap_size;
->>         memmap.desc_size = params.desc_size;
->>         memmap.desc_version = params.desc_ver;
->> +       memmap.nr_map = params.mmap_size / params.desc_size;
->> +       efi.memmap = &memmap;
->>         if (uefi_init() < 0)
->>                 return;
->>   +     efi_esrt_init();
->
-> This call to efi_esrt_init() is failing because efi.flags does not have
-> EFI_MEMMAP set. This flag gets set at the end of reserve_regions(). I tested
-> moving the set_bit() call from reserve_regions() to just before
-> efi_esrt_init() and also tested moving efi_esrt_init() to just after
-> reserve_regions(). Both of these options worked.
+Hi Hans,
 
-Thanks for spotting that. I moved the call around for some reason (I
-don't remember why, exactly), but it indeed belongs after the call to
-reserve_regions()
+On Wed, 2016-02-17 at 08:47 +0100, Hans Verkuil wrote:
+> On 02/16/2016 07:37 AM, tiffany lin wrote:
+> >>> +static int fops_vcodec_open(struct file *file)
+> >>> +{
+> >>> +	struct video_device *vfd = video_devdata(file);
+> >>> +	struct mtk_vcodec_dev *dev = video_drvdata(file);
+> >>> +	struct mtk_vcodec_ctx *ctx = NULL;
+> >>> +	int ret = 0;
+> >>> +
+> >>> +	mutex_lock(&dev->dev_mutex);
+> >>> +
+> >>> +	ctx = devm_kzalloc(&dev->plat_dev->dev, sizeof(*ctx), GFP_KERNEL);
+> >>> +	if (!ctx) {
+> >>> +		ret = -ENOMEM;
+> >>> +		goto err_alloc;
+> >>> +	}
+> >>> +
+> >>> +	if (dev->num_instances >= MTK_VCODEC_MAX_ENCODER_INSTANCES) {
+> >>> +		mtk_v4l2_err("Too many open contexts\n");
+> >>> +		ret = -EBUSY;
+> >>> +		goto err_no_ctx;
+> >>
+> >> Hmm. I never like it if you can't open a video node because of a reason like this.
+> >>
+> >> I.e. a simple 'v4l2-ctl -D' (i.e. calling QUERYCAP) should never fail.
+> >>
+> >> If there are hardware limitation that prevent more than X instances from running at
+> >> the same time, then those limitations typically kick in when you start to stream
+> >> (or possibly when calling REQBUFS). But before that it should always be possible to
+> >> open the device.
+> >>
+> >> Having this check at open() is an indication of a poor design.
+> >>
+> >> Is this is a hardware limitation at all?
+> >>
+> > This is to make sure performance meet requirements, such as bitrate and
+> > framerate.
+> 
+> Is it the driver's job to make enforce this? What if the application only
+> deals with low-res video, but wants to encode a lot of those? Or is encoding
+> a video off-line?
+> 
+> The driver generally doesn't know the use-case, so if this is an artificial
+> limitation as opposed to a hardware limitation, then I would just drop this.
+> 
+We got your point, we will remove this artificial limitation in next
+version.
 
-I will send out a v2
+best regards,
+Tiffany
 
->>
->>         reserve_regions();
->>         early_memunmap(memmap.map, params.mmap_size);
->>         memblock_mark_nomap(params.mmap & PAGE_MASK,
->
-> Thanks,
-> Tyler
->
-> --
-> Qualcomm Innovation Center, Inc.
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> a Linux Foundation Collaborative Project
->
+
+> Regards,
+> 
+> 	Hans
+> 
+> > We got your point. We will remove this and move limitation control to
+> > start_streaming or REQBUFS.
+> > Appreciated for your suggestion.:)
+> > 
+> > 
+> >>> +	}
+> 
