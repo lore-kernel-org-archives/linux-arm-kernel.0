@@ -1,40 +1,22 @@
-From: raveendra.padasalagi@broadcom.com (Raveendra Padasalagi)
-Date: Wed, 17 Feb 2016 15:23:49 +0530
-Subject: [PATCH v2 1/3] input: cygnus-update touchscreen dt node document
-In-Reply-To: <13357929.DDBX61jLXt@wuerfel>
-References: <1455702226-20599-1-git-send-email-raveendra.padasalagi@broadcom.com>
- <1455702226-20599-2-git-send-email-raveendra.padasalagi@broadcom.com>
- <13357929.DDBX61jLXt@wuerfel>
-Message-ID: <b2adbdb45d34485fbe8a29f580ab0c61@mail.gmail.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 17 Feb 2016 11:03:36 +0100
+Subject: [PATCH v5 2/3] clk: samsung: Don't build ARMv8 clock drivers on
+ ARMv7
+In-Reply-To: <1455603632-11158-3-git-send-email-k.kozlowski@samsung.com>
+References: <1455603632-11158-1-git-send-email-k.kozlowski@samsung.com>
+ <1455603632-11158-3-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <56C44578.5010009@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: 17 February 2016 15:16
-> To: Raveendra Padasalagi
-> Cc: Dmitry Torokhov; Russell King; Rob Herring;
-devicetree at vger.kernel.org;
-> linux-arm-kernel at lists.infradead.org; linux-input at vger.kernel.org; Pawel
-Moll;
-> Mark Rutland; Ian Campbell; Kumar Gala; Jonathan Richardson; Jon Mason;
-> Florian Fainelli; Anup Patel; Ray Jui; Scott Branden; linux-
-> kernel at vger.kernel.org; bcm-kernel-feedback-list at broadcom.com
-> Subject: Re: [PATCH v2 1/3] input: cygnus-update touchscreen dt node
-> document
->
-> On Wednesday 17 February 2016 15:13:44 Raveendra Padasalagi wrote:
-> > +
-> > +       ts_adc_syscon: ts_adc_syscon at 0x180a6000 {
-> > +               compatible = "syscon";
-> > +               reg = <0x180a6000 0xc30>;
-> > +       };
-> >
->
-> This should have a more specific compatible string in addition to the
-generic
-> "syscon" one.
+On 16/02/16 07:20, Krzysztof Kozlowski wrote:
+> Currently the Exynos5433 (ARMv8 SoC) clock driver depends on ARCH_EXYNOS
+> so it is built also on ARMv7. This does not bring any kind of benefit.
+> There won't be a single kernel image for ARMv7 and ARMv8 SoCs (like
+> multi_v7 for ARMv7).
+> 
+> Instead build clock drivers only for respective SoC's architecture.
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-Ok, Thanks Arnd. I will address this in the next patch.
-
-> 	Arnd
+Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
