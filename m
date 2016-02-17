@@ -1,61 +1,53 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 17 Feb 2016 16:02:34 +0100
-Subject: [PATCH v3 4/5] serial: 8250/ingenic: fix building with SERIAL_8250=m
-In-Reply-To: <1455721357-4008289-1-git-send-email-arnd@arndb.de>
-References: <1455721357-4008289-1-git-send-email-arnd@arndb.de>
-Message-ID: <1455721357-4008289-5-git-send-email-arnd@arndb.de>
+From: kirill@shutemov.name (Kirill A. Shutemov)
+Date: Wed, 17 Feb 2016 17:04:56 +0200
+Subject: [BUG] random kernel crashes after THP rework on s390 (maybe also
+ on PowerPC and ARM)
+In-Reply-To: <20160216172444.013988d8@thinkpad>
+References: <20160211205702.24f0d17a@thinkpad>
+ <20160212154116.GA15142@node.shutemov.name>
+ <56BE00E7.1010303@de.ibm.com> <20160212181640.4eabb85f@thinkpad>
+ <20160212231510.GB15142@node.shutemov.name>
+ <alpine.LFD.2.20.1602131238260.1910@schleppi>
+ <20160215113159.GA28832@node.shutemov.name>
+ <20160215193702.4a15ed5e@thinkpad>
+ <20160215213526.GA9766@node.shutemov.name>
+ <20160216172444.013988d8@thinkpad>
+Message-ID: <20160217150456.GA15882@node.shutemov.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Ingenic 8250 driver has a 'bool' Kconfig symbol, but that
-breaks when SERIAL_8250 is a loadable module:
+On Tue, Feb 16, 2016 at 05:24:44PM +0100, Gerald Schaefer wrote:
+> On Mon, 15 Feb 2016 23:35:26 +0200
+> "Kirill A. Shutemov" <kirill@shutemov.name> wrote:
+> 
+> > Is there any chance that I'll be able to trigger the bug using QEMU?
+> > Does anybody have an QEMU image I can use?
+> > 
+> 
+> I have no image, but trying to reproduce this under virtualization may
+> help to trigger this also on other architectures. After ruling out IPI
+> vs. fast_gup I do not really see why this should be arch-specific, and
+> it wouldn't be the first time that we hit subtle races first on s390, due
+> to our virtualized environment (my test case is make -j20 with 10 CPUs and
+> 4GB of memory, no swap).
 
-drivers/tty/built-in.o: In function `ingenic_uart_probe':
-8250_ingenic.c:(.text+0x1c1a0): undefined reference to `serial8250_register_8250_port'
+Could you post your kernel config?
 
-This changes the symbol to a 'tristate', plus a dependency on
-SERIAL_8250, which makes it work again. Unlike the other
-soc-specific backends, this one has no dependency on an
-architecture or a platform. I'm adding a dependency on
-MIPS || COMPILE_TEST as well here, to avoid showing the driver
-on architectures that are not interested in it.
+It would be nice also to check if disabling split_huge_page() would make
+any difference:
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/tty/serial/8250/8250_ingenic.c | 2 +-
- drivers/tty/serial/8250/Kconfig        | 7 ++++---
- 2 files changed, 5 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/tty/serial/8250/8250_ingenic.c b/drivers/tty/serial/8250/8250_ingenic.c
-index 97b78558caed..b0677f610863 100644
---- a/drivers/tty/serial/8250/8250_ingenic.c
-+++ b/drivers/tty/serial/8250/8250_ingenic.c
-@@ -48,7 +48,7 @@ static const struct of_device_id of_match[];
- #define UART_MCR_MDCE	BIT(7)
- #define UART_MCR_FCM	BIT(6)
+diff --git a/mm/huge_memory.c b/mm/huge_memory.c
+index a75081ca31cf..26d2b7b21021 100644
+--- a/mm/huge_memory.c
++++ b/mm/huge_memory.c
+@@ -3364,6 +3364,8 @@ int split_huge_page_to_list(struct page *page, struct list_head *list)
+ 	bool mlocked;
+ 	unsigned long flags;
  
--#ifdef CONFIG_SERIAL_EARLYCON
-+#if defined(CONFIG_SERIAL_EARLYCON) && !defined(MODULE)
- static struct earlycon_device *early_device;
- 
- static uint8_t __init early_in(struct uart_port *port, int offset)
-diff --git a/drivers/tty/serial/8250/Kconfig b/drivers/tty/serial/8250/Kconfig
-index 67ad6b0d595b..1b0638511ac1 100644
---- a/drivers/tty/serial/8250/Kconfig
-+++ b/drivers/tty/serial/8250/Kconfig
-@@ -384,9 +384,10 @@ config SERIAL_8250_UNIPHIER
- 	  serial ports, say Y to this option. If unsure, say N.
- 
- config SERIAL_8250_INGENIC
--	bool "Support for Ingenic SoC serial ports"
--	depends on OF_FLATTREE
--	select LIBFDT
-+	tristate "Support for Ingenic SoC serial ports"
-+	depends on SERIAL_8250
-+	depends on (OF_FLATTREE && SERIAL_8250_CONSOLE) || !SERIAL_EARLYCON
-+	depends on MIPS || COMPILE_TEST
- 	help
- 	  If you have a system using an Ingenic SoC and wish to make use of
- 	  its UARTs, say Y to this option. If unsure, say N.
++	return -EBUSY;
++
+ 	VM_BUG_ON_PAGE(is_huge_zero_page(page), page);
+ 	VM_BUG_ON_PAGE(!PageAnon(page), page);
+ 	VM_BUG_ON_PAGE(!PageLocked(page), page);
 -- 
-2.7.0
+ Kirill A. Shutemov
