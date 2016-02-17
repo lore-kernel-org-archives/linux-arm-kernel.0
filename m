@@ -1,35 +1,31 @@
-From: jay.xu@rock-chips.com (Jianqun Xu)
-Date: Wed, 17 Feb 2016 08:21:58 +0800
-Subject: [PATCH] spi/rockchip: Add dt-binding for Rockchip rk3399 spi
-In-Reply-To: <1730751.NYv1NxJVuB@phil>
-References: <1455614538-4415-1-git-send-email-jay.xu@rock-chips.com>
- <20160216132223.GM18327@sirena.org.uk> <1730751.NYv1NxJVuB@phil>
-Message-ID: <56C3BD26.3030704@rock-chips.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 16 Feb 2016 22:28:05 -0200
+Subject: [PATCH v2 2/3] ARM: dts: vf-colibri: add basic supply regulators
+In-Reply-To: <1455668317-15728-2-git-send-email-stefan@agner.ch>
+References: <1455668317-15728-1-git-send-email-stefan@agner.ch>
+ <1455668317-15728-2-git-send-email-stefan@agner.ch>
+Message-ID: <CAOMZO5Bb1eGSinoNkUhB_2w8mWdA+RQA0Z4geJp8B-MfGryAHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko
+On Tue, Feb 16, 2016 at 10:18 PM, Stefan Agner <stefan@agner.ch> wrote:
 
-? 16/02/2016 22:37, Heiko Stuebner ??:
-> Am Dienstag, 16. Februar 2016, 13:22:23 schrieb Mark Brown:
->> On Tue, Feb 16, 2016 at 05:22:18PM +0800, jianqun.xu wrote:
->>>   Documentation/devicetree/bindings/spi/spi-rockchip.txt | 1 +
->>>   1 file changed, 1 insertion(+)
->>
->> I'd expect this to be added to both the driver and the binding document
->> not just the document.
->
-> It seems the driver can still use the rk3066-variant - aka nobody has found
-> specific issues in the rk3399 IP implementation.
->
-> Having the more specific IP names already in the dts before actually using
-> them was suggested by devicetree people to not have to exchange everything
-> once specific issues were found.
->
-> So right now it's using the fallback-mechanism of binding to the rk3066
-> name, but if some obstacle appears it will only take adding the binding in
-> the driver to make it work (even with old devicetrees).
->
->
-Thank you, got it, and I will re-send this patch with the driver patch.
->
+> +       reg_module_3v3: regulator-module-3v3 {
+> +               compatible = "regulator-fixed";
+> +               regulator-name = "+V3.3";
+> +               regulator-min-microvolt = <3300000>;
+> +               regulator-max-microvolt = <3300000>;
+> +               regulator-always-on;
+
+This 'regulator-always-on' property can be removed.
+
+> +       };
+> +
+> +       reg_module_3v3_avdd: regulator-module-3v3-avdd {
+> +               compatible = "regulator-fixed";
+> +               regulator-name = "+V3.3_AVDD_AUDIO";
+> +               regulator-min-microvolt = <3300000>;
+> +               regulator-max-microvolt = <3300000>;
+> +               regulator-always-on;
+
+Same here.
