@@ -1,42 +1,151 @@
-From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
-Date: Wed, 17 Feb 2016 09:36:37 +0100
-Subject: [PATCH 3/7] usb: gadget: pxa25x_udc: use readl/writel for mmio
-In-Reply-To: <3062977.Ya2ztQYFaM@wuerfel> (Arnd Bergmann's message of "Tue, 16
- Feb 2016 14:55:43 +0100")
-References: <1453997722-3489596-1-git-send-email-arnd@arndb.de>
- <2702068.KRp0Bplb5Q@wuerfel> <m34md8rdol.fsf@t19.piap.pl>
- <3062977.Ya2ztQYFaM@wuerfel>
-Message-ID: <m3ziuzpwbu.fsf@t19.piap.pl>
+From: yong.wu@mediatek.com (Yong Wu)
+Date: Wed, 17 Feb 2016 08:46:09 +0800
+Subject: [PATCH v9 0/5] MT8173 IOMMU SUPPORT
+Message-ID: <1455669974-1527-1-git-send-email-yong.wu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+  This patch set adds support for m4u(Multimedia Memory Management Unit),
+Currently it only support the m4u with 2 levels of pagetable on mt8173.
 
-> ixp4xx is really special in that it performs hardware swapping for
-> internal devices based on CPU endianess but not on PCI devices.
+  It's based on Robin Murphy's Short-descriptor v3[1].
+ 
+  Please check the hardware block diagram of Mediatek IOMMU.
+ 
+              m4u (Multimedia Memory Management Unit)
+               |
+           SMI Common(Smart Multimedia Interface Common)
+               |
+       +----------------+-------
+       |                |
+       |                |
+   SMI larb0        SMI larb1   ... SoCs have several SMI local arbiter(larb).
+   (display)         (vdec)
+       |                |
+       |                |
+ +-----+-----+     +----+----+
+ |     |     |     |    |    |
+ |     |     |...  |    |    |  ... There are different ports in each larb.
+ |     |     |     |    |    |
+OVL0 RDMA0 WDMA0  MC   PP   VLD
 
-Again, IXP4xx does not perform hardware (nor any other) swapping for
-registers of on-chip devices. The registers are connected 1:1,
-bit 0 to bit 0 etc.
+  As above, The Multimedia HW will go through SMI and M4U while it
+access EMI. SMI is a bridge between m4u and the Multimedia HW. It contain
+smi local arbiter and smi common. It will control whether the Multimedia
+HW should go though the m4u for translation or bypass it and talk
+directly with EMI. And also SMI help control the power domain and clocks for
+each local arbiter.
+  Normally we specify a local arbiter(larb) for each multimedia HW
+like display, video decode, and camera. And there are different ports
+in each larb. Take a example, There are many ports like MC, PP, VLD in the
+video decode local arbiter, all these ports are according to the video HW.
 
-(Yes, IXP4xx can be optionally programmed for such swapping, depending
-on silicon revision, but it is not used in mainline kernel).
+[1] : http://thread.gmane.org/gmane.linux.kernel.iommu/12007
 
-The only hardware swapping happens on PCI bus (in BE mode), to be
-compatible with other platforms and non-IXP4xx-specific PCI drivers.
+v9:
+ - rebase onto Robin's Short-descriptor v3.
+ - add the Acks and other tags for all the patches(No change the code).
 
-> Coming back to the specific pxa25x_udc case: using __raw_* accessors
-> in the driver would possibly end up breaking the PXA25x machines in
-> the (very unlikely) case that someone wants to make it work with
-> big-endian kernels, assuming it does not have the same hardware
-> byteswap logic as ixp4xx.
+v8: http://thread.gmane.org/gmane.linux.kernel.iommu/11974
+ - rebase onto v4.5-rc1.
+ - add depends on (ARM || ARM64) for MTK_IOMMU in Kconfig to avoid build fail
+   in other ARCHs.
+ - delete COHERENCE_EN bit.
+ - delete a *if* while config iommu information since the iommu is always
+   enabled currently.
 
-I'd expect both CPUs to behave in exactly the same manner, i.e., to
-not swap anything on the internal bus. If true, it would mean it should
-"just work" in both BE and LE modes (including BE mode on PXA, should
-it be actually possible).
+v7: http://lists.linuxfoundation.org/pipermail/iommu/2015-December/015214.html
+- rebase onto Robin's short v2:
+  http://lists.linuxfoundation.org/pipermail/iommu/2015-December/015210.html
+- Adjust the iommu probe sequence to meet the expectant flow that the iommu
+  core help create the domain.
+- use component additional data instead of the interface mtk_smi_config_port.
+- reconstruct the SMI help function.
+
+v6: http://lists.linuxfoundation.org/pipermail/iommu/2015-December/015105.html
+-rebase onto v4.4-rc1.
+-Use Robin's reposting Short-decriptor.
+ http://lists.linuxfoundation.org/pipermail/iommu/2015-December/015088.html
+-Add component for m4u and smi since m4u should depend on smi-larb.
+ The master device is the m4u device, and the client one is the smi-larb device. 
+-Change mtk iommu-cells from 2 to 1 since the mapping between larb and port is
+ fixed. Compare this with v2, we redefine MTK_M4U_ID following this register
+ REG_MMU_INT_ID.
+-About SMI: Add some help funcion and rename some function and struction for
+ more readable. 
+ These three above are according to Daniel Kurtz's suggestion.
+
+v5: http://lists.linuxfoundation.org/pipermail/iommu/2015-October/014586.html
+-rebase onto v4.3-rc1.
+-About MTK iommu: don't return the same domain while domain_alloc, change the
+ domain's flow according to the M4U HW.
+-About Short-descriptor: Improve many error-handles, NO_PERMS quirk, and 
+ add TLBI_MAP quirk following Will's Suggestion; Add io-pgtable don't use 
+ dma_to_phys; Add a loop in arm_short_unmap since iommu_unmap don't care the 
+ physical address align.
+-About SMI driver: Add a help funcion for some similar code. Add PROPRE_DEFER
+ for power-domain as MTK SCPSYS is module_init currently.
+
+v4: http://lists.linuxfoundation.org/pipermail/iommu/2015-August/013903.html
+-use only one iommu domain here based on the Robin's DMA-v5:
+ http://lists.linuxfoundation.org/pipermail/iommu/2015-July/013900.html
+-remove flush_pgtable.
+-change writel to writel_relaxed.
+-about Short-descriptor: move dma_map_single into io-pgtable-arm-short.
+ Improve the flow of free pgtable and add NO_XN+NO_PERMS quirk following
+ Will's suggestion.
+-Change two sytle issues in dtsi according to Daniel's suggestion.
+
+v3: http://lists.linuxfoundation.org/pipermail/iommu/2015-July/013632.html
+-rebased onto v4.2-rc1
+-improve iommu flow based on the Robin's DMA v3:
+ http://lists.linuxfoundation.org/pipermail/iommu/2015-July/013597.html
+-change mtk iommu-cells from 1 to 2.
+-about Short-descriptor: add split function; add self-test; add some other bits like nG,
+ XN according to the spec; add SUPERSECTION and MTK quirk; move io_pgtable_ops_to_pgtable
+ out from LPAE to the header file.
+-about SMI: move from driver/soc/mediatek to driver/memory; change the clocks from
+ clk[2] to clk_apb and clk_smi; add pm.
+-add iommu suspend/resume to backup/restore register.
+
+v2: http://lists.linuxfoundation.org/pipermail/iommu/2015-May/013028.html
+-add arm short descriptor support.
+-seperate smi common from smi and change the clock-names according
+ to smi HW.
+-delete the hardcode of the port-names in mt8173.
+ replace this with larb-portes-nr in dtsi.
+-fix some coding style issues.
+
+v1: http://lists.infradead.org/pipermail/linux-mediatek/2015-March/000058.html
+-initial version.
+
+Yong Wu (5):
+  dt-bindings: iommu: Add binding for mediatek IOMMU
+  dt-bindings: mediatek: Add smi dts binding
+  memory: mediatek: Add SMI driver
+  iommu/mediatek: Add mt8173 IOMMU driver
+  dts: mt8173: Add iommu/smi nodes for mt8173
+
+ .../devicetree/bindings/iommu/mediatek,iommu.txt   |  68 ++
+ .../memory-controllers/mediatek,smi-common.txt     |  24 +
+ .../memory-controllers/mediatek,smi-larb.txt       |  25 +
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  81 +++
+ drivers/iommu/Kconfig                              |  16 +
+ drivers/iommu/Makefile                             |   1 +
+ drivers/iommu/mtk_iommu.c                          | 732 +++++++++++++++++++++
+ drivers/memory/Kconfig                             |   8 +
+ drivers/memory/Makefile                            |   1 +
+ drivers/memory/mtk-smi.c                           | 272 ++++++++
+ include/dt-bindings/memory/mt8173-larb-port.h      | 111 ++++
+ include/soc/mediatek/smi.h                         |  58 ++
+ 12 files changed, 1397 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/iommu/mediatek,iommu.txt
+ create mode 100644 Documentation/devicetree/bindings/memory-controllers/mediatek,smi-common.txt
+ create mode 100644 Documentation/devicetree/bindings/memory-controllers/mediatek,smi-larb.txt
+ create mode 100644 drivers/iommu/mtk_iommu.c
+ create mode 100644 drivers/memory/mtk-smi.c
+ create mode 100644 include/dt-bindings/memory/mt8173-larb-port.h
+ create mode 100644 include/soc/mediatek/smi.h
+
 -- 
-Krzysztof Halasa
-
-Industrial Research Institute for Automation and Measurements PIAP
-Al. Jerozolimskie 202, 02-486 Warsaw, Poland
+1.8.1.1.dirty 
