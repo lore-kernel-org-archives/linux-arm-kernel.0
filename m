@@ -1,25 +1,31 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 17 Feb 2016 13:40:42 -0200
-Subject: [PATCH] i.MX SPI DMA cleanup
-In-Reply-To: <56C492DB.6000405@de.bosch.com>
-References: <1455715739-25161-1-git-send-email-s.hauer@pengutronix.de>
- <56C478C9.6050706@de.bosch.com>
- <20160217135441.GA3939@pengutronix.de>
- <56C47F64.1080706@de.bosch.com>
- <20160217145944.GB3939@pengutronix.de>
- <56C492DB.6000405@de.bosch.com>
-Message-ID: <CAOMZO5Bcwf335VY2809YU2b_-+jntJ_pjNQw_E+jdvEYV==NrQ@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 17 Feb 2016 10:51:04 -0500 (EST)
+Subject: [PATCH] drivers: net: cpsw-phy-sel: add dev_warn() for
+ unsupported PHY mode
+In-Reply-To: <1455324336-3884-1-git-send-email-drivshin.allworx@gmail.com>
+References: <1455324336-3884-1-git-send-email-drivshin.allworx@gmail.com>
+Message-ID: <20160217.105104.143723229571677119.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 17, 2016 at 1:33 PM, Dirk Behme <dirk.behme@de.bosch.com> wrote:
+From: "David Rivshin (Allworx)" <drivshin.allworx@gmail.com>
+Date: Fri, 12 Feb 2016 19:45:36 -0500
 
-> To my understanding, the TKT238285 hardware issue exists on both i.MX6Q and
-> i.MX6DL. Even though the commit message in
->
-> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/drivers/spi/spi-imx.c?id=a02bb401f8ae264be782ee57d98bdd99f14c802
->
-> states it differently. Maybe due to timing issues it happens less often on
-> i.MX6Q and therefore wasn't in the focus there, yet.
+> From: David Rivshin <drivshin@allworx.com>
+> 
+> The cpsw-phy-sel driver supports only MII, RMII, and RGMII PHY modes,
+> and silently handled any other values as if MII was specified. In a
+> case where the PHY mode was incorrectly specified, or a bug elsewhere,
+> there would be no indication of a problem. If MII was the correct mode,
+> then this will go unnoticed, otherwise the symptom will be a failure
+> to transmit/receive data over the RMII/RGMII link.
+> 
+> Add a dev_warn() to make this condition obvious and provide a
+> breadcrumb to follow.
+> 
+> Cc: Mugunthan V N <mugunthanvnm@ti.com>
+> Signed-off-by: David Rivshin <drivshin@allworx.com>
 
-Yes, this is my understanding as well.
+Applied to 'net', thanks.  I don't think I'll queue this up for -stable.
+
+Thanks.
