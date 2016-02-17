@@ -1,38 +1,33 @@
 From: jay.xu@rock-chips.com (jianqun.xu)
-Date: Wed, 17 Feb 2016 09:53:06 +0800
-Subject: [PATCH 0/6] Add core dtsi for rk3399 from Rockchip
-Message-ID: <1455673992-16469-1-git-send-email-jay.xu@rock-chips.com>
+Date: Wed, 17 Feb 2016 09:53:09 +0800
+Subject: [PATCH 3/6] ASoC: rockchip: add bindings for rk3399 i2s
+In-Reply-To: <1455673992-16469-1-git-send-email-jay.xu@rock-chips.com>
+References: <1455673992-16469-1-git-send-email-jay.xu@rock-chips.com>
+Message-ID: <1455673992-16469-4-git-send-email-jay.xu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Xu Jianqun <jay.xu@rock-chips.com>
 
-There is the new SoCs from Rockchip which named rk3399, the
-patches are added to support them.
+Add devicetree bindings for i2s controller found on rk3399
+processors from rockchip.
 
-Two patch of cru from Xing are quoted, but the cru driver will
-be pushed by Xing near later.
+Signed-off-by: Xu Jianqun <jay.xu@rock-chips.com>
+---
+ Documentation/devicetree/bindings/sound/rockchip-i2s.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-Xing Zheng (2):
-  clk: rockchip: add dt-binding header for rk3399
-  dt-bindings: add documentation of rk3399 clock controller
-
-Xu Jianqun (4):
-  spi: rockchip: add bindings for rk3399 spi
-  ASoC: rockchip: add bindings for rk3399 i2s
-  pinctrl: rockchip: add bindings for rk3399 pinctrl
-  ARM64: dts: rockchip: add core dtsi file for rk3399
-
- .../bindings/clock/rockchip,rk3399-cru.txt         |  82 ++
- .../bindings/pinctrl/rockchip,pinctrl.txt          |   2 +-
- .../devicetree/bindings/sound/rockchip-i2s.txt     |   1 +
- .../devicetree/bindings/spi/spi-rockchip.txt       |   1 +
- arch/arm64/boot/dts/rockchip/rk3399.dtsi           | 989 +++++++++++++++++++++
- include/dt-bindings/clock/rk3399-cru.h             | 610 +++++++++++++
- 6 files changed, 1684 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/clock/rockchip,rk3399-cru.txt
- create mode 100644 arch/arm64/boot/dts/rockchip/rk3399.dtsi
- create mode 100644 include/dt-bindings/clock/rk3399-cru.h
-
+diff --git a/Documentation/devicetree/bindings/sound/rockchip-i2s.txt b/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
+index b7f3a93..6e86d8a 100644
+--- a/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
++++ b/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
+@@ -9,6 +9,7 @@ Required properties:
+    - "rockchip,rk3066-i2s": for rk3066
+    - "rockchip,rk3188-i2s", "rockchip,rk3066-i2s": for rk3188
+    - "rockchip,rk3288-i2s", "rockchip,rk3066-i2s": for rk3288
++   - "rockchip,rk3399-i2s", "rockchip,rk3066-i2s": for rk3399
+ - reg: physical base address of the controller and length of memory mapped
+   region.
+ - interrupts: should contain the I2S interrupt.
 -- 
 1.9.1
