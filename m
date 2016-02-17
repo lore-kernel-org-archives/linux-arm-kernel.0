@@ -1,63 +1,106 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 17 Feb 2016 23:28:27 +0100
-Subject: [PATCH] ARM: move __kuser_cmpxchg{32,64} into .kprobes.text
-Message-ID: <1455748127-2844701-1-git-send-email-arnd@arndb.de>
+From: joshc@ni.com (Josh Cartwright)
+Date: Wed, 17 Feb 2016 16:44:15 -0600
+Subject: Bunch of machines are not booting in next again, GPIO regression?
+In-Reply-To: <20160217202224.GD21202@atomide.com>
+References: <20160217192755.GC21202@atomide.com>
+ <20160217195543.GA871@jcartwri.amer.corp.natinst.com>
+ <20160217201259.GA16028@deathstar>
+ <20160217202224.GD21202@atomide.com>
+Message-ID: <20160217224415.GA3866@jcartwri.amer.corp.natinst.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When kprobes is used, most of the entry-armv.S file is put into the .kprobes.text
-section rather than .text, but the kuser_cmpxchg64_fixup and kuser_cmpxchg32_fixup
-code is not, which can lead to a link error when extremely large kernels get
-built (typically for randconfig):
+On Wed, Feb 17, 2016 at 12:22:25PM -0800, Tony Lindgren wrote:
+> * Michael Welling <mwelling@ieee.org> [160217 12:13]:
+> > On Wed, Feb 17, 2016 at 01:55:43PM -0600, Josh Cartwright wrote:
+> > > On Wed, Feb 17, 2016 at 11:27:55AM -0800, Tony Lindgren wrote:
+> > > > Hi Linus,
+> > > > 
+> > > > Looks like ff2b13592299 ("gpio: make the gpiochip a real device")
+> > > > broke booting on all omaps, and probably other machines too according
+> > > > to this:
+> > > > 
+> > > > https://kernelci.org/boot/all/job/next/kernel/next-20160217/
+> > > > 
+> > > > So far we've gone from 1 failed machine with next-20160216 to
+> > > > 18 failed machines with next-20160217.
+> > > > 
+> > > > The error I'm getting on omaps is below with debug_ll enable,
+> > > > any ideas?
+> > > 
+> > > Hey Tony-
+> > > 
+> > > Looks like the newly allocated gpio_device object isn't zeroed,
+> > > confusing dev_set_name.  Can you give this a try?
+> > > 
+> > >   Josh
+> > > 
+> > > diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
+> > > index d8511cd..59f0045 100644
+> > > --- a/drivers/gpio/gpiolib.c
+> > > +++ b/drivers/gpio/gpiolib.c
+> > > @@ -435,7 +435,7 @@ int gpiochip_add_data(struct gpio_chip *chip, void *data)
+> > >  	 * First: allocate and populate the internal stat container, and
+> > >  	 * set up the struct device.
+> > >  	 */
+> > > -	gdev = kmalloc(sizeof(*gdev), GFP_KERNEL);
+> > > +	gdev = kzalloc(sizeof(*gdev), GFP_KERNEL);
+> > >  	if (!gdev)
+> > >  		return -ENOMEM;
+> > >  	gdev->dev.bus = &gpio_bus_type;
+> > 
+> > As you can see by my post on the GPIO mailing list, a boot failure
+> > was occurring on the Dragonboard 410C:
+> > http://permalink.gmane.org/gmane.linux.kernel.gpio/14360
+> > 
+> > With the above patch the board now boots. Good catch.
+> 
+> Yup fixes the issue for me too.
 
-arch/arm/kernel/built-in.o: In function `__dabt_usr':
-:(.kprobes.text+0x47c): relocation truncated to fit: R_ARM_JUMP24 against `.text'
-arch/arm/kernel/built-in.o: In function `__irq_usr':
-:(.kprobes.text+0x4e4): relocation truncated to fit: R_ARM_JUMP24 against `.text'
-arch/arm/kernel/built-in.o: In function `__fiq_usr':
-:(.kprobes.text+0x740): relocation truncated to fit: R_ARM_JUMP24 against `.text'
+Linus-
 
-This moves the two remaining functions into the same section as the rest,
-to avoid the link error.
+Here's a properly cooked patch.  Otherwise, feel free to squash it in if
+it's easier for you.
 
-The current behavior has existed for many years and has not caused problems in
-practice except for extreme randconfig builds, so the patch should not need to
-get backported.
+  Josh
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: b49c0f24cf67 ("[ARM] 4659/1: remove possibilities for spurious false negative with __kuser_cmpxchg")
-Fixes: 785d3cd286f0 ("ARM kprobes: prevent some functions involved with kprobes from being probed")
+-- 8< --
+Subject: [PATCH] gpio: use kzalloc to allocate gpio_device
+
+The use of kmalloc() to allocate the gpio_device leaves the contained struct
+device object in an unknown state.  Calling dev_set_name() on a struct device
+of unknown state can trigger the free() of an invalid pointer, as seen in the
+following backtrace (collected by Tony Lindgren):
+
+  kfree
+  kobject_set_name_vargs
+  dev_set_name
+  gpiochip_add_data
+  omap_gpio_probe
+  platform_drv_probe
+  ...
+
+Reported-by: Michael Welling <mwelling@ieee.org>
+Reported-by: Tony Lindgren <tony@atomide.com>
+Tested-by: Michael Welling <mwelling@ieee.org>
+Tested-by: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Josh Cartwright <joshc@ni.com>
 ---
- arch/arm/kernel/entry-armv.S | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ drivers/gpio/gpiolib.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-index e2550500486d..030e43a0dce8 100644
---- a/arch/arm/kernel/entry-armv.S
-+++ b/arch/arm/kernel/entry-armv.S
-@@ -895,7 +895,11 @@ __kuser_cmpxchg64:				@ 0xffff0f60
- 	rsbs	r0, r3, #0			@ set return val and C flag
- 	ldmfd	sp!, {r4, r5, r6, pc}
- 
-+#ifdef CONFIG_KPROBES
-+	.section	.kprobes.text,"ax",%progbits
-+#else
- 	.text
-+#endif
- kuser_cmpxchg64_fixup:
- 	@ Called from kuser_cmpxchg_fixup.
- 	@ r4 = address of interrupted insn (must be preserved).
-@@ -953,7 +957,11 @@ __kuser_cmpxchg:				@ 0xffff0fc0
- 	rsbs	r0, r3, #0			@ set return val and C flag
- 	usr_ret	lr
- 
-+#ifdef CONFIG_KPROBES
-+	.section	.kprobes.text,"ax",%progbits
-+#else
- 	.text
-+#endif
- kuser_cmpxchg32_fixup:
- 	@ Called from kuser_cmpxchg_check macro.
- 	@ r4 = address of interrupted insn (must be preserved).
+diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
+index d8511cd..59f0045 100644
+--- a/drivers/gpio/gpiolib.c
++++ b/drivers/gpio/gpiolib.c
+@@ -435,7 +435,7 @@ int gpiochip_add_data(struct gpio_chip *chip, void *data)
+ 	 * First: allocate and populate the internal stat container, and
+ 	 * set up the struct device.
+ 	 */
+-	gdev = kmalloc(sizeof(*gdev), GFP_KERNEL);
++	gdev = kzalloc(sizeof(*gdev), GFP_KERNEL);
+ 	if (!gdev)
+ 		return -ENOMEM;
+ 	gdev->dev.bus = &gpio_bus_type;
 -- 
 2.7.0
