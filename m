@@ -1,97 +1,38 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 17 Feb 2016 16:02:31 +0100
-Subject: [PATCH v3 1/5] Revert "drivers/tty/serial: make 8250/8250_mtk.c
- explicitly non-modular"
+Date: Wed, 17 Feb 2016 16:02:33 +0100
+Subject: [PATCH v3 3/5] serial: 8250/uniphier: fix modular build
 In-Reply-To: <1455721357-4008289-1-git-send-email-arnd@arndb.de>
 References: <1455721357-4008289-1-git-send-email-arnd@arndb.de>
-Message-ID: <1455721357-4008289-2-git-send-email-arnd@arndb.de>
+Message-ID: <1455721357-4008289-4-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit d72d391c126e ("drivers/tty/serial: make
-8250/8250_mtk.c explicitly non-modular"), which intended to remove dead
-code but did not have the desired effect when the main 8250 driver was
-a module itself.
+The newly added uniphier serial port driver fails to build as
+a loadable module when the base 8250 driver is built-in and
+its console support enabled:
 
-This would normally result in a link error, but as the entire
-drivers/tty/serial/8250/ directory is only entered when CONFIG_SERIAL_8250
-is set, we never notice that the driver does not get built in this
-configuration.
+ERROR: "early_serial8250_setup" [drivers/tty/serial/8250/8250_uniphier.ko] undefined!
+
+This changes the driver to only provide the early console support
+if it is built-in itself as well.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/tty/serial/8250/8250_mtk.c | 35 ++++++++++++++++++++++++++++-------
- 1 file changed, 28 insertions(+), 7 deletions(-)
+ drivers/tty/serial/8250/8250_uniphier.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/tty/serial/8250/8250_mtk.c b/drivers/tty/serial/8250/8250_mtk.c
-index 9038843cadc7..6ecc6e3e82dc 100644
---- a/drivers/tty/serial/8250/8250_mtk.c
-+++ b/drivers/tty/serial/8250/8250_mtk.c
-@@ -16,7 +16,7 @@
-  */
- #include <linux/clk.h>
- #include <linux/io.h>
--#include <linux/init.h>
-+#include <linux/module.h>
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
- #include <linux/platform_device.h>
-@@ -245,6 +245,23 @@ static int mtk8250_probe(struct platform_device *pdev)
- 	return 0;
- }
+diff --git a/drivers/tty/serial/8250/8250_uniphier.c b/drivers/tty/serial/8250/8250_uniphier.c
+index bab6b3ae2540..1b7bd26555b7 100644
+--- a/drivers/tty/serial/8250/8250_uniphier.c
++++ b/drivers/tty/serial/8250/8250_uniphier.c
+@@ -35,7 +35,7 @@ struct uniphier8250_priv {
+ 	spinlock_t atomic_write_lock;
+ };
  
-+static int mtk8250_remove(struct platform_device *pdev)
-+{
-+	struct mtk8250_data *data = platform_get_drvdata(pdev);
-+
-+	pm_runtime_get_sync(&pdev->dev);
-+
-+	serial8250_unregister_port(data->line);
-+
-+	pm_runtime_disable(&pdev->dev);
-+	pm_runtime_put_noidle(&pdev->dev);
-+
-+	if (!pm_runtime_status_suspended(&pdev->dev))
-+		mtk8250_runtime_suspend(&pdev->dev);
-+
-+	return 0;
-+}
-+
- static int __maybe_unused mtk8250_suspend(struct device *dev)
+-#ifdef CONFIG_SERIAL_8250_CONSOLE
++#if defined(CONFIG_SERIAL_8250_CONSOLE) && !defined(MODULE)
+ static int __init uniphier_early_console_setup(struct earlycon_device *device,
+ 					       const char *options)
  {
- 	struct mtk8250_data *data = dev_get_drvdata(dev);
-@@ -273,18 +290,18 @@ static const struct of_device_id mtk8250_of_match[] = {
- 	{ .compatible = "mediatek,mt6577-uart" },
- 	{ /* Sentinel */ }
- };
-+MODULE_DEVICE_TABLE(of, mtk8250_of_match);
- 
- static struct platform_driver mtk8250_platform_driver = {
- 	.driver = {
--		.name			= "mt6577-uart",
--		.pm			= &mtk8250_pm_ops,
--		.of_match_table		= mtk8250_of_match,
--		.suppress_bind_attrs	= true,
--
-+		.name		= "mt6577-uart",
-+		.pm		= &mtk8250_pm_ops,
-+		.of_match_table	= mtk8250_of_match,
- 	},
- 	.probe			= mtk8250_probe,
-+	.remove			= mtk8250_remove,
- };
--builtin_platform_driver(mtk8250_platform_driver);
-+module_platform_driver(mtk8250_platform_driver);
- 
- #ifdef CONFIG_SERIAL_8250_CONSOLE
- static int __init early_mtk8250_setup(struct earlycon_device *device,
-@@ -300,3 +317,7 @@ static int __init early_mtk8250_setup(struct earlycon_device *device,
- 
- OF_EARLYCON_DECLARE(mtk8250, "mediatek,mt6577-uart", early_mtk8250_setup);
- #endif
-+
-+MODULE_AUTHOR("Matthias Brugger");
-+MODULE_LICENSE("GPL");
-+MODULE_DESCRIPTION("Mediatek 8250 serial port driver");
 -- 
 2.7.0
