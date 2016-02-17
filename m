@@ -1,37 +1,92 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Wed, 17 Feb 2016 08:55:02 +0100
-Subject: noise issues when recording sound on i.MX28
-In-Reply-To: <CAOMZO5BDjkWi+cQK1-J7ag8Z48tY1Uwofi4EkovN-drSC4_reA@mail.gmail.com>
-References: <20160127105613.GC13664@pengutronix.de>
- <CAOMZO5BpLen517q2heramSta-R6pdESkjM6w=7FRMZebY6ue-Q@mail.gmail.com>
- <20160127144340.GD13664@pengutronix.de>
- <CAOMZO5AE6HwBYz7kOFORt0HTojJLSb0MYUbkb_HCshDHy=d27g@mail.gmail.com>
- <20160210150315.GC13664@pengutronix.de>
- <CAOMZO5D5H4F90nse9kyW9KvsJStN-sCGktup4FDPw_zTeNfS2g@mail.gmail.com>
- <20160211084029.GE13664@pengutronix.de>
- <CAOMZO5BDjkWi+cQK1-J7ag8Z48tY1Uwofi4EkovN-drSC4_reA@mail.gmail.com>
-Message-ID: <20160217085502.39e4cb24@ipc1.ka-ro>
+From: tiffany.lin@mediatek.com (tiffany lin)
+Date: Wed, 17 Feb 2016 16:01:08 +0800
+Subject: [PATCH v4 5/8] [Media] vcodec: mediatek: Add Mediatek V4L2
+ Video Encoder Driver
+In-Reply-To: <56C328AF.5030604@cisco.com>
+References: <1454585703-42428-1-git-send-email-tiffany.lin@mediatek.com>
+ <1454585703-42428-2-git-send-email-tiffany.lin@mediatek.com>
+ <1454585703-42428-3-git-send-email-tiffany.lin@mediatek.com>
+ <1454585703-42428-4-git-send-email-tiffany.lin@mediatek.com>
+ <1454585703-42428-5-git-send-email-tiffany.lin@mediatek.com>
+ <1454585703-42428-6-git-send-email-tiffany.lin@mediatek.com>
+ <56C1B4AF.1030207@xs4all.nl> <1455604653.19396.68.camel@mtksdaap41>
+ <56C2D371.9090805@xs4all.nl> <1455628805.19396.82.camel@mtksdaap41>
+ <56C328AF.5030604@cisco.com>
+Message-ID: <1455696068.26202.4.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, 16 Feb 2016 13:01:19 -0200 Fabio Estevam wrote:
-> On Thu, Feb 11, 2016 at 6:40 AM, Uwe Kleine-K?nig
-> <u.kleine-koenig@pengutronix.de> wrote:
+On Tue, 2016-02-16 at 14:48 +0100, Hans Verkuil wrote:
+> Hi Tiffany,
 > 
-> > root at hostname:/sys/kernel/debug/clk find -name saif?_sel
-> > ./ref_xtal/pll0/saif0_sel
-> > ./ref_xtal/pll0/saif1_sel
-> >
-> > root at hostname:/sys/kernel/debug/clk cat ./ref_xtal/pll0/saif?_sel/clk_rate
-> > 480000000
-> > 480000000
+> >>>>> +int mtk_vcodec_enc_queue_init(void *priv, struct vb2_queue *src_vq,
+> >>>>> +			   struct vb2_queue *dst_vq)
+> >>>>> +{
+> >>>>> +	struct mtk_vcodec_ctx *ctx = priv;
+> >>>>> +	int ret;
+> >>>>> +
+> >>>>> +	src_vq->type		= V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE;
+> >>>>> +	src_vq->io_modes	= VB2_DMABUF | VB2_MMAP | VB2_USERPTR;
+> >>>>
+> >>>> I recomment dropping VB2_USERPTR. That only makes sense for scatter-gather dma,
+> >>>> and you use physically contiguous DMA.
+> >>>>
+> >>> Now our userspace app use VB2_USERPTR. I need to check if we could drop
+> >>> VB2_USERPTR.
+> >>> We use src_vq->mem_ops = &vb2_dma_contig_memops;
+> >>> And there are
+> >>> 	.get_userptr	= vb2_dc_get_userptr,
+> >>> 	.put_userptr	= vb2_dc_put_userptr,
+> >>> I was confused why it only make sense for scatter-gather.
+> >>> Could you kindly explain more?
+> >>
+> >> VB2_USERPTR indicates that the application can use malloc to allocate buffers
+> >> and pass those to the driver. Since malloc uses virtual memory the physical
+> >> memory is scattered all over. And the first page typically does not start at
+> >> the beginning of the page but at a random offset.
+> >>
+> >> To support that the DMA generally has to be able to do scatter-gather.
+> >>
+> >> Now, where things get ugly is that a hack was added to the USERPTR support where
+> >> apps could pass a pointer to physically contiguous memory as a user pointer. This
+> >> was a hack for embedded systems that preallocated a pool of buffers and needed to
+> >> pass those pointers around somehow. So the dma-contig USERPTR support is for that
+> >> 'feature'. If you try to pass a malloc()ed buffer to a dma-contig driver it will
+> >> reject it. One big problem is that this specific hack isn't signaled anywhere, so
+> >> applications have no way of knowing if the USERPTR support is the proper version
+> >> or the hack where physically contiguous memory is expected.
+> >>
+> >> This hack has been replaced with DMABUF which is the proper way of passing buffers
+> >> around.
+> >>
+> >> New dma-contig drivers should not use that old hack anymore. Use dmabuf to pass
+> >> external buffers around.
+> >>
+> >> How do you use it in your app? With malloc()ed buffers? Or with 'special' pointers
+> >> to physically contiguous buffers?
+> >>
+> > Understood now. Thanks for your explanation.
+> > Now our app use malloc()ed buffers and we hook vb2_dma_contig_memops. 
+> > I don't know why that dma-contig driver do not reject it.
+> > I will try to figure it out.
 > 
-> Ok, what about the SAIF0 and SAIF1 sampling rates: are they always the same?
->
-Yes, of course. The driver wouldn't allow using both interfaces with
-different sample rates any way.
+> Is there an iommu involved that turns the scatter-gather list into what looks like
+> contiguous memory for the DMA?
+> 
+Yes, We have iommu that could make scatter-gather list looks like
+contiguous memory.
 
+> At the end of vb2_dc_get_userptr() in videobuf2-dma-contig.c there is a check
+> 'if (contig_size < size)' that verifies that the sg DMA is contiguous. This would
+> work if there is an iommu involved (if I understand it correctly).
+> 
+I see. We saw this error before we add iommu support.
 
-Lothar Wa?mann
+> If that's the case, then it's OK to keep VB2_USERPTR because you have real sg
+> support (although not via the DMA engine, but via iommu mappings).
+> 
+Got it. We will keep VB2_USERPTR.
+
+> Regards,
+> 
+> 	Hans
