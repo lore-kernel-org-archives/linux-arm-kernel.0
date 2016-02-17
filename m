@@ -1,117 +1,74 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 18 Feb 2016 08:48:57 +0900
-Subject: [PATCH v2 5/5] ARM: dts: r8a7794: add sound support
-In-Reply-To: <56C4C506.8040803@cogentembedded.com>
-References: <2543047.yYrDdYb9v5@wasted.cogentembedded.com>
- <874mdhtn7d.wl%kuninori.morimoto.gx@renesas.com>
- <20160210171455.GB17671@verge.net.au>
- <56BE0CB1.4070408@cogentembedded.com>
- <20160212184343.GA31655@verge.net.au>
- <56BE2DC6.4080802@cogentembedded.com>
- <20160212193347.GB23472@verge.net.au>
- <56BE3912.9000601@cogentembedded.com>
- <20160217053848.GC11534@verge.net.au>
- <56C4C506.8040803@cogentembedded.com>
-Message-ID: <20160217234857.GA6886@verge.net.au>
+From: kirill@shutemov.name (Kirill A. Shutemov)
+Date: Thu, 18 Feb 2016 01:58:08 +0200
+Subject: [BUG] random kernel crashes after THP rework on s390 (maybe also
+ on PowerPC and ARM)
+In-Reply-To: <20160217201340.2dafad8d@thinkpad>
+References: <20160211192223.4b517057@thinkpad>
+ <20160211190942.GA10244@node.shutemov.name>
+ <20160211205702.24f0d17a@thinkpad>
+ <20160212154116.GA15142@node.shutemov.name>
+ <56BE00E7.1010303@de.ibm.com> <20160212181640.4eabb85f@thinkpad>
+ <20160212231510.GB15142@node.shutemov.name>
+ <alpine.LFD.2.20.1602131238260.1910@schleppi>
+ <20160217201340.2dafad8d@thinkpad>
+Message-ID: <20160217235808.GA21696@node.shutemov.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 17, 2016 at 10:07:50PM +0300, Sergei Shtylyov wrote:
-> On 02/17/2016 08:38 AM, Simon Horman wrote:
+On Wed, Feb 17, 2016 at 08:13:40PM +0100, Gerald Schaefer wrote:
+> On Sat, 13 Feb 2016 12:58:31 +0100 (CET)
+> Sebastian Ott <sebott@linux.vnet.ibm.com> wrote:
 > 
-> >>>>>>>>>Define the generic R8A7794 part of  the sound device node.
-> >>>>>>>>>This sound device  is a complex one and comprises the Audio Clock Generator
-> >>>>>>>>>(ADG), Sampling Rate Converter Unit (SCU), Serial Sound Interface [Unit]
-> >>>>>>>>>(SSI[U]), and Audio DMAC-Peripheral-Peripheral.
-> >>>>>>>>>It is up  to the board file to enable the device.
-> >>>>>>>>>
-> >>>>>>>>>This patch is based on the R8A7791 sound work by Kuninori Morimoto.
-> >>>>>>>>>
-> >>>>>>>>>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> >>>>>>>>(snip)
-> >>>>>>>>>+		rcar_sound,src {
-> >>>>>>>>>+			src1: src at 1 {
-> >>>>>>>>>+				interrupts = <GIC_SPI 353 IRQ_TYPE_LEVEL_HIGH>;
-> >>>>>>>>>+				dmas = <&audma0 0x87>, <&audma0 0x9c>;
-> >>>>>>>>>+				dma-names = "rx", "tx";
-> >>>>>>>>>+			};
-> >>>>>>>>>+			src2: src at 2 {
-> >>>>>>>>>+				interrupts = <GIC_SPI 354 IRQ_TYPE_LEVEL_HIGH>;
-> >>>>>>>>>+				dmas = <&audma0 0x89>, <&audma0 0x9e>;
-> >>>>>>>>>+				dma-names = "rx", "tx";
-> >>>>>>>>>+			};
-> >>>>>>>>>+			src3: src at 3 {
-> >>>>>>>>>+				interrupts = <GIC_SPI 355 IRQ_TYPE_LEVEL_HIGH>;
-> >>>>>>>>>+				dmas = <&audma0 0x8b>, <&audma0 0xa0>;
-> >>>>>>>>>+				dma-names = "rx", "tx";
-> >>>>>>>>>+			};
-> >>>>>>>>>+			src4: src at 4 {
-> >>>>>>>>>+				interrupts = <GIC_SPI 356 IRQ_TYPE_LEVEL_HIGH>;
-> >>>>>>>>>+				dmas = <&audma0 0x8d>, <&audma0 0xb0>;
-> >>>>>>>>>+				dma-names = "rx", "tx";
-> >>>>>>>>>+			};
-> >>>>>>>>>+			src5: src at 5 {
-> >>>>>>>>>+				interrupts = <GIC_SPI 357 IRQ_TYPE_LEVEL_HIGH>;
-> >>>>>>>>>+				dmas = <&audma0 0x8f>, <&audma0 0xb2>;
-> >>>>>>>>>+				dma-names = "rx", "tx";
-> >>>>>>>>>+			};
-> >>>>>>>>>+			src6: src at 6 {
-> >>>>>>>>>+				interrupts = <GIC_SPI 358 IRQ_TYPE_LEVEL_HIGH>;
-> >>>>>>>>>+				dmas = <&audma0 0x91>, <&audma0 0xb4>;
-> >>>>>>>>>+				dma-names = "rx", "tx";
-> >>>>>>>>>+			};
-> >>>>>>>>>+		};
-> >>>>>>>>
-> >>>>>>>>I think this can't work correctly, because driver is assuming
-> >>>>>>>>DT has all channles (from 0). (see linux/sound/soc/sh/rcar/src.c :: rsnd_src_probe)
-> >>>>>>>>Can you adds dummy src0 with some comments ? or fix src.c driver ?
-> >>>>>>>
-> >>>>>>>I would prefer the driver to be fixed (I had a similar patchset locally
-> >>>>>>>and I found it doesn't work).
-> >>>>>>
-> >>>>>>    You mean you had R8A7794 sound patch set too?
-> >>>>>
-> >>>>>Yes, I was working on it recently.
-> >>>>>I suppose we should coordinate these things in future to avoid
-> >>>>>duplicated effort.
-> >>>>
-> >>>>    Yes, seems a good idea now. :-)
-> >>>>
-> >>>>>>>The reason is that DT should describe
-> >>>>>>>the hardware rather than the current state of the software.
-> >>>>>>
-> >>>>>>    Yes, of course. Just tell me do I have to fix the driver *before* this
-> >>>>>>patch set is accepted?
-> >>>>
-> >>>>>I did not entirely get to the bottom of the problem, but I think that at
-> >>>>>the very least something needs to be done about the for_each_rsnd_src()
-> >>>>>loop in rsnd_src_probe.
-> >>>>
-> >>>>    It's not that it replies to my question. :-)
-> >>>>    So you're looking at this issue yourself?
-> >>>
-> >>>I have not got very far, as you can see, but I was planning to look into it.
-> >>>I don't mind if you want to do so.
-> >>
-> >>    After consultation with the management, I'm going to look into this issue
-> >>myself. :-)
-> >
-> >Excellent.
+> > [   59.875935] ------------[ cut here ]------------
+> > [   59.875937] kernel BUG at mm/huge_memory.c:2884!
+> > [   59.875979] illegal operation: 0001 ilc:1 [#1] PREEMPT SMP DEBUG_PAGEALLOC
+> > [   59.875986] Modules linked in: bridge stp llc btrfs xor mlx4_en vxlan ip6_udp_tunnel udp_tunnel mlx4_ib ptp pps_core ib_sa ib_mad ib_core ib_addr ghash_s390 prng raid6_pq ecb aes_s390 des_s390 des_generic sha512_s390 sha256_s390 sha1_s390 mlx4_core sha_common genwqe_card scm_block crc_itu_t vhost_net tun vhost dm_mod macvtap eadm_sch macvlan kvm autofs4
+> > [   59.876033] CPU: 2 PID: 5402 Comm: git Tainted: G        W       4.4.0-07794-ga4eff16-dirty #77
+> > [   59.876036] task: 00000000d2312948 ti: 00000000cfecc000 task.ti: 00000000cfecc000
+> > [   59.876039] Krnl PSW : 0704d00180000000 00000000002bf3aa (__split_huge_pmd_locked+0x562/0xa10)
+> > [   59.876045]            R:0 T:1 IO:1 EX:1 Key:0 M:1 W:0 P:0 AS:3 CC:1 PM:0 EA:3
+> >                Krnl GPRS: 0000000001a7a1cf 000003d10177c000 0000000000044068 000000005df00215
+> > [   59.876051]            0000000000000001 0000000000000001 0000000000000000 00000000774e6900
+> > [   59.876054]            000003ff52000000 000000006d403b10 000000006e1eb800 000003ff51f00000
+> > [   59.876058]            000003d10177c000 0000000000715190 00000000002bf234 00000000cfecfb58
+> > [   59.876068] Krnl Code: 00000000002bf39c: d507d010a000	clc	16(8,%%r13),0(%%r10)
+> >                           00000000002bf3a2: a7840004		brc	8,2bf3aa
+> >                          #00000000002bf3a6: a7f40001		brc	15,2bf3a8
+> >                          >00000000002bf3aa: 91407440		tm	1088(%%r7),64
+> >                           00000000002bf3ae: a7840208		brc	8,2bf7be
+> >                           00000000002bf3b2: a7f401e9		brc	15,2bf784
+> >                           00000000002bf3b6: 9104a006		tm	6(%%r10),4
+> >                           00000000002bf3ba: a7740004		brc	7,2bf3c2
+> > [   59.876089] Call Trace:
+> > [   59.876092] ([<00000000002bf234>] __split_huge_pmd_locked+0x3ec/0xa10)
+> > [   59.876095]  [<00000000002c4310>] __split_huge_pmd+0x118/0x218
+> > [   59.876099]  [<00000000002810e8>] unmap_single_vma+0x2d8/0xb40
+> > [   59.876102]  [<0000000000282d66>] zap_page_range+0x116/0x318
+> > [   59.876105]  [<000000000029b834>] SyS_madvise+0x23c/0x5e8
+> > [   59.876108]  [<00000000006f9f56>] system_call+0xd6/0x258
+> > [   59.876111]  [<000003ff9bbfd282>] 0x3ff9bbfd282
+> > [   59.876113] INFO: lockdep is turned off.
+> > [   59.876115] Last Breaking-Event-Address:
+> > [   59.876118]  [<00000000002bf3a6>] __split_huge_pmd_locked+0x55e/0xa10
 > 
->    But not immediately. I have some other things to look at before that (DU
-> and AVB), they'll going to take some (significant) time... :-(
+> The BUG at mm/huge_memory.c:2884 is interesting, it's the BUG_ON(!pte_none(*pte))
+> check in __split_huge_pmd_locked(). Obviously we expect the pre-allocated
+> pagetables to be empty, but in collapse_huge_page() we deposit the original
+> pagetable instead of allocating a new (empty) one. This saves an allocation,
+> which is good, but doesn't that mean that if such a collapsed hugepage will
+> ever be split, we will always run into the BUG_ON(!pte_none(*pte)), or one
+> of the two other VM_BUG_ONs in mm/huge_memory.c that check the same?
 > 
-> >FWIW, I can test anything you come up with for the r8a7794 an alt board
-> 
->    I have remote access to Alt now, in fact using it currently for the AVB work.
-> 
-> >or post patches for it once you have r8a7794/silk sorted out.
-> 
->    I already have audio on these working. Or you're going to wait until I
-> fix the SRC issue?
+> This behavior is not new, it was the same before the THP rework, so I do not
+> assume that it is related to the current problems, maybe with the exception
+> of this specific crash. I never saw the BUG at mm/huge_memory.c:2884 myself,
+> and the other crashes probably cannot be explained with this. Maybe I am
+> also missing something, but I do not see how collapse_huge_page() and the
+> (non-empty) pgtable deposit there can work out with the BUG_ON(!pte_none(*pte))
+> checks. Any thoughts?
 
-I'm happy to merge a subset of your r8a7794/silk patches,
-that don't touch the SRC issue if you think that is appropriate.
->From there I could get similar functionality running on the Alt - I don't
-expect that to be a difficult task. And then when you come back to the SRC
-issue we can enhance support for r8a7794/silk,alt.
+I don't think there's a problem: ptes in the pgtable are cleared with
+pte_clear() in __collapse_huge_page_copy().
+
+-- 
+ Kirill A. Shutemov
