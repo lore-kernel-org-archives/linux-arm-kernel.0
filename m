@@ -1,73 +1,48 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 17 Feb 2016 15:40:59 -0800
-Subject: [PATCH v3 2/3] ARM: dts: vf-colibri: add basic supply regulators
-In-Reply-To: <1455752460-2770-1-git-send-email-stefan@agner.ch>
-References: <1455752460-2770-1-git-send-email-stefan@agner.ch>
-Message-ID: <1455752460-2770-2-git-send-email-stefan@agner.ch>
+From: david.brown@linaro.org (David Brown)
+Date: Wed, 17 Feb 2016 16:43:06 -0700
+Subject: [PATCH] ARM: vdso: Mark vDSO code as read-only
+In-Reply-To: <CAGXu5jK22LfvLdMfWz_vbQsJ3bbjSdJrYAp=5yWzD4yRNTTGFQ@mail.gmail.com>
+References: <1453226922-16831-1-git-send-email-keescook@chromium.org>
+ <20160216213659.GA47194@davidb.org>
+ <CAGXu5j+H63jhcDpHpXK5aWvgUBz=5vB0FK_zRoc+wZEk32B2fg@mail.gmail.com>
+ <20160217052010.GA49233@davidb.org>
+ <CAGXu5jK22LfvLdMfWz_vbQsJ3bbjSdJrYAp=5yWzD4yRNTTGFQ@mail.gmail.com>
+Message-ID: <20160217234306.GA59532@davidb.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Colibri modules need to be powered using the power pins 3V3 and
-AVDD_AUDIO. Add fixed regulators which represent this power rails.
-Potentially, those power rails could be switched on a carrier
-board. A carrier board device tree could add a own regulator with
-a GPIO, and reference that regulator in a vin-supply property of
-those new module level system regulators.
+On Wed, Feb 17, 2016 at 03:00:52PM -0800, Kees Cook wrote:
+>On Tue, Feb 16, 2016 at 9:20 PM, David Brown <david.brown@linaro.org> wrote:
+>> On Tue, Feb 16, 2016 at 01:52:33PM -0800, Kees Cook wrote:
+>>>
+>>> On Tue, Feb 16, 2016 at 1:36 PM, David Brown <david.brown@linaro.org>
+>>> wrote:
+>>>>
+>>>> Although the arm vDSO is cleanly separated by code/data with the code
+>>>> being read-only in userspace mappings, the code page is still writable
+>>>> from the kernel.  There have been exploits (such as
+>>>> http://itszn.com/blog/?p=21) that take advantage of this on x86 to go
+>>>> from a bad kernel write to full root.
+>>>>
+>>>> Prevent this specific exploit on arm by putting the vDSO code page in
+>>>> post-init read-only memory as well.
+>>>
+>>>
+>>> Is the vdso dynamically built at init time like on x86, or can this
+>>> just use .rodata directly?
+>>
+>>
+>> On ARM, it is patched during init.  Arm64's is just plain read-only.
+>
+>Okay, great. I've added this to my postinit-readonly series (which I
+>just refreshed and sent out again...)
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
-Changes since v2:
-- remove regulator-always-on
+However, this distinction between .rodata and .data..ro_after_init is
+kind of fuzzy, anyway, since they both get made actually read-only at
+the same time (post init).  The patch actually does work fine with the
+vDSO page in .rodata, since the patching happens during init.
 
-Changes since v1:
-- Add module prefix to avoid namespace issue with Carrier Board regulators
-- Name the regulators according to schematics
+Is there a possible future consideration to perhaps make .rodata read
+only much earlier?
 
- arch/arm/boot/dts/vf-colibri.dtsi | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
-
-diff --git a/arch/arm/boot/dts/vf-colibri.dtsi b/arch/arm/boot/dts/vf-colibri.dtsi
-index ff6f58e..ed4cfc5 100644
---- a/arch/arm/boot/dts/vf-colibri.dtsi
-+++ b/arch/arm/boot/dts/vf-colibri.dtsi
-@@ -48,14 +48,30 @@
- 		enable-gpios = <&gpio1 13 GPIO_ACTIVE_HIGH>;
- 		status = "disabled";
- 	};
-+
-+	reg_module_3v3: regulator-module-3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "+V3.3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+
-+	reg_module_3v3_avdd: regulator-module-3v3-avdd {
-+		compatible = "regulator-fixed";
-+		regulator-name = "+V3.3_AVDD_AUDIO";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
- };
- 
- &adc0 {
- 	status = "okay";
-+	vref-supply = <&reg_module_3v3_avdd>;
- };
- 
- &adc1 {
- 	status = "okay";
-+	vref-supply = <&reg_module_3v3_avdd>;
- };
- 
- &can0 {
-@@ -96,6 +112,7 @@
- 
- &fec1 {
- 	phy-mode = "rmii";
-+	phy-supply = <&reg_module_3v3>;
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_fec1>;
- };
--- 
-2.7.1
+David
