@@ -1,46 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 17 Feb 2016 09:41:47 +0000
-Subject: [PATCH 11/11] ARM: versatile: move CLCD configuration to device
- tree
-In-Reply-To: <56C438DA.5040109@ti.com>
-References: <1454594660-7532-1-git-send-email-linus.walleij@linaro.org>
- <1454594660-7532-12-git-send-email-linus.walleij@linaro.org>
- <56C438DA.5040109@ti.com>
-Message-ID: <20160217094147.GG19428@n2100.arm.linux.org.uk>
+From: raveendra.padasalagi@broadcom.com (Raveendra Padasalagi)
+Date: Wed, 17 Feb 2016 15:13:43 +0530
+Subject: [PATCH v2 0/3] Syscon support for iProc touchscreen driver
+Message-ID: <1455702226-20599-1-git-send-email-raveendra.padasalagi@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 17, 2016 at 11:09:46AM +0200, Tomi Valkeinen wrote:
-> What's the SYS_CLCD register? An EEPROM or such, programmed when the
-> board is manufactured? Is the panel meant to be switchable by the user,
-> possibly to a panel that's not "standard"?
+This patchset is based on v4.5-rc3 tag and its tested on
+Broadcom Cygnus SoC.
 
-If you read this bit of the patch, which describes the bits in the
-register, it gives some clues:
+The patches can be fetched from iproc-tsc-v2 branch of
+https://github.com/Broadcom/arm64-linux.git
 
--#define SYS_CLCD_MODE_MASK     (3 << 0)
--#define SYS_CLCD_MODE_888      (0 << 0)
--#define SYS_CLCD_MODE_5551     (1 << 0)
--#define SYS_CLCD_MODE_565_RLSB (2 << 0)
--#define SYS_CLCD_MODE_565_BLSB (3 << 0)
--#define SYS_CLCD_NLCDIOON      (1 << 2)
--#define SYS_CLCD_VDDPOSSWITCH  (1 << 3)
--#define SYS_CLCD_PWR3V5SWITCH  (1 << 4)
--#define SYS_CLCD_ID_MASK       (0x1f << 8)
--#define SYS_CLCD_ID_SANYO_3_8  (0x00 << 8)
--#define SYS_CLCD_ID_UNKNOWN_8_4        (0x01 << 8)
--#define SYS_CLCD_ID_EPSON_2_2  (0x02 << 8)
--#define SYS_CLCD_ID_SANYO_2_5  (0x07 << 8)
--#define SYS_CLCD_ID_VGA                (0x1f << 8)
+Changes since v1:
+ - Enhanced touchscreen driver to handle syscon based register access if
+   "brcm,iproc-touchscreen-syscon" compatible string is provided in dt
+ - Normal register access is handled through readl and writel API's if
+   "brcm,iproc-touchscreen" compatible string is provided.
+ - Updated touchscreen dt node document to reflect the new changes.
+ - Updated change logs in each patchset to reflect the new changes.
 
-The LCD panels plug-in to the board, and they have a 5-bit hard-wired
-ID, which is signalled through five ID lines into the FPGA.
+Raveendra Padasalagi (3):
+  input: cygnus-update touchscreen dt node document
+  input: syscon support in bcm_iproc_tsc driver
+  ARM: dts: use syscon in cygnus touchscreen dt node
 
-The register is also writable, which is used to control power supplies
-to the LCD and an external MUX which changes the RGB format outside of
-the capabilities of the CLCD itself.
+ .../input/touchscreen/brcm,iproc-touchscreen.txt   |  57 +++++++-
+ arch/arm/boot/dts/bcm-cygnus.dtsi                  |  11 +-
+ drivers/input/touchscreen/bcm_iproc_tsc.c          | 152 +++++++++++++++------
+ 3 files changed, 172 insertions(+), 48 deletions(-)
 
 -- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently@9.6Mbps down 400kbps up
-according to speedtest.net.
+1.9.1
