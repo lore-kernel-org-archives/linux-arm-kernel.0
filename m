@@ -1,31 +1,47 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 17 Feb 2016 14:22:37 +0000
-Subject: [PATCH 03/13] spi: imx: replace fixed timeout with calculated
-In-Reply-To: <1455715739-25161-4-git-send-email-s.hauer@pengutronix.de>
-References: <1455715739-25161-1-git-send-email-s.hauer@pengutronix.de>
- <1455715739-25161-4-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20160217142237.GS7544@sirena.org.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 17 Feb 2016 15:23:33 +0100
+Subject: [PATCH 0/3] clk: mvebu: initial support for AP806 clocks
+In-Reply-To: <CAEG3pNCRa_CQx70aPHfQpG+7jEZ_=_-FxBWDkXVYbgH=j=1rmA@mail.gmail.com>
+References: <1455521698-7905-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20160215233102.2278.88855@quark.deferred.io>
+ <CAEG3pNCRa_CQx70aPHfQpG+7jEZ_=_-FxBWDkXVYbgH=j=1rmA@mail.gmail.com>
+Message-ID: <20160217152333.6718d8fc@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 17, 2016 at 02:28:49PM +0100, Sascha Hauer wrote:
-> From: Anton Bondarenko <anton.bondarenko.sama@gmail.com>
-> 
-> Fixed timeout value can fire while transaction is ongoing. This may happen
-> because there are no strict requirements on SPI transaction duration.
-> Dynamic timeout value is generated based on SCLK and transaction size.
-> 
-> There is also 4 * SCLK delay between TX bursts related to HW internal CS change.
-> 
-> Signed-off-by: Anton Bondarenko <anton.bondarenko.sama@gmail.com>
-> ---
+Hello Michael,
 
-I can't take this without a signoff from you, sorry - the DCO is very
-imporant here.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160217/acd043d2/attachment.sig>
+On Mon, 15 Feb 2016 15:36:49 -0800, Michael Turquette wrote:
+
+> > Yay, new SoC! Just FYI, we worked out an agreement in December[0] that
+> > the clk git tree can take DT bindings and headers, and we'll always host
+> > them in an immutable branch by default in case arm-soc (or anyone else)
+> > needs them. Stephen and I are doing this now.
+> 
+> Oops, I misunderstood your point (and I should have looked at the
+> patches before replying). The patches in this series do indeed have
+> the clk DT binding descriptions.
+> 
+> Pardon the noise, nothing to see here, move along ;-)
+
+Yes, each driver comes with its DT binding documentation in the same
+patch. Unfortunately, some maintainers prefer to have the DT binding
+documentation as separate patches from the driver itself, while some
+other maintainers prefer to have both in the same patch. And I never
+remember which maintainer has which preference.
+
+So, let me know if you're fine with having both in the same patches. If
+not, I can respin by splitting the DT binding documentation in its own
+patches.
+
+Other than that, any comments on the drivers themselves? Since they are
+quite trivial, I would ideally like to see them in 4.6, if at all
+possible.
+
+Thanks a lot!
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
