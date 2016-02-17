@@ -1,42 +1,30 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 16 Feb 2016 19:37:45 -0800
-Subject: [PATCH v3 0/3] Allow iio_hwmon to accept hypen in node names
-In-Reply-To: <cover.1455597464.git.maitysanchayan@gmail.com>
-References: <cover.1455597464.git.maitysanchayan@gmail.com>
-Message-ID: <56C3EB09.1050803@roeck-us.net>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 17 Feb 2016 12:39:21 +0900
+Subject: [clk:clk-samsung-kconfig 2/2] drivers/clk/samsung/clk.h:142:17:
+ error: invalid operands to binary | (have 'struct samsung_pll_clock *' and
+ 'struct samsung_pll_clock *')
+In-Reply-To: <201602171104.YkeaxmIS%fengguang.wu@intel.com>
+References: <201602171104.YkeaxmIS%fengguang.wu@intel.com>
+Message-ID: <56C3EB69.2000307@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/15/2016 09:00 PM, Sanchayan Maity wrote:
-> Hello,
->
-> Initial versions of the patchset intended to introduce the use of
-> iio_hwmon for Vybrid SoC's. Currently the iio_hwmon driver has two
-> users and as per the binding documentation, the node names use the
-> underscore. Use of hypen in device tree node names is acceptable,
-> however currently the hwmon core code rejects it due to perhaps user
-> space not liking the hypen and getting confused.
->
-> As per Guenter Roeck's suggestion, the first patch looks for a hypen
-> and replaces it with a underscore in the probe call of iio_hwmon driver
-> before calling hwmon_device_register_with_groups for registration. Any
-> users of iio_hwmon driver can now use hypen in the node name.
->
-> As per Shawn's suggestion, the existing users have been changed to use
-> the hypen instead of the underscore and the iio-bindings document
-> updated. Third patch introduces the usage for Vybrid itself.
->
-> Patchset is based on top of shawn's for-next branch.
->
-> Feedbacks and comments most welcome. Thank you for feedbacks.
->
-> @Guenter
-> I hope I understood and implemented correctly what you had in mind.
->
-Yes.
+On 17.02.2016 12:22, kbuild test robot wrote:
+> tree:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-samsung-kconfig
+> head:   e83cb468452c25597e868d1ed778fa73fdaeca4c
+> commit: e83cb468452c25597e868d1ed778fa73fdaeca4c [2/2] clk: samsung: Don't build ARMv8 clock drivers on ARMv7
+> config: mips-allmodconfig (attached as .config)
+> reproduce:
+>         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+>         chmod +x ~/bin/make.cross
+>         git checkout e83cb468452c25597e868d1ed778fa73fdaeca4c
+>         # save the attached .config to linux build tree
+>         make.cross ARCH=mips 
+> 
 
-Series applied to hwmon-next (if the dts changes also end up in an arm branch,
-no harm done).
+I think this is the same as previous - patch which added dependency on
+CLK_COMMON is not present. My tests on MIPS passed fine. Also attached
+configs builds fine with the dependency applied.
 
-Thanks,
-Guenter
+Best regards,
+Krzysztof
