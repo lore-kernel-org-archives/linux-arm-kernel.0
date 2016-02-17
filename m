@@ -1,47 +1,55 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 17 Feb 2016 12:31:05 +0530
-Subject: [RFC 1/3] ARM: dts: Add cooling levels for CPUs on exynos5420
-In-Reply-To: <1455692128-28504-2-git-send-email-k.kozlowski@samsung.com>
-References: <1455692128-28504-1-git-send-email-k.kozlowski@samsung.com>
- <1455692128-28504-2-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20160217070105.GK2454@vireshk-i7>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Wed, 17 Feb 2016 15:01:35 +0800
+Subject: [PATCH v5 0/4] Mediatek MT2701 SCPSYS power domain support 
+Message-ID: <1455692499-56828-1-git-send-email-jamesjj.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17-02-16, 15:55, Krzysztof Kozlowski wrote:
-> On Exynos5420 we support 8 cpufreq steps (600-1300 MHz) for LITTLE and
-> 12 steps for big core (700-1800 MHz). Add respective cooling cells.
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos5420-cpus.dtsi | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/exynos5420-cpus.dtsi b/arch/arm/boot/dts/exynos5420-cpus.dtsi
-> index 261d25173f61..498ae82e1cb2 100644
-> --- a/arch/arm/boot/dts/exynos5420-cpus.dtsi
-> +++ b/arch/arm/boot/dts/exynos5420-cpus.dtsi
-> @@ -33,6 +33,9 @@
->  			clock-frequency = <1800000000>;
->  			cci-control-port = <&cci_control1>;
->  			operating-points-v2 = <&cluster_a15_opp_table>;
-> +			cooling-min-level = <0>;
-> +			cooling-max-level = <11>;
-> +			#cooling-cells = <2>; /* min followed by max */
->  		};
->  
->  		cpu1: cpu at 1 {
-> @@ -70,6 +73,9 @@
->  			clock-frequency = <1000000000>;
->  			cci-control-port = <&cci_control0>;
->  			operating-points-v2 = <&cluster_a7_opp_table>;
-> +			cooling-min-level = <0>;
-> +			cooling-max-level = <7>;
-> +			#cooling-cells = <2>; /* min followed by max */
->  		};
+This patchset is based on v4.5-rc4 and adds scpsys power domain support
+for Mediatek MT2701.
 
-Though it wouldn't matter (for the issue you are getting), but this should be
-added for all the CPUs in case some other CPU is booted first.
+To share the code between MT2701 and MT8173, this patchset also refined
+original mtk-scpsys.c to separate common codes and platform codes, so
+that mtk-scpsys.c can support new SoCs more easily.
 
--- 
-viresh
+MT8173 and MT2701 scpsys init level are now subsys_init. Please refer to [1]
+to see discussion details.
+
+changes since v4:
+- Rebase to v4.5-rc4.
+- Remove mtk-scpsys.h and Merge its code into mtk-scpsys.c.
+- Add names for every controlling registers and bits.
+- Include dt-bindings headers at the beginning of mtk-scpsys.c.
+- Sort compatible string in dt-binding documents.
+
+changes since v3:
+- Implement MT8173 and MT2701 scpsys drivers in a signle file.
+- Remove naming of registers that can't be shared among SoCs.
+
+changes since v2:
+- Rebase to mbgg/linux-mediatek v4.4-next/soc [1].
+- Remove MTK_SCPSYS_MT8173 and MTK_SCPSYS_MT2701.
+- Modify scpsys dt-binding document to support MT2701.
+
+changes since v1:
+- Make MTK_SCPSYS in Kconfig invisible from users.
+- Add comments for changing scpsys init level to subsys_init.
+
+[1] http://lists.infradead.org/pipermail/linux-mediatek/2015-December/003416.html
+
+James Liao (2):
+  soc: mediatek: Refine scpsys to support multiple platform
+  soc: mediatek: Init MT8173 scpsys driver earlier
+
+Shunli Wang (2):
+  soc: mediatek: Add MT2701 power dt-bindings
+  soc: mediatek: Add MT2701 scpsys driver
+
+ .../devicetree/bindings/soc/mediatek/scpsys.txt    |   6 +-
+ drivers/soc/mediatek/mtk-scpsys.c                  | 490 +++++++++++++++------
+ include/dt-bindings/power/mt2701-power.h           |  27 ++
+ 3 files changed, 376 insertions(+), 147 deletions(-)
+ create mode 100644 include/dt-bindings/power/mt2701-power.h
+
+--
+1.9.1
