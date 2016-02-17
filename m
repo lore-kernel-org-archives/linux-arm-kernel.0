@@ -1,54 +1,43 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 17 Feb 2016 23:43:41 +0300
-Subject: [PATCH 1/2] ARM: dts: r8a7794: add EtherAVB clock
+Date: Wed, 17 Feb 2016 23:45:10 +0300
+Subject: [PATCH 2/2] ARM: dts: r8a7794: add EtherAVB support
 In-Reply-To: <1926986.gmrsfKE5A2@wasted.cogentembedded.com>
 References: <1926986.gmrsfKE5A2@wasted.cogentembedded.com>
-Message-ID: <29718029.UyjYgE2loj@wasted.cogentembedded.com>
+Message-ID: <3612334.eXmTxlrOol@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the EtherAVB clock to the R8A7794 device tree.
+Define the generic R8A7794 part of the EtherAVB device node.
 
-Based on the commit eaa870b30553 ("ARM: shmobile: r8a7791: add EtherAVB clock").
+Based on the commit 46ece349aa54 ("ARM: shmobile: r8a7791: add EtherAVB DT
+support").
 
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
 ---
- arch/arm/boot/dts/r8a7794.dtsi            |    7 ++++---
- include/dt-bindings/clock/r8a7794-clock.h |    1 +
- 2 files changed, 5 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/r8a7794.dtsi |   12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
 Index: renesas/arch/arm/boot/dts/r8a7794.dtsi
 ===================================================================
 --- renesas.orig/arch/arm/boot/dts/r8a7794.dtsi
 +++ renesas/arch/arm/boot/dts/r8a7794.dtsi
-@@ -1173,13 +1173,14 @@
- 		mstp8_clks: mstp8_clks at e6150990 {
- 			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
- 			reg = <0 0xe6150990 0 4>, <0 0xe61509a0 0 4>;
--			clocks = <&zg_clk>, <&zg_clk>, <&p_clk>;
-+			clocks = <&zg_clk>, <&zg_clk>, <&hp_clk>, <&p_clk>;
- 			#clock-cells = <1>;
- 			clock-indices = <
--				R8A7794_CLK_VIN1 R8A7794_CLK_VIN0 R8A7794_CLK_ETHER
-+				R8A7794_CLK_VIN1 R8A7794_CLK_VIN0
-+				R8A7794_CLK_ETHERAVB R8A7794_CLK_ETHER
- 			>;
- 			clock-output-names =
--				"vin1", "vin0", "ether";
-+				"vin1", "vin0", "etheravb", "ether";
- 		};
- 		mstp9_clks: mstp9_clks at e6150994 {
- 			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
-Index: renesas/include/dt-bindings/clock/r8a7794-clock.h
-===================================================================
---- renesas.orig/include/dt-bindings/clock/r8a7794-clock.h
-+++ renesas/include/dt-bindings/clock/r8a7794-clock.h
-@@ -85,6 +85,7 @@
- /* MSTP8 */
- #define R8A7794_CLK_VIN1		10
- #define R8A7794_CLK_VIN0		11
-+#define R8A7794_CLK_ETHERAVB		12
- #define R8A7794_CLK_ETHER		13
+@@ -572,6 +572,18 @@
+ 		status = "disabled";
+ 	};
  
- /* MSTP9 */
++	avb: ethernet at e6800000 {
++		compatible = "renesas,etheravb-r8a7794",
++			     "renesas,etheravb-rcar-gen2";
++		reg = <0 0xe6800000 0 0x800>, <0 0xee0e8000 0 0x4000>;
++		interrupts = <GIC_SPI 163 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp8_clks R8A7794_CLK_ETHERAVB>;
++		power-domains = <&cpg_clocks>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "disabled";
++	};
++
+ 	/* The memory map in the User's Manual maps the cores to bus numbers */
+ 	i2c0: i2c at e6508000 {
+ 		compatible = "renesas,i2c-r8a7794";
