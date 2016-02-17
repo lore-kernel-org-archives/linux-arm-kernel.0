@@ -1,71 +1,94 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Tue, 16 Feb 2016 23:23:24 -0300
-Subject: [PATCH v2] ARM: dts: Move syscon reboot/poweroff to common dtsi
- for Exynos
-In-Reply-To: <56C3D745.7050904@samsung.com>
-References: <1455636348-14277-1-git-send-email-javier@osg.samsung.com>
- <56C3D745.7050904@samsung.com>
-Message-ID: <56C3D99C.3090403@osg.samsung.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 17 Feb 2016 10:21:24 +0800
+Subject: [PATCH 5/5] arm64: marvell: add Device Tree files for Armada 7K/8K
+In-Reply-To: <20160216173840.7f93896f@free-electrons.com>
+References: <1455526065-7307-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1455526065-7307-6-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20160216134219.00045b5b@xhacker>
+ <20160216173840.7f93896f@free-electrons.com>
+Message-ID: <20160217102124.7353591f@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+Dear Thomas,
 
-On 02/16/2016 11:13 PM, Krzysztof Kozlowski wrote:
+On Tue, 16 Feb 2016 17:38:40 +0100 Thomas Petazzoni wrote:
 
-[snip]
+> Hello,
+> 
+> On Tue, 16 Feb 2016 13:42:19 +0800, Jisheng Zhang wrote:
+> 
+> > > +/ {
+> > > +	model = "Marvell Armada AP806";
+> > > +	compatible = "marvell,armada-ap806";
+> > > +	#address-cells = <2>;
+> > > +	#size-cells = <2>;
+> > > +
+> > > +	psci {
+> > > +		compatible = "arm,psci-0.2";  
+> > 
+> > I guess the firmware is also psci-1.0 compatible.  
+> 
+> At boot time, the kernel queries the PSCI firmware, and it says:
+> 
+> [    0.000000] psci: probing for conduit method from DT.
+> [    0.000000] psci: PSCIv0.2 detected in firmware.
+> [    0.000000] psci: Using standard PSCI v0.2 function IDs
+> 
+> So I think psci-0.2 is correct here. Should this change for the
+> production revision of the chip, we'll send an update to the Device
+> Tree accordingly.
 
->> diff --git a/arch/arm/boot/dts/exynos-syscon-restart.dtsi b/arch/arm/boot/dts/exynos-syscon-restart.dtsi
->> new file mode 100644
->> index 000000000000..09a2040054ed
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/exynos-syscon-restart.dtsi
->> @@ -0,0 +1,27 @@
->> +/*
->> + * Samsung's Exynos SoC syscon reboot/poweroff nodes common definition.
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +
->> +/ {
->> +	soc {
->> +		compatible = "simple-bus";
->
-> The exynos4 does not have soc node. I wonder whether we should provide
-> here also address and size:
->                  #address-cells = <1>;
->                  #size-cells = <1>;
-> 		ranges;
->
-> Without this it works fine but that does not look correct enough.
->
-> A minor effect of this patch on Exynos4 is that syscon-poweroff/reboot
-> are now the only children of "soc" simple-bus (rest of platform devices
-> is not)... but this is not a problem.
->
-> Works fine so only the question about cells/ranges remains. Any comments?
->
+Thanks for the information.
 
-I in fact had the #address-cells and #size-cells at the beginning but then
-realized that both the syscon-poweroff and syscon-reboot nodes didn't have
-a reg property so it felt strange to me to have those.
+> 
+> > > +	ap806 {
+> > > +		#address-cells = <2>;
+> > > +		#size-cells = <2>;
+> > > +		compatible = "simple-bus";
+> > > +		interrupt-parent = <&gic>;
+> > > +		ranges;
+> > > +
+> > > +		config-space {
+> > > +			#address-cells = <1>;
+> > > +			#size-cells = <1>;
+> > > +			compatible = "simple-bus";
+> > > +			ranges = <0x0 0x0 0xf0000000 0x1000000>;
+> > > +
+> > > +			gic: interrupt-controller at 210000 {
+> > > +				compatible = "arm,cortex-a15-gic",
+> > > +					     "arm,cortex-a9-gic";  
+> > 
+> > I guess the GIC is neither the one in cortex-a15 or cortex-a9.   
+> 
+> What makes you think this?
+> 
+> The GIC is a GIC400, which is GICv2 compliant, and arm-cortex-a15-gic /
 
-Also, I thought that maybe a SoC dtsi may need a different #address-cells
-and #size-cells for the other child nodes so having those in this dtsi
-could override the values in the SoC dtsi depending where is included.
+That's my point, why not "gic-400" explicitly?
 
-So I thought it could do more harm than good but I've no strong opinion
-and can add those if you prefer.
+Thanks,
+Jisheng
 
+> arm-cortex-a9-gic are valid compatible strings to identify a GICv2
+> compliant interrupt controller.
+> 
+> See:
+> 
+> arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi:              compatible = "arm,gic-400", "arm,cortex-a15-gic";
+> arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi:           compatible = "arm,gic-400", "arm,cortex-a15-gic";
+> arch/arm64/boot/dts/apm/apm-shadowcat.dtsi:             compatible = "arm,cortex-a15-gic";
+> arch/arm64/boot/dts/apm/apm-storm.dtsi:         compatible = "arm,cortex-a15-gic";
+> arch/arm64/boot/dts/arm/foundation-v8.dts:              compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
+> arch/arm64/boot/dts/arm/juno-base.dtsi:         compatible = "arm,gic-400", "arm,cortex-a15-gic";
+> arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts:             compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
+> arch/arm64/boot/dts/marvell/armada-ap806.dtsi:                          compatible = "arm,cortex-a15-gic",
+> arch/arm64/boot/dts/nvidia/tegra132.dtsi:               compatible = "arm,cortex-a15-gic";
+> arch/arm64/boot/dts/xilinx/zynqmp.dtsi:                 compatible = "arm,gic-400", "arm,cortex-a15-gic";
+> 
+> Or do you have a more specific reason to think that this compatible
+> string is wrong?
+> 
 > Best regards,
-> Krzysztof
->
->
-
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+> 
+> Thomas
