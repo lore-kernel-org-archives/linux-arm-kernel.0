@@ -1,258 +1,329 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 17 Feb 2016 17:24:16 +0800
-Subject: [PATCH] ALSA: jack: Allow building the jack layer without input
+From: tiwai@suse.de (Takashi Iwai)
+Date: Wed, 17 Feb 2016 10:35:40 +0100
+Subject: [PATCH] sound: hdmi: avoid dereferencing uninitialized 'jack'
+ pointer
 In-Reply-To: <s5h8u2j6749.wl-tiwai@suse.de>
-Message-ID: <201602171732.VPVdhvvI%fengguang.wu@intel.com>
+References: <1455634059-1896914-1-git-send-email-arnd@arndb.de>
+ <s5hr3gc60ph.wl-tiwai@suse.de> <2706488.VpKveMVPGI@wuerfel>
+ <3395859.dhsfOsmVIe@wuerfel> <s5h8u2j6749.wl-tiwai@suse.de>
+Message-ID: <s5h1t8b65n7.wl-tiwai@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Takashi,
+On Wed, 17 Feb 2016 10:03:50 +0100,
+Takashi Iwai wrote:
+> --- a/sound/core/Kconfig
+> +++ b/sound/core/Kconfig
+> @@ -24,11 +24,14 @@ config SND_RAWMIDI
+>  config SND_COMPRESS_OFFLOAD
+>  	tristate
+>  
+> -# To be effective this also requires INPUT - users should say:
+> -#    select SND_JACK if INPUT=y || INPUT=SND
+> -# to avoid having to force INPUT on.
+>  config SND_JACK
+> +	tristate
 
-[auto build test ERROR on sound/for-next]
-[also build test ERROR on v4.5-rc4 next-20160217]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+Oops, some unintentional change slipped in.  This must be bool.
 
-url:    https://github.com/0day-ci/linux/commits/Takashi-Iwai/ALSA-jack-Allow-building-the-jack-layer-without-input/20160217-171209
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/tiwai/sound.git for-next
-config: x86_64-randconfig-x012-201607 (attached as .config)
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=x86_64 
+Below is the revised patch.
 
-All errors (new ones prefixed by >>):
 
->> sound/core/jack.c:184:5: error: redefinition of 'snd_jack_add_new_kctl'
-    int snd_jack_add_new_kctl(struct snd_jack *jack, const char * name, int mask)
-        ^
-   In file included from sound/core/jack.c:25:0:
-   include/sound/jack.h:108:19: note: previous definition of 'snd_jack_add_new_kctl' was here
-    static inline int snd_jack_add_new_kctl(struct snd_jack *jack, const char * name, int mask)
-                      ^
->> sound/core/jack.c:212:5: error: redefinition of 'snd_jack_new'
-    int snd_jack_new(struct snd_card *card, const char *id, int type,
-        ^
-   In file included from sound/core/jack.c:25:0:
-   include/sound/jack.h:102:19: note: previous definition of 'snd_jack_new' was here
-    static inline int snd_jack_new(struct snd_card *card, const char *id, int type,
-                      ^
->> sound/core/jack.c:296:6: error: redefinition of 'snd_jack_set_parent'
-    void snd_jack_set_parent(struct snd_jack *jack, struct device *parent)
-         ^
-   In file included from sound/core/jack.c:25:0:
-   include/sound/jack.h:120:20: note: previous definition of 'snd_jack_set_parent' was here
-    static inline void snd_jack_set_parent(struct snd_jack *jack,
-                       ^
->> sound/core/jack.c:331:5: error: redefinition of 'snd_jack_set_key'
-    int snd_jack_set_key(struct snd_jack *jack, enum snd_jack_types type,
-        ^
-   In file included from sound/core/jack.c:25:0:
-   include/sound/jack.h:125:19: note: previous definition of 'snd_jack_set_key' was here
-    static inline int snd_jack_set_key(struct snd_jack *jack,
-                      ^
->> sound/core/jack.c:354:6: error: redefinition of 'snd_jack_report'
-    void snd_jack_report(struct snd_jack *jack, int status)
-         ^
-   In file included from sound/core/jack.c:25:0:
-   include/sound/jack.h:113:20: note: previous definition of 'snd_jack_report' was here
-    static inline void snd_jack_report(struct snd_jack *jack, int status)
-                       ^
+Takashi
 
-vim +/snd_jack_add_new_kctl +184 sound/core/jack.c
+-- 8< --
+From: Takashi Iwai <tiwai@suse.de>
+Subject: [PATCH v2] ALSA: jack: Allow building the jack layer without
+ input device
 
-9058cbe1e Jie Yang         2015-04-27  178   *         by this snd_jack_kctl object.
-9058cbe1e Jie Yang         2015-04-27  179   *
-9058cbe1e Jie Yang         2015-04-27  180   * Creates a new snd_kcontrol object and adds it to the jack kctl_list.
-9058cbe1e Jie Yang         2015-04-27  181   *
-9058cbe1e Jie Yang         2015-04-27  182   * Return: Zero if successful, or a negative error code on failure.
-9058cbe1e Jie Yang         2015-04-27  183   */
-9058cbe1e Jie Yang         2015-04-27 @184  int snd_jack_add_new_kctl(struct snd_jack *jack, const char * name, int mask)
-9058cbe1e Jie Yang         2015-04-27  185  {
-9058cbe1e Jie Yang         2015-04-27  186  	struct snd_jack_kctl *jack_kctl;
-9058cbe1e Jie Yang         2015-04-27  187  
-9058cbe1e Jie Yang         2015-04-27  188  	jack_kctl = snd_jack_kctl_new(jack->card, name, mask);
-9058cbe1e Jie Yang         2015-04-27  189  	if (!jack_kctl)
-9058cbe1e Jie Yang         2015-04-27  190  		return -ENOMEM;
-9058cbe1e Jie Yang         2015-04-27  191  
-9058cbe1e Jie Yang         2015-04-27  192  	snd_jack_kctl_add(jack, jack_kctl);
-9058cbe1e Jie Yang         2015-04-27  193  	return 0;
-9058cbe1e Jie Yang         2015-04-27  194  }
-9058cbe1e Jie Yang         2015-04-27  195  EXPORT_SYMBOL(snd_jack_add_new_kctl);
-9058cbe1e Jie Yang         2015-04-27  196  
-e76d8ceaa Mark Brown       2008-07-28  197  /**
-e76d8ceaa Mark Brown       2008-07-28  198   * snd_jack_new - Create a new jack
-e76d8ceaa Mark Brown       2008-07-28  199   * @card:  the card instance
-e76d8ceaa Mark Brown       2008-07-28  200   * @id:    an identifying string for this jack
-e76d8ceaa Mark Brown       2008-07-28  201   * @type:  a bitmask of enum snd_jack_type values that can be detected by
-e76d8ceaa Mark Brown       2008-07-28  202   *         this jack
-e76d8ceaa Mark Brown       2008-07-28  203   * @jjack: Used to provide the allocated jack object to the caller.
-4e3f0dc65 Jie Yang         2015-04-27  204   * @initial_kctl: if true, create a kcontrol and add it to the jack list.
-4e3f0dc65 Jie Yang         2015-04-27  205   * @phantom_jack: Don't create a input device for phantom jacks.
-e76d8ceaa Mark Brown       2008-07-28  206   *
-e76d8ceaa Mark Brown       2008-07-28  207   * Creates a new jack object.
-e76d8ceaa Mark Brown       2008-07-28  208   *
-eb7c06e8e Yacine Belkadi   2013-03-11  209   * Return: Zero if successful, or a negative error code on failure.
-eb7c06e8e Yacine Belkadi   2013-03-11  210   * On success @jjack will be initialised.
-e76d8ceaa Mark Brown       2008-07-28  211   */
-e76d8ceaa Mark Brown       2008-07-28 @212  int snd_jack_new(struct snd_card *card, const char *id, int type,
-4e3f0dc65 Jie Yang         2015-04-27  213  		 struct snd_jack **jjack, bool initial_kctl, bool phantom_jack)
-e76d8ceaa Mark Brown       2008-07-28  214  {
-e76d8ceaa Mark Brown       2008-07-28  215  	struct snd_jack *jack;
-4e3f0dc65 Jie Yang         2015-04-27  216  	struct snd_jack_kctl *jack_kctl = NULL;
-e76d8ceaa Mark Brown       2008-07-28  217  	int err;
-e76d8ceaa Mark Brown       2008-07-28  218  	static struct snd_device_ops ops = {
-e76d8ceaa Mark Brown       2008-07-28  219  		.dev_free = snd_jack_dev_free,
-dbe821f46 Takashi Iwai     2016-02-17  220  #ifdef CONFIG_SND_JACK_INPUT_DEV
-e76d8ceaa Mark Brown       2008-07-28  221  		.dev_register = snd_jack_dev_register,
-32b854429 Takashi Iwai     2013-11-14  222  		.dev_disconnect = snd_jack_dev_disconnect,
-dbe821f46 Takashi Iwai     2016-02-17  223  #endif /* CONFIG_SND_JACK_INPUT_DEV */
-e76d8ceaa Mark Brown       2008-07-28  224  	};
-e76d8ceaa Mark Brown       2008-07-28  225  
-4e3f0dc65 Jie Yang         2015-04-27  226  	if (initial_kctl) {
-4e3f0dc65 Jie Yang         2015-04-27  227  		jack_kctl = snd_jack_kctl_new(card, id, type);
-4e3f0dc65 Jie Yang         2015-04-27  228  		if (!jack_kctl)
-4e3f0dc65 Jie Yang         2015-04-27  229  			return -ENOMEM;
-4e3f0dc65 Jie Yang         2015-04-27  230  	}
-4e3f0dc65 Jie Yang         2015-04-27  231  
-e76d8ceaa Mark Brown       2008-07-28  232  	jack = kzalloc(sizeof(struct snd_jack), GFP_KERNEL);
-e76d8ceaa Mark Brown       2008-07-28  233  	if (jack == NULL)
-e76d8ceaa Mark Brown       2008-07-28  234  		return -ENOMEM;
-e76d8ceaa Mark Brown       2008-07-28  235  
-282cd76ff Matthew Ranostay 2008-10-25  236  	jack->id = kstrdup(id, GFP_KERNEL);
-e76d8ceaa Mark Brown       2008-07-28  237  
-4e3f0dc65 Jie Yang         2015-04-27  238  	/* don't creat input device for phantom jack */
-4e3f0dc65 Jie Yang         2015-04-27  239  	if (!phantom_jack) {
-dbe821f46 Takashi Iwai     2016-02-17  240  #ifdef CONFIG_SND_JACK_INPUT_DEV
-dbe821f46 Takashi Iwai     2016-02-17  241  		int i;
-dbe821f46 Takashi Iwai     2016-02-17  242  
-e76d8ceaa Mark Brown       2008-07-28  243  		jack->input_dev = input_allocate_device();
-e76d8ceaa Mark Brown       2008-07-28  244  		if (jack->input_dev == NULL) {
-e76d8ceaa Mark Brown       2008-07-28  245  			err = -ENOMEM;
-e76d8ceaa Mark Brown       2008-07-28  246  			goto fail_input;
-e76d8ceaa Mark Brown       2008-07-28  247  		}
-e76d8ceaa Mark Brown       2008-07-28  248  
-e76d8ceaa Mark Brown       2008-07-28  249  		jack->input_dev->phys = "ALSA";
-e76d8ceaa Mark Brown       2008-07-28  250  
-e76d8ceaa Mark Brown       2008-07-28  251  		jack->type = type;
-e76d8ceaa Mark Brown       2008-07-28  252  
-53803aead Mark Brown       2012-02-07  253  		for (i = 0; i < SND_JACK_SWITCH_TYPES; i++)
-bd8a71a7b Mark Brown       2009-01-03  254  			if (type & (1 << i))
-e76d8ceaa Mark Brown       2008-07-28  255  				input_set_capability(jack->input_dev, EV_SW,
-1c6e555c3 Mark Brown       2010-03-17  256  						     jack_switch_types[i]);
-e76d8ceaa Mark Brown       2008-07-28  257  
-dbe821f46 Takashi Iwai     2016-02-17  258  #endif /* CONFIG_SND_JACK_INPUT_DEV */
-4e3f0dc65 Jie Yang         2015-04-27  259  	}
-4e3f0dc65 Jie Yang         2015-04-27  260  
-e76d8ceaa Mark Brown       2008-07-28  261  	err = snd_device_new(card, SNDRV_DEV_JACK, jack, &ops);
-e76d8ceaa Mark Brown       2008-07-28  262  	if (err < 0)
-e76d8ceaa Mark Brown       2008-07-28  263  		goto fail_input;
-e76d8ceaa Mark Brown       2008-07-28  264  
-9058cbe1e Jie Yang         2015-04-27  265  	jack->card = card;
-9058cbe1e Jie Yang         2015-04-27  266  	INIT_LIST_HEAD(&jack->kctl_list);
-9058cbe1e Jie Yang         2015-04-27  267  
-4e3f0dc65 Jie Yang         2015-04-27  268  	if (initial_kctl)
-4e3f0dc65 Jie Yang         2015-04-27  269  		snd_jack_kctl_add(jack, jack_kctl);
-4e3f0dc65 Jie Yang         2015-04-27  270  
-e76d8ceaa Mark Brown       2008-07-28  271  	*jjack = jack;
-e76d8ceaa Mark Brown       2008-07-28  272  
-e76d8ceaa Mark Brown       2008-07-28  273  	return 0;
-e76d8ceaa Mark Brown       2008-07-28  274  
-e76d8ceaa Mark Brown       2008-07-28  275  fail_input:
-dbe821f46 Takashi Iwai     2016-02-17  276  #ifdef CONFIG_SND_JACK_INPUT_DEV
-e76d8ceaa Mark Brown       2008-07-28  277  	input_free_device(jack->input_dev);
-dbe821f46 Takashi Iwai     2016-02-17  278  #endif
-eeda276be Lu Guanqun       2011-02-21  279  	kfree(jack->id);
-e76d8ceaa Mark Brown       2008-07-28  280  	kfree(jack);
-e76d8ceaa Mark Brown       2008-07-28  281  	return err;
-e76d8ceaa Mark Brown       2008-07-28  282  }
-e76d8ceaa Mark Brown       2008-07-28  283  EXPORT_SYMBOL(snd_jack_new);
-e76d8ceaa Mark Brown       2008-07-28  284  
-dbe821f46 Takashi Iwai     2016-02-17  285  #ifdef CONFIG_SND_JACK_INPUT_DEV
-e76d8ceaa Mark Brown       2008-07-28  286  /**
-e76d8ceaa Mark Brown       2008-07-28  287   * snd_jack_set_parent - Set the parent device for a jack
-e76d8ceaa Mark Brown       2008-07-28  288   *
-e76d8ceaa Mark Brown       2008-07-28  289   * @jack:   The jack to configure
-e76d8ceaa Mark Brown       2008-07-28  290   * @parent: The device to set as parent for the jack.
-e76d8ceaa Mark Brown       2008-07-28  291   *
-a2e888f0d Mark Brown       2012-05-07  292   * Set the parent for the jack devices in the device tree.  This
-e76d8ceaa Mark Brown       2008-07-28  293   * function is only valid prior to registration of the jack.  If no
-e76d8ceaa Mark Brown       2008-07-28  294   * parent is configured then the parent device will be the sound card.
-e76d8ceaa Mark Brown       2008-07-28  295   */
-e76d8ceaa Mark Brown       2008-07-28 @296  void snd_jack_set_parent(struct snd_jack *jack, struct device *parent)
-e76d8ceaa Mark Brown       2008-07-28  297  {
-e76d8ceaa Mark Brown       2008-07-28  298  	WARN_ON(jack->registered);
-43b2cd547 Takashi Iwai     2015-04-30  299  	if (!jack->input_dev)
-43b2cd547 Takashi Iwai     2015-04-30  300  		return;
-e76d8ceaa Mark Brown       2008-07-28  301  
-e76d8ceaa Mark Brown       2008-07-28  302  	jack->input_dev->dev.parent = parent;
-e76d8ceaa Mark Brown       2008-07-28  303  }
-e76d8ceaa Mark Brown       2008-07-28  304  EXPORT_SYMBOL(snd_jack_set_parent);
-e76d8ceaa Mark Brown       2008-07-28  305  
-e76d8ceaa Mark Brown       2008-07-28  306  /**
-ebb812cb8 Mark Brown       2010-03-17  307   * snd_jack_set_key - Set a key mapping on a jack
-ebb812cb8 Mark Brown       2010-03-17  308   *
-ebb812cb8 Mark Brown       2010-03-17  309   * @jack:    The jack to configure
-ebb812cb8 Mark Brown       2010-03-17  310   * @type:    Jack report type for this key
-ebb812cb8 Mark Brown       2010-03-17  311   * @keytype: Input layer key type to be reported
-ebb812cb8 Mark Brown       2010-03-17  312   *
-ebb812cb8 Mark Brown       2010-03-17  313   * Map a SND_JACK_BTN_ button type to an input layer key, allowing
-ebb812cb8 Mark Brown       2010-03-17  314   * reporting of keys on accessories via the jack abstraction.  If no
-ebb812cb8 Mark Brown       2010-03-17  315   * mapping is provided but keys are enabled in the jack type then
-ebb812cb8 Mark Brown       2010-03-17  316   * BTN_n numeric buttons will be reported.
-ebb812cb8 Mark Brown       2010-03-17  317   *
-a2e888f0d Mark Brown       2012-05-07  318   * If jacks are not reporting via the input API this call will have no
-a2e888f0d Mark Brown       2012-05-07  319   * effect.
-a2e888f0d Mark Brown       2012-05-07  320   *
-ebb812cb8 Mark Brown       2010-03-17  321   * Note that this is intended to be use by simple devices with small
-ebb812cb8 Mark Brown       2010-03-17  322   * numbers of keys that can be reported.  It is also possible to
-ebb812cb8 Mark Brown       2010-03-17  323   * access the input device directly - devices with complex input
-ebb812cb8 Mark Brown       2010-03-17  324   * capabilities on accessories should consider doing this rather than
-ebb812cb8 Mark Brown       2010-03-17  325   * using this abstraction.
-ebb812cb8 Mark Brown       2010-03-17  326   *
-ebb812cb8 Mark Brown       2010-03-17  327   * This function may only be called prior to registration of the jack.
-eb7c06e8e Yacine Belkadi   2013-03-11  328   *
-eb7c06e8e Yacine Belkadi   2013-03-11  329   * Return: Zero if successful, or a negative error code on failure.
-ebb812cb8 Mark Brown       2010-03-17  330   */
-ebb812cb8 Mark Brown       2010-03-17 @331  int snd_jack_set_key(struct snd_jack *jack, enum snd_jack_types type,
-ebb812cb8 Mark Brown       2010-03-17  332  		     int keytype)
-ebb812cb8 Mark Brown       2010-03-17  333  {
-ebb812cb8 Mark Brown       2010-03-17  334  	int key = fls(SND_JACK_BTN_0) - fls(type);
-ebb812cb8 Mark Brown       2010-03-17  335  
-ebb812cb8 Mark Brown       2010-03-17  336  	WARN_ON(jack->registered);
-ebb812cb8 Mark Brown       2010-03-17  337  
-ebb812cb8 Mark Brown       2010-03-17  338  	if (!keytype || key >= ARRAY_SIZE(jack->key))
-ebb812cb8 Mark Brown       2010-03-17  339  		return -EINVAL;
-ebb812cb8 Mark Brown       2010-03-17  340  
-ebb812cb8 Mark Brown       2010-03-17  341  	jack->type |= type;
-ebb812cb8 Mark Brown       2010-03-17  342  	jack->key[key] = keytype;
-ebb812cb8 Mark Brown       2010-03-17  343  	return 0;
-ebb812cb8 Mark Brown       2010-03-17  344  }
-ebb812cb8 Mark Brown       2010-03-17  345  EXPORT_SYMBOL(snd_jack_set_key);
-dbe821f46 Takashi Iwai     2016-02-17  346  #endif /* CONFIG_SND_JACK_INPUT_DEV */
-ebb812cb8 Mark Brown       2010-03-17  347  
-ebb812cb8 Mark Brown       2010-03-17  348  /**
-e76d8ceaa Mark Brown       2008-07-28  349   * snd_jack_report - Report the current status of a jack
-e76d8ceaa Mark Brown       2008-07-28  350   *
-e76d8ceaa Mark Brown       2008-07-28  351   * @jack:   The jack to report status for
-e76d8ceaa Mark Brown       2008-07-28  352   * @status: The current status of the jack
-e76d8ceaa Mark Brown       2008-07-28  353   */
-e76d8ceaa Mark Brown       2008-07-28 @354  void snd_jack_report(struct snd_jack *jack, int status)
-e76d8ceaa Mark Brown       2008-07-28  355  {
-9058cbe1e Jie Yang         2015-04-27  356  	struct snd_jack_kctl *jack_kctl;
-dbe821f46 Takashi Iwai     2016-02-17  357  #ifdef CONFIG_SND_JACK_INPUT_DEV
+Since the recent integration of kctl jack and input jack layers, we
+can basically build the jack layer even without input devices.  That
+is, the jack layer itself can be built with conditional to enable the
+input device support or not, while the users may enable always
+CONFIG_SND_JACK unconditionally.
 
-:::::: The code at line 184 was first introduced by commit
-:::::: 9058cbe1eed29381f84dec9f96980f5a4ea1025f ALSA: jack: implement kctl creating for jack devices
+For achieving it, this patch changes the following:
+- A new Kconfig, CONFIG_SND_JACK_INPUT_DEV, was introduced to indicate
+  whether the jack layer supports the input device,
+- A few items in snd_jack struct and relevant codes are conditionally
+  built upon CONFIG_SND_JACK_INPUT_DEV,
+- The users of CONFIG_SND_JACK drop the messy dependency on
+  CONFIG_INPUT.
 
-:::::: TO: Jie Yang <yang.jie@intel.com>
-:::::: CC: Takashi Iwai <tiwai@suse.de>
+This change also automagically fixes a potential bug in HD-audio
+driver Arnd reported, where the NULL or uninitialized jack instance is
+dereferenced.
 
+Reported-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Takashi Iwai <tiwai@suse.de>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 27529 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160217/e0faed33/attachment-0001.obj>
+ include/sound/jack.h  | 23 ++++++++++++++---------
+ sound/core/Kconfig    |  9 ++++++---
+ sound/core/jack.c     | 23 ++++++++++++++++++++---
+ sound/pci/Kconfig     |  2 +-
+ sound/pci/hda/Kconfig |  2 +-
+ sound/soc/Kconfig     |  2 +-
+ 6 files changed, 43 insertions(+), 18 deletions(-)
+
+diff --git a/include/sound/jack.h b/include/sound/jack.h
+index 23bede121c78..1e84bfb553cf 100644
+--- a/include/sound/jack.h
++++ b/include/sound/jack.h
+@@ -72,14 +72,16 @@ enum snd_jack_types {
+ #define SND_JACK_SWITCH_TYPES 6
+ 
+ struct snd_jack {
+-	struct input_dev *input_dev;
+ 	struct list_head kctl_list;
+ 	struct snd_card *card;
++	const char *id;
++#ifdef CONFIG_SND_JACK_INPUT_DEV
++	struct input_dev *input_dev;
+ 	int registered;
+ 	int type;
+-	const char *id;
+ 	char name[100];
+ 	unsigned int key[6];   /* Keep in sync with definitions above */
++#endif /* CONFIG_SND_JACK_INPUT_DEV */
+ 	void *private_data;
+ 	void (*private_free)(struct snd_jack *);
+ };
+@@ -89,10 +91,11 @@ struct snd_jack {
+ int snd_jack_new(struct snd_card *card, const char *id, int type,
+ 		 struct snd_jack **jack, bool initial_kctl, bool phantom_jack);
+ int snd_jack_add_new_kctl(struct snd_jack *jack, const char * name, int mask);
++#ifdef CONFIG_SND_JACK_INPUT_DEV
+ void snd_jack_set_parent(struct snd_jack *jack, struct device *parent);
+ int snd_jack_set_key(struct snd_jack *jack, enum snd_jack_types type,
+ 		     int keytype);
+-
++#endif
+ void snd_jack_report(struct snd_jack *jack, int status);
+ 
+ #else
+@@ -107,6 +110,13 @@ static inline int snd_jack_add_new_kctl(struct snd_jack *jack, const char * name
+ 	return 0;
+ }
+ 
++static inline void snd_jack_report(struct snd_jack *jack, int status)
++{
++}
++
++#endif
++
++#if !defined(CONFIG_SND_JACK) || !defined(CONFIG_SND_JACK_INPUT_DEV)
+ static inline void snd_jack_set_parent(struct snd_jack *jack,
+ 				       struct device *parent)
+ {
+@@ -118,11 +128,6 @@ static inline int snd_jack_set_key(struct snd_jack *jack,
+ {
+ 	return 0;
+ }
+-
+-static inline void snd_jack_report(struct snd_jack *jack, int status)
+-{
+-}
+-
+-#endif
++#endif /* !CONFIG_SND_JACK || !CONFIG_SND_JACK_INPUT_DEV */
+ 
+ #endif
+diff --git a/sound/core/Kconfig b/sound/core/Kconfig
+index a2a1e24becc6..6d12ca9bcb80 100644
+--- a/sound/core/Kconfig
++++ b/sound/core/Kconfig
+@@ -24,12 +24,15 @@ config SND_RAWMIDI
+ config SND_COMPRESS_OFFLOAD
+ 	tristate
+ 
+-# To be effective this also requires INPUT - users should say:
+-#    select SND_JACK if INPUT=y || INPUT=SND
+-# to avoid having to force INPUT on.
+ config SND_JACK
+ 	bool
+ 
++# enable input device support in jack layer
++config SND_JACK_INPUT_DEV
++	bool
++	depends on SND_JACK
++	default y if INPUT=y || INPUT=SND
++
+ config SND_SEQUENCER
+ 	tristate "Sequencer support"
+ 	select SND_TIMER
+diff --git a/sound/core/jack.c b/sound/core/jack.c
+index 7237acbdcbbc..f652e90efd7e 100644
+--- a/sound/core/jack.c
++++ b/sound/core/jack.c
+@@ -32,6 +32,7 @@ struct snd_jack_kctl {
+ 	unsigned int mask_bits; /* only masked status bits are reported via kctl */
+ };
+ 
++#ifdef CONFIG_SND_JACK_INPUT_DEV
+ static int jack_switch_types[SND_JACK_SWITCH_TYPES] = {
+ 	SW_HEADPHONE_INSERT,
+ 	SW_MICROPHONE_INSERT,
+@@ -40,9 +41,11 @@ static int jack_switch_types[SND_JACK_SWITCH_TYPES] = {
+ 	SW_VIDEOOUT_INSERT,
+ 	SW_LINEIN_INSERT,
+ };
++#endif /* CONFIG_SND_JACK_INPUT_DEV */
+ 
+ static int snd_jack_dev_disconnect(struct snd_device *device)
+ {
++#ifdef CONFIG_SND_JACK_INPUT_DEV
+ 	struct snd_jack *jack = device->device_data;
+ 
+ 	if (!jack->input_dev)
+@@ -55,6 +58,7 @@ static int snd_jack_dev_disconnect(struct snd_device *device)
+ 	else
+ 		input_free_device(jack->input_dev);
+ 	jack->input_dev = NULL;
++#endif /* CONFIG_SND_JACK_INPUT_DEV */
+ 	return 0;
+ }
+ 
+@@ -79,6 +83,7 @@ static int snd_jack_dev_free(struct snd_device *device)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_SND_JACK_INPUT_DEV
+ static int snd_jack_dev_register(struct snd_device *device)
+ {
+ 	struct snd_jack *jack = device->device_data;
+@@ -116,6 +121,7 @@ static int snd_jack_dev_register(struct snd_device *device)
+ 
+ 	return err;
+ }
++#endif /* CONFIG_SND_JACK_INPUT_DEV */
+ 
+ static void snd_jack_kctl_private_free(struct snd_kcontrol *kctl)
+ {
+@@ -209,11 +215,12 @@ int snd_jack_new(struct snd_card *card, const char *id, int type,
+ 	struct snd_jack *jack;
+ 	struct snd_jack_kctl *jack_kctl = NULL;
+ 	int err;
+-	int i;
+ 	static struct snd_device_ops ops = {
+ 		.dev_free = snd_jack_dev_free,
++#ifdef CONFIG_SND_JACK_INPUT_DEV
+ 		.dev_register = snd_jack_dev_register,
+ 		.dev_disconnect = snd_jack_dev_disconnect,
++#endif /* CONFIG_SND_JACK_INPUT_DEV */
+ 	};
+ 
+ 	if (initial_kctl) {
+@@ -230,6 +237,9 @@ int snd_jack_new(struct snd_card *card, const char *id, int type,
+ 
+ 	/* don't creat input device for phantom jack */
+ 	if (!phantom_jack) {
++#ifdef CONFIG_SND_JACK_INPUT_DEV
++		int i;
++
+ 		jack->input_dev = input_allocate_device();
+ 		if (jack->input_dev == NULL) {
+ 			err = -ENOMEM;
+@@ -245,6 +255,7 @@ int snd_jack_new(struct snd_card *card, const char *id, int type,
+ 				input_set_capability(jack->input_dev, EV_SW,
+ 						     jack_switch_types[i]);
+ 
++#endif /* CONFIG_SND_JACK_INPUT_DEV */
+ 	}
+ 
+ 	err = snd_device_new(card, SNDRV_DEV_JACK, jack, &ops);
+@@ -262,13 +273,16 @@ int snd_jack_new(struct snd_card *card, const char *id, int type,
+ 	return 0;
+ 
+ fail_input:
++#ifdef CONFIG_SND_JACK_INPUT_DEV
+ 	input_free_device(jack->input_dev);
++#endif
+ 	kfree(jack->id);
+ 	kfree(jack);
+ 	return err;
+ }
+ EXPORT_SYMBOL(snd_jack_new);
+ 
++#ifdef CONFIG_SND_JACK_INPUT_DEV
+ /**
+  * snd_jack_set_parent - Set the parent device for a jack
+  *
+@@ -326,10 +340,10 @@ int snd_jack_set_key(struct snd_jack *jack, enum snd_jack_types type,
+ 
+ 	jack->type |= type;
+ 	jack->key[key] = keytype;
+-
+ 	return 0;
+ }
+ EXPORT_SYMBOL(snd_jack_set_key);
++#endif /* CONFIG_SND_JACK_INPUT_DEV */
+ 
+ /**
+  * snd_jack_report - Report the current status of a jack
+@@ -340,7 +354,9 @@ EXPORT_SYMBOL(snd_jack_set_key);
+ void snd_jack_report(struct snd_jack *jack, int status)
+ {
+ 	struct snd_jack_kctl *jack_kctl;
++#ifdef CONFIG_SND_JACK_INPUT_DEV
+ 	int i;
++#endif
+ 
+ 	if (!jack)
+ 		return;
+@@ -349,6 +365,7 @@ void snd_jack_report(struct snd_jack *jack, int status)
+ 		snd_kctl_jack_report(jack->card, jack_kctl->kctl,
+ 					    status & jack_kctl->mask_bits);
+ 
++#ifdef CONFIG_SND_JACK_INPUT_DEV
+ 	if (!jack->input_dev)
+ 		return;
+ 
+@@ -369,6 +386,6 @@ void snd_jack_report(struct snd_jack *jack, int status)
+ 	}
+ 
+ 	input_sync(jack->input_dev);
+-
++#endif /* CONFIG_SND_JACK_INPUT_DEV */
+ }
+ EXPORT_SYMBOL(snd_jack_report);
+diff --git a/sound/pci/Kconfig b/sound/pci/Kconfig
+index 8f6594a7d37f..32151d8c6bb8 100644
+--- a/sound/pci/Kconfig
++++ b/sound/pci/Kconfig
+@@ -866,7 +866,7 @@ config SND_VIRTUOSO
+ 	select SND_OXYGEN_LIB
+ 	select SND_PCM
+ 	select SND_MPU401_UART
+-	select SND_JACK if INPUT=y || INPUT=SND
++	select SND_JACK
+ 	help
+ 	  Say Y here to include support for sound cards based on the
+ 	  Asus AV66/AV100/AV200 chips, i.e., Xonar D1, DX, D2, D2X, DS, DSX,
+diff --git a/sound/pci/hda/Kconfig b/sound/pci/hda/Kconfig
+index e94cfd5c69f7..bb02c2d48fd5 100644
+--- a/sound/pci/hda/Kconfig
++++ b/sound/pci/hda/Kconfig
+@@ -4,7 +4,7 @@ config SND_HDA
+ 	tristate
+ 	select SND_PCM
+ 	select SND_VMASTER
+-	select SND_JACK if INPUT=y || INPUT=SND
++	select SND_JACK
+ 	select SND_HDA_CORE
+ 
+ config SND_HDA_INTEL
+diff --git a/sound/soc/Kconfig b/sound/soc/Kconfig
+index 7ea66ee3653f..182d92efc7c8 100644
+--- a/sound/soc/Kconfig
++++ b/sound/soc/Kconfig
+@@ -6,7 +6,7 @@ menuconfig SND_SOC
+ 	tristate "ALSA for SoC audio support"
+ 	select SND_PCM
+ 	select AC97_BUS if SND_SOC_AC97_BUS
+-	select SND_JACK if INPUT=y || INPUT=SND
++	select SND_JACK
+ 	select REGMAP_I2C if I2C
+ 	select REGMAP_SPI if SPI_MASTER
+ 	---help---
+-- 
+2.7.1
