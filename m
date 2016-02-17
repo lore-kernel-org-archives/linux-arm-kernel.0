@@ -1,64 +1,100 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 17 Feb 2016 14:28:59 +0100
-Subject: [PATCH 13/13] ARM: dts: imx6: Use correct SDMA script for SPI cores
+Date: Wed, 17 Feb 2016 14:28:49 +0100
+Subject: [PATCH 03/13] spi: imx: replace fixed timeout with calculated
 In-Reply-To: <1455715739-25161-1-git-send-email-s.hauer@pengutronix.de>
 References: <1455715739-25161-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1455715739-25161-14-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1455715739-25161-4-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the reference manual the shp_2_mcu / mcu_2_shp
-scripts must be used for devices connected through the SPBA.
+From: Anton Bondarenko <anton.bondarenko.sama@gmail.com>
 
-This fixes an issue we saw with DMA transfers from SPI NOR Flashes.
-Sometimes the SPI controller RX FIFO was not empty after a DMA
-transfer and the driver got stuck in the next PIO transfer when
-it read one word more than expected.
+Fixed timeout value can fire while transaction is ongoing. This may happen
+because there are no strict requirements on SPI transaction duration.
+Dynamic timeout value is generated based on SCLK and transaction size.
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+There is also 4 * SCLK delay between TX bursts related to HW internal CS change.
+
+Signed-off-by: Anton Bondarenko <anton.bondarenko.sama@gmail.com>
 ---
- arch/arm/boot/dts/imx6qdl.dtsi | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/spi/spi-imx.c | 24 +++++++++++++++++++++---
+ 1 file changed, 21 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index 4f6ae92..06d2c4e 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -261,7 +261,7 @@
- 					clocks = <&clks IMX6QDL_CLK_ECSPI1>,
- 						 <&clks IMX6QDL_CLK_ECSPI1>;
- 					clock-names = "ipg", "per";
--					dmas = <&sdma 3 7 1>, <&sdma 4 7 2>;
-+					dmas = <&sdma 3 8 1>, <&sdma 4 8 2>;
- 					dma-names = "rx", "tx";
- 					status = "disabled";
- 				};
-@@ -275,7 +275,7 @@
- 					clocks = <&clks IMX6QDL_CLK_ECSPI2>,
- 						 <&clks IMX6QDL_CLK_ECSPI2>;
- 					clock-names = "ipg", "per";
--					dmas = <&sdma 5 7 1>, <&sdma 6 7 2>;
-+					dmas = <&sdma 5 8 1>, <&sdma 6 8 2>;
- 					dma-names = "rx", "tx";
- 					status = "disabled";
- 				};
-@@ -289,7 +289,7 @@
- 					clocks = <&clks IMX6QDL_CLK_ECSPI3>,
- 						 <&clks IMX6QDL_CLK_ECSPI3>;
- 					clock-names = "ipg", "per";
--					dmas = <&sdma 7 7 1>, <&sdma 8 7 2>;
-+					dmas = <&sdma 7 8 1>, <&sdma 8 8 2>;
- 					dma-names = "rx", "tx";
- 					status = "disabled";
- 				};
-@@ -303,7 +303,7 @@
- 					clocks = <&clks IMX6QDL_CLK_ECSPI4>,
- 						 <&clks IMX6QDL_CLK_ECSPI4>;
- 					clock-names = "ipg", "per";
--					dmas = <&sdma 9 7 1>, <&sdma 10 7 2>;
-+					dmas = <&sdma 9 8 1>, <&sdma 10 8 2>;
- 					dma-names = "rx", "tx";
- 					status = "disabled";
- 				};
+diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
+index 7904d45..b277375 100644
+--- a/drivers/spi/spi-imx.c
++++ b/drivers/spi/spi-imx.c
+@@ -56,7 +56,6 @@
+ 
+ /* The maximum  bytes that a sdma BD can transfer.*/
+ #define MAX_SDMA_BD_BYTES  (1 << 15)
+-#define IMX_DMA_TIMEOUT (msecs_to_jiffies(3000))
+ struct spi_imx_config {
+ 	unsigned int speed_hz;
+ 	unsigned int bpw;
+@@ -93,6 +92,7 @@ struct spi_imx_data {
+ 	struct clk *clk_per;
+ 	struct clk *clk_ipg;
+ 	unsigned long spi_clk;
++	unsigned int spi_bus_clk;
+ 
+ 	unsigned int count;
+ 	void (*tx)(struct spi_imx_data *);
+@@ -333,6 +333,7 @@ static int __maybe_unused mx51_ecspi_config(struct spi_imx_data *spi_imx,
+ 
+ 	/* set clock speed */
+ 	ctrl |= mx51_ecspi_clkdiv(spi_imx, config->speed_hz, &clk);
++	spi_imx->spi_bus_clk = clk;
+ 
+ 	/* set chip select to use */
+ 	ctrl |= MX51_ECSPI_CTRL_CS(config->cs);
+@@ -915,11 +916,26 @@ static void spi_imx_dma_tx_callback(void *cookie)
+ 	complete(&spi_imx->dma_tx_completion);
+ }
+ 
++static int spi_imx_calculate_timeout(struct spi_imx_data *spi_imx, int size)
++{
++	unsigned long timeout = 0;
++
++	/* Time with actual data transfer and CS change delay related to HW */
++	timeout = (8 + 4) * size / spi_imx->spi_bus_clk;
++
++	/* Add extra second for scheduler related activities */
++	timeout += 1;
++
++	/* Double calculated timeout */
++	return msecs_to_jiffies(2 * timeout * MSEC_PER_SEC);
++}
++
+ static int spi_imx_dma_transfer(struct spi_imx_data *spi_imx,
+ 				struct spi_transfer *transfer)
+ {
+ 	struct dma_async_tx_descriptor *desc_tx = NULL, *desc_rx = NULL;
+ 	int ret;
++	unsigned long transfer_timeout;
+ 	unsigned long timeout;
+ 	struct spi_master *master = spi_imx->bitbang.master;
+ 	struct sg_table *tx = &transfer->tx_sg, *rx = &transfer->rx_sg;
+@@ -966,16 +982,18 @@ static int spi_imx_dma_transfer(struct spi_imx_data *spi_imx,
+ 	dma_async_issue_pending(master->dma_tx);
+ 	spi_imx->devtype_data->trigger(spi_imx);
+ 
++	transfer_timeout = spi_imx_calculate_timeout(spi_imx, transfer->len);
++
+ 	/* Wait SDMA to finish the data transfer.*/
+ 	timeout = wait_for_completion_timeout(&spi_imx->dma_tx_completion,
+-						IMX_DMA_TIMEOUT);
++						transfer_timeout);
+ 	if (!timeout) {
+ 		dev_err(spi_imx->dev, "I/O Error in DMA TX\n");
+ 		dmaengine_terminate_all(master->dma_tx);
+ 		dmaengine_terminate_all(master->dma_rx);
+ 	} else {
+ 		timeout = wait_for_completion_timeout(
+-				&spi_imx->dma_rx_completion, IMX_DMA_TIMEOUT);
++				&spi_imx->dma_rx_completion, transfer_timeout);
+ 		if (!timeout) {
+ 			dev_err(spi_imx->dev, "I/O Error in DMA RX\n");
+ 			spi_imx->devtype_data->reset(spi_imx);
 -- 
 2.7.0
