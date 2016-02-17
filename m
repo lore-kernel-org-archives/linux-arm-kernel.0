@@ -1,27 +1,54 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Wed, 17 Feb 2016 10:41:12 -0600
-Subject: [PATCH v2 0/2] arm64: mm: Mark .rodata as RO
-Message-ID: <1455727274-16328-1-git-send-email-jeremy.linton@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 17 Feb 2016 16:40:49 +0000
+Subject: [PATCH v2 17/17] arm64: KVM: vgic-v3: Do not save ICH_AP0Rn_EL2 for
+ GICv2 emulation
+In-Reply-To: <1455727249-24752-1-git-send-email-marc.zyngier@arm.com>
+References: <1455727249-24752-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1455727249-24752-18-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the .rodata section is actually still executable when DEBUG_RODATA
-is enabled. This changes that so the .rodata is actually read only, no execute.
+The GICv3 specification mandates that ICH_AP0Rn_EL2 are set to
+zero when running guests that use the memory mapped registers.
 
-This patch is based on top of "PATCH v2 flag contiguous PTES in linear mapping"
+This is fine, as we initialize all ICH_AP0Rn_EL2 registers to
+zero, and restore them on entry. But it also means that we
+do not need to save these registers on exit. Profit!
 
-V1->V2
-  Added .rodata to kernel VM range notice in mem_init
-  Split _stext->_etext into an additional chunk in map_kernel
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/kvm/hyp/vgic-v3-sr.c | 19 +++++++++++--------
+ 1 file changed, 11 insertions(+), 8 deletions(-)
 
-Jeremy Linton (2):
-  arm64: mm: Mark .rodata as RO
-  arm64/mm: Add .rodata to kernel virtual memory boot notice
-
- arch/arm64/kernel/vmlinux.lds.S |  5 +++--
- arch/arm64/mm/init.c            |  4 +++-
- arch/arm64/mm/mmu.c             | 17 +++++++++++++----
- 3 files changed, 19 insertions(+), 7 deletions(-)
-
+diff --git a/arch/arm64/kvm/hyp/vgic-v3-sr.c b/arch/arm64/kvm/hyp/vgic-v3-sr.c
+index 5f12c57..c2f173d 100644
+--- a/arch/arm64/kvm/hyp/vgic-v3-sr.c
++++ b/arch/arm64/kvm/hyp/vgic-v3-sr.c
+@@ -202,14 +202,17 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
+ 			__gic_v3_set_lr(0, i);
+ 		}
+ 
+-		switch (nr_pri_bits) {
+-		case 7:
+-			cpu_if->vgic_ap0r[3] = read_gicreg(ICH_AP0R3_EL2);
+-			cpu_if->vgic_ap0r[2] = read_gicreg(ICH_AP0R2_EL2);
+-		case 6:
+-			cpu_if->vgic_ap0r[1] = read_gicreg(ICH_AP0R1_EL2);
+-		default:
+-			cpu_if->vgic_ap0r[0] = read_gicreg(ICH_AP0R0_EL2);
++		/* ICH_AP0Rn is only valid for SRE==1 */
++		if (cpu_if->vgic_sre & ICC_SRE_EL1_SRE) {
++			switch (nr_pri_bits) {
++			case 7:
++				cpu_if->vgic_ap0r[3] = read_gicreg(ICH_AP0R3_EL2);
++				cpu_if->vgic_ap0r[2] = read_gicreg(ICH_AP0R2_EL2);
++			case 6:
++				cpu_if->vgic_ap0r[1] = read_gicreg(ICH_AP0R1_EL2);
++			default:
++				cpu_if->vgic_ap0r[0] = read_gicreg(ICH_AP0R0_EL2);
++			}
+ 		}
+ 
+ 		switch (nr_pri_bits) {
 -- 
-2.4.3
+2.1.4
