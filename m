@@ -1,53 +1,116 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 17 Feb 2016 14:28:51 +0100
-Subject: [PATCH 05/13] spi: imx: initialize usedma earlier
+Date: Wed, 17 Feb 2016 14:28:48 +0100
+Subject: [PATCH 02/13] spi: imx: use proper dev_* functions for driver messages
 In-Reply-To: <1455715739-25161-1-git-send-email-s.hauer@pengutronix.de>
 References: <1455715739-25161-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1455715739-25161-6-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1455715739-25161-3-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So that the SoC specific config function can know if we will do
-DMA or not. Will be needed in following patches.
+Add a struct device * member to the private driver data and use
+it to print messages using dev_* functions rather than pr_*.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/spi/spi-imx.c | 15 ++++++++-------
- 1 file changed, 8 insertions(+), 7 deletions(-)
+ drivers/spi/spi-imx.c | 27 ++++++++++++---------------
+ 1 file changed, 12 insertions(+), 15 deletions(-)
 
 diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
-index 5a48d07..7047453 100644
+index 08492d6..7904d45 100644
 --- a/drivers/spi/spi-imx.c
 +++ b/drivers/spi/spi-imx.c
-@@ -815,6 +815,11 @@ static int spi_imx_setupxfer(struct spi_device *spi,
- 		spi_imx->tx = spi_imx_buf_tx_u32;
+@@ -86,6 +86,7 @@ struct spi_imx_devtype_data {
+ 
+ struct spi_imx_data {
+ 	struct spi_bitbang bitbang;
++	struct device *dev;
+ 
+ 	struct completion xfer_done;
+ 	void __iomem *base;
+@@ -250,14 +251,15 @@ static bool spi_imx_can_dma(struct spi_master *master, struct spi_device *spi,
+ #define MX51_ECSPI_TESTREG_LBC	BIT(31)
+ 
+ /* MX51 eCSPI */
+-static unsigned int mx51_ecspi_clkdiv(unsigned int fin, unsigned int fspi,
+-				      unsigned int *fres)
++static unsigned int mx51_ecspi_clkdiv(struct spi_imx_data *spi_imx,
++				      unsigned int fspi, unsigned int *fres)
+ {
+ 	/*
+ 	 * there are two 4-bit dividers, the pre-divider divides by
+ 	 * $pre, the post-divider by 2^$post
+ 	 */
+ 	unsigned int pre, post;
++	unsigned int fin = spi_imx->spi_clk;
+ 
+ 	if (unlikely(fspi > fin))
+ 		return 0;
+@@ -270,14 +272,14 @@ static unsigned int mx51_ecspi_clkdiv(unsigned int fin, unsigned int fspi,
+ 
+ 	post = max(4U, post) - 4;
+ 	if (unlikely(post > 0xf)) {
+-		pr_err("%s: cannot set clock freq: %u (base freq: %u)\n",
+-				__func__, fspi, fin);
++		dev_err(spi_imx->dev, "cannot set clock freq: %u (base freq: %u)\n",
++				fspi, fin);
+ 		return 0xff;
  	}
  
-+	if (spi_imx_can_dma(spi_imx->bitbang.master, spi, t))
-+		spi_imx->usedma = 1;
-+	else
-+		spi_imx->usedma = 0;
-+
- 	spi_imx->devtype_data->config(spi_imx, &config);
+ 	pre = DIV_ROUND_UP(fin, fspi << post) - 1;
  
- 	return 0;
-@@ -1038,14 +1043,10 @@ static int spi_imx_transfer(struct spi_device *spi,
- {
- 	struct spi_imx_data *spi_imx = spi_master_get_devdata(spi->master);
+-	pr_debug("%s: fin: %u, fspi: %u, post: %u, pre: %u\n",
++	dev_dbg(spi_imx->dev, "%s: fin: %u, fspi: %u, post: %u, pre: %u\n",
+ 			__func__, fin, fspi, post, pre);
  
--	if (spi_imx->bitbang.master->can_dma &&
--	    spi_imx_can_dma(spi_imx->bitbang.master, spi, transfer)) {
--		spi_imx->usedma = true;
-+	if (spi_imx->usedma)
- 		return spi_imx_dma_transfer(spi_imx, transfer);
--	}
--	spi_imx->usedma = false;
--
--	return spi_imx_pio_transfer(spi, transfer);
-+	else
-+		return spi_imx_pio_transfer(spi, transfer);
+ 	/* Resulting frequency for the SCLK line. */
+@@ -330,7 +332,7 @@ static int __maybe_unused mx51_ecspi_config(struct spi_imx_data *spi_imx,
+ 	ctrl |= MX51_ECSPI_CTRL_MODE_MASK;
+ 
+ 	/* set clock speed */
+-	ctrl |= mx51_ecspi_clkdiv(spi_imx->spi_clk, config->speed_hz, &clk);
++	ctrl |= mx51_ecspi_clkdiv(spi_imx, config->speed_hz, &clk);
+ 
+ 	/* set chip select to use */
+ 	ctrl |= MX51_ECSPI_CTRL_CS(config->cs);
+@@ -968,18 +970,14 @@ static int spi_imx_dma_transfer(struct spi_imx_data *spi_imx,
+ 	timeout = wait_for_completion_timeout(&spi_imx->dma_tx_completion,
+ 						IMX_DMA_TIMEOUT);
+ 	if (!timeout) {
+-		pr_warn("%s %s: I/O Error in DMA TX\n",
+-			dev_driver_string(&master->dev),
+-			dev_name(&master->dev));
++		dev_err(spi_imx->dev, "I/O Error in DMA TX\n");
+ 		dmaengine_terminate_all(master->dma_tx);
+ 		dmaengine_terminate_all(master->dma_rx);
+ 	} else {
+ 		timeout = wait_for_completion_timeout(
+ 				&spi_imx->dma_rx_completion, IMX_DMA_TIMEOUT);
+ 		if (!timeout) {
+-			pr_warn("%s %s: I/O Error in DMA RX\n",
+-				dev_driver_string(&master->dev),
+-				dev_name(&master->dev));
++			dev_err(spi_imx->dev, "I/O Error in DMA RX\n");
+ 			spi_imx->devtype_data->reset(spi_imx);
+ 			dmaengine_terminate_all(master->dma_rx);
+ 		}
+@@ -996,9 +994,7 @@ static int spi_imx_dma_transfer(struct spi_imx_data *spi_imx,
+ 	return ret;
+ 
+ no_dma:
+-	pr_warn_once("%s %s: DMA not available, falling back to PIO\n",
+-		     dev_driver_string(&master->dev),
+-		     dev_name(&master->dev));
++	dev_warn_once(spi_imx->dev, "DMA not available, falling back to PIO\n");
+ 	return -EAGAIN;
  }
  
- static int spi_imx_setup(struct spi_device *spi)
+@@ -1128,6 +1124,7 @@ static int spi_imx_probe(struct platform_device *pdev)
+ 
+ 	spi_imx = spi_master_get_devdata(master);
+ 	spi_imx->bitbang.master = master;
++	spi_imx->dev = &pdev->dev;
+ 
+ 	spi_imx->devtype_data = of_id ? of_id->data :
+ 		(struct spi_imx_devtype_data *)pdev->id_entry->driver_data;
 -- 
 2.7.0
