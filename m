@@ -1,7 +1,9 @@
 From: agust@denx.de (Anatolij Gustschin)
-Date: Wed, 17 Feb 2016 19:48:19 +0100
+Date: Wed, 17 Feb 2016 19:48:20 +0100
 Subject: [PATCH] clk: imx: correct pwm7 clock name in driver for i.MX6UL
-Message-ID: <1455734900-1913-1-git-send-email-agust@denx.de>
+In-Reply-To: <1455734900-1913-1-git-send-email-agust@denx.de>
+References: <1455734900-1913-1-git-send-email-agust@denx.de>
+Message-ID: <1455734900-1913-2-git-send-email-agust@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
