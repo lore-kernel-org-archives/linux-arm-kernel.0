@@ -1,80 +1,90 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 17 Feb 2016 14:28:52 +0100
-Subject: [PATCH 06/13] spi: imx: drop unnecessary read/modify/write
+Date: Wed, 17 Feb 2016 14:28:57 +0100
+Subject: [PATCH 11/13] spi: imx: set MX51_ECSPI_CTRL_SMC bit in setup function
 In-Reply-To: <1455715739-25161-1-git-send-email-s.hauer@pengutronix.de>
 References: <1455715739-25161-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1455715739-25161-7-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1455715739-25161-12-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the MX51_ECSPI_DMA is configured we control every single bit
-of the register, so there's no need to read/modify/write it. Instead
-just write the value we want to have in the register. Also, drop
-unnecessary check if we are actually doing DMA. The values written
-to the register have no effect in PIO mode and value written there
-during the last DMA transfer is still in the register, so we can
-equally well always write a value.
+Now that the config function knows whether we are doing DMA or not we
+can do the necessary register setup in the config function and no longer
+have to do this in the trigger function. With this the trigger function
+becomes a no-op for DMA, so instead of testing if we are doing DMA or
+not in the trigger function we simply no longer call it in the DMA case.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/spi/spi-imx.c | 31 ++++++++++---------------------
- 1 file changed, 10 insertions(+), 21 deletions(-)
+ drivers/spi/spi-imx.c | 21 ++++++---------------
+ 1 file changed, 6 insertions(+), 15 deletions(-)
 
 diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
-index 7047453..073a134 100644
+index dee5e28..3512c2f 100644
 --- a/drivers/spi/spi-imx.c
 +++ b/drivers/spi/spi-imx.c
-@@ -240,9 +240,9 @@ static bool spi_imx_can_dma(struct spi_master *master, struct spi_device *spi,
- #define MX51_ECSPI_DMA_RXT_WML_OFFSET	24
- #define MX51_ECSPI_DMA_RXT_WML_MASK	(0x3F << 24)
+@@ -106,7 +106,6 @@ struct spi_imx_data {
+ 	unsigned int txfifo; /* number of words pushed in tx FIFO */
  
--#define MX51_ECSPI_DMA_TEDEN_OFFSET	7
--#define MX51_ECSPI_DMA_RXDEN_OFFSET	23
--#define MX51_ECSPI_DMA_RXTDEN_OFFSET	31
-+#define MX51_ECSPI_DMA_TEDEN		(1 << 7)
-+#define MX51_ECSPI_DMA_RXDEN		(1 << 23)
-+#define MX51_ECSPI_DMA_RXTDEN		(1 << 31)
+ 	/* DMA */
+-	unsigned int dma_finished;
+ 	bool usedma;
+ 	u32 wml;
+ 	struct completion dma_rx_completion;
+@@ -324,14 +323,10 @@ static void __maybe_unused mx51_ecspi_intctrl(struct spi_imx_data *spi_imx, int
  
- #define MX51_ECSPI_STAT		0x18
- #define MX51_ECSPI_STAT_RR		(1 <<  3)
-@@ -318,8 +318,7 @@ static void __maybe_unused mx51_ecspi_trigger(struct spi_imx_data *spi_imx)
- static int __maybe_unused mx51_ecspi_config(struct spi_imx_data *spi_imx,
- 		struct spi_imx_config *config)
+ static void __maybe_unused mx51_ecspi_trigger(struct spi_imx_data *spi_imx)
  {
--	u32 ctrl = MX51_ECSPI_CTRL_ENABLE, cfg = 0, dma = 0;
--	u32 tx_wml_cfg, rx_wml_cfg, rxt_wml_cfg;
-+	u32 ctrl = MX51_ECSPI_CTRL_ENABLE, cfg = 0;
- 	u32 clk = config->speed_hz, delay, reg;
+-	u32 reg = readl(spi_imx->base + MX51_ECSPI_CTRL);
++	u32 reg;
  
- 	/*
-@@ -392,22 +391,12 @@ static int __maybe_unused mx51_ecspi_config(struct spi_imx_data *spi_imx,
- 	 * Configure the DMA register: setup the watermark
- 	 * and enable DMA request.
- 	 */
--	if (spi_imx->dma_is_inited) {
--		dma = readl(spi_imx->base + MX51_ECSPI_DMA);
--
--		rx_wml_cfg = spi_imx->wml << MX51_ECSPI_DMA_RX_WML_OFFSET;
--		tx_wml_cfg = spi_imx->wml << MX51_ECSPI_DMA_TX_WML_OFFSET;
--		rxt_wml_cfg = spi_imx->wml << MX51_ECSPI_DMA_RXT_WML_OFFSET;
--		dma = (dma & ~MX51_ECSPI_DMA_TX_WML_MASK
--			   & ~MX51_ECSPI_DMA_RX_WML_MASK
--			   & ~MX51_ECSPI_DMA_RXT_WML_MASK)
--			   | rx_wml_cfg | tx_wml_cfg | rxt_wml_cfg
--			   |(1 << MX51_ECSPI_DMA_TEDEN_OFFSET)
--			   |(1 << MX51_ECSPI_DMA_RXDEN_OFFSET)
--			   |(1 << MX51_ECSPI_DMA_RXTDEN_OFFSET);
--
--		writel(dma, spi_imx->base + MX51_ECSPI_DMA);
--	}
-+
-+	writel(spi_imx->wml << MX51_ECSPI_DMA_RX_WML_OFFSET |
-+		spi_imx->wml << MX51_ECSPI_DMA_TX_WML_OFFSET |
-+		spi_imx->wml << MX51_ECSPI_DMA_RXT_WML_OFFSET |
-+		MX51_ECSPI_DMA_TEDEN | MX51_ECSPI_DMA_RXDEN |
-+		MX51_ECSPI_DMA_RXTDEN, spi_imx->base + MX51_ECSPI_DMA);
- 
- 	return 0;
+-	if (!spi_imx->usedma)
+-		reg |= MX51_ECSPI_CTRL_XCH;
+-	else if (!spi_imx->dma_finished)
+-		reg |= MX51_ECSPI_CTRL_SMC;
+-	else
+-		reg &= ~MX51_ECSPI_CTRL_SMC;
++	reg = readl(spi_imx->base + MX51_ECSPI_CTRL);
++	reg |= MX51_ECSPI_CTRL_XCH;
+ 	writel(reg, spi_imx->base + MX51_ECSPI_CTRL);
  }
+ 
+@@ -371,6 +366,9 @@ static int __maybe_unused mx51_ecspi_config(struct spi_imx_data *spi_imx,
+ 	if (config->mode & SPI_CS_HIGH)
+ 		cfg |= MX51_ECSPI_CONFIG_SSBPOL(config->cs);
+ 
++	if (spi_imx->usedma)
++		ctrl |= MX51_ECSPI_CTRL_SMC;
++
+ 	/* CTRL register always go first to bring out controller from reset */
+ 	writel(ctrl, spi_imx->base + MX51_ECSPI_CTRL);
+ 
+@@ -1010,9 +1008,6 @@ static int spi_imx_dma_transfer(struct spi_imx_data *spi_imx,
+ 	reinit_completion(&spi_imx->dma_rx_completion);
+ 	reinit_completion(&spi_imx->dma_tx_completion);
+ 
+-	/* Trigger the cspi module. */
+-	spi_imx->dma_finished = 0;
+-
+ 	/*
+ 	 * Set these order to avoid potential RX overflow. The overflow may
+ 	 * happen if we enable SPI HW before starting RX DMA due to rescheduling
+@@ -1023,7 +1018,6 @@ static int spi_imx_dma_transfer(struct spi_imx_data *spi_imx,
+ 	 */
+ 	dma_async_issue_pending(master->dma_rx);
+ 	dma_async_issue_pending(master->dma_tx);
+-	spi_imx->devtype_data->trigger(spi_imx);
+ 
+ 	transfer_timeout = spi_imx_calculate_timeout(spi_imx, transfer->len);
+ 
+@@ -1044,9 +1038,6 @@ static int spi_imx_dma_transfer(struct spi_imx_data *spi_imx,
+ 		}
+ 	}
+ 
+-	spi_imx->dma_finished = 1;
+-	spi_imx->devtype_data->trigger(spi_imx);
+-
+ 	if (!timeout)
+ 		ret = -ETIMEDOUT;
+ 	else
 -- 
 2.7.0
