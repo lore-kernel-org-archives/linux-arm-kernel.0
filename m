@@ -1,75 +1,60 @@
 From: jamesjj.liao@mediatek.com (James Liao)
-Date: Wed, 17 Feb 2016 15:01:38 +0800
-Subject: [PATCH v5 3/4] soc: mediatek: Add MT2701 power dt-bindings
+Date: Wed, 17 Feb 2016 15:01:37 +0800
+Subject: [PATCH v5 2/4] soc: mediatek: Init MT8173 scpsys driver earlier
 In-Reply-To: <1455692499-56828-1-git-send-email-jamesjj.liao@mediatek.com>
 References: <1455692499-56828-1-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <1455692499-56828-4-git-send-email-jamesjj.liao@mediatek.com>
+Message-ID: <1455692499-56828-3-git-send-email-jamesjj.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shunli Wang <shunli.wang@mediatek.com>
+Some power domain comsumers may init before module_init.
+So the power domain provider (scpsys) need to be initialized
+earlier too.
 
-Add power dt-bindings for MT2701.
+Take an example for our IOMMU (M4U) and SMI. SMI is a bridge
+between IOMMU and multimedia HW. SMI is responsible to
+enable/disable iommu and help transfer data for each multimedia
+HW. Both of them have to wait until the power and clocks are
+enabled.
 
-Signed-off-by: Shunli Wang <shunli.wang@mediatek.com>
+So scpsys driver should be initialized before SMI, and SMI should
+be initialized before IOMMU, and then init IOMMU consumers
+(display/vdec/venc/camera etc.).
+
+IOMMU is subsys_init by default. So we need to init scpsys driver
+before subsys_init.
+
 Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
 ---
- .../devicetree/bindings/soc/mediatek/scpsys.txt    |  6 +++--
- include/dt-bindings/power/mt2701-power.h           | 27 ++++++++++++++++++++++
- 2 files changed, 31 insertions(+), 2 deletions(-)
- create mode 100644 include/dt-bindings/power/mt2701-power.h
+ drivers/soc/mediatek/mtk-scpsys.c | 19 ++++++++++++++++++-
+ 1 file changed, 18 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
-index e8f15e3..5f3d1c9 100644
---- a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
-+++ b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
-@@ -9,10 +9,12 @@ domain control.
- 
- The driver implements the Generic PM domain bindings described in
- power/power_domain.txt. It provides the power domains defined in
--include/dt-bindings/power/mt8173-power.h.
-+include/dt-bindings/power/mt8173-power.h and mt2701-power.h.
- 
- Required properties:
--- compatible: Must be "mediatek,mt8173-scpsys"
-+- compatible: Should be one of:
-+	- "mediatek,mt2701-scpsys"
-+	- "mediatek,mt8173-scpsys"
- - #power-domain-cells: Must be 1
- - reg: Address range of the SCPSYS unit
- - infracfg: must contain a phandle to the infracfg controller
-diff --git a/include/dt-bindings/power/mt2701-power.h b/include/dt-bindings/power/mt2701-power.h
-new file mode 100644
-index 0000000..64cc826
---- /dev/null
-+++ b/include/dt-bindings/power/mt2701-power.h
-@@ -0,0 +1,27 @@
+diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
+index 6d2874d..ebfc887 100644
+--- a/drivers/soc/mediatek/mtk-scpsys.c
++++ b/drivers/soc/mediatek/mtk-scpsys.c
+@@ -625,4 +625,21 @@ static struct platform_driver scpsys_drv = {
+ 		.of_match_table = of_match_ptr(of_scpsys_match_tbl),
+ 	},
+ };
+-builtin_platform_driver_probe(scpsys_drv, scpsys_probe);
++
++static int __init scpsys_drv_init(void)
++{
++	return platform_driver_probe(&scpsys_drv, scpsys_probe);
++}
++
 +/*
-+ * Copyright (C) 2015 MediaTek Inc.
++ * There are some Mediatek drivers which depend on the power domain driver need
++ * to probe in earlier initcall levels. So scpsys driver also need to probe
++ * earlier.
 + *
-+ * This program is free software: you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-+ * GNU General Public License for more details.
++ * IOMMU(M4U) and SMI drivers for example. SMI is a bridge between IOMMU and
++ * multimedia HW. IOMMU depends on SMI, and SMI is a power domain consumer,
++ * so the proper probe sequence should be scpsys -> SMI -> IOMMU driver.
++ * IOMMU drivers are initialized during subsys_init by default, so we need to
++ * move SMI and scpsys drivers to subsys_init or earlier init levels.
 + */
-+
-+#ifndef _DT_BINDINGS_POWER_MT2701_POWER_H
-+#define _DT_BINDINGS_POWER_MT2701_POWER_H
-+
-+#define MT2701_POWER_DOMAIN_CONN	0
-+#define MT2701_POWER_DOMAIN_DISP	1
-+#define MT2701_POWER_DOMAIN_MFG		2
-+#define MT2701_POWER_DOMAIN_VDEC	3
-+#define MT2701_POWER_DOMAIN_ISP		4
-+#define MT2701_POWER_DOMAIN_BDP		5
-+#define MT2701_POWER_DOMAIN_ETH		6
-+#define MT2701_POWER_DOMAIN_HIF		7
-+#define MT2701_POWER_DOMAIN_IFR_MSC	8
-+
-+#endif /* _DT_BINDINGS_POWER_MT2701_POWER_H */
++subsys_initcall(scpsys_drv_init);
 -- 
 1.9.1
