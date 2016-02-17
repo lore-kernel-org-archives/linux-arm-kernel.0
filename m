@@ -1,31 +1,22 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 17 Feb 2016 17:26:00 +0000
-Subject: [PATCH 4/4] arm64: cputype info for Broadcom Vulcan
-In-Reply-To: <56C3C9D4.4020506@gmail.com>
-References: <1455389195-31870-1-git-send-email-jchandra@broadcom.com>
- <1455389195-31870-5-git-send-email-jchandra@broadcom.com>
- <20160215101235.GA1748@arm.com> <56C3C9D4.4020506@gmail.com>
-Message-ID: <20160217172600.GA26514@e104818-lin.cambridge.arm.com>
+From: romain.perier@gmail.com (Romain Perier)
+Date: Wed, 17 Feb 2016 18:28:32 +0100
+Subject: [PATCH 0/2] Adding support to show SoC revision in /proc/cpuinfo
+Message-ID: <1455730114-2547-1-git-send-email-romain.perier@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 16, 2016 at 05:16:04PM -0800, Florian Fainelli wrote:
-> On 15/02/16 02:12, Will Deacon wrote:
-> > On Sun, Feb 14, 2016 at 12:16:35AM +0530, Jayachandran C wrote:
-> >> Add Broadcom Vulcan implementor ID and part ID in cputype.h. This is
-> >> to document the values.
-> >>
-> >> Signed-off-by: Jayachandran C <jchandra@broadcom.com>
-> >> ---
-> >>  arch/arm64/include/asm/cputype.h | 2 ++
-> >>  1 file changed, 2 insertions(+)
-> > 
-> > Acked-by: Will Deacon <will.deacon@arm.com>
-> 
-> Would this be picked by Calatin, or should this be sent along with the
-> ARM/ARM64 SoC changes pull requests (just wondering?), thanks!
+This serie adds support to retrieve the SoC serial and revision of the current
+Meson8 platform. Basically, in the first patch I register a soc_device and retrieve
+information from a syscon register, then I populate system_rev and system_serial.
+In the second patch I add the device_node to the devicetree.
 
-It can go via the arm-soc tree together with the other patches. If you
-need another ack:
+Romain Perier (2):
+  ARM: meson: Adding support to retrieve serial and SoC revision
+  ARM: dts: meson: Adding hwrev syscon node
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+ arch/arm/boot/dts/meson8b.dtsi |  5 ++++
+ arch/arm/mach-meson/meson.c    | 55 ++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 60 insertions(+)
+
+-- 
+2.5.0
