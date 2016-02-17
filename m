@@ -1,47 +1,78 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 17 Feb 2016 15:23:33 +0100
-Subject: [PATCH 0/3] clk: mvebu: initial support for AP806 clocks
-In-Reply-To: <CAEG3pNCRa_CQx70aPHfQpG+7jEZ_=_-FxBWDkXVYbgH=j=1rmA@mail.gmail.com>
-References: <1455521698-7905-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20160215233102.2278.88855@quark.deferred.io>
- <CAEG3pNCRa_CQx70aPHfQpG+7jEZ_=_-FxBWDkXVYbgH=j=1rmA@mail.gmail.com>
-Message-ID: <20160217152333.6718d8fc@free-electrons.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 17 Feb 2016 14:31:07 +0000
+Subject: [PATCH v3 1/3] iommu/io-pgtable: Add ARMv7 short descriptor
+ support
+In-Reply-To: <56AA1A89.6080706@arm.com>
+References: <cover.1453723096.git.robin.murphy@arm.com>
+ <066c4af0e29c9cc658bd5e48edc5e2d7ba7140a1.1453723096.git.robin.murphy@arm.com>
+ <1453857386.28284.4.camel@mhfsdcap03> <56AA1A89.6080706@arm.com>
+Message-ID: <20160217143106.GC1459@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Michael,
+Hi Robin,
 
-On Mon, 15 Feb 2016 15:36:49 -0800, Michael Turquette wrote:
-
-> > Yay, new SoC! Just FYI, we worked out an agreement in December[0] that
-> > the clk git tree can take DT bindings and headers, and we'll always host
-> > them in an immutable branch by default in case arm-soc (or anyone else)
-> > needs them. Stephen and I are doing this now.
+On Thu, Jan 28, 2016 at 01:41:29PM +0000, Robin Murphy wrote:
+> On 27/01/16 01:16, Yong Wu wrote:
+> >On Tue, 2016-01-26 at 17:13 +0000, Robin Murphy wrote:
+> >>Add a nearly-complete ARMv7 short descriptor implementation, omitting
+> >>only a few legacy and CPU-centric aspects which shouldn't be necessary
+> >>for IOMMU API use anyway.
+> >>
+> >>Signed-off-by: Yong Wu <yong.wu@mediatek.com>
+> >>Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> >
+> >This looks good to me.
+> >And actually our disp/vdec/venc works well on your v2.
+> >
+> >You could choose the two below,
+> >Reviewed-by: Yong Wu <yong.wu@mediatek.com>
+> >Tested-by: Yong Wu <yong.wu@mediatek.com>
 > 
-> Oops, I misunderstood your point (and I should have looked at the
-> patches before replying). The patches in this series do indeed have
-> the clk DT binding descriptions.
+> Great, thanks!
 > 
-> Pardon the noise, nothing to see here, move along ;-)
+> Will, it seems to make the most sense for Joerg to pick these patches up
+> directly with the MTK series that depends on them - any objections?
 
-Yes, each driver comes with its DT binding documentation in the same
-patch. Unfortunately, some maintainers prefer to have the DT binding
-documentation as separate patches from the driver itself, while some
-other maintainers prefer to have both in the same patch. And I never
-remember which maintainer has which preference.
+As discussed with Joerg, I'll pick these up and send him a pull request
+containing all the pgtable bits. I've taken the liberty of updating
+MAINTAINERS too, assuming you don't mind being a reviewer for this?
 
-So, let me know if you're fine with having both in the same patches. If
-not, I can respin by splitting the DT binding documentation in its own
-patches.
+Will
 
-Other than that, any comments on the drivers themselves? Since they are
-quite trivial, I would ideally like to see them in 4.6, if at all
-possible.
+--->8
 
-Thanks a lot!
+>From bccb08d096703bd790fcf2f934553dd9c8503fc9 Mon Sep 17 00:00:00 2001
+From: Will Deacon <will.deacon@arm.com>
+Date: Wed, 17 Feb 2016 14:18:00 +0000
+Subject: [PATCH] MAINTAINERS: update ARM SMMU entry
 
-Thomas
+Ensure that the short-descriptor page table code is included under the
+SMMU entry, and add Robin as a designated reviewer.
+
+Cc: Robin Murphy <robin.murphy@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ MAINTAINERS | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index cc2f753cb357..a01bae148b89 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1793,11 +1793,13 @@ F:	drivers/edac/synopsys_edac.c
+ 
+ ARM SMMU DRIVERS
+ M:	Will Deacon <will.deacon@arm.com>
++R:	Robin Murphy <robin.murphy@arm.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
+ F:	drivers/iommu/arm-smmu.c
+ F:	drivers/iommu/arm-smmu-v3.c
+ F:	drivers/iommu/io-pgtable-arm.c
++F:	drivers/iommu/io-pgtable-arm-v7s.c
+ 
+ ARM64 PORT (AARCH64 ARCHITECTURE)
+ M:	Catalin Marinas <catalin.marinas@arm.com>
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+2.1.4
