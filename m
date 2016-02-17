@@ -1,56 +1,55 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 17 Feb 2016 10:19:17 +0000
-Subject: [PATCH] ARM64: dma-mapping: fix handling of devices registered
- before arch_initcall
-In-Reply-To: <56C41BE6.5000203@samsung.com>
-References: <1455632084-14666-1-git-send-email-m.szyprowski@samsung.com>
- <56C37317.9020104@arm.com> <56C41BE6.5000203@samsung.com>
-Message-ID: <56C44925.6090406@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 17 Feb 2016 10:19:41 +0000
+Subject: [PATCH v5sub1 7/8] arm64: move kernel image to base of vmalloc
+ area
+In-Reply-To: <56C446F8.3050906@arm.com>
+References: <56BDFC86.5010705@arm.com>
+ <20160212160652.GL31665@e104818-lin.cambridge.arm.com>
+ <56C1E072.2090909@virtuozzo.com>
+ <20160215185957.GB19413@e104818-lin.cambridge.arm.com>
+ <56C31D1D.50708@virtuozzo.com>
+ <CAKv+Gu8WE=fTZF0Pou24FKDocgshWu8dJRbaC5SJ11E-6T=2Hw@mail.gmail.com>
+ <56C34204.60605@virtuozzo.com> <20160216164245.GC8022@leverpostej>
+ <56C43A23.1020301@virtuozzo.com> <56C446F8.3050906@arm.com>
+Message-ID: <20160217101941.GC32714@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/02/16 07:06, Marek Szyprowski wrote:
-> Hello,
->
-> On 2016-02-16 20:05, Robin Murphy wrote:
->> On 16/02/16 14:14, Marek Szyprowski wrote:
->>> This patch ensures that devices, which got registered before
->>> arch_initcall
->>> will be handled correctly by IOMMU-based DMA-mapping code.
->>>
->>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->>> ---
->>>   arch/arm64/mm/dma-mapping.c | 4 ++++
->>>   1 file changed, 4 insertions(+)
->>>
->>> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
->>> index 573b1e6..ce6019f 100644
->>> --- a/arch/arm64/mm/dma-mapping.c
->>> +++ b/arch/arm64/mm/dma-mapping.c
->>> @@ -928,6 +928,10 @@ static int __init __iommu_dma_init(void)
->>>           ret = register_iommu_dma_ops_notifier(&platform_bus_type);
->>>       if (!ret)
->>>           ret = register_iommu_dma_ops_notifier(&amba_bustype);
->>> +
->>> +    /* handle devices queued before this arch_initcall */
->>> +    if (!ret)
->>> +        __iommu_attach_notifier(NULL, BUS_NOTIFY_ADD_DEVICE, NULL);
->>
->> Hmm, surely unless *all* the devices on the relevant buses are created
->> before arch_initcall level, then the next one is going to kick off the
->> notifier to walk the whole list anyway. Have you seen this being a
->> problem in practice?
->
-> Yes, I've observed such situation, that's why I've posted this patch. I was
-> really surprised that this code doesn't handle all cases.
+On Wed, Feb 17, 2016 at 10:10:00AM +0000, James Morse wrote:
+> On 17/02/16 09:15, Andrey Ryabinin wrote:
+> > On 02/16/2016 07:42 PM, Mark Rutland wrote:
+> >> On Tue, Feb 16, 2016 at 06:36:36PM +0300, Andrey Ryabinin wrote:
+> >>> You are right. 
+> >>> So we should write 'shadow_start' instead of 'i'.
+> >>
+> >> FWIW with the below patch I don't see any "screwed shadow mapping"
+> >> warnings on my board, and still later see a tonne of KASAN splats in the
+> >> scheduler.
+> >>
+> > 
+> > It is possible that I missed something, but I think it means that shadow is alright.
+> > 
+> > I wonder whether this happens on 4.4. If not, than something in 4.5-rc1 caused this, and the obvious suspect
+> > here is irq stack.
+> 
+> This quick hack will prevent ever switching to the irq stack:
+> 
+> ---------------------------%<---------------------------
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index 1f7f5a2b61bf..83ae736429b6 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -188,7 +188,7 @@ alternative_endif
+>          */
+>         and     x25, x19, #~(THREAD_SIZE - 1)
+>         cmp     x25, tsk
+> -       b.ne    9998f
+> +       b       9998f
+> 
+>         this_cpu_ptr irq_stack, x25, x26
+>         mov     x26, #IRQ_STACK_START_SP
 
-Ok, fair enough - I guess I just didn't consider that being a likely 
-possibility. Since I am a fan of correctness:
+Thanks James. I'll give it a try.
 
-Acked-by: Robin Murphy <robin.murphy@arm.com>
-
-Thanks,
-Robin.
-
->
-> Best regards
+-- 
+Catalin
