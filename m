@@ -1,50 +1,84 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Wed, 17 Feb 2016 16:57:14 +0300
-Subject: [PATCH 1/5] all: s390: move wrapper infrastructure to generic
- headers
-In-Reply-To: <20160217082210.GA4175@osiris>
-References: <1453741047-5498-2-git-send-email-ynorov@caviumnetworks.com>
- <20160128121618.GB5418@osiris> <20160128163109.GA8529@yury-N73SV>
- <20160201114251.GB973@yury-N73SV> <20160202073913.GB3990@osiris>
- <20160202154331.GA3003@yury-N73SV> <20160202160826.GF3990@osiris>
- <20160202195434.GA3397@osiris> <20160202204156.GA27290@yury-N73SV>
- <20160217082210.GA4175@osiris>
-Message-ID: <20160217135714.GB13549@yury-N73SV>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 17 Feb 2016 14:59:48 +0100
+Subject: [linux-sunxi] [PATCH] ARM: dts: sun4i: Enable USB DRC on
+ Hyundai-a7hd
+In-Reply-To: <1455656404-31191-1-git-send-email-peter@korsgaard.com>
+References: <1455656404-31191-1-git-send-email-peter@korsgaard.com>
+Message-ID: <56C47CD4.3080402@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 17, 2016 at 09:22:10AM +0100, Heiko Carstens wrote:
-> On Tue, Feb 02, 2016 at 11:41:56PM +0300, Yury Norov wrote:
-> > > However I'll try to write an addon patch to your patch series. Maybe we can
-> > > still get rid of compat_wrapper.c in a way which makes both of us happy.
-> > > Also.. the idea with the alias names for compat wrappers does seem to have
-> > > the disadvantage that it will pollute /proc/kallsyms for example.
-> > > 
-> > > Anyway, I'm not sure if I will be able to come up with something this week
-> > > though.
-> > 
-> > Great, I'm looking forward...
-> 
-> Hi Yuri,
-> 
-> after playing around with this a bit I couldn't come up with a solution
-> that I'm happy with, unfortunately.
-> 
-> So in order to make some progress here I'd vote that we simply move the
-> existing compat_wrapper.c from arch/s390 to common code like you did in
-> your first approach and leave the existing SYSCALL macros alone.
-> 
-> That will have hardly any effect to anybody else and your problem is
-> solved while s390 still works.
-> 
-> Does that make sense?
-> 
+Hi,
 
-OK. This week I'll split v1 as I did with v2, and send it here. So
-we'll have two versions, and so will start true elections. :)
+On 16-02-16 22:00, Peter Korsgaard wrote:
+> Enable the OTG USB controller on the A7HD.
+>
+> Signed-off-by: Peter Korsgaard <peter@korsgaard.com>
 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Looks good to me:
+
+Reviewed-by: Hans de Goede <hdegoede@redhat.com>
+
+Regards,
+
+Hans
+
+
+> ---
+>   arch/arm/boot/dts/sun4i-a10-hyundai-a7hd.dts | 34 ++++++++++++++++++++++++++++
+>   1 file changed, 34 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sun4i-a10-hyundai-a7hd.dts b/arch/arm/boot/dts/sun4i-a10-hyundai-a7hd.dts
+> index 43f58fb..9103864 100644
+> --- a/arch/arm/boot/dts/sun4i-a10-hyundai-a7hd.dts
+> +++ b/arch/arm/boot/dts/sun4i-a10-hyundai-a7hd.dts
+> @@ -87,6 +87,30 @@
+>   	status = "okay";
+>   };
+>
+> +&otg_sram {
+> +	status = "okay";
+> +};
+> +
+> +&pio {
+> +	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
+> +		allwinner,pins = "PH4";
+> +		allwinner,function = "gpio_in";
+> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+> +	};
+> +
+> +	usb0_vbus_detect_pin: usb0_vbus_detect_pin at 0 {
+> +		allwinner,pins = "PH5";
+> +		allwinner,function = "gpio_in";
+> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +		allwinner,pull = <SUN4I_PINCTRL_PULL_DOWN>;
+> +	};
+> +};
+> +
+> +&reg_usb0_vbus {
+> +	status = "okay";
+> +};
+> +
+>   &reg_usb2_vbus {
+>   	gpio = <&pio 7 6 GPIO_ACTIVE_HIGH>; /* PH6 */
+>   	status = "okay";
+> @@ -102,7 +126,17 @@
+>   	allwinner,pins = "PH6";
+>   };
+>
+> +&usb_otg {
+> +	dr_mode = "otg";
+> +	status = "okay";
+> +};
+> +
+>   &usbphy {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&usb0_id_detect_pin>, <&usb0_vbus_detect_pin>;
+> +	usb0_id_det-gpio = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
+> +	usb0_vbus_det-gpio = <&pio 7 5 GPIO_ACTIVE_HIGH>; /* PH5 */
+> +	usb0_vbus-supply = <&reg_usb0_vbus>;
+>   	usb2_vbus-supply = <&reg_usb2_vbus>;
+>   	status = "okay";
+>   };
+>
