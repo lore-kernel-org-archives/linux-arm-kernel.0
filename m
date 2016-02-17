@@ -1,62 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 17 Feb 2016 16:02:35 +0100
-Subject: [PATCH v3 5/5] serial: 8250/mediatek: fix building with SERIAL_8250=m
-In-Reply-To: <1455721357-4008289-1-git-send-email-arnd@arndb.de>
-References: <1455721357-4008289-1-git-send-email-arnd@arndb.de>
-Message-ID: <1455721357-4008289-6-git-send-email-arnd@arndb.de>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Wed, 17 Feb 2016 16:05:41 +0100
+Subject: [PATCH V5 07/15] pci, acpi: Provide generic way to assign bus
+ domain number.
+In-Reply-To: <CAKc_7PUiLQhUuJjR8wcuRm7KJdxBYjb+ZBd_cLTtjNPbEro6wA@mail.gmail.com>
+References: <1455630825-27253-1-git-send-email-tn@semihalf.com>
+ <1455630825-27253-8-git-send-email-tn@semihalf.com>
+ <CAKc_7PU+i2AwOVCyW2VNt4BZCWw=KBMAbV8v9DVQ2Ess3WE=kw@mail.gmail.com>
+ <56C47E9A.5010901@semihalf.com>
+ <CAKc_7PUiLQhUuJjR8wcuRm7KJdxBYjb+ZBd_cLTtjNPbEro6wA@mail.gmail.com>
+Message-ID: <56C48C45.7050203@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Mediatek 8250 driver has a 'bool' Kconfig symbol, but that
-breaks when SERIAL_8250 is a loadable module:
+On 17.02.2016 15:21, Jayachandran Chandrashekaran Nair wrote:
+> On Wed, Feb 17, 2016 at 7:37 PM, Tomasz Nowicki <tn@semihalf.com> wrote:
+>> On 17.02.2016 14:44, Jayachandran Chandrashekaran Nair wrote:
+>>>
+>>> Tomasz, Lorenzo,
+>>>
+>>> On Tue, Feb 16, 2016 at 7:23 PM, Tomasz Nowicki<tn@semihalf.com>  wrote:
+>>>>
+>>>>> As we now have valid PCI host bridge device reference we can
+>>>>> introduce code that is going to find its bus domain number using
+>>>>> ACPI _SEG method.
+>>>>>
+>>>>> Note that _SEG method is optional, therefore _SEG absence means
+>>>>> that all PCI buses belong to domain 0.
+>>>>>
+>>>>> While at it, for the sake of code clarity we put ACPI and DT domain
+>>>>> assign methods into the corresponding helpers.
+>>>
+>>> In my patchset, I had a slightly different and I think better approach for
+>>> this without calling the _SEG method again. Please see
+>>> http://www.spinics.net/lists/arm-kernel/msg478167.html
+>>> at the last part ofhttp://www.spinics.net/lists/arm-kernel/msg478169.html
+>>
+>> Relying on NULL parent device to make decision on boot method is really ugly
+>> way. This may hit us again once we want to obtain another firmware specific
+>> info e.g. numa node. IMO we need to fix it this way.
+>
+> I am not relying on NULL there, in the current code parent is NULL
+> in case of ACPI, and the check is needed not to crash (unless that
+> has changed).
 
-drivers/tty/built-in.o: In function `mtk8250_set_termios':
-:(.text+0x1bee8): undefined reference to `serial8250_do_set_termios'
-:(.text+0x1bf10): undefined reference to `uart_get_baud_rate'
-:(.text+0x1c09c): undefined reference to `uart_get_divisor'
-drivers/tty/built-in.o: In function `mtk8250_do_pm':
-:(.text+0x1c0d0): undefined reference to `serial8250_do_pm'
-drivers/tty/built-in.o: In function `mtk8250_probe':
-:(.text+0x1c2e4): undefined reference to `serial8250_register_8250_port'
-serial/8250/8250_mtk.c:287:242: error: data definition has no type or storage class [-Werror]
-serial/8250/8250_mtk.c:287:122: error: 'mtk8250_platform_driver_init' defined but not used [-Werror=unused-function]
+This series passes down valid parent, see [PATCH V5 06/15].
 
-This changes the symbol to a 'tristate', so the dependency on
-SERIAL_8250 also works when that is set to 'm'.
-To actually build the driver, we also need to include <linux/module.h>.
+>
+> The main part was the macro acpi_pci_get_segment() and the use
+> of acpi_pci_root_info from sysdata to do this.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Matthias Brugger <matthias.bgg@gmail.com>
----
- drivers/tty/serial/8250/8250_mtk.c | 2 +-
- drivers/tty/serial/8250/Kconfig    | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+Since we can obtain related firmware specific data from valid parent 
+device (without defining another accessors), I do not see the point to 
+use sysdata. Let me know your opinion.
 
-diff --git a/drivers/tty/serial/8250/8250_mtk.c b/drivers/tty/serial/8250/8250_mtk.c
-index 6ecc6e3e82dc..a0294f3de4f8 100644
---- a/drivers/tty/serial/8250/8250_mtk.c
-+++ b/drivers/tty/serial/8250/8250_mtk.c
-@@ -303,7 +303,7 @@ static struct platform_driver mtk8250_platform_driver = {
- };
- module_platform_driver(mtk8250_platform_driver);
- 
--#ifdef CONFIG_SERIAL_8250_CONSOLE
-+#if defined(CONFIG_SERIAL_8250_CONSOLE) && !defined(MODULE)
- static int __init early_mtk8250_setup(struct earlycon_device *device,
- 					const char *options)
- {
-diff --git a/drivers/tty/serial/8250/Kconfig b/drivers/tty/serial/8250/Kconfig
-index 1b0638511ac1..c45a02a7f9e2 100644
---- a/drivers/tty/serial/8250/Kconfig
-+++ b/drivers/tty/serial/8250/Kconfig
-@@ -370,7 +370,7 @@ config SERIAL_8250_LPC18XX
- 	  serial port, say Y to this option. If unsure, say Y.
- 
- config SERIAL_8250_MT6577
--	bool "Mediatek serial port support"
-+	tristate "Mediatek serial port support"
- 	depends on SERIAL_8250 && ARCH_MEDIATEK
- 	help
- 	  If you have a Mediatek based board and want to use the
--- 
-2.7.0
+Tomasz
