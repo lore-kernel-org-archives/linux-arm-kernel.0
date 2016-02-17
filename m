@@ -1,36 +1,56 @@
-From: brian.starkey@arm.com (Brian Starkey)
-Date: Wed, 17 Feb 2016 10:07:34 +0000
-Subject: [RESEND2 PATCH 1/3] memremap: add MEMREMAP_WC flag
-In-Reply-To: <20160217004351.GE3037@kroah.com>
-References: <cover.1454950917.git.brian.starkey@arm.com>
- <9085d37fa97a762a46b9d58719c085368682c64f.1454950917.git.brian.starkey@arm.com>
- <20160208183006.GA8429@kroah.com>
- <20160209091501.GA23507@e106950-lin.cambridge.arm.com>
- <20160216111426.GA22133@e106950-lin.cambridge.arm.com>
- <20160217004351.GE3037@kroah.com>
-Message-ID: <20160217100734.GC22133@e106950-lin.cambridge.arm.com>
+From: james.morse@arm.com (James Morse)
+Date: Wed, 17 Feb 2016 10:10:00 +0000
+Subject: [PATCH v5sub1 7/8] arm64: move kernel image to base of vmalloc
+ area
+In-Reply-To: <56C43A23.1020301@virtuozzo.com>
+References: <20160212151006.GJ31665@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu84mVP=YjbLhWoGj9AEUD8m8+Lq8kTCniCHwxJwMWaZtA@mail.gmail.com>
+ <20160212152641.GK31665@e104818-lin.cambridge.arm.com>
+ <56BDFC86.5010705@arm.com>
+ <20160212160652.GL31665@e104818-lin.cambridge.arm.com>
+ <56C1E072.2090909@virtuozzo.com>
+ <20160215185957.GB19413@e104818-lin.cambridge.arm.com>
+ <56C31D1D.50708@virtuozzo.com>
+ <CAKv+Gu8WE=fTZF0Pou24FKDocgshWu8dJRbaC5SJ11E-6T=2Hw@mail.gmail.com>
+ <56C34204.60605@virtuozzo.com> <20160216164245.GC8022@leverpostej>
+ <56C43A23.1020301@virtuozzo.com>
+Message-ID: <56C446F8.3050906@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 16, 2016 at 04:43:51PM -0800, Greg Kroah-Hartman wrote:
->On Tue, Feb 16, 2016 at 11:14:26AM +0000, Brian Starkey wrote:
->> Hi Greg,
+On 17/02/16 09:15, Andrey Ryabinin wrote:
+> On 02/16/2016 07:42 PM, Mark Rutland wrote:
+>> On Tue, Feb 16, 2016 at 06:36:36PM +0300, Andrey Ryabinin wrote:
+>>> You are right. 
+>>> So we should write 'shadow_start' instead of 'i'.
 >>
->> Is the documentation OK? Is there any chance of you picking up this
->> series?
+>> FWIW with the below patch I don't see any "screwed shadow mapping"
+>> warnings on my board, and still later see a tonne of KASAN splats in the
+>> scheduler.
 >>
->> I can rebase onto -next if that's the right place, but they still apply
->> on 4.5-rc4 and fix a panic, so I thought perhaps they could make 4.5.
->
->I think memory stuff like this goes through Andrew's tree, not mine...
+> 
+> It is possible that I missed something, but I think it means that shadow is alright.
+> 
+> I wonder whether this happens on 4.4. If not, than something in 4.5-rc1 caused this, and the obvious suspect
+> here is irq stack.
 
-Right, fair enough. I was just blindly working off get_maintainer.pl
+This quick hack will prevent ever switching to the irq stack:
 
-Cheers,
+---------------------------%<---------------------------
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 1f7f5a2b61bf..83ae736429b6 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -188,7 +188,7 @@ alternative_endif
+         */
+        and     x25, x19, #~(THREAD_SIZE - 1)
+        cmp     x25, tsk
+-       b.ne    9998f
++       b       9998f
 
-Brian
->
->thanks,
->
->greg k-h
->
+        this_cpu_ptr irq_stack, x25, x26
+        mov     x26, #IRQ_STACK_START_SP
+---------------------------%<---------------------------
+
+
+James
