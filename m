@@ -1,96 +1,89 @@
-From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
-Date: Wed, 17 Feb 2016 17:14:35 +0100
-Subject: [PATCH 3/7] usb: gadget: pxa25x_udc: use readl/writel for mmio
-In-Reply-To: <2926671.iEYNiy920m@wuerfel> (Arnd Bergmann's message of "Wed, 17
- Feb 2016 11:36:49 +0100")
-References: <1453997722-3489596-1-git-send-email-arnd@arndb.de>
- <3062977.Ya2ztQYFaM@wuerfel> <m3ziuzpwbu.fsf@t19.piap.pl>
- <2926671.iEYNiy920m@wuerfel>
-Message-ID: <m3r3gbpb4k.fsf@t19.piap.pl>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 17 Feb 2016 17:14:52 +0100
+Subject: [GIT PULL] ARM: mvebu: dt64 for v4.6 (#1)
+Message-ID: <877fi3s48z.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+Hi,
 
-> Ok, so I guess what this means is that ixp4xx (or xscale in general)
-> implements its big-endian mode by adding a byteswap on its DRAM
-> and PCI interfaces in be32 mode, rather than by changing the behavior of
-> the load/store operations (as be8 mode does) or by having the byteswap
-> in its load/store pipeline or the top-level AHB bridge?
+Here is the first pull request for dt64 for mvebu for v4.6.
 
-Hmm... IIRC, there is normally no swapping on DRAM bus. E.g. if you
-write 0x12345678 to RAM and change endianness, it will still read as
-0x12345678. The CPU will still be able to execute opcodes after
-switching endianness, but byte-oriented data will be messed up.
+This is the second part of the Armada 3700 series[1]. This part is
+easier to handle as there is no dependency. As for the other one, let me
+know if I should do it in a different way.
 
-PCI swaps in BE mode, so byte order is preserved but readl() must
-"unswap" it.
+Thanks,
 
-> I'm still unsure about
-> __indirect_readsl()/ioread32_rep()/insl()/readsl().
+Gregory
 
-Indirect ops should behave the same as direct. I think I have tested
-them at some point. The "string" operations don't have to swap (on PCI)
-because the PCI bus controller does it for them (in BE mode).
+[1]: https://lkml.org/lkml/2016/2/16/735
 
-> insl() does a double-swap on big-endian, which seems right, as we
-> end up with four swaps total, preserving correct byte order.
+The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
 
-static inline void insl(u32 io_addr, void *p, u32 count)
-{
-        u32 *vaddr = p;
-        while (count--)
-                *vaddr++ = le32_to_cpu(inl(io_addr));
-}
+  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
 
-inl() does indirect input (preserving value, not byte order), so there seem
-to be just one swap here (le32_to_cpu) preserving byte order.
+are available in the git repository at:
 
-> __raw_readsl() performs no swap, which would be correct for PCI
-> (same swap on PCI and RAM, so byteorder is preserved),
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.6-1
 
-No, a single swap on PCI, this means the byte order is preserved :-)
+for you to fetch changes up to adbc3695d9e487fa07214140a46b68ac3156fb78:
 
-> but wrong
-> for on-chip FIFO registers (one swap on RAM, no swap on MMIO).
+  arm64: dts: add the Marvell Armada 3700 family and a development board (2016-02-17 16:09:55 +0100)
 
-But there aren't any such registers. Basically, almost all registers are
-32-bit, even if they only hold an 8-bit value.
-Exceptions such as 16550 UARTs are taken care of in platform structs
-(using offset = 3).
+----------------------------------------------------------------
+mvebu dt64 for 4.6 (part 1)
 
-> However, when CONFIG_IXP4XX_INDIRECT_PCI is set, both
-> ioread32_rep() and readsl() call __indirect_readsl(), which
-> in turn swaps the data once, so I think we actually need this patch:
->
-> diff --git a/arch/arm/mach-ixp4xx/include/mach/io.h b/arch/arm/mach-ixp4xx/include/mach/io.h
+Device tree part of the Armada 3700 support:
+- binding for the Armada 3700 SoCs
+- device tree files for the SoCs and a board
+- tidy up the Marvell related files
 
-> @@ -100,7 +102,7 @@ static inline void __indirect_writesw(volatile void __iomem *bus_addr,
->  	const u16 *vaddr = p;
->  
->  	while (count--)
-> -		writew(*vaddr++, bus_addr);
-> +		writew((u16 __force)cpu_to_le32(*vaddr++), bus_addr);
->  }
+----------------------------------------------------------------
+Gregory CLEMENT (4):
+      Documentation: dt-bindings: Add a new compatible for the Armada 3700
+      Documentation: dt: Tidy up the Marvell related files
+      devicetree: bindings: add DT binding for the Marvell Armada 3700 SoC family
+      arm64: dts: add the Marvell Armada 3700 family and a development board
 
-...
-
-> Does that make sense to you? This is essentially the same thing we already
-> do for inw/inl/outw/outl.
-
-Well, we may need something like this. It seems writesw() (and thus
-__indirect_writesw()) etc. use le16 values (preserving byte order), so
-the above should probably use le16_to_cpu() instead (and le32_to_cpu in
-__indirect_writesl()). I think the only thing that can use it on my hw
-is VIA PATA adapter (throught ioread32_rep() etc). I will have to dig it
-up as well.
-I wouldn't rather touch this stuff without verifying that it fixes
-things up.
-
-
-Thanks for looking into this.
--- 
-Krzysztof Halasa
-
-Industrial Research Institute for Automation and Measurements PIAP
-Al. Jerozolimskie 202, 02-486 Warsaw, Poland
+ .../arm/{ => marvell}/armada-370-xp-pmsu.txt       |   0
+ .../bindings/arm/{ => marvell}/armada-370-xp.txt   |   0
+ .../bindings/arm/{ => marvell}/armada-375.txt      |   0
+ .../bindings/arm/marvell/armada-37xx.txt           |  16 +++
+ .../{ => marvell}/armada-380-mpcore-soc-ctrl.txt   |   0
+ .../bindings/arm/{ => marvell}/armada-38x.txt      |   0
+ .../bindings/arm/{ => marvell}/armada-39x.txt      |   0
+ .../arm/{ => marvell}/armada-cpu-reset.txt         |   0
+ .../arm/{ => marvell}/coherency-fabric.txt         |   0
+ .../bindings/arm/{ => marvell}/kirkwood.txt        |   0
+ .../bindings/arm/{ => marvell}/marvell,berlin.txt  |   0
+ .../bindings/arm/{ => marvell}/marvell,dove.txt    |   0
+ .../arm/{ => marvell}/marvell,kirkwood.txt         |   0
+ .../arm/{ => marvell}/mvebu-cpu-config.txt         |   0
+ .../arm/{ => marvell}/mvebu-system-controller.txt  |   0
+ .../devicetree/bindings/ata/ahci-platform.txt      |   1 +
+ arch/arm64/boot/dts/marvell/Makefile               |   4 +
+ arch/arm64/boot/dts/marvell/armada-371x.dtsi       |  53 +++++++++
+ arch/arm64/boot/dts/marvell/armada-3720-db.dts     |  86 ++++++++++++++
+ arch/arm64/boot/dts/marvell/armada-372x.dtsi       |  63 ++++++++++
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi       | 131 +++++++++++++++++++++
+ 21 files changed, 354 insertions(+)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/armada-370-xp-pmsu.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/armada-370-xp.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/armada-375.txt (100%)
+ create mode 100644 Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/armada-380-mpcore-soc-ctrl.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/armada-38x.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/armada-39x.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/armada-cpu-reset.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/coherency-fabric.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/kirkwood.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/marvell,berlin.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/marvell,dove.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/marvell,kirkwood.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/mvebu-cpu-config.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/mvebu-system-controller.txt (100%)
+ create mode 100644 arch/arm64/boot/dts/marvell/armada-371x.dtsi
+ create mode 100644 arch/arm64/boot/dts/marvell/armada-3720-db.dts
+ create mode 100644 arch/arm64/boot/dts/marvell/armada-372x.dtsi
+ create mode 100644 arch/arm64/boot/dts/marvell/armada-37xx.dtsi
