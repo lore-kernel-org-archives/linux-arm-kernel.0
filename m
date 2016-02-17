@@ -1,30 +1,43 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Wed, 17 Feb 2016 11:57:25 -0800
-Subject: [PATCH] clk: imx: correct pwm7 clock name in driver for i.MX6UL
-In-Reply-To: <CAOMZO5Cwed8uOKz6=Odu=jaaBqoNzUxm2Xv3+6TAxKGsa27Mdw@mail.gmail.com>
-References: <1455734900-1913-1-git-send-email-agust@denx.de>
- <CAOMZO5Cwed8uOKz6=Odu=jaaBqoNzUxm2Xv3+6TAxKGsa27Mdw@mail.gmail.com>
-Message-ID: <20160217195725.2278.96780@quark.deferred.io>
+From: tj@kernel.org (Tejun Heo)
+Date: Wed, 17 Feb 2016 15:00:29 -0500
+Subject: [PATCH V2] AHCI: Workaround for ThunderX Errata#22536
+In-Reply-To: <56C4C2AE.90009@caviumnetworks.com>
+References: <56C147B2.9010303@caviumnetworks.com>
+ <20160215183041.GH3965@htj.duckdns.org>
+ <20160216144250.GD31343@rric.localdomain>
+ <56C37524.5090000@caviumnetworks.com>
+ <56C37AD3.4030407@caviumnetworks.com>
+ <56C37D94.8080403@caviumnetworks.com>
+ <20160216211410.GI25086@rric.localdomain>
+ <56C3AD1C.2000003@caviumnetworks.com>
+ <20160217112931.GB31970@arm.com>
+ <56C4C2AE.90009@caviumnetworks.com>
+Message-ID: <20160217200029.GB4751@mtj.duckdns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Fabio Estevam (2016-02-17 10:58:13)
-> On Wed, Feb 17, 2016 at 4:48 PM, Anatolij Gustschin <agust@denx.de> wrote:
-> > Don't capitalize p in the pwm7 clock name.
-> >
-> > Signed-off-by: Anatolij Gustschin <agust@denx.de>
+Hello, David.
+
+On Wed, Feb 17, 2016 at 10:57:50AM -0800, David Daney wrote:
+> If the ahci/ata maintainers insist, we can add that.
+
+I don't mind whether it is CONFIG_ARM64 or something more specific but
+I think it's a good idea to gate it some way.
+
+> <sarcasm>
+
+If at all possible, please write plain arguments.
+
+> Should we also add some CONFIG_ variables for:
 > 
-> Thanks.
-> 
-> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+>   ahci_mcp89_apple_enable()
+>   ahci_sb600_enable_64bit()
+>   ahci_p5wdh_workaround()
 
-Should I apply this to clk-next or is someone (Shawn?) gathering patches
-for a pull request?
+And I think these should be gated behind CONFIG_X86.  The lack of
+gating is historic, not intentional.
 
-Regards,
-Mike
+Thanks.
 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-clk" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-- 
+tejun
