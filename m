@@ -1,44 +1,42 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 17 Feb 2016 17:55:41 +0100
-Subject: [PATCH V5 04/11] soc: mediatek: PMIC wrap: split SoC specific
- init into callback
-In-Reply-To: <56C0EB32.4080701@openwrt.org>
-References: <1454841778-35529-1-git-send-email-blogic@openwrt.org>
- <1454841778-35529-5-git-send-email-blogic@openwrt.org>
- <56BC7674.9030706@gmail.com> <56C0EB32.4080701@openwrt.org>
-Message-ID: <56C4A60D.30709@gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 17 Feb 2016 17:55:57 +0100
+Subject: [PATCH v2 1/2] arm64: mm: Mark .rodata as RO
+In-Reply-To: <56C4A5AE.1090602@arm.com>
+References: <1455727274-16328-1-git-send-email-jeremy.linton@arm.com>
+ <1455727274-16328-2-git-send-email-jeremy.linton@arm.com>
+ <CAKv+Gu82_sXwRjZpqsLDMc_MVwZ3bRLodS4TEQRoRSKQCNQu3A@mail.gmail.com>
+ <56C4A5AE.1090602@arm.com>
+Message-ID: <CAKv+Gu-TgwNHEeqe3+H1ork5N-pVROTrJ4FPzUBvUGo-Z9RehA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 14/02/16 22:01, John Crispin wrote:
->
->
-> On 11/02/2016 12:54, Matthias Brugger wrote:
->>> diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c
->>> b/drivers/soc/mediatek/mtk-pmic-wrap.c
->>> index b22b664..e3bbee5 100644
->>> --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
->>> +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
->>> @@ -372,6 +372,7 @@ struct pmic_wrapper_type {
->>>        enum pwrap_type type;
->>>        u32 arb_en_all;
->>>        int (*init_reg_clock)(struct pmic_wrapper *wrp);
->>> +    int (*init_special)(struct pmic_wrapper *wrp);
+On 17 February 2016 at 17:54, Jeremy Linton <jeremy.linton@arm.com> wrote:
+> On 02/17/2016 10:46 AM, Ard Biesheuvel wrote:
 >>
->> Nit:
->> I wonder if we can find a better name for the callback, as init_special
->> sounds quite generic to me.
+>> On 17 February 2016 at 17:41, Jeremy Linton <jeremy.linton@arm.com> wrote:
+>>>
+>>> Currently the .rodata section is actually still executable when
+>>> DEBUG_RODATA
+>>> is enabled. This changes that so the .rodata is actually read only, no
+>>> execute.
+>>>
+> (trimming)
+>>>
+>>>
+>>> -       map_kernel_chunk(pgd, _stext, _etext, PAGE_KERNEL_EXEC);
+>>> +       map_kernel_chunk(pgd, _stext, __start_rodata, PAGE_KERNEL_EXEC);
+>>> +       map_kernel_chunk(pgd, __start_rodata, _etext, PAGE_KERNEL_EXEC);
 >>
->> Thanks,
->> Matthias
+>>
+>> Couldn't we map this non-exec from the start?
 >
-> Hi,
 >
-> At first I considered enable_wrapper as the mt8135/8173 code seems to do
-> just that. however mt2701 does an init of the ADC. So how about using
-> init_soc_specific ?
+> Probably, Mark suggested that, but Kees seemed to have reasons not to.
+> Either way, my opinion is that for that change to make sense we also need to
+> always enable the functionality turned on by DEBUG_RODATA.
 >
 
-sounds good :)
+Actually, I think that was about mapping read-only, not non-exec. For
+text patching and Kees's __ro_after_init stuff, the region would need
+to be writable early on. But I don't think there is a reason to make
+it executable.
