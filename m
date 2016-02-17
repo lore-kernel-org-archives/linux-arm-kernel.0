@@ -1,46 +1,32 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Thu, 18 Feb 2016 10:33:03 +1100
-Subject: linux-next: manual merge of the mvebu tree with the arm-soc tree
-Message-ID: <20160218103303.4cc2d25e@canb.auug.org.au>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Wed, 17 Feb 2016 16:38:30 -0700
+Subject: [RFC v2 03/12] PM / cpu_domains: Setup PM domains for
+ CPUs/clusters
+In-Reply-To: <1455310238-8963-4-git-send-email-lina.iyer@linaro.org>
+References: <1455310238-8963-1-git-send-email-lina.iyer@linaro.org>
+ <1455310238-8963-4-git-send-email-lina.iyer@linaro.org>
+Message-ID: <20160217233830.GA1313@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Fri, Feb 12 2016 at 13:51 -0700, Lina Iyer wrote:
 
-Today's linux-next merge of the mvebu tree got a conflict in:
+>+static int cpu_pd_power_on(struct generic_pm_domain *genpd)
+>+{
+>+	struct cpu_pm_domain *pd = to_cpu_pd(genpd);
+>+
+>+	return pd->ops.power_on();
 
-  arch/arm64/configs/defconfig
+Needs a check for NULL ops.power_on() here.
+>+}
+>+
+>+static int cpu_pd_power_off(struct generic_pm_domain *genpd)
+>+{
+>+	struct cpu_pm_domain *pd = to_cpu_pd(genpd);
+>+
+>+	return pd->ops.power_off(genpd->state_idx,
+>+			genpd->states[genpd->state_idx].param);
+Needs a check for NULL ops.power_off().
 
-between commit:
-
-  efdda175c07f ("arm64: defconfig: add spmi and usb related configs")
-
-from the arm-soc tree and commit:
-
-  e772ca05cceb ("arm64: defconfig: enable Armada 3700 related config")
-
-from the mvebu tree.
-
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
-
--- 
-Cheers,
-Stephen Rothwell
-
-diff --cc arch/arm64/configs/defconfig
-index 91ae2634cae9,00a49b4e61c1..000000000000
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@@ -170,9 -169,9 +173,11 @@@ CONFIG_SND_SOC=
-  CONFIG_SND_SOC_RCAR=y
-  CONFIG_SND_SOC_AK4613=y
-  CONFIG_USB=y
- +CONFIG_USB_OTG=y
-+ CONFIG_USB_XHCI_HCD=y
-+ CONFIG_USB_XHCI_PLATFORM=y
-  CONFIG_USB_EHCI_HCD=y
- +CONFIG_USB_EHCI_MSM=y
-  CONFIG_USB_EHCI_HCD_PLATFORM=y
-  CONFIG_USB_OHCI_HCD=y
-  CONFIG_USB_OHCI_HCD_PLATFORM=y
+Thanks,
+Lina
