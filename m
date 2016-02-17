@@ -1,71 +1,106 @@
-From: aryabinin@virtuozzo.com (Andrey Ryabinin)
-Date: Wed, 17 Feb 2016 12:15:15 +0300
-Subject: [PATCH v5sub1 7/8] arm64: move kernel image to base of vmalloc
- area
-In-Reply-To: <20160216164245.GC8022@leverpostej>
-References: <20160212151006.GJ31665@e104818-lin.cambridge.arm.com>
- <CAKv+Gu84mVP=YjbLhWoGj9AEUD8m8+Lq8kTCniCHwxJwMWaZtA@mail.gmail.com>
- <20160212152641.GK31665@e104818-lin.cambridge.arm.com>
- <56BDFC86.5010705@arm.com>
- <20160212160652.GL31665@e104818-lin.cambridge.arm.com>
- <56C1E072.2090909@virtuozzo.com>
- <20160215185957.GB19413@e104818-lin.cambridge.arm.com>
- <56C31D1D.50708@virtuozzo.com>
- <CAKv+Gu8WE=fTZF0Pou24FKDocgshWu8dJRbaC5SJ11E-6T=2Hw@mail.gmail.com>
- <56C34204.60605@virtuozzo.com> <20160216164245.GC8022@leverpostej>
-Message-ID: <56C43A23.1020301@virtuozzo.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 17 Feb 2016 10:15:14 +0100
+Subject: [PATCH] KVM: arm/arm64: vgic: ensure bitmaps are long enough
+In-Reply-To: <56C33C1A.3090703@arm.com>
+References: <1455634051-1860-1-git-send-email-mark.rutland@arm.com>
+ <56C33C1A.3090703@arm.com>
+Message-ID: <20160217091514.GA6696@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/16/2016 07:42 PM, Mark Rutland wrote:
-> On Tue, Feb 16, 2016 at 06:36:36PM +0300, Andrey Ryabinin wrote:
->>
->> On 02/16/2016 06:17 PM, Ard Biesheuvel wrote:
->>> On 16 February 2016 at 13:59, Andrey Ryabinin <aryabinin@virtuozzo.com> wrote:
->>>> +static void verify_shadow(void)
->>>> +{
->>>> +       struct memblock_region *reg;
->>>> +       int i = 0;
->>>> +
->>>> +       for_each_memblock(memory, reg) {
->>>> +               void *start = (void *)__phys_to_virt(reg->base);
->>>> +               void *end = (void *)__phys_to_virt(reg->base + reg->size);
->>>> +               int *shadow_start, *shadow_end;
->>>> +
->>>> +               if (start >= end)
->>>> +                       break;
->>>> +               shadow_start = (int *)((unsigned long)kasan_mem_to_shadow(start) & ~(PAGE_SIZE - 1));
->>>> +               shadow_end =  (int *)kasan_mem_to_shadow(end);
->>>
->>> shadow_start and shadow_end can refer to the same page as in the
->>> previous iteration. For instance, I have these two regions
->>>
->>>   0x00006e090000-0x00006e0adfff [Conventional Memory|   |  |  |  |  |
->>> |   |WB|WT|WC|UC]
->>>   0x00006e0ae000-0x00006e0affff [Loader Data        |   |  |  |  |  |
->>> |   |WB|WT|WC|UC]
->>>
->>> which are covered by different memblocks since the second one is
->>> marked as MEMBLOCK_NOMAP, due to the fact that it contains the UEFI
->>> memory map.
->>>
->>> I get the following output
->>>
->>> kasan: screwed shadow mapping 23575, 23573
->>>
->>> which I think is simply a result from the fact the shadow_start refers
->>> to the same page as in the previous iteration(s)
->>>
->>
->> You are right. 
->> So we should write 'shadow_start' instead of 'i'.
+On Tue, Feb 16, 2016 at 03:11:22PM +0000, Marc Zyngier wrote:
+> On 16/02/16 14:47, Mark Rutland wrote:
+> > When we allocate bitmaps in vgic_vcpu_init_maps, we divide the number of
+> > bits we need by 8 to figure out how many bytes to allocate. However,
+> > bitmap elements are always accessed as unsigned longs, and if we didn't
+> > happen to allocate a size such that size % sizeof(unsigned long) == 0,
+> > bitmap accesses may go past the end of the allocation.
+> > 
+> > When using KASAN (which does byte-granular access checks), this results
+> > in a continuous stream of BUGs whenever these bitmaps are accessed:
+> > 
+> > =============================================================================
+> > BUG kmalloc-128 (Tainted: G    B          ): kasan: bad access detected
+> > -----------------------------------------------------------------------------
+> > 
+> > INFO: Allocated in vgic_init.part.25+0x55c/0x990 age=7493 cpu=3 pid=1730
+> > INFO: Slab 0xffffffbde6d5da40 objects=16 used=15 fp=0xffffffc935769700 flags=0x4000000000000080
+> > INFO: Object 0xffffffc935769500 @offset=1280 fp=0x          (null)
+> > 
+> > Bytes b4 ffffffc9357694f0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+> > Object ffffffc935769500: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+> > Object ffffffc935769510: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+> > Object ffffffc935769520: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+> > Object ffffffc935769530: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+> > Object ffffffc935769540: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+> > Object ffffffc935769550: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+> > Object ffffffc935769560: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+> > Object ffffffc935769570: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+> > Padding ffffffc9357695b0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+> > Padding ffffffc9357695c0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+> > Padding ffffffc9357695d0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+> > Padding ffffffc9357695e0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+> > Padding ffffffc9357695f0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+> > CPU: 3 PID: 1740 Comm: kvm-vcpu-0 Tainted: G    B           4.4.0+ #17
+> > Hardware name: ARM Juno development board (r1) (DT)
+> > Call trace:
+> > [<ffffffc00008e770>] dump_backtrace+0x0/0x280
+> > [<ffffffc00008ea04>] show_stack+0x14/0x20
+> > [<ffffffc000726360>] dump_stack+0x100/0x188
+> > [<ffffffc00030d324>] print_trailer+0xfc/0x168
+> > [<ffffffc000312294>] object_err+0x3c/0x50
+> > [<ffffffc0003140fc>] kasan_report_error+0x244/0x558
+> > [<ffffffc000314548>] __asan_report_load8_noabort+0x48/0x50
+> > [<ffffffc000745688>] __bitmap_or+0xc0/0xc8
+> > [<ffffffc0000d9e44>] kvm_vgic_flush_hwstate+0x1bc/0x650
+> > [<ffffffc0000c514c>] kvm_arch_vcpu_ioctl_run+0x2ec/0xa60
+> > [<ffffffc0000b9a6c>] kvm_vcpu_ioctl+0x474/0xa68
+> > [<ffffffc00036b7b0>] do_vfs_ioctl+0x5b8/0xcb0
+> > [<ffffffc00036bf34>] SyS_ioctl+0x8c/0xa0
+> > [<ffffffc000086cb0>] el0_svc_naked+0x24/0x28
+> > Memory state around the buggy address:
+> >  ffffffc935769400: 00 00 fc fc fc fc fc fc fc fc fc fc fc fc fc fc
+> >  ffffffc935769480: fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc
+> >> ffffffc935769500: 04 fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc
+> >                    ^
+> >  ffffffc935769580: fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc
+> >  ffffffc935769600: 00 00 00 00 fc fc fc fc fc fc fc fc fc fc fc fc
+> > ==================================================================
+> > 
+> > Fix the issue by always allocating a multiple of sizeof(unsigned long),
+> > as we do elsewhere in the vgic code.
+> > 
+> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > Cc: Marc Zyngier <marc.zyngier@arm.com>
+> > Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> > ---
+> >  virt/kvm/arm/vgic.c | 4 ++--
+> >  1 file changed, 2 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> > index 7a2f449..5d10f10 100644
+> > --- a/virt/kvm/arm/vgic.c
+> > +++ b/virt/kvm/arm/vgic.c
+> > @@ -1875,8 +1875,8 @@ void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu)
+> >  static int vgic_vcpu_init_maps(struct kvm_vcpu *vcpu, int nr_irqs)
+> >  {
+> >  	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+> > -
+> > -	int sz = (nr_irqs - VGIC_NR_PRIVATE_IRQS) / 8;
+> > +	int nr_longs = BITS_TO_LONGS(nr_irqs - VGIC_NR_PRIVATE_IRQS);
+> > +	int sz = nr_longs * sizeof(unsigned long);
+> >  	vgic_cpu->pending_shared = kzalloc(sz, GFP_KERNEL);
+> >  	vgic_cpu->active_shared = kzalloc(sz, GFP_KERNEL);
+> >  	vgic_cpu->pend_act_shared = kzalloc(sz, GFP_KERNEL);
+> > 
 > 
-> FWIW with the below patch I don't see any "screwed shadow mapping"
-> warnings on my board, and still later see a tonne of KASAN splats in the
-> scheduler.
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 > 
+> Worth mentioning:
+> 
+> Fixes: c1bfb577a ("arm/arm64: KVM: vgic: switch to dynamic allocation")
+> Cc: stable at vger.kernel.org
+> 
+Thanks for this fix:
 
-It is possible that I missed something, but I think it means that shadow is alright.
-
-I wonder whether this happens on 4.4. If not, than something in 4.5-rc1 caused this, and the obvious suspect
-here is irq stack.
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
