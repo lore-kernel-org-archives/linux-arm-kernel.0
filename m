@@ -1,32 +1,88 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Wed, 17 Feb 2016 16:38:30 -0700
-Subject: [RFC v2 03/12] PM / cpu_domains: Setup PM domains for
- CPUs/clusters
-In-Reply-To: <1455310238-8963-4-git-send-email-lina.iyer@linaro.org>
-References: <1455310238-8963-1-git-send-email-lina.iyer@linaro.org>
- <1455310238-8963-4-git-send-email-lina.iyer@linaro.org>
-Message-ID: <20160217233830.GA1313@linaro.org>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed, 17 Feb 2016 15:40:58 -0800
+Subject: [PATCH v3 1/3] ARM: dts: vf-colibri: remove regulator container node
+Message-ID: <1455752460-2770-1-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 12 2016 at 13:51 -0700, Lina Iyer wrote:
+Drop the fake simple-bus container 'regulators' and put the
+regulators directly under the root node. This also makes the
+artificial 'reg' properties superfluous. While at it, remove
+the unnecessary regulator-always-on property and name the
+regulators according to schematics.
 
->+static int cpu_pd_power_on(struct generic_pm_domain *genpd)
->+{
->+	struct cpu_pm_domain *pd = to_cpu_pd(genpd);
->+
->+	return pd->ops.power_on();
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+Changes since v2:
+- remove regulator-always-on
 
-Needs a check for NULL ops.power_on() here.
->+}
->+
->+static int cpu_pd_power_off(struct generic_pm_domain *genpd)
->+{
->+	struct cpu_pm_domain *pd = to_cpu_pd(genpd);
->+
->+	return pd->ops.power_off(genpd->state_idx,
->+			genpd->states[genpd->state_idx].param);
-Needs a check for NULL ops.power_off().
+Changes since v1:
+- rename regulators according to schematics
+- drop sys prefix
 
-Thanks,
-Lina
+ arch/arm/boot/dts/vf-colibri-eval-v3.dtsi | 42 ++++++++++++-------------------
+ 1 file changed, 16 insertions(+), 26 deletions(-)
+
+diff --git a/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi b/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
+index b494673..291e939 100644
+--- a/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
++++ b/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
+@@ -50,32 +50,22 @@
+ 		clock-frequency = <16000000>;
+ 	};
+ 
+-	regulators {
+-		compatible = "simple-bus";
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-
+-		sys_5v0_reg: regulator at 0 {
+-			compatible = "regulator-fixed";
+-			reg = <0>;
+-			regulator-name = "5v0";
+-			regulator-min-microvolt = <5000000>;
+-			regulator-max-microvolt = <5000000>;
+-			regulator-always-on;
+-		};
++	reg_5v0: regulator-5v0 {
++		compatible = "regulator-fixed";
++		regulator-name = "5V";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++	};
+ 
+-		/* USBH_PEN */
+-		usbh_vbus_reg: regulator at 1 {
+-			compatible = "regulator-fixed";
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&pinctrl_usbh1_reg>;
+-			reg = <1>;
+-			regulator-name = "usbh_vbus";
+-			regulator-min-microvolt = <5000000>;
+-			regulator-max-microvolt = <5000000>;
+-			gpio = <&gpio2 19 GPIO_ACTIVE_LOW>;
+-			vin-supply = <&sys_5v0_reg>;
+-		};
++	reg_usbh_vbus: regulator-usbh-vbus {
++		compatible = "regulator-fixed";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_usbh1_reg>;
++		regulator-name = "VCC_USB[1-4]";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		gpio = <&gpio2 19 GPIO_ACTIVE_LOW>; /* USBH_PEN resp. USBH_P_EN */
++		vin-supply = <&reg_5v0>;
+ 	};
+ };
+ 
+@@ -145,7 +135,7 @@
+ };
+ 
+ &usbh1 {
+-	vbus-supply = <&usbh_vbus_reg>;
++	vbus-supply = <&reg_usbh_vbus>;
+ };
+ 
+ &iomuxc {
+-- 
+2.7.1
