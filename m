@@ -1,63 +1,83 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Wed, 17 Feb 2016 15:02:53 -0800
-Subject: [PATCH 2/2] clk: ti: Add support for dm814x ADPLL
-In-Reply-To: <20160217212045.GE21202@atomide.com>
-References: <1455312009-808-1-git-send-email-tony@atomide.com>
- <1455312009-808-3-git-send-email-tony@atomide.com>
- <20160217011930.2278.38316@quark.deferred.io>
- <20160217173949.GB21202@atomide.com>
- <20160217205257.2278.11639@quark.deferred.io>
- <20160217212045.GE21202@atomide.com>
-Message-ID: <20160217230253.2278.80903@quark.deferred.io>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 17 Feb 2016 18:11:37 -0500 (EST)
+Subject: [PATCH] ARM: move __kuser_cmpxchg{32,64} into .kprobes.text
+In-Reply-To: <1455748127-2844701-1-git-send-email-arnd@arndb.de>
+References: <1455748127-2844701-1-git-send-email-arnd@arndb.de>
+Message-ID: <alpine.LFD.2.20.1602171806230.13632@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Tony Lindgren (2016-02-17 13:20:46)
-> * Michael Turquette <mturquette@baylibre.com> [160217 12:53]:
-> > Quoting Tony Lindgren (2016-02-17 09:39:49)
-> > > * Michael Turquette <mturquette@baylibre.com> [160216 17:32]:
-> > > > 
-> > > > We have a shiny new series that provides a standard way to do this:
-> > > > 
-> > > > http://lkml.kernel.org/r/<1455225554-13267-1-git-send-email-mturquette@baylibre.com>
-> > > 
-> > > OK nice, so tagging the MPU and DDR clocks with CLK_IS_CRITICAL or
-> > > "clock-critical" should allow removing this code. I think in this
-> > > case I still need to set CLK_IS_CRITICAL as the clock is output 1
-> > > of the dts defined clock and does not have a separate dts node.
-> > 
-> > In fact I hate clock-critical as a DT property and it's only there to
-> > support legacy DT bindings that store all clk data in DT and have zero
-> > clk data in C. So please use the CLK_IS_CRITICAL or CLK_ENABLE_HAND_OFF
-> > flags in C.
-> > 
-> > Do you think you will ever have a driver that wants to gate these
-> > clocks? Probably not for MPU/DDR, but the HAND_OFF flag is a better fit
-> > if you do. It's the same as CRITICAL but transfers the prepare/enable
-> > reference counting to the consumer driver after that driver calls
-> > clk_get() and clk_prepare_enable() on the HAND_OFF clk.
-> 
-> OK I'll use CLK_ENABLE_HAND_OFF then. Who knows maybe somebody
-> somewhere has code running on one of the coprocessors in SRAM that
-> actually allows gating these :)
+On Wed, 17 Feb 2016, Arnd Bergmann wrote:
 
-Low power mp3 decoder executing out of ARM icache with DDR clock cut ;-)
+> When kprobes is used, most of the entry-armv.S file is put into the .kprobes.text
+> section rather than .text, but the kuser_cmpxchg64_fixup and kuser_cmpxchg32_fixup
+> code is not, which can lead to a link error when extremely large kernels get
+> built (typically for randconfig):
+> 
+> arch/arm/kernel/built-in.o: In function `__dabt_usr':
+> :(.kprobes.text+0x47c): relocation truncated to fit: R_ARM_JUMP24 against `.text'
+> arch/arm/kernel/built-in.o: In function `__irq_usr':
+> :(.kprobes.text+0x4e4): relocation truncated to fit: R_ARM_JUMP24 against `.text'
+> arch/arm/kernel/built-in.o: In function `__fiq_usr':
+> :(.kprobes.text+0x740): relocation truncated to fit: R_ARM_JUMP24 against `.text'
+> 
+> This moves the two remaining functions into the same section as the rest,
+> to avoid the link error.
+> 
+> The current behavior has existed for many years and has not caused problems in
+> practice except for extreme randconfig builds, so the patch should not need to
+> get backported.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: b49c0f24cf67 ("[ARM] 4659/1: remove possibilities for spurious false negative with __kuser_cmpxchg")
+> Fixes: 785d3cd286f0 ("ARM kprobes: prevent some functions involved with kprobes from being probed")
 
-Regards,
-Mike
+Stylewise it might be worth having something like:
 
+#ifdef CONFIG_KPROBES
+#define KPROBE_TEXT  .section .kprobes.text,"ax",%progbits
+#else
+#define KPROBE_TEXT .text
+#endif
+
+and then use that throughout.  Then...
+
+Acked-by: Nicolas Pitre <nico@linaro.org>
+
+
+> ---
+>  arch/arm/kernel/entry-armv.S | 8 ++++++++
+>  1 file changed, 8 insertions(+)
 > 
-> > > I can update when those patches hit Linux next, or I can do a
-> > > follow-up patch later on if we want to avoid the dependency
-> > > here. Which do you prefer?
-> > 
-> > Well, testing is always welcome :-)
-> >
-> > If you rebase onto those patches then I'll add your patches to that
-> > series for testing and merge it that way.
+> diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+> index e2550500486d..030e43a0dce8 100644
+> --- a/arch/arm/kernel/entry-armv.S
+> +++ b/arch/arm/kernel/entry-armv.S
+> @@ -895,7 +895,11 @@ __kuser_cmpxchg64:				@ 0xffff0f60
+>  	rsbs	r0, r3, #0			@ set return val and C flag
+>  	ldmfd	sp!, {r4, r5, r6, pc}
+>  
+> +#ifdef CONFIG_KPROBES
+> +	.section	.kprobes.text,"ax",%progbits
+> +#else
+>  	.text
+> +#endif
+>  kuser_cmpxchg64_fixup:
+>  	@ Called from kuser_cmpxchg_fixup.
+>  	@ r4 = address of interrupted insn (must be preserved).
+> @@ -953,7 +957,11 @@ __kuser_cmpxchg:				@ 0xffff0fc0
+>  	rsbs	r0, r3, #0			@ set return val and C flag
+>  	usr_ret	lr
+>  
+> +#ifdef CONFIG_KPROBES
+> +	.section	.kprobes.text,"ax",%progbits
+> +#else
+>  	.text
+> +#endif
+>  kuser_cmpxchg32_fixup:
+>  	@ Called from kuser_cmpxchg_check macro.
+>  	@ r4 = address of interrupted insn (must be preserved).
+> -- 
+> 2.7.0
 > 
-> OK will do and repost after some testing.
 > 
-> Regards,
-> 
-> Tony
