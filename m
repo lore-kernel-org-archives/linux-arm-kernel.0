@@ -1,58 +1,28 @@
-From: majun258@huawei.com (majun (F))
-Date: Wed, 17 Feb 2016 12:18:52 +0800
-Subject: [PATCH v2 4/5] irqchip:create irq domain for each mbigen device
-In-Reply-To: <20160216085024.3f573f40@arm.com>
-References: <1455604648-20668-1-git-send-email-majun258@huawei.com>
- <1455604648-20668-5-git-send-email-majun258@huawei.com>
- <20160216085024.3f573f40@arm.com>
-Message-ID: <56C3F4AC.8020807@huawei.com>
+From: david.brown@linaro.org (David Brown)
+Date: Tue, 16 Feb 2016 22:20:10 -0700
+Subject: [PATCH] ARM: vdso: Mark vDSO code as read-only
+In-Reply-To: <CAGXu5j+H63jhcDpHpXK5aWvgUBz=5vB0FK_zRoc+wZEk32B2fg@mail.gmail.com>
+References: <1453226922-16831-1-git-send-email-keescook@chromium.org>
+ <20160216213659.GA47194@davidb.org>
+ <CAGXu5j+H63jhcDpHpXK5aWvgUBz=5vB0FK_zRoc+wZEk32B2fg@mail.gmail.com>
+Message-ID: <20160217052010.GA49233@davidb.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Feb 16, 2016 at 01:52:33PM -0800, Kees Cook wrote:
+>On Tue, Feb 16, 2016 at 1:36 PM, David Brown <david.brown@linaro.org> wrote:
+>> Although the arm vDSO is cleanly separated by code/data with the code
+>> being read-only in userspace mappings, the code page is still writable
+>> from the kernel.  There have been exploits (such as
+>> http://itszn.com/blog/?p=21) that take advantage of this on x86 to go
+>> from a bad kernel write to full root.
+>>
+>> Prevent this specific exploit on arm by putting the vDSO code page in
+>> post-init read-only memory as well.
+>
+>Is the vdso dynamically built at init time like on x86, or can this
+>just use .rodata directly?
 
+On ARM, it is patched during init.  Arm64's is just plain read-only.
 
-? 2016/2/16 16:50, Marc Zyngier ??:
-> On Tue, 16 Feb 2016 14:37:27 +0800
-> MaJun <majun258@huawei.com> wrote:
-> 
->> From: Ma Jun <majun258@huawei.com>
-[...]
->> +	unsigned int nid;
->> +
->> +	nid = get_mbigen_nid(hwirq);
->> +
->> +	if (nid < 4)
->> +		return (nid * 4) + REG_MBIGEN_VEC_OFFSET;
->> +	else
->> +		return (nid - 4) * 4 + REG_MBIGEN_EXT_VEC_OFFSET;
->> +}
->> +
->> +static struct irq_chip mbigen_irq_chip = {
->> +	.name =			"mbigen-v1",
->> +};
->> +
->> +static void mbigen_write_msg(struct msi_desc *desc, struct msi_msg *msg)
->> +{
->> +	/* The address of doorbell is encoded in mbigen register by default
->> +	 * So,we don't need to program the doorbell address at here
->> +	 * Besides, the event ID is decided by the hardware pin number,
->> +	 * we can't change it in software.So, we don't need to encode the
->> +	 * event ID in mbigen register.
->> +	 */
-> 
-> Really? What if tomorrow I decide to change the EventID allocation
-> policy in the ITS driver? Have your HW engineers really baked the
-> behaviour of the Linux driver into the device?
-> 
-
-Yes.
-If we really need to support this chip,is there
-any possible solution for this problem?
-
-Thanks!
-MaJun
-
-> I'm puzzled.
-> 
-> 	M.
-> 
+David
