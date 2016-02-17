@@ -1,59 +1,115 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 17 Feb 2016 10:36:23 +0000
-Subject: [PATCH v5sub1 7/8] arm64: move kernel image to base of vmalloc
- area
-In-Reply-To: <20160217101941.GC32714@e104818-lin.cambridge.arm.com>
-References: <20160212160652.GL31665@e104818-lin.cambridge.arm.com>
- <56C1E072.2090909@virtuozzo.com>
- <20160215185957.GB19413@e104818-lin.cambridge.arm.com>
- <56C31D1D.50708@virtuozzo.com>
- <CAKv+Gu8WE=fTZF0Pou24FKDocgshWu8dJRbaC5SJ11E-6T=2Hw@mail.gmail.com>
- <56C34204.60605@virtuozzo.com> <20160216164245.GC8022@leverpostej>
- <56C43A23.1020301@virtuozzo.com> <56C446F8.3050906@arm.com>
- <20160217101941.GC32714@e104818-lin.cambridge.arm.com>
-Message-ID: <20160217103623.GD32714@e104818-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 17 Feb 2016 11:36:49 +0100
+Subject: [PATCH 3/7] usb: gadget: pxa25x_udc: use readl/writel for mmio
+In-Reply-To: <m3ziuzpwbu.fsf@t19.piap.pl>
+References: <1453997722-3489596-1-git-send-email-arnd@arndb.de>
+ <3062977.Ya2ztQYFaM@wuerfel> <m3ziuzpwbu.fsf@t19.piap.pl>
+Message-ID: <2926671.iEYNiy920m@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 17, 2016 at 10:19:41AM +0000, Catalin Marinas wrote:
-> On Wed, Feb 17, 2016 at 10:10:00AM +0000, James Morse wrote:
-> > On 17/02/16 09:15, Andrey Ryabinin wrote:
-> > > On 02/16/2016 07:42 PM, Mark Rutland wrote:
-> > >> On Tue, Feb 16, 2016 at 06:36:36PM +0300, Andrey Ryabinin wrote:
-> > >>> You are right. 
-> > >>> So we should write 'shadow_start' instead of 'i'.
-> > >>
-> > >> FWIW with the below patch I don't see any "screwed shadow mapping"
-> > >> warnings on my board, and still later see a tonne of KASAN splats in the
-> > >> scheduler.
-> > >>
-> > > 
-> > > It is possible that I missed something, but I think it means that shadow is alright.
-> > > 
-> > > I wonder whether this happens on 4.4. If not, than something in 4.5-rc1 caused this, and the obvious suspect
-> > > here is irq stack.
-> > 
-> > This quick hack will prevent ever switching to the irq stack:
-> > 
-> > ---------------------------%<---------------------------
-> > diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> > index 1f7f5a2b61bf..83ae736429b6 100644
-> > --- a/arch/arm64/kernel/entry.S
-> > +++ b/arch/arm64/kernel/entry.S
-> > @@ -188,7 +188,7 @@ alternative_endif
-> >          */
-> >         and     x25, x19, #~(THREAD_SIZE - 1)
-> >         cmp     x25, tsk
-> > -       b.ne    9998f
-> > +       b       9998f
-> > 
-> >         this_cpu_ptr irq_stack, x25, x26
-> >         mov     x26, #IRQ_STACK_START_SP
+On Wednesday 17 February 2016 09:36:37 Krzysztof Ha?asa wrote:
+> Arnd Bergmann <arnd@arndb.de> writes:
 > 
-> Thanks James. I'll give it a try.
+> > ixp4xx is really special in that it performs hardware swapping for
+> > internal devices based on CPU endianess but not on PCI devices.
+> 
+> Again, IXP4xx does not perform hardware (nor any other) swapping for
+> registers of on-chip devices. The registers are connected 1:1,
+> bit 0 to bit 0 etc.
+> 
+> (Yes, IXP4xx can be optionally programmed for such swapping, depending
+> on silicon revision, but it is not used in mainline kernel).
+> 
+> The only hardware swapping happens on PCI bus (in BE mode), to be
+> compatible with other platforms and non-IXP4xx-specific PCI drivers.
 
-And it didn't make any difference (on top of 4.5-rc1), still the same
-KASAN warnings.
+Ok, so I guess what this means is that ixp4xx (or xscale in general)
+implements its big-endian mode by adding a byteswap on its DRAM
+and PCI interfaces in be32 mode, rather than by changing the behavior of
+the load/store operations (as be8 mode does) or by having the byteswap
+in its load/store pipeline or the top-level AHB bridge?
 
--- 
-Catalin
+It's a bit surprising but it sounds plausible and explains most of
+the code we see.
+
+I'm still unsure about __indirect_readsl()/ioread32_rep()/insl()/readsl().
+
+insl() does a double-swap on big-endian, which seems right, as we
+end up with four swaps total, preserving correct byte order.
+
+__raw_readsl() performs no swap, which would be correct for PCI
+(same swap on PCI and RAM, so byteorder is preserved), but wrong
+for on-chip FIFO registers (one swap on RAM, no swap on MMIO).
+This is probably fine as well, as I don't see any use of __raw_readsl()
+on non-PCI devices.
+
+However, when CONFIG_IXP4XX_INDIRECT_PCI is set, both
+ioread32_rep() and readsl() call __indirect_readsl(), which
+in turn swaps the data once, so I think we actually need this patch:
+
+diff --git a/arch/arm/mach-ixp4xx/include/mach/io.h b/arch/arm/mach-ixp4xx/include/mach/io.h
+index e770858b490a..871f92f3504a 100644
+--- a/arch/arm/mach-ixp4xx/include/mach/io.h
++++ b/arch/arm/mach-ixp4xx/include/mach/io.h
+@@ -85,6 +85,8 @@ u8 __indirect_readb(const volatile void __iomem *p);
+ u16 __indirect_readw(const volatile void __iomem *p);
+ u32 __indirect_readl(const volatile void __iomem *p);
+ 
++/* string functions may need to swap data back to revert the byte swap on
++   big-endian __indirect_{read,write}{w,l}() accesses */
+ static inline void __indirect_writesb(volatile void __iomem *bus_addr,
+ 				      const void *p, int count)
+ {
+@@ -100,7 +102,7 @@ static inline void __indirect_writesw(volatile void __iomem *bus_addr,
+ 	const u16 *vaddr = p;
+ 
+ 	while (count--)
+-		writew(*vaddr++, bus_addr);
++		writew((u16 __force)cpu_to_le32(*vaddr++), bus_addr);
+ }
+ 
+ static inline void __indirect_writesl(volatile void __iomem *bus_addr,
+@@ -108,7 +110,7 @@ static inline void __indirect_writesl(volatile void __iomem *bus_addr,
+ {
+ 	const u32 *vaddr = p;
+ 	while (count--)
+-		writel(*vaddr++, bus_addr);
++		writel((u32 __force)cpu_to_le32(*vaddr++), bus_addr);
+ }
+ 
+ static inline void __indirect_readsb(const volatile void __iomem *bus_addr,
+@@ -126,7 +128,7 @@ static inline void __indirect_readsw(const volatile void __iomem *bus_addr,
+ 	u16 *vaddr = p;
+ 
+ 	while (count--)
+-		*vaddr++ = readw(bus_addr);
++		*vaddr++ = (u16 __force)cpu_to_le16(readw(bus_addr));
+ }
+ 
+ static inline void __indirect_readsl(const volatile void __iomem *bus_addr,
+@@ -135,7 +137,7 @@ static inline void __indirect_readsl(const volatile void __iomem *bus_addr,
+ 	u32 *vaddr = p;
+ 
+ 	while (count--)
+-		*vaddr++ = readl(bus_addr);
++		*vaddr++ = (u32 __force)cpu_to_le32(readl(bus_addr));
+ }
+ 
+Does that make sense to you? This is essentially the same thing we already
+do for inw/inl/outw/outl.
+
+> > Coming back to the specific pxa25x_udc case: using __raw_* accessors
+> > in the driver would possibly end up breaking the PXA25x machines in
+> > the (very unlikely) case that someone wants to make it work with
+> > big-endian kernels, assuming it does not have the same hardware
+> > byteswap logic as ixp4xx.
+> 
+> I'd expect both CPUs to behave in exactly the same manner, i.e., to
+> not swap anything on the internal bus. If true, it would mean it should
+> "just work" in both BE and LE modes (including BE mode on PXA, should
+> it be actually possible).
+
+Ok, I'll change the patch accordingly and resubmit.
+
+	Arnd
