@@ -1,45 +1,74 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 17 Feb 2016 14:28:46 +0100
-Subject: [PATCH] i.MX SPI DMA cleanup
-Message-ID: <1455715739-25161-1-git-send-email-s.hauer@pengutronix.de>
+Date: Wed, 17 Feb 2016 14:28:50 +0100
+Subject: [PATCH 04/13] spi: imx: drop fallback to PIO
+In-Reply-To: <1455715739-25161-1-git-send-email-s.hauer@pengutronix.de>
+References: <1455715739-25161-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1455715739-25161-5-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This picks up a series sent by Anton Bondarenko last year. It
-contains the remaining not yet upstreamed patches from Antons series
-plus some more DMA related cleanup patches.
+At the moment the driver decides to fallback to PIO mode the buffers
+are already mapped for DMA. It's a bug to access them with the CPU
+afterwards, so we cannot just fallback to PIO mode.
+It should not be necessary anyway, since we only use DMA when we
+verified that it's possible in the fist place, so when prep_slave_sg
+fails it's a bug, either in the SDMA driver or in the can_dma
+implementation.
 
-My mission was to hunt a bug in the DMA code path sometimes causing
-an additional word in the RX FIFO which locked up the driver in the
-next transfer. It turned out that this was no bug in the driver but
-instead in the device tree: We used the wrong SDMA script for i.MX6.
-The ECSPI cores are connected through the SPBA, so according to the
-reference manual we need the shp/mcu scripts rather than the app/mcu
-scripts.
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ drivers/spi/spi-imx.c | 13 +++----------
+ 1 file changed, 3 insertions(+), 10 deletions(-)
 
-Shawn, please pick up the last patch. The rest can go through the SPI
-tree. The last patch has no dependency on the remaining patches.
-
-Sascha
-
-----------------------------------------------------------------
-Anton Bondarenko (3):
-      spi: imx: allow only WML aligned transfers to use DMA
-      spi: imx: replace fixed timeout with calculated
-      spi: imx: add support for all SPI word width for DMA
-
-Sascha Hauer (10):
-      spi: imx: use proper dev_* functions for driver messages
-      spi: imx: drop fallback to PIO
-      spi: imx: initialize usedma earlier
-      spi: imx: drop unnecessary read/modify/write
-      spi: imx: drop unncessary dma_is_inited variable
-      spi: imx: remove unnecessary bit clearing in mx51_ecspi_config
-      spi: imx: make some register defines simpler
-      spi: imx: set MX51_ECSPI_CTRL_SMC bit in setup function
-      spi: imx: drop bogus tests for rx/tx bufs in DMA transfer
-      ARM: dts: imx6: Use correct SDMA script for SPI cores
-
- arch/arm/boot/dts/imx6qdl.dtsi |   8 +-
- drivers/spi/spi-imx.c          | 350 +++++++++++++++++++++--------------------
- 2 files changed, 185 insertions(+), 173 deletions(-)
+diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
+index b277375..5a48d07 100644
+--- a/drivers/spi/spi-imx.c
++++ b/drivers/spi/spi-imx.c
+@@ -945,7 +945,7 @@ static int spi_imx_dma_transfer(struct spi_imx_data *spi_imx,
+ 					tx->sgl, tx->nents, DMA_MEM_TO_DEV,
+ 					DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
+ 		if (!desc_tx)
+-			goto no_dma;
++			return -EINVAL;
+ 
+ 		desc_tx->callback = spi_imx_dma_tx_callback;
+ 		desc_tx->callback_param = (void *)spi_imx;
+@@ -957,7 +957,7 @@ static int spi_imx_dma_transfer(struct spi_imx_data *spi_imx,
+ 					rx->sgl, rx->nents, DMA_DEV_TO_MEM,
+ 					DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
+ 		if (!desc_rx)
+-			goto no_dma;
++			return -EINVAL;
+ 
+ 		desc_rx->callback = spi_imx_dma_rx_callback;
+ 		desc_rx->callback_param = (void *)spi_imx;
+@@ -1010,10 +1010,6 @@ static int spi_imx_dma_transfer(struct spi_imx_data *spi_imx,
+ 		ret = transfer->len;
+ 
+ 	return ret;
+-
+-no_dma:
+-	dev_warn_once(spi_imx->dev, "DMA not available, falling back to PIO\n");
+-	return -EAGAIN;
+ }
+ 
+ static int spi_imx_pio_transfer(struct spi_device *spi,
+@@ -1040,15 +1036,12 @@ static int spi_imx_pio_transfer(struct spi_device *spi,
+ static int spi_imx_transfer(struct spi_device *spi,
+ 				struct spi_transfer *transfer)
+ {
+-	int ret;
+ 	struct spi_imx_data *spi_imx = spi_master_get_devdata(spi->master);
+ 
+ 	if (spi_imx->bitbang.master->can_dma &&
+ 	    spi_imx_can_dma(spi_imx->bitbang.master, spi, transfer)) {
+ 		spi_imx->usedma = true;
+-		ret = spi_imx_dma_transfer(spi_imx, transfer);
+-		if (ret != -EAGAIN)
+-			return ret;
++		return spi_imx_dma_transfer(spi_imx, transfer);
+ 	}
+ 	spi_imx->usedma = false;
+ 
+-- 
+2.7.0
