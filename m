@@ -1,575 +1,594 @@
-From: blogic@openwrt.org (John Crispin)
-Date: Wed, 17 Feb 2016 12:37:36 +0100
-Subject: [PATCH V6 2/2] regulator: mt6323: Add support for MT6323 regulator
-In-Reply-To: <1455709056-50510-1-git-send-email-blogic@openwrt.org>
-References: <1455709056-50510-1-git-send-email-blogic@openwrt.org>
-Message-ID: <1455709056-50510-2-git-send-email-blogic@openwrt.org>
+From: xinliang.liu@linaro.org (Xinliang Liu)
+Date: Wed, 17 Feb 2016 19:40:37 +0800
+Subject: [PATCH v4 03/11] drm/hisilicon: Add crtc driver for ADE
+In-Reply-To: <56B874F5.8020103@codeaurora.org>
+References: <1454729098-79807-1-git-send-email-xinliang.liu@linaro.org>
+ <1454729098-79807-4-git-send-email-xinliang.liu@linaro.org>
+ <56B874F5.8020103@codeaurora.org>
+Message-ID: <CAGd==06c+or8_d_z0NRyKhs86iEg=C5Bi6h6L3gV38EBzCEcBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chen Zhong <chen.zhong@mediatek.com>
+On 8 February 2016 at 18:59, Archit Taneja <architt@codeaurora.org> wrote:
+>
+>
+> On 02/06/2016 08:54 AM, Xinliang Liu wrote:
+>>
+>> Add crtc funcs and helper funcs for ADE.
+>>
+>> v4: None.
+>> v3:
+>> - Make ade as the master driver.
+>> - Use port to connect with encoder.
+>> - A few cleanup.
+>> v2:
+>> - Remove abtraction layer.
+>>
+>> Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
+>> ---
+>>   drivers/gpu/drm/hisilicon/kirin/Makefile        |   3 +-
+>>   drivers/gpu/drm/hisilicon/kirin/kirin_ade_reg.h | 280 +++++++++++++++
+>>   drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c | 458
+>> ++++++++++++++++++++++++
+>>   drivers/gpu/drm/hisilicon/kirin/kirin_drm_drv.c |  15 +
+>>   drivers/gpu/drm/hisilicon/kirin/kirin_drm_drv.h |   8 +
+>>   5 files changed, 763 insertions(+), 1 deletion(-)
+>>   create mode 100644 drivers/gpu/drm/hisilicon/kirin/kirin_ade_reg.h
+>>   create mode 100644 drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c
+>>
+>> diff --git a/drivers/gpu/drm/hisilicon/kirin/Makefile
+>> b/drivers/gpu/drm/hisilicon/kirin/Makefile
+>> index cb346de47d48..2a61ab006ddb 100644
+>> --- a/drivers/gpu/drm/hisilicon/kirin/Makefile
+>> +++ b/drivers/gpu/drm/hisilicon/kirin/Makefile
+>> @@ -1,3 +1,4 @@
+>> -kirin-drm-y := kirin_drm_drv.o
+>> +kirin-drm-y := kirin_drm_drv.o \
+>> +              kirin_drm_ade.o
+>>
+>>   obj-$(CONFIG_DRM_HISI_KIRIN) += kirin-drm.o
+>> diff --git a/drivers/gpu/drm/hisilicon/kirin/kirin_ade_reg.h
+>> b/drivers/gpu/drm/hisilicon/kirin/kirin_ade_reg.h
+>> new file mode 100644
+>> index 000000000000..78020747abfe
+>> --- /dev/null
+>> +++ b/drivers/gpu/drm/hisilicon/kirin/kirin_ade_reg.h
+>> @@ -0,0 +1,280 @@
+>> +/*
+>> + * Copyright (c) 2016 Linaro Limited.
+>> + * Copyright (c) 2014-2016 Hisilicon Limited.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + */
+>> +
+>> +#ifndef __KIRIN_ADE_REG_H__
+>> +#define __KIRIN_ADE_REG_H__
+>> +
+>> +/*
+>> + * ADE Registers
+>> + */
+>> +#define MASK(x)                                (BIT(x) - 1)
+>> +
+>> +#define ADE_CTRL                       0x0004
+>> +#define FRM_END_START_OFST             0
+>> +#define FRM_END_START_MASK             MASK(2)
+>> +#define ADE_CTRL1                      0x008C
+>> +#define AUTO_CLK_GATE_EN_OFST          0
+>> +#define AUTO_CLK_GATE_EN               BIT(0)
+>> +#define ADE_ROT_SRC_CFG                        0x0010
+>> +#define ADE_DISP_SRC_CFG               0x0018
+>> +#define ADE_WDMA2_SRC_CFG              0x001C
+>> +#define ADE_SEC_OVLY_SRC_CFG           0x0020
+>> +#define ADE_WDMA3_SRC_CFG              0x0024
+>> +#define ADE_OVLY1_TRANS_CFG            0x002C
+>> +#define ADE_EN                         0x0100
+>> +#define ADE_DISABLE                    0
+>> +#define ADE_ENABLE                     1
+>> +#define INTR_MASK_CPU(x)               (0x0C10 + (x) * 0x4)
+>> +#define ADE_FRM_DISGARD_CTRL           0x00A4
+>> +/* reset and reload regs */
+>> +#define ADE_SOFT_RST_SEL(x)            (0x0078 + (x) * 0x4)
+>> +#define ADE_RELOAD_DIS(x)              (0x00AC + (x) * 0x4)
+>> +#define RDMA_OFST                      0
+>> +#define CLIP_OFST                      15
+>> +#define SCL_OFST                       21
+>> +#define CTRAN_OFST                     24
+>> +#define OVLY_OFST                      37 /* 32+5 */
+>> +/* channel regs */
+>> +#define RD_CH_PE(x)                    (0x1000 + (x) * 0x80)
+>> +#define RD_CH_CTRL(x)                  (0x1004 + (x) * 0x80)
+>> +#define RD_CH_ADDR(x)                  (0x1008 + (x) * 0x80)
+>> +#define RD_CH_SIZE(x)                  (0x100C + (x) * 0x80)
+>> +#define RD_CH_STRIDE(x)                        (0x1010 + (x) * 0x80)
+>> +#define RD_CH_SPACE(x)                 (0x1014 + (x) * 0x80)
+>> +#define RD_CH_PARTIAL_SIZE(x)          (0x1018 + (x) * 0x80)
+>> +#define RD_CH_PARTIAL_SPACE(x)         (0x101C + (x) * 0x80)
+>> +#define RD_CH_EN(x)                    (0x1020 + (x) * 0x80)
+>> +#define RD_CH_STATUS(x)                        (0x1024 + (x) * 0x80)
+>> +#define RD_CH_DISP_CTRL                        0x1404
+>> +#define RD_CH_DISP_ADDR                        0x1408
+>> +#define RD_CH_DISP_SIZE                        0x140C
+>> +#define RD_CH_DISP_STRIDE              0x1410
+>> +#define RD_CH_DISP_SPACE               0x1414
+>> +#define RD_CH_DISP_EN                  0x142C
+>> +/* clip regs */
+>> +#define ADE_CLIP_DISABLE(x)            (0x6800 + (x) * 0x100)
+>> +#define ADE_CLIP_SIZE0(x)              (0x6804 + (x) * 0x100)
+>> +#define ADE_CLIP_SIZE1(x)              (0x6808 + (x) * 0x100)
+>> +#define ADE_CLIP_SIZE2(x)              (0x680C + (x) * 0x100)
+>> +#define ADE_CLIP_CFG_OK(x)             (0x6810 + (x) * 0x100)
+>> +/* scale regs */
+>> +#define ADE_SCL1_MUX_CFG               0x000C
+>> +#define ADE_SCL2_SRC_CFG               0x0014
+>> +#define ADE_SCL3_MUX_CFG               0x0008
+>> +#define ADE_SCL_CTRL(x)                        (0x3000 + (x) * 0x800)
+>> +#define ADE_SCL_HSP(x)                 (0x3004 + (x) * 0x800)
+>> +#define ADE_SCL_UV_HSP(x)              (0x3008 + (x) * 0x800)
+>> +#define ADE_SCL_VSP(x)                 (0x300C + (x) * 0x800)
+>> +#define ADE_SCL_UV_VSP(x)              (0x3010 + (x) * 0x800)
+>> +#define ADE_SCL_ORES(x)                        (0x3014 + (x) * 0x800)
+>> +#define ADE_SCL_IRES(x)                        (0x3018 + (x) * 0x800)
+>> +#define ADE_SCL_START(x)               (0x301C + (x) * 0x800)
+>> +#define ADE_SCL_ERR(x)                 (0x3020 + (x) * 0x800)
+>> +#define ADE_SCL_PIX_OFST(x)            (0x3024 + (x) * 0x800)
+>> +#define ADE_SCL_UV_PIX_OFST(x)         (0x3028 + (x) * 0x800)
+>> +#define ADE_SCL_COEF_CLR(x)            (0x3030 + (x) * 0x800)
+>> +#define ADE_SCL_HCOEF(x, m, n)         (0x3100 + (x) * 0x800 + \
+>> +                                       12 * (m) + 4 * (n))
+>> +#define ADE_SCL_VCOEF(x, i, j)         (0x340C + (x) * 0x800 + \
+>> +                                       12 * (i) + 4 * (j))
+>> +/* ctran regs */
+>> +#define ADE_CTRAN5_TRANS_CFG           0x0040
+>> +#define ADE_CTRAN_DIS(x)               (0x5004 + (x) * 0x100)
+>> +#define CTRAN_BYPASS_ON                        1
+>> +#define CTRAN_BYPASS_OFF               0
+>> +#define ADE_CTRAN_MODE_CHOOSE(x)       (0x5008 + (x) * 0x100)
+>> +#define ADE_CTRAN_STAT(x)              (0x500C + (x) * 0x100)
+>> +#define ADE_CTRAN_CHDC0(x)             (0x5010 + (x) * 0x100)
+>> +#define ADE_CTRAN_CHDC1(x)             (0x5014 + (x) * 0x100)
+>> +#define ADE_CTRAN_CHDC2(x)             (0x5018 + (x) * 0x100)
+>> +#define ADE_CTRAN_CHDC3(x)             (0x501C + (x) * 0x100)
+>> +#define ADE_CTRAN_CHDC4(x)             (0x5020 + (x) * 0x100)
+>> +#define ADE_CTRAN_CHDC5(x)             (0x5024 + (x) * 0x100)
+>> +#define ADE_CTRAN_CSC0(x)              (0x5028 + (x) * 0x100)
+>> +#define ADE_CTRAN_CSC1(x)              (0x502C + (x) * 0x100)
+>> +#define ADE_CTRAN_CSC2(x)              (0x5030 + (x) * 0x100)
+>> +#define ADE_CTRAN_CSC3(x)              (0x5034 + (x) * 0x100)
+>> +#define ADE_CTRAN_CSC4(x)              (0x5038 + (x) * 0x100)
+>> +#define ADE_CTRAN_IMAGE_SIZE(x)                (0x503C + (x) * 0x100)
+>> +#define ADE_CTRAN_CFG_OK(x)            (0x5040 + (x) * 0x100)
+>> +/* overlay regs */
+>> +#define ADE_OVLY_ALPHA_ST              0x2000
+>> +#define ADE_OVLY_CH_XY0(x)             (0x2004 + (x) * 4)
+>> +#define ADE_OVLY_CH_XY1(x)             (0x2024 + (x) * 4)
+>> +#define ADE_OVLY_CH_CTL(x)             (0x204C + (x) * 4)
+>> +#define ADE_OVLY_OUTPUT_SIZE(x)                (0x2070 + (x) * 8)
+>> +#define OUTPUT_XSIZE_OFST              16
+>> +#define ADE_OVLY_BASE_COLOR(x)         (0x2074 + (x) * 8)
+>> +#define ADE_OVLYX_CTL(x)               (0x209C + (x) * 4)
+>> +#define ADE_OVLY_CTL                   0x0098
+>> +#define CH_OVLY_SEL_OFST(x)            ((x) * 4)
+>> +#define CH_OVLY_SEL_MASK               MASK(2)
+>> +#define CH_OVLY_SEL_VAL(x)             ((x) + 1)
+>> +#define CH_ALP_MODE_OFST               0
+>> +#define CH_ALP_SEL_OFST                        2
+>> +#define CH_UNDER_ALP_SEL_OFST          4
+>> +#define CH_EN_OFST                     6
+>> +#define CH_ALP_GBL_OFST                        15
+>> +#define CH_SEL_OFST                    28
+>> +
+>> +/*
+>> + * LDI Registers
+>> + */
+>> +#define LDI_HRZ_CTRL0                  0x7400
+>> +#define HBP_OFST                       20
+>> +#define LDI_HRZ_CTRL1                  0x7404
+>> +#define LDI_VRT_CTRL0                  0x7408
+>> +#define VBP_OFST                       20
+>> +#define LDI_VRT_CTRL1                  0x740C
+>> +#define LDI_PLR_CTRL                   0x7410
+>> +#define FLAG_NVSYNC                    BIT(0)
+>> +#define FLAG_NHSYNC                    BIT(1)
+>> +#define FLAG_NPIXCLK                   BIT(2)
+>> +#define FLAG_NDE                       BIT(3)
+>> +#define LDI_DSP_SIZE                   0x7414
+>> +#define VSIZE_OFST                     20
+>> +#define LDI_INT_EN                     0x741C
+>> +#define FRAME_END_INT_EN_OFST          1
+>> +#define LDI_CTRL                       0x7420
+>> +#define BPP_OFST                       3
+>> +#define DATA_GATE_EN                   BIT(2)
+>> +#define LDI_EN                         BIT(0)
+>> +#define LDI_ORG_INT                    0x7424
+>> +#define LDI_MSK_INT                    0x7428
+>> +#define LDI_INT_CLR                    0x742C
+>> +#define LDI_WORK_MODE                  0x7430
+>> +#define LDI_DE_SPACE_LOW               0x7438
+>> +#define LDI_MCU_INTS                   0x7450
+>> +#define LDI_MCU_INTE                   0x7454
+>> +#define LDI_MCU_INTC                   0x7458
+>> +#define LDI_HDMI_DSI_GT                        0x7434
+>> +
+>> +/*
+>> + * media regs
+>> + */
+>> +#define SC_MEDIA_RSTDIS                                0x0530
+>> +#define SC_MEDIA_RSTEN                         0x052C
+>> +#define NOC_ADE0_QOSGENERATOR_MODE             0x010C
+>> +#define NOC_ADE0_QOSGENERATOR_EXTCONTROL       0x0118
+>> +#define NOC_ADE1_QOSGENERATOR_MODE             0x020C
+>> +#define NOC_ADE1_QOSGENERATOR_EXTCONTROL       0x0218
+>> +
+>> +/*
+>> + * ADE regs relevant enums
+>> + */
+>> +enum frame_end_start {
+>> +       /* regs take effective in every vsync */
+>> +       REG_EFFECTIVE_IN_VSYNC = 0,
+>> +       /* regs take effective in fist ade en and every frame end */
+>> +       REG_EFFECTIVE_IN_ADEEN_FRMEND,
+>> +       /* regs take effective in ade en immediately */
+>> +       REG_EFFECTIVE_IN_ADEEN,
+>> +       /* regs take effective in first vsync and every frame end */
+>> +       REG_EFFECTIVE_IN_VSYNC_FRMEND
+>> +};
+>> +
+>> +enum ade_fb_format {
+>> +       ADE_RGB_565 = 0,
+>> +       ADE_BGR_565,
+>> +       ADE_XRGB_8888,
+>> +       ADE_XBGR_8888,
+>> +       ADE_ARGB_8888,
+>> +       ADE_ABGR_8888,
+>> +       ADE_RGBA_8888,
+>> +       ADE_BGRA_8888,
+>> +       ADE_RGB_888,
+>> +       ADE_BGR_888 = 9,
+>> +       ADE_FORMAT_NOT_SUPPORT = 800
+>> +};
+>> +
+>> +enum ade_channel {
+>> +       ADE_CH1 = 0,    /* channel 1 for primary plane */
+>> +       ADE_CH_NUM
+>> +};
+>> +
+>> +enum ade_scale {
+>> +       ADE_SCL1 = 0,
+>> +       ADE_SCL2,
+>> +       ADE_SCL3,
+>> +       ADE_SCL_NUM
+>> +};
+>> +
+>> +enum ade_ctran {
+>> +       ADE_CTRAN1 = 0,
+>> +       ADE_CTRAN2,
+>> +       ADE_CTRAN3,
+>> +       ADE_CTRAN4,
+>> +       ADE_CTRAN5,
+>> +       ADE_CTRAN6,
+>> +       ADE_CTRAN_NUM
+>> +};
+>> +
+>> +enum ade_overlay {
+>> +       ADE_OVLY1 = 0,
+>> +       ADE_OVLY2,
+>> +       ADE_OVLY3,
+>> +       ADE_OVLY_NUM
+>> +};
+>> +
+>> +enum ade_alpha_mode {
+>> +       ADE_ALP_GLOBAL = 0,
+>> +       ADE_ALP_PIXEL,
+>> +       ADE_ALP_PIXEL_AND_GLB
+>> +};
+>> +
+>> +enum ade_alpha_blending_mode {
+>> +       ADE_ALP_MUL_COEFF_0 = 0,        /* alpha */
+>> +       ADE_ALP_MUL_COEFF_1,            /* 1-alpha */
+>> +       ADE_ALP_MUL_COEFF_2,            /* 0 */
+>> +       ADE_ALP_MUL_COEFF_3             /* 1 */
+>> +};
+>> +
+>> +/*
+>> + * LDI regs relevant enums
+>> + */
+>> +enum dsi_pclk_en {
+>> +       DSI_PCLK_ON = 0,
+>> +       DSI_PCLK_OFF
+>> +};
+>> +
+>> +enum ldi_output_format {
+>> +       LDI_OUT_RGB_565 = 0,
+>> +       LDI_OUT_RGB_666,
+>> +       LDI_OUT_RGB_888
+>> +};
+>> +
+>> +enum ldi_work_mode {
+>> +       TEST_MODE = 0,
+>> +       NORMAL_MODE
+>> +};
+>> +
+>> +enum ldi_input_source {
+>> +       DISP_SRC_NONE = 0,
+>> +       DISP_SRC_OVLY2,
+>> +       DISP_SRC_DISP,
+>> +       DISP_SRC_ROT,
+>> +       DISP_SRC_SCL2
+>> +};
+>> +
+>> +/*
+>> + * Register Write/Read Helper functions
+>> + */
+>> +static inline void ade_update_bits(void __iomem *addr, u32 bit_start,
+>> +                                  u32 mask, u32 val)
+>> +{
+>> +       u32 tmp, orig;
+>> +
+>> +       orig = readl(addr);
+>> +       tmp = orig & ~(mask << bit_start);
+>> +       tmp |= (val & mask) << bit_start;
+>> +       writel(tmp, addr);
+>> +}
+>> +
+>> +#endif
+>> diff --git a/drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c
+>> b/drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c
+>> new file mode 100644
+>> index 000000000000..b45149616716
+>> --- /dev/null
+>> +++ b/drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c
+>> @@ -0,0 +1,458 @@
+>> +/*
+>> + * Hisilicon Hi6220 SoC ADE(Advanced Display Engine)'s crtc&plane driver
+>> + *
+>> + * Copyright (c) 2016 Linaro Limited.
+>> + * Copyright (c) 2014-2016 Hisilicon Limited.
+>> + *
+>> + * Author:
+>> + *     Xinliang Liu <z.liuxinliang@hisilicon.com>
+>> + *     Xinliang Liu <xinliang.liu@linaro.org>
+>> + *     Xinwei Kong <kong.kongxinwei@hisilicon.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + */
+>> +
+>> +#include <linux/bitops.h>
+>> +#include <linux/clk.h>
+>> +#include <video/display_timing.h>
+>> +
+>> +#include <drm/drmP.h>
+>> +#include <drm/drm_crtc.h>
+>> +#include <drm/drm_crtc_helper.h>
+>> +#include <drm/drm_atomic.h>
+>> +#include <drm/drm_atomic_helper.h>
+>> +
+>> +#include "kirin_drm_drv.h"
+>> +#include "kirin_ade_reg.h"
+>> +
+>> +#define to_ade_crtc(crtc) \
+>> +       container_of(crtc, struct ade_crtc, base)
+>> +
+>> +struct ade_hw_ctx {
+>> +       void __iomem  *base;
+>> +       void __iomem  *media_base;
+>> +       void __iomem  *media_noc_base;
+>> +       int irq;
+>> +       struct clk *ade_core_clk;
+>> +       struct clk *media_noc_clk;
+>> +       struct clk *ade_pix_clk;
+>> +       bool power_on;
+>> +};
+>> +
+>> +struct ade_crtc {
+>> +       struct drm_crtc base;
+>> +       struct ade_hw_ctx *ctx;
+>> +       bool enable;
+>> +       u32 out_format;
+>> +};
+>> +
+>> +struct ade_data {
+>> +       struct ade_crtc acrtc;
+>> +       struct ade_hw_ctx ctx;
+>> +};
+>> +
+>> +static void ade_update_reload_bit(void __iomem *base, u32 bit_num, u32
+>> val)
+>> +{
+>> +       u32 bit_ofst, reg_num;
+>> +
+>> +       bit_ofst = bit_num % 32;
+>> +       reg_num = bit_num / 32;
+>> +
+>> +       ade_update_bits(base + ADE_RELOAD_DIS(reg_num), bit_ofst,
+>> +                       MASK(1), !!val);
+>> +}
+>> +
+>> +static u32 ade_read_reload_bit(void __iomem *base, u32 bit_num)
+>> +{
+>> +       u32 tmp, bit_ofst, reg_num;
+>> +
+>> +       bit_ofst = bit_num % 32;
+>> +       reg_num = bit_num / 32;
+>> +
+>> +       tmp = readl(base + ADE_RELOAD_DIS(reg_num));
+>> +       return !!(BIT(bit_ofst) & tmp);
+>> +}
+>> +
+>> +static void ade_init(struct ade_hw_ctx *ctx)
+>> +{
+>> +       void __iomem *base = ctx->base;
+>> +
+>> +       /* enable clk gate */
+>> +       ade_update_bits(base + ADE_CTRL1, AUTO_CLK_GATE_EN_OFST,
+>> +                       AUTO_CLK_GATE_EN, ADE_ENABLE);
+>> +       /* clear overlay */
+>> +       writel(0, base + ADE_OVLY1_TRANS_CFG);
+>> +       writel(0, base + ADE_OVLY_CTL);
+>> +       writel(0, base + ADE_OVLYX_CTL(ADE_OVLY2));
+>> +       /* clear reset and reload regs */
+>> +       writel(MASK(32), base + ADE_SOFT_RST_SEL(0));
+>> +       writel(MASK(32), base + ADE_SOFT_RST_SEL(1));
+>> +       writel(MASK(32), base + ADE_RELOAD_DIS(0));
+>> +       writel(MASK(32), base + ADE_RELOAD_DIS(1));
+>> +       /* for video mode, that ade registers
+>> +        * became effective at frame end
+>> +        */
+>> +       ade_update_bits(base + ADE_CTRL, FRM_END_START_OFST,
+>> +                       FRM_END_START_MASK,
+>> REG_EFFECTIVE_IN_ADEEN_FRMEND);
+>> +}
+>> +
+>> +static void ade_ldi_set_mode(struct ade_crtc *acrtc,
+>> +                            struct drm_display_mode *mode,
+>> +                            struct drm_display_mode *adj_mode)
+>> +{
+>> +       struct ade_hw_ctx *ctx = acrtc->ctx;
+>> +       void __iomem *base = ctx->base;
+>> +       u32 width = mode->hdisplay;
+>> +       u32 height = mode->vdisplay;
+>> +       u32 hfp, hbp, hsw, vfp, vbp, vsw;
+>> +       u32 plr_flags;
+>> +       int ret;
+>> +
+>> +       plr_flags = (mode->flags & DRM_MODE_FLAG_NVSYNC) ? FLAG_NVSYNC :
+>> 0;
+>> +       plr_flags |= (mode->flags & DRM_MODE_FLAG_NHSYNC) ? FLAG_NHSYNC :
+>> 0;
+>> +       hfp = mode->hsync_start - mode->hdisplay;
+>> +       hbp = mode->htotal - mode->hsync_end;
+>> +       hsw = mode->hsync_end - mode->hsync_start;
+>> +       vfp = mode->vsync_start - mode->vdisplay;
+>> +       vbp = mode->vtotal - mode->vsync_end;
+>> +       vsw = mode->vsync_end - mode->vsync_start;
+>> +       if (vsw > 15) {
+>> +               DRM_DEBUG_DRIVER("vsw exceeded 15\n");
+>> +               vsw = 15;
+>> +       }
+>> +
+>> +       writel((hbp << HBP_OFST) | hfp, base + LDI_HRZ_CTRL0);
+>> +        /* the configured value is actual value - 1 */
+>> +       writel(hsw - 1, base + LDI_HRZ_CTRL1);
+>> +       writel((vbp << VBP_OFST) | vfp, base + LDI_VRT_CTRL0);
+>> +        /* the configured value is actual value - 1 */
+>> +       writel(vsw - 1, base + LDI_VRT_CTRL1);
+>> +        /* the configured value is actual value - 1 */
+>> +       writel(((height - 1) << VSIZE_OFST) | (width - 1),
+>> +              base + LDI_DSP_SIZE);
+>> +       writel(plr_flags, base + LDI_PLR_CTRL);
+>> +
+>> +       /* Success should be guaranteed in mode_valid call back,
+>> +        * so failer shouldn't happen here
+>> +        */
+>> +       ret = clk_set_rate(ctx->ade_pix_clk, mode->clock * 1000);
+>> +       if (ret)
+>> +               DRM_ERROR("failed to set pixel clk %dHz (%d)\n",
+>> +                         mode->clock * 1000, ret);
+>> +       adj_mode->clock = clk_get_rate(ctx->ade_pix_clk) / 1000;
+>> +
+>> +       /* ctran6 setting */
+>> +       writel(CTRAN_BYPASS_ON, base + ADE_CTRAN_DIS(ADE_CTRAN6));
+>> +        /* the configured value is actual value - 1 */
+>> +       writel(width * height - 1, base +
+>> ADE_CTRAN_IMAGE_SIZE(ADE_CTRAN6));
+>> +       ade_update_reload_bit(base, CTRAN_OFST + ADE_CTRAN6, 0);
+>> +
+>> +       DRM_DEBUG_DRIVER("set mode: %dx%d\n", width, height);
+>> +}
+>> +
+>> +static int ade_power_up(struct ade_hw_ctx *ctx)
+>> +{
+>> +       void __iomem *media_base = ctx->media_base;
+>> +       int ret;
+>> +
+>> +       ret = clk_prepare_enable(ctx->media_noc_clk);
+>> +       if (ret) {
+>> +               DRM_ERROR("failed to enable media_noc_clk (%d)\n", ret);
+>> +               return ret;
+>> +       }
+>> +
+>> +       writel(0x20, media_base + SC_MEDIA_RSTDIS);
+>
+>
+> If this and the write in ade_power_down are to reset the
+> ADE block, they should ideally belong to clock/reset subsystem
+> and not touched by the driver.
 
-The MT6323 is a regulator found on boards based on MediaTek MT7623 and
-probably other SoCs. It is a so called pmic and connects as a slave to
-SoC using SPI, wrapped inside the pmic-wrapper.
+yes, this is to reset ADE block.
+you are right! will use reset subsystem to do the reset in v5.
+Thanks for letting me know about this.
 
-Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
-Signed-off-by: John Crispin <blogic@openwrt.org>
+>
+>
+>> +
+>> +       ret = clk_prepare_enable(ctx->ade_core_clk);
+>> +       if (ret) {
+>> +               DRM_ERROR("failed to enable ade_core_clk (%d)\n", ret);
+>> +               return ret;
+>> +       }
+>> +
+>> +       ade_init(ctx);
+>> +       ctx->power_on = true;
+>> +       return 0;
+>> +}
+>> +
+>> +static void ade_power_down(struct ade_hw_ctx *ctx)
+>> +{
+>> +       void __iomem *base = ctx->base;
+>> +       void __iomem *media_base = ctx->media_base;
+>> +
+>> +       writel(ADE_DISABLE, base + LDI_CTRL);
+>> +       /* dsi pixel off */
+>> +       writel(DSI_PCLK_OFF, base + LDI_HDMI_DSI_GT);
+>> +
+>> +       clk_disable_unprepare(ctx->ade_core_clk);
+>> +       writel(0x20, media_base + SC_MEDIA_RSTEN);
+>> +       clk_disable_unprepare(ctx->media_noc_clk);
+>> +       ctx->power_on = false;
+>> +}
+>> +
+>> +static void ade_set_medianoc_qos(struct ade_crtc *acrtc)
+>> +{
+>> +       struct ade_hw_ctx *ctx = acrtc->ctx;
+>> +       void __iomem *base = ctx->media_noc_base;
+>> +       void __iomem *reg;
+>> +       u32 val;
+>> +
+>> +       reg = base + NOC_ADE0_QOSGENERATOR_MODE;
+>> +       val = (readl(reg) & 0xfffffffc) | 0x2;
+>> +       writel(val, reg);
+>> +
+>> +       reg = base + NOC_ADE0_QOSGENERATOR_EXTCONTROL;
+>> +       val = readl(reg) | 0x1;
+>> +       writel(val, reg);
+>> +
+>> +       reg = base + NOC_ADE1_QOSGENERATOR_MODE;
+>> +       val = (readl(reg) & 0xfffffffc) | 0x2;
+>> +       writel(val, reg);
+>> +
+>> +       reg = base + NOC_ADE1_QOSGENERATOR_EXTCONTROL;
+>> +       val = readl(reg) | 0x1;
+>> +       writel(val, reg);
+>
+>
+> We could at least try to pass these via syscon, since we
+> don't have a framework to configure NoC QoS stuff.
 
----
-Changes in V6
-* add back the set/get mode callbacks
+yes, it is better to write regs via syscon. Will fixed in v5.
+Thanks for letting me know about this.
 
-Changes in V5
-* remove the code that modifies constraints
-* remove the code allows mode changes
+Thanks,
+-xinliang
 
-Changes in V4:
-* add id_table and of_match_table
-* use short GPL text
-* change MODULE_LICENSE to GPL V2
-
-Changes in V3:
-* none
-
-Changes in V2:
-* send to the the proper maintainer
-
- drivers/regulator/Kconfig                  |    9 +
- drivers/regulator/Makefile                 |    1 +
- drivers/regulator/mt6323-regulator.c       |  432 ++++++++++++++++++++++++++++
- include/linux/regulator/mt6323-regulator.h |   52 ++++
- 4 files changed, 494 insertions(+)
- create mode 100644 drivers/regulator/mt6323-regulator.c
- create mode 100644 include/linux/regulator/mt6323-regulator.h
-
-diff --git a/drivers/regulator/Kconfig b/drivers/regulator/Kconfig
-index 8155e80..5e49568 100644
---- a/drivers/regulator/Kconfig
-+++ b/drivers/regulator/Kconfig
-@@ -462,6 +462,15 @@ config REGULATOR_MT6311
- 	  This driver supports the control of different power rails of device
- 	  through regulator interface.
- 
-+config REGULATOR_MT6323
-+	tristate "MediaTek MT6323 PMIC"
-+	depends on MFD_MT6397
-+	help
-+	  Say y here to select this option to enable the power regulator of
-+	  MediaTek MT6323 PMIC.
-+	  This driver supports the control of different power rails of device
-+	  through regulator interface.
-+
- config REGULATOR_MT6397
- 	tristate "MediaTek MT6397 PMIC"
- 	depends on MFD_MT6397
-diff --git a/drivers/regulator/Makefile b/drivers/regulator/Makefile
-index 980b194..8fb55640 100644
---- a/drivers/regulator/Makefile
-+++ b/drivers/regulator/Makefile
-@@ -61,6 +61,7 @@ obj-$(CONFIG_REGULATOR_MC13783) += mc13783-regulator.o
- obj-$(CONFIG_REGULATOR_MC13892) += mc13892-regulator.o
- obj-$(CONFIG_REGULATOR_MC13XXX_CORE) +=  mc13xxx-regulator-core.o
- obj-$(CONFIG_REGULATOR_MT6311) += mt6311-regulator.o
-+obj-$(CONFIG_REGULATOR_MT6323)	+= mt6323-regulator.o
- obj-$(CONFIG_REGULATOR_MT6397)	+= mt6397-regulator.o
- obj-$(CONFIG_REGULATOR_QCOM_RPM) += qcom_rpm-regulator.o
- obj-$(CONFIG_REGULATOR_QCOM_SMD_RPM) += qcom_smd-regulator.o
-diff --git a/drivers/regulator/mt6323-regulator.c b/drivers/regulator/mt6323-regulator.c
-new file mode 100644
-index 0000000..28ebbda
---- /dev/null
-+++ b/drivers/regulator/mt6323-regulator.c
-@@ -0,0 +1,432 @@
-+/*
-+ * Copyright (c) 2016 MediaTek Inc.
-+ * Author: Chen Zhong <chen.zhong@mediatek.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/regmap.h>
-+#include <linux/mfd/mt6397/core.h>
-+#include <linux/mfd/mt6323/registers.h>
-+#include <linux/regulator/driver.h>
-+#include <linux/regulator/machine.h>
-+#include <linux/regulator/mt6323-regulator.h>
-+#include <linux/regulator/of_regulator.h>
-+
-+#define MT6323_LDO_MODE_NORMAL	0
-+#define MT6323_LDO_MODE_LP	1
-+
-+/*
-+ * MT6323 regulators' information
-+ *
-+ * @desc: standard fields of regulator description.
-+ * @qi: Mask for query enable signal status of regulators
-+ * @vselon_reg: Register sections for hardware control mode of bucks
-+ * @vselctrl_reg: Register for controlling the buck control mode.
-+ * @vselctrl_mask: Mask for query buck's voltage control mode.
-+ */
-+struct mt6323_regulator_info {
-+	struct regulator_desc desc;
-+	u32 qi;
-+	u32 vselon_reg;
-+	u32 vselctrl_reg;
-+	u32 vselctrl_mask;
-+	u32 modeset_reg;
-+	u32 modeset_mask;
-+};
-+
-+#define MT6323_BUCK(match, vreg, min, max, step, volt_ranges, enreg,	\
-+		vosel, vosel_mask, voselon, vosel_ctrl)			\
-+[MT6323_ID_##vreg] = {							\
-+	.desc = {							\
-+		.name = #vreg,						\
-+		.of_match = of_match_ptr(match),			\
-+		.ops = &mt6323_volt_range_ops,				\
-+		.type = REGULATOR_VOLTAGE,				\
-+		.id = MT6323_ID_##vreg,					\
-+		.owner = THIS_MODULE,					\
-+		.n_voltages = (max - min)/step + 1,			\
-+		.linear_ranges = volt_ranges,				\
-+		.n_linear_ranges = ARRAY_SIZE(volt_ranges),		\
-+		.vsel_reg = vosel,					\
-+		.vsel_mask = vosel_mask,				\
-+		.enable_reg = enreg,					\
-+		.enable_mask = BIT(0),					\
-+	},								\
-+	.qi = BIT(13),							\
-+	.vselon_reg = voselon,						\
-+	.vselctrl_reg = vosel_ctrl,					\
-+	.vselctrl_mask = BIT(1),					\
-+}
-+
-+#define MT6323_LDO(match, vreg, ldo_volt_table, enreg, enbit, vosel,	\
-+		vosel_mask, _modeset_reg, _modeset_mask)		\
-+[MT6323_ID_##vreg] = {							\
-+	.desc = {							\
-+		.name = #vreg,						\
-+		.of_match = of_match_ptr(match),			\
-+		.ops = &mt6323_volt_table_ops,				\
-+		.type = REGULATOR_VOLTAGE,				\
-+		.id = MT6323_ID_##vreg,					\
-+		.owner = THIS_MODULE,					\
-+		.n_voltages = ARRAY_SIZE(ldo_volt_table),		\
-+		.volt_table = ldo_volt_table,				\
-+		.vsel_reg = vosel,					\
-+		.vsel_mask = vosel_mask,				\
-+		.enable_reg = enreg,					\
-+		.enable_mask = BIT(enbit),				\
-+	},								\
-+	.qi = BIT(15),							\
-+	.modeset_reg = _modeset_reg,					\
-+	.modeset_mask = _modeset_mask,					\
-+}
-+
-+#define MT6323_REG_FIXED(match, vreg, enreg, enbit, volt,		\
-+		_modeset_reg, _modeset_mask)				\
-+[MT6323_ID_##vreg] = {							\
-+	.desc = {							\
-+		.name = #vreg,						\
-+		.of_match = of_match_ptr(match),			\
-+		.ops = &mt6323_volt_fixed_ops,				\
-+		.type = REGULATOR_VOLTAGE,				\
-+		.id = MT6323_ID_##vreg,					\
-+		.owner = THIS_MODULE,					\
-+		.n_voltages = 1,					\
-+		.enable_reg = enreg,					\
-+		.enable_mask = BIT(enbit),				\
-+		.min_uV = volt,						\
-+	},								\
-+	.qi = BIT(15),							\
-+	.modeset_reg = _modeset_reg,					\
-+	.modeset_mask = _modeset_mask,					\
-+}
-+
-+static const struct regulator_linear_range buck_volt_range1[] = {
-+	REGULATOR_LINEAR_RANGE(700000, 0, 0x7f, 6250),
-+};
-+
-+static const struct regulator_linear_range buck_volt_range2[] = {
-+	REGULATOR_LINEAR_RANGE(1400000, 0, 0x7f, 12500),
-+};
-+
-+static const struct regulator_linear_range buck_volt_range3[] = {
-+	REGULATOR_LINEAR_RANGE(500000, 0, 0x3f, 50000),
-+};
-+
-+static const u32 ldo_volt_table1[] = {
-+	3300000, 3400000, 3500000, 3600000,
-+};
-+
-+static const u32 ldo_volt_table2[] = {
-+	1500000, 1800000, 2500000, 2800000,
-+};
-+
-+static const u32 ldo_volt_table3[] = {
-+	1800000, 3300000,
-+};
-+
-+static const u32 ldo_volt_table4[] = {
-+	3000000, 3300000,
-+};
-+
-+static const u32 ldo_volt_table5[] = {
-+	1200000, 1300000, 1500000, 1800000, 2000000, 2800000, 3000000, 3300000,
-+};
-+
-+static const u32 ldo_volt_table6[] = {
-+	1200000, 1300000, 1500000, 1800000, 2500000, 2800000, 3000000, 2000000,
-+};
-+
-+static const u32 ldo_volt_table7[] = {
-+	1200000, 1300000, 1500000, 1800000,
-+};
-+
-+static const u32 ldo_volt_table8[] = {
-+	1800000, 3000000,
-+};
-+
-+static const u32 ldo_volt_table9[] = {
-+	1200000, 1350000, 1500000, 1800000,
-+};
-+
-+static const u32 ldo_volt_table10[] = {
-+	1200000, 1300000, 1500000, 1800000,
-+};
-+
-+static int mt6323_get_status(struct regulator_dev *rdev)
-+{
-+	int ret;
-+	u32 regval;
-+	struct mt6323_regulator_info *info = rdev_get_drvdata(rdev);
-+
-+	ret = regmap_read(rdev->regmap, info->desc.enable_reg, &regval);
-+	if (ret != 0) {
-+		dev_err(&rdev->dev, "Failed to get enable reg: %d\n", ret);
-+		return ret;
-+	}
-+
-+	return (regval & info->qi) ? REGULATOR_STATUS_ON : REGULATOR_STATUS_OFF;
-+}
-+
-+static int mt6323_ldo_set_mode(struct regulator_dev *rdev, unsigned int mode)
-+{
-+	int ret, val = 0;
-+	struct mt6323_regulator_info *info = rdev_get_drvdata(rdev);
-+
-+	if (!info->modeset_mask) {
-+		dev_err(&rdev->dev, "regulator %s doesn't support set_mode\n",
-+			info->desc.name);
-+		return -EINVAL;
-+	}
-+
-+	switch (mode) {
-+	case REGULATOR_MODE_STANDBY:
-+		val = MT6323_LDO_MODE_LP;
-+		break;
-+	case REGULATOR_MODE_NORMAL:
-+		val = MT6323_LDO_MODE_NORMAL;
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	val <<= ffs(info->modeset_mask) - 1;
-+
-+	ret = regmap_update_bits(rdev->regmap, info->modeset_reg,
-+				  info->modeset_mask, val);
-+
-+	return ret;
-+}
-+
-+static unsigned int mt6323_ldo_get_mode(struct regulator_dev *rdev)
-+{
-+	unsigned int val;
-+	unsigned int mode;
-+	int ret;
-+	struct mt6323_regulator_info *info = rdev_get_drvdata(rdev);
-+
-+	if (!info->modeset_mask) {
-+		dev_err(&rdev->dev, "regulator %s doesn't support get_mode\n",
-+			info->desc.name);
-+		return -EINVAL;
-+	}
-+
-+	ret = regmap_read(rdev->regmap, info->modeset_reg, &val);
-+	if (ret < 0)
-+		return ret;
-+
-+	val &= info->modeset_mask;
-+	val >>= ffs(info->modeset_mask) - 1;
-+
-+	if (val & 0x1)
-+		mode = REGULATOR_MODE_STANDBY;
-+	else
-+		mode = REGULATOR_MODE_NORMAL;
-+
-+	return mode;
-+}
-+
-+static struct regulator_ops mt6323_volt_range_ops = {
-+	.list_voltage = regulator_list_voltage_linear_range,
-+	.map_voltage = regulator_map_voltage_linear_range,
-+	.set_voltage_sel = regulator_set_voltage_sel_regmap,
-+	.get_voltage_sel = regulator_get_voltage_sel_regmap,
-+	.set_voltage_time_sel = regulator_set_voltage_time_sel,
-+	.enable = regulator_enable_regmap,
-+	.disable = regulator_disable_regmap,
-+	.is_enabled = regulator_is_enabled_regmap,
-+	.get_status = mt6323_get_status,
-+};
-+
-+static struct regulator_ops mt6323_volt_table_ops = {
-+	.list_voltage = regulator_list_voltage_table,
-+	.map_voltage = regulator_map_voltage_iterate,
-+	.set_voltage_sel = regulator_set_voltage_sel_regmap,
-+	.get_voltage_sel = regulator_get_voltage_sel_regmap,
-+	.set_voltage_time_sel = regulator_set_voltage_time_sel,
-+	.enable = regulator_enable_regmap,
-+	.disable = regulator_disable_regmap,
-+	.is_enabled = regulator_is_enabled_regmap,
-+	.get_status = mt6323_get_status,
-+	.set_mode = mt6323_ldo_set_mode,
-+	.get_mode = mt6323_ldo_get_mode,
-+};
-+
-+static struct regulator_ops mt6323_volt_fixed_ops = {
-+	.list_voltage = regulator_list_voltage_linear,
-+	.enable = regulator_enable_regmap,
-+	.disable = regulator_disable_regmap,
-+	.is_enabled = regulator_is_enabled_regmap,
-+	.get_status = mt6323_get_status,
-+	.set_mode = mt6323_ldo_set_mode,
-+	.get_mode = mt6323_ldo_get_mode,
-+};
-+
-+/* The array is indexed by id(MT6323_ID_XXX) */
-+static struct mt6323_regulator_info mt6323_regulators[] = {
-+	MT6323_BUCK("buck_vproc", VPROC, 700000, 1493750, 6250,
-+		buck_volt_range1, MT6323_VPROC_CON7, MT6323_VPROC_CON9, 0x7f,
-+		MT6323_VPROC_CON10, MT6323_VPROC_CON5),
-+	MT6323_BUCK("buck_vsys", VSYS, 1400000, 2987500, 12500,
-+		buck_volt_range2, MT6323_VSYS_CON7, MT6323_VSYS_CON9, 0x7f,
-+		MT6323_VSYS_CON10, MT6323_VSYS_CON5),
-+	MT6323_BUCK("buck_vpa", VPA, 500000, 3650000, 50000,
-+		buck_volt_range3, MT6323_VPA_CON7, MT6323_VPA_CON9,
-+		0x3f, MT6323_VPA_CON10, MT6323_VPA_CON5),
-+	MT6323_REG_FIXED("ldo_vtcxo", VTCXO, MT6323_ANALDO_CON1, 10, 2800000,
-+		MT6323_ANALDO_CON1, 0x2),
-+	MT6323_REG_FIXED("ldo_vcn28", VCN28, MT6323_ANALDO_CON19, 12, 2800000,
-+		MT6323_ANALDO_CON20, 0x2),
-+	MT6323_LDO("ldo_vcn33_bt", VCN33_BT, ldo_volt_table1,
-+		MT6323_ANALDO_CON16, 7, MT6323_ANALDO_CON16, 0xC,
-+		MT6323_ANALDO_CON21, 0x2),
-+	MT6323_LDO("ldo_vcn33_wifi", VCN33_WIFI, ldo_volt_table1,
-+		MT6323_ANALDO_CON17, 12, MT6323_ANALDO_CON16, 0xC,
-+		MT6323_ANALDO_CON21, 0x2),
-+	MT6323_REG_FIXED("ldo_va", VA, MT6323_ANALDO_CON2, 14, 2800000,
-+		MT6323_ANALDO_CON2, 0x2),
-+	MT6323_LDO("ldo_vcama", VCAMA, ldo_volt_table2,
-+		MT6323_ANALDO_CON4, 15, MT6323_ANALDO_CON10, 0x60, -1, 0),
-+	MT6323_REG_FIXED("ldo_vio28", VIO28, MT6323_DIGLDO_CON0, 14, 2800000,
-+		MT6323_DIGLDO_CON0, 0x2),
-+	MT6323_REG_FIXED("ldo_vusb", VUSB, MT6323_DIGLDO_CON2, 14, 3300000,
-+		MT6323_DIGLDO_CON2, 0x2),
-+	MT6323_LDO("ldo_vmc", VMC, ldo_volt_table3,
-+		MT6323_DIGLDO_CON3, 12, MT6323_DIGLDO_CON24, 0x10,
-+		MT6323_DIGLDO_CON3, 0x2),
-+	MT6323_LDO("ldo_vmch", VMCH, ldo_volt_table4,
-+		MT6323_DIGLDO_CON5, 14, MT6323_DIGLDO_CON26, 0x80,
-+		MT6323_DIGLDO_CON5, 0x2),
-+	MT6323_LDO("ldo_vemc3v3", VEMC3V3, ldo_volt_table4,
-+		MT6323_DIGLDO_CON6, 14, MT6323_DIGLDO_CON27, 0x80,
-+		MT6323_DIGLDO_CON6, 0x2),
-+	MT6323_LDO("ldo_vgp1", VGP1, ldo_volt_table5,
-+		MT6323_DIGLDO_CON7, 15, MT6323_DIGLDO_CON28, 0xE0,
-+		MT6323_DIGLDO_CON7, 0x2),
-+	MT6323_LDO("ldo_vgp2", VGP2, ldo_volt_table6,
-+		MT6323_DIGLDO_CON8, 15, MT6323_DIGLDO_CON29, 0xE0,
-+		MT6323_DIGLDO_CON8, 0x2),
-+	MT6323_LDO("ldo_vgp3", VGP3, ldo_volt_table7,
-+		MT6323_DIGLDO_CON9, 15, MT6323_DIGLDO_CON30, 0x60,
-+		MT6323_DIGLDO_CON9, 0x2),
-+	MT6323_REG_FIXED("ldo_vcn18", VCN18, MT6323_DIGLDO_CON11, 14, 1800000,
-+		MT6323_DIGLDO_CON11, 0x2),
-+	MT6323_LDO("ldo_vsim1", VSIM1, ldo_volt_table8,
-+		MT6323_DIGLDO_CON13, 15, MT6323_DIGLDO_CON34, 0x20,
-+		MT6323_DIGLDO_CON13, 0x2),
-+	MT6323_LDO("ldo_vsim2", VSIM2, ldo_volt_table8,
-+		MT6323_DIGLDO_CON14, 15, MT6323_DIGLDO_CON35, 0x20,
-+		MT6323_DIGLDO_CON14, 0x2),
-+	MT6323_REG_FIXED("ldo_vrtc", VRTC, MT6323_DIGLDO_CON15, 8, 2800000,
-+		-1, 0),
-+	MT6323_LDO("ldo_vcamaf", VCAMAF, ldo_volt_table5,
-+		MT6323_DIGLDO_CON31, 15, MT6323_DIGLDO_CON32, 0xE0,
-+		MT6323_DIGLDO_CON31, 0x2),
-+	MT6323_LDO("ldo_vibr", VIBR, ldo_volt_table5,
-+		MT6323_DIGLDO_CON39, 15, MT6323_DIGLDO_CON40, 0xE0,
-+		MT6323_DIGLDO_CON39, 0x2),
-+	MT6323_REG_FIXED("ldo_vrf18", VRF18, MT6323_DIGLDO_CON45, 15, 1825000,
-+		MT6323_DIGLDO_CON45, 0x2),
-+	MT6323_LDO("ldo_vm", VM, ldo_volt_table9,
-+		MT6323_DIGLDO_CON47, 14, MT6323_DIGLDO_CON48, 0x30,
-+		MT6323_DIGLDO_CON47, 0x2),
-+	MT6323_REG_FIXED("ldo_vio18", VIO18, MT6323_DIGLDO_CON49, 14, 1800000,
-+		MT6323_DIGLDO_CON49, 0x2),
-+	MT6323_LDO("ldo_vcamd", VCAMD, ldo_volt_table10,
-+		MT6323_DIGLDO_CON51, 14, MT6323_DIGLDO_CON52, 0x60,
-+		MT6323_DIGLDO_CON51, 0x2),
-+	MT6323_REG_FIXED("ldo_vcamio", VCAMIO, MT6323_DIGLDO_CON53, 14, 1800000,
-+		MT6323_DIGLDO_CON53, 0x2),
-+};
-+
-+static int mt6323_set_buck_vosel_reg(struct platform_device *pdev)
-+{
-+	struct mt6397_chip *mt6323 = dev_get_drvdata(pdev->dev.parent);
-+	int i;
-+	u32 regval;
-+
-+	for (i = 0; i < MT6323_MAX_REGULATOR; i++) {
-+		if (mt6323_regulators[i].vselctrl_reg) {
-+			if (regmap_read(mt6323->regmap,
-+				mt6323_regulators[i].vselctrl_reg,
-+				&regval) < 0) {
-+				dev_err(&pdev->dev,
-+					"Failed to read buck ctrl\n");
-+				return -EIO;
-+			}
-+
-+			if (regval & mt6323_regulators[i].vselctrl_mask) {
-+				mt6323_regulators[i].desc.vsel_reg =
-+				mt6323_regulators[i].vselon_reg;
-+			}
-+		}
-+	}
-+
-+	return 0;
-+}
-+
-+static int mt6323_regulator_probe(struct platform_device *pdev)
-+{
-+	struct mt6397_chip *mt6323 = dev_get_drvdata(pdev->dev.parent);
-+	struct regulator_config config = {};
-+	struct regulator_dev *rdev;
-+	int i;
-+	u32 reg_value;
-+
-+	/* Query buck controller to select activated voltage register part */
-+	if (mt6323_set_buck_vosel_reg(pdev))
-+		return -EIO;
-+
-+	/* Read PMIC chip revision to update constraints and voltage table */
-+	if (regmap_read(mt6323->regmap, MT6323_CID, &reg_value) < 0) {
-+		dev_err(&pdev->dev, "Failed to read Chip ID\n");
-+		return -EIO;
-+	}
-+	dev_info(&pdev->dev, "Chip ID = 0x%x\n", reg_value);
-+
-+	for (i = 0; i < MT6323_MAX_REGULATOR; i++) {
-+		config.dev = &pdev->dev;
-+		config.driver_data = &mt6323_regulators[i];
-+		config.regmap = mt6323->regmap;
-+		rdev = devm_regulator_register(&pdev->dev,
-+				&mt6323_regulators[i].desc, &config);
-+		if (IS_ERR(rdev)) {
-+			dev_err(&pdev->dev, "failed to register %s\n",
-+				mt6323_regulators[i].desc.name);
-+			return PTR_ERR(rdev);
-+		}
-+	}
-+	return 0;
-+}
-+
-+static const struct platform_device_id mt6323_platform_ids[] = {
-+	{"mt6323-regulator", 0},
-+	{ /* sentinel */ },
-+};
-+MODULE_DEVICE_TABLE(platform, mt6323_platform_ids);
-+
-+static const struct of_device_id mt6323_of_match[] = {
-+	{ .compatible = "mediatek,mt6323-regulator", },
-+	{ /* sentinel */ },
-+};
-+MODULE_DEVICE_TABLE(of, mt6323_of_match);
-+
-+static struct platform_driver mt6323_regulator_driver = {
-+	.driver = {
-+		.name = "mt6323-regulator",
-+		.of_match_table = of_match_ptr(mt6323_of_match),
-+	},
-+	.probe = mt6323_regulator_probe,
-+	.id_table = mt6323_platform_ids,
-+};
-+
-+module_platform_driver(mt6323_regulator_driver);
-+
-+MODULE_AUTHOR("Chen Zhong <chen.zhong@mediatek.com>");
-+MODULE_DESCRIPTION("Regulator Driver for MediaTek MT6397 PMIC");
-+MODULE_LICENSE("GPL v2");
-diff --git a/include/linux/regulator/mt6323-regulator.h b/include/linux/regulator/mt6323-regulator.h
-new file mode 100644
-index 0000000..67011cd
---- /dev/null
-+++ b/include/linux/regulator/mt6323-regulator.h
-@@ -0,0 +1,52 @@
-+/*
-+ * Copyright (c) 2016 MediaTek Inc.
-+ * Author: Chen Zhong <chen.zhong@mediatek.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef __LINUX_REGULATOR_MT6323_H
-+#define __LINUX_REGULATOR_MT6323_H
-+
-+enum {
-+	MT6323_ID_VPROC = 0,
-+	MT6323_ID_VSYS,
-+	MT6323_ID_VPA,
-+	MT6323_ID_VTCXO,
-+	MT6323_ID_VCN28,
-+	MT6323_ID_VCN33_BT,
-+	MT6323_ID_VCN33_WIFI,
-+	MT6323_ID_VA,
-+	MT6323_ID_VCAMA,
-+	MT6323_ID_VIO28 = 9,
-+	MT6323_ID_VUSB,
-+	MT6323_ID_VMC,
-+	MT6323_ID_VMCH,
-+	MT6323_ID_VEMC3V3,
-+	MT6323_ID_VGP1,
-+	MT6323_ID_VGP2,
-+	MT6323_ID_VGP3,
-+	MT6323_ID_VCN18,
-+	MT6323_ID_VSIM1,
-+	MT6323_ID_VSIM2,
-+	MT6323_ID_VRTC,
-+	MT6323_ID_VCAMAF,
-+	MT6323_ID_VIBR,
-+	MT6323_ID_VRF18,
-+	MT6323_ID_VM,
-+	MT6323_ID_VIO18,
-+	MT6323_ID_VCAMD,
-+	MT6323_ID_VCAMIO,
-+	MT6323_ID_RG_MAX,
-+};
-+
-+#define MT6323_MAX_REGULATOR	MT6323_ID_RG_MAX
-+
-+#endif /* __LINUX_REGULATOR_MT6323_H */
--- 
-1.7.10.4
+>
+> Thanks,
+> Archit
+>
+> --
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> hosted by The Linux Foundation
