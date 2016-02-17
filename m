@@ -1,26 +1,45 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 17 Feb 2016 18:56:07 +0530
-Subject: [PATCH 3/3] ARM: DTS: da850: add DT node for tps6507x-ts
-In-Reply-To: <1454308130-12452-5-git-send-email-sushaanth.s@ti.com>
-References: <1454308130-12452-1-git-send-email-sushaanth.s@ti.com>
- <1454308130-12452-5-git-send-email-sushaanth.s@ti.com>
-Message-ID: <56C474EF.5040006@ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 17 Feb 2016 14:28:46 +0100
+Subject: [PATCH] i.MX SPI DMA cleanup
+Message-ID: <1455715739-25161-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 01 February 2016 11:58 AM, Sushaanth Srirangapathi wrote:
-> add tps6507x touchscreen device tree node information to
-> DA850 EVM
-> 
-> Signed-off-by: Sushaanth Srirangapathi <sushaanth.s@ti.com>
+This picks up a series sent by Anton Bondarenko last year. It
+contains the remaining not yet upstreamed patches from Antons series
+plus some more DMA related cleanup patches.
 
-Acked-by: Sekhar Nori <nsekhar@ti.com>
+My mission was to hunt a bug in the DMA code path sometimes causing
+an additional word in the RX FIFO which locked up the driver in the
+next transfer. It turned out that this was no bug in the driver but
+instead in the device tree: We used the wrong SDMA script for i.MX6.
+The ECSPI cores are connected through the SPBA, so according to the
+reference manual we need the shp/mcu scripts rather than the app/mcu
+scripts.
 
-I can queue 3/3 once driver changes are accepted (let me know about that
-because I am not copied on this series).
+Shawn, please pick up the last patch. The rest can go through the SPI
+tree. The last patch has no dependency on the remaining patches.
 
-If Dmitry wants to queue the whole series once he has had a look, thats
-fine too. I have nothing that will clash with this.
+Sascha
 
-Regards,
-Sekhar
+----------------------------------------------------------------
+Anton Bondarenko (3):
+      spi: imx: allow only WML aligned transfers to use DMA
+      spi: imx: replace fixed timeout with calculated
+      spi: imx: add support for all SPI word width for DMA
+
+Sascha Hauer (10):
+      spi: imx: use proper dev_* functions for driver messages
+      spi: imx: drop fallback to PIO
+      spi: imx: initialize usedma earlier
+      spi: imx: drop unnecessary read/modify/write
+      spi: imx: drop unncessary dma_is_inited variable
+      spi: imx: remove unnecessary bit clearing in mx51_ecspi_config
+      spi: imx: make some register defines simpler
+      spi: imx: set MX51_ECSPI_CTRL_SMC bit in setup function
+      spi: imx: drop bogus tests for rx/tx bufs in DMA transfer
+      ARM: dts: imx6: Use correct SDMA script for SPI cores
+
+ arch/arm/boot/dts/imx6qdl.dtsi |   8 +-
+ drivers/spi/spi-imx.c          | 350 +++++++++++++++++++++--------------------
+ 2 files changed, 185 insertions(+), 173 deletions(-)
