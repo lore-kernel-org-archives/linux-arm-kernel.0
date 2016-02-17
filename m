@@ -1,50 +1,59 @@
-From: vigneshr@ti.com (R, Vignesh)
-Date: Wed, 17 Feb 2016 21:41:10 +0530
-Subject: [PATCH v5 3/5] mtd: devices: m25p80: add support for mmap read
- request
-In-Reply-To: <20160216123854.GJ18327@sirena.org.uk>
-References: <1449807000-6457-1-git-send-email-vigneshr@ti.com>
- <1449807000-6457-4-git-send-email-vigneshr@ti.com>
- <20160209193616.GN13270@sirena.org.uk> <56BC1D3E.5020203@ti.com>
- <20160212223711.GD18988@sirena.org.uk> <56C2D731.6050306@ti.com>
- <20160216123854.GJ18327@sirena.org.uk>
-Message-ID: <56C49B9E.8060506@ti.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 17 Feb 2016 17:12:40 +0100
+Subject: [GIT PULL] ARM: mvebu: arm64 for v4.6 (#1)
+Message-ID: <878u2js4cn.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+Here is the first pull request for arm64 for mvebu for v4.6. It is even
+the first pull request ever for arm64 for us. Let me know if I am doing
+it wrong.
 
-On 02/16/2016 06:08 PM, Mark Brown wrote:
-> On Tue, Feb 16, 2016 at 01:30:49PM +0530, Vignesh R wrote:
->> On 02/13/2016 04:07 AM, Mark Brown wrote:
->>> On Thu, Feb 11, 2016 at 11:03:50AM +0530, Vignesh R wrote:
->>>> On 02/10/2016 01:06 AM, Mark Brown wrote:
-> 
->>>>> Looking at this I can't help but think that spi_flash_read() ought to
->>>>> have the stub in rather than the caller.  But given that we're pretty
->>>>> much only ever expecting one user I'm not 100% sure it actually matters.
-> 
->>>> Well, my initial patch set passed long list of arguments to
->>>> spi_flash_read(), but Brian suggested to use struct[1] in order to avoid
->>>> unnecessary churn when things need changed in the API.
-> 
->>> I don't see what that has to do with my point?
-> 
->> AFAIU, your previous comment was to move initialization of
->> spi_flash_read_message struct to spi_flash_read(). This would mean
-> 
-> No, not at all.  I'm talking about how we handle the case where we don't
-> have hardware support for this and need to implement it in software -
-> currently that's in a separate place to the place where we call the
-> driver.
-> 
+I split my initial series[1] in two parts: device tree related and non
+device tree related. I will also let the driver maintainers directly
+take the related patch for ATA and serial.
 
-Yeah, but AFAIK, hardware accelerated read support is applicable for
-m25p80 flashes only, I doubt whether spi_flash_read() will be used by
-other types. I felt keeping the software implementation in m25p80_read()
-will be consistent with m25p80_write().
+For this non device tree part I have a dependency with the irchip
+subsystem. For this I based on the irqchip/mvebu immutable branch form
+Jason Cooper located at git://git.infradead.org/users/jcooper/linux.git.
 
+Thanks,
 
--- 
-Regards
-Vignesh
+Gregory
+
+[1]: https://lkml.org/lkml/2016/2/16/735
+
+The following changes since commit 63131b636a0ec969e8b98122c1a928b5a2649d3b:
+
+  irqchip/armada-370-xp: Do not enable it by default when ARCH_MVEBU is selected (2016-02-16 18:11:39 +0000)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-arm64-4.6-1
+
+for you to fetch changes up to e772ca05cceb1480bdc7a7579e042b18558d0959:
+
+  arm64: defconfig: enable Armada 3700 related config (2016-02-17 16:23:20 +0100)
+
+----------------------------------------------------------------
+mvebu arm64 for 4.6 (part 1)
+
+Non dt part of the Armada 3700 support:
+- Kconfig update
+- defconfig update
+- documentation update (including MAINTAINERS:)
+
+----------------------------------------------------------------
+Gregory CLEMENT (4):
+      arm64: add mvebu architecture entry
+      MAINTAINERS: Extend dts entry for ARM64 mvebu files
+      Documentation: arm: update supported Marvell EBU processors
+      arm64: defconfig: enable Armada 3700 related config
+
+ Documentation/arm/Marvell/README | 13 +++++++++++++
+ MAINTAINERS                      |  1 +
+ arch/arm64/Kconfig.platforms     |  6 ++++++
+ arch/arm64/configs/defconfig     |  5 +++++
+ 4 files changed, 25 insertions(+)
