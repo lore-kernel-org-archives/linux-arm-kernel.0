@@ -1,63 +1,104 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 17 Feb 2016 17:33:33 +0000
-Subject: [PATCH 1/2 v3] dt/bindings: Add bindings for Layerscape SCFG MSI
-In-Reply-To: <1454403648-5551-1-git-send-email-Minghuan.Lian@nxp.com>
-References: <1454403648-5551-1-git-send-email-Minghuan.Lian@nxp.com>
-Message-ID: <56C4AEED.4060901@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 17 Feb 2016 09:39:49 -0800
+Subject: [PATCH 2/2] clk: ti: Add support for dm814x ADPLL
+In-Reply-To: <20160217011930.2278.38316@quark.deferred.io>
+References: <1455312009-808-1-git-send-email-tony@atomide.com>
+ <1455312009-808-3-git-send-email-tony@atomide.com>
+ <20160217011930.2278.38316@quark.deferred.io>
+Message-ID: <20160217173949.GB21202@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/02/16 09:00, Minghuan Lian wrote:
-> Some Layerscape SoCs use a simple MSI controller implementation.
-> It contains only two SCFG register to trigger and describe a
-> group 32 MSI interrupts. The patch adds bindings to describe
-> the controller.
+* Michael Turquette <mturquette@baylibre.com> [160216 17:32]:
+> Quoting Tony Lindgren (2016-02-12 13:20:09)
+> > 
+> > - Split the device tree binding into a separate patch as requested
+> >   by Mike for his conditional ack of the binding
 > 
-> Signed-off-by: Minghuan Lian <Minghuan.Lian@nxp.com>
-> ---
->  .../interrupt-controller/fsl,ls-scfg-msi.txt       | 23 ++++++++++++++++++++++
->  1 file changed, 23 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/fsl,ls-scfg-msi.txt
+> Just to make life fun for you, the clk tree is once more merging DT
+> bindings descriptions and headers. You don't need to merge the patches,
+> it doesn't matter to me, but just as a heads up for the future.
+
+OK :)
+
+> > --- /dev/null
+> > +++ b/drivers/clk/ti/Kconfig
+> > @@ -0,0 +1,6 @@
+> > +config COMMON_CLK_TI_ADPLL
+> > +       tristate "Clock driver for dm814x ADPLL"
+> > +       depends on ARCH_OMAP2PLUS
+> > +       default y if SOC_TI81XX
 > 
-> diff --git a/Documentation/devicetree/bindings/interrupt-controller/fsl,ls-scfg-msi.txt b/Documentation/devicetree/bindings/interrupt-controller/fsl,ls-scfg-msi.txt
-> new file mode 100644
-> index 0000000..0c41151
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/interrupt-controller/fsl,ls-scfg-msi.txt
-> @@ -0,0 +1,23 @@
-> +* Freescale Layerscape SCFG PCIe MSI controller
-> +
-> +Required properties:
-> +
-> +- compatible: should be "fsl,<soc-name>-msi" to identify
-> +	      Layerscape PCIe MSI controller block such as:
-> +              "fsl,1s1021a-msi"
-> +              "fsl,1s1043a-msi"
-> +- msi-controller: indicates that this is a PCIe MSI controller node
-> +- reg: physical base address of the controller and length of memory mapped.
-> +- interrupts: A interrupt of the controller.
+> Can we add COMPILE_TEST here?
 
-This is an interrupt *to* the the parent interrupt controller.
+Good idea, will add.
 
-> +
-> +Each PCIe node needs to have property msi-parent that points to
-> +MSI controller node
-> +
-> +Examples:
-> +
-> +	msi1: msi-controller at 1571000 {
-> +		compatible = "fsl,1s1043a-msi";
-> +		reg = <0x0 0x1571000 0x0 0x8>,
-> +		msi-controller;
-> +		interrupts = <0 116 0x4>;
-> +	};
+> > +static int ti_adpll_init_inputs(struct ti_adpll_data *d)
+> > +{
+> > +       const char *error = "need at least %i inputs";
+> > +       struct clk *clock;
+> > +       int nr_inputs;
+> > +
+> > +       nr_inputs = of_clk_get_parent_count(d->np);
+> > +       if (nr_inputs < d->c->nr_max_inputs) {
+> > +               dev_err(d->dev, error, nr_inputs);
+> > +               return -EINVAL;
+> > +       }
+> > +       of_clk_parent_fill(d->np, d->parent_names, nr_inputs);
+> > +
+> > +       clock = devm_clk_get(d->dev, d->parent_names[0]);
+> > +       if (IS_ERR(clock)) {
+> > +               dev_err(d->dev, "could not get clkinp\n");
+> > +               return PTR_ERR(clock);
+> > +       }
+> > +       d->parent_clocks[TI_ADPLL_CLKINP] = clock;
+> > +
+> > +       clock = devm_clk_get(d->dev, d->parent_names[1]);
+> > +       if (IS_ERR(clock)) {
+> > +               dev_err(d->dev, "could not get clkinpulow clock\n");
+> > +               return PTR_ERR(clock);
+> > +       }
+> > +       d->parent_clocks[TI_ADPLL_CLKINPULOW] = clock;
 > 
+> Are the clock parents known at compile-time? Can we just put that data
+> in C instead of whatever is going on here?
 
-Please document the need for an interrupt-parent property. Your example
-assumes that there is a default one...
+No they can be board specific depending how the inputs for
+clkin, clkinpulow and clkinphif are wired.
 
-Thanks,
+> ...
+> > +int __init dm814x_adpll_enable_init_clocks(void)
+> > +{
+> > +       int i, err;
+> > +
+> > +       if (!timer_clocks_initialized)
+> > +               return -ENODEV;
+> > +
+> > +       for (i = 0; i < ARRAY_SIZE(init_clocks); i++) {
+> > +               struct clk *clock;
+> > +
+> > +               clock = clk_get(NULL, init_clocks[i]);
+> > +               if (WARN(IS_ERR(clock), "could not find init clock %s\n",
+> > +                        init_clocks[i]))
+> > +                       continue;
+> > +               err = clk_prepare_enable(clock);
+> > +               if (WARN(err, "could not enable init clock %s\n",
+> > +                        init_clocks[i]))
+> > +                       continue;
+> 
+> We have a shiny new series that provides a standard way to do this:
+> 
+> http://lkml.kernel.org/r/<1455225554-13267-1-git-send-email-mturquette@baylibre.com>
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+OK nice, so tagging the MPU and DDR clocks with CLK_IS_CRITICAL or
+"clock-critical" should allow removing this code. I think in this
+case I still need to set CLK_IS_CRITICAL as the clock is output 1
+of the dts defined clock and does not have a separate dts node.
+
+I can update when those patches hit Linux next, or I can do a
+follow-up patch later on if we want to avoid the dependency
+here. Which do you prefer?
+
+Regards,
+
+Tony
