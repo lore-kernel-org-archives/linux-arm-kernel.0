@@ -1,49 +1,53 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 17 Feb 2016 08:06:14 +0100
-Subject: [PATCH] ARM64: dma-mapping: fix handling of devices registered
- before arch_initcall
-In-Reply-To: <56C37317.9020104@arm.com>
-References: <1455632084-14666-1-git-send-email-m.szyprowski@samsung.com>
- <56C37317.9020104@arm.com>
-Message-ID: <56C41BE6.5000203@samsung.com>
+From: jay.xu@rock-chips.com (Jianqun Xu)
+Date: Wed, 17 Feb 2016 15:23:14 +0800
+Subject: [PATCH 4/6] pinctrl: rockchip: add bindings for rk3399 pinctrl
+In-Reply-To: <19942952.P4nUQKPo3g@phil>
+References: <1455673992-16469-1-git-send-email-jay.xu@rock-chips.com>
+ <1455673992-16469-5-git-send-email-jay.xu@rock-chips.com>
+ <19942952.P4nUQKPo3g@phil>
+Message-ID: <56C41FE2.8020800@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
 
-On 2016-02-16 20:05, Robin Murphy wrote:
-> On 16/02/16 14:14, Marek Szyprowski wrote:
->> This patch ensures that devices, which got registered before 
->> arch_initcall
->> will be handled correctly by IOMMU-based DMA-mapping code.
->>
->> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->> ---
->>   arch/arm64/mm/dma-mapping.c | 4 ++++
->>   1 file changed, 4 insertions(+)
->>
->> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
->> index 573b1e6..ce6019f 100644
->> --- a/arch/arm64/mm/dma-mapping.c
->> +++ b/arch/arm64/mm/dma-mapping.c
->> @@ -928,6 +928,10 @@ static int __init __iommu_dma_init(void)
->>           ret = register_iommu_dma_ops_notifier(&platform_bus_type);
->>       if (!ret)
->>           ret = register_iommu_dma_ops_notifier(&amba_bustype);
->> +
->> +    /* handle devices queued before this arch_initcall */
->> +    if (!ret)
->> +        __iommu_attach_notifier(NULL, BUS_NOTIFY_ADD_DEVICE, NULL);
+
+? 17/02/2016 14:47, Heiko Stuebner ??:
+> Hi Jianqun,
 >
-> Hmm, surely unless *all* the devices on the relevant buses are created 
-> before arch_initcall level, then the next one is going to kick off the 
-> notifier to walk the whole list anyway. Have you seen this being a 
-> problem in practice?
-
-Yes, I've observed such situation, that's why I've posted this patch. I was
-really surprised that this code doesn't handle all cases.
-
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+> Am Mittwoch, 17. Februar 2016, 09:53:10 schrieb jianqun.xu:
+>> From: Xu Jianqun <jay.xu@rock-chips.com>
+>>
+>> Add devicetree bindings for pinctrl found on rk3399
+>> processors from rockchip.
+>>
+>> Signed-off-by: Xu Jianqun <jay.xu@rock-chips.com>
+>> ---
+>>   Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt | 2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git
+>> a/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
+>> b/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt index
+>> 0cd701b..c68b955 100644
+>> --- a/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
+>> +++ b/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
+>> @@ -22,7 +22,7 @@ Required properties for iomux controller:
+>>     - compatible: one of "rockchip,rk2928-pinctrl",
+>> "rockchip,rk3066a-pinctrl" "rockchip,rk3066b-pinctrl",
+>> "rockchip,rk3188-pinctrl"
+>>   		       "rockchip,rk3228-pinctrl", "rockchip,rk3288-pinctrl"
+>> -		       "rockchip,rk3368-pinctrl"
+>> +		       "rockchip,rk3368-pinctrl", "rockchip,rk3399-pinctrl"
+>>     - rockchip,grf: phandle referencing a syscon providing the
+>>   	 "general register files"
+>
+> that is already contained in David's core pinctrl patch that already got
+> applied to the pinctrl tree.
+>
+Sorry very much, I forgot it after a long time of spring holiday
+thanks
+>
+> Heiko
+>
+>
+>
