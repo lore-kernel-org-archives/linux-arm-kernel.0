@@ -1,76 +1,43 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 17 Feb 2016 16:40:36 +0000
-Subject: [PATCH v2 04/17] ARM: KVM: Rename struct coproc_reg::is_64 to is_64bit
+Date: Wed, 17 Feb 2016 16:40:47 +0000
+Subject: [PATCH v2 15/17] arm64: KVM: vgic-v3: Do not save an LR known to be
+ empty
 In-Reply-To: <1455727249-24752-1-git-send-email-marc.zyngier@arm.com>
 References: <1455727249-24752-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1455727249-24752-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1455727249-24752-16-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we're going to play some tricks on the struct coproc_reg,
-make sure its 64bit indicator field matches that of coproc_params.
+On exit, any empty LR will be signaled in ICH_ELRSR_EL2. Which
+means that we do not have to save it, and we can just clear
+its state in the in-memory copy.
 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kvm/coproc.c | 4 ++--
- arch/arm/kvm/coproc.h | 8 ++++----
- 2 files changed, 6 insertions(+), 6 deletions(-)
+ arch/arm64/kvm/hyp/vgic-v3-sr.c | 11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
-index 03f5d14..2a67f00 100644
---- a/arch/arm/kvm/coproc.c
-+++ b/arch/arm/kvm/coproc.c
-@@ -423,7 +423,7 @@ static const struct coproc_reg *find_reg(const struct coproc_params *params,
- 	for (i = 0; i < num; i++) {
- 		const struct coproc_reg *r = &table[i];
+diff --git a/arch/arm64/kvm/hyp/vgic-v3-sr.c b/arch/arm64/kvm/hyp/vgic-v3-sr.c
+index 3463c0a..ff67296 100644
+--- a/arch/arm64/kvm/hyp/vgic-v3-sr.c
++++ b/arch/arm64/kvm/hyp/vgic-v3-sr.c
+@@ -190,8 +190,15 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
+ 		save_maint_int_state(vcpu, max_lr_idx + 1);
  
--		if (params->is_64bit != r->is_64)
-+		if (params->is_64bit != r->is_64bit)
- 			continue;
- 		if (params->CRn != r->CRn)
- 			continue;
-@@ -1105,7 +1105,7 @@ static int write_demux_regids(u64 __user *uindices)
- static u64 cp15_to_index(const struct coproc_reg *reg)
- {
- 	u64 val = KVM_REG_ARM | (15 << KVM_REG_ARM_COPROC_SHIFT);
--	if (reg->is_64) {
-+	if (reg->is_64bit) {
- 		val |= KVM_REG_SIZE_U64;
- 		val |= (reg->Op1 << KVM_REG_ARM_OPC1_SHIFT);
- 		/*
-diff --git a/arch/arm/kvm/coproc.h b/arch/arm/kvm/coproc.h
-index 88d24a3..5acd097 100644
---- a/arch/arm/kvm/coproc.h
-+++ b/arch/arm/kvm/coproc.h
-@@ -37,7 +37,7 @@ struct coproc_reg {
- 	unsigned long Op1;
- 	unsigned long Op2;
+ 		for (i = 0; i <= max_lr_idx; i++) {
+-			if (vcpu->arch.vgic_cpu.live_lrs & (1UL << i))
+-				cpu_if->vgic_lr[i] = __gic_v3_get_lr(i);
++			if (!(vcpu->arch.vgic_cpu.live_lrs & (1UL << i)))
++				continue;
++
++			if (cpu_if->vgic_elrsr & (1 << i)) {
++				cpu_if->vgic_lr[i] &= ~ICH_LR_STATE;
++				continue;
++			}
++
++			cpu_if->vgic_lr[i] = __gic_v3_get_lr(i);
+ 		}
  
--	bool is_64;
-+	bool is_64bit;
- 
- 	/* Trapped access from guest, if non-NULL. */
- 	bool (*access)(struct kvm_vcpu *,
-@@ -141,7 +141,7 @@ static inline int cmp_reg(const struct coproc_reg *i1,
- 		return i1->Op1 - i2->Op1;
- 	if (i1->Op2 != i2->Op2)
- 		return i1->Op2 - i2->Op2;
--	return i2->is_64 - i1->is_64;
-+	return i2->is_64bit - i1->is_64bit;
- }
- 
- 
-@@ -150,8 +150,8 @@ static inline int cmp_reg(const struct coproc_reg *i1,
- #define CRm64(_x)       .CRn = _x, .CRm = 0
- #define Op1(_x) 	.Op1 = _x
- #define Op2(_x) 	.Op2 = _x
--#define is64		.is_64 = true
--#define is32		.is_64 = false
-+#define is64		.is_64bit = true
-+#define is32		.is_64bit = false
- 
- bool access_vm_reg(struct kvm_vcpu *vcpu,
- 		   const struct coproc_params *p,
+ 		switch (nr_pri_bits) {
 -- 
 2.1.4
