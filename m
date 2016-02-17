@@ -1,283 +1,83 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed, 17 Feb 2016 15:22:39 +0000
-Subject: [PATCH v2 7/8] arm64: dts: add Pine64 support
-In-Reply-To: <1455709440-8668-8-git-send-email-andre.przywara@arm.com>
-References: <1455709440-8668-1-git-send-email-andre.przywara@arm.com>
- <1455709440-8668-8-git-send-email-andre.przywara@arm.com>
-Message-ID: <56C4903F.7050509@arm.com>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Wed, 17 Feb 2016 16:33:47 +0100
+Subject: [PATCH] i.MX SPI DMA cleanup
+In-Reply-To: <20160217145944.GB3939@pengutronix.de>
+References: <1455715739-25161-1-git-send-email-s.hauer@pengutronix.de>
+ <56C478C9.6050706@de.bosch.com> <20160217135441.GA3939@pengutronix.de>
+ <56C47F64.1080706@de.bosch.com> <20160217145944.GB3939@pengutronix.de>
+Message-ID: <56C492DB.6000405@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Again the changelog was missing:
+On 17.02.2016 15:59, Sascha Hauer wrote:
+> On Wed, Feb 17, 2016 at 03:10:44PM +0100, Dirk Behme wrote:
+>> On 17.02.2016 14:54, Sascha Hauer wrote:
+>>> Hi Dirk,
+>>>
+>>> On Wed, Feb 17, 2016 at 02:42:33PM +0100, Dirk Behme wrote:
+>>>> Hi Sascha,
+>>>>
+>>>> On 17.02.2016 14:28, Sascha Hauer wrote:
+>>>>> This picks up a series sent by Anton Bondarenko last year. It
+>>>>> contains the remaining not yet upstreamed patches from Antons series
+>>>>> plus some more DMA related cleanup patches.
+>>>>>
+>>>>> My mission was to hunt a bug in the DMA code path sometimes causing
+>>>>> an additional word in the RX FIFO which locked up the driver in the
+>>>>> next transfer. It turned out that this was no bug in the driver but
+>>>>> instead in the device tree: We used the wrong SDMA script for i.MX6.
+>>>>> The ECSPI cores are connected through the SPBA, so according to the
+>>>>> reference manual we need the shp/mcu scripts rather than the app/mcu
+>>>>> scripts.
+>>>>
+>>>>
+>>>> Are you talking about what is known as "TKT238285 hardware issue"
+>>>>
+>>>> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/drivers/spi/spi-imx.c?id=a02bb401f8ae264be782ee57d98bdd99f14c8022
+>>>
+>>> I am aware of this issue, but I have no idea if this is the same or
+>>> another issue. It says:
+>>>
+>>>> For TKT238285 hardware issue which may cause txfifo store data twice can only
+>>>> be caught on i.mx6dl, we use pio mode instead of DMA mode on i.mx6dl.
+>>>
+>>> What I saw here is that there was one word more than expected in the RX
+>>> FIFO. Since both RX and TX FIFO act synchronously it could be that the
+>>> additional word in the RX FIFO was caused by an additional word in the
+>>> TX FIFO as described above.
+>>
+>>
+>> The question behind all this is if we could drop
+>>
+>> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/drivers/spi/spi-imx.c?id=a02bb401f8ae264be782ee57d98bdd99f14c8022
+>>
+>> ?
+>
+> It seems on the i.MX6DL we (additionally) have another issue. I just
+> tested here on a i.MX6DL board with a NOR Flash connected. I saw the
+> same issue as I saw on the i.MX6Q, but on the i.MX6DL it cannot be fixed
+> by using the shp/mcu SDMA scripts.
 
-On 17/02/16 11:43, Andre Przywara wrote:
-> The Pine64 is a cost-efficient development board based on the
-> Allwinner A64 SoC.
-> There are three models: the basic version with Fast Ethernet and
-> 512 MB of DRAM (Pine64) and two Pine64+ versions, which both
-> feature Gigabit Ethernet and additional connectors for touchscreens
-> and a camera. Or as my son put it: "Those are smaller and these are
-> missing." ;-)
-> The two Pine64+ models just differ in the amount of DRAM
-> (1GB vs. 2GB). Since U-Boot will figure out the right size for us and
-> patches the DT accordingly we just need to provide one DT for the
-> Pine64+.
 
-Changelog v1 .. v2:
-- move aliases node into the common board DT file
-- move fixed MMC regulator into the common board DT file
-- drop UARTs 1-4 nodes from the default DT
-- add I2C node (pins seem to be dedicated to I2C)
+To my understanding this might depend on the SDMA firmware itself, as in
 
-Cheers,
-Andre.
+http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git/commit/?h=imx_3.14.38_6qp_ga&id=321beb210ffb382b8b5378cbf4467f8986efd52f
 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  arch/arm64/boot/dts/Makefile                       |  1 +
->  arch/arm64/boot/dts/allwinner/Makefile             |  5 ++
->  .../dts/allwinner/sun50i-a64-pine64-common.dtsi    | 80 ++++++++++++++++++++++
->  .../boot/dts/allwinner/sun50i-a64-pine64-plus.dts  | 59 ++++++++++++++++
->  .../arm64/boot/dts/allwinner/sun50i-a64-pine64.dts | 58 ++++++++++++++++
->  5 files changed, 203 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/allwinner/Makefile
->  create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-common.dtsi
->  create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts
->  create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-> 
-> diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
-> index f832b8a..3b7428a 100644
-> --- a/arch/arm64/boot/dts/Makefile
-> +++ b/arch/arm64/boot/dts/Makefile
-> @@ -1,3 +1,4 @@
-> +dts-dirs += allwinner
->  dts-dirs += altera
->  dts-dirs += amd
->  dts-dirs += apm
-> diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
-> new file mode 100644
-> index 0000000..1e29a5a
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/allwinner/Makefile
-> @@ -0,0 +1,5 @@
-> +dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
-> +
-> +always		:= $(dtb-y)
-> +subdir-y	:= $(dts-dirs)
-> +clean-files	:= *.dtb
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-common.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-common.dtsi
-> new file mode 100644
-> index 0000000..d5a7249
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-common.dtsi
-> @@ -0,0 +1,80 @@
-> +/*
-> + * Copyright (c) 2016 ARM Ltd.
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This library is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This library is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +#include "sun50i-a64.dtsi"
-> +
-> +/ {
-> +
-> +	aliases {
-> +		serial0 = &uart0;
-> +	};
-> +
-> +	soc {
-> +		reg_vcc3v3: vcc3v3 {
-> +			compatible = "regulator-fixed";
-> +			regulator-name = "vcc3v3";
-> +			regulator-min-microvolt = <3300000>;
-> +			regulator-max-microvolt = <3300000>;
-> +		};
-> +	};
-> +};
-> +
-> +&mmc0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&mmc0_pins>, <&mmc0_default_cd_pin>;
-> +	vmmc-supply = <&reg_vcc3v3>;
-> +	cd-gpios = <&pio 5 6 0>;
-> +	cd-inverted;
-> +	status = "okay";
-> +};
-> +
-> +&uart0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&uart0_pins_a>;
-> +	status = "okay";
-> +};
-> +
-> +&i2c1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&i2c1_pins>;
-> +	status = "okay";
-> +};
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts
-> new file mode 100644
-> index 0000000..549dc15
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts
-> @@ -0,0 +1,59 @@
-> +/*
-> + * Copyright (c) 2016 ARM Ltd.
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This library is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This library is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "sun50i-a64-pine64-common.dtsi"
-> +
-> +/ {
-> +	model = "Pine64+";
-> +	compatible = "pine64,pine64-plus", "allwinner,sun50i-a64";
-> +
-> +	chosen {
-> +		stdout-path = "serial0:115200n8";
-> +	};
-> +
-> +	/* There is a model with 2GB of DRAM, but U-Boot fixes this for us. */
-> +	memory {
-> +		reg = <0x40000000 0x40000000>;
-> +	};
-> +};
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-> new file mode 100644
-> index 0000000..ebe029e
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-> @@ -0,0 +1,58 @@
-> +/*
-> + * Copyright (c) 2016 ARM Ltd.
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This library is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This library is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "sun50i-a64-pine64-common.dtsi"
-> +
-> +/ {
-> +	model = "Pine64";
-> +	compatible = "pine64,pine64", "allwinner,sun50i-a64";
-> +
-> +	chosen {
-> +		stdout-path = "serial0:115200n8";
-> +	};
-> +
-> +	memory {
-> +		reg = <0x40000000 0x20000000>;
-> +	};
-> +};
-> 
+Freescale patches/changes the firmware, too.
+
+
+> Funny enough on the i.MX6DL the RXFIFO issue happens much more
+> frequently than on the i.MX6Q.
+
+
+To my understanding, the TKT238285 hardware issue exists on both i.MX6Q 
+and i.MX6DL. Even though the commit message in
+
+https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/drivers/spi/spi-imx.c?id=a02bb401f8ae264be782ee57d98bdd99f14c802
+
+states it differently. Maybe due to timing issues it happens less often 
+on i.MX6Q and therefore wasn't in the focus there, yet.
+
+Best regards
+
+Dirk
