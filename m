@@ -1,51 +1,57 @@
-From: raveendra.padasalagi@broadcom.com (Raveendra Padasalagi)
-Date: Wed, 17 Feb 2016 15:13:46 +0530
-Subject: [PATCH v2 3/3] ARM: dts: use syscon in cygnus touchscreen dt node
-In-Reply-To: <1455702226-20599-1-git-send-email-raveendra.padasalagi@broadcom.com>
-References: <1455702226-20599-1-git-send-email-raveendra.padasalagi@broadcom.com>
-Message-ID: <1455702226-20599-4-git-send-email-raveendra.padasalagi@broadcom.com>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Wed, 17 Feb 2016 10:45:10 +0100
+Subject: [PATCH v3 0/2] Consolidate redundant register/stack access code
+In-Reply-To: <56BA5226.3090105@linaro.org>
+References: <1454996337-7935-1-git-send-email-dave.long@linaro.org>
+ <1455010600.13384.3.camel@ellerman.id.au>
+ <20160209094526.GB25268@gmail.com> <56BA5226.3090105@linaro.org>
+Message-ID: <20160217094510.GA27144@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In Cygnus SOC touch screen controller registers are shared
-with ADC and flex timer. Using readl/writel could lead to
-race condition. So in such case register access is handled
-through syscon framework API's in the touch screen driver.
-This feature is enabled if "brcm,iproc-touchscreen-syscon"
-compatible string is selected in touchscreen dt node.
 
-So this patch enables syscon support in touchscreen driver
-by adding necessary properties in touchscreen dt node.
+* David Long <dave.long@linaro.org> wrote:
 
-Signed-off-by: Raveendra Padasalagi <raveendra.padasalagi@broadcom.com>
-Reviewed-by: Ray Jui <ray.jui@broadcom.com>
-Reviewed-by: Scott Branden <scott.branden@broadcom.com>
----
- arch/arm/boot/dts/bcm-cygnus.dtsi | 11 +++++++++--
- 1 file changed, 9 insertions(+), 2 deletions(-)
+> On 02/09/2016 04:45 AM, Ingo Molnar wrote:
+> >
+> >* Michael Ellerman <mpe@ellerman.id.au> wrote:
+> >
+> >>On Tue, 2016-02-09 at 00:38 -0500, David Long wrote:
+> >>
+> >>>From: "David A. Long" <dave.long@linaro.org>
+> >>>
+> >>>Move duplicate and functionally equivalent code for accessing registers
+> >>>and stack (CONFIG_HAVE_REGS_AND_STACK_ACCESS_API) from arch subdirs into
+> >>>common kernel files.
+> >>>
+> >>>I'm sending this out again (with updated distribution list) because v2
+> >>>just never got pulled in, even though I don't think there were any
+> >>>outstanding issues.
+> >>
+> >>A big cross arch patch like this would often get taken by Andrew Morton, but
+> >>AFAICS you didn't CC him - so I just added him, perhaps he'll pick it up for
+> >>us :D
+> >
+> >The other problem is that the second patch is commingling changes to 6 separate
+> >architectures:
+> >
+> >  16 files changed, 106 insertions(+), 343 deletions(-)
+> >
+> >that should probably be 6 separate patches. Easier to review, easier to bisect to,
+> >easier to revert, etc.
+> >
+> >Thanks,
+> >
+> >	Ingo
+> >
+> 
+> I see your point but I'm not sure it could have been broken into separate 
+> successive patches that would each build for all architectures.
 
-diff --git a/arch/arm/boot/dts/bcm-cygnus.dtsi b/arch/arm/boot/dts/bcm-cygnus.dtsi
-index 3878793..79678c1 100644
---- a/arch/arm/boot/dts/bcm-cygnus.dtsi
-+++ b/arch/arm/boot/dts/bcm-cygnus.dtsi
-@@ -351,9 +351,16 @@
- 					<&pinctrl 142 10 1>;
- 		};
- 
-+		ts_adc_syscon: ts_adc_syscon at 0x180a6000 {
-+			compatible = "syscon";
-+			reg = <0x180a6000 0xc30>;
-+		};
-+
- 		touchscreen: tsc at 180a6000 {
--			compatible = "brcm,iproc-touchscreen";
--			reg = <0x180a6000 0x40>;
-+			compatible = "brcm,iproc-touchscreen-syscon";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ts_syscon = <&ts_adc_syscon>;
- 			clocks = <&asiu_clks BCM_CYGNUS_ASIU_ADC_CLK>;
- 			clock-names = "tsc_clk";
- 			interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>;
--- 
-1.9.1
+Why? AFAICS all the functionality appears to be conditional on 
+CONFIG_HAVE_REGS_AND_STACK_ACCESS_API, so it ought to build standalone as well, on 
+a per arch basis, as long as the core kernel patch is applied first.
+
+Thanks,
+
+	Ingo
