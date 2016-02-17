@@ -1,49 +1,53 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Wed, 17 Feb 2016 11:09:46 +0200
-Subject: [PATCH 11/11] ARM: versatile: move CLCD configuration to device
- tree
-In-Reply-To: <1454594660-7532-12-git-send-email-linus.walleij@linaro.org>
+Date: Wed, 17 Feb 2016 11:11:18 +0200
+Subject: [PATCH 07/11] Documentation/DT: add Versatile display bindings
+In-Reply-To: <1454594660-7532-8-git-send-email-linus.walleij@linaro.org>
 References: <1454594660-7532-1-git-send-email-linus.walleij@linaro.org>
- <1454594660-7532-12-git-send-email-linus.walleij@linaro.org>
-Message-ID: <56C438DA.5040109@ti.com>
+ <1454594660-7532-8-git-send-email-linus.walleij@linaro.org>
+Message-ID: <56C43936.2060808@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+
+
 On 04/02/16 16:04, Linus Walleij wrote:
-> This moves the versatile CLCD configuration to the device tree by:
+> This adds bindings for the LCD displays that can be found connected
+> to the ARM Versatile reference design, interface boards IB1 and
+> IB2.
 > 
-> - Deleting the board file set-up of CLCD displays and quirks,
->   instead relying on the driver to handle this. The driver will
->   attempt to auto-detect (like the board file did) and match to
->   a corresponding panel in the device tree.
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Rob Herring <robh@kernel.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  .../devicetree/bindings/display/panel/epson,l2f50113t00.txt        | 7 +++++++
+>  .../devicetree/bindings/display/panel/sanyo,alr252rgt.txt          | 7 +++++++
+>  .../devicetree/bindings/display/panel/sanyo,tm38qv67a02a.txt       | 7 +++++++
+>  .../devicetree/bindings/display/panel/sharp,lq084v1dg21.txt        | 7 +++++++
+>  Documentation/devicetree/bindings/vendor-prefixes.txt              | 1 +
+>  5 files changed, 29 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/display/panel/epson,l2f50113t00.txt
+>  create mode 100644 Documentation/devicetree/bindings/display/panel/sanyo,alr252rgt.txt
+>  create mode 100644 Documentation/devicetree/bindings/display/panel/sanyo,tm38qv67a02a.txt
+>  create mode 100644 Documentation/devicetree/bindings/display/panel/sharp,lq084v1dg21.txt
 > 
-> - Defining all auto-detectable panels in the device tree for the
->   versatile-ab, defaulting the first one to VGA. The right
->   panel will be selected at panel initialization, and should
->   just work for the IB1 daughterboard panels, like EPSON.
-> 
-> - Creating a special superset DTS file for the IB2 daughterboard
->   (phone form-factor) equipped Versatile, overriding the default VGA
->   display with the Sanyo 2.5" portrait display definitions, so that
->   the IB2-equipped Versatile can be used with this. This follows
->   the pattern of how we define the Versatile PB as a superset of
->   Versatile AB.
-> 
-> Tested on Versatile AB with just VGA with the default device tree,
-> and with the IB2 daughterboard with the custom IB2 device tree.
-> Tested to shunt in XVGA by modifying the device tree and this works
-> too. Also tested on QEMU for Versatile in both VGA and Sanyo 2.5"
-> mode. I don't have the IB1 daughterboard and its add-on displays,
-> but it should work as long as the detection mechanism and device
-> tree parameters are sound.
+> diff --git a/Documentation/devicetree/bindings/display/panel/epson,l2f50113t00.txt b/Documentation/devicetree/bindings/display/panel/epson,l2f50113t00.txt
+> new file mode 100644
+> index 000000000000..58eca804dbe8
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/display/panel/epson,l2f50113t00.txt
+> @@ -0,0 +1,7 @@
+> +Epson Mobile display
+> +
+> +Required properties:
+> +- compatible: should be "epson,l2f50113t00"
+> +
+> +This binding is compatible with the panel-dpi binding, which is specified
+> +in panel-dpi.txt in this directory.
 
-Well... I don't like this very much. The .dts should contain
-descriptions for hardware that is connected. Have you looked at DT
-overlays? I think they would be a much better match for this.
-
-What's the SYS_CLCD register? An EEPROM or such, programmed when the
-board is manufactured? Is the panel meant to be switchable by the user,
-possibly to a panel that's not "standard"?
+Do we really want to add new binding doc files for all panels, even if
+they just point to a more generic binding? We may end up with quite a
+lot of these, each only saying "look at the panel-dpi.txt".
 
  Tomi
 
@@ -53,4 +57,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160217/1978c9c1/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160217/39cfbc9c/attachment-0001.sig>
