@@ -1,84 +1,41 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Tue, 16 Feb 2016 18:00:36 -0600
-Subject: [PATCH v2] irqchip/gicv3-its: Avoid cache flush beyond ITS_BASERn
- memory size
-Message-ID: <1455667236-14913-1-git-send-email-shankerd@codeaurora.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 17 Feb 2016 09:00:36 +0900
+Subject: [PATCH] regulator: s5m8767: fix get_register() error handling
+In-Reply-To: <1455634402-1997203-1-git-send-email-arnd@arndb.de>
+References: <1455634402-1997203-1-git-send-email-arnd@arndb.de>
+Message-ID: <56C3B824.9010808@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Function its_alloc_tables() maintains two local variables, "order" and
-and "alloc_size", to hold memory size that has been allocated to
-ITS_BASEn. We don't always refresh the variable alloc_size whenever
-value of the variable order changes, causing the following two
-problems.
+On 16.02.2016 23:53, Arnd Bergmann wrote:
+> The s5m8767_pmic_probe() function calls s5m8767_get_register() to
+> read data without checking the return code, which produces a compile-time
+> warning when that data is accessed:
+> 
+> drivers/regulator/s5m8767.c: In function 's5m8767_pmic_probe':
+> drivers/regulator/s5m8767.c:924:7: error: 'enable_reg' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+> drivers/regulator/s5m8767.c:944:30: error: 'enable_val' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+> 
+> This changes the s5m8767_get_register() function to return a -EINVAL
+> not just for an invalid register number but also for an invalid
+> regulator number, as both would result in returning uninitialized
+> data. The s5m8767_pmic_probe() function is then changed accordingly
+> to fail on a read error, as all the other callers of s5m8767_get_register()
+> already do.
+> 
+> In practice this probably cannot happen, as we don't call
+> s5m8767_get_register() with invalid arguments, but the gcc
+> warning seems valid in principle, in terms writing safe
+> error checking.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 9c4c60554acf ("regulator: s5m8767: Convert to use regulator_[enable|disable|is_enabled]_regmap")
+> ---
+>  drivers/regulator/s5m8767.c | 13 +++++++++----
+>  1 file changed, 9 insertions(+), 4 deletions(-)
+> 
 
-  - Cache flush operation with size more than required.
-  - Information reported by pr_info is not correct.
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-Use a helper macro that converts page order to size in bytes instead of
-variable "alloc_size" to fix both the problems.
-
-Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
----
-[v1] -> [v2]:
-   Change the macro name from PAGE_ORDER_TO_BYTES to PAGE_ORDER_TO_SIZE.
-   Keep function __flush_dcache_area() arguments on the same line.
-
- drivers/irqchip/irq-gic-v3-its.c | 11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 0a73632..cd07556 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -78,6 +78,9 @@ struct its_node {
- 
- #define ITS_ITT_ALIGN		SZ_256
- 
-+/* Convert page order to size in bytes */
-+#define PAGE_ORDER_TO_SIZE(o)	(PAGE_SIZE << (o))
-+
- struct event_lpi_map {
- 	unsigned long		*lpi_map;
- 	u16			*col_map;
-@@ -846,7 +849,6 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
- 		u64 type = GITS_BASER_TYPE(val);
- 		u64 entry_size = GITS_BASER_ENTRY_SIZE(val);
- 		int order = get_order(psz);
--		int alloc_size;
- 		int alloc_pages;
- 		u64 tmp;
- 		void *base;
-@@ -878,9 +880,8 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
- 			}
- 		}
- 
--		alloc_size = (1 << order) * PAGE_SIZE;
- retry_alloc_baser:
--		alloc_pages = (alloc_size / psz);
-+		alloc_pages = (PAGE_ORDER_TO_SIZE(order) / psz);
- 		if (alloc_pages > GITS_BASER_PAGES_MAX) {
- 			alloc_pages = GITS_BASER_PAGES_MAX;
- 			order = get_order(GITS_BASER_PAGES_MAX * psz);
-@@ -933,7 +934,7 @@ retry_baser:
- 			shr = tmp & GITS_BASER_SHAREABILITY_MASK;
- 			if (!shr) {
- 				cache = GITS_BASER_nC;
--				__flush_dcache_area(base, alloc_size);
-+				__flush_dcache_area(base, PAGE_ORDER_TO_SIZE(order));
- 			}
- 			goto retry_baser;
- 		}
-@@ -966,7 +967,7 @@ retry_baser:
- 		}
- 
- 		pr_info("ITS: allocated %d %s @%lx (psz %dK, shr %d)\n",
--			(int)(alloc_size / entry_size),
-+			(int)(PAGE_ORDER_TO_SIZE(order) / entry_size),
- 			its_base_type_string[type],
- 			(unsigned long)virt_to_phys(base),
- 			psz / SZ_1K, (int)shr >> GITS_BASER_SHAREABILITY_SHIFT);
--- 
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc. 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, 
-a Linux Foundation Collaborative Project
+Best regards,
+Krzysztof
