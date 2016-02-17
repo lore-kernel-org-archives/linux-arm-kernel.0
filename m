@@ -1,96 +1,68 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Wed, 17 Feb 2016 09:31:31 +0100
-Subject: [PATCH v4 5/8] [Media] vcodec: mediatek: Add Mediatek V4L2 Video
- Encoder Driver
-In-Reply-To: <1455696068.26202.4.camel@mtksdaap41>
-References: <1454585703-42428-1-git-send-email-tiffany.lin@mediatek.com>
- <1454585703-42428-2-git-send-email-tiffany.lin@mediatek.com>
- <1454585703-42428-3-git-send-email-tiffany.lin@mediatek.com>
- <1454585703-42428-4-git-send-email-tiffany.lin@mediatek.com>
- <1454585703-42428-5-git-send-email-tiffany.lin@mediatek.com>
- <1454585703-42428-6-git-send-email-tiffany.lin@mediatek.com>
- <56C1B4AF.1030207@xs4all.nl> <1455604653.19396.68.camel@mtksdaap41>
- <56C2D371.9090805@xs4all.nl> <1455628805.19396.82.camel@mtksdaap41>
- <56C328AF.5030604@cisco.com> <1455696068.26202.4.camel@mtksdaap41>
-Message-ID: <56C42FE3.8000105@xs4all.nl>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 17 Feb 2016 09:32:51 +0100
+Subject: [PATCH v2 2/2] arm64/efi: esrt: add missing call to
+ efi_esrt_init()
+In-Reply-To: <56C385D3.3090308@codeaurora.org>
+References: <1455535953-5056-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1455535953-5056-3-git-send-email-ard.biesheuvel@linaro.org>
+ <56C385D3.3090308@codeaurora.org>
+Message-ID: <CAKv+Gu9YoUujk2mA7wLyiWZ9=v3XTMkDT6vzgOq5a=FtCcHZwQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/17/16 09:01, tiffany lin wrote:
-> On Tue, 2016-02-16 at 14:48 +0100, Hans Verkuil wrote:
->> Hi Tiffany,
+On 16 February 2016 at 21:25, Baicar, Tyler <tbaicar@codeaurora.org> wrote:
+> On 2/15/2016 4:32 AM, Ard Biesheuvel wrote:
 >>
->>>>>>> +int mtk_vcodec_enc_queue_init(void *priv, struct vb2_queue *src_vq,
->>>>>>> +			   struct vb2_queue *dst_vq)
->>>>>>> +{
->>>>>>> +	struct mtk_vcodec_ctx *ctx = priv;
->>>>>>> +	int ret;
->>>>>>> +
->>>>>>> +	src_vq->type		= V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE;
->>>>>>> +	src_vq->io_modes	= VB2_DMABUF | VB2_MMAP | VB2_USERPTR;
->>>>>>
->>>>>> I recomment dropping VB2_USERPTR. That only makes sense for scatter-gather dma,
->>>>>> and you use physically contiguous DMA.
->>>>>>
->>>>> Now our userspace app use VB2_USERPTR. I need to check if we could drop
->>>>> VB2_USERPTR.
->>>>> We use src_vq->mem_ops = &vb2_dma_contig_memops;
->>>>> And there are
->>>>> 	.get_userptr	= vb2_dc_get_userptr,
->>>>> 	.put_userptr	= vb2_dc_put_userptr,
->>>>> I was confused why it only make sense for scatter-gather.
->>>>> Could you kindly explain more?
->>>>
->>>> VB2_USERPTR indicates that the application can use malloc to allocate buffers
->>>> and pass those to the driver. Since malloc uses virtual memory the physical
->>>> memory is scattered all over. And the first page typically does not start at
->>>> the beginning of the page but at a random offset.
->>>>
->>>> To support that the DMA generally has to be able to do scatter-gather.
->>>>
->>>> Now, where things get ugly is that a hack was added to the USERPTR support where
->>>> apps could pass a pointer to physically contiguous memory as a user pointer. This
->>>> was a hack for embedded systems that preallocated a pool of buffers and needed to
->>>> pass those pointers around somehow. So the dma-contig USERPTR support is for that
->>>> 'feature'. If you try to pass a malloc()ed buffer to a dma-contig driver it will
->>>> reject it. One big problem is that this specific hack isn't signaled anywhere, so
->>>> applications have no way of knowing if the USERPTR support is the proper version
->>>> or the hack where physically contiguous memory is expected.
->>>>
->>>> This hack has been replaced with DMABUF which is the proper way of passing buffers
->>>> around.
->>>>
->>>> New dma-contig drivers should not use that old hack anymore. Use dmabuf to pass
->>>> external buffers around.
->>>>
->>>> How do you use it in your app? With malloc()ed buffers? Or with 'special' pointers
->>>> to physically contiguous buffers?
->>>>
->>> Understood now. Thanks for your explanation.
->>> Now our app use malloc()ed buffers and we hook vb2_dma_contig_memops. 
->>> I don't know why that dma-contig driver do not reject it.
->>> I will try to figure it out.
+>> ESRT support is built by default for all architectures that define
+>> CONFIG_EFI. However, this support was not wired up yet for ARM/arm64,
+>> since efi_esrt_init() was never called. So add the missing call.
 >>
->> Is there an iommu involved that turns the scatter-gather list into what looks like
->> contiguous memory for the DMA?
+>> Since efi_esrt_init() uses efi_mem_desc_lookup(), which in turn relies
+>> on efi.memmap having been assigned and populated completetely, add the
+>> missing assignments of efi.memmap and efi.memmap->nr_map.
 >>
-> Yes, We have iommu that could make scatter-gather list looks like
-> contiguous memory.
-> 
->> At the end of vb2_dc_get_userptr() in videobuf2-dma-contig.c there is a check
->> 'if (contig_size < size)' that verifies that the sg DMA is contiguous. This would
->> work if there is an iommu involved (if I understand it correctly).
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>>   drivers/firmware/efi/arm-init.c | 3 +++
+>>   1 file changed, 3 insertions(+)
 >>
-> I see. We saw this error before we add iommu support.
-> 
->> If that's the case, then it's OK to keep VB2_USERPTR because you have real sg
->> support (although not via the DMA engine, but via iommu mappings).
->>
-> Got it. We will keep VB2_USERPTR.
+>> diff --git a/drivers/firmware/efi/arm-init.c
+>> b/drivers/firmware/efi/arm-init.c
+>> index 9e15d571b53c..5c5e799bdb50 100644
+>> --- a/drivers/firmware/efi/arm-init.c
+>> +++ b/drivers/firmware/efi/arm-init.c
+>> @@ -197,10 +197,13 @@ void __init efi_init(void)
+>>         memmap.map_end = memmap.map + params.mmap_size;
+>>         memmap.desc_size = params.desc_size;
+>>         memmap.desc_version = params.desc_ver;
+>> +       memmap.nr_map = params.mmap_size / params.desc_size;
+>> +       efi.memmap = &memmap;
+>>         if (uefi_init() < 0)
+>>                 return;
+>>   +     efi_esrt_init();
+>
+> This call to efi_esrt_init() is failing because efi.flags does not have
+> EFI_MEMMAP set. This flag gets set at the end of reserve_regions(). I tested
+> moving the set_bit() call from reserve_regions() to just before
+> efi_esrt_init() and also tested moving efi_esrt_init() to just after
+> reserve_regions(). Both of these options worked.
 
-Can you add a comment here mentioning that VB2_USERPTR works with dma-contig because
-there is an iommu? That should clarify this.
+Thanks for spotting that. I moved the call around for some reason (I
+don't remember why, exactly), but it indeed belongs after the call to
+reserve_regions()
 
-Regards,
+I will send out a v2
 
-	Hans
+>>
+>>         reserve_regions();
+>>         early_memunmap(memmap.map, params.mmap_size);
+>>         memblock_mark_nomap(params.mmap & PAGE_MASK,
+>
+> Thanks,
+> Tyler
+>
+> --
+> Qualcomm Innovation Center, Inc.
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> a Linux Foundation Collaborative Project
+>
