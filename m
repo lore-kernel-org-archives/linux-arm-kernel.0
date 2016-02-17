@@ -1,53 +1,117 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 17 Feb 2016 10:15:49 +0100
-Subject: [PATCH 0/8] KVM/ARM: Guest Entry/Exit optimizations
-In-Reply-To: <56C38109.3020501@arm.com>
-References: <1454931622-14902-1-git-send-email-marc.zyngier@arm.com>
- <20160210204012.GS5171@cbox> <56C38109.3020501@arm.com>
-Message-ID: <20160217091549.GB6696@cbox>
+From: tiffany.lin@mediatek.com (tiffany lin)
+Date: Wed, 17 Feb 2016 17:23:09 +0800
+Subject: [PATCH v4 5/8] [Media] vcodec: mediatek: Add Mediatek V4L2
+ Video Encoder Driver
+In-Reply-To: <56C42FE3.8000105@xs4all.nl>
+References: <1454585703-42428-1-git-send-email-tiffany.lin@mediatek.com>
+ <1454585703-42428-2-git-send-email-tiffany.lin@mediatek.com>
+ <1454585703-42428-3-git-send-email-tiffany.lin@mediatek.com>
+ <1454585703-42428-4-git-send-email-tiffany.lin@mediatek.com>
+ <1454585703-42428-5-git-send-email-tiffany.lin@mediatek.com>
+ <1454585703-42428-6-git-send-email-tiffany.lin@mediatek.com>
+ <56C1B4AF.1030207@xs4all.nl> <1455604653.19396.68.camel@mtksdaap41>
+ <56C2D371.9090805@xs4all.nl> <1455628805.19396.82.camel@mtksdaap41>
+ <56C328AF.5030604@cisco.com> <1455696068.26202.4.camel@mtksdaap41>
+ <56C42FE3.8000105@xs4all.nl>
+Message-ID: <1455700989.3782.7.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 16, 2016 at 08:05:29PM +0000, Marc Zyngier wrote:
-> On 10/02/16 20:40, Christoffer Dall wrote:
-> > On Mon, Feb 08, 2016 at 11:40:14AM +0000, Marc Zyngier wrote:
-> >> I've recently been looking at our entry/exit costs, and profiling
-> >> figures did show some very low hanging fruits.
+On Wed, 2016-02-17 at 09:31 +0100, Hans Verkuil wrote:
+> On 02/17/16 09:01, tiffany lin wrote:
+> > On Tue, 2016-02-16 at 14:48 +0100, Hans Verkuil wrote:
+> >> Hi Tiffany,
 > >>
-> >> The most obvious cost is that accessing the GIC HW is slow. As in
-> >> "deadly slow", specially when GICv2 is involved. So not hammering the
-> >> HW when there is nothing to write is immediately beneficial, as this
-> >> is the most common cases (whatever people seem to think, interrupts
-> >> are a *rare* event).
+> >>>>>>> +int mtk_vcodec_enc_queue_init(void *priv, struct vb2_queue *src_vq,
+> >>>>>>> +			   struct vb2_queue *dst_vq)
+> >>>>>>> +{
+> >>>>>>> +	struct mtk_vcodec_ctx *ctx = priv;
+> >>>>>>> +	int ret;
+> >>>>>>> +
+> >>>>>>> +	src_vq->type		= V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE;
+> >>>>>>> +	src_vq->io_modes	= VB2_DMABUF | VB2_MMAP | VB2_USERPTR;
+> >>>>>>
+> >>>>>> I recomment dropping VB2_USERPTR. That only makes sense for scatter-gather dma,
+> >>>>>> and you use physically contiguous DMA.
+> >>>>>>
+> >>>>> Now our userspace app use VB2_USERPTR. I need to check if we could drop
+> >>>>> VB2_USERPTR.
+> >>>>> We use src_vq->mem_ops = &vb2_dma_contig_memops;
+> >>>>> And there are
+> >>>>> 	.get_userptr	= vb2_dc_get_userptr,
+> >>>>> 	.put_userptr	= vb2_dc_put_userptr,
+> >>>>> I was confused why it only make sense for scatter-gather.
+> >>>>> Could you kindly explain more?
+> >>>>
+> >>>> VB2_USERPTR indicates that the application can use malloc to allocate buffers
+> >>>> and pass those to the driver. Since malloc uses virtual memory the physical
+> >>>> memory is scattered all over. And the first page typically does not start at
+> >>>> the beginning of the page but at a random offset.
+> >>>>
+> >>>> To support that the DMA generally has to be able to do scatter-gather.
+> >>>>
+> >>>> Now, where things get ugly is that a hack was added to the USERPTR support where
+> >>>> apps could pass a pointer to physically contiguous memory as a user pointer. This
+> >>>> was a hack for embedded systems that preallocated a pool of buffers and needed to
+> >>>> pass those pointers around somehow. So the dma-contig USERPTR support is for that
+> >>>> 'feature'. If you try to pass a malloc()ed buffer to a dma-contig driver it will
+> >>>> reject it. One big problem is that this specific hack isn't signaled anywhere, so
+> >>>> applications have no way of knowing if the USERPTR support is the proper version
+> >>>> or the hack where physically contiguous memory is expected.
+> >>>>
+> >>>> This hack has been replaced with DMABUF which is the proper way of passing buffers
+> >>>> around.
+> >>>>
+> >>>> New dma-contig drivers should not use that old hack anymore. Use dmabuf to pass
+> >>>> external buffers around.
+> >>>>
+> >>>> How do you use it in your app? With malloc()ed buffers? Or with 'special' pointers
+> >>>> to physically contiguous buffers?
+> >>>>
+> >>> Understood now. Thanks for your explanation.
+> >>> Now our app use malloc()ed buffers and we hook vb2_dma_contig_memops. 
+> >>> I don't know why that dma-contig driver do not reject it.
+> >>> I will try to figure it out.
 > >>
-> >> Another easy thing to fix is the way we handle trapped system
-> >> registers. We do insist on (mostly) sorting them, but we do perform a
-> >> linear search on trap. We can switch to a binary search for free, and
-> >> get immediate benefits (the PMU code, being extremely trap-happy,
-> >> benefits immediately from this).
+> >> Is there an iommu involved that turns the scatter-gather list into what looks like
+> >> contiguous memory for the DMA?
 > >>
-> >> With these in place, I see an improvement of 20 to 30% (depending on
-> >> the platform) on our world-switch cycle count when running a set of
-> >> hand-crafted guests that are designed to only perform traps.
-> >>
+> > Yes, We have iommu that could make scatter-gather list looks like
+> > contiguous memory.
 > > 
-> > By the way, I took this whole stack of changes (wsinc, vhe, and
-> > optimizations) and ran it on Mustang and fired up UEFI and did a reboot
-> > and things seem to work, so that's a small shallow
-> > 'tested-by-something-else-than-a-linux-guest' statement from me.
+> >> At the end of vb2_dc_get_userptr() in videobuf2-dma-contig.c there is a check
+> >> 'if (contig_size < size)' that verifies that the sg DMA is contiguous. This would
+> >> work if there is an iommu involved (if I understand it correctly).
+> >>
+> > I see. We saw this error before we add iommu support.
+> > 
+> >> If that's the case, then it's OK to keep VB2_USERPTR because you have real sg
+> >> support (although not via the DMA engine, but via iommu mappings).
+> >>
+> > Got it. We will keep VB2_USERPTR.
 > 
-> I've ran a slightly heavier set of tests, and the infamous reboot loop
-> broke, thanks to patch #7.
+> Can you add a comment here mentioning that VB2_USERPTR works with dma-contig because
+> there is an iommu? That should clarify this.
 > 
-> Notice how we fail to wipe the vgic_apr copy on the "light" exit path?
-> If you're unlucky (and odds are that you will be), you will inject an
-> interrupt while its active priority bit is set, and the new interrupt
-> won't be delivered. Bah.
-> 
-> With that fixed, the reboot loop has been going strong for a few hours.
-> I'll leave my Seattle cooking overnight and if everything looks good in
-> the morning, I'll repost a new set of patches.
-> 
-Good that you caught this one then!
+Got it. I will add comment before this line.
+src_vq->io_modes = VB2_DMABUF | VB2_MMAP | VB2_USERPTR;.
 
--Christoffer
+I will also add out IOMMU patches information in cover letter, like:
+The following patches are needed to support VB2_USERPTR works with
+dma-contig.
+https://patchwork.kernel.org/patch/8335461/
+https://patchwork.kernel.org/patch/8335471/
+https://patchwork.kernel.org/patch/8335481/
+https://patchwork.kernel.org/patch/8335491/
+https://patchwork.kernel.org/patch/8335501/
+https://patchwork.kernel.org/patch/7596181/
+
+
+best regards,
+Tiffany
+
+
+
+> Regards,
+> 
+> 	Hans
