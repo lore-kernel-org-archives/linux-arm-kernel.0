@@ -1,36 +1,96 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 17 Feb 2016 09:30:45 +0100
-Subject: [PATCH 5/5] arm64: marvell: add Device Tree files for Armada 7K/8K
-In-Reply-To: <20160217102124.7353591f@xhacker>
-References: <1455526065-7307-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1455526065-7307-6-git-send-email-thomas.petazzoni@free-electrons.com>
- <20160216134219.00045b5b@xhacker>
- <20160216173840.7f93896f@free-electrons.com>
- <20160217102124.7353591f@xhacker>
-Message-ID: <20160217093045.457e6a54@free-electrons.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Wed, 17 Feb 2016 09:31:31 +0100
+Subject: [PATCH v4 5/8] [Media] vcodec: mediatek: Add Mediatek V4L2 Video
+ Encoder Driver
+In-Reply-To: <1455696068.26202.4.camel@mtksdaap41>
+References: <1454585703-42428-1-git-send-email-tiffany.lin@mediatek.com>
+ <1454585703-42428-2-git-send-email-tiffany.lin@mediatek.com>
+ <1454585703-42428-3-git-send-email-tiffany.lin@mediatek.com>
+ <1454585703-42428-4-git-send-email-tiffany.lin@mediatek.com>
+ <1454585703-42428-5-git-send-email-tiffany.lin@mediatek.com>
+ <1454585703-42428-6-git-send-email-tiffany.lin@mediatek.com>
+ <56C1B4AF.1030207@xs4all.nl> <1455604653.19396.68.camel@mtksdaap41>
+ <56C2D371.9090805@xs4all.nl> <1455628805.19396.82.camel@mtksdaap41>
+ <56C328AF.5030604@cisco.com> <1455696068.26202.4.camel@mtksdaap41>
+Message-ID: <56C42FE3.8000105@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Wed, 17 Feb 2016 10:21:24 +0800, Jisheng Zhang wrote:
-
-> > > I guess the GIC is neither the one in cortex-a15 or cortex-a9.   
-> > 
-> > What makes you think this?
-> > 
-> > The GIC is a GIC400, which is GICv2 compliant, and arm-cortex-a15-gic /
+On 02/17/16 09:01, tiffany lin wrote:
+> On Tue, 2016-02-16 at 14:48 +0100, Hans Verkuil wrote:
+>> Hi Tiffany,
+>>
+>>>>>>> +int mtk_vcodec_enc_queue_init(void *priv, struct vb2_queue *src_vq,
+>>>>>>> +			   struct vb2_queue *dst_vq)
+>>>>>>> +{
+>>>>>>> +	struct mtk_vcodec_ctx *ctx = priv;
+>>>>>>> +	int ret;
+>>>>>>> +
+>>>>>>> +	src_vq->type		= V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE;
+>>>>>>> +	src_vq->io_modes	= VB2_DMABUF | VB2_MMAP | VB2_USERPTR;
+>>>>>>
+>>>>>> I recomment dropping VB2_USERPTR. That only makes sense for scatter-gather dma,
+>>>>>> and you use physically contiguous DMA.
+>>>>>>
+>>>>> Now our userspace app use VB2_USERPTR. I need to check if we could drop
+>>>>> VB2_USERPTR.
+>>>>> We use src_vq->mem_ops = &vb2_dma_contig_memops;
+>>>>> And there are
+>>>>> 	.get_userptr	= vb2_dc_get_userptr,
+>>>>> 	.put_userptr	= vb2_dc_put_userptr,
+>>>>> I was confused why it only make sense for scatter-gather.
+>>>>> Could you kindly explain more?
+>>>>
+>>>> VB2_USERPTR indicates that the application can use malloc to allocate buffers
+>>>> and pass those to the driver. Since malloc uses virtual memory the physical
+>>>> memory is scattered all over. And the first page typically does not start at
+>>>> the beginning of the page but at a random offset.
+>>>>
+>>>> To support that the DMA generally has to be able to do scatter-gather.
+>>>>
+>>>> Now, where things get ugly is that a hack was added to the USERPTR support where
+>>>> apps could pass a pointer to physically contiguous memory as a user pointer. This
+>>>> was a hack for embedded systems that preallocated a pool of buffers and needed to
+>>>> pass those pointers around somehow. So the dma-contig USERPTR support is for that
+>>>> 'feature'. If you try to pass a malloc()ed buffer to a dma-contig driver it will
+>>>> reject it. One big problem is that this specific hack isn't signaled anywhere, so
+>>>> applications have no way of knowing if the USERPTR support is the proper version
+>>>> or the hack where physically contiguous memory is expected.
+>>>>
+>>>> This hack has been replaced with DMABUF which is the proper way of passing buffers
+>>>> around.
+>>>>
+>>>> New dma-contig drivers should not use that old hack anymore. Use dmabuf to pass
+>>>> external buffers around.
+>>>>
+>>>> How do you use it in your app? With malloc()ed buffers? Or with 'special' pointers
+>>>> to physically contiguous buffers?
+>>>>
+>>> Understood now. Thanks for your explanation.
+>>> Now our app use malloc()ed buffers and we hook vb2_dma_contig_memops. 
+>>> I don't know why that dma-contig driver do not reject it.
+>>> I will try to figure it out.
+>>
+>> Is there an iommu involved that turns the scatter-gather list into what looks like
+>> contiguous memory for the DMA?
+>>
+> Yes, We have iommu that could make scatter-gather list looks like
+> contiguous memory.
 > 
-> That's my point, why not "gic-400" explicitly?
+>> At the end of vb2_dc_get_userptr() in videobuf2-dma-contig.c there is a check
+>> 'if (contig_size < size)' that verifies that the sg DMA is contiguous. This would
+>> work if there is an iommu involved (if I understand it correctly).
+>>
+> I see. We saw this error before we add iommu support.
+> 
+>> If that's the case, then it's OK to keep VB2_USERPTR because you have real sg
+>> support (although not via the DMA engine, but via iommu mappings).
+>>
+> Got it. We will keep VB2_USERPTR.
 
-Yes, we could use arm,gic-400 instead. Note that implementation-wise,
-there is currently zero difference between arm,cortex-a9-gic,
-arm,cortex-a15-gic and arm,gic-400. But indeed arm,gic-400 looks better.
+Can you add a comment here mentioning that VB2_USERPTR works with dma-contig because
+there is an iommu? That should clarify this.
 
-Thanks!
+Regards,
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+	Hans
