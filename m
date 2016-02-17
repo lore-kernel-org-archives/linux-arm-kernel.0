@@ -1,85 +1,87 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 17 Feb 2016 18:17:46 +0100
-Subject: [PATCH v2 1/2] arm64: mm: Enable CONT_SIZE aligned sections for
- 64k page kernels.
-In-Reply-To: <1455726594-16104-2-git-send-email-jeremy.linton@arm.com>
-References: <1455726594-16104-1-git-send-email-jeremy.linton@arm.com>
- <1455726594-16104-2-git-send-email-jeremy.linton@arm.com>
-Message-ID: <CAKv+Gu8kN_bFfXsgCTyaZXTfuU7UAP9U93SiqvXz0bPRu7D=bg@mail.gmail.com>
+From: xhnjupt@gmail.com (Han Xu)
+Date: Thu, 18 Feb 2016 01:14:36 +0800
+Subject: [PATCH v4 2/7] mtd: spi-nor: fsl-quadspi: add support for ls1021a
+In-Reply-To: <1453793041-35868-2-git-send-email-yao.yuan@freescale.com>
+References: <1453793041-35868-1-git-send-email-yao.yuan@freescale.com>
+ <1453793041-35868-2-git-send-email-yao.yuan@freescale.com>
+Message-ID: <20160217171436.GC16812@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 February 2016 at 17:29, Jeremy Linton <jeremy.linton@arm.com> wrote:
-> This change allows ALIGN_RODATA for 16k and 64k kernels.
-> In the case of 64k kernels it actually aligns to the CONT_SIZE
-
-... and 16k kernels ...
-
-> rather than the SECTION_SIZE (which is 512M). This makes it generally
-> more useful, especially for CONT enabled kernels.
->
-> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
-
-It probably makes sense to mention here that the alignment is 2 MB for
-all page sizes.
-
-Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-
+On Tue, Jan 26, 2016 at 03:23:56PM +0800, Yuan Yao wrote:
+> LS1021a also support Freescale Quad SPI controller.
+> Add fsl-quadspi support for ls1021a chip and make SPI_FSL_QUADSPI
+> selectable for LS1021A SOC hardwares.
+> 
+> Signed-off-by: Yuan Yao <yao.yuan@nxp.com>
+> Acked-by: Han xu <han.xu@freescale.com>
 > ---
->  arch/arm64/Kconfig.debug        | 12 ++++++------
->  arch/arm64/kernel/vmlinux.lds.S | 11 ++++++-----
->  2 files changed, 12 insertions(+), 11 deletions(-)
->
-> diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
-> index e13c4bf..65705ee 100644
-> --- a/arch/arm64/Kconfig.debug
-> +++ b/arch/arm64/Kconfig.debug
-> @@ -59,15 +59,15 @@ config DEBUG_RODATA
->            If in doubt, say Y
->
->  config DEBUG_ALIGN_RODATA
-> -       depends on DEBUG_RODATA && ARM64_4K_PAGES
-> +       depends on DEBUG_RODATA
->         bool "Align linker sections up to SECTION_SIZE"
->         help
->           If this option is enabled, sections that may potentially be marked as
-> -         read only or non-executable will be aligned up to the section size of
-> -         the kernel. This prevents sections from being split into pages and
-> -         avoids a potential TLB penalty. The downside is an increase in
-> -         alignment and potentially wasted space. Turn on this option if
-> -         performance is more important than memory pressure.
-> +         read only or non-executable will be aligned up to the section size
-> +         or contiguous hint size of the kernel. This prevents sections from
-> +         being split into pages and avoids a potential TLB penalty. The downside
-> +         is an increase in alignment and potentially wasted space. Turn on
-> +         this option if performance is more important than memory pressure.
->
->           If in doubt, say N
->
-> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-> index b78a3c7..8f4fc2c 100644
-> --- a/arch/arm64/kernel/vmlinux.lds.S
-> +++ b/arch/arm64/kernel/vmlinux.lds.S
-> @@ -63,13 +63,14 @@ PECOFF_FILE_ALIGNMENT = 0x200;
->  #endif
->
->  #if defined(CONFIG_DEBUG_ALIGN_RODATA)
-> -#define ALIGN_DEBUG_RO                 . = ALIGN(1<<SECTION_SHIFT);
-> -#define ALIGN_DEBUG_RO_MIN(min)                ALIGN_DEBUG_RO
-> +#if defined(CONFIG_ARM64_4K_PAGES)
-> +#define ALIGN_DEBUG_RO_MIN(min)                . = ALIGN(SECTION_SIZE);
-> +#else
-> +#define ALIGN_DEBUG_RO_MIN(min)                . = ALIGN(CONT_SIZE);
-> +#endif
->  #elif defined(CONFIG_DEBUG_RODATA)
-> -#define ALIGN_DEBUG_RO                 . = ALIGN(1<<PAGE_SHIFT);
-> -#define ALIGN_DEBUG_RO_MIN(min)                ALIGN_DEBUG_RO
-> +#define ALIGN_DEBUG_RO_MIN(min)                . = ALIGN(PAGE_SIZE);
->  #else
-> -#define ALIGN_DEBUG_RO
->  #define ALIGN_DEBUG_RO_MIN(min)                . = ALIGN(min);
->  #endif
->
-> --
-> 2.4.3
->
+> Changed in v4:
+> No changes.
+> 
+> Changed in v3:
+> No changes.
+> 
+> Changed in v2:
+> Update my email to <yao.yuan@nxp.com>
+> ---
+>  drivers/mtd/spi-nor/Kconfig       |  2 +-
+>  drivers/mtd/spi-nor/fsl-quadspi.c | 10 ++++++++++
+>  2 files changed, 11 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/mtd/spi-nor/Kconfig b/drivers/mtd/spi-nor/Kconfig
+> index 0dc9275..a28c278 100644
+> --- a/drivers/mtd/spi-nor/Kconfig
+> +++ b/drivers/mtd/spi-nor/Kconfig
+> @@ -30,7 +30,7 @@ config MTD_SPI_NOR_USE_4K_SECTORS
+>  
+>  config SPI_FSL_QUADSPI
+>  	tristate "Freescale Quad SPI controller"
+> -	depends on ARCH_MXC || COMPILE_TEST
+> +	depends on ARCH_MXC || SOC_LS1021A || COMPILE_TEST
+>  	depends on HAS_IOMEM
+>  	help
+>  	  This enables support for the Quad SPI controller in master mode.
+> diff --git a/drivers/mtd/spi-nor/fsl-quadspi.c b/drivers/mtd/spi-nor/fsl-quadspi.c
+> index 04e8a93..9ab2b51 100644
+> --- a/drivers/mtd/spi-nor/fsl-quadspi.c
+> +++ b/drivers/mtd/spi-nor/fsl-quadspi.c
+> @@ -213,6 +213,7 @@ enum fsl_qspi_devtype {
+>  	FSL_QUADSPI_IMX6SX,
+>  	FSL_QUADSPI_IMX7D,
+>  	FSL_QUADSPI_IMX6UL,
+> +	FSL_QUADSPI_LS1021A,
+>  };
+>  
+>  struct fsl_qspi_devtype_data {
+> @@ -258,6 +259,14 @@ static struct fsl_qspi_devtype_data imx6ul_data = {
+>  		       | QUADSPI_QUIRK_4X_INT_CLK,
+>  };
+>  
+> +static struct fsl_qspi_devtype_data ls1021a_data = {
+> +	.devtype = FSL_QUADSPI_LS1021A,
+> +	.rxfifo = 128,
+> +	.txfifo = 64,
+> +	.ahb_buf_size = 1024,
+> +	.driver_data = 0,
+> +};
+> +
+>  #define FSL_QSPI_MAX_CHIP	4
+>  struct fsl_qspi {
+>  	struct spi_nor nor[FSL_QSPI_MAX_CHIP];
+> @@ -812,6 +821,7 @@ static const struct of_device_id fsl_qspi_dt_ids[] = {
+>  	{ .compatible = "fsl,imx6sx-qspi", .data = (void *)&imx6sx_data, },
+>  	{ .compatible = "fsl,imx7d-qspi", .data = (void *)&imx7d_data, },
+>  	{ .compatible = "fsl,imx6ul-qspi", .data = (void *)&imx6ul_data, },
+> +	{ .compatible = "fsl,ls1021a-qspi", .data = (void *)&ls1021a_data, },
+>  	{ /* sentinel */ }
+>  };
+>  MODULE_DEVICE_TABLE(of, fsl_qspi_dt_ids);
+> -- 
+> 2.1.0.27.g96db324
+> 
+Acked-by: Han xu <han.xu@nxp.com>
+> 
+> ______________________________________________________
+> Linux MTD discussion mailing list
+> http://lists.infradead.org/mailman/listinfo/linux-mtd/
