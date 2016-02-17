@@ -1,50 +1,31 @@
-From: xhnjupt@gmail.com (Han Xu)
-Date: Thu, 18 Feb 2016 01:16:52 +0800
-Subject: [PATCH v4 7/7] Documentation: fsl-quadspi: Add optional properties
-In-Reply-To: <1453793041-35868-7-git-send-email-yao.yuan@freescale.com>
-References: <1453793041-35868-1-git-send-email-yao.yuan@freescale.com>
- <1453793041-35868-7-git-send-email-yao.yuan@freescale.com>
-Message-ID: <20160217171652.GH16812@shlinux2>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 17 Feb 2016 17:26:00 +0000
+Subject: [PATCH 4/4] arm64: cputype info for Broadcom Vulcan
+In-Reply-To: <56C3C9D4.4020506@gmail.com>
+References: <1455389195-31870-1-git-send-email-jchandra@broadcom.com>
+ <1455389195-31870-5-git-send-email-jchandra@broadcom.com>
+ <20160215101235.GA1748@arm.com> <56C3C9D4.4020506@gmail.com>
+Message-ID: <20160217172600.GA26514@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 26, 2016 at 03:24:01PM +0800, Yuan Yao wrote:
-> Add optional properties for QSPI:
-> big-endian
-> if the register is big endian on this platform.
+On Tue, Feb 16, 2016 at 05:16:04PM -0800, Florian Fainelli wrote:
+> On 15/02/16 02:12, Will Deacon wrote:
+> > On Sun, Feb 14, 2016 at 12:16:35AM +0530, Jayachandran C wrote:
+> >> Add Broadcom Vulcan implementor ID and part ID in cputype.h. This is
+> >> to document the values.
+> >>
+> >> Signed-off-by: Jayachandran C <jchandra@broadcom.com>
+> >> ---
+> >>  arch/arm64/include/asm/cputype.h | 2 ++
+> >>  1 file changed, 2 insertions(+)
+> > 
+> > Acked-by: Will Deacon <will.deacon@arm.com>
 > 
-> Signed-off-by: Yuan Yao <yao.yuan@nxp.com>
-> Acked-by: Rob Herring <robh@kernel.org>
-> ---
-> Changed in v4:
-> No changes.
-> 
-> Changed in v3:
-> No changes.
-> 
-> Changed in v2:
-> Update my email to <yao.yuan@nxp.com>
-> ---
->  Documentation/devicetree/bindings/mtd/fsl-quadspi.txt | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/mtd/fsl-quadspi.txt b/Documentation/devicetree/bindings/mtd/fsl-quadspi.txt
-> index 0df2f3a..0333ec8 100644
-> --- a/Documentation/devicetree/bindings/mtd/fsl-quadspi.txt
-> +++ b/Documentation/devicetree/bindings/mtd/fsl-quadspi.txt
-> @@ -21,6 +21,7 @@ Optional properties:
->  			      But if there are two NOR flashes connected to the
->  			      bus, you should enable this property.
->  			      (Please check the board's schematic.)
-> +  - big-endian : That means the IP register is big endian
->  
->  Example:
->  
-> -- 
-> 2.1.0.27.g96db324
-> 
-> 
-Acked-by: Han xu <han.xu@nxp.com>
-> ______________________________________________________
-> Linux MTD discussion mailing list
-> http://lists.infradead.org/mailman/listinfo/linux-mtd/
+> Would this be picked by Calatin, or should this be sent along with the
+> ARM/ARM64 SoC changes pull requests (just wondering?), thanks!
+
+It can go via the arm-soc tree together with the other patches. If you
+need another ack:
+
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
