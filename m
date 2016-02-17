@@ -1,32 +1,41 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 17 Feb 2016 14:54:31 +0900
-Subject: [PATCH] ARM: dts: r8a7794: replace gpio-key,wakeup with
- wakeup-source property
-In-Reply-To: <56C2F266.5030709@arm.com>
-References: <1455572925-27697-1-git-send-email-horms+renesas@verge.net.au>
- <56C2F266.5030709@arm.com>
-Message-ID: <20160217055431.GE11534@verge.net.au>
+Date: Wed, 17 Feb 2016 15:33:17 +0900
+Subject: [PATCH v2] arm64: dts: r8a7795: Add GIC-400 virtual interfaces
+In-Reply-To: <CAMuHMdVP4wA4eXK-fkENndNs=zS2vuUeDww2ZZbXvocfFiOgWQ@mail.gmail.com>
+References: <1455615802-9083-1-git-send-email-dirk.behme@de.bosch.com>
+ <CAMuHMdVP4wA4eXK-fkENndNs=zS2vuUeDww2ZZbXvocfFiOgWQ@mail.gmail.com>
+Message-ID: <20160217063316.GL11534@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 16, 2016 at 09:56:54AM +0000, Sudeep Holla wrote:
+On Tue, Feb 16, 2016 at 10:55:37AM +0100, Geert Uytterhoeven wrote:
+> CC Marc
 > 
+> On Tue, Feb 16, 2016 at 10:43 AM, Dirk Behme <dirk.behme@de.bosch.com> wrote:
+> > Besides the distributor and the CPU interface the GIC-400 additionally
+> > supports the virtual interface control blocks and the virtual CPU interfaces.
+> >
+> > Add the physical base addresses and size for these.
+> >
+> > See
+> >
+> > http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0471b/index.html
+> > -> 3.2. GIC-400 register map
+> >
+> > and Linux kernel's
+> >
+> > Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt
+> >
+> > for more details.
+> >
+> > For the at GICH Virtual interface control blocks at 0xf1040000 cover the
+> > whole 128kB (0x20000) range. This is done based on the advice from Marc
+> > Zyngier http://www.spinics.net/lists/arm-kernel/msg483139.html
+> >
+> > Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
 > 
-> On 15/02/16 21:48, Simon Horman wrote:
-> >Though the keyboard driver for GPIO buttons(gpio-keys) will continue to
-> >check for/support the legacy "gpio-key,wakeup" boolean property to
-> >enable gpio buttons as wakeup source, "wakeup-source" is the new
-> >standard binding.
-> >
-> >This patch replaces the legacy "gpio-key,wakeup" with the unified
-> >"wakeup-source" property in order to avoid any futher copy-paste
-> >duplication.
-> >
-> >Changelog text from a similar patch by Sudeep Holla.
-> >
-> >Cc: Sudeep Holla <sudeep.holla@arm.com>
+> Thanks!
 > 
-> Thanks for doing this, not sure how I missed it, was this merged in v4.5?
+> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-I believe it came later and it was my error not to include this in the
-change that added the nodes in question.
+Thanks, I have queued this up for v4.6.
