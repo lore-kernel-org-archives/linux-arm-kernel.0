@@ -1,215 +1,50 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 17 Feb 2016 16:40:32 +0000
-Subject: [PATCH v2 00/17] KVM/ARM: Guest Entry/Exit optimizations
-Message-ID: <1455727249-24752-1-git-send-email-marc.zyngier@arm.com>
+Date: Wed, 17 Feb 2016 16:40:48 +0000
+Subject: [PATCH v2 16/17] arm64: KVM: vgic-v3: Only wipe LRs on vcpu exit
+In-Reply-To: <1455727249-24752-1-git-send-email-marc.zyngier@arm.com>
+References: <1455727249-24752-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1455727249-24752-17-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've recently been looking at our entry/exit costs, and profiling
-figures did show some very low hanging fruits.
+So far, we're always writing all possible LRs, setting the empty
+ones with a zero value. This is obvious doing a low of work for
+nothing, and we're better off clearing those we've actually
+dirtied on the exit path (it is very rare to inject more than one
+interrupt at a time anyway).
 
-The most obvious cost is that accessing the GIC HW is slow. As in
-"deadly slow", specially when GICv2 is involved. So not hammering the
-HW when there is nothing to write (and even to read) is immediately
-beneficial, as this is the most common cases (whatever people seem to
-think, interrupts are a *rare* event). Similar work has also been done
-for GICv3, with a reduced impact (it was less "bad" to start with).
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/kvm/hyp/vgic-v3-sr.c | 9 ++++-----
+ 1 file changed, 4 insertions(+), 5 deletions(-)
 
-Another easy thing to fix is the way we handle trapped system
-registers. We do insist on (mostly) sorting them, but we do perform a
-linear search on trap. We can switch to a binary search for free, and
-get immediate benefits (the PMU code, being extremely trap-happy,
-benefits immediately from this).
-
-With these in place, I see an improvement of 10 to 40% (depending on
-the platform) on our world-switch cycle count when running a set of
-hand-crafted guests that are designed to only perform traps.
-
-Please note that VM exits are actually a rare event on ARM. So don't
-expect your guest to be 40% faster, this will hardly make a noticable
-difference.
-
-Methodology:
-
-* NULL-hypercall guest: Perform 2^20 PSCI_0_2_FN_PSCI_VERSION calls,
-and then a power-off:
-
-__start:
-	mov	x19, #(1 << 16)
-1:	mov	x0, #0x84000000
-	hvc	#0
-	sub	x19, x19, #1
-	cbnz	x19, 1b
-	mov	x0, #0x84000000
-	add	x0, x0, #9
-	hvc	#0
-	b	.
-
-* Self IPI guest: Inject and handle 2^20 SGI0 using GICv2 or GICv3,
-and then power-off:
-
-__start:
-	mov	x19, #(1 << 20)
-
-	mrs	x0, id_aa64pfr0_el1
-	ubfx	x0, x0, #24, #4
-	and	x0, x0, #0xf
-	cbz	x0, do_v2
-
-	mrs	x0, s3_0_c12_c12_5	// ICC_SRE_EL1
-	and	x0, x0, #1		// SRE bit
-	cbnz	x0, do_v3
-
-do_v2:
-	mov	x0, #0x3fff0000		// Dist
-	mov	x1, #0x3ffd0000		// CPU
-	mov	w2, #1
-	str	w2, [x0]		// Enable Group0
-	ldr	w2, =0xa0a0a0a0
-	str	w2, [x0, 0x400]		// A0 priority for SGI0-3
-	mov	w2, #0x0f
-	str	w2, [x0, #0x100]	// Enable SGI0-3
-	mov	w2, #0xf0
-	str	w2, [x1, #4]		// PMR
-	mov	w2, #1
-	str	w2, [x1]		// Enable CPU interface
-	
-1:
-	mov	w2, #(2 << 24)		// Interrupt self with SGI0
-	str	w2, [x0, #0xf00]
-
-2:	ldr	w2, [x1, #0x0c]		// GICC_IAR
-	cmp	w2, #0x3ff
-	b.ne	3f
-
-	wfi
-	b	2b
-
-3:	str	w2, [x1, #0x10]		// EOI
-
-	sub	x19, x19, #1
-	cbnz	x19, 1b
-
-die:
-	mov	x0, #0x84000000
-	add	x0, x0, #9
-	hvc	#0
-	b	.
-
-do_v3:
-	mov	x0, #0x3fff0000		// Dist
-	mov	x1, #0x3fbf0000		// Redist 0
-	mov	x2, #0x10000
-	add	x1, x1, x2		// SGI page
-	mov	w2, #2
-	str	w2, [x0]		// Enable Group1
-	ldr	w2, =0xa0a0a0a0
-	str	w2, [x1, 0x400]		// A0 priority for SGI0-3
-	mov	w2, #0x0f
-	str	w2, [x1, #0x100]	// Enable SGI0-3
-	mov	w2, #0xf0
-	msr	S3_0_c4_c6_0, x2	// PMR
-	mov	w2, #1
-	msr	S3_0_C12_C12_7, x2	// Enable Group1
-
-1:
-	mov	x2, #1
-	msr	S3_0_c12_c11_5, x2	// Self SGI0
-
-2:	mrs	x2, S3_0_c12_c12_0	// Read IAR1
-	cmp	w2, #0x3ff
-	b.ne	3f
-
-	wfi
-	b	2b
-
-3:	msr	S3_0_c12_c12_1, x2	// EOI
-
-	sub	x19, x19, #1
-	cbnz	x19, 1b
-
-	b	die
-
-* sysreg trap guest: Perform 2^20 PMSELR_EL0 accesses, and power-off:
-
-__start:
-	mov	x19, #(1 << 20)
-1:	mrs	x0, PMSELR_EL0
-	sub	x19, x19, #1
-	cbnz	x19, 1b
-	mov	x0, #0x84000000
-	add	x0, x0, #9
-	hvc	#0
-	b	.
-
-* These guests are profiled using perf and kvmtool:
-
-taskset -c 1 perf stat -e cycles:kh lkvm run -c1 --kernel do_sysreg.bin 2>&1 >/dev/null| grep cycles
-
-The result is then divided by the number of iterations (2^20).
-
-These tests have been run on three different platform (two GICv2
-based, and one with GICv3 and legacy mode) and shown significant
-improvements in all cases. I've only touched the arm64 GIC code, but
-obviously the 32bit code should use it as well once we've migrated it
-to C.
-
-Vanilla v4.5-rc4
-	     A             B            C-v2         C-v3
-Null HVC:   8462          6566          6572         6505
-Self SGI:  11961          8690          9541         8629
-SysReg:     8952          6979          7212         7180
-
-Patched v4.5-rc4
-	     A             B            C-v2         C-v3
-Null HVC:   5219  -38%    3957  -39%    5175  -21%   5158  -20%
-Self SGI:   8946  -25%    6658  -23%    8547  -10%   7299  -15%
-SysReg:     5314  -40%    4190  -40%    5417  -25%   5414  -24%
-
-I've pushed out a branch (kvm-arm64/suck-less) to the usual location,
-based on -rc4 + a few fixes I also posted today.
-
-Thanks,
-
-	M.
-
-* From v1:
-  - Fixed a nasty bug dealing with the active Priority Register
-  - Maintenance interrupt lazy saving
-  - More LR hackery
-  - Adapted most of the series for GICv3 as well
-
-Marc Zyngier (17):
-  arm64: KVM: Switch the sys_reg search to be a binary search
-  ARM: KVM: Properly sort the invariant table
-  ARM: KVM: Enforce sorting of all CP tables
-  ARM: KVM: Rename struct coproc_reg::is_64 to is_64bit
-  ARM: KVM: Switch the CP reg search to be a binary search
-  KVM: arm/arm64: timer: Add active state caching
-  arm64: KVM: vgic-v2: Avoid accessing GICH registers
-  arm64: KVM: vgic-v2: Save maintenance interrupt state only if required
-  arm64: KVM: vgic-v2: Move GICH_ELRSR saving to its own function
-  arm64: KVM: vgic-v2: Do not save an LR known to be empty
-  arm64: KVM: vgic-v2: Only wipe LRs on vcpu exit
-  arm64: KVM: vgic-v2: Make GICD_SGIR quicker to hit
-  arm64: KVM: vgic-v3: Avoid accessing ICH registers
-  arm64: KVM: vgic-v3: Save maintenance interrupt state only if required
-  arm64: KVM: vgic-v3: Do not save an LR known to be empty
-  arm64: KVM: vgic-v3: Only wipe LRs on vcpu exit
-  arm64: KVM: vgic-v3: Do not save ICH_AP0Rn_EL2 for GICv2 emulation
-
- arch/arm/kvm/arm.c              |   1 +
- arch/arm/kvm/coproc.c           |  74 +++++----
- arch/arm/kvm/coproc.h           |   8 +-
- arch/arm64/kvm/hyp/vgic-v2-sr.c | 144 +++++++++++++----
- arch/arm64/kvm/hyp/vgic-v3-sr.c | 333 ++++++++++++++++++++++++++--------------
- arch/arm64/kvm/sys_regs.c       |  40 ++---
- include/kvm/arm_arch_timer.h    |   5 +
- include/kvm/arm_vgic.h          |   8 +-
- virt/kvm/arm/arch_timer.c       |  31 ++++
- virt/kvm/arm/vgic-v2-emul.c     |  10 +-
- virt/kvm/arm/vgic-v3.c          |   4 +-
- 11 files changed, 452 insertions(+), 206 deletions(-)
-
+diff --git a/arch/arm64/kvm/hyp/vgic-v3-sr.c b/arch/arm64/kvm/hyp/vgic-v3-sr.c
+index ff67296..5f12c57 100644
+--- a/arch/arm64/kvm/hyp/vgic-v3-sr.c
++++ b/arch/arm64/kvm/hyp/vgic-v3-sr.c
+@@ -199,6 +199,7 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
+ 			}
+ 
+ 			cpu_if->vgic_lr[i] = __gic_v3_get_lr(i);
++			__gic_v3_set_lr(0, i);
+ 		}
+ 
+ 		switch (nr_pri_bits) {
+@@ -296,12 +297,10 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
+ 		}
+ 		 	                           
+ 		for (i = 0; i <= max_lr_idx; i++) {
+-			val = 0;
+-
+-			if (live_lrs & (1 << i))
+-				val = cpu_if->vgic_lr[i];
++			if (!(live_lrs & (1 << i)))
++				continue;
+ 
+-			__gic_v3_set_lr(val, i);
++			__gic_v3_set_lr(cpu_if->vgic_lr[i], i);
+ 		}
+ 	}
+ 
 -- 
 2.1.4
