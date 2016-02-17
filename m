@@ -1,109 +1,18 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 17 Feb 2016 23:25:11 +0100
-Subject: [PATCH] USB: cdc_subset: only build when one driver is enabled
-Message-ID: <1455747932-2844084-1-git-send-email-arnd@arndb.de>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 17 Feb 2016 20:29:11 -0200
+Subject: [PATCH v2 2/3] ARM: dts: vf-colibri: add basic supply regulators
+In-Reply-To: <a07b405a5c73b092eaa6422b8562b56f@agner.ch>
+References: <1455668317-15728-1-git-send-email-stefan@agner.ch>
+ <1455668317-15728-2-git-send-email-stefan@agner.ch>
+ <CAOMZO5Bb1eGSinoNkUhB_2w8mWdA+RQA0Z4geJp8B-MfGryAHw@mail.gmail.com>
+ <a07b405a5c73b092eaa6422b8562b56f@agner.ch>
+Message-ID: <CAOMZO5CSw=Gx52H27C_H2ytnkup6emgVxv5=FPmGnmTMEjE9CA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This avoids a harmless randconfig warning I get when USB_NET_CDC_SUBSET
-is enabled, but all of the more specific drivers are not:
+On Wed, Feb 17, 2016 at 7:52 PM, Stefan Agner <stefan@agner.ch> wrote:
 
-drivers/net/usb/cdc_subset.c:241:2: #warning You need to configure some hardware for this driver
+> Hm, should I remove them also in Patch 1/3? It's a fixed regulator too,
+> hence I guess regulator-always-on is pointless there too...?
 
-The current behavior is clearly intentional, giving a warning when
-a user picks a configuration that won't do anything good. The only
-reason for even addressing this is that I'm getting close to
-eliminating all 'randconfig' warnings on ARM, and this came up
-a couple of times.
-
-My workaround is to not even build the module when none of the
-configurations are enable.
-
-Alternatively we could simply remove the #warning (nothing wrong
-for compile-testing), turn it into a runtime warning, or
-change the Kconfig options into a menu to hide CONFIG_USB_NET_CDC_SUBSET.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/net/usb/Kconfig  | 10 ++++++++++
- drivers/net/usb/Makefile |  2 +-
- 2 files changed, 11 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/net/usb/Kconfig b/drivers/net/usb/Kconfig
-index 7f83504dfa69..cdde59089f72 100644
---- a/drivers/net/usb/Kconfig
-+++ b/drivers/net/usb/Kconfig
-@@ -395,6 +395,10 @@ config USB_NET_RNDIS_HOST
- 	  The protocol specification is incomplete, and is controlled by
- 	  (and for) Microsoft; it isn't an "Open" ecosystem or market.
- 
-+config USB_NET_CDC_SUBSET_ENABLE
-+	tristate
-+	depends on USB_NET_CDC_SUBSET
-+
- config USB_NET_CDC_SUBSET
- 	tristate "Simple USB Network Links (CDC Ethernet subset)"
- 	depends on USB_USBNET
-@@ -413,6 +417,7 @@ config USB_NET_CDC_SUBSET
- config USB_ALI_M5632
- 	bool "ALi M5632 based 'USB 2.0 Data Link' cables"
- 	depends on USB_NET_CDC_SUBSET
-+	select USB_NET_CDC_SUBSET_ENABLE
- 	help
- 	  Choose this option if you're using a host-to-host cable
- 	  based on this design, which supports USB 2.0 high speed.
-@@ -420,6 +425,7 @@ config USB_ALI_M5632
- config USB_AN2720
- 	bool "AnchorChips 2720 based cables (Xircom PGUNET, ...)"
- 	depends on USB_NET_CDC_SUBSET
-+	select USB_NET_CDC_SUBSET_ENABLE
- 	help
- 	  Choose this option if you're using a host-to-host cable
- 	  based on this design.  Note that AnchorChips is now a
-@@ -428,6 +434,7 @@ config USB_AN2720
- config USB_BELKIN
- 	bool "eTEK based host-to-host cables (Advance, Belkin, ...)"
- 	depends on USB_NET_CDC_SUBSET
-+	select USB_NET_CDC_SUBSET_ENABLE
- 	default y
- 	help
- 	  Choose this option if you're using a host-to-host cable
-@@ -437,6 +444,7 @@ config USB_BELKIN
- config USB_ARMLINUX
- 	bool "Embedded ARM Linux links (iPaq, ...)"
- 	depends on USB_NET_CDC_SUBSET
-+	select USB_NET_CDC_SUBSET_ENABLE
- 	default y
- 	help
- 	  Choose this option to support the "usb-eth" networking driver
-@@ -454,6 +462,7 @@ config USB_ARMLINUX
- config USB_EPSON2888
- 	bool "Epson 2888 based firmware (DEVELOPMENT)"
- 	depends on USB_NET_CDC_SUBSET
-+	select USB_NET_CDC_SUBSET_ENABLE
- 	help
- 	  Choose this option to support the usb networking links used
- 	  by some sample firmware from Epson.
-@@ -461,6 +470,7 @@ config USB_EPSON2888
- config USB_KC2190
- 	bool "KT Technology KC2190 based cables (InstaNet)"
- 	depends on USB_NET_CDC_SUBSET
-+	select USB_NET_CDC_SUBSET_ENABLE
- 	help
- 	  Choose this option if you're using a host-to-host cable
- 	  with one of these chips.
-diff --git a/drivers/net/usb/Makefile b/drivers/net/usb/Makefile
-index b5f04068dbe4..37fb46aee341 100644
---- a/drivers/net/usb/Makefile
-+++ b/drivers/net/usb/Makefile
-@@ -23,7 +23,7 @@ obj-$(CONFIG_USB_NET_GL620A)	+= gl620a.o
- obj-$(CONFIG_USB_NET_NET1080)	+= net1080.o
- obj-$(CONFIG_USB_NET_PLUSB)	+= plusb.o
- obj-$(CONFIG_USB_NET_RNDIS_HOST)	+= rndis_host.o
--obj-$(CONFIG_USB_NET_CDC_SUBSET)	+= cdc_subset.o
-+obj-$(CONFIG_USB_NET_CDC_SUBSET_ENABLE)	+= cdc_subset.o
- obj-$(CONFIG_USB_NET_ZAURUS)	+= zaurus.o
- obj-$(CONFIG_USB_NET_MCS7830)	+= mcs7830.o
- obj-$(CONFIG_USB_USBNET)	+= usbnet.o
--- 
-2.7.0
+That's correct. And from 3/3 too.
