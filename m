@@ -1,43 +1,29 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 17 Feb 2016 23:45:10 +0300
-Subject: [PATCH 2/2] ARM: dts: r8a7794: add EtherAVB support
-In-Reply-To: <1926986.gmrsfKE5A2@wasted.cogentembedded.com>
-References: <1926986.gmrsfKE5A2@wasted.cogentembedded.com>
-Message-ID: <3612334.eXmTxlrOol@wasted.cogentembedded.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 17 Feb 2016 21:50:44 +0100
+Subject: [PATCH 2/2] ARM: dts: meson: Adding hwrev syscon node
+In-Reply-To: <1455730114-2547-3-git-send-email-romain.perier@gmail.com>
+References: <1455730114-2547-1-git-send-email-romain.perier@gmail.com>
+ <1455730114-2547-3-git-send-email-romain.perier@gmail.com>
+Message-ID: <9529888.YxErSS5PS8@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the generic R8A7794 part of the EtherAVB device node.
+On Wednesday 17 February 2016 18:28:34 Romain Perier wrote:
+> diff --git a/arch/arm/boot/dts/meson8b.dtsi b/arch/arm/boot/dts/meson8b.dtsi
+> index 0477a81..71009dc 100644
+> --- a/arch/arm/boot/dts/meson8b.dtsi
+> +++ b/arch/arm/boot/dts/meson8b.dtsi
+> @@ -99,6 +99,11 @@
+>                 };
+>         };
+>  
+> +       hwrev at c1107d4c {
+> +               compatible = "amlogic,meson8b-hwrev", "syscon";
+> +               reg = <0xc1107d4c 0x460>;
+> +       };
+> 
 
-Based on the commit 46ece349aa54 ("ARM: shmobile: r8a7791: add EtherAVB DT
-support").
+That is a very odd address. Are you sure this is not part of a larger
+block of registers?
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-
----
- arch/arm/boot/dts/r8a7794.dtsi |   12 ++++++++++++
- 1 file changed, 12 insertions(+)
-
-Index: renesas/arch/arm/boot/dts/r8a7794.dtsi
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7794.dtsi
-+++ renesas/arch/arm/boot/dts/r8a7794.dtsi
-@@ -572,6 +572,18 @@
- 		status = "disabled";
- 	};
- 
-+	avb: ethernet at e6800000 {
-+		compatible = "renesas,etheravb-r8a7794",
-+			     "renesas,etheravb-rcar-gen2";
-+		reg = <0 0xe6800000 0 0x800>, <0 0xee0e8000 0 0x4000>;
-+		interrupts = <GIC_SPI 163 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp8_clks R8A7794_CLK_ETHERAVB>;
-+		power-domains = <&cpg_clocks>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		status = "disabled";
-+	};
-+
- 	/* The memory map in the User's Manual maps the cores to bus numbers */
- 	i2c0: i2c at e6508000 {
- 		compatible = "renesas,i2c-r8a7794";
+	Arnd
