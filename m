@@ -1,53 +1,62 @@
-From: kirill@shutemov.name (Kirill A. Shutemov)
-Date: Wed, 17 Feb 2016 17:04:56 +0200
-Subject: [BUG] random kernel crashes after THP rework on s390 (maybe also
- on PowerPC and ARM)
-In-Reply-To: <20160216172444.013988d8@thinkpad>
-References: <20160211205702.24f0d17a@thinkpad>
- <20160212154116.GA15142@node.shutemov.name>
- <56BE00E7.1010303@de.ibm.com> <20160212181640.4eabb85f@thinkpad>
- <20160212231510.GB15142@node.shutemov.name>
- <alpine.LFD.2.20.1602131238260.1910@schleppi>
- <20160215113159.GA28832@node.shutemov.name>
- <20160215193702.4a15ed5e@thinkpad>
- <20160215213526.GA9766@node.shutemov.name>
- <20160216172444.013988d8@thinkpad>
-Message-ID: <20160217150456.GA15882@node.shutemov.name>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 17 Feb 2016 16:02:35 +0100
+Subject: [PATCH v3 5/5] serial: 8250/mediatek: fix building with SERIAL_8250=m
+In-Reply-To: <1455721357-4008289-1-git-send-email-arnd@arndb.de>
+References: <1455721357-4008289-1-git-send-email-arnd@arndb.de>
+Message-ID: <1455721357-4008289-6-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 16, 2016 at 05:24:44PM +0100, Gerald Schaefer wrote:
-> On Mon, 15 Feb 2016 23:35:26 +0200
-> "Kirill A. Shutemov" <kirill@shutemov.name> wrote:
-> 
-> > Is there any chance that I'll be able to trigger the bug using QEMU?
-> > Does anybody have an QEMU image I can use?
-> > 
-> 
-> I have no image, but trying to reproduce this under virtualization may
-> help to trigger this also on other architectures. After ruling out IPI
-> vs. fast_gup I do not really see why this should be arch-specific, and
-> it wouldn't be the first time that we hit subtle races first on s390, due
-> to our virtualized environment (my test case is make -j20 with 10 CPUs and
-> 4GB of memory, no swap).
+The Mediatek 8250 driver has a 'bool' Kconfig symbol, but that
+breaks when SERIAL_8250 is a loadable module:
 
-Could you post your kernel config?
+drivers/tty/built-in.o: In function `mtk8250_set_termios':
+:(.text+0x1bee8): undefined reference to `serial8250_do_set_termios'
+:(.text+0x1bf10): undefined reference to `uart_get_baud_rate'
+:(.text+0x1c09c): undefined reference to `uart_get_divisor'
+drivers/tty/built-in.o: In function `mtk8250_do_pm':
+:(.text+0x1c0d0): undefined reference to `serial8250_do_pm'
+drivers/tty/built-in.o: In function `mtk8250_probe':
+:(.text+0x1c2e4): undefined reference to `serial8250_register_8250_port'
+serial/8250/8250_mtk.c:287:242: error: data definition has no type or storage class [-Werror]
+serial/8250/8250_mtk.c:287:122: error: 'mtk8250_platform_driver_init' defined but not used [-Werror=unused-function]
 
-It would be nice also to check if disabling split_huge_page() would make
-any difference:
+This changes the symbol to a 'tristate', so the dependency on
+SERIAL_8250 also works when that is set to 'm'.
+To actually build the driver, we also need to include <linux/module.h>.
 
-diff --git a/mm/huge_memory.c b/mm/huge_memory.c
-index a75081ca31cf..26d2b7b21021 100644
---- a/mm/huge_memory.c
-+++ b/mm/huge_memory.c
-@@ -3364,6 +3364,8 @@ int split_huge_page_to_list(struct page *page, struct list_head *list)
- 	bool mlocked;
- 	unsigned long flags;
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Matthias Brugger <matthias.bgg@gmail.com>
+---
+ drivers/tty/serial/8250/8250_mtk.c | 2 +-
+ drivers/tty/serial/8250/Kconfig    | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/tty/serial/8250/8250_mtk.c b/drivers/tty/serial/8250/8250_mtk.c
+index 6ecc6e3e82dc..a0294f3de4f8 100644
+--- a/drivers/tty/serial/8250/8250_mtk.c
++++ b/drivers/tty/serial/8250/8250_mtk.c
+@@ -303,7 +303,7 @@ static struct platform_driver mtk8250_platform_driver = {
+ };
+ module_platform_driver(mtk8250_platform_driver);
  
-+	return -EBUSY;
-+
- 	VM_BUG_ON_PAGE(is_huge_zero_page(page), page);
- 	VM_BUG_ON_PAGE(!PageAnon(page), page);
- 	VM_BUG_ON_PAGE(!PageLocked(page), page);
+-#ifdef CONFIG_SERIAL_8250_CONSOLE
++#if defined(CONFIG_SERIAL_8250_CONSOLE) && !defined(MODULE)
+ static int __init early_mtk8250_setup(struct earlycon_device *device,
+ 					const char *options)
+ {
+diff --git a/drivers/tty/serial/8250/Kconfig b/drivers/tty/serial/8250/Kconfig
+index 1b0638511ac1..c45a02a7f9e2 100644
+--- a/drivers/tty/serial/8250/Kconfig
++++ b/drivers/tty/serial/8250/Kconfig
+@@ -370,7 +370,7 @@ config SERIAL_8250_LPC18XX
+ 	  serial port, say Y to this option. If unsure, say Y.
+ 
+ config SERIAL_8250_MT6577
+-	bool "Mediatek serial port support"
++	tristate "Mediatek serial port support"
+ 	depends on SERIAL_8250 && ARCH_MEDIATEK
+ 	help
+ 	  If you have a Mediatek based board and want to use the
 -- 
- Kirill A. Shutemov
+2.7.0
