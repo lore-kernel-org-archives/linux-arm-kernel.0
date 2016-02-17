@@ -1,89 +1,278 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 17 Feb 2016 15:55:28 +0900
-Subject: [RFC 3/3] ARM: dts: Don't overheat the Odroid XU3-Lite on high load
-In-Reply-To: <1455692128-28504-1-git-send-email-k.kozlowski@samsung.com>
-References: <1455692128-28504-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1455692128-28504-4-git-send-email-k.kozlowski@samsung.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Wed, 17 Feb 2016 08:00:33 +0100
+Subject: [PATCH 6/6] ARM64: dts: rockchip: add core dtsi file for rk3399
+In-Reply-To: <1455674476-16655-1-git-send-email-jay.xu@rock-chips.com>
+References: <1455673992-16469-1-git-send-email-jay.xu@rock-chips.com>
+ <1455674476-16655-1-git-send-email-jay.xu@rock-chips.com>
+Message-ID: <2396201.CBcovI4jc4@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After adding cpufreq-dt support to Exynos542x, the Odroid XU3-Lite can
-be easily overheated when launching eight CPU-intensive tasks:
-	thermal thermal_zone3: critical temperature reached(121 C),shutting down
+Hi Jianqun,
 
-This seems to be specific to Odroid XU3-Lite board which officially
-supports lower frequencies than regular XU3 or XU4. When working at
-maximum CPU speed (1800 MHz big and 1300 MHz LITTLE) in warmer place for
-longer time, the fan fails to cool down the board and it reaches
-critical temperature.
+Am Mittwoch, 17. Februar 2016, 10:01:16 schrieb jianqun.xu:
+> From: Xu Jianqun <jay.xu@rock-chips.com>
+> 
+> Add dtsi file for Rockchip rk3399 SoCs, which includes some
+> general nodes such as cpu, pmu, cru, gic, amba and so on.
+> 
+> Change-Id: Ie3b824e8ead967d4cb119d73222b7a198478c29c
 
-Add CPU cooling to Exynos5422/5800 to fix this issue. When reaching 95
-degrees of Celsius, the board will slow down by 3 steps (around
-1400/1000 MHz). When reaching 110 degrees of Celsius go to 600 MHz.
+please remove any review-cruft like Change-Ids from mainline patches :-)
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- arch/arm/boot/dts/exynos5422-cpu-thermal.dtsi | 41 +++++++++++++++++++++++++++
- 1 file changed, 41 insertions(+)
+> Signed-off-by: Xu Jianqun <jay.xu@rock-chips.com>
+> ---
+>  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 989
+> +++++++++++++++++++++++++++++++ 1 file changed, 989 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> 
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> b/arch/arm64/boot/dts/rockchip/rk3399.dtsi new file mode 100644
+> index 0000000..eb671f6
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> @@ -0,0 +1,989 @@
+> +/*
+> + * Copyright (c) 2016 Fuzhou Rockchip Electronics Co., Ltd
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This library is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This library is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +#include <dt-bindings/clock/rk3399-cru.h>
+> +#include <dt-bindings/gpio/gpio.h>
+> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> +#include <dt-bindings/interrupt-controller/irq.h>
+> +#include <dt-bindings/pinctrl/rockchip.h>
+> +
+> +/ {
+> +	compatible = "rockchip,rk3399";
+> +	interrupt-parent = <&gic>;
+> +	#address-cells = <2>;
+> +	#size-cells = <2>;
+> +
+> +	aliases {
+> +		serial0 = &uart0;
+> +		serial1 = &uart1;
+> +		serial2 = &uart2;
+> +		serial3 = &uart3;
+> +	};
+> +
+> +	psci {
+> +		compatible = "arm,psci";
+> +		method = "smc";
+> +	};
+> +
+> +	cpus {
+> +		#address-cells = <2>;
+> +		#size-cells = <0>;
+> +
+> +		cpu-map {
+> +			cluster0 {
+> +				core0 {
+> +					cpu = <&cpu_l0>;
+> +				};
+> +				core1 {
+> +					cpu = <&cpu_l1>;
+> +				};
+> +				core2 {
+> +					cpu = <&cpu_l2>;
+> +				};
+> +				core3 {
+> +					cpu = <&cpu_l3>;
+> +				};
+> +			};
+> +
+> +			cluster1 {
+> +				core0 {
+> +					cpu = <&cpu_b0>;
+> +				};
+> +				core1 {
+> +					cpu = <&cpu_b1>;
+> +				};
+> +			};
+> +		};
+> +
+> +		idle-states {
+> +			entry-method = "psci";
+> +
+> +			cpu_sleep: cpu-sleep-0 {
+> +				compatible = "arm,idle-state";
+> +			};
+> +		};
 
-diff --git a/arch/arm/boot/dts/exynos5422-cpu-thermal.dtsi b/arch/arm/boot/dts/exynos5422-cpu-thermal.dtsi
-index 2b289d7c0d13..66073ce29aee 100644
---- a/arch/arm/boot/dts/exynos5422-cpu-thermal.dtsi
-+++ b/arch/arm/boot/dts/exynos5422-cpu-thermal.dtsi
-@@ -34,6 +34,16 @@
- 					hysteresis = <5000>; /* millicelsius */
- 					type = "active";
- 				};
-+				cpu_alert3: cpu-alert-3 {
-+					temperature = <95000>; /* millicelsius */
-+					hysteresis = <5000>; /* millicelsius */
-+					type = "passive";
-+				};
-+				cpu_alert4: cpu-alert-4 {
-+					temperature = <110000>; /* millicelsius */
-+					hysteresis = <5000>; /* millicelsius */
-+					type = "passive";
-+				};
- 				cpu_crit0: cpu-crit-0 {
- 					temperature = <120000>; /* millicelsius */
- 					hysteresis = <0>; /* millicelsius */
-@@ -53,6 +63,37 @@
- 				     trip = <&cpu_alert2>;
- 				     cooling-device = <&fan0 2 3>;
- 				};
-+
-+				/*
-+				 * When reaching cpu_alert3, reduce CPU
-+				 * by 3 steps. On Exynos5422/5800 that would
-+				 * be: 1400 MHz and 1000 MHz.
-+				 */
-+				map3 {
-+				     trip = <&cpu_alert3>;
-+				     cooling-device = <&cpu0 3 3>;
-+				};
-+				map4 {
-+				     trip = <&cpu_alert3>;
-+				     cooling-device = <&cpu4 3 3>;
-+				};
-+
-+				/*
-+				 * When reaching cpu_alert4, reduce CPU
-+				 * to 600 MHz (11 steps for big, 7 steps for
-+				 * LITTLE).
-+				 * Exynos5420 has less OPPs and reversed
-+				 * numbering of CPUs (big/LITTLE) so this
-+				 * would not match.
-+				 */
-+				map5 {
-+				     trip = <&cpu_alert4>;
-+				     cooling-device = <&cpu0 7 7>;
-+				};
-+				map6 {
-+				     trip = <&cpu_alert4>;
-+				     cooling-device = <&cpu4 11 11>;
-+				};
- 			};
- 		};
- 	};
--- 
-2.5.0
+why the essentially empty idle-states, which is probably missing properties? 
+In the absence of a real idle driver the kernel will fall back to 
+arch_cpu_idle(), which already does WFI handling even on arm64.
+
+
+> +
+> +		cpu_l0: cpu at 0 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a53", "arm,armv8";
+> +			reg = <0x0 0x0>;
+> +			cpu-idle-states = <&cpu_sleep>;
+
+that won't compile, as the referenced node is not present
+
+
+> +			enable-method = "psci";
+> +		};
+> +
+> +		cpu_l1: cpu at 1 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a53", "arm,armv8";
+> +			reg = <0x0 0x1>;
+> +			cpu-idle-states = <&cpu_sleep>;
+> +			enable-method = "psci";
+> +		};
+> +
+> +		cpu_l2: cpu at 2 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a53", "arm,armv8";
+> +			reg = <0x0 0x2>;
+> +			cpu-idle-states = <&cpu_sleep>;
+> +			enable-method = "psci";
+> +		};
+> +
+> +		cpu_l3: cpu at 3 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a53", "arm,armv8";
+> +			reg = <0x0 0x3>;
+> +			cpu-idle-states = <&cpu_sleep>;
+> +			enable-method = "psci";
+> +		};
+> +
+> +		cpu_b0: cpu at 100 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a72", "arm,armv8";
+> +			reg = <0x0 0x100>;
+> +			cpu-idle-states = <&cpu_sleep>;
+> +			enable-method = "psci";
+> +		};
+> +
+> +		cpu_b1: cpu at 101 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a72", "arm,armv8";
+> +			reg = <0x0 0x101>;
+> +			cpu-idle-states = <&cpu_sleep>;
+> +			enable-method = "psci";
+> +		};
+> +	};
+> +
+> +	pmu {
+> +		compatible = "arm,armv8-pmuv3";
+> +		interrupts = <GIC_PPI 7 IRQ_TYPE_LEVEL_LOW>;
+> +		interrupt-affinity = <&cpu_l0>, <&cpu_l1>, <&cpu_l2>,
+> +				     <&cpu_l3>, <&cpu_b0>, <&cpu_b1>;
+> +	};
+> +
+> +	timer {
+> +		compatible = "arm,armv8-timer";
+> +		interrupts =
+> +			<GIC_PPI 13
+> +			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
+
+shouldn't that be GIC_CPU_MASK_SIMPLE(6) instead of 4?
+
+
+> +			<GIC_PPI 14
+> +			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
+> +			<GIC_PPI 11
+> +			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
+> +			<GIC_PPI 10
+> +			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+> +		clock-frequency = <24000000>;
+> +	};
+> +
+> +	xin24m: xin24m {
+> +		compatible = "fixed-clock";
+> +		#clock-cells = <0>;
+> +		clock-frequency = <24000000>;
+> +		clock-output-names = "xin24m";
+> +	};
+> +
+> +	gic: interrupt-controller at fee00000 {
+> +		compatible = "arm,gic-v3";
+> +		#interrupt-cells = <3>;
+> +		#address-cells = <2>;
+> +		#size-cells = <2>;
+> +		ranges;
+> +		interrupt-controller;
+> +
+> +		reg = <0x0 0xfee00000 0 0x10000>, /* GICD */
+> +		      <0x0 0xfef00000 0 0xc0000>, /* GICR */
+> +		      <0x0 0xfff00000 0 0x10000>, /* GICC */
+> +		      <0x0 0xfff10000 0 0x10000>, /* GICH */
+> +		      <0x0 0xfff20000 0 0x10000>; /* GICV */
+> +		interrupts =
+> +			<GIC_PPI 9
+> +			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+
+again GIC_CPU_MASK_SIMPLE(6)?
+
+> +		its: interrupt-controller at fee20000 {
+> +			compatible = "arm,gic-v3-its";
+> +			msi-controller;
+> +			reg = <0x0 0xfee20000 0x0 0x20000>;
+> +		};
+> +	};
+> +
+> +	amba {
+> +		compatible = "arm,amba-bus";
+> +		#address-cells = <2>;
+> +		#size-cells = <2>;
+> +		ranges;
+> +
+> +		dmac_bus: dma-controller at ff6d0000 {
+> +			compatible = "arm,pl330", "arm,primecell";
+> +			reg = <0x0 0xff6d0000 0x0 0x4000>;
+> +			interrupts = <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
+> +			#dma-cells = <1>;
+> +			clocks = <&cru ACLK_DMAC_BUS>;
+> +			clock-names = "apb_pclk";
+
+has the FLUSHP bug gotten fixed? That would be cool.
+
+
+> +		};
+
+rest looks nice on first glance :-)
+
+
+Heiko
