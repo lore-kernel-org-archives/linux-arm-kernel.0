@@ -1,42 +1,69 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 17 Feb 2016 15:00:52 -0800
-Subject: [PATCH] ARM: vdso: Mark vDSO code as read-only
-In-Reply-To: <20160217052010.GA49233@davidb.org>
-References: <1453226922-16831-1-git-send-email-keescook@chromium.org>
- <20160216213659.GA47194@davidb.org>
- <CAGXu5j+H63jhcDpHpXK5aWvgUBz=5vB0FK_zRoc+wZEk32B2fg@mail.gmail.com>
- <20160217052010.GA49233@davidb.org>
-Message-ID: <CAGXu5jK22LfvLdMfWz_vbQsJ3bbjSdJrYAp=5yWzD4yRNTTGFQ@mail.gmail.com>
+From: w@1wt.eu (Willy Tarreau)
+Date: Wed, 17 Feb 2016 23:59:58 +0100
+Subject: [PATCH v2 net-next 0/8] API set for HW Buffer management
+In-Reply-To: <1455636823-14470-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1455636823-14470-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20160217225958.GA31113@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 16, 2016 at 9:20 PM, David Brown <david.brown@linaro.org> wrote:
-> On Tue, Feb 16, 2016 at 01:52:33PM -0800, Kees Cook wrote:
->>
->> On Tue, Feb 16, 2016 at 1:36 PM, David Brown <david.brown@linaro.org>
->> wrote:
->>>
->>> Although the arm vDSO is cleanly separated by code/data with the code
->>> being read-only in userspace mappings, the code page is still writable
->>> from the kernel.  There have been exploits (such as
->>> http://itszn.com/blog/?p=21) that take advantage of this on x86 to go
->>> from a bad kernel write to full root.
->>>
->>> Prevent this specific exploit on arm by putting the vDSO code page in
->>> post-init read-only memory as well.
->>
->>
->> Is the vdso dynamically built at init time like on x86, or can this
->> just use .rodata directly?
->
->
-> On ARM, it is patched during init.  Arm64's is just plain read-only.
+Hi Gregory,
 
-Okay, great. I've added this to my postinit-readonly series (which I
-just refreshed and sent out again...)
+On Tue, Feb 16, 2016 at 04:33:35PM +0100, Gregory CLEMENT wrote:
+> Hello,
+> 
+> A few weeks ago I sent a proposal for a API set for HW Buffer
+> management, to have a better view of the motivation for this API see
+> the cover letter of this proposal:
+> http://thread.gmane.org/gmane.linux.kernel/2125152
+> 
+> Since this version I took into account the review from Florian:
+> - The hardware buffer management helpers are no more built by default
+>   and now depend on a hidden config symbol which has to be selected
+>   by the driver if needed
+> - The hwbm_pool_refill() and hwbm_pool_add() now receive a gfp_t as
+>   argument allowing the caller to specify the flag it needs.
+> - buf_num is now tested to ensure there is no wrapping
+> - A spinlock has been added to protect the hwbm_pool_add() function in
+>   SMP or irq context.
+> 
+> I also used pr_warn instead of pr_debug in case of errors.
+> 
+> I fixed the mvneta implementation by returning the buffer to the pool
+> at various place instead of ignoring it.
+> 
+> About the series itself I tried to make this series easier to merge:
+> - Squashed "bus: mvenus-mbus: Fix size test for
+>    mvebu_mbus_get_dram_win_info" into bus: mvebu-mbus: provide api for
+>    obtaining IO and DRAM window information.
+> - Added my signed-otf-by on all the patches as submitter of the series.
+> - Renamed the dts patches with the pattern "ARM: dts: platform:"
+> - Removed the patch "ARM: mvebu: enable SRAM support in
+>   mvebu_v7_defconfig" of this series and already applied it
+> - Rodified the order of the patches.
+> 
+> In order to ease the test the branch mvneta-BM-framework-v2 is
+> available at git at github.com:MISL-EBU-System-SW/mainline-public.git.
 
--Kees
+Well, I tested this patch series on top of latest master (from today)
+on my fresh new clearfog board. I compared carefully with and without
+the patchset. My workload was haproxy receiving connections and forwarding
+them to my PC via the same port. I tested both with short connections
+(HTTP GET of an empty file) and long ones (1 MB or more). No trouble
+was detected at all, which is pretty good. I noticed a very tiny
+performance drop which is more noticeable on short connections (high
+packet rates), my forwarded connection rate went down from 17500/s to
+17300/s. But I have not checked yet what can be tuned when using the
+BM, nor did I compare CPU usage. I remember having run some tests in
+the past, I guess it was on the XP-GP board, and noticed that the BM
+could save a significant amount of CPU and improve cache efficiency,
+so if this is the case here, we don't really care about a possible 1%
+performance drop.
 
--- 
-Kees Cook
-Chrome OS & Brillo Security
+I'll try to provide more results as time permits.
+
+In the mean time if you want (or plan to submit a next batch), feel
+free to add a Tested-by: Willy Tarreau <w@1wt.eu>.
+
+cheers,
+Willy
