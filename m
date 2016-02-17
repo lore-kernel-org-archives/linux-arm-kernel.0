@@ -1,70 +1,51 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Wed, 17 Feb 2016 08:47:44 +0100
-Subject: [PATCH v4 5/8] [Media] vcodec: mediatek: Add Mediatek V4L2 Video
- Encoder Driver
-In-Reply-To: <1455604653.19396.68.camel@mtksdaap41>
-References: <1454585703-42428-1-git-send-email-tiffany.lin@mediatek.com>
- <1454585703-42428-2-git-send-email-tiffany.lin@mediatek.com>
- <1454585703-42428-3-git-send-email-tiffany.lin@mediatek.com>
- <1454585703-42428-4-git-send-email-tiffany.lin@mediatek.com>
- <1454585703-42428-5-git-send-email-tiffany.lin@mediatek.com>
- <1454585703-42428-6-git-send-email-tiffany.lin@mediatek.com>
- <56C1B4AF.1030207@xs4all.nl> <1455604653.19396.68.camel@mtksdaap41>
-Message-ID: <56C425A0.6080005@xs4all.nl>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 17 Feb 2016 08:52:36 +0100
+Subject: [PATCH v5 RESEND 4/5] ARM: amba: Move reading of periphid to
+ amba_match()
+In-Reply-To: <20160215175250.GJ10826@n2100.arm.linux.org.uk>
+References: <1455101250-11327-1-git-send-email-m.szyprowski@samsung.com>
+ <1455101250-11327-5-git-send-email-m.szyprowski@samsung.com>
+ <20160215175250.GJ10826@n2100.arm.linux.org.uk>
+Message-ID: <56C426C4.7040907@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/16/2016 07:37 AM, tiffany lin wrote:
->>> +static int fops_vcodec_open(struct file *file)
->>> +{
->>> +	struct video_device *vfd = video_devdata(file);
->>> +	struct mtk_vcodec_dev *dev = video_drvdata(file);
->>> +	struct mtk_vcodec_ctx *ctx = NULL;
->>> +	int ret = 0;
->>> +
->>> +	mutex_lock(&dev->dev_mutex);
->>> +
->>> +	ctx = devm_kzalloc(&dev->plat_dev->dev, sizeof(*ctx), GFP_KERNEL);
->>> +	if (!ctx) {
->>> +		ret = -ENOMEM;
->>> +		goto err_alloc;
->>> +	}
->>> +
->>> +	if (dev->num_instances >= MTK_VCODEC_MAX_ENCODER_INSTANCES) {
->>> +		mtk_v4l2_err("Too many open contexts\n");
->>> +		ret = -EBUSY;
->>> +		goto err_no_ctx;
->>
->> Hmm. I never like it if you can't open a video node because of a reason like this.
->>
->> I.e. a simple 'v4l2-ctl -D' (i.e. calling QUERYCAP) should never fail.
->>
->> If there are hardware limitation that prevent more than X instances from running at
->> the same time, then those limitations typically kick in when you start to stream
->> (or possibly when calling REQBUFS). But before that it should always be possible to
->> open the device.
->>
->> Having this check at open() is an indication of a poor design.
->>
->> Is this is a hardware limitation at all?
->>
-> This is to make sure performance meet requirements, such as bitrate and
-> framerate.
+Hello,
 
-Is it the driver's job to make enforce this? What if the application only
-deals with low-res video, but wants to encode a lot of those? Or is encoding
-a video off-line?
+On 2016-02-15 18:52, Russell King - ARM Linux wrote:
+> On Wed, Feb 10, 2016 at 11:47:29AM +0100, Marek Szyprowski wrote:
+>> From: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+>>
+>> Reading the periphid when the Primecell device is registered means that
+>> the apb pclk must be available by then or the device won't be registered
+>> at all.
+>>
+>> By reading the periphid in amba_match() we can return -EPROBE_DEFER if
+>> the apb pclk isn't there yet and the device will be retried later.
+> I've just realised, we can't do this.  We need to read the peripheral
+> ID at registration time, because that's published to userspace via
+> (a) a sysfs attribute, and (b) as part of the uevent, which will be
+> used by udev to locate the driver module.
+>
+> So, this will have the side effect of breaking systems which have
+> AMBA primecell devices configured as modules.
+>
+> Sorry, I can't apply this.  We can't regress existing platforms for
+> the sake of introducing new platforms to this code.
 
-The driver generally doesn't know the use-case, so if this is an artificial
-limitation as opposed to a hardware limitation, then I would just drop this.
+Then the only solution right now I see is to get back to v1:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/388199.html
+which at least handles correctly device registration when power domain 
+driver
+is available. You pointed that the patch cannot be applied, because failure
+of dev_pm_domain_attach() will be fatal for device registration. Right now
+lack of such call is fatal for the whole system, so there is really not a
+big difference. Please also note that amba_get_enable_pclk() calls 
+clk_get(),
+which also might return -EPROBE_DEFER, which already breaks device
+registration the same way.
 
-Regards,
-
-	Hans
-
-> We got your point. We will remove this and move limitation control to
-> start_streaming or REQBUFS.
-> Appreciated for your suggestion.:)
-> 
-> 
->>> +	}
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
