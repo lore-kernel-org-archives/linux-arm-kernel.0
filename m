@@ -1,70 +1,70 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 17 Feb 2016 07:47:40 +0000
-Subject: [PATCH v2 4/5] irqchip:create irq domain for each mbigen device
-In-Reply-To: <56C3F4AC.8020807@huawei.com>
-References: <1455604648-20668-1-git-send-email-majun258@huawei.com>
- <1455604648-20668-5-git-send-email-majun258@huawei.com>
- <20160216085024.3f573f40@arm.com> <56C3F4AC.8020807@huawei.com>
-Message-ID: <20160217074740.439c53b4@arm.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Wed, 17 Feb 2016 08:47:44 +0100
+Subject: [PATCH v4 5/8] [Media] vcodec: mediatek: Add Mediatek V4L2 Video
+ Encoder Driver
+In-Reply-To: <1455604653.19396.68.camel@mtksdaap41>
+References: <1454585703-42428-1-git-send-email-tiffany.lin@mediatek.com>
+ <1454585703-42428-2-git-send-email-tiffany.lin@mediatek.com>
+ <1454585703-42428-3-git-send-email-tiffany.lin@mediatek.com>
+ <1454585703-42428-4-git-send-email-tiffany.lin@mediatek.com>
+ <1454585703-42428-5-git-send-email-tiffany.lin@mediatek.com>
+ <1454585703-42428-6-git-send-email-tiffany.lin@mediatek.com>
+ <56C1B4AF.1030207@xs4all.nl> <1455604653.19396.68.camel@mtksdaap41>
+Message-ID: <56C425A0.6080005@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 17 Feb 2016 12:18:52 +0800
-"majun (F)" <majun258@huawei.com> wrote:
+On 02/16/2016 07:37 AM, tiffany lin wrote:
+>>> +static int fops_vcodec_open(struct file *file)
+>>> +{
+>>> +	struct video_device *vfd = video_devdata(file);
+>>> +	struct mtk_vcodec_dev *dev = video_drvdata(file);
+>>> +	struct mtk_vcodec_ctx *ctx = NULL;
+>>> +	int ret = 0;
+>>> +
+>>> +	mutex_lock(&dev->dev_mutex);
+>>> +
+>>> +	ctx = devm_kzalloc(&dev->plat_dev->dev, sizeof(*ctx), GFP_KERNEL);
+>>> +	if (!ctx) {
+>>> +		ret = -ENOMEM;
+>>> +		goto err_alloc;
+>>> +	}
+>>> +
+>>> +	if (dev->num_instances >= MTK_VCODEC_MAX_ENCODER_INSTANCES) {
+>>> +		mtk_v4l2_err("Too many open contexts\n");
+>>> +		ret = -EBUSY;
+>>> +		goto err_no_ctx;
+>>
+>> Hmm. I never like it if you can't open a video node because of a reason like this.
+>>
+>> I.e. a simple 'v4l2-ctl -D' (i.e. calling QUERYCAP) should never fail.
+>>
+>> If there are hardware limitation that prevent more than X instances from running at
+>> the same time, then those limitations typically kick in when you start to stream
+>> (or possibly when calling REQBUFS). But before that it should always be possible to
+>> open the device.
+>>
+>> Having this check at open() is an indication of a poor design.
+>>
+>> Is this is a hardware limitation at all?
+>>
+> This is to make sure performance meet requirements, such as bitrate and
+> framerate.
 
+Is it the driver's job to make enforce this? What if the application only
+deals with low-res video, but wants to encode a lot of those? Or is encoding
+a video off-line?
+
+The driver generally doesn't know the use-case, so if this is an artificial
+limitation as opposed to a hardware limitation, then I would just drop this.
+
+Regards,
+
+	Hans
+
+> We got your point. We will remove this and move limitation control to
+> start_streaming or REQBUFS.
+> Appreciated for your suggestion.:)
 > 
 > 
-> ? 2016/2/16 16:50, Marc Zyngier ??:
-> > On Tue, 16 Feb 2016 14:37:27 +0800
-> > MaJun <majun258@huawei.com> wrote:
-> > 
-> >> From: Ma Jun <majun258@huawei.com>
-> [...]
-> >> +	unsigned int nid;
-> >> +
-> >> +	nid = get_mbigen_nid(hwirq);
-> >> +
-> >> +	if (nid < 4)
-> >> +		return (nid * 4) + REG_MBIGEN_VEC_OFFSET;
-> >> +	else
-> >> +		return (nid - 4) * 4 + REG_MBIGEN_EXT_VEC_OFFSET;
-> >> +}
-> >> +
-> >> +static struct irq_chip mbigen_irq_chip = {
-> >> +	.name =			"mbigen-v1",
-> >> +};
-> >> +
-> >> +static void mbigen_write_msg(struct msi_desc *desc, struct msi_msg *msg)
-> >> +{
-> >> +	/* The address of doorbell is encoded in mbigen register by default
-> >> +	 * So,we don't need to program the doorbell address at here
-> >> +	 * Besides, the event ID is decided by the hardware pin number,
-> >> +	 * we can't change it in software.So, we don't need to encode the
-> >> +	 * event ID in mbigen register.
-> >> +	 */
-> > 
-> > Really? What if tomorrow I decide to change the EventID allocation
-> > policy in the ITS driver? Have your HW engineers really baked the
-> > behaviour of the Linux driver into the device?
-> > 
-> 
-> Yes.
-> If we really need to support this chip,is there
-> any possible solution for this problem?
-
-You would have to provide some sort of lookup table from the
-device-tree, or find a way to pass this information down the ITS code.
-
-The real question is: do we take this as it is and fix it once it
-breaks? or do we mandate a proper solution before this has a remote
-chance of getting in?
-
-At the moment, I don't know, because the idea of hardcoded MSIs is so
-wrong and so against the way the whole stack works that I just want to
-say no to this and run away.
-
-I need to think.
-
-	M.
--- 
-Jazz is not dead. It just smells funny.
+>>> +	}
