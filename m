@@ -1,45 +1,62 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 17 Feb 2016 15:34:41 +0000
-Subject: [PATCH] arm/arm64: KVM: vgic: Handle out-of-bound MMIO access
-Message-ID: <1455723281-23846-1-git-send-email-marc.zyngier@arm.com>
+Date: Wed, 17 Feb 2016 15:35:12 +0000
+Subject: [PATCH] arm64: KVM: vgic-v3: Restore ICH_APR0Rn_EL2 before
+ ICH_APR0Rn_EL2
+Message-ID: <1455723312-23896-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When performing a MMIO access via a KVM IO bus, it is possible
-that the access will actually be out-of-bounds (the redistributor
-handlers do not cover the whole device, for example). In this case,
-we return an error code, which leads to escaping to userspace
-to handle it. Not that good.
+The GICv3 architecture spec says:
 
-Instead, let's just treat it like any other OOB access, by either
-ignoring the write, or by returning a bunch of zeroes.
+Writing to the active priority registers in any order other than
+the following order will result in UNPREDICTABLE behavior:
+- ICH_AP0R<n>_EL2.
+- ICH_AP1R<n>_EL2.
 
-And let's keep the code quiet while we're at it, as nobody likes
-it when a guest can generate zillions on messages on the host's
-console...
+So let's not pointlessly go against the rule...
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/vgic.c | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+ arch/arm64/kvm/hyp/vgic-v3-sr.c | 20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 043032c..2358272 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -830,8 +830,11 @@ static int vgic_handle_mmio_access(struct kvm_vcpu *vcpu,
- 	offset = addr - iodev->addr;
- 	range = vgic_find_range(iodev->reg_ranges, len, offset);
- 	if (unlikely(!range || !range->handle_mmio)) {
--		pr_warn("Unhandled access %d %08llx %d\n", is_write, addr, len);
--		return -ENXIO;
-+		/* Treat an OOR access as RAZ/WI. */
-+		if (!is_write)
-+			memset(val, 0, len);
-+		pr_debug("Unhandled access %d %08llx %d\n", is_write, addr, len);
-+		return 0;
+diff --git a/arch/arm64/kvm/hyp/vgic-v3-sr.c b/arch/arm64/kvm/hyp/vgic-v3-sr.c
+index 9142e082..93f6c5c 100644
+--- a/arch/arm64/kvm/hyp/vgic-v3-sr.c
++++ b/arch/arm64/kvm/hyp/vgic-v3-sr.c
+@@ -149,16 +149,6 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
+ 
+ 	switch (nr_pri_bits) {
+ 	case 7:
+-		 write_gicreg(cpu_if->vgic_ap1r[3], ICH_AP1R3_EL2);
+-		 write_gicreg(cpu_if->vgic_ap1r[2], ICH_AP1R2_EL2);
+-	case 6:
+-		 write_gicreg(cpu_if->vgic_ap1r[1], ICH_AP1R1_EL2);
+-	default:
+-		 write_gicreg(cpu_if->vgic_ap1r[0], ICH_AP1R0_EL2);
+-	}	 	                           
+-		 	                           
+-	switch (nr_pri_bits) {
+-	case 7:
+ 		 write_gicreg(cpu_if->vgic_ap0r[3], ICH_AP0R3_EL2);
+ 		 write_gicreg(cpu_if->vgic_ap0r[2], ICH_AP0R2_EL2);
+ 	case 6:
+@@ -167,6 +157,16 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
+ 		 write_gicreg(cpu_if->vgic_ap0r[0], ICH_AP0R0_EL2);
  	}
  
- 	mmio.phys_addr = addr;
++	switch (nr_pri_bits) {
++	case 7:
++		 write_gicreg(cpu_if->vgic_ap1r[3], ICH_AP1R3_EL2);
++		 write_gicreg(cpu_if->vgic_ap1r[2], ICH_AP1R2_EL2);
++	case 6:
++		 write_gicreg(cpu_if->vgic_ap1r[1], ICH_AP1R1_EL2);
++	default:
++		 write_gicreg(cpu_if->vgic_ap1r[0], ICH_AP1R0_EL2);
++	}	 	                           
++		 	                           
+ 	switch (max_lr_idx) {
+ 	case 15:
+ 		write_gicreg(cpu_if->vgic_lr[VGIC_V3_LR_INDEX(15)], ICH_LR15_EL2);
 -- 
 2.1.4
