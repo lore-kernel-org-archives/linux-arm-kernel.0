@@ -1,36 +1,84 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Wed, 17 Feb 2016 10:54:06 -0600
-Subject: [PATCH v2 1/2] arm64: mm: Mark .rodata as RO
-In-Reply-To: <CAKv+Gu82_sXwRjZpqsLDMc_MVwZ3bRLodS4TEQRoRSKQCNQu3A@mail.gmail.com>
-References: <1455727274-16328-1-git-send-email-jeremy.linton@arm.com>
- <1455727274-16328-2-git-send-email-jeremy.linton@arm.com>
- <CAKv+Gu82_sXwRjZpqsLDMc_MVwZ3bRLodS4TEQRoRSKQCNQu3A@mail.gmail.com>
-Message-ID: <56C4A5AE.1090602@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 17 Feb 2016 17:58:09 +0100
+Subject: [PATCH v3 09/10] ARM: dts: introduce MPS2 AN385/AN386
+In-Reply-To: <56C4A46C.50506@arm.com>
+References: <1455617295-23736-1-git-send-email-vladimir.murzin@arm.com>
+ <56C349E6.2000002@arm.com> <56C4A46C.50506@arm.com>
+Message-ID: <7272921.u1gphgWzUn@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/17/2016 10:46 AM, Ard Biesheuvel wrote:
-> On 17 February 2016 at 17:41, Jeremy Linton <jeremy.linton@arm.com> wrote:
->> Currently the .rodata section is actually still executable when DEBUG_RODATA
->> is enabled. This changes that so the .rodata is actually read only, no execute.
->>
-(trimming)
->>
->> -       map_kernel_chunk(pgd, _stext, _etext, PAGE_KERNEL_EXEC);
->> +       map_kernel_chunk(pgd, _stext, __start_rodata, PAGE_KERNEL_EXEC);
->> +       map_kernel_chunk(pgd, __start_rodata, _etext, PAGE_KERNEL_EXEC);
->
-> Couldn't we map this non-exec from the start?
+On Wednesday 17 February 2016 16:48:44 Vladimir Murzin wrote:
+> On 16/02/16 16:10, Vladimir Murzin wrote:
+> > On 16/02/16 11:01, Arnd Bergmann wrote:
+> >> On Tuesday 16 February 2016 10:08:14 Vladimir Murzin wrote:
+> >>> +
+> >>> +       ethernet at 40200000 {
+> >>> +               compatible = "smsc,lan9220", "smsc,lan9115";
+> >>> +               reg = <0x40200000 0x10000>;
+> >>> +               interrupts = <13>;
+> >>> +               interrupt-parent = <&nvic>;
+> >>> +               smsc,irq-active-high;
+> >>> +       };
+> >>> +};
+> >>> +
+> >>>
+> >>
+> >> This node seems slightly misplaced. Is there some external bus interface
+> >> that this is connected to? The address suggests that it should be somewhere
+> >> below the /soc node, and you probably want to list the external bus
+> >> interface with a "ranges" property that identifies the addresses visibile
+> >> there, and put the external chip under there.
+> >>
+> > 
+> > I might messed it up since the MAC/PHY connects to the same 16-bit
+> > interface as the 16MB PSRAM external memory and both connected via AHB.
+> > 
+> > Not sure how it should be expressed, so some help form DT camp would be
+> > appreciated.
+> 
+> Does following fixup address your point on where/how ethernet node
+> should be placed?
 
-Probably, Mark suggested that, but Kees seemed to have reasons not to. 
-Either way, my opinion is that for that change to make sense we also 
-need to always enable the functionality turned on by DEBUG_RODATA.
 
->
->>          map_kernel_chunk(pgd, __init_begin, __init_end, PAGE_KERNEL_EXEC);
->>          map_kernel_chunk(pgd, _data, _end, PAGE_KERNEL);
->>
->> --
->> 2.4.3
->>
->
+
+> diff --git a/arch/arm/boot/dts/mps2-an385.dts b/arch/arm/boot/dts/an385.dts
+> index 976f86d..50c8d24 100644
+> --- a/arch/arm/boot/dts/mps2-an385.dts
+> +++ b/arch/arm/boot/dts/mps2-an385.dts
+> @@ -63,14 +63,10 @@
+>  		device_type = "memory";
+>  		reg = <0x21000000 0x1000000>;
+>  	};
+> +};
+> 
+> -	ethernet at 40200000 {
+> -		compatible = "smsc,lan9220", "smsc,lan9115";
+> -		reg = <0x40200000 0x10000>;
+> -		interrupts = <13>;
+> -		interrupt-parent = <&nvic>;
+> -		smsc,irq-active-high;
+> -	};
+> +&mb {
+> +	ranges = <0 0x40200000 0x10000>;
+>  };
+
+How is the range being set here? The way I read this is:
+
+"There is an external bus controller whose single CPU physical
+address for MMIO is configurable. The chip always connects
+a lan9220 device to it (as that is in the dtsi file) and
+nothing else is possible, and the bootloader in this
+version of the machine has configured the window to be
+at address 0x40200000."
+
+Is that what the hardware does?
+
+I would have expected the opposite, with the external bus
+interface being hardwired to one or more physical addresses
+(more than one if you have multiple chip-selects), and
+then allow to connect different devices, which are in the
+.dts file, while the bus controller is defined in the
+.dtsi file.
+
+	Arnd
