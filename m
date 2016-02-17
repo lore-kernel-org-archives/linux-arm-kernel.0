@@ -1,91 +1,40 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 17 Feb 2016 16:40:46 +0000
-Subject: [PATCH v2 14/17] arm64: KVM: vgic-v3: Save maintenance interrupt
- state only if required
-In-Reply-To: <1455727249-24752-1-git-send-email-marc.zyngier@arm.com>
-References: <1455727249-24752-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1455727249-24752-15-git-send-email-marc.zyngier@arm.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Wed, 17 Feb 2016 16:43:42 +0000
+Subject: [PATCH] ARM64: Don't set the default console to ttyAMA0
+Message-ID: <1455727422-10733-1-git-send-email-jonathanh@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Next on our list of useless accesses is the maintenance interrupt
-status registers (ICH_MISR_EL2, ICH_EISR_EL2).
+When booting Tegra210 with a minimal rootfs it may not be necessary to
+specify any boot parameters via the kernel command line as information
+for console is described via the "stdout-path" node the device-tree
+blob. However, when there are no boot parameter specified, no output is
+seen on the console in the case of Tegra210 and this is because the
+default command line in the ARM64 defconfig specifies the console as
+ttyAMA0 which takes precedence over the "stdout-path" node from
+device-tree.
 
-It is pointless to save them if we haven't asked for a maintenance
-interrupt the first place, which can only happen for two reasons:
-- Underflow: ICH_HCR_UIE will be set,
-- EOI: ICH_LR_EOI will be set.
+ttyAMAx is used for AMBA PL011 serial ports, but not all ARM64 platforms
+use this serial driver. Therefore, remove the default command line
+entry from the ARM64 defconfig to ensure that ttyAMA0 does not get set
+as the default console if no kernel command line is specified.
 
-These conditions can be checked on the in-memory copies of the regs.
-Should any of these two condition be valid, we must read GICH_MISR.
-We can then check for ICH_MISR_EOI, and only when set read
-ICH_EISR_EL2.
-
-This means that in most case, we don't have to save them at all.
-
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
 ---
- arch/arm64/kvm/hyp/vgic-v3-sr.c | 34 ++++++++++++++++++++++++++++++++--
- 1 file changed, 32 insertions(+), 2 deletions(-)
+ arch/arm64/configs/defconfig | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm64/kvm/hyp/vgic-v3-sr.c b/arch/arm64/kvm/hyp/vgic-v3-sr.c
-index b62c923..3463c0a 100644
---- a/arch/arm64/kvm/hyp/vgic-v3-sr.c
-+++ b/arch/arm64/kvm/hyp/vgic-v3-sr.c
-@@ -133,6 +133,36 @@ static void __hyp_text __gic_v3_set_lr(u64 val, int lr)
- 	}
- }
- 
-+static void __hyp_text save_maint_int_state(struct kvm_vcpu *vcpu, int nr_lr)
-+{
-+	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
-+	int i;
-+	bool expect_mi;
-+
-+	expect_mi = !!(cpu_if->vgic_hcr & ICH_HCR_UIE);
-+
-+	for (i = 0; i < nr_lr; i++) {
-+		if (!(vcpu->arch.vgic_cpu.live_lrs & (1UL << i)))
-+				continue;
-+
-+		expect_mi |= (!(cpu_if->vgic_lr[i] & ICH_LR_HW) &&
-+			      (cpu_if->vgic_lr[i] & ICH_LR_EOI));
-+	}
-+
-+	if (expect_mi) {
-+		cpu_if->vgic_misr  = read_gicreg(ICH_MISR_EL2);
-+
-+		if (cpu_if->vgic_misr & ICH_MISR_EOI) {
-+			cpu_if->vgic_eisr = read_gicreg(ICH_EISR_EL2);
-+		} else {
-+			cpu_if->vgic_eisr = 0;
-+		}
-+	} else {
-+		cpu_if->vgic_misr = 0;
-+		cpu_if->vgic_eisr = 0;
-+	}
-+}
-+
- void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
- {
- 	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
-@@ -150,8 +180,6 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
- 		int i;
- 		u32 max_lr_idx, nr_pri_bits;
- 
--		cpu_if->vgic_misr  = read_gicreg(ICH_MISR_EL2);
--		cpu_if->vgic_eisr  = read_gicreg(ICH_EISR_EL2);
- 		cpu_if->vgic_elrsr = read_gicreg(ICH_ELSR_EL2);
- 
- 		write_gicreg(0, ICH_HCR_EL2);
-@@ -159,6 +187,8 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
- 		max_lr_idx = vtr_to_max_lr_idx(val);
- 		nr_pri_bits = vtr_to_nr_pri_bits(val);
- 
-+		save_maint_int_state(vcpu, max_lr_idx + 1);
-+
- 		for (i = 0; i <= max_lr_idx; i++) {
- 			if (vcpu->arch.vgic_cpu.live_lrs & (1UL << i))
- 				cpu_if->vgic_lr[i] = __gic_v3_get_lr(i);
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index d21631760ec7..caecb66188be 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -64,7 +64,6 @@ CONFIG_KSM=y
+ CONFIG_TRANSPARENT_HUGEPAGE=y
+ CONFIG_CMA=y
+ CONFIG_XEN=y
+-CONFIG_CMDLINE="console=ttyAMA0"
+ # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+ CONFIG_COMPAT=y
+ CONFIG_CPU_IDLE=y
 -- 
 2.1.4
