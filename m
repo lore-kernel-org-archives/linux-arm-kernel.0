@@ -1,46 +1,67 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 16 Feb 2016 17:22:36 -0800
-Subject: [PATCH 1/4] arm64: Broadcom Vulcan support
-In-Reply-To: <1455389195-31870-2-git-send-email-jchandra@broadcom.com>
-References: <1455389195-31870-1-git-send-email-jchandra@broadcom.com>
- <1455389195-31870-2-git-send-email-jchandra@broadcom.com>
-Message-ID: <56C3CB5C.7080609@gmail.com>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Tue, 16 Feb 2016 17:31:48 -0800
+Subject: [PATCH v2] serial: earlycon: rework common framework for earlycon
+ declarations
+In-Reply-To: <CAK7LNAS_vietwRRFnH3YhbWSzjRFP4U6rjftYek1KQ3ips2ZSQ@mail.gmail.com>
+References: <1455273394-27350-1-git-send-email-yamada.masahiro@socionext.com>
+ <56BDF799.1030505@hurleysoftware.com>
+ <CAK7LNAS_vietwRRFnH3YhbWSzjRFP4U6rjftYek1KQ3ips2ZSQ@mail.gmail.com>
+Message-ID: <56C3CD84.9000504@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/02/16 10:46, Jayachandran C wrote:
-> From: Zi Shen Lim <zlim@broadcom.com>
+On 02/12/2016 08:30 AM, Masahiro Yamada wrote:
+> Hi Peter,
 > 
-> Add a configuration option and a device tree for Broadcom's Vulcan
-> ARM64 processor. brcm-vulcan.dtsi has the on-chip blocks like the
-> PCIe controller, GICv3 with ITS, PMU, system timer and pl011 UART.
-> brcm-vulcan-eval.dts has definitions for a basic evaluation board.
-> The firmware supports PSCI 0.2 for cpu wakeup.
 > 
-> Signed-off-by: Zi Shen Lim <zlim@broadcom.com>
-> [ updated and split dts - jchandra at broadcom.com ]
-> Signed-off-by: Jayachandran C <jchandra@broadcom.com>
-> ---
->  arch/arm64/Kconfig.platforms                      |   5 +
->  arch/arm64/boot/dts/broadcom/Makefile             |   1 +
->  arch/arm64/boot/dts/broadcom/brcm-vulcan-eval.dts |  33 +++++
->  arch/arm64/boot/dts/broadcom/brcm-vulcan.dtsi     | 146 ++++++++++++++++++++++
->  4 files changed, 185 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/broadcom/brcm-vulcan-eval.dts
->  create mode 100644 arch/arm64/boot/dts/broadcom/brcm-vulcan.dtsi
+> 2016-02-13 0:17 GMT+09:00 Peter Hurley <peter@hurleysoftware.com>:
+>> On 02/12/2016 02:36 AM, Masahiro Yamada wrote:
+>>> Commit 71f50c6d9a22 ("of: drop symbols declared by _OF_DECLARE() from
+>>> modules") fixed the link error introduced by commit b8d20e06eaad
+>>> ("serial: 8250_uniphier: add earlycon support").
+>>>
+>>> After commit 2eaa790989e0 ("earlycon: Use common framework for
+>>> earlycon declarations") was applied, the link error came back
+>>> because the commit reworked OF_EARLYCON_DECLARE() to not use
+>>> _OF_DECLARE().
+>>
+>> What link error are you getting?
+> 
+> The combination of CONFIG_SERIAL_8250_CONSOLE=y
+> and CONFIG_SERIAL_8250_UNIPHIER=m causes a link error.
+> 
+> 
+> 
+>>
+>>> This commit reworks OF_EARLYCON_DECLARE() again based on
+>>> _OF_DECLARE().  My motivations are:
+>>>
+>>>  - Fix the link error in a generic way (without patching
+>>>    drivers/tty/serial/8250/8250_uniphier.c)
+>>>
+>>>  - Delete struct earlycon_id.  This struct is re-inventing the wheel;
+>>>    the fields "name", "compatible", "setup" can be implemented in
+>>>    struct of_device_id as other frameworks do.
+>>
+>> This patch basically reverts the common framework.
+>> What happens when not building with OF? Does it still declare the
+>> earlycon table?
+> 
+> Ah, I missed this.  (sigh)
+> 
+> Earlycon must still work without OF.
+> My way only works with OF.
+> 
+> I really screwed up.  Sorry.
 
-You might want a MAINTAINERS entry too for these new files?
+Hi Masahiro,
 
-[snip]
+No big deal.
 
-> +++ b/arch/arm64/boot/dts/broadcom/brcm-vulcan-eval.dts
-> @@ -0,0 +1,33 @@
-> +/*
-> + * dts file for Broadcom (BRCM) Vulcan Eval Platform
-> + *
-> + * Copyright (C) 2013-2016, Broadcom Corporation.
+We need to come up with a better way to enable earlycon builds and
+opt-in by driver than the current method. Breaking builds with earlycon
+support has happened several times in the last couple of years so
+it's not just you.
 
-My little finger tells me we should be using a plain
-Broadcom now and drop the Corporation in the license header.
--- 
-Florian
+Regards,
+Peter Hurley
