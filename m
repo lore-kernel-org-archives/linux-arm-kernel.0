@@ -1,42 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 17 Feb 2016 10:40:41 +0100
-Subject: [PATCH] sound: hdmi: avoid dereferencing uninitialized 'jack'
- pointer
-In-Reply-To: <s5h1t8b65n7.wl-tiwai@suse.de>
-References: <1455634059-1896914-1-git-send-email-arnd@arndb.de>
- <s5h8u2j6749.wl-tiwai@suse.de> <s5h1t8b65n7.wl-tiwai@suse.de>
-Message-ID: <7110505.tMOluD0MjY@wuerfel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 17 Feb 2016 09:41:47 +0000
+Subject: [PATCH 11/11] ARM: versatile: move CLCD configuration to device
+ tree
+In-Reply-To: <56C438DA.5040109@ti.com>
+References: <1454594660-7532-1-git-send-email-linus.walleij@linaro.org>
+ <1454594660-7532-12-git-send-email-linus.walleij@linaro.org>
+ <56C438DA.5040109@ti.com>
+Message-ID: <20160217094147.GG19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 17 February 2016 10:35:40 Takashi Iwai wrote:
-> From: Takashi Iwai <tiwai@suse.de>
-> Subject: [PATCH v2] ALSA: jack: Allow building the jack layer without
->  input device
-> 
-> Since the recent integration of kctl jack and input jack layers, we
-> can basically build the jack layer even without input devices.  That
-> is, the jack layer itself can be built with conditional to enable the
-> input device support or not, while the users may enable always
-> CONFIG_SND_JACK unconditionally.
-> 
-> For achieving it, this patch changes the following:
-> - A new Kconfig, CONFIG_SND_JACK_INPUT_DEV, was introduced to indicate
->   whether the jack layer supports the input device,
-> - A few items in snd_jack struct and relevant codes are conditionally
->   built upon CONFIG_SND_JACK_INPUT_DEV,
-> - The users of CONFIG_SND_JACK drop the messy dependency on
->   CONFIG_INPUT.
-> 
-> This change also automagically fixes a potential bug in HD-audio
-> driver Arnd reported, where the NULL or uninitialized jack instance is
-> dereferenced.
-> 
-> Reported-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Takashi Iwai <tiwai@suse.de>
-> 
+On Wed, Feb 17, 2016 at 11:09:46AM +0200, Tomi Valkeinen wrote:
+> What's the SYS_CLCD register? An EEPROM or such, programmed when the
+> board is manufactured? Is the panel meant to be switchable by the user,
+> possibly to a panel that's not "standard"?
 
-Looks great, that indeed takes care of the issue I reported and
-makes the code more useful and more robust overall.
+If you read this bit of the patch, which describes the bits in the
+register, it gives some clues:
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+-#define SYS_CLCD_MODE_MASK     (3 << 0)
+-#define SYS_CLCD_MODE_888      (0 << 0)
+-#define SYS_CLCD_MODE_5551     (1 << 0)
+-#define SYS_CLCD_MODE_565_RLSB (2 << 0)
+-#define SYS_CLCD_MODE_565_BLSB (3 << 0)
+-#define SYS_CLCD_NLCDIOON      (1 << 2)
+-#define SYS_CLCD_VDDPOSSWITCH  (1 << 3)
+-#define SYS_CLCD_PWR3V5SWITCH  (1 << 4)
+-#define SYS_CLCD_ID_MASK       (0x1f << 8)
+-#define SYS_CLCD_ID_SANYO_3_8  (0x00 << 8)
+-#define SYS_CLCD_ID_UNKNOWN_8_4        (0x01 << 8)
+-#define SYS_CLCD_ID_EPSON_2_2  (0x02 << 8)
+-#define SYS_CLCD_ID_SANYO_2_5  (0x07 << 8)
+-#define SYS_CLCD_ID_VGA                (0x1f << 8)
+
+The LCD panels plug-in to the board, and they have a 5-bit hard-wired
+ID, which is signalled through five ID lines into the FPGA.
+
+The register is also writable, which is used to control power supplies
+to the LCD and an external MUX which changes the RGB format outside of
+the capabilities of the CLCD itself.
+
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently@9.6Mbps down 400kbps up
+according to speedtest.net.
