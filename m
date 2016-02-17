@@ -1,66 +1,116 @@
-From: gerald.schaefer@de.ibm.com (Gerald Schaefer)
-Date: Wed, 17 Feb 2016 20:13:40 +0100
-Subject: [BUG] random kernel crashes after THP rework on s390 (maybe
- also on PowerPC and ARM)
-In-Reply-To: <alpine.LFD.2.20.1602131238260.1910@schleppi>
-References: <20160211192223.4b517057@thinkpad>
- <20160211190942.GA10244@node.shutemov.name>
- <20160211205702.24f0d17a@thinkpad>
- <20160212154116.GA15142@node.shutemov.name>
- <56BE00E7.1010303@de.ibm.com> <20160212181640.4eabb85f@thinkpad>
- <20160212231510.GB15142@node.shutemov.name>
- <alpine.LFD.2.20.1602131238260.1910@schleppi>
-Message-ID: <20160217201340.2dafad8d@thinkpad>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 17 Feb 2016 19:16:43 +0000
+Subject: KASAN issues with idle / hotplug area (was: Re: [PATCH v5sub1
+ 7/8] arm64: move kernel image to base of vmalloc area)
+In-Reply-To: <20160217175656.GJ32647@leverpostej>
+References: <CAKv+Gu84mVP=YjbLhWoGj9AEUD8m8+Lq8kTCniCHwxJwMWaZtA@mail.gmail.com>
+ <20160212152641.GK31665@e104818-lin.cambridge.arm.com>
+ <56BDFC86.5010705@arm.com>
+ <20160212160652.GL31665@e104818-lin.cambridge.arm.com>
+ <56C1E072.2090909@virtuozzo.com>
+ <20160215185957.GB19413@e104818-lin.cambridge.arm.com>
+ <56C31D1D.50708@virtuozzo.com> <20160217143950.GC32647@leverpostej>
+ <20160217170110.GE32647@leverpostej>
+ <20160217175656.GJ32647@leverpostej>
+Message-ID: <20160217191643.GK32647@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 13 Feb 2016 12:58:31 +0100 (CET)
-Sebastian Ott <sebott@linux.vnet.ibm.com> wrote:
+On Wed, Feb 17, 2016 at 05:56:56PM +0000, Mark Rutland wrote:
+> On Wed, Feb 17, 2016 at 05:01:11PM +0000, Mark Rutland wrote:
+> > On Wed, Feb 17, 2016 at 02:39:51PM +0000, Mark Rutland wrote:
+> > > Perhaps the simplest option is to not instrument invoke_psci_fn_* and
+> > > psci_suspend_finisher. Do we have a per-function annotation to avoid
+> > > KASAN instrumentation, like notrace? I need to investigate, but we may
+> > > also need notrace for similar reasons.
+> >
+> > I came up with the patch below, per the reasoning above.
+> > 
+> > It _changes_ the KASAN splats (I see errors in tick_program_event rather
+> > than find_busiest_group), but doesn't seem to get rid of them. I'm not
+> > sure if I've missed something, or if we also have another latent issue.
+> > 
+> > Ideas?
+> 
+> I'd missed annotating __cpu_suspend_save. I've fixed that up locally
+> (along with s/virt_to_phys/__virt_to_phys due to the inlining issue).
 
-> [   59.875935] ------------[ cut here ]------------
-> [   59.875937] kernel BUG at mm/huge_memory.c:2884!
-> [   59.875979] illegal operation: 0001 ilc:1 [#1] PREEMPT SMP DEBUG_PAGEALLOC
-> [   59.875986] Modules linked in: bridge stp llc btrfs xor mlx4_en vxlan ip6_udp_tunnel udp_tunnel mlx4_ib ptp pps_core ib_sa ib_mad ib_core ib_addr ghash_s390 prng raid6_pq ecb aes_s390 des_s390 des_generic sha512_s390 sha256_s390 sha1_s390 mlx4_core sha_common genwqe_card scm_block crc_itu_t vhost_net tun vhost dm_mod macvtap eadm_sch macvlan kvm autofs4
-> [   59.876033] CPU: 2 PID: 5402 Comm: git Tainted: G        W       4.4.0-07794-ga4eff16-dirty #77
-> [   59.876036] task: 00000000d2312948 ti: 00000000cfecc000 task.ti: 00000000cfecc000
-> [   59.876039] Krnl PSW : 0704d00180000000 00000000002bf3aa (__split_huge_pmd_locked+0x562/0xa10)
-> [   59.876045]            R:0 T:1 IO:1 EX:1 Key:0 M:1 W:0 P:0 AS:3 CC:1 PM:0 EA:3
->                Krnl GPRS: 0000000001a7a1cf 000003d10177c000 0000000000044068 000000005df00215
-> [   59.876051]            0000000000000001 0000000000000001 0000000000000000 00000000774e6900
-> [   59.876054]            000003ff52000000 000000006d403b10 000000006e1eb800 000003ff51f00000
-> [   59.876058]            000003d10177c000 0000000000715190 00000000002bf234 00000000cfecfb58
-> [   59.876068] Krnl Code: 00000000002bf39c: d507d010a000	clc	16(8,%%r13),0(%%r10)
->                           00000000002bf3a2: a7840004		brc	8,2bf3aa
->                          #00000000002bf3a6: a7f40001		brc	15,2bf3a8
->                          >00000000002bf3aa: 91407440		tm	1088(%%r7),64
->                           00000000002bf3ae: a7840208		brc	8,2bf7be
->                           00000000002bf3b2: a7f401e9		brc	15,2bf784
->                           00000000002bf3b6: 9104a006		tm	6(%%r10),4
->                           00000000002bf3ba: a7740004		brc	7,2bf3c2
-> [   59.876089] Call Trace:
-> [   59.876092] ([<00000000002bf234>] __split_huge_pmd_locked+0x3ec/0xa10)
-> [   59.876095]  [<00000000002c4310>] __split_huge_pmd+0x118/0x218
-> [   59.876099]  [<00000000002810e8>] unmap_single_vma+0x2d8/0xb40
-> [   59.876102]  [<0000000000282d66>] zap_page_range+0x116/0x318
-> [   59.876105]  [<000000000029b834>] SyS_madvise+0x23c/0x5e8
-> [   59.876108]  [<00000000006f9f56>] system_call+0xd6/0x258
-> [   59.876111]  [<000003ff9bbfd282>] 0x3ff9bbfd282
-> [   59.876113] INFO: lockdep is turned off.
-> [   59.876115] Last Breaking-Event-Address:
-> [   59.876118]  [<00000000002bf3a6>] __split_huge_pmd_locked+0x55e/0xa10
+Thinking about it more, I shouldn't have to annotate __cpu_suspend_save,
+as it returns (and hence should have cleaned up after itself).
 
-The BUG at mm/huge_memory.c:2884 is interesting, it's the BUG_ON(!pte_none(*pte))
-check in __split_huge_pmd_locked(). Obviously we expect the pre-allocated
-pagetables to be empty, but in collapse_huge_page() we deposit the original
-pagetable instead of allocating a new (empty) one. This saves an allocation,
-which is good, but doesn't that mean that if such a collapsed hugepage will
-ever be split, we will always run into the BUG_ON(!pte_none(*pte)), or one
-of the two other VM_BUG_ONs in mm/huge_memory.c that check the same?
+Looking at the assembly, functions seem to get instrumented regardless
+of the __no_sanitize_address annotation. The assembly of
+__invoke_psci_fn_{smc,hvc} look identical, even if one has the
+annotation and one does not.
 
-This behavior is not new, it was the same before the THP rework, so I do not
-assume that it is related to the current problems, maybe with the exception
-of this specific crash. I never saw the BUG at mm/huge_memory.c:2884 myself,
-and the other crashes probably cannot be explained with this. Maybe I am
-also missing something, but I do not see how collapse_huge_page() and the
-(non-empty) pgtable deposit there can work out with the BUG_ON(!pte_none(*pte))
-checks. Any thoughts?
+In the case below, it looks like __invoke_psci_fn_hvc is storing to the
+shadow area even though it's anotated with __no_sanitize_address.  Note
+that the adrp symbol resolution is bogus; psci_to_linux_errno happens to
+be at offset 0 in the as-yet unlinked psci.o object.
+
+0000000000000420 <__invoke_psci_fn_hvc>:
+ 420:   d10283ff        sub     sp, sp, #0xa0
+ 424:   90000004        adrp    x4, 0 <psci_to_linux_errno>
+ 428:   91000084        add     x4, x4, #0x0
+ 42c:   90000005        adrp    x5, 0 <psci_to_linux_errno>
+ 430:   910000a5        add     x5, x5, #0x0
+ 434:   d2800007        mov     x7, #0x0                        // #0
+ 438:   a9017bfd        stp     x29, x30, [sp,#16]
+ 43c:   910043fd        add     x29, sp, #0x10
+ 440:   d2800006        mov     x6, #0x0                        // #0
+ 444:   a90253f3        stp     x19, x20, [sp,#32]
+ 448:   9100c3b3        add     x19, x29, #0x30
+ 44c:   d2dff214        mov     x20, #0xff9000000000            // #280993940373504
+ 450:   a90393a5        stp     x5, x4, [x29,#56]
+ 454:   f2fbfff4        movk    x20, #0xdfff, lsl #48
+ 458:   d343fe73        lsr     x19, x19, #3
+ 45c:   d2915664        mov     x4, #0x8ab3                     // #35507
+ 460:   f9001bf5        str     x21, [sp,#48]
+ 464:   f2a836a4        movk    x4, #0x41b5, lsl #16
+ 468:   8b140275        add     x21, x19, x20
+ 46c:   f9001ba4        str     x4, [x29,#48]
+ 470:   3204d3e4        mov     w4, #0xf1f1f1f1                 // #-235802127
+ 474:   b8346a64        str     w4, [x19,x20]
+ 478:   3204d7e4        mov     w4, #0xf3f3f3f3                 // #-202116109
+ 47c:   b9000aa4        str     w4, [x21,#8]
+ 480:   910143a4        add     x4, x29, #0x50
+ 484:   d2800005        mov     x5, #0x0                        // #0
+ 488:   f90003e4        str     x4, [sp]
+ 48c:   d2800004        mov     x4, #0x0                        // #0
+ 490:   94000000        bl      0 <arm_smccc_hvc>
+ 494:   f9402ba0        ldr     x0, [x29,#80]
+ 498:   910003bf        mov     sp, x29
+ 49c:   b8346a7f        str     wzr, [x19,x20]
+ 4a0:   b9000abf        str     wzr, [x21,#8]
+ 4a4:   a94153f3        ldp     x19, x20, [sp,#16]
+ 4a8:   f94013f5        ldr     x21, [sp,#32]
+ 4ac:   a8c97bfd        ldp     x29, x30, [sp],#144
+ 4b0:   d65f03c0        ret
+ 4b4:   d503201f        nop
+
+For comparison, without KASAN __incoke_psci_fn_hvc looks like:
+
+0000000000000280 <__invoke_psci_fn_hvc>:
+ 280:   d10103ff        sub     sp, sp, #0x40
+ 284:   d2800007        mov     x7, #0x0                        // #0
+ 288:   d2800006        mov     x6, #0x0                        // #0
+ 28c:   d2800005        mov     x5, #0x0                        // #0
+ 290:   a9017bfd        stp     x29, x30, [sp,#16]
+ 294:   910043fd        add     x29, sp, #0x10
+ 298:   910043a4        add     x4, x29, #0x10
+ 29c:   f90003e4        str     x4, [sp]
+ 2a0:   d2800004        mov     x4, #0x0                        // #0
+ 2a4:   94000000        bl      0 <arm_smccc_hvc>
+ 2a8:   910003bf        mov     sp, x29
+ 2ac:   f9400ba0        ldr     x0, [x29,#16]
+ 2b0:   a8c37bfd        ldp     x29, x30, [sp],#48
+ 2b4:   d65f03c0        ret
+
+I also tried using __attribute__((no_sanitize_address)) directly, in
+case there was some header issue, but that doesn't seem to be the case.
+
+I'm using the Linaro 15.08 AArch64 GCC 5.1. Is anyone else able to
+confirm whether they see the same? Does the same happen for x86?
+
+Thanks,
+Mark.
