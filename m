@@ -1,72 +1,85 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Tue, 16 Feb 2016 16:18:36 -0800
-Subject: [PATCH v2 2/3] ARM: dts: vf-colibri: add basic supply regulators
-In-Reply-To: <1455668317-15728-1-git-send-email-stefan@agner.ch>
-References: <1455668317-15728-1-git-send-email-stefan@agner.ch>
-Message-ID: <1455668317-15728-2-git-send-email-stefan@agner.ch>
+Date: Tue, 16 Feb 2016 16:18:35 -0800
+Subject: [PATCH v2 1/3] ARM: dts: vf-colibri: remove regulator container node
+Message-ID: <1455668317-15728-1-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Colibri modules need to be powered using the power pins 3V3 and
-AVDD_AUDIO. Add fixed regulators which represent this power rails.
-Potentially, those power rails could be switched on a carrier
-board. A carrier board device tree could add a own regulator with
-a GPIO, and reference that regulator in a vin-supply property of
-those new module level system regulators.
+Drop the fake simple-bus container 'regulators' and put the
+regulators directly under the root node. This also makes the
+artificial 'reg' properties superfluous. While at it, name
+the regulators according to schematics.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
 Changes since v1:
-- Add module prefix to avoid namespace issue with Carrier Board regulators
-- Name the regulators according to schematics
+- Rename regulators according to schematics
+- Drop sys prefix
 
- arch/arm/boot/dts/vf-colibri.dtsi | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ arch/arm/boot/dts/vf-colibri-eval-v3.dtsi | 43 ++++++++++++-------------------
+ 1 file changed, 17 insertions(+), 26 deletions(-)
 
-diff --git a/arch/arm/boot/dts/vf-colibri.dtsi b/arch/arm/boot/dts/vf-colibri.dtsi
-index ff6f58e..dcc73b7 100644
---- a/arch/arm/boot/dts/vf-colibri.dtsi
-+++ b/arch/arm/boot/dts/vf-colibri.dtsi
-@@ -48,14 +48,32 @@
- 		enable-gpios = <&gpio1 13 GPIO_ACTIVE_HIGH>;
- 		status = "disabled";
+diff --git a/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi b/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
+index b494673..ca061c9 100644
+--- a/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
++++ b/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
+@@ -50,32 +50,23 @@
+ 		clock-frequency = <16000000>;
  	};
-+
-+	reg_module_3v3: regulator-module-3v3 {
+ 
+-	regulators {
+-		compatible = "simple-bus";
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-
+-		sys_5v0_reg: regulator at 0 {
+-			compatible = "regulator-fixed";
+-			reg = <0>;
+-			regulator-name = "5v0";
+-			regulator-min-microvolt = <5000000>;
+-			regulator-max-microvolt = <5000000>;
+-			regulator-always-on;
+-		};
++	reg_5v0: regulator-5v0 {
 +		compatible = "regulator-fixed";
-+		regulator-name = "+V3.3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
++		regulator-name = "5V";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
 +		regulator-always-on;
 +	};
-+
-+	reg_module_3v3_avdd: regulator-module-3v3-avdd {
+ 
+-		/* USBH_PEN */
+-		usbh_vbus_reg: regulator at 1 {
+-			compatible = "regulator-fixed";
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&pinctrl_usbh1_reg>;
+-			reg = <1>;
+-			regulator-name = "usbh_vbus";
+-			regulator-min-microvolt = <5000000>;
+-			regulator-max-microvolt = <5000000>;
+-			gpio = <&gpio2 19 GPIO_ACTIVE_LOW>;
+-			vin-supply = <&sys_5v0_reg>;
+-		};
++	reg_usbh_vbus: regulator-usbh-vbus {
 +		compatible = "regulator-fixed";
-+		regulator-name = "+V3.3_AVDD_AUDIO";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-always-on;
-+	};
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_usbh1_reg>;
++		regulator-name = "VCC_USB[1-4]";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		gpio = <&gpio2 19 GPIO_ACTIVE_LOW>; /* USBH_PEN resp. USBH_P_EN */
++		vin-supply = <&reg_5v0>;
+ 	};
  };
  
- &adc0 {
- 	status = "okay";
-+	vref-supply = <&reg_module_3v3_avdd>;
+@@ -145,7 +136,7 @@
  };
  
- &adc1 {
- 	status = "okay";
-+	vref-supply = <&reg_module_3v3_avdd>;
+ &usbh1 {
+-	vbus-supply = <&usbh_vbus_reg>;
++	vbus-supply = <&reg_usbh_vbus>;
  };
  
- &can0 {
-@@ -96,6 +114,7 @@
- 
- &fec1 {
- 	phy-mode = "rmii";
-+	phy-supply = <&reg_module_3v3>;
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_fec1>;
- };
+ &iomuxc {
 -- 
 2.7.1
