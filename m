@@ -1,50 +1,72 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 17 Feb 2016 16:40:48 +0000
-Subject: [PATCH v2 16/17] arm64: KVM: vgic-v3: Only wipe LRs on vcpu exit
-In-Reply-To: <1455727249-24752-1-git-send-email-marc.zyngier@arm.com>
-References: <1455727249-24752-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1455727249-24752-17-git-send-email-marc.zyngier@arm.com>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Wed, 17 Feb 2016 10:41:13 -0600
+Subject: [PATCH v2 1/2] arm64: mm: Mark .rodata as RO
+In-Reply-To: <1455727274-16328-1-git-send-email-jeremy.linton@arm.com>
+References: <1455727274-16328-1-git-send-email-jeremy.linton@arm.com>
+Message-ID: <1455727274-16328-2-git-send-email-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So far, we're always writing all possible LRs, setting the empty
-ones with a zero value. This is obvious doing a low of work for
-nothing, and we're better off clearing those we've actually
-dirtied on the exit path (it is very rare to inject more than one
-interrupt at a time anyway).
+Currently the .rodata section is actually still executable when DEBUG_RODATA
+is enabled. This changes that so the .rodata is actually read only, no execute.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
 ---
- arch/arm64/kvm/hyp/vgic-v3-sr.c | 9 ++++-----
- 1 file changed, 4 insertions(+), 5 deletions(-)
+ arch/arm64/kernel/vmlinux.lds.S |  5 +++--
+ arch/arm64/mm/mmu.c             | 17 +++++++++++++----
+ 2 files changed, 16 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/kvm/hyp/vgic-v3-sr.c b/arch/arm64/kvm/hyp/vgic-v3-sr.c
-index ff67296..5f12c57 100644
---- a/arch/arm64/kvm/hyp/vgic-v3-sr.c
-+++ b/arch/arm64/kvm/hyp/vgic-v3-sr.c
-@@ -199,6 +199,7 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
- 			}
- 
- 			cpu_if->vgic_lr[i] = __gic_v3_get_lr(i);
-+			__gic_v3_set_lr(0, i);
- 		}
- 
- 		switch (nr_pri_bits) {
-@@ -296,12 +297,10 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
- 		}
- 		 	                           
- 		for (i = 0; i <= max_lr_idx; i++) {
--			val = 0;
--
--			if (live_lrs & (1 << i))
--				val = cpu_if->vgic_lr[i];
-+			if (!(live_lrs & (1 << i)))
-+				continue;
- 
--			__gic_v3_set_lr(val, i);
-+			__gic_v3_set_lr(cpu_if->vgic_lr[i], i);
- 		}
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index 8f4fc2c..9208f53 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -114,8 +114,9 @@ SECTIONS
+ 		*(.got)			/* Global offset table		*/
  	}
  
+-	RO_DATA(PAGE_SIZE)
+-	EXCEPTION_TABLE(8)
++	ALIGN_DEBUG_RO_MIN(0)
++	RO_DATA(PAGE_SIZE)		/* everything from this point to */
++	EXCEPTION_TABLE(8)		/* _etext will be marked RO NX   */
+ 	NOTES
+ 
+ 	ALIGN_DEBUG_RO_MIN(PAGE_SIZE)
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index ab69a99..9aa5201 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -453,10 +453,18 @@ static void __init map_mem(pgd_t *pgd)
+ #ifdef CONFIG_DEBUG_RODATA
+ void mark_rodata_ro(void)
+ {
+-	create_mapping_late(__pa(_stext), (unsigned long)_stext,
+-				(unsigned long)_etext - (unsigned long)_stext,
+-				PAGE_KERNEL_ROX);
++	unsigned long section_size;
+ 
++	section_size = (unsigned long)__start_rodata - (unsigned long)_stext;
++	create_mapping_late(__pa(_stext), (unsigned long)_stext,
++			    section_size, PAGE_KERNEL_ROX);
++	/*
++	 * mark .rodata as read only. Use _etext rather than __end_rodata to
++	 * cover NOTES and EXCEPTION_TABLE.
++	 */
++	section_size = (unsigned long)_etext - (unsigned long)__start_rodata;
++	create_mapping_late(__pa(__start_rodata), (unsigned long)__start_rodata,
++			    section_size, PAGE_KERNEL_RO);
+ }
+ #endif
+ 
+@@ -486,7 +494,8 @@ static void __init map_kernel_chunk(pgd_t *pgd, void *va_start, void *va_end,
+ static void __init map_kernel(pgd_t *pgd)
+ {
+ 
+-	map_kernel_chunk(pgd, _stext, _etext, PAGE_KERNEL_EXEC);
++	map_kernel_chunk(pgd, _stext, __start_rodata, PAGE_KERNEL_EXEC);
++	map_kernel_chunk(pgd, __start_rodata, _etext, PAGE_KERNEL_EXEC);
+ 	map_kernel_chunk(pgd, __init_begin, __init_end, PAGE_KERNEL_EXEC);
+ 	map_kernel_chunk(pgd, _data, _end, PAGE_KERNEL);
+ 
 -- 
-2.1.4
+2.4.3
