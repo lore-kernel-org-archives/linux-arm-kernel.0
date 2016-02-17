@@ -1,55 +1,54 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 17 Feb 2016 13:20:46 -0800
-Subject: [PATCH 2/2] clk: ti: Add support for dm814x ADPLL
-In-Reply-To: <20160217205257.2278.11639@quark.deferred.io>
-References: <1455312009-808-1-git-send-email-tony@atomide.com>
- <1455312009-808-3-git-send-email-tony@atomide.com>
- <20160217011930.2278.38316@quark.deferred.io>
- <20160217173949.GB21202@atomide.com>
- <20160217205257.2278.11639@quark.deferred.io>
-Message-ID: <20160217212045.GE21202@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 17 Feb 2016 21:25:51 +0000
+Subject: [arm:for-next 24/31] arch/arm/kernel/hyp-stub.S:168: Error:
+ selected processor does not support ARM mode `ubfx r7,r7,#28,#4'
+In-Reply-To: <20160217195127.GA4566@e106794-lin.cambridge.arm.com>
+References: <201602180044.PcvJbrb9%fengguang.wu@intel.com>
+ <20160217195127.GA4566@e106794-lin.cambridge.arm.com>
+Message-ID: <20160217212551.GJ19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Michael Turquette <mturquette@baylibre.com> [160217 12:53]:
-> Quoting Tony Lindgren (2016-02-17 09:39:49)
-> > * Michael Turquette <mturquette@baylibre.com> [160216 17:32]:
-> > > 
-> > > We have a shiny new series that provides a standard way to do this:
-> > > 
-> > > http://lkml.kernel.org/r/<1455225554-13267-1-git-send-email-mturquette@baylibre.com>
+On Wed, Feb 17, 2016 at 07:51:28PM +0000, Jean-Philippe Brucker wrote:
+> On Thu, Feb 18, 2016 at 12:26:46AM +0800, kbuild test robot wrote:
+> > tree:   http://repo.or.cz/linux-2.6/linux-2.6-arm.git for-next
+> > head:   5aeac3b523644cbc300f17d67c8fce73df9060c0
+> > commit: e59941b9b3817c9b1dd6662d903150fe3f3c3b0b [24/31] ARM: 8527/1: virt: enable GICv3 system registers
+> > config: arm-allmodconfig (attached as .config)
+> > reproduce:
+> >         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+> >         chmod +x ~/bin/make.cross
+> >         git checkout e59941b9b3817c9b1dd6662d903150fe3f3c3b0b
+> >         # save the attached .config to linux build tree
+> >         make.cross ARCH=arm 
 > > 
-> > OK nice, so tagging the MPU and DDR clocks with CLK_IS_CRITICAL or
-> > "clock-critical" should allow removing this code. I think in this
-> > case I still need to set CLK_IS_CRITICAL as the clock is output 1
-> > of the dts defined clock and does not have a separate dts node.
+> > All errors (new ones prefixed by >>):
+> > 
+> >    arch/arm/kernel/hyp-stub.S: Assembler messages:
+> > >> arch/arm/kernel/hyp-stub.S:168: Error: selected processor does not support ARM mode `ubfx r7,r7,#28,#4'
+> > >> arch/arm/kernel/hyp-stub.S:176: Error: selected processor does not support ARM mode `isb'
 > 
-> In fact I hate clock-critical as a DT property and it's only there to
-> support legacy DT bindings that store all clk data in DT and have zero
-> clk data in C. So please use the CLK_IS_CRITICAL or CLK_ENABLE_HAND_OFF
-> flags in C.
-> 
-> Do you think you will ever have a driver that wants to gate these
-> clocks? Probably not for MPU/DDR, but the HAND_OFF flag is a better fit
-> if you do. It's the same as CRITICAL but transfers the prepare/enable
-> reference counting to the consumer driver after that driver calls
-> clk_get() and clk_prepare_enable() on the HAND_OFF clk.
+> Selected processor being arm1136j-s, it doesn't make sense to build
+> hyp-stub.S at all, in my opinion. We should select ARM_VIRT_EXT only
+> when CPU_32v6 and lower are deselected (as with LPAE). I realize such a
+> change might be too invasive for a fix, so I attached a version of my
+> patch that builds for older architectures. If there is no objection, it
+> will supersede the previous one.
 
-OK I'll use CLK_ENABLE_HAND_OFF then. Who knows maybe somebody
-somewhere has code running on one of the coprocessors in SRAM that
-actually allows gating these :)
+Well, in order to get to the ubfx instruction, you need the CPU to be
+in HYP mode, which these older CPUs aren't going to be.  So, it's safe
+to use ubfx here.
 
-> > I can update when those patches hit Linux next, or I can do a
-> > follow-up patch later on if we want to avoid the dependency
-> > here. Which do you prefer?
-> 
-> Well, testing is always welcome :-)
->
-> If you rebase onto those patches then I'll add your patches to that
-> series for testing and merge it that way.
+The solution to this is to add:
 
-OK will do and repost after some testing.
+AFLAGS_hyp-stub.o		:=-Wa,-march=armv7
 
-Regards,
+to the makefile so the toolchain will build it for ARMv7 even though
+older CPUs are selected.
 
-Tony
+Thanks.
+
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
