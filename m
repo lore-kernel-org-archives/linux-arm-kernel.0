@@ -1,35 +1,55 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 17 Feb 2016 19:35:33 +0000
-Subject: [PATCH v5sub1 7/8] arm64: move kernel image to base of vmalloc
- area
-In-Reply-To: <56C4A06F.3040702@virtuozzo.com>
-References: <20160212151006.GJ31665@e104818-lin.cambridge.arm.com>
- <CAKv+Gu84mVP=YjbLhWoGj9AEUD8m8+Lq8kTCniCHwxJwMWaZtA@mail.gmail.com>
- <20160212152641.GK31665@e104818-lin.cambridge.arm.com>
- <56BDFC86.5010705@arm.com>
- <20160212160652.GL31665@e104818-lin.cambridge.arm.com>
- <56C1E072.2090909@virtuozzo.com>
- <20160215185957.GB19413@e104818-lin.cambridge.arm.com>
- <56C31D1D.50708@virtuozzo.com> <20160217143950.GC32647@leverpostej>
- <56C4A06F.3040702@virtuozzo.com>
-Message-ID: <20160217193532.GL32647@leverpostej>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Wed, 17 Feb 2016 19:36:20 +0000
+Subject: [PATCH] iio: health/afe4404: mark suspend/resume functions
+ __maybe_unused
+In-Reply-To: <1455527958-2647084-1-git-send-email-arnd@arndb.de>
+References: <1455527958-2647084-1-git-send-email-arnd@arndb.de>
+Message-ID: <56C4CBB4.3050708@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 17, 2016 at 07:31:43PM +0300, Andrey Ryabinin wrote:
-> On 02/17/2016 05:39 PM, Mark Rutland wrote:
-> > Andrey, on a tangential note, what do we do around hotplug? I assume
-> > that we must unpooison the shadow region for the stack of a dead CPU,
-> > but I wasn't able to figure out where we do that. Hopefuly we're not
-> > just getting lucky?
+On 15/02/16 09:19, Arnd Bergmann wrote:
+> The newly added afe4404 driver implements suspend/resume using the
+> SIMPLE_DEV_PM_OPS() macro, which leaves out references to the actual
+> functions when CONFIG_PM is disabled, causing a harmless warning:
 > 
-> We do nothing about it. AFAIU we need to clear swapper's stack,
-> somewhere in secondary_start_kernel() perhaps.
+> health/afe4404.c:509:12: error: 'afe4404_suspend' defined but not used
+> health/afe4404.c:530:12: error: 'afe4404_resume' defined but not used
+> 
+> This marks the functions as __maybe_unused so we don't get those
+> warnings.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 87aec56e27ef ("iio: health: Add driver for the TI AFE4404 heart monitor")
+Applied to the togreg branch of iio.git.
 
-Oh, joy...
+Thanks,
 
-Surely other architectures (e.g. x86) will need to do something similar?
-
-Do they do anything currently? I can't see that they do...
-
-Mark.
+Jonathan
+> ---
+>  drivers/iio/health/afe4404.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/iio/health/afe4404.c b/drivers/iio/health/afe4404.c
+> index 0759268f37e0..5096a4643784 100644
+> --- a/drivers/iio/health/afe4404.c
+> +++ b/drivers/iio/health/afe4404.c
+> @@ -477,7 +477,7 @@ static const struct of_device_id afe4404_of_match[] = {
+>  MODULE_DEVICE_TABLE(of, afe4404_of_match);
+>  #endif
+>  
+> -static int afe4404_suspend(struct device *dev)
+> +static int __maybe_unused afe4404_suspend(struct device *dev)
+>  {
+>  	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
+>  	struct afe4404_data *afe = iio_priv(indio_dev);
+> @@ -498,7 +498,7 @@ static int afe4404_suspend(struct device *dev)
+>  	return 0;
+>  }
+>  
+> -static int afe4404_resume(struct device *dev)
+> +static int __maybe_unused afe4404_resume(struct device *dev)
+>  {
+>  	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
+>  	struct afe4404_data *afe = iio_priv(indio_dev);
+> 
