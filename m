@@ -1,90 +1,88 @@
-From: xhnjupt@gmail.com (Han Xu)
-Date: Thu, 18 Feb 2016 02:07:42 +0800
-Subject: [PATCH v2 3/4] mtd:spi-nor:fsl-quadspi:Add fast-read mode support
-In-Reply-To: <1454326208-4533-3-git-send-email-B56489@freescale.com>
-References: <1454326208-4533-1-git-send-email-B56489@freescale.com>
- <1454326208-4533-3-git-send-email-B56489@freescale.com>
-Message-ID: <20160217180742.GB17485@shlinux2>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 17 Feb 2016 18:18:55 +0000
+Subject: [PATCH V5 14/15] arm64, pci, acpi: Assign legacy IRQs once
+ device is enable.
+In-Reply-To: <1455630825-27253-15-git-send-email-tn@semihalf.com>
+References: <1455630825-27253-1-git-send-email-tn@semihalf.com>
+ <1455630825-27253-15-git-send-email-tn@semihalf.com>
+Message-ID: <20160217181855.GB11132@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 01, 2016 at 07:30:07PM +0800, Yunhui Cui wrote:
-> The qspi driver add generic fast-read mode for different
-> flash venders. There are some different board flash work on
-> different mode, such fast-read, quad-mode.
-> So we have to modify the third entrace parameter of spi_nor_scan().
+[+ Duc, this needs testing on DT PCI hosts that do not call pci_fixup_irqs()]
+
+On Tue, Feb 16, 2016 at 02:53:44PM +0100, Tomasz Nowicki wrote:
+
+Subject is wrong, leftover from previous posting (ie you do not allocate
+at device enable anymore).
+
+> This is the last step before enabling generic ACPI PCI host controller
+> for ARM64. We need to take care of legacy IRQ mapping for non-MSI(X)
+
+You do not check MSIs anymore.
+
+> PCI devices. pcibios_alloc_irq() evaluation is not sensitive to
+> ACPI device enumeration order, so it is the best place to assign
+> device's IRQs for ACPI boot method. Also, it does not hurt DT to be
+> initialized form the same place.
 > 
-> Signed-off-by: Yunhui Cui <B56489@freescale.com>
+> NOTE: *This is going to be temporary solution*. There is ongoing work
+> which aims for cleaning legacy IRQ allocation from arch specific code.
+> We can consider this patch as the necessary evil which will be removed
+> once cleanup series lands in mailnline in the near future.
+
+"To enable PCI legacy IRQs on platforms booting with ACPI, arch code
+should include ACPI specific callbacks that parse and set-up the
+device IRQ number, equivalent to the DT boot path. Owing to the current
+ACPI core scan handlers implementation, ACPI PCI legacy IRQs bindings
+cannot be parsed at device add time, since that would trigger ACPI scan
+handlers ordering issues depending on how the ACPI tables are defined.
+
+To solve this problem and consolidate FW PCI legacy IRQs parsing in
+one single pcibios callback (pending final removal), this patch moves
+DT PCI IRQ parsing to the pcibios_alloc_irq() callback (called by
+PCI core code at device probe time) and adds ACPI PCI legacy IRQs
+parsing to the same callback too, so that FW PCI legacy IRQs parsing
+is confined in one single arch callback that can be easily removed
+when code parsing PCI legacy IRQs is consolidated and moved to core
+PCI code".
+
+?
+
+> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+> Suggested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 > ---
->  drivers/mtd/spi-nor/fsl-quadspi.c | 27 +++++++++++++++++++++------
->  1 file changed, 21 insertions(+), 6 deletions(-)
+>  arch/arm64/kernel/pci.c | 11 ++++++++---
+>  1 file changed, 8 insertions(+), 3 deletions(-)
 > 
-> diff --git a/drivers/mtd/spi-nor/fsl-quadspi.c b/drivers/mtd/spi-nor/fsl-quadspi.c
-> index 9861290..0a31cb1 100644
-> --- a/drivers/mtd/spi-nor/fsl-quadspi.c
-> +++ b/drivers/mtd/spi-nor/fsl-quadspi.c
-> @@ -389,11 +389,21 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
->  	/* Read */
->  	lut_base = SEQID_READ * 4;
+> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+> index 023b983..6e77e1b 100644
+> --- a/arch/arm64/kernel/pci.c
+> +++ b/arch/arm64/kernel/pci.c
+> @@ -52,11 +52,16 @@ int pcibios_enable_device(struct pci_dev *dev, int mask)
+>  }
 >  
-> -	qspi_writel(q, LUT0(CMD, PAD1, read_op) | LUT1(ADDR, PAD1, addrlen),
-> -			base + QUADSPI_LUT(lut_base));
-> -	qspi_writel(q, LUT0(DUMMY, PAD1, read_dm) |
-> -		    LUT1(FSL_READ, PAD4, rxfifo),
-> -			base + QUADSPI_LUT(lut_base + 1));
-> +	if (nor->flash_read == SPI_NOR_FAST) {
-> +		qspi_writel(q, LUT0(CMD, PAD1, read_op) |
-> +			    LUT1(ADDR, PAD1, addrlen),
-> +				base + QUADSPI_LUT(lut_base));
-> +		qspi_writel(q,  LUT0(DUMMY, PAD1, read_dm) |
-> +			    LUT1(FSL_READ, PAD1, rxfifo),
-> +				base + QUADSPI_LUT(lut_base + 1));
-> +	} else if (nor->flash_read == SPI_NOR_QUAD) {
-> +		qspi_writel(q, LUT0(CMD, PAD1, read_op) |
-> +			    LUT1(ADDR, PAD1, addrlen),
-> +				base + QUADSPI_LUT(lut_base));
-> +		qspi_writel(q, LUT0(DUMMY, PAD1, read_dm) |
-> +			    LUT1(FSL_READ, PAD4, rxfifo),
-> +				base + QUADSPI_LUT(lut_base + 1));
-> +	}
->  
->  	/* Write enable */
->  	lut_base = SEQID_WREN * 4;
-> @@ -468,6 +478,7 @@ static int fsl_qspi_get_seqid(struct fsl_qspi *q, u8 cmd)
+>  /*
+> - * Try to assign the IRQ number from DT when adding a new device
+> + * Try to assign the IRQ number when probing a new device
+>   */
+> -int pcibios_add_device(struct pci_dev *dev)
+> +int pcibios_alloc_irq(struct pci_dev *dev)
 >  {
->  	switch (cmd) {
->  	case SPINOR_OP_READ_1_1_4:
-> +	case SPINOR_OP_READ_FAST:
->  		return SEQID_READ;
->  	case SPINOR_OP_WREN:
->  		return SEQID_WREN;
-> @@ -963,6 +974,7 @@ static int fsl_qspi_probe(struct platform_device *pdev)
->  	struct spi_nor *nor;
->  	struct mtd_info *mtd;
->  	int ret, i = 0;
-> +	enum read_mode mode = SPI_NOR_QUAD;
+> -	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
+> +	if (acpi_disabled)
+> +		dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
+> +#ifdef CONFIG_ACPI
+> +	else
+> +		return acpi_pci_irq_enable(dev);
+> +#endif
 >  
->  	q = devm_kzalloc(dev, sizeof(*q), GFP_KERNEL);
->  	if (!q)
-> @@ -1064,7 +1076,10 @@ static int fsl_qspi_probe(struct platform_device *pdev)
->  		/* set the chip address for READID */
->  		fsl_qspi_set_base_addr(q, nor);
->  
-> -		ret = spi_nor_scan(nor, NULL, SPI_NOR_QUAD);
-> +		ret = of_property_read_bool(np, "m25p,fast-read");
-> +		mode = (ret) ? SPI_NOR_FAST : SPI_NOR_QUAD;
-> +
-> +		ret = spi_nor_scan(nor, NULL, mode);
->  		if (ret)
->  			goto mutex_failed;
->  
-I understand you want to provide a more generic read mode, but this is a quad
-spi driver, I prefer to provide the options, either quad read/quad IO read,
-or just normal read.
-> -- 
-> 2.1.0.27.g96db324
-> 
-> 
-> ______________________________________________________
-> Linux MTD discussion mailing list
-> http://lists.infradead.org/mailman/listinfo/linux-mtd/
+>  	return 0;
+>  }
+
+It is good this code is now in one single function, it will be removed
+more quickly :D
+
+So pending APM X-gene DT testing:
+
+Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
