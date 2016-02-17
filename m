@@ -1,69 +1,56 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Wed, 17 Feb 2016 23:59:58 +0100
-Subject: [PATCH v2 net-next 0/8] API set for HW Buffer management
-In-Reply-To: <1455636823-14470-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1455636823-14470-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20160217225958.GA31113@1wt.eu>
+From: isubramanian@apm.com (Iyappan Subramanian)
+Date: Wed, 17 Feb 2016 15:00:38 -0800
+Subject: [PATCH net-next v3 0/4] Add support for Classifier and RSS
+Message-ID: <1455750042-1521-1-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory,
+This patch set enables,
 
-On Tue, Feb 16, 2016 at 04:33:35PM +0100, Gregory CLEMENT wrote:
-> Hello,
-> 
-> A few weeks ago I sent a proposal for a API set for HW Buffer
-> management, to have a better view of the motivation for this API see
-> the cover letter of this proposal:
-> http://thread.gmane.org/gmane.linux.kernel/2125152
-> 
-> Since this version I took into account the review from Florian:
-> - The hardware buffer management helpers are no more built by default
->   and now depend on a hidden config symbol which has to be selected
->   by the driver if needed
-> - The hwbm_pool_refill() and hwbm_pool_add() now receive a gfp_t as
->   argument allowing the caller to specify the flag it needs.
-> - buf_num is now tested to ensure there is no wrapping
-> - A spinlock has been added to protect the hwbm_pool_add() function in
->   SMP or irq context.
-> 
-> I also used pr_warn instead of pr_debug in case of errors.
-> 
-> I fixed the mvneta implementation by returning the buffer to the pool
-> at various place instead of ignoring it.
-> 
-> About the series itself I tried to make this series easier to merge:
-> - Squashed "bus: mvenus-mbus: Fix size test for
->    mvebu_mbus_get_dram_win_info" into bus: mvebu-mbus: provide api for
->    obtaining IO and DRAM window information.
-> - Added my signed-otf-by on all the patches as submitter of the series.
-> - Renamed the dts patches with the pattern "ARM: dts: platform:"
-> - Removed the patch "ARM: mvebu: enable SRAM support in
->   mvebu_v7_defconfig" of this series and already applied it
-> - Rodified the order of the patches.
-> 
-> In order to ease the test the branch mvneta-BM-framework-v2 is
-> available at git at github.com:MISL-EBU-System-SW/mainline-public.git.
+(i) Classifier engine that is used for parsing
+through the packet and extracting a search string that is then used
+to search a database to find associative data.
 
-Well, I tested this patch series on top of latest master (from today)
-on my fresh new clearfog board. I compared carefully with and without
-the patchset. My workload was haproxy receiving connections and forwarding
-them to my PC via the same port. I tested both with short connections
-(HTTP GET of an empty file) and long ones (1 MB or more). No trouble
-was detected at all, which is pretty good. I noticed a very tiny
-performance drop which is more noticeable on short connections (high
-packet rates), my forwarded connection rate went down from 17500/s to
-17300/s. But I have not checked yet what can be tuned when using the
-BM, nor did I compare CPU usage. I remember having run some tests in
-the past, I guess it was on the XP-GP board, and noticed that the BM
-could save a significant amount of CPU and improve cache efficiency,
-so if this is the case here, we don't really care about a possible 1%
-performance drop.
+(ii) Receive Side Scaling (RSS) that does dynamic load
+balancing of the CPUs by controlling the number of messages enqueued
+per CPU though the help of Toeplitz Hash function of 4-tuple of
+source TCP/UDP port, destination TCP/UDP port, source IPV4 address and
+destination IPV4 address.
 
-I'll try to provide more results as time permits.
+(iii) Multi queue, to make advantage of RSS
 
-In the mean time if you want (or plan to submit a next batch), feel
-free to add a Tested-by: Willy Tarreau <w@1wt.eu>.
+v3: Address review comments from v2
+    - reordered local variables from longest to shortlest line
 
-cheers,
-Willy
+v2: Address review comments from v1
+    - fix kbuild warning
+    - add default coalescing
+
+v1:
+    - Initial version
+
+Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
+---
+
+Iyappan Subramanian (4):
+  drivers: net: xgene: Add support for Classifier engine
+  drivers: net: xgene: Add support for RSS
+  drivers: net: xgene: Add support for multiple queues
+  dtb: xgene: Add irqs to support multi queue
+
+ arch/arm64/boot/dts/apm/apm-shadowcat.dtsi        |   8 +-
+ arch/arm64/boot/dts/apm/apm-storm.dtsi            |   8 +-
+ drivers/net/ethernet/apm/xgene/Makefile           |   3 +-
+ drivers/net/ethernet/apm/xgene/xgene_enet_cle.c   | 734 ++++++++++++++++++++++
+ drivers/net/ethernet/apm/xgene/xgene_enet_cle.h   | 295 +++++++++
+ drivers/net/ethernet/apm/xgene/xgene_enet_hw.c    |  12 +
+ drivers/net/ethernet/apm/xgene/xgene_enet_hw.h    |   6 +
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.c  | 482 ++++++++------
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.h  |  35 +-
+ drivers/net/ethernet/apm/xgene/xgene_enet_ring2.c |  12 +
+ 10 files changed, 1395 insertions(+), 200 deletions(-)
+ create mode 100644 drivers/net/ethernet/apm/xgene/xgene_enet_cle.c
+ create mode 100644 drivers/net/ethernet/apm/xgene/xgene_enet_cle.h
+
+-- 
+1.9.1
