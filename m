@@ -1,86 +1,77 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 17 Feb 2016 14:34:08 +0000
-Subject: [PATCH v3 1/3] iommu/io-pgtable: Add ARMv7 short descriptor
- support
-In-Reply-To: <20160217143106.GC1459@arm.com>
-References: <cover.1453723096.git.robin.murphy@arm.com>
- <066c4af0e29c9cc658bd5e48edc5e2d7ba7140a1.1453723096.git.robin.murphy@arm.com>
- <1453857386.28284.4.camel@mhfsdcap03> <56AA1A89.6080706@arm.com>
- <20160217143106.GC1459@arm.com>
-Message-ID: <56C484E0.3000709@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 17 Feb 2016 14:39:51 +0000
+Subject: [PATCH v5sub1 7/8] arm64: move kernel image to base of vmalloc
+ area
+In-Reply-To: <56C31D1D.50708@virtuozzo.com>
+References: <20160212145844.GI31665@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu-x6QPorWsPDP8bqAkmbasqzhqmP39HS=qprfGB4r8JLw@mail.gmail.com>
+ <20160212151006.GJ31665@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu84mVP=YjbLhWoGj9AEUD8m8+Lq8kTCniCHwxJwMWaZtA@mail.gmail.com>
+ <20160212152641.GK31665@e104818-lin.cambridge.arm.com>
+ <56BDFC86.5010705@arm.com>
+ <20160212160652.GL31665@e104818-lin.cambridge.arm.com>
+ <56C1E072.2090909@virtuozzo.com>
+ <20160215185957.GB19413@e104818-lin.cambridge.arm.com>
+ <56C31D1D.50708@virtuozzo.com>
+Message-ID: <20160217143950.GC32647@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/02/16 14:31, Will Deacon wrote:
-> Hi Robin,
->
-> On Thu, Jan 28, 2016 at 01:41:29PM +0000, Robin Murphy wrote:
->> On 27/01/16 01:16, Yong Wu wrote:
->>> On Tue, 2016-01-26 at 17:13 +0000, Robin Murphy wrote:
->>>> Add a nearly-complete ARMv7 short descriptor implementation, omitting
->>>> only a few legacy and CPU-centric aspects which shouldn't be necessary
->>>> for IOMMU API use anyway.
->>>>
->>>> Signed-off-by: Yong Wu <yong.wu@mediatek.com>
->>>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->>>
->>> This looks good to me.
->>> And actually our disp/vdec/venc works well on your v2.
->>>
->>> You could choose the two below,
->>> Reviewed-by: Yong Wu <yong.wu@mediatek.com>
->>> Tested-by: Yong Wu <yong.wu@mediatek.com>
->>
->> Great, thanks!
->>
->> Will, it seems to make the most sense for Joerg to pick these patches up
->> directly with the MTK series that depends on them - any objections?
->
-> As discussed with Joerg, I'll pick these up and send him a pull request
-> containing all the pgtable bits. I've taken the liberty of updating
-> MAINTAINERS too, assuming you don't mind being a reviewer for this?
+On Tue, Feb 16, 2016 at 03:59:09PM +0300, Andrey Ryabinin wrote:
+> Actually, the first report is a bit more useful. It shows that shadow memory was corrupted:
+> 
+>   ffffffc93665bc00: f1 f1 f1 f1 00 f4 f4 f4 f2 f2 f2 f2 00 00 f1 f1
+> > ffffffc93665bc80: f1 f1 00 00 00 00 f3 f3 00 f4 f4 f4 f3 f3 f3 f3
+>                       ^
+> F1 - left redzone, it indicates start of stack frame
+> F3 - right redzone, it should be the end of stack frame.
+> 
+> But here we have the second set of F1s without F3s which should close the first set of F1s.
+> Also those two F3s in the middle cannot be right.
+> 
+> So shadow is corrupted.
+> Some hypotheses:
 
-Sure, that's fine by me.
+> 2) Shadow memory wasn't cleared. GCC poison memory on function entrance and unpoisons it before return.
+>      If we use some tricky way to exit from function this could cause false-positives like that.
+>      E.g. some hand-written assembly return code.
 
-> Will
->
-> --->8
->
->  From bccb08d096703bd790fcf2f934553dd9c8503fc9 Mon Sep 17 00:00:00 2001
-> From: Will Deacon <will.deacon@arm.com>
-> Date: Wed, 17 Feb 2016 14:18:00 +0000
-> Subject: [PATCH] MAINTAINERS: update ARM SMMU entry
->
-> Ensure that the short-descriptor page table code is included under the
-> SMMU entry, and add Robin as a designated reviewer.
->
-> Cc: Robin Murphy <robin.murphy@arm.com>
+I think this is what's happenening, at least for the idle case.
 
-s/Cc/Acked-by/
+A second attempt at bisecting led me to commit e679660dbb8347f2 ("ARM:
+8481/2: drivers: psci: replace psci firmware calls"). Reverting that
+makes v4.5-rc1 boot without KASAN splats.
 
-Robin.
+That patch turned __invoke_psci_fn_{smc,hvc} into (ASAN-instrumented) C
+functions. Prior to that commit, __invoke_psci_fn_{smc,hvc} were
+pure assembly functions which used no stack.
 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->   MAINTAINERS | 2 ++
->   1 file changed, 2 insertions(+)
->
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index cc2f753cb357..a01bae148b89 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -1793,11 +1793,13 @@ F:	drivers/edac/synopsys_edac.c
->
->   ARM SMMU DRIVERS
->   M:	Will Deacon <will.deacon@arm.com>
-> +R:	Robin Murphy <robin.murphy@arm.com>
->   L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->   S:	Maintained
->   F:	drivers/iommu/arm-smmu.c
->   F:	drivers/iommu/arm-smmu-v3.c
->   F:	drivers/iommu/io-pgtable-arm.c
-> +F:	drivers/iommu/io-pgtable-arm-v7s.c
->
->   ARM64 PORT (AARCH64 ARCHITECTURE)
->   M:	Catalin Marinas <catalin.marinas@arm.com>
->
+When we go down for idle, in __cpu_suspend_enter we stash some context
+to the stack (in assembly). The CPU may return from a cold state via
+cpu_resume, where we restore context from the stack.
+
+However, after storing the context we call psci_suspend_finisher, which
+calls psci_cpu_suspend, which calls invoke_psci_fn_*. As
+psci_cpu_suspend and invoke_psci_fn_* are instrumented, they poison
+memory on function entrance, but we never perform the unpoisoning.
+
+That was always the case for psci_suspend_finisher, so there was a
+latent issue that we were somehow avoiding. Perhaps we got luck with
+stack layout and never hit the poison.
+
+I'm not sure how we fix that, as invoke_psci_fn_* may or may not return
+for arbitrary reasons (e.g. a CPU_SUSPEND_CALL may or may not return
+depending on whether an interrupt comes in at the right time).
+
+Perhaps the simplest option is to not instrument invoke_psci_fn_* and
+psci_suspend_finisher. Do we have a per-function annotation to avoid
+KASAN instrumentation, like notrace? I need to investigate, but we may
+also need notrace for similar reasons.
+
+Andrey, on a tangential note, what do we do around hotplug? I assume
+that we must unpooison the shadow region for the stack of a dead CPU,
+but I wasn't able to figure out where we do that. Hopefuly we're not
+just getting lucky?
+
+Thanks,
+Mark.
