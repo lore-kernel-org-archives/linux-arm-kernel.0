@@ -1,788 +1,749 @@
-From: zhang.chunyan@linaro.org (Chunyan Zhang)
-Date: Wed, 17 Feb 2016 11:18:50 +0800
-Subject: [PATCH V3 6/6] coresight-stm: adding driver for CoreSight STM
- component
-In-Reply-To: <VI1PR08MB06708C5EA9DEE2D71C13FFAA8AA90@VI1PR08MB0670.eurprd08.prod.outlook.com>
-References: <1454756672-12790-1-git-send-email-zhang.chunyan@linaro.org>
- <1454756672-12790-7-git-send-email-zhang.chunyan@linaro.org>
- <CANLsYkxvLFu1C+_H9c0EoMebLQu1gnwt9bqY6_R3j+ua2w+xMg@mail.gmail.com>
- <VI1PR08MB06708C5EA9DEE2D71C13FFAA8AA90@VI1PR08MB0670.eurprd08.prod.outlook.com>
-Message-ID: <CAG2=9p9-c5z6yXm6VDkDeqZmpFGt3z88ccNQxZTwia=dm3_GNQ@mail.gmail.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Wed, 17 Feb 2016 11:22:07 +0800
+Subject: [clk:clk-samsung-kconfig 2/2] drivers/clk/samsung/clk.h:142:17:
+ error: invalid operands to binary | (have 'struct samsung_pll_clock *' and
+ 'struct samsung_pll_clock *')
+Message-ID: <201602171104.YkeaxmIS%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michael,
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-samsung-kconfig
+head:   e83cb468452c25597e868d1ed778fa73fdaeca4c
+commit: e83cb468452c25597e868d1ed778fa73fdaeca4c [2/2] clk: samsung: Don't build ARMv8 clock drivers on ARMv7
+config: mips-allmodconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout e83cb468452c25597e868d1ed778fa73fdaeca4c
+        # save the attached .config to linux build tree
+        make.cross ARCH=mips 
 
-One question below need to be clarified.
+All errors (new ones prefixed by >>):
 
-On Fri, Feb 12, 2016 at 10:55 PM, Michael Williams
-<Michael.Williams@arm.com> wrote:
-> Mathieu Poirier [mailto:mathieu.poirier at linaro.org] wrote:
->> On 6 February 2016 at 04:04, Chunyan Zhang <zhang.chunyan@linaro.org> wrote:
->>> From: Pratik Patel <pratikp@codeaurora.org>
->>>
->>> This driver adds support for the STM CoreSight IP block, allowing any
->>> system compoment (HW or SW) to log and aggregate messages via a
->>> single entity.
->>>
->>> The CoreSight STM exposes an application defined number of channels
->>> called stimulus port.  Configuration is done using entries in sysfs
->>> and channels made available to userspace via configfs.
->>>
->>> Signed-off-by: Pratik Patel <pratikp@codeaurora.org>
->>> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
->>> Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
->>> ---
->>>  .../ABI/testing/sysfs-bus-coresight-devices-stm    |  53 ++
->>>  Documentation/trace/coresight.txt                  |  37 +-
->>>  drivers/hwtracing/coresight/Kconfig                |  11 +
->>>  drivers/hwtracing/coresight/Makefile               |   1 +
->>>  drivers/hwtracing/coresight/coresight-stm.c        | 928 +++++++++++++++++++++
->>>  include/linux/coresight-stm.h                      |   6 +
->>>  include/uapi/linux/coresight-stm.h                 |  12 +
->>>  7 files changed, 1046 insertions(+), 2 deletions(-)
->>>  create mode 100644 Documentation/ABI/testing/sysfs-bus-coresight-devices-stm
->>>  create mode 100644 drivers/hwtracing/coresight/coresight-stm.c
->>>  create mode 100644 include/linux/coresight-stm.h
->>>  create mode 100644 include/uapi/linux/coresight-stm.h
->>>
+   drivers/clk/samsung/clk-exynos5433.c:3178:7: note: (near initialization for 'bus2_gate_clks[2].flags')
+       1, CLK_IGNORE_UNUSED, 0),
+          ^
+   drivers/clk/samsung/clk.h:245:13: note: in definition of macro '__GATE'
+      .flags  = f,    \
+                ^
+   drivers/clk/samsung/clk-exynos5433.c:3176:2: note: in expansion of macro 'GATE'
+     GATE(CLK_ACLK_BUS2BEND_400, "aclk_bus2bend_400",
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3181:7: error: initializer element is not constant
+       0, CLK_IGNORE_UNUSED, 0),
+          ^
+   drivers/clk/samsung/clk.h:245:13: note: in definition of macro '__GATE'
+      .flags  = f,    \
+                ^
+   drivers/clk/samsung/clk-exynos5433.c:3179:2: note: in expansion of macro 'GATE'
+     GATE(CLK_ACLK_BUS2RTND_400, "aclk_bus2rtnd_400",
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3181:7: note: (near initialization for 'bus2_gate_clks[3].flags')
+       0, CLK_IGNORE_UNUSED, 0),
+          ^
+   drivers/clk/samsung/clk.h:245:13: note: in definition of macro '__GATE'
+      .flags  = f,    \
+                ^
+   drivers/clk/samsung/clk-exynos5433.c:3179:2: note: in expansion of macro 'GATE'
+     GATE(CLK_ACLK_BUS2RTND_400, "aclk_bus2rtnd_400",
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3187:24: error: initializer element is not constant
+       ENABLE_PCLK_BUS, 1, CLK_IGNORE_UNUSED, 0),
+                           ^
+   drivers/clk/samsung/clk.h:245:13: note: in definition of macro '__GATE'
+      .flags  = f,    \
+                ^
+   drivers/clk/samsung/clk-exynos5433.c:3186:2: note: in expansion of macro 'GATE'
+     GATE(CLK_PCLK_PMU_BUS, "pclk_pmu_bus2", "div_pclk_bus2_133",
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3187:24: note: (near initialization for 'bus2_gate_clks[5].flags')
+       ENABLE_PCLK_BUS, 1, CLK_IGNORE_UNUSED, 0),
+                           ^
+   drivers/clk/samsung/clk.h:245:13: note: in definition of macro '__GATE'
+      .flags  = f,    \
+                ^
+   drivers/clk/samsung/clk-exynos5433.c:3186:2: note: in expansion of macro 'GATE'
+     GATE(CLK_PCLK_PMU_BUS, "pclk_pmu_bus2", "div_pclk_bus2_133",
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3189:24: error: initializer element is not constant
+       ENABLE_PCLK_BUS, 0, CLK_IGNORE_UNUSED, 0),
+                           ^
+   drivers/clk/samsung/clk.h:245:13: note: in definition of macro '__GATE'
+      .flags  = f,    \
+                ^
+   drivers/clk/samsung/clk-exynos5433.c:3188:2: note: in expansion of macro 'GATE'
+     GATE(CLK_PCLK_SYSREG_BUS, "pclk_sysreg_bus2", "div_pclk_bus2_133",
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3189:24: note: (near initialization for 'bus2_gate_clks[6].flags')
+       ENABLE_PCLK_BUS, 0, CLK_IGNORE_UNUSED, 0),
+                           ^
+   drivers/clk/samsung/clk.h:245:13: note: in definition of macro '__GATE'
+      .flags  = f,    \
+                ^
+   drivers/clk/samsung/clk-exynos5433.c:3188:2: note: in expansion of macro 'GATE'
+     GATE(CLK_PCLK_SYSREG_BUS, "pclk_sysreg_bus2", "div_pclk_bus2_133",
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3225:3: error: expected ')' before string constant
+      "samsung,exynos5433-cmu-bus"#id,   \
+      ^
+   drivers/clk/samsung/clk-exynos5433.c:3228:1: note: in expansion of macro 'exynos5433_cmu_bus_init'
+    exynos5433_cmu_bus_init(0);
+    ^
+   drivers/clk/samsung/clk-exynos5433.c:3225:3: error: expected ')' before string constant
+      "samsung,exynos5433-cmu-bus"#id,   \
+      ^
+   drivers/clk/samsung/clk-exynos5433.c:3229:1: note: in expansion of macro 'exynos5433_cmu_bus_init'
+    exynos5433_cmu_bus_init(1);
+    ^
+   drivers/clk/samsung/clk-exynos5433.c:3225:3: error: expected ')' before string constant
+      "samsung,exynos5433-cmu-bus"#id,   \
+      ^
+   drivers/clk/samsung/clk-exynos5433.c:3230:1: note: in expansion of macro 'exynos5433_cmu_bus_init'
+    exynos5433_cmu_bus_init(2);
+    ^
+   In file included from drivers/clk/samsung/clk-exynos5433.c:17:0:
+   drivers/clk/samsung/clk.h:309:13: error: initializer element is not constant
+      .flags  = CLK_GET_RATE_NOCACHE,   \
+                ^
+   drivers/clk/samsung/clk.h:317:2: note: in expansion of macro '__PLL'
+     __PLL(_typ, _id, NULL, _name, _pname, CLK_GET_RATE_NOCACHE, \
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3282:2: note: in expansion of macro 'PLL'
+     PLL(pll_35xx, CLK_FOUT_G3D_PLL, "fout_g3d_pll", "oscclk",
+     ^
+   drivers/clk/samsung/clk.h:309:13: note: (near initialization for 'g3d_pll_clks[0].flags')
+      .flags  = CLK_GET_RATE_NOCACHE,   \
+                ^
+   drivers/clk/samsung/clk.h:317:2: note: in expansion of macro '__PLL'
+     __PLL(_typ, _id, NULL, _name, _pname, CLK_GET_RATE_NOCACHE, \
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3282:2: note: in expansion of macro 'PLL'
+     PLL(pll_35xx, CLK_FOUT_G3D_PLL, "fout_g3d_pll", "oscclk",
+     ^
+>> drivers/clk/samsung/clk.h:142:17: error: invalid operands to binary | (have 'struct samsung_pll_clock *' and 'struct samsung_pll_clock *')
+      .flags  = (f) | CLK_SET_RATE_NO_REPARENT, \
+                    ^
+   drivers/clk/samsung/clk.h:157:2: note: in expansion of macro '__MUX'
+     __MUX(_id, NULL, cname, pnames, o, s, w, f, mf, NULL)
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3288:2: note: in expansion of macro 'MUX_F'
+     MUX_F(CLK_MOUT_ACLK_G3D_400, "mout_aclk_g3d_400", mout_aclk_g3d_400_p,
+     ^
+   drivers/clk/samsung/clk.h:142:13: error: initializer element is not constant
+      .flags  = (f) | CLK_SET_RATE_NO_REPARENT, \
+                ^
+   drivers/clk/samsung/clk.h:157:2: note: in expansion of macro '__MUX'
+     __MUX(_id, NULL, cname, pnames, o, s, w, f, mf, NULL)
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3288:2: note: in expansion of macro 'MUX_F'
+     MUX_F(CLK_MOUT_ACLK_G3D_400, "mout_aclk_g3d_400", mout_aclk_g3d_400_p,
+     ^
+   drivers/clk/samsung/clk.h:142:13: note: (near initialization for 'g3d_mux_clks[0].flags')
+      .flags  = (f) | CLK_SET_RATE_NO_REPARENT, \
+                ^
+   drivers/clk/samsung/clk.h:157:2: note: in expansion of macro '__MUX'
+     __MUX(_id, NULL, cname, pnames, o, s, w, f, mf, NULL)
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3288:2: note: in expansion of macro 'MUX_F'
+     MUX_F(CLK_MOUT_ACLK_G3D_400, "mout_aclk_g3d_400", mout_aclk_g3d_400_p,
+     ^
+>> drivers/clk/samsung/clk.h:142:17: error: invalid operands to binary | (have 'struct samsung_pll_clock *' and 'struct samsung_pll_clock *')
+      .flags  = (f) | CLK_SET_RATE_NO_REPARENT, \
+                    ^
+   drivers/clk/samsung/clk.h:157:2: note: in expansion of macro '__MUX'
+     __MUX(_id, NULL, cname, pnames, o, s, w, f, mf, NULL)
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3290:2: note: in expansion of macro 'MUX_F'
+     MUX_F(CLK_MOUT_G3D_PLL, "mout_g3d_pll", mout_g3d_pll_p,
+     ^
+   drivers/clk/samsung/clk.h:142:13: error: initializer element is not constant
+      .flags  = (f) | CLK_SET_RATE_NO_REPARENT, \
+                ^
+   drivers/clk/samsung/clk.h:157:2: note: in expansion of macro '__MUX'
+     __MUX(_id, NULL, cname, pnames, o, s, w, f, mf, NULL)
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3290:2: note: in expansion of macro 'MUX_F'
+     MUX_F(CLK_MOUT_G3D_PLL, "mout_g3d_pll", mout_g3d_pll_p,
+     ^
+   drivers/clk/samsung/clk.h:142:13: note: (near initialization for 'g3d_mux_clks[1].flags')
+      .flags  = (f) | CLK_SET_RATE_NO_REPARENT, \
+                ^
+   drivers/clk/samsung/clk.h:157:2: note: in expansion of macro '__MUX'
+     __MUX(_id, NULL, cname, pnames, o, s, w, f, mf, NULL)
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3290:2: note: in expansion of macro 'MUX_F'
+     MUX_F(CLK_MOUT_G3D_PLL, "mout_g3d_pll", mout_g3d_pll_p,
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3301:10: error: initializer element is not constant
+       0, 3, CLK_SET_RATE_PARENT, 0),
+             ^
+   drivers/clk/samsung/clk.h:194:13: note: in definition of macro '__DIV'
+      .flags  = f,    \
+                ^
+   drivers/clk/samsung/clk-exynos5433.c:3300:2: note: in expansion of macro 'DIV_F'
+     DIV_F(CLK_DIV_ACLK_G3D, "div_aclk_g3d", "mout_aclk_g3d_400", DIV_G3D,
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3301:10: note: (near initialization for 'g3d_div_clks[2].flags')
+       0, 3, CLK_SET_RATE_PARENT, 0),
+             ^
+   drivers/clk/samsung/clk.h:194:13: note: in definition of macro '__DIV'
+      .flags  = f,    \
+                ^
+   drivers/clk/samsung/clk-exynos5433.c:3300:2: note: in expansion of macro 'DIV_F'
+     DIV_F(CLK_DIV_ACLK_G3D, "div_aclk_g3d", "mout_aclk_g3d_400", DIV_G3D,
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3311:24: error: initializer element is not constant
+       ENABLE_ACLK_G3D, 5, CLK_IGNORE_UNUSED, 0),
+                           ^
+   drivers/clk/samsung/clk.h:245:13: note: in definition of macro '__GATE'
+      .flags  = f,    \
+                ^
+   drivers/clk/samsung/clk-exynos5433.c:3310:2: note: in expansion of macro 'GATE'
+     GATE(CLK_ACLK_ASYNCAPBS_G3D, "aclk_asyncapbs_g3d", "div_pclk_g3d",
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3311:24: note: (near initialization for 'g3d_gate_clks[2].flags')
+       ENABLE_ACLK_G3D, 5, CLK_IGNORE_UNUSED, 0),
+                           ^
+   drivers/clk/samsung/clk.h:245:13: note: in definition of macro '__GATE'
+      .flags  = f,    \
+                ^
+   drivers/clk/samsung/clk-exynos5433.c:3310:2: note: in expansion of macro 'GATE'
+     GATE(CLK_ACLK_ASYNCAPBS_G3D, "aclk_asyncapbs_g3d", "div_pclk_g3d",
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3313:24: error: initializer element is not constant
+       ENABLE_ACLK_G3D, 4, CLK_IGNORE_UNUSED, 0),
+                           ^
+   drivers/clk/samsung/clk.h:245:13: note: in definition of macro '__GATE'
+      .flags  = f,    \
+                ^
+   drivers/clk/samsung/clk-exynos5433.c:3312:2: note: in expansion of macro 'GATE'
+     GATE(CLK_ACLK_ASYNCAPBM_G3D, "aclk_asyncapbm_g3d", "div_aclk_g3d",
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3313:24: note: (near initialization for 'g3d_gate_clks[3].flags')
+       ENABLE_ACLK_G3D, 4, CLK_IGNORE_UNUSED, 0),
+                           ^
+   drivers/clk/samsung/clk.h:245:13: note: in definition of macro '__GATE'
+      .flags  = f,    \
+                ^
+   drivers/clk/samsung/clk-exynos5433.c:3312:2: note: in expansion of macro 'GATE'
+     GATE(CLK_ACLK_ASYNCAPBM_G3D, "aclk_asyncapbm_g3d", "div_aclk_g3d",
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3315:24: error: initializer element is not constant
+       ENABLE_ACLK_G3D, 3, CLK_IGNORE_UNUSED, 0),
+                           ^
+   drivers/clk/samsung/clk.h:245:13: note: in definition of macro '__GATE'
+      .flags  = f,    \
+                ^
+   drivers/clk/samsung/clk-exynos5433.c:3314:2: note: in expansion of macro 'GATE'
+     GATE(CLK_ACLK_AHB2APB_G3DP, "aclk_ahb2apb_g3dp", "div_pclk_g3d",
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3315:24: note: (near initialization for 'g3d_gate_clks[4].flags')
+       ENABLE_ACLK_G3D, 3, CLK_IGNORE_UNUSED, 0),
+                           ^
+   drivers/clk/samsung/clk.h:245:13: note: in definition of macro '__GATE'
+      .flags  = f,    \
+                ^
+   drivers/clk/samsung/clk-exynos5433.c:3314:2: note: in expansion of macro 'GATE'
+     GATE(CLK_ACLK_AHB2APB_G3DP, "aclk_ahb2apb_g3dp", "div_pclk_g3d",
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3317:24: error: initializer element is not constant
+       ENABLE_ACLK_G3D, 2, CLK_IGNORE_UNUSED, 0),
+--
+   drivers/clk/samsung/clk.h:151:2: note: in expansion of macro '__MUX'
+     __MUX(_id, NULL, cname, pnames, o, s, w, 0, 0, NULL)
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3406:2: note: in expansion of macro 'MUX'
+     MUX(CLK_MOUT_ACLK_GSCL_333_USER, "mout_aclk_gscl_333_user",
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3420:7: error: initializer element is not constant
+       8, CLK_IGNORE_UNUSED, 0),
+          ^
+   drivers/clk/samsung/clk.h:245:13: note: in definition of macro '__GATE'
+      .flags  = f,    \
+                ^
+   drivers/clk/samsung/clk-exynos5433.c:3418:2: note: in expansion of macro 'GATE'
+     GATE(CLK_ACLK_AHB2APB_GSCLP, "aclk_ahb2apb_gsclp",
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3420:7: note: (near initialization for 'gscl_gate_clks[3].flags')
+       8, CLK_IGNORE_UNUSED, 0),
+          ^
+   drivers/clk/samsung/clk.h:245:13: note: in definition of macro '__GATE'
+      .flags  = f,    \
+                ^
+   drivers/clk/samsung/clk-exynos5433.c:3418:2: note: in expansion of macro 'GATE'
+     GATE(CLK_ACLK_AHB2APB_GSCLP, "aclk_ahb2apb_gsclp",
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3424:25: error: initializer element is not constant
+       ENABLE_ACLK_GSCL, 6, CLK_IGNORE_UNUSED, 0),
+                            ^
+   drivers/clk/samsung/clk.h:245:13: note: in definition of macro '__GATE'
+      .flags  = f,    \
+                ^
+   drivers/clk/samsung/clk-exynos5433.c:3423:2: note: in expansion of macro 'GATE'
+     GATE(CLK_ACLK_GSCLNP_111, "aclk_gsclnp_111", "mout_aclk_gscl_111_user",
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3424:25: note: (near initialization for 'gscl_gate_clks[5].flags')
+       ENABLE_ACLK_GSCL, 6, CLK_IGNORE_UNUSED, 0),
+                            ^
+   drivers/clk/samsung/clk.h:245:13: note: in definition of macro '__GATE'
+      .flags  = f,    \
+                ^
+   drivers/clk/samsung/clk-exynos5433.c:3423:2: note: in expansion of macro 'GATE'
+     GATE(CLK_ACLK_GSCLNP_111, "aclk_gsclnp_111", "mout_aclk_gscl_111_user",
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3458:25: error: initializer element is not constant
+       ENABLE_PCLK_GSCL, 4, CLK_IGNORE_UNUSED, 0),
+                            ^
+   drivers/clk/samsung/clk.h:245:13: note: in definition of macro '__GATE'
+      .flags  = f,    \
+                ^
+   drivers/clk/samsung/clk-exynos5433.c:3457:2: note: in expansion of macro 'GATE'
+     GATE(CLK_PCLK_PMU_GSCL, "pclk_pmu_gscl", "mout_aclk_gscl_111_user",
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3458:25: note: (near initialization for 'gscl_gate_clks[18].flags')
+       ENABLE_PCLK_GSCL, 4, CLK_IGNORE_UNUSED, 0),
+                            ^
+   drivers/clk/samsung/clk.h:245:13: note: in definition of macro '__GATE'
+      .flags  = f,    \
+                ^
+   drivers/clk/samsung/clk-exynos5433.c:3457:2: note: in expansion of macro 'GATE'
+     GATE(CLK_PCLK_PMU_GSCL, "pclk_pmu_gscl", "mout_aclk_gscl_111_user",
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3461:7: error: initializer element is not constant
+       3, CLK_IGNORE_UNUSED, 0),
+          ^
+   drivers/clk/samsung/clk.h:245:13: note: in definition of macro '__GATE'
+      .flags  = f,    \
+                ^
+   drivers/clk/samsung/clk-exynos5433.c:3459:2: note: in expansion of macro 'GATE'
+     GATE(CLK_PCLK_SYSREG_GSCL, "pclk_sysreg_gscl",
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3461:7: note: (near initialization for 'gscl_gate_clks[19].flags')
+       3, CLK_IGNORE_UNUSED, 0),
+          ^
+   drivers/clk/samsung/clk.h:245:13: note: in definition of macro '__GATE'
+      .flags  = f,    \
+                ^
+   drivers/clk/samsung/clk-exynos5433.c:3459:2: note: in expansion of macro 'GATE'
+     GATE(CLK_PCLK_SYSREG_GSCL, "pclk_sysreg_gscl",
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3496:37: error: expected ')' before string constant
+    CLK_OF_DECLARE(exynos5433_cmu_gscl, "samsung,exynos5433-cmu-gscl",
+                                        ^
+   In file included from drivers/clk/samsung/clk-exynos5433.c:17:0:
+   drivers/clk/samsung/clk.h:309:13: error: initializer element is not constant
+      .flags  = CLK_GET_RATE_NOCACHE,   \
+                ^
+   drivers/clk/samsung/clk.h:317:2: note: in expansion of macro '__PLL'
+     __PLL(_typ, _id, NULL, _name, _pname, CLK_GET_RATE_NOCACHE, \
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3577:2: note: in expansion of macro 'PLL'
+     PLL(pll_35xx, CLK_FOUT_APOLLO_PLL, "fout_apollo_pll", "oscclk",
+     ^
+   drivers/clk/samsung/clk.h:309:13: note: (near initialization for 'apollo_pll_clks[0].flags')
+      .flags  = CLK_GET_RATE_NOCACHE,   \
+                ^
+   drivers/clk/samsung/clk.h:317:2: note: in expansion of macro '__PLL'
+     __PLL(_typ, _id, NULL, _name, _pname, CLK_GET_RATE_NOCACHE, \
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3577:2: note: in expansion of macro 'PLL'
+     PLL(pll_35xx, CLK_FOUT_APOLLO_PLL, "fout_apollo_pll", "oscclk",
+     ^
+>> drivers/clk/samsung/clk.h:142:17: error: invalid operands to binary | (have 'struct samsung_pll_clock *' and 'struct samsung_pll_clock *')
+      .flags  = (f) | CLK_SET_RATE_NO_REPARENT, \
+                    ^
+   drivers/clk/samsung/clk.h:157:2: note: in expansion of macro '__MUX'
+     __MUX(_id, NULL, cname, pnames, o, s, w, f, mf, NULL)
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3583:2: note: in expansion of macro 'MUX_F'
+     MUX_F(CLK_MOUT_APOLLO_PLL, "mout_apollo_pll", mout_apollo_pll_p,
+     ^
+   drivers/clk/samsung/clk.h:142:13: error: initializer element is not constant
+      .flags  = (f) | CLK_SET_RATE_NO_REPARENT, \
+                ^
+   drivers/clk/samsung/clk.h:157:2: note: in expansion of macro '__MUX'
+     __MUX(_id, NULL, cname, pnames, o, s, w, f, mf, NULL)
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3583:2: note: in expansion of macro 'MUX_F'
+     MUX_F(CLK_MOUT_APOLLO_PLL, "mout_apollo_pll", mout_apollo_pll_p,
+     ^
+   drivers/clk/samsung/clk.h:142:13: note: (near initialization for 'apollo_mux_clks[0].flags')
+      .flags  = (f) | CLK_SET_RATE_NO_REPARENT, \
+                ^
+   drivers/clk/samsung/clk.h:157:2: note: in expansion of macro '__MUX'
+     __MUX(_id, NULL, cname, pnames, o, s, w, f, mf, NULL)
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3583:2: note: in expansion of macro 'MUX_F'
+     MUX_F(CLK_MOUT_APOLLO_PLL, "mout_apollo_pll", mout_apollo_pll_p,
+     ^
+   drivers/clk/samsung/clk.h:142:17: error: invalid operands to binary | (have 'int' and 'struct samsung_pll_clock *')
+      .flags  = (f) | CLK_SET_RATE_NO_REPARENT, \
+                    ^
+   drivers/clk/samsung/clk.h:151:2: note: in expansion of macro '__MUX'
+     __MUX(_id, NULL, cname, pnames, o, s, w, 0, 0, NULL)
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3587:2: note: in expansion of macro 'MUX'
+     MUX(CLK_MOUT_BUS_PLL_APOLLO_USER, "mout_bus_pll_apollo_user",
+     ^
+   drivers/clk/samsung/clk.h:142:13: error: initializer element is not constant
+      .flags  = (f) | CLK_SET_RATE_NO_REPARENT, \
+                ^
+   drivers/clk/samsung/clk.h:151:2: note: in expansion of macro '__MUX'
+     __MUX(_id, NULL, cname, pnames, o, s, w, 0, 0, NULL)
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3587:2: note: in expansion of macro 'MUX'
+     MUX(CLK_MOUT_BUS_PLL_APOLLO_USER, "mout_bus_pll_apollo_user",
+     ^
+   drivers/clk/samsung/clk.h:142:13: note: (near initialization for 'apollo_mux_clks[1].flags')
+      .flags  = (f) | CLK_SET_RATE_NO_REPARENT, \
+                ^
+   drivers/clk/samsung/clk.h:151:2: note: in expansion of macro '__MUX'
+     __MUX(_id, NULL, cname, pnames, o, s, w, 0, 0, NULL)
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3587:2: note: in expansion of macro 'MUX'
+     MUX(CLK_MOUT_BUS_PLL_APOLLO_USER, "mout_bus_pll_apollo_user",
+     ^
+>> drivers/clk/samsung/clk.h:142:17: error: invalid operands to binary | (have 'struct samsung_pll_clock *' and 'struct samsung_pll_clock *')
+      .flags  = (f) | CLK_SET_RATE_NO_REPARENT, \
+                    ^
+   drivers/clk/samsung/clk.h:157:2: note: in expansion of macro '__MUX'
+     __MUX(_id, NULL, cname, pnames, o, s, w, f, mf, NULL)
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3591:2: note: in expansion of macro 'MUX_F'
+     MUX_F(CLK_MOUT_APOLLO, "mout_apollo", mout_apollo_p, MUX_SEL_APOLLO2,
+     ^
+   drivers/clk/samsung/clk.h:142:13: error: initializer element is not constant
+      .flags  = (f) | CLK_SET_RATE_NO_REPARENT, \
+                ^
+   drivers/clk/samsung/clk.h:157:2: note: in expansion of macro '__MUX'
+     __MUX(_id, NULL, cname, pnames, o, s, w, f, mf, NULL)
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3591:2: note: in expansion of macro 'MUX_F'
+     MUX_F(CLK_MOUT_APOLLO, "mout_apollo", mout_apollo_p, MUX_SEL_APOLLO2,
+     ^
+   drivers/clk/samsung/clk.h:142:13: note: (near initialization for 'apollo_mux_clks[2].flags')
+      .flags  = (f) | CLK_SET_RATE_NO_REPARENT, \
+                ^
+   drivers/clk/samsung/clk.h:157:2: note: in expansion of macro '__MUX'
+     __MUX(_id, NULL, cname, pnames, o, s, w, f, mf, NULL)
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3591:2: note: in expansion of macro 'MUX_F'
+     MUX_F(CLK_MOUT_APOLLO, "mout_apollo", mout_apollo_p, MUX_SEL_APOLLO2,
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3598:24: error: initializer element is not constant
+       DIV_APOLLO0, 24, 3, CLK_GET_RATE_NOCACHE,
+                           ^
+   drivers/clk/samsung/clk.h:194:13: note: in definition of macro '__DIV'
+      .flags  = f,    \
+                ^
+   drivers/clk/samsung/clk-exynos5433.c:3597:2: note: in expansion of macro 'DIV_F'
+     DIV_F(CLK_DIV_CNTCLK_APOLLO, "div_cntclk_apollo", "div_apollo2",
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3598:24: note: (near initialization for 'apollo_div_clks[0].flags')
+       DIV_APOLLO0, 24, 3, CLK_GET_RATE_NOCACHE,
+                           ^
+   drivers/clk/samsung/clk.h:194:13: note: in definition of macro '__DIV'
+      .flags  = f,    \
+                ^
+   drivers/clk/samsung/clk-exynos5433.c:3597:2: note: in expansion of macro 'DIV_F'
+     DIV_F(CLK_DIV_CNTCLK_APOLLO, "div_cntclk_apollo", "div_apollo2",
+     ^
+>> drivers/clk/samsung/clk-exynos5433.c:3599:4: error: 'CLK_DIVIDER_READ_ONLY' undeclared here (not in a function)
+       CLK_DIVIDER_READ_ONLY),
+       ^
+   drivers/clk/samsung/clk.h:198:16: note: in definition of macro '__DIV'
+      .div_flags = df,    \
+                   ^
+   drivers/clk/samsung/clk-exynos5433.c:3597:2: note: in expansion of macro 'DIV_F'
+     DIV_F(CLK_DIV_CNTCLK_APOLLO, "div_cntclk_apollo", "div_apollo2",
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3599:4: error: initializer element is not constant
+       CLK_DIVIDER_READ_ONLY),
+       ^
+   drivers/clk/samsung/clk.h:198:16: note: in definition of macro '__DIV'
+      .div_flags = df,    \
+                   ^
+   drivers/clk/samsung/clk-exynos5433.c:3597:2: note: in expansion of macro 'DIV_F'
+     DIV_F(CLK_DIV_CNTCLK_APOLLO, "div_cntclk_apollo", "div_apollo2",
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3599:4: note: (near initialization for 'apollo_div_clks[0].div_flags')
+       CLK_DIVIDER_READ_ONLY),
+       ^
+   drivers/clk/samsung/clk.h:198:16: note: in definition of macro '__DIV'
+      .div_flags = df,    \
+                   ^
+   drivers/clk/samsung/clk-exynos5433.c:3597:2: note: in expansion of macro 'DIV_F'
+     DIV_F(CLK_DIV_CNTCLK_APOLLO, "div_cntclk_apollo", "div_apollo2",
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3601:24: error: initializer element is not constant
+       DIV_APOLLO0, 20, 3, CLK_GET_RATE_NOCACHE,
+                           ^
+   drivers/clk/samsung/clk.h:194:13: note: in definition of macro '__DIV'
+      .flags  = f,    \
+                ^
+   drivers/clk/samsung/clk-exynos5433.c:3600:2: note: in expansion of macro 'DIV_F'
+     DIV_F(CLK_DIV_PCLK_DBG_APOLLO, "div_pclk_dbg_apollo", "div_apollo2",
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3601:24: note: (near initialization for 'apollo_div_clks[1].flags')
+       DIV_APOLLO0, 20, 3, CLK_GET_RATE_NOCACHE,
+                           ^
+   drivers/clk/samsung/clk.h:194:13: note: in definition of macro '__DIV'
+      .flags  = f,    \
+                ^
+   drivers/clk/samsung/clk-exynos5433.c:3600:2: note: in expansion of macro 'DIV_F'
+     DIV_F(CLK_DIV_PCLK_DBG_APOLLO, "div_pclk_dbg_apollo", "div_apollo2",
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3602:4: error: initializer element is not constant
+       CLK_DIVIDER_READ_ONLY),
+       ^
+   drivers/clk/samsung/clk.h:198:16: note: in definition of macro '__DIV'
+      .div_flags = df,    \
+                   ^
+   drivers/clk/samsung/clk-exynos5433.c:3600:2: note: in expansion of macro 'DIV_F'
+     DIV_F(CLK_DIV_PCLK_DBG_APOLLO, "div_pclk_dbg_apollo", "div_apollo2",
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3602:4: note: (near initialization for 'apollo_div_clks[1].div_flags')
+       CLK_DIVIDER_READ_ONLY),
+       ^
+   drivers/clk/samsung/clk.h:198:16: note: in definition of macro '__DIV'
+      .div_flags = df,    \
+                   ^
+   drivers/clk/samsung/clk-exynos5433.c:3600:2: note: in expansion of macro 'DIV_F'
+     DIV_F(CLK_DIV_PCLK_DBG_APOLLO, "div_pclk_dbg_apollo", "div_apollo2",
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3604:24: error: initializer element is not constant
+       DIV_APOLLO0, 16, 3, CLK_GET_RATE_NOCACHE,
+                           ^
+   drivers/clk/samsung/clk.h:194:13: note: in definition of macro '__DIV'
+      .flags  = f,    \
+                ^
+   drivers/clk/samsung/clk-exynos5433.c:3603:2: note: in expansion of macro 'DIV_F'
+     DIV_F(CLK_DIV_ATCLK_APOLLO, "div_atclk_apollo", "div_apollo2",
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3604:24: note: (near initialization for 'apollo_div_clks[2].flags')
+       DIV_APOLLO0, 16, 3, CLK_GET_RATE_NOCACHE,
+                           ^
+   drivers/clk/samsung/clk.h:194:13: note: in definition of macro '__DIV'
+      .flags  = f,    \
+                ^
+   drivers/clk/samsung/clk-exynos5433.c:3603:2: note: in expansion of macro 'DIV_F'
+     DIV_F(CLK_DIV_ATCLK_APOLLO, "div_atclk_apollo", "div_apollo2",
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3605:4: error: initializer element is not constant
+       CLK_DIVIDER_READ_ONLY),
+       ^
+   drivers/clk/samsung/clk.h:198:16: note: in definition of macro '__DIV'
+      .div_flags = df,    \
+                   ^
+   drivers/clk/samsung/clk-exynos5433.c:3603:2: note: in expansion of macro 'DIV_F'
+     DIV_F(CLK_DIV_ATCLK_APOLLO, "div_atclk_apollo", "div_apollo2",
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3605:4: note: (near initialization for 'apollo_div_clks[2].div_flags')
+       CLK_DIVIDER_READ_ONLY),
+       ^
+   drivers/clk/samsung/clk.h:198:16: note: in definition of macro '__DIV'
+      .div_flags = df,    \
+                   ^
+   drivers/clk/samsung/clk-exynos5433.c:3603:2: note: in expansion of macro 'DIV_F'
+     DIV_F(CLK_DIV_ATCLK_APOLLO, "div_atclk_apollo", "div_apollo2",
+     ^
+   drivers/clk/samsung/clk-exynos5433.c:3607:24: error: initializer element is not constant
+       DIV_APOLLO0, 12, 3, CLK_GET_RATE_NOCACHE,
+..
 
-[...]
+vim +142 drivers/clk/samsung/clk.h
 
->>> +static int stm_send(void *addr, const void *data, u32 size, u8 max)
->>> +{
->>> +       u32 len = size;
->>> +       u8 paload[8];
->>> +
->>> +       if (stm_addr_unaligned(data, max)) {
->>> +               memcpy(paload, data, size);
->>> +               data = paload;
->>> +       }
->>> +
->>> +       /* now we are 64bit/32bit aligned */
->>> +#ifdef CONFIG_64BIT
->>> +       if (size == 8)
->>> +               writeq_relaxed(*(u64 *)data, addr);
->>> +#endif
->>
->> We probably don't need an #ifdef here.  Checking the size of the
->> transfer against the fundamental data size will result in the same
->> outcome, i.e preventing 64 bit transfers on a 32 bit architecture.  An
->> error (understandable by the caller) should probably be returned in
->> this case.
->
-> In theory this is correct, but if the code is unreachable for non-32-bit architectures, why include it at all?
+721c42a3 Thomas Abraham       2013-03-09  136  	{							\
+721c42a3 Thomas Abraham       2013-03-09  137  		.id		= _id,				\
+721c42a3 Thomas Abraham       2013-03-09  138  		.dev_name	= dname,			\
+721c42a3 Thomas Abraham       2013-03-09  139  		.name		= cname,			\
+721c42a3 Thomas Abraham       2013-03-09  140  		.parent_names	= pnames,			\
+721c42a3 Thomas Abraham       2013-03-09  141  		.num_parents	= ARRAY_SIZE(pnames),		\
+819c1de3 James Hogan          2013-07-29 @142  		.flags		= (f) | CLK_SET_RATE_NO_REPARENT, \
+721c42a3 Thomas Abraham       2013-03-09  143  		.offset		= o,				\
+721c42a3 Thomas Abraham       2013-03-09  144  		.shift		= s,				\
+721c42a3 Thomas Abraham       2013-03-09  145  		.width		= w,				\
+721c42a3 Thomas Abraham       2013-03-09  146  		.mux_flags	= mf,				\
+721c42a3 Thomas Abraham       2013-03-09  147  		.alias		= a,				\
+721c42a3 Thomas Abraham       2013-03-09  148  	}
+721c42a3 Thomas Abraham       2013-03-09  149  
+721c42a3 Thomas Abraham       2013-03-09  150  #define MUX(_id, cname, pnames, o, s, w)			\
+721c42a3 Thomas Abraham       2013-03-09  151  	__MUX(_id, NULL, cname, pnames, o, s, w, 0, 0, NULL)
+721c42a3 Thomas Abraham       2013-03-09  152  
+721c42a3 Thomas Abraham       2013-03-09  153  #define MUX_A(_id, cname, pnames, o, s, w, a)			\
+721c42a3 Thomas Abraham       2013-03-09  154  	__MUX(_id, NULL, cname, pnames, o, s, w, 0, 0, a)
+721c42a3 Thomas Abraham       2013-03-09  155  
+721c42a3 Thomas Abraham       2013-03-09  156  #define MUX_F(_id, cname, pnames, o, s, w, f, mf)		\
+721c42a3 Thomas Abraham       2013-03-09  157  	__MUX(_id, NULL, cname, pnames, o, s, w, f, mf, NULL)
+721c42a3 Thomas Abraham       2013-03-09  158  
+41ccf7f2 Tushar Behera        2013-06-20  159  #define MUX_FA(_id, cname, pnames, o, s, w, f, mf, a)		\
+41ccf7f2 Tushar Behera        2013-06-20  160  	__MUX(_id, NULL, cname, pnames, o, s, w, f, mf, a)
+41ccf7f2 Tushar Behera        2013-06-20  161  
+721c42a3 Thomas Abraham       2013-03-09  162  /**
+721c42a3 Thomas Abraham       2013-03-09  163   * @id: platform specific id of the clock.
+721c42a3 Thomas Abraham       2013-03-09  164   * struct samsung_div_clock: information about div clock
+721c42a3 Thomas Abraham       2013-03-09  165   * @dev_name: name of the device to which this clock belongs.
+721c42a3 Thomas Abraham       2013-03-09  166   * @name: name of this div clock.
+721c42a3 Thomas Abraham       2013-03-09  167   * @parent_name: name of the parent clock.
+721c42a3 Thomas Abraham       2013-03-09  168   * @flags: optional flags for basic clock.
+721c42a3 Thomas Abraham       2013-03-09  169   * @offset: offset of the register for configuring the div.
+721c42a3 Thomas Abraham       2013-03-09  170   * @shift: starting bit location of the div control bit-field in @reg.
+721c42a3 Thomas Abraham       2013-03-09  171   * @div_flags: flags for div-type clock.
+721c42a3 Thomas Abraham       2013-03-09  172   * @alias: optional clock alias name to be assigned to this clock.
+721c42a3 Thomas Abraham       2013-03-09  173   */
+721c42a3 Thomas Abraham       2013-03-09  174  struct samsung_div_clock {
+721c42a3 Thomas Abraham       2013-03-09  175  	unsigned int		id;
+721c42a3 Thomas Abraham       2013-03-09  176  	const char		*dev_name;
+721c42a3 Thomas Abraham       2013-03-09  177  	const char		*name;
+721c42a3 Thomas Abraham       2013-03-09  178  	const char		*parent_name;
+721c42a3 Thomas Abraham       2013-03-09  179  	unsigned long		flags;
+721c42a3 Thomas Abraham       2013-03-09  180  	unsigned long		offset;
+721c42a3 Thomas Abraham       2013-03-09  181  	u8			shift;
+721c42a3 Thomas Abraham       2013-03-09  182  	u8			width;
+721c42a3 Thomas Abraham       2013-03-09  183  	u8			div_flags;
+721c42a3 Thomas Abraham       2013-03-09  184  	const char		*alias;
+798ed613 Heiko Stuebner       2013-03-18  185  	struct clk_div_table	*table;
+721c42a3 Thomas Abraham       2013-03-09  186  };
+721c42a3 Thomas Abraham       2013-03-09  187  
+798ed613 Heiko Stuebner       2013-03-18  188  #define __DIV(_id, dname, cname, pname, o, s, w, f, df, a, t)	\
+721c42a3 Thomas Abraham       2013-03-09  189  	{							\
+721c42a3 Thomas Abraham       2013-03-09  190  		.id		= _id,				\
+721c42a3 Thomas Abraham       2013-03-09  191  		.dev_name	= dname,			\
+721c42a3 Thomas Abraham       2013-03-09  192  		.name		= cname,			\
+721c42a3 Thomas Abraham       2013-03-09  193  		.parent_name	= pname,			\
+721c42a3 Thomas Abraham       2013-03-09  194  		.flags		= f,				\
+721c42a3 Thomas Abraham       2013-03-09  195  		.offset		= o,				\
+721c42a3 Thomas Abraham       2013-03-09  196  		.shift		= s,				\
+721c42a3 Thomas Abraham       2013-03-09  197  		.width		= w,				\
+721c42a3 Thomas Abraham       2013-03-09  198  		.div_flags	= df,				\
+721c42a3 Thomas Abraham       2013-03-09  199  		.alias		= a,				\
+798ed613 Heiko Stuebner       2013-03-18  200  		.table		= t,				\
+721c42a3 Thomas Abraham       2013-03-09  201  	}
+721c42a3 Thomas Abraham       2013-03-09  202  
+721c42a3 Thomas Abraham       2013-03-09  203  #define DIV(_id, cname, pname, o, s, w)				\
+798ed613 Heiko Stuebner       2013-03-18  204  	__DIV(_id, NULL, cname, pname, o, s, w, 0, 0, NULL, NULL)
+721c42a3 Thomas Abraham       2013-03-09  205  
+721c42a3 Thomas Abraham       2013-03-09  206  #define DIV_A(_id, cname, pname, o, s, w, a)			\
+798ed613 Heiko Stuebner       2013-03-18  207  	__DIV(_id, NULL, cname, pname, o, s, w, 0, 0, a, NULL)
+721c42a3 Thomas Abraham       2013-03-09  208  
+721c42a3 Thomas Abraham       2013-03-09  209  #define DIV_F(_id, cname, pname, o, s, w, f, df)		\
+798ed613 Heiko Stuebner       2013-03-18  210  	__DIV(_id, NULL, cname, pname, o, s, w, f, df, NULL, NULL)
+798ed613 Heiko Stuebner       2013-03-18  211  
+798ed613 Heiko Stuebner       2013-03-18  212  #define DIV_T(_id, cname, pname, o, s, w, t)			\
+798ed613 Heiko Stuebner       2013-03-18  213  	__DIV(_id, NULL, cname, pname, o, s, w, 0, 0, NULL, t)
+721c42a3 Thomas Abraham       2013-03-09  214  
+721c42a3 Thomas Abraham       2013-03-09  215  /**
+721c42a3 Thomas Abraham       2013-03-09  216   * struct samsung_gate_clock: information about gate clock
+721c42a3 Thomas Abraham       2013-03-09  217   * @id: platform specific id of the clock.
+721c42a3 Thomas Abraham       2013-03-09  218   * @dev_name: name of the device to which this clock belongs.
+721c42a3 Thomas Abraham       2013-03-09  219   * @name: name of this gate clock.
+721c42a3 Thomas Abraham       2013-03-09  220   * @parent_name: name of the parent clock.
+721c42a3 Thomas Abraham       2013-03-09  221   * @flags: optional flags for basic clock.
+721c42a3 Thomas Abraham       2013-03-09  222   * @offset: offset of the register for configuring the gate.
+721c42a3 Thomas Abraham       2013-03-09  223   * @bit_idx: bit index of the gate control bit-field in @reg.
+721c42a3 Thomas Abraham       2013-03-09  224   * @gate_flags: flags for gate-type clock.
+721c42a3 Thomas Abraham       2013-03-09  225   * @alias: optional clock alias name to be assigned to this clock.
+721c42a3 Thomas Abraham       2013-03-09  226   */
+721c42a3 Thomas Abraham       2013-03-09  227  struct samsung_gate_clock {
+721c42a3 Thomas Abraham       2013-03-09  228  	unsigned int		id;
+721c42a3 Thomas Abraham       2013-03-09  229  	const char		*dev_name;
+721c42a3 Thomas Abraham       2013-03-09  230  	const char		*name;
+721c42a3 Thomas Abraham       2013-03-09  231  	const char		*parent_name;
+721c42a3 Thomas Abraham       2013-03-09  232  	unsigned long		flags;
+721c42a3 Thomas Abraham       2013-03-09  233  	unsigned long		offset;
+721c42a3 Thomas Abraham       2013-03-09  234  	u8			bit_idx;
+721c42a3 Thomas Abraham       2013-03-09  235  	u8			gate_flags;
+721c42a3 Thomas Abraham       2013-03-09  236  	const char		*alias;
+721c42a3 Thomas Abraham       2013-03-09  237  };
+721c42a3 Thomas Abraham       2013-03-09  238  
+721c42a3 Thomas Abraham       2013-03-09  239  #define __GATE(_id, dname, cname, pname, o, b, f, gf, a)	\
+721c42a3 Thomas Abraham       2013-03-09  240  	{							\
+721c42a3 Thomas Abraham       2013-03-09  241  		.id		= _id,				\
+721c42a3 Thomas Abraham       2013-03-09  242  		.dev_name	= dname,			\
+721c42a3 Thomas Abraham       2013-03-09  243  		.name		= cname,			\
+721c42a3 Thomas Abraham       2013-03-09  244  		.parent_name	= pname,			\
+721c42a3 Thomas Abraham       2013-03-09  245  		.flags		= f,				\
+721c42a3 Thomas Abraham       2013-03-09  246  		.offset		= o,				\
+721c42a3 Thomas Abraham       2013-03-09  247  		.bit_idx	= b,				\
+721c42a3 Thomas Abraham       2013-03-09  248  		.gate_flags	= gf,				\
+721c42a3 Thomas Abraham       2013-03-09  249  		.alias		= a,				\
+721c42a3 Thomas Abraham       2013-03-09  250  	}
+721c42a3 Thomas Abraham       2013-03-09  251  
+721c42a3 Thomas Abraham       2013-03-09  252  #define GATE(_id, cname, pname, o, b, f, gf)			\
+721c42a3 Thomas Abraham       2013-03-09  253  	__GATE(_id, NULL, cname, pname, o, b, f, gf, NULL)
+721c42a3 Thomas Abraham       2013-03-09  254  
+721c42a3 Thomas Abraham       2013-03-09  255  #define GATE_A(_id, cname, pname, o, b, f, gf, a)		\
+721c42a3 Thomas Abraham       2013-03-09  256  	__GATE(_id, NULL, cname, pname, o, b, f, gf, a)
+721c42a3 Thomas Abraham       2013-03-09  257  
+721c42a3 Thomas Abraham       2013-03-09  258  #define GATE_D(_id, dname, cname, pname, o, b, f, gf)		\
+721c42a3 Thomas Abraham       2013-03-09  259  	__GATE(_id, dname, cname, pname, o, b, f, gf, NULL)
+721c42a3 Thomas Abraham       2013-03-09  260  
+721c42a3 Thomas Abraham       2013-03-09  261  #define GATE_DA(_id, dname, cname, pname, o, b, f, gf, a)	\
+721c42a3 Thomas Abraham       2013-03-09  262  	__GATE(_id, dname, cname, pname, o, b, f, gf, a)
+721c42a3 Thomas Abraham       2013-03-09  263  
+721c42a3 Thomas Abraham       2013-03-09  264  #define PNAME(x) static const char *x[] __initdata
+721c42a3 Thomas Abraham       2013-03-09  265  
+721c42a3 Thomas Abraham       2013-03-09  266  /**
+721c42a3 Thomas Abraham       2013-03-09  267   * struct samsung_clk_reg_dump: register dump of clock controller registers.
+721c42a3 Thomas Abraham       2013-03-09  268   * @offset: clock register offset from the controller base address.
+721c42a3 Thomas Abraham       2013-03-09  269   * @value: the value to be register at offset.
+721c42a3 Thomas Abraham       2013-03-09  270   */
+721c42a3 Thomas Abraham       2013-03-09  271  struct samsung_clk_reg_dump {
+721c42a3 Thomas Abraham       2013-03-09  272  	u32	offset;
+721c42a3 Thomas Abraham       2013-03-09  273  	u32	value;
+721c42a3 Thomas Abraham       2013-03-09  274  };
+721c42a3 Thomas Abraham       2013-03-09  275  
+07dc76fa Yadwinder Singh Brar 2013-06-11  276  /**
+07dc76fa Yadwinder Singh Brar 2013-06-11  277   * struct samsung_pll_clock: information about pll clock
+07dc76fa Yadwinder Singh Brar 2013-06-11  278   * @id: platform specific id of the clock.
+07dc76fa Yadwinder Singh Brar 2013-06-11  279   * @dev_name: name of the device to which this clock belongs.
+07dc76fa Yadwinder Singh Brar 2013-06-11  280   * @name: name of this pll clock.
+07dc76fa Yadwinder Singh Brar 2013-06-11  281   * @parent_name: name of the parent clock.
+07dc76fa Yadwinder Singh Brar 2013-06-11  282   * @flags: optional flags for basic clock.
+07dc76fa Yadwinder Singh Brar 2013-06-11  283   * @con_offset: offset of the register for configuring the PLL.
+07dc76fa Yadwinder Singh Brar 2013-06-11  284   * @lock_offset: offset of the register for locking the PLL.
+07dc76fa Yadwinder Singh Brar 2013-06-11  285   * @type: Type of PLL to be registered.
+07dc76fa Yadwinder Singh Brar 2013-06-11  286   * @alias: optional clock alias name to be assigned to this clock.
+07dc76fa Yadwinder Singh Brar 2013-06-11  287   */
+07dc76fa Yadwinder Singh Brar 2013-06-11  288  struct samsung_pll_clock {
+07dc76fa Yadwinder Singh Brar 2013-06-11  289  	unsigned int		id;
+07dc76fa Yadwinder Singh Brar 2013-06-11  290  	const char		*dev_name;
+07dc76fa Yadwinder Singh Brar 2013-06-11  291  	const char		*name;
+07dc76fa Yadwinder Singh Brar 2013-06-11  292  	const char		*parent_name;
+07dc76fa Yadwinder Singh Brar 2013-06-11  293  	unsigned long		flags;
+07dc76fa Yadwinder Singh Brar 2013-06-11  294  	int			con_offset;
+07dc76fa Yadwinder Singh Brar 2013-06-11  295  	int			lock_offset;
+07dc76fa Yadwinder Singh Brar 2013-06-11  296  	enum samsung_pll_type	type;
+3ff6e0d8 Yadwinder Singh Brar 2013-06-11  297  	const struct samsung_pll_rate_table *rate_table;
+07dc76fa Yadwinder Singh Brar 2013-06-11  298  	const char              *alias;
+07dc76fa Yadwinder Singh Brar 2013-06-11  299  };
+07dc76fa Yadwinder Singh Brar 2013-06-11  300  
+3ff6e0d8 Yadwinder Singh Brar 2013-06-11  301  #define __PLL(_typ, _id, _dname, _name, _pname, _flags, _lock, _con,	\
+3ff6e0d8 Yadwinder Singh Brar 2013-06-11  302  		_rtable, _alias)					\
+07dc76fa Yadwinder Singh Brar 2013-06-11  303  	{								\
+07dc76fa Yadwinder Singh Brar 2013-06-11  304  		.id		= _id,					\
+07dc76fa Yadwinder Singh Brar 2013-06-11  305  		.type		= _typ,					\
+07dc76fa Yadwinder Singh Brar 2013-06-11  306  		.dev_name	= _dname,				\
+07dc76fa Yadwinder Singh Brar 2013-06-11  307  		.name		= _name,				\
+07dc76fa Yadwinder Singh Brar 2013-06-11  308  		.parent_name	= _pname,				\
+07dc76fa Yadwinder Singh Brar 2013-06-11 @309  		.flags		= CLK_GET_RATE_NOCACHE,			\
+07dc76fa Yadwinder Singh Brar 2013-06-11  310  		.con_offset	= _con,					\
+07dc76fa Yadwinder Singh Brar 2013-06-11  311  		.lock_offset	= _lock,				\
+3ff6e0d8 Yadwinder Singh Brar 2013-06-11  312  		.rate_table	= _rtable,				\
 
-                            ^^^^^^^
-I guess you mean the code is unreachable for "non-64-bit" architectures?
+:::::: The code at line 142 was first introduced by commit
+:::::: 819c1de344c5b8350bffd35be9a0fa74541292d3 clk: add CLK_SET_RATE_NO_REPARENT flag
 
->
->>> +       if (size >= 4) {
->>> +               writel_relaxed(*(u32 *)data, addr);
->>> +               data += 4;
->>> +               size -= 4;
->>> +       }
->>> +
->>> +       if (size >= 2) {
->>> +               writew_relaxed(*(u16 *)data, addr);
->>> +               data += 2;
->>> +               size -= 2;
->>> +       }
->>> +
->>> +       if (size == 1)
->>> +               writeb_relaxed(*(u8 *)data, addr);
->>> +
->>> +       return len;
->>> +}
->
-> The API for stm_data::packet (include/linux/stm.h) is not wholly clearly defined, but it does state "sends an STP packet," which I interpret as meaning exactly one packet and no more. This function (which is called from this module's implementation of stm_data::packet) will send multiple STP packets if called with a value that is not exactly 8, 4, 2, or 1.
+:::::: TO: James Hogan <james.hogan@imgtec.com>
+:::::: CC: Mike Turquette <mturquette@linaro.org>
 
-Yes, understand. Since the only first packet in one STM trace should
-be marked timestamp, others should not be(their timestamps are same),
-the function "stm_send" should indeed send one STP packet at a time.
-
-I will address this in the next version.
-
-Thanks for your time,
-Chunyan
-
->
-> To send only one packet, either:
->
-> * These "if" statements are replaced with "else if" (as appropriate), and the function returns the size of data consumed; or
-> * The stm_generic_packet() function (below) forces "size" to a power-of-two (<= write_max) before calling stm_send().
->
->>> +static int stm_generic_link(struct stm_data *stm_data,
->>> +                           unsigned int master,  unsigned int channel)
->>> +{
->>> +       struct stm_drvdata *drvdata = container_of(stm_data,
->>> +                                                  struct stm_drvdata, stm);
->>> +       if (!drvdata || !drvdata->csdev)
->>> +               return -EINVAL;
->>> +
->>> +       return coresight_enable(drvdata->csdev);
->>> +}
->>> +
->>> +static void stm_generic_unlink(struct stm_data *stm_data,
->>> +                              unsigned int master,  unsigned int channel)
->>> +{
->>> +       struct stm_drvdata *drvdata = container_of(stm_data,
->>> +                                                  struct stm_drvdata, stm);
->>> +       if (!drvdata || !drvdata->csdev)
->>> +               return;
->>> +
->>> +       stm_disable(drvdata->csdev);
->>> +}
->>> +
->>> +static long stm_generic_set_options(struct stm_data *stm_data,
->>> +                                   unsigned int master,
->>> +                                   unsigned int channel,
->>> +                                   unsigned int nr_chans,
->>> +                                   unsigned long options)
->>> +{
->>> +       struct stm_drvdata *drvdata = container_of(stm_data,
->>> +                                                  struct stm_drvdata, stm);
->>> +       if (!(drvdata && drvdata->enable))
->>> +               return -EINVAL;
->>> +
->>> +       if (channel >= drvdata->numsp)
->>> +               return -EINVAL;
->>> +
->>> +       switch (options) {
->>> +       case STM_OPTION_GUARANTEED:
->>> +               set_bit(channel, drvdata->chs.guaranteed);
->>> +               break;
->>> +
->>> +       case STM_OPTION_INVARIANT:
->>> +               clear_bit(channel, drvdata->chs.guaranteed);
->>> +               break;
->>> +
->>> +       default:
->>> +               return -EINVAL;
->>> +       }
->>> +
->>> +       return 0;
->>> +}
->>> +
->>> +static long stm_generic_get_options(struct stm_data *stm_data,
->>> +                                   unsigned int master,
->>> +                                   unsigned int channel,
->>> +                                   unsigned int nr_chans,
->>> +                                   u64 *options)
->>> +{
->>> +       struct stm_drvdata *drvdata = container_of(stm_data,
->>> +                                                  struct stm_drvdata, stm);
->>> +       if (!(drvdata && drvdata->enable))
->>> +               return -EINVAL;
->>> +
->>> +       if (channel >= drvdata->numsp)
->>> +               return -EINVAL;
->>> +
->>> +       switch (*options) {
->>> +       case STM_OPTION_GUARANTEED:
->>> +               *options = test_bit(channel, drvdata->chs.guaranteed);
->>> +               break;
->>> +
->>> +       default:
->>> +               return -EINVAL;
->>> +       }
->>> +
->>> +       return 0;
->>> +}
->>> +
->>> +static ssize_t stm_generic_packet(struct stm_data *stm_data,
->>> +                                 unsigned int master,
->>> +                                 unsigned int channel,
->>> +                                 unsigned int packet,
->>> +                                 unsigned int flags,
->>> +                                 unsigned int size,
->>> +                                 const unsigned char *payload)
->>> +{
->>> +       unsigned long ch_addr;
->>> +       struct stm_drvdata *drvdata = container_of(stm_data,
->>> +                                                  struct stm_drvdata, stm);
->>> +
->>> +       if (!(drvdata && drvdata->enable))
->>> +               return 0;
->>> +
->>> +       if (channel >= drvdata->numsp)
->>> +               return 0;
->>> +
->>> +       ch_addr = (unsigned long)stm_channel_addr(drvdata, channel);
->>> +
->>> +       flags = (flags == STP_PACKET_TIMESTAMPED) ? STM_FLAG_TIMESTAMPED : 0;
->>> +       flags |= test_bit(channel, drvdata->chs.guaranteed) ?
->>> +                          STM_FLAG_GUARANTEED : 0;
->>> +
->>> +       if (size > drvdata->write_max)
->>> +               size = drvdata->write_max;
->>> +
->>> +       switch (packet) {
->>> +       case STP_PACKET_FLAG:
->>> +               ch_addr |= stm_channel_off(STM_PKT_TYPE_FLAG, flags);
->>> +
->>> +               /* the generic STM API set a size of zero on flag packets. */
->>> +               size = 1;
->>> +               break;
->>> +
->>> +       case STP_PACKET_DATA:
->>> +               ch_addr |= stm_channel_off(STM_PKT_TYPE_DATA, flags);
->>> +               break;
->>> +
->>> +       default:
->>> +               return 0;
->>> +       }
->>> +
->>> +       return stm_send((void *)ch_addr, payload, size, drvdata->write_max);
->>> +}
->>> +
->>> +static ssize_t hwevent_enable_show(struct device *dev,
->>> +                                  struct device_attribute *attr, char *buf)
->>> +{
->>> +       struct stm_drvdata *drvdata = dev_get_drvdata(dev->parent);
->>> +       unsigned long val = drvdata->stmheer;
->>> +
->>> +       return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
->>> +}
->>> +
->>> +static ssize_t hwevent_enable_store(struct device *dev,
->>> +                                   struct device_attribute *attr,
->>> +                                   const char *buf, size_t size)
->>> +{
->>> +       struct stm_drvdata *drvdata = dev_get_drvdata(dev->parent);
->>> +       unsigned long val;
->>> +       int ret = 0;
->>> +
->>> +       ret = kstrtoul(buf, 16, &val);
->>> +       if (ret)
->>> +               return -EINVAL;
->>> +
->>> +       drvdata->stmheer = val;
->>> +       /* HW event enable and trigger go hand in hand */
->>> +       drvdata->stmheter = val;
->>> +
->>> +       return size;
->>> +}
->>> +static DEVICE_ATTR_RW(hwevent_enable);
->>> +
->>> +static ssize_t hwevent_select_show(struct device *dev,
->>> +                                  struct device_attribute *attr, char *buf)
->>> +{
->>> +       struct stm_drvdata *drvdata = dev_get_drvdata(dev->parent);
->>> +       unsigned long val = drvdata->stmhebsr;
->>> +
->>> +       return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
->>> +}
->>> +
->>> +static ssize_t hwevent_select_store(struct device *dev,
->>> +                                   struct device_attribute *attr,
->>> +                                   const char *buf, size_t size)
->>> +{
->>> +       struct stm_drvdata *drvdata = dev_get_drvdata(dev->parent);
->>> +       unsigned long val;
->>> +       int ret = 0;
->>> +
->>> +       ret = kstrtoul(buf, 16, &val);
->>> +       if (ret)
->>> +               return -EINVAL;
->>> +
->>> +       drvdata->stmhebsr = val;
->>> +
->>> +       return size;
->>> +}
->>> +static DEVICE_ATTR_RW(hwevent_select);
->>> +
->>> +static ssize_t port_select_show(struct device *dev,
->>> +                               struct device_attribute *attr, char *buf)
->>> +{
->>> +       struct stm_drvdata *drvdata = dev_get_drvdata(dev->parent);
->>> +       unsigned long val;
->>> +
->>> +       if (!drvdata->enable) {
->>> +               val = drvdata->stmspscr;
->>> +       } else {
->>> +               spin_lock(&drvdata->spinlock);
->>> +               val = readl_relaxed(drvdata->base + STMSPSCR);
->>> +               spin_unlock(&drvdata->spinlock);
->>> +       }
->>> +
->>> +       return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
->>> +}
->>> +
->>> +static ssize_t port_select_store(struct device *dev,
->>> +                                struct device_attribute *attr,
->>> +                                const char *buf, size_t size)
->>> +{
->>> +       struct stm_drvdata *drvdata = dev_get_drvdata(dev->parent);
->>> +       unsigned long val, stmsper;
->>> +       int ret = 0;
->>> +
->>> +       ret = kstrtoul(buf, 16, &val);
->>> +       if (ret)
->>> +               return ret;
->>> +
->>> +       spin_lock(&drvdata->spinlock);
->>> +       drvdata->stmspscr = val;
->>> +
->>> +       if (drvdata->enable) {
->>> +               CS_UNLOCK(drvdata->base);
->>> +               /* Process as per ARM's TRM recommendation */
->>> +               stmsper = readl_relaxed(drvdata->base + STMSPER);
->>> +               writel_relaxed(0x0, drvdata->base + STMSPER);
->>> +               writel_relaxed(drvdata->stmspscr, drvdata->base + STMSPSCR);
->>> +               writel_relaxed(stmsper, drvdata->base + STMSPER);
->>> +               CS_LOCK(drvdata->base);
->>> +       }
->>> +       spin_unlock(&drvdata->spinlock);
->>> +
->>> +       return size;
->>> +}
->>> +static DEVICE_ATTR_RW(port_select);
->>> +
->>> +static ssize_t port_enable_show(struct device *dev,
->>> +                               struct device_attribute *attr, char *buf)
->>> +{
->>> +       struct stm_drvdata *drvdata = dev_get_drvdata(dev->parent);
->>> +       unsigned long val;
->>> +
->>> +       if (!drvdata->enable) {
->>> +               val = drvdata->stmsper;
->>> +       } else {
->>> +               spin_lock(&drvdata->spinlock);
->>> +               val = readl_relaxed(drvdata->base + STMSPER);
->>> +               spin_unlock(&drvdata->spinlock);
->>> +       }
->>> +
->>> +       return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
->>> +}
->>> +
->>> +static ssize_t port_enable_store(struct device *dev,
->>> +                                struct device_attribute *attr,
->>> +                                const char *buf, size_t size)
->>> +{
->>> +       struct stm_drvdata *drvdata = dev_get_drvdata(dev->parent);
->>> +       unsigned long val;
->>> +       int ret = 0;
->>> +
->>> +       ret = kstrtoul(buf, 16, &val);
->>> +       if (ret)
->>> +               return ret;
->>> +
->>> +       spin_lock(&drvdata->spinlock);
->>> +       drvdata->stmsper = val;
->>> +
->>> +       if (drvdata->enable) {
->>> +               CS_UNLOCK(drvdata->base);
->>> +               writel_relaxed(drvdata->stmsper, drvdata->base + STMSPER);
->>> +               CS_LOCK(drvdata->base);
->>> +       }
->>> +       spin_unlock(&drvdata->spinlock);
->>> +
->>> +       return size;
->>> +}
->>> +static DEVICE_ATTR_RW(port_enable);
->>> +
->>> +static ssize_t traceid_show(struct device *dev,
->>> +                           struct device_attribute *attr, char *buf)
->>> +{
->>> +       unsigned long val;
->>> +       struct stm_drvdata *drvdata = dev_get_drvdata(dev->parent);
->>> +
->>> +       val = drvdata->traceid;
->>> +       return sprintf(buf, "%#lx\n", val);
->>> +}
->>> +
->>> +static ssize_t traceid_store(struct device *dev,
->>> +                            struct device_attribute *attr,
->>> +                            const char *buf, size_t size)
->>> +{
->>> +       int ret;
->>> +       unsigned long val;
->>> +       struct stm_drvdata *drvdata = dev_get_drvdata(dev->parent);
->>> +
->>> +       ret = kstrtoul(buf, 16, &val);
->>> +       if (ret)
->>> +               return ret;
->>> +
->>> +       /* traceid field is 7bit wide on STM32 */
->>> +       drvdata->traceid = val & 0x7f;
->>> +       return size;
->>> +}
->>> +static DEVICE_ATTR_RW(traceid);
->>> +
->>> +#define coresight_simple_func(type, name, offset)                      \
->>> +static ssize_t name##_show(struct device *_dev,                                \
->>> +                          struct device_attribute *attr, char *buf)    \
->>> +{                                                                      \
->>> +       type *drvdata = dev_get_drvdata(_dev->parent);                  \
->>> +       return scnprintf(buf, PAGE_SIZE, "0x%08x\n",                    \
->>> +                        readl_relaxed(drvdata->base + offset));        \
->>> +}                                                                      \
->>> +DEVICE_ATTR_RO(name)
->>> +
->>> +#define coresight_stm_simple_func(name, offset)        \
->>> +       coresight_simple_func(struct stm_drvdata, name, offset)
->>> +
->>> +coresight_stm_simple_func(tcsr, STMTCSR);
->>> +coresight_stm_simple_func(tsfreqr, STMTSFREQR);
->>> +coresight_stm_simple_func(syncr, STMSYNCR);
->>> +coresight_stm_simple_func(sper, STMSPER);
->>> +coresight_stm_simple_func(spter, STMSPTER);
->>> +coresight_stm_simple_func(privmaskr, STMPRIVMASKR);
->>> +coresight_stm_simple_func(spscr, STMSPSCR);
->>> +coresight_stm_simple_func(spmscr, STMSPMSCR);
->>> +coresight_stm_simple_func(spfeat1r, STMSPFEAT1R);
->>> +coresight_stm_simple_func(spfeat2r, STMSPFEAT2R);
->>> +coresight_stm_simple_func(spfeat3r, STMSPFEAT3R);
->>> +coresight_stm_simple_func(devid, CORESIGHT_DEVID);
->>> +
->>> +static struct attribute *coresight_stm_attrs[] = {
->>> +       &dev_attr_hwevent_enable.attr,
->>> +       &dev_attr_hwevent_select.attr,
->>> +       &dev_attr_port_enable.attr,
->>> +       &dev_attr_port_select.attr,
->>> +       &dev_attr_traceid.attr,
->>> +       NULL,
->>> +};
->>> +
->>> +static struct attribute *coresight_stm_mgmt_attrs[] = {
->>> +       &dev_attr_tcsr.attr,
->>> +       &dev_attr_tsfreqr.attr,
->>> +       &dev_attr_syncr.attr,
->>> +       &dev_attr_sper.attr,
->>> +       &dev_attr_spter.attr,
->>> +       &dev_attr_privmaskr.attr,
->>> +       &dev_attr_spscr.attr,
->>> +       &dev_attr_spmscr.attr,
->>> +       &dev_attr_spfeat1r.attr,
->>> +       &dev_attr_spfeat2r.attr,
->>> +       &dev_attr_spfeat3r.attr,
->>> +       &dev_attr_devid.attr,
->>> +       NULL,
->>> +};
->>> +
->>> +static const struct attribute_group coresight_stm_group = {
->>> +       .attrs = coresight_stm_attrs,
->>> +};
->>> +
->>> +static const struct attribute_group coresight_stm_mgmt_group = {
->>> +       .attrs = coresight_stm_mgmt_attrs,
->>> +       .name = "mgmt",
->>> +};
->>> +
->>> +static const struct attribute_group *coresight_stm_groups[] = {
->>> +       &coresight_stm_group,
->>> +       &coresight_stm_mgmt_group,
->>> +       NULL,
->>> +};
->>> +
->>> +static int stm_get_resource_byname(struct device_node *np,
->>> +                                  char *ch_base, struct resource *res)
->>> +{
->>> +       const char *name = NULL;
->>> +       int index = 0, found = 0;
->>> +
->>> +       while (!of_property_read_string_index(np, "reg-names", index, &name)) {
->>> +               if (strcmp(ch_base, name)) {
->>> +                       index++;
->>> +                       continue;
->>> +               }
->>> +
->>> +               /* We have a match and @index is where it's at */
->>> +               found = 1;
->>> +               break;
->>> +       }
->>> +
->>> +       if (!found)
->>> +               return -EINVAL;
->>> +
->>> +       return of_address_to_resource(np, index, res);
->>> +}
->>> +
->>> +static u32 stm_fundamental_data_size(struct stm_drvdata *drvdata)
->>> +{
->>> +       u32 stmspfeat2r;
->>> +
->>> +       stmspfeat2r = readl_relaxed(drvdata->base + STMSPFEAT2R);
->>> +       return BMVAL(stmspfeat2r, 12, 15);
->>> +}
->>> +
->>> +static u32 stm_num_stimulus_port(struct stm_drvdata *drvdata)
->>> +{
->>> +       u32 numsp;
->>> +
->>> +       numsp = readl_relaxed(drvdata->base + CORESIGHT_DEVID);
->>> +       /*
->>> +        * NUMPS in STMDEVID is 17 bit long and if equal to 0x0,
->>> +        * 32 stimulus ports are supported.
->>> +        */
->>> +       numsp &= 0x1ffff;
->>> +       if (!numsp)
->>> +               numsp = STM_32_CHANNEL;
->>> +       return numsp;
->>> +}
->>> +
->>> +static void stm_init_default_data(struct stm_drvdata *drvdata)
->>> +{
->>> +       /* Don't use port selection */
->>> +       drvdata->stmspscr = 0x0;
->>> +       /*
->>> +        * Enable all channel regardless of their number.  When port
->>> +        * selection isn't used (see above) STMSPER applies to all
->>> +        * 32 channel group available, hence setting all 32 bits to 1
->>> +        */
->>> +       drvdata->stmsper = ~0x0;
->>> +
->>> +       /*
->>> +        * Select arbitrary value to start with.  If there is a conflict
->>> +        * with other tracers the framework will deal with it.
->>> +        */
->>> +       drvdata->traceid = 0x20;
->>> +
->>> +       /* Set invariant transaction timing on all channels */
->>> +       bitmap_clear(drvdata->chs.guaranteed, 0, drvdata->numsp);
->>> +}
->>> +
->>> +static void stm_init_generic_data(struct stm_drvdata *drvdata)
->>> +{
->>> +       drvdata->stm.name = dev_name(drvdata->dev);
->>> +       drvdata->stm.mstatic = true;
->>> +       drvdata->stm.sw_nchannels = drvdata->numsp;
->>> +       drvdata->stm.packet = stm_generic_packet;
->>> +       drvdata->stm.link = stm_generic_link;
->>> +       drvdata->stm.unlink = stm_generic_unlink;
->>> +       drvdata->stm.set_options = stm_generic_set_options;
->>> +       drvdata->stm.get_options = stm_generic_get_options;
->>> +}
->>> +
->>> +static int stm_probe(struct amba_device *adev, const struct amba_id *id)
->>> +{
->>> +       int ret;
->>> +       void __iomem *base;
->>> +       unsigned long *guaranteed;
->>> +       struct device *dev = &adev->dev;
->>> +       struct coresight_platform_data *pdata = NULL;
->>> +       struct stm_drvdata *drvdata;
->>> +       struct resource *res = &adev->res;
->>> +       struct resource ch_res;
->>> +       size_t res_size, bitmap_size;
->>> +       struct coresight_desc *desc;
->>> +       struct device_node *np = adev->dev.of_node;
->>> +
->>> +       if (np) {
->>> +               pdata = of_get_coresight_platform_data(dev, np);
->>> +               if (IS_ERR(pdata))
->>> +                       return PTR_ERR(pdata);
->>> +               adev->dev.platform_data = pdata;
->>> +       }
->>> +       drvdata = devm_kzalloc(dev, sizeof(*drvdata), GFP_KERNEL);
->>> +       if (!drvdata)
->>> +               return -ENOMEM;
->>> +
->>> +       drvdata->dev = &adev->dev;
->>> +       drvdata->atclk = devm_clk_get(&adev->dev, "atclk"); /* optional */
->>> +       if (!IS_ERR(drvdata->atclk)) {
->>> +               ret = clk_prepare_enable(drvdata->atclk);
->>> +               if (ret)
->>> +                       return ret;
->>> +       }
->>> +       dev_set_drvdata(dev, drvdata);
->>> +
->>> +       base = devm_ioremap_resource(dev, res);
->>> +       if (IS_ERR(base))
->>> +               return PTR_ERR(base);
->>> +       drvdata->base = base;
->>> +
->>> +       ret = stm_get_resource_byname(np, "stm-stimulus-base", &ch_res);
->>> +       if (ret)
->>> +               return ret;
->>> +
->>> +       base = devm_ioremap_resource(dev, &ch_res);
->>> +       if (IS_ERR(base))
->>> +               return PTR_ERR(base);
->>> +       drvdata->chs.base = base;
->>> +
->>> +       drvdata->write_max = sizeof(u32);
->>
->> Isn't the fundamental data size the maximum an architecture can stand?
->>  Why not simply use that rather than adding another variable?
->>
->>> +       drvdata->write_64bit = stm_fundamental_data_size(drvdata);
->>> +
->>> +#ifndef CONFIG_64BIT
->>> +       if (drvdata->write_64bit)
->>> +               drvdata->write_max = sizeof(u64);
->>> +#endif
->
-> It is a bit odd that this code is using sizeof(u64) / sizeof(u32) here, when it is using 8 / 4 explicitly in the functions above.
->
->>
->> In most cases the fundamental data size will follow the architecture
->> size, i.e, 32 bit architecture with 32 bit fundamental data size, 64
->> bit architecture with 64 bit fundamental data size.  A fundamental
->> data size of 32 is also possible on a 64 bit architecture.
->>
->> What needs to be prevented is a 32 bit architecture with a fundamental
->> data size of 64.  In those cases the fundamental data size should be
->> adjusted to be 32 bit.  To do that I suggest to modify
->> stm_fundamental_data_size() to probe the STM's fundamental data size
->> but to adjust it down if on a 32 bit system.  Knowing whether running
->> on a 32/64 bit system is easy when using the IS_ENABLED() macro.
->
-> Agreed. For ARM, 64-bit writes to the STM are supported only if BOTH the STM supports 64-bit data and the processor is in 64-bit execution state. Otherwise, the largest size is 32 bits. You are likely to see both 64-bit STM from 32-bit execution state, and 32-bit STM on a SoC with a 64-bit ARM processor.
->
->>> +
->>> +       if (boot_nr_channel) {
->>> +               drvdata->numsp = boot_nr_channel;
->>> +               res_size = min((resource_size_t)(boot_nr_channel *
->>> +                                 BYTES_PER_CHANNEL), resource_size(res));
->>> +       } else {
->>> +               drvdata->numsp = stm_num_stimulus_port(drvdata);
->>> +               res_size = min((resource_size_t)(drvdata->numsp *
->>> +                                BYTES_PER_CHANNEL), resource_size(res));
->>> +       }
->>> +       bitmap_size = BITS_TO_LONGS(drvdata->numsp) * sizeof(long);
->>> +
->>> +       guaranteed = devm_kzalloc(dev, bitmap_size, GFP_KERNEL);
->>> +       if (!guaranteed)
->>> +               return -ENOMEM;
->>> +       drvdata->chs.guaranteed = guaranteed;
->>> +
->>> +       spin_lock_init(&drvdata->spinlock);
->>> +
->>> +       stm_init_default_data(drvdata);
->>> +       stm_init_generic_data(drvdata);
->>> +
->>> +       if (stm_register_device(dev, &drvdata->stm, THIS_MODULE)) {
->>> +               dev_info(dev,
->>> +                        "stm_register_device failed, probing deffered\n");
->>> +               return -EPROBE_DEFER;
->>> +       }
->>> +
->>> +       desc = devm_kzalloc(dev, sizeof(*desc), GFP_KERNEL);
->>> +       if (!desc) {
->>> +               ret = -ENOMEM;
->>> +               goto stm_unregister;
->>> +       }
->>> +
->>> +       desc->type = CORESIGHT_DEV_TYPE_SOURCE;
->>> +       desc->subtype.source_subtype = CORESIGHT_DEV_SUBTYPE_SOURCE_SOFTWARE;
->>> +       desc->ops = &stm_cs_ops;
->>> +       desc->pdata = pdata;
->>> +       desc->dev = dev;
->>> +       desc->groups = coresight_stm_groups;
->>> +       drvdata->csdev = coresight_register(desc);
->>> +       if (IS_ERR(drvdata->csdev)) {
->>> +               ret = PTR_ERR(drvdata->csdev);
->>> +               goto stm_unregister;
->>> +       }
->>> +
->>> +       pm_runtime_put(&adev->dev);
->>> +
->>> +       dev_info(dev, "%s initialized\n", (char *)id->data);
->>> +       return 0;
->>> +
->>> +stm_unregister:
->>> +       stm_unregister_device(&drvdata->stm);
->>> +       return ret;
->>> +}
->>> +
->>> +static int stm_remove(struct amba_device *adev)
->>> +{
->>> +       struct stm_drvdata *drvdata = amba_get_drvdata(adev);
->>> +
->>> +       stm_unregister_device(&drvdata->stm);
->>> +       coresight_unregister(drvdata->csdev);
->>> +       return 0;
->>> +}
->>
->> The xyz_remove() functions is not needed for coresight devices -
->> unbinding a device from its driver will no longer be possible in the
->> 4.6 cycle.
->>
->>> +
->>> +#ifdef CONFIG_PM
->>> +static int stm_runtime_suspend(struct device *dev)
->>> +{
->>> +       struct stm_drvdata *drvdata = dev_get_drvdata(dev);
->>> +
->>> +       if (drvdata && !IS_ERR(drvdata->atclk))
->>> +               clk_disable_unprepare(drvdata->atclk);
->>> +
->>> +       return 0;
->>> +}
->>> +
->>> +static int stm_runtime_resume(struct device *dev)
->>> +{
->>> +       struct stm_drvdata *drvdata = dev_get_drvdata(dev);
->>> +
->>> +       if (drvdata && !IS_ERR(drvdata->atclk))
->>> +               clk_prepare_enable(drvdata->atclk);
->>> +
->>> +       return 0;
->>> +}
->>> +#endif
->>> +
->>> +static const struct dev_pm_ops stm_dev_pm_ops = {
->>> +       SET_RUNTIME_PM_OPS(stm_runtime_suspend, stm_runtime_resume, NULL)
->>> +};
->>> +
->>> +static struct amba_id stm_ids[] = {
->>> +       {
->>> +               .id     = 0x0003b962,
->>> +               .mask   = 0x0003ffff,
->>> +               .data   = "STM32",
->>> +       },
->>> +       { 0, 0},
->>> +};
->>> +
->>> +static struct amba_driver stm_driver = {
->>> +       .drv = {
->>> +               .name   = "coresight-stm",
->>> +               .owner  = THIS_MODULE,
->>> +               .pm     = &stm_dev_pm_ops,
->>> +       },
->>> +       .probe          = stm_probe,
->>> +       .remove         = stm_remove,
->>> +       .id_table       = stm_ids,
->>> +};
->>> +
->>> +module_amba_driver(stm_driver);
->>> +
->>> +MODULE_LICENSE("GPL v2");
->>> +MODULE_DESCRIPTION("CoreSight System Trace Macrocell driver");
->>> diff --git a/include/linux/coresight-stm.h b/include/linux/coresight-stm.h
->>> new file mode 100644
->>> index 0000000..a978bb8
->>> --- /dev/null
->>> +++ b/include/linux/coresight-stm.h
->>> @@ -0,0 +1,6 @@
->>> +#ifndef __LINUX_CORESIGHT_STM_H_
->>> +#define __LINUX_CORESIGHT_STM_H_
->>> +
->>> +#include <uapi/linux/coresight-stm.h>
->>> +
->>> +#endif
->>> diff --git a/include/uapi/linux/coresight-stm.h b/include/uapi/linux/coresight-stm.h
->>> new file mode 100644
->>> index 0000000..fa35f0b
->>> --- /dev/null
->>> +++ b/include/uapi/linux/coresight-stm.h
->>> @@ -0,0 +1,12 @@
->>> +#ifndef __UAPI_CORESIGHT_STM_H_
->>> +#define __UAPI_CORESIGHT_STM_H_
->>> +
->>> +#define STM_FLAG_TIMESTAMPED   BIT(3)
->>> +#define STM_FLAG_GUARANTEED    BIT(7)
->>> +
->>> +enum {
->>> +       STM_OPTION_GUARANTEED = 0,
->>> +       STM_OPTION_INVARIANT,
->>> +};
->>> +
->>> +#endif
->>> --
->>> 1.9.1
->>>
->
-> IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 40456 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160217/701f7c6c/attachment-0001.obj>
