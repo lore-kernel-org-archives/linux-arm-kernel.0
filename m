@@ -1,84 +1,53 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 17 Feb 2016 14:59:48 +0100
-Subject: [linux-sunxi] [PATCH] ARM: dts: sun4i: Enable USB DRC on
- Hyundai-a7hd
-In-Reply-To: <1455656404-31191-1-git-send-email-peter@korsgaard.com>
-References: <1455656404-31191-1-git-send-email-peter@korsgaard.com>
-Message-ID: <56C47CD4.3080402@redhat.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 17 Feb 2016 15:06:08 +0100
+Subject: [PATCH 5/5] arm64: marvell: add Device Tree files for Armada 7K/8K
+In-Reply-To: <56C356F8.8080105@arm.com>
+References: <1455526065-7307-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1455526065-7307-6-git-send-email-thomas.petazzoni@free-electrons.com>
+ <56C19B18.8090005@arm.com>
+ <20160216173155.4f832646@free-electrons.com>
+ <56C356F8.8080105@arm.com>
+Message-ID: <20160217150608.2c9cdb02@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Marc,
 
-On 16-02-16 22:00, Peter Korsgaard wrote:
-> Enable the OTG USB controller on the A7HD.
->
-> Signed-off-by: Peter Korsgaard <peter@korsgaard.com>
+On Tue, 16 Feb 2016 17:06:00 +0000, Marc Zyngier wrote:
 
-Looks good to me:
+> > According to the datasheet I have, the GICD, GICC, GICV and GICH blocks
+> > are all 0x10000 in size. Not sure the entire 0x10000 is actually used,
+> > but th memory map is pretty clear.
+> 
+> No, that's just a way to make sure that you can give the GICV block to a
+> guest while using 64k pages.
+> 
+> Talking about GICV: are you sure it is 0x10000 and not 0x20000? SBSA
+> recommends to have the first 4kB GICV page aliased over 64kB, and the
+> second 4kB page over the second 64kB block. That is to ensure that a
+> hypervisor can trap access to GICV_DIR register independently of the
+> rest of the virtual CPU interface.
+> 
+> But hey, almost everybody got it wrong so far, so I wouldn't be
+> surprised if that was broken on this platform as well...
 
-Reviewed-by: Hans de Goede <hdegoede@redhat.com>
+It seems like Marvell didn't get it wrong, and that my eyes were the
+issue.
 
-Regards,
+What I have in the datasheet is:
 
-Hans
+GICD 0x210000 0x21FFFF Distributor
+GICC 0x220000 0x23FFFF Banked per CPU
+GICV 0x240000 0x25FFFF Virtual Control
+GICH 0x260000 0x27FFFF Hypervisor Control
 
+So: GICD is 64 KB in size, while GICC, GICV and GICH are all 128 KB in
+size. I'll fix that up in my v2.
 
-> ---
->   arch/arm/boot/dts/sun4i-a10-hyundai-a7hd.dts | 34 ++++++++++++++++++++++++++++
->   1 file changed, 34 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/sun4i-a10-hyundai-a7hd.dts b/arch/arm/boot/dts/sun4i-a10-hyundai-a7hd.dts
-> index 43f58fb..9103864 100644
-> --- a/arch/arm/boot/dts/sun4i-a10-hyundai-a7hd.dts
-> +++ b/arch/arm/boot/dts/sun4i-a10-hyundai-a7hd.dts
-> @@ -87,6 +87,30 @@
->   	status = "okay";
->   };
->
-> +&otg_sram {
-> +	status = "okay";
-> +};
-> +
-> +&pio {
-> +	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
-> +		allwinner,pins = "PH4";
-> +		allwinner,function = "gpio_in";
-> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> +		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-> +	};
-> +
-> +	usb0_vbus_detect_pin: usb0_vbus_detect_pin at 0 {
-> +		allwinner,pins = "PH5";
-> +		allwinner,function = "gpio_in";
-> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> +		allwinner,pull = <SUN4I_PINCTRL_PULL_DOWN>;
-> +	};
-> +};
-> +
-> +&reg_usb0_vbus {
-> +	status = "okay";
-> +};
-> +
->   &reg_usb2_vbus {
->   	gpio = <&pio 7 6 GPIO_ACTIVE_HIGH>; /* PH6 */
->   	status = "okay";
-> @@ -102,7 +126,17 @@
->   	allwinner,pins = "PH6";
->   };
->
-> +&usb_otg {
-> +	dr_mode = "otg";
-> +	status = "okay";
-> +};
-> +
->   &usbphy {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&usb0_id_detect_pin>, <&usb0_vbus_detect_pin>;
-> +	usb0_id_det-gpio = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
-> +	usb0_vbus_det-gpio = <&pio 7 5 GPIO_ACTIVE_HIGH>; /* PH5 */
-> +	usb0_vbus-supply = <&reg_usb0_vbus>;
->   	usb2_vbus-supply = <&reg_usb2_vbus>;
->   	status = "okay";
->   };
->
+Thanks!
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
