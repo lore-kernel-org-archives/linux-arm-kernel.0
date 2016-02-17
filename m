@@ -1,35 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 17 Feb 2016 20:08:28 +0000
-Subject: [PATCH v5 RESEND 4/5] ARM: amba: Move reading of periphid to
- amba_match()
-In-Reply-To: <56C426C4.7040907@samsung.com>
-References: <1455101250-11327-1-git-send-email-m.szyprowski@samsung.com>
- <1455101250-11327-5-git-send-email-m.szyprowski@samsung.com>
- <20160215175250.GJ10826@n2100.arm.linux.org.uk>
- <56C426C4.7040907@samsung.com>
-Message-ID: <20160217200828.GH19428@n2100.arm.linux.org.uk>
+From: mwelling@ieee.org (Michael Welling)
+Date: Wed, 17 Feb 2016 14:13:07 -0600
+Subject: Bunch of machines are not booting in next again, GPIO regression?
+In-Reply-To: <20160217195543.GA871@jcartwri.amer.corp.natinst.com>
+References: <20160217192755.GC21202@atomide.com>
+ <20160217195543.GA871@jcartwri.amer.corp.natinst.com>
+Message-ID: <20160217201259.GA16028@deathstar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 17, 2016 at 08:52:36AM +0100, Marek Szyprowski wrote:
-> Then the only solution right now I see is to get back to v1:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/388199.html
-> which at least handles correctly device registration when power domain
-> driver is available.
+On Wed, Feb 17, 2016 at 01:55:43PM -0600, Josh Cartwright wrote:
+> On Wed, Feb 17, 2016 at 11:27:55AM -0800, Tony Lindgren wrote:
+> > Hi Linus,
+> > 
+> > Looks like ff2b13592299 ("gpio: make the gpiochip a real device")
+> > broke booting on all omaps, and probably other machines too according
+> > to this:
+> > 
+> > https://kernelci.org/boot/all/job/next/kernel/next-20160217/
+> > 
+> > So far we've gone from 1 failed machine with next-20160216 to
+> > 18 failed machines with next-20160217.
+> > 
+> > The error I'm getting on omaps is below with debug_ll enable,
+> > any ideas?
+> 
+> Hey Tony-
+> 
+> Looks like the newly allocated gpio_device object isn't zeroed,
+> confusing dev_set_name.  Can you give this a try?
+> 
+>   Josh
+> 
+> diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
+> index d8511cd..59f0045 100644
+> --- a/drivers/gpio/gpiolib.c
+> +++ b/drivers/gpio/gpiolib.c
+> @@ -435,7 +435,7 @@ int gpiochip_add_data(struct gpio_chip *chip, void *data)
+>  	 * First: allocate and populate the internal stat container, and
+>  	 * set up the struct device.
+>  	 */
+> -	gdev = kmalloc(sizeof(*gdev), GFP_KERNEL);
+> +	gdev = kzalloc(sizeof(*gdev), GFP_KERNEL);
+>  	if (!gdev)
+>  		return -ENOMEM;
+>  	gdev->dev.bus = &gpio_bus_type;
 
-... and which has the ability to break platforms if the PM domain is
-not already available.
+As you can see by my post on the GPIO mailing list, a boot failure
+was occurring on the Dragonboard 410C:
+http://permalink.gmane.org/gmane.linux.kernel.gpio/14360
 
-What's wrong with the patch in the link above _combined_ with a patch
-which addresses the concern I have with that patch: build a list of
-the failed-to-register devices, and retry them later - maybe from a
-late_initcall(), or a similar mechanism?
-
-My view is the risk to existing systems is _too_ high to apply either
-this patch, or the patch you link to above, and I refuse to play the
-"lets apply it and see if we break anything" lottery with this.
-
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+With the above patch the board now boots. Good catch.
