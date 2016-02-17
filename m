@@ -1,87 +1,169 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 17 Feb 2016 17:45:16 +0000
-Subject: [PATCH V5 07/15] pci, acpi: Provide generic way to assign bus
- domain number.
-In-Reply-To: <56C49342.1070308@semihalf.com>
-References: <1455630825-27253-1-git-send-email-tn@semihalf.com>
- <1455630825-27253-8-git-send-email-tn@semihalf.com>
- <CAKc_7PU+i2AwOVCyW2VNt4BZCWw=KBMAbV8v9DVQ2Ess3WE=kw@mail.gmail.com>
- <56C47E9A.5010901@semihalf.com>
- <CAKc_7PUiLQhUuJjR8wcuRm7KJdxBYjb+ZBd_cLTtjNPbEro6wA@mail.gmail.com>
- <56C48C45.7050203@semihalf.com>
- <CAKc_7PV=p7kHt73c673L+v=KCaFV8RzoaSHwcH2gd1g-fWGq5w@mail.gmail.com>
- <56C49342.1070308@semihalf.com>
-Message-ID: <20160217174516.GA11132@red-moon>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 17 Feb 2016 17:56:56 +0000
+Subject: KASAN issues with idle / hotplug area (was: Re: [PATCH v5sub1
+ 7/8] arm64: move kernel image to base of vmalloc area)
+In-Reply-To: <20160217170110.GE32647@leverpostej>
+References: <20160212151006.GJ31665@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu84mVP=YjbLhWoGj9AEUD8m8+Lq8kTCniCHwxJwMWaZtA@mail.gmail.com>
+ <20160212152641.GK31665@e104818-lin.cambridge.arm.com>
+ <56BDFC86.5010705@arm.com>
+ <20160212160652.GL31665@e104818-lin.cambridge.arm.com>
+ <56C1E072.2090909@virtuozzo.com>
+ <20160215185957.GB19413@e104818-lin.cambridge.arm.com>
+ <56C31D1D.50708@virtuozzo.com> <20160217143950.GC32647@leverpostej>
+ <20160217170110.GE32647@leverpostej>
+Message-ID: <20160217175656.GJ32647@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Guys,
-
-On Wed, Feb 17, 2016 at 04:35:30PM +0100, Tomasz Nowicki wrote:
-
-[...]
-
-> >>>>>In my patchset, I had a slightly different and I think better approach
-> >>>>>for
-> >>>>>this without calling the _SEG method again. Please see
-> >>>>>http://www.spinics.net/lists/arm-kernel/msg478167.html
-> >>>>>at the last part
-> >>>>>ofhttp://www.spinics.net/lists/arm-kernel/msg478169.html
-> >>>>
-> >>>>
-> >>>>Relying on NULL parent device to make decision on boot method is really
-> >>>>ugly
-> >>>>way. This may hit us again once we want to obtain another firmware
-> >>>>specific
-> >>>>info e.g. numa node. IMO we need to fix it this way.
-> >>>
-> >>>
-> >>>I am not relying on NULL there, in the current code parent is NULL
-> >>>in case of ACPI, and the check is needed not to crash (unless that
-> >>>has changed).
-> >>
-> >>
-> >>This series passes down valid parent, see [PATCH V5 06/15].
-> >>
-> >>>
-> >>>The main part was the macro acpi_pci_get_segment() and the use
-> >>>of acpi_pci_root_info from sysdata to do this.
-> >>
-> >>
-> >>Since we can obtain related firmware specific data from valid parent device
-> >>(without defining another accessors), I do not see the point to use sysdata.
-> >>Let me know your opinion.
-> >
-> >In the patch, you use the parent info and call _SEG method again.
-> >The segment information is available in the ->root->segment of
-> >acpi_pci_root_info if you setup the sysdata like in my patch
+On Wed, Feb 17, 2016 at 05:01:11PM +0000, Mark Rutland wrote:
+> On Wed, Feb 17, 2016 at 02:39:51PM +0000, Mark Rutland wrote:
+> > Perhaps the simplest option is to not instrument invoke_psci_fn_* and
+> > psci_suspend_finisher. Do we have a per-function annotation to avoid
+> > KASAN instrumentation, like notrace? I need to investigate, but we may
+> > also need notrace for similar reasons.
+>
+> I came up with the patch below, per the reasoning above.
 > 
-> I know it is in sysdata->root->segment, but the way it is passed
-> down is wrong. sysdata is the pointer to unknown content (void *) so
-> we need to validate it before we can use it. If we merge this patch
-> we can remove first _SEG call.
+> It _changes_ the KASAN splats (I see errors in tick_program_event rather
+> than find_busiest_group), but doesn't seem to get rid of them. I'm not
+> sure if I've missed something, or if we also have another latent issue.
+> 
+> Ideas?
 
-I personally do not think there is such a significant difference, both
-solutions have pros and cons, it is worth keeping in mind though
-that reading _SEG again to set the bus domain number works only if
-the value we stash in acpi_pci_root.segment is not overridden, if it
-is (ie see x86 - agreed that's to fix a FW bug) we have a disconnect.
+I'd missed annotating __cpu_suspend_save. I've fixed that up locally
+(along with s/virt_to_phys/__virt_to_phys due to the inlining issue).
 
-On the other hand Tomasz's code allows removing some IA64 code in the
-process (code that sets the bridge companion, so part of the patch
-should be kept regardless).
+I'm still missing somehing; I'm getting KASAN warnings in find_busiest_group
+again, and the shadow looks like it's corrupt (the second batch of f3 /
+KASAN_STACK_RIGHT don't have a matching f1 / KASAN_STACK_LEFT):
 
-So, there are two things to do:
+[   13.138791] Memory state around the buggy address:
+[   13.143624]  ffffffc936a7fb80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+[   13.150929]  ffffffc936a7fc00: 00 00 00 00 00 00 00 00 f1 f1 f1 f1 00 00 00 00
+[   13.158232] >ffffffc936a7fc80: f3 f3 f3 f3 00 00 00 00 00 f4 f4 f4 f3 f3 f3 f3
+[   13.165530]                       ^
+[   13.169066]  ffffffc936a7fd00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+[   13.176369]  ffffffc936a7fd80: 00 00 00 00 00 00 00 00 00 00 00 00 f1 f1 f1 f1
 
-- Assign the bridge companion in PCI core code
-- Decide where to get the domain number from (acpi_pci_root.segment vs
-  calling _SEG again). At present they are equivalent so I do not see
-  any compelling reason to change this patch.
+This is turning into a whack-a-mole game...
 
-Side note: there is already a function (pci_domain_nr()) that you
-can implement in ACPI PCI host generic (by deselecting
-PCI_DOMAINS_GENERIC if ACPI) so there is no need for acpi_pci_get_segment()
-in case we have to override _SEG value in the future, at present
-there is no need, comments appreciated.
+Mark.
 
-Lorenzo
+> ---->8----
+> From 8f7ae44d8f8862f5300483d45617b5bd05fc652f Mon Sep 17 00:00:00 2001
+> From: Mark Rutland <mark.rutland@arm.com>
+> Date: Wed, 17 Feb 2016 15:38:22 +0000
+> Subject: [PATCH] arm64/psci: avoid KASAN splats with idle
+> 
+> When a CPU goes into a deep idle state, we store CPU context in
+> __cpu_suspend_enter, then call psci_suspend_finisher to invoke the
+> firmware. If we entered a deep idle state, we do not return directly,
+> and instead start cold, restoring state in cpu_resume.
+> 
+> Thus we may execute the prologue and body of psci_suspend_finisher and
+> the PSCI invocation function, but not their epilogue. When using KASAN
+> this means that we poison a region of shadow memory, but never unpoison
+> it. After we resume, subsequent stack accesses may hit the stale poison
+> values, leading to false positives from KASAN.
+> 
+> To avoid this, we must ensure that functions called after the context
+> save are not instrumented, and do not posion the shadow region, by
+> annotating them with __no_sanitize_address. As common inlines they may
+> call are not similarly annotated, and the compiler refuses to allow
+> function attribute mismatches, we must also avoid calls to such
+> functions.
+> 
+> ARM is not affected, as it does not support KASAN. When CONFIG_KASAN is
+> not selected, __no_sanitize_address expands to nothing, so the
+> annotation should not be harmful.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> ---
+>  arch/arm64/kernel/psci.c | 14 ++++++++------
+>  drivers/firmware/psci.c  |  3 +++
+>  2 files changed, 11 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
+> index f67f35b..8324ce8 100644
+> --- a/arch/arm64/kernel/psci.c
+> +++ b/arch/arm64/kernel/psci.c
+> @@ -32,12 +32,16 @@
+>  
+>  static DEFINE_PER_CPU_READ_MOSTLY(u32 *, psci_power_state);
+>  
+> +static phys_addr_t cpu_resume_phys;
+> +
+>  static int __maybe_unused cpu_psci_cpu_init_idle(unsigned int cpu)
+>  {
+>  	int i, ret, count = 0;
+>  	u32 *psci_states;
+>  	struct device_node *state_node, *cpu_node;
+>  
+> +	cpu_resume_phys = virt_to_phys(cpu_resume);
+> +
+>  	cpu_node = of_get_cpu_node(cpu, NULL);
+>  	if (!cpu_node)
+>  		return -ENODEV;
+> @@ -178,12 +182,10 @@ static int cpu_psci_cpu_kill(unsigned int cpu)
+>  }
+>  #endif
+>  
+> -static int psci_suspend_finisher(unsigned long index)
+> +__no_sanitize_address
+> +static int psci_suspend_finisher(unsigned long state)
+>  {
+> -	u32 *state = __this_cpu_read(psci_power_state);
+> -
+> -	return psci_ops.cpu_suspend(state[index - 1],
+> -				    virt_to_phys(cpu_resume));
+> +	return psci_ops.cpu_suspend(state, cpu_resume_phys);
+>  }
+>  
+>  static int __maybe_unused cpu_psci_cpu_suspend(unsigned long index)
+> @@ -200,7 +202,7 @@ static int __maybe_unused cpu_psci_cpu_suspend(unsigned long index)
+>  	if (!psci_power_state_loses_context(state[index - 1]))
+>  		ret = psci_ops.cpu_suspend(state[index - 1], 0);
+>  	else
+> -		ret = cpu_suspend(index, psci_suspend_finisher);
+> +		ret = cpu_suspend(state[index - 1], psci_suspend_finisher);
+>  
+>  	return ret;
+>  }
+> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+> index f25cd79..e4e8dc1 100644
+> --- a/drivers/firmware/psci.c
+> +++ b/drivers/firmware/psci.c
+> @@ -106,6 +106,7 @@ bool psci_power_state_is_valid(u32 state)
+>  	return !(state & ~valid_mask);
+>  }
+>  
+> +__no_sanitize_address
+>  static unsigned long __invoke_psci_fn_hvc(unsigned long function_id,
+>  			unsigned long arg0, unsigned long arg1,
+>  			unsigned long arg2)
+> @@ -116,6 +117,7 @@ static unsigned long __invoke_psci_fn_hvc(unsigned long function_id,
+>  	return res.a0;
+>  }
+>  
+> +__no_sanitize_address
+>  static unsigned long __invoke_psci_fn_smc(unsigned long function_id,
+>  			unsigned long arg0, unsigned long arg1,
+>  			unsigned long arg2)
+> @@ -148,6 +150,7 @@ static u32 psci_get_version(void)
+>  	return invoke_psci_fn(PSCI_0_2_FN_PSCI_VERSION, 0, 0, 0);
+>  }
+>  
+> +__no_sanitize_address
+>  static int psci_cpu_suspend(u32 state, unsigned long entry_point)
+>  {
+>  	int err;
+> -- 
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
