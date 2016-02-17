@@ -1,85 +1,35 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Tue, 16 Feb 2016 16:18:35 -0800
-Subject: [PATCH v2 1/3] ARM: dts: vf-colibri: remove regulator container node
-Message-ID: <1455668317-15728-1-git-send-email-stefan@agner.ch>
+From: jay.xu@rock-chips.com (Jianqun Xu)
+Date: Wed, 17 Feb 2016 08:21:58 +0800
+Subject: [PATCH] spi/rockchip: Add dt-binding for Rockchip rk3399 spi
+In-Reply-To: <1730751.NYv1NxJVuB@phil>
+References: <1455614538-4415-1-git-send-email-jay.xu@rock-chips.com>
+ <20160216132223.GM18327@sirena.org.uk> <1730751.NYv1NxJVuB@phil>
+Message-ID: <56C3BD26.3030704@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Drop the fake simple-bus container 'regulators' and put the
-regulators directly under the root node. This also makes the
-artificial 'reg' properties superfluous. While at it, name
-the regulators according to schematics.
+Hi Heiko
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
-Changes since v1:
-- Rename regulators according to schematics
-- Drop sys prefix
-
- arch/arm/boot/dts/vf-colibri-eval-v3.dtsi | 43 ++++++++++++-------------------
- 1 file changed, 17 insertions(+), 26 deletions(-)
-
-diff --git a/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi b/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
-index b494673..ca061c9 100644
---- a/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
-+++ b/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
-@@ -50,32 +50,23 @@
- 		clock-frequency = <16000000>;
- 	};
- 
--	regulators {
--		compatible = "simple-bus";
--		#address-cells = <1>;
--		#size-cells = <0>;
--
--		sys_5v0_reg: regulator at 0 {
--			compatible = "regulator-fixed";
--			reg = <0>;
--			regulator-name = "5v0";
--			regulator-min-microvolt = <5000000>;
--			regulator-max-microvolt = <5000000>;
--			regulator-always-on;
--		};
-+	reg_5v0: regulator-5v0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "5V";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+	};
- 
--		/* USBH_PEN */
--		usbh_vbus_reg: regulator at 1 {
--			compatible = "regulator-fixed";
--			pinctrl-names = "default";
--			pinctrl-0 = <&pinctrl_usbh1_reg>;
--			reg = <1>;
--			regulator-name = "usbh_vbus";
--			regulator-min-microvolt = <5000000>;
--			regulator-max-microvolt = <5000000>;
--			gpio = <&gpio2 19 GPIO_ACTIVE_LOW>;
--			vin-supply = <&sys_5v0_reg>;
--		};
-+	reg_usbh_vbus: regulator-usbh-vbus {
-+		compatible = "regulator-fixed";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_usbh1_reg>;
-+		regulator-name = "VCC_USB[1-4]";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		gpio = <&gpio2 19 GPIO_ACTIVE_LOW>; /* USBH_PEN resp. USBH_P_EN */
-+		vin-supply = <&reg_5v0>;
- 	};
- };
- 
-@@ -145,7 +136,7 @@
- };
- 
- &usbh1 {
--	vbus-supply = <&usbh_vbus_reg>;
-+	vbus-supply = <&reg_usbh_vbus>;
- };
- 
- &iomuxc {
--- 
-2.7.1
+? 16/02/2016 22:37, Heiko Stuebner ??:
+> Am Dienstag, 16. Februar 2016, 13:22:23 schrieb Mark Brown:
+>> On Tue, Feb 16, 2016 at 05:22:18PM +0800, jianqun.xu wrote:
+>>>   Documentation/devicetree/bindings/spi/spi-rockchip.txt | 1 +
+>>>   1 file changed, 1 insertion(+)
+>>
+>> I'd expect this to be added to both the driver and the binding document
+>> not just the document.
+>
+> It seems the driver can still use the rk3066-variant - aka nobody has found
+> specific issues in the rk3399 IP implementation.
+>
+> Having the more specific IP names already in the dts before actually using
+> them was suggested by devicetree people to not have to exchange everything
+> once specific issues were found.
+>
+> So right now it's using the fallback-mechanism of binding to the rk3066
+> name, but if some obstacle appears it will only take adding the binding in
+> the driver to make it work (even with old devicetrees).
+>
+>
+Thank you, got it, and I will re-send this patch with the driver patch.
+>
