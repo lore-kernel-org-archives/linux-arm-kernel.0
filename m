@@ -1,92 +1,39 @@
-From: tiffany.lin@mediatek.com (tiffany lin)
-Date: Wed, 17 Feb 2016 16:01:08 +0800
-Subject: [PATCH v4 5/8] [Media] vcodec: mediatek: Add Mediatek V4L2
- Video Encoder Driver
-In-Reply-To: <56C328AF.5030604@cisco.com>
-References: <1454585703-42428-1-git-send-email-tiffany.lin@mediatek.com>
- <1454585703-42428-2-git-send-email-tiffany.lin@mediatek.com>
- <1454585703-42428-3-git-send-email-tiffany.lin@mediatek.com>
- <1454585703-42428-4-git-send-email-tiffany.lin@mediatek.com>
- <1454585703-42428-5-git-send-email-tiffany.lin@mediatek.com>
- <1454585703-42428-6-git-send-email-tiffany.lin@mediatek.com>
- <56C1B4AF.1030207@xs4all.nl> <1455604653.19396.68.camel@mtksdaap41>
- <56C2D371.9090805@xs4all.nl> <1455628805.19396.82.camel@mtksdaap41>
- <56C328AF.5030604@cisco.com>
-Message-ID: <1455696068.26202.4.camel@mtksdaap41>
+From: heiko.carstens@de.ibm.com (Heiko Carstens)
+Date: Wed, 17 Feb 2016 09:22:10 +0100
+Subject: [PATCH 1/5] all: s390: move wrapper infrastructure to generic
+ headers
+In-Reply-To: <20160202204156.GA27290@yury-N73SV>
+References: <1453741047-5498-1-git-send-email-ynorov@caviumnetworks.com>
+ <1453741047-5498-2-git-send-email-ynorov@caviumnetworks.com>
+ <20160128121618.GB5418@osiris> <20160128163109.GA8529@yury-N73SV>
+ <20160201114251.GB973@yury-N73SV> <20160202073913.GB3990@osiris>
+ <20160202154331.GA3003@yury-N73SV> <20160202160826.GF3990@osiris>
+ <20160202195434.GA3397@osiris> <20160202204156.GA27290@yury-N73SV>
+Message-ID: <20160217082210.GA4175@osiris>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2016-02-16 at 14:48 +0100, Hans Verkuil wrote:
-> Hi Tiffany,
+On Tue, Feb 02, 2016 at 11:41:56PM +0300, Yury Norov wrote:
+> > However I'll try to write an addon patch to your patch series. Maybe we can
+> > still get rid of compat_wrapper.c in a way which makes both of us happy.
+> > Also.. the idea with the alias names for compat wrappers does seem to have
+> > the disadvantage that it will pollute /proc/kallsyms for example.
+> > 
+> > Anyway, I'm not sure if I will be able to come up with something this week
+> > though.
 > 
-> >>>>> +int mtk_vcodec_enc_queue_init(void *priv, struct vb2_queue *src_vq,
-> >>>>> +			   struct vb2_queue *dst_vq)
-> >>>>> +{
-> >>>>> +	struct mtk_vcodec_ctx *ctx = priv;
-> >>>>> +	int ret;
-> >>>>> +
-> >>>>> +	src_vq->type		= V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE;
-> >>>>> +	src_vq->io_modes	= VB2_DMABUF | VB2_MMAP | VB2_USERPTR;
-> >>>>
-> >>>> I recomment dropping VB2_USERPTR. That only makes sense for scatter-gather dma,
-> >>>> and you use physically contiguous DMA.
-> >>>>
-> >>> Now our userspace app use VB2_USERPTR. I need to check if we could drop
-> >>> VB2_USERPTR.
-> >>> We use src_vq->mem_ops = &vb2_dma_contig_memops;
-> >>> And there are
-> >>> 	.get_userptr	= vb2_dc_get_userptr,
-> >>> 	.put_userptr	= vb2_dc_put_userptr,
-> >>> I was confused why it only make sense for scatter-gather.
-> >>> Could you kindly explain more?
-> >>
-> >> VB2_USERPTR indicates that the application can use malloc to allocate buffers
-> >> and pass those to the driver. Since malloc uses virtual memory the physical
-> >> memory is scattered all over. And the first page typically does not start at
-> >> the beginning of the page but at a random offset.
-> >>
-> >> To support that the DMA generally has to be able to do scatter-gather.
-> >>
-> >> Now, where things get ugly is that a hack was added to the USERPTR support where
-> >> apps could pass a pointer to physically contiguous memory as a user pointer. This
-> >> was a hack for embedded systems that preallocated a pool of buffers and needed to
-> >> pass those pointers around somehow. So the dma-contig USERPTR support is for that
-> >> 'feature'. If you try to pass a malloc()ed buffer to a dma-contig driver it will
-> >> reject it. One big problem is that this specific hack isn't signaled anywhere, so
-> >> applications have no way of knowing if the USERPTR support is the proper version
-> >> or the hack where physically contiguous memory is expected.
-> >>
-> >> This hack has been replaced with DMABUF which is the proper way of passing buffers
-> >> around.
-> >>
-> >> New dma-contig drivers should not use that old hack anymore. Use dmabuf to pass
-> >> external buffers around.
-> >>
-> >> How do you use it in your app? With malloc()ed buffers? Or with 'special' pointers
-> >> to physically contiguous buffers?
-> >>
-> > Understood now. Thanks for your explanation.
-> > Now our app use malloc()ed buffers and we hook vb2_dma_contig_memops. 
-> > I don't know why that dma-contig driver do not reject it.
-> > I will try to figure it out.
-> 
-> Is there an iommu involved that turns the scatter-gather list into what looks like
-> contiguous memory for the DMA?
-> 
-Yes, We have iommu that could make scatter-gather list looks like
-contiguous memory.
+> Great, I'm looking forward...
 
-> At the end of vb2_dc_get_userptr() in videobuf2-dma-contig.c there is a check
-> 'if (contig_size < size)' that verifies that the sg DMA is contiguous. This would
-> work if there is an iommu involved (if I understand it correctly).
-> 
-I see. We saw this error before we add iommu support.
+Hi Yuri,
 
-> If that's the case, then it's OK to keep VB2_USERPTR because you have real sg
-> support (although not via the DMA engine, but via iommu mappings).
-> 
-Got it. We will keep VB2_USERPTR.
+after playing around with this a bit I couldn't come up with a solution
+that I'm happy with, unfortunately.
 
-> Regards,
-> 
-> 	Hans
+So in order to make some progress here I'd vote that we simply move the
+existing compat_wrapper.c from arch/s390 to common code like you did in
+your first approach and leave the existing SYSCALL macros alone.
+
+That will have hardly any effect to anybody else and your problem is
+solved while s390 still works.
+
+Does that make sense?
