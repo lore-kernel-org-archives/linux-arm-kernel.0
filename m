@@ -1,25 +1,22 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 17 Feb 2016 11:03:06 +0000
-Subject: [PATCH 3/6] ASoC: rockchip: add bindings for rk3399 i2s
-In-Reply-To: <1455673992-16469-4-git-send-email-jay.xu@rock-chips.com>
-References: <1455673992-16469-1-git-send-email-jay.xu@rock-chips.com>
- <1455673992-16469-4-git-send-email-jay.xu@rock-chips.com>
-Message-ID: <20160217110306.GJ7544@sirena.org.uk>
+From: jbe@pengutronix.de (Juergen Borleis)
+Date: Wed, 17 Feb 2016 12:10:14 +0100
+Subject: Using i.MX6 quad's IPU#1/DI#1 to drive parallel port #1 failed
+Message-ID: <201602171210.14545.jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 17, 2016 at 09:53:09AM +0800, jianqun.xu wrote:
+Hi,
 
-> ---
->  Documentation/devicetree/bindings/sound/rockchip-i2s.txt | 1 +
->  1 file changed, 1 insertion(+)
+someone here who has a working display (or similar) connected to i.MX6 quad's 
+parallel port #1 and driven by IPU#1/DI#1? It seems there is currently no user 
+in the mainline supported boards.
 
-As with the other patch I'd expect to see a matching driver update if
-only for documentation purposes.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160217/ce584e1d/attachment.sig>
+In my application the RGB data signals seem present, HSYNC and VSYNC as well 
+(with the expected timing), but the display clock and the DE signals are 
+missing. We already double checked the pin muxing and the physical connection 
+(for example muxing the clock pad to be a GPIO works as expected).
+
+Are there any known restrictions?
+
+Thanks in advance.
+Juergen
