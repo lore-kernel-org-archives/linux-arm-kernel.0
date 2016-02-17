@@ -1,128 +1,185 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 17 Feb 2016 14:38:48 +0900
-Subject: [PATCH v2 5/5] ARM: dts: r8a7794: add sound support
-In-Reply-To: <56BE3912.9000601@cogentembedded.com>
-References: <12033353.rt0nolnBmD@wasted.cogentembedded.com>
- <2543047.yYrDdYb9v5@wasted.cogentembedded.com>
- <874mdhtn7d.wl%kuninori.morimoto.gx@renesas.com>
- <20160210171455.GB17671@verge.net.au>
- <56BE0CB1.4070408@cogentembedded.com>
- <20160212184343.GA31655@verge.net.au>
- <56BE2DC6.4080802@cogentembedded.com>
- <20160212193347.GB23472@verge.net.au>
- <56BE3912.9000601@cogentembedded.com>
-Message-ID: <20160217053848.GC11534@verge.net.au>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Wed, 17 Feb 2016 13:40:24 +0800
+Subject: [PATCH] mtd: atmel_nand: move the hsmc_clk from nfc node to nand node
+Message-ID: <1455687624-9488-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 12, 2016 at 10:57:06PM +0300, Sergei Shtylyov wrote:
-> On 02/12/2016 10:33 PM, Simon Horman wrote:
-> 
-> >>>>>>Sorry for my un-ordered response
-> >>>>>>
-> >>>>>>>Define the generic R8A7794 part of  the sound device node.
-> >>>>>>>This sound device  is a complex one and comprises the Audio Clock Generator
-> >>>>>>>(ADG), Sampling Rate Converter Unit (SCU), Serial Sound Interface [Unit]
-> >>>>>>>(SSI[U]), and Audio DMAC-Peripheral-Peripheral.
-> >>>>>>>It is up  to the board file to enable the device.
-> >>>>>>>
-> >>>>>>>This patch is based on the R8A7791 sound work by Kuninori Morimoto.
-> >>>>>>>
-> >>>>>>>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> >>>>>>(snip)
-> >>>>>>>+		rcar_sound,src {
-> >>>>>>>+			src1: src at 1 {
-> >>>>>>>+				interrupts = <GIC_SPI 353 IRQ_TYPE_LEVEL_HIGH>;
-> >>>>>>>+				dmas = <&audma0 0x87>, <&audma0 0x9c>;
-> >>>>>>>+				dma-names = "rx", "tx";
-> >>>>>>>+			};
-> >>>>>>>+			src2: src at 2 {
-> >>>>>>>+				interrupts = <GIC_SPI 354 IRQ_TYPE_LEVEL_HIGH>;
-> >>>>>>>+				dmas = <&audma0 0x89>, <&audma0 0x9e>;
-> >>>>>>>+				dma-names = "rx", "tx";
-> >>>>>>>+			};
-> >>>>>>>+			src3: src at 3 {
-> >>>>>>>+				interrupts = <GIC_SPI 355 IRQ_TYPE_LEVEL_HIGH>;
-> >>>>>>>+				dmas = <&audma0 0x8b>, <&audma0 0xa0>;
-> >>>>>>>+				dma-names = "rx", "tx";
-> >>>>>>>+			};
-> >>>>>>>+			src4: src at 4 {
-> >>>>>>>+				interrupts = <GIC_SPI 356 IRQ_TYPE_LEVEL_HIGH>;
-> >>>>>>>+				dmas = <&audma0 0x8d>, <&audma0 0xb0>;
-> >>>>>>>+				dma-names = "rx", "tx";
-> >>>>>>>+			};
-> >>>>>>>+			src5: src at 5 {
-> >>>>>>>+				interrupts = <GIC_SPI 357 IRQ_TYPE_LEVEL_HIGH>;
-> >>>>>>>+				dmas = <&audma0 0x8f>, <&audma0 0xb2>;
-> >>>>>>>+				dma-names = "rx", "tx";
-> >>>>>>>+			};
-> >>>>>>>+			src6: src at 6 {
-> >>>>>>>+				interrupts = <GIC_SPI 358 IRQ_TYPE_LEVEL_HIGH>;
-> >>>>>>>+				dmas = <&audma0 0x91>, <&audma0 0xb4>;
-> >>>>>>>+				dma-names = "rx", "tx";
-> >>>>>>>+			};
-> >>>>>>>+		};
-> >>>>>>
-> >>>>>>I think this can't work correctly, because driver is assuming
-> >>>>>>DT has all channles (from 0). (see linux/sound/soc/sh/rcar/src.c :: rsnd_src_probe)
-> >>>>>>Can you adds dummy src0 with some comments ? or fix src.c driver ?
-> >>>>>
-> >>>>>I would prefer the driver to be fixed (I had a similar patchset locally
-> >>>>>and I found it doesn't work).
-> >>>>
-> >>>>    You mean you had R8A7794 sound patch set too?
-> >>>
-> >>>Yes, I was working on it recently.
-> >>>I suppose we should coordinate these things in future to avoid
-> >>>duplicated effort.
-> >>
-> >>    Yes, seems a good idea now. :-)
-> >>
-> >>>>>The reason is that DT should describe
-> >>>>>the hardware rather than the current state of the software.
-> >>>>
-> >>>>    Yes, of course. Just tell me do I have to fix the driver *before* this
-> >>>>patch set is accepted?
-> >>
-> >>>I did not entirely get to the bottom of the problem, but I think that at
-> >>>the very least something needs to be done about the for_each_rsnd_src()
-> >>>loop in rsnd_src_probe.
-> >>
-> >>    It's not that it replies to my question. :-)
-> >>    So you're looking at this issue yourself?
-> >
-> >I have not got very far, as you can see, but I was planning to look into it.
-> >I don't mind if you want to do so.
-> 
->    After consultation with the management, I'm going to look into this issue
-> myself. :-)
+From: Josh Wu <josh.wu@atmel.com>
 
-Excellent.
+For sama5d3, sama5d4 chip, the pmecc becomes a part of HSMC, they
+need the HSMC clock to be enabled to work.
+The NFC is a sub feature for current nand driver, it can be disabled.
+But if HSMC clock is controlled by NFC, so disable NFC will also
+disable the HSMC clock. then, it will make the PMECC fail to work.
 
-FWIW, I can test anything you come up with for the r8a7794 an alt board
-or post patches for it once you have r8a7794/silk sorted out.
+So the solution is to move the HSMC clock out of NFC to nand node.
+When nand driver probed, it will check whether the chip has HSMC,
+if yes then it will require a HSMC clock.
 
-> >>>My, obviously not satisfactory, hack around there being no src0 was as follows.
-> >>>
-> >>>diff --git a/sound/soc/sh/rcar/src.c b/sound/soc/sh/rcar/src.c
-> >>>index 68b439ed22d7..58a447b0785b 100644
-> >>>--- a/sound/soc/sh/rcar/src.c
-> >>>+++ b/sound/soc/sh/rcar/src.c
-> >>>@@ -1072,7 +1072,7 @@ int rsnd_src_probe(struct platform_device *pdev,
-> >>>
-> >>>  	for_each_rsnd_src(src, priv, i) {
-> >>
-> >>    Which tree is this? The recent devel branch of renesas.git has
-> >>for_each_child_of_node() here...
-> >
-> >renesas-devel-20160118-v4.4
-> 
->    Ah! :-)
-> 
-> >I guess the code in question updated in v4.5-rcX.
-> 
->    Probably...
-> 
-> [...]
-> 
-> MBR, Sergei
+Signed-off-by: Josh Wu <josh.wu@atmel.com>
+Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+---
+
+ .../devicetree/bindings/mtd/atmel-nand.txt         |    4 +-
+ drivers/mtd/nand/atmel_nand.c                      |   43 +++++++++-----------
+ 2 files changed, 22 insertions(+), 25 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/mtd/atmel-nand.txt b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
+index d53aba9..29bee7c 100644
+--- a/Documentation/devicetree/bindings/mtd/atmel-nand.txt
++++ b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
+@@ -15,6 +15,7 @@ Required properties:
+ - atmel,nand-cmd-offset : offset for the command latch.
+ - #address-cells, #size-cells : Must be present if the device has sub-nodes
+   representing partitions.
++- clocks: phandle to the peripheral clock
+ 
+ - gpios : specifies the gpio pins to control the NAND device. detect is an
+   optional gpio and may be set to 0 if not present.
+@@ -43,7 +44,6 @@ Required properties:
+ - reg : should specify the address and size used for NFC command registers,
+         NFC registers and NFC SRAM. NFC SRAM address and size can be absent
+         if don't want to use it.
+-- clocks: phandle to the peripheral clock
+ Optional properties:
+ - atmel,write-by-sram: boolean to enable NFC write by SRAM.
+ 
+@@ -100,13 +100,13 @@ nand0: nand at 40000000 {
+ 	compatible = "atmel,at91rm9200-nand";
+ 	#address-cells = <1>;
+ 	#size-cells = <1>;
++	clocks = <&hsmc_clk>
+ 	ranges;
+         ...
+         nfc at 70000000 {
+ 		compatible = "atmel,sama5d3-nfc";
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+-		clocks = <&hsmc_clk>
+ 		reg = <
+ 			0x70000000 0x10000000	/* NFC Command Registers */
+ 			0xffffc000 0x00000070	/* NFC HSMC regs */
+diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+index 20cbaab..a1f4ad2 100644
+--- a/drivers/mtd/nand/atmel_nand.c
++++ b/drivers/mtd/nand/atmel_nand.c
+@@ -66,6 +66,7 @@ module_param(on_flash_bbt, int, 0);
+ struct atmel_nand_caps {
+ 	bool pmecc_correct_erase_page;
+ 	uint8_t pmecc_max_correction;
++	bool has_hsmc_clk;
+ };
+ 
+ struct atmel_nand_nfc_caps {
+@@ -106,8 +107,6 @@ struct atmel_nfc {
+ 	bool			use_nfc_sram;
+ 	bool			write_by_sram;
+ 
+-	struct clk		*clk;
+-
+ 	bool			is_initialized;
+ 	struct completion	comp_ready;
+ 	struct completion	comp_cmd_done;
+@@ -132,6 +131,7 @@ struct atmel_nand_host {
+ 	struct dma_chan		*dma_chan;
+ 
+ 	struct atmel_nfc	*nfc;
++	struct clk		*clk;
+ 
+ 	const struct atmel_nand_caps	*caps;
+ 	bool			has_pmecc;
+@@ -2157,6 +2157,19 @@ static int atmel_nand_probe(struct platform_device *pdev)
+ 	nand_chip->IO_ADDR_R = host->io_base;
+ 	nand_chip->IO_ADDR_W = host->io_base;
+ 
++	if (host->caps->has_hsmc_clk) {
++		host->clk = devm_clk_get(&pdev->dev, NULL);
++		if (IS_ERR(host->clk)) {
++			dev_err(&pdev->dev, "HSMC clock is missing, update your Device Tree");
++			res = PTR_ERR(host->clk);
++			goto err_nand_ioremap;
++		}
++
++		res = clk_prepare_enable(host->clk);
++		if (res)
++			goto err_nand_ioremap;
++	}
++
+ 	if (nand_nfc.is_initialized) {
+ 		/* NFC driver is probed and initialized */
+ 		host->nfc = &nand_nfc;
+@@ -2321,6 +2334,9 @@ static int atmel_nand_remove(struct platform_device *pdev)
+ 	if (host->dma_chan)
+ 		dma_release_channel(host->dma_chan);
+ 
++	if (!IS_ERR(host->clk))
++		clk_disable_unprepare(host->clk);
++
+ 	platform_driver_unregister(&atmel_nand_nfc_driver);
+ 
+ 	return 0;
+@@ -2334,11 +2350,13 @@ static int atmel_nand_remove(struct platform_device *pdev)
+ static const struct atmel_nand_caps at91rm9200_caps = {
+ 	.pmecc_correct_erase_page = false,
+ 	.pmecc_max_correction = 24,
++	.has_hsmc_clk = false,
+ };
+ 
+ static const struct atmel_nand_caps sama5d4_caps = {
+ 	.pmecc_correct_erase_page = true,
+ 	.pmecc_max_correction = 24,
++	.has_hsmc_clk = true,
+ };
+ 
+ /*
+@@ -2363,7 +2381,6 @@ static int atmel_nand_nfc_probe(struct platform_device *pdev)
+ {
+ 	struct atmel_nfc *nfc = &nand_nfc;
+ 	struct resource *nfc_cmd_regs, *nfc_hsmc_regs, *nfc_sram;
+-	int ret;
+ 
+ 	nfc_cmd_regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	nfc->base_cmd_regs = devm_ioremap_resource(&pdev->dev, nfc_cmd_regs);
+@@ -2401,31 +2418,12 @@ static int atmel_nand_nfc_probe(struct platform_device *pdev)
+ 	nfc_writel(nfc->hsmc_regs, IDR, 0xffffffff);
+ 	nfc_readl(nfc->hsmc_regs, SR);	/* clear the NFC_SR */
+ 
+-	nfc->clk = devm_clk_get(&pdev->dev, NULL);
+-	if (!IS_ERR(nfc->clk)) {
+-		ret = clk_prepare_enable(nfc->clk);
+-		if (ret)
+-			return ret;
+-	} else {
+-		dev_warn(&pdev->dev, "NFC clock missing, update your Device Tree");
+-	}
+-
+ 	nfc->is_initialized = true;
+ 	dev_info(&pdev->dev, "NFC is probed.\n");
+ 
+ 	return 0;
+ }
+ 
+-static int atmel_nand_nfc_remove(struct platform_device *pdev)
+-{
+-	struct atmel_nfc *nfc = &nand_nfc;
+-
+-	if (!IS_ERR(nfc->clk))
+-		clk_disable_unprepare(nfc->clk);
+-
+-	return 0;
+-}
+-
+ static const struct atmel_nand_nfc_caps sama5d3_nfc_caps = {
+ 	.rb_mask = NFC_SR_RB_EDGE0,
+ };
+@@ -2447,7 +2445,6 @@ static struct platform_driver atmel_nand_nfc_driver = {
+ 		.of_match_table = of_match_ptr(atmel_nand_nfc_match),
+ 	},
+ 	.probe = atmel_nand_nfc_probe,
+-	.remove = atmel_nand_nfc_remove,
+ };
+ 
+ static struct platform_driver atmel_nand_driver = {
+-- 
+1.7.9.5
