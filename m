@@ -1,30 +1,42 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 17 Feb 2016 12:39:21 +0900
-Subject: [clk:clk-samsung-kconfig 2/2] drivers/clk/samsung/clk.h:142:17:
- error: invalid operands to binary | (have 'struct samsung_pll_clock *' and
- 'struct samsung_pll_clock *')
-In-Reply-To: <201602171104.YkeaxmIS%fengguang.wu@intel.com>
-References: <201602171104.YkeaxmIS%fengguang.wu@intel.com>
-Message-ID: <56C3EB69.2000307@samsung.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 16 Feb 2016 19:42:56 -0800
+Subject: [PATCH v13 4/4] Watchdog: introduce ARM SBSA watchdog driver
+In-Reply-To: <1455642530-19103-5-git-send-email-fu.wei@linaro.org>
+References: <1455642530-19103-1-git-send-email-fu.wei@linaro.org>
+ <1455642530-19103-5-git-send-email-fu.wei@linaro.org>
+Message-ID: <56C3EC40.6080500@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17.02.2016 12:22, kbuild test robot wrote:
-> tree:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-samsung-kconfig
-> head:   e83cb468452c25597e868d1ed778fa73fdaeca4c
-> commit: e83cb468452c25597e868d1ed778fa73fdaeca4c [2/2] clk: samsung: Don't build ARMv8 clock drivers on ARMv7
-> config: mips-allmodconfig (attached as .config)
-> reproduce:
->         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
->         chmod +x ~/bin/make.cross
->         git checkout e83cb468452c25597e868d1ed778fa73fdaeca4c
->         # save the attached .config to linux build tree
->         make.cross ARCH=mips 
-> 
+On 02/16/2016 09:08 AM, fu.wei at linaro.org wrote:
+> From: Fu Wei <fu.wei@linaro.org>
+>
+> According to Server Base System Architecture (SBSA) specification,
+> the SBSA Generic Watchdog has two stage timeouts: the first signal (WS0)
+> is for alerting the system by interrupt, the second one (WS1) is a real
+> hardware reset.
+> More details about the hardware specification of this device:
+> ARM DEN0029B - Server Base System Architecture (SBSA)
+>
+> This driver can operate ARM SBSA Generic Watchdog as a single stage watchdog
+> or a two stages watchdog, it's set up by the module parameter "action".
+> In the single stage mode, when the timeout is reached, your system
+> will be reset by WS1. The first signal (WS0) is ignored.
+> In the two stages mode, when the timeout is reached, the first signal (WS0)
+> will trigger panic. If the system is getting into trouble and cannot be reset
+> by panic or restart properly by the kdump kernel(if supported), then the
+> second stage (as long as the first stage) will be reached, system will be
+> reset by WS1. This function can help administrator to backup the system
+> context info by panic console output or kdump.
+>
+> This driver bases on linux kernel watchdog framework, so it can get
+> timeout from module parameter and FDT at the driver init stage.
+>
+> Signed-off-by: Fu Wei <fu.wei@linaro.org>
+> Reviewed-by: Graeme Gregory <graeme.gregory@linaro.org>
+> Tested-by: Pratyush Anand <panand@redhat.com>
+> Acked-by: Timur Tabi <timur@codeaurora.org>
+> Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Tested-by: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
 
-I think this is the same as previous - patch which added dependency on
-CLK_COMMON is not present. My tests on MIPS passed fine. Also attached
-configs builds fine with the dependency applied.
-
-Best regards,
-Krzysztof
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
