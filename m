@@ -1,36 +1,30 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Wed, 17 Feb 2016 14:42:33 +0100
-Subject: [PATCH] i.MX SPI DMA cleanup
-In-Reply-To: <1455715739-25161-1-git-send-email-s.hauer@pengutronix.de>
-References: <1455715739-25161-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <56C478C9.6050706@de.bosch.com>
+From: jayachandran.chandrashekaran@broadcom.com (Jayachandran Chandrashekaran Nair)
+Date: Wed, 17 Feb 2016 19:14:13 +0530
+Subject: [PATCH V5 07/15] pci, acpi: Provide generic way to assign bus
+ domain number.
+In-Reply-To: <1455630825-27253-8-git-send-email-tn@semihalf.com>
+References: <1455630825-27253-1-git-send-email-tn@semihalf.com>
+ <1455630825-27253-8-git-send-email-tn@semihalf.com>
+Message-ID: <CAKc_7PU+i2AwOVCyW2VNt4BZCWw=KBMAbV8v9DVQ2Ess3WE=kw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+Tomasz, Lorenzo,
 
-On 17.02.2016 14:28, Sascha Hauer wrote:
-> This picks up a series sent by Anton Bondarenko last year. It
-> contains the remaining not yet upstreamed patches from Antons series
-> plus some more DMA related cleanup patches.
+On Tue, Feb 16, 2016 at 7:23 PM, Tomasz Nowicki <tn@semihalf.com> wrote:
+> As we now have valid PCI host bridge device reference we can
+> introduce code that is going to find its bus domain number using
+> ACPI _SEG method.
 >
-> My mission was to hunt a bug in the DMA code path sometimes causing
-> an additional word in the RX FIFO which locked up the driver in the
-> next transfer. It turned out that this was no bug in the driver but
-> instead in the device tree: We used the wrong SDMA script for i.MX6.
-> The ECSPI cores are connected through the SPBA, so according to the
-> reference manual we need the shp/mcu scripts rather than the app/mcu
-> scripts.
+> Note that _SEG method is optional, therefore _SEG absence means
+> that all PCI buses belong to domain 0.
+>
+> While at it, for the sake of code clarity we put ACPI and DT domain
+> assign methods into the corresponding helpers.
 
+In my patchset, I had a slightly different and I think better approach for
+this without calling the _SEG method again. Please see
+http://www.spinics.net/lists/arm-kernel/msg478167.html
+at the last part of http://www.spinics.net/lists/arm-kernel/msg478169.html
 
-Are you talking about what is known as "TKT238285 hardware issue"
-
-https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/drivers/spi/spi-imx.c?id=a02bb401f8ae264be782ee57d98bdd99f14c8022
-
-?
-
-Or are you talking about a different issue?
-
-Best regards
-
-Dirk
+JC.
