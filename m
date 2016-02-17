@@ -1,39 +1,36 @@
-From: heiko.carstens@de.ibm.com (Heiko Carstens)
-Date: Wed, 17 Feb 2016 09:22:10 +0100
-Subject: [PATCH 1/5] all: s390: move wrapper infrastructure to generic
- headers
-In-Reply-To: <20160202204156.GA27290@yury-N73SV>
-References: <1453741047-5498-1-git-send-email-ynorov@caviumnetworks.com>
- <1453741047-5498-2-git-send-email-ynorov@caviumnetworks.com>
- <20160128121618.GB5418@osiris> <20160128163109.GA8529@yury-N73SV>
- <20160201114251.GB973@yury-N73SV> <20160202073913.GB3990@osiris>
- <20160202154331.GA3003@yury-N73SV> <20160202160826.GF3990@osiris>
- <20160202195434.GA3397@osiris> <20160202204156.GA27290@yury-N73SV>
-Message-ID: <20160217082210.GA4175@osiris>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 17 Feb 2016 09:30:45 +0100
+Subject: [PATCH 5/5] arm64: marvell: add Device Tree files for Armada 7K/8K
+In-Reply-To: <20160217102124.7353591f@xhacker>
+References: <1455526065-7307-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1455526065-7307-6-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20160216134219.00045b5b@xhacker>
+ <20160216173840.7f93896f@free-electrons.com>
+ <20160217102124.7353591f@xhacker>
+Message-ID: <20160217093045.457e6a54@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 02, 2016 at 11:41:56PM +0300, Yury Norov wrote:
-> > However I'll try to write an addon patch to your patch series. Maybe we can
-> > still get rid of compat_wrapper.c in a way which makes both of us happy.
-> > Also.. the idea with the alias names for compat wrappers does seem to have
-> > the disadvantage that it will pollute /proc/kallsyms for example.
+Hello,
+
+On Wed, 17 Feb 2016 10:21:24 +0800, Jisheng Zhang wrote:
+
+> > > I guess the GIC is neither the one in cortex-a15 or cortex-a9.   
 > > 
-> > Anyway, I'm not sure if I will be able to come up with something this week
-> > though.
+> > What makes you think this?
+> > 
+> > The GIC is a GIC400, which is GICv2 compliant, and arm-cortex-a15-gic /
 > 
-> Great, I'm looking forward...
+> That's my point, why not "gic-400" explicitly?
 
-Hi Yuri,
+Yes, we could use arm,gic-400 instead. Note that implementation-wise,
+there is currently zero difference between arm,cortex-a9-gic,
+arm,cortex-a15-gic and arm,gic-400. But indeed arm,gic-400 looks better.
 
-after playing around with this a bit I couldn't come up with a solution
-that I'm happy with, unfortunately.
+Thanks!
 
-So in order to make some progress here I'd vote that we simply move the
-existing compat_wrapper.c from arch/s390 to common code like you did in
-your first approach and leave the existing SYSCALL macros alone.
-
-That will have hardly any effect to anybody else and your problem is
-solved while s390 still works.
-
-Does that make sense?
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
