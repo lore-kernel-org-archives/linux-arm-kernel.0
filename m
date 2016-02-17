@@ -1,88 +1,63 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 17 Feb 2016 23:05:29 +0000
-Subject: [PATCH] clk: fix clk-gpio.c with optional clock= DT property
-In-Reply-To: <E1aFJ0A-00086Z-0I@rmk-PC.arm.linux.org.uk>
-References: <E1aFJ0A-00086Z-0I@rmk-PC.arm.linux.org.uk>
-Message-ID: <20160217230529.GM19428@n2100.arm.linux.org.uk>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Wed, 17 Feb 2016 15:02:53 -0800
+Subject: [PATCH 2/2] clk: ti: Add support for dm814x ADPLL
+In-Reply-To: <20160217212045.GE21202@atomide.com>
+References: <1455312009-808-1-git-send-email-tony@atomide.com>
+ <1455312009-808-3-git-send-email-tony@atomide.com>
+ <20160217011930.2278.38316@quark.deferred.io>
+ <20160217173949.GB21202@atomide.com>
+ <20160217205257.2278.11639@quark.deferred.io>
+ <20160217212045.GE21202@atomide.com>
+Message-ID: <20160217230253.2278.80903@quark.deferred.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 02, 2016 at 10:01:34AM +0000, Russell King wrote:
-> When the clock DT property is not given, of_clk_get_parent_count()
-> returns -ENOENT, which then tries to allocate -2 x 4 bytes of memory,
-> which of course fails, causing the whole driver to fail to create
-> the clock.
+Quoting Tony Lindgren (2016-02-17 13:20:46)
+> * Michael Turquette <mturquette@baylibre.com> [160217 12:53]:
+> > Quoting Tony Lindgren (2016-02-17 09:39:49)
+> > > * Michael Turquette <mturquette@baylibre.com> [160216 17:32]:
+> > > > 
+> > > > We have a shiny new series that provides a standard way to do this:
+> > > > 
+> > > > http://lkml.kernel.org/r/<1455225554-13267-1-git-send-email-mturquette@baylibre.com>
+> > > 
+> > > OK nice, so tagging the MPU and DDR clocks with CLK_IS_CRITICAL or
+> > > "clock-critical" should allow removing this code. I think in this
+> > > case I still need to set CLK_IS_CRITICAL as the clock is output 1
+> > > of the dts defined clock and does not have a separate dts node.
+> > 
+> > In fact I hate clock-critical as a DT property and it's only there to
+> > support legacy DT bindings that store all clk data in DT and have zero
+> > clk data in C. So please use the CLK_IS_CRITICAL or CLK_ENABLE_HAND_OFF
+> > flags in C.
+> > 
+> > Do you think you will ever have a driver that wants to gate these
+> > clocks? Probably not for MPU/DDR, but the HAND_OFF flag is a better fit
+> > if you do. It's the same as CRITICAL but transfers the prepare/enable
+> > reference counting to the consumer driver after that driver calls
+> > clk_get() and clk_prepare_enable() on the HAND_OFF clk.
 > 
-> This causes the SolidRun platforms to fail probing the SDHCI1 interface
-> which is connected to the WiFi.
-> 
-> Fix this by detecting errno codes, skipping the allocation, and fixing
-> of_clk_gpio_gate_delayed_register_get() to handle a NULL parent_names
-> array.
-> 
-> Fixes: 80eeb1f0f757 ("clk: add gpio controlled clock multiplexer")
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
-> This goes all the way back to 80eeb1f0f757 ("clk: add gpio controlled
-> clock multiplexer") introduced in June in v4.3-rc2 - which raises the
-> question why _development_ work in clk is being merged outside of the
-> merge window.
-> 
-> A rewrite of this patch will be necessary to apply to v4.3 kernels.
-> 
-> This applies on top of v4.4-rc6.
-> 
->  drivers/clk/clk-gpio.c | 23 ++++++++++++++---------
->  1 file changed, 14 insertions(+), 9 deletions(-)
-> 
-> diff --git a/drivers/clk/clk-gpio.c b/drivers/clk/clk-gpio.c
-> index 335322dc403f..05cca9298f44 100644
-> --- a/drivers/clk/clk-gpio.c
-> +++ b/drivers/clk/clk-gpio.c
-> @@ -264,8 +264,8 @@ static struct clk *of_clk_gpio_gate_delayed_register_get(const char *name,
->  		const char * const *parent_names, u8 num_parents,
->  		unsigned gpio, bool active_low)
->  {
-> -	return clk_register_gpio_gate(NULL, name, parent_names[0],
-> -			gpio, active_low, 0);
-> +	return clk_register_gpio_gate(NULL, name, parent_names ?
-> +			parent_names[0] : NULL, gpio, active_low, 0);
->  }
->  
->  static struct clk *of_clk_gpio_mux_delayed_register_get(const char *name,
-> @@ -292,13 +292,18 @@ static void __init of_gpio_clk_setup(struct device_node *node,
->  		return;
->  
->  	num_parents = of_clk_get_parent_count(node);
-> -
-> -	parent_names = kcalloc(num_parents, sizeof(char *), GFP_KERNEL);
-> -	if (!parent_names)
-> -		return;
-> -
-> -	for (i = 0; i < num_parents; i++)
-> -		parent_names[i] = of_clk_get_parent_name(node, i);
-> +	if (num_parents > 0) {
-> +		parent_names = kcalloc(num_parents, sizeof(char *), GFP_KERNEL);
-> +		if (!parent_names) {
-> +			kfree(data);
-> +			return;
-> +		}
-> +
-> +		for (i = 0; i < num_parents; i++)
-> +			parent_names[i] = of_clk_get_parent_name(node, i);
-> +	} else {
-> +		parent_names = NULL;
-> +	}
->  
->  	data->num_parents = num_parents;
->  	data->parent_names = parent_names;
-> -- 
-> 2.1.0
+> OK I'll use CLK_ENABLE_HAND_OFF then. Who knows maybe somebody
+> somewhere has code running on one of the coprocessors in SRAM that
+> actually allows gating these :)
 
-Yes, indeed, my patch above which fixed clk-gpio.c as can be seen above
-does not have the problem that I'm currently seeing...
+Low power mp3 decoder executing out of ARM icache with DDR clock cut ;-)
 
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Regards,
+Mike
+
+> 
+> > > I can update when those patches hit Linux next, or I can do a
+> > > follow-up patch later on if we want to avoid the dependency
+> > > here. Which do you prefer?
+> > 
+> > Well, testing is always welcome :-)
+> >
+> > If you rebase onto those patches then I'll add your patches to that
+> > series for testing and merge it that way.
+> 
+> OK will do and repost after some testing.
+> 
+> Regards,
+> 
+> Tony
