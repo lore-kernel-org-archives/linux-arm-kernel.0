@@ -1,58 +1,131 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Wed, 17 Feb 2016 20:51:14 +0000
-Subject: [PATCH] iio: pressure: ms5611: select IIO_BUFFER
-In-Reply-To: <CAEnQRZBk0R-A5VEEd_D+kLKnyhc3nhrm0tv2JOkv0iqywGFtuw@mail.gmail.com>
-References: <1455634525-2023774-1-git-send-email-arnd@arndb.de>
- <CAEnQRZBk0R-A5VEEd_D+kLKnyhc3nhrm0tv2JOkv0iqywGFtuw@mail.gmail.com>
-Message-ID: <56C4DD42.9090400@kernel.org>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Wed, 17 Feb 2016 12:52:57 -0800
+Subject: [PATCH 2/2] clk: ti: Add support for dm814x ADPLL
+In-Reply-To: <20160217173949.GB21202@atomide.com>
+References: <1455312009-808-1-git-send-email-tony@atomide.com>
+ <1455312009-808-3-git-send-email-tony@atomide.com>
+ <20160217011930.2278.38316@quark.deferred.io>
+ <20160217173949.GB21202@atomide.com>
+Message-ID: <20160217205257.2278.11639@quark.deferred.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/02/16 18:03, Daniel Baluta wrote:
-> On Tue, Feb 16, 2016 at 4:55 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> The ms5611 driver started using the IIO_TRIGGERED_BUFFER infrastructure
->> which in turn depend on IIO_BUFFER, and it produces a build error now
->> if that is not enabled:
->>
->> warning: (... && MS5611 && ...) selects IIO_TRIGGERED_BUFFER which has unmet direct dependencies (IIO && IIO_BUFFER)
->> buffer/industrialio-triggered-buffer.c: In function 'iio_triggered_buffer_setup':
->> buffer/industrialio-triggered-buffer.c:58:2: error: implicit declaration of function 'iio_device_attach_buffer' [-Werror=implicit-function-declaration]
->> pressure/ms5611_core.c: In function 'ms5611_trigger_handler':
->> pressure/ms5611_core.c:193:2: error: implicit declaration of function 'iio_push_to_buffers_with_timestamp' [-Werror=implicit-function-declaration]
->>
->> This adds the second select.
->>
->> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->> Fixes: 713bbb4efb9d ("iio: pressure: ms5611: Add triggered buffer support")
+Quoting Tony Lindgren (2016-02-17 09:39:49)
+> * Michael Turquette <mturquette@baylibre.com> [160216 17:32]:
+> > Quoting Tony Lindgren (2016-02-12 13:20:09)
+> > > 
+> > > - Split the device tree binding into a separate patch as requested
+> > >   by Mike for his conditional ack of the binding
+> > 
+> > Just to make life fun for you, the clk tree is once more merging DT
+> > bindings descriptions and headers. You don't need to merge the patches,
+> > it doesn't matter to me, but just as a heads up for the future.
 > 
-> Acked-by: Daniel Baluta <daniel.baluta@intel.com>
-Applied.
-
-Thanks, I've gotten a bit too reliant on the autobuilders it seems.
-Need to keep a closer eye on this stuff to stop wasting Arnd's time!
-
-Jonathan
+> OK :)
 > 
->> ---
->>  drivers/iio/pressure/Kconfig | 1 +
->>  1 file changed, 1 insertion(+)
->>
->> diff --git a/drivers/iio/pressure/Kconfig b/drivers/iio/pressure/Kconfig
->> index f15f66d6f527..31c0e1fd2202 100644
->> --- a/drivers/iio/pressure/Kconfig
->> +++ b/drivers/iio/pressure/Kconfig
->> @@ -69,6 +69,7 @@ config MPL3115
->>
->>  config MS5611
->>         tristate "Measurement Specialties MS5611 pressure sensor driver"
->> +       select IIO_BUFFER
->>         select IIO_TRIGGERED_BUFFER
->>         help
->>           Say Y here to build support for the Measurement Specialties
->> --
->> 2.7.0
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > > --- /dev/null
+> > > +++ b/drivers/clk/ti/Kconfig
+> > > @@ -0,0 +1,6 @@
+> > > +config COMMON_CLK_TI_ADPLL
+> > > +       tristate "Clock driver for dm814x ADPLL"
+> > > +       depends on ARCH_OMAP2PLUS
+> > > +       default y if SOC_TI81XX
+> > 
+> > Can we add COMPILE_TEST here?
+> 
+> Good idea, will add.
+> 
+> > > +static int ti_adpll_init_inputs(struct ti_adpll_data *d)
+> > > +{
+> > > +       const char *error = "need at least %i inputs";
+> > > +       struct clk *clock;
+> > > +       int nr_inputs;
+> > > +
+> > > +       nr_inputs = of_clk_get_parent_count(d->np);
+> > > +       if (nr_inputs < d->c->nr_max_inputs) {
+> > > +               dev_err(d->dev, error, nr_inputs);
+> > > +               return -EINVAL;
+> > > +       }
+> > > +       of_clk_parent_fill(d->np, d->parent_names, nr_inputs);
+> > > +
+> > > +       clock = devm_clk_get(d->dev, d->parent_names[0]);
+> > > +       if (IS_ERR(clock)) {
+> > > +               dev_err(d->dev, "could not get clkinp\n");
+> > > +               return PTR_ERR(clock);
+> > > +       }
+> > > +       d->parent_clocks[TI_ADPLL_CLKINP] = clock;
+> > > +
+> > > +       clock = devm_clk_get(d->dev, d->parent_names[1]);
+> > > +       if (IS_ERR(clock)) {
+> > > +               dev_err(d->dev, "could not get clkinpulow clock\n");
+> > > +               return PTR_ERR(clock);
+> > > +       }
+> > > +       d->parent_clocks[TI_ADPLL_CLKINPULOW] = clock;
+> > 
+> > Are the clock parents known at compile-time? Can we just put that data
+> > in C instead of whatever is going on here?
+> 
+> No they can be board specific depending how the inputs for
+> clkin, clkinpulow and clkinphif are wired.
+> 
+> > ...
+> > > +int __init dm814x_adpll_enable_init_clocks(void)
+> > > +{
+> > > +       int i, err;
+> > > +
+> > > +       if (!timer_clocks_initialized)
+> > > +               return -ENODEV;
+> > > +
+> > > +       for (i = 0; i < ARRAY_SIZE(init_clocks); i++) {
+> > > +               struct clk *clock;
+> > > +
+> > > +               clock = clk_get(NULL, init_clocks[i]);
+> > > +               if (WARN(IS_ERR(clock), "could not find init clock %s\n",
+> > > +                        init_clocks[i]))
+> > > +                       continue;
+> > > +               err = clk_prepare_enable(clock);
+> > > +               if (WARN(err, "could not enable init clock %s\n",
+> > > +                        init_clocks[i]))
+> > > +                       continue;
+> > 
+> > We have a shiny new series that provides a standard way to do this:
+> > 
+> > http://lkml.kernel.org/r/<1455225554-13267-1-git-send-email-mturquette@baylibre.com>
+> 
+> OK nice, so tagging the MPU and DDR clocks with CLK_IS_CRITICAL or
+> "clock-critical" should allow removing this code. I think in this
+> case I still need to set CLK_IS_CRITICAL as the clock is output 1
+> of the dts defined clock and does not have a separate dts node.
+
+In fact I hate clock-critical as a DT property and it's only there to
+support legacy DT bindings that store all clk data in DT and have zero
+clk data in C. So please use the CLK_IS_CRITICAL or CLK_ENABLE_HAND_OFF
+flags in C.
+
+Do you think you will ever have a driver that wants to gate these
+clocks? Probably not for MPU/DDR, but the HAND_OFF flag is a better fit
+if you do. It's the same as CRITICAL but transfers the prepare/enable
+reference counting to the consumer driver after that driver calls
+clk_get() and clk_prepare_enable() on the HAND_OFF clk.
+
+> 
+> I can update when those patches hit Linux next, or I can do a
+> follow-up patch later on if we want to avoid the dependency
+> here. Which do you prefer?
+
+Well, testing is always welcome :-)
+
+If you rebase onto those patches then I'll add your patches to that
+series for testing and merge it that way.
+
+Regards,
+Mike
+
+> 
+> Regards,
+> 
+> Tony
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-clk" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
