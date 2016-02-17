@@ -1,51 +1,37 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 17 Feb 2016 08:52:36 +0100
-Subject: [PATCH v5 RESEND 4/5] ARM: amba: Move reading of periphid to
- amba_match()
-In-Reply-To: <20160215175250.GJ10826@n2100.arm.linux.org.uk>
-References: <1455101250-11327-1-git-send-email-m.szyprowski@samsung.com>
- <1455101250-11327-5-git-send-email-m.szyprowski@samsung.com>
- <20160215175250.GJ10826@n2100.arm.linux.org.uk>
-Message-ID: <56C426C4.7040907@samsung.com>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Wed, 17 Feb 2016 08:55:02 +0100
+Subject: noise issues when recording sound on i.MX28
+In-Reply-To: <CAOMZO5BDjkWi+cQK1-J7ag8Z48tY1Uwofi4EkovN-drSC4_reA@mail.gmail.com>
+References: <20160127105613.GC13664@pengutronix.de>
+ <CAOMZO5BpLen517q2heramSta-R6pdESkjM6w=7FRMZebY6ue-Q@mail.gmail.com>
+ <20160127144340.GD13664@pengutronix.de>
+ <CAOMZO5AE6HwBYz7kOFORt0HTojJLSb0MYUbkb_HCshDHy=d27g@mail.gmail.com>
+ <20160210150315.GC13664@pengutronix.de>
+ <CAOMZO5D5H4F90nse9kyW9KvsJStN-sCGktup4FDPw_zTeNfS2g@mail.gmail.com>
+ <20160211084029.GE13664@pengutronix.de>
+ <CAOMZO5BDjkWi+cQK1-J7ag8Z48tY1Uwofi4EkovN-drSC4_reA@mail.gmail.com>
+Message-ID: <20160217085502.39e4cb24@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi,
 
-On 2016-02-15 18:52, Russell King - ARM Linux wrote:
-> On Wed, Feb 10, 2016 at 11:47:29AM +0100, Marek Szyprowski wrote:
->> From: Tomeu Vizoso <tomeu.vizoso@collabora.com>
->>
->> Reading the periphid when the Primecell device is registered means that
->> the apb pclk must be available by then or the device won't be registered
->> at all.
->>
->> By reading the periphid in amba_match() we can return -EPROBE_DEFER if
->> the apb pclk isn't there yet and the device will be retried later.
-> I've just realised, we can't do this.  We need to read the peripheral
-> ID at registration time, because that's published to userspace via
-> (a) a sysfs attribute, and (b) as part of the uevent, which will be
-> used by udev to locate the driver module.
+On Tue, 16 Feb 2016 13:01:19 -0200 Fabio Estevam wrote:
+> On Thu, Feb 11, 2016 at 6:40 AM, Uwe Kleine-K?nig
+> <u.kleine-koenig@pengutronix.de> wrote:
+> 
+> > root at hostname:/sys/kernel/debug/clk find -name saif?_sel
+> > ./ref_xtal/pll0/saif0_sel
+> > ./ref_xtal/pll0/saif1_sel
+> >
+> > root at hostname:/sys/kernel/debug/clk cat ./ref_xtal/pll0/saif?_sel/clk_rate
+> > 480000000
+> > 480000000
+> 
+> Ok, what about the SAIF0 and SAIF1 sampling rates: are they always the same?
 >
-> So, this will have the side effect of breaking systems which have
-> AMBA primecell devices configured as modules.
->
-> Sorry, I can't apply this.  We can't regress existing platforms for
-> the sake of introducing new platforms to this code.
+Yes, of course. The driver wouldn't allow using both interfaces with
+different sample rates any way.
 
-Then the only solution right now I see is to get back to v1:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/388199.html
-which at least handles correctly device registration when power domain 
-driver
-is available. You pointed that the patch cannot be applied, because failure
-of dev_pm_domain_attach() will be fatal for device registration. Right now
-lack of such call is fatal for the whole system, so there is really not a
-big difference. Please also note that amba_get_enable_pclk() calls 
-clk_get(),
-which also might return -EPROBE_DEFER, which already breaks device
-registration the same way.
 
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Lothar Wa?mann
