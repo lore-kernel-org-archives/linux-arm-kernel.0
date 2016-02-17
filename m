@@ -1,51 +1,50 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 17 Feb 2016 14:54:41 +0100
-Subject: [PATCH] i.MX SPI DMA cleanup
-In-Reply-To: <56C478C9.6050706@de.bosch.com>
-References: <1455715739-25161-1-git-send-email-s.hauer@pengutronix.de>
- <56C478C9.6050706@de.bosch.com>
-Message-ID: <20160217135441.GA3939@pengutronix.de>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Wed, 17 Feb 2016 16:57:14 +0300
+Subject: [PATCH 1/5] all: s390: move wrapper infrastructure to generic
+ headers
+In-Reply-To: <20160217082210.GA4175@osiris>
+References: <1453741047-5498-2-git-send-email-ynorov@caviumnetworks.com>
+ <20160128121618.GB5418@osiris> <20160128163109.GA8529@yury-N73SV>
+ <20160201114251.GB973@yury-N73SV> <20160202073913.GB3990@osiris>
+ <20160202154331.GA3003@yury-N73SV> <20160202160826.GF3990@osiris>
+ <20160202195434.GA3397@osiris> <20160202204156.GA27290@yury-N73SV>
+ <20160217082210.GA4175@osiris>
+Message-ID: <20160217135714.GB13549@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dirk,
-
-On Wed, Feb 17, 2016 at 02:42:33PM +0100, Dirk Behme wrote:
-> Hi Sascha,
+On Wed, Feb 17, 2016 at 09:22:10AM +0100, Heiko Carstens wrote:
+> On Tue, Feb 02, 2016 at 11:41:56PM +0300, Yury Norov wrote:
+> > > However I'll try to write an addon patch to your patch series. Maybe we can
+> > > still get rid of compat_wrapper.c in a way which makes both of us happy.
+> > > Also.. the idea with the alias names for compat wrappers does seem to have
+> > > the disadvantage that it will pollute /proc/kallsyms for example.
+> > > 
+> > > Anyway, I'm not sure if I will be able to come up with something this week
+> > > though.
+> > 
+> > Great, I'm looking forward...
 > 
-> On 17.02.2016 14:28, Sascha Hauer wrote:
-> >This picks up a series sent by Anton Bondarenko last year. It
-> >contains the remaining not yet upstreamed patches from Antons series
-> >plus some more DMA related cleanup patches.
-> >
-> >My mission was to hunt a bug in the DMA code path sometimes causing
-> >an additional word in the RX FIFO which locked up the driver in the
-> >next transfer. It turned out that this was no bug in the driver but
-> >instead in the device tree: We used the wrong SDMA script for i.MX6.
-> >The ECSPI cores are connected through the SPBA, so according to the
-> >reference manual we need the shp/mcu scripts rather than the app/mcu
-> >scripts.
+> Hi Yuri,
 > 
+> after playing around with this a bit I couldn't come up with a solution
+> that I'm happy with, unfortunately.
 > 
-> Are you talking about what is known as "TKT238285 hardware issue"
+> So in order to make some progress here I'd vote that we simply move the
+> existing compat_wrapper.c from arch/s390 to common code like you did in
+> your first approach and leave the existing SYSCALL macros alone.
 > 
-> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/drivers/spi/spi-imx.c?id=a02bb401f8ae264be782ee57d98bdd99f14c8022
+> That will have hardly any effect to anybody else and your problem is
+> solved while s390 still works.
+> 
+> Does that make sense?
+> 
 
-I am aware of this issue, but I have no idea if this is the same or
-another issue. It says:
+OK. This week I'll split v1 as I did with v2, and send it here. So
+we'll have two versions, and so will start true elections. :)
 
-> For TKT238285 hardware issue which may cause txfifo store data twice can only
-> be caught on i.mx6dl, we use pio mode instead of DMA mode on i.mx6dl.
-
-What I saw here is that there was one word more than expected in the RX
-FIFO. Since both RX and TX FIFO act synchronously it could be that the
-additional word in the RX FIFO was caused by an additional word in the
-TX FIFO as described above.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
