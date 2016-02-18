@@ -1,143 +1,127 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 18 Feb 2016 09:14:32 +0000
-Subject: no irq domain found for ... a GPIO interrupt controller
-In-Reply-To: <2dc0519827dc9d210e38c498d830cd97@agner.ch>
-References: <2dc0519827dc9d210e38c498d830cd97@agner.ch>
-Message-ID: <20160218091432.6968b836@arm.com>
+From: a0131933@ti.com (Lokesh Vutla)
+Date: Thu, 18 Feb 2016 14:49:20 +0530
+Subject: [PATCH v4 1/3] ARM: hwmod: RTC: Add lock and unlock functions
+In-Reply-To: <alpine.DEB.2.02.1602180626420.4792@utopia.booyaka.com>
+References: <1454650952-20154-1-git-send-email-lokeshvutla@ti.com>
+ <1454650952-20154-2-git-send-email-lokeshvutla@ti.com>
+ <alpine.DEB.2.02.1602072209460.2182@utopia.booyaka.com>
+ <alpine.DEB.2.02.1602180626420.4792@utopia.booyaka.com>
+Message-ID: <56C58C98.2040006@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 17 Feb 2016 15:29:22 -0800
-Stefan Agner <stefan@agner.ch> wrote:
+Hi Paul,
 
-Hi Stefan,
 
-> Hi Marc,
-> 
-> I get the following warning on our Vybrid based Colibri VF50 module:
-> [    0.147674] irq: no irq domain found for
-> /soc/aips-bus at 40000000/gpio at 4004a000 !
-> 
-> The device tree arch/arm/boot/dts/vf500-colibri.dtsi uses the following
-> interrupt specification in a touchscreen node which seems to trigger the
-> issue:
-> interrupt-parent = <&gpio0>;
-> interrupts = <8 IRQ_TYPE_LEVEL_LOW>;
-> 
-> We use other GPIO interrupts, but I guess it is a matter of
-> initialization order, and the above specification seems to be parsed
-> before the GPIO interrupt-controller gets created...?
+On 2/18/2016 11:57 AM, Paul Walmsley wrote:
+> Hi Lokesh
+>
+> On Sun, 7 Feb 2016, Paul Walmsley wrote:
+>
+>> A few comments:
+>>
+>> On Fri, 5 Feb 2016, Lokesh Vutla wrote:
+>>
+>>> RTC IP have kicker feature which prevents spurious writes to its registers.
+>>> In order to write into any of the RTC registers, KICK values has to be
+>>> written to KICK registers.
+>>> Introduce omap_hwmod_rtc_unlock/lock functions, which  writes into these
+>>> KICK registers inorder to lock and unlock RTC registers.
+>>>
+>>> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+>>> ---
+>>
+>> ...
+>>
+>>> +/**
+>>> + * omap_rtc_wait_not_busy - Wait for the RTC BUSY flag
+>>> + * @oh: struct omap_hwmod *
+>>> + *
+>>> + * For updating certain RTC registers, the MPU must wait
+>>> + * for the BUSY status in OMAP_RTC_STATUS_REG to become zero.
+>>> + * Once the BUSY status is zero, there is a 15-?s access
+>>
+>> Probably best just to write out "microseconds" or "us" here to avoid the
+>> high-bit character problem.
+>>
+>>> + * period in which the MPU can program.
+>>> + */
+>>> +static void omap_rtc_wait_not_busy(struct omap_hwmod *oh)
+>>> +{
+>>> +	int i;
+>>> +
+>>> +	/* BUSY may stay active for 1/32768 second (~30 usec) */
+>>> +	omap_test_timeout(omap_hwmod_read(oh, OMAP_RTC_STATUS_REG)
+>>> +			  & OMAP_RTC_STATUS_REG, OMAP_RTC_MAX_READY_TIME, i);
+>>
+>> This test looks bogus.  Shouldn't it AND the register value with
+>> OMAP_RTC_STATUS_BUSY?  Right now the code is AND-ing with 0x44, which
+>> doesn't include the BUSY bit.  So I guess the tests that you mentioned in
+>> the first message of the series don't cover the BUSY case?
+>>
+>>> +	/* now we have ~15 usec to read/write various registers */
+>>> +}
+>>> +
+>>> +/**
+>>> + * omap_hwmod_rtc_unlock - Unlock the Kicker mechanism.
+>>> + * @oh: struct omap_hwmod *
+>>> + *
+>>> + * RTC IP have kicker feature. This prevents spurious writes to its registers.
+>>> + * In order to write into any of the RTC registers, KICK values has te be
+>>> + * written in respective KICK registers. This is needed for hwmod to write into
+>>> + * sysconfig register.
+>>> + */
+>>> +void omap_hwmod_rtc_unlock(struct omap_hwmod *oh)
+>>> +{
+>>> +	local_irq_disable();
+>>> +	omap_rtc_wait_not_busy(oh);
+>>> +	omap_hwmod_write(OMAP_RTC_KICK0_VALUE, oh, OMAP_RTC_KICK0_REG);
+>>> +	omap_hwmod_write(OMAP_RTC_KICK1_VALUE, oh, OMAP_RTC_KICK1_REG);
+>>> +	local_irq_enable();
+>>
+>> Finally, could you ask the IP block maintainer to confirm the
+>> interpretation that, for any STATUS_REG read where the BUSY bit is 0, that
+>> we are guaranteed to have at least 15 microseconds from that point in time
+>> to access the IP block?  It appears to be this way from my reading of the
+>> TRM; but to me, the phrasing is not explicit.  Another interpretation
+>> could be that the BUSY bit reflects the IP block's current status.  If
+>> this latter case is true, then to ensure that the IP block accesses
+>> complete inside the access window, we'll either need to test the BUSY bit
+>> after the writes to ensure that it is still 0, and otherwise repeat the
+>> busy test and writes; or we'll need to wait for a 0->1 BUSY transition
+>> before we wait for a 1->0 BUSY transition.
+>>
+>>> +}
+>>> +
+>>> +/**
+>>> + * omap_hwmod_rtc_lock - Lock the Kicker mechanism.
+>>> + * @oh: struct omap_hwmod *
+>>> + *
+>>> + * RTC IP have kicker feature. This prevents spurious writes to its registers.
+>>> + * Once the RTC registers are written, KICK mechanism needs to be locked,
+>>> + * in order to prevent any spurious writes. This function locks back the RTC
+>>> + * registers once hwmod completes its write into sysconfig register.
+>>> + */
+>>> +void omap_hwmod_rtc_lock(struct omap_hwmod *oh)
+>>> +{
+>>> +	local_irq_disable();
+>>> +	omap_rtc_wait_not_busy(oh);
+>>> +	omap_hwmod_write(0x0, oh, OMAP_RTC_KICK0_REG);
+>>> +	omap_hwmod_write(0x0, oh, OMAP_RTC_KICK1_REG);
+>>> +	local_irq_enable();
+>>> +}
+>
+> Any update?
 
-That's very likely. GPIO interrupt controllers tend to be available
-quite late in the boot sequence.
 
-> 
-> It seems that Rob Herring addressed a similar issue a while ago in 
-> 9ec36ca ("of/irq: do irq resolution in platform_get_irq")
-> 
-> Is this problem known?
-> 
-> Currently, the device does not get any interrupts. The interrupt seems
-> to be requested successfully at probe time later, so I am not sure if
-> the not working device is really related to the message above....
+Sorry for the delay, I am on a vacation right now. I have already sent
+a mail to the HW guys. Will update you as soon as I receive a reply
+from them.
 
-That is what Rob's patch fixes: it ensures that the interrupt specifier
-is resolved (turned into a Linux IRQ) when you call platform_get_irq.
+Thanks and regards,
+Lokesh
 
-> 
-> This is a stack trace when I add a WARN_ON(1) in
-> irq_create_fwspec_mapping:
-> [    0.147674] irq: no irq domain found for
-> /soc/aips-bus at 40000000/gpio at 4004a000 !
-> [    0.147823] ------------[ cut here ]------------
-> [    0.147941] WARNING: CPU: 0 PID: 1 at kernel/irq/irqdomain.c:584
-> irq_create_fwspec_mapping+0xf0/0x1e4()
-> [    0.148056] Modules linked in:
-> [    0.148142] CPU: 0 PID: 1 Comm: swapper Not tainted
-> 4.4.0-00070-g3690255-dirty #764
-> [    0.148246] Hardware name: Freescale Vybrid VF5xx/VF6xx (Device Tree)
-> [    0.148311] Backtrace:
-> [    0.148416] [<80013498>] (dump_backtrace) from [<80013690>]
-> (show_stack+0x18/0x1c)
-> [    0.148521]  r7:800539f4 r6:00000248 r5:00000009 r4:00000000
-> [    0.148646] [<80013678>] (show_stack) from [<8029d070>]
-> (dump_stack+0x24/0x28)
-> [    0.148782] [<8029d04c>] (dump_stack) from [<800219a4>]
-> (warn_slowpath_common+0x88/0xb4)
-> [    0.148916] [<8002191c>] (warn_slowpath_common) from [<80021a74>]
-> (warn_slowpath_null+0x24/0x2c)
-> [    0.149021]  r8:00000000 r7:87cf0f88 r6:87cf0f88 r5:00000000
-> r4:87843ca8
-> [    0.149158] [<80021a50>] (warn_slowpath_null) from [<800539f4>]
-> (irq_create_fwspec_mapping+0xf0/0x1e4)
-> [    0.149294] [<80053904>] (irq_create_fwspec_mapping) from
-> [<80053b44>] (irq_create_of_mapping+0x5c/0x64)
-> [    0.149400]  r6:87cf0f88 r5:878bb7c0 r4:00000000
-> [    0.149508] [<80053ae8>] (irq_create_of_mapping) from [<8045e934>]
-> (irq_of_parse_and_map+0x2c/0x34)
-> [    0.149633] [<8045e908>] (irq_of_parse_and_map) from [<8045e95c>]
-> (of_irq_to_resource+0x20/0xc4)
-> [    0.149755] [<8045e93c>] (of_irq_to_resource) from [<8045ea44>]
-> (of_irq_to_resource_table+0x44/0x54)
-> [    0.149859]  r8:00000001 r7:00000001 r6:87cf0f88 r5:878bb7dc
-> r4:00000000
-> [    0.149990] [<8045ea00>] (of_irq_to_resource_table) from [<8045c5b0>]
-> (of_device_alloc+0x114/0x184)
-> [    0.150097]  r7:00000000 r6:878be800 r5:87cf0f88 r4:00000000
-> [    0.150339] [<8045c49c>] (of_device_alloc) from [<8045c678>]
-> (of_platform_device_create_pdata+0x58/0xd4)
-> [    0.150457]  r10:00000000 r9:00000000 r8:80650628 r7:00000000
-> r6:00000000 r5:87cf0f88
-> [    0.150600]  r4:00000000
-> [    0.150688] [<8045c620>] (of_platform_device_create_pdata) from
-> [<8045c800>] (of_platform_bus_create+0xf0/0x194)
-> [    0.150796]  r7:00000001 r6:00000000 r5:87cf0f88 r4:00000000
-> [    0.150912] [<8045c710>] (of_platform_bus_create) from [<8045c9e0>]
-> (of_platform_populate+0x64/0xc0)
-> [    0.151016]  r10:00000000 r9:00000001 r8:00000000 r7:00000000
-> r6:80650628 r5:87ce34f4
-> [    0.151152]  r4:87cf0f88
-> [    0.151244] [<8045c97c>] (of_platform_populate) from [<80806fa8>]
-> (vf610_init_machine+0x24/0x2c)
-> [    0.151352]  r9:807ff5ec r8:000000b0 r7:87896600 r6:80840420
-> r5:80801a48 r4:80840420
-> [    0.151515] [<80806f84>] (vf610_init_machine) from [<80801a70>]
-> (customize_machine+0x28/0x48)
-> [    0.151640] [<80801a48>] (customize_machine) from [<800095fc>]
-> (do_one_initcall+0x98/0x1e0)
-> [    0.151763] [<80009564>] (do_one_initcall) from [<807ffe34>]
-> (kernel_init_freeable+0x13c/0x1e0)
-> [    0.151867]  r10:8082b824 r9:807ff5ec r8:000000b0 r7:8086e440
-> r6:8086e440 r5:00000003
-> [    0.152004]  r4:80838704
-> [    0.152091] [<807ffcf8>] (kernel_init_freeable) from [<805ee93c>]
-> (kernel_init+0x18/0xf0)
-> [    0.152197]  r10:00000000 r9:00000000 r8:00000000 r7:00000000
-> r6:00000000 r5:805ee924
-> [    0.152333]  r4:8086e440
-> [    0.152424] [<805ee924>] (kernel_init) from [<8000f878>]
-> (ret_from_fork+0x14/0x3c)
-> [    0.152526]  r5:805ee924 r4:00000000
-> [    0.152670] ---[ end trace c2d84d5af0139987 ]---
-
-What your stack trace shows is that the failure occurs at boot time,
-when of_platform_populate() parses the DT and creates the platform
-devices. As part of this process, it tries to resolves the interrupt
-specifiers, but fails to do so for this particular device, since the
-corresponding irqchip and domain have not been created yet (the GPIO
-controller is itself a device, while other irqchips are not).
-
-But as long as your device driver uses platform_get_irq(), you will
-force the interrupt specifier to be evaluated again, this time giving
-you a valid interrupt (and provided that your GPIO driver has
-initialized in the meantime - check for -EPROBE_DEFER). At some point,
-we'll be able to kill the interrupt resolution from
-of_platform_populate().
-
-To summarize, your driver not working may not be related to this issue.
-
-Hope this helps,
-
-	M.
--- 
-Jazz is not dead. It just smells funny.
+>
+>
+> - Paul
+>
