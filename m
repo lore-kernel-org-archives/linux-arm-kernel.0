@@ -1,39 +1,72 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Thu, 18 Feb 2016 10:54:02 +0800
-Subject: [PATCH v8.1 1/2] drm/rockchip: hdmi: add Innosilicon HDMI support
-In-Reply-To: <3883951.Go5JsyhPRt@phil>
-References: <1454049768-30872-1-git-send-email-ykk@rock-chips.com>
- <1454492697-7837-1-git-send-email-ykk@rock-chips.com>
- <3883951.Go5JsyhPRt@phil>
-Message-ID: <56C5324A.5080009@rock-chips.com>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Thu, 18 Feb 2016 08:24:34 +0530
+Subject: [RFC 3/3] ARM: dts: Don't overheat the Odroid XU3-Lite on high
+ load
+In-Reply-To: <20160218023622.GA2610@vireshk-i7>
+References: <1455692128-28504-1-git-send-email-k.kozlowski@samsung.com>
+ <1455692128-28504-4-git-send-email-k.kozlowski@samsung.com>
+ <CANAwSgQHiJGSYB7Qhq066Mqfskwrr_3SDQGXH-WN=Wt3SEF-QA@mail.gmail.com>
+ <56C522A9.8070800@samsung.com> <20160218023622.GA2610@vireshk-i7>
+Message-ID: <CANAwSgTGod7kR0fWMZuCFG9oAnt6CrUXsQs=JWz4LtqWi5P8Tw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016?02?18? 05:00, Heiko Stuebner wrote:
-> Am Mittwoch, 3. Februar 2016, 17:44:57 schrieb Yakir Yang:
->> The Innosilicon HDMI is a low power HDMI 1.4 transmitter
->> IP, and it have been integrated on some rockchip CPUs
->> (like RK3036, RK312x).
+Hi Viresh,
+
+On 18 February 2016 at 08:06, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> On 18-02-16, 10:47, Krzysztof Kozlowski wrote:
+>> On 18.02.2016 04:53, Anand Moon wrote:
+>> > I also got lot's of error.
+>> >
+>> > root at odroidxu4l:~# cpu[ 3050.847663] cpu cpu4: Failed to find dev_opp: -19
+>> > [ 3171.640836] cpu cpu4: device_opp_debug_create_link: Failed to create link
+>> > [ 3171.646197] cpu cpu4: _add_list_dev: Failed to register opp debugfs (-12)
+>> > [ 3171.653574] cpu cpu7: device_opp_debug_create_link: Failed to create link
+>> > [ 3171.659752] cpu cpu7: _add_list_dev: Failed to register opp debugfs (-12)
+>> > [ 3171.697011] cpu cpu5: cpufreq_init: failed to get clk: -2
+>> > [ 3171.732505] cpu cpu6: cpufreq_init: failed to get clk: -2
+>> > [ 3171.768160] cpu cpu7: cpufreq_init: failed to get clk: -2
+>> >
+>> > Tested on Odroid-XU4
+>> >
+>> > Reviewed-by: Anand Moon <linux.amoon@gmail.com>
+>> > Tested-by: Anand Moon <linux.amoon@gmail.com>
+>
+> What was this Tested-by supposed to mean? You got errors out there ...
+>
+
+I had done some stress testing, as pointed by Krzysztof.
+I got myself in two minds on this part, please don't consider the
+Tested-by and Reviewed-by part.
+Thanks for pointing out.
+
+-Anand  Moon
+
+>> The patch is not sufficient. It does not work the way it should...
 >>
->> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-> On a Kylin board against 4.5-rc
-> Tested-by: Heiko Stuebner <heiko@sntech.de>
-
-Good, Thanks your Tested-by.
-
-> @Mark: While testing I noticed a black box around my cursor. It moves with
-> the cursor, so seems to be the plane itself - the hdmi driver is of course
-> innocent. May there exist an issue with plane transparency?
-
-Oh, yes, it's my problem, forget to add transparency for rk3036 plane, I 
-will do it later soon.
-
+>> BTW, I found the issue. The order of trip points in DT:
+>> thermal_zone0/trip_point_0_hyst:5000
+>> thermal_zone0/trip_point_0_temp:50000
+>> thermal_zone0/trip_point_0_type:active
+>> thermal_zone0/trip_point_1_hyst:5000
+>> thermal_zone0/trip_point_1_temp:60000
+>> thermal_zone0/trip_point_1_type:active
+>> thermal_zone0/trip_point_2_hyst:5000
+>> thermal_zone0/trip_point_2_temp:70000
+>> thermal_zone0/trip_point_2_type:active
+>> thermal_zone0/trip_point_3_hyst:0
+>> thermal_zone0/trip_point_3_temp:120000        <---- this should be last one!
+>> thermal_zone0/trip_point_3_type:critical
+>> thermal_zone0/trip_point_4_hyst:5000
+>> thermal_zone0/trip_point_4_temp:90000
+>> thermal_zone0/trip_point_4_type:passive
+>> thermal_zone0/trip_point_5_hyst:5000
+>> thermal_zone0/trip_point_5_temp:110000
+>> thermal_zone0/trip_point_5_type:passive
+>>
+>> After fixing the order in DT, the cpu cooler starts working.
 >
+> Ahh, nice.
 >
-> Heiko
->
->
->
-
--- 
-?ark Yao
+> --
+> viresh
