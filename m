@@ -1,54 +1,85 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 18 Feb 2016 17:00:08 +0100
-Subject: [PATCH V5 11/14] soc: tegra: pmc: Add generic PM domain support
-In-Reply-To: <56C1B62B.5060708@nvidia.com>
-References: <1453998832-27383-1-git-send-email-jonathanh@nvidia.com>
- <1453998832-27383-12-git-send-email-jonathanh@nvidia.com>
- <CAPDyKFpnUJA2pLSUOw8rkjyXLY6b__TM=38jsvYAZVhe+DS=zg@mail.gmail.com>
- <7hh9hdzflv.fsf@baylibre.com> <56C1B62B.5060708@nvidia.com>
-Message-ID: <CAPDyKFoPrFoMOFxC37zXX4L3VdLKknaw_LUTw7ycr9mfa_=7_A@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 18 Feb 2016 11:02:33 -0500 (EST)
+Subject: [PATCH 4/9] ARM: add CONFIG_PHYS_OFFSET default values
+In-Reply-To: <1455804123-2526139-5-git-send-email-arnd@arndb.de>
+References: <1455804123-2526139-1-git-send-email-arnd@arndb.de>
+ <1455804123-2526139-5-git-send-email-arnd@arndb.de>
+Message-ID: <alpine.LFD.2.20.1602181100410.13632@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
+On Thu, 18 Feb 2016, Arnd Bergmann wrote:
 
->>
->> What about the pm_clk_* API which was built for tracking clocks
->> associated with devices for runtime PM.
->>
->> IOW, you could pm_clk_add(pg->pmc->dev, pg->clks[i]) and then your
->> _enable_clocks() would become pm_clk_suspend() an dyour
->> _disable_clocks() would become pm_clk_resume().
->
-> Very interesting, I was not aware of this.
->
->> I might not be following the mapping between PMC and PGs though so not
->> sure pg->pmc->dev is the right struct device, but you get the idea.
->
-> Yes, so this will not work here as-is, because the pmc->dev is common to
-> all pm-domains (it is the device that creates all the pm-domains). So to
-> make this work, I would need to create a device for each pm-domain and
-> add the clocks to that.
->
-> I see that this works very well for normal drivers, but it does not feel
-> so natural for pm-domains where we don't have a device struct today. By
-> the way, the rockchip pm-domains implementation is very much in the same
-> boat as tegra, where there are multiple clocks per pm-domain and it is
-> handled by a simple list. So I am not sure if you think that we should
-> be turning all pm-domains registered by pm_genpd_init() into a device
-> and then we can make use of these pm_clk_XXXX() APIs?
->
-> I have implemented the generic clk APIs that Ulf and I discussed for
-> handling multiple clocks, but if we think that this is a better way,
-> then I will hold off for now.
+> For platforms that are not yet converted to ARCH_MULTIPLATFORM,
+> we can disable CONFIG_ARM_PATCH_PHYS_VIRT, which in turn requires
+> setting a correct address here.
+> 
+> As we actualy know what all the values are supposed to be based
+> on the old mach/memory.h header file contents (from git history),
+> we can just add them here.
+> 
+> This also solves a problem in Kconfig where 'make randconfig'
+> fails to continue if no number is selected for a 'hex' option.
+> Users can still override the number at configuration time, e.g.
+> when the memory visible to the kernel starts at a nonstandard
+> address on some machine, but it should no longer be required
+> now.
+> 
+> To make this foolproof, another patch is required in mach-davinci
+> to prevent a configuration with both DMx and DA8xx enabled but
+> ARM_PATCH_PHYS_VIRT disabled. The two patches however can be
+> merged independently as there is no direct dependency between
+> them.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-I think Kevin has a point that we already have PM clocks to build upon.
-Could we perhaps try to extend that API instead to suite this needs as well?
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
-I do realize that it will make this patchset more complicated. As I
-stated earlier, this was just an idea I had, so to be clear I won't
-hold back an ack for this patchset, if you decide to deal with this in
-separate "improvement" step.
+Is there a way to provide a default for defaults?
 
-Kind regards
-Uffe
+
+> ---
+>  arch/arm/Kconfig | 20 +++++++++++++++++---
+>  1 file changed, 17 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index be00b53f399b..7839c9923709 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -271,15 +271,29 @@ config PHYS_OFFSET
+>  	depends on !ARM_PATCH_PHYS_VIRT
+>  	default DRAM_BASE if !MMU
+>  	default 0x00000000 if ARCH_EBSA110 || \
+> +			ARCH_DOVE || \
+>  			ARCH_FOOTBRIDGE || \
+> +			(ARCH_GEMINI && GEMINI_MEM_SWAP) || \
+>  			ARCH_INTEGRATOR || \
+> +			ARCH_IOP33X || \
+>  			ARCH_IOP13XX || \
+> +			ARCH_IXP4XX || \
+>  			ARCH_KS8695 || \
+> -			(ARCH_REALVIEW && !REALVIEW_HIGH_PHYS_OFFSET)
+> -	default 0x10000000 if ARCH_OMAP1 || ARCH_RPC
+> +			(ARCH_REALVIEW && !REALVIEW_HIGH_PHYS_OFFSET) || \
+> +			ARCH_W90X900
+> +	default 0x10000000 if (ARCH_GEMINI && !GEMINI_MEM_SWAP) || \
+> +			ARCH_OMAP1 || \
+> +			ARCH_RPC
+>  	default 0x20000000 if ARCH_S5PV210
+> +	default 0x30000000 if ARCH_S3C24XX
+>  	default 0x70000000 if REALVIEW_HIGH_PHYS_OFFSET
+> -	default 0xc0000000 if ARCH_SA1100
+> +	default 0x80000000 if (ARCH_DAVINCI_DMx && !ARCH_DAVINCI_DA8XX) || \
+> +			ARCH_NETX || \
+> +			ARCH_LPC32XX
+> +	default 0xa0000000 if ARCH_IOP32X || ARCH_PXA
+> +	default 0xc0000000 if (ARCH_DAVINCI_DA8XX && !ARCH_DAVINCI_DMx) || \
+> +			ARCH_CLPS711X || \
+> +			ARCH_SA1100
+>  	help
+>  	  Please provide the physical address corresponding to the
+>  	  location of main memory in your system.
+> -- 
+> 2.7.0
+> 
+> 
