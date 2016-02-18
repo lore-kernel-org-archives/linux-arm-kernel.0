@@ -1,72 +1,146 @@
 From: jglauber@cavium.com (Jan Glauber)
-Date: Thu, 18 Feb 2016 17:50:13 +0100
-Subject: [PATCH v4 4/5] arm64/perf: Enable PMCR long cycle counter bit
+Date: Thu, 18 Feb 2016 17:50:11 +0100
+Subject: [PATCH v4 2/5] arm64/perf: Add Cavium ThunderX PMU support
 In-Reply-To: <cover.1455810755.git.jglauber@cavium.com>
 References: <cover.1455810755.git.jglauber@cavium.com>
-Message-ID: <467597048eda3004bd69f1fbe3981aab111e00dd.1455810755.git.jglauber@cavium.com>
+Message-ID: <cbce6ebf42efa8c0bcfc590b2569bf57cb0fd763.1455810755.git.jglauber@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the long cycle counter bit (LC) disabled the cycle counter is not
-working on ThunderX SOC (ThunderX only implements Aarch64).
-Also, according to documentation LC == 0 is deprecated.
+Support PMU events on Caviums ThunderX SOC. ThunderX supports
+some additional counters compared to the default ARMv8 PMUv3:
 
-To keep the code simple the patch does not introduce 64 bit wide counter
-functions. Instead writing the cycle counter always sets the upper
-32 bits so overflow interrupts are generated as before.
-
-Original patch from Andrew Pinksi <Andrew.Pinksi@caviumnetworks.com>
+- branch instructions counter
+- stall frontend & backend counters
+- L1 dcache load & store counters
+- L1 icache counters
+- iTLB & dTLB counters
+- L1 dcache & icache prefetch counters
 
 Signed-off-by: Jan Glauber <jglauber@cavium.com>
 ---
- arch/arm64/kernel/perf_event.c | 21 ++++++++++++++++-----
- 1 file changed, 16 insertions(+), 5 deletions(-)
+ arch/arm64/kernel/perf_event.c | 69 +++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 68 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-index 0ed05f6..c68fa98 100644
+index 2adbcb5..0ed05f6 100644
 --- a/arch/arm64/kernel/perf_event.c
 +++ b/arch/arm64/kernel/perf_event.c
-@@ -405,6 +405,7 @@ static const struct attribute_group *armv8_pmuv3_attr_groups[] = {
- #define ARMV8_PMCR_D		(1 << 3) /* CCNT counts every 64th cpu cycle */
- #define ARMV8_PMCR_X		(1 << 4) /* Export to ETM */
- #define ARMV8_PMCR_DP		(1 << 5) /* Disable CCNT if non-invasive debug*/
-+#define ARMV8_PMCR_LC		(1 << 6) /* Overflow on 64 bit cycle counter */
- #define	ARMV8_PMCR_N_SHIFT	11	 /* Number of counters supported */
- #define	ARMV8_PMCR_N_MASK	0x1f
- #define	ARMV8_PMCR_MASK		0x3f	 /* Mask for writable bits */
-@@ -494,9 +495,16 @@ static inline void armv8pmu_write_counter(struct perf_event *event, u32 value)
- 	if (!armv8pmu_counter_valid(cpu_pmu, idx))
- 		pr_err("CPU%u writing wrong counter %d\n",
- 			smp_processor_id(), idx);
--	else if (idx == ARMV8_IDX_CYCLE_COUNTER)
--		asm volatile("msr pmccntr_el0, %0" :: "r" (value));
--	else if (armv8pmu_select_counter(idx) == idx)
-+	else if (idx == ARMV8_IDX_CYCLE_COUNTER) {
-+		/*
-+		 * Set the upper 32bits as this is a 64bit counter but we only
-+		 * count using the lower 32bits and we want an interrupt when
-+		 * it overflows.
-+		 */
-+		u64 value64 = 0xffffffff00000000ULL | value;
+@@ -97,6 +97,15 @@
+ #define ARMV8_IMPDEF_PERFCTR_L1_DCACHE_REFILL_ST		0x43
+ #define ARMV8_IMPDEF_PERFCTR_DTLB_REFILL_LD			0x4c
+ #define ARMV8_IMPDEF_PERFCTR_DTLB_REFILL_ST			0x4d
++#define ARMV8_IMPDEF_PERFCTR_DTLB_ACCESS_LD			0x4e
++#define ARMV8_IMPDEF_PERFCTR_DTLB_ACCESS_ST			0x4f
 +
-+		asm volatile("msr pmccntr_el0, %0" :: "r" (value64));
-+	} else if (armv8pmu_select_counter(idx) == idx)
- 		asm volatile("msr pmxevcntr_el0, %0" :: "r" (value));
++/* ARMv8 Cavium ThunderX specific event types. */
++#define ARMV8_THUNDER_PERFCTR_L1_DCACHE_MISS_ST			0xE9
++#define ARMV8_THUNDER_PERFCTR_L1_DCACHE_PREF_ACCESS		0xea
++#define ARMV8_THUNDER_PERFCTR_L1_DCACHE_PREF_MISS		0xeb
++#define ARMV8_THUNDER_PERFCTR_L1_ICACHE_PREF_ACCESS		0xec
++#define ARMV8_THUNDER_PERFCTR_L1_ICACHE_PREF_MISS		0xed
+ 
+ /* PMUv3 HW events mapping. */
+ static const unsigned armv8_pmuv3_perf_map[PERF_COUNT_HW_MAX] = {
+@@ -131,6 +140,18 @@ static const unsigned armv8_a57_perf_map[PERF_COUNT_HW_MAX] = {
+ 	[PERF_COUNT_HW_BUS_CYCLES]		= ARMV8_PMUV3_PERFCTR_BUS_CYCLES,
+ };
+ 
++static const unsigned armv8_thunder_perf_map[PERF_COUNT_HW_MAX] = {
++	PERF_MAP_ALL_UNSUPPORTED,
++	[PERF_COUNT_HW_CPU_CYCLES]		= ARMV8_PMUV3_PERFCTR_CLOCK_CYCLES,
++	[PERF_COUNT_HW_INSTRUCTIONS]		= ARMV8_PMUV3_PERFCTR_INSTR_EXECUTED,
++	[PERF_COUNT_HW_CACHE_REFERENCES]	= ARMV8_PMUV3_PERFCTR_L1_DCACHE_ACCESS,
++	[PERF_COUNT_HW_CACHE_MISSES]		= ARMV8_PMUV3_PERFCTR_L1_DCACHE_REFILL,
++	[PERF_COUNT_HW_BRANCH_INSTRUCTIONS]	= ARMV8_PMUV3_PERFCTR_PC_WRITE,
++	[PERF_COUNT_HW_BRANCH_MISSES]		= ARMV8_PMUV3_PERFCTR_PC_BRANCH_MIS_PRED,
++	[PERF_COUNT_HW_STALLED_CYCLES_FRONTEND] = ARMV8_PMUV3_PERFCTR_STALL_FRONTEND,
++	[PERF_COUNT_HW_STALLED_CYCLES_BACKEND]	= ARMV8_PMUV3_PERFCTR_STALL_BACKEND,
++};
++
+ static const unsigned armv8_pmuv3_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
+ 						[PERF_COUNT_HW_CACHE_OP_MAX]
+ 						[PERF_COUNT_HW_CACHE_RESULT_MAX] = {
+@@ -193,6 +214,36 @@ static const unsigned armv8_a57_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
+ 	[C(BPU)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_PC_BRANCH_MIS_PRED,
+ };
+ 
++static const unsigned armv8_thunder_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
++						   [PERF_COUNT_HW_CACHE_OP_MAX]
++						   [PERF_COUNT_HW_CACHE_RESULT_MAX] = {
++	PERF_CACHE_MAP_ALL_UNSUPPORTED,
++
++	[C(L1D)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_IMPDEF_PERFCTR_L1_DCACHE_ACCESS_LD,
++	[C(L1D)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_IMPDEF_PERFCTR_L1_DCACHE_REFILL_LD,
++	[C(L1D)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV8_IMPDEF_PERFCTR_L1_DCACHE_ACCESS_ST,
++	[C(L1D)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV8_THUNDER_PERFCTR_L1_DCACHE_MISS_ST,
++	[C(L1D)][C(OP_PREFETCH)][C(RESULT_ACCESS)] = ARMV8_THUNDER_PERFCTR_L1_DCACHE_PREF_ACCESS,
++	[C(L1D)][C(OP_PREFETCH)][C(RESULT_MISS)] = ARMV8_THUNDER_PERFCTR_L1_DCACHE_PREF_MISS,
++
++	[C(L1I)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L1_ICACHE_ACCESS,
++	[C(L1I)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L1_ICACHE_REFILL,
++	[C(L1I)][C(OP_PREFETCH)][C(RESULT_ACCESS)] = ARMV8_THUNDER_PERFCTR_L1_ICACHE_PREF_ACCESS,
++	[C(L1I)][C(OP_PREFETCH)][C(RESULT_MISS)] = ARMV8_THUNDER_PERFCTR_L1_ICACHE_PREF_MISS,
++
++	[C(DTLB)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_IMPDEF_PERFCTR_DTLB_ACCESS_LD,
++	[C(DTLB)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_IMPDEF_PERFCTR_DTLB_REFILL_LD,
++	[C(DTLB)][C(OP_WRITE)][C(RESULT_ACCESS)] = ARMV8_IMPDEF_PERFCTR_DTLB_ACCESS_ST,
++	[C(DTLB)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV8_IMPDEF_PERFCTR_DTLB_REFILL_ST,
++
++	[C(ITLB)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_ITLB_REFILL,
++
++	[C(BPU)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_PC_BRANCH_PRED,
++	[C(BPU)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_PC_BRANCH_MIS_PRED,
++	[C(BPU)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_PC_BRANCH_PRED,
++	[C(BPU)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_PC_BRANCH_MIS_PRED,
++};
++
+ #define ARMV8_EVENT_ATTR_RESOLVE(m) #m
+ #define ARMV8_EVENT_ATTR(name, config) \
+ 	PMU_EVENT_ATTR_STRING(name, armv8_event_attr_##name, \
+@@ -324,7 +375,6 @@ static const struct attribute_group *armv8_pmuv3_attr_groups[] = {
+ 	NULL,
+ };
+ 
+-
+ /*
+  * Perf Events' indices
+  */
+@@ -743,6 +793,13 @@ static int armv8_a57_map_event(struct perf_event *event)
+ 				ARMV8_EVTYPE_EVENT);
  }
  
-@@ -768,8 +776,11 @@ static void armv8pmu_reset(void *info)
- 		armv8pmu_disable_intens(idx);
- 	}
- 
--	/* Initialize & Reset PMNC: C and P bits. */
--	armv8pmu_pmcr_write(ARMV8_PMCR_P | ARMV8_PMCR_C);
-+	/*
-+	 * Initialize & Reset PMNC. Request overflow interrupt for
-+	 * 64 bit cycle counter but cheat in armv8pmu_write_counter().
-+	 */
-+	armv8pmu_pmcr_write(ARMV8_PMCR_P | ARMV8_PMCR_C | ARMV8_PMCR_LC);
++static int armv8_thunder_map_event(struct perf_event *event)
++{
++	return armpmu_map_event(event, &armv8_thunder_perf_map,
++				&armv8_thunder_perf_cache_map,
++				ARMV8_EVTYPE_EVENT);
++}
++
+ static void armv8pmu_read_num_pmnc_events(void *info)
+ {
+ 	int *nb_cnt = info;
+@@ -811,11 +868,21 @@ static int armv8_a72_pmu_init(struct arm_pmu *cpu_pmu)
+ 	return armv8pmu_probe_num_events(cpu_pmu);
  }
  
- static int armv8_pmuv3_map_event(struct perf_event *event)
++static int armv8_thunder_pmu_init(struct arm_pmu *cpu_pmu)
++{
++	armv8_pmu_init(cpu_pmu);
++	cpu_pmu->name			= "armv8_cavium_thunder";
++	cpu_pmu->map_event		= armv8_thunder_map_event;
++	cpu_pmu->pmu.attr_groups	= armv8_pmuv3_attr_groups;
++	return armv8pmu_probe_num_events(cpu_pmu);
++}
++
+ static const struct of_device_id armv8_pmu_of_device_ids[] = {
+ 	{.compatible = "arm,armv8-pmuv3",	.data = armv8_pmuv3_init},
+ 	{.compatible = "arm,cortex-a53-pmu",	.data = armv8_a53_pmu_init},
+ 	{.compatible = "arm,cortex-a57-pmu",	.data = armv8_a57_pmu_init},
+ 	{.compatible = "arm,cortex-a72-pmu",	.data = armv8_a72_pmu_init},
++	{.compatible = "cavium,thunder-pmu",	.data = armv8_thunder_pmu_init},
+ 	{},
+ };
+ 
 -- 
 1.9.1
