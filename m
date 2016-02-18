@@ -1,55 +1,50 @@
-From: Larry.Finger@lwfinger.net (Larry Finger)
-Date: Wed, 17 Feb 2016 20:20:15 -0600
-Subject: [PATCH] staging: rtl8712: reduce stack usage
-In-Reply-To: <1455698012-814399-1-git-send-email-arnd@arndb.de>
-References: <1455698012-814399-1-git-send-email-arnd@arndb.de>
-Message-ID: <56C52A5F.2030302@lwfinger.net>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 18 Feb 2016 03:23:11 +0100
+Subject: [GIT PULL] at91: dt for 4.6 #1
+Message-ID: <20160218022311.GA2466@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/17/2016 02:32 AM, Arnd Bergmann wrote:
-> The "translate_scan" function in rtl8712 uses a lot of stack, and
-> gets inlined into its single caller, r8711_wx_get_scan, which
-> in some configurations now blows the 1024 byte stack warning
-> limit:
->
-> drivers/staging/rtl8712/rtl871x_ioctl_linux.c: In function 'r8711_wx_get_scan':
-> drivers/staging/rtl8712/rtl871x_ioctl_linux.c:1227:1: error: the frame size of 1032 bytes is larger than 1024 bytes [-Werror=frame-larger-than=]
->
-> This somewhat reduces the stack usage by moving the translate_scan
-> function out of line with the noinline_for_stack annotation.
-> It might be possible to modify translate_scan() a little further
-> to reduce the stack usage, but with this patch, we can build without
-> the warning, the the call chain to get here is rather predictable
-> (sys_ioctl->vfs_ioctl->sock_ioctl->dev_ioctl->wext_ioctl->
-> r8711_wx_get_scan).
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->   drivers/staging/rtl8712/rtl871x_ioctl_linux.c | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
+Arnd, Olof, Kevin,
 
-As there is no reason for translate_scan() to be inlined, this patch seems 
-reasonable The largest user of stack likely comes from the line "struct iw_event 
-iwe". Changing that to a pointer, and using kalloc to acquire the space would 
-likely clear the compile message, but that would require many more changes.
+This is the addition of the ADC support for sama5d2. The driver went
+through the iio tree.
 
-Acked-by: Larry Finger <Larry.Finger@lwfinger.net>
+Thanks!
 
-Larry
+The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
 
->
-> diff --git a/drivers/staging/rtl8712/rtl871x_ioctl_linux.c b/drivers/staging/rtl8712/rtl871x_ioctl_linux.c
-> index db2e31bcdd77..a15f3ce70223 100644
-> --- a/drivers/staging/rtl8712/rtl871x_ioctl_linux.c
-> +++ b/drivers/staging/rtl8712/rtl871x_ioctl_linux.c
-> @@ -137,7 +137,7 @@ static inline void handle_group_key(struct ieee_param *param,
->   	}
->   }
->
-> -static inline char *translate_scan(struct _adapter *padapter,
-> +static noinline_for_stack char *translate_scan(struct _adapter *padapter,
->   				   struct iw_request_info *info,
->   				   struct wlan_network *pnetwork,
->   				   char *start, char *stop)
->
+  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.6-dt
+
+for you to fetch changes up to 5e72c25b40c1e9ed77650f258799514aabd17303:
+
+  ARM: dts: at91: sama5d2 Xplained: enable the adc device (2016-02-18 03:10:05 +0100)
+
+----------------------------------------------------------------
+DT changes for 4.6:
+ - Addition of the ADC for sama5d2 and sama5d2_xplained
+
+----------------------------------------------------------------
+Ludovic Desroches (2):
+      ARM: dts: at91: sama5d2: add adc device
+      ARM: dts: at91: sama5d2 Xplained: enable the adc device
+
+ arch/arm/boot/dts/at91-sama5d2_xplained.dts | 22 ++++++++++++++++++++++
+ arch/arm/boot/dts/sama5d2.dtsi              | 18 ++++++++++++------
+ 2 files changed, 34 insertions(+), 6 deletions(-)
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160218/80da022e/attachment.sig>
