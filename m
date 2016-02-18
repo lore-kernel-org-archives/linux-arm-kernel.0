@@ -1,75 +1,53 @@
-From: aryabinin@virtuozzo.com (Andrey Ryabinin)
-Date: Thu, 18 Feb 2016 14:46:30 +0300
-Subject: KASAN issues with idle / hotplug area
-In-Reply-To: <20160218111516.GM32647@leverpostej>
-References: <56BDFC86.5010705@arm.com>
- <20160212160652.GL31665@e104818-lin.cambridge.arm.com>
- <56C1E072.2090909@virtuozzo.com>
- <20160215185957.GB19413@e104818-lin.cambridge.arm.com>
- <56C31D1D.50708@virtuozzo.com> <20160217143950.GC32647@leverpostej>
- <20160217170110.GE32647@leverpostej> <20160217175656.GJ32647@leverpostej>
- <20160217191643.GK32647@leverpostej> <56C57F40.3050500@virtuozzo.com>
- <20160218111516.GM32647@leverpostej>
-Message-ID: <56C5AF16.7020904@virtuozzo.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 18 Feb 2016 12:45:30 +0100
+Subject: [PATCH v5 11/15] arm64: head.S: Change the register el2_setup()
+ returns its result in x0
+In-Reply-To: <20160218114127.GA12626@red-moon>
+References: <1455637767-31561-1-git-send-email-james.morse@arm.com>
+ <1455637767-31561-12-git-send-email-james.morse@arm.com>
+ <20160218114127.GA12626@red-moon>
+Message-ID: <20160218114530.GA23804@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu 2016-02-18 11:41:27, Lorenzo Pieralisi wrote:
+> Hi James,
+> 
+> On Tue, Feb 16, 2016 at 03:49:23PM +0000, James Morse wrote:
+> > Today el2_setup() returns its result in w20. This means we can't call it
+> > like any normal function. Change this to w0.
+> > 
+> > All three callers of el2_setup() call set_cpu_boot_mode_flag() immediately
+> > afterwards, and don't rely on x0 in later code. Boot cpu code calls
+> > preserve_boot_args() before el2_setup(), so we don't clobber the DT pointer.
+> > 
+> > Signed-off-by: James Morse <james.morse@arm.com>
+> > ---
+> >  arch/arm64/include/asm/processor.h |  2 ++
+> >  arch/arm64/kernel/head.S           | 18 +++++++++---------
+> >  2 files changed, 11 insertions(+), 9 deletions(-)
+> > 
+> > diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+> > index 4acb7ca94fcd..07ac4351538e 100644
+> > --- a/arch/arm64/include/asm/processor.h
+> > +++ b/arch/arm64/include/asm/processor.h
+> > @@ -188,4 +188,6 @@ static inline void spin_lock_prefetch(const void *x)
+> >  
+> >  void cpu_enable_pan(void *__unused);
+> >  
+> > +int el2_setup(void);
+> 
+> Do we really need to have this declaration (and this patch) ? We never
+> treat (and call) el2_setup as a C function anyway, as long as the registers
+> used to pass in values (and return value) are documented I do not think we
+> have an issue anyway, am I missing something here ?
 
+Well, using non-standard calling convention for something that can use
+standard one is very ugly at least.
 
-On 02/18/2016 02:15 PM, Mark Rutland wrote:
-> On Thu, Feb 18, 2016 at 11:22:24AM +0300, Andrey Ryabinin wrote:
->>
->> On 02/17/2016 10:16 PM, Mark Rutland wrote:
->>> Looking at the assembly, functions seem to get instrumented regardless
->>> of the __no_sanitize_address annotation. The assembly of
->>> __invoke_psci_fn_{smc,hvc} look identical, even if one has the
->>> annotation and one does not.
->>>
->>> In the case below, it looks like __invoke_psci_fn_hvc is storing to the
->>> shadow area even though it's anotated with __no_sanitize_address.  Note
->>> that the adrp symbol resolution is bogus; psci_to_linux_errno happens to
->>> be at offset 0 in the as-yet unlinked psci.o object.
->>>
->>
->> ...
->>> I also tried using __attribute__((no_sanitize_address)) directly, in
->>> case there was some header issue, but that doesn't seem to be the case.
->>>
->>> I'm using the Linaro 15.08 AArch64 GCC 5.1. Is anyone else able to
->>> confirm whether they see the same? Does the same happen for x86?
->>
->> Confirming, this happens on every GCC I have (including x86).
->> It seems that 'no_sanitize_address' in gcc removes only memory access checks
->> but it doesn't remove stack redzones.
->> I think this is wrong, e.g. clang removes instrumentation completely. I'll submit a bug.
-> 
-> Ok.
-> 
-> Unless there's some clever trickery that we can employ, the above
-> renders the Linux __no_sanitize_address annotation useless for this
-> style of code.
-> 
-> We should certianly call that out in the commentary in
-> include/linux/compiler-gcc.h.
-> 
->> But we need fix this in kernel.
->> I see two options here:
->>  * completely disable instrumentation for drivers/firmware/psci.c
-> 
-> This is somewhat overkill, and we'd also have to disable instrumentation
-> for arch/arm64/kernel/psci.c (for psci_suspend_finisher).
-> 
-> I would like to have instrumentation for everything we can safely
-> instrument.
-> 
-> This is probably the least worst option, though.
-> 
->>  * get back to assembly implementation
-> 
-> We'd also have to convert psci_suspend_finisher and psci_cpu_suspend,
-> the latter being generic code. That goes against the consolidation we
-> were aiming for.
-> 
+Best regards,
+								Pavel
 
-Yup, I missed these two.
-In that case the only way is to manually unpoison stack.
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
