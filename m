@@ -1,122 +1,129 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 18 Feb 2016 15:12:52 +0100
-Subject: [PATCH v2 05/13] iommu: exynos: refactor code (no direct register
- access)
+Date: Thu, 18 Feb 2016 15:12:51 +0100
+Subject: [PATCH v2 04/13] iommu: exynos: simplify master clock operations
 In-Reply-To: <1455804780-9616-1-git-send-email-m.szyprowski@samsung.com>
 References: <1455804780-9616-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1455804780-9616-6-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1455804780-9616-5-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch changes some internal functions to have access to the state of
-sysmmu device instead of having only it's registers. This will make the
-code ready for future extensions.
+All clock API function can be called on NULL clock, so simplify code avoid
+checking of master clock presence.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/iommu/exynos-iommu.c | 40 +++++++++++++++++++---------------------
- 1 file changed, 19 insertions(+), 21 deletions(-)
+ drivers/iommu/exynos-iommu.c | 32 ++++++++++++--------------------
+ 1 file changed, 12 insertions(+), 20 deletions(-)
 
 diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index bf6b826b1d8b..4275222cead3 100644
+index 8c8a7f7968d1..bf6b826b1d8b 100644
 --- a/drivers/iommu/exynos-iommu.c
 +++ b/drivers/iommu/exynos-iommu.c
-@@ -254,50 +254,49 @@ static bool is_sysmmu_active(struct sysmmu_drvdata *data)
- 	return data->activations > 0;
- }
+@@ -333,8 +333,7 @@ static irqreturn_t exynos_sysmmu_irq(int irq, void *dev_id)
  
--static void sysmmu_unblock(void __iomem *sfrbase)
-+static void sysmmu_unblock(struct sysmmu_drvdata *data)
+ 	spin_lock(&data->lock);
+ 
+-	if (!IS_ERR(data->clk_master))
+-		clk_enable(data->clk_master);
++	clk_enable(data->clk_master);
+ 
+ 	itype = (enum exynos_sysmmu_inttype)
+ 		__ffs(__raw_readl(data->sfrbase + REG_INT_STATUS));
+@@ -366,8 +365,7 @@ static irqreturn_t exynos_sysmmu_irq(int irq, void *dev_id)
+ 
+ 	sysmmu_unblock(data->sfrbase);
+ 
+-	if (!IS_ERR(data->clk_master))
+-		clk_disable(data->clk_master);
++	clk_disable(data->clk_master);
+ 
+ 	spin_unlock(&data->lock);
+ 
+@@ -376,15 +374,13 @@ static irqreturn_t exynos_sysmmu_irq(int irq, void *dev_id)
+ 
+ static void __sysmmu_disable_nocount(struct sysmmu_drvdata *data)
  {
--	__raw_writel(CTRL_ENABLE, sfrbase + REG_MMU_CTRL);
-+	__raw_writel(CTRL_ENABLE, data->sfrbase + REG_MMU_CTRL);
+-	if (!IS_ERR(data->clk_master))
+-		clk_enable(data->clk_master);
++	clk_enable(data->clk_master);
+ 
+ 	__raw_writel(CTRL_DISABLE, data->sfrbase + REG_MMU_CTRL);
+ 	__raw_writel(0, data->sfrbase + REG_MMU_CFG);
+ 
+ 	clk_disable(data->clk);
+-	if (!IS_ERR(data->clk_master))
+-		clk_disable(data->clk_master);
++	clk_disable(data->clk_master);
  }
  
--static bool sysmmu_block(void __iomem *sfrbase)
-+static bool sysmmu_block(struct sysmmu_drvdata *data)
+ static bool __sysmmu_disable(struct sysmmu_drvdata *data)
+@@ -437,8 +433,7 @@ static void __sysmmu_init_config(struct sysmmu_drvdata *data)
+ 
+ static void __sysmmu_enable_nocount(struct sysmmu_drvdata *data)
  {
- 	int i = 120;
+-	if (!IS_ERR(data->clk_master))
+-		clk_enable(data->clk_master);
++	clk_enable(data->clk_master);
+ 	clk_enable(data->clk);
  
--	__raw_writel(CTRL_BLOCK, sfrbase + REG_MMU_CTRL);
--	while ((i > 0) && !(__raw_readl(sfrbase + REG_MMU_STATUS) & 1))
-+	__raw_writel(CTRL_BLOCK, data->sfrbase + REG_MMU_CTRL);
-+	while ((i > 0) && !(__raw_readl(data->sfrbase + REG_MMU_STATUS) & 1))
- 		--i;
- 
--	if (!(__raw_readl(sfrbase + REG_MMU_STATUS) & 1)) {
--		sysmmu_unblock(sfrbase);
-+	if (!(__raw_readl(data->sfrbase + REG_MMU_STATUS) & 1)) {
-+		sysmmu_unblock(data);
- 		return false;
- 	}
- 
- 	return true;
- }
- 
--static void __sysmmu_tlb_invalidate(void __iomem *sfrbase)
-+static void __sysmmu_tlb_invalidate(struct sysmmu_drvdata *data)
- {
--	__raw_writel(0x1, sfrbase + REG_MMU_FLUSH);
-+	__raw_writel(0x1, data->sfrbase + REG_MMU_FLUSH);
- }
- 
--static void __sysmmu_tlb_invalidate_entry(void __iomem *sfrbase,
-+static void __sysmmu_tlb_invalidate_entry(struct sysmmu_drvdata *data,
- 				sysmmu_iova_t iova, unsigned int num_inv)
- {
- 	unsigned int i;
- 
- 	for (i = 0; i < num_inv; i++) {
- 		__raw_writel((iova & SPAGE_MASK) | 1,
--				sfrbase + REG_MMU_FLUSH_ENTRY);
-+				data->sfrbase + REG_MMU_FLUSH_ENTRY);
- 		iova += SPAGE_SIZE;
- 	}
- }
- 
--static void __sysmmu_set_ptbase(void __iomem *sfrbase,
--				       phys_addr_t pgd)
-+static void __sysmmu_set_ptbase(struct sysmmu_drvdata *data, phys_addr_t pgd)
- {
--	__raw_writel(pgd, sfrbase + REG_PT_BASE_ADDR);
-+	__raw_writel(pgd, data->sfrbase + REG_PT_BASE_ADDR);
- 
--	__sysmmu_tlb_invalidate(sfrbase);
-+	__sysmmu_tlb_invalidate(data);
- }
- 
- static void show_fault_information(const char *name,
-@@ -363,7 +362,7 @@ static irqreturn_t exynos_sysmmu_irq(int irq, void *dev_id)
- 
- 	__raw_writel(1 << itype, data->sfrbase + REG_INT_CLEAR);
- 
--	sysmmu_unblock(data->sfrbase);
-+	sysmmu_unblock(data);
- 
- 	clk_disable(data->clk_master);
- 
-@@ -440,7 +439,7 @@ static void __sysmmu_enable_nocount(struct sysmmu_drvdata *data)
- 
- 	__sysmmu_init_config(data);
- 
--	__sysmmu_set_ptbase(data->sfrbase, data->pgtable);
-+	__sysmmu_set_ptbase(data, data->pgtable);
+ 	__raw_writel(CTRL_BLOCK, data->sfrbase + REG_MMU_CTRL);
+@@ -449,8 +444,7 @@ static void __sysmmu_enable_nocount(struct sysmmu_drvdata *data)
  
  	__raw_writel(CTRL_ENABLE, data->sfrbase + REG_MMU_CTRL);
  
-@@ -521,10 +520,9 @@ static void sysmmu_tlb_invalidate_entry(struct sysmmu_drvdata *data,
- 		if (MMU_MAJ_VER(data->version) == 2)
- 			num_inv = min_t(unsigned int, size / PAGE_SIZE, 64);
+-	if (!IS_ERR(data->clk_master))
+-		clk_disable(data->clk_master);
++	clk_disable(data->clk_master);
+ }
  
--		if (sysmmu_block(data->sfrbase)) {
--			__sysmmu_tlb_invalidate_entry(
--				data->sfrbase, iova, num_inv);
--			sysmmu_unblock(data->sfrbase);
-+		if (sysmmu_block(data)) {
-+			__sysmmu_tlb_invalidate_entry(data, iova, num_inv);
-+			sysmmu_unblock(data);
+ static int __sysmmu_enable(struct sysmmu_drvdata *data, phys_addr_t pgtable,
+@@ -493,16 +487,14 @@ static void sysmmu_tlb_invalidate_flpdcache(struct sysmmu_drvdata *data,
+ {
+ 	unsigned long flags;
+ 
+-	if (!IS_ERR(data->clk_master))
+-		clk_enable(data->clk_master);
++	clk_enable(data->clk_master);
+ 
+ 	spin_lock_irqsave(&data->lock, flags);
+ 	if (is_sysmmu_active(data))
+ 		__sysmmu_tlb_invalidate_flpdcache(data, iova);
+ 	spin_unlock_irqrestore(&data->lock, flags);
+ 
+-	if (!IS_ERR(data->clk_master))
+-		clk_disable(data->clk_master);
++	clk_disable(data->clk_master);
+ }
+ 
+ static void sysmmu_tlb_invalidate_entry(struct sysmmu_drvdata *data,
+@@ -514,8 +506,7 @@ static void sysmmu_tlb_invalidate_entry(struct sysmmu_drvdata *data,
+ 	if (is_sysmmu_active(data)) {
+ 		unsigned int num_inv = 1;
+ 
+-		if (!IS_ERR(data->clk_master))
+-			clk_enable(data->clk_master);
++		clk_enable(data->clk_master);
+ 
+ 		/*
+ 		 * L2TLB invalidation required
+@@ -535,8 +526,7 @@ static void sysmmu_tlb_invalidate_entry(struct sysmmu_drvdata *data,
+ 				data->sfrbase, iova, num_inv);
+ 			sysmmu_unblock(data->sfrbase);
  		}
- 		clk_disable(data->clk_master);
+-		if (!IS_ERR(data->clk_master))
+-			clk_disable(data->clk_master);
++		clk_disable(data->clk_master);
  	} else {
+ 		dev_dbg(data->master,
+ 			"disabled. Skipping TLB invalidation @ %#x\n", iova);
+@@ -593,6 +583,8 @@ static int __init exynos_sysmmu_probe(struct platform_device *pdev)
+ 			dev_err(dev, "Failed to prepare master's clk\n");
+ 			return ret;
+ 		}
++	} else {
++		data->clk_master = NULL;
+ 	}
+ 
+ 	data->sysmmu = dev;
 -- 
 1.9.2
