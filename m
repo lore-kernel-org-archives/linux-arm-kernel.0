@@ -1,40 +1,84 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Thu, 18 Feb 2016 10:57:55 -0800
-Subject: [PATCH v4 4/5] arm64/perf: Enable PMCR long cycle counter bit
-In-Reply-To: <20160218173428.GE16883@arm.com>
-References: <cover.1455810755.git.jglauber@cavium.com>
- <467597048eda3004bd69f1fbe3981aab111e00dd.1455810755.git.jglauber@cavium.com>
- <20160218173428.GE16883@arm.com>
-Message-ID: <56C61433.2090006@caviumnetworks.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 18 Feb 2016 18:59:18 +0000
+Subject: [PATCH 3/3] [RESEND] ARM: kprobes: use "I" constraint for inline
+ assembly offsets
+In-Reply-To: <1455819135.2958.6.camel@linaro.org>
+References: <1455815113-2562966-1-git-send-email-arnd@arndb.de>
+ <1455815113-2562966-4-git-send-email-arnd@arndb.de>
+ <1455819135.2958.6.camel@linaro.org>
+Message-ID: <56C61486.9070803@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/18/2016 09:34 AM, Will Deacon wrote:
-> On Thu, Feb 18, 2016 at 05:50:13PM +0100, Jan Glauber wrote:
->> With the long cycle counter bit (LC) disabled the cycle counter is not
->> working on ThunderX SOC (ThunderX only implements Aarch64).
->> Also, according to documentation LC == 0 is deprecated.
+On 18/02/16 18:12, Jon Medhurst (Tixy) wrote:
+> On Thu, 2016-02-18 at 18:05 +0100, Arnd Bergmann wrote:
+>> build-testing with clang showed that the "J" constraint does not take
+>> positive arguments on clang when building in for Thumb-2:
 >>
->> To keep the code simple the patch does not introduce 64 bit wide counter
->> functions. Instead writing the cycle counter always sets the upper
->> 32 bits so overflow interrupts are generated as before.
+>> core.c:540:3: error: invalid operand for inline asm constraint 'J'
 >>
->> Original patch from Andrew Pinksi <Andrew.Pinksi@caviumnetworks.com>
+>> This has been reported as llvm bug https://llvm.org/bugs/show_bug.cgi?id=26061
+>>
+>> However, looking at the source code in depth, I found that the
+>> kernel is also wrong, and it should not use "J" at all, but should
+>> use "I" to pass an immediate argument to the inline assembly when that
+>> is used as an offset to an 'ldr' instruction rather than the 'sub'
+>> argument.
 >
-> What does this mean? Do we need Andrew's S-o-B, or is this a fresh patch?
-
-I don't believe we need Andrew's S-o-B as the assertion of the 
-Developer's Certificate of Origin 1.1 clauses (a), (b) and (d) is being 
-made.  Specifically, clause (c) does not apply.
-
-However this may be a gray area, so we could put on Andrew's S-o-B if 
-that would make everybody happier.
-
-David Daney
-
-
+> This patch doesn't seem correct to me.
 >
-> Will
+> The ARM ARM says the immediate offset to an ARM ldr instructions is "any
+> value in the range 0-4095" and offsets may be added or subtracted,
+> leading to values from ?4095 to 4095".
+>
+> And GCC machine constraints [1] says
+>
+> I
+>      Integer that is valid as an immediate operand in a data processing
+>      instruction. That is, an integer in the range 0 to 255 rotated by a
+>      multiple of 2
+> J
+>      Integer in the range ?4095 to 4095
+>
+> So the current use of 'J' seems correct to me.
+
+Hmm, Arnd reports the failure when building for Thumb-2, and the code 
+under #ifdef CONFIG_THUMB2_KERNEL contains an ldrd, which takes a 
+different immediate of the form imm8 * 4. Maybe it's just operand %5 
+which needs fixing, although I don't see that a suitable constraint for 
+that actually exists...
+
+Robin.
+
+> [1] https://gcc.gnu.org/onlinedocs/gcc/Machine-Constraints.html#Machine-Constraints
+>
+>
+>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>> ---
+>>   arch/arm/probes/kprobes/core.c | 8 ++++----
+>>   1 file changed, 4 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/arch/arm/probes/kprobes/core.c b/arch/arm/probes/kprobes/core.c
+>> index a4ec240ee7ba..4b34b40ca917 100644
+>> --- a/arch/arm/probes/kprobes/core.c
+>> +++ b/arch/arm/probes/kprobes/core.c
+>> @@ -570,10 +570,10 @@ void __kprobes jprobe_return(void)
+>>   		:
+>>   		: "r" (kcb->jprobe_saved_regs.ARM_sp),
+>>   		  "I" (sizeof(struct pt_regs) * 2),
+>> -		  "J" (offsetof(struct pt_regs, ARM_sp)),
+>> -		  "J" (offsetof(struct pt_regs, ARM_pc)),
+>> -		  "J" (offsetof(struct pt_regs, ARM_cpsr)),
+>> -		  "J" (offsetof(struct pt_regs, ARM_lr))
+>> +		  "I" (offsetof(struct pt_regs, ARM_sp)),
+>> +		  "I" (offsetof(struct pt_regs, ARM_pc)),
+>> +		  "I" (offsetof(struct pt_regs, ARM_cpsr)),
+>> +		  "I" (offsetof(struct pt_regs, ARM_lr))
+>>   		: "memory", "cc");
+>>   }
+>>
+>
+>
 >
 > _______________________________________________
 > linux-arm-kernel mailing list
