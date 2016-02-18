@@ -1,61 +1,33 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 18 Feb 2016 14:29:32 +0100
-Subject: [PATCH v2 1/2] efi: esrt: use memremap not ioremap to access ESRT
- table in memory
-In-Reply-To: <20160218132824.GE2651@codeblueprint.co.uk>
-References: <1455535953-5056-1-git-send-email-ard.biesheuvel@linaro.org>
- <1455535953-5056-2-git-send-email-ard.biesheuvel@linaro.org>
- <20160218104407.GC2651@codeblueprint.co.uk>
- <CAKv+Gu_AW7PKJJOd2mbEu3LKJe+gNaPHnH=sgO=YXM_KWFyKxw@mail.gmail.com>
- <20160218132824.GE2651@codeblueprint.co.uk>
-Message-ID: <CAKv+Gu-s1pzYBzuDG-Z7s3gyo8dPOfeidZQ+rim-uAWZCBcKQQ@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 18 Feb 2016 14:32:10 +0100
+Subject: [PATCH] PCI: mvebu: Restrict build to 32-bit ARM
+Message-ID: <1455802330-17565-1-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 February 2016 at 14:28, Matt Fleming <matt@codeblueprint.co.uk> wrote:
-> On Thu, 18 Feb, at 01:16:05PM, Ard Biesheuvel wrote:
->> On 18 February 2016 at 11:44, Matt Fleming <matt@codeblueprint.co.uk> wrote:
->> > On Mon, 15 Feb, at 12:32:32PM, Ard Biesheuvel wrote:
->> >> On ARM and arm64, ioremap() and memremap() are not interchangeable like
->> >> on x86, and the use of ioremap() on ordinary RAM is typically flagged
->> >> as an error if the memory region being mapped is also covered by the
->> >> linear mapping, since that would lead to aliases with conflicting
->> >> cacheability attributes.
->> >>
->> >> Since what we are dealing with is not an I/O region with side effects,
->> >> using ioremap() here is arguably incorrect anyway, so let's replace
->> >> it with memremap instead. Also add a missing unmap on the success path,
->> >> and drop a memblock_remove() call which does not belong here, this far
->> >> into the boot sequence.
->> >>
->> >> Cc: Peter Jones <pjones@redhat.com>
->> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> >> ---
->> >>  drivers/firmware/efi/esrt.c | 16 ++++++++--------
->> >>  1 file changed, 8 insertions(+), 8 deletions(-)
->> >>
->> >
->> > [...]
->> >
->> >> @@ -432,8 +434,6 @@ static int __init esrt_sysfs_init(void)
->> >>       if (error)
->> >>               goto err_cleanup_list;
->> >>
->> >> -     memblock_remove(esrt_data, esrt_data_size);
->> >> -
->> >>       pr_debug("esrt-sysfs: loaded.\n");
->> >>
->> >>       return 0;
->> >
->> > Shouldn't we be replacing memblock_remove() with free_bootmem_late()?
->> > The original ESRT region is still reserved at this point, so we should
->> > do our best to release it to the page allocator.
->>
->> I'd rather we keep it reserved. That way, the config table entry still
->> points to something valid, which could be useful for kexec(), I think?
->> At least, that is how I intended to handle config tables on ARM ...
->
-> If we're going to reserve it why do we need to copy the data out at
-> all in esrt_sysfs_init()?
+From: Thierry Reding <treding@nvidia.com>
 
-Excellent question. I don't think there is any point to doing that.
+This driver uses PCI glue that is only available on 32-bit ARM. This
+used to work fine as long as ARCH_MVEBU and ARCH_DOVE were exclusively
+32-bit, but that's changed now, with ARCH_MVEBU also being available
+on 64-bit ARM.
+
+Signed-off-by: Thierry Reding <treding@nvidia.com>
+---
+ drivers/pci/host/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+index 75a605426538..d1cdd9c992ac 100644
+--- a/drivers/pci/host/Kconfig
++++ b/drivers/pci/host/Kconfig
+@@ -14,6 +14,7 @@ config PCI_DRA7XX
+ config PCI_MVEBU
+ 	bool "Marvell EBU PCIe controller"
+ 	depends on ARCH_MVEBU || ARCH_DOVE
++	depends on ARM
+ 	depends on OF
+ 
+ config PCIE_DW
+-- 
+2.7.1
