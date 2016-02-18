@@ -1,29 +1,25 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 19 Feb 2016 00:19:18 +0100
-Subject: [PATCH v2 1/5] MIPS: jz4740: remove broken irq_to_gpio() call
-In-Reply-To: <20160216160609.GA15268@linux-mips.org>
+Date: Fri, 19 Feb 2016 00:19:46 +0100
+Subject: [PATCH v2 2/5] gpio: remove broken irq_to_gpio() interface
+In-Reply-To: <1455637261-2920972-2-git-send-email-arnd@arndb.de>
 References: <455637086-2794174-1-git-send-email-arnd@arndb.de>
  <1455637261-2920972-1-git-send-email-arnd@arndb.de>
- <20160216160609.GA15268@linux-mips.org>
-Message-ID: <CACRpkda=TFuUWzV_pLKoVhCZp1zWbEjoGmCey_w87bsuQZZ=jg@mail.gmail.com>
+ <1455637261-2920972-2-git-send-email-arnd@arndb.de>
+Message-ID: <CACRpkdaNA0p95f8i4o0+Abqc-YshvaBhOBAWbi=s1AfFmeHY_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 16, 2016 at 5:06 PM, Ralf Baechle <ralf@linux-mips.org> wrote:
+On Tue, Feb 16, 2016 at 4:40 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
->> -#define IRQ_TO_BIT(irq) BIT(irq_to_gpio(irq) & 0x1f)
->> +#define IRQ_TO_BIT(irq) BIT((irq - JZ4740_IRQ_GPIO(0)) & 0x1f)
->>
->>  static void jz_gpio_check_trigger_both(struct jz_gpio_chip *chip, unsigned int irq)
->>  {
+> gpiolib has removed the irq_to_gpio() API several years ago,
+> but the global header still provided a non-working stub.
 >
-> I've already committed an identical fix locally.
+> To prevent new users of this broken function from showing
+> up, let's remove the stubs as well.
 >
->   Ralf
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-I took that fix out of linux-next and applied to the GPIO tree so I can apply
-the rest of the patches without build problems. If you keep it
-around without changing it, git should cope I guess.
+Patch applied.
 
 Yours,
 Linus Walleij
