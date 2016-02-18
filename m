@@ -1,30 +1,39 @@
-From: matt@codeblueprint.co.uk (Matt Fleming)
-Date: Thu, 18 Feb 2016 10:15:01 +0000
-Subject: [PATCH v5sub3 4/4] arm64: efi: invoke EFI_RNG_PROTOCOL to supply
- KASLR randomness
-In-Reply-To: <1455126905-22688-5-git-send-email-ard.biesheuvel@linaro.org>
-References: <1455126905-22688-1-git-send-email-ard.biesheuvel@linaro.org>
- <1455126905-22688-5-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160218101501.GA2651@codeblueprint.co.uk>
+From: romain.izard.pro@gmail.com (Romain Izard)
+Date: Thu, 18 Feb 2016 11:21:06 +0100
+Subject: [PATCH] ARM: dts: at91: sama5d2 Xplained: Correct the macb irq
+ pinctrl node
+Message-ID: <1455790866-13301-1-git-send-email-romain.izard.pro@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 10 Feb, at 06:55:05PM, Ard Biesheuvel wrote:
-> Since arm64 does not use a decompressor that supplies an execution
-> environment where it is feasible to some extent to provide a source of
-> randomness, the arm64 KASLR kernel depends on the bootloader to supply
-> some random bits in the /chosen/kaslr-seed DT property upon kernel entry.
-> 
-> On UEFI systems, we can use the EFI_RNG_PROTOCOL, if supplied, to obtain
-> some random bits. At the same time, use it to randomize the offset of the
-> kernel Image in physical memory.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/Kconfig                        |  5 ++
->  drivers/firmware/efi/libstub/arm-stub.c   | 40 ++++++----
->  drivers/firmware/efi/libstub/arm64-stub.c | 78 ++++++++++++++------
->  drivers/firmware/efi/libstub/fdt.c        | 14 ++++
->  4 files changed, 102 insertions(+), 35 deletions(-)
+All pinctrl nodes for the Atmel pinctrl controller need to have their
+bias configuration explicitly defined. Otherwise, the pinctrl mapping
+is not valid.
 
-Reviewed-by: Matt Fleming <matt@codeblueprint.co.uk>
+It works for now as the pinctrl driver proceeds even with invalid
+mappings, but this can become an issue, if the pinctrl driver starts
+to require valid mappings. Additionally, the pin is not protected from
+being remapped later by an other driver.
+
+There is an external 1k? pull-up to 3.3V, so no bias is required on
+the Ethernet PHY's interrupt line.
+
+Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
+---
+ arch/arm/boot/dts/at91-sama5d2_xplained.dts | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained.dts b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+index e683856c507c..75341eec2dfd 100644
+--- a/arch/arm/boot/dts/at91-sama5d2_xplained.dts
++++ b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+@@ -308,6 +308,7 @@
+ 
+ 				pinctrl_macb0_phy_irq: macb0_phy_irq {
+ 					pinmux = <PIN_PC9__GPIO>;
++					bias-disable;
+ 				};
+ 
+ 				pinctrl_pdmic_default: pdmic_default {
+-- 
+2.5.0
