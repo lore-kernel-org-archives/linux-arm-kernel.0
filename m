@@ -1,73 +1,62 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Thu, 18 Feb 2016 12:41:40 +0100
-Subject: [PATCH v2 net-next 6/8] net: mvneta: bm: add support for hardware
- buffer management
-In-Reply-To: <20160217.234321.1202099534402079240.davem@davemloft.net>
-References: <1455636823-14470-1-git-send-email-gregory.clement@free-electrons.com>
- <1455636823-14470-7-git-send-email-gregory.clement@free-electrons.com>
- <20160217.234321.1202099534402079240.davem@davemloft.net>
-Message-ID: <CAPv3WKfDo8YV1PksBwhVnL6PLeUomxhWgZzhDMZ7fKX95aSPpw@mail.gmail.com>
+From: aryabinin@virtuozzo.com (Andrey Ryabinin)
+Date: Thu, 18 Feb 2016 14:45:31 +0300
+Subject: KASAN issues with idle / hotplug area
+In-Reply-To: <20160218093938.GB12476@red-moon>
+References: <56BDFC86.5010705@arm.com>
+ <20160212160652.GL31665@e104818-lin.cambridge.arm.com>
+ <56C1E072.2090909@virtuozzo.com>
+ <20160215185957.GB19413@e104818-lin.cambridge.arm.com>
+ <56C31D1D.50708@virtuozzo.com> <20160217143950.GC32647@leverpostej>
+ <20160217170110.GE32647@leverpostej> <20160217175656.GJ32647@leverpostej>
+ <20160217191643.GK32647@leverpostej> <56C57F40.3050500@virtuozzo.com>
+ <20160218093938.GB12476@red-moon>
+Message-ID: <56C5AEDB.1070507@virtuozzo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
 
 
-2016-02-18 5:43 GMT+01:00 David Miller <davem@davemloft.net>:
-> From: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Date: Tue, 16 Feb 2016 16:33:41 +0100
->
->>       pp->dev = dev;
->>       SET_NETDEV_DEV(dev, &pdev->dev);
+On 02/18/2016 12:39 PM, Lorenzo Pieralisi wrote:
+> On Thu, Feb 18, 2016 at 11:22:24AM +0300, Andrey Ryabinin wrote:
+> 
+> [...]
+> 
+>>> I also tried using __attribute__((no_sanitize_address)) directly, in
+>>> case there was some header issue, but that doesn't seem to be the case.
+>>>
+>>> I'm using the Linaro 15.08 AArch64 GCC 5.1. Is anyone else able to
+>>> confirm whether they see the same? Does the same happen for x86?
+>>>
 >>
->> +     dev->features = NETIF_F_SG | NETIF_F_IP_CSUM | NETIF_F_TSO;
->> +     dev->hw_features |= dev->features;
->> +     dev->vlan_features |= dev->features;
->> +     dev->priv_flags |= IFF_UNICAST_FLT;
->> +     dev->gso_max_segs = MVNETA_MAX_TSO_SEGS;
->> +
->> +     err = register_netdev(dev);
->> +     if (err < 0) {
->> +             dev_err(&pdev->dev, "failed to register\n");
->> +             goto err_free_stats;
->> +     }
->> +
->> +     pp->id = dev->ifindex;
->> +
->> +     /* Obtain access to BM resources if enabled and already initialized */
->> +     bm_node = of_parse_phandle(dn, "buffer-manager", 0);
->> +     if (bm_node && bm_node->data) {
->
-> This set of changes has a lot of problems.
->
-> First, the exact moment you call register_netdev() your device must be
-> fully initialized because ->open() can be invoked immediately.  This
-> means you must take care of all of this buffer manager stuff before
-> calling register_netdev().
->
-> It must precisely be the last thing you invoke in your probe function
-> for this reason.
+>> Confirming, this happens on every GCC I have (including x86).
+>> It seems that 'no_sanitize_address' in gcc removes only memory access checks
+>> but it doesn't remove stack redzones.
+>> I think this is wrong, e.g. clang removes instrumentation completely. I'll submit a bug.
+>>
+>> But we need fix this in kernel.
+>> I see two options here:
+>>  * completely disable instrumentation for drivers/firmware/psci.c
+> 
+> We have to have a way to disable instrumentation for functions that
+> are used to call into FW and return via different code paths.
+> 
 
-Ok. I shifted register_netdev in order to obtain port id dynamically
-from netdev's ifindex (needed to control port <-> pool mapping). If
-this order of registration is problematic, I will add an ID property
-to DT.
+Unfortunately gcc doesn't allow us to do this yet.
 
->
-> Also you are now adding conditionalized code to every fastpath in your
-> driver, that is rediculous and is going to hurt performance.
->
-> Add seperate code paths for the HWBM vs SWBM, and register a unique
-> set of netdev_ops as appropriate.
 
-TX is untouched and BM support affects only open, stop and change_mtu
-- whose execution is not problematic in terms of performance. However
-there are a couple new conditions in mvneta_rx(). It can be reduced to
-a single condition check, moved to NAPI callback. I'll try to refactor
-code in a way to avoid code duplication. Please bear in mind I don't
-want to register to different NAPI functions (exactly the same apart
-from one line), as the driver can fall back to SWBM after e.g.
-unsuccessful mtu change.
+>>  * get back to assembly implementation
+> 
+> No, we are certainly not reverting the SMCCC work because Kasan adds
+> instrumentation to C functions, that's not even an option.
+> 
+> Is it possible at all to implement a function to remove instrumentation
+> for a chunk of memory (ie resetting the shadow memory to a clean slate
+> for a range of stack addresses) ?
+> 
 
-Best regards,
-Marcin
+
+Yes, that's possible. We can tell that function resume SP, it can zero out all shadow for stack bellow that SP.
+
+> Thanks,
+> Lorenzo
+> 
