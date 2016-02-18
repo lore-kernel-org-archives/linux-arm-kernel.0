@@ -1,18 +1,20 @@
 From: jay.xu@rock-chips.com (Jianqun Xu)
-Date: Thu, 18 Feb 2016 09:07:04 +0800
+Date: Thu, 18 Feb 2016 09:43:37 +0800
 Subject: [PATCH 6/6] ARM64: dts: rockchip: add core dtsi file for rk3399
-In-Reply-To: <20160217114645.GA32647@leverpostej>
+In-Reply-To: <2396201.CBcovI4jc4@phil>
 References: <1455673992-16469-1-git-send-email-jay.xu@rock-chips.com>
  <1455674476-16655-1-git-send-email-jay.xu@rock-chips.com>
- <20160217114645.GA32647@leverpostej>
-Message-ID: <56C51938.1060806@rock-chips.com>
+ <2396201.CBcovI4jc4@phil>
+Message-ID: <56C521C9.4050906@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark
 
-? 17/02/2016 19:46, Mark Rutland ??:
-> On Wed, Feb 17, 2016 at 10:01:16AM +0800, jianqun.xu wrote:
+
+? 17/02/2016 15:00, Heiko Stuebner ??:
+> Hi Jianqun,
+>
+> Am Mittwoch, 17. Februar 2016, 10:01:16 schrieb jianqun.xu:
 >> From: Xu Jianqun <jay.xu@rock-chips.com>
 >>
 >> Add dtsi file for Rockchip rk3399 SoCs, which includes some
@@ -20,19 +22,17 @@ Hi Mark
 >>
 >> Change-Id: Ie3b824e8ead967d4cb119d73222b7a198478c29c
 >
-> This is meaningless upstream. Please remove any "Change-Id" lines from
-> upstream commit messages.
-ok, next version will remove them. thanks
-
+> please remove any review-cruft like Change-Ids from mainline patches :-)
+ok, will fix it in next version patch
 >
 >> Signed-off-by: Xu Jianqun <jay.xu@rock-chips.com>
 >> ---
->>   arch/arm64/boot/dts/rockchip/rk3399.dtsi | 989 +++++++++++++++++++++++++++++++
->>   1 file changed, 989 insertions(+)
+>>   arch/arm64/boot/dts/rockchip/rk3399.dtsi | 989
+>> +++++++++++++++++++++++++++++++ 1 file changed, 989 insertions(+)
 >>   create mode 100644 arch/arm64/boot/dts/rockchip/rk3399.dtsi
 >>
->> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
->> new file mode 100644
+>> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+>> b/arch/arm64/boot/dts/rockchip/rk3399.dtsi new file mode 100644
 >> index 0000000..eb671f6
 >> --- /dev/null
 >> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
@@ -101,25 +101,89 @@ ok, next version will remove them. thanks
 >> +		compatible = "arm,psci";
 >> +		method = "smc";
 >> +	};
+>> +
+>> +	cpus {
+>> +		#address-cells = <2>;
+>> +		#size-cells = <0>;
+>> +
+>> +		cpu-map {
+>> +			cluster0 {
+>> +				core0 {
+>> +					cpu = <&cpu_l0>;
+>> +				};
+>> +				core1 {
+>> +					cpu = <&cpu_l1>;
+>> +				};
+>> +				core2 {
+>> +					cpu = <&cpu_l2>;
+>> +				};
+>> +				core3 {
+>> +					cpu = <&cpu_l3>;
+>> +				};
+>> +			};
+>> +
+>> +			cluster1 {
+>> +				core0 {
+>> +					cpu = <&cpu_b0>;
+>> +				};
+>> +				core1 {
+>> +					cpu = <&cpu_b1>;
+>> +				};
+>> +			};
+>> +		};
+>> +
+>> +		idle-states {
+>> +			entry-method = "psci";
+>> +
+>> +			cpu_sleep: cpu-sleep-0 {
+>> +				compatible = "arm,idle-state";
+>> +			};
+>> +		};
 >
-> That compatible string alone is insufficient, as it implies no
-> particular function IDs. Hotplug and idle cannot possibly work.
+> why the essentially empty idle-states, which is probably missing properties?
+> In the absence of a real idle driver the kernel will fall back to
+> arch_cpu_idle(), which already does WFI handling even on arm64.
 >
-> Have you tested this DT?
-Yes, but only the simple system now, more function IDs will be added later.
-
+the idle node will be added by my colleague with new patch later,
+so I will remove it first in next version patch.
 >
-> Which PSCI version have you implemented? Are you using a standard
-> firmware (e.g. ARM Trusted Firmware), or some custom implementation?
->
+>> +
 >> +		cpu_l0: cpu at 0 {
 >> +			device_type = "cpu";
 >> +			compatible = "arm,cortex-a53", "arm,armv8";
 >> +			reg = <0x0 0x0>;
 >> +			cpu-idle-states = <&cpu_sleep>;
+>
+> that won't compile, as the referenced node is not present
+>
+>
 >> +			enable-method = "psci";
 >> +		};
->
+>> +
+>> +		cpu_l1: cpu at 1 {
+>> +			device_type = "cpu";
+>> +			compatible = "arm,cortex-a53", "arm,armv8";
+>> +			reg = <0x0 0x1>;
+>> +			cpu-idle-states = <&cpu_sleep>;
+>> +			enable-method = "psci";
+>> +		};
+>> +
+>> +		cpu_l2: cpu at 2 {
+>> +			device_type = "cpu";
+>> +			compatible = "arm,cortex-a53", "arm,armv8";
+>> +			reg = <0x0 0x2>;
+>> +			cpu-idle-states = <&cpu_sleep>;
+>> +			enable-method = "psci";
+>> +		};
+>> +
+>> +		cpu_l3: cpu at 3 {
+>> +			device_type = "cpu";
+>> +			compatible = "arm,cortex-a53", "arm,armv8";
+>> +			reg = <0x0 0x3>;
+>> +			cpu-idle-states = <&cpu_sleep>;
+>> +			enable-method = "psci";
+>> +		};
+>> +
 >> +		cpu_b0: cpu at 100 {
 >> +			device_type = "cpu";
 >> +			compatible = "arm,cortex-a72", "arm,armv8";
@@ -128,7 +192,15 @@ Yes, but only the simple system now, more function IDs will be added later.
 >> +			enable-method = "psci";
 >> +		};
 >> +
->
+>> +		cpu_b1: cpu at 101 {
+>> +			device_type = "cpu";
+>> +			compatible = "arm,cortex-a72", "arm,armv8";
+>> +			reg = <0x0 0x101>;
+>> +			cpu-idle-states = <&cpu_sleep>;
+>> +			enable-method = "psci";
+>> +		};
+>> +	};
+>> +
 >> +	pmu {
 >> +		compatible = "arm,armv8-pmuv3";
 >> +		interrupts = <GIC_PPI 7 IRQ_TYPE_LEVEL_LOW>;
@@ -136,24 +208,16 @@ Yes, but only the simple system now, more function IDs will be added later.
 >> +				     <&cpu_l3>, <&cpu_b0>, <&cpu_b1>;
 >> +	};
 >> +
->
-> This isn't quite right. We should have separate nodes for the A72 and
-> A53 PMUs.
->
-> We can't describe that just yet due to needing cluster-local PPIs. I
-> believe Will was looking into that.
->
-> In the mean time, please drop the PMU node.
-
-ok, next version will drop the pmu node first, someone will add them in 
-another patch.
-
->
 >> +	timer {
 >> +		compatible = "arm,armv8-timer";
 >> +		interrupts =
 >> +			<GIC_PPI 13
 >> +			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
+>
+> shouldn't that be GIC_CPU_MASK_SIMPLE(6) instead of 4?
+>
+ok, will fix it in next version patch
+>
 >> +			<GIC_PPI 14
 >> +			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
 >> +			<GIC_PPI 11
@@ -162,15 +226,66 @@ another patch.
 >> +			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
 >> +		clock-frequency = <24000000>;
 >> +	};
+>> +
+>> +	xin24m: xin24m {
+>> +		compatible = "fixed-clock";
+>> +		#clock-cells = <0>;
+>> +		clock-frequency = <24000000>;
+>> +		clock-output-names = "xin24m";
+>> +	};
+>> +
+>> +	gic: interrupt-controller at fee00000 {
+>> +		compatible = "arm,gic-v3";
+>> +		#interrupt-cells = <3>;
+>> +		#address-cells = <2>;
+>> +		#size-cells = <2>;
+>> +		ranges;
+>> +		interrupt-controller;
+>> +
+>> +		reg = <0x0 0xfee00000 0 0x10000>, /* GICD */
+>> +		      <0x0 0xfef00000 0 0xc0000>, /* GICR */
+>> +		      <0x0 0xfff00000 0 0x10000>, /* GICC */
+>> +		      <0x0 0xfff10000 0 0x10000>, /* GICH */
+>> +		      <0x0 0xfff20000 0 0x10000>; /* GICV */
+>> +		interrupts =
+>> +			<GIC_PPI 9
+>> +			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
 >
-> Please fix your firmware to program CNTFRQ. Using clock-frequency is
-> really not sufficient, and new platforms have no excuse for not having
-> it programmed correctly.
-ok, I will fix it. thanks
-
+> again GIC_CPU_MASK_SIMPLE(6)?
+ok.
 >
-> Thanks,
-> Mark.
+>> +		its: interrupt-controller at fee20000 {
+>> +			compatible = "arm,gic-v3-its";
+>> +			msi-controller;
+>> +			reg = <0x0 0xfee20000 0x0 0x20000>;
+>> +		};
+>> +	};
+>> +
+>> +	amba {
+>> +		compatible = "arm,amba-bus";
+>> +		#address-cells = <2>;
+>> +		#size-cells = <2>;
+>> +		ranges;
+>> +
+>> +		dmac_bus: dma-controller at ff6d0000 {
+>> +			compatible = "arm,pl330", "arm,primecell";
+>> +			reg = <0x0 0xff6d0000 0x0 0x4000>;
+>> +			interrupts = <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>,
+>> +				     <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
+>> +			#dma-cells = <1>;
+>> +			clocks = <&cru ACLK_DMAC_BUS>;
+>> +			clock-names = "apb_pclk";
+>
+> has the FLUSHP bug gotten fixed? That would be cool.
+>
+Since amba node is added by my colleague, I will double check it, thanks
+>
+>> +		};
+>
+> rest looks nice on first glance :-)
+>
+>
+> Heiko
 >
 >
 >
