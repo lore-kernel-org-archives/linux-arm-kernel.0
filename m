@@ -1,74 +1,38 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 18 Feb 2016 09:08:52 -0600
-Subject: [PATCH] PCI: imx6:don't sleep in atomic context
-In-Reply-To: <FDC088D3B5555644AE135ED28A7ABDE986504C90@EU-MBX-04.mgc.mentorg.com>
-References: <1447066080-5859-1-git-send-email-sanjeev_sharma@mentor.com>
- <20160106220430.GC16231@localhost>
- <FDC088D3B5555644AE135ED28A7ABDE986504C90@EU-MBX-04.mgc.mentorg.com>
-Message-ID: <20160218150852.GA17588@localhost>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 18 Feb 2016 23:04:35 +0800
+Subject: [PATCH] ARM: dts: vf-colibri: disable write-protection for SD-card
+In-Reply-To: <1455752656-4040-1-git-send-email-stefan@agner.ch>
+References: <1455752656-4040-1-git-send-email-stefan@agner.ch>
+Message-ID: <20160218150434.GD6756@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 18, 2016 at 07:17:41AM +0000, Sharma, Sanjeev wrote:
-> -----Original Message-----
-> From: Bjorn Helgaas [mailto:helgaas at kernel.org] 
-> Sent: Thursday, January 07, 2016 3:35 AM
-> To: Sharma, Sanjeev
-> Cc: Richard.Zhu at freescale.com; l.stach at pengutronix.de; bhelgaas at google.com; linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; David Mueller
-> Subject: Re: [PATCH] PCI: imx6:don't sleep in atomic context
+On Wed, Feb 17, 2016 at 03:44:16PM -0800, Stefan Agner wrote:
+> The Colibri standard does not define a pin for SD-Card write-
+> protection. Use the disable-wp property to indicate that there
+> is no physical WP line present.
 > 
-> Hi Sanjeev,
-> 
-> On Mon, Nov 09, 2015 at 04:18:00PM +0530, Sanjeev Sharma wrote:
-> > If additional PCIe switch get connected between the host and the 
-> > NIC,the kernel crashes with "BUG:
-> > scheduling while atomic". To handle this we need to call mdelay() 
-> > instead of usleep_range().
-> > 
-> > For more detail please refer bugzilla.kernel.org, Bug
-> > 100031
-> > 
-> > Signed-off-by: Sanjeev Sharma <sanjeev_sharma@mentor.com>
-> > Signed-off-by: David Mueller <dave.mueller@gmx.ch>
-> 
-> I'm dropping this for now because we've been kicking around the same solution (with tweaks to the mdelay amount) since June, but no progress on the *real* issue, which is that imx6_pcie_link_up() should never wait; it should simply return the link status.
-> 
-> I'm pretty sure the amount of time I've spent looking into this would have been enough to make some progress on that underlying issue.
-> 
-> Bjorn
-> 
-> Ok ! please share the change you are planning to implement. 
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
 
-I didn't mean I personally was going to do this.  But I think Lucas
-stepped up and did it:
+Applied, thanks.
 
-https://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/commit/?h=pci/host-imx6&id=4d107d3b5a686b5834e533a00b73bf7b1cf59df7
-
-> > ---
-> >  drivers/pci/host/pci-imx6.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c 
-> > index 233a196..9769b13 100644
-> > --- a/drivers/pci/host/pci-imx6.c
-> > +++ b/drivers/pci/host/pci-imx6.c
-> > @@ -499,7 +499,7 @@ static int imx6_pcie_link_up(struct pcie_port *pp)
-> >  		 * Wait a little bit, then re-check if the link finished
-> >  		 * the training.
-> >  		 */
-> > -		usleep_range(1000, 2000);
-> > +		mdelay(1000);
-> >  	}
-> >  	/*
-> >  	 * From L0, initiate MAC entry to gen2 if EP/RC supports gen2.
-> > --
-> > 1.7.11.7
-> > 
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-pci" 
-> > in the body of a message to majordomo at vger.kernel.org More majordomo 
-> > info at  http://vger.kernel.org/majordomo-info.html
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> ---
+>  arch/arm/boot/dts/vf-colibri.dtsi | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/boot/dts/vf-colibri.dtsi b/arch/arm/boot/dts/vf-colibri.dtsi
+> index ff6f58e..e49bbbc 100644
+> --- a/arch/arm/boot/dts/vf-colibri.dtsi
+> +++ b/arch/arm/boot/dts/vf-colibri.dtsi
+> @@ -92,6 +92,7 @@
+>  	pinctrl-0 = <&pinctrl_esdhc1>;
+>  	bus-width = <4>;
+>  	cd-gpios = <&gpio1 10 GPIO_ACTIVE_LOW>;
+> +	disable-wp;
+>  };
+>  
+>  &fec1 {
+> -- 
+> 2.7.1
+> 
+> 
