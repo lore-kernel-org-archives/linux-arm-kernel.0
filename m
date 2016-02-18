@@ -1,70 +1,31 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 18 Feb 2016 15:12:56 +0100
-Subject: [PATCH v2 09/13] iommu: exynos: add support for SYSMMU controller with
- bogus version reg
-In-Reply-To: <1455804780-9616-1-git-send-email-m.szyprowski@samsung.com>
-References: <1455804780-9616-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1455804780-9616-10-git-send-email-m.szyprowski@samsung.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 18 Feb 2016 22:14:26 +0800
+Subject: [PATCH] clk: imx: correct pwm7 clock name in driver for i.MX6UL
+In-Reply-To: <20160217195725.2278.96780@quark.deferred.io>
+References: <1455734900-1913-1-git-send-email-agust@denx.de>
+ <CAOMZO5Cwed8uOKz6=Odu=jaaBqoNzUxm2Xv3+6TAxKGsa27Mdw@mail.gmail.com>
+ <20160217195725.2278.96780@quark.deferred.io>
+Message-ID: <20160218141426.GZ6756@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SYSMMU on some SoCs reports bogus values in VERSION register. Force
-hardware version to 1.0 for such controllers. This patch also moves reading
-version register to driver's probe() function.
+On Wed, Feb 17, 2016 at 11:57:25AM -0800, Michael Turquette wrote:
+> Quoting Fabio Estevam (2016-02-17 10:58:13)
+> > On Wed, Feb 17, 2016 at 4:48 PM, Anatolij Gustschin <agust@denx.de> wrote:
+> > > Don't capitalize p in the pwm7 clock name.
+> > >
+> > > Signed-off-by: Anatolij Gustschin <agust@denx.de>
+> > 
+> > Thanks.
+> > 
+> > Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+> 
+> Should I apply this to clk-next or is someone (Shawn?) gathering patches
+> for a pull request?
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
- drivers/iommu/exynos-iommu.c | 24 +++++++++++++++++++++++-
- 1 file changed, 23 insertions(+), 1 deletion(-)
+Yes, I'm collecting i.MX clock patches for a pull request that will go
+to you later.
 
-diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index e42a76cc9674..8e289e2a05fb 100644
---- a/drivers/iommu/exynos-iommu.c
-+++ b/drivers/iommu/exynos-iommu.c
-@@ -284,6 +284,28 @@ static void __sysmmu_set_ptbase(struct sysmmu_drvdata *data, phys_addr_t pgd)
- 	__sysmmu_tlb_invalidate(data);
- }
- 
-+static void __sysmmu_get_version(struct sysmmu_drvdata *data)
-+{
-+	u32 ver;
-+
-+	clk_enable(data->clk_master);
-+	clk_enable(data->clk);
-+
-+	ver = __raw_readl(data->sfrbase + REG_MMU_VERSION);
-+
-+	/* controllers on some SoCs don't report proper version */
-+	if (ver == 0x80000001u)
-+		data->version = MAKE_MMU_VER(1, 0);
-+	else
-+		data->version = MMU_RAW_VER(ver);
-+
-+	dev_dbg(data->sysmmu, "hardware version: %d.%d\n",
-+		MMU_MAJ_VER(data->version), MMU_MIN_VER(data->version));
-+
-+	clk_disable(data->clk);
-+	clk_disable(data->clk_master);
-+}
-+
- static void show_fault_information(struct sysmmu_drvdata *data,
- 				   const struct sysmmu_fault_info *finfo,
- 				   sysmmu_iova_t fault_addr)
-@@ -385,7 +407,6 @@ static void __sysmmu_init_config(struct sysmmu_drvdata *data)
- {
- 	unsigned int cfg;
- 
--	data->version = MMU_RAW_VER(__raw_readl(data->sfrbase + REG_MMU_VERSION));
- 	if (data->version <= MAKE_MMU_VER(3, 1))
- 		cfg = CFG_LRU | CFG_QOS(15);
- 	else if (data->version <= MAKE_MMU_VER(3, 2))
-@@ -551,6 +572,7 @@ static int __init exynos_sysmmu_probe(struct platform_device *pdev)
- 
- 	platform_set_drvdata(pdev, data);
- 
-+	__sysmmu_get_version(data);
- 	pm_runtime_enable(dev);
- 
- 	return 0;
--- 
-1.9.2
+Patch applied, thanks.
+
+Shawn
