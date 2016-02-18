@@ -1,54 +1,73 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 18 Feb 2016 10:59:19 +0100
-Subject: [RFC 3/3] ARM: dts: Don't overheat the Odroid XU3-Lite on high
- load
-In-Reply-To: <56C54B9B.7030105@samsung.com>
-References: <1455692128-28504-1-git-send-email-k.kozlowski@samsung.com>
- <1455692128-28504-4-git-send-email-k.kozlowski@samsung.com>
- <CANAwSgQHiJGSYB7Qhq066Mqfskwrr_3SDQGXH-WN=Wt3SEF-QA@mail.gmail.com>
- <56C522A9.8070800@samsung.com> <20160218023622.GA2610@vireshk-i7>
- <56C54B9B.7030105@samsung.com>
-Message-ID: <56C595F7.1080406@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 18 Feb 2016 11:01:20 +0100
+Subject: [PATCH v2] ARM: move __kuser_cmpxchg{32,64} into .kprobes.text
+Message-ID: <1455789689-2839463-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+When kprobes is used, most of the entry-armv.S file is put into the .kprobes.text
+section rather than .text, but the kuser_cmpxchg64_fixup and kuser_cmpxchg32_fixup
+code is not, which can lead to a link error when extremely large kernels get
+built (typically for randconfig):
 
-On 2016-02-18 05:42, Krzysztof Kozlowski wrote:
-> On 18.02.2016 11:36, Viresh Kumar wrote:
->>> BTW, I found the issue. The order of trip points in DT:
->>> thermal_zone0/trip_point_0_hyst:5000
->>> thermal_zone0/trip_point_0_temp:50000
->>> thermal_zone0/trip_point_0_type:active
->>> thermal_zone0/trip_point_1_hyst:5000
->>> thermal_zone0/trip_point_1_temp:60000
->>> thermal_zone0/trip_point_1_type:active
->>> thermal_zone0/trip_point_2_hyst:5000
->>> thermal_zone0/trip_point_2_temp:70000
->>> thermal_zone0/trip_point_2_type:active
->>> thermal_zone0/trip_point_3_hyst:0
->>> thermal_zone0/trip_point_3_temp:120000	<---- this should be last one!
->>> thermal_zone0/trip_point_3_type:critical
->>> thermal_zone0/trip_point_4_hyst:5000
->>> thermal_zone0/trip_point_4_temp:90000
->>> thermal_zone0/trip_point_4_type:passive
->>> thermal_zone0/trip_point_5_hyst:5000
->>> thermal_zone0/trip_point_5_temp:110000
->>> thermal_zone0/trip_point_5_type:passive
->>>
->>> After fixing the order in DT, the cpu cooler starts working.
->> Ahh, nice.
-> Damn, not entirely. I almost fried my Odroid (it survived 130 degrees of
-> C)... The TMU supports only 4 trip points, so when I added two new trip
-> points and reordered them... the last two (including critical) was not
-> receiving interrupts.
->
-> Polling mode is needed. I'll sent some patches soon...
+arch/arm/kernel/built-in.o: In function `__dabt_usr':
+:(.kprobes.text+0x47c): relocation truncated to fit: R_ARM_JUMP24 against `.text'
+arch/arm/kernel/built-in.o: In function `__irq_usr':
+:(.kprobes.text+0x4e4): relocation truncated to fit: R_ARM_JUMP24 against `.text'
+arch/arm/kernel/built-in.o: In function `__fiq_usr':
+:(.kprobes.text+0x740): relocation truncated to fit: R_ARM_JUMP24 against `.text'
 
-Instead of polling the driver should simply use some dynamic window for
-the nearest temperature ranges and reconfigure it when interrupt of occurs.
+This moves the two remaining functions into the same section as the rest
+using a new macro suggested by Nicolas Pitre, which avoids the link error.
 
-Best regards
+The current behavior has existed for many years and has not caused problems in
+practice except for extreme randconfig builds, so the patch should not need to
+get backported.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: b49c0f24cf67 ("[ARM] 4659/1: remove possibilities for spurious false negative with __kuser_cmpxchg")
+Fixes: 785d3cd286f0 ("ARM kprobes: prevent some functions involved with kprobes from being probed")
+Acked-by: Nicolas Pitre <nico@linaro.org>
+---
+ arch/arm/kernel/entry-armv.S | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+index e2550500486d..3bc1a196cb53 100644
+--- a/arch/arm/kernel/entry-armv.S
++++ b/arch/arm/kernel/entry-armv.S
+@@ -83,11 +83,12 @@
+ 	.endm
+ 
+ #ifdef CONFIG_KPROBES
+-	.section	.kprobes.text,"ax",%progbits
++#define KPROBE_TEXT	.section .kprobes.text,"ax",%progbits
+ #else
+-	.text
++#define KPROBE_TEXT	.text
+ #endif
+ 
++	KPROBE_TEXT
+ /*
+  * Invalid mode handlers
+  */
+@@ -895,7 +896,7 @@ __kuser_cmpxchg64:				@ 0xffff0f60
+ 	rsbs	r0, r3, #0			@ set return val and C flag
+ 	ldmfd	sp!, {r4, r5, r6, pc}
+ 
+-	.text
++	KPROBE_TEXT
+ kuser_cmpxchg64_fixup:
+ 	@ Called from kuser_cmpxchg_fixup.
+ 	@ r4 = address of interrupted insn (must be preserved).
+@@ -953,7 +954,7 @@ __kuser_cmpxchg:				@ 0xffff0fc0
+ 	rsbs	r0, r3, #0			@ set return val and C flag
+ 	usr_ret	lr
+ 
+-	.text
++	KPROBE_TEXT
+ kuser_cmpxchg32_fixup:
+ 	@ Called from kuser_cmpxchg_check macro.
+ 	@ r4 = address of interrupted insn (must be preserved).
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+2.7.0
