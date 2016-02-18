@@ -1,60 +1,70 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 17 Feb 2016 17:51:43 -0700
-Subject: [PATCH 01/21] coresight: "DEVICE_ATTR_RO" should defined as static.
-In-Reply-To: <1455756723-8456-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1455756723-8456-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1455756723-8456-2-git-send-email-mathieu.poirier@linaro.org>
+Date: Wed, 17 Feb 2016 17:51:42 -0700
+Subject: [PATCH 00/21] coresight: next v4.5-rc4
+Message-ID: <1455756723-8456-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Long <eric.long@linaro.org>
+Good evening Greg,
 
-"DEVICE_ATTR_RO(name)" should be defined as static. And
-there is an unnecessary space at the front of the code.
+Here are more enhancement that I would like to see going in the 4.6 cycle.
+Everything will apply cleanly on your 'char-misc-next' branch.  
 
-The sparse tool output logs as the following:
-coresight-etm4x.c:2224:1: warning: symbol 'dev_attr_trcoslsr' was
-not declared. Should it be static?
-coresight-etm4x.c:2225:1: warning: symbol 'dev_attr_trcpdcr' was
-not declared. Should it be static?
-coresight-etm4x.c:2226:1: warning: symbol 'dev_attr_trcpdsr' was
-not declared. Should it be static?
-And the smatch tool output logs as the following:
-of_coresight.c:89 of_coresight_alloc_memory() warn:
-inconsistent indenting
+Thanks,
+Mathieu
 
-Signed-off-by: Eric Long <eric.long@linaro.org>
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
----
- drivers/hwtracing/coresight/coresight-etm4x.c | 2 +-
- drivers/hwtracing/coresight/of_coresight.c    | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+Eric Long (2):
+  coresight: "DEVICE_ATTR_RO" should defined as static.
+  coresight: etm4x: Check every parameter used by dma_xx_coherent.
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-index b6ae9cb6ff57..d6a92c6d3a66 100644
---- a/drivers/hwtracing/coresight/coresight-etm4x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-@@ -2227,7 +2227,7 @@ static ssize_t name##_show(struct device *_dev,				\
- 	return scnprintf(buf, PAGE_SIZE, "0x%x\n",			\
- 			 readl_relaxed(drvdata->base + offset));	\
- }									\
--DEVICE_ATTR_RO(name)
-+static DEVICE_ATTR_RO(name)
- 
- coresight_simple_func(trcoslsr, TRCOSLSR);
- coresight_simple_func(trcpdcr, TRCPDCR);
-diff --git a/drivers/hwtracing/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
-index b0973617826f..3cc57c1e3b5d 100644
---- a/drivers/hwtracing/coresight/of_coresight.c
-+++ b/drivers/hwtracing/coresight/of_coresight.c
-@@ -86,7 +86,7 @@ static int of_coresight_alloc_memory(struct device *dev,
- 		return -ENOMEM;
- 
- 	/* Children connected to this component via @outports */
--	 pdata->child_names = devm_kzalloc(dev, pdata->nr_outport *
-+	pdata->child_names = devm_kzalloc(dev, pdata->nr_outport *
- 					  sizeof(*pdata->child_names),
- 					  GFP_KERNEL);
- 	if (!pdata->child_names)
+Mathieu Poirier (18):
+  coresight: associating path with session rather than tracer
+  coresight: add API to get sink from path
+  coresight: moving PM runtime operations to core framework
+  coresight: etm3x: moving etm_readl/writel to header file
+  coresight: etm3x: moving sysFS entries to dedicated file
+  coresight: etm3x: unlocking tracers in default arch init
+  coresight: etm3x: splitting struct etm_drvdata
+  coresight: etm3x: adding operation mode for etm_enable()
+  coresight: etm3x: set progbit to stop trace collection
+  coresight: etm3x: changing default trace configuration
+  coresight: etm3x: consolidating initial config
+  coresight: etm3x: implementing user/kernel mode tracing
+  coresight: etm3x: implementing perf_enable/disable() API
+  coresight: etb10: moving to local atomic operations
+  coresight: etb10: adding operation mode for sink->enable()
+  coresight: etb10: implementing AUX API
+  coresight: etm-perf: new PMU driver for ETM tracers
+  coresight: introducing a global trace ID function
+
+Paul Gortmaker (1):
+  drivers/hwtracing: make coresight-* explicitly non-modular
+
+ drivers/hwtracing/coresight/Kconfig                |    1 +
+ drivers/hwtracing/coresight/Makefile               |    4 +-
+ drivers/hwtracing/coresight/coresight-etb10.c      |  282 +++-
+ drivers/hwtracing/coresight/coresight-etm-perf.c   |  393 +++++
+ drivers/hwtracing/coresight/coresight-etm-perf.h   |   32 +
+ drivers/hwtracing/coresight/coresight-etm.h        |  142 +-
+ .../hwtracing/coresight/coresight-etm3x-sysfs.c    | 1272 +++++++++++++++
+ drivers/hwtracing/coresight/coresight-etm3x.c      | 1724 ++++----------------
+ drivers/hwtracing/coresight/coresight-etm4x.c      |   16 +-
+ drivers/hwtracing/coresight/coresight-funnel.c     |   11 +-
+ drivers/hwtracing/coresight/coresight-priv.h       |   15 +
+ .../coresight/coresight-replicator-qcom.c          |    8 +-
+ drivers/hwtracing/coresight/coresight-replicator.c |    9 +-
+ drivers/hwtracing/coresight/coresight-tmc.c        |   20 +-
+ drivers/hwtracing/coresight/coresight-tpiu.c       |   13 +-
+ drivers/hwtracing/coresight/coresight.c            |  329 ++--
+ drivers/hwtracing/coresight/of_coresight.c         |    3 +-
+ include/linux/amba/bus.h                           |    9 +
+ include/linux/coresight-pmu.h                      |   39 +
+ include/linux/coresight.h                          |   31 +-
+ 20 files changed, 2740 insertions(+), 1613 deletions(-)
+ create mode 100644 drivers/hwtracing/coresight/coresight-etm-perf.c
+ create mode 100644 drivers/hwtracing/coresight/coresight-etm-perf.h
+ create mode 100644 drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
+ create mode 100644 include/linux/coresight-pmu.h
+
 -- 
 2.1.4
