@@ -1,65 +1,42 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 18 Feb 2016 08:38:26 -0600
-Subject: [PATCH/RFC v2 01/11] PM / Domains: Add DT bindings for the R-Car
- System Controller
-In-Reply-To: <1455571020-18968-2-git-send-email-geert+renesas@glider.be>
-References: <1455571020-18968-1-git-send-email-geert+renesas@glider.be>
- <1455571020-18968-2-git-send-email-geert+renesas@glider.be>
-Message-ID: <20160218143826.GB9654@rob-hp-laptop>
+From: matt@codeblueprint.co.uk (Matt Fleming)
+Date: Thu, 18 Feb 2016 14:38:25 +0000
+Subject: [PATCH v2 1/2] efi: esrt: use memremap not ioremap to access
+ ESRT table in memory
+In-Reply-To: <CAKv+Gu8RP21vw1Ht7UtkHsen2GMUNx8DikH-hLaezV+uZvWO-g@mail.gmail.com>
+References: <1455535953-5056-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1455535953-5056-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20160218104407.GC2651@codeblueprint.co.uk>
+ <CAKv+Gu_AW7PKJJOd2mbEu3LKJe+gNaPHnH=sgO=YXM_KWFyKxw@mail.gmail.com>
+ <20160218132824.GE2651@codeblueprint.co.uk>
+ <CAKv+Gu-s1pzYBzuDG-Z7s3gyo8dPOfeidZQ+rim-uAWZCBcKQQ@mail.gmail.com>
+ <20160218134324.GG2651@codeblueprint.co.uk>
+ <CAKv+Gu875r9RkDC723kNsG4XC0eSE9RPPmSFZrD0sx0QxS+V4g@mail.gmail.com>
+ <20160218141544.GH2651@codeblueprint.co.uk>
+ <CAKv+Gu8RP21vw1Ht7UtkHsen2GMUNx8DikH-hLaezV+uZvWO-g@mail.gmail.com>
+Message-ID: <20160218143825.GI2651@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 15, 2016 at 10:16:50PM +0100, Geert Uytterhoeven wrote:
-> The Renesas R-Car System Controller provides power management for the
-> CPU cores and various coprocessors, following the generic PM domain
-> bindings in Documentation/devicetree/bindings/power/power_domain.txt.
+On Thu, 18 Feb, at 03:21:25PM, Ard Biesheuvel wrote:
 > 
-> This supports R-Car Gen1, Gen2, and Gen3.
+> We treat all Boot Services regions like Loader Code/Data or free
+> regions: it is all recorded in memblock as usable memory, and only the
+> regions that are explicitly reserved are protected from further
+> general use.
 > 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
-> Alternatives I considered:
-> 
->   - Using a single node per power register block, even if it contains
->     multiple domains, e.g.:
-> 
-> 	    pd_ca15_scu: ca15_scu at 180 {
-> 		    reg = <0x180 0x20>;
-> 		    #address-cells = <1>;
-> 		    #size-cells = <0>;
-> 		    #power-domain-cells = <0>;
-> 		    renesas,interrupt-bits = <12>;
-> 
-> 		    pd_ca15_cpu: ca15_cpu at 40 {
-> 			    reg = <0x40 0x20>;
-> 			    #power-domain-cells = <1>;
-> 			    renesas,pm-domain-indices = <0 1>;
-> 			    renesas,pm-domain-names =
-> 				    "ca15_cpu0", "ca15_cpu1";
-> 			    renesas,interrupt-bits = <0 1>;
-> 		    };
-> 	    };
-> 
->     Notes:
->       - You cannot just have a property with the number of domains, as
-> 	index 0 is not used on R-Car H1. Hence the need for
-> 	"renesas,pm-domain-indices" and "renesas,interrupt-bits",
->       - "#power-domain-cells = <1>" for nodes with multiple domains,
-> 	which allows typos in "power-domains = <&pd_ca15_cpu n>", using
-> 	an invalid value of "n".
-> 
->   - Using a linear description in DT:
->       - Needs parent links for subdomains,
->       - More complicated to parse (lesson learned from R-Mobile PM
-> 	Domain support).
-> 
->   - Keeping the power register block offset and the bit number as separate
->     "reg" cells, increasing "#address-cells" from 2 to 3,
-> 
->   - Merging the interrupt bit (which needs only 5 bits) in the other "reg"
->     cell, decreasing "#address-cells" from 2 to 1.
+> I am currently looking into the memory attribute table, and the use
+> case is very similar. It would be very useful from our pov to simply
+> memblock_reserve() the region right after having called
+> efi_config_parse_tables(), and actually consume its data when we get
+> around to it later. The ESRT handling is already split down the middle
+> in the same way.
 
-I think I'd move to not encoding mulitple things into reg. This seems 
-like a bit of abuse of reg. Otherwise, I don't have much to comment on.
+Agreed, this would also be useful in general for kexec. I've got a
+couple of patches in flight that try to handle the BGRT case in a
+different way,
 
-Rob
+  https://lkml.kernel.org/r/1455723910-16710-2-git-send-email-matt at codeblueprint.co.uk
+  https://lkml.kernel.org/r/1455723910-16710-3-git-send-email-matt at codeblueprint.co.uk
+
+Let me instead take a look at how we might be able to preserve only
+those Boot Services regions we care out.
