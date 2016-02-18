@@ -1,30 +1,42 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 18 Feb 2016 08:35:43 -0600
-Subject: [PATCH v2 2/8] drivers: pinctrl: add driver for Allwinner A64 SoC
-In-Reply-To: <1455709440-8668-3-git-send-email-andre.przywara@arm.com>
-References: <1455709440-8668-1-git-send-email-andre.przywara@arm.com>
- <1455709440-8668-3-git-send-email-andre.przywara@arm.com>
-Message-ID: <20160218143543.GC9654@rob-hp-laptop>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 18 Feb 2016 15:34:30 +0100
+Subject: [PATCH] PCI: mvebu: Restrict build to 32-bit ARM
+In-Reply-To: <5051836.EUN3ennYNm@wuerfel> (Arnd Bergmann's message of "Thu, 18
+ Feb 2016 15:06:23 +0100")
+References: <1455802330-17565-1-git-send-email-thierry.reding@gmail.com>
+ <5051836.EUN3ennYNm@wuerfel>
+Message-ID: <87egcaqe89.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 17, 2016 at 11:43:54AM +0000, Andre Przywara wrote:
-> Based on the Allwinner A64 user manual and on the previous sunxi
-> pinctrl drivers this introduces the pin multiplex assignments for
-> the ARMv8 Allwinner A64 SoC.
-> Port A is apparently used for the fixed function DRAM controller, so
-> the ports start at B here (the manual mentions "n from 1 to 7", so
-> not starting at 0).
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   |   1 +
+Hi Arnd,
+ 
+ On jeu., f?vr. 18 2016, Arnd Bergmann <arnd@arndb.de> wrote:
 
-Acked-by: Rob Herring <robh@kernel.org>
+> On Thursday 18 February 2016 14:32:10 Thierry Reding wrote:
+>> From: Thierry Reding <treding@nvidia.com>
+>> 
+>> This driver uses PCI glue that is only available on 32-bit ARM. This
+>> used to work fine as long as ARCH_MVEBU and ARCH_DOVE were exclusively
+>> 32-bit, but that's changed now, with ARCH_MVEBU also being available
+>> on 64-bit ARM.
+>> 
+>> Signed-off-by: Thierry Reding <treding@nvidia.com>
+>
+> Looks fine as a temporary workaround, but I think what we really want to
+> do here is to remove the dependency, as the new ARM64 platforms are going
+> to need this driver anyway.
 
->  arch/arm64/Kconfig.platforms                       |   1 +
->  drivers/pinctrl/sunxi/Kconfig                      |   4 +
->  drivers/pinctrl/sunxi/Makefile                     |   1 +
->  drivers/pinctrl/sunxi/pinctrl-sun50i-a64.c         | 606 +++++++++++++++++++++
->  5 files changed, 613 insertions(+)
->  create mode 100644 drivers/pinctrl/sunxi/pinctrl-sun50i-a64.c
+Actually the mvebu ARM64 platform we know about (Armada 3700, 7K and
+8K), won't use the same controller. A7K/A8K will use a synopsis IP and
+Armada 3700 a new Marvell IP.
+
+So for me depending on ARM32 is enough.
+
+Gregory
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
