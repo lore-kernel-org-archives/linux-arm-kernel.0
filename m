@@ -1,193 +1,79 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 18 Feb 2016 11:09:17 +0000
-Subject: [RFC v3 05/15] iommu/arm-smmu: implement
- alloc/free_reserved_iova_domain
-In-Reply-To: <1455264797-2334-6-git-send-email-eric.auger@linaro.org>
-References: <1455264797-2334-1-git-send-email-eric.auger@linaro.org>
- <1455264797-2334-6-git-send-email-eric.auger@linaro.org>
-Message-ID: <56C5A65D.5010401@arm.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Thu, 18 Feb 2016 11:13:06 +0000
+Subject: [PATCH v3 09/10] ARM: dts: introduce MPS2 AN385/AN386
+In-Reply-To: <7245560.jfhuhtPsB8@wuerfel>
+References: <1455617295-23736-1-git-send-email-vladimir.murzin@arm.com>
+ <7272921.u1gphgWzUn@wuerfel> <56C598D9.3030001@arm.com>
+ <7245560.jfhuhtPsB8@wuerfel>
+Message-ID: <56C5A742.8010304@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+On 18/02/16 10:45, Arnd Bergmann wrote:
+> On Thursday 18 February 2016 10:11:37 Vladimir Murzin wrote:
+>>
+>> Right, I thought in a wrong way, in opposite it makes more sense now.
+>>
+>> .dtsi
+>>
+>> /* below the soc/ */
+>> smb {
+>>         compatible = "simple-bus";
+>>         #address-cells = <2>;
+>>         #size-cells = <1>;
+>>         ranges = <0 0 0x40200000 0x10000>,
+>>                  <1 0 0xa0000000 0x10000>;
+>> };
+> 
+> That looks good, yes.
+> 
+> Is 0x10000 the correct maximum addressable size of the external bus
+> in both cases?
+> 
+> Intuitively, I would guess that the 0xa0000000 range might
+> be much wider.
 
-On 12/02/16 08:13, Eric Auger wrote:
-> Implement alloc/free_reserved_iova_domain for arm-smmu. we use
-> the iova allocator (iova.c). The iova_domain is attached to the
-> arm_smmu_domain struct. A mutex is introduced to protect it.
+There is only Ethernet connected to this bus (apart from PSRAM), so it
+might be wider, but there is no indication of this in documentation.
 
-The IOMMU API currently leaves IOVA management entirely up to the caller 
-- VFIO is already managing its own IOVA space, so what warrants this 
-being pushed all the way down to the IOMMU driver? All I see here is 
-abstract code with no hardware-specific details that'll have to be 
-copy-pasted into other IOMMU drivers (e.g. SMMUv3), which strongly 
-suggests it's the wrong place to do it.
+> 
+>> .dts
+>>
+>> smb {
+>>         ethernet at 0,0 {
+>>                 compatible = "smsc,lan9220", "smsc,lan9115";
+>>                 reg = <0 0x0 0x10000>;
+>>                 interrupts = <13>;
+>>                 interrupt-parent = <&nvic>;
+>>                 smsc,irq-active-high;
+>> };
+>>
+>>
+>> and looking again at .dtsi it seems to me that fpgaio should be moved
+>> below the soc/ under separate bus interface which would hosts audio and
+>> spi too or I keep missing things around device-tree?
+>>
+> 
+> I don't see the audio and spi nodes, so I'm not sure where exactly
+> you would put them.
 
-As I understand the problem, VFIO has a generic "configure an IOMMU to 
-point at an MSI doorbell" step to do in the process of attaching a 
-device, which hasn't needed implementing yet due to VT-d's 
-IOMMU_CAP_I_AM_ALSO_ACTUALLY_THE_MSI_CONTROLLER_IN_DISGUISE flag, which 
-most of us have managed to misinterpret so far. AFAICS all the IOMMU 
-driver should need to know about this is an iommu_map() call (which will 
-want a slight extension[1] to make things behave properly). We should be 
-fixing the abstraction to be less x86-centric, not hacking up all the 
-ARM drivers to emulate x86 hardware behaviour in software.
+I just keep things simple ;)
 
-Robin.
+> 
+> Ideally those things should be visible from a block diagram in the
+> datasheet.
 
-[1]:http://article.gmane.org/gmane.linux.kernel.cross-arch/30833
+Indeed, block diagram indicates all them as a "FPGA APB subsystem" and
+clearly draws a line indicating a bus those devices are connected to.
+After your point about lan9220, it looks clearer to me to express that
+subsystem outside of soc/ node indicating bus interface, so it would
+match to those drawings closely.
 
-> Signed-off-by: Eric Auger <eric.auger@linaro.org>
->
-> ---
-> v2 -> v3:
-> - select IOMMU_IOVA when ARM_SMMU or ARM_SMMU_V3 is set
->
-> v1 -> v2:
-> - formerly implemented in vfio_iommu_type1
-> ---
->   drivers/iommu/Kconfig    |  2 ++
->   drivers/iommu/arm-smmu.c | 87 +++++++++++++++++++++++++++++++++++++++---------
->   2 files changed, 74 insertions(+), 15 deletions(-)
->
-> diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
-> index a1e75cb..1106528 100644
-> --- a/drivers/iommu/Kconfig
-> +++ b/drivers/iommu/Kconfig
-> @@ -289,6 +289,7 @@ config ARM_SMMU
->   	bool "ARM Ltd. System MMU (SMMU) Support"
->   	depends on (ARM64 || ARM) && MMU
->   	select IOMMU_API
-> +	select IOMMU_IOVA
->   	select IOMMU_IO_PGTABLE_LPAE
->   	select ARM_DMA_USE_IOMMU if ARM
->   	help
-> @@ -302,6 +303,7 @@ config ARM_SMMU_V3
->   	bool "ARM Ltd. System MMU Version 3 (SMMUv3) Support"
->   	depends on ARM64 && PCI
->   	select IOMMU_API
-> +	select IOMMU_IOVA
->   	select IOMMU_IO_PGTABLE_LPAE
->   	select GENERIC_MSI_IRQ_DOMAIN
->   	help
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index c8b7e71..f42341d 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -42,6 +42,7 @@
->   #include <linux/platform_device.h>
->   #include <linux/slab.h>
->   #include <linux/spinlock.h>
-> +#include <linux/iova.h>
->
->   #include <linux/amba/bus.h>
->
-> @@ -347,6 +348,9 @@ struct arm_smmu_domain {
->   	enum arm_smmu_domain_stage	stage;
->   	struct mutex			init_mutex; /* Protects smmu pointer */
->   	struct iommu_domain		domain;
-> +	struct iova_domain		*reserved_iova_domain;
-> +	/* protects reserved domain manipulation */
-> +	struct mutex			reserved_mutex;
->   };
->
->   static struct iommu_ops arm_smmu_ops;
-> @@ -975,6 +979,7 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
->   		return NULL;
->
->   	mutex_init(&smmu_domain->init_mutex);
-> +	mutex_init(&smmu_domain->reserved_mutex);
->   	spin_lock_init(&smmu_domain->pgtbl_lock);
->
->   	return &smmu_domain->domain;
-> @@ -1446,22 +1451,74 @@ out_unlock:
->   	return ret;
->   }
->
-> +static int arm_smmu_alloc_reserved_iova_domain(struct iommu_domain *domain,
-> +					       dma_addr_t iova, size_t size,
-> +					       unsigned long order)
-> +{
-> +	unsigned long granule, mask;
-> +	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
-> +	int ret = 0;
-> +
-> +	granule = 1UL << order;
-> +	mask = granule - 1;
-> +	if (iova & mask || (!size) || (size & mask))
-> +		return -EINVAL;
-> +
-> +	if (smmu_domain->reserved_iova_domain)
-> +		return -EEXIST;
-> +
-> +	mutex_lock(&smmu_domain->reserved_mutex);
-> +
-> +	smmu_domain->reserved_iova_domain =
-> +		kzalloc(sizeof(struct iova_domain), GFP_KERNEL);
-> +	if (!smmu_domain->reserved_iova_domain) {
-> +		ret = -ENOMEM;
-> +		goto unlock;
-> +	}
-> +
-> +	init_iova_domain(smmu_domain->reserved_iova_domain,
-> +			 granule, iova >> order, (iova + size - 1) >> order);
-> +
-> +unlock:
-> +	mutex_unlock(&smmu_domain->reserved_mutex);
-> +	return ret;
-> +}
-> +
-> +static void arm_smmu_free_reserved_iova_domain(struct iommu_domain *domain)
-> +{
-> +	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
-> +	struct iova_domain *iovad = smmu_domain->reserved_iova_domain;
-> +
-> +	if (!iovad)
-> +		return;
-> +
-> +	mutex_lock(&smmu_domain->reserved_mutex);
-> +
-> +	put_iova_domain(iovad);
-> +	kfree(iovad);
-> +
-> +	mutex_unlock(&smmu_domain->reserved_mutex);
-> +}
-> +
->   static struct iommu_ops arm_smmu_ops = {
-> -	.capable		= arm_smmu_capable,
-> -	.domain_alloc		= arm_smmu_domain_alloc,
-> -	.domain_free		= arm_smmu_domain_free,
-> -	.attach_dev		= arm_smmu_attach_dev,
-> -	.detach_dev		= arm_smmu_detach_dev,
-> -	.map			= arm_smmu_map,
-> -	.unmap			= arm_smmu_unmap,
-> -	.map_sg			= default_iommu_map_sg,
-> -	.iova_to_phys		= arm_smmu_iova_to_phys,
-> -	.add_device		= arm_smmu_add_device,
-> -	.remove_device		= arm_smmu_remove_device,
-> -	.device_group		= arm_smmu_device_group,
-> -	.domain_get_attr	= arm_smmu_domain_get_attr,
-> -	.domain_set_attr	= arm_smmu_domain_set_attr,
-> -	.pgsize_bitmap		= -1UL, /* Restricted during device attach */
-> +	.capable			= arm_smmu_capable,
-> +	.domain_alloc			= arm_smmu_domain_alloc,
-> +	.domain_free			= arm_smmu_domain_free,
-> +	.attach_dev			= arm_smmu_attach_dev,
-> +	.detach_dev			= arm_smmu_detach_dev,
-> +	.map				= arm_smmu_map,
-> +	.unmap				= arm_smmu_unmap,
-> +	.map_sg				= default_iommu_map_sg,
-> +	.iova_to_phys			= arm_smmu_iova_to_phys,
-> +	.add_device			= arm_smmu_add_device,
-> +	.remove_device			= arm_smmu_remove_device,
-> +	.device_group			= arm_smmu_device_group,
-> +	.domain_get_attr		= arm_smmu_domain_get_attr,
-> +	.domain_set_attr		= arm_smmu_domain_set_attr,
-> +	.alloc_reserved_iova_domain	= arm_smmu_alloc_reserved_iova_domain,
-> +	.free_reserved_iova_domain	= arm_smmu_free_reserved_iova_domain,
-> +	/* Page size bitmap, restricted during device attach */
-> +	.pgsize_bitmap			= -1UL,
->   };
->
->   static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
->
+Cheers
+Vladimir
+
+> 
+> 	Arnd
+> 
+> 
+> 
