@@ -1,49 +1,41 @@
-From: yong.wu@mediatek.com (Yong Wu)
-Date: Thu, 18 Feb 2016 01:52:15 +0800
-Subject: [PATCH v8 3/5] memory: mediatek: Add SMI driver
-In-Reply-To: <20160216141059.GT18805@8bytes.org>
-References: <1453781562-23556-1-git-send-email-yong.wu@mediatek.com>
- <1453781562-23556-4-git-send-email-yong.wu@mediatek.com>
- <56ADE959.2050309@gmail.com> <20160216141059.GT18805@8bytes.org>
-Message-ID: <1455731535.10704.8.camel@mhfsdcap03>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 18 Feb 2016 02:56:34 +0100
+Subject: [GIT PULL] at91: defconfig for 4.6 #1
+Message-ID: <20160218015634.GA31609@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2016-02-16 at 15:11 +0100, Joerg Roedel wrote:
-> On Sun, Jan 31, 2016 at 12:00:41PM +0100, Matthias Brugger wrote:
-> > 
-> > 
-> > On 26/01/16 05:12, Yong Wu wrote:
-> > >This patch add SMI(Smart Multimedia Interface) driver. This driver
-> > >is responsible to enable/disable iommu and control the power domain
-> > >and clocks of each local arbiter.
-> > >
-> > >Signed-off-by: Yong Wu <yong.wu@mediatek.com>
-> > >Tested-by: Philipp Zabel <p.zabel@pengutronix.de>
-> > >---
-> > 
-> > Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
-> > 
-> > Joerg would you mind to take this through your branch?
-> 
-> Hmm, I somehow missed the patch-set, at least I can't find the v8
-> patches in my inbox.
-> 
-> Yong, can you please re-send with all Acks and other tags added?
+Arnd, Olof, Kevin,
 
-Hi Joerg,
-  
-     I have re-sent v9[1] which has added all the tags yesterday.
+A defconfig update, adding the sama5d2 ADC to sama5_defconfig.
 
-     Could you find them in your inbox? If not again, please tell me.
+Thanks,
 
-     Thanks.
 
-[1]:http://lists.linuxfoundation.org/pipermail/iommu/2016-February/015713.html
+The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
 
-> 
-> 
-> Thanks,
-> 
-> 	Joerg
-> 
+  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.6-defconfig
+
+for you to fetch changes up to 48a2e12adb7f4d1a03720d3923bedbc13ab96143:
+
+  ARM: at91/defconfig: add sama5d2 adc support in sama5_defconfig (2016-02-17 22:51:48 +0100)
+
+----------------------------------------------------------------
+defconfig update for 4.6:
+ - Addition of sama5d2 ADC to sama5_defconfig
+
+----------------------------------------------------------------
+Ludovic Desroches (1):
+      ARM: at91/defconfig: add sama5d2 adc support in sama5_defconfig
+
+ arch/arm/configs/sama5_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
