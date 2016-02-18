@@ -1,47 +1,34 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 18 Feb 2016 22:57:40 +0800
-Subject: [PATCH] ARM: imx: Do L2 errata only if the L2 cache isn't enabled
-In-Reply-To: <56C03B0E.9000809@gmail.com>
-References: <1455261093-11849-1-git-send-email-dirk.behme@de.bosch.com>
- <20160212141654.GA10826@n2100.arm.linux.org.uk>
- <56BDFF64.9090701@gmail.com> <20160214081857.GQ6756@tiger>
- <56C03B0E.9000809@gmail.com>
-Message-ID: <20160218145739.GC6756@tiger>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 18 Feb 2016 14:59:54 +0000
+Subject: [PATCH 3/6] ASoC: rockchip: add bindings for rk3399 i2s
+In-Reply-To: <20160218143702.GN9654@rob-hp-laptop>
+References: <1455673992-16469-1-git-send-email-jay.xu@rock-chips.com>
+ <1455673992-16469-4-git-send-email-jay.xu@rock-chips.com>
+ <20160217110306.GJ7544@sirena.org.uk>
+ <20160218143702.GN9654@rob-hp-laptop>
+Message-ID: <20160218145954.GI7129@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 14, 2016 at 09:30:06AM +0100, Dirk Behme wrote:
-> On 14.02.2016 09:18, Shawn Guo wrote:
-> >On Fri, Feb 12, 2016 at 04:51:00PM +0100, Dirk Behme wrote:
-> >>On 12.02.2016 15:16, Russell King - ARM Linux wrote:
-> >>>On Fri, Feb 12, 2016 at 08:11:33AM +0100, Dirk Behme wrote:
-> >>>>All the generic L2 cache handling code is encapsulated by a
-> >>>>check if the L2 cache is enabled. If it's enabled already, the code
-> >>>>is skipped.
-> >>>>
-> >>>>For the i.MX6 specific L2 cache handling we missed this check.
-> >>>>Add it.
-> >>>
-> >>>What's the reasoning behind this?  The prefetch register is writable
-> >>>while the L2 cache is enabled, unlike the auxiliary control register.
-> >>
-> >> From an internal log I have the following info:
-> >>
-> >>The write to the L2-Cache controller from non-secure world causes an
-> >>imprecise
-> >>external abort. If Linux runs from normal world the cache controller
-> >>is already
-> >>enabled and thus no configuration is needed by Linux.
-> >
-> >Dirk,
-> >
-> >Do you have a real use case of this, i.e. running Linux on i.MX6 in
-> >non-secure world?
-> 
-> 
-> Yes, in a scenario where one of the cores runs a RTOS.
+On Thu, Feb 18, 2016 at 08:37:02AM -0600, Rob Herring wrote:
+> On Wed, Feb 17, 2016 at 11:03:06AM +0000, Mark Brown wrote:
 
-Can you please reword the commit log to have the above non-secure world
-user story mentioned in there?
+> > As with the other patch I'd expect to see a matching driver update if
+> > only for documentation purposes.
 
-Shawn
+> Why? They match on the prior chip's compatible until there is some 
+> difference the driver needs to handle.
+
+That then requires anyone using a compatible string to also know the
+full set of other compatible strings that can be used for this device
+and that they have to list the others too in the correct order which
+isn't something the binding document tells them.  It also feels better
+to record in the code how we think we should support the device when we
+know it, seems more helpful.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160218/3903df38/attachment.sig>
