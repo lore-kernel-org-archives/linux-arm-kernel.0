@@ -1,67 +1,136 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 18 Feb 2016 08:36:10 -0600
-Subject: [PATCH V6 1/2] regulator: Add document for MT6323 regulator
-In-Reply-To: <1455709056-50510-1-git-send-email-blogic@openwrt.org>
-References: <1455709056-50510-1-git-send-email-blogic@openwrt.org>
-Message-ID: <20160218143610.GG9654@rob-hp-laptop>
+Date: Thu, 18 Feb 2016 08:36:17 -0600
+Subject: [PATCH v2 1/3] input: cygnus-update touchscreen dt node document
+In-Reply-To: <1455702226-20599-2-git-send-email-raveendra.padasalagi@broadcom.com>
+References: <1455702226-20599-1-git-send-email-raveendra.padasalagi@broadcom.com>
+ <1455702226-20599-2-git-send-email-raveendra.padasalagi@broadcom.com>
+Message-ID: <20160218143617.GH9654@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 17, 2016 at 12:37:35PM +0100, John Crispin wrote:
-> Signed-off-by: John Crispin <blogic@openwrt.org>
-> Cc: devicetree at vger.kernel.org
+On Wed, Feb 17, 2016 at 03:13:44PM +0530, Raveendra Padasalagi wrote:
+> In Cygnus SOC touch screen controller registers are shared
+> with ADC and flex timer. Using readl/writel could lead to
+> race condition. So touch screen driver is enhanced to support
 > 
+> 1. If touchscreen register's are not shared. Register access
+> is handled through readl/writel if "brcm,iproc-touchscreen"
+> compatible is provided in touchscreen dt node. This will help
+> for future SOC's if comes with dedicated touchscreen IP register's.
+> 
+> 2. If touchscreen register's are shared with other IP's, register
+> access is handled through syscon framework API's to take care of
+> mutually exclusive access. This feature can be enabled by selecting
+> "brcm,iproc-touchscreen-syscon" compatible string in the touchscreen
+> dt node.
+> 
+> Hence touchscreen dt node bindings document is updated to take care
+> of above changes in the touchscreen driver.
+> 
+> Signed-off-by: Raveendra Padasalagi <raveendra.padasalagi@broadcom.com>
+> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
 > ---
-> Changes in V6
-> * remove the compatible string
+>  .../input/touchscreen/brcm,iproc-touchscreen.txt   | 57 +++++++++++++++++++---
+>  1 file changed, 51 insertions(+), 6 deletions(-)
 > 
-> Changes in V5
-> * regulator vs regulators
+> diff --git a/Documentation/devicetree/bindings/input/touchscreen/brcm,iproc-touchscreen.txt b/Documentation/devicetree/bindings/input/touchscreen/brcm,iproc-touchscreen.txt
+> index 34e3382..f530c25 100644
+> --- a/Documentation/devicetree/bindings/input/touchscreen/brcm,iproc-touchscreen.txt
+> +++ b/Documentation/devicetree/bindings/input/touchscreen/brcm,iproc-touchscreen.txt
+> @@ -1,12 +1,30 @@
+>  * Broadcom's IPROC Touchscreen Controller
+>  
+>  Required properties:
+> -- compatible: must be "brcm,iproc-touchscreen"
+> -- reg: physical base address of the controller and length of memory mapped
+> -  region.
+> +- compatible: should be one of
+> +        "brcm,iproc-touchscreen"
+> +        "brcm,iproc-touchscreen-syscon"
+
+More specific and this is not how you do syscon. Either the block is or 
+isn't. You can't have it both ways.
+
+> +- ts_syscon: if "brcm,iproc-touchscreen-syscon" compatible string
+> +  is selected then "ts_syscon" is mandatory or else not required.
+> +  The "ts_syscon" is handler of syscon node defining physical base
+> +  address of the controller and length of memory mapped region.
+> +  If this property is selected please make sure MFD_SYSCON config
+> +  is enabled in the defconfig file.
+> +- reg: if "brcm,iproc-touchscreen" compatible string is selected
+> +  then "reg" property is mandatory or else not required.
+> +  The "reg" should be physical base address of the controller and
+> +  length of memory mapped region.
+
+I thought every chip to date is a syscon. Add reg support when you 
+actually need it.
+
+>  - clocks:  The clock provided by the SOC to driver the tsc
+>  - clock-name:  name for the clock
+>  - interrupts: The touchscreen controller's interrupt
+> +- address-cells: Specify the number of u32 entries needed in child nodes.
+> +                 Should set to 1. This property is mandatory when
+> +                 "brcm,iproc-touchscreen-syscon" compatible string is selected
+> +                 or else not required.
+> +- size-cells: Specify number of u32 entries needed to specify child nodes size
+> +              in reg property. Should set to 1.This property is mandatory when
+> +              "brcm,iproc-touchscreen-syscon" compatible string is selected or
+> +              else not required.
+>  
+>  Optional properties:
+>  - scanning_period: Time between scans. Each step is 1024 us.  Valid 1-256.
+> @@ -53,13 +71,40 @@ Optional properties:
+>  - touchscreen-inverted-x: X axis is inverted (boolean)
+>  - touchscreen-inverted-y: Y axis is inverted (boolean)
+>  
+> -Example:
+> +Example 1: An example of touchscreen node with "brcm,iproc-touchscreen-syscon"
+> +           compatible string.
+> +
+> +	ts_adc_syscon: ts_adc_syscon at 0x180a6000 {
+> +		compatible = "syscon";
+> +		reg = <0x180a6000 0xc30>;
+> +	};
+>  
+>  	touchscreen: tsc at 0x180A6000 {
+
+Drop the '0x' and the node name should be touchscreen, not tsc.
+
+> -		compatible = "brcm,iproc-touchscreen";
+> +		compatible = "brcm,iproc-touchscreen-syscon";
+>  		#address-cells = <1>;
+>  		#size-cells = <1>;
+> -		reg = <0x180A6000 0x40>;
+> +		ts_syscon = <&ts_adc_syscon>;
+> +		clocks = <&adc_clk>;
+> +		clock-names = "tsc_clk";
+> +		interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>;
+> +
+
+> +		scanning_period = <5>;
+> +		debounce_timeout = <40>;
+> +		settling_timeout = <7>;
+> +		touch_timeout = <10>;
+> +		average_data = <5>;
+> +		fifo_threshold = <1>;
+
+New properties?
+
+> +		/* Touchscreen is rotated 180 degrees. */
+> +		touchscreen-inverted-x;
+> +		touchscreen-inverted-y;
+> +	};
+> +
+> +Example 2: An example of touchscreen node with "brcm,iproc-touchscreen"
+> +          compatible string.
+> +
+> +	touchscreen: tsc at 0x180A6000 {
+> +		compatible = "brcm,iproc-touchscreen";
+> +		reg = <0x180a6000 0x40>;
+>  		clocks = <&adc_clk>;
+>  		clock-names = "tsc_clk";
+>  		interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>;
+> -- 
+> 1.9.1
 > 
-> Changes in V4
-> * regulator is a subnode and not a property
-> 
->  .../bindings/regulator/mt6323-regulator.txt        |  241 ++++++++++++++++++++
->  1 file changed, 241 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/regulator/mt6323-regulator.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/regulator/mt6323-regulator.txt b/Documentation/devicetree/bindings/regulator/mt6323-regulator.txt
-> new file mode 100644
-> index 0000000..67c0780
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/regulator/mt6323-regulator.txt
-> @@ -0,0 +1,241 @@
-> +Mediatek MT6323 Regulator Driver
-> +
-> +All voltage regulators are defined as subnodes of the regulators node. A list
-> +of regulators provided by this controller are defined as subnodes of the
-> +drivers node. Each regulator is named according to its regulator type,
-
-s/drivers/PMIC's/
-
-> +buck_<name> and ldo_<name>. The definition for each of these nodes is defined
-> +using the standard binding for regulators at
-> +Documentation/devicetree/bindings/regulator/regulator.txt.
-> +
-> +The valid names for regulators are::
-> +BUCK:
-> +  buck_vproc, buck_vsys, buck_vpa
-> +LDO:
-> +  ldo_vtcxo, ldo_vcn28, ldo_vcn33_bt, ldo_vcn33_wifi, ldo_va, ldo_vcama,
-> +  ldo_vio28, ldo_vusb, ldo_vmc, ldo_vmch, ldo_vemc3v3, ldo_vgp1, ldo_vgp2,
-> +  ldo_vgp3, ldo_vcn18, ldo_vsim1, ldo_vsim2, ldo_vrtc, ldo_vcamaf, ldo_vibr,
-> +  ldo_vrf18, ldo_vm, ldo_vio18, ldo_vcamd, ldo_vcamio
-> +
-> +Example:
-> +
-> +	pmic: mt6323 {
-> +		compatible = "mediatek,mt6323";
-> +
-> +		mt6323regulator: regulators {
-> +			compatible = "mediatek,mt6323-regulator";
-
-Still have the compatible here...
-
-Otherwise:
-
-Acked-by: Rob Herring <robh@kernel.org>
