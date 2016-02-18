@@ -1,207 +1,162 @@
-From: fcooper@ti.com (Franklin S Cooper Jr.)
-Date: Thu, 18 Feb 2016 09:33:58 -0600
-Subject: [PATCH v2 2/5] ARM: OMAP2+: DRA7: Add hwmod entries for PWMSS
-In-Reply-To: <alpine.DEB.2.02.1602180652380.4792@utopia.booyaka.com>
-References: <1433332284-10766-1-git-send-email-vigneshr@ti.com>
- <1433332284-10766-3-git-send-email-vigneshr@ti.com>
- <alpine.DEB.2.02.1507152029460.32764@utopia.booyaka.com>
- <55A7CE59.6010600@ti.com>
- <alpine.DEB.2.02.1508121700500.7154@utopia.booyaka.com>
- <56C4DB37.9090802@ti.com>
- <alpine.DEB.2.02.1602180652380.4792@utopia.booyaka.com>
-Message-ID: <56C5E466.2030002@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 18 Feb 2016 15:47:19 +0000
+Subject: [RFC v3 15/15] irqchip/gicv2m/v3-its-pci-msi: IOMMU map the MSI
+ frame when needed
+In-Reply-To: <56C5E450.3010501@linaro.org>
+References: <1455264797-2334-1-git-send-email-eric.auger@linaro.org>
+ <1455264797-2334-16-git-send-email-eric.auger@linaro.org>
+ <20160218113307.2b263b10@arm.com> <56C5E450.3010501@linaro.org>
+Message-ID: <56C5E787.9070303@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul
-
-On 02/18/2016 12:58 AM, Paul Walmsley wrote:
-> Hi Franklin
->
-> On Wed, 17 Feb 2016, Franklin S Cooper Jr. wrote:
->
->> On 08/31/2015 10:51 AM, Paul Walmsley wrote:
->>> On Thu, 16 Jul 2015, R, Vignesh wrote:
->>>> On 07/16/2015 03:24 AM, Paul Walmsley wrote:
->>>>> On Wed, 3 Jun 2015, Vignesh R wrote:
->>>>>
->>>>>> Add hwmod entries for the PWMSS on DRA7.
->>>>>>
->>>>>> Set l4_root_clk_div as the main_clk of PWMSS. It is fixed-factored clock
->>>>>> equal to L4PER2_L3_GICLK/2(l3_iclk_div/2).
->>>>>> As per AM57x TRM SPRUHZ6[1], October 2014, Section 29.1.3 Table 29-4,
->>>>>> clock source to PWMSS is L4PER2_L3_GICLK. But it is actually
->>>>>> L4PER2_L3_GICLK/2. The TRM does not show the division by 2.
->>>>> Is the divide-by-two coming from PWMSS_EPWM.EPWM_TBCTL[HSPCLKDIV]?  Or is 
->>>>> HSPCLKDIV a separate divider after the divide-by-2 you mention above?
->>>> No, it not related to HSPCLKDIV. The TRM wrongly states L4PER2_L3_GICLK
->>>> as clock input for PWMSS. But actually  L4PER2_L4_GICLK(=L3_GICLK/2) is
->>>> the clock input for PWMSS. This will be updated in TRM soon.
->>> OK
->>>
->>>>>> --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
->>>>>> +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
->>>>>> @@ -362,6 +362,149 @@ static struct omap_hwmod dra7xx_dcan2_hwmod = {
->>>>>>  	},
->>>>>>  };
->>>>>>  
->>>>>> +/* pwmss  */
->>>>>> +static struct omap_hwmod_class_sysconfig dra7xx_epwmss_sysc = {
->>>>>> +	.rev_offs	= 0x0,
->>>>>> +	.sysc_offs	= 0x4,
->>>>>> +	.sysc_flags	= SYSC_HAS_SIDLEMODE | SYSC_HAS_RESET_STATUS,
->>>>> This doesn't match SPRUHZ6 Table 29-13 "PWMSS_SYSCONFIG".  There's no 
->>>>> RESETSTATUS bit.  There is a SOFTRESET bit. 
->>>>>
->>>>> Could you please confirm whether this is intentional?
->>>> sorry my bad... I will change this in v3.
->>> OK
->>>
->>>>>> +/* ecap0 */
->>>>>> +struct omap_hwmod dra7xx_ecap0_hwmod = {
->>>>>> +	.name		= "ecap0",
->>>>>> +	.class		= &dra7xx_ecap_hwmod_class,
->>>>>> +	.clkdm_name	= "l4per2_clkdm",
->>>>>> +	.main_clk	= "l4_root_clk_div",
->>>>> Looking at SPRUHZ6 Section 29.1.4.2 "PWMSS Modules Local Clock Gating", 
->>>>> there appears to be a local "mini-PRCM" for the PWMSS which implements 
->>>>> clock gating and reports back on the status of what I'd guess is the local 
->>>>> clock gating FSM.
->>>>>
->>>>> So from that point of view, you should probably create a clock driver that 
->>>>> manages both the clock gate request bit and the FSM status bit.  It should 
->>>>> be something that can be reused for the other PWMSS IP blocks.  Then 
->>>>> you'd create per-IP block clock nodes and set the main_clk to point to 
->>>>> that node.
->>>> Since, this register is within the config space of PWMSS, the individual
->>>> gating and reporting for the modules within PWMSS
->>>> (PWMSS_CLKCONFIG) is currently being taken care by pwm-tipwmss.c(almost
->>>> the sole function this driver is doing). It has been the same since
->>>> am335x. Adding new clock nodes will result in driver changes and also
->>>> changes to am335x, am437x (and other platforms) hwmod files. It also
->>>> involves adding new nodes to clocks.dtsi and it will be difficult to
->>>> maintain backward compatibility for older platforms. Is it not better to
->>>> keep this as is, in order to maintain consistency (with am335x, am437x
->>>> etc) and also that these clock bits are within IP's config space?
->>> It's certainly possible that we as maintainers didn't look closely enough 
->>> at the AM33xx data for the PWMSS when we merged it.  But if that's 
->>> incorrect too, then now is the time to fix this.  Otherwise it will never 
->>> get fixed, since each new group of people patching this code will keep 
->>> punting it off to the indeterminate future.
->>>
->>> In terms of hwmod data: based on the register maps in sections 29.4.3, 
->>> 29.3.3, and 29.2.3 of SPRUHZ6, none of these subdevices are hwmod devices.  
->>> They don't support the Highlander OCP registers, they have no individual 
->>> PRCM registers or register bitfields, and all of the idle and status 
->>> reporting is to the PWMSS top-level IP block itself.  So it looks to me 
->>> like the eCAP, eQEP, and ePWM modules should be registered via DT, rather 
->>> than via hwmod.  It looks like you can get away with using the 
->>> "simple-bus" abstraction, but you might ultimately have to define 
->>> something custom here.  However, the PWMSS top level subsystem, described 
->>> in section 29.1, does have the OCP registers, sideband signals, etc., and 
->>> thus should remain a hwmod-registered device (via DT).
->>>
->>> In terms of the clock data: based on section 29.1.4, section 29.1.5.2, 
->>> figure 29-3, and table 29-4, there are several clock gating control bits.  
->>> These should be modeled as clock nodes in the Linux common clock 
->>> framework.  Furthermore these registers are located inside the PWMSS 
->>> subsystem itself, and are only accessible when the PWMSS IP block is 
->>> functional in a PM runtime point of view: i.e., when the block is mapped 
->>> into memory space, clocked and out of reset, etc.  So the clock types for 
->>> the PWMSS_CFG IP block should most likely be implemented in the PWMSS 
->>> driver.  I think you'll still be able to define the clock node data itself 
->>> in DT, but this will probably need a closer look.  Ideally, since the 
->>> clock node register address data is the same for all three subsystem 
->>> instances, one would be able to simply include a DT include file three 
->>> times; but the DT binding data format may ultimately make this 
->>> impractical.
->>>
->>> In terms of the transition from the old approach to this approach, it ooks 
->>> to me like the first thing to do would be to convert
->>> drivers/pwm/pwm-tipwmss.c to define some clk_ops and register some clock
->>> nodes with the CCF.  You've got the meat of the clock gating control code
->>> there already.  Then the next thing to do would be to to get rid of
->>> pwmss_submodule_state_change() and use
->>> clk_{prepare,enable,disable,unprepare}*() in the drivers/pwm/pwm-ti*.c
->>> subdrivers instead.  All of that looks like it should be possible to  
->>> implement in a backwards-compatible way.  Then you'd convert the eCAP, 
->>> eQEP, and ePWM code to probe as platform_devices, driven from a simple-bus 
->>> or pwmss-bus or whatever in the DT data.  Naturally, the AM33xx/43xx data 
->>> should be fixed also.  
->> I am working on updating this patchset on behalf of Vignesh
->> based on your suggestion. During the process of converting
->> the pwm-tipwmss.c to be a clock provider I discovered that
->> there is an issue with the PWMSS local clock gates. For
->> example on AM437x if you run the below commands you will get
->> a " Custom Error: MASTER M2 (64-bit) TARGET L4_PER_0 (Read):
->> Data Access in User mode during Functional access" error.
+On 18/02/16 15:33, Eric Auger wrote:
+> Hi Marc,
+> On 02/18/2016 12:33 PM, Marc Zyngier wrote:
+>> On Fri, 12 Feb 2016 08:13:17 +0000
+>> Eric Auger <eric.auger@linaro.org> wrote:
 >>
->> rmmod pwm_tiecap
->> rmmod pwm_bl
->> rmmod pwm_tiecap
->> modprobe pwm_tiecap
->> modprobe pwm_bl
+>>> In case the msi_desc references a device attached to an iommu
+>>> domain, the msi address needs to be mapped in the IOMMU. Else any
+>>> MSI write transaction will cause a fault.
+>>>
+>>> gic_set_msi_addr detects that case and allocates an iova bound
+>>> to the physical address page comprising the MSI frame. This iova
+>>> then is used as the msi_msg address. Unset operation decrements the
+>>> reference on the binding.
+>>>
+>>> The functions are called in the irq_write_msi_msg ops implementation.
+>>> At that time we can recognize whether the msi is setup or teared down
+>>> looking at the msi_msg content. Indeed msi_domain_deactivate zeroes all
+>>> the fields.
+>>>
+>>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>>>
+>>> ---
+>>>
+>>> v2 -> v3:
+>>> - protect iova/addr manipulation with CONFIG_ARCH_DMA_ADDR_T_64BIT and
+>>>   CONFIG_PHYS_ADDR_T_64BIT
+>>> - only expose gic_pci_msi_domain_write_msg in case CONFIG_IOMMU_API &
+>>>   CONFIG_PCI_MSI_IRQ_DOMAIN are set.
+>>> - gic_set/unset_msi_addr duly become static
+>>> ---
+>>>  drivers/irqchip/irq-gic-common.c         | 69 ++++++++++++++++++++++++++++++++
+>>>  drivers/irqchip/irq-gic-common.h         |  5 +++
+>>>  drivers/irqchip/irq-gic-v2m.c            |  7 +++-
+>>>  drivers/irqchip/irq-gic-v3-its-pci-msi.c |  5 +++
+>>>  4 files changed, 85 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/irqchip/irq-gic-common.c b/drivers/irqchip/irq-gic-common.c
+>>> index f174ce0..46cd06c 100644
+>>> --- a/drivers/irqchip/irq-gic-common.c
+>>> +++ b/drivers/irqchip/irq-gic-common.c
+>>> @@ -18,6 +18,8 @@
+>>>  #include <linux/io.h>
+>>>  #include <linux/irq.h>
+>>>  #include <linux/irqchip/arm-gic.h>
+>>> +#include <linux/iommu.h>
+>>> +#include <linux/msi.h>
+>>>  
+>>>  #include "irq-gic-common.h"
+>>>  
+>>> @@ -121,3 +123,70 @@ void gic_cpu_config(void __iomem *base, void (*sync_access)(void))
+>>>  	if (sync_access)
+>>>  		sync_access();
+>>>  }
+>>> +
+>>> +#if defined(CONFIG_IOMMU_API) && defined(CONFIG_PCI_MSI_IRQ_DOMAIN)
+>>> +static int gic_set_msi_addr(struct irq_data *data, struct msi_msg *msg)
+>>> +{
+>>> +	struct msi_desc *desc = irq_data_get_msi_desc(data);
+>>> +	struct device *dev = msi_desc_to_dev(desc);
+>>> +	struct iommu_domain *d;
+>>> +	phys_addr_t addr;
+>>> +	dma_addr_t iova;
+>>> +	int ret;
+>>> +
+>>> +	d = iommu_get_domain_for_dev(dev);
+>>> +	if (!d)
+>>> +		return 0;
+>>> +#ifdef CONFIG_PHYS_ADDR_T_64BIT
+>>> +	addr = ((phys_addr_t)(msg->address_hi) << 32) | msg->address_lo;
+>>> +#else
+>>> +	addr = msg->address_lo;
+>>> +#endif
+>>> +
+>>> +	ret = iommu_get_single_reserved(d, addr, IOMMU_WRITE, &iova);
+>>> +
+>>> +	if (!ret) {
+>>> +		msg->address_lo = lower_32_bits(iova);
+>>> +		msg->address_hi = upper_32_bits(iova);
+>>> +	}
+>>> +	return ret;
+>>> +}
+>>> +
+>>> +
+>>> +static void gic_unset_msi_addr(struct irq_data *data)
+>>> +{
+>>> +	struct msi_desc *desc = irq_data_get_msi_desc(data);
+>>> +	struct device *dev;
+>>> +	struct iommu_domain *d;
+>>> +	dma_addr_t iova;
+>>> +
+>>> +#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
+>>> +	iova = ((dma_addr_t)(desc->msg.address_hi) << 32) |
+>>> +		desc->msg.address_lo;
+>>> +#else
+>>> +	iova = desc->msg.address_lo;
+>>> +#endif
+>>> +
+>>> +	dev = msi_desc_to_dev(desc);
+>>> +	if (!dev)
+>>> +		return;
+>>> +
+>>> +	d = iommu_get_domain_for_dev(dev);
+>>> +	if (!d)
+>>> +		return;
+>>> +
+>>> +	iommu_put_single_reserved(d, iova);
+>>> +}
+>>> +
+>>> +void gic_pci_msi_domain_write_msg(struct irq_data *irq_data,
+>>> +				  struct msi_msg *msg)
+>>> +{
+>>> +	if (!msg->address_hi && !msg->address_lo && !msg->data)
+>>> +		gic_unset_msi_addr(irq_data); /* deactivate */
+>>> +	else
+>>> +		gic_set_msi_addr(irq_data, msg); /* activate, set_affinity */
+>>> +
+>>> +	pci_msi_domain_write_msg(irq_data, msg);
+>>> +}
 >>
->> Full Log: http://pastebin.com/sEyy52HV
+>> So by doing that, you are specializing this infrastructure to PCI.
+>> If you hijacked irq_compose_msi_msg() instead, you'd have both
+>> platform and PCI MSI for the same price.
 >>
->> On device powerup, the various PWMSS local clock gates are
->> "unlocked". The remove call in the ecap driver gates the
->> local PWMSS clock gate for the ecap. The probe of the ecap
->> driver "unlocks" the clock gate for the ecap. However, once
->> you try to access any of the ecap registers which is
->> indirectly accessed by the pwm_bl driver you will get an
->> error. This is because the ecap clock is still being gated.
-> OK I'm not sure I understand what's going on, particularly the part about 
-> locking and unlocking.  Are you saying that the pwm_bl driver calls into 
-> the pwm_tiecap module to write to the PWMSS_CLKCONFIG registers to ungate 
-> the ECAP clock, and then the hardware silently ignores the write?  If 
-> that's the case, shouldn't we be seeing some warning messages from a 
-> failure to ungate the clock from a subsequent PWMSS_CLKSTATUS poll?  Or am 
-> I misunderstanding what's going on here?
-Pwm-tipwmss.c exports a function
-pwmss_submodule_state_change which interacts with
-PWMSS_CLKCONFIG and PWMSS_CLKSTATUS registers. Both
-pwm-tiehrpwm.c and pwm-tiecap.c calls this exported function
-to unlock the gate at probe time and lock the gate when the
-driver is removed.
+>> I can see a potential problem with the teardown of an MSI (I don't
+>> think the compose method is called on teardown), but I think this could
+>> be easily addressed.
+> Yes effectively this is the reason why I moved it from
+> irq_compose_msi_msg (my original implementation) to irq_write_msi_msg. I
+> noticed I had no way to detect the teardown whereas the
+> msi_domain_deactivate also calls irq_write_msi_msg which is quite
+> practical ;-) To be honest I need to further look at the non PCI
+> implementation.
 
-So when the gate fails to be unlocked after it previously is
-locked there isn't a way to know this via the
-PWMSS_CLKSTATUS registers. So the driver "believes" that the
-gate is unlocked and when pwm_bl runs it calls the
-set_polarity function. Set_polarity in the case of AM437x gp
-evm maps to the ecap's  ecap_pwm_set_polarity function call.
-This call then attempts to write to the ecap registers which
-results in the external abort since the clock to the ecap is
-still gated.
+Another thing to consider is that MSI controllers may use different
+doorbells for different CPU affinities. With your implementation,
+repeatedly changing the affinity from one CPU to another would increase
+the refcounting, and never actually lower it (you don't necessarily go
+via an "unmap"). Of course, none of that applies to GICv2m/GICv3-ITS,
+but that's worth considering.
 
-When the ecap and tihrpwm driver request to unlock the clock
-gate it already checks the XXX_CLK_EN_ACK bitfields within
-CLKSTATUS and it shows that the clocks "should" be unlocked.
-So there is an issue with the IP.
+So I think we may need some better tracking of the IOVA we program in
+the device, and offer a generic infrastructure for this instead of
+hiding it in the MSI controller drivers.
 
->> This has been verified by hardware folks on our side. Its
->> been determined these registers are not needed since they
->> were designed for devices that didn't have a PRCM.
->> Therefore, the current plan is to update the trms of
->> AM335x,AM437x,DRA7 and AM57x to make it clear that these
->> registers shouldn't be touched.
-> OK 
->
->> I plan on sending a patch for the pwm-tipwmss.c driver
->> essentially removing anything that touches the
->> PWMSS_CLKCONFIG and PWMSS_CLKSTATUS registers. I will also
->> be sending a v3 version of this patch since I believe the
->> struct omap_hwmod dra7xx_ecap0_hwmod and similar entries you
->> had comments about before are ok to leave as is based on the
->> above findings.
-> Including the comments regarding dra7xx_epwmss_sysc ?  
+Thanks,
 
-Yes, I plan on addressing the change Vignesh acknowledged
-regarding changing RESETSTATUS to SOFTRESET. For your other
-comments I believe he already explained why it has to be set
-in that particular way. If there is anything that I missed
-or something that isn't clear please let me know.
->
->
-> - Paul
+	M.
+-- 
+Jazz is not dead. It just smells funny...
