@@ -1,47 +1,34 @@
 From: jglauber@cavium.com (Jan Glauber)
-Date: Thu, 18 Feb 2016 17:50:12 +0100
-Subject: [PATCH v4 3/5] arm64: dts: Add Cavium ThunderX specific PMU
+Date: Thu, 18 Feb 2016 17:50:14 +0100
+Subject: [PATCH v4 5/5] arm64/perf: Extend event mask for ARMv8.1
 In-Reply-To: <cover.1455810755.git.jglauber@cavium.com>
 References: <cover.1455810755.git.jglauber@cavium.com>
-Message-ID: <2b8c963d3e63ecfc412bfd6fab804890a1586b16.1455810755.git.jglauber@cavium.com>
+Message-ID: <028b5d83ded39048ec996fe4d4912702704f156b.1455810755.git.jglauber@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a compatible string for the Cavium ThunderX PMU.
+ARMv8.1 increases the PMU event number space to 16 bit so increase
+the EVTYPE mask.
 
 Signed-off-by: Jan Glauber <jglauber@cavium.com>
 ---
- Documentation/devicetree/bindings/arm/pmu.txt | 1 +
- arch/arm64/boot/dts/cavium/thunder-88xx.dtsi  | 5 +++++
- 2 files changed, 6 insertions(+)
+ arch/arm64/kernel/perf_event.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/pmu.txt b/Documentation/devicetree/bindings/arm/pmu.txt
-index 5651883..d3999a1 100644
---- a/Documentation/devicetree/bindings/arm/pmu.txt
-+++ b/Documentation/devicetree/bindings/arm/pmu.txt
-@@ -25,6 +25,7 @@ Required properties:
- 	"qcom,scorpion-pmu"
- 	"qcom,scorpion-mp-pmu"
- 	"qcom,krait-pmu"
-+	"cavium,thunder-pmu"
- - interrupts : 1 combined interrupt or 1 per core. If the interrupt is a per-cpu
-                interrupt (PPI) then 1 interrupt should be specified.
+diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+index c68fa98..8746781 100644
+--- a/arch/arm64/kernel/perf_event.c
++++ b/arch/arm64/kernel/perf_event.c
+@@ -419,8 +419,8 @@ static const struct attribute_group *armv8_pmuv3_attr_groups[] = {
+ /*
+  * PMXEVTYPER: Event selection reg
+  */
+-#define	ARMV8_EVTYPE_MASK	0xc80003ff	/* Mask for writable bits */
+-#define	ARMV8_EVTYPE_EVENT	0x3ff		/* Mask for EVENT bits */
++#define	ARMV8_EVTYPE_MASK	0xc800ffff	/* Mask for writable bits */
++#define	ARMV8_EVTYPE_EVENT	0xffff		/* Mask for EVENT bits */
  
-diff --git a/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi b/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
-index 9cb7cf9..2eb9b22 100644
---- a/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
-+++ b/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
-@@ -360,6 +360,11 @@
- 		             <1 10 0xff01>;
- 	};
- 
-+	pmu {
-+		compatible = "cavium,thunder-pmu", "arm,armv8-pmuv3";
-+		interrupts = <1 7 4>;
-+	};
-+
- 	soc {
- 		compatible = "simple-bus";
- 		#address-cells = <2>;
+ /*
+  * Event filters for PMUv3
 -- 
 1.9.1
