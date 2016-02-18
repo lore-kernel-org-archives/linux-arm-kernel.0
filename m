@@ -1,48 +1,46 @@
 From: slemieux.tyco@gmail.com (slemieux.tyco at gmail.com)
-Date: Thu, 18 Feb 2016 16:35:23 -0500
-Subject: [PATCH 1/2] arm: lpc32xx: restart: add support for soft reset
+Date: Thu, 18 Feb 2016 16:35:24 -0500
+Subject: [PATCH 2/2] arm: lpc32xx: restart: support "cmd" from userspace
 In-Reply-To: <1455831324-8909-1-git-send-email-slemieux.tyco@gmail.com>
 References: <1455831324-8909-1-git-send-email-slemieux.tyco@gmail.com>
-Message-ID: <1455831324-8909-2-git-send-email-slemieux.tyco@gmail.com>
+Message-ID: <1455831324-8909-3-git-send-email-slemieux.tyco@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sylvain Lemieux <slemieux@tycoint.com>
 
-Add support for explicit soft reset using the reboot mode.
-
-The default reboot mode behavior is unchanged;
-you can specified the default reboot type in the board specific file
-"DT_MACHINE_START" definition using the "reboot_mode" parameter.
+Add the support to verify if a "cmd" is passed from the userspace program rebooting the system;
+- if a valid "cmd" is available, it will be handle;
+- If the received "cmd" is not supported, the default reboot mode is used.
 
 Signed-off-by: Sylvain Lemieux <slemieux@tycoint.com>
 ---
- arch/arm/mach-lpc32xx/common.c | 13 ++++++++++---
- 1 file changed, 10 insertions(+), 3 deletions(-)
+ arch/arm/mach-lpc32xx/common.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
 diff --git a/arch/arm/mach-lpc32xx/common.c b/arch/arm/mach-lpc32xx/common.c
-index 716e83e..9eb9f22 100644
+index 9eb9f22..ba61839 100644
 --- a/arch/arm/mach-lpc32xx/common.c
 +++ b/arch/arm/mach-lpc32xx/common.c
-@@ -200,9 +200,16 @@ void lpc23xx_restart(enum reboot_mode mode, const char *cmd)
+@@ -196,6 +196,19 @@ void __init lpc32xx_map_io(void)
+ 
+ void lpc23xx_restart(enum reboot_mode mode, const char *cmd)
+ {
++	/*
++	 * Verify if a "cmd" passed from the userspace program rebooting
++	 * the system; if available, and handle it.
++	 * - For details, see the 'reboot' syscall in kernel/reboot.c
++	 * - If the received "cmd" is not supported, use the default mode.
++	 */
++	if (cmd) {
++		if (cmd[0] == 'h')
++			mode = REBOOT_HARD;
++		else if (cmd[0] == 's')
++			mode = REBOOT_SOFT;
++	}
++
+ 	/* Make sure WDT clocks are enabled */
  	__raw_writel(LPC32XX_CLKPWR_PWMCLK_WDOG_EN,
  		LPC32XX_CLKPWR_TIMER_CLK_CTRL);
- 
--	/* Instant assert of RESETOUT_N with pulse length 1mS */
--	__raw_writel(13000, io_p2v(LPC32XX_WDTIM_BASE + 0x18));
--	__raw_writel(0x70, io_p2v(LPC32XX_WDTIM_BASE + 0xC));
-+	if (mode == REBOOT_SOFT) {
-+		/* Force match output active */
-+		__raw_writel(0x01, io_p2v(LPC32XX_WDTIM_BASE + 0x14));
-+		/* Enable internal reset on match output (RESOUT_N not asserted) */
-+		__raw_writel(0x08, io_p2v(LPC32XX_WDTIM_BASE + 0xC));
-+	} else {
-+		/* Instant assert of RESETOUT_N with pulse length 1mS */
-+		__raw_writel(13000, io_p2v(LPC32XX_WDTIM_BASE + 0x18));
-+		__raw_writel(0x70, io_p2v(LPC32XX_WDTIM_BASE + 0xC));
-+	}
- 
- 	/* Wait for watchdog to reset system */
- 	while (1)
 -- 
 1.8.3.1
