@@ -1,57 +1,87 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 18 Feb 2016 17:32:48 +0000
-Subject: [PATCH v4 3/5] arm64: dts: Add Cavium ThunderX specific PMU
-In-Reply-To: <2b8c963d3e63ecfc412bfd6fab804890a1586b16.1455810755.git.jglauber@cavium.com>
-References: <cover.1455810755.git.jglauber@cavium.com>
- <2b8c963d3e63ecfc412bfd6fab804890a1586b16.1455810755.git.jglauber@cavium.com>
-Message-ID: <20160218173248.GD16883@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 18 Feb 2016 18:32:23 +0100
+Subject: [PATCH v2 net-next 0/8] API set for HW Buffer management
+In-Reply-To: <20160217225958.GA31113@1wt.eu> (Willy Tarreau's message of "Wed,
+ 17 Feb 2016 23:59:58 +0100")
+References: <1455636823-14470-1-git-send-email-gregory.clement@free-electrons.com>
+ <20160217225958.GA31113@1wt.eu>
+Message-ID: <877fi1rkk8.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 18, 2016 at 05:50:12PM +0100, Jan Glauber wrote:
-> Add a compatible string for the Cavium ThunderX PMU.
+Hi Willy,
+ 
+ On mer., f?vr. 17 2016, Willy Tarreau <w@1wt.eu> wrote:
 
-Stupid question, but is "thunder" the name of the CPU or the SoC or ...?
+> Hi Gregory,
+>
+> On Tue, Feb 16, 2016 at 04:33:35PM +0100, Gregory CLEMENT wrote:
+>> Hello,
+>> 
+>> A few weeks ago I sent a proposal for a API set for HW Buffer
+>> management, to have a better view of the motivation for this API see
+>> the cover letter of this proposal:
+>> http://thread.gmane.org/gmane.linux.kernel/2125152
+>> 
+>> Since this version I took into account the review from Florian:
+>> - The hardware buffer management helpers are no more built by default
+>>   and now depend on a hidden config symbol which has to be selected
+>>   by the driver if needed
+>> - The hwbm_pool_refill() and hwbm_pool_add() now receive a gfp_t as
+>>   argument allowing the caller to specify the flag it needs.
+>> - buf_num is now tested to ensure there is no wrapping
+>> - A spinlock has been added to protect the hwbm_pool_add() function in
+>>   SMP or irq context.
+>> 
+>> I also used pr_warn instead of pr_debug in case of errors.
+>> 
+>> I fixed the mvneta implementation by returning the buffer to the pool
+>> at various place instead of ignoring it.
+>> 
+>> About the series itself I tried to make this series easier to merge:
+>> - Squashed "bus: mvenus-mbus: Fix size test for
+>>    mvebu_mbus_get_dram_win_info" into bus: mvebu-mbus: provide api for
+>>    obtaining IO and DRAM window information.
+>> - Added my signed-otf-by on all the patches as submitter of the series.
+>> - Renamed the dts patches with the pattern "ARM: dts: platform:"
+>> - Removed the patch "ARM: mvebu: enable SRAM support in
+>>   mvebu_v7_defconfig" of this series and already applied it
+>> - Rodified the order of the patches.
+>> 
+>> In order to ease the test the branch mvneta-BM-framework-v2 is
+>> available at git at github.com:MISL-EBU-System-SW/mainline-public.git.
+>
+> Well, I tested this patch series on top of latest master (from today)
+> on my fresh new clearfog board. I compared carefully with and without
+> the patchset. My workload was haproxy receiving connections and forwarding
+> them to my PC via the same port. I tested both with short connections
+> (HTTP GET of an empty file) and long ones (1 MB or more). No trouble
+> was detected at all, which is pretty good. I noticed a very tiny
+> performance drop which is more noticeable on short connections (high
+> packet rates), my forwarded connection rate went down from 17500/s to
+> 17300/s. But I have not checked yet what can be tuned when using the
+> BM, nor did I compare CPU usage. I remember having run some tests in
+> the past, I guess it was on the XP-GP board, and noticed that the BM
+> could save a significant amount of CPU and improve cache efficiency,
+> so if this is the case here, we don't really care about a possible 1%
+> performance drop.
+>
+> I'll try to provide more results as time permits.
+>
+> In the mean time if you want (or plan to submit a next batch), feel
+> free to add a Tested-by: Willy Tarreau <w@1wt.eu>.
 
-Whatever we use to describe the PMU, should probably also identify the
-CPU uniquely.
+Great!  thanks for testing.
 
-Will
+Gregory
 
-> Signed-off-by: Jan Glauber <jglauber@cavium.com>
-> ---
->  Documentation/devicetree/bindings/arm/pmu.txt | 1 +
->  arch/arm64/boot/dts/cavium/thunder-88xx.dtsi  | 5 +++++
->  2 files changed, 6 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/pmu.txt b/Documentation/devicetree/bindings/arm/pmu.txt
-> index 5651883..d3999a1 100644
-> --- a/Documentation/devicetree/bindings/arm/pmu.txt
-> +++ b/Documentation/devicetree/bindings/arm/pmu.txt
-> @@ -25,6 +25,7 @@ Required properties:
->  	"qcom,scorpion-pmu"
->  	"qcom,scorpion-mp-pmu"
->  	"qcom,krait-pmu"
-> +	"cavium,thunder-pmu"
->  - interrupts : 1 combined interrupt or 1 per core. If the interrupt is a per-cpu
->                 interrupt (PPI) then 1 interrupt should be specified.
->  
-> diff --git a/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi b/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
-> index 9cb7cf9..2eb9b22 100644
-> --- a/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
-> +++ b/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
-> @@ -360,6 +360,11 @@
->  		             <1 10 0xff01>;
->  	};
->  
-> +	pmu {
-> +		compatible = "cavium,thunder-pmu", "arm,armv8-pmuv3";
-> +		interrupts = <1 7 4>;
-> +	};
-> +
->  	soc {
->  		compatible = "simple-bus";
->  		#address-cells = <2>;
-> -- 
-> 1.9.1
-> 
+>
+> cheers,
+> Willy
+>
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
