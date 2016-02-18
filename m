@@ -1,25 +1,22 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 18 Feb 2016 08:37:02 -0600
+Date: Thu, 18 Feb 2016 08:36:53 -0600
 Subject: [PATCH 3/6] ASoC: rockchip: add bindings for rk3399 i2s
-In-Reply-To: <20160217110306.GJ7544@sirena.org.uk>
+In-Reply-To: <1455673992-16469-4-git-send-email-jay.xu@rock-chips.com>
 References: <1455673992-16469-1-git-send-email-jay.xu@rock-chips.com>
  <1455673992-16469-4-git-send-email-jay.xu@rock-chips.com>
- <20160217110306.GJ7544@sirena.org.uk>
-Message-ID: <20160218143702.GN9654@rob-hp-laptop>
+Message-ID: <20160218143653.GM9654@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 17, 2016 at 11:03:06AM +0000, Mark Brown wrote:
-> On Wed, Feb 17, 2016 at 09:53:09AM +0800, jianqun.xu wrote:
+On Wed, Feb 17, 2016 at 09:53:09AM +0800, jianqun.xu wrote:
+> From: Xu Jianqun <jay.xu@rock-chips.com>
 > 
-> > ---
-> >  Documentation/devicetree/bindings/sound/rockchip-i2s.txt | 1 +
-> >  1 file changed, 1 insertion(+)
+> Add devicetree bindings for i2s controller found on rk3399
+> processors from rockchip.
 > 
-> As with the other patch I'd expect to see a matching driver update if
-> only for documentation purposes.
+> Signed-off-by: Xu Jianqun <jay.xu@rock-chips.com>
+> ---
+>  Documentation/devicetree/bindings/sound/rockchip-i2s.txt | 1 +
+>  1 file changed, 1 insertion(+)
 
-Why? They match on the prior chip's compatible until there is some 
-difference the driver needs to handle.
-
-Rob
+Acked-by: Rob Herring <robh@kernel.org>
