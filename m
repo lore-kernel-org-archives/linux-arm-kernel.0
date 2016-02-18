@@ -1,33 +1,38 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 18 Feb 2016 15:40:34 +0100
-Subject: [PATCH 1/3] irqchip: gic/realview: support more RealView DCC
- variants
-In-Reply-To: <56C5D304.5010708@arm.com>
-References: <1455803172-22747-1-git-send-email-linus.walleij@linaro.org>
- <56C5D304.5010708@arm.com>
-Message-ID: <5028476.WAQS3ylXOd@wuerfel>
+Date: Thu, 18 Feb 2016 15:41:45 +0100
+Subject: [PATCH] PCI: mvebu: Restrict build to 32-bit ARM
+In-Reply-To: <87egcaqe89.fsf@free-electrons.com>
+References: <1455802330-17565-1-git-send-email-thierry.reding@gmail.com>
+ <5051836.EUN3ennYNm@wuerfel> <87egcaqe89.fsf@free-electrons.com>
+Message-ID: <2551766.4Kx1a2F3t1@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 18 February 2016 14:19:48 Marc Zyngier wrote:
-> On 18/02/16 13:46, Linus Walleij wrote:
-> > In the add-on file for the GIC dealing with the RealView family
-> > we currently only handle the PB11MPCore, let's extend this to
-> > manage the RealView EB ARM11MPCore as well. The Revision B of the
-> > ARM11MPCore core tile is a bit special and needs special handling
-> > as it moves a system control register around at random.
+On Thursday 18 February 2016 15:34:30 Gregory CLEMENT wrote:
+>  On jeu., f?vr. 18 2016, Arnd Bergmann <arnd@arndb.de> wrote:
 > 
-> Ah, 11MPCore RevB. That thing. Tried to locate one in the magic
-> cupboard, and failed. Oh well...
+> > On Thursday 18 February 2016 14:32:10 Thierry Reding wrote:
+> >> From: Thierry Reding <treding@nvidia.com>
+> >> 
+> >> This driver uses PCI glue that is only available on 32-bit ARM. This
+> >> used to work fine as long as ARCH_MVEBU and ARCH_DOVE were exclusively
+> >> 32-bit, but that's changed now, with ARCH_MVEBU also being available
+> >> on 64-bit ARM.
+> >> 
+> >> Signed-off-by: Thierry Reding <treding@nvidia.com>
+> >
+> > Looks fine as a temporary workaround, but I think what we really want to
+> > do here is to remove the dependency, as the new ARM64 platforms are going
+> > to need this driver anyway.
+> 
+> Actually the mvebu ARM64 platform we know about (Armada 3700, 7K and
+> 8K), won't use the same controller. A7K/A8K will use a synopsis IP and
+> Armada 3700 a new Marvell IP.
+> 
+> So for me depending on ARM32 is enough.
 
-What surprised me though is that it's enabled by default:
+Ah, that makes things much easier indeed.
 
-$ grep REVB arch/arm/configs/realview*
-arch/arm/configs/realview_defconfig:CONFIG_REALVIEW_EB_ARM11MP_REVB=y
-arch/arm/configs/realview-smp_defconfig:CONFIG_REALVIEW_EB_ARM11MP_REVB=y
-
-With that option set, the defconfig kernel should not be able
-to boot on RevC machines. Do you have a RevC machine that works
-with the defconfig?
+Does this mean no more MBUS on the 64-bit platforms too?
 
 	Arnd
