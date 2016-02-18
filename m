@@ -1,39 +1,34 @@
-From: ray.jui@broadcom.com (Ray Jui)
-Date: Thu, 18 Feb 2016 10:15:11 -0800
-Subject: [1/4] arm64: Broadcom Vulcan support
-In-Reply-To: <1455389195-31870-2-git-send-email-jchandra@broadcom.com>
-References: <1455389195-31870-2-git-send-email-jchandra@broadcom.com>
-Message-ID: <0c75ddd6-d353-bb73-62e4-bae0ff95a3b0@broadcom.com>
+From: Chris.Brandt@renesas.com (Chris Brandt)
+Date: Thu, 18 Feb 2016 18:18:02 +0000
+Subject: [PATCH] ARM: Allow MULTIPLATFORM to select XIP
+In-Reply-To: <alpine.LFD.2.20.1602181244490.13632@knanqh.ubzr>
+References: <1455816310-11308-1-git-send-email-chris.brandt@renesas.com>
+ <alpine.LFD.2.20.1602181244490.13632@knanqh.ubzr>
+Message-ID: <HK2PR06MB0561377EABB3B4B8E94F22328AAF0@HK2PR06MB0561.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ bcm-kernel-feedback-list mailing list
+> And realistically it makes no sense to use XIP (surely because you need
+> to save space) and have multi-platform support in your kernel.
 
-On 2/13/2016 10:46 AM, Jayachandran C. wrote:
-> From: Zi Shen Lim <zlim@broadcom.com>
->
-> Add a configuration option and a device tree for Broadcom's Vulcan
-> ARM64 processor. brcm-vulcan.dtsi has the on-chip blocks like the
-> PCIe controller, GICv3 with ITS, PMU, system timer and pl011 UART.
-> brcm-vulcan-eval.dts has definitions for a basic evaluation board.
-> The firmware supports PSCI 0.2 for cpu wakeup.
->
-> Signed-off-by: Zi Shen Lim <zlim@broadcom.com>
-> [ updated and split dts - jchandra at broadcom.com ]
-> Signed-off-by: Jayachandran C <jchandra@broadcom.com>
->
-> ---
-> arch/arm64/Kconfig.platforms                      |   5 +
->  arch/arm64/boot/dts/broadcom/Makefile             |   1 +
->  arch/arm64/boot/dts/broadcom/brcm-vulcan-eval.dts |  33 +++++
->  arch/arm64/boot/dts/broadcom/brcm-vulcan.dtsi     | 146 ++++++++++++++++++++++
->  4 files changed, 185 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/broadcom/brcm-vulcan-eval.dts
->  create mode 100644 arch/arm64/boot/dts/broadcom/brcm-vulcan.dtsi
 
-Could you please name the files "vulcan.dtsi" and "vulcan-eval.dts" so 
-it's consistent with the rest of files in the same directory?
+The problem is that you don't have a choice: Multi-platform is your only choice for many devices (MMU devices that is).
 
-Thanks,
+So for XIP, it comes down to either:
 
-Ray
+A) Go back to making individual configs for each MPU
+
+B) Let everything keep getting grouped together into multi-platform, and then just de-selecting the MPU you don't want.
+
+I can tell you when I build my upstream XIP kernel for testing for the RZ/A1, it's ARCH_MULTIPLATFORM (all Renesas parts are multiplatform) and then remove everything I don't want/need, my kernel size is 3.4MB.
+
+
+> IMHO it should be clear that with XIP there is only one platform that can
+> be supported.
+
+I would be fine if there was some way you could only select XIP_KERNEL if only 1 of the MPUs in the multiplatform group were selected...but I can't figure out how to do that in the kbuild system (without adding lots of chunky configs all over the place...which is not what I want)
+
+Is there some way you can do a PLATFORM_COUNTER++ for each device that is selected, and then XIP_KERNEL would depend on PLATFORM_COUNTER == 1 ?
+
+
+Chris
