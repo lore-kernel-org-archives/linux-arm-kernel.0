@@ -1,126 +1,120 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 18 Feb 2016 22:31:31 +0300
-Subject: [PATCH v2 5/5] ARM: dts: r8a7794: add sound support
-In-Reply-To: <20160217234857.GA6886@verge.net.au>
-References: <2543047.yYrDdYb9v5@wasted.cogentembedded.com>
- <874mdhtn7d.wl%kuninori.morimoto.gx@renesas.com>
- <20160210171455.GB17671@verge.net.au> <56BE0CB1.4070408@cogentembedded.com>
- <20160212184343.GA31655@verge.net.au> <56BE2DC6.4080802@cogentembedded.com>
- <20160212193347.GB23472@verge.net.au> <56BE3912.9000601@cogentembedded.com>
- <20160217053848.GC11534@verge.net.au> <56C4C506.8040803@cogentembedded.com>
- <20160217234857.GA6886@verge.net.au>
-Message-ID: <56C61C13.8000301@cogentembedded.com>
+From: stuart.yoder@nxp.com (Stuart Yoder)
+Date: Thu, 18 Feb 2016 19:33:19 +0000
+Subject: RFC: extend IOMMU attributes
+In-Reply-To: <20160218162145.GB16883@arm.com>
+References: <HE1PR04MB1641F22E38710B68F4ED891F8DAF0@HE1PR04MB1641.eurprd04.prod.outlook.com>
+ <20160218162145.GB16883@arm.com>
+Message-ID: <HE1PR04MB16418B721EF4A95F6860542B8DAF0@HE1PR04MB1641.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/18/2016 02:48 AM, Simon Horman wrote:
 
->>>>>>>>>>> Define the generic R8A7794 part of  the sound device node.
->>>>>>>>>>> This sound device  is a complex one and comprises the Audio Clock Generator
->>>>>>>>>>> (ADG), Sampling Rate Converter Unit (SCU), Serial Sound Interface [Unit]
->>>>>>>>>>> (SSI[U]), and Audio DMAC-Peripheral-Peripheral.
->>>>>>>>>>> It is up  to the board file to enable the device.
->>>>>>>>>>>
->>>>>>>>>>> This patch is based on the R8A7791 sound work by Kuninori Morimoto.
->>>>>>>>>>>
->>>>>>>>>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->>>>>>>>>> (snip)
->>>>>>>>>>> +		rcar_sound,src {
->>>>>>>>>>> +			src1: src at 1 {
->>>>>>>>>>> +				interrupts = <GIC_SPI 353 IRQ_TYPE_LEVEL_HIGH>;
->>>>>>>>>>> +				dmas = <&audma0 0x87>, <&audma0 0x9c>;
->>>>>>>>>>> +				dma-names = "rx", "tx";
->>>>>>>>>>> +			};
->>>>>>>>>>> +			src2: src at 2 {
->>>>>>>>>>> +				interrupts = <GIC_SPI 354 IRQ_TYPE_LEVEL_HIGH>;
->>>>>>>>>>> +				dmas = <&audma0 0x89>, <&audma0 0x9e>;
->>>>>>>>>>> +				dma-names = "rx", "tx";
->>>>>>>>>>> +			};
->>>>>>>>>>> +			src3: src at 3 {
->>>>>>>>>>> +				interrupts = <GIC_SPI 355 IRQ_TYPE_LEVEL_HIGH>;
->>>>>>>>>>> +				dmas = <&audma0 0x8b>, <&audma0 0xa0>;
->>>>>>>>>>> +				dma-names = "rx", "tx";
->>>>>>>>>>> +			};
->>>>>>>>>>> +			src4: src at 4 {
->>>>>>>>>>> +				interrupts = <GIC_SPI 356 IRQ_TYPE_LEVEL_HIGH>;
->>>>>>>>>>> +				dmas = <&audma0 0x8d>, <&audma0 0xb0>;
->>>>>>>>>>> +				dma-names = "rx", "tx";
->>>>>>>>>>> +			};
->>>>>>>>>>> +			src5: src at 5 {
->>>>>>>>>>> +				interrupts = <GIC_SPI 357 IRQ_TYPE_LEVEL_HIGH>;
->>>>>>>>>>> +				dmas = <&audma0 0x8f>, <&audma0 0xb2>;
->>>>>>>>>>> +				dma-names = "rx", "tx";
->>>>>>>>>>> +			};
->>>>>>>>>>> +			src6: src at 6 {
->>>>>>>>>>> +				interrupts = <GIC_SPI 358 IRQ_TYPE_LEVEL_HIGH>;
->>>>>>>>>>> +				dmas = <&audma0 0x91>, <&audma0 0xb4>;
->>>>>>>>>>> +				dma-names = "rx", "tx";
->>>>>>>>>>> +			};
->>>>>>>>>>> +		};
->>>>>>>>>>
->>>>>>>>>> I think this can't work correctly, because driver is assuming
->>>>>>>>>> DT has all channles (from 0). (see linux/sound/soc/sh/rcar/src.c :: rsnd_src_probe)
->>>>>>>>>> Can you adds dummy src0 with some comments ? or fix src.c driver ?
->>>>>>>>>
->>>>>>>>> I would prefer the driver to be fixed (I had a similar patchset locally
->>>>>>>>> and I found it doesn't work).
->>>>>>>>
->>>>>>>>     You mean you had R8A7794 sound patch set too?
->>>>>>>
->>>>>>> Yes, I was working on it recently.
->>>>>>> I suppose we should coordinate these things in future to avoid
->>>>>>> duplicated effort.
->>>>>>
->>>>>>     Yes, seems a good idea now. :-)
->>>>>>
->>>>>>>>> The reason is that DT should describe
->>>>>>>>> the hardware rather than the current state of the software.
->>>>>>>>
->>>>>>>>     Yes, of course. Just tell me do I have to fix the driver *before* this
->>>>>>>> patch set is accepted?
->>>>>>
->>>>>>> I did not entirely get to the bottom of the problem, but I think that at
->>>>>>> the very least something needs to be done about the for_each_rsnd_src()
->>>>>>> loop in rsnd_src_probe.
->>>>>>
->>>>>>     It's not that it replies to my question. :-)
->>>>>>     So you're looking at this issue yourself?
->>>>>
->>>>> I have not got very far, as you can see, but I was planning to look into it.
->>>>> I don't mind if you want to do so.
->>>>
->>>>     After consultation with the management, I'm going to look into this issue
->>>> myself. :-)
->>>
->>> Excellent.
->>
->>     But not immediately. I have some other things to look at before that (DU
->> and AVB), they'll going to take some (significant) time... :-(
->>
->>> FWIW, I can test anything you come up with for the r8a7794 an alt board
->>
->>     I have remote access to Alt now, in fact using it currently for the AVB work.
->>
->>> or post patches for it once you have r8a7794/silk sorted out.
->>
->>     I already have audio on these working. Or you're going to wait until I
->> fix the SRC issue?
->
-> I'm happy to merge a subset of your r8a7794/silk patches,
-> that don't touch the SRC issue if you think that is appropriate.
 
-    I think you can merge everything R8A7794 specific. The SILK patch doesn't 
-make use of SRCs yet but depends on the PFC patches, so makes sense to hold it 
-up...
+> -----Original Message-----
+> From: Will Deacon [mailto:will.deacon at arm.com]
+> Sent: Thursday, February 18, 2016 10:22 AM
+> To: Stuart Yoder <stuart.yoder@nxp.com>
+> Cc: joro at 8bytes.org; robin.murphy at arm.com; iommu at lists.linux-foundation.org; linux-arm-
+> kernel at lists.infradead.org; Varun Sethi <V.Sethi@nxp.com>; Bharat Bhushan
+> <bharat.bhushan@nxp.com>; Nipun Gupta <nipun.gupta@nxp.com>; Peter Newton
+> <peter.newton@nxp.com>
+> Subject: Re: RFC: extend IOMMU attributes
+> 
+> Hi Stuart,
+> 
+> On Thu, Feb 18, 2016 at 04:16:26PM +0000, Stuart Yoder wrote:
+> > We are implementing support for some specialized NXP SoC network
+> > devices and have the desire to extend the mapping attributes beyond
+> > those currently in iommu.h. (I see there is a recent proposal to
+> > add an IOMMU_MMIO flag)
+> >
+> > What we have right now in Linux is a least-common-denominator set of
+> > attributes, while for the ARM SMMU there is a much richer set of
+> > attributes that seem useful to support. Specifically, we have one
+> > SoC device we're dealing with right now that is the target of DMA
+> > that functionally requires a "cacheable, non-shareable" attribute
+> > in its SMMU mapping.
+> >
+> > In addition, there are many other attributes such as r/w allocate
+> > hints, transient hints, write-back/write-thru, etc in the SMMU.
+> >
+> > We wanted to see what your thinking is with respect to the
+> > direction the Linux IOMMU layer will head over the longer term with
+> > respect to attributes.
+> >
+> > Is there anything problematic with continuing to grow the
+> > attributes in iommu.h?...e.g.:
+> >
+> >  #define IOMMU_READ            (1 << 0)
+> >  #define IOMMU_WRITE           (1 << 1)
+> > -#define IOMMU_CACHE           (1 << 2) /* DMA cache coherency */
+> > +#define IOMMU_CACHE_COHERENT  (1 << 2) /* cacheable and coherent */
+> >  #define IOMMU_NOEXEC          (1 << 3)
+> >  #define IOMMU_MMIO            (1 << 4) /* e.g. things like MSI doorbells */
+> > +#define IOMMU_CACHEABLE       (1 << 5) /* cacheable, not coherent */
+> 
+> What does that even mean?
 
->  From there I could get similar functionality running on the Alt - I don't
-> expect that to be a difficult task.
+It means allocate in the cache, but don't propagate coherency.
+In our case we have a device using an A57 cluster ACP port
+to do stashing.  
 
-    Sure -- if you have direct access to the board.
+             cluster
+       +------------------+
+       |   A57     A57    |                +----+
+       |           ......ACP..<............|SMMU|<...device
+       |  +--------.--+   |  non-coherent  +----+
+       |  |    L2  v  |   | write w/allocate
+       |  +--------.--+   |
+       +-----------.------+
+                   .
+       +-----------v------+
+       |     CCN-504      |
+       +-------------.----+
+                     .
+              +------v------+
+              |    device   |
+              | (descriptor |
+              |    rings)   | 
+              +-------------+
 
-> And then when you come back to the SRC
-> issue we can enhance support for r8a7794/silk,alt.
+The device in question is doing a cacheable write targeting some
+device descriptor rings.  The purpose of this transaction is to stash
+the descriptor ring data in the L2 cache so the driver on the
+A57s can get@it with low latency.  It has to be non-coherent
+because of stuff related to how things are hooked up to CCN-504
+(can take more details offline if you want).  Because it is non
+coherent, the driver obviously has to be affined to the cluster.
+It's a lot of hoops to jump through, but the performance benefit
+is worth it.
 
-    Yes.
+> > +#define IOMMU_CACHE_ALLOCATE  (1 << 6) /* hint to allocate in the cache */
+> >
+> > Also, are we willing to let somewhat architecture specific flags
+> > onto that list?  For, example the ARM 'transient' hint.
+> 
+> If we're going to support fine-grained attribute control, I think it needs
+> to be done in a page-table specific manner. That is, io-pgtable-arm could
+> provide those attribute controls which feature in the ARMv8 architecture...
 
-MBR, Sergei
+So there would be some new API for users like vfio?
+
+> ...but that brings me onto my next question: Who on Earth is actually
+> going to provide these attributes to the IOMMU API?
+> 
+> There seems to be a missing piece.
+
+Currently it would be vfio, because the driver is in user space.
+There are some details to be worked out regarding how vfio would
+determine and provide the attributes.  This is a device on the
+fsl-mc bus (see drivers/staging/fsl-mc/README.txt) and the
+vfio-fsl-mc bus layer should be able to determine what attributes
+to use.
+
+Once the kernel dma map API is hooked up to the SMMU, I think there
+could be similar requirements down the road for kernel drivers.
+If a driver is  intelligent enough to use some of the fine grained
+attributes, how can that be supported?
+
+Thanks,
+Stuart
