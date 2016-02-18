@@ -1,45 +1,77 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 18 Feb 2016 17:20:29 +0100
-Subject: [PATCH v2 5/6] arm64: update ARCH_MVEBU for Marvell Armada 7K/8K
- support
-In-Reply-To: <1455812430-4656-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1455812430-4656-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1455812430-4656-6-git-send-email-thomas.petazzoni@free-electrons.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 18 Feb 2016 11:21:45 -0500 (EST)
+Subject: [PATCH 9/9] ARM: fix kprobe test with CONFIG_CPU_32v3
+In-Reply-To: <1455804123-2526139-10-git-send-email-arnd@arndb.de>
+References: <1455804123-2526139-1-git-send-email-arnd@arndb.de>
+ <1455804123-2526139-10-git-send-email-arnd@arndb.de>
+Message-ID: <alpine.LFD.2.20.1602181121170.13632@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit updates the ARCH_MVEBU Kconfig option introduced for
-Armada 3700 to also be used for the Armada 7K and 8K platforms, by:
+On Thu, 18 Feb 2016, Arnd Bergmann wrote:
 
- - Selecting the appropriate clock and irqchip drivers
- - Updating the help text to mention Armada 7K and 8K
+> ARMv3 did not have 16-bit load/store or 32-bit multiply instructions,
+> so building the kprobe test code fails with lots of warnings about
+> these:
+> 
+> /tmp/ccI4SKHx.s:19585: Error: selected processor does not support ARM mode `umull r0,r1,r2,r3'
+> /tmp/ccI4SKHx.s:19617: Error: selected processor does not support ARM mode `umullls r7,r8,r9,r10'
+> /tmp/ccI4SKHx.s:19645: Error: selected processor does not support ARM mode `umull lr,r12,r11,r13'
+> /tmp/ccI4SKHx.s:19727: Error: selected processor does not support ARM mode `umulls r0,r1,r2,r3'
+> ...
+> /tmp/ccI4SKHx.s:21273: Error: selected processor does not support ARM mode `strh r0,[r1,-r2]'
+> /tmp/ccI4SKHx.s:21309: Error: selected processor does not support ARM mode `streqh r14,[r11,r12]'
+> /tmp/ccI4SKHx.s:21333: Error: selected processor does not support ARM mode `streqh r14,[r13,r12]'
+> 
+> This puts all the affected instructions inside an #ifdef section,
+> like we do for the other architecture levels.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm64/Kconfig.platforms | 11 ++++++++---
- 1 file changed, 8 insertions(+), 3 deletions(-)
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index 85bec42..c9a184b 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -50,9 +50,14 @@ config ARCH_MEDIATEK
- 
- config ARCH_MVEBU
- 	bool "Marvell EBU SoC Family"
--	help
--	  This enables support for Marvell EBU family such as the
--	  Armada 3700 SoC family.
-+	select ARMADA_AP806_CORE_CLK
-+	select ARMADA_AP806_RING_CLK
-+	select MVEBU_ODMI
-+	help
-+	  This enables support for Marvell EBU familly, including:
-+	   - Armada 3700 SoC Family
-+	   - Armada 7K SoC Family
-+	   - Armada 8K SoC Family
- 
- config ARCH_QCOM
- 	bool "Qualcomm Platforms"
--- 
-2.6.4
+> ---
+>  arch/arm/probes/kprobes/test-arm.c | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/probes/kprobes/test-arm.c b/arch/arm/probes/kprobes/test-arm.c
+> index 8866aedfdea2..4e8511f0582d 100644
+> --- a/arch/arm/probes/kprobes/test-arm.c
+> +++ b/arch/arm/probes/kprobes/test-arm.c
+> @@ -391,6 +391,7 @@ void kprobe_arm_test_cases(void)
+>  	TEST_UNSUPPORTED(__inst_arm(0xe0700090) " @ undef")
+>  	TEST_UNSUPPORTED(__inst_arm(0xe07fff9f) " @ undef")
+>  
+> +#if __LINUX_ARM_ARCH__ >= 4
+>  	TEST_RR(  "umull	r0, r1, r",2, VAL1,", r",3, VAL2,"")
+>  	TEST_RR(  "umullls	r7, r8, r",9, VAL2,", r",10, VAL1,"")
+>  	TEST_R(   "umull	lr, r12, r",11,VAL3,", r13")
+> @@ -436,6 +437,7 @@ void kprobe_arm_test_cases(void)
+>  	TEST_UNSUPPORTED(__inst_arm(0xe0f0f392) " @ smlals r0, pc, r2, r3")
+>  	TEST_UNSUPPORTED(__inst_arm(0xe0f0139f) " @ smlals r0, r1, pc, r3")
+>  	TEST_UNSUPPORTED(__inst_arm(0xe0f01f92) " @ smlals r0, r1, r2, pc")
+> +#endif
+>  
+>  	TEST_GROUP("Synchronization primitives")
+>  
+> @@ -478,7 +480,7 @@ void kprobe_arm_test_cases(void)
+>  	TEST_UNSUPPORTED("ldrexh	r2, [sp]")
+>  #endif
+>  	TEST_GROUP("Extra load/store instructions")
+> -
+> +#if __LINUX_ARM_ARCH__ >= 4
+>  	TEST_RPR(  "strh	r",0, VAL1,", [r",1, 48,", -r",2, 24,"]")
+>  	TEST_RPR(  "streqh	r",14,VAL2,", [r",11,0, ", r",12, 48,"]")
+>  	TEST_UNSUPPORTED(  "streqh	r14, [r13, r12]")
+> @@ -560,6 +562,7 @@ void kprobe_arm_test_cases(void)
+>  	TEST(      "ldrsh	r0, [pc, #0]")
+>  	TEST_UNSUPPORTED(__inst_arm(0xe1ffc3f0) "	@ ldrsh r12, [pc, #48]!")
+>  	TEST_UNSUPPORTED(__inst_arm(0xe0d9f3f0) "	@ ldrsh pc, [r9], #48")
+> +#endif
+>  
+>  #if __LINUX_ARM_ARCH__ >= 7
+>  	TEST_UNSUPPORTED("strht	r1, [r2], r3")
+> -- 
+> 2.7.0
+> 
+> 
