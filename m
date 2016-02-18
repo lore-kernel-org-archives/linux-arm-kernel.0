@@ -1,35 +1,44 @@
-From: han.xu@nxp.com (Han Xu)
-Date: Thu, 18 Feb 2016 03:55:15 +0000
-Subject: [PATCH] MAINTAINERS: add maintainer entry for FREESCALE GPMI NAND
- driver
-Message-ID: <1455767715-621-1-git-send-email-han.xu@nxp.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Wed, 17 Feb 2016 20:09:23 -0800
+Subject: [PATCH V2 3/8] dmaengine: bcm2835: use shared interrupt for
+ channel 11 to 14.
+In-Reply-To: <1452187987-2605-4-git-send-email-kernel@martin.sperl.org>
+References: <1452187987-2605-1-git-send-email-kernel@martin.sperl.org>
+ <1452187987-2605-4-git-send-email-kernel@martin.sperl.org>
+Message-ID: <87ziuywtfw.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a maintainer entry for FREESCALE GPMI NAND driver and add myself as a
-maintainer.
+kernel at martin.sperl.org writes:
 
-Signed-off-by: Han Xu <han.xu@nxp.com>
----
- MAINTAINERS | 6 ++++++
- 1 file changed, 6 insertions(+)
+> From: Martin Sperl <kernel@martin.sperl.org>
+>
+> The bcm2835 dma channel 11 to 14 only have a single shared irq line,
+> so this patch implements shared interrupts for these channels.
+>
+> To avoid changes to the device tree (with regards to interrupts listed,
+> which reflects on pdev->num_resources) a fixed channel count had
+> to get used in the code instead.
+>
+> With this patch applied we now have 11 dma channels available to
+> the ARM side of the SOC.
+>
+> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 7bd927e..49baa5b 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -4543,6 +4543,12 @@ L:	linuxppc-dev at lists.ozlabs.org
- S:	Maintained
- F:	drivers/dma/fsldma.*
- 
-+FREESCALE GPMI NAND DRIVER
-+M:	Han Xu <han.xu@nxp.com>
-+L:	linux-mtd at lists.infradead.org
-+S:	Maintained
-+F:	drivers/mtd/nand/gpmi-nand/*
-+
- FREESCALE I2C CPM DRIVER
- M:	Jochen Friedrich <jochen@scram.de>
- L:	linuxppc-dev at lists.ozlabs.org
--- 
-2.7.1
+Particularly given the existing DT bindings we have, I actually think
+this is a good way to go.  This is internal to the hardware module about
+how its features map to interrupt lines that leave the hardware module
+(which are exposed in DT appropriately).
+
+I thought about "what if we had the last interrupt line hooked up to a
+different interrupt handler that read out and decided which channels to
+wake up", but this seems much simpler.
+
+Reviewed-by: Eric Anholt <eric@anholt.net>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160217/ca03aa66/attachment.sig>
