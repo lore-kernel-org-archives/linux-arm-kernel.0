@@ -1,61 +1,52 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 18 Feb 2016 12:48:28 -0500 (EST)
-Subject: [PATCH] ARM: Allow MULTIPLATFORM to select XIP
-In-Reply-To: <1455816310-11308-1-git-send-email-chris.brandt@renesas.com>
-References: <1455816310-11308-1-git-send-email-chris.brandt@renesas.com>
-Message-ID: <alpine.LFD.2.20.1602181244490.13632@knanqh.ubzr>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 18 Feb 2016 17:49:18 +0000
+Subject: [GIT PULL] iommu/io-pgtable: Updates for 4.6
+Message-ID: <20160218174918.GF16883@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 18 Feb 2016, Chris Brandt wrote:
+Hi Joerg,
 
-> As Multiplatform seems to be the way of the future, you should not restrict
-> from selecting XIP. Whether it makes sense or not depends on how you
-> configure the rest of the kernel (as in, removing individual platforms).
-> Also, it stands to reason that if you select MULTIPLATFORM and XIP_KERNEL,
-> you either know what you are doing...or have NO idea what you are doing.
+Here are the io-pgtable updates from Robin for 4.6.
 
-There are simply too many people who don't know what they're doing.
+The bulk of this is adding support for the ARM v7s page table format,
+which will be used by the Mediatek IOMMU driver from Yong Wu. Subsequent
+work may also enable this format for the ARM SMMU.
 
-And realistically it makes no sense to use XIP (surely because you 
-need to save space) and have multi-platform support in your kernel.
+Cheers,
 
-IMHO it should be clear that with XIP there is only one platform that 
-can be supported.
+Will
 
+--->8
 
+The following changes since commit 18558cae0272f8fd9647e69d3fec1565a7949865:
 
+  Linux 4.5-rc4 (2016-02-14 13:05:20 -0800)
 
-> 
-> Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
-> ---
->  arch/arm/Kconfig | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index cc95ff8..2e4a127 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -327,7 +327,7 @@ config ARCH_MULTIPLATFORM
->  	depends on MMU
->  	select ARCH_WANT_OPTIONAL_GPIOLIB
->  	select ARM_HAS_SG_CHAIN
-> -	select ARM_PATCH_PHYS_VIRT
-> +	select ARM_PATCH_PHYS_VIRT if !XIP_KERNEL
->  	select AUTO_ZRELADDR
->  	select CLKSRC_OF
->  	select COMMON_CLK
-> @@ -1919,7 +1919,7 @@ endchoice
->  
->  config XIP_KERNEL
->  	bool "Kernel Execute-In-Place from ROM"
-> -	depends on !ARM_LPAE && !ARCH_MULTIPLATFORM
-> +	depends on !ARM_LPAE
->  	help
->  	  Execute-In-Place allows the kernel to run from non-volatile storage
->  	  directly addressable by the CPU, such as NOR flash. This saves RAM
-> -- 
-> 1.9.1
-> 
-> 
-> 
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-joerg/io-pgtable
+
+for you to fetch changes up to c8bff3a68f33b94e53f65aa9a4c0e9be34b6b514:
+
+  MAINTAINERS: update ARM SMMU entry (2016-02-17 14:43:40 +0000)
+
+----------------------------------------------------------------
+Robin Murphy (4):
+      iommu/io-pgtable: Add ARMv7 short descriptor support
+      iommu/io-pgtable: Add helper functions for TLB ops
+      iommu/io-pgtable: Avoid redundant TLB syncs
+      iommu/io-pgtable: Rationalise quirk handling
+
+Will Deacon (1):
+      MAINTAINERS: update ARM SMMU entry
+
+ MAINTAINERS                        |   2 +
+ drivers/iommu/Kconfig              |  19 +
+ drivers/iommu/Makefile             |   1 +
+ drivers/iommu/io-pgtable-arm-v7s.c | 846 +++++++++++++++++++++++++++++++++++++
+ drivers/iommu/io-pgtable-arm.c     |  34 +-
+ drivers/iommu/io-pgtable.c         |   5 +-
+ drivers/iommu/io-pgtable.h         |  53 ++-
+ 7 files changed, 943 insertions(+), 17 deletions(-)
+ create mode 100644 drivers/iommu/io-pgtable-arm-v7s.c
