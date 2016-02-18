@@ -1,54 +1,60 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 18 Feb 2016 11:06:08 -0500 (EST)
-Subject: [PATCH 1/9] ARM: ARMv7-M uses BE-8, not BE-32
-In-Reply-To: <1455804123-2526139-2-git-send-email-arnd@arndb.de>
-References: <1455804123-2526139-1-git-send-email-arnd@arndb.de>
- <1455804123-2526139-2-git-send-email-arnd@arndb.de>
-Message-ID: <alpine.LFD.2.20.1602181102570.13632@knanqh.ubzr>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Thu, 18 Feb 2016 09:06:08 -0700
+Subject: [RFC v3 05/15] iommu/arm-smmu: implement
+ alloc/free_reserved_iova_domain
+In-Reply-To: <56C5A65D.5010401@arm.com>
+References: <1455264797-2334-1-git-send-email-eric.auger@linaro.org>
+ <1455264797-2334-6-git-send-email-eric.auger@linaro.org>
+ <56C5A65D.5010401@arm.com>
+Message-ID: <20160218090608.025a5103@t450s.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 18 Feb 2016, Arnd Bergmann wrote:
+On Thu, 18 Feb 2016 11:09:17 +0000
+Robin Murphy <robin.murphy@arm.com> wrote:
 
-> When configuring the kernel for big-endian, we set either BE-8 or BE-32
-> based on the CPU architecture level. Until linux-4.4, we did not have
-> any ARMv7-M platform allowing big-endian builds, but now i.MX/Vybrid
-> is in that category, adn we get a build error because of this:
+> Hi Eric,
 > 
-> arch/arm/kernel/module-plts.c: In function 'get_module_plt':
-> arch/arm/kernel/module-plts.c:60:46: error: implicit declaration of function '__opcode_to_mem_thumb32' [-Werror=implicit-function-declaration]
+> On 12/02/16 08:13, Eric Auger wrote:
+> > Implement alloc/free_reserved_iova_domain for arm-smmu. we use
+> > the iova allocator (iova.c). The iova_domain is attached to the
+> > arm_smmu_domain struct. A mutex is introduced to protect it.  
 > 
-> This comes down to picking the wrong default, ARMv7-M uses BE8
-> like ARMv7-A does. Changing the default gets the kernel to compile
-> and presumably works.
+> The IOMMU API currently leaves IOVA management entirely up to the caller 
+> - VFIO is already managing its own IOVA space, so what warrants this 
+> being pushed all the way down to the IOMMU driver? All I see here is 
+> abstract code with no hardware-specific details that'll have to be 
+> copy-pasted into other IOMMU drivers (e.g. SMMUv3), which strongly 
+> suggests it's the wrong place to do it.
+> 
+> As I understand the problem, VFIO has a generic "configure an IOMMU to 
+> point at an MSI doorbell" step to do in the process of attaching a 
+> device, which hasn't needed implementing yet due to VT-d's 
+> IOMMU_CAP_I_AM_ALSO_ACTUALLY_THE_MSI_CONTROLLER_IN_DISGUISE flag, which 
+> most of us have managed to misinterpret so far. AFAICS all the IOMMU 
+> driver should need to know about this is an iommu_map() call (which will 
+> want a slight extension[1] to make things behave properly). We should be 
+> fixing the abstraction to be less x86-centric, not hacking up all the 
+> ARM drivers to emulate x86 hardware behaviour in software.
 
-Was it tested without BE8 when it was submitted upstream? I don't think 
-you can switch this freely on a given hardware platform and expect it to 
-still work.
+The gap I see is that, that the I_AM_ALSO_ACTUALLY_THE_MSI...
+solution transparently fixes, is that there's no connection between
+pci_enable_msi{x}_range and the IOMMU API.  If I want to allow a device
+managed by an IOMMU API domain to perform MSI, I need to go scrape the
+MSI vectors out of the device, setup a translation into my IOVA space,
+and re-write those vectors.  Not to mention that as an end user, I
+have no idea what might be sharing the page where those vectors are
+targeted and what I might be allowing the user DMA access to.  MSI
+setup is necessarily making use of the IOVA space of the device, so
+there's clearly an opportunity to interact with the IOMMU API to manage
+that IOVA usage.  x86 has an implicit range of IOVA space for MSI, this
+makes an explicit range, reserved by the IOMMU API user for this
+purpose.  At the vfio level, I just want to be able to call the PCI
+MSI/X setup routines and have them automatically program vectors that
+make use of IOVA space that I've already marked reserved for this
+purpose.  I don't see how that's x86-centric other than x86 has already
+managed to make this transparent and spoiled users into expecting
+working IOVAs on the device after using standard MSI vector setup
+callbacks.  That's the goal I'm looking for.  Thanks,
 
-
-
-
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  arch/arm/mm/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-> index 55347662e5ed..ff1637365494 100644
-> --- a/arch/arm/mm/Kconfig
-> +++ b/arch/arm/mm/Kconfig
-> @@ -723,7 +723,7 @@ config CPU_BIG_ENDIAN
->  config CPU_ENDIAN_BE8
->  	bool
->  	depends on CPU_BIG_ENDIAN
-> -	default CPU_V6 || CPU_V6K || CPU_V7
-> +	default CPU_V6 || CPU_V6K || CPU_V7 || CPU_V7M
->  	help
->  	  Support for the BE-8 (big-endian) mode on ARMv6 and ARMv7 processors.
->  
-> -- 
-> 2.7.0
-> 
-> 
+Alex
