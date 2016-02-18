@@ -1,33 +1,37 @@
-From: k@japko.eu (Krzysztof Adamski)
-Date: Thu, 18 Feb 2016 20:49:31 +0100
-Subject: [PATCH] pinctrl: sunxi: Add missing H3 R_PIO binding documentation
-In-Reply-To: <CACRpkdbfNeh7_=3ReQtJc7OxkkQEn+BUhZ0O0SKnFsRD=WZiUQ@mail.gmail.com>
-References: <CACRpkdbfNeh7_=3ReQtJc7OxkkQEn+BUhZ0O0SKnFsRD=WZiUQ@mail.gmail.com>
-Message-ID: <20160218194931.GA16393@box2.japko.eu>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 18 Feb 2016 15:06:31 -0500 (EST)
+Subject: [PATCH 2/2] net, thunderx: Use bool in structs where possible
+In-Reply-To: <20160218164217.GP24726@rric.localdomain>
+References: <1455799149-19590-3-git-send-email-rrichter@caviumnetworks.com>
+ <20160218.110514.652169911099659792.davem@davemloft.net>
+ <20160218164217.GP24726@rric.localdomain>
+Message-ID: <20160218.150631.574392083739567663.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-allwinner,sun8i-h3-r-pinctrl was added by
-commit ba83a11104ae ("pinctrl: sunxi: Add H3 R_PIO controller support")
-but the patch was missing proper binding documentation. This patch fixes
-this issue.
+From: Robert Richter <robert.richter@caviumnetworks.com>
+Date: Thu, 18 Feb 2016 17:42:17 +0100
 
-Signed-off-by: Krzysztof Adamski <k@japko.eu>
----
- Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt | 1 +
- 1 file changed, 1 insertion(+)
+> On 18.02.16 11:05:14, David Miller wrote:
+>> From: Robert Richter <rrichter@caviumnetworks.com>
+>> Date: Thu, 18 Feb 2016 13:39:09 +0100
+>> 
+>> > From: Robert Richter <rrichter@cavium.com>
+>> > 
+>> > Looks like the :1 notation was accidentally introduced (this still
+>> > uses 1 byte per flag). Using bool instead, which is the common use.
+>> > 
+>> > Signed-off-by: Robert Richter <rrichter@cavium.com>
+>> 
+>> Such cleanups are not appropriate for 'net'.  Only real bug fixes should
+>> be targetted that.
+>> 
+>> Respin these patches targetting the correct tree(s).
+> 
+> Do you mean posting the two as "trivial" patches?
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-index 9213b27..3e56b16 100644
---- a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-@@ -21,6 +21,7 @@ Required properties:
-   "allwinner,sun9i-a80-r-pinctrl"
-   "allwinner,sun8i-a83t-pinctrl"
-   "allwinner,sun8i-h3-pinctrl"
-+  "allwinner,sun8i-h3-r-pinctrl"
- 
- - reg: Should contain the register physical address and length for the
-   pin controller.
--- 
-2.1.4
+No I mean posting #1 targetted at my 'net' GIT tree as a bug fix,
+and posting #2 targetted separately at my 'net-next' GIT tree as
+a cleanup.
+
+This is how we've been doing things for more than a decade.
