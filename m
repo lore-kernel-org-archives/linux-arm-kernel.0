@@ -1,46 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 18 Feb 2016 15:22:29 +0100
-Subject: [PATCH 2/2] ARM: dts: meson: Adding hwrev syscon node
-In-Reply-To: <CAOQ7t2byFoW657-1xnsBpeyPkB6K25R=_pPmRDmT32Sjef=kUw@mail.gmail.com>
-References: <1455730114-2547-1-git-send-email-romain.perier@gmail.com>
- <4158343.mkrTsd5B4G@wuerfel>
- <CAOQ7t2byFoW657-1xnsBpeyPkB6K25R=_pPmRDmT32Sjef=kUw@mail.gmail.com>
-Message-ID: <4136837.fyWFbJqZfO@wuerfel>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 18 Feb 2016 22:23:07 +0800
+Subject: [PATCH v3 1/3] ARM: dts: vf-colibri: remove regulator container
+ node
+In-Reply-To: <1455752460-2770-1-git-send-email-stefan@agner.ch>
+References: <1455752460-2770-1-git-send-email-stefan@agner.ch>
+Message-ID: <20160218142307.GA6756@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 18 February 2016 15:14:45 Carlo Caione wrote:
-> >
-> > Yes, you should describe the device that is actually there, which would be
-> > something like
-> >
-> >         cbus at c1100000 {
-> >                 compatible = "amlogic,meson8b-cbus", "syscon";
-> >                 reg = <0xc1100000 0x10000>; /* no idea what the length is, fix it */
-> >         };
-> >
-> > Don't just make things up because you happen to access them in a particular
-> > way, but try to stay as close as you can to describing the actual hardware.
+On Wed, Feb 17, 2016 at 03:40:58PM -0800, Stefan Agner wrote:
+> Drop the fake simple-bus container 'regulators' and put the
+> regulators directly under the root node. This also makes the
+> artificial 'reg' properties superfluous. While at it, remove
+> the unnecessary regulator-always-on property and name the
+> regulators according to schematics.
 > 
-> Arnd,
-> in the cbus region are mapped a lot of different devices, do you think
-> that it is a good idea mapping the whole region as a single syscon
-> device?
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
+> Changes since v2:
+> - remove regulator-always-on
+> 
+> Changes since v1:
+> - rename regulators according to schematics
+> - drop sys prefix
 
-It really depends on what those other devices do with the registers:
+Okay.  Replaced v1 with v3.
 
-If each device just uses a couple of random registers from the cbus,
-they should probably all be changed to go through syscon.
-
-However, if some or all of the other devices actually are entirely
-made up of register ranges within cbus, that would indicate that
-cbus itself is not just a collection of random registers but something
-that could be considered a bus of itself in hardware, and then
-we could represent the other devices as children of this bus.
-
-Usually once you have a list of all the register locations, you can
-identify the hardware structure to a certain degree from that, even
-if you don't have access to a data sheet that would clarify this
-better.
-
-	Arnd
+Shawn
