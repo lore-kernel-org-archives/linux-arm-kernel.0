@@ -1,103 +1,41 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 18 Feb 2016 09:34:54 +0000
-Subject: [RFC v3 02/15] vfio: expose MSI mapping requirement through
- VFIO_IOMMU_GET_INFO
-In-Reply-To: <1455264797-2334-3-git-send-email-eric.auger@linaro.org>
-References: <1455264797-2334-1-git-send-email-eric.auger@linaro.org>
- <1455264797-2334-3-git-send-email-eric.auger@linaro.org>
-Message-ID: <20160218093454.660b20c6@arm.com>
+From: aryabinin@virtuozzo.com (Andrey Ryabinin)
+Date: Thu, 18 Feb 2016 12:38:09 +0300
+Subject: KASAN issues with idle / hotplug area
+In-Reply-To: <56C57F40.3050500@virtuozzo.com>
+References: <CAKv+Gu84mVP=YjbLhWoGj9AEUD8m8+Lq8kTCniCHwxJwMWaZtA@mail.gmail.com>
+ <20160212152641.GK31665@e104818-lin.cambridge.arm.com>
+ <56BDFC86.5010705@arm.com>
+ <20160212160652.GL31665@e104818-lin.cambridge.arm.com>
+ <56C1E072.2090909@virtuozzo.com>
+ <20160215185957.GB19413@e104818-lin.cambridge.arm.com>
+ <56C31D1D.50708@virtuozzo.com> <20160217143950.GC32647@leverpostej>
+ <20160217170110.GE32647@leverpostej> <20160217175656.GJ32647@leverpostej>
+ <20160217191643.GK32647@leverpostej> <56C57F40.3050500@virtuozzo.com>
+Message-ID: <56C59101.80805@virtuozzo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 12 Feb 2016 08:13:04 +0000
-Eric Auger <eric.auger@linaro.org> wrote:
-
-> This patch allows the user-space to retrieve whether msi write
-> transaction addresses must be mapped. This is returned through the
-> VFIO_IOMMU_GET_INFO API and its new flag: VFIO_IOMMU_INFO_REQUIRE_MSI_MAP.
-> 
-> Signed-off-by: Bharat Bhushan <Bharat.Bhushan@freescale.com>
-> Signed-off-by: Eric Auger <eric.auger@linaro.org>
-> 
-> ---
-> 
-> RFC v1 -> v1:
-> - derived from
->   [RFC PATCH 3/6] vfio: Extend iommu-info to return MSIs automap state
-> - renamed allow_msi_reconfig into require_msi_mapping
-> - fixed VFIO_IOMMU_GET_INFO
-> ---
->  drivers/vfio/vfio_iommu_type1.c | 26 ++++++++++++++++++++++++++
->  include/uapi/linux/vfio.h       |  1 +
->  2 files changed, 27 insertions(+)
-> 
-> diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
-> index 6f1ea3d..c5b57e1 100644
-> --- a/drivers/vfio/vfio_iommu_type1.c
-> +++ b/drivers/vfio/vfio_iommu_type1.c
-> @@ -255,6 +255,29 @@ static int vaddr_get_pfn(unsigned long vaddr, int prot, unsigned long *pfn)
->  }
->  
->  /*
-> + * vfio_domains_require_msi_mapping: indicates whether MSI write transaction
-> + * addresses must be mapped
-> + *
-> + * returns true if it does
-> + */
-> +static bool vfio_domains_require_msi_mapping(struct vfio_iommu *iommu)
-> +{
-> +	struct vfio_domain *d;
-> +	bool ret;
-> +
-> +	mutex_lock(&iommu->lock);
-> +	/* All domains have same require_msi_map property, pick first */
-> +	d = list_first_entry(&iommu->domain_list, struct vfio_domain, next);
-> +	if (iommu_domain_get_attr(d->domain, DOMAIN_ATTR_MSI_MAPPING, NULL) < 0)
-> +		ret = false;
-> +	else
-> +		ret = true;
-
-nit: this could be simplified as:
-
-ret = (iommu_domain_get_attr(d->domain, DOMAIN_ATTR_MSI_MAPPING, NULL) == 0);
-
-> +	mutex_unlock(&iommu->lock);
-> +
-> +	return ret;
-> +}
-> +
-> +/*
->   * Attempt to pin pages.  We really don't want to track all the pfns and
->   * the iommu can only map chunks of consecutive pfns anyway, so get the
->   * first page and all consecutive pages with the same locking.
-> @@ -997,6 +1020,9 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
->  
->  		info.flags = VFIO_IOMMU_INFO_PGSIZES;
->  
-> +		if (vfio_domains_require_msi_mapping(iommu))
-> +			info.flags |= VFIO_IOMMU_INFO_REQUIRE_MSI_MAP;
-> +
->  		info.iova_pgsizes = vfio_pgsize_bitmap(iommu);
->  
->  		return copy_to_user((void __user *)arg, &info, minsz);
-> diff --git a/include/uapi/linux/vfio.h b/include/uapi/linux/vfio.h
-> index 7d7a4c6..43e183b 100644
-> --- a/include/uapi/linux/vfio.h
-> +++ b/include/uapi/linux/vfio.h
-> @@ -400,6 +400,7 @@ struct vfio_iommu_type1_info {
->  	__u32	argsz;
->  	__u32	flags;
->  #define VFIO_IOMMU_INFO_PGSIZES (1 << 0)	/* supported page sizes info */
-> +#define VFIO_IOMMU_INFO_REQUIRE_MSI_MAP (1 << 1)/* MSI must be mapped */
->  	__u64	iova_pgsizes;		/* Bitmap of supported page sizes */
->  };
->  
 
 
-FWIW:
+On 02/18/2016 11:22 AM, Andrey Ryabinin wrote:
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> I see two options here:
+>  * completely disable instrumentation for drivers/firmware/psci.c
+>  * get back to assembly implementation
 
-	M.
--- 
-Jazz is not dead. It just smells funny.
+One more option is to allocate struct arm_smccc_res on stack of arm_smccc_[hvc, smc](), and return res.a0
+from arm_smccc_[hvc,smc]().
+
+So it will look like this:
+
+asmlinkage unsigned long arm_smccc_hvc(unsigned long a0, unsigned long a1,
+			unsigned long a2, unsigned long a3, unsigned long a4,
+			unsigned long a5, unsigned long a6, unsigned long a7);
+
+
+static unsigned long __invoke_psci_fn_hvc(unsigned long function_id,
+			unsigned long arg0, unsigned long arg1,
+			unsigned long arg2)
+{
+	return arm_smccc_hvc(function_id, arg0, arg1, arg2, 0, 0, 0, 0);
+}
