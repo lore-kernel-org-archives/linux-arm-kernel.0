@@ -1,26 +1,41 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Wed, 17 Feb 2016 20:19:09 -0800
-Subject: [PATCH V2 5/8] dmaengine: bcm2835: move cyclic member from
- bcm2835_chan into bcm2835_desc
-In-Reply-To: <1452187987-2605-6-git-send-email-kernel@martin.sperl.org>
-References: <1452187987-2605-1-git-send-email-kernel@martin.sperl.org>
- <1452187987-2605-6-git-send-email-kernel@martin.sperl.org>
-Message-ID: <87twl6wszm.fsf@eliezer.anholt.net>
+From: shijie.huang@arm.com (Huang Shijie)
+Date: Thu, 18 Feb 2016 12:36:13 +0800
+Subject: [PATCH] MAINTAINERS: add maintainer entry for FREESCALE GPMI
+ NAND driver
+In-Reply-To: <1455767715-621-1-git-send-email-han.xu@nxp.com>
+References: <1455767715-621-1-git-send-email-han.xu@nxp.com>
+Message-ID: <20160218043612.GA735@sha-win-210.asiapac.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-kernel at martin.sperl.org writes:
-
-> From: Martin Sperl <kernel@martin.sperl.org>
+On Thu, Feb 18, 2016 at 03:55:15AM +0000, Han Xu wrote:
+> Add a maintainer entry for FREESCALE GPMI NAND driver and add myself as a
+> maintainer.
 >
-> In preparation to consolidating code we move the cyclic member
-> into the bcm_2835_desc structure.
-
-Reviewed-by: Eric Anholt <eric@anholt.net>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160217/b9f7c7f9/attachment.sig>
+> Signed-off-by: Han Xu <han.xu@nxp.com>
+> ---
+>  MAINTAINERS | 6 ++++++
+>  1 file changed, 6 insertions(+)
+>
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 7bd927e..49baa5b 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -4543,6 +4543,12 @@ L:     linuxppc-dev at lists.ozlabs.org
+>  S:   Maintained
+>  F:   drivers/dma/fsldma.*
+>
+> +FREESCALE GPMI NAND DRIVER
+> +M:   Han Xu <han.xu@nxp.com>
+> +L:   linux-mtd at lists.infradead.org
+> +S:   Maintained
+> +F:   drivers/mtd/nand/gpmi-nand/*
+> +
+>  FREESCALE I2C CPM DRIVER
+>  M:   Jochen Friedrich <jochen@scram.de>
+>  L:   linuxppc-dev at lists.ozlabs.org
+> --
+> 2.7.1
+>
+Acked-by: Huang Shijie <shijie.huang@arm.com>
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
