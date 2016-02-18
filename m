@@ -1,51 +1,81 @@
-From: rrichter@caviumnetworks.com (Robert Richter)
-Date: Thu, 18 Feb 2016 13:39:09 +0100
-Subject: [PATCH 2/2] net, thunderx: Use bool in structs where possible
-In-Reply-To: <1455799149-19590-1-git-send-email-rrichter@caviumnetworks.com>
-References: <1455799149-19590-1-git-send-email-rrichter@caviumnetworks.com>
-Message-ID: <1455799149-19590-3-git-send-email-rrichter@caviumnetworks.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 18 Feb 2016 13:40:47 +0100
+Subject: [PATCH v5 00/13] mmc: use sdhci_pltfm_init for private allocation
+ and clean up
+In-Reply-To: <1455628111-5583-1-git-send-email-jszhang@marvell.com>
+References: <1455628111-5583-1-git-send-email-jszhang@marvell.com>
+Message-ID: <CAPDyKFr2RBOuVM+QeOrbH=uZE+3wymqgZzvDPUa0JUnoK+raWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Robert Richter <rrichter@cavium.com>
+On 16 February 2016 at 14:08, Jisheng Zhang <jszhang@marvell.com> wrote:
+> These patches are to complete the TODOs in Commit 0e748234293f ("mmc:
+> sdhci: Add size for caller in init+register"), I.E:
+>
+> - todo: migrate clients to using allocation this way
+> - todo: remove priv variable once migration is complete
+>
+> Since v4:
+>  - based on Ulf's latest next branch
+>  - add Adrian's Ack for all patches, add Thierry's Ack and Test for patch 11
+>    add S?ren Ack for patch 5.
+>
+> Since v3:
+>  - based on v4.5-rc1
+>  - add Ludovic's ack for sdhci-of-at91 changes
+>  - fix use-after-free in some drivers: some host drivers still needs to
+>    access sdhci_pltfm_host->private after sdhci_pltfm_unregister(), but
+>    the private should be already freed by sdhci_pltfm_unregister.
+>  - add patch5 to fix one clk bug in sdhci_arasan_remove(). IMHO, It's
+>    better to add this patch to fixes rather than waiting for next merge
+>    window
+>
+> Since v2:
+>  - based on mmc next tree and remove all priv usage introduced in newly
+>    commits in this tree
+>  - don't break two lines if sdhci_pltfm_init() call could be put into
+>    one line. Thank Ludovic Desroches.
+>
+> Since v1:
+>  - add new patch03 to factorise sdhci_msm_pdata outisde of sdhci_msm_host.
+>    This is to fix drivers/mmc/host/sdhci-msm.c:440:32: warning: 'msm_host'
+>    is used uninitialized in this function [-Wuninitialized]
+>  - Add Arnd's Ack for all patches except patch3 which is new in v2
+>
+>
+> Jisheng Zhang (13):
+>   mmc: sdhci-bcm2835: use sdhci_pltfm_init for private allocation
+>   mmc: sdhci-esdhc-imx: use sdhci_pltfm_init for private allocation
+>   mmc: sdhci-msm: factorise sdhci_msm_pdata outisde of sdhci_msm_host
+>   mmc: sdhci-msm: use sdhci_pltfm_init for private allocation
+>   mmc: sdhci-of-arasan: fix clk issue in sdhci_arasan_remove()
+>   mmc: sdhci-of-arasan: use sdhci_pltfm_init for private allocation
+>   mmc: sdhci-of-at91: use sdhci_pltfm_init for private allocation
+>   mmc: sdhci-of-esdhc: use sdhci_pltfm_init for private allocation
+>   mmc: sdhci-pxav3: use sdhci_pltfm_init for private allocation
+>   mmc: sdhci-st: use sdhci_pltfm_init for private allocation
+>   mmc: sdhci-tegra: use sdhci_pltfm_init for private allocation
+>   mmc: sdhci-pxav2: remove unnecessary assignment of pltfm_host->priv
+>   mmc: sdhci-pltfm: remove priv variable from sdhci_pltfm_host
+>
+>  drivers/mmc/host/sdhci-bcm2835.c   | 14 +++----------
+>  drivers/mmc/host/sdhci-esdhc-imx.c | 38 ++++++++++++++++--------------------
+>  drivers/mmc/host/sdhci-msm.c       | 25 +++++++++++-------------
+>  drivers/mmc/host/sdhci-of-arasan.c | 33 +++++++++++++++----------------
+>  drivers/mmc/host/sdhci-of-at91.c   | 33 ++++++++++++++-----------------
+>  drivers/mmc/host/sdhci-of-esdhc.c  | 19 +++++++++---------
+>  drivers/mmc/host/sdhci-pltfm.h     |  1 -
+>  drivers/mmc/host/sdhci-pxav2.c     |  1 -
+>  drivers/mmc/host/sdhci-pxav3.c     | 20 ++++++++-----------
+>  drivers/mmc/host/sdhci-st.c        | 40 +++++++++++++++++++-------------------
+>  drivers/mmc/host/sdhci-tegra.c     | 21 +++++++-------------
+>  11 files changed, 106 insertions(+), 139 deletions(-)
+>
+> --
+> 2.7.0
+>
 
-Looks like the :1 notation was accidentally introduced (this still
-uses 1 byte per flag). Using bool instead, which is the common use.
+Thanks, applied for next!
 
-Signed-off-by: Robert Richter <rrichter@cavium.com>
----
- drivers/net/ethernet/cavium/thunder/nic.h | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/net/ethernet/cavium/thunder/nic.h b/drivers/net/ethernet/cavium/thunder/nic.h
-index 688828865c48..fa5b1d2d8e23 100644
---- a/drivers/net/ethernet/cavium/thunder/nic.h
-+++ b/drivers/net/ethernet/cavium/thunder/nic.h
-@@ -262,9 +262,9 @@ struct nicvf {
- 	struct pci_dev		*pdev;
- 	u8			vf_id;
- 	u8			node;
--	u8			tns_mode:1;
--	u8			sqs_mode:1;
--	u8			loopback_supported:1;
-+	bool			tns_mode;
-+	bool                    sqs_mode;
-+	bool			loopback_supported;
- 	bool			hw_tso;
- 	u16			mtu;
- 	struct queue_set	*qs;
-@@ -353,9 +353,9 @@ struct nic_cfg_msg {
- 	u8    msg;
- 	u8    vf_id;
- 	u8    node_id;
--	u8    tns_mode:1;
--	u8    sqs_mode:1;
--	u8    loopback_supported:1;
-+	bool  tns_mode;
-+	bool  sqs_mode;
-+	bool  loopback_supported;
- 	u8    mac_addr[ETH_ALEN];
- };
- 
--- 
-2.7.0.rc3
+Kind regards
+Uffe
