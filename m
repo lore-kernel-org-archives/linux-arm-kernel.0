@@ -1,87 +1,109 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Thu, 18 Feb 2016 07:15:54 -0800
-Subject: [PATCH 2/3] thermal: Add Mediatek thermal controller support
-In-Reply-To: <20160218105603.GE3939@pengutronix.de>
-References: <1448883753-19068-1-git-send-email-s.hauer@pengutronix.de>
- <1448883753-19068-3-git-send-email-s.hauer@pengutronix.de>
- <20151217193332.GB7999@localhost.localdomain>
- <20160104141940.GI13058@pengutronix.de>
- <20160119072917.GA13237@pengutronix.de>
- <1454295246.22151.6.camel@mtksdaap41>
- <CAGS+omD9U8tKmb02d_gMMAGX18MJZhz0RrugpBK2EuqgZrBy6g@mail.gmail.com>
- <CAGS+omArr0_-ziBXWjEcKS0bqnruNzZc2aq2s3zkghUC7_HfGw@mail.gmail.com>
- <56C4A875.6080908@gmail.com> <20160218105603.GE3939@pengutronix.de>
-Message-ID: <20160218151552.GA1852@localhost.localdomain>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 18 Feb 2016 16:18:59 +0100
+Subject: [PATCH 2/9] ARM: change NR_IPIS to 8
+In-Reply-To: <20160218143709.GQ19428@n2100.arm.linux.org.uk>
+References: <1455804123-2526139-1-git-send-email-arnd@arndb.de>
+ <1455804123-2526139-3-git-send-email-arnd@arndb.de>
+ <20160218143709.GQ19428@n2100.arm.linux.org.uk>
+Message-ID: <2915766.O3WEnikESX@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Folks,
-
-On Thu, Feb 18, 2016 at 11:56:03AM +0100, Sascha Hauer wrote:
-> On Wed, Feb 17, 2016 at 06:05:57PM +0100, Matthias Brugger wrote:
+On Thursday 18 February 2016 14:37:09 Russell King - ARM Linux wrote:
+> On Thu, Feb 18, 2016 at 03:01:54PM +0100, Arnd Bergmann wrote:
+> > When function tracing for IPIs is enabled, we get a warning for an
+> > overflow of the ipi_types array with the IPI_CPU_BACKTRACE type
+> > as triggered by raise_nmi():
 > > 
-> > 
-> > On 15/02/16 03:14, Daniel Kurtz wrote:
-> > >On Mon, Feb 15, 2016 at 10:11 AM, Daniel Kurtz <djkurtz@chromium.org> wrote:
-> > >>Hi Eduardo, Sascha,
-> > >>
-> > >>>>Any input on this? I really like to get this driver upstream as it is
-> > >>>>currently blocking other Mediatek drivers.
-> > >>>>
-> > >>>
-> > >>>Hi Eduardo,
-> > >>>
-> > >>>Do you have any comment about Sascha's response ? We really hope get
-> > >>>your comment since Mediatek thermal driver already reviewed in public
-> > >>>over half years, and we have other patches [0] [1] depend on thermal
-> > >>>driver.
-> > >>>
-> > >>>[0]:
-> > >>>http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/394084.html
-> > >>>[1]:
-> > >>>http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/401055.html
-> > >>
-> > >>Friendly ping on the Mediatek thermal driver.
-> > >>The "EFUSE" dependency has now landed in v4.5-rc4.
-> > >
-> > >Actually, it landed in char-misc-next, not v4.5-rc4.
-> > >
-> > >>So, AFAICT, the only thing left that may be blocking landing Mediatek
-> > >>thermal driver is resolution of this discussion about thermal zones.
-> > >>Can we kindly resolve this soon so we have a chance to land it in v4.6.
-> > >>
-> > 
-> > 
-> > I think the problem is, that Eduardo wants to see the hierachical thermal
-> > zones being used. But there is still a discussion ongoing [1].
+> > arch/arm/kernel/smp.c: In function 'raise_nmi':
+> > arch/arm/kernel/smp.c:489:2: error: array subscript is above array bounds [-Werror=array-bounds]
+> >   trace_ipi_raise(target, ipi_types[ipinr]);
 > 
-> It seems the original Author lost interest in the hierarchical thermal
-> zones. I am not convinced that we need hierarchical thermal zones for
-> the Mediatek driver since from the five sensors we only need the maximum
-> temperature (If this ever changes we could still rework it).
+> We really don't want to treat the backtrace IPI as a normal IPI at all -
+> we want it to invoke the least amount of code possible.  Hence this code
+> which avoids the issue:
 > 
-> Given the current speed of communication I am not willing to add
-> another, possibly controversal, dependency to an otherwise simple
-> driver. I am even less willing when concerns like these come after *v12*
-> of this series.
+>         if ((unsigned)ipinr < NR_IPI) {
+>                 trace_ipi_entry_rcuidle(ipi_types[ipinr]);
+>                 __inc_irq_stat(cpu, ipi_irqs[ipinr]);
+>         }
 > 
-> Eduardo, it would really help to get a word from you.
+> However, what's missing is that the addition of tracing here missed
+> that CPU_BACKTRACE is not to be traced.  The call in raise_nmi()
+> should have been converted to __smp_cross_call() to avoid the
+> tracing code.
 
-Apologize for the long delays here. In fact I want the hierarchical
-support on this driver. But given that it is not really a strong
-dependency and the hierarchical support is still an ongoing development,
-I don't see why we should not merge this driver.
+I've replaced the patch locally with the version below now, and
+will throw it into the randconfig build test infrastructure to
+make sure I didn't screw up in an obvious way here.
 
-I also have had the chance to try it out in a board, and seams to work
-for me. I am adding to my tree.
+	Arnd
 
-Thanks for the perseverance. :-)
+>From 7528c9b0558fdf4de785e62e61f0dd2ffe874110 Mon Sep 17 00:00:00 2001
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Sun, 31 Jan 2016 22:26:21 +0100
+Subject: [PATCH] ARM: prevent tracing IPI_CPU_BACKTRACE
 
-> 
-> Sascha
-> 
-> -- 
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+When function tracing for IPIs is enabled, we get a warning for an
+overflow of the ipi_types array with the IPI_CPU_BACKTRACE type
+as triggered by raise_nmi():
+
+arch/arm/kernel/smp.c: In function 'raise_nmi':
+arch/arm/kernel/smp.c:489:2: error: array subscript is above array bounds [-Werror=array-bounds]
+  trace_ipi_raise(target, ipi_types[ipinr]);
+
+This is a correct warning as we actually overflow the array here.
+
+This patch raise_nmi() to call __smp_cross_call() instead of
+smp_cross_call(), to avoid calling into ftrace. For clarification,
+I'm also adding a two new code comments describing how this one
+is special.
+
+The warning appears to have shown up after patch e7273ff49acf
+("ARM: 8488/1: Make IPI_CPU_BACKTRACE a "non-secure" SGI"), which
+changed the number assignment from '15' to '8', but as far as I can
+tell has existed since the IPI tracepoints were first introduced.
+If we decide to backport this patch to stable kernels, we probably
+need to backport e7273ff49acf as well.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: e7273ff49acf ("ARM: 8488/1: Make IPI_CPU_BACKTRACE a "non-secure" SGI")
+Fixes: 365ec7b17327 ("ARM: add IPI tracepoints") # v3.17
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/arch/arm/include/asm/hardirq.h b/arch/arm/include/asm/hardirq.h
+index 3d7351c844aa..2fd0a2619b0b 100644
+--- a/arch/arm/include/asm/hardirq.h
++++ b/arch/arm/include/asm/hardirq.h
+@@ -5,6 +5,7 @@
+ #include <linux/threads.h>
+ #include <asm/irq.h>
+ 
++/* number of IPIS _not_ including IPI_CPU_BACKTRACE */
+ #define NR_IPI	7
+ 
+ typedef struct {
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index b4048e370730..9802a94260db 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -72,6 +72,10 @@ enum ipi_msg_type {
+ 	IPI_CPU_STOP,
+ 	IPI_IRQ_WORK,
+ 	IPI_COMPLETION,
++	/*
++	 * CPU_BACKTRACE is special and not included in NR_IPI
++	 * or tracable with trace_ipi_*
++	 */
+ 	IPI_CPU_BACKTRACE,
+ 	/*
+ 	 * SGI8-15 can be reserved by secure firmware, and thus may
+@@ -757,7 +761,7 @@ static void raise_nmi(cpumask_t *mask)
+ 	if (cpumask_test_cpu(smp_processor_id(), mask) && irqs_disabled())
+ 		nmi_cpu_backtrace(NULL);
+ 
+-	smp_cross_call(mask, IPI_CPU_BACKTRACE);
++	__smp_cross_call(mask, IPI_CPU_BACKTRACE);
+ }
+ 
+ void arch_trigger_all_cpu_backtrace(bool include_self)
