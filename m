@@ -1,33 +1,29 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 18 Feb 2016 15:29:03 +0100
-Subject: [PATCH] PCI: mvebu: Restrict build to 32-bit ARM
-In-Reply-To: <1455802330-17565-1-git-send-email-thierry.reding@gmail.com>
-References: <1455802330-17565-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <20160218152903.7a659ca8@free-electrons.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 18 Feb 2016 08:35:48 -0600
+Subject: [PATCH v2 3/8] DT: clk: sunxi: add binding doc for the
+ multi-bus-gates clock
+In-Reply-To: <1455709440-8668-4-git-send-email-andre.przywara@arm.com>
+References: <1455709440-8668-1-git-send-email-andre.przywara@arm.com>
+ <1455709440-8668-4-git-send-email-andre.przywara@arm.com>
+Message-ID: <20160218143548.GD9654@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Thu, 18 Feb 2016 14:32:10 +0100, Thierry Reding wrote:
-> From: Thierry Reding <treding@nvidia.com>
+On Wed, Feb 17, 2016 at 11:43:55AM +0000, Andre Przywara wrote:
+> Recent Allwinner SoCs introduced a bus gates clock which can have
+> different parents for individual gates.
+> For the time being we encoded this relation in the driver.
+> This commit specifies a new binding which allows to encode this in
+> the DT by using a child node for each parent clock used. This allows
+> to specify any kind of relation efficiently and also keeps the very
+> same kernel driver for all SoCs at the same time.
 > 
-> This driver uses PCI glue that is only available on 32-bit ARM. This
-> used to work fine as long as ARCH_MVEBU and ARCH_DOVE were exclusively
-> 32-bit, but that's changed now, with ARCH_MVEBU also being available
-> on 64-bit ARM.
-> 
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 > ---
->  drivers/pci/host/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
+>  Documentation/devicetree/bindings/clock/sunxi.txt | 6 ++++++
+>  1 file changed, 6 insertions(+)
 
-Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Whether this makes sense or not for sunxi, I don't know. But for the 
+binding:
 
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Acked-by: Rob Herring <robh@kernel.org>
