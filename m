@@ -1,47 +1,85 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Wed, 17 Feb 2016 18:56:48 -0800
-Subject: [GIT PULL 2/2] bcm2835 changes to DT for 4.6
-In-Reply-To: <1455764208-5679-1-git-send-email-eric@anholt.net>
-References: <1455764208-5679-1-git-send-email-eric@anholt.net>
-Message-ID: <1455764208-5679-2-git-send-email-eric@anholt.net>
+Date: Wed, 17 Feb 2016 18:57:50 -0800
+Subject: [GIT PULL] bcm2835 DT changes for 4.6
+In-Reply-To: <56BEAA57.3050600@gmail.com>
+References: <1454977978-17491-1-git-send-email-eric@anholt.net>
+ <DDFB1D8B-805B-488F-9582-796EBCEF287B@sperl.org>
+ <87d1s42yb8.fsf@eliezer.anholt.net> <56BD55A2.20104@gmail.com>
+ <877fi92zxb.fsf@eliezer.anholt.net> <56BEAA57.3050600@gmail.com>
+Message-ID: <87mvqyybbl.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
+Florian Fainelli <f.fainelli@gmail.com> writes:
 
-  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+> On 12/02/2016 16:53, Eric Anholt wrote:
+>> Florian Fainelli <f.fainelli@gmail.com> writes:
+>> 
+>>> On 10/02/2016 10:51, Eric Anholt wrote:
+>>>> Martin Sperl <martin@sperl.org> writes:
+>>>>
+>>>>>> On 09.02.2016, at 01:32, Eric Anholt <eric@anholt.net> wrote:
+>>>>>>
+>>>>>> Hi Florian.  Here's the first set of patches for bcm2835 for 4.6.
+>>>>>> We've got more DT patches that are going to happen for new boards,
+>>>>>> too, but they're still getting polished.
+>>>>>>
+>>>>>> The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
+>>>>>>
+>>>>>>  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+>>>>>>
+>>>>>> are available in the git repository at:
+>>>>>>
+>>>>>>  git at github.com:anholt/linux.git tags/bcm2835-dt-next-2016-02-04
+>>>>>>
+>>>>>> for you to fetch changes up to 5ec6f2cd8ec4bcd38ba199ea8711a5ec906d85e7:
+>>>>>>
+>>>>>>  ARM: bcm2835: Add the Raspberry Pi power domain driver to the DT. (2016-02-02 20:02:45 -0800)
+>>>>>>
+>>>>>> ----------------------------------------------------------------
+>>>>>> This pull request covers mostly DT changes that didn't make it into
+>>>>>> 4.5 because required header files went through other trees.
+>>>>>>
+>>>>>> ----------------------------------------------------------------
+>>>>>> Alexander Aring (1):
+>>>>>>      ARM: bcm2835: Add the Raspberry Pi power domain driver to the DT.
+>>>>>>
+>>>>>> Lubomir Rintel (1):
+>>>>>>      ARM: bcm2835: dt: Add Raspberry Pi Model A
+>>>>>>
+>>>>>> Martin Sperl (2):
+>>>>>>      ARM: bcm2835: add the auxiliary spi1 and spi2 to the device tree
+>>>>>>      ARM: bcm2835: follow dt uart node-naming convention
+>>>>>
+>>>>> Do you want me to resend a rebased version of:
+>>>>>      ARM: bcm2835: add bcm2835-aux-uart support to default DT
+>>>>>
+>>>>> The corresponding driver has been added to tty/tty-next.
+>>>>
+>>>> It hadn't landed last time I checked.  A rebased version that you've
+>>>> tested would be great!
+>>>
+>>> OK, please submit this in the next week or so at most, so we can get
+>>> this pull request merged, thanks!
+>>>
+>>> Eric, do you have other changes outside of Device Tree?
+>> 
+>> We've got bcm2835_defconfig changes that I need to test and tag.
+>
+> Ok, so that one needs to be a pull request.
+>
+>> 
+>> There are also the multi_v7_defconfig updates to enable bcm2835.  Would
+>> I be pulling those, or someone above me?
+>
+> This one could too, or it could be an individual patch that the arm-soc
+> maintainers take directly, either way is fine AFAIR.
 
-are available in the git repository at:
-
-  git at github.com:anholt/linux.git bcm2835-dt-next-2016-02-17
-
-for you to fetch changes up to 1305141d1a7254b53b35303ee84f4c4948007bd0:
-
-  ARM: bcm2835: add bcm2835-aux-uart support to DT (2016-02-17 11:01:00 -0800)
-
-----------------------------------------------------------------
-This pull request covers mostly DT changes that didn't make it into
-4.5 because required header files went through other trees, plus the
-AUX uart support this time around.
-
-----------------------------------------------------------------
-Alexander Aring (1):
-      ARM: bcm2835: Add the Raspberry Pi power domain driver to the DT.
-
-Lubomir Rintel (1):
-      ARM: bcm2835: dt: Add Raspberry Pi Model A
-
-Martin Sperl (3):
-      ARM: bcm2835: add the auxiliary spi1 and spi2 to the device tree
-      ARM: bcm2835: follow dt uart node-naming convention
-      ARM: bcm2835: add bcm2835-aux-uart support to DT
-
-Remi Pommarel (1):
-      ARM: bcm2835: Add PWM clock support to the device tree
-
- arch/arm/boot/dts/Makefile          |  1 +
- arch/arm/boot/dts/bcm2835-rpi-a.dts | 24 +++++++++++++++++++++
- arch/arm/boot/dts/bcm2835-rpi.dtsi  | 16 ++++++++++++++
- arch/arm/boot/dts/bcm283x.dtsi      | 43 +++++++++++++++++++++++++++++++++++--
- 4 files changed, 82 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/boot/dts/bcm2835-rpi-a.dts
+All right, I included it in my pull request.  Thanks!
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160217/5b3c6d85/attachment.sig>
