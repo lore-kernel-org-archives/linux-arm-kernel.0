@@ -1,41 +1,59 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 18 Feb 2016 15:01:58 +0100
-Subject: [PATCH 6/9] ARM: uaccess: avoid warning for NOMMU in access_ok
+Date: Thu, 18 Feb 2016 15:01:59 +0100
+Subject: [PATCH 7/9] ARM: move NO_DMA definition to ecard.h
 In-Reply-To: <1455804123-2526139-1-git-send-email-arnd@arndb.de>
 References: <1455804123-2526139-1-git-send-email-arnd@arndb.de>
-Message-ID: <1455804123-2526139-7-git-send-email-arnd@arndb.de>
+Message-ID: <1455804123-2526139-8-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_MMU is disabled, the access_ok() and __range_ok()
-macros always return success, and there is a cast to void
-to ensure the compiler does not warn about an unused address
-variable. However, at least one driver has a variable for
-the size argument as well and does warn about that one:
+The NO_DMA macro is only used on the RiscPC ecard bus, and conflicts
+with a couple of driver specific macros with the same name:
 
-drivers/vhost/vhost.c: In function 'vq_access_ok':
-drivers/vhost/vhost.c:633:9: warning: unused variable 's' [-Wunused-variable]
+drivers/scsi/eata.c:571:0: warning: "NO_DMA" redefined
+ #define NO_DMA  0xff
+In file included from ../drivers/scsi/eata.c:495:0:
+arch/arm/include/asm/dma.h:140:0: note: this is the location of the previous definition
+ #define NO_DMA 255
 
-This changes the macro to also ignore the size argument
-explicitly to shut up that warning.
+This moves the definition out of the asm/dma.h header that is used
+by all ISA DMA API users and into the ecard header.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/include/asm/uaccess.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/include/asm/dma.h   | 4 ----
+ arch/arm/include/asm/ecard.h | 4 ++++
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
-index 35c9db857ebe..9c74c84a10d2 100644
---- a/arch/arm/include/asm/uaccess.h
-+++ b/arch/arm/include/asm/uaccess.h
-@@ -290,7 +290,7 @@ extern int __put_user_8(void *, unsigned long long);
+diff --git a/arch/arm/include/asm/dma.h b/arch/arm/include/asm/dma.h
+index bb4fa67da541..573128481fc4 100644
+--- a/arch/arm/include/asm/dma.h
++++ b/arch/arm/include/asm/dma.h
+@@ -136,10 +136,6 @@ extern void set_dma_speed(unsigned int chan, int cycle_ns);
+  */
+ extern int  get_dma_residue(unsigned int chan);
  
- #define segment_eq(a, b)		(1)
- #define __addr_ok(addr)		((void)(addr), 1)
--#define __range_ok(addr, size)	((void)(addr), 0)
-+#define __range_ok(addr, size)	((void)(addr), (void)(size), 0)
- #define get_fs()		(KERNEL_DS)
+-#ifndef NO_DMA
+-#define NO_DMA	255
+-#endif
+-
+ #endif /* CONFIG_ISA_DMA_API */
  
- static inline void set_fs(mm_segment_t fs)
+ #ifdef CONFIG_PCI
+diff --git a/arch/arm/include/asm/ecard.h b/arch/arm/include/asm/ecard.h
+index eaea14676d57..d3e16628c792 100644
+--- a/arch/arm/include/asm/ecard.h
++++ b/arch/arm/include/asm/ecard.h
+@@ -83,6 +83,10 @@
+ #define CONST const
+ #endif
+ 
++#ifndef NO_DMA
++#define NO_DMA	255
++#endif
++
+ #define MAX_ECARDS	9
+ 
+ struct ecard_id {			/* Card ID structure		*/
 -- 
 2.7.0
