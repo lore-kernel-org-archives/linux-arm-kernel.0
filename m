@@ -1,22 +1,37 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 18 Feb 2016 08:37:07 -0600
-Subject: [PATCH 2/6] spi: rockchip: add bindings for rk3399 spi
-In-Reply-To: <1455673992-16469-3-git-send-email-jay.xu@rock-chips.com>
-References: <1455673992-16469-1-git-send-email-jay.xu@rock-chips.com>
- <1455673992-16469-3-git-send-email-jay.xu@rock-chips.com>
-Message-ID: <20160218143707.GO9654@rob-hp-laptop>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 18 Feb 2016 14:37:09 +0000
+Subject: [PATCH 2/9] ARM: change NR_IPIS to 8
+In-Reply-To: <1455804123-2526139-3-git-send-email-arnd@arndb.de>
+References: <1455804123-2526139-1-git-send-email-arnd@arndb.de>
+ <1455804123-2526139-3-git-send-email-arnd@arndb.de>
+Message-ID: <20160218143709.GQ19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 17, 2016 at 09:53:08AM +0800, jianqun.xu wrote:
-> From: Xu Jianqun <jay.xu@rock-chips.com>
+On Thu, Feb 18, 2016 at 03:01:54PM +0100, Arnd Bergmann wrote:
+> When function tracing for IPIs is enabled, we get a warning for an
+> overflow of the ipi_types array with the IPI_CPU_BACKTRACE type
+> as triggered by raise_nmi():
 > 
-> Add devicetree bindings for Rockchip rk3399 spi which found on
-> Rockchip rk3399 SoCs.
-> 
-> Signed-off-by: Xu Jianqun <jay.xu@rock-chips.com>
-> ---
->  Documentation/devicetree/bindings/spi/spi-rockchip.txt | 1 +
->  1 file changed, 1 insertion(+)
+> arch/arm/kernel/smp.c: In function 'raise_nmi':
+> arch/arm/kernel/smp.c:489:2: error: array subscript is above array bounds [-Werror=array-bounds]
+>   trace_ipi_raise(target, ipi_types[ipinr]);
 
-Acked-by: Rob Herring <robh@kernel.org>
+We really don't want to treat the backtrace IPI as a normal IPI at all -
+we want it to invoke the least amount of code possible.  Hence this code
+which avoids the issue:
+
+        if ((unsigned)ipinr < NR_IPI) {
+                trace_ipi_entry_rcuidle(ipi_types[ipinr]);
+                __inc_irq_stat(cpu, ipi_irqs[ipinr]);
+        }
+
+However, what's missing is that the addition of tracing here missed
+that CPU_BACKTRACE is not to be traced.  The call in raise_nmi()
+should have been converted to __smp_cross_call() to avoid the
+tracing code.
+
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently@9.6Mbps down 400kbps up
+according to speedtest.net.
