@@ -1,7 +1,7 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 18 Feb 2016 11:34:07 +0000
+Date: Thu, 18 Feb 2016 11:38:34 +0000
 Subject: KASAN issues with idle / hotplug area
-In-Reply-To: <56C59101.80805@virtuozzo.com>
+In-Reply-To: <20160218093938.GB12476@red-moon>
 References: <20160212160652.GL31665@e104818-lin.cambridge.arm.com>
  <56C1E072.2090909@virtuozzo.com>
  <20160215185957.GB19413@e104818-lin.cambridge.arm.com>
@@ -9,49 +9,46 @@ References: <20160212160652.GL31665@e104818-lin.cambridge.arm.com>
  <20160217170110.GE32647@leverpostej>
  <20160217175656.GJ32647@leverpostej>
  <20160217191643.GK32647@leverpostej>
- <56C57F40.3050500@virtuozzo.com> <56C59101.80805@virtuozzo.com>
-Message-ID: <20160218113407.GN32647@leverpostej>
+ <56C57F40.3050500@virtuozzo.com> <20160218093938.GB12476@red-moon>
+Message-ID: <20160218113833.GO32647@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 18, 2016 at 12:38:09PM +0300, Andrey Ryabinin wrote:
+On Thu, Feb 18, 2016 at 09:39:38AM +0000, Lorenzo Pieralisi wrote:
+> On Thu, Feb 18, 2016 at 11:22:24AM +0300, Andrey Ryabinin wrote:
 > 
+> [...]
 > 
-> On 02/18/2016 11:22 AM, Andrey Ryabinin wrote:
-> 
+> > > I also tried using __attribute__((no_sanitize_address)) directly, in
+> > > case there was some header issue, but that doesn't seem to be the case.
+> > > 
+> > > I'm using the Linaro 15.08 AArch64 GCC 5.1. Is anyone else able to
+> > > confirm whether they see the same? Does the same happen for x86?
+> > > 
+> > 
+> > Confirming, this happens on every GCC I have (including x86).
+> > It seems that 'no_sanitize_address' in gcc removes only memory access checks
+> > but it doesn't remove stack redzones.
+> > I think this is wrong, e.g. clang removes instrumentation completely. I'll submit a bug.
+> > 
+> > But we need fix this in kernel.
 > > I see two options here:
 > >  * completely disable instrumentation for drivers/firmware/psci.c
+> 
+> We have to have a way to disable instrumentation for functions that
+> are used to call into FW and return via different code paths.
+> 
 > >  * get back to assembly implementation
 > 
-> One more option is to allocate struct arm_smccc_res on stack of arm_smccc_[hvc, smc](), and return res.a0
-> from arm_smccc_[hvc,smc]().
-
-In general ARM SMCCC calls can return multiple values, and there are
-callers that may care (even if they're not here just yet).
-
-So we can't change the arm_smccc_{smc,hvc} prototypes, and adding
-another asm function is somewhat self-defeating (an asm caller
-of arm_smccc_* is more complex and slower than a direct SMC/HVC).
-
-> So it will look like this:
+> No, we are certainly not reverting the SMCCC work because Kasan adds
+> instrumentation to C functions, that's not even an option.
 > 
-> asmlinkage unsigned long arm_smccc_hvc(unsigned long a0, unsigned long a1,
-> 			unsigned long a2, unsigned long a3, unsigned long a4,
-> 			unsigned long a5, unsigned long a6, unsigned long a7);
-> 
-> 
-> static unsigned long __invoke_psci_fn_hvc(unsigned long function_id,
-> 			unsigned long arg0, unsigned long arg1,
-> 			unsigned long arg2)
-> {
-> 	return arm_smccc_hvc(function_id, arg0, arg1, arg2, 0, 0, 0, 0);
-> }
+> Is it possible at all to implement a function to remove instrumentation
+> for a chunk of memory (ie resetting the shadow memory to a clean slate
+> for a range of stack addresses) ?
 
-While this looks like it might work today, it's going to be _extremely_
-fragile -- other instrumentation might cause stack allocation and hence
-shadow dirtying.
+In mm/kasan/kasan.c (which is uninstrumented) there is:
 
-I'm not keen on this.
+void kasan_unpoison_shadow(const void *address, size_t size)
 
-Thanks,
 Mark.
