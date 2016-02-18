@@ -1,49 +1,83 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 18 Feb 2016 15:15:21 +0800
-Subject: [PATCH] ARM64: Don't set the default console to ttyAMA0
-In-Reply-To: <1455727422-10733-1-git-send-email-jonathanh@nvidia.com>
-References: <1455727422-10733-1-git-send-email-jonathanh@nvidia.com>
-Message-ID: <20160218151521.66e0cbf7@xhacker>
+From: a0393675@ti.com (Keerthy)
+Date: Thu, 18 Feb 2016 13:15:25 +0530
+Subject: [PATCH 2/2] ARM: AM43XX: HWMOD: Add rtc hwmod
+In-Reply-To: <alpine.DEB.2.02.1602180634120.4792@utopia.booyaka.com>
+References: <1455773381-11839-1-git-send-email-j-keerthy@ti.com>
+ <1455773381-11839-3-git-send-email-j-keerthy@ti.com>
+ <alpine.DEB.2.02.1602180634120.4792@utopia.booyaka.com>
+Message-ID: <56C57695.3010300@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jon,
+Hi Paul,
 
-On Wed, 17 Feb 2016 16:43:42 +0000 Jon Hunter wrote:
+On Thursday 18 February 2016 12:12 PM, Paul Walmsley wrote:
+> Hi Keerthy
+>
+> On Thu, 18 Feb 2016, Keerthy wrote:
+>
+>> The patch adds rtc hwmod. RTC module The RTC module is physically
+>> present on the AM438x SoC used on AM43X-EPOS-EVM, but it is permanently
+>> disabled. A secure RTC is used instead on these devices, where needed.
+>> . Hence adding it selectively using a seprate list to get RTC Module
+>> functional on the other am43x SoCs used on am437x-gp-evm and
+>> am437x-sk-evm.
+>>
+>> Signed-off-by: Keerthy <j-keerthy@ti.com>
+>> ---
+>>
+>> No Public TRM is available for AM438x SoC as of now.
+>>
+>>   arch/arm/mach-omap2/omap_hwmod_43xx_data.c | 14 +++++++++++++-
+>>   1 file changed, 13 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+>> index e97a894..fcffaf8 100644
+>> --- a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+>> +++ b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+>> @@ -1020,9 +1020,21 @@ static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
+>>   	NULL,
+>>   };
+>>
+>> +static struct omap_hwmod_ocp_if *am43xx_rtc_hwmod_ocp_ifs[] __initdata = {
+>> +	&am33xx_l4_wkup__rtc,
+>> +	NULL,
+>> +};
+>> +
+>>   int __init am43xx_hwmod_init(void)
+>>   {
+>> +	int ret;
+>> +
+>>   	omap_hwmod_am43xx_reg();
+>>   	omap_hwmod_init();
+>> -	return omap_hwmod_register_links(am43xx_hwmod_ocp_ifs);
+>> +	ret = omap_hwmod_register_links(am43xx_hwmod_ocp_ifs);
+>> +
+>> +	if (!(of_machine_is_compatible("ti,am438x")))
+>> +		ret = omap_hwmod_register_links(am43xx_rtc_hwmod_ocp_ifs);
+>> +
+>> +	return ret;
+>>   }
+>
+> Could you please invert the test of this case such that the RTC hwmod is
+> only registered on AM43xx SoCs where it is specifically known to be
+> enabled?
+>
+> That way, if another AM43xx SoC comes out that doesn't have the RTC
+> module, it won't inadvertently be registered.  This seems like a safer
+> approach.
 
-> When booting Tegra210 with a minimal rootfs it may not be necessary to
-> specify any boot parameters via the kernel command line as information
-> for console is described via the "stdout-path" node the device-tree
-> blob. However, when there are no boot parameter specified, no output is
-> seen on the console in the case of Tegra210 and this is because the
-> default command line in the ARM64 defconfig specifies the console as
-> ttyAMA0 which takes precedence over the "stdout-path" node from
-> device-tree.
-> 
-> ttyAMAx is used for AMBA PL011 serial ports, but not all ARM64 platforms
-> use this serial driver. Therefore, remove the default command line
-> entry from the ARM64 defconfig to ensure that ttyAMA0 does not get set
-> as the default console if no kernel command line is specified.
-> 
-> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+I get your point but currently only am438x SoC has RTC disabled forever.
+So i checked negating am438x. I can add a check with am4372 here and 
+register for only those SoCs.
 
-We need this patch as well. Thanks
+I will resend a v2 in a while.
 
-Tested-by: Jisheng Zhang <jszhang@marvell.com>
+Thanks for the quick response.
 
-> ---
->  arch/arm64/configs/defconfig | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> index d21631760ec7..caecb66188be 100644
-> --- a/arch/arm64/configs/defconfig
-> +++ b/arch/arm64/configs/defconfig
-> @@ -64,7 +64,6 @@ CONFIG_KSM=y
->  CONFIG_TRANSPARENT_HUGEPAGE=y
->  CONFIG_CMA=y
->  CONFIG_XEN=y
-> -CONFIG_CMDLINE="console=ttyAMA0"
->  # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
->  CONFIG_COMPAT=y
->  CONFIG_CPU_IDLE=y
+Best Regards,
+Keerthy
+
+>
+> - Paul
+>
