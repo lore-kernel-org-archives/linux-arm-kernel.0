@@ -1,87 +1,190 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 18 Feb 2016 18:32:23 +0100
-Subject: [PATCH v2 net-next 0/8] API set for HW Buffer management
-In-Reply-To: <20160217225958.GA31113@1wt.eu> (Willy Tarreau's message of "Wed,
- 17 Feb 2016 23:59:58 +0100")
-References: <1455636823-14470-1-git-send-email-gregory.clement@free-electrons.com>
- <20160217225958.GA31113@1wt.eu>
-Message-ID: <877fi1rkk8.fsf@free-electrons.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 18 Feb 2016 12:34:17 -0500 (EST)
+Subject: [PATCH 2/3] [RESEND] ARM: fix copypage-*.c building with clang
+In-Reply-To: <1455815113-2562966-3-git-send-email-arnd@arndb.de>
+References: <1455815113-2562966-1-git-send-email-arnd@arndb.de>
+ <1455815113-2562966-3-git-send-email-arnd@arndb.de>
+Message-ID: <alpine.LFD.2.20.1602181233480.13632@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Willy,
- 
- On mer., f?vr. 17 2016, Willy Tarreau <w@1wt.eu> wrote:
+On Thu, 18 Feb 2016, Arnd Bergmann wrote:
 
-> Hi Gregory,
->
-> On Tue, Feb 16, 2016 at 04:33:35PM +0100, Gregory CLEMENT wrote:
->> Hello,
->> 
->> A few weeks ago I sent a proposal for a API set for HW Buffer
->> management, to have a better view of the motivation for this API see
->> the cover letter of this proposal:
->> http://thread.gmane.org/gmane.linux.kernel/2125152
->> 
->> Since this version I took into account the review from Florian:
->> - The hardware buffer management helpers are no more built by default
->>   and now depend on a hidden config symbol which has to be selected
->>   by the driver if needed
->> - The hwbm_pool_refill() and hwbm_pool_add() now receive a gfp_t as
->>   argument allowing the caller to specify the flag it needs.
->> - buf_num is now tested to ensure there is no wrapping
->> - A spinlock has been added to protect the hwbm_pool_add() function in
->>   SMP or irq context.
->> 
->> I also used pr_warn instead of pr_debug in case of errors.
->> 
->> I fixed the mvneta implementation by returning the buffer to the pool
->> at various place instead of ignoring it.
->> 
->> About the series itself I tried to make this series easier to merge:
->> - Squashed "bus: mvenus-mbus: Fix size test for
->>    mvebu_mbus_get_dram_win_info" into bus: mvebu-mbus: provide api for
->>    obtaining IO and DRAM window information.
->> - Added my signed-otf-by on all the patches as submitter of the series.
->> - Renamed the dts patches with the pattern "ARM: dts: platform:"
->> - Removed the patch "ARM: mvebu: enable SRAM support in
->>   mvebu_v7_defconfig" of this series and already applied it
->> - Rodified the order of the patches.
->> 
->> In order to ease the test the branch mvneta-BM-framework-v2 is
->> available at git at github.com:MISL-EBU-System-SW/mainline-public.git.
->
-> Well, I tested this patch series on top of latest master (from today)
-> on my fresh new clearfog board. I compared carefully with and without
-> the patchset. My workload was haproxy receiving connections and forwarding
-> them to my PC via the same port. I tested both with short connections
-> (HTTP GET of an empty file) and long ones (1 MB or more). No trouble
-> was detected at all, which is pretty good. I noticed a very tiny
-> performance drop which is more noticeable on short connections (high
-> packet rates), my forwarded connection rate went down from 17500/s to
-> 17300/s. But I have not checked yet what can be tuned when using the
-> BM, nor did I compare CPU usage. I remember having run some tests in
-> the past, I guess it was on the XP-GP board, and noticed that the BM
-> could save a significant amount of CPU and improve cache efficiency,
-> so if this is the case here, we don't really care about a possible 1%
-> performance drop.
->
-> I'll try to provide more results as time permits.
->
-> In the mean time if you want (or plan to submit a next batch), feel
-> free to add a Tested-by: Willy Tarreau <w@1wt.eu>.
+> clang does not allow inline assembly in __naked functions to
+> have any register parameters and throws an error:
+> 
+> arch/arm/mm/copypage-v4wb.c:47:9: error: parameter references not allowed in naked functions
+>         : "r" (kto), "r" (kfrom), "I" (PAGE_SIZE / 64));
+> 
+> Fortunately, all of these functions are trivial to convert to
+> using the registers directly.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Great!  thanks for testing.
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
-Gregory
 
->
-> cheers,
-> Willy
->
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> ---
+>  arch/arm/mm/copypage-feroceon.c |  4 ++--
+>  arch/arm/mm/copypage-v4mc.c     | 26 +++++++++++++-------------
+>  arch/arm/mm/copypage-v4wb.c     |  4 ++--
+>  arch/arm/mm/copypage-v4wt.c     |  4 ++--
+>  arch/arm/mm/copypage-xsc3.c     |  4 ++--
+>  arch/arm/mm/copypage-xscale.c   |  4 ++--
+>  6 files changed, 23 insertions(+), 23 deletions(-)
+> 
+> diff --git a/arch/arm/mm/copypage-feroceon.c b/arch/arm/mm/copypage-feroceon.c
+> index 49ee0c1a7209..e69bf2f15f32 100644
+> --- a/arch/arm/mm/copypage-feroceon.c
+> +++ b/arch/arm/mm/copypage-feroceon.c
+> @@ -18,7 +18,7 @@ feroceon_copy_user_page(void *kto, const void *kfrom)
+>  {
+>  	asm("\
+>  	stmfd	sp!, {r4-r9, lr}		\n\
+> -	mov	ip, %2				\n\
+> +	mov	ip, %0				\n\
+>  1:	mov	lr, r1				\n\
+>  	ldmia	r1!, {r2 - r9}			\n\
+>  	pld	[lr, #32]			\n\
+> @@ -64,7 +64,7 @@ feroceon_copy_user_page(void *kto, const void *kfrom)
+>  	mcr	p15, 0, ip, c7, c10, 4		@ drain WB\n\
+>  	ldmfd	sp!, {r4-r9, pc}"
+>  	:
+> -	: "r" (kto), "r" (kfrom), "I" (PAGE_SIZE));
+> +	: "I" (PAGE_SIZE));
+>  }
+>  
+>  void feroceon_copy_user_highpage(struct page *to, struct page *from,
+> diff --git a/arch/arm/mm/copypage-v4mc.c b/arch/arm/mm/copypage-v4mc.c
+> index 1267e64133b9..ea89722c00db 100644
+> --- a/arch/arm/mm/copypage-v4mc.c
+> +++ b/arch/arm/mm/copypage-v4mc.c
+> @@ -45,23 +45,23 @@ mc_copy_user_page(void *from, void *to)
+>  {
+>  	asm volatile(
+>  	"stmfd	sp!, {r4, lr}			@ 2\n\
+> -	mov	r4, %2				@ 1\n\
+> -	ldmia	%0!, {r2, r3, ip, lr}		@ 4\n\
+> -1:	mcr	p15, 0, %1, c7, c6, 1		@ 1   invalidate D line\n\
+> -	stmia	%1!, {r2, r3, ip, lr}		@ 4\n\
+> -	ldmia	%0!, {r2, r3, ip, lr}		@ 4+1\n\
+> -	stmia	%1!, {r2, r3, ip, lr}		@ 4\n\
+> -	ldmia	%0!, {r2, r3, ip, lr}		@ 4\n\
+> -	mcr	p15, 0, %1, c7, c6, 1		@ 1   invalidate D line\n\
+> -	stmia	%1!, {r2, r3, ip, lr}		@ 4\n\
+> -	ldmia	%0!, {r2, r3, ip, lr}		@ 4\n\
+> +	mov	r4, %0				@ 1\n\
+> +	ldmia	r0!, {r2, r3, ip, lr}		@ 4\n\
+> +1:	mcr	p15, 0, r1, c7, c6, 1		@ 1   invalidate D line\n\
+> +	stmia	r1!, {r2, r3, ip, lr}		@ 4\n\
+> +	ldmia	r0!, {r2, r3, ip, lr}		@ 4+1\n\
+> +	stmia	r1!, {r2, r3, ip, lr}		@ 4\n\
+> +	ldmia	r0!, {r2, r3, ip, lr}		@ 4\n\
+> +	mcr	p15, 0, r1, c7, c6, 1		@ 1   invalidate D line\n\
+> +	stmia	r1!, {r2, r3, ip, lr}		@ 4\n\
+> +	ldmia	r0!, {r2, r3, ip, lr}		@ 4\n\
+>  	subs	r4, r4, #1			@ 1\n\
+> -	stmia	%1!, {r2, r3, ip, lr}		@ 4\n\
+> -	ldmneia	%0!, {r2, r3, ip, lr}		@ 4\n\
+> +	stmia	r1!, {r2, r3, ip, lr}		@ 4\n\
+> +	ldmneia	r0!, {r2, r3, ip, lr}		@ 4\n\
+>  	bne	1b				@ 1\n\
+>  	ldmfd	sp!, {r4, pc}			@ 3"
+>  	:
+> -	: "r" (from), "r" (to), "I" (PAGE_SIZE / 64));
+> +	: "I" (PAGE_SIZE / 64));
+>  }
+>  
+>  void v4_mc_copy_user_highpage(struct page *to, struct page *from,
+> diff --git a/arch/arm/mm/copypage-v4wb.c b/arch/arm/mm/copypage-v4wb.c
+> index 067d0fdd630c..7ea9cf07bd5c 100644
+> --- a/arch/arm/mm/copypage-v4wb.c
+> +++ b/arch/arm/mm/copypage-v4wb.c
+> @@ -27,7 +27,7 @@ v4wb_copy_user_page(void *kto, const void *kfrom)
+>  {
+>  	asm("\
+>  	stmfd	sp!, {r4, lr}			@ 2\n\
+> -	mov	r2, %2				@ 1\n\
+> +	mov	r2, %0				@ 1\n\
+>  	ldmia	r1!, {r3, r4, ip, lr}		@ 4\n\
+>  1:	mcr	p15, 0, r0, c7, c6, 1		@ 1   invalidate D line\n\
+>  	stmia	r0!, {r3, r4, ip, lr}		@ 4\n\
+> @@ -44,7 +44,7 @@ v4wb_copy_user_page(void *kto, const void *kfrom)
+>  	mcr	p15, 0, r1, c7, c10, 4		@ 1   drain WB\n\
+>  	ldmfd	 sp!, {r4, pc}			@ 3"
+>  	:
+> -	: "r" (kto), "r" (kfrom), "I" (PAGE_SIZE / 64));
+> +	: "I" (PAGE_SIZE / 64));
+>  }
+>  
+>  void v4wb_copy_user_highpage(struct page *to, struct page *from,
+> diff --git a/arch/arm/mm/copypage-v4wt.c b/arch/arm/mm/copypage-v4wt.c
+> index b85c5da2e510..c742ab24efd6 100644
+> --- a/arch/arm/mm/copypage-v4wt.c
+> +++ b/arch/arm/mm/copypage-v4wt.c
+> @@ -25,7 +25,7 @@ v4wt_copy_user_page(void *kto, const void *kfrom)
+>  {
+>  	asm("\
+>  	stmfd	sp!, {r4, lr}			@ 2\n\
+> -	mov	r2, %2				@ 1\n\
+> +	mov	r2, %0				@ 1\n\
+>  	ldmia	r1!, {r3, r4, ip, lr}		@ 4\n\
+>  1:	stmia	r0!, {r3, r4, ip, lr}		@ 4\n\
+>  	ldmia	r1!, {r3, r4, ip, lr}		@ 4+1\n\
+> @@ -40,7 +40,7 @@ v4wt_copy_user_page(void *kto, const void *kfrom)
+>  	mcr	p15, 0, r2, c7, c7, 0		@ flush ID cache\n\
+>  	ldmfd	sp!, {r4, pc}			@ 3"
+>  	:
+> -	: "r" (kto), "r" (kfrom), "I" (PAGE_SIZE / 64));
+> +	: "I" (PAGE_SIZE / 64));
+>  }
+>  
+>  void v4wt_copy_user_highpage(struct page *to, struct page *from,
+> diff --git a/arch/arm/mm/copypage-xsc3.c b/arch/arm/mm/copypage-xsc3.c
+> index 03a2042aced5..17e4e11c4612 100644
+> --- a/arch/arm/mm/copypage-xsc3.c
+> +++ b/arch/arm/mm/copypage-xsc3.c
+> @@ -34,7 +34,7 @@ xsc3_mc_copy_user_page(void *kto, const void *kfrom)
+>  {
+>  	asm("\
+>  	stmfd	sp!, {r4, r5, lr}		\n\
+> -	mov	lr, %2				\n\
+> +	mov	lr, %0				\n\
+>  						\n\
+>  	pld	[r1, #0]			\n\
+>  	pld	[r1, #32]			\n\
+> @@ -67,7 +67,7 @@ xsc3_mc_copy_user_page(void *kto, const void *kfrom)
+>  						\n\
+>  	ldmfd	sp!, {r4, r5, pc}"
+>  	:
+> -	: "r" (kto), "r" (kfrom), "I" (PAGE_SIZE / 64 - 1));
+> +	: "I" (PAGE_SIZE / 64 - 1));
+>  }
+>  
+>  void xsc3_mc_copy_user_highpage(struct page *to, struct page *from,
+> diff --git a/arch/arm/mm/copypage-xscale.c b/arch/arm/mm/copypage-xscale.c
+> index 0fb85025344d..1034b4ce80cc 100644
+> --- a/arch/arm/mm/copypage-xscale.c
+> +++ b/arch/arm/mm/copypage-xscale.c
+> @@ -45,7 +45,7 @@ mc_copy_user_page(void *from, void *to)
+>  	 */
+>  	asm volatile(
+>  	"stmfd	sp!, {r4, r5, lr}		\n\
+> -	mov	lr, %2				\n\
+> +	mov	lr, %0				\n\
+>  	pld	[r0, #0]			\n\
+>  	pld	[r0, #32]			\n\
+>  	pld	[r1, #0]			\n\
+> @@ -81,7 +81,7 @@ mc_copy_user_page(void *from, void *to)
+>  	beq	2b				\n\
+>  	ldmfd	sp!, {r4, r5, pc}		"
+>  	:
+> -	: "r" (from), "r" (to), "I" (PAGE_SIZE / 64 - 1));
+> +	: "I" (PAGE_SIZE / 64 - 1));
+>  }
+>  
+>  void xscale_mc_copy_user_highpage(struct page *to, struct page *from,
+> -- 
+> 2.7.0
+> 
+> 
