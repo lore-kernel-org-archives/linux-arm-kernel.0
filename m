@@ -1,46 +1,29 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Thu, 18 Feb 2016 15:51:46 -0700
-Subject: [BUG FIX] PM / cpu_domains: Check for NULL callbacks
-In-Reply-To: <CAJZ5v0gXd573OM_xQBsqqaZoRWvT_px64Cx2avR5dCxCwmMWjA@mail.gmail.com>
-References: <1455310238-8963-4-git-send-email-lina.iyer@linaro.org>
- <1455816573-43849-1-git-send-email-lina.iyer@linaro.org>
- <CAJZ5v0gXd573OM_xQBsqqaZoRWvT_px64Cx2avR5dCxCwmMWjA@mail.gmail.com>
-Message-ID: <20160218225146.GB1313@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 19 Feb 2016 00:19:18 +0100
+Subject: [PATCH v2 1/5] MIPS: jz4740: remove broken irq_to_gpio() call
+In-Reply-To: <20160216160609.GA15268@linux-mips.org>
+References: <455637086-2794174-1-git-send-email-arnd@arndb.de>
+ <1455637261-2920972-1-git-send-email-arnd@arndb.de>
+ <20160216160609.GA15268@linux-mips.org>
+Message-ID: <CACRpkda=TFuUWzV_pLKoVhCZp1zWbEjoGmCey_w87bsuQZZ=jg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 18 2016 at 10:46 -0700, Rafael J. Wysocki wrote:
->On Thu, Feb 18, 2016 at 6:29 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
->> Check for NULL platform callback before calling.
->>
->> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
->> ---
->>  drivers/base/power/cpu_domains.c | 10 ++++++++--
->>  1 file changed, 8 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/base/power/cpu_domains.c b/drivers/base/power/cpu_domains.c
->> index 7069411..bcaa474 100644
->> --- a/drivers/base/power/cpu_domains.c
->> +++ b/drivers/base/power/cpu_domains.c
->> @@ -157,16 +157,22 @@ static int cpu_pd_power_on(struct generic_pm_domain *genpd)
->>  {
->>         struct cpu_pm_domain *pd = to_cpu_pd(genpd);
->>
->> -       return pd->ops.power_on();
->> +       if (pd->ops.power_on)
->> +               return pd->ops.power_on();
->> +
->> +       return 0;
->>  }
->
->I usually write things like that as
->
->return pd->ops.power_on ? pd->ops.power_on() : 0;
->
->That gets the job done in just one line of code instead of 4 and in
->one statement instead of 3.
->
-Sure. Thanks. Will roll this in with the next submission.
+On Tue, Feb 16, 2016 at 5:06 PM, Ralf Baechle <ralf@linux-mips.org> wrote:
 
-Thanks,
-Lina
+>> -#define IRQ_TO_BIT(irq) BIT(irq_to_gpio(irq) & 0x1f)
+>> +#define IRQ_TO_BIT(irq) BIT((irq - JZ4740_IRQ_GPIO(0)) & 0x1f)
+>>
+>>  static void jz_gpio_check_trigger_both(struct jz_gpio_chip *chip, unsigned int irq)
+>>  {
+>
+> I've already committed an identical fix locally.
+>
+>   Ralf
+
+I took that fix out of linux-next and applied to the GPIO tree so I can apply
+the rest of the patches without build problems. If you keep it
+around without changing it, git should cope I guess.
+
+Yours,
+Linus Walleij
