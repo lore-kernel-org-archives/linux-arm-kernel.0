@@ -1,39 +1,60 @@
-From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Thu, 18 Feb 2016 11:21:06 +0100
-Subject: [PATCH] ARM: dts: at91: sama5d2 Xplained: Correct the macb irq
- pinctrl node
-Message-ID: <1455790866-13301-1-git-send-email-romain.izard.pro@gmail.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Thu, 18 Feb 2016 10:25:01 +0000
+Subject: [PATCH v2 1/8] arm64: Introduce Allwinner SoC config option
+In-Reply-To: <20160218113207.5ffffee2@xhacker>
+References: <1455709440-8668-1-git-send-email-andre.przywara@arm.com>
+ <1455709440-8668-2-git-send-email-andre.przywara@arm.com>
+ <20160218113207.5ffffee2@xhacker>
+Message-ID: <56C59BFD.20609@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All pinctrl nodes for the Atmel pinctrl controller need to have their
-bias configuration explicitly defined. Otherwise, the pinctrl mapping
-is not valid.
+Hi,
 
-It works for now as the pinctrl driver proceeds even with invalid
-mappings, but this can become an issue, if the pinctrl driver starts
-to require valid mappings. Additionally, the pin is not protected from
-being remapped later by an other driver.
+On 18/02/16 03:32, Jisheng Zhang wrote:
+> Dear Andre,
+> 
+> On Wed, 17 Feb 2016 11:43:53 +0000
+> Andre Przywara <andre.przywara@arm.com> wrote:
+> 
+>> To prepare for the Allwinner A64 SoC support, introduce a config
+>> option to allow compiling Allwinner (aka. sunxi) specific drivers
+>> for the arm64 architecture as well.
+>> This patch just defines the ARCH_SUNXI symbol to allow Allwinner
+>> specific drivers to be selected during kernel configuration.
+>>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> ---
+>>  arch/arm64/Kconfig.platforms | 5 +++++
+>>  1 file changed, 5 insertions(+)
+>>
+>> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+>> index 8a09522..2f7f69b 100644
+>> --- a/arch/arm64/Kconfig.platforms
+>> +++ b/arch/arm64/Kconfig.platforms
+>> @@ -1,5 +1,10 @@
+>>  menu "Platform selection"
+>>  
+>> +config ARCH_SUNXI
+> 
+> it's better to keep ARCH_YYZZ sorted in alphabetic order
 
-There is an external 1k? pull-up to 3.3V, so no bias is required on
-the Ethernet PHY's interrupt line.
+Right, I think I originally started with ARCH_ALLWINNER until I found
+ARCH_SUNXI, but forgot to move it.
+Actually I wonder if we should sort for the user visible config options
+instead, but that's another story.
 
-Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
----
- arch/arm/boot/dts/at91-sama5d2_xplained.dts | 1 +
- 1 file changed, 1 insertion(+)
+Cheers,
+Andre.
 
-diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained.dts b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-index e683856c507c..75341eec2dfd 100644
---- a/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-+++ b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-@@ -308,6 +308,7 @@
- 
- 				pinctrl_macb0_phy_irq: macb0_phy_irq {
- 					pinmux = <PIN_PC9__GPIO>;
-+					bias-disable;
- 				};
- 
- 				pinctrl_pdmic_default: pdmic_default {
--- 
-2.5.0
+> Thanks,
+> Jisheng
+> 
+>> +	bool "Allwinner sunxi 64-bit SoC Family"
+>> +	help
+>> +	  This enables support for Allwinner sunxi based SoCs like the A64.
+>> +
+>>  config ARCH_BCM_IPROC
+>>  	bool "Broadcom iProc SoC Family"
+>>  	help
+> 
