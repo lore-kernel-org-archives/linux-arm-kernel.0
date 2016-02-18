@@ -1,87 +1,47 @@
-From: blogic@openwrt.org (John Crispin)
-Date: Thu, 18 Feb 2016 15:50:10 +0100
-Subject: [PATCH V6 1/2] regulator: Add document for MT6323 regulator
-In-Reply-To: <20160218143610.GG9654@rob-hp-laptop>
-References: <1455709056-50510-1-git-send-email-blogic@openwrt.org>
- <20160218143610.GG9654@rob-hp-laptop>
-Message-ID: <56C5DA22.9080008@openwrt.org>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 18 Feb 2016 22:57:40 +0800
+Subject: [PATCH] ARM: imx: Do L2 errata only if the L2 cache isn't enabled
+In-Reply-To: <56C03B0E.9000809@gmail.com>
+References: <1455261093-11849-1-git-send-email-dirk.behme@de.bosch.com>
+ <20160212141654.GA10826@n2100.arm.linux.org.uk>
+ <56BDFF64.9090701@gmail.com> <20160214081857.GQ6756@tiger>
+ <56C03B0E.9000809@gmail.com>
+Message-ID: <20160218145739.GC6756@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sun, Feb 14, 2016 at 09:30:06AM +0100, Dirk Behme wrote:
+> On 14.02.2016 09:18, Shawn Guo wrote:
+> >On Fri, Feb 12, 2016 at 04:51:00PM +0100, Dirk Behme wrote:
+> >>On 12.02.2016 15:16, Russell King - ARM Linux wrote:
+> >>>On Fri, Feb 12, 2016 at 08:11:33AM +0100, Dirk Behme wrote:
+> >>>>All the generic L2 cache handling code is encapsulated by a
+> >>>>check if the L2 cache is enabled. If it's enabled already, the code
+> >>>>is skipped.
+> >>>>
+> >>>>For the i.MX6 specific L2 cache handling we missed this check.
+> >>>>Add it.
+> >>>
+> >>>What's the reasoning behind this?  The prefetch register is writable
+> >>>while the L2 cache is enabled, unlike the auxiliary control register.
+> >>
+> >> From an internal log I have the following info:
+> >>
+> >>The write to the L2-Cache controller from non-secure world causes an
+> >>imprecise
+> >>external abort. If Linux runs from normal world the cache controller
+> >>is already
+> >>enabled and thus no configuration is needed by Linux.
+> >
+> >Dirk,
+> >
+> >Do you have a real use case of this, i.e. running Linux on i.MX6 in
+> >non-secure world?
+> 
+> 
+> Yes, in a scenario where one of the cores runs a RTOS.
 
+Can you please reword the commit log to have the above non-secure world
+user story mentioned in there?
 
-On 18/02/2016 15:36, Rob Herring wrote:
-> On Wed, Feb 17, 2016 at 12:37:35PM +0100, John Crispin wrote:
->> Signed-off-by: John Crispin <blogic@openwrt.org>
->> Cc: devicetree at vger.kernel.org
->>
->> ---
->> Changes in V6
->> * remove the compatible string
->>
->> Changes in V5
->> * regulator vs regulators
->>
->> Changes in V4
->> * regulator is a subnode and not a property
->>
->>  .../bindings/regulator/mt6323-regulator.txt        |  241 ++++++++++++++++++++
->>  1 file changed, 241 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/regulator/mt6323-regulator.txt
->>
->> diff --git a/Documentation/devicetree/bindings/regulator/mt6323-regulator.txt b/Documentation/devicetree/bindings/regulator/mt6323-regulator.txt
->> new file mode 100644
->> index 0000000..67c0780
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/regulator/mt6323-regulator.txt
->> @@ -0,0 +1,241 @@
->> +Mediatek MT6323 Regulator Driver
->> +
->> +All voltage regulators are defined as subnodes of the regulators node. A list
->> +of regulators provided by this controller are defined as subnodes of the
->> +drivers node. Each regulator is named according to its regulator type,
-> 
-> s/drivers/PMIC's/
-> 
->> +buck_<name> and ldo_<name>. The definition for each of these nodes is defined
->> +using the standard binding for regulators at
->> +Documentation/devicetree/bindings/regulator/regulator.txt.
->> +
->> +The valid names for regulators are::
->> +BUCK:
->> +  buck_vproc, buck_vsys, buck_vpa
->> +LDO:
->> +  ldo_vtcxo, ldo_vcn28, ldo_vcn33_bt, ldo_vcn33_wifi, ldo_va, ldo_vcama,
->> +  ldo_vio28, ldo_vusb, ldo_vmc, ldo_vmch, ldo_vemc3v3, ldo_vgp1, ldo_vgp2,
->> +  ldo_vgp3, ldo_vcn18, ldo_vsim1, ldo_vsim2, ldo_vrtc, ldo_vcamaf, ldo_vibr,
->> +  ldo_vrf18, ldo_vm, ldo_vio18, ldo_vcamd, ldo_vcamio
->> +
->> +Example:
->> +
->> +	pmic: mt6323 {
->> +		compatible = "mediatek,mt6323";
->> +
->> +		mt6323regulator: regulators {
->> +			compatible = "mediatek,mt6323-regulator";
-> 
-> Still have the compatible here...
-> 
-> Otherwise:
-> 
-> Acked-by: Rob Herring <robh@kernel.org>
-> 
-
-grml, i only removed one of the compat strings and did not notice there
-are two. do you want me to send a fixup that you can fold into the one
-you already merged or do you want me to resend just this one patch with
-the fix applied ?
-
-	John
-
-
-> 
-> _______________________________________________
-> Linux-mediatek mailing list
-> Linux-mediatek at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-mediatek
-> 
+Shawn
