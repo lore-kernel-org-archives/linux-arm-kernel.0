@@ -1,89 +1,293 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 18 Feb 2016 17:20:24 +0100
-Subject: [PATCH v2 0/6] arm64: Initial support for Marvell Armada 7K/8K
-Message-ID: <1455812430-4656-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Thu, 18 Feb 2016 17:20:25 +0100
+Subject: [PATCH v2 1/6] Documentation: arm: update Marvell product listing
+In-Reply-To: <1455812430-4656-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1455812430-4656-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1455812430-4656-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Arnd Bergmann <arnd@arndb.de>
 
-This series adds initial support for the new Armada 7K and 8K Marvell
-64 bits processors. Details about those processors based on the
-Cortex-A72 can be found at:
+I'm still getting confused regarding which core specifically
+is used in which SoC, so I've added some more detail to the
+Marvell README file. I got most of this from random sources
+on the internet, so it's possible that some of the information
+is wrong, but most of it should be pretty obvious.
 
-  http://www.marvell.com/embedded-processors/armada-70xx/
-  http://www.marvell.com/embedded-processors/armada-80xx/
+There are a few remaining points I could not find out:
 
-One characteristic of those processors is that internally they are
-built from several components:
+* The CPU core in Orion 88F6183
+* The difference (if any) between PJ4B-MP and PJ4C
+* The naming of Feroceon/Jolteon/Flareon/Sheeva/Mohawk/PJ1/PJ4
+  is still confusing, as they tend to overlap.
 
- - One "AP", which contains the processor itself and a few core IP
-   blocks. The AP in 7K and 8K is called AP806, and is available on
-   two variants: dual Cortex-A72 and quad Cortex-A72.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+[Thomas:
+ - move Armada SP out from the EBU family into its own "Storage"
+   family. This chip is indeed not part of the EBU family.
+ - fixed the URL for the Armada SP information, since the link of the
+   original patch no longer existed
+ - explicitly indicate that there is no support in upstream for the
+   Armada SP
+ - indent the "Core: " description for the Armada XP to be clearly
+   under the Armada XP category, so that it is clear it applies to
+   Armada XP only, and not other cores of the EBU family.]
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ Documentation/arm/Marvell/README | 132 +++++++++++++++++++++++++++++++--------
+ 1 file changed, 105 insertions(+), 27 deletions(-)
 
- - Or or two "CP", which contains most of the I/Os (SATA, PCIe,
-   etc.). The CP in 7K and 8K is called CP110. One CP110 is available
-   in the 7K family, while two CP110 are available in the 8K family,
-   doubling the number of I/O interfaces.
-
-The support added in this series only brings minimal support for the
-AP side (and not yet all IP blocks, obviously). Support for the CP
-part will come in the future.
-
-Since the series touches similar files as the Armada 3700 series from
-Gregory Clement, it is based on it (its 4th version).
-
-Changes since v1:
-
- - Add initial patch from Arnd which updates the Marvell README, and
-   did a few adjustements to it.
-
- - Use arm,gic-400 as the compatible string identifying the GIC, as
-   suggested by Jisheng.
-
- - Rework the patch series on top of Gregory's latest patch series for
-   Armada 3700, since the patch series interact a little bit on a few
-   aspects (usage of the ARCH_MVEBU Kconfig option, for example).
-
- - Fix the size of the register areas used for the GIC to be in line
-   with the datasheet. Follows some questions from Marc Zyngier.
-
-Best regards,
-
-Thomas
-
-Arnd Bergmann (1):
-  Documentation: arm: update Marvell product listing
-
-Thomas Petazzoni (5):
-  Documentation: arm: improve Armada 37xx description
-  Documentation: arm: add link to Armada 38x Functional Spec
-  Documentation: arm: add Marvell Armada 7K and 8K families
-  arm64: update ARCH_MVEBU for Marvell Armada 7K/8K support
-  arm64: marvell: add Device Tree files for Armada 7K/8K
-
- Documentation/arm/Marvell/README                   | 158 +++++++++++---
- .../bindings/arm/marvell/armada-7k-8k.txt          |  24 +++
- arch/arm64/Kconfig.platforms                       |  11 +-
- arch/arm64/boot/dts/marvell/Makefile               |   1 +
- arch/arm64/boot/dts/marvell/armada-7020.dtsi       |  54 +++++
- arch/arm64/boot/dts/marvell/armada-7040-db.dts     |  92 ++++++++
- arch/arm64/boot/dts/marvell/armada-7040.dtsi       |  54 +++++
- arch/arm64/boot/dts/marvell/armada-8020.dtsi       |  54 +++++
- arch/arm64/boot/dts/marvell/armada-8040.dtsi       |  54 +++++
- arch/arm64/boot/dts/marvell/armada-ap806-dual.dtsi |  71 +++++++
- arch/arm64/boot/dts/marvell/armada-ap806-quad.dtsi |  84 ++++++++
- arch/arm64/boot/dts/marvell/armada-ap806.dtsi      | 234 +++++++++++++++++++++
- 12 files changed, 858 insertions(+), 33 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/marvell/armada-7k-8k.txt
- create mode 100644 arch/arm64/boot/dts/marvell/armada-7020.dtsi
- create mode 100644 arch/arm64/boot/dts/marvell/armada-7040-db.dts
- create mode 100644 arch/arm64/boot/dts/marvell/armada-7040.dtsi
- create mode 100644 arch/arm64/boot/dts/marvell/armada-8020.dtsi
- create mode 100644 arch/arm64/boot/dts/marvell/armada-8040.dtsi
- create mode 100644 arch/arm64/boot/dts/marvell/armada-ap806-dual.dtsi
- create mode 100644 arch/arm64/boot/dts/marvell/armada-ap806-quad.dtsi
- create mode 100644 arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-
+diff --git a/Documentation/arm/Marvell/README b/Documentation/arm/Marvell/README
+index ddbc048..981164f 100644
+--- a/Documentation/arm/Marvell/README
++++ b/Documentation/arm/Marvell/README
+@@ -22,7 +22,7 @@ Orion family
+         88F5281
+                Datasheet               : http://www.ocmodshop.com/images/reviews/networking/qnap_ts409u/marvel_88f5281_data_sheet.pdf
+         88F6183
+-  Core: Feroceon ARMv5 compatible
++  Core: Feroceon 88fr331 (88f51xx) or 88fr531-vd (88f52xx) ARMv5 compatible
+   Linux kernel mach directory: arch/arm/mach-orion5x
+   Linux kernel plat directory: arch/arm/plat-orion
+ 
+@@ -52,7 +52,7 @@ Kirkwood family
+                 Hardware Spec  : http://www.marvell.com/embedded-processors/kirkwood/assets/HW_88F6281_OpenSource.pdf
+                 Functional Spec: http://www.marvell.com/embedded-processors/kirkwood/assets/FS_88F6180_9x_6281_OpenSource.pdf
+   Homepage: http://www.marvell.com/embedded-processors/kirkwood/
+-  Core: Feroceon ARMv5 compatible
++  Core: Feroceon 88fr131 ARMv5 compatible
+   Linux kernel mach directory: arch/arm/mach-mvebu
+   Linux kernel plat directory: none
+ 
+@@ -71,7 +71,7 @@ Discovery family
+         MV76100
+                 Not supported by the Linux kernel.
+ 
+-  Core: Feroceon ARMv5 compatible
++  Core: Feroceon 88fr571-vd ARMv5 compatible
+ 
+   Linux kernel mach directory: arch/arm/mach-mv78xx0
+   Linux kernel plat directory: arch/arm/plat-orion
+@@ -86,20 +86,25 @@ EBU Armada family
+     Product Brief:   http://www.marvell.com/embedded-processors/armada-300/assets/Marvell_ARMADA_370_SoC.pdf
+     Hardware Spec:   http://www.marvell.com/embedded-processors/armada-300/assets/ARMADA370-datasheet.pdf
+     Functional Spec: http://www.marvell.com/embedded-processors/armada-300/assets/ARMADA370-FunctionalSpec-datasheet.pdf
++    Core: Sheeva ARMv7 compatible PJ4B
+ 
+   Armada 375 Flavors:
+ 	88F6720
+     Product Brief: http://www.marvell.com/embedded-processors/armada-300/assets/ARMADA_375_SoC-01_product_brief.pdf
+-
+-  Armada 380/385 Flavors:
+-	88F6810
+-	88F6820
+-	88F6828
+-
+-  Armada 390/398 Flavors:
+-	88F6920
+-	88F6928
++    Core: ARM Cortex-A9
++
++  Armada 38x Flavors:
++	88F6810	Armada 380
++	88F6820 Armada 385
++	88F6828 Armada 388
++    Produce infos: http://www.marvell.com/embedded-processors/armada-38x/
++    Core: ARM Cortex-A9
++
++  Armada 39x Flavors:
++	88F6920 Armada 390
++	88F6928 Armada 398
+     Product infos: http://www.marvell.com/embedded-processors/armada-39x/
++    Core: ARM Cortex-A9
+ 
+   Armada XP Flavors:
+         MV78230
+@@ -112,8 +117,7 @@ EBU Armada family
+       http://www.marvell.com/embedded-processors/armada-xp/assets/HW_MV78230_OS.PDF
+       http://www.marvell.com/embedded-processors/armada-xp/assets/HW_MV78260_OS.PDF
+       http://www.marvell.com/embedded-processors/armada-xp/assets/HW_MV78460_OS.PDF
+-
+-  Core: Sheeva ARMv7 compatible
++    Core: Sheeva ARMv7 compatible Dual-core or Quad-core PJ4B-MP
+ 
+   Linux kernel mach directory: arch/arm/mach-mvebu
+   Linux kernel plat directory: none
+@@ -148,6 +152,15 @@ Avanta family
+   Linux kernel mach directory: no code in mainline yet, planned for the future
+   Linux kernel plat directory: no code in mainline yet, planned for the future
+ 
++Storage family
++--------------
++
++  Armada SP:
++	88RC1580
++    Product infos: http://www.marvell.com/storage/armada-sp/
++    Core: Sheeva ARMv7 comatible Quad-core PJ4C
++    (not supported in upstream Linux kernel)
++
+ Dove family (application processor)
+ -----------------------------------
+ 
+@@ -168,7 +181,7 @@ PXA 2xx/3xx/93x/95x family
+   Flavors:
+         PXA21x, PXA25x, PXA26x
+              Application processor only
+-             Core: ARMv5 XScale core
++             Core: ARMv5 XScale1 core
+         PXA270, PXA271, PXA272
+              Product Brief         : http://www.marvell.com/application-processors/pxa-family/assets/pxa_27x_pb.pdf
+              Design guide          : http://www.marvell.com/application-processors/pxa-family/assets/pxa_27x_design_guide.pdf
+@@ -176,7 +189,7 @@ PXA 2xx/3xx/93x/95x family
+              Specification         : http://www.marvell.com/application-processors/pxa-family/assets/pxa_27x_emts.pdf
+              Specification update  : http://www.marvell.com/application-processors/pxa-family/assets/pxa_27x_spec_update.pdf
+              Application processor only
+-             Core: ARMv5 XScale core
++             Core: ARMv5 XScale2 core
+         PXA300, PXA310, PXA320
+              PXA 300 Product Brief : http://www.marvell.com/application-processors/pxa-family/assets/PXA300_PB_R4.pdf
+              PXA 310 Product Brief : http://www.marvell.com/application-processors/pxa-family/assets/PXA310_PB_R4.pdf
+@@ -187,10 +200,10 @@ PXA 2xx/3xx/93x/95x family
+              Specification Update  : http://www.marvell.com/application-processors/pxa-family/assets/PXA3xx_Spec_Update.zip
+              Reference Manual      : http://www.marvell.com/application-processors/pxa-family/assets/PXA3xx_TavorP_BootROM_Ref_Manual.pdf
+              Application processor only
+-             Core: ARMv5 XScale core
++             Core: ARMv5 XScale3 core
+         PXA930, PXA935
+              Application processor with Communication processor
+-             Core: ARMv5 XScale core
++             Core: ARMv5 XScale3 core
+         PXA955
+              Application processor with Communication processor
+              Core: ARMv7 compatible Sheeva PJ4 core
+@@ -209,7 +222,7 @@ PXA 2xx/3xx/93x/95x family
+    Linux kernel mach directory: arch/arm/mach-pxa
+    Linux kernel plat directory: arch/arm/plat-pxa
+ 
+-MMP/MMP2 family (communication processor)
++MMP/MMP2/MMP3 family (communication processor)
+ -----------------------------------------
+ 
+    Flavors:
+@@ -222,16 +235,32 @@ MMP/MMP2 family (communication processor)
+              Boot ROM manual      : http://www.marvell.com/application-processors/armada-100/assets/armada_16x_ref_manual.pdf
+              App node package     : http://www.marvell.com/application-processors/armada-100/assets/armada_16x_app_note_package.pdf
+              Application processor only
+-             Core: ARMv5 compatible Marvell PJ1 (Mohawk)
+-        PXA910
++             Core: ARMv5 compatible Marvell PJ1 88sv331 (Mohawk)
++        PXA910/PXA920
+              Homepage             : http://www.marvell.com/communication-processors/pxa910/
+              Product Brief        : http://www.marvell.com/communication-processors/pxa910/assets/Marvell_PXA910_Platform-001_PB_final.pdf
+              Application processor with Communication processor
+-             Core: ARMv5 compatible Marvell PJ1 (Mohawk)
+-        MMP2, a.k.a Armada 610
++             Core: ARMv5 compatible Marvell PJ1 88sv331 (Mohawk)
++        PXA688, a.k.a. MMP2, a.k.a Armada 610
+              Product Brief        : http://www.marvell.com/application-processors/armada-600/assets/armada610_pb.pdf
+              Application processor only
+-             Core: ARMv7 compatible Sheeva PJ4 core
++             Core: ARMv7 compatible Sheeva PJ4 88sv581x core
++	PXA2128, a.k.a. MMP3 (OLPC XO4, Linux support not upstream)
++	     Product Brief	  : http://www.marvell.com/application-processors/armada/pxa2128/assets/Marvell-ARMADA-PXA2128-SoC-PB.pdf
++	     Application processor only
++	     Core: Dual-core ARMv7 compatible Sheeva PJ4C core
++	PXA960/PXA968/PXA978 (Linux support not upstream)
++	     Application processor with Communication Processor
++	     Core: ARMv7 compatible Sheeva PJ4 core
++	PXA986/PXA988 (Linux support not upstream)
++	     Application processor with Communication Processor
++	     Core: Dual-core ARMv7 compatible Sheeva PJ4B-MP core
++	PXA1088/PXA1920 (Linux support not upstream)
++	     Application processor with Communication Processor
++	     Core: quad-core ARMv7 Cortex-A7
++	PXA1908/PXA1928/PXA1936
++	     Application processor with Communication Processor
++	     Core: multi-core ARMv8 Cortex-A53
+ 
+    Comments:
+ 
+@@ -250,6 +279,10 @@ Berlin family (Multimedia Solutions)
+ -------------------------------------
+ 
+   Flavors:
++	88DE3010, Armada 1000 (no Linux support)
++		Core:		Marvell PJ1 (ARMv5TE), Dual-core
++		Product Brief:	http://www.marvell.com.cn/digital-entertainment/assets/armada_1000_pb.pdf
++	88DE3005, Armada 1500-mini
+ 	88DE3005, Armada 1500 Mini
+ 		Design name:	BG2CD
+ 		Core:		ARM Cortex-A9, PL310 L2CC
+@@ -260,14 +293,16 @@ Berlin family (Multimedia Solutions)
+                 Homepage:       http://www.marvell.com/multimedia-solutions/armada-1500-mini-plus/
+ 	88DE3100, Armada 1500
+ 		Design name:	BG2
+-		Core:		Marvell PJ4B (ARMv7), Tauros3 L2CC
+-		Product Brief:	http://www.marvell.com/multimedia-solutions/armada-1500/assets/Marvell-ARMADA-1500-Product-Brief.pdf
++		Core:		Marvell PJ4B-MP (ARMv7), Tauros3 L2CC
++		Product Brief:	http://www.marvell.com/digital-entertainment/armada-1500/assets/Marvell-ARMADA-1500-Product-Brief.pdf
+ 	88DE3114, Armada 1500 Pro
+ 		Design name:	BG2Q
+ 		Core:		Quad Core ARM Cortex-A9, PL310 L2CC
+-	88DE????
++	88DE3214, Armada 1500 Pro 4K
+ 		Design name:	BG3
+ 		Core:		ARM Cortex-A15, CA15 integrated L2CC
++	88DE3218, ARMADA 1500 Ultra
++		Core:		ARM Cortex-A53
+ 
+   Homepage: http://www.marvell.com/multimedia-solutions/
+   Directory: arch/arm/mach-berlin
+@@ -276,6 +311,49 @@ Berlin family (Multimedia Solutions)
+    * This line of SoCs is based on Marvell Sheeva or ARM Cortex CPUs
+      with Synopsys DesignWare (IRQ, GPIO, Timers, ...) and PXA IP (SDHCI, USB, ETH, ...).
+ 
++CPU Cores
++---------
++
++The XScale cores were designed by Intel, and shipped by Marvell in the older
++PXA processors. Feroceon is a Marvell designed core that developed in-house,
++and that evolved into Sheeva. The XScale and Feroceon cores were phased out
++over time and replaced with Sheeva cores in later products, which subsequently
++got replaced with licensed ARM Cortex-A cores.
++
++  XScale 1
++	CPUID 0x69052xxx
++	ARMv5, iWMMXt
++  XScale 2
++	CPUID 0x69054xxx
++	ARMv5, iWMMXt
++  XScale 3
++	CPUID 0x69056xxx or 0x69056xxx
++	ARMv5, iWMMXt
++  Feroceon-1850 88fr331 "Mohawk"
++	CPUID 0x5615331x or 0x41xx926x
++	ARMv5TE, single issue
++  Feroceon-2850 88fr531-vd "Jolteon"
++	CPUID 0x5605531x or 0x41xx926x
++	ARMv5TE, VFP, dual-issue
++  Feroceon 88fr571-vd "Jolteon"
++	CPUID 0x5615571x
++	ARMv5TE, VFP, dual-issue
++  Feroceon 88fr131 "Mohawk-D"
++	CPUID 0x5625131x
++	ARMv5TE, single-issue in-order
++  Sheeva PJ1 88sv331 "Mohawk"
++	CPUID 0x561584xx
++	ARMv5, single-issue iWMMXt v2
++  Sheeva PJ4 88sv581x "Flareon"
++	CPUID 0x560f581x
++	ARMv7, idivt, optional iWMMXt v2
++  Sheeva PJ4B 88sv581x
++	CPUID 0x561f581x
++	ARMv7, idivt, optional iWMMXt v2
++  Sheeva PJ4B-MP / PJ4C
++	CPUID 0x562f584x
++	ARMv7, idivt/idiva, LPAE, optional iWMMXt v2 and/or NEON
++
+ Long-term plans
+ ---------------
+ 
 -- 
 2.6.4
