@@ -1,38 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 18 Feb 2016 15:41:45 +0100
-Subject: [PATCH] PCI: mvebu: Restrict build to 32-bit ARM
-In-Reply-To: <87egcaqe89.fsf@free-electrons.com>
-References: <1455802330-17565-1-git-send-email-thierry.reding@gmail.com>
- <5051836.EUN3ennYNm@wuerfel> <87egcaqe89.fsf@free-electrons.com>
-Message-ID: <2551766.4Kx1a2F3t1@wuerfel>
+From: james.morse@arm.com (James Morse)
+Date: Thu, 18 Feb 2016 14:43:48 +0000
+Subject: [PATCH v2 5/5] arm64: kernel: Don't toggle PAN on systems with UAO
+In-Reply-To: <20160218143648.GC2538@e104818-lin.cambridge.arm.com>
+References: <1454684330-892-1-git-send-email-james.morse@arm.com>
+ <1454684330-892-6-git-send-email-james.morse@arm.com>
+ <20160218143648.GC2538@e104818-lin.cambridge.arm.com>
+Message-ID: <56C5D8A4.8070505@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 18 February 2016 15:34:30 Gregory CLEMENT wrote:
->  On jeu., f?vr. 18 2016, Arnd Bergmann <arnd@arndb.de> wrote:
-> 
-> > On Thursday 18 February 2016 14:32:10 Thierry Reding wrote:
-> >> From: Thierry Reding <treding@nvidia.com>
-> >> 
-> >> This driver uses PCI glue that is only available on 32-bit ARM. This
-> >> used to work fine as long as ARCH_MVEBU and ARCH_DOVE were exclusively
-> >> 32-bit, but that's changed now, with ARCH_MVEBU also being available
-> >> on 64-bit ARM.
-> >> 
-> >> Signed-off-by: Thierry Reding <treding@nvidia.com>
-> >
-> > Looks fine as a temporary workaround, but I think what we really want to
-> > do here is to remove the dependency, as the new ARM64 platforms are going
-> > to need this driver anyway.
-> 
-> Actually the mvebu ARM64 platform we know about (Armada 3700, 7K and
-> 8K), won't use the same controller. A7K/A8K will use a synopsis IP and
-> Armada 3700 a new Marvell IP.
-> 
-> So for me depending on ARM32 is enough.
+Hi Catalin,
 
-Ah, that makes things much easier indeed.
+On 18/02/16 14:36, Catalin Marinas wrote:
+> On Fri, Feb 05, 2016 at 02:58:50PM +0000, James Morse wrote:
+>> --- a/arch/arm64/mm/fault.c
+>> +++ b/arch/arm64/mm/fault.c
+>> @@ -234,6 +234,9 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
+>>  	}
+>>  
+>>  	if (permission_fault(esr) && (addr < USER_DS)) {
+>> +		if (get_thread_info(regs->sp)->addr_limit == KERNEL_DS)
+>> +			panic("Accessing user space memory with fs=KERNEL_DS");
+> 
+> We could simply use "get_fs() == KERNEL_DS" as we should call
+> do_page_fault() outside the current context.
 
-Does this mean no more MBUS on the 64-bit platforms too?
+shouldn't?
 
-	Arnd
+You're right, it will always be on the same stack, so get_fs() will give us the
+right result. This fits better with getting rid of the new get_thread_info() in
+patch 3.
+
+
+Thanks,
+
+James
