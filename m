@@ -1,67 +1,53 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 18 Feb 2016 17:18:49 +0100
-Subject: [PATCH 3/3] ARM64: dts: mt8173: Add thermal/auxadc device nodes
-In-Reply-To: <1448883753-19068-4-git-send-email-s.hauer@pengutronix.de>
-References: <1448883753-19068-1-git-send-email-s.hauer@pengutronix.de>
- <1448883753-19068-4-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <56C5EEE9.4020407@gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 18 Feb 2016 17:20:28 +0100
+Subject: [PATCH v2 4/6] Documentation: arm: add Marvell Armada 7K and 8K
+ families
+In-Reply-To: <1455812430-4656-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1455812430-4656-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1455812430-4656-5-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+As we are adding support for the Armada 7K and 8K families, this
+commit adds them to the Marvell documentation listing all supported
+SoCs, together with references to their Product Brief, Homepage and
+Device Tree files.
 
-On 30/11/15 12:42, Sascha Hauer wrote:
-> This adds the thermal controller and auxadc nodes to the Mediatek MT8173
-> dtsi file.
->
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
-> ---
->   arch/arm64/boot/dts/mediatek/mt8173.dtsi | 17 +++++++++++++++++
->   1 file changed, 17 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> index 06a1564..e2ddd03 100644
-> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> @@ -277,6 +277,11 @@
->   				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
->   		};
->
-> +		auxadc: auxadc at 11001000 {
-> +			compatible = "mediatek,mt8173-auxadc";
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ Documentation/arm/Marvell/README | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-Can you please write a small Documentation about the binding.
-I suppose it will be mediatek,auxadc and mediatek,mt8173-auxadc.
-
-I can't do it my self, as my datasheet lacks the auxadc registers.
-
-Thanks,
-Matthias
-
-> +			reg = <0 0x11001000 0 0x1000>;
-> +		};
-> +
->   		uart0: serial at 11002000 {
->   			compatible = "mediatek,mt8173-uart",
->   				     "mediatek,mt6577-uart";
-> @@ -487,6 +492,18 @@
->   			clock-names = "source", "hclk";
->   			status = "disabled";
->   		};
-> +
-> +		thermal: thermal at 1100b000 {
-> +			#thermal-sensor-cells = <0>;
-> +			compatible = "mediatek,mt8173-thermal";
-> +			reg = <0 0x1100b000 0 0x1000>;
-> +			interrupts = <0 70 IRQ_TYPE_LEVEL_LOW>;
-> +			clocks = <&pericfg CLK_PERI_THERM>, <&pericfg CLK_PERI_AUXADC>;
-> +			clock-names = "therm", "auxadc";
-> +			resets = <&pericfg MT8173_PERI_THERM_SW_RST>;
-> +			mediatek,auxadc = <&auxadc>;
-> +			mediatek,apmixedsys = <&apmixedsys>;
-> +		};
->   	};
->   };
->
->
+diff --git a/Documentation/arm/Marvell/README b/Documentation/arm/Marvell/README
+index fe867f1..b5bb7f5 100644
+--- a/Documentation/arm/Marvell/README
++++ b/Documentation/arm/Marvell/README
+@@ -135,6 +135,26 @@ EBU Armada family ARMv8
+ 	Product Brief: http://www.marvell.com/embedded-processors/assets/PB-88F3700-FNL.pdf
+ 	Device tree files: arch/arm64/boot/dts/marvell/armada-37*
+ 
++  Armada 7K Flavors:
++	88F7020 (AP806 Dual + one CP110)
++	88F7040 (AP806 Quad + one CP110)
++	Core: ARM Cortex A72
++
++	Homepage: http://www.marvell.com/embedded-processors/armada-70xx/
++	Product Brief: http://www.marvell.com/embedded-processors/assets/Armada7020PB-Jan2016.pdf
++		       http://www.marvell.com/embedded-processors/assets/Armada7040PB-Jan2016.pdf
++	Device tree files: arch/arm64/boot/dts/marvell/armada-70*
++
++  Armada 8K Flavors:
++	88F8020 (AP806 Dual + two CP110)
++	88F8040 (AP806 Quad + two CP110)
++	Core: ARM Cortex A72
++
++	Homepage: http://www.marvell.com/embedded-processors/armada-80xx/
++	Product Brief: http://www.marvell.com/embedded-processors/assets/Armada8020PB-Jan2016.pdf
++		       http://www.marvell.com/embedded-processors/assets/Armada8040PB-Jan2016.pdf
++	Device tree files: arch/arm64/boot/dts/marvell/armada-80*
++
+ Avanta family
+ -------------
+ 
+-- 
+2.6.4
