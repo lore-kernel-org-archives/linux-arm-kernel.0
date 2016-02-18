@@ -1,5 +1,5 @@
-From: carlo@endlessm.com (Carlo Caione)
-Date: Thu, 18 Feb 2016 22:24:24 +0100
+From: drake@endlessm.com (Daniel Drake)
+Date: Thu, 18 Feb 2016 15:27:06 -0600
 Subject: [PATCH 2/2] ARM: dts: meson: Adding hwrev syscon node
 In-Reply-To: <CAOQ7t2aqZj3STFsdTSQZMTK5U+8Oem8oFroxHKWkt=AeP+Zczg@mail.gmail.com>
 References: <1455730114-2547-1-git-send-email-romain.perier@gmail.com>
@@ -7,13 +7,11 @@ References: <1455730114-2547-1-git-send-email-romain.perier@gmail.com>
  <CAOQ7t2byFoW657-1xnsBpeyPkB6K25R=_pPmRDmT32Sjef=kUw@mail.gmail.com>
  <4136837.fyWFbJqZfO@wuerfel>
  <CAOQ7t2aqZj3STFsdTSQZMTK5U+8Oem8oFroxHKWkt=AeP+Zczg@mail.gmail.com>
-Message-ID: <CAL9uMOGy=sP+gg8v=9N5zhrWGNA2Aq7N34JYgUON-+GH4b1d0w@mail.gmail.com>
+Message-ID: <CAD8Lp47LGUc3-MFpU+3iNjXJL0i4nLTY_49NUxFXeZ2SokDuaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 18, 2016 at 10:04 PM, Carlo Caione <carlo@caione.org> wrote:
-> On Thu, Feb 18, 2016 at 3:22 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-
+On Thu, Feb 18, 2016 at 3:04 PM, Carlo Caione <carlo@caione.org> wrote:
 >> However, if some or all of the other devices actually are entirely
 >> made up of register ranges within cbus, that would indicate that
 >> cbus itself is not just a collection of random registers but something
@@ -24,8 +22,19 @@ On Thu, Feb 18, 2016 at 10:04 PM, Carlo Caione <carlo@caione.org> wrote:
 > DTS because (for lacking of proper documentation) we are not sure
 > about start / end / size.
 
-This is not entirely correct actually.
-CBUS starts at 0xc1100000 with a size of 0x00100000 according to the Amlogic SDK
+Here's a hint from the vendor kernel
+https://github.com/endlessm/linux-meson/blob/master/arch/arm/mach-meson8b/iomapping.c#L87
 
--- 
-Carlo Caione  |  +39.340.80.30.096  |  Endless
+Having a cbus bus node with child devices does sound like it would
+reflect this particular view of the hardware design. How would we then
+represent the hwrev registers under that?
+
+I am also curious if this is the common practice. We were working with
+Exynos devices before, and even though many of the components are on
+the AXI bus there, there is no AXI bus representation in the DT. But
+now that I go digging, I see other SoCs that do have a DT bus
+representation very similar to what's being described, such as the apb
+and axi busses in mmp2.dtsi. Is one approach preferred over the other
+for new SoC support?
+
+Daniel
