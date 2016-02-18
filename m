@@ -1,52 +1,33 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 18 Feb 2016 14:26:31 +0000
-Subject: [PATCH 2/9] ARM: change NR_IPIS to 8
-In-Reply-To: <1455804123-2526139-3-git-send-email-arnd@arndb.de>
-References: <1455804123-2526139-1-git-send-email-arnd@arndb.de>
- <1455804123-2526139-3-git-send-email-arnd@arndb.de>
-Message-ID: <56C5D497.7030309@arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 18 Feb 2016 15:29:03 +0100
+Subject: [PATCH] PCI: mvebu: Restrict build to 32-bit ARM
+In-Reply-To: <1455802330-17565-1-git-send-email-thierry.reding@gmail.com>
+References: <1455802330-17565-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <20160218152903.7a659ca8@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hello,
 
-On 18/02/16 14:01, Arnd Bergmann wrote:
-> When function tracing for IPIs is enabled, we get a warning for an
-> overflow of the ipi_types array with the IPI_CPU_BACKTRACE type
-> as triggered by raise_nmi():
+On Thu, 18 Feb 2016 14:32:10 +0100, Thierry Reding wrote:
+> From: Thierry Reding <treding@nvidia.com>
 > 
-> arch/arm/kernel/smp.c: In function 'raise_nmi':
-> arch/arm/kernel/smp.c:489:2: error: array subscript is above array bounds [-Werror=array-bounds]
->   trace_ipi_raise(target, ipi_types[ipinr]);
+> This driver uses PCI glue that is only available on 32-bit ARM. This
+> used to work fine as long as ARCH_MVEBU and ARCH_DOVE were exclusively
+> 32-bit, but that's changed now, with ARCH_MVEBU also being available
+> on 64-bit ARM.
 > 
-> This is a correct warning as we actually overflow the array here.
-> To make the tracing work correctly, this extends the array by one
-> entry and increases NR_IPI accordingly.
-> 
-> This only works after patch e7273ff49acf ("ARM: 8488/1: Make
-> IPI_CPU_BACKTRACE a "non-secure" SGI"), which changed the number
-> assignment from '15' to '8'. If we decide to backport this patch
-> to stable kernels, we probably need to backport e7273ff49acf
-> as well.
+> Signed-off-by: Thierry Reding <treding@nvidia.com>
+> ---
+>  drivers/pci/host/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
 
-I may actually have made the bug worse in 89d798b ("ARM: 8487/1: Remove
-IPI_CALL_FUNC_SINGLE"), which changed NR_IPI from 8 to 7. It would need
-to be backported as well (as otherwise we don't have a free non-secure
-IP slot).
+Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-> 
-> As far as I can tell, the problem has existed since the tracepoints
-> were originally added, but it only triggered a gcc warning with the
-> later change to NR_IPIS.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: e7273ff49acf ("ARM: 8488/1: Make IPI_CPU_BACKTRACE a "non-secure" SGI")
-> Fixes: 365ec7b17327 ("ARM: add IPI tracepoints") # v3.17
+Best regards,
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-
-Thanks,
-
-	M.
+Thomas
 -- 
-Jazz is not dead. It just smells funny...
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
