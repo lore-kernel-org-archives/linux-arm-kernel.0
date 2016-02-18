@@ -1,85 +1,55 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 18 Feb 2016 03:06:08 +0100
-Subject: [GIT PULL] at91: drivers for 4.6 #1
-Message-ID: <20160218020608.GA31682@piout.net>
+From: Larry.Finger@lwfinger.net (Larry Finger)
+Date: Wed, 17 Feb 2016 20:20:15 -0600
+Subject: [PATCH] staging: rtl8712: reduce stack usage
+In-Reply-To: <1455698012-814399-1-git-send-email-arnd@arndb.de>
+References: <1455698012-814399-1-git-send-email-arnd@arndb.de>
+Message-ID: <56C52A5F.2030302@lwfinger.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+On 02/17/2016 02:32 AM, Arnd Bergmann wrote:
+> The "translate_scan" function in rtl8712 uses a lot of stack, and
+> gets inlined into its single caller, r8711_wx_get_scan, which
+> in some configurations now blows the 1024 byte stack warning
+> limit:
+>
+> drivers/staging/rtl8712/rtl871x_ioctl_linux.c: In function 'r8711_wx_get_scan':
+> drivers/staging/rtl8712/rtl871x_ioctl_linux.c:1227:1: error: the frame size of 1032 bytes is larger than 1024 bytes [-Werror=frame-larger-than=]
+>
+> This somewhat reduces the stack usage by moving the translate_scan
+> function out of line with the noinline_for_stack annotation.
+> It might be possible to modify translate_scan() a little further
+> to reduce the stack usage, but with this patch, we can build without
+> the warning, the the call chain to get here is rather predictable
+> (sys_ioctl->vfs_ioctl->sock_ioctl->dev_ioctl->wext_ioctl->
+> r8711_wx_get_scan).
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>   drivers/staging/rtl8712/rtl871x_ioctl_linux.c | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
 
-This is a rework of the PMC driver. It touches multiple subsystems so
-the easiest path is through arm-soc.
+As there is no reason for translate_scan() to be inlined, this patch seems 
+reasonable The largest user of stack likely comes from the line "struct iw_event 
+iwe". Changing that to a pointer, and using kalloc to acquire the space would 
+likely clear the compile message, but that would require many more changes.
 
-Thanks,
+Acked-by: Larry Finger <Larry.Finger@lwfinger.net>
 
-The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
+Larry
 
-  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.6-drivers
-
-for you to fetch changes up to 0002ca168f16e5b6ac67415a4e0198cc39af2b7f:
-
-  clk: at91: remove useless includes (2016-02-17 17:53:04 +0100)
-
-----------------------------------------------------------------
-drivers update for 4.6:
- - Big PMC rework that touches clk, PM, usb
-
-----------------------------------------------------------------
-Alexandre Belloni (11):
-      clk: at91: remove IRQ handling and use polling
-      clk: at91: pmc: merge at91_pmc_init in atmel_pmc_probe
-      clk: at91: pmc: move pmc structures to C file
-      ARM: at91: pm: simply call at91_pm_init
-      ARM: at91: pm: find and remap the pmc
-      ARM: at91: pm: move idle functions to pm.c
-      ARM: at91: remove useless includes and function prototypes
-      usb: gadget: atmel: access the PMC using regmap
-      clk: at91: pmc: drop at91_pmc_base
-      clk: at91: pmc: remove useless capacities handling
-      clk: at91: remove useless includes
-
-Boris Brezillon (2):
-      clk: at91: make use of syscon to share PMC registers in several drivers
-      clk: at91: make use of syscon/regmap internally
-
- arch/arm/mach-at91/Kconfig              |   1 +
- arch/arm/mach-at91/at91rm9200.c         |   2 -
- arch/arm/mach-at91/at91sam9.c           |   2 -
- arch/arm/mach-at91/generic.h            |  13 +-
- arch/arm/mach-at91/pm.c                 |  70 +++++-
- arch/arm/mach-at91/sama5.c              |   2 +-
- drivers/clk/at91/clk-generated.c        |  95 ++++---
- drivers/clk/at91/clk-h32mx.c            |  40 +--
- drivers/clk/at91/clk-main.c             | 324 +++++++++++-------------
- drivers/clk/at91/clk-master.c           |  94 +++----
- drivers/clk/at91/clk-peripheral.c       | 137 +++++-----
- drivers/clk/at91/clk-pll.c              | 150 +++++------
- drivers/clk/at91/clk-plldiv.c           |  44 ++--
- drivers/clk/at91/clk-programmable.c     |  96 +++----
- drivers/clk/at91/clk-slow.c             |  35 +--
- drivers/clk/at91/clk-smd.c              |  56 +++--
- drivers/clk/at91/clk-system.c           |  96 +++----
- drivers/clk/at91/clk-usb.c              | 123 ++++-----
- drivers/clk/at91/clk-utmi.c             |  80 ++----
- drivers/clk/at91/pmc.c                  | 426 +-------------------------------
- drivers/clk/at91/pmc.h                  |  98 +-------
- drivers/usb/gadget/udc/atmel_usba_udc.c |  20 +-
- drivers/usb/gadget/udc/atmel_usba_udc.h |   2 +
- include/linux/clk/at91_pmc.h            |  12 -
- 24 files changed, 724 insertions(+), 1294 deletions(-)
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160218/e96f2dc7/attachment-0001.sig>
+>
+> diff --git a/drivers/staging/rtl8712/rtl871x_ioctl_linux.c b/drivers/staging/rtl8712/rtl871x_ioctl_linux.c
+> index db2e31bcdd77..a15f3ce70223 100644
+> --- a/drivers/staging/rtl8712/rtl871x_ioctl_linux.c
+> +++ b/drivers/staging/rtl8712/rtl871x_ioctl_linux.c
+> @@ -137,7 +137,7 @@ static inline void handle_group_key(struct ieee_param *param,
+>   	}
+>   }
+>
+> -static inline char *translate_scan(struct _adapter *padapter,
+> +static noinline_for_stack char *translate_scan(struct _adapter *padapter,
+>   				   struct iw_request_info *info,
+>   				   struct wlan_network *pnetwork,
+>   				   char *start, char *stop)
+>
