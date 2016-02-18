@@ -1,261 +1,207 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 17 Feb 2016 17:51:57 -0700
-Subject: [PATCH 15/21] coresight: etm3x: implementing perf_enable/disable() API
+Date: Wed, 17 Feb 2016 17:51:59 -0700
+Subject: [PATCH 17/21] coresight: etb10: adding operation mode for
+ sink->enable()
 In-Reply-To: <1455756723-8456-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1455756723-8456-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1455756723-8456-16-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1455756723-8456-18-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-That way traces can be enabled and disabled automatically
-from the Perf subystem using the PMU abstraction.
+Adding an operation mode to the sink->enable() API in order
+to prevent simultaneous access from different callers.
+
+TPIU and TMC won't be supplemented with the AUX area
+API immediately and as such ignore the new mode.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/Kconfig           |  1 +
- drivers/hwtracing/coresight/coresight-etm3x.c | 95 +++++++++++++++++++++++++--
- drivers/hwtracing/coresight/coresight-etm4x.c |  4 +-
- drivers/hwtracing/coresight/coresight.c       |  2 +-
- include/linux/coresight.h                     |  6 +-
- 5 files changed, 99 insertions(+), 9 deletions(-)
+ drivers/hwtracing/coresight/coresight-etb10.c | 30 ++++++++++++++++++++-------
+ drivers/hwtracing/coresight/coresight-priv.h  |  2 +-
+ drivers/hwtracing/coresight/coresight-tmc.c   |  2 +-
+ drivers/hwtracing/coresight/coresight-tpiu.c  |  2 +-
+ drivers/hwtracing/coresight/coresight.c       | 10 ++++-----
+ include/linux/coresight.h                     |  2 +-
+ 6 files changed, 32 insertions(+), 16 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/Kconfig b/drivers/hwtracing/coresight/Kconfig
-index c85935f3525a..db0541031c72 100644
---- a/drivers/hwtracing/coresight/Kconfig
-+++ b/drivers/hwtracing/coresight/Kconfig
-@@ -4,6 +4,7 @@
- menuconfig CORESIGHT
- 	bool "CoreSight Tracing Support"
- 	select ARM_AMBA
-+	select PERF_EVENTS
- 	help
- 	  This framework provides a kernel interface for the CoreSight debug
- 	  and trace drivers to register themselves with. It's intended to build
-diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
-index c82d545e68ef..a9b820ec16aa 100644
---- a/drivers/hwtracing/coresight/coresight-etm3x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm3x.c
-@@ -31,6 +31,7 @@
- #include <linux/seq_file.h>
- #include <linux/uaccess.h>
- #include <linux/clk.h>
-+#include <linux/perf_event.h>
- #include <asm/sections.h>
+diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
+index 162c9ccc8c33..79099f95ba3f 100644
+--- a/drivers/hwtracing/coresight/coresight-etb10.c
++++ b/drivers/hwtracing/coresight/coresight-etb10.c
+@@ -73,9 +73,9 @@
+  * @miscdev:	specifics to handle "/dev/xyz.etb" entry.
+  * @spinlock:	only one at a time pls.
+  * @reading:	synchronise user space access to etb buffer.
++ * @mode:	this ETB is being used.
+  * @buf:	area of memory where ETB buffer content gets sent.
+  * @buffer_depth: size of @buf.
+- * @enable:	this ETB is being used.
+  * @trigger_cntr: amount of words to store after a trigger.
+  */
+ struct etb_drvdata {
+@@ -86,9 +86,9 @@ struct etb_drvdata {
+ 	struct miscdevice	miscdev;
+ 	spinlock_t		spinlock;
+ 	local_t			reading;
++	local_t			mode;
+ 	u8			*buf;
+ 	u32			buffer_depth;
+-	bool			enable;
+ 	u32			trigger_cntr;
+ };
  
- #include "coresight-etm.h"
-@@ -297,6 +298,47 @@ void etm_config_trace_mode(struct etm_config *config)
- 	config->addr_type[1] = ETM_ADDR_TYPE_RANGE;
- }
- 
-+#define ETM3X_SUPPORTED_OPTIONS (ETMCR_CYC_ACC | ETMCR_TIMESTAMP_EN)
-+
-+static int etm_parse_event_config(struct etm_drvdata *drvdata,
-+				  struct perf_event_attr *attr)
-+{
-+	struct etm_config *config = &drvdata->config;
-+
-+	if (!attr)
-+		return -EINVAL;
-+
-+	/* Clear configuration from previous run */
-+	memset(config, 0, sizeof(struct etm_config));
-+
-+	if (attr->exclude_kernel)
-+		config->mode = ETM_MODE_EXCL_KERN;
-+
-+	if (attr->exclude_user)
-+		config->mode = ETM_MODE_EXCL_USER;
-+
-+	/* Always start from the default config */
-+	etm_set_default(config);
-+
-+	/*
-+	 * By default the tracers are configured to trace the whole address
-+	 * range.  Narrow the field only if requested by user space.
-+	 */
-+	if (config->mode)
-+		etm_config_trace_mode(config);
-+
-+	/*
-+	 * At this time only cycle accurate and timestamp options are
-+	 * available.
-+	 */
-+	if (attr->config & ~ETM3X_SUPPORTED_OPTIONS)
-+		return -EINVAL;
-+
-+	config->ctrl = attr->config;
-+
-+	return 0;
-+}
-+
- static void etm_enable_hw(void *info)
- {
- 	int i;
-@@ -316,8 +358,10 @@ static void etm_enable_hw(void *info)
- 	etm_set_prog(drvdata);
- 
- 	etmcr = etm_readl(drvdata, ETMCR);
--	etmcr &= (ETMCR_PWD_DWN | ETMCR_ETM_PRG);
-+	/* Clear setting from a previous run if need be */
-+	etmcr &= ~ETM3X_SUPPORTED_OPTIONS;
- 	etmcr |= drvdata->port_size;
-+	etmcr |= ETMCR_ETM_EN;
- 	etm_writel(drvdata, config->ctrl | etmcr, ETMCR);
- 	etm_writel(drvdata, config->trigger_event, ETMTRIGGER);
- 	etm_writel(drvdata, config->startstop_ctrl, ETMTSSCR);
-@@ -357,9 +401,6 @@ static void etm_enable_hw(void *info)
- 	/* No VMID comparator value selected */
- 	etm_writel(drvdata, 0x0, ETMVMIDCVR);
- 
--	/* Ensures trace output is enabled from this ETM */
--	etm_writel(drvdata, config->ctrl | ETMCR_ETM_EN | etmcr, ETMCR);
--
- 	etm_clr_prog(drvdata);
+@@ -133,16 +133,31 @@ static void etb_enable_hw(struct etb_drvdata *drvdata)
  	CS_LOCK(drvdata->base);
- 
-@@ -407,6 +448,22 @@ static int etm_trace_id(struct coresight_device *csdev)
- 	return etm_get_trace_id(drvdata);
  }
  
-+static int etm_enable_perf(struct coresight_device *csdev,
-+			   struct perf_event_attr *attr)
-+{
-+	struct etm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-+
-+	if (WARN_ON_ONCE(drvdata->cpu != smp_processor_id()))
-+		return -EINVAL;
-+
-+	/* Configure the tracer based on the session's specifics */
-+	etm_parse_event_config(drvdata, attr);
-+	/* And enable it */
-+	etm_enable_hw(drvdata);
-+
-+	return 0;
-+}
-+
- static int etm_enable_sysfs(struct coresight_device *csdev)
+-static int etb_enable(struct coresight_device *csdev)
++static int etb_enable(struct coresight_device *csdev, u32 mode)
  {
- 	struct etm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-@@ -437,7 +494,8 @@ err:
- 	return ret;
- }
- 
--static int etm_enable(struct coresight_device *csdev, u32 mode)
-+static int etm_enable(struct coresight_device *csdev,
-+		      struct perf_event_attr *attr, u32 mode)
- {
- 	int ret;
- 	u32 val;
-@@ -453,6 +511,9 @@ static int etm_enable(struct coresight_device *csdev, u32 mode)
- 	case CS_MODE_SYSFS:
- 		ret = etm_enable_sysfs(csdev);
- 		break;
-+	case CS_MODE_PERF:
-+		ret = etm_enable_perf(csdev, attr);
-+		break;
- 	default:
- 		ret = -EINVAL;
- 	}
-@@ -485,6 +546,27 @@ static void etm_disable_hw(void *info)
- 	dev_dbg(drvdata->dev, "cpu: %d disable smp call done\n", drvdata->cpu);
- }
- 
-+static void etm_disable_perf(struct coresight_device *csdev)
-+{
-+	struct etm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+-	struct etb_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
++	u32 val;
+ 	unsigned long flags;
++	struct etb_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
 +
-+	if (WARN_ON_ONCE(drvdata->cpu != smp_processor_id()))
-+		return;
-+
-+	CS_UNLOCK(drvdata->base);
-+
-+	/* Setting the prog bit disables tracing immediately */
-+	etm_set_prog(drvdata);
-+
++	val = local_cmpxchg(&drvdata->mode,
++			    CS_MODE_DISABLED, mode);
 +	/*
-+	 * There is no way to know when the tracer will be used again so
-+	 * power down the tracer.
++	 * When accessing from Perf, a HW buffer can be handled
++	 * by a single trace entity.  In sysFS mode many tracers
++	 * can be logging to the same HW buffer.
 +	 */
-+	etm_set_pwrdwn(drvdata);
++	if (val == CS_MODE_PERF)
++		return -EBUSY;
 +
-+	CS_LOCK(drvdata->base);
-+}
-+
- static void etm_disable_sysfs(struct coresight_device *csdev)
- {
- 	struct etm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-@@ -528,6 +610,9 @@ static void etm_disable(struct coresight_device *csdev)
- 	case CS_MODE_SYSFS:
- 		etm_disable_sysfs(csdev);
- 		break;
-+	case CS_MODE_PERF:
-+		etm_disable_perf(csdev);
-+		break;
- 	default:
- 		WARN_ON_ONCE(mode);
- 		return;
-diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-index 0026092fec7f..d0169ba7fbf2 100644
---- a/drivers/hwtracing/coresight/coresight-etm4x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-@@ -32,6 +32,7 @@
- #include <linux/seq_file.h>
- #include <linux/uaccess.h>
- #include <linux/pm_runtime.h>
-+#include <linux/perf_event.h>
- #include <asm/sections.h>
++	/* Nothing to do, the tracer is already enabled. */
++	if (val == CS_MODE_SYSFS)
++		goto out;
  
- #include "coresight-etm4x.h"
-@@ -187,7 +188,8 @@ static void etm4_enable_hw(void *info)
- 	dev_dbg(drvdata->dev, "cpu: %d enable smp call done\n", drvdata->cpu);
+ 	spin_lock_irqsave(&drvdata->spinlock, flags);
+ 	etb_enable_hw(drvdata);
+-	drvdata->enable = true;
+ 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+ 
++out:
+ 	dev_info(drvdata->dev, "ETB enabled\n");
+ 	return 0;
+ }
+@@ -243,9 +258,10 @@ static void etb_disable(struct coresight_device *csdev)
+ 	spin_lock_irqsave(&drvdata->spinlock, flags);
+ 	etb_disable_hw(drvdata);
+ 	etb_dump_hw(drvdata);
+-	drvdata->enable = false;
+ 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+ 
++	local_set(&drvdata->mode, CS_MODE_DISABLED);
++
+ 	dev_info(drvdata->dev, "ETB disabled\n");
  }
  
--static int etm4_enable(struct coresight_device *csdev, u32 mode)
-+static int etm4_enable(struct coresight_device *csdev,
-+		       struct perf_event_attr *attr, u32 mode)
+@@ -263,7 +279,7 @@ static void etb_dump(struct etb_drvdata *drvdata)
+ 	unsigned long flags;
+ 
+ 	spin_lock_irqsave(&drvdata->spinlock, flags);
+-	if (drvdata->enable) {
++	if (local_read(&drvdata->mode) == CS_MODE_SYSFS) {
+ 		etb_disable_hw(drvdata);
+ 		etb_dump_hw(drvdata);
+ 		etb_enable_hw(drvdata);
+diff --git a/drivers/hwtracing/coresight/coresight-priv.h b/drivers/hwtracing/coresight/coresight-priv.h
+index 932f34a84d96..333eddaed339 100644
+--- a/drivers/hwtracing/coresight/coresight-priv.h
++++ b/drivers/hwtracing/coresight/coresight-priv.h
+@@ -62,7 +62,7 @@ static inline void CS_UNLOCK(void __iomem *addr)
+ }
+ 
+ void coresight_disable_path(struct list_head *path);
+-int coresight_enable_path(struct list_head *path);
++int coresight_enable_path(struct list_head *path, u32 mode);
+ struct coresight_device *coresight_get_sink(struct list_head *path);
+ struct list_head *coresight_build_path(struct coresight_device *csdev);
+ void coresight_release_path(struct list_head *path);
+diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
+index b526396d80b6..ac91b0b40ec2 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc.c
++++ b/drivers/hwtracing/coresight/coresight-tmc.c
+@@ -265,7 +265,7 @@ static int tmc_enable(struct tmc_drvdata *drvdata, enum tmc_mode mode)
+ 	return 0;
+ }
+ 
+-static int tmc_enable_sink(struct coresight_device *csdev)
++static int tmc_enable_sink(struct coresight_device *csdev, u32 mode)
  {
- 	struct etmv4_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
- 	int ret;
+ 	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+ 
+diff --git a/drivers/hwtracing/coresight/coresight-tpiu.c b/drivers/hwtracing/coresight/coresight-tpiu.c
+index 0d8fce651ff7..71582f6dfd4c 100644
+--- a/drivers/hwtracing/coresight/coresight-tpiu.c
++++ b/drivers/hwtracing/coresight/coresight-tpiu.c
+@@ -70,7 +70,7 @@ static void tpiu_enable_hw(struct tpiu_drvdata *drvdata)
+ 	CS_LOCK(drvdata->base);
+ }
+ 
+-static int tpiu_enable(struct coresight_device *csdev)
++static int tpiu_enable(struct coresight_device *csdev, u32 mode)
+ {
+ 	struct tpiu_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+ 
 diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
-index b20afb709141..95cccb179763 100644
+index 95cccb179763..6ec2b66af9ee 100644
 --- a/drivers/hwtracing/coresight/coresight.c
 +++ b/drivers/hwtracing/coresight/coresight.c
-@@ -234,7 +234,7 @@ static int coresight_enable_source(struct coresight_device *csdev, u32 mode)
+@@ -121,13 +121,13 @@ static int coresight_find_link_outport(struct coresight_device *csdev,
+ 	return 0;
+ }
+ 
+-static int coresight_enable_sink(struct coresight_device *csdev)
++static int coresight_enable_sink(struct coresight_device *csdev, u32 mode)
+ {
+ 	int ret;
  
  	if (!csdev->enable) {
- 		if (source_ops(csdev)->enable) {
--			ret = source_ops(csdev)->enable(csdev, mode);
-+			ret = source_ops(csdev)->enable(csdev, NULL, mode);
+ 		if (sink_ops(csdev)->enable) {
+-			ret = sink_ops(csdev)->enable(csdev);
++			ret = sink_ops(csdev)->enable(csdev, mode);
  			if (ret)
  				return ret;
  		}
+@@ -283,7 +283,7 @@ void coresight_disable_path(struct list_head *path)
+ 	}
+ }
+ 
+-int coresight_enable_path(struct list_head *path)
++int coresight_enable_path(struct list_head *path, u32 mode)
+ {
+ 
+ 	int ret = 0;
+@@ -296,7 +296,7 @@ int coresight_enable_path(struct list_head *path)
+ 		switch (csdev->type) {
+ 		case CORESIGHT_DEV_TYPE_SINK:
+ 		case CORESIGHT_DEV_TYPE_LINKSINK:
+-			ret = coresight_enable_sink(csdev);
++			ret = coresight_enable_sink(csdev, mode);
+ 			if (ret)
+ 				goto err;
+ 			break;
+@@ -454,7 +454,7 @@ int coresight_enable(struct coresight_device *csdev)
+ 		goto out;
+ 	}
+ 
+-	ret = coresight_enable_path(path);
++	ret = coresight_enable_path(path, CS_MODE_SYSFS);
+ 	if (ret)
+ 		goto err_path;
+ 
 diff --git a/include/linux/coresight.h b/include/linux/coresight.h
-index 61dfb8d511ea..6801dd64ee5d 100644
+index 6801dd64ee5d..9fa92dcdd2ea 100644
 --- a/include/linux/coresight.h
 +++ b/include/linux/coresight.h
-@@ -14,6 +14,7 @@
- #define _LINUX_CORESIGHT_H
- 
- #include <linux/device.h>
-+#include <linux/perf_event.h>
- #include <linux/sched.h>
- 
- /* Peripheral id registers (0xFD0-0xFEC) */
-@@ -206,14 +207,15 @@ struct coresight_ops_link {
-  * @cpu_id:	returns the value of the CPU number this component
-  *		is associated to.
-  * @trace_id:	returns the value of the component's trace ID as known
--		to the HW.
-+ *		to the HW.
-  * @enable:	enables tracing for a source.
-  * @disable:	disables tracing for a source.
+@@ -186,7 +186,7 @@ struct coresight_device {
+  * @disable:	disables the sink.
   */
- struct coresight_ops_source {
- 	int (*cpu_id)(struct coresight_device *csdev);
- 	int (*trace_id)(struct coresight_device *csdev);
--	int (*enable)(struct coresight_device *csdev, u32 mode);
-+	int (*enable)(struct coresight_device *csdev,
-+		      struct perf_event_attr *attr,  u32 mode);
+ struct coresight_ops_sink {
+-	int (*enable)(struct coresight_device *csdev);
++	int (*enable)(struct coresight_device *csdev, u32 mode);
  	void (*disable)(struct coresight_device *csdev);
  };
  
