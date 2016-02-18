@@ -1,50 +1,106 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 17 Feb 2016 23:43:21 -0500 (EST)
-Subject: [PATCH v2 net-next 6/8] net: mvneta: bm: add support for
- hardware buffer management
-In-Reply-To: <1455636823-14470-7-git-send-email-gregory.clement@free-electrons.com>
-References: <1455636823-14470-1-git-send-email-gregory.clement@free-electrons.com>
- <1455636823-14470-7-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20160217.234321.1202099534402079240.davem@davemloft.net>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 18 Feb 2016 14:13:01 +0900
+Subject: [PATCH v2 1/3] ARM: dts: Add cooling levels for CPUs on exynos5420
+Message-ID: <1455772383-20598-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Date: Tue, 16 Feb 2016 16:33:41 +0100
+On Exynos5420 we support 8 cpufreq steps (600-1300 MHz) for LITTLE and
+12 steps for big core (700-1800 MHz). Add respective cooling cells.
 
->  	pp->dev = dev;
->  	SET_NETDEV_DEV(dev, &pdev->dev);
->  
-> +	dev->features = NETIF_F_SG | NETIF_F_IP_CSUM | NETIF_F_TSO;
-> +	dev->hw_features |= dev->features;
-> +	dev->vlan_features |= dev->features;
-> +	dev->priv_flags |= IFF_UNICAST_FLT;
-> +	dev->gso_max_segs = MVNETA_MAX_TSO_SEGS;
-> +
-> +	err = register_netdev(dev);
-> +	if (err < 0) {
-> +		dev_err(&pdev->dev, "failed to register\n");
-> +		goto err_free_stats;
-> +	}
-> +
-> +	pp->id = dev->ifindex;
-> +
-> +	/* Obtain access to BM resources if enabled and already initialized */
-> +	bm_node = of_parse_phandle(dn, "buffer-manager", 0);
-> +	if (bm_node && bm_node->data) {
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-This set of changes has a lot of problems.
+---
 
-First, the exact moment you call register_netdev() your device must be
-fully initialized because ->open() can be invoked immediately.  This
-means you must take care of all of this buffer manager stuff before
-calling register_netdev().
+Changes since v1:
+1. Add cooling properties to all CPUs (suggested by Viresh).
+---
+ arch/arm/boot/dts/exynos5420-cpus.dtsi | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-It must precisely be the last thing you invoke in your probe function
-for this reason.
-
-Also you are now adding conditionalized code to every fastpath in your
-driver, that is rediculous and is going to hurt performance.
-
-Add seperate code paths for the HWBM vs SWBM, and register a unique
-set of netdev_ops as appropriate.
+diff --git a/arch/arm/boot/dts/exynos5420-cpus.dtsi b/arch/arm/boot/dts/exynos5420-cpus.dtsi
+index 261d25173f61..5c052d7ff554 100644
+--- a/arch/arm/boot/dts/exynos5420-cpus.dtsi
++++ b/arch/arm/boot/dts/exynos5420-cpus.dtsi
+@@ -33,6 +33,9 @@
+ 			clock-frequency = <1800000000>;
+ 			cci-control-port = <&cci_control1>;
+ 			operating-points-v2 = <&cluster_a15_opp_table>;
++			cooling-min-level = <0>;
++			cooling-max-level = <11>;
++			#cooling-cells = <2>; /* min followed by max */
+ 		};
+ 
+ 		cpu1: cpu at 1 {
+@@ -42,6 +45,9 @@
+ 			clock-frequency = <1800000000>;
+ 			cci-control-port = <&cci_control1>;
+ 			operating-points-v2 = <&cluster_a15_opp_table>;
++			cooling-min-level = <0>;
++			cooling-max-level = <11>;
++			#cooling-cells = <2>; /* min followed by max */
+ 		};
+ 
+ 		cpu2: cpu at 2 {
+@@ -51,6 +57,9 @@
+ 			clock-frequency = <1800000000>;
+ 			cci-control-port = <&cci_control1>;
+ 			operating-points-v2 = <&cluster_a15_opp_table>;
++			cooling-min-level = <0>;
++			cooling-max-level = <11>;
++			#cooling-cells = <2>; /* min followed by max */
+ 		};
+ 
+ 		cpu3: cpu at 3 {
+@@ -60,6 +69,9 @@
+ 			clock-frequency = <1800000000>;
+ 			cci-control-port = <&cci_control1>;
+ 			operating-points-v2 = <&cluster_a15_opp_table>;
++			cooling-min-level = <0>;
++			cooling-max-level = <11>;
++			#cooling-cells = <2>; /* min followed by max */
+ 		};
+ 
+ 		cpu4: cpu at 100 {
+@@ -70,6 +82,9 @@
+ 			clock-frequency = <1000000000>;
+ 			cci-control-port = <&cci_control0>;
+ 			operating-points-v2 = <&cluster_a7_opp_table>;
++			cooling-min-level = <0>;
++			cooling-max-level = <7>;
++			#cooling-cells = <2>; /* min followed by max */
+ 		};
+ 
+ 		cpu5: cpu at 101 {
+@@ -79,6 +94,9 @@
+ 			clock-frequency = <1000000000>;
+ 			cci-control-port = <&cci_control0>;
+ 			operating-points-v2 = <&cluster_a7_opp_table>;
++			cooling-min-level = <0>;
++			cooling-max-level = <7>;
++			#cooling-cells = <2>; /* min followed by max */
+ 		};
+ 
+ 		cpu6: cpu at 102 {
+@@ -88,6 +106,9 @@
+ 			clock-frequency = <1000000000>;
+ 			cci-control-port = <&cci_control0>;
+ 			operating-points-v2 = <&cluster_a7_opp_table>;
++			cooling-min-level = <0>;
++			cooling-max-level = <7>;
++			#cooling-cells = <2>; /* min followed by max */
+ 		};
+ 
+ 		cpu7: cpu at 103 {
+@@ -97,6 +118,9 @@
+ 			clock-frequency = <1000000000>;
+ 			cci-control-port = <&cci_control0>;
+ 			operating-points-v2 = <&cluster_a7_opp_table>;
++			cooling-min-level = <0>;
++			cooling-max-level = <7>;
++			#cooling-cells = <2>; /* min followed by max */
+ 		};
+ 	};
+ };
+-- 
+2.5.0
