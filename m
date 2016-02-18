@@ -1,291 +1,185 @@
-From: jay.xu@rock-chips.com (Jianqun Xu)
-Date: Thu, 18 Feb 2016 09:43:37 +0800
-Subject: [PATCH 6/6] ARM64: dts: rockchip: add core dtsi file for rk3399
-In-Reply-To: <2396201.CBcovI4jc4@phil>
-References: <1455673992-16469-1-git-send-email-jay.xu@rock-chips.com>
- <1455674476-16655-1-git-send-email-jay.xu@rock-chips.com>
- <2396201.CBcovI4jc4@phil>
-Message-ID: <56C521C9.4050906@rock-chips.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 18 Feb 2016 10:47:21 +0900
+Subject: [RFC 3/3] ARM: dts: Don't overheat the Odroid XU3-Lite on high
+ load
+In-Reply-To: <CANAwSgQHiJGSYB7Qhq066Mqfskwrr_3SDQGXH-WN=Wt3SEF-QA@mail.gmail.com>
+References: <1455692128-28504-1-git-send-email-k.kozlowski@samsung.com>
+ <1455692128-28504-4-git-send-email-k.kozlowski@samsung.com>
+ <CANAwSgQHiJGSYB7Qhq066Mqfskwrr_3SDQGXH-WN=Wt3SEF-QA@mail.gmail.com>
+Message-ID: <56C522A9.8070800@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-? 17/02/2016 15:00, Heiko Stuebner ??:
-> Hi Jianqun,
->
-> Am Mittwoch, 17. Februar 2016, 10:01:16 schrieb jianqun.xu:
->> From: Xu Jianqun <jay.xu@rock-chips.com>
+On 18.02.2016 04:53, Anand Moon wrote:
+> Hi Krzysztof,
+> 
+> On 17 February 2016 at 12:25, Krzysztof Kozlowski
+> <k.kozlowski@samsung.com> wrote:
+>> After adding cpufreq-dt support to Exynos542x, the Odroid XU3-Lite can
+>> be easily overheated when launching eight CPU-intensive tasks:
+>>         thermal thermal_zone3: critical temperature reached(121 C),shutting down
 >>
->> Add dtsi file for Rockchip rk3399 SoCs, which includes some
->> general nodes such as cpu, pmu, cru, gic, amba and so on.
+>> This seems to be specific to Odroid XU3-Lite board which officially
+>> supports lower frequencies than regular XU3 or XU4. When working at
+>> maximum CPU speed (1800 MHz big and 1300 MHz LITTLE) in warmer place for
+>> longer time, the fan fails to cool down the board and it reaches
+>> critical temperature.
 >>
->> Change-Id: Ie3b824e8ead967d4cb119d73222b7a198478c29c
->
-> please remove any review-cruft like Change-Ids from mainline patches :-)
-ok, will fix it in next version patch
->
->> Signed-off-by: Xu Jianqun <jay.xu@rock-chips.com>
+>> Add CPU cooling to Exynos5422/5800 to fix this issue. When reaching 95
+>> degrees of Celsius, the board will slow down by 3 steps (around
+>> 1400/1000 MHz). When reaching 110 degrees of Celsius go to 600 MHz.
+>>
+>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 >> ---
->>   arch/arm64/boot/dts/rockchip/rk3399.dtsi | 989
->> +++++++++++++++++++++++++++++++ 1 file changed, 989 insertions(+)
->>   create mode 100644 arch/arm64/boot/dts/rockchip/rk3399.dtsi
+>>  arch/arm/boot/dts/exynos5422-cpu-thermal.dtsi | 41 +++++++++++++++++++++++++++
+>>  1 file changed, 41 insertions(+)
 >>
->> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
->> b/arch/arm64/boot/dts/rockchip/rk3399.dtsi new file mode 100644
->> index 0000000..eb671f6
->> --- /dev/null
->> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
->> @@ -0,0 +1,989 @@
->> +/*
->> + * Copyright (c) 2016 Fuzhou Rockchip Electronics Co., Ltd
->> + *
->> + * This file is dual-licensed: you can use it either under the terms
->> + * of the GPL or the X11 license, at your option. Note that this dual
->> + * licensing only applies to this file, and not this project as a
->> + * whole.
->> + *
->> + *  a) This library is free software; you can redistribute it and/or
->> + *     modify it under the terms of the GNU General Public License as
->> + *     published by the Free Software Foundation; either version 2 of the
->> + *     License, or (at your option) any later version.
->> + *
->> + *     This library is distributed in the hope that it will be useful,
->> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + *     GNU General Public License for more details.
->> + *
->> + * Or, alternatively,
->> + *
->> + *  b) Permission is hereby granted, free of charge, to any person
->> + *     obtaining a copy of this software and associated documentation
->> + *     files (the "Software"), to deal in the Software without
->> + *     restriction, including without limitation the rights to use,
->> + *     copy, modify, merge, publish, distribute, sublicense, and/or
->> + *     sell copies of the Software, and to permit persons to whom the
->> + *     Software is furnished to do so, subject to the following
->> + *     conditions:
->> + *
->> + *     The above copyright notice and this permission notice shall be
->> + *     included in all copies or substantial portions of the Software.
->> + *
->> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
->> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
->> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
->> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
->> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
->> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
->> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
->> + *     OTHER DEALINGS IN THE SOFTWARE.
->> + */
->> +#include <dt-bindings/clock/rk3399-cru.h>
->> +#include <dt-bindings/gpio/gpio.h>
->> +#include <dt-bindings/interrupt-controller/arm-gic.h>
->> +#include <dt-bindings/interrupt-controller/irq.h>
->> +#include <dt-bindings/pinctrl/rockchip.h>
+>> diff --git a/arch/arm/boot/dts/exynos5422-cpu-thermal.dtsi b/arch/arm/boot/dts/exynos5422-cpu-thermal.dtsi
+>> index 2b289d7c0d13..66073ce29aee 100644
+>> --- a/arch/arm/boot/dts/exynos5422-cpu-thermal.dtsi
+>> +++ b/arch/arm/boot/dts/exynos5422-cpu-thermal.dtsi
+>> @@ -34,6 +34,16 @@
+>>                                         hysteresis = <5000>; /* millicelsius */
+>>                                         type = "active";
+>>                                 };
+>> +                               cpu_alert3: cpu-alert-3 {
+>> +                                       temperature = <95000>; /* millicelsius */
+>> +                                       hysteresis = <5000>; /* millicelsius */
+>> +                                       type = "passive";
+>> +                               };
+>> +                               cpu_alert4: cpu-alert-4 {
+>> +                                       temperature = <110000>; /* millicelsius */
+>> +                                       hysteresis = <5000>; /* millicelsius */
+>> +                                       type = "passive";
+>> +                               };
+>>                                 cpu_crit0: cpu-crit-0 {
+>>                                         temperature = <120000>; /* millicelsius */
+>>                                         hysteresis = <0>; /* millicelsius */
+>> @@ -53,6 +63,37 @@
+>>                                      trip = <&cpu_alert2>;
+>>                                      cooling-device = <&fan0 2 3>;
+>>                                 };
 >> +
->> +/ {
->> +	compatible = "rockchip,rk3399";
->> +	interrupt-parent = <&gic>;
->> +	#address-cells = <2>;
->> +	#size-cells = <2>;
+>> +                               /*
+>> +                                * When reaching cpu_alert3, reduce CPU
+>> +                                * by 3 steps. On Exynos5422/5800 that would
+>> +                                * be: 1400 MHz and 1000 MHz.
+>> +                                */
+>> +                               map3 {
+>> +                                    trip = <&cpu_alert3>;
+>> +                                    cooling-device = <&cpu0 3 3>;
+>> +                               };
+>> +                               map4 {
+>> +                                    trip = <&cpu_alert3>;
+>> +                                    cooling-device = <&cpu4 3 3>;
+>> +                               };
 >> +
->> +	aliases {
->> +		serial0 = &uart0;
->> +		serial1 = &uart1;
->> +		serial2 = &uart2;
->> +		serial3 = &uart3;
->> +	};
->> +
->> +	psci {
->> +		compatible = "arm,psci";
->> +		method = "smc";
->> +	};
->> +
->> +	cpus {
->> +		#address-cells = <2>;
->> +		#size-cells = <0>;
->> +
->> +		cpu-map {
->> +			cluster0 {
->> +				core0 {
->> +					cpu = <&cpu_l0>;
->> +				};
->> +				core1 {
->> +					cpu = <&cpu_l1>;
->> +				};
->> +				core2 {
->> +					cpu = <&cpu_l2>;
->> +				};
->> +				core3 {
->> +					cpu = <&cpu_l3>;
->> +				};
->> +			};
->> +
->> +			cluster1 {
->> +				core0 {
->> +					cpu = <&cpu_b0>;
->> +				};
->> +				core1 {
->> +					cpu = <&cpu_b1>;
->> +				};
->> +			};
->> +		};
->> +
->> +		idle-states {
->> +			entry-method = "psci";
->> +
->> +			cpu_sleep: cpu-sleep-0 {
->> +				compatible = "arm,idle-state";
->> +			};
->> +		};
->
-> why the essentially empty idle-states, which is probably missing properties?
-> In the absence of a real idle driver the kernel will fall back to
-> arch_cpu_idle(), which already does WFI handling even on arm64.
->
-the idle node will be added by my colleague with new patch later,
-so I will remove it first in next version patch.
->
->> +
->> +		cpu_l0: cpu at 0 {
->> +			device_type = "cpu";
->> +			compatible = "arm,cortex-a53", "arm,armv8";
->> +			reg = <0x0 0x0>;
->> +			cpu-idle-states = <&cpu_sleep>;
->
-> that won't compile, as the referenced node is not present
->
->
->> +			enable-method = "psci";
->> +		};
->> +
->> +		cpu_l1: cpu at 1 {
->> +			device_type = "cpu";
->> +			compatible = "arm,cortex-a53", "arm,armv8";
->> +			reg = <0x0 0x1>;
->> +			cpu-idle-states = <&cpu_sleep>;
->> +			enable-method = "psci";
->> +		};
->> +
->> +		cpu_l2: cpu at 2 {
->> +			device_type = "cpu";
->> +			compatible = "arm,cortex-a53", "arm,armv8";
->> +			reg = <0x0 0x2>;
->> +			cpu-idle-states = <&cpu_sleep>;
->> +			enable-method = "psci";
->> +		};
->> +
->> +		cpu_l3: cpu at 3 {
->> +			device_type = "cpu";
->> +			compatible = "arm,cortex-a53", "arm,armv8";
->> +			reg = <0x0 0x3>;
->> +			cpu-idle-states = <&cpu_sleep>;
->> +			enable-method = "psci";
->> +		};
->> +
->> +		cpu_b0: cpu at 100 {
->> +			device_type = "cpu";
->> +			compatible = "arm,cortex-a72", "arm,armv8";
->> +			reg = <0x0 0x100>;
->> +			cpu-idle-states = <&cpu_sleep>;
->> +			enable-method = "psci";
->> +		};
->> +
->> +		cpu_b1: cpu at 101 {
->> +			device_type = "cpu";
->> +			compatible = "arm,cortex-a72", "arm,armv8";
->> +			reg = <0x0 0x101>;
->> +			cpu-idle-states = <&cpu_sleep>;
->> +			enable-method = "psci";
->> +		};
->> +	};
->> +
->> +	pmu {
->> +		compatible = "arm,armv8-pmuv3";
->> +		interrupts = <GIC_PPI 7 IRQ_TYPE_LEVEL_LOW>;
->> +		interrupt-affinity = <&cpu_l0>, <&cpu_l1>, <&cpu_l2>,
->> +				     <&cpu_l3>, <&cpu_b0>, <&cpu_b1>;
->> +	};
->> +
->> +	timer {
->> +		compatible = "arm,armv8-timer";
->> +		interrupts =
->> +			<GIC_PPI 13
->> +			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
->
-> shouldn't that be GIC_CPU_MASK_SIMPLE(6) instead of 4?
->
-ok, will fix it in next version patch
->
->> +			<GIC_PPI 14
->> +			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
->> +			<GIC_PPI 11
->> +			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
->> +			<GIC_PPI 10
->> +			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
->> +		clock-frequency = <24000000>;
->> +	};
->> +
->> +	xin24m: xin24m {
->> +		compatible = "fixed-clock";
->> +		#clock-cells = <0>;
->> +		clock-frequency = <24000000>;
->> +		clock-output-names = "xin24m";
->> +	};
->> +
->> +	gic: interrupt-controller at fee00000 {
->> +		compatible = "arm,gic-v3";
->> +		#interrupt-cells = <3>;
->> +		#address-cells = <2>;
->> +		#size-cells = <2>;
->> +		ranges;
->> +		interrupt-controller;
->> +
->> +		reg = <0x0 0xfee00000 0 0x10000>, /* GICD */
->> +		      <0x0 0xfef00000 0 0xc0000>, /* GICR */
->> +		      <0x0 0xfff00000 0 0x10000>, /* GICC */
->> +		      <0x0 0xfff10000 0 0x10000>, /* GICH */
->> +		      <0x0 0xfff20000 0 0x10000>; /* GICV */
->> +		interrupts =
->> +			<GIC_PPI 9
->> +			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
->
-> again GIC_CPU_MASK_SIMPLE(6)?
-ok.
->
->> +		its: interrupt-controller at fee20000 {
->> +			compatible = "arm,gic-v3-its";
->> +			msi-controller;
->> +			reg = <0x0 0xfee20000 0x0 0x20000>;
->> +		};
->> +	};
->> +
->> +	amba {
->> +		compatible = "arm,amba-bus";
->> +		#address-cells = <2>;
->> +		#size-cells = <2>;
->> +		ranges;
->> +
->> +		dmac_bus: dma-controller at ff6d0000 {
->> +			compatible = "arm,pl330", "arm,primecell";
->> +			reg = <0x0 0xff6d0000 0x0 0x4000>;
->> +			interrupts = <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>,
->> +				     <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
->> +			#dma-cells = <1>;
->> +			clocks = <&cru ACLK_DMAC_BUS>;
->> +			clock-names = "apb_pclk";
->
-> has the FLUSHP bug gotten fixed? That would be cool.
->
-Since amba node is added by my colleague, I will double check it, thanks
->
->> +		};
->
-> rest looks nice on first glance :-)
->
->
-> Heiko
->
->
->
+>> +                               /*
+>> +                                * When reaching cpu_alert4, reduce CPU
+>> +                                * to 600 MHz (11 steps for big, 7 steps for
+>> +                                * LITTLE).
+>> +                                * Exynos5420 has less OPPs and reversed
+>> +                                * numbering of CPUs (big/LITTLE) so this
+>> +                                * would not match.
+>> +                                */
+>> +                               map5 {
+>> +                                    trip = <&cpu_alert4>;
+>> +                                    cooling-device = <&cpu0 7 7>;
+>> +                               };
+>> +                               map6 {
+>> +                                    trip = <&cpu_alert4>;
+>> +                                    cooling-device = <&cpu4 11 11>;
+>> +                               };
+>>                         };
+>>                 };
+>>         };
+>> --
+>> 2.5.0
+>>
+> 
+> could you append this patch with following changes.
+
+Could you describe why?
+
+> diff --git a/arch/arm/boot/dts/exynos5422-cpu-thermal.dtsi
+> b/arch/arm/boot/dts/exynos5422-cpu-thermal.dtsi
+> index 66073ce..4e72637 100644
+> --- a/arch/arm/boot/dts/exynos5422-cpu-thermal.dtsi
+> +++ b/arch/arm/boot/dts/exynos5422-cpu-thermal.dtsi
+> @@ -16,8 +16,8 @@
+>         thermal-zones {
+>                 cpu0_thermal: cpu0-thermal {
+>                         thermal-sensors = <&tmu_cpu0 0>;
+> -                       polling-delay-passive = <0>;
+> -                       polling-delay = <0>;
+> +                       polling-delay-passive = <250>; /* milliseconds */
+> +                       polling-delay = <500>; /* milliseconds */
+>                         trips {
+>                                 cpu_alert0: cpu-alert-0 {
+>                                         temperature = <50000>; /*
+> millicelsius */
+> ---
+> On running linaro pm-qa diagnostic tool
+> ----------------------------------------------------------
+> 
+> thermal_01.28: checking 'thermal_zone2'/'trip_point_2_temp' ='110000'...    Ok
+> thermal_01.29: checking 'cdev0_trip_point' exists in
+> '/sys/devices/virtual/thermal/thermal_zone0'... Ok
+> thermal_01.30: checking 'thermal_zone0/cdev0_trip_point' valid binding...   Ok
+> thermal_01.31: checking 'cdev4_trip_point' exists in
+> '/sys/devices/virtual/thermal/thermal_zone0'... Ok
+> thermal_01.32: checking 'thermal_zone0/cdev4_trip_point' valid binding...   Err
+> thermal_01.33: checking 'cdev4_trip_point' exists in
+> '/sys/devices/virtual/thermal/thermal_zone0'... Ok
+> thermal_01.34: checking 'thermal_zone0/cdev4_trip_point' valid binding...   Err
+> thermal_01.35: checking 'cdev4_trip_point' exists in
+> '/sys/devices/virtual/thermal/thermal_zone0'... Ok
+> thermal_01.36: checking 'thermal_zone0/cdev4_trip_point' valid binding...   Err
+> thermal_01.37: checking 'cdev4_trip_point' exists in
+> '/sys/devices/virtual/thermal/thermal_zone0'... Ok
+> thermal_01.38: checking 'thermal_zone0/cdev4_trip_point' valid binding...   Err
+> 
+> thermal_01: fail
+> -------------------------------------------------------
+> I also got lot's of error.
+> 
+> root at odroidxu4l:~# cpu[ 3050.847663] cpu cpu4: Failed to find dev_opp: -19
+> [ 3171.640836] cpu cpu4: device_opp_debug_create_link: Failed to create link
+> [ 3171.646197] cpu cpu4: _add_list_dev: Failed to register opp debugfs (-12)
+> [ 3171.653574] cpu cpu7: device_opp_debug_create_link: Failed to create link
+> [ 3171.659752] cpu cpu7: _add_list_dev: Failed to register opp debugfs (-12)
+> [ 3171.697011] cpu cpu5: cpufreq_init: failed to get clk: -2
+> [ 3171.732505] cpu cpu6: cpufreq_init: failed to get clk: -2
+> [ 3171.768160] cpu cpu7: cpufreq_init: failed to get clk: -2
+> 
+> Tested on Odroid-XU4
+> 
+> Reviewed-by: Anand Moon <linux.amoon@gmail.com>
+> Tested-by: Anand Moon <linux.amoon@gmail.com>
+
+The patch is not sufficient. It does not work the way it should...
+
+BTW, I found the issue. The order of trip points in DT:
+thermal_zone0/trip_point_0_hyst:5000
+thermal_zone0/trip_point_0_temp:50000
+thermal_zone0/trip_point_0_type:active
+thermal_zone0/trip_point_1_hyst:5000
+thermal_zone0/trip_point_1_temp:60000
+thermal_zone0/trip_point_1_type:active
+thermal_zone0/trip_point_2_hyst:5000
+thermal_zone0/trip_point_2_temp:70000
+thermal_zone0/trip_point_2_type:active
+thermal_zone0/trip_point_3_hyst:0
+thermal_zone0/trip_point_3_temp:120000	<---- this should be last one!
+thermal_zone0/trip_point_3_type:critical
+thermal_zone0/trip_point_4_hyst:5000
+thermal_zone0/trip_point_4_temp:90000
+thermal_zone0/trip_point_4_type:passive
+thermal_zone0/trip_point_5_hyst:5000
+thermal_zone0/trip_point_5_temp:110000
+thermal_zone0/trip_point_5_type:passive
+
+After fixing the order in DT, the cpu cooler starts working.
+
+Best regards,
+Krzysztof
