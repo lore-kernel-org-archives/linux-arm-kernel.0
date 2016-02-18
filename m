@@ -1,59 +1,45 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 18 Feb 2016 15:01:59 +0100
-Subject: [PATCH 7/9] ARM: move NO_DMA definition to ecard.h
+Date: Thu, 18 Feb 2016 15:02:00 +0100
+Subject: [PATCH 8/9] ARM: do not use optimized do_div for ARMv3
 In-Reply-To: <1455804123-2526139-1-git-send-email-arnd@arndb.de>
 References: <1455804123-2526139-1-git-send-email-arnd@arndb.de>
-Message-ID: <1455804123-2526139-8-git-send-email-arnd@arndb.de>
+Message-ID: <1455804123-2526139-9-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The NO_DMA macro is only used on the RiscPC ecard bus, and conflicts
-with a couple of driver specific macros with the same name:
+The gcc-4.9 optimization goes wrong while building target_core_iblock.c
+for ARMv3 and leaves a bogus reference to __aeabi_uldivmod in the
+output:
 
-drivers/scsi/eata.c:571:0: warning: "NO_DMA" redefined
- #define NO_DMA  0xff
-In file included from ../drivers/scsi/eata.c:495:0:
-arch/arm/include/asm/dma.h:140:0: note: this is the location of the previous definition
- #define NO_DMA 255
+ERROR: "__aeabi_uldivmod" [drivers/target/target_core_iblock.ko] undefined!
 
-This moves the definition out of the asm/dma.h header that is used
-by all ISA DMA API users and into the ecard header.
+I could not find anyone who is interested in fixing it in gcc,
+so as a workaround this disables the do_div magic, just like
+we do for old compilers and for OABI.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/include/asm/dma.h   | 4 ----
- arch/arm/include/asm/ecard.h | 4 ++++
- 2 files changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/include/asm/div64.h | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/include/asm/dma.h b/arch/arm/include/asm/dma.h
-index bb4fa67da541..573128481fc4 100644
---- a/arch/arm/include/asm/dma.h
-+++ b/arch/arm/include/asm/dma.h
-@@ -136,10 +136,6 @@ extern void set_dma_speed(unsigned int chan, int cycle_ns);
+diff --git a/arch/arm/include/asm/div64.h b/arch/arm/include/asm/div64.h
+index 7d919a9b32e5..958fdc2363f5 100644
+--- a/arch/arm/include/asm/div64.h
++++ b/arch/arm/include/asm/div64.h
+@@ -58,6 +58,14 @@ static inline uint32_t __div64_32(uint64_t *n, uint32_t base)
   */
- extern int  get_dma_residue(unsigned int chan);
+ #define do_div(n, base) __div64_32(&(n), base)
  
--#ifndef NO_DMA
--#define NO_DMA	255
--#endif
--
- #endif /* CONFIG_ISA_DMA_API */
- 
- #ifdef CONFIG_PCI
-diff --git a/arch/arm/include/asm/ecard.h b/arch/arm/include/asm/ecard.h
-index eaea14676d57..d3e16628c792 100644
---- a/arch/arm/include/asm/ecard.h
-+++ b/arch/arm/include/asm/ecard.h
-@@ -83,6 +83,10 @@
- #define CONST const
- #endif
- 
-+#ifndef NO_DMA
-+#define NO_DMA	255
-+#endif
++#elif defined(CONFIG_CPU_32v3)
 +
- #define MAX_ECARDS	9
++/*
++ * modern compiler versions (>= gcc-4.9) tend to misoptimize
++ * the code for ARMv3, and this is not getting fixed any more.
++ */
++#define do_div(n, base) __div64_32(&(n), base)
++
+ #else
  
- struct ecard_id {			/* Card ID structure		*/
+ /*
 -- 
 2.7.0
