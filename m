@@ -1,54 +1,117 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 18 Feb 2016 11:38:34 +0000
-Subject: KASAN issues with idle / hotplug area
-In-Reply-To: <20160218093938.GB12476@red-moon>
-References: <20160212160652.GL31665@e104818-lin.cambridge.arm.com>
- <56C1E072.2090909@virtuozzo.com>
- <20160215185957.GB19413@e104818-lin.cambridge.arm.com>
- <56C31D1D.50708@virtuozzo.com> <20160217143950.GC32647@leverpostej>
- <20160217170110.GE32647@leverpostej>
- <20160217175656.GJ32647@leverpostej>
- <20160217191643.GK32647@leverpostej>
- <56C57F40.3050500@virtuozzo.com> <20160218093938.GB12476@red-moon>
-Message-ID: <20160218113833.GO32647@leverpostej>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 18 Feb 2016 11:41:27 +0000
+Subject: [PATCH v5 11/15] arm64: head.S: Change the register el2_setup()
+ returns its result in x0
+In-Reply-To: <1455637767-31561-12-git-send-email-james.morse@arm.com>
+References: <1455637767-31561-1-git-send-email-james.morse@arm.com>
+ <1455637767-31561-12-git-send-email-james.morse@arm.com>
+Message-ID: <20160218114127.GA12626@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 18, 2016 at 09:39:38AM +0000, Lorenzo Pieralisi wrote:
-> On Thu, Feb 18, 2016 at 11:22:24AM +0300, Andrey Ryabinin wrote:
-> 
-> [...]
-> 
-> > > I also tried using __attribute__((no_sanitize_address)) directly, in
-> > > case there was some header issue, but that doesn't seem to be the case.
-> > > 
-> > > I'm using the Linaro 15.08 AArch64 GCC 5.1. Is anyone else able to
-> > > confirm whether they see the same? Does the same happen for x86?
-> > > 
-> > 
-> > Confirming, this happens on every GCC I have (including x86).
-> > It seems that 'no_sanitize_address' in gcc removes only memory access checks
-> > but it doesn't remove stack redzones.
-> > I think this is wrong, e.g. clang removes instrumentation completely. I'll submit a bug.
-> > 
-> > But we need fix this in kernel.
-> > I see two options here:
-> >  * completely disable instrumentation for drivers/firmware/psci.c
-> 
-> We have to have a way to disable instrumentation for functions that
-> are used to call into FW and return via different code paths.
-> 
-> >  * get back to assembly implementation
-> 
-> No, we are certainly not reverting the SMCCC work because Kasan adds
-> instrumentation to C functions, that's not even an option.
-> 
-> Is it possible at all to implement a function to remove instrumentation
-> for a chunk of memory (ie resetting the shadow memory to a clean slate
-> for a range of stack addresses) ?
+Hi James,
 
-In mm/kasan/kasan.c (which is uninstrumented) there is:
+On Tue, Feb 16, 2016 at 03:49:23PM +0000, James Morse wrote:
+> Today el2_setup() returns its result in w20. This means we can't call it
+> like any normal function. Change this to w0.
+> 
+> All three callers of el2_setup() call set_cpu_boot_mode_flag() immediately
+> afterwards, and don't rely on x0 in later code. Boot cpu code calls
+> preserve_boot_args() before el2_setup(), so we don't clobber the DT pointer.
+> 
+> Signed-off-by: James Morse <james.morse@arm.com>
+> ---
+>  arch/arm64/include/asm/processor.h |  2 ++
+>  arch/arm64/kernel/head.S           | 18 +++++++++---------
+>  2 files changed, 11 insertions(+), 9 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+> index 4acb7ca94fcd..07ac4351538e 100644
+> --- a/arch/arm64/include/asm/processor.h
+> +++ b/arch/arm64/include/asm/processor.h
+> @@ -188,4 +188,6 @@ static inline void spin_lock_prefetch(const void *x)
+>  
+>  void cpu_enable_pan(void *__unused);
+>  
+> +int el2_setup(void);
 
-void kasan_unpoison_shadow(const void *address, size_t size)
+Do we really need to have this declaration (and this patch) ? We never
+treat (and call) el2_setup as a C function anyway, as long as the registers
+used to pass in values (and return value) are documented I do not think we
+have an issue anyway, am I missing something here ?
 
-Mark.
+Thanks,
+Lorenzo
+
+> +
+>  #endif /* __ASM_PROCESSOR_H */
+> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> index 410a2dc04775..5894c7e91e6b 100644
+> --- a/arch/arm64/kernel/head.S
+> +++ b/arch/arm64/kernel/head.S
+> @@ -206,7 +206,7 @@ section_table:
+>  
+>  ENTRY(stext)
+>  	bl	preserve_boot_args
+> -	bl	el2_setup			// Drop to EL1, w20=cpu_boot_mode
+> +	bl	el2_setup			// Drop to EL1, w0=cpu_boot_mode
+>  	adrp	x24, __PHYS_OFFSET
+>  	bl	set_cpu_boot_mode_flag
+>  	bl	__create_page_tables		// x25=TTBR0, x26=TTBR1
+> @@ -446,8 +446,8 @@ ENDPROC(__mmap_switched)
+>   * If we're fortunate enough to boot at EL2, ensure that the world is
+>   * sane before dropping to EL1.
+>   *
+> - * Returns either BOOT_CPU_MODE_EL1 or BOOT_CPU_MODE_EL2 in x20 if
+> - * booted in EL1 or EL2 respectively.
+> + * Returns either BOOT_CPU_MODE_EL1 or BOOT_CPU_MODE_EL2 if booted in
+> + * EL1 or EL2 respectively.
+>   */
+>  ENTRY(el2_setup)
+>  	mrs	x0, CurrentEL
+> @@ -462,7 +462,7 @@ CPU_LE(	bic	x0, x0, #(1 << 25)	)	// Clear the EE bit for EL2
+>  CPU_BE(	orr	x0, x0, #(3 << 24)	)	// Set the EE and E0E bits for EL1
+>  CPU_LE(	bic	x0, x0, #(3 << 24)	)	// Clear the EE and E0E bits for EL1
+>  	msr	sctlr_el1, x0
+> -	mov	w20, #BOOT_CPU_MODE_EL1		// This cpu booted in EL1
+> +	mov	w0, #BOOT_CPU_MODE_EL1		// This cpu booted in EL1
+>  	isb
+>  	ret
+>  
+> @@ -538,20 +538,20 @@ CPU_LE(	movk	x0, #0x30d0, lsl #16	)	// Clear EE and E0E on LE systems
+>  		      PSR_MODE_EL1h)
+>  	msr	spsr_el2, x0
+>  	msr	elr_el2, lr
+> -	mov	w20, #BOOT_CPU_MODE_EL2		// This CPU booted in EL2
+> +	mov	w0, #BOOT_CPU_MODE_EL2		// This CPU booted in EL2
+>  	eret
+>  ENDPROC(el2_setup)
+>  
+>  /*
+>   * Sets the __boot_cpu_mode flag depending on the CPU boot mode passed
+> - * in x20. See arch/arm64/include/asm/virt.h for more info.
+> + * in w0. See arch/arm64/include/asm/virt.h for more info.
+>   */
+>  ENTRY(set_cpu_boot_mode_flag)
+>  	adr_l	x1, __boot_cpu_mode
+> -	cmp	w20, #BOOT_CPU_MODE_EL2
+> +	cmp	w0, #BOOT_CPU_MODE_EL2
+>  	b.ne	1f
+>  	add	x1, x1, #4
+> -1:	str	w20, [x1]			// This CPU has booted in EL1
+> +1:	str	w0, [x1]			// This CPU has booted in EL1
+>  	dmb	sy
+>  	dc	ivac, x1			// Invalidate potentially stale cache line
+>  	ret
+> @@ -576,7 +576,7 @@ ENTRY(__boot_cpu_mode)
+>  	 * cores are held until we're ready for them to initialise.
+>  	 */
+>  ENTRY(secondary_holding_pen)
+> -	bl	el2_setup			// Drop to EL1, w20=cpu_boot_mode
+> +	bl	el2_setup			// Drop to EL1, w0=cpu_boot_mode
+>  	bl	set_cpu_boot_mode_flag
+>  	mrs	x0, mpidr_el1
+>  	ldr     x1, =MPIDR_HWID_BITMASK
+> -- 
+> 2.6.2
+> 
