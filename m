@@ -1,116 +1,78 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 18 Feb 2016 14:31:59 +0900
-Subject: [PATCH 3/3] thermal: exynos: Print a message about exceeded number
- of supported trip-points
-In-Reply-To: <1455772460-20684-3-git-send-email-k.kozlowski@samsung.com>
-References: <1455772460-20684-1-git-send-email-k.kozlowski@samsung.com>
- <1455772460-20684-3-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <56C5574F.7090900@samsung.com>
+From: mark.yao@rock-chips.com (Mark yao)
+Date: Thu, 18 Feb 2016 14:12:02 +0800
+Subject: [PATCH v8 0/2] Add Rockchip Inno-HDMI driver
+In-Reply-To: <1454049768-30872-1-git-send-email-ykk@rock-chips.com>
+References: <1454049768-30872-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <56C560B2.6020208@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016? 02? 18? 14:14, Krzysztof Kozlowski wrote:
-> When DeviveTree contains more trip-points than SoC can configure
-> (usually more than four) and polling mode is not enabled, then the
-> remaining trip-points will be silently ignored. No interrupts will be
-> generated for them.
-> 
-> This might be quite dangerous when one provides DTB with a
-> non-configurable critical trip-point, like (assuming four supported
-> thresholds in TMU):
->  - alert @50 C (type: active),
->  - alert @60 C (type: active),
->  - alert @70 C (type: active),
->  - alert @80 C (type: active),
->  - critical @120 C (type: critical) <- no interrupts generated.
-> 
-> This is a mistake in DTB so print a message in such case.
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
->  drivers/thermal/samsung/exynos_tmu.c | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
-> 
-> diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
-> index fa61eff88496..6c6f59ba7423 100644
-> --- a/drivers/thermal/samsung/exynos_tmu.c
-> +++ b/drivers/thermal/samsung/exynos_tmu.c
-> @@ -184,6 +184,7 @@
->   * @temp_error2: fused value of the second point trim.
->   * @regulator: pointer to the TMU regulator structure.
->   * @reg_conf: pointer to structure to register with core thermal.
-> + * @ntrip: number of supported trip points.
->   * @tmu_initialize: SoC specific TMU initialization method
->   * @tmu_control: SoC specific TMU control method
->   * @tmu_read: SoC specific TMU temperature read method
-> @@ -203,6 +204,7 @@ struct exynos_tmu_data {
->  	u16 temp_error1, temp_error2;
->  	struct regulator *regulator;
->  	struct thermal_zone_device *tzd;
-> +	unsigned int ntrip;
->  
->  	int (*tmu_initialize)(struct platform_device *pdev);
->  	void (*tmu_control)(struct platform_device *pdev, bool on);
-> @@ -346,6 +348,14 @@ static int exynos_tmu_initialize(struct platform_device *pdev)
->  	struct exynos_tmu_data *data = platform_get_drvdata(pdev);
->  	int ret;
->  
-> +	if (of_thermal_get_ntrips(data->tzd) > data->ntrip) {
-> +		dev_info(&pdev->dev,
-> +			 "More trip points than supported by this TMU.\n");
-> +		dev_info(&pdev->dev,
-> +			 "%d trip points should be configured in polling mode.\n",
-> +			 (of_thermal_get_ntrips(data->tzd) - data->ntrip));
-> +	}
-> +
->  	mutex_lock(&data->lock);
->  	clk_enable(data->clk);
->  	if (!IS_ERR(data->clk_sec))
-> @@ -1210,6 +1220,7 @@ static int exynos_map_dt_data(struct platform_device *pdev)
->  		data->tmu_control = exynos4210_tmu_control;
->  		data->tmu_read = exynos4210_tmu_read;
->  		data->tmu_clear_irqs = exynos4210_tmu_clear_irqs;
-> +		data->ntrip = 4;
->  		break;
->  	case SOC_ARCH_EXYNOS3250:
->  	case SOC_ARCH_EXYNOS4412:
-> @@ -1222,6 +1233,7 @@ static int exynos_map_dt_data(struct platform_device *pdev)
->  		data->tmu_read = exynos4412_tmu_read;
->  		data->tmu_set_emulation = exynos4412_tmu_set_emulation;
->  		data->tmu_clear_irqs = exynos4210_tmu_clear_irqs;
-> +		data->ntrip = 4;
->  		break;
->  	case SOC_ARCH_EXYNOS5433:
->  		data->tmu_initialize = exynos5433_tmu_initialize;
-> @@ -1229,6 +1241,7 @@ static int exynos_map_dt_data(struct platform_device *pdev)
->  		data->tmu_read = exynos4412_tmu_read;
->  		data->tmu_set_emulation = exynos4412_tmu_set_emulation;
->  		data->tmu_clear_irqs = exynos4210_tmu_clear_irqs;
-> +		data->ntrip = 8;
->  		break;
->  	case SOC_ARCH_EXYNOS5440:
->  		data->tmu_initialize = exynos5440_tmu_initialize;
-> @@ -1236,6 +1249,7 @@ static int exynos_map_dt_data(struct platform_device *pdev)
->  		data->tmu_read = exynos5440_tmu_read;
->  		data->tmu_set_emulation = exynos5440_tmu_set_emulation;
->  		data->tmu_clear_irqs = exynos5440_tmu_clear_irqs;
-> +		data->ntrip = 4;
->  		break;
->  	case SOC_ARCH_EXYNOS7:
->  		data->tmu_initialize = exynos7_tmu_initialize;
-> @@ -1243,6 +1257,7 @@ static int exynos_map_dt_data(struct platform_device *pdev)
->  		data->tmu_read = exynos7_tmu_read;
->  		data->tmu_set_emulation = exynos4412_tmu_set_emulation;
->  		data->tmu_clear_irqs = exynos4210_tmu_clear_irqs;
-> +		data->ntrip = 8;
->  		break;
->  	default:
->  		dev_err(&pdev->dev, "Platform not supported\n");
-> 
+On 2016?01?29? 14:42, Yakir Yang wrote:
+> Here are a brief introduction to Innosilicon HDMI IP:
+>    - Support HDMI 1.4a, HDCP 1.2 and DVI 1.0 standard compliant transmitter
+>    - Support HDMI1.4 a/b 3D function defined in HDMI 1.4 a/b spec
+>    - Digital video interface supports a pixel size of 24, 30, 36, 48bits color depth in RGB
+>    - S/PDIF output supports PCM, Dolby Digital, DTS digital audio transmission
+>      (32-192kHz Fs) using IEC60958 and IEC 61937
+>    - The EDID and CEC function are also supported by Innosilicon HDMI Transmitter Controlle
+>
+> Changes in v8:
+> - Don't check whether encoder output format is RGB colorspace, cause driver
+>    default configure the output colorspace to RGB. (ZhengYang)
+> - Correct the check condition in inno_hdmi_config_video_csc() (ZhengYang)
+>      - if (data->enc_out_format == data->enc_out_format) {
+>      + if (data->enc_in_format == data->enc_out_format) {
+>
+> Changes in v7:
+> - Correct the module licnese statement (Paul)
+>       - MODULE_LICENSE("GPL");
+>       + MODULE_LICENSE("GPLv2");
+> - Start indentation with tabs and fix the misspell in Kconfig (Paul)
+> - Carry the lost device-binding document (Heiko)
+>
+> Changes in v6:
+> - Rebase the Makefile/Kconfig files which add by Chris's rockchip-mipi driver (Caeser)
+>
+> Changes in v5:
+> - Use hdmi_infoframe helper functions to packed the infoframe (Russell)
+> - Remove the unused double wait_for_completion_timeout for ddc transfer (Russell)
+> - Remove the unused local variable in "inno_hdmi_i2c_write()" function (Russell)
+>
+> Changes in v4:
+> - Modify the commit title "drm/rockchip: hdmi: ..." (Mark)
+> - Correct the "DKMS" to "DPMS" (Mark)
+> - Fix over 80 characters problems (Mark)
+> - Remove encoder .prepare/.commit helper functions, and move the vop mode
+> configure function into encoder .enable helper functions. (Mark)
+>
+> Changes in v3:
+> - Use encoder enable/disable function, and remove the encoder DPMS function
+> - Keep HDMI PLL power on in standby mode
+>
+> Changes in v2:
+> - Using DRM atomic helper functions for connector init (Mark)
+> - Remove "hdmi->connector.encoder = encoder;" (Mark)
+> - Add the Acked-by tags from Rob
+> - Correct the misspell "rk3036-dw-hdmi" (Heiko)
+>
+> Yakir Yang (2):
+>    drm/rockchip: hdmi: add Innosilicon HDMI support
+>    dt-bindings: add document for Innosilicon HDMI on Rockchip platform
+>
+>   .../display/rockchip/inno_hdmi-rockchip.txt        |  50 ++
+>   drivers/gpu/drm/rockchip/Kconfig                   |   8 +
+>   drivers/gpu/drm/rockchip/Makefile                  |   1 +
+>   drivers/gpu/drm/rockchip/inno_hdmi.c               | 939 +++++++++++++++++++++
+>   drivers/gpu/drm/rockchip/inno_hdmi.h               | 362 ++++++++
+>   5 files changed, 1360 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/display/rockchip/inno_hdmi-rockchip.txt
+>   create mode 100644 drivers/gpu/drm/rockchip/inno_hdmi.c
+>   create mode 100644 drivers/gpu/drm/rockchip/inno_hdmi.h
+>
 
-Exynos5433 and Exynos7 have the 8 interrupt.
+Applied to my branch :-) .
 
-Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
+Thanks.
 
-Best Regards,
-Chanwoo Choi
+-- 
+?ark Yao
