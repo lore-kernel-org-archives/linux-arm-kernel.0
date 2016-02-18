@@ -1,50 +1,68 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 18 Feb 2016 16:43:17 +0000
-Subject: no irq domain found for ... a GPIO interrupt controller
-In-Reply-To: <11a0b1f5808af5bdabaab657366918d4@agner.ch>
-References: <2dc0519827dc9d210e38c498d830cd97@agner.ch>
- <20160218091432.6968b836@arm.com> <11a0b1f5808af5bdabaab657366918d4@agner.ch>
-Message-ID: <56C5F4A5.2000206@arm.com>
+From: ilya@compulab.co.il (Ilya Ledvich)
+Date: Thu, 18 Feb 2016 18:44:07 +0200
+Subject: iMX7d cpu1 issue
+In-Reply-To: <AMSPR04MB263D00A3F8D9A8D9D3A536D88AF0@AMSPR04MB263.eurprd04.prod.outlook.com>
+References: <56C2D63F.1030408@compulab.co.il> <20160218140913.GY6756@tiger>
+ <AMSPR04MB263D00A3F8D9A8D9D3A536D88AF0@AMSPR04MB263.eurprd04.prod.outlook.com>
+Message-ID: <56C5F4D7.1070704@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+Hi!
 
-On 18/02/16 16:13, Stefan Agner wrote:
-> Hi Marc,
-> 
-> On 2016-02-18 01:14, Marc Zyngier wrote:
-> <snip>
->> What your stack trace shows is that the failure occurs at boot time,
->> when of_platform_populate() parses the DT and creates the platform
->> devices. As part of this process, it tries to resolves the interrupt
->> specifiers, but fails to do so for this particular device, since the
->> corresponding irqchip and domain have not been created yet (the GPIO
->> controller is itself a device, while other irqchips are not).
+On 02/18/2016 05:24 PM, Frank Li wrote:
+>
+>
+>> -----Original Message-----
+>> From: Shawn Guo [mailto:shawnguo at kernel.org]
+>> Sent: Thursday, February 18, 2016 8:09 AM
+>> To: Ilya Ledvich <ilya@compulab.co.il>
+>> Cc: linux-arm-kernel at lists.infradead.org; Frank Li <frank.li@nxp.com>;
+>> Yongcai Huang <anson.huang@nxp.com>
+>> Subject: Re: iMX7d cpu1 issue
 >>
->> But as long as your device driver uses platform_get_irq(), you will
->> force the interrupt specifier to be evaluated again, this time giving
->> you a valid interrupt (and provided that your GPIO driver has
->> initialized in the meantime - check for -EPROBE_DEFER). At some point,
->> we'll be able to kill the interrupt resolution from
->> of_platform_populate().
-> 
-> The device driver is using platform_get_irq. However, I think it
-> currently would not handle EPROBE_DEFER right, but seems also not to
-> happen in practice...
-> 
->>
->> To summarize, your driver not working may not be related to this issue.
-> 
-> So this means that despite the warning, nothing I really need to worry
-> right? Does this warning will go away in the future?
+>> On Tue, Feb 16, 2016 at 09:56:47AM +0200, Ilya Ledvich wrote:
+>>> Hi Shawn,
+>>> I'm working on Compulab CL-SOM-IMX7 device
+>>> (http://www.compulab.co.il/products/computer-on-modules/cl-som-
+>> imx7-fr
+>>> eescale-i-mx-7-system-on-module)
+>>> based on Freescale iMX7d CPU.
+>>> I use the Freescale latest BSP imx_3.14.52_1.1.0_ga  and the Linux
+>>> mainline v4.4-rc6 as a reference.
+>>> I observe an issue with bringing up the second CPU core. Briefly, the
+>>> kernel can successfully boot only when CPU1 fails to come online.
+>>> In this case the boot log shows the following messages:
+>>> ...
+>>> CPU1: failed to come online
+>>> Brought up 1 CPUs
+>>> SMP: Total of 1 processors activated (6.00 BogoMIPS).
+>>> ...
+>>>
+>>> Otherwise, the device tries to start kernel several times until the
+>>> boot process eventually crashes. Please see attached logs for more
+>>> details.
+>>> This never happens on mainline Linus kernel, because it never tries to
+>>> bring up CPU1.
+>>> Unfortunately, we cannot verify this behavior on reference board cause
+>>> we have no one.
+>>> Have you ever seen such behavior? Could you please advice something?
+>
+> Did you set arm,cpu-registers-not-fw-configured; in arch timer?
 
-It is unlikely that the warning will go away anytime soon (there is a
-truckload of drivers to fix), but you can safely ignore it as long as
-you end up getting a interrupt from platform_get_irq().
+Yes, it's set in the imx7d.dtsi file included by my device .dts.
 
-Thanks,
+> How about your uboot version?
+>
+> Latest upstream uboot already boot A7 as no-security mode.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+I actually use v2016.01 from the upstream and u-boot sources are based 
+on on mx7dsabresd.c.
+
+>
+> Best regards
+> Frank Li
+>
+
+Kind regards,
+Ilya.
