@@ -1,100 +1,65 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 18 Feb 2016 12:32:16 +0000
-Subject: [PATCH V5 04/15] pci, acpi, ecam: Add flag to indicate whether
- ECAM region was hot added or not.
-In-Reply-To: <1455630825-27253-5-git-send-email-tn@semihalf.com>
-References: <1455630825-27253-1-git-send-email-tn@semihalf.com>
- <1455630825-27253-5-git-send-email-tn@semihalf.com>
-Message-ID: <20160218123216.GB12626@red-moon>
+From: romain.perier@gmail.com (Romain Perier)
+Date: Thu, 18 Feb 2016 13:33:04 +0100
+Subject: [PATCH 2/2] ARM: dts: meson: Adding hwrev syscon node
+In-Reply-To: <CAOQ7t2add21t4hFtTeUBFe9aW0EtNvSi5KS4JMb6qVC60Fj-tA@mail.gmail.com>
+References: <1455730114-2547-1-git-send-email-romain.perier@gmail.com>
+ <1455730114-2547-3-git-send-email-romain.perier@gmail.com>
+ <CAOQ7t2add21t4hFtTeUBFe9aW0EtNvSi5KS4JMb6qVC60Fj-tA@mail.gmail.com>
+Message-ID: <CABgxDo+oGe47hvxiCOAUWz8zfSeVONf=3pFm+=PbNsCbr_jTpg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 16, 2016 at 02:53:34PM +0100, Tomasz Nowicki wrote:
-> There are two ways we can get ECAM (aka MCFG) regions using ACPI,
-> first from MCFG static table and second from _CBA method. We cannot remove
-> static regions, however regions coming from _CBA should be removed while
-> removing bridge device.
-> 
-> In the light of above we need flag to mark hot added ECAM entries
-> and user to call pci_mmconfig_insert while adding regions from _CBA method.
-> Similarly pci_mmconfig_delete while removing hot added regions.
+Hi,
 
-"According to the PCI firmware specification, ACPI provides two standard
-mechanisms to retrieve ECAM memory mapped configuration regions (aka MCFG).
-For non-hot-removable bridges, ECAM bridge configurations are retrieved from
-the static MCFG table and have to be considered non-hot-removable for the
-current boot; hot-removable PCI host bridges configurations are retrieved
-through bridges _CBA methods.
+2016-02-17 21:36 GMT+01:00 Carlo Caione <carlo@caione.org>:
+> On Wed, Feb 17, 2016 at 6:28 PM, Romain Perier <romain.perier@gmail.com> wrote:
+>> These are the CBUS registers used to retrieve the revision and the
+>> identifier of the SoC on Meson8.
+>>
+>> Signed-off-by: Romain Perier <romain.perier@gmail.com>
+>> ---
+>>  arch/arm/boot/dts/meson8b.dtsi | 5 +++++
+>>  1 file changed, 5 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/meson8b.dtsi b/arch/arm/boot/dts/meson8b.dtsi
+>> index 0477a81..71009dc 100644
+>> --- a/arch/arm/boot/dts/meson8b.dtsi
+>> +++ b/arch/arm/boot/dts/meson8b.dtsi
+>> @@ -99,6 +99,11 @@
+>>                 };
+>>         };
+>>
+>> +       hwrev at c1107d4c {
+>> +               compatible = "amlogic,meson8b-hwrev", "syscon";
+>> +               reg = <0xc1107d4c 0x460>;
+>
+> Interesting. Where did you get 0x460?
 
-When ECAM regions are added through _CBA methods, they can be marked
-as hot-added so that, upon respective PCI host bridge hot-removal, they can
-be unmapped and deleted in that no longer needed.
+Carlo, Arnd.
 
-This patch adds a flag to MCFG regions allowing to mark them as hot-added,
-so that upon corresponding PCI bridge hot-removal they can be deleted since
-no longer needed."
+Well, what I did is the following :
+- CBUS_PHY_BASE is 0xc1100000   (CBUS is a larger block of registers,
+like slcr on zynq)
+- the serial is at CBUS_PHY_BASE + 0x7d4c
+- the revision is at CBUS_PHY_BASE + 0x81a8
 
-> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> Tested-by: Jeremy Linton <jeremy.linton@arm.com>
-> Tested-by: Duc Dang <dhdang@apm.com>
-> Tested-by: Dongdong Liu <liudongdong3@huawei.com>
-> Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Tested-by: Graeme Gregory <graeme.gregory@linaro.org>
-> Tested-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
->  drivers/acpi/pci_mcfg.c  | 4 +++-
->  include/linux/pci-acpi.h | 1 +
->  2 files changed, 4 insertions(+), 1 deletion(-)
+So I decided to create a device_node for hw revision at 0xc1107d4c, in
+this case the lenght is 0x460...
+Am I wrong ?
 
-It would be great if x86 people can have a look, we no longer
-associate a MCFG region to a bridge structure, the end result
-should be equivalent though, so:
 
-Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>
+>> +       };
+>> +
+>>         sram: sram at d9000000 {
+>>                 compatible = "mmio-sram";
+>>                 reg = <0xd9000000 0x20000>;
+>
+> This patch fails to apply on the current master. Probably because you
+> have based this patch on a repo containing (as I can see) also my WiP
+> patches on SMP.
 
-> 
-> diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
-> index 0467b00..3282f2a 100644
-> --- a/drivers/acpi/pci_mcfg.c
-> +++ b/drivers/acpi/pci_mcfg.c
-> @@ -74,6 +74,7 @@ static struct pci_mmcfg_region *pci_mmconfig_alloc(int segment, int start,
->  	new->segment = segment;
->  	new->start_bus = start;
->  	new->end_bus = end;
-> +	new->hot_added = false;
->  
->  	res = &new->res;
->  	res->start = addr + PCI_MMCFG_BUS_OFFSET(start);
-> @@ -205,6 +206,7 @@ int pci_mmconfig_insert(struct device *dev, u16 seg, u8 start, u8 end,
->  	}
->  	rc = pci_mmconfig_map_resource(dev, cfg);
->  	if (!rc) {
-> +		cfg->hot_added = true;
->  		list_add_sorted(cfg);
->  		dev_info(dev, "MMCONFIG at %pR (base %#lx)\n",
->  				 &cfg->res, (unsigned long)addr);
-> @@ -228,7 +230,7 @@ int pci_mmconfig_delete(u16 seg, u8 start, u8 end)
->  	mutex_lock(&pci_mmcfg_lock);
->  	list_for_each_entry_rcu(cfg, &pci_mmcfg_list, list)
->  		if (cfg->segment == seg && cfg->start_bus == start &&
-> -		    cfg->end_bus == end) {
-> +		    cfg->end_bus == end && cfg->hot_added) {
->  			list_del_rcu(&cfg->list);
->  			synchronize_rcu();
->  			pci_mmconfig_unmap_resource(cfg);
-> diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
-> index e9450ef..94d8f38 100644
-> --- a/include/linux/pci-acpi.h
-> +++ b/include/linux/pci-acpi.h
-> @@ -119,6 +119,7 @@ struct pci_mmcfg_region {
->  	u8 start_bus;
->  	u8 end_bus;
->  	char name[PCI_MMCFG_RESOURCE_NAME_LEN];
-> +	bool hot_added;
->  };
->  
->  extern int pci_mmconfig_insert(struct device *dev, u16 seg, u8 start, u8 end,
-> -- 
-> 1.9.1
-> 
+I used linux-next with your patches on top of it yes... I will rebase it
+
+Thanks,
+Romain
