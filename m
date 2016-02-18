@@ -1,21 +1,46 @@
 From: j-keerthy@ti.com (Keerthy)
-Date: Thu, 18 Feb 2016 10:59:39 +0530
-Subject: [PATCH 0/2] arm: am43xx: Enable rtc
-Message-ID: <1455773381-11839-1-git-send-email-j-keerthy@ti.com>
+Date: Thu, 18 Feb 2016 10:59:40 +0530
+Subject: [PATCH 1/2] ARM: dts: am43x-epos-evm: Add the am438 compatible string
+In-Reply-To: <1455773381-11839-1-git-send-email-j-keerthy@ti.com>
+References: <1455773381-11839-1-git-send-email-j-keerthy@ti.com>
+Message-ID: <1455773381-11839-2-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch adds rtc hwmod. This is present on gp and sk evm and not on
-epos evm. Hence adding it selectively using a seprate list. 
+The SoCs on am43x-epos-evm are named am438x.
+Hence add the compatibility string and remove the am4372 string.
 
-Keerthy (2):
-  ARM: dts: am43x-epos-evm: Add the am438 compatible string
-  ARM: AM43XX: HWMOD: Add rtc hwmod
+Signed-off-by: Keerthy <j-keerthy@ti.com>
+---
+ Documentation/devicetree/bindings/arm/omap/omap.txt | 2 +-
+ arch/arm/boot/dts/am43x-epos-evm.dts                | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
- Documentation/devicetree/bindings/arm/omap/omap.txt |  2 +-
- arch/arm/boot/dts/am43x-epos-evm.dts                |  2 +-
- arch/arm/mach-omap2/omap_hwmod_43xx_data.c          | 14 +++++++++++++-
- 3 files changed, 15 insertions(+), 3 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
+index a2bd593..739bc48 100644
+--- a/Documentation/devicetree/bindings/arm/omap/omap.txt
++++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
+@@ -154,7 +154,7 @@ Boards:
+   compatible = "compulab,am437x-sbc-t43", "compulab,am437x-cm-t43", "ti,am4372", "ti,am43"
+ 
+ - AM43x EPOS EVM
+-  compatible = "ti,am43x-epos-evm", "ti,am4372", "ti,am43"
++  compatible = "ti,am43x-epos-evm", "ti,am43", "ti,am438x"
+ 
+ - AM437x GP EVM
+   compatible = "ti,am437x-gp-evm", "ti,am4372", "ti,am43"
+diff --git a/arch/arm/boot/dts/am43x-epos-evm.dts b/arch/arm/boot/dts/am43x-epos-evm.dts
+index d580e2b..d2408c4 100644
+--- a/arch/arm/boot/dts/am43x-epos-evm.dts
++++ b/arch/arm/boot/dts/am43x-epos-evm.dts
+@@ -18,7 +18,7 @@
+ 
+ / {
+ 	model = "TI AM43x EPOS EVM";
+-	compatible = "ti,am43x-epos-evm","ti,am4372","ti,am43";
++	compatible = "ti,am43x-epos-evm","ti,am438x","ti,am43";
+ 
+ 	aliases {
+ 		display0 = &lcd0;
 -- 
 1.9.1
