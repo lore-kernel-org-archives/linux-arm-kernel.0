@@ -1,41 +1,43 @@
 From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu, 18 Feb 2016 15:19:08 -0300
-Subject: [PATCH 0/3] thermal: exynos: Fixes for vtmu-supply regulator handling
-Message-ID: <1455819551-4666-1-git-send-email-javier@osg.samsung.com>
+Date: Thu, 18 Feb 2016 15:19:10 -0300
+Subject: [PATCH 2/3] thermal: exynos: Use devm_regulator_get_optional() for
+ vtmu
+In-Reply-To: <1455819551-4666-1-git-send-email-javier@osg.samsung.com>
+References: <1455819551-4666-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <1455819551-4666-3-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+The Exynos TMU DT binding says that the vtmu-supply is optional but the
+driver uses devm_regulator_get() that creates a dummy regulator if it's
+not defined in the DT. For example the following message is in the log:
 
-On a recent patch series to build a PMIC chip as a module [0], Krzysztof
-asked me to check if all the consumer drivers, using the resources that
-this PMIC provides, already support probe deferral.
+10060000.tmu supply vtmu not found, using dummy regulator
 
-While investigating that, I noticed that the Exynos TMU didn't do it so
-this series fix that bug and other two minor issues that I noticed while
-reviewing the driver and its DT binding.
+Use the optional version of regulator_get() that doesn't create a dummy
+regulator and instead returns a -ENODEV errno code. Since it's expected
+that a regulator may not be defined and the driver will inform about it:
 
-The series are on top of Krzysztof's patches [1,2,3] not because there's
-a dependency but to avoid merge conflicts with in-flight patches. Please
-let me know if you prefer to use a different base instead.
+exynos-tmu 10060000.tmu: Regulator node (vtmu) not found
 
-[0]: https://lkml.org/lkml/2016/2/11/857
-[1]: https://patchwork.kernel.org/patch/8345791/
-[2]: https://patchwork.kernel.org/patch/8345741/
-[3]: https://patchwork.kernel.org/patch/8345701/
+Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+---
 
-Best regards,
-Javier
+ drivers/thermal/samsung/exynos_tmu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-
-Javier Martinez Canillas (3):
-  thermal: exynos: List vtmu-supply as optional property in DT binding
-  thermal: exynos: Use devm_regulator_get_optional() for vtmu
-  thermal: exynos: Defer probe if vtmu is present but not registered
-
- Documentation/devicetree/bindings/thermal/exynos-thermal.txt | 9 ++++++---
- drivers/thermal/samsung/exynos_tmu.c                         | 4 +++-
- 2 files changed, 9 insertions(+), 4 deletions(-)
-
+diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
+index 6c6f59ba7423..f4f36bba7be9 100644
+--- a/drivers/thermal/samsung/exynos_tmu.c
++++ b/drivers/thermal/samsung/exynos_tmu.c
+@@ -1310,7 +1310,7 @@ static int exynos_tmu_probe(struct platform_device *pdev)
+ 	 * TODO: Add regulator as an SOC feature, so that regulator enable
+ 	 * is a compulsory call.
+ 	 */
+-	data->regulator = devm_regulator_get(&pdev->dev, "vtmu");
++	data->regulator = devm_regulator_get_optional(&pdev->dev, "vtmu");
+ 	if (!IS_ERR(data->regulator)) {
+ 		ret = regulator_enable(data->regulator);
+ 		if (ret) {
 -- 
 2.5.0
