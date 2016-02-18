@@ -1,38 +1,39 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 18 Feb 2016 14:14:19 +0900
-Subject: [PATCH 2/3] thermal: exynos: Document number of supported trip-points
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Thu, 18 Feb 2016 14:20:12 +0900
+Subject: [PATCH 1/3] thermal: exynos: Document compatible for Exynos5433
+ TMU
 In-Reply-To: <1455772460-20684-1-git-send-email-k.kozlowski@samsung.com>
 References: <1455772460-20684-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1455772460-20684-2-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <56C5548C.7090305@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the number of configurable temperature thresholds (for
-trip-points in interrupt-driven mode).
+On 2016? 02? 18? 14:14, Krzysztof Kozlowski wrote:
+> Commit 488c7455d74c ("thermal: exynos: Add the support for Exynos5433
+> TMU") added new compatible but forgot to update documentation.
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
+>  Documentation/devicetree/bindings/thermal/exynos-thermal.txt | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/thermal/exynos-thermal.txt b/Documentation/devicetree/bindings/thermal/exynos-thermal.txt
+> index 695150a4136b..34315d7fbfde 100644
+> --- a/Documentation/devicetree/bindings/thermal/exynos-thermal.txt
+> +++ b/Documentation/devicetree/bindings/thermal/exynos-thermal.txt
+> @@ -11,6 +11,7 @@
+>  	       "samsung,exynos5420-tmu" for TMU channel 0, 1 on Exynos5420
+>  	       "samsung,exynos5420-tmu-ext-triminfo" for TMU channels 2, 3 and 4
+>  			Exynos5420 (Must pass triminfo base and triminfo clock)
+> +               "samsung,exynos5433-tmu"
+>  	       "samsung,exynos5440-tmu"
+>  	       "samsung,exynos7-tmu"
+>  - interrupt-parent : The phandle for the interrupt controller
+> 
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- Documentation/devicetree/bindings/thermal/exynos-thermal.txt | 8 ++++++++
- 1 file changed, 8 insertions(+)
+I was implementing the Exynos5433's thermal driver. Looks good to me.
 
-diff --git a/Documentation/devicetree/bindings/thermal/exynos-thermal.txt b/Documentation/devicetree/bindings/thermal/exynos-thermal.txt
-index 34315d7fbfde..faa62059b5c5 100644
---- a/Documentation/devicetree/bindings/thermal/exynos-thermal.txt
-+++ b/Documentation/devicetree/bindings/thermal/exynos-thermal.txt
-@@ -44,6 +44,14 @@
- - vtmu-supply: This entry is optional and provides the regulator node supplying
- 		voltage to TMU. If needed this entry can be placed inside
- 		board/platform specific dts file.
-+
-+The Exynos TMU supports generating interrupts when reaching given
-+temperature thresholds. Number of supported thermal trip points depends
-+on the SoC (only first trip points defined in DT will be configured):
-+ - most of SoC: 4
-+ - samsung,exynos5433-tmu: 8
-+ - samsung,exynos7-tmu: 8
-+
- Following properties are mandatory (depending on SoC):
- - samsung,tmu_gain: Gain value for internal TMU operation.
- - samsung,tmu_reference_voltage: Value of TMU IP block's reference voltage
--- 
-2.5.0
+Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
+
+Best Regards,
+Chanwoo Choi
