@@ -1,61 +1,39 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 18 Feb 2016 08:06:22 +0530
-Subject: [RFC 3/3] ARM: dts: Don't overheat the Odroid XU3-Lite on high
- load
-In-Reply-To: <56C522A9.8070800@samsung.com>
-References: <1455692128-28504-1-git-send-email-k.kozlowski@samsung.com>
- <1455692128-28504-4-git-send-email-k.kozlowski@samsung.com>
- <CANAwSgQHiJGSYB7Qhq066Mqfskwrr_3SDQGXH-WN=Wt3SEF-QA@mail.gmail.com>
- <56C522A9.8070800@samsung.com>
-Message-ID: <20160218023622.GA2610@vireshk-i7>
+From: jay.xu@rock-chips.com (jianqun.xu)
+Date: Thu, 18 Feb 2016 10:36:19 +0800
+Subject: [PATCH v2 0/4] Add core dtsi for rk3399 from Rockchip
+Message-ID: <1455762983-29980-1-git-send-email-jay.xu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18-02-16, 10:47, Krzysztof Kozlowski wrote:
-> On 18.02.2016 04:53, Anand Moon wrote:
-> > I also got lot's of error.
-> > 
-> > root at odroidxu4l:~# cpu[ 3050.847663] cpu cpu4: Failed to find dev_opp: -19
-> > [ 3171.640836] cpu cpu4: device_opp_debug_create_link: Failed to create link
-> > [ 3171.646197] cpu cpu4: _add_list_dev: Failed to register opp debugfs (-12)
-> > [ 3171.653574] cpu cpu7: device_opp_debug_create_link: Failed to create link
-> > [ 3171.659752] cpu cpu7: _add_list_dev: Failed to register opp debugfs (-12)
-> > [ 3171.697011] cpu cpu5: cpufreq_init: failed to get clk: -2
-> > [ 3171.732505] cpu cpu6: cpufreq_init: failed to get clk: -2
-> > [ 3171.768160] cpu cpu7: cpufreq_init: failed to get clk: -2
-> > 
-> > Tested on Odroid-XU4
-> > 
-> > Reviewed-by: Anand Moon <linux.amoon@gmail.com>
-> > Tested-by: Anand Moon <linux.amoon@gmail.com>
+From: Jianqun Xu <jay.xu@rock-chips.com>
 
-What was this Tested-by supposed to mean? You got errors out there ...
+There is the new SoCs from Rockchip which named rk3399, the
+patches are added to support them.
 
-> The patch is not sufficient. It does not work the way it should...
-> 
-> BTW, I found the issue. The order of trip points in DT:
-> thermal_zone0/trip_point_0_hyst:5000
-> thermal_zone0/trip_point_0_temp:50000
-> thermal_zone0/trip_point_0_type:active
-> thermal_zone0/trip_point_1_hyst:5000
-> thermal_zone0/trip_point_1_temp:60000
-> thermal_zone0/trip_point_1_type:active
-> thermal_zone0/trip_point_2_hyst:5000
-> thermal_zone0/trip_point_2_temp:70000
-> thermal_zone0/trip_point_2_type:active
-> thermal_zone0/trip_point_3_hyst:0
-> thermal_zone0/trip_point_3_temp:120000	<---- this should be last one!
-> thermal_zone0/trip_point_3_type:critical
-> thermal_zone0/trip_point_4_hyst:5000
-> thermal_zone0/trip_point_4_temp:90000
-> thermal_zone0/trip_point_4_type:passive
-> thermal_zone0/trip_point_5_hyst:5000
-> thermal_zone0/trip_point_5_temp:110000
-> thermal_zone0/trip_point_5_type:passive
-> 
-> After fixing the order in DT, the cpu cooler starts working.
+Xing Zheng (2):
+  clk: rockchip: add dt-binding header for rk3399
+  dt-bindings: add documentation of rk3399 clock controller
 
-Ahh, nice.
+Xu Jianqun (2):
+  spi: rockchip: add bindings for rk3399 spi
+  ARM64: dts: rockchip: add core dtsi file for rk3399
+
+ .../bindings/clock/rockchip,rk3399-cru.txt         |  82 ++
+ .../devicetree/bindings/spi/spi-rockchip.txt       |   1 +
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi           | 949 +++++++++++++++++++++
+ include/dt-bindings/clock/rk3399-cru.h             | 609 +++++++++++++
+ 4 files changed, 1641 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/rockchip,rk3399-cru.txt
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3399.dtsi
+ create mode 100644 include/dt-bindings/clock/rk3399-cru.h
 
 -- 
-viresh
+changes in v2:
+- remove changeID (Heiko, Mark)
+- drop pmu and psci temporary (Mark)
+- drop applied patch (Heiko)
+- drop GIC_CPU_MASK_SIMPLE from the interrupt specifiers (Marc, Heiko)
+- drop clock-frequency of timer (Marc, Mark)
+- remove double defination for SCLK_SPI5
+
+1.9.1
