@@ -1,34 +1,17 @@
-From: jglauber@cavium.com (Jan Glauber)
-Date: Thu, 18 Feb 2016 17:50:14 +0100
-Subject: [PATCH v4 5/5] arm64/perf: Extend event mask for ARMv8.1
-In-Reply-To: <cover.1455810755.git.jglauber@cavium.com>
-References: <cover.1455810755.git.jglauber@cavium.com>
-Message-ID: <028b5d83ded39048ec996fe4d4912702704f156b.1455810755.git.jglauber@cavium.com>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Thu, 18 Feb 2016 08:50:56 -0800
+Subject: [PATCH v2] serial: xuartps: Enable OF earlycon support
+In-Reply-To: <09f2c419994281fca7968142e52d969542370d1c.1455782238.git.michal.simek@xilinx.com>
+References: <09f2c419994281fca7968142e52d969542370d1c.1455782238.git.michal.simek@xilinx.com>
+Message-ID: <56C5F670.50005@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARMv8.1 increases the PMU event number space to 16 bit so increase
-the EVTYPE mask.
+On 02/17/2016 11:57 PM, Michal Simek wrote:
+> Support early console setup via DT for all listed compatible strings.
+> Remove EARLYCON_DECLARE which was done by:
+> "Use common framework for earlycon declarations"
+> (sha1: 2eaa790989e03900298ad24f77f1086dbbc1aebd)
+> when OF_EARLYCON_DECLARE is defined.
 
-Signed-off-by: Jan Glauber <jglauber@cavium.com>
----
- arch/arm64/kernel/perf_event.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-index c68fa98..8746781 100644
---- a/arch/arm64/kernel/perf_event.c
-+++ b/arch/arm64/kernel/perf_event.c
-@@ -419,8 +419,8 @@ static const struct attribute_group *armv8_pmuv3_attr_groups[] = {
- /*
-  * PMXEVTYPER: Event selection reg
-  */
--#define	ARMV8_EVTYPE_MASK	0xc80003ff	/* Mask for writable bits */
--#define	ARMV8_EVTYPE_EVENT	0x3ff		/* Mask for EVENT bits */
-+#define	ARMV8_EVTYPE_MASK	0xc800ffff	/* Mask for writable bits */
-+#define	ARMV8_EVTYPE_EVENT	0xffff		/* Mask for EVENT bits */
- 
- /*
-  * Event filters for PMUv3
--- 
-1.9.1
+Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
