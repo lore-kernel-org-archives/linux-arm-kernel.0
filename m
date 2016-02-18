@@ -1,34 +1,49 @@
-From: Chris.Brandt@renesas.com (Chris Brandt)
-Date: Thu, 18 Feb 2016 18:18:02 +0000
-Subject: [PATCH] ARM: Allow MULTIPLATFORM to select XIP
-In-Reply-To: <alpine.LFD.2.20.1602181244490.13632@knanqh.ubzr>
-References: <1455816310-11308-1-git-send-email-chris.brandt@renesas.com>
- <alpine.LFD.2.20.1602181244490.13632@knanqh.ubzr>
-Message-ID: <HK2PR06MB0561377EABB3B4B8E94F22328AAF0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Thu, 18 Feb 2016 15:19:09 -0300
+Subject: [PATCH 1/3] thermal: exynos: List vtmu-supply as optional property in
+ DT binding
+In-Reply-To: <1455819551-4666-1-git-send-email-javier@osg.samsung.com>
+References: <1455819551-4666-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <1455819551-4666-2-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> And realistically it makes no sense to use XIP (surely because you need
-> to save space) and have multi-platform support in your kernel.
+The Exynos Thermal Management Unit binding says that the vtmu-supply
+is optional but is listed in the required properties section. Add an
+optional properties section and move the regulator property there.
 
+Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+---
 
-The problem is that you don't have a choice: Multi-platform is your only choice for many devices (MMU devices that is).
+ Documentation/devicetree/bindings/thermal/exynos-thermal.txt | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
-So for XIP, it comes down to either:
-
-A) Go back to making individual configs for each MPU
-
-B) Let everything keep getting grouped together into multi-platform, and then just de-selecting the MPU you don't want.
-
-I can tell you when I build my upstream XIP kernel for testing for the RZ/A1, it's ARCH_MULTIPLATFORM (all Renesas parts are multiplatform) and then remove everything I don't want/need, my kernel size is 3.4MB.
-
-
-> IMHO it should be clear that with XIP there is only one platform that can
-> be supported.
-
-I would be fine if there was some way you could only select XIP_KERNEL if only 1 of the MPUs in the multiplatform group were selected...but I can't figure out how to do that in the kbuild system (without adding lots of chunky configs all over the place...which is not what I want)
-
-Is there some way you can do a PLATFORM_COUNTER++ for each device that is selected, and then XIP_KERNEL would depend on PLATFORM_COUNTER == 1 ?
-
-
-Chris
+diff --git a/Documentation/devicetree/bindings/thermal/exynos-thermal.txt b/Documentation/devicetree/bindings/thermal/exynos-thermal.txt
+index faa62059b5c5..70b4c16c7ed8 100644
+--- a/Documentation/devicetree/bindings/thermal/exynos-thermal.txt
++++ b/Documentation/devicetree/bindings/thermal/exynos-thermal.txt
+@@ -41,9 +41,6 @@
+ 		for current TMU channel
+ 	-- "tmu_sclk" clock for functional operation of the current TMU
+ 		channel
+-- vtmu-supply: This entry is optional and provides the regulator node supplying
+-		voltage to TMU. If needed this entry can be placed inside
+-		board/platform specific dts file.
+ 
+ The Exynos TMU supports generating interrupts when reaching given
+ temperature thresholds. Number of supported thermal trip points depends
+@@ -65,6 +62,12 @@ Following properties are mandatory (depending on SoC):
+ - samsung,tmu_default_temp_offset: Default temperature offset
+ - samsung,tmu_cal_type: Callibration type
+ 
++** Optional properties:
++
++- vtmu-supply: This entry is optional and provides the regulator node supplying
++		voltage to TMU. If needed this entry can be placed inside
++		board/platform specific dts file.
++
+ Example 1):
+ 
+ 	tmu at 100C0000 {
+-- 
+2.5.0
