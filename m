@@ -1,60 +1,46 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 18 Feb 2016 10:25:01 +0000
-Subject: [PATCH v2 1/8] arm64: Introduce Allwinner SoC config option
-In-Reply-To: <20160218113207.5ffffee2@xhacker>
-References: <1455709440-8668-1-git-send-email-andre.przywara@arm.com>
- <1455709440-8668-2-git-send-email-andre.przywara@arm.com>
- <20160218113207.5ffffee2@xhacker>
-Message-ID: <56C59BFD.20609@arm.com>
+From: matt@codeblueprint.co.uk (Matt Fleming)
+Date: Thu, 18 Feb 2016 10:44:07 +0000
+Subject: [PATCH v2 1/2] efi: esrt: use memremap not ioremap to access
+ ESRT table in memory
+In-Reply-To: <1455535953-5056-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1455535953-5056-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1455535953-5056-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160218104407.GC2651@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, 15 Feb, at 12:32:32PM, Ard Biesheuvel wrote:
+> On ARM and arm64, ioremap() and memremap() are not interchangeable like
+> on x86, and the use of ioremap() on ordinary RAM is typically flagged
+> as an error if the memory region being mapped is also covered by the
+> linear mapping, since that would lead to aliases with conflicting
+> cacheability attributes.
+> 
+> Since what we are dealing with is not an I/O region with side effects,
+> using ioremap() here is arguably incorrect anyway, so let's replace
+> it with memremap instead. Also add a missing unmap on the success path,
+> and drop a memblock_remove() call which does not belong here, this far
+> into the boot sequence.
+> 
+> Cc: Peter Jones <pjones@redhat.com>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  drivers/firmware/efi/esrt.c | 16 ++++++++--------
+>  1 file changed, 8 insertions(+), 8 deletions(-)
+> 
 
-On 18/02/16 03:32, Jisheng Zhang wrote:
-> Dear Andre,
-> 
-> On Wed, 17 Feb 2016 11:43:53 +0000
-> Andre Przywara <andre.przywara@arm.com> wrote:
-> 
->> To prepare for the Allwinner A64 SoC support, introduce a config
->> option to allow compiling Allwinner (aka. sunxi) specific drivers
->> for the arm64 architecture as well.
->> This patch just defines the ARCH_SUNXI symbol to allow Allwinner
->> specific drivers to be selected during kernel configuration.
->>
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->> ---
->>  arch/arm64/Kconfig.platforms | 5 +++++
->>  1 file changed, 5 insertions(+)
->>
->> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
->> index 8a09522..2f7f69b 100644
->> --- a/arch/arm64/Kconfig.platforms
->> +++ b/arch/arm64/Kconfig.platforms
->> @@ -1,5 +1,10 @@
->>  menu "Platform selection"
->>  
->> +config ARCH_SUNXI
-> 
-> it's better to keep ARCH_YYZZ sorted in alphabetic order
+[...]
 
-Right, I think I originally started with ARCH_ALLWINNER until I found
-ARCH_SUNXI, but forgot to move it.
-Actually I wonder if we should sort for the user visible config options
-instead, but that's another story.
+> @@ -432,8 +434,6 @@ static int __init esrt_sysfs_init(void)
+>  	if (error)
+>  		goto err_cleanup_list;
+>  
+> -	memblock_remove(esrt_data, esrt_data_size);
+> -
+>  	pr_debug("esrt-sysfs: loaded.\n");
+>  
+>  	return 0;
 
-Cheers,
-Andre.
-
-> Thanks,
-> Jisheng
-> 
->> +	bool "Allwinner sunxi 64-bit SoC Family"
->> +	help
->> +	  This enables support for Allwinner sunxi based SoCs like the A64.
->> +
->>  config ARCH_BCM_IPROC
->>  	bool "Broadcom iProc SoC Family"
->>  	help
-> 
+Shouldn't we be replacing memblock_remove() with free_bootmem_late()?
+The original ESRT region is still reserved at this point, so we should
+do our best to release it to the page allocator.
