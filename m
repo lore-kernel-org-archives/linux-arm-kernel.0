@@ -1,45 +1,74 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 18 Feb 2016 15:01:55 +0100
-Subject: [PATCH 3/9] ARM: make free_memmap as __init
+Date: Thu, 18 Feb 2016 15:01:56 +0100
+Subject: [PATCH 4/9] ARM: add CONFIG_PHYS_OFFSET default values
 In-Reply-To: <1455804123-2526139-1-git-send-email-arnd@arndb.de>
 References: <1455804123-2526139-1-git-send-email-arnd@arndb.de>
-Message-ID: <1455804123-2526139-4-git-send-email-arnd@arndb.de>
+Message-ID: <1455804123-2526139-5-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-free_memmap is an inline function, but gcc may choose to ignore that
-when CONFIG_OPTIMIZE_INLINING is set. In that case it is put in the
-.text section, causing a kbuild warning:
+For platforms that are not yet converted to ARCH_MULTIPLATFORM,
+we can disable CONFIG_ARM_PATCH_PHYS_VIRT, which in turn requires
+setting a correct address here.
 
-WARNING: vmlinux.o(.text.unlikely+0x1a0): Section mismatch in reference from the function free_memmap() to the function .init.text:__memblock_free_early()
-The function free_memmap() references
-the function __init __memblock_free_early().
-This is often because free_memmap lacks a __init
-annotation or the annotation of __memblock_free_early is wrong.
+As we actualy know what all the values are supposed to be based
+on the old mach/memory.h header file contents (from git history),
+we can just add them here.
 
-FATAL: modpost: Section mismatches detected.
-Set CONFIG_SECTION_MISMATCH_WARN_ONLY=y to allow them.
+This also solves a problem in Kconfig where 'make randconfig'
+fails to continue if no number is selected for a 'hex' option.
+Users can still override the number at configuration time, e.g.
+when the memory visible to the kernel starts at a nonstandard
+address on some machine, but it should no longer be required
+now.
 
-This marks the function both inline and __init, which is a
-correct annotation and avoids the problem.
+To make this foolproof, another patch is required in mach-davinci
+to prevent a configuration with both DMx and DA8xx enabled but
+ARM_PATCH_PHYS_VIRT disabled. The two patches however can be
+merged independently as there is no direct dependency between
+them.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mm/init.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/Kconfig | 20 +++++++++++++++++---
+ 1 file changed, 17 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 370581aeb871..a4db267c35b2 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -330,7 +330,7 @@ static inline void poison_init_mem(void *s, size_t count)
- 		*p++ = 0xe7fddef0;
- }
- 
--static inline void
-+static inline void __init
- free_memmap(unsigned long start_pfn, unsigned long end_pfn)
- {
- 	struct page *start_pg, *end_pg;
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index be00b53f399b..7839c9923709 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -271,15 +271,29 @@ config PHYS_OFFSET
+ 	depends on !ARM_PATCH_PHYS_VIRT
+ 	default DRAM_BASE if !MMU
+ 	default 0x00000000 if ARCH_EBSA110 || \
++			ARCH_DOVE || \
+ 			ARCH_FOOTBRIDGE || \
++			(ARCH_GEMINI && GEMINI_MEM_SWAP) || \
+ 			ARCH_INTEGRATOR || \
++			ARCH_IOP33X || \
+ 			ARCH_IOP13XX || \
++			ARCH_IXP4XX || \
+ 			ARCH_KS8695 || \
+-			(ARCH_REALVIEW && !REALVIEW_HIGH_PHYS_OFFSET)
+-	default 0x10000000 if ARCH_OMAP1 || ARCH_RPC
++			(ARCH_REALVIEW && !REALVIEW_HIGH_PHYS_OFFSET) || \
++			ARCH_W90X900
++	default 0x10000000 if (ARCH_GEMINI && !GEMINI_MEM_SWAP) || \
++			ARCH_OMAP1 || \
++			ARCH_RPC
+ 	default 0x20000000 if ARCH_S5PV210
++	default 0x30000000 if ARCH_S3C24XX
+ 	default 0x70000000 if REALVIEW_HIGH_PHYS_OFFSET
+-	default 0xc0000000 if ARCH_SA1100
++	default 0x80000000 if (ARCH_DAVINCI_DMx && !ARCH_DAVINCI_DA8XX) || \
++			ARCH_NETX || \
++			ARCH_LPC32XX
++	default 0xa0000000 if ARCH_IOP32X || ARCH_PXA
++	default 0xc0000000 if (ARCH_DAVINCI_DA8XX && !ARCH_DAVINCI_DMx) || \
++			ARCH_CLPS711X || \
++			ARCH_SA1100
+ 	help
+ 	  Please provide the physical address corresponding to the
+ 	  location of main memory in your system.
 -- 
 2.7.0
