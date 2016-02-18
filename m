@@ -1,40 +1,69 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Thu, 18 Feb 2016 08:13:59 -0800
-Subject: no irq domain found for ... a GPIO interrupt controller
-In-Reply-To: <20160218091432.6968b836@arm.com>
-References: <2dc0519827dc9d210e38c498d830cd97@agner.ch>
- <20160218091432.6968b836@arm.com>
-Message-ID: <11a0b1f5808af5bdabaab657366918d4@agner.ch>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 18 Feb 2016 11:17:36 -0500 (EST)
+Subject: [PATCH 7/9] ARM: move NO_DMA definition to ecard.h
+In-Reply-To: <1455804123-2526139-8-git-send-email-arnd@arndb.de>
+References: <1455804123-2526139-1-git-send-email-arnd@arndb.de>
+ <1455804123-2526139-8-git-send-email-arnd@arndb.de>
+Message-ID: <alpine.LFD.2.20.1602181116410.13632@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On Thu, 18 Feb 2016, Arnd Bergmann wrote:
 
-On 2016-02-18 01:14, Marc Zyngier wrote:
-<snip>
-> What your stack trace shows is that the failure occurs at boot time,
-> when of_platform_populate() parses the DT and creates the platform
-> devices. As part of this process, it tries to resolves the interrupt
-> specifiers, but fails to do so for this particular device, since the
-> corresponding irqchip and domain have not been created yet (the GPIO
-> controller is itself a device, while other irqchips are not).
+> The NO_DMA macro is only used on the RiscPC ecard bus, and conflicts
+> with a couple of driver specific macros with the same name:
 > 
-> But as long as your device driver uses platform_get_irq(), you will
-> force the interrupt specifier to be evaluated again, this time giving
-> you a valid interrupt (and provided that your GPIO driver has
-> initialized in the meantime - check for -EPROBE_DEFER). At some point,
-> we'll be able to kill the interrupt resolution from
-> of_platform_populate().
-
-The device driver is using platform_get_irq. However, I think it
-currently would not handle EPROBE_DEFER right, but seems also not to
-happen in practice...
-
+> drivers/scsi/eata.c:571:0: warning: "NO_DMA" redefined
+>  #define NO_DMA  0xff
+> In file included from ../drivers/scsi/eata.c:495:0:
+> arch/arm/include/asm/dma.h:140:0: note: this is the location of the previous definition
+>  #define NO_DMA 255
 > 
-> To summarize, your driver not working may not be related to this issue.
+> This moves the definition out of the asm/dma.h header that is used
+> by all ISA DMA API users and into the ecard header.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-So this means that despite the warning, nothing I really need to worry
-right? Does this warning will go away in the future?
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
---
-Stefan
+
+
+> ---
+>  arch/arm/include/asm/dma.h   | 4 ----
+>  arch/arm/include/asm/ecard.h | 4 ++++
+>  2 files changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/dma.h b/arch/arm/include/asm/dma.h
+> index bb4fa67da541..573128481fc4 100644
+> --- a/arch/arm/include/asm/dma.h
+> +++ b/arch/arm/include/asm/dma.h
+> @@ -136,10 +136,6 @@ extern void set_dma_speed(unsigned int chan, int cycle_ns);
+>   */
+>  extern int  get_dma_residue(unsigned int chan);
+>  
+> -#ifndef NO_DMA
+> -#define NO_DMA	255
+> -#endif
+> -
+>  #endif /* CONFIG_ISA_DMA_API */
+>  
+>  #ifdef CONFIG_PCI
+> diff --git a/arch/arm/include/asm/ecard.h b/arch/arm/include/asm/ecard.h
+> index eaea14676d57..d3e16628c792 100644
+> --- a/arch/arm/include/asm/ecard.h
+> +++ b/arch/arm/include/asm/ecard.h
+> @@ -83,6 +83,10 @@
+>  #define CONST const
+>  #endif
+>  
+> +#ifndef NO_DMA
+> +#define NO_DMA	255
+> +#endif
+> +
+>  #define MAX_ECARDS	9
+>  
+>  struct ecard_id {			/* Card ID structure		*/
+> -- 
+> 2.7.0
+> 
+> 
