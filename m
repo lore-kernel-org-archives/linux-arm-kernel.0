@@ -1,71 +1,43 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 18 Feb 2016 11:15:16 +0000
-Subject: KASAN issues with idle / hotplug area
-In-Reply-To: <56C57F40.3050500@virtuozzo.com>
-References: <56BDFC86.5010705@arm.com>
- <20160212160652.GL31665@e104818-lin.cambridge.arm.com>
- <56C1E072.2090909@virtuozzo.com>
- <20160215185957.GB19413@e104818-lin.cambridge.arm.com>
- <56C31D1D.50708@virtuozzo.com> <20160217143950.GC32647@leverpostej>
- <20160217170110.GE32647@leverpostej>
- <20160217175656.GJ32647@leverpostej>
- <20160217191643.GK32647@leverpostej>
- <56C57F40.3050500@virtuozzo.com>
-Message-ID: <20160218111516.GM32647@leverpostej>
+From: jay.xu@rock-chips.com (jianqun.xu)
+Date: Thu, 18 Feb 2016 19:16:29 +0800
+Subject: [PATCH v3 0/4] add core dtsi file for rk3399
+Message-ID: <1455794193-4497-1-git-send-email-jay.xu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 18, 2016 at 11:22:24AM +0300, Andrey Ryabinin wrote:
-> 
-> On 02/17/2016 10:16 PM, Mark Rutland wrote:
-> > Looking at the assembly, functions seem to get instrumented regardless
-> > of the __no_sanitize_address annotation. The assembly of
-> > __invoke_psci_fn_{smc,hvc} look identical, even if one has the
-> > annotation and one does not.
-> > 
-> > In the case below, it looks like __invoke_psci_fn_hvc is storing to the
-> > shadow area even though it's anotated with __no_sanitize_address.  Note
-> > that the adrp symbol resolution is bogus; psci_to_linux_errno happens to
-> > be at offset 0 in the as-yet unlinked psci.o object.
-> > 
-> 
-> ...
-> > I also tried using __attribute__((no_sanitize_address)) directly, in
-> > case there was some header issue, but that doesn't seem to be the case.
-> > 
-> > I'm using the Linaro 15.08 AArch64 GCC 5.1. Is anyone else able to
-> > confirm whether they see the same? Does the same happen for x86?
->
-> Confirming, this happens on every GCC I have (including x86).
-> It seems that 'no_sanitize_address' in gcc removes only memory access checks
-> but it doesn't remove stack redzones.
-> I think this is wrong, e.g. clang removes instrumentation completely. I'll submit a bug.
+From: Jianqun Xu <jay.xu@rock-chips.com>
 
-Ok.
+There is the new SoCs from Rockchip which named rk3399, the
+patches are added to support them.
 
-Unless there's some clever trickery that we can employ, the above
-renders the Linux __no_sanitize_address annotation useless for this
-style of code.
+Xing Zheng (2):
+  clk: rockchip: add dt-binding header for rk3399
+  dt-bindings: add documentation of rk3399 clock controller
 
-We should certianly call that out in the commentary in
-include/linux/compiler-gcc.h.
+Xu Jianqun (2):
+  spi: rockchip: add bindings for rk3399 spi
+  ARM64: dts: rockchip: add core dtsi file for rk3399
 
-> But we need fix this in kernel.
-> I see two options here:
->  * completely disable instrumentation for drivers/firmware/psci.c
+ .../bindings/clock/rockchip,rk3399-cru.txt         |  82 ++
+ .../devicetree/bindings/spi/spi-rockchip.txt       |   1 +
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi           | 949 +++++++++++++++++++++
+ drivers/spi/spi-rockchip.c                         |   1 +
+ include/dt-bindings/clock/rk3399-cru.h             | 609 +++++++++++++
+ 5 files changed, 1642 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/rockchip,rk3399-cru.txt
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3399.dtsi
+ create mode 100644 include/dt-bindings/clock/rk3399-cru.h
 
-This is somewhat overkill, and we'd also have to disable instrumentation
-for arch/arm64/kernel/psci.c (for psci_suspend_finisher).
+--
+changes in v3:
+- add compatible for rk3399 spi (Mark, Heiko)
 
-I would like to have instrumentation for everything we can safely
-instrument.
+changes in v2:
+- remove changeID (Heiko, Mark)
+- drop pmu and psci temporary (Mark)
+- drop applied patch (Heiko)
+- drop GIC_CPU_MASK_SIMPLE from the interrupt specifiers (Marc, Heiko)
+- drop clock-frequency of timer (Marc, Mark)
+- remove double defination for SCLK_SPI5
 
-This is probably the least worst option, though.
-
->  * get back to assembly implementation
-
-We'd also have to convert psci_suspend_finisher and psci_cpu_suspend,
-the latter being generic code. That goes against the consolidation we
-were aiming for.
-
-Mark.
+1.9.1
