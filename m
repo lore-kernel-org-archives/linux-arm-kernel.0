@@ -1,173 +1,176 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 18 Feb 2016 00:55:03 +0000
-Subject: [PATCH] clk: fix clk-gpio.c with optional clock= DT property
-In-Reply-To: <20160218000747.2278.46405@quark.deferred.io>
-References: <E1aFJ0A-00086Z-0I@rmk-PC.arm.linux.org.uk>
- <20160217230529.GM19428@n2100.arm.linux.org.uk>
- <20160218000747.2278.46405@quark.deferred.io>
-Message-ID: <20160218005503.GO19428@n2100.arm.linux.org.uk>
+From: jay.xu@rock-chips.com (Jianqun Xu)
+Date: Thu, 18 Feb 2016 09:07:04 +0800
+Subject: [PATCH 6/6] ARM64: dts: rockchip: add core dtsi file for rk3399
+In-Reply-To: <20160217114645.GA32647@leverpostej>
+References: <1455673992-16469-1-git-send-email-jay.xu@rock-chips.com>
+ <1455674476-16655-1-git-send-email-jay.xu@rock-chips.com>
+ <20160217114645.GA32647@leverpostej>
+Message-ID: <56C51938.1060806@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 17, 2016 at 04:07:47PM -0800, Michael Turquette wrote:
-> Quoting Russell King - ARM Linux (2016-02-17 15:05:29)
-> > On Sat, Jan 02, 2016 at 10:01:34AM +0000, Russell King wrote:
-> > > When the clock DT property is not given, of_clk_get_parent_count()
-> > > returns -ENOENT, which then tries to allocate -2 x 4 bytes of memory,
-> > > which of course fails, causing the whole driver to fail to create
-> > > the clock.
-> > > 
-> > > This causes the SolidRun platforms to fail probing the SDHCI1 interface
-> > > which is connected to the WiFi.
-> > > 
-> > > Fix this by detecting errno codes, skipping the allocation, and fixing
-> > > of_clk_gpio_gate_delayed_register_get() to handle a NULL parent_names
-> > > array.
-> > > 
-> > > Fixes: 80eeb1f0f757 ("clk: add gpio controlled clock multiplexer")
-> > > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > > ---
-> > > This goes all the way back to 80eeb1f0f757 ("clk: add gpio controlled
-> > > clock multiplexer") introduced in June in v4.3-rc2 - which raises the
-> > > question why _development_ work in clk is being merged outside of the
-> > > merge window.
-> > > 
-> > > A rewrite of this patch will be necessary to apply to v4.3 kernels.
-> > > 
-> > > This applies on top of v4.4-rc6.
-> > > 
-> > >  drivers/clk/clk-gpio.c | 23 ++++++++++++++---------
-> > >  1 file changed, 14 insertions(+), 9 deletions(-)
-> > > 
-> > > diff --git a/drivers/clk/clk-gpio.c b/drivers/clk/clk-gpio.c
-> > > index 335322dc403f..05cca9298f44 100644
-> > > --- a/drivers/clk/clk-gpio.c
-> > > +++ b/drivers/clk/clk-gpio.c
-> > > @@ -264,8 +264,8 @@ static struct clk *of_clk_gpio_gate_delayed_register_get(const char *name,
-> > >               const char * const *parent_names, u8 num_parents,
-> > >               unsigned gpio, bool active_low)
-> > >  {
-> > > -     return clk_register_gpio_gate(NULL, name, parent_names[0],
-> > > -                     gpio, active_low, 0);
-> > > +     return clk_register_gpio_gate(NULL, name, parent_names ?
-> > > +                     parent_names[0] : NULL, gpio, active_low, 0);
-> > >  }
-> > >  
-> > >  static struct clk *of_clk_gpio_mux_delayed_register_get(const char *name,
-> > > @@ -292,13 +292,18 @@ static void __init of_gpio_clk_setup(struct device_node *node,
-> > >               return;
-> > >  
-> > >       num_parents = of_clk_get_parent_count(node);
-> > > -
-> > > -     parent_names = kcalloc(num_parents, sizeof(char *), GFP_KERNEL);
-> > > -     if (!parent_names)
-> > > -             return;
-> > > -
-> > > -     for (i = 0; i < num_parents; i++)
-> > > -             parent_names[i] = of_clk_get_parent_name(node, i);
-> > > +     if (num_parents > 0) {
-> > > +             parent_names = kcalloc(num_parents, sizeof(char *), GFP_KERNEL);
-> > > +             if (!parent_names) {
-> > > +                     kfree(data);
-> > > +                     return;
-> > > +             }
-> > > +
-> > > +             for (i = 0; i < num_parents; i++)
-> > > +                     parent_names[i] = of_clk_get_parent_name(node, i);
-> > > +     } else {
-> > > +             parent_names = NULL;
-> > > +     }
-> > >  
-> > >       data->num_parents = num_parents;
-> > >       data->parent_names = parent_names;
-> > > -- 
-> > > 2.1.0
-> > 
-> > Yes, indeed, my patch above which fixed clk-gpio.c as can be seen above
-> > does not have the problem that I'm currently seeing...
-> 
-> Hi Russell,
-> 
-> I must be missing something. After merging your patch on top of Brian's,
-> the code looks like:
-> 
->         ...
->         int i, num_parents;
-> 
->         num_parents = of_clk_get_parent_count(node);
->         if (num_parents < 0)
->                 return;
-> 
->         data = kzalloc(sizeof(*data), GFP_KERNEL);
->         if (!data)
->                 return;
-> 
->         if (num_parents) {
->                 parent_names = kcalloc(num_parents, sizeof(char *), GFP_KERNEL);
->                 if (!parent_names) {
->                         kfree(data);
->                         return;
->                 }
-> 
->                 for (i = 0; i < num_parents; i++)
->                         parent_names[i] = of_clk_get_parent_name(node, i);
->         } else {
->                 parent_names = NULL;
->         }
-> 
-> Brian's if (num_parents < 0) check, followed by the if (num_parent)
-> check appear equivalent to your original patch. Not sure why I merged it
-> as if (num_parents) instead of if (num_parents > 0) as your original
-> patch uses, but thanks to the extra check that predates your patch it
-> should be equivalent.
-> 
-> Let me know if I've lost the plot.
+Hi Mark
 
-You have.  Read the commit log on my patch.  Then look at this code:
+? 17/02/2016 19:46, Mark Rutland ??:
+> On Wed, Feb 17, 2016 at 10:01:16AM +0800, jianqun.xu wrote:
+>> From: Xu Jianqun <jay.xu@rock-chips.com>
+>>
+>> Add dtsi file for Rockchip rk3399 SoCs, which includes some
+>> general nodes such as cpu, pmu, cru, gic, amba and so on.
+>>
+>> Change-Id: Ie3b824e8ead967d4cb119d73222b7a198478c29c
+>
+> This is meaningless upstream. Please remove any "Change-Id" lines from
+> upstream commit messages.
+ok, next version will remove them. thanks
 
-         num_parents = of_clk_get_parent_count(node);
-         if (num_parents < 0)
-                 return;
+>
+>> Signed-off-by: Xu Jianqun <jay.xu@rock-chips.com>
+>> ---
+>>   arch/arm64/boot/dts/rockchip/rk3399.dtsi | 989 +++++++++++++++++++++++++++++++
+>>   1 file changed, 989 insertions(+)
+>>   create mode 100644 arch/arm64/boot/dts/rockchip/rk3399.dtsi
+>>
+>> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+>> new file mode 100644
+>> index 0000000..eb671f6
+>> --- /dev/null
+>> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+>> @@ -0,0 +1,989 @@
+>> +/*
+>> + * Copyright (c) 2016 Fuzhou Rockchip Electronics Co., Ltd
+>> + *
+>> + * This file is dual-licensed: you can use it either under the terms
+>> + * of the GPL or the X11 license, at your option. Note that this dual
+>> + * licensing only applies to this file, and not this project as a
+>> + * whole.
+>> + *
+>> + *  a) This library is free software; you can redistribute it and/or
+>> + *     modify it under the terms of the GNU General Public License as
+>> + *     published by the Free Software Foundation; either version 2 of the
+>> + *     License, or (at your option) any later version.
+>> + *
+>> + *     This library is distributed in the hope that it will be useful,
+>> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + *     GNU General Public License for more details.
+>> + *
+>> + * Or, alternatively,
+>> + *
+>> + *  b) Permission is hereby granted, free of charge, to any person
+>> + *     obtaining a copy of this software and associated documentation
+>> + *     files (the "Software"), to deal in the Software without
+>> + *     restriction, including without limitation the rights to use,
+>> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+>> + *     sell copies of the Software, and to permit persons to whom the
+>> + *     Software is furnished to do so, subject to the following
+>> + *     conditions:
+>> + *
+>> + *     The above copyright notice and this permission notice shall be
+>> + *     included in all copies or substantial portions of the Software.
+>> + *
+>> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+>> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+>> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+>> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+>> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+>> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+>> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+>> + *     OTHER DEALINGS IN THE SOFTWARE.
+>> + */
+>> +#include <dt-bindings/clock/rk3399-cru.h>
+>> +#include <dt-bindings/gpio/gpio.h>
+>> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+>> +#include <dt-bindings/interrupt-controller/irq.h>
+>> +#include <dt-bindings/pinctrl/rockchip.h>
+>> +
+>> +/ {
+>> +	compatible = "rockchip,rk3399";
+>> +	interrupt-parent = <&gic>;
+>> +	#address-cells = <2>;
+>> +	#size-cells = <2>;
+>> +
+>> +	aliases {
+>> +		serial0 = &uart0;
+>> +		serial1 = &uart1;
+>> +		serial2 = &uart2;
+>> +		serial3 = &uart3;
+>> +	};
+>> +
+>> +	psci {
+>> +		compatible = "arm,psci";
+>> +		method = "smc";
+>> +	};
+>
+> That compatible string alone is insufficient, as it implies no
+> particular function IDs. Hotplug and idle cannot possibly work.
+>
+> Have you tested this DT?
+Yes, but only the simple system now, more function IDs will be added later.
 
-compared to mine:
+>
+> Which PSCI version have you implemented? Are you using a standard
+> firmware (e.g. ARM Trusted Firmware), or some custom implementation?
+>
+>> +		cpu_l0: cpu at 0 {
+>> +			device_type = "cpu";
+>> +			compatible = "arm,cortex-a53", "arm,armv8";
+>> +			reg = <0x0 0x0>;
+>> +			cpu-idle-states = <&cpu_sleep>;
+>> +			enable-method = "psci";
+>> +		};
+>
+>> +		cpu_b0: cpu at 100 {
+>> +			device_type = "cpu";
+>> +			compatible = "arm,cortex-a72", "arm,armv8";
+>> +			reg = <0x0 0x100>;
+>> +			cpu-idle-states = <&cpu_sleep>;
+>> +			enable-method = "psci";
+>> +		};
+>> +
+>
+>> +	pmu {
+>> +		compatible = "arm,armv8-pmuv3";
+>> +		interrupts = <GIC_PPI 7 IRQ_TYPE_LEVEL_LOW>;
+>> +		interrupt-affinity = <&cpu_l0>, <&cpu_l1>, <&cpu_l2>,
+>> +				     <&cpu_l3>, <&cpu_b0>, <&cpu_b1>;
+>> +	};
+>> +
+>
+> This isn't quite right. We should have separate nodes for the A72 and
+> A53 PMUs.
+>
+> We can't describe that just yet due to needing cluster-local PPIs. I
+> believe Will was looking into that.
+>
+> In the mean time, please drop the PMU node.
 
-         num_parents = of_clk_get_parent_count(node);
-         if (num_parents > 0) {
-                 parent_names = kcalloc(num_parents, sizeof(char *), ...
+ok, next version will drop the pmu node first, someone will add them in 
+another patch.
 
-It is very much _NOT_ equivalent.
+>
+>> +	timer {
+>> +		compatible = "arm,armv8-timer";
+>> +		interrupts =
+>> +			<GIC_PPI 13
+>> +			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
+>> +			<GIC_PPI 14
+>> +			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
+>> +			<GIC_PPI 11
+>> +			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
+>> +			<GIC_PPI 10
+>> +			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+>> +		clock-frequency = <24000000>;
+>> +	};
+>
+> Please fix your firmware to program CNTFRQ. Using clock-frequency is
+> really not sufficient, and new platforms have no excuse for not having
+> it programmed correctly.
+ok, I will fix it. thanks
 
-The big pointer here is this:
-* My patch works.
-* The code you have in mainline does not work.
-
-Therefore, they _can't_ be equivalent - because they have _visibly_
-different behaviours.  So, they are different.
-
-The former omits the _entire_ registration of the clock if
-of_clk_get_parent_count() returns a negative number.  Thus, no
-parent clocks, no clock gets registered.
-
-The whole point behind my patch was to restore the regression
-that occurred: the regression being that having no parent clocks
-used to be explicitly allowed, and the patch I mentioned in my
-commit message broke it.
-
-This is even explained in the very first sentence of my commit
-log:
-
-| When the clock DT property is not given, of_clk_get_parent_count()
-                                           ^^^^^^^^^^^^^^^^^^^^^^^^^
-| returns -ENOENT, which then tries to allocate -2 x 4 bytes of memory,
-  ^^^^^^^^^^^^^^^
-
--ENOENT is a negative number.  Now look at the patch which totally
-rejects the clock if of_clk_get_parent_count() returns any negative
-number...
-
-I assume, therefore, that you did not *even* read my commit log...
-
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+>
+> Thanks,
+> Mark.
+>
+>
+>
