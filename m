@@ -1,77 +1,45 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 18 Feb 2016 11:21:45 -0500 (EST)
-Subject: [PATCH 9/9] ARM: fix kprobe test with CONFIG_CPU_32v3
-In-Reply-To: <1455804123-2526139-10-git-send-email-arnd@arndb.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 18 Feb 2016 17:26:56 +0100
+Subject: [PATCH v2] ARM: atags_to_fdt: don't warn about stack size
+In-Reply-To: <alpine.LFD.2.20.1602181112310.13632@knanqh.ubzr>
 References: <1455804123-2526139-1-git-send-email-arnd@arndb.de>
- <1455804123-2526139-10-git-send-email-arnd@arndb.de>
-Message-ID: <alpine.LFD.2.20.1602181121170.13632@knanqh.ubzr>
+ <1455804123-2526139-6-git-send-email-arnd@arndb.de>
+ <alpine.LFD.2.20.1602181112310.13632@knanqh.ubzr>
+Message-ID: <7301172.5fH67MHlU9@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 18 Feb 2016, Arnd Bergmann wrote:
+The merge_fdt_bootargs() function by definition consumes more than 1024
+bytes of stack because it has a 1024 byte command line on the stack,
+meaning that we always get a warning when building this file:
 
-> ARMv3 did not have 16-bit load/store or 32-bit multiply instructions,
-> so building the kprobe test code fails with lots of warnings about
-> these:
-> 
-> /tmp/ccI4SKHx.s:19585: Error: selected processor does not support ARM mode `umull r0,r1,r2,r3'
-> /tmp/ccI4SKHx.s:19617: Error: selected processor does not support ARM mode `umullls r7,r8,r9,r10'
-> /tmp/ccI4SKHx.s:19645: Error: selected processor does not support ARM mode `umull lr,r12,r11,r13'
-> /tmp/ccI4SKHx.s:19727: Error: selected processor does not support ARM mode `umulls r0,r1,r2,r3'
-> ...
-> /tmp/ccI4SKHx.s:21273: Error: selected processor does not support ARM mode `strh r0,[r1,-r2]'
-> /tmp/ccI4SKHx.s:21309: Error: selected processor does not support ARM mode `streqh r14,[r11,r12]'
-> /tmp/ccI4SKHx.s:21333: Error: selected processor does not support ARM mode `streqh r14,[r13,r12]'
-> 
-> This puts all the affected instructions inside an #ifdef section,
-> like we do for the other architecture levels.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+arch/arm/boot/compressed/atags_to_fdt.c: In function 'merge_fdt_bootargs':
+arch/arm/boot/compressed/atags_to_fdt.c:98:1: warning: the frame size of 1032 bytes is larger than 1024 bytes [-Wframe-larger-than=]
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
+However, as this is the decompressor and we know that it has a very shallow
+call chain, and we do not actually risk overflowing the kernel stack
+at runtime here.
 
-> ---
->  arch/arm/probes/kprobes/test-arm.c | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/probes/kprobes/test-arm.c b/arch/arm/probes/kprobes/test-arm.c
-> index 8866aedfdea2..4e8511f0582d 100644
-> --- a/arch/arm/probes/kprobes/test-arm.c
-> +++ b/arch/arm/probes/kprobes/test-arm.c
-> @@ -391,6 +391,7 @@ void kprobe_arm_test_cases(void)
->  	TEST_UNSUPPORTED(__inst_arm(0xe0700090) " @ undef")
->  	TEST_UNSUPPORTED(__inst_arm(0xe07fff9f) " @ undef")
->  
-> +#if __LINUX_ARM_ARCH__ >= 4
->  	TEST_RR(  "umull	r0, r1, r",2, VAL1,", r",3, VAL2,"")
->  	TEST_RR(  "umullls	r7, r8, r",9, VAL2,", r",10, VAL1,"")
->  	TEST_R(   "umull	lr, r12, r",11,VAL3,", r13")
-> @@ -436,6 +437,7 @@ void kprobe_arm_test_cases(void)
->  	TEST_UNSUPPORTED(__inst_arm(0xe0f0f392) " @ smlals r0, pc, r2, r3")
->  	TEST_UNSUPPORTED(__inst_arm(0xe0f0139f) " @ smlals r0, r1, pc, r3")
->  	TEST_UNSUPPORTED(__inst_arm(0xe0f01f92) " @ smlals r0, r1, r2, pc")
-> +#endif
->  
->  	TEST_GROUP("Synchronization primitives")
->  
-> @@ -478,7 +480,7 @@ void kprobe_arm_test_cases(void)
->  	TEST_UNSUPPORTED("ldrexh	r2, [sp]")
->  #endif
->  	TEST_GROUP("Extra load/store instructions")
-> -
-> +#if __LINUX_ARM_ARCH__ >= 4
->  	TEST_RPR(  "strh	r",0, VAL1,", [r",1, 48,", -r",2, 24,"]")
->  	TEST_RPR(  "streqh	r",14,VAL2,", [r",11,0, ", r",12, 48,"]")
->  	TEST_UNSUPPORTED(  "streqh	r14, [r13, r12]")
-> @@ -560,6 +562,7 @@ void kprobe_arm_test_cases(void)
->  	TEST(      "ldrsh	r0, [pc, #0]")
->  	TEST_UNSUPPORTED(__inst_arm(0xe1ffc3f0) "	@ ldrsh r12, [pc, #48]!")
->  	TEST_UNSUPPORTED(__inst_arm(0xe0d9f3f0) "	@ ldrsh pc, [r9], #48")
-> +#endif
->  
->  #if __LINUX_ARM_ARCH__ >= 7
->  	TEST_UNSUPPORTED("strht	r1, [r2], r3")
-> -- 
-> 2.7.0
-> 
-> 
+This just shuts up the warning by slightly increasing the limit for this
+file.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+On Thursday 18 February 2016 11:13:52 Nicolas Pitre wrote:
+> What about setting the warning to 2048 instead?
+
+Sure, actually 1280 is more than enough I think.
+
+diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+index 7a6a58ef8aaf..2cc63038d6c8 100644
+--- a/arch/arm/boot/compressed/Makefile
++++ b/arch/arm/boot/compressed/Makefile
+@@ -85,6 +85,8 @@ $(addprefix $(obj)/,$(libfdt) $(libfdt_hdrs)): $(obj)/%: $(srctree)/scripts/dtc/
+ $(addprefix $(obj)/,$(libfdt_objs) atags_to_fdt.o): \
+ 	$(addprefix $(obj)/,$(libfdt_hdrs))
+ 
++CFLAGS_atags_to_fdt.o += -Wframe-larger-than=1280
++
+ ifeq ($(CONFIG_ARM_ATAG_DTB_COMPAT),y)
+ OBJS	+= $(libfdt_objs) atags_to_fdt.o
+ endif
