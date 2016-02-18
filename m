@@ -1,80 +1,49 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 18 Feb 2016 15:12:49 +0100
-Subject: [PATCH v2 02/13] iommu: exynos: add support for IOMMU_DOMAIN_DMA
- domain type
+Date: Thu, 18 Feb 2016 15:12:55 +0100
+Subject: [PATCH v2 08/13] iommu: exynos: unify code for fldp cache invalidation
 In-Reply-To: <1455804780-9616-1-git-send-email-m.szyprowski@samsung.com>
 References: <1455804780-9616-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1455804780-9616-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1455804780-9616-9-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for DMA domain type. Such domain have DMA cookie
-prepared and can be used by generic DMA-IOMMU glue layer.
+This patch simplifies the code for handling of flpdcache invalidation.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/iommu/exynos-iommu.c | 19 +++++++++++++++----
- 1 file changed, 15 insertions(+), 4 deletions(-)
+ drivers/iommu/exynos-iommu.c | 13 ++++---------
+ 1 file changed, 4 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index 4fc079073c86..595e0da55db4 100644
+index 15787a177a16..e42a76cc9674 100644
 --- a/drivers/iommu/exynos-iommu.c
 +++ b/drivers/iommu/exynos-iommu.c
-@@ -25,9 +25,9 @@
- #include <linux/platform_device.h>
- #include <linux/pm_runtime.h>
- #include <linux/slab.h>
-+#include <linux/dma-iommu.h>
+@@ -440,13 +440,6 @@ static int __sysmmu_enable(struct sysmmu_drvdata *data, phys_addr_t pgtable,
+ 	return ret;
+ }
  
- #include <asm/cacheflush.h>
--#include <asm/dma-iommu.h>
- #include <asm/pgtable.h>
+-static void __sysmmu_tlb_invalidate_flpdcache(struct sysmmu_drvdata *data,
+-					      sysmmu_iova_t iova)
+-{
+-	if (data->version == MAKE_MMU_VER(3, 3))
+-		__raw_writel(iova | 0x1, data->sfrbase + REG_MMU_FLUSH_ENTRY);
+-}
+-
+ static void sysmmu_tlb_invalidate_flpdcache(struct sysmmu_drvdata *data,
+ 					    sysmmu_iova_t iova)
+ {
+@@ -455,8 +448,10 @@ static void sysmmu_tlb_invalidate_flpdcache(struct sysmmu_drvdata *data,
+ 	clk_enable(data->clk_master);
  
- typedef u32 sysmmu_iova_t;
-@@ -662,16 +662,21 @@ static struct iommu_domain *exynos_iommu_domain_alloc(unsigned type)
- 	struct exynos_iommu_domain *domain;
- 	int i;
- 
--	if (type != IOMMU_DOMAIN_UNMANAGED)
--		return NULL;
- 
- 	domain = kzalloc(sizeof(*domain), GFP_KERNEL);
- 	if (!domain)
- 		return NULL;
- 
-+	if (type == IOMMU_DOMAIN_DMA) {
-+		if (iommu_get_dma_cookie(&domain->domain) != 0)
-+			goto err_pgtable;
-+	} else if (type != IOMMU_DOMAIN_UNMANAGED) {
-+		goto err_pgtable;
+ 	spin_lock_irqsave(&data->lock, flags);
+-	if (is_sysmmu_active(data))
+-		__sysmmu_tlb_invalidate_flpdcache(data, iova);
++	if (is_sysmmu_active(data)) {
++		if (data->version >= MAKE_MMU_VER(3, 3))
++			__sysmmu_tlb_invalidate_entry(data, iova, 1);
 +	}
-+
- 	domain->pgtable = (sysmmu_pte_t *)__get_free_pages(GFP_KERNEL, 2);
- 	if (!domain->pgtable)
--		goto err_pgtable;
-+		goto err_dma_cookie;
+ 	spin_unlock_irqrestore(&data->lock, flags);
  
- 	domain->lv2entcnt = (short *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, 1);
- 	if (!domain->lv2entcnt)
-@@ -703,6 +708,9 @@ static struct iommu_domain *exynos_iommu_domain_alloc(unsigned type)
- 
- err_counter:
- 	free_pages((unsigned long)domain->pgtable, 2);
-+err_dma_cookie:
-+	if (type == IOMMU_DOMAIN_DMA)
-+		iommu_put_dma_cookie(&domain->domain);
- err_pgtable:
- 	kfree(domain);
- 	return NULL;
-@@ -727,6 +735,9 @@ static void exynos_iommu_domain_free(struct iommu_domain *iommu_domain)
- 
- 	spin_unlock_irqrestore(&domain->lock, flags);
- 
-+	if (iommu_domain->type == IOMMU_DOMAIN_DMA)
-+		iommu_put_dma_cookie(iommu_domain);
-+
- 	for (i = 0; i < NUM_LV1ENTRIES; i++)
- 		if (lv1ent_page(domain->pgtable + i))
- 			kmem_cache_free(lv2table_kmem_cache,
+ 	clk_disable(data->clk_master);
 -- 
 1.9.2
