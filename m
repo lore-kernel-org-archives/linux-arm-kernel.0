@@ -1,70 +1,73 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 18 Feb 2016 08:38:08 -0600
-Subject: [PATCH v5 1/1] USB: core: let USB device know device node
-In-Reply-To: <1455612172-2081-1-git-send-email-peter.chen@nxp.com>
-References: <1455612172-2081-1-git-send-email-peter.chen@nxp.com>
-Message-ID: <20160218143808.GY9654@rob-hp-laptop>
+Date: Thu, 18 Feb 2016 08:38:15 -0600
+Subject: [PATCH 3/5] dt-bindings: phy: bindings document for common
+ Broadcom SATA3 PHY driver
+In-Reply-To: <1455604420-11300-4-git-send-email-anup.patel@broadcom.com>
+References: <1455604420-11300-1-git-send-email-anup.patel@broadcom.com>
+ <1455604420-11300-4-git-send-email-anup.patel@broadcom.com>
+Message-ID: <20160218143815.GZ9654@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 16, 2016 at 04:42:52PM +0800, Peter Chen wrote:
-> From: Peter Chen <peter.chen@freescale.com>
+On Tue, Feb 16, 2016 at 12:03:38PM +0530, Anup Patel wrote:
+> This patch:
+> 1. Renames DT bindings document of Broadcom STB SATA3 PHY driver to
+> common Broadcom SATA3 PHY driver bindings document
+> 2. Adds bindings info for NS2 SATA3 PHY
 > 
-> Although most of USB devices are hot-plug's, there are still some devices
-> are hard wired on the board, eg, for HSIC and SSIC interface USB devices.
-> If these kinds of USB devices are multiple functions, and they can supply
-> other interfaces like i2c, gpios for other devices, we may need to
-> describe these at device tree.
-> 
-> In this commit, it uses "reg" in dts as physical port number to match
-> the phyiscal port number decided by USB core, if they are the same,
-> then the device node is for the device we are creating for USB core.
-> 
-> Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
 > ---
-> Changes for v5:
-> - Refine the code how to get the device node at usb_alloc_dev according
->   to Alan's comment.
-> - Point out "usbVID,PID" is the recommented compatible, and others
->   compatibles at binding doc could also be used.
+>  .../phy/{brcm,brcmstb-sata-phy.txt => brcm-sata-phy.txt}  | 15 +++++++++------
+>  1 file changed, 9 insertions(+), 6 deletions(-)
+>  rename Documentation/devicetree/bindings/phy/{brcm,brcmstb-sata-phy.txt => brcm-sata-phy.txt} (69%)
 > 
-> Changes for v4:
-> - The range of "reg" should be 1-31, changing device node address
->   style as in lower case hexadecimal with leading zeroes suppressed
->   [binding doc, usb-device.txt]
-> - Improve the example at binding doc, it describes node from the top
->   (the controller)
-> - Delete the struct of_node * within struct usb_device
-> - Using usb_hcd_find_raw_port_number to get raw port number under root
->   hub port
-> 
-> Changes for v3:
-> - typo: s/descirbe/describe/
-> 
-> Changes for v2:
-> - Fix build error reported by kbuild robot, lack of "static" for
->   inline usb_of_get_child_node
-> - Fix typo, "devcie_node" -> "device_node"
-> - Add kernel-doc for of_node at struct usb_device
-> 
-> Changes from RFC:
-> - Fix the error address for binding doc, and add compatible for binding doc
-> - Change get child node API from "usb_of_find_node" to
->   "usb_of_get_child_node"
-> - Delete unecessary header files
-> - One typo
-> 
->  .../devicetree/bindings/usb/usb-device.txt         | 26 ++++++++++++
+> diff --git a/Documentation/devicetree/bindings/phy/brcm,brcmstb-sata-phy.txt b/Documentation/devicetree/bindings/phy/brcm-sata-phy.txt
+> similarity index 69%
+> rename from Documentation/devicetree/bindings/phy/brcm,brcmstb-sata-phy.txt
+> rename to Documentation/devicetree/bindings/phy/brcm-sata-phy.txt
+> index d87ab7c..d023120 100644
+> --- a/Documentation/devicetree/bindings/phy/brcm,brcmstb-sata-phy.txt
+> +++ b/Documentation/devicetree/bindings/phy/brcm-sata-phy.txt
+> @@ -1,14 +1,17 @@
+> -* Broadcom SATA3 PHY for STB
+> +* Broadcom SATA3 PHY
+>  
+>  Required properties:
+>  - compatible: should be one or more of
+>       "brcm,bcm7425-sata-phy"
+>       "brcm,bcm7445-sata-phy"
+> +     "brcm,iproc-ns2-sata-phy"
+>       "brcm,phy-sata3"
+>  - address-cells: should be 1
+>  - size-cells: should be 0
+> -- reg: register range for the PHY PCB interface
+> -- reg-names: should be "phy"
+> +- reg: register ranges for the PHY PCB interface
+> +- reg-names: should be "phy" and "phy-ctrl"
+> +     The "phy-ctrl" registers are only required for
+> +     "brcm,iproc-ns2-sata-phy".
+>  
+>  Sub-nodes:
+>    Each port's PHY should be represented as a sub-node.
+> @@ -16,12 +19,12 @@ Sub-nodes:
+>  Sub-nodes required properties:
+>  - reg: the PHY number
+>  - phy-cells: generic PHY binding; must be 0
+> -Optional:
+> -- brcm,enable-ssc: use spread spectrum clocking (SSC) on this port
+>  
+> +Sub-nodes optional properties:
+> +- brcm,enable-ssc: use spread spectrum clocking (SSC) on this port
+> +     This property is not applicable for "brcm,iproc-ns2-sata-phy".
 
-Looks good to me. Thanks for driving this to completion.
+My understanding of SSC is it is required for hosts and optional for 
+drives to support (from first hand experience of a host not enabling). 
+Not setting this is would not be compliant. The polarity on this is 
+somewhat backwards too as the common case should be no property.
+
+Anyway, that's all besides the point of your change. I assume it doesn't 
+apply here for you because it is always enabled. 
 
 Acked-by: Rob Herring <robh@kernel.org>
 
->  drivers/usb/core/Makefile                          |  2 +-
->  drivers/usb/core/of.c                              | 47 ++++++++++++++++++++++
->  drivers/usb/core/usb.c                             | 10 +++++
->  include/linux/usb/of.h                             |  7 ++++
->  5 files changed, 91 insertions(+), 1 deletion(-)
->  create mode 100644 Documentation/devicetree/bindings/usb/usb-device.txt
->  create mode 100644 drivers/usb/core/of.c
-> 
+Rob
