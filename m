@@ -1,49 +1,53 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 18 Feb 2016 11:15:32 -0500 (EST)
-Subject: [PATCH 6/9] ARM: uaccess: avoid warning for NOMMU in access_ok
-In-Reply-To: <1455804123-2526139-7-git-send-email-arnd@arndb.de>
-References: <1455804123-2526139-1-git-send-email-arnd@arndb.de>
- <1455804123-2526139-7-git-send-email-arnd@arndb.de>
-Message-ID: <alpine.LFD.2.20.1602181115040.13632@knanqh.ubzr>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 18 Feb 2016 17:16:23 +0100
+Subject: [PATCH v2] irqchip: irq-mvebu-odmi: new driver for platform MSI
+ on Marvell 7K/8K
+In-Reply-To: <3923904.c50oLNXXZ1@wuerfel>
+References: <1455811134-3679-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <3923904.c50oLNXXZ1@wuerfel>
+Message-ID: <20160218171623.664dabd1@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 18 Feb 2016, Arnd Bergmann wrote:
+Arnd,
 
-> When CONFIG_MMU is disabled, the access_ok() and __range_ok()
-> macros always return success, and there is a cast to void
-> to ensure the compiler does not warn about an unused address
-> variable. However, at least one driver has a variable for
-> the size argument as well and does warn about that one:
+On Thu, 18 Feb 2016 17:08:05 +0100, Arnd Bergmann wrote:
+> On Thursday 18 February 2016 16:58:54 Thomas Petazzoni wrote:
+> > +- marvell,spi-base     : List of GIC base SPI interrupts, one for each
+> > +                         ODMI frame. Those SPI interrupts are 0-based,
+> > +                         i.e marvell,spi-base = <128> will use SPI #96.
+> > +                         See Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt
+> > +                         for details about the GIC Device Tree binding.
+> > 
 > 
-> drivers/vhost/vhost.c: In function 'vq_access_ok':
-> drivers/vhost/vhost.c:633:9: warning: unused variable 's' [-Wunused-variable]
-> 
-> This changes the macro to also ignore the size argument
-> explicitly to shut up that warning.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Why are these not just in an 'interrupts' property as we do for other
+> nested irqchips?
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
+I modeled this after the GICv2m bindings. I think the reason is that if
+we were to use the interrupts property, we should be listing *all*
+interrupts of the parent interrupt controller we are using. Which would
+be quite painful when your ODMI interrupt controller uses 32 interrupts
+of the parent controller (I think for the GICv2m, it's even more).
 
-> ---
->  arch/arm/include/asm/uaccess.h | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
-> index 35c9db857ebe..9c74c84a10d2 100644
-> --- a/arch/arm/include/asm/uaccess.h
-> +++ b/arch/arm/include/asm/uaccess.h
-> @@ -290,7 +290,7 @@ extern int __put_user_8(void *, unsigned long long);
->  
->  #define segment_eq(a, b)		(1)
->  #define __addr_ok(addr)		((void)(addr), 1)
-> -#define __range_ok(addr, size)	((void)(addr), 0)
-> +#define __range_ok(addr, size)	((void)(addr), (void)(size), 0)
->  #define get_fs()		(KERNEL_DS)
->  
->  static inline void set_fs(mm_segment_t fs)
-> -- 
-> 2.7.0
-> 
-> 
+I.e, we currently say:
+
+	marvell,spi-base = <128>, <136>, <144>, <152>
+
+but in fact we are using 128, 129, 130, 131, 132, 133, 134, 135, 136,
+137, etc. until 159.
+
+If you think
+
+	interrupts = <128>, <136>, <144>, <152>
+
+is still correct, then why not. But I believe this might be confusing,
+as people will think that we are only using interrupts 128, 136, 144
+and 152, and not 129, 133, 147 or 158.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
