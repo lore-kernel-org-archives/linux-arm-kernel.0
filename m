@@ -1,53 +1,53 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 18 Feb 2016 17:16:23 +0100
-Subject: [PATCH v2] irqchip: irq-mvebu-odmi: new driver for platform MSI
- on Marvell 7K/8K
-In-Reply-To: <3923904.c50oLNXXZ1@wuerfel>
-References: <1455811134-3679-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <3923904.c50oLNXXZ1@wuerfel>
-Message-ID: <20160218171623.664dabd1@free-electrons.com>
+From: stuart.yoder@nxp.com (Stuart Yoder)
+Date: Thu, 18 Feb 2016 16:16:26 +0000
+Subject: RFC: extend IOMMU attributes
+Message-ID: <HE1PR04MB1641F22E38710B68F4ED891F8DAF0@HE1PR04MB1641.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd,
+Hi Joerg and Will,
 
-On Thu, 18 Feb 2016 17:08:05 +0100, Arnd Bergmann wrote:
-> On Thursday 18 February 2016 16:58:54 Thomas Petazzoni wrote:
-> > +- marvell,spi-base     : List of GIC base SPI interrupts, one for each
-> > +                         ODMI frame. Those SPI interrupts are 0-based,
-> > +                         i.e marvell,spi-base = <128> will use SPI #96.
-> > +                         See Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt
-> > +                         for details about the GIC Device Tree binding.
-> > 
-> 
-> Why are these not just in an 'interrupts' property as we do for other
-> nested irqchips?
+We are implementing support for some specialized NXP SoC network
+devices and have the desire to extend the mapping attributes beyond
+those currently in iommu.h. (I see there is a recent proposal to
+add an IOMMU_MMIO flag)
 
-I modeled this after the GICv2m bindings. I think the reason is that if
-we were to use the interrupts property, we should be listing *all*
-interrupts of the parent interrupt controller we are using. Which would
-be quite painful when your ODMI interrupt controller uses 32 interrupts
-of the parent controller (I think for the GICv2m, it's even more).
+What we have right now in Linux is a least-common-denominator set of
+attributes, while for the ARM SMMU there is a much richer set of
+attributes that seem useful to support. Specifically, we have one
+SoC device we're dealing with right now that is the target of DMA
+that functionally requires a "cacheable, non-shareable" attribute
+in its SMMU mapping.
 
-I.e, we currently say:
+In addition, there are many other attributes such as r/w allocate
+hints, transient hints, write-back/write-thru, etc in the SMMU.
 
-	marvell,spi-base = <128>, <136>, <144>, <152>
+We wanted to see what your thinking is with respect to the
+direction the Linux IOMMU layer will head over the longer term with
+respect to attributes.
 
-but in fact we are using 128, 129, 130, 131, 132, 133, 134, 135, 136,
-137, etc. until 159.
+Is there anything problematic with continuing to grow the
+attributes in iommu.h?...e.g.:
 
-If you think
+ #define IOMMU_READ            (1 << 0)
+ #define IOMMU_WRITE           (1 << 1)
+-#define IOMMU_CACHE           (1 << 2) /* DMA cache coherency */
++#define IOMMU_CACHE_COHERENT  (1 << 2) /* cacheable and coherent */
+ #define IOMMU_NOEXEC          (1 << 3)
+ #define IOMMU_MMIO            (1 << 4) /* e.g. things like MSI doorbells */
++#define IOMMU_CACHEABLE       (1 << 5) /* cacheable, not coherent */
++#define IOMMU_CACHE_ALLOCATE  (1 << 6) /* hint to allocate in the cache */
 
-	interrupts = <128>, <136>, <144>, <152>
+Also, are we willing to let somewhat architecture specific flags
+onto that list?  For, example the ARM 'transient' hint.
 
-is still correct, then why not. But I believe this might be confusing,
-as people will think that we are only using interrupts 128, 136, 144
-and 152, and not 129, 133, 147 or 158.
+Another potential direction would be to provide some approach
+where IOMMU PTE attributes could be somehow derived from a
+corresponding MMU PTE in an arch-specific manner and the IOMMU
+API itself would not have to explicitly define all possible
+attributes.
 
-Best regards,
+Thoughts?
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Thanks,
+Stuart
