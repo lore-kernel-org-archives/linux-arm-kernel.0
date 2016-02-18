@@ -1,79 +1,71 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Thu, 18 Feb 2016 11:13:06 +0000
-Subject: [PATCH v3 09/10] ARM: dts: introduce MPS2 AN385/AN386
-In-Reply-To: <7245560.jfhuhtPsB8@wuerfel>
-References: <1455617295-23736-1-git-send-email-vladimir.murzin@arm.com>
- <7272921.u1gphgWzUn@wuerfel> <56C598D9.3030001@arm.com>
- <7245560.jfhuhtPsB8@wuerfel>
-Message-ID: <56C5A742.8010304@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 18 Feb 2016 11:15:16 +0000
+Subject: KASAN issues with idle / hotplug area
+In-Reply-To: <56C57F40.3050500@virtuozzo.com>
+References: <56BDFC86.5010705@arm.com>
+ <20160212160652.GL31665@e104818-lin.cambridge.arm.com>
+ <56C1E072.2090909@virtuozzo.com>
+ <20160215185957.GB19413@e104818-lin.cambridge.arm.com>
+ <56C31D1D.50708@virtuozzo.com> <20160217143950.GC32647@leverpostej>
+ <20160217170110.GE32647@leverpostej>
+ <20160217175656.GJ32647@leverpostej>
+ <20160217191643.GK32647@leverpostej>
+ <56C57F40.3050500@virtuozzo.com>
+Message-ID: <20160218111516.GM32647@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/02/16 10:45, Arnd Bergmann wrote:
-> On Thursday 18 February 2016 10:11:37 Vladimir Murzin wrote:
->>
->> Right, I thought in a wrong way, in opposite it makes more sense now.
->>
->> .dtsi
->>
->> /* below the soc/ */
->> smb {
->>         compatible = "simple-bus";
->>         #address-cells = <2>;
->>         #size-cells = <1>;
->>         ranges = <0 0 0x40200000 0x10000>,
->>                  <1 0 0xa0000000 0x10000>;
->> };
+On Thu, Feb 18, 2016 at 11:22:24AM +0300, Andrey Ryabinin wrote:
 > 
-> That looks good, yes.
+> On 02/17/2016 10:16 PM, Mark Rutland wrote:
+> > Looking at the assembly, functions seem to get instrumented regardless
+> > of the __no_sanitize_address annotation. The assembly of
+> > __invoke_psci_fn_{smc,hvc} look identical, even if one has the
+> > annotation and one does not.
+> > 
+> > In the case below, it looks like __invoke_psci_fn_hvc is storing to the
+> > shadow area even though it's anotated with __no_sanitize_address.  Note
+> > that the adrp symbol resolution is bogus; psci_to_linux_errno happens to
+> > be at offset 0 in the as-yet unlinked psci.o object.
+> > 
 > 
-> Is 0x10000 the correct maximum addressable size of the external bus
-> in both cases?
-> 
-> Intuitively, I would guess that the 0xa0000000 range might
-> be much wider.
+> ...
+> > I also tried using __attribute__((no_sanitize_address)) directly, in
+> > case there was some header issue, but that doesn't seem to be the case.
+> > 
+> > I'm using the Linaro 15.08 AArch64 GCC 5.1. Is anyone else able to
+> > confirm whether they see the same? Does the same happen for x86?
+>
+> Confirming, this happens on every GCC I have (including x86).
+> It seems that 'no_sanitize_address' in gcc removes only memory access checks
+> but it doesn't remove stack redzones.
+> I think this is wrong, e.g. clang removes instrumentation completely. I'll submit a bug.
 
-There is only Ethernet connected to this bus (apart from PSRAM), so it
-might be wider, but there is no indication of this in documentation.
+Ok.
 
-> 
->> .dts
->>
->> smb {
->>         ethernet at 0,0 {
->>                 compatible = "smsc,lan9220", "smsc,lan9115";
->>                 reg = <0 0x0 0x10000>;
->>                 interrupts = <13>;
->>                 interrupt-parent = <&nvic>;
->>                 smsc,irq-active-high;
->> };
->>
->>
->> and looking again at .dtsi it seems to me that fpgaio should be moved
->> below the soc/ under separate bus interface which would hosts audio and
->> spi too or I keep missing things around device-tree?
->>
-> 
-> I don't see the audio and spi nodes, so I'm not sure where exactly
-> you would put them.
+Unless there's some clever trickery that we can employ, the above
+renders the Linux __no_sanitize_address annotation useless for this
+style of code.
 
-I just keep things simple ;)
+We should certianly call that out in the commentary in
+include/linux/compiler-gcc.h.
 
-> 
-> Ideally those things should be visible from a block diagram in the
-> datasheet.
+> But we need fix this in kernel.
+> I see two options here:
+>  * completely disable instrumentation for drivers/firmware/psci.c
 
-Indeed, block diagram indicates all them as a "FPGA APB subsystem" and
-clearly draws a line indicating a bus those devices are connected to.
-After your point about lan9220, it looks clearer to me to express that
-subsystem outside of soc/ node indicating bus interface, so it would
-match to those drawings closely.
+This is somewhat overkill, and we'd also have to disable instrumentation
+for arch/arm64/kernel/psci.c (for psci_suspend_finisher).
 
-Cheers
-Vladimir
+I would like to have instrumentation for everything we can safely
+instrument.
 
-> 
-> 	Arnd
-> 
-> 
-> 
+This is probably the least worst option, though.
+
+>  * get back to assembly implementation
+
+We'd also have to convert psci_suspend_finisher and psci_cpu_suspend,
+the latter being generic code. That goes against the consolidation we
+were aiming for.
+
+Mark.
