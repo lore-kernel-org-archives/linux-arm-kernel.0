@@ -1,39 +1,30 @@
-From: Chris.Brandt@renesas.com (Chris Brandt)
-Date: Thu, 18 Feb 2016 19:42:20 +0000
-Subject: [PATCH] ARM: Allow MULTIPLATFORM to select XIP
-In-Reply-To: <alpine.LFD.2.20.1602181327060.13632@knanqh.ubzr>
-References: <1455816310-11308-1-git-send-email-chris.brandt@renesas.com>
- <alpine.LFD.2.20.1602181244490.13632@knanqh.ubzr>
- <HK2PR06MB0561377EABB3B4B8E94F22328AAF0@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <alpine.LFD.2.20.1602181327060.13632@knanqh.ubzr>
-Message-ID: <HK2PR06MB0561C0EEA846C516645239338AAF0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+From: k@japko.eu (Krzysztof Adamski)
+Date: Thu, 18 Feb 2016 20:42:56 +0100
+Subject: [linux-sunxi] Re: [PATCH] clk: sunxi: Add missing H3 apb0 clock
+ documentation
+In-Reply-To: <CAGb2v67PiQHVQfhbsk2f3aQFOaDXHy3P+NJDoTw-+GshubWaYQ@mail.gmail.com>
+References: <CACRpkdbfNeh7_=3ReQtJc7OxkkQEn+BUhZ0O0SKnFsRD=WZiUQ@mail.gmail.com>
+ <1455807809-30827-1-git-send-email-k@japko.eu>
+ <CAGb2v67PiQHVQfhbsk2f3aQFOaDXHy3P+NJDoTw-+GshubWaYQ@mail.gmail.com>
+Message-ID: <20160218194255.GD18745@box2.japko.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 18 Feb 2016, Nicolas Pitre wrote:
-
-> > Is there some way you can do a PLATFORM_COUNTER++ for each device that 
-> > is selected, and then XIP_KERNEL would depend on PLATFORM_COUNTER == 1 
-> > ?
+On Thu, Feb 18, 2016 at 09:07:16AM -0800, Chen-Yu Tsai wrote:
+>On Thu, Feb 18, 2016 at 7:03 AM, Krzysztof Adamski
+><krzysztof.adamski@tieto.com> wrote:
+>> allwinner,sun8i-h3-apb0-gates-clk was added by
+>> commit ba83a11104ae ("pinctrl: sunxi: Add H3 R_PIO controller support")
+>> but the patch was missing proper binding documentation. This patch fixes
+>> this issue.
 >
-> I don't know all the Kconfig possibilities.
->
-> But would something like this work?
->
-> config FOO
->	depends on !(XIP && CHOICE_MADE)
->	select CHOICE_MADE
+>What are you talking about? The commit you mentioned only adds the pinctrl
+>driver. Your H3 PRCM related clock and reset patches are still pending.
+>No need for this patch as your earlier patches includes this.
 
-I follow your logic and that might work: If you made multiple choices, it would just take the first one.
+Damn, I messed up patches, I must have been tired or something. It was 
+documentation for "allwinner,sun8i-h3-r-pinctrl" that was missing. I'm 
+sending a new patch. Sorry for confusion.
 
-However...I just tried it and it crashes.
-
-scripts/kconfig/mconf  Kconfig
-make[2]: *** [menuconfig] Segmentation fault (core dumped)
-make[1]: *** [menuconfig] Error 2
-
-
-It looks like you can't depend on something not being set that you are going to set yourself. Basically..."do as I say, not as I do"
-
-
-Chris
+Best regards,
+Krzysztof Adamski
