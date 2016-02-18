@@ -1,52 +1,46 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 18 Feb 2016 13:16:05 +0100
-Subject: [PATCH v2 1/2] efi: esrt: use memremap not ioremap to access ESRT
- table in memory
-In-Reply-To: <20160218104407.GC2651@codeblueprint.co.uk>
-References: <1455535953-5056-1-git-send-email-ard.biesheuvel@linaro.org>
- <1455535953-5056-2-git-send-email-ard.biesheuvel@linaro.org>
- <20160218104407.GC2651@codeblueprint.co.uk>
-Message-ID: <CAKv+Gu_AW7PKJJOd2mbEu3LKJe+gNaPHnH=sgO=YXM_KWFyKxw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 18 Feb 2016 13:16:28 +0100
+Subject: [PATCH v3 09/10] ARM: dts: introduce MPS2 AN385/AN386
+In-Reply-To: <56C5A742.8010304@arm.com>
+References: <1455617295-23736-1-git-send-email-vladimir.murzin@arm.com>
+ <7245560.jfhuhtPsB8@wuerfel> <56C5A742.8010304@arm.com>
+Message-ID: <5567140.dIBhKTnriP@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 February 2016 at 11:44, Matt Fleming <matt@codeblueprint.co.uk> wrote:
-> On Mon, 15 Feb, at 12:32:32PM, Ard Biesheuvel wrote:
->> On ARM and arm64, ioremap() and memremap() are not interchangeable like
->> on x86, and the use of ioremap() on ordinary RAM is typically flagged
->> as an error if the memory region being mapped is also covered by the
->> linear mapping, since that would lead to aliases with conflicting
->> cacheability attributes.
->>
->> Since what we are dealing with is not an I/O region with side effects,
->> using ioremap() here is arguably incorrect anyway, so let's replace
->> it with memremap instead. Also add a missing unmap on the success path,
->> and drop a memblock_remove() call which does not belong here, this far
->> into the boot sequence.
->>
->> Cc: Peter Jones <pjones@redhat.com>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  drivers/firmware/efi/esrt.c | 16 ++++++++--------
->>  1 file changed, 8 insertions(+), 8 deletions(-)
->>
->
-> [...]
->
->> @@ -432,8 +434,6 @@ static int __init esrt_sysfs_init(void)
->>       if (error)
->>               goto err_cleanup_list;
->>
->> -     memblock_remove(esrt_data, esrt_data_size);
->> -
->>       pr_debug("esrt-sysfs: loaded.\n");
->>
->>       return 0;
->
-> Shouldn't we be replacing memblock_remove() with free_bootmem_late()?
-> The original ESRT region is still reserved at this point, so we should
-> do our best to release it to the page allocator.
+On Thursday 18 February 2016 11:13:06 Vladimir Murzin wrote:
+> On 18/02/16 10:45, Arnd Bergmann wrote:
+> > On Thursday 18 February 2016 10:11:37 Vladimir Murzin wrote:
+> >>
+> >> Right, I thought in a wrong way, in opposite it makes more sense now.
+> >>
+> >> .dtsi
+> >>
+> >> /* below the soc/ */
+> >> smb {
+> >>         compatible = "simple-bus";
+> >>         #address-cells = <2>;
+> >>         #size-cells = <1>;
+> >>         ranges = <0 0 0x40200000 0x10000>,
+> >>                  <1 0 0xa0000000 0x10000>;
+> >> };
+> > 
+> > That looks good, yes.
+> > 
+> > Is 0x10000 the correct maximum addressable size of the external bus
+> > in both cases?
+> > 
+> > Intuitively, I would guess that the 0xa0000000 range might
+> > be much wider.
+> 
+> There is only Ethernet connected to this bus (apart from PSRAM), so it
+> might be wider, but there is no indication of this in documentation.
 
-I'd rather we keep it reserved. That way, the config table entry still
-points to something valid, which could be useful for kexec(), I think?
-At least, that is how I intended to handle config tables on ARM ...
+I see this called "ahb_to_extmem16" in the documentation, which indicates
+that it might be use 16 bits of address space, which would match
+the 64K you listed.
+
+For SSRAM1 / SSRAM2 / SSRAM3, a 8 MB address space is mentioned
+and 16 MB for external PSRAM at 0x21000000.
+
+	Arnd
