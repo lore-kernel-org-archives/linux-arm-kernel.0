@@ -1,136 +1,117 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 18 Feb 2016 08:36:17 -0600
-Subject: [PATCH v2 1/3] input: cygnus-update touchscreen dt node document
-In-Reply-To: <1455702226-20599-2-git-send-email-raveendra.padasalagi@broadcom.com>
-References: <1455702226-20599-1-git-send-email-raveendra.padasalagi@broadcom.com>
- <1455702226-20599-2-git-send-email-raveendra.padasalagi@broadcom.com>
-Message-ID: <20160218143617.GH9654@rob-hp-laptop>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 18 Feb 2016 15:21:25 +0100
+Subject: [PATCH v2 1/2] efi: esrt: use memremap not ioremap to access ESRT
+ table in memory
+In-Reply-To: <20160218141544.GH2651@codeblueprint.co.uk>
+References: <1455535953-5056-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1455535953-5056-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20160218104407.GC2651@codeblueprint.co.uk>
+ <CAKv+Gu_AW7PKJJOd2mbEu3LKJe+gNaPHnH=sgO=YXM_KWFyKxw@mail.gmail.com>
+ <20160218132824.GE2651@codeblueprint.co.uk>
+ <CAKv+Gu-s1pzYBzuDG-Z7s3gyo8dPOfeidZQ+rim-uAWZCBcKQQ@mail.gmail.com>
+ <20160218134324.GG2651@codeblueprint.co.uk>
+ <CAKv+Gu875r9RkDC723kNsG4XC0eSE9RPPmSFZrD0sx0QxS+V4g@mail.gmail.com>
+ <20160218141544.GH2651@codeblueprint.co.uk>
+Message-ID: <CAKv+Gu8RP21vw1Ht7UtkHsen2GMUNx8DikH-hLaezV+uZvWO-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 17, 2016 at 03:13:44PM +0530, Raveendra Padasalagi wrote:
-> In Cygnus SOC touch screen controller registers are shared
-> with ADC and flex timer. Using readl/writel could lead to
-> race condition. So touch screen driver is enhanced to support
-> 
-> 1. If touchscreen register's are not shared. Register access
-> is handled through readl/writel if "brcm,iproc-touchscreen"
-> compatible is provided in touchscreen dt node. This will help
-> for future SOC's if comes with dedicated touchscreen IP register's.
-> 
-> 2. If touchscreen register's are shared with other IP's, register
-> access is handled through syscon framework API's to take care of
-> mutually exclusive access. This feature can be enabled by selecting
-> "brcm,iproc-touchscreen-syscon" compatible string in the touchscreen
-> dt node.
-> 
-> Hence touchscreen dt node bindings document is updated to take care
-> of above changes in the touchscreen driver.
-> 
-> Signed-off-by: Raveendra Padasalagi <raveendra.padasalagi@broadcom.com>
-> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
-> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
-> ---
->  .../input/touchscreen/brcm,iproc-touchscreen.txt   | 57 +++++++++++++++++++---
->  1 file changed, 51 insertions(+), 6 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/input/touchscreen/brcm,iproc-touchscreen.txt b/Documentation/devicetree/bindings/input/touchscreen/brcm,iproc-touchscreen.txt
-> index 34e3382..f530c25 100644
-> --- a/Documentation/devicetree/bindings/input/touchscreen/brcm,iproc-touchscreen.txt
-> +++ b/Documentation/devicetree/bindings/input/touchscreen/brcm,iproc-touchscreen.txt
-> @@ -1,12 +1,30 @@
->  * Broadcom's IPROC Touchscreen Controller
->  
->  Required properties:
-> -- compatible: must be "brcm,iproc-touchscreen"
-> -- reg: physical base address of the controller and length of memory mapped
-> -  region.
-> +- compatible: should be one of
-> +        "brcm,iproc-touchscreen"
-> +        "brcm,iproc-touchscreen-syscon"
+On 18 February 2016 at 15:15, Matt Fleming <matt@codeblueprint.co.uk> wrote:
+> On Thu, 18 Feb, at 02:44:02PM, Ard Biesheuvel wrote:
+>> On 18 February 2016 at 14:43, Matt Fleming <matt@codeblueprint.co.uk> wrote:
+>> > On Thu, 18 Feb, at 02:29:32PM, Ard Biesheuvel wrote:
+>> >> On 18 February 2016 at 14:28, Matt Fleming <matt@codeblueprint.co.uk> wrote:
+>> >> > On Thu, 18 Feb, at 01:16:05PM, Ard Biesheuvel wrote:
+>> >> >> On 18 February 2016 at 11:44, Matt Fleming <matt@codeblueprint.co.uk> wrote:
+>> >> >> > On Mon, 15 Feb, at 12:32:32PM, Ard Biesheuvel wrote:
+>> >> >> >> On ARM and arm64, ioremap() and memremap() are not interchangeable like
+>> >> >> >> on x86, and the use of ioremap() on ordinary RAM is typically flagged
+>> >> >> >> as an error if the memory region being mapped is also covered by the
+>> >> >> >> linear mapping, since that would lead to aliases with conflicting
+>> >> >> >> cacheability attributes.
+>> >> >> >>
+>> >> >> >> Since what we are dealing with is not an I/O region with side effects,
+>> >> >> >> using ioremap() here is arguably incorrect anyway, so let's replace
+>> >> >> >> it with memremap instead. Also add a missing unmap on the success path,
+>> >> >> >> and drop a memblock_remove() call which does not belong here, this far
+>> >> >> >> into the boot sequence.
+>> >> >> >>
+>> >> >> >> Cc: Peter Jones <pjones@redhat.com>
+>> >> >> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> >> >> >> ---
+>> >> >> >>  drivers/firmware/efi/esrt.c | 16 ++++++++--------
+>> >> >> >>  1 file changed, 8 insertions(+), 8 deletions(-)
+>> >> >> >>
+>> >> >> >
+>> >> >> > [...]
+>> >> >> >
+>> >> >> >> @@ -432,8 +434,6 @@ static int __init esrt_sysfs_init(void)
+>> >> >> >>       if (error)
+>> >> >> >>               goto err_cleanup_list;
+>> >> >> >>
+>> >> >> >> -     memblock_remove(esrt_data, esrt_data_size);
+>> >> >> >> -
+>> >> >> >>       pr_debug("esrt-sysfs: loaded.\n");
+>> >> >> >>
+>> >> >> >>       return 0;
+>> >> >> >
+>> >> >> > Shouldn't we be replacing memblock_remove() with free_bootmem_late()?
+>> >> >> > The original ESRT region is still reserved at this point, so we should
+>> >> >> > do our best to release it to the page allocator.
+>> >> >>
+>> >> >> I'd rather we keep it reserved. That way, the config table entry still
+>> >> >> points to something valid, which could be useful for kexec(), I think?
+>> >> >> At least, that is how I intended to handle config tables on ARM ...
+>> >> >
+>> >> > If we're going to reserve it why do we need to copy the data out at
+>> >> > all in esrt_sysfs_init()?
+>> >>
+>> >> Excellent question. I don't think there is any point to doing that.
+>> >
+>> > ... Unless the data is contained in an EFI Boot Services region ;-)
+>> >
+>> > Peter?
+>>
+>> Yes, it usually is. Is that a problem?
+>
+> Yes, we free the Boot Services regions before hitting userspace on
+> x86, see efi_free_boot_services(). We do this map/copy/unmap trick in
+> the ACPI BGRT driver for that reason.
+>
+> The Boot Services regions can be many gigabytes in size, which makes
+> leaving them alone impractical.
+>
+> For kexec on x86 we simply discard the BGRT table, which isn't the end
+> of the world because who really needs access to the BGRT image on
+> kexec reboot? However, I can see the value of preserving the ESRT.
+>
+> I guess we've got two options, 1) copy out the chunks of Boot Services
+> regions we're interested in and rewrite the EFI tables to point at
+> these new allocations and free/discard all of the original Boot
+> Services regions or 2) only selectively free the Boot Services
+> regions.
+>
+> I've always stayed clear of 2) in case there exists cross-region
+> references in the data that isn't obvious. I'd like to think that
+> would never happen, but, you know, dragons lurk here, etc.
+>
+> Though actually, now I think about it, cross-region references can't
+> possibly exist because they'd cause issues with the current code.
+>
+> So maybe the best solution is actually 2), where we preserve the Boot
+> Services regions if any of the drivers (ESRT, BGRT) request them but
+> free all the others?
+>
+> What are the lifetime rules for Boot Services regions on arm*?
 
-More specific and this is not how you do syscon. Either the block is or 
-isn't. You can't have it both ways.
+We treat all Boot Services regions like Loader Code/Data or free
+regions: it is all recorded in memblock as usable memory, and only the
+regions that are explicitly reserved are protected from further
+general use.
 
-> +- ts_syscon: if "brcm,iproc-touchscreen-syscon" compatible string
-> +  is selected then "ts_syscon" is mandatory or else not required.
-> +  The "ts_syscon" is handler of syscon node defining physical base
-> +  address of the controller and length of memory mapped region.
-> +  If this property is selected please make sure MFD_SYSCON config
-> +  is enabled in the defconfig file.
-> +- reg: if "brcm,iproc-touchscreen" compatible string is selected
-> +  then "reg" property is mandatory or else not required.
-> +  The "reg" should be physical base address of the controller and
-> +  length of memory mapped region.
-
-I thought every chip to date is a syscon. Add reg support when you 
-actually need it.
-
->  - clocks:  The clock provided by the SOC to driver the tsc
->  - clock-name:  name for the clock
->  - interrupts: The touchscreen controller's interrupt
-> +- address-cells: Specify the number of u32 entries needed in child nodes.
-> +                 Should set to 1. This property is mandatory when
-> +                 "brcm,iproc-touchscreen-syscon" compatible string is selected
-> +                 or else not required.
-> +- size-cells: Specify number of u32 entries needed to specify child nodes size
-> +              in reg property. Should set to 1.This property is mandatory when
-> +              "brcm,iproc-touchscreen-syscon" compatible string is selected or
-> +              else not required.
->  
->  Optional properties:
->  - scanning_period: Time between scans. Each step is 1024 us.  Valid 1-256.
-> @@ -53,13 +71,40 @@ Optional properties:
->  - touchscreen-inverted-x: X axis is inverted (boolean)
->  - touchscreen-inverted-y: Y axis is inverted (boolean)
->  
-> -Example:
-> +Example 1: An example of touchscreen node with "brcm,iproc-touchscreen-syscon"
-> +           compatible string.
-> +
-> +	ts_adc_syscon: ts_adc_syscon at 0x180a6000 {
-> +		compatible = "syscon";
-> +		reg = <0x180a6000 0xc30>;
-> +	};
->  
->  	touchscreen: tsc at 0x180A6000 {
-
-Drop the '0x' and the node name should be touchscreen, not tsc.
-
-> -		compatible = "brcm,iproc-touchscreen";
-> +		compatible = "brcm,iproc-touchscreen-syscon";
->  		#address-cells = <1>;
->  		#size-cells = <1>;
-> -		reg = <0x180A6000 0x40>;
-> +		ts_syscon = <&ts_adc_syscon>;
-> +		clocks = <&adc_clk>;
-> +		clock-names = "tsc_clk";
-> +		interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>;
-> +
-
-> +		scanning_period = <5>;
-> +		debounce_timeout = <40>;
-> +		settling_timeout = <7>;
-> +		touch_timeout = <10>;
-> +		average_data = <5>;
-> +		fifo_threshold = <1>;
-
-New properties?
-
-> +		/* Touchscreen is rotated 180 degrees. */
-> +		touchscreen-inverted-x;
-> +		touchscreen-inverted-y;
-> +	};
-> +
-> +Example 2: An example of touchscreen node with "brcm,iproc-touchscreen"
-> +          compatible string.
-> +
-> +	touchscreen: tsc at 0x180A6000 {
-> +		compatible = "brcm,iproc-touchscreen";
-> +		reg = <0x180a6000 0x40>;
->  		clocks = <&adc_clk>;
->  		clock-names = "tsc_clk";
->  		interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>;
-> -- 
-> 1.9.1
-> 
+I am currently looking into the memory attribute table, and the use
+case is very similar. It would be very useful from our pov to simply
+memblock_reserve() the region right after having called
+efi_config_parse_tables(), and actually consume its data when we get
+around to it later. The ESRT handling is already split down the middle
+in the same way.
