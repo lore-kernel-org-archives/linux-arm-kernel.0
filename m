@@ -1,61 +1,68 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 18 Feb 2016 12:20:51 -0500 (EST)
-Subject: [PATCH 8/9] ARM: do not use optimized do_div for ARMv3
-In-Reply-To: <1455804123-2526139-9-git-send-email-arnd@arndb.de>
-References: <1455804123-2526139-1-git-send-email-arnd@arndb.de>
- <1455804123-2526139-9-git-send-email-arnd@arndb.de>
-Message-ID: <alpine.LFD.2.20.1602181215310.13632@knanqh.ubzr>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 18 Feb 2016 17:21:28 +0000 (UTC)
+Subject: [PATCH v2 2/5] ARM: OMAP2+: DRA7: Add hwmod entries for PWMSS
+In-Reply-To: <56C5E466.2030002@ti.com>
+References: <1433332284-10766-1-git-send-email-vigneshr@ti.com>
+ <1433332284-10766-3-git-send-email-vigneshr@ti.com>
+ <alpine.DEB.2.02.1507152029460.32764@utopia.booyaka.com>
+ <55A7CE59.6010600@ti.com>
+ <alpine.DEB.2.02.1508121700500.7154@utopia.booyaka.com>
+ <56C4DB37.9090802@ti.com>
+ <alpine.DEB.2.02.1602180652380.4792@utopia.booyaka.com>
+ <56C5E466.2030002@ti.com>
+Message-ID: <alpine.DEB.2.02.1602181718560.4792@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 18 Feb 2016, Arnd Bergmann wrote:
+Hi Franklin, 
 
-> The gcc-4.9 optimization goes wrong while building target_core_iblock.c
-> for ARMv3 and leaves a bogus reference to __aeabi_uldivmod in the
-> output:
-> 
-> ERROR: "__aeabi_uldivmod" [drivers/target/target_core_iblock.ko] undefined!
-> 
-> I could not find anyone who is interested in fixing it in gcc,
-> so as a workaround this disables the do_div magic, just like
-> we do for old compilers and for OABI.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+On Thu, 18 Feb 2016, Franklin S Cooper Jr. wrote:
 
-I suppose this is good enough for the purpose of keeping RiscPC 
-buildable. Whether or not it is still used is another question.  If it 
-is then its user probably expects it to be slow already.
-
-Acked-by: Nicolas Pitre <nico@linaro.org>
-
-Still unfortunate having to use a big hammer such as -march=armv3 just 
-to avoid halfword memory accesses.
-
-
-> ---
->  arch/arm/include/asm/div64.h | 8 ++++++++
->  1 file changed, 8 insertions(+)
+> On 02/18/2016 12:58 AM, Paul Walmsley wrote:
+>
+> > OK I'm not sure I understand what's going on, particularly the part about 
+> > locking and unlocking.  Are you saying that the pwm_bl driver calls into 
+> > the pwm_tiecap module to write to the PWMSS_CLKCONFIG registers to ungate 
+> > the ECAP clock, and then the hardware silently ignores the write?  If 
+> > that's the case, shouldn't we be seeing some warning messages from a 
+> > failure to ungate the clock from a subsequent PWMSS_CLKSTATUS poll?  Or am 
+> > I misunderstanding what's going on here?
+> Pwm-tipwmss.c exports a function
+> pwmss_submodule_state_change which interacts with
+> PWMSS_CLKCONFIG and PWMSS_CLKSTATUS registers. Both
+> pwm-tiehrpwm.c and pwm-tiecap.c calls this exported function
+> to unlock the gate at probe time and lock the gate when the
+> driver is removed.
 > 
-> diff --git a/arch/arm/include/asm/div64.h b/arch/arm/include/asm/div64.h
-> index 7d919a9b32e5..958fdc2363f5 100644
-> --- a/arch/arm/include/asm/div64.h
-> +++ b/arch/arm/include/asm/div64.h
-> @@ -58,6 +58,14 @@ static inline uint32_t __div64_32(uint64_t *n, uint32_t base)
->   */
->  #define do_div(n, base) __div64_32(&(n), base)
->  
-> +#elif defined(CONFIG_CPU_32v3)
-> +
-> +/*
-> + * modern compiler versions (>= gcc-4.9) tend to misoptimize
-> + * the code for ARMv3, and this is not getting fixed any more.
-> + */
-> +#define do_div(n, base) __div64_32(&(n), base)
-> +
->  #else
->  
->  /*
-> -- 
-> 2.7.0
-> 
-> 
+> So when the gate fails to be unlocked after it previously is
+> locked there isn't a way to know this via the
+> PWMSS_CLKSTATUS registers.
+
+OK I understand now.  Sounds like the gating -> ungating transition is 
+effectively a one-time operation, and once the ungating -> gating 
+transition is done, there's no way to reverse it.  Please correct me if 
+I've got it wrong.
+
+>  So the driver "believes" that the gate is unlocked and when pwm_bl runs 
+> it calls the set_polarity function. Set_polarity in the case of AM437x 
+> gp evm maps to the ecap's ecap_pwm_set_polarity function call. This call 
+> then attempts to write to the ecap registers which results in the 
+> external abort since the clock to the ecap is still gated.
+>
+> When the ecap and tihrpwm driver request to unlock the clock
+> gate it already checks the XXX_CLK_EN_ACK bitfields within
+> CLKSTATUS and it shows that the clocks "should" be unlocked.
+> So there is an issue with the IP.
+
+OK
+
+> Yes, I plan on addressing the change Vignesh acknowledged
+> regarding changing RESETSTATUS to SOFTRESET. For your other
+> comments I believe he already explained why it has to be set
+> in that particular way. If there is anything that I missed
+> or something that isn't clear please let me know.
+
+Perfect, thanks for the good description and the followup.
+
+
+- Paul
