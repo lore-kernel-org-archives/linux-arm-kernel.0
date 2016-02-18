@@ -1,50 +1,61 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 18 Feb 2016 03:23:11 +0100
-Subject: [GIT PULL] at91: dt for 4.6 #1
-Message-ID: <20160218022311.GA2466@piout.net>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 18 Feb 2016 08:06:22 +0530
+Subject: [RFC 3/3] ARM: dts: Don't overheat the Odroid XU3-Lite on high
+ load
+In-Reply-To: <56C522A9.8070800@samsung.com>
+References: <1455692128-28504-1-git-send-email-k.kozlowski@samsung.com>
+ <1455692128-28504-4-git-send-email-k.kozlowski@samsung.com>
+ <CANAwSgQHiJGSYB7Qhq066Mqfskwrr_3SDQGXH-WN=Wt3SEF-QA@mail.gmail.com>
+ <56C522A9.8070800@samsung.com>
+Message-ID: <20160218023622.GA2610@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+On 18-02-16, 10:47, Krzysztof Kozlowski wrote:
+> On 18.02.2016 04:53, Anand Moon wrote:
+> > I also got lot's of error.
+> > 
+> > root at odroidxu4l:~# cpu[ 3050.847663] cpu cpu4: Failed to find dev_opp: -19
+> > [ 3171.640836] cpu cpu4: device_opp_debug_create_link: Failed to create link
+> > [ 3171.646197] cpu cpu4: _add_list_dev: Failed to register opp debugfs (-12)
+> > [ 3171.653574] cpu cpu7: device_opp_debug_create_link: Failed to create link
+> > [ 3171.659752] cpu cpu7: _add_list_dev: Failed to register opp debugfs (-12)
+> > [ 3171.697011] cpu cpu5: cpufreq_init: failed to get clk: -2
+> > [ 3171.732505] cpu cpu6: cpufreq_init: failed to get clk: -2
+> > [ 3171.768160] cpu cpu7: cpufreq_init: failed to get clk: -2
+> > 
+> > Tested on Odroid-XU4
+> > 
+> > Reviewed-by: Anand Moon <linux.amoon@gmail.com>
+> > Tested-by: Anand Moon <linux.amoon@gmail.com>
 
-This is the addition of the ADC support for sama5d2. The driver went
-through the iio tree.
+What was this Tested-by supposed to mean? You got errors out there ...
 
-Thanks!
+> The patch is not sufficient. It does not work the way it should...
+> 
+> BTW, I found the issue. The order of trip points in DT:
+> thermal_zone0/trip_point_0_hyst:5000
+> thermal_zone0/trip_point_0_temp:50000
+> thermal_zone0/trip_point_0_type:active
+> thermal_zone0/trip_point_1_hyst:5000
+> thermal_zone0/trip_point_1_temp:60000
+> thermal_zone0/trip_point_1_type:active
+> thermal_zone0/trip_point_2_hyst:5000
+> thermal_zone0/trip_point_2_temp:70000
+> thermal_zone0/trip_point_2_type:active
+> thermal_zone0/trip_point_3_hyst:0
+> thermal_zone0/trip_point_3_temp:120000	<---- this should be last one!
+> thermal_zone0/trip_point_3_type:critical
+> thermal_zone0/trip_point_4_hyst:5000
+> thermal_zone0/trip_point_4_temp:90000
+> thermal_zone0/trip_point_4_type:passive
+> thermal_zone0/trip_point_5_hyst:5000
+> thermal_zone0/trip_point_5_temp:110000
+> thermal_zone0/trip_point_5_type:passive
+> 
+> After fixing the order in DT, the cpu cooler starts working.
 
-The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
-
-  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.6-dt
-
-for you to fetch changes up to 5e72c25b40c1e9ed77650f258799514aabd17303:
-
-  ARM: dts: at91: sama5d2 Xplained: enable the adc device (2016-02-18 03:10:05 +0100)
-
-----------------------------------------------------------------
-DT changes for 4.6:
- - Addition of the ADC for sama5d2 and sama5d2_xplained
-
-----------------------------------------------------------------
-Ludovic Desroches (2):
-      ARM: dts: at91: sama5d2: add adc device
-      ARM: dts: at91: sama5d2 Xplained: enable the adc device
-
- arch/arm/boot/dts/at91-sama5d2_xplained.dts | 22 ++++++++++++++++++++++
- arch/arm/boot/dts/sama5d2.dtsi              | 18 ++++++++++++------
- 2 files changed, 34 insertions(+), 6 deletions(-)
+Ahh, nice.
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160218/80da022e/attachment.sig>
+viresh
