@@ -1,49 +1,57 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 18 Feb 2016 13:20:38 +0000
-Subject: [Linaro-acpi] [PATCH V5 01/15] ACPI: MCFG: Move mmcfg_list
- management to drivers/acpi
-In-Reply-To: <56C5B83F.4010602@huawei.com>
-References: <1455630825-27253-1-git-send-email-tn@semihalf.com>
- <1455630825-27253-2-git-send-email-tn@semihalf.com>
- <56C5B83F.4010602@huawei.com>
-Message-ID: <20160218132038.GA13229@red-moon>
+From: matt@codeblueprint.co.uk (Matt Fleming)
+Date: Thu, 18 Feb 2016 13:28:24 +0000
+Subject: [PATCH v2 1/2] efi: esrt: use memremap not ioremap to access
+ ESRT table in memory
+In-Reply-To: <CAKv+Gu_AW7PKJJOd2mbEu3LKJe+gNaPHnH=sgO=YXM_KWFyKxw@mail.gmail.com>
+References: <1455535953-5056-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1455535953-5056-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20160218104407.GC2651@codeblueprint.co.uk>
+ <CAKv+Gu_AW7PKJJOd2mbEu3LKJe+gNaPHnH=sgO=YXM_KWFyKxw@mail.gmail.com>
+Message-ID: <20160218132824.GE2651@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 18, 2016 at 08:25:35PM +0800, liudongdong (C) wrote:
-
-[...]
-
-> >+/*
-> >+ * Map a pci_mmcfg_region, can be overrriden by arch
-> >+ */
-> >+int __weak pci_mmconfig_map_resource(struct device *dev,
-> >+	struct pci_mmcfg_region *mcfg)
-> >+{
-> >+	struct resource *tmp;
-> >+	void __iomem *vaddr;
-> >+
-> >+	tmp = insert_resource_conflict(&iomem_resource, &mcfg->res);
-> >+	if (tmp) {
-> >+		dev_warn(dev, "MMCONFIG %pR conflicts with %s %pR\n",
-> >+			&mcfg->res, tmp->name, tmp);
-> >+		return -EBUSY;
-> >+	}
-> >+
-> >+	vaddr =  ioremap(mcfg->res.start, resource_size(&mcfg->res));
-               ^^
-	       while at it, stray white space
-
-> >+	if (!vaddr) {
-> >+		release_resource(&mcfg->res);
-> >+		return -ENOMEM;
-> >+	}
-> >+
-> >+	mcfg->virt = vaddr;
-> Here should be changed to
-> 	mcfg->virt = vaddr - PCI_MMCFG_BUS_OFFSET(mcfg->start_bus);
+On Thu, 18 Feb, at 01:16:05PM, Ard Biesheuvel wrote:
+> On 18 February 2016 at 11:44, Matt Fleming <matt@codeblueprint.co.uk> wrote:
+> > On Mon, 15 Feb, at 12:32:32PM, Ard Biesheuvel wrote:
+> >> On ARM and arm64, ioremap() and memremap() are not interchangeable like
+> >> on x86, and the use of ioremap() on ordinary RAM is typically flagged
+> >> as an error if the memory region being mapped is also covered by the
+> >> linear mapping, since that would lead to aliases with conflicting
+> >> cacheability attributes.
+> >>
+> >> Since what we are dealing with is not an I/O region with side effects,
+> >> using ioremap() here is arguably incorrect anyway, so let's replace
+> >> it with memremap instead. Also add a missing unmap on the success path,
+> >> and drop a memblock_remove() call which does not belong here, this far
+> >> into the boot sequence.
+> >>
+> >> Cc: Peter Jones <pjones@redhat.com>
+> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >> ---
+> >>  drivers/firmware/efi/esrt.c | 16 ++++++++--------
+> >>  1 file changed, 8 insertions(+), 8 deletions(-)
+> >>
+> >
+> > [...]
+> >
+> >> @@ -432,8 +434,6 @@ static int __init esrt_sysfs_init(void)
+> >>       if (error)
+> >>               goto err_cleanup_list;
+> >>
+> >> -     memblock_remove(esrt_data, esrt_data_size);
+> >> -
+> >>       pr_debug("esrt-sysfs: loaded.\n");
+> >>
+> >>       return 0;
+> >
+> > Shouldn't we be replacing memblock_remove() with free_bootmem_late()?
+> > The original ESRT region is still reserved at this point, so we should
+> > do our best to release it to the page allocator.
 > 
-> or when pcie host "start_bus" is not 0, the configuraion access will be wrong.
-Well spotted, thanks.
+> I'd rather we keep it reserved. That way, the config table entry still
+> points to something valid, which could be useful for kexec(), I think?
+> At least, that is how I intended to handle config tables on ARM ...
 
-Lorenzo
+If we're going to reserve it why do we need to copy the data out at
+all in esrt_sysfs_init()?
