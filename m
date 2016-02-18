@@ -1,29 +1,61 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Thu, 18 Feb 2016 09:20:32 -0800
-Subject: [PATCH 2/3] serial: xuartps: Enable OF earlycon support
-In-Reply-To: <56C57A60.4070600@xilinx.com>
-References: <67c9013fc61f53515934b54847a05df8b8e1504a.1455552315.git.michal.simek@xilinx.com>
- <23ab10a19b21df2ef17a5bb6ce2a70d2d3fd3551.1455552315.git.michal.simek@xilinx.com>
- <56C34F65.1040506@hurleysoftware.com> <56C57A60.4070600@xilinx.com>
-Message-ID: <56C5FD60.4090906@hurleysoftware.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 18 Feb 2016 12:20:51 -0500 (EST)
+Subject: [PATCH 8/9] ARM: do not use optimized do_div for ARMv3
+In-Reply-To: <1455804123-2526139-9-git-send-email-arnd@arndb.de>
+References: <1455804123-2526139-1-git-send-email-arnd@arndb.de>
+ <1455804123-2526139-9-git-send-email-arnd@arndb.de>
+Message-ID: <alpine.LFD.2.20.1602181215310.13632@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/18/2016 12:01 AM, Michal Simek wrote:
-> BTW: Is it normal that when earlycon support is enabled that the bootlog
-> is copied again? All what was printed before bootconsole [xxx] disabled
-> is printed twice.
+On Thu, 18 Feb 2016, Arnd Bergmann wrote:
 
-I think it has to do with the dummy console bug w/ OF.
+> The gcc-4.9 optimization goes wrong while building target_core_iblock.c
+> for ARMv3 and leaves a bogus reference to __aeabi_uldivmod in the
+> output:
+> 
+> ERROR: "__aeabi_uldivmod" [drivers/target/target_core_iblock.ko] undefined!
+> 
+> I could not find anyone who is interested in fixing it in gcc,
+> so as a workaround this disables the do_div magic, just like
+> we do for old compilers and for OABI.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Masahiro Yamada reported this back with 4.4-rc1 [1] but problem occurs before
-then as well.
+I suppose this is good enough for the purpose of keeping RiscPC 
+buildable. Whether or not it is still used is another question.  If it 
+is then its user probably expects it to be slow already.
 
-[1] http://www.gossamer-threads.com/lists/linux/kernel/2313050
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
-> Or is this just bug in our driver?
+Still unfortunate having to use a big hammer such as -march=armv3 just 
+to avoid halfword memory accesses.
 
-No.
 
-Regards,
-Peter Hurley
+> ---
+>  arch/arm/include/asm/div64.h | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/arch/arm/include/asm/div64.h b/arch/arm/include/asm/div64.h
+> index 7d919a9b32e5..958fdc2363f5 100644
+> --- a/arch/arm/include/asm/div64.h
+> +++ b/arch/arm/include/asm/div64.h
+> @@ -58,6 +58,14 @@ static inline uint32_t __div64_32(uint64_t *n, uint32_t base)
+>   */
+>  #define do_div(n, base) __div64_32(&(n), base)
+>  
+> +#elif defined(CONFIG_CPU_32v3)
+> +
+> +/*
+> + * modern compiler versions (>= gcc-4.9) tend to misoptimize
+> + * the code for ARMv3, and this is not getting fixed any more.
+> + */
+> +#define do_div(n, base) __div64_32(&(n), base)
+> +
+>  #else
+>  
+>  /*
+> -- 
+> 2.7.0
+> 
+> 
