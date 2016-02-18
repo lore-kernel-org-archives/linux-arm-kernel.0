@@ -1,34 +1,31 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Thu, 18 Feb 2016 15:15:44 -0600
-Subject: [PATCH v3 0/5] ACPI: parse the SPCR table
-In-Reply-To: <1455559532-8305-1-git-send-email-aleksey.makarov@linaro.org>
-References: <1455559532-8305-1-git-send-email-aleksey.makarov@linaro.org>
-Message-ID: <56C63480.5020605@arm.com>
+From: carlo@endlessm.com (Carlo Caione)
+Date: Thu, 18 Feb 2016 22:24:24 +0100
+Subject: [PATCH 2/2] ARM: dts: meson: Adding hwrev syscon node
+In-Reply-To: <CAOQ7t2aqZj3STFsdTSQZMTK5U+8Oem8oFroxHKWkt=AeP+Zczg@mail.gmail.com>
+References: <1455730114-2547-1-git-send-email-romain.perier@gmail.com>
+ <4158343.mkrTsd5B4G@wuerfel>
+ <CAOQ7t2byFoW657-1xnsBpeyPkB6K25R=_pPmRDmT32Sjef=kUw@mail.gmail.com>
+ <4136837.fyWFbJqZfO@wuerfel>
+ <CAOQ7t2aqZj3STFsdTSQZMTK5U+8Oem8oFroxHKWkt=AeP+Zczg@mail.gmail.com>
+Message-ID: <CAL9uMOGy=sP+gg8v=9N5zhrWGNA2Aq7N34JYgUON-+GH4b1d0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/15/2016 12:05 PM, Aleksey Makarov wrote:
-> This patchset is based on the patchset by Leif Lindholm [1]
->
-> 'ARM Server Base Boot Requirements' [2] mentions SPCR (Serial Port
-> Console Redirection Table) [3] as a mandatory ACPI table that
-> specifies the configuration of serial console.
->
-> SPCR support is included in QEMU's ARM mach-virt since 2.4 release.
->
-> Introduce a new function acpi_console_check().  At the uart port
-> registration, this function checks if the ACPI SPCR table specifies
-> its argument of type struct uart_port to be a console
-> and if so calls add_preferred_console().
->
-> Use SPCR to tell if SBSA serial driver should use 32-bit access to registers.
->
-> To be able to access SPCR table each time any console is registered
-> change __init to __ref for early_acpi_os_unmap_memory().
->
-> The patchset should be applied to tty-next.
-(trimming)
+On Thu, Feb 18, 2016 at 10:04 PM, Carlo Caione <carlo@caione.org> wrote:
+> On Thu, Feb 18, 2016 at 3:22 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-This works on the JunoR2 with a new enough firmware to have the SPCR table.
+>> However, if some or all of the other devices actually are entirely
+>> made up of register ranges within cbus, that would indicate that
+>> cbus itself is not just a collection of random registers but something
+>> that could be considered a bus of itself in hardware, and then
+>> we could represent the other devices as children of this bus.
+>
+> I think that this is exactly the case. We are missing this cbus in the
+> DTS because (for lacking of proper documentation) we are not sure
+> about start / end / size.
 
-Tested-by: Jeremy Linton <jeremy.linton@arm.com>
+This is not entirely correct actually.
+CBUS starts at 0xc1100000 with a size of 0x00100000 according to the Amlogic SDK
+
+-- 
+Carlo Caione  |  +39.340.80.30.096  |  Endless
