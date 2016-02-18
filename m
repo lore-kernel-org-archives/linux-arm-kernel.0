@@ -1,72 +1,111 @@
 From: zhangqing@rock-chips.com (Elaine Zhang)
-Date: Thu, 18 Feb 2016 11:07:14 +0800
-Subject: [PATCH v2 2/6] rockchip: power-domain: allow domains only handling
- idle requests
-In-Reply-To: <1455764838-12928-1-git-send-email-zhangqing@rock-chips.com>
-References: <1455764838-12928-1-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <1455764838-12928-3-git-send-email-zhangqing@rock-chips.com>
+Date: Thu, 18 Feb 2016 11:08:05 +0800
+Subject: [PATCH v2 5/6] rockchip: power-domain: Modify power domain driver for
+ rk3399
+Message-ID: <1455764885-12979-1-git-send-email-zhangqing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some Rockchip SoC there exist child-domains only handling their
-idle state with the actual power-state handled by a parent-domain.
-
-So allow such types of domains. For them, we can determine their
-state (on/of) by checking the inverse idle-state instead.
-
-There exist one special case if both idle as well power handling
-were set as not present, but as the domain-data is defined in the
-code itself, we can expect the reasonable developer to define them
-
-So allow such types of domains. For them, we can determine their
-state (on/of) by checking the inverse idle-state instead.
-
-There exist one special case if both idle as well power handling
-were set as not present, but as the domain-data is defined in the
-code itself, we can expect the reasonable developer to define them
-in a correct, without adding more checks.
+This driver is modified to support RK3399 SoC.
 
 Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- drivers/soc/rockchip/pm_domains.c | 11 +++++++++--
- 1 file changed, 9 insertions(+), 2 deletions(-)
+ drivers/soc/rockchip/pm_domains.c | 55 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 55 insertions(+)
 
 diff --git a/drivers/soc/rockchip/pm_domains.c b/drivers/soc/rockchip/pm_domains.c
-index 3dcc611..350527b 100644
+index 8cdf1b2..067e655 100644
 --- a/drivers/soc/rockchip/pm_domains.c
 +++ b/drivers/soc/rockchip/pm_domains.c
-@@ -68,8 +68,8 @@ struct rockchip_pmu {
+@@ -19,6 +19,7 @@
+ #include <linux/mfd/syscon.h>
+ #include <dt-bindings/power/rk3288-power.h>
+ #include <dt-bindings/power/rk3368-power.h>
++#include <dt-bindings/power/rk3399-power.h>
  
- #define DOMAIN(pwr, status, req, idle, ack)	\
- {						\
--	.pwr_mask = BIT(pwr),			\
--	.status_mask = BIT(status),		\
-+	.pwr_mask = (pwr >= 0) ? BIT(pwr) : OVERFLOW_MASK,		\
-+	.status_mask = (status >= 0) ? BIT(status) : OVERFLOW_MASK,\
- 	.req_mask = (req >= 0) ? BIT(req) : OVERFLOW_MASK,		\
- 	.idle_mask = (idle >= 0) ? BIT(idle) : OVERFLOW_MASK,	\
- 	.ack_mask = (ack >= 0) ? BIT(ack) : OVERFLOW_MASK,		\
-@@ -121,6 +121,10 @@ static bool rockchip_pmu_domain_is_on(struct rockchip_pm_domain *pd)
- 	struct rockchip_pmu *pmu = pd->pmu;
- 	unsigned int val;
+ struct rockchip_domain_info {
+ 	int pwr_mask;
+@@ -81,6 +82,9 @@ struct rockchip_pmu {
+ #define DOMAIN_RK3368(pwr, status, req)		\
+ 	DOMAIN(pwr, status, req, (req) + 16, req)
  
-+	/* check idle status for idle-only domains */
-+	if (pd->info->status_mask >= OVERFLOW_MASK)
-+		return !rockchip_pmu_domain_is_idle(pd);
++#define DOMAIN_RK3399(pwr, status, req)                \
++	DOMAIN(pwr, status, req, req, req)
 +
- 	regmap_read(pmu->regmap, pmu->info->status_offset, &val);
- 
- 	/* 1'b0: power on, 1'b1: power off */
-@@ -132,6 +136,9 @@ static void rockchip_do_pmu_set_power_domain(struct rockchip_pm_domain *pd,
+ static bool rockchip_pmu_domain_is_idle(struct rockchip_pm_domain *pd)
  {
  	struct rockchip_pmu *pmu = pd->pmu;
+@@ -522,6 +526,36 @@ static const struct rockchip_domain_info rk3368_pm_domains[] = {
+ 	[RK3368_PD_GPU_1]	= DOMAIN_RK3368(17, 16, 2),
+ };
  
-+	if (pd->info->pwr_mask >= OVERFLOW_MASK)
-+		return;
++static const struct rockchip_domain_info rk3399_pm_domains[] = {
++	[RK3399_PD_TCPD0]       = DOMAIN_RK3399(8, 8, NULL_BIT),
++	[RK3399_PD_TCPD1]       = DOMAIN_RK3399(9, 9, NULL_BIT),
++	[RK3399_PD_CCI]         = DOMAIN_RK3399(10, 10, NULL_BIT),
++	[RK3399_PD_CCI0]        = DOMAIN_RK3399(NULL_BIT, NULL_BIT, 15),
++	[RK3399_PD_CCI1]        = DOMAIN_RK3399(NULL_BIT, NULL_BIT, 16),
++	[RK3399_PD_PERILP]      = DOMAIN_RK3399(11, 11, 1),
++	[RK3399_PD_PERIHP]      = DOMAIN_RK3399(12, 12, 2),
++	[RK3399_PD_CENTER]      = DOMAIN_RK3399(13, 13, 14),
++	[RK3399_PD_VIO]         = DOMAIN_RK3399(14, 14, 17),
++	[RK3399_PD_GPU]         = DOMAIN_RK3399(15, 15, 0),
++	[RK3399_PD_VCODEC]      = DOMAIN_RK3399(16, 16, 3),
++	[RK3399_PD_VDU]         = DOMAIN_RK3399(17, 17, 4),
++	[RK3399_PD_RGA]         = DOMAIN_RK3399(18, 18, 5),
++	[RK3399_PD_IEP]         = DOMAIN_RK3399(19, 19, 6),
++	[RK3399_PD_VO]          = DOMAIN_RK3399(20, 20, NULL_BIT),
++	[RK3399_PD_VOPB]        = DOMAIN_RK3399(NULL_BIT, NULL_BIT, 7),
++	[RK3399_PD_VOPL]        = DOMAIN_RK3399(NULL_BIT, NULL_BIT, 8),
++	[RK3399_PD_ISP0]        = DOMAIN_RK3399(22, 22, 9),
++	[RK3399_PD_ISP1]        = DOMAIN_RK3399(23, 23, 10),
++	[RK3399_PD_HDCP]        = DOMAIN_RK3399(24, 24, 11),
++	[RK3399_PD_GMAC]        = DOMAIN_RK3399(25, 25, 23),
++	[RK3399_PD_EMMC]        = DOMAIN_RK3399(26, 26, 24),
++	[RK3399_PD_USB3]        = DOMAIN_RK3399(27, 27, 12),
++	[RK3399_PD_EDP]         = DOMAIN_RK3399(28, 28, 22),
++	[RK3399_PD_GIC]         = DOMAIN_RK3399(29, 29, 27),
++	[RK3399_PD_SD]          = DOMAIN_RK3399(30, 30, 28),
++	[RK3399_PD_SDIOAUDIO]   = DOMAIN_RK3399(31, 31, 29),
++};
 +
- 	regmap_update_bits(pmu->regmap, pmu->info->pwr_offset,
- 			   pd->info->pwr_mask, on ? 0 : -1U);
+ static const struct rockchip_pmu_info rk3288_pmu = {
+ 	.pwr_offset = 0x08,
+ 	.status_offset = 0x0c,
+@@ -556,6 +590,23 @@ static const struct rockchip_pmu_info rk3368_pmu = {
+ 	.domain_info = rk3368_pm_domains,
+ };
+ 
++static const struct rockchip_pmu_info rk3399_pmu = {
++	.pwr_offset = 0x14,
++	.status_offset = 0x18,
++	.req_offset = 0x60,
++	.idle_offset = 0x64,
++	.ack_offset = 0x68,
++
++	.core_pwrcnt_offset = 0x9c,
++	.gpu_pwrcnt_offset = 0xa4,
++
++	.core_power_transition_time = 24,
++	.gpu_power_transition_time = 24,
++
++	.num_domains = ARRAY_SIZE(rk3399_pm_domains),
++	.domain_info = rk3399_pm_domains,
++};
++
+ static const struct of_device_id rockchip_pm_domain_dt_match[] = {
+ 	{
+ 		.compatible = "rockchip,rk3288-power-controller",
+@@ -565,6 +616,10 @@ static const struct of_device_id rockchip_pm_domain_dt_match[] = {
+ 		.compatible = "rockchip,rk3368-power-controller",
+ 		.data = (void *)&rk3368_pmu,
+ 	},
++	{
++		.compatible = "rockchip,rk3399-power-controller",
++		.data = (void *)&rk3399_pmu,
++	},
+ 	{ /* sentinel */ },
+ };
  
 -- 
 1.9.1
