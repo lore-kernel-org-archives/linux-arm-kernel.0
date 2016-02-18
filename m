@@ -1,30 +1,42 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Thu, 18 Feb 2016 12:41:56 -0500
-Subject: [PATCH v4 04/12] ata: ahci_mvebu: add support for Armada 3700
- variant
-In-Reply-To: <1455646502-23834-5-git-send-email-gregory.clement@free-electrons.com>
-References: <1455646502-23834-1-git-send-email-gregory.clement@free-electrons.com>
- <1455646502-23834-5-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20160218174156.GF13177@mtj.duckdns.org>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Thu, 18 Feb 2016 18:46:40 +0100
+Subject: [BUG FIX] PM / cpu_domains: Check for NULL callbacks
+In-Reply-To: <1455816573-43849-1-git-send-email-lina.iyer@linaro.org>
+References: <1455310238-8963-4-git-send-email-lina.iyer@linaro.org>
+ <1455816573-43849-1-git-send-email-lina.iyer@linaro.org>
+Message-ID: <CAJZ5v0gXd573OM_xQBsqqaZoRWvT_px64Cx2avR5dCxCwmMWjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 16, 2016 at 07:14:54PM +0100, Gregory CLEMENT wrote:
-> From: Lior Amsalem <alior@marvell.com>
-> 
-> The main difference in the new Armada 3700 is that no address
-> decoding needs to take place in the driver probe.
-> 
-> [gregory.clement at free-electrons.com: reformulate the commit log]
-> 
-> Signed-off-by: Lior Amsalem <alior@marvell.com>
-> Reviewed-by: Nadav Haklai <nadavh@marvell.com>
-> Tested-by: Nadav Haklai <nadavh@marvell.com>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+On Thu, Feb 18, 2016 at 6:29 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
+> Check for NULL platform callback before calling.
+>
+> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+> ---
+>  drivers/base/power/cpu_domains.c | 10 ++++++++--
+>  1 file changed, 8 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/base/power/cpu_domains.c b/drivers/base/power/cpu_domains.c
+> index 7069411..bcaa474 100644
+> --- a/drivers/base/power/cpu_domains.c
+> +++ b/drivers/base/power/cpu_domains.c
+> @@ -157,16 +157,22 @@ static int cpu_pd_power_on(struct generic_pm_domain *genpd)
+>  {
+>         struct cpu_pm_domain *pd = to_cpu_pd(genpd);
+>
+> -       return pd->ops.power_on();
+> +       if (pd->ops.power_on)
+> +               return pd->ops.power_on();
+> +
+> +       return 0;
+>  }
 
-Applied to libata/for-4.6.
+I usually write things like that as
 
-Thanks.
+return pd->ops.power_on ? pd->ops.power_on() : 0;
 
--- 
-tejun
+That gets the job done in just one line of code instead of 4 and in
+one statement instead of 3.
+
+Thanks,
+Rafael
