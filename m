@@ -1,42 +1,43 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 18 Feb 2016 15:34:30 +0100
-Subject: [PATCH] PCI: mvebu: Restrict build to 32-bit ARM
-In-Reply-To: <5051836.EUN3ennYNm@wuerfel> (Arnd Bergmann's message of "Thu, 18
- Feb 2016 15:06:23 +0100")
-References: <1455802330-17565-1-git-send-email-thierry.reding@gmail.com>
- <5051836.EUN3ennYNm@wuerfel>
-Message-ID: <87egcaqe89.fsf@free-electrons.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 18 Feb 2016 08:36:01 -0600
+Subject: [PATCH v2 5/8] arm64: dts: add Allwinner A64 SoC .dtsi
+In-Reply-To: <1455709440-8668-6-git-send-email-andre.przywara@arm.com>
+References: <1455709440-8668-1-git-send-email-andre.przywara@arm.com>
+ <1455709440-8668-6-git-send-email-andre.przywara@arm.com>
+Message-ID: <20160218143601.GE9654@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
- 
- On jeu., f?vr. 18 2016, Arnd Bergmann <arnd@arndb.de> wrote:
+On Wed, Feb 17, 2016 at 11:43:57AM +0000, Andre Przywara wrote:
+> The Allwinner A64 SoC is a low-cost chip with 4 ARM Cortex-A53 cores
+> and the typical tablet / TV box peripherals.
+> The SoC is based on the (32-bit) Allwinner H3 chip, sharing most of
+> the peripherals and the memory map.
+> Although the cores are proper 64-bit ones, the whole SoC is actually
+> limited to 4GB (including all the supported DRAM), so we use 32-bit
+> address and size cells. This has the nice feature of us being able to
+> reuse the DT for 32-bit kernels as well.
+> This .dtsi lists the hardware that we support so far.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  Documentation/devicetree/bindings/arm/sunxi.txt   |   1 +
+>  Documentation/devicetree/bindings/clock/sunxi.txt |   1 +
+>  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi     | 642 ++++++++++++++++++++++
+>  3 files changed, 644 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
 
-> On Thursday 18 February 2016 14:32:10 Thierry Reding wrote:
->> From: Thierry Reding <treding@nvidia.com>
->> 
->> This driver uses PCI glue that is only available on 32-bit ARM. This
->> used to work fine as long as ARCH_MVEBU and ARCH_DOVE were exclusively
->> 32-bit, but that's changed now, with ARCH_MVEBU also being available
->> on 64-bit ARM.
->> 
->> Signed-off-by: Thierry Reding <treding@nvidia.com>
->
-> Looks fine as a temporary workaround, but I think what we really want to
-> do here is to remove the dependency, as the new ARM64 platforms are going
-> to need this driver anyway.
+[...]
 
-Actually the mvebu ARM64 platform we know about (Armada 3700, 7K and
-8K), won't use the same controller. A7K/A8K will use a synopsis IP and
-Armada 3700 a new Marvell IP.
+> +	memory {
+> +		device_type = "memory";
+> +		reg = <0x40000000 0>;
+> +	};
+> +
+> +	gic: interrupt-controller at 01c81000 {
 
-So for me depending on ARM32 is enough.
+Remove the numerous leading 0s on the unit addresses.
 
-Gregory
+With that:
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Acked-by: Rob Herring <robh@kernel.org>
