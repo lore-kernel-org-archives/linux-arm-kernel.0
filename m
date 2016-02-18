@@ -1,41 +1,41 @@
-From: shijie.huang@arm.com (Huang Shijie)
-Date: Thu, 18 Feb 2016 12:36:13 +0800
-Subject: [PATCH] MAINTAINERS: add maintainer entry for FREESCALE GPMI
- NAND driver
-In-Reply-To: <1455767715-621-1-git-send-email-han.xu@nxp.com>
-References: <1455767715-621-1-git-send-email-han.xu@nxp.com>
-Message-ID: <20160218043612.GA735@sha-win-210.asiapac.arm.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Wed, 17 Feb 2016 20:39:25 -0800
+Subject: [PATCH V2 7/8] dmaengine: bcm2835: add slave_sg support to
+ bcm2835-dma
+In-Reply-To: <1452187987-2605-8-git-send-email-kernel@martin.sperl.org>
+References: <1452187987-2605-1-git-send-email-kernel@martin.sperl.org>
+ <1452187987-2605-8-git-send-email-kernel@martin.sperl.org>
+Message-ID: <87oabews1u.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 18, 2016 at 03:55:15AM +0000, Han Xu wrote:
-> Add a maintainer entry for FREESCALE GPMI NAND driver and add myself as a
-> maintainer.
+kernel at martin.sperl.org writes:
+
+> From: Martin Sperl <kernel@martin.sperl.org>
 >
-> Signed-off-by: Han Xu <han.xu@nxp.com>
-> ---
->  MAINTAINERS | 6 ++++++
->  1 file changed, 6 insertions(+)
+> Add slave_sg support to bcm2835-dma using shared allocation
+> code for bcm2835_desc and DMA-control blocks already used by
+> dma_cyclic.
 >
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 7bd927e..49baa5b 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -4543,6 +4543,12 @@ L:     linuxppc-dev at lists.ozlabs.org
->  S:   Maintained
->  F:   drivers/dma/fsldma.*
+> Note that bcm2835_dma_callback had to get modified to support
+> both modes of operation (cyclic and non-cyclic).
 >
-> +FREESCALE GPMI NAND DRIVER
-> +M:   Han Xu <han.xu@nxp.com>
-> +L:   linux-mtd at lists.infradead.org
-> +S:   Maintained
-> +F:   drivers/mtd/nand/gpmi-nand/*
-> +
->  FREESCALE I2C CPM DRIVER
->  M:   Jochen Friedrich <jochen@scram.de>
->  L:   linuxppc-dev at lists.ozlabs.org
-> --
-> 2.7.1
+> Tested using:
+> * Hifiberry I2S card (using cyclic DMA)
+> * fb_st7735r SPI-framebuffer (using slave_sg DMA via spi-bcm2835)
+> playing BigBuckBunny for audio and video.
 >
-Acked-by: Huang Shijie <shijie.huang@arm.com>
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+
+I would have expected bcm2835_dma_create_cb_chain()'s changes to support
+slave DMA to be in this patch rather than the refactor patch.  However,
+the content of this one and 8/8 are:
+
+Reviewed-by: Eric Anholt <eric@anholt.net>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160217/9d8c8c3b/attachment.sig>
