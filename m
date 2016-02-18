@@ -1,33 +1,30 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 18 Feb 2016 14:32:10 +0100
-Subject: [PATCH] PCI: mvebu: Restrict build to 32-bit ARM
-Message-ID: <1455802330-17565-1-git-send-email-thierry.reding@gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 18 Feb 2016 21:35:39 +0800
+Subject: [PATCH] ARM: dts: imx6qdl-microsom.dtsi: avoid boot-time UHS
+ warning
+In-Reply-To: <E1aVMgw-0001wE-5w@rmk-PC.arm.linux.org.uk>
+References: <E1aVMgw-0001wE-5w@rmk-PC.arm.linux.org.uk>
+Message-ID: <20160218133539.GW6756@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <treding@nvidia.com>
+On Mon, Feb 15, 2016 at 05:12:06PM +0000, Russell King wrote:
+> Avoid the following warning:
+> 
+> sdhci-esdhc-imx 2190000.usdhc: could not get ultra high speed state, work on normal mode
+> 
+> which occurs at boot each time the SDHCI interface for the Broadcom
+> WiFi is probed.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-This driver uses PCI glue that is only available on 32-bit ARM. This
-used to work fine as long as ARCH_MVEBU and ARCH_DOVE were exclusively
-32-bit, but that's changed now, with ARCH_MVEBU also being available
-on 64-bit ARM.
+Not sure why you resend, but I already applied the following series you
+sent on Jan. 27 [1].
 
-Signed-off-by: Thierry Reding <treding@nvidia.com>
----
- drivers/pci/host/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+[PATCH 1/3] ARM: dts: imx6qdl-microsom.dtsi: avoid boot-time UHS warning
+[PATCH 2/3] ARM: dts: imx6*-hummingboard: use proper gpio flags definitions
+[PATCH 3/3] ARM: dts: imx6*-hummingboard: fix pcie reset GPIO specification
 
-diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-index 75a605426538..d1cdd9c992ac 100644
---- a/drivers/pci/host/Kconfig
-+++ b/drivers/pci/host/Kconfig
-@@ -14,6 +14,7 @@ config PCI_DRA7XX
- config PCI_MVEBU
- 	bool "Marvell EBU PCIe controller"
- 	depends on ARCH_MVEBU || ARCH_DOVE
-+	depends on ARM
- 	depends on OF
- 
- config PCIE_DW
--- 
-2.7.1
+Shawn
+
+[1] http://permalink.gmane.org/gmane.linux.drivers.devicetree/154097
