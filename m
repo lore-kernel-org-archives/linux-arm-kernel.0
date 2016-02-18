@@ -1,23 +1,52 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 18 Feb 2016 09:41:08 +0000
-Subject: [PATCH v2 2/4] spi: rockchip: add bindings for rk3399 spi
-In-Reply-To: <1455762983-29980-3-git-send-email-jay.xu@rock-chips.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 18 Feb 2016 10:47:31 +0100
+Subject: [PATCH v2.1 2/4] spi: rockchip: add bindings for rk3399 spi
+In-Reply-To: <20160218094108.GA7129@sirena.org.uk>
 References: <1455762983-29980-1-git-send-email-jay.xu@rock-chips.com>
  <1455762983-29980-3-git-send-email-jay.xu@rock-chips.com>
-Message-ID: <20160218094108.GA7129@sirena.org.uk>
+ <20160218094108.GA7129@sirena.org.uk>
+Message-ID: <2327512.KAqs6H56Km@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 18, 2016 at 10:36:21AM +0800, jianqun.xu wrote:
+From: Xu Jianqun <jay.xu@rock-chips.com>
 
->  Documentation/devicetree/bindings/spi/spi-rockchip.txt | 1 +
->  1 file changed, 1 insertion(+)
+Add devicetree bindings for Rockchip rk3399 spi which found on
+Rockchip rk3399 SoCs.
 
-I'd still expect to see the string in the driver.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160218/8899d408/attachment-0001.sig>
+Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+Hi Jianqun,
+what Mark means is the following.
+
+ Documentation/devicetree/bindings/spi/spi-rockchip.txt | 1 +
+ drivers/spi/spi-rockchip.c                             | 1 +
+ 2 files changed, 2 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/spi/spi-rockchip.txt b/Documentation/devicetree/bindings/spi/spi-rockchip.txt
+index 0c491bd..1b14d69 100644
+--- a/Documentation/devicetree/bindings/spi/spi-rockchip.txt
++++ b/Documentation/devicetree/bindings/spi/spi-rockchip.txt
+@@ -9,6 +9,7 @@ Required Properties:
+     "rockchip,rk3066-spi" for rk3066.
+     "rockchip,rk3188-spi", "rockchip,rk3066-spi" for rk3188.
+     "rockchip,rk3288-spi", "rockchip,rk3066-spi" for rk3288.
++    "rockchip,rk3399-spi", "rockchip,rk3066-spi" for rk3399.
+ - reg: physical base address of the controller and length of memory mapped
+        region.
+ - interrupts: The interrupt number to the cpu. The interrupt specifier format
+diff --git a/drivers/spi/spi-rockchip.c b/drivers/spi/spi-rockchip.c
+index 79a8bc4..345fefd 100644
+--- a/drivers/spi/spi-rockchip.c
++++ b/drivers/spi/spi-rockchip.c
+@@ -868,6 +868,7 @@ static const struct of_device_id rockchip_spi_dt_match[] = {
+ 	{ .compatible = "rockchip,rk3066-spi", },
+ 	{ .compatible = "rockchip,rk3188-spi", },
+ 	{ .compatible = "rockchip,rk3288-spi", },
++	{ .compatible = "rockchip,rk3399-spi", },
+ 	{ },
+ };
+ MODULE_DEVICE_TABLE(of, rockchip_spi_dt_match);
+-- 
+2.6.4
