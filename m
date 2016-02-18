@@ -1,31 +1,33 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 18 Feb 2016 21:48:43 +0100
-Subject: [PATCH 07/11] Documentation/DT: add Versatile display bindings
-In-Reply-To: <56C43936.2060808@ti.com>
-References: <1454594660-7532-1-git-send-email-linus.walleij@linaro.org>
- <1454594660-7532-8-git-send-email-linus.walleij@linaro.org>
- <56C43936.2060808@ti.com>
-Message-ID: <CACRpkdbGqbjEwHcspcRW0_889YO0RpVTef2mhVdP_9vJHMD8gQ@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 18 Feb 2016 16:00:09 -0500 (EST)
+Subject: [PATCH] USB: cdc_subset: only build when one driver is enabled
+In-Reply-To: <1455747932-2844084-1-git-send-email-arnd@arndb.de>
+References: <1455747932-2844084-1-git-send-email-arnd@arndb.de>
+Message-ID: <20160218.160009.1485326686227753180.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 17, 2016 at 10:11 AM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Wed, 17 Feb 2016 23:25:11 +0100
 
->> +Required properties:
->> +- compatible: should be "epson,l2f50113t00"
->> +
->> +This binding is compatible with the panel-dpi binding, which is specified
->> +in panel-dpi.txt in this directory.
->
-> Do we really want to add new binding doc files for all panels, even if
-> they just point to a more generic binding? We may end up with quite a
-> lot of these, each only saying "look at the panel-dpi.txt".
+> This avoids a harmless randconfig warning I get when USB_NET_CDC_SUBSET
+> is enabled, but all of the more specific drivers are not:
+> 
+> drivers/net/usb/cdc_subset.c:241:2: #warning You need to configure some hardware for this driver
+> 
+> The current behavior is clearly intentional, giving a warning when
+> a user picks a configuration that won't do anything good. The only
+> reason for even addressing this is that I'm getting close to
+> eliminating all 'randconfig' warnings on ARM, and this came up
+> a couple of times.
+> 
+> My workaround is to not even build the module when none of the
+> configurations are enable.
+> 
+> Alternatively we could simply remove the #warning (nothing wrong
+> for compile-testing), turn it into a runtime warning, or
+> change the Kconfig options into a menu to hide CONFIG_USB_NET_CDC_SUBSET.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-That's sort of what I'm asking too. But there was some other
-file doing exactly this :(
-
-What do you say about just putting a list of compatible panels
-directly into panel-dpi.txt?
-
-Yours,
-Linus Walleij
+Applied, thanks Arnd.
