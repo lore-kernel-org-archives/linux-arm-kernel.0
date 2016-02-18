@@ -1,37 +1,49 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 18 Feb 2016 23:04:35 +0800
-Subject: [PATCH] ARM: dts: vf-colibri: disable write-protection for SD-card
-In-Reply-To: <1455752656-4040-1-git-send-email-stefan@agner.ch>
-References: <1455752656-4040-1-git-send-email-stefan@agner.ch>
-Message-ID: <20160218150434.GD6756@tiger>
+Date: Thu, 18 Feb 2016 23:10:42 +0800
+Subject: [PATCH] ARM: dts: vf610: add performance monitoring unit
+In-Reply-To: <1455755820-31442-1-git-send-email-stefan@agner.ch>
+References: <1455755820-31442-1-git-send-email-stefan@agner.ch>
+Message-ID: <20160218151042.GE6756@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 17, 2016 at 03:44:16PM -0800, Stefan Agner wrote:
-> The Colibri standard does not define a pin for SD-Card write-
-> protection. Use the disable-wp property to indicate that there
-> is no physical WP line present.
+On Wed, Feb 17, 2016 at 04:37:00PM -0800, Stefan Agner wrote:
+> All Freescale Vybrid SoC include a Cortex-A5 core which supports
+> ARM's standard PMU (performance monitoring unit). Include the
+> monitoring unit into the Cortex-A5 base device tree vf500.dtsi.
 > 
 > Signed-off-by: Stefan Agner <stefan@agner.ch>
-
-Applied, thanks.
-
 > ---
->  arch/arm/boot/dts/vf-colibri.dtsi | 1 +
->  1 file changed, 1 insertion(+)
+>  arch/arm/boot/dts/vf500.dtsi | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
 > 
-> diff --git a/arch/arm/boot/dts/vf-colibri.dtsi b/arch/arm/boot/dts/vf-colibri.dtsi
-> index ff6f58e..e49bbbc 100644
-> --- a/arch/arm/boot/dts/vf-colibri.dtsi
-> +++ b/arch/arm/boot/dts/vf-colibri.dtsi
-> @@ -92,6 +92,7 @@
->  	pinctrl-0 = <&pinctrl_esdhc1>;
->  	bus-width = <4>;
->  	cd-gpios = <&gpio1 10 GPIO_ACTIVE_LOW>;
-> +	disable-wp;
+> diff --git a/arch/arm/boot/dts/vf500.dtsi b/arch/arm/boot/dts/vf500.dtsi
+> index b94b992..9cd1ac5 100644
+> --- a/arch/arm/boot/dts/vf500.dtsi
+> +++ b/arch/arm/boot/dts/vf500.dtsi
+> @@ -75,6 +75,16 @@
+>  				clocks = <&clks VF610_CLK_PLATFORM_BUS>;
+>  			};
+>  		};
+> +
+> +		aips-bus at 40080000 {
+> +
+
+This new line is not really necessary.  I applied the patch with it
+dropped.
+
+Shawn
+
+> +			pmu at 40089000 {
+> +				compatible = "arm,cortex-a5-pmu";
+> +				interrupts = <7 IRQ_TYPE_LEVEL_HIGH>;
+> +				interrupt-affinity = <&a5_cpu>;
+> +			};
+> +		};
+> +
+>  	};
 >  };
 >  
->  &fec1 {
 > -- 
 > 2.7.1
 > 
