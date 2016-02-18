@@ -1,48 +1,50 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 18 Feb 2016 13:42:03 +0900
-Subject: [RFC 3/3] ARM: dts: Don't overheat the Odroid XU3-Lite on high
- load
-In-Reply-To: <20160218023622.GA2610@vireshk-i7>
-References: <1455692128-28504-1-git-send-email-k.kozlowski@samsung.com>
- <1455692128-28504-4-git-send-email-k.kozlowski@samsung.com>
- <CANAwSgQHiJGSYB7Qhq066Mqfskwrr_3SDQGXH-WN=Wt3SEF-QA@mail.gmail.com>
- <56C522A9.8070800@samsung.com> <20160218023622.GA2610@vireshk-i7>
-Message-ID: <56C54B9B.7030105@samsung.com>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 17 Feb 2016 23:43:21 -0500 (EST)
+Subject: [PATCH v2 net-next 6/8] net: mvneta: bm: add support for
+ hardware buffer management
+In-Reply-To: <1455636823-14470-7-git-send-email-gregory.clement@free-electrons.com>
+References: <1455636823-14470-1-git-send-email-gregory.clement@free-electrons.com>
+ <1455636823-14470-7-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20160217.234321.1202099534402079240.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18.02.2016 11:36, Viresh Kumar wrote:
->>
->> BTW, I found the issue. The order of trip points in DT:
->> thermal_zone0/trip_point_0_hyst:5000
->> thermal_zone0/trip_point_0_temp:50000
->> thermal_zone0/trip_point_0_type:active
->> thermal_zone0/trip_point_1_hyst:5000
->> thermal_zone0/trip_point_1_temp:60000
->> thermal_zone0/trip_point_1_type:active
->> thermal_zone0/trip_point_2_hyst:5000
->> thermal_zone0/trip_point_2_temp:70000
->> thermal_zone0/trip_point_2_type:active
->> thermal_zone0/trip_point_3_hyst:0
->> thermal_zone0/trip_point_3_temp:120000	<---- this should be last one!
->> thermal_zone0/trip_point_3_type:critical
->> thermal_zone0/trip_point_4_hyst:5000
->> thermal_zone0/trip_point_4_temp:90000
->> thermal_zone0/trip_point_4_type:passive
->> thermal_zone0/trip_point_5_hyst:5000
->> thermal_zone0/trip_point_5_temp:110000
->> thermal_zone0/trip_point_5_type:passive
->>
->> After fixing the order in DT, the cpu cooler starts working.
-> 
-> Ahh, nice.
+From: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Date: Tue, 16 Feb 2016 16:33:41 +0100
 
-Damn, not entirely. I almost fried my Odroid (it survived 130 degrees of
-C)... The TMU supports only 4 trip points, so when I added two new trip
-points and reordered them... the last two (including critical) was not
-receiving interrupts.
+>  	pp->dev = dev;
+>  	SET_NETDEV_DEV(dev, &pdev->dev);
+>  
+> +	dev->features = NETIF_F_SG | NETIF_F_IP_CSUM | NETIF_F_TSO;
+> +	dev->hw_features |= dev->features;
+> +	dev->vlan_features |= dev->features;
+> +	dev->priv_flags |= IFF_UNICAST_FLT;
+> +	dev->gso_max_segs = MVNETA_MAX_TSO_SEGS;
+> +
+> +	err = register_netdev(dev);
+> +	if (err < 0) {
+> +		dev_err(&pdev->dev, "failed to register\n");
+> +		goto err_free_stats;
+> +	}
+> +
+> +	pp->id = dev->ifindex;
+> +
+> +	/* Obtain access to BM resources if enabled and already initialized */
+> +	bm_node = of_parse_phandle(dn, "buffer-manager", 0);
+> +	if (bm_node && bm_node->data) {
 
-Polling mode is needed. I'll sent some patches soon...
+This set of changes has a lot of problems.
 
-BR,
-Krzysztof
+First, the exact moment you call register_netdev() your device must be
+fully initialized because ->open() can be invoked immediately.  This
+means you must take care of all of this buffer manager stuff before
+calling register_netdev().
+
+It must precisely be the last thing you invoke in your probe function
+for this reason.
+
+Also you are now adding conditionalized code to every fastpath in your
+driver, that is rediculous and is going to hurt performance.
+
+Add seperate code paths for the HWBM vs SWBM, and register a unique
+set of netdev_ops as appropriate.
