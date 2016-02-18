@@ -1,70 +1,59 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 17 Feb 2016 17:51:42 -0700
-Subject: [PATCH 00/21] coresight: next v4.5-rc4
-Message-ID: <1455756723-8456-1-git-send-email-mathieu.poirier@linaro.org>
+Date: Wed, 17 Feb 2016 17:51:46 -0700
+Subject: [PATCH 04/21] coresight: add API to get sink from path
+In-Reply-To: <1455756723-8456-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1455756723-8456-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1455756723-8456-5-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Good evening Greg,
+Add an API allowing external code to quickly get a handle on the
+sink within a path.  The sink is always last, but adding an API allows
+to keep the path's node structure private and remove redundant checks.
 
-Here are more enhancement that I would like to see going in the 4.6 cycle.
-Everything will apply cleanly on your 'char-misc-next' branch.  
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+---
+ drivers/hwtracing/coresight/coresight-priv.h |  1 +
+ drivers/hwtracing/coresight/coresight.c      | 15 +++++++++++++++
+ 2 files changed, 16 insertions(+)
 
-Thanks,
-Mathieu
-
-Eric Long (2):
-  coresight: "DEVICE_ATTR_RO" should defined as static.
-  coresight: etm4x: Check every parameter used by dma_xx_coherent.
-
-Mathieu Poirier (18):
-  coresight: associating path with session rather than tracer
-  coresight: add API to get sink from path
-  coresight: moving PM runtime operations to core framework
-  coresight: etm3x: moving etm_readl/writel to header file
-  coresight: etm3x: moving sysFS entries to dedicated file
-  coresight: etm3x: unlocking tracers in default arch init
-  coresight: etm3x: splitting struct etm_drvdata
-  coresight: etm3x: adding operation mode for etm_enable()
-  coresight: etm3x: set progbit to stop trace collection
-  coresight: etm3x: changing default trace configuration
-  coresight: etm3x: consolidating initial config
-  coresight: etm3x: implementing user/kernel mode tracing
-  coresight: etm3x: implementing perf_enable/disable() API
-  coresight: etb10: moving to local atomic operations
-  coresight: etb10: adding operation mode for sink->enable()
-  coresight: etb10: implementing AUX API
-  coresight: etm-perf: new PMU driver for ETM tracers
-  coresight: introducing a global trace ID function
-
-Paul Gortmaker (1):
-  drivers/hwtracing: make coresight-* explicitly non-modular
-
- drivers/hwtracing/coresight/Kconfig                |    1 +
- drivers/hwtracing/coresight/Makefile               |    4 +-
- drivers/hwtracing/coresight/coresight-etb10.c      |  282 +++-
- drivers/hwtracing/coresight/coresight-etm-perf.c   |  393 +++++
- drivers/hwtracing/coresight/coresight-etm-perf.h   |   32 +
- drivers/hwtracing/coresight/coresight-etm.h        |  142 +-
- .../hwtracing/coresight/coresight-etm3x-sysfs.c    | 1272 +++++++++++++++
- drivers/hwtracing/coresight/coresight-etm3x.c      | 1724 ++++----------------
- drivers/hwtracing/coresight/coresight-etm4x.c      |   16 +-
- drivers/hwtracing/coresight/coresight-funnel.c     |   11 +-
- drivers/hwtracing/coresight/coresight-priv.h       |   15 +
- .../coresight/coresight-replicator-qcom.c          |    8 +-
- drivers/hwtracing/coresight/coresight-replicator.c |    9 +-
- drivers/hwtracing/coresight/coresight-tmc.c        |   20 +-
- drivers/hwtracing/coresight/coresight-tpiu.c       |   13 +-
- drivers/hwtracing/coresight/coresight.c            |  329 ++--
- drivers/hwtracing/coresight/of_coresight.c         |    3 +-
- include/linux/amba/bus.h                           |    9 +
- include/linux/coresight-pmu.h                      |   39 +
- include/linux/coresight.h                          |   31 +-
- 20 files changed, 2740 insertions(+), 1613 deletions(-)
- create mode 100644 drivers/hwtracing/coresight/coresight-etm-perf.c
- create mode 100644 drivers/hwtracing/coresight/coresight-etm-perf.h
- create mode 100644 drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
- create mode 100644 include/linux/coresight-pmu.h
-
+diff --git a/drivers/hwtracing/coresight/coresight-priv.h b/drivers/hwtracing/coresight/coresight-priv.h
+index 7b193a34d709..14f245a2018d 100644
+--- a/drivers/hwtracing/coresight/coresight-priv.h
++++ b/drivers/hwtracing/coresight/coresight-priv.h
+@@ -54,6 +54,7 @@ static inline void CS_UNLOCK(void __iomem *addr)
+ 
+ void coresight_disable_path(struct list_head *path);
+ int coresight_enable_path(struct list_head *path);
++struct coresight_device *coresight_get_sink(struct list_head *path);
+ struct list_head *coresight_build_path(struct coresight_device *csdev);
+ void coresight_release_path(struct list_head *path);
+ 
+diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
+index f26589effb70..2ed48545df26 100644
+--- a/drivers/hwtracing/coresight/coresight.c
++++ b/drivers/hwtracing/coresight/coresight.c
+@@ -321,6 +321,21 @@ err:
+ 	goto out;
+ }
+ 
++struct coresight_device *coresight_get_sink(struct list_head *path)
++{
++	struct coresight_device *csdev;
++
++	if (!path)
++		return NULL;
++
++	csdev = list_last_entry(path, struct coresight_node, link)->csdev;
++	if (csdev->type != CORESIGHT_DEV_TYPE_SINK &&
++	    csdev->type != CORESIGHT_DEV_TYPE_LINKSINK)
++		return NULL;
++
++	return csdev;
++}
++
+ /**
+  * _coresight_build_path - recursively build a path from a @csdev to a sink.
+  * @csdev:	The device to start from.
 -- 
 2.1.4
