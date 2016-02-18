@@ -1,45 +1,50 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 18 Feb 2016 17:26:56 +0100
-Subject: [PATCH v2] ARM: atags_to_fdt: don't warn about stack size
-In-Reply-To: <alpine.LFD.2.20.1602181112310.13632@knanqh.ubzr>
-References: <1455804123-2526139-1-git-send-email-arnd@arndb.de>
- <1455804123-2526139-6-git-send-email-arnd@arndb.de>
- <alpine.LFD.2.20.1602181112310.13632@knanqh.ubzr>
-Message-ID: <7301172.5fH67MHlU9@wuerfel>
+Date: Thu, 18 Feb 2016 17:27:48 +0100
+Subject: [PATCH v2] irqchip: irq-mvebu-odmi: new driver for platform MSI
+ on Marvell 7K/8K
+In-Reply-To: <20160218171623.664dabd1@free-electrons.com>
+References: <1455811134-3679-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <3923904.c50oLNXXZ1@wuerfel> <20160218171623.664dabd1@free-electrons.com>
+Message-ID: <3474575.KNRGuJK4d6@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The merge_fdt_bootargs() function by definition consumes more than 1024
-bytes of stack because it has a 1024 byte command line on the stack,
-meaning that we always get a warning when building this file:
+On Thursday 18 February 2016 17:16:23 Thomas Petazzoni wrote:
+> 
+> On Thu, 18 Feb 2016 17:08:05 +0100, Arnd Bergmann wrote:
+> > On Thursday 18 February 2016 16:58:54 Thomas Petazzoni wrote:
+> > > +- marvell,spi-base     : List of GIC base SPI interrupts, one for each
+> > > +                         ODMI frame. Those SPI interrupts are 0-based,
+> > > +                         i.e marvell,spi-base = <128> will use SPI #96.
+> > > +                         See Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt
+> > > +                         for details about the GIC Device Tree binding.
+> > > 
+> > 
+> > Why are these not just in an 'interrupts' property as we do for other
+> > nested irqchips?
+> 
+> I modeled this after the GICv2m bindings. I think the reason is that if
+> we were to use the interrupts property, we should be listing *all*
+> interrupts of the parent interrupt controller we are using. Which would
+> be quite painful when your ODMI interrupt controller uses 32 interrupts
+> of the parent controller (I think for the GICv2m, it's even more).
+> 
+> I.e, we currently say:
+> 
+>         marvell,spi-base = <128>, <136>, <144>, <152>
+> 
+> but in fact we are using 128, 129, 130, 131, 132, 133, 134, 135, 136,
+> 137, etc. until 159.
+> 
+> If you think
+> 
+>         interrupts = <128>, <136>, <144>, <152>
+> 
+> is still correct, then why not. But I believe this might be confusing,
+> as people will think that we are only using interrupts 128, 136, 144
+> and 152, and not 129, 133, 147 or 158.
+> 
 
-arch/arm/boot/compressed/atags_to_fdt.c: In function 'merge_fdt_bootargs':
-arch/arm/boot/compressed/atags_to_fdt.c:98:1: warning: the frame size of 1032 bytes is larger than 1024 bytes [-Wframe-larger-than=]
+Ok, got it. Your current version seems fine then.
 
-However, as this is the decompressor and we know that it has a very shallow
-call chain, and we do not actually risk overflowing the kernel stack
-at runtime here.
-
-This just shuts up the warning by slightly increasing the limit for this
-file.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
-On Thursday 18 February 2016 11:13:52 Nicolas Pitre wrote:
-> What about setting the warning to 2048 instead?
-
-Sure, actually 1280 is more than enough I think.
-
-diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-index 7a6a58ef8aaf..2cc63038d6c8 100644
---- a/arch/arm/boot/compressed/Makefile
-+++ b/arch/arm/boot/compressed/Makefile
-@@ -85,6 +85,8 @@ $(addprefix $(obj)/,$(libfdt) $(libfdt_hdrs)): $(obj)/%: $(srctree)/scripts/dtc/
- $(addprefix $(obj)/,$(libfdt_objs) atags_to_fdt.o): \
- 	$(addprefix $(obj)/,$(libfdt_hdrs))
- 
-+CFLAGS_atags_to_fdt.o += -Wframe-larger-than=1280
-+
- ifeq ($(CONFIG_ARM_ATAG_DTB_COMPAT),y)
- OBJS	+= $(libfdt_objs) atags_to_fdt.o
- endif
+	Arnd
