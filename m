@@ -1,89 +1,180 @@
-From: frank.li@nxp.com (Frank Li)
-Date: Thu, 18 Feb 2016 16:56:22 +0000
-Subject: iMX7d cpu1 issue
-In-Reply-To: <56C5F4D7.1070704@compulab.co.il>
-References: <56C2D63F.1030408@compulab.co.il> <20160218140913.GY6756@tiger>
- <AMSPR04MB263D00A3F8D9A8D9D3A536D88AF0@AMSPR04MB263.eurprd04.prod.outlook.com>
- <56C5F4D7.1070704@compulab.co.il>
-Message-ID: <AMSPR04MB26334EB884FA8A4B565278188AF0@AMSPR04MB263.eurprd04.prod.outlook.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Thu, 18 Feb 2016 17:58:45 +0100
+Subject: [RFC v3 15/15] irqchip/gicv2m/v3-its-pci-msi: IOMMU map the MSI
+ frame when needed
+In-Reply-To: <56C5E787.9070303@arm.com>
+References: <1455264797-2334-1-git-send-email-eric.auger@linaro.org>
+ <1455264797-2334-16-git-send-email-eric.auger@linaro.org>
+ <20160218113307.2b263b10@arm.com> <56C5E450.3010501@linaro.org>
+ <56C5E787.9070303@arm.com>
+Message-ID: <56C5F845.7020408@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> -----Original Message-----
-> From: Ilya Ledvich [mailto:ilya at compulab.co.il]
-> Sent: Thursday, February 18, 2016 10:44 AM
-> To: Frank Li <frank.li@nxp.com>; Shawn Guo <shawnguo@kernel.org>
-> Cc: linux-arm-kernel at lists.infradead.org; Yongcai Huang
-> <anson.huang@nxp.com>
-> Subject: Re: iMX7d cpu1 issue
+Hi Marc,
+On 02/18/2016 04:47 PM, Marc Zyngier wrote:
+> On 18/02/16 15:33, Eric Auger wrote:
+>> Hi Marc,
+>> On 02/18/2016 12:33 PM, Marc Zyngier wrote:
+>>> On Fri, 12 Feb 2016 08:13:17 +0000
+>>> Eric Auger <eric.auger@linaro.org> wrote:
+>>>
+>>>> In case the msi_desc references a device attached to an iommu
+>>>> domain, the msi address needs to be mapped in the IOMMU. Else any
+>>>> MSI write transaction will cause a fault.
+>>>>
+>>>> gic_set_msi_addr detects that case and allocates an iova bound
+>>>> to the physical address page comprising the MSI frame. This iova
+>>>> then is used as the msi_msg address. Unset operation decrements the
+>>>> reference on the binding.
+>>>>
+>>>> The functions are called in the irq_write_msi_msg ops implementation.
+>>>> At that time we can recognize whether the msi is setup or teared down
+>>>> looking at the msi_msg content. Indeed msi_domain_deactivate zeroes all
+>>>> the fields.
+>>>>
+>>>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>>>>
+>>>> ---
+>>>>
+>>>> v2 -> v3:
+>>>> - protect iova/addr manipulation with CONFIG_ARCH_DMA_ADDR_T_64BIT and
+>>>>   CONFIG_PHYS_ADDR_T_64BIT
+>>>> - only expose gic_pci_msi_domain_write_msg in case CONFIG_IOMMU_API &
+>>>>   CONFIG_PCI_MSI_IRQ_DOMAIN are set.
+>>>> - gic_set/unset_msi_addr duly become static
+>>>> ---
+>>>>  drivers/irqchip/irq-gic-common.c         | 69 ++++++++++++++++++++++++++++++++
+>>>>  drivers/irqchip/irq-gic-common.h         |  5 +++
+>>>>  drivers/irqchip/irq-gic-v2m.c            |  7 +++-
+>>>>  drivers/irqchip/irq-gic-v3-its-pci-msi.c |  5 +++
+>>>>  4 files changed, 85 insertions(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/drivers/irqchip/irq-gic-common.c b/drivers/irqchip/irq-gic-common.c
+>>>> index f174ce0..46cd06c 100644
+>>>> --- a/drivers/irqchip/irq-gic-common.c
+>>>> +++ b/drivers/irqchip/irq-gic-common.c
+>>>> @@ -18,6 +18,8 @@
+>>>>  #include <linux/io.h>
+>>>>  #include <linux/irq.h>
+>>>>  #include <linux/irqchip/arm-gic.h>
+>>>> +#include <linux/iommu.h>
+>>>> +#include <linux/msi.h>
+>>>>  
+>>>>  #include "irq-gic-common.h"
+>>>>  
+>>>> @@ -121,3 +123,70 @@ void gic_cpu_config(void __iomem *base, void (*sync_access)(void))
+>>>>  	if (sync_access)
+>>>>  		sync_access();
+>>>>  }
+>>>> +
+>>>> +#if defined(CONFIG_IOMMU_API) && defined(CONFIG_PCI_MSI_IRQ_DOMAIN)
+>>>> +static int gic_set_msi_addr(struct irq_data *data, struct msi_msg *msg)
+>>>> +{
+>>>> +	struct msi_desc *desc = irq_data_get_msi_desc(data);
+>>>> +	struct device *dev = msi_desc_to_dev(desc);
+>>>> +	struct iommu_domain *d;
+>>>> +	phys_addr_t addr;
+>>>> +	dma_addr_t iova;
+>>>> +	int ret;
+>>>> +
+>>>> +	d = iommu_get_domain_for_dev(dev);
+>>>> +	if (!d)
+>>>> +		return 0;
+>>>> +#ifdef CONFIG_PHYS_ADDR_T_64BIT
+>>>> +	addr = ((phys_addr_t)(msg->address_hi) << 32) | msg->address_lo;
+>>>> +#else
+>>>> +	addr = msg->address_lo;
+>>>> +#endif
+>>>> +
+>>>> +	ret = iommu_get_single_reserved(d, addr, IOMMU_WRITE, &iova);
+>>>> +
+>>>> +	if (!ret) {
+>>>> +		msg->address_lo = lower_32_bits(iova);
+>>>> +		msg->address_hi = upper_32_bits(iova);
+>>>> +	}
+>>>> +	return ret;
+>>>> +}
+>>>> +
+>>>> +
+>>>> +static void gic_unset_msi_addr(struct irq_data *data)
+>>>> +{
+>>>> +	struct msi_desc *desc = irq_data_get_msi_desc(data);
+>>>> +	struct device *dev;
+>>>> +	struct iommu_domain *d;
+>>>> +	dma_addr_t iova;
+>>>> +
+>>>> +#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
+>>>> +	iova = ((dma_addr_t)(desc->msg.address_hi) << 32) |
+>>>> +		desc->msg.address_lo;
+>>>> +#else
+>>>> +	iova = desc->msg.address_lo;
+>>>> +#endif
+>>>> +
+>>>> +	dev = msi_desc_to_dev(desc);
+>>>> +	if (!dev)
+>>>> +		return;
+>>>> +
+>>>> +	d = iommu_get_domain_for_dev(dev);
+>>>> +	if (!d)
+>>>> +		return;
+>>>> +
+>>>> +	iommu_put_single_reserved(d, iova);
+>>>> +}
+>>>> +
+>>>> +void gic_pci_msi_domain_write_msg(struct irq_data *irq_data,
+>>>> +				  struct msi_msg *msg)
+>>>> +{
+>>>> +	if (!msg->address_hi && !msg->address_lo && !msg->data)
+>>>> +		gic_unset_msi_addr(irq_data); /* deactivate */
+>>>> +	else
+>>>> +		gic_set_msi_addr(irq_data, msg); /* activate, set_affinity */
+>>>> +
+>>>> +	pci_msi_domain_write_msg(irq_data, msg);
+>>>> +}
+>>>
+>>> So by doing that, you are specializing this infrastructure to PCI.
+>>> If you hijacked irq_compose_msi_msg() instead, you'd have both
+>>> platform and PCI MSI for the same price.
+>>>
+>>> I can see a potential problem with the teardown of an MSI (I don't
+>>> think the compose method is called on teardown), but I think this could
+>>> be easily addressed.
+>> Yes effectively this is the reason why I moved it from
+>> irq_compose_msi_msg (my original implementation) to irq_write_msi_msg. I
+>> noticed I had no way to detect the teardown whereas the
+>> msi_domain_deactivate also calls irq_write_msi_msg which is quite
+>> practical ;-) To be honest I need to further look at the non PCI
+>> implementation.
 > 
-> Hi!
-> 
-> On 02/18/2016 05:24 PM, Frank Li wrote:
-> >
-> >
-> >> -----Original Message-----
-> >> From: Shawn Guo [mailto:shawnguo at kernel.org]
-> >> Sent: Thursday, February 18, 2016 8:09 AM
-> >> To: Ilya Ledvich <ilya@compulab.co.il>
-> >> Cc: linux-arm-kernel at lists.infradead.org; Frank Li
-> >> <frank.li@nxp.com>; Yongcai Huang <anson.huang@nxp.com>
-> >> Subject: Re: iMX7d cpu1 issue
-> >>
-> >> On Tue, Feb 16, 2016 at 09:56:47AM +0200, Ilya Ledvich wrote:
-> >>> Hi Shawn,
-> >>> I'm working on Compulab CL-SOM-IMX7 device
-> >>> (http://www.compulab.co.il/products/computer-on-modules/cl-som-
-> >> imx7-fr
-> >>> eescale-i-mx-7-system-on-module)
-> >>> based on Freescale iMX7d CPU.
-> >>> I use the Freescale latest BSP imx_3.14.52_1.1.0_ga  and the Linux
-> >>> mainline v4.4-rc6 as a reference.
-> >>> I observe an issue with bringing up the second CPU core. Briefly,
-> >>> the kernel can successfully boot only when CPU1 fails to come online.
-> >>> In this case the boot log shows the following messages:
-> >>> ...
-> >>> CPU1: failed to come online
-> >>> Brought up 1 CPUs
-> >>> SMP: Total of 1 processors activated (6.00 BogoMIPS).
-> >>> ...
-> >>>
-> >>> Otherwise, the device tries to start kernel several times until the
-> >>> boot process eventually crashes. Please see attached logs for more
-> >>> details.
-> >>> This never happens on mainline Linus kernel, because it never tries
-> >>> to bring up CPU1.
-> >>> Unfortunately, we cannot verify this behavior on reference board
-> >>> cause we have no one.
-> >>> Have you ever seen such behavior? Could you please advice something?
-> >
-> > Did you set arm,cpu-registers-not-fw-configured; in arch timer?
-> 
-> Yes, it's set in the imx7d.dtsi file included by my device .dts.
-> 
-> > How about your uboot version?
-> >
-> > Latest upstream uboot already boot A7 as no-security mode.
-> 
-> I actually use v2016.01 from the upstream and u-boot sources are based on
-> on mx7dsabresd.c.
+> Another thing to consider is that MSI controllers may use different
+> doorbells for different CPU affinities.
 
-Can you try to disable NOSEC?
+OK thanks for pointing this out.
 
-#define CONFIG_MX7_SEC
+This is also a good confirmation that a single IOVA address is not
+always sufficient (at some point we wondered if we could directly use
+the MSI controller guest PA instead of having the user-space providing
+an IOVA pool)
 
-include/configs/mx7_common.h
+ With your implementation,
+> repeatedly changing the affinity from one CPU to another would increase
+> the refcounting, and never actually lower it (you don't necessarily go
+> via an "unmap").
 
-Best regards
-Frank Li
-
+ Of course, none of that applies to GICv2m/GICv3-ITS,
+> but that's worth considering.
 > 
-> >
-> > Best regards
-> > Frank Li
-> >
+> So I think we may need some better tracking of the IOVA we program in
+> the device, and offer a generic infrastructure for this instead of
+> hiding it in the MSI controller drivers.
+OK I will study that.
+
+Thanks for your time!
+
+Eric
 > 
-> Kind regards,
-> Ilya.
+> Thanks,
+> 
+> 	M.
+> 
