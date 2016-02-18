@@ -1,37 +1,42 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 18 Feb 2016 14:43:48 +0000
-Subject: [PATCH v2 5/5] arm64: kernel: Don't toggle PAN on systems with UAO
-In-Reply-To: <20160218143648.GC2538@e104818-lin.cambridge.arm.com>
-References: <1454684330-892-1-git-send-email-james.morse@arm.com>
- <1454684330-892-6-git-send-email-james.morse@arm.com>
- <20160218143648.GC2538@e104818-lin.cambridge.arm.com>
-Message-ID: <56C5D8A4.8070505@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 18 Feb 2016 14:47:13 +0000
+Subject: [PATCH 1/3] irqchip: gic/realview: support more RealView DCC
+ variants
+In-Reply-To: <5028476.WAQS3ylXOd@wuerfel>
+References: <1455803172-22747-1-git-send-email-linus.walleij@linaro.org>
+ <56C5D304.5010708@arm.com> <5028476.WAQS3ylXOd@wuerfel>
+Message-ID: <56C5D971.6060005@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
-
-On 18/02/16 14:36, Catalin Marinas wrote:
-> On Fri, Feb 05, 2016 at 02:58:50PM +0000, James Morse wrote:
->> --- a/arch/arm64/mm/fault.c
->> +++ b/arch/arm64/mm/fault.c
->> @@ -234,6 +234,9 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
->>  	}
->>  
->>  	if (permission_fault(esr) && (addr < USER_DS)) {
->> +		if (get_thread_info(regs->sp)->addr_limit == KERNEL_DS)
->> +			panic("Accessing user space memory with fs=KERNEL_DS");
+On 18/02/16 14:40, Arnd Bergmann wrote:
+> On Thursday 18 February 2016 14:19:48 Marc Zyngier wrote:
+>> On 18/02/16 13:46, Linus Walleij wrote:
+>>> In the add-on file for the GIC dealing with the RealView family
+>>> we currently only handle the PB11MPCore, let's extend this to
+>>> manage the RealView EB ARM11MPCore as well. The Revision B of the
+>>> ARM11MPCore core tile is a bit special and needs special handling
+>>> as it moves a system control register around at random.
+>>
+>> Ah, 11MPCore RevB. That thing. Tried to locate one in the magic
+>> cupboard, and failed. Oh well...
 > 
-> We could simply use "get_fs() == KERNEL_DS" as we should call
-> do_page_fault() outside the current context.
+> What surprised me though is that it's enabled by default:
+> 
+> $ grep REVB arch/arm/configs/realview*
+> arch/arm/configs/realview_defconfig:CONFIG_REALVIEW_EB_ARM11MP_REVB=y
+> arch/arm/configs/realview-smp_defconfig:CONFIG_REALVIEW_EB_ARM11MP_REVB=y
+> 
+> With that option set, the defconfig kernel should not be able
+> to boot on RevC machines. Do you have a RevC machine that works
+> with the defconfig?
 
-shouldn't?
+No, it looks like someone helped themselves to *all* of the EB-11MPs - I
+have a bunch of empty baseboards, and no tile to slap on. I also have a
+box of unsoldered 11MPs, but that a different story... ;-)
 
-You're right, it will always be on the same stack, so get_fs() will give us the
-right result. This fits better with getting rid of the new get_thread_info() in
-patch 3.
+I guess I should plan for another dumpster diving session.
 
-
-Thanks,
-
-James
+	M.
+-- 
+Jazz is not dead. It just smells funny...
