@@ -1,64 +1,53 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Thu, 18 Feb 2016 07:53:02 -0800
-Subject: [PATCH v12] Add Mediatek thermal support
-In-Reply-To: <1448883753-19068-1-git-send-email-s.hauer@pengutronix.de>
-References: <1448883753-19068-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20160218155300.GA20378@localhost.localdomain>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 18 Feb 2016 10:55:59 -0500 (EST)
+Subject: [PATCH 3/9] ARM: make free_memmap as __init
+In-Reply-To: <1455804123-2526139-4-git-send-email-arnd@arndb.de>
+References: <1455804123-2526139-1-git-send-email-arnd@arndb.de>
+ <1455804123-2526139-4-git-send-email-arnd@arndb.de>
+Message-ID: <alpine.LFD.2.20.1602181055320.13632@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 30, 2015 at 12:42:30PM +0100, Sascha Hauer wrote:
-> This series adds support for the thermal sensors included in the
-> MT8173 SoC. Currently only basic temperature reading is supported
-> without any interrupt support.
-> 
+On Thu, 18 Feb 2016, Arnd Bergmann wrote:
 
-Merged v12.
+> free_memmap is an inline function, but gcc may choose to ignore that
+> when CONFIG_OPTIMIZE_INLINING is set. In that case it is put in the
+> .text section, causing a kbuild warning:
+> 
+> WARNING: vmlinux.o(.text.unlikely+0x1a0): Section mismatch in reference from the function free_memmap() to the function .init.text:__memblock_free_early()
+> The function free_memmap() references
+> the function __init __memblock_free_early().
+> This is often because free_memmap lacks a __init
+> annotation or the annotation of __memblock_free_early is wrong.
+> 
+> FATAL: modpost: Section mismatches detected.
+> Set CONFIG_SECTION_MISMATCH_WARN_ONLY=y to allow them.
+> 
+> This marks the function both inline and __init, which is a
+> correct annotation and avoids the problem.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-> 
-> 	fan: gpio_fan {
-> 		compatible = "gpio-fan";
-> 		gpios = <&pio 24 0>;
-> 		gpio-fan,speed-map = <0    0
-> 				      4500 1>;
-> 		#cooling-cells = <2>;
-> 	};
-> 
-> 	thermal-zones {
-> 			cpu_thermal: cpu_thermal {
-> 			polling-delay-passive = <1000>; /* milliseconds */
-> 			polling-delay = <1000>; /* milliseconds */
-> 
-> 			thermal-sensors = <&thermal>;
-> 
-> 			trips {
-> 				cpu_passive: cpu_passive {
-> 					temperature = <47000>; /* millicelsius */
-> 					hysteresis = <2000>; /* millicelsius */
-> 					type = "passive";
-> 				};
-> 
-> 				cpu_crit {
-> 					temperature = <90000>; /* millicelsius */
-> 					hysteresis = <2000>; /* millicelsius */
-> 					type = "critical";
-> 				};
-> 			};
-> 
-> 			cooling-maps {
-> 				map0 {
-> 					trip = <&cpu_passive>;
-> 					cooling-device = <&fan THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-> 				};
-> 			};
-> 		};
-> 	};
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
-But, as usual, the dt changes go via your machine tree.
-
-You may add my 
-Acked-by: Eduardo Valentin <edubezval@gmail.com>
-
-in your DT patch.
-
+> ---
+>  arch/arm/mm/init.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+> index 370581aeb871..a4db267c35b2 100644
+> --- a/arch/arm/mm/init.c
+> +++ b/arch/arm/mm/init.c
+> @@ -330,7 +330,7 @@ static inline void poison_init_mem(void *s, size_t count)
+>  		*p++ = 0xe7fddef0;
+>  }
+>  
+> -static inline void
+> +static inline void __init
+>  free_memmap(unsigned long start_pfn, unsigned long end_pfn)
+>  {
+>  	struct page *start_pg, *end_pg;
+> -- 
+> 2.7.0
+> 
 > 
