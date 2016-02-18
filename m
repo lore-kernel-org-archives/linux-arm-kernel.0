@@ -1,147 +1,321 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 17 Feb 2016 17:51:56 -0700
-Subject: [PATCH 14/21] coresight: etm3x: implementing user/kernel mode tracing
+Date: Wed, 17 Feb 2016 17:52:00 -0700
+Subject: [PATCH 18/21] coresight: etb10: implementing AUX API
 In-Reply-To: <1455756723-8456-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1455756723-8456-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1455756723-8456-15-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1455756723-8456-19-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding new mode to limit tracing to kernel or user space.
+Adding an ETB10 specific AUX area operations to be used
+by the perf framework when events are initialised.
+
+Part of this operation involves modeling the mmap'ed area
+based on the specific ways a sink buffer gathers information.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-etm.h        |  6 ++-
- .../hwtracing/coresight/coresight-etm3x-sysfs.c    |  4 ++
- drivers/hwtracing/coresight/coresight-etm3x.c      | 63 ++++++++++++++++++++++
- drivers/hwtracing/coresight/coresight-priv.h       |  3 ++
- 4 files changed, 75 insertions(+), 1 deletion(-)
+ drivers/hwtracing/coresight/coresight-etb10.c | 234 ++++++++++++++++++++++++++
+ include/linux/coresight.h                     |  21 ++-
+ 2 files changed, 253 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm.h b/drivers/hwtracing/coresight/coresight-etm.h
-index 44585d4adb26..51597cb2c08a 100644
---- a/drivers/hwtracing/coresight/coresight-etm.h
-+++ b/drivers/hwtracing/coresight/coresight-etm.h
-@@ -110,7 +110,10 @@
- #define ETM_MODE_STALL		BIT(2)
- #define ETM_MODE_TIMESTAMP	BIT(3)
- #define ETM_MODE_CTXID		BIT(4)
--#define ETM_MODE_ALL		0x1f
-+#define ETM_MODE_ALL		(ETM_MODE_EXCLUDE | ETM_MODE_CYCACC | \
-+				 ETM_MODE_STALL | ETM_MODE_TIMESTAMP | \
-+				 ETM_MODE_CTXID | ETM_MODE_EXCL_KERN | \
-+				 ETM_MODE_EXCL_USER)
- 
- #define ETM_SQR_MASK		0x3
- #define ETM_TRACEID_MASK	0x3f
-@@ -296,5 +299,6 @@ static inline unsigned int etm_readl(struct etm_drvdata *drvdata, u32 off)
- extern const struct attribute_group *coresight_etm_groups[];
- int etm_get_trace_id(struct etm_drvdata *drvdata);
- void etm_set_default(struct etm_config *config);
-+void etm_config_trace_mode(struct etm_config *config);
- struct etm_config *get_etm_config(struct etm_drvdata *drvdata);
- #endif
-diff --git a/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c b/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
-index 387c79fd9d5e..cbb4046c1070 100644
---- a/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
-+++ b/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
-@@ -162,6 +162,10 @@ static ssize_t mode_store(struct device *dev,
- 		config->ctrl |= ETMCR_CTXID_SIZE;
- 	else
- 		config->ctrl &= ~ETMCR_CTXID_SIZE;
+diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
+index 79099f95ba3f..a2eb6bdeaafa 100644
+--- a/drivers/hwtracing/coresight/coresight-etb10.c
++++ b/drivers/hwtracing/coresight/coresight-etb10.c
+@@ -28,6 +28,11 @@
+ #include <linux/coresight.h>
+ #include <linux/amba/bus.h>
+ #include <linux/clk.h>
++#include <linux/circ_buf.h>
++#include <linux/mm.h>
++#include <linux/perf_event.h>
 +
-+	if (config->mode & (ETM_MODE_EXCL_KERN | ETM_MODE_EXCL_USER))
-+		etm_config_trace_mode(config);
-+
- 	spin_unlock(&drvdata->spinlock);
++#include <asm/local.h>
  
- 	return size;
-diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
-index 34a69583ccbc..c82d545e68ef 100644
---- a/drivers/hwtracing/coresight/coresight-etm3x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm3x.c
-@@ -234,6 +234,69 @@ void etm_set_default(struct etm_config *config)
- 	config->ctxid_mask = 0x0;
+ #include "coresight-priv.h"
+ 
+@@ -65,6 +70,26 @@
+ #define ETB_FRAME_SIZE_WORDS	4
+ 
+ /**
++ * struct cs_buffer - keep track of a recording session' specifics
++ * @cur:	index of the current buffer
++ * @nr_pages:	max number of pages granted to us
++ * @offset:	offset within the current buffer
++ * @data_size:	how much we collected in this run
++ * @lost:	other than zero if we had a HW buffer wrap around
++ * @snapshot:	is this run in snapshot mode
++ * @data_pages:	a handle the ring buffer
++ */
++struct cs_buffers {
++	unsigned int		cur;
++	unsigned int		nr_pages;
++	unsigned long		offset;
++	local_t			data_size;
++	local_t			lost;
++	bool			snapshot;
++	void			**data_pages;
++};
++
++/**
+  * struct etb_drvdata - specifics associated to an ETB component
+  * @base:	memory mapped base address for this component.
+  * @dev:	the device entity associated to this component.
+@@ -265,9 +290,218 @@ static void etb_disable(struct coresight_device *csdev)
+ 	dev_info(drvdata->dev, "ETB disabled\n");
  }
  
-+void etm_config_trace_mode(struct etm_config *config)
++static void *etb_alloc_buffer(struct coresight_device *csdev, int cpu,
++			      void **pages, int nr_pages, bool overwrite)
 +{
-+	u32 flags, mode;
++	int node;
++	struct cs_buffers *buf;
 +
-+	mode = config->mode;
++	if (cpu == -1)
++		cpu = smp_processor_id();
++	node = cpu_to_node(cpu);
 +
-+	mode &= (ETM_MODE_EXCL_KERN | ETM_MODE_EXCL_USER);
++	buf = kzalloc_node(sizeof(struct cs_buffers), GFP_KERNEL, node);
++	if (!buf)
++		return NULL;
 +
-+	/* excluding kernel AND user space doesn't make sense */
-+	if (mode == (ETM_MODE_EXCL_KERN | ETM_MODE_EXCL_USER))
++	buf->snapshot = overwrite;
++	buf->nr_pages = nr_pages;
++	buf->data_pages = pages;
++
++	return buf;
++}
++
++static void etb_free_buffer(void *config)
++{
++	struct cs_buffers *buf = config;
++
++	kfree(buf);
++}
++
++static int etb_set_buffer(struct coresight_device *csdev,
++			  struct perf_output_handle *handle,
++			  void *sink_config)
++{
++	int ret = 0;
++	unsigned long head;
++	struct cs_buffers *buf = sink_config;
++
++	/* wrap head around to the amount of space we have */
++	head = handle->head & ((buf->nr_pages << PAGE_SHIFT) - 1);
++
++	/* find the page to write to */
++	buf->cur = head / PAGE_SIZE;
++
++	/* and offset within that page */
++	buf->offset = head % PAGE_SIZE;
++
++	local_set(&buf->data_size, 0);
++
++	return ret;
++}
++
++static unsigned long etb_reset_buffer(struct coresight_device *csdev,
++				      struct perf_output_handle *handle,
++				      void *sink_config, bool *lost)
++{
++	unsigned long size = 0;
++	struct cs_buffers *buf = sink_config;
++
++	if (buf) {
++		/*
++		 * In snapshot mode ->data_size holds the new address of the
++		 * ring buffer's head.  The size itself is the whole address
++		 * range since we want the latest information.
++		 */
++		if (buf->snapshot)
++			handle->head = local_xchg(&buf->data_size,
++						  buf->nr_pages << PAGE_SHIFT);
++
++		/*
++		 * Tell the tracer PMU how much we got in this run and if
++		 * something went wrong along the way.  Nobody else can use
++		 * this cs_buffers instance until we are done.  As such
++		 * resetting parameters here and squaring off with the ring
++		 * buffer API in the tracer PMU is fine.
++		 */
++		*lost = !!local_xchg(&buf->lost, 0);
++		size = local_xchg(&buf->data_size, 0);
++	}
++
++	return size;
++}
++
++static void etb_update_buffer(struct coresight_device *csdev,
++			      struct perf_output_handle *handle,
++			      void *sink_config)
++{
++	int i, cur;
++	u8 *buf_ptr;
++	u32 read_ptr, write_ptr, capacity;
++	u32 status, read_data, to_read;
++	unsigned long offset;
++	struct cs_buffers *buf = sink_config;
++	struct etb_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
++
++	if (!buf)
 +		return;
 +
-+	/* nothing to do if neither flags are set */
-+	if (!(mode & ETM_MODE_EXCL_KERN) && !(mode & ETM_MODE_EXCL_USER))
-+		return;
++	capacity = drvdata->buffer_depth * ETB_FRAME_SIZE_WORDS;
 +
-+	flags = (1 << 0 |	/* instruction execute */
-+		 3 << 3 |	/* ARM instruction */
-+		 0 << 5 |	/* No data value comparison */
-+		 0 << 7 |	/* No exact mach */
-+		 0 << 8);	/* Ignore context ID */
++	CS_UNLOCK(drvdata->base);
++	etb_disable_hw(drvdata);
 +
-+	/* No need to worry about single address comparators. */
-+	config->enable_ctrl2 = 0x0;
-+
-+	/* Bit 0 is address range comparator 1 */
-+	config->enable_ctrl1 = ETMTECR1_ADDR_COMP_1;
++	/* unit is in words, not bytes */
++	read_ptr = readl_relaxed(drvdata->base + ETB_RAM_READ_POINTER);
++	write_ptr = readl_relaxed(drvdata->base + ETB_RAM_WRITE_POINTER);
 +
 +	/*
-+	 * On ETMv3.5:
-+	 * ETMACTRn[13,11] == Non-secure state comparison control
-+	 * ETMACTRn[12,10] == Secure state comparison control
-+	 *
-+	 * b00 == Match in all modes in this state
-+	 * b01 == Do not match in any more in this state
-+	 * b10 == Match in all modes excepts user mode in this state
-+	 * b11 == Match only in user mode in this state
++	 * Entries should be aligned to the frame size.  If they are not
++	 * go back to the last alignement point to give decoding tools a
++	 * chance to fix things.
 +	 */
++	if (write_ptr % ETB_FRAME_SIZE_WORDS) {
++		dev_err(drvdata->dev,
++			"write_ptr: %lu not aligned to formatter frame size\n",
++			(unsigned long)write_ptr);
 +
-+	/* Tracing in secure mode is not supported at this time */
-+	flags |= (0 << 12 | 1 << 10);
-+
-+	if (mode & ETM_MODE_EXCL_USER) {
-+		/* exclude user, match all modes except user mode */
-+		flags |= (1 << 13 | 0 << 11);
-+	} else {
-+		/* exclude kernel, match only in user mode */
-+		flags |= (1 << 13 | 1 << 11);
++		write_ptr &= ~(ETB_FRAME_SIZE_WORDS - 1);
++		local_inc(&buf->lost);
 +	}
 +
 +	/*
-+	 * The ETMEEVR register is already set to "hard wire A".  As such
-+	 * all there is to do is setup an address comparator that spans
-+	 * the entire address range and configure the state and mode bits.
++	 * Get a hold of the status register and see if a wrap around
++	 * has occurred.  If so adjust things accordingly.  Otherwise
++	 * start at the beginning and go until the write pointer has
++	 * been reached.
 +	 */
-+	config->addr_val[0] = (u32) 0x0;
-+	config->addr_val[1] = (u32) ~0x0;
-+	config->addr_acctype[0] = flags;
-+	config->addr_acctype[1] = flags;
-+	config->addr_type[0] = ETM_ADDR_TYPE_RANGE;
-+	config->addr_type[1] = ETM_ADDR_TYPE_RANGE;
++	status = readl_relaxed(drvdata->base + ETB_STATUS_REG);
++	if (status & ETB_STATUS_RAM_FULL) {
++		local_inc(&buf->lost);
++		to_read = capacity;
++		read_ptr = write_ptr;
++	} else {
++		to_read = CIRC_CNT(write_ptr, read_ptr, drvdata->buffer_depth);
++		to_read *= ETB_FRAME_SIZE_WORDS;
++	}
++
++	/*
++	 * Make sure we don't overwrite data that hasn't been consumed yet.
++	 * It is entirely possible that the HW buffer has more data than the
++	 * ring buffer can currently handle.  If so adjust the start address
++	 * to take only the last traces.
++	 *
++	 * In snapshot mode we are looking to get the latest traces only and as
++	 * such, we don't care about not overwriting data that hasn't been
++	 * processed by user space.
++	 */
++	if (!buf->snapshot && to_read > handle->size) {
++		u32 mask = ~(ETB_FRAME_SIZE_WORDS - 1);
++
++		/* The new read pointer must be frame size aligned */
++		to_read -= handle->size & mask;
++		/*
++		 * Move the RAM read pointer up, keeping in mind that
++		 * everything is in frame size units.
++		 */
++		read_ptr = (write_ptr + drvdata->buffer_depth) -
++					to_read / ETB_FRAME_SIZE_WORDS;
++		/* Wrap around if need be*/
++		read_ptr &= ~(drvdata->buffer_depth - 1);
++		/* let the decoder know we've skipped ahead */
++		local_inc(&buf->lost);
++	}
++
++	/* finally tell HW where we want to start reading from */
++	writel_relaxed(read_ptr, drvdata->base + ETB_RAM_READ_POINTER);
++
++	cur = buf->cur;
++	offset = buf->offset;
++	for (i = 0; i < to_read; i += 4) {
++		buf_ptr = buf->data_pages[cur] + offset;
++		read_data = readl_relaxed(drvdata->base +
++					  ETB_RAM_READ_DATA_REG);
++		*buf_ptr++ = read_data >> 0;
++		*buf_ptr++ = read_data >> 8;
++		*buf_ptr++ = read_data >> 16;
++		*buf_ptr++ = read_data >> 24;
++
++		offset += 4;
++		if (offset >= PAGE_SIZE) {
++			offset = 0;
++			cur++;
++			/* wrap around at the end of the buffer */
++			cur &= buf->nr_pages - 1;
++		}
++	}
++
++	/* reset ETB buffer for next run */
++	writel_relaxed(0x0, drvdata->base + ETB_RAM_READ_POINTER);
++	writel_relaxed(0x0, drvdata->base + ETB_RAM_WRITE_POINTER);
++
++	/*
++	 * In snapshot mode all we have to do is communicate to
++	 * perf_aux_output_end() the address of the current head.  In full
++	 * trace mode the same function expects a size to move rb->aux_head
++	 * forward.
++	 */
++	if (buf->snapshot)
++		local_set(&buf->data_size, (cur * PAGE_SIZE) + offset);
++	else
++		local_add(to_read, &buf->data_size);
++
++	etb_enable_hw(drvdata);
++	CS_LOCK(drvdata->base);
 +}
 +
- static void etm_enable_hw(void *info)
- {
- 	int i;
-diff --git a/drivers/hwtracing/coresight/coresight-priv.h b/drivers/hwtracing/coresight/coresight-priv.h
-index ed116b303e87..932f34a84d96 100644
---- a/drivers/hwtracing/coresight/coresight-priv.h
-+++ b/drivers/hwtracing/coresight/coresight-priv.h
-@@ -34,6 +34,9 @@
- #define TIMEOUT_US		100
- #define BMVAL(val, lsb, msb)	((val & GENMASK(msb, lsb)) >> lsb)
+ static const struct coresight_ops_sink etb_sink_ops = {
+ 	.enable		= etb_enable,
+ 	.disable	= etb_disable,
++	.alloc_buffer	= etb_alloc_buffer,
++	.free_buffer	= etb_free_buffer,
++	.set_buffer	= etb_set_buffer,
++	.reset_buffer	= etb_reset_buffer,
++	.update_buffer	= etb_update_buffer,
+ };
  
-+#define ETM_MODE_EXCL_KERN	BIT(30)
-+#define ETM_MODE_EXCL_USER	BIT(31)
-+
- enum cs_mode {
- 	CS_MODE_DISABLED,
- 	CS_MODE_SYSFS,
+ static const struct coresight_ops etb_cs_ops = {
+diff --git a/include/linux/coresight.h b/include/linux/coresight.h
+index 9fa92dcdd2ea..385d62e64abb 100644
+--- a/include/linux/coresight.h
++++ b/include/linux/coresight.h
+@@ -182,12 +182,29 @@ struct coresight_device {
+ /**
+  * struct coresight_ops_sink - basic operations for a sink
+  * Operations available for sinks
+- * @enable:	enables the sink.
+- * @disable:	disables the sink.
++ * @enable:		enables the sink.
++ * @disable:		disables the sink.
++ * @alloc_buffer:	initialises perf's ring buffer for trace collection.
++ * @free_buffer:	release memory allocated in @get_config.
++ * @set_buffer:		initialises buffer mechanic before a trace session.
++ * @reset_buffer:	finalises buffer mechanic after a trace session.
++ * @update_buffer:	update buffer pointers after a trace session.
+  */
+ struct coresight_ops_sink {
+ 	int (*enable)(struct coresight_device *csdev, u32 mode);
+ 	void (*disable)(struct coresight_device *csdev);
++	void *(*alloc_buffer)(struct coresight_device *csdev, int cpu,
++			      void **pages, int nr_pages, bool overwrite);
++	void (*free_buffer)(void *config);
++	int (*set_buffer)(struct coresight_device *csdev,
++			  struct perf_output_handle *handle,
++			  void *sink_config);
++	unsigned long (*reset_buffer)(struct coresight_device *csdev,
++				      struct perf_output_handle *handle,
++				      void *sink_config, bool *lost);
++	void (*update_buffer)(struct coresight_device *csdev,
++			      struct perf_output_handle *handle,
++			      void *sink_config);
+ };
+ 
+ /**
 -- 
 2.1.4
