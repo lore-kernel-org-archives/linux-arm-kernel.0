@@ -1,74 +1,40 @@
-From: zhangqing@rock-chips.com (Elaine Zhang)
-Date: Thu, 18 Feb 2016 11:08:19 +0800
-Subject: [PATCH v2 6/6] dt/bindings: rockchip: modify document of Rockchip
- power domains
-Message-ID: <1455764899-13028-1-git-send-email-zhangqing@rock-chips.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 18 Feb 2016 09:00:33 +0000
+Subject: A gic problem about eoi
+In-Reply-To: <56C5500A.2060104@huawei.com>
+References: <56C5500A.2060104@huawei.com>
+Message-ID: <20160218090033.289de1c3@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add binding documentation for the power domains
-found on Rockchip RK3399 SoCs
+On Thu, 18 Feb 2016 13:00:58 +0800
+Yang Yingliang <yangyingliang@huawei.com> wrote:
 
-Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
----
- .../bindings/soc/rockchip/power_domain.txt          | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+Hi Yang,
 
-diff --git a/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt b/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
-index 13dc6a3..c65d401 100644
---- a/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
-+++ b/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
-@@ -7,6 +7,7 @@ Required properties for power domain controller:
- - compatible: Should be one of the following.
- 	"rockchip,rk3288-power-controller" - for RK3288 SoCs.
- 	"rockchip,rk3368-power-controller" - for RK3368 SoCs.
-+	"rockchip,rk3399-power-controller" - for RK3399 SoCs.
- - #power-domain-cells: Number of cells in a power-domain specifier.
- 	Should be 1 for multiple PM domains.
- - #address-cells: Should be 1.
-@@ -16,6 +17,7 @@ Required properties for power domain sub nodes:
- - reg: index of the power domain, should use macros in:
- 	"include/dt-bindings/power/rk3288-power.h" - for RK3288 type power domain.
- 	"include/dt-bindings/power/rk3368-power.h" - for RK3368 type power domain.
-+	"include/dt-bindings/power/rk3399-power.h" - for RK3399 type power domain.
- - clocks (optional): phandles to clocks which need to be enabled while power domain
- 	switches state.
- 
-@@ -45,12 +47,25 @@ Example:
-                 };
-         };
- 
-+	power: power-controller {
-+		compatible = "rockchip,rk3399-power-controller";
-+		#power-domain-cells = <1>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		pd_gpu {
-+			reg = <RK3399_PD_GPU>;
-+			clocks = <&cru ACLK_GPU>;
-+		};
-+	};
-+
- Node of a device using power domains must have a power-domains property,
- containing a phandle to the power device node and an index specifying which
- power domain to use.
- The index should use macros in:
- 	"include/dt-bindings/power/rk3288-power.h" - for rk3288 type power domain.
- 	"include/dt-bindings/power/rk3368-power.h" - for rk3368 type power domain.
-+	"include/dt-bindings/power/rk3399-power.h" - for rk3399 type power domain.
- 
- Example of the node using power domain:
- 
-@@ -65,3 +80,9 @@ Example of the node using power domain:
-                 power-domains = <&power RK3368_PD_GPU_1>;
-                 /* ... */
-         };
-+
-+	node {
-+		/* ... */
-+		power-domains = <&power RK3399_PD_GPU>;
-+		/* ... */
-+	};
+> Hi, Marc
+> 
+> We found if hardware clear pending and active status is slower than
+> software handling, the new sgi will be merged because of hardware 
+> status. The new sgi will be lost.
+> 
+> If we add a dsb instruction after gic_write_eoir(), it can avoid this
+> case happening.
+> 
+> Is it a right way to add a dsb instruction after gic_write_eoir()
+> in current gic driver code ?
+
+I suspect your problem is not so much the EOI, but that the read of
+ICC_IAR1_EL1 doesn't propagate the Ack quickly enough, leading to the
+transition from pending to active to still be in flux when the interrupt
+is EOIed. This is where a DSB is required (and was missing until very
+recently).
+
+Does 1a1ebd5 ("irqchip/gic-v3: Make sure read from ICC_IAR1_EL1 is
+visible on redestributor") solve your problem?
+
+Thanks,
+
+	M.
 -- 
-1.9.1
+Jazz is not dead. It just smells funny.
