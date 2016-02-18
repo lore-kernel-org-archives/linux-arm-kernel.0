@@ -1,30 +1,50 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 18 Feb 2016 21:35:39 +0800
-Subject: [PATCH] ARM: dts: imx6qdl-microsom.dtsi: avoid boot-time UHS
- warning
-In-Reply-To: <E1aVMgw-0001wE-5w@rmk-PC.arm.linux.org.uk>
-References: <E1aVMgw-0001wE-5w@rmk-PC.arm.linux.org.uk>
-Message-ID: <20160218133539.GW6756@tiger>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Thu, 18 Feb 2016 15:37:01 +0200
+Subject: [PATCH 11/11] ARM: versatile: move CLCD configuration to device
+ tree
+In-Reply-To: <20160218131233.GP19428@n2100.arm.linux.org.uk>
+References: <1454594660-7532-1-git-send-email-linus.walleij@linaro.org>
+ <1454594660-7532-12-git-send-email-linus.walleij@linaro.org>
+ <56C438DA.5040109@ti.com>
+ <CACRpkdZ+G17hmVP8AejL7NTqg7k0SBC5kgF55ASjD+kfuGFJhQ@mail.gmail.com>
+ <20160217213250.GK19428@n2100.arm.linux.org.uk> <56C5B080.9090007@ti.com>
+ <20160218131233.GP19428@n2100.arm.linux.org.uk>
+Message-ID: <56C5C8FD.7090004@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 15, 2016 at 05:12:06PM +0000, Russell King wrote:
-> Avoid the following warning:
+On 18/02/16 15:12, Russell King - ARM Linux wrote:
+> On Thu, Feb 18, 2016 at 01:52:32PM +0200, Tomi Valkeinen wrote:
+>> In my opinion the best option would be to use DT overlays, but so that
+>> the bootloader would supply them, or construct the dtb. But afaik that's
+>> not possible at the moment. And perhaps I think that's the best option
+>> only because I don't work with the bootloaders =).
+>>
+>> So, I don't like this, but I don't have a good suggestion how to do it
+>> better with the infrastructure in place at the moment.
 > 
-> sdhci-esdhc-imx 2190000.usdhc: could not get ultra high speed state, work on normal mode
-> 
-> which occurs at boot each time the SDHCI interface for the Broadcom
-> WiFi is probed.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> The danger of that position is that we end up with nothing happening,
+> and the problem remaining unresolved, which then pushes people into
+> maintaining patches out of mainline just to have a working setup -
+> which then pushes people to vendor trees.
 
-Not sure why you resend, but I already applied the following series you
-sent on Jan. 27 [1].
+I agree.
 
-[PATCH 1/3] ARM: dts: imx6qdl-microsom.dtsi: avoid boot-time UHS warning
-[PATCH 2/3] ARM: dts: imx6*-hummingboard: use proper gpio flags definitions
-[PATCH 3/3] ARM: dts: imx6*-hummingboard: fix pcie reset GPIO specification
+I didn't express my position clearly: I'm ok with the approach, if we
+don't come up with anything better.
 
-Shawn
+But if we go with this approach, it must be understood that it may cause
+problems later. It's not the most maintainable approach.
 
-[1] http://permalink.gmane.org/gmane.linux.drivers.devicetree/154097
+I'd also like to have an ack from the DT maintainers, as I think this is
+somewhat of an abuse of the DT.
+
+ Tomi
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160218/d9a76271/attachment-0001.sig>
