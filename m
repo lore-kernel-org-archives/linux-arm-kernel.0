@@ -1,69 +1,67 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 18 Feb 2016 11:17:36 -0500 (EST)
-Subject: [PATCH 7/9] ARM: move NO_DMA definition to ecard.h
-In-Reply-To: <1455804123-2526139-8-git-send-email-arnd@arndb.de>
-References: <1455804123-2526139-1-git-send-email-arnd@arndb.de>
- <1455804123-2526139-8-git-send-email-arnd@arndb.de>
-Message-ID: <alpine.LFD.2.20.1602181116410.13632@knanqh.ubzr>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 18 Feb 2016 17:18:49 +0100
+Subject: [PATCH 3/3] ARM64: dts: mt8173: Add thermal/auxadc device nodes
+In-Reply-To: <1448883753-19068-4-git-send-email-s.hauer@pengutronix.de>
+References: <1448883753-19068-1-git-send-email-s.hauer@pengutronix.de>
+ <1448883753-19068-4-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <56C5EEE9.4020407@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 18 Feb 2016, Arnd Bergmann wrote:
+Hi Sascha,
 
-> The NO_DMA macro is only used on the RiscPC ecard bus, and conflicts
-> with a couple of driver specific macros with the same name:
-> 
-> drivers/scsi/eata.c:571:0: warning: "NO_DMA" redefined
->  #define NO_DMA  0xff
-> In file included from ../drivers/scsi/eata.c:495:0:
-> arch/arm/include/asm/dma.h:140:0: note: this is the location of the previous definition
->  #define NO_DMA 255
-> 
-> This moves the definition out of the asm/dma.h header that is used
-> by all ISA DMA API users and into the ecard header.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-Acked-by: Nicolas Pitre <nico@linaro.org>
-
-
-
+On 30/11/15 12:42, Sascha Hauer wrote:
+> This adds the thermal controller and auxadc nodes to the Mediatek MT8173
+> dtsi file.
+>
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
 > ---
->  arch/arm/include/asm/dma.h   | 4 ----
->  arch/arm/include/asm/ecard.h | 4 ++++
->  2 files changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/dma.h b/arch/arm/include/asm/dma.h
-> index bb4fa67da541..573128481fc4 100644
-> --- a/arch/arm/include/asm/dma.h
-> +++ b/arch/arm/include/asm/dma.h
-> @@ -136,10 +136,6 @@ extern void set_dma_speed(unsigned int chan, int cycle_ns);
->   */
->  extern int  get_dma_residue(unsigned int chan);
->  
-> -#ifndef NO_DMA
-> -#define NO_DMA	255
-> -#endif
-> -
->  #endif /* CONFIG_ISA_DMA_API */
->  
->  #ifdef CONFIG_PCI
-> diff --git a/arch/arm/include/asm/ecard.h b/arch/arm/include/asm/ecard.h
-> index eaea14676d57..d3e16628c792 100644
-> --- a/arch/arm/include/asm/ecard.h
-> +++ b/arch/arm/include/asm/ecard.h
-> @@ -83,6 +83,10 @@
->  #define CONST const
->  #endif
->  
-> +#ifndef NO_DMA
-> +#define NO_DMA	255
-> +#endif
+>   arch/arm64/boot/dts/mediatek/mt8173.dtsi | 17 +++++++++++++++++
+>   1 file changed, 17 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> index 06a1564..e2ddd03 100644
+> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> @@ -277,6 +277,11 @@
+>   				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+>   		};
+>
+> +		auxadc: auxadc at 11001000 {
+> +			compatible = "mediatek,mt8173-auxadc";
+
+Can you please write a small Documentation about the binding.
+I suppose it will be mediatek,auxadc and mediatek,mt8173-auxadc.
+
+I can't do it my self, as my datasheet lacks the auxadc registers.
+
+Thanks,
+Matthias
+
+> +			reg = <0 0x11001000 0 0x1000>;
+> +		};
 > +
->  #define MAX_ECARDS	9
->  
->  struct ecard_id {			/* Card ID structure		*/
-> -- 
-> 2.7.0
-> 
-> 
+>   		uart0: serial at 11002000 {
+>   			compatible = "mediatek,mt8173-uart",
+>   				     "mediatek,mt6577-uart";
+> @@ -487,6 +492,18 @@
+>   			clock-names = "source", "hclk";
+>   			status = "disabled";
+>   		};
+> +
+> +		thermal: thermal at 1100b000 {
+> +			#thermal-sensor-cells = <0>;
+> +			compatible = "mediatek,mt8173-thermal";
+> +			reg = <0 0x1100b000 0 0x1000>;
+> +			interrupts = <0 70 IRQ_TYPE_LEVEL_LOW>;
+> +			clocks = <&pericfg CLK_PERI_THERM>, <&pericfg CLK_PERI_AUXADC>;
+> +			clock-names = "therm", "auxadc";
+> +			resets = <&pericfg MT8173_PERI_THERM_SW_RST>;
+> +			mediatek,auxadc = <&auxadc>;
+> +			mediatek,apmixedsys = <&apmixedsys>;
+> +		};
+>   	};
+>   };
+>
+>
