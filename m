@@ -1,68 +1,103 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Thu, 18 Feb 2016 15:14:45 +0100
-Subject: [PATCH 2/2] ARM: dts: meson: Adding hwrev syscon node
-In-Reply-To: <4158343.mkrTsd5B4G@wuerfel>
-References: <1455730114-2547-1-git-send-email-romain.perier@gmail.com>
- <CAOQ7t2add21t4hFtTeUBFe9aW0EtNvSi5KS4JMb6qVC60Fj-tA@mail.gmail.com>
- <CABgxDo+oGe47hvxiCOAUWz8zfSeVONf=3pFm+=PbNsCbr_jTpg@mail.gmail.com>
- <4158343.mkrTsd5B4G@wuerfel>
-Message-ID: <CAOQ7t2byFoW657-1xnsBpeyPkB6K25R=_pPmRDmT32Sjef=kUw@mail.gmail.com>
+From: matt@codeblueprint.co.uk (Matt Fleming)
+Date: Thu, 18 Feb 2016 14:15:44 +0000
+Subject: [PATCH v2 1/2] efi: esrt: use memremap not ioremap to access
+ ESRT table in memory
+In-Reply-To: <CAKv+Gu875r9RkDC723kNsG4XC0eSE9RPPmSFZrD0sx0QxS+V4g@mail.gmail.com>
+References: <1455535953-5056-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1455535953-5056-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20160218104407.GC2651@codeblueprint.co.uk>
+ <CAKv+Gu_AW7PKJJOd2mbEu3LKJe+gNaPHnH=sgO=YXM_KWFyKxw@mail.gmail.com>
+ <20160218132824.GE2651@codeblueprint.co.uk>
+ <CAKv+Gu-s1pzYBzuDG-Z7s3gyo8dPOfeidZQ+rim-uAWZCBcKQQ@mail.gmail.com>
+ <20160218134324.GG2651@codeblueprint.co.uk>
+ <CAKv+Gu875r9RkDC723kNsG4XC0eSE9RPPmSFZrD0sx0QxS+V4g@mail.gmail.com>
+Message-ID: <20160218141544.GH2651@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 18, 2016 at 1:43 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 18 February 2016 13:33:04 Romain Perier wrote:
->> 2016-02-17 21:36 GMT+01:00 Carlo Caione <carlo@caione.org>:
->> > On Wed, Feb 17, 2016 at 6:28 PM, Romain Perier <romain.perier@gmail.com> wrote:
->> >> These are the CBUS registers used to retrieve the revision and the
->> >> identifier of the SoC on Meson8.
->> >>
->> >> Signed-off-by: Romain Perier <romain.perier@gmail.com>
->> >> ---
->> >>  arch/arm/boot/dts/meson8b.dtsi | 5 +++++
->> >>  1 file changed, 5 insertions(+)
->> >>
->> >> diff --git a/arch/arm/boot/dts/meson8b.dtsi b/arch/arm/boot/dts/meson8b.dtsi
->> >> index 0477a81..71009dc 100644
->> >> --- a/arch/arm/boot/dts/meson8b.dtsi
->> >> +++ b/arch/arm/boot/dts/meson8b.dtsi
->> >> @@ -99,6 +99,11 @@
->> >>                 };
->> >>         };
->> >>
->> >> +       hwrev at c1107d4c {
->> >> +               compatible = "amlogic,meson8b-hwrev", "syscon";
->> >> +               reg = <0xc1107d4c 0x460>;
->> >
->> > Interesting. Where did you get 0x460?
->>
->> Carlo, Arnd.
->>
->> Well, what I did is the following :
->> - CBUS_PHY_BASE is 0xc1100000   (CBUS is a larger block of registers,
->> like slcr on zynq)
->> - the serial is at CBUS_PHY_BASE + 0x7d4c
->> - the revision is at CBUS_PHY_BASE + 0x81a8
->>
->> So I decided to create a device_node for hw revision at 0xc1107d4c, in
->> this case the lenght is 0x460...
->> Am I wrong ?
->
-> Yes, you should describe the device that is actually there, which would be
-> something like
->
->         cbus at c1100000 {
->                 compatible = "amlogic,meson8b-cbus", "syscon";
->                 reg = <0xc1100000 0x10000>; /* no idea what the length is, fix it */
->         };
->
-> Don't just make things up because you happen to access them in a particular
-> way, but try to stay as close as you can to describing the actual hardware.
+On Thu, 18 Feb, at 02:44:02PM, Ard Biesheuvel wrote:
+> On 18 February 2016 at 14:43, Matt Fleming <matt@codeblueprint.co.uk> wrote:
+> > On Thu, 18 Feb, at 02:29:32PM, Ard Biesheuvel wrote:
+> >> On 18 February 2016 at 14:28, Matt Fleming <matt@codeblueprint.co.uk> wrote:
+> >> > On Thu, 18 Feb, at 01:16:05PM, Ard Biesheuvel wrote:
+> >> >> On 18 February 2016 at 11:44, Matt Fleming <matt@codeblueprint.co.uk> wrote:
+> >> >> > On Mon, 15 Feb, at 12:32:32PM, Ard Biesheuvel wrote:
+> >> >> >> On ARM and arm64, ioremap() and memremap() are not interchangeable like
+> >> >> >> on x86, and the use of ioremap() on ordinary RAM is typically flagged
+> >> >> >> as an error if the memory region being mapped is also covered by the
+> >> >> >> linear mapping, since that would lead to aliases with conflicting
+> >> >> >> cacheability attributes.
+> >> >> >>
+> >> >> >> Since what we are dealing with is not an I/O region with side effects,
+> >> >> >> using ioremap() here is arguably incorrect anyway, so let's replace
+> >> >> >> it with memremap instead. Also add a missing unmap on the success path,
+> >> >> >> and drop a memblock_remove() call which does not belong here, this far
+> >> >> >> into the boot sequence.
+> >> >> >>
+> >> >> >> Cc: Peter Jones <pjones@redhat.com>
+> >> >> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >> >> >> ---
+> >> >> >>  drivers/firmware/efi/esrt.c | 16 ++++++++--------
+> >> >> >>  1 file changed, 8 insertions(+), 8 deletions(-)
+> >> >> >>
+> >> >> >
+> >> >> > [...]
+> >> >> >
+> >> >> >> @@ -432,8 +434,6 @@ static int __init esrt_sysfs_init(void)
+> >> >> >>       if (error)
+> >> >> >>               goto err_cleanup_list;
+> >> >> >>
+> >> >> >> -     memblock_remove(esrt_data, esrt_data_size);
+> >> >> >> -
+> >> >> >>       pr_debug("esrt-sysfs: loaded.\n");
+> >> >> >>
+> >> >> >>       return 0;
+> >> >> >
+> >> >> > Shouldn't we be replacing memblock_remove() with free_bootmem_late()?
+> >> >> > The original ESRT region is still reserved at this point, so we should
+> >> >> > do our best to release it to the page allocator.
+> >> >>
+> >> >> I'd rather we keep it reserved. That way, the config table entry still
+> >> >> points to something valid, which could be useful for kexec(), I think?
+> >> >> At least, that is how I intended to handle config tables on ARM ...
+> >> >
+> >> > If we're going to reserve it why do we need to copy the data out at
+> >> > all in esrt_sysfs_init()?
+> >>
+> >> Excellent question. I don't think there is any point to doing that.
+> >
+> > ... Unless the data is contained in an EFI Boot Services region ;-)
+> >
+> > Peter?
+> 
+> Yes, it usually is. Is that a problem?
 
-Arnd,
-in the cbus region are mapped a lot of different devices, do you think
-that it is a good idea mapping the whole region as a single syscon
-device?
+Yes, we free the Boot Services regions before hitting userspace on
+x86, see efi_free_boot_services(). We do this map/copy/unmap trick in
+the ACPI BGRT driver for that reason.
 
--- 
-Carlo Caione
+The Boot Services regions can be many gigabytes in size, which makes
+leaving them alone impractical.
+
+For kexec on x86 we simply discard the BGRT table, which isn't the end
+of the world because who really needs access to the BGRT image on
+kexec reboot? However, I can see the value of preserving the ESRT.
+
+I guess we've got two options, 1) copy out the chunks of Boot Services
+regions we're interested in and rewrite the EFI tables to point at
+these new allocations and free/discard all of the original Boot
+Services regions or 2) only selectively free the Boot Services
+regions.
+
+I've always stayed clear of 2) in case there exists cross-region
+references in the data that isn't obvious. I'd like to think that
+would never happen, but, you know, dragons lurk here, etc.
+
+Though actually, now I think about it, cross-region references can't
+possibly exist because they'd cause issues with the current code.
+
+So maybe the best solution is actually 2), where we preserve the Boot
+Services regions if any of the drivers (ESRT, BGRT) request them but
+free all the others? 
+
+What are the lifetime rules for Boot Services regions on arm*?
