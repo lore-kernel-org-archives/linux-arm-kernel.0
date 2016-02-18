@@ -1,38 +1,39 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 18 Feb 2016 18:13:57 +0000
-Subject: [PATCH] arm64: kasan: clear stale stack poison
-In-Reply-To: <20160218180353.GG16883@arm.com>
-References: <1455816458-19485-1-git-send-email-mark.rutland@arm.com>
- <20160218175447.GD2538@e104818-lin.cambridge.arm.com>
- <20160218180353.GG16883@arm.com>
-Message-ID: <20160218181356.GF2538@e104818-lin.cambridge.arm.com>
+From: ray.jui@broadcom.com (Ray Jui)
+Date: Thu, 18 Feb 2016 10:15:11 -0800
+Subject: [1/4] arm64: Broadcom Vulcan support
+In-Reply-To: <1455389195-31870-2-git-send-email-jchandra@broadcom.com>
+References: <1455389195-31870-2-git-send-email-jchandra@broadcom.com>
+Message-ID: <0c75ddd6-d353-bb73-62e4-bae0ff95a3b0@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 18, 2016 at 06:03:54PM +0000, Will Deacon wrote:
-> On Thu, Feb 18, 2016 at 05:54:47PM +0000, Catalin Marinas wrote:
-> > On Thu, Feb 18, 2016 at 05:27:38PM +0000, Mark Rutland wrote:
-> > > @@ -145,6 +146,7 @@ ENTRY(cpu_resume_mmu)
-> > >  ENDPROC(cpu_resume_mmu)
-> > >  	.popsection
-> > >  cpu_resume_after_mmu:
-> > > +	kasan_unpoison_stack 96
-> > 
-> > I don't think the 96 here is needed since we populate the stack in
-> > assembly (__cpu_suspend_enter) and unwind it again still in assembly
-> > (cpu_resume_after_mmu), so no KASAN shadow writes/reads.
-> > 
-> > Otherwise the patch looks fine.
-> 
-> I'd much rather it was written in C -- is there a reason we can't do
-> that if we use a separate compilation unit where the compiler will
-> honour the fno-sanitize flag?
++ bcm-kernel-feedback-list mailing list
 
-A simple, non-sanitised C wrapper around __cpu_suspend_enter() would
-probably work. We need to make sure it is static inline when !KASAN to
-avoid an unnecessary function call. Or we just move cpu_suspend() to a
-different compilation unit, though that's a slightly larger function
-which we may want to track under KASAN.
+On 2/13/2016 10:46 AM, Jayachandran C. wrote:
+> From: Zi Shen Lim <zlim@broadcom.com>
+>
+> Add a configuration option and a device tree for Broadcom's Vulcan
+> ARM64 processor. brcm-vulcan.dtsi has the on-chip blocks like the
+> PCIe controller, GICv3 with ITS, PMU, system timer and pl011 UART.
+> brcm-vulcan-eval.dts has definitions for a basic evaluation board.
+> The firmware supports PSCI 0.2 for cpu wakeup.
+>
+> Signed-off-by: Zi Shen Lim <zlim@broadcom.com>
+> [ updated and split dts - jchandra at broadcom.com ]
+> Signed-off-by: Jayachandran C <jchandra@broadcom.com>
+>
+> ---
+> arch/arm64/Kconfig.platforms                      |   5 +
+>  arch/arm64/boot/dts/broadcom/Makefile             |   1 +
+>  arch/arm64/boot/dts/broadcom/brcm-vulcan-eval.dts |  33 +++++
+>  arch/arm64/boot/dts/broadcom/brcm-vulcan.dtsi     | 146 ++++++++++++++++++++++
+>  4 files changed, 185 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/broadcom/brcm-vulcan-eval.dts
+>  create mode 100644 arch/arm64/boot/dts/broadcom/brcm-vulcan.dtsi
 
--- 
-Catalin
+Could you please name the files "vulcan.dtsi" and "vulcan-eval.dts" so 
+it's consistent with the rest of files in the same directory?
+
+Thanks,
+
+Ray
