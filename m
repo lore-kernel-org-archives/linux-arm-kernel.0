@@ -1,60 +1,78 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 18 Feb 2016 11:57:37 +0000
-Subject: [PATCH v5 11/15] arm64: head.S: Change the register el2_setup()
- returns its result in x0
-In-Reply-To: <20160218114127.GA12626@red-moon>
-References: <1455637767-31561-1-git-send-email-james.morse@arm.com>
- <1455637767-31561-12-git-send-email-james.morse@arm.com>
- <20160218114127.GA12626@red-moon>
-Message-ID: <56C5B1B1.20205@arm.com>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Thu, 18 Feb 2016 17:30:08 +0530
+Subject: [PATCH v2 2/4] iommu/arm-smmu: Invoke DT probe from
+ arm_smmu_of_setup()
+In-Reply-To: <1454908652-15317-3-git-send-email-anup.patel@broadcom.com>
+References: <1454908652-15317-1-git-send-email-anup.patel@broadcom.com>
+ <1454908652-15317-3-git-send-email-anup.patel@broadcom.com>
+Message-ID: <001f01d16a43$ef47d3b0$cdd77b10$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+Hi,
 
-On 18/02/16 11:41, Lorenzo Pieralisi wrote:
-> On Tue, Feb 16, 2016 at 03:49:23PM +0000, James Morse wrote:
->> Today el2_setup() returns its result in w20. This means we can't call it
->> like any normal function. Change this to w0.
->>
->> All three callers of el2_setup() call set_cpu_boot_mode_flag() immediately
->> afterwards, and don't rely on x0 in later code. Boot cpu code calls
->> preserve_boot_args() before el2_setup(), so we don't clobber the DT pointer.
->>
->> Signed-off-by: James Morse <james.morse@arm.com>
->> ---
->>  arch/arm64/include/asm/processor.h |  2 ++
->>  arch/arm64/kernel/head.S           | 18 +++++++++---------
->>  2 files changed, 11 insertions(+), 9 deletions(-)
->>
->> diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
->> index 4acb7ca94fcd..07ac4351538e 100644
->> --- a/arch/arm64/include/asm/processor.h
->> +++ b/arch/arm64/include/asm/processor.h
->> @@ -188,4 +188,6 @@ static inline void spin_lock_prefetch(const void *x)
->>  
->>  void cpu_enable_pan(void *__unused);
->>  
->> +int el2_setup(void);
+> -----Original Message-----
+> From: linux-arm-kernel [mailto:linux-arm-kernel-
+> bounces at lists.infradead.org] On Behalf Of Anup Patel
+> Sent: Monday, February 08, 2016 10:48 AM
+> To: Catalin Marinas; Joerg Roedel; Will Deacon; Robin Murphy; Sricharan R;
+> Linux IOMMU; Linux ARM Kernel
+> Cc: Mark Rutland; Device Tree; Scott Branden; Pawel Moll; Ian Campbell;
+Ray
+> Jui; Linux Kernel; Vikram Prakash; Rob Herring; BCM Kernel Feedback; Kumar
+> Gala; Anup Patel
+> Subject: [PATCH v2 2/4] iommu/arm-smmu: Invoke DT probe from
+> arm_smmu_of_setup()
 > 
-> Do we really need to have this declaration (and this patch) ? We never
-> treat (and call) el2_setup as a C function anyway, as long as the registers
-> used to pass in values (and return value) are documented I do not think we
-> have an issue anyway, am I missing something here ?
+> The SMMUv1/SMMUv2 driver is initialized very early using the
+> IOMMU_OF_DECLARE() but the actual platform device is probed via normal
+> DT probing.
+> 
+> This patch uses of_platform_device_create() from arm_smmu_of_setup() to
+> ensure that SMMU platform device is probed immediately.
+> 
+> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+> ---
+>  drivers/iommu/arm-smmu.c | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c index
+> 2c8f871..02cd67d 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -40,6 +40,7 @@
+>  #include <linux/of.h>
+>  #include <linux/of_address.h>
+>  #include <linux/of_iommu.h>
+> +#include <linux/of_platform.h>
+>  #include <linux/pci.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/slab.h>
+> @@ -1956,10 +1957,15 @@ static int __init arm_smmu_init(void)
+> 
+>  static int __init arm_smmu_of_setup(struct device_node *np)  {
+> +	struct platform_device *pdev;
+> 
+>  	if (!init_done)
+>  		arm_smmu_init();
+> 
+> +	pdev = of_platform_device_create(np, NULL, NULL);
+> +	if (IS_ERR(pdev))
+> +		return PTR_ERR(pdev);
+> +
+>  	of_iommu_set_ops(np, &arm_smmu_ops);
 
-Without this patch swsusp_el2_setup_helper() in patch 14 needs to know that
-el2_setup will clobber w20, and save that value somewhere that it knows won't
-get clobbered. It didn't seem right to bake all this knowledge into another
-function.
+ A question here is,  There was a probe deferral series [1], to take care of
+deferred
+ probing of devices behind iommus. With that this sort of early device
+probing during setup
+ should not be required and also it clears other dependencies of iommus on
+clocks, etc, if any.
+ My intention was to check whats the right way to do this  ? (or) point me
+to any updates 
+ on the probe deferral series that I miss ?
 
-Its not quite perfect, as el2_setup() has "msr el2_lr, lr; eret", any caller
-needs to know this.
-
-I added the declaration because this now gets called from hibernate-asm.S, but
-this doesn't seem to be normal for asm functions. I will remove it from any
-future version.
-
-
-Thanks,
-
-James
+[1]  http://lkml.iu.edu/hypermail/linux/kernel/1505.3/03280.html
+ 
+Regards,
+ Sricharan
