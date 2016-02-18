@@ -1,180 +1,175 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 18 Feb 2016 17:27:38 +0000
-Subject: [PATCH] arm64: kasan: clear stale stack poison
-Message-ID: <1455816458-19485-1-git-send-email-mark.rutland@arm.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 18 Feb 2016 09:28:13 -0800
+Subject: [PATCH v2 2/8] drivers: pinctrl: add driver for Allwinner A64 SoC
+In-Reply-To: <1455709440-8668-3-git-send-email-andre.przywara@arm.com>
+References: <1455709440-8668-1-git-send-email-andre.przywara@arm.com>
+ <1455709440-8668-3-git-send-email-andre.przywara@arm.com>
+Message-ID: <CAGb2v67UkRv86rUMfY9u+szv7CKAK9wh8kfoqWh8XUCkifjjUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is a followup to the discussion in [1].
+Hi,
 
-When using KASAN and CPU idle and/or CPU hotplug, KASAN leaves the stack shadow
-poisoned on exit from the kernel, and this poison is later hit when a CPU is
-brought online and reuses that portion of the stack. Hitting the poison depends
-on stackframe layout, so the bug only manifests in some configurations.
+On Wed, Feb 17, 2016 at 3:43 AM, Andre Przywara <andre.przywara@arm.com> wrote:
+> Based on the Allwinner A64 user manual and on the previous sunxi
+> pinctrl drivers this introduces the pin multiplex assignments for
+> the ARMv8 Allwinner A64 SoC.
+> Port A is apparently used for the fixed function DRAM controller, so
+> the ports start at B here (the manual mentions "n from 1 to 7", so
+> not starting at 0).
+>
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   |   1 +
+>  arch/arm64/Kconfig.platforms                       |   1 +
+>  drivers/pinctrl/sunxi/Kconfig                      |   4 +
+>  drivers/pinctrl/sunxi/Makefile                     |   1 +
+>  drivers/pinctrl/sunxi/pinctrl-sun50i-a64.c         | 606 +++++++++++++++++++++
+>  5 files changed, 613 insertions(+)
+>  create mode 100644 drivers/pinctrl/sunxi/pinctrl-sun50i-a64.c
+>
+> diff --git a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
+> index 9213b27..08b2361 100644
+> --- a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
+> +++ b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
+> @@ -21,6 +21,7 @@ Required properties:
+>    "allwinner,sun9i-a80-r-pinctrl"
+>    "allwinner,sun8i-a83t-pinctrl"
+>    "allwinner,sun8i-h3-pinctrl"
+> +  "allwinner,sun50i-a64-pinctrl"
+>
+>  - reg: Should contain the register physical address and length for the
+>    pin controller.
+> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+> index 2f7f69b..d15c532 100644
+> --- a/arch/arm64/Kconfig.platforms
+> +++ b/arch/arm64/Kconfig.platforms
+> @@ -2,6 +2,7 @@ menu "Platform selection"
+>
+>  config ARCH_SUNXI
+>         bool "Allwinner sunxi 64-bit SoC Family"
+> +       select PINCTRL_SUN50I_A64
+>         help
+>           This enables support for Allwinner sunxi based SoCs like the A64.
+>
+> diff --git a/drivers/pinctrl/sunxi/Kconfig b/drivers/pinctrl/sunxi/Kconfig
+> index 1868b82..aaf075b 100644
+> --- a/drivers/pinctrl/sunxi/Kconfig
+> +++ b/drivers/pinctrl/sunxi/Kconfig
+> @@ -68,4 +68,8 @@ config PINCTRL_SUN9I_A80_R
+>         depends on RESET_CONTROLLER
+>         select PINCTRL_SUNXI
+>
+> +config PINCTRL_SUN50I_A64
+> +       bool
+> +       select PINCTRL_SUNXI
+> +
+>  endif
+> diff --git a/drivers/pinctrl/sunxi/Makefile b/drivers/pinctrl/sunxi/Makefile
+> index f22de0e..2d8b64e 100644
+> --- a/drivers/pinctrl/sunxi/Makefile
+> +++ b/drivers/pinctrl/sunxi/Makefile
+> @@ -12,6 +12,7 @@ obj-$(CONFIG_PINCTRL_SUN7I_A20)               += pinctrl-sun7i-a20.o
+>  obj-$(CONFIG_PINCTRL_SUN8I_A23)                += pinctrl-sun8i-a23.o
+>  obj-$(CONFIG_PINCTRL_SUN8I_A23_R)      += pinctrl-sun8i-a23-r.o
+>  obj-$(CONFIG_PINCTRL_SUN8I_A33)                += pinctrl-sun8i-a33.o
+> +obj-$(CONFIG_PINCTRL_SUN50I_A64)       += pinctrl-sun50i-a64.o
+>  obj-$(CONFIG_PINCTRL_SUN8I_A83T)       += pinctrl-sun8i-a83t.o
+>  obj-$(CONFIG_PINCTRL_SUN8I_H3)         += pinctrl-sun8i-h3.o
+>  obj-$(CONFIG_PINCTRL_SUN8I_H3_R)       += pinctrl-sun8i-h3-r.o
+> diff --git a/drivers/pinctrl/sunxi/pinctrl-sun50i-a64.c b/drivers/pinctrl/sunxi/pinctrl-sun50i-a64.c
+> new file mode 100644
+> index 0000000..20bd15b
+> --- /dev/null
+> +++ b/drivers/pinctrl/sunxi/pinctrl-sun50i-a64.c
+> @@ -0,0 +1,606 @@
+> +/*
+> + * Allwinner A64 SoCs pinctrl driver.
+> + *
+> + * Copyright (C) 2016 - ARM Ltd.
+> + * Author: Andre Przywara <andre.przywara@arm.com>
+> + *
+> + * Based on pinctrl-sun7i-a20.c, which is:
+> + * Copyright (C) 2014 Maxime Ripard <maxime.ripard@free-electrons.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+> +#include <linux/pinctrl/pinctrl.h>
+> +
+> +#include "pinctrl-sunxi.h"
+> +
+> +static const struct sunxi_desc_pin a64_pins[] = {
 
-I think that the hotplug issue is generic, and x86 is affected. I couldn't spot
-magic around idle, so x86 may be fine there. It would be great if someone
-familiar with the x86 code could prove/disprove either of those assertions.
+[...]
 
-If x86 is affected, it likely makes sense to unpoison the stack in common code
-prior to bringing a CPU online to avoid that.
+> +       SUNXI_PIN(SUNXI_PINCTRL_PIN(H, 8),
+> +                 SUNXI_FUNCTION(0x0, "gpio_in"),
+> +                 SUNXI_FUNCTION(0x1, "gpio_out"),
+> +                 SUNXI_FUNCTION(0x2, "owa"),           /* OUT */
 
-For idle I'm not keen on having to perform a memset of THREAD_SIZE/8 every time
-a CPU re-enters the kernel. I don't yet have numbers for how bad that is, but
-it doesn't sound good.
+This is better known as spdif.
 
-Thanks,
-Mark.
+> +                 SUNXI_FUNCTION_IRQ_BANK(0x6, 2, 8)),  /* EINT8 */
+> +       SUNXI_PIN(SUNXI_PINCTRL_PIN(H, 9),
+> +                 SUNXI_FUNCTION(0x0, "gpio_in"),
+> +                 SUNXI_FUNCTION(0x1, "gpio_out"),
+> +                 SUNXI_FUNCTION_IRQ_BANK(0x6, 2, 9)),  /* EINT9 */
+> +       SUNXI_PIN(SUNXI_PINCTRL_PIN(H, 10),
+> +                 SUNXI_FUNCTION(0x0, "gpio_in"),
+> +                 SUNXI_FUNCTION(0x1, "gpio_out"),
+> +                 SUNXI_FUNCTION(0x2, "mic"),           /* CLK */
+> +                 SUNXI_FUNCTION_IRQ_BANK(0x6, 2, 10)), /* EINT10 */
+> +       SUNXI_PIN(SUNXI_PINCTRL_PIN(H, 11),
+> +                 SUNXI_FUNCTION(0x0, "gpio_in"),
+> +                 SUNXI_FUNCTION(0x1, "gpio_out"),
+> +                 SUNXI_FUNCTION(0x2, "mic"),           /* DATA */
+> +                 SUNXI_FUNCTION_IRQ_BANK(0x6, 2, 11)), /* EINT11 */
+> +};
+> +
+> +static const struct sunxi_pinctrl_desc a64_pinctrl_data = {
+> +       .pins = a64_pins,
+> +       .npins = ARRAY_SIZE(a64_pins),
+> +       .irq_banks = 3,
+> +};
+> +
+> +static int a64_pinctrl_probe(struct platform_device *pdev)
+> +{
+> +       return sunxi_pinctrl_init(pdev,
+> +                                 &a64_pinctrl_data);
+> +}
+> +
+> +static const struct of_device_id a64_pinctrl_match[] = {
+> +       { .compatible = "allwinner,sun50i-a64-pinctrl", },
+> +       {}
+> +};
+> +MODULE_DEVICE_TABLE(of, a64_pinctrl_match);
+> +
+> +static struct platform_driver a64_pinctrl_driver = {
+> +       .probe  = a64_pinctrl_probe,
+> +       .driver = {
+> +               .name           = "sun50i-a64-pinctrl",
+> +               .of_match_table = a64_pinctrl_match,
+> +       },
+> +};
+> +module_platform_driver(a64_pinctrl_driver);
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-February/408961.html
+Since the Kconfig symbol is bool, you could probably use
+builtin_platform_driver and drop MODULE_*.
 
----->8----
-When a CPU is shut down or placed into a low power state, the functions
-on the critical path to firmware never return, and hence their epilogues
-never execute. When using KASAN, this means that the shadow entries for
-the corresponding stack are poisoned but never unpoisoned. When a CPU
-subsequently re-enters the kernel via another path, and begins using
-the stack, it may hit stale poison values, leading to false-positive
-KASAN failures.
+Regards
+ChenYu
 
-We can't ensure that all functions on the critical path are not
-instrumented. For CPU hotplug this includes lots of core code starting
-from secondary_start_kernel, and for CPU idle we can't ensure that
-specific functions are not instrumented, as the compiler always poisons
-the stack even when told to not instrument a function:
-
-https://gcc.gnu.org/bugzilla/show_bug.cgi?id=69863
-
-This patch works around the issue by forcefully unpoisoning the shadow
-region for all stack on the critical path, before we return to
-instrumented C code. As we cannot statically determine the stack usage
-of code in the critical path, we must clear the shadow for all remaining
-stack, meaning that we must clear up to 2K of shadow memory each time a
-CPU enters the kernel from idle or hotplug.
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Andrey Ryabinin <aryabinin@virtuozzo.com>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/kasan.h  | 40 ++++++++++++++++++++++++++++++++++------
- arch/arm64/kernel/asm-offsets.c |  1 +
- arch/arm64/kernel/head.S        |  2 ++
- arch/arm64/kernel/sleep.S       |  2 ++
- 4 files changed, 39 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm64/include/asm/kasan.h b/arch/arm64/include/asm/kasan.h
-index 2774fa3..b75b171 100644
---- a/arch/arm64/include/asm/kasan.h
-+++ b/arch/arm64/include/asm/kasan.h
-@@ -1,10 +1,30 @@
- #ifndef __ASM_KASAN_H
- #define __ASM_KASAN_H
- 
--#ifndef __ASSEMBLY__
--
-+#ifndef LINKER_SCRIPT
- #ifdef CONFIG_KASAN
- 
-+#ifdef __ASSEMBLY__
-+
-+#include <asm/asm-offsets.h>
-+#include <asm/thread_info.h>
-+
-+	/*
-+	 * Remove stale shadow posion for the stack left over from a prior
-+	 * hot-unplug or idle exit, covering up to offset bytes above the
-+	 * current stack pointer. Shadow poison above this is preserved.
-+	 */
-+	.macro kasan_unpoison_stack offset=0
-+	add	x1, sp, #\offset
-+	and	x0, x1, #~(THREAD_SIZE - 1)
-+	add	x0, x0, #THREAD_INFO_SIZE
-+	and	x1, x1, #(THREAD_SIZE - 1)
-+	sub	x1, x1, #THREAD_INFO_SIZE
-+	bl	kasan_unpoison_shadow
-+	.endm
-+
-+#else /* __ASSEMBLY__ */
-+
- #include <linux/linkage.h>
- #include <asm/memory.h>
- 
-@@ -30,9 +50,17 @@
- void kasan_init(void);
- asmlinkage void kasan_early_init(void);
- 
--#else
-+#endif /* __ASSEMBLY__ */
-+
-+#else /* CONFIG_KASAN */
-+
-+#ifdef __ASSEMBLY__
-+	.macro kasan_unpoison_stack offset
-+	.endm
-+#else /* __ASSEMBLY */
- static inline void kasan_init(void) { }
--#endif
-+#endif /* __ASSEMBLY__ */
- 
--#endif
--#endif
-+#endif /* CONFIG_KASAN */
-+#endif /* LINKER_SCRIPT */
-+#endif /* __ASM_KASAN_H */
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index fffa4ac6..c615fa3 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -39,6 +39,7 @@ int main(void)
-   DEFINE(TI_ADDR_LIMIT,		offsetof(struct thread_info, addr_limit));
-   DEFINE(TI_TASK,		offsetof(struct thread_info, task));
-   DEFINE(TI_CPU,		offsetof(struct thread_info, cpu));
-+  DEFINE(THREAD_INFO_SIZE,	sizeof(struct thread_info));
-   BLANK();
-   DEFINE(THREAD_CPU_CONTEXT,	offsetof(struct task_struct, thread.cpu_context));
-   BLANK();
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index ffe9c2b..a0c3ec7 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -29,6 +29,7 @@
- #include <asm/asm-offsets.h>
- #include <asm/cache.h>
- #include <asm/cputype.h>
-+#include <asm/kasan.h>
- #include <asm/kernel-pgtable.h>
- #include <asm/memory.h>
- #include <asm/pgtable-hwdef.h>
-@@ -611,6 +612,7 @@ ENTRY(__secondary_switched)
- 	and	x0, x0, #~(THREAD_SIZE - 1)
- 	msr	sp_el0, x0			// save thread_info
- 	mov	x29, #0
-+	kasan_unpoison_stack
- 	b	secondary_start_kernel
- ENDPROC(__secondary_switched)
- 
-diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
-index e33fe33..3b95841 100644
---- a/arch/arm64/kernel/sleep.S
-+++ b/arch/arm64/kernel/sleep.S
-@@ -2,6 +2,7 @@
- #include <linux/linkage.h>
- #include <asm/asm-offsets.h>
- #include <asm/assembler.h>
-+#include <asm/kasan.h>
- 
- 	.text
- /*
-@@ -145,6 +146,7 @@ ENTRY(cpu_resume_mmu)
- ENDPROC(cpu_resume_mmu)
- 	.popsection
- cpu_resume_after_mmu:
-+	kasan_unpoison_stack 96
- 	mov	x0, #0			// return zero on success
- 	ldp	x19, x20, [sp, #16]
- 	ldp	x21, x22, [sp, #32]
--- 
-1.9.1
+> +
+> +MODULE_AUTHOR("Andre Przywara <andre.przywara@arm.com>");
+> +MODULE_DESCRIPTION("Allwinner A64 pinctrl driver");
+> +MODULE_LICENSE("GPL");
+> --
+> 2.6.4
+>
