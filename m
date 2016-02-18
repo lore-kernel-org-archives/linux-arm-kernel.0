@@ -1,19 +1,103 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Thu, 18 Feb 2016 09:32:41 +0000
-Subject: [PATCH] arm64: dts: msm8996: Add #power-domain-cells property
-In-Reply-To: <1455787866-22223-1-git-send-email-rnayak@codeaurora.org>
-References: <1455787866-22223-1-git-send-email-rnayak@codeaurora.org>
-Message-ID: <20160218093241.GA4931@hector.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 18 Feb 2016 09:34:54 +0000
+Subject: [RFC v3 02/15] vfio: expose MSI mapping requirement through
+ VFIO_IOMMU_GET_INFO
+In-Reply-To: <1455264797-2334-3-git-send-email-eric.auger@linaro.org>
+References: <1455264797-2334-1-git-send-email-eric.auger@linaro.org>
+ <1455264797-2334-3-git-send-email-eric.auger@linaro.org>
+Message-ID: <20160218093454.660b20c6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 18, 2016 at 03:01:06PM +0530, Rajendra Nayak wrote:
-> Add #power-domain-cells property for both the gcc and mmcc
-> clock controller nodes as they both supports power domains (gdsc's)
-> 
-> Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
-> ---
-> Andy, the gdsc support patches for 8996 are pulled into clk-next.
-> Can you please pull the dts changes in for 4.6?
+On Fri, 12 Feb 2016 08:13:04 +0000
+Eric Auger <eric.auger@linaro.org> wrote:
 
-Yes, I'll include it in the next pull.  Thanks!
+> This patch allows the user-space to retrieve whether msi write
+> transaction addresses must be mapped. This is returned through the
+> VFIO_IOMMU_GET_INFO API and its new flag: VFIO_IOMMU_INFO_REQUIRE_MSI_MAP.
+> 
+> Signed-off-by: Bharat Bhushan <Bharat.Bhushan@freescale.com>
+> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+> 
+> ---
+> 
+> RFC v1 -> v1:
+> - derived from
+>   [RFC PATCH 3/6] vfio: Extend iommu-info to return MSIs automap state
+> - renamed allow_msi_reconfig into require_msi_mapping
+> - fixed VFIO_IOMMU_GET_INFO
+> ---
+>  drivers/vfio/vfio_iommu_type1.c | 26 ++++++++++++++++++++++++++
+>  include/uapi/linux/vfio.h       |  1 +
+>  2 files changed, 27 insertions(+)
+> 
+> diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
+> index 6f1ea3d..c5b57e1 100644
+> --- a/drivers/vfio/vfio_iommu_type1.c
+> +++ b/drivers/vfio/vfio_iommu_type1.c
+> @@ -255,6 +255,29 @@ static int vaddr_get_pfn(unsigned long vaddr, int prot, unsigned long *pfn)
+>  }
+>  
+>  /*
+> + * vfio_domains_require_msi_mapping: indicates whether MSI write transaction
+> + * addresses must be mapped
+> + *
+> + * returns true if it does
+> + */
+> +static bool vfio_domains_require_msi_mapping(struct vfio_iommu *iommu)
+> +{
+> +	struct vfio_domain *d;
+> +	bool ret;
+> +
+> +	mutex_lock(&iommu->lock);
+> +	/* All domains have same require_msi_map property, pick first */
+> +	d = list_first_entry(&iommu->domain_list, struct vfio_domain, next);
+> +	if (iommu_domain_get_attr(d->domain, DOMAIN_ATTR_MSI_MAPPING, NULL) < 0)
+> +		ret = false;
+> +	else
+> +		ret = true;
+
+nit: this could be simplified as:
+
+ret = (iommu_domain_get_attr(d->domain, DOMAIN_ATTR_MSI_MAPPING, NULL) == 0);
+
+> +	mutex_unlock(&iommu->lock);
+> +
+> +	return ret;
+> +}
+> +
+> +/*
+>   * Attempt to pin pages.  We really don't want to track all the pfns and
+>   * the iommu can only map chunks of consecutive pfns anyway, so get the
+>   * first page and all consecutive pages with the same locking.
+> @@ -997,6 +1020,9 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
+>  
+>  		info.flags = VFIO_IOMMU_INFO_PGSIZES;
+>  
+> +		if (vfio_domains_require_msi_mapping(iommu))
+> +			info.flags |= VFIO_IOMMU_INFO_REQUIRE_MSI_MAP;
+> +
+>  		info.iova_pgsizes = vfio_pgsize_bitmap(iommu);
+>  
+>  		return copy_to_user((void __user *)arg, &info, minsz);
+> diff --git a/include/uapi/linux/vfio.h b/include/uapi/linux/vfio.h
+> index 7d7a4c6..43e183b 100644
+> --- a/include/uapi/linux/vfio.h
+> +++ b/include/uapi/linux/vfio.h
+> @@ -400,6 +400,7 @@ struct vfio_iommu_type1_info {
+>  	__u32	argsz;
+>  	__u32	flags;
+>  #define VFIO_IOMMU_INFO_PGSIZES (1 << 0)	/* supported page sizes info */
+> +#define VFIO_IOMMU_INFO_REQUIRE_MSI_MAP (1 << 1)/* MSI must be mapped */
+>  	__u64	iova_pgsizes;		/* Bitmap of supported page sizes */
+>  };
+>  
+
+
+FWIW:
+
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+
+	M.
+-- 
+Jazz is not dead. It just smells funny.
