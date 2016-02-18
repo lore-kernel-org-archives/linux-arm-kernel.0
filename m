@@ -1,117 +1,73 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 18 Feb 2016 11:41:27 +0000
-Subject: [PATCH v5 11/15] arm64: head.S: Change the register el2_setup()
- returns its result in x0
-In-Reply-To: <1455637767-31561-12-git-send-email-james.morse@arm.com>
-References: <1455637767-31561-1-git-send-email-james.morse@arm.com>
- <1455637767-31561-12-git-send-email-james.morse@arm.com>
-Message-ID: <20160218114127.GA12626@red-moon>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Thu, 18 Feb 2016 12:41:40 +0100
+Subject: [PATCH v2 net-next 6/8] net: mvneta: bm: add support for hardware
+ buffer management
+In-Reply-To: <20160217.234321.1202099534402079240.davem@davemloft.net>
+References: <1455636823-14470-1-git-send-email-gregory.clement@free-electrons.com>
+ <1455636823-14470-7-git-send-email-gregory.clement@free-electrons.com>
+ <20160217.234321.1202099534402079240.davem@davemloft.net>
+Message-ID: <CAPv3WKfDo8YV1PksBwhVnL6PLeUomxhWgZzhDMZ7fKX95aSPpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
+Hi David,
 
-On Tue, Feb 16, 2016 at 03:49:23PM +0000, James Morse wrote:
-> Today el2_setup() returns its result in w20. This means we can't call it
-> like any normal function. Change this to w0.
-> 
-> All three callers of el2_setup() call set_cpu_boot_mode_flag() immediately
-> afterwards, and don't rely on x0 in later code. Boot cpu code calls
-> preserve_boot_args() before el2_setup(), so we don't clobber the DT pointer.
-> 
-> Signed-off-by: James Morse <james.morse@arm.com>
-> ---
->  arch/arm64/include/asm/processor.h |  2 ++
->  arch/arm64/kernel/head.S           | 18 +++++++++---------
->  2 files changed, 11 insertions(+), 9 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-> index 4acb7ca94fcd..07ac4351538e 100644
-> --- a/arch/arm64/include/asm/processor.h
-> +++ b/arch/arm64/include/asm/processor.h
-> @@ -188,4 +188,6 @@ static inline void spin_lock_prefetch(const void *x)
->  
->  void cpu_enable_pan(void *__unused);
->  
-> +int el2_setup(void);
 
-Do we really need to have this declaration (and this patch) ? We never
-treat (and call) el2_setup as a C function anyway, as long as the registers
-used to pass in values (and return value) are documented I do not think we
-have an issue anyway, am I missing something here ?
+2016-02-18 5:43 GMT+01:00 David Miller <davem@davemloft.net>:
+> From: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Date: Tue, 16 Feb 2016 16:33:41 +0100
+>
+>>       pp->dev = dev;
+>>       SET_NETDEV_DEV(dev, &pdev->dev);
+>>
+>> +     dev->features = NETIF_F_SG | NETIF_F_IP_CSUM | NETIF_F_TSO;
+>> +     dev->hw_features |= dev->features;
+>> +     dev->vlan_features |= dev->features;
+>> +     dev->priv_flags |= IFF_UNICAST_FLT;
+>> +     dev->gso_max_segs = MVNETA_MAX_TSO_SEGS;
+>> +
+>> +     err = register_netdev(dev);
+>> +     if (err < 0) {
+>> +             dev_err(&pdev->dev, "failed to register\n");
+>> +             goto err_free_stats;
+>> +     }
+>> +
+>> +     pp->id = dev->ifindex;
+>> +
+>> +     /* Obtain access to BM resources if enabled and already initialized */
+>> +     bm_node = of_parse_phandle(dn, "buffer-manager", 0);
+>> +     if (bm_node && bm_node->data) {
+>
+> This set of changes has a lot of problems.
+>
+> First, the exact moment you call register_netdev() your device must be
+> fully initialized because ->open() can be invoked immediately.  This
+> means you must take care of all of this buffer manager stuff before
+> calling register_netdev().
+>
+> It must precisely be the last thing you invoke in your probe function
+> for this reason.
 
-Thanks,
-Lorenzo
+Ok. I shifted register_netdev in order to obtain port id dynamically
+from netdev's ifindex (needed to control port <-> pool mapping). If
+this order of registration is problematic, I will add an ID property
+to DT.
 
-> +
->  #endif /* __ASM_PROCESSOR_H */
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index 410a2dc04775..5894c7e91e6b 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -206,7 +206,7 @@ section_table:
->  
->  ENTRY(stext)
->  	bl	preserve_boot_args
-> -	bl	el2_setup			// Drop to EL1, w20=cpu_boot_mode
-> +	bl	el2_setup			// Drop to EL1, w0=cpu_boot_mode
->  	adrp	x24, __PHYS_OFFSET
->  	bl	set_cpu_boot_mode_flag
->  	bl	__create_page_tables		// x25=TTBR0, x26=TTBR1
-> @@ -446,8 +446,8 @@ ENDPROC(__mmap_switched)
->   * If we're fortunate enough to boot at EL2, ensure that the world is
->   * sane before dropping to EL1.
->   *
-> - * Returns either BOOT_CPU_MODE_EL1 or BOOT_CPU_MODE_EL2 in x20 if
-> - * booted in EL1 or EL2 respectively.
-> + * Returns either BOOT_CPU_MODE_EL1 or BOOT_CPU_MODE_EL2 if booted in
-> + * EL1 or EL2 respectively.
->   */
->  ENTRY(el2_setup)
->  	mrs	x0, CurrentEL
-> @@ -462,7 +462,7 @@ CPU_LE(	bic	x0, x0, #(1 << 25)	)	// Clear the EE bit for EL2
->  CPU_BE(	orr	x0, x0, #(3 << 24)	)	// Set the EE and E0E bits for EL1
->  CPU_LE(	bic	x0, x0, #(3 << 24)	)	// Clear the EE and E0E bits for EL1
->  	msr	sctlr_el1, x0
-> -	mov	w20, #BOOT_CPU_MODE_EL1		// This cpu booted in EL1
-> +	mov	w0, #BOOT_CPU_MODE_EL1		// This cpu booted in EL1
->  	isb
->  	ret
->  
-> @@ -538,20 +538,20 @@ CPU_LE(	movk	x0, #0x30d0, lsl #16	)	// Clear EE and E0E on LE systems
->  		      PSR_MODE_EL1h)
->  	msr	spsr_el2, x0
->  	msr	elr_el2, lr
-> -	mov	w20, #BOOT_CPU_MODE_EL2		// This CPU booted in EL2
-> +	mov	w0, #BOOT_CPU_MODE_EL2		// This CPU booted in EL2
->  	eret
->  ENDPROC(el2_setup)
->  
->  /*
->   * Sets the __boot_cpu_mode flag depending on the CPU boot mode passed
-> - * in x20. See arch/arm64/include/asm/virt.h for more info.
-> + * in w0. See arch/arm64/include/asm/virt.h for more info.
->   */
->  ENTRY(set_cpu_boot_mode_flag)
->  	adr_l	x1, __boot_cpu_mode
-> -	cmp	w20, #BOOT_CPU_MODE_EL2
-> +	cmp	w0, #BOOT_CPU_MODE_EL2
->  	b.ne	1f
->  	add	x1, x1, #4
-> -1:	str	w20, [x1]			// This CPU has booted in EL1
-> +1:	str	w0, [x1]			// This CPU has booted in EL1
->  	dmb	sy
->  	dc	ivac, x1			// Invalidate potentially stale cache line
->  	ret
-> @@ -576,7 +576,7 @@ ENTRY(__boot_cpu_mode)
->  	 * cores are held until we're ready for them to initialise.
->  	 */
->  ENTRY(secondary_holding_pen)
-> -	bl	el2_setup			// Drop to EL1, w20=cpu_boot_mode
-> +	bl	el2_setup			// Drop to EL1, w0=cpu_boot_mode
->  	bl	set_cpu_boot_mode_flag
->  	mrs	x0, mpidr_el1
->  	ldr     x1, =MPIDR_HWID_BITMASK
-> -- 
-> 2.6.2
-> 
+>
+> Also you are now adding conditionalized code to every fastpath in your
+> driver, that is rediculous and is going to hurt performance.
+>
+> Add seperate code paths for the HWBM vs SWBM, and register a unique
+> set of netdev_ops as appropriate.
+
+TX is untouched and BM support affects only open, stop and change_mtu
+- whose execution is not problematic in terms of performance. However
+there are a couple new conditions in mvneta_rx(). It can be reduced to
+a single condition check, moved to NAPI callback. I'll try to refactor
+code in a way to avoid code duplication. Please bear in mind I don't
+want to register to different NAPI functions (exactly the same apart
+from one line), as the driver can fall back to SWBM after e.g.
+unsuccessful mtu change.
+
+Best regards,
+Marcin
