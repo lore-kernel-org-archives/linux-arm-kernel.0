@@ -1,38 +1,52 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 18 Feb 2016 19:30:27 +0100
-Subject: [PATCH 1/3] irqchip: gic/realview: support more RealView DCC
- variants
-In-Reply-To: <5028476.WAQS3ylXOd@wuerfel>
-References: <1455803172-22747-1-git-send-email-linus.walleij@linaro.org>
- <56C5D304.5010708@arm.com> <5028476.WAQS3ylXOd@wuerfel>
-Message-ID: <CACRpkdZD_qg0p8spr9HnFBSzXidi59J_kR8XBo-s8z-tSqKs5g@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 18 Feb 2016 13:31:56 -0500 (EST)
+Subject: [PATCH] ARM: Allow MULTIPLATFORM to select XIP
+In-Reply-To: <HK2PR06MB0561377EABB3B4B8E94F22328AAF0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+References: <1455816310-11308-1-git-send-email-chris.brandt@renesas.com>
+ <alpine.LFD.2.20.1602181244490.13632@knanqh.ubzr>
+ <HK2PR06MB0561377EABB3B4B8E94F22328AAF0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+Message-ID: <alpine.LFD.2.20.1602181327060.13632@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 18, 2016 at 3:40 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 18 February 2016 14:19:48 Marc Zyngier wrote:
->> On 18/02/16 13:46, Linus Walleij wrote:
->> > In the add-on file for the GIC dealing with the RealView family
->> > we currently only handle the PB11MPCore, let's extend this to
->> > manage the RealView EB ARM11MPCore as well. The Revision B of the
->> > ARM11MPCore core tile is a bit special and needs special handling
->> > as it moves a system control register around at random.
->>
->> Ah, 11MPCore RevB. That thing. Tried to locate one in the magic
->> cupboard, and failed. Oh well...
->
-> What surprised me though is that it's enabled by default:
+On Thu, 18 Feb 2016, Chris Brandt wrote:
 
-Looks like my fault according to git-blame...
+> > And realistically it makes no sense to use XIP (surely because you need
+> > to save space) and have multi-platform support in your kernel.
+> 
+> 
+> The problem is that you don't have a choice: Multi-platform is your only choice for many devices (MMU devices that is).
+> 
+> So for XIP, it comes down to either:
+> 
+> A) Go back to making individual configs for each MPU
+> 
+> B) Let everything keep getting grouped together into multi-platform, and then just de-selecting the MPU you don't want.
+> 
+> I can tell you when I build my upstream XIP kernel for testing for the RZ/A1, it's ARCH_MULTIPLATFORM (all Renesas parts are multiplatform) and then remove everything I don't want/need, my kernel size is 3.4MB.
+> 
+> 
+> > IMHO it should be clear that with XIP there is only one platform that can
+> > be supported.
+> 
+> I would be fine if there was some way you could only select XIP_KERNEL 
+> if only 1 of the MPUs in the multiplatform group were selected...but I 
+> can't figure out how to do that in the kbuild system (without adding 
+> lots of chunky configs all over the place...which is not what I want)
+> 
+> Is there some way you can do a PLATFORM_COUNTER++ for each device that 
+> is selected, and then XIP_KERNEL would depend on PLATFORM_COUNTER == 1 
+> ?
 
-I think this happened when making cover-all defconfigs for
-multiplatform. I think I just turned everything on... not realizing
-that turning on RevB disabled RevA+RevC.
+I don't know all the Kconfig possibilities.
 
-However since it is the *only* version that works with QEMU
-it actually makes some kind of weird sense to have it enabled
-since the QEMU version is probably more common than
-RevA+RevC...
+But would something like this work?
 
-Yours,
-Linus Walleij
+config FOO
+	depends on !(XIP && CHOICE_MADE)
+	select CHOICE_MADE
+
+?
+
+
+Nicolas
