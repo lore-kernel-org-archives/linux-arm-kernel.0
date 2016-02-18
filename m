@@ -1,48 +1,50 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Thu, 18 Feb 2016 17:42:26 +0100
-Subject: [RFC v3 07/15] iommu: iommu_get/put_single_reserved
-In-Reply-To: <20160218110616.05108071@arm.com>
-References: <1455264797-2334-1-git-send-email-eric.auger@linaro.org>
- <1455264797-2334-8-git-send-email-eric.auger@linaro.org>
- <20160218110616.05108071@arm.com>
-Message-ID: <56C5F472.1020003@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 18 Feb 2016 16:43:17 +0000
+Subject: no irq domain found for ... a GPIO interrupt controller
+In-Reply-To: <11a0b1f5808af5bdabaab657366918d4@agner.ch>
+References: <2dc0519827dc9d210e38c498d830cd97@agner.ch>
+ <20160218091432.6968b836@arm.com> <11a0b1f5808af5bdabaab657366918d4@agner.ch>
+Message-ID: <56C5F4A5.2000206@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-On 02/18/2016 12:06 PM, Marc Zyngier wrote:
-> On Fri, 12 Feb 2016 08:13:09 +0000
-> Eric Auger <eric.auger@linaro.org> wrote:
-> 
->> This patch introduces iommu_get/put_single_reserved.
->>
->> iommu_get_single_reserved allows to allocate a new reserved iova page
->> and map it onto the physical page that contains a given physical address.
->> It returns the iova that is mapped onto the provided physical address.
->> Hence the physical address passed in argument does not need to be aligned.
->>
->> In case a mapping already exists between both pages, the IOVA mapped
->> to the PA is directly returned.
->>
->> Each time an iova is successfully returned a binding ref count is
->> incremented.
->>
->> iommu_put_single_reserved decrements the ref count and when this latter
->> is null, the mapping is destroyed and the iova is released.
-> 
-> I wonder if there is a requirement for the caller to find out about the
-> size of the mapping, or to impose a given size... MSIs clearly do not
-> have that requirement (this is always a 32bit value), but since. 
-> allocations usually pair address and size, I though I'd ask...
-Yes. Currently this only makes sure the host PA is mapped and returns
-the corresponding IOVA. It is part of the discussion we need to have on
-the API besides the problematic of which API it should belong to.
+Hi Stefan,
 
-Thanks
+On 18/02/16 16:13, Stefan Agner wrote:
+> Hi Marc,
+> 
+> On 2016-02-18 01:14, Marc Zyngier wrote:
+> <snip>
+>> What your stack trace shows is that the failure occurs at boot time,
+>> when of_platform_populate() parses the DT and creates the platform
+>> devices. As part of this process, it tries to resolves the interrupt
+>> specifiers, but fails to do so for this particular device, since the
+>> corresponding irqchip and domain have not been created yet (the GPIO
+>> controller is itself a device, while other irqchips are not).
+>>
+>> But as long as your device driver uses platform_get_irq(), you will
+>> force the interrupt specifier to be evaluated again, this time giving
+>> you a valid interrupt (and provided that your GPIO driver has
+>> initialized in the meantime - check for -EPROBE_DEFER). At some point,
+>> we'll be able to kill the interrupt resolution from
+>> of_platform_populate().
+> 
+> The device driver is using platform_get_irq. However, I think it
+> currently would not handle EPROBE_DEFER right, but seems also not to
+> happen in practice...
+> 
+>>
+>> To summarize, your driver not working may not be related to this issue.
+> 
+> So this means that despite the warning, nothing I really need to worry
+> right? Does this warning will go away in the future?
 
-Eric
-> 
-> Thanks,
-> 
-> 	M.
-> 
+It is unlikely that the warning will go away anytime soon (there is a
+truckload of drivers to fix), but you can safely ignore it as long as
+you end up getting a interrupt from platform_get_irq().
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
