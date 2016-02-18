@@ -1,166 +1,38 @@
-From: tchalamarla@caviumnetworks.com (tchalamarla at caviumnetworks.com)
-Date: Thu, 18 Feb 2016 10:29:18 -0800
-Subject: [PATCH V2] iommu/arm-smmu-v2: Workaround for ThunderX errata#27704
-Message-ID: <1455820158-8529-1-git-send-email-tchalamarla@caviumnetworks.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 18 Feb 2016 19:30:27 +0100
+Subject: [PATCH 1/3] irqchip: gic/realview: support more RealView DCC
+ variants
+In-Reply-To: <5028476.WAQS3ylXOd@wuerfel>
+References: <1455803172-22747-1-git-send-email-linus.walleij@linaro.org>
+ <56C5D304.5010708@arm.com> <5028476.WAQS3ylXOd@wuerfel>
+Message-ID: <CACRpkdZD_qg0p8spr9HnFBSzXidi59J_kR8XBo-s8z-tSqKs5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
+On Thu, Feb 18, 2016 at 3:40 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 18 February 2016 14:19:48 Marc Zyngier wrote:
+>> On 18/02/16 13:46, Linus Walleij wrote:
+>> > In the add-on file for the GIC dealing with the RealView family
+>> > we currently only handle the PB11MPCore, let's extend this to
+>> > manage the RealView EB ARM11MPCore as well. The Revision B of the
+>> > ARM11MPCore core tile is a bit special and needs special handling
+>> > as it moves a system control register around at random.
+>>
+>> Ah, 11MPCore RevB. That thing. Tried to locate one in the magic
+>> cupboard, and failed. Oh well...
+>
+> What surprised me though is that it's enabled by default:
 
-Due to Errata#27704 CN88xx SMMUv2,supports  only shared ASID and VMID
-namespaces; specifically within a given node SMMU0 and SMMU1 share,
-as does SMMU2 and SMMU3.
+Looks like my fault according to git-blame...
 
-This patch tries to address these issuee by supplying asid and vmid
-base from devicetree.
+I think this happened when making cover-all defconfigs for
+multiplatform. I think I just turned everything on... not realizing
+that turning on RevB disabled RevA+RevC.
 
-changes from V1:
-	- rebased on top of 16 bit VMID patch
-	- removed redundent options from DT
-	- insted of transform, DT now supplies starting ASID/VMID
+However since it is the *only* version that works with QEMU
+it actually makes some kind of weird sense to have it enabled
+since the QEMU version is probably more common than
+RevA+RevC...
 
-Signed-off-by: Akula Geethasowjanya <Geethasowjanya.Akula@caviumnetworks.com>
-Signed-off-by: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
----
- .../devicetree/bindings/iommu/arm,smmu.txt         |  8 +++++
- drivers/iommu/arm-smmu.c                           | 37 +++++++++++++++-------
- 2 files changed, 34 insertions(+), 11 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-index bb7e569..80b8484 100644
---- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-+++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-@@ -57,6 +57,14 @@ conditions.
- 
- - smmu-enable-vmid16 : Enable 16 bit VMID, if allowed.
- 
-+- asid-base :	Buggy SMMUv2 implementations which doesn't satisfy the
-+		ASID namespace needs, use this field to specify starting
-+		ASID for the SMMU.
-+
-+- vmid-base :	Buggy SMMUv2 implementations which doesn't satisfy the VMID
-+		namespace needs, use this field to specify starting VMID
-+		for the SMMU.
-+
- Example:
- 
-         smmu {
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 003c442..dc46b9a 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -320,6 +320,9 @@ struct arm_smmu_device {
- 	unsigned long			ipa_size;
- 	unsigned long			pa_size;
- 
-+	u32				asid_base;
-+	u32				vmid_base;
-+
- 	u32				num_global_irqs;
- 	u32				num_context_irqs;
- 	unsigned int			*irqs;
-@@ -335,8 +338,8 @@ struct arm_smmu_cfg {
- };
- #define INVALID_IRPTNDX			0xff
- 
--#define ARM_SMMU_CB_ASID(cfg)		((cfg)->cbndx)
--#define ARM_SMMU_CB_VMID(cfg)		((cfg)->cbndx + 1)
-+#define ARM_SMMU_CB_ASID(smmu, cfg)	((u16)((smmu)->asid_base + (cfg)->cbndx))
-+#define ARM_SMMU_CB_VMID(smmu, cfg)	((u16)((smmu)->vmid_base + (cfg)->cbndx))
- 
- enum arm_smmu_domain_stage {
- 	ARM_SMMU_DOMAIN_S1 = 0,
-@@ -576,11 +579,11 @@ static void arm_smmu_tlb_inv_context(void *cookie)
- 
- 	if (stage1) {
- 		base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cfg->cbndx);
--		writel_relaxed(ARM_SMMU_CB_ASID(cfg),
-+		writel_relaxed(ARM_SMMU_CB_ASID(smmu, cfg),
- 			       base + ARM_SMMU_CB_S1_TLBIASID);
- 	} else {
- 		base = ARM_SMMU_GR0(smmu);
--		writel_relaxed(ARM_SMMU_CB_VMID(cfg),
-+		writel_relaxed(ARM_SMMU_CB_VMID(smmu, cfg),
- 			       base + ARM_SMMU_GR0_TLBIVMID);
- 	}
- 
-@@ -602,7 +605,7 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
- 
- 		if (!IS_ENABLED(CONFIG_64BIT) || smmu->version == ARM_SMMU_V1) {
- 			iova &= ~12UL;
--			iova |= ARM_SMMU_CB_ASID(cfg);
-+			iova |= ARM_SMMU_CB_ASID(smmu, cfg);
- 			do {
- 				writel_relaxed(iova, reg);
- 				iova += granule;
-@@ -610,7 +613,7 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
- #ifdef CONFIG_64BIT
- 		} else {
- 			iova >>= 12;
--			iova |= (u64)ARM_SMMU_CB_ASID(cfg) << 48;
-+			iova |= (u64)ARM_SMMU_CB_ASID(smmu, cfg) << 48;
- 			do {
- 				writeq_relaxed(iova, reg);
- 				iova += granule >> 12;
-@@ -630,7 +633,7 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
- #endif
- 	} else {
- 		reg = ARM_SMMU_GR0(smmu) + ARM_SMMU_GR0_TLBIVMID;
--		writel_relaxed(ARM_SMMU_CB_VMID(cfg), reg);
-+		writel_relaxed(ARM_SMMU_CB_VMID(smmu, cfg), reg);
- 	}
- }
- 
-@@ -744,7 +747,7 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
- #endif
- 		/* if 16bit VMID required set VMID in CBA2R */
- 		if (smmu->options & ARM_SMMU_OPT_ENABLE_VMID16)
--			reg |= ARM_SMMU_CB_VMID(cfg) << CBA2R_VMID_SHIFT;
-+			reg |= ARM_SMMU_CB_VMID(smmu, cfg) << CBA2R_VMID_SHIFT;
- 
- 		writel_relaxed(reg, gr1_base + ARM_SMMU_GR1_CBA2R(cfg->cbndx));
- 	}
-@@ -763,7 +766,7 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
- 			(CBAR_S1_MEMATTR_WB << CBAR_S1_MEMATTR_SHIFT);
- 	} else if (!(smmu->options & ARM_SMMU_OPT_ENABLE_VMID16)) {
- 		/*16 bit VMID is not enabled set 8 bit VMID here */
--		reg |= ARM_SMMU_CB_VMID(cfg) << CBAR_VMID_SHIFT;
-+		reg |= ARM_SMMU_CB_VMID(smmu, cfg) << CBAR_VMID_SHIFT;
- 	}
- 	writel_relaxed(reg, gr1_base + ARM_SMMU_GR1_CBAR(cfg->cbndx));
- 
-@@ -771,11 +774,11 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
- 	if (stage1) {
- 		reg64 = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0];
- 
--		reg64 |= ((u64)ARM_SMMU_CB_ASID(cfg)) << TTBRn_ASID_SHIFT;
-+		reg64 |= ((u64)ARM_SMMU_CB_ASID(smmu, cfg)) << TTBRn_ASID_SHIFT;
- 		smmu_writeq(reg64, cb_base + ARM_SMMU_CB_TTBR0);
- 
- 		reg64 = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1];
--		reg64 |= ((u64)ARM_SMMU_CB_ASID(cfg)) << TTBRn_ASID_SHIFT;
-+		reg64 |= ((u64)ARM_SMMU_CB_ASID(smmu, cfg)) << TTBRn_ASID_SHIFT;
- 		smmu_writeq(reg64, cb_base + ARM_SMMU_CB_TTBR1);
- 	} else {
- 		reg64 = pgtbl_cfg->arm_lpae_s2_cfg.vttbr;
-@@ -1812,6 +1815,18 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
- 
- 	parse_driver_options(smmu);
- 
-+	if (of_property_read_u32(dev->of_node, "#asid-base",
-+				 &smmu->asid_base)) {
-+		smmu->asid_base = 0;
-+	}
-+
-+	if (of_property_read_u32(dev->of_node, "#vmid-base",
-+				 &smmu->vmid_base)) {
-+		smmu->vmid_base = 1;
-+	}
-+	if (smmu->vmid_base == 0)
-+		smmu->vmid_base = 1;
-+
- 	if (smmu->version > ARM_SMMU_V1 &&
- 	    smmu->num_context_banks != smmu->num_context_irqs) {
- 		dev_err(dev,
--- 
-2.1.0
+Yours,
+Linus Walleij
