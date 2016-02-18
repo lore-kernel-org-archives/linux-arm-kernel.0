@@ -1,41 +1,48 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Wed, 17 Feb 2016 20:39:25 -0800
-Subject: [PATCH V2 7/8] dmaengine: bcm2835: add slave_sg support to
- bcm2835-dma
-In-Reply-To: <1452187987-2605-8-git-send-email-kernel@martin.sperl.org>
-References: <1452187987-2605-1-git-send-email-kernel@martin.sperl.org>
- <1452187987-2605-8-git-send-email-kernel@martin.sperl.org>
-Message-ID: <87oabews1u.fsf@eliezer.anholt.net>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 18 Feb 2016 13:42:03 +0900
+Subject: [RFC 3/3] ARM: dts: Don't overheat the Odroid XU3-Lite on high
+ load
+In-Reply-To: <20160218023622.GA2610@vireshk-i7>
+References: <1455692128-28504-1-git-send-email-k.kozlowski@samsung.com>
+ <1455692128-28504-4-git-send-email-k.kozlowski@samsung.com>
+ <CANAwSgQHiJGSYB7Qhq066Mqfskwrr_3SDQGXH-WN=Wt3SEF-QA@mail.gmail.com>
+ <56C522A9.8070800@samsung.com> <20160218023622.GA2610@vireshk-i7>
+Message-ID: <56C54B9B.7030105@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-kernel at martin.sperl.org writes:
+On 18.02.2016 11:36, Viresh Kumar wrote:
+>>
+>> BTW, I found the issue. The order of trip points in DT:
+>> thermal_zone0/trip_point_0_hyst:5000
+>> thermal_zone0/trip_point_0_temp:50000
+>> thermal_zone0/trip_point_0_type:active
+>> thermal_zone0/trip_point_1_hyst:5000
+>> thermal_zone0/trip_point_1_temp:60000
+>> thermal_zone0/trip_point_1_type:active
+>> thermal_zone0/trip_point_2_hyst:5000
+>> thermal_zone0/trip_point_2_temp:70000
+>> thermal_zone0/trip_point_2_type:active
+>> thermal_zone0/trip_point_3_hyst:0
+>> thermal_zone0/trip_point_3_temp:120000	<---- this should be last one!
+>> thermal_zone0/trip_point_3_type:critical
+>> thermal_zone0/trip_point_4_hyst:5000
+>> thermal_zone0/trip_point_4_temp:90000
+>> thermal_zone0/trip_point_4_type:passive
+>> thermal_zone0/trip_point_5_hyst:5000
+>> thermal_zone0/trip_point_5_temp:110000
+>> thermal_zone0/trip_point_5_type:passive
+>>
+>> After fixing the order in DT, the cpu cooler starts working.
+> 
+> Ahh, nice.
 
-> From: Martin Sperl <kernel@martin.sperl.org>
->
-> Add slave_sg support to bcm2835-dma using shared allocation
-> code for bcm2835_desc and DMA-control blocks already used by
-> dma_cyclic.
->
-> Note that bcm2835_dma_callback had to get modified to support
-> both modes of operation (cyclic and non-cyclic).
->
-> Tested using:
-> * Hifiberry I2S card (using cyclic DMA)
-> * fb_st7735r SPI-framebuffer (using slave_sg DMA via spi-bcm2835)
-> playing BigBuckBunny for audio and video.
->
-> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+Damn, not entirely. I almost fried my Odroid (it survived 130 degrees of
+C)... The TMU supports only 4 trip points, so when I added two new trip
+points and reordered them... the last two (including critical) was not
+receiving interrupts.
 
-I would have expected bcm2835_dma_create_cb_chain()'s changes to support
-slave DMA to be in this patch rather than the refactor patch.  However,
-the content of this one and 8/8 are:
+Polling mode is needed. I'll sent some patches soon...
 
-Reviewed-by: Eric Anholt <eric@anholt.net>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160217/9d8c8c3b/attachment.sig>
+BR,
+Krzysztof
