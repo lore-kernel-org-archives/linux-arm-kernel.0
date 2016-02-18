@@ -1,43 +1,41 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 18 Feb 2016 15:01:57 +0100
-Subject: [PATCH 5/9] ARM: atags_to_fdt: don't warn about stack size
+Date: Thu, 18 Feb 2016 15:01:58 +0100
+Subject: [PATCH 6/9] ARM: uaccess: avoid warning for NOMMU in access_ok
 In-Reply-To: <1455804123-2526139-1-git-send-email-arnd@arndb.de>
 References: <1455804123-2526139-1-git-send-email-arnd@arndb.de>
-Message-ID: <1455804123-2526139-6-git-send-email-arnd@arndb.de>
+Message-ID: <1455804123-2526139-7-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The merge_fdt_bootargs() function by definition consumes more than 1024
-bytes of stack because it has a 1024 byte command line on the stack,
-meaning that we always get a warning when building this file:
+When CONFIG_MMU is disabled, the access_ok() and __range_ok()
+macros always return success, and there is a cast to void
+to ensure the compiler does not warn about an unused address
+variable. However, at least one driver has a variable for
+the size argument as well and does warn about that one:
 
-arch/arm/boot/compressed/atags_to_fdt.c: In function 'merge_fdt_bootargs':
-arch/arm/boot/compressed/atags_to_fdt.c:98:1: warning: the frame size of 1032 bytes is larger than 1024 bytes [-Wframe-larger-than=]
+drivers/vhost/vhost.c: In function 'vq_access_ok':
+drivers/vhost/vhost.c:633:9: warning: unused variable 's' [-Wunused-variable]
 
-However, as this is the decompressor and we know that it has a very shallow
-call chain, and we do not actually risk overflowing the kernel stack
-at runtime here.
-
-This just shuts up the warning by disabling the warning flag for this
-file.
+This changes the macro to also ignore the size argument
+explicitly to shut up that warning.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/boot/compressed/Makefile | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/include/asm/uaccess.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-index 7a6a58ef8aaf..b5db4c868640 100644
---- a/arch/arm/boot/compressed/Makefile
-+++ b/arch/arm/boot/compressed/Makefile
-@@ -85,6 +85,8 @@ $(addprefix $(obj)/,$(libfdt) $(libfdt_hdrs)): $(obj)/%: $(srctree)/scripts/dtc/
- $(addprefix $(obj)/,$(libfdt_objs) atags_to_fdt.o): \
- 	$(addprefix $(obj)/,$(libfdt_hdrs))
+diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
+index 35c9db857ebe..9c74c84a10d2 100644
+--- a/arch/arm/include/asm/uaccess.h
++++ b/arch/arm/include/asm/uaccess.h
+@@ -290,7 +290,7 @@ extern int __put_user_8(void *, unsigned long long);
  
-+CFLAGS_REMOVE_atags_to_fdt.o += -Wframe-larger-than=${CONFIG_FRAME_WARN}
-+
- ifeq ($(CONFIG_ARM_ATAG_DTB_COMPAT),y)
- OBJS	+= $(libfdt_objs) atags_to_fdt.o
- endif
+ #define segment_eq(a, b)		(1)
+ #define __addr_ok(addr)		((void)(addr), 1)
+-#define __range_ok(addr, size)	((void)(addr), 0)
++#define __range_ok(addr, size)	((void)(addr), (void)(size), 0)
+ #define get_fs()		(KERNEL_DS)
+ 
+ static inline void set_fs(mm_segment_t fs)
 -- 
 2.7.0
