@@ -1,25 +1,25 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 18 Feb 2016 14:36:48 +0000
-Subject: [PATCH v2 5/5] arm64: kernel: Don't toggle PAN on systems with UAO
-In-Reply-To: <1454684330-892-6-git-send-email-james.morse@arm.com>
-References: <1454684330-892-1-git-send-email-james.morse@arm.com>
- <1454684330-892-6-git-send-email-james.morse@arm.com>
-Message-ID: <20160218143648.GC2538@e104818-lin.cambridge.arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 18 Feb 2016 08:37:02 -0600
+Subject: [PATCH 3/6] ASoC: rockchip: add bindings for rk3399 i2s
+In-Reply-To: <20160217110306.GJ7544@sirena.org.uk>
+References: <1455673992-16469-1-git-send-email-jay.xu@rock-chips.com>
+ <1455673992-16469-4-git-send-email-jay.xu@rock-chips.com>
+ <20160217110306.GJ7544@sirena.org.uk>
+Message-ID: <20160218143702.GN9654@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 05, 2016 at 02:58:50PM +0000, James Morse wrote:
-> --- a/arch/arm64/mm/fault.c
-> +++ b/arch/arm64/mm/fault.c
-> @@ -234,6 +234,9 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
->  	}
->  
->  	if (permission_fault(esr) && (addr < USER_DS)) {
-> +		if (get_thread_info(regs->sp)->addr_limit == KERNEL_DS)
-> +			panic("Accessing user space memory with fs=KERNEL_DS");
+On Wed, Feb 17, 2016 at 11:03:06AM +0000, Mark Brown wrote:
+> On Wed, Feb 17, 2016 at 09:53:09AM +0800, jianqun.xu wrote:
+> 
+> > ---
+> >  Documentation/devicetree/bindings/sound/rockchip-i2s.txt | 1 +
+> >  1 file changed, 1 insertion(+)
+> 
+> As with the other patch I'd expect to see a matching driver update if
+> only for documentation purposes.
 
-We could simply use "get_fs() == KERNEL_DS" as we should call
-do_page_fault() outside the current context.
+Why? They match on the prior chip's compatible until there is some 
+difference the driver needs to handle.
 
--- 
-Catalin
+Rob
