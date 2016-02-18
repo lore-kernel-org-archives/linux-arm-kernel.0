@@ -1,25 +1,27 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 18 Feb 2016 13:46:23 -0500 (EST)
-Subject: [PATCH v5 1/1] USB: core: let USB device know device node
-In-Reply-To: <1455612172-2081-1-git-send-email-peter.chen@nxp.com>
-Message-ID: <Pine.LNX.4.44L0.1602181345570.1280-100000@iolanthe.rowland.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 18 Feb 2016 19:55:17 +0100
+Subject: Bunch of machines are not booting in next again, GPIO regression?
+In-Reply-To: <20160217224415.GA3866@jcartwri.amer.corp.natinst.com>
+References: <20160217192755.GC21202@atomide.com>
+ <20160217195543.GA871@jcartwri.amer.corp.natinst.com>
+ <20160217201259.GA16028@deathstar>
+ <20160217202224.GD21202@atomide.com>
+ <20160217224415.GA3866@jcartwri.amer.corp.natinst.com>
+Message-ID: <CACRpkdY2=mYVDU2BXzN1rY7=mP_iyG3UEaCNVom4HFJDf61+0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 16 Feb 2016, Peter Chen wrote:
+On Wed, Feb 17, 2016 at 11:44 PM, Josh Cartwright <joshc@ni.com> wrote:
 
-> From: Peter Chen <peter.chen@freescale.com>
-> 
-> Although most of USB devices are hot-plug's, there are still some devices
-> are hard wired on the board, eg, for HSIC and SSIC interface USB devices.
-> If these kinds of USB devices are multiple functions, and they can supply
-> other interfaces like i2c, gpios for other devices, we may need to
-> describe these at device tree.
-> 
-> In this commit, it uses "reg" in dts as physical port number to match
-> the phyiscal port number decided by USB core, if they are the same,
-> then the device node is for the device we are creating for USB core.
-> 
-> Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> Here's a properly cooked patch.  Otherwise, feel free to squash it in if
+> it's easier for you.
+>
+> -- 8< --
+> Subject: [PATCH] gpio: use kzalloc to allocate gpio_device
 
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
+Patch applied, of course.
+
+Big hugs and thanks for fixing my stupid mistake!
+
+N?ras,
+Linus Walleij
