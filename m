@@ -1,66 +1,31 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 18 Feb 2016 21:31:30 +0100
-Subject: [PATCH 11/11] ARM: versatile: move CLCD configuration to device
- tree
-In-Reply-To: <56C5C8FD.7090004@ti.com>
+Date: Thu, 18 Feb 2016 21:48:43 +0100
+Subject: [PATCH 07/11] Documentation/DT: add Versatile display bindings
+In-Reply-To: <56C43936.2060808@ti.com>
 References: <1454594660-7532-1-git-send-email-linus.walleij@linaro.org>
- <1454594660-7532-12-git-send-email-linus.walleij@linaro.org>
- <56C438DA.5040109@ti.com>
- <CACRpkdZ+G17hmVP8AejL7NTqg7k0SBC5kgF55ASjD+kfuGFJhQ@mail.gmail.com>
- <20160217213250.GK19428@n2100.arm.linux.org.uk>
- <56C5B080.9090007@ti.com>
- <20160218131233.GP19428@n2100.arm.linux.org.uk>
- <56C5C8FD.7090004@ti.com>
-Message-ID: <CACRpkdYRNLdsR1fdJ0WyVpRbtca+1zSjohSKKQcmSgARhRejhA@mail.gmail.com>
+ <1454594660-7532-8-git-send-email-linus.walleij@linaro.org>
+ <56C43936.2060808@ti.com>
+Message-ID: <CACRpkdbGqbjEwHcspcRW0_889YO0RpVTef2mhVdP_9vJHMD8gQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 18, 2016 at 2:37 PM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
-> On 18/02/16 15:12, Russell King - ARM Linux wrote:
->> On Thu, Feb 18, 2016 at 01:52:32PM +0200, Tomi Valkeinen wrote:
->>> In my opinion the best option would be to use DT overlays, but so that
->>> the bootloader would supply them, or construct the dtb. But afaik that's
->>> not possible at the moment. And perhaps I think that's the best option
->>> only because I don't work with the bootloaders =).
->>>
->>> So, I don't like this, but I don't have a good suggestion how to do it
->>> better with the infrastructure in place at the moment.
->>
->> The danger of that position is that we end up with nothing happening,
->> and the problem remaining unresolved, which then pushes people into
->> maintaining patches out of mainline just to have a working setup -
->> which then pushes people to vendor trees.
+On Wed, Feb 17, 2016 at 10:11 AM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
+
+>> +Required properties:
+>> +- compatible: should be "epson,l2f50113t00"
+>> +
+>> +This binding is compatible with the panel-dpi binding, which is specified
+>> +in panel-dpi.txt in this directory.
 >
-> I agree.
->
-> I didn't express my position clearly: I'm ok with the approach, if we
-> don't come up with anything better.
+> Do we really want to add new binding doc files for all panels, even if
+> they just point to a more generic binding? We may end up with quite a
+> lot of these, each only saying "look at the panel-dpi.txt".
 
-I'm checking to see if I can use the overlay primitives directly from
-the kernel.
+That's sort of what I'm asking too. But there was some other
+file doing exactly this :(
 
-It seems possible, basically to have a panel defined in the device tree
-for VGA as default, and then augment it depending on what we detect.
-Meaning I start to overwrite clock-frequency, pixelclk-active, hactive etc.
-It basically means we go back to having a database in the kernel.
-
-I would then even overwrite the .compatible string from the kernel.
-
-It may be more elegant than this solution though?
-
-> But if we go with this approach, it must be understood that it may cause
-> problems later. It's not the most maintainable approach.
->
-> I'd also like to have an ack from the DT maintainers, as I think this is
-> somewhat of an abuse of the DT.
-
-What I am doing in this patch is sort of a "Schr?dinger's cat approach",
-I basically say that the cat is both dead and alive until we open the
-box, i.e. all displays are connected until we figure out which one it
-actually is.
-
-Basically the approach taken could even handle the case of switching
-a display at runtime. Though I don't think the hardware would like that.
+What do you say about just putting a list of compatible panels
+directly into panel-dpi.txt?
 
 Yours,
 Linus Walleij
