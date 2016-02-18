@@ -1,63 +1,57 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 18 Feb 2016 12:31:35 -0500 (EST)
-Subject: [PATCH 1/3] [RESEND] ARM: pass -march=armv7-a when building NEON
- files with clang
-In-Reply-To: <1455815113-2562966-2-git-send-email-arnd@arndb.de>
-References: <1455815113-2562966-1-git-send-email-arnd@arndb.de>
- <1455815113-2562966-2-git-send-email-arnd@arndb.de>
-Message-ID: <alpine.LFD.2.20.1602181230440.13632@knanqh.ubzr>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 18 Feb 2016 17:32:48 +0000
+Subject: [PATCH v4 3/5] arm64: dts: Add Cavium ThunderX specific PMU
+In-Reply-To: <2b8c963d3e63ecfc412bfd6fab804890a1586b16.1455810755.git.jglauber@cavium.com>
+References: <cover.1455810755.git.jglauber@cavium.com>
+ <2b8c963d3e63ecfc412bfd6fab804890a1586b16.1455810755.git.jglauber@cavium.com>
+Message-ID: <20160218173248.GD16883@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 18 Feb 2016, Arnd Bergmann wrote:
+On Thu, Feb 18, 2016 at 05:50:12PM +0100, Jan Glauber wrote:
+> Add a compatible string for the Cavium ThunderX PMU.
 
-> clang ignores the -mfpu=neon flag when building with -march=armv6:
-> 
-> In file included from lib/raid6/neon1.c:27:
-> clang/3.8.0/include/arm_neon.h:28:2: error: "NEON support not enabled"
-> 
-> There is no real need to build the file with -march=armv6 in a
-> multi-CPU enabled kernel, as nothing in here will ever get called
-> on an ARMv6 CPU. Adding -march=armv7 doesn't hurt and can only
-> improve the code quality.
+Stupid question, but is "thunder" the name of the CPU or the SoC or ...?
 
-Is this enough to override a previous -mfpu for gcc?
+Whatever we use to describe the PMU, should probably also identify the
+CPU uniquely.
 
+Will
 
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Jan Glauber <jglauber@cavium.com>
 > ---
->  arch/arm/lib/Makefile | 2 +-
->  lib/raid6/Makefile    | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
+>  Documentation/devicetree/bindings/arm/pmu.txt | 1 +
+>  arch/arm64/boot/dts/cavium/thunder-88xx.dtsi  | 5 +++++
+>  2 files changed, 6 insertions(+)
 > 
-> diff --git a/arch/arm/lib/Makefile b/arch/arm/lib/Makefile
-> index d8a780799506..a86c6c8e0648 100644
-> --- a/arch/arm/lib/Makefile
-> +++ b/arch/arm/lib/Makefile
-> @@ -35,7 +35,7 @@ $(obj)/csumpartialcopy.o:	$(obj)/csumpartialcopygeneric.S
->  $(obj)/csumpartialcopyuser.o:	$(obj)/csumpartialcopygeneric.S
+> diff --git a/Documentation/devicetree/bindings/arm/pmu.txt b/Documentation/devicetree/bindings/arm/pmu.txt
+> index 5651883..d3999a1 100644
+> --- a/Documentation/devicetree/bindings/arm/pmu.txt
+> +++ b/Documentation/devicetree/bindings/arm/pmu.txt
+> @@ -25,6 +25,7 @@ Required properties:
+>  	"qcom,scorpion-pmu"
+>  	"qcom,scorpion-mp-pmu"
+>  	"qcom,krait-pmu"
+> +	"cavium,thunder-pmu"
+>  - interrupts : 1 combined interrupt or 1 per core. If the interrupt is a per-cpu
+>                 interrupt (PPI) then 1 interrupt should be specified.
 >  
->  ifeq ($(CONFIG_KERNEL_MODE_NEON),y)
-> -  NEON_FLAGS			:= -mfloat-abi=softfp -mfpu=neon
-> +  NEON_FLAGS			:= -mfloat-abi=softfp -mfpu=neon -march=armv7-a
->    CFLAGS_xor-neon.o		+= $(NEON_FLAGS)
->    obj-$(CONFIG_XOR_BLOCKS)	+= xor-neon.o
->  endif
-> diff --git a/lib/raid6/Makefile b/lib/raid6/Makefile
-> index 3b10a48fa040..4ef3e800fb39 100644
-> --- a/lib/raid6/Makefile
-> +++ b/lib/raid6/Makefile
-> @@ -23,7 +23,7 @@ endif
->  ifeq ($(CONFIG_KERNEL_MODE_NEON),y)
->  NEON_FLAGS := -ffreestanding
->  ifeq ($(ARCH),arm)
-> -NEON_FLAGS += -mfloat-abi=softfp -mfpu=neon
-> +NEON_FLAGS += -mfloat-abi=softfp -mfpu=neon -march=armv7-a
->  endif
->  ifeq ($(ARCH),arm64)
->  CFLAGS_REMOVE_neon1.o += -mgeneral-regs-only
+> diff --git a/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi b/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
+> index 9cb7cf9..2eb9b22 100644
+> --- a/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
+> +++ b/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
+> @@ -360,6 +360,11 @@
+>  		             <1 10 0xff01>;
+>  	};
+>  
+> +	pmu {
+> +		compatible = "cavium,thunder-pmu", "arm,armv8-pmuv3";
+> +		interrupts = <1 7 4>;
+> +	};
+> +
+>  	soc {
+>  		compatible = "simple-bus";
+>  		#address-cells = <2>;
 > -- 
-> 2.7.0
-> 
+> 1.9.1
 > 
