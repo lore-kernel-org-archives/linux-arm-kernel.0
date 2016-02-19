@@ -1,31 +1,40 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Fri, 19 Feb 2016 16:22:48 +0100
-Subject: [PATCH v3 6/7] arm64: alpine: select the Alpine MSI controller driver
+Date: Fri, 19 Feb 2016 16:22:47 +0100
+Subject: [PATCH v3 5/7] ARM: dts: alpine: add the MSIX node
 In-Reply-To: <1455895369-13187-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1455895369-13187-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1455895369-13187-7-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1455895369-13187-6-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Select the Alpine MSI controller driver when using an Alpine platform.
+With the newly available MSIX driver for Alpine, add the corresponding
+node in the Alpine device tree.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-Signed-off-by: Tsahee Zidenberg <tsahee@annapurnalabs.com>
 ---
- arch/arm64/Kconfig.platforms | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/alpine.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index bfbefa3e0dbe..6761e12e5e13 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -2,6 +2,7 @@ menu "Platform selection"
+diff --git a/arch/arm/boot/dts/alpine.dtsi b/arch/arm/boot/dts/alpine.dtsi
+index 9af2d60e9a7f..db8752fc480e 100644
+--- a/arch/arm/boot/dts/alpine.dtsi
++++ b/arch/arm/boot/dts/alpine.dtsi
+@@ -155,6 +155,16 @@
+ 			ranges = <0x02000000 0x0 0xfe000000 0x0 0xfe000000 0x0 0x1000000>;
  
- config ARCH_ALPINE
- 	bool "Annapurna Labs Alpine platform"
-+	select ALPINE_MSI
- 	help
- 	  This enables support for the Annapurna Labs Alpine
- 	  Soc family.
+ 			bus-range = <0x00 0x00>;
++			msi-parent = <&msix>;
++		};
++
++		msix: msix at fbe00000 {
++			compatible = "al,alpine-msix";
++			reg = <0x0 0xfbe00000 0x0 0x100000>;
++			interrupt-controller;
++			msi-controller;
++			al,msi-base-spi = <96>;
++			al,msi-num-spis = <64>;
+ 		};
+ 	};
+ };
 -- 
 2.7.1
