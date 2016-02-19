@@ -1,44 +1,26 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 19 Feb 2016 13:25:05 +0900
-Subject: [PATCH 3/3] thermal: exynos: Defer probe if vtmu is present but
- not registered
-In-Reply-To: <20160219042014.GB27936@samsunx.samsung>
+From: andi.shyti@samsung.com (Andi Shyti)
+Date: Fri, 19 Feb 2016 13:29:54 +0900
+Subject: [PATCH 0/3] thermal: exynos: Fixes for vtmu-supply regulator
+ handling
+In-Reply-To: <1455819551-4666-1-git-send-email-javier@osg.samsung.com>
 References: <1455819551-4666-1-git-send-email-javier@osg.samsung.com>
- <1455819551-4666-4-git-send-email-javier@osg.samsung.com>
- <20160219042014.GB27936@samsunx.samsung>
-Message-ID: <56C69921.4050201@samsung.com>
+Message-ID: <20160219042954.GD27936@samsunx.samsung>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19.02.2016 13:20, Andi Shyti wrote:
-> Hi Javier,
+Hi Javier,
+
+> Javier Martinez Canillas (3):
+>   thermal: exynos: List vtmu-supply as optional property in DT binding
+>   thermal: exynos: Use devm_regulator_get_optional() for vtmu
+>   thermal: exynos: Defer probe if vtmu is present but not registered
 > 
-> Just a question...
-> 
->> diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
->> index f4f36bba7be9..f3ce94ec73b5 100644
->> --- a/drivers/thermal/samsung/exynos_tmu.c
->> +++ b/drivers/thermal/samsung/exynos_tmu.c
->> @@ -1318,6 +1318,8 @@ static int exynos_tmu_probe(struct platform_device *pdev)
->>  			return ret;
->>  		}
->>  	} else {
->> +		if (PTR_ERR(data->regulator) == -EPROBE_DEFER)
->> +			return -EPROBE_DEFER;
-> 
-> shouldn't we return also in case of -ENOMEM? -ENOMEM is a Kernel
-> failure, not depending on the regulator itself.
+>  Documentation/devicetree/bindings/thermal/exynos-thermal.txt | 9 ++++++---
+>  drivers/thermal/samsung/exynos_tmu.c                         | 4 +++-
+>  2 files changed, 9 insertions(+), 4 deletions(-)
 
-Usually not because that would make this error path quite complicated
-and difficult to keep consistent. If you choose this way then you will
-have to probably extend the black list (e.g. EINVAL, some other)... or
-use a white list.
+for all of them:
 
-Additionally the error codes can come from deeper layers. These layer
-now can return ESOMETHING but later it might change to EDIFFERENT... you
-cannot predict that.
+Reviewed-by: Andi Shyti <andi.shyti@samsung.com>
 
-Whatever the reason was (except defer), just ignore the regulator.
-
-Best regards,
-Krzysztof
+Andi
