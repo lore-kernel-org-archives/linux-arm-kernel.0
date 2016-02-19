@@ -1,64 +1,53 @@
-From: guodong.xu@linaro.org (Guodong Xu)
-Date: Fri, 19 Feb 2016 13:19:08 +0800
-Subject: [PATCH 5/5] arm64: dts: add wifi nodes support for hi6220-hikey
-In-Reply-To: <1455859148-29098-1-git-send-email-guodong.xu@linaro.org>
-References: <1455859148-29098-1-git-send-email-guodong.xu@linaro.org>
-Message-ID: <1455859148-29098-6-git-send-email-guodong.xu@linaro.org>
+From: henryc.chen@mediatek.com (Henry Chen)
+Date: Fri, 19 Feb 2016 13:31:25 +0800
+Subject: [RFC PATCH 4/5] PM / AVS: thermal: MT8173: Introduce support
+ for SVS engine
+In-Reply-To: <1455858482.17104.13.camel@mtksdaap41>
+References: <1453452029-20843-1-git-send-email-pi-cheng.chen@linaro.org>
+ <1453452029-20843-5-git-send-email-pi-cheng.chen@linaro.org>
+ <CAGS+omAYPhJ80kHG=bW4AjFsQzhwUfC6C+nAXa=Ny5UyoCid=w@mail.gmail.com>
+ <20160218030049.GA8780@gmail.com> <1455858482.17104.13.camel@mtksdaap41>
+Message-ID: <1455859885.17104.21.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add wifi nodes support for hi6220-hikey
+On Fri, 2016-02-19 at 13:08 +0800, Henry Chen wrote:
+> On Thu, 2016-02-18 at 11:00 +0800, Pi-Cheng Chen wrote:
+> 
+> > > > +               vboot = regulator_get_voltage(svs->reg) / 1000;
+> > > > +               if (mvolt_to_config(vboot) !=
+> > > > +                   mvolt_to_config(svs_bank_cfgs[i].vboot)) {
+> > > > +                       dev_err(svs->dev, "Vboot value mismatch!\n");
+> > > > +                       ret = -EINVAL;
+> > > > +                       break;
+> > > > +               }
+> > > > +
+> > > > +               ret = regulator_set_mode(svs->reg, REGULATOR_MODE_FAST);
+> > > > +               if (ret) {
+> > > > +                       dev_err(svs->dev,
+> > > > +                               "Failed to set regulator in PWM mode\n");
+> > > > +                       ret = -EINVAL;
+> > > > +                       break;
+> > > > +               }
+> > > 
+> > > Shouldn't this be best effort?
+> > > If we can't set the regulator to fast mode, can we continue anyway?
+> > > 
+> > 
+> > AFAIK, we need to set the regulator to fast mode to get stable voltage as
+> > possible. I am sure about the details.
+> > 
+> > @Henry,
+> > Would you please comment it?
+> 
 
-Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
----
- arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 28 ++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+Hi,
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-index 5a004b4..eba6ec7 100644
---- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-+++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-@@ -47,6 +47,7 @@
- 		i2c0: i2c at f7100000 {
- 			status = "ok";
- 		};
-+
- 		i2c1: i2c at f7101000 {
- 			status = "ok";
- 		};
-@@ -62,6 +63,33 @@
- 		uart3: uart at f7113000 {
- 			status = "ok";
- 		};
-+
-+		dwmmc_2: dwmmc2 at f723f000 {
-+			/* WL_EN */
-+			vmmc-supply = <&wlan_en_reg>;
-+
-+			#address-cells = <0x1>;
-+			#size-cells = <0x0>;
-+			wlcore: wlcore at 2 {
-+				compatible = "ti,wl1835";
-+				reg = <2>;	/* sdio func num */
-+				/* WL_IRQ, WL_HOST_WAKE_GPIO1_3 */
-+				interrupt-parent = <&gpio1>;
-+				interrupts = <3 IRQ_TYPE_EDGE_RISING>;
-+			};
-+		};
-+
-+		wlan_en_reg: fixedregulator at 1 {
-+			compatible = "regulator-fixed";
-+			regulator-name = "wlan-en-regulator";
-+			regulator-min-microvolt = <1800000>;
-+			regulator-max-microvolt = <1800000>;
-+			/* WLAN_EN GPIO */
-+			gpio = <&gpio0 5 0>;
-+			/* WLAN card specific delay */
-+			startup-delay-us = <70000>;
-+			enable-active-high;
-+		};
- 	};
- 
- 	leds {
--- 
-1.9.1
+Correct typos.Sorry for the wrong module name. 
+
+Yes, as you said, SVS need the more precisely voltage as possible when
+driver initialize, there has two mode in mt6397: pwm/auto mode, the pwm
+mode which can get the more stable Vout than auto mode.
+
+Thanks,
+Henry
