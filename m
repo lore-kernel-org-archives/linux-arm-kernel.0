@@ -1,100 +1,59 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sat, 20 Feb 2016 02:29:54 +0900
-Subject: [PATCH] arm64, kbuild: make "make install" not depend on vmlinux
-In-Reply-To: <1455861950-21832-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1455861950-21832-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CAK7LNATs3Xkp05cYsUAhUtQuvrpo=dUe5R6+bQjcLdpPrG_S3w@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 19 Feb 2016 12:31:02 -0500 (EST)
+Subject: [PATCH 4/9] ARM: add CONFIG_PHYS_OFFSET default values
+In-Reply-To: <38246773.SnToSslHuj@wuerfel>
+References: <1455804123-2526139-1-git-send-email-arnd@arndb.de>
+ <3974581.yknKb3tq7o@wuerfel>
+ <alpine.LFD.2.20.1602191106020.13632@knanqh.ubzr>
+ <38246773.SnToSslHuj@wuerfel>
+Message-ID: <alpine.LFD.2.20.1602191215140.13632@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just for clarification:
+On Fri, 19 Feb 2016, Arnd Bergmann wrote:
 
-This patch has been applied to arm64 tree.
+> On Friday 19 February 2016 11:10:22 Nicolas Pitre wrote:
+> > On Fri, 19 Feb 2016, Arnd Bergmann wrote:
+> > 
+> > > On Thursday 18 February 2016 11:02:33 Nicolas Pitre wrote:
+> > > > 
+> > > > Acked-by: Nicolas Pitre <nico@linaro.org>
+> > > > 
+> > > > Is there a way to provide a default for defaults?
+> ...
+> > > and then select one of the bool symbols from each platform.
+> > > Would that address your question?
+> > 
+> > Yes, but the ugliness factor isn't worth it IMHO.
+> > 
+> > I was wondering if something like this was possible:
+> > 
+> > config PHYS_OFFSET
+> >         hex "Physical address of main memory" if MMU
+> >         default DRAM_BASE if !MMU
+> >         default 0x10000000 if FOO
+> >         default 0x20000000 if BAR
+> >         default 0x30000000 if BAZ
+> >         default 0x00000000
+> > 
+> 
+> Ah, that was my previous approach, but Russell didn't like
+> how it makes it easier to fall back to an incorrect address
+> instead of forcing a build error when the address is not
+> configured.
 
-Michal,
-Just ignore this patch.
+Makes sense.
 
+Yet, the only reason for a default here is to accommodate automatic 
+build tests like randconfig, right?
 
+If so then this should be "fixed" by having the config system provide 
+built-in symbols that can be tested from kconfig files.  This way you 
+could terminate the above list with:
 
-2016-02-19 15:05 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
-> For the same reason as commit 19514fc665ff (arm, kbuild: make "make
-> install" not depend on vmlinux), the install targets should never
-> trigger the rebuild of the kernel.
->
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
->
->  arch/arm64/Makefile        |  2 +-
->  arch/arm64/boot/Makefile   |  4 ++--
->  arch/arm64/boot/install.sh | 14 ++++++++++++++
->  3 files changed, 17 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-> index 307237c..b5e3f6d 100644
-> --- a/arch/arm64/Makefile
-> +++ b/arch/arm64/Makefile
-> @@ -88,7 +88,7 @@ Image: vmlinux
->  Image.%: vmlinux
->         $(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
->
-> -zinstall install: vmlinux
-> +zinstall install:
->         $(Q)$(MAKE) $(build)=$(boot) $@
->
->  %.dtb: scripts
-> diff --git a/arch/arm64/boot/Makefile b/arch/arm64/boot/Makefile
-> index abcbba2..305c552 100644
-> --- a/arch/arm64/boot/Makefile
-> +++ b/arch/arm64/boot/Makefile
-> @@ -34,10 +34,10 @@ $(obj)/Image.lzma: $(obj)/Image FORCE
->  $(obj)/Image.lzo: $(obj)/Image FORCE
->         $(call if_changed,lzo)
->
-> -install: $(obj)/Image
-> +install:
->         $(CONFIG_SHELL) $(srctree)/$(src)/install.sh $(KERNELRELEASE) \
->         $(obj)/Image System.map "$(INSTALL_PATH)"
->
-> -zinstall: $(obj)/Image.gz
-> +zinstall:
->         $(CONFIG_SHELL) $(srctree)/$(src)/install.sh $(KERNELRELEASE) \
->         $(obj)/Image.gz System.map "$(INSTALL_PATH)"
-> diff --git a/arch/arm64/boot/install.sh b/arch/arm64/boot/install.sh
-> index 12ed78a..d91e1f0 100644
-> --- a/arch/arm64/boot/install.sh
-> +++ b/arch/arm64/boot/install.sh
-> @@ -20,6 +20,20 @@
->  #   $4 - default install path (blank if root directory)
->  #
->
-> +verify () {
-> +       if [ ! -f "$1" ]; then
-> +               echo ""                                                   1>&2
-> +               echo " *** Missing file: $1"                              1>&2
-> +               echo ' *** You need to run "make" before "make install".' 1>&2
-> +               echo ""                                                   1>&2
-> +               exit 1
-> +       fi
-> +}
-> +
-> +# Make sure the files actually exist
-> +verify "$2"
-> +verify "$3"
-> +
->  # User may have a custom install script
->  if [ -x ~/bin/${INSTALLKERNEL} ]; then exec ~/bin/${INSTALLKERNEL} "$@"; fi
->  if [ -x /sbin/${INSTALLKERNEL} ]; then exec /sbin/${INSTALLKERNEL} "$@"; fi
-> --
-> 1.9.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+	default 0x00000000 if RANDCONFIG || ALLYESCONFIG
+
+or the like.
 
 
-
--- 
-Best Regards
-Masahiro Yamada
+Nicolas
