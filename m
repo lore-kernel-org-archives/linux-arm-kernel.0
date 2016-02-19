@@ -1,55 +1,53 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 19 Feb 2016 15:09:46 +0900
-Subject: [GIT PULL] Renesas ARM Based SoC Fixes for v4.5
-Message-ID: <cover.1455859965.git.horms+renesas@verge.net.au>
+Date: Fri, 19 Feb 2016 15:09:44 +0900
+Subject: [PATCH 1/4] ARM: shmobile: Move shmobile_scu_base from .text to .bss
+In-Reply-To: <cover.1455859965.git.horms+renesas@verge.net.au>
+References: <cover.1455859965.git.horms+renesas@verge.net.au>
+Message-ID: <d2613f56ce0287211d70a86443a143cae1887911.1455859965.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Please consider these Renesas ARM based SoC fixes for v4.5.
+shmobile_scu_base is being written to, so it doesn't belong in the .text
+section. Fix this by moving it from asm .text to C .bss, as it's no
+longer used from asm code since commit 4f6da36f7edd5790 ("ARM: shmobile:
+Remove old SCU boot code").
 
-This pull request is comprised of patches from Geert Uytterhoeven to avoid
-writing to .text.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/headsmp-scu.S | 6 ------
+ arch/arm/mach-shmobile/platsmp-scu.c | 3 +++
+ 2 files changed, 3 insertions(+), 6 deletions(-)
 
-* "ARM: shmobile: Move shmobile_scu_base from .text to .bss"
-
-  Resolves a problem for XIP kernels as writing to .text is not allowed.
-  For non-XIP kernels a problem does not manifst as the pages are mapped
-  read-only during late kernel startup.
-
-* The remaining patches resolve a kernel-crash that occurs during system
-  suspend for CONFIG_DEBUG_RODATA=y kernels.
-
-
-The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
-
-  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-fixes-for-v4.5
-
-for you to fetch changes up to 901c5ffaaed117a38be9d0c29247c4888d6c8636:
-
-  ARM: shmobile: Remove shmobile_boot_arg (2016-02-17 18:27:21 +0900)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC Fixes for v4.5
-
-* Avoid writing to .text
-
-----------------------------------------------------------------
-Geert Uytterhoeven (4):
-      ARM: shmobile: Move shmobile_scu_base from .text to .bss
-      ARM: shmobile: r8a7779: Remove remainings of removed SCU boot setup code
-      ARM: shmobile: Move shmobile_smp_{mpidr, fn, arg}[] from .text to .bss
-      ARM: shmobile: Remove shmobile_boot_arg
-
- arch/arm/mach-shmobile/common.h       |  1 -
- arch/arm/mach-shmobile/headsmp-scu.S  |  6 ------
- arch/arm/mach-shmobile/headsmp.S      | 28 ++++++++++++++++------------
- arch/arm/mach-shmobile/platsmp-apmu.c |  1 -
- arch/arm/mach-shmobile/platsmp-scu.c  |  4 +++-
- arch/arm/mach-shmobile/smp-r8a7779.c  |  2 --
- 6 files changed, 19 insertions(+), 23 deletions(-)
+diff --git a/arch/arm/mach-shmobile/headsmp-scu.S b/arch/arm/mach-shmobile/headsmp-scu.S
+index fa5248c52399..5e503d91ad70 100644
+--- a/arch/arm/mach-shmobile/headsmp-scu.S
++++ b/arch/arm/mach-shmobile/headsmp-scu.S
+@@ -38,9 +38,3 @@ ENTRY(shmobile_boot_scu)
+ 
+ 	b	secondary_startup
+ ENDPROC(shmobile_boot_scu)
+-
+-	.text
+-	.align	2
+-	.globl	shmobile_scu_base
+-shmobile_scu_base:
+-	.space	4
+diff --git a/arch/arm/mach-shmobile/platsmp-scu.c b/arch/arm/mach-shmobile/platsmp-scu.c
+index 64663110ab6c..f2198c9c7435 100644
+--- a/arch/arm/mach-shmobile/platsmp-scu.c
++++ b/arch/arm/mach-shmobile/platsmp-scu.c
+@@ -17,6 +17,9 @@
+ #include <asm/smp_scu.h>
+ #include "common.h"
+ 
++
++void __iomem *shmobile_scu_base;
++
+ static int shmobile_smp_scu_notifier_call(struct notifier_block *nfb,
+ 					  unsigned long action, void *hcpu)
+ {
+-- 
+2.1.4
