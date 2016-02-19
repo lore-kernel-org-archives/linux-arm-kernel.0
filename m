@@ -1,39 +1,80 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 19 Feb 2016 08:43:00 +0100
-Subject: [PATCH v2] i.MX SPI DMA cleanup
-Message-ID: <1455867792-26389-1-git-send-email-s.hauer@pengutronix.de>
+Date: Fri, 19 Feb 2016 08:43:06 +0100
+Subject: [PATCH 06/12] spi: imx: drop unnecessary read/modify/write
+In-Reply-To: <1455867792-26389-1-git-send-email-s.hauer@pengutronix.de>
+References: <1455867792-26389-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1455867792-26389-7-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Second round for the i.MX SPI DMA patches. No changes to code, only
-updated commit messages.
+When the MX51_ECSPI_DMA is configured we control every single bit
+of the register, so there's no need to read/modify/write it. Instead
+just write the value we want to have in the register. Also, drop
+unnecessary check if we are actually doing DMA. The values written
+to the register have no effect in PIO mode and value written there
+during the last DMA transfer is still in the register, so we can
+equally well always write a value.
 
-Mark, you already applied patch 1/12 and 2/12. I'm resending them here
-anyway because I updated the commit message as you requested. Feel free
-to ignore 1/12 and 2/12 or replace them with this updated version.
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ drivers/spi/spi-imx.c | 31 ++++++++++---------------------
+ 1 file changed, 10 insertions(+), 21 deletions(-)
 
-Changes since v1:
-
-- Add missing Signed-off-by to Patch 3
-- Drop device tree change as it's already applied by Shawn
-- Add patch subject when referring to commits
-
-----------------------------------------------------------------
-Anton Bondarenko (3):
-      spi: imx: allow only WML aligned transfers to use DMA
-      spi: imx: replace fixed timeout with calculated
-      spi: imx: add support for all SPI word width for DMA
-
-Sascha Hauer (9):
-      spi: imx: use proper dev_* functions for driver messages
-      spi: imx: drop fallback to PIO
-      spi: imx: initialize usedma earlier
-      spi: imx: drop unnecessary read/modify/write
-      spi: imx: drop unncessary dma_is_inited variable
-      spi: imx: remove unnecessary bit clearing in mx51_ecspi_config
-      spi: imx: make some register defines simpler
-      spi: imx: set MX51_ECSPI_CTRL_SMC bit in setup function
-      spi: imx: drop bogus tests for rx/tx bufs in DMA transfer
-
- drivers/spi/spi-imx.c | 350 ++++++++++++++++++++++++++------------------------
- 1 file changed, 181 insertions(+), 169 deletions(-)
+diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
+index 7047453..073a134 100644
+--- a/drivers/spi/spi-imx.c
++++ b/drivers/spi/spi-imx.c
+@@ -240,9 +240,9 @@ static bool spi_imx_can_dma(struct spi_master *master, struct spi_device *spi,
+ #define MX51_ECSPI_DMA_RXT_WML_OFFSET	24
+ #define MX51_ECSPI_DMA_RXT_WML_MASK	(0x3F << 24)
+ 
+-#define MX51_ECSPI_DMA_TEDEN_OFFSET	7
+-#define MX51_ECSPI_DMA_RXDEN_OFFSET	23
+-#define MX51_ECSPI_DMA_RXTDEN_OFFSET	31
++#define MX51_ECSPI_DMA_TEDEN		(1 << 7)
++#define MX51_ECSPI_DMA_RXDEN		(1 << 23)
++#define MX51_ECSPI_DMA_RXTDEN		(1 << 31)
+ 
+ #define MX51_ECSPI_STAT		0x18
+ #define MX51_ECSPI_STAT_RR		(1 <<  3)
+@@ -318,8 +318,7 @@ static void __maybe_unused mx51_ecspi_trigger(struct spi_imx_data *spi_imx)
+ static int __maybe_unused mx51_ecspi_config(struct spi_imx_data *spi_imx,
+ 		struct spi_imx_config *config)
+ {
+-	u32 ctrl = MX51_ECSPI_CTRL_ENABLE, cfg = 0, dma = 0;
+-	u32 tx_wml_cfg, rx_wml_cfg, rxt_wml_cfg;
++	u32 ctrl = MX51_ECSPI_CTRL_ENABLE, cfg = 0;
+ 	u32 clk = config->speed_hz, delay, reg;
+ 
+ 	/*
+@@ -392,22 +391,12 @@ static int __maybe_unused mx51_ecspi_config(struct spi_imx_data *spi_imx,
+ 	 * Configure the DMA register: setup the watermark
+ 	 * and enable DMA request.
+ 	 */
+-	if (spi_imx->dma_is_inited) {
+-		dma = readl(spi_imx->base + MX51_ECSPI_DMA);
+-
+-		rx_wml_cfg = spi_imx->wml << MX51_ECSPI_DMA_RX_WML_OFFSET;
+-		tx_wml_cfg = spi_imx->wml << MX51_ECSPI_DMA_TX_WML_OFFSET;
+-		rxt_wml_cfg = spi_imx->wml << MX51_ECSPI_DMA_RXT_WML_OFFSET;
+-		dma = (dma & ~MX51_ECSPI_DMA_TX_WML_MASK
+-			   & ~MX51_ECSPI_DMA_RX_WML_MASK
+-			   & ~MX51_ECSPI_DMA_RXT_WML_MASK)
+-			   | rx_wml_cfg | tx_wml_cfg | rxt_wml_cfg
+-			   |(1 << MX51_ECSPI_DMA_TEDEN_OFFSET)
+-			   |(1 << MX51_ECSPI_DMA_RXDEN_OFFSET)
+-			   |(1 << MX51_ECSPI_DMA_RXTDEN_OFFSET);
+-
+-		writel(dma, spi_imx->base + MX51_ECSPI_DMA);
+-	}
++
++	writel(spi_imx->wml << MX51_ECSPI_DMA_RX_WML_OFFSET |
++		spi_imx->wml << MX51_ECSPI_DMA_TX_WML_OFFSET |
++		spi_imx->wml << MX51_ECSPI_DMA_RXT_WML_OFFSET |
++		MX51_ECSPI_DMA_TEDEN | MX51_ECSPI_DMA_RXDEN |
++		MX51_ECSPI_DMA_RXTDEN, spi_imx->base + MX51_ECSPI_DMA);
+ 
+ 	return 0;
+ }
+-- 
+2.7.0
