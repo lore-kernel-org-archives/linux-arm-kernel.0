@@ -1,51 +1,60 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 19 Feb 2016 14:48:50 -0800
-Subject: [PATCH] usb: move usb_calc_bus_time into common code
-In-Reply-To: <Pine.LNX.4.44L0.1602191650570.1700-100000@iolanthe.rowland.org>
-References: <1455918064-410571-1-git-send-email-arnd@arndb.de>
- <Pine.LNX.4.44L0.1602191650570.1700-100000@iolanthe.rowland.org>
-Message-ID: <CAD=FV=VjgTUQR-Rw+LWXnNdZhruukaV-+LnXFqNRj-wpcvSJ4w@mail.gmail.com>
+From: akshay.bhat@timesys.com (Akshay Bhat)
+Date: Fri, 19 Feb 2016 18:35:24 -0500
+Subject: [PATCH v8 0/7] ARM: dts: Add Advantech board support
+Message-ID: <1455924931-13784-1-git-send-email-akshay.bhat@timesys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This series aims to add Advantech BA-16 module (iMX6 based) and GE board support.
 
-On Fri, Feb 19, 2016 at 1:52 PM, Alan Stern <stern@rowland.harvard.edu> wrote:
-> On Fri, 19 Feb 2016, Arnd Bergmann wrote:
->
->> The dwc2 dual-role USB controller driver has started calling
->> usb_calc_bus_time, and does so regardless of whether it is
->> being built as a host controller or gadget. In case all
->
-> Out of curiosity...  Why does dwc2 need to calculate bus times when it
-> is in device mode?
+This series has been tested against linux-next tag next-20160216.
 
-Hoo boy.  it doesn't.  Nor does it need to properly set the even/odd
-frame in device mode.
+Modifications:
+v7->v8:
+Incorporate comments made by Shawn Guo
+- BA16:
+Remove invalid i2s-master property in ssi1 node
+- Bx50v3:
+Remove redundant address-cells/size-cells properties in clocks node
+Update stgl5000 node name to codec to better match DT convention
+Remove unused igb entries
+Fix unit address for wlcore
+Move status to last property in usdhc4 node
 
-Basically dwc2's "core.c" has a whole bunch of stuff in it that's host
-only and isn't guarded with any #ifdef.  ...yet that file is included
-in gadget-only builds.  It's a bit of a mess.  Take a gander at all of
-the "dwc2_hc_xxx" functions sitting in "drivers/usb/dwc2/core.c".
+History:
+--------
+[v1]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/381872.html
+[v2]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/383276.html
+[v3]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/384202.html
+[v4]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/390373.html
+[v5]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/390788.html
+[v6]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/396131.html
+[v7]: http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/403429.html
 
-Long term that needs to be cleaned up, but such a cleanup is going to
-be a bit of churn so we'd need to schedule it for a time when not much
-else is going on (and presumably it should be done by John or in close
-coordination with him so it can get Acked / landed quickly to avoid
-conflicts?).  To do this we'd have to figure out why some things are
-in "core.c" and some in "hcd.c" and if it makes sense to move them all
-to "hcd.c" or if we need a new "core_hc.c" or something...  All of
-that design predates me.
+Akshay Bhat (5):
+  of: Add vendor prefix for Advantech Corporation
+  of: Add vendor prefix for General Electric Company
+  ARM: dts: imx: Add support for Advantech/GE B450v3
+  ARM: dts: imx: Add support for Advantech/GE B650v3
+  ARM: dts: imx: Add support for Advantech/GE B850v3
 
-In any case I guess we need a solution for right now, huh?
+Justin Waters (2):
+  ARM: dts: imx: Add Advantech BA-16 Qseven module
+  ARM: dts: imx: Add support for Advantech/GE Bx50v3
 
-One terribly lame hack would be to just make a dummy no-op
-"dwc2_hc_set_even_odd_frame()" if host mode is disabled.  That doesn't
-really fix the root problem of lots of host mode code being compiled
-in a gadget-only driver.  It also adds an ugly "#ifdef".  ...but it
-does get around the current compile error.
+ .../devicetree/bindings/vendor-prefixes.txt        |   2 +
+ arch/arm/boot/dts/Makefile                         |   3 +
+ arch/arm/boot/dts/imx6q-b450v3.dts                 |  88 +++
+ arch/arm/boot/dts/imx6q-b650v3.dts                 |  88 +++
+ arch/arm/boot/dts/imx6q-b850v3.dts                 | 157 +++++
+ arch/arm/boot/dts/imx6q-ba16.dtsi                  | 632 +++++++++++++++++++++
+ arch/arm/boot/dts/imx6q-bx50v3.dtsi                | 225 ++++++++
+ 7 files changed, 1195 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6q-b450v3.dts
+ create mode 100644 arch/arm/boot/dts/imx6q-b650v3.dts
+ create mode 100644 arch/arm/boot/dts/imx6q-b850v3.dts
+ create mode 100644 arch/arm/boot/dts/imx6q-ba16.dtsi
+ create mode 100644 arch/arm/boot/dts/imx6q-bx50v3.dtsi
 
-
-What do folks think?
-
--Doug
+-- 
+2.7.1
