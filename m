@@ -1,36 +1,38 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 19 Feb 2016 17:13:30 +0000
-Subject: [PATCH] iommu/arm-smmu-v2: Add support for 16 bit VMID
-In-Reply-To: <1455819817-8432-1-git-send-email-tchalamarla@caviumnetworks.com>
-References: <1455819817-8432-1-git-send-email-tchalamarla@caviumnetworks.com>
-Message-ID: <20160219171329.GO27062@arm.com>
+From: Chris.Brandt@renesas.com (Chris Brandt)
+Date: Fri, 19 Feb 2016 17:18:46 +0000
+Subject: [PATCH 4/9] ARM: add CONFIG_PHYS_OFFSET default values
+In-Reply-To: <20160219164344.GY19428@n2100.arm.linux.org.uk>
+References: <1455804123-2526139-1-git-send-email-arnd@arndb.de>
+ <3974581.yknKb3tq7o@wuerfel>
+ <HK2PR06MB056137892B6F968A8A1008C58AA00@HK2PR06MB0561.apcprd06.prod.outlook.com>
+ <14272873.q312Ii8Axy@wuerfel> <20160219164344.GY19428@n2100.arm.linux.org.uk>
+Message-ID: <HK2PR06MB0561C34E8FE1480224C2C6778AA00@HK2PR06MB0561.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 18, 2016 at 10:23:37AM -0800, tchalamarla at caviumnetworks.com wrote:
-> From: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
-> 
-> ARM-SMMUv2 supports upto 16 bit VMID. This patch enables
-> 16 bit VMID when requested from device-tree.
-> 
-> Signed-off-by: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
-> ---
->  .../devicetree/bindings/iommu/arm,smmu.txt          |  2 ++
->  drivers/iommu/arm-smmu.c                            | 21 ++++++++++++++++++++-
->  2 files changed, 22 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-> index 7180745..bb7e569 100644
-> --- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-> @@ -55,6 +55,8 @@ conditions.
->                    aliases of secure registers have to be used during
->                    SMMU configuration.
->  
-> +- smmu-enable-vmid16 : Enable 16 bit VMID, if allowed.
+On 19 Feb 2016, Russell King wrote:
 
-Why do we need a new property for this, given that we can detect it
-from the ID registers? I can't think of a reason why we wouldn't use
-16-bit VMIDs if they were available to us.
+> Using the DTB location on XIP platforms is a no-goer - the flattened
+> DTB information can be fixed, so on an XIP platform it makes sense
+> for this to also be in flash, not in RAM (the whole point of XIP is
+> to remove constant data from RAM after all, so why would you want to
+> copy the FDT to RAM?)
 
-Will
+I was under the impression that the DTB had a limited life span, and once booted, it could be clobbered. Hence, RAM would not really be wasted (post boot that is).
+
+For an XIP system (with MMU), if you have your DTB in ROM someplace, you run the risk of getting it cut off after the MMU setup is done because it would fall someplace after the _exiprom marker.
+
+
+> Passing it in a register to the kernel image is also not possible:
+> we've been out of spare registers for some time now for passing
+> additional information into the kernel.  It wouldn't be a problem
+> had folk not had this "eww, I don't like ATAGs, lets get rid of them
+> and use DT instead" attitude: had we kept ATAGs, then we'd have an
+> in-memory format to pass this kind of information to the kernel.
+> That would solve soo many problems today it's untrue: stuff like
+> where a debugging UART is located and the type of it...
+
+Too bad we just couldn't have added an ATAG to point to a DTB. Sigh.
+
+
+Chris
