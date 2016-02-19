@@ -1,102 +1,155 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 19 Feb 2016 15:09:47 +0900
-Subject: [PATCH 4/4] ARM: shmobile: Remove shmobile_boot_arg
-In-Reply-To: <cover.1455859965.git.horms+renesas@verge.net.au>
-References: <cover.1455859965.git.horms+renesas@verge.net.au>
-Message-ID: <901c5ffaaed117a38be9d0c29247c4888d6c8636.1455859965.git.horms+renesas@verge.net.au>
+From: raveendra.padasalagi@broadcom.com (Raveendra Padasalagi)
+Date: Fri, 19 Feb 2016 11:43:50 +0530
+Subject: [PATCH v2 1/3] input: cygnus-update touchscreen dt node document
+In-Reply-To: <20160218143617.GH9654@rob-hp-laptop>
+References: <1455702226-20599-1-git-send-email-raveendra.padasalagi@broadcom.com>
+ <1455702226-20599-2-git-send-email-raveendra.padasalagi@broadcom.com>
+ <20160218143617.GH9654@rob-hp-laptop>
+Message-ID: <CAAFb_vq6_uQbcWvwV8TZqVqH_C-ueUd+gBRA=mXUQrWqxoz=ww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+On Thu, Feb 18, 2016 at 8:06 PM, Rob Herring <robh@kernel.org> wrote:
+> On Wed, Feb 17, 2016 at 03:13:44PM +0530, Raveendra Padasalagi wrote:
+>> In Cygnus SOC touch screen controller registers are shared
+>> with ADC and flex timer. Using readl/writel could lead to
+>> race condition. So touch screen driver is enhanced to support
+>>
+>> 1. If touchscreen register's are not shared. Register access
+>> is handled through readl/writel if "brcm,iproc-touchscreen"
+>> compatible is provided in touchscreen dt node. This will help
+>> for future SOC's if comes with dedicated touchscreen IP register's.
+>>
+>> 2. If touchscreen register's are shared with other IP's, register
+>> access is handled through syscon framework API's to take care of
+>> mutually exclusive access. This feature can be enabled by selecting
+>> "brcm,iproc-touchscreen-syscon" compatible string in the touchscreen
+>> dt node.
+>>
+>> Hence touchscreen dt node bindings document is updated to take care
+>> of above changes in the touchscreen driver.
+>>
+>> Signed-off-by: Raveendra Padasalagi <raveendra.padasalagi@broadcom.com>
+>> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+>> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+>> ---
+>>  .../input/touchscreen/brcm,iproc-touchscreen.txt   | 57 +++++++++++++++++++---
+>>  1 file changed, 51 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/input/touchscreen/brcm,iproc-touchscreen.txt b/Documentation/devicetree/bindings/input/touchscreen/brcm,iproc-touchscreen.txt
+>> index 34e3382..f530c25 100644
+>> --- a/Documentation/devicetree/bindings/input/touchscreen/brcm,iproc-touchscreen.txt
+>> +++ b/Documentation/devicetree/bindings/input/touchscreen/brcm,iproc-touchscreen.txt
+>> @@ -1,12 +1,30 @@
+>>  * Broadcom's IPROC Touchscreen Controller
+>>
+>>  Required properties:
+>> -- compatible: must be "brcm,iproc-touchscreen"
+>> -- reg: physical base address of the controller and length of memory mapped
+>> -  region.
+>> +- compatible: should be one of
+>> +        "brcm,iproc-touchscreen"
+>> +        "brcm,iproc-touchscreen-syscon"
+>
+> More specific and this is not how you do syscon. Either the block is or
+> isn't. You can't have it both ways.
 
-CPU boot configuration writes to shmobile_boot_arg, which is located in
-the .text section, and thus should not be written to.
+Existing driver has support for reg, if we modify now to support only syscon
+then this driver will not work if some one wishes to use previous
+kernel version's
+dt and vice versa. Basically this breaks dt compatibility. Is that ok ?
 
-As of commit 1d33a354bbb618ba ("ARM: shmobile: Per-CPU SMP boot / sleep
-code for SCU SoCs"), and ignoring accidental remainings,
-shmobile_boot_arg is always set to MPIDR_HWID_BITMASK by C code.
-Hence we can just hardcode this in the assembler code, and remove the
-variable, and thus also remove the need to write to this variable.
+>> +- ts_syscon: if "brcm,iproc-touchscreen-syscon" compatible string
+>> +  is selected then "ts_syscon" is mandatory or else not required.
+>> +  The "ts_syscon" is handler of syscon node defining physical base
+>> +  address of the controller and length of memory mapped region.
+>> +  If this property is selected please make sure MFD_SYSCON config
+>> +  is enabled in the defconfig file.
+>> +- reg: if "brcm,iproc-touchscreen" compatible string is selected
+>> +  then "reg" property is mandatory or else not required.
+>> +  The "reg" should be physical base address of the controller and
+>> +  length of memory mapped region.
+>
+> I thought every chip to date is a syscon. Add reg support when you
+> actually need it.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Acked-by: Nicolas Pitre <nico@linaro.org>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/common.h       | 1 -
- arch/arm/mach-shmobile/headsmp.S      | 8 ++------
- arch/arm/mach-shmobile/platsmp-apmu.c | 1 -
- arch/arm/mach-shmobile/platsmp-scu.c  | 1 -
- 4 files changed, 2 insertions(+), 9 deletions(-)
+Since the existing driver has support for reg and now if we modify it to
+support syscon only then we break the dt compatibility with previous kernel
+versions. So keeping support for both will help to avoid dt
+compatibility issues.
 
-diff --git a/arch/arm/mach-shmobile/common.h b/arch/arm/mach-shmobile/common.h
-index 9cb11215ceba..b3a4ed5289ec 100644
---- a/arch/arm/mach-shmobile/common.h
-+++ b/arch/arm/mach-shmobile/common.h
-@@ -4,7 +4,6 @@
- extern void shmobile_init_delay(void);
- extern void shmobile_boot_vector(void);
- extern unsigned long shmobile_boot_fn;
--extern unsigned long shmobile_boot_arg;
- extern unsigned long shmobile_boot_size;
- extern void shmobile_smp_boot(void);
- extern void shmobile_smp_sleep(void);
-diff --git a/arch/arm/mach-shmobile/headsmp.S b/arch/arm/mach-shmobile/headsmp.S
-index 94d86ed16414..32e0bf6e3ccb 100644
---- a/arch/arm/mach-shmobile/headsmp.S
-+++ b/arch/arm/mach-shmobile/headsmp.S
-@@ -24,7 +24,6 @@
- 	.arm
- 	.align  12
- ENTRY(shmobile_boot_vector)
--	ldr     r0, 2f
- 	ldr     r1, 1f
- 	bx	r1
- 
-@@ -34,9 +33,6 @@ ENDPROC(shmobile_boot_vector)
- 	.globl	shmobile_boot_fn
- shmobile_boot_fn:
- 1:	.space	4
--	.globl	shmobile_boot_arg
--shmobile_boot_arg:
--2:	.space	4
- 	.globl	shmobile_boot_size
- shmobile_boot_size:
- 	.long	. - shmobile_boot_vector
-@@ -46,9 +42,9 @@ shmobile_boot_size:
-  */
- 
- ENTRY(shmobile_smp_boot)
--						@ r0 = MPIDR_HWID_BITMASK
- 	mrc	p15, 0, r1, c0, c0, 5		@ r1 = MPIDR
--	and	r0, r1, r0			@ r0 = cpu_logical_map() value
-+	and	r0, r1, #0xffffff		@ MPIDR_HWID_BITMASK
-+						@ r0 = cpu_logical_map() value
- 	mov	r1, #0				@ r1 = CPU index
- 	adr	r2, 1f
- 	ldmia	r2, {r5, r6, r7}
-diff --git a/arch/arm/mach-shmobile/platsmp-apmu.c b/arch/arm/mach-shmobile/platsmp-apmu.c
-index 911884f7e28b..aba75c89f9c1 100644
---- a/arch/arm/mach-shmobile/platsmp-apmu.c
-+++ b/arch/arm/mach-shmobile/platsmp-apmu.c
-@@ -123,7 +123,6 @@ void __init shmobile_smp_apmu_prepare_cpus(unsigned int max_cpus,
- {
- 	/* install boot code shared by all CPUs */
- 	shmobile_boot_fn = virt_to_phys(shmobile_smp_boot);
--	shmobile_boot_arg = MPIDR_HWID_BITMASK;
- 
- 	/* perform per-cpu setup */
- 	apmu_parse_cfg(apmu_init_cpu, apmu_config, num);
-diff --git a/arch/arm/mach-shmobile/platsmp-scu.c b/arch/arm/mach-shmobile/platsmp-scu.c
-index f2198c9c7435..081a097c9219 100644
---- a/arch/arm/mach-shmobile/platsmp-scu.c
-+++ b/arch/arm/mach-shmobile/platsmp-scu.c
-@@ -44,7 +44,6 @@ void __init shmobile_smp_scu_prepare_cpus(unsigned int max_cpus)
- {
- 	/* install boot code shared by all CPUs */
- 	shmobile_boot_fn = virt_to_phys(shmobile_smp_boot);
--	shmobile_boot_arg = MPIDR_HWID_BITMASK;
- 
- 	/* enable SCU and cache coherency on booting CPU */
- 	scu_enable(shmobile_scu_base);
--- 
-2.1.4
+I will change the driver if you still think syscon only support is fine.
+Let me know your opinion.
+
+>>  - clocks:  The clock provided by the SOC to driver the tsc
+>>  - clock-name:  name for the clock
+>>  - interrupts: The touchscreen controller's interrupt
+>> +- address-cells: Specify the number of u32 entries needed in child nodes.
+>> +                 Should set to 1. This property is mandatory when
+>> +                 "brcm,iproc-touchscreen-syscon" compatible string is selected
+>> +                 or else not required.
+>> +- size-cells: Specify number of u32 entries needed to specify child nodes size
+>> +              in reg property. Should set to 1.This property is mandatory when
+>> +              "brcm,iproc-touchscreen-syscon" compatible string is selected or
+>> +              else not required.
+>>
+>>  Optional properties:
+>>  - scanning_period: Time between scans. Each step is 1024 us.  Valid 1-256.
+>> @@ -53,13 +71,40 @@ Optional properties:
+>>  - touchscreen-inverted-x: X axis is inverted (boolean)
+>>  - touchscreen-inverted-y: Y axis is inverted (boolean)
+>>
+>> -Example:
+>> +Example 1: An example of touchscreen node with "brcm,iproc-touchscreen-syscon"
+>> +           compatible string.
+>> +
+>> +     ts_adc_syscon: ts_adc_syscon at 0x180a6000 {
+>> +             compatible = "syscon";
+>> +             reg = <0x180a6000 0xc30>;
+>> +     };
+>>
+>>       touchscreen: tsc at 0x180A6000 {
+>
+> Drop the '0x' and the node name should be touchscreen, not tsc.
+
+I will address this in the next patch.
+
+>> -             compatible = "brcm,iproc-touchscreen";
+>> +             compatible = "brcm,iproc-touchscreen-syscon";
+>>               #address-cells = <1>;
+>>               #size-cells = <1>;
+>> -             reg = <0x180A6000 0x40>;
+>> +             ts_syscon = <&ts_adc_syscon>;
+>> +             clocks = <&adc_clk>;
+>> +             clock-names = "tsc_clk";
+>> +             interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>;
+>> +
+>
+>> +             scanning_period = <5>;
+>> +             debounce_timeout = <40>;
+>> +             settling_timeout = <7>;
+>> +             touch_timeout = <10>;
+>> +             average_data = <5>;
+>> +             fifo_threshold = <1>;
+>
+> New properties?
+
+No, These are existing properties.
+
+>> +             /* Touchscreen is rotated 180 degrees. */
+>> +             touchscreen-inverted-x;
+>> +             touchscreen-inverted-y;
+>> +     };
+>> +
+>> +Example 2: An example of touchscreen node with "brcm,iproc-touchscreen"
+>> +          compatible string.
+>> +
+>> +     touchscreen: tsc at 0x180A6000 {
+>> +             compatible = "brcm,iproc-touchscreen";
+>> +             reg = <0x180a6000 0x40>;
+>>               clocks = <&adc_clk>;
+>>               clock-names = "tsc_clk";
+>>               interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>;
+>> --
+>> 1.9.1
+>>
