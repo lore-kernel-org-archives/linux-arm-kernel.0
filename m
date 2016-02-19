@@ -1,64 +1,105 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 19 Feb 2016 11:10:22 -0500 (EST)
-Subject: [PATCH 4/9] ARM: add CONFIG_PHYS_OFFSET default values
-In-Reply-To: <3974581.yknKb3tq7o@wuerfel>
-References: <1455804123-2526139-1-git-send-email-arnd@arndb.de>
- <1455804123-2526139-5-git-send-email-arnd@arndb.de>
- <alpine.LFD.2.20.1602181100410.13632@knanqh.ubzr>
- <3974581.yknKb3tq7o@wuerfel>
-Message-ID: <alpine.LFD.2.20.1602191106020.13632@knanqh.ubzr>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Fri, 19 Feb 2016 08:13:38 -0800
+Subject: [PATCH v3 2/5] ACPI: parse SPCR and enable matching console
+In-Reply-To: <56C6F2DA.3020002@linaro.org>
+References: <1455559532-8305-1-git-send-email-aleksey.makarov@linaro.org>
+ <1455559532-8305-3-git-send-email-aleksey.makarov@linaro.org>
+ <56C64366.2070702@hurleysoftware.com> <56C6F2DA.3020002@linaro.org>
+Message-ID: <56C73F32.6060701@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 19 Feb 2016, Arnd Bergmann wrote:
+On 02/19/2016 02:47 AM, Aleksey Makarov wrote:
+> Hi Peter,
+> 
+> Thank you for review.
+> 
+> On 02/19/2016 01:19 AM, Peter Hurley wrote:
+>> On 02/15/2016 10:05 AM, Aleksey Makarov wrote:
+> 
+> [..]
+> 
+>>> diff --git a/drivers/tty/serial/serial_core.c b/drivers/tty/serial/serial_core.c
+>>> index a126a60..459ab54 100644
+>>> --- a/drivers/tty/serial/serial_core.c
+>>> +++ b/drivers/tty/serial/serial_core.c
+>>> @@ -34,6 +34,7 @@
+>>>  #include <linux/serial_core.h>
+>>>  #include <linux/delay.h>
+>>>  #include <linux/mutex.h>
+>>> +#include <linux/acpi.h>
+>>>  
+>>>  #include <asm/irq.h>
+>>>  #include <asm/uaccess.h>
+>>> @@ -2654,8 +2655,17 @@ int uart_add_one_port(struct uart_driver *drv, struct uart_port *uport)
+>>>  		spin_lock_init(&uport->lock);
+>>>  		lockdep_set_class(&uport->lock, &port_lock_key);
+>>>  	}
+>>> -	if (uport->cons && uport->dev)
+>>> -		of_console_check(uport->dev->of_node, uport->cons->name, uport->line);
+>>> +
+>>> +	/*
+>>> +	 * Support both open FW and ACPI access to console definitions.
+>>> +	 * Both of_console_check() and acpi_console_check() will call
+>>> +	 * add_preferred_console() if a console definition is found.
+>>> +	 */
+>>> +	if (uport->cons && uport->dev) {
+>>> +		if (!acpi_console_check(uport))
+>>> +			of_console_check(uport->dev->of_node, uport->cons->name,
+>>> +					 uport->line);
+>>
+>> of_console_check() is not a good model for enabling a console.
+>> It's a hack with several shortcomings (and bugs) that is tolerated here
+>> because of its broad applicability to a wide range of platforms and drivers.
+> 
+> It's definitely not the best code I saw 
 
-> On Thursday 18 February 2016 11:02:33 Nicolas Pitre wrote:
-> > 
-> > Acked-by: Nicolas Pitre <nico@linaro.org>
-> > 
-> > Is there a way to provide a default for defaults?
-> 
-> We could have something like
-> 
-> config PHYS_OFFSET_0
-> 	bool
-> 
-> config PHYS_OFFSET_1
-> 	bool
-> 
-> config PHYS_OFFSET_2
-> 	bool
-> 
-> ... (we need 8 of the 16 possible addresses)
-> 
-> 
-> config PHYS_OFFSET
-> 	hex "Physical address of main memory" if MMU
-> 	default DRAM_BASE if !MMU
-> 	default 0x00000000 if PHYS_OFFSET_0
-> 	default 0x10000000 if PHYS_OFFSET_1
-> 	default 0x20000000 if PHYS_OFFSET_2
-> 	default 0x30000000 if PHYS_OFFSET_3
-> 	default 0x70000000 if PHYS_OFFSET_7
-> 	default 0x80000000 if PHYS_OFFSET_8
-> 	default 0xa0000000 if PHYS_OFFSET_A
-> 	default 0xc0000000 if PHYS_OFFSET_C
-> 
-> 
-> and then select one of the bool symbols from each platform.
-> Would that address your question?
+> but there is no bugs.
 
-Yes, but the ugliness factor isn't worth it IMHO.
-
-I was wondering if something like this was possible:
-
-config PHYS_OFFSET
-        hex "Physical address of main memory" if MMU
-        default DRAM_BASE if !MMU
-        default 0x10000000 if FOO
-        default 0x20000000 if BAR
-        default 0x30000000 if BAZ
-        default 0x00000000
+I pointed out just one of the problems with adding a preferred console
+late in the boot cycle (eg, at uart driver load) in the other patch review.
 
 
-Nicolas
+>> I specifically added console matching to enable exactly this kind of
+>> console-selection-via-firmware. Please use that facility.
+> 
+> I described why this does not work (except you insist on having 
+> new made up names for all types of SPCR consoles) in the reply to another your message.
+
+They're not "new made up names".
+
+They're the documented names of earlycons, which you'd know if you
+researched how you're going to start an earlycon with the DBG2 table
+like I suggested in previous reviews.
+
+And I explained in the other patch review exactly how it works.
+
+Regards,
+Peter Hurley
+
+
+>>> +	}
+>>>  
+>>>  	uart_configure_port(drv, state, uport);
+>>>  
+>>> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+>>> index 06ed7e5..ea0c297 100644
+>>> --- a/include/linux/acpi.h
+>>> +++ b/include/linux/acpi.h
+>>> @@ -1004,4 +1004,14 @@ static inline struct fwnode_handle *acpi_get_next_subnode(struct device *dev,
+>>>  #define acpi_probe_device_table(t)	({ int __r = 0; __r;})
+>>>  #endif
+>>>  
+>>> +struct uart_port;
+>>> +#ifdef CONFIG_ACPI_SPCR_TABLE
+>>> +bool acpi_console_check(struct uart_port *uport);
+>>> +#else
+>>> +static inline bool acpi_console_check(struct uart_port *uport)
+>>> +{
+>>> +	return FALSE;
+>>> +}
+>>> +#endif
+>>> +
+>>>  #endif	/*_LINUX_ACPI_H*/
+>>>
+>>
