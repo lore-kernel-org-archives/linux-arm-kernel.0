@@ -1,306 +1,97 @@
-From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Fri, 19 Feb 2016 14:02:56 +0300
-Subject: [PATCH v3 1/5] ACPI: change __init to __ref for
- early_acpi_os_unmap_memory()
-In-Reply-To: <1AE640813FDE7649BE1B193DEA596E883BB4D5A0@SHSMSX101.ccr.corp.intel.com>
-References: <1455559532-8305-1-git-send-email-aleksey.makarov@linaro.org>
- <1455559532-8305-2-git-send-email-aleksey.makarov@linaro.org>
- <1AE640813FDE7649BE1B193DEA596E883BB4BDBB@SHSMSX101.ccr.corp.intel.com>
- <1AE640813FDE7649BE1B193DEA596E883BB4BDCF@SHSMSX101.ccr.corp.intel.com>
- <56C470C5.2080203@linaro.org>
- <1AE640813FDE7649BE1B193DEA596E883BB4D2DA@SHSMSX101.ccr.corp.intel.com>
- <56C63FB5.2030907@hurleysoftware.com>
- <1AE640813FDE7649BE1B193DEA596E883BB4D5A0@SHSMSX101.ccr.corp.intel.com>
-Message-ID: <56C6F660.9020407@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 19 Feb 2016 12:11:10 +0100
+Subject: [PATCH] ARM: Allow MULTIPLATFORM to select XIP
+In-Reply-To: <HK2PR06MB05617E2ED835CFE20F65E3D38AA00@HK2PR06MB0561.apcprd06.prod.outlook.com>
+References: <1455816310-11308-1-git-send-email-chris.brandt@renesas.com>
+ <20160218223312.GT19428@n2100.arm.linux.org.uk>
+ <HK2PR06MB05617E2ED835CFE20F65E3D38AA00@HK2PR06MB0561.apcprd06.prod.outlook.com>
+Message-ID: <3461274.sjccN4r7lq@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lv,
-
-On 02/19/2016 05:58 AM, Zheng, Lv wrote:
-> Hi,
+On Friday 19 February 2016 03:39:38 Chris Brandt wrote:
+> On Thu, 18 Feb 2016, Russell King - ARM Linux wrote:
 > 
->> From: Peter Hurley [mailto:peter at hurleysoftware.com]
->> Subject: Re: [PATCH v3 1/5] ACPI: change __init to __ref for
->> early_acpi_os_unmap_memory()
->>
->> On 02/17/2016 07:36 PM, Zheng, Lv wrote:
->>> Hi,
->>>
->>>> From: Aleksey Makarov [mailto:aleksey.makarov at linaro.org]
->>>> Subject: Re: [PATCH v3 1/5] ACPI: change __init to __ref for
->>>> early_acpi_os_unmap_memory()
->>>>
->>>> Hi Lv,
->>>>
->>>> Thank you for review.
->>>>
->>>> On 02/17/2016 05:51 AM, Zheng, Lv wrote:
->>>>
->>>> [..]
->>>>
->>>>>>> early_acpi_os_unmap_memory() is marked as __init because it calls
->>>>>>> __acpi_unmap_table(), but only when acpi_gbl_permanent_mmap is not
->>>> set.
->>>>>>>
->>>>>>> acpi_gbl_permanent_mmap is set in __init acpi_early_init()
->>>>>>> so it is safe to call early_acpi_os_unmap_memory() from anywhere
->>>>>>>
->>>>>>> We need this function to be non-__init because we need access to
->>>>>>> some tables at unpredictable time--it may be before or after
->>>>>>> acpi_gbl_permanent_mmap is set.  For example, SPCR (Serial Port
->> Console
->>>>>>> Redirection) table is needed each time a new console is registered.
->>>>>>> It can be quite early (console_initcall) or when a module is inserted.
->>>>>>> When this table accessed before acpi_gbl_permanent_mmap is set,
->>>>>>> the pointer should be unmapped.  This is exactly what this function
->>>>>>> does.
->>>>>> [Lv Zheng]
->>>>>> Why don't you use another API instead of
->> early_acpi_os_unmap_memory()
->>>> in
->>>>>> case you want to unmap things in any cases.
->>>>>> acpi_os_unmap_memory() should be the one to match this purpose.
->>>>>> It checks acpi_gbl_ppermanent_mmap in acpi_os_unmap_iomem().
->>>>
->>>> As far as I understand, there exist two steps in ACPI initialization:
->>>>
->>>> 1. Before acpi_gbl_permanent_mmap is set, tables received with
->>>> acpi_get_table_with_size()
->>>>    are mapped by early_memremap().  If a subsystem gets such a pointer it
->>>> should be unmapped.
->>>>
->>>> 2  After acpi_gbl_permanent_mmap is set this pointer should not be
->> unmapped
->>>> at all.
->>>>
->>> [Lv Zheng]
->>> This statement is wrong, this should be:
->>> As long as there is a __reference__ to the mapped table, the pointer should
->> not be unmapped.
->>> In fact, we have a series to introduce acpi_put_table() to achieve this.
->>> So your argument is wrong from very first point.
->>>
->>>> That exactly what early_acpi_os_unmap_memory() does--it checks
->>>> acpi_gbl_permanent_mmap.
->>>> If I had used acpi_os_unmap_memory() after acpi_gbl_permanent_mmap
->> had
->>>> been set,
->>>> it would have tried to free that pointer with an oops (actually, I checked that
->>>> and got that oops).
->>>>
->>>> So using acpi_os_unmap_memory() is not an option here, but
->>>> early_acpi_os_unmap_memory()
->>>> match perfectly.
->>> [Lv Zheng]
->>> I don't think so.
->>> For definition block tables, we know for sure there will always be references,
->> until "Unload" opcode is invoked by the AML interpreter.
->>> But for the data tables, OSPMs should use them in this way:
->>> 1. map the table
->>> 2. parse the table and convert it to OS specific structures
->>> 3. unmap the table
->>> This helps to shrink virtual memory address space usages.
->>>
->>> So from this point of view, all data tables should be unmapped right after
->> being parsed.
->>> Why do you need the map to be persistent in the kernel address space?
->>> You can always map a small table, but what if the table size is very big?
->>>
->>>>
->>>>>> And in fact early_acpi_os_unmap_memory() should be removed.
->>>>
->>>> I don't think so -- I have explained why.  It does different thing.
->>>> Probably it (and/or other functions in that api) should be renamed.
->>>>
->>> [Lv Zheng]
->>> Just let me ask one more question.
->>> eary_acpi_os_unmap_memory() is not used inside of ACPICA.
->>> How ACPICA can work with just acpi_os_unmap_memory()?
->>> You can check drivers/acpi/tbxxx.c.
->>> Especially: acpi_tb_release_temp_table() and the code invoking it.
->>>
->>>>> [Lv Zheng]
->>>>> One more thing is:
->>>>> If you can't switch your driver to use acpi_os_unmap_memory() instead of
->>>> early_acpi_os_unmap_memory(),
->>>>> then it implies that your driver does have a defect.
->>>>
->>>> I still don't understand what defect, sorry.
->>> [Lv Zheng]
->>> If you can't ensure this sequence for using the data tables:
->>> 1. map the table
->>> 2. parse the table and convert it to OS specific structure
->>> 3. unmap the table
->>> It implies there is a bug in the driver or a bug in the ACPI subsystem core.
->>
->> Exactly.
-> [Lv Zheng] 
-> So it looks to me:
-> Changing __init to __ref here is entirely not acceptable.
-> This API should stay being invoked during early stage.
-> Otherwise, it may leave us untrackable code that maps tables during early stage and leaks maps to the late stage.
-> If Linux contains such kind of code, I'm afraid, it will become impossible to introduce acpi_put_table() to clean up the mappings.
-> Because when acpi_put_table() is called during the late stage to free a map acquired during the early stage, it then obviously will end up with panic.
-
-Can you please sugggest a common method to access ACPI tables that
-works both before *and* after acpi_gbl_permanent_mmap is set and __init code
-is removed?
-
-> Thanks and best regards
-> -Lv
+> > On Thu, Feb 18, 2016 at 07:42:20PM +0000, Chris Brandt wrote:
+> > > On Thu, 18 Feb 2016, Nicolas Pitre wrote:
+> > > 
+> > > > > Is there some way you can do a PLATFORM_COUNTER++ for each device 
+> > > > > that is selected, and then XIP_KERNEL would depend on 
+> > > > > PLATFORM_COUNTER == 1 ?
+> > > >
+> > > > I don't know all the Kconfig possibilities.
+> > > >
+> > > > But would something like this work?
+> > > >
+> > > > config FOO
+> > > >   depends on !(XIP && CHOICE_MADE)
+> > > >   select CHOICE_MADE
+> > > 
+> > > I follow your logic and that might work: If you made multiple choices,
+> > > it would just take the first one.
+> > > 
+> > > However...I just tried it and it crashes.
+> > > 
+> > > scripts/kconfig/mconf  Kconfig
+> > > make[2]: *** [menuconfig] Segmentation fault (core dumped)
+> > > make[1]: *** [menuconfig] Error 2
+> > > 
+> > > 
+> > > It looks like you can't depend on something not being set that you are
+> > > going to set yourself. Basically..."do as I say, not as I do"
+> > 
+> > It's missing a bool/tristate.  Every config option needs to be typed.
 > 
->> The central problem here is the way Aleksey is trying to hookup a console.
->>
->> What should be happening in this series is:
->> 1. early map SPCR
->> 2. parse the SPCR table
->> 3. call add_preferred_console() to add the SPCR console to the console table
->> 4. unmap SPCR
->>
->> This trivial and unobtrusive method would already have a 8250 console
->> running via SPCR. I've already pointed this out in previous reviews.
->>
->> Further, the above method *will be required anyway* for the DBG2 table to
->> start an earlycon, which I've already pointed out in previous reviews.
->>
->> Then to enable amba-pl011 console via ACPI, add a console match() method
->> similar to the 8250 console match() method, univ8250_console_match().
->>
->> FWIW, PCI earlycon + console support was already submitted once before but
->> never picked up by GregKH. I think I'll just grab that and re-submit so
->> you would know what to emit for console options in the
->> add_preferred_console().
->>
->>
->> Regards,
->> Peter Hurley
->>
->>
->>>>> There is an early bootup requirement in Linux.
->>>>> Maps acquired during the early stage should be freed by the driver during
->> the
->>>> early stage.
->>>>> And the driver should re-acquire the memory map after booting.
->>>>
->>>> Exactly.  That's why I use early_acpi_os_unmap_memory().  The point is that
->>>> that code can be
->>>> called *before* acpi_gbl_permanent_mmap is set (at early initialization of
->> for
->>>> example 8250 console)
->>>> or *after* acpi_gbl_permanent_mmap is set (at insertion of a module that
->>>> registers a console),
->>>> We just can not tell if the received table pointer should or sould not be freed
->>>> with early_memunmap()
->>>> (actually __acpi_unmap_table() or whatever) without checking
->>>> acpi_gbl_permanent_mmap,
->>>> but that's all too low level.
->>> [Lv Zheng]
->>> The driver should make sure that:
->>> Map/unmap is paired during early stage.
->>> For late stage, it should be another pair of map/unmap.
->>>
->>>>
->>>> Another option, as you describe, is to get this pointer early, don't free it
->>> [Lv Zheng]
->>> I mean you should free it early.
->>>
->>>> untill acpi_gbl_permanent_mmap is set, then free it (with
->>>> early_acpi_os_unmap_memory(), that's
->>>> ok because acpi_gbl_permanent_mmap is set in an init code), then get the
->>>> persistent
->>>> pointer to the table.  The problem with it is that we can not just watch
->>>> acpi_gbl_permanent_mmap
->>>> to catch this exact moment.  And also accessing acpi_gbl_permanent_mmap
->> is
->>>> not good as it probably is
->>>> an implementation detail (i. e. too lowlevel) of the ACPI code.
->>>> Or I probably miss what you are suggesting.
->>>>
->>> [Lv Zheng]
->>> I mean, you should:
->>> During early stage:
->>> acpi_os_map_memory()
->>> Parse the table.
->>> acpi_os_unmap_memory().
->>>
->>>>> This is because, during early bootup stage, there are only limited slots
->>>> available for drivers to map memory.
->>>>> So by changing __init to __ref here, you probably will hide many such
->> defects.
->>>>
->>>> What defects?  This funcions checks acpi_gbl_permanent_mmap.
->>>> BTW, exactly the same thing is done in the beginning of
->>>> acpi_os_unmap_memory() and than's ok,
->>>> that function is __ref.
->>>>
->>>>> And solving issues in this way doesn't seem to be an improvement.
->>>>
->>>> Could you please tell me where I am wrong?  I still don't understand your
->> point.
->>> [Lv Zheng]
->>> But anyway, the defect should be in ACPI subsystem core.
->>> The cause should be the API itself - acpi_get_table().
->>>
->>> So I agree you can use early_acpi_os_unmap_memory() during the period the
->> root causes are not cleaned up.
->>> But the bottom line is: the driver need to ensure that
->> early_acpi_os_unmap_memory() is always invoked.
->>> As long as you can ensure this, I don't have objections for deploying
->> early_acpi_os_unmap_memory()  for now.
->>>
->>> Thanks and best regards
->>> -Lv
->>>
->>>>
->>>> Thank you
->>>> Aleksey Makarov
->>>>
->>>>>
->>>>> Thanks and best regards
->>>>> -Lv
->>>>>
->>>>>>
->>>>>> Thanks and best regards
->>>>>> -Lv
->>>>>>
->>>>>>>
->>>>>>> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
->>>>>>> ---
->>>>>>>  drivers/acpi/osl.c | 6 +++++-
->>>>>>>  1 file changed, 5 insertions(+), 1 deletion(-)
->>>>>>>
->>>>>>> diff --git a/drivers/acpi/osl.c b/drivers/acpi/osl.c
->>>>>>> index 67da6fb..8a552cd 100644
->>>>>>> --- a/drivers/acpi/osl.c
->>>>>>> +++ b/drivers/acpi/osl.c
->>>>>>> @@ -497,7 +497,11 @@ void __ref acpi_os_unmap_memory(void *virt,
->>>>>>> acpi_size size)
->>>>>>>  }
->>>>>>>  EXPORT_SYMBOL_GPL(acpi_os_unmap_memory);
->>>>>>>
->>>>>>> -void __init early_acpi_os_unmap_memory(void __iomem *virt,
->> acpi_size
->>>>>> size)
->>>>>>> +/*
->>>>>>> + * acpi_gbl_permanent_mmap is set in __init acpi_early_init()
->>>>>>> + * so it is safe to call early_acpi_os_unmap_memory() from anywhere
->>>>>>> + */
->>>>>>> +void __ref early_acpi_os_unmap_memory(void __iomem *virt,
->> acpi_size
->>>>>> size)
->>>>>>>  {
->>>>>>>  	if (!acpi_gbl_permanent_mmap)
->>>>>>>  		__acpi_unmap_table(virt, size);
->>>>>>> --
->>>>>>> 2.7.1
->>>>>>>
->>>>>>> --
->>>>>>> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
->>>>>>> the body of a message to majordomo at vger.kernel.org
->>>>>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>>>>> --
->>>>>> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
->>>>>> the body of a message to majordomo at vger.kernel.org
->>>>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
+> Thank you! That makes things better.
+> 
+> Technically, it seems to work (you can only select 1), but the menu system is a little flakey when you try jumping back and forth between what device to select. Somehow when 2 get selected, I need to get kbuild to go back and do a full refresh or something.
+> 
+> 
+> I'm going to play with it some more before I start shouting victory.
+
+I think Kconfig interprets the above as a circular dependency (using depends
+and select on the same symbol), it will print a warning and misbehave randomly.
+
+In a different thread today, I was trying to come up with a way to
+reliably pick a PHYS_OFFSET value, and I think it can be done but it
+quickly gets ugly without extending the Kconfig language.
+
+Also, the same problem exists in three areas:
+
+a) PHYS_OFFSET / DRAM_BASE
+b) XIP_PHYS_ADDR
+c) DEBUG_UART_VIRT/DEBUG_UART_PHYS
+
+The last one is already really ugly and by nature causes problems
+whenever someone enables DEBUG_LL and tries to boot a compressed
+kernel on a platform other than the one that was configured.
+
+XIP_PHYS_ADDR is probably the worst here, because the number does
+not just depend on the SoC family but the specific board configuration
+and could even change when you rearrange the partitions on your NOR
+flash (unless you enforce that the kernel has to start at the
+beginning of the ROM or some other fixed location).
+
+It would be nice to handle all three of the above in a similar manner,
+and I'm definitely open to a range of solutions for this, like
+
+- always allow turning XIP_KERNEL on for all configurations, and
+  expect the user to know what they are doing (as your current
+  patch)
+
+- allow turning on XIP_KERNEL as long as Kconfig can figure out that
+  this has a chance of working on at least one platform (easy enough
+  to implement, and similar to how we handle DEBUG_LL).
+
+- make XIP_KERNEL and DEBUG_LL depend on either CONFIG_EXPERT or
+  a new "I know this breaks other platforms and I won't complain
+  about that" flag.
+
+- implement a Kconfig method to only allow XIP_KERNEL if exactly
+  one platform is enable that supports it, or if all platforms
+  use the exact same PHYS_OFFSET and XIP_PHYS_ADDR settings.
+  Whether we want to enforce the same thing for DEBUG_LL is a
+  separate matter once that infrastructure exists.
+
+	Arnd
