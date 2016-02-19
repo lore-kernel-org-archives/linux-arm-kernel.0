@@ -1,103 +1,116 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 19 Feb 2016 08:43:01 +0100
-Subject: [PATCH 01/12] spi: imx: allow only WML aligned transfers to use DMA
+Date: Fri, 19 Feb 2016 08:43:02 +0100
+Subject: [PATCH 02/12] spi: imx: use proper dev_* functions for driver messages
 In-Reply-To: <1455867792-26389-1-git-send-email-s.hauer@pengutronix.de>
 References: <1455867792-26389-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1455867792-26389-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1455867792-26389-3-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Anton Bondarenko <anton.bondarenko.sama@gmail.com>
+Add a struct device * member to the private driver data and use
+it to print messages using dev_* functions rather than pr_*.
 
-RX DMA tail data handling doesn't work correctly in many cases with current
-implementation. It happens because SPI core was setup to generates both RX
-and RX TAIL events. And RX TAIL event does not work correctly.
-This can be easily verified by sending SPI transaction with size modulus
-WML(32 in our case) not equal 0.
-
-Also this removes the change introduced in f6ee9b582 (spi: imx: Fix small
-DMA transfers) since this only fixes usecases with transfer size from 33 to
-128 bytes and doesn't fix 129 bytes and bigger.
-
-This is output from transaction with len 138 bytes in loopback mode at 10Mhz:
-TX0000: a3 97 a2 55 53 be f1 fc f9 79 6b 52 14 13 e9 e2
-TX0010: 2d 51 8e 1f 56 08 57 27 a7 05 d4 d0 52 82 77 75
-TX0020: 1b 99 4a ed 58 3d 6a 52 36 d5 24 4a 68 8e ad 95
-TX0030: 5f 3c 35 b5 c4 8c dd 6c 11 32 3d e2 b4 b4 59 cf
-TX0040: ce 23 3d 27 df a7 f9 96 fc 1e e0 66 2c 0e 7b 8c
-TX0050: ca 30 42 8f bc 9f 7b ce d1 b8 b1 87 ec 8a d6 bb
-TX0060: 2e 15 63 0e 3c dc a4 3a 7a 06 20 a7 93 1b 34 dd
-TX0070: 4c f5 ec 88 96 68 d6 68 a0 09 6f 8e 93 47 c9 41
-TX0080: db ac cf 97 89 f3 51 05 79 71
-
-RX0000: a3 97 a2 55 53 be f1 fc f9 79 6b 52 14 13 e9 e2
-RX0010: 2d 51 8e 1f 56 08 57 27 a7 05 d4 d0 52 82 77 75
-RX0020: 1b 99 4a ed 58 3d 6a 52 36 d5 24 4a 68 8e ad 95
-RX0030: 5f 3c 35 00 00 b5 00 00 00 c4 00 00 8c 00 00 dd
-RX0040: 6c 11 32 3d e2 b4 b4 59 cf ce 23 3d 27 df a7 f9
-RX0050: 96 fc 1e e0 66 2c 0e 7b 8c ca 30 42 8f 1f 1f bc
-RX0060: 9f 7b ce d1 b8 b1 87 ec 8a d6 bb 2e 15 63 0e ed
-RX0070: ed 3c 58 58 58 dc 3d 3d a4 6a 6a 3a 52 52 7a 36
-RX0080: 06 20 a7 93 1b 34 dd 4c f5 ec
-
-Zeros at offset 33 and 34 caused by reading empty RX FIFO which not possible
-if DMA RX read was triggered by RX event. This mean DMA was triggered
-by RX TAIL event.
-
-Signed-off-by: Anton Bondarenko <anton.bondarenko.sama@gmail.com>
-Signed-off--by: Sascha Hauer <s.hauer@pengutronix.de>
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/spi/spi-imx.c | 17 ++---------------
- 1 file changed, 2 insertions(+), 15 deletions(-)
+ drivers/spi/spi-imx.c | 27 ++++++++++++---------------
+ 1 file changed, 12 insertions(+), 15 deletions(-)
 
 diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
-index d98c33c..08492d6 100644
+index 08492d6..7904d45 100644
 --- a/drivers/spi/spi-imx.c
 +++ b/drivers/spi/spi-imx.c
-@@ -204,8 +204,8 @@ static bool spi_imx_can_dma(struct spi_master *master, struct spi_device *spi,
+@@ -86,6 +86,7 @@ struct spi_imx_devtype_data {
+ 
+ struct spi_imx_data {
+ 	struct spi_bitbang bitbang;
++	struct device *dev;
+ 
+ 	struct completion xfer_done;
+ 	void __iomem *base;
+@@ -250,14 +251,15 @@ static bool spi_imx_can_dma(struct spi_master *master, struct spi_device *spi,
+ #define MX51_ECSPI_TESTREG_LBC	BIT(31)
+ 
+ /* MX51 eCSPI */
+-static unsigned int mx51_ecspi_clkdiv(unsigned int fin, unsigned int fspi,
+-				      unsigned int *fres)
++static unsigned int mx51_ecspi_clkdiv(struct spi_imx_data *spi_imx,
++				      unsigned int fspi, unsigned int *fres)
  {
- 	struct spi_imx_data *spi_imx = spi_master_get_devdata(master);
- 
--	if (spi_imx->dma_is_inited &&
--	    transfer->len > spi_imx->wml * sizeof(u32))
-+	if (spi_imx->dma_is_inited && transfer->len >= spi_imx->wml &&
-+	    (transfer->len % spi_imx->wml) == 0)
- 		return true;
- 	return false;
- }
-@@ -919,8 +919,6 @@ static int spi_imx_dma_transfer(struct spi_imx_data *spi_imx,
- 	struct dma_async_tx_descriptor *desc_tx = NULL, *desc_rx = NULL;
- 	int ret;
- 	unsigned long timeout;
--	u32 dma;
--	int left;
- 	struct spi_master *master = spi_imx->bitbang.master;
- 	struct sg_table *tx = &transfer->tx_sg, *rx = &transfer->rx_sg;
- 
-@@ -954,13 +952,6 @@ static int spi_imx_dma_transfer(struct spi_imx_data *spi_imx,
- 	/* Trigger the cspi module. */
- 	spi_imx->dma_finished = 0;
- 
--	dma = readl(spi_imx->base + MX51_ECSPI_DMA);
--	dma = dma & (~MX51_ECSPI_DMA_RXT_WML_MASK);
--	/* Change RX_DMA_LENGTH trigger dma fetch tail data */
--	left = transfer->len % spi_imx->wml;
--	if (left)
--		writel(dma | (left << MX51_ECSPI_DMA_RXT_WML_OFFSET),
--				spi_imx->base + MX51_ECSPI_DMA);
  	/*
- 	 * Set these order to avoid potential RX overflow. The overflow may
- 	 * happen if we enable SPI HW before starting RX DMA due to rescheduling
-@@ -992,10 +983,6 @@ static int spi_imx_dma_transfer(struct spi_imx_data *spi_imx,
+ 	 * there are two 4-bit dividers, the pre-divider divides by
+ 	 * $pre, the post-divider by 2^$post
+ 	 */
+ 	unsigned int pre, post;
++	unsigned int fin = spi_imx->spi_clk;
+ 
+ 	if (unlikely(fspi > fin))
+ 		return 0;
+@@ -270,14 +272,14 @@ static unsigned int mx51_ecspi_clkdiv(unsigned int fin, unsigned int fspi,
+ 
+ 	post = max(4U, post) - 4;
+ 	if (unlikely(post > 0xf)) {
+-		pr_err("%s: cannot set clock freq: %u (base freq: %u)\n",
+-				__func__, fspi, fin);
++		dev_err(spi_imx->dev, "cannot set clock freq: %u (base freq: %u)\n",
++				fspi, fin);
+ 		return 0xff;
+ 	}
+ 
+ 	pre = DIV_ROUND_UP(fin, fspi << post) - 1;
+ 
+-	pr_debug("%s: fin: %u, fspi: %u, post: %u, pre: %u\n",
++	dev_dbg(spi_imx->dev, "%s: fin: %u, fspi: %u, post: %u, pre: %u\n",
+ 			__func__, fin, fspi, post, pre);
+ 
+ 	/* Resulting frequency for the SCLK line. */
+@@ -330,7 +332,7 @@ static int __maybe_unused mx51_ecspi_config(struct spi_imx_data *spi_imx,
+ 	ctrl |= MX51_ECSPI_CTRL_MODE_MASK;
+ 
+ 	/* set clock speed */
+-	ctrl |= mx51_ecspi_clkdiv(spi_imx->spi_clk, config->speed_hz, &clk);
++	ctrl |= mx51_ecspi_clkdiv(spi_imx, config->speed_hz, &clk);
+ 
+ 	/* set chip select to use */
+ 	ctrl |= MX51_ECSPI_CTRL_CS(config->cs);
+@@ -968,18 +970,14 @@ static int spi_imx_dma_transfer(struct spi_imx_data *spi_imx,
+ 	timeout = wait_for_completion_timeout(&spi_imx->dma_tx_completion,
+ 						IMX_DMA_TIMEOUT);
+ 	if (!timeout) {
+-		pr_warn("%s %s: I/O Error in DMA TX\n",
+-			dev_driver_string(&master->dev),
+-			dev_name(&master->dev));
++		dev_err(spi_imx->dev, "I/O Error in DMA TX\n");
+ 		dmaengine_terminate_all(master->dma_tx);
+ 		dmaengine_terminate_all(master->dma_rx);
+ 	} else {
+ 		timeout = wait_for_completion_timeout(
+ 				&spi_imx->dma_rx_completion, IMX_DMA_TIMEOUT);
+ 		if (!timeout) {
+-			pr_warn("%s %s: I/O Error in DMA RX\n",
+-				dev_driver_string(&master->dev),
+-				dev_name(&master->dev));
++			dev_err(spi_imx->dev, "I/O Error in DMA RX\n");
  			spi_imx->devtype_data->reset(spi_imx);
  			dmaengine_terminate_all(master->dma_rx);
  		}
--		dma &= ~MX51_ECSPI_DMA_RXT_WML_MASK;
--		writel(dma |
--		       spi_imx->wml << MX51_ECSPI_DMA_RXT_WML_OFFSET,
--		       spi_imx->base + MX51_ECSPI_DMA);
- 	}
+@@ -996,9 +994,7 @@ static int spi_imx_dma_transfer(struct spi_imx_data *spi_imx,
+ 	return ret;
  
- 	spi_imx->dma_finished = 1;
+ no_dma:
+-	pr_warn_once("%s %s: DMA not available, falling back to PIO\n",
+-		     dev_driver_string(&master->dev),
+-		     dev_name(&master->dev));
++	dev_warn_once(spi_imx->dev, "DMA not available, falling back to PIO\n");
+ 	return -EAGAIN;
+ }
+ 
+@@ -1128,6 +1124,7 @@ static int spi_imx_probe(struct platform_device *pdev)
+ 
+ 	spi_imx = spi_master_get_devdata(master);
+ 	spi_imx->bitbang.master = master;
++	spi_imx->dev = &pdev->dev;
+ 
+ 	spi_imx->devtype_data = of_id ? of_id->data :
+ 		(struct spi_imx_devtype_data *)pdev->id_entry->driver_data;
 -- 
 2.7.0
