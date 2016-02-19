@@ -1,133 +1,89 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 19 Feb 2016 08:43:12 +0100
-Subject: [PATCH 12/12] spi: imx: drop bogus tests for rx/tx bufs in DMA
- transfer
-In-Reply-To: <1455867792-26389-1-git-send-email-s.hauer@pengutronix.de>
-References: <1455867792-26389-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1455867792-26389-13-git-send-email-s.hauer@pengutronix.de>
+From: a0393675@ti.com (Keerthy)
+Date: Fri, 19 Feb 2016 13:29:23 +0530
+Subject: [PATCH v2 2/2] ARM: AM43XX: HWMOD: Add rtc hwmod
+In-Reply-To: <alpine.DEB.2.02.1602190720490.27696@utopia.booyaka.com>
+References: <1455856735-11515-1-git-send-email-j-keerthy@ti.com>
+ <1455856735-11515-3-git-send-email-j-keerthy@ti.com>
+ <alpine.DEB.2.02.1602190720490.27696@utopia.booyaka.com>
+Message-ID: <56C6CB5B.20804@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver tries to be clever by only setting up DMA channels when
-the corresponding sg tables are non NULL. The sg tables are embedded
-structs in struct spi_transfer, so they are guaranteed to be non NULL
-which makes the if(tx)/if(rx) tests completely bogus. The driver even
-sets the SPI_MASTER_MUST_RX / SPI_MASTER_MUST_TX flags which makes sure
-the sg tables are not only present but also non empty.
-Drop the tests and make the DMA path easier to follow.
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- drivers/spi/spi-imx.c | 78 +++++++++++++++++++++------------------------------
- 1 file changed, 32 insertions(+), 46 deletions(-)
 
-diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
-index 3512c2f..9fc1de0 100644
---- a/drivers/spi/spi-imx.c
-+++ b/drivers/spi/spi-imx.c
-@@ -975,48 +975,37 @@ static int spi_imx_dma_transfer(struct spi_imx_data *spi_imx,
- 				struct spi_transfer *transfer)
- {
- 	struct dma_async_tx_descriptor *desc_tx = NULL, *desc_rx = NULL;
--	int ret;
- 	unsigned long transfer_timeout;
- 	unsigned long timeout;
- 	struct spi_master *master = spi_imx->bitbang.master;
- 	struct sg_table *tx = &transfer->tx_sg, *rx = &transfer->rx_sg;
- 
--	if (tx) {
--		desc_tx = dmaengine_prep_slave_sg(master->dma_tx,
--					tx->sgl, tx->nents, DMA_MEM_TO_DEV,
--					DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
--		if (!desc_tx)
--			return -EINVAL;
--
--		desc_tx->callback = spi_imx_dma_tx_callback;
--		desc_tx->callback_param = (void *)spi_imx;
--		dmaengine_submit(desc_tx);
--	}
-+	/*
-+	 * The TX DMA setup starts the transfer, so make sure RX is configured
-+	 * before TX.
-+	 */
-+	desc_rx = dmaengine_prep_slave_sg(master->dma_rx,
-+				rx->sgl, rx->nents, DMA_DEV_TO_MEM,
-+				DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
-+	if (!desc_rx)
-+		return -EINVAL;
- 
--	if (rx) {
--		desc_rx = dmaengine_prep_slave_sg(master->dma_rx,
--					rx->sgl, rx->nents, DMA_DEV_TO_MEM,
--					DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
--		if (!desc_rx)
--			return -EINVAL;
-+	desc_rx->callback = spi_imx_dma_rx_callback;
-+	desc_rx->callback_param = (void *)spi_imx;
-+	dmaengine_submit(desc_rx);
-+	reinit_completion(&spi_imx->dma_rx_completion);
-+	dma_async_issue_pending(master->dma_rx);
- 
--		desc_rx->callback = spi_imx_dma_rx_callback;
--		desc_rx->callback_param = (void *)spi_imx;
--		dmaengine_submit(desc_rx);
--	}
-+	desc_tx = dmaengine_prep_slave_sg(master->dma_tx,
-+				tx->sgl, tx->nents, DMA_MEM_TO_DEV,
-+				DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
-+	if (!desc_tx)
-+		return -EINVAL;
- 
--	reinit_completion(&spi_imx->dma_rx_completion);
-+	desc_tx->callback = spi_imx_dma_tx_callback;
-+	desc_tx->callback_param = (void *)spi_imx;
-+	dmaengine_submit(desc_tx);
- 	reinit_completion(&spi_imx->dma_tx_completion);
--
--	/*
--	 * Set these order to avoid potential RX overflow. The overflow may
--	 * happen if we enable SPI HW before starting RX DMA due to rescheduling
--	 * for another task and/or interrupt.
--	 * So RX DMA enabled first to make sure data would be read out from FIFO
--	 * ASAP. TX DMA enabled next to start filling TX FIFO with new data.
--	 * And finaly SPI HW enabled to start actual data transfer.
--	 */
--	dma_async_issue_pending(master->dma_rx);
- 	dma_async_issue_pending(master->dma_tx);
- 
- 	transfer_timeout = spi_imx_calculate_timeout(spi_imx, transfer->len);
-@@ -1028,22 +1017,19 @@ static int spi_imx_dma_transfer(struct spi_imx_data *spi_imx,
- 		dev_err(spi_imx->dev, "I/O Error in DMA TX\n");
- 		dmaengine_terminate_all(master->dma_tx);
- 		dmaengine_terminate_all(master->dma_rx);
--	} else {
--		timeout = wait_for_completion_timeout(
--				&spi_imx->dma_rx_completion, transfer_timeout);
--		if (!timeout) {
--			dev_err(spi_imx->dev, "I/O Error in DMA RX\n");
--			spi_imx->devtype_data->reset(spi_imx);
--			dmaengine_terminate_all(master->dma_rx);
--		}
-+		return -ETIMEDOUT;
- 	}
- 
--	if (!timeout)
--		ret = -ETIMEDOUT;
--	else
--		ret = transfer->len;
-+	timeout = wait_for_completion_timeout(&spi_imx->dma_rx_completion,
-+					      transfer_timeout);
-+	if (!timeout) {
-+		dev_err(&master->dev, "I/O Error in DMA RX\n");
-+		spi_imx->devtype_data->reset(spi_imx);
-+		dmaengine_terminate_all(master->dma_rx);
-+		return -ETIMEDOUT;
-+	}
- 
--	return ret;
-+	return transfer->len;
- }
- 
- static int spi_imx_pio_transfer(struct spi_device *spi,
--- 
-2.7.0
+On Friday 19 February 2016 12:51 PM, Paul Walmsley wrote:
+> On Fri, 19 Feb 2016, Keerthy wrote:
+>
+>> The patch adds rtc hwmod. RTC module The RTC module is physically
+>> present on the AM438x SoC used on AM43X-EPOS-EVM, but it is permanently
+>> disabled. A secure RTC is used instead on these devices, where needed.
+>> . Hence adding it selectively using a seprate list to get RTC Module
+>> functional on the other am43x SoCs used on am437x-gp-evm and
+>> am437x-sk-evm.
+>>
+>> Signed-off-by: Keerthy <j-keerthy@ti.com>
+>> ---
+>>
+>> Changes in v2:
+>>
+>> Inverted the checking logic to accommodate registering for all
+>> the SoCs compatible to am4372 and removed the negating am438x logic
+>> to register rtc hwmods as suggested by Paul.
+>>
+>>   arch/arm/mach-omap2/omap_hwmod_43xx_data.c | 14 +++++++++++++-
+>>   1 file changed, 13 insertions(+), 1 deletion(-)
+>
+> OK thanks; I've queued the following patch for v4.6 or if I get unlucky,
+> v4.7.
+
+Thanks Paul!
+
+>
+> - Paul
+>
+> From: Keerthy <j-keerthy@ti.com>
+> Date: Fri, 19 Feb 2016 10:08:55 +0530
+> Subject: [PATCH] ARM: AM43XX: hwmod: Add rtc hwmod
+>
+> The patch registers the rtc hwmod on AM437x chips.  The RTC module is
+> physically present on the AM438x SoC used on AM43X-EPOS-EVM, but it is
+> permanently disabled. A secure RTC is used instead on these devices,
+> where needed. Hence adding it selectively using a separate list to get
+> RTC Module functional on the other am43x SoCs used on am437x-gp-evm
+> and am437x-sk-evm.
+>
+> Signed-off-by: Keerthy <j-keerthy@ti.com>
+> [paul at pwsan.com: cleaned up patch description]
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> ---
+>   arch/arm/mach-omap2/omap_hwmod_43xx_data.c | 14 +++++++++++++-
+>   1 file changed, 13 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+> index e97a894b5f88..97fd399202dc 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+> @@ -1020,9 +1020,21 @@ static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
+>   	NULL,
+>   };
+>
+> +static struct omap_hwmod_ocp_if *am43xx_rtc_hwmod_ocp_ifs[] __initdata = {
+> +	&am33xx_l4_wkup__rtc,
+> +	NULL,
+> +};
+> +
+>   int __init am43xx_hwmod_init(void)
+>   {
+> +	int ret;
+> +
+>   	omap_hwmod_am43xx_reg();
+>   	omap_hwmod_init();
+> -	return omap_hwmod_register_links(am43xx_hwmod_ocp_ifs);
+> +	ret = omap_hwmod_register_links(am43xx_hwmod_ocp_ifs);
+> +
+> +	if (!ret && of_machine_is_compatible("ti,am4372"))
+> +		ret = omap_hwmod_register_links(am43xx_rtc_hwmod_ocp_ifs);
+> +
+> +	return ret;
+>   }
+>
