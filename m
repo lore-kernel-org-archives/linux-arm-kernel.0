@@ -1,71 +1,59 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 19 Feb 2016 14:50:26 +0000
-Subject: [PATCH v3] irqchip: irq-mvebu-odmi: new driver for platform MSI
- on Marvell 7K/8K
-In-Reply-To: <56C72B01.4060005@arm.com>
-References: <1455888883-5127-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <56C72392.5010202@arm.com> <20160219142848.GA958@io.lakedaemon.net>
- <56C72B01.4060005@arm.com>
-Message-ID: <20160219145026.GC958@io.lakedaemon.net>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 19 Feb 2016 14:57:17 +0000
+Subject: [PATCH v6sub1 00/11] arm64: split linear and kernel mappings
+In-Reply-To: <CAKv+Gu-3y9LoxM9swbwZuXXxuMppnWzd=PmyALa+P0NhvR7mtw@mail.gmail.com>
+References: <1455627162-31600-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20160218182509.GG2538@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu_UqoYB5QAWOU9_iZDoRO=rqHu8o87JboSAqNqOhoOCXw@mail.gmail.com>
+ <CAKv+Gu_25mz37gdgVx5Yz7DJ+QbOMNa4rYBymFL1nL7nGOzBVQ@mail.gmail.com>
+ <CAKv+Gu8aKDtev2LdGMy9a485Z8S7TYgsbXky6wR6e3F+j2nkUQ@mail.gmail.com>
+ <20160219142551.GA12864@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu_44=2NMuon694T_YW6QUU-ixC+q_7WxbMtBuN3dRNP2Q@mail.gmail.com>
+ <CAKv+Gu9WTVrYmc7GwxDeHppSHoRmSS4nK5iG3HZVMOPcPP1MOw@mail.gmail.com>
+ <20160219143701.GB12864@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu-3y9LoxM9swbwZuXXxuMppnWzd=PmyALa+P0NhvR7mtw@mail.gmail.com>
+Message-ID: <20160219145716.GC12864@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 19, 2016 at 02:47:29PM +0000, Marc Zyngier wrote:
-> On 19/02/16 14:28, Jason Cooper wrote:
-> > On Fri, Feb 19, 2016 at 02:15:46PM +0000, Marc Zyngier wrote:
-> >> On 19/02/16 13:34, Thomas Petazzoni wrote:
-> >>> This commits adds a new irqchip driver that handles the ODMI
-> >>> controller found on Marvell 7K/8K processors. The ODMI controller
-> >>> provide MSI interrupt functionality to on-board peripherals, much like
-> >>> the GIC-v2m.
-> >>>
-> >>> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> >>> ---
-> >>> Changes v2 -> v2:
-> >>>  - Express NODMIS_SHIFT, NODMIS_PER_FRAME, NODMIS_MASK in term of each
-> >>>    other. Suggested by Marc Zyngier.
-> >>>  - Rework the global bitmask allocation to make sure we allocate a
-> >>>    number of longs rather than a number of bytes, to avoid having the
-> >>>    bitmap API (which operates on longs) access memory we haven't
-> >>>    explicitly allocated. Reported by Marc Zyngier.
-> >>>
-> >>> Changes v1 -> v2:
-> >>>  - Better commit title, as suggested by Marc Zyngier.
-> >>>  - Improve the DT binding documentation, as suggested by Marc Zingier:
-> >>>    add a reference to the GIC documentation, be more specific about
-> >>>    the marvell,spi-base values, and add the requirement of the
-> >>>    interrupt-parent property.
-> >>>  - As suggested by Marc Zyngier, use a single global bitmap to
-> >>>    allocate all ODMIs, regardless of the frame they belong to. As part
-> >>>    of this change, the hwirq used to identify the interrupt inside the
-> >>>    ODMI irqdomain are 0-based (instead of being based on their
-> >>>    corresponding SPI base value), which allows to significantly
-> >>>    simplify the allocation/free logic.
-> >>> ---
-> >>>  .../marvell,odmi-controller.txt                    |  41 ++++
-> >>>  drivers/irqchip/Kconfig                            |   4 +
-> >>>  drivers/irqchip/Makefile                           |   1 +
-> >>>  drivers/irqchip/irq-mvebu-odmi.c                   | 248 +++++++++++++++++++++
-> >>>  4 files changed, 294 insertions(+)
-> >>>  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/marvell,odmi-controller.txt
-> >>>  create mode 100644 drivers/irqchip/irq-mvebu-odmi.c
+On Fri, Feb 19, 2016 at 03:40:32PM +0100, Ard Biesheuvel wrote:
+> On 19 February 2016 at 15:37, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Fri, Feb 19, 2016 at 03:29:13PM +0100, Ard Biesheuvel wrote:
+> >> On 19 February 2016 at 15:27, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> >> > On 19 February 2016 at 15:25, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> >> >> On Fri, Feb 19, 2016 at 09:05:25AM +0100, Ard Biesheuvel wrote:
+> >> >>> So it appears that akpm will need to drop that patch anyway, as he
+> >> >>> won't be able to carry an updated version since he does not have the
+> >> >>> UAO patches. That means it probably makes even more sense to take
+> >> >>> those through the arm64 tree as well (minus the x86 one, which has a
+> >> >>> conflict now as well). In fact, perhaps it makes sense to only take
+> >> >>> the base patch and the arm64 patch, and I can send the remaining ones
+> >> >>> to the various maintainers (or akpm) for v4.7
+> >> >>
+> >> >> Or we make BUILDTIME_EXTABLE_SORT depend on !RANDOMIZE_BASE until we
+> >> >> sort out the extable patches.
+> >> >
+> >> > That would still result in breakage once the current version queued by
+> >> > akpm hits mainline.
 > >>
-> >> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-> >>
-> >> I'll queue that for 4.6.
-> > 
-> > I had it on my list to queue up, but you beat me to it.  :-)
+> >> ... or in other words, the breakage is already in -next. This is
+> >> completely unrelated to the sorting, btw, but due to the difference
+> >> between relative/absolute
+> >
+> > Ah, I now realised that it was only working fine for me before merging
+> > the EFI patches to actually do the base randomisation. Once we fully
+> > randomise the load address, we must have relative extable.
+> >
+> > Is your branch updated with the patches needed for arm64 (against
+> > for-next/core)?
 > 
-> Ah, sorry! The reason I was eager to queue it is because I have some
-> related changes in the GIC/GICv2m department, simplifying a few things
-> there:
+> Yes. I dropped the kallsyms patches, and included only the base and
+> arm64 extable patches, with the UAO issue fixed.
 > 
-> http://git.kernel.org/cgit/linux/kernel/git/maz/arm-platforms.git/commit/?h=irq/gic-4.6&id=9b29f74f6b4b56aa4bb5cc91474aa2451de5c628
-> 
-> I'll post this on the list later today.
+> https://git.linaro.org/people/ard.biesheuvel/linux-arm.git/shortlog/refs/heads/arm64-kaslr-v6
+> git://git.linaro.org/people/ard.biesheuvel/linux-arm.git arm64-kaslr-v6
 
-ah, no problem.  Whichever is easiest for you.  Just let me know.
+Thanks, I'll give it a try.
 
-thx,
-
-Jason.
+-- 
+Catalin
