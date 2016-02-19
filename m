@@ -1,46 +1,132 @@
-From: blogic@openwrt.org (John Crispin)
-Date: Fri, 19 Feb 2016 10:23:47 +0100
-Subject: [PATCH V2 1/2] pinctrl: mediatek: Modify pinctrl bindings for
- mt7623
-In-Reply-To: <CACRpkdYiQop2qDNuh4N2YZy2DTy9mOEyERro8hT4YogCPc2LGw@mail.gmail.com>
-References: <1455866238-6102-1-git-send-email-blogic@openwrt.org>
- <CACRpkdYiQop2qDNuh4N2YZy2DTy9mOEyERro8hT4YogCPc2LGw@mail.gmail.com>
-Message-ID: <56C6DF23.3060202@openwrt.org>
+From: dyoung@redhat.com (Dave Young)
+Date: Fri, 19 Feb 2016 17:27:38 +0800
+Subject: [PATCH v2 1/2] efi: esrt: use memremap not ioremap to access
+ ESRT table in memory
+In-Reply-To: <CAKv+Gu8RP21vw1Ht7UtkHsen2GMUNx8DikH-hLaezV+uZvWO-g@mail.gmail.com>
+References: <1455535953-5056-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1455535953-5056-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20160218104407.GC2651@codeblueprint.co.uk>
+ <CAKv+Gu_AW7PKJJOd2mbEu3LKJe+gNaPHnH=sgO=YXM_KWFyKxw@mail.gmail.com>
+ <20160218132824.GE2651@codeblueprint.co.uk>
+ <CAKv+Gu-s1pzYBzuDG-Z7s3gyo8dPOfeidZQ+rim-uAWZCBcKQQ@mail.gmail.com>
+ <20160218134324.GG2651@codeblueprint.co.uk>
+ <CAKv+Gu875r9RkDC723kNsG4XC0eSE9RPPmSFZrD0sx0QxS+V4g@mail.gmail.com>
+ <20160218141544.GH2651@codeblueprint.co.uk>
+ <CAKv+Gu8RP21vw1Ht7UtkHsen2GMUNx8DikH-hLaezV+uZvWO-g@mail.gmail.com>
+Message-ID: <20160219092738.GA18240@dhcp-128-65.nay.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 02/18/16 at 03:21pm, Ard Biesheuvel wrote:
+> On 18 February 2016 at 15:15, Matt Fleming <matt@codeblueprint.co.uk> wrote:
+> > On Thu, 18 Feb, at 02:44:02PM, Ard Biesheuvel wrote:
+> >> On 18 February 2016 at 14:43, Matt Fleming <matt@codeblueprint.co.uk> wrote:
+> >> > On Thu, 18 Feb, at 02:29:32PM, Ard Biesheuvel wrote:
+> >> >> On 18 February 2016 at 14:28, Matt Fleming <matt@codeblueprint.co.uk> wrote:
+> >> >> > On Thu, 18 Feb, at 01:16:05PM, Ard Biesheuvel wrote:
+> >> >> >> On 18 February 2016 at 11:44, Matt Fleming <matt@codeblueprint.co.uk> wrote:
+> >> >> >> > On Mon, 15 Feb, at 12:32:32PM, Ard Biesheuvel wrote:
+> >> >> >> >> On ARM and arm64, ioremap() and memremap() are not interchangeable like
+> >> >> >> >> on x86, and the use of ioremap() on ordinary RAM is typically flagged
+> >> >> >> >> as an error if the memory region being mapped is also covered by the
+> >> >> >> >> linear mapping, since that would lead to aliases with conflicting
+> >> >> >> >> cacheability attributes.
+> >> >> >> >>
+> >> >> >> >> Since what we are dealing with is not an I/O region with side effects,
+> >> >> >> >> using ioremap() here is arguably incorrect anyway, so let's replace
+> >> >> >> >> it with memremap instead. Also add a missing unmap on the success path,
+> >> >> >> >> and drop a memblock_remove() call which does not belong here, this far
+> >> >> >> >> into the boot sequence.
+> >> >> >> >>
+> >> >> >> >> Cc: Peter Jones <pjones@redhat.com>
+> >> >> >> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >> >> >> >> ---
+> >> >> >> >>  drivers/firmware/efi/esrt.c | 16 ++++++++--------
+> >> >> >> >>  1 file changed, 8 insertions(+), 8 deletions(-)
+> >> >> >> >>
+> >> >> >> >
+> >> >> >> > [...]
+> >> >> >> >
+> >> >> >> >> @@ -432,8 +434,6 @@ static int __init esrt_sysfs_init(void)
+> >> >> >> >>       if (error)
+> >> >> >> >>               goto err_cleanup_list;
+> >> >> >> >>
+> >> >> >> >> -     memblock_remove(esrt_data, esrt_data_size);
+> >> >> >> >> -
+> >> >> >> >>       pr_debug("esrt-sysfs: loaded.\n");
+> >> >> >> >>
+> >> >> >> >>       return 0;
+> >> >> >> >
+> >> >> >> > Shouldn't we be replacing memblock_remove() with free_bootmem_late()?
+> >> >> >> > The original ESRT region is still reserved at this point, so we should
+> >> >> >> > do our best to release it to the page allocator.
+> >> >> >>
+> >> >> >> I'd rather we keep it reserved. That way, the config table entry still
+> >> >> >> points to something valid, which could be useful for kexec(), I think?
+> >> >> >> At least, that is how I intended to handle config tables on ARM ...
+> >> >> >
+> >> >> > If we're going to reserve it why do we need to copy the data out at
+> >> >> > all in esrt_sysfs_init()?
+> >> >>
+> >> >> Excellent question. I don't think there is any point to doing that.
+> >> >
+> >> > ... Unless the data is contained in an EFI Boot Services region ;-)
+> >> >
+> >> > Peter?
+> >>
+> >> Yes, it usually is. Is that a problem?
+> >
+> > Yes, we free the Boot Services regions before hitting userspace on
+> > x86, see efi_free_boot_services(). We do this map/copy/unmap trick in
+> > the ACPI BGRT driver for that reason.
+> >
+> > The Boot Services regions can be many gigabytes in size, which makes
+> > leaving them alone impractical.
+> >
+> > For kexec on x86 we simply discard the BGRT table, which isn't the end
+> > of the world because who really needs access to the BGRT image on
+> > kexec reboot? However, I can see the value of preserving the ESRT.
+> >
+> > I guess we've got two options, 1) copy out the chunks of Boot Services
+> > regions we're interested in and rewrite the EFI tables to point at
+> > these new allocations and free/discard all of the original Boot
+> > Services regions or 2) only selectively free the Boot Services
+> > regions.
+> >
+> > I've always stayed clear of 2) in case there exists cross-region
+> > references in the data that isn't obvious. I'd like to think that
+> > would never happen, but, you know, dragons lurk here, etc.
+> >
+> > Though actually, now I think about it, cross-region references can't
+> > possibly exist because they'd cause issues with the current code.
+> >
+> > So maybe the best solution is actually 2), where we preserve the Boot
+> > Services regions if any of the drivers (ESRT, BGRT) request them but
+> > free all the others?
 
+It is a good idea so that drivers can add their useful sections to
+a list or an array, they can avoid another copy of the memory also.
 
-On 19/02/2016 10:03, Linus Walleij wrote:
-> On Fri, Feb 19, 2016 at 8:17 AM, John Crispin <blogic@openwrt.org> wrote:
+> >
+> > What are the lifetime rules for Boot Services regions on arm*?
 > 
->> Signed-off-by: John Crispin <blogic@openwrt.org>
->> Cc: devicetree at vger.kernel.org
->> ---
->> please apply to the devel-mt2701 branch
->>
->> Changes in V2
->> * make mt7623-pinfunc.h part of patch 1/2
->> * make sure the list stays sorted
+> We treat all Boot Services regions like Loader Code/Data or free
+> regions: it is all recorded in memblock as usable memory, and only the
+> regions that are explicitly reserved are protected from further
+> general use.
 > 
-> Patch applied unless the Mediatek maintainers come with serious
-> remarks (I can always revert).
-> 
-> Only minor comments from Yingjoe on the previous version so I guess
-> it is finished.
-> 
-> MTK guys: do you even have this SoC? It appears MTK is churning out
-> a plethora of SoCs and then they land in the lap of the OpenWRT
-> developers before the MTK maintainers even start to look at it...
-> 
-> Yours,
-> Linus Walleij
-> 
+> I am currently looking into the memory attribute table, and the use
+> case is very similar. It would be very useful from our pov to simply
+> memblock_reserve() the region right after having called
+> efi_config_parse_tables(), and actually consume its data when we get
+> around to it later. The ESRT handling is already split down the middle
+> in the same way.
 
-I am doing this work in close collaboration with MTK. It is contractual
-work. MTK is huge and has many BUs, one of them is WCN, formerly known
-as Ralink. I have supported their MIPS silicon for many years now so
-asking me to also take care of the Wireless SoCs based on ARM was the
-natural next step.
+A question is how can make a general way for both x86 and arm*.
 
-	John
+Maybe change the efi_free_boot_mem to something like efi_clean_boot_mem?
+It can first call efi_free_boot_mem, then reserve the ranges to be reserved
+again, but it sounds odd though.
+
+Thanks
+Dave
