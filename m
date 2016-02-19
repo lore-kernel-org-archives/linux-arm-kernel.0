@@ -1,64 +1,109 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Fri, 19 Feb 2016 08:47:47 +0000
-Subject: [PATCH 1/9] ARM: ARMv7-M uses BE-8, not BE-32
-In-Reply-To: <2702301.CTWUiSsjZR@wuerfel>
-References: <1455804123-2526139-1-git-send-email-arnd@arndb.de>
- <1455804123-2526139-2-git-send-email-arnd@arndb.de>
- <alpine.LFD.2.20.1602181102570.13632@knanqh.ubzr>
- <2702301.CTWUiSsjZR@wuerfel>
-Message-ID: <56C6D6B3.60605@arm.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 19 Feb 2016 09:51:07 +0100
+Subject: [PATCH v5 1/1] USB: core: let USB device know device node
+In-Reply-To: <1455612172-2081-1-git-send-email-peter.chen@nxp.com>
+References: <1455612172-2081-1-git-send-email-peter.chen@nxp.com>
+Message-ID: <1455871867.5745.3.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/02/16 16:12, Arnd Bergmann wrote:
-> On Thursday 18 February 2016 11:06:08 Nicolas Pitre wrote:
->> On Thu, 18 Feb 2016, Arnd Bergmann wrote:
->>
->>> When configuring the kernel for big-endian, we set either BE-8 or BE-32
->>> based on the CPU architecture level. Until linux-4.4, we did not have
->>> any ARMv7-M platform allowing big-endian builds, but now i.MX/Vybrid
->>> is in that category, adn we get a build error because of this:
->>>
->>> arch/arm/kernel/module-plts.c: In function 'get_module_plt':
->>> arch/arm/kernel/module-plts.c:60:46: error: implicit declaration of function '__opcode_to_mem_thumb32' [-Werror=implicit-function-declaration]
->>>
->>> This comes down to picking the wrong default, ARMv7-M uses BE8
->>> like ARMv7-A does. Changing the default gets the kernel to compile
->>> and presumably works.
->>
->> Was it tested without BE8 when it was submitted upstream? I don't think 
->> you can switch this freely on a given hardware platform and expect it to 
->> still work.
->>
->>
-> 
-> mach-imx contains a number of different SoCs, and one SoC was recently
-> tested successfully after a number of endianess bugs got fixed. This was
-> an i.mx6 using a Cortex-A9 core, but we are now also able to build
-> vybrid vf610 big-endian based on that selection. This SoC supports
-> Linux running either on its Cortex-A5 or its Cortex-M3 (or M4?) cores.
-> 
-> I am rather sure nobody has ever run Linux in big-endian mode on the
-> Cortex-M platform, specifically because it was always wrong and could
-> not be enabled in Kconfig.
+Hi Peter,
 
-Ah, it explains why my quick attempt to enable BE for MPS2 (M-class
-platform) failed. With this patch applied I'm able to see Linux booting
-on MPS2 FVP model in BE, not complete boot but it might be due to other
-reasons. So this patch definitely improves things for me, if it helps
+Am Dienstag, den 16.02.2016, 16:42 +0800 schrieb Peter Chen:
+> From: Peter Chen <peter.chen@freescale.com>
+> 
+> Although most of USB devices are hot-plug's, there are still some devices
+> are hard wired on the board, eg, for HSIC and SSIC interface USB devices.
+> If these kinds of USB devices are multiple functions, and they can supply
+> other interfaces like i2c, gpios for other devices, we may need to
+> describe these at device tree.
+> 
+> In this commit, it uses "reg" in dts as physical port number to match
+> the phyiscal port number decided by USB core, if they are the same,
+> then the device node is for the device we are creating for USB core.
+> 
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> ---
+> Changes for v5:
+> - Refine the code how to get the device node at usb_alloc_dev according
+>   to Alan's comment.
+> - Point out "usbVID,PID" is the recommented compatible, and others
+>   compatibles at binding doc could also be used.
+> 
+> Changes for v4:
+> - The range of "reg" should be 1-31, changing device node address
+>   style as in lower case hexadecimal with leading zeroes suppressed
+>   [binding doc, usb-device.txt]
+> - Improve the example at binding doc, it describes node from the top
+>   (the controller)
+> - Delete the struct of_node * within struct usb_device
+> - Using usb_hcd_find_raw_port_number to get raw port number under root
+>   hub port
+> 
+> Changes for v3:
+> - typo: s/descirbe/describe/
+> 
+> Changes for v2:
+> - Fix build error reported by kbuild robot, lack of "static" for
+>   inline usb_of_get_child_node
+> - Fix typo, "devcie_node" -> "device_node"
+> - Add kernel-doc for of_node at struct usb_device
+> 
+> Changes from RFC:
+> - Fix the error address for binding doc, and add compatible for binding doc
+> - Change get child node API from "usb_of_find_node" to
+>   "usb_of_get_child_node"
+> - Delete unecessary header files
+> - One typo
+> 
+>  .../devicetree/bindings/usb/usb-device.txt         | 26 ++++++++++++
+>  drivers/usb/core/Makefile                          |  2 +-
+>  drivers/usb/core/of.c                              | 47 ++++++++++++++++++++++
+>  drivers/usb/core/usb.c                             | 10 +++++
+>  include/linux/usb/of.h                             |  7 ++++
+>  5 files changed, 91 insertions(+), 1 deletion(-)
+>  create mode 100644 Documentation/devicetree/bindings/usb/usb-device.txt
+>  create mode 100644 drivers/usb/core/of.c
+> 
+> diff --git a/Documentation/devicetree/bindings/usb/usb-device.txt b/Documentation/devicetree/bindings/usb/usb-device.txt
+> new file mode 100644
+> index 0000000..a997a23
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/usb/usb-device.txt
+> @@ -0,0 +1,26 @@
+> +Generic USB Device Properties
+> +
+> +Usually, we only use device tree for hard wired USB device.
+> +The reference binding doc is from:
+> +http://www.firmware.org/1275/bindings/usb/usb-1_0.ps
+> +
+> +Required properties:
+> +- compatible: usbVID,PID. The other compatible strings from the above
+> +  standard binding could also be used, but a device adhering to this
+> +  binding may leave out all except for usbVID,PID.
 
-Tested-by: Vladimir Murzin <vladimir.murzin@arm.com>
+I asked to document the format of VID and PID ("lower case hexadecimal
+with leading zeroes suppressed") here.
 
-Cheers
-Vladimir
+> +- reg: the port number which this device is connecting to, the range
+> +  is 1-31.
+> +
+> +Example:
+> +
+> +&usb1 {
+> +	status = "okay";
+> +
+> +	#address-cells = <1>;
+> +	#size-cells = <0>;
+> +
+> +	hub: genesys at 1 {
+> +		compatible = "usb05e3,0608";
 
-> 
-> 	Arnd
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> 
-> 
+This should be:
+		compatible = "usb5e3,608";
+
+After those two issues are fixed,
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+
+best regards
+Philipp
