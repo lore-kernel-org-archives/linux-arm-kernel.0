@@ -1,59 +1,101 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 19 Feb 2016 14:57:17 +0000
-Subject: [PATCH v6sub1 00/11] arm64: split linear and kernel mappings
-In-Reply-To: <CAKv+Gu-3y9LoxM9swbwZuXXxuMppnWzd=PmyALa+P0NhvR7mtw@mail.gmail.com>
-References: <1455627162-31600-1-git-send-email-ard.biesheuvel@linaro.org>
- <20160218182509.GG2538@e104818-lin.cambridge.arm.com>
- <CAKv+Gu_UqoYB5QAWOU9_iZDoRO=rqHu8o87JboSAqNqOhoOCXw@mail.gmail.com>
- <CAKv+Gu_25mz37gdgVx5Yz7DJ+QbOMNa4rYBymFL1nL7nGOzBVQ@mail.gmail.com>
- <CAKv+Gu8aKDtev2LdGMy9a485Z8S7TYgsbXky6wR6e3F+j2nkUQ@mail.gmail.com>
- <20160219142551.GA12864@e104818-lin.cambridge.arm.com>
- <CAKv+Gu_44=2NMuon694T_YW6QUU-ixC+q_7WxbMtBuN3dRNP2Q@mail.gmail.com>
- <CAKv+Gu9WTVrYmc7GwxDeHppSHoRmSS4nK5iG3HZVMOPcPP1MOw@mail.gmail.com>
- <20160219143701.GB12864@e104818-lin.cambridge.arm.com>
- <CAKv+Gu-3y9LoxM9swbwZuXXxuMppnWzd=PmyALa+P0NhvR7mtw@mail.gmail.com>
-Message-ID: <20160219145716.GC12864@e104818-lin.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 19 Feb 2016 15:00:29 +0000
+Subject: [PATCH] irqchip/gic: Return IRQ_SET_MASK_OK_DONE in the set_affinity
+ method
+Message-ID: <1455894029-17270-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 19, 2016 at 03:40:32PM +0100, Ard Biesheuvel wrote:
-> On 19 February 2016 at 15:37, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > On Fri, Feb 19, 2016 at 03:29:13PM +0100, Ard Biesheuvel wrote:
-> >> On 19 February 2016 at 15:27, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> >> > On 19 February 2016 at 15:25, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> >> >> On Fri, Feb 19, 2016 at 09:05:25AM +0100, Ard Biesheuvel wrote:
-> >> >>> So it appears that akpm will need to drop that patch anyway, as he
-> >> >>> won't be able to carry an updated version since he does not have the
-> >> >>> UAO patches. That means it probably makes even more sense to take
-> >> >>> those through the arm64 tree as well (minus the x86 one, which has a
-> >> >>> conflict now as well). In fact, perhaps it makes sense to only take
-> >> >>> the base patch and the arm64 patch, and I can send the remaining ones
-> >> >>> to the various maintainers (or akpm) for v4.7
-> >> >>
-> >> >> Or we make BUILDTIME_EXTABLE_SORT depend on !RANDOMIZE_BASE until we
-> >> >> sort out the extable patches.
-> >> >
-> >> > That would still result in breakage once the current version queued by
-> >> > akpm hits mainline.
-> >>
-> >> ... or in other words, the breakage is already in -next. This is
-> >> completely unrelated to the sorting, btw, but due to the difference
-> >> between relative/absolute
-> >
-> > Ah, I now realised that it was only working fine for me before merging
-> > the EFI patches to actually do the base randomisation. Once we fully
-> > randomise the load address, we must have relative extable.
-> >
-> > Is your branch updated with the patches needed for arm64 (against
-> > for-next/core)?
-> 
-> Yes. I dropped the kallsyms patches, and included only the base and
-> arm64 extable patches, with the UAO issue fixed.
-> 
-> https://git.linaro.org/people/ard.biesheuvel/linux-arm.git/shortlog/refs/heads/arm64-kaslr-v6
-> git://git.linaro.org/people/ard.biesheuvel/linux-arm.git arm64-kaslr-v6
+Moving an SPI around doesn't require any extra work from the rest
+of the stack, and specially not for MSI-generated SPIs.
 
-Thanks, I'll give it a try.
+It is then worth returning IRQ_SET_MASK_OK_DONE instead of
+IRQ_SET_MASK_OK, and simplify the other irqchips that rely on
+this behaviour (GICv2m and Marvell's ODMI controller).
 
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ drivers/irqchip/irq-gic-v2m.c    | 14 +-------------
+ drivers/irqchip/irq-gic.c        |  2 +-
+ drivers/irqchip/irq-mvebu-odmi.c | 14 +-------------
+ 3 files changed, 3 insertions(+), 27 deletions(-)
+
+diff --git a/drivers/irqchip/irq-gic-v2m.c b/drivers/irqchip/irq-gic-v2m.c
+index c779f83..28f047c 100644
+--- a/drivers/irqchip/irq-gic-v2m.c
++++ b/drivers/irqchip/irq-gic-v2m.c
+@@ -92,18 +92,6 @@ static struct msi_domain_info gicv2m_msi_domain_info = {
+ 	.chip	= &gicv2m_msi_irq_chip,
+ };
+ 
+-static int gicv2m_set_affinity(struct irq_data *irq_data,
+-			       const struct cpumask *mask, bool force)
+-{
+-	int ret;
+-
+-	ret = irq_chip_set_affinity_parent(irq_data, mask, force);
+-	if (ret == IRQ_SET_MASK_OK)
+-		ret = IRQ_SET_MASK_OK_DONE;
+-
+-	return ret;
+-}
+-
+ static void gicv2m_compose_msi_msg(struct irq_data *data, struct msi_msg *msg)
+ {
+ 	struct v2m_data *v2m = irq_data_get_irq_chip_data(data);
+@@ -122,7 +110,7 @@ static struct irq_chip gicv2m_irq_chip = {
+ 	.irq_mask		= irq_chip_mask_parent,
+ 	.irq_unmask		= irq_chip_unmask_parent,
+ 	.irq_eoi		= irq_chip_eoi_parent,
+-	.irq_set_affinity	= gicv2m_set_affinity,
++	.irq_set_affinity	= irq_chip_set_affinity_parent,
+ 	.irq_compose_msi_msg	= gicv2m_compose_msi_msg,
+ };
+ 
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index 8f9ebf7..282344b 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -319,7 +319,7 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+ 	writel_relaxed(val | bit, reg);
+ 	raw_spin_unlock_irqrestore(&irq_controller_lock, flags);
+ 
+-	return IRQ_SET_MASK_OK;
++	return IRQ_SET_MASK_OK_DONE;
+ }
+ #endif
+ 
+diff --git a/drivers/irqchip/irq-mvebu-odmi.c b/drivers/irqchip/irq-mvebu-odmi.c
+index 0ae98b2..b4d3678 100644
+--- a/drivers/irqchip/irq-mvebu-odmi.c
++++ b/drivers/irqchip/irq-mvebu-odmi.c
+@@ -47,18 +47,6 @@ static unsigned int odmis_count;
+ /* Protects odmis_bm */
+ static DEFINE_SPINLOCK(odmis_bm_lock);
+ 
+-static int odmi_set_affinity(struct irq_data *d,
+-			     const struct cpumask *mask, bool force)
+-{
+-	int ret;
+-
+-	ret = irq_chip_set_affinity_parent(d, mask, force);
+-	if (ret == IRQ_SET_MASK_OK)
+-		ret = IRQ_SET_MASK_OK_DONE;
+-
+-	return ret;
+-}
+-
+ static void odmi_compose_msi_msg(struct irq_data *d, struct msi_msg *msg)
+ {
+ 	struct odmi_data *odmi;
+@@ -83,7 +71,7 @@ static struct irq_chip odmi_irq_chip = {
+ 	.irq_mask		= irq_chip_mask_parent,
+ 	.irq_unmask		= irq_chip_unmask_parent,
+ 	.irq_eoi		= irq_chip_eoi_parent,
+-	.irq_set_affinity	= odmi_set_affinity,
++	.irq_set_affinity	= irq_chip_set_affinity_parent,
+ 	.irq_compose_msi_msg	= odmi_compose_msi_msg,
+ };
+ 
 -- 
-Catalin
+2.1.4
