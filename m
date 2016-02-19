@@ -1,41 +1,36 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Fri, 19 Feb 2016 11:57:45 +0200
-Subject: [PATCH v3 05/10] serial: mps2-uart: add support for early console
-In-Reply-To: <56C6E42E.5070601@arm.com>
-References: <1455617295-23736-1-git-send-email-vladimir.murzin@arm.com>
- <1455617295-23736-6-git-send-email-vladimir.murzin@arm.com>
- <CAHp75VdugAq0WnzLHmd9CJHCjBOdBwPqCmC3ARSaVF5XMYGoMw@mail.gmail.com>
- <56C31F9F.10000@arm.com> <56C6E42E.5070601@arm.com>
-Message-ID: <CAHp75VcosaVcz_aYbpfL-nUH0kBf72SshXU5k95s48Z3wnA5nQ@mail.gmail.com>
+From: dinguyen@kernel.org (Dinh Nguyen)
+Date: Fri, 19 Feb 2016 04:02:06 -0600
+Subject: [GIT PULL] SoCFPGA defconfig for v4.6
+Message-ID: <1455876126-26635-1-git-send-email-dinguyen@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 19, 2016 at 11:45 AM, Vladimir Murzin
-<vladimir.murzin@arm.com> wrote:
-> On 16/02/16 13:09, Vladimir Murzin wrote:
->>>> +EARLYCON_DECLARE(mps2, mps2_early_console_setup);
->>>> >> +OF_EARLYCON_DECLARE(mps2, "arm,mps2-uart", mps2_early_console_setup);
->>> >
->>> > IIRC Peter Hurley mentioned you don't need to put both anymore, OF_
->>> > one is enough.
->>> >
->> I've just tried with OF_ only and seems it works fine. Thanks for
->> pointing at it!
->>
->
-> ..and the reason for that was that I had stdout pointing at uart node.
-> Now, while testing v4 I end-up with configuration:
->
-> 1) no EARLYCON_DECLARE in mps2-uart.c
-> 2) stdout not set
-> 3) cmdline has "earlycon=mps2,0x40004000 console=/dev/ttyMPS"
->
-> and I don't see bootconsole, but if I avoid 1) everything works fine.
-> So, I'd leave EARLYCON_DECLARE in this patch.
+Hi Arnd, Kevin, and Olof:
 
-Peter, what is your comment on this?
+Please consider pulling this defconfig update for v4.6.
 
+Thanks,
+Dinh
 
--- 
-With Best Regards,
-Andy Shevchenko
+The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
+
+  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git socfpga_defconfig_for_v4.6
+
+for you to fetch changes up to 31d74b2bf0c921276a1e987ca5371e2f79a783c2:
+
+  ARM: socfpga_defconfig: enable support for initramfs/initrd support (2016-02-19 03:48:20 -0600)
+
+----------------------------------------------------------------
+SoCFPGA defconfig update for v4.6
+-Enable initrd/initramfs support
+
+----------------------------------------------------------------
+Dinh Nguyen (1):
+      ARM: socfpga_defconfig: enable support for initramfs/initrd support
+
+ arch/arm/configs/socfpga_defconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
