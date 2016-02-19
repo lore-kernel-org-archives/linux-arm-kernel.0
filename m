@@ -1,41 +1,48 @@
-From: yangyingliang@huawei.com (Yang Yingliang)
-Date: Fri, 19 Feb 2016 14:39:17 +0800
-Subject: A gic problem about eoi
-In-Reply-To: <20160218090033.289de1c3@arm.com>
-References: <56C5500A.2060104@huawei.com> <20160218090033.289de1c3@arm.com>
-Message-ID: <56C6B895.6070400@huawei.com>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Fri, 19 Feb 2016 07:50:12 +0100
+Subject: [PATCH v2] ARM: imx: Do L2 errata only if the L2 cache isn't enabled
+Message-ID: <1455864612-12089-1-git-send-email-dirk.behme@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+All the generic L2 cache handling code is encapsulated by a
+check if the L2 cache is enabled. If it's enabled already, the code
+is skipped. The write to the L2-Cache controller from non-secure
+world causes an imprecise external abort. This is needed in
+scenarios where one of the cores runs an other OS, e.g. an RTOS.
 
+For the i.MX6 specific L2 cache handling we missed this check.
+Add it.
 
-On 2016/2/18 17:00, Marc Zyngier wrote:
-> On Thu, 18 Feb 2016 13:00:58 +0800
-> Yang Yingliang <yangyingliang@huawei.com> wrote:
->
-> Hi Yang,
->
->> Hi, Marc
->>
->> We found if hardware clear pending and active status is slower than
->> software handling, the new sgi will be merged because of hardware
->> status. The new sgi will be lost.
->>
->> If we add a dsb instruction after gic_write_eoir(), it can avoid this
->> case happening.
->>
->> Is it a right way to add a dsb instruction after gic_write_eoir()
->> in current gic driver code ?
->
-> I suspect your problem is not so much the EOI, but that the read of
-> ICC_IAR1_EL1 doesn't propagate the Ack quickly enough, leading to the
-> transition from pending to active to still be in flux when the interrupt
-> is EOIed. This is where a DSB is required (and was missing until very
-> recently).
->
-> Does 1a1ebd5 ("irqchip/gic-v3: Make sure read from ICC_IAR1_EL1 is
-> visible on redestributor") solve your problem?
+Signed-off-by: Marcel Grosshans <MarcelViktor.Grosshans@de.bosch.com>
+Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
+---
+Changes in v2: Update the commit message regarding the non-secure use case.
 
-I tested this patch, it can solve the problem.
+ arch/arm/mach-imx/system.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Will this patch queue to stable ?
+diff --git a/arch/arm/mach-imx/system.c b/arch/arm/mach-imx/system.c
+index 51c3501..a600bd7 100644
+--- a/arch/arm/mach-imx/system.c
++++ b/arch/arm/mach-imx/system.c
+@@ -106,6 +106,9 @@ void __init imx_init_l2cache(void)
+ 		goto out;
+ 	}
+ 
++	if (readl_relaxed(l2x0_base + L2X0_CTRL) & L2X0_CTRL_EN)
++		goto skip_if_enabled;
++
+ 	/* Configure the L2 PREFETCH and POWER registers */
+ 	val = readl_relaxed(l2x0_base + L310_PREFETCH_CTRL);
+ 	val |= 0x70800000;
+@@ -122,6 +125,7 @@ void __init imx_init_l2cache(void)
+ 		val &= ~(1 << 30 | 1 << 23);
+ 	writel_relaxed(val, l2x0_base + L310_PREFETCH_CTRL);
+ 
++skip_if_enabled:
+ 	iounmap(l2x0_base);
+ 	of_node_put(np);
+ 
+-- 
+2.5.0
