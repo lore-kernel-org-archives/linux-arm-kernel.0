@@ -1,42 +1,63 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 19 Feb 2016 17:23:44 +0100
-Subject: [PATCH 4/9] ARM: add CONFIG_PHYS_OFFSET default values
-In-Reply-To: <alpine.LFD.2.20.1602191106020.13632@knanqh.ubzr>
-References: <1455804123-2526139-1-git-send-email-arnd@arndb.de>
- <3974581.yknKb3tq7o@wuerfel>
- <alpine.LFD.2.20.1602191106020.13632@knanqh.ubzr>
-Message-ID: <38246773.SnToSslHuj@wuerfel>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Fri, 19 Feb 2016 16:27:16 +0000
+Subject: [PATCH v3 05/10] serial: mps2-uart: add support for early console
+In-Reply-To: <56C738F1.2070307@hurleysoftware.com>
+References: <1455617295-23736-1-git-send-email-vladimir.murzin@arm.com>
+ <1455617295-23736-6-git-send-email-vladimir.murzin@arm.com>
+ <CAHp75VdugAq0WnzLHmd9CJHCjBOdBwPqCmC3ARSaVF5XMYGoMw@mail.gmail.com>
+ <56C31F9F.10000@arm.com> <56C6E42E.5070601@arm.com>
+ <CAHp75VcosaVcz_aYbpfL-nUH0kBf72SshXU5k95s48Z3wnA5nQ@mail.gmail.com>
+ <56C738F1.2070307@hurleysoftware.com>
+Message-ID: <56C74264.9070906@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 19 February 2016 11:10:22 Nicolas Pitre wrote:
-> On Fri, 19 Feb 2016, Arnd Bergmann wrote:
+On 19/02/16 15:46, Peter Hurley wrote:
+> On 02/19/2016 01:57 AM, Andy Shevchenko wrote:
+>> On Fri, Feb 19, 2016 at 11:45 AM, Vladimir Murzin
+>> <vladimir.murzin@arm.com> wrote:
+>>> On 16/02/16 13:09, Vladimir Murzin wrote:
+>>>>>> +EARLYCON_DECLARE(mps2, mps2_early_console_setup);
+>>>>>>>> +OF_EARLYCON_DECLARE(mps2, "arm,mps2-uart", mps2_early_console_setup);
+>>>>>>
+>>>>>> IIRC Peter Hurley mentioned you don't need to put both anymore, OF_
+>>>>>> one is enough.
+>>>>>>
+>>>> I've just tried with OF_ only and seems it works fine. Thanks for
+>>>> pointing at it!
+>>>>
+>>>
+>>> ..and the reason for that was that I had stdout pointing at uart node.
+>>> Now, while testing v4 I end-up with configuration:
+>>>
+>>> 1) no EARLYCON_DECLARE in mps2-uart.c
+>>> 2) stdout not set
+>>> 3) cmdline has "earlycon=mps2,0x40004000 console=/dev/ttyMPS"
+>>>
+>>> and I don't see bootconsole, but if I avoid 1) everything works fine.
+>>> So, I'd leave EARLYCON_DECLARE in this patch.
+>>
+>> Peter, what is your comment on this?
 > 
-> > On Thursday 18 February 2016 11:02:33 Nicolas Pitre wrote:
-> > > 
-> > > Acked-by: Nicolas Pitre <nico@linaro.org>
-> > > 
-> > > Is there a way to provide a default for defaults?
-...
-> > and then select one of the bool symbols from each platform.
-> > Would that address your question?
+> That Vladimir is not testing with linux-next.
 > 
-> Yes, but the ugliness factor isn't worth it IMHO.
+> linux-next has common framework for both command line and OF-defined
+> earlycons.
 > 
-> I was wondering if something like this was possible:
+> Vladimir, if you pull in Greg's tty-next branch, then just
 > 
-> config PHYS_OFFSET
->         hex "Physical address of main memory" if MMU
->         default DRAM_BASE if !MMU
->         default 0x10000000 if FOO
->         default 0x20000000 if BAR
->         default 0x30000000 if BAZ
->         default 0x00000000
+> OF_EARLYCON_DECLARE(mps2, "arm,mps2-uart", mps2_early_console_setup);
 > 
+> should enable both command-line and OF-defined earlycons.
 
-Ah, that was my previous approach, but Russell didn't like
-how it makes it easier to fall back to an incorrect address
-instead of forcing a build error when the address is not
-configured.
+Confirmed! No doubt now EARLYCON_DECLARE can be dropped from this patch
+safely.
 
-	Arnd
+Thanks!
+Vladimir
+
+> 
+> Regards,
+> Peter Hurley
+> 
+> 
