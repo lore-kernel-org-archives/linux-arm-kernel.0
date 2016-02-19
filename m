@@ -1,36 +1,41 @@
-From: jay.xu@rock-chips.com (Jianqun Xu)
-Date: Fri, 19 Feb 2016 14:38:17 +0800
-Subject: [PATCH v4 3/6] spi: rockchip: add bindings for rk3399 spi
-In-Reply-To: <2298327.hkyYk2mMRK@phil>
-References: <1455846978-4272-1-git-send-email-jay.xu@rock-chips.com>
- <1455846978-4272-4-git-send-email-jay.xu@rock-chips.com>
- <2298327.hkyYk2mMRK@phil>
-Message-ID: <56C6B859.8060608@rock-chips.com>
+From: yangyingliang@huawei.com (Yang Yingliang)
+Date: Fri, 19 Feb 2016 14:39:17 +0800
+Subject: A gic problem about eoi
+In-Reply-To: <20160218090033.289de1c3@arm.com>
+References: <56C5500A.2060104@huawei.com> <20160218090033.289de1c3@arm.com>
+Message-ID: <56C6B895.6070400@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko
 
-? 19/02/2016 14:31, Heiko Stuebner ??:
-> Hi Jianqun,
+
+On 2016/2/18 17:00, Marc Zyngier wrote:
+> On Thu, 18 Feb 2016 13:00:58 +0800
+> Yang Yingliang <yangyingliang@huawei.com> wrote:
 >
-> Am Freitag, 19. Februar 2016, 09:56:15 schrieb jianqun.xu:
->> From: Jianqun Xu <jay.xu@rock-chips.com>
+> Hi Yang,
+>
+>> Hi, Marc
 >>
->> Add devicetree bindings for Rockchip rk3399 spi which found on
->> Rockchip rk3399 SoCs.
+>> We found if hardware clear pending and active status is slower than
+>> software handling, the new sgi will be merged because of hardware
+>> status. The new sgi will be lost.
 >>
->> Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
->> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+>> If we add a dsb instruction after gic_write_eoir(), it can avoid this
+>> case happening.
+>>
+>> Is it a right way to add a dsb instruction after gic_write_eoir()
+>> in current gic driver code ?
 >
-> Mark already applied this patch yesterday.
+> I suspect your problem is not so much the EOI, but that the read of
+> ICC_IAR1_EL1 doesn't propagate the Ack quickly enough, leading to the
+> transition from pending to active to still be in flux when the interrupt
+> is EOIed. This is where a DSB is required (and was missing until very
+> recently).
 >
+> Does 1a1ebd5 ("irqchip/gic-v3: Make sure read from ICC_IAR1_EL1 is
+> visible on redestributor") solve your problem?
 
-Good news, so the patch will be removed in next version's patchset.
+I tested this patch, it can solve the problem.
 
-thanks
->
-> Heiko
->
->
->
+Will this patch queue to stable ?
