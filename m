@@ -1,53 +1,43 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 19 Feb 2016 15:40:32 +0100
-Subject: [PATCH v6sub1 00/11] arm64: split linear and kernel mappings
-In-Reply-To: <20160219143701.GB12864@e104818-lin.cambridge.arm.com>
-References: <1455627162-31600-1-git-send-email-ard.biesheuvel@linaro.org>
- <20160218182509.GG2538@e104818-lin.cambridge.arm.com>
- <CAKv+Gu_UqoYB5QAWOU9_iZDoRO=rqHu8o87JboSAqNqOhoOCXw@mail.gmail.com>
- <CAKv+Gu_25mz37gdgVx5Yz7DJ+QbOMNa4rYBymFL1nL7nGOzBVQ@mail.gmail.com>
- <CAKv+Gu8aKDtev2LdGMy9a485Z8S7TYgsbXky6wR6e3F+j2nkUQ@mail.gmail.com>
- <20160219142551.GA12864@e104818-lin.cambridge.arm.com>
- <CAKv+Gu_44=2NMuon694T_YW6QUU-ixC+q_7WxbMtBuN3dRNP2Q@mail.gmail.com>
- <CAKv+Gu9WTVrYmc7GwxDeHppSHoRmSS4nK5iG3HZVMOPcPP1MOw@mail.gmail.com>
- <20160219143701.GB12864@e104818-lin.cambridge.arm.com>
-Message-ID: <CAKv+Gu-3y9LoxM9swbwZuXXxuMppnWzd=PmyALa+P0NhvR7mtw@mail.gmail.com>
+From: Chris.Brandt@renesas.com (Chris Brandt)
+Date: Fri, 19 Feb 2016 14:46:36 +0000
+Subject: [PATCH] ARM: Allow MULTIPLATFORM to select XIP
+In-Reply-To: <2413859.DaWDFlIaaB@wuerfel>
+References: <1455816310-11308-1-git-send-email-chris.brandt@renesas.com>
+ <3461274.sjccN4r7lq@wuerfel>
+ <HK2PR06MB0561F8D4A17AAEFEBD774E478AA00@HK2PR06MB0561.apcprd06.prod.outlook.com>
+ <2413859.DaWDFlIaaB@wuerfel>
+Message-ID: <HK2PR06MB05613CF6C996BF8BD459842E8AA00@HK2PR06MB0561.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 February 2016 at 15:37, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Fri, Feb 19, 2016 at 03:29:13PM +0100, Ard Biesheuvel wrote:
->> On 19 February 2016 at 15:27, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->> > On 19 February 2016 at 15:25, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> >> On Fri, Feb 19, 2016 at 09:05:25AM +0100, Ard Biesheuvel wrote:
->> >>> So it appears that akpm will need to drop that patch anyway, as he
->> >>> won't be able to carry an updated version since he does not have the
->> >>> UAO patches. That means it probably makes even more sense to take
->> >>> those through the arm64 tree as well (minus the x86 one, which has a
->> >>> conflict now as well). In fact, perhaps it makes sense to only take
->> >>> the base patch and the arm64 patch, and I can send the remaining ones
->> >>> to the various maintainers (or akpm) for v4.7
->> >>
->> >> Or we make BUILDTIME_EXTABLE_SORT depend on !RANDOMIZE_BASE until we
->> >> sort out the extable patches.
->> >
->> > That would still result in breakage once the current version queued by
->> > akpm hits mainline.
->>
->> ... or in other words, the breakage is already in -next. This is
->> completely unrelated to the sorting, btw, but due to the difference
->> between relative/absolute
->
-> Ah, I now realised that it was only working fine for me before merging
-> the EFI patches to actually do the base randomisation. Once we fully
-> randomise the load address, we must have relative extable.
->
-> Is your branch updated with the patches needed for arm64 (against
-> for-next/core)?
+On 19 Feb 2016, Arnd Bergmann wrote:
+
+> > A car with the best seat belts and airbags still won't help you
+> > if you drive it off a cliff.
+> 
+> That was my point about DEBUG_LL: We already allow picking a DEBUG_LL
+> option that immediately breaks booting on any other platform, and
+> (worse) breaks even printing any useful output about that fact.
+
+Ya, the DEBUG_LL issue seems like it could be an endless hole of options all throughout the Kconfigs.
+
+DT was supposed to allow everything to be configured at boot time, but it looks like we still need an early-Device-Tree for settings before DT is available. That would solve your DEBUG_LL and PHYS_OFFSET issue.
+
+
+> Even allowing XIP_KERNEL unconditionally doesn't make it much worse.
+> 
+> Other options that are able to ruin your day are CONFIG_CPU_BIG_ENDIAN
+> (which breaks all user space when changed) and CONFIG_ARM_LPAE (which
+> breaks booting on Cortex-A8/A9/A5 systems), or simply disabling essential
+> drivers like your console or the block device for your rootfs.
+> 
+> 	Arnd
 >
 
-Yes. I dropped the kallsyms patches, and included only the base and
-arm64 extable patches, with the UAO issue fixed.
+Yup. As I said...car...vroom vroom...cliff.
 
-https://git.linaro.org/people/ard.biesheuvel/linux-arm.git/shortlog/refs/heads/arm64-kaslr-v6
-git://git.linaro.org/people/ard.biesheuvel/linux-arm.git arm64-kaslr-v6
+(to be humble, I've driven off that cliff before and spent hours trying to figure out what happened)
+
+
+
+Chris
