@@ -1,49 +1,111 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 19 Feb 2016 13:08:51 +0000
-Subject: [PULL] GICv3 changes for 4.5-rc5
-Message-ID: <1455887331-29492-1-git-send-email-marc.zyngier@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 19 Feb 2016 14:12:13 +0100
+Subject: [PATCH v2 0/6] arm64: Initial support for Marvell Armada 7K/8K
+In-Reply-To: <1455812430-4656-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ (Thomas Petazzoni's message of "Thu, 18 Feb 2016 17:20:24 +0100")
+References: <1455812430-4656-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <87h9h4q1xu.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Thomas,
+ 
+ On jeu., f?vr. 18 2016, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
 
-Please find below a pull request for three GICv3 fixes that I've
-collected over the past week. Hopefully, this will be the last batch
-for 4.5.
+> Hello,
+>
+> This series adds initial support for the new Armada 7K and 8K Marvell
+> 64 bits processors. Details about those processors based on the
+> Cortex-A72 can be found at:
+>
+>   http://www.marvell.com/embedded-processors/armada-70xx/
+>   http://www.marvell.com/embedded-processors/armada-80xx/
+>
+> One characteristic of those processors is that internally they are
+> built from several components:
+>
+>  - One "AP", which contains the processor itself and a few core IP
+>    blocks. The AP in 7K and 8K is called AP806, and is available on
+>    two variants: dual Cortex-A72 and quad Cortex-A72.
+>
+>  - Or or two "CP", which contains most of the I/Os (SATA, PCIe,
+>    etc.). The CP in 7K and 8K is called CP110. One CP110 is available
+>    in the 7K family, while two CP110 are available in the 8K family,
+>    doubling the number of I/O interfaces.
+>
+> The support added in this series only brings minimal support for the
+> AP side (and not yet all IP blocks, obviously). Support for the CP
+> part will come in the future.
+>
+> Since the series touches similar files as the Armada 3700 series from
+> Gregory Clement, it is based on it (its 4th version).
+>
+> Changes since v1:
+>
+>  - Add initial patch from Arnd which updates the Marvell README, and
+>    did a few adjustements to it.
+>
+>  - Use arm,gic-400 as the compatible string identifying the GIC, as
+>    suggested by Jisheng.
+>
+>  - Rework the patch series on top of Gregory's latest patch series for
+>    Armada 3700, since the patch series interact a little bit on a few
+>    aspects (usage of the ARCH_MVEBU Kconfig option, for example).
+>
+>  - Fix the size of the register areas used for the GIC to be in line
+>    with the datasheet. Follows some questions from Marc Zyngier.
+>
+> Best regards,
+>
+> Thomas
+>
+> Arnd Bergmann (1):
+>   Documentation: arm: update Marvell product listing
+>
+> Thomas Petazzoni (5):
+>   Documentation: arm: improve Armada 37xx description
+>   Documentation: arm: add link to Armada 38x Functional Spec
+>   Documentation: arm: add Marvell Armada 7K and 8K families
+>   arm64: update ARCH_MVEBU for Marvell Armada 7K/8K support
+>   arm64: marvell: add Device Tree files for Armada 7K/8K
+
+I applied the 5 first patches to mvebu/arm64 and the last one to
+mvebu/dt64.
 
 Thanks,
 
-	M.
+Gregory
 
-The following changes since commit 1a1ebd5fb1e203ee8cc73508cc7a38ac4b804596:
+>
+>  Documentation/arm/Marvell/README                   | 158 +++++++++++---
+>  .../bindings/arm/marvell/armada-7k-8k.txt          |  24 +++
+>  arch/arm64/Kconfig.platforms                       |  11 +-
+>  arch/arm64/boot/dts/marvell/Makefile               |   1 +
+>  arch/arm64/boot/dts/marvell/armada-7020.dtsi       |  54 +++++
+>  arch/arm64/boot/dts/marvell/armada-7040-db.dts     |  92 ++++++++
+>  arch/arm64/boot/dts/marvell/armada-7040.dtsi       |  54 +++++
+>  arch/arm64/boot/dts/marvell/armada-8020.dtsi       |  54 +++++
+>  arch/arm64/boot/dts/marvell/armada-8040.dtsi       |  54 +++++
+>  arch/arm64/boot/dts/marvell/armada-ap806-dual.dtsi |  71 +++++++
+>  arch/arm64/boot/dts/marvell/armada-ap806-quad.dtsi |  84 ++++++++
+>  arch/arm64/boot/dts/marvell/armada-ap806.dtsi      | 234 +++++++++++++++++++++
+>  12 files changed, 858 insertions(+), 33 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/marvell/armada-7k-8k.txt
+>  create mode 100644 arch/arm64/boot/dts/marvell/armada-7020.dtsi
+>  create mode 100644 arch/arm64/boot/dts/marvell/armada-7040-db.dts
+>  create mode 100644 arch/arm64/boot/dts/marvell/armada-7040.dtsi
+>  create mode 100644 arch/arm64/boot/dts/marvell/armada-8020.dtsi
+>  create mode 100644 arch/arm64/boot/dts/marvell/armada-8040.dtsi
+>  create mode 100644 arch/arm64/boot/dts/marvell/armada-ap806-dual.dtsi
+>  create mode 100644 arch/arm64/boot/dts/marvell/armada-ap806-quad.dtsi
+>  create mode 100644 arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+>
+> -- 
+> 2.6.4
+>
 
-  irqchip/gic-v3: Make sure read from ICC_IAR1_EL1 is visible on redestributor (2016-02-11 10:20:02 +0000)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git tags/gic-fixes-4.5-rc5
-
-for you to fetch changes up to 8f318526a292c5e7cebb82f3f766b83c22343293:
-
-  irqchip/gic-v3: Add missing barrier to 32bit version of gic_read_iar() (2016-02-18 19:15:45 +0000)
-
-----------------------------------------------------------------
-GIC fixes for 4.5-rc5:
-
-- EOI handling for LPIs when GICv3 is in EOImode==1
-- Another fallout from changing page size while allocating ITS tables
-- Missing memory barrier in the 32bit GICv3 code
-
-----------------------------------------------------------------
-Ashok Kumar (1):
-      irqchip/gic-v3-its: Fix double ICC_EOIR write for LPI in EOImode==1
-
-Marc Zyngier (1):
-      irqchip/gic-v3: Add missing barrier to 32bit version of gic_read_iar()
-
-Shanker Donthineni (1):
-      irqchip/gicv3-its: Avoid cache flush beyond ITS_BASERn memory size
-
- arch/arm/include/asm/arch_gicv3.h |  1 +
- drivers/irqchip/irq-gic-v3-its.c  | 18 +++++++-----------
- 2 files changed, 8 insertions(+), 11 deletions(-)
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
