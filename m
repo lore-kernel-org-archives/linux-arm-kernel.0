@@ -1,71 +1,368 @@
-From: carlo@endlessm.com (Carlo Caione)
-Date: Fri, 19 Feb 2016 14:25:20 +0100
-Subject: [PATCH 2/2] ARM: dts: meson: Adding hwrev syscon node
-In-Reply-To: <3072897.5MMsyiojns@wuerfel>
-References: <1455730114-2547-1-git-send-email-romain.perier@gmail.com>
- <CAOQ7t2aqZj3STFsdTSQZMTK5U+8Oem8oFroxHKWkt=AeP+Zczg@mail.gmail.com>
- <CAD8Lp47LGUc3-MFpU+3iNjXJL0i4nLTY_49NUxFXeZ2SokDuaQ@mail.gmail.com>
- <3072897.5MMsyiojns@wuerfel>
-Message-ID: <CAL9uMOG2gnGnxv9RmmKuHjc72xyyyEu3AW6pTyM2oA=aM171eQ@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 19 Feb 2016 14:34:43 +0100
+Subject: [PATCH v3] irqchip: irq-mvebu-odmi: new driver for platform MSI on
+ Marvell 7K/8K
+Message-ID: <1455888883-5127-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 19, 2016 at 1:54 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 18 February 2016 15:27:06 Daniel Drake wrote:
->>
->> Having a cbus bus node with child devices does sound like it would
->> reflect this particular view of the hardware design. How would we then
->> represent the hwrev registers under that?
->>
->
-> The question is still how the CBUS is structured internally.
->
-> https://github.com/endlessm/linux-meson/blob/master/arch/arm/mach-meson8b/include/mach/register.h
->
-> seems to have a good list of registers, but it's a bit hard to
-> read, so I reformatted it slightly and put it up at http://pastebin.com/GrzYM7Ti
->
-> In many cases, the register name prefix gives a good idea of what things
-> are. In particular, it seems that all registers numbers are between 0x1000
-> and 0x2fff, which would be offsets 0x4000 through 0xbfff.
->
-> The revisison register is in a block called ASSIST, which is mixed with two
-> AC3 (audio?) regions, and the only other ASSIST register that is ever
-> used is the ASSIST_POR_CONFIG.
->
-> The METAL_REVISION is in the middle of some apparently all unrelated registers:
->
-> #define PREG_ETH_REG0 0x2050
-> #define PREG_ETH_REG1 0x2051
-> #define PROD_TEST_REG1 0x2067
-> #define PROD_TEST_REG0 0x2068
-> #define METAL_REVISION 0x206a
-> #define ADC_TOP_MISC 0x206b
-> #define DPLL_TOP_MISC 0x206c
-> #define ANALOG_TOP_MISC 0x206d
-> #define AM_ANALOG_TOP_REG0 0x206e
-> #define AM_ANALOG_TOP_REG1 0x206f
-> #define PREG_STICKY_REG0 0x207c
-> #define PREG_STICKY_REG1 0x207d
->
-> This still really sounds like a mixed bag to me, which should better get represented
-> as a syscon node, except that there are also some more structured areas in
-> CBUS.
->
-> Having just the registers between METAL_REVISION and HW_REV in a syscon
-> is clearly wrong, as that would include the pinctrl area that already has
-> a driver, but would not include some other parts that want the syscon.
+This commits adds a new irqchip driver that handles the ODMI
+controller found on Marvell 7K/8K processors. The ODMI controller
+provide MSI interrupt functionality to on-board peripherals, much like
+the GIC-v2m.
 
-Agree
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+Changes v2 -> v2:
+ - Express NODMIS_SHIFT, NODMIS_PER_FRAME, NODMIS_MASK in term of each
+   other. Suggested by Marc Zyngier.
+ - Rework the global bitmask allocation to make sure we allocate a
+   number of longs rather than a number of bytes, to avoid having the
+   bitmap API (which operates on longs) access memory we haven't
+   explicitly allocated. Reported by Marc Zyngier.
 
-> Maybe the best way is to make it compatible with both syscon and
-> simple-bus and put the other nodes underneath. That is still rather
-> ugly, but at least it works and can be extended.
+Changes v1 -> v2:
+ - Better commit title, as suggested by Marc Zyngier.
+ - Improve the DT binding documentation, as suggested by Marc Zingier:
+   add a reference to the GIC documentation, be more specific about
+   the marvell,spi-base values, and add the requirement of the
+   interrupt-parent property.
+ - As suggested by Marc Zyngier, use a single global bitmap to
+   allocate all ODMIs, regardless of the frame they belong to. As part
+   of this change, the hwirq used to identify the interrupt inside the
+   ODMI irqdomain are 0-based (instead of being based on their
+   corresponding SPI base value), which allows to significantly
+   simplify the allocation/free logic.
+---
+ .../marvell,odmi-controller.txt                    |  41 ++++
+ drivers/irqchip/Kconfig                            |   4 +
+ drivers/irqchip/Makefile                           |   1 +
+ drivers/irqchip/irq-mvebu-odmi.c                   | 248 +++++++++++++++++++++
+ 4 files changed, 294 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/marvell,odmi-controller.txt
+ create mode 100644 drivers/irqchip/irq-mvebu-odmi.c
 
-This is a good idea actually. I'll prepare a patch.
-Thank you for having spent time on this.
-
-Cheers,
-
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/marvell,odmi-controller.txt b/Documentation/devicetree/bindings/interrupt-controller/marvell,odmi-controller.txt
+new file mode 100644
+index 0000000..252d5c9
+--- /dev/null
++++ b/Documentation/devicetree/bindings/interrupt-controller/marvell,odmi-controller.txt
+@@ -0,0 +1,41 @@
++
++* Marvell ODMI for MSI support
++
++Some Marvell SoCs have an On-Die Message Interrupt (ODMI) controller
++which can be used by on-board peripheral for MSI interrupts.
++
++Required properties:
++
++- compatible           : The value here should contain "marvell,odmi-controller".
++
++- interrupt,controller : Identifies the node as an interrupt controller.
++
++- msi-controller       : Identifies the node as an MSI controller.
++
++- marvell,odmi-frames  : Number of ODMI frames available. Each frame
++                         provides a number of events.
++
++- reg                  : List of register definitions, one for each
++                         ODMI frame.
++
++- marvell,spi-base     : List of GIC base SPI interrupts, one for each
++                         ODMI frame. Those SPI interrupts are 0-based,
++                         i.e marvell,spi-base = <128> will use SPI #96.
++                         See Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt
++                         for details about the GIC Device Tree binding.
++
++- interrupt-parent     : Reference to the parent interrupt controller.
++
++Example:
++
++	odmi: odmi at 300000 {
++		compatible = "marvell,odmi-controller";
++		interrupt-controller;
++		msi-controller;
++		marvell,odmi-frames = <4>;
++		reg = <0x300000 0x4000>,
++		      <0x304000 0x4000>,
++		      <0x308000 0x4000>,
++		      <0x30C000 0x4000>;
++		marvell,spi-base = <128>, <136>, <144>, <152>;
++	};
+diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+index 715923d..18bed3c 100644
+--- a/drivers/irqchip/Kconfig
++++ b/drivers/irqchip/Kconfig
+@@ -217,3 +217,7 @@ config IRQ_MXS
+ 	def_bool y if MACH_ASM9260 || ARCH_MXS
+ 	select IRQ_DOMAIN
+ 	select STMP_DEVICE
++
++config MVEBU_ODMI
++	bool
++	select GENERIC_MSI_IRQ_DOMAIN
+diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+index 18caacb..29c388f 100644
+--- a/drivers/irqchip/Makefile
++++ b/drivers/irqchip/Makefile
+@@ -59,3 +59,4 @@ obj-$(CONFIG_ARCH_SA1100)		+= irq-sa11x0.o
+ obj-$(CONFIG_INGENIC_IRQ)		+= irq-ingenic.o
+ obj-$(CONFIG_IMX_GPCV2)			+= irq-imx-gpcv2.o
+ obj-$(CONFIG_PIC32_EVIC)		+= irq-pic32-evic.o
++obj-$(CONFIG_MVEBU_ODMI)		+= irq-mvebu-odmi.o
+diff --git a/drivers/irqchip/irq-mvebu-odmi.c b/drivers/irqchip/irq-mvebu-odmi.c
+new file mode 100644
+index 0000000..0ae98b2
+--- /dev/null
++++ b/drivers/irqchip/irq-mvebu-odmi.c
+@@ -0,0 +1,248 @@
++/*
++ * Copyright (C) 2016 Marvell
++ *
++ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#define pr_fmt(fmt) "GIC-ODMI: " fmt
++
++#include <linux/irq.h>
++#include <linux/irqchip.h>
++#include <linux/irqdomain.h>
++#include <linux/kernel.h>
++#include <linux/msi.h>
++#include <linux/of_address.h>
++#include <linux/slab.h>
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++
++#define GICP_ODMIN_SET			0x40
++#define   GICP_ODMI_INT_NUM_SHIFT	12
++#define GICP_ODMIN_GM_EP_R0		0x110
++#define GICP_ODMIN_GM_EP_R1		0x114
++#define GICP_ODMIN_GM_EA_R0		0x108
++#define GICP_ODMIN_GM_EA_R1		0x118
++
++/*
++ * We don't support the group events, so we simply have 8 interrupts
++ * per frame.
++ */
++#define NODMIS_SHIFT		3
++#define NODMIS_PER_FRAME	(1 << NODMIS_SHIFT)
++#define NODMIS_MASK		(NODMIS_PER_FRAME - 1)
++
++struct odmi_data {
++	struct resource res;
++	void __iomem *base;
++	unsigned int spi_base;
++};
++
++static struct odmi_data *odmis;
++static unsigned long *odmis_bm;
++static unsigned int odmis_count;
++
++/* Protects odmis_bm */
++static DEFINE_SPINLOCK(odmis_bm_lock);
++
++static int odmi_set_affinity(struct irq_data *d,
++			     const struct cpumask *mask, bool force)
++{
++	int ret;
++
++	ret = irq_chip_set_affinity_parent(d, mask, force);
++	if (ret == IRQ_SET_MASK_OK)
++		ret = IRQ_SET_MASK_OK_DONE;
++
++	return ret;
++}
++
++static void odmi_compose_msi_msg(struct irq_data *d, struct msi_msg *msg)
++{
++	struct odmi_data *odmi;
++	phys_addr_t addr;
++	unsigned int odmin;
++
++	if (WARN_ON(d->hwirq >= odmis_count * NODMIS_PER_FRAME))
++		return;
++
++	odmi = &odmis[d->hwirq >> NODMIS_SHIFT];
++	odmin = d->hwirq & NODMIS_MASK;
++
++	addr = odmi->res.start + GICP_ODMIN_SET;
++
++	msg->address_hi = upper_32_bits(addr);
++	msg->address_lo = lower_32_bits(addr);
++	msg->data = odmin << GICP_ODMI_INT_NUM_SHIFT;
++}
++
++static struct irq_chip odmi_irq_chip = {
++	.name			= "ODMI",
++	.irq_mask		= irq_chip_mask_parent,
++	.irq_unmask		= irq_chip_unmask_parent,
++	.irq_eoi		= irq_chip_eoi_parent,
++	.irq_set_affinity	= odmi_set_affinity,
++	.irq_compose_msi_msg	= odmi_compose_msi_msg,
++};
++
++static int odmi_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
++				 unsigned int nr_irqs, void *args)
++{
++	struct odmi_data *odmi = NULL;
++	struct irq_fwspec fwspec;
++	struct irq_data *d;
++	unsigned int hwirq, odmin;
++	int ret;
++
++	spin_lock(&odmis_bm_lock);
++	hwirq = find_first_zero_bit(odmis_bm, NODMIS_PER_FRAME * odmis_count);
++	if (hwirq >= NODMIS_PER_FRAME * odmis_count) {
++		spin_unlock(&odmis_bm_lock);
++		return -ENOSPC;
++	}
++
++	__set_bit(hwirq, odmis_bm);
++	spin_unlock(&odmis_bm_lock);
++
++	odmi = &odmis[hwirq >> NODMIS_SHIFT];
++	odmin = hwirq & NODMIS_MASK;
++
++	fwspec.fwnode = domain->parent->fwnode;
++	fwspec.param_count = 3;
++	fwspec.param[0] = GIC_SPI;
++	fwspec.param[1] = odmi->spi_base - 32 + odmin;
++	fwspec.param[2] = IRQ_TYPE_EDGE_RISING;
++
++	ret = irq_domain_alloc_irqs_parent(domain, virq, 1, &fwspec);
++	if (ret) {
++		pr_err("Cannot allocate parent IRQ\n");
++		spin_lock(&odmis_bm_lock);
++		__clear_bit(odmin, odmis_bm);
++		spin_unlock(&odmis_bm_lock);
++		return ret;
++	}
++
++	/* Configure the interrupt line to be edge */
++	d = irq_domain_get_irq_data(domain->parent, virq);
++	d->chip->irq_set_type(d, IRQ_TYPE_EDGE_RISING);
++
++	irq_domain_set_hwirq_and_chip(domain, virq, hwirq,
++				      &odmi_irq_chip, NULL);
++
++	return 0;
++}
++
++static void odmi_irq_domain_free(struct irq_domain *domain,
++				 unsigned int virq, unsigned int nr_irqs)
++{
++	struct irq_data *d = irq_domain_get_irq_data(domain, virq);
++
++	if (d->hwirq >= odmis_count * NODMIS_PER_FRAME) {
++		pr_err("Failed to teardown msi. Invalid hwirq %lu\n", d->hwirq);
++		return;
++	}
++
++	irq_domain_free_irqs_parent(domain, virq, nr_irqs);
++
++	/* Actually free the MSI */
++	spin_lock(&odmis_bm_lock);
++	__clear_bit(d->hwirq, odmis_bm);
++	spin_unlock(&odmis_bm_lock);
++}
++
++static const struct irq_domain_ops odmi_domain_ops = {
++	.alloc	= odmi_irq_domain_alloc,
++	.free	= odmi_irq_domain_free,
++};
++
++static struct irq_chip odmi_msi_irq_chip = {
++	.name	= "ODMI",
++};
++
++static struct msi_domain_ops odmi_msi_ops = {
++};
++
++static struct msi_domain_info odmi_msi_domain_info = {
++	.flags	= (MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS),
++	.ops	= &odmi_msi_ops,
++	.chip	= &odmi_msi_irq_chip,
++};
++
++static int __init mvebu_odmi_init(struct device_node *node,
++				  struct device_node *parent)
++{
++	struct irq_domain *inner_domain, *plat_domain;
++	int ret, i;
++
++	if (of_property_read_u32(node, "marvell,odmi-frames", &odmis_count))
++		return -EINVAL;
++
++	odmis = kcalloc(odmis_count, sizeof(struct odmi_data), GFP_KERNEL);
++	if (!odmis)
++		return -ENOMEM;
++
++	odmis_bm = kcalloc(BITS_TO_LONGS(odmis_count * NODMIS_PER_FRAME),
++			   sizeof(long), GFP_KERNEL);
++	if (!odmis_bm) {
++		ret = -ENOMEM;
++		goto err_alloc;
++	}
++
++	for (i = 0; i < odmis_count; i++) {
++		struct odmi_data *odmi = &odmis[i];
++
++		ret = of_address_to_resource(node, i, &odmi->res);
++		if (ret)
++			goto err_unmap;
++
++		odmi->base = of_io_request_and_map(node, i, "odmi");
++		if (IS_ERR(odmi->base)) {
++			ret = PTR_ERR(odmi->base);
++			goto err_unmap;
++		}
++
++		if (of_property_read_u32_index(node, "marvell,spi-base",
++					       i, &odmi->spi_base)) {
++			ret = -EINVAL;
++			goto err_unmap;
++		}
++	}
++
++	inner_domain = irq_domain_create_linear(of_node_to_fwnode(node),
++						odmis_count * NODMIS_PER_FRAME,
++						&odmi_domain_ops, NULL);
++	if (!inner_domain) {
++		ret = -ENOMEM;
++		goto err_unmap;
++	}
++
++	inner_domain->parent = irq_find_host(parent);
++
++	plat_domain = platform_msi_create_irq_domain(of_node_to_fwnode(node),
++						     &odmi_msi_domain_info,
++						     inner_domain);
++	if (!plat_domain) {
++		ret = -ENOMEM;
++		goto err_remove_inner;
++	}
++
++	return 0;
++
++err_remove_inner:
++	irq_domain_remove(inner_domain);
++err_unmap:
++	for (i = 0; i < odmis_count; i++) {
++		struct odmi_data *odmi = &odmis[i];
++
++		if (odmi->base && !IS_ERR(odmi->base))
++			iounmap(odmis[i].base);
++	}
++	kfree(odmis_bm);
++err_alloc:
++	kfree(odmis);
++	return ret;
++}
++
++IRQCHIP_DECLARE(mvebu_odmi, "marvell,odmi-controller", mvebu_odmi_init);
 -- 
-Carlo Caione  |  +39.340.80.30.096  |  Endless
+2.6.4
