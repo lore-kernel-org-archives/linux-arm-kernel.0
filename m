@@ -1,26 +1,21 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 19 Feb 2016 17:58:46 +0100
-Subject: [PATCH v2] ARM: atags_to_fdt: don't warn about stack size
-In-Reply-To: <7301172.5fH67MHlU9@wuerfel>
-References: <1455804123-2526139-1-git-send-email-arnd@arndb.de>
- <alpine.LFD.2.20.1602181112310.13632@knanqh.ubzr>
- <7301172.5fH67MHlU9@wuerfel>
-Message-ID: <8232115.18ykgQ6J5T@wuerfel>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Fri, 19 Feb 2016 17:03:15 +0000
+Subject: [PATCH v2 0/5] arm64: kernel: Add support for User Access Override
+In-Reply-To: <CAKv+Gu9GDE5MVLGkvx9NGB=R_AS--32aGYQ++zT9gGFwBFgnpw@mail.gmail.com>
+References: <1454684330-892-1-git-send-email-james.morse@arm.com>
+ <20160218180313.GE2538@e104818-lin.cambridge.arm.com>
+ <CAFEAcA9SQjg3GpDpU-Tt8i+JiOcJWQKTNzwLLTC4imiBuiP6+w@mail.gmail.com>
+ <20160219164606.GD12864@e104818-lin.cambridge.arm.com>
+ <CAFEAcA_uAG1hX2a3n8FSJpB704wzJeXzijHSETJ2B6OR0g=nJw@mail.gmail.com>
+ <CAKv+Gu9GDE5MVLGkvx9NGB=R_AS--32aGYQ++zT9gGFwBFgnpw@mail.gmail.com>
+Message-ID: <CAFEAcA8V+wnD2JBRvsj+KvkjxHrcfa8jbb9CH3nJe-gjsxhKoA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 18 February 2016 17:26:56 Arnd Bergmann wrote:
-> On Thursday 18 February 2016 11:13:52 Nicolas Pitre wrote:
-> > What about setting the warning to 2048 instead?
-> 
-> Sure, actually 1280 is more than enough I think.
-> 
-It turns out that doesn't fix the problem though, as the new
-argument gets prepended and the existing flag overrides it.
+On 19 February 2016 at 16:57, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> Doesn't this only affect TCG emulation, and not KVM?
 
-I have modified the patch now to do both:
+Correct, but that's still a fair userbase.
 
-CFLAGS_REMOVE_atags_to_fdt.o += -Wframe-larger-than=${CONFIG_FRAME_WARN}
-CFLAGS_atags_to_fdt.o += -Wframe-larger-than=1280
-
-	Arnd
+thanks
+-- PMM
