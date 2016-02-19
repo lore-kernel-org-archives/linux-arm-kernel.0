@@ -1,34 +1,64 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 19 Feb 2016 16:59:43 +0100
-Subject: [PATCH] ARM: Allow MULTIPLATFORM to select XIP
-In-Reply-To: <HK2PR06MB05616AAF67B15C7A2BDC4F608AA00@HK2PR06MB0561.apcprd06.prod.outlook.com>
-References: <1455816310-11308-1-git-send-email-chris.brandt@renesas.com>
- <3699765.F7sfuMCyKT@wuerfel>
- <HK2PR06MB05616AAF67B15C7A2BDC4F608AA00@HK2PR06MB0561.apcprd06.prod.outlook.com>
-Message-ID: <64215923.Y25jP5YYZ2@wuerfel>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 19 Feb 2016 11:10:22 -0500 (EST)
+Subject: [PATCH 4/9] ARM: add CONFIG_PHYS_OFFSET default values
+In-Reply-To: <3974581.yknKb3tq7o@wuerfel>
+References: <1455804123-2526139-1-git-send-email-arnd@arndb.de>
+ <1455804123-2526139-5-git-send-email-arnd@arndb.de>
+ <alpine.LFD.2.20.1602181100410.13632@knanqh.ubzr>
+ <3974581.yknKb3tq7o@wuerfel>
+Message-ID: <alpine.LFD.2.20.1602191106020.13632@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 19 February 2016 15:36:23 Chris Brandt wrote:
-> On 19 Feb 2016, Arnd Bergmann wrote:
-> 
-> > For PHYS_OFFSET, parsing the DT doesn't help at all because we only
-> > need it for XIP_KERNEL (more or less at least) which cannot patch
-> > the kernel image at boot time, so knowing that the address is wrong
-> > also doesn't help you.
+On Fri, 19 Feb 2016, Arnd Bergmann wrote:
+
+> On Thursday 18 February 2016 11:02:33 Nicolas Pitre wrote:
 > > 
-> > 	Arnd
+> > Acked-by: Nicolas Pitre <nico@linaro.org>
+> > 
+> > Is there a way to provide a default for defaults?
 > 
-> OK, at first I was thinking that PHYS_OFFSET was only used early in boot as a pointer to valid RAM before the DT was read (in head.S and head-nommu.S). Hence, you could pass in the pointer in via another CPU register like the DT pointer is passed in.
+> We could have something like
 > 
-> But, now I see that PHYS_OFFSET is used all over the place as a hard coded #define, hence your comment "which cannot patch the kernel image at boot time"
+> config PHYS_OFFSET_0
+> 	bool
 > 
-> So, I retract my thought...it has to be configured at build-time (unless of course you turn it into a global variable everywhere...which might be an even bigger mess)
+> config PHYS_OFFSET_1
+> 	bool
 > 
+> config PHYS_OFFSET_2
+> 	bool
+> 
+> ... (we need 8 of the 16 possible addresses)
+> 
+> 
+> config PHYS_OFFSET
+> 	hex "Physical address of main memory" if MMU
+> 	default DRAM_BASE if !MMU
+> 	default 0x00000000 if PHYS_OFFSET_0
+> 	default 0x10000000 if PHYS_OFFSET_1
+> 	default 0x20000000 if PHYS_OFFSET_2
+> 	default 0x30000000 if PHYS_OFFSET_3
+> 	default 0x70000000 if PHYS_OFFSET_7
+> 	default 0x80000000 if PHYS_OFFSET_8
+> 	default 0xa0000000 if PHYS_OFFSET_A
+> 	default 0xc0000000 if PHYS_OFFSET_C
+> 
+> 
+> and then select one of the bool symbols from each platform.
+> Would that address your question?
 
-BTW, I've tried removing the patching in CONFIG_PHYS_VIRT and replaced it
-with references to __pv_phys_pfn_offset, which surprisingly only grew
-.text from 4901692 to 4904300 bytes, so the size overhead of doing this
-would be close to zero.
+Yes, but the ugliness factor isn't worth it IMHO.
 
-	Arnd
+I was wondering if something like this was possible:
+
+config PHYS_OFFSET
+        hex "Physical address of main memory" if MMU
+        default DRAM_BASE if !MMU
+        default 0x10000000 if FOO
+        default 0x20000000 if BAR
+        default 0x30000000 if BAZ
+        default 0x00000000
+
+
+Nicolas
