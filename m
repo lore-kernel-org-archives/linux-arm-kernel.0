@@ -1,73 +1,84 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 19 Feb 2016 22:14:57 +0100
-Subject: [PATCH 4/9] ARM: add CONFIG_PHYS_OFFSET default values
-In-Reply-To: <20160219180725.GB19428@n2100.arm.linux.org.uk>
-References: <1455804123-2526139-1-git-send-email-arnd@arndb.de>
- <alpine.LFD.2.20.1602191215140.13632@knanqh.ubzr>
- <20160219180725.GB19428@n2100.arm.linux.org.uk>
-Message-ID: <3612170.sHbTTc5Sc9@wuerfel>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Fri, 19 Feb 2016 13:23:23 -0800
+Subject: [PATCH 1/2] mm: cma: split out in_cma check to separate function
+In-Reply-To: <1455869524-13874-1-git-send-email-rabin.vincent@axis.com>
+References: <1455869524-13874-1-git-send-email-rabin.vincent@axis.com>
+Message-ID: <20160219132323.d3c6bfb8cf1a420b4cb1b508@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 19 February 2016 18:07:25 Russell King - ARM Linux wrote:
-> On Fri, Feb 19, 2016 at 12:31:02PM -0500, Nicolas Pitre wrote:
-> > Yet, the only reason for a default here is to accommodate automatic 
-> > build tests like randconfig, right?
-> > 
-> > If so then this should be "fixed" by having the config system provide 
-> > built-in symbols that can be tested from kconfig files.  This way you 
-> > could terminate the above list with:
-> > 
-> > 	default 0x00000000 if RANDCONFIG || ALLYESCONFIG
-> > 
-> > or the like.
+On Fri, 19 Feb 2016 09:12:03 +0100 Rabin Vincent <rabin.vincent@axis.com> wrote:
+
+> Split out the logic in cma_release() which checks if the page is in the
+> contiguous area to a new function which can be called separately.  ARM
+> will use this.
 > 
-> I've suggested in the past that we have kconf read a seed file for
-> these configurations.  kconf already has most of the required support
-> for this, we just need to teach it where to read it from.  Maybe
-> something like this.
-> 
->  arch/arm/allrandom.config |  1 +
->  scripts/kconfig/conf.c    | 61 ++++++++++++++++++++++++++++++++++++++---------
->  2 files changed, 51 insertions(+), 11 deletions(-)
+> ...
+>
+> --- a/include/linux/cma.h
+> +++ b/include/linux/cma.h
+> @@ -27,5 +27,17 @@ extern int cma_init_reserved_mem(phys_addr_t base, phys_addr_t size,
+>  					unsigned int order_per_bit,
+>  					struct cma **res_cma);
+>  extern struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align);
+> +
+>  extern bool cma_release(struct cma *cma, const struct page *pages, unsigned int count);
+> +#ifdef CONFIG_CMA
+> +extern bool in_cma(struct cma *cma, const struct page *pages,
+> +		   unsigned int count);
+> +#else
+> +static inline bool in_cma(struct cma *cma, const struct page *pages,
+> +			  unsigned int count)
+> +{
+> +	return false;
+> +}
+> +#endif
 
-Interesting, I had never noticed that we had the infrastructure to have
-separate presets for allno/allmod/allyes/...config by file name,
-aside from the ${KCONFIG_ALLCONFIG}, I think your extension to make
-it architecture specific is a very good idea, and it can solve a
-couple of other problems as well, such as new toolchains barfing
-on -march=armv3 and OABI support.
+Calling it "pages" is weird.  I immediately read it as a `struct page **'. 
+Drop the 's' please.  Or call it `start_page' if you wish to retain the
+"we're dealing with more than one page here" info.
 
-There is a bit of overlap with the Kconfig fragments, which are
-defined in a similar way:
+And `nr_pages' is a better name than `count'.  
 
-> diff --git a/arch/arm/allrandom.config b/arch/arm/allrandom.config
-> index e69de29bb2d1..5a70ef5926f5 100644
-> --- a/arch/arm/allrandom.config
-> +++ b/arch/arm/allrandom.config
-> @@ -0,0 +1 @@
-> +CONFIG_PHYS_OFFSET=0
+And `in_cma' seems rather ...  brief.  And it breaks the convention that
+interface identifiers start with the name of the subsystem.  Look at the rest
+of cma.h: cma_get_base(), cma_get_size() cma_declare_contiguous(), etc -
+let's not break that.
 
-With the recently added Kconfig fragments support, you could do
-(almost) the same thing by specifying
+>  #endif
+> diff --git a/mm/cma.c b/mm/cma.c
+> index ea506eb..55cda16 100644
+> --- a/mm/cma.c
+> +++ b/mm/cma.c
+> @@ -426,6 +426,23 @@ struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align)
+>  	return page;
+>  }
+>  
+> +bool in_cma(struct cma *cma, const struct page *pages, unsigned int count)
 
-make randconfig allrandom.config
+A bit of documentation would be nice.
 
-"almost", because
+> +{
+> +	unsigned long pfn;
+> +
+> +	if (!cma || !pages)
+> +		return false;
 
-- The fragments use a search path including kernel/config/*.config
-  and arch/*/configs/*.config, rather than arch/*/*.config
-  I would prefer using the search path we have for the fragments now.
+Is this actually needed?  If there's no good reason for the test, let's leave
+it out because it will just be hiding bugs in the caller.
 
-- The current implementation does not start out with the symbols
-  from the fragment but instead applies the fragments one by one
-  after the initial config, so the example above is the same as
+> +	pfn = page_to_pfn(pages);
+> +
+> +	if (pfn < cma->base_pfn || pfn >= cma->base_pfn + cma->count)
+> +		return false;
+> +
+> +	VM_BUG_ON(pfn + count > cma->base_pfn + cma->count);
+> +
+> +	return true;
+> +}
+> +
+>  /**
+>   * cma_release() - release allocated pages
+>   * @cma:   Contiguous memory region for which the allocation is performed.
 
-	make randconfig
-	make allrandom.config
-
-  which does not have the same results. For this, I think starting
-  with the fragment makes more sense, but that unfortunately requires
-  changing the command line interface if we want to generalize it.
-
-	Arnd
+Apart from those cosmeticish things, no objections from me.
