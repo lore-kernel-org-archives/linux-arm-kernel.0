@@ -1,30 +1,25 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 19 Feb 2016 10:09:07 +0100
-Subject: [PATCH V2 2/2] pinctrl: mediatek: Add Pinctrl/GPIO/EINT driver
- for MT7623
-In-Reply-To: <1455866238-6102-2-git-send-email-blogic@openwrt.org>
-References: <1455866238-6102-1-git-send-email-blogic@openwrt.org>
- <1455866238-6102-2-git-send-email-blogic@openwrt.org>
-Message-ID: <CACRpkdbK7vJDgVHFaQFcULtUmBKN_b_Z5usgYVk67jxH-cKwaA@mail.gmail.com>
+Date: Fri, 19 Feb 2016 10:11:29 +0100
+Subject: [PATCH v7 1/3] gpio: xgene: Enable X-Gene standby GPIO as
+ interrupt controller
+In-Reply-To: <1455714909-3027-2-git-send-email-qnguyen@apm.com>
+References: <1455714909-3027-1-git-send-email-qnguyen@apm.com>
+ <1455714909-3027-2-git-send-email-qnguyen@apm.com>
+Message-ID: <CACRpkdaH7CLZDK9HP1nCYioPVbypQsZ76ZJcPMPLjVzV-DWqDQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 19, 2016 at 8:17 AM, John Crispin <blogic@openwrt.org> wrote:
+On Wed, Feb 17, 2016 at 2:15 PM, Quan Nguyen <qnguyen@apm.com> wrote:
 
-> Add the driver and header files required to make pinctrl work on MediaTek
-> MT7623.
+> Enable X-Gene standby GPIO controller as interrupt controller to provide
+> its own resources. This avoids ambiguity where GIC interrupt resource is
+> use as X-Gene standby GPIO interrupt resource in user driver.
 >
-> Signed-off-by: John Crispin <blogic@openwrt.org>
-> ---
-> please apply to the devel-mt2701 branch
->
-> Changes in V2
-> * fix typo in Kconfig
-> * move mt7623-pinfunc.h into 1/2
+> Signed-off-by: Y Vo <yvo@apm.com>
+> Signed-off-by: Quan Nguyen <qnguyen@apm.com>
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Patch applied, thanks for your efforts to support this SoC.
-I had to do some manual fixup for Makefile, I think it looks
-allright now.
+Sweet! Patch applied.
 
 Yours,
 Linus Walleij
