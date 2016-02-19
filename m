@@ -1,38 +1,25 @@
-From: michael@amarulasolutions.com (Michael Trimarchi)
-Date: Sat, 20 Feb 2016 18:21:33 +0100
-Subject: [PATCH 3/4] ARM: dts: imx6ul: Add GPMI nand controller support
-In-Reply-To: <CAOMZO5DTmG7Umt+H20r+tZi9zZhsK=eoPbHOBO3iwvM2GXXLgg@mail.gmail.com>
-References: <1455963652-24618-1-git-send-email-michael@amarulasolutions.com>
- <1455963652-24618-4-git-send-email-michael@amarulasolutions.com>
- <CAOMZO5DTmG7Umt+H20r+tZi9zZhsK=eoPbHOBO3iwvM2GXXLgg@mail.gmail.com>
-Message-ID: <20160220172127.GC24064@panicking>
+From: broonie@kernel.org (Mark Brown)
+Date: Sat, 20 Feb 2016 01:21:35 +0900
+Subject: [PATCH v6 1/2] dt-bindings: sunxi :add sun4i SPDIF transceiver
+In-Reply-To: <1454951361-10625-2-git-send-email-codekipper@gmail.com>
+References: <1454951361-10625-1-git-send-email-codekipper@gmail.com>
+ <1454951361-10625-2-git-send-email-codekipper@gmail.com>
+Message-ID: <20160219162135.GZ18327@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-
-On Sat, Feb 20, 2016 at 09:57:27AM -0200, Fabio Estevam wrote:
-> Hi Michael,
+On Mon, Feb 08, 2016 at 06:09:20PM +0100, codekipper at gmail.com wrote:
+> From: Marcus Cooper <codekipper@gmail.com>
 > 
-> On Sat, Feb 20, 2016 at 8:20 AM, Michael Trimarchi
-> <michael@amarulasolutions.com> wrote:
-> > Add support for GPMI nand controller.
-> >
-> > Signed-off-by: Michael Trimarchi <michael@amarulasolutions.com>
-> > ---
-> >  arch/arm/boot/dts/imx6ul.dtsi          | 33 +++++++++++++++++++++++++++++++++
-> >  drivers/mtd/nand/gpmi-nand/gpmi-nand.c | 10 ++++++++++
-> >  drivers/mtd/nand/gpmi-nand/gpmi-nand.h |  6 ++++--
-> 
-> It would be better to split the dts and mtd parts in two patches.
+> Add devicetree bindings for the SPDIF transceiver found on
+> found on Allwinners A10 and A20 SoCs.
 
-I'm thinking even to drop the IS_TYPE for the IMX6QUL. Does it make sense
-to have or let compatible to the one that is already defined?
-
-Michael
-
--- 
-| Michael Nazzareno Trimarchi                     Amarula Solutions BV |
-| COO  -  Founder                                      Cruquiuskade 47 |
-| +31(0)851119172                                 Amsterdam 1018 AM NL |
-|                  [`as] http://www.amarulasolutions.com               |
+Please use subject lines matching the style for the subsystem.  This
+makes it easier for people to identify relevant patches.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160220/92041e51/attachment-0001.sig>
