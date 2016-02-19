@@ -1,36 +1,39 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 19 Feb 2016 16:06:32 +0100
-Subject: [PATCH] irqchip/gic: Return IRQ_SET_MASK_OK_DONE in the
- set_affinity method
-In-Reply-To: <1455894029-17270-1-git-send-email-marc.zyngier@arm.com>
-References: <1455894029-17270-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20160219160632.1947d1a2@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 19 Feb 2016 16:06:40 +0100
+Subject: [PATCH] ARM: Allow MULTIPLATFORM to select XIP
+In-Reply-To: <HK2PR06MB05613CF6C996BF8BD459842E8AA00@HK2PR06MB0561.apcprd06.prod.outlook.com>
+References: <1455816310-11308-1-git-send-email-chris.brandt@renesas.com>
+ <2413859.DaWDFlIaaB@wuerfel>
+ <HK2PR06MB05613CF6C996BF8BD459842E8AA00@HK2PR06MB0561.apcprd06.prod.outlook.com>
+Message-ID: <3699765.F7sfuMCyKT@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc,
-
-On Fri, 19 Feb 2016 15:00:29 +0000, Marc Zyngier wrote:
-> Moving an SPI around doesn't require any extra work from the rest
-> of the stack, and specially not for MSI-generated SPIs.
+On Friday 19 February 2016 14:46:36 Chris Brandt wrote:
+> On 19 Feb 2016, Arnd Bergmann wrote:
 > 
-> It is then worth returning IRQ_SET_MASK_OK_DONE instead of
-> IRQ_SET_MASK_OK, and simplify the other irqchips that rely on
-> this behaviour (GICv2m and Marvell's ODMI controller).
+> > > A car with the best seat belts and airbags still won't help you
+> > > if you drive it off a cliff.
+> > 
+> > That was my point about DEBUG_LL: We already allow picking a DEBUG_LL
+> > option that immediately breaks booting on any other platform, and
+> > (worse) breaks even printing any useful output about that fact.
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  drivers/irqchip/irq-gic-v2m.c    | 14 +-------------
->  drivers/irqchip/irq-gic.c        |  2 +-
->  drivers/irqchip/irq-mvebu-odmi.c | 14 +-------------
->  3 files changed, 3 insertions(+), 27 deletions(-)
+> Ya, the DEBUG_LL issue seems like it could be an endless hole of options
+> all throughout the Kconfigs.
+> 
+> DT was supposed to allow everything to be configured at boot time, but
+> it looks like we still need an early-Device-Tree for settings before DT
+> is available. That would solve your DEBUG_LL and PHYS_OFFSET issue.
 
-For the irq-mvebu-odmi part:
+Not really: for DEBUG_LL, it doesn't work because DEBUG_LL is literally
+meant to work from the first instruction in the kernel, so there can't
+be any code to configure it. If you don't need to go that low-level,
+you should use "earlycon", which can parse the DT just fine.
 
-Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+For PHYS_OFFSET, parsing the DT doesn't help at all because we only
+need it for XIP_KERNEL (more or less at least) which cannot patch
+the kernel image at boot time, so knowing that the address is wrong
+also doesn't help you.
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+	Arnd
