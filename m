@@ -1,45 +1,101 @@
 From: blogic@openwrt.org (John Crispin)
-Date: Fri, 19 Feb 2016 09:44:04 +0100
-Subject: [PATCH V6 00/11] soc: mediatek: PMIC wrap: add MT6323/2701/7623
- support
-Message-ID: <1455871455-21212-1-git-send-email-blogic@openwrt.org>
+Date: Fri, 19 Feb 2016 09:44:06 +0100
+Subject: [PATCH V6 02/11] soc: mediatek: PMIC wrap: don't duplicate the
+ wrapper data
+In-Reply-To: <1455871455-21212-1-git-send-email-blogic@openwrt.org>
+References: <1455871455-21212-1-git-send-email-blogic@openwrt.org>
+Message-ID: <1455871455-21212-3-git-send-email-blogic@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds support for the MT6323 PMIC and the MT2701/7623 SoC.
-MT6323 is slightly different to the already supported PMIC. This series
-makes a few changes to the code to allow easy addition of the new PMIC
-and SoCs.
+As we add support for more devices struct pmic_wrapper_type will grow and
+we do not really want to start duplicating all the elements in
+struct pmic_wrapper.
 
-Changes in V6
-* 4/11 - make description verbose and rename init_special
-* 6/11 - make description verbose
-* 7/11 - make description verbose
-* 8/11 - make description verbose
-* 9/11 - put mt6397 specific dew registers in their own paragraph
+Signed-off-by: John Crispin <blogic@openwrt.org>
+---
+ drivers/soc/mediatek/mtk-pmic-wrap.c |   22 ++++++++--------------
+ 1 file changed, 8 insertions(+), 14 deletions(-)
 
-
-John Crispin (11):
-  dt-bindings: ARM: Mediatek: add MT2701/7623 string to the PMIC
-    wrapper doc
-  soc: mediatek: PMIC wrap: don't duplicate the wrapper data
-  soc: mediatek: PMIC wrap: add wrapper callbacks for init_reg_clock
-  soc: mediatek: PMIC wrap: split SoC specific init into callback
-  soc: mediatek: PMIC wrap: WRAP_INT_EN needs a different bitmask for
-    MT2701/7623
-  soc: mediatek: PMIC wrap: SPI_WRITE needs a different bitmask for
-    MT2701/7623
-  soc: mediatek: PMIC wrap: move wdt_src into the pmic_wrapper_type
-    struct
-  soc: mediatek: PMIC wrap: remove pwrap_is_mt8135() and
-    pwrap_is_mt8173()
-  soc: mediatek: PMIC wrap: add a slave specific struct
-  soc: mediatek: PMIC wrap: add mt6323 slave support
-  soc: mediatek: PMIC wrap: add MT2701/7623 support
-
- .../devicetree/bindings/soc/mediatek/pwrap.txt     |    1 +
- drivers/soc/mediatek/mtk-pmic-wrap.c               |  544 +++++++++++++++-----
- 2 files changed, 414 insertions(+), 131 deletions(-)
-
+diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
+index 0d9b19a..340c4b5 100644
+--- a/drivers/soc/mediatek/mtk-pmic-wrap.c
++++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
+@@ -376,9 +376,7 @@ struct pmic_wrapper {
+ 	struct device *dev;
+ 	void __iomem *base;
+ 	struct regmap *regmap;
+-	int *regs;
+-	enum pwrap_type type;
+-	u32 arb_en_all;
++	const struct pmic_wrapper_type *master;
+ 	struct clk *clk_spi;
+ 	struct clk *clk_wrap;
+ 	struct reset_control *rstc;
+@@ -389,22 +387,22 @@ struct pmic_wrapper {
+ 
+ static inline int pwrap_is_mt8135(struct pmic_wrapper *wrp)
+ {
+-	return wrp->type == PWRAP_MT8135;
++	return wrp->master->type == PWRAP_MT8135;
+ }
+ 
+ static inline int pwrap_is_mt8173(struct pmic_wrapper *wrp)
+ {
+-	return wrp->type == PWRAP_MT8173;
++	return wrp->master->type == PWRAP_MT8173;
+ }
+ 
+ static u32 pwrap_readl(struct pmic_wrapper *wrp, enum pwrap_regs reg)
+ {
+-	return readl(wrp->base + wrp->regs[reg]);
++	return readl(wrp->base + wrp->master->regs[reg]);
+ }
+ 
+ static void pwrap_writel(struct pmic_wrapper *wrp, u32 val, enum pwrap_regs reg)
+ {
+-	writel(val, wrp->base + wrp->regs[reg]);
++	writel(val, wrp->base + wrp->master->regs[reg]);
+ }
+ 
+ static bool pwrap_is_fsm_idle(struct pmic_wrapper *wrp)
+@@ -697,7 +695,7 @@ static int pwrap_init(struct pmic_wrapper *wrp)
+ 
+ 	pwrap_writel(wrp, 1, PWRAP_WRAP_EN);
+ 
+-	pwrap_writel(wrp, wrp->arb_en_all, PWRAP_HIPRIO_ARB_EN);
++	pwrap_writel(wrp, wrp->master->arb_en_all, PWRAP_HIPRIO_ARB_EN);
+ 
+ 	pwrap_writel(wrp, 1, PWRAP_WACS2_EN);
+ 
+@@ -742,7 +740,7 @@ static int pwrap_init(struct pmic_wrapper *wrp)
+ 	pwrap_writel(wrp, 0x1, PWRAP_CRC_EN);
+ 	pwrap_writel(wrp, 0x0, PWRAP_SIG_MODE);
+ 	pwrap_writel(wrp, PWRAP_DEW_CRC_VAL, PWRAP_SIG_ADR);
+-	pwrap_writel(wrp, wrp->arb_en_all, PWRAP_HIPRIO_ARB_EN);
++	pwrap_writel(wrp, wrp->master->arb_en_all, PWRAP_HIPRIO_ARB_EN);
+ 
+ 	if (pwrap_is_mt8135(wrp))
+ 		pwrap_writel(wrp, 0x7, PWRAP_RRARB_EN);
+@@ -836,7 +834,6 @@ static int pwrap_probe(struct platform_device *pdev)
+ 	struct device_node *np = pdev->dev.of_node;
+ 	const struct of_device_id *of_id =
+ 		of_match_device(of_pwrap_match_tbl, &pdev->dev);
+-	const struct pmic_wrapper_type *type;
+ 	struct resource *res;
+ 
+ 	wrp = devm_kzalloc(&pdev->dev, sizeof(*wrp), GFP_KERNEL);
+@@ -845,10 +842,7 @@ static int pwrap_probe(struct platform_device *pdev)
+ 
+ 	platform_set_drvdata(pdev, wrp);
+ 
+-	type = of_id->data;
+-	wrp->regs = type->regs;
+-	wrp->type = type->type;
+-	wrp->arb_en_all = type->arb_en_all;
++	wrp->master = of_id->data;
+ 	wrp->dev = &pdev->dev;
+ 
+ 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "pwrap");
 -- 
 1.7.10.4
