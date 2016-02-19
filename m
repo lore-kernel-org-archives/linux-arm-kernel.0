@@ -1,134 +1,94 @@
 From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Fri, 19 Feb 2016 11:46:23 -0600
-Subject: [PATCH v3 2/2] arm64: Mark kernel page ranges contiguous
-In-Reply-To: <1455903983-23910-1-git-send-email-jeremy.linton@arm.com>
-References: <1455903983-23910-1-git-send-email-jeremy.linton@arm.com>
-Message-ID: <1455903983-23910-3-git-send-email-jeremy.linton@arm.com>
+Date: Fri, 19 Feb 2016 11:50:32 -0600
+Subject: [PATCH v3] arm64: mm: Mark .rodata as RO
+Message-ID: <1455904232-24053-1-git-send-email-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With 64k pages, the next larger segment size is 512M. The linux
-kernel also uses different protection flags to cover its code and data.
-Because of these requirements, the vast majority of the kernel code and
-data structures end up being mapped with 64k pages instead of the larger
-pages common with a 4k page kernel.
-
-Recent ARM processors support a contiguous bit in the
-page tables which allows a TLB to cover a range larger than a
-single PTE if that range is mapped into physically contiguous
-RAM.
-
-So, for the kernel its a good idea to set this flag. Some basic
-micro benchmarks show it can significantly reduce the number of
-L1 dTLB refills.
+Currently the .rodata section is actually still executable when DEBUG_RODATA
+is enabled. This changes that so the .rodata is actually read only, no execute.
+It also adds the .rodata section to the mem_init banner.
 
 Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
 ---
- arch/arm64/mm/mmu.c | 64 ++++++++++++++++++++++++++++++++++++++++++++++++-----
- 1 file changed, 58 insertions(+), 6 deletions(-)
+ arch/arm64/kernel/vmlinux.lds.S |  5 +++--
+ arch/arm64/mm/init.c            |  4 +++-
+ arch/arm64/mm/mmu.c             | 17 +++++++++++++----
+ 3 files changed, 19 insertions(+), 7 deletions(-)
 
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index 8f4fc2c..9208f53 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -114,8 +114,9 @@ SECTIONS
+ 		*(.got)			/* Global offset table		*/
+ 	}
+ 
+-	RO_DATA(PAGE_SIZE)
+-	EXCEPTION_TABLE(8)
++	ALIGN_DEBUG_RO_MIN(0)
++	RO_DATA(PAGE_SIZE)		/* everything from this point to */
++	EXCEPTION_TABLE(8)		/* _etext will be marked RO NX   */
+ 	NOTES
+ 
+ 	ALIGN_DEBUG_RO_MIN(PAGE_SIZE)
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index 5dd0831..41be7db 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -325,6 +325,7 @@ void __init mem_init(void)
+ 		  "    memory  : 0x%16lx - 0x%16lx   (%6ld MB)\n"
+ 		  "      .init : 0x%p" " - 0x%p" "   (%6ld KB)\n"
+ 		  "      .text : 0x%p" " - 0x%p" "   (%6ld KB)\n"
++		  "    .rodata : 0x%p" " - 0x%p" "   (%6ld KB)\n"
+ 		  "      .data : 0x%p" " - 0x%p" "   (%6ld KB)\n",
+ #ifdef CONFIG_KASAN
+ 		  MLG(KASAN_SHADOW_START, KASAN_SHADOW_END),
+@@ -341,7 +342,8 @@ void __init mem_init(void)
+ 		  MLM(MODULES_VADDR, MODULES_END),
+ 		  MLM(PAGE_OFFSET, (unsigned long)high_memory),
+ 		  MLK_ROUNDUP(__init_begin, __init_end),
+-		  MLK_ROUNDUP(_text, _etext),
++		  MLK_ROUNDUP(_text, __start_rodata),
++		  MLK_ROUNDUP(__start_rodata, _etext),
+ 		  MLK_ROUNDUP(_sdata, _edata));
+ 
+ #undef MLK
 diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 7711554..ab69a99 100644
+index ab69a99..a18dfd0 100644
 --- a/arch/arm64/mm/mmu.c
 +++ b/arch/arm64/mm/mmu.c
-@@ -1,3 +1,4 @@
-+
- /*
-  * Based on arch/arm/mm/mmu.c
-  *
-@@ -103,17 +104,49 @@ static void split_pmd(pmd_t *pmd, pte_t *pte)
- 		 * Need to have the least restrictive permissions available
- 		 * permissions will be fixed up later
- 		 */
--		set_pte(pte, pfn_pte(pfn, PAGE_KERNEL_EXEC));
-+		set_pte(pte, pfn_pte(pfn, PAGE_KERNEL_EXEC_CONT));
- 		pfn++;
- 	} while (pte++, i++, i < PTRS_PER_PTE);
- }
- 
-+static void clear_cont_pte_range(pte_t *pte, unsigned long addr)
-+{
-+	int i;
-+
-+	pte -= CONT_RANGE_OFFSET(addr);
-+	for (i = 0; i < CONT_PTES; i++) {
-+		if (pte_cont(*pte))
-+			set_pte(pte, pte_mknoncont(*pte));
-+		pte++;
-+	}
-+	flush_tlb_all();
-+}
-+
-+/*
-+ * Given a range of PTEs set the pfn and provided page protection flags
-+ */
-+static void __populate_init_pte(pte_t *pte, unsigned long addr,
-+			       unsigned long end, phys_addr_t phys,
-+			       pgprot_t prot)
-+{
-+	unsigned long pfn = __phys_to_pfn(phys);
-+
-+	do {
-+		/* clear all the bits except the pfn, then apply the prot */
-+		set_pte(pte, pfn_pte(pfn, prot));
-+		pte++;
-+		pfn++;
-+		addr += PAGE_SIZE;
-+	} while (addr != end);
-+}
-+
- static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
--				  unsigned long end, unsigned long pfn,
-+				  unsigned long end, phys_addr_t phys,
- 				  pgprot_t prot,
- 				  phys_addr_t (*pgtable_alloc)(void))
+@@ -453,10 +453,18 @@ static void __init map_mem(pgd_t *pgd)
+ #ifdef CONFIG_DEBUG_RODATA
+ void mark_rodata_ro(void)
  {
- 	pte_t *pte;
-+	unsigned long next;
+-	create_mapping_late(__pa(_stext), (unsigned long)_stext,
+-				(unsigned long)_etext - (unsigned long)_stext,
+-				PAGE_KERNEL_ROX);
++	unsigned long section_size;
  
- 	if (pmd_none(*pmd) || pmd_sect(*pmd)) {
- 		phys_addr_t pte_phys = pgtable_alloc();
-@@ -127,10 +160,29 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
- 	BUG_ON(pmd_bad(*pmd));
- 
- 	pte = pte_set_fixmap_offset(pmd, addr);
-+
- 	do {
--		set_pte(pte, pfn_pte(pfn, prot));
--		pfn++;
--	} while (pte++, addr += PAGE_SIZE, addr != end);
-+		next = min(end, (addr + CONT_SIZE) & CONT_MASK);
-+		if (((addr | next | phys) & ~CONT_MASK) == 0) {
-+			/* a block of CONT_PTES	 */
-+			__populate_init_pte(pte, addr, next, phys,
-+					    prot | __pgprot(PTE_CONT));
-+		} else {
-+			/*
-+			 * If the range being split is already inside of a
-+			 * contiguous range but this PTE isn't going to be
-+			 * contiguous, then we want to unmark the adjacent
-+			 * ranges, then update the portion of the range we
-+			 * are interrested in.
-+			 */
-+			clear_cont_pte_range(pte, addr);
-+			__populate_init_pte(pte, addr, next, phys, prot);
-+		}
-+
-+		pte += (next - addr) >> PAGE_SHIFT;
-+		phys += next - addr;
-+		addr = next;
-+	} while (addr != end);
- 
- 	pte_clear_fixmap();
++	section_size = (unsigned long)__start_rodata - (unsigned long)_stext;
++	create_mapping_late(__pa(_stext), (unsigned long)_stext,
++			    section_size, PAGE_KERNEL_ROX);
++	/*
++	 * mark .rodata as read only. Use _etext rather than __end_rodata to
++	 * cover NOTES and EXCEPTION_TABLE.
++	 */
++	section_size = (unsigned long)_etext - (unsigned long)__start_rodata;
++	create_mapping_late(__pa(__start_rodata), (unsigned long)__start_rodata,
++			    section_size, PAGE_KERNEL_RO);
  }
-@@ -194,7 +246,7 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
- 				}
- 			}
- 		} else {
--			alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys),
-+			alloc_init_pte(pmd, addr, next, phys,
- 				       prot, pgtable_alloc);
- 		}
- 		phys += next - addr;
+ #endif
+ 
+@@ -486,7 +494,8 @@ static void __init map_kernel_chunk(pgd_t *pgd, void *va_start, void *va_end,
+ static void __init map_kernel(pgd_t *pgd)
+ {
+ 
+-	map_kernel_chunk(pgd, _stext, _etext, PAGE_KERNEL_EXEC);
++	map_kernel_chunk(pgd, _stext, __start_rodata, PAGE_KERNEL_EXEC);
++	map_kernel_chunk(pgd, __start_rodata, _etext, PAGE_KERNEL);
+ 	map_kernel_chunk(pgd, __init_begin, __init_end, PAGE_KERNEL_EXEC);
+ 	map_kernel_chunk(pgd, _data, _end, PAGE_KERNEL);
+ 
 -- 
 2.4.3
