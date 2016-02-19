@@ -1,141 +1,80 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 19 Feb 2016 18:07:25 +0000
-Subject: [PATCH 4/9] ARM: add CONFIG_PHYS_OFFSET default values
-In-Reply-To: <alpine.LFD.2.20.1602191215140.13632@knanqh.ubzr>
-References: <1455804123-2526139-1-git-send-email-arnd@arndb.de>
- <3974581.yknKb3tq7o@wuerfel>
- <alpine.LFD.2.20.1602191106020.13632@knanqh.ubzr>
- <38246773.SnToSslHuj@wuerfel>
- <alpine.LFD.2.20.1602191215140.13632@knanqh.ubzr>
-Message-ID: <20160219180725.GB19428@n2100.arm.linux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 19 Feb 2016 18:14:11 +0000
+Subject: [PATCH v2] arm64: add alignment fault hanling
+In-Reply-To: <CA+55aFw-86k4gY46Et=e02HQQSxjUK2Jfz0SJz8tWtk5P8YZFA@mail.gmail.com>
+References: <329817481.954581455597874663.JavaMail.weblogic@epmlwas08c>
+ <20160216103104.GC14509@arm.com> <56C300AD.8070505@arm.com>
+ <20160216122153.GD19413@e104818-lin.cambridge.arm.com>
+ <20160216160055.GH14509@arm.com> <20160216170408.GL14509@arm.com>
+ <CA+55aFw-86k4gY46Et=e02HQQSxjUK2Jfz0SJz8tWtk5P8YZFA@mail.gmail.com>
+Message-ID: <20160219181410.GG12864@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 19, 2016 at 12:31:02PM -0500, Nicolas Pitre wrote:
-> Yet, the only reason for a default here is to accommodate automatic 
-> build tests like randconfig, right?
+On Tue, Feb 16, 2016 at 10:50:02AM -0800, Linus Torvalds wrote:
+> On Tue, Feb 16, 2016 at 9:04 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > [replying to self and adding some x86 people]
+> >
+> > Background: Euntaik reports a problem where userspace has ended up with
+> > a memory page mapped adjacent to an MMIO page (e.g. from /dev/mem or a
+> > PCI memory bar from someplace in /sys). strncpy_from_user happens with
+> > the word-at-a-time implementation, and we end up reading into the MMIO
+> > page.
+> >
+> > Question: Does x86 guarantee that this faults? (Arjan reckoned no, but
+> > wasn't 100%).
 > 
-> If so then this should be "fixed" by having the config system provide 
-> built-in symbols that can be tested from kconfig files.  This way you 
-> could terminate the above list with:
+> x86 not only does *not* guarantee that that faults, but quite the
+> reverse: I'm pretty sure it would be considered an architectural bug
+> if it didn't silently "just work". IOW, the page-crossing unaligned
+> access will be split up as two accesses, and done as a regular cached
+> read for the normal RAM page part, and as an uncached IO read for the
+> MMIO page.
 > 
-> 	default 0x00000000 if RANDCONFIG || ALLYESCONFIG
+> So if somebody passes us a string adjacent to a MMIO mapping, we'll
+> happily do the access on x86 and touch the MMIO space. No biggie, and
+> nobody sane actually does that. If you have the rights to do device
+> mappings, you should probably restrain from doing insane things. "With
+> great power comes great responsibility".
+
+Unless I misunderstand it, I don't think the user is even aware of this
+potential problem. Let's say it mmap's a file (script etc.) which
+contains a string (file name) towards the end of the last page. Such
+pointer gets passed to sys_open() and it eventually ends up in
+strncpy_from_user() with count == EMBEDDED_NAME_MAX (so well beyond the
+end of the page).
+
+The user also maps a device with mmap(NULL, ...) and there is a slight
+chance that the kernel allocates this VA space without any gap from the
+previous mmap().
+
+With the above scenario, I don't see what the user could control here,
+other than using MAP_FIXED and force a guard from user space.
+
+> > Thinking more about this, we could spit out a guard page between every
+> > VMA, but it's likely to hamper any VMA merging.
 > 
-> or the like.
+> More importantly, it wouldn't work for the general case. People often
+> pass in a specific virtual memory address to mmap because they *need*
+> adjacent mappings. One example of that case is doing a circular buffer
+> that is guaranteed to always be accessible linearly (and avoiding the
+> split case where it hits the end of the circular buffer) by mapping
+> the same buffer twice.
+> 
+> Of course, no actual real program will do that for mixing MMIO and
+> non-MMIO, and so we might obviously add code to always add a guard
+> page for the normal case when a specific address isn't asked for. So
+> as a heuristic to make sure it doesn't happen by mistake it possibly
+> makes sense.
 
-I've suggested in the past that we have kconf read a seed file for
-these configurations.  kconf already has most of the required support
-for this, we just need to teach it where to read it from.  Maybe
-something like this.
+I agree, a guard page for the general case (!MAP_FIXED) is the best
+option and it would be better to have it in core code (maybe hidden
+behind some Kconfig if it's not desirable for all architectures using
+the generic implementation).
 
- arch/arm/allrandom.config |  1 +
- scripts/kconfig/conf.c    | 61 ++++++++++++++++++++++++++++++++++++++---------
- 2 files changed, 51 insertions(+), 11 deletions(-)
-
-diff --git a/arch/arm/allrandom.config b/arch/arm/allrandom.config
-index e69de29bb2d1..5a70ef5926f5 100644
---- a/arch/arm/allrandom.config
-+++ b/arch/arm/allrandom.config
-@@ -0,0 +1 @@
-+CONFIG_PHYS_OFFSET=0
-diff --git a/scripts/kconfig/conf.c b/scripts/kconfig/conf.c
-index 866369f10ff8..5a4b2d8bbf9a 100644
---- a/scripts/kconfig/conf.c
-+++ b/scripts/kconfig/conf.c
-@@ -12,6 +12,7 @@
- #include <time.h>
- #include <unistd.h>
- #include <getopt.h>
-+#include <sys/fcntl.h>
- #include <sys/stat.h>
- #include <sys/time.h>
- #include <errno.h>
-@@ -489,10 +490,53 @@ static void conf_usage(const char *progname)
- 	printf("  --randconfig            New config with random answer to all options\n");
- }
- 
-+static int try_allconfig(int try_arch, int input_mode)
-+{
-+	const char *name = NULL;
-+	int fd = -1, ret;
-+
-+	if (try_arch) {
-+		const char *srctree = getenv("srctree");
-+		const char *arch = getenv("ARCH");
-+		
-+		fd = open(".", O_DIRECTORY);
-+		if (fd == -1) {
-+			perror("opening .");
-+			return -1;
-+		}
-+		if (chdir(srctree) == -1 ||
-+		    chdir("arch") == -1 ||
-+		    chdir(arch) == -1) {
-+			perror("chdir");
-+			return -1;
-+		}
-+	}
-+
-+	switch (input_mode) {
-+	case allnoconfig:	name = "allno.config"; break;
-+	case allyesconfig:	name = "allyes.config"; break;
-+	case allmodconfig:	name = "allmod.config"; break;
-+	case alldefconfig:	name = "alldef.config"; break;
-+	case randconfig:	name = "allrandom.config"; break;
-+	default: break;
-+	}
-+
-+	ret = name ? conf_read_simple(name, S_DEF_USER) : 1;
-+	if (ret)
-+		ret = conf_read_simple("all.config", S_DEF_USER);
-+
-+	if (fd >= 0) {
-+		fchdir(fd);
-+		close(fd);
-+	}
-+
-+	return ret;
-+}
-+
- int main(int ac, char **av)
- {
- 	const char *progname = av[0];
--	int opt;
-+	int opt, ret;
- 	const char *name, *defconfig_file = NULL /* gcc uninit */;
- 	struct stat tmpstat;
- 
-@@ -601,6 +645,9 @@ int main(int ac, char **av)
- 	case allmodconfig:
- 	case alldefconfig:
- 	case randconfig:
-+		ret = try_allconfig(1, input_mode);
-+		if (ret < 0)
-+			exit(1);
- 		name = getenv("KCONFIG_ALLCONFIG");
- 		if (!name)
- 			break;
-@@ -613,16 +660,8 @@ int main(int ac, char **av)
- 			}
- 			break;
- 		}
--		switch (input_mode) {
--		case allnoconfig:	name = "allno.config"; break;
--		case allyesconfig:	name = "allyes.config"; break;
--		case allmodconfig:	name = "allmod.config"; break;
--		case alldefconfig:	name = "alldef.config"; break;
--		case randconfig:	name = "allrandom.config"; break;
--		default: break;
--		}
--		if (conf_read_simple(name, S_DEF_USER) &&
--		    conf_read_simple("all.config", S_DEF_USER)) {
-+		ret = try_allconfig(0, input_mode);
-+		if (ret) {
- 			fprintf(stderr,
- 				_("*** KCONFIG_ALLCONFIG set, but no \"%s\" or \"all.config\" file found\n"),
- 				name);
+Alternatively, aligning the source pointer reads (but not the
+destination) in strncpy_from_user() is another option, though I'm pretty
+sure we would notice some performance penalty.
 
 -- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently@9.6Mbps down 400kbps up
-according to speedtest.net.
+Catalin
