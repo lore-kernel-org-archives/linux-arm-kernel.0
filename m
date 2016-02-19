@@ -1,63 +1,37 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Fri, 19 Feb 2016 16:27:16 +0000
-Subject: [PATCH v3 05/10] serial: mps2-uart: add support for early console
-In-Reply-To: <56C738F1.2070307@hurleysoftware.com>
-References: <1455617295-23736-1-git-send-email-vladimir.murzin@arm.com>
- <1455617295-23736-6-git-send-email-vladimir.murzin@arm.com>
- <CAHp75VdugAq0WnzLHmd9CJHCjBOdBwPqCmC3ARSaVF5XMYGoMw@mail.gmail.com>
- <56C31F9F.10000@arm.com> <56C6E42E.5070601@arm.com>
- <CAHp75VcosaVcz_aYbpfL-nUH0kBf72SshXU5k95s48Z3wnA5nQ@mail.gmail.com>
- <56C738F1.2070307@hurleysoftware.com>
-Message-ID: <56C74264.9070906@arm.com>
+From: Chris.Brandt@renesas.com (Chris Brandt)
+Date: Fri, 19 Feb 2016 16:28:06 +0000
+Subject: [PATCH] ARM: Allow MULTIPLATFORM to select XIP
+In-Reply-To: <64215923.Y25jP5YYZ2@wuerfel>
+References: <1455816310-11308-1-git-send-email-chris.brandt@renesas.com>
+ <3699765.F7sfuMCyKT@wuerfel>
+ <HK2PR06MB05616AAF67B15C7A2BDC4F608AA00@HK2PR06MB0561.apcprd06.prod.outlook.com>
+ <64215923.Y25jP5YYZ2@wuerfel>
+Message-ID: <HK2PR06MB056181A22F655E6D4A11DEED8AA00@HK2PR06MB0561.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/02/16 15:46, Peter Hurley wrote:
-> On 02/19/2016 01:57 AM, Andy Shevchenko wrote:
->> On Fri, Feb 19, 2016 at 11:45 AM, Vladimir Murzin
->> <vladimir.murzin@arm.com> wrote:
->>> On 16/02/16 13:09, Vladimir Murzin wrote:
->>>>>> +EARLYCON_DECLARE(mps2, mps2_early_console_setup);
->>>>>>>> +OF_EARLYCON_DECLARE(mps2, "arm,mps2-uart", mps2_early_console_setup);
->>>>>>
->>>>>> IIRC Peter Hurley mentioned you don't need to put both anymore, OF_
->>>>>> one is enough.
->>>>>>
->>>> I've just tried with OF_ only and seems it works fine. Thanks for
->>>> pointing at it!
->>>>
->>>
->>> ..and the reason for that was that I had stdout pointing at uart node.
->>> Now, while testing v4 I end-up with configuration:
->>>
->>> 1) no EARLYCON_DECLARE in mps2-uart.c
->>> 2) stdout not set
->>> 3) cmdline has "earlycon=mps2,0x40004000 console=/dev/ttyMPS"
->>>
->>> and I don't see bootconsole, but if I avoid 1) everything works fine.
->>> So, I'd leave EARLYCON_DECLARE in this patch.
->>
->> Peter, what is your comment on this?
+On 19 Feb 2016, Arnd Bergmann wrote:
 > 
-> That Vladimir is not testing with linux-next.
+> > But, now I see that PHYS_OFFSET is used all over the place as a hard
+> > coded #define, hence your comment "which cannot patch the kernel image
+> > at boot time"
+> > 
+> > So, I retract my thought...it has to be configured at build-time
+> > (unless of course you turn it into a global variable everywhere...which
+> >  might be an even bigger mess)
+> > 
 > 
-> linux-next has common framework for both command line and OF-defined
-> earlycons.
+> BTW, I've tried removing the patching in CONFIG_PHYS_VIRT and replaced it
+> with references to __pv_phys_pfn_offset, which surprisingly only grew
+> .text from 4901692 to 4904300 bytes, so the size overhead of doing this
+> would be close to zero.
 > 
-> Vladimir, if you pull in Greg's tty-next branch, then just
-> 
-> OF_EARLYCON_DECLARE(mps2, "arm,mps2-uart", mps2_early_console_setup);
-> 
-> should enable both command-line and OF-defined earlycons.
+> 	Arnd
 
-Confirmed! No doubt now EARLYCON_DECLARE can be dropped from this patch
-safely.
+Cool. If you come up with a patch, I'll give it a try.
 
-Thanks!
-Vladimir
 
-> 
-> Regards,
-> Peter Hurley
-> 
-> 
+Overall, I'd rather side with "Let me enable stuff even though it might not work automatically" as opposed to "Don't let me do anything unless it's simple and safe" (which kind of reminds me of Apple products)
+
+
+Chris
