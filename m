@@ -1,24 +1,50 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Fri, 19 Feb 2016 10:08:53 +0530
-Subject: [PATCH v2 0/2] arm: am43xx: Register rtc hwmod
-Message-ID: <1455856735-11515-1-git-send-email-j-keerthy@ti.com>
+From: henryc.chen@mediatek.com (Henry Chen)
+Date: Fri, 19 Feb 2016 13:08:02 +0800
+Subject: [RFC PATCH 4/5] PM / AVS: thermal: MT8173: Introduce support
+ for SVS engine
+In-Reply-To: <20160218030049.GA8780@gmail.com>
+References: <1453452029-20843-1-git-send-email-pi-cheng.chen@linaro.org>
+ <1453452029-20843-5-git-send-email-pi-cheng.chen@linaro.org>
+ <CAGS+omAYPhJ80kHG=bW4AjFsQzhwUfC6C+nAXa=Ny5UyoCid=w@mail.gmail.com>
+ <20160218030049.GA8780@gmail.com>
+Message-ID: <1455858482.17104.13.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch adds rtc hwmod. This is present on gp and sk evm and not on
-epos evm. Hence adding it selectively using a seprate list.
 
-Boot tested on AM437X-GP-EVM and AM437X-SK-EVM and checked
-for rtc ticking on AM437X-GP-EVM.
+On Thu, 2016-02-18 at 11:00 +0800, Pi-Cheng Chen wrote:
 
-Keerthy (2):
-  ARM: dts: am43x-epos-evm: Add the am438 compatible string
-  ARM: AM43XX: HWMOD: Add rtc hwmod
+> > > +               vboot = regulator_get_voltage(svs->reg) / 1000;
+> > > +               if (mvolt_to_config(vboot) !=
+> > > +                   mvolt_to_config(svs_bank_cfgs[i].vboot)) {
+> > > +                       dev_err(svs->dev, "Vboot value mismatch!\n");
+> > > +                       ret = -EINVAL;
+> > > +                       break;
+> > > +               }
+> > > +
+> > > +               ret = regulator_set_mode(svs->reg, REGULATOR_MODE_FAST);
+> > > +               if (ret) {
+> > > +                       dev_err(svs->dev,
+> > > +                               "Failed to set regulator in PWM mode\n");
+> > > +                       ret = -EINVAL;
+> > > +                       break;
+> > > +               }
+> > 
+> > Shouldn't this be best effort?
+> > If we can't set the regulator to fast mode, can we continue anyway?
+> > 
+> 
+> AFAIK, we need to set the regulator to fast mode to get stable voltage as
+> possible. I am sure about the details.
+> 
+> @Henry,
+> Would you please comment it?
 
- Documentation/devicetree/bindings/arm/omap/omap.txt |  2 +-
- arch/arm/boot/dts/am43x-epos-evm.dts                |  2 +-
- arch/arm/mach-omap2/omap_hwmod_43xx_data.c          | 14 +++++++++++++-
- 3 files changed, 15 insertions(+), 3 deletions(-)
+Hi,
 
--- 
-1.9.1
+Yes, as you said, PTPOD need the more precisely voltage as possible when
+driver initialize, there has two mode in mt6397: pwm/auto mode, the pwm
+mode which can get the more stable Vout than auto mode.
+
+Thanks,
+Henry
