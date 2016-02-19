@@ -1,83 +1,130 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 19 Feb 2016 07:21:36 +0000 (UTC)
-Subject: [PATCH v2 2/2] ARM: AM43XX: HWMOD: Add rtc hwmod
-In-Reply-To: <1455856735-11515-3-git-send-email-j-keerthy@ti.com>
-References: <1455856735-11515-1-git-send-email-j-keerthy@ti.com>
- <1455856735-11515-3-git-send-email-j-keerthy@ti.com>
-Message-ID: <alpine.DEB.2.02.1602190720490.27696@utopia.booyaka.com>
+From: wei@redhat.com (Wei Huang)
+Date: Fri, 19 Feb 2016 01:24:08 -0600
+Subject: [PATCH v2 1/6] KVM: arm/arm64: arch_timer: Gather KVM specific
+ information in a structure
+In-Reply-To: <1455204804-31830-2-git-send-email-julien.grall@arm.com>
+References: <1455204804-31830-1-git-send-email-julien.grall@arm.com>
+ <1455204804-31830-2-git-send-email-julien.grall@arm.com>
+Message-ID: <56C6C318.3000205@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 19 Feb 2016, Keerthy wrote:
 
-> The patch adds rtc hwmod. RTC module The RTC module is physically
-> present on the AM438x SoC used on AM43X-EPOS-EVM, but it is permanently
-> disabled. A secure RTC is used instead on these devices, where needed.
-> . Hence adding it selectively using a seprate list to get RTC Module
-> functional on the other am43x SoCs used on am437x-gp-evm and
-> am437x-sk-evm.
+
+On 02/11/2016 09:33 AM, Julien Grall wrote:
+> Introduce a structure which are filled up by the arch timer driver and
+> used by the virtual timer in KVM.
 > 
-> Signed-off-by: Keerthy <j-keerthy@ti.com>
+> The first member of this structure will be the timecounter. More members
+> will be added later.
+> 
+> This is also dropping arch_timer_get_timecounter as it was only used by
+> the KVM code. Furthermore, a stub for the new helper hasn't been
+> introduced because KVM is requiring the arch timer for both ARM64 and
+> ARM32.
+> 
+> Signed-off-by: Julien Grall <julien.grall@arm.com>
+> 
 > ---
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Gleb Natapov <gleb@kernel.org>
+> Cc: Paolo Bonzini <pbonzini@redhat.com>
+> ---
+>  drivers/clocksource/arm_arch_timer.c |  9 +++++----
+>  include/clocksource/arm_arch_timer.h | 12 ++++++------
+>  virt/kvm/arm/arch_timer.c            |  6 +++---
+>  3 files changed, 14 insertions(+), 13 deletions(-)
 > 
-> Changes in v2:
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index c64d543..6eb2c5d 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -447,11 +447,11 @@ static struct cyclecounter cyclecounter = {
+>  	.mask	= CLOCKSOURCE_MASK(56),
+>  };
+>  
+> -static struct timecounter timecounter;
+> +static struct arch_timer_kvm_info arch_timer_kvm_info;
+>  
+> -struct timecounter *arch_timer_get_timecounter(void)
+> +struct arch_timer_kvm_info *arch_timer_get_kvm_info(void)
+>  {
+> -	return &timecounter;
+> +	return &arch_timer_kvm_info;
+>  }
+>  
+>  static void __init arch_counter_register(unsigned type)
+> @@ -479,7 +479,8 @@ static void __init arch_counter_register(unsigned type)
+>  	clocksource_register_hz(&clocksource_counter, arch_timer_rate);
+>  	cyclecounter.mult = clocksource_counter.mult;
+>  	cyclecounter.shift = clocksource_counter.shift;
+> -	timecounter_init(&timecounter, &cyclecounter, start_count);
+> +	timecounter_init(&arch_timer_kvm_info.timecounter,
+> +			 &cyclecounter, start_count);
+>  
+>  	/* 56 bits minimum, so we assume worst case rollover */
+>  	sched_clock_register(arch_timer_read_counter, 56, arch_timer_rate);
+> diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
+> index 25d0914..4d487f8 100644
+> --- a/include/clocksource/arm_arch_timer.h
+> +++ b/include/clocksource/arm_arch_timer.h
+> @@ -49,11 +49,16 @@ enum arch_timer_reg {
+>  
+>  #define ARCH_TIMER_EVT_STREAM_FREQ	10000	/* 100us */
+>  
+> +struct arch_timer_kvm_info {
+> +	struct timecounter timecounter;
+> +};
+> +
+>  #ifdef CONFIG_ARM_ARCH_TIMER
+>  
+>  extern u32 arch_timer_get_rate(void);
+>  extern u64 (*arch_timer_read_counter)(void);
+> -extern struct timecounter *arch_timer_get_timecounter(void);
+> +
+> +extern struct arch_timer_kvm_info *arch_timer_get_kvm_info(void);
+>  
+>  #else
+>  
+> @@ -67,11 +72,6 @@ static inline u64 arch_timer_read_counter(void)
+>  	return 0;
+>  }
+>  
+> -static inline struct timecounter *arch_timer_get_timecounter(void)
+> -{
+> -	return NULL;
+> -}
+> -
+
+Most parts are OK. Regarding removing this function from the #else area,
+is there a possibility to have CONFIG_ARM_ARCH_TIMER=n and CONFIG_KVM=y.
+If so, will the compilation fails here?
+
+-Wei
+
+>  #endif
+>  
+>  #endif
+> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+> index 69bca18..a669c6a 100644
+> --- a/virt/kvm/arm/arch_timer.c
+> +++ b/virt/kvm/arm/arch_timer.c
+> @@ -385,11 +385,11 @@ int kvm_timer_hyp_init(void)
+>  {
+>  	struct device_node *np;
+>  	unsigned int ppi;
+> +	struct arch_timer_kvm_info *info;
+>  	int err;
+>  
+> -	timecounter = arch_timer_get_timecounter();
+> -	if (!timecounter)
+> -		return -ENODEV;
+> +	info = arch_timer_get_kvm_info();
+> +	timecounter = &info->timecounter;
+>  
+>  	np = of_find_matching_node(NULL, arch_timer_of_match);
+>  	if (!np) {
 > 
-> Inverted the checking logic to accommodate registering for all
-> the SoCs compatible to am4372 and removed the negating am438x logic
-> to register rtc hwmods as suggested by Paul.
-> 
->  arch/arm/mach-omap2/omap_hwmod_43xx_data.c | 14 +++++++++++++-
->  1 file changed, 13 insertions(+), 1 deletion(-)
-
-OK thanks; I've queued the following patch for v4.6 or if I get unlucky, 
-v4.7.
-
-- Paul
-
-From: Keerthy <j-keerthy@ti.com>
-Date: Fri, 19 Feb 2016 10:08:55 +0530
-Subject: [PATCH] ARM: AM43XX: hwmod: Add rtc hwmod
-
-The patch registers the rtc hwmod on AM437x chips.  The RTC module is
-physically present on the AM438x SoC used on AM43X-EPOS-EVM, but it is
-permanently disabled. A secure RTC is used instead on these devices,
-where needed. Hence adding it selectively using a separate list to get
-RTC Module functional on the other am43x SoCs used on am437x-gp-evm
-and am437x-sk-evm.
-
-Signed-off-by: Keerthy <j-keerthy@ti.com>
-[paul at pwsan.com: cleaned up patch description]
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
----
- arch/arm/mach-omap2/omap_hwmod_43xx_data.c | 14 +++++++++++++-
- 1 file changed, 13 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
-index e97a894b5f88..97fd399202dc 100644
---- a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
-@@ -1020,9 +1020,21 @@ static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
- 	NULL,
- };
- 
-+static struct omap_hwmod_ocp_if *am43xx_rtc_hwmod_ocp_ifs[] __initdata = {
-+	&am33xx_l4_wkup__rtc,
-+	NULL,
-+};
-+
- int __init am43xx_hwmod_init(void)
- {
-+	int ret;
-+
- 	omap_hwmod_am43xx_reg();
- 	omap_hwmod_init();
--	return omap_hwmod_register_links(am43xx_hwmod_ocp_ifs);
-+	ret = omap_hwmod_register_links(am43xx_hwmod_ocp_ifs);
-+
-+	if (!ret && of_machine_is_compatible("ti,am4372"))
-+		ret = omap_hwmod_register_links(am43xx_rtc_hwmod_ocp_ifs);
-+
-+	return ret;
- }
--- 
-2.7.0
