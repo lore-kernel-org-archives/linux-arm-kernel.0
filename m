@@ -1,72 +1,59 @@
 From: blogic@openwrt.org (John Crispin)
-Date: Fri, 19 Feb 2016 09:44:11 +0100
-Subject: [PATCH V6 07/11] soc: mediatek: PMIC wrap: move wdt_src into the
- pmic_wrapper_type struct
+Date: Fri, 19 Feb 2016 09:44:09 +0100
+Subject: [PATCH V6 05/11] soc: mediatek: PMIC wrap: WRAP_INT_EN needs a
+ different bitmask for MT2701/7623
 In-Reply-To: <1455871455-21212-1-git-send-email-blogic@openwrt.org>
 References: <1455871455-21212-1-git-send-email-blogic@openwrt.org>
-Message-ID: <1455871455-21212-8-git-send-email-blogic@openwrt.org>
+Message-ID: <1455871455-21212-6-git-send-email-blogic@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Different SoCs will use different bitmask for the wdt_src. This patch
-defines the bitmask in the pmic_wrapper_type struct. This allows us to
-support new SoCs with a different bitmask to the one currently used.
+MT2701 and MT7623 use a different bitmask for PWRAP_INT_EN.
 
 Signed-off-by: John Crispin <blogic@openwrt.org>
 ---
-Changes in V6
-* make the description verbose
+Changes in V5
+* move the logic invert from call to declaration
 
- drivers/soc/mediatek/mtk-pmic-wrap.c |    9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
+ drivers/soc/mediatek/mtk-pmic-wrap.c |    5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
-index 8ce1bad..aa54df3 100644
+index 22c89e9..9df1135 100644
 --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
 +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
-@@ -373,6 +373,7 @@ struct pmic_wrapper_type {
+@@ -371,6 +371,7 @@ struct pmic_wrapper_type {
+ 	int *regs;
+ 	enum pwrap_type type;
  	u32 arb_en_all;
- 	u32 int_en_all;
- 	u32 spi_w;
-+	u32 wdt_src;
++	u32 int_en_all;
  	int (*init_reg_clock)(struct pmic_wrapper *wrp);
  	int (*init_soc_specific)(struct pmic_wrapper *wrp);
  };
-@@ -829,6 +830,7 @@ static struct pmic_wrapper_type pwrap_mt8135 = {
+@@ -825,6 +826,7 @@ static struct pmic_wrapper_type pwrap_mt8135 = {
+ 	.regs = mt8135_regs,
+ 	.type = PWRAP_MT8135,
  	.arb_en_all = 0x1ff,
- 	.int_en_all = ~(BIT(31) | BIT(1)),
- 	.spi_w = PWRAP_MAN_CMD_SPI_WRITE,
-+	.wdt_src = PWRAP_WDT_SRC_MASK_ALL,
++	.int_en_all = ~(BIT(31) | BIT(1)),
  	.init_reg_clock = pwrap_mt8135_init_reg_clock,
  	.init_soc_specific = pwrap_mt8135_init_soc_specific,
  };
-@@ -839,6 +841,7 @@ static struct pmic_wrapper_type pwrap_mt8173 = {
+@@ -833,6 +835,7 @@ static struct pmic_wrapper_type pwrap_mt8173 = {
+ 	.regs = mt8173_regs,
+ 	.type = PWRAP_MT8173,
  	.arb_en_all = 0x3f,
- 	.int_en_all = ~(BIT(31) | BIT(1)),
- 	.spi_w = PWRAP_MAN_CMD_SPI_WRITE,
-+	.wdt_src = PWRAP_WDT_SRC_MASK_NO_STAUPD,
++	.int_en_all = ~(BIT(31) | BIT(1)),
  	.init_reg_clock = pwrap_mt8173_init_reg_clock,
  	.init_soc_specific = pwrap_mt8173_init_soc_specific,
  };
-@@ -858,7 +861,7 @@ MODULE_DEVICE_TABLE(of, of_pwrap_match_tbl);
- 
- static int pwrap_probe(struct platform_device *pdev)
- {
--	int ret, irq, wdt_src;
-+	int ret, irq;
- 	struct pmic_wrapper *wrp;
- 	struct device_node *np = pdev->dev.of_node;
- 	const struct of_device_id *of_id =
-@@ -948,9 +951,7 @@ static int pwrap_probe(struct platform_device *pdev)
- 	 * Since STAUPD was not used on mt8173 platform,
- 	 * so STAUPD of WDT_SRC which should be turned off
- 	 */
--	wdt_src = pwrap_is_mt8173(wrp) ?
--			PWRAP_WDT_SRC_MASK_NO_STAUPD : PWRAP_WDT_SRC_MASK_ALL;
--	pwrap_writel(wrp, wdt_src, PWRAP_WDT_SRC_EN);
-+	pwrap_writel(wrp, wrp->master->wdt_src, PWRAP_WDT_SRC_EN);
+@@ -946,7 +949,7 @@ static int pwrap_probe(struct platform_device *pdev)
+ 			PWRAP_WDT_SRC_MASK_NO_STAUPD : PWRAP_WDT_SRC_MASK_ALL;
+ 	pwrap_writel(wrp, wdt_src, PWRAP_WDT_SRC_EN);
  	pwrap_writel(wrp, 0x1, PWRAP_TIMER_EN);
- 	pwrap_writel(wrp, wrp->master->int_en_all, PWRAP_INT_EN);
+-	pwrap_writel(wrp, ~((1 << 31) | (1 << 1)), PWRAP_INT_EN);
++	pwrap_writel(wrp, wrp->master->int_en_all, PWRAP_INT_EN);
  
+ 	irq = platform_get_irq(pdev, 0);
+ 	ret = devm_request_irq(wrp->dev, irq, pwrap_interrupt, IRQF_TRIGGER_HIGH,
 -- 
 1.7.10.4
