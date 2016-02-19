@@ -1,99 +1,46 @@
-From: guodong.xu@linaro.org (Guodong Xu)
-Date: Fri, 19 Feb 2016 19:58:27 +0800
-Subject: [PATCH V5 3/3] arm64: dts: add Hi6220 spi configuration nodes
-In-Reply-To: <1455883107-8411-1-git-send-email-guodong.xu@linaro.org>
-References: <1455883107-8411-1-git-send-email-guodong.xu@linaro.org>
-Message-ID: <1455883107-8411-4-git-send-email-guodong.xu@linaro.org>
+From: zhizhou.zh@gmail.com (Zhizhou Zhang)
+Date: Fri, 19 Feb 2016 20:01:27 +0800
+Subject: [PATCH] arm64: add architecture specified current_pt_regs
+In-Reply-To: <20160219103205.GD27062@arm.com>
+References: <1455796115-7844-1-git-send-email-zhizhou.zh@gmail.com>
+ <20160218115824.GA2538@e104818-lin.cambridge.arm.com>
+ <CAN1e=SF4iAVZzvs=+rJxmUX_z7KNSwegxWaor3gDfXD-=MAQ4Q@mail.gmail.com>
+ <20160219103205.GD27062@arm.com>
+Message-ID: <CAN1e=SERqTUU_mLwyOQFonz2sVT1xUQAxUs7WOqCNWe_GxCj4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Zhong Kaihua <zhongkaihua@huawei.com>
+On Fri, Feb 19, 2016 at 6:32 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Fri, Feb 19, 2016 at 10:30:09AM +0800, Zhi-zhou wrote:
+>> On Thu, Feb 18, 2016 at 7:58 PM, Catalin Marinas
+>> <catalin.marinas@arm.com> wrote:
+>> >
+>> > On Thu, Feb 18, 2016 at 07:48:35PM +0800, Zhi-zhou Zhang wrote:
+>> > > From: zhizhou <zhizhou.zh@gmail.com>
+>> > >
+>> > > This patch is based on the implementation of arm. The generic
+>> > > current_pt_regs is implemented with current->stack. It need to access
+>> > > memory that would be too expensive.
+>> >
+>> > Do you have any performance numbers?
+>>
+>> I'm using QEMU, so no. Actually this macro isn't heavily used. I just
+>> think using the generic
+>> implementation is not very nice. It get task_struct from sp_el0, then
+>> get stack(which is
+>> equal to sp_el0) from task_struct. There are two unnecessary memory accesses.
+>
+> I'd much rather use the generic implementation unless there's a compelling
+> reason not to. "I think it's not very nice" doesn't really cut it for me!
+Refer to memory twice may incur cache eviction. I'm really a newbie to
+kernel. Anyway, I have a look at kernel and I'm very curious what's
+the 'compelling reason' of 16 architectures implement their own
+current_pt_regs?
+>
+> Will
 
-Add Hi6220 spi configuration nodes
 
-Signed-off-by: Zhong Kaihua <zhongkaihua@huawei.com>
-Signed-off-by: Wei Xu <xuwei5@hisilicon.com>
----
- arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts   |  1 +
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi        | 15 +++++++++++++++
- arch/arm64/boot/dts/hisilicon/hikey-pinctrl.dtsi | 21 +++++++++++++++++++++
- 3 files changed, 37 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-index 985a2ad..5c9ee31 100644
---- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-+++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-@@ -20,6 +20,7 @@
- 		serial1 = &uart1; /* BT UART */
- 		serial2 = &uart2; /* LS Expansion UART0 */
- 		serial3 = &uart3; /* LS Expansion UART1 */
-+		spi0 = &spi_0;
- 	};
- 
- 	chosen {
-diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-index e96cc3c..dcca83b 100644
---- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-@@ -585,5 +585,20 @@
- 			clock-names = "apb_pclk";
- 			status = "ok";
- 		};
-+
-+		spi_0: spi at f7106000 {
-+			compatible = "arm,pl022", "arm,primecell";
-+			reg = <0x0 0xf7106000 0x0 0x1000>;
-+			interrupts = <0 50 4>;
-+			bus-id = <0>;
-+			enable-dma = <0>;
-+			clocks = <&sys_ctrl HI6220_SPI_CLK>;
-+			clock-names = "apb_pclk";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&spi0_pmx_func &spi0_cfg_func>;
-+			num-cs = <1>;
-+			cs-gpios = <&gpio6 2 0>;
-+			status = "ok";
-+		};
- 	};
- };
-diff --git a/arch/arm64/boot/dts/hisilicon/hikey-pinctrl.dtsi b/arch/arm64/boot/dts/hisilicon/hikey-pinctrl.dtsi
-index 28806df..0916e84 100644
---- a/arch/arm64/boot/dts/hisilicon/hikey-pinctrl.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hikey-pinctrl.dtsi
-@@ -221,6 +221,15 @@
- 					0xfc   MUX_M0	/* I2C2_SDA     (IOMG063) */
- 				>;
- 			};
-+
-+			spi0_pmx_func: spi0_pmx_func {
-+				pinctrl-single,pins = <
-+					0x1a0  MUX_M1   /* SPI0_DI      (IOMG104) */
-+					0x1a4  MUX_M1	/* SPI0_DO	(IOMG105) */
-+					0x1a8  MUX_M1	/* SPI0_CS_N	(IOMG106) */
-+					0x1ac  MUX_M1	/* SPI0_CLK	(IOMG107) */
-+				>;
-+			};
- 		};
- 
- 		pmx1: pinmux at f7010800 {
-@@ -625,6 +634,18 @@
- 				pinctrl-single,bias-pullup    = <PULL_DIS  PULL_UP   PULL_DIS  PULL_UP>;
- 				pinctrl-single,drive-strength = <DRIVE1_02MA DRIVE_MASK>;
- 			};
-+
-+			spi0_cfg_func: spi0_cfg_func {
-+				pinctrl-single,pins = <
-+					0x1b0  0x0	/* SPI0_DI	(IOCFG108) */
-+					0x1b4  0x0	/* SPI0_DO	(IOCFG109) */
-+					0x1b8  0x0	/* SPI0_CS_N	(IOCFG110) */
-+					0x1bc  0x0	/* SPI0_CLK	(IOCFG111) */
-+				>;
-+				pinctrl-single,bias-pulldown  = <PULL_DIS  PULL_DOWN PULL_DIS PULL_DOWN>;
-+				pinctrl-single,bias-pullup    = <PULL_DIS  PULL_UP   PULL_DIS PULL_UP>;
-+				pinctrl-single,drive-strength = <DRIVE1_02MA DRIVE_MASK>;
-+			};
- 		};
- 
- 		pmx2: pinmux at f8001800 {
 -- 
-1.9.1
+Regards,
+Zhizhou
