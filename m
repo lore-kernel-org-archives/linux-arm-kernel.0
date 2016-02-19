@@ -1,92 +1,127 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 19 Feb 2016 16:43:21 +0000
-Subject: [PATCH v5 07/15] arm64: Change cpu_resume() to enable mmu early
- then access sleep_sp by va
-In-Reply-To: <56C740E2.5000801@arm.com>
-References: <1455637767-31561-1-git-send-email-james.morse@arm.com>
- <1455637767-31561-8-git-send-email-james.morse@arm.com>
- <20160218182602.GA17589@red-moon> <56C740E2.5000801@arm.com>
-Message-ID: <20160219164321.GA1195@red-moon>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 19 Feb 2016 16:43:44 +0000
+Subject: [PATCH 4/9] ARM: add CONFIG_PHYS_OFFSET default values
+In-Reply-To: <14272873.q312Ii8Axy@wuerfel>
+References: <1455804123-2526139-1-git-send-email-arnd@arndb.de>
+ <3974581.yknKb3tq7o@wuerfel>
+ <HK2PR06MB056137892B6F968A8A1008C58AA00@HK2PR06MB0561.apcprd06.prod.outlook.com>
+ <14272873.q312Ii8Axy@wuerfel>
+Message-ID: <20160219164344.GY19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 19, 2016 at 04:20:50PM +0000, James Morse wrote:
-
-[...]
-
-> >> diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
-> >> index dca81612fe90..0e2b36f1fb44 100644
-> >> --- a/arch/arm64/kernel/sleep.S
-> >> +++ b/arch/arm64/kernel/sleep.S
-> >> @@ -73,8 +73,8 @@ ENTRY(__cpu_suspend_enter)
-> >>  	str	x2, [x0, #SLEEP_STACK_DATA_SYSTEM_REGS + CPU_CTX_SP]
-> >>  
-> >>  	/* find the mpidr_hash */
-> >> -	ldr	x1, =sleep_save_sp
-> >> -	ldr	x1, [x1, #SLEEP_SAVE_SP_VIRT]
-> >> +	ldr	x1, =sleep_save_stash
-> >> +	ldr	x1, [x1]
-> >>  	mrs	x7, mpidr_el1
-> >>  	ldr	x9, =mpidr_hash
-> >>  	ldr	x10, [x9, #MPIDR_HASH_MASK]
-> >> @@ -87,40 +87,26 @@ ENTRY(__cpu_suspend_enter)
-> >>  	compute_mpidr_hash x8, x3, x4, x5, x6, x7, x10
-> >>  	add	x1, x1, x8, lsl #3
-> >>  
-> >> +	str	x0, [x1]
-> >> +	add	x0, x0, #SLEEP_STACK_DATA_SYSTEM_REGS
+On Fri, Feb 19, 2016 at 04:34:51PM +0100, Arnd Bergmann wrote:
+> On Friday 19 February 2016 14:29:00 Chris Brandt wrote:
+> > On 19 Feb 2016, Arnd Bergmann wrote:
 > > 
-> > Mmm...this instruction does not really belong in this patch,
-> > it should be part of patch 6, correct ? What I mean is, the new
-> > struct to stash system regs (struct sleep_stack_data) was added in
-> > patch 6, if the offset #SLEEP_STACK_DATA_SYSTEM_REGS (which is 0) had
-> > to be added it had to be added in patch 6 too, it does not belong
-> > in this patch, am I right ?
-> 
-> In the previous patch __cpu_suspend_save() was changed to take a
-> struct sleep_stack_data, this then passes system_regs to
-> cpu_do_suspend(). The 'add	x0, x0, #SLEEP_STACK_DATA_SYSTEM_REGS'
-> is being done in C, (and hopefully optimised out by the compiler).
-> 
-> In this patch, we removed __cpu_suspend_save() and call cpu_do_suspend()
-> directly, so need to account for system_regs's position in struct
-> sleep_stack_data ourselves.
-
-Yes, I missed that during the review, that explains, thanks.
-
-> I'm paranoid, but if you prefer I can remove the 'add 0', and dump a
-> comment next to the struct definition making it someone elses problem
-> to fix it if they ever change the layout of the struct...
-
-No, what you do is correct and should be kept as-is, I thought it
-had to be added in patch 6 but I was wrong, see above, code is
-correct as it is.
-
-Thanks,
-Lorenzo
-
-> 
-> 
+> > > On Thursday 18 February 2016 11:02:33 Nicolas Pitre wrote:
+> > > > 
+> > > > Acked-by: Nicolas Pitre <nico@linaro.org>
+> > > > 
+> > > > Is there a way to provide a default for defaults?
+> > > 
+> > > We could have something like
+> > > 
+> > > config PHYS_OFFSET_0
+> > > 	bool
+> > > 
+> > > config PHYS_OFFSET_1
+> > > 	bool
+> > > 
+> > > config PHYS_OFFSET_2
+> > > 	bool
+> > > 
+> > > ... (we need 8 of the 16 possible addresses)
+> > > 
+> > > 
+> > > config PHYS_OFFSET
+> > > 	hex "Physical address of main memory" if MMU
+> > > 	default DRAM_BASE if !MMU
+> > > 	default 0x00000000 if PHYS_OFFSET_0
+> > > 	default 0x10000000 if PHYS_OFFSET_1
+> > > 	default 0x20000000 if PHYS_OFFSET_2
+> > > 	default 0x30000000 if PHYS_OFFSET_3
+> > > 	default 0x70000000 if PHYS_OFFSET_7
+> > > 	default 0x80000000 if PHYS_OFFSET_8
+> > > 	default 0xa0000000 if PHYS_OFFSET_A
+> > > 	default 0xc0000000 if PHYS_OFFSET_C
+> > > 
+> > > 
+> > > and then select one of the bool symbols from each platform.
+> > > Would that address your question?
 > > 
-> >>  	push	x29, lr
-> >> -	bl	__cpu_suspend_save
-> >> +	bl	cpu_do_suspend
-> >>  	pop	x29, lr
-> >>  	mov	x0, #1
-> >>  	ret
-> >>  ENDPROC(__cpu_suspend_enter)
-> >>  	.ltorg
-> 
-> [...2x Nits fixed...]
-> 
-> > With the last updates it seems fine by me, so:
 > > 
-> > Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > Here's a question:
+> > 
+> > Can we just get rid of PHYS_OFFSET???
+> > 
+> > If it's only used at boot for XIP systems, we could:
+> > 
+> > A) pass it in via an unused register like atags and DT
+> >  or
+> > B) just assume that atags or DT is in RAM, so round down to the nearest section and assume that is the start of your RAM
+> > 
+> > If it is needed after initial boot, then on first boot we save what was passed in from the boot loader for later use.
 > 
+> Hmm, you mean making phys_offset a runtime variable instead
+> of patching it at early boot time in the instructions?
 > 
-> Thanks!
+> I have no idea if that works, how much effort it would be,
+> or how much it would enlarge the kernel image size, but
+> you can definitely try.
 > 
-> 
-> James
-> 
-> 
+> Of course we must not break existing platforms using XIP_KERNEL
+> already, but the installed base among systems that are upgrading
+> to modern kernels is very small now, given how all modern platforms
+> don't support XIP_KERNEL today, or have no MMU to start with.
+
+You're all barking up the wrong tree, because you don't understand
+why it exists.
+
+ARM_PATCH_PHYS_VIRT exists to support an init-time decided phys offset,
+and it supports this by modifying each location that the phys offset
+is used.  It determines this by looking at the location that the early
+init code is executing, and masking the PC with a value that has been
+carefully crafted to fit 99% of the existing platforms.
+
+One of the side effects of ARM_PATCH_PHYS_VIRT is that we hide the
+translation from the compiler, so the compiler is unable to optimise
+things like virt_to_phys(phys_to_virt(x)) to just 'x' (and yes, such
+things do happen.)
+
+PHYS_OFFSET exists to cater for the case where ARM_PATCH_PHYS_VIRT is
+disabled, because either ARM_PATCH_PHYS_VIRT does not work for the
+platform, or the platform has special requirements and/or requires
+better performance.  It switches back to the pre-ARM_PATCH_PHYS_VIRT
+situation where the PHYS_OFFSET is a compile time constant.
+
+Obviously, making PHYS_OFFSET a runtime variable is basically what
+ARM_PATCH_PHYS_VIRT is doing.  That does not help these cases though,
+because the problem cases are not whether it's a runtime variable or
+not, it's how to arrive at the value for it in the first place.
+
+Using the DTB location on XIP platforms is a no-goer - the flattened
+DTB information can be fixed, so on an XIP platform it makes sense
+for this to also be in flash, not in RAM (the whole point of XIP is
+to remove constant data from RAM after all, so why would you want to
+copy the FDT to RAM?)
+
+Passing it in a register to the kernel image is also not possible:
+we've been out of spare registers for some time now for passing
+additional information into the kernel.  It wouldn't be a problem
+had folk not had this "eww, I don't like ATAGs, lets get rid of them
+and use DT instead" attitude: had we kept ATAGs, then we'd have an
+in-memory format to pass this kind of information to the kernel.
+That would solve soo many problems today it's untrue: stuff like
+where a debugging UART is located and the type of it...
+
+When DT was being proposed, my opinion was that's how it should've
+been done, but I assumed that the DT folk knew better, and Grant was
+very much of the opinion that ATAGs should be completely dropped (I
+did touch on it with Grant.)  I regret now not having a discussion
+about it and pressing strongly for it.
+
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
