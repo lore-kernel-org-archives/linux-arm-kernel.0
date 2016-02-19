@@ -1,37 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 19 Feb 2016 15:06:48 +0100
-Subject: [RFC5 PATCH v6 00/21] ILP32 for ARM64
-In-Reply-To: <20160219125959.GA8675@yury-N73SV>
-References: <1452792198-10718-1-git-send-email-ynorov@caviumnetworks.com>
- <208897488.c0hkBy2G1S@wuerfel> <20160219125959.GA8675@yury-N73SV>
-Message-ID: <91909204.T63Mn1YGy7@wuerfel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 19 Feb 2016 14:06:00 +0000
+Subject: [PATCH 2/2] ARM: dma-mapping: fix alloc/free for coherent + CMA
+ + gfp=0
+In-Reply-To: <1455869524-13874-2-git-send-email-rabin.vincent@axis.com>
+References: <1455869524-13874-1-git-send-email-rabin.vincent@axis.com>
+ <1455869524-13874-2-git-send-email-rabin.vincent@axis.com>
+Message-ID: <20160219140600.GW19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 19 February 2016 15:59:59 Yury Norov wrote:
-> On Fri, Feb 19, 2016 at 09:23:35AM +0100, Arnd Bergmann wrote:
-> > On Friday 19 February 2016 01:35:06 Yury Norov wrote:
-
-> > In https://github.com/norov/glibc/commit/5d4290435e428267171ece871539b76e1d079d11
-> > you are defining a struct __kernel_stat64 in the glibc. Is this the expected
-> > way to do it? I would have thought you'd get the definition from the kernel
-> > headers.
-> >  
-> > 	Arnd
-> > 
+On Fri, Feb 19, 2016 at 09:12:04AM +0100, Rabin Vincent wrote:
+> Given a device which uses arm_coherent_dma_ops and on which
+> dev_get_cma_area(dev) returns non-NULL, the following usage of the DMA
+> API with gfp=0 results in a memory leak and memory corruption.
 > 
-> Almost all ports define its own struct kernel_stat / kernel_stat64.
-> in "kernel_header.h" See mips, spark, alpha, i386... Some also define
-> function xstat_conv or similar. With all that defined, it's expected
-> that one of generic xstat wrappers will work properly. I tried all,
-> and noone got working, so I wrote this hack to make it work somehow. 
+>  p = dma_alloc_coherent(dev, sz, &dma, 0);
+>  if (p)
+>  	dma_free_coherent(dev, sz, p, dma);
+> 
+> The memory leak is because the alloc allocates using
+> __alloc_simple_buffer() but the free attempts
+> dma_release_from_contiguous(), which does not do free anything since the
+> page is not in the CMA area.
 
-I see. I grepped for __kernel_stat64 and couldn't find any other
-with that name, as the others tend to us slightly different names.
+I'd really like to see a better solution to this problem: over the course
+of the years, I've seen a number of patches that rearrange the test order
+at allocation time because of some problem or the other.
 
-I would still think there is something wrong if you need to define
-your own copy of xstat_conv when the kernel 'struct stat64' is
-meant to be usable by user space. Shouldn't this work like any
-other 32-bit architecture now?
+What we need is a better way to ensure that we use the correct release
+functionality - having two independent set of tests where the order
+matters is really not very good.
 
-	Arnd
+Maybe someone can put some thought into this...
+
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
