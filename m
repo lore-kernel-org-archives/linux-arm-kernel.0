@@ -1,39 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 19 Feb 2016 16:06:40 +0100
-Subject: [PATCH] ARM: Allow MULTIPLATFORM to select XIP
-In-Reply-To: <HK2PR06MB05613CF6C996BF8BD459842E8AA00@HK2PR06MB0561.apcprd06.prod.outlook.com>
-References: <1455816310-11308-1-git-send-email-chris.brandt@renesas.com>
- <2413859.DaWDFlIaaB@wuerfel>
- <HK2PR06MB05613CF6C996BF8BD459842E8AA00@HK2PR06MB0561.apcprd06.prod.outlook.com>
-Message-ID: <3699765.F7sfuMCyKT@wuerfel>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Fri, 19 Feb 2016 16:22:42 +0100
+Subject: [PATCH v3 0/7] irqchip: introduce the Alpine MSIX driver
+Message-ID: <1455895369-13187-1-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 19 February 2016 14:46:36 Chris Brandt wrote:
-> On 19 Feb 2016, Arnd Bergmann wrote:
-> 
-> > > A car with the best seat belts and airbags still won't help you
-> > > if you drive it off a cliff.
-> > 
-> > That was my point about DEBUG_LL: We already allow picking a DEBUG_LL
-> > option that immediately breaks booting on any other platform, and
-> > (worse) breaks even printing any useful output about that fact.
-> 
-> Ya, the DEBUG_LL issue seems like it could be an endless hole of options
-> all throughout the Kconfigs.
-> 
-> DT was supposed to allow everything to be configured at boot time, but
-> it looks like we still need an early-Device-Tree for settings before DT
-> is available. That would solve your DEBUG_LL and PHYS_OFFSET issue.
+Hi all,
 
-Not really: for DEBUG_LL, it doesn't work because DEBUG_LL is literally
-meant to work from the first instruction in the kernel, so there can't
-be any code to configure it. If you don't need to go that low-level,
-you should use "earlycon", which can parse the DT just fine.
+This series introduce the Alpine MSIX driver, and enables it in both
+the Alpine v1 and Alpine v2 device trees.
 
-For PHYS_OFFSET, parsing the DT doesn't help at all because we only
-need it for XIP_KERNEL (more or less at least) which cannot patch
-the kernel image at boot time, so knowing that the address is wrong
-also doesn't help you.
+This series depends on "[PATCH v2 0/3] arm64: introduce the Alpine support":
+https://lkml.org/lkml/2016/2/10/83
 
-	Arnd
+You can find the series at:
+https://github.com/atenart/linux.git 4.5-rc1/alpinev2-msix
+
+Antoine
+
+Since v2:
+  - Updated the documentation (added a reference to the GIC documentation).
+
+Since v1:
+  - Added an interrupt-parent property in the documentation example.
+  - Updated to use bitmap_*() instead of *_bit().
+  - Removed the static irq_set_affinity to use irq_chip_set_affinity_parent().
+  - Updated the address field to use phys_addr_t.
+  - Added a comment on why we're setting bit 16 in the address.
+  - Patched the gic_set_affinity() function in irqchip/gic-v3.
+
+Antoine Tenart (7):
+  irqchip/gic-v3: always return IRQ_SET_MASK_OK_DONE in gic_set_affinity
+  irqchip: add the Alpine MSIX interrupt controller
+  Documentation: bindings: document the Alpine MSIX driver
+  arm64: dts: alpine: add the MSIX node in the Alpine v2 dtsi
+  ARM: dts: alpine: add the MSIX node
+  arm64: alpine: select the Alpine MSI controller driver
+  arm: alpine: select the Alpine MSI controller driver
+
+ .../interrupt-controller/al,alpine-msix.txt        |  26 ++
+ arch/arm/boot/dts/alpine.dtsi                      |  10 +
+ arch/arm/mach-alpine/Kconfig                       |   1 +
+ arch/arm64/Kconfig.platforms                       |   1 +
+ arch/arm64/boot/dts/al/alpine-v2.dtsi              |  10 +
+ drivers/irqchip/Kconfig                            |   6 +
+ drivers/irqchip/Makefile                           |   1 +
+ drivers/irqchip/irq-alpine-msi.c                   | 293 +++++++++++++++++++++
+ drivers/irqchip/irq-gic-v3.c                       |   2 +-
+ 9 files changed, 349 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/al,alpine-msix.txt
+ create mode 100644 drivers/irqchip/irq-alpine-msi.c
+
+-- 
+2.7.1
