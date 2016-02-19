@@ -1,42 +1,35 @@
-From: tchalamarla@caviumnetworks.com (Tirumalesh Chalamarla)
-Date: Fri, 19 Feb 2016 10:36:15 -0800
-Subject: [PATCH] iommu/arm-smmu-v2: Add support for 16 bit VMID
-In-Reply-To: <20160219171329.GO27062@arm.com>
-References: <1455819817-8432-1-git-send-email-tchalamarla@caviumnetworks.com>
- <20160219171329.GO27062@arm.com>
-Message-ID: <56C7609F.4030403@caviumnetworks.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 19 Feb 2016 10:39:26 -0800
+Subject: [GIT PULL] ARM: OMAP2+: first set of hwmod fixes and additions
+ for v4.6
+In-Reply-To: <alpine.DEB.2.02.1602171838420.11377@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1602171838420.11377@utopia.booyaka.com>
+Message-ID: <20160219183925.GM21202@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+* Paul Walmsley <paul@pwsan.com> [160217 10:41]:
+> Hi Tony
+> 
+> The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
+> 
+>   Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v4.6/omap-hwmod-a
+> 
+> for you to fetch changes up to 8fe097a3d99e22355fb8e3bcee59542bf3f46b2d:
+> 
+>   ARM: DRA7: hwmod: Add reset data for PCIe (2016-02-09 02:18:52 -0700)
+> 
+> ----------------------------------------------------------------
+> ARM: OMAP2+: first set of hwmod fixes and additions for v4.6
+> 
+> A few fixes for OMAP hwmod data.  SSI hwmod data for the OMAP 3730,
+> and some fixes for the DRA7xx hwmod data.  These shouldn't interfere
+> or impact anything else.
 
+Thanks pulling into omap-for-v4.6/fixes-not-urgent.
 
-On 02/19/2016 09:13 AM, Will Deacon wrote:
-> On Thu, Feb 18, 2016 at 10:23:37AM -0800, tchalamarla at caviumnetworks.com wrote:
->> From: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
->>
->> ARM-SMMUv2 supports upto 16 bit VMID. This patch enables
->> 16 bit VMID when requested from device-tree.
->>
->> Signed-off-by: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
->> ---
->>   .../devicetree/bindings/iommu/arm,smmu.txt          |  2 ++
->>   drivers/iommu/arm-smmu.c                            | 21 ++++++++++++++++++++-
->>   2 files changed, 22 insertions(+), 1 deletion(-)
->>
->> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
->> index 7180745..bb7e569 100644
->> --- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
->> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
->> @@ -55,6 +55,8 @@ conditions.
->>                     aliases of secure registers have to be used during
->>                     SMMU configuration.
->>
->> +- smmu-enable-vmid16 : Enable 16 bit VMID, if allowed.
->
-> Why do we need a new property for this, given that we can detect it
-> from the ID registers? I can't think of a reason why we wouldn't use
-> 16-bit VMIDs if they were available to us.
-Done.
->
-> Will
->
+Tony
