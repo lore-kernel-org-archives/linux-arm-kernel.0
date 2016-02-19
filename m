@@ -1,42 +1,37 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 18 Feb 2016 18:43:50 -0800
-Subject: [PATCH v3 5/6] dts: ipq4019: Add support for IPQ4019 DK01 board
-In-Reply-To: <59152C1B-683F-417D-9C23-C6E3F53D7096@codeaurora.org>
-References: <1447975173-29485-1-git-send-email-mmcclint@qca.qualcomm.com>
- <1447975173-29485-6-git-send-email-mmcclint@qca.qualcomm.com>
- <20160208224328.GB10791@codeaurora.org>
- <59152C1B-683F-417D-9C23-C6E3F53D7096@codeaurora.org>
-Message-ID: <20160219024350.GQ4847@codeaurora.org>
+From: jay.xu@rock-chips.com (Jianqun Xu)
+Date: Fri, 19 Feb 2016 10:44:42 +0800
+Subject: [PATCH v2.1 2/4] spi: rockchip: add bindings for rk3399 spi
+In-Reply-To: <20160218135751.GE7129@sirena.org.uk>
+References: <1455762983-29980-1-git-send-email-jay.xu@rock-chips.com>
+ <1455762983-29980-3-git-send-email-jay.xu@rock-chips.com>
+ <20160218094108.GA7129@sirena.org.uk> <2327512.KAqs6H56Km@phil>
+ <56C5959D.3030806@rock-chips.com> <20160218135751.GE7129@sirena.org.uk>
+Message-ID: <56C6819A.8090106@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/16, Matthew McClintock wrote:
-> On Feb 8, 2016, at 4:43 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> > 
-> > On 11/19, Matthew McClintock wrote:
-> >> +
-> >> +/ {
-> >> +	model = "Qualcomm Technologies, Inc. IPQ4019/AP-DK01.1";
-> >> +	compatible = "qcom,ipq4019";
-> >> +
-> >> +	clocks {
-> >> +                xo: xo {
-> >> +                        compatible = "fixed-clock";
-> >> +                        clock-frequency = <48000000>;
-> >> +                        #clock-cells = <0>;
-> >> +                };
-> >> +	};
-> > 
-> > Is there a reason the xo is here and the sleep clk is in the SoC
-> > dtsi file? Both are board clocks so I would think they would be
-> > added in the same place.
-> 
-> I?m a little bit confused and I wanted to confirm. I can see the xo clock is on the board itself. However, the sleep_clk is not, can you clarify why they would both be in the same place?
-> 
+Hi Mark
 
-The sleep clk is typically a pin on the SoC package. Look at your
-schematic. Same goes for the XO.
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+? 18/02/2016 21:57, Mark Brown ??:
+> On Thu, Feb 18, 2016 at 05:57:49PM +0800, Jianqun Xu wrote:
+>
+>> I'm a little confuse, I have upstreamed rockchip-i2s, and the i2s driver set
+>> the compatible like:
+>> - compatible: should be one of the followings
+>>     - "rockchip,rk3066-i2s": for rk3066
+>>     - "rockchip,rk3188-i2s", "rockchip,rk3066-i2s": for rk3188
+>>     - "rockchip,rk3288-i2s", "rockchip,rk3066-i2s": for rk3288
+>>     - "rockchip,rk3399-i2s", "rockchip,rk3066-i2s": for rk3399
+>> and the driver only has
+>> static const struct of_device_id rockchip_i2s_match[] = {
+>> 	{ .compatible = "rockchip,rk3066-i2s", },
+>> 	{},
+>> };
+>
+>> The spi of rk3399 as same as rk3066, rk3188, rk3288, like i2s, if they are
+>> keep different rules ?
+>
+> No, that's just something that got missed in review and which should be
+> fixed.
+>
+Got it, it's will be fixed in a separate patch later, thank you very much.
