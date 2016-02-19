@@ -1,130 +1,100 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 19 Feb 2016 17:19:35 +0100
-Subject: [PATCH v2] [RFC] ARM: modify pgd_t definition for
- TRANSPARENT_HUGEPAGE_PUD
-Message-ID: <1455898786-2720743-1-git-send-email-arnd@arndb.de>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 19 Feb 2016 16:20:50 +0000
+Subject: [PATCH v5 07/15] arm64: Change cpu_resume() to enable mmu early
+ then access sleep_sp by va
+In-Reply-To: <20160218182602.GA17589@red-moon>
+References: <1455637767-31561-1-git-send-email-james.morse@arm.com>
+ <1455637767-31561-8-git-send-email-james.morse@arm.com>
+ <20160218182602.GA17589@red-moon>
+Message-ID: <56C740E2.5000801@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I ran into build errors on ARM after Willy's newly added generic
-TRANSPARENT_HUGEPAGE_PUD support. We don't support this feature
-on ARM at all, but the patch causes a build error anyway:
+Hi Lorenzo,
 
-In file included from ../kernel/memremap.c:17:0:
-../include/linux/pfn_t.h:108:7: error: 'pud_mkdevmap' declared as function returning an array
- pud_t pud_mkdevmap(pud_t pud);
+On 18/02/16 18:26, Lorenzo Pieralisi wrote:
+> On Tue, Feb 16, 2016 at 03:49:19PM +0000, James Morse wrote:
+>> By enabling the MMU early in cpu_resume(), the sleep_save_sp and stack can
+>> be accessed by VA, which avoids the need to convert-addresses and clean to
+>> PoC on the suspend path.
+>>
+>> MMU setup is shared with the boot path, meaning the swapper_pg_dir is
+>> restored directly: ttbr1_el1 is no longer saved/restored.
+>>
+>> struct sleep_save_sp is removed, replacing it with a single array of
+>> pointers.
+>>
+>> cpu_do_{suspend,resume} could be further reduced to not restore: cpacr_el1,
+>> mdscr_el1, tcr_el1, vbar_el1 and sctlr_el1, all of which are set by
+>> __cpu_setup(). However these values all contain res0 bits that may be used
+>> to enable future features.
+>>
+>> Signed-off-by: James Morse <james.morse@arm.com>
+>> ---
+> 
+> [...]
+> 
+>> diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
+>> index dca81612fe90..0e2b36f1fb44 100644
+>> --- a/arch/arm64/kernel/sleep.S
+>> +++ b/arch/arm64/kernel/sleep.S
+>> @@ -73,8 +73,8 @@ ENTRY(__cpu_suspend_enter)
+>>  	str	x2, [x0, #SLEEP_STACK_DATA_SYSTEM_REGS + CPU_CTX_SP]
+>>  
+>>  	/* find the mpidr_hash */
+>> -	ldr	x1, =sleep_save_sp
+>> -	ldr	x1, [x1, #SLEEP_SAVE_SP_VIRT]
+>> +	ldr	x1, =sleep_save_stash
+>> +	ldr	x1, [x1]
+>>  	mrs	x7, mpidr_el1
+>>  	ldr	x9, =mpidr_hash
+>>  	ldr	x10, [x9, #MPIDR_HASH_MASK]
+>> @@ -87,40 +87,26 @@ ENTRY(__cpu_suspend_enter)
+>>  	compute_mpidr_hash x8, x3, x4, x5, x6, x7, x10
+>>  	add	x1, x1, x8, lsl #3
+>>  
+>> +	str	x0, [x1]
+>> +	add	x0, x0, #SLEEP_STACK_DATA_SYSTEM_REGS
+> 
+> Mmm...this instruction does not really belong in this patch,
+> it should be part of patch 6, correct ? What I mean is, the new
+> struct to stash system regs (struct sleep_stack_data) was added in
+> patch 6, if the offset #SLEEP_STACK_DATA_SYSTEM_REGS (which is 0) had
+> to be added it had to be added in patch 6 too, it does not belong
+> in this patch, am I right ?
 
-We don't use a PUD on ARM, so pud_t is defined as pmd_t, which
-in turn is defined as
+In the previous patch __cpu_suspend_save() was changed to take a struct
+sleep_stack_data, this then passes system_regs to cpu_do_suspend(). The 'add	x0,
+x0, #SLEEP_STACK_DATA_SYSTEM_REGS' is being done in C, (and hopefully optimised
+out by the compiler).
 
-typedef unsigned long pgd_t[2];
+In this patch, we removed __cpu_suspend_save() and call cpu_do_suspend()
+directly, so need to account for system_regs's position in struct
+sleep_stack_data ourselves.
 
-on NOMMU and on 2-level MMU configurations. There is an (unused)
-other definition using a struct around the array, which happens to
-work fine here.
+I'm paranoid, but if you prefer I can remove the 'add 0', and dump a comment
+next to the struct definition making it someone elses problem to fix it if they
+ever change the layout of the struct...
 
-There is a comment in the file about the fact the other version
-is "easier on the compiler", and I've traced that version back
-to linux-2.1.80 when ARM support was first merged back in 1998.
 
-It's probably a safe assumption that this is no longer necessary:
-The same logic existed in asm-i386 at the time but was removed
-a year later in 2.3.23pre3. The STRICT_MM_TYPECHECKS logic
-also ended up getting copied into other architectures, which
-use them in various ways:
+> 
+>>  	push	x29, lr
+>> -	bl	__cpu_suspend_save
+>> +	bl	cpu_do_suspend
+>>  	pop	x29, lr
+>>  	mov	x0, #1
+>>  	ret
+>>  ENDPROC(__cpu_suspend_enter)
+>>  	.ltorg
 
-* both defined, but using strict:
-arch/alpha/include/asm/page.h:#define STRICT_MM_TYPECHECKS
-arch/sparc/include/asm/page_64.h:#define STRICT_MM_TYPECHECKS
-arch/ia64/include/asm/page.h:#  define STRICT_MM_TYPECHECKS
-arch/parisc/include/asm/page.h:#define STRICT_MM_TYPECHECKS
+[...2x Nits fixed...]
 
-* both defined, but using non-strict:
-arch/arc/include/asm/page.h:#undef STRICT_MM_TYPECHECKS
-arch/arm/include/asm/pgtable-2level-types.h:#undef STRICT_MM_TYPECHECKS
-arch/arm/include/asm/pgtable-3level-types.h:#undef STRICT_MM_TYPECHECKS
-arch/arm64/include/asm/pgtable-types.h:#undef STRICT_MM_TYPECHECKS
-arch/sparc/include/asm/page_32.h:/* #define STRICT_MM_TYPECHECKS */
-arch/unicore32/include/asm/page.h:#undef STRICT_MM_TYPECHECKS
+> With the last updates it seems fine by me, so:
+> 
+> Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-* Kconfig option:
-arch/powerpc/Kconfig.debug:config STRICT_MM_TYPECHECKS
-			 	default n
 
-Everthing else uses only the strict definitions.
+Thanks!
 
-For the moment, this only does the minimal change to fix things
-on ARM in linux-next. At least in case of sparc32, passing structs
-to functions is traditionally inefficient and the non-strict version
-should be kept, whether we change any of the other architectures
-depends on further testing.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: a27da20ed50e ("mm: add support for PUD-sized transparent hugepages")
-Link: http://www.spinics.net/lists/linux-mm/msg101404.html
----
- arch/arm/include/asm/page-nommu.h           | 4 ++--
- arch/arm/include/asm/pgtable-2level-types.h | 7 +++----
- 2 files changed, 5 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/include/asm/page-nommu.h b/arch/arm/include/asm/page-nommu.h
-index d1b162a18dcb..3db1ca22fecb 100644
---- a/arch/arm/include/asm/page-nommu.h
-+++ b/arch/arm/include/asm/page-nommu.h
-@@ -31,12 +31,12 @@
-  */
- typedef unsigned long pte_t;
- typedef unsigned long pmd_t;
--typedef unsigned long pgd_t[2];
-+typedef struct { unsigned long pgd[2]; } pgd_t;
- typedef unsigned long pgprot_t;
- 
- #define pte_val(x)      (x)
- #define pmd_val(x)      (x)
--#define pgd_val(x)	((x)[0])
-+#define pgd_val(x)	((x).pgd[0])
- #define pgprot_val(x)   (x)
- 
- #define __pte(x)        (x)
-diff --git a/arch/arm/include/asm/pgtable-2level-types.h b/arch/arm/include/asm/pgtable-2level-types.h
-index 66cb5b0e89c5..9b9815d5ebd6 100644
---- a/arch/arm/include/asm/pgtable-2level-types.h
-+++ b/arch/arm/include/asm/pgtable-2level-types.h
-@@ -24,6 +24,9 @@
- typedef u32 pteval_t;
- typedef u32 pmdval_t;
- 
-+typedef struct { pmdval_t pgd[2]; } pgd_t;
-+#define pgd_val(x)	((x).pgd[0])
-+
- #undef STRICT_MM_TYPECHECKS
- 
- #ifdef STRICT_MM_TYPECHECKS
-@@ -32,12 +35,10 @@ typedef u32 pmdval_t;
-  */
- typedef struct { pteval_t pte; } pte_t;
- typedef struct { pmdval_t pmd; } pmd_t;
--typedef struct { pmdval_t pgd[2]; } pgd_t;
- typedef struct { pteval_t pgprot; } pgprot_t;
- 
- #define pte_val(x)      ((x).pte)
- #define pmd_val(x)      ((x).pmd)
--#define pgd_val(x)	((x).pgd[0])
- #define pgprot_val(x)   ((x).pgprot)
- 
- #define __pte(x)        ((pte_t) { (x) } )
-@@ -50,12 +51,10 @@ typedef struct { pteval_t pgprot; } pgprot_t;
-  */
- typedef pteval_t pte_t;
- typedef pmdval_t pmd_t;
--typedef pmdval_t pgd_t[2];
- typedef pteval_t pgprot_t;
- 
- #define pte_val(x)      (x)
- #define pmd_val(x)      (x)
--#define pgd_val(x)	((x)[0])
- #define pgprot_val(x)   (x)
- 
- #define __pte(x)        (x)
--- 
-2.7.0
+James
