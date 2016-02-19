@@ -1,93 +1,56 @@
-From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Fri, 19 Feb 2016 13:47:54 +0300
-Subject: [PATCH v3 2/5] ACPI: parse SPCR and enable matching console
-In-Reply-To: <56C64366.2070702@hurleysoftware.com>
-References: <1455559532-8305-1-git-send-email-aleksey.makarov@linaro.org>
- <1455559532-8305-3-git-send-email-aleksey.makarov@linaro.org>
- <56C64366.2070702@hurleysoftware.com>
-Message-ID: <56C6F2DA.3020002@linaro.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 19 Feb 2016 10:52:29 +0000
+Subject: [PATCH] arm64: kasan: clear stale stack poison
+In-Reply-To: <20160218181356.GF2538@e104818-lin.cambridge.arm.com>
+References: <1455816458-19485-1-git-send-email-mark.rutland@arm.com>
+ <20160218175447.GD2538@e104818-lin.cambridge.arm.com>
+ <20160218180353.GG16883@arm.com>
+ <20160218181356.GF2538@e104818-lin.cambridge.arm.com>
+Message-ID: <20160219105229.GA18597@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
-
-Thank you for review.
-
-On 02/19/2016 01:19 AM, Peter Hurley wrote:
-> On 02/15/2016 10:05 AM, Aleksey Makarov wrote:
-
-[..]
-
->> diff --git a/drivers/tty/serial/serial_core.c b/drivers/tty/serial/serial_core.c
->> index a126a60..459ab54 100644
->> --- a/drivers/tty/serial/serial_core.c
->> +++ b/drivers/tty/serial/serial_core.c
->> @@ -34,6 +34,7 @@
->>  #include <linux/serial_core.h>
->>  #include <linux/delay.h>
->>  #include <linux/mutex.h>
->> +#include <linux/acpi.h>
->>  
->>  #include <asm/irq.h>
->>  #include <asm/uaccess.h>
->> @@ -2654,8 +2655,17 @@ int uart_add_one_port(struct uart_driver *drv, struct uart_port *uport)
->>  		spin_lock_init(&uport->lock);
->>  		lockdep_set_class(&uport->lock, &port_lock_key);
->>  	}
->> -	if (uport->cons && uport->dev)
->> -		of_console_check(uport->dev->of_node, uport->cons->name, uport->line);
->> +
->> +	/*
->> +	 * Support both open FW and ACPI access to console definitions.
->> +	 * Both of_console_check() and acpi_console_check() will call
->> +	 * add_preferred_console() if a console definition is found.
->> +	 */
->> +	if (uport->cons && uport->dev) {
->> +		if (!acpi_console_check(uport))
->> +			of_console_check(uport->dev->of_node, uport->cons->name,
->> +					 uport->line);
+On Thu, Feb 18, 2016 at 06:13:57PM +0000, Catalin Marinas wrote:
+> On Thu, Feb 18, 2016 at 06:03:54PM +0000, Will Deacon wrote:
+> > On Thu, Feb 18, 2016 at 05:54:47PM +0000, Catalin Marinas wrote:
+> > > On Thu, Feb 18, 2016 at 05:27:38PM +0000, Mark Rutland wrote:
+> > > > @@ -145,6 +146,7 @@ ENTRY(cpu_resume_mmu)
+> > > >  ENDPROC(cpu_resume_mmu)
+> > > >  	.popsection
+> > > >  cpu_resume_after_mmu:
+> > > > +	kasan_unpoison_stack 96
+> > > 
+> > > I don't think the 96 here is needed since we populate the stack in
+> > > assembly (__cpu_suspend_enter) and unwind it again still in assembly
+> > > (cpu_resume_after_mmu), so no KASAN shadow writes/reads.
+> > > 
+> > > Otherwise the patch looks fine.
+> > 
+> > I'd much rather it was written in C -- is there a reason we can't do
+> > that if we use a separate compilation unit where the compiler will
+> > honour the fno-sanitize flag?
 > 
-> of_console_check() is not a good model for enabling a console.
-> It's a hack with several shortcomings (and bugs) that is tolerated here
-> because of its broad applicability to a wide range of platforms and drivers.
+> A simple, non-sanitised C wrapper around __cpu_suspend_enter() would
+> probably work. We need to make sure it is static inline when !KASAN to
+> avoid an unnecessary function call. Or we just move cpu_suspend() to a
+> different compilation unit, though that's a slightly larger function
+> which we may want to track under KASAN.
 
-It's definitely not the best code I saw but there is no bugs.
+Both options are ok with me. There is one more. We pass the "saved" sp
+to __cpu_suspend_save (ie in cpu_suspend_ctx), you can stash it and
+use it in the resume path (through logical cpu indexing) to carry
+out the kasan clean-up, in C, with no wrapper needed.
 
-> I specifically added console matching to enable exactly this kind of
-> console-selection-via-firmware. Please use that facility.
+With James' hibernate patches:
 
-I described why this does not work (except you insist on having 
-new made up names for all types of SPCR consoles) in the reply to another your message.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2016-February/408597.html
 
-Thank you
-Aleksey Makarov
+this is going to be even easier, since the struct above is on the
+cpu_suspend stack upon cpu_resume, so you can use the sp in there
+straight away.
 
-> Regards,
-> Peter Hurley
-> 
-> 
->> +	}
->>  
->>  	uart_configure_port(drv, state, uport);
->>  
->> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
->> index 06ed7e5..ea0c297 100644
->> --- a/include/linux/acpi.h
->> +++ b/include/linux/acpi.h
->> @@ -1004,4 +1004,14 @@ static inline struct fwnode_handle *acpi_get_next_subnode(struct device *dev,
->>  #define acpi_probe_device_table(t)	({ int __r = 0; __r;})
->>  #endif
->>  
->> +struct uart_port;
->> +#ifdef CONFIG_ACPI_SPCR_TABLE
->> +bool acpi_console_check(struct uart_port *uport);
->> +#else
->> +static inline bool acpi_console_check(struct uart_port *uport)
->> +{
->> +	return FALSE;
->> +}
->> +#endif
->> +
->>  #endif	/*_LINUX_ACPI_H*/
->>
-> 
+We can put together a fix following Catalin's suggestion and when James'
+patches land in mainline we will update the code.
+
+Thanks,
+Lorenzo
