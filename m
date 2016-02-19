@@ -1,56 +1,28 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 19 Feb 2016 14:15:46 +0000
-Subject: [PATCH v3] irqchip: irq-mvebu-odmi: new driver for platform MSI
- on Marvell 7K/8K
-In-Reply-To: <1455888883-5127-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1455888883-5127-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <56C72392.5010202@arm.com>
+From: sebott@linux.vnet.ibm.com (Sebastian Ott)
+Date: Fri, 19 Feb 2016 15:15:50 +0100 (CET)
+Subject: [BUG] random kernel crashes after THP rework on s390 (maybe also
+ on PowerPC and ARM)
+In-Reply-To: <20160218170658.GC28184@node.shutemov.name>
+References: <20160211190942.GA10244@node.shutemov.name>
+ <20160211205702.24f0d17a@thinkpad>
+ <20160212154116.GA15142@node.shutemov.name> <56BE00E7.1010303@de.ibm.com>
+ <20160212181640.4eabb85f@thinkpad>
+ <20160212231510.GB15142@node.shutemov.name>
+ <alpine.LFD.2.20.1602131238260.1910@schleppi>
+ <20160217201340.2dafad8d@thinkpad>
+ <20160217235808.GA21696@node.shutemov.name>
+ <20160218160037.627cc7ec@thinkpad>
+ <20160218170658.GC28184@node.shutemov.name>
+Message-ID: <alpine.LFD.2.20.1602191509270.1742@schleppi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/02/16 13:34, Thomas Petazzoni wrote:
-> This commits adds a new irqchip driver that handles the ODMI
-> controller found on Marvell 7K/8K processors. The ODMI controller
-> provide MSI interrupt functionality to on-board peripherals, much like
-> the GIC-v2m.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
-> Changes v2 -> v2:
->  - Express NODMIS_SHIFT, NODMIS_PER_FRAME, NODMIS_MASK in term of each
->    other. Suggested by Marc Zyngier.
->  - Rework the global bitmask allocation to make sure we allocate a
->    number of longs rather than a number of bytes, to avoid having the
->    bitmap API (which operates on longs) access memory we haven't
->    explicitly allocated. Reported by Marc Zyngier.
-> 
-> Changes v1 -> v2:
->  - Better commit title, as suggested by Marc Zyngier.
->  - Improve the DT binding documentation, as suggested by Marc Zingier:
->    add a reference to the GIC documentation, be more specific about
->    the marvell,spi-base values, and add the requirement of the
->    interrupt-parent property.
->  - As suggested by Marc Zyngier, use a single global bitmap to
->    allocate all ODMIs, regardless of the frame they belong to. As part
->    of this change, the hwirq used to identify the interrupt inside the
->    ODMI irqdomain are 0-based (instead of being based on their
->    corresponding SPI base value), which allows to significantly
->    simplify the allocation/free logic.
-> ---
->  .../marvell,odmi-controller.txt                    |  41 ++++
->  drivers/irqchip/Kconfig                            |   4 +
->  drivers/irqchip/Makefile                           |   1 +
->  drivers/irqchip/irq-mvebu-odmi.c                   | 248 +++++++++++++++++++++
->  4 files changed, 294 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/marvell,odmi-controller.txt
->  create mode 100644 drivers/irqchip/irq-mvebu-odmi.c
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+On Thu, 18 Feb 2016, Kirill A. Shutemov wrote:
+> I worth minimizing kernel config on which you can see the bug. Things like
+> CONFIG_DEBUG_PAGEALLOC used to interfere with THP before.
 
-I'll queue that for 4.6.
+I disabled all debugging options (using
+arch/s390/configs/performance_defconfig) - we still chrashed.
 
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Sebastian
