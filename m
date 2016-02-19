@@ -1,106 +1,40 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Fri, 19 Feb 2016 16:44:29 +0000
-Subject: [PATCH] drm: ARM HDLCD - get rid of devm_clk_put()
-In-Reply-To: <1455869701-23437-1-git-send-email-abrodkin@synopsys.com>
-References: <1455869701-23437-1-git-send-email-abrodkin@synopsys.com>
-Message-ID: <20160219164429.GQ1123@e106497-lin.cambridge.arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 19 Feb 2016 16:46:06 +0000
+Subject: [PATCH v2 0/5] arm64: kernel: Add support for User Access Override
+In-Reply-To: <CAFEAcA9SQjg3GpDpU-Tt8i+JiOcJWQKTNzwLLTC4imiBuiP6+w@mail.gmail.com>
+References: <1454684330-892-1-git-send-email-james.morse@arm.com>
+ <20160218180313.GE2538@e104818-lin.cambridge.arm.com>
+ <CAFEAcA9SQjg3GpDpU-Tt8i+JiOcJWQKTNzwLLTC4imiBuiP6+w@mail.gmail.com>
+Message-ID: <20160219164606.GD12864@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 19, 2016 at 11:15:01AM +0300, Alexey Brodkin wrote:
-> Clock is acquired with devm_clk_get() which already manages
-> corresponding resource.
+On Fri, Feb 19, 2016 at 03:38:44PM +0000, Peter Maydell wrote:
+> On 18 February 2016 at 18:03, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Fri, Feb 05, 2016 at 02:58:45PM +0000, James Morse wrote:
+> >> James Morse (5):
+> >>   arm64: cpufeature: Change read_cpuid() to use sysreg's mrs_s macro
+> >>   arm64: add ARMv8.2 id_aa64mmfr2 boiler plate
+> >>   arm64: kernel: Add support for User Access Override
+> >>   arm64: cpufeature: Test 'matches' pointer to find the end of the list
+> >>   arm64: kernel: Don't toggle PAN on systems with UAO
+> >
+> > Patches applied with an additional fixup on top for removing
+> > get_thread_info().
 > 
-> I.e. in case of driver removal or failure on installaiton
-> clock resources will be automatically released and explicit
-> call of devm_clk_put() is not required.
+> Just to let you know, unfortunately this series breaks booting the
+> kernel on QEMU. We didn't implement the parts of the ID register
+> space that the ARM ARM documents as "reserved, RAZ", and so when
+> the kernel touches ID_AA64MMFR2 (new in v8.2) QEMU hands it an
+> UNDEF. This is obviously a bug in QEMU, and I just sent out a patch
+> for it: http://patchwork.ozlabs.org/patch/585237/ -- but of course
+> that doesn't do anything for all the buggy QEMUs already in the field.
 > 
-> Signed-off-by: Alexey Brodkin <abrodkin@synopsys.com>
-> Cc: Liviu Dudau <Liviu.Dudau@arm.com>
+> This is more of a heads-up than a demand that you Do Something,
+> but perhaps somebody has a clever idea...
 
-Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
-
-Thanks,
-Liviu
-
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Daniel Vetter <daniel.vetter@ffwll.ch>
-> Cc: David Airlie <airlied@linux.ie>
-> Cc: Robin Murphy <robin.murphy@arm.com>
-> ---
->  drivers/gpu/drm/arm/hdlcd_drv.c | 15 +++------------
->  1 file changed, 3 insertions(+), 12 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/arm/hdlcd_drv.c b/drivers/gpu/drm/arm/hdlcd_drv.c
-> index 56b829f..734849f 100644
-> --- a/drivers/gpu/drm/arm/hdlcd_drv.c
-> +++ b/drivers/gpu/drm/arm/hdlcd_drv.c
-> @@ -55,16 +55,14 @@ static int hdlcd_load(struct drm_device *drm, unsigned long flags)
->  	hdlcd->mmio = devm_ioremap_resource(drm->dev, res);
->  	if (IS_ERR(hdlcd->mmio)) {
->  		DRM_ERROR("failed to map control registers area\n");
-> -		ret = PTR_ERR(hdlcd->mmio);
->  		hdlcd->mmio = NULL;
-> -		goto fail;
-> +		return PTR_ERR(hdlcd->mmio);
->  	}
->  
->  	version = hdlcd_read(hdlcd, HDLCD_REG_VERSION);
->  	if ((version & HDLCD_PRODUCT_MASK) != HDLCD_PRODUCT_ID) {
->  		DRM_ERROR("unknown product id: 0x%x\n", version);
-> -		ret = -EINVAL;
-> -		goto fail;
-> +		return -EINVAL;
->  	}
->  	DRM_INFO("found ARM HDLCD version r%dp%d\n",
->  		(version & HDLCD_VERSION_MAJOR_MASK) >> 8,
-> @@ -73,7 +71,7 @@ static int hdlcd_load(struct drm_device *drm, unsigned long flags)
->  	/* Get the optional framebuffer memory resource */
->  	ret = of_reserved_mem_device_init(drm->dev);
->  	if (ret && ret != -ENODEV)
-> -		goto fail;
-> +		return ret;
->  
->  	ret = dma_set_mask_and_coherent(drm->dev, DMA_BIT_MASK(32));
->  	if (ret)
-> @@ -101,8 +99,6 @@ irq_fail:
->  	drm_crtc_cleanup(&hdlcd->crtc);
->  setup_fail:
->  	of_reserved_mem_device_release(drm->dev);
-> -fail:
-> -	devm_clk_put(drm->dev, hdlcd->clk);
->  
->  	return ret;
->  }
-> @@ -412,7 +408,6 @@ err_unload:
->  	pm_runtime_put_sync(drm->dev);
->  	pm_runtime_disable(drm->dev);
->  	of_reserved_mem_device_release(drm->dev);
-> -	devm_clk_put(dev, hdlcd->clk);
->  err_free:
->  	drm_dev_unref(drm);
->  
-> @@ -436,10 +431,6 @@ static void hdlcd_drm_unbind(struct device *dev)
->  	pm_runtime_put_sync(drm->dev);
->  	pm_runtime_disable(drm->dev);
->  	of_reserved_mem_device_release(drm->dev);
-> -	if (!IS_ERR(hdlcd->clk)) {
-> -		devm_clk_put(drm->dev, hdlcd->clk);
-> -		hdlcd->clk = NULL;
-> -	}
->  	drm_mode_config_cleanup(drm);
->  	drm_dev_unregister(drm);
->  	drm_dev_unref(drm);
-> -- 
-> 2.5.0
-> 
+Only if Qemu had its own MIDR/REVIDR ;) (and patch the instruction like
+other errata workarounds).
 
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Catalin
