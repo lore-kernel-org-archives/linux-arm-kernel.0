@@ -1,46 +1,50 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 19 Feb 2016 08:20:00 +0100
-Subject: [PATCH 3/3] ARM64: dts: mt8173: Add thermal/auxadc device nodes
-In-Reply-To: <56C5EEE9.4020407@gmail.com>
-References: <1448883753-19068-1-git-send-email-s.hauer@pengutronix.de>
- <1448883753-19068-4-git-send-email-s.hauer@pengutronix.de>
- <56C5EEE9.4020407@gmail.com>
-Message-ID: <20160219071959.GL3939@pengutronix.de>
+Date: Fri, 19 Feb 2016 08:21:32 +0100
+Subject: [PATCH 2/3] thermal: Add Mediatek thermal controller support
+In-Reply-To: <20160218151552.GA1852@localhost.localdomain>
+References: <1448883753-19068-3-git-send-email-s.hauer@pengutronix.de>
+ <20151217193332.GB7999@localhost.localdomain>
+ <20160104141940.GI13058@pengutronix.de>
+ <20160119072917.GA13237@pengutronix.de>
+ <1454295246.22151.6.camel@mtksdaap41>
+ <CAGS+omD9U8tKmb02d_gMMAGX18MJZhz0RrugpBK2EuqgZrBy6g@mail.gmail.com>
+ <CAGS+omArr0_-ziBXWjEcKS0bqnruNzZc2aq2s3zkghUC7_HfGw@mail.gmail.com>
+ <56C4A875.6080908@gmail.com> <20160218105603.GE3939@pengutronix.de>
+ <20160218151552.GA1852@localhost.localdomain>
+Message-ID: <20160219072132.GM3939@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matthias,
-
-On Thu, Feb 18, 2016 at 05:18:49PM +0100, Matthias Brugger wrote:
-> Hi Sascha,
+On Thu, Feb 18, 2016 at 07:15:54AM -0800, Eduardo Valentin wrote:
+> Folks,
 > 
-> On 30/11/15 12:42, Sascha Hauer wrote:
-> >This adds the thermal controller and auxadc nodes to the Mediatek MT8173
-> >dtsi file.
-> >
-> >Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> >Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
-> >---
-> >  arch/arm64/boot/dts/mediatek/mt8173.dtsi | 17 +++++++++++++++++
-> >  1 file changed, 17 insertions(+)
-> >
-> >diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> >index 06a1564..e2ddd03 100644
-> >--- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> >+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> >@@ -277,6 +277,11 @@
-> >  				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
-> >  		};
-> >
-> >+		auxadc: auxadc at 11001000 {
-> >+			compatible = "mediatek,mt8173-auxadc";
+> > > I think the problem is, that Eduardo wants to see the hierachical thermal
+> > > zones being used. But there is still a discussion ongoing [1].
+> > 
+> > It seems the original Author lost interest in the hierarchical thermal
+> > zones. I am not convinced that we need hierarchical thermal zones for
+> > the Mediatek driver since from the five sensors we only need the maximum
+> > temperature (If this ever changes we could still rework it).
+> > 
+> > Given the current speed of communication I am not willing to add
+> > another, possibly controversal, dependency to an otherwise simple
+> > driver. I am even less willing when concerns like these come after *v12*
+> > of this series.
+> > 
+> > Eduardo, it would really help to get a word from you.
 > 
-> Can you please write a small Documentation about the binding.
-> I suppose it will be mediatek,auxadc and mediatek,mt8173-auxadc.
+> Apologize for the long delays here. In fact I want the hierarchical
+> support on this driver. But given that it is not really a strong
+> dependency and the hierarchical support is still an ongoing development,
+> I don't see why we should not merge this driver.
+> 
+> I also have had the chance to try it out in a board, and seams to work
+> for me. I am adding to my tree.
 
-Just did that.
+Thanks for applying :)
 
 Sascha
+
 
 -- 
 Pengutronix e.K.                           |                             |
