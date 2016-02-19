@@ -1,54 +1,42 @@
 From: jay.xu@rock-chips.com (jianqun.xu)
-Date: Fri, 19 Feb 2016 09:56:15 +0800
-Subject: [PATCH v4 3/6] spi: rockchip: add bindings for rk3399 spi
+Date: Fri, 19 Feb 2016 09:56:16 +0800
+Subject: [PATCH v4 4/6] ASoC: rockchip: add bindings for rk3399 i2s
 In-Reply-To: <1455846978-4272-1-git-send-email-jay.xu@rock-chips.com>
 References: <1455846978-4272-1-git-send-email-jay.xu@rock-chips.com>
-Message-ID: <1455846978-4272-4-git-send-email-jay.xu@rock-chips.com>
+Message-ID: <1455846978-4272-5-git-send-email-jay.xu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jianqun Xu <jay.xu@rock-chips.com>
 
-Add devicetree bindings for Rockchip rk3399 spi which found on
-Rockchip rk3399 SoCs.
+Add devicetree bindings for i2s controller found on rk3399
+processors from rockchip.
 
+Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
 changes in v4:
-- none
+- restore
+- add acked-by (Rob)
 changes in v3:
-- add compatible for rk3399 spi (Mark, Heiko)
-changes in v2:
 - none
+changes in v2:
+- removed
 
- Documentation/devicetree/bindings/spi/spi-rockchip.txt | 1 +
- drivers/spi/spi-rockchip.c                             | 1 +
- 2 files changed, 2 insertions(+)
+ Documentation/devicetree/bindings/sound/rockchip-i2s.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/spi/spi-rockchip.txt b/Documentation/devicetree/bindings/spi/spi-rockchip.txt
-index 0c491bd..1b14d69 100644
---- a/Documentation/devicetree/bindings/spi/spi-rockchip.txt
-+++ b/Documentation/devicetree/bindings/spi/spi-rockchip.txt
-@@ -9,6 +9,7 @@ Required Properties:
-     "rockchip,rk3066-spi" for rk3066.
-     "rockchip,rk3188-spi", "rockchip,rk3066-spi" for rk3188.
-     "rockchip,rk3288-spi", "rockchip,rk3066-spi" for rk3288.
-+    "rockchip,rk3399-spi", "rockchip,rk3066-spi" for rk3399.
+diff --git a/Documentation/devicetree/bindings/sound/rockchip-i2s.txt b/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
+index b7f3a93..6e86d8a 100644
+--- a/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
++++ b/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
+@@ -9,6 +9,7 @@ Required properties:
+    - "rockchip,rk3066-i2s": for rk3066
+    - "rockchip,rk3188-i2s", "rockchip,rk3066-i2s": for rk3188
+    - "rockchip,rk3288-i2s", "rockchip,rk3066-i2s": for rk3288
++   - "rockchip,rk3399-i2s", "rockchip,rk3066-i2s": for rk3399
  - reg: physical base address of the controller and length of memory mapped
-        region.
- - interrupts: The interrupt number to the cpu. The interrupt specifier format
-diff --git a/drivers/spi/spi-rockchip.c b/drivers/spi/spi-rockchip.c
-index 79a8bc4..345fefd 100644
---- a/drivers/spi/spi-rockchip.c
-+++ b/drivers/spi/spi-rockchip.c
-@@ -868,6 +868,7 @@ static const struct of_device_id rockchip_spi_dt_match[] = {
- 	{ .compatible = "rockchip,rk3066-spi", },
- 	{ .compatible = "rockchip,rk3188-spi", },
- 	{ .compatible = "rockchip,rk3288-spi", },
-+	{ .compatible = "rockchip,rk3399-spi", },
- 	{ },
- };
- MODULE_DEVICE_TABLE(of, rockchip_spi_dt_match);
+   region.
+ - interrupts: should contain the I2S interrupt.
 -- 
 1.9.1
