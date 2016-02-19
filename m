@@ -1,9 +1,9 @@
 From: jay.xu@rock-chips.com (jianqun.xu)
-Date: Fri, 19 Feb 2016 10:03:47 +0800
-Subject: [PATCH 6/6] ARM64: dts: rockchip: add core dtsi file for rk3399
+Date: Fri, 19 Feb 2016 10:05:40 +0800
+Subject: [PATCH v4 6/6] ARM64: dts: rockchip: add core dtsi file for rk3399
 In-Reply-To: <1455846978-4272-1-git-send-email-jay.xu@rock-chips.com>
 References: <1455846978-4272-1-git-send-email-jay.xu@rock-chips.com>
-Message-ID: <1455847427-4498-1-git-send-email-jay.xu@rock-chips.com>
+Message-ID: <1455847540-4545-1-git-send-email-jay.xu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
