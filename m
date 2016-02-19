@@ -1,53 +1,83 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 19 Feb 2016 08:21:32 +0100
-Subject: [PATCH 2/3] thermal: Add Mediatek thermal controller support
-In-Reply-To: <20160218151552.GA1852@localhost.localdomain>
-References: <1448883753-19068-3-git-send-email-s.hauer@pengutronix.de>
- <20151217193332.GB7999@localhost.localdomain>
- <20160104141940.GI13058@pengutronix.de>
- <20160119072917.GA13237@pengutronix.de>
- <1454295246.22151.6.camel@mtksdaap41>
- <CAGS+omD9U8tKmb02d_gMMAGX18MJZhz0RrugpBK2EuqgZrBy6g@mail.gmail.com>
- <CAGS+omArr0_-ziBXWjEcKS0bqnruNzZc2aq2s3zkghUC7_HfGw@mail.gmail.com>
- <56C4A875.6080908@gmail.com> <20160218105603.GE3939@pengutronix.de>
- <20160218151552.GA1852@localhost.localdomain>
-Message-ID: <20160219072132.GM3939@pengutronix.de>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 19 Feb 2016 07:21:36 +0000 (UTC)
+Subject: [PATCH v2 2/2] ARM: AM43XX: HWMOD: Add rtc hwmod
+In-Reply-To: <1455856735-11515-3-git-send-email-j-keerthy@ti.com>
+References: <1455856735-11515-1-git-send-email-j-keerthy@ti.com>
+ <1455856735-11515-3-git-send-email-j-keerthy@ti.com>
+Message-ID: <alpine.DEB.2.02.1602190720490.27696@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 18, 2016 at 07:15:54AM -0800, Eduardo Valentin wrote:
-> Folks,
+On Fri, 19 Feb 2016, Keerthy wrote:
+
+> The patch adds rtc hwmod. RTC module The RTC module is physically
+> present on the AM438x SoC used on AM43X-EPOS-EVM, but it is permanently
+> disabled. A secure RTC is used instead on these devices, where needed.
+> . Hence adding it selectively using a seprate list to get RTC Module
+> functional on the other am43x SoCs used on am437x-gp-evm and
+> am437x-sk-evm.
 > 
-> > > I think the problem is, that Eduardo wants to see the hierachical thermal
-> > > zones being used. But there is still a discussion ongoing [1].
-> > 
-> > It seems the original Author lost interest in the hierarchical thermal
-> > zones. I am not convinced that we need hierarchical thermal zones for
-> > the Mediatek driver since from the five sensors we only need the maximum
-> > temperature (If this ever changes we could still rework it).
-> > 
-> > Given the current speed of communication I am not willing to add
-> > another, possibly controversal, dependency to an otherwise simple
-> > driver. I am even less willing when concerns like these come after *v12*
-> > of this series.
-> > 
-> > Eduardo, it would really help to get a word from you.
+> Signed-off-by: Keerthy <j-keerthy@ti.com>
+> ---
 > 
-> Apologize for the long delays here. In fact I want the hierarchical
-> support on this driver. But given that it is not really a strong
-> dependency and the hierarchical support is still an ongoing development,
-> I don't see why we should not merge this driver.
+> Changes in v2:
 > 
-> I also have had the chance to try it out in a board, and seams to work
-> for me. I am adding to my tree.
+> Inverted the checking logic to accommodate registering for all
+> the SoCs compatible to am4372 and removed the negating am438x logic
+> to register rtc hwmods as suggested by Paul.
+> 
+>  arch/arm/mach-omap2/omap_hwmod_43xx_data.c | 14 +++++++++++++-
+>  1 file changed, 13 insertions(+), 1 deletion(-)
 
-Thanks for applying :)
+OK thanks; I've queued the following patch for v4.6 or if I get unlucky, 
+v4.7.
 
-Sascha
+- Paul
 
+From: Keerthy <j-keerthy@ti.com>
+Date: Fri, 19 Feb 2016 10:08:55 +0530
+Subject: [PATCH] ARM: AM43XX: hwmod: Add rtc hwmod
 
+The patch registers the rtc hwmod on AM437x chips.  The RTC module is
+physically present on the AM438x SoC used on AM43X-EPOS-EVM, but it is
+permanently disabled. A secure RTC is used instead on these devices,
+where needed. Hence adding it selectively using a separate list to get
+RTC Module functional on the other am43x SoCs used on am437x-gp-evm
+and am437x-sk-evm.
+
+Signed-off-by: Keerthy <j-keerthy@ti.com>
+[paul at pwsan.com: cleaned up patch description]
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+---
+ arch/arm/mach-omap2/omap_hwmod_43xx_data.c | 14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+index e97a894b5f88..97fd399202dc 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+@@ -1020,9 +1020,21 @@ static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
+ 	NULL,
+ };
+ 
++static struct omap_hwmod_ocp_if *am43xx_rtc_hwmod_ocp_ifs[] __initdata = {
++	&am33xx_l4_wkup__rtc,
++	NULL,
++};
++
+ int __init am43xx_hwmod_init(void)
+ {
++	int ret;
++
+ 	omap_hwmod_am43xx_reg();
+ 	omap_hwmod_init();
+-	return omap_hwmod_register_links(am43xx_hwmod_ocp_ifs);
++	ret = omap_hwmod_register_links(am43xx_hwmod_ocp_ifs);
++
++	if (!ret && of_machine_is_compatible("ti,am4372"))
++		ret = omap_hwmod_register_links(am43xx_rtc_hwmod_ocp_ifs);
++
++	return ret;
+ }
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+2.7.0
