@@ -1,32 +1,26 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 19 Feb 2016 17:57:17 +0100
-Subject: [PATCH v2 0/5] arm64: kernel: Add support for User Access Override
-In-Reply-To: <CAFEAcA_uAG1hX2a3n8FSJpB704wzJeXzijHSETJ2B6OR0g=nJw@mail.gmail.com>
-References: <1454684330-892-1-git-send-email-james.morse@arm.com>
- <20160218180313.GE2538@e104818-lin.cambridge.arm.com>
- <CAFEAcA9SQjg3GpDpU-Tt8i+JiOcJWQKTNzwLLTC4imiBuiP6+w@mail.gmail.com>
- <20160219164606.GD12864@e104818-lin.cambridge.arm.com>
- <CAFEAcA_uAG1hX2a3n8FSJpB704wzJeXzijHSETJ2B6OR0g=nJw@mail.gmail.com>
-Message-ID: <CAKv+Gu9GDE5MVLGkvx9NGB=R_AS--32aGYQ++zT9gGFwBFgnpw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 19 Feb 2016 17:58:46 +0100
+Subject: [PATCH v2] ARM: atags_to_fdt: don't warn about stack size
+In-Reply-To: <7301172.5fH67MHlU9@wuerfel>
+References: <1455804123-2526139-1-git-send-email-arnd@arndb.de>
+ <alpine.LFD.2.20.1602181112310.13632@knanqh.ubzr>
+ <7301172.5fH67MHlU9@wuerfel>
+Message-ID: <8232115.18ykgQ6J5T@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 February 2016 at 17:54, Peter Maydell <peter.maydell@linaro.org> wrote:
-> On 19 February 2016 at 16:46, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> On Fri, Feb 19, 2016 at 03:38:44PM +0000, Peter Maydell wrote:
->>> This is more of a heads-up than a demand that you Do Something,
->>> but perhaps somebody has a clever idea...
->>
->> Only if Qemu had its own MIDR/REVIDR ;) (and patch the instruction like
->> other errata workarounds).
->
-> Smiley noted, but FWIW the relevant CPUs advertise themselves as
-> MIDR 0x411fd070 REVIDR 0 (A57) and MIDR 0x410fd034 REVIDR 0 (A53),
-> and it should be harmless to patch the ID_AA64MMFR2 read to always
-> return 0 on any A53 or A57 including h/w, because they'll read as
-> zero anyway...
->
-> So it comes down to how much we want to work around QEMU "errata".
->
+On Thursday 18 February 2016 17:26:56 Arnd Bergmann wrote:
+> On Thursday 18 February 2016 11:13:52 Nicolas Pitre wrote:
+> > What about setting the warning to 2048 instead?
+> 
+> Sure, actually 1280 is more than enough I think.
+> 
+It turns out that doesn't fix the problem though, as the new
+argument gets prepended and the existing flag overrides it.
 
-Doesn't this only affect TCG emulation, and not KVM?
+I have modified the patch now to do both:
+
+CFLAGS_REMOVE_atags_to_fdt.o += -Wframe-larger-than=${CONFIG_FRAME_WARN}
+CFLAGS_atags_to_fdt.o += -Wframe-larger-than=1280
+
+	Arnd
