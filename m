@@ -1,135 +1,92 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 19 Feb 2016 17:39:35 +0100
-Subject: [PATCH] ARM: Allow MULTIPLATFORM to select XIP
-In-Reply-To: <HK2PR06MB056181A22F655E6D4A11DEED8AA00@HK2PR06MB0561.apcprd06.prod.outlook.com>
-References: <1455816310-11308-1-git-send-email-chris.brandt@renesas.com>
- <64215923.Y25jP5YYZ2@wuerfel>
- <HK2PR06MB056181A22F655E6D4A11DEED8AA00@HK2PR06MB0561.apcprd06.prod.outlook.com>
-Message-ID: <4255249.Z5tzmoAfvg@wuerfel>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 19 Feb 2016 16:43:21 +0000
+Subject: [PATCH v5 07/15] arm64: Change cpu_resume() to enable mmu early
+ then access sleep_sp by va
+In-Reply-To: <56C740E2.5000801@arm.com>
+References: <1455637767-31561-1-git-send-email-james.morse@arm.com>
+ <1455637767-31561-8-git-send-email-james.morse@arm.com>
+ <20160218182602.GA17589@red-moon> <56C740E2.5000801@arm.com>
+Message-ID: <20160219164321.GA1195@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 19 February 2016 16:28:06 Chris Brandt wrote:
-> On 19 Feb 2016, Arnd Bergmann wrote:
+On Fri, Feb 19, 2016 at 04:20:50PM +0000, James Morse wrote:
+
+[...]
+
+> >> diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
+> >> index dca81612fe90..0e2b36f1fb44 100644
+> >> --- a/arch/arm64/kernel/sleep.S
+> >> +++ b/arch/arm64/kernel/sleep.S
+> >> @@ -73,8 +73,8 @@ ENTRY(__cpu_suspend_enter)
+> >>  	str	x2, [x0, #SLEEP_STACK_DATA_SYSTEM_REGS + CPU_CTX_SP]
+> >>  
+> >>  	/* find the mpidr_hash */
+> >> -	ldr	x1, =sleep_save_sp
+> >> -	ldr	x1, [x1, #SLEEP_SAVE_SP_VIRT]
+> >> +	ldr	x1, =sleep_save_stash
+> >> +	ldr	x1, [x1]
+> >>  	mrs	x7, mpidr_el1
+> >>  	ldr	x9, =mpidr_hash
+> >>  	ldr	x10, [x9, #MPIDR_HASH_MASK]
+> >> @@ -87,40 +87,26 @@ ENTRY(__cpu_suspend_enter)
+> >>  	compute_mpidr_hash x8, x3, x4, x5, x6, x7, x10
+> >>  	add	x1, x1, x8, lsl #3
+> >>  
+> >> +	str	x0, [x1]
+> >> +	add	x0, x0, #SLEEP_STACK_DATA_SYSTEM_REGS
 > > 
-> > > But, now I see that PHYS_OFFSET is used all over the place as a hard
-> > > coded #define, hence your comment "which cannot patch the kernel image
-> > > at boot time"
-> > > 
-> > > So, I retract my thought...it has to be configured at build-time
-> > > (unless of course you turn it into a global variable everywhere...which
-> > >  might be an even bigger mess)
-> > > 
-> > 
-> > BTW, I've tried removing the patching in CONFIG_PHYS_VIRT and replaced it
-> > with references to __pv_phys_pfn_offset, which surprisingly only grew
-> > .text from 4901692 to 4904300 bytes, so the size overhead of doing this
-> > would be close to zero.
-> > 
-> >       Arnd
+> > Mmm...this instruction does not really belong in this patch,
+> > it should be part of patch 6, correct ? What I mean is, the new
+> > struct to stash system regs (struct sleep_stack_data) was added in
+> > patch 6, if the offset #SLEEP_STACK_DATA_SYSTEM_REGS (which is 0) had
+> > to be added it had to be added in patch 6 too, it does not belong
+> > in this patch, am I right ?
 > 
-> Cool. If you come up with a patch, I'll give it a try.
+> In the previous patch __cpu_suspend_save() was changed to take a
+> struct sleep_stack_data, this then passes system_regs to
+> cpu_do_suspend(). The 'add	x0, x0, #SLEEP_STACK_DATA_SYSTEM_REGS'
+> is being done in C, (and hopefully optimised out by the compiler).
+> 
+> In this patch, we removed __cpu_suspend_save() and call cpu_do_suspend()
+> directly, so need to account for system_regs's position in struct
+> sleep_stack_data ourselves.
 
-It was really just a hack, deleting code that we normally need,  but
-you can work on top of that. This is still not useful unless you
-also find a way to guess the __pv_phys_pfn_offset value. Maybe
-there is even a way to derive that from the stack pointer if we
-can safely assume that it points into RAM ?
+Yes, I missed that during the review, that explains, thanks.
 
-	Arnd
+> I'm paranoid, but if you prefer I can remove the 'add 0', and dump a
+> comment next to the struct definition making it someone elses problem
+> to fix it if they ever change the layout of the struct...
 
-diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index 9427fd632552..3f797bc5d73f 100644
---- a/arch/arm/include/asm/memory.h
-+++ b/arch/arm/include/asm/memory.h
-@@ -175,10 +175,11 @@
- #define __PV_BITS_7_0	0x81
- 
- extern unsigned long __pv_phys_pfn_offset;
--extern u64 __pv_offset;
-+extern phys_addr_t __pv_offset;
- extern void fixup_pv_table(const void *, unsigned long);
- extern const void *__pv_table_begin, *__pv_table_end;
- 
-+#define PAGE_SHIFT 12
- #define PHYS_OFFSET	((phys_addr_t)__pv_phys_pfn_offset << PAGE_SHIFT)
- #define PHYS_PFN_OFFSET	(__pv_phys_pfn_offset)
- 
-@@ -186,75 +187,14 @@ extern const void *__pv_table_begin, *__pv_table_end;
- 	((((unsigned long)(kaddr) - PAGE_OFFSET) >> PAGE_SHIFT) + \
- 	 PHYS_PFN_OFFSET)
- 
--#define __pv_stub(from,to,instr,type)			\
--	__asm__("@ __pv_stub\n"				\
--	"1:	" instr "	%0, %1, %2\n"		\
--	"	.pushsection .pv_table,\"a\"\n"		\
--	"	.long	1b\n"				\
--	"	.popsection\n"				\
--	: "=r" (to)					\
--	: "r" (from), "I" (type))
--
--#define __pv_stub_mov_hi(t)				\
--	__asm__ volatile("@ __pv_stub_mov\n"		\
--	"1:	mov	%R0, %1\n"			\
--	"	.pushsection .pv_table,\"a\"\n"		\
--	"	.long	1b\n"				\
--	"	.popsection\n"				\
--	: "=r" (t)					\
--	: "I" (__PV_BITS_7_0))
--
--#define __pv_add_carry_stub(x, y)			\
--	__asm__ volatile("@ __pv_add_carry_stub\n"	\
--	"1:	adds	%Q0, %1, %2\n"			\
--	"	adc	%R0, %R0, #0\n"			\
--	"	.pushsection .pv_table,\"a\"\n"		\
--	"	.long	1b\n"				\
--	"	.popsection\n"				\
--	: "+r" (y)					\
--	: "r" (x), "I" (__PV_BITS_31_24)		\
--	: "cc")
--
--static inline phys_addr_t __virt_to_phys(unsigned long x)
--{
--	phys_addr_t t;
--
--	if (sizeof(phys_addr_t) == 4) {
--		__pv_stub(x, t, "add", __PV_BITS_31_24);
--	} else {
--		__pv_stub_mov_hi(t);
--		__pv_add_carry_stub(x, t);
--	}
--	return t;
--}
--
--static inline unsigned long __phys_to_virt(phys_addr_t x)
--{
--	unsigned long t;
--
--	/*
--	 * 'unsigned long' cast discard upper word when
--	 * phys_addr_t is 64 bit, and makes sure that inline
--	 * assembler expression receives 32 bit argument
--	 * in place where 'r' 32 bit operand is expected.
--	 */
--	__pv_stub((unsigned long) x, t, "sub", __PV_BITS_31_24);
--	return t;
--}
--
--#else
--
--#define PHYS_OFFSET	PLAT_PHYS_OFFSET
--#define PHYS_PFN_OFFSET	((unsigned long)(PHYS_OFFSET >> PAGE_SHIFT))
--
- static inline phys_addr_t __virt_to_phys(unsigned long x)
- {
--	return (phys_addr_t)x - PAGE_OFFSET + PHYS_OFFSET;
-+	return (phys_addr_t)x - PAGE_OFFSET + __pv_offset;
- }
- 
- static inline unsigned long __phys_to_virt(phys_addr_t x)
- {
--	return x - PHYS_OFFSET + PAGE_OFFSET;
-+	return x - __pv_offset + PAGE_OFFSET;
- }
- 
- #define virt_to_pfn(kaddr) \
+No, what you do is correct and should be kept as-is, I thought it
+had to be added in patch 6 but I was wrong, see above, code is
+correct as it is.
+
+Thanks,
+Lorenzo
+
+> 
+> 
+> > 
+> >>  	push	x29, lr
+> >> -	bl	__cpu_suspend_save
+> >> +	bl	cpu_do_suspend
+> >>  	pop	x29, lr
+> >>  	mov	x0, #1
+> >>  	ret
+> >>  ENDPROC(__cpu_suspend_enter)
+> >>  	.ltorg
+> 
+> [...2x Nits fixed...]
+> 
+> > With the last updates it seems fine by me, so:
+> > 
+> > Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> 
+> 
+> Thanks!
+> 
+> 
+> James
+> 
+> 
