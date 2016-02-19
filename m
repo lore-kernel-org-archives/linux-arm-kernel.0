@@ -1,111 +1,52 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 19 Feb 2016 14:12:13 +0100
-Subject: [PATCH v2 0/6] arm64: Initial support for Marvell Armada 7K/8K
-In-Reply-To: <1455812430-4656-1-git-send-email-thomas.petazzoni@free-electrons.com>
- (Thomas Petazzoni's message of "Thu, 18 Feb 2016 17:20:24 +0100")
-References: <1455812430-4656-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <87h9h4q1xu.fsf@free-electrons.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Fri, 19 Feb 2016 14:19:45 +0100
+Subject: [PATCH] ARM: dts: at91: sama5d2 Xplained: Correct the macb irq
+ pinctrl node
+In-Reply-To: <1455790866-13301-1-git-send-email-romain.izard.pro@gmail.com>
+References: <1455790866-13301-1-git-send-email-romain.izard.pro@gmail.com>
+Message-ID: <20160219131945.GX2607@odux.rfo.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
- 
- On jeu., f?vr. 18 2016, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+On Thu, Feb 18, 2016 at 11:21:06AM +0100, Romain Izard wrote:
+> All pinctrl nodes for the Atmel pinctrl controller need to have their
+> bias configuration explicitly defined. Otherwise, the pinctrl mapping
+> is not valid.
+> 
+> It works for now as the pinctrl driver proceeds even with invalid
+> mappings, but this can become an issue, if the pinctrl driver starts
+> to require valid mappings. Additionally, the pin is not protected from
+> being remapped later by an other driver.
+> 
+> There is an external 1k? pull-up to 3.3V, so no bias is required on
+> the Ethernet PHY's interrupt line.
+> 
+> Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
 
-> Hello,
->
-> This series adds initial support for the new Armada 7K and 8K Marvell
-> 64 bits processors. Details about those processors based on the
-> Cortex-A72 can be found at:
->
->   http://www.marvell.com/embedded-processors/armada-70xx/
->   http://www.marvell.com/embedded-processors/armada-80xx/
->
-> One characteristic of those processors is that internally they are
-> built from several components:
->
->  - One "AP", which contains the processor itself and a few core IP
->    blocks. The AP in 7K and 8K is called AP806, and is available on
->    two variants: dual Cortex-A72 and quad Cortex-A72.
->
->  - Or or two "CP", which contains most of the I/Os (SATA, PCIe,
->    etc.). The CP in 7K and 8K is called CP110. One CP110 is available
->    in the 7K family, while two CP110 are available in the 8K family,
->    doubling the number of I/O interfaces.
->
-> The support added in this series only brings minimal support for the
-> AP side (and not yet all IP blocks, obviously). Support for the CP
-> part will come in the future.
->
-> Since the series touches similar files as the Armada 3700 series from
-> Gregory Clement, it is based on it (its 4th version).
->
-> Changes since v1:
->
->  - Add initial patch from Arnd which updates the Marvell README, and
->    did a few adjustements to it.
->
->  - Use arm,gic-400 as the compatible string identifying the GIC, as
->    suggested by Jisheng.
->
->  - Rework the patch series on top of Gregory's latest patch series for
->    Armada 3700, since the patch series interact a little bit on a few
->    aspects (usage of the ARCH_MVEBU Kconfig option, for example).
->
->  - Fix the size of the register areas used for the GIC to be in line
->    with the datasheet. Follows some questions from Marc Zyngier.
->
-> Best regards,
->
-> Thomas
->
-> Arnd Bergmann (1):
->   Documentation: arm: update Marvell product listing
->
-> Thomas Petazzoni (5):
->   Documentation: arm: improve Armada 37xx description
->   Documentation: arm: add link to Armada 38x Functional Spec
->   Documentation: arm: add Marvell Armada 7K and 8K families
->   arm64: update ARCH_MVEBU for Marvell Armada 7K/8K support
->   arm64: marvell: add Device Tree files for Armada 7K/8K
+Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-I applied the 5 first patches to mvebu/arm64 and the last one to
-mvebu/dt64.
+Thanks
 
-Thanks,
-
-Gregory
-
->
->  Documentation/arm/Marvell/README                   | 158 +++++++++++---
->  .../bindings/arm/marvell/armada-7k-8k.txt          |  24 +++
->  arch/arm64/Kconfig.platforms                       |  11 +-
->  arch/arm64/boot/dts/marvell/Makefile               |   1 +
->  arch/arm64/boot/dts/marvell/armada-7020.dtsi       |  54 +++++
->  arch/arm64/boot/dts/marvell/armada-7040-db.dts     |  92 ++++++++
->  arch/arm64/boot/dts/marvell/armada-7040.dtsi       |  54 +++++
->  arch/arm64/boot/dts/marvell/armada-8020.dtsi       |  54 +++++
->  arch/arm64/boot/dts/marvell/armada-8040.dtsi       |  54 +++++
->  arch/arm64/boot/dts/marvell/armada-ap806-dual.dtsi |  71 +++++++
->  arch/arm64/boot/dts/marvell/armada-ap806-quad.dtsi |  84 ++++++++
->  arch/arm64/boot/dts/marvell/armada-ap806.dtsi      | 234 +++++++++++++++++++++
->  12 files changed, 858 insertions(+), 33 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/marvell/armada-7k-8k.txt
->  create mode 100644 arch/arm64/boot/dts/marvell/armada-7020.dtsi
->  create mode 100644 arch/arm64/boot/dts/marvell/armada-7040-db.dts
->  create mode 100644 arch/arm64/boot/dts/marvell/armada-7040.dtsi
->  create mode 100644 arch/arm64/boot/dts/marvell/armada-8020.dtsi
->  create mode 100644 arch/arm64/boot/dts/marvell/armada-8040.dtsi
->  create mode 100644 arch/arm64/boot/dts/marvell/armada-ap806-dual.dtsi
->  create mode 100644 arch/arm64/boot/dts/marvell/armada-ap806-quad.dtsi
->  create mode 100644 arch/arm64/boot/dts/marvell/armada-ap806.dtsi
->
+> ---
+>  arch/arm/boot/dts/at91-sama5d2_xplained.dts | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained.dts b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+> index e683856c507c..75341eec2dfd 100644
+> --- a/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+> +++ b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+> @@ -308,6 +308,7 @@
+>  
+>  				pinctrl_macb0_phy_irq: macb0_phy_irq {
+>  					pinmux = <PIN_PC9__GPIO>;
+> +					bias-disable;
+>  				};
+>  
+>  				pinctrl_pdmic_default: pdmic_default {
 > -- 
-> 2.6.4
->
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> 2.5.0
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-gpio" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
