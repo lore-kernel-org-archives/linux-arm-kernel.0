@@ -1,40 +1,83 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 19 Feb 2016 15:09:45 +0900
-Subject: [PATCH 2/4] ARM: shmobile: r8a7779: Remove remainings of removed SCU
- boot setup code
+Date: Fri, 19 Feb 2016 15:09:46 +0900
+Subject: [PATCH 3/4] ARM: shmobile: Move shmobile_smp_{mpidr, fn,
+ arg}[] from .text to .bss
 In-Reply-To: <cover.1455859965.git.horms+renesas@verge.net.au>
 References: <cover.1455859965.git.horms+renesas@verge.net.au>
-Message-ID: <b1568d80123a7e7ab528f587ef6896b2d5413b61.1455859965.git.horms+renesas@verge.net.au>
+Message-ID: <4e960f52fce16a3bf3261fa92c34cf2306059ba2.1455859965.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Commit 0ca2894b5a900709 ("ARM: shmobile: Use shared SCU SMP boot code on
-r8a7779") obsoleted the r8a7779-specific SCU boot code, but forgot to
-remove the setup of shmobile_boot_fn and shmobile_boot_arg, which is
-overwritten by shmobile_smp_scu_prepare_cpus().
+If CONFIG_DEBUG_RODATA=y, the kernel crashes during system suspend:
 
-Note that shmobile_scu_base wasn't initialized at that point yet anyway.
+    Freezing user space processes ... (elapsed 0.004 seconds) done.
+    Freezing remaining freezable tasks ... (elapsed 0.002 seconds)
+    done.
+    PM: suspend of devices complete after 111.948 msecs
+    PM: late suspend of devices complete after 1.086 msecs
+    PM: noirq suspend of devices complete after 11.576 msecs
+    Disabling non-boot CPUs ...
+    Kernel panic - not syncing: Attempted to kill the idle task!
+    1014ec ---[ end Kernel panic - not syncing: Attempted to kill the idle task!
+    CPU0: stopping
+
+This happens because the .text section is marked read-only, while the
+arrays shmobile_smp_mpidr[], shmobile_smp_fn[], and shmobile_smp_arg[]
+are being written to.
+
+Fix this by moving these arrays from the .text to the .bss section.
+This requires accessing them through PC-relative offsets.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Reviewed-by: Kees Cook <keescook@chromium.org>
+Reviewed-by: Nicolas Pitre <nico@linaro.org>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/smp-r8a7779.c | 2 --
- 1 file changed, 2 deletions(-)
+ arch/arm/mach-shmobile/headsmp.S | 20 ++++++++++++++------
+ 1 file changed, 14 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/smp-r8a7779.c b/arch/arm/mach-shmobile/smp-r8a7779.c
-index b854fe2095ad..0b024a9dbd43 100644
---- a/arch/arm/mach-shmobile/smp-r8a7779.c
-+++ b/arch/arm/mach-shmobile/smp-r8a7779.c
-@@ -92,8 +92,6 @@ static void __init r8a7779_smp_prepare_cpus(unsigned int max_cpus)
- {
- 	/* Map the reset vector (in headsmp-scu.S, headsmp.S) */
- 	__raw_writel(__pa(shmobile_boot_vector), AVECR);
--	shmobile_boot_fn = virt_to_phys(shmobile_boot_scu);
--	shmobile_boot_arg = (unsigned long)shmobile_scu_base;
+diff --git a/arch/arm/mach-shmobile/headsmp.S b/arch/arm/mach-shmobile/headsmp.S
+index 330c1fc63197..94d86ed16414 100644
+--- a/arch/arm/mach-shmobile/headsmp.S
++++ b/arch/arm/mach-shmobile/headsmp.S
+@@ -50,9 +50,11 @@ ENTRY(shmobile_smp_boot)
+ 	mrc	p15, 0, r1, c0, c0, 5		@ r1 = MPIDR
+ 	and	r0, r1, r0			@ r0 = cpu_logical_map() value
+ 	mov	r1, #0				@ r1 = CPU index
+-	adr	r5, 1f				@ array of per-cpu mpidr values
+-	adr	r6, 2f				@ array of per-cpu functions
+-	adr	r7, 3f				@ array of per-cpu arguments
++	adr	r2, 1f
++	ldmia	r2, {r5, r6, r7}
++	add	r5, r5, r2			@ array of per-cpu mpidr values
++	add	r6, r6, r2			@ array of per-cpu functions
++	add	r7, r7, r2			@ array of per-cpu arguments
  
- 	/* setup r8a7779 specific SCU bits */
- 	shmobile_scu_base = IOMEM(R8A7779_SCU_BASE);
+ shmobile_smp_boot_find_mpidr:
+ 	ldr	r8, [r5, r1, lsl #2]
+@@ -80,12 +82,18 @@ ENTRY(shmobile_smp_sleep)
+ 	b	shmobile_smp_boot
+ ENDPROC(shmobile_smp_sleep)
+ 
++	.align	2
++1:	.long	shmobile_smp_mpidr - .
++	.long	shmobile_smp_fn - 1b
++	.long	shmobile_smp_arg - 1b
++
++	.bss
+ 	.globl	shmobile_smp_mpidr
+ shmobile_smp_mpidr:
+-1:	.space	NR_CPUS * 4
++	.space	NR_CPUS * 4
+ 	.globl	shmobile_smp_fn
+ shmobile_smp_fn:
+-2:	.space	NR_CPUS * 4
++	.space	NR_CPUS * 4
+ 	.globl	shmobile_smp_arg
+ shmobile_smp_arg:
+-3:	.space	NR_CPUS * 4
++	.space	NR_CPUS * 4
 -- 
 2.1.4
