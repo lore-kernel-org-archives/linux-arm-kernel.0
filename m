@@ -1,132 +1,233 @@
-From: dyoung@redhat.com (Dave Young)
-Date: Fri, 19 Feb 2016 17:27:38 +0800
-Subject: [PATCH v2 1/2] efi: esrt: use memremap not ioremap to access
- ESRT table in memory
-In-Reply-To: <CAKv+Gu8RP21vw1Ht7UtkHsen2GMUNx8DikH-hLaezV+uZvWO-g@mail.gmail.com>
-References: <1455535953-5056-1-git-send-email-ard.biesheuvel@linaro.org>
- <1455535953-5056-2-git-send-email-ard.biesheuvel@linaro.org>
- <20160218104407.GC2651@codeblueprint.co.uk>
- <CAKv+Gu_AW7PKJJOd2mbEu3LKJe+gNaPHnH=sgO=YXM_KWFyKxw@mail.gmail.com>
- <20160218132824.GE2651@codeblueprint.co.uk>
- <CAKv+Gu-s1pzYBzuDG-Z7s3gyo8dPOfeidZQ+rim-uAWZCBcKQQ@mail.gmail.com>
- <20160218134324.GG2651@codeblueprint.co.uk>
- <CAKv+Gu875r9RkDC723kNsG4XC0eSE9RPPmSFZrD0sx0QxS+V4g@mail.gmail.com>
- <20160218141544.GH2651@codeblueprint.co.uk>
- <CAKv+Gu8RP21vw1Ht7UtkHsen2GMUNx8DikH-hLaezV+uZvWO-g@mail.gmail.com>
-Message-ID: <20160219092738.GA18240@dhcp-128-65.nay.redhat.com>
+From: peter.chen@nxp.com (Peter Chen)
+Date: Fri, 19 Feb 2016 17:26:15 +0800
+Subject: [PATCH v6 1/1] USB: core: let USB device know device node
+Message-ID: <1455873975-19531-1-git-send-email-peter.chen@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/18/16 at 03:21pm, Ard Biesheuvel wrote:
-> On 18 February 2016 at 15:15, Matt Fleming <matt@codeblueprint.co.uk> wrote:
-> > On Thu, 18 Feb, at 02:44:02PM, Ard Biesheuvel wrote:
-> >> On 18 February 2016 at 14:43, Matt Fleming <matt@codeblueprint.co.uk> wrote:
-> >> > On Thu, 18 Feb, at 02:29:32PM, Ard Biesheuvel wrote:
-> >> >> On 18 February 2016 at 14:28, Matt Fleming <matt@codeblueprint.co.uk> wrote:
-> >> >> > On Thu, 18 Feb, at 01:16:05PM, Ard Biesheuvel wrote:
-> >> >> >> On 18 February 2016 at 11:44, Matt Fleming <matt@codeblueprint.co.uk> wrote:
-> >> >> >> > On Mon, 15 Feb, at 12:32:32PM, Ard Biesheuvel wrote:
-> >> >> >> >> On ARM and arm64, ioremap() and memremap() are not interchangeable like
-> >> >> >> >> on x86, and the use of ioremap() on ordinary RAM is typically flagged
-> >> >> >> >> as an error if the memory region being mapped is also covered by the
-> >> >> >> >> linear mapping, since that would lead to aliases with conflicting
-> >> >> >> >> cacheability attributes.
-> >> >> >> >>
-> >> >> >> >> Since what we are dealing with is not an I/O region with side effects,
-> >> >> >> >> using ioremap() here is arguably incorrect anyway, so let's replace
-> >> >> >> >> it with memremap instead. Also add a missing unmap on the success path,
-> >> >> >> >> and drop a memblock_remove() call which does not belong here, this far
-> >> >> >> >> into the boot sequence.
-> >> >> >> >>
-> >> >> >> >> Cc: Peter Jones <pjones@redhat.com>
-> >> >> >> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >> >> >> >> ---
-> >> >> >> >>  drivers/firmware/efi/esrt.c | 16 ++++++++--------
-> >> >> >> >>  1 file changed, 8 insertions(+), 8 deletions(-)
-> >> >> >> >>
-> >> >> >> >
-> >> >> >> > [...]
-> >> >> >> >
-> >> >> >> >> @@ -432,8 +434,6 @@ static int __init esrt_sysfs_init(void)
-> >> >> >> >>       if (error)
-> >> >> >> >>               goto err_cleanup_list;
-> >> >> >> >>
-> >> >> >> >> -     memblock_remove(esrt_data, esrt_data_size);
-> >> >> >> >> -
-> >> >> >> >>       pr_debug("esrt-sysfs: loaded.\n");
-> >> >> >> >>
-> >> >> >> >>       return 0;
-> >> >> >> >
-> >> >> >> > Shouldn't we be replacing memblock_remove() with free_bootmem_late()?
-> >> >> >> > The original ESRT region is still reserved at this point, so we should
-> >> >> >> > do our best to release it to the page allocator.
-> >> >> >>
-> >> >> >> I'd rather we keep it reserved. That way, the config table entry still
-> >> >> >> points to something valid, which could be useful for kexec(), I think?
-> >> >> >> At least, that is how I intended to handle config tables on ARM ...
-> >> >> >
-> >> >> > If we're going to reserve it why do we need to copy the data out at
-> >> >> > all in esrt_sysfs_init()?
-> >> >>
-> >> >> Excellent question. I don't think there is any point to doing that.
-> >> >
-> >> > ... Unless the data is contained in an EFI Boot Services region ;-)
-> >> >
-> >> > Peter?
-> >>
-> >> Yes, it usually is. Is that a problem?
-> >
-> > Yes, we free the Boot Services regions before hitting userspace on
-> > x86, see efi_free_boot_services(). We do this map/copy/unmap trick in
-> > the ACPI BGRT driver for that reason.
-> >
-> > The Boot Services regions can be many gigabytes in size, which makes
-> > leaving them alone impractical.
-> >
-> > For kexec on x86 we simply discard the BGRT table, which isn't the end
-> > of the world because who really needs access to the BGRT image on
-> > kexec reboot? However, I can see the value of preserving the ESRT.
-> >
-> > I guess we've got two options, 1) copy out the chunks of Boot Services
-> > regions we're interested in and rewrite the EFI tables to point at
-> > these new allocations and free/discard all of the original Boot
-> > Services regions or 2) only selectively free the Boot Services
-> > regions.
-> >
-> > I've always stayed clear of 2) in case there exists cross-region
-> > references in the data that isn't obvious. I'd like to think that
-> > would never happen, but, you know, dragons lurk here, etc.
-> >
-> > Though actually, now I think about it, cross-region references can't
-> > possibly exist because they'd cause issues with the current code.
-> >
-> > So maybe the best solution is actually 2), where we preserve the Boot
-> > Services regions if any of the drivers (ESRT, BGRT) request them but
-> > free all the others?
+From: Peter Chen <peter.chen@freescale.com>
 
-It is a good idea so that drivers can add their useful sections to
-a list or an array, they can avoid another copy of the memory also.
+Although most of USB devices are hot-plug's, there are still some devices
+are hard wired on the board, eg, for HSIC and SSIC interface USB devices.
+If these kinds of USB devices are multiple functions, and they can supply
+other interfaces like i2c, gpios for other devices, we may need to
+describe these at device tree.
 
-> >
-> > What are the lifetime rules for Boot Services regions on arm*?
-> 
-> We treat all Boot Services regions like Loader Code/Data or free
-> regions: it is all recorded in memblock as usable memory, and only the
-> regions that are explicitly reserved are protected from further
-> general use.
-> 
-> I am currently looking into the memory attribute table, and the use
-> case is very similar. It would be very useful from our pov to simply
-> memblock_reserve() the region right after having called
-> efi_config_parse_tables(), and actually consume its data when we get
-> around to it later. The ESRT handling is already split down the middle
-> in the same way.
+In this commit, it uses "reg" in dts as physical port number to match
+the phyiscal port number decided by USB core, if they are the same,
+then the device node is for the device we are creating for USB core.
 
-A question is how can make a general way for both x86 and arm*.
+Signed-off-by: Peter Chen <peter.chen@freescale.com>
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+Acked-by: Alan Stern <stern@rowland.harvard.edu>
+Acked-by: Rob Herring <robh@kernel.org>
+---
 
-Maybe change the efi_free_boot_mem to something like efi_clean_boot_mem?
-It can first call efi_free_boot_mem, then reserve the ranges to be reserved
-again, but it sounds odd though.
+Changes for v6:
+- Add textual representation for VID and PID in binding doc, and changing
+  example accordingly.
+- Add three Acks.
 
-Thanks
-Dave
+Changes for v5:
+- Refine the code how to get the device node at usb_alloc_dev according
+  to Alan's comment.
+- Point out "usbVID,PID" is the recommented compatible, and others
+  compatibles at binding doc could also be used.
+
+Changes for v4:
+- The range of "reg" should be 1-31, changing device node address
+  style as in lower case hexadecimal with leading zeroes suppressed
+  [binding doc, usb-device.txt]
+- Improve the example at binding doc, it describes node from the top
+  (the controller)
+- Delete the struct of_node * within struct usb_device
+- Using usb_hcd_find_raw_port_number to get raw port number under root
+  hub port
+
+Changes for v3:
+- typo: s/descirbe/describe/
+
+Changes for v2:
+- Fix build error reported by kbuild robot, lack of "static" for
+  inline usb_of_get_child_node
+- Fix typo, "devcie_node" -> "device_node"
+- Add kernel-doc for of_node at struct usb_device
+
+Changes from RFC:
+- Fix the error address for binding doc, and add compatible for binding doc
+- Change get child node API from "usb_of_find_node" to
+  "usb_of_get_child_node"
+- Delete unecessary header files
+- One typo
+
+ .../devicetree/bindings/usb/usb-device.txt         | 28 +++++++++++++
+ drivers/usb/core/Makefile                          |  2 +-
+ drivers/usb/core/of.c                              | 47 ++++++++++++++++++++++
+ drivers/usb/core/usb.c                             | 10 +++++
+ include/linux/usb/of.h                             |  7 ++++
+ 5 files changed, 93 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/usb/usb-device.txt
+ create mode 100644 drivers/usb/core/of.c
+
+diff --git a/Documentation/devicetree/bindings/usb/usb-device.txt b/Documentation/devicetree/bindings/usb/usb-device.txt
+new file mode 100644
+index 0000000..1c35e7b
+--- /dev/null
++++ b/Documentation/devicetree/bindings/usb/usb-device.txt
+@@ -0,0 +1,28 @@
++Generic USB Device Properties
++
++Usually, we only use device tree for hard wired USB device.
++The reference binding doc is from:
++http://www.firmware.org/1275/bindings/usb/usb-1_0.ps
++
++Required properties:
++- compatible: usbVID,PID. The textual representation of VID, PID shall
++  be in lower case hexadecimal with leading zeroes suppressed. The
++  other compatible strings from the above standard binding could also
++  be used, but a device adhering to this binding may leave out all except
++  for usbVID,PID.
++- reg: the port number which this device is connecting to, the range
++  is 1-31.
++
++Example:
++
++&usb1 {
++	status = "okay";
++
++	#address-cells = <1>;
++	#size-cells = <0>;
++
++	hub: genesys at 1 {
++		compatible = "usb5e3,608";
++		reg = <1>;
++	};
++}
+diff --git a/drivers/usb/core/Makefile b/drivers/usb/core/Makefile
+index 2f6f932..9780877 100644
+--- a/drivers/usb/core/Makefile
++++ b/drivers/usb/core/Makefile
+@@ -5,7 +5,7 @@
+ usbcore-y := usb.o hub.o hcd.o urb.o message.o driver.o
+ usbcore-y += config.o file.o buffer.o sysfs.o endpoint.o
+ usbcore-y += devio.o notify.o generic.o quirks.o devices.o
+-usbcore-y += port.o
++usbcore-y += port.o of.o
+ 
+ usbcore-$(CONFIG_PCI)		+= hcd-pci.o
+ usbcore-$(CONFIG_ACPI)		+= usb-acpi.o
+diff --git a/drivers/usb/core/of.c b/drivers/usb/core/of.c
+new file mode 100644
+index 0000000..2289700
+--- /dev/null
++++ b/drivers/usb/core/of.c
+@@ -0,0 +1,47 @@
++/*
++ * of.c		The helpers for hcd device tree support
++ *
++ * Copyright (C) 2016 Freescale Semiconductor, Inc.
++ * Author: Peter Chen <peter.chen@freescale.com>
++ *
++ * This program is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2  of
++ * the License as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/of.h>
++
++/**
++ * usb_of_get_child_node - Find the device node match port number
++ * @parent: the parent device node
++ * @portnum: the port number which device is connecting
++ *
++ * Find the node from device tree according to its port number.
++ *
++ * Return: On success, a pointer to the device node, %NULL on failure.
++ */
++struct device_node *usb_of_get_child_node(struct device_node *parent,
++					int portnum)
++{
++	struct device_node *node;
++	u32 port;
++
++	for_each_child_of_node(parent, node) {
++		if (!of_property_read_u32(node, "reg", &port)) {
++			if (port == portnum)
++				return node;
++		}
++	}
++
++	return NULL;
++}
++EXPORT_SYMBOL_GPL(usb_of_get_child_node);
++
+diff --git a/drivers/usb/core/usb.c b/drivers/usb/core/usb.c
+index 524c982..ffa5cf1 100644
+--- a/drivers/usb/core/usb.c
++++ b/drivers/usb/core/usb.c
+@@ -36,6 +36,7 @@
+ #include <linux/mutex.h>
+ #include <linux/workqueue.h>
+ #include <linux/debugfs.h>
++#include <linux/usb/of.h>
+ 
+ #include <asm/io.h>
+ #include <linux/scatterlist.h>
+@@ -470,6 +471,7 @@ struct usb_device *usb_alloc_dev(struct usb_device *parent,
+ 		dev->route = 0;
+ 
+ 		dev->dev.parent = bus->controller;
++		dev->dev.of_node = bus->controller->of_node;
+ 		dev_set_name(&dev->dev, "usb%d", bus->busnum);
+ 		root_hub = 1;
+ 	} else {
+@@ -494,6 +496,14 @@ struct usb_device *usb_alloc_dev(struct usb_device *parent,
+ 		dev->dev.parent = &parent->dev;
+ 		dev_set_name(&dev->dev, "%d-%s", bus->busnum, dev->devpath);
+ 
++		if (!parent->parent) {
++			/* device under root hub's port */
++			port1 = usb_hcd_find_raw_port_number(usb_hcd,
++				port1);
++		}
++		dev->dev.of_node = usb_of_get_child_node(parent->dev.of_node,
++				port1);
++
+ 		/* hub driver sets up TT records */
+ 	}
+ 
+diff --git a/include/linux/usb/of.h b/include/linux/usb/of.h
+index 974bce9..de3237f 100644
+--- a/include/linux/usb/of.h
++++ b/include/linux/usb/of.h
+@@ -16,6 +16,8 @@ enum usb_dr_mode of_usb_get_dr_mode_by_phy(struct device_node *phy_np);
+ bool of_usb_host_tpl_support(struct device_node *np);
+ int of_usb_update_otg_caps(struct device_node *np,
+ 			struct usb_otg_caps *otg_caps);
++struct device_node *usb_of_get_child_node(struct device_node *parent,
++			int portnum);
+ #else
+ static inline enum usb_dr_mode
+ of_usb_get_dr_mode_by_phy(struct device_node *phy_np)
+@@ -31,6 +33,11 @@ static inline int of_usb_update_otg_caps(struct device_node *np,
+ {
+ 	return 0;
+ }
++static inline struct device_node *usb_of_get_child_node
++		(struct device_node *parent, int portnum)
++{
++	return NULL;
++}
+ #endif
+ 
+ #if IS_ENABLED(CONFIG_OF) && IS_ENABLED(CONFIG_USB_SUPPORT)
+-- 
+1.9.1
