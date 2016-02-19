@@ -1,58 +1,65 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 19 Feb 2016 14:28:48 +0000
-Subject: [PATCH v3] irqchip: irq-mvebu-odmi: new driver for platform MSI
- on Marvell 7K/8K
-In-Reply-To: <56C72392.5010202@arm.com>
-References: <1455888883-5127-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <56C72392.5010202@arm.com>
-Message-ID: <20160219142848.GA958@io.lakedaemon.net>
+From: Chris.Brandt@renesas.com (Chris Brandt)
+Date: Fri, 19 Feb 2016 14:29:00 +0000
+Subject: [PATCH 4/9] ARM: add CONFIG_PHYS_OFFSET default values
+In-Reply-To: <3974581.yknKb3tq7o@wuerfel>
+References: <1455804123-2526139-1-git-send-email-arnd@arndb.de>
+ <1455804123-2526139-5-git-send-email-arnd@arndb.de>
+ <alpine.LFD.2.20.1602181100410.13632@knanqh.ubzr>
+ <3974581.yknKb3tq7o@wuerfel>
+Message-ID: <HK2PR06MB056137892B6F968A8A1008C58AA00@HK2PR06MB0561.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 19, 2016 at 02:15:46PM +0000, Marc Zyngier wrote:
-> On 19/02/16 13:34, Thomas Petazzoni wrote:
-> > This commits adds a new irqchip driver that handles the ODMI
-> > controller found on Marvell 7K/8K processors. The ODMI controller
-> > provide MSI interrupt functionality to on-board peripherals, much like
-> > the GIC-v2m.
+On 19 Feb 2016, Arnd Bergmann wrote:
+
+> On Thursday 18 February 2016 11:02:33 Nicolas Pitre wrote:
 > > 
-> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> > ---
-> > Changes v2 -> v2:
-> >  - Express NODMIS_SHIFT, NODMIS_PER_FRAME, NODMIS_MASK in term of each
-> >    other. Suggested by Marc Zyngier.
-> >  - Rework the global bitmask allocation to make sure we allocate a
-> >    number of longs rather than a number of bytes, to avoid having the
-> >    bitmap API (which operates on longs) access memory we haven't
-> >    explicitly allocated. Reported by Marc Zyngier.
+> > Acked-by: Nicolas Pitre <nico@linaro.org>
 > > 
-> > Changes v1 -> v2:
-> >  - Better commit title, as suggested by Marc Zyngier.
-> >  - Improve the DT binding documentation, as suggested by Marc Zingier:
-> >    add a reference to the GIC documentation, be more specific about
-> >    the marvell,spi-base values, and add the requirement of the
-> >    interrupt-parent property.
-> >  - As suggested by Marc Zyngier, use a single global bitmap to
-> >    allocate all ODMIs, regardless of the frame they belong to. As part
-> >    of this change, the hwirq used to identify the interrupt inside the
-> >    ODMI irqdomain are 0-based (instead of being based on their
-> >    corresponding SPI base value), which allows to significantly
-> >    simplify the allocation/free logic.
-> > ---
-> >  .../marvell,odmi-controller.txt                    |  41 ++++
-> >  drivers/irqchip/Kconfig                            |   4 +
-> >  drivers/irqchip/Makefile                           |   1 +
-> >  drivers/irqchip/irq-mvebu-odmi.c                   | 248 +++++++++++++++++++++
-> >  4 files changed, 294 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/marvell,odmi-controller.txt
-> >  create mode 100644 drivers/irqchip/irq-mvebu-odmi.c
+> > Is there a way to provide a default for defaults?
 > 
-> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+> We could have something like
 > 
-> I'll queue that for 4.6.
+> config PHYS_OFFSET_0
+> 	bool
+> 
+> config PHYS_OFFSET_1
+> 	bool
+> 
+> config PHYS_OFFSET_2
+> 	bool
+> 
+> ... (we need 8 of the 16 possible addresses)
+> 
+> 
+> config PHYS_OFFSET
+> 	hex "Physical address of main memory" if MMU
+> 	default DRAM_BASE if !MMU
+> 	default 0x00000000 if PHYS_OFFSET_0
+> 	default 0x10000000 if PHYS_OFFSET_1
+> 	default 0x20000000 if PHYS_OFFSET_2
+> 	default 0x30000000 if PHYS_OFFSET_3
+> 	default 0x70000000 if PHYS_OFFSET_7
+> 	default 0x80000000 if PHYS_OFFSET_8
+> 	default 0xa0000000 if PHYS_OFFSET_A
+> 	default 0xc0000000 if PHYS_OFFSET_C
+> 
+> 
+> and then select one of the bool symbols from each platform.
+> Would that address your question?
 
-I had it on my list to queue up, but you beat me to it.  :-)
 
-thx,
+Here's a question:
 
-Jason.
+Can we just get rid of PHYS_OFFSET???
+
+If it's only used at boot for XIP systems, we could:
+
+A) pass it in via an unused register like atags and DT
+ or
+B) just assume that atags or DT is in RAM, so round down to the nearest section and assume that is the start of your RAM
+
+If it is needed after initial boot, then on first boot we save what was passed in from the boot loader for later use.
+
+
+Chris
