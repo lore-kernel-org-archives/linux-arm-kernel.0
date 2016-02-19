@@ -1,58 +1,130 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Fri, 19 Feb 2016 08:18:50 -0800
-Subject: [PATCH] clk: gpio: Really allow an optional clock= DT property
-In-Reply-To: <1455851525-18972-1-git-send-email-sboyd@codeaurora.org>
-References: <20160219030731.GS4847@codeaurora.org>
- <1455851525-18972-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <CAEG3pNAee6e7nnnCB334zecADV58yfcJ5azUjALHaDP40B_pLQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 19 Feb 2016 17:19:35 +0100
+Subject: [PATCH v2] [RFC] ARM: modify pgd_t definition for
+ TRANSPARENT_HUGEPAGE_PUD
+Message-ID: <1455898786-2720743-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 18, 2016 at 7:12 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
->
-> We mis-merged the original patch from Russell here and so the
-> patch went almost all the way, except that we still failed to
-> probe when there wasn't a clocks property in the DT node. Allow
-> that case by making a negative value from
-> of_clk_get_parent_count() into "no parents", like the original
-> patch did.
->
-> Fixes: 7ed88aa2efa5 ("clk: fix clk-gpio.c with optional clock= DT property")
-> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> Cc: Michael Turquette <mturquette@baylibre.com>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+I ran into build errors on ARM after Willy's newly added generic
+TRANSPARENT_HUGEPAGE_PUD support. We don't support this feature
+on ARM at all, but the patch causes a build error anyway:
 
-Ack.
+In file included from ../kernel/memremap.c:17:0:
+../include/linux/pfn_t.h:108:7: error: 'pud_mkdevmap' declared as function returning an array
+ pud_t pud_mkdevmap(pud_t pud);
 
-Regards,
-Mike
+We don't use a PUD on ARM, so pud_t is defined as pmd_t, which
+in turn is defined as
 
-> ---
->  drivers/clk/clk-gpio.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/clk/clk-gpio.c b/drivers/clk/clk-gpio.c
-> index 19fed65587e8..7b09a265d79f 100644
-> --- a/drivers/clk/clk-gpio.c
-> +++ b/drivers/clk/clk-gpio.c
-> @@ -289,7 +289,7 @@ static void __init of_gpio_clk_setup(struct device_node *node,
->
->         num_parents = of_clk_get_parent_count(node);
->         if (num_parents < 0)
-> -               return;
-> +               num_parents = 0;
->
->         data = kzalloc(sizeof(*data), GFP_KERNEL);
->         if (!data)
-> --
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> a Linux Foundation Collaborative Project
->
+typedef unsigned long pgd_t[2];
 
+on NOMMU and on 2-level MMU configurations. There is an (unused)
+other definition using a struct around the array, which happens to
+work fine here.
 
+There is a comment in the file about the fact the other version
+is "easier on the compiler", and I've traced that version back
+to linux-2.1.80 when ARM support was first merged back in 1998.
 
+It's probably a safe assumption that this is no longer necessary:
+The same logic existed in asm-i386 at the time but was removed
+a year later in 2.3.23pre3. The STRICT_MM_TYPECHECKS logic
+also ended up getting copied into other architectures, which
+use them in various ways:
+
+* both defined, but using strict:
+arch/alpha/include/asm/page.h:#define STRICT_MM_TYPECHECKS
+arch/sparc/include/asm/page_64.h:#define STRICT_MM_TYPECHECKS
+arch/ia64/include/asm/page.h:#  define STRICT_MM_TYPECHECKS
+arch/parisc/include/asm/page.h:#define STRICT_MM_TYPECHECKS
+
+* both defined, but using non-strict:
+arch/arc/include/asm/page.h:#undef STRICT_MM_TYPECHECKS
+arch/arm/include/asm/pgtable-2level-types.h:#undef STRICT_MM_TYPECHECKS
+arch/arm/include/asm/pgtable-3level-types.h:#undef STRICT_MM_TYPECHECKS
+arch/arm64/include/asm/pgtable-types.h:#undef STRICT_MM_TYPECHECKS
+arch/sparc/include/asm/page_32.h:/* #define STRICT_MM_TYPECHECKS */
+arch/unicore32/include/asm/page.h:#undef STRICT_MM_TYPECHECKS
+
+* Kconfig option:
+arch/powerpc/Kconfig.debug:config STRICT_MM_TYPECHECKS
+			 	default n
+
+Everthing else uses only the strict definitions.
+
+For the moment, this only does the minimal change to fix things
+on ARM in linux-next. At least in case of sparc32, passing structs
+to functions is traditionally inefficient and the non-strict version
+should be kept, whether we change any of the other architectures
+depends on further testing.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: a27da20ed50e ("mm: add support for PUD-sized transparent hugepages")
+Link: http://www.spinics.net/lists/linux-mm/msg101404.html
+---
+ arch/arm/include/asm/page-nommu.h           | 4 ++--
+ arch/arm/include/asm/pgtable-2level-types.h | 7 +++----
+ 2 files changed, 5 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/include/asm/page-nommu.h b/arch/arm/include/asm/page-nommu.h
+index d1b162a18dcb..3db1ca22fecb 100644
+--- a/arch/arm/include/asm/page-nommu.h
++++ b/arch/arm/include/asm/page-nommu.h
+@@ -31,12 +31,12 @@
+  */
+ typedef unsigned long pte_t;
+ typedef unsigned long pmd_t;
+-typedef unsigned long pgd_t[2];
++typedef struct { unsigned long pgd[2]; } pgd_t;
+ typedef unsigned long pgprot_t;
+ 
+ #define pte_val(x)      (x)
+ #define pmd_val(x)      (x)
+-#define pgd_val(x)	((x)[0])
++#define pgd_val(x)	((x).pgd[0])
+ #define pgprot_val(x)   (x)
+ 
+ #define __pte(x)        (x)
+diff --git a/arch/arm/include/asm/pgtable-2level-types.h b/arch/arm/include/asm/pgtable-2level-types.h
+index 66cb5b0e89c5..9b9815d5ebd6 100644
+--- a/arch/arm/include/asm/pgtable-2level-types.h
++++ b/arch/arm/include/asm/pgtable-2level-types.h
+@@ -24,6 +24,9 @@
+ typedef u32 pteval_t;
+ typedef u32 pmdval_t;
+ 
++typedef struct { pmdval_t pgd[2]; } pgd_t;
++#define pgd_val(x)	((x).pgd[0])
++
+ #undef STRICT_MM_TYPECHECKS
+ 
+ #ifdef STRICT_MM_TYPECHECKS
+@@ -32,12 +35,10 @@ typedef u32 pmdval_t;
+  */
+ typedef struct { pteval_t pte; } pte_t;
+ typedef struct { pmdval_t pmd; } pmd_t;
+-typedef struct { pmdval_t pgd[2]; } pgd_t;
+ typedef struct { pteval_t pgprot; } pgprot_t;
+ 
+ #define pte_val(x)      ((x).pte)
+ #define pmd_val(x)      ((x).pmd)
+-#define pgd_val(x)	((x).pgd[0])
+ #define pgprot_val(x)   ((x).pgprot)
+ 
+ #define __pte(x)        ((pte_t) { (x) } )
+@@ -50,12 +51,10 @@ typedef struct { pteval_t pgprot; } pgprot_t;
+  */
+ typedef pteval_t pte_t;
+ typedef pmdval_t pmd_t;
+-typedef pmdval_t pgd_t[2];
+ typedef pteval_t pgprot_t;
+ 
+ #define pte_val(x)      (x)
+ #define pmd_val(x)      (x)
+-#define pgd_val(x)	((x)[0])
+ #define pgprot_val(x)   (x)
+ 
+ #define __pte(x)        (x)
 -- 
-Michael Turquette
-CEO
-BayLibre - At the Heart of Embedded Linux
-http://baylibre.com/
+2.7.0
