@@ -1,86 +1,75 @@
 From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Fri, 19 Feb 2016 11:46:21 -0600
-Subject: [PATCH v3 0/2] flag contiguous PTEs in linear mapping
-Message-ID: <1455903983-23910-1-git-send-email-jeremy.linton@arm.com>
+Date: Fri, 19 Feb 2016 11:46:22 -0600
+Subject: [PATCH v3 1/2] arm64: mm: Enable CONT_SIZE aligned sections for 64k
+ page kernels.
+In-Reply-To: <1455903983-23910-1-git-send-email-jeremy.linton@arm.com>
+References: <1455903983-23910-1-git-send-email-jeremy.linton@arm.com>
+Message-ID: <1455903983-23910-2-git-send-email-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a rebase of the previous contiguous ptes in linear map patches
-on top of Mark Rutland's fixmap changes. Those changes appear to be sufficient
-to allow this patch set to boot on JunoR2, Seattle and the xgene/m400. I've
-also done basic testing with RODATA turned on. In all cases with ACPI systems.
+This change allows ALIGN_RODATA for 64k and 16k kernels.
+In the case of 64k/16k kernels it actually aligns to the CONT_SIZE (2M)
+rather than the SECTION_SIZE (which is 512M/32M). This makes it generally
+more useful, given contiguous hit enabled kernels.
 
-This patch also adds the ability to align 64k kernels on the 2M CONT boundary
-which helps to assure that a number of the sections are completely mapped with
-CONT bits. There remain a number of holes due to smaller remapping operations
-that don't really affect the page protection states. That can be worked around
-in a number of cases if the code gets smart enough to detect that the break
-doesn't result in an actual change in permissions. Some of these are visible
-in the included example where its not initially obvious why a contiguous 2M
-region isn't marked as such until digging into it.
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+---
+ arch/arm64/Kconfig.debug        | 13 +++++++------
+ arch/arm64/kernel/vmlinux.lds.S | 11 ++++++-----
+ 2 files changed, 13 insertions(+), 11 deletions(-)
 
-Changed v1->v2:
-    16k kernels now use CONT_SIZE rather than SECTION_SIZE for alignment.
-Changed v2->v3:
-    Updated commit log, and Kconfig description to explicitly state 2M alignment
-    Added Ard's Reviewed by.
-
-With 64k pages, and section alignment enabled the kernel looks like:
----[ Kernel Mapping ]---
-0xfffffe0000000000-0xfffffe0000200000           2M     RW NX SHD AF    CON     UXN MEM/NORMAL
-0xfffffe0000200000-0xfffffe0001200000          16M     ro x  SHD AF    CON     UXN MEM/NORMAL
-0xfffffe0001200000-0xfffffe0001400000           2M     RW NX SHD AF    CON     UXN MEM/NORMAL
-0xfffffe0001400000-0xfffffe0001600000           2M     RW NX SHD AF            UXN MEM/NORMAL
-0xfffffe0001600000-0xfffffe0002600000          16M     RW NX SHD AF    CON     UXN MEM/NORMAL
-0xfffffe0002600000-0xfffffe0002800000           2M     RW NX SHD AF            UXN MEM/NORMAL
-0xfffffe0002800000-0xfffffe0020000000         472M     RW NX SHD AF    CON     UXN MEM/NORMAL
-0xfffffe0020000000-0xfffffe0060000000           1G     RW NX SHD AF        BLK UXN MEM/NORMAL
-0xfffffe00600f0000-0xfffffe0060200000        1088K     RW NX SHD AF            UXN MEM/NORMAL
-0xfffffe0060200000-0xfffffe0076400000         354M     RW NX SHD AF    CON     UXN MEM/NORMAL
-0xfffffe0076400000-0xfffffe0076600000           2M     RW NX SHD AF            UXN MEM/NORMAL
-0xfffffe0076600000-0xfffffe0078e00000          40M     RW NX SHD AF    CON     UXN MEM/NORMAL
-0xfffffe00793b0000-0xfffffe0079400000         320K     RW NX SHD AF            UXN MEM/NORMAL
-0xfffffe0079400000-0xfffffe007e200000          78M     RW NX SHD AF    CON     UXN MEM/NORMAL
-0xfffffe007e200000-0xfffffe007e3d0000        1856K     RW NX SHD AF            UXN MEM/NORMAL
-0xfffffe007e420000-0xfffffe007e600000        1920K     RW NX SHD AF            UXN MEM/NORMAL
-0xfffffe007e600000-0xfffffe007f000000          10M     RW NX SHD AF    CON     UXN MEM/NORMAL
-0xfffffe0800000000-0xfffffe0980000000           6G     RW NX SHD AF        BLK UXN MEM/NORMAL
-
-With 4k pages
----[ Kernel Mapping ]---
-0xffffffc000000000-0xffffffc000200000           2M     RW NX SHD AF        BLK UXN MEM/NORMAL
-0xffffffc000200000-0xffffffc001200000          16M     ro x  SHD AF        BLK UXN MEM/NORMAL
-0xffffffc001200000-0xffffffc001400000           2M     RW NX SHD AF        BLK UXN MEM/NORMAL
-0xffffffc001400000-0xffffffc0015c0000        1792K     RW NX SHD AF    CON     UXN MEM/NORMAL
-0xffffffc0015c0000-0xffffffc0015d0000          64K     RW NX SHD AF            UXN MEM/NORMAL
-0xffffffc0015d0000-0xffffffc001600000         192K     RW NX SHD AF    CON     UXN MEM/NORMAL
-0xffffffc001600000-0xffffffc002600000          16M     RW NX SHD AF        BLK UXN MEM/NORMAL
-0xffffffc002600000-0xffffffc002620000         128K     RW NX SHD AF    CON     UXN MEM/NORMAL
-0xffffffc002620000-0xffffffc002630000          64K     RW NX SHD AF            UXN MEM/NORMAL
-0xffffffc002630000-0xffffffc002800000        1856K     RW NX SHD AF    CON     UXN MEM/NORMAL
-0xffffffc002800000-0xffffffc060000000        1496M     RW NX SHD AF        BLK UXN MEM/NORMAL
-0xffffffc0600f0000-0xffffffc060200000        1088K     RW NX SHD AF    CON     UXN MEM/NORMAL
-0xffffffc060200000-0xffffffc076400000         354M     RW NX SHD AF        BLK UXN MEM/NORMAL
-0xffffffc076400000-0xffffffc076590000        1600K     RW NX SHD AF    CON     UXN MEM/NORMAL
-0xffffffc076590000-0xffffffc076595000          20K     RW NX SHD AF            UXN MEM/NORMAL
-0xffffffc076596000-0xffffffc0765a0000          40K     RW NX SHD AF            UXN MEM/NORMAL
-0xffffffc0765a0000-0xffffffc076600000         384K     RW NX SHD AF    CON     UXN MEM/NORMAL
-0xffffffc076600000-0xffffffc078e00000          40M     RW NX SHD AF        BLK UXN MEM/NORMAL
-0xffffffc0793b0000-0xffffffc079400000         320K     RW NX SHD AF    CON     UXN MEM/NORMAL
-0xffffffc079400000-0xffffffc07e200000          78M     RW NX SHD AF        BLK UXN MEM/NORMAL
-0xffffffc07e200000-0xffffffc07e3d0000        1856K     RW NX SHD AF    CON     UXN MEM/NORMAL
-0xffffffc07e420000-0xffffffc07e600000        1920K     RW NX SHD AF    CON     UXN MEM/NORMAL
-0xffffffc07e600000-0xffffffc07f000000          10M     RW NX SHD AF        BLK UXN MEM/NORMAL
-0xffffffc800000000-0xffffffc980000000           6G     RW NX SHD AF        BLK UXN MEM/NORMAL
-
-Jeremy Linton (2):
-  arm64: mm: Enable CONT_SIZE aligned sections for 64k page kernels.
-  arm64: Mark kernel page ranges contiguous
-
- arch/arm64/Kconfig.debug        | 13 +++++----
- arch/arm64/kernel/vmlinux.lds.S | 11 +++----
- arch/arm64/mm/mmu.c             | 64 +++++++++++++++++++++++++++++++++++++----
- 3 files changed, 71 insertions(+), 17 deletions(-)
-
+diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
+index e13c4bf..9d33d5e 100644
+--- a/arch/arm64/Kconfig.debug
++++ b/arch/arm64/Kconfig.debug
+@@ -59,15 +59,16 @@ config DEBUG_RODATA
+           If in doubt, say Y
+ 
+ config DEBUG_ALIGN_RODATA
+-	depends on DEBUG_RODATA && ARM64_4K_PAGES
++	depends on DEBUG_RODATA
+ 	bool "Align linker sections up to SECTION_SIZE"
+ 	help
+ 	  If this option is enabled, sections that may potentially be marked as
+-	  read only or non-executable will be aligned up to the section size of
+-	  the kernel. This prevents sections from being split into pages and
+-	  avoids a potential TLB penalty. The downside is an increase in
+-	  alignment and potentially wasted space. Turn on this option if
+-	  performance is more important than memory pressure.
++	  read only or non-executable will be aligned up to the section size
++	  or contiguous hint size of the kernel (2 MiB). This prevents sections
++	  from being split into pages and avoids a potential TLB penalty. The
++	  downside is an increase in alignment and potentially wasted space.
++	  Turn on this option if performance is more important than memory
++	  pressure.
+ 
+ 	  If in doubt, say N
+ 
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index b78a3c7..8f4fc2c 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -63,13 +63,14 @@ PECOFF_FILE_ALIGNMENT = 0x200;
+ #endif
+ 
+ #if defined(CONFIG_DEBUG_ALIGN_RODATA)
+-#define ALIGN_DEBUG_RO			. = ALIGN(1<<SECTION_SHIFT);
+-#define ALIGN_DEBUG_RO_MIN(min)		ALIGN_DEBUG_RO
++#if defined(CONFIG_ARM64_4K_PAGES)
++#define ALIGN_DEBUG_RO_MIN(min)		. = ALIGN(SECTION_SIZE);
++#else
++#define ALIGN_DEBUG_RO_MIN(min)		. = ALIGN(CONT_SIZE);
++#endif
+ #elif defined(CONFIG_DEBUG_RODATA)
+-#define ALIGN_DEBUG_RO			. = ALIGN(1<<PAGE_SHIFT);
+-#define ALIGN_DEBUG_RO_MIN(min)		ALIGN_DEBUG_RO
++#define ALIGN_DEBUG_RO_MIN(min)		. = ALIGN(PAGE_SIZE);
+ #else
+-#define ALIGN_DEBUG_RO
+ #define ALIGN_DEBUG_RO_MIN(min)		. = ALIGN(min);
+ #endif
+ 
 -- 
 2.4.3
