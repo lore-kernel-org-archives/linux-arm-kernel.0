@@ -1,47 +1,27 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 19 Feb 2016 23:36:06 +0100
-Subject: [PATCH] thermal: mediatek: add missing dependencies
-Message-ID: <1455921381-1881305-1-git-send-email-arnd@arndb.de>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 19 Feb 2016 14:37:59 -0800
+Subject: [GIT PULL 1/2] bcm2835 changes to defconfigs for 4.6
+In-Reply-To: <56C625D0.3010504@gmail.com>
+References: <1455764208-5679-1-git-send-email-eric@anholt.net>
+ <56C625D0.3010504@gmail.com>
+Message-ID: <56C79947.2050906@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The newly added mtk_thermal driver uses the generic reset
-and nvmem infrastructure, but lacks a dependency that enforces
-them from actually being present:
+On 18/02/16 12:13, Florian Fainelli wrote:
+> On 17/02/16 18:56, Eric Anholt wrote:
+>> The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
+>>
+>>   Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+>>
+>> are available in the git repository at:
+>>
+>>   git at github.com:anholt/linux.git bcm2835-defconfig-next-2016-02-17
+> 
+> Same here, could not find this branch, should I pull from
+> bcm2835-defconfig-next directly?
 
-drivers/thermal/mtk_thermal.c: In function 'mtk_thermal_probe':
-drivers/thermal/mtk_thermal.c:560:8: error: implicit declaration of function 'device_reset' [-Werror=implicit-function-declaration]
-drivers/thermal/built-in.o: In function `mtk_thermal_probe':
-mtk_thermal.c:(.text+0x7fb0): undefined reference to `nvmem_cell_get'
-mtk_thermal.c:(.text+0x7fd8): undefined reference to `nvmem_cell_read'
-mtk_thermal.c:(.text+0x7fe4): undefined reference to `nvmem_cell_put'
-
-Without CONFIG_THERMAL, the driver cannot build, so this needs
-to be a hard dependency.
-
-For CONFIG_NVMEM, the header file allows building the driver even
-when the subsystem is disabled, but we get the link error above
-when nvmem is built as a module and the thermal driver is built-in,
-so we can allow compile-testing when NVMEM is completely disabled,
-but otherwise require the dependency.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/thermal/Kconfig | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
-index 5e7c97a3f1d8..75d164341f0d 100644
---- a/drivers/thermal/Kconfig
-+++ b/drivers/thermal/Kconfig
-@@ -368,6 +368,8 @@ config INTEL_PCH_THERMAL
- config MTK_THERMAL
- 	tristate "Temperature sensor driver for mediatek SoCs"
- 	depends on ARCH_MEDIATEK || COMPILE_TEST
-+	depends on NVMEM || (!NVMEM && COMPILE_TEST)
-+	depends on RESET_CONTROLLER
- 	default y
- 	help
- 	  Enable this option if you want to have support for thermal management
+Eric, I would like to send the pull request soon, and this is one of the
+gating items, please advise. Thanks!
 -- 
-2.7.0
+Florian
