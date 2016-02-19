@@ -1,68 +1,86 @@
-From: rabin.vincent@axis.com (Rabin Vincent)
-Date: Fri, 19 Feb 2016 09:12:04 +0100
-Subject: [PATCH 2/2] ARM: dma-mapping: fix alloc/free for coherent + CMA +
- gfp=0
-In-Reply-To: <1455869524-13874-1-git-send-email-rabin.vincent@axis.com>
-References: <1455869524-13874-1-git-send-email-rabin.vincent@axis.com>
-Message-ID: <1455869524-13874-2-git-send-email-rabin.vincent@axis.com>
+From: Alexey.Brodkin@synopsys.com (Alexey Brodkin)
+Date: Fri, 19 Feb 2016 11:15:01 +0300
+Subject: [PATCH] drm: ARM HDLCD - get rid of devm_clk_put()
+Message-ID: <1455869701-23437-1-git-send-email-abrodkin@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Given a device which uses arm_coherent_dma_ops and on which
-dev_get_cma_area(dev) returns non-NULL, the following usage of the DMA
-API with gfp=0 results in a memory leak and memory corruption.
+Clock is acquired with devm_clk_get() which already manages
+corresponding resource.
 
- p = dma_alloc_coherent(dev, sz, &dma, 0);
- if (p)
- 	dma_free_coherent(dev, sz, p, dma);
+I.e. in case of driver removal or failure on installaiton
+clock resources will be automatically released and explicit
+call of devm_clk_put() is not required.
 
-The memory leak is because the alloc allocates using
-__alloc_simple_buffer() but the free attempts
-dma_release_from_contiguous(), which does not do free anything since the
-page is not in the CMA area.
-
-The memory corruption is because the free calls __dma_remap() on a page
-which is backed by only first level page tables.  The
-apply_to_page_range() + __dma_update_pte() loop ends up interpreting the
-section mapping as the address to a second level page table and writing
-the new PTE to memory which is not used by page tables.
-
-We don't have access to the GFP flags used for allocation in the free
-function, so fix it by using the new in_cma() function to determine if a
-buffer was allocated with CMA, similar to how we check for
-__in_atomic_pool().
-
-Fixes: 21caf3a7 ("ARM: 8398/1: arm DMA: Fix allocation from CMA for coherent DMA")
-Signed-off-by: Rabin Vincent <rabin.vincent@axis.com>
+Signed-off-by: Alexey Brodkin <abrodkin@synopsys.com>
+Cc: Liviu Dudau <Liviu.Dudau@arm.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Daniel Vetter <daniel.vetter@ffwll.ch>
+Cc: David Airlie <airlied@linux.ie>
+Cc: Robin Murphy <robin.murphy@arm.com>
 ---
- arch/arm/mm/dma-mapping.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ drivers/gpu/drm/arm/hdlcd_drv.c | 15 +++------------
+ 1 file changed, 3 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 0eca381..a4592c7 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -749,16 +749,16 @@ static void __arm_dma_free(struct device *dev, size_t size, void *cpu_addr,
- 		__dma_free_buffer(page, size);
- 	} else if (!is_coherent && __free_from_pool(cpu_addr, size)) {
- 		return;
--	} else if (!dev_get_cma_area(dev)) {
--		if (want_vaddr && !is_coherent)
--			__dma_free_remap(cpu_addr, size);
--		__dma_free_buffer(page, size);
--	} else {
-+	} else if (in_cma(dev_get_cma_area(dev), page, size >> PAGE_SHIFT)) {
- 		/*
- 		 * Non-atomic allocations cannot be freed with IRQs disabled
- 		 */
- 		WARN_ON(irqs_disabled());
- 		__free_from_contiguous(dev, page, cpu_addr, size, want_vaddr);
-+	} else {
-+		if (want_vaddr && !is_coherent)
-+			__dma_free_remap(cpu_addr, size);
-+		__dma_free_buffer(page, size);
+diff --git a/drivers/gpu/drm/arm/hdlcd_drv.c b/drivers/gpu/drm/arm/hdlcd_drv.c
+index 56b829f..734849f 100644
+--- a/drivers/gpu/drm/arm/hdlcd_drv.c
++++ b/drivers/gpu/drm/arm/hdlcd_drv.c
+@@ -55,16 +55,14 @@ static int hdlcd_load(struct drm_device *drm, unsigned long flags)
+ 	hdlcd->mmio = devm_ioremap_resource(drm->dev, res);
+ 	if (IS_ERR(hdlcd->mmio)) {
+ 		DRM_ERROR("failed to map control registers area\n");
+-		ret = PTR_ERR(hdlcd->mmio);
+ 		hdlcd->mmio = NULL;
+-		goto fail;
++		return PTR_ERR(hdlcd->mmio);
  	}
- }
  
+ 	version = hdlcd_read(hdlcd, HDLCD_REG_VERSION);
+ 	if ((version & HDLCD_PRODUCT_MASK) != HDLCD_PRODUCT_ID) {
+ 		DRM_ERROR("unknown product id: 0x%x\n", version);
+-		ret = -EINVAL;
+-		goto fail;
++		return -EINVAL;
+ 	}
+ 	DRM_INFO("found ARM HDLCD version r%dp%d\n",
+ 		(version & HDLCD_VERSION_MAJOR_MASK) >> 8,
+@@ -73,7 +71,7 @@ static int hdlcd_load(struct drm_device *drm, unsigned long flags)
+ 	/* Get the optional framebuffer memory resource */
+ 	ret = of_reserved_mem_device_init(drm->dev);
+ 	if (ret && ret != -ENODEV)
+-		goto fail;
++		return ret;
+ 
+ 	ret = dma_set_mask_and_coherent(drm->dev, DMA_BIT_MASK(32));
+ 	if (ret)
+@@ -101,8 +99,6 @@ irq_fail:
+ 	drm_crtc_cleanup(&hdlcd->crtc);
+ setup_fail:
+ 	of_reserved_mem_device_release(drm->dev);
+-fail:
+-	devm_clk_put(drm->dev, hdlcd->clk);
+ 
+ 	return ret;
+ }
+@@ -412,7 +408,6 @@ err_unload:
+ 	pm_runtime_put_sync(drm->dev);
+ 	pm_runtime_disable(drm->dev);
+ 	of_reserved_mem_device_release(drm->dev);
+-	devm_clk_put(dev, hdlcd->clk);
+ err_free:
+ 	drm_dev_unref(drm);
+ 
+@@ -436,10 +431,6 @@ static void hdlcd_drm_unbind(struct device *dev)
+ 	pm_runtime_put_sync(drm->dev);
+ 	pm_runtime_disable(drm->dev);
+ 	of_reserved_mem_device_release(drm->dev);
+-	if (!IS_ERR(hdlcd->clk)) {
+-		devm_clk_put(drm->dev, hdlcd->clk);
+-		hdlcd->clk = NULL;
+-	}
+ 	drm_mode_config_cleanup(drm);
+ 	drm_dev_unregister(drm);
+ 	drm_dev_unref(drm);
 -- 
-2.7.0
+2.5.0
