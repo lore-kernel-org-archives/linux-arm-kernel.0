@@ -1,48 +1,55 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Fri, 19 Feb 2016 07:50:12 +0100
-Subject: [PATCH v2] ARM: imx: Do L2 errata only if the L2 cache isn't enabled
-Message-ID: <1455864612-12089-1-git-send-email-dirk.behme@de.bosch.com>
+From: jayachandran.chandrashekaran@broadcom.com (Jayachandran Chandrashekaran Nair)
+Date: Fri, 19 Feb 2016 12:28:26 +0530
+Subject: [PATCH 1/4] arm64: Broadcom Vulcan support
+In-Reply-To: <20160217171616.GH32647@leverpostej>
+References: <1455389195-31870-1-git-send-email-jchandra@broadcom.com>
+ <1455389195-31870-2-git-send-email-jchandra@broadcom.com>
+ <20160217171616.GH32647@leverpostej>
+Message-ID: <CAKc_7PXte5nmtFRv4cQXJSFuWtAWnrBazYQJAEejX8ifxXRaMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All the generic L2 cache handling code is encapsulated by a
-check if the L2 cache is enabled. If it's enabled already, the code
-is skipped. The write to the L2-Cache controller from non-secure
-world causes an imprecise external abort. This is needed in
-scenarios where one of the cores runs an other OS, e.g. an RTOS.
+On Wed, Feb 17, 2016 at 10:46 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> Hi,
+>
+> On Sun, Feb 14, 2016 at 12:16:32AM +0530, Jayachandran C wrote:
+>> From: Zi Shen Lim <zlim@broadcom.com>
+>
+>> +     compatible = "brcm,vulcan-eval", "brcm,vulcan";
+>
+> You use "brcm,vulcan" as the compatible string for both the platform and
+> the CPU nodes. You need different strings.
+>
+>> +
+>> +     memory {
+>> +             device_type = "memory";
+>> +             reg = <0x00000000 0x80000000 0x0 0x80000000>,  /* 2G @ 2G  */
+>> +                   <0x00000008 0x80000000 0x0 0x80000000>;  /* 2G @ 34G */
+>> +     };
+>
+>> +/memreserve/ 0x80000000 0x00010000;
+>
+> What is this for?
 
-For the i.MX6 specific L2 cache handling we missed this check.
-Add it.
+This seems to left over from the time we were using spin. Will take
+it out. Thanks.
 
-Signed-off-by: Marcel Grosshans <MarcelViktor.Grosshans@de.bosch.com>
-Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
----
-Changes in v2: Update the commit message regarding the non-secure use case.
+>> +
+>> +/ {
+>> +     model = "Broadcom Vulcan";
+>> +     compatible = "brcm,vulcan";
+>
+> As above, it doesn't make sense to have the same compatible string for
+> both the platform as a whole and the CPU.
 
- arch/arm/mach-imx/system.c | 4 ++++
- 1 file changed, 4 insertions(+)
+Will fix this in v2.
 
-diff --git a/arch/arm/mach-imx/system.c b/arch/arm/mach-imx/system.c
-index 51c3501..a600bd7 100644
---- a/arch/arm/mach-imx/system.c
-+++ b/arch/arm/mach-imx/system.c
-@@ -106,6 +106,9 @@ void __init imx_init_l2cache(void)
- 		goto out;
- 	}
- 
-+	if (readl_relaxed(l2x0_base + L2X0_CTRL) & L2X0_CTRL_EN)
-+		goto skip_if_enabled;
-+
- 	/* Configure the L2 PREFETCH and POWER registers */
- 	val = readl_relaxed(l2x0_base + L310_PREFETCH_CTRL);
- 	val |= 0x70800000;
-@@ -122,6 +125,7 @@ void __init imx_init_l2cache(void)
- 		val &= ~(1 << 30 | 1 << 23);
- 	writel_relaxed(val, l2x0_base + L310_PREFETCH_CTRL);
- 
-+skip_if_enabled:
- 	iounmap(l2x0_base);
- 	of_node_put(np);
- 
--- 
-2.5.0
+>> +                     device_type = "cpu";
+>> +                     compatible = "brcm,vulcan", "arm,armv8";
+>> +                     reg = <0x0 0x0>;
+>> +                     enable-method = "psci";
+>> +             };
+
+Thanks for the review.
+
+JC.
