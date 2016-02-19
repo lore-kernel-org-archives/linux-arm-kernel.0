@@ -1,39 +1,64 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 19 Feb 2016 09:46:27 +0100
-Subject: [02/11] video: ARM CLCD: support DT signal inversion flags
-In-Reply-To: <0cebf93a-ee0a-3637-3242-8aed266df091@broadcom.com>
-References: <1454594660-7532-3-git-send-email-linus.walleij@linaro.org>
- <0cebf93a-ee0a-3637-3242-8aed266df091@broadcom.com>
-Message-ID: <CACRpkdbGCidu_3qbTYf7WSoAhafU4Z5W0jDs4CGtH5XwSf14aA@mail.gmail.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Fri, 19 Feb 2016 08:47:47 +0000
+Subject: [PATCH 1/9] ARM: ARMv7-M uses BE-8, not BE-32
+In-Reply-To: <2702301.CTWUiSsjZR@wuerfel>
+References: <1455804123-2526139-1-git-send-email-arnd@arndb.de>
+ <1455804123-2526139-2-git-send-email-arnd@arndb.de>
+ <alpine.LFD.2.20.1602181102570.13632@knanqh.ubzr>
+ <2702301.CTWUiSsjZR@wuerfel>
+Message-ID: <56C6D6B3.60605@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 17, 2016 at 7:10 PM, Ray Jui <ray.jui@broadcom.com> wrote:
+On 18/02/16 16:12, Arnd Bergmann wrote:
+> On Thursday 18 February 2016 11:06:08 Nicolas Pitre wrote:
+>> On Thu, 18 Feb 2016, Arnd Bergmann wrote:
+>>
+>>> When configuring the kernel for big-endian, we set either BE-8 or BE-32
+>>> based on the CPU architecture level. Until linux-4.4, we did not have
+>>> any ARMv7-M platform allowing big-endian builds, but now i.MX/Vybrid
+>>> is in that category, adn we get a build error because of this:
+>>>
+>>> arch/arm/kernel/module-plts.c: In function 'get_module_plt':
+>>> arch/arm/kernel/module-plts.c:60:46: error: implicit declaration of function '__opcode_to_mem_thumb32' [-Werror=implicit-function-declaration]
+>>>
+>>> This comes down to picking the wrong default, ARMv7-M uses BE8
+>>> like ARMv7-A does. Changing the default gets the kernel to compile
+>>> and presumably works.
+>>
+>> Was it tested without BE8 when it was submitted upstream? I don't think 
+>> you can switch this freely on a given hardware platform and expect it to 
+>> still work.
+>>
+>>
+> 
+> mach-imx contains a number of different SoCs, and one SoC was recently
+> tested successfully after a number of endianess bugs got fixed. This was
+> an i.mx6 using a Cortex-A9 core, but we are now also able to build
+> vybrid vf610 big-endian based on that selection. This SoC supports
+> Linux running either on its Cortex-A5 or its Cortex-M3 (or M4?) cores.
+> 
+> I am rather sure nobody has ever run Linux in big-endian mode on the
+> Cortex-M platform, specifically because it was always wrong and could
+> not be enabled in Kconfig.
 
-> A somewhat related question, how do you see the CLKSEL bit in the TIM2
-> register will be supported in the future? There are some cases where the
-> CLKSEL bit needs to be set, and therefore the "CLCDCLK" instead of "HCLK"
-> reference clock source is selected.
+Ah, it explains why my quick attempt to enable BE for MPS2 (M-class
+platform) failed. With this patch applied I'm able to see Linux booting
+on MPS2 FVP model in BE, not complete boot but it might be due to other
+reasons. So this patch definitely improves things for me, if it helps
 
-I think it's very simple:
+Tested-by: Vladimir Murzin <vladimir.murzin@arm.com>
 
-The DT node usually looks like so:
+Cheers
+Vladimir
 
-display at 10120000 {
-        compatible = "arm,pl110", "arm,primecell";
-(...)
-        clocks = <&oscclk4>, <&pclk>;
-        clock-names = "clcd", "apb_pclk";
-
-Just add a custom attribute pointing to the
-reference clock in this array:
-
-clcd-reference-clock = <0>;
-
-If this is set to <1> "apb_pclk" (i.e. HCLK) is
-the reference, and that bit in TIM2 gets set.
-
-Do you have a system that needs this?
-
-Yours,
-Linus Walleij
+> 
+> 	Arnd
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> 
+> 
