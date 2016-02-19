@@ -1,46 +1,51 @@
-From: zhizhou.zh@gmail.com (Zhizhou Zhang)
-Date: Fri, 19 Feb 2016 20:01:27 +0800
-Subject: [PATCH] arm64: add architecture specified current_pt_regs
-In-Reply-To: <20160219103205.GD27062@arm.com>
-References: <1455796115-7844-1-git-send-email-zhizhou.zh@gmail.com>
- <20160218115824.GA2538@e104818-lin.cambridge.arm.com>
- <CAN1e=SF4iAVZzvs=+rJxmUX_z7KNSwegxWaor3gDfXD-=MAQ4Q@mail.gmail.com>
- <20160219103205.GD27062@arm.com>
-Message-ID: <CAN1e=SERqTUU_mLwyOQFonz2sVT1xUQAxUs7WOqCNWe_GxCj4w@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 19 Feb 2016 13:12:29 +0100
+Subject: [PATCH V2 1/2] pinctrl: mediatek: Modify pinctrl bindings for
+ mt7623
+In-Reply-To: <56C6DF23.3060202@openwrt.org>
+References: <1455866238-6102-1-git-send-email-blogic@openwrt.org>
+ <CACRpkdYiQop2qDNuh4N2YZy2DTy9mOEyERro8hT4YogCPc2LGw@mail.gmail.com>
+ <56C6DF23.3060202@openwrt.org>
+Message-ID: <CACRpkdbWad9iZV9LYkvEFRZn_BQDtPEAy3JE0uuR569UwMJkHQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 19, 2016 at 6:32 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Fri, Feb 19, 2016 at 10:30:09AM +0800, Zhi-zhou wrote:
->> On Thu, Feb 18, 2016 at 7:58 PM, Catalin Marinas
->> <catalin.marinas@arm.com> wrote:
->> >
->> > On Thu, Feb 18, 2016 at 07:48:35PM +0800, Zhi-zhou Zhang wrote:
->> > > From: zhizhou <zhizhou.zh@gmail.com>
->> > >
->> > > This patch is based on the implementation of arm. The generic
->> > > current_pt_regs is implemented with current->stack. It need to access
->> > > memory that would be too expensive.
->> >
->> > Do you have any performance numbers?
+On Fri, Feb 19, 2016 at 10:23 AM, John Crispin <blogic@openwrt.org> wrote:
+> On 19/02/2016 10:03, Linus Walleij wrote:
+>> On Fri, Feb 19, 2016 at 8:17 AM, John Crispin <blogic@openwrt.org> wrote:
 >>
->> I'm using QEMU, so no. Actually this macro isn't heavily used. I just
->> think using the generic
->> implementation is not very nice. It get task_struct from sp_el0, then
->> get stack(which is
->> equal to sp_el0) from task_struct. There are two unnecessary memory accesses.
+>>> Signed-off-by: John Crispin <blogic@openwrt.org>
+>>> Cc: devicetree at vger.kernel.org
+>>> ---
+>>> please apply to the devel-mt2701 branch
+>>>
+>>> Changes in V2
+>>> * make mt7623-pinfunc.h part of patch 1/2
+>>> * make sure the list stays sorted
+>>
+>> Patch applied unless the Mediatek maintainers come with serious
+>> remarks (I can always revert).
+>>
+>> Only minor comments from Yingjoe on the previous version so I guess
+>> it is finished.
+>>
+>> MTK guys: do you even have this SoC? It appears MTK is churning out
+>> a plethora of SoCs and then they land in the lap of the OpenWRT
+>> developers before the MTK maintainers even start to look at it...
+>>
+>> Yours,
+>> Linus Walleij
+>>
 >
-> I'd much rather use the generic implementation unless there's a compelling
-> reason not to. "I think it's not very nice" doesn't really cut it for me!
-Refer to memory twice may incur cache eviction. I'm really a newbie to
-kernel. Anyway, I have a look at kernel and I'm very curious what's
-the 'compelling reason' of 16 architectures implement their own
-current_pt_regs?
->
-> Will
+> I am doing this work in close collaboration with MTK. It is contractual
+> work. MTK is huge and has many BUs, one of them is WCN, formerly known
+> as Ralink. I have supported their MIPS silicon for many years now so
+> asking me to also take care of the Wireless SoCs based on ARM was the
+> natural next step.
 
+Awesome!
 
+Keep doing what you're doing :)
 
--- 
-Regards,
-Zhizhou
+Yours,
+Linus Walleij
