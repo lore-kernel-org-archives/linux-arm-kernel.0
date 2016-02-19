@@ -1,35 +1,52 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Fri, 19 Feb 2016 15:38:44 +0000
-Subject: [PATCH v2 0/5] arm64: kernel: Add support for User Access Override
-In-Reply-To: <20160218180313.GE2538@e104818-lin.cambridge.arm.com>
-References: <1454684330-892-1-git-send-email-james.morse@arm.com>
- <20160218180313.GE2538@e104818-lin.cambridge.arm.com>
-Message-ID: <CAFEAcA9SQjg3GpDpU-Tt8i+JiOcJWQKTNzwLLTC4imiBuiP6+w@mail.gmail.com>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Fri, 19 Feb 2016 07:46:57 -0800
+Subject: [PATCH v3 05/10] serial: mps2-uart: add support for early console
+In-Reply-To: <CAHp75VcosaVcz_aYbpfL-nUH0kBf72SshXU5k95s48Z3wnA5nQ@mail.gmail.com>
+References: <1455617295-23736-1-git-send-email-vladimir.murzin@arm.com>
+ <1455617295-23736-6-git-send-email-vladimir.murzin@arm.com>
+ <CAHp75VdugAq0WnzLHmd9CJHCjBOdBwPqCmC3ARSaVF5XMYGoMw@mail.gmail.com>
+ <56C31F9F.10000@arm.com> <56C6E42E.5070601@arm.com>
+ <CAHp75VcosaVcz_aYbpfL-nUH0kBf72SshXU5k95s48Z3wnA5nQ@mail.gmail.com>
+Message-ID: <56C738F1.2070307@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 February 2016 at 18:03, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Fri, Feb 05, 2016 at 02:58:45PM +0000, James Morse wrote:
->> James Morse (5):
->>   arm64: cpufeature: Change read_cpuid() to use sysreg's mrs_s macro
->>   arm64: add ARMv8.2 id_aa64mmfr2 boiler plate
->>   arm64: kernel: Add support for User Access Override
->>   arm64: cpufeature: Test 'matches' pointer to find the end of the list
->>   arm64: kernel: Don't toggle PAN on systems with UAO
->
-> Patches applied with an additional fixup on top for removing
-> get_thread_info().
+On 02/19/2016 01:57 AM, Andy Shevchenko wrote:
+> On Fri, Feb 19, 2016 at 11:45 AM, Vladimir Murzin
+> <vladimir.murzin@arm.com> wrote:
+>> On 16/02/16 13:09, Vladimir Murzin wrote:
+>>>>> +EARLYCON_DECLARE(mps2, mps2_early_console_setup);
+>>>>>>> +OF_EARLYCON_DECLARE(mps2, "arm,mps2-uart", mps2_early_console_setup);
+>>>>>
+>>>>> IIRC Peter Hurley mentioned you don't need to put both anymore, OF_
+>>>>> one is enough.
+>>>>>
+>>> I've just tried with OF_ only and seems it works fine. Thanks for
+>>> pointing at it!
+>>>
+>>
+>> ..and the reason for that was that I had stdout pointing at uart node.
+>> Now, while testing v4 I end-up with configuration:
+>>
+>> 1) no EARLYCON_DECLARE in mps2-uart.c
+>> 2) stdout not set
+>> 3) cmdline has "earlycon=mps2,0x40004000 console=/dev/ttyMPS"
+>>
+>> and I don't see bootconsole, but if I avoid 1) everything works fine.
+>> So, I'd leave EARLYCON_DECLARE in this patch.
+> 
+> Peter, what is your comment on this?
 
-Just to let you know, unfortunately this series breaks booting the
-kernel on QEMU. We didn't implement the parts of the ID register
-space that the ARM ARM documents as "reserved, RAZ", and so when
-the kernel touches ID_AA64MMFR2 (new in v8.2) QEMU hands it an
-UNDEF. This is obviously a bug in QEMU, and I just sent out a patch
-for it: http://patchwork.ozlabs.org/patch/585237/ -- but of course
-that doesn't do anything for all the buggy QEMUs already in the field.
+That Vladimir is not testing with linux-next.
 
-This is more of a heads-up than a demand that you Do Something,
-but perhaps somebody has a clever idea...
+linux-next has common framework for both command line and OF-defined
+earlycons.
 
-thanks
--- PMM
+Vladimir, if you pull in Greg's tty-next branch, then just
+
+OF_EARLYCON_DECLARE(mps2, "arm,mps2-uart", mps2_early_console_setup);
+
+should enable both command-line and OF-defined earlycons.
+
+Regards,
+Peter Hurley
