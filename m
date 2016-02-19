@@ -1,44 +1,76 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Fri, 19 Feb 2016 14:00:43 +0800
-Subject: [PATCH] ARM64: dts: Mediatek: mt8173-evb: fix access MMC fail issue
-Message-ID: <1455861643-24307-1-git-send-email-eddie.huang@mediatek.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Fri, 19 Feb 2016 15:05:50 +0900
+Subject: [PATCH] arm64, kbuild:  make "make install" not depend on vmlinux
+Message-ID: <1455861950-21832-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MT8173 E1 chip has one bug that if turn off USB power domain, vcore
-power will also be off, thus cause modules using vcore power domain
-fail, like MMC. The E1 chip only found on MT8173-evb board and this
-board only has E1 chip, so implement this as a board specific
-workaround.
+For the same reason as commit 19514fc665ff (arm, kbuild: make "make
+install" not depend on vmlinux), the install targets should never
+trigger the rebuild of the kernel.
 
-Pwrapper use vcore power, so add pwrapper using USB power domain to
-keep USB power domain not to zero and disabled.
-
-Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
-
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
-Sascha sent similar patch before[0], but MMC support runtime-pm,
-vcore power domain still be disabled after MMC and USB suspend.
-This silicon bug already fix in MT8173 MP chip.
 
-[0]:http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/358065.html
----
- arch/arm64/boot/dts/mediatek/mt8173-evb.dts | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm64/Makefile        |  2 +-
+ arch/arm64/boot/Makefile   |  4 ++--
+ arch/arm64/boot/install.sh | 14 ++++++++++++++
+ 3 files changed, 17 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-index e427f04..7453a47 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-+++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-@@ -214,6 +214,9 @@
- };
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index 307237c..b5e3f6d 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -88,7 +88,7 @@ Image: vmlinux
+ Image.%: vmlinux
+ 	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
  
- &pwrap {
-+	/* Only MT8173 E1 needs USB power domain */
-+	power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
+-zinstall install: vmlinux
++zinstall install:
+ 	$(Q)$(MAKE) $(build)=$(boot) $@
+ 
+ %.dtb: scripts
+diff --git a/arch/arm64/boot/Makefile b/arch/arm64/boot/Makefile
+index abcbba2..305c552 100644
+--- a/arch/arm64/boot/Makefile
++++ b/arch/arm64/boot/Makefile
+@@ -34,10 +34,10 @@ $(obj)/Image.lzma: $(obj)/Image FORCE
+ $(obj)/Image.lzo: $(obj)/Image FORCE
+ 	$(call if_changed,lzo)
+ 
+-install: $(obj)/Image
++install:
+ 	$(CONFIG_SHELL) $(srctree)/$(src)/install.sh $(KERNELRELEASE) \
+ 	$(obj)/Image System.map "$(INSTALL_PATH)"
+ 
+-zinstall: $(obj)/Image.gz
++zinstall:
+ 	$(CONFIG_SHELL) $(srctree)/$(src)/install.sh $(KERNELRELEASE) \
+ 	$(obj)/Image.gz System.map "$(INSTALL_PATH)"
+diff --git a/arch/arm64/boot/install.sh b/arch/arm64/boot/install.sh
+index 12ed78a..d91e1f0 100644
+--- a/arch/arm64/boot/install.sh
++++ b/arch/arm64/boot/install.sh
+@@ -20,6 +20,20 @@
+ #   $4 - default install path (blank if root directory)
+ #
+ 
++verify () {
++	if [ ! -f "$1" ]; then
++		echo ""                                                   1>&2
++		echo " *** Missing file: $1"                              1>&2
++		echo ' *** You need to run "make" before "make install".' 1>&2
++		echo ""                                                   1>&2
++		exit 1
++	fi
++}
 +
- 	pmic: mt6397 {
- 		compatible = "mediatek,mt6397";
- 		interrupt-parent = <&pio>;
++# Make sure the files actually exist
++verify "$2"
++verify "$3"
++
+ # User may have a custom install script
+ if [ -x ~/bin/${INSTALLKERNEL} ]; then exec ~/bin/${INSTALLKERNEL} "$@"; fi
+ if [ -x /sbin/${INSTALLKERNEL} ]; then exec /sbin/${INSTALLKERNEL} "$@"; fi
 -- 
 1.9.1
