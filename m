@@ -1,75 +1,134 @@
 From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Fri, 19 Feb 2016 11:46:22 -0600
-Subject: [PATCH v3 1/2] arm64: mm: Enable CONT_SIZE aligned sections for 64k
- page kernels.
+Date: Fri, 19 Feb 2016 11:46:23 -0600
+Subject: [PATCH v3 2/2] arm64: Mark kernel page ranges contiguous
 In-Reply-To: <1455903983-23910-1-git-send-email-jeremy.linton@arm.com>
 References: <1455903983-23910-1-git-send-email-jeremy.linton@arm.com>
-Message-ID: <1455903983-23910-2-git-send-email-jeremy.linton@arm.com>
+Message-ID: <1455903983-23910-3-git-send-email-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This change allows ALIGN_RODATA for 64k and 16k kernels.
-In the case of 64k/16k kernels it actually aligns to the CONT_SIZE (2M)
-rather than the SECTION_SIZE (which is 512M/32M). This makes it generally
-more useful, given contiguous hit enabled kernels.
+With 64k pages, the next larger segment size is 512M. The linux
+kernel also uses different protection flags to cover its code and data.
+Because of these requirements, the vast majority of the kernel code and
+data structures end up being mapped with 64k pages instead of the larger
+pages common with a 4k page kernel.
 
-Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Recent ARM processors support a contiguous bit in the
+page tables which allows a TLB to cover a range larger than a
+single PTE if that range is mapped into physically contiguous
+RAM.
+
+So, for the kernel its a good idea to set this flag. Some basic
+micro benchmarks show it can significantly reduce the number of
+L1 dTLB refills.
+
 Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
 ---
- arch/arm64/Kconfig.debug        | 13 +++++++------
- arch/arm64/kernel/vmlinux.lds.S | 11 ++++++-----
- 2 files changed, 13 insertions(+), 11 deletions(-)
+ arch/arm64/mm/mmu.c | 64 ++++++++++++++++++++++++++++++++++++++++++++++++-----
+ 1 file changed, 58 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
-index e13c4bf..9d33d5e 100644
---- a/arch/arm64/Kconfig.debug
-+++ b/arch/arm64/Kconfig.debug
-@@ -59,15 +59,16 @@ config DEBUG_RODATA
-           If in doubt, say Y
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 7711554..ab69a99 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -1,3 +1,4 @@
++
+ /*
+  * Based on arch/arm/mm/mmu.c
+  *
+@@ -103,17 +104,49 @@ static void split_pmd(pmd_t *pmd, pte_t *pte)
+ 		 * Need to have the least restrictive permissions available
+ 		 * permissions will be fixed up later
+ 		 */
+-		set_pte(pte, pfn_pte(pfn, PAGE_KERNEL_EXEC));
++		set_pte(pte, pfn_pte(pfn, PAGE_KERNEL_EXEC_CONT));
+ 		pfn++;
+ 	} while (pte++, i++, i < PTRS_PER_PTE);
+ }
  
- config DEBUG_ALIGN_RODATA
--	depends on DEBUG_RODATA && ARM64_4K_PAGES
-+	depends on DEBUG_RODATA
- 	bool "Align linker sections up to SECTION_SIZE"
- 	help
- 	  If this option is enabled, sections that may potentially be marked as
--	  read only or non-executable will be aligned up to the section size of
--	  the kernel. This prevents sections from being split into pages and
--	  avoids a potential TLB penalty. The downside is an increase in
--	  alignment and potentially wasted space. Turn on this option if
--	  performance is more important than memory pressure.
-+	  read only or non-executable will be aligned up to the section size
-+	  or contiguous hint size of the kernel (2 MiB). This prevents sections
-+	  from being split into pages and avoids a potential TLB penalty. The
-+	  downside is an increase in alignment and potentially wasted space.
-+	  Turn on this option if performance is more important than memory
-+	  pressure.
++static void clear_cont_pte_range(pte_t *pte, unsigned long addr)
++{
++	int i;
++
++	pte -= CONT_RANGE_OFFSET(addr);
++	for (i = 0; i < CONT_PTES; i++) {
++		if (pte_cont(*pte))
++			set_pte(pte, pte_mknoncont(*pte));
++		pte++;
++	}
++	flush_tlb_all();
++}
++
++/*
++ * Given a range of PTEs set the pfn and provided page protection flags
++ */
++static void __populate_init_pte(pte_t *pte, unsigned long addr,
++			       unsigned long end, phys_addr_t phys,
++			       pgprot_t prot)
++{
++	unsigned long pfn = __phys_to_pfn(phys);
++
++	do {
++		/* clear all the bits except the pfn, then apply the prot */
++		set_pte(pte, pfn_pte(pfn, prot));
++		pte++;
++		pfn++;
++		addr += PAGE_SIZE;
++	} while (addr != end);
++}
++
+ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
+-				  unsigned long end, unsigned long pfn,
++				  unsigned long end, phys_addr_t phys,
+ 				  pgprot_t prot,
+ 				  phys_addr_t (*pgtable_alloc)(void))
+ {
+ 	pte_t *pte;
++	unsigned long next;
  
- 	  If in doubt, say N
+ 	if (pmd_none(*pmd) || pmd_sect(*pmd)) {
+ 		phys_addr_t pte_phys = pgtable_alloc();
+@@ -127,10 +160,29 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
+ 	BUG_ON(pmd_bad(*pmd));
  
-diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index b78a3c7..8f4fc2c 100644
---- a/arch/arm64/kernel/vmlinux.lds.S
-+++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -63,13 +63,14 @@ PECOFF_FILE_ALIGNMENT = 0x200;
- #endif
+ 	pte = pte_set_fixmap_offset(pmd, addr);
++
+ 	do {
+-		set_pte(pte, pfn_pte(pfn, prot));
+-		pfn++;
+-	} while (pte++, addr += PAGE_SIZE, addr != end);
++		next = min(end, (addr + CONT_SIZE) & CONT_MASK);
++		if (((addr | next | phys) & ~CONT_MASK) == 0) {
++			/* a block of CONT_PTES	 */
++			__populate_init_pte(pte, addr, next, phys,
++					    prot | __pgprot(PTE_CONT));
++		} else {
++			/*
++			 * If the range being split is already inside of a
++			 * contiguous range but this PTE isn't going to be
++			 * contiguous, then we want to unmark the adjacent
++			 * ranges, then update the portion of the range we
++			 * are interrested in.
++			 */
++			clear_cont_pte_range(pte, addr);
++			__populate_init_pte(pte, addr, next, phys, prot);
++		}
++
++		pte += (next - addr) >> PAGE_SHIFT;
++		phys += next - addr;
++		addr = next;
++	} while (addr != end);
  
- #if defined(CONFIG_DEBUG_ALIGN_RODATA)
--#define ALIGN_DEBUG_RO			. = ALIGN(1<<SECTION_SHIFT);
--#define ALIGN_DEBUG_RO_MIN(min)		ALIGN_DEBUG_RO
-+#if defined(CONFIG_ARM64_4K_PAGES)
-+#define ALIGN_DEBUG_RO_MIN(min)		. = ALIGN(SECTION_SIZE);
-+#else
-+#define ALIGN_DEBUG_RO_MIN(min)		. = ALIGN(CONT_SIZE);
-+#endif
- #elif defined(CONFIG_DEBUG_RODATA)
--#define ALIGN_DEBUG_RO			. = ALIGN(1<<PAGE_SHIFT);
--#define ALIGN_DEBUG_RO_MIN(min)		ALIGN_DEBUG_RO
-+#define ALIGN_DEBUG_RO_MIN(min)		. = ALIGN(PAGE_SIZE);
- #else
--#define ALIGN_DEBUG_RO
- #define ALIGN_DEBUG_RO_MIN(min)		. = ALIGN(min);
- #endif
- 
+ 	pte_clear_fixmap();
+ }
+@@ -194,7 +246,7 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
+ 				}
+ 			}
+ 		} else {
+-			alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys),
++			alloc_init_pte(pmd, addr, next, phys,
+ 				       prot, pgtable_alloc);
+ 		}
+ 		phys += next - addr;
 -- 
 2.4.3
