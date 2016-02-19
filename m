@@ -1,94 +1,52 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Fri, 19 Feb 2016 11:50:32 -0600
-Subject: [PATCH v3] arm64: mm: Mark .rodata as RO
-Message-ID: <1455904232-24053-1-git-send-email-jeremy.linton@arm.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 19 Feb 2016 12:57:43 -0500 (EST)
+Subject: [PATCH 4/9] ARM: add CONFIG_PHYS_OFFSET default values
+In-Reply-To: <20160219164344.GY19428@n2100.arm.linux.org.uk>
+References: <1455804123-2526139-1-git-send-email-arnd@arndb.de>
+ <3974581.yknKb3tq7o@wuerfel>
+ <HK2PR06MB056137892B6F968A8A1008C58AA00@HK2PR06MB0561.apcprd06.prod.outlook.com>
+ <14272873.q312Ii8Axy@wuerfel> <20160219164344.GY19428@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.20.1602191239020.13632@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the .rodata section is actually still executable when DEBUG_RODATA
-is enabled. This changes that so the .rodata is actually read only, no execute.
-It also adds the .rodata section to the mem_init banner.
+On Fri, 19 Feb 2016, Russell King - ARM Linux wrote:
 
-Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
----
- arch/arm64/kernel/vmlinux.lds.S |  5 +++--
- arch/arm64/mm/init.c            |  4 +++-
- arch/arm64/mm/mmu.c             | 17 +++++++++++++----
- 3 files changed, 19 insertions(+), 7 deletions(-)
+> ARM_PATCH_PHYS_VIRT exists to support an init-time decided phys offset,
+> and it supports this by modifying each location that the phys offset
+> is used.  It determines this by looking at the location that the early
+> init code is executing, and masking the PC with a value that has been
+> carefully crafted to fit 99% of the existing platforms.
+> 
+> One of the side effects of ARM_PATCH_PHYS_VIRT is that we hide the
+> translation from the compiler, so the compiler is unable to optimise
+> things like virt_to_phys(phys_to_virt(x)) to just 'x' (and yes, such
+> things do happen.)
+> 
+> PHYS_OFFSET exists to cater for the case where ARM_PATCH_PHYS_VIRT is
+> disabled, because either ARM_PATCH_PHYS_VIRT does not work for the
+> platform, or the platform has special requirements and/or requires
+> better performance.  It switches back to the pre-ARM_PATCH_PHYS_VIRT
+> situation where the PHYS_OFFSET is a compile time constant.
+> 
+> Obviously, making PHYS_OFFSET a runtime variable is basically what
+> ARM_PATCH_PHYS_VIRT is doing.  That does not help these cases though,
+> because the problem cases are not whether it's a runtime variable or
+> not, it's how to arrive at the value for it in the first place.
 
-diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index 8f4fc2c..9208f53 100644
---- a/arch/arm64/kernel/vmlinux.lds.S
-+++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -114,8 +114,9 @@ SECTIONS
- 		*(.got)			/* Global offset table		*/
- 	}
- 
--	RO_DATA(PAGE_SIZE)
--	EXCEPTION_TABLE(8)
-+	ALIGN_DEBUG_RO_MIN(0)
-+	RO_DATA(PAGE_SIZE)		/* everything from this point to */
-+	EXCEPTION_TABLE(8)		/* _etext will be marked RO NX   */
- 	NOTES
- 
- 	ALIGN_DEBUG_RO_MIN(PAGE_SIZE)
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 5dd0831..41be7db 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -325,6 +325,7 @@ void __init mem_init(void)
- 		  "    memory  : 0x%16lx - 0x%16lx   (%6ld MB)\n"
- 		  "      .init : 0x%p" " - 0x%p" "   (%6ld KB)\n"
- 		  "      .text : 0x%p" " - 0x%p" "   (%6ld KB)\n"
-+		  "    .rodata : 0x%p" " - 0x%p" "   (%6ld KB)\n"
- 		  "      .data : 0x%p" " - 0x%p" "   (%6ld KB)\n",
- #ifdef CONFIG_KASAN
- 		  MLG(KASAN_SHADOW_START, KASAN_SHADOW_END),
-@@ -341,7 +342,8 @@ void __init mem_init(void)
- 		  MLM(MODULES_VADDR, MODULES_END),
- 		  MLM(PAGE_OFFSET, (unsigned long)high_memory),
- 		  MLK_ROUNDUP(__init_begin, __init_end),
--		  MLK_ROUNDUP(_text, _etext),
-+		  MLK_ROUNDUP(_text, __start_rodata),
-+		  MLK_ROUNDUP(__start_rodata, _etext),
- 		  MLK_ROUNDUP(_sdata, _edata));
- 
- #undef MLK
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index ab69a99..a18dfd0 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -453,10 +453,18 @@ static void __init map_mem(pgd_t *pgd)
- #ifdef CONFIG_DEBUG_RODATA
- void mark_rodata_ro(void)
- {
--	create_mapping_late(__pa(_stext), (unsigned long)_stext,
--				(unsigned long)_etext - (unsigned long)_stext,
--				PAGE_KERNEL_ROX);
-+	unsigned long section_size;
- 
-+	section_size = (unsigned long)__start_rodata - (unsigned long)_stext;
-+	create_mapping_late(__pa(_stext), (unsigned long)_stext,
-+			    section_size, PAGE_KERNEL_ROX);
-+	/*
-+	 * mark .rodata as read only. Use _etext rather than __end_rodata to
-+	 * cover NOTES and EXCEPTION_TABLE.
-+	 */
-+	section_size = (unsigned long)_etext - (unsigned long)__start_rodata;
-+	create_mapping_late(__pa(__start_rodata), (unsigned long)__start_rodata,
-+			    section_size, PAGE_KERNEL_RO);
- }
- #endif
- 
-@@ -486,7 +494,8 @@ static void __init map_kernel_chunk(pgd_t *pgd, void *va_start, void *va_end,
- static void __init map_kernel(pgd_t *pgd)
- {
- 
--	map_kernel_chunk(pgd, _stext, _etext, PAGE_KERNEL_EXEC);
-+	map_kernel_chunk(pgd, _stext, __start_rodata, PAGE_KERNEL_EXEC);
-+	map_kernel_chunk(pgd, __start_rodata, _etext, PAGE_KERNEL);
- 	map_kernel_chunk(pgd, __init_begin, __init_end, PAGE_KERNEL_EXEC);
- 	map_kernel_chunk(pgd, _data, _end, PAGE_KERNEL);
- 
--- 
-2.4.3
+I think what Chris was suggesting is to have the same functionality as 
+PATCH_PHYS_VIRT i.e. determining phys offset at run time while being 
+XIP.  In theory that could mean that the kernel binary becomes 
+independent of the physical location in flash where it executes from.
+
+Arriving at the value for phys offset could be done based on sp instead 
+of pc.  That's assuming the bootloader did not clobber sp before calling 
+into the kernel.
+
+But this is rather fragile. And normally if you are interested in XIP, 
+you certainly have a highly customized kernel config already anyway. And 
+having a build-time constant PHYS_OFFSET is of course what performs 
+best.
+
+
+Nicolas
