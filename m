@@ -1,56 +1,56 @@
-From: Chris.Brandt@renesas.com (Chris Brandt)
-Date: Fri, 19 Feb 2016 03:39:38 +0000
-Subject: [PATCH] ARM: Allow MULTIPLATFORM to select XIP
-In-Reply-To: <20160218223312.GT19428@n2100.arm.linux.org.uk>
-References: <1455816310-11308-1-git-send-email-chris.brandt@renesas.com>
- <alpine.LFD.2.20.1602181244490.13632@knanqh.ubzr>
- <HK2PR06MB0561377EABB3B4B8E94F22328AAF0@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <alpine.LFD.2.20.1602181327060.13632@knanqh.ubzr>
- <HK2PR06MB0561C0EEA846C516645239338AAF0@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <20160218223312.GT19428@n2100.arm.linux.org.uk>
-Message-ID: <HK2PR06MB05617E2ED835CFE20F65E3D38AA00@HK2PR06MB0561.apcprd06.prod.outlook.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 19 Feb 2016 12:51:48 +0900
+Subject: [PATCH v2 1/3] ARM: dts: Add cooling levels for CPUs on exynos5420
+In-Reply-To: <87h9h599zi.fsf@e105922-lin.cambridge.arm.com>
+References: <1455772383-20598-1-git-send-email-k.kozlowski@samsung.com>
+ <87h9h599zi.fsf@e105922-lin.cambridge.arm.com>
+Message-ID: <56C69154.40608@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 18 Feb 2016, Russell King - ARM Linux wrote:
-
-> On Thu, Feb 18, 2016 at 07:42:20PM +0000, Chris Brandt wrote:
-> > On Thu, 18 Feb 2016, Nicolas Pitre wrote:
-> > 
-> > > > Is there some way you can do a PLATFORM_COUNTER++ for each device 
-> > > > that is selected, and then XIP_KERNEL would depend on 
-> > > > PLATFORM_COUNTER == 1 ?
-> > >
-> > > I don't know all the Kconfig possibilities.
-> > >
-> > > But would something like this work?
-> > >
-> > > config FOO
-> > >	depends on !(XIP && CHOICE_MADE)
-> > >	select CHOICE_MADE
-> > 
-> > I follow your logic and that might work: If you made multiple choices,
-> > it would just take the first one.
-> > 
-> > However...I just tried it and it crashes.
-> > 
-> > scripts/kconfig/mconf  Kconfig
-> > make[2]: *** [menuconfig] Segmentation fault (core dumped)
-> > make[1]: *** [menuconfig] Error 2
-> > 
-> > 
-> > It looks like you can't depend on something not being set that you are
-> > going to set yourself. Basically..."do as I say, not as I do"
+On 19.02.2016 02:58, Punit Agrawal wrote:
+> Hi Krzysztof,
 > 
-> It's missing a bool/tristate.  Every config option needs to be typed.
+> Krzysztof Kozlowski <k.kozlowski@samsung.com> writes:
+> 
+>> On Exynos5420 we support 8 cpufreq steps (600-1300 MHz) for LITTLE and
+>> 12 steps for big core (700-1800 MHz). Add respective cooling cells.
+>>
+>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>>
+>> ---
+>>
+>> Changes since v1:
+>> 1. Add cooling properties to all CPUs (suggested by Viresh).
+>> ---
+>>  arch/arm/boot/dts/exynos5420-cpus.dtsi | 24 ++++++++++++++++++++++++
+>>  1 file changed, 24 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/exynos5420-cpus.dtsi b/arch/arm/boot/dts/exynos5420-cpus.dtsi
+>> index 261d25173f61..5c052d7ff554 100644
+>> --- a/arch/arm/boot/dts/exynos5420-cpus.dtsi
+>> +++ b/arch/arm/boot/dts/exynos5420-cpus.dtsi
+>> @@ -33,6 +33,9 @@
+>>  			clock-frequency = <1800000000>;
+>>  			cci-control-port = <&cci_control1>;
+>>  			operating-points-v2 = <&cluster_a15_opp_table>;
+>> +			cooling-min-level = <0>;
+>> +			cooling-max-level = <11>;
+> 
+> Although the above two properties are defined they aren't parsed in the
+> kernel.
+> 
+> Setting min / max extents for cooling devices via cooling maps does work
+> though.
 
+It is described as optional property in
+Documentation/devicetree/bindings/thermal/thermal.txt ... but indeed it
+is totally ignored.
 
-Thank you! That makes things better.
+So what is the recommendation? Get rid of it from DTS and documentation
+or leave it because it will be implemented someday?
 
-Technically, it seems to work (you can only select 1), but the menu system is a little flakey when you try jumping back and forth between what device to select. Somehow when 2 get selected, I need to get kbuild to go back and do a full refresh or something.
+Thanks for feedback!
 
-
-I'm going to play with it some more before I start shouting victory.
-
-
-Chris
+Best regards,
+Krzysztof
