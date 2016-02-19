@@ -1,105 +1,58 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Fri, 19 Feb 2016 08:13:38 -0800
-Subject: [PATCH v3 2/5] ACPI: parse SPCR and enable matching console
-In-Reply-To: <56C6F2DA.3020002@linaro.org>
-References: <1455559532-8305-1-git-send-email-aleksey.makarov@linaro.org>
- <1455559532-8305-3-git-send-email-aleksey.makarov@linaro.org>
- <56C64366.2070702@hurleysoftware.com> <56C6F2DA.3020002@linaro.org>
-Message-ID: <56C73F32.6060701@hurleysoftware.com>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Fri, 19 Feb 2016 08:18:50 -0800
+Subject: [PATCH] clk: gpio: Really allow an optional clock= DT property
+In-Reply-To: <1455851525-18972-1-git-send-email-sboyd@codeaurora.org>
+References: <20160219030731.GS4847@codeaurora.org>
+ <1455851525-18972-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <CAEG3pNAee6e7nnnCB334zecADV58yfcJ5azUjALHaDP40B_pLQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/19/2016 02:47 AM, Aleksey Makarov wrote:
-> Hi Peter,
-> 
-> Thank you for review.
-> 
-> On 02/19/2016 01:19 AM, Peter Hurley wrote:
->> On 02/15/2016 10:05 AM, Aleksey Makarov wrote:
-> 
-> [..]
-> 
->>> diff --git a/drivers/tty/serial/serial_core.c b/drivers/tty/serial/serial_core.c
->>> index a126a60..459ab54 100644
->>> --- a/drivers/tty/serial/serial_core.c
->>> +++ b/drivers/tty/serial/serial_core.c
->>> @@ -34,6 +34,7 @@
->>>  #include <linux/serial_core.h>
->>>  #include <linux/delay.h>
->>>  #include <linux/mutex.h>
->>> +#include <linux/acpi.h>
->>>  
->>>  #include <asm/irq.h>
->>>  #include <asm/uaccess.h>
->>> @@ -2654,8 +2655,17 @@ int uart_add_one_port(struct uart_driver *drv, struct uart_port *uport)
->>>  		spin_lock_init(&uport->lock);
->>>  		lockdep_set_class(&uport->lock, &port_lock_key);
->>>  	}
->>> -	if (uport->cons && uport->dev)
->>> -		of_console_check(uport->dev->of_node, uport->cons->name, uport->line);
->>> +
->>> +	/*
->>> +	 * Support both open FW and ACPI access to console definitions.
->>> +	 * Both of_console_check() and acpi_console_check() will call
->>> +	 * add_preferred_console() if a console definition is found.
->>> +	 */
->>> +	if (uport->cons && uport->dev) {
->>> +		if (!acpi_console_check(uport))
->>> +			of_console_check(uport->dev->of_node, uport->cons->name,
->>> +					 uport->line);
->>
->> of_console_check() is not a good model for enabling a console.
->> It's a hack with several shortcomings (and bugs) that is tolerated here
->> because of its broad applicability to a wide range of platforms and drivers.
-> 
-> It's definitely not the best code I saw 
+On Thu, Feb 18, 2016 at 7:12 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>
+> We mis-merged the original patch from Russell here and so the
+> patch went almost all the way, except that we still failed to
+> probe when there wasn't a clocks property in the DT node. Allow
+> that case by making a negative value from
+> of_clk_get_parent_count() into "no parents", like the original
+> patch did.
+>
+> Fixes: 7ed88aa2efa5 ("clk: fix clk-gpio.c with optional clock= DT property")
+> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> Cc: Michael Turquette <mturquette@baylibre.com>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-> but there is no bugs.
-
-I pointed out just one of the problems with adding a preferred console
-late in the boot cycle (eg, at uart driver load) in the other patch review.
-
-
->> I specifically added console matching to enable exactly this kind of
->> console-selection-via-firmware. Please use that facility.
-> 
-> I described why this does not work (except you insist on having 
-> new made up names for all types of SPCR consoles) in the reply to another your message.
-
-They're not "new made up names".
-
-They're the documented names of earlycons, which you'd know if you
-researched how you're going to start an earlycon with the DBG2 table
-like I suggested in previous reviews.
-
-And I explained in the other patch review exactly how it works.
+Ack.
 
 Regards,
-Peter Hurley
+Mike
+
+> ---
+>  drivers/clk/clk-gpio.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/clk/clk-gpio.c b/drivers/clk/clk-gpio.c
+> index 19fed65587e8..7b09a265d79f 100644
+> --- a/drivers/clk/clk-gpio.c
+> +++ b/drivers/clk/clk-gpio.c
+> @@ -289,7 +289,7 @@ static void __init of_gpio_clk_setup(struct device_node *node,
+>
+>         num_parents = of_clk_get_parent_count(node);
+>         if (num_parents < 0)
+> -               return;
+> +               num_parents = 0;
+>
+>         data = kzalloc(sizeof(*data), GFP_KERNEL);
+>         if (!data)
+> --
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> a Linux Foundation Collaborative Project
+>
 
 
->>> +	}
->>>  
->>>  	uart_configure_port(drv, state, uport);
->>>  
->>> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
->>> index 06ed7e5..ea0c297 100644
->>> --- a/include/linux/acpi.h
->>> +++ b/include/linux/acpi.h
->>> @@ -1004,4 +1004,14 @@ static inline struct fwnode_handle *acpi_get_next_subnode(struct device *dev,
->>>  #define acpi_probe_device_table(t)	({ int __r = 0; __r;})
->>>  #endif
->>>  
->>> +struct uart_port;
->>> +#ifdef CONFIG_ACPI_SPCR_TABLE
->>> +bool acpi_console_check(struct uart_port *uport);
->>> +#else
->>> +static inline bool acpi_console_check(struct uart_port *uport)
->>> +{
->>> +	return FALSE;
->>> +}
->>> +#endif
->>> +
->>>  #endif	/*_LINUX_ACPI_H*/
->>>
->>
+
+-- 
+Michael Turquette
+CEO
+BayLibre - At the Heart of Embedded Linux
+http://baylibre.com/
