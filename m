@@ -1,59 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 19 Feb 2016 09:33:39 +0100
-Subject: [PATCH 4/9] ARM: add CONFIG_PHYS_OFFSET default values
-In-Reply-To: <alpine.LFD.2.20.1602181100410.13632@knanqh.ubzr>
-References: <1455804123-2526139-1-git-send-email-arnd@arndb.de>
- <1455804123-2526139-5-git-send-email-arnd@arndb.de>
- <alpine.LFD.2.20.1602181100410.13632@knanqh.ubzr>
-Message-ID: <3974581.yknKb3tq7o@wuerfel>
+From: blogic@openwrt.org (John Crispin)
+Date: Fri, 19 Feb 2016 09:44:05 +0100
+Subject: [PATCH V6 01/11] dt-bindings: ARM: Mediatek: add MT2701/7623 string
+ to the PMIC wrapper doc
+In-Reply-To: <1455871455-21212-1-git-send-email-blogic@openwrt.org>
+References: <1455871455-21212-1-git-send-email-blogic@openwrt.org>
+Message-ID: <1455871455-21212-2-git-send-email-blogic@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 18 February 2016 11:02:33 Nicolas Pitre wrote:
-> 
-> Acked-by: Nicolas Pitre <nico@linaro.org>
-> 
-> Is there a way to provide a default for defaults?
+Signed-off-by: John Crispin <blogic@openwrt.org>
+Acked-by: Rob Herring <robh@kernel.org>
+Cc: devicetree at vger.kernel.org
+---
+ Documentation/devicetree/bindings/soc/mediatek/pwrap.txt |    1 +
+ 1 file changed, 1 insertion(+)
 
-We could have something like
-
-config PHYS_OFFSET_0
-	bool
-
-config PHYS_OFFSET_1
-	bool
-
-config PHYS_OFFSET_2
-	bool
-
-... (we need 8 of the 16 possible addresses)
-
-
-config PHYS_OFFSET
-	hex "Physical address of main memory" if MMU
-	default DRAM_BASE if !MMU
-	default 0x00000000 if PHYS_OFFSET_0
-	default 0x10000000 if PHYS_OFFSET_1
-	default 0x20000000 if PHYS_OFFSET_2
-	default 0x30000000 if PHYS_OFFSET_3
-	default 0x70000000 if PHYS_OFFSET_7
-	default 0x80000000 if PHYS_OFFSET_8
-	default 0xa0000000 if PHYS_OFFSET_A
-	default 0xc0000000 if PHYS_OFFSET_C
-
-
-and then select one of the bool symbols from each platform.
-Would that address your question?
-
-FWIW, that would also let us do:
-
-config XIP_KERNEL
-	bool "Kernel Execute-In-Place from ROM"
-	depends on PHYS_OFFSET_0 || PHYS_OFFSET_1 || PHYS_OFFSET_2 ||
-		   PHYS_OFFSET_3 || PHYS_OFFSET_7 || PHYS_OFFSET_8 ||
-		   PHYS_OFFSET_A || PHYS_OFFSET_C
-
-We can probably come up with a more elaborate way to prevent configurations
-that have more than one of these set.
-
-	Arnd
+diff --git a/Documentation/devicetree/bindings/soc/mediatek/pwrap.txt b/Documentation/devicetree/bindings/soc/mediatek/pwrap.txt
+index ddeb5b6..107700d 100644
+--- a/Documentation/devicetree/bindings/soc/mediatek/pwrap.txt
++++ b/Documentation/devicetree/bindings/soc/mediatek/pwrap.txt
+@@ -18,6 +18,7 @@ IP Pairing
+ 
+ Required properties in pwrap device node.
+ - compatible:
++	"mediatek,mt2701-pwrap" for MT2701/7623 SoCs
+ 	"mediatek,mt8135-pwrap" for MT8135 SoCs
+ 	"mediatek,mt8173-pwrap" for MT8173 SoCs
+ - interrupts: IRQ for pwrap in SOC
+-- 
+1.7.10.4
