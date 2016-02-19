@@ -1,18 +1,22 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 20 Feb 2016 15:29:44 -0200
-Subject: [PATCH 1/4] ARM: dts: imx6ul: Add flexcan1 and flexcan2 support
-In-Reply-To: <20160220171816.GA24064@panicking>
-References: <1455963652-24618-1-git-send-email-michael@amarulasolutions.com>
- <1455963652-24618-2-git-send-email-michael@amarulasolutions.com>
- <CAOMZO5Bk_ZMhYzFLRFNK2TQvK4KHuj62AM_6uF-m-P1kJupTHQ@mail.gmail.com>
- <20160220171816.GA24064@panicking>
-Message-ID: <CAOMZO5DfKi5KymQ6p9yF4ntqEJ7O=EEE7CKFmS-0N2XL8=ET7A@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Sat, 20 Feb 2016 01:17:49 +0900
+Subject: [PATCH] regulator: qcom-saw: avoid uninitialized variable warning
+In-Reply-To: <1455183497-299798-1-git-send-email-arnd@arndb.de>
+References: <1455183497-299798-1-git-send-email-arnd@arndb.de>
+Message-ID: <20160219161749.GX18327@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 20, 2016 at 3:18 PM, Michael Trimarchi
-<michael@amarulasolutions.com> wrote:
+On Thu, Feb 11, 2016 at 10:38:08AM +0100, Arnd Bergmann wrote:
+> gcc cannot know that a for_each_possible_cpu() loop always executes
+> at least once, so it warns about the use of the "found" variable
+> in qcom_saw_regulator_probe:
 
-> ok. Can you point me out to a driver in freescale source that use it?
-
-http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git/tree/drivers/net/can/flexcan.c?h=imx_3.14.52_1.1.0_ga#n1146
+I'm going to drop this driver so this won't be needed.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160220/fb3c8d40/attachment.sig>
