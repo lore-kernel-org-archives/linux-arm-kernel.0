@@ -1,46 +1,50 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 20 Feb 2016 12:11:14 -0200
-Subject: [PATCH 4/4] ARM: dts: imx6ul-geam: Add Engicam IMX6UL GEA M6UL
- initial support
-In-Reply-To: <1455963652-24618-5-git-send-email-michael@amarulasolutions.com>
-References: <1455963652-24618-1-git-send-email-michael@amarulasolutions.com>
- <1455963652-24618-5-git-send-email-michael@amarulasolutions.com>
-Message-ID: <CAOMZO5AmePs3aE2zRSXcSS8iKQ0m2kvTAezsfHS13e-Zv1HCrA@mail.gmail.com>
+From: jchandra@broadcom.com (Jayachandran C)
+Date: Sat, 20 Feb 2016 19:49:19 +0530
+Subject: [PATCH v2 0/5] Support for Broadcom Vulcan ARM64 processor
+Message-ID: <1455977964-8099-1-git-send-email-jchandra@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 20, 2016 at 8:20 AM, Michael Trimarchi
-<michael@amarulasolutions.com> wrote:
+This patchset adds support for Broadcom's Vulcan ARM64 processor.
+The changes are to add the device tree files, documentation for the
+device tree, cpu ID and the maintainers entry.
 
-> +       reg_1p8v: regulator-1p8v {
-> +               compatible = "regulator-fixed";
-> +               regulator-name = "1P8V";
-> +               regulator-min-microvolt = <1800000>;
-> +               regulator-max-microvolt = <1800000>;
-> +               regulator-boot-on;
-> +               regulator-always-on;
+This is v2 of the patchset, changelog below:
 
-These last two properties can be removed.
+v1->v2 :
+ - dts: remove memreserve, use brcm,vulcan-soc for board
+   (to address comments from Mark Rutland)
+ - Fixup copyright (Broadcomp corp -> Broadcom)
+   (suggested by Florian Fainelli)
+ - Rename dts from brcm-vulcan* to vulcan*
+   (suggested by Ray Jui)
+ - Add maintainers entry
+   (suggested by Florian Fainelli)
+ - Updated the device tree doc and fixed a couple of commit
+   comments
 
-> +       };
-> +
-> +       reg_3p3v: regulator-3p3v {
-> +               compatible = "regulator-fixed";
-> +               regulator-name = "3P3V";
-> +               regulator-min-microvolt = <3300000>;
-> +               regulator-max-microvolt = <3300000>;
-> +               regulator-boot-on;
-> +               regulator-always-on;
+Jayachandran C (4):
+  dt-bindings: Add documentation for Broadcom Vulcan
+  arm64: defconfig: Add Broadcom Vulcan to defconfig
+  arm64: cputype info for Broadcom Vulcan
+  MAINTAINERS: Add entry for Broadcom Vulcan SoC
 
-Ditto.
+Zi Shen Lim (1):
+  arm64: Broadcom Vulcan support
 
-> +       pinctrl_spi4: spi4grp {
-> +               fsl,pins = <
-> +                       MX6UL_PAD_BOOT_MODE0__GPIO5_IO10        0x70a1
-> +                       MX6UL_PAD_BOOT_MODE1__GPIO5_IO11        0x70a1
-> +                       MX6UL_PAD_SNVS_TAMPER7__GPIO5_IO07      0x70a1
-> +                       MX6UL_PAD_SNVS_TAMPER8__GPIO5_IO08      0x80000000
-> +               >;
-> +       };
+ .../bindings/arm/bcm/brcm,vulcan-soc.txt           |  10 ++
+ Documentation/devicetree/bindings/arm/cpus.txt     |   1 +
+ MAINTAINERS                                        |   7 +
+ arch/arm64/Kconfig.platforms                       |   5 +
+ arch/arm64/boot/dts/broadcom/Makefile              |   1 +
+ arch/arm64/boot/dts/broadcom/vulcan-eval.dts       |  33 +++++
+ arch/arm64/boot/dts/broadcom/vulcan.dtsi           | 144 +++++++++++++++++++++
+ arch/arm64/configs/defconfig                       |   1 +
+ arch/arm64/include/asm/cputype.h                   |   3 +
+ 9 files changed, 205 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/bcm/brcm,vulcan-soc.txt
+ create mode 100644 arch/arm64/boot/dts/broadcom/vulcan-eval.dts
+ create mode 100644 arch/arm64/boot/dts/broadcom/vulcan.dtsi
 
-pinctrl_spi4 seems to be unused.
+-- 
+1.9.1
