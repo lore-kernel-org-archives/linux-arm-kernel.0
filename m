@@ -1,83 +1,26 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Sat, 20 Feb 2016 23:52:09 +0800
-Subject: [PATCH 3/3] arm64: dts: register Hi6220's thermal zone for power
- allocator
-In-Reply-To: <1455983529-9559-1-git-send-email-leo.yan@linaro.org>
-References: <1455983529-9559-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <1455983529-9559-4-git-send-email-leo.yan@linaro.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Sun, 21 Feb 2016 02:14:59 +0900
+Subject: [PATCH 1/4] ASoC: wm9713: add binding for WM9713 codec
+In-Reply-To: <1455979079-9030-1-git-send-email-robert.jarzmik@free.fr>
+References: <1455979079-9030-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <20160220171459.GA18327@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With profiling Hi6220's power modeling so get dynamic coefficient and
-sustainable power. So pass these parameters from DT.
+On Sat, Feb 20, 2016 at 03:37:56PM +0100, Robert Jarzmik wrote:
 
-Now enable power allocator wit only one actor for CPU part, so directly
-use cluster0's thermal sensor for monitoring temperature.
+> +WM9713 audio CODEC
+> +
+> +This devices supports I2C.
 
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
----
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 36 +++++++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-index 50ba1b0..3608a3e 100644
---- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-@@ -6,6 +6,7 @@
- 
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/clock/hi6220-clock.h>
-+#include <dt-bindings/thermal/thermal.h>
- 
- / {
- 	compatible = "hisilicon,hi6220";
-@@ -87,6 +88,7 @@
- 			cooling-max-level = <0>;
- 			#cooling-cells = <2>; /* min followed by max */
- 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
-+			dynamic-power-coefficient = <311>;
- 		};
- 
- 		cpu1: cpu at 1 {
-@@ -322,5 +324,39 @@
- 			clock-names = "thermal_clk";
- 			#thermal-sensor-cells = <1>;
- 		};
-+
-+		thermal-zones {
-+
-+			cls0: cls0 {
-+				polling-delay = <1000>;
-+				polling-delay-passive = <100>;
-+				sustainable-power = <3326>;
-+
-+				/* sensor ID */
-+				thermal-sensors = <&tsensor 2>;
-+
-+				trips {
-+					threshold: trip-point at 0 {
-+						temperature = <65000>;
-+						hysteresis = <1000>;
-+						type = "passive";
-+					};
-+
-+					target: trip-point at 1 {
-+						temperature = <75000>;
-+						hysteresis = <1000>;
-+						type = "passive";
-+					};
-+				};
-+
-+				cooling-maps {
-+					map0 {
-+						trip = <&target>;
-+						contribution = <1024>;
-+						cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-+					};
-+				};
-+			};
-+		};
- 	};
- };
--- 
-1.9.1
+No, it clearly doesn't...  The problem with doing this is that since
+AC'97 is an enumerable bus we really shouldn't need to list AC'97 CODECs
+in the device tree.  Instead we should be probing at runtime (as the
+non-ASoC AC'97 code does) or something similar.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160221/8be5e8ff/attachment.sig>
