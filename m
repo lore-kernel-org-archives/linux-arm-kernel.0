@@ -1,71 +1,60 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 19 Feb 2016 17:15:20 -0800
-Subject: [PATCH] hwmon: (gpio-fan) Remove un-necessary speed_index lookup
- for thermal hook
-In-Reply-To: <1455926991-15189-1-git-send-email-nm@ti.com>
-References: <1455926991-15189-1-git-send-email-nm@ti.com>
-Message-ID: <56C7BE28.2060606@roeck-us.net>
+From: ray.jui@broadcom.com (Ray Jui)
+Date: Fri, 19 Feb 2016 17:23:33 -0800
+Subject: [02/11] video: ARM CLCD: support DT signal inversion flags
+In-Reply-To: <CACRpkdbGCidu_3qbTYf7WSoAhafU4Z5W0jDs4CGtH5XwSf14aA@mail.gmail.com>
+References: <1454594660-7532-3-git-send-email-linus.walleij@linaro.org>
+ <0cebf93a-ee0a-3637-3242-8aed266df091@broadcom.com>
+ <CACRpkdbGCidu_3qbTYf7WSoAhafU4Z5W0jDs4CGtH5XwSf14aA@mail.gmail.com>
+Message-ID: <ac0739e5-4339-7fc5-1179-73af722beb08@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/19/2016 04:09 PM, Nishanth Menon wrote:
-> Thermal hook gpio_fan_get_cur_state is only interested in knowing
-> the current speed index that was setup in the system, this is
-> already available as part of fan_data->speed_index which is always
-> set by set_fan_speed. Using get_fan_speed_index is useful when we
-> have no idea about the fan speed configuration (for example during
-> fan_ctrl_init).
->
-> When thermal framework invokes
-> gpio_fan_get_cur_state=>get_fan_speed_index via gpio_fan_get_cur_state
-> especially in a polled configuration for thermal governor, we
-> basically hog the i2c interface to the extent that other functions
-> fail to get any traffic out :(.
->
-> Instead, just provide the last state set in the driver - since the gpio
-> fan driver is responsible for the fan state immaterial of override, the
-> fan_data->speed_index should accurately reflect the state.
->
-> Fixes: b5cf88e46bad ("(gpio-fan): Add thermal control hooks")
->
-> Reported-by: Tony Lindgren <tony@atomide.com>
-> Cc: Guenter Roeck <linux@roeck-us.net>
-> Cc: Eduardo Valentin <edubezval@gmail.com>
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> ---
+Hi Linus,
 
-Applied.
+On 2/19/2016 12:46 AM, Linus Walleij wrote:
+> On Wed, Feb 17, 2016 at 7:10 PM, Ray Jui <ray.jui@broadcom.com> wrote:
+>
+>> A somewhat related question, how do you see the CLKSEL bit in the TIM2
+>> register will be supported in the future? There are some cases where the
+>> CLKSEL bit needs to be set, and therefore the "CLCDCLK" instead of "HCLK"
+>> reference clock source is selected.
+>
+> I think it's very simple:
+>
+> The DT node usually looks like so:
+>
+> display at 10120000 {
+>         compatible = "arm,pl110", "arm,primecell";
+> (...)
+>         clocks = <&oscclk4>, <&pclk>;
+>         clock-names = "clcd", "apb_pclk";
+>
+> Just add a custom attribute pointing to the
+> reference clock in this array:
+>
+> clcd-reference-clock = <0>;
+>
+> If this is set to <1> "apb_pclk" (i.e. HCLK) is
+> the reference, and that bit in TIM2 gets set.
+
+This looks good!
+
+>
+> Do you have a system that needs this?
+>
+
+Yah, we have a system (Cygnus) that can either use the HCLK, or an 
+external clock generated from a PLL. To get certain pixel clock 
+frequencies (depending on the LCD panel we use), we need to use the 
+external clock source with the PLL configured to a particular VCO frequency.
+
+We have not enabled full LCD/video support on that platform in the 
+mainline kernel, but we'll eventually get to it.
+
+> Yours,
+> Linus Walleij
+>
 
 Thanks,
-Guenter
 
-> Test logs from linus master  v4.5-rc4-137-g23300f657594
-> Without fix: http://paste.ubuntu.org.cn/3948618
-> With Fix: http://paste.ubuntu.org.cn/3948617
->
->   drivers/hwmon/gpio-fan.c | 7 +------
->   1 file changed, 1 insertion(+), 6 deletions(-)
->
-> diff --git a/drivers/hwmon/gpio-fan.c b/drivers/hwmon/gpio-fan.c
-> index 82de3deeb18a..685568b1236d 100644
-> --- a/drivers/hwmon/gpio-fan.c
-> +++ b/drivers/hwmon/gpio-fan.c
-> @@ -406,16 +406,11 @@ static int gpio_fan_get_cur_state(struct thermal_cooling_device *cdev,
->   				  unsigned long *state)
->   {
->   	struct gpio_fan_data *fan_data = cdev->devdata;
-> -	int r;
->
->   	if (!fan_data)
->   		return -EINVAL;
->
-> -	r = get_fan_speed_index(fan_data);
-> -	if (r < 0)
-> -		return r;
-> -
-> -	*state = r;
-> +	*state = fan_data->speed_index;
->   	return 0;
->   }
->
->
+Ray
