@@ -1,43 +1,77 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat, 20 Feb 2016 15:37:57 +0100
-Subject: [PATCH 2/4] ASoC: wm9713: add device tree support
+Date: Sat, 20 Feb 2016 15:37:59 +0100
+Subject: [PATCH 4/4] ASoC: pxa: add pxa2xx-ac97 devicetree support
 In-Reply-To: <1455979079-9030-1-git-send-email-robert.jarzmik@free.fr>
 References: <1455979079-9030-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <1455979079-9030-2-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <1455979079-9030-4-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the code to be able to use this codec in a devicetree platform.
-This is tested with the zylonite pxa310 board.
+Add the devicetree support, so that the driver can be used in a
+devicetree platform.
 
 Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
 ---
- sound/soc/codecs/wm9713.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ sound/arm/pxa2xx-ac97-lib.c | 11 +++++++++++
+ sound/soc/pxa/pxa2xx-ac97.c | 10 ++++++++++
+ 2 files changed, 21 insertions(+)
 
-diff --git a/sound/soc/codecs/wm9713.c b/sound/soc/codecs/wm9713.c
-index 79e143625ac3..4e522302bb8a 100644
---- a/sound/soc/codecs/wm9713.c
-+++ b/sound/soc/codecs/wm9713.c
-@@ -1272,9 +1272,19 @@ static int wm9713_remove(struct platform_device *pdev)
- 	return 0;
- }
+diff --git a/sound/arm/pxa2xx-ac97-lib.c b/sound/arm/pxa2xx-ac97-lib.c
+index 39c3969ac1c7..37fe7e0cbcf1 100644
+--- a/sound/arm/pxa2xx-ac97-lib.c
++++ b/sound/arm/pxa2xx-ac97-lib.c
+@@ -19,6 +19,7 @@
+ #include <linux/module.h>
+ #include <linux/io.h>
+ #include <linux/gpio.h>
++#include <linux/of_gpio.h>
+ 
+ #include <sound/ac97_codec.h>
+ #include <sound/pxa2xx-lib.h>
+@@ -332,6 +333,16 @@ int pxa2xx_ac97_hw_probe(struct platform_device *dev)
+ 			dev_err(&dev->dev, "Invalid reset GPIO %d\n",
+ 				pdata->reset_gpio);
+ 		}
++	} else if (!pdata && dev->dev.of_node) {
++		pdata = devm_kzalloc(&dev->dev, sizeof(*pdata), GFP_KERNEL);
++		if (!pdata)
++			return -ENOMEM;
++		pdata->reset_gpio = of_get_named_gpio(dev->dev.of_node,
++						      "reset-gpio", 0);
++		if (pdata->reset_gpio == -ENOENT)
++			pdata->reset_gpio = -1;
++		else if (pdata->reset_gpio < 0)
++			return pdata->reset_gpio;
+ 	} else {
+ 		if (cpu_is_pxa27x())
+ 			reset_gpio = 113;
+diff --git a/sound/soc/pxa/pxa2xx-ac97.c b/sound/soc/pxa/pxa2xx-ac97.c
+index f3de615aacd7..13e3ab9224b9 100644
+--- a/sound/soc/pxa/pxa2xx-ac97.c
++++ b/sound/soc/pxa/pxa2xx-ac97.c
+@@ -221,6 +221,15 @@ static const struct snd_soc_component_driver pxa_ac97_component = {
+ 	.name		= "pxa-ac97",
+ };
  
 +#ifdef CONFIG_OF
-+static const struct of_device_id wm9713_dt_ids[] = {
-+	{ .compatible = "wlf,wm9713", },
++static const struct of_device_id pxa2xx_ac97_dt_ids[] = {
++	{ .compatible = "marvell,pxa2xx-ac97", },
 +	{ }
 +};
-+MODULE_DEVICE_TABLE(of, wm9713_dt_ids);
++MODULE_DEVICE_TABLE(of, pxa2xx_ac97_dt_ids);
 +
 +#endif
 +
- static struct platform_driver wm9713_codec_driver = {
- 	.driver = {
- 			.name = "wm9713-codec",
-+			.of_match_table = of_match_ptr(wm9713_dt_ids),
+ static int pxa2xx_ac97_dev_probe(struct platform_device *pdev)
+ {
+ 	int ret;
+@@ -279,6 +288,7 @@ static struct platform_driver pxa2xx_ac97_driver = {
+ #ifdef CONFIG_PM_SLEEP
+ 		.pm	= &pxa2xx_ac97_pm_ops,
+ #endif
++		.of_match_table = of_match_ptr(pxa2xx_ac97_dt_ids),
  	},
+ };
  
- 	.probe = wm9713_probe,
 -- 
 2.1.4
