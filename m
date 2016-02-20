@@ -1,26 +1,18 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sat, 20 Feb 2016 00:37:44 +0900
-Subject: [PATCH] ASoC: mediatek: Add machine driver for ALC5650 codec
-In-Reply-To: <1455849359-14581-1-git-send-email-pc.liao@mediatek.com>
-References: <1455849359-14581-1-git-send-email-pc.liao@mediatek.com>
-Message-ID: <20160219153744.GP18327@sirena.org.uk>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 20 Feb 2016 15:29:44 -0200
+Subject: [PATCH 1/4] ARM: dts: imx6ul: Add flexcan1 and flexcan2 support
+In-Reply-To: <20160220171816.GA24064@panicking>
+References: <1455963652-24618-1-git-send-email-michael@amarulasolutions.com>
+ <1455963652-24618-2-git-send-email-michael@amarulasolutions.com>
+ <CAOMZO5Bk_ZMhYzFLRFNK2TQvK4KHuj62AM_6uF-m-P1kJupTHQ@mail.gmail.com>
+ <20160220171816.GA24064@panicking>
+Message-ID: <CAOMZO5DfKi5KymQ6p9yF4ntqEJ7O=EEE7CKFmS-0N2XL8=ET7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 19, 2016 at 10:35:59AM +0800, PC Liao wrote:
+On Sat, Feb 20, 2016 at 3:18 PM, Michael Trimarchi
+<michael@amarulasolutions.com> wrote:
 
-> @@ -3,3 +3,4 @@ obj-$(CONFIG_SND_SOC_MEDIATEK) += mtk-afe-pcm.o
->  # Machine support
->  obj-$(CONFIG_SND_SOC_MT8173_MAX98090) += mt8173-max98090.o
->  obj-$(CONFIG_SND_SOC_MT8173_RT5650_RT5676) += mt8173-rt5650-rt5676.o
-> +obj-$(CONFIG_SND_SOC_MT8173_RT5650) += mt8173-rt5650.o
+> ok. Can you point me out to a driver in freescale source that use it?
 
-Why is this not covered by (or coverable by) the existinng RT5650-RT5657
-driver?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160220/c90df662/attachment.sig>
+http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git/tree/drivers/net/can/flexcan.c?h=imx_3.14.52_1.1.0_ga#n1146
