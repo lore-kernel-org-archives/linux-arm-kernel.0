@@ -1,64 +1,36 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Sat, 20 Feb 2016 10:18:24 +0100
-Subject: [PATCH v4 5/8] [Media] vcodec: mediatek: Add Mediatek V4L2 Video
- Encoder Driver
-In-Reply-To: <1455959480.12533.11.camel@mtksdaap41>
-References: <1454585703-42428-1-git-send-email-tiffany.lin@mediatek.com>
- <1454585703-42428-2-git-send-email-tiffany.lin@mediatek.com>
- <1454585703-42428-3-git-send-email-tiffany.lin@mediatek.com>
- <1454585703-42428-4-git-send-email-tiffany.lin@mediatek.com>
- <1454585703-42428-5-git-send-email-tiffany.lin@mediatek.com>
- <1454585703-42428-6-git-send-email-tiffany.lin@mediatek.com>
- <56C1B4AF.1030207@xs4all.nl> <1455604653.19396.68.camel@mtksdaap41>
- <56C2D371.9090805@xs4all.nl> <1455959480.12533.11.camel@mtksdaap41>
-Message-ID: <56C82F60.4060304@xs4all.nl>
+From: michael@amarulasolutions.com (Michael Trimarchi)
+Date: Sat, 20 Feb 2016 11:20:48 +0100
+Subject: [PATCH 0/4] Add support for Engicam IMX6UL module
+Message-ID: <1455963652-24618-1-git-send-email-michael@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/20/2016 10:11 AM, tiffany lin wrote:
-> Hi Hans,
-> 
-> On Tue, 2016-02-16 at 08:44 +0100, Hans Verkuil wrote:
->> On 02/16/2016 07:37 AM, tiffany lin wrote:
->>>>> +
->>>>> +const struct v4l2_ioctl_ops mtk_venc_ioctl_ops = {
->>>>> +	.vidioc_streamon		= v4l2_m2m_ioctl_streamon,
->>>>> +	.vidioc_streamoff		= v4l2_m2m_ioctl_streamoff,
->>>>> +
->>>>> +	.vidioc_reqbufs			= v4l2_m2m_ioctl_reqbufs,
->>>>> +	.vidioc_querybuf		= v4l2_m2m_ioctl_querybuf,
->>>>> +	.vidioc_qbuf			= vidioc_venc_qbuf,
->>>>> +	.vidioc_dqbuf			= vidioc_venc_dqbuf,
->>>>> +
->>>>> +	.vidioc_querycap		= vidioc_venc_querycap,
->>>>> +	.vidioc_enum_fmt_vid_cap_mplane = vidioc_enum_fmt_vid_cap_mplane,
->>>>> +	.vidioc_enum_fmt_vid_out_mplane = vidioc_enum_fmt_vid_out_mplane,
->>>>> +	.vidioc_enum_framesizes		= vidioc_enum_framesizes,
->>>>> +
->>>>> +	.vidioc_try_fmt_vid_cap_mplane	= vidioc_try_fmt_vid_cap_mplane,
->>>>> +	.vidioc_try_fmt_vid_out_mplane	= vidioc_try_fmt_vid_out_mplane,
->>>>> +	.vidioc_expbuf			= v4l2_m2m_ioctl_expbuf,
->>>>
->>>> Please add vidioc_create_bufs and vidioc_prepare_buf as well.
->>>>
->>>
->>> Currently we do not support these use cases, do we need to add
->>> vidioc_create_bufs and vidioc_prepare_buf now?
->>
->> I would suggest you do. The vb2 framework gives it (almost) for free.
->> prepare_buf is completely free (just add the helper) and create_bufs
->> needs a few small changes in the queue_setup function, that's all.
->>
-> After try to add vidioc_create_bufs directly using
-> vb2_ioctl_create_bufs, it will have problem in 
+Thi patch series add the support for Engicam IMXUL product
 
-This is a m2m device, so you should use the m2m variant of this:
-v4l2_m2m_ioctl_create_bufs
+https://community.freescale.com/docs/DOC-328428
 
-That should solve this problem.
+Based on Freescale? i.MX 6UltraLite processor, a high performance,
+ultra-efficient processor family featuring an advanced implementation
+of a single ARM? Cortex?-A7 core, which operates at speeds up to 528 MHz.
 
-Ditto for prepare_buf: you need to use v4l2_m2m_ioctl_prepare_buf.
+The new ENGICAM GEA M6UL module is suitable for cost effective HMI
+applications requiring high performance CPU.
 
-Regards,
+Michael Trimarchi (4):
+  ARM: dts: imx6ul: Add flexcan1 and flexcan2 support
+  ARM: dts: imx6ul: Add LCDIF support
+  ARM: dts: imx6ul: Add GPMI nand controller support
+  ARM: dts: imx6ul-geam: Add Engicam IMX6UL GEA M6UL initial support
 
-	Hans
+ arch/arm/boot/dts/Makefile             |   3 +-
+ arch/arm/boot/dts/imx6ul-geam-kit.dts  | 102 +++++++++
+ arch/arm/boot/dts/imx6ul-geam.dtsi     | 371 +++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx6ul.dtsi          |  68 ++++++
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.c |  10 +
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.h |   6 +-
+ 6 files changed, 557 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/boot/dts/imx6ul-geam-kit.dts
+ create mode 100644 arch/arm/boot/dts/imx6ul-geam.dtsi
+
+-- 
+2.7.0
