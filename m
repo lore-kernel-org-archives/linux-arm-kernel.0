@@ -1,112 +1,39 @@
-From: draakje197@gmail.com (hp197)
-Date: Sat, 20 Feb 2016 22:28:25 +0100
-Subject: [PATCH] Fix sun7i pin assignment for IRQ's
-Message-ID: <1456003710-14807-1-git-send-email-henry@nitronetworks.nl>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 20 Feb 2016 22:39:15 +0100
+Subject: [PATCH v2 4/4] dmaengine: pxa_dma: fix the maximum requestor line
+In-Reply-To: <1455569868-25017-4-git-send-email-robert.jarzmik@free.fr>
+ (Robert Jarzmik's message of "Mon, 15 Feb 2016 21:57:48 +0100")
+References: <1455569868-25017-1-git-send-email-robert.jarzmik@free.fr>
+ <1455569868-25017-4-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <87d1rrxdrw.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IRQ pins are now according this page: http://linux-sunxi.org/A20/PIO
+Robert Jarzmik <robert.jarzmik@free.fr> writes:
 
-Signed-off-by: hp197 <henry@nitronetworks.nl>
----
- drivers/pinctrl/sunxi/pinctrl-sun7i-a20.c | 14 --------------
- 1 file changed, 14 deletions(-)
+> The current number of requestor lines is limited to 31. This was an
+> error of a previous commit, as this number is platform dependent, and is
+> actually :
+>  - for pxa25x: 40 requestor lines
+>  - for pxa27x: 75 requestor lines
+>  - for pxa3xx: 100 requestor lines
+>
+> The previous testing did not reveal the faulty constant as on pxa[23]xx
+> platforms, only camera, MSL and USB are above requestor 32, and in these
+> only the camera has a driver using dma.
+>
+> Fixes: e87ffbdf0697 ("dmaengine: pxa_dma: fix the no-requestor case")
+> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> ---
+> Since v1: change to #dma-requests the of property name
+>       	  default to 32 requestors and warn as suggested by Vinod
 
-diff --git a/drivers/pinctrl/sunxi/pinctrl-sun7i-a20.c b/drivers/pinctrl/sunxi/pinctrl-sun7i-a20.c
-index cf1ce0c..4db5e19 100644
---- a/drivers/pinctrl/sunxi/pinctrl-sun7i-a20.c
-+++ b/drivers/pinctrl/sunxi/pinctrl-sun7i-a20.c
-@@ -344,25 +344,21 @@ static const struct sunxi_desc_pin sun7i_a20_pins[] = {
- 		  SUNXI_FUNCTION(0x1, "gpio_out"),
- 		  SUNXI_FUNCTION(0x2, "nand0"),		/* NCE4 */
- 		  SUNXI_FUNCTION(0x3, "spi2"),		/* CS0 */
--		  SUNXI_FUNCTION_IRQ(0x6, 12)),		/* EINT12 */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 20),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out"),
- 		  SUNXI_FUNCTION(0x2, "nand0"),		/* NCE5 */
- 		  SUNXI_FUNCTION(0x3, "spi2"),		/* CLK */
--		  SUNXI_FUNCTION_IRQ(0x6, 13)),		/* EINT13 */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 21),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out"),
- 		  SUNXI_FUNCTION(0x2, "nand0"),		/* NCE6 */
- 		  SUNXI_FUNCTION(0x3, "spi2"),		/* MOSI */
--		  SUNXI_FUNCTION_IRQ(0x6, 14)),		/* EINT14 */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 22),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out"),
- 		  SUNXI_FUNCTION(0x2, "nand0"),		/* NCE7 */
- 		  SUNXI_FUNCTION(0x3, "spi2"),		/* MISO */
--		  SUNXI_FUNCTION_IRQ(0x6, 15)),		/* EINT15 */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 23),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out"),
-@@ -960,65 +956,55 @@ static const struct sunxi_desc_pin sun7i_a20_pins[] = {
- 		  SUNXI_FUNCTION(0x1, "gpio_out"),
- 		  SUNXI_FUNCTION(0x2, "spi0"),		/* CS0 */
- 		  SUNXI_FUNCTION(0x3, "uart5"),		/* TX */
--		  SUNXI_FUNCTION_IRQ(0x5, 22)),		/* EINT22 */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(I, 11),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out"),
- 		  SUNXI_FUNCTION(0x2, "spi0"),		/* CLK */
- 		  SUNXI_FUNCTION(0x3, "uart5"),		/* RX */
--		  SUNXI_FUNCTION_IRQ(0x5, 23)),		/* EINT23 */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(I, 12),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out"),
- 		  SUNXI_FUNCTION(0x2, "spi0"),		/* MOSI */
- 		  SUNXI_FUNCTION(0x3, "uart6"),		/* TX */
- 		  SUNXI_FUNCTION(0x4, "clk_out_a"),	/* CLK_OUT_A */
--		  SUNXI_FUNCTION_IRQ(0x5, 24)),		/* EINT24 */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(I, 13),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out"),
- 		  SUNXI_FUNCTION(0x2, "spi0"),		/* MISO */
- 		  SUNXI_FUNCTION(0x3, "uart6"),		/* RX */
- 		  SUNXI_FUNCTION(0x4, "clk_out_b"),	/* CLK_OUT_B */
--		  SUNXI_FUNCTION_IRQ(0x5, 25)),		/* EINT25 */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(I, 14),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out"),
- 		  SUNXI_FUNCTION(0x2, "spi0"),		/* CS1 */
- 		  SUNXI_FUNCTION(0x3, "ps2"),		/* SCK1 */
- 		  SUNXI_FUNCTION(0x4, "timer4"),	/* TCLKIN0 */
--		  SUNXI_FUNCTION_IRQ(0x5, 26)),		/* EINT26 */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(I, 15),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out"),
- 		  SUNXI_FUNCTION(0x2, "spi1"),		/* CS1 */
- 		  SUNXI_FUNCTION(0x3, "ps2"),		/* SDA1 */
- 		  SUNXI_FUNCTION(0x4, "timer5"),	/* TCLKIN1 */
--		  SUNXI_FUNCTION_IRQ(0x5, 27)),		/* EINT27 */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(I, 16),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out"),
- 		  SUNXI_FUNCTION(0x2, "spi1"),		/* CS0 */
- 		  SUNXI_FUNCTION(0x3, "uart2"),		/* RTS */
--		  SUNXI_FUNCTION_IRQ(0x5, 28)),		/* EINT28 */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(I, 17),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out"),
- 		  SUNXI_FUNCTION(0x2, "spi1"),		/* CLK */
- 		  SUNXI_FUNCTION(0x3, "uart2"),		/* CTS */
--		  SUNXI_FUNCTION_IRQ(0x5, 29)),		/* EINT29 */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(I, 18),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out"),
- 		  SUNXI_FUNCTION(0x2, "spi1"),		/* MOSI */
- 		  SUNXI_FUNCTION(0x3, "uart2"),		/* TX */
--		  SUNXI_FUNCTION_IRQ(0x5, 30)),		/* EINT30 */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(I, 19),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out"),
- 		  SUNXI_FUNCTION(0x2, "spi1"),		/* MISO */
- 		  SUNXI_FUNCTION(0x3, "uart2"),		/* RX */
--		  SUNXI_FUNCTION_IRQ(0x5, 31)),		/* EINT31 */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(I, 20),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out"),
--- 
-2.5.0
+Hi Vinod,
+
+Are you happy with this version ?
+If so could you provide me your Acked-by please ?
+
+Cheers.
+
+--
+Robert
