@@ -1,9 +1,9 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Sat, 20 Feb 2016 11:46:23 -0800
-Subject: [GIT PULL 4/8] Broadcom devicetree-arm64 changes for 4.6
+Date: Sat, 20 Feb 2016 11:46:24 -0800
+Subject: [GIT PULL 5/8] Broadcom maintainers changes for 4.6
 In-Reply-To: <1455997587-17564-1-git-send-email-f.fainelli@gmail.com>
 References: <1455997587-17564-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <1455997587-17564-4-git-send-email-f.fainelli@gmail.com>
+Message-ID: <1455997587-17564-5-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,45 +11,21 @@ List-Id: linux-arm-kernel.lists.infradead.org
 
 are available in the git repository at:
 
-  http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.6/devicetree-arm64
+  http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.6/maintainers
 
-for you to fetch changes up to f008decc4797979bc1d3b8efd18bd5df1e53e9f0:
+for you to fetch changes up to 20de823e8b38119d8106aa85e0bd8b47eb295889:
 
-  dt-bindings: Add documentation for Broadcom Vulcan (2016-02-20 10:42:51 -0800)
-
-----------------------------------------------------------------
-This pull request contains Broadcom ARM64-based SoCs device tree changes:
-
-- Anup adds additional nodes to the Broadcom Northstart 2 Device Trees: SDHCI
-  (iProc-compatible), ARM SP804 timers, ARM SP805 watchdog
-
-- Anup also adds a binding documentation for the ARM SP805 watchdog since there
-  was not one in tree before
-
-- Ray adds PCIE root complex nodes to the Northstar 2 Device Tree nodes, using
-  the iProc-compatible binding
-
-- Jayachandran C. adds binding documentation for the Broadcom Vulcan processors and
-  reference platforms
+  MAINTAINERS: ARM: BCM63xx: Update git and mailing-lists (2016-02-02 10:47:47 -0800)
 
 ----------------------------------------------------------------
-Anup Patel (4):
-      arm64: dts: Add SDHCI DT node for NS2
-      arm64: dts: Add ARM SP804 timer DT nodes for NS2
-      dt-bindings: watchdog: Add ARM SP805 DT bindings
-      arm64: dts: Add ARM SP805 watchdog DT node for NS2
+This pull request contains MAINTAINERS file updates for Broadcom ARM-based SoCs:
 
-Jayachandran C (1):
-      dt-bindings: Add documentation for Broadcom Vulcan
+- Florian updates the Broadcom BCM63xx ARM-based DSL SoCs to use the same mailing-list
+  and development tree as all the other Broadcom SoCS
 
-Ray Jui (1):
-      arm64: dts: Add PCIe0 and PCIe4 DT nodes for NS2
+----------------------------------------------------------------
+Florian Fainelli (1):
+      MAINTAINERS: ARM: BCM63xx: Update git and mailing-lists
 
- .../bindings/arm/bcm/brcm,vulcan-soc.txt           |  10 ++
- Documentation/devicetree/bindings/arm/cpus.txt     |   1 +
- .../devicetree/bindings/watchdog/arm,sp805.txt     |  17 +++
- arch/arm64/boot/dts/broadcom/ns2-svk.dts           |  12 ++
- arch/arm64/boot/dts/broadcom/ns2.dtsi              | 140 +++++++++++++++++++++
- 5 files changed, 180 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/bcm/brcm,vulcan-soc.txt
- create mode 100644 Documentation/devicetree/bindings/watchdog/arm,sp805.txt
+ MAINTAINERS | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
