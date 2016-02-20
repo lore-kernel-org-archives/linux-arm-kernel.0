@@ -1,20 +1,37 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 20 Feb 2016 15:30:58 -0200
-Subject: [PATCH 4/4] ARM: dts: imx6ul-geam: Add Engicam IMX6UL GEA M6UL
- initial support
-In-Reply-To: <20160220171921.GB24064@panicking>
-References: <1455963652-24618-1-git-send-email-michael@amarulasolutions.com>
- <1455963652-24618-5-git-send-email-michael@amarulasolutions.com>
- <CAOMZO5AmePs3aE2zRSXcSS8iKQ0m2kvTAezsfHS13e-Zv1HCrA@mail.gmail.com>
- <20160220171921.GB24064@panicking>
-Message-ID: <CAOMZO5CaBaNYAZDOhW2mXDe4OtBmZK7bDRfoQXcKio_tr3ZUBQ@mail.gmail.com>
+From: alexander.sverdlin@gmail.com (Alexander Sverdlin)
+Date: Sat, 20 Feb 2016 18:59:37 +0100
+Subject: [PATCH v2 0/5] iio: ADC driver for EP93xx SoC
+Message-ID: <56C8A989.9030801@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 20, 2016 at 3:19 PM, Michael Trimarchi
-<michael@amarulasolutions.com> wrote:
+This series prepares the necessary infrastructure for ADC platform device on
+Cirrus Logic EP93xx family of SoCs and adds the driver for ADC device using
+IIO subsystem.
 
-> This map the phy connection. Regulator are really always on and they
-> are always on
+Changelog
+v2:
+  Added Documentation/iio/ep93xx_adc.txt
+  Removed extend_name
+  Added timeout to the status polling loop
+  Used iio_device_register() instead of devm_iio_device_register()
 
-but they are pointless with this type of regulator.
+Alexander Sverdlin (5):
+  clk: ep93xx: Implement clk_get_parent()
+  clk: ep93xx: Add ADC clock
+  ep93xx: Add ADC platform device support to core
+  edb93xx: Add ADC platform device
+  iio: adc: New driver for Cirrus Logic EP93xx ADC
+
+ Documentation/iio/ep93xx_adc.txt             |  29 +++
+ arch/arm/mach-ep93xx/clock.c                 |  14 ++
+ arch/arm/mach-ep93xx/core.c                  |  24 +++
+ arch/arm/mach-ep93xx/edb93xx.c               |   1 +
+ arch/arm/mach-ep93xx/include/mach/platform.h |   1 +
+ arch/arm/mach-ep93xx/soc.h                   |   1 +
+ drivers/iio/adc/Kconfig                      |  11 ++
+ drivers/iio/adc/Makefile                     |   1 +
+ drivers/iio/adc/ep93xx_adc.c                 | 261 +++++++++++++++++++++++++++
+ 9 files changed, 343 insertions(+)
+ create mode 100644 Documentation/iio/ep93xx_adc.txt
+ create mode 100644 drivers/iio/adc/ep93xx_adc.c
