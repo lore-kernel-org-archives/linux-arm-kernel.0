@@ -1,113 +1,159 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 19 Feb 2016 23:02:09 -0800
-Subject: [v9,4/5] iommu/mediatek: Add mt8173 IOMMU driver
-In-Reply-To: <1455669974-1527-5-git-send-email-yong.wu@mediatek.com>
-References: <1455669974-1527-5-git-send-email-yong.wu@mediatek.com>
-Message-ID: <20160220070209.GA16577@roeck-us.net>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sat, 20 Feb 2016 09:20:05 +0100
+Subject: [PATCH v11 00/10] arm64,
+ numa: Add numa support for arm64 platforms
+In-Reply-To: <1455930799-5371-1-git-send-email-ddaney.cavm@gmail.com>
+References: <1455930799-5371-1-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <CAKv+Gu8FRdif_WDZPqs7gHxXMu=6SqDd6A54dQc1KWuGwxpf0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 17, 2016 at 08:46:13AM +0800, Yong Wu wrote:
-> This patch adds support for mediatek m4u (MultiMedia Memory Management
-> Unit).
-> 
-> Signed-off-by: Yong Wu <yong.wu@mediatek.com>
-> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-> 
-> ---
-> drivers/iommu/Kconfig     |  16 +
->  drivers/iommu/Makefile    |   1 +
->  drivers/iommu/mtk_iommu.c | 732 ++++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 749 insertions(+)
->  create mode 100644 drivers/iommu/mtk_iommu.c
-> 
-> diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
-> index a1e75cb..4922aa8 100644
-> --- a/drivers/iommu/Kconfig
-> +++ b/drivers/iommu/Kconfig
-> @@ -318,4 +318,20 @@ config S390_IOMMU
->  	help
->  	  Support for the IOMMU API for s390 PCI devices.
->  
-> +config MTK_IOMMU
-> +	bool "MTK IOMMU Support"
-> +	depends on ARM || ARM64
-> +	depends on ARCH_MEDIATEK || COMPILE_TEST
-> +	select IOMMU_API
-> +	select IOMMU_DMA
-> +	select IOMMU_IO_PGTABLE_ARMV7S
-> +	select MEMORY
-> +	select MTK_SMI
-> +	help
-> +	  Support for the M4U on certain Mediatek SOCs. M4U is MultiMedia
-> +	  Memory Management Unit. This option enables remapping of DMA memory
-> +	  accesses for the multimedia subsystem.
-> +
-> +	  If unsure, say N here.
-> +
->  endif # IOMMU_SUPPORT
-> diff --git a/drivers/iommu/Makefile b/drivers/iommu/Makefile
-> index 42fc0c2..44ae2e0 100644
-> --- a/drivers/iommu/Makefile
-> +++ b/drivers/iommu/Makefile
-> @@ -16,6 +16,7 @@ obj-$(CONFIG_INTEL_IOMMU) += intel-iommu.o
->  obj-$(CONFIG_INTEL_IOMMU_SVM) += intel-svm.o
->  obj-$(CONFIG_IPMMU_VMSA) += ipmmu-vmsa.o
->  obj-$(CONFIG_IRQ_REMAP) += intel_irq_remapping.o irq_remapping.o
-> +obj-$(CONFIG_MTK_IOMMU) += mtk_iommu.o
->  obj-$(CONFIG_OMAP_IOMMU) += omap-iommu.o
->  obj-$(CONFIG_OMAP_IOMMU_DEBUG) += omap-iommu-debug.o
->  obj-$(CONFIG_ROCKCHIP_IOMMU) += rockchip-iommu.o
-> diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
-> new file mode 100644
-> index 0000000..60fe97b
-> --- /dev/null
-> +++ b/drivers/iommu/mtk_iommu.c
-> @@ -0,0 +1,732 @@
-> +/*
-> + * Copyright (c) 2015-2016 MediaTek Inc.
-> + * Author: Yong Wu <yong.wu@mediatek.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +#include <linux/clk.h>
-> +#include <linux/component.h>
-> +#include <linux/dma-iommu.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/io.h>
-> +#include <linux/iommu.h>
-> +#include <linux/iopoll.h>
-> +#include <linux/list.h>
-> +#include <linux/module.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_iommu.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/platform_device.h>
-> +#include <soc/mediatek/smi.h>
-> +#include <dt-bindings/memory/mt8173-larb-port.h>
-> +
+Hello David,
 
-Some missing includes:
+On 20 February 2016 at 02:13, David Daney <ddaney.cavm@gmail.com> wrote:
+> From: David Daney <david.daney@cavium.com>
+>
+> v11:
+>         - Dropped cleanup patches for other architectures, they will be
+>           submitted as a separate set after more testing.
+>
+>         - Added patch set from Ard Biesheuvel that are needed to make
+>           the whole thing actually work.  Previously this was a
+>           separate set.
+>
 
-linux/bug.h
-	for WARN_ON()
-linux/device.h
-	for dev_xxx() error messages, dev_get_drvdata(), etc.
-linux/err.h
-	for error functions (IS_ERR, error definitions)
-linux/slab.h
-	for kzalloc() etc.
-linux/spinlock.h
-	for spinlock functions
-asm/barrier.h
-	for wmb()
+This series is out of date, unfortunately. The EFI init code is now
+(as of v4.5-rc1) shared between ARM and arm64, which means that any
+changes you make must be made on both sides. This applies to the split
+between parsing the EFI dt nodes and performing the actual EFI init,
+but also to the early_init_dt_add_memory_arch() changes. I am happy to
+have a go at this, but first I need a clear statement from whoever
+maintains that area that keeping memory nodes *just* for the
+annotations (and otherwise ignore them) is the way forward (Rob?
+Grant?)
 
-Guenter
+Also, please drop the 6th patch. As i replied to Robert when he
+reposted these patches, we need to honor the /reserved-memory node
+rather than remove it. I will follow up with an updated
+/reserved-memory node validation patch for the EFI stub once these
+changes are in.
+
+
+>         - Kconfig and other fixes and simplifications as suggested by Rob Herring.
+>
+>         - Rearranged, refactored and reordered so that we don't patch
+>           new files multiple times.
+>
+>         - Summary:
+>
+>                 o 6 patches from Ard Biesheuvel to allow use of
+>                   "memory" nodes with efi stub.
+>
+>                 o 2 patches to document and add of_numa.c
+>
+>                 o 1 patch to add arm64 NUMA support.
+>
+>                 o 1 patch to add NUMA balancing support for arm64.
+>
+> v10:
+>         - Incorporated review comments from Rob Herring.
+>         - Moved numa binding and implementation to devicetree core.
+>         - Added cleanup patch to remove redundant NODE_DATA macro from asm header files
+>         - Include numa balancing support for arm64 patch in this series.
+>         - Fix tile build issue reported by the kbuild robot(patch 7)
+>
+> v9:     - Added cleanup patch to reuse and avoid redefinition of cpumask_of_pcibus
+>           as suggested from Will Deacon and Bjorn Helgaas.
+>           - Including patch to Make pci-host-generic driver numa aware.
+>           - Incorporated comment from Shannon Zhao.
+>
+> v8:
+>         - Incorporated review comments of Mark Rutland and Will Deacon.
+>         - Added pci helper function and macro for numa.
+>
+> v7:
+>         - managing numa memory mapping using memblock.
+>         - Incorporated review comments of Mark Rutland.
+>
+> v6:
+>         - defined and implemented the numa dt binding using
+>         node property proximity and device node distance-map.
+>         - renamed dt_numa to of_numa
+>
+> v5:
+>         - created base verion of numa.c which creates dummy numa without using dt
+>           on single socket platforms. Then added patches for dt support.
+>         - Incorporated review comments from Hanjun Guo.
+>
+> v4:
+> done changes as per Arnd review comments.
+>
+> v3:
+> Added changes to support numa on arm64 based platforms.
+> Tested these patches on cavium's multinode(2 node topology) platform.
+> In this patchset, defined and implemented dt bindings for numa mapping
+> for core and memory using device node property arm,associativity.
+>
+> v2:
+> Defined and implemented numa map for memory, cores to node and
+> proximity distance matrix of nodes.
+>
+> v1:
+> Initial patchset to support numa on arm64 platforms.
+>
+> Note: 1. This patchset is tested for NUMA and without NUMA with dt
+>         (both with and without NUMA bindings) on thunderx single
+>         socket and dual socket boards.
+>
+>
+> Ard Biesheuvel (6):
+>   of/fdt: make generic early_init_dt_add_memory_arch() a weak alias
+>   arm64: override generic version of early_init_dt_add_memory_arch()
+>   efi: move FDT handling to separate object file
+>   arm64/efi: move EFI /chosen node parsing before early FDT processing
+>   arm64/efi: ignore DT memory nodes instead of removing them
+>   arm64/efi: ignore DT memreserve entries instead of removing them
+>
+> Ganapatrao Kulkarni (4):
+>   Documentation, dt, numa: dt bindings for NUMA.
+>   dt, numa: Add NUMA dt binding implementation.
+>   arm64, numa: Add NUMA support for arm64 platforms.
+>   arm64, mm, numa: Add NUMA balancing support for arm64.
+>
+>  Documentation/devicetree/bindings/numa.txt | 272 +++++++++++++++++++
+>  arch/arm64/Kconfig                         |  27 ++
+>  arch/arm64/include/asm/efi.h               |   2 +
+>  arch/arm64/include/asm/mmzone.h            |  12 +
+>  arch/arm64/include/asm/numa.h              |  45 ++++
+>  arch/arm64/include/asm/pgtable.h           |  15 ++
+>  arch/arm64/include/asm/topology.h          |  10 +
+>  arch/arm64/kernel/pci.c                    |  10 +
+>  arch/arm64/kernel/setup.c                  |   7 +
+>  arch/arm64/kernel/smp.c                    |   4 +
+>  arch/arm64/mm/Makefile                     |   1 +
+>  arch/arm64/mm/init.c                       |  46 +++-
+>  arch/arm64/mm/mmu.c                        |   1 +
+>  arch/arm64/mm/numa.c                       | 403 +++++++++++++++++++++++++++++
+>  drivers/firmware/efi/Makefile              |   1 +
+>  drivers/firmware/efi/arm-init.c            |  36 ++-
+>  drivers/firmware/efi/efi-fdt.c             |  73 ++++++
+>  drivers/firmware/efi/efi.c                 |  84 ------
+>  drivers/firmware/efi/libstub/fdt.c         |  33 +--
+>  drivers/of/Kconfig                         |   3 +
+>  drivers/of/Makefile                        |   1 +
+>  drivers/of/fdt.c                           |   7 +-
+>  drivers/of/of_numa.c                       | 211 +++++++++++++++
+>  include/linux/efi.h                        |   2 +-
+>  include/linux/of.h                         |   9 +
+>  include/linux/of_fdt.h                     |   1 +
+>  26 files changed, 1178 insertions(+), 138 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/numa.txt
+>  create mode 100644 arch/arm64/include/asm/mmzone.h
+>  create mode 100644 arch/arm64/include/asm/numa.h
+>  create mode 100644 arch/arm64/mm/numa.c
+>  create mode 100644 drivers/firmware/efi/efi-fdt.c
+>  create mode 100644 drivers/of/of_numa.c
+>
+> --
+> 1.8.3.1
+>
