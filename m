@@ -1,23 +1,20 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sat, 20 Feb 2016 00:51:03 +0900
-Subject: [PATCH 04/12] spi: imx: drop fallback to PIO
-In-Reply-To: <1455867792-26389-5-git-send-email-s.hauer@pengutronix.de>
-References: <1455867792-26389-1-git-send-email-s.hauer@pengutronix.de>
- <1455867792-26389-5-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20160219155103.GS18327@sirena.org.uk>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 20 Feb 2016 15:30:58 -0200
+Subject: [PATCH 4/4] ARM: dts: imx6ul-geam: Add Engicam IMX6UL GEA M6UL
+ initial support
+In-Reply-To: <20160220171921.GB24064@panicking>
+References: <1455963652-24618-1-git-send-email-michael@amarulasolutions.com>
+ <1455963652-24618-5-git-send-email-michael@amarulasolutions.com>
+ <CAOMZO5AmePs3aE2zRSXcSS8iKQ0m2kvTAezsfHS13e-Zv1HCrA@mail.gmail.com>
+ <20160220171921.GB24064@panicking>
+Message-ID: <CAOMZO5CaBaNYAZDOhW2mXDe4OtBmZK7bDRfoQXcKio_tr3ZUBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 19, 2016 at 08:43:04AM +0100, Sascha Hauer wrote:
-> At the moment the driver decides to fallback to PIO mode the buffers
-> are already mapped for DMA. It's a bug to access them with the CPU
-> afterwards, so we cannot just fallback to PIO mode.
+On Sat, Feb 20, 2016 at 3:19 PM, Michael Trimarchi
+<michael@amarulasolutions.com> wrote:
 
-This doesn't apply against current code, please check and resend.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160220/a63b0592/attachment.sig>
+> This map the phy connection. Regulator are really always on and they
+> are always on
+
+but they are pointless with this type of regulator.
