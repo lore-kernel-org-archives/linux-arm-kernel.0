@@ -1,60 +1,63 @@
-From: ray.jui@broadcom.com (Ray Jui)
-Date: Fri, 19 Feb 2016 17:23:33 -0800
-Subject: [02/11] video: ARM CLCD: support DT signal inversion flags
-In-Reply-To: <CACRpkdbGCidu_3qbTYf7WSoAhafU4Z5W0jDs4CGtH5XwSf14aA@mail.gmail.com>
-References: <1454594660-7532-3-git-send-email-linus.walleij@linaro.org>
- <0cebf93a-ee0a-3637-3242-8aed266df091@broadcom.com>
- <CACRpkdbGCidu_3qbTYf7WSoAhafU4Z5W0jDs4CGtH5XwSf14aA@mail.gmail.com>
-Message-ID: <ac0739e5-4339-7fc5-1179-73af722beb08@broadcom.com>
+From: John.Youn@synopsys.com (John Youn)
+Date: Sat, 20 Feb 2016 02:55:33 +0000
+Subject: [PATCH] usb: move usb_calc_bus_time into common code
+References: <1455918064-410571-1-git-send-email-arnd@arndb.de>
+ <Pine.LNX.4.44L0.1602191650570.1700-100000@iolanthe.rowland.org>
+ <CAD=FV=VjgTUQR-Rw+LWXnNdZhruukaV-+LnXFqNRj-wpcvSJ4w@mail.gmail.com>
+Message-ID: <2B3535C5ECE8B5419E3ECBE30077290901DC453B41@US01WEMBX2.internal.synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On 2/19/2016 2:48 PM, Doug Anderson wrote:
+> Hi,
+> 
+> On Fri, Feb 19, 2016 at 1:52 PM, Alan Stern <stern@rowland.harvard.edu> wrote:
+>> On Fri, 19 Feb 2016, Arnd Bergmann wrote:
+>>
+>>> The dwc2 dual-role USB controller driver has started calling
+>>> usb_calc_bus_time, and does so regardless of whether it is
+>>> being built as a host controller or gadget. In case all
+>>
+>> Out of curiosity...  Why does dwc2 need to calculate bus times when it
+>> is in device mode?
+> 
+> Hoo boy.  it doesn't.  Nor does it need to properly set the even/odd
+> frame in device mode.
+> 
+> Basically dwc2's "core.c" has a whole bunch of stuff in it that's host
+> only and isn't guarded with any #ifdef.  ...yet that file is included
+> in gadget-only builds.  It's a bit of a mess.  Take a gander at all of
+> the "dwc2_hc_xxx" functions sitting in "drivers/usb/dwc2/core.c".
+> 
+> Long term that needs to be cleaned up, but such a cleanup is going to
+> be a bit of churn so we'd need to schedule it for a time when not much
+> else is going on (and presumably it should be done by John or in close
+> coordination with him so it can get Acked / landed quickly to avoid
+> conflicts?).  To do this we'd have to figure out why some things are
+> in "core.c" and some in "hcd.c" and if it makes sense to move them all
+> to "hcd.c" or if we need a new "core_hc.c" or something...  All of
+> that design predates me.
+> 
 
-On 2/19/2016 12:46 AM, Linus Walleij wrote:
-> On Wed, Feb 17, 2016 at 7:10 PM, Ray Jui <ray.jui@broadcom.com> wrote:
->
->> A somewhat related question, how do you see the CLKSEL bit in the TIM2
->> register will be supported in the future? There are some cases where the
->> CLKSEL bit needs to be set, and therefore the "CLCDCLK" instead of "HCLK"
->> reference clock source is selected.
->
-> I think it's very simple:
->
-> The DT node usually looks like so:
->
-> display at 10120000 {
->         compatible = "arm,pl110", "arm,primecell";
-> (...)
->         clocks = <&oscclk4>, <&pclk>;
->         clock-names = "clcd", "apb_pclk";
->
-> Just add a custom attribute pointing to the
-> reference clock in this array:
->
-> clcd-reference-clock = <0>;
->
-> If this is set to <1> "apb_pclk" (i.e. HCLK) is
-> the reference, and that bit in TIM2 gets set.
+Yeah, that stuff has been bugging me for a while. I have a branch that
+started a lot of clean-ups, but it's never been a great time to merge
+it.
 
-This looks good!
+> In any case I guess we need a solution for right now, huh?
+> 
+> One terribly lame hack would be to just make a dummy no-op
+> "dwc2_hc_set_even_odd_frame()" if host mode is disabled.  That doesn't
+> really fix the root problem of lots of host mode code being compiled
+> in a gadget-only driver.  It also adds an ugly "#ifdef".  ...but it
+> does get around the current compile error.
+> 
+> 
+> What do folks think?
+> 
 
->
-> Do you have a system that needs this?
->
+I think if we can fix it for -next in dwc2 by moving all host code out
+of core then we should do it that way. I'll see if I can revive my
+patches.
 
-Yah, we have a system (Cygnus) that can either use the HCLK, or an 
-external clock generated from a PLL. To get certain pixel clock 
-frequencies (depending on the LCD panel we use), we need to use the 
-external clock source with the PLL configured to a particular VCO frequency.
-
-We have not enabled full LCD/video support on that platform in the 
-mainline kernel, but we'll eventually get to it.
-
-> Yours,
-> Linus Walleij
->
-
-Thanks,
-
-Ray
+Regards,
+John
