@@ -1,39 +1,70 @@
-From: robert.richter@caviumnetworks.com (Robert Richter)
-Date: Sat, 20 Feb 2016 11:39:59 +0100
-Subject: [PATCH v11 00/10] arm64, numa: Add numa support for arm64
- platforms
-In-Reply-To: <CAKv+Gu8FRdif_WDZPqs7gHxXMu=6SqDd6A54dQc1KWuGwxpf0w@mail.gmail.com>
-References: <1455930799-5371-1-git-send-email-ddaney.cavm@gmail.com>
- <CAKv+Gu8FRdif_WDZPqs7gHxXMu=6SqDd6A54dQc1KWuGwxpf0w@mail.gmail.com>
-Message-ID: <20160220103959.GC4914@rric.localdomain>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sat, 20 Feb 2016 10:40:19 +0000
+Subject: [PATCH v3 0/7] irqchip: introduce the Alpine MSIX driver
+In-Reply-To: <1455895369-13187-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1455895369-13187-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <20160220104019.21e425c6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20.02.16 09:20:05, Ard Biesheuvel wrote:
-> On 20 February 2016 at 02:13, David Daney <ddaney.cavm@gmail.com> wrote:
-> > From: David Daney <david.daney@cavium.com>
-> >
-> > v11:
-> >         - Dropped cleanup patches for other architectures, they will be
-> >           submitted as a separate set after more testing.
-> >
-> >         - Added patch set from Ard Biesheuvel that are needed to make
-> >           the whole thing actually work.  Previously this was a
-> >           separate set.
-> >
+On Fri, 19 Feb 2016 16:22:42 +0100
+Antoine Tenart <antoine.tenart@free-electrons.com> wrote:
+
+Hi Antoine,
+
+> Hi all,
 > 
-> This series is out of date, unfortunately. The EFI init code is now
-> (as of v4.5-rc1) shared between ARM and arm64, which means that any
-> changes you make must be made on both sides. This applies to the split
-> between parsing the EFI dt nodes and performing the actual EFI init,
-> but also to the early_init_dt_add_memory_arch() changes. I am happy to
-> have a go at this, but first I need a clear statement from whoever
-> maintains that area that keeping memory nodes *just* for the
-> annotations (and otherwise ignore them) is the way forward (Rob?
-> Grant?)
+> This series introduce the Alpine MSIX driver, and enables it in both
+> the Alpine v1 and Alpine v2 device trees.
+> 
+> This series depends on "[PATCH v2 0/3] arm64: introduce the Alpine support":
+> https://lkml.org/lkml/2016/2/10/83
+> 
+> You can find the series at:
+> https://github.com/atenart/linux.git 4.5-rc1/alpinev2-msix
+> 
+> Antoine
+> 
+> Since v2:
+>   - Updated the documentation (added a reference to the GIC documentation).
+> 
+> Since v1:
+>   - Added an interrupt-parent property in the documentation example.
+>   - Updated to use bitmap_*() instead of *_bit().
+>   - Removed the static irq_set_affinity to use irq_chip_set_affinity_parent().
+>   - Updated the address field to use phys_addr_t.
+>   - Added a comment on why we're setting bit 16 in the address.
+>   - Patched the gic_set_affinity() function in irqchip/gic-v3.
+> 
+> Antoine Tenart (7):
+>   irqchip/gic-v3: always return IRQ_SET_MASK_OK_DONE in gic_set_affinity
+>   irqchip: add the Alpine MSIX interrupt controller
+>   Documentation: bindings: document the Alpine MSIX driver
+>   arm64: dts: alpine: add the MSIX node in the Alpine v2 dtsi
+>   ARM: dts: alpine: add the MSIX node
+>   arm64: alpine: select the Alpine MSI controller driver
+>   arm: alpine: select the Alpine MSI controller driver
+> 
+>  .../interrupt-controller/al,alpine-msix.txt        |  26 ++
+>  arch/arm/boot/dts/alpine.dtsi                      |  10 +
+>  arch/arm/mach-alpine/Kconfig                       |   1 +
+>  arch/arm64/Kconfig.platforms                       |   1 +
+>  arch/arm64/boot/dts/al/alpine-v2.dtsi              |  10 +
+>  drivers/irqchip/Kconfig                            |   6 +
+>  drivers/irqchip/Makefile                           |   1 +
+>  drivers/irqchip/irq-alpine-msi.c                   | 293 +++++++++++++++++++++
+>  drivers/irqchip/irq-gic-v3.c                       |   2 +-
+>  9 files changed, 349 insertions(+), 1 deletion(-)
+>  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/al,alpine-msix.txt
+>  create mode 100644 drivers/irqchip/irq-alpine-msi.c
+> 
 
-Wasn't there the approach to check for consistency between efi tables
-and devicetree? Thus, DT is actually not ignored but rather checked if
-it is in sync with efi tables.
+I've queued the first three patches in my irq/gic-4.6 branch. I'd
+expect the last 4 patches to be taken care off by armsoc once the code
+has made it into Linus' tree.
 
--Robert
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny.
