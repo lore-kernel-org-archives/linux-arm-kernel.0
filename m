@@ -1,41 +1,63 @@
-From: yang.shi@linaro.org (Shi, Yang)
-Date: Fri, 19 Feb 2016 16:07:02 -0800
-Subject: [PATCH] arm64: remove redundant preempt.h
-In-Reply-To: <1455299803-317-1-git-send-email-yang.shi@linaro.org>
-References: <1455299803-317-1-git-send-email-yang.shi@linaro.org>
-Message-ID: <56C7AE26.1060407@linaro.org>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 19 Feb 2016 18:09:51 -0600
+Subject: [PATCH] hwmon: (gpio-fan) Remove un-necessary speed_index lookup for
+ thermal hook
+Message-ID: <1455926991-15189-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will & Catalin,
+Thermal hook gpio_fan_get_cur_state is only interested in knowing
+the current speed index that was setup in the system, this is
+already available as part of fan_data->speed_index which is always
+set by set_fan_speed. Using get_fan_speed_index is useful when we
+have no idea about the fan speed configuration (for example during
+fan_ctrl_init).
 
-Any comment on this one?
+When thermal framework invokes
+gpio_fan_get_cur_state=>get_fan_speed_index via gpio_fan_get_cur_state
+especially in a polled configuration for thermal governor, we
+basically hog the i2c interface to the extent that other functions
+fail to get any traffic out :(.
 
-Thanks,
-Yang
+Instead, just provide the last state set in the driver - since the gpio
+fan driver is responsible for the fan state immaterial of override, the
+fan_data->speed_index should accurately reflect the state.
 
-On 2/12/2016 9:56 AM, Yang Shi wrote:
-> preempt.h has been included by sched.h, so it is not necessary to include
-> both, just keep sched.h.
->
-> Signed-off-by: Yang Shi <yang.shi@linaro.org>
-> ---
-> Happened to find this when checking preempt.h include for another patch review.
-> Build test is passed with and without CONFIG_PREEMPT enabled.
->
->   arch/arm64/kernel/cpuinfo.c | 1 -
->   1 file changed, 1 deletion(-)
->
-> diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-> index 212ae63..e2b37ff 100644
-> --- a/arch/arm64/kernel/cpuinfo.c
-> +++ b/arch/arm64/kernel/cpuinfo.c
-> @@ -25,7 +25,6 @@
->   #include <linux/init.h>
->   #include <linux/kernel.h>
->   #include <linux/personality.h>
-> -#include <linux/preempt.h>
->   #include <linux/printk.h>
->   #include <linux/seq_file.h>
->   #include <linux/sched.h>
->
+Fixes: b5cf88e46bad ("(gpio-fan): Add thermal control hooks")
+
+Reported-by: Tony Lindgren <tony@atomide.com>
+Cc: Guenter Roeck <linux@roeck-us.net>
+Cc: Eduardo Valentin <edubezval@gmail.com>
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+Test logs from linus master  v4.5-rc4-137-g23300f657594 
+Without fix: http://paste.ubuntu.org.cn/3948618
+With Fix: http://paste.ubuntu.org.cn/3948617
+
+ drivers/hwmon/gpio-fan.c | 7 +------
+ 1 file changed, 1 insertion(+), 6 deletions(-)
+
+diff --git a/drivers/hwmon/gpio-fan.c b/drivers/hwmon/gpio-fan.c
+index 82de3deeb18a..685568b1236d 100644
+--- a/drivers/hwmon/gpio-fan.c
++++ b/drivers/hwmon/gpio-fan.c
+@@ -406,16 +406,11 @@ static int gpio_fan_get_cur_state(struct thermal_cooling_device *cdev,
+ 				  unsigned long *state)
+ {
+ 	struct gpio_fan_data *fan_data = cdev->devdata;
+-	int r;
+ 
+ 	if (!fan_data)
+ 		return -EINVAL;
+ 
+-	r = get_fan_speed_index(fan_data);
+-	if (r < 0)
+-		return r;
+-
+-	*state = r;
++	*state = fan_data->speed_index;
+ 	return 0;
+ }
+ 
+-- 
+2.7.0
