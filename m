@@ -1,7 +1,9 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Sat, 20 Feb 2016 11:46:20 -0800
-Subject: [GIT PULL 1/8] Broadcom soc changes for 4.6
-Message-ID: <1455997587-17564-1-git-send-email-f.fainelli@gmail.com>
+Date: Sat, 20 Feb 2016 11:46:21 -0800
+Subject: [GIT PULL 2/8] Broadcom soc-arm64 changes for 4.6
+In-Reply-To: <1455997587-17564-1-git-send-email-f.fainelli@gmail.com>
+References: <1455997587-17564-1-git-send-email-f.fainelli@gmail.com>
+Message-ID: <1455997587-17564-2-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -9,27 +11,39 @@ List-Id: linux-arm-kernel.lists.infradead.org
 
 are available in the git repository at:
 
-  http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.6/soc
+  http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.6/soc-arm64
 
-for you to fetch changes up to 6580566e10016c1ec00aa5e0e62af3c4b3498019:
+for you to fetch changes up to 9eb8a2cdf65ce47c3aa68f1297c84d8bcf5a7b3a:
 
-  ARM: BCM63xx: Remove unused pmb_dn variable (2016-02-02 10:47:08 -0800)
-
-----------------------------------------------------------------
-This pull request contains Broadcom ARM-based SoC/platform changes:
-
-- Masahiro updates the Broadcom Northstar Plus SMP operations to be annotated
-  with const and __initconst
-
-- Florian removes an unused variable in the Broadcom BCM63XX SMP code
+  arm64: cputype info for Broadcom Vulcan (2016-02-20 10:42:38 -0800)
 
 ----------------------------------------------------------------
-Florian Fainelli (1):
-      ARM: BCM63xx: Remove unused pmb_dn variable
+This pull request contains Broadcom ARM64-based SoC/platform changes:
 
-Masahiro Yamada (1):
-      ARM: bcm: use const and __initconst for smp_operations
+- Anup, Ray and Dhanajay enable COMMON_CLK_IPROC, PINCTRL and GPIOLIB for iProc
+  SoCs to get the corresponding iProc-based drivers to be available and work
 
- arch/arm/mach-bcm/bcm63xx_pmb.c | 2 --
- arch/arm/mach-bcm/platsmp.c     | 2 +-
- 2 files changed, 1 insertion(+), 3 deletions(-)
+- Zi adds support for Broadcom's Vulcan processor by adding a reference
+  board Device Tree file along with a config ARCH_VULCAN symbol
+
+- Jayachandran C. adds the Broadcom implementor ID and part ID for the Vulcan
+  processors
+
+----------------------------------------------------------------
+Anup Patel (1):
+      arm64: Select COMMON_CLK_IPROC, PINCTRL and GPIOLIB for iProc SoCs
+
+Jayachandran C (1):
+      arm64: cputype info for Broadcom Vulcan
+
+Zi Shen Lim (1):
+      arm64: Broadcom Vulcan support
+
+ arch/arm64/Kconfig.platforms                 |   8 ++
+ arch/arm64/boot/dts/broadcom/Makefile        |   1 +
+ arch/arm64/boot/dts/broadcom/vulcan-eval.dts |  33 ++++++
+ arch/arm64/boot/dts/broadcom/vulcan.dtsi     | 144 +++++++++++++++++++++++++++
+ arch/arm64/include/asm/cputype.h             |   3 +
+ 5 files changed, 189 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/broadcom/vulcan-eval.dts
+ create mode 100644 arch/arm64/boot/dts/broadcom/vulcan.dtsi
