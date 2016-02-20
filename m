@@ -1,50 +1,31 @@
 From: jchandra@broadcom.com (Jayachandran C)
-Date: Sat, 20 Feb 2016 19:49:19 +0530
-Subject: [PATCH v2 0/5] Support for Broadcom Vulcan ARM64 processor
-Message-ID: <1455977964-8099-1-git-send-email-jchandra@broadcom.com>
+Date: Sat, 20 Feb 2016 19:49:22 +0530
+Subject: [PATCH v2 3/5] arm64: defconfig: Add Broadcom Vulcan to defconfig
+In-Reply-To: <1455977964-8099-1-git-send-email-jchandra@broadcom.com>
+References: <1455977964-8099-1-git-send-email-jchandra@broadcom.com>
+Message-ID: <1455977964-8099-4-git-send-email-jchandra@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds support for Broadcom's Vulcan ARM64 processor.
-The changes are to add the device tree files, documentation for the
-device tree, cpu ID and the maintainers entry.
+Enable Broadcom Vulcan support in arm64 default configuration. This will
+build the device tree needed to boot on a Broadcom Vulcan board.
 
-This is v2 of the patchset, changelog below:
+Signed-off-by: Jayachandran C <jchandra@broadcom.com>
+---
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-v1->v2 :
- - dts: remove memreserve, use brcm,vulcan-soc for board
-   (to address comments from Mark Rutland)
- - Fixup copyright (Broadcomp corp -> Broadcom)
-   (suggested by Florian Fainelli)
- - Rename dts from brcm-vulcan* to vulcan*
-   (suggested by Ray Jui)
- - Add maintainers entry
-   (suggested by Florian Fainelli)
- - Updated the device tree doc and fixed a couple of commit
-   comments
-
-Jayachandran C (4):
-  dt-bindings: Add documentation for Broadcom Vulcan
-  arm64: defconfig: Add Broadcom Vulcan to defconfig
-  arm64: cputype info for Broadcom Vulcan
-  MAINTAINERS: Add entry for Broadcom Vulcan SoC
-
-Zi Shen Lim (1):
-  arm64: Broadcom Vulcan support
-
- .../bindings/arm/bcm/brcm,vulcan-soc.txt           |  10 ++
- Documentation/devicetree/bindings/arm/cpus.txt     |   1 +
- MAINTAINERS                                        |   7 +
- arch/arm64/Kconfig.platforms                       |   5 +
- arch/arm64/boot/dts/broadcom/Makefile              |   1 +
- arch/arm64/boot/dts/broadcom/vulcan-eval.dts       |  33 +++++
- arch/arm64/boot/dts/broadcom/vulcan.dtsi           | 144 +++++++++++++++++++++
- arch/arm64/configs/defconfig                       |   1 +
- arch/arm64/include/asm/cputype.h                   |   3 +
- 9 files changed, 205 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/bcm/brcm,vulcan-soc.txt
- create mode 100644 arch/arm64/boot/dts/broadcom/vulcan-eval.dts
- create mode 100644 arch/arm64/boot/dts/broadcom/vulcan.dtsi
-
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 86581f7..6c1b3a6 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -47,6 +47,7 @@ CONFIG_ARCH_SPRD=y
+ CONFIG_ARCH_THUNDER=y
+ CONFIG_ARCH_UNIPHIER=y
+ CONFIG_ARCH_VEXPRESS=y
++CONFIG_ARCH_VULCAN=y
+ CONFIG_ARCH_XGENE=y
+ CONFIG_ARCH_ZYNQMP=y
+ CONFIG_PCI=y
 -- 
 1.9.1
