@@ -1,26 +1,39 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sun, 21 Feb 2016 02:14:59 +0900
-Subject: [PATCH 1/4] ASoC: wm9713: add binding for WM9713 codec
-In-Reply-To: <1455979079-9030-1-git-send-email-robert.jarzmik@free.fr>
-References: <1455979079-9030-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <20160220171459.GA18327@sirena.org.uk>
+From: michael@amarulasolutions.com (Michael Trimarchi)
+Date: Sat, 20 Feb 2016 18:18:23 +0100
+Subject: [PATCH 1/4] ARM: dts: imx6ul: Add flexcan1 and flexcan2 support
+In-Reply-To: <CAOMZO5Bk_ZMhYzFLRFNK2TQvK4KHuj62AM_6uF-m-P1kJupTHQ@mail.gmail.com>
+References: <1455963652-24618-1-git-send-email-michael@amarulasolutions.com>
+ <1455963652-24618-2-git-send-email-michael@amarulasolutions.com>
+ <CAOMZO5Bk_ZMhYzFLRFNK2TQvK4KHuj62AM_6uF-m-P1kJupTHQ@mail.gmail.com>
+Message-ID: <20160220171816.GA24064@panicking>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 20, 2016 at 03:37:56PM +0100, Robert Jarzmik wrote:
+Hi Fabio
 
-> +WM9713 audio CODEC
-> +
-> +This devices supports I2C.
+On Sat, Feb 20, 2016 at 12:02:51PM -0200, Fabio Estevam wrote:
+> On Sat, Feb 20, 2016 at 8:20 AM, Michael Trimarchi
+> <michael@amarulasolutions.com> wrote:
+> 
+> > +
+> > +                               flexcan1: can at 02090000 {
+> > +                                       compatible = "fsl,imx6ul-flexcan", "fsl,imx6q-flexcan";
+> > +                                       reg = <0x02090000 0x4000>;
+> > +                                       interrupts = <GIC_SPI 110 IRQ_TYPE_LEVEL_HIGH>;
+> > +                                       clocks = <&clks IMX6UL_CLK_CAN1_IPG>,
+> > +                                                <&clks IMX6UL_CLK_CAN1_SERIAL>;
+> > +                                       clock-names = "ipg", "per";
+> > +                                       stop-mode = <&gpr 0x10 1 0x10 17>;
+> 
+> This 'stop-mode' property is not handled in mainline, only in NXP
+> kernel, so I suggest to drop this.
 
-No, it clearly doesn't...  The problem with doing this is that since
-AC'97 is an enumerable bus we really shouldn't need to list AC'97 CODECs
-in the device tree.  Instead we should be probing at runtime (as the
-non-ASoC AC'97 code does) or something similar.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160221/8be5e8ff/attachment.sig>
+ok. Can you point me out to a driver in freescale source that use it?
+
+Michael
+
+-- 
+| Michael Nazzareno Trimarchi                     Amarula Solutions BV |
+| COO  -  Founder                                      Cruquiuskade 47 |
+| +31(0)851119172                                 Amsterdam 1018 AM NL |
+|                  [`as] http://www.amarulasolutions.com               |
