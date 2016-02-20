@@ -1,9 +1,9 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Sat, 20 Feb 2016 11:46:26 -0800
-Subject: [GIT PULL 7/8] Broadcom defconfig changes for 4.6
+Date: Sat, 20 Feb 2016 11:46:27 -0800
+Subject: [GIT PULL 8/8] Broadcom defconfig-arm64 changes for 4.6
 In-Reply-To: <1455997587-17564-1-git-send-email-f.fainelli@gmail.com>
 References: <1455997587-17564-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <1455997587-17564-7-git-send-email-f.fainelli@gmail.com>
+Message-ID: <1455997587-17564-8-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,40 +11,21 @@ List-Id: linux-arm-kernel.lists.infradead.org
 
 are available in the git repository at:
 
-  http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.6/defconfig
+  http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.6/defconfig-arm64
 
-for you to fetch changes up to 9eefbe52737f2ae6c2d3556339ef851201516c26:
+for you to fetch changes up to 4cf430ee0c2ba1da97cab10b904291eb6fc5f170:
 
-  Merge tag 'bcm2835-defconfig-next-2016-02-17' into defconfig/next (2016-02-20 11:07:10 -0800)
-
-----------------------------------------------------------------
-This pull request contains defconfig changes for Broadcom ARM-based SoCs:
-
-- Daniel enables all that is required to get the BCM283x (Raspberry Pi and
-  Raspberry Pi 2) SoCs to boot with multi_v7_defconfig
-
-- Stefan enables the Raspberry Pi firmware driver and power domain drivers
-  in bcm2835_defconfig
-
-- Stephen refreshes the bcm2835_defconfig, disables DEBUG_LL, and turns on
-  ARMv7 support which is needed for BCM2836 (Raspberry Pi 2)
+  arm64: defconfig: Add Broadcom Vulcan to defconfig (2016-02-20 10:42:08 -0800)
 
 ----------------------------------------------------------------
-Daniel Stone (1):
-      ARM: multi_v7_defconfig: Enable BCM283x
+This pull request contains ARM64 defconfig changes for Broadcom SoCs:
 
-Florian Fainelli (1):
-      Merge tag 'bcm2835-defconfig-next-2016-02-17' into defconfig/next
+- Jayachandran C enables the newly introduced Broadcom Vulcan SoC to the ARM64
+  defconfig
 
-Stefan Wahren (2):
-      ARM: bcm2835_defconfig: Enable RPi firmware driver
-      ARM: bcm2835_defconfig: Enable RPi power domain driver
+----------------------------------------------------------------
+Jayachandran C (1):
+      arm64: defconfig: Add Broadcom Vulcan to defconfig
 
-Stephen Warren (3):
-      ARM: bcm2835_defconfig: rebuild on next-20160205
-      ARM: bcm2835_defconfig: disable DEBUG_LL
-      ARM: bcm2835_defconfig: enable ARMv7 support
-
- arch/arm/configs/bcm2835_defconfig  | 11 +++++------
- arch/arm/configs/multi_v7_defconfig | 12 ++++++++++++
- 2 files changed, 17 insertions(+), 6 deletions(-)
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
