@@ -1,107 +1,40 @@
 From: ddaney.cavm@gmail.com (David Daney)
-Date: Fri, 19 Feb 2016 17:13:14 -0800
-Subject: [PATCH v11 05/10] arm64/efi: ignore DT memory nodes instead of
- removing them
+Date: Fri, 19 Feb 2016 17:13:11 -0800
+Subject: [PATCH v11 02/10] arm64: override generic version of
+ early_init_dt_add_memory_arch()
 In-Reply-To: <1455930799-5371-1-git-send-email-ddaney.cavm@gmail.com>
 References: <1455930799-5371-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <1455930799-5371-6-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <1455930799-5371-3-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-There are two problems with the UEFI stub DT memory node removal
-routine:
-- it deletes nodes as it traverses the tree, which happens to work
-  but is not supported, as deletion invalidates the node iterator;
-- deleting memory nodes entirely may discard annotations in the form
-  of additional properties on the nodes.
+Override the __weak early_init_dt_add_memory_arch() with our own
+version. We need this in a subsequent patch to make the handling of
+the memory nodes conditional on whether we are booting via UEFI or
+not. Note that for now, all that our version does is invoke the generic
+implementation.
 
-Now that the UEFI initialization has moved to an earlier stage, we can
-actually just ignore any memblocks that are installed after we have
-processed the UEFI memory map. This way, it is no longer necessary to
-remove the nodes, so we can remove that logic from the stub as well.
-
-Acked-by: Leif Lindholm <leif.lindholm@linaro.org>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-[ rric: Ported to v4.5-rc1 ]
 Signed-off-by: Robert Richter <rrichter@cavium.com>
 Signed-off-by: David Daney <david.daney@cavium.com>
 ---
- arch/arm64/mm/init.c               |  6 +++++-
- drivers/firmware/efi/arm-init.c    |  2 +-
- drivers/firmware/efi/libstub/fdt.c | 24 +-----------------------
- 3 files changed, 7 insertions(+), 25 deletions(-)
+ arch/arm64/mm/init.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
 diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 208c1d3..eda226e 100644
+index f3b061e..208c1d3 100644
 --- a/arch/arm64/mm/init.c
 +++ b/arch/arm64/mm/init.c
-@@ -383,5 +383,9 @@ __setup("keepinitrd", keepinitrd_setup);
+@@ -380,3 +380,8 @@ static int __init keepinitrd_setup(char *__unused)
  
- void __init early_init_dt_add_memory_arch(u64 base, u64 size)
- {
--	early_init_dt_add_memory(base, size);
-+	/*
-+	 * Ignore DT memory nodes if we are booting via UEFI.
-+	 */
-+	if (!efi_enabled(EFI_MEMMAP))
-+		early_init_dt_add_memory(base, size);
- }
-diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
-index 9fe0464..ded8957 100644
---- a/drivers/firmware/efi/arm-init.c
-+++ b/drivers/firmware/efi/arm-init.c
-@@ -159,7 +159,7 @@ static __init void reserve_regions(void)
- 		size = npages << PAGE_SHIFT;
- 
- 		if (is_normal_ram(md))
--			early_init_dt_add_memory_arch(paddr, size);
-+			early_init_dt_add_memory(paddr, size);
- 
- 		if (is_reserve_region(md)) {
- 			memblock_mark_nomap(paddr, size);
-diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
-index cf7b7d4..9df1560 100644
---- a/drivers/firmware/efi/libstub/fdt.c
-+++ b/drivers/firmware/efi/libstub/fdt.c
-@@ -24,7 +24,7 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
- 			unsigned long map_size, unsigned long desc_size,
- 			u32 desc_ver)
- {
--	int node, prev, num_rsv;
-+	int node, num_rsv;
- 	int status;
- 	u32 fdt_val32;
- 	u64 fdt_val64;
-@@ -54,28 +54,6 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
- 		goto fdt_set_fail;
- 
- 	/*
--	 * Delete any memory nodes present. We must delete nodes which
--	 * early_init_dt_scan_memory may try to use.
--	 */
--	prev = 0;
--	for (;;) {
--		const char *type;
--		int len;
--
--		node = fdt_next_node(fdt, prev, NULL);
--		if (node < 0)
--			break;
--
--		type = fdt_getprop(fdt, node, "device_type", &len);
--		if (type && strncmp(type, "memory", len) == 0) {
--			fdt_del_node(fdt, node);
--			continue;
--		}
--
--		prev = node;
--	}
--
--	/*
- 	 * Delete all memory reserve map entries. When booting via UEFI,
- 	 * kernel will use the UEFI memory map to find reserved regions.
- 	 */
+ __setup("keepinitrd", keepinitrd_setup);
+ #endif
++
++void __init early_init_dt_add_memory_arch(u64 base, u64 size)
++{
++	early_init_dt_add_memory(base, size);
++}
 -- 
 1.8.3.1
