@@ -1,142 +1,164 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sat, 20 Feb 2016 11:44:22 +0100
-Subject: [PATCH v11 00/10] arm64,
- numa: Add numa support for arm64 platforms
-In-Reply-To: <20160220103959.GC4914@rric.localdomain>
-References: <1455930799-5371-1-git-send-email-ddaney.cavm@gmail.com>
- <CAKv+Gu8FRdif_WDZPqs7gHxXMu=6SqDd6A54dQc1KWuGwxpf0w@mail.gmail.com>
- <20160220103959.GC4914@rric.localdomain>
-Message-ID: <CAKv+Gu_1gRa2VW-C54sXfGP6+azE8aCLxDr8=YZVAkz0QxURpA@mail.gmail.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Sat, 20 Feb 2016 12:59:38 +0200
+Subject: GPIO regression in Linux next caused by syscon change
+In-Reply-To: <20160215180635.GW19432@atomide.com>
+References: <20160213002643.GQ19432@atomide.com>
+ <20160213004935.GR19432@atomide.com>
+ <CA+gwMccZeYimupmGsMX8YbNH9eEA6=Xi=rupciubBwzktfjvBA@mail.gmail.com>
+ <20160215160115.GU19432@atomide.com>
+ <1455552961.4899.37.camel@pengutronix.de>
+ <20160215164757.GV19432@atomide.com> <20160215180635.GW19432@atomide.com>
+Message-ID: <56C8471A.1040702@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 February 2016 at 11:39, Robert Richter
-<robert.richter@caviumnetworks.com> wrote:
-> On 20.02.16 09:20:05, Ard Biesheuvel wrote:
->> On 20 February 2016 at 02:13, David Daney <ddaney.cavm@gmail.com> wrote:
->> > From: David Daney <david.daney@cavium.com>
->> >
->> > v11:
->> >         - Dropped cleanup patches for other architectures, they will be
->> >           submitted as a separate set after more testing.
->> >
->> >         - Added patch set from Ard Biesheuvel that are needed to make
->> >           the whole thing actually work.  Previously this was a
->> >           separate set.
->> >
+On 02/15/2016 08:06 PM, Tony Lindgren wrote:
+> * Tony Lindgren <tony@atomide.com> [160215 08:49]:
+>> * Philipp Zabel <p.zabel@pengutronix.de> [160215 08:17]:
+>>> Am Montag, den 15.02.2016, 08:01 -0800 schrieb Tony Lindgren:
+>>>> * Philipp Zabel <philipp.zabel@gmail.com> [160214 11:24]:
+>>>>> I've just replaced the of_iomap() call with an open coded version,
+>>>>> calling of_address_to_resource() and ioremap() directly. That was
+>>>>> needed so I can use the struct resource returned by
+>>>>> of_address_to_resource() to set the syscon_config.max_register. I
+>>>>> don't see where this could cause resource overlap. Does just setting
+>>>>> syscon_config.max_register to zero again make the problem disappear?
+>>>>
+>>>> Yes commenting out the syscon_config.max_register line in your patch
+>>>> makes things work again.
+>>>>
+>>>> So what does that tell us about the problem?
+>>>
+>>> Maybe some out of bounds writes that previously worked are now catched
+>>> by the max_register check in regmap_writable and regmap_write returns
+>>> -EIO instead of the write being executed.
 >>
->> This series is out of date, unfortunately. The EFI init code is now
->> (as of v4.5-rc1) shared between ARM and arm64, which means that any
->> changes you make must be made on both sides. This applies to the split
->> between parsing the EFI dt nodes and performing the actual EFI init,
->> but also to the early_init_dt_add_memory_arch() changes. I am happy to
->> have a go at this, but first I need a clear statement from whoever
->> maintains that area that keeping memory nodes *just* for the
->> annotations (and otherwise ignore them) is the way forward (Rob?
->> Grant?)
+>> Hmm weird that something like that would not produce errors?
+>>
+>>> Is there any omap_ctrl_write?() call with an offset > 0x32c into
+>>> scm_conf?
+>>
+>> Indeed, that's where things go wrong. Adding Tero to Cc, something
+>> is wrong there.
 >
-> Wasn't there the approach to check for consistency between efi tables
-> and devicetree? Thus, DT is actually not ignored but rather checked if
-> it is in sync with efi tables.
+> Something like this might fix it? Needs to be tested to see if it
+> happens on other omaps.
 >
+> Tero, got any better ideas?
 
-I proposed such an approach for the /reserved-memory node, but not for
-the memory nodes themselves.
+The underlying problem is the fact that OMAP3 control module register 
+map is split into multiple regions, which in certain cases have 
+overlapping functionality, and need to be accessed over boundaries. And 
+the fact that we decided to split it in such way in the first place, for 
+example to have pinmux regions separate.
 
-But thinking about this a bit more, I think we can replace the whole 6
-piece series with the following patch
-(apologies for the mangled whitespace). The reason is that, if we
-decide to keep the memory nodes, we might just as well parse them as
-usual (and use generic code to spot any problems etc), and just
-discard the regions it describes. This completely solves the ARM vs
-arm64 problem.
+If you are going to bypass the usage of regmap, you could just drop it 
+completely from the omap_ctrl_readl / writel APIs, and use the iomap 
+directly. That simplifies the code and is slightly faster also.
+
+Eventually this should probably be fixed in such way that any 
+out-of-bounds accesses on the omap_ctrl region should use the actual 
+driver APIs for that. The padconf accesses I have no clue how to fix (as 
+pinctrl driver doesn't provide direct register read/write API), but for 
+others we should introduce new regions under the DTS files and use a 
+separate syscon mapping or something similar.
+
+It looks like we have following accesses in kernel that should be converted:
+
+under omap3_ctrl_init:
+OMAP2_CONTROL_SYSCONFIG
+OMAP3_PADCONF_SAD2D_MSTANDBY
+OMAP3_PADCONF_SAD2D_IDLEACK
+
+under omap3_core_save_context:
+
+         omap_ctrl_writel(omap_ctrl_readl(OMAP343X_PADCONF_ETK_D14),
+                 OMAP343X_CONTROL_MEM_WKUP + 0x2a0);
 
 
----------8<--------------
-Subject: [PATCH] efi: ARM/arm64: ignore DT memory nodes instead of removing
- them
+under omap3_control_save / restore:
 
-There are two problems with the UEFI stub DT memory node removal
-routine:
-- it deletes nodes as it traverses the tree, which happens to work
-  but is not supported, as deletion invalidates the node iterator;
-- deleting memory nodes entirely may discard annotations in the form
-  of additional properties on the nodes.
+OMAP2_CONTROL_SYSCONFIG
+OMAP34XX_CONTROL_WKUP_CTRL
+OMAP343X_CONTROL_PADCONF_SYSNIRQ
 
-Since the discovery of DT memory nodes occurs strictly before the
-UEFI init sequence, we can simply clear the memblock memory table
-before parsing the UEFI memory map. This way, it is no longer
-necessary to remove the nodes, so we can remove that logic from the
-stub as well.
+-Tero
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- drivers/firmware/efi/arm-init.c    |  8 +++++++
- drivers/firmware/efi/libstub/fdt.c | 24 +-------------------
- 2 files changed, 9 insertions(+), 23 deletions(-)
-
-diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
-index 9e15d571b53c..40c9d8596d69 100644
---- a/drivers/firmware/efi/arm-init.c
-+++ b/drivers/firmware/efi/arm-init.c
-@@ -143,6 +143,14 @@ static __init void reserve_regions(void)
-  if (efi_enabled(EFI_DBG))
-  pr_info("Processing EFI memory map:\n");
-
-+ /*
-+ * Discard memblocks discovered so far: if there are any at this
-+ * point, they originate from memory nodes in the DT, and UEFI
-+ * uses its own memory map instead.
-+ */
-+ memblock_dump_all();
-+ memblock_remove(0, ULLONG_MAX);
-+
-  for_each_efi_memory_desc(&memmap, md) {
-  paddr = md->phys_addr;
-  npages = md->num_pages;
-diff --git a/drivers/firmware/efi/libstub/fdt.c
-b/drivers/firmware/efi/libstub/fdt.c
-index 6dba78aef337..e58abfa953cc 100644
---- a/drivers/firmware/efi/libstub/fdt.c
-+++ b/drivers/firmware/efi/libstub/fdt.c
-@@ -24,7 +24,7 @@ efi_status_t update_fdt(efi_system_table_t
-*sys_table, void *orig_fdt,
-  unsigned long map_size, unsigned long desc_size,
-  u32 desc_ver)
- {
-- int node, prev, num_rsv;
-+ int node, num_rsv;
-  int status;
-  u32 fdt_val32;
-  u64 fdt_val64;
-@@ -54,28 +54,6 @@
-  goto fdt_set_fail;
-
-  /*
-- * Delete any memory nodes present. We must delete nodes which
-- * early_init_dt_scan_memory may try to use.
-- */
-- prev = 0;
-- for (;;) {
-- const char *type;
-- int len;
--
-- node = fdt_next_node(fdt, prev, NULL);
-- if (node < 0)
-- break;
--
-- type = fdt_getprop(fdt, node, "device_type", &len);
-- if (type && strncmp(type, "memory", len) == 0) {
-- fdt_del_node(fdt, node);
-- continue;
-- }
--
-- prev = node;
-- }
--
-- /*
-  * Delete all memory reserve map entries. When booting via UEFI,
-  * kernel will use the UEFI memory map to find reserved regions.
-  */
--- 
-1.9.1
+>
+> Regards,
+>
+> Tony
+>
+> 8< -------------------
+> --- a/arch/arm/mach-omap2/control.c
+> +++ b/arch/arm/mach-omap2/control.c
+> @@ -167,15 +167,23 @@ u16 omap_ctrl_readw(u16 offset)
+>   u32 omap_ctrl_readl(u16 offset)
+>   {
+>   	u32 val;
+> +	int err;
+>
+>   	offset &= 0xfffc;
+> -	if (!omap2_ctrl_syscon)
+> -		val = readl_relaxed(omap2_ctrl_base + offset);
+> -	else
+> -		regmap_read(omap2_ctrl_syscon, omap2_ctrl_offset + offset,
+> -			    &val);
+> +	if (omap2_ctrl_syscon) {
+> +		err = regmap_read(omap2_ctrl_syscon,
+> +				  omap2_ctrl_offset + offset, &val);
+> +		if (!err)
+> +			return val;
+> +	}
+> +
+> +	if (WARN(!omap2_ctrl_base,
+> +		 "syscon out of range for offset 0x%x, no omap2_ctrl_base?\n",
+> +		    offset)) {
+> +		return 0;
+> +	}
+>
+> -	return val;
+> +	return readl_relaxed(omap2_ctrl_base + offset);
+>   }
+>
+>   void omap_ctrl_writeb(u8 val, u16 offset)
+> @@ -206,12 +214,23 @@ void omap_ctrl_writew(u16 val, u16 offset)
+>
+>   void omap_ctrl_writel(u32 val, u16 offset)
+>   {
+> +	int err;
+> +
+>   	offset &= 0xfffc;
+> -	if (!omap2_ctrl_syscon)
+> -		writel_relaxed(val, omap2_ctrl_base + offset);
+> -	else
+> -		regmap_write(omap2_ctrl_syscon, omap2_ctrl_offset + offset,
+> -			     val);
+> +	if (omap2_ctrl_syscon) {
+> +		err = regmap_write(omap2_ctrl_syscon,
+> +				   omap2_ctrl_offset + offset, val);
+> +		if (!err)
+> +			return;
+> +	}
+> +
+> +	if (WARN(!omap2_ctrl_base,
+> +		 "syscon out of range for offset 0x%x, no omap2_ctrl_base?\n",
+> +		    offset)) {
+> +		return;
+> +	}
+> +
+> +	writel_relaxed(val, omap2_ctrl_base + offset);
+>   }
+>
+>   #ifdef CONFIG_ARCH_OMAP3
+> @@ -724,9 +743,6 @@ int __init omap_control_init(void)
+>   				if (ret)
+>   					return ret;
+>   			}
+> -
+> -			iounmap(omap2_ctrl_base);
+> -			omap2_ctrl_base = NULL;
+>   		} else {
+>   			/* No scm_conf found, direct access */
+>   			ret = omap2_clk_provider_init(np, data->index, NULL,
+>
