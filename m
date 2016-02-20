@@ -1,74 +1,47 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Sat, 20 Feb 2016 23:19:36 +0100
-Subject: [PATCH 0/2] arm: lpc32xx: restart: add support for soft reset
-In-Reply-To: <002701d16b5b$f78c7b70$e6a57250$@gmail.com>
-References: <002701d16b5b$f78c7b70$e6a57250$@gmail.com>
-Message-ID: <CAGhQ9Vwr6H0YjRfaiBNaUrm8rHEVjh-NQbPZMdOZh2cJnMXmBA@mail.gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 20 Feb 2016 23:24:02 +0100
+Subject: [PATCH 1/4] ASoC: wm9713: add binding for WM9713 codec
+In-Reply-To: <20160220211659.GG18327@sirena.org.uk> (Mark Brown's message of
+ "Sun, 21 Feb 2016 06:16:59 +0900")
+References: <1455979079-9030-1-git-send-email-robert.jarzmik@free.fr>
+ <20160220171459.GA18327@sirena.org.uk> <871t87z1gz.fsf@belgarion.home>
+ <20160220195925.GF18327@sirena.org.uk> <87twl3xgud.fsf@belgarion.home>
+ <20160220211659.GG18327@sirena.org.uk>
+Message-ID: <878u2fxbp9.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 February 2016 at 22:24, Sylvain Lemieux <slemieux.tyco@gmail.com> wrote:
-> Hi Joachim,
+Mark Brown <broonie@kernel.org> writes:
+
+> On Sat, Feb 20, 2016 at 09:32:58PM +0100, Robert Jarzmik wrote:
+>> Mark Brown <broonie@kernel.org> writes:
+>> > On Sat, Feb 20, 2016 at 07:22:04PM +0100, Robert Jarzmik wrote:
+>> I will. By now I fail to see how this will help in the wm9713 probing and
+>> detection ...
 >
->> From: Joachim Eastwood [mailto:manabian at gmail.com]
->> Sent: 18-Feb-16 5:08 PM
->> To: slemieux.tyco at gmail.com
->>
->> Hi Sylvain,
->>
->> On 18 February 2016 at 22:35,  <slemieux.tyco@gmail.com> wrote:
->> > From: Sylvain Lemieux <slemieux@tycoint.com>
->> >
->> > The LPC32xx provide the capability to perform a soft or hard reset;
->> > a soft reset will no reset the external peripheral
->> > (i.e. RESOUT_N output not asserted).
->> >
->> > The default behavior (i.e. hard reset) remain unchanged.
->> >
->> > Sylvain Lemieux (2):
->> >   arm: lpc32xx: restart: add support for soft reset
->> >   arm: lpc32xx: restart: support "cmd" from userspace
->> >
->> >  arch/arm/mach-lpc32xx/common.c | 26 +++++++++++++++++++++++---
->> >  1 file changed, 23 insertions(+), 3 deletions(-)
->>
->> Instead of adding more code to mach-lpc32xx could this code be moved
->> to the watchdog driver (pnx4008_wdt.c) ?
->> See register_restart_handler() and how it's used in other watchdog drivers.
->>
->> Then maybe the restart hook in phy3250.c could be removed all together.
+> It will eumerate the AC'97 bus by itself and does not need the CODEC to
+> be described.
+I think I still don't get it.
+
+So let's rephrase it another way : how will the function wm9713_probe() be
+called, ie. what is the possible function backtrace leading to that call ?
+
+>> Until I make the try, here is what I have as a device-tree extract in [1],
+>> which is my candidate for sound/soc/pxa/zylonite.c replacement.. If we
+>> conclude that wm9713 shouldn't be in device-tree, then I'm curious how the
+>> DAI bindings (simple-audio-card,dai-link*) should be handled.
 >
-> Thanks for the feedback;
->
-> It is possible to remove the "lpc23xx_restart" function from "mach-lpc32xx"
-> and add the functionality to the pnx4008 watchdog driver.
-> The restart hook in phy3250.c can be remove.
->
-> I will submit a new revision of the patch on Monday.
->
->>
-> I need to add a new functionality to the pnx4008 driver to
-> keep the driver disable and only provide the restart hook.
+> They should be created as a function of enumerating the CODEC.  If you
+> use the genric AC'97 stuff it doesn't use ASoC at all and this happens
+> as a side effect.
+I don't get that either. For me sound/soc/pci/ac97/ac97_codec.c is PCI specific,
+not generic, so what is "generic AC'97 stuff" ? I will never be able to use it
+as on my platforms CONFIG_PCI=n.
 
-Why do you need to disable the driver?
-The watchdog is not enabled unless you don't explicitly do so, ie
-opening it and starting it.
+Do you have a devicetree example somewhere, with (ac97 host, audio codec) pair I
+can have a look at to understand ?
 
+Cheers.
 
-> I am planning to add the functionality using a module parameter;
-> this is the way the pnx833x & s3c2410 driver are doing it.
-
-You should normally try to avoid module parameters if you can.
-
-
-> Do you have any feedback before a submit a patch for this change.
-
-Take a look at:
-2165bf524da5f5e496d - "watchdog: core: add restart handler support"
-
-Note that this will not give you the reboot_mode parameter. But maybe
-that could be added to the restart-callback function.
-
-
-regards,
-Joachim Eastwood
+-- 
+Robert
