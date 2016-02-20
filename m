@@ -1,63 +1,113 @@
-From: John.Youn@synopsys.com (John Youn)
-Date: Sat, 20 Feb 2016 02:55:33 +0000
-Subject: [PATCH] usb: move usb_calc_bus_time into common code
-References: <1455918064-410571-1-git-send-email-arnd@arndb.de>
- <Pine.LNX.4.44L0.1602191650570.1700-100000@iolanthe.rowland.org>
- <CAD=FV=VjgTUQR-Rw+LWXnNdZhruukaV-+LnXFqNRj-wpcvSJ4w@mail.gmail.com>
-Message-ID: <2B3535C5ECE8B5419E3ECBE30077290901DC453B41@US01WEMBX2.internal.synopsys.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Fri, 19 Feb 2016 23:02:09 -0800
+Subject: [v9,4/5] iommu/mediatek: Add mt8173 IOMMU driver
+In-Reply-To: <1455669974-1527-5-git-send-email-yong.wu@mediatek.com>
+References: <1455669974-1527-5-git-send-email-yong.wu@mediatek.com>
+Message-ID: <20160220070209.GA16577@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/19/2016 2:48 PM, Doug Anderson wrote:
-> Hi,
+On Wed, Feb 17, 2016 at 08:46:13AM +0800, Yong Wu wrote:
+> This patch adds support for mediatek m4u (MultiMedia Memory Management
+> Unit).
 > 
-> On Fri, Feb 19, 2016 at 1:52 PM, Alan Stern <stern@rowland.harvard.edu> wrote:
->> On Fri, 19 Feb 2016, Arnd Bergmann wrote:
->>
->>> The dwc2 dual-role USB controller driver has started calling
->>> usb_calc_bus_time, and does so regardless of whether it is
->>> being built as a host controller or gadget. In case all
->>
->> Out of curiosity...  Why does dwc2 need to calculate bus times when it
->> is in device mode?
+> Signed-off-by: Yong Wu <yong.wu@mediatek.com>
+> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
 > 
-> Hoo boy.  it doesn't.  Nor does it need to properly set the even/odd
-> frame in device mode.
+> ---
+> drivers/iommu/Kconfig     |  16 +
+>  drivers/iommu/Makefile    |   1 +
+>  drivers/iommu/mtk_iommu.c | 732 ++++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 749 insertions(+)
+>  create mode 100644 drivers/iommu/mtk_iommu.c
 > 
-> Basically dwc2's "core.c" has a whole bunch of stuff in it that's host
-> only and isn't guarded with any #ifdef.  ...yet that file is included
-> in gadget-only builds.  It's a bit of a mess.  Take a gander at all of
-> the "dwc2_hc_xxx" functions sitting in "drivers/usb/dwc2/core.c".
-> 
-> Long term that needs to be cleaned up, but such a cleanup is going to
-> be a bit of churn so we'd need to schedule it for a time when not much
-> else is going on (and presumably it should be done by John or in close
-> coordination with him so it can get Acked / landed quickly to avoid
-> conflicts?).  To do this we'd have to figure out why some things are
-> in "core.c" and some in "hcd.c" and if it makes sense to move them all
-> to "hcd.c" or if we need a new "core_hc.c" or something...  All of
-> that design predates me.
-> 
+> diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+> index a1e75cb..4922aa8 100644
+> --- a/drivers/iommu/Kconfig
+> +++ b/drivers/iommu/Kconfig
+> @@ -318,4 +318,20 @@ config S390_IOMMU
+>  	help
+>  	  Support for the IOMMU API for s390 PCI devices.
+>  
+> +config MTK_IOMMU
+> +	bool "MTK IOMMU Support"
+> +	depends on ARM || ARM64
+> +	depends on ARCH_MEDIATEK || COMPILE_TEST
+> +	select IOMMU_API
+> +	select IOMMU_DMA
+> +	select IOMMU_IO_PGTABLE_ARMV7S
+> +	select MEMORY
+> +	select MTK_SMI
+> +	help
+> +	  Support for the M4U on certain Mediatek SOCs. M4U is MultiMedia
+> +	  Memory Management Unit. This option enables remapping of DMA memory
+> +	  accesses for the multimedia subsystem.
+> +
+> +	  If unsure, say N here.
+> +
+>  endif # IOMMU_SUPPORT
+> diff --git a/drivers/iommu/Makefile b/drivers/iommu/Makefile
+> index 42fc0c2..44ae2e0 100644
+> --- a/drivers/iommu/Makefile
+> +++ b/drivers/iommu/Makefile
+> @@ -16,6 +16,7 @@ obj-$(CONFIG_INTEL_IOMMU) += intel-iommu.o
+>  obj-$(CONFIG_INTEL_IOMMU_SVM) += intel-svm.o
+>  obj-$(CONFIG_IPMMU_VMSA) += ipmmu-vmsa.o
+>  obj-$(CONFIG_IRQ_REMAP) += intel_irq_remapping.o irq_remapping.o
+> +obj-$(CONFIG_MTK_IOMMU) += mtk_iommu.o
+>  obj-$(CONFIG_OMAP_IOMMU) += omap-iommu.o
+>  obj-$(CONFIG_OMAP_IOMMU_DEBUG) += omap-iommu-debug.o
+>  obj-$(CONFIG_ROCKCHIP_IOMMU) += rockchip-iommu.o
+> diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
+> new file mode 100644
+> index 0000000..60fe97b
+> --- /dev/null
+> +++ b/drivers/iommu/mtk_iommu.c
+> @@ -0,0 +1,732 @@
+> +/*
+> + * Copyright (c) 2015-2016 MediaTek Inc.
+> + * Author: Yong Wu <yong.wu@mediatek.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +#include <linux/clk.h>
+> +#include <linux/component.h>
+> +#include <linux/dma-iommu.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/io.h>
+> +#include <linux/iommu.h>
+> +#include <linux/iopoll.h>
+> +#include <linux/list.h>
+> +#include <linux/module.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_iommu.h>
+> +#include <linux/of_irq.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/platform_device.h>
+> +#include <soc/mediatek/smi.h>
+> +#include <dt-bindings/memory/mt8173-larb-port.h>
+> +
 
-Yeah, that stuff has been bugging me for a while. I have a branch that
-started a lot of clean-ups, but it's never been a great time to merge
-it.
+Some missing includes:
 
-> In any case I guess we need a solution for right now, huh?
-> 
-> One terribly lame hack would be to just make a dummy no-op
-> "dwc2_hc_set_even_odd_frame()" if host mode is disabled.  That doesn't
-> really fix the root problem of lots of host mode code being compiled
-> in a gadget-only driver.  It also adds an ugly "#ifdef".  ...but it
-> does get around the current compile error.
-> 
-> 
-> What do folks think?
-> 
+linux/bug.h
+	for WARN_ON()
+linux/device.h
+	for dev_xxx() error messages, dev_get_drvdata(), etc.
+linux/err.h
+	for error functions (IS_ERR, error definitions)
+linux/slab.h
+	for kzalloc() etc.
+linux/spinlock.h
+	for spinlock functions
+asm/barrier.h
+	for wmb()
 
-I think if we can fix it for -next in dwc2 by moving all host code out
-of core then we should do it that way. I'll see if I can revive my
-patches.
-
-Regards,
-John
+Guenter
