@@ -1,31 +1,55 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Sun, 21 Feb 2016 15:16:48 +0100
-Subject: [PATCH] i2c: brcmstb: allocate correct amount of memory for regmap
-Message-ID: <1456064238-6294-1-git-send-email-wsa@the-dreams.de>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sun, 21 Feb 2016 12:22:34 -0300
+Subject: iMX7d cpu1 issue
+In-Reply-To: <56C6CE36.6040503@compulab.co.il>
+References: <56C2D63F.1030408@compulab.co.il> <20160218140913.GY6756@tiger>
+ <AMSPR04MB263D00A3F8D9A8D9D3A536D88AF0@AMSPR04MB263.eurprd04.prod.outlook.com>
+ <56C5F4D7.1070704@compulab.co.il>
+ <AMSPR04MB26334EB884FA8A4B565278188AF0@AMSPR04MB263.eurprd04.prod.outlook.com>
+ <56C6CE36.6040503@compulab.co.il>
+Message-ID: <CAOMZO5Aa+veHWQCrKGz4rsvmjKWiitd81D8ncGnX8Fdk0aYe7Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We want the size of the struct, not of a pointer to it. To be future
-proof, just dereference the pointer to get the desired type.
+Hi Ilya/Frank,
 
-Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
----
- drivers/i2c/busses/i2c-brcmstb.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+On Fri, Feb 19, 2016 at 6:11 AM, Ilya Ledvich <ilya@compulab.co.il> wrote:
+> Hi Frank,
+> Thank you for so brilliant suggestion!!!
+>
+>> #define CONFIG_MX7_SEC
+>
+>
+> Seems it works!
+> The  CPU1 is brought up, and kernel can successfully boot!
 
-diff --git a/drivers/i2c/busses/i2c-brcmstb.c b/drivers/i2c/busses/i2c-brcmstb.c
-index 3711df1d452622..4a45408dd82060 100644
---- a/drivers/i2c/busses/i2c-brcmstb.c
-+++ b/drivers/i2c/busses/i2c-brcmstb.c
-@@ -586,8 +586,7 @@ static int brcmstb_i2c_probe(struct platform_device *pdev)
- 	if (!dev)
- 		return -ENOMEM;
- 
--	dev->bsc_regmap = devm_kzalloc(&pdev->dev, sizeof(struct bsc_regs *),
--				       GFP_KERNEL);
-+	dev->bsc_regmap = devm_kzalloc(&pdev->dev, sizeof(*dev->bsc_regmap), GFP_KERNEL);
- 	if (!dev->bsc_regmap)
- 		return -ENOMEM;
- 
--- 
-2.7.0
+I changed U-boot as suggested:
+
+--- a/include/configs/mx7_common.h
++++ b/include/configs/mx7_common.h
+@@ -94,10 +94,7 @@
+ #define CONFIG_CMD_FUSE
+ #define CONFIG_MXC_OCOTP
+
+-/*
+- * Default boot linux kernel in no secure mode.
+- * If want to boot kernel in secure mode, please define CONFIG_MX7_SEC
+- */
++#define CONFIG_MX7_SEC
+ #ifndef CONFIG_MX7_SEC
+ #define CONFIG_ARMV7_NONSEC
+ #define CONFIG_ARMV7_PSCI
+
+
+but still see only one core brought up in the kernel:
+
+[    0.003051] /cpus/cpu at 0 missing clock-frequency property
+[    0.003076] /cpus/cpu at 1 missing clock-frequency property
+[    0.003092] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
+[    0.003157] Setting up static identity map for 0x80008280 - 0x800082f0
+[    0.005152] Brought up 1 CPUs
+[    0.005169] SMP: Total of 1 processors activated (48.00 BogoMIPS).
+
+I am booting 4.5-rc5 on a imx7d-sdb board.
+
+Any ideas on how to bring up the second core?
