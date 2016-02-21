@@ -1,75 +1,91 @@
-From: michael@amarulasolutions.com (Michael Trimarchi)
-Date: Sun, 21 Feb 2016 12:29:53 +0100
-Subject: [PATCH V2 3/4] ARM: dts: imx6ul: Add GPMI nand controller support
-In-Reply-To: <20160220172127.GC24064@panicking>
-References: <1455963652-24618-1-git-send-email-michael@amarulasolutions.com>
- <1455963652-24618-4-git-send-email-michael@amarulasolutions.com>
- <CAOMZO5DTmG7Umt+H20r+tZi9zZhsK=eoPbHOBO3iwvM2GXXLgg@mail.gmail.com>
- <20160220172127.GC24064@panicking>
-Message-ID: <20160221112949.GB5387@panicking>
+From: sdliyong@gmail.com (LIYONG)
+Date: Sun, 21 Feb 2016 20:19:57 +0800
+Subject: [PATCH] ARM: OMAP2+: allow DEBUG_UNCOMPRESS for OMAP2+
+In-Reply-To: <20160219180237.GI21202@atomide.com>
+References: <1451362159-27910-1-git-send-email-sdliyong@gmail.com>
+ <20160219180237.GI21202@atomide.com>
+Message-ID: <BLU402-EAS3654C3D896BB35B714D68BD6A20@phx.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for GPMI nand controller.
+no problem, let me submit another patch
 
-Signed-off-by: Michael Trimarchi <michael@amarulasolutions.com>
----
-Changes V2:
-	- drop special IMXUL type because seems that is compatible
-	  with IMX6Q
-
- arch/arm/boot/dts/imx6ul.dtsi | 33 +++++++++++++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
-index f4daf97..1a486ac 100644
---- a/arch/arm/boot/dts/imx6ul.dtsi
-+++ b/arch/arm/boot/dts/imx6ul.dtsi
-@@ -142,6 +142,39 @@
- 			reg = <0x00900000 0x20000>;
- 		};
- 
-+		dma_apbh: dma-apbh at 01804000 {
-+			compatible = "fsl,imx6ul-dma-apbh", "fsl,imx28-dma-apbh";
-+			reg = <0x01804000 0x2000>;
-+			interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "gpmi0", "gpmi1", "gpmi2", "gpmi3";
-+			#dma-cells = <1>;
-+			dma-channels = <4>;
-+			clocks = <&clks IMX6UL_CLK_APBHDMA>;
-+		};
-+
-+		gpmi: gpmi-nand at 01806000 {
-+			compatible = "fsl,imx6q-gpmi-nand";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			reg = <0x01806000 0x2000>, <0x01808000 0x4000>;
-+			reg-names = "gpmi-nand", "bch";
-+			interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "bch";
-+			clocks = <&clks IMX6UL_CLK_GPMI_IO>,
-+				 <&clks IMX6UL_CLK_GPMI_APB>,
-+				 <&clks IMX6UL_CLK_GPMI_BCH>,
-+				 <&clks IMX6UL_CLK_GPMI_BCH_APB>,
-+				 <&clks IMX6UL_CLK_PER_BCH>;
-+			clock-names = "gpmi_io", "gpmi_apb", "gpmi_bch",
-+				      "gpmi_bch_apb", "per1_bch";
-+			dmas = <&dma_apbh 0>;
-+			dma-names = "rx-tx";
-+			status = "disabled";
-+		};
-+
- 		aips1: aips-bus at 02000000 {
- 			compatible = "fsl,aips-bus", "simple-bus";
- 			#address-cells = <1>;
--- 
-2.7.0
-
--- 
-| Michael Nazzareno Trimarchi                     Amarula Solutions BV |
-| COO  -  Founder                                      Cruquiuskade 47 |
-| +31(0)851119172                                 Amsterdam 1018 AM NL |
-|                  [`as] http://www.amarulasolutions.com               |
+> ? 2016?2?20??02:02?Tony Lindgren <tony@atomide.com> ???
+> 
+> Hi,
+> 
+> * Yong Li <sdliyong@gmail.com> [151228 20:12]:
+>> Based on the below
+>> commit ae3c99a26c60 ("ARM: 7806/1: allow DEBUG_UNCOMPRESS for Tegra"),
+>> change the .data section to .text section,
+>> to enable DEBUG_UNCOMPRESS for OMAP2+ platforms
+>> Tested okay using BeagleBone Black
+> 
+> Sorry for the delay, I just noticed this one while looking
+> through my inbox for pending patches.
+> 
+> I think we should first simplify things by moving things over
+> to use the generic DEBUG_UART_8250 code where the addresses
+> need to be specified in the .config. It's been on my list of
+> things to do for quite a while but I keep getting interrupted.
+> 
+> My guess is that if we do that, this patch is no longer
+> needed :) Yong, care to take a look at that?
+> 
+> Regards,
+> 
+> Tony
+> 
+>> Signed-off-by: Yong Li <sdliyong@gmail.com>
+>> ---
+>> arch/arm/Kconfig.debug             |  2 +-
+>> arch/arm/include/debug/omap2plus.S | 13 ++++++++++---
+>> 2 files changed, 11 insertions(+), 4 deletions(-)
+>> 
+>> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+>> index 259c0ca..e5ae36a 100644
+>> --- a/arch/arm/Kconfig.debug
+>> +++ b/arch/arm/Kconfig.debug
+>> @@ -1596,7 +1596,7 @@ config DEBUG_UART_8250_FLOW_CONTROL
+>> config DEBUG_UNCOMPRESS
+>>    bool
+>>    depends on ARCH_MULTIPLATFORM || PLAT_SAMSUNG || ARM_SINGLE_ARMV7M
+>> -    default y if DEBUG_LL && !DEBUG_OMAP2PLUS_UART && \
+>> +    default y if DEBUG_LL && (!DEBUG_OMAP2PLUS_UART || !ZBOOT_ROM) && \
+>>             (!DEBUG_TEGRA_UART || !ZBOOT_ROM)
+>>    help
+>>      This option influences the normal decompressor output for
+>> diff --git a/arch/arm/include/debug/omap2plus.S b/arch/arm/include/debug/omap2plus.S
+>> index 6d867ae..12421f9 100644
+>> --- a/arch/arm/include/debug/omap2plus.S
+>> +++ b/arch/arm/include/debug/omap2plus.S
+>> @@ -58,11 +58,18 @@
+>> 
+>> #define UART_OFFSET(addr)    ((addr) & 0x00ffffff)
+>> 
+>> +#if defined(ZIMAGE)
+>> +    omap_uart_phys:    .word    0
+>> +    omap_uart_virt:    .word    0
+>> +    omap_uart_lsr:    .word    0
+>> +#else
+>> +
+>>        .pushsection .data
+>> -omap_uart_phys:    .word    0
+>> -omap_uart_virt:    .word    0
+>> -omap_uart_lsr:    .word    0
+>> +    omap_uart_phys:    .word    0
+>> +    omap_uart_virt:    .word    0
+>> +    omap_uart_lsr:    .word    0
+>>        .popsection
+>> +#endif
+>> 
+>>        .macro    addruart, rp, rv, tmp
+>> 
+>> -- 
+>> 2.1.4
+>> 
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> 
