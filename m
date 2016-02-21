@@ -1,297 +1,144 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 21 Feb 2016 23:39:24 +0100
-Subject: [PATCH 11/11] ARM: versatile: move CLCD configuration to device
- tree
-In-Reply-To: <56C5B080.9090007@ti.com>
-References: <1454594660-7532-1-git-send-email-linus.walleij@linaro.org>
- <1454594660-7532-12-git-send-email-linus.walleij@linaro.org>
- <56C438DA.5040109@ti.com>
- <CACRpkdZ+G17hmVP8AejL7NTqg7k0SBC5kgF55ASjD+kfuGFJhQ@mail.gmail.com>
- <20160217213250.GK19428@n2100.arm.linux.org.uk>
- <56C5B080.9090007@ti.com>
-Message-ID: <CACRpkdaXFUCR5=5mS28_4Dx_LfzqV13zwT=vVeJwuOzm_rGRBQ@mail.gmail.com>
+From: draakje197@gmail.com (Henry Paulissen)
+Date: Mon, 22 Feb 2016 00:17:14 +0100
+Subject: [PATCH v4] Fix sun7i pin assignment for IRQ's
+Message-ID: <1456096638-21961-1-git-send-email-henry@nitronetworks.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 18, 2016 at 12:52 PM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
+After testing IRQ pins we found some bugs in the pinctrl declaration.
 
-> For panels we need DT fragments. The question is where these fragments
-> are and, possibly, who who loads them.
+Signed-off-by: Henry Paulissen <henry@nitronetworks.nl>
+---
 
-I hacked something up that augments the device tree from the kernel,
-given you have a node with all the props you want to augment, tell me
-what you think of this and whether I should continue in this direction...
-also the DT people need to be involved:
+Changes in v2:
+    After some more testing we found irq on PI pins.
+    they where on mux6 so this is included in my patch.
 
-#include "../../drivers/of/of_private.h"
-/* Obviously make the property duplication function public instead,
-it's a test */
+    Also included is a warning for PI17, this pin was not working
+    on apritzel his bPI and he thinks it might be correlated to
+    GIC and IRQ 29.
 
-struct versatile_panel {
-    u32 id;
-    char *compatible;
-    u32 clock_frequency;
-    u32 pixelclk_active;
-    u32 hsync_active;
-    u32 vsync_active;
-    u32 de_active;
-    u32 hactive;
-    u32 hback_porch;
-    u32 hfront_porch;
-    u32 hsync_len;
-    u32 vactive;
-    u32 vback_porch;
-    u32 vfront_porch;
-    u32 vsync_len;
-    bool ib2;
-};
+Changes in v3:
+    Changed name from nickname to realname in email and SoB.
 
-static const struct versatile_panel versatile_panels[] = {
-    {
-        .id = SYS_CLCD_ID_VGA,
-        .compatible = "VGA",
-        .clock_frequency = 25175000,
-        .pixelclk_active = 0,
-        .hsync_active = 1,
-        .vsync_active = 1,
-        .de_active = 1,
-        .hactive = 640,
-        .hback_porch = 48,
-        .hfront_porch = 16,
-        .hsync_len = 96,
-        .vactive = 480,
-        .vback_porch = 33,
-        .vfront_porch = 10,
-        .vsync_len = 2,
-    },
-    {
-        .id = SYS_CLCD_ID_SANYO_3_8,
-        .compatible = "sanyo,tm38qv67a02a",
-        .clock_frequency = 10000000,
-        .pixelclk_active = 1,
-        .hsync_active = 1,
-        .vsync_active = 1,
-        .de_active = 1,
-        .hactive = 320,
-        .hback_porch = 6,
-        .hfront_porch = 6,
-        .hsync_len = 6,
-        .vactive = 240,
-        .vback_porch = 6,
-        .vfront_porch = 6,
-        .vsync_len = 0,
-    },
-    {
-        .id = SYS_CLCD_ID_SHARP_8_4,
-        .compatible = "sharp,lq084v1dg21",
-        .clock_frequency = 25175000,
-        .pixelclk_active = 0,
-        .hsync_active = 1,
-        .vsync_active = 1,
-        .de_active = 1,
-        .hactive = 640,
-        .hback_porch = 48,
-        .hfront_porch = 16,
-        .hsync_len = 96,
-        .vactive = 480,
-        .vback_porch = 33,
-        .vfront_porch = 10,
-        .vsync_len = 2,
-    },
-    {
-        .id = SYS_CLCD_ID_EPSON_2_2,
-        .compatible = "epson,l2f50113t00",
-        .clock_frequency = 16000000,
-        .pixelclk_active = 0,
-        .hsync_active = 1,
-        .vsync_active = 1,
-        .de_active = 1,
-        .hactive = 176,
-        .hback_porch = 3,
-        .hfront_porch = 2,
-        .hsync_len = 3,
-        .vactive = 220,
-        .vback_porch = 1,
-        .vfront_porch = 0,
-        .vsync_len = 2,
-    },
-    {
-        .id = SYS_CLCD_ID_SANYO_2_5,
-        .compatible = "sanyo,alr252rgt",
-        .ib2 = true,
-        .clock_frequency = 5440000,
-        .pixelclk_active = 0,
-        .hsync_active = 0,
-        .vsync_active = 0,
-        .de_active = 1,
-        .hactive = 240,
-        .hback_porch = 20,
-        .hfront_porch = 10,
-        .hsync_len = 10,
-        .vactive = 320,
-        .vback_porch = 2,
-        .vfront_porch = 2,
-        .vsync_len = 2,
-    },
-};
+Changes in v4:
+    Added closing parenthesis for the C pins 
 
-static void update_timings_prop(struct device *dev,
-                struct of_changeset *cset,
-                struct device_node *timings,
-                const char *propname,
-                u32 val)
-{
-    struct property *prop, *new;
-    __be32 *dt_val;
+---
+ drivers/pinctrl/sunxi/pinctrl-sun7i-a20.c | 33 ++++++++++++++-----------------
+ 1 file changed, 15 insertions(+), 18 deletions(-)
 
-    prop = of_find_property(timings, propname, NULL);
-    if (!prop) {
-        dev_err(dev, "could not find property \"%s\" - skipping\n",
-            propname);
-        return;
-    }
-    new = __of_prop_dup(prop, GFP_KERNEL);
-    if (!new) {
-        dev_err(dev, "could not copy property \"%s\" - skipping\n",
-            propname);
-        return;
-    }
-
-    dt_val = new->value;
-    *dt_val = cpu_to_be32(val);
-
-    of_changeset_update_property(cset, timings, new);
-}
-
-static int versatile_overwrite_of_panel(struct device *dev,
-                    struct device_node *panel,
-                    const struct versatile_panel *vpanel)
-{
-    struct of_changeset cset;
-    struct device_node *timings;
-    int ret;
-
-    dev_info(dev, "CLCD: overwriting device tree\n");
-
-    of_changeset_init(&cset);
-    /* Find the timings node */
-    timings = of_get_child_by_name(panel, "panel-timing");
-    if (!timings) {
-        dev_err(dev, "could not find panel timing node\n");
-        goto err_destroy_cs;
-    }
-    update_timings_prop(dev, &cset, timings, "clock-frequency",
-                vpanel->clock_frequency);
-    update_timings_prop(dev, &cset, timings, "pixelclk-active",
-                vpanel->pixelclk_active);
-    update_timings_prop(dev, &cset, timings, "hsync-active",
-                vpanel->hsync_active);
-    update_timings_prop(dev, &cset, timings, "vsync-active",
-                vpanel->vsync_active);
-    update_timings_prop(dev, &cset, timings, "de-active",
-                vpanel->de_active);
-    update_timings_prop(dev, &cset, timings, "hactive",
-                vpanel->hactive);
-    update_timings_prop(dev, &cset, timings, "hback-porch",
-                vpanel->hback_porch);
-    update_timings_prop(dev, &cset, timings, "hsync-len",
-                vpanel->hsync_len);
-    update_timings_prop(dev, &cset, timings, "vactive",
-                vpanel->vactive);
-    update_timings_prop(dev, &cset, timings, "vback-porch",
-                vpanel->vback_porch);
-    update_timings_prop(dev, &cset, timings, "vfront-porch",
-                vpanel->vfront_porch);
-    update_timings_prop(dev, &cset, timings, "vsync-len",
-                vpanel->hsync_len);
-
-    ret = of_changeset_apply(&cset);
-    if (ret) {
-        dev_err(dev, "could not apply device tree changeset\n");
-        goto err_destroy_cs;
-    }
-    return ret;
-
-err_destroy_cs:
-    of_changeset_destroy(&cset);
-    return ret;
-}
-
-static void versatile_panel_probe(struct device *dev,
-                  struct device_node *endpoint)
-{
-    struct versatile_panel const *vpanel = NULL;
-    struct device_node *panel = NULL;
-    u32 val;
-    int ret;
-    int i;
-
-    /*
-     * The Versatile CLCD has a panel auto-detection mechanism.
-     * We use this and look for the compatible panel in the
-     * device tree.
-     */
-    ret = regmap_read(versatile_syscon_map, SYS_CLCD, &val);
-    if (ret) {
-        dev_err(dev, "cannot read CLCD syscon register\n");
-        return;
-    }
-    val &= SYS_CLCD_CLCDID_MASK;
-    dev_info(dev, "SYS_CLCD=%08x\n", val);
-
-    /* First find corresponding panel information */
-    for (i = 0; i < ARRAY_SIZE(versatile_panels); i++) {
-        vpanel = &versatile_panels[i];
-
-        if (val == vpanel->id) {
-            dev_err(dev, "autodetected panel \"%s\"\n",
-                vpanel->compatible);
-            break;
-        }
-    }
-    if (i == ARRAY_SIZE(versatile_panels)) {
-        dev_err(dev, "could not auto-detect panel\n");
-        return;
-    }
-
-    /* This is the default panel node in the device tree */
-    panel = of_graph_get_remote_port_parent(endpoint);
-    if (!panel) {
-        dev_err(dev, "could not locate remote port for panel\n");
-        return;
-    }
-
-    /*
-     * So now we dynamically update the display properties of the
-     * panel in accordance to what was detected..
-     */
-    ret = versatile_overwrite_of_panel(dev, panel, vpanel);
-    if (ret) {
-        dev_err(dev, "cannot overwrite devicetree panel\n");
-        return;
-    }
-
-    /*
-     * If we have a Sanyo 2.5" port
-     * that we're running on an IB2 and proceed to look for the
-     * IB2 syscon regmap.
-     */
-    if (!vpanel->ib2)
-        return;
-
-    versatile_ib2_map = syscon_regmap_lookup_by_compatible(
-        "arm,versatile-ib2-syscon");
-    if (IS_ERR(versatile_ib2_map)) {
-        dev_err(dev, "could not locate IB2 control register\n");
-        versatile_ib2_map = NULL;
-        return;
-    }
-}
-
-
-This actually works. But would need some public device tree
-property augmentation API instead of the hacks. Should I pursue
-it?
-
-Yours,
-Linus Walleij
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sun7i-a20.c b/drivers/pinctrl/sunxi/pinctrl-sun7i-a20.c
+index cf1ce0c..ca7b9a3 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sun7i-a20.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sun7i-a20.c
+@@ -343,26 +343,22 @@ static const struct sunxi_desc_pin sun7i_a20_pins[] = {
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION(0x2, "nand0"),		/* NCE4 */
+-		  SUNXI_FUNCTION(0x3, "spi2"),		/* CS0 */
+-		  SUNXI_FUNCTION_IRQ(0x6, 12)),		/* EINT12 */
++		  SUNXI_FUNCTION(0x3, "spi2")),		/* CS0 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 20),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION(0x2, "nand0"),		/* NCE5 */
+-		  SUNXI_FUNCTION(0x3, "spi2"),		/* CLK */
+-		  SUNXI_FUNCTION_IRQ(0x6, 13)),		/* EINT13 */
++		  SUNXI_FUNCTION(0x3, "spi2")),		/* CLK */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 21),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION(0x2, "nand0"),		/* NCE6 */
+-		  SUNXI_FUNCTION(0x3, "spi2"),		/* MOSI */
+-		  SUNXI_FUNCTION_IRQ(0x6, 14)),		/* EINT14 */
++		  SUNXI_FUNCTION(0x3, "spi2")),		/* MOSI */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 22),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION(0x2, "nand0"),		/* NCE7 */
+-		  SUNXI_FUNCTION(0x3, "spi2"),		/* MISO */
+-		  SUNXI_FUNCTION_IRQ(0x6, 15)),		/* EINT15 */
++		  SUNXI_FUNCTION(0x3, "spi2")),		/* MISO */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 23),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+@@ -960,65 +956,66 @@ static const struct sunxi_desc_pin sun7i_a20_pins[] = {
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION(0x2, "spi0"),		/* CS0 */
+ 		  SUNXI_FUNCTION(0x3, "uart5"),		/* TX */
+-		  SUNXI_FUNCTION_IRQ(0x5, 22)),		/* EINT22 */
++		  SUNXI_FUNCTION_IRQ(0x6, 22)),		/* EINT22 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(I, 11),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION(0x2, "spi0"),		/* CLK */
+ 		  SUNXI_FUNCTION(0x3, "uart5"),		/* RX */
+-		  SUNXI_FUNCTION_IRQ(0x5, 23)),		/* EINT23 */
++		  SUNXI_FUNCTION_IRQ(0x6, 23)),		/* EINT23 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(I, 12),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION(0x2, "spi0"),		/* MOSI */
+ 		  SUNXI_FUNCTION(0x3, "uart6"),		/* TX */
+ 		  SUNXI_FUNCTION(0x4, "clk_out_a"),	/* CLK_OUT_A */
+-		  SUNXI_FUNCTION_IRQ(0x5, 24)),		/* EINT24 */
++		  SUNXI_FUNCTION_IRQ(0x6, 24)),		/* EINT24 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(I, 13),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION(0x2, "spi0"),		/* MISO */
+ 		  SUNXI_FUNCTION(0x3, "uart6"),		/* RX */
+ 		  SUNXI_FUNCTION(0x4, "clk_out_b"),	/* CLK_OUT_B */
+-		  SUNXI_FUNCTION_IRQ(0x5, 25)),		/* EINT25 */
++		  SUNXI_FUNCTION_IRQ(0x6, 25)),		/* EINT25 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(I, 14),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION(0x2, "spi0"),		/* CS1 */
+ 		  SUNXI_FUNCTION(0x3, "ps2"),		/* SCK1 */
+ 		  SUNXI_FUNCTION(0x4, "timer4"),	/* TCLKIN0 */
+-		  SUNXI_FUNCTION_IRQ(0x5, 26)),		/* EINT26 */
++		  SUNXI_FUNCTION_IRQ(0x6, 26)),		/* EINT26 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(I, 15),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION(0x2, "spi1"),		/* CS1 */
+ 		  SUNXI_FUNCTION(0x3, "ps2"),		/* SDA1 */
+ 		  SUNXI_FUNCTION(0x4, "timer5"),	/* TCLKIN1 */
+-		  SUNXI_FUNCTION_IRQ(0x5, 27)),		/* EINT27 */
++		  SUNXI_FUNCTION_IRQ(0x6, 27)),		/* EINT27 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(I, 16),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION(0x2, "spi1"),		/* CS0 */
+ 		  SUNXI_FUNCTION(0x3, "uart2"),		/* RTS */
+-		  SUNXI_FUNCTION_IRQ(0x5, 28)),		/* EINT28 */
++		  SUNXI_FUNCTION_IRQ(0x6, 28)),		/* EINT28 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(I, 17),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION(0x2, "spi1"),		/* CLK */
+ 		  SUNXI_FUNCTION(0x3, "uart2"),		/* CTS */
+-		  SUNXI_FUNCTION_IRQ(0x5, 29)),		/* EINT29 */
++		  SUNXI_FUNCTION_IRQ(0x6, 29)),		/* EINT29 */
++		  /* EINT29 might not work - more testing needed */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(I, 18),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION(0x2, "spi1"),		/* MOSI */
+ 		  SUNXI_FUNCTION(0x3, "uart2"),		/* TX */
+-		  SUNXI_FUNCTION_IRQ(0x5, 30)),		/* EINT30 */
++		  SUNXI_FUNCTION_IRQ(0x6, 30)),		/* EINT30 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(I, 19),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION(0x2, "spi1"),		/* MISO */
+ 		  SUNXI_FUNCTION(0x3, "uart2"),		/* RX */
+-		  SUNXI_FUNCTION_IRQ(0x5, 31)),		/* EINT31 */
++		  SUNXI_FUNCTION_IRQ(0x6, 31)),		/* EINT31 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(I, 20),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+-- 
+2.5.0
