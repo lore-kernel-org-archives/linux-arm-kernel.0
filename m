@@ -1,25 +1,25 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sun, 21 Feb 2016 01:03:47 +0100
-Subject: [PATCH v5 1/8] ARM: dts: rockchip: add hdmi/vop device node for
- rk3036
-In-Reply-To: <1454384453-7127-1-git-send-email-wxt@rock-chips.com>
-References: <1454384032-6794-1-git-send-email-wxt@rock-chips.com>
- <1454384453-7127-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <6774166.XfKvalhQ7F@phil>
+From: broonie@kernel.org (Mark Brown)
+Date: Sun, 21 Feb 2016 09:38:59 +0900
+Subject: [PATCH V6 1/2] regulator: Add document for MT6323 regulator
+In-Reply-To: <1455709056-50510-1-git-send-email-blogic@openwrt.org>
+References: <1455709056-50510-1-git-send-email-blogic@openwrt.org>
+Message-ID: <20160221003859.GI18327@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 2. Februar 2016, 11:40:50 schrieb Caesar Wang:
-> This patch adds the needed display info for rk3036 SOCs.
-> 
-> The rk3036 support two overlay plane and one hwc plane,
-> it supports IOMMU, and its IOMMU same as rk3288's.
-> Meanwhile, add the inno hdmi for HDMI display.
-> 
-> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+On Wed, Feb 17, 2016 at 12:37:35PM +0100, John Crispin wrote:
+> Signed-off-by: John Crispin <blogic@openwrt.org>
+> Cc: devicetree at vger.kernel.org
 
-I've split this into 3 patches (vop, hdmi, kylin enablement) and applied 
-this to my dts32 branch.
-
-
-Heiko
+...and dropped due to the dependency on MFD changes that you didn't
+mention :/  I can't apply this without a pull request from Lee with the
+MFD changes for the chip that I can depend on, there's no separate
+Kconfig symbol and the MFD is already merged causing build failures
+(you've had mail from 0day about that).
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160221/81493bbd/attachment.sig>
