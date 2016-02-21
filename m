@@ -1,91 +1,106 @@
-From: sdliyong@gmail.com (LIYONG)
-Date: Sun, 21 Feb 2016 20:19:57 +0800
-Subject: [PATCH] ARM: OMAP2+: allow DEBUG_UNCOMPRESS for OMAP2+
-In-Reply-To: <20160219180237.GI21202@atomide.com>
-References: <1451362159-27910-1-git-send-email-sdliyong@gmail.com>
- <20160219180237.GI21202@atomide.com>
-Message-ID: <BLU402-EAS3654C3D896BB35B714D68BD6A20@phx.gbl>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Sun, 21 Feb 2016 13:52:06 +0100
+Subject: [PATCH RESEND] gpmi-nand: Handle ECC Errors in erased pages
+Message-ID: <1456059126-25469-1-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-no problem, let me submit another patch
+ECC is only calculated for written pages. As erased pages are not
+actively written the ECC is always invalid. For this purpose the
+Hardware BCH unit is able to check for erased pages and does not raise
+an ECC error in this case. This behaviour can be influenced using the
+BCH_MODE register which sets the number of allowed bitflips in an erased
+page. Unfortunately the unit is not capable of fixing the bitflips in
+memory.
 
-> ? 2016?2?20??02:02?Tony Lindgren <tony@atomide.com> ???
-> 
-> Hi,
-> 
-> * Yong Li <sdliyong@gmail.com> [151228 20:12]:
->> Based on the below
->> commit ae3c99a26c60 ("ARM: 7806/1: allow DEBUG_UNCOMPRESS for Tegra"),
->> change the .data section to .text section,
->> to enable DEBUG_UNCOMPRESS for OMAP2+ platforms
->> Tested okay using BeagleBone Black
-> 
-> Sorry for the delay, I just noticed this one while looking
-> through my inbox for pending patches.
-> 
-> I think we should first simplify things by moving things over
-> to use the generic DEBUG_UART_8250 code where the addresses
-> need to be specified in the .config. It's been on my list of
-> things to do for quite a while but I keep getting interrupted.
-> 
-> My guess is that if we do that, this patch is no longer
-> needed :) Yong, care to take a look at that?
-> 
-> Regards,
-> 
-> Tony
-> 
->> Signed-off-by: Yong Li <sdliyong@gmail.com>
->> ---
->> arch/arm/Kconfig.debug             |  2 +-
->> arch/arm/include/debug/omap2plus.S | 13 ++++++++++---
->> 2 files changed, 11 insertions(+), 4 deletions(-)
->> 
->> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
->> index 259c0ca..e5ae36a 100644
->> --- a/arch/arm/Kconfig.debug
->> +++ b/arch/arm/Kconfig.debug
->> @@ -1596,7 +1596,7 @@ config DEBUG_UART_8250_FLOW_CONTROL
->> config DEBUG_UNCOMPRESS
->>    bool
->>    depends on ARCH_MULTIPLATFORM || PLAT_SAMSUNG || ARM_SINGLE_ARMV7M
->> -    default y if DEBUG_LL && !DEBUG_OMAP2PLUS_UART && \
->> +    default y if DEBUG_LL && (!DEBUG_OMAP2PLUS_UART || !ZBOOT_ROM) && \
->>             (!DEBUG_TEGRA_UART || !ZBOOT_ROM)
->>    help
->>      This option influences the normal decompressor output for
->> diff --git a/arch/arm/include/debug/omap2plus.S b/arch/arm/include/debug/omap2plus.S
->> index 6d867ae..12421f9 100644
->> --- a/arch/arm/include/debug/omap2plus.S
->> +++ b/arch/arm/include/debug/omap2plus.S
->> @@ -58,11 +58,18 @@
->> 
->> #define UART_OFFSET(addr)    ((addr) & 0x00ffffff)
->> 
->> +#if defined(ZIMAGE)
->> +    omap_uart_phys:    .word    0
->> +    omap_uart_virt:    .word    0
->> +    omap_uart_lsr:    .word    0
->> +#else
->> +
->>        .pushsection .data
->> -omap_uart_phys:    .word    0
->> -omap_uart_virt:    .word    0
->> -omap_uart_lsr:    .word    0
->> +    omap_uart_phys:    .word    0
->> +    omap_uart_virt:    .word    0
->> +    omap_uart_lsr:    .word    0
->>        .popsection
->> +#endif
->> 
->>        .macro    addruart, rp, rv, tmp
->> 
->> -- 
->> 2.1.4
->> 
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->> 
+To avoid complete software checks for erased pages, we can simply check
+buffers with uncorrectable ECC errors because we know that any erased
+page with errors is uncorrectable by the BCH unit.
+
+This patch adds the generic nand_check_erased_ecc_chunk() to gpmi-nand
+to correct erased pages. To have the valid data in the buffer before
+using them, this patch moves the read_page_swap_end() call before the
+ECC status checking for-loop.
+
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.c | 49 ++++++++++++++++++++++++++++++----
+ 1 file changed, 44 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+index 235ddcb58f39..ce5a21252102 100644
+--- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
++++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+@@ -1035,14 +1035,58 @@ static int gpmi_ecc_read_page(struct mtd_info *mtd, struct nand_chip *chip,
+ 	/* Loop over status bytes, accumulating ECC status. */
+ 	status = auxiliary_virt + nfc_geo->auxiliary_status_offset;
+ 
++	read_page_swap_end(this, buf, nfc_geo->payload_size,
++			   this->payload_virt, this->payload_phys,
++			   nfc_geo->payload_size,
++			   payload_virt, payload_phys);
++
+ 	for (i = 0; i < nfc_geo->ecc_chunk_count; i++, status++) {
+ 		if ((*status == STATUS_GOOD) || (*status == STATUS_ERASED))
+ 			continue;
+ 
+ 		if (*status == STATUS_UNCORRECTABLE) {
++			int flips;
++
++			/*
++			 * The ECC hardware has an uncorrectable ECC status
++			 * code in case we have bitflips in an erased page. As
++			 * nothing was written into this subpage the ECC is
++			 * obviously wrong and we can not trust it. We assume
++			 * at this point that we are reading an erased page and
++			 * try to correct the bitflips in buffer up to
++			 * ecc_strength bitflips. If this is a page with random
++			 * data, we exceed this number of bitflips and have a
++			 * ECC failure. Otherwise we use the corrected buffer.
++			 */
++			if (i == 0) {
++				/* The first block includes metadata */
++				flips = nand_check_erased_ecc_chunk(
++						buf + i * nfc_geo->ecc_chunk_size,
++						nfc_geo->ecc_chunk_size,
++						NULL, 0,
++						auxiliary_virt,
++						nfc_geo->metadata_size,
++						nfc_geo->ecc_strength);
++			} else {
++				flips = nand_check_erased_ecc_chunk(
++						buf + i * nfc_geo->ecc_chunk_size,
++						nfc_geo->ecc_chunk_size,
++						NULL, 0,
++						NULL, 0,
++						nfc_geo->ecc_strength);
++			}
++
++			if (flips > 0) {
++				max_bitflips = max_t(unsigned int, max_bitflips,
++						     flips);
++				mtd->ecc_stats.corrected += flips;
++				continue;
++			}
++
+ 			mtd->ecc_stats.failed++;
+ 			continue;
+ 		}
++
+ 		mtd->ecc_stats.corrected += *status;
+ 		max_bitflips = max_t(unsigned int, max_bitflips, *status);
+ 	}
+@@ -1062,11 +1106,6 @@ static int gpmi_ecc_read_page(struct mtd_info *mtd, struct nand_chip *chip,
+ 		chip->oob_poi[0] = ((uint8_t *) auxiliary_virt)[0];
+ 	}
+ 
+-	read_page_swap_end(this, buf, nfc_geo->payload_size,
+-			this->payload_virt, this->payload_phys,
+-			nfc_geo->payload_size,
+-			payload_virt, payload_phys);
+-
+ 	return max_bitflips;
+ }
+ 
+-- 
+2.7.0
