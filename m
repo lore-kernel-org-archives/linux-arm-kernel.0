@@ -1,726 +1,168 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 21 Feb 2016 20:51:54 +0100
-Subject: [PATCH] ARM: dts: vf610-zii-dev: Add ZII development board.
-Message-ID: <1456084314-9871-1-git-send-email-andrew@lunn.ch>
+From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
+Date: Sun, 21 Feb 2016 17:17:17 -0300
+Subject: LPC18xx doesn't boot on linux-next
+Message-ID: <CAAEAJfB4_JbRMC5Y5siqPR__Tr8V6x15DSuvEdANxVNjiB-v3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Cory Tusar <cory.tusar@pid1solutions.com>
+Hey Joachim,
 
-This commit adds support for Rev. B of a Zodiac Inflight Innovations
-development board, mainly intended for DSA and ARINC 429 development
-work.
+I've noticed that my Hitex LPC4350 doesn't boot with latest next.
+Here's the bootlog,
+with lpc18xx_defconfig.
 
-Signed-off-by: Cory Tusar <cory.tusar@pid1solutions.com>
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
----
- arch/arm/boot/dts/Makefile                |   3 +-
- arch/arm/boot/dts/vf610-zii-dev-rev-b.dts | 683 ++++++++++++++++++++++++++++++
- 2 files changed, 685 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
+Uncompressing Linux... done, booting the kernel.
+[    0.000000] Booting Linux on physical CPU 0x0
+[    0.000000] Linux version
+4.5.0-rc4-next-20160219-00003-ge153f1589736 (zeta at laptop) (gcc version
+4.8.2 (OSELAS.Toolchain-2013.12.2) ) #208 PREEMPT Sun Feb 21 17:05:51
+ART 2016
+[    0.000000] CPU: ARMv7-M [410fc241] revision 1 (ARMv7M), cr=00000000
+[    0.000000] CPU: unknown data cache, unknown instruction cache
+[    0.000000] Machine model: Hitex LPC4350 Evaluation Board
+[    0.000000] bootconsole [earlycon0] enabled
+[    0.000000] Built 1 zonelists in Zone order, mobility grouping off.
+Total pages: 2032
+[    0.000000] Kernel command line: console=ttyS0,115200 earlyprintk
+ethaddr=C0:B1:3C:88:88:90
+[    0.000000] PID hash table entries: 32 (order: -5, 128 bytes)
+[    0.000000] Dentry cache hash table entries: 1024 (order: 0, 4096 bytes)
+[    0.000000] Inode-cache hash table entries: 1024 (order: 0, 4096 bytes)
+[    0.000000] Memory: 5080K/8192K available (1883K kernel code, 119K
+rwdata, 652K rodata, 84K init, 185K bss, 3112K reserved, 0K
+cma-reserved)
+[    0.000000] Virtual kernel memory layout:
+[    0.000000]     vector  : 0x00000000 - 0x00001000   (   4 kB)
+[    0.000000]     fixmap  : 0xffc00000 - 0xfff00000   (3072 kB)
+[    0.000000]     vmalloc : 0x00000000 - 0xffffffff   (4095 MB)
+[    0.000000]     lowmem  : 0x28000000 - 0x28800000   (   8 MB)
+[    0.000000]       .text : 0x28008000 - 0x2828205c   (2537 kB)
+[    0.000000]       .init : 0x28283000 - 0x28298000   (  84 kB)
+[    0.000000]       .data : 0x28298000 - 0x282b5fe0   ( 120 kB)
+[    0.000000]        .bss : 0x282b5fe0 - 0x282e47ac   ( 186 kB)
+[    0.000000] SLUB: HWalign=32, Order=0-3, MinObjects=0, CPUs=1, Nodes=1
+[    0.000000] Preemptible hierarchical RCU implementation.
+[    0.000000] Build-time adjustment of leaf fanout to 32.
+[    0.000000] NR_IRQS:16 nr_irqs:16 16
+[    0.000000] __clk_core_init: pll1 would create circular parent
+[    0.000000] lpc18xx_cgu_register_source_clks: failed to register pll (2)
+[    0.000000] __clk_core_init: idiva would create circular parent
+[    0.000000] lpc18xx_cgu_register_source_clks: failed to register div 0
+[    0.000000] __clk_core_init: idivb would create circular parent
+[    0.000000] lpc18xx_cgu_register_source_clks: failed to register div 1
+[    0.000000] __clk_core_init: idivc would create circular parent
+[    0.000000] lpc18xx_cgu_register_source_clks: failed to register div 2
+[    0.000000] __clk_core_init: idivd would create circular parent
+[    0.000000] lpc18xx_cgu_register_source_clks: failed to register div 3
+[    0.000000] __clk_core_init: idive would create circular parent
+[    0.000000] lpc18xx_cgu_register_source_clks: failed to register div 4
+[    0.000000] Division by zero in kernel.
+[    0.000000] CPU: 0 PID: 0 Comm: swapper Not tainted
+4.5.0-rc4-next-20160219-00003-ge153f1589736 #208
+[    0.000000] Hardware name: NXP LPC18xx/43xx (Device Tree)
+[    0.000000] [<2800be59>] (unwind_backtrace) from [<2800b20b>]
+(show_stack+0xb/0xc)
+[    0.000000] [<2800b20b>] (show_stack) from [<280ac3cf>] (Ldiv0_64+0x9/0x1a)
+[    0.000000] [<280ac3cf>] (Ldiv0_64) from [<28036787>]
+(clocks_calc_max_nsecs+0x19/0x4e)
+[    0.000000] [<28036787>] (clocks_calc_max_nsecs) from [<280368b3>]
+(__clocksource_update_freq_scale+0xf7/0x12c)
+[    0.000000] [<280368b3>] (__clocksource_update_freq_scale) from
+[<280368f1>] (__clocksource_register_scale+0x9/0x34)
+[    0.000000] [<280368f1>] (__clocksource_register_scale) from
+[<2828dea9>] (lpc32xx_timer_init+0x125/0x228)
+[    0.000000] [<2828dea9>] (lpc32xx_timer_init) from [<2828dcd5>]
+(clocksource_probe+0x25/0x50)
+[    0.000000] [<2828dcd5>] (clocksource_probe) from [<28283579>]
+(start_kernel+0x19d/0x2b4)
+[    0.000000] [<28283579>] (start_kernel) from [<28008025>] (0x28008025)
+[    0.000000] clocksource: lpc3220 timer: mask: 0xffffffff
+max_cycles: 0x0, max_idle_ns: 0 ns
+[    0.000000] Division by zero in kernel.
+[    0.000000] CPU: 0 PID: 0 Comm: swapper Not tainted
+4.5.0-rc4-next-20160219-00003-ge153f1589736 #208
+[    0.000000] Hardware name: NXP LPC18xx/43xx (Device Tree)
+[    0.000000] [<2800be59>] (unwind_backtrace) from [<2800b20b>]
+(show_stack+0xb/0xc)
+[    0.000000] [<2800b20b>] (show_stack) from [<280ac3cf>] (Ldiv0_64+0x9/0x1a)
+[    0.000000] [<280ac3cf>] (Ldiv0_64) from [<280366f7>]
+(clocks_calc_mult_shift+0x77/0x9c)
+[    0.000000] [<280366f7>] (clocks_calc_mult_shift) from [<2828aaf9>]
+(register_current_timer_delay+0x19/0xbc)
+[    0.000000] [<2828aaf9>] (register_current_timer_delay) from
+[<2828dddb>] (lpc32xx_timer_init+0x57/0x228)
+[    0.000000] [<2828dddb>] (lpc32xx_timer_init) from [<2828dcd5>]
+(clocksource_probe+0x25/0x50)
+[    0.000000] [<2828dcd5>] (clocksource_probe) from [<28283579>]
+(start_kernel+0x19d/0x2b4)
+[    0.000000] [<28283579>] (start_kernel) from [<28008025>] (0x28008025)
+[    0.000000] Switching to timer-based delay loop, resolution 0ns
+[    0.000000] Division by zero in kernel.
+[    0.000000] CPU: 0 PID: 0 Comm: swapper Not tainted
+4.5.0-rc4-next-20160219-00003-ge153f1589736 #208
+[    0.000000] Hardware name: NXP LPC18xx/43xx (Device Tree)
+[    0.000000] [<2800be59>] (unwind_backtrace) from [<2800b20b>]
+(show_stack+0xb/0xc)
+[    0.000000] [<2800b20b>] (show_stack) from [<280ac3cf>] (Ldiv0_64+0x9/0x1a)
+[    0.000000] [<280ac3cf>] (Ldiv0_64) from [<280366f7>]
+(clocks_calc_mult_shift+0x77/0x9c)
+[    0.000000] [<280366f7>] (clocks_calc_mult_shift) from [<28287bfb>]
+(sched_clock_register+0x3b/0x164)
+[    0.000000] [<28287bfb>] (sched_clock_register) from [<2828dde5>]
+(lpc32xx_timer_init+0x61/0x228)
+[    0.000000] [<2828dde5>] (lpc32xx_timer_init) from [<2828dcd5>]
+(clocksource_probe+0x25/0x50)
+[    0.000000] [<2828dcd5>] (clocksource_probe) from [<28283579>]
+(start_kernel+0x19d/0x2b4)
+[    0.000000] [<28283579>] (start_kernel) from [<28008025>] (0x28008025)
+[    0.000000] Division by zero in kernel.
+[    0.000000] CPU: 0 PID: 0 Comm: swapper Not tainted
+4.5.0-rc4-next-20160219-00003-ge153f1589736 #208
+[    0.000000] Hardware name: NXP LPC18xx/43xx (Device Tree)
+[    0.000000] [<2800be59>] (unwind_backtrace) from [<2800b20b>]
+(show_stack+0xb/0xc)
+[    0.000000] [<2800b20b>] (show_stack) from [<280ac3cf>] (Ldiv0_64+0x9/0x1a)
+[    0.000000] [<280ac3cf>] (Ldiv0_64) from [<28036787>]
+(clocks_calc_max_nsecs+0x19/0x4e)
+[    0.000000] [<28036787>] (clocks_calc_max_nsecs) from [<28287c31>]
+(sched_clock_register+0x71/0x164)
+[    0.000000] [<28287c31>] (sched_clock_register) from [<2828dde5>]
+(lpc32xx_timer_init+0x61/0x228)
+[    0.000000] [<2828dde5>] (lpc32xx_timer_init) from [<2828dcd5>]
+(clocksource_probe+0x25/0x50)
+[    0.000000] [<2828dcd5>] (clocksource_probe) from [<28283579>]
+(start_kernel+0x19d/0x2b4)
+[    0.000000] [<28283579>] (start_kernel) from [<28008025>] (0x28008025)
+[    0.000000] sched_clock: 32 bits at 0 Hz, resolution 0ns, wraps every 0ns
+[    0.000000] ------------[ cut here ]------------
+[    0.000000] WARNING: CPU: 0 PID: 0 at
+/home/zeta/fast/linux/ezequielg/kernel/time/clockevents.c:44
+cev_delta2ns+0x2d/0xc8()
+[    0.000000] CPU: 0 PID: 0 Comm: swapper Not tainted
+4.5.0-rc4-next-20160219-00003-ge153f1589736 #208
+[    0.000000] Hardware name: NXP LPC18xx/43xx (Device Tree)
+[    0.000000] [<2800be59>] (unwind_backtrace) from [<2800b20b>]
+(show_stack+0xb/0xc)
+[    0.000000] [<2800b20b>] (show_stack) from [<2800e42d>]
+(warn_slowpath_common+0x51/0x74)
+[    0.000000] [<2800e42d>] (warn_slowpath_common) from [<2800e4c7>]
+(warn_slowpath_null+0xf/0x14)
+[    0.000000] [<2800e4c7>] (warn_slowpath_null) from [<2803847d>]
+(cev_delta2ns+0x2d/0xc8)
+[    0.000000] [<2803847d>] (cev_delta2ns) from [<28038a0d>]
+(clockevents_config+0x35/0x50)
+[    0.000000] [<28038a0d>] (clockevents_config) from [<28038a35>]
+(clockevents_config_and_register+0xd/0x16)
+[    0.000000] [<28038a35>] (clockevents_config_and_register) from
+[<2828df31>] (lpc32xx_timer_init+0x1ad/0x228)
+[    0.000000] [<2828df31>] (lpc32xx_timer_init) from [<2828dcd5>]
+(clocksource_probe+0x25/0x50)
+[    0.000000] [<2828dcd5>] (clocksource_probe) from [<28283579>]
+(start_kernel+0x19d/0x2b4)
+[    0.000000] [<28283579>] (start_kernel) from [<28008025>] (0x28008025)
+[    0.000000] ---[ end trace cb88537fdc8fa200 ]---
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index a4a6d70e8b26..47c4c2ff41de 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -372,7 +372,8 @@ dtb-$(CONFIG_SOC_VF610) += \
- 	vf610m4-colibri.dtb \
- 	vf610-cosmic.dtb \
- 	vf610m4-cosmic.dtb \
--	vf610-twr.dtb
-+	vf610-twr.dtb \
-+	vf610-zii-dev-rev-b.dtb
- dtb-$(CONFIG_ARCH_MXS) += \
- 	imx23-evk.dtb \
- 	imx23-olinuxino.dtb \
-diff --git a/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts b/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
-new file mode 100644
-index 000000000000..fafe0039ebce
---- /dev/null
-+++ b/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
-@@ -0,0 +1,683 @@
-+/*
-+ * Copyright 2013 Freescale Semiconductor, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+
-+/dts-v1/;
-+#include "vf610.dtsi"
-+
-+/ {
-+	model = "ZII VF610 Development Board, Rev B";
-+	compatible = "zii,vf610dev-b", "zii,vf610dev", "fsl,vf610";
-+
-+	chosen {
-+		bootargs = "console=ttyLP0,115200n8";
-+		stdout-path = &uart0;
-+	};
-+
-+	memory {
-+		reg = <0x80000000 0x8000000>;
-+	};
-+
-+	gpio-leds {
-+		compatible = "gpio-leds";
-+		pinctrl-0 = <&pinctrl_leds_debug>;
-+		pinctrl-names = "default";
-+
-+		debug_1 {
-+			label = "zii:green:debug1";
-+			gpios = <&gpio2 10 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+
-+	mdio-mux {
-+		compatible = "mdio-mux-gpio";
-+		pinctrl-0 = <&pinctrl_mdio_mux>;
-+		pinctrl-names = "default";
-+		gpios = <&gpio0 8  GPIO_ACTIVE_HIGH
-+			 &gpio0 9  GPIO_ACTIVE_HIGH
-+			 &gpio0 24 GPIO_ACTIVE_HIGH
-+			 &gpio0 25 GPIO_ACTIVE_HIGH>;
-+		mdio-parent-bus = <&mdio1>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		mdio_mux_1: mdio at 1 {
-+			reg = <1>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
-+		mdio_mux_2: mdio at 2 {
-+			reg = <2>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
-+		mdio_mux_4: mdio at 4 {
-+			reg = <4>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
-+		mdio_mux_8: mdio at 8 {
-+			reg = <8>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+	};
-+
-+	dsa at 0 {
-+		compatible = "marvell,dsa";
-+		#address-cells = <2>;
-+		#size-cells = <0>;
-+
-+		dsa,ethernet = <&fec1>;
-+		dsa,mii-bus = <&mdio_mux_1>;
-+
-+		/* 6352 - Primary - 7 ports */
-+		switch0: switch at 2 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x00 0>;
-+			eeprom-length = <512>;
-+
-+			port at 0 {
-+				reg = <0>;
-+				label = "lan0";
-+			};
-+
-+			port at 1 {
-+				reg = <1>;
-+				label = "lan1";
-+			};
-+
-+			port at 2 {
-+				reg = <2>;
-+				label = "lan2";
-+			};
-+
-+			switch0port5: port at 5 {
-+				reg = <5>;
-+				label = "dsa";
-+				phy-mode = "rgmii-txid";
-+				link = <&switch1port6
-+					&switch2port9>;
-+				fixed-link {
-+					speed = <1000>;
-+					full-duplex;
-+				};
-+			};
-+
-+			port at 6 {
-+				reg = <6>;
-+				label = "cpu";
-+				fixed-link {
-+					speed = <100>;
-+					full-duplex;
-+				};
-+			};
-+
-+		};
-+
-+		/* 6352 - Secondary - 7 ports */
-+		switch1: switch at 0 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x00 1>;
-+			eeprom-length = <512>;
-+			mii-bus = <&mdio_mux_2>;
-+
-+			port at 0 {
-+				reg = <0>;
-+				label = "lan3";
-+			};
-+
-+			port at 1 {
-+				reg = <1>;
-+				label = "lan4";
-+			};
-+
-+			port at 2 {
-+				reg = <2>;
-+				label = "lan5";
-+			};
-+
-+			switch1port5: port at 5 {
-+				reg = <5>;
-+				label = "dsa";
-+				link = <&switch2port9>;
-+				phy-mode = "rgmii-txid";
-+				fixed-link {
-+					speed = <1000>;
-+					full-duplex;
-+				};
-+			};
-+
-+			switch1port6: port at 6 {
-+				reg = <6>;
-+				label = "dsa";
-+				phy-mode = "rgmii-txid";
-+				link = <&switch0port5>;
-+				fixed-link {
-+					speed = <1000>;
-+					full-duplex;
-+				};
-+			};
-+		};
-+
-+		/* 6185 - 10 ports */
-+		switch2: switch at 6 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x00 2>;
-+			mii-bus = <&mdio_mux_4>;
-+
-+			port at 0 {
-+				reg = <0>;
-+				label = "lan6";
-+			};
-+
-+			port at 1 {
-+				reg = <1>;
-+				label = "lan7";
-+			};
-+
-+			port at 2 {
-+				reg = <2>;
-+				label = "lan8";
-+			};
-+
-+			port at 3 {
-+				reg = <3>;
-+				label = "optical3";
-+				fixed-link {
-+					speed = <1000>;
-+					full-duplex;
-+					link-gpios = <&gpio6 2
-+						      GPIO_ACTIVE_HIGH>;
-+				};
-+			};
-+
-+			port at 4 {
-+				reg = <4>;
-+				label = "optical4";
-+				fixed-link {
-+					speed = <1000>;
-+					full-duplex;
-+					link-gpios = <&gpio6 3
-+						      GPIO_ACTIVE_HIGH>;
-+				};
-+			};
-+
-+			switch2port9: port at 9 {
-+				reg = <9>;
-+				label = "dsa";
-+				phy-mode = "rgmii-txid";
-+				link = <&switch1port5
-+					&switch0port5>;
-+				fixed-link {
-+					speed = <1000>;
-+					full-duplex;
-+				};
-+			};
-+		};
-+	};
-+
-+	audio_ext: mclk-osc {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <24576000>;
-+	};
-+
-+	enet_ext: eth-osc {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <50000000>;
-+	};
-+
-+	reg_3p3v: regulator at 0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "3P3V";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-always-on;
-+	};
-+
-+	reg_vcc_3v3_mcu: regulator at 1 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc_3v3_mcu";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+
-+	usb0_vbus: regulator at 2 {
-+		compatible = "regulator-fixed";
-+		pinctrl-0 = <&pinctrl_usb_vbus>;
-+		regulator-name = "usb_vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		enable-active-high;
-+		regulator-always-on;
-+		regulator-boot-on;
-+		gpio = <&gpio0 6 0>;
-+	};
-+};
-+
-+&fec0 {
-+	phy-mode = "rmii";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_fec0>;
-+	status = "okay";
-+};
-+
-+&fec1 {
-+	phy-mode = "rmii";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_fec1>;
-+	status = "okay";
-+
-+	fixed-link {
-+		   speed = <100>;
-+		   full-duplex;
-+	};
-+
-+	mdio1: mdio {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		status = "okay";
-+	};
-+};
-+
-+&adc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_adc0_ad5>;
-+	vref-supply = <&reg_vcc_3v3_mcu>;
-+	status = "okay";
-+};
-+
-+&edma0 {
-+	status = "okay";
-+};
-+
-+&esdhc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_esdhc1>;
-+	bus-width = <4>;
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c0>;
-+	status = "okay";
-+
-+	gpio5: pca9505 at 20 {
-+		compatible = "nxp,pca9554";
-+		reg = <0x20>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+	};
-+
-+	gpio6: pca9505 at 22 {
-+		compatible = "nxp,pca9554";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_pca9554_opt>;
-+		reg = <0x22>;
-+		interrupt-parent = <&gpio1>;
-+		interrupts = <8 IRQ_TYPE_LEVEL_LOW>;
-+	};
-+
-+	lm75 at 48 {
-+		compatible = "national,lm75";
-+		reg = <0x48>;
-+	};
-+
-+	at24c04 at 50 {
-+		compatible = "atmel,24c04";
-+		reg = <0x50>;
-+	};
-+
-+	at24c04 at 52 {
-+		compatible = "atmel,24c04";
-+		reg = <0x52>;
-+	};
-+
-+	ds1682 at 6b {
-+		compatible = "dallas,ds1682";
-+		reg = <0x6b>;
-+	};
-+};
-+
-+&i2c1 {
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c1>;
-+	status = "okay";
-+};
-+
-+&i2c2 {
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c2>;
-+	status = "okay";
-+
-+	tca9548 at 70 {
-+		compatible = "nxp,pca9548";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		reg = <0x70>;
-+		reset-gpios = <&gpio3 23 GPIO_ACTIVE_LOW>;
-+
-+		i2c2_0: i2c at 0 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0>;
-+
-+			sfp1: at24c04 at 50 {
-+				compatible = "atmel,24c02";
-+				reg = <0x50>;
-+			};
-+		};
-+
-+		i2c2_1: i2c at 1 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <1>;
-+
-+			sfp2: at24c04 at 50 {
-+				compatible = "atmel,24c02";
-+				reg = <0x50>;
-+			};
-+		};
-+
-+		i2c2_2: i2c at 2 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <2>;
-+
-+			sfp3: at24c04 at 50 {
-+				compatible = "atmel,24c02";
-+				reg = <0x50>;
-+			};
-+		};
-+
-+		i2c2_3:	 i2c at 3 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <3>;
-+
-+			sfp4: at24c04 at 50 {
-+				compatible = "atmel,24c02";
-+				reg = <0x50>;
-+			};
-+
-+		};
-+
-+		i2c2_4: i2c at 4 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <4>;
-+		};
-+	};
-+};
-+
-+&i2c3 {
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c3>;
-+	status = "okay";
-+};
-+
-+&iomuxc {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c_mux_reset>;
-+
-+	vf610-zii {
-+		pinctrl_usb_vbus: pinctrl-usb-vbus {
-+			fsl,pins = <
-+				VF610_PAD_PTA16__GPIO_6	0x31c2
-+			>;
-+		};
-+
-+		pinctrl_i2c_mux_reset: pinctrl-i2c-mux-reset {
-+			fsl,pins = <
-+				 VF610_PAD_PTE14__GPIO_119	0x31c2
-+				 >;
-+		};
-+
-+		pinctrl_adc0_ad5: adc0ad5grp {
-+			fsl,pins = <
-+				VF610_PAD_PTC30__ADC0_SE5	0x00a1
-+			>;
-+		};
-+
-+		pinctrl_esdhc1: esdhc1grp {
-+			fsl,pins = <
-+				VF610_PAD_PTA24__ESDHC1_CLK	0x31ef
-+				VF610_PAD_PTA25__ESDHC1_CMD	0x31ef
-+				VF610_PAD_PTA26__ESDHC1_DAT0	0x31ef
-+				VF610_PAD_PTA27__ESDHC1_DAT1	0x31ef
-+				VF610_PAD_PTA28__ESDHC1_DATA2	0x31ef
-+				VF610_PAD_PTA29__ESDHC1_DAT3	0x31ef
-+				VF610_PAD_PTA7__GPIO_134	0x219d
-+			>;
-+		};
-+
-+		pinctrl_fec1: fec1grp {
-+			fsl,pins = <
-+				VF610_PAD_PTA6__RMII_CLKIN		0x30d1
-+				VF610_PAD_PTC9__ENET_RMII1_MDC		0x30d2
-+				VF610_PAD_PTC10__ENET_RMII1_MDIO	0x30d3
-+				VF610_PAD_PTC11__ENET_RMII1_CRS		0x30d1
-+				VF610_PAD_PTC12__ENET_RMII1_RXD1	0x30d1
-+				VF610_PAD_PTC13__ENET_RMII1_RXD0	0x30d1
-+				VF610_PAD_PTC14__ENET_RMII1_RXER	0x30d1
-+				VF610_PAD_PTC15__ENET_RMII1_TXD1	0x30d2
-+				VF610_PAD_PTC16__ENET_RMII1_TXD0	0x30d2
-+				VF610_PAD_PTC17__ENET_RMII1_TXEN	0x30d2
-+			>;
-+		};
-+
-+		pinctrl_i2c0: i2c0grp {
-+			fsl,pins = <
-+				VF610_PAD_PTB14__I2C0_SCL	0x37ff
-+				VF610_PAD_PTB15__I2C0_SDA	0x37ff
-+			>;
-+		};
-+
-+		pinctrl_i2c1: i2c1grp {
-+			fsl,pins = <
-+				VF610_PAD_PTB16__I2C1_SCL	0x37ff
-+				VF610_PAD_PTB17__I2C1_SDA	0x37ff
-+			>;
-+		};
-+
-+		pinctrl_i2c2: i2c2grp {
-+			fsl,pins = <
-+				VF610_PAD_PTA22__I2C2_SCL	0x37ff
-+				VF610_PAD_PTA23__I2C2_SDA	0x37ff
-+			>;
-+		};
-+
-+		pinctrl_i2c3: i2c3grp {
-+			fsl,pins = <
-+				VF610_PAD_PTA30__I2C3_SCL	0x37ff
-+				VF610_PAD_PTA31__I2C3_SDA	0x37ff
-+			>;
-+		};
-+
-+		pinctrl_pwm0: pwm0grp {
-+			fsl,pins = <
-+				VF610_PAD_PTB0__FTM0_CH0	0x1582
-+				VF610_PAD_PTB1__FTM0_CH1	0x1582
-+				VF610_PAD_PTB2__FTM0_CH2	0x1582
-+				VF610_PAD_PTB3__FTM0_CH3	0x1582
-+			>;
-+		};
-+
-+		pinctrl_uart0: uart0grp {
-+			fsl,pins = <
-+				VF610_PAD_PTB10__UART0_TX	0x21a2
-+				VF610_PAD_PTB11__UART0_RX	0x21a1
-+			>;
-+		};
-+
-+		pinctrl_uart1: uart1grp {
-+			fsl,pins = <
-+				VF610_PAD_PTB23__UART1_TX	0x21a2
-+				VF610_PAD_PTB24__UART1_RX	0x21a1
-+			>;
-+		};
-+
-+		pinctrl_uart2: uart2grp {
-+			fsl,pins = <
-+				VF610_PAD_PTD0__UART2_TX	0x21a2
-+				VF610_PAD_PTD1__UART2_RX	0x21a1
-+			>;
-+		};
-+
-+		pinctrl_qspi0: qspi0grp {
-+			fsl,pins = <
-+				VF610_PAD_PTD7__QSPI0_B_QSCK	0x31c3
-+				VF610_PAD_PTD8__QSPI0_B_CS0	0x31ff
-+				VF610_PAD_PTD9__QSPI0_B_DATA3	0x31c3
-+				VF610_PAD_PTD10__QSPI0_B_DATA2	0x31c3
-+				VF610_PAD_PTD11__QSPI0_B_DATA1	0x31c3
-+				VF610_PAD_PTD12__QSPI0_B_DATA0	0x31c3
-+			>;
-+		};
-+
-+		pinctrl_usb0_host: usb0-host-grp {
-+			fsl,pins = <
-+				VF610_PAD_PTD6__GPIO_85		0x0062
-+			>;
-+		};
-+		pinctrl_mdio_mux: pinctrl-mdio-mux {
-+			fsl,pins = <
-+				VF610_PAD_PTA18__GPIO_8		0x31c2
-+				VF610_PAD_PTA19__GPIO_9		0x31c2
-+				VF610_PAD_PTB2__GPIO_24		0x31c2
-+				VF610_PAD_PTB3__GPIO_25		0x31c2
-+			>;
-+		};
-+		pinctrl_fec0: fec0grp {
-+			fsl,pins = <
-+				VF610_PAD_PTC0__ENET_RMII0_MDC	0x30d2
-+				VF610_PAD_PTC1__ENET_RMII0_MDIO	0x30d3
-+				VF610_PAD_PTC2__ENET_RMII0_CRS	0x30d1
-+				VF610_PAD_PTC3__ENET_RMII0_RXD1	0x30d1
-+				VF610_PAD_PTC4__ENET_RMII0_RXD0	0x30d1
-+				VF610_PAD_PTC5__ENET_RMII0_RXER	0x30d1
-+				VF610_PAD_PTC6__ENET_RMII0_TXD1	0x30d2
-+				VF610_PAD_PTC7__ENET_RMII0_TXD0	0x30d2
-+				VF610_PAD_PTC8__ENET_RMII0_TXEN	0x30d2
-+			>;
-+		};
-+
-+		pinctrl_leds_debug: pinctrl-leds-debug {
-+			fsl,pins = <
-+				 VF610_PAD_PTD20__GPIO_74	0x31c2
-+				 >;
-+		};
-+
-+		pinctrl_pca9554_opt: pinctrl-pca95540-opt {
-+			fsl,pins = <
-+				VF610_PAD_PTB18__GPIO_40	0x219d
-+			>;
-+		};
-+	};
-+};
-+
-+&L2 {
-+	arm,data-latency = <2 1 2>;
-+	arm,tag-latency = <3 2 3>;
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart0>;
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart1>;
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart2>;
-+	status = "okay";
-+};
-+
-+&usbdev0 {
-+	disable-over-current;
-+	status = "okay";
-+	vbus-supply = <&usb0_vbus>;
-+	dr_mode = "host";
-+};
-+
-+&usbh1 {
-+	disable-over-current;
-+	status = "okay";
-+};
-+
-+&usbmisc0 {
-+	status = "okay";
-+};
-+
-+&usbmisc1 {
-+	status = "okay";
-+};
-+
-+&usbphy0 {
-+	status = "okay";
-+};
-+
-+&usbphy1 {
-+	status = "okay";
-+};
-+
-+&qspi0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_qspi0>;
-+	fsl,nor-size = <0x10000000>;
-+	fsl,spi-num-chipselects = <2>;
-+	status = "okay";
-+
-+	flash0: mt25ql02gc at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "micron,mt25ql02gc";
-+		spi-max-frequency = <66000000>;
-+		reg = <0>;
-+
-+		partition at 0 {
-+			label = "mt25ql02gc-0-uboot";
-+			reg = <0x0 0x0100000>;
-+		};
-+
-+		partition2 at 100000 {
-+			label = "mt25ql02gc-0-dtb";
-+			reg = <0x0100000 0x0100000>;
-+		};
-+
-+		partition3 at 200000 {
-+			label = "mt25ql02gc-0-kernel";
-+			reg = <0x0200000 0x0500000>;
-+		};
-+
-+		partition4 at 700000 {
-+			label = "mt25ql02gc-0-rfs";
-+			reg = <0x0600000 0x8000000>;
-+		};
-+	};
-+};
+
 -- 
-2.7.0
+Ezequiel Garc?a, VanguardiaSur
+www.vanguardiasur.com.ar
