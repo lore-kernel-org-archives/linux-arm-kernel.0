@@ -1,106 +1,62 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Sun, 21 Feb 2016 13:52:06 +0100
-Subject: [PATCH RESEND] gpmi-nand: Handle ECC Errors in erased pages
-Message-ID: <1456059126-25469-1-git-send-email-mpa@pengutronix.de>
+Date: Sun, 21 Feb 2016 14:07:15 +0100
+Subject: [PATCH] mfd: fsl-imx25-tsadc: select IRQ_DOMAIN
+In-Reply-To: <1455634467-2013548-1-git-send-email-arnd@arndb.de>
+References: <1455634467-2013548-1-git-send-email-arnd@arndb.de>
+Message-ID: <1544245.mjq7iKKDQ3@galactica>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ECC is only calculated for written pages. As erased pages are not
-actively written the ECC is always invalid. For this purpose the
-Hardware BCH unit is able to check for erased pages and does not raise
-an ECC error in this case. This behaviour can be influenced using the
-BCH_MODE register which sets the number of allowed bitflips in an erased
-page. Unfortunately the unit is not capable of fixing the bitflips in
-memory.
+On Tuesday 16 February 2016 15:54:24 Arnd Bergmann wrote:
+> The newly added tsadc code use irq domains, but it can be enabled
+> when they are disabled in Kconfig:
+> 
+> drivers/mfd/fsl-imx25-tsadc.c:41:22: error: implicit declaration of function 'irq_find_mapping' [-Werror=implicit-function-declaration]
+>    generic_handle_irq(irq_find_mapping(tsadc->domain, 1));
+> drivers/mfd/fsl-imx25-tsadc.c: In function 'mx25_tsadc_setup_irq':
+> drivers/mfd/fsl-imx25-tsadc.c:80:18: error: implicit declaration of function 'irq_domain_add_simple' [-Werror=implicit-function-declaration]
+> 
+> This adds a 'select IRQ_DOMAIN' code, like we have it in all other
+> drivers with this requirement.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: e2fccf5c1515 ("mfd: fsl-imx25-tsadc: Register touchscreen ADC driver")
 
-To avoid complete software checks for erased pages, we can simply check
-buffers with uncorrectable ECC errors because we know that any erased
-page with errors is uncorrectable by the BCH unit.
+Thanks,
 
-This patch adds the generic nand_check_erased_ecc_chunk() to gpmi-nand
-to correct erased pages. To have the valid data in the buffer before
-using them, this patch moves the read_page_swap_end() call before the
-ECC status checking for-loop.
+Reviewed-by: Markus Pargmann <mpa@pengutronix.de>
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
----
- drivers/mtd/nand/gpmi-nand/gpmi-nand.c | 49 ++++++++++++++++++++++++++++++----
- 1 file changed, 44 insertions(+), 5 deletions(-)
+Best Regards,
 
-diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-index 235ddcb58f39..ce5a21252102 100644
---- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-@@ -1035,14 +1035,58 @@ static int gpmi_ecc_read_page(struct mtd_info *mtd, struct nand_chip *chip,
- 	/* Loop over status bytes, accumulating ECC status. */
- 	status = auxiliary_virt + nfc_geo->auxiliary_status_offset;
- 
-+	read_page_swap_end(this, buf, nfc_geo->payload_size,
-+			   this->payload_virt, this->payload_phys,
-+			   nfc_geo->payload_size,
-+			   payload_virt, payload_phys);
-+
- 	for (i = 0; i < nfc_geo->ecc_chunk_count; i++, status++) {
- 		if ((*status == STATUS_GOOD) || (*status == STATUS_ERASED))
- 			continue;
- 
- 		if (*status == STATUS_UNCORRECTABLE) {
-+			int flips;
-+
-+			/*
-+			 * The ECC hardware has an uncorrectable ECC status
-+			 * code in case we have bitflips in an erased page. As
-+			 * nothing was written into this subpage the ECC is
-+			 * obviously wrong and we can not trust it. We assume
-+			 * at this point that we are reading an erased page and
-+			 * try to correct the bitflips in buffer up to
-+			 * ecc_strength bitflips. If this is a page with random
-+			 * data, we exceed this number of bitflips and have a
-+			 * ECC failure. Otherwise we use the corrected buffer.
-+			 */
-+			if (i == 0) {
-+				/* The first block includes metadata */
-+				flips = nand_check_erased_ecc_chunk(
-+						buf + i * nfc_geo->ecc_chunk_size,
-+						nfc_geo->ecc_chunk_size,
-+						NULL, 0,
-+						auxiliary_virt,
-+						nfc_geo->metadata_size,
-+						nfc_geo->ecc_strength);
-+			} else {
-+				flips = nand_check_erased_ecc_chunk(
-+						buf + i * nfc_geo->ecc_chunk_size,
-+						nfc_geo->ecc_chunk_size,
-+						NULL, 0,
-+						NULL, 0,
-+						nfc_geo->ecc_strength);
-+			}
-+
-+			if (flips > 0) {
-+				max_bitflips = max_t(unsigned int, max_bitflips,
-+						     flips);
-+				mtd->ecc_stats.corrected += flips;
-+				continue;
-+			}
-+
- 			mtd->ecc_stats.failed++;
- 			continue;
- 		}
-+
- 		mtd->ecc_stats.corrected += *status;
- 		max_bitflips = max_t(unsigned int, max_bitflips, *status);
- 	}
-@@ -1062,11 +1106,6 @@ static int gpmi_ecc_read_page(struct mtd_info *mtd, struct nand_chip *chip,
- 		chip->oob_poi[0] = ((uint8_t *) auxiliary_virt)[0];
- 	}
- 
--	read_page_swap_end(this, buf, nfc_geo->payload_size,
--			this->payload_virt, this->payload_phys,
--			nfc_geo->payload_size,
--			payload_virt, payload_phys);
--
- 	return max_bitflips;
- }
- 
+Markus
+
+> ---
+>  drivers/mfd/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+> index aa21dc55eb15..8cab3ecca8fc 100644
+> --- a/drivers/mfd/Kconfig
+> +++ b/drivers/mfd/Kconfig
+> @@ -300,6 +300,7 @@ config MFD_MC13XXX_I2C
+>  config MFD_MX25_TSADC
+>  	tristate "Freescale i.MX25 integrated Touchscreen and ADC unit"
+>  	select REGMAP_MMIO
+> +	select IRQ_DOMAIN
+>  	depends on (SOC_IMX25 && OF) || COMPILE_TEST
+>  	help
+>  	  Enable support for the integrated Touchscreen and ADC unit of the
+> 
+
 -- 
-2.7.0
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160221/ef514e0f/attachment-0001.sig>
