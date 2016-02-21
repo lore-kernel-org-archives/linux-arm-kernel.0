@@ -1,74 +1,33 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Sun, 21 Feb 2016 20:44:12 +0200
-Subject: [PATCH] ARM: OMAP2+: Fix onenand initialization to avoid
- filesystem corruption
-In-Reply-To: <1454683028-4193-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
-References: <linux-kernel@vger.kernel.org>
- <1454683028-4193-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
-Message-ID: <20160221184412.GR1640@darkstar.musicnaut.iki.fi>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Sun, 21 Feb 2016 20:18:18 +0100
+Subject: [PATCH] ARM: dts: omap3-n900: Allow gpio keys to be disabled
+In-Reply-To: <56C9F8AA.9080503@gmail.com>
+References: <1452447990-22775-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
+ <20160212215326.GD19432@atomide.com> <56C9F8AA.9080503@gmail.com>
+Message-ID: <20160221191818.GB15242@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Ivo,
 
-On Fri, Feb 05, 2016 at 04:37:08PM +0200, Ivaylo Dimitrov wrote:
-> Commit <e7b11dc7b77bfce0a351230a5feeadc1d0bba997> ("ARM: OMAP2+: Fix
-> onenand rate detection to avoid filesystem corruption") partially fixed
-> onenand configuration when GPMC module is reset. Finish the job by also
-> providing the correct values in ONENAND_REG_SYS_CFG1 register.
+On Sun, Feb 21, 2016 at 07:49:30PM +0200, Ivaylo Dimitrov wrote:
+> On 12.02.2016 23:53, Tony Lindgren wrote:
+> >Looks like this no longer applies because of linux,can-disable
+> >to wakeup-source changes. Can you please update against v4.5-rc
+> >series and repost?
 > 
-> Signed-off-by: Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com>
+> Could you elaborate on that? As I don't really understand what needs to be
+> updated and what are "wakeup-source changes".
 
-I tested this on N950 by creating ubifs file system with stock kernel,
-then reading & writing to it with mainline kernel, and then again
-verifying the fs is good with the stock kernel. Note that onenand does
-not work properly on N950 at the moment unless ONENAND_HAS_CACHE_PROGRAM
-is disabled by patching, but that's an issue unrelated to this patch.
+Due to changes in the kernel source  (each gpio key in omap3-n900.dts
+gained a "wakeup-source" property) the patch can no longer be applied
+using "git am". Just rebase your patch to current 4.5-rc and resend it.
 
-Tested-by: Aaro Koskinen <aaro.koskinen@iki.fi>
-
-A.
-
-> ---
->  arch/arm/mach-omap2/gpmc-onenand.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/gpmc-onenand.c b/arch/arm/mach-omap2/gpmc-onenand.c
-> index 7b76ce0..8633c70 100644
-> --- a/arch/arm/mach-omap2/gpmc-onenand.c
-> +++ b/arch/arm/mach-omap2/gpmc-onenand.c
-> @@ -101,10 +101,8 @@ static void omap2_onenand_set_async_mode(void __iomem *onenand_base)
->  
->  static void set_onenand_cfg(void __iomem *onenand_base)
->  {
-> -	u32 reg;
-> +	u32 reg = ONENAND_SYS_CFG1_RDY | ONENAND_SYS_CFG1_INT;
->  
-> -	reg = readw(onenand_base + ONENAND_REG_SYS_CFG1);
-> -	reg &= ~((0x7 << ONENAND_SYS_CFG1_BRL_SHIFT) | (0x7 << 9));
->  	reg |=	(latency << ONENAND_SYS_CFG1_BRL_SHIFT) |
->  		ONENAND_SYS_CFG1_BL_16;
->  	if (onenand_flags & ONENAND_FLAG_SYNCREAD)
-> @@ -123,6 +121,7 @@ static void set_onenand_cfg(void __iomem *onenand_base)
->  		reg |= ONENAND_SYS_CFG1_VHF;
->  	else
->  		reg &= ~ONENAND_SYS_CFG1_VHF;
-> +
->  	writew(reg, onenand_base + ONENAND_REG_SYS_CFG1);
->  }
->  
-> @@ -289,6 +288,7 @@ static int omap2_onenand_setup_async(void __iomem *onenand_base)
->  		}
->  	}
->  
-> +	onenand_async.sync_write = true;
->  	omap2_onenand_calc_async_timings(&t);
->  
->  	ret = gpmc_cs_program_settings(gpmc_onenand_data->cs, &onenand_async);
-> -- 
-> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160221/c2614b30/attachment.sig>
