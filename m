@@ -1,62 +1,135 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Sun, 21 Feb 2016 14:07:15 +0100
-Subject: [PATCH] mfd: fsl-imx25-tsadc: select IRQ_DOMAIN
-In-Reply-To: <1455634467-2013548-1-git-send-email-arnd@arndb.de>
-References: <1455634467-2013548-1-git-send-email-arnd@arndb.de>
-Message-ID: <1544245.mjq7iKKDQ3@galactica>
+From: draakje197@gmail.com (Henry Paulissen)
+Date: Sun, 21 Feb 2016 14:20:41 +0100
+Subject: [PATCH v3] Fix sun7i pin assignment for IRQ's
+Message-ID: <1456060845-20692-1-git-send-email-henry@nitronetworks.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 16 February 2016 15:54:24 Arnd Bergmann wrote:
-> The newly added tsadc code use irq domains, but it can be enabled
-> when they are disabled in Kconfig:
-> 
-> drivers/mfd/fsl-imx25-tsadc.c:41:22: error: implicit declaration of function 'irq_find_mapping' [-Werror=implicit-function-declaration]
->    generic_handle_irq(irq_find_mapping(tsadc->domain, 1));
-> drivers/mfd/fsl-imx25-tsadc.c: In function 'mx25_tsadc_setup_irq':
-> drivers/mfd/fsl-imx25-tsadc.c:80:18: error: implicit declaration of function 'irq_domain_add_simple' [-Werror=implicit-function-declaration]
-> 
-> This adds a 'select IRQ_DOMAIN' code, like we have it in all other
-> drivers with this requirement.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: e2fccf5c1515 ("mfd: fsl-imx25-tsadc: Register touchscreen ADC driver")
+After testing IRQ pins we found some bugs in the pinctrl declaration.
 
-Thanks,
+Signed-off-by: Henry Paulissen <henry@nitronetworks.nl>
+---
 
-Reviewed-by: Markus Pargmann <mpa@pengutronix.de>
+Changes in v2:
+    After some more testing we found irq on PI pins.
+    they where on mux6 so this is included in my patch.
 
-Best Regards,
+    Also included is a warning for PI17, this pin was not working
+    on apritzel his bPI and he thinks it might be correlated to
+    GIC and IRQ 29.
 
-Markus
+Changes in v3:
+    Changed name from nickname to realname in email and SoB.
+---
+ drivers/pinctrl/sunxi/pinctrl-sun7i-a20.c | 25 +++++++++++--------------
+ 1 file changed, 11 insertions(+), 14 deletions(-)
 
-> ---
->  drivers/mfd/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-> index aa21dc55eb15..8cab3ecca8fc 100644
-> --- a/drivers/mfd/Kconfig
-> +++ b/drivers/mfd/Kconfig
-> @@ -300,6 +300,7 @@ config MFD_MC13XXX_I2C
->  config MFD_MX25_TSADC
->  	tristate "Freescale i.MX25 integrated Touchscreen and ADC unit"
->  	select REGMAP_MMIO
-> +	select IRQ_DOMAIN
->  	depends on (SOC_IMX25 && OF) || COMPILE_TEST
->  	help
->  	  Enable support for the integrated Touchscreen and ADC unit of the
-> 
-
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sun7i-a20.c b/drivers/pinctrl/sunxi/pinctrl-sun7i-a20.c
+index cf1ce0c..0fe173e 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sun7i-a20.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sun7i-a20.c
+@@ -344,25 +344,21 @@ static const struct sunxi_desc_pin sun7i_a20_pins[] = {
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION(0x2, "nand0"),		/* NCE4 */
+ 		  SUNXI_FUNCTION(0x3, "spi2"),		/* CS0 */
+-		  SUNXI_FUNCTION_IRQ(0x6, 12)),		/* EINT12 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 20),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION(0x2, "nand0"),		/* NCE5 */
+ 		  SUNXI_FUNCTION(0x3, "spi2"),		/* CLK */
+-		  SUNXI_FUNCTION_IRQ(0x6, 13)),		/* EINT13 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 21),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION(0x2, "nand0"),		/* NCE6 */
+ 		  SUNXI_FUNCTION(0x3, "spi2"),		/* MOSI */
+-		  SUNXI_FUNCTION_IRQ(0x6, 14)),		/* EINT14 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 22),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION(0x2, "nand0"),		/* NCE7 */
+ 		  SUNXI_FUNCTION(0x3, "spi2"),		/* MISO */
+-		  SUNXI_FUNCTION_IRQ(0x6, 15)),		/* EINT15 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 23),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+@@ -960,65 +956,66 @@ static const struct sunxi_desc_pin sun7i_a20_pins[] = {
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION(0x2, "spi0"),		/* CS0 */
+ 		  SUNXI_FUNCTION(0x3, "uart5"),		/* TX */
+-		  SUNXI_FUNCTION_IRQ(0x5, 22)),		/* EINT22 */
++		  SUNXI_FUNCTION_IRQ(0x6, 22)),		/* EINT22 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(I, 11),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION(0x2, "spi0"),		/* CLK */
+ 		  SUNXI_FUNCTION(0x3, "uart5"),		/* RX */
+-		  SUNXI_FUNCTION_IRQ(0x5, 23)),		/* EINT23 */
++		  SUNXI_FUNCTION_IRQ(0x6, 23)),		/* EINT23 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(I, 12),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION(0x2, "spi0"),		/* MOSI */
+ 		  SUNXI_FUNCTION(0x3, "uart6"),		/* TX */
+ 		  SUNXI_FUNCTION(0x4, "clk_out_a"),	/* CLK_OUT_A */
+-		  SUNXI_FUNCTION_IRQ(0x5, 24)),		/* EINT24 */
++		  SUNXI_FUNCTION_IRQ(0x6, 24)),		/* EINT24 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(I, 13),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION(0x2, "spi0"),		/* MISO */
+ 		  SUNXI_FUNCTION(0x3, "uart6"),		/* RX */
+ 		  SUNXI_FUNCTION(0x4, "clk_out_b"),	/* CLK_OUT_B */
+-		  SUNXI_FUNCTION_IRQ(0x5, 25)),		/* EINT25 */
++		  SUNXI_FUNCTION_IRQ(0x6, 25)),		/* EINT25 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(I, 14),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION(0x2, "spi0"),		/* CS1 */
+ 		  SUNXI_FUNCTION(0x3, "ps2"),		/* SCK1 */
+ 		  SUNXI_FUNCTION(0x4, "timer4"),	/* TCLKIN0 */
+-		  SUNXI_FUNCTION_IRQ(0x5, 26)),		/* EINT26 */
++		  SUNXI_FUNCTION_IRQ(0x6, 26)),		/* EINT26 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(I, 15),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION(0x2, "spi1"),		/* CS1 */
+ 		  SUNXI_FUNCTION(0x3, "ps2"),		/* SDA1 */
+ 		  SUNXI_FUNCTION(0x4, "timer5"),	/* TCLKIN1 */
+-		  SUNXI_FUNCTION_IRQ(0x5, 27)),		/* EINT27 */
++		  SUNXI_FUNCTION_IRQ(0x6, 27)),		/* EINT27 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(I, 16),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION(0x2, "spi1"),		/* CS0 */
+ 		  SUNXI_FUNCTION(0x3, "uart2"),		/* RTS */
+-		  SUNXI_FUNCTION_IRQ(0x5, 28)),		/* EINT28 */
++		  SUNXI_FUNCTION_IRQ(0x6, 28)),		/* EINT28 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(I, 17),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION(0x2, "spi1"),		/* CLK */
+ 		  SUNXI_FUNCTION(0x3, "uart2"),		/* CTS */
+-		  SUNXI_FUNCTION_IRQ(0x5, 29)),		/* EINT29 */
++		  SUNXI_FUNCTION_IRQ(0x6, 29)),		/* EINT29 */
++		  /* EINT29 might not work - more testing needed */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(I, 18),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION(0x2, "spi1"),		/* MOSI */
+ 		  SUNXI_FUNCTION(0x3, "uart2"),		/* TX */
+-		  SUNXI_FUNCTION_IRQ(0x5, 30)),		/* EINT30 */
++		  SUNXI_FUNCTION_IRQ(0x6, 30)),		/* EINT30 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(I, 19),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION(0x2, "spi1"),		/* MISO */
+ 		  SUNXI_FUNCTION(0x3, "uart2"),		/* RX */
+-		  SUNXI_FUNCTION_IRQ(0x5, 31)),		/* EINT31 */
++		  SUNXI_FUNCTION_IRQ(0x6, 31)),		/* EINT31 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(I, 20),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160221/ef514e0f/attachment-0001.sig>
+2.5.0
