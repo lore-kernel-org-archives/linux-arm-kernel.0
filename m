@@ -1,23 +1,39 @@
 From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
-Date: Sun, 21 Feb 2016 19:49:30 +0200
-Subject: [PATCH] ARM: dts: omap3-n900: Allow gpio keys to be disabled
-In-Reply-To: <20160212215326.GD19432@atomide.com>
-References: <1452447990-22775-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
- <20160212215326.GD19432@atomide.com>
-Message-ID: <56C9F8AA.9080503@gmail.com>
+Date: Sun, 21 Feb 2016 20:13:55 +0200
+Subject: [PATCH] ARM: OMAP2+: Fix onenand initialization to avoid
+ filesystem corruption
+In-Reply-To: <20160211001220.GM19432@atomide.com>
+References: <linux-kernel@vger.kernel.org>
+ <1454683028-4193-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
+ <20160208193644.GU19432@atomide.com>
+ <20160210211226.GB1640@darkstar.musicnaut.iki.fi>
+ <20160211001220.GM19432@atomide.com>
+Message-ID: <56C9FE63.3070602@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-
-On 12.02.2016 23:53, Tony Lindgren wrote:
+On 11.02.2016 02:12, Tony Lindgren wrote:
 >
-> Looks like this no longer applies because of linux,can-disable
-> to wakeup-source changes. Can you please update against v4.5-rc
-> series and repost?
+> Also.. There's a chance somebody has created a onenand file system
+> with recent mainline kernels that did the reset and disabled ECC.
+> So with Ivaylo's patch fixing that, those may not mount properly
+> any longer. Most likely people just keep their maemo rootfs there
+> though with the MMC being available.
 
-Could you elaborate on that? As I don't really understand what needs to 
-be updated and what are "wakeup-source changes".
+I guess this is possible, but what worries me more is that the longer 
+the patch is not pushed, the higher the chance somebody to end-up with 
+broken rootfs. Wouldn't it be better to push it, thus preventing that 
+happening?
 
-Thanks,
-Ivo
+BTW the differences for N9/50 come from ONENAND_SYS_CFG1_HF bit and 
+ONENAND_SYS_CFG1_BRL_6 vs ONENAND_SYS_CFG1_BRL_4. Both are changed 
+(later in the code) anyway, so I guess it is safe to reset them to 
+default values.
+
+Or, maybe the correct fix is to issue RESET command to onenand 
+controller after GPMC reset? RESET command is supposed to put all the 
+bits to their default values.
+
+Ivo.
