@@ -1,67 +1,70 @@
 From: michael@amarulasolutions.com (Michael Trimarchi)
-Date: Sun, 21 Feb 2016 12:18:03 +0100
-Subject: [PATCH V2 1/4] ARM: dts: imx6ul: Add flexcan1 and flexcan2 support
-In-Reply-To: <CAOMZO5DfKi5KymQ6p9yF4ntqEJ7O=EEE7CKFmS-0N2XL8=ET7A@mail.gmail.com>
+Date: Sun, 21 Feb 2016 12:29:53 +0100
+Subject: [PATCH V2 3/4] ARM: dts: imx6ul: Add GPMI nand controller support
+In-Reply-To: <20160220172127.GC24064@panicking>
 References: <1455963652-24618-1-git-send-email-michael@amarulasolutions.com>
- <1455963652-24618-2-git-send-email-michael@amarulasolutions.com>
- <CAOMZO5Bk_ZMhYzFLRFNK2TQvK4KHuj62AM_6uF-m-P1kJupTHQ@mail.gmail.com>
- <20160220171816.GA24064@panicking>
- <CAOMZO5DfKi5KymQ6p9yF4ntqEJ7O=EEE7CKFmS-0N2XL8=ET7A@mail.gmail.com>
-Message-ID: <20160221111759.GA5387@panicking>
+ <1455963652-24618-4-git-send-email-michael@amarulasolutions.com>
+ <CAOMZO5DTmG7Umt+H20r+tZi9zZhsK=eoPbHOBO3iwvM2GXXLgg@mail.gmail.com>
+ <20160220172127.GC24064@panicking>
+Message-ID: <20160221112949.GB5387@panicking>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for FLEXCAN1 and FLEXCAN2.
+Add support for GPMI nand controller.
 
 Signed-off-by: Michael Trimarchi <michael@amarulasolutions.com>
 ---
-Changes in V2:
-	- remove stop-mode property because is not handle in
-	  mainline
+Changes V2:
+	- drop special IMXUL type because seems that is compatible
+	  with IMX6Q
 
- arch/arm/boot/dts/imx6ul.dtsi | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+ arch/arm/boot/dts/imx6ul.dtsi | 33 +++++++++++++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
 
 diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
-index 99b6465..f7b852e 100644
+index f4daf97..1a486ac 100644
 --- a/arch/arm/boot/dts/imx6ul.dtsi
 +++ b/arch/arm/boot/dts/imx6ul.dtsi
-@@ -14,6 +14,8 @@
+@@ -142,6 +142,39 @@
+ 			reg = <0x00900000 0x20000>;
+ 		};
  
- / {
- 	aliases {
-+		can0 = &flexcan1;
-+		can1 = &flexcan2;
- 		ethernet0 = &fec1;
- 		ethernet1 = &fec2;
- 		gpio0 = &gpio1;
-@@ -234,6 +236,26 @@
- 					clock-names = "ipg", "per";
- 					status = "disabled";
- 				};
++		dma_apbh: dma-apbh at 01804000 {
++			compatible = "fsl,imx6ul-dma-apbh", "fsl,imx28-dma-apbh";
++			reg = <0x01804000 0x2000>;
++			interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "gpmi0", "gpmi1", "gpmi2", "gpmi3";
++			#dma-cells = <1>;
++			dma-channels = <4>;
++			clocks = <&clks IMX6UL_CLK_APBHDMA>;
++		};
 +
-+				flexcan1: can at 02090000 {
-+					compatible = "fsl,imx6ul-flexcan", "fsl,imx6q-flexcan";
-+					reg = <0x02090000 0x4000>;
-+					interrupts = <GIC_SPI 110 IRQ_TYPE_LEVEL_HIGH>;
-+					clocks = <&clks IMX6UL_CLK_CAN1_IPG>,
-+						 <&clks IMX6UL_CLK_CAN1_SERIAL>;
-+					clock-names = "ipg", "per";
-+					status = "disabled";
-+				};
++		gpmi: gpmi-nand at 01806000 {
++			compatible = "fsl,imx6q-gpmi-nand";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			reg = <0x01806000 0x2000>, <0x01808000 0x4000>;
++			reg-names = "gpmi-nand", "bch";
++			interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "bch";
++			clocks = <&clks IMX6UL_CLK_GPMI_IO>,
++				 <&clks IMX6UL_CLK_GPMI_APB>,
++				 <&clks IMX6UL_CLK_GPMI_BCH>,
++				 <&clks IMX6UL_CLK_GPMI_BCH_APB>,
++				 <&clks IMX6UL_CLK_PER_BCH>;
++			clock-names = "gpmi_io", "gpmi_apb", "gpmi_bch",
++				      "gpmi_bch_apb", "per1_bch";
++			dmas = <&dma_apbh 0>;
++			dma-names = "rx-tx";
++			status = "disabled";
++		};
 +
-+				flexcan2: can at 02094000 {
-+					compatible = "fsl,imx6ul-flexcan", "fsl,imx6q-flexcan";
-+					reg = <0x02094000 0x4000>;
-+					interrupts = <GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>;
-+					clocks = <&clks IMX6UL_CLK_CAN2_IPG>,
-+						 <&clks IMX6UL_CLK_CAN2_SERIAL>;
-+					clock-names = "ipg", "per";
-+					status = "disabled";
-+				};
- 			};
- 
- 			gpt1: gpt at 02098000 {
+ 		aips1: aips-bus at 02000000 {
+ 			compatible = "fsl,aips-bus", "simple-bus";
+ 			#address-cells = <1>;
 -- 
 2.7.0
 
