@@ -1,388 +1,726 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 21 Feb 2016 19:47:53 +0000
-Subject: [PATCH v2 5/5] iio: adc: New driver for Cirrus Logic EP93xx ADC
-In-Reply-To: <56C8A9AB.7040506@gmail.com>
-References: <56C88EDD.3040007@gmail.com> <56C88FCB.30008@gmail.com>
- <56C88FFD.9050504@gmail.com> <56C89024.3060802@gmail.com>
- <56C89056.7070903@gmail.com> <56C8A9AB.7040506@gmail.com>
-Message-ID: <56CA1469.70806@kernel.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sun, 21 Feb 2016 20:51:54 +0100
+Subject: [PATCH] ARM: dts: vf610-zii-dev: Add ZII development board.
+Message-ID: <1456084314-9871-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/02/16 18:00, Alexander Sverdlin wrote:
-> New driver adding support for ADC found on Cirrus Logic EP93xx series of SoCs.
-> Board specific code must take care to create plaform device with all necessary
-> resources.
-> 
-> Signed-off-by: Alexander Sverdlin <alexander.sverdlin@gmail.com>
-Looks basically good to me.  A few things that might by convention in IIO
-have been slightly different framed, but nothing that matters.
+From: Cory Tusar <cory.tusar@pid1solutions.com>
 
-Given the need for the earlier arch related patches, this either needs to
-got through the relevant arm-soc trees, or I need an Ack to apply those
-through IIO.  I don't mind either way.  One aside though - is there anything
-preventing us have this build with COMPILE_TEST as an alternative to the arch
-dependency?  If not then adding that would be good to improve build test
-coverage.  Note that you will probably need to check dependencies on one or
-two things if you do that (HAS_IOMEM I would think for starters) which are
-implicitly brought in otherwise by the ARCH dependency.
+This commit adds support for Rev. B of a Zodiac Inflight Innovations
+development board, mainly intended for DSA and ARINC 429 development
+work.
 
-Should it go through the relevant arch trees then feel free to add.
+Signed-off-by: Cory Tusar <cory.tusar@pid1solutions.com>
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+---
+ arch/arm/boot/dts/Makefile                |   3 +-
+ arch/arm/boot/dts/vf610-zii-dev-rev-b.dts | 683 ++++++++++++++++++++++++++++++
+ 2 files changed, 685 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
 
-Acked-by: Jonathan Cameron <jic23@kernel.org>
-
-Thanks,
-
-Jonathan
-> ---
->  Documentation/iio/ep93xx_adc.txt |  29 +++++
->  drivers/iio/adc/Kconfig          |  11 ++
->  drivers/iio/adc/Makefile         |   1 +
->  drivers/iio/adc/ep93xx_adc.c     | 261 +++++++++++++++++++++++++++++++++++++++
->  4 files changed, 302 insertions(+)
->  create mode 100644 Documentation/iio/ep93xx_adc.txt
->  create mode 100644 drivers/iio/adc/ep93xx_adc.c
-> 
-> diff --git a/Documentation/iio/ep93xx_adc.txt b/Documentation/iio/ep93xx_adc.txt
-> new file mode 100644
-> index 0000000..321e59f
-> --- /dev/null
-> +++ b/Documentation/iio/ep93xx_adc.txt
-> @@ -0,0 +1,29 @@
-> +Cirrus Logic EP93xx ADC driver.
-> +
-> +1. Overview
-> +
-> +The driver is intended to work on both low-end (EP9301, EP9302) devices with
-> +5-channel ADC and high-end (EP9307, EP9312, EP9315) devices with 10-channel
-> +touchscreen/ADC module.
-> +
-> +2. Channel numbering
-> +
-> +Numbering scheme for channels 0..4 is defined in EP9301 and EP9302 datasheets.
-> +EP9307, EP9312 and EP9312 have 3 channels more (total 8), but the numbering is
-> +not defined. So the last three are numbered randomly, let's say.
-> +
-> +Assuming ep93xx_adc is IIO device0, you'd find following entries under
-> +/sys/bus/iio/devices/iio:device0/:
-> +
-> +  +-----------------+---------------+
-> +  | sysfs entry     | ball/pin name |
-> +  +-----------------+---------------+
-> +  | in_voltage0_raw | YM            |
-> +  | in_voltage1_raw | SXP           |
-> +  | in_voltage2_raw | SXM           |
-> +  | in_voltage3_raw | SYP           |
-> +  | in_voltage4_raw | SYM           |
-> +  | in_voltage5_raw | XP            |
-> +  | in_voltage6_raw | XM            |
-> +  | in_voltage7_raw | YP            |
-> +  +-----------------+---------------+
-> diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
-> index 283ded7..0482f29 100644
-> --- a/drivers/iio/adc/Kconfig
-> +++ b/drivers/iio/adc/Kconfig
-> @@ -172,6 +172,17 @@ config DA9150_GPADC
->  	  To compile this driver as a module, choose M here: the module will be
->  	  called berlin2-adc.
-> 
-> +config EP93XX_ADC
-> +	tristate "Cirrus Logic EP93XX ADC driver"
-> +	depends on ARCH_EP93XX
-> +	help
-> +	  Driver for the ADC module on the EP93XX series of SoC from Cirrus Logic.
-> +	  It's recommended to switch on CONFIG_HIGH_RES_TIMERS option, in this
-> +	  case driver will reduce its CPU usage by 90% in some use cases.
-> +
-> +	  To compile this driver as a module, choose M here: the module will be
-> +	  called ep93xx_adc.
-> +
->  config EXYNOS_ADC
->  	tristate "Exynos ADC driver support"
->  	depends on ARCH_EXYNOS || ARCH_S3C24XX || ARCH_S3C64XX || (OF && COMPILE_TEST)
-> diff --git a/drivers/iio/adc/Makefile b/drivers/iio/adc/Makefile
-> index 6435780..cd7d33e 100644
-> --- a/drivers/iio/adc/Makefile
-> +++ b/drivers/iio/adc/Makefile
-> @@ -18,6 +18,7 @@ obj-$(CONFIG_AXP288_ADC) += axp288_adc.o
->  obj-$(CONFIG_BERLIN2_ADC) += berlin2-adc.o
->  obj-$(CONFIG_CC10001_ADC) += cc10001_adc.o
->  obj-$(CONFIG_DA9150_GPADC) += da9150-gpadc.o
-> +obj-$(CONFIG_EP93XX_ADC) += ep93xx_adc.o
->  obj-$(CONFIG_EXYNOS_ADC) += exynos_adc.o
->  obj-$(CONFIG_HI8435) += hi8435.o
->  obj-$(CONFIG_IMX7D_ADC) += imx7d_adc.o
-> diff --git a/drivers/iio/adc/ep93xx_adc.c b/drivers/iio/adc/ep93xx_adc.c
-> new file mode 100644
-> index 0000000..3728591
-> --- /dev/null
-> +++ b/drivers/iio/adc/ep93xx_adc.c
-> @@ -0,0 +1,261 @@
-> +/*
-> + * Driver for ADC module on the Cirrus Logic EP93xx series of SoCs
-> + *
-> + * Copyright (C) 2015 Alexander Sverdlin
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * The driver uses polling to get the conversion status. According to EP93xx
-> + * datasheets, reading ADCResult register starts the conversion, but user is also
-> + * responsible for ensuring that delay between adjacent conversion triggers is
-> + * long enough so that maximum allowed conversion rate is not exceeded. This
-> + * basically renders IRQ mode unusable.
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/delay.h>
-> +#include <linux/device.h>
-> +#include <linux/err.h>
-> +#include <linux/iio/iio.h>
-> +#include <linux/io.h>
-> +#include <linux/irqflags.h>
-> +#include <linux/module.h>
-> +#include <linux/mutex.h>
-> +#include <linux/platform_device.h>
-> +
-> +#define EP93XX_NUM_CHANNELS 8
-> +
-> +/*
-> + * This code could benefit from real HR Timers, but jiffy granularity would
-> + * lower ADC conversion rate down to CONFIG_HZ, so we fallback to busy wait
-> + * in such case.
-> + *
-> + * HR Timers-based version loads CPU only up to 10% during back to back ADC
-> + * conversion, while busy wait-based version consumes whole CPU power.
-> + */
-> +#ifdef CONFIG_HIGH_RES_TIMERS
-> +#define ep93xx_adc_delay(usmin, usmax) usleep_range(usmin, usmax)
-> +#else
-> +#define ep93xx_adc_delay(usmin, usmax) udelay(usmin)
-> +#endif
-> +
-> +#define EP93XX_ADC_RESULT	0x08
-> +#define   EP93XX_ADC_SDR	BIT(31)
-> +#define EP93XX_ADC_SWITCH	0x18
-> +#define EP93XX_ADC_SW_LOCK	0x20
-> +#define EP93XX_ADC_INT_EN	0x24
-> +#define   EP93XX_ADC_RINTEN	BIT(11)
-> +
-> +struct ep93xx_adc_priv {
-> +	struct clk *clk;
-> +	void __iomem *base;
-> +	int lastch;
-> +	struct mutex lock;
-> +};
-> +
-> +#define EP93XX_ADC_CH(index, dname, swcfg) {			\
-> +	.type = IIO_VOLTAGE,					\
-> +	.indexed = 1,						\
-> +	.channel = index,					\
-> +	.address = swcfg,					\
-> +	.datasheet_name = dname,				\
-> +	.info_mask_separate = BIT(IIO_CHAN_INFO_RAW),		\
-> +	.info_mask_shared_by_all = BIT(IIO_CHAN_INFO_SCALE) |	\
-> +				   BIT(IIO_CHAN_INFO_OFFSET),	\
-> +}
-> +
-> +/*
-> + * Numbering scheme for channels 0..4 is defined in EP9301 and EP9302 datasheets.
-> + * EP9307, EP9312 and EP9312 have 3 channels more (total 8), but the numbering is
-> + * not defined. So the last three are numbered randomly, let's say.
-> + */
-> +static const struct iio_chan_spec ep93xx_adc_channels[EP93XX_NUM_CHANNELS] = {
-> +	EP93XX_ADC_CH(0, "YM",	0x608),
-> +	EP93XX_ADC_CH(1, "SXP",	0x680),
-> +	EP93XX_ADC_CH(2, "SXM",	0x640),
-> +	EP93XX_ADC_CH(3, "SYP",	0x620),
-> +	EP93XX_ADC_CH(4, "SYM",	0x610),
-> +	EP93XX_ADC_CH(5, "XP",	0x601),
-> +	EP93XX_ADC_CH(6, "XM",	0x602),
-> +	EP93XX_ADC_CH(7, "YP",	0x604),
-> +};
-> +
-> +static int ep93xx_read_raw(struct iio_dev *iiodev,
-> +			   struct iio_chan_spec const *channel, int *value,
-> +			   int *shift, long mask)
-> +{
-> +	struct ep93xx_adc_priv *priv = iio_priv(iiodev);
-> +	unsigned long timeout;
-> +	int ret;
-> +
-> +	switch (mask) {
-> +	case IIO_CHAN_INFO_RAW:
-> +		mutex_lock(&priv->lock);
-> +		if (priv->lastch != channel->channel) {
-> +			priv->lastch = channel->channel;
-> +			/*
-> +			 * Switch register is software-locked, unlocking must be
-> +			 * immediately followed by write
-> +			 */
-> +			local_irq_disable();
-> +			writel_relaxed(0xAA, priv->base + EP93XX_ADC_SW_LOCK);
-> +			writel_relaxed(channel->address,
-> +				       priv->base + EP93XX_ADC_SWITCH);
-> +			local_irq_enable();
-> +			/*
-> +			 * Settling delay depends on module clock and could be
-> +			 * 2ms or 500us
-> +			 */
-> +			ep93xx_adc_delay(2000, 2000);
-> +		}
-> +		/* Start the conversion, eventually discarding old result */
-> +		readl_relaxed(priv->base + EP93XX_ADC_RESULT);
-> +		/* Ensure maximun conversion rate is not exceeded */
-> +		ep93xx_adc_delay(DIV_ROUND_UP(1000000, 925),
-> +				 DIV_ROUND_UP(1000000, 925));
-> +		/* At this point conversion must be completed, but anyway... */
-> +		ret = IIO_VAL_INT;
-> +		timeout = jiffies + msecs_to_jiffies(1) + 1;
-> +		while (1) {
-> +			u32 t;
-> +
-> +			t = readl_relaxed(priv->base + EP93XX_ADC_RESULT);
-> +			if (t & EP93XX_ADC_SDR) {
-> +				/* Sign extend lower 16 bits */
-> +				*value = (s16)t;
-> +				break;
-> +			}
-> +
-> +			if (time_after(jiffies, timeout)) {
-> +				dev_err(&iiodev->dev, "Conversion timeout\n");
-> +				ret = -ETIMEDOUT;
-> +				break;
-> +			}
-> +
-> +			cpu_relax();
-> +		}
-> +		mutex_unlock(&priv->lock);
-> +		return ret;
-> +
-> +	case IIO_CHAN_INFO_OFFSET:
-> +		/* According to datasheet, range is -25000..25000 */
-> +		*value = 25000;
-> +		return IIO_VAL_INT;
-> +
-> +	case IIO_CHAN_INFO_SCALE:
-> +		/* Typical supply voltage is 3.3v */
-> +		*value = (1ULL << 32) * 3300 / 50000;
-> +		*shift = 32;
-> +		return IIO_VAL_FRACTIONAL_LOG2;
-> +	}
-> +
-> +	return -EINVAL;
-> +}
-> +
-> +static const struct iio_info ep93xx_adc_info = {
-> +	.driver_module = THIS_MODULE,
-> +	.read_raw = ep93xx_read_raw,
-> +};
-> +
-> +static int ep93xx_adc_probe(struct platform_device *pdev)
-> +{
-> +	int ret;
-> +	struct iio_dev *iiodev;
-> +	struct ep93xx_adc_priv *priv;
-> +	struct clk *pclk;
-> +	struct resource *res;
-> +
-> +	iiodev = devm_iio_device_alloc(&pdev->dev,
-> +				       sizeof(struct ep93xx_adc_priv));
-slight preference for sizeof(*priv)
-> +	if (!iiodev)
-> +		return -ENOMEM;
-> +	priv = iio_priv(iiodev);
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (!res) {
-> +		dev_err(&pdev->dev, "Cannot obtain memory resource\n");
-> +		return -ENXIO;
-> +	}
-> +	priv->base = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(priv->base)) {
-> +		dev_err(&pdev->dev, "Cannot map memory resource\n");
-> +		return PTR_ERR(priv->base);
-> +	}
-> +
-> +	iiodev->dev.parent = &pdev->dev;
-> +	iiodev->name = dev_name(&pdev->dev);
-> +	iiodev->modes = INDIO_DIRECT_MODE;
-> +	iiodev->info = &ep93xx_adc_info;
-> +	iiodev->num_channels = ARRAY_SIZE(ep93xx_adc_channels);
-> +	iiodev->channels = ep93xx_adc_channels;
-> +
-> +	priv->lastch = -1;
-> +	mutex_init(&priv->lock);
-> +
-> +	platform_set_drvdata(pdev, iiodev);
-> +
-> +	priv->clk = devm_clk_get(&pdev->dev, NULL);
-> +	if (IS_ERR(priv->clk)) {
-> +		dev_err(&pdev->dev, "Cannot obtain clock\n");
-> +		return PTR_ERR(priv->clk);
-> +	}
-> +
-> +	pclk = clk_get_parent(priv->clk);
-> +	if (!pclk) {
-> +		dev_warn(&pdev->dev, "Cannot obtain parent clock\n");
-> +	} else {
-> +		/*
-> +		 * This is actually a place for improvement:
-> +		 * EP93xx ADC supports two clock divisors -- 4 and 16,
-> +		 * resulting in conversion rates 3750 and 925 samples per second
-> +		 * respectively with 500uS or 2ms settling time respectively.
-> +		 * One might find this interesting enough to be configurable.
-> +		 */
-> +		ret = clk_set_rate(priv->clk, clk_get_rate(pclk) / 16);
-> +		if (ret)
-> +			dev_warn(&pdev->dev, "Cannot set clock rate\n");
-> +		/*
-> +		 * We can tolerate rate setting failure because the module should
-> +		 * work in any case.
-> +		 */
-> +	}
-> +
-> +	ret = clk_enable(priv->clk);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "Cannot enable clock\n");
-> +		return ret;
-> +	}
-> +
-> +	ret = iio_device_register(iiodev);
-> +	if (ret)
-> +		clk_disable(priv->clk);
-> +
-> +	return ret;
-> +}
-> +
-> +static int ep93xx_adc_remove(struct platform_device *pdev)
-> +{
-> +	struct iio_dev *iiodev = platform_get_drvdata(pdev);
-> +	struct ep93xx_adc_priv *priv = iio_priv(iiodev);
-> +
-> +	iio_device_unregister(iiodev);
-> +	clk_disable(priv->clk);
-> +
-> +	return 0;
-> +}
-> +
-> +static struct platform_driver ep93xx_adc_driver = {
-> +	.driver = {
-> +		.name = "ep93xx-adc",
-> +	},
-> +	.probe = ep93xx_adc_probe,
-> +	.remove = ep93xx_adc_remove,
-> +};
-> +module_platform_driver(ep93xx_adc_driver);
-> +
-> +MODULE_AUTHOR("Alexander Sverdlin <alexander.sverdlin@gmail.com>");
-> +MODULE_DESCRIPTION("Cirrus Logic EP93XX ADC driver");
-> +MODULE_LICENSE("GPL");
-> +MODULE_ALIAS("platform:ep93xx-adc");
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index a4a6d70e8b26..47c4c2ff41de 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -372,7 +372,8 @@ dtb-$(CONFIG_SOC_VF610) += \
+ 	vf610m4-colibri.dtb \
+ 	vf610-cosmic.dtb \
+ 	vf610m4-cosmic.dtb \
+-	vf610-twr.dtb
++	vf610-twr.dtb \
++	vf610-zii-dev-rev-b.dtb
+ dtb-$(CONFIG_ARCH_MXS) += \
+ 	imx23-evk.dtb \
+ 	imx23-olinuxino.dtb \
+diff --git a/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts b/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
+new file mode 100644
+index 000000000000..fafe0039ebce
+--- /dev/null
++++ b/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
+@@ -0,0 +1,683 @@
++/*
++ * Copyright 2013 Freescale Semiconductor, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++/dts-v1/;
++#include "vf610.dtsi"
++
++/ {
++	model = "ZII VF610 Development Board, Rev B";
++	compatible = "zii,vf610dev-b", "zii,vf610dev", "fsl,vf610";
++
++	chosen {
++		bootargs = "console=ttyLP0,115200n8";
++		stdout-path = &uart0;
++	};
++
++	memory {
++		reg = <0x80000000 0x8000000>;
++	};
++
++	gpio-leds {
++		compatible = "gpio-leds";
++		pinctrl-0 = <&pinctrl_leds_debug>;
++		pinctrl-names = "default";
++
++		debug_1 {
++			label = "zii:green:debug1";
++			gpios = <&gpio2 10 GPIO_ACTIVE_HIGH>;
++		};
++	};
++
++	mdio-mux {
++		compatible = "mdio-mux-gpio";
++		pinctrl-0 = <&pinctrl_mdio_mux>;
++		pinctrl-names = "default";
++		gpios = <&gpio0 8  GPIO_ACTIVE_HIGH
++			 &gpio0 9  GPIO_ACTIVE_HIGH
++			 &gpio0 24 GPIO_ACTIVE_HIGH
++			 &gpio0 25 GPIO_ACTIVE_HIGH>;
++		mdio-parent-bus = <&mdio1>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		mdio_mux_1: mdio at 1 {
++			reg = <1>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++
++		mdio_mux_2: mdio at 2 {
++			reg = <2>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++
++		mdio_mux_4: mdio at 4 {
++			reg = <4>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++
++		mdio_mux_8: mdio at 8 {
++			reg = <8>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++	};
++
++	dsa at 0 {
++		compatible = "marvell,dsa";
++		#address-cells = <2>;
++		#size-cells = <0>;
++
++		dsa,ethernet = <&fec1>;
++		dsa,mii-bus = <&mdio_mux_1>;
++
++		/* 6352 - Primary - 7 ports */
++		switch0: switch at 2 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x00 0>;
++			eeprom-length = <512>;
++
++			port at 0 {
++				reg = <0>;
++				label = "lan0";
++			};
++
++			port at 1 {
++				reg = <1>;
++				label = "lan1";
++			};
++
++			port at 2 {
++				reg = <2>;
++				label = "lan2";
++			};
++
++			switch0port5: port at 5 {
++				reg = <5>;
++				label = "dsa";
++				phy-mode = "rgmii-txid";
++				link = <&switch1port6
++					&switch2port9>;
++				fixed-link {
++					speed = <1000>;
++					full-duplex;
++				};
++			};
++
++			port at 6 {
++				reg = <6>;
++				label = "cpu";
++				fixed-link {
++					speed = <100>;
++					full-duplex;
++				};
++			};
++
++		};
++
++		/* 6352 - Secondary - 7 ports */
++		switch1: switch at 0 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x00 1>;
++			eeprom-length = <512>;
++			mii-bus = <&mdio_mux_2>;
++
++			port at 0 {
++				reg = <0>;
++				label = "lan3";
++			};
++
++			port at 1 {
++				reg = <1>;
++				label = "lan4";
++			};
++
++			port at 2 {
++				reg = <2>;
++				label = "lan5";
++			};
++
++			switch1port5: port at 5 {
++				reg = <5>;
++				label = "dsa";
++				link = <&switch2port9>;
++				phy-mode = "rgmii-txid";
++				fixed-link {
++					speed = <1000>;
++					full-duplex;
++				};
++			};
++
++			switch1port6: port at 6 {
++				reg = <6>;
++				label = "dsa";
++				phy-mode = "rgmii-txid";
++				link = <&switch0port5>;
++				fixed-link {
++					speed = <1000>;
++					full-duplex;
++				};
++			};
++		};
++
++		/* 6185 - 10 ports */
++		switch2: switch at 6 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x00 2>;
++			mii-bus = <&mdio_mux_4>;
++
++			port at 0 {
++				reg = <0>;
++				label = "lan6";
++			};
++
++			port at 1 {
++				reg = <1>;
++				label = "lan7";
++			};
++
++			port at 2 {
++				reg = <2>;
++				label = "lan8";
++			};
++
++			port at 3 {
++				reg = <3>;
++				label = "optical3";
++				fixed-link {
++					speed = <1000>;
++					full-duplex;
++					link-gpios = <&gpio6 2
++						      GPIO_ACTIVE_HIGH>;
++				};
++			};
++
++			port at 4 {
++				reg = <4>;
++				label = "optical4";
++				fixed-link {
++					speed = <1000>;
++					full-duplex;
++					link-gpios = <&gpio6 3
++						      GPIO_ACTIVE_HIGH>;
++				};
++			};
++
++			switch2port9: port at 9 {
++				reg = <9>;
++				label = "dsa";
++				phy-mode = "rgmii-txid";
++				link = <&switch1port5
++					&switch0port5>;
++				fixed-link {
++					speed = <1000>;
++					full-duplex;
++				};
++			};
++		};
++	};
++
++	audio_ext: mclk-osc {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <24576000>;
++	};
++
++	enet_ext: eth-osc {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <50000000>;
++	};
++
++	reg_3p3v: regulator at 0 {
++		compatible = "regulator-fixed";
++		regulator-name = "3P3V";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++	};
++
++	reg_vcc_3v3_mcu: regulator at 1 {
++		compatible = "regulator-fixed";
++		regulator-name = "vcc_3v3_mcu";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++	};
++
++	usb0_vbus: regulator at 2 {
++		compatible = "regulator-fixed";
++		pinctrl-0 = <&pinctrl_usb_vbus>;
++		regulator-name = "usb_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		enable-active-high;
++		regulator-always-on;
++		regulator-boot-on;
++		gpio = <&gpio0 6 0>;
++	};
++};
++
++&fec0 {
++	phy-mode = "rmii";
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_fec0>;
++	status = "okay";
++};
++
++&fec1 {
++	phy-mode = "rmii";
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_fec1>;
++	status = "okay";
++
++	fixed-link {
++		   speed = <100>;
++		   full-duplex;
++	};
++
++	mdio1: mdio {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "okay";
++	};
++};
++
++&adc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_adc0_ad5>;
++	vref-supply = <&reg_vcc_3v3_mcu>;
++	status = "okay";
++};
++
++&edma0 {
++	status = "okay";
++};
++
++&esdhc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_esdhc1>;
++	bus-width = <4>;
++	status = "okay";
++};
++
++&i2c0 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c0>;
++	status = "okay";
++
++	gpio5: pca9505 at 20 {
++		compatible = "nxp,pca9554";
++		reg = <0x20>;
++		gpio-controller;
++		#gpio-cells = <2>;
++
++	};
++
++	gpio6: pca9505 at 22 {
++		compatible = "nxp,pca9554";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_pca9554_opt>;
++		reg = <0x22>;
++		interrupt-parent = <&gpio1>;
++		interrupts = <8 IRQ_TYPE_LEVEL_LOW>;
++	};
++
++	lm75 at 48 {
++		compatible = "national,lm75";
++		reg = <0x48>;
++	};
++
++	at24c04 at 50 {
++		compatible = "atmel,24c04";
++		reg = <0x50>;
++	};
++
++	at24c04 at 52 {
++		compatible = "atmel,24c04";
++		reg = <0x52>;
++	};
++
++	ds1682 at 6b {
++		compatible = "dallas,ds1682";
++		reg = <0x6b>;
++	};
++};
++
++&i2c1 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c1>;
++	status = "okay";
++};
++
++&i2c2 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c2>;
++	status = "okay";
++
++	tca9548 at 70 {
++		compatible = "nxp,pca9548";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		reg = <0x70>;
++		reset-gpios = <&gpio3 23 GPIO_ACTIVE_LOW>;
++
++		i2c2_0: i2c at 0 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0>;
++
++			sfp1: at24c04 at 50 {
++				compatible = "atmel,24c02";
++				reg = <0x50>;
++			};
++		};
++
++		i2c2_1: i2c at 1 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <1>;
++
++			sfp2: at24c04 at 50 {
++				compatible = "atmel,24c02";
++				reg = <0x50>;
++			};
++		};
++
++		i2c2_2: i2c at 2 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <2>;
++
++			sfp3: at24c04 at 50 {
++				compatible = "atmel,24c02";
++				reg = <0x50>;
++			};
++		};
++
++		i2c2_3:	 i2c at 3 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <3>;
++
++			sfp4: at24c04 at 50 {
++				compatible = "atmel,24c02";
++				reg = <0x50>;
++			};
++
++		};
++
++		i2c2_4: i2c at 4 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <4>;
++		};
++	};
++};
++
++&i2c3 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c3>;
++	status = "okay";
++};
++
++&iomuxc {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c_mux_reset>;
++
++	vf610-zii {
++		pinctrl_usb_vbus: pinctrl-usb-vbus {
++			fsl,pins = <
++				VF610_PAD_PTA16__GPIO_6	0x31c2
++			>;
++		};
++
++		pinctrl_i2c_mux_reset: pinctrl-i2c-mux-reset {
++			fsl,pins = <
++				 VF610_PAD_PTE14__GPIO_119	0x31c2
++				 >;
++		};
++
++		pinctrl_adc0_ad5: adc0ad5grp {
++			fsl,pins = <
++				VF610_PAD_PTC30__ADC0_SE5	0x00a1
++			>;
++		};
++
++		pinctrl_esdhc1: esdhc1grp {
++			fsl,pins = <
++				VF610_PAD_PTA24__ESDHC1_CLK	0x31ef
++				VF610_PAD_PTA25__ESDHC1_CMD	0x31ef
++				VF610_PAD_PTA26__ESDHC1_DAT0	0x31ef
++				VF610_PAD_PTA27__ESDHC1_DAT1	0x31ef
++				VF610_PAD_PTA28__ESDHC1_DATA2	0x31ef
++				VF610_PAD_PTA29__ESDHC1_DAT3	0x31ef
++				VF610_PAD_PTA7__GPIO_134	0x219d
++			>;
++		};
++
++		pinctrl_fec1: fec1grp {
++			fsl,pins = <
++				VF610_PAD_PTA6__RMII_CLKIN		0x30d1
++				VF610_PAD_PTC9__ENET_RMII1_MDC		0x30d2
++				VF610_PAD_PTC10__ENET_RMII1_MDIO	0x30d3
++				VF610_PAD_PTC11__ENET_RMII1_CRS		0x30d1
++				VF610_PAD_PTC12__ENET_RMII1_RXD1	0x30d1
++				VF610_PAD_PTC13__ENET_RMII1_RXD0	0x30d1
++				VF610_PAD_PTC14__ENET_RMII1_RXER	0x30d1
++				VF610_PAD_PTC15__ENET_RMII1_TXD1	0x30d2
++				VF610_PAD_PTC16__ENET_RMII1_TXD0	0x30d2
++				VF610_PAD_PTC17__ENET_RMII1_TXEN	0x30d2
++			>;
++		};
++
++		pinctrl_i2c0: i2c0grp {
++			fsl,pins = <
++				VF610_PAD_PTB14__I2C0_SCL	0x37ff
++				VF610_PAD_PTB15__I2C0_SDA	0x37ff
++			>;
++		};
++
++		pinctrl_i2c1: i2c1grp {
++			fsl,pins = <
++				VF610_PAD_PTB16__I2C1_SCL	0x37ff
++				VF610_PAD_PTB17__I2C1_SDA	0x37ff
++			>;
++		};
++
++		pinctrl_i2c2: i2c2grp {
++			fsl,pins = <
++				VF610_PAD_PTA22__I2C2_SCL	0x37ff
++				VF610_PAD_PTA23__I2C2_SDA	0x37ff
++			>;
++		};
++
++		pinctrl_i2c3: i2c3grp {
++			fsl,pins = <
++				VF610_PAD_PTA30__I2C3_SCL	0x37ff
++				VF610_PAD_PTA31__I2C3_SDA	0x37ff
++			>;
++		};
++
++		pinctrl_pwm0: pwm0grp {
++			fsl,pins = <
++				VF610_PAD_PTB0__FTM0_CH0	0x1582
++				VF610_PAD_PTB1__FTM0_CH1	0x1582
++				VF610_PAD_PTB2__FTM0_CH2	0x1582
++				VF610_PAD_PTB3__FTM0_CH3	0x1582
++			>;
++		};
++
++		pinctrl_uart0: uart0grp {
++			fsl,pins = <
++				VF610_PAD_PTB10__UART0_TX	0x21a2
++				VF610_PAD_PTB11__UART0_RX	0x21a1
++			>;
++		};
++
++		pinctrl_uart1: uart1grp {
++			fsl,pins = <
++				VF610_PAD_PTB23__UART1_TX	0x21a2
++				VF610_PAD_PTB24__UART1_RX	0x21a1
++			>;
++		};
++
++		pinctrl_uart2: uart2grp {
++			fsl,pins = <
++				VF610_PAD_PTD0__UART2_TX	0x21a2
++				VF610_PAD_PTD1__UART2_RX	0x21a1
++			>;
++		};
++
++		pinctrl_qspi0: qspi0grp {
++			fsl,pins = <
++				VF610_PAD_PTD7__QSPI0_B_QSCK	0x31c3
++				VF610_PAD_PTD8__QSPI0_B_CS0	0x31ff
++				VF610_PAD_PTD9__QSPI0_B_DATA3	0x31c3
++				VF610_PAD_PTD10__QSPI0_B_DATA2	0x31c3
++				VF610_PAD_PTD11__QSPI0_B_DATA1	0x31c3
++				VF610_PAD_PTD12__QSPI0_B_DATA0	0x31c3
++			>;
++		};
++
++		pinctrl_usb0_host: usb0-host-grp {
++			fsl,pins = <
++				VF610_PAD_PTD6__GPIO_85		0x0062
++			>;
++		};
++		pinctrl_mdio_mux: pinctrl-mdio-mux {
++			fsl,pins = <
++				VF610_PAD_PTA18__GPIO_8		0x31c2
++				VF610_PAD_PTA19__GPIO_9		0x31c2
++				VF610_PAD_PTB2__GPIO_24		0x31c2
++				VF610_PAD_PTB3__GPIO_25		0x31c2
++			>;
++		};
++		pinctrl_fec0: fec0grp {
++			fsl,pins = <
++				VF610_PAD_PTC0__ENET_RMII0_MDC	0x30d2
++				VF610_PAD_PTC1__ENET_RMII0_MDIO	0x30d3
++				VF610_PAD_PTC2__ENET_RMII0_CRS	0x30d1
++				VF610_PAD_PTC3__ENET_RMII0_RXD1	0x30d1
++				VF610_PAD_PTC4__ENET_RMII0_RXD0	0x30d1
++				VF610_PAD_PTC5__ENET_RMII0_RXER	0x30d1
++				VF610_PAD_PTC6__ENET_RMII0_TXD1	0x30d2
++				VF610_PAD_PTC7__ENET_RMII0_TXD0	0x30d2
++				VF610_PAD_PTC8__ENET_RMII0_TXEN	0x30d2
++			>;
++		};
++
++		pinctrl_leds_debug: pinctrl-leds-debug {
++			fsl,pins = <
++				 VF610_PAD_PTD20__GPIO_74	0x31c2
++				 >;
++		};
++
++		pinctrl_pca9554_opt: pinctrl-pca95540-opt {
++			fsl,pins = <
++				VF610_PAD_PTB18__GPIO_40	0x219d
++			>;
++		};
++	};
++};
++
++&L2 {
++	arm,data-latency = <2 1 2>;
++	arm,tag-latency = <3 2 3>;
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart0>;
++	status = "okay";
++};
++
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart1>;
++	status = "okay";
++};
++
++&uart2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart2>;
++	status = "okay";
++};
++
++&usbdev0 {
++	disable-over-current;
++	status = "okay";
++	vbus-supply = <&usb0_vbus>;
++	dr_mode = "host";
++};
++
++&usbh1 {
++	disable-over-current;
++	status = "okay";
++};
++
++&usbmisc0 {
++	status = "okay";
++};
++
++&usbmisc1 {
++	status = "okay";
++};
++
++&usbphy0 {
++	status = "okay";
++};
++
++&usbphy1 {
++	status = "okay";
++};
++
++&qspi0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_qspi0>;
++	fsl,nor-size = <0x10000000>;
++	fsl,spi-num-chipselects = <2>;
++	status = "okay";
++
++	flash0: mt25ql02gc at 0 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "micron,mt25ql02gc";
++		spi-max-frequency = <66000000>;
++		reg = <0>;
++
++		partition at 0 {
++			label = "mt25ql02gc-0-uboot";
++			reg = <0x0 0x0100000>;
++		};
++
++		partition2 at 100000 {
++			label = "mt25ql02gc-0-dtb";
++			reg = <0x0100000 0x0100000>;
++		};
++
++		partition3 at 200000 {
++			label = "mt25ql02gc-0-kernel";
++			reg = <0x0200000 0x0500000>;
++		};
++
++		partition4 at 700000 {
++			label = "mt25ql02gc-0-rfs";
++			reg = <0x0600000 0x8000000>;
++		};
++	};
++};
+-- 
+2.7.0
