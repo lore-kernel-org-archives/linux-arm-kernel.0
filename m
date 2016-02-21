@@ -1,67 +1,81 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Sun, 21 Feb 2016 11:09:17 +0100
-Subject: [GIT PULL] ARM: mvebu: fixes for v4.5 (#2)
-In-Reply-To: <874mdfxkjx.fsf@free-electrons.com> (Gregory CLEMENT's message of
- "Thu, 11 Feb 2016 17:45:38 +0100")
-References: <874mdfxkjx.fsf@free-electrons.com>
-Message-ID: <874md2pe7m.fsf@free-electrons.com>
+From: codekipper@gmail.com (codekipper at gmail.com)
+Date: Sun, 21 Feb 2016 12:13:36 +0100
+Subject: [PATCH v7 0/2] ASoC: Add SPDIF support for Allwinner SoCs
+Message-ID: <1456053218-16325-1-git-send-email-codekipper@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
- 
- On jeu., f?vr. 11 2016, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+From: Marcus Cooper <codekipper@gmail.com>
 
-> Hi,
->
-> Here is the second pull request for fixes for mvebu for v4.5.
->
+For now just the SPDIF transmitter has been tested on a Mele A2000(A10)
+and a Itead Ibox(A20).
 
-I didn't see these 2 commits in v4.5-rc4 or v4.5-rc5. So I wanted to
-check that you didn't miss this PR.
+In order for this patch set to be functional we require an audio clock patch
+which will be delivered separately. For those that are interested I've pushed
+the patches here with all the required changes to get SPDIF audio out of the
+device.
 
-Thanks,
+https://github.com/codekipper/linux-sunxi/commits/spdif_delivery
 
-Gregory
+Thanks in advance,
+CK
 
+---
+Changes since v6:
+- removed legacy dapm components that are no longer needed.
+- changed dt-bindings patch subject styling to match that of the sound subsystem
 
->
-> The following changes since commit ff61ee84e7aa5842d9e33c0b442f0b43a6a44eaf:
->
->   ARM: dts: orion5x: gpio pin fixes for linkstation lswtgl (2016-01-25 16:22:59 +0100)
->
-> are available in the git repository at:
->
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.5-2
->
-> for you to fetch changes up to 44361a2cc13493fc41216d33bb9a562ec3a9cc4e:
->
->   ARM: dts: orion5x: fix the missing mtd flash on linkstation lswtgl (2016-02-09 11:17:53 +0100)
->
-> ----------------------------------------------------------------
-> mvebu fixes for 4.5 (part 2)
->
-> - Fix the missing mtd flash on linkstation lswtgl
-> - Use unique machine name for the kirkwood ds112 (for Debian flash-kernel tool)
->
-> ----------------------------------------------------------------
-> Heinrich Schuchardt (1):
->       ARM: dts: kirkwood: use unique machine name for ds112
->
-> Roger Shimizu (1):
->       ARM: dts: orion5x: fix the missing mtd flash on linkstation lswtgl
->
->  arch/arm/boot/dts/kirkwood-ds112.dts             |  2 +-
->  arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts | 31 ++++++++++++++++++++++++
->  2 files changed, 32 insertions(+), 1 deletion(-)
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Changes since v5:
+- fixed warning that had sneaked in.
+
+Changes since v4:
+- corrected indentation issues
+- removed old macros
+- removed unnecessary enabling of apb clock
+
+Changes since v3:
+- removed code required for spdif capture
+- added disable/enable of apb clk to suspend/resume.
+- removed unnecessary dt checks in probe
+- fixed error conditions in probe/resume
+- modified pm_runtime functionality and confirmed that driver worked when PM was disabled.
+- removed .owner from platform driver
+- renamed bindings file
+
+Changes since v2:
+- removed sunxi-machine-spdif and replaced with simple audio card
+- removed untested compatibilities from device tree documentation
+- added pm_runtime and remove shutdown
+- removed pll2 as it's the parent of the spdif clock
+- rename clk to spdif_clk
+- removed enabling of mclk output
+- removed interrupts status being cleared as it's not being used
+- use default fifo settings for now
+- fixed alignments for wrapped lines
+
+Changes since v1:
+- Moved sunxi-machine-spdif.c to separate patch
+- replaced sunxi in naming scheme with sun4i in the sun4i-spdif driver.
+- split tx controller into separate enable/disable functions
+- moved setclk and setfmt functionality into hw params
+- added support for mono signals.
+- cleaned up probe clock set up.
+- removed all writes to transmit status registers.
+- removed of_id
+- removed power management code.
+- Added support for more rates.
+
+Marcus Cooper (2):
+  ASoC: sunxi :add sun4i SPDIF dt bindings
+  ASoC: sunxi: Add support for the SPDIF block
+
+ .../bindings/sound/sunxi,sun4i-spdif.txt           |  39 ++
+ sound/soc/sunxi/Kconfig                            |   8 +
+ sound/soc/sunxi/Makefile                           |   1 +
+ sound/soc/sunxi/sun4i-spdif.c                      | 542 +++++++++++++++++++++
+ 4 files changed, 590 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sound/sunxi,sun4i-spdif.txt
+ create mode 100644 sound/soc/sunxi/sun4i-spdif.c
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.7.1
