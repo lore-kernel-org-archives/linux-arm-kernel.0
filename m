@@ -1,81 +1,86 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 22 Feb 2016 15:43:15 +0000
-Subject: [PATCH] arm*: efi: drop permanent mapping of the UEFI System table
-In-Reply-To: <1456153179-27214-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1456153179-27214-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160222154314.GJ3435@leverpostej>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 22 Feb 2016 16:45:17 +0100
+Subject: [PATCH 1/8] arm64: move acpi/dt decision earlier in boot process
+In-Reply-To: <1456148818-26257-2-git-send-email-aleksey.makarov@linaro.org>
+References: <1456148818-26257-1-git-send-email-aleksey.makarov@linaro.org>
+ <1456148818-26257-2-git-send-email-aleksey.makarov@linaro.org>
+Message-ID: <56CB2D0D.3090408@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 22, 2016 at 03:59:39PM +0100, Ard Biesheuvel wrote:
-> The permanent, writable mapping of the UEFI System table is only
-> referenced during invocations of UEFI Runtime Services, at which time
-> the UEFI virtual mapping is available, which also covers the system
-> table (since the runtime services themselves need access to it)
 
-I'm not sure it's strictly true that the runtime services themselves
-need access to the system table. Why would that be necessary? Are
-runtime services mandated to indirect calls via the system table?
 
-I would expect that the EFI system table and EFI runtime services table
-are not in EfiConventionalMemory, but I'm not sure that we have the
-guarnatee that they're both in EfiRuntimeServices* memory..
-
->From the spec, I couldn't find a mandate that the system table (nor the
-runtime services table) were in a region of EfiRuntimeServicesData
-memory. I suspect I'm looking in the wrong place...
-
-> So instead of creating this permanent mapping, record the virtual
-> address of the system table inside the UEFI virtual mapping, and
-> use that instead. This protects the contents of the system table
-> from inadvertent (or deliberate) modification.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+On 22/02/16 14:46, Aleksey Makarov wrote:
+> From: Leif Lindholm <leif.lindholm@linaro.org>
+>
+> In order to support selecting earlycon via either ACPI or DT, move
+> the decision on whether to attempt ACPI configuration into the
+> early_param handling. Then make acpi_boot_table_init() bail out if
+> acpi_disabled.
+>
+> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
 > ---
-> 
-> Something I spotted while working on the memory attribute table stuff.
-> Since this is low hanging fruit and otherwise completely unrelated to it,
-> I am posting it as a separate patch
-> 
->  drivers/firmware/efi/arm-init.c    |  2 ++
->  drivers/firmware/efi/arm-runtime.c | 24 ++++++++++----------
->  2 files changed, 14 insertions(+), 12 deletions(-)
-> 
-> diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
-> index 022f11157acd..e995d61da747 100644
-> --- a/drivers/firmware/efi/arm-init.c
-> +++ b/drivers/firmware/efi/arm-init.c
-> @@ -85,6 +85,8 @@ static int __init uefi_init(void)
->  			efi.systab->hdr.revision >> 16,
->  			efi.systab->hdr.revision & 0xffff);
->  
-> +	efi.runtime_version = efi.systab->hdr.revision;
+>   arch/arm64/kernel/acpi.c | 54 ++++++++++++++++++++++++++----------------------
+>   1 file changed, 29 insertions(+), 25 deletions(-)
+>
+> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+> index d1ce8e2..7a944f7 100644
+> --- a/arch/arm64/kernel/acpi.c
+> +++ b/arch/arm64/kernel/acpi.c
+> @@ -44,6 +44,19 @@ EXPORT_SYMBOL(acpi_pci_disabled);
+>   static bool param_acpi_off __initdata;
+>   static bool param_acpi_force __initdata;
+>
+> +static int __init dt_scan_depth1_nodes(unsigned long node,
+> +				       const char *uname, int depth,
+> +				       void *data)
+> +{
+> +	/*
+> +	 * Return 1 as soon as we encounter a node at depth 1 that is
+> +	 * not the /chosen node.
+> +	 */
+> +	if (depth == 1 && (strcmp(uname, "chosen") != 0))
+> +		return 1;
+> +	return 0;
+> +}
 > +
->  	/* Show what we know for posterity */
->  	c16 = early_memremap_ro(efi_to_phys(efi.systab->fw_vendor),
->  				sizeof(vendor) * sizeof(efi_char16_t));
-> diff --git a/drivers/firmware/efi/arm-runtime.c b/drivers/firmware/efi/arm-runtime.c
-> index 848ede1587dc..6ce13d6b7122 100644
-> --- a/drivers/firmware/efi/arm-runtime.c
-> +++ b/drivers/firmware/efi/arm-runtime.c
-> @@ -64,6 +64,16 @@ static bool __init efi_virtmap_init(void)
->  				&phys, ret);
->  			return false;
->  		}
-> +		/*
-> +		 * If this entry covers the address of the UEFI system table,
-> +		 * calculate and record its virtual address.
-> +		 */
-> +		if (efi_system_table >= phys &&
-> +		    efi_system_table < phys + (md->num_pages * EFI_PAGE_SIZE)) {
-> +			efi.systab = (void *)(efi_system_table - phys +
-> +					      md->virt_addr);
-> +			set_bit(EFI_SYSTEM_TABLES, &efi.flags);
-> +		}
+>   static int __init parse_acpi(char *arg)
+>   {
+>   	if (!arg)
+> @@ -57,23 +70,27 @@ static int __init parse_acpi(char *arg)
+>   	else
+>   		return -EINVAL;	/* Core will print when we return error */
+>
+> -	return 0;
+> -}
+> -early_param("acpi", parse_acpi);
+> +	/*
+> +	 * Enable ACPI instead of device tree unless
+> +	 * - ACPI has been disabled explicitly (acpi=off), or
+> +	 * - the device tree is not empty (it has more than just a /chosen node)
+> +	 *   and ACPI has not been force enabled (acpi=force)
+> +	 */
+> +	if (param_acpi_off ||
+> +	    (!param_acpi_force && of_scan_flat_dt(dt_scan_depth1_nodes, NULL)))
+> +		return 0;
+>
+> -static int __init dt_scan_depth1_nodes(unsigned long node,
+> -				       const char *uname, int depth,
+> -				       void *data)
+> -{
+>   	/*
+> -	 * Return 1 as soon as we encounter a node at depth 1 that is
+> -	 * not the /chosen node.
+> +	 * ACPI is disabled at this point. Enable it in order to parse
+> +	 * the ACPI tables and carry out sanity checks
+>   	 */
+> -	if (depth == 1 && (strcmp(uname, "chosen") != 0))
+> -		return 1;
+> +	enable_acpi();
+> +
 
-It seems very odd to me to set this given it's currently unused, and we
-don't have permanent access to the table. That sounds like we're just
-setting ourselves up for future fragility as users appear.
+So we only enable ACPI if we pass acpi=force as kernel parameter?
+I'm not sure if this is what you wanted to do.
 
-Thanks,
-Mark.
+Regards,
+Matthias
