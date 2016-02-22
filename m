@@ -1,75 +1,92 @@
-From: frank.li@nxp.com (Frank Li)
-Date: Mon, 22 Feb 2016 20:48:19 +0000
-Subject: iMX7d cpu1 issue
-In-Reply-To: <CAOMZO5Aa+veHWQCrKGz4rsvmjKWiitd81D8ncGnX8Fdk0aYe7Q@mail.gmail.com>
-References: <56C2D63F.1030408@compulab.co.il>	<20160218140913.GY6756@tiger>
- <AMSPR04MB263D00A3F8D9A8D9D3A536D88AF0@AMSPR04MB263.eurprd04.prod.outlook.com>
- <56C5F4D7.1070704@compulab.co.il>
- <AMSPR04MB26334EB884FA8A4B565278188AF0@AMSPR04MB263.eurprd04.prod.outlook.com>
- <56C6CE36.6040503@compulab.co.il>
- <CAOMZO5Aa+veHWQCrKGz4rsvmjKWiitd81D8ncGnX8Fdk0aYe7Q@mail.gmail.com>
-Message-ID: <AMSPR04MB2634AA127C6397584AF6BA488A30@AMSPR04MB263.eurprd04.prod.outlook.com>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Mon, 22 Feb 2016 13:48:56 -0700
+Subject: [PATCH v1] ARM: dts: nitrogen6x: add USB host 1 support
+In-Reply-To: <1456171421-10044-1-git-send-email-ps.report@gmx.net>
+References: <1456171421-10044-1-git-send-email-ps.report@gmx.net>
+Message-ID: <56CB7438.5030102@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 2/22/2016 1:03 PM, Peter Seiderer wrote:
+> Regulator stuff and pin configuration copied from imx6qdl-nitrogen6_max.dtsi
+> and checked against Boundary Devices linux kernel tree ([1]).
+> 
+> [1] https://github.com/boundarydevices/linux-imx6/blob/boundary-imx_3.14.28_1.0.0_ga/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+> 
+> Signed-off-by: Peter Seiderer <ps.report@gmx.net>
+> ---
+>  arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi | 25 ++++++++++++++++++++++---
+>  1 file changed, 22 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+> index c6c590d..81f8c5c 100644
+> --- a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+> @@ -85,9 +85,21 @@
+>  			enable-active-high;
+>  		};
+>  
+> -		reg_can_xcvr: regulator at 3 {
+> +		reg_usb_h1_vbus: regulator at 3 {
+>  			compatible = "regulator-fixed";
+>  			reg = <3>;
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&pinctrl_usbh1>;
+> +			regulator-name = "usb_h1_vbus";
+> +			regulator-min-microvolt = <3300000>;
+> +			regulator-max-microvolt = <3300000>;
+> +			gpio = <&gpio7 12 GPIO_ACTIVE_HIGH>;
+> +			enable-active-high;
+> +		};
+> +
+> +		reg_can_xcvr: regulator at 4 {
+> +			compatible = "regulator-fixed";
+> +			reg = <4>;
+>  			regulator-name = "CAN XCVR";
+>  			regulator-min-microvolt = <3300000>;
+>  			regulator-max-microvolt = <3300000>;
+> @@ -96,9 +108,9 @@
+>  			gpio = <&gpio1 2 GPIO_ACTIVE_LOW>;
+>  		};
+>  
+> -		reg_wlan_vmmc: regulator at 4 {
+> +		reg_wlan_vmmc: regulator at 5 {
+>  			compatible = "regulator-fixed";
+> -			reg = <4>;
+> +			reg = <5>;
+>  			pinctrl-names = "default";
+>  			pinctrl-0 = <&pinctrl_wlan_vmmc>;
+>  			regulator-name = "reg_wlan_vmmc";
+> @@ -515,6 +527,12 @@
+>  			>;
+>  		};
+>  
+> +		pinctrl_usbh1: usbh1grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_GPIO_17__GPIO7_IO12          0x0b0b0
 
 
-> -----Original Message-----
-> From: Fabio Estevam [mailto:festevam at gmail.com]
-> Sent: Sunday, February 21, 2016 9:23 AM
-> To: Ilya Ledvich <ilya@compulab.co.il>
-> Cc: Frank Li <frank.li@nxp.com>; Shawn Guo <shawnguo@kernel.org>;
-> Yongcai Huang <anson.huang@nxp.com>; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: iMX7d cpu1 issue
-> 
-> Hi Ilya/Frank,
-> 
-> On Fri, Feb 19, 2016 at 6:11 AM, Ilya Ledvich <ilya@compulab.co.il> wrote:
-> > Hi Frank,
-> > Thank you for so brilliant suggestion!!!
-> >
-> >> #define CONFIG_MX7_SEC
-> >
-> >
-> > Seems it works!
-> > The  CPU1 is brought up, and kernel can successfully boot!
-> 
-> I changed U-boot as suggested:
-> 
-> --- a/include/configs/mx7_common.h
-> +++ b/include/configs/mx7_common.h
-> @@ -94,10 +94,7 @@
->  #define CONFIG_CMD_FUSE
->  #define CONFIG_MXC_OCOTP
-> 
-> -/*
-> - * Default boot linux kernel in no secure mode.
-> - * If want to boot kernel in secure mode, please define CONFIG_MX7_SEC
-> - */
-> +#define CONFIG_MX7_SEC
 
-Upstream kernel use PSCI to enable second core.  You can't define CONFIG_MX7_SEC. 
 
-NXP released kernel use legacy method, which require kernel run in security mode. So you have to define CONFIG_MX7_SEC.
+I'm ok with this patch, but a more correct fix would be to add a
+reset-gpios to usbh1 instead, as this is a reset pin for
+a usb hub. So if nobody else has a problem,
 
-Best regards
-Frank Li
+Acked-by: Troy Kisky <troy.kisky@boundarydevices.com>
 
->  #ifndef CONFIG_MX7_SEC
->  #define CONFIG_ARMV7_NONSEC
->  #define CONFIG_ARMV7_PSCI
+
+> +			>;
+> +		};
+> +
+>  		pinctrl_usbotg: usbotggrp {
+>  			fsl,pins = <
+>  				MX6QDL_PAD_GPIO_1__USB_OTG_ID	0x17059
+> @@ -632,6 +650,7 @@
+>  };
+>  
+>  &usbh1 {
+> +	vbus-supply = <&reg_usb_h1_vbus>;
+>  	status = "okay";
+>  };
+>  
 > 
-> 
-> but still see only one core brought up in the kernel:
-> 
-> [    0.003051] /cpus/cpu at 0 missing clock-frequency property
-> [    0.003076] /cpus/cpu at 1 missing clock-frequency property
-> [    0.003092] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
-> [    0.003157] Setting up static identity map for 0x80008280 - 0x800082f0
-> [    0.005152] Brought up 1 CPUs
-> [    0.005169] SMP: Total of 1 processors activated (48.00 BogoMIPS).
-> 
-> I am booting 4.5-rc5 on a imx7d-sdb board.
-> 
-> Any ideas on how to bring up the second core?
