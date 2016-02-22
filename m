@@ -1,26 +1,44 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 22 Feb 2016 20:04:16 +0900
-Subject: [PATCH v1 0/2] patches to add support for rockchip rt5640 card
-In-Reply-To: <1456127815-68575-1-git-send-email-sugar.zhang@rock-chips.com>
-References: <1456127815-68575-1-git-send-email-sugar.zhang@rock-chips.com>
-Message-ID: <20160222110416.GC18327@sirena.org.uk>
+From: ynvich@gmail.com (Sergei Ianovich)
+Date: Mon, 22 Feb 2016 14:08:17 +0300
+Subject: [PATCH v1] arm: pxa: fix DT node name for PXA27X usb
+Message-ID: <1456139297-5854-1-git-send-email-ynvich@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 22, 2016 at 03:56:53PM +0800, Sugar Zhang wrote:
+Without this patch I am getting an error:
+---8<---
+[   15.709742] ohci-pxa27x: OHCI PXA27x/PXA3x driver
+[   15.737150] pxa27x-ohci: probe of 4c000000.ohci failed with error -2
+---8<---
 
-> Sugar Zhang (2):
->   ASoC: rockchip: i2s: add default values for registers
->   ASoC: rt5640: add master clock handling for rt5640
+The error is generated in drivers/usb/host/ohci-pxa27x.c@line 441:
+---8<---
+441:	usb_clk = devm_clk_get(&pdev->dev, NULL);
+442:	if (IS_ERR(usb_clk))
+443:		return PTR_ERR(usb_clk);
+---8<---
 
-These appear to be commpletly unrelated patches so should each be sent
-individually rather than as a series - that way there is no confusion
-about them possibly depending on each other and they are easier to
-review and apply.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160222/40b71dfd/attachment.sig>
+The error is caused by different names for the same DT node in pxa2xx.dtsi
+and pxa27x.dtsi.
+
+Signed-off-by: Sergei Ianovich <ynvich@gmail.com>
+CC: Robert Jarzmik <robert.jarzmik@free.fr>
+---
+ arch/arm/boot/dts/pxa27x.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/pxa27x.dtsi b/arch/arm/boot/dts/pxa27x.dtsi
+index 7f68a1e..3016a73 100644
+--- a/arch/arm/boot/dts/pxa27x.dtsi
++++ b/arch/arm/boot/dts/pxa27x.dtsi
+@@ -26,7 +26,7 @@
+ 			clocks = <&clks CLK_NONE>;
+ 		};
+ 
+-		pxa27x_ohci: usb at 4c000000 {
++		usb0: ohci at 4c000000 {
+ 			compatible = "marvell,pxa-ohci";
+ 			reg = <0x4c000000 0x10000>;
+ 			interrupts = <3>;
+-- 
+2.6.3
