@@ -1,38 +1,34 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 22 Feb 2016 16:31:15 +0900
-Subject: [PATCH 4/6] ARM: decompressor: drop redundant FORCE in Makefile
-In-Reply-To: <1456126277-14633-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1456126277-14633-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1456126277-14633-5-git-send-email-yamada.masahiro@socionext.com>
+Date: Mon, 22 Feb 2016 16:31:11 +0900
+Subject: [PATCH 0/6] ARM: decompressor: several cleanups
+Message-ID: <1456126277-14633-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The object "piggy.$(suffix_y).o" is created from "piggy.$(suffix).S"
-by the following pattern rule defined in scripts/Makefile.build:
 
-  $(obj)/%.o: $(src)/%.S FORCE
-          $(call if_changed_dep,as_o_S)
 
-FORCE is already added to the prerequisite of the object there.
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+Masahiro Yamada (6):
+  ARM: decompressor: drop unneeded assignments to "targets"
+  ARM: decompressor: drop more unneeded assignments to "targets"
+  ARM: decompressor: use clean-files instead of extra-y to clean files
+  ARM: decompressor: drop redundant FORCE in Makefile
+  ARM: decompressor: merge piggy.*.S and simplify Makefile
+  ARM: decompressor: rename suffix_y to compress-y
 
- arch/arm/boot/compressed/Makefile | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/compressed/.gitignore                |  6 +----
+ arch/arm/boot/compressed/Makefile                  | 31 ++++++++++------------
+ arch/arm/boot/compressed/{piggy.gzip.S => piggy.S} |  2 +-
+ arch/arm/boot/compressed/piggy.lz4.S               |  6 -----
+ arch/arm/boot/compressed/piggy.lzma.S              |  6 -----
+ arch/arm/boot/compressed/piggy.lzo.S               |  6 -----
+ arch/arm/boot/compressed/piggy.xzkern.S            |  6 -----
+ 7 files changed, 16 insertions(+), 47 deletions(-)
+ rename arch/arm/boot/compressed/{piggy.gzip.S => piggy.S} (67%)
+ delete mode 100644 arch/arm/boot/compressed/piggy.lz4.S
+ delete mode 100644 arch/arm/boot/compressed/piggy.lzma.S
+ delete mode 100644 arch/arm/boot/compressed/piggy.lzo.S
+ delete mode 100644 arch/arm/boot/compressed/piggy.xzkern.S
 
-diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-index f9e8e68..903b953 100644
---- a/arch/arm/boot/compressed/Makefile
-+++ b/arch/arm/boot/compressed/Makefile
-@@ -187,7 +187,7 @@ $(obj)/vmlinux: $(obj)/vmlinux.lds $(obj)/$(HEAD) $(obj)/piggy.$(suffix_y).o \
- $(obj)/piggy.$(suffix_y): $(obj)/../Image FORCE
- 	$(call if_changed,$(suffix_y))
- 
--$(obj)/piggy.$(suffix_y).o:  $(obj)/piggy.$(suffix_y) FORCE
-+$(obj)/piggy.$(suffix_y).o:  $(obj)/piggy.$(suffix_y)
- 
- CFLAGS_font.o := -Dstatic=
- 
 -- 
 1.9.1
