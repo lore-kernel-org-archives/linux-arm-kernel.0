@@ -1,40 +1,67 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 22 Feb 2016 22:58:34 +0100
-Subject: [PATCH] nvdimm: use 'u64' for pfn flags
-Message-ID: <1456178322-1728962-1-git-send-email-arnd@arndb.de>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 22 Feb 2016 14:05:14 -0800
+Subject: [PATCHv2] clk: ti: omap3+: dpll: use non-locking version of
+ clk_get_rate
+In-Reply-To: <20160222165252.GF13417@atomide.com>
+References: <1455966777-30576-1-git-send-email-t-kristo@ti.com>
+ <20160222165252.GF13417@atomide.com>
+Message-ID: <20160222220514.GZ4847@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A recent bugfix changed pfn_t to always be 64-bit wide, but did not
-change the code in pmem.c, which is now broken on 32-bit architectures
-as reported by gcc:
+On 02/22, Tony Lindgren wrote:
+> * Tero Kristo <t-kristo@ti.com> [160220 03:12]:
+> > As the code in this file is being executed within irq context in some
+> > cases, we must avoid the clk_get_rate which uses mutex internally.
+> > Switch the code to use clk_hw_get_rate instead which is non-locking.
+> > 
+> > This fixes an issue where PM runtime will hang the system if enabled
+> > with a serial console before a suspend-resume cycle.
+> 
+> Can you please add the "Fixes: " line here?
+> 
+> And when applying, please tag this one Cc stable.
+> 
+> Other than that, please feel free to add:
+> 
+> Tested-by: Tony Lindgren <tony@atomide.com>
+> 
 
-In file included from ../drivers/nvdimm/pmem.c:28:0:
-drivers/nvdimm/pmem.c: In function 'pmem_alloc':
-include/linux/pfn_t.h:15:17: error: large integer implicitly truncated to unsigned type [-Werror=overflow]
- #define PFN_DEV (1ULL << (BITS_PER_LONG_LONG - 3))
+This is what I got. "Fixes" should take care of stable.
 
-This changes the intermediate pfn_flags in struct pmem_device to
-be 64 bit wide as well, so they can store the flags correctly.
+From: Tero Kristo <t-kristo@ti.com>
+Subject: [PATCH] clk: ti: omap3+: dpll: use non-locking version of
+ clk_get_rate
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: db78c22230d0 ("mm: fix pfn_t vs highmem")
+As the code in this file is being executed within irq context in some
+cases, we must avoid the clk_get_rate which uses mutex internally.
+Switch the code to use clk_hw_get_rate instead which is non-locking.
+
+This fixes an issue where PM runtime will hang the system if enabled
+with a serial console before a suspend-resume cycle.
+
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+Tested-by: Tony Lindgren <tony@atomide.com>
+Fixes: a53ad8ef3dcc ("clk: ti: Convert to clk_hw based provider APIs")
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/nvdimm/pmem.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/clk/ti/dpll3xxx.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/nvdimm/pmem.c b/drivers/nvdimm/pmem.c
-index 7edf31671dab..8d0b54670184 100644
---- a/drivers/nvdimm/pmem.c
-+++ b/drivers/nvdimm/pmem.c
-@@ -41,7 +41,7 @@ struct pmem_device {
- 	phys_addr_t		phys_addr;
- 	/* when non-zero this device is hosting a 'pfn' instance */
- 	phys_addr_t		data_offset;
--	unsigned long		pfn_flags;
-+	u64			pfn_flags;
- 	void __pmem		*virt_addr;
- 	size_t			size;
- 	struct badblocks	bb;
+diff --git a/drivers/clk/ti/dpll3xxx.c b/drivers/clk/ti/dpll3xxx.c
+index 1c300388782b..cc739291a3ce 100644
+--- a/drivers/clk/ti/dpll3xxx.c
++++ b/drivers/clk/ti/dpll3xxx.c
+@@ -460,7 +460,8 @@ int omap3_noncore_dpll_enable(struct clk_hw *hw)
+ 
+ 	parent = clk_hw_get_parent(hw);
+ 
+-	if (clk_hw_get_rate(hw) == clk_get_rate(dd->clk_bypass)) {
++	if (clk_hw_get_rate(hw) ==
++	    clk_hw_get_rate(__clk_get_hw(dd->clk_bypass))) {
+ 		WARN_ON(parent != __clk_get_hw(dd->clk_bypass));
+ 		r = _omap3_noncore_dpll_bypass(clk);
+ 	} else {
 -- 
-2.7.0
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
