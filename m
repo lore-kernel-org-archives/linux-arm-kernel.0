@@ -1,150 +1,66 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Mon, 22 Feb 2016 11:51:47 +0000
-Subject: [PATCH v2 1/2] drm: Improve drm_of_component_probe() to
- correctly handle ports and remote ports.
-In-Reply-To: <1448029325-14602-2-git-send-email-Liviu.Dudau@arm.com>
-References: <1448029325-14602-1-git-send-email-Liviu.Dudau@arm.com>
- <1448029325-14602-2-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <20160222115147.GR1123@e106497-lin.cambridge.arm.com>
+From: brian.starkey@arm.com (Brian Starkey)
+Date: Mon, 22 Feb 2016 11:52:43 +0000
+Subject: next-20160222 build: 5 failures 9 warnings (next-20160222)
+In-Reply-To: <56CAE5E6.7030707@arm.com>
+References: <E1aXlz4-000486-Pb@optimist> <20160222100832.GX18327@sirena.org.uk>
+ <56CAE5E6.7030707@arm.com>
+Message-ID: <20160222115243.GA5779@e106950-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 20, 2015 at 02:22:04PM +0000, Liviu Dudau wrote:
-> Rockchip DRM driver cannot use the same compare_of() function to
-> match ports and remote ports (aka encoders) as their OF sub-trees
-> look different. Add a second compare function to be used when encoders
-> are added to the component framework and patch the existing users of
-> the function accordingly.
-> 
-> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+Hi Mark,
 
-Russell,
+On Mon, Feb 22, 2016 at 10:41:42AM +0000, Marc Zyngier wrote:
+>I'm about to push the following patch on top of the KVM tree:
+>
+>diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+>index 43688d9..31fe7d6 100644
+>--- a/arch/arm64/include/asm/kvm_host.h
+>+++ b/arch/arm64/include/asm/kvm_host.h
+>@@ -333,11 +333,6 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
+> 		     hyp_stack_ptr, vector_ptr);
+> }
+>
+>-static inline void __cpu_init_stage2(void)
+>-{
+>-	kvm_call_hyp(__init_stage2_translation);
+>-}
+>-
+> static inline void kvm_arch_hardware_disable(void) {}
+> static inline void kvm_arch_hardware_unsetup(void) {}
+> static inline void kvm_arch_sync_events(struct kvm *kvm) {}
+>@@ -349,4 +344,11 @@ void kvm_arm_setup_debug(struct kvm_vcpu *vcpu);
+> void kvm_arm_clear_debug(struct kvm_vcpu *vcpu);
+> void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu);
+>
+>+/* #define kvm_call_hyp(f, ...) __kvm_call_hyp(kvm_ksym_ref(f), ##__VA_ARGS__) */
+>+
+>+static inline void __cpu_init_stage2(void)
+>+{
+>+	kvm_call_hyp(__init_stage2_translation);
+>+}
+>+
+> #endif /* __ARM64_KVM_HOST_H__ */
+>
+>This will create a new conflict, but will make the resolution 100% clear.
 
-Resurecting this old patch from around Christmas time (bad time for patch review).
+I applied this, but arm64 defconfig wouldn't build until I uncommented
+the '#define kvm_call_hyp(...' line.
 
-Are you happy enough with this version to re-issue the Ack or do you think I still
-need to work on it?
+Is that right?
 
-Best regards,
-Liviu
+Thanks,
+Brian
 
-> ---
->  drivers/gpu/drm/armada/armada_drv.c |  3 ++-
->  drivers/gpu/drm/drm_of.c            | 19 ++++++++++++++-----
->  drivers/gpu/drm/imx/imx-drm-core.c  |  3 ++-
->  include/drm/drm_of.h                |  6 ++++--
->  4 files changed, 22 insertions(+), 9 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/armada/armada_drv.c b/drivers/gpu/drm/armada/armada_drv.c
-> index 77ab93d..3a2a929 100644
-> --- a/drivers/gpu/drm/armada/armada_drv.c
-> +++ b/drivers/gpu/drm/armada/armada_drv.c
-> @@ -274,7 +274,8 @@ static int armada_drm_probe(struct platform_device *pdev)
->  	struct device *dev = &pdev->dev;
->  	int ret;
->  
-> -	ret = drm_of_component_probe(dev, compare_dev_name, &armada_master_ops);
-> +	ret = drm_of_component_probe(dev, compare_dev_name, compare_dev_name,
-> +				     &armada_master_ops);
->  	if (ret != -EINVAL)
->  		return ret;
->  
-> diff --git a/drivers/gpu/drm/drm_of.c b/drivers/gpu/drm/drm_of.c
-> index 493c05c..34589d3 100644
-> --- a/drivers/gpu/drm/drm_of.c
-> +++ b/drivers/gpu/drm/drm_of.c
-> @@ -77,7 +77,8 @@ EXPORT_SYMBOL(drm_of_find_possible_crtcs);
->   * Returns zero if successful, or one of the standard error codes if it fails.
->   */
->  int drm_of_component_probe(struct device *dev,
-> -			   int (*compare_of)(struct device *, void *),
-> +			   int (*compare_port)(struct device *, void *),
-> +			   int (*compare_encoder)(struct device *, void *),
->  			   const struct component_master_ops *m_ops)
->  {
->  	struct device_node *ep, *port, *remote;
-> @@ -101,8 +102,12 @@ int drm_of_component_probe(struct device *dev,
->  			continue;
->  		}
->  
-> -		component_match_add(dev, &match, compare_of, port);
-> -		of_node_put(port);
-> +		component_match_add(dev, &match, compare_port, port);
-> +		/*
-> +		 * component_match_add keeps a reference to the port
-> +		 * variable, so we need to keep the reference count
-> +		 * increment from of_parse_phandle()
-> +		 */
->  	}
->  
->  	if (i == 0) {
-> @@ -140,8 +145,12 @@ int drm_of_component_probe(struct device *dev,
->  				continue;
->  			}
->  
-> -			component_match_add(dev, &match, compare_of, remote);
-> -			of_node_put(remote);
-> +			component_match_add(dev, &match, compare_encoder, remote);
-> +			/*
-> +			 * component_match_add keeps a reference to the port
-> +			 * variable, so we need to keep the reference count
-> +			 * increment from of_graph_get_remote_port_parent()
-> +			 */
->  		}
->  		of_node_put(port);
->  	}
-> diff --git a/drivers/gpu/drm/imx/imx-drm-core.c b/drivers/gpu/drm/imx/imx-drm-core.c
-> index 64f16ea..0d36410 100644
-> --- a/drivers/gpu/drm/imx/imx-drm-core.c
-> +++ b/drivers/gpu/drm/imx/imx-drm-core.c
-> @@ -531,7 +531,8 @@ static const struct component_master_ops imx_drm_ops = {
->  
->  static int imx_drm_platform_probe(struct platform_device *pdev)
->  {
-> -	int ret = drm_of_component_probe(&pdev->dev, compare_of, &imx_drm_ops);
-> +	int ret = drm_of_component_probe(&pdev->dev, compare_of, compare_of,
-> +					 &imx_drm_ops);
->  
->  	if (!ret)
->  		ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
-> diff --git a/include/drm/drm_of.h b/include/drm/drm_of.h
-> index 8544665..1c29e42 100644
-> --- a/include/drm/drm_of.h
-> +++ b/include/drm/drm_of.h
-> @@ -10,7 +10,8 @@ struct device_node;
->  extern uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
->  					   struct device_node *port);
->  extern int drm_of_component_probe(struct device *dev,
-> -				  int (*compare_of)(struct device *, void *),
-> +				  int (*compare_port)(struct device *, void *),
-> +				  int (*compare_encoder)(struct device *, void *),
->  				  const struct component_master_ops *m_ops);
->  #else
->  static inline uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
-> @@ -21,7 +22,8 @@ static inline uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
->  
->  static inline int
->  drm_of_component_probe(struct device *dev,
-> -		       int (*compare_of)(struct device *, void *),
-> +		       int (*compare_port)(struct device *, void *),
-> +		       int (*compare_encoder)(struct device *, void *),
->  		       const struct component_master_ops *m_ops)
->  {
->  	return -EINVAL;
-> -- 
-> 2.6.2
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> http://lists.freedesktop.org/mailman/listinfo/dri-devel
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+>
+>Thanks,
+>
+>	M.
+>-- 
+>Jazz is not dead. It just smells funny...
+>
+>_______________________________________________
+>linux-arm-kernel mailing list
+>linux-arm-kernel at lists.infradead.org
+>http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
