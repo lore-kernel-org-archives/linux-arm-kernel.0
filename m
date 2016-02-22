@@ -1,67 +1,111 @@
 From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Mon, 22 Feb 2016 16:46:48 +0300
-Subject: [PATCH 0/8] ACPI: parse the DBG2 table
-Message-ID: <1456148818-26257-1-git-send-email-aleksey.makarov@linaro.org>
+Date: Mon, 22 Feb 2016 16:46:49 +0300
+Subject: [PATCH 1/8] arm64: move acpi/dt decision earlier in boot process
+In-Reply-To: <1456148818-26257-1-git-send-email-aleksey.makarov@linaro.org>
+References: <1456148818-26257-1-git-send-email-aleksey.makarov@linaro.org>
+Message-ID: <1456148818-26257-2-git-send-email-aleksey.makarov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM Server Base Boot Requiremets' [1] mentions DBG2 (Microsoft Debug
-Port Table 2) [2] as a mandatory ACPI table that specifies debug ports.
+From: Leif Lindholm <leif.lindholm@linaro.org>
 
-- Move acpi/dt decision earlier in boot process on ARM64
-- Move earlycon early_param handling to serial to parse earlycon option once
-- Add definition of DBG2 subtypes.  It's the same patch as in the SPCR series [3]
-- Refactor ACPI linker tables code to enable iterating over subtables other than
-  subtables having acpi_subtype header (such as DBG2)
-- Implement macros
+In order to support selecting earlycon via either ACPI or DT, move
+the decision on whether to attempt ACPI configuration into the
+early_param handling. Then make acpi_boot_table_init() bail out if
+acpi_disabled.
 
-	ACPI_DBG2_DECLARE(name, type, subtype, setup_fn, data_ptr)
+Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+---
+ arch/arm64/kernel/acpi.c | 54 ++++++++++++++++++++++++++----------------------
+ 1 file changed, 29 insertions(+), 25 deletions(-)
 
-  that defines a handler for the port of the given type and subtype.
-- For each port defined by that macros that is also described in the ACPI DBG2
-  table call provided callback.
-- Implement a helper macros that can be used to define early serial console
-- Enable DBG2 on ARM64
-- Define early console for pl011 serial
-
-[1] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0044a/index.html
-[2] http://go.microsoft.com/fwlink/p/?LinkId=234837
-[3] https://lkml.kernel.org/g/455559532-8305-1-git-send-email-aleksey.makarov at linaro.org
-
-Aleksey Makarov (6):
-  ACPI: add definitions of DBG2 subtypes
-  ACPI: genaralize iterating over subtables in ACPI_PROBE_TABLE()
-  ACPI: parse DBG2 table
-  ACPI: serial: implement earlycon on ACPI DBG2 port
-  ACPI: enable ACPI_DBG2_TABLE on ARM64
-  serial: pl011: add ACPI DBG2 serial port
-
-Leif Lindholm (2):
-  arm64: move acpi/dt decision earlier in boot process
-  of/serial: move earlycon early_param handling to serial
-
- Documentation/kernel-parameters.txt  |   3 +
- arch/arm64/Kconfig                   |   1 +
- arch/arm64/kernel/acpi.c             |  56 ++++++++++---------
- drivers/acpi/Kconfig                 |   3 +
- drivers/acpi/Makefile                |   1 +
- drivers/acpi/dbg2.c                  |  85 ++++++++++++++++++++++++++++
- drivers/acpi/scan.c                  |  44 ++++++++++-----
- drivers/clocksource/arm_arch_timer.c |   3 +-
- drivers/irqchip/irq-gic.c            |   4 +-
- drivers/of/fdt.c                     |  11 +---
- drivers/tty/serial/amba-pl011.c      |   3 +
- drivers/tty/serial/earlycon.c        |  57 +++++++++++++++++++
- include/acpi/actbl2.h                |   5 ++
- include/asm-generic/vmlinux.lds.h    |   1 +
- include/linux/acpi.h                 | 104 ++++++++++++++++++++++++-----------
- include/linux/acpi_dbg2.h            |  68 +++++++++++++++++++++++
- include/linux/clocksource.h          |   2 +-
- include/linux/irqchip.h              |   5 +-
- include/linux/of_fdt.h               |   2 +
- 19 files changed, 370 insertions(+), 88 deletions(-)
- create mode 100644 drivers/acpi/dbg2.c
- create mode 100644 include/linux/acpi_dbg2.h
-
+diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+index d1ce8e2..7a944f7 100644
+--- a/arch/arm64/kernel/acpi.c
++++ b/arch/arm64/kernel/acpi.c
+@@ -44,6 +44,19 @@ EXPORT_SYMBOL(acpi_pci_disabled);
+ static bool param_acpi_off __initdata;
+ static bool param_acpi_force __initdata;
+ 
++static int __init dt_scan_depth1_nodes(unsigned long node,
++				       const char *uname, int depth,
++				       void *data)
++{
++	/*
++	 * Return 1 as soon as we encounter a node at depth 1 that is
++	 * not the /chosen node.
++	 */
++	if (depth == 1 && (strcmp(uname, "chosen") != 0))
++		return 1;
++	return 0;
++}
++
+ static int __init parse_acpi(char *arg)
+ {
+ 	if (!arg)
+@@ -57,23 +70,27 @@ static int __init parse_acpi(char *arg)
+ 	else
+ 		return -EINVAL;	/* Core will print when we return error */
+ 
+-	return 0;
+-}
+-early_param("acpi", parse_acpi);
++	/*
++	 * Enable ACPI instead of device tree unless
++	 * - ACPI has been disabled explicitly (acpi=off), or
++	 * - the device tree is not empty (it has more than just a /chosen node)
++	 *   and ACPI has not been force enabled (acpi=force)
++	 */
++	if (param_acpi_off ||
++	    (!param_acpi_force && of_scan_flat_dt(dt_scan_depth1_nodes, NULL)))
++		return 0;
+ 
+-static int __init dt_scan_depth1_nodes(unsigned long node,
+-				       const char *uname, int depth,
+-				       void *data)
+-{
+ 	/*
+-	 * Return 1 as soon as we encounter a node at depth 1 that is
+-	 * not the /chosen node.
++	 * ACPI is disabled at this point. Enable it in order to parse
++	 * the ACPI tables and carry out sanity checks
+ 	 */
+-	if (depth == 1 && (strcmp(uname, "chosen") != 0))
+-		return 1;
++	enable_acpi();
++
+ 	return 0;
+ }
+ 
++early_param("acpi", parse_acpi);
++
+ /*
+  * __acpi_map_table() will be called before page_init(), so early_ioremap()
+  * or early_memremap() should be called here to for ACPI table mapping.
+@@ -181,23 +198,10 @@ out:
+  */
+ void __init acpi_boot_table_init(void)
+ {
+-	/*
+-	 * Enable ACPI instead of device tree unless
+-	 * - ACPI has been disabled explicitly (acpi=off), or
+-	 * - the device tree is not empty (it has more than just a /chosen node)
+-	 *   and ACPI has not been force enabled (acpi=force)
+-	 */
+-	if (param_acpi_off ||
+-	    (!param_acpi_force && of_scan_flat_dt(dt_scan_depth1_nodes, NULL)))
++	if (acpi_disabled)
+ 		return;
+ 
+ 	/*
+-	 * ACPI is disabled at this point. Enable it in order to parse
+-	 * the ACPI tables and carry out sanity checks
+-	 */
+-	enable_acpi();
+-
+-	/*
+ 	 * If ACPI tables are initialized and FADT sanity checks passed,
+ 	 * leave ACPI enabled and carry on booting; otherwise disable ACPI
+ 	 * on initialization error.
 -- 
 2.7.1
