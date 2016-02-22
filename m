@@ -1,64 +1,45 @@
-From: raveendra.padasalagi@broadcom.com (Raveendra Padasalagi)
-Date: Mon, 22 Feb 2016 13:40:05 +0530
-Subject: [PATCH v3 3/3] ARM: dts: use syscon in cygnus touchscreen dt node
-In-Reply-To: <1456127379-25866-4-git-send-email-raveendra.padasalagi@broadcom.com>
-References: <1456127379-25866-1-git-send-email-raveendra.padasalagi@broadcom.com>
- <1456127379-25866-4-git-send-email-raveendra.padasalagi@broadcom.com>
-Message-ID: <CAAFb_vocadoQ1Egt4PgOX4pW2Tz5aifqWZQxQKOhvNeq0frsYQ@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 22 Feb 2016 09:10:55 +0100
+Subject: [PATCH] irqchip: irq-mvebu-odmi: new driver
+In-Reply-To: <20160222025353.GD15973@rob-hp-laptop>
+References: <1455522162-16425-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20160222025353.GD15973@rob-hp-laptop>
+Message-ID: <20160222091055.524c60a9@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 22, 2016 at 1:19 PM, Raveendra Padasalagi
-<raveendra.padasalagi@broadcom.com> wrote:
-> In Cygnus SOC touch screen controller registers are shared
-> with ADC and flex timer. Using readl/writel could lead to
-> race condition. So in such case register access is handled
-> through syscon framework API's in the touch screen driver.
-> This feature is enabled if "brcm,iproc-touchscreen-syscon"
-> compatible string is selected in touchscreen dt node.
->
-> So this patch enables syscon support in touchscreen driver
-> by adding necessary properties in touchscreen dt node.
->
-> Signed-off-by: Raveendra Padasalagi <raveendra.padasalagi@broadcom.com>
-> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
-> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
-> ---
->  arch/arm/boot/dts/bcm-cygnus.dtsi | 11 +++++++++--
->  1 file changed, 9 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/bcm-cygnus.dtsi b/arch/arm/boot/dts/bcm-cygnus.dtsi
-> index 3878793..1704dc0 100644
-> --- a/arch/arm/boot/dts/bcm-cygnus.dtsi
-> +++ b/arch/arm/boot/dts/bcm-cygnus.dtsi
-> @@ -351,9 +351,16 @@
->                                         <&pinctrl 142 10 1>;
->                 };
->
-> +               ts_adc_syscon: ts_adc_syscon at 180a6000 {
-> +                       compatible = "brcm,iproc-ts-adc-syscon","syscon";
-> +                       reg = <0x180a6000 0xc30>;
-> +               };
-> +
->                 touchscreen: tsc at 180a6000 {
-> -                       compatible = "brcm,iproc-touchscreen";
-> -                       reg = <0x180a6000 0x40>;
-> +                       compatible = "brcm,iproc-touchscreen-syscon";
+Hello,
 
-Hi Rob,
-In patchset V2 you had a comment as to have only "syscon" support,
-Since having "syscon" only support breaks the dt backward compatibility
-as the existing driver has support for "reg".  So in patchset V3 I have
-not addressed this comment yet. Waiting for your opinion on whether
-to proceed with "syscon" only support.
+FWIW, you're replying to the v1 of this patch, while v2 and v3 have
+already been posted, and v3 has already been merged by the irqchip
+maintainers:
 
--Raveendra
-> +                       #address-cells = <1>;
-> +                       #size-cells = <1>;
-> +                       ts_syscon = <&ts_adc_syscon>;
->                         clocks = <&asiu_clks BCM_CYGNUS_ASIU_ADC_CLK>;
->                         clock-names = "tsc_clk";
->                         interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>;
-> --
-> 1.9.1
->
+  http://git.kernel.org/cgit/linux/kernel/git/tip/tip.git/commit/?id=c27f29bbbf02168c9b1e8ba0fe7a8cb917e5a50f
+
+On Sun, 21 Feb 2016 20:53:53 -0600, Rob Herring wrote:
+
+> > +- compatible	       : The value here should contain "marvell,odmi-controller".
+> 
+> SoC specific compatible too please.
+
+I can add that in a follow-up patch.
+
+> > +- marvell,spi-base     : List of GIC base SPI interrupts, one for each
+> > +                         ODMI frame.
+> 
+> Why not "interrupts" property?
+
+This has already been discussed with Arnd in a more recent iteration of
+the patch:
+
+  http://lists.infradead.org/pipermail/linux-arm-kernel/2016-February/409411.html
+  http://lists.infradead.org/pipermail/linux-arm-kernel/2016-February/409415.html
+  http://lists.infradead.org/pipermail/linux-arm-kernel/2016-February/409430.html
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
