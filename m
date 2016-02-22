@@ -1,24 +1,62 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Mon, 22 Feb 2016 07:20:37 +0100
-Subject: [PATCH] ARM: tegra: add "jedec,spi-nor" flash compatible binding
-In-Reply-To: <1439705605-9127-1-git-send-email-zajec5@gmail.com>
-References: <1439705605-9127-1-git-send-email-zajec5@gmail.com>
-Message-ID: <CACna6rzi2NJW2JL0X4eLJOXDsLyvcsj+piBEbP6LWOUvOfctRw@mail.gmail.com>
+From: maitysanchayan@gmail.com (Sanchayan Maity)
+Date: Mon, 22 Feb 2016 11:48:35 +0530
+Subject: [PATCH v3 0/2] Add DAC driver support for Vybrid SoC
+Message-ID: <cover.1456121233.git.maitysanchayan@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 August 2015 at 08:13, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
-> Starting with commit 8947e396a829 ("Documentation: dt: mtd: replace
-> "nor-jedec" binding with "jedec, spi-nor"") we have "jedec,spi-nor"
-> binding indicating support for JEDEC identification.
->
-> Use it for all flashes that are supposed to support READ ID op according
-> to the datasheets.
+Hello,
 
-Hi, for some reason it seems this patch wasn't applied. I didn't get
-any comment and it was sent to all e-mails listed in MAINTAINERS in
-TEGRA ARCHITECTURE SUPPORT
-which I hope it enough.
+This patchset adds support for the DAC peripheral on Vybrid SoC.
+Patchset is based on top of shawn's for-next branch and has been
+tested on a Toradex Colibri VF50 module.
 
-Could someone pick it, please? FWIW you can find it in the patchwork:
-http://patchwork.ozlabs.org/patch/507676/
+@Jonathan
+I kept the IIO_SHARED_BY_DIR instead of using IIO_SHARED_BY_ALL
+since this gives "out_conversion_mode" allowing me to distinguish
+this in the ABI documentation, that this is explicitly for the DAC.
+
+Since 4.5-rc4 was released recently and assuming this makes it with
+this or next version, I assumed the target kernel version would be
+4.6 and used that in ABI documentation.
+
+Feedbacks and comments most welcome.
+
+Changes since v2:
+1. Add dependencies on OF and HAS_IOMEM in Kconfig
+2. Fix ordering of disabling DAC and calling iio unregister
+
+Changes since v1:
+1. Fix return type of vf610_dac_init function
+2. Document conversion modes in sysfs-bus-iio-vf610
+3. Remove "indexed" specification from iio_chan_spec
+4. Use "return" directly from default case in switch
+5. Remove DRIVER_NAME
+6. Call vf610_dac_init before iio device registration
+7. Define and use vf610_dac_exit function in remove and suspend
+
+v2 of the patchset
+http://www.spinics.net/lists/arm-kernel/msg482839.html
+
+v1 of the patchset:
+http://www.spinics.net/lists/arm-kernel/msg481190.html
+
+Thanks & Regards,
+Sanchayan Maity.
+
+Sanchayan Maity (2):
+  ARM: dts: vfxxx: Add DAC node for Vybrid SoC
+  iio: dac: vf610_dac: Add IIO DAC driver for Vybrid SoC
+
+ Documentation/ABI/testing/sysfs-bus-iio-vf610      |   9 +
+ .../devicetree/bindings/iio/dac/vf610-dac.txt      |  20 ++
+ arch/arm/boot/dts/vfxxx.dtsi                       |  18 ++
+ drivers/iio/dac/Kconfig                            |  10 +
+ drivers/iio/dac/Makefile                           |   1 +
+ drivers/iio/dac/vf610_dac.c                        | 298 +++++++++++++++++++++
+ 6 files changed, 356 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/iio/dac/vf610-dac.txt
+ create mode 100644 drivers/iio/dac/vf610_dac.c
+
+-- 
+2.7.1
