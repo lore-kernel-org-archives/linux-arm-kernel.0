@@ -1,10 +1,10 @@
 From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Mon, 22 Feb 2016 19:38:36 +0530
-Subject: [PATCH 47/61] gpio: timberdale Use devm_gpiochip_add_data() for gpio
+Date: Mon, 22 Feb 2016 19:38:49 +0530
+Subject: [PATCH 60/61] gpio: xgene-sb: Use devm_gpiochip_add_data() for gpio
  registration
 In-Reply-To: <1456150130-2668-1-git-send-email-ldewangan@nvidia.com>
 References: <1456150130-2668-1-git-send-email-ldewangan@nvidia.com>
-Message-ID: <1456150130-2668-48-git-send-email-ldewangan@nvidia.com>
+Message-ID: <1456150130-2668-61-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,28 +12,27 @@ Use devm_gpiochip_add_data() for GPIO registration.
 
 Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
 ---
- drivers/gpio/gpio-timberdale.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+ drivers/gpio/gpio-xgene-sb.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/drivers/gpio/gpio-timberdale.c b/drivers/gpio/gpio-timberdale.c
-index a6de10c..f0164ec 100644
---- a/drivers/gpio/gpio-timberdale.c
-+++ b/drivers/gpio/gpio-timberdale.c
-@@ -279,7 +279,7 @@ static int timbgpio_probe(struct platform_device *pdev)
- 	gc->ngpio = pdata->nr_pins;
- 	gc->can_sleep = false;
+diff --git a/drivers/gpio/gpio-xgene-sb.c b/drivers/gpio/gpio-xgene-sb.c
+index 282004d..e665770 100644
+--- a/drivers/gpio/gpio-xgene-sb.c
++++ b/drivers/gpio/gpio-xgene-sb.c
+@@ -116,7 +116,7 @@ static int xgene_gpio_sb_probe(struct platform_device *pdev)
  
--	err = gpiochip_add_data(gc, tgpio);
-+	err = devm_gpiochip_add_data(&pdev->dev, gc, tgpio);
- 	if (err)
- 		return err;
+ 	platform_set_drvdata(pdev, priv);
  
-@@ -320,8 +320,6 @@ static int timbgpio_remove(struct platform_device *pdev)
- 		irq_set_handler_data(irq, NULL);
+-	ret = gpiochip_add_data(&priv->gc, priv);
++	ret = devm_gpiochip_add_data(&pdev->dev, &priv->gc, priv);
+ 	if (ret)
+ 		dev_err(&pdev->dev, "failed to register X-Gene GPIO Standby driver\n");
+ 	else
+@@ -138,7 +138,6 @@ static int xgene_gpio_sb_remove(struct platform_device *pdev)
+ 		acpi_gpiochip_free_interrupts(&priv->gc);
  	}
  
--	gpiochip_remove(&tgpio->gpio);
--
+-	gpiochip_remove(&priv->gc);
  	return 0;
  }
  
