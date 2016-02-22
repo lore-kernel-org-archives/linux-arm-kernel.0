@@ -1,125 +1,32 @@
 From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Mon, 22 Feb 2016 19:37:50 +0530
-Subject: [PATCH 01/61] gpio: Add devm_ apis for gpiochip_add_data and
- gpiochip_remove
+Date: Mon, 22 Feb 2016 19:37:51 +0530
+Subject: [PATCH 02/61] gpio: Add resource management devm_gpio_chip_{add_data,
+ remove}
 In-Reply-To: <1456150130-2668-1-git-send-email-ldewangan@nvidia.com>
 References: <1456150130-2668-1-git-send-email-ldewangan@nvidia.com>
-Message-ID: <1456150130-2668-2-git-send-email-ldewangan@nvidia.com>
+Message-ID: <1456150130-2668-3-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device managed APIs devm_gpiochip_add_data() and
-devm_gpiochip_remove() for the APIs gpiochip_add_data()
-and gpiochip_remove().
-
-This helps in reducing code in error path and sometimes
-removal of .remove callback for driver unbind.
+Add devm wrappers for the gpiochip_add_data() and gpiochip_remove().
 
 Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
 ---
- drivers/gpio/gpiolib.c      | 74 +++++++++++++++++++++++++++++++++++++++++++++
- include/linux/gpio/driver.h |  4 +++
- 2 files changed, 78 insertions(+)
+ Documentation/driver-model/devres.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
-index 5c1ba87..d9a40bc 100644
---- a/drivers/gpio/gpiolib.c
-+++ b/drivers/gpio/gpiolib.c
-@@ -462,6 +462,80 @@ void gpiochip_remove(struct gpio_chip *chip)
- }
- EXPORT_SYMBOL_GPL(gpiochip_remove);
+diff --git a/Documentation/driver-model/devres.txt b/Documentation/driver-model/devres.txt
+index 831a536..8d8f944 100644
+--- a/Documentation/driver-model/devres.txt
++++ b/Documentation/driver-model/devres.txt
+@@ -252,6 +252,8 @@ GPIO
+   devm_gpiod_get_index_optional()
+   devm_gpiod_get_optional()
+   devm_gpiod_put()
++  devm_gpiochip_add_data()
++  devm_gpiochip_remove()
  
-+static void devm_gpio_chip_release(struct device *dev, void *res)
-+{
-+	struct gpio_chip *chip = *(struct gpio_chip **)res;
-+
-+	gpiochip_remove(chip);
-+}
-+
-+static int devm_gpio_chip_match(struct device *dev, void *res, void *data)
-+
-+{
-+	struct gpio_chip **r = res;
-+
-+	if (!r || !*r) {
-+		WARN_ON(!r || !*r);
-+		return 0;
-+	}
-+
-+	return *r == data;
-+}
-+
-+/**
-+ * devm_gpiochip_add_data() - Resource manager piochip_add_data()
-+ * @dev: the device pointer on which irq_chip belongs to.
-+ * @chip: the chip to register, with chip->base initialized
-+ * Context: potentially before irqs will work
-+ *
-+ * Returns a negative errno if the chip can't be registered, such as
-+ * because the chip->base is invalid or already associated with a
-+ * different chip.  Otherwise it returns zero as a success code.
-+ *
-+ * The gpio chip automatically be released when the device is unbound.
-+ */
-+int devm_gpiochip_add_data(struct device *dev, struct gpio_chip *chip,
-+			   void *data)
-+{
-+	struct gpio_chip **ptr;
-+	int ret;
-+
-+	ptr = devres_alloc(devm_gpio_chip_release, sizeof(*ptr),
-+			     GFP_KERNEL);
-+	if (!ptr)
-+		return -ENOMEM;
-+
-+	ret = gpiochip_add_data(chip, data);
-+	if (ret < 0) {
-+		devres_free(ptr);
-+		return ret;
-+	}
-+
-+	*ptr = chip;
-+	devres_add(dev, ptr);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(devm_gpiochip_add_data);
-+
-+/**
-+ * devm_gpiochip_remove() - Resource manager of gpiochip_remove()
-+ * @dev: device for which which resource was allocated
-+ * @chip: the chip to remove
-+ *
-+ * A gpio_chip with any GPIOs still requested may not be removed.
-+ */
-+void devm_gpiochip_remove(struct device *dev, struct gpio_chip *chip)
-+{
-+	int ret;
-+
-+	ret = devres_release(dev, devm_gpio_chip_release,
-+			     devm_gpio_chip_match, chip);
-+	if (!ret)
-+		WARN_ON(ret);
-+}
-+EXPORT_SYMBOL_GPL(devm_gpiochip_remove);
-+
- /**
-  * gpiochip_find() - iterator for locating a specific gpio_chip
-  * @data: data to pass to match function
-diff --git a/include/linux/gpio/driver.h b/include/linux/gpio/driver.h
-index 82fda48..d5d19cc 100644
---- a/include/linux/gpio/driver.h
-+++ b/include/linux/gpio/driver.h
-@@ -205,6 +205,10 @@ static inline int gpiochip_add(struct gpio_chip *chip)
- 	return gpiochip_add_data(chip, NULL);
- }
- extern void gpiochip_remove(struct gpio_chip *chip);
-+extern int devm_gpiochip_add_data(struct device *dev, struct gpio_chip *chip,
-+				  void *data);
-+extern void devm_gpiochip_remove(struct device *dev, struct gpio_chip *chip);
-+
- extern struct gpio_chip *gpiochip_find(void *data,
- 			      int (*match)(struct gpio_chip *chip, void *data));
- 
+ IIO
+   devm_iio_device_alloc()
 -- 
 2.1.4
