@@ -1,59 +1,43 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Mon, 22 Feb 2016 03:03:53 +0000
-Subject: [PATCH v3 4/4] Documentation: atmel-pmc: add DT bindings for
- fast startup
-In-Reply-To: <20160222025417.GH15973@rob-hp-laptop>
-References: <1455507630-29592-1-git-send-email-wenyou.yang@atmel.com>
- <1455507630-29592-5-git-send-email-wenyou.yang@atmel.com>
- <20160222025417.GH15973@rob-hp-laptop>
-Message-ID: <B256D81BAE5131468A838E5D7A243641D642649E@penmbx01>
+From: pc.liao@mediatek.com (PC Liao)
+Date: Mon, 22 Feb 2016 11:05:50 +0800
+Subject: [PATCH] ASoC: mediatek: Add machine driver for ALC5650 codec
+In-Reply-To: <20160219153744.GP18327@sirena.org.uk>
+References: <1455849359-14581-1-git-send-email-pc.liao@mediatek.com>
+ <20160219153744.GP18327@sirena.org.uk>
+Message-ID: <1456110350.7576.12.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Rob Herring [mailto:robh at kernel.org]
-> Sent: 2016?2?22? 10:54
-> To: Yang, Wenyou <Wenyou.Yang@atmel.com>
-> Cc: Ferre, Nicolas <Nicolas.FERRE@atmel.com>; Alexandre Belloni
-> <alexandre.belloni@free-electrons.com>; Jean-Christophe Plagniol-Villard
-> <plagnioj@jcrosoft.com>; Russell King <linux@arm.linux.org.uk>; linux-
-> clk at vger.kernel.org; Pawel Moll <pawel.moll@arm.com>; Mark Brown
-> <broonie@kernel.org>; Ian Campbell <ijc+devicetree@hellion.org.uk>; Kumar
-> Gala <galak@codeaurora.org>; linux-arm-kernel at lists.infradead.org; linux-
-> kernel at vger.kernel.org; devicetree at vger.kernel.org
-> Subject: Re: [PATCH v3 4/4] Documentation: atmel-pmc: add DT bindings for fast
-> startup
+Hi Mark,
+
+On Fri, 2016-02-19 at 23:37 +0800, Mark Brown wrote:
+> On Fri, Feb 19, 2016 at 10:35:59AM +0800, PC Liao wrote:
 > 
-> On Mon, Feb 15, 2016 at 11:40:30AM +0800, Wenyou Yang wrote:
-> > Add DT bindings to configurate the PMC_FSMR and PMC_FSPR registers to
-> > trigger a fast restart signal to PMC.
-> >
-> > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> > Document: binding
-> >
-> > ---
-> >
-> > Changes in v3:
-> >  - update the property description.
+> > @@ -3,3 +3,4 @@ obj-$(CONFIG_SND_SOC_MEDIATEK) += mtk-afe-pcm.o
+> >  # Machine support
+> >  obj-$(CONFIG_SND_SOC_MT8173_MAX98090) += mt8173-max98090.o
+> >  obj-$(CONFIG_SND_SOC_MT8173_RT5650_RT5676) += mt8173-rt5650-rt5676.o
+> > +obj-$(CONFIG_SND_SOC_MT8173_RT5650) += mt8173-rt5650.o
 > 
-> This is not helpful. Assume I don't remember what I told you and you need to jog
-> my memory what exactly changed so I don't have to go look it up.
+> Why is this not covered by (or coverable by) the existinng RT5650-RT5657
+> driver?
 
-Thank you for your instruction, I will keep it in mind.
+Thanks for your review.
 
-> 
-> >
-> > Changes in v2:
-> >  - change the property name and property description.
-> >
-> >  .../devicetree/bindings/arm/atmel-pmc.txt          |   63
-> ++++++++++++++++++++
-> >  1 file changed, 63 insertions(+)
-> 
-> Acked-by: Rob Herring <robh@kernel.org>
+Because they are different boards and have some differences like HW
+configuration and mixer control, we want to separate machine driver
+clearly.
 
-Thank you for your Acked.
-
-
-Best Regards,
-Wenyou Yang
+Otherwise, I think I will upload this change to new version for more
+clearly.
+diff --git a/sound/soc/mediatek/Makefile b/sound/soc/mediatek/Makefile
+index bcdcb06..dcb1440 100644
+--- a/sound/soc/mediatek/Makefile
++++ b/sound/soc/mediatek/Makefile
+@@ -2,5 +2,5 @@
+ obj-$(CONFIG_SND_SOC_MEDIATEK) += mtk-afe-pcm.o
+ # Machine support
+ obj-$(CONFIG_SND_SOC_MT8173_MAX98090) += mt8173-max98090.o
+-obj-$(CONFIG_SND_SOC_MT8173_RT5650_RT5676) += mt8173-rt5650-rt5676.o
+ obj-$(CONFIG_SND_SOC_MT8173_RT5650) += mt8173-rt5650.o
++obj-$(CONFIG_SND_SOC_MT8173_RT5650_RT5676) += mt8173-rt5650-rt5676.o
