@@ -1,66 +1,64 @@
-From: jan.glauber@caviumnetworks.com (Jan Glauber)
-Date: Mon, 22 Feb 2016 13:40:34 +0100
-Subject: [PATCH v4 3/5] arm64: dts: Add Cavium ThunderX specific PMU
-In-Reply-To: <20160218173248.GD16883@arm.com>
-References: <20160218173248.GD16883@arm.com>
-Message-ID: <20160222124034.GA766@hardcore>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 22 Feb 2016 13:40:51 +0100
+Subject: [GIT PULL] ARM: mediatek: soc updates for v4.5
+Message-ID: <CABuKBeLEf+jyE5gzWEVzfRZ7DwRgnLrdWLREwqqfYGBb2g+exQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 18, 2016 at 05:32:48PM +0000, Will Deacon wrote:
-> On Thu, Feb 18, 2016 at 05:50:12PM +0100, Jan Glauber wrote:
-> > Add a compatible string for the Cavium ThunderX PMU.
-> 
-> Stupid question, but is "thunder" the name of the CPU or the SoC or ...?
-> 
-> Whatever we use to describe the PMU, should probably also identify the
-> CPU uniquely.
+Hi Arnd and Olof,
 
-The CPU is currently:
+Please pull the following patches.
+As you can see from the description, this pull request includes some
+fixes. Only a few developer have access to a Mediatek HW at the
+moment. Therefor I didn't send the fixes to stable.
 
-compatible = "cavium,thunder", "arm,armv8";
+If you want me to send the fixes for older kernel versions, please let me know.
 
-We clearly need better names in case of a subsequent CPU, but for now
-I think we should stick to the existing name.
+Thanks,
+Matthias
 
-Jan
+---
 
-> Will
-> 
-> > Signed-off-by: Jan Glauber <jglauber@cavium.com>
-> > ---
-> >  Documentation/devicetree/bindings/arm/pmu.txt | 1 +
-> >  arch/arm64/boot/dts/cavium/thunder-88xx.dtsi  | 5 +++++
-> >  2 files changed, 6 insertions(+)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/arm/pmu.txt b/Documentation/devicetree/bindings/arm/pmu.txt
-> > index 5651883..d3999a1 100644
-> > --- a/Documentation/devicetree/bindings/arm/pmu.txt
-> > +++ b/Documentation/devicetree/bindings/arm/pmu.txt
-> > @@ -25,6 +25,7 @@ Required properties:
-> >  	"qcom,scorpion-pmu"
-> >  	"qcom,scorpion-mp-pmu"
-> >  	"qcom,krait-pmu"
-> > +	"cavium,thunder-pmu"
-> >  - interrupts : 1 combined interrupt or 1 per core. If the interrupt is a per-cpu
-> >                 interrupt (PPI) then 1 interrupt should be specified.
-> >  
-> > diff --git a/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi b/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
-> > index 9cb7cf9..2eb9b22 100644
-> > --- a/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
-> > +++ b/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
-> > @@ -360,6 +360,11 @@
-> >  		             <1 10 0xff01>;
-> >  	};
-> >  
-> > +	pmu {
-> > +		compatible = "cavium,thunder-pmu", "arm,armv8-pmuv3";
-> > +		interrupts = <1 7 4>;
-> > +	};
-> > +
-> >  	soc {
-> >  		compatible = "simple-bus";
-> >  		#address-cells = <2>;
-> > -- 
-> > 1.9.1
-> > 
+The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
+
+Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+
+are available in the git repository at:
+
+https://github.com/mbgg/linux-mediatek.git tags/v4.5-next-soc
+
+for you to fetch changes up to cc8ed76938b5cf6a54ab3d60edabaf808dc960d1:
+
+soc: mediatek: SCPSYS: Fix double enabling of regulators (2016-02-01
+11:28:07 +0100)
+
+----------------------------------------------------------------
+Fix state machine implemenation of PMIC wrapper.
+Add SMP support for mt7623.
+Disable watchdog of STAUPD in PMIC wrapper for mt8173.
+Add SMP support for mt2701.
+Use builtin_platform_driver for scpsys. Driver can't be build as module.
+Fix regulator enablement in scpsys.
+
+----------------------------------------------------------------
+Henry Chen (2):
+soc: mediatek: PMIC wrap: Clear the vldclr if state machine stay on
+FSM_VLDCLR state.
+soc: mediatek: PMIC wrap: clear the STAUPD_TRIG bit of WDT_SRC_EN
+
+John Crispin (1):
+ARM: mediatek: add MT7623 smp bringup code
+
+Louis Yu (1):
+ARM: mediatek: add mt2701 smp bringup code
+
+Matthias Brugger (1):
+soc: mediatek: SCPSYS: use builtin_platform_driver
+
+Sascha Hauer (1):
+soc: mediatek: SCPSYS: Fix double enabling of regulators
+
+arch/arm/mach-mediatek/platsmp.c | 8 +++++
+drivers/soc/mediatek/mtk-pmic-wrap.c | 41 +++++++++++++++++++++---
+drivers/soc/mediatek/mtk-scpsys.c | 60 ++++++++++++++++--------------------
+3 files changed, 71 insertions(+), 38 deletions(-)
