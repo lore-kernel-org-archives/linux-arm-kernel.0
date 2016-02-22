@@ -1,27 +1,29 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 22 Feb 2016 16:52:09 +0000
-Subject: [PATCH v3 4/4] arm64: prevent __va() translations before
- memstart_addr is assigned
-In-Reply-To: <1455289046-21321-5-git-send-email-ard.biesheuvel@linaro.org>
-References: <1455289046-21321-1-git-send-email-ard.biesheuvel@linaro.org>
- <1455289046-21321-5-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160222165209.GK31168@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 22 Feb 2016 08:52:53 -0800
+Subject: [PATCHv2] clk: ti: omap3+: dpll: use non-locking version of
+ clk_get_rate
+In-Reply-To: <1455966777-30576-1-git-send-email-t-kristo@ti.com>
+References: <1455966777-30576-1-git-send-email-t-kristo@ti.com>
+Message-ID: <20160222165252.GF13417@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 12, 2016 at 03:57:26PM +0100, Ard Biesheuvel wrote:
-> Since memstart_addr is assigned relatively late in the boot code,
-> after generic code like DT parsing and memblock manipulation has
-> already occurred, we need to ensure that no __va() translation occur
-> until memstart_addr has been set to a meaningful value.
+* Tero Kristo <t-kristo@ti.com> [160220 03:12]:
+> As the code in this file is being executed within irq context in some
+> cases, we must avoid the clk_get_rate which uses mutex internally.
+> Switch the code to use clk_hw_get_rate instead which is non-locking.
 > 
-> So initialize memstart_addr to a value that cannot represent a valid
-> physical address, and BUG() if memstart_addr is referenced while it
-> still holds this value. Note that the > comparison against LLONG_MAX
-> (not ULLONG_MAX) resolves to a single tbnz instruction that performs
-> a conditional jump to a brk instruction that is emitted out of line.
+> This fixes an issue where PM runtime will hang the system if enabled
+> with a serial console before a suspend-resume cycle.
 
-Even so, I'd imagine that having a measurable impact on system
-performance. Did you have a go at benchmarking this?
+Can you please add the "Fixes: " line here?
 
-Will
+And when applying, please tag this one Cc stable.
+
+Other than that, please feel free to add:
+
+Tested-by: Tony Lindgren <tony@atomide.com>
+
+Regards,
+
+Tony
