@@ -1,469 +1,241 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 22 Feb 2016 22:08:37 +0100
-Subject: [PATCH 3/8] drm: msm: split out fence and iotrace modules
+Date: Mon, 22 Feb 2016 22:08:38 +0100
+Subject: [PATCH 4/8] drm: msm: split out GEM code into helper module
 In-Reply-To: <1456175331-714117-1-git-send-email-arnd@arndb.de>
 References: <1456175331-714117-1-git-send-email-arnd@arndb.de>
-Message-ID: <1456175331-714117-4-git-send-email-arnd@arndb.de>
+Message-ID: <1456175331-714117-5-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a preparation for having edp, dsi and hdmi in separate
-modules. Those three drivers depend on the iotrace code and,
-and edp depends on gem, which in turn depends on the fence.
-
-With this change, those two pieces of the main driver can be
-loaded first, to resolve circular dependencies.
+The GEM code is used by dsi, so it can't be part of
+the main module. This exports all functions that are called
+by other code, and puts it into the helper module.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/gpu/drm/msm/Kconfig       |   2 +-
- drivers/gpu/drm/msm/Makefile      |   4 +-
- drivers/gpu/drm/msm/msm_drv.c     | 165 --------------------------------------
- drivers/gpu/drm/msm/msm_drv.h     |  12 +++
- drivers/gpu/drm/msm/msm_fence.c   | 115 ++++++++++++++++++++++++++
- drivers/gpu/drm/msm/msm_iotrace.c |  65 +++++++++++++++
- 6 files changed, 196 insertions(+), 167 deletions(-)
- create mode 100644 drivers/gpu/drm/msm/msm_fence.c
- create mode 100644 drivers/gpu/drm/msm/msm_iotrace.c
+ drivers/gpu/drm/msm/Makefile  |  3 +--
+ drivers/gpu/drm/msm/msm_gem.c | 29 +++++++++++++++++++++++++++++
+ 2 files changed, 30 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/gpu/drm/msm/Kconfig b/drivers/gpu/drm/msm/Kconfig
-index b8beb9bccd91..d987c584d817 100644
---- a/drivers/gpu/drm/msm/Kconfig
-+++ b/drivers/gpu/drm/msm/Kconfig
-@@ -21,7 +21,7 @@ config DRM_MSM_REGISTER_LOGGING
- 	help
- 	  Compile in support for logging register reads/writes in a format
- 	  that can be parsed by envytools demsm tool.  If enabled, register
--	  logging can be switched on via msm.reglog=y module param.
-+	  logging can be switched on via msm_iotrace.reglog=y module param.
- 
- source "drivers/gpu/drm/msm/dsi/Kconfig"
- source "drivers/gpu/drm/msm/hdmi/Kconfig"
 diff --git a/drivers/gpu/drm/msm/Makefile b/drivers/gpu/drm/msm/Makefile
-index 24f6fd2b9651..acc02aef1b42 100644
+index acc02aef1b42..6817e9390153 100644
 --- a/drivers/gpu/drm/msm/Makefile
 +++ b/drivers/gpu/drm/msm/Makefile
-@@ -44,4 +44,6 @@ obj-$(CONFIG_DRM_MSM_DSI) += dsi/
- obj-$(CONFIG_DRM_MSM_HDMI) += hdmi/
- obj-$(CONFIG_DRM_MSM_EDP) += edp/
+@@ -25,7 +25,6 @@ drm-msm-y := \
+ 	msm_atomic.o \
+ 	msm_drv.o \
+ 	msm_fb.o \
+-	msm_gem.o \
+ 	msm_gem_prime.o \
+ 	msm_gem_submit.o \
+ 	msm_gpu.o \
+@@ -46,4 +45,4 @@ obj-$(CONFIG_DRM_MSM_EDP) += edp/
  
--obj-$(CONFIG_DRM_MSM)	+= drm-msm.o
-+obj-$(CONFIG_DRM_MSM)	+= drm-msm.o drm_msm_helper.o
-+
-+drm_msm_helper-y	+= msm_iotrace.o msm_fence.o
-diff --git a/drivers/gpu/drm/msm/msm_drv.c b/drivers/gpu/drm/msm/msm_drv.c
-index d52910e2c26c..5430ea7d2375 100644
---- a/drivers/gpu/drm/msm/msm_drv.c
-+++ b/drivers/gpu/drm/msm/msm_drv.c
-@@ -46,14 +46,6 @@ int msm_register_mmu(struct drm_device *dev, struct msm_mmu *mmu)
- 	return idx;
+ obj-$(CONFIG_DRM_MSM)	+= drm-msm.o drm_msm_helper.o
+ 
+-drm_msm_helper-y	+= msm_iotrace.o msm_fence.o
++drm_msm_helper-y	+= msm_iotrace.o msm_fence.o msm_gem.o
+diff --git a/drivers/gpu/drm/msm/msm_gem.c b/drivers/gpu/drm/msm/msm_gem.c
+index 3cedb8d5c855..1d64febee274 100644
+--- a/drivers/gpu/drm/msm/msm_gem.c
++++ b/drivers/gpu/drm/msm/msm_gem.c
+@@ -143,11 +143,13 @@ struct page **msm_gem_get_pages(struct drm_gem_object *obj)
+ 	mutex_unlock(&dev->struct_mutex);
+ 	return p;
  }
++EXPORT_SYMBOL_GPL(msm_gem_get_pages);
  
--#ifdef CONFIG_DRM_MSM_REGISTER_LOGGING
--static bool reglog = false;
--MODULE_PARM_DESC(reglog, "Enable register read/write logging");
--module_param(reglog, bool, 0600);
--#else
--#define reglog 0
--#endif
--
- #ifdef CONFIG_DRM_FBDEV_EMULATION
- static bool fbdev = true;
- MODULE_PARM_DESC(fbdev, "Enable fbdev compat layer");
-@@ -64,56 +56,6 @@ static char *vram = "16m";
- MODULE_PARM_DESC(vram, "Configure VRAM size (for devices without IOMMU/GPUMMU)");
- module_param(vram, charp, 0);
+ void msm_gem_put_pages(struct drm_gem_object *obj)
+ {
+ 	/* when we start tracking the pin count, then do something here */
+ }
++EXPORT_SYMBOL_GPL(msm_gem_put_pages);
  
--/*
-- * Util/helpers:
-- */
--
--void __iomem *msm_ioremap(struct platform_device *pdev, const char *name,
--		const char *dbgname)
--{
--	struct resource *res;
--	unsigned long size;
--	void __iomem *ptr;
--
--	if (name)
--		res = platform_get_resource_byname(pdev, IORESOURCE_MEM, name);
--	else
--		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--
--	if (!res) {
--		dev_err(&pdev->dev, "failed to get memory resource: %s\n", name);
--		return ERR_PTR(-EINVAL);
--	}
--
--	size = resource_size(res);
--
--	ptr = devm_ioremap_nocache(&pdev->dev, res->start, size);
--	if (!ptr) {
--		dev_err(&pdev->dev, "failed to ioremap: %s\n", name);
--		return ERR_PTR(-ENOMEM);
--	}
--
--	if (reglog)
--		printk(KERN_DEBUG "IO:region %s %p %08lx\n", dbgname, ptr, size);
--
--	return ptr;
--}
--
--void msm_writel(u32 data, void __iomem *addr)
--{
--	if (reglog)
--		printk(KERN_DEBUG "IO:W %p %08x\n", addr, data);
--	writel(data, addr);
--}
--
--u32 msm_readl(const void __iomem *addr)
--{
--	u32 val = readl(addr);
--	if (reglog)
--		printk(KERN_ERR "IO:R %p %08x\n", addr, val);
--	return val;
--}
--
- struct vblank_event {
- 	struct list_head node;
- 	int crtc_id;
-@@ -691,113 +633,6 @@ static void msm_debugfs_cleanup(struct drm_minor *minor)
+ int msm_gem_mmap_obj(struct drm_gem_object *obj,
+ 		struct vm_area_struct *vma)
+@@ -177,6 +179,7 @@ int msm_gem_mmap_obj(struct drm_gem_object *obj,
+ 
+ 	return 0;
+ }
++EXPORT_SYMBOL_GPL(msm_gem_mmap_obj);
+ 
+ int msm_gem_mmap(struct file *filp, struct vm_area_struct *vma)
+ {
+@@ -190,6 +193,7 @@ int msm_gem_mmap(struct file *filp, struct vm_area_struct *vma)
+ 
+ 	return msm_gem_mmap_obj(vma->vm_private_data, vma);
+ }
++EXPORT_SYMBOL_GPL(msm_gem_mmap);
+ 
+ int msm_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
+ {
+@@ -246,6 +250,7 @@ out:
+ 		return VM_FAULT_SIGBUS;
+ 	}
+ }
++EXPORT_SYMBOL_GPL(msm_gem_fault);
+ 
+ /** get mmap offset */
+ static uint64_t mmap_offset(struct drm_gem_object *obj)
+@@ -274,6 +279,7 @@ uint64_t msm_gem_mmap_offset(struct drm_gem_object *obj)
+ 	mutex_unlock(&obj->dev->struct_mutex);
+ 	return offset;
+ }
++EXPORT_SYMBOL_GPL(msm_gem_mmap_offset);
+ 
+ /* should be called under struct_mutex.. although it can be called
+  * from atomic context without struct_mutex to acquire an extra
+@@ -316,6 +322,7 @@ int msm_gem_get_iova_locked(struct drm_gem_object *obj, int id,
+ 
+ 	return ret;
+ }
++EXPORT_SYMBOL_GPL(msm_gem_get_iova_locked);
+ 
+ /* get iova, taking a reference.  Should have a matching put */
+ int msm_gem_get_iova(struct drm_gem_object *obj, int id, uint32_t *iova)
+@@ -336,6 +343,7 @@ int msm_gem_get_iova(struct drm_gem_object *obj, int id, uint32_t *iova)
+ 	mutex_unlock(&obj->dev->struct_mutex);
+ 	return ret;
+ }
++EXPORT_SYMBOL_GPL(msm_gem_get_iova);
+ 
+ /* get iova without taking a reference, used in places where you have
+  * already done a 'msm_gem_get_iova()'.
+@@ -346,6 +354,7 @@ uint32_t msm_gem_iova(struct drm_gem_object *obj, int id)
+ 	WARN_ON(!msm_obj->domain[id].iova);
+ 	return msm_obj->domain[id].iova;
+ }
++EXPORT_SYMBOL_GPL(msm_gem_iova);
+ 
+ void msm_gem_put_iova(struct drm_gem_object *obj, int id)
+ {
+@@ -356,6 +365,7 @@ void msm_gem_put_iova(struct drm_gem_object *obj, int id)
+ 	// if another _get_iova_locked() fails we can start unmapping
+ 	// things that are no longer needed..
+ }
++EXPORT_SYMBOL_GPL(msm_gem_put_iova);
+ 
+ int msm_gem_dumb_create(struct drm_file *file, struct drm_device *dev,
+ 		struct drm_mode_create_dumb *args)
+@@ -365,6 +375,7 @@ int msm_gem_dumb_create(struct drm_file *file, struct drm_device *dev,
+ 	return msm_gem_new_handle(dev, file, args->size,
+ 			MSM_BO_SCANOUT | MSM_BO_WC, &args->handle);
+ }
++EXPORT_SYMBOL_GPL(msm_gem_dumb_create);
+ 
+ int msm_gem_dumb_map_offset(struct drm_file *file, struct drm_device *dev,
+ 		uint32_t handle, uint64_t *offset)
+@@ -386,6 +397,7 @@ int msm_gem_dumb_map_offset(struct drm_file *file, struct drm_device *dev,
+ fail:
+ 	return ret;
+ }
++EXPORT_SYMBOL_GPL(msm_gem_dumb_map_offset);
+ 
+ void *msm_gem_vaddr_locked(struct drm_gem_object *obj)
+ {
+@@ -400,6 +412,7 @@ void *msm_gem_vaddr_locked(struct drm_gem_object *obj)
+ 	}
+ 	return msm_obj->vaddr;
+ }
++EXPORT_SYMBOL_GPL(msm_gem_vaddr_locked);
+ 
+ void *msm_gem_vaddr(struct drm_gem_object *obj)
+ {
+@@ -409,6 +422,7 @@ void *msm_gem_vaddr(struct drm_gem_object *obj)
+ 	mutex_unlock(&obj->dev->struct_mutex);
+ 	return ret;
+ }
++EXPORT_SYMBOL_GPL(msm_gem_vaddr);
+ 
+ /* setup callback for when bo is no longer busy..
+  * TODO probably want to differentiate read vs write..
+@@ -421,6 +435,7 @@ int msm_gem_queue_inactive_cb(struct drm_gem_object *obj,
+ 			MSM_PREP_READ | MSM_PREP_WRITE);
+ 	return msm_queue_fence_cb(obj->dev, cb, fence);
+ }
++EXPORT_SYMBOL_GPL(msm_gem_queue_inactive_cb);
+ 
+ void msm_gem_move_to_active(struct drm_gem_object *obj,
+ 		struct msm_gpu *gpu, bool write, uint32_t fence)
+@@ -434,6 +449,7 @@ void msm_gem_move_to_active(struct drm_gem_object *obj,
+ 	list_del_init(&msm_obj->mm_list);
+ 	list_add_tail(&msm_obj->mm_list, &gpu->active_list);
+ }
++EXPORT_SYMBOL_GPL(msm_gem_move_to_active);
+ 
+ void msm_gem_move_to_inactive(struct drm_gem_object *obj)
+ {
+@@ -449,6 +465,7 @@ void msm_gem_move_to_inactive(struct drm_gem_object *obj)
+ 	list_del_init(&msm_obj->mm_list);
+ 	list_add_tail(&msm_obj->mm_list, &priv->inactive_list);
+ }
++EXPORT_SYMBOL_GPL(msm_gem_move_to_inactive);
+ 
+ int msm_gem_cpu_prep(struct drm_gem_object *obj, uint32_t op, ktime_t *timeout)
+ {
+@@ -469,12 +486,14 @@ int msm_gem_cpu_prep(struct drm_gem_object *obj, uint32_t op, ktime_t *timeout)
+ 
+ 	return ret;
+ }
++EXPORT_SYMBOL_GPL(msm_gem_cpu_prep);
+ 
+ int msm_gem_cpu_fini(struct drm_gem_object *obj)
+ {
+ 	/* TODO cache maintenance */
+ 	return 0;
+ }
++EXPORT_SYMBOL_GPL(msm_gem_cpu_fini);
+ 
+ #ifdef CONFIG_DEBUG_FS
+ void msm_gem_describe(struct drm_gem_object *obj, struct seq_file *m)
+@@ -490,6 +509,7 @@ void msm_gem_describe(struct drm_gem_object *obj, struct seq_file *m)
+ 			obj->name, obj->refcount.refcount.counter,
+ 			off, msm_obj->vaddr, obj->size);
+ }
++EXPORT_SYMBOL_GPL(msm_gem_describe);
+ 
+ void msm_gem_describe_objects(struct list_head *list, struct seq_file *m)
+ {
+@@ -507,6 +527,7 @@ void msm_gem_describe_objects(struct list_head *list, struct seq_file *m)
+ 
+ 	seq_printf(m, "Total %d objects, %zu bytes\n", count, size);
+ }
++EXPORT_SYMBOL_GPL(msm_gem_describe_objects);
  #endif
  
- /*
-- * Fences:
-- */
--
--int msm_wait_fence(struct drm_device *dev, uint32_t fence,
--		ktime_t *timeout , bool interruptible)
--{
--	struct msm_drm_private *priv = dev->dev_private;
--	int ret;
--
--	if (!priv->gpu)
--		return 0;
--
--	if (fence > priv->gpu->submitted_fence) {
--		DRM_ERROR("waiting on invalid fence: %u (of %u)\n",
--				fence, priv->gpu->submitted_fence);
--		return -EINVAL;
--	}
--
--	if (!timeout) {
--		/* no-wait: */
--		ret = fence_completed(dev, fence) ? 0 : -EBUSY;
--	} else {
--		ktime_t now = ktime_get();
--		unsigned long remaining_jiffies;
--
--		if (ktime_compare(*timeout, now) < 0) {
--			remaining_jiffies = 0;
--		} else {
--			ktime_t rem = ktime_sub(*timeout, now);
--			struct timespec ts = ktime_to_timespec(rem);
--			remaining_jiffies = timespec_to_jiffies(&ts);
--		}
--
--		if (interruptible)
--			ret = wait_event_interruptible_timeout(priv->fence_event,
--				fence_completed(dev, fence),
--				remaining_jiffies);
--		else
--			ret = wait_event_timeout(priv->fence_event,
--				fence_completed(dev, fence),
--				remaining_jiffies);
--
--		if (ret == 0) {
--			DBG("timeout waiting for fence: %u (completed: %u)",
--					fence, priv->completed_fence);
--			ret = -ETIMEDOUT;
--		} else if (ret != -ERESTARTSYS) {
--			ret = 0;
--		}
--	}
--
--	return ret;
--}
--
--int msm_queue_fence_cb(struct drm_device *dev,
--		struct msm_fence_cb *cb, uint32_t fence)
--{
--	struct msm_drm_private *priv = dev->dev_private;
--	int ret = 0;
--
--	mutex_lock(&dev->struct_mutex);
--	if (!list_empty(&cb->work.entry)) {
--		ret = -EINVAL;
--	} else if (fence > priv->completed_fence) {
--		cb->fence = fence;
--		list_add_tail(&cb->work.entry, &priv->fence_cbs);
--	} else {
--		queue_work(priv->wq, &cb->work);
--	}
--	mutex_unlock(&dev->struct_mutex);
--
--	return ret;
--}
--
--/* called from workqueue */
--void msm_update_fence(struct drm_device *dev, uint32_t fence)
--{
--	struct msm_drm_private *priv = dev->dev_private;
--
--	mutex_lock(&dev->struct_mutex);
--	priv->completed_fence = max(fence, priv->completed_fence);
--
--	while (!list_empty(&priv->fence_cbs)) {
--		struct msm_fence_cb *cb;
--
--		cb = list_first_entry(&priv->fence_cbs,
--				struct msm_fence_cb, work.entry);
--
--		if (cb->fence > priv->completed_fence)
--			break;
--
--		list_del_init(&cb->work.entry);
--		queue_work(priv->wq, &cb->work);
--	}
--
--	mutex_unlock(&dev->struct_mutex);
--
--	wake_up_all(&priv->fence_event);
--}
--
--void __msm_fence_worker(struct work_struct *work)
--{
--	struct msm_fence_cb *cb = container_of(work, struct msm_fence_cb, work);
--	cb->func(cb);
--}
--
--/*
-  * DRM ioctls:
-  */
+ void msm_gem_free_object(struct drm_gem_object *obj)
+@@ -554,6 +575,7 @@ void msm_gem_free_object(struct drm_gem_object *obj)
  
-diff --git a/drivers/gpu/drm/msm/msm_drv.h b/drivers/gpu/drm/msm/msm_drv.h
-index a2755b4a0d86..b8bd88b66c9c 100644
---- a/drivers/gpu/drm/msm/msm_drv.h
-+++ b/drivers/gpu/drm/msm/msm_drv.h
-@@ -28,6 +28,7 @@
- #include <linux/pm_runtime.h>
- #include <linux/slab.h>
- #include <linux/list.h>
-+#include <linux/io.h>
- #include <linux/iommu.h>
- #include <linux/types.h>
- #include <linux/of_graph.h>
-@@ -330,8 +331,19 @@ static inline void msm_rd_dump_submit(struct msm_gem_submit *submit) {}
+ 	kfree(msm_obj);
+ }
++EXPORT_SYMBOL_GPL(msm_gem_free_object);
  
- void __iomem *msm_ioremap(struct platform_device *pdev, const char *name,
- 		const char *dbgname);
-+#ifdef CONFIG_DRM_MSM_REGISTER_LOGGING
- void msm_writel(u32 data, void __iomem *addr);
- u32 msm_readl(const void __iomem *addr);
-+#else
-+static inline void msm_writel(u32 data, void __iomem *addr)
-+{
-+	writel(data, addr);
-+}
-+static inline u32 msm_readl(const void __iomem *addr)
-+{
-+	return readl(addr);
-+}
-+#endif
+ /* convenience method to construct a GEM buffer object, and userspace handle */
+ int msm_gem_new_handle(struct drm_device *dev, struct drm_file *file,
+@@ -580,6 +602,7 @@ int msm_gem_new_handle(struct drm_device *dev, struct drm_file *file,
  
- #define DBG(fmt, ...) DRM_DEBUG(fmt"\n", ##__VA_ARGS__)
- #define VERB(fmt, ...) if (0) DRM_DEBUG(fmt"\n", ##__VA_ARGS__)
-diff --git a/drivers/gpu/drm/msm/msm_fence.c b/drivers/gpu/drm/msm/msm_fence.c
-new file mode 100644
-index 000000000000..df66e04e01d8
---- /dev/null
-+++ b/drivers/gpu/drm/msm/msm_fence.c
-@@ -0,0 +1,115 @@
-+#include <linux/ktime.h>
-+#include <linux/module.h>
-+#include <linux/types.h>
-+
-+#include <drm/drmP.h>
-+
-+#include "msm_drv.h"
-+#include "msm_gpu.h"
-+
-+int msm_wait_fence(struct drm_device *dev, uint32_t fence,
-+		ktime_t *timeout , bool interruptible)
-+{
-+	struct msm_drm_private *priv = dev->dev_private;
-+	int ret;
-+
-+	if (!priv->gpu)
-+		return 0;
-+
-+	if (fence > priv->gpu->submitted_fence) {
-+		DRM_ERROR("waiting on invalid fence: %u (of %u)\n",
-+				fence, priv->gpu->submitted_fence);
-+		return -EINVAL;
-+	}
-+
-+	if (!timeout) {
-+		/* no-wait: */
-+		ret = fence_completed(dev, fence) ? 0 : -EBUSY;
-+	} else {
-+		ktime_t now = ktime_get();
-+		unsigned long remaining_jiffies;
-+
-+		if (ktime_compare(*timeout, now) < 0) {
-+			remaining_jiffies = 0;
-+		} else {
-+			ktime_t rem = ktime_sub(*timeout, now);
-+			struct timespec ts = ktime_to_timespec(rem);
-+			remaining_jiffies = timespec_to_jiffies(&ts);
-+		}
-+
-+		if (interruptible)
-+			ret = wait_event_interruptible_timeout(priv->fence_event,
-+				fence_completed(dev, fence),
-+				remaining_jiffies);
-+		else
-+			ret = wait_event_timeout(priv->fence_event,
-+				fence_completed(dev, fence),
-+				remaining_jiffies);
-+
-+		if (ret == 0) {
-+			DBG("timeout waiting for fence: %u (completed: %u)",
-+					fence, priv->completed_fence);
-+			ret = -ETIMEDOUT;
-+		} else if (ret != -ERESTARTSYS) {
-+			ret = 0;
-+		}
-+	}
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(msm_wait_fence);
-+
-+int msm_queue_fence_cb(struct drm_device *dev,
-+		struct msm_fence_cb *cb, uint32_t fence)
-+{
-+	struct msm_drm_private *priv = dev->dev_private;
-+	int ret = 0;
-+
-+	mutex_lock(&dev->struct_mutex);
-+	if (!list_empty(&cb->work.entry)) {
-+		ret = -EINVAL;
-+	} else if (fence > priv->completed_fence) {
-+		cb->fence = fence;
-+		list_add_tail(&cb->work.entry, &priv->fence_cbs);
-+	} else {
-+		queue_work(priv->wq, &cb->work);
-+	}
-+	mutex_unlock(&dev->struct_mutex);
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(msm_queue_fence_cb);
-+
-+/* called from workqueue */
-+void msm_update_fence(struct drm_device *dev, uint32_t fence)
-+{
-+	struct msm_drm_private *priv = dev->dev_private;
-+
-+	mutex_lock(&dev->struct_mutex);
-+	priv->completed_fence = max(fence, priv->completed_fence);
-+
-+	while (!list_empty(&priv->fence_cbs)) {
-+		struct msm_fence_cb *cb;
-+
-+		cb = list_first_entry(&priv->fence_cbs,
-+				struct msm_fence_cb, work.entry);
-+
-+		if (cb->fence > priv->completed_fence)
-+			break;
-+
-+		list_del_init(&cb->work.entry);
-+		queue_work(priv->wq, &cb->work);
-+	}
-+
-+	mutex_unlock(&dev->struct_mutex);
-+
-+	wake_up_all(&priv->fence_event);
-+}
-+EXPORT_SYMBOL_GPL(msm_update_fence);
-+
-+void __msm_fence_worker(struct work_struct *work)
-+{
-+	struct msm_fence_cb *cb = container_of(work, struct msm_fence_cb, work);
-+	cb->func(cb);
-+}
-+EXPORT_SYMBOL_GPL(__msm_fence_worker);
-diff --git a/drivers/gpu/drm/msm/msm_iotrace.c b/drivers/gpu/drm/msm/msm_iotrace.c
-new file mode 100644
-index 000000000000..7761470eee26
---- /dev/null
-+++ b/drivers/gpu/drm/msm/msm_iotrace.c
-@@ -0,0 +1,65 @@
-+#include <linux/io.h>
-+#include <linux/ioport.h>
-+#include <linux/platform_device.h>
-+#include <linux/printk.h>
-+#include <linux/module.h>
-+
-+static bool reglog = false;
-+
-+#ifdef CONFIG_DRM_MSM_REGISTER_LOGGING
-+MODULE_PARM_DESC(reglog, "Enable register read/write logging");
-+module_param(reglog, bool, 0600);
-+
-+void msm_writel(u32 data, void __iomem *addr)
-+{
-+	if (reglog)
-+		printk(KERN_DEBUG "IO:W %p %08x\n", addr, data);
-+	writel(data, addr);
-+}
-+EXPORT_SYMBOL_GPL(msm_writel);
-+
-+u32 msm_readl(const void __iomem *addr)
-+{
-+	u32 val = readl(addr);
-+	if (reglog)
-+		printk(KERN_ERR "IO:R %p %08x\n", addr, val);
-+	return val;
-+}
-+EXPORT_SYMBOL_GPL(msm_readl);
-+#endif
-+
-+void __iomem *msm_ioremap(struct platform_device *pdev, const char *name,
-+		const char *dbgname)
-+{
-+	struct resource *res;
-+	unsigned long size;
-+	void __iomem *ptr;
-+
-+	if (name)
-+		res = platform_get_resource_byname(pdev, IORESOURCE_MEM, name);
-+	else
-+		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+
-+	if (!res) {
-+		dev_err(&pdev->dev, "failed to get memory resource: %s\n", name);
-+		return ERR_PTR(-EINVAL);
-+	}
-+
-+	size = resource_size(res);
-+
-+	ptr = devm_ioremap_nocache(&pdev->dev, res->start, size);
-+	if (!ptr) {
-+		dev_err(&pdev->dev, "failed to ioremap: %s\n", name);
-+		return ERR_PTR(-ENOMEM);
-+	}
-+
-+	if (reglog)
-+		printk(KERN_DEBUG "IO:region %s %p %08lx\n", dbgname, ptr, size);
-+
-+	return ptr;
-+}
-+EXPORT_SYMBOL_GPL(msm_ioremap);
+ 	return ret;
+ }
++EXPORT_SYMBOL_GPL(msm_gem_new_handle);
+ 
+ static int msm_gem_new_impl(struct drm_device *dev,
+ 		uint32_t size, uint32_t flags,
+@@ -663,6 +686,7 @@ fail:
+ 
+ 	return ERR_PTR(ret);
+ }
++EXPORT_SYMBOL_GPL(msm_gem_new);
+ 
+ struct drm_gem_object *msm_gem_import(struct drm_device *dev,
+ 		uint32_t size, struct sg_table *sgt)
+@@ -707,3 +731,8 @@ fail:
+ 
+ 	return ERR_PTR(ret);
+ }
++EXPORT_SYMBOL_GPL(msm_gem_import);
 +
 +MODULE_AUTHOR("Rob Clark <robdclark@gmail.com");
-+MODULE_DESCRIPTION("MSM DRM Driver support code");
++MODULE_DESCRIPTION("MSM DRM Driver GEM implementation");
 +MODULE_LICENSE("GPL");
 -- 
 2.7.0
