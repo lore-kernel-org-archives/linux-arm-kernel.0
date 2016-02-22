@@ -1,29 +1,71 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 22 Feb 2016 15:18:09 +0000
-Subject: [PATCH v6 00/12] arm-cci: PMU driver updates
-In-Reply-To: <1453720877-24962-1-git-send-email-suzuki.poulose@arm.com>
-References: <1453720877-24962-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20160222151808.GI3435@leverpostej>
+From: tiffany.lin@mediatek.com (tiffany lin)
+Date: Mon, 22 Feb 2016 23:19:24 +0800
+Subject: [PATCH v4 5/8] [Media] vcodec: mediatek: Add Mediatek V4L2
+ Video Encoder Driver
+In-Reply-To: <56C82F60.4060304@xs4all.nl>
+References: <1454585703-42428-1-git-send-email-tiffany.lin@mediatek.com>
+ <1454585703-42428-2-git-send-email-tiffany.lin@mediatek.com>
+ <1454585703-42428-3-git-send-email-tiffany.lin@mediatek.com>
+ <1454585703-42428-4-git-send-email-tiffany.lin@mediatek.com>
+ <1454585703-42428-5-git-send-email-tiffany.lin@mediatek.com>
+ <1454585703-42428-6-git-send-email-tiffany.lin@mediatek.com>
+ <56C1B4AF.1030207@xs4all.nl> <1455604653.19396.68.camel@mtksdaap41>
+ <56C2D371.9090805@xs4all.nl> <1455959480.12533.11.camel@mtksdaap41>
+ <56C82F60.4060304@xs4all.nl>
+Message-ID: <1456154364.1943.3.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 25, 2016 at 11:21:05AM +0000, Suzuki K. Poulose wrote:
-> Suzuki K. Poulose (11):
->   arm-cci: Group writes to counter
->   arm-cci: Refactor CCI PMU enable/disable methods
->   arm-cci: Delay PMU counter writes to pmu::pmu_enable
->   arm-cci: write_counter: Remove redundant check
->   arm-cci: Get the status of a counter
->   arm-cci: Add routines to save/restore all counters
->   __cci_pmu_enable: Make counter sync optional
->   arm-cci: Provide hook for writing to PMU counters
->   arm-cci: CCI-500: Work around PMU counter writes
->   arm-cci500: Rearrange PMU driver for code sharing with CCI-550 PMU
->   arm-cci: CoreLink CCI-550 PMU driver
+Hi Hans,
 
-These generally look fine. If you can fix up for my other comments,
-then for the series:
+On Sat, 2016-02-20 at 10:18 +0100, Hans Verkuil wrote:
+> On 02/20/2016 10:11 AM, tiffany lin wrote:
+> > Hi Hans,
+> > 
+> > On Tue, 2016-02-16 at 08:44 +0100, Hans Verkuil wrote:
+> >> On 02/16/2016 07:37 AM, tiffany lin wrote:
+> >>>>> +
+> >>>>> +const struct v4l2_ioctl_ops mtk_venc_ioctl_ops = {
+> >>>>> +	.vidioc_streamon		= v4l2_m2m_ioctl_streamon,
+> >>>>> +	.vidioc_streamoff		= v4l2_m2m_ioctl_streamoff,
+> >>>>> +
+> >>>>> +	.vidioc_reqbufs			= v4l2_m2m_ioctl_reqbufs,
+> >>>>> +	.vidioc_querybuf		= v4l2_m2m_ioctl_querybuf,
+> >>>>> +	.vidioc_qbuf			= vidioc_venc_qbuf,
+> >>>>> +	.vidioc_dqbuf			= vidioc_venc_dqbuf,
+> >>>>> +
+> >>>>> +	.vidioc_querycap		= vidioc_venc_querycap,
+> >>>>> +	.vidioc_enum_fmt_vid_cap_mplane = vidioc_enum_fmt_vid_cap_mplane,
+> >>>>> +	.vidioc_enum_fmt_vid_out_mplane = vidioc_enum_fmt_vid_out_mplane,
+> >>>>> +	.vidioc_enum_framesizes		= vidioc_enum_framesizes,
+> >>>>> +
+> >>>>> +	.vidioc_try_fmt_vid_cap_mplane	= vidioc_try_fmt_vid_cap_mplane,
+> >>>>> +	.vidioc_try_fmt_vid_out_mplane	= vidioc_try_fmt_vid_out_mplane,
+> >>>>> +	.vidioc_expbuf			= v4l2_m2m_ioctl_expbuf,
+> >>>>
+> >>>> Please add vidioc_create_bufs and vidioc_prepare_buf as well.
+> >>>>
+> >>>
+> >>> Currently we do not support these use cases, do we need to add
+> >>> vidioc_create_bufs and vidioc_prepare_buf now?
+> >>
+> >> I would suggest you do. The vb2 framework gives it (almost) for free.
+> >> prepare_buf is completely free (just add the helper) and create_bufs
+> >> needs a few small changes in the queue_setup function, that's all.
+> >>
+> > After try to add vidioc_create_bufs directly using
+> > vb2_ioctl_create_bufs, it will have problem in 
+> 
+> This is a m2m device, so you should use the m2m variant of this:
+> v4l2_m2m_ioctl_create_bufs
+> 
+> That should solve this problem.
+> 
+> Ditto for prepare_buf: you need to use v4l2_m2m_ioctl_prepare_buf.
+> 
+Got it. After using v4l2_m2m_ioctl_create_bufs, the problem was solved.
+Thanks for your help.
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Mark.
+> Regards,
+> 
+> 	Hans
