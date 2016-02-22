@@ -1,50 +1,176 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 22 Feb 2016 08:09:56 -0800
-Subject: [PATCH] ARM: OMAP2+: Fix onenand initialization to avoid
- filesystem corruption
-In-Reply-To: <56C9FE63.3070602@gmail.com>
-References: <linux-kernel@vger.kernel.org>
- <1454683028-4193-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
- <20160208193644.GU19432@atomide.com>
- <20160210211226.GB1640@darkstar.musicnaut.iki.fi>
- <20160211001220.GM19432@atomide.com> <56C9FE63.3070602@gmail.com>
-Message-ID: <20160222160956.GB13417@atomide.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 22 Feb 2016 16:17:45 +0000
+Subject: [PATCH V4 5/5] Microblaze: Modifying microblaze PCI subsytem to
+ support  generic Xilinx  AXI PCIe Host Bridge IP driver
+In-Reply-To: <8520D5D51A55D047800579B09414719825884643@XAP-PVEXMBX01.xlnx.xilinx.com>
+References: <1455208091-15556-1-git-send-email-bharatku@xilinx.com>
+ <1455208091-15556-6-git-send-email-bharatku@xilinx.com>
+ <8520D5D51A55D047800579B09414719825884643@XAP-PVEXMBX01.xlnx.xilinx.com>
+Message-ID: <20160222161745.GL3435@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com> [160221 10:14]:
-> Hi,
+On Mon, Feb 22, 2016 at 04:01:15PM +0000, Bharat Kumar Gogada wrote:
+> Ping
+
+Please trim your To line, and state who you're pinging, and specifically
+what you are pinging for. You'll have much better luck with targetted
+replies.
+
+Given the number of people in the To line, no-one knows if they're being
+poked, or if someone else is. Given the lack of any question/statement
+with your ping, it's not clear what you're asking for.
+
+The DT parts of this series already appear to have been reviewed, so
+there's no reason to keep myself and other DT maintainers on the To
+line for this patch.
+
+Mark.
+
 > 
-> On 11.02.2016 02:12, Tony Lindgren wrote:
-> >
-> >Also.. There's a chance somebody has created a onenand file system
-> >with recent mainline kernels that did the reset and disabled ECC.
-> >So with Ivaylo's patch fixing that, those may not mount properly
-> >any longer. Most likely people just keep their maemo rootfs there
-> >though with the MMC being available.
+> > Subject: [PATCH V4 5/5] Microblaze: Modifying microblaze PCI subsytem to
+> > support generic Xilinx AXI PCIe Host Bridge IP driver
+> > 
+> > This patch does required modifications to microblaze PCI subsystem, to work
+> > with generic driver (drivers/pci/host/pcie-xilinx.c) on Microblaze and Zynq.
+> > 
+> > Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
+> > Signed-off-by: Ravi Kiran Gummaluri <rgummal@xilinx.com>
+> > ---
+> > Changes:
+> > Removed pcibios_get_phb_of_node in pci-common.c, using generic version
+> > instead.
+> > Modified pcibios_fixup_bus in pci-common.c, as per generic architecuture.
+> > Modified pcibios_align_resource in pci-common.c, as per generic
+> > architecuture, removed temporary variable.
+> > Removed pci_domain_nr in pci-common.c, instead using generic code.
+> > Added pcibios_add_device in pci-common.c, as per generic architecuture.
+> > Adding Kernel configuration in arch/microblaze as required for generic PCI
+> > domains.
+> > Added kernel configuration for driver to support Microblaze.
+> > ---
+> >  arch/microblaze/Kconfig          |  3 +++
+> >  arch/microblaze/pci/pci-common.c | 56 +++++++---------------------------------
+> >  drivers/pci/host/Kconfig         |  2 +-
+> >  3 files changed, 14 insertions(+), 47 deletions(-)
+> > 
+> > diff --git a/arch/microblaze/Kconfig b/arch/microblaze/Kconfig index
+> > 0bce820..c3702b9 100644
+> > --- a/arch/microblaze/Kconfig
+> > +++ b/arch/microblaze/Kconfig
+> > @@ -271,6 +271,9 @@ config PCI
+> >  config PCI_DOMAINS
+> >  	def_bool PCI
+> > 
+> > +config PCI_DOMAINS_GENERIC
+> > +	def_bool PCI_DOMAINS
+> > +
+> >  config PCI_SYSCALL
+> >  	def_bool PCI
+> > 
+> > diff --git a/arch/microblaze/pci/pci-common.c b/arch/microblaze/pci/pci-
+> > common.c
+> > index ae838ed..35654be 100644
+> > --- a/arch/microblaze/pci/pci-common.c
+> > +++ b/arch/microblaze/pci/pci-common.c
+> > @@ -123,17 +123,6 @@ unsigned long pci_address_to_pio(phys_addr_t
+> > address)  }  EXPORT_SYMBOL_GPL(pci_address_to_pio);
+> > 
+> > -/*
+> > - * Return the domain number for this bus.
+> > - */
+> > -int pci_domain_nr(struct pci_bus *bus)
+> > -{
+> > -	struct pci_controller *hose = pci_bus_to_host(bus);
+> > -
+> > -	return hose->global_number;
+> > -}
+> > -EXPORT_SYMBOL(pci_domain_nr);
+> > -
+> >  /* This routine is meant to be used early during boot, when the
+> >   * PCI bus numbers have not yet been assigned, and you need to
+> >   * issue PCI config cycles to an OF device.
+> > @@ -863,26 +852,10 @@ void pcibios_setup_bus_devices(struct pci_bus
+> > *bus)
+> > 
+> >  void pcibios_fixup_bus(struct pci_bus *bus)  {
+> > -	/* When called from the generic PCI probe, read PCI<->PCI bridge
+> > -	 * bases. This is -not- called when generating the PCI tree from
+> > -	 * the OF device-tree.
+> > -	 */
+> > -	if (bus->self != NULL)
+> > -		pci_read_bridge_bases(bus);
+> > -
+> > -	/* Now fixup the bus bus */
+> > -	pcibios_setup_bus_self(bus);
+> > -
+> > -	/* Now fixup devices on that bus */
+> > -	pcibios_setup_bus_devices(bus);
+> > +	/* nothing to do */
+> >  }
+> >  EXPORT_SYMBOL(pcibios_fixup_bus);
+> > 
+> > -static int skip_isa_ioresource_align(struct pci_dev *dev) -{
+> > -	return 0;
+> > -}
+> > -
+> >  /*
+> >   * We need to avoid collisions with `mirrored' VGA ports
+> >   * and other strange ISA hardware, so we always want the @@ -899,20
+> > +872,18 @@ static int skip_isa_ioresource_align(struct pci_dev *dev)
+> > resource_size_t pcibios_align_resource(void *data, const struct resource
+> > *res,
+> >  				resource_size_t size, resource_size_t align)  {
+> > -	struct pci_dev *dev = data;
+> > -	resource_size_t start = res->start;
+> > -
+> > -	if (res->flags & IORESOURCE_IO) {
+> > -		if (skip_isa_ioresource_align(dev))
+> > -			return start;
+> > -		if (start & 0x300)
+> > -			start = (start + 0x3ff) & ~0x3ff;
+> > -	}
+> > -
+> > -	return start;
+> > +	return res->start;
+> >  }
+> >  EXPORT_SYMBOL(pcibios_align_resource);
+> > 
+> > +int pcibios_add_device(struct pci_dev *dev) {
+> > +	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
+> > +
+> > +	return 0;
+> > +}
+> > +EXPORT_SYMBOL(pcibios_add_device);
+> > +
+> >  /*
+> >   * Reparent resource children of pr that conflict with res
+> >   * under res, and make res replace those children.
+> > @@ -1333,13 +1304,6 @@ static void pcibios_setup_phb_resources(struct
+> > pci_controller *hose,
+> >  		 (unsigned long)hose->io_base_virt - _IO_BASE);  }
+> > 
+> > -struct device_node *pcibios_get_phb_of_node(struct pci_bus *bus) -{
+> > -	struct pci_controller *hose = bus->sysdata;
+> > -
+> > -	return of_node_get(hose->dn);
+> > -}
+> > -
+> >  static void pcibios_scan_phb(struct pci_controller *hose)  {
+> >  	LIST_HEAD(resources);
+> > diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig index
+> > d5e58ba..7c56c2e 100644
+> > --- a/drivers/pci/host/Kconfig
+> > +++ b/drivers/pci/host/Kconfig
+> > @@ -79,7 +79,7 @@ config PCI_KEYSTONE
+> > 
+> >  config PCIE_XILINX
+> >  	bool "Xilinx AXI PCIe host bridge support"
+> > -	depends on ARCH_ZYNQ
+> > +	depends on ARCH_ZYNQ || MICROBLAZE
+> >  	help
+> >  	  Say 'Y' here if you want kernel to support the Xilinx AXI PCIe
+> >  	  Host Bridge driver.
+> > --
+> > 2.1.1
 > 
-> I guess this is possible, but what worries me more is that the longer the
-> patch is not pushed, the higher the chance somebody to end-up with broken
-> rootfs. Wouldn't it be better to push it, thus preventing that happening?
-
-Will apply today into omap-for-v4.5/fixes with Aaro's ack. Note that
-Aaro found also two other error causing issues with the onenand
-driver, so it seems the onenand driver has been broken for years in
-the mainline kernel..
-
-> BTW the differences for N9/50 come from ONENAND_SYS_CFG1_HF bit and
-> ONENAND_SYS_CFG1_BRL_6 vs ONENAND_SYS_CFG1_BRL_4. Both are changed (later in
-> the code) anyway, so I guess it is safe to reset them to default values.
-
-Yes I think we're better off having things fully configured by the
-kernel in the long run.
-
-> Or, maybe the correct fix is to issue RESET command to onenand controller
-> after GPMC reset? RESET command is supposed to put all the bits to their
-> default values.
-
-Something like that could be added if needed.
-
-Regards,
-
-Tony
