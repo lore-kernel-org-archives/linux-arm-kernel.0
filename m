@@ -1,123 +1,85 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Mon, 22 Feb 2016 11:37:28 -0800
-Subject: [PATCH 1/3] arm64: ptdump: use static initializers for vmemmap
- region boundaries
-In-Reply-To: <20160222113310.GB3435@leverpostej>
-References: <1456135239-3607-1-git-send-email-ard.biesheuvel@linaro.org>
- <1456135239-3607-2-git-send-email-ard.biesheuvel@linaro.org>
- <20160222113310.GB3435@leverpostej>
-Message-ID: <56CB6378.9090207@redhat.com>
+From: scott.branden@broadcom.com (Scott Branden)
+Date: Mon, 22 Feb 2016 11:41:37 -0800
+Subject: [PATCH v2 1/3] input: cygnus-update touchscreen dt node document
+In-Reply-To: <20160222193604.GA26177@dtor-ws>
+References: <1455702226-20599-1-git-send-email-raveendra.padasalagi@broadcom.com>
+ <1455702226-20599-2-git-send-email-raveendra.padasalagi@broadcom.com>
+ <20160218143617.GH9654@rob-hp-laptop>
+ <CAAFb_vq6_uQbcWvwV8TZqVqH_C-ueUd+gBRA=mXUQrWqxoz=ww@mail.gmail.com>
+ <20160222193604.GA26177@dtor-ws>
+Message-ID: <56CB6471.3020400@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/22/2016 03:33 AM, Mark Rutland wrote:
-> Hi,
+My comments below
+
+On 16-02-22 11:36 AM, Dmitry Torokhov wrote:
+> On Fri, Feb 19, 2016 at 11:43:50AM +0530, Raveendra Padasalagi wrote:
+>> On Thu, Feb 18, 2016 at 8:06 PM, Rob Herring <robh@kernel.org> wrote:
+>>> On Wed, Feb 17, 2016 at 03:13:44PM +0530, Raveendra Padasalagi wrote:
+>>>> In Cygnus SOC touch screen controller registers are shared
+>>>> with ADC and flex timer. Using readl/writel could lead to
+>>>> race condition. So touch screen driver is enhanced to support
+>>>>
+>>>> 1. If touchscreen register's are not shared. Register access
+>>>> is handled through readl/writel if "brcm,iproc-touchscreen"
+>>>> compatible is provided in touchscreen dt node. This will help
+>>>> for future SOC's if comes with dedicated touchscreen IP register's.
+>>>>
+>>>> 2. If touchscreen register's are shared with other IP's, register
+>>>> access is handled through syscon framework API's to take care of
+>>>> mutually exclusive access. This feature can be enabled by selecting
+>>>> "brcm,iproc-touchscreen-syscon" compatible string in the touchscreen
+>>>> dt node.
+>>>>
+>>>> Hence touchscreen dt node bindings document is updated to take care
+>>>> of above changes in the touchscreen driver.
+>>>>
+>>>> Signed-off-by: Raveendra Padasalagi <raveendra.padasalagi@broadcom.com>
+>>>> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+>>>> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+>>>> ---
+>>>>   .../input/touchscreen/brcm,iproc-touchscreen.txt   | 57 +++++++++++++++++++---
+>>>>   1 file changed, 51 insertions(+), 6 deletions(-)
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/input/touchscreen/brcm,iproc-touchscreen.txt b/Documentation/devicetree/bindings/input/touchscreen/brcm,iproc-touchscreen.txt
+>>>> index 34e3382..f530c25 100644
+>>>> --- a/Documentation/devicetree/bindings/input/touchscreen/brcm,iproc-touchscreen.txt
+>>>> +++ b/Documentation/devicetree/bindings/input/touchscreen/brcm,iproc-touchscreen.txt
+>>>> @@ -1,12 +1,30 @@
+>>>>   * Broadcom's IPROC Touchscreen Controller
+>>>>
+>>>>   Required properties:
+>>>> -- compatible: must be "brcm,iproc-touchscreen"
+>>>> -- reg: physical base address of the controller and length of memory mapped
+>>>> -  region.
+>>>> +- compatible: should be one of
+>>>> +        "brcm,iproc-touchscreen"
+>>>> +        "brcm,iproc-touchscreen-syscon"
+>>>
+>>> More specific and this is not how you do syscon. Either the block is or
+>>> isn't. You can't have it both ways.
+>>
+>> Existing driver has support for reg, if we modify now to support only syscon
+>> then this driver will not work if some one wishes to use previous
+>> kernel version's
+>> dt and vice versa. Basically this breaks dt compatibility. Is that ok ?
 >
-> On Mon, Feb 22, 2016 at 11:00:37AM +0100, Ard Biesheuvel wrote:
->> There is no need to initialize the vmemmap region boundaries dynamically,
->> since they are compile time constants. So just add these constants to the
->> global struct initializer, and drop the dynamic assignment and related code.
+> But the issue is that the driver does not actually work correctly with
+> direct register access on those systems, since the registers are
+> actually shared with other components. I am not quite sure if it is OK
+> to break DT binding in this case...
+
+The driver does work correctly with direct register access on those 
+systems because the other components using those registers are not 
+active in those systems - so syscon is not needed in those cases.
+
+I'm ok with not containing backwards compatibility though and always 
+using syscon.  There are no deployed systems using older versions of the 
+upstreamed kernel.
 >
-> This does look nicer.
->
-> I believe the intention here was to mark the end of the _populated_
-> vmemmap region rather than the static VA carveout, so this is a slight
-> change in behaviour.
->
-> However, I don't think we gained much by only handling the populated
-> region, and we didn't do the same for the linear map. So FWIW:
->
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> Thanks.
 >
 
-Yes, I implemented it off of the existing calculation for printing in
-init.c which at the time was static. Going the full range does match
-up better with the rest of the markers.
-
-Acked-by: Laura Abbott <labbott@redhat.com>
-  
-> Mark.
->
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>   arch/arm64/mm/dump.c | 47 +++++---------------
->>   1 file changed, 12 insertions(+), 35 deletions(-)
->>
->> diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
->> index 6be918478f85..eadcb70e733c 100644
->> --- a/arch/arm64/mm/dump.c
->> +++ b/arch/arm64/mm/dump.c
->> @@ -34,37 +34,21 @@ struct addr_marker {
->>   	const char *name;
->>   };
->>
->> -enum address_markers_idx {
->> -	MODULES_START_NR = 0,
->> -	MODULES_END_NR,
->> -	VMALLOC_START_NR,
->> -	VMALLOC_END_NR,
->> -#ifdef CONFIG_SPARSEMEM_VMEMMAP
->> -	VMEMMAP_START_NR,
->> -	VMEMMAP_END_NR,
->> -#endif
->> -	FIXADDR_START_NR,
->> -	FIXADDR_END_NR,
->> -	PCI_START_NR,
->> -	PCI_END_NR,
->> -	KERNEL_SPACE_NR,
->> -};
->> -
->>   static struct addr_marker address_markers[] = {
->> -	{ MODULES_VADDR,	"Modules start" },
->> -	{ MODULES_END,		"Modules end" },
->> -	{ VMALLOC_START,	"vmalloc() Area" },
->> -	{ VMALLOC_END,		"vmalloc() End" },
->> +	{ MODULES_VADDR,		"Modules start" },
->> +	{ MODULES_END,			"Modules end" },
->> +	{ VMALLOC_START,		"vmalloc() Area" },
->> +	{ VMALLOC_END,			"vmalloc() End" },
->>   #ifdef CONFIG_SPARSEMEM_VMEMMAP
->> -	{ 0,			"vmemmap start" },
->> -	{ 0,			"vmemmap end" },
->> +	{ (u64)vmemmap,			"vmemmap start" },
->> +	{ (u64)vmemmap + VMEMMAP_SIZE,	"vmemmap end" },
->>   #endif
->> -	{ FIXADDR_START,	"Fixmap start" },
->> -	{ FIXADDR_TOP,		"Fixmap end" },
->> -	{ PCI_IO_START,		"PCI I/O start" },
->> -	{ PCI_IO_END,		"PCI I/O end" },
->> -	{ PAGE_OFFSET,		"Linear Mapping" },
->> -	{ -1,			NULL },
->> +	{ FIXADDR_START,		"Fixmap start" },
->> +	{ FIXADDR_TOP,			"Fixmap end" },
->> +	{ PCI_IO_START,			"PCI I/O start" },
->> +	{ PCI_IO_END,			"PCI I/O end" },
->> +	{ PAGE_OFFSET,			"Linear Mapping" },
->> +	{ -1,				NULL },
->>   };
->>
->>   /*
->> @@ -349,13 +333,6 @@ static int ptdump_init(void)
->>   			for (j = 0; j < pg_level[i].num; j++)
->>   				pg_level[i].mask |= pg_level[i].bits[j].mask;
->>
->> -#ifdef CONFIG_SPARSEMEM_VMEMMAP
->> -	address_markers[VMEMMAP_START_NR].start_address =
->> -				(unsigned long)virt_to_page(PAGE_OFFSET);
->> -	address_markers[VMEMMAP_END_NR].start_address =
->> -				(unsigned long)virt_to_page(high_memory);
->> -#endif
->> -
->>   	pe = debugfs_create_file("kernel_page_tables", 0400, NULL, NULL,
->>   				 &ptdump_fops);
->>   	return pe ? 0 : -ENOMEM;
->> --
->> 2.5.0
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
+Regards,
+Scott
