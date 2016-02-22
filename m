@@ -1,112 +1,104 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 22 Feb 2016 09:38:53 +0000
-Subject: [PATCH] clk: sunxi: allow PLL6 clock to be reused
-In-Reply-To: <CAGb2v66Fkvpqay+pNYjN1KP_KSUmv-du+PVSsyeuK+Y7bzEt+g@mail.gmail.com>
-References: <1456105198-25295-1-git-send-email-andre.przywara@arm.com>
- <CAGb2v66Fkvpqay+pNYjN1KP_KSUmv-du+PVSsyeuK+Y7bzEt+g@mail.gmail.com>
-Message-ID: <56CAD72D.7050102@arm.com>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Mon, 22 Feb 2016 17:37:50 +0800
+Subject: [PATCH v12 14/21] KVM: ARM64: Add helper to handle PMCR register bits
+In-Reply-To: <1456133877-9584-1-git-send-email-zhaoshenglong@huawei.com>
+References: <1456133877-9584-1-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1456133877-9584-15-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chen-Yu,
+From: Shannon Zhao <shannon.zhao@linaro.org>
 
-On 22/02/16 08:08, Chen-Yu Tsai wrote:
-> On Sun, Feb 21, 2016 at 5:39 PM, Andre Przywara <andre.przywara@arm.com> wrote:
->> Currently we hard-code the base name for the PLL6 clock for both the
->> sun4i and sun6i variants in the driver (pll6 and pll6x2, respectively).
->> This unfortunately denies reusing this clock for the H3 and A64 PLL8
->> clock, which is the same otherwise.
->> Remove the hard-coded name in the source code and replace it with an
->> appropriate index into the clock-output-names array in the DT.
->> This is compatible with all current device trees, since they all carry
->> the hard-coded base name in there.
->>
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->> ---
->> Salut Maxime,
->>
->> does that patch make sense?
->> It fixes the re-usability problem while still keeping compatibility
->> with existing DTs and also is pretty small.
->> If you agree with this, I'll send out a v3 of the A64 series including
->> this patch and the H3 PLL8 enablement later.
->> I tested this on my BananaPi, the clk_summary output was identical
->> with and without this patch.
-> 
-> This look OK to me, except one minor detail below.
-> 
->> Cheers,
->> Andre.
->>
->>  drivers/clk/sunxi/clk-factors.c | 3 ++-
->>  drivers/clk/sunxi/clk-factors.h | 1 +
->>  drivers/clk/sunxi/clk-sunxi.c   | 4 ++--
->>  3 files changed, 5 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/clk/sunxi/clk-factors.c b/drivers/clk/sunxi/clk-factors.c
->> index ddefe96..7daf01d 100644
->> --- a/drivers/clk/sunxi/clk-factors.c
->> +++ b/drivers/clk/sunxi/clk-factors.c
->> @@ -202,7 +202,8 @@ struct clk *sunxi_factors_register(struct device_node *node,
->>         if (data->name)
->>                 clk_name = data->name;
->>         else
->> -               of_property_read_string(node, "clock-output-names", &clk_name);
->> +               of_property_read_string_index(node, "clock-output-names",
->> +                                             data->name_idx, &clk_name);
->>
->>         factors = kzalloc(sizeof(struct clk_factors), GFP_KERNEL);
->>         if (!factors)
->> diff --git a/drivers/clk/sunxi/clk-factors.h b/drivers/clk/sunxi/clk-factors.h
->> index 1e63c5b..3a7da86 100644
->> --- a/drivers/clk/sunxi/clk-factors.h
->> +++ b/drivers/clk/sunxi/clk-factors.h
->> @@ -36,6 +36,7 @@ struct factors_data {
->>         void (*getter)(struct factors_request *req);
->>         void (*recalc)(struct factors_request *req);
->>         const char *name;
->> +       int name_idx;
-> 
-> I would drop the .name field. It was a bad workaround
-> due to limitations of the factors clk code at the time
-> by me. We really shouldn't hard-code the name if we want
-> to reuse the driver.
+According to ARMv8 spec, when writing 1 to PMCR.E, all counters are
+enabled by PMCNTENSET, while writing 0 to PMCR.E, all counters are
+disabled. When writing 1 to PMCR.P, reset all event counters, not
+including PMCCNTR, to zero. When writing 1 to PMCR.C, reset PMCCNTR to
+zero.
 
-I know what you mean (my first thought, too) and I totally agree, but we
-need it still for PLL5, which does not carry the original name in the DT
-output names.
-So at least this workaround here does not work, I guess we have to come
-up with something different - which would be a different patch.
-I can take a look into this later.
+Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/kvm/sys_regs.c |  1 +
+ include/kvm/arm_pmu.h     |  2 ++
+ virt/kvm/arm/pmu.c        | 34 ++++++++++++++++++++++++++++++++++
+ 3 files changed, 37 insertions(+)
 
-Thanks,
-Andre.
-
->>  };
->>
->>  struct clk_factors {
->> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
->> index 99f60ef..53f5927 100644
->> --- a/drivers/clk/sunxi/clk-sunxi.c
->> +++ b/drivers/clk/sunxi/clk-sunxi.c
->> @@ -530,14 +530,14 @@ static const struct factors_data sun4i_pll6_data __initconst = {
->>         .enable = 31,
->>         .table = &sun4i_pll5_config,
->>         .getter = sun4i_get_pll5_factors,
->> -       .name = "pll6",
->> +       .name_idx = 2,
->>  };
->>
->>  static const struct factors_data sun6i_a31_pll6_data __initconst = {
->>         .enable = 31,
->>         .table = &sun6i_a31_pll6_config,
->>         .getter = sun6i_a31_get_pll6_factors,
->> -       .name = "pll6x2",
->> +       .name_idx = 1,
->>  };
->>
->>  static const struct factors_data sun5i_a13_ahb_data __initconst = {
->> --
->> 1.8.4
->>
-> 
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index f31023b..f1866c3 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -467,6 +467,7 @@ static bool access_pmcr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+ 		val &= ~ARMV8_PMU_PMCR_MASK;
+ 		val |= p->regval & ARMV8_PMU_PMCR_MASK;
+ 		vcpu_sys_reg(vcpu, PMCR_EL0) = val;
++		kvm_pmu_handle_pmcr(vcpu, val);
+ 	} else {
+ 		/* PMCR.P & PMCR.C are RAZ */
+ 		val = vcpu_sys_reg(vcpu, PMCR_EL0)
+diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
+index 348c4c9..8bc92d1 100644
+--- a/include/kvm/arm_pmu.h
++++ b/include/kvm/arm_pmu.h
+@@ -45,6 +45,7 @@ void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val);
+ void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val);
+ void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val);
+ void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, u64 val);
++void kvm_pmu_handle_pmcr(struct kvm_vcpu *vcpu, u64 val);
+ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
+ 				    u64 select_idx);
+ #else
+@@ -67,6 +68,7 @@ static inline void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val) {}
+ static inline void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val) {}
+ static inline void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val) {}
+ static inline void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, u64 val) {}
++static inline void kvm_pmu_handle_pmcr(struct kvm_vcpu *vcpu, u64 val) {}
+ static inline void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu,
+ 						  u64 data, u64 select_idx) {}
+ #endif
+diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+index 9fc775e..cda869c 100644
+--- a/virt/kvm/arm/pmu.c
++++ b/virt/kvm/arm/pmu.c
+@@ -210,6 +210,40 @@ void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, u64 val)
+ 	}
+ }
+ 
++/**
++ * kvm_pmu_handle_pmcr - handle PMCR register
++ * @vcpu: The vcpu pointer
++ * @val: the value guest writes to PMCR register
++ */
++void kvm_pmu_handle_pmcr(struct kvm_vcpu *vcpu, u64 val)
++{
++	struct kvm_pmu *pmu = &vcpu->arch.pmu;
++	struct kvm_pmc *pmc;
++	u64 mask;
++	int i;
++
++	mask = kvm_pmu_valid_counter_mask(vcpu);
++	if (val & ARMV8_PMU_PMCR_E) {
++		kvm_pmu_enable_counter(vcpu,
++				vcpu_sys_reg(vcpu, PMCNTENSET_EL0) & mask);
++	} else {
++		kvm_pmu_disable_counter(vcpu, mask);
++	}
++
++	if (val & ARMV8_PMU_PMCR_C)
++		kvm_pmu_set_counter_value(vcpu, ARMV8_PMU_CYCLE_IDX, 0);
++
++	if (val & ARMV8_PMU_PMCR_P) {
++		for (i = 0; i < ARMV8_PMU_CYCLE_IDX; i++)
++			kvm_pmu_set_counter_value(vcpu, i, 0);
++	}
++
++	if (val & ARMV8_PMU_PMCR_LC) {
++		pmc = &pmu->pmc[ARMV8_PMU_CYCLE_IDX];
++		pmc->bitmask = 0xffffffffffffffffUL;
++	}
++}
++
+ static bool kvm_pmu_counter_is_enabled(struct kvm_vcpu *vcpu, u64 select_idx)
+ {
+ 	return (vcpu_sys_reg(vcpu, PMCR_EL0) & ARMV8_PMU_PMCR_E) &&
+-- 
+2.0.4
