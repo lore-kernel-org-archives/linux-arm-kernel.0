@@ -1,47 +1,30 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 22 Feb 2016 21:54:29 +0100
-Subject: [RFC PATCH 07/10] arm64: mm: avoid __pa translations for idmap_pg_dir
- and swapper_pg_dir
-In-Reply-To: <1456174472-30028-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1456174472-30028-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1456174472-30028-8-git-send-email-ard.biesheuvel@linaro.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 22 Feb 2016 17:59:50 -0300
+Subject: iMX7d cpu1 issue
+In-Reply-To: <AMSPR04MB2634AA127C6397584AF6BA488A30@AMSPR04MB263.eurprd04.prod.outlook.com>
+References: <56C2D63F.1030408@compulab.co.il> <20160218140913.GY6756@tiger>
+ <AMSPR04MB263D00A3F8D9A8D9D3A536D88AF0@AMSPR04MB263.eurprd04.prod.outlook.com>
+ <56C5F4D7.1070704@compulab.co.il>
+ <AMSPR04MB26334EB884FA8A4B565278188AF0@AMSPR04MB263.eurprd04.prod.outlook.com>
+ <56C6CE36.6040503@compulab.co.il>
+ <CAOMZO5Aa+veHWQCrKGz4rsvmjKWiitd81D8ncGnX8Fdk0aYe7Q@mail.gmail.com>
+ <AMSPR04MB2634AA127C6397584AF6BA488A30@AMSPR04MB263.eurprd04.prod.outlook.com>
+Message-ID: <CAOMZO5Dp-NCktEWrMuuot3T1dV386tkSoHU_DAtBYiJQbBm33A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When taking the physical address of idmap_pg_dir or swapper_pg_dir,
-which are static kernel globals, use __pa_symbol() not __pa().
+Hi Frank,
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/include/asm/mmu_context.h | 2 +-
- arch/arm64/mm/mmu.c                  | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+On Mon, Feb 22, 2016 at 5:48 PM, Frank Li <frank.li@nxp.com> wrote:
 
-diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
-index b03272fc501e..a8ba62955a62 100644
---- a/arch/arm64/include/asm/mmu_context.h
-+++ b/arch/arm64/include/asm/mmu_context.h
-@@ -123,7 +123,7 @@ static inline void cpu_install_idmap(void)
- 	local_flush_tlb_all();
- 	cpu_set_idmap_tcr_t0sz();
- 
--	cpu_switch_mm(idmap_pg_dir, &init_mm);
-+	cpu_do_switch_mm(__pa_symbol(idmap_pg_dir), &init_mm);
- }
- 
- /*
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 13517699bea6..980dd9cbdc19 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -557,7 +557,7 @@ void __init paging_init(void)
- 	 * We only reuse the PGD from the swapper_pg_dir, not the pud + pmd
- 	 * allocated with it.
- 	 */
--	memblock_free(__pa(swapper_pg_dir) + PAGE_SIZE,
-+	memblock_free(__pa_symbol(swapper_pg_dir) + PAGE_SIZE,
- 		      SWAPPER_DIR_SIZE - PAGE_SIZE);
- 
- 	bootmem_init();
--- 
-2.5.0
+> Upstream kernel use PSCI to enable second core.  You can't define CONFIG_MX7_SEC.
+>
+> NXP released kernel use legacy method, which require kernel run in security mode. So you have to define CONFIG_MX7_SEC.
+
+Thanks for the clarification.
+
+With linux-next I can see the two cores brought up:
+
+[    0.005377] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
+[    0.007734] CPU1: thread -1, cpu 1, socket 0, mpidr 80000001
+[    0.007862] Brought up 2 CPU
