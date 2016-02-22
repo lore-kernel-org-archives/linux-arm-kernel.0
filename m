@@ -1,39 +1,114 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 22 Feb 2016 13:42:49 -0600
-Subject: [PATCH 2/3] clk: mvebu: add AP806 core clock driver
-In-Reply-To: <20160222183203.2278.60153@quark.deferred.io>
-References: <1455521698-7905-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1455521698-7905-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <20160222025357.GE15973@rob-hp-laptop>
- <20160222091423.4756a579@free-electrons.com>
- <20160222141617.GA14970@lunn.ch> <20160222183203.2278.60153@quark.deferred.io>
-Message-ID: <CAL_Jsq+iiUBcTdnqzFWLJ+5jPvq0rmWgBboab4xyj1dQyDQE+Q@mail.gmail.com>
+From: ray.jui@broadcom.com (Ray Jui)
+Date: Mon, 22 Feb 2016 11:48:47 -0800
+Subject: [PATCH v2 1/3] input: cygnus-update touchscreen dt node document
+In-Reply-To: <56CB6471.3020400@broadcom.com>
+References: <1455702226-20599-1-git-send-email-raveendra.padasalagi@broadcom.com>
+ <1455702226-20599-2-git-send-email-raveendra.padasalagi@broadcom.com>
+ <20160218143617.GH9654@rob-hp-laptop>
+ <CAAFb_vq6_uQbcWvwV8TZqVqH_C-ueUd+gBRA=mXUQrWqxoz=ww@mail.gmail.com>
+ <20160222193604.GA26177@dtor-ws> <56CB6471.3020400@broadcom.com>
+Message-ID: <47ef2a75-3f97-644f-a817-c93e6b3bc658@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 22, 2016 at 12:32 PM, Michael Turquette
-<mturquette@baylibre.com> wrote:
-> Quoting Andrew Lunn (2016-02-22 06:16:17)
->> > Such information will come later, and we can rework the drivers and DT
->> > bindings accordingly. Those DT bindings cannot be stable, as the
->> > platform is under heavy development and we'll probably discover some
->> > issues down the road.
->>
->> Hi Thomas
->>
->> Maybe add a big fat warning that the bindings are unstable, and the DT
->> blob must be kept in sync with the kernel?
+
+
+On 2/22/2016 11:41 AM, Scott Branden wrote:
+> My comments below
 >
-> +1 and feel free to blame the lack of documentation.  No one can expect
-> bindings to be finalized when the chip topology is not fully understood.
+> On 16-02-22 11:36 AM, Dmitry Torokhov wrote:
+>> On Fri, Feb 19, 2016 at 11:43:50AM +0530, Raveendra Padasalagi wrote:
+>>> On Thu, Feb 18, 2016 at 8:06 PM, Rob Herring <robh@kernel.org> wrote:
+>>>> On Wed, Feb 17, 2016 at 03:13:44PM +0530, Raveendra Padasalagi wrote:
+>>>>> In Cygnus SOC touch screen controller registers are shared
+>>>>> with ADC and flex timer. Using readl/writel could lead to
+>>>>> race condition. So touch screen driver is enhanced to support
+>>>>>
+>>>>> 1. If touchscreen register's are not shared. Register access
+>>>>> is handled through readl/writel if "brcm,iproc-touchscreen"
+>>>>> compatible is provided in touchscreen dt node. This will help
+>>>>> for future SOC's if comes with dedicated touchscreen IP register's.
+>>>>>
+>>>>> 2. If touchscreen register's are shared with other IP's, register
+>>>>> access is handled through syscon framework API's to take care of
+>>>>> mutually exclusive access. This feature can be enabled by selecting
+>>>>> "brcm,iproc-touchscreen-syscon" compatible string in the touchscreen
+>>>>> dt node.
+>>>>>
+>>>>> Hence touchscreen dt node bindings document is updated to take care
+>>>>> of above changes in the touchscreen driver.
+>>>>>
+>>>>> Signed-off-by: Raveendra Padasalagi
+>>>>> <raveendra.padasalagi@broadcom.com>
+>>>>> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+>>>>> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+>>>>> ---
+>>>>>   .../input/touchscreen/brcm,iproc-touchscreen.txt   | 57
+>>>>> +++++++++++++++++++---
+>>>>>   1 file changed, 51 insertions(+), 6 deletions(-)
+>>>>>
+>>>>> diff --git
+>>>>> a/Documentation/devicetree/bindings/input/touchscreen/brcm,iproc-touchscreen.txt
+>>>>> b/Documentation/devicetree/bindings/input/touchscreen/brcm,iproc-touchscreen.txt
+>>>>>
+>>>>> index 34e3382..f530c25 100644
+>>>>> ---
+>>>>> a/Documentation/devicetree/bindings/input/touchscreen/brcm,iproc-touchscreen.txt
+>>>>>
+>>>>> +++
+>>>>> b/Documentation/devicetree/bindings/input/touchscreen/brcm,iproc-touchscreen.txt
+>>>>>
+>>>>> @@ -1,12 +1,30 @@
+>>>>>   * Broadcom's IPROC Touchscreen Controller
+>>>>>
+>>>>>   Required properties:
+>>>>> -- compatible: must be "brcm,iproc-touchscreen"
+>>>>> -- reg: physical base address of the controller and length of
+>>>>> memory mapped
+>>>>> -  region.
+>>>>> +- compatible: should be one of
+>>>>> +        "brcm,iproc-touchscreen"
+>>>>> +        "brcm,iproc-touchscreen-syscon"
+>>>>
+>>>> More specific and this is not how you do syscon. Either the block is or
+>>>> isn't. You can't have it both ways.
+>>>
+>>> Existing driver has support for reg, if we modify now to support only
+>>> syscon
+>>> then this driver will not work if some one wishes to use previous
+>>> kernel version's
+>>> dt and vice versa. Basically this breaks dt compatibility. Is that ok ?
+>>
+>> But the issue is that the driver does not actually work correctly with
+>> direct register access on those systems, since the registers are
+>> actually shared with other components. I am not quite sure if it is OK
+>> to break DT binding in this case...
+>
+> The driver does work correctly with direct register access on those
+> systems because the other components using those registers are not
+> active in those systems - so syscon is not needed in those cases.
+>
+> I'm ok with not containing backwards compatibility though and always
+> using syscon.  There are no deployed systems using older versions of the
+> upstreamed kernel.
+>>
+>> Thanks.
+>>
+>
+> Regards,
+> Scott
 
-I can understand not understanding the full clock tree. I have "full"
-documentation of a Marvell chip and don't understand the clock tree
-fully. But I can't believe you don't have some sense of how many
-clocks you have to deal with. 10? 100? 1000? What I see is 2 nodes of
-a single register each for clocks at roughly the same address. That
-tells me your binding is too fine grained. If you really don't know
-what is right, then err on the side of a single clock provider node
-and don't put the clock details in DT.
+The iproc touchscreen is currently activated in the "bcm9hmidc.dtsi" 
+that represents the optional daughter card installed on reference boards 
+bcm958300k and bcm958305k. While not maintaining backwards compatibility 
+*might not* be a serious issue, it would be nice if we can at least make 
+sure the driver change and DT are merged into the same kernel version so 
+they stay in sync.
 
-Rob
+Going forward, if we are only going to support syscon based 
+implementation, the existing compatible string "brcm,iproc-touchscreen" 
+is preferred over "brcm,iproc-touchscreen-syscon".
+
+Thanks,
+
+Ray
