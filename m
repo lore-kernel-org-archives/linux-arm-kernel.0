@@ -1,126 +1,215 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 22 Feb 2016 15:25:47 +0530
-Subject: [PATCH v3 3/3] pci: dra7xx: use pdata callbacks to perform reset
-In-Reply-To: <alpine.DEB.2.02.1602220631300.3418@utopia.booyaka.com>
-References: <1452780672-14339-1-git-send-email-kishon@ti.com>
- <1452780672-14339-4-git-send-email-kishon@ti.com>
- <20160127173104.GQ19432@atomide.com> <56A90971.4020409@ti.com>
- <20160127185649.GV19432@atomide.com> <56A94FB7.6020903@ti.com>
- <20160128183156.GH19432@atomide.com> <56B087AD.4000505@ti.com>
- <alpine.DEB.2.02.1602080208070.2182@utopia.booyaka.com>
- <56B900E9.9040306@ti.com>
- <alpine.DEB.2.02.1602090846480.2906@utopia.booyaka.com>
- <56BA2495.9020407@ti.com>
- <alpine.DEB.2.02.1602091932160.2906@utopia.booyaka.com>
- <56BA958A.1020503@ti.com> <56BACCDB.2070507@ti.com>
- <alpine.DEB.2.02.1602111921090.20757@utopia.booyaka.com>
- <56BD8091.4090007@ti.com> <56BE1454.3030002@ti.com> <56C5D377.50901@ti.com>
- <56CAA82D.6000507@ti.com>
- <alpine.DEB.2.02.1602220631300.3418@utopia.booyaka.com>
-Message-ID: <56CADB23.8020202@ti.com>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Mon, 22 Feb 2016 17:37:43 +0800
+Subject: [PATCH v12 07/21] KVM: ARM64: PMU: Add perf event map and introduce
+ perf event creating function
+In-Reply-To: <1456133877-9584-1-git-send-email-zhaoshenglong@huawei.com>
+References: <1456133877-9584-1-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1456133877-9584-8-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+From: Shannon Zhao <shannon.zhao@linaro.org>
 
-On Monday 22 February 2016 12:01 PM, Paul Walmsley wrote:
-> Kishon,
-> 
-> On Mon, 22 Feb 2016, Kishon Vijay Abraham I wrote:
-> 
->> Sekhar,
->>
->> On Thursday 18 February 2016 07:51 PM, Sekhar Nori wrote:
->>> On Friday 12 February 2016 10:50 PM, Suman Anna wrote:
->>>> Sekhar,
->>>> Will you be following up with above suggestion since Kishon is gonna be out?
->>>
->>> Alright, noticed this action for me :) Went through the thread, and 
->>> looks like this is what we want to see?
->>>
->>> Thanks,
->>> Sekhar
->>>
->>> ---8<---
->>> From e3ba368f2235e1bf38a22ba8ea4e5c12aaafda19 Mon Sep 17 00:00:00 2001
->>> Message-Id: <e3ba368f2235e1bf38a22ba8ea4e5c12aaafda19.1455803758.git.nsekhar@ti.com>
->>> From: Sekhar Nori <nsekhar@ti.com>
->>> Date: Thu, 18 Feb 2016 16:49:56 +0530
->>> Subject: [PATCH 1/1] ARM: DRA7: hwmod: Add custom reset handler for PCIeSS
->>>
->>> Add a custom reset handler for DRA7x PCIeSS. This
->>> handler is required to deassert PCIe hardreset lines
->>> after they have been asserted.
->>>
->>> This enables the PCIe driver to access registers after
->>> PCIeSS has been runtime enabled without having to
->>> deassert hardreset lines itself.
->>>
->>> With this patch applied, used lspci to make sure
->>> connected PCIe device enumerates on DRA74x and DRA72x
->>> EVMs.
->>>
->>> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
->>> ---
->>> Applies to tag for-v4.6/omap-hwmod-a of Paul W's tree.
->>>
->>>  arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 23 +++++++++++++++++++++++
->>>  1 file changed, 23 insertions(+)
->>>
->>> diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
->>> index b61355e2a771..252b74633e31 100644
->>> --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
->>> +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
->>> @@ -1526,8 +1526,31 @@ static struct omap_hwmod dra7xx_ocp2scp3_hwmod = {
->>>   *
->>>   */
->>>  
->>> +/*
->>> + * As noted in documentation for _reset() in omap_hwmod.c, the stock reset
->>> + * functionality of OMAP HWMOD layer does not deassert the hardreset lines
->>> + * associated with an IP automatically leaving the driver to handle that
->>> + * by itself. This does not work for PCIeSS which needs the reset lines
->>> + * deasserted for the driver to start accessing registers.
->>> + *
->>> + * We use a PCIeSS HWMOD class specific reset handler to deassert the hardreset
->>> + * lines after asserting them.
->>> + */
->>> +static int dra7xx_pciess_reset(struct omap_hwmod *oh)
->>> +{
->>> +	int i;
->>> +
->>> +	for (i = 0; i < oh->rst_lines_cnt; i++) {
->>> +		omap_hwmod_assert_hardreset(oh, oh->rst_lines[i].name);
->>> +		omap_hwmod_deassert_hardreset(oh, oh->rst_lines[i].name);
->>> +	}
->>> +
->>> +	return 0;
->>> +}
->>> +
->>>  static struct omap_hwmod_class dra7xx_pciess_hwmod_class = {
->>>  	.name	= "pcie",
->>> +	.reset	= dra7xx_pciess_reset,
->>>  };
->>
->> Thanks for the patch.
-> 
-> Could you please test the bind/unbind functionality just to make sure it 
-> works?
+When we use tools like perf on host, perf passes the event type and the
+id of this event type category to kernel, then kernel will map them to
+hardware event number and write this number to PMU PMEVTYPER<n>_EL0
+register. When getting the event number in KVM, directly use raw event
+type to create a perf_event for it.
 
-The pci-dra7xx driver neither expose the bind/unbind sysfs entry nor can be
-built as module.
+Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/include/asm/perf_event.h |   2 +
+ arch/arm64/kvm/Makefile             |   1 +
+ include/kvm/arm_pmu.h               |  12 ++++
+ virt/kvm/arm/pmu.c                  | 122 ++++++++++++++++++++++++++++++++++++
+ 4 files changed, 137 insertions(+)
+ create mode 100644 virt/kvm/arm/pmu.c
 
-However I hacked the pci-dra7xx driver to be built as module [and reverted
-Commit 5de85b9d57ab ("PM / runtime: Re-init runtime PM states at probe error
-and driver unbind")] and I don't see an abort when the PCI registers are
-accessed after rmmod/modprobe cycle (that was the issue that Sekhar's patch
-tried to solve). However PCI as such doesn't work after rmmod/modprobe cycle
-[1], but this is a different issue most likely in PCIe core and has to debugged.
-
-In summary, there are other issues in PCI across rmmod/modprobe cycle but the
-reset of pci-dra7xx happens fine with this patch.
-
-Thanks
-Kishon
-
-[1] -> http://pastebin.ubuntu.com/15169387/
+diff --git a/arch/arm64/include/asm/perf_event.h b/arch/arm64/include/asm/perf_event.h
+index 5c77ef8..867140d 100644
+--- a/arch/arm64/include/asm/perf_event.h
++++ b/arch/arm64/include/asm/perf_event.h
+@@ -29,6 +29,8 @@
+ #define ARMV8_PMU_PMCR_D	(1 << 3) /* CCNT counts every 64th cpu cycle */
+ #define ARMV8_PMU_PMCR_X	(1 << 4) /* Export to ETM */
+ #define ARMV8_PMU_PMCR_DP	(1 << 5) /* Disable CCNT if non-invasive debug*/
++/* Determines which bit of PMCCNTR_EL0 generates an overflow */
++#define ARMV8_PMU_PMCR_LC	(1 << 6)
+ #define	ARMV8_PMU_PMCR_N_SHIFT	11	 /* Number of counters supported */
+ #define	ARMV8_PMU_PMCR_N_MASK	0x1f
+ #define	ARMV8_PMU_PMCR_MASK	0x3f	 /* Mask for writable bits */
+diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
+index caee9ee..122cff4 100644
+--- a/arch/arm64/kvm/Makefile
++++ b/arch/arm64/kvm/Makefile
+@@ -26,3 +26,4 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v2-emul.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v3.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v3-emul.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arch_timer.o
++kvm-$(CONFIG_KVM_ARM_PMU) += $(KVM)/arm/pmu.o
+diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
+index 8157fe5..9536a24 100644
+--- a/include/kvm/arm_pmu.h
++++ b/include/kvm/arm_pmu.h
+@@ -23,6 +23,8 @@
+ #include <linux/perf_event.h>
+ #include <asm/perf_event.h>
+ 
++#define ARMV8_PMU_CYCLE_IDX		(ARMV8_PMU_MAX_COUNTERS - 1)
++
+ struct kvm_pmc {
+ 	u8 idx;	/* index into the pmu->pmc array */
+ 	struct perf_event *perf_event;
+@@ -36,11 +38,21 @@ struct kvm_pmu {
+ };
+ 
+ #define kvm_arm_pmu_v3_ready(v)		((v)->arch.pmu.ready)
++u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u64 select_idx);
++void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
++				    u64 select_idx);
+ #else
+ struct kvm_pmu {
+ };
+ 
+ #define kvm_arm_pmu_v3_ready(v)		(false)
++static inline u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu,
++					    u64 select_idx)
++{
++	return 0;
++}
++static inline void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu,
++						  u64 data, u64 select_idx) {}
+ #endif
+ 
+ #endif
+diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+new file mode 100644
+index 0000000..648c30e
+--- /dev/null
++++ b/virt/kvm/arm/pmu.c
+@@ -0,0 +1,122 @@
++/*
++ * Copyright (C) 2015 Linaro Ltd.
++ * Author: Shannon Zhao <shannon.zhao@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/cpu.h>
++#include <linux/kvm.h>
++#include <linux/kvm_host.h>
++#include <linux/perf_event.h>
++#include <asm/kvm_emulate.h>
++#include <kvm/arm_pmu.h>
++
++/**
++ * kvm_pmu_get_counter_value - get PMU counter value
++ * @vcpu: The vcpu pointer
++ * @select_idx: The counter index
++ */
++u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u64 select_idx)
++{
++	u64 counter, reg, enabled, running;
++	struct kvm_pmu *pmu = &vcpu->arch.pmu;
++	struct kvm_pmc *pmc = &pmu->pmc[select_idx];
++
++	reg = (select_idx == ARMV8_PMU_CYCLE_IDX)
++	      ? PMCCNTR_EL0 : PMEVCNTR0_EL0 + select_idx;
++	counter = vcpu_sys_reg(vcpu, reg);
++
++	/* The real counter value is equal to the value of counter register plus
++	 * the value perf event counts.
++	 */
++	if (pmc->perf_event)
++		counter += perf_event_read_value(pmc->perf_event, &enabled,
++						 &running);
++
++	return counter & pmc->bitmask;
++}
++
++/**
++ * kvm_pmu_stop_counter - stop PMU counter
++ * @pmc: The PMU counter pointer
++ *
++ * If this counter has been configured to monitor some event, release it here.
++ */
++static void kvm_pmu_stop_counter(struct kvm_vcpu *vcpu, struct kvm_pmc *pmc)
++{
++	u64 counter, reg;
++
++	if (pmc->perf_event) {
++		counter = kvm_pmu_get_counter_value(vcpu, pmc->idx);
++		reg = (pmc->idx == ARMV8_PMU_CYCLE_IDX)
++		       ? PMCCNTR_EL0 : PMEVCNTR0_EL0 + pmc->idx;
++		vcpu_sys_reg(vcpu, reg) = counter;
++		perf_event_disable(pmc->perf_event);
++		perf_event_release_kernel(pmc->perf_event);
++		pmc->perf_event = NULL;
++	}
++}
++
++static bool kvm_pmu_counter_is_enabled(struct kvm_vcpu *vcpu, u64 select_idx)
++{
++	return (vcpu_sys_reg(vcpu, PMCR_EL0) & ARMV8_PMU_PMCR_E) &&
++	       (vcpu_sys_reg(vcpu, PMCNTENSET_EL0) & BIT(select_idx));
++}
++
++/**
++ * kvm_pmu_set_counter_event_type - set selected counter to monitor some event
++ * @vcpu: The vcpu pointer
++ * @data: The data guest writes to PMXEVTYPER_EL0
++ * @select_idx: The number of selected counter
++ *
++ * When OS accesses PMXEVTYPER_EL0, that means it wants to set a PMC to count an
++ * event with given hardware event number. Here we call perf_event API to
++ * emulate this action and create a kernel perf event for it.
++ */
++void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
++				    u64 select_idx)
++{
++	struct kvm_pmu *pmu = &vcpu->arch.pmu;
++	struct kvm_pmc *pmc = &pmu->pmc[select_idx];
++	struct perf_event *event;
++	struct perf_event_attr attr;
++	u64 eventsel, counter;
++
++	kvm_pmu_stop_counter(vcpu, pmc);
++	eventsel = data & ARMV8_PMU_EVTYPE_EVENT;
++
++	memset(&attr, 0, sizeof(struct perf_event_attr));
++	attr.type = PERF_TYPE_RAW;
++	attr.size = sizeof(attr);
++	attr.pinned = 1;
++	attr.disabled = !kvm_pmu_counter_is_enabled(vcpu, select_idx);
++	attr.exclude_user = data & ARMV8_PMU_EXCLUDE_EL0 ? 1 : 0;
++	attr.exclude_kernel = data & ARMV8_PMU_EXCLUDE_EL1 ? 1 : 0;
++	attr.exclude_hv = 1; /* Don't count EL2 events */
++	attr.exclude_host = 1; /* Don't count host events */
++	attr.config = eventsel;
++
++	counter = kvm_pmu_get_counter_value(vcpu, select_idx);
++	/* The initial sample period (overflow count) of an event. */
++	attr.sample_period = (-counter) & pmc->bitmask;
++
++	event = perf_event_create_kernel_counter(&attr, -1, current, NULL, pmc);
++	if (IS_ERR(event)) {
++		pr_err_once("kvm: pmu event creation failed %ld\n",
++			    PTR_ERR(event));
++		return;
++	}
++
++	pmc->perf_event = event;
++}
+-- 
+2.0.4
