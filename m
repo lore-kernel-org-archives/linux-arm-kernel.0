@@ -1,27 +1,30 @@
-From: a0393675@ti.com (Keerthy)
-Date: Mon, 22 Feb 2016 08:57:30 +0530
-Subject: [PATCH] ARM: OMAP: DRA7: Make use of omap_revision information
- for soc_is* calls
-In-Reply-To: <20160219181514.GK21202@atomide.com>
-References: <1455706123-26497-1-git-send-email-j-keerthy@ti.com>
- <20160219181514.GK21202@atomide.com>
-Message-ID: <56CA8022.6010206@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun, 21 Feb 2016 19:34:42 -0800
+Subject: [PATCH] ARM: dts: sun4i: Enable USB DRC on Hyundai-a7hd
+In-Reply-To: <1455656404-31191-1-git-send-email-peter@korsgaard.com>
+References: <1455656404-31191-1-git-send-email-peter@korsgaard.com>
+Message-ID: <20160222033442.GG19169@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Peter,
 
+On Tue, Feb 16, 2016 at 10:00:04PM +0100, Peter Korsgaard wrote:
+> Enable the OTG USB controller on the A7HD.
+> 
+> Signed-off-by: Peter Korsgaard <peter@korsgaard.com>
 
-On Friday 19 February 2016 11:45 PM, Tony Lindgren wrote:
-> * Keerthy <j-keerthy@ti.com> [160217 02:49]:
->> Currently of_machine_is_compatible is used to detect the soc which
->> employs string comparison operations. We already have all the required
->> information in the omap_revision. Hence make use of the same like
->> the previous OMAPs and avoid costly string comparisons.
->
-> Looks good to me thanks. Applying into omap-for-v4.6/soc.
+Applied, thanks!
+Maxime
 
-Thanks Tony.
-
->
-> Tony
->
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160221/97797048/attachment-0001.sig>
