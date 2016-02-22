@@ -1,58 +1,34 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon, 22 Feb 2016 11:23:44 +0000
-Subject: [PATCH 1/3] nvmem: Fix dependencies for !HAS_IOMEM archs
+Date: Mon, 22 Feb 2016 11:23:52 +0000
+Subject: [PATCH 2/3] nvmem: imx-ocotp: Fix return value of imx_ocotp_read
 In-Reply-To: <1456140161-6851-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <1456140161-6851-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1456140224-6895-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1456140232-6938-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Richard Weinberger <richard@nod.at>
+From: Axel Lin <axel.lin@ingics.com>
 
-Not every arch has io memory.
-So, unbreak the build by fixing the dependencies.
+imx_ocotp_read() should return 0 on success.
 
-Signed-off-by: Richard Weinberger <richard@nod.at>
+Signed-off-by: Axel Lin <axel.lin@ingics.com>
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- drivers/nvmem/Kconfig | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/nvmem/imx-ocotp.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/nvmem/Kconfig b/drivers/nvmem/Kconfig
-index 5bd18cc..ca52952 100644
---- a/drivers/nvmem/Kconfig
-+++ b/drivers/nvmem/Kconfig
-@@ -37,6 +37,7 @@ config NVMEM_LPC18XX_EEPROM
- config NVMEM_MXS_OCOTP
- 	tristate "Freescale MXS On-Chip OTP Memory Support"
- 	depends on ARCH_MXS || COMPILE_TEST
-+	depends on HAS_IOMEM
- 	help
- 	  If you say Y here, you will get readonly access to the
- 	  One Time Programmable memory pages that are stored
-@@ -59,6 +60,7 @@ config MTK_EFUSE
- config QCOM_QFPROM
- 	tristate "QCOM QFPROM Support"
- 	depends on ARCH_QCOM || COMPILE_TEST
-+	depends on HAS_IOMEM
- 	select REGMAP_MMIO
- 	help
- 	  Say y here to enable QFPROM support. The QFPROM provides access
-@@ -70,6 +72,7 @@ config QCOM_QFPROM
- config ROCKCHIP_EFUSE
- 	tristate "Rockchip eFuse Support"
- 	depends on ARCH_ROCKCHIP || COMPILE_TEST
-+	depends on HAS_IOMEM
- 	help
- 	  This is a simple drive to dump specified values of Rockchip SoC
- 	  from eFuse, such as cpu-leakage.
-@@ -91,6 +94,7 @@ config NVMEM_SUNXI_SID
- config NVMEM_VF610_OCOTP
- 	tristate "VF610 SoC OCOTP support"
- 	depends on SOC_VF610 || COMPILE_TEST
-+	depends on HAS_IOMEM
- 	help
- 	  This is a driver for the 'OCOTP' peripheral available on Vybrid
- 	  devices like VF5xx and VF6xx.
+diff --git a/drivers/nvmem/imx-ocotp.c b/drivers/nvmem/imx-ocotp.c
+index b7971d4..d7796eb 100644
+--- a/drivers/nvmem/imx-ocotp.c
++++ b/drivers/nvmem/imx-ocotp.c
+@@ -51,7 +51,7 @@ static int imx_ocotp_read(void *context, const void *reg, size_t reg_size,
+ 		val += 4;
+ 	}
+ 
+-	return (i - index) * 4;
++	return 0;
+ }
+ 
+ static int imx_ocotp_write(void *context, const void *data, size_t count)
 -- 
 1.9.1
