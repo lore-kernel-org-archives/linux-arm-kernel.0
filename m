@@ -1,41 +1,51 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 22 Feb 2016 16:31:12 +0900
-Subject: [PATCH 1/6] ARM: decompressor: drop unneeded assignments to "targets"
+Date: Mon, 22 Feb 2016 16:31:17 +0900
+Subject: [PATCH 6/6] ARM: decompressor: rename suffix_y to compress-y
 In-Reply-To: <1456126277-14633-1-git-send-email-yamada.masahiro@socionext.com>
 References: <1456126277-14633-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1456126277-14633-2-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1456126277-14633-7-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The "targets" exists to specify which files need the corresponding
-".*_cmd" files to be included during the build.  In other words, it
-is used for files that need to detect the change of the command line
-by if_changed, if_changed_dep, and if_changed_rule.  While, these
-files are just copied by "$(call cmd,shipped)".  Adding them to the
-"targets" is meaningless because $(call cmd,...) never creates
-".*_cmd" files.  Such files as ".lib1funcs.S.cmd", ".ashldi3.S.cmd"
-do not exist in the first place.
+The "$(suffix_y)" no longer appears in the file names, but it just
+specifies the method of the file compression.  The "compress-y" sounds
+more suitable.
 
 Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
 
- arch/arm/boot/compressed/Makefile | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/compressed/Makefile | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
 diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-index 7a6a58e..7090ad3 100644
+index 3243f09..5018bfa 100644
 --- a/arch/arm/boot/compressed/Makefile
 +++ b/arch/arm/boot/compressed/Makefile
-@@ -91,8 +91,8 @@ endif
+@@ -66,11 +66,11 @@ endif
  
- targets       := vmlinux vmlinux.lds \
- 		 piggy.$(suffix_y) piggy.$(suffix_y).o \
--		 lib1funcs.o lib1funcs.S ashldi3.o ashldi3.S bswapsdi2.o \
--		 bswapsdi2.S font.o font.c head.o misc.o $(OBJS)
-+		 lib1funcs.o ashldi3.o bswapsdi2.o \
-+		 font.o head.o misc.o $(OBJS)
+ CPPFLAGS_vmlinux.lds := -DTEXT_START="$(ZTEXTADDR)" -DBSS_START="$(ZBSSADDR)"
  
- # Make sure files are removed during clean
- extra-y       += piggy.gzip piggy.lzo piggy.lzma piggy.xzkern piggy.lz4 \
+-suffix_$(CONFIG_KERNEL_GZIP) = gzip
+-suffix_$(CONFIG_KERNEL_LZO)  = lzo
+-suffix_$(CONFIG_KERNEL_LZMA) = lzma
+-suffix_$(CONFIG_KERNEL_XZ)   = xzkern
+-suffix_$(CONFIG_KERNEL_LZ4)  = lz4
++compress-$(CONFIG_KERNEL_GZIP) = gzip
++compress-$(CONFIG_KERNEL_LZO)  = lzo
++compress-$(CONFIG_KERNEL_LZMA) = lzma
++compress-$(CONFIG_KERNEL_XZ)   = xzkern
++compress-$(CONFIG_KERNEL_LZ4)  = lz4
+ 
+ # Borrowed libfdt files for the ATAG compatibility mode
+ 
+@@ -183,7 +183,7 @@ $(obj)/vmlinux: $(obj)/vmlinux.lds $(obj)/$(HEAD) $(obj)/piggy.o \
+ 	@$(check_for_bad_syms)
+ 
+ $(obj)/piggy_data: $(obj)/../Image FORCE
+-	$(call if_changed,$(suffix_y))
++	$(call if_changed,$(compress-y))
+ 
+ $(obj)/piggy.o: $(obj)/piggy_data
+ 
 -- 
 1.9.1
