@@ -1,42 +1,42 @@
-From: brian.starkey@arm.com (Brian Starkey)
-Date: Mon, 22 Feb 2016 12:07:31 +0000
-Subject: next-20160222 build: 5 failures 9 warnings (next-20160222)
-In-Reply-To: <56CAF868.5020406@arm.com>
-References: <E1aXlz4-000486-Pb@optimist> <20160222100832.GX18327@sirena.org.uk>
- <56CAE5E6.7030707@arm.com>
- <20160222115243.GA5779@e106950-lin.cambridge.arm.com>
- <56CAF868.5020406@arm.com>
-Message-ID: <20160222120730.GB5779@e106950-lin.cambridge.arm.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Mon, 22 Feb 2016 21:08:05 +0900
+Subject: [PATCH 0/6] ARM: decompressor: several cleanups
+In-Reply-To: <20160222113625.GC19428@n2100.arm.linux.org.uk>
+References: <1456126277-14633-1-git-send-email-yamada.masahiro@socionext.com>
+ <20160222113625.GC19428@n2100.arm.linux.org.uk>
+Message-ID: <CAK7LNAQEwm=2bHX+kTxFVJTh-sFX+3MBgwuEmmNM-XoyvdbWRA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 22, 2016 at 12:00:40PM +0000, Marc Zyngier wrote:
->On 22/02/16 11:52, Brian Starkey wrote:
->>> This will create a new conflict, but will make the resolution 100% 
->>> clear.
->>
->> I applied this, but arm64 defconfig wouldn't build until I uncommented
->> the '#define kvm_call_hyp(...' line.
->>
->> Is that right?
->
->This patch is intended as a merge indication so that when you do the
->merge with the arm64 tree, it conflicts and you can resolve it by going
->the right thing (merging the non-comment version of this line).
+Hi Russell,
 
-Right, now I understand "make the resolution 100% clear" - I guess 100%
-clear isn't clear enough for me :-(
 
-I've not seen that used as notation before, thanks for explaining.
+2016-02-22 20:36 GMT+09:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Mon, Feb 22, 2016 at 04:31:11PM +0900, Masahiro Yamada wrote:
+>> Masahiro Yamada (6):
+>>   ARM: decompressor: drop unneeded assignments to "targets"
+>>   ARM: decompressor: drop more unneeded assignments to "targets"
+>>   ARM: decompressor: use clean-files instead of extra-y to clean files
+>>   ARM: decompressor: drop redundant FORCE in Makefile
+>>   ARM: decompressor: merge piggy.*.S and simplify Makefile
+>>   ARM: decompressor: rename suffix_y to compress-y
+>
+> Most of this looks fine to me, but I've a question about how thoroughly
+> patch 5 has been tested: iow, do we get correct behaviour if only the
+> compression method is changed?
+>
+> Thanks.
 
--Brian
 
->
->So yes, uncommenting it is the right thing to do.
->
->Thanks,
->
->	M.
->-- 
->Jazz is not dead. It just smells funny...
->
+I did build-test, changing the configuration
+CONFIG_KERNEL_GZIP -> CONFIG_KERNEL_LZMA -> CONFIG_KERNEL_XZ -> ...
+
+I confirmed zImage was created from the expected piggy.
+
+For run-test, it worked fine too.
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
