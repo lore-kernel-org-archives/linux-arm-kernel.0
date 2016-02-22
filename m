@@ -1,96 +1,75 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 22 Feb 2016 21:35:24 +0100
-Subject: [RFC PATCH 1/2] memremap: add arch specific hook for MEMREMAP_WB
- mappings
-In-Reply-To: <20160222200227.GF19428@n2100.arm.linux.org.uk>
-References: <1456149728-16706-1-git-send-email-ard.biesheuvel@linaro.org>
- <1456149728-16706-2-git-send-email-ard.biesheuvel@linaro.org>
- <CAPcyv4ivN9c8PHBR77vd36ovB28OETJUr6VYf_8gNtXgqEmATw@mail.gmail.com>
- <CAKv+Gu9OWVgo+Qm85jPjY7xJ1UELm-4LYORHKF8Yy+_HuzmtGw@mail.gmail.com>
- <20160222200227.GF19428@n2100.arm.linux.org.uk>
-Message-ID: <CAKv+Gu9gwnuu7hnYpjv7ozuKYmC8ApMakSJmYvQMaevNEd5zvA@mail.gmail.com>
+From: frank.li@nxp.com (Frank Li)
+Date: Mon, 22 Feb 2016 20:48:19 +0000
+Subject: iMX7d cpu1 issue
+In-Reply-To: <CAOMZO5Aa+veHWQCrKGz4rsvmjKWiitd81D8ncGnX8Fdk0aYe7Q@mail.gmail.com>
+References: <56C2D63F.1030408@compulab.co.il>	<20160218140913.GY6756@tiger>
+ <AMSPR04MB263D00A3F8D9A8D9D3A536D88AF0@AMSPR04MB263.eurprd04.prod.outlook.com>
+ <56C5F4D7.1070704@compulab.co.il>
+ <AMSPR04MB26334EB884FA8A4B565278188AF0@AMSPR04MB263.eurprd04.prod.outlook.com>
+ <56C6CE36.6040503@compulab.co.il>
+ <CAOMZO5Aa+veHWQCrKGz4rsvmjKWiitd81D8ncGnX8Fdk0aYe7Q@mail.gmail.com>
+Message-ID: <AMSPR04MB2634AA127C6397584AF6BA488A30@AMSPR04MB263.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 February 2016 at 21:02, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Feb 22, 2016 at 08:17:11PM +0100, Ard Biesheuvel wrote:
->> I am not exactly sure why ioremap_cache() does not use MT_MEMORY_RW
->> attributes, but the ARM architecture simply does not allow mismatched
->> attributes, so we cannot simply replace each instance of
->> ioremap_cache() with memremap()
->>
->> Perhaps Russell can explain?
->
-> ARM has had ioremap_cached() for a while - it was introduced in the
-> bitkeeper times of 2.6, so pre-git.  In those kernels, and into the
-> git era, pre-dating ARMv6 support, it was merely:
->
-> +#define ioremap_cached(cookie,size)    __arch_ioremap((cookie),(size),L_PTE_CACHEABLE)
->
-> which means that we got write-through cache behaviour for mappings
-> created by this, where supported, or if not, read-allocate writeback.
-> This was completely independent of the system memory mapping
-> attributes, which could be specified on the kernel command line.
->
-> This was originally used by pxa2xx-flash to provide faster flash
-> access on those systems - in other words, it's created to remap
-> devices with cacheable attributes.
->
-> When creating ARMv6 support, I ended up completely rewriting how
-> the memory attributes were handled, and so it then became this:
->
-> +#define ioremap_cached(cookie,size)    __arch_ioremap((cookie), (size), MT_DEVICE_CACHED)
->
-> which gives very similar behaviour, though we now default to RAWB
-> mappings, which fall back to WT on CPUs that don't support RAWB.
-> Again, independent of the system memory mapping.
->
-> Then, in 2013, with the advent of Xen, ioremap_cached() became
-> ioremap_cache() so that Xen would build on ARM, and to align it
-> with other architectures.  Whether ioremap_cached() actually was
-> suitable to become ioremap_cache(), I'm not sure, but that's
-> what happened.
->
-> Since it was just renamed, it preserves the original goal which is
-> to remap device memory with cacheable attributes, which may differ
-> from the cacheable attributes of the system RAM.  It has never
-> been intended for remapping system memory: none of the ioremap_*
-> family of functions on ARM were ever intended for that purpose.
->
-> However, some people did use it for that purpose on ARMv5 and
-> earlier architectures, where, due to the virtual cache architecture,
-> you could get away with remapping the same memory with differing
-> attributes without any problem.  With the advent of ARMv6
-> (pre-dating 2013), this was clearly stated as being illegal at
-> architecture level, but people were married to the idea - despite
-> me telling them not to.
->
-> So eventually, I had no other option than to add a code check to
-> ioremap*() which prevents any ioremap*() function from being used
-> on system memory - iow, memory that Linux maps itself either as
-> part of lowmem or via the kmap*() API - since an ioremap*()
-> mapping would conflict with those.
->
-> That's basically where we are today: ioremap*() does not permit
-> system memory to be remapped, even ioremap_cache().
->
 
-OK, thanks for the historical context.
 
-So what is your opinion on this series, i.e., to wire up memremap() to
-remap arbitrary memory regions into the vmalloc area with MT_MEMORY_RW
-attributes, and at the same time lift the restriction that the region
-must be disjoint from memory covered by lowmem or kmap?
+> -----Original Message-----
+> From: Fabio Estevam [mailto:festevam at gmail.com]
+> Sent: Sunday, February 21, 2016 9:23 AM
+> To: Ilya Ledvich <ilya@compulab.co.il>
+> Cc: Frank Li <frank.li@nxp.com>; Shawn Guo <shawnguo@kernel.org>;
+> Yongcai Huang <anson.huang@nxp.com>; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: iMX7d cpu1 issue
+> 
+> Hi Ilya/Frank,
+> 
+> On Fri, Feb 19, 2016 at 6:11 AM, Ilya Ledvich <ilya@compulab.co.il> wrote:
+> > Hi Frank,
+> > Thank you for so brilliant suggestion!!!
+> >
+> >> #define CONFIG_MX7_SEC
+> >
+> >
+> > Seems it works!
+> > The  CPU1 is brought up, and kernel can successfully boot!
+> 
+> I changed U-boot as suggested:
+> 
+> --- a/include/configs/mx7_common.h
+> +++ b/include/configs/mx7_common.h
+> @@ -94,10 +94,7 @@
+>  #define CONFIG_CMD_FUSE
+>  #define CONFIG_MXC_OCOTP
+> 
+> -/*
+> - * Default boot linux kernel in no secure mode.
+> - * If want to boot kernel in secure mode, please define CONFIG_MX7_SEC
+> - */
+> +#define CONFIG_MX7_SEC
 
-It would make my life a lot easier, since we can more easily share
-code between x86, arm64 and ARM to permanently map memory regions that
-have been populated by the firmware. As I noted in the commit log,
-memremap() already does the right thing wrt lowmem, i.e., it returns
-the existing mapping rather than creating a new one. For highmem, I
-don't think kmap() is the way to go considering the unknown size and
-the potentially permanent nature of the mappings (which resemble
-ioremap more than they resemble kmap)
+Upstream kernel use PSCI to enable second core.  You can't define CONFIG_MX7_SEC. 
 
--- 
-Ard.
+NXP released kernel use legacy method, which require kernel run in security mode. So you have to define CONFIG_MX7_SEC.
+
+Best regards
+Frank Li
+
+>  #ifndef CONFIG_MX7_SEC
+>  #define CONFIG_ARMV7_NONSEC
+>  #define CONFIG_ARMV7_PSCI
+> 
+> 
+> but still see only one core brought up in the kernel:
+> 
+> [    0.003051] /cpus/cpu at 0 missing clock-frequency property
+> [    0.003076] /cpus/cpu at 1 missing clock-frequency property
+> [    0.003092] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
+> [    0.003157] Setting up static identity map for 0x80008280 - 0x800082f0
+> [    0.005152] Brought up 1 CPUs
+> [    0.005169] SMP: Total of 1 processors activated (48.00 BogoMIPS).
+> 
+> I am booting 4.5-rc5 on a imx7d-sdb board.
+> 
+> Any ideas on how to bring up the second core?
