@@ -1,88 +1,72 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 22 Feb 2016 16:45:10 +0530
-Subject: [PATCH 0/2] Add Rockchip display port phy driver support
-In-Reply-To: <1455534071-31230-1-git-send-email-ykk@rock-chips.com>
-References: <1455534071-31230-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <56CAEDBE.2050808@ti.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Mon, 22 Feb 2016 11:21:37 +0000
+Subject: [PATCH v2 1/3] ARM: dts: Add cooling levels for CPUs on exynos5420
+In-Reply-To: <56C69154.40608@samsung.com> (Krzysztof Kozlowski's message of
+ "Fri, 19 Feb 2016 12:51:48 +0900")
+References: <1455772383-20598-1-git-send-email-k.kozlowski@samsung.com>
+ <87h9h599zi.fsf@e105922-lin.cambridge.arm.com>
+ <56C69154.40608@samsung.com>
+Message-ID: <871t857zy6.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Krzysztof Kozlowski <k.kozlowski@samsung.com> writes:
 
-On Monday 15 February 2016 04:31 PM, Yakir Yang wrote:
-> 
-> Hi Kison,
-> 
-> This series is splited from Analogix DP DRM thread [0], and Heiko suggest this
-> should be an independent thread which may be easy for you to apply.
+> On 19.02.2016 02:58, Punit Agrawal wrote:
+>> Hi Krzysztof,
+>> 
+>> Krzysztof Kozlowski <k.kozlowski@samsung.com> writes:
+>> 
+>>> On Exynos5420 we support 8 cpufreq steps (600-1300 MHz) for LITTLE and
+>>> 12 steps for big core (700-1800 MHz). Add respective cooling cells.
+>>>
+>>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>>>
+>>> ---
+>>>
+>>> Changes since v1:
+>>> 1. Add cooling properties to all CPUs (suggested by Viresh).
+>>> ---
+>>>  arch/arm/boot/dts/exynos5420-cpus.dtsi | 24 ++++++++++++++++++++++++
+>>>  1 file changed, 24 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/exynos5420-cpus.dtsi b/arch/arm/boot/dts/exynos5420-cpus.dtsi
+>>> index 261d25173f61..5c052d7ff554 100644
+>>> --- a/arch/arm/boot/dts/exynos5420-cpus.dtsi
+>>> +++ b/arch/arm/boot/dts/exynos5420-cpus.dtsi
+>>> @@ -33,6 +33,9 @@
+>>>  			clock-frequency = <1800000000>;
+>>>  			cci-control-port = <&cci_control1>;
+>>>  			operating-points-v2 = <&cluster_a15_opp_table>;
+>>> +			cooling-min-level = <0>;
+>>> +			cooling-max-level = <11>;
+>> 
+>> Although the above two properties are defined they aren't parsed in the
+>> kernel.
+>> 
+>> Setting min / max extents for cooling devices via cooling maps does work
+>> though.
+>
+> It is described as optional property in
+> Documentation/devicetree/bindings/thermal/thermal.txt ... but indeed it
+> is totally ignored.
+>
+> So what is the recommendation? Get rid of it from DTS and documentation
+> or leave it because it will be implemented someday?
 
-Indeed. Merged now thanks. (Changed the year to 2016 in the file header before
-merging)
+As long as you are not expecting any particular behaviour arising from
+that property today I think it should be fine to leave it in.
 
-Thanks
-Kishon
+Eduardo, do you agree?
 
-> 
+>
+> Thanks for feedback!
+>
 > Best regards,
-> Yakir
-> 
-> [0]: https://patchwork.kernel.org/patch/8086571/
-> 
-> 
-> Changes in v12:
-> - Re-order the include headers file alphabetically in phy-rockchip-dp.c (Jingoo)
-> 
-> Changes in v11:
-> - Correct the title of this rockchip dp phy document(Rob)
-> - Add the ack from Rob Herring
-> 
-> Changes in v10:
-> - Fix the wrong macro value of GRF_EDP_REF_CLK_SEL_INTER_HIWORD_MASK
->     BIT(4) -> BIT(20)
-> 
-> Changes in v9:
-> - Removed the unused the variable "res" in probe function. (Heiko)
-> - Removed the unused head file.
-> 
-> Changes in v8:
-> - Fix the mixed spacers on macro definitions. (Heiko)
-> - Remove the unnecessary empty line after clk_prepare_enable. (Heiko)
-> - Remove the specific address in the example node name. (Heiko)
-> 
-> Changes in v7:
-> - Simply the commit message. (Kishon)
-> - Symmetrical enable/disbale the phy clock and power. (Kishon)
-> - Simplify the commit message. (Kishon)
-> 
-> Changes in v5:
-> - Remove "reg" DT property, cause driver could poweron/poweroff phy via
->   the exist "grf" syscon already. And rename the example DT node from
->   "edp_phy: phy at ff770274" to "edp_phy: edp-phy" directly. (Heiko)
-> - Add deivce_node at the front of driver, update phy_ops type from "static
->   struct" to "static const struct". And correct the input paramters of
->   devm_phy_create() interfaces. (Heiko)
-> - Split binding doc's from driver changes. (Rob)
-> - Update the rockchip,grf explain in document, and correct the clock required
->   elemets in document. (Rob & Heiko)
-> 
-> Changes in v4:
-> - Add commit message, and remove the redundant rockchip_dp_phy_init()
->   function, move those code to probe() method. And remove driver .owner
->   number. (Kishon)
-> 
-> Changes in v3:
-> - Suggest, add rockchip dp phy driver, collect the phy clocks and
->   power control. (Heiko)
-> 
-> Yakir Yang (2):
->   phy: Add driver for rockchip Display Port PHY
->   dt-bindings: add document for rockchip dp phy
-> 
->  .../devicetree/bindings/phy/rockchip-dp-phy.txt    |  22 +++
->  drivers/phy/Kconfig                                |   7 +
->  drivers/phy/Makefile                               |   1 +
->  drivers/phy/phy-rockchip-dp.c                      | 151 +++++++++++++++++++++
->  4 files changed, 181 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/phy/rockchip-dp-phy.txt
->  create mode 100644 drivers/phy/phy-rockchip-dp.c
-> 
+> Krzysztof
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
