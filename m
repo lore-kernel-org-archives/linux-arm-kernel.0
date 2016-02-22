@@ -1,10 +1,10 @@
 From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Mon, 22 Feb 2016 19:38:25 +0530
-Subject: [PATCH 36/61] gpio: rc5t583: Use devm_gpiochip_add_data() for gpio
+Date: Mon, 22 Feb 2016 19:38:26 +0530
+Subject: [PATCH 37/61] gpio: rdc321x: Use devm_gpiochip_add_data() for gpio
  registration
 In-Reply-To: <1456150130-2668-1-git-send-email-ldewangan@nvidia.com>
 References: <1456150130-2668-1-git-send-email-ldewangan@nvidia.com>
-Message-ID: <1456150130-2668-37-git-send-email-ldewangan@nvidia.com>
+Message-ID: <1456150130-2668-38-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,38 +13,38 @@ need of driver callback .remove.
 
 Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
 ---
- drivers/gpio/gpio-rc5t583.c | 12 ++----------
- 1 file changed, 2 insertions(+), 10 deletions(-)
+ drivers/gpio/gpio-rdc321x.c | 13 ++-----------
+ 1 file changed, 2 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/gpio/gpio-rc5t583.c b/drivers/gpio/gpio-rc5t583.c
-index 1e2d210..1d6100f 100644
---- a/drivers/gpio/gpio-rc5t583.c
-+++ b/drivers/gpio/gpio-rc5t583.c
-@@ -136,15 +136,8 @@ static int rc5t583_gpio_probe(struct platform_device *pdev)
+diff --git a/drivers/gpio/gpio-rdc321x.c b/drivers/gpio/gpio-rdc321x.c
+index 96ddee3..ec945b9 100644
+--- a/drivers/gpio/gpio-rdc321x.c
++++ b/drivers/gpio/gpio-rdc321x.c
+@@ -194,23 +194,14 @@ static int rdc321x_gpio_probe(struct platform_device *pdev)
  
- 	platform_set_drvdata(pdev, rc5t583_gpio);
- 
--	return gpiochip_add_data(&rc5t583_gpio->gpio_chip, rc5t583_gpio);
+ 	dev_info(&pdev->dev, "registering %d GPIOs\n",
+ 					rdc321x_gpio_dev->chip.ngpio);
+-	return gpiochip_add_data(&rdc321x_gpio_dev->chip, rdc321x_gpio_dev);
 -}
 -
--static int rc5t583_gpio_remove(struct platform_device *pdev)
+-static int rdc321x_gpio_remove(struct platform_device *pdev)
 -{
--	struct rc5t583_gpio *rc5t583_gpio = platform_get_drvdata(pdev);
+-	struct rdc321x_gpio *rdc321x_gpio_dev = platform_get_drvdata(pdev);
 -
--	gpiochip_remove(&rc5t583_gpio->gpio_chip);
+-	gpiochip_remove(&rdc321x_gpio_dev->chip);
+-
 -	return 0;
-+	return devm_gpiochip_add_data(&pdev->dev, &rc5t583_gpio->gpio_chip,
-+				      rc5t583_gpio);
++	return devm_gpiochip_add_data(&pdev->dev, &rdc321x_gpio_dev->chip,
++				      rdc321x_gpio_dev);
  }
  
- static struct platform_driver rc5t583_gpio_driver = {
-@@ -152,7 +145,6 @@ static struct platform_driver rc5t583_gpio_driver = {
- 		.name    = "rc5t583-gpio",
- 	},
- 	.probe		= rc5t583_gpio_probe,
--	.remove		= rc5t583_gpio_remove,
+ static struct platform_driver rdc321x_gpio_driver = {
+ 	.driver.name	= "rdc321x-gpio",
+ 	.driver.owner	= THIS_MODULE,
+ 	.probe		= rdc321x_gpio_probe,
+-	.remove		= rdc321x_gpio_remove,
  };
  
- static int __init rc5t583_gpio_init(void)
+ module_platform_driver(rdc321x_gpio_driver);
 -- 
 2.1.4
