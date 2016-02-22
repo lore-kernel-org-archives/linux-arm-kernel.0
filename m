@@ -1,35 +1,25 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 22 Feb 2016 21:50:39 +0100
+From: davem@davemloft.net (David Miller)
+Date: Mon, 22 Feb 2016 15:52:21 -0500 (EST)
 Subject: [PATCH] netcp: fix typo in netcp_setup_tc
-Message-ID: <1456174246-293822-1-git-send-email-arnd@arndb.de>
+In-Reply-To: <1456174246-293822-1-git-send-email-arnd@arndb.de>
+References: <1456174246-293822-1-git-send-email-arnd@arndb.de>
+Message-ID: <20160222.155221.1930653393972032546.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A change to the prototype of netcp_setup_tc() missed a '*'
-character, which broke compilation of hte netcp driver:
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Mon, 22 Feb 2016 21:50:39 +0100
 
-drivers/net/ethernet/ti/netcp_core.c: In function 'netcp_setup_tc':
-drivers/net/ethernet/ti/netcp_core.c:1839:31: error: invalid type argument of '->' (have 'struct tc_to_netdev')
-drivers/net/ethernet/ti/netcp_core.c:1872:19: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
+> A change to the prototype of netcp_setup_tc() missed a '*'
+> character, which broke compilation of hte netcp driver:
+> 
+> drivers/net/ethernet/ti/netcp_core.c: In function 'netcp_setup_tc':
+> drivers/net/ethernet/ti/netcp_core.c:1839:31: error: invalid type argument of '->' (have 'struct tc_to_netdev')
+> drivers/net/ethernet/ti/netcp_core.c:1872:19: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 16e5cc647173 ("net: rework setup_tc ndo op to consume general tc operand")
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 16e5cc647173 ("net: rework setup_tc ndo op to consume general tc operand")
----
- drivers/net/ethernet/ti/netcp_core.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Should be fixed in my net-next tree already.
 
-diff --git a/drivers/net/ethernet/ti/netcp_core.c b/drivers/net/ethernet/ti/netcp_core.c
-index 132caebb401a..e74e68eabd5f 100644
---- a/drivers/net/ethernet/ti/netcp_core.c
-+++ b/drivers/net/ethernet/ti/netcp_core.c
-@@ -1829,7 +1829,7 @@ static u16 netcp_select_queue(struct net_device *dev, struct sk_buff *skb,
- }
- 
- static int netcp_setup_tc(struct net_device *dev, u32 handle, __be16 proto,
--			  struct tc_to_netdev tc)
-+			  struct tc_to_netdev *tc)
- {
- 	int i;
- 
--- 
-2.7.0
+Thanks.
