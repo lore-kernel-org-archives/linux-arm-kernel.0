@@ -1,38 +1,53 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Mon, 22 Feb 2016 17:36:36 -0500
-Subject: [PATCH 0/8] drm: msm: module rework
-In-Reply-To: <1456175331-714117-1-git-send-email-arnd@arndb.de>
-References: <1456175331-714117-1-git-send-email-arnd@arndb.de>
-Message-ID: <CAF6AEGuYQqsH9TEoc-_cgMRNRvB99SveTqW3gSwJJvsvhaqNmw@mail.gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 22 Feb 2016 23:38:56 +0100
+Subject: [PATCH 9/9] ARM: mmp: mark usb_dma_mask as __maybe_unused
+In-Reply-To: <1454076396-3563101-10-git-send-email-arnd@arndb.de> (Arnd
+ Bergmann's message of "Fri, 29 Jan 2016 15:06:33 +0100")
+References: <1454076396-3563101-1-git-send-email-arnd@arndb.de>
+ <1454076396-3563101-10-git-send-email-arnd@arndb.de>
+Message-ID: <87bn78wetb.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 22, 2016 at 4:08 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> I saw some regressions on today's Linux-next kernel after
-> the Makefiles got reworked and tried to come up with a quick
-> fix. This ended up taking much longer, but the new version should
-> be cleaner and I no longer get any build errors in this
-> driver.
+Arnd Bergmann <arnd@arndb.de> writes:
 
-fyi, for the time being, I've already kicked out the kconfig/makefile
-splitup patches..
-
-I'll go ahead and pull in the hdmi symbol rename patch, since that is
-a sane thing to do.  I'm less sure about splitting things up into
-separate .ko's.  And I think having the .ko name not match the drm
-driver name (ie. what is passed in to drmOpen() in userspace) would
-cause issues since libdrm could try to modprobe $drivername.ko.  (I
-*think* that only matters in the non-udev case?  Which is at least not
-a common case, but breaking userspace is breaking userspace...)
-
-BR,
--R
-
-> The first two patches are just preparation to avoid the
-> namespace problems with global symbols and the module name.
+> This variable may be used by some devices that each have their
+> on Kconfig symbol, or by none of them, and that causes a build
+> warning:
 >
-> The next five patches separate out each subdirectory that has
-> its own Makefile into a separate loadable module.
+> arch/arm/mach-mmp/devices.c:241:12: error: 'usb_dma_mask' defined but not used [-Werror=unused-variable]
 >
-> The final patch is just a nice addon, it should work in theory
-> but this needs to be tested well.
+> Marking it __maybe_unused avoids the warning.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  arch/arm/mach-mmp/devices.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+
+Hi Haojian,
+
+I still didn't get an ack on this one, do you want to carry it through your
+tree, or let Arnd carry it or let me carry it ?
+
+Cheers.
+
+--
+Robert
+
+[1] The patch
+> diff --git a/arch/arm/mach-mmp/devices.c b/arch/arm/mach-mmp/devices.c
+> index 3330ac7cfbef..671c7a09ab3d 100644
+> --- a/arch/arm/mach-mmp/devices.c
+> +++ b/arch/arm/mach-mmp/devices.c
+> @@ -238,7 +238,7 @@ void pxa_usb_phy_deinit(void __iomem *phy_reg)
+>  #endif
+>  
+>  #if IS_ENABLED(CONFIG_USB_SUPPORT)
+> -static u64 usb_dma_mask = ~(u32)0;
+> +static u64 __maybe_unused usb_dma_mask = ~(u32)0;
+>  
+>  #if IS_ENABLED(CONFIG_USB_MV_UDC)
+>  struct resource pxa168_u2o_resources[] = {
+
+-- 
+Robert
