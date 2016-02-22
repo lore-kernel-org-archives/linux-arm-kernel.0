@@ -1,55 +1,50 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 22 Feb 2016 16:09:11 +0000
-Subject: [PATCH] arm*: efi: drop permanent mapping of the UEFI System table
-In-Reply-To: <CAKv+Gu_pnjL557dE1xez_y2tESOjZj9_2XEbNtm_b4yAA-WdYg@mail.gmail.com>
-References: <1456153179-27214-1-git-send-email-ard.biesheuvel@linaro.org>
- <20160222154314.GJ3435@leverpostej>
- <CAKv+Gu_pnjL557dE1xez_y2tESOjZj9_2XEbNtm_b4yAA-WdYg@mail.gmail.com>
-Message-ID: <20160222160910.GK3435@leverpostej>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 22 Feb 2016 08:09:56 -0800
+Subject: [PATCH] ARM: OMAP2+: Fix onenand initialization to avoid
+ filesystem corruption
+In-Reply-To: <56C9FE63.3070602@gmail.com>
+References: <linux-kernel@vger.kernel.org>
+ <1454683028-4193-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
+ <20160208193644.GU19432@atomide.com>
+ <20160210211226.GB1640@darkstar.musicnaut.iki.fi>
+ <20160211001220.GM19432@atomide.com> <56C9FE63.3070602@gmail.com>
+Message-ID: <20160222160956.GB13417@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 22, 2016 at 04:56:57PM +0100, Ard Biesheuvel wrote:
-> On 22 February 2016 at 16:43, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Mon, Feb 22, 2016 at 03:59:39PM +0100, Ard Biesheuvel wrote:
-> >> The permanent, writable mapping of the UEFI System table is only
-> >> referenced during invocations of UEFI Runtime Services, at which time
-> >> the UEFI virtual mapping is available, which also covers the system
-> >> table (since the runtime services themselves need access to it)
-> >
-> > I'm not sure it's strictly true that the runtime services themselves
-> > need access to the system table. Why would that be necessary? Are
-> > runtime services mandated to indirect calls via the system table?
-> >
+* Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com> [160221 10:14]:
+> Hi,
 > 
-> They don't need access per se, but they are allowed to reference it,
-> and so the memory remapping layer must make it accessible after
-> SetVirtualAddressMap(). The spec lists explicitly which fields are
-> still valid after ExitBootServices()
-
-I was language-lawyering ;)
-
-I appreciate that they _can_, I just didn't think it was true that they
-_must_ (i.e. that they always "need to access it"). Per the below that's
-likely moot.
-
-> SetVirtualAddressMap() is a runtime service, and one of the things it
-> does is update the pointers in the system table, hence it must be
-> located in RuntimeService memory, because anything else may be gone by
-> this time.
-
-Good point. That does imply that it must be in EfiRuntimeServices*
-memory.
-
-> > From the spec, I couldn't find a mandate that the system table (nor the
-> > runtime services table) were in a region of EfiRuntimeServicesData
-> > memory. I suspect I'm looking in the wrong place...
+> On 11.02.2016 02:12, Tony Lindgren wrote:
+> >
+> >Also.. There's a chance somebody has created a onenand file system
+> >with recent mainline kernels that did the reset and disabled ECC.
+> >So with Ivaylo's patch fixing that, those may not mount properly
+> >any longer. Most likely people just keep their maemo rootfs there
+> >though with the MMC being available.
 > 
-> We should clarify it if it is not clear (or if I turn out to be wrong)
+> I guess this is possible, but what worries me more is that the longer the
+> patch is not pushed, the higher the chance somebody to end-up with broken
+> rootfs. Wouldn't it be better to push it, thus preventing that happening?
 
-I'm hoping that I've simply missed something. Perhaps the implication
-above was intentional, albeit rather opaque.
+Will apply today into omap-for-v4.5/fixes with Aaro's ack. Note that
+Aaro found also two other error causing issues with the onenand
+driver, so it seems the onenand driver has been broken for years in
+the mainline kernel..
 
-Otherwise, I certainly agree a clarification would be a good thing!
+> BTW the differences for N9/50 come from ONENAND_SYS_CFG1_HF bit and
+> ONENAND_SYS_CFG1_BRL_6 vs ONENAND_SYS_CFG1_BRL_4. Both are changed (later in
+> the code) anyway, so I guess it is safe to reset them to default values.
 
-Mark.
+Yes I think we're better off having things fully configured by the
+kernel in the long run.
+
+> Or, maybe the correct fix is to issue RESET command to onenand controller
+> after GPMC reset? RESET command is supposed to put all the bits to their
+> default values.
+
+Something like that could be added if needed.
+
+Regards,
+
+Tony
