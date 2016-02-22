@@ -1,38 +1,55 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 22 Feb 2016 21:54:30 +0100
-Subject: [RFC PATCH 08/10] arm64: vdso: avoid __pa translations
+Date: Mon, 22 Feb 2016 21:54:32 +0100
+Subject: [RFC PATCH 10/10] arm64: mm: restrict __pa() translations to linear
+ virtual addresses
 In-Reply-To: <1456174472-30028-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1456174472-30028-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1456174472-30028-9-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1456174472-30028-11-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use __pa_symbol() not __pa() when taking the physical address of the
-VDSO symbols that are part of the kernel text.
+Now that we have replaced all occurrences of __pa() translations
+involving virtual addresses that are covered by the kernel text,
+we can redefine __virt_to_phys and __pa() etc to only take virtual
+address that are covered by the linear mapping. This means we can
+remove the comparison with PAGE_OFFSET in the definition of
+__virt_to_phys().
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/kernel/vdso.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ arch/arm64/include/asm/memory.h | 12 +++++++-----
+ 1 file changed, 7 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
-index 97bc68f4c689..065756b358b4 100644
---- a/arch/arm64/kernel/vdso.c
-+++ b/arch/arm64/kernel/vdso.c
-@@ -131,11 +131,12 @@ static int __init vdso_init(void)
- 		return -ENOMEM;
+diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+index 56d6739430f3..3b5dc5b243ac 100644
+--- a/arch/arm64/include/asm/memory.h
++++ b/arch/arm64/include/asm/memory.h
+@@ -86,11 +86,14 @@
+  * private definitions which should NOT be used outside memory.h
+  * files.  Use virt_to_phys/phys_to_virt/__pa/__va instead.
+  */
+-#define __virt_to_phys(x) ({						\
++#ifndef CONFIG_DEBUG_VM
++#define __virt_to_phys(x)	(((phys_addr_t)(x) & ~PAGE_OFFSET) + PHYS_OFFSET)
++#else
++#define __virt_to_phys(x)	({					\
+ 	phys_addr_t __x = (phys_addr_t)(x);				\
+-	__x & BIT(VA_BITS - 1) ? (__x & ~PAGE_OFFSET) + PHYS_OFFSET :	\
+-				 (__x - kimage_voffset); })
+-
++	BUG_ON(__x < PAGE_OFFSET);					\
++	(((phys_addr_t)__x & ~PAGE_OFFSET) + PHYS_OFFSET); })
++#endif
+ #define __phys_to_virt(x)	((unsigned long)((x) - PHYS_OFFSET) | PAGE_OFFSET)
  
- 	/* Grab the vDSO data page. */
--	vdso_pagelist[0] = virt_to_page(vdso_data);
-+	vdso_pagelist[0] = phys_to_page(__pa_symbol(vdso_data));
+ #define __kimg_to_phys(x)	((phys_addr_t)(x) - kimage_voffset)
+@@ -134,7 +137,6 @@
+ #endif
  
- 	/* Grab the vDSO code pages. */
- 	for (i = 0; i < vdso_pages; i++)
--		vdso_pagelist[i + 1] = virt_to_page(&vdso_start + i * PAGE_SIZE);
-+		vdso_pagelist[i + 1] = phys_to_page(__pa_symbol(&vdso_start) +
-+						    i * PAGE_SIZE);
+ #ifndef __ASSEMBLY__
+-#include <linux/bitops.h>
  
- 	/* Populate the special mapping structures */
- 	vdso_spec[0] = (struct vm_special_mapping) {
+ extern phys_addr_t		memstart_addr;
+ /* PHYS_OFFSET - the physical address of the start of memory. */
 -- 
 2.5.0
