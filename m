@@ -1,92 +1,35 @@
-From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Mon, 22 Feb 2016 13:48:56 -0700
-Subject: [PATCH v1] ARM: dts: nitrogen6x: add USB host 1 support
-In-Reply-To: <1456171421-10044-1-git-send-email-ps.report@gmx.net>
-References: <1456171421-10044-1-git-send-email-ps.report@gmx.net>
-Message-ID: <56CB7438.5030102@boundarydevices.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 22 Feb 2016 21:50:39 +0100
+Subject: [PATCH] netcp: fix typo in netcp_setup_tc
+Message-ID: <1456174246-293822-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/22/2016 1:03 PM, Peter Seiderer wrote:
-> Regulator stuff and pin configuration copied from imx6qdl-nitrogen6_max.dtsi
-> and checked against Boundary Devices linux kernel tree ([1]).
-> 
-> [1] https://github.com/boundarydevices/linux-imx6/blob/boundary-imx_3.14.28_1.0.0_ga/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-> 
-> Signed-off-by: Peter Seiderer <ps.report@gmx.net>
-> ---
->  arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi | 25 ++++++++++++++++++++++---
->  1 file changed, 22 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-> index c6c590d..81f8c5c 100644
-> --- a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-> @@ -85,9 +85,21 @@
->  			enable-active-high;
->  		};
->  
-> -		reg_can_xcvr: regulator at 3 {
-> +		reg_usb_h1_vbus: regulator at 3 {
->  			compatible = "regulator-fixed";
->  			reg = <3>;
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&pinctrl_usbh1>;
-> +			regulator-name = "usb_h1_vbus";
-> +			regulator-min-microvolt = <3300000>;
-> +			regulator-max-microvolt = <3300000>;
-> +			gpio = <&gpio7 12 GPIO_ACTIVE_HIGH>;
-> +			enable-active-high;
-> +		};
-> +
-> +		reg_can_xcvr: regulator at 4 {
-> +			compatible = "regulator-fixed";
-> +			reg = <4>;
->  			regulator-name = "CAN XCVR";
->  			regulator-min-microvolt = <3300000>;
->  			regulator-max-microvolt = <3300000>;
-> @@ -96,9 +108,9 @@
->  			gpio = <&gpio1 2 GPIO_ACTIVE_LOW>;
->  		};
->  
-> -		reg_wlan_vmmc: regulator at 4 {
-> +		reg_wlan_vmmc: regulator at 5 {
->  			compatible = "regulator-fixed";
-> -			reg = <4>;
-> +			reg = <5>;
->  			pinctrl-names = "default";
->  			pinctrl-0 = <&pinctrl_wlan_vmmc>;
->  			regulator-name = "reg_wlan_vmmc";
-> @@ -515,6 +527,12 @@
->  			>;
->  		};
->  
-> +		pinctrl_usbh1: usbh1grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_GPIO_17__GPIO7_IO12          0x0b0b0
+A change to the prototype of netcp_setup_tc() missed a '*'
+character, which broke compilation of hte netcp driver:
 
+drivers/net/ethernet/ti/netcp_core.c: In function 'netcp_setup_tc':
+drivers/net/ethernet/ti/netcp_core.c:1839:31: error: invalid type argument of '->' (have 'struct tc_to_netdev')
+drivers/net/ethernet/ti/netcp_core.c:1872:19: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
 
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 16e5cc647173 ("net: rework setup_tc ndo op to consume general tc operand")
+---
+ drivers/net/ethernet/ti/netcp_core.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-
-I'm ok with this patch, but a more correct fix would be to add a
-reset-gpios to usbh1 instead, as this is a reset pin for
-a usb hub. So if nobody else has a problem,
-
-Acked-by: Troy Kisky <troy.kisky@boundarydevices.com>
-
-
-> +			>;
-> +		};
-> +
->  		pinctrl_usbotg: usbotggrp {
->  			fsl,pins = <
->  				MX6QDL_PAD_GPIO_1__USB_OTG_ID	0x17059
-> @@ -632,6 +650,7 @@
->  };
->  
->  &usbh1 {
-> +	vbus-supply = <&reg_usb_h1_vbus>;
->  	status = "okay";
->  };
->  
-> 
+diff --git a/drivers/net/ethernet/ti/netcp_core.c b/drivers/net/ethernet/ti/netcp_core.c
+index 132caebb401a..e74e68eabd5f 100644
+--- a/drivers/net/ethernet/ti/netcp_core.c
++++ b/drivers/net/ethernet/ti/netcp_core.c
+@@ -1829,7 +1829,7 @@ static u16 netcp_select_queue(struct net_device *dev, struct sk_buff *skb,
+ }
+ 
+ static int netcp_setup_tc(struct net_device *dev, u32 handle, __be16 proto,
+-			  struct tc_to_netdev tc)
++			  struct tc_to_netdev *tc)
+ {
+ 	int i;
+ 
+-- 
+2.7.0
