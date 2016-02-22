@@ -1,47 +1,85 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 22 Feb 2016 09:31:02 +0100
-Subject: [PATCH] ARM: ux500: fix ureachable iounmap()
-Message-ID: <1456129862-3918-1-git-send-email-linus.walleij@linaro.org>
+Date: Mon, 22 Feb 2016 09:33:26 +0100
+Subject: [PATCH] ARM: Ux500: add synaptics RMI4 for Ux500 TVK DT
+Message-ID: <1456130006-4169-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The code was executing a return with a pointer before reaching
-iounmap().
+This adds the Synaptics RMI4 touchscreen to the Ux500 TVK
+user interface board. Tested on the U8500 HREFv60plus with
+the TVK UIB.
 
-Reported-by: David Binderman <dcb314@hotmail.com>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
-ARM SoC folks: I have no other Ux500 patches queued, so can
-you please apply this patch directly for-next somewhere,
-thanks.
+ARM SoC maintainers: please apply this patch directly for-next
+on some DT branch, I have no other Ux500 DT patches. These bindings
+are ACKed by Rob Herring in another thread so I think it's pointless
+to keep it out of tree.
 ---
- arch/arm/mach-ux500/cpu-db8500.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/ste-href-tvk1281618.dtsi | 37 +++++++++++++++++++++++++++++-
+ 1 file changed, 36 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-index a0ffaad1fb61..a557955472ea 100644
---- a/arch/arm/mach-ux500/cpu-db8500.c
-+++ b/arch/arm/mach-ux500/cpu-db8500.c
-@@ -76,17 +76,19 @@ static struct arm_pmu_platdata db8500_pmu_platdata = {
- static const char *db8500_read_soc_id(void)
- {
- 	void __iomem *uid;
-+	const char *retstr;
+diff --git a/arch/arm/boot/dts/ste-href-tvk1281618.dtsi b/arch/arm/boot/dts/ste-href-tvk1281618.dtsi
+index b7b4211c5353..55f9d0cc90f3 100644
+--- a/arch/arm/boot/dts/ste-href-tvk1281618.dtsi
++++ b/arch/arm/boot/dts/ste-href-tvk1281618.dtsi
+@@ -37,7 +37,6 @@
+ 	};
  
- 	uid = ioremap(U8500_BB_UID_BASE, 0x20);
- 	if (!uid)
- 		return NULL;
- 	/* Throw these device-specific numbers into the entropy pool */
- 	add_device_randomness(uid, 0x14);
--	return kasprintf(GFP_KERNEL, "%08x%08x%08x%08x%08x",
-+	retstr = kasprintf(GFP_KERNEL, "%08x%08x%08x%08x%08x",
- 			 readl((u32 *)uid+0),
- 			 readl((u32 *)uid+1), readl((u32 *)uid+2),
- 			 readl((u32 *)uid+3), readl((u32 *)uid+4));
- 	iounmap(uid);
-+	return retstr;
- }
- 
- static struct device * __init db8500_soc_device_init(void)
+ 	soc {
+-		/* Add Synaptics touch screen, TC35893 keypad etc here */
+ 		i2c at 80004000 {
+ 			tc35893 at 44 {
+ 				compatible = "toshiba,tc35893";
+@@ -159,6 +158,33 @@
+ 				vddio-supply = <&db8500_vsmps2_reg>;
+ 			};
+ 		};
++
++		i2c at 80110000 {
++			synaptics at 4b {
++				/* Synaptics RMI4 TM1217 touchscreen */
++				compatible = "syna,rmi4-i2c";
++				#address-cells = <1>;
++				#size-cells = <0>;
++				reg = <0x4b>;
++				vdd-supply = <&ab8500_ldo_aux1_reg>;
++				vddio-supply = <&db8500_vsmps2_reg>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&synaptics_tvk_mode>;
++				interrupt-parent = <&gpio2>;
++				interrupts = <20 IRQ_TYPE_EDGE_FALLING>;
++
++				rmi-f01 at 1 {
++					reg = <0x1>;
++					syna,nosleep = <1>;
++				};
++				rmi-f11 at 11 {
++					reg = <0x11>;
++					touchscreen-inverted-x;
++					syna,sensor-type = <1>;
++				};
++			};
++		};
++
+ 		pinctrl {
+ 			/* Pull up this GPIO pin */
+ 			tc35893 {
+@@ -212,6 +238,15 @@
+ 					};
+ 				};
+ 			};
++			synaptics {
++				synaptics_tvk_mode: synaptics_tvk {
++					/* Touchscreen uses GPIO 84 */
++					tvk_cfg1 {
++						pins = "GPIO84_C2";
++						ste,config = <&gpio_in_pu>;
++					};
++				};
++			};
+ 		};
+ 	};
+ };
 -- 
 2.4.3
