@@ -1,50 +1,40 @@
 From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Mon, 22 Feb 2016 19:38:40 +0530
-Subject: [PATCH 51/61] gpio: ts4800: Use devm_gpiochip_add_data() for gpio
+Date: Mon, 22 Feb 2016 19:38:43 +0530
+Subject: [PATCH 54/61] gpio: ucb1400: Use devm_gpiochip_add_data() for gpio
  registration
 In-Reply-To: <1456150130-2668-1-git-send-email-ldewangan@nvidia.com>
 References: <1456150130-2668-1-git-send-email-ldewangan@nvidia.com>
-Message-ID: <1456150130-2668-52-git-send-email-ldewangan@nvidia.com>
+Message-ID: <1456150130-2668-55-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use devm_gpiochip_add_data() for GPIO registration and remove the
-need of driver callback .remove.
+Use devm_gpiochip_add_data() for GPIO registration.
 
 Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
 ---
- drivers/gpio/gpio-ts4800.c | 12 +-----------
- 1 file changed, 1 insertion(+), 11 deletions(-)
+ drivers/gpio/gpio-ucb1400.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/drivers/gpio/gpio-ts4800.c b/drivers/gpio/gpio-ts4800.c
-index c4908a4..b8762d9 100644
---- a/drivers/gpio/gpio-ts4800.c
-+++ b/drivers/gpio/gpio-ts4800.c
-@@ -61,16 +61,7 @@ static int ts4800_gpio_probe(struct platform_device *pdev)
+diff --git a/drivers/gpio/gpio-ucb1400.c b/drivers/gpio/gpio-ucb1400.c
+index 2c5cd46..5dbe31b 100644
+--- a/drivers/gpio/gpio-ucb1400.c
++++ b/drivers/gpio/gpio-ucb1400.c
+@@ -67,7 +67,7 @@ static int ucb1400_gpio_probe(struct platform_device *dev)
+ 	ucb->gc.set = ucb1400_gpio_set;
+ 	ucb->gc.can_sleep = true;
  
- 	platform_set_drvdata(pdev, chip);
+-	err = gpiochip_add_data(&ucb->gc, ucb);
++	err = devm_gpiochip_add_data(&dev->dev, &ucb->gc, ucb);
+ 	if (err)
+ 		goto err;
  
--	return gpiochip_add_data(chip, NULL);
--}
--
--static int ts4800_gpio_remove(struct platform_device *pdev)
--{
--	struct gpio_chip *chip = platform_get_drvdata(pdev);
--
--	gpiochip_remove(chip);
--
--	return 0;
-+	return devm_gpiochip_add_data(&pdev->dev, chip, NULL);
+@@ -90,7 +90,6 @@ static int ucb1400_gpio_remove(struct platform_device *dev)
+ 			return err;
+ 	}
+ 
+-	gpiochip_remove(&ucb->gc);
+ 	return err;
  }
  
- static const struct of_device_id ts4800_gpio_of_match[] = {
-@@ -84,7 +75,6 @@ static struct platform_driver ts4800_gpio_driver = {
- 		   .of_match_table = ts4800_gpio_of_match,
- 		   },
- 	.probe = ts4800_gpio_probe,
--	.remove = ts4800_gpio_remove,
- };
- 
- module_platform_driver_probe(ts4800_gpio_driver, ts4800_gpio_probe);
 -- 
 2.1.4
