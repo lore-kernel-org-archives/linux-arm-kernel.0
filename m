@@ -1,43 +1,67 @@
-From: vinmenon@codeaurora.org (Vinayak Menon)
-Date: Mon, 22 Feb 2016 19:15:44 +0530
-Subject: [PATCH] of: alloc anywhere from memblock if range not specified
-Message-ID: <1456148744-7583-1-git-send-email-vinmenon@codeaurora.org>
+From: aleksey.makarov@linaro.org (Aleksey Makarov)
+Date: Mon, 22 Feb 2016 16:46:48 +0300
+Subject: [PATCH 0/8] ACPI: parse the DBG2 table
+Message-ID: <1456148818-26257-1-git-send-email-aleksey.makarov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-early_init_dt_alloc_reserved_memory_arch passes end as 0 to
-__memblock_alloc_base, when limits are not specified. But
-__memblock_alloc_base takes end value of 0 as MEMBLOCK_ALLOC_ACCESSIBLE
-and limits the end to memblock.current_limit. This results in regions
-never being placed in HIGHMEM area, for e.g. CMA.
-Let __memblock_alloc_base allocate from anywhere in memory if limits are
-not specified.
+ARM Server Base Boot Requiremets' [1] mentions DBG2 (Microsoft Debug
+Port Table 2) [2] as a mandatory ACPI table that specifies debug ports.
 
-Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Signed-off-by: Vinayak Menon <vinmenon@codeaurora.org>
----
- drivers/of/of_reserved_mem.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+- Move acpi/dt decision earlier in boot process on ARM64
+- Move earlycon early_param handling to serial to parse earlycon option once
+- Add definition of DBG2 subtypes.  It's the same patch as in the SPCR series [3]
+- Refactor ACPI linker tables code to enable iterating over subtables other than
+  subtables having acpi_subtype header (such as DBG2)
+- Implement macros
 
-diff --git a/drivers/of/of_reserved_mem.c b/drivers/of/of_reserved_mem.c
-index 1a3556a..ed01c01 100644
---- a/drivers/of/of_reserved_mem.c
-+++ b/drivers/of/of_reserved_mem.c
-@@ -32,11 +32,13 @@ int __init __weak early_init_dt_alloc_reserved_memory_arch(phys_addr_t size,
- 	phys_addr_t align, phys_addr_t start, phys_addr_t end, bool nomap,
- 	phys_addr_t *res_base)
- {
-+	phys_addr_t base;
- 	/*
- 	 * We use __memblock_alloc_base() because memblock_alloc_base()
- 	 * panic()s on allocation failure.
- 	 */
--	phys_addr_t base = __memblock_alloc_base(size, align, end);
-+	end = !end ? MEMBLOCK_ALLOC_ANYWHERE : end;
-+	base = __memblock_alloc_base(size, align, end);
- 	if (!base)
- 		return -ENOMEM;
- 
+	ACPI_DBG2_DECLARE(name, type, subtype, setup_fn, data_ptr)
+
+  that defines a handler for the port of the given type and subtype.
+- For each port defined by that macros that is also described in the ACPI DBG2
+  table call provided callback.
+- Implement a helper macros that can be used to define early serial console
+- Enable DBG2 on ARM64
+- Define early console for pl011 serial
+
+[1] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0044a/index.html
+[2] http://go.microsoft.com/fwlink/p/?LinkId=234837
+[3] https://lkml.kernel.org/g/455559532-8305-1-git-send-email-aleksey.makarov at linaro.org
+
+Aleksey Makarov (6):
+  ACPI: add definitions of DBG2 subtypes
+  ACPI: genaralize iterating over subtables in ACPI_PROBE_TABLE()
+  ACPI: parse DBG2 table
+  ACPI: serial: implement earlycon on ACPI DBG2 port
+  ACPI: enable ACPI_DBG2_TABLE on ARM64
+  serial: pl011: add ACPI DBG2 serial port
+
+Leif Lindholm (2):
+  arm64: move acpi/dt decision earlier in boot process
+  of/serial: move earlycon early_param handling to serial
+
+ Documentation/kernel-parameters.txt  |   3 +
+ arch/arm64/Kconfig                   |   1 +
+ arch/arm64/kernel/acpi.c             |  56 ++++++++++---------
+ drivers/acpi/Kconfig                 |   3 +
+ drivers/acpi/Makefile                |   1 +
+ drivers/acpi/dbg2.c                  |  85 ++++++++++++++++++++++++++++
+ drivers/acpi/scan.c                  |  44 ++++++++++-----
+ drivers/clocksource/arm_arch_timer.c |   3 +-
+ drivers/irqchip/irq-gic.c            |   4 +-
+ drivers/of/fdt.c                     |  11 +---
+ drivers/tty/serial/amba-pl011.c      |   3 +
+ drivers/tty/serial/earlycon.c        |  57 +++++++++++++++++++
+ include/acpi/actbl2.h                |   5 ++
+ include/asm-generic/vmlinux.lds.h    |   1 +
+ include/linux/acpi.h                 | 104 ++++++++++++++++++++++++-----------
+ include/linux/acpi_dbg2.h            |  68 +++++++++++++++++++++++
+ include/linux/clocksource.h          |   2 +-
+ include/linux/irqchip.h              |   5 +-
+ include/linux/of_fdt.h               |   2 +
+ 19 files changed, 370 insertions(+), 88 deletions(-)
+ create mode 100644 drivers/acpi/dbg2.c
+ create mode 100644 include/linux/acpi_dbg2.h
+
 -- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a
-member of the Code Aurora Forum, hosted by The Linux Foundation
+2.7.1
