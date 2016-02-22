@@ -1,23 +1,62 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 22 Feb 2016 08:42:50 -0800
-Subject: [PATCH] i2c: brcmstb: allocate correct amount of memory for regmap
-In-Reply-To: <1456064238-6294-1-git-send-email-wsa@the-dreams.de>
-References: <1456064238-6294-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <56CB3A8A.9040401@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 22 Feb 2016 16:49:58 +0000
+Subject: [PATCH v3 1/4] of/fdt: factor out assignment of
+ initrd_start/initrd_end
+In-Reply-To: <1455289046-21321-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1455289046-21321-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1455289046-21321-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160222164958.GJ31168@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 21/02/2016 06:16, Wolfram Sang a ?crit :
-> We want the size of the struct, not of a pointer to it. To be future
-> proof, just dereference the pointer to get the desired type.
+On Fri, Feb 12, 2016 at 03:57:23PM +0100, Ard Biesheuvel wrote:
+> Since architectures may not yet have their linear mapping up and running
+> when the initrd address is discovered from the DT, factor out the
+> assignment of initrd_start and initrd_end, so that an architecture can
+> override it and use the translation it needs.
 > 
-> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
+> Cc: Rob Herring <robh@kernel.org>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  drivers/of/fdt.c | 14 +++++++++++---
+>  1 file changed, 11 insertions(+), 3 deletions(-)
 
-Fixes: dd1aa2524bc5 ("i2c: brcmstb: Add Broadcom settop SoC i2c
-controller driver")
+Mark, Rob, any comments on this?
 
-Acked-by: Florian Fainelli <f.fainelli@gmail.com>
+Will
 
-Thanks!
--- 
-Florian
+> diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+> index 1f98156f8996..3e90bce70545 100644
+> --- a/drivers/of/fdt.c
+> +++ b/drivers/of/fdt.c
+> @@ -760,6 +760,16 @@ const void * __init of_flat_dt_match_machine(const void *default_match,
+>  }
+>  
+>  #ifdef CONFIG_BLK_DEV_INITRD
+> +#ifndef __early_init_dt_declare_initrd
+> +static void __early_init_dt_declare_initrd(unsigned long start,
+> +					   unsigned long end)
+> +{
+> +	initrd_start = (unsigned long)__va(start);
+> +	initrd_end = (unsigned long)__va(end);
+> +	initrd_below_start_ok = 1;
+> +}
+> +#endif
+> +
+>  /**
+>   * early_init_dt_check_for_initrd - Decode initrd location from flat tree
+>   * @node: reference to node containing initrd location ('chosen')
+> @@ -782,9 +792,7 @@ static void __init early_init_dt_check_for_initrd(unsigned long node)
+>  		return;
+>  	end = of_read_number(prop, len/4);
+>  
+> -	initrd_start = (unsigned long)__va(start);
+> -	initrd_end = (unsigned long)__va(end);
+> -	initrd_below_start_ok = 1;
+> +	__early_init_dt_declare_initrd(start, end);
+>  
+>  	pr_debug("initrd_start=0x%llx  initrd_end=0x%llx\n",
+>  		 (unsigned long long)start, (unsigned long long)end);
+> -- 
+> 2.5.0
+> 
