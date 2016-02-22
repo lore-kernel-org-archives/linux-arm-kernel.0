@@ -1,69 +1,101 @@
 From: k@japko.eu (Krzysztof Adamski)
-Date: Mon, 22 Feb 2016 14:03:26 +0100
-Subject: [PATCH v5 2/4] dts: sun8i-h3: Add APB0 related clocks and resets
+Date: Mon, 22 Feb 2016 14:03:28 +0100
+Subject: [PATCH v5 4/4] ARM: dts: sun8i: Add leds and switch on Orangepi Plus
+ boards
 In-Reply-To: <1456146208-13890-1-git-send-email-k@japko.eu>
 References: <1456146208-13890-1-git-send-email-k@japko.eu>
-Message-ID: <1456146208-13890-3-git-send-email-k@japko.eu>
+Message-ID: <1456146208-13890-5-git-send-email-k@japko.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-APB0 is bearly mentioned in H3 User Manual and it is only setup in the
-Allwinners kernel dump for CIR. I have verified experimentally that the
-gate for R_PIO exists and works, though. There are probably other gates
-there but I don't know their order right now and I don't have access to
-their peripherals on my board to test them.
-
-After some experiments and reviewing how this is organized on other
-sunxi SoCs, I couldn't actually find any way to disable clocks for R_PIO
-and they are working properly without doing anything so I assume they
-are connected straight to the 24Mhz oscillator for now.
+OrangePi Plus board has two leds - green ("pwr") and red ("status")
+and a switch ("sw4"). This patch describes them in a devicetree.
 
 Signed-off-by: Krzysztof Adamski <k@japko.eu>
 ---
- arch/arm/boot/dts/sun8i-h3.dtsi | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts | 63 ++++++++++++++++++++++++++++
+ 1 file changed, 63 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-index 3ba65c2..1348b69 100644
---- a/arch/arm/boot/dts/sun8i-h3.dtsi
-+++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-@@ -276,6 +276,25 @@
- 			clocks = <&osc24M>, <&pll6 1>, <&pll5>;
- 			clock-output-names = "mbus";
- 		};
-+
-+		apb0: apb0_clk {
-+			compatible = "fixed-factor-clock";
-+			#clock-cells = <0>;
-+			clock-div = <1>;
-+			clock-mult = <1>;
-+			clocks = <&osc24M>;
-+			clock-output-names = "apb0";
-+		};
-+
-+		apb0_gates: clk at 01f01428 {
-+			compatible = "allwinner,sun8i-h3-apb0-gates-clk",
-+				     "allwinner,sun4i-a10-gates-clk";
-+			reg = <0x01f01428 0x4>;
-+			#clock-cells = <1>;
-+			clocks = <&apb0>;
-+			clock-indices = <0>, <1>;
-+			clock-output-names = "apb0_pio", "apb0_ir";
-+		};
- 	};
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
+index e67df59..5f159d0 100644
+--- a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
+@@ -45,6 +45,7 @@
+ #include "sunxi-common-regulators.dtsi"
  
- 	soc {
-@@ -493,5 +512,11 @@
- 			interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>,
- 				     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
- 		};
-+
-+		apb0_reset: reset at 01f014b0 {
-+			reg = <0x01f014b0 0x4>;
-+			compatible = "allwinner,sun6i-a31-clock-reset";
-+			#reset-cells = <1>;
-+		};
+ #include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
+ #include <dt-bindings/pinctrl/sun4i-a10.h>
+ 
+ / {
+@@ -58,6 +59,68 @@
+ 	chosen {
+ 		stdout-path = "serial0:115200n8";
  	};
++
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&leds_opc>;
++
++		status_led {
++			label = "status:red:user";
++			gpios = <&pio 0 15 GPIO_ACTIVE_HIGH>;
++		};
++	};
++
++	r_leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&leds_r_opc>;
++
++		tx {
++			label = "pwr:green:user";
++			gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>;
++			default-state = "on";
++		};
++	};
++
++	r_gpio_keys {
++		compatible = "gpio-keys";
++		input-name = "sw4";
++
++		pinctrl-names = "default";
++		pinctrl-0 = <&sw_r_opc>;
++
++		sw4 at 0 {
++			label = "sw4";
++			linux,code = <BTN_0>;
++			gpios = <&r_pio 0 3 GPIO_ACTIVE_LOW>;
++		};
++	};
++};
++
++&pio {
++	leds_opc: led_pins at 0 {
++		allwinner,pins = "PA15";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++};
++
++&r_pio {
++	leds_r_opc: led_pins at 0 {
++		allwinner,pins = "PL10";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++
++	sw_r_opc: key_pins at 0 {
++		allwinner,pins = "PL03";
++		allwinner,function = "gpio_in";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
  };
+ 
+ &mmc0 {
 -- 
 2.1.4
