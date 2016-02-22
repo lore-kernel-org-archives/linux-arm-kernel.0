@@ -1,67 +1,29 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Mon, 22 Feb 2016 10:23:58 +0000
-Subject: Tegra baseline test results for v4.5-rc5
-Message-ID: <56CAE1BE.6000602@nvidia.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 22 Feb 2016 19:25:42 +0900
+Subject: next-20160222 build: 5 failures 9 warnings (next-20160222)
+In-Reply-To: <E1aXlz4-000486-Pb@optimist>
+References: <E1aXlz4-000486-Pb@optimist>
+Message-ID: <20160222102542.GZ18327@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v4.5-rc5.
-Logs and other details at:
+On Mon, Feb 22, 2016 at 08:36:46AM +0000, Build bot for Mark Brown wrote:
 
-    https://nvtb.github.io//linux/test_v4.5-rc5/20160220140102/
+For the past few days -next has been failing to build an arm
+allmodconfig due to:
 
+> 	arm-allmodconfig
+> ../arch/arm/kernel/hyp-stub.S:168: Error: selected processor does not support ARM mode `ubfx r7,r7,#28,#4'
+> ../arch/arm/kernel/hyp-stub.S:176: Error: selected processor does not support ARM mode `isb'
 
-Test summary
-------------
-
-Build: zImage:
-    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
-
-Build: Image:
-    Pass: ( 1/ 1): defconfig
-
-Boot to userspace: defconfig:
-    Pass: ( 3/ 3): qemu-vexpress64, tegra132-norrin,
-		   tegra210-p2371-0000
-
-Boot to userspace: multi_v7_defconfig:
-    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice, tegra30-beaver
-
-Boot to userspace: tegra_defconfig:
-    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice, tegra30-beaver
-
-PM: System suspend: multi_v7_defconfig:
-    FAIL: ( 1/ 4): tegra114-dalmore-a04
-    Pass: ( 3/ 4): tegra124-jetson-tk1, tegra20-trimslice,
-		   tegra30-beaver
-
-PM: System suspend: tegra_defconfig:
-    FAIL: ( 1/ 4): tegra114-dalmore-a04
-    Pass: ( 3/ 4): tegra124-jetson-tk1, tegra20-trimslice,
-		   tegra30-beaver
-
-
-vmlinux object size
-(delta in bytes from test_v4.5-rc4 (18558cae0272f8fd9647e69d3fec1565a7949865)):
-   text     data      bss    total  kernel
-    +60     +512     +128     +700  defconfig
-  +1596     +224        0    +1820  multi_v7_defconfig
-  +1320     +232        0    +1552  tegra_defconfig
-
-
-Boot-time memory difference
-(delta in bytes from test_v4.5-rc4 (18558cae0272f8fd9647e69d3fec1565a7949865))
-    avail    rsrvd     high    freed                board              kconfig                  dtb
-        .        .        .        .      qemu-vexpress64            defconfig           __internal
-      -8k       8k        .       4k tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-      -8k       8k        .       4k  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
-        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
-        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
-      -8k       8k        .       4k    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
-        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
-        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
-      -8k       8k        .       4k       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+caused by e59941b9b3817c (ARM: 8527/1: virt: enable GICv3 system
+registers) in the ARM tree.  My hot take is that it looks like
+CONFIG_ARM_GIC_V3 needs tighter dependencies so it can't get enabled for
+a v6 system but I could be wrong.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160222/9736c9c3/attachment.sig>
