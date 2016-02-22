@@ -1,180 +1,47 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 22 Feb 2016 15:26:25 +0000
-Subject: [linux-sunxi] [PATCH v5] Fix sun7i pin assignment for IRQ's
-In-Reply-To: <1456129208-11490-1-git-send-email-henry@nitronetworks.nl>
-References: <1456129208-11490-1-git-send-email-henry@nitronetworks.nl>
-Message-ID: <56CB28A1.9040406@arm.com>
+From: mika.penttila@nextfour.com (=?UTF-8?Q?Mika_Penttil=c3=a4?=)
+Date: Mon, 22 Feb 2016 17:34:07 +0200
+Subject: arm: set_memory_xx fixes patch missing?
+In-Reply-To: <20160222150911.GA25429@luxor.wired.org>
+References: <20160222150911.GA25429@luxor.wired.org>
+Message-ID: <56CB2A6F.5060006@nextfour.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Henry,
+On 22.02.2016 17:09, Paolo Pisati wrote:
+> What's happened to the arm side of this patch:
+>
+> http://lkml.iu.edu/hypermail/linux/kernel/1601.2/04934.html
+>
+> the arm64 code is already in Linus's tree, while it seems like the arm part was
+> lost and forgotten, and i don't see it in rmk's patch queue.
 
-On 22/02/16 08:20, Henry Paulissen wrote:
-> After testing IRQ pins we found some bugs in the pinctrl declaration.
-> Both PI* and PC* pins didn't work. PI* pins seemed to be connected
-> to the wrong mux and PC* pins waren't working at all.
-> 
-> Please note that the A20 soc manual is contradicting between version
-> and even within the same document for both the PI and PC pins.
-> 
-> Patch is based on testing with the hardware itself.
+Hi,
 
-So I tested this on the BananaPi M1:
-None of the PIxx interrupts worked before, but now with this patch on
-top of 4.5-rc5 all PI pins accessible on CON3 (expect PI3, which does
-not provide an EINT) trigger interrupts as expected.
-Also PH0, PH1, PH2, PH20 and PH21 trigger interrupts (as before).
-I cannot say anything about the PC ports, because neither PC19-PC22 nor
-PH12-PH15 are on a header on the BPi, but now the mapping:
-PH0-PH21: EINT0-EINT21, PI10-PI19: EINT22-EINT31
-looks reasonable enough to me.
+Yes, it for sure should go in, please apply:
 
-Also PI17 now worked in my latest testing, so not sure if that was a
-hiccup at my test setup or the different kernel base I used at the weekend.
+----------------------------------------------------
+From: Mika Penttil? <mika.penttila@nextfour.com>
 
-So dear committer, feel free to drop the comment there.
+Allow zero size updates. This makes set_memory_xx() consistent with x86, s390 and arm64.
 
-> Signed-off-by: Henry Paulissen <henry@nitronetworks.nl>
+Signed-off-by: Mika Penttil? mika.penttila at nextfour.com
 
-Tested-by: Andre Przywara <andre.przywara@arm.com>
-Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+---
+ arch/arm/mm/pageattr.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-Cheers,
-Andre.
-
-> 
-> ---
-> 
-> Changes in v2:
->     After some more testing we found irq on PI pins.
->     they where on mux6 so this is included in my patch.
-> 
->     Also included is a warning for PI17, this pin was not working
->     on apritzel his bPI and he thinks it might be correlated to
->     GIC and IRQ 29.
-> 
-> Changes in v3:
->     Changed name from nickname to realname in email and SoB.
-> 
-> Changes in v4:
->     Added closing parenthesis for the C pins.
-> 
-> Changes in v5:
->     Added a more detailed description.
-> ---
->  drivers/pinctrl/sunxi/pinctrl-sun7i-a20.c | 33 ++++++++++++++-----------------
->  1 file changed, 15 insertions(+), 18 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/sunxi/pinctrl-sun7i-a20.c b/drivers/pinctrl/sunxi/pinctrl-sun7i-a20.c
-> index cf1ce0c..ca7b9a3 100644
-> --- a/drivers/pinctrl/sunxi/pinctrl-sun7i-a20.c
-> +++ b/drivers/pinctrl/sunxi/pinctrl-sun7i-a20.c
-> @@ -343,26 +343,22 @@ static const struct sunxi_desc_pin sun7i_a20_pins[] = {
->  		  SUNXI_FUNCTION(0x0, "gpio_in"),
->  		  SUNXI_FUNCTION(0x1, "gpio_out"),
->  		  SUNXI_FUNCTION(0x2, "nand0"),		/* NCE4 */
-> -		  SUNXI_FUNCTION(0x3, "spi2"),		/* CS0 */
-> -		  SUNXI_FUNCTION_IRQ(0x6, 12)),		/* EINT12 */
-> +		  SUNXI_FUNCTION(0x3, "spi2")),		/* CS0 */
->  	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 20),
->  		  SUNXI_FUNCTION(0x0, "gpio_in"),
->  		  SUNXI_FUNCTION(0x1, "gpio_out"),
->  		  SUNXI_FUNCTION(0x2, "nand0"),		/* NCE5 */
-> -		  SUNXI_FUNCTION(0x3, "spi2"),		/* CLK */
-> -		  SUNXI_FUNCTION_IRQ(0x6, 13)),		/* EINT13 */
-> +		  SUNXI_FUNCTION(0x3, "spi2")),		/* CLK */
->  	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 21),
->  		  SUNXI_FUNCTION(0x0, "gpio_in"),
->  		  SUNXI_FUNCTION(0x1, "gpio_out"),
->  		  SUNXI_FUNCTION(0x2, "nand0"),		/* NCE6 */
-> -		  SUNXI_FUNCTION(0x3, "spi2"),		/* MOSI */
-> -		  SUNXI_FUNCTION_IRQ(0x6, 14)),		/* EINT14 */
-> +		  SUNXI_FUNCTION(0x3, "spi2")),		/* MOSI */
->  	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 22),
->  		  SUNXI_FUNCTION(0x0, "gpio_in"),
->  		  SUNXI_FUNCTION(0x1, "gpio_out"),
->  		  SUNXI_FUNCTION(0x2, "nand0"),		/* NCE7 */
-> -		  SUNXI_FUNCTION(0x3, "spi2"),		/* MISO */
-> -		  SUNXI_FUNCTION_IRQ(0x6, 15)),		/* EINT15 */
-> +		  SUNXI_FUNCTION(0x3, "spi2")),		/* MISO */
->  	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 23),
->  		  SUNXI_FUNCTION(0x0, "gpio_in"),
->  		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> @@ -960,65 +956,66 @@ static const struct sunxi_desc_pin sun7i_a20_pins[] = {
->  		  SUNXI_FUNCTION(0x1, "gpio_out"),
->  		  SUNXI_FUNCTION(0x2, "spi0"),		/* CS0 */
->  		  SUNXI_FUNCTION(0x3, "uart5"),		/* TX */
-> -		  SUNXI_FUNCTION_IRQ(0x5, 22)),		/* EINT22 */
-> +		  SUNXI_FUNCTION_IRQ(0x6, 22)),		/* EINT22 */
->  	SUNXI_PIN(SUNXI_PINCTRL_PIN(I, 11),
->  		  SUNXI_FUNCTION(0x0, "gpio_in"),
->  		  SUNXI_FUNCTION(0x1, "gpio_out"),
->  		  SUNXI_FUNCTION(0x2, "spi0"),		/* CLK */
->  		  SUNXI_FUNCTION(0x3, "uart5"),		/* RX */
-> -		  SUNXI_FUNCTION_IRQ(0x5, 23)),		/* EINT23 */
-> +		  SUNXI_FUNCTION_IRQ(0x6, 23)),		/* EINT23 */
->  	SUNXI_PIN(SUNXI_PINCTRL_PIN(I, 12),
->  		  SUNXI_FUNCTION(0x0, "gpio_in"),
->  		  SUNXI_FUNCTION(0x1, "gpio_out"),
->  		  SUNXI_FUNCTION(0x2, "spi0"),		/* MOSI */
->  		  SUNXI_FUNCTION(0x3, "uart6"),		/* TX */
->  		  SUNXI_FUNCTION(0x4, "clk_out_a"),	/* CLK_OUT_A */
-> -		  SUNXI_FUNCTION_IRQ(0x5, 24)),		/* EINT24 */
-> +		  SUNXI_FUNCTION_IRQ(0x6, 24)),		/* EINT24 */
->  	SUNXI_PIN(SUNXI_PINCTRL_PIN(I, 13),
->  		  SUNXI_FUNCTION(0x0, "gpio_in"),
->  		  SUNXI_FUNCTION(0x1, "gpio_out"),
->  		  SUNXI_FUNCTION(0x2, "spi0"),		/* MISO */
->  		  SUNXI_FUNCTION(0x3, "uart6"),		/* RX */
->  		  SUNXI_FUNCTION(0x4, "clk_out_b"),	/* CLK_OUT_B */
-> -		  SUNXI_FUNCTION_IRQ(0x5, 25)),		/* EINT25 */
-> +		  SUNXI_FUNCTION_IRQ(0x6, 25)),		/* EINT25 */
->  	SUNXI_PIN(SUNXI_PINCTRL_PIN(I, 14),
->  		  SUNXI_FUNCTION(0x0, "gpio_in"),
->  		  SUNXI_FUNCTION(0x1, "gpio_out"),
->  		  SUNXI_FUNCTION(0x2, "spi0"),		/* CS1 */
->  		  SUNXI_FUNCTION(0x3, "ps2"),		/* SCK1 */
->  		  SUNXI_FUNCTION(0x4, "timer4"),	/* TCLKIN0 */
-> -		  SUNXI_FUNCTION_IRQ(0x5, 26)),		/* EINT26 */
-> +		  SUNXI_FUNCTION_IRQ(0x6, 26)),		/* EINT26 */
->  	SUNXI_PIN(SUNXI_PINCTRL_PIN(I, 15),
->  		  SUNXI_FUNCTION(0x0, "gpio_in"),
->  		  SUNXI_FUNCTION(0x1, "gpio_out"),
->  		  SUNXI_FUNCTION(0x2, "spi1"),		/* CS1 */
->  		  SUNXI_FUNCTION(0x3, "ps2"),		/* SDA1 */
->  		  SUNXI_FUNCTION(0x4, "timer5"),	/* TCLKIN1 */
-> -		  SUNXI_FUNCTION_IRQ(0x5, 27)),		/* EINT27 */
-> +		  SUNXI_FUNCTION_IRQ(0x6, 27)),		/* EINT27 */
->  	SUNXI_PIN(SUNXI_PINCTRL_PIN(I, 16),
->  		  SUNXI_FUNCTION(0x0, "gpio_in"),
->  		  SUNXI_FUNCTION(0x1, "gpio_out"),
->  		  SUNXI_FUNCTION(0x2, "spi1"),		/* CS0 */
->  		  SUNXI_FUNCTION(0x3, "uart2"),		/* RTS */
-> -		  SUNXI_FUNCTION_IRQ(0x5, 28)),		/* EINT28 */
-> +		  SUNXI_FUNCTION_IRQ(0x6, 28)),		/* EINT28 */
->  	SUNXI_PIN(SUNXI_PINCTRL_PIN(I, 17),
->  		  SUNXI_FUNCTION(0x0, "gpio_in"),
->  		  SUNXI_FUNCTION(0x1, "gpio_out"),
->  		  SUNXI_FUNCTION(0x2, "spi1"),		/* CLK */
->  		  SUNXI_FUNCTION(0x3, "uart2"),		/* CTS */
-> -		  SUNXI_FUNCTION_IRQ(0x5, 29)),		/* EINT29 */
-> +		  SUNXI_FUNCTION_IRQ(0x6, 29)),		/* EINT29 */
-> +		  /* EINT29 might not work - more testing needed */
->  	SUNXI_PIN(SUNXI_PINCTRL_PIN(I, 18),
->  		  SUNXI_FUNCTION(0x0, "gpio_in"),
->  		  SUNXI_FUNCTION(0x1, "gpio_out"),
->  		  SUNXI_FUNCTION(0x2, "spi1"),		/* MOSI */
->  		  SUNXI_FUNCTION(0x3, "uart2"),		/* TX */
-> -		  SUNXI_FUNCTION_IRQ(0x5, 30)),		/* EINT30 */
-> +		  SUNXI_FUNCTION_IRQ(0x6, 30)),		/* EINT30 */
->  	SUNXI_PIN(SUNXI_PINCTRL_PIN(I, 19),
->  		  SUNXI_FUNCTION(0x0, "gpio_in"),
->  		  SUNXI_FUNCTION(0x1, "gpio_out"),
->  		  SUNXI_FUNCTION(0x2, "spi1"),		/* MISO */
->  		  SUNXI_FUNCTION(0x3, "uart2"),		/* RX */
-> -		  SUNXI_FUNCTION_IRQ(0x5, 31)),		/* EINT31 */
-> +		  SUNXI_FUNCTION_IRQ(0x6, 31)),		/* EINT31 */
->  	SUNXI_PIN(SUNXI_PINCTRL_PIN(I, 20),
->  		  SUNXI_FUNCTION(0x0, "gpio_in"),
->  		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> 
+diff --git a/arch/arm/mm/pageattr.c b/arch/arm/mm/pageattr.c
+index be7fe4b..9edf6b0 100644
+--- a/arch/arm/mm/pageattr.c
++++ b/arch/arm/mm/pageattr.c
+@@ -49,6 +49,9 @@ static int change_memory_common(unsigned long addr, int numpages,
+ 		WARN_ON_ONCE(1);
+ 	}
+ 
++	if (!numpages)
++		return 0;
++
+ 	if (start < MODULES_VADDR || start >= MODULES_END)
+ 		return -EINVAL;
+ 
+-- 1.9.1
