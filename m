@@ -1,69 +1,76 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 22 Feb 2016 18:20:47 +0000
-Subject: [PATCH v3 02/10] ARM: dts: sunxi: make PLL8 in the H3 a proper clock
+Date: Mon, 22 Feb 2016 18:20:46 +0000
+Subject: [PATCH v3 00/10] arm64: Introduce Allwinner A64 and Pine64 support
 In-Reply-To: <1456165255-31013-1-git-send-email-andre.przywara@arm.com>
 References: <1456165255-31013-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1456165255-31013-3-git-send-email-andre.przywara@arm.com>
+Message-ID: <1456165255-31013-2-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we can reuse the A31 PLL6 clock driver for clocks other then
-PLL6 itself, describe the PLL8 clock properly.
+Subject: [PATCH v3 01/10] clk: sunxi: allow PLL6 clock to be reused
+
+Currently we hard-code the base name for the PLL6 clock for both the
+sun4i and sun6i variants in the driver (pll6 and pll6x2, respectively).
+This unfortunately denies reusing this clock for the H3 and A64 PLL8
+clock, which is the same otherwise.
+Remove the hard-coded name in the source code and replace it with an
+appropriate index into the clock-output-names array in the DT.
+This is compatible with all current device trees, since they all carry
+the hard-coded base name in there.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- arch/arm/boot/dts/sun8i-h3.dtsi | 18 +++++++++---------
- 1 file changed, 9 insertions(+), 9 deletions(-)
+ drivers/clk/sunxi/clk-factors.c | 3 ++-
+ drivers/clk/sunxi/clk-factors.h | 1 +
+ drivers/clk/sunxi/clk-sunxi.c   | 4 ++--
+ 3 files changed, 5 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-index 3ba65c2..d84ea9b 100644
---- a/arch/arm/boot/dts/sun8i-h3.dtsi
-+++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-@@ -137,12 +137,12 @@
- 			clock-output-names = "pll6d2";
- 		};
+diff --git a/drivers/clk/sunxi/clk-factors.c b/drivers/clk/sunxi/clk-factors.c
+index ddefe96..7daf01d 100644
+--- a/drivers/clk/sunxi/clk-factors.c
++++ b/drivers/clk/sunxi/clk-factors.c
+@@ -202,7 +202,8 @@ struct clk *sunxi_factors_register(struct device_node *node,
+ 	if (data->name)
+ 		clk_name = data->name;
+ 	else
+-		of_property_read_string(node, "clock-output-names", &clk_name);
++		of_property_read_string_index(node, "clock-output-names",
++					      data->name_idx, &clk_name);
  
--		/* dummy clock until pll6 can be reused */
--		pll8: pll8_clk {
--			#clock-cells = <0>;
--			compatible = "fixed-clock";
--			clock-frequency = <1>;
--			clock-output-names = "pll8";
-+		pll8: clk at c01c20044 {
-+			#clock-cells = <1>;
-+			compatible = "allwinner,sun6i-a31-pll6-clk";
-+			reg = <0x01c20044 0x4>;
-+			clocks = <&osc24M>;
-+			clock-output-names = "pll8", "pll8x2";
- 		};
+ 	factors = kzalloc(sizeof(struct clk_factors), GFP_KERNEL);
+ 	if (!factors)
+diff --git a/drivers/clk/sunxi/clk-factors.h b/drivers/clk/sunxi/clk-factors.h
+index 1e63c5b..3a7da86 100644
+--- a/drivers/clk/sunxi/clk-factors.h
++++ b/drivers/clk/sunxi/clk-factors.h
+@@ -36,6 +36,7 @@ struct factors_data {
+ 	void (*getter)(struct factors_request *req);
+ 	void (*recalc)(struct factors_request *req);
+ 	const char *name;
++	int name_idx;
+ };
  
- 		cpu: cpu_clk at 01c20050 {
-@@ -243,7 +243,7 @@
- 			#clock-cells = <1>;
- 			compatible = "allwinner,sun4i-a10-mmc-clk";
- 			reg = <0x01c20088 0x4>;
--			clocks = <&osc24M>, <&pll6 0>, <&pll8>;
-+			clocks = <&osc24M>, <&pll6 0>, <&pll8 0>;
- 			clock-output-names = "mmc0",
- 					     "mmc0_output",
- 					     "mmc0_sample";
-@@ -253,7 +253,7 @@
- 			#clock-cells = <1>;
- 			compatible = "allwinner,sun4i-a10-mmc-clk";
- 			reg = <0x01c2008c 0x4>;
--			clocks = <&osc24M>, <&pll6 0>, <&pll8>;
-+			clocks = <&osc24M>, <&pll6 0>, <&pll8 0>;
- 			clock-output-names = "mmc1",
- 					     "mmc1_output",
- 					     "mmc1_sample";
-@@ -263,7 +263,7 @@
- 			#clock-cells = <1>;
- 			compatible = "allwinner,sun4i-a10-mmc-clk";
- 			reg = <0x01c20090 0x4>;
--			clocks = <&osc24M>, <&pll6 0>, <&pll8>;
-+			clocks = <&osc24M>, <&pll6 0>, <&pll8 0>;
- 			clock-output-names = "mmc2",
- 					     "mmc2_output",
- 					     "mmc2_sample";
+ struct clk_factors {
+diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+index 99f60ef..53f5927 100644
+--- a/drivers/clk/sunxi/clk-sunxi.c
++++ b/drivers/clk/sunxi/clk-sunxi.c
+@@ -530,14 +530,14 @@ static const struct factors_data sun4i_pll6_data __initconst = {
+ 	.enable = 31,
+ 	.table = &sun4i_pll5_config,
+ 	.getter = sun4i_get_pll5_factors,
+-	.name = "pll6",
++	.name_idx = 2,
+ };
+ 
+ static const struct factors_data sun6i_a31_pll6_data __initconst = {
+ 	.enable = 31,
+ 	.table = &sun6i_a31_pll6_config,
+ 	.getter = sun6i_a31_get_pll6_factors,
+-	.name = "pll6x2",
++	.name_idx = 1,
+ };
+ 
+ static const struct factors_data sun5i_a13_ahb_data __initconst = {
 -- 
 2.6.4
