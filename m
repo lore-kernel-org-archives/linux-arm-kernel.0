@@ -1,150 +1,33 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 22 Feb 2016 11:28:55 +0100
-Subject: [PATCH v3 2/2] arm64: Mark kernel page ranges contiguous
-In-Reply-To: <1455903983-23910-3-git-send-email-jeremy.linton@arm.com>
-References: <1455903983-23910-1-git-send-email-jeremy.linton@arm.com>
- <1455903983-23910-3-git-send-email-jeremy.linton@arm.com>
-Message-ID: <CAKv+Gu8YYuE78QAzgFFZgPOz4o_4L70Ko-vO-GKwSFeYdNv+vA@mail.gmail.com>
+From: Jean-Philippe.Brucker@arm.com (Jean-Philippe Brucker)
+Date: Mon, 22 Feb 2016 10:37:26 +0000
+Subject: next-20160222 build: 5 failures 9 warnings (next-20160222)
+In-Reply-To: <20160222102542.GZ18327@sirena.org.uk>
+References: <E1aXlz4-000486-Pb@optimist> <20160222102542.GZ18327@sirena.org.uk>
+Message-ID: <20160222103725.GA5163@e106794-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 February 2016 at 18:46, Jeremy Linton <jeremy.linton@arm.com> wrote:
-> With 64k pages, the next larger segment size is 512M. The linux
-> kernel also uses different protection flags to cover its code and data.
-> Because of these requirements, the vast majority of the kernel code and
-> data structures end up being mapped with 64k pages instead of the larger
-> pages common with a 4k page kernel.
->
-> Recent ARM processors support a contiguous bit in the
-> page tables which allows a TLB to cover a range larger than a
-> single PTE if that range is mapped into physically contiguous
-> RAM.
->
-> So, for the kernel its a good idea to set this flag. Some basic
-> micro benchmarks show it can significantly reduce the number of
-> L1 dTLB refills.
->
-> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+Mark,
 
-Tested on 4k/3 levels, and the page tables look correct to me
+On Mon, Feb 22, 2016 at 07:25:42PM +0900, Mark Brown wrote:
+> On Mon, Feb 22, 2016 at 08:36:46AM +0000, Build bot for Mark Brown wrote:
+> 
+> For the past few days -next has been failing to build an arm
+> allmodconfig due to:
+> 
+> > 	arm-allmodconfig
+> > ../arch/arm/kernel/hyp-stub.S:168: Error: selected processor does not support ARM mode `ubfx r7,r7,#28,#4'
+> > ../arch/arm/kernel/hyp-stub.S:176: Error: selected processor does not support ARM mode `isb'
+> 
+> caused by e59941b9b3817c (ARM: 8527/1: virt: enable GICv3 system
+> registers) in the ARM tree.  My hot take is that it looks like
+> CONFIG_ARM_GIC_V3 needs tighter dependencies so it can't get enabled for
+> a v6 system but I could be wrong.
 
-Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Thanks for the report. A fix is already in Russell's patch system [1],
+and should be applied shortly.
 
-You didn't answer my question though, regarding implementing this at
-the PMD level for 16k pages kernels, so that we can use 1 GB chunks
-for mapping system RAM. Would that just be a matter of doing the exact
-same thing at the PMD level? Or is it more complicated than that?
+Thanks,
+Jean-Philippe
 
--- 
-Ard.
-
-> ---
->  arch/arm64/mm/mmu.c | 64 ++++++++++++++++++++++++++++++++++++++++++++++++-----
->  1 file changed, 58 insertions(+), 6 deletions(-)
->
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index 7711554..ab69a99 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -1,3 +1,4 @@
-> +
->  /*
->   * Based on arch/arm/mm/mmu.c
->   *
-> @@ -103,17 +104,49 @@ static void split_pmd(pmd_t *pmd, pte_t *pte)
->                  * Need to have the least restrictive permissions available
->                  * permissions will be fixed up later
->                  */
-> -               set_pte(pte, pfn_pte(pfn, PAGE_KERNEL_EXEC));
-> +               set_pte(pte, pfn_pte(pfn, PAGE_KERNEL_EXEC_CONT));
->                 pfn++;
->         } while (pte++, i++, i < PTRS_PER_PTE);
->  }
->
-> +static void clear_cont_pte_range(pte_t *pte, unsigned long addr)
-> +{
-> +       int i;
-> +
-> +       pte -= CONT_RANGE_OFFSET(addr);
-> +       for (i = 0; i < CONT_PTES; i++) {
-> +               if (pte_cont(*pte))
-> +                       set_pte(pte, pte_mknoncont(*pte));
-> +               pte++;
-> +       }
-> +       flush_tlb_all();
-> +}
-> +
-> +/*
-> + * Given a range of PTEs set the pfn and provided page protection flags
-> + */
-> +static void __populate_init_pte(pte_t *pte, unsigned long addr,
-> +                              unsigned long end, phys_addr_t phys,
-> +                              pgprot_t prot)
-> +{
-> +       unsigned long pfn = __phys_to_pfn(phys);
-> +
-> +       do {
-> +               /* clear all the bits except the pfn, then apply the prot */
-> +               set_pte(pte, pfn_pte(pfn, prot));
-> +               pte++;
-> +               pfn++;
-> +               addr += PAGE_SIZE;
-> +       } while (addr != end);
-> +}
-> +
->  static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
-> -                                 unsigned long end, unsigned long pfn,
-> +                                 unsigned long end, phys_addr_t phys,
->                                   pgprot_t prot,
->                                   phys_addr_t (*pgtable_alloc)(void))
->  {
->         pte_t *pte;
-> +       unsigned long next;
->
->         if (pmd_none(*pmd) || pmd_sect(*pmd)) {
->                 phys_addr_t pte_phys = pgtable_alloc();
-> @@ -127,10 +160,29 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
->         BUG_ON(pmd_bad(*pmd));
->
->         pte = pte_set_fixmap_offset(pmd, addr);
-> +
->         do {
-> -               set_pte(pte, pfn_pte(pfn, prot));
-> -               pfn++;
-> -       } while (pte++, addr += PAGE_SIZE, addr != end);
-> +               next = min(end, (addr + CONT_SIZE) & CONT_MASK);
-> +               if (((addr | next | phys) & ~CONT_MASK) == 0) {
-> +                       /* a block of CONT_PTES  */
-> +                       __populate_init_pte(pte, addr, next, phys,
-> +                                           prot | __pgprot(PTE_CONT));
-> +               } else {
-> +                       /*
-> +                        * If the range being split is already inside of a
-> +                        * contiguous range but this PTE isn't going to be
-> +                        * contiguous, then we want to unmark the adjacent
-> +                        * ranges, then update the portion of the range we
-> +                        * are interrested in.
-> +                        */
-> +                       clear_cont_pte_range(pte, addr);
-> +                       __populate_init_pte(pte, addr, next, phys, prot);
-> +               }
-> +
-> +               pte += (next - addr) >> PAGE_SHIFT;
-> +               phys += next - addr;
-> +               addr = next;
-> +       } while (addr != end);
->
->         pte_clear_fixmap();
->  }
-> @@ -194,7 +246,7 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
->                                 }
->                         }
->                 } else {
-> -                       alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys),
-> +                       alloc_init_pte(pmd, addr, next, phys,
->                                        prot, pgtable_alloc);
->                 }
->                 phys += next - addr;
-> --
-> 2.4.3
->
+[1] http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8534/1
