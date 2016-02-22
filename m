@@ -1,52 +1,53 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Mon, 22 Feb 2016 15:33:15 +0530
-Subject: [PATCH 2/3] ARM: EXYNOS: remove unused register offset definition
-In-Reply-To: <1456135396-17767-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1456135396-17767-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1456135396-17767-3-git-send-email-pankaj.dubey@samsung.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 22 Feb 2016 15:37:22 +0530
+Subject: [PATCH 3/5] ARM: davinci: dm365: Add dma_slave_map to edma
+In-Reply-To: <56CADBB1.9040908@ti.com>
+References: <1454416997-14230-1-git-send-email-peter.ujfalusi@ti.com>
+ <1454416997-14230-4-git-send-email-peter.ujfalusi@ti.com>
+ <56CADBB1.9040908@ti.com>
+Message-ID: <56CADDDA.5070402@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch cleans up map.h by removing unused register offset
-and changing EXYNOS4 to EXYNOS in header comment section.
+On Monday 22 February 2016 03:28 PM, Sekhar Nori wrote:
+> On Tuesday 02 February 2016 06:13 PM, Peter Ujfalusi wrote:
+>> Provide the dma_slave_map to edma which will allow us to move the drivers
+>> to the new, simpler dmaengine API and we can remove the DMA resources also
+>> for the devices.
+>>
+>> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> 
+>> FIX: dm365
+> 
+> dropped this "note to self" :)
+> 
+>> ---
+>>  arch/arm/mach-davinci/dm365.c | 22 ++++++++++++++++++++++
+>>  1 file changed, 22 insertions(+)
+>>
+>> diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
+>> index 01843fbcc9ea..d26dc2b4339a 100644
+>> --- a/arch/arm/mach-davinci/dm365.c
+>> +++ b/arch/arm/mach-davinci/dm365.c
+>> @@ -17,6 +17,7 @@
+>>  #include <linux/serial_8250.h>
+>>  #include <linux/platform_device.h>
+>>  #include <linux/dma-mapping.h>
+>> +#include <linux/dmaengine.h>
+>>  #include <linux/spi/spi.h>
+>>  #include <linux/platform_data/edma.h>
+>>  #include <linux/platform_data/gpio-davinci.h>
+>> @@ -862,9 +863,30 @@ static s8 dm365_queue_priority_mapping[][2] = {
+>>  	{-1, -1},
+>>  };
+>>  
+>> +static const struct dma_slave_map da365_edma_map[] = {
+> 
+> This should be "dm365_edma_map".
+> 
+> Fixed both locally while applying.
 
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
----
- arch/arm/mach-exynos/include/mach/map.h | 9 +--------
- 1 file changed, 1 insertion(+), 8 deletions(-)
+Similar fixes needed on patches 2,4,5 as well. Made those too.
 
-diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
-index 351e839..c48ba4f 100644
---- a/arch/arm/mach-exynos/include/mach/map.h
-+++ b/arch/arm/mach-exynos/include/mach/map.h
-@@ -2,7 +2,7 @@
-  * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
-  *		http://www.samsung.com/
-  *
-- * EXYNOS4 - Memory map definitions
-+ * EXYNOS - Memory map definitions
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-@@ -14,12 +14,6 @@
- 
- #include <plat/map-base.h>
- 
--/*
-- * EXYNOS4 UART offset is 0x10000 but the older S5P SoCs are 0x400.
-- * So need to define it, and here is to avoid redefinition warning.
-- */
--#define S3C_UART_OFFSET			(0x10000)
--
- #include <plat/map-s5p.h>
- 
- #define EXYNOS_PA_CHIPID		0x10000000
-@@ -30,6 +24,5 @@
- #define EXYNOS4_PA_DMC1			0x10410000
- 
- #define EXYNOS4_PA_COREPERI		0x10500000
--#define EXYNOS4_PA_L2CC			0x10502000
- 
- #endif /* __ASM_ARCH_MAP_H */
--- 
-2.4.5
+Thanks,
+Sekhar
