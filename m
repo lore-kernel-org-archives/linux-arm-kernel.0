@@ -1,196 +1,33 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Sun, 21 Feb 2016 19:06:04 -0500
-Subject: [PATCH v2 1/5] xen: audit usages of module.h ;
- remove unnecessary instances
-In-Reply-To: <1456099568-5154-1-git-send-email-paul.gortmaker@windriver.com>
-References: <1456099568-5154-1-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <1456099568-5154-2-git-send-email-paul.gortmaker@windriver.com>
+From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
+Date: Sun, 21 Feb 2016 22:26:34 -0300
+Subject: [PATCH 1/3] [media] rc: sunxi-cir: support module autoloading
+Message-ID: <1456104396-13282-1-git-send-email-emilio@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Code that uses no modular facilities whatsoever should not be
-sourcing module.h at all, since that header drags in a bunch
-of other headers with it.
+From: Emilio L?pez <emilio.lopez@collabora.co.uk>
 
-Similarly, code that is not explicitly using modular facilities
-like module_init() but only is declaring module_param setup
-variables should be using moduleparam.h and not the larger
-module.h file for that.
+MODULE_DEVICE_TABLE() is missing, so the module isn't auto-loading on
+systems supporting infrared. This commit adds the missing line so it
+works out of the box when built as a module and running on a sunxi
+system with an infrared receiver.
 
-In making this change, we also uncover an implicit use of BUG()
-in inline fcns within arch/arm/include/asm/xen/hypercall.h so
-we explicitly source <linux/bug.h> for that file now.
-
-Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
-Cc: David Vrabel <david.vrabel@citrix.com>
-Cc: xen-devel at lists.xenproject.org
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+Signed-off-by: Emilio L?pez <emilio.lopez@collabora.co.uk>
 ---
- arch/arm/include/asm/xen/hypercall.h  | 2 ++
- drivers/xen/events/events_2l.c        | 1 -
- drivers/xen/events/events_base.c      | 2 +-
- drivers/xen/events/events_fifo.c      | 1 -
- drivers/xen/features.c                | 2 +-
- drivers/xen/grant-table.c             | 1 -
- drivers/xen/xen-pciback/conf_space.c  | 2 +-
- drivers/xen/xen-pciback/pciback_ops.c | 2 +-
- drivers/xen/xen-pciback/xenbus.c      | 2 +-
- drivers/xen/xen-selfballoon.c         | 1 -
- drivers/xen/xenbus/xenbus_xs.c        | 1 -
- drivers/xen/xenfs/xensyms.c           | 1 -
- 12 files changed, 7 insertions(+), 11 deletions(-)
+ drivers/media/rc/sunxi-cir.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/include/asm/xen/hypercall.h b/arch/arm/include/asm/xen/hypercall.h
-index d769972db8cb..b6b962d70db9 100644
---- a/arch/arm/include/asm/xen/hypercall.h
-+++ b/arch/arm/include/asm/xen/hypercall.h
-@@ -33,6 +33,8 @@
- #ifndef _ASM_ARM_XEN_HYPERCALL_H
- #define _ASM_ARM_XEN_HYPERCALL_H
+diff --git a/drivers/media/rc/sunxi-cir.c b/drivers/media/rc/sunxi-cir.c
+index 40f7768..eaadc08 100644
+--- a/drivers/media/rc/sunxi-cir.c
++++ b/drivers/media/rc/sunxi-cir.c
+@@ -326,6 +326,7 @@ static const struct of_device_id sunxi_ir_match[] = {
+ 	{ .compatible = "allwinner,sun5i-a13-ir", },
+ 	{},
+ };
++MODULE_DEVICE_TABLE(of, sunxi_ir_match);
  
-+#include <linux/bug.h>
-+
- #include <xen/interface/xen.h>
- #include <xen/interface/sched.h>
- #include <xen/interface/platform.h>
-diff --git a/drivers/xen/events/events_2l.c b/drivers/xen/events/events_2l.c
-index 7dd46312c180..51b488f5bfe9 100644
---- a/drivers/xen/events/events_2l.c
-+++ b/drivers/xen/events/events_2l.c
-@@ -9,7 +9,6 @@
- #include <linux/linkage.h>
- #include <linux/interrupt.h>
- #include <linux/irq.h>
--#include <linux/module.h>
- 
- #include <asm/sync_bitops.h>
- #include <asm/xen/hypercall.h>
-diff --git a/drivers/xen/events/events_base.c b/drivers/xen/events/events_base.c
-index 524c22146429..488017a0806a 100644
---- a/drivers/xen/events/events_base.c
-+++ b/drivers/xen/events/events_base.c
-@@ -26,7 +26,7 @@
- #include <linux/linkage.h>
- #include <linux/interrupt.h>
- #include <linux/irq.h>
--#include <linux/module.h>
-+#include <linux/moduleparam.h>
- #include <linux/string.h>
- #include <linux/bootmem.h>
- #include <linux/slab.h>
-diff --git a/drivers/xen/events/events_fifo.c b/drivers/xen/events/events_fifo.c
-index eff2b88003d9..9289a17712e2 100644
---- a/drivers/xen/events/events_fifo.c
-+++ b/drivers/xen/events/events_fifo.c
-@@ -36,7 +36,6 @@
- #include <linux/linkage.h>
- #include <linux/interrupt.h>
- #include <linux/irq.h>
--#include <linux/module.h>
- #include <linux/smp.h>
- #include <linux/percpu.h>
- #include <linux/cpu.h>
-diff --git a/drivers/xen/features.c b/drivers/xen/features.c
-index 99eda169c779..d7d34fdfc993 100644
---- a/drivers/xen/features.c
-+++ b/drivers/xen/features.c
-@@ -7,7 +7,7 @@
-  */
- #include <linux/types.h>
- #include <linux/cache.h>
--#include <linux/module.h>
-+#include <linux/export.h>
- 
- #include <asm/xen/hypercall.h>
- 
-diff --git a/drivers/xen/grant-table.c b/drivers/xen/grant-table.c
-index effbaf91791f..bb36b1e1dbcc 100644
---- a/drivers/xen/grant-table.c
-+++ b/drivers/xen/grant-table.c
-@@ -33,7 +33,6 @@
- 
- #define pr_fmt(fmt) "xen:" KBUILD_MODNAME ": " fmt
- 
--#include <linux/module.h>
- #include <linux/sched.h>
- #include <linux/mm.h>
- #include <linux/slab.h>
-diff --git a/drivers/xen/xen-pciback/conf_space.c b/drivers/xen/xen-pciback/conf_space.c
-index 9c234209d8b5..8e67336f8ddd 100644
---- a/drivers/xen/xen-pciback/conf_space.c
-+++ b/drivers/xen/xen-pciback/conf_space.c
-@@ -10,7 +10,7 @@
-  */
- 
- #include <linux/kernel.h>
--#include <linux/module.h>
-+#include <linux/moduleparam.h>
- #include <linux/pci.h>
- #include "pciback.h"
- #include "conf_space.h"
-diff --git a/drivers/xen/xen-pciback/pciback_ops.c b/drivers/xen/xen-pciback/pciback_ops.c
-index 73dafdc494aa..5ad01f9c24fc 100644
---- a/drivers/xen/xen-pciback/pciback_ops.c
-+++ b/drivers/xen/xen-pciback/pciback_ops.c
-@@ -6,7 +6,7 @@
- 
- #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
- 
--#include <linux/module.h>
-+#include <linux/moduleparam.h>
- #include <linux/wait.h>
- #include <linux/bitops.h>
- #include <xen/events.h>
-diff --git a/drivers/xen/xen-pciback/xenbus.c b/drivers/xen/xen-pciback/xenbus.c
-index 4843741e703a..c252eb3f0176 100644
---- a/drivers/xen/xen-pciback/xenbus.c
-+++ b/drivers/xen/xen-pciback/xenbus.c
-@@ -6,7 +6,7 @@
- 
- #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
- 
--#include <linux/module.h>
-+#include <linux/moduleparam.h>
- #include <linux/init.h>
- #include <linux/list.h>
- #include <linux/vmalloc.h>
-diff --git a/drivers/xen/xen-selfballoon.c b/drivers/xen/xen-selfballoon.c
-index 3b2bffde534f..53a085fca00c 100644
---- a/drivers/xen/xen-selfballoon.c
-+++ b/drivers/xen/xen-selfballoon.c
-@@ -71,7 +71,6 @@
- #include <linux/swap.h>
- #include <linux/mm.h>
- #include <linux/mman.h>
--#include <linux/module.h>
- #include <linux/workqueue.h>
- #include <linux/device.h>
- #include <xen/balloon.h>
-diff --git a/drivers/xen/xenbus/xenbus_xs.c b/drivers/xen/xenbus/xenbus_xs.c
-index ba804f3d8278..374b12af8812 100644
---- a/drivers/xen/xenbus/xenbus_xs.c
-+++ b/drivers/xen/xenbus/xenbus_xs.c
-@@ -44,7 +44,6 @@
- #include <linux/fcntl.h>
- #include <linux/kthread.h>
- #include <linux/rwsem.h>
--#include <linux/module.h>
- #include <linux/mutex.h>
- #include <asm/xen/hypervisor.h>
- #include <xen/xenbus.h>
-diff --git a/drivers/xen/xenfs/xensyms.c b/drivers/xen/xenfs/xensyms.c
-index a03f261b12d8..c6e2b4a542ea 100644
---- a/drivers/xen/xenfs/xensyms.c
-+++ b/drivers/xen/xenfs/xensyms.c
-@@ -1,4 +1,3 @@
--#include <linux/module.h>
- #include <linux/init.h>
- #include <linux/seq_file.h>
- #include <linux/fs.h>
+ static struct platform_driver sunxi_ir_driver = {
+ 	.probe          = sunxi_ir_probe,
 -- 
-2.6.1
+2.7.1
