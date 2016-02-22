@@ -1,44 +1,40 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 22 Feb 2016 18:16:16 +0100
-Subject: [PATCH v3 1/4] of/fdt: factor out assignment of
- initrd_start/initrd_end
-In-Reply-To: <20160222170952.GM31168@arm.com>
-References: <1455289046-21321-1-git-send-email-ard.biesheuvel@linaro.org>
- <1455289046-21321-2-git-send-email-ard.biesheuvel@linaro.org>
- <20160222164958.GJ31168@arm.com>
- <CAKv+Gu_OGJG0i9T=ecFVQM-P8KRpasJ+h6L4onJgpaED07Q8Jg@mail.gmail.com>
- <20160222170952.GM31168@arm.com>
-Message-ID: <CAKv+Gu8H3hQ6tPmw-s6G7u5qzTXBvLndxDEynKx36r5eW5SDjg@mail.gmail.com>
+From: ray.jui@broadcom.com (Ray Jui)
+Date: Mon, 22 Feb 2016 09:17:13 -0800
+Subject: [PATCH 11/61] gpio: bcm-kona: Use devm_gpiochip_add_data() for
+ gpio registration
+In-Reply-To: <1456150130-2668-12-git-send-email-ldewangan@nvidia.com>
+References: <1456150130-2668-1-git-send-email-ldewangan@nvidia.com>
+ <1456150130-2668-12-git-send-email-ldewangan@nvidia.com>
+Message-ID: <67faee9e-e234-fc60-5465-3193bed4a7c3@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 February 2016 at 18:09, Will Deacon <will.deacon@arm.com> wrote:
-> On Mon, Feb 22, 2016 at 05:56:40PM +0100, Ard Biesheuvel wrote:
->> On 22 February 2016 at 17:49, Will Deacon <will.deacon@arm.com> wrote:
->> > On Fri, Feb 12, 2016 at 03:57:23PM +0100, Ard Biesheuvel wrote:
->> >> Since architectures may not yet have their linear mapping up and running
->> >> when the initrd address is discovered from the DT, factor out the
->> >> assignment of initrd_start and initrd_end, so that an architecture can
->> >> override it and use the translation it needs.
->> >>
->> >> Cc: Rob Herring <robh@kernel.org>
->> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> >> ---
->> >>  drivers/of/fdt.c | 14 +++++++++++---
->> >>  1 file changed, 11 insertions(+), 3 deletions(-)
->> >
->> > Mark, Rob, any comments on this?
->> >
->>
->> Already acked by Rob, and pulled into -next by Catalin ...
+
+
+On 2/22/2016 6:08 AM, Laxman Dewangan wrote:
+> Use devm_gpiochip_add_data() for GPIO registration.
 >
-> Weird, I don't see that in my inbox or on the list archives. Where should
-> I be looking?
+> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+> Cc: Ray Jui <rjui@broadcom.com>
+> ---
+>  drivers/gpio/gpio-bcm-kona.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 >
-> I'd certainly like to see some performance measurement of the BUG_ON
-> in PHYS_ADDR that is introduced later in the series too.
+> diff --git a/drivers/gpio/gpio-bcm-kona.c b/drivers/gpio/gpio-bcm-kona.c
+> index b6c5abe..2fd38d5 100644
+> --- a/drivers/gpio/gpio-bcm-kona.c
+> +++ b/drivers/gpio/gpio-bcm-kona.c
+> @@ -630,7 +630,7 @@ static int bcm_kona_gpio_probe(struct platform_device *pdev)
+>
+>  	bcm_kona_gpio_reset(kona_gpio);
+>
+> -	ret = gpiochip_add_data(chip, kona_gpio);
+> +	ret = devm_gpiochip_add_data(dev, chip, kona_gpio);
+>  	if (ret < 0) {
+>  		dev_err(dev, "Couldn't add GPIO chip -- %d\n", ret);
+>  		goto err_irq_domain;
 >
 
-Apologies, I removed you from cc unintentionally.
+Acked-by: Ray Jui <ray.jui@broadcom.com>
 
-http://thread.gmane.org/gmane.linux.ports.arm.kernel/478714
+Thanks!
