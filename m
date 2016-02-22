@@ -1,54 +1,41 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 22 Feb 2016 15:25:53 +0100
-Subject: [PATCH 0/5] memory attribute table support
-Message-ID: <1456151158-25849-1-git-send-email-ard.biesheuvel@linaro.org>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Mon, 22 Feb 2016 19:38:36 +0530
+Subject: [PATCH 47/61] gpio: timberdale Use devm_gpiochip_add_data() for gpio
+ registration
+In-Reply-To: <1456150130-2668-1-git-send-email-ldewangan@nvidia.com>
+References: <1456150130-2668-1-git-send-email-ldewangan@nvidia.com>
+Message-ID: <1456150130-2668-48-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This implements ARM/arm64 support for dealing with the UEFI memory attribute
-table, which allows the OS to map UEFI Runtime Services regions with stricter
-permissions.
+Use devm_gpiochip_add_data() for GPIO registration.
 
-I have tried to implement the early discovery and validation of the table
-as generically as possible. I think it should be reusable on x86 as well,
-but I haven't tried myself. Note that this also depends on the way we
-deal with the reservation of BootServicesData regions goind forward.
+Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+---
+ drivers/gpio/gpio-timberdale.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-Note that for 32-bit ARM, this depends on [1], which addresses an issue
-with memremap() on that architecture
-
-Patches #1 and #2 implement support for the EFI_MEMORY_RO and EFI_MEMORY_XP
-attributes, and as it turns out, this code supports both the (obsolete)
-PropertiesTable and the new Memory Attributes table, so I moved them to the
-beginning of the series.
-
-Patch #3 adds the GUID and type definitions for the memory attributes table.
-
-Patch #4 implements the generic handling of the table.
-
-Patch #5 wires it up for ARM and arm64.
-
-[1] http://thread.gmane.org/gmane.linux.kernel/2157907
-
-Ard Biesheuvel (5):
-  ARM: efi: apply strict permissons for UEFI Runtime Services regions
-  arm64: efi: apply strict permissons for UEFI Runtime Services regions
-  efi: add support for the EFI_MEMORY_ATTRIBUTES_TABLE config table
-  efi: implement generic support for the Memory Attributes table
-  arm*: efi: take the Memory Attributes table into account
-
- arch/arm/include/asm/efi.h         |   1 +
- arch/arm/kernel/efi.c              |  41 ++++++
- arch/arm64/include/asm/efi.h       |   2 +
- arch/arm64/kernel/efi.c            |  27 +++-
- drivers/firmware/efi/Makefile      |   2 +-
- drivers/firmware/efi/arm-init.c    |   1 +
- drivers/firmware/efi/arm-runtime.c |   3 +
- drivers/firmware/efi/efi.c         |   2 +
- drivers/firmware/efi/memattr.c     | 137 ++++++++++++++++++++
- include/linux/efi.h                |  19 +++
- 10 files changed, 229 insertions(+), 6 deletions(-)
- create mode 100644 drivers/firmware/efi/memattr.c
-
+diff --git a/drivers/gpio/gpio-timberdale.c b/drivers/gpio/gpio-timberdale.c
+index a6de10c..f0164ec 100644
+--- a/drivers/gpio/gpio-timberdale.c
++++ b/drivers/gpio/gpio-timberdale.c
+@@ -279,7 +279,7 @@ static int timbgpio_probe(struct platform_device *pdev)
+ 	gc->ngpio = pdata->nr_pins;
+ 	gc->can_sleep = false;
+ 
+-	err = gpiochip_add_data(gc, tgpio);
++	err = devm_gpiochip_add_data(&pdev->dev, gc, tgpio);
+ 	if (err)
+ 		return err;
+ 
+@@ -320,8 +320,6 @@ static int timbgpio_remove(struct platform_device *pdev)
+ 		irq_set_handler_data(irq, NULL);
+ 	}
+ 
+-	gpiochip_remove(&tgpio->gpio);
+-
+ 	return 0;
+ }
+ 
 -- 
-2.5.0
+2.1.4
