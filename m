@@ -1,36 +1,27 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 22 Feb 2016 10:51:07 -0600
-Subject: [PATCH 1/2] ARM: dts: am57xx-beagle-x15: Add eeprom information
-In-Reply-To: <1456159868-32416-1-git-send-email-nm@ti.com>
-References: <1456159868-32416-1-git-send-email-nm@ti.com>
-Message-ID: <1456159868-32416-2-git-send-email-nm@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 22 Feb 2016 16:52:09 +0000
+Subject: [PATCH v3 4/4] arm64: prevent __va() translations before
+ memstart_addr is assigned
+In-Reply-To: <1455289046-21321-5-git-send-email-ard.biesheuvel@linaro.org>
+References: <1455289046-21321-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1455289046-21321-5-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160222165209.GK31168@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add EEPROM at 0x50 that describes the board configuration.
-This is useful for userspace programs that may need to check board
-revision and other similar information.
+On Fri, Feb 12, 2016 at 03:57:26PM +0100, Ard Biesheuvel wrote:
+> Since memstart_addr is assigned relatively late in the boot code,
+> after generic code like DT parsing and memblock manipulation has
+> already occurred, we need to ensure that no __va() translation occur
+> until memstart_addr has been set to a meaningful value.
+> 
+> So initialize memstart_addr to a value that cannot represent a valid
+> physical address, and BUG() if memstart_addr is referenced while it
+> still holds this value. Note that the > comparison against LLONG_MAX
+> (not ULLONG_MAX) resolves to a single tbnz instruction that performs
+> a conditional jump to a brk instruction that is emitted out of line.
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
- arch/arm/boot/dts/am57xx-beagle-x15.dts | 5 +++++
- 1 file changed, 5 insertions(+)
+Even so, I'd imagine that having a measurable impact on system
+performance. Did you have a go at benchmarking this?
 
-diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-index 36c0fa6c362a..50312f80b972 100644
---- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
-+++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-@@ -591,6 +591,11 @@
- 		DRVDD-supply = <&vdd_3v3>;
- 		DVDD-supply = <&aic_dvdd>;
- 	};
-+
-+	eeprom: eeprom at 50 {
-+		compatible = "at,24c32";
-+		reg = <0x50>;
-+	};
- };
- 
- &i2c3 {
--- 
-2.7.0
+Will
