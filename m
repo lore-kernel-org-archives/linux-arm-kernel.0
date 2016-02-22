@@ -1,136 +1,55 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Mon, 22 Feb 2016 10:03:33 -0600
-Subject: [PATCH] PCI/MSI: pci-xgene-msi: Enable MSI support in ACPI boot
- for X-Gene v1
-In-Reply-To: <CADaLNDmsW+5-EEvTMGOyCGmKWYS-trx74pQ87czkrSWqNgrHWw@mail.gmail.com>
-References: <1455069384-22323-1-git-send-email-dhdang@apm.com>
- <CADaLNDmsW+5-EEvTMGOyCGmKWYS-trx74pQ87czkrSWqNgrHWw@mail.gmail.com>
-Message-ID: <CAErSpo6nNKeg+v7SGLieBOi0f+5U_G03T6F7VtSw1N_VbjA2rg@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 22 Feb 2016 16:09:11 +0000
+Subject: [PATCH] arm*: efi: drop permanent mapping of the UEFI System table
+In-Reply-To: <CAKv+Gu_pnjL557dE1xez_y2tESOjZj9_2XEbNtm_b4yAA-WdYg@mail.gmail.com>
+References: <1456153179-27214-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20160222154314.GJ3435@leverpostej>
+ <CAKv+Gu_pnjL557dE1xez_y2tESOjZj9_2XEbNtm_b4yAA-WdYg@mail.gmail.com>
+Message-ID: <20160222160910.GK3435@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 20, 2016 at 1:47 PM, Duc Dang <dhdang@apm.com> wrote:
-> On Tue, Feb 9, 2016 at 5:56 PM, Duc Dang <dhdang@apm.com> wrote:
->> This patch makes pci-xgene-msi driver ACPI-aware and provides
->> MSI capability for X-Gene v1 PCIe controllers in ACPI boot mode.
->
-> Hi Bjorn,
->
-> Are you planning to take this patch into your tree?
+On Mon, Feb 22, 2016 at 04:56:57PM +0100, Ard Biesheuvel wrote:
+> On 22 February 2016 at 16:43, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Mon, Feb 22, 2016 at 03:59:39PM +0100, Ard Biesheuvel wrote:
+> >> The permanent, writable mapping of the UEFI System table is only
+> >> referenced during invocations of UEFI Runtime Services, at which time
+> >> the UEFI virtual mapping is available, which also covers the system
+> >> table (since the runtime services themselves need access to it)
+> >
+> > I'm not sure it's strictly true that the runtime services themselves
+> > need access to the system table. Why would that be necessary? Are
+> > runtime services mandated to indirect calls via the system table?
+> >
+> 
+> They don't need access per se, but they are allowed to reference it,
+> and so the memory remapping layer must make it accessible after
+> SetVirtualAddressMap(). The spec lists explicitly which fields are
+> still valid after ExitBootServices()
 
-Sorry, I haven't had a chance to look at this yet.  I had a sick
-daughter last week, so I'm even farther behind than usual.
+I was language-lawyering ;)
 
-When I get to it, I'll be asking questions like:
+I appreciate that they _can_, I just didn't think it was true that they
+_must_ (i.e. that they always "need to access it"). Per the below that's
+likely moot.
 
-  - Does this correspond to some analogous x86 code?
-  - Is there something unique about arm64 or X-Gene that means it
-needs special code?
+> SetVirtualAddressMap() is a runtime service, and one of the things it
+> does is update the pointers in the system table, hence it must be
+> located in RuntimeService memory, because anything else may be gone by
+> this time.
 
-I don't really understand the arm64/ACPI strategy yet, so I'll be
-looking first for generic solutions that work across x86/ia64/arm64,
-and justifications for the inevitable exceptions.
+Good point. That does imply that it must be in EfiRuntimeServices*
+memory.
 
->> Signed-off-by: Duc Dang <dhdang@apm.com>
->> ---
->>  drivers/pci/host/pci-xgene-msi.c | 35 ++++++++++++++++++++++++++++++++---
->>  1 file changed, 32 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/pci/host/pci-xgene-msi.c b/drivers/pci/host/pci-xgene-msi.c
->> index a6456b5..466aa93 100644
->> --- a/drivers/pci/host/pci-xgene-msi.c
->> +++ b/drivers/pci/host/pci-xgene-msi.c
->> @@ -24,6 +24,7 @@
->>  #include <linux/pci.h>
->>  #include <linux/platform_device.h>
->>  #include <linux/of_pci.h>
->> +#include <linux/acpi.h>
->>
->>  #define MSI_IR0                        0x000000
->>  #define MSI_INT0               0x800000
->> @@ -39,7 +40,7 @@ struct xgene_msi_group {
->>  };
->>
->>  struct xgene_msi {
->> -       struct device_node      *node;
->> +       struct fwnode_handle    *fwnode;
->>         struct irq_domain       *inner_domain;
->>         struct irq_domain       *msi_domain;
->>         u64                     msi_addr;
->> @@ -249,6 +250,13 @@ static const struct irq_domain_ops msi_domain_ops = {
->>         .free   = xgene_irq_domain_free,
->>  };
->>
->> +#ifdef CONFIG_ACPI
->> +static struct fwnode_handle *xgene_msi_get_fwnode(struct device *dev)
->> +{
->> +       return xgene_msi_ctrl.fwnode;
->> +}
->> +#endif
->> +
->>  static int xgene_allocate_domains(struct xgene_msi *msi)
->>  {
->>         msi->inner_domain = irq_domain_add_linear(NULL, NR_MSI_VEC,
->> @@ -256,7 +264,7 @@ static int xgene_allocate_domains(struct xgene_msi *msi)
->>         if (!msi->inner_domain)
->>                 return -ENOMEM;
->>
->> -       msi->msi_domain = pci_msi_create_irq_domain(of_node_to_fwnode(msi->node),
->> +       msi->msi_domain = pci_msi_create_irq_domain(msi->fwnode,
->>                                                     &xgene_msi_domain_info,
->>                                                     msi->inner_domain);
->>
->> @@ -265,6 +273,9 @@ static int xgene_allocate_domains(struct xgene_msi *msi)
->>                 return -ENOMEM;
->>         }
->>
->> +#ifdef CONFIG_ACPI
->> +       pci_msi_register_fwnode_provider(&xgene_msi_get_fwnode);
->> +#endif
->>         return 0;
->>  }
->>
->> @@ -473,6 +484,13 @@ static const struct of_device_id xgene_msi_match_table[] = {
->>         {},
->>  };
->>
->> +#ifdef CONFIG_ACPI
->> +static const struct acpi_device_id xgene_msi_acpi_ids[] = {
->> +       {"APMC0D0E", 0},
->> +       { },
->> +};
->> +#endif
->> +
->>  static int xgene_msi_probe(struct platform_device *pdev)
->>  {
->>         struct resource *res;
->> @@ -494,7 +512,17 @@ static int xgene_msi_probe(struct platform_device *pdev)
->>                 goto error;
->>         }
->>         xgene_msi->msi_addr = res->start;
->> -       xgene_msi->node = pdev->dev.of_node;
->> +
->> +       xgene_msi->fwnode = of_node_to_fwnode(pdev->dev.of_node);
->> +       if (!xgene_msi->fwnode) {
->> +               xgene_msi->fwnode = irq_domain_alloc_fwnode(NULL);
->> +               if (!xgene_msi->fwnode) {
->> +                       dev_err(&pdev->dev, "Failed to create fwnode\n");
->> +                       rc = ENOMEM;
->> +                       goto error;
->> +               }
->> +       }
->> +
->>         xgene_msi->num_cpus = num_possible_cpus();
->>
->>         rc = xgene_msi_init_allocator(xgene_msi);
->> @@ -571,6 +599,7 @@ static struct platform_driver xgene_msi_driver = {
->>         .driver = {
->>                 .name = "xgene-msi",
->>                 .of_match_table = xgene_msi_match_table,
->> +               .acpi_match_table = ACPI_PTR(xgene_msi_acpi_ids),
->>         },
->>         .probe = xgene_msi_probe,
->>         .remove = xgene_msi_remove,
->> --
->> 1.9.1
->>
+> > From the spec, I couldn't find a mandate that the system table (nor the
+> > runtime services table) were in a region of EfiRuntimeServicesData
+> > memory. I suspect I'm looking in the wrong place...
+> 
+> We should clarify it if it is not clear (or if I turn out to be wrong)
+
+I'm hoping that I've simply missed something. Perhaps the implication
+above was intentional, albeit rather opaque.
+
+Otherwise, I certainly agree a clarification would be a good thing!
+
+Mark.
