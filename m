@@ -1,74 +1,40 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Sun, 21 Feb 2016 21:51:24 -0800
-Subject: [PATCH v2 2/8] arm64: dts: qcom: apq8016-sbc: add usb support
-In-Reply-To: <1455104202-10560-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1455104164-29356-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1455104202-10560-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <20160222055124.GG21240@tuxbot>
+From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
+Date: Mon, 22 Feb 2016 11:24:36 +0530
+Subject: [PATCH v2 3/4] dmaengine: xilinx_vdma: Fix issues with non-parking
+ mode
+In-Reply-To: <1456120477-32134-1-git-send-email-appanad@xilinx.com>
+References: <1456120477-32134-1-git-send-email-appanad@xilinx.com>
+Message-ID: <1456120477-32134-3-git-send-email-appanad@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 10 Feb 03:36 PST 2016, Srinivas Kandagatla wrote:
+This patch fixes issues with the Non-parking mode(Cirular mode).
+With the  existing driver in cirular mode if we submit frames less than h/w
+configured we simply end-up having misconfigured vdma h/w.
+This patch fixes this issue by configuring the frame count register.
 
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> ---
->  arch/arm64/boot/dts/qcom/apq8016-sbc-soc-pins.dtsi | 15 ++++++++++
->  arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi          | 35 ++++++++++++++++++++++
->  2 files changed, 50 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc-soc-pins.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc-soc-pins.dtsi
-> index cbeee0b..4a79dd9 100644
-> --- a/arch/arm64/boot/dts/qcom/apq8016-sbc-soc-pins.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/apq8016-sbc-soc-pins.dtsi
-> @@ -10,4 +10,19 @@
->  			output-low;
->  		};
->  	};
-> +
-> +	usb_id_default: usb_id_default {
+Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+---
+Changes for v2:
+---> splitted the changes into multiple patches.
 
-Labels are built with _, node names with -.
+ drivers/dma/xilinx/xilinx_vdma.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-> +		pinmux {
-> +			function = "gpio";
-> +			pins = "gpio121";
-> +		};
-
-You don't need a separate node to specify function...
-
-> +
-> +		pinconf {
-> +			pins = "gpio121";
-> +			function = "gpio";
-
-...but if you really want it, then you shouldn't specify the function
-here.
-
-> +			drive-strength = <8>;
-> +			input-enable;
-> +			bias-pull-up;
-> +		};
-> +	};
->  };
-> diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-[..]
-> +
-> +	usb_id: usb-id {
-> +		interrupt-parent = <&msmgpio>;
-
-interrupt-parent is part of specifying an interrupt. You're not doing
-that here, so no need to specify a parent.
-
-> +		compatible = "linux,extcon-usb-gpio";
-> +		id-gpio = <&msmgpio 121 GPIO_ACTIVE_HIGH>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&usb_id_default>;
->  	};
->  };
-
-Apart from these two nits
-
-Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
-
-Regards,
-Bjorn
+diff --git a/drivers/dma/xilinx/xilinx_vdma.c b/drivers/dma/xilinx/xilinx_vdma.c
+index d646218..8db07f7 100644
+--- a/drivers/dma/xilinx/xilinx_vdma.c
++++ b/drivers/dma/xilinx/xilinx_vdma.c
+@@ -645,6 +645,10 @@ static void xilinx_vdma_start_transfer(struct xilinx_vdma_chan *chan)
+ 	else
+ 		reg &= ~XILINX_VDMA_DMACR_FRAMECNT_EN;
+ 
++	/* Configure channel to allow number frame buffers */
++	vdma_ctrl_write(chan, XILINX_VDMA_REG_FRMSTORE,
++			chan->desc_pendingcount);
++
+ 	/*
+ 	 * With SG, start with circular mode, so that BDs can be fetched.
+ 	 * In direct register mode, if not parking, enable circular mode
+-- 
+2.1.2
