@@ -1,86 +1,52 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 22 Feb 2016 16:45:17 +0100
-Subject: [PATCH 1/8] arm64: move acpi/dt decision earlier in boot process
-In-Reply-To: <1456148818-26257-2-git-send-email-aleksey.makarov@linaro.org>
-References: <1456148818-26257-1-git-send-email-aleksey.makarov@linaro.org>
- <1456148818-26257-2-git-send-email-aleksey.makarov@linaro.org>
-Message-ID: <56CB2D0D.3090408@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 22 Feb 2016 15:51:29 +0000
+Subject: [PATCH v2 1/2] drm: Improve drm_of_component_probe() to
+ correctly handle ports and remote ports.
+In-Reply-To: <20160222115147.GR1123@e106497-lin.cambridge.arm.com>
+References: <1448029325-14602-1-git-send-email-Liviu.Dudau@arm.com>
+ <1448029325-14602-2-git-send-email-Liviu.Dudau@arm.com>
+ <20160222115147.GR1123@e106497-lin.cambridge.arm.com>
+Message-ID: <20160222155128.GE19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Feb 22, 2016 at 11:51:47AM +0000, Liviu Dudau wrote:
+> On Fri, Nov 20, 2015 at 02:22:04PM +0000, Liviu Dudau wrote:
+> > Rockchip DRM driver cannot use the same compare_of() function to
+> > match ports and remote ports (aka encoders) as their OF sub-trees
+> > look different. Add a second compare function to be used when encoders
+> > are added to the component framework and patch the existing users of
+> > the function accordingly.
+> > 
+> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> 
+> Russell,
+> 
+> Resurecting this old patch from around Christmas time (bad time for patch
+> review).
+> 
+> Are you happy enough with this version to re-issue the Ack or do you think
+> I still need to work on it?
 
+What I'd like to see is the patch reworked, because:
 
-On 22/02/16 14:46, Aleksey Makarov wrote:
-> From: Leif Lindholm <leif.lindholm@linaro.org>
->
-> In order to support selecting earlycon via either ACPI or DT, move
-> the decision on whether to attempt ACPI configuration into the
-> early_param handling. Then make acpi_boot_table_init() bail out if
-> acpi_disabled.
->
-> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
-> ---
->   arch/arm64/kernel/acpi.c | 54 ++++++++++++++++++++++++++----------------------
->   1 file changed, 29 insertions(+), 25 deletions(-)
->
-> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-> index d1ce8e2..7a944f7 100644
-> --- a/arch/arm64/kernel/acpi.c
-> +++ b/arch/arm64/kernel/acpi.c
-> @@ -44,6 +44,19 @@ EXPORT_SYMBOL(acpi_pci_disabled);
->   static bool param_acpi_off __initdata;
->   static bool param_acpi_force __initdata;
->
-> +static int __init dt_scan_depth1_nodes(unsigned long node,
-> +				       const char *uname, int depth,
-> +				       void *data)
-> +{
-> +	/*
-> +	 * Return 1 as soon as we encounter a node at depth 1 that is
-> +	 * not the /chosen node.
-> +	 */
-> +	if (depth == 1 && (strcmp(uname, "chosen") != 0))
-> +		return 1;
-> +	return 0;
-> +}
-> +
->   static int __init parse_acpi(char *arg)
->   {
->   	if (!arg)
-> @@ -57,23 +70,27 @@ static int __init parse_acpi(char *arg)
->   	else
->   		return -EINVAL;	/* Core will print when we return error */
->
-> -	return 0;
-> -}
-> -early_param("acpi", parse_acpi);
-> +	/*
-> +	 * Enable ACPI instead of device tree unless
-> +	 * - ACPI has been disabled explicitly (acpi=off), or
-> +	 * - the device tree is not empty (it has more than just a /chosen node)
-> +	 *   and ACPI has not been force enabled (acpi=force)
-> +	 */
-> +	if (param_acpi_off ||
-> +	    (!param_acpi_force && of_scan_flat_dt(dt_scan_depth1_nodes, NULL)))
-> +		return 0;
->
-> -static int __init dt_scan_depth1_nodes(unsigned long node,
-> -				       const char *uname, int depth,
-> -				       void *data)
-> -{
->   	/*
-> -	 * Return 1 as soon as we encounter a node at depth 1 that is
-> -	 * not the /chosen node.
-> +	 * ACPI is disabled at this point. Enable it in order to parse
-> +	 * the ACPI tables and carry out sanity checks
->   	 */
-> -	if (depth == 1 && (strcmp(uname, "chosen") != 0))
-> -		return 1;
-> +	enable_acpi();
-> +
+> > +		component_match_add(dev, &match, compare_port, port);
+> > +		/*
+> > +		 * component_match_add keeps a reference to the port
+> > +		 * variable, so we need to keep the reference count
+> > +		 * increment from of_parse_phandle()
+> > +		 */
+...
+> > +			component_match_add(dev, &match, compare_encoder, remote);
+> > +			/*
+> > +			 * component_match_add keeps a reference to the port
+> > +			 * variable, so we need to keep the reference count
+> > +			 * increment from of_graph_get_remote_port_parent()
+> > +			 */
 
-So we only enable ACPI if we pass acpi=force as kernel parameter?
-I'm not sure if this is what you wanted to do.
+This problem no longer exists.
 
-Regards,
-Matthias
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
