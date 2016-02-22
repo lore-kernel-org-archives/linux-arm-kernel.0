@@ -1,78 +1,101 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 22 Feb 2016 16:54:15 +0100
-Subject: [PATCH 11/11] ARM: versatile: move CLCD configuration to device
- tree
-In-Reply-To: <56CB2C31.5040703@ti.com>
-References: <1454594660-7532-1-git-send-email-linus.walleij@linaro.org>
- <1454594660-7532-12-git-send-email-linus.walleij@linaro.org>
- <56C438DA.5040109@ti.com>
- <CACRpkdZ+G17hmVP8AejL7NTqg7k0SBC5kgF55ASjD+kfuGFJhQ@mail.gmail.com>
- <20160217213250.GK19428@n2100.arm.linux.org.uk>
- <56C5B080.9090007@ti.com>
- <CACRpkdaXFUCR5=5mS28_4Dx_LfzqV13zwT=vVeJwuOzm_rGRBQ@mail.gmail.com>
- <56CB2C31.5040703@ti.com>
-Message-ID: <CACRpkdbO1+nWJOce8eC-G=tKrH3a2OEqQ-ro=LK88RhNrJ5cfQ@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 22 Feb 2016 16:56:57 +0100
+Subject: [PATCH] arm*: efi: drop permanent mapping of the UEFI System table
+In-Reply-To: <20160222154314.GJ3435@leverpostej>
+References: <1456153179-27214-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20160222154314.GJ3435@leverpostej>
+Message-ID: <CAKv+Gu_pnjL557dE1xez_y2tESOjZj9_2XEbNtm_b4yAA-WdYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 22, 2016 at 4:41 PM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
-
-> After thinking this a bit and discussing it with Laurent P., generally
-> speaking I still think that the only sane option is that the bootloader
-> does any detection needed and provides the kernel a .dtb that contains
-> the HW that is connected. No board specific drivers are needed on the
-> kernel side.
+On 22 February 2016 at 16:43, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Mon, Feb 22, 2016 at 03:59:39PM +0100, Ard Biesheuvel wrote:
+>> The permanent, writable mapping of the UEFI System table is only
+>> referenced during invocations of UEFI Runtime Services, at which time
+>> the UEFI virtual mapping is available, which also covers the system
+>> table (since the runtime services themselves need access to it)
 >
-> In some cases userspace loaded DT overlays may be fine, if the userspace
-> can do the detection and the device in question is not somehow critical
-> to operation. But I think displays are critical, and afaik in Versatile
-> case the userspace can't even do the detection (?).
+> I'm not sure it's strictly true that the runtime services themselves
+> need access to the system table. Why would that be necessary? Are
+> runtime services mandated to indirect calls via the system table?
 >
-> The third option is to have board specific display handling code and the
-> display HW data in the kernel, as you've done in the patches.
 
-Yeah correct...
+They don't need access per se, but they are allowed to reference it,
+and so the memory remapping layer must make it accessible after
+SetVirtualAddressMap(). The spec lists explicitly which fields are
+still valid after ExitBootServices()
 
-> But, of course, which option should be used for which board is not
-> always clear...
+> I would expect that the EFI system table and EFI runtime services table
+> are not in EfiConventionalMemory, but I'm not sure that we have the
+> guarnatee that they're both in EfiRuntimeServices* memory..
 >
-> What bootloader is used on Versatile?
 
-It's U-boot indeed. Not that I've tried to compile or use it, I got it
-as binary from ARM.
+SetVirtualAddressMap() is a runtime service, and one of the things it
+does is update the pointers in the system table, hence it must be
+located in RuntimeService memory, because anything else may be gone by
+this time.
 
-> If it's some proprietary loader
-> which can't be changed, then the bootloader option is out, and I guess
-> it points to the third option, i.e. either the version in this patch or
-> the earlier version. If it's u-boot, I would suggest going for the
-> bootloader option.
+> From the spec, I couldn't find a mandate that the system table (nor the
+> runtime services table) were in a region of EfiRuntimeServicesData
+> memory. I suspect I'm looking in the wrong place...
 >
-> Afaik u-boot doesn't support combining DT fragments yet. But (also
-> afaik) the u-boot maintainer is ok with the idea. And I know there are
-> others (for example TI) interested in the same functionality.
 
-Hm OK.... so the bootloader need to be better at augmenting device
-trees than the kernel. Well... The problem is that there are a bunch
-of deployed systems out there and they all need to have their boot loader
-updated then, which may be OK since it's ARM development boards
-but I don't know.
+We should clarify it if it is not clear (or if I turn out to be wrong)
 
-> Now, adding that support might take some time, and in the meantime it'd
-> be good to get the HW working with kernel with a temporary solution. To
-> do that, my suggestion is basically "any solution which requires no
-> (temporary) changes to .dts".
+>> So instead of creating this permanent mapping, record the virtual
+>> address of the system table inside the UEFI virtual mapping, and
+>> use that instead. This protects the contents of the system table
+>> from inadvertent (or deliberate) modification.
+>>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>>
+>> Something I spotted while working on the memory attribute table stuff.
+>> Since this is low hanging fruit and otherwise completely unrelated to it,
+>> I am posting it as a separate patch
+>>
+>>  drivers/firmware/efi/arm-init.c    |  2 ++
+>>  drivers/firmware/efi/arm-runtime.c | 24 ++++++++++----------
+>>  2 files changed, 14 insertions(+), 12 deletions(-)
+>>
+>> diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
+>> index 022f11157acd..e995d61da747 100644
+>> --- a/drivers/firmware/efi/arm-init.c
+>> +++ b/drivers/firmware/efi/arm-init.c
+>> @@ -85,6 +85,8 @@ static int __init uefi_init(void)
+>>                       efi.systab->hdr.revision >> 16,
+>>                       efi.systab->hdr.revision & 0xffff);
+>>
+>> +     efi.runtime_version = efi.systab->hdr.revision;
+>> +
+>>       /* Show what we know for posterity */
+>>       c16 = early_memremap_ro(efi_to_phys(efi.systab->fw_vendor),
+>>                               sizeof(vendor) * sizeof(efi_char16_t));
+>> diff --git a/drivers/firmware/efi/arm-runtime.c b/drivers/firmware/efi/arm-runtime.c
+>> index 848ede1587dc..6ce13d6b7122 100644
+>> --- a/drivers/firmware/efi/arm-runtime.c
+>> +++ b/drivers/firmware/efi/arm-runtime.c
+>> @@ -64,6 +64,16 @@ static bool __init efi_virtmap_init(void)
+>>                               &phys, ret);
+>>                       return false;
+>>               }
+>> +             /*
+>> +              * If this entry covers the address of the UEFI system table,
+>> +              * calculate and record its virtual address.
+>> +              */
+>> +             if (efi_system_table >= phys &&
+>> +                 efi_system_table < phys + (md->num_pages * EFI_PAGE_SIZE)) {
+>> +                     efi.systab = (void *)(efi_system_table - phys +
+>> +                                           md->virt_addr);
+>> +                     set_bit(EFI_SYSTEM_TABLES, &efi.flags);
+>> +             }
 >
-> While I don't like too much the solution in the patch here, it's all
-> inside kernel code and can be dropped easily, right? If we would merge
-> the the multi-endpoint solution you had in the earlier patch, you would
-> have to support that .dts in the future too.
+> It seems very odd to me to set this given it's currently unused, and we
+> don't have permanent access to the table. That sounds like we're just
+> setting ourselves up for future fragility as users appear.
+>
 
-To go with this solution I need to extend the drivers/of library to be
-able to update properties properly instead of this hack, and that is
-non-reversible if we start to use it.
+I wondered about the purpose as well. It is only ever set, and never
+tested (until this patch)
 
-It is not really an overlay because the DT stuff is dynamically
-augmented by the kernel, not taken from somewhere else.
-
-Yours,
-Linus Walleij
+@Matt: any thoughts?
