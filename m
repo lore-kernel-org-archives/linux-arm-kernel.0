@@ -1,20 +1,36 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 22 Feb 2016 10:11:29 -0800
-Subject: [PATCH 0/3] ARM: omap2plus_defconfig: Enable OMAP3 ISP and
- dependencies
-In-Reply-To: <1454953983-8894-1-git-send-email-javier@osg.samsung.com>
-References: <1454953983-8894-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <20160222181128.GM13417@atomide.com>
+Date: Mon, 22 Feb 2016 10:13:54 -0800
+Subject: [PATCH 2/2] ARM: omap2plus_defconfig: Enable AT24 eeprom
+In-Reply-To: <1456159868-32416-3-git-send-email-nm@ti.com>
+References: <1456159868-32416-1-git-send-email-nm@ti.com>
+ <1456159868-32416-3-git-send-email-nm@ti.com>
+Message-ID: <20160222181354.GN13417@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Javier Martinez Canillas <javier@osg.samsung.com> [160208 09:54]:
-> Hello,
+* Nishanth Menon <nm@ti.com> [160222 08:51]:
+> AT24 compatible eeproms are used in BB family and X15 boards.
 > 
-> This small series enables all the Kconfig symbols needed to test the
-> OMAP3 ISP on the IGEPv2 board. I've enabled as much as possible as a
-> module and only as built-in the options that are boolean.
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> ---
+>  arch/arm/configs/omap2plus_defconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+> index d18d6b42fcf5..fa82f4e25d0e 100644
+> --- a/arch/arm/configs/omap2plus_defconfig
+> +++ b/arch/arm/configs/omap2plus_defconfig
+> @@ -145,6 +145,7 @@ CONFIG_BLK_DEV_RAM_SIZE=16384
+>  CONFIG_SENSORS_TSL2550=m
+>  CONFIG_BMP085_I2C=m
+>  CONFIG_SRAM=y
+> +CONFIG_EEPROM_AT24=m
+>  CONFIG_SENSORS_LIS3_I2C=m
+>  CONFIG_BLK_DEV_SD=y
+>  CONFIG_SCSI_SCAN_ASYNC=y
 
-Looks good to me thanks, applying into omap-for-v4.6/defconfig.
+Applying into omap-for-v4.6/defconfig.
+
+Thanks,
 
 Tony
