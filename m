@@ -1,51 +1,53 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Mon, 22 Feb 2016 11:55:35 -0800
-Subject: [RFC PATCH 1/2] memremap: add arch specific hook for MEMREMAP_WB
- mappings
-In-Reply-To: <CAKv+Gu9OWVgo+Qm85jPjY7xJ1UELm-4LYORHKF8Yy+_HuzmtGw@mail.gmail.com>
-References: <1456149728-16706-1-git-send-email-ard.biesheuvel@linaro.org>
- <1456149728-16706-2-git-send-email-ard.biesheuvel@linaro.org>
- <CAPcyv4ivN9c8PHBR77vd36ovB28OETJUr6VYf_8gNtXgqEmATw@mail.gmail.com>
- <CAKv+Gu9OWVgo+Qm85jPjY7xJ1UELm-4LYORHKF8Yy+_HuzmtGw@mail.gmail.com>
-Message-ID: <CAPcyv4gtzzSBTUdd6_5P0C=bJBgbb1q035bQX9OcxUUT1ifJeA@mail.gmail.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Mon, 22 Feb 2016 13:58:14 -0600
+Subject: [PATCH] dma: mv_xor_v2: new driver
+In-Reply-To: <20160222101621.4f03ef8b@free-electrons.com>
+References: <1455523083-25506-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20160222032730.GU19598@localhost>
+ <20160222101621.4f03ef8b@free-electrons.com>
+Message-ID: <CAL_Jsq+bYmafQWasY1T2QG6Dujf7Ki6JSZKZoFzJXAphTAvnCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 22, 2016 at 11:17 AM, Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> On 22 February 2016 at 20:05, Dan Williams <dan.j.williams@intel.com> wrote:
->> On Mon, Feb 22, 2016 at 6:02 AM, Ard Biesheuvel
->> <ard.biesheuvel@linaro.org> wrote:
->>> Currently, the memremap code serves MEMREMAP_WB mappings directly from
->>> the kernel direct mapping, unless the region is in high memory, in which
->>> case it falls back to using ioremap_cache(). However, the semantics of
->>> ioremap_cache() are not unambiguously defined, and on ARM, it will
->>> actually result in a mapping type that differs from the attributes used
->>> for the linear mapping, and for this reason, the ioremap_cache() call
->>> fails if the region is part of the memory managed by the kernel.
->>>
->>> So instead, implement an optional hook 'arch_memremap_wb' whose default
->>> implementation calls ioremap_cache() as before, but which can be
->>> overridden by the architecture to do what is appropriate for it.
->>>
->>
->> Acked-by: Dan Williams <dan.j.williams@intel.com>
->>
->> I still have patches pending to delete ioremap_cache() from ARM and
->> require memremap() to be used for cacheable mappings.  Do you see any
->> use for ioremap_cache() on ARM after this change?
+On Mon, Feb 22, 2016 at 3:16 AM, Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com> wrote:
+> Hello Vinod,
 >
-> I am not exactly sure why ioremap_cache() does not use MT_MEMORY_RW
-> attributes, but the ARM architecture simply does not allow mismatched
-> attributes, so we cannot simply replace each instance of
-> ioremap_cache() with memremap()
+> On Mon, 22 Feb 2016 08:57:30 +0530, Vinod Koul wrote:
+>> On Mon, Feb 15, 2016 at 08:58:03AM +0100, Thomas Petazzoni wrote:
+>> > diff --git a/Documentation/devicetree/bindings/dma/mv-xor-v2.txt b/Documentation/devicetree/bindings/dma/mv-xor-v2.txt
+>> > new file mode 100644
+>> > index 0000000..0a03dcf
+>> > --- /dev/null
+>> > +++ b/Documentation/devicetree/bindings/dma/mv-xor-v2.txt
+>> > @@ -0,0 +1,19 @@
+>> > +* Marvell XOR v2 engines
+>> > +
+>> > +Required properties:
+>> > +- compatible: Should be "marvell,mv-xor-v2"
+>> > +- reg: Should contain registers location and length (two sets)
+>> > +    the first set is the DMA registers
+>> > +    the second set is the global registers
+>> > +- msi-parent: Phandle to the MSI-capable interrupt controller used for
+>> > +  interrupts.
+>> > +
+>> > +Example:
+>> > +
+>> > +   xor0 at 400000 {
+>> > +           compatible = "marvell,mv-xor-v2";
+>> > +           reg = <0x400000 0x1000>,
+>> > +                 <0x410000 0x1000>;
+>> > +           msi-parent = <&gic_v2m0>;
+>> > +           dma-coherent;
+>> > +   };
+>>
+>> This should be a separate patch :)
 >
-> Perhaps Russell can explain?
+> This is really a personal preference, and different maintainers have
+> different opinions on the matter. However, if your preference is to
+> have the DT binding documentation as a separate patch, then I'll split
+> it, no problem :)
 
->From the x86 perspective mismatched mappings are also disallowed.  The
-goal of deprecating ioremap_cache() in favor of memremap() is simply
-that the __iomem annotation is misplaced [1], and to clean up the
-calling convention to be explicit without silent fallbacks to
-different mapping types.
+Read step 1 in Documentation/devicetree/bindings/submitting-patches.txt.
 
-[1]: https://lwn.net/Articles/653585/
+Rob
