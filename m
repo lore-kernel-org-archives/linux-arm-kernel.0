@@ -1,55 +1,32 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 22 Feb 2016 21:54:32 +0100
-Subject: [RFC PATCH 10/10] arm64: mm: restrict __pa() translations to linear
- virtual addresses
+Date: Mon, 22 Feb 2016 21:54:31 +0100
+Subject: [RFC PATCH 09/10] arm64: insn: avoid __pa translations
 In-Reply-To: <1456174472-30028-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1456174472-30028-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1456174472-30028-11-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1456174472-30028-10-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have replaced all occurrences of __pa() translations
-involving virtual addresses that are covered by the kernel text,
-we can redefine __virt_to_phys and __pa() etc to only take virtual
-address that are covered by the linear mapping. This means we can
-remove the comparison with PAGE_OFFSET in the definition of
-__virt_to_phys().
+When taking the physical address of something that is known to be
+covered by the kernel text, use __kimg_to_phys() not virt_to_phys()
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/include/asm/memory.h | 12 +++++++-----
- 1 file changed, 7 insertions(+), 5 deletions(-)
+ arch/arm64/kernel/insn.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index 56d6739430f3..3b5dc5b243ac 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -86,11 +86,14 @@
-  * private definitions which should NOT be used outside memory.h
-  * files.  Use virt_to_phys/phys_to_virt/__pa/__va instead.
-  */
--#define __virt_to_phys(x) ({						\
-+#ifndef CONFIG_DEBUG_VM
-+#define __virt_to_phys(x)	(((phys_addr_t)(x) & ~PAGE_OFFSET) + PHYS_OFFSET)
-+#else
-+#define __virt_to_phys(x)	({					\
- 	phys_addr_t __x = (phys_addr_t)(x);				\
--	__x & BIT(VA_BITS - 1) ? (__x & ~PAGE_OFFSET) + PHYS_OFFSET :	\
--				 (__x - kimage_voffset); })
--
-+	BUG_ON(__x < PAGE_OFFSET);					\
-+	(((phys_addr_t)__x & ~PAGE_OFFSET) + PHYS_OFFSET); })
-+#endif
- #define __phys_to_virt(x)	((unsigned long)((x) - PHYS_OFFSET) | PAGE_OFFSET)
+diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+index 7371455160e5..bc91e3c2cdb1 100644
+--- a/arch/arm64/kernel/insn.c
++++ b/arch/arm64/kernel/insn.c
+@@ -96,7 +96,7 @@ static void __kprobes *patch_map(void *addr, int fixmap)
+ 	if (module && IS_ENABLED(CONFIG_DEBUG_SET_MODULE_RONX))
+ 		page = vmalloc_to_page(addr);
+ 	else if (!module && IS_ENABLED(CONFIG_DEBUG_RODATA))
+-		page = virt_to_page(addr);
++		page = phys_to_page(__kimg_to_phys(addr));
+ 	else
+ 		return addr;
  
- #define __kimg_to_phys(x)	((phys_addr_t)(x) - kimage_voffset)
-@@ -134,7 +137,6 @@
- #endif
- 
- #ifndef __ASSEMBLY__
--#include <linux/bitops.h>
- 
- extern phys_addr_t		memstart_addr;
- /* PHYS_OFFSET - the physical address of the start of memory. */
 -- 
 2.5.0
