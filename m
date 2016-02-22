@@ -1,58 +1,60 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon, 22 Feb 2016 11:24:05 +0000
-Subject: [PATCH 3/3] nvmem: mediatek: Fix later provider initialization
-In-Reply-To: <1456140161-6851-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1456140161-6851-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1456140245-6982-1-git-send-email-srinivas.kandagatla@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 22 Feb 2016 11:24:03 +0000
+Subject: [PATCH] Irq/mbigen:Promote the mbigen driver register timing
+In-Reply-To: <1456138810-24008-1-git-send-email-majun258@huawei.com>
+References: <1456138810-24008-1-git-send-email-majun258@huawei.com>
+Message-ID: <56CAEFD3.2060700@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrew-CT Chen <andrew-ct.chen@mediatek.com>
+On 22/02/16 11:00, MaJun wrote:
+> From: Ma Jun <majun258@huawei.com>
+> 
+> Using module_platform_driver() to register mbigen driver is
+> too late for some driver to apply irq, because the mbigen irq
+> domain is not created yet. 
+> 
+> Signed-off-by: Ma Jun <majun258@huawei.com>
+> ---
+>  drivers/irqchip/irq-mbigen.c |    9 ++++++++-
+>  1 files changed, 8 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
+> index 4dd3eb8..4df359c 100644
+> --- a/drivers/irqchip/irq-mbigen.c
+> +++ b/drivers/irqchip/irq-mbigen.c
+> @@ -289,7 +289,14 @@ static struct platform_driver mbigen_platform_driver = {
+>  	.probe			= mbigen_device_probe,
+>  };
+>  
+> -module_platform_driver(mbigen_platform_driver);
+> +static __init int mbigen_init(void)
+> +
+> +{
+> +	return platform_driver_register(&mbigen_platform_driver);
+> +
+> +}
+> +
+> +arch_initcall(mbigen_init);
+>  
+>  MODULE_AUTHOR("Jun Ma <majun258@huawei.com>");
+>  MODULE_AUTHOR("Yun Wu <wuyun.wu@huawei.com>");
+> 
 
-Possibly, provider driver initialization is later than
-consumer driver. Use function subsys_initcall to initialize
-NVMEM provider early to ensure NVMEM consumer doesn't need
-to -EPROBE_DEFER.
+I don't believe this is a proper fix, and already said so when reviewing
+this code:
 
-Signed-off-by: Andrew-CT Chen <andrew-ct.chen@mediatek.com>
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- drivers/nvmem/mtk-efuse.c | 23 ++++++++++++++++++++++-
- 1 file changed, 22 insertions(+), 1 deletion(-)
+http://www.spinics.net/lists/linux-pci/msg46534.html
 
-diff --git a/drivers/nvmem/mtk-efuse.c b/drivers/nvmem/mtk-efuse.c
-index 7b35f5b..9c49369 100644
---- a/drivers/nvmem/mtk-efuse.c
-+++ b/drivers/nvmem/mtk-efuse.c
-@@ -83,7 +83,28 @@ static struct platform_driver mtk_efuse_driver = {
- 		.of_match_table = mtk_efuse_of_match,
- 	},
- };
--module_platform_driver(mtk_efuse_driver);
-+
-+static int __init mtk_efuse_init(void)
-+{
-+	int ret;
-+
-+	ret = platform_driver_register(&mtk_efuse_driver);
-+	if (ret) {
-+		pr_err("Failed to register efuse driver\n");
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static void __exit mtk_efuse_exit(void)
-+{
-+	return platform_driver_unregister(&mtk_efuse_driver);
-+}
-+
-+subsys_initcall(mtk_efuse_init);
-+module_exit(mtk_efuse_exit);
-+
- MODULE_AUTHOR("Andrew-CT Chen <andrew-ct.chen@mediatek.com>");
- MODULE_DESCRIPTION("Mediatek EFUSE driver");
- MODULE_LICENSE("GPL v2");
+Short of actually solving the dependencies, it is likely that you will
+only move the problem somewhere else.
+
+I suggest you engage will people that are working on a proper solution,
+and/or fix the drivers to gracefully defer their probing if their IRQs
+are not available.
+
+Thanks,
+
+	M.
 -- 
-1.9.1
+Jazz is not dead. It just smells funny...
