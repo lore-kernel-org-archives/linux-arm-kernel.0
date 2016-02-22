@@ -1,699 +1,129 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 22 Feb 2016 18:20:52 +0000
-Subject: [PATCH v3 07/10] arm64: dts: add Allwinner A64 SoC .dtsi
-In-Reply-To: <1456165255-31013-1-git-send-email-andre.przywara@arm.com>
-References: <1456165255-31013-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1456165255-31013-8-git-send-email-andre.przywara@arm.com>
+From: slemieux.tyco@gmail.com (Sylvain Lemieux)
+Date: Mon, 22 Feb 2016 13:25:26 -0500
+Subject: [PATCH v2 2/5] watchdog: pnx4008: add restart handler
+In-Reply-To: <CAGhQ9Vz-6seRXQzcrfR-jS2GdYYac3ERz6wAiMZENq+ECHFzSw@mail.gmail.com>
+References: <1456160143-26761-1-git-send-email-slemieux.tyco@gmail.com>
+ <1456160143-26761-3-git-send-email-slemieux.tyco@gmail.com>
+ <CAGhQ9Vz-6seRXQzcrfR-jS2GdYYac3ERz6wAiMZENq+ECHFzSw@mail.gmail.com>
+Message-ID: <1456165526.28348.9.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Allwinner A64 SoC is a low-cost chip with 4 ARM Cortex-A53 cores
-and the typical tablet / TV box peripherals.
-The SoC is based on the (32-bit) Allwinner H3 chip, sharing most of
-the peripherals and the memory map.
-Although the cores are proper 64-bit ones, the whole SoC is actually
-limited to 4GB (including all the supported DRAM), so we use 32-bit
-address and size cells. This has the nice feature of us being able to
-reuse the DT for 32-bit kernels as well.
-This .dtsi lists the hardware that we support so far.
+On Mon, 2016-02-22 at 19:03 +0100, Joachim Eastwood wrote:
+> Hi Sylvain,
+> 
+> On 22 February 2016 at 17:55,  <slemieux.tyco@gmail.com> wrote:
+> > From: Sylvain Lemieux <slemieux@tycoint.com>
+> >
+> > Add restart handler capability to the driver;
+> > the restart handler implementation was taken from
+> > "mach-lpc32xx" ("lpc23xx_restart" function).
+> 
+> I think it would be better if you were to expand on "watchdog: core:
+> add restart handler support" to give you the parameters you need to
+> make the restart hook work for you. But that is up to watchdog
+> maintainers to decide.
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
-Changelog v1 .. v2:
-- remove compatible string from the .dtsi
-- amend compatible names to include sun50i
-- drop PSCI 0.1 compatibility
-- use lowercase hex digits in the GIC node too
-- make pll6x2 an explicit fixed-factor clock
-- make pll8 and pll8x2 proper clocks
-- amend MMC clocks to match the manual, they are now mod0 clocks
-- adapt MMC nodes to new MMC clocks
-- add separate 4-pin and 2-pin definitions for the UARTs
-- add I2C pins and driver nodes
-- switch ahb_rst node to use normal compatible name, not the special,
-  early-registration one.
-Changelog v2 .. v3:
-- remove leading zeros from node names' address part
-- adapt PLL6/7/8 to proper PLL6 binding
-- rename PLL6 to PLL7
+I prefer to do this as a separate patchset;
+I will wait for the watchdog maintainer feedback on this.
 
- Documentation/devicetree/bindings/arm/sunxi.txt   |   1 +
- Documentation/devicetree/bindings/clock/sunxi.txt |   1 +
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi     | 624 ++++++++++++++++++++++
- 3 files changed, 626 insertions(+)
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> 
+> > Signed-off-by: Sylvain Lemieux <slemieux@tycoint.com>
+> > ---
+> > Changes from v1 to v2:
+> > - new patch in v2.
+> >
+> >  drivers/watchdog/pnx4008_wdt.c | 30 ++++++++++++++++++++++++++++++
+> >  1 file changed, 30 insertions(+)
+> >
+> > diff --git a/drivers/watchdog/pnx4008_wdt.c b/drivers/watchdog/pnx4008_wdt.c
+> > index 88264a2..4b01b2b 100644
+> > --- a/drivers/watchdog/pnx4008_wdt.c
+> > +++ b/drivers/watchdog/pnx4008_wdt.c
+> > @@ -31,7 +31,10 @@
+> >  #include <linux/slab.h>
+> >  #include <linux/err.h>
+> >  #include <linux/of.h>
+> > +#include <linux/delay.h>
+> > +#include <linux/reboot.h>
+> >  #include <mach/hardware.h>
+> > +#include <mach/platform.h>
+> 
+> What are you using from mach/platform.h?
+This file is require for the define use to directly
+access the clock register (see note below).
+> 
+> >
+> >  /* WatchDog Timer - Chapter 23 Page 207 */
+> >
+> > @@ -77,6 +80,7 @@
+> >
+> >  static bool nowayout = WATCHDOG_NOWAYOUT;
+> >  static unsigned int heartbeat = DEFAULT_HEARTBEAT;
+> > +static struct notifier_block restart_handler;
+> >
+> >  static DEFINE_SPINLOCK(io_lock);
+> >  static void __iomem    *wdt_base;
+> > @@ -124,6 +128,27 @@ static int pnx4008_wdt_set_timeout(struct watchdog_device *wdd,
+> >         return 0;
+> >  }
+> >
+> > +static void pnx4008_wdt_sys_reset(enum reboot_mode mode, const char *cmd)
+> > +{
+> > +       /* Make sure WDT clocks are enabled */
+> > +       writel(LPC32XX_CLKPWR_PWMCLK_WDOG_EN, LPC32XX_CLKPWR_TIMER_CLK_CTRL);
+> 
+> Doesn't the watchdog driver already enable this clock in probe?
+> Either way doing a direct write to LPC32XX_CLKPWR_TIMER_CLK_CTRL from
+> here isn't very nice.
+> 
+I keep this from the "mach-lpc32xx" implementation, in case the call to
+the "devm_clk_get" fail in the probe; the restart will still work.
 
-diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
-index 7e79fcc..7e59d8b 100644
---- a/Documentation/devicetree/bindings/arm/sunxi.txt
-+++ b/Documentation/devicetree/bindings/arm/sunxi.txt
-@@ -14,3 +14,4 @@ using one of the following compatible strings:
-   allwinner,sun8i-a83t
-   allwinner,sun8i-h3
-   allwinner,sun9i-a80
-+  allwinner,sun50i-a64
-diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-index 323af8e..b7bd40d 100644
---- a/Documentation/devicetree/bindings/clock/sunxi.txt
-+++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-@@ -80,6 +80,7 @@ Required properties:
- 	"allwinner,sun9i-a80-usb-phy-clk" - for usb phy gates + resets on A80
- 	"allwinner,sun4i-a10-ve-clk" - for the Video Engine clock
- 	"allwinner,sunxi-multi-bus-gates-clk" - for the multi-parent bus gates
-+	"allwinner,sun50i-a64-bus-gates-clk" - for the bus gates on A64
- 
- Required properties for all clocks:
- - reg : shall be the control register address for the clock.
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-new file mode 100644
-index 0000000..fb9c509
---- /dev/null
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -0,0 +1,624 @@
-+/*
-+ * Copyright (C) 2016 ARM Ltd.
-+ * based on the Allwinner H3 dtsi:
-+ *    Copyright (C) 2015 Jens Kuske <jenskuske@gmail.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
-+
-+/ {
-+	interrupt-parent = <&gic>;
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu at 1 {
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			device_type = "cpu";
-+			reg = <1>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu at 2 {
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			device_type = "cpu";
-+			reg = <2>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu at 3 {
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			device_type = "cpu";
-+			reg = <3>;
-+			enable-method = "psci";
-+		};
-+	};
-+
-+	psci {
-+		compatible = "arm,psci-0.2";
-+		method = "smc";
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x40000000 0>;
-+	};
-+
-+	gic: interrupt-controller at 1c81000 {
-+		compatible = "arm,gic-400";
-+		interrupt-controller;
-+		#interrupt-cells = <3>;
-+		#address-cells = <0>;
-+
-+		reg = <0x01c81000 0x1000>,
-+		      <0x01c82000 0x2000>,
-+		      <0x01c84000 0x2000>,
-+		      <0x01c86000 0x2000>;
-+		interrupts = <GIC_PPI 9
-+		      (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
-+	};
-+
-+	timer {
-+		compatible = "arm,armv8-timer";
-+		interrupts = <GIC_PPI 13
-+			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
-+			     <GIC_PPI 14
-+			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
-+			     <GIC_PPI 11
-+			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
-+			     <GIC_PPI 10
-+			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
-+	};
-+
-+	clocks {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		osc24M: osc24M_clk {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <24000000>;
-+			clock-output-names = "osc24M";
-+		};
-+
-+		osc32k: osc32k_clk {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <32768>;
-+			clock-output-names = "osc32k";
-+		};
-+
-+		pll1: pll1_clk at 1c20000 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun8i-a23-pll1-clk";
-+			reg = <0x01c20000 0x4>;
-+			clocks = <&osc24M>;
-+			clock-output-names = "pll1";
-+		};
-+
-+		pll6: pll6_clk at 1c20028 {
-+			#clock-cells = <1>;
-+			compatible = "allwinner,sun6i-a31-pll6-clk";
-+			reg = <0x01c20028 0x4>;
-+			clocks = <&osc24M>;
-+			clock-output-names = "pll6", "pll6x2";
-+		};
-+
-+		pll6d2: pll6d2_clk {
-+			#clock-cells = <0>;
-+			compatible = "fixed-factor-clock";
-+			clock-div = <2>;
-+			clock-mult = <1>;
-+			clocks = <&pll6 0>;
-+			clock-output-names = "pll6d2";
-+		};
-+
-+		pll7: pll7_clk at 1c2002c {
-+			#clock-cells = <1>;
-+			compatible = "allwinner,sun6i-a31-pll6-clk";
-+			reg = <0x01c2002c 0x4>;
-+			clocks = <&osc24M>;
-+			clock-output-names = "pll7", "pll7x2";
-+		};
-+
-+		cpu: cpu_clk at 1c20050 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-a10-cpu-clk";
-+			reg = <0x01c20050 0x4>;
-+			clocks = <&osc32k>, <&osc24M>, <&pll1>, <&pll1>;
-+			clock-output-names = "cpu";
-+			critical-clocks = <0>;
-+		};
-+
-+		axi: axi_clk at 1c20050 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-a10-axi-clk";
-+			reg = <0x01c20050 0x4>;
-+			clocks = <&cpu>;
-+			clock-output-names = "axi";
-+		};
-+
-+		ahb1: ahb1_clk at 1c20054 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun6i-a31-ahb1-clk";
-+			reg = <0x01c20054 0x4>;
-+			clocks = <&osc32k>, <&osc24M>, <&axi>, <&pll6 0>;
-+			clock-output-names = "ahb1";
-+		};
-+
-+		ahb2: ahb2_clk at 1c2005c {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun8i-h3-ahb2-clk";
-+			reg = <0x01c2005c 0x4>;
-+			clocks = <&ahb1>, <&pll6d2>;
-+			clock-output-names = "ahb2";
-+		};
-+
-+		apb1: apb1_clk at 1c20054 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-a10-apb0-clk";
-+			reg = <0x01c20054 0x4>;
-+			clocks = <&ahb1>;
-+			clock-output-names = "apb1";
-+		};
-+
-+		apb2: apb2_clk at 1c20058 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-a10-apb1-clk";
-+			reg = <0x01c20058 0x4>;
-+			clocks = <&osc32k>, <&osc24M>, <&pll6 1>, <&pll6 1>;
-+			clock-output-names = "apb2";
-+		};
-+
-+		bus_gates: bus_gates_clk at 1c20060 {
-+			#clock-cells = <1>;
-+			compatible = "allwinner,sun50i-a64-bus-gates-clk",
-+				     "allwinner,sunxi-multi-bus-gates-clk";
-+			reg = <0x01c20060 0x14>;
-+			ahb1_parent {
-+				clocks = <&ahb1>;
-+				clock-indices = <1>, <5>,
-+						<6>, <8>,
-+						<9>, <10>,
-+						<13>, <14>,
-+						<18>, <19>,
-+						<20>, <21>,
-+						<23>, <24>,
-+						<25>, <28>,
-+						<32>, <35>,
-+						<36>, <37>,
-+						<40>, <43>,
-+						<44>, <52>,
-+						<53>, <54>,
-+						<135>;
-+				clock-output-names = "bus_mipidsi", "bus_ce",
-+						"bus_dma", "bus_mmc0",
-+						"bus_mmc1", "bus_mmc2",
-+						"bus_nand", "bus_sdram",
-+						"bus_ts", "bus_hstimer",
-+						"bus_spi0", "bus_spi1",
-+						"bus_otg", "bus_otg_ehci0",
-+						"bus_ehci0", "bus_otg_ohci0",
-+						"bus_ve", "bus_lcd0",
-+						"bus_lcd1", "bus_deint",
-+						"bus_csi", "bus_hdmi",
-+						"bus_de", "bus_gpu",
-+						"bus_msgbox", "bus_spinlock",
-+						"bus_dbg";
-+			};
-+			ahb2_parent {
-+				clocks = <&ahb2>;
-+				clock-indices = <17>, <29>;
-+				clock-output-names = "bus_gmac", "bus_ohci0";
-+			};
-+			apb1_parent {
-+				clocks = <&apb1>;
-+				clock-indices = <64>, <65>,
-+						<69>, <72>,
-+						<76>, <77>,
-+						<78>;
-+				clock-output-names = "bus_codec", "bus_spdif",
-+						"bus_pio", "bus_ths",
-+						"bus_i2s0", "bus_i2s1",
-+						"bus_i2s2";
-+			};
-+			abp2_parent {
-+				clocks = <&apb2>;
-+				clock-indices = <96>, <97>,
-+						<98>, <101>,
-+						<112>, <113>,
-+						<114>, <115>,
-+						<116>;
-+				clock-output-names = "bus_i2c0", "bus_i2c1",
-+						"bus_i2c2", "bus_scr",
-+						"bus_uart0", "bus_uart1",
-+						"bus_uart2", "bus_uart3",
-+						"bus_uart4";
-+			};
-+		};
-+
-+		mmc0_clk: mmc0_clk at 1c20088 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-a10-mod0-clk";
-+			reg = <0x01c20088 0x4>;
-+			clocks = <&osc24M>, <&pll6 1>, <&pll7 1>;
-+			clock-output-names = "mmc0";
-+                };
-+
-+		mmc1_clk: mmc1_clk at 1c2008c {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-a10-mod0-clk";
-+			reg = <0x01c2008c 0x4>;
-+			clocks = <&osc24M>, <&pll6 1>, <&pll7 1>;
-+			clock-output-names = "mmc1";
-+		};
-+
-+		mmc2_clk: mmc2_clk at 1c20090 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-a10-mod0-clk";
-+			reg = <0x01c20090 0x4>;
-+			clocks = <&osc24M>, <&pll6 1>, <&pll7 1>;
-+			clock-output-names = "mmc2";
-+		};
-+	};
-+
-+	soc {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		mmc0: mmc at 1c0f000 {
-+			compatible = "allwinner,sun50i-a64-mmc",
-+				     "allwinner,sun5i-a13-mmc";
-+			reg = <0x01c0f000 0x1000>;
-+			clocks = <&bus_gates 8>, <&mmc0_clk>,
-+				 <&mmc0_clk>, <&mmc0_clk>;
-+			clock-names = "ahb", "mmc",
-+				      "output", "sample";
-+			resets = <&ahb_rst 8>;
-+			reset-names = "ahb";
-+			interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
-+		mmc1: mmc at 1c10000 {
-+			compatible = "allwinner,sun50i-a64-mmc",
-+				     "allwinner,sun5i-a13-mmc";
-+			reg = <0x01c10000 0x1000>;
-+			clocks = <&bus_gates 9>, <&mmc1_clk>,
-+				 <&mmc1_clk>, <&mmc1_clk>;
-+			clock-names = "ahb", "mmc",
-+				      "output", "sample";
-+			resets = <&ahb_rst 9>;
-+			reset-names = "ahb";
-+			interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
-+		mmc2: mmc at 1c11000 {
-+			compatible = "allwinner,sun50i-a64-mmc",
-+				     "allwinner,sun5i-a13-mmc";
-+			reg = <0x01c11000 0x1000>;
-+			clocks = <&bus_gates 10>, <&mmc2_clk>,
-+				 <&mmc2_clk>, <&mmc2_clk>;
-+			clock-names = "ahb", "mmc",
-+				      "output", "sample";
-+			resets = <&ahb_rst 10>;
-+			reset-names = "ahb";
-+			interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
-+		pio: pinctrl at 1c20800 {
-+			compatible = "allwinner,sun50i-a64-pinctrl";
-+			reg = <0x01c20800 0x400>;
-+			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&bus_gates 69>;
-+			gpio-controller;
-+			#gpio-cells = <3>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+
-+			uart0_pins_a: uart0 at 0 {
-+				allwinner,pins = "PB8", "PB9";
-+				allwinner,function = "uart0";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			uart0_pins_b: uart0 at 1 {
-+				allwinner,pins = "PF2", "PF3";
-+				allwinner,function = "uart0";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			uart1_2pins: uart1_2 at 0 {
-+				allwinner,pins = "PG6", "PG7";
-+				allwinner,function = "uart1";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			uart1_4pins: uart1_4 at 0 {
-+				allwinner,pins = "PG6", "PG7", "PG8", "PG9";
-+				allwinner,function = "uart1";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			uart2_2pins: uart2_2 at 0 {
-+				allwinner,pins = "PB0", "PB1";
-+				allwinner,function = "uart2";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			uart2_4pins: uart2_4 at 0 {
-+				allwinner,pins = "PB0", "PB1", "PB2", "PB3";
-+				allwinner,function = "uart2";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			uart3_pins_a: uart3 at 0 {
-+				allwinner,pins = "PD0", "PD1";
-+				allwinner,function = "uart3";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			uart3_2pins_b: uart3_2 at 1 {
-+				allwinner,pins = "PH4", "PH5";
-+				allwinner,function = "uart3";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			uart3_4pins_b: uart3_4 at 1 {
-+				allwinner,pins = "PH4", "PH5", "PH6", "PH7";
-+				allwinner,function = "uart3";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			uart4_2pins: uart4_2 at 0 {
-+				allwinner,pins = "PD2", "PD3";
-+				allwinner,function = "uart4";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			uart4_4pins: uart4_4 at 0 {
-+				allwinner,pins = "PD2", "PD3", "PD4", "PD5";
-+				allwinner,function = "uart4";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			mmc0_pins: mmc0 at 0 {
-+				allwinner,pins = "PF0", "PF1", "PF2", "PF3",
-+						 "PF4", "PF5";
-+				allwinner,function = "mmc0";
-+				allwinner,drive = <SUN4I_PINCTRL_30_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			mmc0_default_cd_pin: mmc0_cd_pin at 0 {
-+				allwinner,pins = "PF6";
-+				allwinner,function = "gpio_in";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-+			};
-+
-+			mmc1_pins: mmc1 at 0 {
-+				allwinner,pins = "PG0", "PG1", "PG2", "PG3",
-+						 "PG4", "PG5";
-+				allwinner,function = "mmc1";
-+				allwinner,drive = <SUN4I_PINCTRL_30_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			mmc2_pins: mmc2 at 0 {
-+				allwinner,pins = "PC1", "PC5", "PC6", "PC8",
-+						 "PC9", "PC10";
-+				allwinner,function = "mmc2";
-+				allwinner,drive = <SUN4I_PINCTRL_30_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			i2c0_pins: i2c0_pins {
-+				allwinner,pins = "PH0", "PH1";
-+				allwinner,function = "i2c0";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			i2c1_pins: i2c1_pins {
-+				allwinner,pins = "PH2", "PH3";
-+				allwinner,function = "i2c1";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			i2c2_pins: i2c2_pins {
-+				allwinner,pins = "PE14", "PE15";
-+				allwinner,function = "i2c2";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+		};
-+
-+		ahb_rst: reset at 1c202c0 {
-+			#reset-cells = <1>;
-+			compatible = "allwinner,sun6i-a31-clock-reset";
-+			reg = <0x01c202c0 0xc>;
-+		};
-+
-+		apb1_rst: reset at 1c202d0 {
-+			#reset-cells = <1>;
-+			compatible = "allwinner,sun6i-a31-clock-reset";
-+			reg = <0x01c202d0 0x4>;
-+		};
-+
-+		apb2_rst: reset at 1c202d8 {
-+			#reset-cells = <1>;
-+			compatible = "allwinner,sun6i-a31-clock-reset";
-+			reg = <0x01c202d8 0x4>;
-+		};
-+
-+		uart0: serial at 1c28000 {
-+			compatible = "snps,dw-apb-uart";
-+			reg = <0x01c28000 0x400>;
-+			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			clocks = <&bus_gates 112>;
-+			resets = <&apb2_rst 16>;
-+			status = "disabled";
-+		};
-+
-+		uart1: serial at 1c28400 {
-+			compatible = "snps,dw-apb-uart";
-+			reg = <0x01c28400 0x400>;
-+			interrupts = <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			clocks = <&bus_gates 113>;
-+			resets = <&apb2_rst 17>;
-+			status = "disabled";
-+		};
-+
-+		uart2: serial at 1c28800 {
-+			compatible = "snps,dw-apb-uart";
-+			reg = <0x01c28800 0x400>;
-+			interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			clocks = <&bus_gates 114>;
-+			resets = <&apb2_rst 18>;
-+			status = "disabled";
-+		};
-+
-+		uart3: serial at 1c28c00 {
-+			compatible = "snps,dw-apb-uart";
-+			reg = <0x01c28c00 0x400>;
-+			interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			clocks = <&bus_gates 115>;
-+			resets = <&apb2_rst 19>;
-+			status = "disabled";
-+		};
-+
-+		uart4: serial at 1c29000 {
-+			compatible = "snps,dw-apb-uart";
-+			reg = <0x01c29000 0x400>;
-+			interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			clocks = <&bus_gates 116>;
-+			resets = <&apb2_rst 20>;
-+			status = "disabled";
-+		};
-+
-+		rtc: rtc at 1f00000 {
-+			compatible = "allwinner,sun6i-a31-rtc";
-+			reg = <0x01f00000 0x54>;
-+			interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
-+		};
-+
-+		i2c0: i2c at 1c2ac00 {
-+			compatible = "allwinner,sun6i-a31-i2c";
-+			reg = <0x01c2ac00 0x400>;
-+			interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&bus_gates 96>;
-+			resets = <&apb2_rst 0>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
-+		i2c1: i2c at 1c2b000 {
-+			compatible = "allwinner,sun6i-a31-i2c";
-+			reg = <0x01c2b000 0x400>;
-+			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&bus_gates 97>;
-+			resets = <&apb2_rst 1>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
-+		i2c2: i2c at 1c2b400 {
-+			compatible = "allwinner,sun6i-a31-i2c";
-+			reg = <0x01c2b400 0x400>;
-+			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&bus_gates 98>;
-+			resets = <&apb2_rst 2>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+	};
-+};
--- 
-2.6.4
+I can remove it, and the platform.h include.
+> 
+> > +       /* Instant assert of RESETOUT_N with pulse length 1mS */
+> > +       writel(13000, WDTIM_PULSE(wdt_base));
+> > +       writel(M_RES2 | RESFRC1 | RESFRC2, WDTIM_MCTRL(wdt_base));
+> > +
+> > +       /* Wait for watchdog to reset system */
+> > +       mdelay(1000);
+> > +}
+> > +
+> > +static int pnx4008_restart_handler(struct notifier_block *this,
+> > +                                  unsigned long mode, void *cmd)
+> > +{
+> > +       pnx4008_wdt_sys_reset((enum reboot_mode)mode, cmd);
+> 
+> Why can you just the stuff from pnx4008_wdt_sys_reset() in this function?
+> 
+OK
+> 
+> > +
+> > +       return NOTIFY_DONE;
+> > +}
+> > +
+> >  static const struct watchdog_info pnx4008_wdt_ident = {
+> >         .options = WDIOF_CARDRESET | WDIOF_MAGICCLOSE |
+> >             WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING,
+> > @@ -157,6 +182,11 @@ static int pnx4008_wdt_probe(struct platform_device *pdev)
+> >         if (IS_ERR(wdt_base))
+> >                 return PTR_ERR(wdt_base);
+> >
+> > +       /* Register restart handler. */
+> > +       restart_handler.notifier_call = pnx4008_restart_handler;
+> > +       restart_handler.priority = 128;
+> > +       ret = register_restart_handler(&restart_handler);
+> 
+> Checking return value would be a nice thing to do.
+OK
+> 
+> You should also do a unregister_restart_handler() in driver remove hook.
+Thanks for catching it.
+
+I will wait, in case there is other feedback, and submit a revision 3
+of the patchset.
+> 
+> 
+> regards,
+> Joachim Eastwood
