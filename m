@@ -1,41 +1,48 @@
-From: albeu@free.fr (Alban)
-Date: Mon, 22 Feb 2016 21:13:23 +0100
-Subject: [PATCH 10/61] gpio: ath79: Use devm_gpiochip_add_data() for
- gpio registration
-In-Reply-To: <1456150130-2668-11-git-send-email-ldewangan@nvidia.com>
-References: <1456150130-2668-1-git-send-email-ldewangan@nvidia.com>
- <1456150130-2668-11-git-send-email-ldewangan@nvidia.com>
-Message-ID: <20160222211323.5c10533f@tock>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Mon, 22 Feb 2016 12:23:20 -0800
+Subject: [PATCH 2/3] clk: mvebu: add AP806 core clock driver
+In-Reply-To: <CAL_Jsq+iiUBcTdnqzFWLJ+5jPvq0rmWgBboab4xyj1dQyDQE+Q@mail.gmail.com>
+References: <1455521698-7905-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1455521698-7905-3-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20160222025357.GE15973@rob-hp-laptop>
+ <20160222091423.4756a579@free-electrons.com> <20160222141617.GA14970@lunn.ch>
+ <20160222183203.2278.60153@quark.deferred.io>
+ <CAL_Jsq+iiUBcTdnqzFWLJ+5jPvq0rmWgBboab4xyj1dQyDQE+Q@mail.gmail.com>
+Message-ID: <20160222202320.2278.62793@quark.deferred.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 Feb 2016 19:37:59 +0530
-Laxman Dewangan <ldewangan@nvidia.com> wrote:
-
-> Use devm_gpiochip_add_data() for GPIO registration.
+Quoting Rob Herring (2016-02-22 11:42:49)
+> On Mon, Feb 22, 2016 at 12:32 PM, Michael Turquette
+> <mturquette@baylibre.com> wrote:
+> > Quoting Andrew Lunn (2016-02-22 06:16:17)
+> >> > Such information will come later, and we can rework the drivers and DT
+> >> > bindings accordingly. Those DT bindings cannot be stable, as the
+> >> > platform is under heavy development and we'll probably discover some
+> >> > issues down the road.
+> >>
+> >> Hi Thomas
+> >>
+> >> Maybe add a big fat warning that the bindings are unstable, and the DT
+> >> blob must be kept in sync with the kernel?
+> >
+> > +1 and feel free to blame the lack of documentation.  No one can expect
+> > bindings to be finalized when the chip topology is not fully understood.
 > 
-> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
-> Cc: Alban Bedel <albeu@free.fr>
-> ---
->  drivers/gpio/gpio-ath79.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> I can understand not understanding the full clock tree. I have "full"
+> documentation of a Marvell chip and don't understand the clock tree
+> fully. But I can't believe you don't have some sense of how many
+> clocks you have to deal with. 10? 100? 1000? What I see is 2 nodes of
+> a single register each for clocks at roughly the same address. That
+> tells me your binding is too fine grained. If you really don't know
+> what is right, then err on the side of a single clock provider node
+> and don't put the clock details in DT.
+
+I like the "err on the side of caution" part. I'll add that to
+clock-bindings.txt.
+
+Regards,
+Mike
+
 > 
-> diff --git a/drivers/gpio/gpio-ath79.c b/drivers/gpio/gpio-ath79.c
-> index d13dd13..a6aad59 100644
-> --- a/drivers/gpio/gpio-ath79.c
-> +++ b/drivers/gpio/gpio-ath79.c
-> @@ -182,7 +182,7 @@ static int ath79_gpio_probe(struct platform_device *pdev)
->  		ctrl->chip.direction_output = ar934x_gpio_direction_output;
->  	}
->  
-> -	err = gpiochip_add_data(&ctrl->chip, ctrl);
-> +	err = devm_gpiochip_add_data(&pdev->dev, &ctrl->chip, ctrl);
->  	if (err) {
->  		dev_err(&pdev->dev,
->  			"cannot add AR71xx GPIO chip, error=%d", err);
-
-With the patches already applied to the devel branch a few more changes
-will be needed to remove the calls to gpiochip_remove() in the probe
-error path and the remove callback.
-
-Alban
+> Rob
