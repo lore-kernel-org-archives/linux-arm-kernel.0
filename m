@@ -1,53 +1,78 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Mon, 22 Feb 2016 13:58:14 -0600
-Subject: [PATCH] dma: mv_xor_v2: new driver
-In-Reply-To: <20160222101621.4f03ef8b@free-electrons.com>
-References: <1455523083-25506-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20160222032730.GU19598@localhost>
- <20160222101621.4f03ef8b@free-electrons.com>
-Message-ID: <CAL_Jsq+bYmafQWasY1T2QG6Dujf7Ki6JSZKZoFzJXAphTAvnCA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 22 Feb 2016 20:02:27 +0000
+Subject: [RFC PATCH 1/2] memremap: add arch specific hook for MEMREMAP_WB
+ mappings
+In-Reply-To: <CAKv+Gu9OWVgo+Qm85jPjY7xJ1UELm-4LYORHKF8Yy+_HuzmtGw@mail.gmail.com>
+References: <1456149728-16706-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1456149728-16706-2-git-send-email-ard.biesheuvel@linaro.org>
+ <CAPcyv4ivN9c8PHBR77vd36ovB28OETJUr6VYf_8gNtXgqEmATw@mail.gmail.com>
+ <CAKv+Gu9OWVgo+Qm85jPjY7xJ1UELm-4LYORHKF8Yy+_HuzmtGw@mail.gmail.com>
+Message-ID: <20160222200227.GF19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 22, 2016 at 3:16 AM, Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com> wrote:
-> Hello Vinod,
->
-> On Mon, 22 Feb 2016 08:57:30 +0530, Vinod Koul wrote:
->> On Mon, Feb 15, 2016 at 08:58:03AM +0100, Thomas Petazzoni wrote:
->> > diff --git a/Documentation/devicetree/bindings/dma/mv-xor-v2.txt b/Documentation/devicetree/bindings/dma/mv-xor-v2.txt
->> > new file mode 100644
->> > index 0000000..0a03dcf
->> > --- /dev/null
->> > +++ b/Documentation/devicetree/bindings/dma/mv-xor-v2.txt
->> > @@ -0,0 +1,19 @@
->> > +* Marvell XOR v2 engines
->> > +
->> > +Required properties:
->> > +- compatible: Should be "marvell,mv-xor-v2"
->> > +- reg: Should contain registers location and length (two sets)
->> > +    the first set is the DMA registers
->> > +    the second set is the global registers
->> > +- msi-parent: Phandle to the MSI-capable interrupt controller used for
->> > +  interrupts.
->> > +
->> > +Example:
->> > +
->> > +   xor0 at 400000 {
->> > +           compatible = "marvell,mv-xor-v2";
->> > +           reg = <0x400000 0x1000>,
->> > +                 <0x410000 0x1000>;
->> > +           msi-parent = <&gic_v2m0>;
->> > +           dma-coherent;
->> > +   };
->>
->> This should be a separate patch :)
->
-> This is really a personal preference, and different maintainers have
-> different opinions on the matter. However, if your preference is to
-> have the DT binding documentation as a separate patch, then I'll split
-> it, no problem :)
+On Mon, Feb 22, 2016 at 08:17:11PM +0100, Ard Biesheuvel wrote:
+> I am not exactly sure why ioremap_cache() does not use MT_MEMORY_RW
+> attributes, but the ARM architecture simply does not allow mismatched
+> attributes, so we cannot simply replace each instance of
+> ioremap_cache() with memremap()
+> 
+> Perhaps Russell can explain?
 
-Read step 1 in Documentation/devicetree/bindings/submitting-patches.txt.
+ARM has had ioremap_cached() for a while - it was introduced in the
+bitkeeper times of 2.6, so pre-git.  In those kernels, and into the
+git era, pre-dating ARMv6 support, it was merely:
 
-Rob
++#define ioremap_cached(cookie,size)    __arch_ioremap((cookie),(size),L_PTE_CACHEABLE)
+
+which means that we got write-through cache behaviour for mappings
+created by this, where supported, or if not, read-allocate writeback.
+This was completely independent of the system memory mapping
+attributes, which could be specified on the kernel command line.
+
+This was originally used by pxa2xx-flash to provide faster flash
+access on those systems - in other words, it's created to remap
+devices with cacheable attributes.
+
+When creating ARMv6 support, I ended up completely rewriting how
+the memory attributes were handled, and so it then became this:
+
++#define ioremap_cached(cookie,size)    __arch_ioremap((cookie), (size), MT_DEVICE_CACHED)
+
+which gives very similar behaviour, though we now default to RAWB
+mappings, which fall back to WT on CPUs that don't support RAWB.
+Again, independent of the system memory mapping.
+
+Then, in 2013, with the advent of Xen, ioremap_cached() became
+ioremap_cache() so that Xen would build on ARM, and to align it
+with other architectures.  Whether ioremap_cached() actually was
+suitable to become ioremap_cache(), I'm not sure, but that's
+what happened.
+
+Since it was just renamed, it preserves the original goal which is
+to remap device memory with cacheable attributes, which may differ
+from the cacheable attributes of the system RAM.  It has never
+been intended for remapping system memory: none of the ioremap_*
+family of functions on ARM were ever intended for that purpose.
+
+However, some people did use it for that purpose on ARMv5 and
+earlier architectures, where, due to the virtual cache architecture,
+you could get away with remapping the same memory with differing
+attributes without any problem.  With the advent of ARMv6
+(pre-dating 2013), this was clearly stated as being illegal at
+architecture level, but people were married to the idea - despite
+me telling them not to.
+
+So eventually, I had no other option than to add a code check to
+ioremap*() which prevents any ioremap*() function from being used
+on system memory - iow, memory that Linux maps itself either as
+part of lowmem or via the kmap*() API - since an ioremap*()
+mapping would conflict with those.
+
+That's basically where we are today: ioremap*() does not permit
+system memory to be remapped, even ioremap_cache().
+
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
