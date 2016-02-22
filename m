@@ -1,67 +1,40 @@
-From: jitao.shi@mediatek.com (Jitao Shi)
-Date: Mon, 22 Feb 2016 19:01:44 +0800
-Subject: [PATCH v2 2/2] drm/panel: Support for LG lp120up1 panel with eDP input
-In-Reply-To: <1456138904-15258-1-git-send-email-jitao.shi@mediatek.com>
-References: <1456138904-15258-1-git-send-email-jitao.shi@mediatek.com>
-Message-ID: <1456138904-15258-2-git-send-email-jitao.shi@mediatek.com>
+From: majun258@huawei.com (MaJun)
+Date: Mon, 22 Feb 2016 19:00:10 +0800
+Subject: [PATCH] Irq/mbigen:Promote the mbigen driver register timing
+Message-ID: <1456138810-24008-1-git-send-email-majun258@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The LG lp120up1 TFT LCD panel with eDP interface is a 12.0" 1920x1280
-panel, which can be supported by the simple panel driver
+From: Ma Jun <majun258@huawei.com>
 
-Signed-off-by: Jitao Shi <jitao.shi@mediatek.com>
----
-Changes since v1:
- - Add eDP panel type in comment msg
- - Fixed comment msg with 72 characters width
----
- drivers/gpu/drm/panel/panel-simple.c |   26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+Using module_platform_driver() to register mbigen driver is
+too late for some driver to apply irq, because the mbigen irq
+domain is not created yet. 
 
-diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
-index f88a631..2030c37 100644
---- a/drivers/gpu/drm/panel/panel-simple.c
-+++ b/drivers/gpu/drm/panel/panel-simple.c
-@@ -982,6 +982,29 @@ static const struct panel_desc lg_lb070wv8 = {
- 	.bus_format = MEDIA_BUS_FMT_RGB888_1X7X4_SPWG,
+Signed-off-by: Ma Jun <majun258@huawei.com>
+---
+ drivers/irqchip/irq-mbigen.c |    9 ++++++++-
+ 1 files changed, 8 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
+index 4dd3eb8..4df359c 100644
+--- a/drivers/irqchip/irq-mbigen.c
++++ b/drivers/irqchip/irq-mbigen.c
+@@ -289,7 +289,14 @@ static struct platform_driver mbigen_platform_driver = {
+ 	.probe			= mbigen_device_probe,
  };
  
-+static const struct drm_display_mode lg_lp120up1_mode = {
-+	.clock = 162300,
-+	.hdisplay = 1920,
-+	.hsync_start = 1920 + 40,
-+	.hsync_end = 1920 + 40 + 40,
-+	.htotal = 1920 + 40 + 40+ 80,
-+	.vdisplay = 1280,
-+	.vsync_start = 1280 + 4,
-+	.vsync_end = 1280 + 4 + 4,
-+	.vtotal = 1280 + 4 + 4 + 12,
-+	.vrefresh = 60,
-+};
+-module_platform_driver(mbigen_platform_driver);
++static __init int mbigen_init(void)
 +
-+static const struct panel_desc lg_lp120up1 = {
-+	.modes = &lg_lp120up1_mode,
-+	.num_modes = 1,
-+	.bpc = 8,
-+	.size = {
-+		.width = 267,
-+		.height = 183,
-+	},
-+};
++{
++	return platform_driver_register(&mbigen_platform_driver);
 +
- static const struct drm_display_mode lg_lp129qe_mode = {
- 	.clock = 285250,
- 	.hdisplay = 2560,
-@@ -1256,6 +1279,9 @@ static const struct of_device_id platform_of_match[] = {
- 		.compatible = "lg,lb070wv8",
- 		.data = &lg_lb070wv8,
- 	}, {
-+		.compatible = "lg,lp120up1",
-+		.data = &lg_lp120up1,
-+	}, {
- 		.compatible = "lg,lp129qe",
- 		.data = &lg_lp129qe,
- 	}, {
++}
++
++arch_initcall(mbigen_init);
+ 
+ MODULE_AUTHOR("Jun Ma <majun258@huawei.com>");
+ MODULE_AUTHOR("Yun Wu <wuyun.wu@huawei.com>");
 -- 
-1.7.9.5
+1.7.1
