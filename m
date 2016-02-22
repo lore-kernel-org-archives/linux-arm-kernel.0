@@ -1,24 +1,23 @@
 From: jitao.shi@mediatek.com (Jitao Shi)
-Date: Mon, 22 Feb 2016 10:12:23 +0800
-Subject: [PATCH 2/2] drm/panel: Add support for LG lp120up1 panel
-In-Reply-To: <20160218151244.GB5571@ulmo.nvidia.com>
+Date: Mon, 22 Feb 2016 10:13:03 +0800
+Subject: [PATCH 1/2] dt-bindings: Add LG lp120up1 panel bindings
+In-Reply-To: <20160218143633.GJ9654@rob-hp-laptop>
 References: <1455691839-2410-1-git-send-email-jitao.shi@mediatek.com>
- <1455691839-2410-2-git-send-email-jitao.shi@mediatek.com>
- <20160218151244.GB5571@ulmo.nvidia.com>
-Message-ID: <1456107143.6025.0.camel@mszsdhlt06>
+ <20160218143633.GJ9654@rob-hp-laptop>
+Message-ID: <1456107183.6025.1.camel@mszsdhlt06>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2016-02-18 at 16:12 +0100, Thierry Reding wrote:
-> On Wed, Feb 17, 2016 at 02:50:39PM +0800, Jitao Shi wrote:
-> > The LG lp120up1 panel is a 12.0" 1920x1280 panel,
-> > which can be supported by the simple panel driver
+On Thu, 2016-02-18 at 08:36 -0600, Rob Herring wrote:
+> On Wed, Feb 17, 2016 at 02:50:38PM +0800, Jitao Shi wrote:
+> > Add documentation for lp120up1 panel
+> > 
+> > Signed-off-by: Jitao Shi <jitao.shi@mediatek.com>
+> > ---
+> >  .../bindings/display/panel/lg,lp120up1.txt         |    7 +++++++
+> >  1 file changed, 7 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/display/panel/lg,lp120up1.txt
 > 
-> It'd be nice to mention the type of interface of the panel here. While
-> at it, please rewrite the commit message to make use of what width you
-> have (i.e. any line after the subject can be 72 characters wide).
-> 
-> Thierry
+> Acked-by: Rob Herring <robh@kernel.org>
 
-Thanks for your review.
-I'll fix it next patchset.
+Thanks for your "acked"
