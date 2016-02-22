@@ -1,220 +1,162 @@
 From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Mon, 22 Feb 2016 16:46:53 +0300
-Subject: [PATCH 5/8] ACPI: parse DBG2 table
+Date: Mon, 22 Feb 2016 16:46:54 +0300
+Subject: [PATCH 6/8] ACPI: serial: implement earlycon on ACPI DBG2 port
 In-Reply-To: <1456148818-26257-1-git-send-email-aleksey.makarov@linaro.org>
 References: <1456148818-26257-1-git-send-email-aleksey.makarov@linaro.org>
-Message-ID: <1456148818-26257-6-git-send-email-aleksey.makarov@linaro.org>
+Message-ID: <1456148818-26257-7-git-send-email-aleksey.makarov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-'ARM Server Base Boot Requiremets' [1] mentions DBG2 (Microsoft Debug
-Port Table 2) [2] as a mandatory ACPI table that specifies debug ports.
+Add ACPI_DBG2_EARLYCON_DECLARE() macros that declares
+an earlycon on the serial port specified in the DBG2 ACPI table.
 
-- Implement macros
+Pass the string "earlycon=acpi_dbg2" to the kernel to activate it.
 
-	ACPI_DBG2_DECLARE(name, type, subtype, setup_fn, data_ptr)
-
-  that defines a handler for the port of given type and subtype.
-
-- For each declared port that is also described in the ACPI DBG2 table
-  call the provided callback.
-
-[1] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0044a/index.html
-[2] http://go.microsoft.com/fwlink/p/?LinkId=234837
+Callbacks for EARLYCON_DECLARE() and OF_EARLYCON_DECLARE()
+can also be used for this macros.
 
 Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
 ---
- drivers/acpi/Kconfig              |  3 ++
- drivers/acpi/Makefile             |  1 +
- drivers/acpi/dbg2.c               | 85 +++++++++++++++++++++++++++++++++++++++
- include/asm-generic/vmlinux.lds.h |  1 +
- include/linux/acpi_dbg2.h         | 48 ++++++++++++++++++++++
- 5 files changed, 138 insertions(+)
- create mode 100644 drivers/acpi/dbg2.c
- create mode 100644 include/linux/acpi_dbg2.h
+ Documentation/kernel-parameters.txt |  3 ++
+ drivers/tty/serial/earlycon.c       | 56 +++++++++++++++++++++++++++++++++++++
+ include/linux/acpi_dbg2.h           | 20 +++++++++++++
+ 3 files changed, 79 insertions(+)
 
-diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-index 65fb483..660666e 100644
---- a/drivers/acpi/Kconfig
-+++ b/drivers/acpi/Kconfig
-@@ -57,6 +57,9 @@ config ACPI_SYSTEM_POWER_STATES_SUPPORT
- config ACPI_CCA_REQUIRED
- 	bool
+diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
+index 9a53c92..4949ebb 100644
+--- a/Documentation/kernel-parameters.txt
++++ b/Documentation/kernel-parameters.txt
+@@ -1058,6 +1058,9 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
+ 			A valid base address must be provided, and the serial
+ 			port must already be setup and configured.
  
-+config ACPI_DBG2_TABLE
-+	bool
++		acpi_dbg2
++			Use serial port specified by the DBG2 ACPI table.
 +
- config ACPI_DEBUGGER
- 	bool "AML debugger interface"
- 	select ACPI_DEBUG
-diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
-index 346101c..ff5e4f0 100644
---- a/drivers/acpi/Makefile
-+++ b/drivers/acpi/Makefile
-@@ -82,6 +82,7 @@ obj-$(CONFIG_ACPI_CUSTOM_METHOD)+= custom_method.o
- obj-$(CONFIG_ACPI_BGRT)		+= bgrt.o
- obj-$(CONFIG_ACPI_CPPC_LIB)	+= cppc_acpi.o
- obj-$(CONFIG_ACPI_DEBUGGER_USER) += acpi_dbg.o
-+obj-$(CONFIG_ACPI_DBG2_TABLE)	+= dbg2.o
- 
- # processor has its own "processor." module_param namespace
- processor-y			:= processor_driver.o
-diff --git a/drivers/acpi/dbg2.c b/drivers/acpi/dbg2.c
-new file mode 100644
-index 0000000..8a79117
---- /dev/null
-+++ b/drivers/acpi/dbg2.c
-@@ -0,0 +1,85 @@
-+/*
-+ * Copyright (c) 2012, Intel Corporation
-+ * Copyright (c) 2015, 2016 Linaro Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+
-+#define pr_fmt(fmt) "ACPI: DBG2: " fmt
-+
-+#include <linux/acpi_dbg2.h>
+ 	earlyprintk=	[X86,SH,BLACKFIN,ARM,M68k]
+ 			earlyprintk=vga
+ 			earlyprintk=efi
+diff --git a/drivers/tty/serial/earlycon.c b/drivers/tty/serial/earlycon.c
+index 05f9e4b..3d11248 100644
+--- a/drivers/tty/serial/earlycon.c
++++ b/drivers/tty/serial/earlycon.c
+@@ -21,6 +21,7 @@
+ #include <linux/serial_core.h>
+ #include <linux/sizes.h>
+ #include <linux/mod_devicetable.h>
 +#include <linux/acpi.h>
-+#include <linux/kernel.h>
+ 
+ #ifdef CONFIG_FIX_EARLYCON_MEM
+ #include <asm/fixmap.h>
+@@ -186,6 +187,8 @@ int __init setup_earlycon(char *buf)
+ 	return -ENOENT;
+ }
+ 
++static bool setup_dbg2_earlycon;
 +
-+static const char * __init type2string(u16 type)
-+{
-+	switch (type) {
-+	case ACPI_DBG2_SERIAL_PORT:
-+		return "SERIAL";
-+	case ACPI_DBG2_1394_PORT:
-+		return "1394";
-+	case ACPI_DBG2_USB_PORT:
-+		return "USB";
-+	case ACPI_DBG2_NET_PORT:
-+		return "NET";
-+	default:
-+		return "?";
-+	}
-+}
-+
-+static const char * __init subtype2string(u16 subtype)
-+{
-+	switch (subtype) {
-+	case ACPI_DBG2_16550_COMPATIBLE:
-+		return "16550_COMPATIBLE";
-+	case ACPI_DBG2_16550_SUBSET:
-+		return "16550_SUBSET";
-+	case ACPI_DBG2_ARM_PL011:
-+		return "ARM_PL011";
-+	case ACPI_DBG2_ARM_SBSA_32BIT:
-+		return "ARM_SBSA_32BIT";
-+	case ACPI_DBG2_ARM_SBSA_GENERIC:
-+		return "ARM_SBSA_GENERIC";
-+	case ACPI_DBG2_ARM_DCC:
-+		return "ARM_DCC";
-+	case ACPI_DBG2_BCM2835:
-+		return "BCM2835";
-+	default:
-+		return "?";
-+	}
-+}
-+
-+int __init acpi_dbg2_setup(struct acpi_table_header *table, const void *data)
-+{
-+	struct acpi_table_dbg2 *dbg2 = (struct acpi_table_dbg2 *)table;
-+	struct acpi_dbg2_data *dbg2_data = (struct acpi_dbg2_data *)data;
-+	struct acpi_dbg2_device *dbg2_device, *dbg2_end;
-+	int i;
-+
-+	dbg2_device = ACPI_ADD_PTR(struct acpi_dbg2_device, dbg2,
-+				   dbg2->info_offset);
-+	dbg2_end = ACPI_ADD_PTR(struct acpi_dbg2_device, dbg2, table->length);
-+
-+	for (i = 0; i < dbg2->info_count; i++) {
-+		if (dbg2_device + 1 > dbg2_end) {
-+			pr_err("device pointer overflows, bad table\n");
-+			return 0;
-+		}
-+
-+		if (dbg2_device->port_type == dbg2_data->port_type &&
-+		    dbg2_device->port_subtype == dbg2_data->port_subtype) {
-+			pr_info("debug port type: %s subtype: %s\n",
-+				type2string(dbg2_device->port_type),
-+				subtype2string(dbg2_device->port_subtype));
-+			dbg2_data->setup(dbg2_device, dbg2_data->data);
-+		}
-+
-+		dbg2_device = ACPI_ADD_PTR(struct acpi_dbg2_device, dbg2_device,
-+					   dbg2_device->length);
+ /* early_param wrapper for setup_earlycon() */
+ static int __init param_setup_earlycon(char *buf)
+ {
+@@ -198,6 +201,11 @@ static int __init param_setup_earlycon(char *buf)
+ 	if (!buf || !buf[0])
+ 		return early_init_dt_scan_chosen_serial();
+ 
++	if (!strcmp(buf, "acpi_dbg2")) {
++		setup_dbg2_earlycon = true;
++		return 0;
 +	}
 +
+ 	err = setup_earlycon(buf);
+ 	if (err == -ENOENT || err == -EALREADY)
+ 		return 0;
+@@ -228,3 +236,51 @@ int __init of_setup_earlycon(unsigned long addr,
+ 	register_console(early_console_dev.con);
+ 	return 0;
+ }
++
++int __init acpi_setup_earlycon(struct acpi_dbg2_device *device, void *d)
++{
++	int err;
++	struct uart_port *port = &early_console_dev.port;
++	int (*setup)(struct earlycon_device *, const char *) = d;
++	struct acpi_generic_address *reg;
++
++	if (!setup_dbg2_earlycon)
++		return -ENODEV;
++
++	if (device->register_count < 1)
++		return -ENODEV;
++
++	if (device->base_address_offset >= device->length)
++		return -EINVAL;
++
++	reg = (void *)device + device->base_address_offset;
++
++	if (reg->space_id != ACPI_ADR_SPACE_SYSTEM_MEMORY &&
++	    reg->space_id != ACPI_ADR_SPACE_SYSTEM_IO)
++		return -EINVAL;
++
++	spin_lock_init(&port->lock);
++	port->uartclk = BASE_BAUD * 16;
++
++	if (reg->space_id == ACPI_ADR_SPACE_SYSTEM_MEMORY) {
++		if (device->port_type == ACPI_DBG2_ARM_SBSA_32BIT)
++			port->iotype = UPIO_MEM32;
++		else
++			port->iotype = UPIO_MEM;
++		port->mapbase = reg->address;
++		port->membase = earlycon_map(reg->address, SZ_4K);
++	} else {
++		port->iotype = UPIO_PORT;
++		port->iobase = reg->address;
++	}
++
++	early_console_dev.con->data = &early_console_dev;
++	err = setup(&early_console_dev, NULL);
++	if (err < 0)
++		return err;
++	if (!early_console_dev.con->write)
++		return -ENODEV;
++
++	register_console(early_console_dev.con);
 +	return 0;
 +}
-diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
-index c4bd0e2..ad9752c 100644
---- a/include/asm-generic/vmlinux.lds.h
-+++ b/include/asm-generic/vmlinux.lds.h
-@@ -526,6 +526,7 @@
- 	IRQCHIP_OF_MATCH_TABLE()					\
- 	ACPI_PROBE_TABLE(irqchip)					\
- 	ACPI_PROBE_TABLE(clksrc)					\
-+	ACPI_PROBE_TABLE(dbg2)						\
- 	EARLYCON_TABLE()						\
- 	EARLYCON_OF_TABLES()
- 
 diff --git a/include/linux/acpi_dbg2.h b/include/linux/acpi_dbg2.h
-new file mode 100644
-index 0000000..465afcb
---- /dev/null
+index 465afcb..9b96de2 100644
+--- a/include/linux/acpi_dbg2.h
 +++ b/include/linux/acpi_dbg2.h
-@@ -0,0 +1,48 @@
-+#ifndef _ACPI_DBG2_H_
-+#define _ACPI_DBG2_H_
-+
-+#ifdef CONFIG_ACPI_DBG2_TABLE
-+
-+#include <linux/kernel.h>
-+
-+struct acpi_dbg2_device;
-+struct acpi_table_header;
-+
-+struct acpi_dbg2_data {
-+	u16 port_type;
-+	u16 port_subtype;
-+	int (*setup)(struct acpi_dbg2_device *, void *);
-+	void *data;
-+};
-+
-+int acpi_dbg2_setup(struct acpi_table_header *header, const void *data);
+@@ -37,12 +37,32 @@ int acpi_dbg2_setup(struct acpi_table_header *header, const void *data);
+ 	ACPI_DECLARE_PROBE_ENTRY(dbg2, name, ACPI_SIG_DBG2,		\
+ 				 acpi_dbg2_setup, &__acpi_dbg2_data_##name)
+ 
++int __init acpi_setup_earlycon(struct acpi_dbg2_device *device, void *d);
 +
 +/*
-+ * ACPI_DBG2_DECLARE() - Define handler for ACPI DBG2 port
-+ * @name:	Identifier to compose name of table data
-+ * @type:	Type of the port
-+ * @subtype:	Subtype of the port
-+ * @setup_fn:	Function to be called to setup the port
-+ *		(of type int (*)(struct acpi_dbg2_device *, void *);)
-+ * @data_ptr:	Sideband data provided back to the driver
++ * ACPI_DBG2_EARLYCON_DECLARE() - Define handler for ACPI GDB2 serial port
++ * @name:		Identifier to compose name of table data
++ * @subtype:		Subtype of the port
++ * @console_setup:	Function to be called to setup the port
++ *
++ * Type of the console_setup() callback is
++ * int (*setup)(struct earlycon_device *, const char *)
++ * It's the type of callback of of_setup_earlycon().
 + */
-+#define ACPI_DBG2_DECLARE(name, type, subtype, setup_fn, data_ptr)	\
-+	static const struct acpi_dbg2_data				\
-+		__acpi_dbg2_data_##name __used = {			\
-+			.port_type = type,				\
-+			.port_subtype = subtype,			\
-+			.setup = setup_fn,				\
-+			.data = data_ptr,				\
-+		   };							\
-+	ACPI_DECLARE_PROBE_ENTRY(dbg2, name, ACPI_SIG_DBG2,		\
-+				 acpi_dbg2_setup, &__acpi_dbg2_data_##name)
++#define ACPI_DBG2_EARLYCON_DECLARE(name, subtype, console_setup)	\
++	ACPI_DBG2_DECLARE(name, ACPI_DBG2_SERIAL_PORT, subtype,		\
++			  acpi_setup_earlycon, console_setup)
 +
-+#else
+ #else
+ 
+ #define ACPI_DBG2_DECLARE(name, type, subtype, setup_fn, data_ptr)	\
+ 	static const void *__acpi_dbg_data_##name[]			\
+ 		__used __initdata = { (void *)setup_fn,	(void *)data_ptr }
+ 
++#define ACPI_DBG2_EARLYCON_DECLARE(name, subtype, console_setup)	\
++	static const void *__acpi_dbg_data_serial_##name[]		\
++		__used __initdata = { (void *)console_setup }
 +
-+#define ACPI_DBG2_DECLARE(name, type, subtype, setup_fn, data_ptr)	\
-+	static const void *__acpi_dbg_data_##name[]			\
-+		__used __initdata = { (void *)setup_fn,	(void *)data_ptr }
-+
-+#endif
-+
-+#endif
+ #endif
+ 
+ #endif
 -- 
 2.7.1
