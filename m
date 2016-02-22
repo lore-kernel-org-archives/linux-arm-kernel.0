@@ -1,393 +1,126 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Mon, 22 Feb 2016 17:37:57 +0800
-Subject: [PATCH v12 21/21] KVM: ARM64: Add a new vcpu device control group for
- PMUv3
-In-Reply-To: <1456133877-9584-1-git-send-email-zhaoshenglong@huawei.com>
-References: <1456133877-9584-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1456133877-9584-22-git-send-email-zhaoshenglong@huawei.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 22 Feb 2016 15:25:47 +0530
+Subject: [PATCH v3 3/3] pci: dra7xx: use pdata callbacks to perform reset
+In-Reply-To: <alpine.DEB.2.02.1602220631300.3418@utopia.booyaka.com>
+References: <1452780672-14339-1-git-send-email-kishon@ti.com>
+ <1452780672-14339-4-git-send-email-kishon@ti.com>
+ <20160127173104.GQ19432@atomide.com> <56A90971.4020409@ti.com>
+ <20160127185649.GV19432@atomide.com> <56A94FB7.6020903@ti.com>
+ <20160128183156.GH19432@atomide.com> <56B087AD.4000505@ti.com>
+ <alpine.DEB.2.02.1602080208070.2182@utopia.booyaka.com>
+ <56B900E9.9040306@ti.com>
+ <alpine.DEB.2.02.1602090846480.2906@utopia.booyaka.com>
+ <56BA2495.9020407@ti.com>
+ <alpine.DEB.2.02.1602091932160.2906@utopia.booyaka.com>
+ <56BA958A.1020503@ti.com> <56BACCDB.2070507@ti.com>
+ <alpine.DEB.2.02.1602111921090.20757@utopia.booyaka.com>
+ <56BD8091.4090007@ti.com> <56BE1454.3030002@ti.com> <56C5D377.50901@ti.com>
+ <56CAA82D.6000507@ti.com>
+ <alpine.DEB.2.02.1602220631300.3418@utopia.booyaka.com>
+Message-ID: <56CADB23.8020202@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shannon Zhao <shannon.zhao@linaro.org>
+Hi Paul,
 
-To configure the virtual PMUv3 overflow interrupt number, we use the
-vcpu kvm_device ioctl, encapsulating the KVM_ARM_VCPU_PMU_V3_IRQ
-attribute within the KVM_ARM_VCPU_PMU_V3_CTRL group.
+On Monday 22 February 2016 12:01 PM, Paul Walmsley wrote:
+> Kishon,
+> 
+> On Mon, 22 Feb 2016, Kishon Vijay Abraham I wrote:
+> 
+>> Sekhar,
+>>
+>> On Thursday 18 February 2016 07:51 PM, Sekhar Nori wrote:
+>>> On Friday 12 February 2016 10:50 PM, Suman Anna wrote:
+>>>> Sekhar,
+>>>> Will you be following up with above suggestion since Kishon is gonna be out?
+>>>
+>>> Alright, noticed this action for me :) Went through the thread, and 
+>>> looks like this is what we want to see?
+>>>
+>>> Thanks,
+>>> Sekhar
+>>>
+>>> ---8<---
+>>> From e3ba368f2235e1bf38a22ba8ea4e5c12aaafda19 Mon Sep 17 00:00:00 2001
+>>> Message-Id: <e3ba368f2235e1bf38a22ba8ea4e5c12aaafda19.1455803758.git.nsekhar@ti.com>
+>>> From: Sekhar Nori <nsekhar@ti.com>
+>>> Date: Thu, 18 Feb 2016 16:49:56 +0530
+>>> Subject: [PATCH 1/1] ARM: DRA7: hwmod: Add custom reset handler for PCIeSS
+>>>
+>>> Add a custom reset handler for DRA7x PCIeSS. This
+>>> handler is required to deassert PCIe hardreset lines
+>>> after they have been asserted.
+>>>
+>>> This enables the PCIe driver to access registers after
+>>> PCIeSS has been runtime enabled without having to
+>>> deassert hardreset lines itself.
+>>>
+>>> With this patch applied, used lspci to make sure
+>>> connected PCIe device enumerates on DRA74x and DRA72x
+>>> EVMs.
+>>>
+>>> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+>>> ---
+>>> Applies to tag for-v4.6/omap-hwmod-a of Paul W's tree.
+>>>
+>>>  arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 23 +++++++++++++++++++++++
+>>>  1 file changed, 23 insertions(+)
+>>>
+>>> diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+>>> index b61355e2a771..252b74633e31 100644
+>>> --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+>>> +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+>>> @@ -1526,8 +1526,31 @@ static struct omap_hwmod dra7xx_ocp2scp3_hwmod = {
+>>>   *
+>>>   */
+>>>  
+>>> +/*
+>>> + * As noted in documentation for _reset() in omap_hwmod.c, the stock reset
+>>> + * functionality of OMAP HWMOD layer does not deassert the hardreset lines
+>>> + * associated with an IP automatically leaving the driver to handle that
+>>> + * by itself. This does not work for PCIeSS which needs the reset lines
+>>> + * deasserted for the driver to start accessing registers.
+>>> + *
+>>> + * We use a PCIeSS HWMOD class specific reset handler to deassert the hardreset
+>>> + * lines after asserting them.
+>>> + */
+>>> +static int dra7xx_pciess_reset(struct omap_hwmod *oh)
+>>> +{
+>>> +	int i;
+>>> +
+>>> +	for (i = 0; i < oh->rst_lines_cnt; i++) {
+>>> +		omap_hwmod_assert_hardreset(oh, oh->rst_lines[i].name);
+>>> +		omap_hwmod_deassert_hardreset(oh, oh->rst_lines[i].name);
+>>> +	}
+>>> +
+>>> +	return 0;
+>>> +}
+>>> +
+>>>  static struct omap_hwmod_class dra7xx_pciess_hwmod_class = {
+>>>  	.name	= "pcie",
+>>> +	.reset	= dra7xx_pciess_reset,
+>>>  };
+>>
+>> Thanks for the patch.
+> 
+> Could you please test the bind/unbind functionality just to make sure it 
+> works?
 
-After configuring the PMUv3, call the vcpu ioctl with attribute
-KVM_ARM_VCPU_PMU_V3_INIT to initialize the PMUv3.
+The pci-dra7xx driver neither expose the bind/unbind sysfs entry nor can be
+built as module.
 
-Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-Acked-by: Peter Maydell <peter.maydell@linaro.org>
-Reviewed-by: Andrew Jones <drjones@redhat.com>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- Documentation/virtual/kvm/devices/vcpu.txt |  25 +++++++
- arch/arm/include/asm/kvm_host.h            |  15 ++++
- arch/arm/kvm/arm.c                         |   3 +
- arch/arm64/include/asm/kvm_host.h          |   6 ++
- arch/arm64/include/uapi/asm/kvm.h          |   5 ++
- arch/arm64/kvm/guest.c                     |  51 +++++++++++++
- include/kvm/arm_pmu.h                      |  23 ++++++
- virt/kvm/arm/pmu.c                         | 112 +++++++++++++++++++++++++++++
- 8 files changed, 240 insertions(+)
+However I hacked the pci-dra7xx driver to be built as module [and reverted
+Commit 5de85b9d57ab ("PM / runtime: Re-init runtime PM states at probe error
+and driver unbind")] and I don't see an abort when the PCI registers are
+accessed after rmmod/modprobe cycle (that was the issue that Sekhar's patch
+tried to solve). However PCI as such doesn't work after rmmod/modprobe cycle
+[1], but this is a different issue most likely in PCIe core and has to debugged.
 
-diff --git a/Documentation/virtual/kvm/devices/vcpu.txt b/Documentation/virtual/kvm/devices/vcpu.txt
-index 3cc59c5..c041658 100644
---- a/Documentation/virtual/kvm/devices/vcpu.txt
-+++ b/Documentation/virtual/kvm/devices/vcpu.txt
-@@ -6,3 +6,28 @@ KVM_GET_DEVICE_ATTR, and KVM_HAS_DEVICE_ATTR. The interface uses the same struct
- kvm_device_attr as other devices, but targets VCPU-wide settings and controls.
- 
- The groups and attributes per virtual cpu, if any, are architecture specific.
-+
-+1. GROUP: KVM_ARM_VCPU_PMU_V3_CTRL
-+Architectures: ARM64
-+
-+1.1. ATTRIBUTE: KVM_ARM_VCPU_PMU_V3_IRQ
-+Parameters: in kvm_device_attr.addr the address for PMU overflow interrupt is a
-+            pointer to an int
-+Returns: -EBUSY: The PMU overflow interrupt is already set
-+         -ENXIO: The overflow interrupt not set when attempting to get it
-+         -ENODEV: PMUv3 not supported
-+         -EINVAL: Invalid PMU overflow interrupt number supplied
-+
-+A value describing the PMUv3 (Performance Monitor Unit v3) overflow interrupt
-+number for this vcpu. This interrupt could be a PPI or SPI, but the interrupt
-+type must be same for each vcpu. As a PPI, the interrupt number is the same for
-+all vcpus, while as an SPI it must be a separate number per vcpu.
-+
-+1.2 ATTRIBUTE: KVM_ARM_VCPU_PMU_V3_INIT
-+Parameters: no additional parameter in kvm_device_attr.addr
-+Returns: -ENODEV: PMUv3 not supported
-+         -ENXIO: PMUv3 not properly configured as required prior to calling this
-+                 attribute
-+         -EBUSY: PMUv3 already initialized
-+
-+Request the initialization of the PMUv3.
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index f9f2779..6dd0992 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -242,5 +242,20 @@ static inline void kvm_arm_init_debug(void) {}
- static inline void kvm_arm_setup_debug(struct kvm_vcpu *vcpu) {}
- static inline void kvm_arm_clear_debug(struct kvm_vcpu *vcpu) {}
- static inline void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu) {}
-+static inline int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
-+					     struct kvm_device_attr *attr)
-+{
-+	return -ENXIO;
-+}
-+static inline int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
-+					     struct kvm_device_attr *attr)
-+{
-+	return -ENXIO;
-+}
-+static inline int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
-+					     struct kvm_device_attr *attr)
-+{
-+	return -ENXIO;
-+}
- 
- #endif /* __ARM_KVM_HOST_H__ */
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 34d7395..dc8644f 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -833,6 +833,7 @@ static int kvm_arm_vcpu_set_attr(struct kvm_vcpu *vcpu,
- 
- 	switch (attr->group) {
- 	default:
-+		ret = kvm_arm_vcpu_arch_set_attr(vcpu, attr);
- 		break;
- 	}
- 
-@@ -846,6 +847,7 @@ static int kvm_arm_vcpu_get_attr(struct kvm_vcpu *vcpu,
- 
- 	switch (attr->group) {
- 	default:
-+		ret = kvm_arm_vcpu_arch_get_attr(vcpu, attr);
- 		break;
- 	}
- 
-@@ -859,6 +861,7 @@ static int kvm_arm_vcpu_has_attr(struct kvm_vcpu *vcpu,
- 
- 	switch (attr->group) {
- 	default:
-+		ret = kvm_arm_vcpu_arch_has_attr(vcpu, attr);
- 		break;
- 	}
- 
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index cb220b7..a855a30 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -359,5 +359,11 @@ void kvm_arm_init_debug(void);
- void kvm_arm_setup_debug(struct kvm_vcpu *vcpu);
- void kvm_arm_clear_debug(struct kvm_vcpu *vcpu);
- void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu);
-+int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
-+			       struct kvm_device_attr *attr);
-+int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
-+			       struct kvm_device_attr *attr);
-+int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
-+			       struct kvm_device_attr *attr);
- 
- #endif /* __ARM64_KVM_HOST_H__ */
-diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-index 6aedbe3..f209ea1 100644
---- a/arch/arm64/include/uapi/asm/kvm.h
-+++ b/arch/arm64/include/uapi/asm/kvm.h
-@@ -205,6 +205,11 @@ struct kvm_arch_memory_slot {
- #define KVM_DEV_ARM_VGIC_GRP_CTRL	4
- #define   KVM_DEV_ARM_VGIC_CTRL_INIT	0
- 
-+/* Device Control API on vcpu fd */
-+#define KVM_ARM_VCPU_PMU_V3_CTRL	0
-+#define   KVM_ARM_VCPU_PMU_V3_IRQ	0
-+#define   KVM_ARM_VCPU_PMU_V3_INIT	1
-+
- /* KVM_IRQ_LINE irq field index values */
- #define KVM_ARM_IRQ_TYPE_SHIFT		24
- #define KVM_ARM_IRQ_TYPE_MASK		0xff
-diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-index fcb7788..dbe45c3 100644
---- a/arch/arm64/kvm/guest.c
-+++ b/arch/arm64/kvm/guest.c
-@@ -380,3 +380,54 @@ int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
- 	}
- 	return 0;
- }
-+
-+int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
-+			       struct kvm_device_attr *attr)
-+{
-+	int ret;
-+
-+	switch (attr->group) {
-+	case KVM_ARM_VCPU_PMU_V3_CTRL:
-+		ret = kvm_arm_pmu_v3_set_attr(vcpu, attr);
-+		break;
-+	default:
-+		ret = -ENXIO;
-+		break;
-+	}
-+
-+	return ret;
-+}
-+
-+int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
-+			       struct kvm_device_attr *attr)
-+{
-+	int ret;
-+
-+	switch (attr->group) {
-+	case KVM_ARM_VCPU_PMU_V3_CTRL:
-+		ret = kvm_arm_pmu_v3_get_attr(vcpu, attr);
-+		break;
-+	default:
-+		ret = -ENXIO;
-+		break;
-+	}
-+
-+	return ret;
-+}
-+
-+int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
-+			       struct kvm_device_attr *attr)
-+{
-+	int ret;
-+
-+	switch (attr->group) {
-+	case KVM_ARM_VCPU_PMU_V3_CTRL:
-+		ret = kvm_arm_pmu_v3_has_attr(vcpu, attr);
-+		break;
-+	default:
-+		ret = -ENXIO;
-+		break;
-+	}
-+
-+	return ret;
-+}
-diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
-index c7595d6..176913f 100644
---- a/include/kvm/arm_pmu.h
-+++ b/include/kvm/arm_pmu.h
-@@ -38,6 +38,7 @@ struct kvm_pmu {
- };
- 
- #define kvm_arm_pmu_v3_ready(v)		((v)->arch.pmu.ready)
-+#define kvm_arm_pmu_irq_initialized(v)	((v)->arch.pmu.irq_num >= VGIC_NR_SGIS)
- u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u64 select_idx);
- void kvm_pmu_set_counter_value(struct kvm_vcpu *vcpu, u64 select_idx, u64 val);
- u64 kvm_pmu_valid_counter_mask(struct kvm_vcpu *vcpu);
-@@ -52,11 +53,18 @@ void kvm_pmu_handle_pmcr(struct kvm_vcpu *vcpu, u64 val);
- void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
- 				    u64 select_idx);
- bool kvm_arm_support_pmu_v3(void);
-+int kvm_arm_pmu_v3_set_attr(struct kvm_vcpu *vcpu,
-+			    struct kvm_device_attr *attr);
-+int kvm_arm_pmu_v3_get_attr(struct kvm_vcpu *vcpu,
-+			    struct kvm_device_attr *attr);
-+int kvm_arm_pmu_v3_has_attr(struct kvm_vcpu *vcpu,
-+			    struct kvm_device_attr *attr);
- #else
- struct kvm_pmu {
- };
- 
- #define kvm_arm_pmu_v3_ready(v)		(false)
-+#define kvm_arm_pmu_irq_initialized(v)	(false)
- static inline u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu,
- 					    u64 select_idx)
- {
-@@ -79,6 +87,21 @@ static inline void kvm_pmu_handle_pmcr(struct kvm_vcpu *vcpu, u64 val) {}
- static inline void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu,
- 						  u64 data, u64 select_idx) {}
- static inline bool kvm_arm_support_pmu_v3(void) { return false; }
-+static inline int kvm_arm_pmu_v3_set_attr(struct kvm_vcpu *vcpu,
-+					  struct kvm_device_attr *attr)
-+{
-+	return -ENXIO;
-+}
-+static inline int kvm_arm_pmu_v3_get_attr(struct kvm_vcpu *vcpu,
-+					  struct kvm_device_attr *attr)
-+{
-+	return -ENXIO;
-+}
-+static inline int kvm_arm_pmu_v3_has_attr(struct kvm_vcpu *vcpu,
-+					  struct kvm_device_attr *attr)
-+{
-+	return -ENXIO;
-+}
- #endif
- 
- #endif
-diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
-index d5b6eb4..904617e 100644
---- a/virt/kvm/arm/pmu.c
-+++ b/virt/kvm/arm/pmu.c
-@@ -19,6 +19,7 @@
- #include <linux/kvm.h>
- #include <linux/kvm_host.h>
- #include <linux/perf_event.h>
-+#include <linux/uaccess.h>
- #include <asm/kvm_emulate.h>
- #include <kvm/arm_pmu.h>
- #include <kvm/arm_vgic.h>
-@@ -393,3 +394,114 @@ bool kvm_arm_support_pmu_v3(void)
- 	 */
- 	return (perf_num_counters() > 0);
- }
-+
-+static int kvm_arm_pmu_v3_init(struct kvm_vcpu *vcpu)
-+{
-+	if (!kvm_arm_support_pmu_v3())
-+		return -ENODEV;
-+
-+	if (!test_bit(KVM_ARM_VCPU_PMU_V3, vcpu->arch.features) ||
-+	    !kvm_arm_pmu_irq_initialized(vcpu))
-+		return -ENXIO;
-+
-+	if (kvm_arm_pmu_v3_ready(vcpu))
-+		return -EBUSY;
-+
-+	kvm_pmu_vcpu_reset(vcpu);
-+	vcpu->arch.pmu.ready = true;
-+
-+	return 0;
-+}
-+
-+static bool irq_is_valid(struct kvm *kvm, int irq, bool is_ppi)
-+{
-+	int i;
-+	struct kvm_vcpu *vcpu;
-+
-+	kvm_for_each_vcpu(i, vcpu, kvm) {
-+		if (!kvm_arm_pmu_irq_initialized(vcpu))
-+			continue;
-+
-+		if (is_ppi) {
-+			if (vcpu->arch.pmu.irq_num != irq)
-+				return false;
-+		} else {
-+			if (vcpu->arch.pmu.irq_num == irq)
-+				return false;
-+		}
-+	}
-+
-+	return true;
-+}
-+
-+
-+int kvm_arm_pmu_v3_set_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
-+{
-+	switch (attr->attr) {
-+	case KVM_ARM_VCPU_PMU_V3_IRQ: {
-+		int __user *uaddr = (int __user *)(long)attr->addr;
-+		int irq;
-+
-+		if (!test_bit(KVM_ARM_VCPU_PMU_V3, vcpu->arch.features))
-+			return -ENODEV;
-+
-+		if (get_user(irq, uaddr))
-+			return -EFAULT;
-+
-+		/*
-+		 * The PMU overflow interrupt could be a PPI or SPI, but for one
-+		 * VM the interrupt type must be same for each vcpu. As a PPI,
-+		 * the interrupt number is the same for all vcpus, while as an
-+		 * SPI it must be a separate number per vcpu.
-+		 */
-+		if (irq < VGIC_NR_SGIS || irq >= vcpu->kvm->arch.vgic.nr_irqs ||
-+		    !irq_is_valid(vcpu->kvm, irq, irq < VGIC_NR_PRIVATE_IRQS))
-+			return -EINVAL;
-+
-+		if (kvm_arm_pmu_irq_initialized(vcpu))
-+			return -EBUSY;
-+
-+		kvm_debug("Set kvm ARM PMU irq: %d\n", irq);
-+		vcpu->arch.pmu.irq_num = irq;
-+		return 0;
-+	}
-+	case KVM_ARM_VCPU_PMU_V3_INIT:
-+		return kvm_arm_pmu_v3_init(vcpu);
-+	}
-+
-+	return -ENXIO;
-+}
-+
-+int kvm_arm_pmu_v3_get_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
-+{
-+	switch (attr->attr) {
-+	case KVM_ARM_VCPU_PMU_V3_IRQ: {
-+		int __user *uaddr = (int __user *)(long)attr->addr;
-+		int irq;
-+
-+		if (!test_bit(KVM_ARM_VCPU_PMU_V3, vcpu->arch.features))
-+			return -ENODEV;
-+
-+		if (!kvm_arm_pmu_irq_initialized(vcpu))
-+			return -ENXIO;
-+
-+		irq = vcpu->arch.pmu.irq_num;
-+		return put_user(irq, uaddr);
-+	}
-+	}
-+
-+	return -ENXIO;
-+}
-+
-+int kvm_arm_pmu_v3_has_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
-+{
-+	switch (attr->attr) {
-+	case KVM_ARM_VCPU_PMU_V3_IRQ:
-+	case KVM_ARM_VCPU_PMU_V3_INIT:
-+		if (kvm_arm_support_pmu_v3() &&
-+		    test_bit(KVM_ARM_VCPU_PMU_V3, vcpu->arch.features))
-+			return 0;
-+	}
-+
-+	return -ENXIO;
-+}
--- 
-2.0.4
+In summary, there are other issues in PCI across rmmod/modprobe cycle but the
+reset of pci-dra7xx happens fine with this patch.
+
+Thanks
+Kishon
+
+[1] -> http://pastebin.ubuntu.com/15169387/
