@@ -1,47 +1,42 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 22 Feb 2016 21:54:26 +0100
-Subject: [RFC PATCH 04/10] arm64: mm: avoid __pa translations on
- empty_zero_page
+Date: Mon, 22 Feb 2016 21:54:23 +0100
+Subject: [RFC PATCH 01/10] arm64: mm: move assignment of 'high_memory' before
+ its first use
 In-Reply-To: <1456174472-30028-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1456174472-30028-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1456174472-30028-5-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1456174472-30028-2-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The variable empty_zero_page is part of the static kernel text, so we
-should use __pa_symbol() not __pa() to take its physical address.
+The variable 'high_memory' ends up being referenced in the call to
+dma_contiguous_reserve(). So move the assignment before that call.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/include/asm/mmu_context.h | 2 +-
- arch/arm64/include/asm/pgtable.h     | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm64/mm/init.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
-index 40fc56f3ed52..b03272fc501e 100644
---- a/arch/arm64/include/asm/mmu_context.h
-+++ b/arch/arm64/include/asm/mmu_context.h
-@@ -49,7 +49,7 @@ static inline void contextidr_thread_switch(struct task_struct *next)
-  */
- static inline void cpu_set_reserved_ttbr0(void)
- {
--	unsigned long ttbr = virt_to_phys(empty_zero_page);
-+	unsigned long ttbr = __pa_symbol(empty_zero_page);
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index e1f425fe5a81..017201982da3 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -235,6 +235,9 @@ void __init arm64_memblock_init(void)
+ 		arm64_dma_phys_limit = max_zone_dma_phys();
+ 	else
+ 		arm64_dma_phys_limit = PHYS_MASK + 1;
++
++	high_memory = __va((memblock_end_of_DRAM() & PAGE_MASK) - 1) + 1;
++
+ 	dma_contiguous_reserve(arm64_dma_phys_limit);
  
- 	asm(
- 	"	msr	ttbr0_el1, %0			// set TTBR0\n"
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index a440f5a85d08..528482f53f12 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -117,7 +117,7 @@ extern void __pgd_error(const char *file, int line, unsigned long val);
-  * for zero-mapped memory areas etc..
-  */
- extern unsigned long empty_zero_page[PAGE_SIZE / sizeof(unsigned long)];
--#define ZERO_PAGE(vaddr)	virt_to_page(empty_zero_page)
-+#define ZERO_PAGE(vaddr)	phys_to_page(__pa_symbol(empty_zero_page))
+ 	memblock_allow_resize();
+@@ -259,7 +262,6 @@ void __init bootmem_init(void)
+ 	sparse_init();
+ 	zone_sizes_init(min, max);
  
- #define pte_ERROR(pte)		__pte_error(__FILE__, __LINE__, pte_val(pte))
+-	high_memory = __va((max << PAGE_SHIFT) - 1) + 1;
+ 	max_pfn = max_low_pfn = max;
+ }
  
 -- 
 2.5.0
