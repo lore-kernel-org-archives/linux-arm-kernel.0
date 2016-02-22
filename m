@@ -1,32 +1,66 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 22 Feb 2016 21:33:38 +0900
-Subject: [PATCH 0/6] ARM: decompressor: several cleanups
-In-Reply-To: <20160222121805.GD19428@n2100.arm.linux.org.uk>
-References: <1456126277-14633-1-git-send-email-yamada.masahiro@socionext.com>
- <20160222113625.GC19428@n2100.arm.linux.org.uk>
- <CAK7LNAQEwm=2bHX+kTxFVJTh-sFX+3MBgwuEmmNM-XoyvdbWRA@mail.gmail.com>
- <20160222121805.GD19428@n2100.arm.linux.org.uk>
-Message-ID: <CAK7LNAS0UVWezhH+KCrvUFeWvJkDzyDEV=-Ng5e9f2G1jJDwWA@mail.gmail.com>
+From: jan.glauber@caviumnetworks.com (Jan Glauber)
+Date: Mon, 22 Feb 2016 13:40:34 +0100
+Subject: [PATCH v4 3/5] arm64: dts: Add Cavium ThunderX specific PMU
+In-Reply-To: <20160218173248.GD16883@arm.com>
+References: <20160218173248.GD16883@arm.com>
+Message-ID: <20160222124034.GA766@hardcore>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Thu, Feb 18, 2016 at 05:32:48PM +0000, Will Deacon wrote:
+> On Thu, Feb 18, 2016 at 05:50:12PM +0100, Jan Glauber wrote:
+> > Add a compatible string for the Cavium ThunderX PMU.
+> 
+> Stupid question, but is "thunder" the name of the CPU or the SoC or ...?
+> 
+> Whatever we use to describe the PMU, should probably also identify the
+> CPU uniquely.
 
-2016-02-22 21:18 GMT+09:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Mon, Feb 22, 2016 at 09:08:05PM +0900, Masahiro Yamada wrote:
->> I did build-test, changing the configuration
->> CONFIG_KERNEL_GZIP -> CONFIG_KERNEL_LZMA -> CONFIG_KERNEL_XZ -> ...
->>
->> I confirmed zImage was created from the expected piggy.
->>
->> For run-test, it worked fine too.
->
-> Okay, please drop them into the patch system, thanks.
+The CPU is currently:
 
-I did so.  Thanks.
+compatible = "cavium,thunder", "arm,armv8";
 
+We clearly need better names in case of a subsequent CPU, but for now
+I think we should stick to the existing name.
 
+Jan
 
--- 
-Best Regards
-Masahiro Yamada
+> Will
+> 
+> > Signed-off-by: Jan Glauber <jglauber@cavium.com>
+> > ---
+> >  Documentation/devicetree/bindings/arm/pmu.txt | 1 +
+> >  arch/arm64/boot/dts/cavium/thunder-88xx.dtsi  | 5 +++++
+> >  2 files changed, 6 insertions(+)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/arm/pmu.txt b/Documentation/devicetree/bindings/arm/pmu.txt
+> > index 5651883..d3999a1 100644
+> > --- a/Documentation/devicetree/bindings/arm/pmu.txt
+> > +++ b/Documentation/devicetree/bindings/arm/pmu.txt
+> > @@ -25,6 +25,7 @@ Required properties:
+> >  	"qcom,scorpion-pmu"
+> >  	"qcom,scorpion-mp-pmu"
+> >  	"qcom,krait-pmu"
+> > +	"cavium,thunder-pmu"
+> >  - interrupts : 1 combined interrupt or 1 per core. If the interrupt is a per-cpu
+> >                 interrupt (PPI) then 1 interrupt should be specified.
+> >  
+> > diff --git a/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi b/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
+> > index 9cb7cf9..2eb9b22 100644
+> > --- a/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
+> > +++ b/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
+> > @@ -360,6 +360,11 @@
+> >  		             <1 10 0xff01>;
+> >  	};
+> >  
+> > +	pmu {
+> > +		compatible = "cavium,thunder-pmu", "arm,armv8-pmuv3";
+> > +		interrupts = <1 7 4>;
+> > +	};
+> > +
+> >  	soc {
+> >  		compatible = "simple-bus";
+> >  		#address-cells = <2>;
+> > -- 
+> > 1.9.1
+> > 
