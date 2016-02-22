@@ -1,100 +1,64 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 22 Feb 2016 00:08:10 -0800
-Subject: [PATCH] clk: sunxi: allow PLL6 clock to be reused
-In-Reply-To: <1456105198-25295-1-git-send-email-andre.przywara@arm.com>
-References: <1456105198-25295-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <CAGb2v66Fkvpqay+pNYjN1KP_KSUmv-du+PVSsyeuK+Y7bzEt+g@mail.gmail.com>
+From: raveendra.padasalagi@broadcom.com (Raveendra Padasalagi)
+Date: Mon, 22 Feb 2016 13:40:05 +0530
+Subject: [PATCH v3 3/3] ARM: dts: use syscon in cygnus touchscreen dt node
+In-Reply-To: <1456127379-25866-4-git-send-email-raveendra.padasalagi@broadcom.com>
+References: <1456127379-25866-1-git-send-email-raveendra.padasalagi@broadcom.com>
+ <1456127379-25866-4-git-send-email-raveendra.padasalagi@broadcom.com>
+Message-ID: <CAAFb_vocadoQ1Egt4PgOX4pW2Tz5aifqWZQxQKOhvNeq0frsYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 21, 2016 at 5:39 PM, Andre Przywara <andre.przywara@arm.com> wrote:
-> Currently we hard-code the base name for the PLL6 clock for both the
-> sun4i and sun6i variants in the driver (pll6 and pll6x2, respectively).
-> This unfortunately denies reusing this clock for the H3 and A64 PLL8
-> clock, which is the same otherwise.
-> Remove the hard-coded name in the source code and replace it with an
-> appropriate index into the clock-output-names array in the DT.
-> This is compatible with all current device trees, since they all carry
-> the hard-coded base name in there.
+On Mon, Feb 22, 2016 at 1:19 PM, Raveendra Padasalagi
+<raveendra.padasalagi@broadcom.com> wrote:
+> In Cygnus SOC touch screen controller registers are shared
+> with ADC and flex timer. Using readl/writel could lead to
+> race condition. So in such case register access is handled
+> through syscon framework API's in the touch screen driver.
+> This feature is enabled if "brcm,iproc-touchscreen-syscon"
+> compatible string is selected in touchscreen dt node.
 >
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> So this patch enables syscon support in touchscreen driver
+> by adding necessary properties in touchscreen dt node.
+>
+> Signed-off-by: Raveendra Padasalagi <raveendra.padasalagi@broadcom.com>
+> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
 > ---
-> Salut Maxime,
+>  arch/arm/boot/dts/bcm-cygnus.dtsi | 11 +++++++++--
+>  1 file changed, 9 insertions(+), 2 deletions(-)
 >
-> does that patch make sense?
-> It fixes the re-usability problem while still keeping compatibility
-> with existing DTs and also is pretty small.
-> If you agree with this, I'll send out a v3 of the A64 series including
-> this patch and the H3 PLL8 enablement later.
-> I tested this on my BananaPi, the clk_summary output was identical
-> with and without this patch.
+> diff --git a/arch/arm/boot/dts/bcm-cygnus.dtsi b/arch/arm/boot/dts/bcm-cygnus.dtsi
+> index 3878793..1704dc0 100644
+> --- a/arch/arm/boot/dts/bcm-cygnus.dtsi
+> +++ b/arch/arm/boot/dts/bcm-cygnus.dtsi
+> @@ -351,9 +351,16 @@
+>                                         <&pinctrl 142 10 1>;
+>                 };
+>
+> +               ts_adc_syscon: ts_adc_syscon at 180a6000 {
+> +                       compatible = "brcm,iproc-ts-adc-syscon","syscon";
+> +                       reg = <0x180a6000 0xc30>;
+> +               };
+> +
+>                 touchscreen: tsc at 180a6000 {
+> -                       compatible = "brcm,iproc-touchscreen";
+> -                       reg = <0x180a6000 0x40>;
+> +                       compatible = "brcm,iproc-touchscreen-syscon";
 
-This look OK to me, except one minor detail below.
+Hi Rob,
+In patchset V2 you had a comment as to have only "syscon" support,
+Since having "syscon" only support breaks the dt backward compatibility
+as the existing driver has support for "reg".  So in patchset V3 I have
+not addressed this comment yet. Waiting for your opinion on whether
+to proceed with "syscon" only support.
 
-> Cheers,
-> Andre.
->
->  drivers/clk/sunxi/clk-factors.c | 3 ++-
->  drivers/clk/sunxi/clk-factors.h | 1 +
->  drivers/clk/sunxi/clk-sunxi.c   | 4 ++--
->  3 files changed, 5 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/clk/sunxi/clk-factors.c b/drivers/clk/sunxi/clk-factors.c
-> index ddefe96..7daf01d 100644
-> --- a/drivers/clk/sunxi/clk-factors.c
-> +++ b/drivers/clk/sunxi/clk-factors.c
-> @@ -202,7 +202,8 @@ struct clk *sunxi_factors_register(struct device_node *node,
->         if (data->name)
->                 clk_name = data->name;
->         else
-> -               of_property_read_string(node, "clock-output-names", &clk_name);
-> +               of_property_read_string_index(node, "clock-output-names",
-> +                                             data->name_idx, &clk_name);
->
->         factors = kzalloc(sizeof(struct clk_factors), GFP_KERNEL);
->         if (!factors)
-> diff --git a/drivers/clk/sunxi/clk-factors.h b/drivers/clk/sunxi/clk-factors.h
-> index 1e63c5b..3a7da86 100644
-> --- a/drivers/clk/sunxi/clk-factors.h
-> +++ b/drivers/clk/sunxi/clk-factors.h
-> @@ -36,6 +36,7 @@ struct factors_data {
->         void (*getter)(struct factors_request *req);
->         void (*recalc)(struct factors_request *req);
->         const char *name;
-> +       int name_idx;
-
-I would drop the .name field. It was a bad workaround
-due to limitations of the factors clk code at the time
-by me. We really shouldn't hard-code the name if we want
-to reuse the driver.
-
-Thanks
-ChenYu
-
->  };
->
->  struct clk_factors {
-> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-> index 99f60ef..53f5927 100644
-> --- a/drivers/clk/sunxi/clk-sunxi.c
-> +++ b/drivers/clk/sunxi/clk-sunxi.c
-> @@ -530,14 +530,14 @@ static const struct factors_data sun4i_pll6_data __initconst = {
->         .enable = 31,
->         .table = &sun4i_pll5_config,
->         .getter = sun4i_get_pll5_factors,
-> -       .name = "pll6",
-> +       .name_idx = 2,
->  };
->
->  static const struct factors_data sun6i_a31_pll6_data __initconst = {
->         .enable = 31,
->         .table = &sun6i_a31_pll6_config,
->         .getter = sun6i_a31_get_pll6_factors,
-> -       .name = "pll6x2",
-> +       .name_idx = 1,
->  };
->
->  static const struct factors_data sun5i_a13_ahb_data __initconst = {
+-Raveendra
+> +                       #address-cells = <1>;
+> +                       #size-cells = <1>;
+> +                       ts_syscon = <&ts_adc_syscon>;
+>                         clocks = <&asiu_clks BCM_CYGNUS_ASIU_ADC_CLK>;
+>                         clock-names = "tsc_clk";
+>                         interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>;
 > --
-> 1.8.4
+> 1.9.1
 >
