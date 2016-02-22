@@ -1,63 +1,58 @@
-From: k@japko.eu (Krzysztof Adamski)
-Date: Mon, 22 Feb 2016 14:03:25 +0100
-Subject: [PATCH v5 1/4] clk: sunxi: Add apb0 gates for H3
-In-Reply-To: <1456146208-13890-1-git-send-email-k@japko.eu>
-References: <1456146208-13890-1-git-send-email-k@japko.eu>
-Message-ID: <1456146208-13890-2-git-send-email-k@japko.eu>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 22 Feb 2016 14:09:45 +0100
+Subject: [PATCH 2/6] mtd: physmap_of: add a hook for Versatile write
+ protection
+In-Reply-To: <CACRpkdY4fNfQWaKAZcak0yzJ2B17hbrqdU=Q4=NiwiWRNv_0yQ@mail.gmail.com>
+References: <1453806725-4880-1-git-send-email-linus.walleij@linaro.org>
+ <1453806725-4880-3-git-send-email-linus.walleij@linaro.org>
+ <CACRpkdY4fNfQWaKAZcak0yzJ2B17hbrqdU=Q4=NiwiWRNv_0yQ@mail.gmail.com>
+Message-ID: <CACRpkdZusueSh99D2JQj5=JQqHAeedTS=X2vm48U58PLbhamcQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for APB0 in H3. It seems to be compatible with
-earlier SOCs. apb0 gates controls R_ block peripherals (R_PIO, R_IR,
-etc).
+On Sat, Feb 13, 2016 at 2:19 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Tue, Jan 26, 2016 at 12:12 PM, Linus Walleij
+> <linus.walleij@linaro.org> wrote:
+>
+>> In order to support device tree probing of Versatile NOR flash
+>> chips, there must be a way to add the VPP (write protection)
+>> enable/disable callback. The register in question is in the
+>> system controllers of these machines. Apart from this quirk,
+>> the ARM flash chips are standard CFI flash chips from various
+>> vendors.
+>>
+>> Additionally, the Integrator/AP require you to set up the external
+>> bus interface (EBI) to allow writes to the chip select where the
+>> flash memory is connected.
+>>
+>> Solve this by looking for the arm,versatile-flash compatible
+>> string in the flash device tree node. In the driver,
+>> add a special hook to check for the various Versatile syscons and
+>> register a callback for .set_vpp() if this compatible is present.
+>>
+>> Provide a special Kconfig entry for the addon hook so it will
+>> not be compiled in if the Versatile boards are not supported.
+>> Stubs in the header file make sure the impact will be zero on
+>> other platforms. (Compilers optimze this out.)
+>>
+>> With this patch, a large slew of ARM board file code can be
+>> removed.
+>>
+>> Cc: Grant Likely <grant.likely@linaro.org>
+>> Cc: Rob Herring <robh@kernel.org>
+>> Cc: Arnd Bergmann <arnd@arndb.de>
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>
+> Do you think my reply to this about reference counting and
+> subsequent (accepted) patch to update the documentation
+> to reflect 876fe76d793d03077
+> "mtd: maps: physmap: Add reference counter to set_vpp()"
+> is enough to warrant merging of this?
+>
+> If you want the code developed in any special direction
+> just tell me.
 
-Signed-off-by: Krzysztof Adamski <k@japko.eu>
----
- Documentation/devicetree/bindings/clock/sunxi.txt | 2 ++
- drivers/clk/sunxi/clk-simple-gates.c              | 4 ++++
- 2 files changed, 6 insertions(+)
+Ping.
 
-diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-index c09f59b..834436f 100644
---- a/Documentation/devicetree/bindings/clock/sunxi.txt
-+++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-@@ -18,6 +18,7 @@ Required properties:
- 	"allwinner,sun4i-a10-cpu-clk" - for the CPU multiplexer clock
- 	"allwinner,sun4i-a10-axi-clk" - for the AXI clock
- 	"allwinner,sun8i-a23-axi-clk" - for the AXI clock on A23
-+	"allwinner,sun4i-a10-gates-clk" - for generic gates on all compatible SoCs
- 	"allwinner,sun4i-a10-axi-gates-clk" - for the AXI gates
- 	"allwinner,sun4i-a10-ahb-clk" - for the AHB clock
- 	"allwinner,sun5i-a13-ahb-clk" - for the AHB clock on A13
-@@ -46,6 +47,7 @@ Required properties:
- 	"allwinner,sun6i-a31-apb0-gates-clk" - for the APB0 gates on A31
- 	"allwinner,sun7i-a20-apb0-gates-clk" - for the APB0 gates on A20
- 	"allwinner,sun8i-a23-apb0-gates-clk" - for the APB0 gates on A23
-+	"allwinner,sun8i-h3-apb0-gates-clk" - for the APB0 gates on H3
- 	"allwinner,sun9i-a80-apb0-gates-clk" - for the APB0 gates on A80
- 	"allwinner,sun4i-a10-apb1-clk" - for the APB1 clock
- 	"allwinner,sun9i-a80-apb1-clk" - for the APB1 bus clock on A80
-diff --git a/drivers/clk/sunxi/clk-simple-gates.c b/drivers/clk/sunxi/clk-simple-gates.c
-index 2cfc5a8..d7ec2dc 100644
---- a/drivers/clk/sunxi/clk-simple-gates.c
-+++ b/drivers/clk/sunxi/clk-simple-gates.c
-@@ -98,6 +98,8 @@ static void __init sunxi_simple_gates_init(struct device_node *node)
- 	sunxi_simple_gates_setup(node, NULL, 0);
- }
- 
-+CLK_OF_DECLARE(sun4i_a10_gates, "allwinner,sun4i-a10-gates-clk",
-+	       sunxi_simple_gates_init);
- CLK_OF_DECLARE(sun4i_a10_apb0, "allwinner,sun4i-a10-apb0-gates-clk",
- 	       sunxi_simple_gates_init);
- CLK_OF_DECLARE(sun4i_a10_apb1, "allwinner,sun4i-a10-apb1-gates-clk",
-@@ -132,6 +134,8 @@ CLK_OF_DECLARE(sun8i_a33_ahb1, "allwinner,sun8i-a33-ahb1-gates-clk",
- 	       sunxi_simple_gates_init);
- CLK_OF_DECLARE(sun8i_a83t_apb0, "allwinner,sun8i-a83t-apb0-gates-clk",
- 	       sunxi_simple_gates_init);
-+CLK_OF_DECLARE(sun8i_h3_apb0, "allwinner,sun8i-h3-apb0-gates-clk",
-+	       sunxi_simple_gates_init);
- CLK_OF_DECLARE(sun9i_a80_ahb0, "allwinner,sun9i-a80-ahb0-gates-clk",
- 	       sunxi_simple_gates_init);
- CLK_OF_DECLARE(sun9i_a80_ahb1, "allwinner,sun9i-a80-ahb1-gates-clk",
--- 
-2.1.4
+Yours,
+Linus Walleij
