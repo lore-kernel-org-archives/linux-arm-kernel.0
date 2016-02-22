@@ -1,36 +1,26 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 22 Feb 2016 14:10:22 -0800
-Subject: [PATCHv2] clk: ti: omap3+: dpll: use non-locking version of
- clk_get_rate
-In-Reply-To: <20160222220514.GZ4847@codeaurora.org>
-References: <1455966777-30576-1-git-send-email-t-kristo@ti.com>
- <20160222165252.GF13417@atomide.com>
- <20160222220514.GZ4847@codeaurora.org>
-Message-ID: <20160222221021.GW13417@atomide.com>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Mon, 22 Feb 2016 14:19:14 -0800
+Subject: [PATCH] nvdimm: use 'u64' for pfn flags
+In-Reply-To: <1456178322-1728962-1-git-send-email-arnd@arndb.de>
+References: <1456178322-1728962-1-git-send-email-arnd@arndb.de>
+Message-ID: <CAPcyv4j-ByA7u0jnnLHeiEYNZU78-twRzQUoeo2BkmtODCAGHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Stephen Boyd <sboyd@codeaurora.org> [160222 14:05]:
-> On 02/22, Tony Lindgren wrote:
-> > * Tero Kristo <t-kristo@ti.com> [160220 03:12]:
-> > > As the code in this file is being executed within irq context in some
-> > > cases, we must avoid the clk_get_rate which uses mutex internally.
-> > > Switch the code to use clk_hw_get_rate instead which is non-locking.
-> > > 
-> > > This fixes an issue where PM runtime will hang the system if enabled
-> > > with a serial console before a suspend-resume cycle.
-> > 
-> > Can you please add the "Fixes: " line here?
-> > 
-> > And when applying, please tag this one Cc stable.
-> > 
-> > Other than that, please feel free to add:
-> > 
-> > Tested-by: Tony Lindgren <tony@atomide.com>
-> > 
-> 
-> This is what I got. "Fixes" should take care of stable.
+On Mon, Feb 22, 2016 at 1:58 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> A recent bugfix changed pfn_t to always be 64-bit wide, but did not
+> change the code in pmem.c, which is now broken on 32-bit architectures
+> as reported by gcc:
+>
+> In file included from ../drivers/nvdimm/pmem.c:28:0:
+> drivers/nvdimm/pmem.c: In function 'pmem_alloc':
+> include/linux/pfn_t.h:15:17: error: large integer implicitly truncated to unsigned type [-Werror=overflow]
+>  #define PFN_DEV (1ULL << (BITS_PER_LONG_LONG - 3))
+>
+> This changes the intermediate pfn_flags in struct pmem_device to
+> be 64 bit wide as well, so they can store the flags correctly.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: db78c22230d0 ("mm: fix pfn_t vs highmem")
 
-OK thanks!
-
-Tony
+Thanks Arnd, I'll roll this up.
