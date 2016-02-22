@@ -1,83 +1,108 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 22 Feb 2016 11:29:02 +0000
-Subject: [PATCH 3/3] arm64: ptdump: include UEFI runtime service mappings
-In-Reply-To: <1456135239-3607-4-git-send-email-ard.biesheuvel@linaro.org>
+Date: Mon, 22 Feb 2016 11:33:10 +0000
+Subject: [PATCH 1/3] arm64: ptdump: use static initializers for vmemmap
+ region boundaries
+In-Reply-To: <1456135239-3607-2-git-send-email-ard.biesheuvel@linaro.org>
 References: <1456135239-3607-1-git-send-email-ard.biesheuvel@linaro.org>
- <1456135239-3607-4-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160222112901.GA3435@leverpostej>
+ <1456135239-3607-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160222113310.GB3435@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Mon, Feb 22, 2016 at 11:00:39AM +0100, Ard Biesheuvel wrote:
-> This adds the UEFI runtime services page table mappings to the output
-> of the kernel page table dumper. These tables are only live during the
-> time UEFI runtime services are being invoked, but we can include them
-> for informational purposes nonetheless.
+On Mon, Feb 22, 2016 at 11:00:37AM +0100, Ard Biesheuvel wrote:
+> There is no need to initialize the vmemmap region boundaries dynamically,
+> since they are compile time constants. So just add these constants to the
+> global struct initializer, and drop the dynamic assignment and related code.
 
-I would prefer that we had a separate file for the EFI runtime services
-page tables. As you mention, they are distinct from the kernel and not
-always live (which is also the case for the idmap, for example).
+This does look nicer.
 
-I have some local patches atop of v4.3 that librify the dumping code and
-add a separate file for EFI [1]. I spotted a couple other things in
-doing that (e.g. that we need to pad addresses more).
+I believe the intention here was to mark the end of the _populated_
+vmemmap region rather than the static VA carveout, so this is a slight
+change in behaviour.
 
-Is it worth cleaning that up?
+However, I don't think we gained much by only handling the populated
+region, and we didn't do the same for the linear map. So FWIW:
 
-Thanks,
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
 Mark.
 
-[1] git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git arm64/ptdump/librify
-
 > 
-> Cc: Matt Fleming <matt@codeblueprint.co.uk>
 > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 > ---
->  arch/arm64/mm/dump.c               | 8 ++++++++
->  drivers/firmware/efi/arm-runtime.c | 2 +-
->  2 files changed, 9 insertions(+), 1 deletion(-)
+>  arch/arm64/mm/dump.c | 47 +++++---------------
+>  1 file changed, 12 insertions(+), 35 deletions(-)
 > 
 > diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
-> index 12e4b1732303..e7b937c9ad52 100644
+> index 6be918478f85..eadcb70e733c 100644
 > --- a/arch/arm64/mm/dump.c
 > +++ b/arch/arm64/mm/dump.c
-> @@ -36,6 +36,10 @@ struct addr_marker {
+> @@ -34,37 +34,21 @@ struct addr_marker {
+>  	const char *name;
 >  };
 >  
+> -enum address_markers_idx {
+> -	MODULES_START_NR = 0,
+> -	MODULES_END_NR,
+> -	VMALLOC_START_NR,
+> -	VMALLOC_END_NR,
+> -#ifdef CONFIG_SPARSEMEM_VMEMMAP
+> -	VMEMMAP_START_NR,
+> -	VMEMMAP_END_NR,
+> -#endif
+> -	FIXADDR_START_NR,
+> -	FIXADDR_END_NR,
+> -	PCI_START_NR,
+> -	PCI_END_NR,
+> -	KERNEL_SPACE_NR,
+> -};
+> -
 >  static struct addr_marker address_markers[] = {
-> +#ifdef CONFIG_EFI
-> +	{ 0,				"UEFI runtime start" },
-> +	{ TASK_SIZE_64,			"UEFI runtime end" },
-> +#endif
->  #ifdef CONFIG_KASAN
->  	{ KASAN_SHADOW_START,		"Kasan shadow start" },
->  	{ KASAN_SHADOW_END,		"Kasan shadow end" },
-> @@ -310,6 +314,10 @@ static int ptdump_show(struct seq_file *m, void *v)
->  		.marker = address_markers,
->  	};
+> -	{ MODULES_VADDR,	"Modules start" },
+> -	{ MODULES_END,		"Modules end" },
+> -	{ VMALLOC_START,	"vmalloc() Area" },
+> -	{ VMALLOC_END,		"vmalloc() End" },
+> +	{ MODULES_VADDR,		"Modules start" },
+> +	{ MODULES_END,			"Modules end" },
+> +	{ VMALLOC_START,		"vmalloc() Area" },
+> +	{ VMALLOC_END,			"vmalloc() End" },
+>  #ifdef CONFIG_SPARSEMEM_VMEMMAP
+> -	{ 0,			"vmemmap start" },
+> -	{ 0,			"vmemmap end" },
+> +	{ (u64)vmemmap,			"vmemmap start" },
+> +	{ (u64)vmemmap + VMEMMAP_SIZE,	"vmemmap end" },
+>  #endif
+> -	{ FIXADDR_START,	"Fixmap start" },
+> -	{ FIXADDR_TOP,		"Fixmap end" },
+> -	{ PCI_IO_START,		"PCI I/O start" },
+> -	{ PCI_IO_END,		"PCI I/O end" },
+> -	{ PAGE_OFFSET,		"Linear Mapping" },
+> -	{ -1,			NULL },
+> +	{ FIXADDR_START,		"Fixmap start" },
+> +	{ FIXADDR_TOP,			"Fixmap end" },
+> +	{ PCI_IO_START,			"PCI I/O start" },
+> +	{ PCI_IO_END,			"PCI I/O end" },
+> +	{ PAGE_OFFSET,			"Linear Mapping" },
+> +	{ -1,				NULL },
+>  };
 >  
-> +	if (IS_ENABLED(CONFIG_EFI)) {
-> +		extern struct mm_struct efi_mm;
-> +		walk_pgd(&st, &efi_mm, 0);
-> +	}
->  	walk_pgd(&st, &init_mm, LOWEST_ADDR);
+>  /*
+> @@ -349,13 +333,6 @@ static int ptdump_init(void)
+>  			for (j = 0; j < pg_level[i].num; j++)
+>  				pg_level[i].mask |= pg_level[i].bits[j].mask;
 >  
->  	note_page(&st, 0, 0, 0);
-> diff --git a/drivers/firmware/efi/arm-runtime.c b/drivers/firmware/efi/arm-runtime.c
-> index 6ae21e41a429..3a3911641049 100644
-> --- a/drivers/firmware/efi/arm-runtime.c
-> +++ b/drivers/firmware/efi/arm-runtime.c
-> @@ -30,7 +30,7 @@
->  
->  extern u64 efi_system_table;
->  
-> -static struct mm_struct efi_mm = {
-> +struct mm_struct efi_mm = {
->  	.mm_rb			= RB_ROOT,
->  	.mm_users		= ATOMIC_INIT(2),
->  	.mm_count		= ATOMIC_INIT(1),
+> -#ifdef CONFIG_SPARSEMEM_VMEMMAP
+> -	address_markers[VMEMMAP_START_NR].start_address =
+> -				(unsigned long)virt_to_page(PAGE_OFFSET);
+> -	address_markers[VMEMMAP_END_NR].start_address =
+> -				(unsigned long)virt_to_page(high_memory);
+> -#endif
+> -
+>  	pe = debugfs_create_file("kernel_page_tables", 0400, NULL, NULL,
+>  				 &ptdump_fops);
+>  	return pe ? 0 : -ENOMEM;
 > -- 
 > 2.5.0
 > 
