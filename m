@@ -1,10 +1,10 @@
 From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Mon, 22 Feb 2016 19:38:12 +0530
-Subject: [PATCH 23/61] gpio: janz-ttl: Use devm_gpiochip_add_data() for gpio
+Date: Mon, 22 Feb 2016 19:38:13 +0530
+Subject: [PATCH 24/61] gpio: kempld: Use devm_gpiochip_add_data() for gpio
  registration
 In-Reply-To: <1456150130-2668-1-git-send-email-ldewangan@nvidia.com>
 References: <1456150130-2668-1-git-send-email-ldewangan@nvidia.com>
-Message-ID: <1456150130-2668-24-git-send-email-ldewangan@nvidia.com>
+Message-ID: <1456150130-2668-25-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,43 +13,42 @@ need of driver callback .remove.
 
 Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
 ---
- drivers/gpio/gpio-janz-ttl.c | 12 +-----------
- 1 file changed, 1 insertion(+), 11 deletions(-)
+ drivers/gpio/gpio-kempld.c | 11 +----------
+ 1 file changed, 1 insertion(+), 10 deletions(-)
 
-diff --git a/drivers/gpio/gpio-janz-ttl.c b/drivers/gpio/gpio-janz-ttl.c
-index 482aa03..a8d0a6b 100644
---- a/drivers/gpio/gpio-janz-ttl.c
-+++ b/drivers/gpio/gpio-janz-ttl.c
-@@ -182,7 +182,7 @@ static int ttl_probe(struct platform_device *pdev)
- 	gpio->base = -1;
- 	gpio->ngpio = 20;
+diff --git a/drivers/gpio/gpio-kempld.c b/drivers/gpio/gpio-kempld.c
+index 0111774..701f151 100644
+--- a/drivers/gpio/gpio-kempld.c
++++ b/drivers/gpio/gpio-kempld.c
+@@ -178,7 +178,7 @@ static int kempld_gpio_probe(struct platform_device *pdev)
+ 		return -ENODEV;
+ 	}
  
--	ret = gpiochip_add_data(gpio, NULL);
-+	ret = devm_gpiochip_add_data(dev, gpio, NULL);
+-	ret = gpiochip_add_data(chip, gpio);
++	ret = devm_gpiochip_add_data(dev, chip, gpio);
  	if (ret) {
- 		dev_err(dev, "unable to add GPIO chip\n");
+ 		dev_err(dev, "Could not register GPIO chip\n");
  		return ret;
-@@ -191,21 +191,11 @@ static int ttl_probe(struct platform_device *pdev)
+@@ -190,20 +190,11 @@ static int kempld_gpio_probe(struct platform_device *pdev)
  	return 0;
  }
  
--static int ttl_remove(struct platform_device *pdev)
+-static int kempld_gpio_remove(struct platform_device *pdev)
 -{
--	struct ttl_module *mod = platform_get_drvdata(pdev);
+-	struct kempld_gpio_data *gpio = platform_get_drvdata(pdev);
 -
--	gpiochip_remove(&mod->gpio);
--
+-	gpiochip_remove(&gpio->chip);
 -	return 0;
 -}
 -
- static struct platform_driver ttl_driver = {
- 	.driver		= {
- 		.name	= DRV_NAME,
+ static struct platform_driver kempld_gpio_driver = {
+ 	.driver = {
+ 		.name = "kempld-gpio",
  	},
- 	.probe		= ttl_probe,
--	.remove		= ttl_remove,
+ 	.probe		= kempld_gpio_probe,
+-	.remove		= kempld_gpio_remove,
  };
  
- module_platform_driver(ttl_driver);
+ module_platform_driver(kempld_gpio_driver);
 -- 
 2.1.4
