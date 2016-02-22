@@ -1,67 +1,30 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Mon, 22 Feb 2016 10:16:06 +0000
-Subject: Tegra baseline test results for v4.5-rc4
-Message-ID: <56CADFE6.8040605@nvidia.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 22 Feb 2016 19:19:18 +0900
+Subject: next-20160222 build: 5 failures 9 warnings (next-20160222)
+In-Reply-To: <E1aXlz4-000486-Pb@optimist>
+References: <E1aXlz4-000486-Pb@optimist>
+Message-ID: <20160222101918.GY18327@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v4.5-rc4.
-Logs and other details at:
+On Mon, Feb 22, 2016 at 08:36:46AM +0000, Build bot for Mark Brown wrote:
 
-    https://nvtb.github.io//linux/test_v4.5-rc4/20160214133102/
+Today's -next fails to build an arm allmodconfig due to:
 
+> 	arm-allmodconfig
+> ../drivers/net/ethernet/ti/netcp_core.c:1846:31: error: invalid type argument of '->' (have 'struct tc_to_netdev')
+> ../drivers/net/ethernet/ti/netcp_core.c:1851:35: error: invalid type argument of '->' (have 'struct tc_to_netdev')
+> ../drivers/net/ethernet/ti/netcp_core.c:1855:8: error: invalid type argument of '->' (have 'struct tc_to_netdev')
+> ../drivers/net/ethernet/ti/netcp_core.c:1856:28: error: invalid type argument of '->' (have 'struct tc_to_netdev')
+> ../drivers/net/ethernet/ti/netcp_core.c:1857:21: error: invalid type argument of '->' (have 'struct tc_to_netdev')
 
-Test summary
-------------
-
-Build: zImage:
-    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
-
-Build: Image:
-    Pass: ( 1/ 1): defconfig
-
-Boot to userspace: defconfig:
-    Pass: ( 3/ 3): qemu-vexpress64, tegra132-norrin,
-		   tegra210-p2371-0000
-
-Boot to userspace: multi_v7_defconfig:
-    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice, tegra30-beaver
-
-Boot to userspace: tegra_defconfig:
-    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice, tegra30-beaver
-
-PM: System suspend: multi_v7_defconfig:
-    FAIL: ( 1/ 4): tegra114-dalmore-a04
-    Pass: ( 3/ 4): tegra124-jetson-tk1, tegra20-trimslice,
-		   tegra30-beaver
-
-PM: System suspend: tegra_defconfig:
-    FAIL: ( 1/ 4): tegra114-dalmore-a04
-    Pass: ( 3/ 4): tegra124-jetson-tk1, tegra20-trimslice,
-		   tegra30-beaver
-
-
-vmlinux object size
-(delta in bytes from test_v4.5-rc3 (388f7b1d6e8ca06762e2454d28d6c3c55ad0fe95)):
-   text     data      bss    total  kernel
-  +4113    -4064     +128     +177  defconfig
-  +5326     +128      +64    +5518  multi_v7_defconfig
-  +1224     +184        0    +1408  tegra_defconfig
-
-
-Boot-time memory difference
-(delta in bytes from test_v4.5-rc3 (388f7b1d6e8ca06762e2454d28d6c3c55ad0fe95))
-    avail    rsrvd     high    freed                board              kconfig                  dtb
-        .        .        .        .      qemu-vexpress64            defconfig           __internal
-        .        .        .      -4k tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-        .        .        .      -4k  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
-        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
-        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
-        .        .        .      -4k    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
-        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
-        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
-        .        .        .      -4k       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+caused by commit 16e5cc647173a (net: rework setup_tc ndo op to consume
+general tc operand) in the net-next tree which looks to have a missing *
+in the rewrite of the function arguments for that driver.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160222/87ece996/attachment-0001.sig>
