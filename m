@@ -1,72 +1,31 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon, 22 Feb 2016 11:21:37 +0000
-Subject: [PATCH v2 1/3] ARM: dts: Add cooling levels for CPUs on exynos5420
-In-Reply-To: <56C69154.40608@samsung.com> (Krzysztof Kozlowski's message of
- "Fri, 19 Feb 2016 12:51:48 +0900")
-References: <1455772383-20598-1-git-send-email-k.kozlowski@samsung.com>
- <87h9h599zi.fsf@e105922-lin.cambridge.arm.com>
- <56C69154.40608@samsung.com>
-Message-ID: <871t857zy6.fsf@e105922-lin.cambridge.arm.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Mon, 22 Feb 2016 11:22:41 +0000
+Subject: [PATCH 0/3] nvmem: fixes for v4.6
+Message-ID: <1456140161-6851-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Krzysztof Kozlowski <k.kozlowski@samsung.com> writes:
+Hi Greg,
 
-> On 19.02.2016 02:58, Punit Agrawal wrote:
->> Hi Krzysztof,
->> 
->> Krzysztof Kozlowski <k.kozlowski@samsung.com> writes:
->> 
->>> On Exynos5420 we support 8 cpufreq steps (600-1300 MHz) for LITTLE and
->>> 12 steps for big core (700-1800 MHz). Add respective cooling cells.
->>>
->>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>>
->>> ---
->>>
->>> Changes since v1:
->>> 1. Add cooling properties to all CPUs (suggested by Viresh).
->>> ---
->>>  arch/arm/boot/dts/exynos5420-cpus.dtsi | 24 ++++++++++++++++++++++++
->>>  1 file changed, 24 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/exynos5420-cpus.dtsi b/arch/arm/boot/dts/exynos5420-cpus.dtsi
->>> index 261d25173f61..5c052d7ff554 100644
->>> --- a/arch/arm/boot/dts/exynos5420-cpus.dtsi
->>> +++ b/arch/arm/boot/dts/exynos5420-cpus.dtsi
->>> @@ -33,6 +33,9 @@
->>>  			clock-frequency = <1800000000>;
->>>  			cci-control-port = <&cci_control1>;
->>>  			operating-points-v2 = <&cluster_a15_opp_table>;
->>> +			cooling-min-level = <0>;
->>> +			cooling-max-level = <11>;
->> 
->> Although the above two properties are defined they aren't parsed in the
->> kernel.
->> 
->> Setting min / max extents for cooling devices via cooling maps does work
->> though.
->
-> It is described as optional property in
-> Documentation/devicetree/bindings/thermal/thermal.txt ... but indeed it
-> is totally ignored.
->
-> So what is the recommendation? Get rid of it from DTS and documentation
-> or leave it because it will be implemented someday?
+Here are couple of nvmem fixes on the mailing list which are good to go in
+v4.6. Could you please take them thru the char-misc tree.
 
-As long as you are not expecting any particular behaviour arising from
-that property today I think it should be fine to leave it in.
+Thanks,
+srini
 
-Eduardo, do you agree?
+Andrew-CT Chen (1):
+  nvmem: mediatek: Fix later provider initialization
 
->
-> Thanks for feedback!
->
-> Best regards,
-> Krzysztof
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Axel Lin (1):
+  nvmem: imx-ocotp: Fix return value of imx_ocotp_read
+
+Richard Weinberger (1):
+  nvmem: Fix dependencies for !HAS_IOMEM archs
+
+ drivers/nvmem/Kconfig     |  4 ++++
+ drivers/nvmem/imx-ocotp.c |  2 +-
+ drivers/nvmem/mtk-efuse.c | 23 ++++++++++++++++++++++-
+ 3 files changed, 27 insertions(+), 2 deletions(-)
+
+-- 
+1.9.1
