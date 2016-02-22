@@ -1,60 +1,47 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 22 Feb 2016 21:54:25 +0100
-Subject: [RFC PATCH 03/10] arm64: mm: avoid __pa translations in
- cpu_replace_ttbr1
+Date: Mon, 22 Feb 2016 21:54:26 +0100
+Subject: [RFC PATCH 04/10] arm64: mm: avoid __pa translations on
+ empty_zero_page
 In-Reply-To: <1456174472-30028-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1456174472-30028-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1456174472-30028-4-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1456174472-30028-5-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Avoid the use of generic __pa() translations in cpu_replace_ttbr1(),
-by changing its argument to a physical pgd[] address, and using
-__pa_symbol() on the reference to swapper_pg_dir.
+The variable empty_zero_page is part of the static kernel text, so we
+should use __pa_symbol() not __pa() to take its physical address.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/include/asm/mmu_context.h | 6 ++----
- arch/arm64/mm/mmu.c                  | 4 ++--
- 2 files changed, 4 insertions(+), 6 deletions(-)
+ arch/arm64/include/asm/mmu_context.h | 2 +-
+ arch/arm64/include/asm/pgtable.h     | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
-index a00f7cf35bbd..40fc56f3ed52 100644
+index 40fc56f3ed52..b03272fc501e 100644
 --- a/arch/arm64/include/asm/mmu_context.h
 +++ b/arch/arm64/include/asm/mmu_context.h
-@@ -130,15 +130,13 @@ static inline void cpu_install_idmap(void)
-  * Atomically replaces the active TTBR1_EL1 PGD with a new VA-compatible PGD,
-  * avoiding the possibility of conflicting TLB entries being allocated.
+@@ -49,7 +49,7 @@ static inline void contextidr_thread_switch(struct task_struct *next)
   */
--static inline void cpu_replace_ttbr1(pgd_t *pgd)
-+static inline void cpu_replace_ttbr1(phys_addr_t pgd_phys)
+ static inline void cpu_set_reserved_ttbr0(void)
  {
- 	typedef void (ttbr_replace_func)(phys_addr_t);
- 	extern ttbr_replace_func idmap_cpu_replace_ttbr1;
- 	ttbr_replace_func *replace_phys;
+-	unsigned long ttbr = virt_to_phys(empty_zero_page);
++	unsigned long ttbr = __pa_symbol(empty_zero_page);
  
--	phys_addr_t pgd_phys = virt_to_phys(pgd);
--
--	replace_phys = (void *)virt_to_phys(idmap_cpu_replace_ttbr1);
-+	replace_phys = (void *)__pa_symbol(idmap_cpu_replace_ttbr1);
+ 	asm(
+ 	"	msr	ttbr0_el1, %0			// set TTBR0\n"
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index a440f5a85d08..528482f53f12 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -117,7 +117,7 @@ extern void __pgd_error(const char *file, int line, unsigned long val);
+  * for zero-mapped memory areas etc..
+  */
+ extern unsigned long empty_zero_page[PAGE_SIZE / sizeof(unsigned long)];
+-#define ZERO_PAGE(vaddr)	virt_to_page(empty_zero_page)
++#define ZERO_PAGE(vaddr)	phys_to_page(__pa_symbol(empty_zero_page))
  
- 	cpu_install_idmap();
- 	replace_phys(pgd_phys);
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 00d166465ff4..fbba941a6e87 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -546,9 +546,9 @@ void __init paging_init(void)
- 	 *
- 	 * To do this we need to go via a temporary pgd.
- 	 */
--	cpu_replace_ttbr1(__va(pgd_phys));
-+	cpu_replace_ttbr1(pgd_phys);
- 	memcpy(swapper_pg_dir, pgd, PAGE_SIZE);
--	cpu_replace_ttbr1(swapper_pg_dir);
-+	cpu_replace_ttbr1(__pa_symbol(swapper_pg_dir));
+ #define pte_ERROR(pte)		__pte_error(__FILE__, __LINE__, pte_val(pte))
  
- 	pgd_clear_fixmap();
- 	memblock_free(pgd_phys, PAGE_SIZE);
 -- 
 2.5.0
