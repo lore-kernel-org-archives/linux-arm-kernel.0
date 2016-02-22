@@ -1,49 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 22 Feb 2016 22:33:31 +0100
-Subject: [PATCH] drm/layerscape: reduce excessive stack usage
-Message-ID: <1456176818-1207477-1-git-send-email-arnd@arndb.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 22 Feb 2016 13:34:28 -0800
+Subject: [GIT PULL] omap fixes against v4.5-rc5, fixes more onenand corruption
+Message-ID: <20160222213427.GU13417@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The fsl-dcu driver copies a drm_mode_config object to its
-stack but then only accesses a single member (dpms_property)
-once. The data structure is large enough to trigger a warning
-about the amount of kernel stack being used:
+The following changes since commit cf26f1137333251f3515dea31f95775b99df0fd5:
 
-drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_rgb.c: In function 'fsl_dcu_drm_connector_create':
-drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_rgb.c:182:1: error: the frame size of 1040 bytes is larger than 1024 bytes [-Werror=frame-larger-than=]
+  ARM: OMAP2+: Fix omap_device for module reload on PM runtime forbid (2016-02-12 08:56:52 -0800)
 
-This changes the fsl_dcu_drm_connector_create() function to
-only access the drm_mode_config by reference, which is also
-more efficient.
+are available in the git repository at:
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 109eee2f2a18 ("drm/layerscape: Add Freescale DCU DRM driver")
----
- drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_rgb.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.5/fixes-rc5
 
-diff --git a/drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_rgb.c b/drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_rgb.c
-index 8780deba5e8a..92149152db44 100644
---- a/drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_rgb.c
-+++ b/drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_rgb.c
-@@ -131,7 +131,7 @@ int fsl_dcu_drm_connector_create(struct fsl_dcu_drm_device *fsl_dev,
- 				 struct drm_encoder *encoder)
- {
- 	struct drm_connector *connector = &fsl_dev->connector.base;
--	struct drm_mode_config mode_config = fsl_dev->drm->mode_config;
-+	struct drm_mode_config *mode_config = &fsl_dev->drm->mode_config;
- 	struct device_node *panel_node;
- 	int ret;
- 
-@@ -153,7 +153,7 @@ int fsl_dcu_drm_connector_create(struct fsl_dcu_drm_device *fsl_dev,
- 		goto err_sysfs;
- 
- 	drm_object_property_set_value(&connector->base,
--				      mode_config.dpms_property,
-+				      mode_config->dpms_property,
- 				      DRM_MODE_DPMS_OFF);
- 
- 	panel_node = of_parse_phandle(fsl_dev->np, "fsl,panel", 0);
--- 
-2.7.0
+for you to fetch changes up to 3f315c5b850fa7aff73f50de8e316b98f611a32b:
+
+  ARM: OMAP2+: Fix onenand initialization to avoid filesystem corruption (2016-02-22 09:24:10 -0800)
+
+----------------------------------------------------------------
+Two omap fixes for omaps against v4.5-rc5:
+
+- Yet another fix for n900 onenand to avoid corruption. This time to
+  fix the issue of mounting onenand back and forth between the original
+  maemo kernel and mainline Linux kernel. And it also seems there will
+  be two more fixes coming via the MTD tree as issues were discovered
+  also in the onenand driver during testing.
+
+- Revert tps65217 regulator clean up as it breaks MMC for am335x
+  variants. The proper way to clean this up is just to rename the
+  tps65217.dtsi file into tps65217-am335x.dtsi as a similar setup
+  is used on many am335x boards.
+
+----------------------------------------------------------------
+Ivaylo Dimitrov (1):
+      ARM: OMAP2+: Fix onenand initialization to avoid filesystem corruption
+
+Peter Ujfalusi (1):
+      Revert "regulator: tps65217: remove tps65217.dtsi file"
+
+ .../devicetree/bindings/regulator/tps65217.txt     | 10 ----
+ arch/arm/boot/dts/am335x-bone-common.dtsi          | 14 ++----
+ arch/arm/boot/dts/am335x-chilisom.dtsi             | 14 +-----
+ arch/arm/boot/dts/am335x-nano.dts                  | 14 +-----
+ arch/arm/boot/dts/am335x-pepper.dts                | 14 +-----
+ arch/arm/boot/dts/am335x-sl50.dts                  | 13 +----
+ arch/arm/boot/dts/tps65217.dtsi                    | 56 ++++++++++++++++++++++
+ arch/arm/mach-omap2/gpmc-onenand.c                 |  6 +--
+ 8 files changed, 70 insertions(+), 71 deletions(-)
+ create mode 100644 arch/arm/boot/dts/tps65217.dtsi
