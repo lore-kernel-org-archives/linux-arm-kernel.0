@@ -1,49 +1,23 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 22 Feb 2016 15:28:09 +0530
-Subject: [PATCH 3/5] ARM: davinci: dm365: Add dma_slave_map to edma
-In-Reply-To: <1454416997-14230-4-git-send-email-peter.ujfalusi@ti.com>
-References: <1454416997-14230-1-git-send-email-peter.ujfalusi@ti.com>
- <1454416997-14230-4-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <56CADBB1.9040908@ti.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 22 Feb 2016 11:00:36 +0100
+Subject: [PATCH 0/3] arm64 pt dumper changes
+Message-ID: <1456135239-3607-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 02 February 2016 06:13 PM, Peter Ujfalusi wrote:
-> Provide the dma_slave_map to edma which will allow us to move the drivers
-> to the new, simpler dmaengine API and we can remove the DMA resources also
-> for the devices.
-> 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+This series updates the kernel page table dumper to:
+- not initialize the vmemmap region markers dynamically
+- show region boundaries for the kasan shadow region
+- include the UEFI runtime services mappings
 
-> FIX: dm365
+Ard Biesheuvel (3):
+  arm64: ptdump: use static initializers for vmemmap region boundaries
+  arm64: ptdump: add region marker for kasan shadow region
+  arm64: ptdump: include UEFI runtime service mappings
 
-dropped this "note to self" :)
+ arch/arm64/mm/dump.c               | 58 ++++++++------------
+ drivers/firmware/efi/arm-runtime.c |  2 +-
+ 2 files changed, 24 insertions(+), 36 deletions(-)
 
-> ---
->  arch/arm/mach-davinci/dm365.c | 22 ++++++++++++++++++++++
->  1 file changed, 22 insertions(+)
-> 
-> diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
-> index 01843fbcc9ea..d26dc2b4339a 100644
-> --- a/arch/arm/mach-davinci/dm365.c
-> +++ b/arch/arm/mach-davinci/dm365.c
-> @@ -17,6 +17,7 @@
->  #include <linux/serial_8250.h>
->  #include <linux/platform_device.h>
->  #include <linux/dma-mapping.h>
-> +#include <linux/dmaengine.h>
->  #include <linux/spi/spi.h>
->  #include <linux/platform_data/edma.h>
->  #include <linux/platform_data/gpio-davinci.h>
-> @@ -862,9 +863,30 @@ static s8 dm365_queue_priority_mapping[][2] = {
->  	{-1, -1},
->  };
->  
-> +static const struct dma_slave_map da365_edma_map[] = {
-
-This should be "dm365_edma_map".
-
-Fixed both locally while applying.
-
-Regards,
-Sekhar
+-- 
+2.5.0
