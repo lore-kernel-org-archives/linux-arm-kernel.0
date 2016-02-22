@@ -1,39 +1,49 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 23 Feb 2016 06:24:38 +0900
-Subject: [PATCH v3 00/12] pwm: add support for atomic update
-In-Reply-To: <CAD=FV=UCErW3EjYRtwt49_ztNR7cyY4U0o4R_dxdomer-Ac2Dg@mail.gmail.com>
-References: <1442828009-6241-1-git-send-email-boris.brezillon@free-electrons.com>
- <2341981.a79ioYM9Es@diego> <20151110173416.GB21727@ulmo>
- <CAD=FV=WL3jYEgVe-m6QcAyQwfJgdX4J5OtKisKwyoKOrTSpEQA@mail.gmail.com>
- <20160125170855.GA10182@ulmo>
- <CAD=FV=Xvxeqo3imUmjukC5iYk3EZkrJ04G7C1B-w4xyr-r6-2Q@mail.gmail.com>
- <20160203145337.GD9650@ulmo>
- <CAD=FV=U_x1cxx6RrHuVgVV8GbOwm9DXXJcyiArbbQySUOaxrvQ@mail.gmail.com>
- <20160222175929.GA23899@ulmo>
- <CAD=FV=UCErW3EjYRtwt49_ztNR7cyY4U0o4R_dxdomer-Ac2Dg@mail.gmail.com>
-Message-ID: <20160222212438.GG18327@sirena.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 22 Feb 2016 22:33:31 +0100
+Subject: [PATCH] drm/layerscape: reduce excessive stack usage
+Message-ID: <1456176818-1207477-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 22, 2016 at 11:15:09AM -0800, Doug Anderson wrote:
+The fsl-dcu driver copies a drm_mode_config object to its
+stack but then only accesses a single member (dpms_property)
+once. The data structure is large enough to trigger a warning
+about the amount of kernel stack being used:
 
-> Note that historically I remember that Linus Torvalds has stated that
-> there is no stable API within the Linux kernel and that forcing the
-> in-kernel API to never change was bad for software development.  I
-> tracked down my memory and found
-> <http://lwn.net/1999/0211/a/lt-binary.html>.  Linus is rabid about not
-> breaking userspace, but in general there's no strong requirement to
-> never change the driver API inside the kernel.  That being said,
-> changing the driver API causes a lot of churn, so presumably changing
-> it in a backward compatible way (like adding to the API instead of
-> changing it) will make things happier.
+drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_rgb.c: In function 'fsl_dcu_drm_connector_create':
+drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_rgb.c:182:1: error: the frame size of 1040 bytes is larger than 1024 bytes [-Werror=frame-larger-than=]
 
-You do need to fix the users though, change is fine but you can't cause
-people's systems to break.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160223/67051580/attachment.sig>
+This changes the fsl_dcu_drm_connector_create() function to
+only access the drm_mode_config by reference, which is also
+more efficient.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 109eee2f2a18 ("drm/layerscape: Add Freescale DCU DRM driver")
+---
+ drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_rgb.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_rgb.c b/drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_rgb.c
+index 8780deba5e8a..92149152db44 100644
+--- a/drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_rgb.c
++++ b/drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_rgb.c
+@@ -131,7 +131,7 @@ int fsl_dcu_drm_connector_create(struct fsl_dcu_drm_device *fsl_dev,
+ 				 struct drm_encoder *encoder)
+ {
+ 	struct drm_connector *connector = &fsl_dev->connector.base;
+-	struct drm_mode_config mode_config = fsl_dev->drm->mode_config;
++	struct drm_mode_config *mode_config = &fsl_dev->drm->mode_config;
+ 	struct device_node *panel_node;
+ 	int ret;
+ 
+@@ -153,7 +153,7 @@ int fsl_dcu_drm_connector_create(struct fsl_dcu_drm_device *fsl_dev,
+ 		goto err_sysfs;
+ 
+ 	drm_object_property_set_value(&connector->base,
+-				      mode_config.dpms_property,
++				      mode_config->dpms_property,
+ 				      DRM_MODE_DPMS_OFF);
+ 
+ 	panel_node = of_parse_phandle(fsl_dev->np, "fsl,panel", 0);
+-- 
+2.7.0
