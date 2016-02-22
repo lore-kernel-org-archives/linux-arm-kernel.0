@@ -1,92 +1,75 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 22 Feb 2016 15:59:39 +0100
-Subject: [PATCH] arm*: efi: drop permanent mapping of the UEFI System table
-Message-ID: <1456153179-27214-1-git-send-email-ard.biesheuvel@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 22 Feb 2016 15:02:03 +0000
+Subject: [PATCH v6 10/12] arm-cci: CCI-500: Work around PMU counter writes
+In-Reply-To: <1453720877-24962-11-git-send-email-suzuki.poulose@arm.com>
+References: <1453720877-24962-1-git-send-email-suzuki.poulose@arm.com>
+ <1453720877-24962-11-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20160222150203.GF3435@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The permanent, writable mapping of the UEFI System table is only
-referenced during invocations of UEFI Runtime Services, at which time
-the UEFI virtual mapping is available, which also covers the system
-table (since the runtime services themselves need access to it)
+On Mon, Jan 25, 2016 at 11:21:15AM +0000, Suzuki K. Poulose wrote:
+> The CCI PMU driver sets the event counter to the half of the maximum
+> value(2^31) it can count before we start the counters via
+> pmu_event_set_period(). This is done to give us the best chance to
+> handle the overflow interrupt, taking care of extreme interrupt latencies.
+> 
+> However, CCI-500 comes with advanced power saving schemes, which
+> disables the clock to the event counters unless the counters are enabled to
+> count (PMCR.CEN). This prevents the driver from writing the period to the
+> counters before starting them.  Also, there is no way we can reset the
+> individual event counter to 0 (PMCR.RST resets all the counters, losing
+> their current readings). However the value of the counter is preserved and
+> could be read back, when the counters are not enabled.
+> 
+> So we cannot reliably use the counters and compute the number of events
+> generated during the sampling period since we don't have the value of the
+> counter at start.
+> 
+> This patch works around this issue by changing writes to the counter
+> with the following steps.
+> 
+>  1) Disable all the counters (remembering any counters which were enabled)
+>  2) Enable the PMU, now that all the counters are disabled.
+> 
+>  For each counter to be programmed, repeat steps 3-7
+>  3) Save the current event and program the target counter to count an
+>     invalid event, which by spec is guaranteed to not-generate any events.
+>  4) Enable the target counter.
+>  5) Write to the target counter.
+>  6) Disable the target counter
+>  7) Restore the event back on the target counter.
+> 
+>  8) Disable the PMU
+>  9) Restore the status of the all the counters
 
-So instead of creating this permanent mapping, record the virtual
-address of the system table inside the UEFI virtual mapping, and
-use that instead. This protects the contents of the system table
-from inadvertent (or deliberate) modification.
+[...]
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
+> + * For each counter to be programmed, repeat steps 3-7:
+> + *
+> + * 3) Write an invalid event code to the event control register for the
+> +      counter, so that the counters are not modified.
+> + * 4) Enable the counter control for the counter.
+> + * 5) Set the counter value
+> + * 6) Restore the event in the target counter
+> + * 7) Disable the counter
 
-Something I spotted while working on the memory attribute table stuff.
-Since this is low hanging fruit and otherwise completely unrelated to it,
-I am posting it as a separate patch
+Steps 6 and 7 are the wrong way around here. They are correct in the
+commit message and the code.
 
- drivers/firmware/efi/arm-init.c    |  2 ++
- drivers/firmware/efi/arm-runtime.c | 24 ++++++++++----------
- 2 files changed, 14 insertions(+), 12 deletions(-)
+[...]
 
-diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
-index 022f11157acd..e995d61da747 100644
---- a/drivers/firmware/efi/arm-init.c
-+++ b/drivers/firmware/efi/arm-init.c
-@@ -85,6 +85,8 @@ static int __init uefi_init(void)
- 			efi.systab->hdr.revision >> 16,
- 			efi.systab->hdr.revision & 0xffff);
- 
-+	efi.runtime_version = efi.systab->hdr.revision;
-+
- 	/* Show what we know for posterity */
- 	c16 = early_memremap_ro(efi_to_phys(efi.systab->fw_vendor),
- 				sizeof(vendor) * sizeof(efi_char16_t));
-diff --git a/drivers/firmware/efi/arm-runtime.c b/drivers/firmware/efi/arm-runtime.c
-index 848ede1587dc..6ce13d6b7122 100644
---- a/drivers/firmware/efi/arm-runtime.c
-+++ b/drivers/firmware/efi/arm-runtime.c
-@@ -64,6 +64,16 @@ static bool __init efi_virtmap_init(void)
- 				&phys, ret);
- 			return false;
- 		}
-+		/*
-+		 * If this entry covers the address of the UEFI system table,
-+		 * calculate and record its virtual address.
-+		 */
-+		if (efi_system_table >= phys &&
-+		    efi_system_table < phys + (md->num_pages * EFI_PAGE_SIZE)) {
-+			efi.systab = (void *)(efi_system_table - phys +
-+					      md->virt_addr);
-+			set_bit(EFI_SYSTEM_TABLES, &efi.flags);
-+		}
- 	}
- 
- 	if (efi_memattr_apply_permissions(&efi_mm, efi_set_mapping_permissions))
-@@ -102,16 +112,8 @@ static int __init arm_enable_runtime_services(void)
- 	memmap.map_end = memmap.map + mapsize;
- 	efi.memmap = &memmap;
- 
--	efi.systab = (__force void *)ioremap_cache(efi_system_table,
--						   sizeof(efi_system_table_t));
--	if (!efi.systab) {
--		pr_err("Failed to remap EFI System Table\n");
--		return -ENOMEM;
--	}
--	set_bit(EFI_SYSTEM_TABLES, &efi.flags);
--
--	if (!efi_virtmap_init()) {
--		pr_err("No UEFI virtual mapping was installed -- runtime services will not be available\n");
-+	if (!efi_virtmap_init() || !efi_enabled(EFI_SYSTEM_TABLES)) {
-+		pr_err("UEFI virtual mapping missing or invalid -- runtime services will not be available\n");
- 		return -ENOMEM;
- 	}
- 
-@@ -119,8 +121,6 @@ static int __init arm_enable_runtime_services(void)
- 	efi_native_runtime_setup();
- 	set_bit(EFI_RUNTIME_SERVICES, &efi.flags);
- 
--	efi.runtime_version = efi.systab->hdr.revision;
--
- 	return 0;
- }
- early_initcall(arm_enable_runtime_services);
--- 
-2.5.0
+> + * We choose an event code which has very little chances of getting
+> + * assigned a valid code for step(2). We use the highest possible
+> + * event code (0x1f) for the master interface 0.
+> + */
+
+Let's just say:
+
+	We choose an event which for CCI-500 is guaranteed not to count.
+	We use the highest possible event code (0x1f) for master
+	interface 0.
+
+Otherwise this looks fine.
+
+Mark.
