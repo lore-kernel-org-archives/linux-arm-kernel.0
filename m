@@ -1,52 +1,57 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 22 Feb 2016 13:43:15 +0100
-Subject: [GIT PULL] ARM: mediatek: dts updates for v4.6
-Message-ID: <CABuKBeK+zT85Z695dBGO-0tU26w5LBJqS53aecdZYGZ6V0GPhA@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 22 Feb 2016 13:43:39 +0100
+Subject: [PATCH v2 01/15] arm: use of_platform_default_populate() to
+ populate default bus
+In-Reply-To: <1453881180-12296-1-git-send-email-wangkefeng.wang@huawei.com>
+References: <1453868872-26300-2-git-send-email-wangkefeng.wang@huawei.com>
+ <1453881180-12296-1-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <56CB027B.6000703@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd and Olof,
+Le 27/01/2016 08:53, Kefeng Wang a ?crit :
+> diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
+> index c1a7c6c..1904bc7 100644
+> --- a/arch/arm/mach-at91/at91rm9200.c
+> +++ b/arch/arm/mach-at91/at91rm9200.c
+> @@ -31,7 +31,7 @@ static void __init at91rm9200_dt_device_init(void)
+>  	if (soc != NULL)
+>  		soc_dev = soc_device_to_device(soc);
+>  
+> -	of_platform_populate(NULL, of_default_bus_match_table, NULL, soc_dev);
+> +	of_platform_default_populate(NULL, NULL, soc_dev);
+>  
+>  	arm_pm_idle = at91rm9200_idle;
+>  	at91rm9200_pm_init();
+> diff --git a/arch/arm/mach-at91/at91sam9.c b/arch/arm/mach-at91/at91sam9.c
+> index 7eb64f7..d495620 100644
+> --- a/arch/arm/mach-at91/at91sam9.c
+> +++ b/arch/arm/mach-at91/at91sam9.c
+> @@ -61,7 +61,7 @@ static void __init at91sam9_common_init(void)
+>  	if (soc != NULL)
+>  		soc_dev = soc_device_to_device(soc);
+>  
+> -	of_platform_populate(NULL, of_default_bus_match_table, NULL, soc_dev);
+> +	of_platform_default_populate(NULL, NULL, soc_dev);
+>  
+>  	arm_pm_idle = at91sam9_idle;
+>  }
+> diff --git a/arch/arm/mach-at91/sama5.c b/arch/arm/mach-at91/sama5.c
+> index d9cf679..6db395e 100644
+> --- a/arch/arm/mach-at91/sama5.c
+> +++ b/arch/arm/mach-at91/sama5.c
+> @@ -50,7 +50,7 @@ static void __init sama5_dt_device_init(void)
+>  	if (soc != NULL)
+>  		soc_dev = soc_device_to_device(soc);
+>  
+> -	of_platform_populate(NULL, of_default_bus_match_table, NULL, soc_dev);
+> +	of_platform_default_populate(NULL, NULL, soc_dev);
+>  	at91sam9x5_pm_init();
+>  }
 
-Please pull the following patches.
-As you can see from the description, this pull request includes some
-fixes. Only a few developer have access to a Mediatek HW at the
-moment. Therefore I didn't send the fixes to stable.
+For AT91:
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-If you want me to send the fixes for older kernel versions, please let me know.
-
-Thanks,
-Matthias
-
----
-
-The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
-
-  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
-
-are available in the git repository at:
-
-  https://github.com/mbgg/linux-mediatek.git tags/v4.5-next-dts64
-
-for you to fetch changes up to 3ea064b1e5adc263893ffdc3a11891c6d00d5e49:
-
-  ARM64: dts: Mediatek: mt8173-evb: fix access MMC fail issue
-(2016-02-19 11:05:09 +0100)
-
-----------------------------------------------------------------
-Add nor-flash to mt8173 SoC.
-Add efuse device to mt1873 SoC.
-Fix power-domain issue mt8173-evb which uses older chip revision.
-
-----------------------------------------------------------------
-Bayi Cheng (1):
-      arm64: dts: mt8173: Add nor flash node
-
-Eddie Huang (1):
-      ARM64: dts: Mediatek: mt8173-evb: fix access MMC fail issue
-
-andrew-ct.chen at mediatek.com (1):
-      dts: arm64: Add EFUSE device node
-
- arch/arm64/boot/dts/mediatek/mt8173-evb.dts |  3 +++
- arch/arm64/boot/dts/mediatek/mt8173.dtsi    | 16 ++++++++++++++++
- 2 files changed, 19 insertions(+)
+Thanks, bye.
+-- 
+Nicolas Ferre
